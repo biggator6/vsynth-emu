@@ -1,0 +1,6 @@
+Your immediate next steps
+1. Get JUCE and build — clone JUCE alongside the project folder, then cmake -B build plugin/ and build. The plugin starts in Passthrough mode and does nothing, which is correct.
+2. Install the Python deps — pip install -r analysis/requirements.txt, then run python compare.py --validate to confirm the analysis tools work.
+3. Record your V-Synth test battery — start with the Priority 1 files in RECORDING_GUIDE.md (sustained sines). These are the most diagnostic and fastest to record.
+4. Run your first batch test — drop your V-Synth WAVs in test_files/ and your plugin renders in plugin_outputs/, then python batch_test.py. This establishes your baseline score (which will be low — that's expected at this stage).
+From there, every Claude Code session starts with "Read ARCHITECTURE.md and RESEARCH_LOG.md" and the iterative loop begins.
