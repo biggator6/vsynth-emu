@@ -9,7 +9,8 @@ Used by compare.py and batch_test.py.
 """
 
 import numpy as np
-from scipy.signal import lfilter, hamming
+from scipy.signal import lfilter
+from scipy.signal.windows import hamming
 import librosa
 import warnings
 warnings.filterwarnings('ignore')

@@ -1,0 +1,4 @@
+# Hashes of file build rules.
+0ddbfec61616dd73b8905ed1b36e5301 VSynthEmu_artefacts/JuceLibraryCode/VSynthEmu_AU/PkgInfo
+760c79da0ff903f1cd104780b7aedfc4 VSynthEmu_artefacts/JuceLibraryCode/VSynthEmu_Standalone/PkgInfo
+da2eed6dad214d04e0bc8af7df900b9a VSynthEmu_artefacts/JuceLibraryCode/VSynthEmu_VST3/PkgInfo

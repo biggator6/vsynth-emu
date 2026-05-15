@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/mborrow/Documents/Claude_Projects/vsynth-emu/build/cmake_install.cmake",
+		"/Users/mborrow/Documents/Claude_Projects/vsynth-emu/build/JUCE/cmake_install.cmake",
+		"/Users/mborrow/Documents/Claude_Projects/vsynth-emu/build/JUCE/modules/cmake_install.cmake",
+		"/Users/mborrow/Documents/Claude_Projects/vsynth-emu/build/JUCE/extras/Build/cmake_install.cmake",
+		"/Users/mborrow/Documents/Claude_Projects/vsynth-emu/build/JUCE/extras/Build/juceaide/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
