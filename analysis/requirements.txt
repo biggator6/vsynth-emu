@@ -1,0 +1,11 @@
+# V-Synth VariPhrase Emulator — Python Analysis Pipeline
+# Install: pip install -r requirements.txt
+
+librosa>=0.10.0
+numpy>=1.24.0
+scipy>=1.11.0
+matplotlib>=3.7.0
+
+# Optional but recommended
+soundfile>=0.12.1      # faster WAV I/O than scipy.io.wavfile
+resampy>=0.4.2         # better resampling quality for librosa
