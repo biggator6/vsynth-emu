@@ -37,7 +37,7 @@ juce_add_plugin(VSynthEmu
     FORMATS                 VST3 AU Standalone
     PRODUCT_NAME            "V-Synth Emu"
 
-    IS_SYNTH                FALSE
+    IS_SYNTH                TRUE
     NEEDS_MIDI_INPUT        TRUE
     NEEDS_MIDI_OUTPUT       FALSE
     IS_MIDI_EFFECT          FALSE

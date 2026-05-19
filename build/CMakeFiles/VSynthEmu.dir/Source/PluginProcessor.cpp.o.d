@@ -1517,6 +1517,24 @@ CMakeFiles/VSynthEmu.dir/Source/PluginProcessor.cpp.o: \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/utilities/juce_PluginHostType.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/utilities/ARA/juce_ARADebug.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/utilities/ARA/juce_ARA_utils.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/juce_audio_formats.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatWriter.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_MemoryMappedAudioFormatReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatManager.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReaderSource.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioSubsectionReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_BufferingAudioFormatReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_AiffAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_CoreAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_FlacAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_LAMEEncoderAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_MP3AudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_OggVorbisAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WavAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WindowsMediaAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/sampler/juce_Sampler.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/VariphraseEngine.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/complex \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/PluginEditor.h
