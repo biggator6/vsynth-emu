@@ -7,20 +7,18 @@
 namespace VSE {
 
 /**
- * PhaseVocoder — baseline VariPhrase algorithm implementation.
+ * PhaseVocoder — baseline VariPhrase algorithm (Algorithm v1).
  *
- * Implements:
- *   - Time stretching via phase vocoder (OLA + phase correction)
- *   - Pitch shifting via resampling after time stretch
- *   - Formant preservation via spectral envelope scaling (cepstral liftering)
+ * Implements independent control of:
+ *   - Time stretch  — phase vocoder OLA with variable synthesis hop
+ *   - Pitch shift   — stretch by pitchRatio, then streaming linear resample back
+ *   - Formant shift — cepstral-liftered spectral envelope warp in frequency domain
  *
- * This is the Phase 1 "baseline" implementation. Batch test results will
- * reveal its failure modes, guiding the move to SMS or LPC models.
+ * Ring-buffer streaming design: processMono() accepts arbitrary block sizes.
  *
  * References:
  *   - Laroche & Dolson (1999), "Improved Phase Vocoder Time-Scale Modification"
- *   - Bonada (2000), "Automatic technique in frequency domain for near-lossless
- *     time-scale modification of audio"
+ *   - Bonada (2000), "Automatic technique in frequency domain for near-lossless TSM"
  */
 class PhaseVocoder {
 public:
@@ -37,55 +35,59 @@ public:
 
 private:
     // ── FFT parameters ──────────────────────────────────────────────────────
-    static constexpr int kFFTSize    = 2048;  // analysis window
-    static constexpr int kHopSize    = 512;   // synthesis hop
-    static constexpr int kOverlap    = kFFTSize / kHopSize;  // 4x overlap
+    static constexpr int kFFTSize = 2048;
+    static constexpr int kHopSize = 512;            // analysis hop (fixed)
+    static constexpr int kOverlap = kFFTSize / kHopSize;   // 4
 
     // ── State ────────────────────────────────────────────────────────────────
     double sampleRate_ = 44100.0;
     VariphraseParams params_ {};
 
-    // Analysis/synthesis buffers
-    std::vector<float> inputBuffer_;   // circular input accumulator
-    std::vector<float> outputBuffer_;  // OLA output accumulator
-    int                inputWritePos_  = 0;
-    int                outputReadPos_  = 0;
+    // ── Input ring buffer ────────────────────────────────────────────────────
+    std::vector<float> inputBuffer_;
+    int inputWritePos_ = 0;   // next slot to write incoming samples
+    int inputReadPos_  = 0;   // next slot to read for analysis
+    int inputFill_     = 0;   // samples queued ahead of inputReadPos_
 
-    // Phase accumulation per bin
-    std::vector<float> lastPhase_;     // analysis: last FFT frame phases
-    std::vector<float> sumPhase_;      // synthesis: running phase sum
+    // ── Output OLA buffer ────────────────────────────────────────────────────
+    std::vector<float> outputBuffer_;
+    int outputWritePos_ = 0;  // where the next synthesis frame is OLA'd in
+    int outputReadPos_  = 0;  // where output samples are read from
+    float synthHopAccum_= 0.0f; // fractional synthesis-hop accumulator
 
-    // Spectral envelope (for formant preservation)
-    std::vector<float> spectralEnvelope_;
+    // ── Phase vocoder state ──────────────────────────────────────────────────
+    std::vector<float> lastPhase_;     // previous analysis frame phases (per bin)
+    std::vector<float> sumPhase_;      // running synthesis phase accumulator (per bin)
 
-    // Resampling buffer (for pitch shift after time stretch)
-    std::vector<float> resampleBuffer_;
-    double             resamplePhase_ = 0.0;
+    // ── Pitch resampler state ────────────────────────────────────────────────
+    float resampleFrac_ = 0.0f;  // fractional position within the OLA output read
+
+    // ── Analysis window ──────────────────────────────────────────────────────
+    std::vector<float> window_;
 
     // ── Internal methods ─────────────────────────────────────────────────────
-    void analyzeFrame(const std::vector<float>& frame,
+
+    // Windowed FFT of 'frame' (kFFTSize samples) → complex spectrum
+    void analyzeFrame(const float* frame,
                       std::vector<std::complex<float>>& spectrum);
 
+    // Cepstral-liftered spectral envelope from half-spectrum magnitudes
     void extractSpectralEnvelope(const std::vector<float>& magnitude,
                                  std::vector<float>& envelope,
-                                 int cepstrumLifter = 80);
+                                 int lifterLength = 80);
 
+    // In-place formant shift via spectral envelope swap
     void shiftFormants(std::vector<std::complex<float>>& spectrum,
                        const std::vector<float>& originalEnvelope,
-                       float formantShiftSemitones);
+                       float semitones);
 
+    // Phase vocoder synthesis frame → time-domain frame (kFFTSize samples)
+    // stretchRatio = totalStretch (timeStretch * pitchRatio)
     void synthesizeFrame(const std::vector<std::complex<float>>& spectrum,
                          std::vector<float>& frame,
                          float stretchRatio);
 
-    void resample(const std::vector<float>& input,
-                  std::vector<float>& output,
-                  float ratio);
-
-    // Hann window
-    std::vector<float> window_;
-
-    // FFT (simple DFT for now — replace with FFTW or JUCE::dsp::FFT in production)
+    // In-place Cooley-Tukey FFT
     void fft(std::vector<std::complex<float>>& data, bool inverse);
 };
 
