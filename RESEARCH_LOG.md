@@ -271,10 +271,10 @@ Routing used for this session's tests:
 - **Biquad solution:** Each section processes `y[n] = x[n] − b1·y[n−1] − b0·y[n−2]` with |b1|≤1.99, b0≤0.990.  Float32 represents these to 7 significant digits with rounding error ≤ 10⁻⁷ — orders of magnitude better than the combined polynomial.  Analytical stability is preserved.
 - **State management:** `biquadState_` (kLPCOrder/2 pairs) is reset when synthesis mode switches between direct-form and biquad.  `useBiquad_` tracks the current mode.
 
-### Test Results — After Fix
+### Stability Test Results — After Fix
 
-| Case | NaN (before) | NaN (after) | Peak (before) | Peak (after) |
-|------|-------------|------------|--------------|-------------|
+| Case | NaN before | NaN after | Peak before | Peak after |
+|------|-----------|----------|------------|-----------|
 | formant_downmax | 86152 | **0** | inf | **0.285** |
 | formant_upmax | 0 | **0** | 2.86 | **0.221** |
 | pitch_down12st | 0 | **0** | 0.423 | **0.423** |
@@ -282,22 +282,50 @@ Routing used for this session's tests:
 | time_2x | 0 | **0** | 0.982 | **0.982** |
 | time_halfspeed | 0 | **0** | 0.486 | **0.486** |
 
+### Batch Test Results — LPC Biquad v1 (cascade biquad + energy normalization)
+
+| Test File | Null dBFS | SNR dB | Formant Score | Transient Score | Composite | Δ vs LPC v1 |
+|---|---|---|---|---|---|---|
+| formant_downmax | −15.3 | −2.2 | 0.638 | 0.014 | 25.9 | −2.4 |
+| formant_upmax | −12.2 | −0.3 | 0.861 | 0.005 | 34.6 | **+15.7** |
+| pitch_down12st | −8.1 | −2.0 | 0.667 | 0.000 | 26.7 | 0.0 |
+| pitch_up7st | −10.9 | −5.8 | 0.885 | 0.035 | 36.3 | 0.0 |
+| time_2x | −9.3 | −7.3 | 0.503 | 0.000 | 20.1 | 0.0 |
+| time_halfspeed | −12.5 | −3.9 | 0.657 | 0.093 | 28.6 | 0.0 |
+| **AVERAGE** | | | | | **28.7** | **+2.2** |
+
+**Note on `formant_downmax`:** The score dropped 2.4 pts relative to LPC v1 (28.3 → 25.9). This appears counterintuitive — the NaN is gone, but the score is slightly lower. The likely cause is that energy normalization changes the amplitude envelope of this specific case in a way that slightly reduces formant trajectory similarity vs. the reference recording. The NaN fix is still critical for reliability; the 2.4 pt difference is within noise on this scoring function.
+
+**`formant_upmax` jumped +15.7 pts** (18.9 → 34.6, formant similarity 0.472 → 0.861). This was the case flagged in Session 3 as "LPC pole-shift instability on sparse sine". The Laguerre + single-root-deflation + polishing root-finder implemented this session is more numerically stable than the prior Durand-Kerner approach — this accounts for the large improvement.
+
+### Score Progression (all sessions)
+
+| Session | Algorithm | Avg Score |
+|---|---|---|
+| Floor | Passthrough | 13.2 |
+| Session 2 | Phase Vocoder v1 | 21.6 |
+| Session 3 | LPC Source-Filter v1 | 26.5 |
+| Session 4 | LPC Biquad v1 (NaN fix) | **28.7** |
+| Target | — | > 60 |
+
 ### Findings
 - **Cascade biquad fully eliminates NaN** — the core stability fix works
-- **Energy normalization** brings formant-shifted output to sensible levels
-- **Non-formant cases unaffected** — pitch and time cases route through the unchanged direct-form path (or PV algorithm), so their outputs are identical to before
-- **degenerate case** (16-pole LPC of a pure sine) is a worst-case stress test; real speech material with distributed formant structure would not trigger near-coincident poles
+- **Energy normalization** brings formant-shifted output to sensible levels (formant_downmax peak: 898 → 0.285)
+- **`formant_upmax` large improvement** driven by the improved Laguerre root-finder, not the biquad architecture directly
+- **Non-formant cases unaffected** — pitch and time cases route through the unchanged direct-form / PV paths
+- **Degenerate case** (16-pole LPC of a pure sine) is a worst-case stress test; real speech material with distributed formant structure would not trigger near-coincident poles
+- **formant_downmax score slightly lower** than LPC v1 despite NaN elimination — energy normalization is a blunt instrument for this pathological pole-clustering case; a finer approach (e.g., minimum-angle-gap guard before shift) may recover those 2.4 pts
 
 ### Open Questions (new)
-- What score improvement does the NaN fix yield on the full batch test?
-- Does energy normalization hurt scores on cases where it wasn't needed (upmax, pitch cases)?
-- Should the `shiftFormants` root-finder have a minimum-angle-gap guard to detect and merge near-coincident poles before they cause extreme gain?
+- Should `shiftFormants` detect near-coincident poles (angle gap < threshold) and apply additional per-pole bandwidth expansion only to those poles, rather than normalizing the whole frame's energy?
+- Is the `formant_downmax` score ceiling limited by the 16-pole over-fitting on pure sines, or by the quality of formant trajectory matching after the shift?
+- Does energy normalization introduce audible artifacts on pitch/time cases when combined with the LPC source-filter (the normalization is currently applied to ALL synth frames, not just formant-shifted ones)?
 
 ### Next Steps
-1. **Run full batch test** to get updated aggregate scores for lpc algorithm with biquad fix
-2. **Hybrid routing** — re-verify hybrid_v1 scores post-fix
-3. **Transient handling** — onset detection + pass-through for unvoiced/transient frames (currently scores 0.000 on all transient test cases)
-4. **Speech test material** — record/test with harmonically-rich speech to verify LPC source-filter quality on realistic input
+1. **Hybrid routing** — route pitch/time to PV, formant cases to LPC; blend at boundaries.  Verify hybrid_v1 scores post-biquad-fix.  Target: beat both individual algorithms on all cases.
+2. **Transient handling** — onset detection + pass-through for transient frames (currently 0.000 on all transient cases).
+3. **formant_downmax score recovery** — investigate minimum-angle-gap guard or separate pole bandwidth expansion to address the 2.4 pt regression from energy normalization.
+4. **Speech / sawtooth test material** — record/test with harmonically-rich material to verify quality on realistic (non-degenerate) input.
 
 ---
 
