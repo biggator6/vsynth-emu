@@ -13,9 +13,9 @@ These are the "oracle" files that all plugin development is measured against.
 
 ## V-Synth Patch Settings for Recording
 Document here once you've established a clean test patch:
-- Patch name: [TBD]
-- Oscillator 1: PCM / EAS / External: [TBD]
-- VariPhrase mode: [TBD]
+- Patch name: [EMU_TEST]
+- Oscillator 1: PCM / EAS / External: [PCM]
+- VariPhrase mode: [SOLO]
 - Effects: ALL OFF
 - COSM: OFF
 
@@ -32,12 +32,12 @@ Examples:
 Record these first — they test the most diagnostic aspects of VariPhrase:
 
 ### Priority 1: Sustained tones (clean, analyzable)
-- [ ] sine_440_pitch_up7st.wav
-- [ ] sine_440_pitch_down12st.wav  
-- [ ] sine_440_time_2x.wav
-- [ ] sine_440_time_halfspeed.wav
-- [ ] sine_440_formant_up4st.wav
-- [ ] sine_440_formant_down4st.wav
+- [x ] sine_440_pitch_up7st.wav
+- [x ] sine_440_pitch_down12st.wav  
+- [x ] sine_440_time_2x.wav
+- [x ] sine_440_time_halfspeed.wav
+- [x ] sine_440_formant_upmax.wav
+- [x ] sine_440_formant_downmax.wav
 
 ### Priority 2: Held vowels (formant analysis gold standard)
 - [ ] vocal_aah_pitch_up7st.wav
