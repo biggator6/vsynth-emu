@@ -559,18 +559,21 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         else
             synthesisFilter(excitation, lpcCoeffs, 1.0f, synthFrame);
 
-        // ── Per-frame energy normalization ────────────────────────────────────
+        // ── Per-frame energy normalization (biquad path only) ────────────────
         // The LPC gain (sqrt of prediction error) correctly compensates for the
-        // filter's spectral shape for the *analysis* frame.  After formant shift
-        // the filter's gain at any given frequency can change dramatically — e.g.
-        // a -12 st shift on a pure 440 Hz sine clusters 16 poles near 220 Hz,
-        // giving ~28000x gain.  Normalising the synthesis frame energy to match
-        // the input frame energy keeps output levels consistent regardless of how
-        // much the poles cluster after shifting.
+        // filter's spectral shape in the direct-form path — no extra normalisation
+        // is needed or wanted there.
         //
-        // This is standard practice in LPC-based vocoders (see e.g. Kleijn &
-        // Paliwal, "Speech Coding and Synthesis", Chapter 4).
-        {
+        // In the biquad (formant-shifted) path the filter's gain at any given
+        // frequency can change dramatically after the pole angle shift — e.g.
+        // a -12 st shift on a pure 440 Hz sine clusters 16 poles near 220 Hz,
+        // giving ~28000x gain even though the analytical stability is preserved.
+        // Normalising only those frames keeps output levels consistent regardless
+        // of how much the poles cluster after shifting, without affecting the
+        // direct-form pitch/time cases where levels are already correct.
+        //
+        // Reference: Kleijn & Paliwal, "Speech Coding and Synthesis", Ch. 4.
+        if (useBiquad_) {
             float inputEnergy = 0.0f;
             for (float v : frame)      inputEnergy += v * v;
             float synthEnergy = 0.0f;

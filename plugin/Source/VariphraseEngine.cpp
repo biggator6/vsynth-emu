@@ -1,5 +1,6 @@
 #include "VariphraseEngine.h"
 #include "PhaseVocoder.h"
+#include "SourceFilterModel.h"
 
 #include <cmath>
 #include <algorithm>
@@ -22,7 +23,8 @@ struct VariphraseEngine::Impl {
     VariphraseParams params {};
 
     // Algorithm implementations
-    std::unique_ptr<PhaseVocoder> phaseVocoder;
+    std::unique_ptr<PhaseVocoder>      phaseVocoder;
+    std::unique_ptr<SourceFilterModel> sourceFilter;
 
     // Latency in samples (set by prepare())
     int latencySamples = 0;
@@ -38,11 +40,15 @@ struct VariphraseEngine::Impl {
         phaseVocoder = std::make_unique<PhaseVocoder>();
         phaseVocoder->prepare(sr, blockSize);
 
+        sourceFilter = std::make_unique<SourceFilterModel>();
+        sourceFilter->prepare(sr, blockSize);
+
         latencySamples = phaseVocoder->getLatencySamples();
     }
 
     void reset() {
         if (phaseVocoder) phaseVocoder->reset();
+        if (sourceFilter) sourceFilter->reset();
     }
 
     void processMono(const float* input, float* output, int numSamples) {
@@ -66,16 +72,48 @@ struct VariphraseEngine::Impl {
                 break;
 
             case Algorithm::LPCSourceFilter:
-                // TODO: Implement LPC source-filter in Phase 4
-                phaseVocoder->setParams(params);
-                phaseVocoder->processMono(input, output, numSamples);
+                sourceFilter->setParams(params);
+                sourceFilter->processMono(input, output, numSamples);
                 break;
 
-            case Algorithm::Hybrid:
-                // TODO: Implement hybrid approach in Phase 5
-                phaseVocoder->setParams(params);
-                phaseVocoder->processMono(input, output, numSamples);
+            case Algorithm::Hybrid: {
+                // ── Hybrid routing (Algorithm v4) ────────────────────────────
+                // Calibrated against batch test results (Sessions 2–4, current
+                // binary), per-algorithm per-case scores:
+                //
+                //   formant_downmax: LPC 25.9  vs PV 16.0  → LPC wins (+9.9)
+                //   formant_upmax:   LPC 34.6  vs PV 32.3  → LPC wins (+2.3)
+                //   pitch_down12st:  PV  26.7  vs LPC 17.3 → PV  wins (+9.4)
+                //   pitch_up7st:     PV  36.3  vs LPC 34.3 → PV  wins (+2.0)
+                //   time_2x:         PV  20.1  vs LPC 15.6 → PV  wins (+4.5)
+                //   time_halfspeed:  PV  28.6  vs LPC 15.7 → PV  wins (+12.9)
+                //
+                // Rule: use LPCSourceFilter iff formant shift is requested;
+                //        use PhaseVocoder for all pitch-only and time-only cases.
+                //
+                // Rationale:
+                //   - LPC models the V-Synth's confirmed source-filter architecture
+                //     and correctly generates harmonics at the shifted formant.
+                //   - PV's spectral envelope warp produces a single spectral peak
+                //     (not a harmonic series) for formant cases → fails badly there.
+                //   - For pitch/time without formant shift, PV's resampler and
+                //     phase accumulation are more numerically stable and better
+                //     matched to the V-Synth's observed pitch output.
+                //
+                // Oracle average with this routing: 28.7/100
+                // Re-calibrate after each session if routing wins/losses change.
+
+                const bool hasFormant = (std::abs(params.formantShiftSemitones) > 0.5f);
+
+                if (hasFormant) {
+                    sourceFilter->setParams(params);
+                    sourceFilter->processMono(input, output, numSamples);
+                } else {
+                    phaseVocoder->setParams(params);
+                    phaseVocoder->processMono(input, output, numSamples);
+                }
                 break;
+            }
         }
     }
 };
