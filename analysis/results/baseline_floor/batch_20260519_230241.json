@@ -1,0 +1,80 @@
+{
+  "timestamp": "20260519_230241",
+  "average_composite_score": 14.779993693033854,
+  "note": "floor baseline: plugin passthrough vs V-Synth reference",
+  "n_tests": 6,
+  "results": [
+    {
+      "test_file": "sine_440_formant_downmax.wav",
+      "null_rms_dbfs": -9.7954740524292,
+      "null_peak_dbfs": -5.316357612609863,
+      "snr_db": -19.397274017333984,
+      "formant_similarity": 0.3719006301108167,
+      "transient_score": 0.2245850490506751,
+      "composite_score": 20.490652084350586,
+      "spectrogram_path": "results/baseline_floor/spectrograms/sine_440_formant_downmax_comparison.png",
+      "ref_path": "test_files/sustained/sine_440_formant_downmax.wav",
+      "plugin_path": "test_files/passthrough/sine_400_formant_downmax.wav"
+    },
+    {
+      "test_file": "sine_440_formant_upmax.wav",
+      "null_rms_dbfs": -9.281049728393555,
+      "null_peak_dbfs": -5.9896087646484375,
+      "snr_db": -16.220823287963867,
+      "formant_similarity": 0.14827715447204892,
+      "transient_score": 0.03635931405569762,
+      "composite_score": 6.840068817138672,
+      "spectrogram_path": "results/baseline_floor/spectrograms/sine_440_formant_upmax_comparison.png",
+      "ref_path": "test_files/sustained/sine_440_formant_upmax.wav",
+      "plugin_path": "test_files/passthrough/sine_400_formant_upmax.wav"
+    },
+    {
+      "test_file": "sine_440_pitch_down12st.wav",
+      "null_rms_dbfs": -9.145142555236816,
+      "null_peak_dbfs": -5.7189555168151855,
+      "snr_db": -13.826266288757324,
+      "formant_similarity": 0.28025708762152396,
+      "transient_score": 0.20934522093168897,
+      "composite_score": 16.44391441345215,
+      "spectrogram_path": "results/baseline_floor/spectrograms/sine_440_pitch_down12st_comparison.png",
+      "ref_path": "test_files/sustained/sine_440_pitch_down12st.wav",
+      "plugin_path": "test_files/passthrough/sine_400_pitch_down12st.wav"
+    },
+    {
+      "test_file": "sine_440_pitch_up7st.wav",
+      "null_rms_dbfs": -8.535689353942871,
+      "null_peak_dbfs": -2.755713701248169,
+      "snr_db": -9.8533353805542,
+      "formant_similarity": 0.18780915084681843,
+      "transient_score": 0.13082799915730026,
+      "composite_score": 10.783065795898438,
+      "spectrogram_path": "results/baseline_floor/spectrograms/sine_440_pitch_up7st_comparison.png",
+      "ref_path": "test_files/sustained/sine_440_pitch_up7st.wav",
+      "plugin_path": "test_files/passthrough/sine_400_pitch_up7st.wav"
+    },
+    {
+      "test_file": "sine_440_time_2x.wav",
+      "null_rms_dbfs": -8.574420928955078,
+      "null_peak_dbfs": -3.029399871826172,
+      "snr_db": -10.606550216674805,
+      "formant_similarity": 0.4188197848762977,
+      "transient_score": 0.0,
+      "composite_score": 16.752790451049805,
+      "spectrogram_path": "results/baseline_floor/spectrograms/sine_440_time_2x_comparison.png",
+      "ref_path": "test_files/sustained/sine_440_time_2x.wav",
+      "plugin_path": "test_files/passthrough/sine_400_time_2x.wav"
+    },
+    {
+      "test_file": "sine_440_time_halfspeed.wav",
+      "null_rms_dbfs": -10.539304733276367,
+      "null_peak_dbfs": -5.073620796203613,
+      "snr_db": -8.652421951293945,
+      "formant_similarity": 0.43423674709748167,
+      "transient_score": 0.0,
+      "composite_score": 17.369470596313477,
+      "spectrogram_path": "results/baseline_floor/spectrograms/sine_440_time_halfspeed_comparison.png",
+      "ref_path": "test_files/sustained/sine_440_time_halfspeed.wav",
+      "plugin_path": "test_files/passthrough/sine_400_time_halfspeed.wav"
+    }
+  ]
+}

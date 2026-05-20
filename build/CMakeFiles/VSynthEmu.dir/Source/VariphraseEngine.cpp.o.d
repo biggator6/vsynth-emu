@@ -981,6 +981,7 @@ CMakeFiles/VSynthEmu.dir/Source/VariphraseEngine.cpp.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/print \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/unistd.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/PhaseVocoder.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/SourceFilterModel.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/numeric \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/accumulate.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/adjacent_difference.h \

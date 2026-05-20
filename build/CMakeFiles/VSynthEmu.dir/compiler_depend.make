@@ -3067,6 +3067,24 @@ CMakeFiles/VSynthEmu.dir/Source/PluginEditor.cpp.o: /Users/mborrow/Documents/Cla
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/utilities/juce_Interpolators.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/utilities/juce_Reverb.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/utilities/juce_SmoothedValue.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_AiffAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_CoreAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_FlacAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_LAMEEncoderAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_MP3AudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_OggVorbisAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WavAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WindowsMediaAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatManager.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReaderSource.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatWriter.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioSubsectionReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_BufferingAudioFormatReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_MemoryMappedAudioFormatReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/juce_audio_formats.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/sampler/juce_Sampler.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format/juce_AudioPluginFormat.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format/juce_AudioPluginFormatManager.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format_types/juce_ARACommon.h \
@@ -4589,6 +4607,24 @@ CMakeFiles/VSynthEmu.dir/Source/PluginProcessor.cpp.o: /Users/mborrow/Documents/
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/utilities/juce_Interpolators.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/utilities/juce_Reverb.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/utilities/juce_SmoothedValue.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_AiffAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_CoreAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_FlacAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_LAMEEncoderAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_MP3AudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_OggVorbisAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WavAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WindowsMediaAudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormat.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatManager.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReaderSource.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatWriter.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioSubsectionReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_BufferingAudioFormatReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_MemoryMappedAudioFormatReader.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/juce_audio_formats.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/sampler/juce_Sampler.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format/juce_AudioPluginFormat.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format/juce_AudioPluginFormatManager.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format_types/juce_ARACommon.h \
@@ -39831,27 +39867,15 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/sampler/juce_Sampler.cpp:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSURLDownload.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/juce_audio_formats.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Accelerate.framework/Frameworks/vImage.framework/Headers/vImage_CVUtilities.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSMenuItem.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReaderSource.cpp:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/components/juce_ModalComponentManager.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReader.h:
-
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_core/xml/juce_XmlDocument.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReader.cpp:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreVideo.framework/Headers/CVBase.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatManager.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormat.cpp:
 
@@ -39933,21 +39957,9 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/oggvorbis/ogg.h:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/layout/juce_ComponentBoundsConstrainer.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WindowsMediaAudioFormat.h:
-
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/utilities/juce_SmoothedValue.cpp:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_MP3AudioFormat.cpp:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_LAMEEncoderAudioFormat.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_CoreAudioFormat.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/stdbool.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_AiffAudioFormat.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/AvailabilityInternalLegacy.h:
 
@@ -40120,10 +40132,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_devices/audio_io/juce_SampleRateHelpers.cpp:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_devices/audio_io/juce_AudioIODeviceType.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormat.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_devices/audio_io/juce_AudioIODeviceType.cpp:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_devices/audio_io/juce_AudioIODevice.cpp:
 
@@ -40635,9 +40643,9 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSPDFPanel.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/time_point.h:
-
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/widgets/juce_Label.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/time_point.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSTextView.h:
 
@@ -42007,6 +42015,10 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreVideo.framework/Headers/CVImageBuffer.h:
 
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatManager.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreVideo.framework/Headers/CVBase.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreText.framework/Headers/CoreText.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreText.framework/Headers/CTTextTab.h:
@@ -42525,31 +42537,49 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CFNetwork.framework/Headers/CFHTTPStream.h:
 
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Headers/ApplicationServices.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/SpeechSynthesis.framework/Headers/SpeechSynthesis.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers/Quickdraw.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Metal.framework/Headers/MTLComputePipeline.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers/QD.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/layout/juce_ComponentMovementWatcher.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers/Fonts.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSGraphics.h:
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/filebrowser/juce_FileListComponent.cpp:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/cerrno:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers/ColorSyncDeprecated.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/PrintCore.framework/Headers/PMPrintAETypes.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/simd/vector_make.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers/HFSVolumes.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSGraphicsContext.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_set_symmetric_difference.h:
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_extra/code_editor/juce_XMLCodeTokeniser.cpp:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/PrintCore.framework/Headers/PMErrors.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/QuartzCore.framework/Headers/CADisplayLink.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_types.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSRegularExpression.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/add_reference.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/PrintCore.framework/Headers/PMCore.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/PrintCore.framework/Headers/PMDefinitions.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/PrintCore.framework/Headers/PDEPluginInterface.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/Headers/UniversalAccess.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSSound.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFByteOrder.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/properties/juce_ButtonPropertyComponent.cpp:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/PhaseVocoder.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/Headers/TranslationServices.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__string/char_traits.h:
 
@@ -42709,12 +42739,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/windows/juce_NativeScaleFactorNotifier.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/dirent.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_utils/gui/juce_BluetoothMidiDevicePairingDialogue.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers/QDAvailability.h:
-
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/windows/juce_NativeMessageBox.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSUserDefaultsController.h:
@@ -42753,10 +42777,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/widgets/juce_ToolbarItemFactory.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Metal.framework/Headers/MTLComputePipeline.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers/QD.h:
-
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/widgets/juce_Toolbar.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/widgets/juce_Slider.h:
@@ -42779,9 +42799,9 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/positioning/juce_RelativeRectangle.h:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_BufferingAudioFormatReader.h:
-
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/sources/juce_MemoryAudioSource.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_BufferingAudioFormatReader.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/vecLib.framework/Headers/Sparse/Sparse.h:
 
@@ -42804,10 +42824,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/PhaseVocoder.cpp:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/misc/juce_DropShadower.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach/mach_traps.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/menus/juce_PopupMenu.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreVideo.framework/Headers/CVBuffer.h:
 
@@ -42885,6 +42901,10 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/layout/juce_ComponentBuilder.h:
 
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WindowsMediaAudioFormat.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/layout/juce_ComponentBoundsConstrainer.h:
+
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/detail/juce_ComponentHelpers.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/decay.h:
@@ -42931,12 +42951,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/drawables/juce_DrawableShape.h:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/properties/juce_ButtonPropertyComponent.cpp:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/Headers/TranslationServices.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/PhaseVocoder.h:
-
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/properties/juce_PropertyPanel.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/drawables/juce_DrawableImage.h:
@@ -42954,6 +42968,10 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSScriptObjectSpecifiers.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/convert_to_integral.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReader.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/components/juce_ModalComponentManager.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_core/memory/juce_MemoryBlock.h:
 
@@ -43222,8 +43240,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_data_structures/undomanager/juce_UndoManager.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_data_structures/app_properties/juce_ApplicationProperties.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/Headers/UniversalAccess.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_events/timers/juce_Timer.cpp:
 
@@ -43579,17 +43595,17 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Accelerate.framework/Headers/Accelerate.h:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_core/zip/zlib/inffixed.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_ctype.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatWriter.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/extent.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/fenv.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__mutex/unique_lock.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_core/zip/zlib/inffixed.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_ctype.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatWriter.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_max_element.h:
 
@@ -43657,6 +43673,10 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_core/json/juce_JSONUtils.cpp:
 
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/juce_audio_formats.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSURLDownload.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__new/align_val_t.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__mutex/mutex.h:
@@ -43672,16 +43692,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/utilities/juce_ExtensionsVisitor.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/utilities/juce_AudioProcessorValueTreeState.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach/vm_page_size.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSLock.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_graphics/fonts/harfbuzz/hb-ot-color.cc:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_events/messages/juce_MountedVolumeListChangeDetector.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/utilities/juce_AudioProcessorParameterWithID.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/utilities/juce_AudioParameterChoice.h:
 
@@ -43769,14 +43779,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format_types/juce_VSTMidiEventList.h:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_graphics/fonts/harfbuzz/hb-ucd-table.hh:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/remove_all_extents.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/stdlib.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format_types/juce_LADSPAPluginFormat.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/xlocale/_wctype.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSScriptSuiteRegistry.h:
@@ -43792,6 +43794,42 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_graphics/fonts/harfbuzz/OT/Layout/GSUB/LigatureSet.hh:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format/juce_AudioPluginFormat.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach/mach_traps.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/menus/juce_PopupMenu.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/oggvorbis/libvorbis-1.3.7/lib/lpc.c:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__locale_dir/money.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/processors/juce_AudioProcessorParameter.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioSubsectionReader.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach/vm_page_size.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSLock.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_graphics/fonts/harfbuzz/hb-ot-color.cc:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_events/messages/juce_MountedVolumeListChangeDetector.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/utilities/juce_AudioProcessorParameterWithID.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_OggVorbisAudioFormat.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_graphics/fonts/harfbuzz/hb-ucd-table.hh:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/remove_all_extents.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/stdlib.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format_types/juce_LADSPAPluginFormat.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/stdbool.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_AiffAudioFormat.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/utilities/juce_Decibels.h:
 
@@ -43816,20 +43854,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSStatusBarButton.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/sources/juce_ToneGeneratorAudioSource.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/write_escaped.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSSpeechSynthesizer.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSApplicationScripting.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_in_addr_t.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_types/_uint8_t.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/desktop/juce_Displays.cpp:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CFNetwork.framework/Headers/CFFTPStream.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Security.framework/Headers/cssmspi.h:
 
@@ -43939,9 +43963,11 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/thread:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioSubsectionReader.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSGraphics.h:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/processors/juce_AudioProcessorParameter.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/cerrno:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/PrintCore.framework/Headers/PMPrintAETypes.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Headers/LSInfo.h:
 
@@ -44621,10 +44647,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/exception_guard.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__locale_dir/money.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/oggvorbis/libvorbis-1.3.7/lib/lpc.c:
-
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_core/streams/juce_BufferedInputStream.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_count.h:
@@ -44899,6 +44921,10 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/disjunction.h:
 
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers/QDAvailability.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_utils/gui/juce_BluetoothMidiDevicePairingDialogue.h:
+
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/processors/juce_AudioProcessorEditor.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSLengthFormatter.h:
@@ -44985,8 +45011,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_unique_copy.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Headers/ApplicationServices.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__fwd/format.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFCharacterSet.h:
@@ -44994,6 +45018,10 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/generate.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/copy_cv.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/PrintCore.framework/Headers/PMCore.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/add_reference.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/deque:
 
@@ -45199,6 +45227,10 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__new/nothrow_t.h:
 
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSSpeechSynthesizer.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/write_escaped.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__new/launder.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__new/interference_size.h:
@@ -45208,6 +45240,10 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_ucontext.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_processors/format_types/juce_LV2PluginFormat.cpp:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_types/_uint8_t.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_in_addr_t.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/limits.h:
 
@@ -45973,6 +46009,14 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_events/timers/juce_Timer.h:
 
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_graphics/image_formats/jpglib/jdapimin.c:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ColorSync.framework/Headers/ColorSyncCMM.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/sources/juce_ReverbAudioSource.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WavAudioFormat.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSPrinter.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/binary_function.h:
@@ -46165,6 +46209,8 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/hash.h:
 
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_CoreAudioFormat.h:
+
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/set_union.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Security.framework/Headers/AuthorizationTags.h:
@@ -46198,6 +46244,12 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__cstddef/max_align_t.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/locale.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers/HFSVolumes.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/PrintCore.framework/Headers/PMErrors.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_set_symmetric_difference.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/xlocale/_stdio.h:
 
@@ -46289,9 +46341,13 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__concepts/assignable.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/merge.h:
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSApplicationScripting.h:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_OggVorbisAudioFormat.h:
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/desktop/juce_Displays.cpp:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CFNetwork.framework/Headers/CFFTPStream.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/merge.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ColorSync.framework/Headers/ColorSyncDevice.h:
 
@@ -46316,8 +46372,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSPressGestureRecognizer.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__new/destroying_delete_t.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/SpeechSynthesis.framework/Headers/SpeechSynthesis.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_bounds.h:
 
@@ -46431,10 +46485,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AudioToolbox.framework/Headers/AudioUnitUtilities.h:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/filebrowser/juce_FileListComponent.cpp:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers/ColorSyncDeprecated.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSTableViewDiffableDataSource.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Security.framework/Headers/AuthorizationDB.h:
@@ -46471,7 +46521,15 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/unique.h:
 
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_types.h:
+
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/midi/juce_MidiRPN.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_graphics/fonts/harfbuzz/hb-ot-math.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__cstddef/nullptr_t.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReaderSource.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_utils/juce_audio_utils.h:
 
@@ -46519,18 +46577,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_specialization.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/simd/vector_make.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSGraphicsContext.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_extra/code_editor/juce_XMLCodeTokeniser.cpp:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/QuartzCore.framework/Headers/CADisplayLink.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSRegularExpression.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ApplicationServices.framework/Frameworks/PrintCore.framework/Headers/PMDefinitions.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/in_in_result.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_ssize_t.h:
@@ -46563,16 +46609,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_locale_posix2008.h:
 
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSSound.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFByteOrder.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormatReaderSource.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_graphics/fonts/harfbuzz/hb-ot-math.h:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__cstddef/nullptr_t.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSTokenField.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreGraphics.framework/Headers/CGConvertColorDataWithFormat.h:
@@ -46588,6 +46624,8 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/ostream_iterator.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/flac/libFLAC/window_flac.c:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_LAMEEncoderAudioFormat.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFCGTypes.h:
 
@@ -46647,14 +46685,6 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/mach/mach.h:
 
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/codecs/juce_WavAudioFormat.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_graphics/image_formats/jpglib/jdapimin.c:
-
-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/ColorSync.framework/Headers/ColorSyncCMM.h:
-
-/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/sources/juce_ReverbAudioSource.h:
-
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSColorPanel.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/is_partitioned.h:
@@ -46690,6 +46720,8 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/all_of.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/allocation_guard.h:
+
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/dirent.h:
 
 /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_gui_basics/misc/juce_FocusOutline.h:
 
@@ -46728,6 +46760,10 @@ CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/complex:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_types/_uintmax_t.h:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_devices/audio_io/juce_AudioIODeviceType.cpp:
+
+/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_formats/format/juce_AudioFormat.h:
 
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSLocalizedNumberFormatRule.h:
 
