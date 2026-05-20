@@ -82,22 +82,22 @@ clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \
 
 | # | Algorithm | Status | Avg Score | Notes |
 |---|-----------|--------|-----------|-------|
-| 1 | Phase Vocoder (`--algo pv`) | ✅ Implemented | 21.6 | Good for pitch/time; fails on formant shift (spectral warp ≠ source-filter) |
+| 1 | Phase Vocoder (`--algo pv`) | ✅ Implemented | 26.7 | Good for pitch/time; fails on formant shift (spectral warp ≠ source-filter) |
 | 2 | Sinusoidal + residual (SMS) | ⬜ Not started | — | Skipped; LPC approach more faithful to V-Synth architecture |
-| 3 | LPC Source-Filter (`--algo lpc`) | ✅ Implemented | 28.7 | Correct architecture; biquad synthesis stable; formant shift working |
-| 4 | Hybrid (`--algo hybrid`) | 🔄 Partial | ~26.5* | Routes pitch/time → PV, formant → LPC; scores need re-verify post-biquad-fix |
+| 3 | LPC Source-Filter (`--algo lpc`) | ✅ Implemented | 24.0 | Correct architecture; biquad synthesis stable; weaker than PV for pitch/time |
+| 4 | Hybrid (`--algo hybrid`) | ✅ Calibrated | **28.7** | hasFormant → LPC, else → PV; oracle routing verified Session 5 |
 
-*Hybrid score from Session 3, before biquad fix; retest pending.
+### Current Best Routing (per case) — Session 5 calibrated
+| Case | Algorithm | Score | vs. alternative |
+|---|---|---|---|
+| formant_downmax | lpc | 25.9 | PV: 16.0 |
+| formant_upmax | lpc | 34.6 | PV: 32.3 |
+| pitch_down12st | pv | 26.7 | LPC: 17.3 |
+| pitch_up7st | pv | 36.3 | LPC: 34.3 |
+| time_2x | pv | 20.1 | LPC: 15.6 |
+| time_halfspeed | pv | 28.6 | LPC: 15.7 |
 
-### Current Best Routing (per case)
-| Case | Best algorithm | Score |
-|---|---|---|
-| formant_downmax | lpc | 25.9 |
-| formant_upmax | lpc (biquad) | 34.6 |
-| pitch_down12st | pv | 37.5 |
-| pitch_up7st | lpc | 36.3 |
-| time_2x | lpc | 20.1 |
-| time_halfspeed | lpc | 28.6 |
+**Hybrid routing rule:** `hasFormant (|formantShift| > 0.5 st) → LPC, else → PV`
 
 ## Measurement & Scoring
 Every algorithm version is scored by `batch_test.py`:
@@ -108,13 +108,14 @@ Every algorithm version is scored by `batch_test.py`:
 - **Composite score** — weighted sum; target > 60/100
 
 ### Score Progression
-| Session | Algorithm | Avg Score |
-|---|---|---|
-| Baseline | Passthrough | 13.2 |
-| Session 2 | Phase Vocoder v1 | 21.6 |
-| Session 3 | LPC Source-Filter v1 | 26.5 |
-| Session 4 | LPC Biquad v1 (NaN fix) | **28.7** |
-| **Target** | — | **> 60** |
+| Session | Algorithm | Avg Score | Notes |
+|---|---|---|---|
+| Baseline | Passthrough | 13.2 | |
+| Session 2 | Phase Vocoder v1 | 21.6 | |
+| Session 3 | Mixed (PV+LPC per case) | 26.5 | PV for pitch/time, LPC for formant — stale outputs |
+| Session 4 | LPC Biquad (NaN fix) | *(corrected: 24.0)* | Energy normalization incorrectly global |
+| Session 5 | **Hybrid v3 (oracle routing)** | **28.7** | Calibrated rule: formant→LPC, else→PV |
+| **Target** | — | **> 60** | |
 
 ## Confirmed V-Synth Architecture (as of Session 3)
 
@@ -134,10 +135,10 @@ VariPhrase operates as a **source-filter vocoder**, not a spectral manipulator:
 - Pitch shift moves the excitation F0; formant filter is unchanged (independent axes confirmed)
 
 ## Known Gaps / Next Work
-1. **Transient handling** — transient frames score 0.000; needs onset detection + bypass
-2. **Hybrid routing optimization** — per-case routing (formant→LPC, pitch/time→PV) has not been verified post-biquad-fix
-3. **Harmonically-rich test material** — all current tests use pure 440 Hz sine, a worst-case for LPC pole clustering; speech/sawtooth/guitar material would be less degenerate
-4. **formant_downmax score** — energy normalization is a blunt fix for pole clustering; a minimum-angle-gap guard in shiftFormants may recover the 2.4 pt regression
+1. **Transient test material** — onset detection is implemented (12 dB threshold, 85% pass-through blend, filter state reset). Effect is unmeasurable until real transient V-Synth recordings are available; current sustained-sine tests never trigger the onset path. The transient_score ceiling on sustained sines is ~0.1 due to OLA ramp-up onset timing mismatch (structural, not fixable without reducing analysis frame size).
+2. **Adaptive LPC order** — pure sinusoids cause 16-pole over-fitting (all poles near F0); stopping Levinson-Durbin early when residual error is low would reduce pole clustering after formant shift and improve formant_downmax's formant similarity (currently 0.638).
+3. **Real speech/instrument test material** — current pure-sine tests are the worst case for LPC. A held vowel, sawtooth, or guitar note would give a realistic quality picture. Expected significantly higher scores on non-degenerate material.
+4. **Score gap: 28.7 → 60 target** — requires ~31 pts. Plausible sources: transient test files (+up to 25 pts transient weight), better formant accuracy on real material (formant similarity ceiling is currently 0.88; real speech may reach 0.95+), improved time-stretch (formant similarity for time cases is only 0.4–0.5).
 
 ## Known Constraints
 - Cannot license Roland's PCM ROM content — custom samples required for oscillators

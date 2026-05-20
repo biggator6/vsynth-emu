@@ -329,6 +329,80 @@ Routing used for this session's tests:
 
 ---
 
+## Session 5 — Hybrid Routing Calibration & Transient Infrastructure
+**Date:** 2026-05-20
+**Phase:** Algorithm / Calibration
+**Model:** Claude Sonnet 4.6
+
+### What Was Done
+
+1. **Diagnosed stale batch test outputs** — the Session 4 "lpc_biquad v1" scores were computed against pre-energy-normalization outputs (generated with an older binary). This made the score appear as 28.7 but was misleading; the actual lpc_biquad scores with the correct binary were 24.0 (energy normalization was being applied to non-formant pitch/time cases, hurting them).
+
+2. **Fixed energy normalization scope** — changed `processMono` to only apply per-frame energy normalization when `useBiquad_` is true (formant-shifted frames). Direct-form synthesis frames (pitch/time cases) already get correct levels from the LPC gain; unconditional normalization was reducing their amplitudes and hurting scores by 9–13 points on time cases.
+
+3. **Calibrated per-algorithm per-case scores (current binary):**
+
+| Case | PV | LPC | Best | Reason |
+|---|---|---|---|---|
+| formant_downmax | 16.0 | **25.9** | LPC | Harmonics generation matches V-Synth; PV zeros upper spectrum |
+| formant_upmax | 32.3 | **34.6** | LPC | Biquad root-finder more stable than prior Durand-Kerner |
+| pitch_down12st | **26.7** | 17.3 | PV | LPC ACF underperforms on pitch-only; PV resampler is better |
+| pitch_up7st | **36.3** | 34.3 | PV | Marginal PV win on positive pitch |
+| time_2x | **20.1** | 15.6 | PV | LPC OLA is worse for time-stretch-only than PV |
+| time_halfspeed | **28.6** | 15.7 | PV | PV wins strongly on half-speed stretch |
+
+4. **Rewrote hybrid routing rule** — Previous rule (pitchOnlyLargeNeg → PV, else → LPC) was routing time cases and pitch_up7st to LPC, which is suboptimal. New rule: `hasFormant → LPC, else → PV`. This is the oracle routing given current per-algorithm scores.
+
+5. **Diagnosed transient score near-zero** — investigated onset strength envelopes:
+   - V-Synth reference onset peak: t≈0.035s (starts nearly immediately)
+   - Our LPC output onset peak: t≈0.348s (OLA ramp-up takes ~60 frames)
+   - Our PV output onset peak: t≈0.95–1.45s (even slower OLA buildup)
+   - Root cause: OLA processing needs 4 frame-hops to reach full energy; reference starts immediately. Near-zero correlation because onsets are fundamentally misaligned in time.
+   - For sustained sine test cases this is a structural limitation — no transients to detect, just onset timing mismatch.
+
+6. **Implemented onset detection infrastructure** — added `prevFrameRMS_` tracking and transient blend logic: when input frame RMS rises >12 dB (4×) over previous frame, synthesis frame is blended toward windowed input pass-through (up to 85%). Filter states are reset post-onset. No effect on current test suite (sustained sines have no sudden onsets), but will help with real transient test material.
+
+### Batch Test Results — Hybrid v3 (oracle routing)
+
+| Test File | Null dBFS | SNR dB | Formant Score | Transient | Composite | Algorithm |
+|---|---|---|---|---|---|---|
+| formant_downmax | −15.3 | −2.2 | 0.638 | 0.014 | 25.9 | LPC |
+| formant_upmax | −12.2 | −0.3 | 0.861 | 0.005 | 34.6 | LPC |
+| pitch_down12st | −8.1 | −2.0 | 0.667 | 0.000 | 26.7 | PV |
+| pitch_up7st | −10.9 | −5.8 | 0.885 | 0.035 | 36.3 | PV |
+| time_2x | −9.3 | −7.3 | 0.503 | 0.000 | 20.1 | PV |
+| time_halfspeed | −12.5 | −3.9 | 0.657 | 0.093 | 28.6 | PV |
+| **AVERAGE** | | | | | **28.7** | |
+
+### Score Progression (all sessions, corrected)
+
+| Session | Algorithm | Avg Score | Notes |
+|---|---|---|---|
+| Baseline | Passthrough | 13.2 | |
+| Session 2 | Phase Vocoder v1 | 21.6 | |
+| Session 3 | Mixed (PV+LPC) | 26.5 | Stale outputs; pitch/time via PV, formant via LPC |
+| Session 4 | LPC Biquad (NaN fix) | *(28.7 was stale)* | Stale pre-normalization outputs |
+| Session 5 | Hybrid v3 (oracle routing) | **28.7** | All cases at per-algorithm best |
+| **Target** | — | **> 60** | |
+
+### Findings
+- **Energy normalization scope matters** — applying it globally hurt non-formant cases significantly; restricting to `useBiquad_` frames is correct
+- **"LPC v1 = 26.5" in Session 3 was mixed routing** — those scores were PV for pitch/time, LPC for formant; pure LPC is worse than PV for pitch/time cases
+- **Transient scores are structural, not algorithmic** — for sustained sine test material, the onset timing mismatch (OLA ramp-up vs. V-Synth immediate onset) limits transient_score to ~0 regardless of algorithm. Transient test files are needed to actually measure this dimension.
+- **Oracle score of 28.7 is the current ceiling** with existing test material and algorithms. To surpass it requires either better algorithms or different test material.
+
+### Open Questions (new)
+- Can the formant_downmax score (25.9) be improved? The LPC over-fitting to the pure sine (16 poles near 440 Hz → clusters at 220 Hz) is the root cause of its low formant similarity (0.638). Would reducing LPC order adaptively for near-sinusoidal inputs help?
+- The gap from 28.7 to 60 target requires roughly 31 more points. Where can they come from? Plausible sources: (a) transient test material where onset detection fires, (b) better formant trajectory on real speech (LPC order may be optimal there), (c) improved time-stretch algorithm.
+- Should LPC order be adaptive (fewer poles for sparse/sinusoidal input, more for complex)?
+
+### Next Steps
+1. **Record real transient test material** — the onset detection is implemented; we need actual drum/pluck V-Synth recordings to see the score impact
+2. **Adaptive LPC order** — detect near-sinusoidal input (low residual energy after order 2) and stop Levinson-Durbin early; this would avoid the 16-pole clustering on pure sines
+3. **Real speech/instrument test material** — current pure-sine tests are degenerate; a held vowel or guitar note would give a more realistic picture of the algorithm's quality
+
+---
+
 ## Session Template (copy for each new session)
 
 ## Session N — [Title]
