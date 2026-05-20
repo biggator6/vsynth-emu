@@ -80,6 +80,13 @@ private:
     std::vector<std::array<float, 2>>     biquadState_;  // per-section [y[n-1], y[n-2]]
     bool                                   useBiquad_ = false;
 
+    // ── Onset detection state ─────────────────────────────────────────────────
+    // Tracks previous-frame RMS energy for onset detection.
+    // When input energy rises sharply (transient onset), the synthesis frame is
+    // blended toward a windowed pass-through of the input frame, preserving the
+    // timing and sharpness of the onset rather than smoothing it via OLA.
+    float prevFrameRMS_ = 0.0f;
+
     // ── Analysis window ───────────────────────────────────────────────────────
     std::vector<float> window_;
 

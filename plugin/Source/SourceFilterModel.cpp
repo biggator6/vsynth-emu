@@ -39,6 +39,7 @@ void SourceFilterModel::reset() {
     for (auto& s : biquadState_) { s[0] = 0.0f; s[1] = 0.0f; }
     biquads_.clear();
     useBiquad_      = false;
+    prevFrameRMS_   = 0.0f;
     inputWritePos_  = 0;
     inputReadPos_   = 0;
     inputFill_      = 0;
@@ -586,6 +587,52 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
                 // Input is silent — silence synthesis frame too
                 for (float& v : synthFrame) v = 0.0f;
             }
+        }
+
+        // ── Onset detection — transient pass-through blend ────────────────────
+        // When the input frame's RMS energy rises sharply relative to the
+        // previous frame (transient onset), the synthesis frame is blended toward
+        // a windowed copy of the input frame.  This preserves onset timing and
+        // sharpness: the direct input signal has a sharp attack, while the
+        // synthesised OLA signal has a gradual ramp-up that smears transients.
+        //
+        // Onset threshold: current RMS > kOnsetRatio × prevRMS.
+        //   kOnsetRatio = 4.0f (≈12 dB sudden energy rise).
+        //   onsetBlend  = 0.0 (synthesis only) → 1.0 (pass-through only).
+        //
+        // For sustained tones, this path is never taken.
+        // For transient attacks (drum hits, consonants), it preserves the onset.
+        {
+            float curRMS = 0.0f;
+            for (float v : frame) curRMS += v * v;
+            curRMS = std::sqrt(curRMS / float(kFrameSize));
+
+            constexpr float kOnsetRatio     = 4.0f;   // 12 dB rise → onset
+            constexpr float kOnsetBlendMax  = 0.85f;  // max pass-through weight
+
+            const bool onset = (prevFrameRMS_ > 1e-6f) &&
+                               (curRMS > kOnsetRatio * prevFrameRMS_);
+
+            if (onset) {
+                // Blend synthesis frame toward windowed input pass-through.
+                // Use a softer blend on first onset (not a hard cut) to avoid
+                // introducing clicks when the synthesis and input have
+                // different levels.
+                const float blend = kOnsetBlendMax *
+                    std::min(1.0f, (curRMS - kOnsetRatio * prevFrameRMS_)
+                                   / (curRMS + 1e-8f));
+                for (int i = 0; i < kFrameSize; ++i) {
+                    // frame[i] is already Hann-windowed
+                    synthFrame[i] = (1.0f - blend) * synthFrame[i]
+                                  +          blend  * frame[i];
+                }
+                // Reset filter state: post-transient, start fresh so the filter
+                // doesn't ring on old state that doesn't match the new segment.
+                std::fill(filterState_.begin(), filterState_.end(), 0.0f);
+                for (auto& s : biquadState_) { s[0] = 0.0f; s[1] = 0.0f; }
+            }
+
+            prevFrameRMS_ = curRMS;
         }
 
         // Apply output window for smooth OLA
