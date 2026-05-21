@@ -115,6 +115,7 @@ Every algorithm version is scored by `batch_test.py`:
 | Session 3 | Mixed (PV+LPC per case) | 26.5 | PV for pitch/time, LPC for formant — stale outputs |
 | Session 4 | LPC Biquad (NaN fix) | *(corrected: 24.0)* | Energy normalization incorrectly global |
 | Session 5 | **Hybrid v3 (oracle routing)** | **28.7** | Calibrated rule: formant→LPC, else→PV |
+| Session 6 | **Hybrid v5 (adaptive LPC)** | **28.3** | Guard 3 min-order-2; formant_downmax +2, upmax −4.5 on pure sine |
 | **Target** | — | **> 60** | |
 
 ## Confirmed V-Synth Architecture (as of Session 3)
@@ -135,10 +136,43 @@ VariPhrase operates as a **source-filter vocoder**, not a spectral manipulator:
 - Pitch shift moves the excitation F0; formant filter is unchanged (independent axes confirmed)
 
 ## Known Gaps / Next Work
-1. **Transient test material** — onset detection is implemented (12 dB threshold, 85% pass-through blend, filter state reset). Effect is unmeasurable until real transient V-Synth recordings are available; current sustained-sine tests never trigger the onset path. The transient_score ceiling on sustained sines is ~0.1 due to OLA ramp-up onset timing mismatch (structural, not fixable without reducing analysis frame size).
-2. **Adaptive LPC order** — pure sinusoids cause 16-pole over-fitting (all poles near F0); stopping Levinson-Durbin early when residual error is low would reduce pole clustering after formant shift and improve formant_downmax's formant similarity (currently 0.638).
-3. **Real speech/instrument test material** — current pure-sine tests are the worst case for LPC. A held vowel, sawtooth, or guitar note would give a realistic quality picture. Expected significantly higher scores on non-degenerate material.
-4. **Score gap: 28.7 → 60 target** — requires ~31 pts. Plausible sources: transient test files (+up to 25 pts transient weight), better formant accuracy on real material (formant similarity ceiling is currently 0.88; real speech may reach 0.95+), improved time-stretch (formant similarity for time cases is only 0.4–0.5).
+
+### Immediate — Recording session incoming
+New V-Synth recordings planned for three signal types.  See `RECORDING_GUIDE.md`
+for the full file list and V-Synth patch settings.
+
+| Signal | Files | Expected benefit |
+|---|---|---|
+| Held vowel "aah" (F0 ≈ 220 Hz) | 7 processed + 1 passthrough | LPC formant quality on real speech (currently untestable) |
+| Single drum hit | 4 processed + 1 passthrough | First real transient_score data; exercises onset detection |
+| C major chord | 3 processed + 1 passthrough | Polyphonic stress test for both PV and LPC paths |
+
+These files plug directly into the existing `batch_test.py` pipeline — no code changes needed.
+Output directory for new renders: `plugin_outputs/hybrid_v6/`.
+
+### Software gaps (next after batch_test reveals new failure modes)
+
+1. **Transient onset detection — untested on real material** — infrastructure is in
+   place (12 dB threshold, 85% blend, filter state reset), but has never fired on the
+   current test suite (sustained sines). Drum-hit recordings will expose actual behavior.
+
+2. **Adaptive LPC — pure-sine regression on upmax** — Guard 3 (min order 2) improved
+   formant_downmax (+2.0) but regressed formant_upmax (−4.5) because a 2-pole model shifts
+   only one resonance to 880 Hz while the 16-pole model accidentally produced richer spectral
+   content. On real speech (order-2 residual 10–60%) the adaptive stop will not fire early.
+   Possible fix: parameter-aware LPC order (don't stop before `formantShift / 12` additional
+   iterations for large positive shifts). Defer until batch test on real speech confirms the
+   magnitude of the issue.
+
+3. **Phase vocoder time-stretch quality** — time_2x (20.1) and time_halfspeed (28.6) are the
+   weakest PV cases. Phase locking (lock the phases of spectral peaks to their harmonics) or
+   transient-aware PV (suppress phase unwrapping at transients) could improve these.
+
+4. **Score gap: 28.3 → 60 target** — ~31.7 pts needed. Expected breakdown once new recordings
+   are added: transient_score dimension newly measurable (+10–20 pts weight uplift), formant
+   similarity on real speech higher than 0.641–0.744 (real vowel may reach 0.90+), time-stretch
+   on real material likely better than on pure sine (OLA artifacts less audible on noise-like
+   content).
 
 ## Known Constraints
 - Cannot license Roland's PCM ROM content — custom samples required for oscillators

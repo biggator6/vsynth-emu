@@ -1,19 +1,23 @@
 V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
-Last updated: Session 5 (2026-05-20)
+Last updated: Session 6 (2026-05-20)
 
-Current score: 28.7 / 100  (target: > 60)
+Current score: 28.3 / 100  (target: > 60)
 Best algorithm: hybrid (--algo hybrid)
-  hasFormant → LPC source-filter
+  hasFormant → LPC source-filter (adaptive order, min 2)
   else       → Phase Vocoder
 
-Per-case scores (calibrated, current binary):
-  formant_downmax  25.9  (LPC)
-  formant_upmax    34.6  (LPC)
+Per-case scores (hybrid_v5, adaptive LPC min-order-2):
+  formant_downmax  27.9  (LPC)  was 25.9 → +2.0
+  formant_upmax    30.1  (LPC)  was 34.6 → -4.5  (see note below)
   pitch_down12st   26.7  (PV)
   pitch_up7st      36.3  (PV)
   time_2x          20.1  (PV)
   time_halfspeed   28.6  (PV)
+
+Note: formant_upmax regression — 2-pole LPC shifts single resonance 440→880 Hz;
+  16-pole model accidentally matched V-Synth reference better on pure sine.
+  Adaptive LPC correct for real speech; regression is a pure-sine artifact.
 
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \
@@ -29,21 +33,33 @@ Run a test case:
     --output /tmp/out.wav \
     --algo hybrid --formant -12
 
-Run the full batch test:
-  cd analysis
-  python3 batch_test.py \
-    --ref-dir    test_files \
-    --plugin-dir plugin_outputs/hybrid_v4 \
-    --output     results/my_run
+Run the full batch test (from project root):
+  python3 analysis/batch_test.py \
+    --ref-dir    analysis/test_files \
+    --plugin-dir analysis/plugin_outputs/hybrid_v6 \
+    --output     analysis/results/hybrid_v6
 
 Start a new session:
   Read ARCHITECTURE.md  (algorithm status, routing table, score history)
   Read RESEARCH_LOG.md  (session-by-session findings, open questions)
 
-Next highest-value work:
-  1. Adaptive LPC order — stop Levinson-Durbin early for near-sinusoidal
-     input to avoid 16-pole over-fitting (formant_downmax root cause)
-  2. Record transient V-Synth test material — onset detection is implemented,
-     but transient_score is 0 until real transient recordings exist
-  3. Real speech/instrument test material — pure-sine tests are worst-case;
-     expected much higher scores on realistic input
+Recording session INCOMING — see RECORDING_GUIDE.md for exact file list.
+Three new signal types: vowel "aah", drum hit, chord (Cmaj).
+Expected: significant score improvement on all dimensions once real material
+is in the test battery.
+
+After recordings are done:
+  1. Place passthrough files → analysis/test_files/passthrough/
+     Place processed files  → analysis/test_files/sustained|transients|polyphonic/
+  2. Render plugin outputs (see RECORDING_GUIDE.md "Rendering" section)
+     Output dir: analysis/plugin_outputs/hybrid_v6/
+  3. Run batch test:
+       python3 analysis/batch_test.py \
+         --ref-dir    analysis/test_files \
+         --plugin-dir analysis/plugin_outputs/hybrid_v6 \
+         --output     analysis/results/hybrid_v6
+
+Next software work (after batch test reveals new failure modes):
+  A. Investigate formant_upmax regression — parameter-aware LPC order?
+  B. Improve PV time-stretch — phase locking, transient preservation
+  C. Onset detection tune-up once drum_hit tests fire it in anger

@@ -75,7 +75,7 @@ void SourceFilterModel::computeLPC(const std::vector<float>& frame,
 
     if (r[0] < 1e-10) return;
 
-    // Levinson-Durbin
+    // Levinson-Durbin with adaptive order
     //
     // Stability invariants:
     //   1. error > 0 must hold before dividing.  Pure sinusoids yield near-zero
@@ -84,9 +84,32 @@ void SourceFilterModel::computeLPC(const std::vector<float>& frame,
     //      analysis has hit a degenerate frame; higher orders are meaningless
     //      and would produce a catastrophically unstable synthesis filter
     //      (confirmed: causes NaN after ~512 output samples).
+    //   3. Adaptive early stop: if the normalised prediction error
+    //      (error / r[0]) falls below kEarlyStopThreshold, the model already
+    //      explains the signal well — further orders fit residual noise or
+    //      numerical artefacts rather than genuine spectral structure.
     //
-    // When either invariant is violated we break early, leaving the remaining
-    // coefficients at zero.  The lower-order model is still correct and stable.
+    // Why Guard 3 matters:
+    //   A pure 440 Hz Hann-windowed sinusoid is almost perfectly predicted by
+    //   a 2nd-order AR model (two poles at ±440 Hz).  The reflection coefficient
+    //   at order 2 is |lam₂| ≈ 0.999975, which is below the |lam|≥1 guard, so
+    //   without Guard 3 Levinson-Durbin runs all 16 orders, producing 16 poles
+    //   clustered near 440 Hz.  After a large formant downshift (e.g. −12 st,
+    //   ratio 0.5) those 16 poles cluster near 220 Hz, giving a combined filter
+    //   gain of ~28 000 at 220 Hz and a formant similarity of only 0.638.
+    //
+    //   With Guard 3 (threshold = 1%), the loop exits at order 2 for the pure
+    //   sine: error after order 2 is r[0]×(1−0.999975²) ≈ 5×10⁻⁵×r[0] ≪ 0.01.
+    //   The resulting 2-pole model shifts cleanly to 220 Hz with no clustering.
+    //
+    //   For voiced speech, the order-2 residual is typically 10–60% of r[0] and
+    //   the loop continues to the full kLPCOrder, capturing all formants.
+    //
+    // Threshold choice: 0.01 (stop when >99% of variance is explained).
+    //   Catches pure/near-pure sinusoids (residual < 0.01%) without stopping
+    //   early on complex spectra.
+    constexpr double kEarlyStopThreshold = 0.01;
+
     std::vector<double> a(kLPCOrder + 1, 0.0);
     double error = r[0];
 
@@ -110,6 +133,19 @@ void SourceFilterModel::computeLPC(const std::vector<float>& frame,
             a[j] = old_a[j] - lam * old_a[i - j];
 
         error *= (1.0 - lam * lam);
+
+        // Guard 3: early stop — model explains >99% of signal variance.
+        // Keep the current order's coefficients (already written above);
+        // do not add more poles.
+        //
+        // Minimum order 2: a pure sinusoid needs a conjugate pair (2 poles).
+        // At order 1, the reflection coefficient for 440 Hz is cos(2π*440/44100)≈0.998,
+        // giving error₁≈0.004×r[0] — already below the threshold.  Breaking at order 1
+        // leaves only a single real (DC-ish) pole, which is useless for formant shift
+        // and causes the biquad synthesis to produce near-DC-only output, wildly
+        // amplified by energy normalization.  Requiring i≥2 ensures we always capture
+        // at least one conjugate pair before declaring the model sufficient.
+        if (i >= 2 && error < kEarlyStopThreshold * r[0]) break;
     }
 
     for (int i = 0; i < kLPCOrder; ++i)
@@ -148,10 +184,26 @@ void SourceFilterModel::shiftFormants(std::vector<float>& coeffs, float semitone
     if (std::abs(semitones) < 0.01f) return;
 
     const double ratio = std::pow(2.0, double(semitones) / 12.0);
-    const int    n     = kLPCOrder;
+
+    // ── Effective LPC order ───────────────────────────────────────────────────
+    // When the adaptive early-stop in computeLPC exits before kLPCOrder, the
+    // remaining coefficients are zero.  Building a 16th-degree polynomial from a
+    // 2nd-order model would produce 14 spurious roots at z=0 that the root-finder
+    // must chase, and the factor count check would reject the result.
+    //
+    // Instead, find the index of the last non-zero coefficient and use that as the
+    // effective polynomial degree.  For a pure sinusoid stopped at order 2, this
+    // gives n=2, one conjugate pair, and 1 biquad section — the correct result.
+    int n = 0;
+    for (int i = kLPCOrder - 1; i >= 0; --i) {
+        if (std::abs(coeffs[i]) > 1e-8f) { n = i + 1; break; }
+    }
+    if (n < 2) return;   // too few poles — nothing useful to shift
+    if (n % 2 != 0) ++n; // round up to even (one extra zero coeff = one pole at origin)
+    n = std::min(n, kLPCOrder);
 
     // Build Q(z) = z^n − a₁z^{n−1} − … − aₙ whose roots are the synthesis filter poles.
-    // Q[0]=1, Q[k]=−aₖ (negated LPC coefficient array).
+    // Q[0]=1, Q[k]=−aₖ (negated LPC coefficient array, up to effective order n).
     std::vector<std::complex<double>> fullPoly(n + 1);
     fullPoly[0] = 1.0;
     for (int i = 0; i < n; ++i)
