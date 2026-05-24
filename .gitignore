@@ -1,0 +1,91 @@
+# macOS / filesystem noise
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100/
+.Trashes/
+.fseventsd/
+
+# Local editor and AI-agent state
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.remember/
+.claude/
+
+# Secrets, local config, signing material
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+*.mobileprovision
+
+# CMake / native build products
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+Makefile
+_deps/
+Testing/
+*.ninja
+.ninja_*
+
+# Native compiler/linker outputs
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.d
+*.dSYM/
+
+# Apple / JUCE plugin artifacts
+*.app/
+*.component/
+*.vst3/
+*.appex/
+*.pkg
+DerivedData/
+
+# Python local environments and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Generated analysis artifacts.
+# Keep curated fixtures under analysis/test_files/ tracked intentionally.
+# Existing committed reports/renders remain tracked until explicitly removed.
+analysis/variphrase_render
+analysis/plugin_outputs/
+analysis/results/
+analysis/*_comparison.png
+analysis/tmp/
+analysis/.cache/
+
+# Scratch / local output
+tmp/
+scratch/
+*.log

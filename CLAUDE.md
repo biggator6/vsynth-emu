@@ -98,6 +98,20 @@ cmake -S plugin -B build && cmake --build build
 - **Algorithm versions are immutable on disk.** New iteration → new `plugin_outputs/hybrid_vN+1/` directory. Don't overwrite old outputs; comparison across versions depends on them.
 - **No allocation in the audio thread.** All buffers are preallocated in `prepare()`. The audio path is `processMono()` and what it calls; if you add a `std::vector` ctor or `new` in there, you'll get dropouts in a DAW.
 
+## Layer boundaries
+
+Treat the project as three related but distinct layers:
+
+- **Audio engine / research core** — `VariphraseEngine`, `PhaseVocoder`, `SourceFilterModel`, and `OfflineRenderer`. This layer must remain JUCE-free, deterministic, offline-renderable, and scoreable without a DAW.
+- **Plugin integration** — `PluginProcessor` and host-facing behavior: parameter mapping, MIDI/file playback, sample-rate handling, state restore, latency/tail drain, and real-time safety. This is not UI; bugs here can change audible behavior even when the DSP core is correct.
+- **UI** — `PluginEditor` and user workflow. The current UI is intentionally minimal and should not drive algorithm decisions.
+
+UI enhancements and modernization cleanup are needed eventually: clearer controls, better state feedback, cleaner file-loading workflow, and general visual polish. Defer that work until the measurement loop and engine behavior are trustworthy, unless a UI issue blocks testing.
+
+## Build cleanup notes
+
+- **C++ standard mismatch:** `plugin/CMakeLists.txt` currently requests C++20, while the documented offline-renderer commands use `-std=c++17` and `OfflineRenderer.h` still mentions `-std=c++20`. Current engine code does not appear to require C++20. Downstream review should standardize the project on one version, preferably C++17 unless a specific C++20 feature is intentionally adopted.
+
 ## Known critical bugs (verified during code review, not yet fixed)
 
 These should be fixed *before* any further algorithm tuning, because they silently corrupt scores.
