@@ -76,11 +76,15 @@ env/
 .ipynb_checkpoints/
 
 # Generated analysis artifacts.
-# Keep curated fixtures under analysis/test_files/ tracked intentionally.
-# Existing committed reports/renders remain tracked until explicitly removed.
+#
+# Policy: the offline-renderer binary is reproducible from source and stays
+# out of the repo. BUT analysis/plugin_outputs/ and analysis/results/ are
+# intentionally tracked — ARCHITECTURE.md and CLAUDE.md treat per-version
+# renders and scored reports as the project's score history, and cross-
+# version comparison depends on them. Keep adding new plugin_outputs/<algo>_vN/
+# and results/<algo>_vN/ directories to the repo; do NOT add those paths here.
+# Curated reference fixtures under analysis/test_files/ are also tracked.
 analysis/variphrase_render
-analysis/plugin_outputs/
-analysis/results/
 analysis/*_comparison.png
 analysis/tmp/
 analysis/.cache/
