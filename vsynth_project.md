@@ -1,4 +1,4 @@
-
+This is the original discussion with Claude to determine if this was a feasible project and how we would go about it:
   
   
 
