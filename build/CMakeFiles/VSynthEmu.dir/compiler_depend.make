@@ -7078,6 +7078,7 @@ CMakeFiles/VSynthEmu.dir/Source/VariphraseEngine.cpp.o: /Users/mborrow/Documents
   /Library/Developer/CommandLineTools/usr/lib/clang/21/include/stddef.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/21/include/stdint.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/PhaseVocoder.h \
+  /Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/SourceFilterModel.h \
   /Users/mborrow/Documents/Claude_Projects/vsynth-emu/plugin/Source/VariphraseEngine.h
 
 CMakeFiles/VSynthEmu.dir/Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/juce_audio_basics.mm.o: /Users/mborrow/Documents/Claude_Projects/vsynth-emu/JUCE/modules/juce_audio_basics/juce_audio_basics.mm \

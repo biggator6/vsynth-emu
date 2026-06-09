@@ -47,48 +47,115 @@ static bool writeWav(const std::string& path,
 
 #else
 
-// ── Minimal WAV reader (PCM 16-bit / float 32-bit, mono or stereo) ───────────
-
-struct WavHeader {
-    char     riff[4];
-    uint32_t chunkSize;
-    char     wave[4];
-    char     fmt[4];
-    uint32_t fmtSize;
-    uint16_t audioFormat;  // 1=PCM, 3=float
-    uint16_t numChannels;
-    uint32_t sampleRate;
-    uint32_t byteRate;
-    uint16_t blockAlign;
-    uint16_t bitsPerSample;
-    char     data[4];
-    uint32_t dataSize;
-};
+// ── WAV reader — chunk-walking, handles 16/24/32-bit PCM and float32 ─────────
+//
+// Uses RIFF chunk walking rather than a fixed-size header struct.  This
+// correctly handles DAW-exported files that have:
+//   • extended fmt chunks (fmtSize 18 or 40, common in 24-bit and 48 kHz files)
+//   • extra chunks (LIST, fact, bext, etc.) between fmt and data
+//   • PCM 16-bit, PCM 24-bit, PCM 32-bit, and IEEE float 32-bit formats
+//
+// Stereo-to-mono downmix (L+R average) is handled in renderOffline().
 
 static bool readWav(const std::string& path,
                     std::vector<float>& samples, int& sr, int& channels) {
     FILE* f = fopen(path.c_str(), "rb");
     if (!f) { std::cerr << "Cannot open: " << path << "\n"; return false; }
 
-    WavHeader h;
-    fread(&h, sizeof(h), 1, f);
-    sr       = h.sampleRate;
-    channels = h.numChannels;
+    // Read RIFF header
+    char riff[4], wave[4];
+    uint32_t riffSz;
+    if (fread(riff, 1, 4, f) < 4 || fread(&riffSz, 4, 1, f) < 1 ||
+        fread(wave, 1, 4, f) < 4 ||
+        std::string(riff, 4) != "RIFF" || std::string(wave, 4) != "WAVE") {
+        std::cerr << "Not a valid WAV file: " << path << "\n";
+        fclose(f); return false;
+    }
 
-    size_t nSamples = h.dataSize / (h.bitsPerSample / 8);
+    // Walk chunks
+    uint16_t audioFormat = 0, numChannels = 0, bitsPerSample = 0;
+    uint32_t sampleRate  = 0, dataSize = 0;
+    long     dataOffset  = -1;
+
+    while (true) {
+        char id[4]; uint32_t sz;
+        if (fread(id, 1, 4, f) < 4 || fread(&sz, 4, 1, f) < 1) break;
+
+        if (std::string(id, 4) == "fmt ") {
+            uint8_t buf[40] = {};
+            fread(buf, 1, std::min(sz, 40u), f);
+            audioFormat  = uint16_t(buf[0])  | (uint16_t(buf[1]) << 8);
+            numChannels  = uint16_t(buf[2])  | (uint16_t(buf[3]) << 8);
+            sampleRate   = uint32_t(buf[4])  | (uint32_t(buf[5]) << 8)
+                         | (uint32_t(buf[6]) << 16) | (uint32_t(buf[7]) << 24);
+            bitsPerSample= uint16_t(buf[14]) | (uint16_t(buf[15]) << 8);
+            if (sz > 40) fseek(f, sz - 40, SEEK_CUR);
+        } else if (std::string(id, 4) == "data") {
+            dataSize   = sz;
+            dataOffset = ftell(f);
+            break;  // data chunk is always last; stop here
+        } else {
+            fseek(f, sz + (sz & 1), SEEK_CUR);  // skip unknown chunk (word-aligned)
+        }
+    }
+
+    if (dataOffset < 0 || sampleRate == 0 || numChannels == 0 || bitsPerSample == 0) {
+        std::cerr << "Malformed WAV (missing fmt or data chunk): " << path << "\n";
+        fclose(f); return false;
+    }
+
+    // Validate format
+    const bool isPCM   = (audioFormat == 1);
+    const bool isFloat = (audioFormat == 3);
+    if (!isPCM && !isFloat) {
+        std::cerr << "Unsupported WAV audioFormat " << audioFormat
+                  << " in " << path << " (expected 1=PCM or 3=float)\n";
+        fclose(f); return false;
+    }
+    if (isFloat && bitsPerSample != 32) {
+        std::cerr << "Only 32-bit float WAV is supported (got " << bitsPerSample << "-bit float)\n";
+        fclose(f); return false;
+    }
+    if (isPCM && bitsPerSample != 16 && bitsPerSample != 24 && bitsPerSample != 32) {
+        std::cerr << "Unsupported PCM bit depth " << bitsPerSample
+                  << " (supported: 16, 24, 32)\n";
+        fclose(f); return false;
+    }
+
+    sr       = static_cast<int>(sampleRate);
+    channels = static_cast<int>(numChannels);
+
+    const size_t bytesPerSample = bitsPerSample / 8;
+    const size_t nSamples = dataSize / bytesPerSample;
     samples.resize(nSamples);
 
-    if (h.audioFormat == 1 && h.bitsPerSample == 16) {
+    fseek(f, dataOffset, SEEK_SET);
+
+    if (isPCM && bitsPerSample == 16) {
         std::vector<int16_t> raw(nSamples);
-        fread(raw.data(), sizeof(int16_t), nSamples, f);
+        fread(raw.data(), 2, nSamples, f);
         for (size_t i = 0; i < nSamples; ++i)
             samples[i] = raw[i] / 32768.0f;
-    } else if (h.audioFormat == 3 && h.bitsPerSample == 32) {
-        fread(samples.data(), sizeof(float), nSamples, f);
-    } else {
-        std::cerr << "Unsupported WAV format (use 16-bit PCM or 32-bit float)\n";
-        fclose(f);
-        return false;
+
+    } else if (isPCM && bitsPerSample == 24) {
+        std::vector<uint8_t> raw(nSamples * 3);
+        fread(raw.data(), 1, nSamples * 3, f);
+        for (size_t i = 0; i < nSamples; ++i) {
+            int32_t v = (int32_t(raw[i*3+2]) << 16)
+                      | (int32_t(raw[i*3+1]) <<  8)
+                      |  int32_t(raw[i*3+0]);
+            if (v & 0x800000) v |= 0xFF000000;  // sign-extend to 32 bits
+            samples[i] = v / 8388608.0f;         // 2^23
+        }
+
+    } else if (isPCM && bitsPerSample == 32) {
+        std::vector<int32_t> raw(nSamples);
+        fread(raw.data(), 4, nSamples, f);
+        for (size_t i = 0; i < nSamples; ++i)
+            samples[i] = raw[i] / 2147483648.0f;  // 2^31
+
+    } else {  // float32
+        fread(samples.data(), 4, nSamples, f);
     }
 
     fclose(f);
@@ -100,23 +167,21 @@ static bool writeWav(const std::string& path,
     FILE* f = fopen(path.c_str(), "wb");
     if (!f) { std::cerr << "Cannot write: " << path << "\n"; return false; }
 
-    WavHeader h;
-    memcpy(h.riff, "RIFF", 4);
-    memcpy(h.wave, "WAVE", 4);
-    memcpy(h.fmt,  "fmt ", 4);
-    memcpy(h.data, "data", 4);
+    // Write minimal 44-byte WAV header (PCM IEEE float, canonical layout)
+    auto w2 = [&](uint16_t v) { fwrite(&v, 2, 1, f); };
+    auto w4 = [&](uint32_t v) { fwrite(&v, 4, 1, f); };
 
-    h.fmtSize      = 16;
-    h.audioFormat  = 3;  // float
-    h.numChannels  = static_cast<uint16_t>(channels);
-    h.sampleRate   = static_cast<uint32_t>(sr);
-    h.bitsPerSample= 32;
-    h.blockAlign   = static_cast<uint16_t>(channels * 4);
-    h.byteRate     = sr * channels * 4;
-    h.dataSize     = static_cast<uint32_t>(samples.size() * sizeof(float));
-    h.chunkSize    = 36 + h.dataSize;
-
-    fwrite(&h, sizeof(h), 1, f);
+    const uint32_t dataBytes = static_cast<uint32_t>(samples.size() * sizeof(float));
+    fwrite("RIFF", 1, 4, f);  w4(36 + dataBytes);
+    fwrite("WAVE", 1, 4, f);
+    fwrite("fmt ", 1, 4, f);  w4(16);
+    w2(3);                                              // audioFormat = IEEE float
+    w2(static_cast<uint16_t>(channels));
+    w4(static_cast<uint32_t>(sr));
+    w4(static_cast<uint32_t>(sr * channels * 4));       // byteRate
+    w2(static_cast<uint16_t>(channels * 4));            // blockAlign
+    w2(32);                                             // bitsPerSample
+    fwrite("data", 1, 4, f);  w4(dataBytes);
     fwrite(samples.data(), sizeof(float), samples.size(), f);
     fclose(f);
     return true;
@@ -158,6 +223,24 @@ int renderOffline(const RenderConfig& config) {
     std::cout << "  Pitch:   " << config.params.pitchShiftSemitones << " st\n";
     std::cout << "  Time:    " << config.params.timeStretchRatio << "x\n";
     std::cout << "  Formant: " << config.params.formantShiftSemitones << " st\n";
+
+    // ── Offline encode pass (V-Synth-style) ──────────────────────────────────
+    // Analyse the full input buffer ONCE to determine content type.
+    // This mirrors the V-Synth's encode step: the content type (SOLO /
+    // ENSEMBLE / BACKING / LITE) is determined globally before playback so
+    // that the real-time processing loop can use a stable routing decision
+    // rather than unreliable per-frame ACF thresholding.
+    {
+        auto analysis = VSE::VariphraseEngine::analyzeContent(
+            monoInput.data(), static_cast<int>(monoInput.size()), sr);
+        engine.setAnalysis(analysis);
+
+        static const char* kContentNames[] = { "LITE", "SOLO", "ENSEMBLE", "BACKING" };
+        const int ct = static_cast<int>(analysis.contentType);
+        std::cout << "  Content: " << kContentNames[ct]
+                  << "  medianConf=" << analysis.medianPitchConf
+                  << "  peakToMean=" << analysis.peakToMeanEnergy << "\n";
+    }
 
     std::vector<float> output = engine.processOffline(monoInput);
 

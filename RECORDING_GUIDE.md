@@ -11,9 +11,9 @@ checklist and update `RESEARCH_LOG.md` with results.
 DAW (playback) → V-Synth audio input (rear panel) → V-Synth audio output → DAW (capture)
 ```
 
-- Sample rate: **44100 Hz**
-- Bit depth: **16-bit PCM** (matches existing test files; 24-bit also fine — batch_test handles both)
-- Channels: **mono** (V-Synth VariPhrase is mono in / mono out when Oscillator is set to External)
+- Sample rate: **48000 Hz** (V-Synth native)
+- Bit depth: **24-bit PCM** (current test files are 24-bit; 16-bit also handled)
+- Channels: **stereo** (capture as-is; renderer downmixes to mono automatically)
 - Trim: set so the passthrough signal peaks around **−3 to −6 dBFS** — not too quiet, not clipping
 
 ---
@@ -44,18 +44,19 @@ should show > 40 dB null when comparing passthrough to input), THEN set the test
 ## File Naming Convention
 
 ```
-{signal}_{descriptor}_{parameter}_{value}.wav
+{signal}_{parameter}_{value}.wav
 ```
 
 Examples:
-- `vocal_aah_formant_up12st.wav`
-- `drum_hit_time_2x.wav`
-- `chord_Cmaj_pitch_up7st.wav`
+- `vocal_aah_formant_upmax.wav`    (formant +12 st)
+- `drum_hit_time_2x.wav`           (time stretch × 2)
+- `chord_Cmaj_pitch_up7st.wav`     (pitch +7 st)
 
-For the matching passthrough (V-Synth bypassed or all params at zero), use the same name
-but replace the parameter section with `passthrough`:
+For the matching passthrough (V-Synth bypassed or all params at zero), use the same base name
+with `_passthrough` suffix:
 - `vocal_aah_passthrough.wav`
 - `drum_hit_passthrough.wav`
+- `chord_Cmaj_passthrough.wav`
 
 ---
 
@@ -63,22 +64,18 @@ but replace the parameter section with `passthrough`:
 
 ```
 analysis/test_files/
-├── passthrough/      ← all unprocessed reference inputs (per signal type)
-├── sustained/        ← held vowels + any other sustained processed outputs
-├── transients/       ← drum hits, plucks, clicks
-├── polyphonic/       ← chords, multi-pitch material
-└── edge_cases/       ← whisper, noise, extreme settings
+├── passthrough/      ← all unprocessed reference inputs (one per signal type)
+└── sustained/        ← all V-Synth processed outputs
 ```
 
-Every processed file in `sustained/`, `transients/`, or `polyphonic/` must have a matching
-passthrough file in `passthrough/` with the same base name.  The offline renderer takes the
-passthrough as its `--input`.
+Every processed file in `sustained/` must have a matching passthrough file in `passthrough/`
+with the same base name.  The offline renderer takes the passthrough as its `--input`.
 
 ---
 
 ## Completed Recordings
 
-### Priority 1: Sustained sine (done)
+### Sustained sine (6 files — done)
 
 | File | Location | Status |
 |---|---|---|
@@ -89,128 +86,135 @@ passthrough as its `--input`.
 | sine_440_formant_upmax.wav (+12 st) | sustained/ + passthrough/ | ✅ done |
 | sine_440_formant_downmax.wav (−12 st) | sustained/ + passthrough/ | ✅ done |
 
----
+### Held vowel "aah" (7 files — done)
 
-## Next Recording Session — Priority 2 & 3
-
-These are the highest-leverage recordings given current algorithm state.
-
-### Signal A — Held vowel "aah" (sustained, ~4 seconds)
-
-**Source:** sing or speak a steady "aah" (or feed a synthesized vowel) into the V-Synth.
-Aim for F0 ≈ 200–250 Hz (comfortable male pitch), steady throughout.
-
-Passthrough first (parameters all at zero, VariPhrase bypassed or zeroed):
-- [ ] `passthrough/vocal_aah_passthrough.wav`
-
-Then record processed versions — **change only one VariPhrase parameter at a time**:
-
-| File | VariPhrase Pitch | VariPhrase Time | VariPhrase Formant | Dir |
+| File | Pitch | Time | Formant | Status |
 |---|---|---|---|---|
-| `vocal_aah_formant_up12st.wav` | 0 | 1.0× | **+12 st** | sustained/ |
-| `vocal_aah_formant_down12st.wav` | 0 | 1.0× | **−12 st** | sustained/ |
-| `vocal_aah_formant_up4st.wav` | 0 | 1.0× | **+4 st** | sustained/ |
-| `vocal_aah_pitch_up7st.wav` | **+7 st** | 1.0× | 0 | sustained/ |
-| `vocal_aah_pitch_down12st.wav` | **−12 st** | 1.0× | 0 | sustained/ |
-| `vocal_aah_time_2x.wav` | 0 | **2.0×** | 0 | sustained/ |
-| `vocal_aah_time_halfspeed.wav` | 0 | **0.5×** | 0 | sustained/ |
+| vocal_aah_passthrough.wav | 0 | 1× | 0 | ✅ done |
+| vocal_aah_time_2x.wav | 0 | **2×** | 0 | ✅ done |
+| vocal_aah_time_halfspeed.wav | 0 | **0.5×** | 0 | ✅ done |
+| vocal_aah_pitch_up7st.wav | **+7 st** | 1× | 0 | ✅ done |
+| vocal_aah_pitch_down12st.wav | **−12 st** | 1× | 0 | ✅ done |
+| vocal_aah_formant_up4st.wav | 0 | 1× | **+4 st** | ✅ done |
+| vocal_aah_formant_upmax.wav | 0 | 1× | **+12 st** | ✅ done |
+| vocal_aah_formant_downmax.wav | 0 | 1× | **−12 st** | ✅ done |
 
-**Why these?**
-- `formant_up12st` / `formant_down12st` directly replicate the existing formant_upmax /
-  formant_downmax test cases but on real speech — expected to expose the adaptive-LPC
-  improvement (and explain the formant_upmax regression on pure sine).
-- `pitch_up7st` / `pitch_down12st` replicate existing pitch cases on real speech.
-- `time_2x` / `time_halfspeed` replicate existing time cases on real speech.
+### Single drum hit (4 files — done)
 
-
-### Signal B — Single drum hit (transient)
-
-**Source:** a single kick drum or snare hit.  Feed a clean, isolated hit with silence
-before and after.  The transient should start at t ≈ 0.5 s (leave 0.5 s of silence at
-the start so our onset detector has a baseline).
-
-Passthrough first:
-- [ ] `passthrough/drum_hit_passthrough.wav`
-
-Processed:
-
-| File | VariPhrase Pitch | VariPhrase Time | VariPhrase Formant | Dir |
+| File | Pitch | Time | Formant | Status |
 |---|---|---|---|---|
-| `drum_hit_time_2x.wav` | 0 | **2.0×** | 0 | transients/ |
-| `drum_hit_time_halfspeed.wav` | 0 | **0.5×** | 0 | transients/ |
-| `drum_hit_pitch_up7st.wav` | **+7 st** | 1.0× | 0 | transients/ |
-| `drum_hit_time_4x.wav` | 0 | **4.0×** | 0 | transients/ |
+| drum_hit_passthrough.wav | 0 | 1× | 0 | ✅ done |
+| drum_hit_time_2x.wav | 0 | **2×** | 0 | ✅ done |
+| drum_hit_time_4x.wav | 0 | **4×** | 0 | ✅ done |
+| drum_hit_time_halfspeed.wav | 0 | **0.5×** | 0 | ✅ done |
+| drum_hit_pitch_up7st.wav | **+7 st** | 1× | 0 | ✅ done |
 
-**Why these?**
-- Transient time-stretch directly exercises the onset detection path (first time it
-  will actually fire in the test suite).
-- time_4x is an extreme stretch that will reveal OLA smearing artifacts.
+### Chord C major (3 files — done)
 
-
-### Signal C — Chord (polyphonic)
-
-**Source:** a short piano or guitar chord (C major or similar), held 2–3 seconds.
-Feed via audio input into External VariPhrase mode.
-
-Passthrough first:
-- [ ] `passthrough/chord_Cmaj_passthrough.wav`
-
-Processed:
-
-| File | VariPhrase Pitch | VariPhrase Time | VariPhrase Formant | Dir |
+| File | Pitch | Time | Formant | Status |
 |---|---|---|---|---|
-| `chord_Cmaj_pitch_up7st.wav` | **+7 st** | 1.0× | 0 | polyphonic/ |
-| `chord_Cmaj_time_2x.wav` | 0 | **2.0×** | 0 | polyphonic/ |
-| `chord_Cmaj_formant_up4st.wav` | 0 | 1.0× | **+4 st** | polyphonic/ |
-
-**Why these?**
-- Polyphonic pitch shift is a known weakness of LPC (designed for monophonic voiced
-  speech).  This will reveal whether the PV path handles chords better.
-- formant_up4st on a chord tests whether the biquad formant shift makes musical
-  sense on harmonic-rich polyphonic content.
+| chord_Cmaj_passthrough.wav | 0 | 1× | 0 | ✅ done |
+| chord_Cmaj_time_2x.wav | 0 | **2×** | 0 | ✅ done |
+| chord_Cmaj_pitch_up7st.wav | **+7 st** | 1× | 0 | ✅ done |
+| chord_Cmaj_formant_max.wav | 0 | 1× | **+12 st** | ✅ done |
 
 ---
 
-## Rendering Plugin Outputs After Recording
+## Next Recording Session — Priorities
 
-Once you have the new files, run the renderer for each one:
+These would extend the test battery into currently under-tested territory.
+
+### Priority 1 — Additional vocal time cases
+
+The vocal_aah_time_halfspeed case (32.5) lags behind time_2x (45.7). An additional
+mid-ratio case would help characterise the quality curve:
+
+| File | Pitch | Time | Formant | Dir |
+|---|---|---|---|---|
+| `vocal_aah_time_1_5x.wav` | 0 | **1.5×** | 0 | sustained/ |
+
+### Priority 2 — Chord compression and pitch
+
+The chord_Cmaj_pitch_up7st (25.1) is the weakest non-formant chord case.  An additional
+time-compression case would reveal how BACKING WSOLA handles short-stretch ratios:
+
+| File | Pitch | Time | Formant | Dir |
+|---|---|---|---|---|
+| `chord_Cmaj_time_halfspeed.wav` | 0 | **0.5×** | 0 | sustained/ |
+| `chord_Cmaj_pitch_down12st.wav` | **−12 st** | 1× | 0 | sustained/ |
+
+### Priority 3 — Second vocal material (female / higher F0)
+
+All current vocal tests use a male-range "aah" (~120 Hz F0). A higher-F0 source
+would stress-test the LPC formant extractor at a different range:
+
+| File | Pitch | Time | Formant | Dir |
+|---|---|---|---|---|
+| `vocal_female_passthrough.wav` | 0 | 1× | 0 | passthrough/ |
+| `vocal_female_time_2x.wav` | 0 | **2×** | 0 | sustained/ |
+| `vocal_female_formant_upmax.wav` | 0 | 1× | **+12 st** | sustained/ |
+
+---
+
+## Rendering Plugin Outputs
+
+After recording, rebuild the renderer (from the project root):
 
 ```bash
-BASE=/path/to/vsynth-emu
-R="$BASE/analysis/variphrase_render"
-
-# Example: vocal_aah_formant_up12st — use LPC (hasFormant = true)
-"$R" --input  "$BASE/analysis/test_files/passthrough/vocal_aah_passthrough.wav" \
-     --output "$BASE/analysis/plugin_outputs/hybrid_v6/sustained/vocal_aah_formant_up12st.wav" \
-     --algo lpc --formant 12
-
-# Example: vocal_aah_pitch_up7st — use PV (no formant shift)
-"$R" --input  "$BASE/analysis/test_files/passthrough/vocal_aah_passthrough.wav" \
-     --output "$BASE/analysis/plugin_outputs/hybrid_v6/sustained/vocal_aah_pitch_up7st.wav" \
-     --algo pv --pitch 7
-
-# Example: drum_hit_time_2x — use PV
-"$R" --input  "$BASE/analysis/test_files/passthrough/drum_hit_passthrough.wav" \
-     --output "$BASE/analysis/plugin_outputs/hybrid_v6/transients/drum_hit_time_2x.wav" \
-     --algo pv --time 2.0
+cd plugin/Source && g++ -std=c++20 -O2 -DOFFLINE_RENDERER_MAIN \
+    OfflineRenderer.cpp VariphraseEngine.cpp \
+    PhaseVocoder.cpp SourceFilterModel.cpp \
+    -o ../../analysis/variphrase_render
 ```
 
-**Hybrid routing reminder:**
-- `|formantShift| > 0.5 st` → `--algo lpc`
-- All other cases → `--algo pv`
+Then render each new test case.  **Always use `--algo hybrid`** — the hybrid algorithm
+runs the offline encode pass (`analyzeContent`) automatically and picks the best
+sub-algorithm for the content type:
+
+```bash
+BASE=/path/to/vsynth-emu/analysis
+R="$BASE/variphrase_render"
+VER=hybrid_v17c      # increment for each new batch
+
+mkdir -p "$BASE/plugin_outputs/$VER/sustained"
+
+# Time stretch — WSOLA will be selected automatically for BACKING/ENSEMBLE content
+"$R" --input  "$BASE/test_files/passthrough/chord_Cmaj_passthrough.wav" \
+     --output "$BASE/plugin_outputs/$VER/sustained/chord_Cmaj_time_2x.wav" \
+     --time 2.0 --algo hybrid
+
+# Pitch shift — PV or LPC selected based on content type + voiced detection
+"$R" --input  "$BASE/test_files/passthrough/vocal_aah_passthrough.wav" \
+     --output "$BASE/plugin_outputs/$VER/sustained/vocal_aah_pitch_up7st.wav" \
+     --pitch 7 --algo hybrid
+
+# Formant shift — LPC always selected when |formant| > 0.5 st
+"$R" --input  "$BASE/test_files/passthrough/vocal_aah_passthrough.wav" \
+     --output "$BASE/plugin_outputs/$VER/sustained/vocal_aah_formant_upmax.wav" \
+     --formant 12 --algo hybrid
+```
+
+**Current hybrid routing summary:**
+| Condition | Sub-algorithm |
+|---|---|
+| `|formantShift| > 0.5 st` | LPC source-filter |
+| `hasPitch AND voiced speech` | LPC source-filter |
+| `ENSEMBLE or BACKING, time ≥ 1×, !hasPitch` | WSOLA |
+| everything else | Phase Vocoder |
+
+The content type (LITE / SOLO / ENSEMBLE / BACKING) is printed to stdout during render:
+```
+Content: BACKING  medianConf=0.895  peakToMean=7.80
+```
 
 Then run the full batch test:
 
 ```bash
-python3 analysis/batch_test.py \
-    --ref-dir    analysis/test_files \
-    --plugin-dir analysis/plugin_outputs/hybrid_v6 \
-    --output     analysis/results/hybrid_v6
+cd "$BASE" && python3 batch_test.py \
+    --ref-dir    test_files/sustained \
+    --plugin-dir plugin_outputs/$VER/sustained \
+    --output     results/$VER
 ```
-
-The batch runner walks `test_files/` recursively and matches any file that also exists in
-`plugin_outputs/hybrid_v6/` at the same relative path.  Passthrough files produce warnings
-(no matching plugin output) — that is expected.
 
 ---
 
@@ -219,10 +223,14 @@ The batch runner walks `test_files/` recursively and matches any file that also 
 1. **Zero all VariPhrase parameters before each take.** Confirm with a passthrough null
    test before setting the test parameter.
 2. **Record a few seconds of silence before playing the signal.** This lets the batch
-   test measure the noise floor.
+   test measure the noise floor and gives the analyzeContent pass enough samples to
+   classify content correctly.
 3. **Use the same audio interface and cable for all takes in a session** so the output
    chain is consistent.
 4. **Label takes immediately** — do not rely on memory.  Record the V-Synth panel display
    settings in a photo alongside the audio file.
 5. **Check the recording with compare.py before moving on** — a quick null test against
    the passthrough reveals miswired settings immediately.
+6. **Verify content classification** after recording by running a quick render and checking
+   the `Content:` line in the output.  If classification looks wrong, check signal length
+   (< 2048 samples returns LITE by default) and silence threshold.

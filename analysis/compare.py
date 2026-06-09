@@ -36,17 +36,19 @@ from lpc import extract_formants, formant_trajectory_similarity
 # ---------------------------------------------------------------------------
 
 def load_wav(path: str) -> tuple[np.ndarray, int]:
-    """Load a WAV file, return (mono float32 array, sample_rate)."""
-    sr, data = wavfile.read(path)
-    if data.ndim == 2:
-        data = data.mean(axis=1)  # stereo -> mono
-    if data.dtype == np.int16:
-        data = data.astype(np.float32) / 32768.0
-    elif data.dtype == np.int32:
-        data = data.astype(np.float32) / 2147483648.0
-    elif data.dtype == np.float64:
-        data = data.astype(np.float32)
-    return data, sr
+    """Load a WAV file, return (mono float32 array, sample_rate).
+
+    Uses librosa.load (backed by soundfile) so that 24-bit PCM, 32-bit PCM,
+    and 48 kHz files are all handled correctly.  librosa returns float32 data
+    already normalised to [-1, 1] and downmixed to mono by default.
+
+    The previous scipy.io.wavfile approach had a latent bug: for stereo integer
+    files, data.mean(axis=1) returns float64, bypassing the integer-normalisation
+    branch and leaving raw ±10^9 values in the array — causing impossibly large
+    null-test residuals (160+ dBFS) for 24-bit stereo recordings.
+    """
+    data, sr = librosa.load(path, sr=None, mono=True)
+    return data.astype(np.float32), sr
 
 
 def align_length(ref: np.ndarray, out: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

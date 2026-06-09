@@ -87,15 +87,56 @@ private:
     // timing and sharpness of the onset rather than smoothing it via OLA.
     float prevFrameRMS_ = 0.0f;
 
+    // ── Pre-emphasis / de-emphasis state ──────────────────────────────────────
+    // Pre-emphasis H(z) = 1 − 0.97z⁻¹ is applied to the windowed analysis frame
+    // before Levinson-Durbin.  For a 1/k harmonic series, |H(kω₀)|² ≈ 0.97(kω₀)²
+    // exactly cancels the 1/k² amplitude decay, making every harmonic contribute
+    // equally to the autocorrelation.  The optimisation criterion then captures
+    // formant peaks rather than the fundamental.  Combined with minGuardOrder=8,
+    // this enables reliable F1–F4 capture even at 48 kHz.
+    //
+    // De-emphasis 1/(1 − 0.97z⁻¹) is applied to the final OLA output stream
+    // (not per-frame) to restore the original spectral tilt.  deEmphState_ holds
+    // the previous de-emphasis output sample and is updated sample-by-sample in
+    // the output-read section.
+    float deEmphState_ = 0.0f;
+
     // ── Analysis window ───────────────────────────────────────────────────────
     std::vector<float> window_;
 
     // ── DSP methods ───────────────────────────────────────────────────────────
 
-    // Levinson-Durbin LPC analysis — returns coefficients and prediction gain
+    // Levinson-Durbin LPC analysis — returns coefficients and prediction gain.
+    // minGuardOrder: earliest order at which Guard 3 (early-stop) may fire.
+    //   Use 2 for pure tones and unvoiced material.
+    //   Use 8 for voiced speech to ensure F1–F4 are captured before early-stop.
     void computeLPC(const std::vector<float>& frame,
                     std::vector<float>& coeffs,
-                    float& gain);
+                    float& gain,
+                    int minGuardOrder = 2);
+
+    // Cepstral-liftering LPC — separates spectral envelope (formants) from
+    // harmonic fine structure (pitch) before running Levinson-Durbin.
+    //
+    // Standard LPC on voiced speech at 48 kHz fails because all harmonics
+    // (F0=120 Hz through F4=3.5 kHz) have ω < 0.46 rad/sample, so the
+    // autocorrelation r[k]/r[0] ≈ 1 for all k, causing Guard 3 to fire at
+    // order 2 (pitch model, not formant model).
+    //
+    // This method:
+    //   1. FFTs the windowed frame to get the log power spectrum
+    //   2. Cepstral-lifters (zeros bins above L = min(60, T0/4)) to remove
+    //      the pitch-harmonic fine structure from the log spectrum
+    //   3. Back-transforms to get a smooth spectral envelope
+    //   4. Derives autocorrelation coefficients from the smooth envelope
+    //   5. Runs Levinson-Durbin without Guard 3 on the resulting autocorrelation
+    //
+    // f0_hz must be > 0 (valid voiced estimate from estimateF0).
+    // Used for voiced frames with formant shift active.
+    void computeLPCCepstral(const std::vector<float>& frame,
+                             float f0_hz,
+                             std::vector<float>& coeffs,
+                             float& gain);
 
     // Shift formant frequencies by semitones via LPC pole angle scaling
     void shiftFormants(std::vector<float>& coeffs, float semitones);

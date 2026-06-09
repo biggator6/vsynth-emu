@@ -9,6 +9,43 @@ namespace VSE {
 
 static constexpr float kTwoPi = 6.28318530718f;
 
+// ─── FFT helper for cepstral LPC (Cooley-Tukey iterative, in-place) ──────────
+// Same bit-reversal + butterfly convention as PhaseVocoder::fft().
+//   inverse=false : forward DFT  (twiddle = exp(+j·2π/len))
+//   inverse=true  : IDFT         (twiddle = exp(−j·2π/len), result ÷ N)
+// N must be a power of two.  Called exclusively from computeLPCCepstral.
+
+static void sfmFft(std::vector<std::complex<float>>& data, bool inverse)
+{
+    const int N = static_cast<int>(data.size());
+    if (N <= 1) return;
+    // Bit-reversal permutation
+    for (int i = 1, j = 0; i < N; ++i) {
+        int bit = N >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) std::swap(data[i], data[j]);
+    }
+    // DIT butterfly
+    for (int len = 2; len <= N; len <<= 1) {
+        const float ang = kTwoPi / float(len) * (inverse ? -1.0f : 1.0f);
+        const std::complex<float> wlen(std::cos(ang), std::sin(ang));
+        for (int i = 0; i < N; i += len) {
+            std::complex<float> w(1.0f, 0.0f);
+            const int half = len >> 1;
+            for (int j = 0; j < half; ++j) {
+                const auto u = data[i + j];
+                const auto v = data[i + j + half] * w;
+                data[i + j]        = u + v;
+                data[i + j + half] = u - v;
+                w *= wlen;
+            }
+        }
+    }
+    if (inverse)
+        for (auto& x : data) x /= float(N);
+}
+
 // ─── Construction ─────────────────────────────────────────────────────────────
 
 SourceFilterModel::SourceFilterModel() {
@@ -48,6 +85,7 @@ void SourceFilterModel::reset() {
     synthHopAccum_  = 0.0f;
     sawPhase_       = 0.0f;
     lpcGain_        = 1.0f;
+    deEmphState_    = 0.0f;
 }
 
 void SourceFilterModel::setParams(const VariphraseParams& params) {
@@ -62,7 +100,8 @@ int SourceFilterModel::getLatencySamples() const {
 
 void SourceFilterModel::computeLPC(const std::vector<float>& frame,
                                     std::vector<float>& coeffs,
-                                    float& gain) {
+                                    float& gain,
+                                    int minGuardOrder) {
     const int N = static_cast<int>(frame.size());
     coeffs.assign(kLPCOrder, 0.0f);
     gain = 0.0f;
@@ -102,12 +141,36 @@ void SourceFilterModel::computeLPC(const std::vector<float>& frame,
     //   sine: error after order 2 is r[0]×(1−0.999975²) ≈ 5×10⁻⁵×r[0] ≪ 0.01.
     //   The resulting 2-pole model shifts cleanly to 220 Hz with no clustering.
     //
-    //   For voiced speech, the order-2 residual is typically 10–60% of r[0] and
-    //   the loop continues to the full kLPCOrder, capturing all formants.
-    //
     // Threshold choice: 0.01 (stop when >99% of variance is explained).
     //   Catches pure/near-pure sinusoids (residual < 0.01%) without stopping
     //   early on complex spectra.
+    //
+    // NOTE (Session 8 diagnostic): For voiced speech with a strong fundamental
+    // (e.g. vowel "aah" at ~120 Hz) the order-2 residual is typically ≈0.14%
+    // of r[0], which IS below the 1% threshold — so Guard 3 fires at order 2
+    // for speech too.  This causes vocal_aah_formant_downmax to score only
+    // 16.4 (formant_sim=0.325) because the 2-pole model captures pitch, not
+    // F1–F4.  We attempted removing Guard 3 entirely in Session 8, but this
+    // introduced near-Nyquist pole aliasing in the 16-pole model after a large
+    // upshift (ratio=2), degrading vocal_aah_formant_upmax from 34.5→30.8.
+    //
+    // Session 9 fix: voiced-adaptive minimum guard order.
+    //   For voiced speech frames, the caller passes minGuardOrder=8.  This
+    //   ensures the recursion runs at least 4 conjugate-pair iterations (≈ F1–F4)
+    //   before Guard 3 is allowed to stop it.
+    //
+    // Session 9 (incorrect) diagnosis of pre-emphasis: the Session 9 comment
+    //   claimed pre-emphasis gives no benefit at 48 kHz.  The argument was that
+    //   r[1]/r[0] stays near 1 regardless, so Guard 3 still fires at order 2.
+    //   This was wrong in an important way: Guard 3 firing behaviour is already
+    //   prevented by minGuardOrder=8.  The more important effect of pre-emphasis
+    //   is on the OPTIMISATION CRITERION used by Levinson-Durbin for orders 2–8:
+    //   without PE, the fundamental (k=1) energy dominates by ~10 000× at 48 kHz,
+    //   so ALL 8 poles cluster near F0 (~120 Hz).  With PE, |H(kω₀)|²≈0.97(kω₀)²
+    //   exactly cancels the 1/k² harmonic decay, making every harmonic contribute
+    //   equally — and the 8 poles then spread across F1–F4 as intended.
+    //   (Session 13: pre-emphasis applied to the analysis frame before calling
+    //   computeLPC; de-emphasis 1/(1−0.97z⁻¹) applied to the OLA output stream.)
     constexpr double kEarlyStopThreshold = 0.01;
 
     std::vector<double> a(kLPCOrder + 1, 0.0);
@@ -138,20 +201,162 @@ void SourceFilterModel::computeLPC(const std::vector<float>& frame,
         // Keep the current order's coefficients (already written above);
         // do not add more poles.
         //
-        // Minimum order 2: a pure sinusoid needs a conjugate pair (2 poles).
-        // At order 1, the reflection coefficient for 440 Hz is cos(2π*440/44100)≈0.998,
-        // giving error₁≈0.004×r[0] — already below the threshold.  Breaking at order 1
-        // leaves only a single real (DC-ish) pole, which is useless for formant shift
-        // and causes the biquad synthesis to produce near-DC-only output, wildly
-        // amplified by energy normalization.  Requiring i≥2 ensures we always capture
-        // at least one conjugate pair before declaring the model sufficient.
-        if (i >= 2 && error < kEarlyStopThreshold * r[0]) break;
+        // The guard uses minGuardOrder (caller-supplied, default 2):
+        //   minGuardOrder=2 → pure sines / unvoiced (one conjugate pair minimum)
+        //   minGuardOrder=8 → voiced speech (4 conjugate pairs = F1–F4 minimum)
+        //
+        // For pure tones: a pure sinusoid needs a conjugate pair (2 poles).
+        //   At order 1, error₁ ≈ 0.004×r[0] — already below the 1% threshold.
+        //   Breaking at order 1 leaves a single real pole, useless for formant
+        //   shift and explosively amplified by energy normalization.
+        //
+        // For voiced speech: the 2-pole model at order 2 explains ≈99.86% of
+        //   variance (fundamental dominates short-lag autocorrelation at 48 kHz).
+        //   Guard 3 would fire and the model captures pitch, not formants.
+        //   Raising the guard to order 8 forces the recursion to at least 4
+        //   conjugate pairs, reliably capturing F1–F4 before stopping.
+        if (i >= minGuardOrder && error < kEarlyStopThreshold * r[0]) break;
     }
 
     for (int i = 0; i < kLPCOrder; ++i)
         coeffs[i] = float(a[i + 1]);
 
     gain = float(std::sqrt(std::max(error, 1e-10)));
+}
+
+// ─── Cepstral-Liftering LPC ───────────────────────────────────────────────────
+//
+// Motivation:
+//   Standard LPC on voiced speech at 48 kHz fails to capture formants because
+//   all speech harmonics (F0=120 Hz up to F4=3.5 kHz) have normalised angular
+//   frequency ω < 0.46 rad/sample.  The short-lag autocorrelation
+//     r[k] = Σ A_h² cos(kω_h) / 2  (sum over harmonics h)
+//   therefore has r[k]/r[0] ≈ 1 for k=1..16 regardless of the formant shaping
+//   of the harmonic amplitudes A_h.  Guard 3 fires at LPC order 2 because the
+//   two-pole pitch model already explains >99% of variance.
+//
+// Fix — derive autocorrelation from the cepstrally-liftered log spectrum:
+//   1. FFT the windowed frame → log power spectrum logP[k]
+//   2. IFFT(logP) → cepstrum c[n]  (real-symmetric for real input)
+//   3. Lifter: zero cepstral bins L+1..N-L-1
+//      L = min(60, T0/4)  where T0 = sampleRate/F0
+//      This removes the pitch-harmonic fine structure (cepstral peak at T0)
+//      while retaining the smooth spectral envelope (formants, at low quefrency)
+//   4. FFT(c_liftered) → smooth log spectrum logP_smooth[k]
+//   5. P_smooth[k] = exp(logP_smooth[k])   (smooth power spectrum)
+//   6. IFFT(P_smooth) → autocorrelation r[k]   (Wiener-Khinchin)
+//   7. Levinson-Durbin on r[0..kLPCOrder] → LPC coefficients
+//
+//   The autocorrelation derived from the smooth power spectrum is no longer
+//   dominated by the fundamental; r[k]/r[0] now reflects the formant bandwidth
+//   and frequency, and Levinson-Durbin converges to formant poles rather than
+//   pitch poles.
+//
+// Lifter length L:
+//   L = min(60, T0/4) satisfies L < T0/2 (well below the pitch cepstral peak)
+//   while being large enough to retain formant structure with bandwidths ≥ 240 Hz.
+//   Typical speech formant bandwidths are 100–300 Hz; narrower formants (F1 of
+//   some vowels, ~50 Hz) lose some cepstral energy at L=60, but the LPC fit
+//   still captures the formant frequency accurately enough for the shift.
+//
+// Guard 3 (adaptive early stop) is NOT applied inside this function.  The smooth
+// spectrum is featureless enough that Levinson-Durbin converges to full order 16
+// without the pitch-harmonic bias that caused premature stopping.  Guards 1 & 2
+// (numerical stability: near-zero error, |lam|≥1) are still present.
+//
+// References:
+//   Noll (1967), "Cepstrum Pitch Determination", JASA 41(2)
+//   Tohkura et al. (1978), "Spectral Smoothing Technique in PARCOR Speech Analysis"
+
+void SourceFilterModel::computeLPCCepstral(const std::vector<float>& frame,
+                                            float f0_hz,
+                                            std::vector<float>& coeffs,
+                                            float& gain)
+{
+    const int N = kFrameSize;  // 1024 — power of 2, fixed for all frames
+
+    // ── Step 1: Forward FFT of windowed frame ──────────────────────────────────
+    std::vector<std::complex<float>> X(N, {0.0f, 0.0f});
+    const int fLen = std::min(static_cast<int>(frame.size()), N);
+    for (int i = 0; i < fLen; ++i) X[i] = frame[i];
+    sfmFft(X, /*inverse=*/false);
+
+    // ── Step 2: Log power spectrum (packed into complex array for IFFT) ────────
+    constexpr float kLogFloor = 1e-6f;   // −60 dBFS floor, avoids log(0)
+    std::vector<std::complex<float>> C(N);
+    for (int i = 0; i < N; ++i)
+        C[i] = 0.5f * std::log(std::max(std::norm(X[i]), kLogFloor));
+    // C[i] is real here; IFFT will keep the imaginary part near zero
+
+    // ── Step 3: IFFT → cepstrum ────────────────────────────────────────────────
+    sfmFft(C, /*inverse=*/true);
+
+    // ── Step 4: Cepstral liftering ─────────────────────────────────────────────
+    // Keep bins 0..L and N-L..N-1 (symmetric around 0); zero the rest.
+    // L is bounded by T0/4 (well below the pitch-period cepstral peak at T0)
+    // and capped at 60 (retains formants with bandwidth ≥ 240 Hz at 48 kHz).
+    const int T0 = std::max(2, std::min(static_cast<int>(sampleRate_ / f0_hz + 0.5f),
+                                         N / 2));
+    const int L  = std::min(60, T0 / 4);
+
+    for (int i = L + 1; i < N - L; ++i) C[i] = 0.0f;
+
+    // ── Step 5: FFT of liftered cepstrum → smooth log spectrum ────────────────
+    sfmFft(C, /*inverse=*/false);
+
+    // ── Step 6: Smooth power spectrum (exp of real part) ──────────────────────
+    // C[i].real() is the smooth log spectrum; imaginary part is near-zero
+    // numerical noise from the real-symmetric cepstrum.
+    std::vector<std::complex<float>> P(N);
+    for (int i = 0; i < N; ++i)
+        P[i] = std::exp(C[i].real());
+
+    // ── Step 7: IFFT of smooth power spectrum → autocorrelation ───────────────
+    sfmFft(P, /*inverse=*/true);
+    // P[k].real() is now the autocorrelation r[k].  The imaginary parts are
+    // near-zero (real-even power spectrum → real-even autocorrelation).
+
+    // ── Step 8: Extract r[0..kLPCOrder] ───────────────────────────────────────
+    std::vector<double> r(kLPCOrder + 1);
+    for (int k = 0; k <= kLPCOrder; ++k)
+        r[k] = static_cast<double>(P[k].real());
+
+    if (r[0] < 1e-10) {
+        coeffs.assign(kLPCOrder, 0.0f);
+        gain = 0.0f;
+        return;
+    }
+
+    // ── Step 9: Levinson-Durbin on smooth autocorrelation ─────────────────────
+    // Guard 3 (early-stop) is intentionally omitted here: the smooth spectrum
+    // does not exhibit the pitch-harmonic autocorrelation bias (r[k]/r[0] ≈ 1)
+    // that caused premature stops in computeLPC.  Guards 1 & 2 remain for
+    // numerical safety (near-zero error, |lam| ≥ 1).
+    std::vector<double> a(kLPCOrder + 1, 0.0);
+    double error = r[0];
+
+    for (int i = 1; i <= kLPCOrder; ++i) {
+        if (error < 1e-10) break;               // Guard 1: near-zero denominator
+
+        double lam = r[i];
+        for (int j = 1; j < i; ++j) lam -= a[j] * r[i - j];
+        lam /= error;
+
+        if (std::abs(lam) >= 1.0) break;         // Guard 2: unstable reflection coeff
+
+        std::vector<double> old_a(a.begin(), a.begin() + i + 1);
+        a[i] = lam;
+        for (int j = 1; j < i; ++j)
+            a[j] = old_a[j] - lam * old_a[i - j];
+
+        error *= (1.0 - lam * lam);
+        // No Guard 3 here — smooth spectrum is well-conditioned to full order 16
+    }
+
+    coeffs.assign(kLPCOrder, 0.0f);
+    for (int i = 0; i < kLPCOrder; ++i)
+        coeffs[i] = static_cast<float>(a[i + 1]);
+    gain = static_cast<float>(std::sqrt(std::max(error, 1e-10)));
 }
 
 // ─── Formant Shift via Root (Pole) Angle Scaling ─────────────────────────────
@@ -539,7 +744,8 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
     // ── 2. Process frames ─────────────────────────────────────────────────────
     while (inputFill_ >= kFrameSize) {
 
-        // Extract windowed frame
+        // Extract windowed frame (unmodified — used for F0/voiced detection,
+        // onset-RMS tracking, and as the reference for onset-blend pass-through).
         std::vector<float> frame(kFrameSize);
         {
             int rp = inputReadPos_;
@@ -549,17 +755,71 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
             }
         }
 
-        // F0 detection and voiced/unvoiced decision
+        // Pre-emphasised windowed frame — used exclusively for LPC analysis.
+        //
+        // Pre-emphasis H(z) = 1 − 0.97z⁻¹ is applied to the raw (unwindowed)
+        // input *before* multiplying by the Hann window.  For a 1/k harmonic-
+        // series spectrum (voiced speech), |H(kω₀)|² ≈ 0.97(kω₀)² exactly
+        // cancels the 1/k² amplitude roll-off, making every harmonic contribute
+        // equally to the autocorrelation.  Without pre-emphasis the fundamental
+        // (k=1) energy dominates by ~10 000× at 48 kHz, and Levinson-Durbin
+        // clusters all available poles near F0 regardless of minGuardOrder.
+        // With pre-emphasis the optimisation criterion is balanced across all
+        // harmonics, so the predictor captures the formant envelope (F1–F4).
+        //
+        // The sample immediately before the analysis frame (from the ring buffer)
+        // is used as the filter's initial state to avoid a step discontinuity at
+        // the frame boundary.
+        std::vector<float> frameEmph(kFrameSize);
+        {
+            float prevSample = inputBuffer_[(inputReadPos_ + inBufSize - 1) % inBufSize];
+            int rp = inputReadPos_;
+            for (int i = 0; i < kFrameSize; ++i) {
+                const float raw = inputBuffer_[rp];
+                frameEmph[i] = (raw - 0.97f * prevSample) * window_[i];
+                prevSample = raw;
+                rp = (rp + 1) % inBufSize;
+            }
+        }
+
+        // F0 detection and voiced/unvoiced decision.
+        // Uses the non-pre-emphasised windowed frame; estimateF0 applies its own
+        // pre-emphasis internally for ACF peak detection.
         const bool voiced = isVoiced(frame);
         float f0 = voiced ? estimateF0(frame) : 0.0f;
 
         // Apply pitch shift to excitation F0
         const float excitationF0 = (f0 > 0.0f) ? f0 * pitchRatio : 0.0f;
 
-        // LPC analysis
+        // LPC analysis on the pre-emphasised frame.
+        //
+        // minGuardOrder=8 is applied whenever the frame is voiced AND any
+        // spectral-envelope manipulation is active (formant or pitch shift).
+        // For formant shift: 8 poles guarantee at least F1–F4 are captured before
+        //   Guard 3 (early-stop) is allowed to fire.
+        // For pitch shift: 8 poles give a realistic formant envelope for the
+        //   synthesis filter; the excitation F0 is then moved to the target pitch
+        //   while the filter poles (vocal-tract formants) remain at their original
+        //   frequencies.  With minGuardOrder=2 the 2-pole pitch model stays at F0
+        //   even after the excitation moves, producing a phantom resonance at the
+        //   original pitch — the root cause of the low vocal_aah_pitch_up7st score.
+        //
+        // Routing (Sessions 10–12 history):
+        //   computeLPCCepstral (Session 10) was reverted — smooth spectrum still
+        //   peaked at a pitch harmonic rather than F1.  Pre-emphasis on the
+        //   analysis frame (Session 13) addresses the same problem differently:
+        //   it changes the Levinson-Durbin cost function rather than the input
+        //   signal, and works at 48 kHz provided minGuardOrder ≥ 8.
+        const bool hasFormantShift = (std::abs(formantShift) > 0.5f);
+        const bool hasPitchShift   = (std::abs(params_.pitchShiftSemitones) > 0.01f);
+
         std::vector<float> lpcCoeffs;
         float lpcGain;
-        computeLPC(frame, lpcCoeffs, lpcGain);
+
+        // Standard LPC with voiced-adaptive minimum guard order.
+        // minGuardOrder=8 for voiced speech with any spectral-envelope operation.
+        const int minGuardOrder = (voiced && (hasFormantShift || hasPitchShift)) ? 8 : 2;
+        computeLPC(frameEmph, lpcCoeffs, lpcGain, minGuardOrder);
 
         // ── Bandwidth expansion (stability guard) ─────────────────────────────
         // Levinson-Durbin guarantees |reflection coefficients| < 1 in theory,
@@ -612,23 +872,31 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         else
             synthesisFilter(excitation, lpcCoeffs, 1.0f, synthFrame);
 
-        // ── Per-frame energy normalization (biquad path only) ────────────────
-        // The LPC gain (sqrt of prediction error) correctly compensates for the
-        // filter's spectral shape in the direct-form path — no extra normalisation
-        // is needed or wanted there.
+        // ── Per-frame energy normalization (all LPC paths) ──────────────────
+        // Applied to BOTH biquad and direct-form synthesis paths.
         //
-        // In the biquad (formant-shifted) path the filter's gain at any given
-        // frequency can change dramatically after the pole angle shift — e.g.
-        // a -12 st shift on a pure 440 Hz sine clusters 16 poles near 220 Hz,
-        // giving ~28000x gain even though the analytical stability is preserved.
-        // Normalising only those frames keeps output levels consistent regardless
-        // of how much the poles cluster after shifting, without affecting the
-        // direct-form pitch/time cases where levels are already correct.
+        // Why direct-form also needs normalization (discovered Session 8):
+        //   The LPC gain (sqrt of prediction error) assumes the excitation is
+        //   white noise.  In reality, the excitation is a band-limited sawtooth
+        //   whose harmonics are not uniformly spread.  When a harmonic falls near
+        //   a narrow-band resonance (pole at r=0.994 → Q ≈ 83), the filter
+        //   amplifies that harmonic by ~83×, producing output RMS >> input RMS.
+        //   For a voiced vowel pitch-shifted +7 st, the excitation harmonic
+        //   nearest the original 2-pole filter resonance (~970 Hz) receives this
+        //   amplification, yielding peaks of ~10× full-scale.
+        //
+        //   Per-frame RMS normalisation corrects the level regardless of the
+        //   harmonic/pole coincidence, making the source-filter output always
+        //   match the input frame's energy — exactly what V-Synth's source-filter
+        //   synthesis does (confirmed by null-test level behaviour).
         //
         // Reference: Kleijn & Paliwal, "Speech Coding and Synthesis", Ch. 4.
-        if (useBiquad_) {
+        {
+            // Compare pre-emphasised input energy to pre-emphasised synthesis energy:
+            // both are in the same spectral domain (post-pre-emphasis) so the ratio
+            // gives the correct normalisation gain.
             float inputEnergy = 0.0f;
-            for (float v : frame)      inputEnergy += v * v;
+            for (float v : frameEmph) inputEnergy += v * v;
             float synthEnergy = 0.0f;
             for (float v : synthFrame) synthEnergy += v * v;
 
@@ -666,17 +934,20 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
                                (curRMS > kOnsetRatio * prevFrameRMS_);
 
             if (onset) {
-                // Blend synthesis frame toward windowed input pass-through.
-                // Use a softer blend on first onset (not a hard cut) to avoid
-                // introducing clicks when the synthesis and input have
-                // different levels.
+                // Blend synthesis frame toward the pre-emphasised windowed input.
+                // synthFrame is already in the pre-emphasised domain (output of the
+                // LPC synthesis filter on the pre-emphasised autocorrelation), so
+                // frameEmph is the correct blend target — using the raw frame would
+                // mix pre-emphasised synthesis with non-pre-emphasised passthrough,
+                // causing a tonal mismatch at the blend boundary.
+                // De-emphasis is applied to the final OLA output, restoring both
+                // paths to the original spectral shape.
                 const float blend = kOnsetBlendMax *
                     std::min(1.0f, (curRMS - kOnsetRatio * prevFrameRMS_)
                                    / (curRMS + 1e-8f));
                 for (int i = 0; i < kFrameSize; ++i) {
-                    // frame[i] is already Hann-windowed
                     synthFrame[i] = (1.0f - blend) * synthFrame[i]
-                                  +          blend  * frame[i];
+                                  +          blend  * frameEmph[i];
                 }
                 // Reset filter state: post-transient, start fresh so the filter
                 // doesn't ring on old state that doesn't match the new segment.
@@ -712,8 +983,20 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
     // Hann window OLA normalization: timeStretch / 2.0 (same derivation as PV)
     const float normFactor = timeStretch / 2.0f;
 
+    // ── De-emphasis: 1/(1 − 0.97z⁻¹) applied to the final OLA output ────────
+    //
+    // Applied here (after OLA summation) rather than per-frame because OLA of
+    // independently de-emphasised frames does not equal de-emphasis of the OLA
+    // output.  Applying it to the summed stream ensures the de-emphasis is
+    // mathematically correct and maintains a consistent IIR state across blocks.
+    //
+    // This restores the original spectral tilt that was removed by the per-frame
+    // pre-emphasis filter (1 − 0.97z⁻¹) applied before LPC analysis.
     for (int i = 0; i < numSamples; ++i) {
-        output[i] = outputBuffer_[outputReadPos_] * normFactor;
+        const float y_e = outputBuffer_[outputReadPos_] * normFactor;
+        const float y   = y_e + 0.97f * deEmphState_;
+        deEmphState_ = y;
+        output[i]    = y;
         outputBuffer_[outputReadPos_] = 0.0f;
         outputReadPos_ = (outputReadPos_ + 1) % outBufSize;
     }

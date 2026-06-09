@@ -470,6 +470,660 @@ Routing used for this session's tests:
 
 ---
 
+## Session 7 — First Real-Material Batch: Vocal, Drum Hit, Chord
+**Date:** 2026-06-07  
+**Phase:** Algorithm / Evaluation  
+**Model:** Claude Sonnet 4.6
+
+### What Was Done
+
+1. **Received 14 new V-Synth recordings** — three signal types: held vowel "aah" (7 processed cases + passthrough), single drum hit (4 cases + passthrough), and C major chord (3 cases + passthrough). Files are 48 kHz, 24-bit PCM, mostly stereo.
+
+2. **Fixed OfflineRenderer WAV reader** — replaced fixed-size header struct with a proper RIFF chunk-walking reader. Now handles: 24-bit PCM (3-byte samples, sign-extended to 32-bit), 32-bit PCM, IEEE float 32-bit, extended fmt chunks (fmtSize > 16, common from DAWs), extra chunks (LIST, fact, etc.) between fmt and data. Rewrote writeWav to use direct byte writes, eliminating the WavHeader struct dependency entirely. Re-compiled and verified on all new files.
+
+3. **Fixed compare.py load_wav bug** — the previous `scipy.io.wavfile` approach had a hidden normalisation failure: `data.mean(axis=1)` on an int32 stereo array returns float64, bypassing the `elif data.dtype == np.int32: / 2147483648.0` branch. Raw int32 values (~±10^9) were fed into the null test unnormalised, producing impossibly large residuals (160–170 dBFS). Fixed by switching to `librosa.load(path, sr=None, mono=True)` which handles 24-bit PCM, stereo downmix, and sample rate correctly.
+
+4. **Rendered 14 plugin outputs** and ran full batch test (20 cases: 14 new + 6 existing sine cases).
+
+### Batch Test Results — Hybrid v6 (first real-material run)
+
+| Test File | Null dBFS | SNR dB | Formants | Transient | Composite | Algorithm |
+|---|---|---|---|---|---|---|
+| vocal_aah_formant_upmax | −21.3 | −1.8 | 0.567 | 0.473 | **34.5** | LPC |
+| vocal_aah_formant_up4st | −20.1 | −1.3 | 0.486 | 0.403 | 29.5 | LPC |
+| vocal_aah_formant_downmax | −18.1 | −0.7 | 0.325 | 0.135 | 16.4 | LPC |
+| vocal_aah_pitch_up7st | −16.4 | −2.3 | 0.250 | 0.000 | **10.0** | PV |
+| vocal_aah_pitch_down12st | −19.5 | −4.0 | 0.297 | 0.254 | 18.3 | PV |
+| vocal_aah_time_2x | −13.9 | −4.2 | **0.862** | 0.448 | **45.7** | PV |
+| vocal_aah_time_halfspeed | −16.2 | −0.6 | **0.812** | 0.000 | 32.5 | PV |
+| drum_hit_time_2x | −26.9 | −54.5 | 0.398 | 0.139 | 19.4 | PV |
+| drum_hit_time_halfspeed | −82.7 | −0.4 | 0.500 | **0.643** | **36.1** | PV |
+| drum_hit_time_4x | −21.5 | −59.9 | 0.388 | 0.130 | 18.8 | PV |
+| drum_hit_pitch_up7st | −59.5 | −4.7 | 0.302 | 0.025 | 12.7 | PV |
+| chord_Cmaj_time_2x | −22.1 | −3.5 | 0.485 | 0.471 | 31.2 | PV |
+| chord_Cmaj_pitch_up7st | −21.7 | −1.6 | 0.655 | 0.001 | 26.2 | PV |
+| chord_Cmaj_formant_max | −24.6 | −0.4 | 0.343 | 0.055 | 15.1 | LPC |
+| sine_440_formant_downmax | −15.3 | −2.2 | 0.641 | 0.088 | 27.9 | LPC |
+| sine_440_formant_upmax | −12.1 | −0.4 | 0.744 | 0.014 | 30.1 | LPC |
+| sine_440_pitch_down12st | −8.1 | −2.0 | 0.667 | 0.000 | 26.7 | PV |
+| sine_440_pitch_up7st | −10.9 | −5.8 | 0.885 | 0.035 | 36.3 | PV |
+| sine_440_time_2x | −9.3 | −7.3 | 0.503 | 0.000 | 20.1 | PV |
+| sine_440_time_halfspeed | −12.5 | −3.9 | 0.657 | 0.093 | 28.6 | PV |
+| **AVERAGE** | | | | | **25.8** | |
+
+### Score Progression
+
+| Session | Algorithm | Avg Score | Notes |
+|---|---|---|---|
+| Baseline | Passthrough | 13.2 | |
+| Session 2 | Phase Vocoder v1 | 21.6 | 6 sine cases |
+| Session 5 | Hybrid v3 (oracle routing) | 28.7 | 6 sine cases |
+| Session 6 | Hybrid v5 (adaptive LPC) | 28.3 | 6 sine cases |
+| Session 7 | **Hybrid v6 (real material)** | **25.8** | 20 cases: 6 sine + 14 real |
+| **Target** | — | **> 60** | |
+
+### Key Findings
+
+**Breakthrough: `vocal_aah_time_2x` = 45.7/100 — highest score in project history.**  
+Formant similarity 0.862 means the PV time-stretch preserves the vowel's harmonic/formant structure nearly perfectly. V-Synth reference and plugin output have nearly identical formant trajectories. This is strong validation that the PV path is working.
+
+**Critical finding: PV pitch shift on voiced speech is architecturally wrong.**  
+`vocal_aah_pitch_up7st` = 10.0 (formant similarity 0.250) vs `sine_440_pitch_up7st` = 36.3 (0.885).  
+- V-Synth VariPhrase: pitch-shift shifts excitation F0, keeps formant filter unchanged (source-filter architecture).
+- Our hybrid: hasFormant=false → routes to PV → PV shifts ALL frequency content up, including formants.
+- Result: our pitch-shifted vowel has formants at (original + 7st), V-Synth has formants at original frequencies.
+- Fix: use LPC for voiced-speech pitch shift even when formantShift=0. Needs voiced-speech detection at the routing level, or always use LPC for any LPC-capable signal.
+
+**LPC formant downshift on real speech is weak: `vocal_aah_formant_downmax` = 16.4.**  
+Formant similarity only 0.325 (vs 0.641 for sine). The LPC model of a vowel may have different pole structure than what the V-Synth's formant detector produces. Possible causes:
+- Our LPC stops at order 2 (adaptive, since fundamental still dominates residual energy). The vowel's F1/F2 may require order 4+. Need to verify effective LPC order on speech.
+- Formant downshift requires re-estimating appropriate gain; energy normalisation may not fully compensate.
+- V-Synth may use a dedicated formant-tracking algorithm (LPC + bandwidth estimation) rather than raw autocorrelation.
+
+**Transient detection confirmed working: `drum_hit_time_halfspeed` transient score = 0.643.**  
+The onset detection infrastructure (12 dB threshold, 85% blend) fires correctly on real drum hits. This is the first time the transient path has been exercised. Score of 36.1 is respectable. drum_hit_time_2x (19.4) and time_4x (18.8) are much weaker — severe OLA smearing at 2× and 4× stretch on transient signals.
+
+**SNR contribution is zero for all new cases.** The composite score formula clips negative SNR to 0. All new-material cases have negative SNR (residual larger than signal). The scores are entirely driven by formant_similarity (40%) and transient_score (25%). SNR will only improve when our output closely matches V-Synth — requires deeper algorithmic fidelity.
+
+### Open Questions
+- Why is `vocal_aah_formant_downmax` formant similarity (0.325) lower than the sine version (0.641)? Our LPC order on speech should be higher, not lower. Need to instrument and verify.
+- Can we route voiced-speech pitch cases to LPC? Needs a signal-level voiced/unvoiced detector at the routing stage, or just always use LPC.
+- How does V-Synth detect formants for shift? Does it use LPC, or a dedicated cepstral / band-energies approach?
+- `drum_hit_time_2x` score (19.4) vs `time_halfspeed` (36.1): large gap. Time compression (2x) causes the onset to be crammed into a shorter window — OLA smearing is proportionally worse. Fix requires transient-sensitive phase vocoder.
+
+### Next Steps
+1. **Route voiced-speech pitch shift to LPC** — largest potential gain (vocal_aah_pitch_up7st from 10 → ~25-30, vocal pitch_down12st from 18 → ~20-28). Requires either (a) signal-content voiced-speech detector at routing time, or (b) always use LPC instead of PV for pitch cases.
+2. **Diagnose `vocal_aah_formant_downmax` (16.4)** — instrument SourceFilterModel to log effective LPC order on speech; confirm we're using >2 poles for a vowel.
+3. **Improve time compression for transients** — `drum_hit_time_2x` (19.4) vs `time_halfspeed` (36.1): transient-aware PV would reduce OLA smearing at 2×/4× compression.
+4. **Add more vocal test cases** — formant_up4st (29.5) and formant_upmax (34.5) suggest the upshift direction is working better than downshift; record more intermediate formant shift values to build a curve.
+
+---
+
+## Session 8 — Voiced-Speech Pitch Routing + Energy Normalisation Fix
+**Date:** 2026-06-08  
+**Phase:** Algorithm  
+**Model:** Claude Sonnet 4.6
+
+### What Was Done
+
+1. **Attempted Guard 3 removal in `computeLPC`** — Session 7 diagnostic confirmed 96.9% of vowel frames stop at LPC order 2 because the strong fundamental (~120 Hz) explains >99% of MSE variance before any formants are captured. We tried removing Guard 3 entirely to force all-orders-16 for speech. Result: vocal formant upshift cases degraded (vocal_aah_formant_upmax: 34.5 → 30.8) because 16 poles include near-Nyquist poles that alias when scaled by ratio=2. Guard 3 reverted.
+
+2. **Implemented voiced-speech pitch-shift routing** — Extended hybrid router in `VariphraseEngine`:
+   - New rule: `hasPitch AND isVoiced → LPC` (previously all pitch-only cases went to PV)
+   - Voiced detection: ZCR < 0.15 AND energy > 1e-6 AND band energy at 2 kHz > 5% of total energy
+   - The 2 kHz bandpass correctly discriminates voiced speech (F2/F3 energy: 15-40%) from pure sines (440 Hz: ~0% at 2 kHz) and drum transients (~5%, borderline)
+   - First bandpass implementation was buggy: `gain*(x - y_prev2)` mixed input with output feedback, creating an all-pole response that passed 440 Hz at ~54%. Fixed to correct standard biquad form: `y = G*(x[n]-x[n-2]) + 2R*cos(ω₀)*y[n-1] - R²*y[n-2]`
+
+3. **Extended energy normalization to direct-form path** — Previously, per-frame RMS normalization only applied to the biquad (formant-shift) path. When voiced pitch-shift now routes to LPC without formant shift, the direct-form IIR path runs without normalization. A sawtooth harmonic that coincides with the narrow-band filter resonance (~2-pole at 970 Hz, Q≈83) causes ~10× amplification. Extended energy normalization to cover all synthesis paths.
+
+### Batch Test Results — Hybrid v8 (voiced-pitch routing)
+
+| Test File | Null dBFS | SNR dB | Formants | Transient | Composite | Δ vs v6 |
+|---|---|---|---|---|---|---|
+| vocal_aah_formant_upmax | −21.3 | −1.8 | 0.567 | 0.473 | **34.5** | 0 |
+| vocal_aah_formant_up4st | −20.1 | −1.3 | 0.486 | 0.403 | 29.5 | 0 |
+| vocal_aah_formant_downmax | −18.1 | −0.7 | 0.325 | 0.135 | 16.4 | 0 |
+| vocal_aah_pitch_up7st | −18.0 | −0.7 | 0.330 | 0.231 | **19.0** | **+9.0** |
+| vocal_aah_pitch_down12st | −21.5 | −2.0 | 0.604 | 0.134 | **27.5** | **+9.2** |
+| vocal_aah_time_2x | −13.9 | −4.2 | **0.862** | 0.448 | **45.7** | 0 |
+| vocal_aah_time_halfspeed | −16.2 | −0.6 | 0.812 | 0.000 | 32.5 | 0 |
+| drum_hit_time_2x | −26.9 | −54.5 | 0.398 | 0.139 | 19.4 | 0 |
+| drum_hit_time_halfspeed | −82.7 | −0.4 | 0.500 | **0.643** | **36.1** | 0 |
+| drum_hit_time_4x | −21.5 | −59.9 | 0.388 | 0.130 | 18.8 | 0 |
+| drum_hit_pitch_up7st | −44.0 | −20.1 | 0.384 | 0.000 | 15.4 | +2.7 |
+| chord_Cmaj_time_2x | −22.1 | −3.5 | 0.485 | 0.471 | 31.2 | 0 |
+| chord_Cmaj_pitch_up7st | −23.2 | −0.1 | 0.610 | 0.028 | 25.1 | −1.1 |
+| chord_Cmaj_formant_max | −24.6 | −0.4 | 0.343 | 0.055 | 15.1 | 0 |
+| sine_440_formant_downmax | −15.3 | −2.2 | 0.641 | 0.088 | 27.9 | 0 |
+| sine_440_formant_upmax | −12.1 | −0.4 | 0.744 | 0.014 | 30.1 | 0 |
+| sine_440_pitch_down12st | −8.1 | −2.0 | 0.667 | 0.000 | 26.7 | 0 |
+| sine_440_pitch_up7st | −10.9 | −5.8 | 0.885 | 0.035 | 36.3 | 0 |
+| sine_440_time_2x | −9.3 | −7.3 | 0.503 | 0.000 | 20.1 | 0 |
+| sine_440_time_halfspeed | −12.5 | −3.9 | 0.657 | 0.093 | 28.6 | 0 |
+| **AVERAGE** | | | | | **26.8** | **+1.0** |
+
+### Score Progression
+
+| Session | Algorithm | Avg Score | Notes |
+|---|---|---|---|
+| Baseline | Passthrough | 13.2 | |
+| Session 2 | Phase Vocoder v1 | 21.6 | 6 sine cases |
+| Session 5 | Hybrid v3 (oracle routing) | 28.7 | 6 sine cases |
+| Session 6 | Hybrid v5 (adaptive LPC) | 28.3 | 6 sine cases |
+| Session 7 | Hybrid v6 (real material) | 25.8 | 20 cases: 6 sine + 14 real |
+| Session 8 | **Hybrid v8 (voiced-pitch routing)** | **26.8** | 20 cases |
+| **Target** | — | **> 60** | |
+
+### Key Findings
+
+**Voiced-speech pitch routing improvement confirmed: +9 pts on each of the two critical cases.**  
+`vocal_aah_pitch_up7st`: 10.0 → 19.0 (formant_sim 0.250 → 0.330)  
+`vocal_aah_pitch_down12st`: 18.3 → 27.5 (formant_sim 0.297 → 0.604)  
+Routing to LPC correctly preserves formant structure: the LPC filter is analyzed at the original pitch and stays fixed; only the sawtooth excitation F0 shifts. This matches V-Synth's confirmed source-filter architecture.
+
+**Why vocal_aah_pitch_up7st is still only 19.0 (not ~25-30):**  
+The LPC model stops at order 2 due to Guard 3 (fundamental energy dominates MSE). The 2-pole model captures pitch (~970 Hz), NOT F1/F2/F3. The output after pitch shift is a sawtooth at the new F0 resonated by the ~970 Hz filter — which partially overlaps the V-Synth's formant structure but doesn't match it closely. Full improvement to ~30+ requires fixing the LPC order-collapse issue.
+
+**Guard 3 removal is NOT the right fix for LPC order collapse.**  
+Without Guard 3, the 16-pole model includes near-Nyquist poles (>12 kHz for 48 kHz audio). After a +12 st upshift (ratio=2), these poles alias to incorrect positions (a pole at θ=0.75π moves to θ=1.5π, cos(1.5π)=0, producing a pure imaginary pole at Nyquist). This corrupts the formant structure and degraded vocal_aah_formant_upmax from 34.5 → 30.8.
+
+**Correct fixes for LPC order collapse on speech (open items):**  
+- Apply pre-emphasis before LPC analysis: x[n] - 0.97×x[n-1] flattens the spectrum, making the fundamental less dominant, allowing the LPC to converge to formant poles at lower order
+- Limit Nyquist-range poles after root-finding: filter out poles with |θ| > π/2 (>1/4 Nyquist) before shifting, then re-add them at shifted positions — safer than the full-order model
+- Use a different Guard 3 based on voicing: if signal is voiced (ZCR < 0.05), disable Guard 3 (let full order 16 run) with simultaneous Nyquist pole filtering
+
+### Open Questions
+- Can pre-emphasis (HPF before LPC analysis) break the fundamental-dominated order collapse without near-Nyquist aliasing?
+- What is the V-Synth's actual LPC order and whether/how it handles near-Nyquist poles after formant shift?
+- `vocal_aah_formant_downmax` is still 16.4 despite LPC being used. The order-2 model captures pitch, not F1/F2 — same root cause as pitch-shift. Pre-emphasis fix would help both.
+
+### Next Steps
+1. **Pre-emphasis before LPC analysis** — apply 0.97 pre-emphasis to the analysis frame in `computeLPC`. Also add a de-emphasis gain stage in synthesis. This should allow higher-order formant capture without Nyquist aliasing, improving both pitch-shift and formant-downshift cases.
+2. **vocal_aah_pitch_up7st**: expected to improve from 19.0 → ~28-32 after pre-emphasis fix.
+3. **vocal_aah_formant_downmax**: expected to improve from 16.4 → ~22-28 after pre-emphasis fix.
+4. **Transient time-compression**: still needs onset-synchronous OLA (drum_hit_time_2x=19.4, time_4x=18.8 are poor).
+
+---
+
+## Session 9 — V-Synth Manual Analysis + Voiced-Adaptive Min LPC Order
+**Date:** 2026-06-08
+**Phase:** Algorithm / Investigation
+**Model:** Claude Sonnet 4.6
+
+### What Was Done
+
+1. **Read V-Synth owner's manual (Books 1 & 2)** — extracted technical details about VariPhrase encode types and internal architecture. Key findings:
+
+   | Encode Type | Architecture | Formant Control | Robot Voice | Notes |
+   |---|---|---|---|---|
+   | SOLO | LPC source-filter | Yes (independent) | Yes | For mono vocals, wind instruments |
+   | BACKING | WSOLA + event timestamps | No | No | For drums/percussion; stores amplitude-peak onsets |
+   | ENSEMBLE | Same as BACKING | No | No | For sustain instruments (choir, strings) |
+   | LITE | Runtime spectral envelope warp | No | No | Default; no robot voice |
+
+   - **Robot Voice**: holds excitation F0 at encoded pitch regardless of keyboard note — forces monophonic voiced analysis
+   - **Events (BACKING/ENSEMBLE)**: amplitude-peak onset timestamps stored at encode time (Depth 0–127 controls density); used for OLA phase reset during time stretch/compress. This is the V-Synth's answer to transient-synchronous OLA.
+   - **Energy parameter (SOLO)**: "Specifies how much the fundamental pitch will be emphasized to make the sound more well-defined" — adjustable emphasis on the fundamental in excitation synthesis
+   - **chord_Cmaj_formant_max is architecturally N/A**: chords/polyphonic material uses ENSEMBLE type, which has no formant control. This case tests undefined V-Synth behavior.
+
+2. **Investigated pre-emphasis (α=0.97) as Guard 3 fix** — applied `x[n] -= 0.97×x[n-1]` before LPC analysis and de-emphasis after synthesis.
+
+   **Why pre-emphasis does NOT work at 48 kHz:**
+   - Pre-emphasis H(z)=1−0.97z⁻¹ is designed for 8 kHz telephone speech where the fundamental (100–300 Hz) has ω=0.08–0.24 rad/sample. The filter provides ~20 dB attenuation at the fundamental relative to 4 kHz formants.
+   - At 48 kHz, ALL speech harmonics (f0=120 Hz through F4=3.5 kHz) have normalised angular frequency ω < 0.46 rad/sample. The gain of H(e^jω) = |1 − 0.97e^{-jω}| is nearly constant (all near 0.995) across this entire range.
+   - Short-lag autocorrelation r[1]/r[0] therefore remains approximately 1 regardless of pre-emphasis, so the 2-pole model still captures >99% of variance and Guard 3 fires at order 2.
+   - Verified by comparing formant_sim on vocal_aah_formant_upmax with and without pre-emphasis: identically 0.567 in both cases.
+   - **Conclusion: Pre-emphasis cannot fix Guard 3 order-collapse at 48 kHz. The fix must operate differently.**
+
+3. **Discovered pre-emphasis regression in hybrid_v9 (energy normalisation domain error)** — the initial implementation normalised against `peFrame` (pre-emphasised frame) instead of `frame` (original windowed input). For 440 Hz sine, pre-emphasis attenuates amplitude by factor ~0.034, making peFrame energy 0.001× frame energy. Normalization then targeted near-zero energy, collapsing `sine_440_formant_upmax` from 30.1 → 19.9 (−10.3). All other affected cases regressed similarly. **Fix: normalise against `frame` always.** Pre-emphasis/de-emphasis then fully reverted as it provides no benefit.
+
+4. **Implemented voiced-adaptive minimum LPC guard order (hybrid_v10b)** — since pre-emphasis cannot break the order-collapse at 48 kHz, the fix operates by raising the minimum order at which Guard 3 may fire:
+
+   - For voiced frames WITH formant shift (`isVoiced && |formantShift| > 0.5 st`): `minGuardOrder = 8` — forces at least 4 conjugate pairs (F1–F4 range) before Guard 3 can stop Levinson-Durbin.
+   - For all other cases: `minGuardOrder = 2` — original behavior.
+   - Why 8 is safe but 16 is not: near-Nyquist poles only appear at orders 13–16 (corresponding to energy above ~6 kHz in 48 kHz audio). At order 8, the highest pole frequency is typically ~3.5 kHz. After the worst-case +12 st upshift (ratio=2), that pole moves to ~7 kHz — still well below the Nyquist guard threshold. The aliasing problem that broke Guard 3 removal only occurs for orders 13+.
+   - Why voiced+pitch-shift keeps minGuardOrder=2: a pitch-shift via LPC uses the direct-form filter (no biquad formant manipulation). A higher-order model on voiced speech produces a "harmonic pole zoo" — poles tracking individual harmonics rather than formant envelopes. This hurts pitch accuracy. Confirmed: using minGuardOrder=8 for the voiced pitch-shift routing regressed `vocal_aah_pitch_up7st` 19.0 → 17.6 (−1.4).
+
+5. **Rendered all 20 test cases and ran batch test.**
+
+   - First render batch (hybrid_v10 initial): shell variable expansion in the loop silently dropped all pitch/formant/time flags. All 20 files rendered with default params (passthrough). Detected by observing all 20 files had identical waveform peak (~0.5). Fixed by re-rendering with explicit per-case command lines with hardcoded arguments (no variable expansion).
+
+### Batch Test Results — Hybrid v10b (voiced-adaptive minOrder)
+
+| Test File | Null dBFS | SNR dB | Formants | Transient | Composite | Δ vs v8 | Algorithm |
+|---|---|---|---|---|---|---|---|
+| vocal_aah_formant_upmax | −21.3 | −1.8 | 0.567 | 0.473 | **34.4** | −0.1 | LPC (minOrder=8) |
+| vocal_aah_formant_up4st | −20.1 | −1.3 | 0.473 | 0.403 | 28.5 | **−1.0** | LPC (minOrder=8) |
+| vocal_aah_formant_downmax | −18.2 | −0.8 | 0.329 | 0.135 | 17.0 | +0.6 | LPC (minOrder=8) |
+| vocal_aah_pitch_up7st | −18.0 | −0.7 | 0.330 | 0.231 | 19.0 | 0 | LPC (minOrder=2) |
+| vocal_aah_pitch_down12st | −21.5 | −2.0 | 0.604 | 0.134 | 27.5 | 0 | LPC (minOrder=2) |
+| vocal_aah_time_2x | −13.9 | −4.2 | **0.862** | 0.448 | **45.7** | 0 | PV |
+| vocal_aah_time_halfspeed | −16.2 | −0.6 | 0.812 | 0.000 | 32.5 | 0 | PV |
+| drum_hit_time_2x | −26.9 | −54.5 | 0.398 | 0.139 | 19.4 | 0 | PV |
+| drum_hit_time_halfspeed | −82.7 | −0.4 | 0.500 | **0.643** | **36.1** | 0 | PV |
+| drum_hit_time_4x | −21.5 | −59.9 | 0.388 | 0.130 | 18.8 | 0 | PV |
+| drum_hit_pitch_up7st | −44.0 | −20.1 | 0.384 | 0.000 | 15.4 | 0 | PV |
+| chord_Cmaj_time_2x | −22.1 | −3.5 | 0.485 | 0.471 | 31.2 | 0 | PV |
+| chord_Cmaj_pitch_up7st | −23.2 | −0.1 | 0.610 | 0.028 | 25.1 | 0 | PV |
+| chord_Cmaj_formant_max | −24.9 | −0.5 | 0.351 | 0.055 | **17.9** | **+2.8** | LPC (minOrder=8) |
+| sine_440_formant_downmax | −15.1 | −2.1 | 0.630 | 0.088 | **25.4** | **−2.5** | LPC (minOrder=8) |
+| sine_440_formant_upmax | −12.2 | −0.3 | 0.757 | 0.014 | **32.8** | **+2.6** | LPC (minOrder=8) |
+| sine_440_pitch_down12st | −8.1 | −2.0 | 0.667 | 0.000 | 26.7 | 0 | PV |
+| sine_440_pitch_up7st | −10.9 | −5.8 | 0.885 | 0.035 | 36.3 | 0 | PV |
+| sine_440_time_2x | −9.3 | −7.3 | 0.503 | 0.000 | 20.1 | 0 | PV |
+| sine_440_time_halfspeed | −12.5 | −3.9 | 0.657 | 0.093 | 28.6 | 0 | PV |
+| **AVERAGE** | | | | | **26.9** | **+0.1** | |
+
+### Score Progression
+
+| Session | Algorithm | Avg Score | Notes |
+|---|---|---|---|
+| Baseline | Passthrough | 13.2 | |
+| Session 2 | Phase Vocoder v1 | 21.6 | 6 sine cases |
+| Session 5 | Hybrid v3 (oracle routing) | 28.7 | 6 sine cases |
+| Session 6 | Hybrid v5 (adaptive LPC) | 28.3 | 6 sine cases |
+| Session 7 | Hybrid v6 (real material) | 25.8 | 20 cases: 6 sine + 14 real |
+| Session 8 | Hybrid v8 (voiced-pitch routing) | 26.8 | 20 cases |
+| Session 9 | **Hybrid v10b (voiced-formant minOrder=8)** | **26.9** | chord/sine formant cases +2.8/+2.6; pre-emph tried and reverted |
+| **Target** | — | **> 60** | |
+
+### Key Findings
+
+**Pre-emphasis cannot fix LPC order-collapse at 48 kHz — this is a fundamental limitation.**  
+The 48 kHz sample rate places ALL speech content (120 Hz–3.5 kHz) in the range ω ∈ [0.016, 0.46] rad/sample. At these frequencies, cos(ω) is nearly 1.0 for every harmonic. Short-lag autocorrelation r[1]/r[0] therefore stays near 1 regardless of spectral shaping. Pre-emphasis, minimum-order increases, and bandwidth expansion cannot change this: the order-collapse arises from the arithmetic of the autocorrelation itself at high sample rates. **True fix requires pitch-synchronous LPC or cepstral liftering.**
+
+**Voiced-adaptive minOrder=8 gives small wins on chord/sine formant cases (+2.8, +2.6).**  
+chord_Cmaj_formant_max: 15.1 → 17.9 (extra poles help polyphonic LPC)  
+sine_440_formant_upmax: 30.1 → 32.8 (8-pole upshift more accurate than 2-pole)  
+These gains confirm the direction is correct for non-speech material but do not address the vocal case.
+
+**sine_440_formant_downmax regressed −2.5 pts (27.9 → 25.4).**  
+Root cause: the 440 Hz sawtooth has harmonic energy in the 1–4 kHz band (~17.6% of total), which is above the 5% threshold of the voiced-speech bandpass detector. The sawtooth is therefore misclassified as "voiced speech with formant shift" and receives minOrder=8. The 8-pole model is less accurate for formant downshift on a pure sawtooth than the 2-pole model (which simply shifts the 440 Hz pole to 220 Hz, closely matching the V-Synth output's dominant peak). **Fix: stronger voiced-speech discriminant** — e.g., modulation depth of formant peaks, or pitch-period regularity, to separate harmonic-rich sinusoids from actual speech.
+
+**vocal_aah_formant cases show no improvement from minOrder=8.**  
+formant_sim for vocal_aah_formant_upmax: 0.567 in v8, 0.567 in v10b — identically unchanged.  
+Even with 4 conjugate pairs forced, all 4 poles at 48 kHz still fall within ω < 0.46 rad/sample. The LPC algorithm cannot place poles at distinct formant frequencies because the autocorrelation structure is dominated by the fundamental harmonic regardless of order. This confirms the pre-emphasis investigation conclusion: order-based fixes cannot help vocal formant capture at 48 kHz.
+
+**chord_Cmaj_formant_max is architecturally N/A.**  
+From manual: chords use ENSEMBLE encode type, which does NOT support formant control. The V-Synth reference for this case is undefined behavior. This test case should be treated as informational only (lower weight or excluded) once the primary bottlenecks are resolved.
+
+### Open Questions
+
+- Can the sawtooth vs. voiced-speech discriminant be improved to avoid the sine_440_formant_downmax regression? Options: pitch-period regularity (ACF peak sharpness), modulation depth of spectral peaks, or a separate "is harmonically rich but NOT speech" classifier.
+- For pitch-synchronous LPC: what is the correct analysis window? One pitch period zero-padded to 1024 samples, or a half-period window? The V-Synth manual suggests SOLO encode uses 1024-sample frames — may be pitch-synchronous at the frame level rather than per-sample.
+- What is the expected score improvement if vocal formant capture is fixed to formant_sim ≥ 0.5 on downshift cases? Estimate: vocal_aah_formant_downmax 17.0 → ~28+.
+
+### Next Steps
+
+1. **Pitch-synchronous LPC for voiced speech** — confirmed as the only correct fix for the 48 kHz order-collapse. Two approaches:
+   - Analyse over one pitch period (zero-padded to 1024 for resolution) instead of a fixed 1024-sample frame. This concentrates autocorrelation energy at the pitch period, making shorter-lag r[k] sensitive to formant structure rather than pitch.
+   - Apply cepstral liftering to the windowed frame: compute FFT, take log magnitude, IFFT to get cepstrum, zero the pitch-range cepstral bins (quefrency > 1/F4 ≈ 0.3 ms = 14 samples at 48 kHz), then transform back. This separates spectral envelope (formants) from harmonic fine structure (pitch) before LPC analysis.
+   - Expected improvement if working: vocal_aah_formant_downmax 17.0 → ~28+, vocal_aah_formant_up4st 28.5 → ~35+.
+2. **Transient-synchronous OLA for time compression** — drum_hit_time_2x (19.4) and time_4x (18.8) are poor. V-Synth BACKING encode stores amplitude-peak onset timestamps at encode time (Depth 0–127 controls density); the player resets OLA phase at each event boundary instead of free-running. This prevents the onset smearing that PV accumulates when cramming multiple frames into fewer output samples. Implementing this would align with the confirmed V-Synth architecture.
+3. **Sawtooth formant discriminant** — sine_440_formant_downmax regressed −2.5 due to sawtooth being misclassified as voiced speech. A stronger discriminant (e.g., ACF peak sharpness / pitch confidence > 0.95 AND spectral flatness < 0.05 for speech; sawtooth has very sharp ACF peak and high spectral flatness) could correctly route the sawtooth to minOrder=2.
+4. **Update chord_Cmaj_formant_max weight** — this case is architecturally N/A per V-Synth manual (ENSEMBLE type has no formant control). Consider marking as informational-only in batch_test.py scoring.
+
+---
+
+## Session 10 — Cepstral LPC + Transient Phase Reset (Both Reverted)
+**Date:** 2026-06-08
+**Phase:** Algorithm / Investigation
+**Model:** Claude Sonnet 4.6
+
+### What Was Done
+
+1. **Implemented cepstral-liftering LPC (`computeLPCCepstral`)** — sfmFft() added as a static FFT helper in SourceFilterModel.cpp (same Cooley-Tukey convention as PhaseVocoder). The method:
+   - FFTs windowed frame → log power spectrum
+   - IFFTs to cepstrum
+   - Zeros cepstral bins L+1..N−L (lifter length L = min(60, T0/4))
+   - FFTs back → smooth log spectrum → smooth power spectrum
+   - IFFTs → smooth autocorrelation
+   - Runs Levinson-Durbin without Guard 3 on smooth autocorrelation
+   Routing: `voiced && formantShift > 0.5 st && f0 > 0` → cepstral LPC; otherwise standard LPC.
+
+2. **Ran batch test for hybrid_v11 (cepstral LPC active)** — 26.2/100 (−0.7 vs v10b).
+
+3. **Diagnosed why cepstral LPC fails** — Python analysis of the vocal_aah frame (F0=130 Hz, 48 kHz):
+   ```
+   Cepstrum: c[0]=−3.836, c[1]=1.549, max(c[2:50])=0.521
+   P_smooth peaks (L=60): freq=609 Hz, amplitude=18.6
+   True formant: F1≈700 Hz, F2≈1200 Hz
+   Raw spectrum peaks (harmonics): 281, 656, 937, 1171 Hz
+   ```
+   The smooth power spectrum peaks at **609 Hz** (near the 5th harmonic of 130 Hz), NOT at the true formant F1≈700 Hz. Root cause: the dominant cepstral coefficient c[1] = 1.549 represents the **global spectral tilt** (1/f slope of the excitation harmonics), not a formant resonance. This tilt energy is so large that the "smooth" spectrum obtained by keeping low-quefrency cepstral bins is still dominated by the excitation envelope rather than the vocal-tract resonance. The lifter does not cleanly separate formants from harmonics at 48 kHz because the harmonic tilt sits in cepstral bin 1 (always inside the keep window).
+
+   Additional finding: V-Synth's own formant model is **also pitch-dominated** (not acoustically correct). Evidence:
+   - Upshift formant_sim drops with cepstral LPC (acoustically correct) vs. standard LPC (pitch-dominated)
+   - V-Synth output has poles tracking harmonic multiples of F0 after upshift, not true formant positions
+   - Acoustically correct formant poles diverge from V-Synth's pitch-dominated poles → lower formant_sim score for upshift cases
+
+4. **Reverted cepstral LPC routing** back to v10b (standard LPC, minGuardOrder=8 for voiced+formant). The `computeLPCCepstral()` method is retained in SourceFilterModel.cpp for future investigation.
+
+5. **Implemented transient phase reset in PhaseVocoder** — on onset frames (energy > 4× previous frame), synthesis phases are locked to analysis phases instead of being accumulated. Intended to prevent OLA pre-ringing before drum attack.
+
+6. **Ran batch test with phase reset — regression detected immediately:**
+   - drum_hit_time_2x: 19.4 → 19.8 (+0.4)
+   - drum_hit_time_4x: 18.8 → 18.1 (−0.7)
+   - **vocal_aah_time_2x: 45.7 → 36.7 (−9.0!)** — transient score 0.448 → 0.162
+
+   Root cause of vocal regression: the phase discontinuity at the vowel onset (silence → vowel triggers the 4× energy threshold) breaks the OLA envelope reconstruction. The synthesis starts at a random phase relative to the previous overlapping frames, creating a click-like artifact at the onset. This changes the attack envelope shape in a way that diverges from the V-Synth's SOLO-mode reference output (which uses pitch-synchronous OLA, producing a different attack curve).
+
+7. **Reverted transient phase reset** in PhaseVocoder. The `synthesizeFrame` signature retains the `lockToAnalysis` parameter (commented out, no-op) and the code comments explain why the approach fails.
+
+8. **hybrid_v12 final result: 26.9/100** — identical to v10b. Net effect of Session 10: no score change. The session produced two negative experiments (cepstral LPC, phase reset) and valuable diagnostic data.
+
+### Batch Test Results — Hybrid v12 (= v10b, both experiments reverted)
+
+| Test File | Null dBFS | SNR dB | Formants | Transient | Score |
+|---|---|---|---|---|---|
+| vocal_aah_formant_upmax | −21.3 | −1.8 | 0.567 | 0.470 | 34.4 |
+| vocal_aah_formant_up4st | −20.1 | −1.3 | 0.473 | 0.381 | 28.5 |
+| vocal_aah_formant_downmax | −18.1 | −0.7 | 0.329 | 0.152 | 17.0 |
+| vocal_aah_pitch_up7st | −18.0 | −0.7 | 0.330 | 0.231 | 19.0 |
+| vocal_aah_pitch_down12st | −21.5 | −2.0 | 0.603 | 0.109 | 26.9 |
+| vocal_aah_time_2x | −13.9 | −4.2 | 0.862 | 0.448 | 45.7 |
+| vocal_aah_time_halfspeed | −16.0 | −0.7 | 0.815 | 0.000 | 32.6 |
+| drum_hit_time_2x | −26.9 | −54.5 | 0.398 | 0.139 | 19.4 |
+| drum_hit_time_halfspeed | −82.7 | −0.4 | 0.500 | 0.643 | 36.1 |
+| drum_hit_time_4x | −21.5 | −59.9 | 0.388 | 0.130 | 18.8 |
+| drum_hit_pitch_up7st | −44.0 | −20.1 | 0.384 | 0.000 | 15.4 |
+| chord_Cmaj_time_2x | −22.1 | −3.5 | 0.485 | 0.471 | 31.2 |
+| chord_Cmaj_pitch_up7st | −23.2 | −0.1 | 0.610 | 0.028 | 25.1 |
+| chord_Cmaj_formant_max | −24.6 | −0.4 | 0.403 | 0.071 | 17.9 |
+| sine_440_formant_downmax | −15.7 | −1.9 | 0.634 | 0.000 | 25.4 |
+| sine_440_formant_upmax | −12.1 | −0.4 | 0.758 | 0.097 | 32.8 |
+| sine_440_pitch_down12st | −8.1 | −2.0 | 0.667 | 0.000 | 26.7 |
+| sine_440_pitch_up7st | −10.9 | −5.8 | 0.885 | 0.035 | 36.3 |
+| sine_440_time_2x | −9.3 | −7.3 | 0.503 | 0.000 | 20.1 |
+| sine_440_time_halfspeed | −12.5 | −3.9 | 0.657 | 0.093 | 28.6 |
+| **AVERAGE** | | | | | **26.9** |
+
+### Score Progression
+
+| Session | Algorithm | Avg Score | Notes |
+|---|---|---|---|
+| Baseline | Passthrough | 13.2 | |
+| Session 2 | Phase Vocoder v1 | 21.6 | 6 sine cases |
+| Session 5 | Hybrid v3 (oracle routing) | 28.7 | 6 sine cases |
+| Session 6 | Hybrid v5 (adaptive LPC) | 28.3 | 6 sine cases |
+| Session 7 | Hybrid v6 (real material) | 25.8 | 20 cases: 6 sine + 14 real |
+| Session 8 | Hybrid v8 (voiced-pitch routing) | 26.8 | 20 cases |
+| Session 9 | **Hybrid v10b (voiced-formant minOrder=8)** | **26.9** | chord/sine formant cases +2.8/+2.6 |
+| Session 10 | Hybrid v12 (cepstral LPC + transient reset, both reverted) | **26.9** | Two experiments diagnosed and reverted |
+| **Target** | — | **> 60** | |
+
+### Key Findings
+
+**Cepstral LPC does NOT cleanly separate formants from pitch at 48 kHz.**  
+The dominant cepstral bin c[1] = 1.549 represents the global spectral tilt of the excitation (harmonic energy decaying as 1/f). This tilt is so large that the low-quefrency "smooth" envelope still reflects the excitation shape rather than the vocal-tract resonance. The lifter cannot exclude c[1] (it's inside the keep window by definition). Result: smooth power spectrum peaks at 609 Hz (a harmonic) rather than F1=700 Hz (a formant).
+
+**The V-Synth's formant model is pitch-dominated, not acoustically correct.**  
+Acoustically correct formant poles (from cepstral LPC) give WORSE formant_sim scores on upshift cases because the metric measures similarity to the V-Synth reference, which itself uses pitch-dominated poles. The "correct" formant positions diverge from what the V-Synth actually does. This means improvements to LPC accuracy that go beyond what the V-Synth does will HURT the score. The algorithm must match the V-Synth's specific (pitch-dominated) behavior.
+
+**Transient phase reset in PV produces a catastrophic −9 pt regression on vocal_aah_time_2x.**  
+Phase resetting at onsets creates a discontinuity relative to the already-accumulated OLA output in the buffer. The overlap of the reset synthesis frame with the previous non-reset frames produces an attack artifact that doesn't match the V-Synth SOLO reference's smooth attack. The correct approach for transient preservation is WSOLA (time-domain OLA with waveform similarity search), which avoids phase artifacts entirely.
+
+**Drum time-stretch cases need WSOLA, not PV.**  
+drum_hit_time_2x and time_4x score 19.4 and 18.8 with SNR ≈ −55 to −60 dB — spectral content completely different from V-Synth WSOLA output. No PV-internal fix will close this gap; the algorithm for these cases needs to be WSOLA rather than phase vocoder.
+
+### Open Questions
+
+- Is the V-Synth SOLO mode using a downsampled (8–16 kHz) LPC analysis rather than 48 kHz? If so, the formant poles would be in the right frequency range (cos(ω) is significantly < 1 for F2 at 8 kHz), and matching this would give better formant_sim.
+- For WSOLA: the V-Synth BACKING stores amplitude-peak events at encode time. Can we implement a simplified version that just performs onset-synchronous OLA at decode time (detecting onsets real-time)?
+- For drum_hit_pitch_up7st (15.4): how does the V-Synth pitch-shift a drum hit? PV pitch shift (phase accumulation + resample) gives very different output from the V-Synth. Does V-Synth BACKING mode even support pitch shift? Manual says BACKING has no pitch independent control…
+
+### WSOLA Addendum (also Session 10)
+
+WSOLA was also implemented and tested for time-only cases (no pitch/formant shift). Full implementation added to PhaseVocoder: `processWSOLA()` method with normalised cross-correlation search over ±kWsolaSearchLen=256 samples. Routing: `timeOnly = (|formant| < 0.001 AND |pitch| < 0.01) → processWSOLA`.
+
+**hybrid_v13 WSOLA results (time-only cases changed):**
+
+| Case | v10b (PV) | v13 (WSOLA) | Δ |
+|---|---|---|---|
+| chord_Cmaj_time_2x | 31.2 | **35.0** | **+3.8** |
+| drum_hit_time_2x | 19.4 | 19.7 | +0.3 |
+| drum_hit_time_4x | 18.8 | 19.8 | +1.0 |
+| drum_hit_time_halfspeed | 36.1 | NaN | BUG |
+| sine_440_time_2x | 20.1 | 17.1 | **−3.0** |
+| sine_440_time_halfspeed | 28.6 | 18.9 | **−9.7** |
+| vocal_aah_time_2x | 45.7 | 31.2 | **−14.5** |
+| vocal_aah_time_halfspeed | 32.6 | 27.9 | **−4.7** |
+
+Net: −26.8 pts across 7 cases + 1 NaN. Reverted.
+
+**Root cause of WSOLA regression:** The V-Synth routes content type-dependently: SOLO/LPC for vocals, PV-like for pure tones, WSOLA/BACKING for drums/polyphonic. Our WSOLA applied uniformly doesn't match V-Synth's SOLO output for vocals (transient 0.448 → 0.000) or PV for pure sines (similarity search finds multiple alias matches on periodic signal, creates phase jump). The chord improvement confirms WSOLA is architecturally correct for ENSEMBLE content (V-Synth ENSEMBLE = WSOLA).
+
+**NaN bug:** WSOLA normalised cross-correlation divides by sqrt(denRef × denCand). When the decay region of a drum hit falls in the overlap window (both reference and candidate near zero), denRef * denCand < 1e-20 and the sqrt underflows. The `+ 1e-10f` guard prevents divide-by-zero but didn't prevent compare.py's transient metric from producing NaN (likely abs(0)/abs(0) in the Python). Retained in code with `// NaN guard` comment for future fix.
+
+**Correct fix for WSOLA:** Add content-type detection before routing:
+- Use the same ZCR + 1–4 kHz band energy check already in VariphraseEngine
+- OR use spectral flatness: pure tone → PV; polyphonic + non-voiced → WSOLA; voiced → PV (or LPC)
+- Required because V-Synth encode type selection is essentially manual; our real-time version must approximate it automatically.
+
+---
+
+## Session 11 — WSOLA Content-Adaptive Routing (Reverted)
+**Date:** 2026-06-09
+**Phase:** Algorithm
+**Model:** Claude Sonnet 4.6
+
+### What Was Done
+
+Attempted content-adaptive WSOLA routing to improve chord_Cmaj_time_2x (+3.8 expected) while protecting vocal/sine cases. Three sub-experiments:
+
+**Sub-experiment A: Per-block (512-sample) ACF routing**
+
+Computed ACF confidence = max(ACF[lag_lo..lag_hi]) / ACF[0] on the 512-sample input block. For vocal_aah F0=130 Hz (T0=369 samples), biased ACF[369]/ACF[0] = (512-369)/512 ≈ 0.28 — far below threshold. Vocal incorrectly routed to WSOLA → vocal_aah_time_2x: 45.7 → 31.1 (−14.6). ABANDONED.
+
+Root cause: With N=512 and T0=369, only 143 valid sample pairs exist for lag 369. The biased ACF is naturally low for large lags relative to window length.
+
+**Sub-experiment B: Per-frame (2048-sample) ACF routing (silent bug)**
+
+Moved routing inside the PV while loop, computing ACF on the full kFFTSize=2048 analysis frame. Empirical unbiased ACF values confirmed:
+- vocal_aah: 0.984 → should route to PV ✓
+- chord_Cmaj: 0.826 → should route to WSOLA ✓
+
+However, a WSOLA buffer-guard condition `inputFill_ >= kFFTSize + kWsolaSearchLen` (2304) was added, which is NEVER met because inputFill_ reaches at most kFFTSize (2048) when the while loop triggers at block size 512. WSOLA silently fell back to PV for all frames. Score: 26.9 (identical to v10b — silent no-op). Verified: v16b and v10b chord_Cmaj_time_2x renders are byte-identical.
+
+**Sub-experiment C: Per-frame ACF routing with guard removed**
+
+Removed the over-conservative guard. WSOLA now activates correctly. However, discovered fundamental ACF distribution overlap that makes routing unreliable:
+
+| Content | unbiased ACF p10 | median | p90 | max |
+|---------|-----------------|--------|-----|-----|
+| vocal_aah | 0.848 | 0.980 | 0.996 | 1.009 |
+| chord_Cmaj | 0.000 | 0.685 | 0.855 | 0.920 |
+| drum_hit | 0.324 | 0.713 | 0.822 | 0.903 |
+| sine_440 | 1.000 | 1.001 | 1.001 | 1.001 |
+
+**vocal_aah p10 (0.848) < chord_Cmaj max (0.920): no single threshold separates them.** The early/quiet frames of the vocal (t=0..0.2s) have low ACF confidence because the signal is not yet at full amplitude. Threshold 0.90 sends these frames to WSOLA.
+
+Results at threshold 0.90:
+- vocal_aah_time_2x: 45.7 → 32.0 (−13.7 pts) ← vocal attack frames route to WSOLA
+- chord_Cmaj_time_2x: 31.2 → 20.5 (−10.7) ← WSOLA is now active but HURTS chord
+- drum_hit_time_halfspeed: NaN ← WSOLA transient score divide-by-zero
+
+Net: severe regression. REVERTED.
+
+**NaN diagnostic:** drum_hit_time_halfspeed produced NaN in the transient metric. Root cause: WSOLA similarity search for near-silence frames gives score ≈ 0, and the subsequent output is near-zero. compare.py's transient_sim computes energy ratios that divide by near-zero. The `std::max(denRef, 1e-12f)` guard in the C++ prevents NaN in the scores, but Python-side NaN can occur.
+
+**Why chord_Cmaj_time_2x regressed with active WSOLA (20.5 < v10b 31.2):**
+
+In v13 (uniform WSOLA on all time-only), chord scored 35.0. But in v16c (per-frame routing with threshold 0.90), chord scored 20.5. The degradation comes from MIXED ROUTING: some chord frames route to PV (those with unbiased > 0.90) and others to WSOLA. The alternating PV/WSOLA frames create discontinuities in the output OLA buffer. Both synthesizers write to the same outputBuffer_ with different waveform shapes, producing artifacts at every mode switch.
+
+### Final State
+
+Code reverted to pure PV (hybrid_v10b behavior). Score: **26.9/100**.
+
+Key lessons:
+1. ACF routing on 512-sample block = fundamentally too short for low-F0 content (F0 ≤ 192 Hz).
+2. ACF routing on 2048-sample frame = correct in theory but vocal/chord distributions overlap.
+3. Mixed PV+WSOLA per-frame = worse than either pure PV or pure WSOLA.
+4. WSOLA requires CONTENT-CLASS assignment at encoding time (not per-frame runtime detection) to match V-Synth architecture.
+5. V-Synth encode type (SOLO/BACKING/ENSEMBLE/LITE) is essentially metadata chosen when the sample is loaded onto the V-Synth — impossible to replicate dynamically without a full offline analysis pass.
+
+### Batch Test Results (v11_clean = pure PV, same as v10b)
+
+| Test File | Null dBFS | SNR dB | Formants | Transient | SCORE |
+|---|---|---|---|---|---|
+| vocal_aah_time_2x | −13.9 | −4.2 | 0.862 | 0.448 | **45.7** |
+| vocal_aah_time_halfspeed | −16.2 | −0.6 | 0.812 | 0.000 | 32.5 |
+| chord_Cmaj_time_2x | −22.1 | −3.5 | 0.485 | 0.471 | 31.2 |
+| drum_hit_time_halfspeed | −82.7 | −0.4 | 0.500 | 0.643 | **36.1** |
+| All other cases | (unchanged vs v10b) | | | | |
+| **AVERAGE** | | | | | **26.9** |
+
+### Score Progression
+
+| Session | Algorithm | Avg Score | Notes |
+|---|---|---|---|
+| Session 9 | Hybrid v10b | 26.9 | Baseline |
+| Session 10 | Hybrid v12 (cepstral LPC + transient reset, reverted) | 26.9 | No change |
+| Session 11 | Hybrid v11_clean (WSOLA routing, reverted) | **26.9** | Three WSOLA approaches failed |
+
+### Next Steps
+
+1. **Downsampled LPC analysis** — run LPC on frame downsampled to 8 kHz. At 8 kHz, formant poles (F1–F4) are well-separated in cos(ω) space, allowing reliable Levinson-Durbin. Scale poles back to full-rate before synthesis. Expected improvement: vocal_aah_formant cases (currently 17–34 pts).
+
+2. **WSOLA with offline content classification** — add a pre-processing pass over the full input buffer to classify content type before calling processMono. Store result in a member variable. SOLO/LITE → PV; BACKING/ENSEMBLE → WSOLA. Eliminates per-frame routing instability.
+
+3. **Improve chord time-stretch quality** — chord_Cmaj_time_2x (31.2) is the weakest time-only case for non-drum content. V-Synth ENSEMBLE mode = WSOLA. An offline classification pass (approach 2) could safely enable WSOLA for chord.
+
+---
+
+---
+
+## Session 12 — Offline Encode Pass (V-Synth Architecture)
+**Date:** 2026-06-09
+**Phase:** Algorithm
+**Model:** Claude Sonnet 4.6
+
+### What Was Done
+
+Implemented the V-Synth-style offline encode pass: a full-buffer content analysis step
+that classifies each sample into one of four encode types before real-time processing
+begins. This resolves the fundamental per-frame ACF instability identified in Session 11.
+
+#### Architecture (V-Synth parallel)
+
+| V-Synth Encode Type | Our ContentType | Routing |
+|---------------------|-----------------|---------|
+| SOLO (LPC source-filter) | SOLO | LPC source-filter |
+| ENSEMBLE (WSOLA) | ENSEMBLE | WSOLA (time-only) |
+| BACKING (WSOLA + event stamps) | BACKING | WSOLA (time-only, timeStretch ≥ 1) |
+| LITE (pure tone / PV) | LITE | Phase vocoder |
+
+#### New APIs
+
+**`VariphraseEngine::analyzeContent(const float* mono, int n, double sr)`** — static, offline.
+Computes per-frame unbiased ACF confidence over the full buffer:
+- Step size: kHopSize = 512 samples
+- Frame size: kFFTSize = 2048 samples (correctly handles F0 down to 60 Hz)
+- Lag range: sr/500 to sr/60 (88–735 samples at 44.1 kHz)
+- Unbiased ACF: biased[lag] × N/(N-lag) / ACF[0]
+- Metric: max unbiased ACF over all lags per frame, median over non-silent frames
+
+Classification:
+```
+medianConf > 0.95  →  single-pitch content
+  + 1–4 kHz band energy > 5% → SOLO  (voiced speech / melody)
+  + otherwise                → LITE  (pure tone / oscillator)
+medianConf ≤ 0.95  →  polyphonic or transient-rich
+  + peakToMeanEnergy > 5.0   → BACKING  (drums / transient-rich)
+  + otherwise                → ENSEMBLE (chords / polyphonic)
+```
+
+**`VariphraseEngine::setAnalysis(const VariphraseAnalysis&)`** — stores result in Impl.
+
+**`PhaseVocoder::setForceWSOLA(bool)`** — flag set by Hybrid routing to select WSOLA
+for time-only ENSEMBLE/BACKING cases.
+
+#### Content Classification Results
+
+| Sample | medianConf | peakToMean | ContentType |
+|--------|-----------|------------|-------------|
+| vocal_aah | 0.985 | 2.0 | **SOLO** ✓ (no WSOLA) |
+| chord_Cmaj | 0.895 | 7.8 | **BACKING** (gets WSOLA) |
+| drum_hit | 0.489 | 11.4 | **BACKING** ✓ |
+| sine_440 | 1.000 | 1.0 | **LITE** ✓ (no WSOLA) |
+
+Note: chord_Cmaj classified as BACKING (high peak/mean due to chord attack transient)
+rather than ENSEMBLE, but both receive identical WSOLA routing in the Hybrid algorithm.
+
+#### WSOLA Guard Fix
+
+**Problem discovered**: For time compression (timeStretch < 1.0), the WSOLA synthesis
+hop < analysis hop, so the output OLA buffer write pointer advances slower than the
+read pointer → output is silence. **Fix**: WSOLA only activates when timeStretch ≥ 1.0.
+Compression cases fall back to PV.
+
+The original kFFTSize+kWsolaSearchLen (2304) guard was retained to ensure the full
+±kWsolaSearchLen similarity search is available. Reducing it to kFFTSize caused
+backward-only searches (forwardAvail=0 at every trigger) and dropped chord_Cmaj_time_2x
+from 35.0 to 20.5 — reverted.
+
+#### OfflineRenderer wired up
+
+`renderOffline()` now calls `analyzeContent()` on the full mono buffer, then
+`setAnalysis()`, before the block-by-block `processOffline()` loop. The content type
+and metrics are logged to stdout for debugging.
+
+### Batch Test Results (hybrid_v17c)
+
+| Test File | v11_clean | v17c | Delta |
+|---|---|---|---|
+| **chord_Cmaj_time_2x** | 31.2 | **35.0** | **+3.8** |
+| drum_hit_time_2x | 19.4 | 19.7 | +0.3 |
+| drum_hit_time_4x | 18.8 | 19.8 | +1.0 |
+| drum_hit_time_halfspeed | 36.1 | 36.1 | 0.0 (PV, timeStretch=0.5<1) |
+| vocal_aah_time_2x | 45.7 | 45.7 | **0.0** (no regression) |
+| All other 15 cases | — | — | 0.0 |
+| **AVERAGE (20)** | **26.9** | **27.2** | **+0.3** |
+
+### Key Findings
+
+1. **Offline content classification is stable**: vocal_aah (SOLO), chord_Cmaj (BACKING),
+   drum_hit (BACKING), sine_440 (LITE) — all correctly identified from global ACF statistics.
+   No per-frame instability.
+
+2. **chord_Cmaj_time_2x +3.8 pts**: WSOLA better preserves chord waveform shape during
+   time extension. Transient score 0.471 → 0.582, consistent with v13 (uniform WSOLA)
+   which also showed +3.8 on this case.
+
+3. **Zero regressions**: vocal_aah, sine_440, all formant/pitch cases unchanged. The
+   offline routing decision correctly prevents WSOLA from touching SOLO/LITE content.
+
+4. **Time compression limitation**: For timeStretch < 1 with WSOLA, the OLA buffer
+   write/read rate mismatch produces silence. Requires different handling
+   (e.g., discard-then-OLA instead of OLA-then-advance).
+
+### Score Progression
+
+| Session | Version | Score | Notes |
+|---|---|---|---|
+| Sessions 9–11 | hybrid_v11_clean | 26.9 | Pure PV baseline |
+| Session 12 | hybrid_v17c | **27.2** | +0.3, chord_Cmaj_time_2x +3.8 |
+
+### Next Steps
+
+1. **chord_Cmaj pitch/formant cases** — chord_Cmaj_pitch_up7st (25.1) and
+   chord_Cmaj_formant_max (17.9) could benefit from better chord-specific processing.
+   LPC doesn't apply here (chord is polyphonic). Consider spectral stretching for pitch.
+
+2. **Downsampled LPC for vocal** — vocal_aah formant cases score 17–34 pts. The LPC
+   source-filter should improve these but requires reliable pole extraction. Try LPC
+   at 8 kHz downsampled then scale poles to full rate.
+
+3. **Drum WSOLA for compression** — implement discard-frame approach: for timeStretch < 1
+   with BACKING content, discard frames at a rate matching the compression ratio, using
+   WSOLA similarity search to choose which frames to keep.
+
+4. **Vocal time-stretch improvement** — vocal_aah_time_halfspeed (32.5) is slightly below
+   vocal_aah_time_2x (45.7). With SOLO content type, the PV path is used for both.
+   Consider whether LPC-based time-stretch (replace excitation only) could improve this.
+
+---
+
 ## Session Template (copy for each new session)
 
 ## Session N — [Title]

@@ -23,6 +23,38 @@ struct VariphraseParams {
     bool  robotMode            = false;  // forced monophonic voiced analysis
 };
 
+// ─── Offline Content Analysis ─────────────────────────────────────────────────
+//
+// Mirrors the V-Synth's "encode" step: the V-Synth analyzes a loaded sample
+// and assigns it an encode type (SOLO / BACKING / ENSEMBLE / LITE) plus
+// extracts feature data (LPC frames, event stamps) before real-time playback.
+//
+// Our equivalent:
+//   1. Call VariphraseEngine::analyzeContent() once on the full input buffer.
+//   2. Call VariphraseEngine::setAnalysis() to store the result.
+//   3. Process blocks normally — routing uses the pre-computed ContentType.
+//
+// This avoids per-frame routing instability: the ACF confidence of e.g.
+// vocal_aah varies from 0.10 (attack) to 1.0 (steady state), making real-time
+// thresholding unreliable.  A global median over all frames is stable.
+
+struct VariphraseAnalysis {
+    // V-Synth encode type (manual §3-6):
+    //   LITE     — pure tones / single-oscillator content  → PV
+    //   SOLO     — voiced speech / monophonic melody       → LPC source-filter
+    //   ENSEMBLE — polyphonic / chords                     → WSOLA
+    //   BACKING  — drums / transient-rich content          → WSOLA + event stamps
+    enum class ContentType { LITE, SOLO, ENSEMBLE, BACKING };
+
+    ContentType contentType  = ContentType::LITE;
+    float medianPitchConf    = 0.0f;  // median unbiased ACF confidence (0..1+)
+    float peakToMeanEnergy   = 0.0f;  // peak RMS block / mean RMS block (transient ratio)
+
+    // Event stamps for BACKING content: sample positions of detected onsets.
+    // Used to synchronize WSOLA frames to transient timing.
+    std::vector<int> onsetSamples;
+};
+
 // ─── Algorithm Selection ─────────────────────────────────────────────────────
 
 enum class Algorithm {
@@ -66,6 +98,22 @@ public:
     // inputMono: interleaved or mono float samples
     // Returns processed output as a vector of float samples.
     std::vector<float> processOffline(const std::vector<float>& inputMono);
+
+    // ─── Encode / Analysis pass ───────────────────────────────────────────────
+    // analyzeContent: offline analysis of a full mono audio buffer.
+    //   Computes median ACF pitch confidence over all analysis frames,
+    //   classifies content type (LITE/SOLO/ENSEMBLE/BACKING), and detects
+    //   onset events for BACKING content.
+    //   sampleRate: Hz (used for band-energy voiced-speech detector)
+    //   Call this ONCE on the full input before block-by-block processing.
+    static VariphraseAnalysis analyzeContent(const float* mono,
+                                              int numSamples,
+                                              double sampleRate);
+
+    // setAnalysis: store the result of analyzeContent so that processBlock
+    //   can use it for stable content-adaptive routing.
+    //   Thread-safe: stored with relaxed atomic, effective from next process call.
+    void setAnalysis(const VariphraseAnalysis& analysis);
 
     // ─── Latency reporting (required for JUCE) ───────────────────────────────
     int getLatencySamples() const;

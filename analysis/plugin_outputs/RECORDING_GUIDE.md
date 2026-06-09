@@ -1,69 +1,43 @@
-# V-Synth Test Recording Guide
+# Plugin Outputs Directory
 
-This directory holds WAV recordings captured from the real V-Synth hardware.
-These are the "oracle" files that all plugin development is measured against.
+This directory holds WAV files rendered by the offline renderer (`variphrase_render`)
+for comparison against V-Synth reference recordings.
 
-## Recording Setup
-- Interface: any clean audio interface, 44100 Hz / 24-bit minimum
-- V-Synth patch: use a CLEAN patch with NO effects, NO COSM, NO reverb/chorus
-  - This isolates pure VariPhrase behavior
-  - Document exact patch settings in the log below
-- Input signal: feed from a DAW via the V-Synth's audio input
-- Capture V-Synth output to DAW track
+## Directory Structure
 
-## V-Synth Patch Settings for Recording
-Document here once you've established a clean test patch:
-- Patch name: [TBD]
-- Oscillator 1: PCM / EAS / External: [TBD]
-- VariPhrase mode: [TBD]
-- Effects: ALL OFF
-- COSM: OFF
+```
+plugin_outputs/
+├── hybrid_v17c/       ← current best version (Session 12)
+│   └── sustained/     ← matches test_files/sustained/ file names
+├── hybrid_v11_clean/  ← pure PV baseline (Sessions 9–11), score 26.9
+│   └── sustained/
+└── ...                ← older versions retained for regression reference
+```
 
-## Test File Naming Convention
-Format: `{signal_type}_{variphrase_setting}_{value}.wav`
+## How to Generate Outputs
 
-Examples:
-- `sine_440_pitch_up7st.wav` — 440 Hz sine, pitch shifted +7 semitones
-- `vocal_aah_time_2x.wav` — held "aah" vowel, time stretched 2x
-- `drum_hit_stretch_4x.wav` — single drum hit, 4x time stretch
-- `piano_chord_formant_up4st.wav` — piano chord, formant shifted +4 semitones
+See the full guide at `../../RECORDING_GUIDE.md` for the rebuild + render workflow.
 
-## Priority Order for First Recording Session
-Record these first — they test the most diagnostic aspects of VariPhrase:
+Quick render example:
 
-### Priority 1: Sustained tones (clean, analyzable)
-- [ ] sine_440_pitch_up7st.wav
-- [ ] sine_440_pitch_down12st.wav  
-- [ ] sine_440_time_2x.wav
-- [ ] sine_440_time_halfspeed.wav
-- [ ] sine_440_formant_up4st.wav
-- [ ] sine_440_formant_down4st.wav
+```bash
+cd ../../   # project root
+BASE=analysis
+R="$BASE/variphrase_render"
+VER=hybrid_v17c
 
-### Priority 2: Held vowels (formant analysis gold standard)
-- [ ] vocal_aah_pitch_up7st.wav
-- [ ] vocal_aah_time_2x.wav
-- [ ] vocal_aah_formant_up4st.wav  ← most diagnostic
-- [ ] vocal_aah_formant_down4st.wav
-- [ ] vocal_aah_pitch_up_formant_neutral.wav  ← pitch up without formant change
+./plugin/Source/g++_build.sh   # or see ARCHITECTURE.md rebuild command
 
-### Priority 3: Transients (reveal time-stretching artifacts)
-- [ ] drum_hit_stretch_2x.wav
-- [ ] drum_hit_stretch_4x.wav
-- [ ] drum_hit_stretch_halfspeed.wav
-- [ ] pluck_stretch_2x.wav
+for case in vocal_aah_time_2x chord_Cmaj_time_2x drum_hit_time_2x; do
+  # determine --time/--pitch/--formant from case name and render with --algo hybrid
+  echo "render $case ..."
+done
+```
 
-### Priority 4: Polyphonic (hardest for phase vocoders)
-- [ ] piano_chord_stretch_2x.wav
-- [ ] two_sines_350_440_pitch_up7st.wav
-- [ ] piano_chord_pitch_up7st.wav
+## Current Scores (hybrid_v17c)
 
-### Priority 5: Edge cases
-- [ ] whisper_pitch_up7st.wav  (unvoiced — tests noise handling)
-- [ ] noise_stretch_2x.wav
-- [ ] extreme_pitch_up24st.wav
-- [ ] extreme_time_4x.wav
+Average composite: **27.2 / 100**
+Best case: vocal_aah_time_2x = 45.7
+Key improvement vs baseline: chord_Cmaj_time_2x 31.2 → 35.0 (+3.8, WSOLA routing)
 
-## Also Record: Passthrough Reference
-For every test file, also record a PASSTHROUGH version (VariPhrase bypassed).
-This is the input signal and serves as the reference for the null test baseline.
-Store these in `test_files/passthrough/` with the same filenames.
+See `../../results/hybrid_v17c.json/` for full per-file breakdown.
