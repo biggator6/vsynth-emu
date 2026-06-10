@@ -1,76 +1,77 @@
 V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
-Last updated: Session 9 (2026-06-08)
+Last updated: Session 14 (2026-06-10)
 
-Current score: 26.9 / 100  (target: > 60)
+Current score: 27.9 / 100  (target: > 60)
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 45.7
-Best algorithm: hybrid_v10b
-  hasFormant (|formantShift| > 0.5 st)              → LPC source-filter
-  hasPitch AND voiced speech (2 kHz bp_ratio > 5%)  → LPC source-filter
-  else                                               → Phase Vocoder
-  LPC min guard order = 8 when voiced AND hasFormant (else 2)
+Best version: v18g (commit 560d322) — pre-emphasis with direction-aware bypass
+  + SOLO-gated pitch routing
+  Outputs: analysis/plugin_outputs/hybrid_v18d  (dir name lags version; scores in
+  analysis/results/hybrid_v18d)
 
-Per-case scores (hybrid_v10b):
+Routing (v18g: pitch→LPC now requires SOLO content type):
+  hasFormant (|formantShift| > 0.5 st)              → LPC source-filter
+  hasPitch AND SOLO AND voiced speech (2 kHz bp)    → LPC source-filter
+  else                                               → Phase Vocoder
+  (chord = BACKING content; its blocks were transiently passing the per-block
+   2 kHz check and routing to LPC — SOLO gate fixed chord_Cmaj_pitch_up7st)
+  LPC min guard order = 8 when voiced AND (hasFormant OR hasPitch) (else 2)
+
+Pre-emphasis logic (Sessions 13–14, the v18 series):
+  H(z) = 1 − 0.97z⁻¹ applied to LPC analysis frame; de-emphasis 1/(1−0.97z⁻¹)
+  applied post-OLA (gated by anyUsePreEmph). Direction-aware bypass:
+    formantUpBypass: voiced AND formant shift ≥ 0 AND NOT speech (2 kHz bp check)
+      → use plain frame.  Pre-emph distorts upward pole shifts on pure tones
+      (sine_440_formant_upmax: 32.8 plain vs 13.7 pre-emph) but helps downward
+      (sine_440_formant_downmax: 31.3 pre-emph vs 25.4 plain).
+    largePitchDown: voiced AND no formant shift AND pitch < −6 st
+      → use plain frame.  Shifted F0 drops below pre-emph corner
+      (vocal_aah_pitch_down12st: 27.0 plain vs 19.9 pre-emph); upward shifts
+      benefit (vocal_aah_pitch_up7st: 24.9 pre-emph vs 19.0 plain).
+  DO NOT fold de-emphasis into the LPC polynomial (A(z)×(1−0.97z⁻¹)): the
+  product is order P+1 and truncating to P distorts ALL formant roots (v18d
+  failure, scored 23.9–24.9).
+
+Per-case scores (v18f, 27.7 avg):
   -- Sine 440 Hz (sawtooth input) --
-  sine_440_formant_downmax   25.4  (LPC)  ← -2.5 vs v8; minOrder=8 hurts downshift
-  sine_440_formant_upmax     32.8  (LPC)  ← +2.6 vs v8; minOrder=8 helps upshift
-  sine_440_pitch_down12st    26.7  (PV)   [sawtooth, 2kHz BP > 5% BUT no formant shift → PV]
+  sine_440_formant_downmax   31.3  (LPC)  ← +5.9 via pre-emph (kept for down-shift)
+  sine_440_formant_upmax     32.8  (LPC)  pre-emph bypassed (formantUpBypass)
+  sine_440_pitch_down12st    26.7  (PV)
   sine_440_pitch_up7st       36.3  (PV)
   sine_440_time_2x           20.1  (PV)
   sine_440_time_halfspeed    28.6  (PV)
 
   -- Vocal "aah" (real speech, 48 kHz, 24-bit) --
-  vocal_aah_formant_upmax    34.4  (LPC)   formant sim 0.567  (unchanged)
-  vocal_aah_formant_up4st    28.5  (LPC)   formant sim 0.473  ← -1.0 vs v8
-  vocal_aah_formant_downmax  17.0  (LPC)   formant sim 0.329  ← +0.6 vs v8
-  vocal_aah_pitch_up7st      19.0  (LPC)   formant sim 0.330  (restored to v8)
-  vocal_aah_pitch_down12st   27.5  (LPC)   formant sim 0.604  (restored to v8)
-  vocal_aah_time_2x          45.7  (PV)    formant sim 0.862  ← BEST EVER
-  vocal_aah_time_halfspeed   32.5  (PV)    formant sim 0.812
+  vocal_aah_formant_upmax    29.9  (LPC)  ← v17c had 34.4; see open item 1
+  vocal_aah_formant_up4st    27.8  (LPC)
+  vocal_aah_formant_downmax  22.0  (LPC)  ← +5.0 vs v17c via pre-emph
+  vocal_aah_pitch_up7st      24.9  (LPC)  ← +5.9 vs v17c via pre-emph
+  vocal_aah_pitch_down12st   27.0  (LPC)  ← recovered via largePitchDown bypass
+  vocal_aah_time_2x          45.7  (PV)   ← BEST EVER
+  vocal_aah_time_halfspeed   32.5  (PV)
 
   -- Drum hit --
-  drum_hit_time_halfspeed    36.1  (PV)   transient score 0.643
-  drum_hit_time_2x           19.4  (PV)   transient score 0.139
-  drum_hit_time_4x           18.8  (PV)   transient score 0.130
+  drum_hit_time_halfspeed    36.1  (PV)
+  drum_hit_time_2x           19.7  (PV)
+  drum_hit_time_4x           19.8  (PV)
   drum_hit_pitch_up7st       15.4  (mixed)
 
   -- Chord C major --
-  chord_Cmaj_time_2x         31.2  (PV)   transient score 0.471
-  chord_Cmaj_pitch_up7st     25.1  (PV)
-  chord_Cmaj_formant_max     17.9  (LPC)  ← +2.8 vs v8; minOrder=8 helps polyphonic LPC
+  chord_Cmaj_time_2x         35.0  (PV/WSOLA)
+  chord_Cmaj_pitch_up7st     26.2  (PV)   ← +4.3 via SOLO gate (was misrouting to LPC)
+  chord_Cmaj_formant_max     21.1  (LPC)  ← +3.2 vs v17c
 
-Session 8 fix — voiced-speech pitch routing to LPC:
-  vocal_aah_pitch_up7st:    10.0 → 19.0 (formant_sim 0.250 → 0.330)
-  vocal_aah_pitch_down12st: 18.3 → 27.5 (formant_sim 0.297 → 0.604)
-  Detection: ZCR < 0.15 AND energy > 1e-6 AND 2kHz band energy > 5% of total.
-  Bug fixed: initial bandpass used y[n-2] in numerator (all-pole, wrong);
-  corrected to standard biquad form y[n]=G*(x[n]-x[n-2])+2R*cos(w)*y[n-1]-R^2*y[n-2].
-  Also: extended energy normalization to direct-form path (was biquad-only).
+Score history: v10b=26.9 → v17c=27.2 → v18_preemph(HEAD)=26.1 → v18e=27.4 → v18f=27.7 → v18g=27.9
 
-Session 9 fix — voiced-adaptive minimum LPC guard order:
-  chord_Cmaj_formant_max: 15.1 → 17.9 (+2.8)
-  sine_440_formant_upmax: 30.1 → 32.8 (+2.6)
-  For voiced+formant frames: Guard 3 min order raised from 2 → 8.
-  This gives LPC 4 conjugate pairs to work with, helping polyphonic/sawtooth cases.
-  For voiced+pitch-only frames: kept at min order 2 (higher order hurts pitch shift).
-  WHY vocal formant cases barely improved: LPC at 48 kHz can't separate formants from
-  pitch. All speech harmonics (120–3500 Hz) have ω << π, so short-lag autocorrelation
-  r[1]/r[0] ≈ 1 regardless of order. The extra poles at orders 3–8 fit harmonic residuals,
-  not vocal-tract formants. True fix requires pitch-synchronous LPC or cepstral liftering.
-  sine_440_formant_downmax regressed -2.5: sawtooth is "voiced" (rich harmonics) AND has
-  formant shift → gets minOrder=8 → 8-pole downshift less accurate than 2-pole.
-
-Open: LPC formant capture for voiced speech at 48 kHz — fundamental limitation:
-  vocal_aah_formant_downmax = 17.0; vocal_aah_pitch_up7st = 19.0
-  The 48 kHz sample rate means ALL speech harmonics (f0=120 Hz to F4=3.5 kHz) have
-  normalised frequency ω = 0.016–0.46 rad/sample. Short-lag autocorrelation r[k] at
-  lags 1–8 is dominated by cos(ω) ≈ 0.9+ for all harmonics. Neither Guard 3 removal,
-  pre-emphasis, nor minimum-order raising fixes this: the poles at order 3–8 fit
-  harmonic residuals, not vocal-tract formants.
-  Tried and reverted Session 8: Guard 3 removal → near-Nyquist pole aliasing.
-  Tried and reverted Session 9: pre-emphasis (α=0.97) → doesn't change r[1]/r[0] at 48 kHz.
-  Next architecture fix: pitch-synchronous LPC or cepstral liftering.
+Session 14 findings:
+  - Pre-emphasis benefit is DIRECTION-DEPENDENT for both formant and pitch shifts.
+    Bypass per-frame via formantUpBypass / largePitchDown (SourceFilterModel.cpp ~line 861).
+  - Tried and reverted: extending formantUpBypass to speech frames (dropping
+    !isVoicedSpeechFrame). upmax +1.0 but up4st −1.8, net wash. Root blocker:
+    anyUsePreEmph stays true (other frames use pre-emph) so post-OLA de-emphasis
+    still tilts the bypassed frames' output. A per-frame de-emphasis architecture
+    would be needed to get vocal_aah_formant_upmax back to v17c's 34.4.
 
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \
@@ -84,34 +85,26 @@ Run a test case (use explicit args — variable expansion can silently drop para
   analysis/variphrase_render \
     --input  analysis/test_files/passthrough/vocal_aah_passthrough.wav \
     --output /tmp/out.wav \
-    --algo lpc --formant 12
+    --algo hybrid --formant 12
+  NOTE: input is always the dry passthrough file, NOT the reference in sustained/.
 
 Run the full batch test (from project root):
   python3 analysis/batch_test.py \
     --ref-dir    analysis/test_files \
-    --plugin-dir analysis/plugin_outputs/hybrid_v10b \
-    --output     analysis/results/hybrid_v10b
+    --plugin-dir analysis/plugin_outputs/hybrid_v18d \
+    --output     analysis/results/hybrid_v18d
 
 Start a new session:
   Read ARCHITECTURE.md  (algorithm status, routing table, score history)
   Read RESEARCH_LOG.md  (session-by-session findings, open questions)
 
 Next highest-value work:
-  1. Pitch-synchronous LPC for voiced speech — the session 9 investigation showed
-     that pre-emphasis and minimum-order changes can't fix vocal formant capture at
-     48 kHz. The correct fix is pitch-synchronous analysis: analyse one pitch period
-     (zero-pad to 1024 for resolution) or apply cepstral liftering to separate the
-     spectral envelope (formants) from the harmonic fine structure (pitch).
-     Expected improvement if fixed correctly: vocal_aah_formant_downmax 17.0 → ~28+,
-                                              vocal_aah_formant_up4st 28.5 → ~35+.
-
-  2. Transient-synchronous OLA for time compression — drum_hit_time_2x (19.4) and
-     time_4x (18.8) are poor because onset cramming smears the transient; OLA phase
-     reset at detected onsets would help.  V-Synth BACKING mode stores event timestamps
-     at encode time (amplitude-peak onsets) for exactly this purpose.
-
-  3. Sawtooth formant downshift — sine_440_formant_downmax regressed to 25.4 in v10b
-     (-2.5 vs v8). Caused by the sawtooth being misclassified as "voiced speech with
-     formant shift" (it has harmonic energy in 1-4 kHz band, same as speech formants).
-     A stronger voiced-speech discriminant (e.g. modulation depth of formant peaks,
-     or pitch-period detection) could route the sawtooth to minOrder=2.
+  1. Per-frame de-emphasis (or per-frame output paths) so frames that bypass
+     pre-emphasis are not tilted by the block-level post-OLA de-emphasis.
+     Unblocks vocal_aah_formant_upmax 29.9 → ~34 (v17c level) without losing
+     the pre-emph gains elsewhere.
+  2. Transient-synchronous OLA for time compression — drum_hit_time_2x (19.7)
+     and time_4x (19.8): OLA phase reset at detected onsets; V-Synth BACKING
+     mode stores onset timestamps at encode time for exactly this.
+  3. drum_hit_pitch_up7st (15.4) — lowest case overall; needs investigation of
+     which path it takes and why both PV and LPC fail on transient pitch shift.
