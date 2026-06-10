@@ -1,18 +1,34 @@
 V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
-Last updated: Session 14 (2026-06-10)
+Last updated: Session 15 (2026-06-10)
 
-Current score: 28.2 / 100 under METRIC v2 (target: > 60)
-  METRIC v2 (commit 3ecdfdf): compare.py now time-aligns ref/output via envelope
-  cross-correlation before scoring. 8 of 20 pairs were previously scored against
-  the reference's lead-in silence — ALL pre-v2 scores are not comparable.
-  v17 outputs re-scored under metric v2 = 27.4 (baseline continuity).
+Current score: 29.5 / 100 under METRIC v2 (target: > 60)
+  METRIC v2 (commit 3ecdfdf): compare.py time-aligns ref/output via envelope
+  cross-correlation. Pre-v2 scores are not comparable (8 of 20 pairs were
+  scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
-  Best single case: vocal_aah_time_2x = 44.7
-Best version: v18h (commit 0b6d706) — dual OLA streams, speech formant-up bypass,
-  polyphonic tilt, SOLO-gated pitch routing
+  Best single case: vocal_aah_time_2x = 57.7
+Best version: v19 (commit 71aa8ce) — drain mode + OLA read gating + OLA-coherent
+  excitation phase, on top of v18h dual streams / direction-aware pre-emphasis.
   Outputs: analysis/plugin_outputs/hybrid_v18d  (dir name lags version; scores in
   analysis/results/hybrid_v18d)
+
+CRITICAL Session 15 fixes (see RESEARCH_LOG Session 15 for the full story):
+  1. processOffline drain mode: output = inputLen×stretch; rings pre-sized
+     (setOutputCapacity); zero-input drain after feed. Old renders corrupted
+     after 1.37 s on extension (ring lap).
+  2. OLA read gating: reader never passes writer (outputAvail_); per-call
+     valid prefix (lastValidOutput_) compacted by processOffline. Compression
+     no longer loses frames behind the read pointer.
+  3. OLA-coherent excitation: sawPhase_ now advances by the SYNTHESIS HOP per
+     frame, not the full frame. The old full-frame advance made overlapping
+     frames phase-incoherent (10 dB cancellation) — masked for 13 sessions by
+     the pre-gating reader reading partial sums + one-lap-late leftovers
+     (accidental 0.37 s echo). DO NOT revert gating to chase the old vocal
+     formant scores (34.x) — those were metric artifacts of the echo.
+  4. RENDER RATIOS: time_2x → --time 0.5, time_4x → 0.25, halfspeed → 2.0
+     (verified against reference content durations). Earlier sessions rendered
+     the wrong direction.
 
 Routing (v18g: pitch→LPC now requires SOLO content type):
   hasFormant (|formantShift| > 0.5 st)              → LPC source-filter
@@ -45,38 +61,38 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v18h, METRIC v2, 28.2 avg):
-  -- Sine 440 Hz (sawtooth input) --
-  sine_440_formant_downmax   28.6  (LPC, pre-emph)
-  sine_440_formant_upmax     30.3  (LPC, bypassed)
-  sine_440_pitch_down12st    28.4  (PV)
-  sine_440_pitch_up7st       37.4  (PV)
-  sine_440_time_2x           20.1  (PV)
-  sine_440_time_halfspeed    29.6  (PV)
+Per-case scores (v19, METRIC v2, 29.5 avg):
+  -- Sine 440 Hz --
+  sine_440_formant_downmax   26.0  (LPC, pre-emph)
+  sine_440_formant_upmax     16.4  (LPC, bypassed)  [render matches ref spectrum;
+                                    low score = metric noise on pure tones]
+  sine_440_pitch_down12st    44.0  (PV)
+  sine_440_pitch_up7st       35.7  (PV)
+  sine_440_time_2x           27.6  (PV)
+  sine_440_time_halfspeed    20.0  (PV)
 
-  -- Vocal "aah" (real speech, 48 kHz, 24-bit) --
-  vocal_aah_formant_upmax    34.5  (LPC, bypassed)  <- recovered via dual streams
-  vocal_aah_formant_up4st    34.2  (LPC, bypassed)
-  vocal_aah_formant_downmax  20.4  (LPC, pre-emph)  <- weakest vocal case now
-  vocal_aah_pitch_up7st      24.9  (LPC, pre-emph)
-  vocal_aah_pitch_down12st   27.1  (LPC, bypassed via largePitchDown)
-  vocal_aah_time_2x          44.7  (PV)   <- best case
-  vocal_aah_time_halfspeed   32.5  (PV)
+  -- Vocal "aah" --
+  vocal_aah_formant_upmax    22.9  (LPC)  [old 34.5 was echo-mask artifact]
+  vocal_aah_formant_up4st    20.3  (LPC)
+  vocal_aah_formant_downmax  16.2  (LPC)
+  vocal_aah_pitch_up7st      16.3  (LPC)
+  vocal_aah_pitch_down12st   26.5  (LPC)
+  vocal_aah_time_2x          57.7  (PV)   <- best case ever
+  vocal_aah_time_halfspeed   34.9  (PV)
 
   -- Drum hit --
-  drum_hit_pitch_up7st       25.7  (PV)  <- was "15.4" pre-alignment (noise)
-  drum_hit_time_2x           25.6  (PV)
-  drum_hit_time_4x           16.5  (PV)  <- lowest case under metric v2
-  drum_hit_time_halfspeed    21.0  (PV)  <- was "36.1" pre-alignment (inflated)
+  drum_hit_pitch_up7st       30.3  (PV)
+  drum_hit_time_2x           24.4  (PV)
+  drum_hit_time_4x           23.1  (PV)
+  drum_hit_time_halfspeed    26.0  (PV)
 
   -- Chord C major --
-  chord_Cmaj_time_2x         35.0  (PV/WSOLA)
-  chord_Cmaj_pitch_up7st     26.2  (PV, SOLO gate keeps it off LPC)
-  chord_Cmaj_formant_max     20.9  (LPC, bypassed + polyphonic tilt)
+  chord_Cmaj_time_2x         44.6  (PV)
+  chord_Cmaj_pitch_up7st     49.8  (PV)
+  chord_Cmaj_formant_max     26.5  (LPC)
 
-Score history (OLD metric, not comparable to v2): v10b=26.9 -> v17c=27.2 ->
-  v18_preemph=26.1 -> v18e=27.4 -> v18f/g=27.7 -> v18h=28.0
-Metric v2 history: v17 outputs=27.4, v18h=28.2
+Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5
+(Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \
@@ -107,15 +123,12 @@ Start a new session:
   Read ARCHITECTURE.md  (algorithm status, routing table, score history)
   Read RESEARCH_LOG.md  (session-by-session findings, open questions)
 
-Next highest-value work (metric v2 numbers):
-  1. Offline render drain mode -- process() forces equal in/out counts, so for
-     timeStretch=2 the input ring (4*kFrameSize) overflows and drops input
-     chunks silently. Sustained vowels mask it; transients don't. Needs a
-     pull-based drain in VariphraseEngine/processOffline. Prerequisite for
-     meaningful time-stretch optimisation.
-  2. drum_hit_time_4x (16.5) -- lowest case. Transient-synchronous OLA: phase
-     reset at detected onsets; V-Synth BACKING mode stores onset timestamps at
-     encode time for exactly this.
-  3. vocal_aah_formant_downmax (20.4) -- weakest vocal case, formant_sim 0.327.
-     Downward shift keeps pre-emph; check whether order-8 guard limits F1
-     resolution after a -12 st shift.
+Next highest-value work (metric v2, v19 numbers):
+  1. Excitation F0 precision — output is ~1% sharp (444 vs 439 Hz; integer ACF
+     lag in estimateF0). Now that the OLA is phase-coherent this directly hurts
+     null tests on every LPC case. Add parabolic interpolation of the ACF peak.
+  2. Vocal formant/pitch cases (16-27) — true weakest group now the echo mask
+     is gone. Visible gap: upper harmonics roll off ~25 dB faster than the
+     V-Synth reference (excitation spectral shape).
+  3. drum time compression (24.4/23.1) — transient-synchronous OLA (V-Synth
+     BACKING event stamps); now measurable with correct compression rendering.

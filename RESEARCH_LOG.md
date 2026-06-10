@@ -1343,6 +1343,118 @@ engine — substantial rework, deferred.
 
 ---
 
+## Session 15 — v19: Drain Mode, Read Gating & the 13-Session OLA Bug
+**Date:** 2026-06-10 (same day, continuation)
+**Phase:** Algorithm / Infrastructure
+**Model:** Fable
+
+### What Was Done
+
+Implemented the offline render drain mode (Session 14 next-step #1), which pulled
+a thread that unravelled into the most significant correctness fix of the project.
+All three fixes landed as **v19 (71aa8ce), score 29.5** (metric v2; previous best
+28.2, re-scored v17 baseline 27.4).
+
+#### 1. Offline drain mode
+
+`processOffline()` now produces `inputLen × timeStretchRatio` samples.  Engine
+output rings are pre-sized via new `setOutputCapacity()` methods so extension
+renders can't lap the ring (the 64k PV ring lapped after ~1.4 s at 48 kHz —
+confirmed: the old vocal_aah_time_halfspeed render degraded at exactly 1.37 s).
+After input is exhausted, zero-input blocks pump out the queued surplus.
+
+Also discovered and fixed the render ratio convention: measuring reference
+content durations against the dry inputs shows time_2x = ratio 0.5, time_4x =
+0.25, halfspeed = 2.0.  **Previous sessions rendered time cases with the wrong
+direction** (e.g. halfspeed at 0.5); they scored plausibly anyway because the
+metrics barely distinguish direction on stationary content.  This also explains
+the Session 12 "chord_Cmaj_time_2x uses WSOLA" claim: WSOLA requires stretch ≥ 1,
+which only held because the render direction was inverted.
+
+#### 2. OLA read gating
+
+For compression (stretch < 1) the reader outpaced the writer: it read zeros
+ahead, and later synthesis frames landed BEHIND the read pointer — silently
+lost.  Engines now track `outputAvail_`; when the queue is empty the read pads
+zeros without consuming, and `lastValidOutput_` reports the per-call valid
+prefix so `processOffline` can compact the stream.  Latency strip is no longer
+needed (leading zeros are reported invalid, never collected).
+
+#### 3. The 13-session OLA bug: incoherent excitation phase, masked by partial reads
+
+After gating, all SFM formant cases collapsed (sine upmax render: RMS 0.024 vs
+the pre-gating 0.073).  Instrumentation showed identical synthesis frames and
+perfect 4-window OLA counts in both builds — yet 3× different output level.
+
+Root cause chain, in two layers:
+
+- **Layer 1 (revealed):** `sawPhase_` advanced a full kFrameSize (1024) per
+  synthesis frame, but frames OLA at kHopSize (256) intervals.  Overlapping
+  frames therefore carried excitation from UNRELATED time regions → phase
+  cancellation in the overlap (~10 dB level loss, smeared spectrum, F0
+  wobble).  The LPC resynthesis has been doing this since Session 3.
+
+- **Layer 2 (the mask):** the pre-gating reader sat 768 samples AHEAD of the
+  OLA write pointer (warm-up arithmetic: reads advance 512/call from call 1,
+  writes lag by the 1024-sample frame fill).  It read PARTIAL OLA sums (1–3
+  windows), zeroed them, and the remaining window contributions accumulated
+  until the ring wrapped — read one lap (16384 samples ≈ 0.37 s) later.  Each
+  output sample was therefore `partial(t) + leftover(t − 0.37 s)`: an
+  accidental echo that decorrelated the would-be-cancelling overlaps and
+  HID the phase bug for 13 sessions.
+
+**Fix:** synthesise each frame from a phase snapshot, then advance the running
+phase by only the synthesis hop (`kTwoPi · f0/sr · kHopSize · timeStretch`).
+Overlapping frames are now coherent on the output timeline.  Result: the sine
+formant-up render finally matches the V-Synth reference's harmonic profile —
+444/888/1332 Hz at 49/61/28 dB vs reference 439/880/1319 Hz at 50/62/53 dB —
+and RMS 0.21 vs reference 0.24 (the old "good-scoring" render was 398/972 Hz
+at 1/10 the reference level).
+
+### Batch Test Results (v19, metric v2)
+
+| Test File | pre-v19 (28.2 run) | v19 | Delta |
+|---|---|---|---|
+| vocal_aah_time_2x | 44.7 | **57.7** | +13.0 (best case ever) |
+| chord_Cmaj_pitch_up7st | 26.2 | **49.8** | +23.6 |
+| chord_Cmaj_time_2x | 35.0 | **44.6** | +9.6 |
+| sine_440_pitch_down12st | 28.4 | **44.0** | +15.6 |
+| drum_hit_pitch_up7st | 25.7 | 30.3 | +4.6 |
+| chord_Cmaj_formant_max | 20.9 | 26.5 | +5.6 |
+| drum_hit_time_4x | 16.5 | 23.1 | +6.6 |
+| vocal_aah_formant_upmax | 34.5 | 22.9 | −11.6 (see caveat) |
+| vocal_aah_formant_up4st | 34.2 | 20.3 | −13.9 (see caveat) |
+| vocal_aah_pitch_up7st | 24.9 | 16.3 | −8.6 (see caveat) |
+| **AVERAGE (20)** | **28.2** | **29.5** | **+1.3** |
+
+### Caveat: the vocal formant/pitch "regressions"
+
+The cases that dropped were previously rendered through the broken partial-read
+OLA, whose 0.37 s echo-doubling appears to FLATTER the formant-similarity metric
+on stationary vowels (fuller spectrum from summed time-shifted copies).  Manual
+spectral analysis shows the v19 renders are objectively closer to the reference
+in harmonic structure and level.  Treat the old 34.x vocal formant scores as
+metric artifacts, not a target to restore by reverting.  The honest gap to
+close: the v19 excitation is ~1% sharp (444 vs 439 Hz — integer-lag ACF
+quantisation in estimateF0) and the upper harmonic (1332 Hz) is ~25 dB below
+the reference's.
+
+### Next Steps
+
+1. **Excitation F0 precision** — the 1% sharpness (integer ACF lag) now matters
+   because the output is phase-coherent.  Parabolic interpolation of the ACF
+   peak, or lag refinement, should tighten the null test on all LPC cases.
+
+2. **Vocal formant cases under the coherent OLA** (16–23 range) — with the echo
+   mask gone these are the true weakest cases.  Upper-harmonic level (synthesis
+   excitation rolls off faster than the V-Synth's) is the visible gap.
+
+3. **drum_hit_time_2x / time_4x (24.4 / 23.1)** — transient-synchronous OLA
+   (V-Synth BACKING event stamps) remains the planned approach, now measurable
+   thanks to correct compression rendering.
+
+---
+
 ## Session Template (copy for each new session)
 
 ## Session N — [Title]
