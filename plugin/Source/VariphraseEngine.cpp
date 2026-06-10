@@ -120,8 +120,17 @@ struct VariphraseEngine::Impl {
                 const bool hasPitch   = (std::abs(params.pitchShiftSemitones)   > 0.5f);
 
                 // ── Voiced-speech detector (lightweight, per-block) ───────────
+                // Gated by the offline encode-pass classification: only SOLO
+                // content (monophonic voiced speech/melody) may route pitch
+                // shifts to LPC.  BACKING (drums) and ENSEMBLE (chords) blocks
+                // can transiently pass the ZCR + 2 kHz band check — C major
+                // chord harmonics put >5% energy at 2 kHz — which routed some
+                // chord_Cmaj_pitch blocks to LPC and cost 3.2 pts once LPC
+                // pre-emphasis landed (Session 14).
                 bool isVoicedSpeech = false;
-                if (hasPitch && !hasFormant) {
+                const bool soloContent =
+                    (analysis.contentType == VariphraseAnalysis::ContentType::SOLO);
+                if (hasPitch && !hasFormant && soloContent) {
                     // ZCR
                     int crossings = 0;
                     for (int i = 1; i < numSamples; ++i)
