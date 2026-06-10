@@ -12,7 +12,7 @@ static constexpr float kTwoPi = 6.28318530718f;
 // Input ring buffer: kFFTSize * 4 — holds frames comfortably between flushes.
 // Output OLA buffer: kFFTSize * 32 — handles up to 4× time stretch + latency.
 static constexpr int kInBufSize  = 2048 * 4;   // = kFFTSize * 4
-static constexpr int kOutBufSize = 2048 * 32;  // = kFFTSize * 32
+static constexpr int kOutBufSize = 2048 * 32;  // = kFFTSize * 32 (default; see setOutputCapacity)
 
 // ─── FFT (Cooley-Tukey iterative, in-place) ───────────────────────────────────
 
@@ -63,7 +63,9 @@ void PhaseVocoder::prepare(double sr, int /*maxBlockSize*/) {
     sampleRate_ = sr;
 
     inputBuffer_.assign(kInBufSize,  0.0f);
-    outputBuffer_.assign(kOutBufSize, 0.0f);
+    if ((int)outputBuffer_.size() < kOutBufSize)
+        outputBuffer_.assign(kOutBufSize, 0.0f);
+    outBufSize_ = (int)outputBuffer_.size();
 
     const int halfN = kFFTSize / 2 + 1;
     lastPhase_.assign(halfN, 0.0f);
@@ -72,6 +74,13 @@ void PhaseVocoder::prepare(double sr, int /*maxBlockSize*/) {
     wsolaRef_.assign(kFFTSize, 0.0f);
 
     reset();
+}
+
+void PhaseVocoder::setOutputCapacity(int samples) {
+    if (samples > (int)outputBuffer_.size()) {
+        outputBuffer_.assign(samples, 0.0f);
+        outBufSize_ = samples;
+    }
 }
 
 void PhaseVocoder::reset() {
@@ -85,6 +94,8 @@ void PhaseVocoder::reset() {
     inputFill_      = 0;
     outputWritePos_ = 0;
     outputReadPos_  = 0;
+    outputAvail_    = 0;
+    lastValidOutput_= 0;
     synthHopAccum_  = 0.0f;
     resampleFrac_   = 0.0f;
 
@@ -311,7 +322,7 @@ void PhaseVocoder::processWSOLA(float timeStretch) {
         for (int i = 0; i < kFFTSize; ++i) {
             const int   inIdx  = (analysisStart + i) % kInBufSize;
             const float sample = inputBuffer_[inIdx] * window_[i];
-            const int   outIdx = (outputWritePos_ + i) % kOutBufSize;
+            const int   outIdx = (outputWritePos_ + i) % outBufSize_;
             outputBuffer_[outIdx] += sample;
         }
 
@@ -319,7 +330,7 @@ void PhaseVocoder::processWSOLA(float timeStretch) {
         // Copy the last (kFFTSize) samples from the synthesis output into
         // wsolaRef_ so the next search has an up-to-date reference.
         for (int i = 0; i < kFFTSize; ++i) {
-            const int outIdx = (outputWritePos_ + i) % kOutBufSize;
+            const int outIdx = (outputWritePos_ + i) % outBufSize_;
             wsolaRef_[i] = outputBuffer_[outIdx];
         }
 
@@ -327,7 +338,8 @@ void PhaseVocoder::processWSOLA(float timeStretch) {
         synthHopAccum_ += float(kHopSize) * timeStretch;
         const int synthHop = static_cast<int>(synthHopAccum_);
         synthHopAccum_    -= float(synthHop);
-        outputWritePos_    = (outputWritePos_ + synthHop) % kOutBufSize;
+        outputWritePos_    = (outputWritePos_ + synthHop) % outBufSize_;
+        outputAvail_      += synthHop;
 
         // Advance ideal input position by one analysis hop (NOT by bestDelta +
         // kHopSize — the search offset is absorbed into the alignment only; the
@@ -480,7 +492,7 @@ void PhaseVocoder::processMono(const float* input, float* output, int numSamples
 
         // OLA: add synthesis frame into output buffer at outputWritePos_
         for (int i = 0; i < kFFTSize; ++i) {
-            int pos = (outputWritePos_ + i) % kOutBufSize;
+            int pos = (outputWritePos_ + i) % outBufSize_;
             outputBuffer_[pos] += synthFrame[i];
         }
 
@@ -488,7 +500,8 @@ void PhaseVocoder::processMono(const float* input, float* output, int numSamples
         synthHopAccum_ += float(kHopSize) * totalStretch;
         const int synthHop = static_cast<int>(synthHopAccum_);
         synthHopAccum_    -= float(synthHop);
-        outputWritePos_    = (outputWritePos_ + synthHop) % kOutBufSize;
+        outputWritePos_    = (outputWritePos_ + synthHop) % outBufSize_;
+        outputAvail_      += synthHop;
 
         // Advance analysis read position by one analysis hop
         inputReadPos_ = (inputReadPos_ + kHopSize) % kInBufSize;
@@ -511,17 +524,34 @@ void PhaseVocoder::processMono(const float* input, float* output, int numSamples
     const float normFactor = totalStretch / 2.0f;
     const bool  doPitch    = std::abs(params_.pitchShiftSemitones) > 0.01f;
 
+    // Read gating (Session 14): never advance the read pointer past the write
+    // pointer.  Without this, time COMPRESSION (timeStretch < 1) makes the
+    // reader outpace the writer — it reads zeros ahead, and later synthesis
+    // frames land BEHIND the read pointer and are silently lost.  When the
+    // queue is empty we emit zeros without consuming, and lastValidOutput_
+    // records how many leading samples of this call were real queued data so
+    // an offline caller can compact the stream.  Production happens before
+    // reads within a call, so availability only decreases here and the valid
+    // samples always form a prefix.
+    lastValidOutput_ = numSamples;
     for (int i = 0; i < numSamples; ++i) {
+        const float advance = doPitch ? pitchRatio : 1.0f;
+
+        if (outputAvail_ < (int)advance + 1) {     // need ip0..ip1 + consumption
+            if (lastValidOutput_ == numSamples) lastValidOutput_ = i;
+            output[i] = 0.0f;
+            continue;
+        }
+
         // Linear interpolation between integer positions in the OLA buffer
         const int   ip0 = outputReadPos_;
-        const int   ip1 = (outputReadPos_ + 1) % kOutBufSize;
+        const int   ip1 = (outputReadPos_ + 1) % outBufSize_;
         const float s0  = outputBuffer_[ip0];
         const float s1  = outputBuffer_[ip1];
 
         output[i] = normFactor * (s0 + resampleFrac_ * (s1 - s0));
 
         // Advance fractional read position by pitchRatio (or 1.0 if no pitch shift)
-        const float advance = doPitch ? pitchRatio : 1.0f;
         resampleFrac_ += advance;
 
         // Consume any whole samples from the OLA buffer
@@ -530,8 +560,9 @@ void PhaseVocoder::processMono(const float* input, float* output, int numSamples
 
         for (int k = 0; k < whole; ++k) {
             outputBuffer_[outputReadPos_] = 0.0f;
-            outputReadPos_ = (outputReadPos_ + 1) % kOutBufSize;
+            outputReadPos_ = (outputReadPos_ + 1) % outBufSize_;
         }
+        outputAvail_ -= whole;
     }
 }
 

@@ -45,6 +45,16 @@ public:
 
     int getLatencySamples() const;
 
+    // Enlarge both OLA output rings for offline time-stretch renders (the
+    // writer outpaces the reader by ~inputLen×(stretch−1) over a render and
+    // the default ring laps).  Call after prepare()/reset(), before processing.
+    // Never shrinks.  Both streams must stay the same size (shared positions).
+    void setOutputCapacity(int samples);
+
+    // Number of leading samples of the last processMono() output block that
+    // were real queued OLA data (rest were starvation-padding zeros).
+    int getLastValidOutput() const { return lastValidOutput_; }
+
 private:
     double sampleRate_ = 44100.0;
     VariphraseParams params_ {};
@@ -65,6 +75,8 @@ private:
     int   inputFill_      = 0;
     int   outputWritePos_ = 0;
     int   outputReadPos_  = 0;
+    int   outputAvail_    = 0;   // queued samples between read and write pointers
+    int   lastValidOutput_= 0;   // see getLastValidOutput()
     float synthHopAccum_  = 0.0f;
 
     // ── Excitation state ──────────────────────────────────────────────────────

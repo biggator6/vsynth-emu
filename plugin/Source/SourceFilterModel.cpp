@@ -70,6 +70,13 @@ void SourceFilterModel::prepare(double sampleRate, int /*maxBlockSize*/) {
     reset();
 }
 
+void SourceFilterModel::setOutputCapacity(int samples) {
+    if (samples > (int)outputBuffer_.size()) {
+        outputBuffer_.assign(samples, 0.0f);
+        outputBufferPlain_.assign(samples, 0.0f);
+    }
+}
+
 void SourceFilterModel::reset() {
     std::fill(inputBuffer_.begin(),  inputBuffer_.end(),  0.0f);
     std::fill(outputBuffer_.begin(), outputBuffer_.end(), 0.0f);
@@ -84,6 +91,8 @@ void SourceFilterModel::reset() {
     inputFill_      = 0;
     outputWritePos_ = 0;
     outputReadPos_  = 0;
+    outputAvail_    = 0;
+    lastValidOutput_= 0;
     synthHopAccum_  = 0.0f;
     sawPhase_       = 0.0f;
     lpcGain_        = 1.0f;
@@ -907,9 +916,31 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
             }
         }
 
-        // Synthesise excitation
+        // Synthesise excitation — OLA-coherent phase (Session 14 fix).
+        //
+        // Frames are OLA'd at synthHop (≈256-sample) intervals but each frame
+        // is kFrameSize (1024) samples long.  Letting sawPhase_ advance by the
+        // full frame per call meant overlapping frames carried excitation from
+        // DIFFERENT time regions — unrelated phase in the overlap → heavy OLA
+        // cancellation (≈10 dB level loss on a pure sine, smeared spectrum).
+        // This was masked for 13 sessions by an output-ring bug that read
+        // partial OLA sums; the Session 14 read-gating fix exposed it.
+        //
+        // Fix: synthesise the frame from a snapshot, then advance the running
+        // phase by only the synthesis hop, so frame k+1 starts exactly where
+        // it overlaps frame k on the OUTPUT timeline.
         std::vector<float> excitation;
-        synthesiseExcitation(excitation, kFrameSize, excitationF0, sawPhase_);
+        {
+            const float hopAdvance = float(kHopSize) * timeStretch;
+            float framePhase = sawPhase_;
+            synthesiseExcitation(excitation, kFrameSize, excitationF0, framePhase);
+            if (excitationF0 > 0.0f)
+                sawPhase_ = std::fmod(sawPhase_
+                            + kTwoPi * (excitationF0 / float(sampleRate_)) * hopAdvance,
+                            kTwoPi);
+            else
+                sawPhase_ = framePhase;   // unvoiced: keep legacy behaviour
+        }
 
         // Scale excitation by LPC gain (match input level)
         for (float& v : excitation) v *= lpcGain;
@@ -1033,6 +1064,7 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         int synthHop    = static_cast<int>(synthHopAccum_);
         synthHopAccum_ -= float(synthHop);
         outputWritePos_ = (outputWritePos_ + synthHop) % outBufSize;
+        outputAvail_   += synthHop;
 
         // Advance analysis hop
         inputReadPos_ = (inputReadPos_ + kHopSize) % inBufSize;
@@ -1052,7 +1084,17 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
     // old single-stream version tilted bypassed frames whenever any frame in
     // the block had used pre-emphasis.  When the pre-emph stream is silent the
     // filter just decays its state; no gating needed.
+    // Read gating (Session 14): when the queue is empty, emit zeros without
+    // advancing the read pointer — otherwise time compression makes the reader
+    // overtake the writer and later frames are written behind it and lost.
+    // lastValidOutput_ records the valid prefix for offline compaction.
+    lastValidOutput_ = numSamples;
     for (int i = 0; i < numSamples; ++i) {
+        if (outputAvail_ <= 0) {
+            if (lastValidOutput_ == numSamples) lastValidOutput_ = i;
+            output[i] = 0.0f;
+            continue;
+        }
         const float y_e = outputBuffer_[outputReadPos_] * normFactor;
         const float y   = y_e + 0.97f * deEmphState_;
         deEmphState_ = y;
@@ -1060,6 +1102,7 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         outputBuffer_[outputReadPos_]      = 0.0f;
         outputBufferPlain_[outputReadPos_] = 0.0f;
         outputReadPos_ = (outputReadPos_ + 1) % outBufSize;
+        --outputAvail_;
     }
 }
 

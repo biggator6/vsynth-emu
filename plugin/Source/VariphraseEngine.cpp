@@ -29,6 +29,10 @@ struct VariphraseEngine::Impl {
     // Latency in samples (set by prepare())
     int latencySamples = 0;
 
+    // Valid (non-starvation-padding) prefix of the last processMono output.
+    // Set per call from the active processor; numSamples for passthrough.
+    int lastValidOutput = 0;
+
     // ── Offline encode pass result ────────────────────────────────────────────
     // Set once by setAnalysis() before real-time processing starts.
     // Used by the Hybrid routing to decide WSOLA vs PV vs LPC.
@@ -58,6 +62,7 @@ struct VariphraseEngine::Impl {
 
     void processMono(const float* input, float* output, int numSamples) {
         const Algorithm algo = algorithm.load(std::memory_order_relaxed);
+        lastValidOutput = numSamples;
 
         switch (algo) {
             case Algorithm::Passthrough:
@@ -67,6 +72,7 @@ struct VariphraseEngine::Impl {
             case Algorithm::PhaseVocoder:
                 phaseVocoder->setParams(params);
                 phaseVocoder->processMono(input, output, numSamples);
+                lastValidOutput = phaseVocoder->getLastValidOutput();
                 break;
 
             case Algorithm::SinusoidalPlusResidual:
@@ -74,11 +80,13 @@ struct VariphraseEngine::Impl {
                 // For now fall through to phase vocoder
                 phaseVocoder->setParams(params);
                 phaseVocoder->processMono(input, output, numSamples);
+                lastValidOutput = phaseVocoder->getLastValidOutput();
                 break;
 
             case Algorithm::LPCSourceFilter:
                 sourceFilter->setParams(params);
                 sourceFilter->processMono(input, output, numSamples);
+                lastValidOutput = sourceFilter->getLastValidOutput();
                 break;
 
             case Algorithm::Hybrid: {
@@ -196,6 +204,7 @@ struct VariphraseEngine::Impl {
                          analysis.contentType == VariphraseAnalysis::ContentType::BACKING);
                     sourceFilter->setParams(lpcParams);
                     sourceFilter->processMono(input, output, numSamples);
+                    lastValidOutput = sourceFilter->getLastValidOutput();
                 } else {
                     // Time-only (or pitch-only on non-voiced content) path.
                     //
@@ -217,6 +226,7 @@ struct VariphraseEngine::Impl {
                     phaseVocoder->setForceWSOLA(wsolaCandidate);
                     phaseVocoder->setParams(params);
                     phaseVocoder->processMono(input, output, numSamples);
+                    lastValidOutput = phaseVocoder->getLastValidOutput();
                 }
                 break;
             }
@@ -270,34 +280,68 @@ Algorithm VariphraseEngine::getAlgorithm() const {
 }
 
 std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& inputMono) {
-    // Process in maxBlockSize chunks
-    const int blockSize = pImpl->maxBlockSize;
-    const int n = static_cast<int>(inputMono.size());
-    std::vector<float> output(n + pImpl->latencySamples, 0.0f);
+    // Session 14 rework: drain mode for time stretch.
+    //
+    // The old implementation collected exactly inputLen output samples.  Two
+    // problems for timeStretch ≠ 1:
+    //   1. The stretched signal is inputLen×stretch long; the tail was lost.
+    //   2. For stretch > 1 the engines' OLA write pointer advances stretch×
+    //      faster than the read pointer.  The surplus grows to
+    //      inputLen×(stretch−1), lapping the default 64k output ring after
+    //      ~1.4 s at 48 kHz and corrupting the OLA sum (confirmed: the
+    //      vocal_aah_time_halfspeed render degraded at exactly 1.37 s).
+    //
+    // Fix: pre-size the engine output rings to the full render, feed all the
+    // input, then keep pumping zero-input blocks ("drain") until the expected
+    // inputLen×stretch samples (plus latency) have been collected.  Trailing
+    // zero blocks are harmless: their Hann-windowed OLA contribution is zero,
+    // and the queued surplus drains through the normal read path.
+    const int   blockSize = pImpl->maxBlockSize;
+    const int   n         = static_cast<int>(inputMono.size());
+    const float stretch   = std::max(0.05f, pImpl->params.timeStretchRatio);
+    const int   expected  = std::max(1, (int)std::lround((double)n * (double)stretch));
 
-    for (int i = 0; i < n; i += blockSize) {
-        int count = std::min(blockSize, n - i);
-        const float* inPtr  = inputMono.data() + i;
-        float*       outPtr = output.data() + i;
+    if (pImpl->phaseVocoder) pImpl->phaseVocoder->setOutputCapacity(expected + 8 * blockSize);
+    if (pImpl->sourceFilter) pImpl->sourceFilter->setOutputCapacity(expected + 8 * blockSize);
 
-        // Pad if last block is short
+    std::vector<float> output;
+    output.reserve(expected + blockSize);
+
+    int fed = 0;
+    // Safety cap: enough iterations to feed all input AND collect all output
+    // (the valid prefix per call can be < blockSize, so allow generous slack).
+    const int maxIters = 4 * ((n + expected) / blockSize) + 64;
+    for (int iter = 0;
+         (fed < n || (int)output.size() < expected) && iter < maxIters;
+         ++iter) {
         std::vector<float> inBuf(blockSize, 0.0f);
-        std::copy(inPtr, inPtr + count, inBuf.data());
+        if (fed < n) {
+            const int count = std::min(blockSize, n - fed);
+            std::copy(inputMono.begin() + fed, inputMono.begin() + fed + count,
+                      inBuf.begin());
+            fed += count;
+        }
 
         std::vector<float> outBuf(blockSize, 0.0f);
         const float* inPtrs[1]  = { inBuf.data() };
         float*       outPtrs[1] = { outBuf.data() };
         process(inPtrs, outPtrs, 1, blockSize);
 
-        std::copy(outBuf.begin(), outBuf.begin() + count, outPtr);
+        // Keep only the valid (non-starvation-padding) prefix.  Read gating in
+        // the processors means engine latency zeros and compression starvation
+        // gaps are reported as invalid rather than collected — so no separate
+        // latency strip is needed and the stream is contiguous signal.
+        const int valid = std::min(pImpl->lastValidOutput, blockSize);
+        if (valid > 0)
+            output.insert(output.end(), outBuf.begin(), outBuf.begin() + valid);
+
+        // After all input is fed, stop once the engines run dry.
+        if (fed >= n && valid == 0 && iter > (n / blockSize) + 8 &&
+            (int)output.size() >= expected)
+            break;
     }
 
-    // Strip latency compensation
-    if (pImpl->latencySamples > 0 && static_cast<int>(output.size()) > pImpl->latencySamples) {
-        output.erase(output.begin(), output.begin() + pImpl->latencySamples);
-    }
-
-    output.resize(n);
+    output.resize(expected);
     return output;
 }
 

@@ -52,6 +52,20 @@ public:
 
     int getLatencySamples() const;
 
+    // Enlarge the output OLA ring so an offline time-stretch render can hold
+    // the full write/read surplus without the write pointer lapping the read
+    // pointer.  For timeStretch > 1 the writer advances stretch× faster than
+    // the reader, so the surplus grows to ~inputLen×(stretch−1) over a render;
+    // the default 64k ring laps after ~1.4 s at 48 kHz, corrupting the OLA sum.
+    // Call after prepare()/reset() and before processing (positions must be 0).
+    // Never shrinks.  Real-time use keeps the default capacity.
+    void setOutputCapacity(int samples);
+
+    // Number of leading samples of the last processMono() output block that
+    // were real queued OLA data (the rest were starvation-padding zeros).
+    // Offline callers use this to compact the stream for time compression.
+    int getLastValidOutput() const { return lastValidOutput_; }
+
 private:
     // ── FFT parameters ──────────────────────────────────────────────────────
     static constexpr int kFFTSize = 2048;
@@ -70,8 +84,11 @@ private:
 
     // ── Output OLA buffer ────────────────────────────────────────────────────
     std::vector<float> outputBuffer_;
+    int outBufSize_     = 0;  // current ring capacity (== outputBuffer_.size())
     int outputWritePos_ = 0;  // where the next synthesis frame is OLA'd in
     int outputReadPos_  = 0;  // where output samples are read from
+    int outputAvail_    = 0;  // queued samples between read and write pointers
+    int lastValidOutput_= 0;  // see getLastValidOutput()
     float synthHopAccum_= 0.0f; // fractional synthesis-hop accumulator
 
     // ── Phase vocoder state ──────────────────────────────────────────────────
