@@ -848,11 +848,22 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
             }
             isVoicedSpeechFrame = (bpEnergy > 0.05 * totalE);
         }
-        // usePreEmph: false only when voiced non-speech frames with positive formant shift.
-        // Pre-emphasis hurts formant-up on pure tones (pole positions distort upward shift)
-        // but helps formant-down (HEAD scores +4.5 pts on sine_440_formant_downmax).
-        const bool usePreEmph = !hasFormantShiftBlock || !voiced || isVoicedSpeechFrame
-                                || (formantShift < 0.0f);
+        // usePreEmph is direction-aware in both axes:
+        //   Formant shift: bypass pre-emphasis only for voiced non-speech frames with
+        //   POSITIVE formant shift — pre-emphasis distorts upward pole shifts on pure
+        //   tones (sine_440_formant_upmax: 32.8 plain vs 13.7 pre-emph) but helps
+        //   downward shifts (+5.9 on sine_440_formant_downmax).
+        //   Pitch shift: bypass pre-emphasis for large DOWNWARD pitch shifts — the
+        //   shifted excitation F0 drops below the pre-emphasis corner so the tilted
+        //   envelope mis-weights the low harmonics (vocal_aah_pitch_down12st:
+        //   27.5 plain vs 19.9 pre-emph), while upward shifts benefit
+        //   (vocal_aah_pitch_up7st: 19.0 plain vs 24.9 pre-emph).
+        const bool largePitchDown = !hasFormantShiftBlock && voiced
+                                    && (params_.pitchShiftSemitones < -6.0f);
+        const bool formantUpBypass = hasFormantShiftBlock && voiced
+                                     && !isVoicedSpeechFrame
+                                     && (formantShift >= 0.0f);
+        const bool usePreEmph = !(formantUpBypass || largePitchDown);
         if (usePreEmph) anyUsePreEmph = true;
         const std::vector<float>& analysisFrame = usePreEmph ? frameEmph : frame;
 
