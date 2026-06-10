@@ -730,6 +730,7 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
     const float pitchRatio   = std::pow(2.0f, params_.pitchShiftSemitones / 12.0f);
     const float timeStretch  = params_.timeStretchRatio;
     const float formantShift = params_.formantShiftSemitones;
+    const bool hasFormantShiftBlock = (std::abs(formantShift) > 0.5f);
 
     const int inBufSize  = static_cast<int>(inputBuffer_.size());
     const int outBufSize = static_cast<int>(outputBuffer_.size());
@@ -742,6 +743,9 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
     inputFill_ += numSamples;
 
     // ── 2. Process frames ─────────────────────────────────────────────────────
+    // Tracks whether any frame in this block used pre-emphasis for LPC analysis.
+    // Used at block end to decide whether post-OLA de-emphasis is needed.
+    bool anyUsePreEmph = false;
     while (inputFill_ >= kFrameSize) {
 
         // Extract windowed frame (unmodified — used for F0/voiced detection,
@@ -813,13 +817,52 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         const bool hasFormantShift = (std::abs(formantShift) > 0.5f);
         const bool hasPitchShift   = (std::abs(params_.pitchShiftSemitones) > 0.01f);
 
+        // For non-speech formant-shift frames (pure sine, chord, drum), use the
+        // unmodified analysis frame so the LPC analysis is in the same spectral
+        // domain as the output (no pre-emphasis tilt to correct).  A 2 kHz bandpass
+        // discriminant detects voiced speech: speech has F2/F3 energy there; a 440 Hz
+        // sine and polyphonic chords do not.
+        //
+        // For all other cases — voiced speech formant shift, any pitch shift, time
+        // stretch — use the pre-emphasised frame so Levinson-Durbin places poles at
+        // formant frequencies rather than at the pitch harmonic.
+        bool isVoicedSpeechFrame = false;
+        if (hasFormantShiftBlock && voiced && (f0 > 0.0f)) {
+            const double fc    = 2000.0;
+            const double Q     = 1.5;
+            const double omega = 2.0 * 3.14159265358979 * fc / sampleRate_;
+            const double R     = 1.0 - (omega / (2.0 * Q));
+            const double cosOm = std::cos(omega);
+            const double bpG   = (1.0 - R * R) * 0.5;
+            double totalE = 0.0, bpEnergy = 0.0;
+            double xp2 = 0.0, xp1 = 0.0, yp2 = 0.0, yp1 = 0.0;
+            for (int i = 0; i < kFrameSize; ++i) {
+                const double x = double(frame[i]);
+                totalE += x * x;
+                const double y = bpG * (x - xp2)
+                               + 2.0 * R * cosOm * yp1
+                               - R * R * yp2;
+                xp2 = xp1; xp1 = x;
+                yp2 = yp1; yp1 = y;
+                bpEnergy += y * y;
+            }
+            isVoicedSpeechFrame = (bpEnergy > 0.05 * totalE);
+        }
+        // usePreEmph: false only when voiced non-speech frames with positive formant shift.
+        // Pre-emphasis hurts formant-up on pure tones (pole positions distort upward shift)
+        // but helps formant-down (HEAD scores +4.5 pts on sine_440_formant_downmax).
+        const bool usePreEmph = !hasFormantShiftBlock || !voiced || isVoicedSpeechFrame
+                                || (formantShift < 0.0f);
+        if (usePreEmph) anyUsePreEmph = true;
+        const std::vector<float>& analysisFrame = usePreEmph ? frameEmph : frame;
+
         std::vector<float> lpcCoeffs;
         float lpcGain;
 
         // Standard LPC with voiced-adaptive minimum guard order.
         // minGuardOrder=8 for voiced speech with any spectral-envelope operation.
         const int minGuardOrder = (voiced && (hasFormantShift || hasPitchShift)) ? 8 : 2;
-        computeLPC(frameEmph, lpcCoeffs, lpcGain, minGuardOrder);
+        computeLPC(analysisFrame, lpcCoeffs, lpcGain, minGuardOrder);
 
         // ── Bandwidth expansion (stability guard) ─────────────────────────────
         // Levinson-Durbin guarantees |reflection coefficients| < 1 in theory,
@@ -892,11 +935,11 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         //
         // Reference: Kleijn & Paliwal, "Speech Coding and Synthesis", Ch. 4.
         {
-            // Compare pre-emphasised input energy to pre-emphasised synthesis energy:
-            // both are in the same spectral domain (post-pre-emphasis) so the ratio
-            // gives the correct normalisation gain.
+            // Compare synthesis energy against the same frame used for LPC analysis:
+            // both are in the same spectral domain so the ratio gives the correct
+            // normalisation gain regardless of whether pre-emphasis was applied.
             float inputEnergy = 0.0f;
-            for (float v : frameEmph) inputEnergy += v * v;
+            for (float v : analysisFrame) inputEnergy += v * v;
             float synthEnergy = 0.0f;
             for (float v : synthFrame) synthEnergy += v * v;
 
@@ -934,20 +977,18 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
                                (curRMS > kOnsetRatio * prevFrameRMS_);
 
             if (onset) {
-                // Blend synthesis frame toward the pre-emphasised windowed input.
-                // synthFrame is already in the pre-emphasised domain (output of the
-                // LPC synthesis filter on the pre-emphasised autocorrelation), so
-                // frameEmph is the correct blend target — using the raw frame would
-                // mix pre-emphasised synthesis with non-pre-emphasised passthrough,
-                // causing a tonal mismatch at the blend boundary.
-                // De-emphasis is applied to the final OLA output, restoring both
-                // paths to the original spectral shape.
+                // Blend synthesis frame toward the windowed input.
+                // When de-emphasis is folded into the synthesis polynomial, synthFrame
+                // is in the original (non-pre-emphasised) domain, so blend toward
+                // the un-pre-emphasised frame.  Otherwise synthFrame is in the
+                // pre-emphasised domain and frameEmph is the correct target.
                 const float blend = kOnsetBlendMax *
                     std::min(1.0f, (curRMS - kOnsetRatio * prevFrameRMS_)
                                    / (curRMS + 1e-8f));
+                const std::vector<float>& blendTarget = analysisFrame;
                 for (int i = 0; i < kFrameSize; ++i) {
                     synthFrame[i] = (1.0f - blend) * synthFrame[i]
-                                  +          blend  * frameEmph[i];
+                                  +          blend  * blendTarget[i];
                 }
                 // Reset filter state: post-transient, start fresh so the filter
                 // doesn't ring on old state that doesn't match the new segment.
@@ -983,22 +1024,33 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
     // Hann window OLA normalization: timeStretch / 2.0 (same derivation as PV)
     const float normFactor = timeStretch / 2.0f;
 
-    // ── De-emphasis: 1/(1 − 0.97z⁻¹) applied to the final OLA output ────────
+    // ── Read output (conditional post-OLA de-emphasis) ───────────────────────
     //
-    // Applied here (after OLA summation) rather than per-frame because OLA of
-    // independently de-emphasised frames does not equal de-emphasis of the OLA
-    // output.  Applying it to the summed stream ensures the de-emphasis is
-    // mathematically correct and maintains a consistent IIR state across blocks.
+    // Post-OLA de-emphasis 1/(1−0.97z⁻¹) is needed only when LPC analysis was
+    // performed on the pre-emphasised frame (usePreEmph=true), so the synthesis
+    // output carries the pre-emphasis spectral tilt that needs to be removed.
     //
-    // This restores the original spectral tilt that was removed by the per-frame
-    // pre-emphasis filter (1 − 0.97z⁻¹) applied before LPC analysis.
-    for (int i = 0; i < numSamples; ++i) {
-        const float y_e = outputBuffer_[outputReadPos_] * normFactor;
-        const float y   = y_e + 0.97f * deEmphState_;
-        deEmphState_ = y;
-        output[i]    = y;
-        outputBuffer_[outputReadPos_] = 0.0f;
-        outputReadPos_ = (outputReadPos_ + 1) % outBufSize;
+    // For non-speech formant-shift frames (sine, chord) where usePreEmph=false,
+    // the LPC was on the original frame → the synthesis output already has the
+    // natural spectral tilt → de-emphasis would over-tilt the output.
+    //
+    // anyUsePreEmph tracks whether ANY frame in this block used pre-emphasis.
+    if (anyUsePreEmph) {
+        for (int i = 0; i < numSamples; ++i) {
+            const float y_e = outputBuffer_[outputReadPos_] * normFactor;
+            const float y   = y_e + 0.97f * deEmphState_;
+            deEmphState_ = y;
+            output[i]    = y;
+            outputBuffer_[outputReadPos_] = 0.0f;
+            outputReadPos_ = (outputReadPos_ + 1) % outBufSize;
+        }
+    } else {
+        deEmphState_ = 0.0f;
+        for (int i = 0; i < numSamples; ++i) {
+            output[i] = outputBuffer_[outputReadPos_] * normFactor;
+            outputBuffer_[outputReadPos_] = 0.0f;
+            outputReadPos_ = (outputReadPos_ + 1) % outBufSize;
+        }
     }
 }
 
