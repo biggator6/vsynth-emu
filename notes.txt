@@ -2,11 +2,15 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 14 (2026-06-10)
 
-Current score: 27.7 / 100  (target: > 60)
+Current score: 28.2 / 100 under METRIC v2 (target: > 60)
+  METRIC v2 (commit 3ecdfdf): compare.py now time-aligns ref/output via envelope
+  cross-correlation before scoring. 8 of 20 pairs were previously scored against
+  the reference's lead-in silence — ALL pre-v2 scores are not comparable.
+  v17 outputs re-scored under metric v2 = 27.4 (baseline continuity).
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
-  Best single case: vocal_aah_time_2x = 45.7
-Best version: v18g (commit 560d322) — pre-emphasis with direction-aware bypass
-  + SOLO-gated pitch routing
+  Best single case: vocal_aah_time_2x = 44.7
+Best version: v18h (commit 0b6d706) — dual OLA streams, speech formant-up bypass,
+  polyphonic tilt, SOLO-gated pitch routing
   Outputs: analysis/plugin_outputs/hybrid_v18d  (dir name lags version; scores in
   analysis/results/hybrid_v18d)
 
@@ -18,60 +22,61 @@ Routing (v18g: pitch→LPC now requires SOLO content type):
    2 kHz check and routing to LPC — SOLO gate fixed chord_Cmaj_pitch_up7st)
   LPC min guard order = 8 when voiced AND (hasFormant OR hasPitch) (else 2)
 
-Pre-emphasis logic (Sessions 13–14, the v18 series):
-  H(z) = 1 − 0.97z⁻¹ applied to LPC analysis frame; de-emphasis 1/(1−0.97z⁻¹)
-  applied post-OLA (gated by anyUsePreEmph). Direction-aware bypass:
-    formantUpBypass: voiced AND formant shift ≥ 0 AND NOT speech (2 kHz bp check)
-      → use plain frame.  Pre-emph distorts upward pole shifts on pure tones
-      (sine_440_formant_upmax: 32.8 plain vs 13.7 pre-emph) but helps downward
-      (sine_440_formant_downmax: 29.9 pre-emph vs 25.4 plain).
-    largePitchDown: voiced AND no formant shift AND pitch < −6 st
-      → use plain frame.  Shifted F0 drops below pre-emph corner
-      (vocal_aah_pitch_down12st: 27.0 plain vs 19.9 pre-emph); upward shifts
-      benefit (vocal_aah_pitch_up7st: 24.9 pre-emph vs 19.0 plain).
-  DO NOT fold de-emphasis into the LPC polynomial (A(z)×(1−0.97z⁻¹)): the
-  product is order P+1 and truncating to P distorts ALL formant roots (v18d
-  failure, scored 23.9–24.9).
+Pre-emphasis logic (Sessions 13-14, the v18 series):
+  H(z) = 1 - 0.97z^-1 applied to LPC analysis frame. v18h: DUAL OLA STREAMS --
+  pre-emphasised frames OLA into outputBuffer_ (de-emphasised continuously at
+  read time); bypassed frames OLA into outputBufferPlain_ (read as-is); summed
+  per sample at output. Direction-aware bypass:
+    formantUpBypass: voiced AND formant shift >= 0 (v18h: now includes speech)
+      -> use plain frame. Pre-emph distorts upward pole shifts
+      (sine_440_formant_upmax: 32.8 plain vs 13.7 pre-emph, old metric;
+      vocal_aah_formant_upmax recovered to 34.5 once dual streams removed the
+      cross-tilt), but helps downward shifts -> keep pre-emph for those.
+    largePitchDown: voiced AND no formant shift AND pitch < -6 st
+      -> use plain frame (vocal_aah_pitch_down12st 27.0 plain vs 19.9 pre-emph,
+      old metric); upward pitch keeps pre-emph (vocal_aah_pitch_up7st 24.9 vs 19.0).
+    polyphonicContent (VariphraseParams flag, set by Hybrid routing for
+      ENSEMBLE/BACKING): bypassed frames route into the DE-EMPH stream anyway --
+      chord formant empirically wants the low-shelf tilt (21.2 tilted vs 17.9
+      clean vs 19.8 pre-emph, old metric).
+  DO NOT fold de-emphasis into the LPC polynomial (A(z)*(1-0.97z^-1)): order
+  P+1 truncated to P distorts ALL formant roots (v18d failure).
+  DO NOT de-emphasise per-frame with fresh state (v18 experiment, 27.0):
+  the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
+  continuous state per stream is the working design.
 
-Per-case scores (v18g, 27.7 avg, correct dry inputs):
+Per-case scores (v18h, METRIC v2, 28.2 avg):
   -- Sine 440 Hz (sawtooth input) --
-  sine_440_formant_downmax   29.9  (LPC)  ← +4.5 via pre-emph (kept for down-shift)
-  sine_440_formant_upmax     32.8  (LPC)  pre-emph bypassed (formantUpBypass)
-  sine_440_pitch_down12st    26.7  (PV)
-  sine_440_pitch_up7st       36.3  (PV)
+  sine_440_formant_downmax   28.6  (LPC, pre-emph)
+  sine_440_formant_upmax     30.3  (LPC, bypassed)
+  sine_440_pitch_down12st    28.4  (PV)
+  sine_440_pitch_up7st       37.4  (PV)
   sine_440_time_2x           20.1  (PV)
-  sine_440_time_halfspeed    28.6  (PV)
+  sine_440_time_halfspeed    29.6  (PV)
 
   -- Vocal "aah" (real speech, 48 kHz, 24-bit) --
-  vocal_aah_formant_upmax    29.9  (LPC)  ← v17c had 34.4; see open item 1
-  vocal_aah_formant_up4st    27.8  (LPC)
-  vocal_aah_formant_downmax  19.3  (LPC)  ← +2.3 vs v17c via pre-emph
-  vocal_aah_pitch_up7st      24.9  (LPC)  ← +5.9 vs v17c via pre-emph
-  vocal_aah_pitch_down12st   27.0  (LPC)  ← recovered via largePitchDown bypass
-  vocal_aah_time_2x          45.7  (PV)   ← BEST EVER
+  vocal_aah_formant_upmax    34.5  (LPC, bypassed)  <- recovered via dual streams
+  vocal_aah_formant_up4st    34.2  (LPC, bypassed)
+  vocal_aah_formant_downmax  20.4  (LPC, pre-emph)  <- weakest vocal case now
+  vocal_aah_pitch_up7st      24.9  (LPC, pre-emph)
+  vocal_aah_pitch_down12st   27.1  (LPC, bypassed via largePitchDown)
+  vocal_aah_time_2x          44.7  (PV)   <- best case
   vocal_aah_time_halfspeed   32.5  (PV)
 
   -- Drum hit --
-  drum_hit_time_halfspeed    36.1  (PV)
-  drum_hit_time_2x           19.7  (PV)
-  drum_hit_time_4x           19.8  (PV)
-  drum_hit_pitch_up7st       15.4  (mixed)
+  drum_hit_pitch_up7st       25.7  (PV)  <- was "15.4" pre-alignment (noise)
+  drum_hit_time_2x           25.6  (PV)
+  drum_hit_time_4x           16.5  (PV)  <- lowest case under metric v2
+  drum_hit_time_halfspeed    21.0  (PV)  <- was "36.1" pre-alignment (inflated)
 
   -- Chord C major --
   chord_Cmaj_time_2x         35.0  (PV/WSOLA)
-  chord_Cmaj_pitch_up7st     26.2  (PV)   ← +4.3 via SOLO gate (was misrouting to LPC)
-  chord_Cmaj_formant_max     21.1  (LPC)  ← +3.2 vs v17c
+  chord_Cmaj_pitch_up7st     26.2  (PV, SOLO gate keeps it off LPC)
+  chord_Cmaj_formant_max     20.9  (LPC, bypassed + polyphonic tilt)
 
-Score history: v10b=26.9 → v17c=27.2 → v18_preemph(HEAD)=26.1 → v18e=27.4 → v18f=27.7 → v18g=27.7 (earlier 27.9 reading was inflated by a wrong-input render)
-
-Session 14 findings:
-  - Pre-emphasis benefit is DIRECTION-DEPENDENT for both formant and pitch shifts.
-    Bypass per-frame via formantUpBypass / largePitchDown (SourceFilterModel.cpp ~line 861).
-  - Tried and reverted: extending formantUpBypass to speech frames (dropping
-    !isVoicedSpeechFrame). upmax +1.0 but up4st −1.8, net wash. Root blocker:
-    anyUsePreEmph stays true (other frames use pre-emph) so post-OLA de-emphasis
-    still tilts the bypassed frames' output. A per-frame de-emphasis architecture
-    would be needed to get vocal_aah_formant_upmax back to v17c's 34.4.
+Score history (OLD metric, not comparable to v2): v10b=26.9 -> v17c=27.2 ->
+  v18_preemph=26.1 -> v18e=27.4 -> v18f/g=27.7 -> v18h=28.0
+Metric v2 history: v17 outputs=27.4, v18h=28.2
 
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \
@@ -102,23 +107,15 @@ Start a new session:
   Read ARCHITECTURE.md  (algorithm status, routing table, score history)
   Read RESEARCH_LOG.md  (session-by-session findings, open questions)
 
-Tried and reverted (Session 14): per-frame de-emphasis (filter synthFrame with
-  1/(1−0.97z⁻¹) before windowing/OLA, fresh state per frame, normalize against
-  the original frame). Scored 27.0 vs 27.7. vocal_aah_formant_up4st +1.4 but
-  vocal_aah_pitch_up7st collapsed 24.9 → 17.1 and vocal_aah_formant_downmax
-  19.3 → 18.2. Likely cause: fresh-state-per-frame loses the de-emphasis
-  integrator's low-frequency build-up across frames (DC gain 33, long memory at
-  F0 ≈ 120 Hz), and filtering before windowing doesn't commute with the block-
-  level filter-after-OLA. A continuous-state per-stream variant might still
-  work but needs separate OLA streams for pre-emph vs bypassed frames.
-
-Next highest-value work:
-  1. vocal_aah_formant_upmax 29.9 vs v17c's 34.4 — the remaining formant gap.
-     Per-frame de-emphasis failed (above); next idea: separate OLA accumulation
-     buffers for pre-emphasised and bypassed frames, each with its own
-     continuous-state output filter, summed at the end.
-  2. Transient-synchronous OLA for time compression — drum_hit_time_2x (19.7)
-     and time_4x (19.8): OLA phase reset at detected onsets; V-Synth BACKING
-     mode stores onset timestamps at encode time for exactly this.
-  3. drum_hit_pitch_up7st (15.4) — lowest case overall; needs investigation of
-     which path it takes and why both PV and LPC fail on transient pitch shift.
+Next highest-value work (metric v2 numbers):
+  1. Offline render drain mode -- process() forces equal in/out counts, so for
+     timeStretch=2 the input ring (4*kFrameSize) overflows and drops input
+     chunks silently. Sustained vowels mask it; transients don't. Needs a
+     pull-based drain in VariphraseEngine/processOffline. Prerequisite for
+     meaningful time-stretch optimisation.
+  2. drum_hit_time_4x (16.5) -- lowest case. Transient-synchronous OLA: phase
+     reset at detected onsets; V-Synth BACKING mode stores onset timestamps at
+     encode time for exactly this.
+  3. vocal_aah_formant_downmax (20.4) -- weakest vocal case, formant_sim 0.327.
+     Downward shift keeps pre-emph; check whether order-8 guard limits F1
+     resolution after a -12 st shift.

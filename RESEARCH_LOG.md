@@ -1265,20 +1265,81 @@ correct inputs; honest v18g score is **27.7**.
    all frames in a block into one spectral domain at the output. Fixing it properly
    (dual OLA streams) is the path to recovering vocal_aah_formant_upmax (29.9 vs 34.4).
 
+### Continuation (same session): v18h — Dual OLA Streams + Metric v2
+
+#### v18h (0b6d706) — dual OLA streams, score 28.0 (old metric)
+
+Implemented the dual-stream architecture proposed above:
+- `outputBuffer_` accumulates pre-emphasised-domain frames, de-emphasised
+  continuously at read time (`deEmphState_` across blocks).
+- `outputBufferPlain_` accumulates bypassed frames, read as-is.
+- Output = de-emphasised stream + plain stream, summed per sample.
+
+With cross-tilting eliminated, `formantUpBypass` was safely extended to speech
+frames (dropped `!isVoicedSpeechFrame`): **vocal_aah_formant_upmax 29.9 → 34.5**,
+above the v17c level (34.4), while keeping all pre-emphasis gains.
+
+One surprise: chord_Cmaj_formant_max dropped 21.1 → 17.9 with the clean split —
+the chord case empirically scores best when bypassed frames ARE de-emphasised
+(the low-shelf boost matches the V-Synth's ENSEMBLE output tilt). Added
+`VariphraseParams::polyphonicContent` (set by Hybrid routing from the encode-pass
+ENSEMBLE/BACKING classification); for polyphonic content, bypassed frames route
+into the de-emphasis stream. chord recovered to 21.2.
+
+#### Metric v2 (3ecdfdf) — time-aligned comparison
+
+Investigating drum_hit_pitch_up7st (15.4, transient score 0.000) revealed a
+test-harness bug, not an algorithm failure: `compare.py align_length()` only
+truncated to the shorter file, with NO time alignment. The V-Synth reference
+recordings have lead-in silence up to ~2.6 s (drum refs especially) while
+renderer outputs start immediately. **8 of 20 test pairs were being scored
+against the reference's leading silence.** All historical drum scores are
+measurement noise (including the "best drum case" drum_hit_time_halfspeed 36.1,
+which was inflated by silence-vs-silence comparison).
+
+Fix: envelope cross-correlation alignment (rectified, ~1 kHz decimation, FFT
+xcorr), shift the later-starting signal, then truncate to common length.
+Self-comparison still aligns at lag 0 exactly.
+
+#### Scores under metric v2 (NOT comparable to any earlier numbers)
+
+| Test File | v17 outputs (aligned) | v18h (aligned) |
+|---|---|---|
+| drum_hit_pitch_up7st | — | 25.7 (was "15.4") |
+| drum_hit_time_2x | — | 25.6 (was "19.7") |
+| drum_hit_time_4x | — | 16.5 |
+| drum_hit_time_halfspeed | — | 21.0 (was "36.1", inflated) |
+| vocal_aah_formant_upmax | — | 34.5 |
+| vocal_aah_formant_up4st | — | 34.2 |
+| vocal_aah_time_2x | — | 44.7 |
+| **AVERAGE (20)** | **27.4** | **28.2** |
+
+The v18 work holds up under the corrected metric: +0.8 vs the re-scored v17
+baseline.
+
+#### Renderer limitation discovered (open)
+
+`VariphraseEngine::processOffline()` resizes output to the input length, and the
+`process()` API forces equal input/output sample counts per call. For
+timeStretch=2 the engine consumes input at half rate, so the input ring
+(4×kFrameSize ≈ 4096 samples) overflows during a multi-second render and input
+chunks are silently dropped. Sustained vowels mask this (stationary content);
+transient material does not. A proper fix needs a pull-based drain mode in the
+engine — substantial rework, deferred.
+
 ### Next Steps
 
-1. **Dual OLA streams** — separate accumulation buffers for pre-emphasised vs bypassed
-   frames with continuous-state de-emphasis on the first; would let speech formant-up
-   frames bypass pre-emphasis without cross-tilting (target: vocal_aah_formant_upmax
-   29.9 → ~34).
+1. **Offline render drain mode** — fix the equal-I/O `process()` constraint for
+   time stretch so the full stretched signal is rendered without ring overflow.
+   Prerequisite for meaningful drum/chord time-stretch optimisation.
 
-2. **Transient-synchronous OLA for time compression** — drum_hit_time_2x (19.7) /
-   time_4x (19.8): OLA phase reset at detected onsets; V-Synth BACKING mode stores
-   onset timestamps at encode time for exactly this purpose.
+2. **Transient-synchronous OLA for time compression** — drum_hit_time_4x (16.5
+   aligned) is now the lowest case; OLA phase reset at detected onsets; V-Synth
+   BACKING mode stores onset timestamps at encode time for exactly this purpose.
 
-3. **drum_hit_pitch_up7st (15.4)** — lowest case overall; with the SOLO gate it now
-   routes entirely to PV. Investigate why PV pitch-shift fails on transient material
-   (likely phase coherence destruction at the attack).
+3. **vocal_aah_formant_downmax (20.4 aligned)** — now the weakest vocal case;
+   formant similarity only 0.327. The downward shift keeps pre-emphasis; consider
+   whether the order-8 guard limits F1 resolution after a −12 st shift.
 
 ---
 
