@@ -1124,6 +1124,164 @@ and metrics are logged to stdout for debugging.
 
 ---
 
+## Session 13 — Pre-Emphasis LPC (Net Regression as Shipped)
+**Date:** 2026-06-09
+**Phase:** Algorithm
+**Model:** Sonnet
+
+### What Was Done
+
+1. **Implemented pre-emphasis for LPC analysis** — `H(z) = 1 − 0.97z⁻¹` applied to the
+   windowed analysis frame before Levinson-Durbin; de-emphasis `1/(1 − 0.97z⁻¹)` applied
+   to the OLA output stream (sample-by-sample, `deEmphState_` carried across blocks).
+
+2. **Corrected the Session 9 diagnosis** — Session 9 concluded pre-emphasis gives no
+   benefit at 48 kHz because `r[1]/r[0]` stays near 1 (Guard 3 still fires at order 2).
+   That mechanism is real but already neutralised by `minGuardOrder=8`. The overlooked
+   effect is on the **optimisation criterion** for orders 2–8: without pre-emphasis the
+   fundamental dominates the autocorrelation by ~10 000× at 48 kHz, so all 8 poles
+   cluster near F0. With pre-emphasis, `|H(kω₀)|² ≈ 0.97(kω₀)²` cancels the 1/k²
+   harmonic decay, every harmonic contributes equally, and the poles spread across
+   F1–F4. (Session 9's separate finding stands: normalise energy against the original
+   frame's domain, not a mismatched one — the v9 regression came from normalising
+   against the pre-emphasised frame while synthesis was in the signal domain.)
+
+### Batch Test Results (hybrid_v18_preemph, committed as 7458bdd)
+
+| Test File | v17c | v18_preemph | Delta |
+|---|---|---|---|
+| vocal_aah_pitch_up7st | 19.0 | 24.9 | **+5.9** |
+| sine_440_formant_downmax | 25.4 | 29.9 | **+4.5** |
+| vocal_aah_formant_downmax | 17.0 | 19.3 | **+2.3** |
+| chord_Cmaj_formant_max | 17.9 | 19.8 | +1.9 |
+| vocal_aah_formant_upmax | 34.4 | 29.4 | **−5.0** |
+| vocal_aah_pitch_down12st | 27.5 | 19.9 | **−7.6** |
+| sine_440_formant_upmax | 32.8 | 13.7 | **−19.1** |
+| chord_Cmaj_pitch_up7st | 25.1 | 21.9 | −3.2 |
+| **AVERAGE (20)** | **27.2** | **26.1** | **−1.1** |
+
+### Findings / Hypothesis Update
+
+Pre-emphasis genuinely improves formant capture (the big wins above prove the
+Session 9 "fundamental limitation" claim wrong), but applying it unconditionally
+regresses cases where the LPC pole positions interact badly with the shift
+direction. The catastrophic sine_440_formant_upmax case (−19.1): with pre-emphasis
+the 2-pole sine model sits on a tilted spectrum; after a +12 st pole-angle shift the
+de-emphasised output level/shape no longer matches the reference at all.
+
+---
+
+## Session 14 — Direction-Aware Pre-Emphasis Bypass + SOLO Routing Gate
+**Date:** 2026-06-10
+**Phase:** Algorithm
+**Model:** Sonnet → Fable
+
+### What Was Done
+
+Recovered the Session 13 regressions while keeping its gains, in three commits:
+
+1. **v18e (2e734a2) — conditional analysis frame, direction-aware for formant shift.**
+   Two failed approaches first:
+   - *De-emphasis polynomial folding* (`A′(z) = A(z)·(1−0.97z⁻¹)`): unsound — the
+     product is order P+1 but only P terms are stored; truncation perturbs ALL formant
+     roots, not just the appended de-emphasis pole. Scored 23.9–24.9. **Do not retry.**
+   - *Blanket bypass for non-speech formant frames*: recovered sine upmax but lost the
+     pre-emph gain on sine downmax.
+   Final form: per-frame selection of the LPC analysis frame.
+   `usePreEmph = !(formantUpBypass)` where `formantUpBypass = hasFormantShift && voiced
+   && !isVoicedSpeechFrame && formantShift ≥ 0`. The voiced-speech discriminant is the
+   same 2 kHz bandpass (fc=2000, Q=1.5, energy ratio > 5%) used by the Hybrid router.
+   Post-OLA de-emphasis gated by `anyUsePreEmph` (any frame in block used pre-emph).
+   Score: 26.1 → **27.4**.
+
+2. **v18f (ab53b60) — pitch-direction bypass.** Pre-emphasis also hurt large downward
+   pitch shifts: at −12 st the excitation F0 drops below the pre-emphasis corner, so the
+   tilted envelope mis-weights the low harmonics. Added `largePitchDown = !hasFormantShift
+   && voiced && pitchShift < −6 st` to the bypass. vocal_aah_pitch_down12st 19.9 → 27.0;
+   vocal_aah_pitch_up7st kept its pre-emph gain (24.9). Score: **27.7**.
+
+3. **v18g (560d322) — SOLO gate on voiced-speech pitch routing.** The
+   chord_Cmaj_pitch_up7st "regression" (25.1 → 21.9) turned out to be a routing bug,
+   not a PV change: chord blocks transiently pass the per-block ZCR + 2 kHz check
+   (C major harmonics put >5% energy at 2 kHz) and were routing to LPC, where pitch-up
+   pre-emphasis hurt. Gated the per-block check by the Session 12 offline encode-pass
+   classification: only SOLO content may route pitch shifts to LPC. chord pitch
+   21.9 → **26.2** (above the v17c 25.1). Drum/vocal/sine pitch cases unchanged.
+
+### Tried and Reverted
+
+1. **Extending formantUpBypass to speech frames** (dropping `!isVoicedSpeechFrame`):
+   vocal_aah_formant_upmax +1.0 but up4st −1.8 — net wash. Root blocker: other frames
+   in the block still use pre-emph, so `anyUsePreEmph` stays true and the block-level
+   post-OLA de-emphasis tilts the bypassed frames' output anyway.
+
+2. **Per-frame de-emphasis** (filter `synthFrame` through `1/(1−0.97z⁻¹)` with fresh
+   zero state before windowing/OLA; normalise against the original frame; delete the
+   block-level output filter): scored **27.0 vs 27.7**. up4st +1.4 but
+   vocal_aah_pitch_up7st collapsed 24.9 → 17.1 and formant_downmax 19.3 → 18.2.
+   Likely cause: the de-emphasis integrator (DC gain 33) needs cross-frame state to
+   build up the low-frequency content of a 120 Hz voice; fresh state per frame loses
+   it, and filtering before windowing doesn't commute with filter-after-OLA. A future
+   variant would need separate OLA accumulation buffers for pre-emphasised vs bypassed
+   frames, each with its own continuous-state output filter.
+
+### Measurement Correction
+
+Earlier readings this session (27.9) were inflated: sine_440_formant_downmax had been
+rendered with `sustained/sine_440_formant_downmax.wav` (the 24-bit V-Synth REFERENCE)
+as input instead of `passthrough/sine_440_formant_downmax.wav` (the 16-bit dry input).
+The sine_440 cases have per-case dry inputs in `passthrough/` with the same filenames
+as the references in `sustained/` — easy trap. All LPC-routed cases re-rendered from
+correct inputs; honest v18g score is **27.7**.
+
+### Batch Test Results (hybrid_v18g, correct inputs)
+
+| Test File | v17c | v18g | Delta |
+|---|---|---|---|
+| sine_440_formant_downmax | 25.4 | 29.9 | **+4.5** |
+| sine_440_formant_upmax | 32.8 | 32.8 | 0.0 (recovered from 13.7) |
+| vocal_aah_pitch_up7st | 19.0 | 24.9 | **+5.9** |
+| vocal_aah_pitch_down12st | 27.5 | 27.0 | −0.5 (recovered from 19.9) |
+| vocal_aah_formant_downmax | 17.0 | 19.3 | +2.3 |
+| vocal_aah_formant_upmax | 34.4 | 29.9 | **−4.5** (open item) |
+| chord_Cmaj_pitch_up7st | 25.1 | 26.2 | **+1.1** |
+| chord_Cmaj_formant_max | 17.9 | 21.1 | **+3.2** |
+| All time-stretch cases | — | — | 0.0 |
+| **AVERAGE (20)** | **27.2** | **27.7** | **+0.5** |
+
+### Findings / Hypothesis Update
+
+1. **Pre-emphasis benefit is direction-dependent in BOTH the formant and pitch axes.**
+   Down-shifts of formants want pre-emphasised analysis; up-shifts of formants on pure
+   tones want plain analysis. Up-shifts of pitch want pre-emphasis; large down-shifts
+   of pitch don't. This is now encoded per-frame in `SourceFilterModel.cpp`
+   (`formantUpBypass` / `largePitchDown`, ~line 861).
+
+2. **The offline encode pass earns its keep again**: the SOLO gate is the second win
+   attributable to Session 12's content classification (after WSOLA routing). Per-block
+   heuristics misfire on polyphonic material; the global classification doesn't.
+
+3. **Block-level de-emphasis is the remaining architectural constraint** — it forces
+   all frames in a block into one spectral domain at the output. Fixing it properly
+   (dual OLA streams) is the path to recovering vocal_aah_formant_upmax (29.9 vs 34.4).
+
+### Next Steps
+
+1. **Dual OLA streams** — separate accumulation buffers for pre-emphasised vs bypassed
+   frames with continuous-state de-emphasis on the first; would let speech formant-up
+   frames bypass pre-emphasis without cross-tilting (target: vocal_aah_formant_upmax
+   29.9 → ~34).
+
+2. **Transient-synchronous OLA for time compression** — drum_hit_time_2x (19.7) /
+   time_4x (19.8): OLA phase reset at detected onsets; V-Synth BACKING mode stores
+   onset timestamps at encode time for exactly this purpose.
+
+3. **drum_hit_pitch_up7st (15.4)** — lowest case overall; with the SOLO gate it now
+   routes entirely to PV. Investigate why PV pitch-shift fails on transient material
+   (likely phase coherence destruction at the attack).
+
+---
+
 ## Session Template (copy for each new session)
 
 ## Session N — [Title]
