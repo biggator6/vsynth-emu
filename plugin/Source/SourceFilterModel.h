@@ -50,8 +50,16 @@ private:
     VariphraseParams params_ {};
 
     // ── Ring buffers ──────────────────────────────────────────────────────────
+    // Two parallel OLA accumulation streams keep pre-emphasised and bypassed
+    // synthesis frames in separate spectral domains until the output read:
+    //   outputBuffer_      — frames whose LPC used the pre-emphasised analysis
+    //                        frame; de-emphasised continuously at read time.
+    //   outputBufferPlain_ — frames that bypassed pre-emphasis; read as-is.
+    // Without this split, one block-level de-emphasis filter tilted bypassed
+    // frames that were OLA'd adjacent to pre-emphasised ones.
     std::vector<float> inputBuffer_;
     std::vector<float> outputBuffer_;
+    std::vector<float> outputBufferPlain_;
     int   inputWritePos_  = 0;
     int   inputReadPos_   = 0;
     int   inputFill_      = 0;

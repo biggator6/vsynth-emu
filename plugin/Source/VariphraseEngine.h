@@ -21,6 +21,9 @@ struct VariphraseParams {
     float timeStretchRatio     = 1.0f;   // 0.25 to 4.0
     float formantShiftSemitones= 0.0f;   // -12 to +12
     bool  robotMode            = false;  // forced monophonic voiced analysis
+    bool  polyphonicContent    = false;  // encode-pass said ENSEMBLE/BACKING;
+                                         // set by Hybrid routing, read by
+                                         // SourceFilterModel output-domain logic
 };
 
 // ─── Offline Content Analysis ─────────────────────────────────────────────────

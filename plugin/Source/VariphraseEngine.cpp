@@ -190,7 +190,11 @@ struct VariphraseEngine::Impl {
 
                 if (hasFormant || isVoicedSpeech) {
                     phaseVocoder->setForceWSOLA(false);
-                    sourceFilter->setParams(params);
+                    VariphraseParams lpcParams = params;
+                    lpcParams.polyphonicContent =
+                        (analysis.contentType == VariphraseAnalysis::ContentType::ENSEMBLE ||
+                         analysis.contentType == VariphraseAnalysis::ContentType::BACKING);
+                    sourceFilter->setParams(lpcParams);
                     sourceFilter->processMono(input, output, numSamples);
                 } else {
                     // Time-only (or pitch-only on non-voiced content) path.
