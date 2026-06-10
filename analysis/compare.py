@@ -51,8 +51,39 @@ def load_wav(path: str) -> tuple[np.ndarray, int]:
     return data.astype(np.float32), sr
 
 
-def align_length(ref: np.ndarray, out: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Trim or zero-pad so both arrays have the same length."""
+def align_length(ref: np.ndarray, out: np.ndarray,
+                 sr: int = 48000) -> tuple[np.ndarray, np.ndarray]:
+    """Time-align via envelope cross-correlation, then trim to equal length.
+
+    Session 14 fix: the original implementation only truncated to the shorter
+    file.  The V-Synth reference recordings have lead-in silence of up to
+    ~2.6 s (drum refs especially), while renderer outputs start immediately —
+    so 8 of 20 test pairs were being scored against the reference's leading
+    SILENCE.  All drum-case scores prior to this fix are measurement noise.
+
+    Alignment: cross-correlate the amplitude envelopes (rectified, smoothed,
+    decimated to ~1 kHz for speed/robustness), shift the later-starting signal
+    forward, then truncate both to the common length.
+    """
+    def envelope(x: np.ndarray, dec: int) -> np.ndarray:
+        e = np.abs(x).astype(np.float64)
+        n = (len(e) // dec) * dec
+        return e[:n].reshape(-1, dec).mean(axis=1)
+
+    dec = max(1, sr // 1000)   # ~1 kHz envelope rate
+    er, eo = envelope(ref, dec), envelope(out, dec)
+    if len(er) > 1 and len(eo) > 1 and er.max() > 1e-9 and eo.max() > 1e-9:
+        m = len(er) + len(eo) - 1
+        nfft = 1 << int(np.ceil(np.log2(m)))
+        xc = np.fft.irfft(np.fft.rfft(er, nfft) *
+                          np.conj(np.fft.rfft(eo, nfft)), nfft)[:m]
+        # circular xcorr → lag in [-(len(eo)-1), len(er)-1]
+        lags = np.concatenate([np.arange(len(er)), -np.arange(len(eo) - 1, 0, -1)])
+        lag = int(lags[np.argmax(np.concatenate([xc[:len(er)], xc[-(len(eo) - 1):]]))]) * dec
+        if lag > 0:
+            ref = ref[lag:]      # reference starts later → drop its lead-in
+        elif lag < 0:
+            out = out[-lag:]
     n = min(len(ref), len(out))
     return ref[:n], out[:n]
 
