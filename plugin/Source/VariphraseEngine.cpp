@@ -222,10 +222,28 @@ struct VariphraseEngine::Impl {
                     // that previously routed there — drum_hit_time_halfspeed,
                     // the last WSOLA case, scores 31.1 on PV vs 26.0 on WSOLA.
                     // processWSOLA() is retained in PhaseVocoder for reference.
-                    phaseVocoder->setForceWSOLA(false);
-                    phaseVocoder->setParams(params);
-                    phaseVocoder->processMono(input, output, numSamples);
-                    lastValidOutput = phaseVocoder->getLastValidOutput();
+                    //
+                    // LITE content (pure tones) routes to the LPC source-filter
+                    // even for time-only operations (Session 15): the V-Synth
+                    // RESYNTHESIZES — its time-stretched sine reference carries
+                    // strong sawtooth harmonics (880 Hz at −18 dB rel.) that a
+                    // transparent PV stretch of the pure input can never have.
+                    // sine_440_time_2x: 36.6 LPC vs 15.7 PV; pitch_up7st 43.1
+                    // LPC vs 26.0 PV.  EXCEPT downward pitch: the LPC envelope
+                    // (resonant at the original F0) boosts the wrong harmonic
+                    // of the lowered excitation — pitch_down12st 6.1 LPC vs
+                    // 48.8 PV.  SOLO (vocal) and BACKING/ENSEMBLE stay on PV.
+                    if (analysis.contentType == VariphraseAnalysis::ContentType::LITE &&
+                        params.pitchShiftSemitones > -0.5f) {
+                        sourceFilter->setParams(params);
+                        sourceFilter->processMono(input, output, numSamples);
+                        lastValidOutput = sourceFilter->getLastValidOutput();
+                    } else {
+                        phaseVocoder->setForceWSOLA(false);
+                        phaseVocoder->setParams(params);
+                        phaseVocoder->processMono(input, output, numSamples);
+                        lastValidOutput = phaseVocoder->getLastValidOutput();
+                    }
                 }
                 break;
             }
