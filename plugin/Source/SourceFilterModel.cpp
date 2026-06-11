@@ -586,16 +586,19 @@ void SourceFilterModel::shiftFormants(std::vector<float>& coeffs, float semitone
 float SourceFilterModel::estimateF0(const std::vector<float>& frame) const {
     const int N = static_cast<int>(frame.size());
 
-    // Pre-emphasised, windowed frame for ACF.  The caller's frame is already
-    // Hann-windowed; windowing again gives a Hann² taper, whose bias is
-    // corrected exactly by winAcf_ (computed on w²) below.  Removing the
-    // second window destabilises the estimate (end effects), so keep it.
+    // Windowed frame for ACF.  The caller's frame is already Hann-windowed;
+    // windowing again gives a Hann² taper, whose bias is corrected exactly by
+    // winAcf_ (computed on w²) below.  Removing the second window destabilises
+    // the estimate (end effects), so keep it.
+    //
+    // NO pre-emphasis here (removed Session 15): pre-emphasis boosts formant
+    // energy, and on real speech the F1-region ACF peaks (~600 Hz) then beat
+    // the fundamental — per-frame F0 flapped between ~130 Hz and ~600 Hz,
+    // putting the pitch-shifted excitation a fourth sharp.  ACF pitch
+    // detection wants the fundamental DOMINANT, the opposite of LPC analysis.
     std::vector<float> x(N);
-    for (int i = 1; i < N; ++i)
-        x[i] = frame[i] - 0.97f * frame[i - 1];
-    x[0] = frame[0];
     for (int i = 0; i < N; ++i)
-        x[i] *= window_[i < static_cast<int>(window_.size()) ? i : 0];
+        x[i] = frame[i] * window_[i < static_cast<int>(window_.size()) ? i : 0];
 
     // Normalised autocorrelation
     const int minLag = static_cast<int>(sampleRate_ / 800.0);  // max ~800 Hz
@@ -643,12 +646,24 @@ float SourceFilterModel::estimateF0(const std::vector<float>& frame) const {
 
     if (maxVal < 0.3f) return 0.0f;   // unvoiced threshold
 
+    // Only consider true subharmonic candidates (maxIdx/2, maxIdx/3, …); an
+    // earlier "shortest local max within 5 %" rule mistook formant-induced ACF
+    // sub-peaks at non-integer fractions of the period for the fundamental
+    // (vocal 130.8 Hz was read as 155.5 Hz, putting the +7 st output a fourth
+    // sharp).  A genuine octave error puts a near-equal peak at an integer
+    // division of the winning lag — search ±2 samples around those only.
     int bestLag = maxIdx;
-    for (int lag = minLag + 1; lag < maxIdx; ++lag) {
-        if (acf[lag] >= 0.95f * maxVal &&
-            acf[lag] >= acf[lag - 1] && acf[lag] >= acf[lag + 1]) {
-            bestLag = lag;
-            break;
+    for (int div = 4; div >= 2; --div) {
+        const int cand = maxIdx / div;
+        if (cand < minLag + 1) continue;
+        for (int lag = std::max(minLag + 1, cand - 2);
+             lag <= std::min(maxLag - 1, cand + 2); ++lag) {
+            if (acf[lag] >= 0.95f * maxVal &&
+                acf[lag] >= acf[lag - 1] && acf[lag] >= acf[lag + 1]) {
+                bestLag = lag;
+                div = 1;   // break outer loop — shortest valid divisor wins
+                break;
+            }
         }
     }
 
