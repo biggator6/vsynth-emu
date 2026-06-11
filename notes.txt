@@ -2,14 +2,15 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-10)
 
-Current score: 29.9 / 100 under METRIC v2 (target: > 60)
+Current score: 30.0 / 100 under METRIC v2 (target: > 60)
   METRIC v2 (commit 3ecdfdf): compare.py time-aligns ref/output via envelope
   cross-correlation. Pre-v2 scores are not comparable (8 of 20 pairs were
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 57.7
-Best version: v19b (commit 9019efc) — v19 (drain mode + OLA read gating +
-  OLA-coherent excitation) + unbiased F0 estimation with octave guard.
+Best version: v19c (commit 19c9b5d) — v19 (drain mode + OLA read gating +
+  OLA-coherent excitation) + unbiased F0 (no pre-emph, w^2 taper correction,
+  integer-subharmonic octave guard).
   Outputs: analysis/plugin_outputs/hybrid_v18d  (dir name lags version; scores in
   analysis/results/hybrid_v18d)
 
@@ -61,22 +62,21 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v19b, METRIC v2, 29.9 avg):
+Per-case scores (v19c, METRIC v2, 30.0 avg):
   -- Sine 440 Hz --
-  sine_440_formant_downmax   23.6  (LPC, pre-emph)
-  sine_440_formant_upmax     17.2  (LPC, bypassed)  [render matches ref spectrum;
-                                    low score = metric noise on pure tones]
+  sine_440_formant_downmax   28.7  (LPC, pre-emph)
+  sine_440_formant_upmax     21.7  (LPC, bypassed)
   sine_440_pitch_down12st    44.0  (PV)
   sine_440_pitch_up7st       35.7  (PV)
   sine_440_time_2x           27.6  (PV)
   sine_440_time_halfspeed    20.0  (PV)
 
   -- Vocal "aah" --
-  vocal_aah_formant_upmax    21.3  (LPC)  [old 34.5 was echo-mask artifact]
-  vocal_aah_formant_up4st    20.5  (LPC)
-  vocal_aah_formant_downmax  19.2  (LPC)
-  vocal_aah_pitch_up7st      15.9  (LPC)
-  vocal_aah_pitch_down12st   30.3  (LPC)
+  vocal_aah_formant_upmax    20.6  (LPC)  [old 34.5 was echo-mask artifact]
+  vocal_aah_formant_up4st    19.2  (LPC)
+  vocal_aah_formant_downmax  16.4  (LPC)
+  vocal_aah_pitch_up7st      18.2  (LPC)
+  vocal_aah_pitch_down12st   25.5  (LPC)
   vocal_aah_time_2x          57.7  (PV)   <- best case ever
   vocal_aah_time_halfspeed   34.9  (PV)
 
@@ -89,9 +89,9 @@ Per-case scores (v19b, METRIC v2, 29.9 avg):
   -- Chord C major --
   chord_Cmaj_time_2x         44.6  (PV)
   chord_Cmaj_pitch_up7st     49.8  (PV)
-  chord_Cmaj_formant_max     32.8  (LPC)
+  chord_Cmaj_formant_max     32.4  (LPC)
 
-Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9
+Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -123,23 +123,28 @@ Start a new session:
   Read ARCHITECTURE.md  (algorithm status, routing table, score history)
   Read RESEARCH_LOG.md  (session-by-session findings, open questions)
 
-F0 ESTIMATION (v19b, SourceFilterModel::estimateF0):
+F0 ESTIMATION (v19b/c, SourceFilterModel::estimateF0):
+  - NO pre-emphasis in estimateF0 (v19c): it boosts formants and on speech the
+    F1-region ACF peaks (~600 Hz) beat the fundamental — F0 flapped 130<->600 Hz
+    and pitch shifts rendered a fourth sharp. ACF pitch detection wants the
+    fundamental dominant (the opposite of LPC analysis needs).
   - frame reaching ACF is Hann^2-tapered (windowed twice); winAcf_ (ACF of w^2,
     precomputed in prepare) unbiases it. Correction clamped at 2.0 (diverges at
     long lags -> spurious peaks).
-  - OCTAVE GUARD required with unbiased ACF: shortest local max within 5% of
-    global max. Without it the sine estimate flips down an octave (77 dB
-    subharmonic). The old biased ACF was an accidental octave guard.
-  - Output fundamental now 442 Hz vs 440 target (was 444.5). Residual bias from
-    pre-emphasis/window interaction; diminishing returns.
+  - OCTAVE GUARD: only integer subharmonics of the global max (lag/2,/3,/4,
+    +-2 samples) qualify as shorter-lag candidates; a looser "any local max
+    within 5%" rule picked formant sub-peaks at non-integer fractions.
+  - Verified output fundamentals: sine cases 441.0 Hz (target 440); vocal
+    pitch+7 190.5 Hz (target 195.9).
 
-Next highest-value work (metric v2, v19b numbers):
-  1. vocal formant/pitch cases (15.9-21.3) — weakest group. Visible gap: upper
-     harmonics roll off ~25 dB faster than the V-Synth reference (excitation
-     spectral shape — V-Synth's sawtooth is brighter than our 1/k synthesis,
-     or its LPC envelope is flatter). vocal_aah_pitch_up7st (15.9) first.
+Next highest-value work (metric v2, v19c numbers):
+  1. Vocal LPC spectral tilt — output upper bands are ~15 dB below the V-Synth
+     reference (1-2 kHz: 26.7 vs 43.2 dB; 2-4 kHz: 6.9 vs 21.7 dB on pitch+7).
+     F0 is now correct, so this is the remaining gap for the whole vocal group
+     (16.4-25.5). Candidates: brighter excitation (slower than 1/k harmonic
+     decay), or flatter LPC envelope (higher effective order / less bandwidth
+     expansion).
   2. drum time compression (24.4/23.1) — transient-synchronous OLA (V-Synth
      BACKING event stamps); now measurable with correct compression rendering.
-  3. sine_440_time_halfspeed (20.0) and sine_440_formant_upmax (17.2) — check
-     whether these are metric noise on pure tones (manual spectra look good)
-     before spending algorithm effort.
+  3. sine_440_time_halfspeed (20.0) — PV path; check for metric noise vs real
+     artifact before algorithm work.

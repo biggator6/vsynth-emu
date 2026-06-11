@@ -1482,18 +1482,43 @@ Results (metric v2): score 29.5 → **29.9**.  chord_Cmaj_formant_max 26.5 →
 19.2; sine_440_formant_downmax 26.0 → 23.6 (small net loss, dominated by the
 gains).  Metric v2 history: v17 = 27.4 → v18h = 28.2 → v19 = 29.5 → v19b = 29.9.
 
-### Next Steps (v19b)
+### Continuation: v19c — F0 Estimation Without Pre-Emphasis (19c9b5d), score 30.0
 
-1. **Vocal formant/pitch group (15.9–21.3)** — weakest cases.  Visible gap:
-   output upper harmonics roll off ~25 dB faster than the V-Synth reference
-   (excitation spectral shape and/or LPC envelope flatness).
-   vocal_aah_pitch_up7st (15.9) first.
+Investigating vocal_aah_pitch_up7st (15.9) found the output a FOURTH sharp
+(233 Hz vs target 195.9).  Per-frame instrumentation showed estimateF0 flapping
+between ~130 Hz (true F0) and ~600 Hz (F1): the pre-emphasis applied inside
+estimateF0 boosts formant energy, so on real speech the F1-region ACF peaks
+beat the fundamental.  ACF pitch detection wants the fundamental DOMINANT —
+the exact opposite of what pre-emphasis does for LPC analysis.  Removed it;
+the Hann²-windowed, taper-corrected ACF alone is stable.
+
+Also replaced the v19b octave guard ("shortest local max within 5 % of global
+max") with an integer-subharmonic guard (only lag/2, lag/3, lag/4 ± 2 samples
+qualify): the looser rule mistook formant sub-peaks at non-integer fractions
+of the period for the fundamental.
+
+Verified output fundamentals: sine cases 441.0 Hz (target 440, best yet);
+vocal pitch+7 190.5 Hz (target 195.9, was 233.0).
+
+Results: score 29.9 → **30.0** (first time above 30).
+sine_440_formant_downmax 23.6 → 28.7, sine_440_formant_upmax 17.2 → 21.7,
+vocal_aah_pitch_up7st 15.9 → 18.2.  vocal_aah_pitch_down12st 30.3 → 25.5 —
+that score had leaned on the erratic F0; the audio is now pitch-correct.
+
+Metric v2 history: v17 27.4 → v18h 28.2 → v19 29.5 → v19b 29.9 → v19c 30.0.
+
+### Next Steps (v19c)
+
+1. **Vocal LPC spectral tilt** — with F0 correct, the remaining vocal-group gap
+   (16.4–25.5) is brightness: output upper bands ~15 dB below the reference
+   (1–2 kHz: 26.7 vs 43.2 dB; 2–4 kHz: 6.9 vs 21.7 dB on pitch+7).  Candidates:
+   slower-than-1/k excitation harmonic decay, or a flatter LPC envelope
+   (higher effective order / less bandwidth expansion).
 
 2. **Drum time compression (24.4 / 23.1)** — transient-synchronous OLA.
 
-3. **Verify suspected metric noise** on sine_440_formant_upmax (17.2) and
-   sine_440_time_halfspeed (20.0) before spending algorithm effort — manual
-   spectra of the formant case already match the reference well.
+3. **sine_440_time_halfspeed (20.0)** — PV path; check for metric noise vs
+   real artifact before algorithm work.
 
 ---
 
