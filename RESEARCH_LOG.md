@@ -1643,17 +1643,49 @@ overfit a discriminator to N=1 examples each.
 Score: 32.7 → **35.5**.  Metric v3 history: v17 27.5 → v22 32.4 → v22b 32.7 →
 v23 35.5.
 
-### Next Steps (v23)
+### Vocal Formant Diagnosis (investigated, no fix landed)
 
-1. **Vocal formant group (17.1–21.3)** — weakest cluster; formant placement
-   after pole shifts (formant_sim 0.35–0.53).  Measure shifted formant peaks
-   directly against the reference; revisit the order-8 guard for downshifts.
+Measured formant placement directly (cepstral-envelope peaks):
+
+- Dry vocal formants: 814 / 2613 / 3650 / 4617 Hz.
+- formant_upmax (+12 st) reference peaks: 1359 / 2326 — note the V-Synth's
+  "max" upshift moves F1 by ~×1.67 (≈ +9 st), NOT ×2; its formant mapping may
+  saturate or warp at the extremes.
+- Our upmax output peaks: 557 / 1383 — F1 essentially unshifted.
+
+Root cause located by dumping the actual LPC pole frequencies per frame:
+**at 48 kHz with order 8, the poles land at ~620 Hz, ~4.5 kHz, and 12–20 kHz**
+— two of the four pole pairs fit the pre-emphasised noise floor far above the
+speech band, leaving only 1–2 pairs on actual formants.  Shifting poles that
+were never on F2/F3 cannot place shifted formants correctly.
+(`shiftFormants` itself is healthy: zero bail-outs over a full render.)
+
+Variants tested, all within noise of each other (17–21 per case):
+- v23 as committed (speech formant-up bypasses pre-emph, order 8): 19.1/21.3/17.1
+- pre-emph restored for speech formant-up: 21.0/20.0/—
+- order 16 for speech formant frames: 19.7/20.2/16.8
+
+Conclusion: neither pre-emphasis nor order fixes formant capture at 48 kHz.
+The correct fix is **downsampled LPC analysis** — decimate the analysis frame
+to 8–12 kHz, run order 10–12 LPC there (all poles forced into the speech
+band), then map pole angles back to the 48 kHz domain for synthesis.  This was
+also the conclusion of Sessions 8–10 by other routes.  Session-sized project;
+deferred.
+
+### Next Steps (v23, final for Session 15)
+
+1. **Downsampled LPC for speech formant analysis** (see diagnosis above) —
+   the only credible path for the vocal formant group (17.1–21.3).
 
 2. **drum_hit_time_halfspeed (31.1)** — BACKING event stamps
    (transient-synchronous resynthesis) remain unimplemented.
 
 3. **vocal_aah_pitch_up7st (26.7)** — formant_sim only 0.30; check whether
    the vocal pitch references also show resynthesis artifacts worth matching.
+
+4. **V-Synth formant-knob mapping** — the reference's "+12 st" formant shift
+   measures as ~×1.67, not ×2.  Calibrating our shift ratio to the V-Synth's
+   actual mapping (once formant capture works) may be worth several points.
 
 ---
 
