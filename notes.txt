@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-11)
 
-Current score: 35.7 / 100 under METRIC v3 (target: > 60)
+Current score: 36.2 / 100 under METRIC v3 (target: > 60)
   METRIC v3 (commit eb18467): null test scales output by least-squares optimal
   gain (clamped [0.25,4]) before subtraction — reference levels are recording-
   chain gain staging, not algorithm error. v17 re-baselined under v3 = 27.5.
@@ -11,7 +11,9 @@ Current score: 35.7 / 100 under METRIC v3 (target: > 60)
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 57.7
-Best version: v24 (commit 74620ca) — v23 + downsampled formant LPC for
+Best version: v24b (commit c11cc1f) — v24 + downsampled envelope on the
+  vocal PITCH path too (ratio 1.0; vocal_aah_pitch_up7st 26.7 -> 36.1).
+v24 (commit 74620ca) — v23 + downsampled formant LPC for
   speech (decimate x4 -> order-12 LPC at ~12 kHz -> poles mapped back theta/4,
   r^0.25 -> shifted biquads; autocorrelation smoothed alpha=0.7 across frames;
   real/tilt poles dropped; polyphonic content excluded) + formant-knob
@@ -87,7 +89,7 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v24, METRIC v3, 35.7 avg):
+Per-case scores (v24b, METRIC v3, 36.2 avg):
   -- Sine 440 Hz --
   sine_440_formant_downmax   39.9  (LPC)
   sine_440_formant_upmax     31.6  (LPC)
@@ -100,7 +102,7 @@ Per-case scores (v24, METRIC v3, 35.7 avg):
   vocal_aah_formant_upmax    19.1  (LPC)
   vocal_aah_formant_up4st    22.0  (dsLPC)
   vocal_aah_formant_downmax  16.8  (dsLPC; placement near-exact, trajectory metric limits)
-  vocal_aah_pitch_up7st      26.7  (LPC)
+  vocal_aah_pitch_up7st      36.1  (dsLPC envelope)
   vocal_aah_pitch_down12st   32.1  (LPC)
   vocal_aah_time_2x          45.9  (PV)
   vocal_aah_time_halfspeed   38.2  (PV)
@@ -117,7 +119,7 @@ Per-case scores (v24, METRIC v3, 35.7 avg):
   chord_Cmaj_formant_max     41.7  (LPC)
 
 Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9
-Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7 → v23=35.5 → v24=35.7
+Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7 → v23=35.5 → v24=35.7 → v24b=36.2
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -191,13 +193,14 @@ VOCAL FORMANT (v24, implemented): downsampled LPC fixes pole placement —
   pole tracking could help further). V-Synth formant-knob mapping: upward
   saturates ~0.75x nominal, downward tracks nominal.
 
-Next highest-value work (metric v3, v24 numbers):
-  1. Vocal formant trajectory stability (16.8-24.2) — placement is now correct
-     but per-frame envelope jitter limits the trajectory-based metric. Try
-     stronger autocorrelation smoothing, or pole tracking/sorting across
-     frames.
+Next highest-value work (metric v3, v24b numbers):
+  1. vocal_aah_formant_downmax (16.8) — lowest case. Placement is near-exact
+     (measured); trajectory jitter limits the metric. Smoothing alpha 0.85
+     tried: WORSE (-1.2). Next: cross-frame pole tracking/sorting, or check
+     whether the downmax reference keeps unshifted upper structure (3170/4172
+     peaks in ref don't match x0.5 scaling — V-Synth may shift only F1-F2 down).
   2. drum_hit_time_halfspeed (31.1) — V-Synth BACKING event stamps
      (transient-synchronous resynthesis) remain unimplemented.
-  3. vocal_aah_pitch_up7st (26.7) — formant_sim 0.30; consider applying the
-     downsampled formant analysis to the PITCH path too (envelope quality
-     matters there equally; currently order-8 full-rate).
+  3. sine_440_formant_upmax (31.6) — still on the full-rate 2-pole shift path
+     (non-speech); fine, but check the V-Synth's upward saturation (x1.67)
+     applies to sines too — calibration is currently speech-only.

@@ -1702,18 +1702,34 @@ Scores: vocal_aah_formant_upmax 19.1 → 24.2, up4st 21.3 → 22.0, downmax
 17.1 → 16.8.  Total 35.5 → **35.7**.
 Metric v3 history: v17 27.5 → v22 32.4 → v22b 32.7 → v23 35.5 → v24 35.7.
 
-### Next Steps (v24, final for Session 15)
+### Continuation: v24b — Downsampled Envelope on the Pitch Path (c11cc1f), score 36.2
 
-1. **Vocal formant trajectory stability (16.8–24.2)** — placement is correct;
-   per-frame jitter limits the trajectory metric.  Stronger smoothing or
-   cross-frame pole tracking.
+Next-step #3 executed immediately: pitch-only speech frames now use
+`computeDownsampledFormantBiquads` with shift ratio 1.0 (unshifted envelope,
+analysed at ~12 kHz).  vocal_aah_pitch_up7st 26.7 → **36.1** (formant_sim
+0.30 → 0.55); pitch_down12st flat (32.6 → 32.2).
+
+Also tried and reverted: autocorrelation smoothing α = 0.85 (vs 0.7) —
+formant_downmax −1.2, others flat.  Simple smoothing has hit its limit;
+trajectory stability needs cross-frame pole tracking.
+
+**Session 15 final: 36.2 / 100** (metric v3; v17 baseline 27.5).
+Full history: v17 27.5 → v22 32.4 → v22b 32.7 → v23 35.5 → v24 35.7 →
+v24b 36.2.  (Old-metric session start: 27.1.)
+
+### Next Steps (final for Session 15)
+
+1. **vocal_aah_formant_downmax (16.8)** — lowest case.  Placement is
+   near-exact; trajectory jitter limits the metric.  Cross-frame pole
+   tracking, or investigate whether the V-Synth shifts only F1–F2 down
+   (the reference's 3170/4172 Hz peaks don't match ×0.5 scaling).
 
 2. **drum_hit_time_halfspeed (31.1)** — BACKING event stamps
    (transient-synchronous resynthesis) remain unimplemented.
 
-3. **Apply downsampled formant analysis to the vocal PITCH path** —
-   vocal_aah_pitch_up7st (26.7) still uses order-8 full-rate LPC for its
-   envelope; the same pole-placement argument applies.
+3. **sine_440_formant_upmax (31.6)** — check whether the V-Synth's upward
+   formant saturation (×1.67 at "max") applies to non-speech content too;
+   the 0.75× calibration is currently speech-only.
 
 ---
 
