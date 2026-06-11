@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-11)
 
-Current score: 35.5 / 100 under METRIC v3 (target: > 60)
+Current score: 35.7 / 100 under METRIC v3 (target: > 60)
   METRIC v3 (commit eb18467): null test scales output by least-squares optimal
   gain (clamped [0.25,4]) before subtraction — reference levels are recording-
   chain gain staging, not algorithm error. v17 re-baselined under v3 = 27.5.
@@ -11,7 +11,13 @@ Current score: 35.5 / 100 under METRIC v3 (target: > 60)
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 57.7
-Best version: v23 (commit 80e0c3b) — v22b + LITE content routes to LPC
+Best version: v24 (commit 74620ca) — v23 + downsampled formant LPC for
+  speech (decimate x4 -> order-12 LPC at ~12 kHz -> poles mapped back theta/4,
+  r^0.25 -> shifted biquads; autocorrelation smoothed alpha=0.7 across frames;
+  real/tilt poles dropped; polyphonic content excluded) + formant-knob
+  calibration (V-Synth upward mapping saturates ~0.75x nominal; downward
+  tracks nominal — measured from references).
+v23 (commit 80e0c3b) — v22b + LITE content routes to LPC
   resynthesis for time-only and pitch-UP ops. KEY ARCHITECTURE FINDING: the
   V-Synth RESYNTHESIZES pure tones even for time stretch (its sine references
   carry sawtooth harmonics the dry input lacks); transparent stretching can
@@ -81,7 +87,7 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v23, METRIC v3, 35.5 avg):
+Per-case scores (v24, METRIC v3, 35.7 avg):
   -- Sine 440 Hz --
   sine_440_formant_downmax   39.9  (LPC)
   sine_440_formant_upmax     31.6  (LPC)
@@ -92,8 +98,8 @@ Per-case scores (v23, METRIC v3, 35.5 avg):
 
   -- Vocal "aah" --
   vocal_aah_formant_upmax    19.1  (LPC)
-  vocal_aah_formant_up4st    21.3  (LPC)
-  vocal_aah_formant_downmax  17.1  (LPC)
+  vocal_aah_formant_up4st    22.0  (dsLPC)
+  vocal_aah_formant_downmax  16.8  (dsLPC; placement near-exact, trajectory metric limits)
   vocal_aah_pitch_up7st      26.7  (LPC)
   vocal_aah_pitch_down12st   32.1  (LPC)
   vocal_aah_time_2x          45.9  (PV)
@@ -111,7 +117,7 @@ Per-case scores (v23, METRIC v3, 35.5 avg):
   chord_Cmaj_formant_max     41.7  (LPC)
 
 Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9
-Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7 → v23=35.5
+Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7 → v23=35.5 → v24=35.7
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -177,22 +183,21 @@ Routing (v23): LITE + (time-only OR pitch>-0.5st) → LPC resynthesis.
   BACKING time cases tested both ways: drum compression prefers LPC (+4/+5),
   drum extension + chord prefer PV (-6/-8) — kept on PV, too thin to split.
 
-VOCAL FORMANT DIAGNOSIS (Session 15, measured — no fix landed yet):
-  LPC poles at 48 kHz/order 8 land at ~620 Hz, ~4.5 kHz and 12-20 kHz: two of
-  four pairs fit the pre-emphasised noise floor, not F2/F3. Shifting them
-  cannot place formants. Pre-emph on/off and order 8/16 all score 17-21
-  (within noise). shiftFormants itself is healthy (0 bail-outs).
-  ALSO: the V-Synth's "+12 st" formant reference measures ~x1.67 (≈+9 st),
-  not x2 — its mapping saturates/warps at extremes.
+VOCAL FORMANT (v24, implemented): downsampled LPC fixes pole placement —
+  measured output formants 492/1395/2139 Hz vs reference 463/1441/2227 (down-
+  max, near-exact). The formant-similarity metric improves less than the
+  physics because it scores TRAJECTORIES and per-frame jitter remains
+  (autocorrelation smoothing alpha=0.7 helps; more aggressive smoothing or
+  pole tracking could help further). V-Synth formant-knob mapping: upward
+  saturates ~0.75x nominal, downward tracks nominal.
 
-Next highest-value work (metric v3, v23 numbers):
-  1. DOWNSAMPLED LPC for speech formant analysis — decimate analysis frame to
-     8-12 kHz, LPC order 10-12 there (all poles in the speech band), map pole
-     angles back to 48 kHz for synthesis. Only credible path for the vocal
-     formant group (17.1-21.3). Session-sized.
+Next highest-value work (metric v3, v24 numbers):
+  1. Vocal formant trajectory stability (16.8-24.2) — placement is now correct
+     but per-frame envelope jitter limits the trajectory-based metric. Try
+     stronger autocorrelation smoothing, or pole tracking/sorting across
+     frames.
   2. drum_hit_time_halfspeed (31.1) — V-Synth BACKING event stamps
      (transient-synchronous resynthesis) remain unimplemented.
-  3. vocal_aah_pitch_up7st (26.7) — formant_sim 0.30; check whether vocal
-     pitch refs also show resynthesis signatures worth matching.
-  4. Calibrate the formant-knob mapping to the V-Synth's measured ~x1.67 at
-     "max" (after #1 makes formant capture real).
+  3. vocal_aah_pitch_up7st (26.7) — formant_sim 0.30; consider applying the
+     downsampled formant analysis to the PITCH path too (envelope quality
+     matters there equally; currently order-8 full-rate).
