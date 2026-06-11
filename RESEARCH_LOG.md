@@ -1453,6 +1453,48 @@ the reference's.
    (V-Synth BACKING event stamps) remains the planned approach, now measurable
    thanks to correct compression rendering.
 
+### Continuation: v19b — Unbiased F0 with Octave Guard (9019efc), score 29.9
+
+Implemented next-step #1.  The ~1 % sharpness was NOT integer-lag quantisation
+(parabolic interpolation was already present) but ACF taper bias: the frame
+reaching estimateF0 is **Hann²-tapered** (windowed once at extraction and again
+inside estimateF0), tilting the ACF down with lag and pulling the interpolated
+peak short.
+
+Fix sequence, with two instructive failures:
+
+1. Unbias by single-Hann window ACF: 444.5 → 443.0 Hz. Partial — wrong window.
+2. Remove the second windowing (so single-Hann correction is exact): the
+   estimate DESTABILISED (output smeared to ~590 Hz dominant) — the strong
+   taper suppresses frame-end effects; keep it.
+3. Correct with the ACF of the SQUARED window (`winAcf_`, precomputed in
+   prepare): 442.0 Hz, stable.  Correction factor clamped at 2.0 — unclamped
+   it diverges at long lags and amplified noise into spurious peaks.
+4. **Octave guard required**: the unbiased ACF has near-equal peaks at the
+   period and its multiples, and the clamped correction slightly favours
+   longer lags — the sine estimate flipped down an octave (77 dB subharmonic
+   at 221 Hz; sine_440_formant_downmax → 5.1).  The old biased ACF favoured
+   short lags by construction — an accidental octave guard, now explicit:
+   shortest local maximum within 5 % of the global maximum.
+
+Results (metric v2): score 29.5 → **29.9**.  chord_Cmaj_formant_max 26.5 →
+32.8, vocal_aah_pitch_down12st 26.5 → 30.3, vocal_aah_formant_downmax 16.2 →
+19.2; sine_440_formant_downmax 26.0 → 23.6 (small net loss, dominated by the
+gains).  Metric v2 history: v17 = 27.4 → v18h = 28.2 → v19 = 29.5 → v19b = 29.9.
+
+### Next Steps (v19b)
+
+1. **Vocal formant/pitch group (15.9–21.3)** — weakest cases.  Visible gap:
+   output upper harmonics roll off ~25 dB faster than the V-Synth reference
+   (excitation spectral shape and/or LPC envelope flatness).
+   vocal_aah_pitch_up7st (15.9) first.
+
+2. **Drum time compression (24.4 / 23.1)** — transient-synchronous OLA.
+
+3. **Verify suspected metric noise** on sine_440_formant_upmax (17.2) and
+   sine_440_time_halfspeed (20.0) before spending algorithm effort — manual
+   spectra of the formant case already match the reference well.
+
 ---
 
 ## Session Template (copy for each new session)
