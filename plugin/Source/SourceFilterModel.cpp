@@ -714,10 +714,18 @@ void SourceFilterModel::synthesiseExcitation(std::vector<float>& excitation,
     const int maxHarmonic = static_cast<int>(sampleRate_ / 2.0 / f0_hz);
     const float phaseInc  = kTwoPi * f0_hz / float(sampleRate_);
 
+    // Flat harmonic weighting (band-limited impulse train), NOT 1/k sawtooth.
+    //
+    // The spectral tilt of voiced speech is already carried by the rest of the
+    // chain: the pre-emphasis path restores it via the output de-emphasis
+    // filter, and the bypass path's LPC envelope (computed from the un-tilted
+    // original frame) includes it.  A 1/k excitation added a SECOND −6 dB/oct
+    // on top of either, making every LPC output ~15 dB too dark above 1 kHz
+    // (measured on vocal pitch+7: 1–2 kHz at 26.7 dB vs reference 43.2 dB).
     for (int i = 0; i < numSamples; ++i) {
         float s = 0.0f;
         for (int k = 1; k <= maxHarmonic; ++k)
-            s += (1.0f / float(k)) * std::sin(phase * float(k));
+            s += std::sin(phase * float(k));
         excitation[i] = s;
         phase += phaseInc;
         if (phase > kTwoPi) phase -= kTwoPi;
