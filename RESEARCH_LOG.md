@@ -1507,15 +1507,47 @@ that score had leaned on the erratic F0; the audio is now pitch-correct.
 
 Metric v2 history: v17 27.4 → v18h 28.2 → v19 29.5 → v19b 29.9 → v19c 30.0.
 
-### Next Steps (v19c)
+### Continuation: v20 — Flat Harmonic Excitation (7e52ac6), score 32.0
 
-1. **Vocal LPC spectral tilt** — with F0 correct, the remaining vocal-group gap
-   (16.4–25.5) is brightness: output upper bands ~15 dB below the reference
-   (1–2 kHz: 26.7 vs 43.2 dB; 2–4 kHz: 6.9 vs 21.7 dB on pitch+7).  Candidates:
-   slower-than-1/k excitation harmonic decay, or a flatter LPC envelope
-   (higher effective order / less bandwidth expansion).
+The vocal spectral tilt (next-step #1) turned out to be a double-counting bug,
+fixed with a one-line change to `synthesiseExcitation`:
 
-2. **Drum time compression (24.4 / 23.1)** — transient-synchronous OLA.
+The 1/k sawtooth excitation added −6 dB/oct on top of a tilt the chain already
+carries once per path:
+- Pre-emphasis path: the LPC envelope is computed from the FLATTENED spectrum
+  and the output de-emphasis filter restores −6 dB/oct → 1/k gave −12 dB/oct
+  total.
+- Bypass path: the LPC envelope of the original frame already includes the
+  natural tilt → 1/k doubled it.
+
+Every LPC output was therefore ~15 dB too dark above 1 kHz (vocal pitch+7:
+1–2 kHz at 26.7 dB vs reference 43.2 dB).  Flat harmonic weighting
+(band-limited impulse train) lets the tilt come from exactly one place per
+path; the 2–4 kHz deficit dropped from −15 dB to −4.5 dB.
+
+Results: score 30.0 → **32.0** (largest single-change gain of the project).
+chord_Cmaj_formant_max 32.4 → 41.7, sine_440_formant_downmax 28.7 → 39.6,
+sine_440_formant_upmax 21.7 → 31.5, vocal_aah_pitch_down12st 25.5 → 32.6.
+
+**Tried and reverted:** output-domain energy normalisation (de-emphasise a
+copy of synthFrame for the energy estimate, target the ORIGINAL frame energy
+instead of the pre-emph-domain energy).  This corrects a real ~10 dB level
+deficit in the de-emphasised output, but scored 31.9 vs 32.0 — the metric
+prefers the current (level-mismatched) normalisation.  Worth revisiting if
+the metric's level sensitivity changes.
+
+Metric v2 history: v17 27.4 → v18h 28.2 → v19 29.5 → v19b 29.9 → v19c 30.0 →
+**v20 32.0**.
+
+### Next Steps (v20)
+
+1. **Vocal formant group (17.1–21.3)** — the remaining weak cluster.  F0 is
+   correct and the tilt is fixed; what's left is formant placement accuracy
+   after pole shifting and the level deficit (whose obvious fix the metric
+   currently rejects — see above).
+
+2. **Drum time compression (24.4 / 23.1)** — transient-synchronous OLA
+   (V-Synth BACKING event stamps).
 
 3. **sine_440_time_halfspeed (20.0)** — PV path; check for metric noise vs
    real artifact before algorithm work.

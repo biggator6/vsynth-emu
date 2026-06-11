@@ -2,15 +2,16 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-10)
 
-Current score: 30.0 / 100 under METRIC v2 (target: > 60)
+Current score: 32.0 / 100 under METRIC v2 (target: > 60)
   METRIC v2 (commit 3ecdfdf): compare.py time-aligns ref/output via envelope
   cross-correlation. Pre-v2 scores are not comparable (8 of 20 pairs were
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 57.7
-Best version: v19c (commit 19c9b5d) — v19 (drain mode + OLA read gating +
-  OLA-coherent excitation) + unbiased F0 (no pre-emph, w^2 taper correction,
-  integer-subharmonic octave guard).
+Best version: v20 (commit 7e52ac6) — v19c + FLAT harmonic excitation
+  (band-limited impulse train, not 1/k sawtooth). The 1/k weighting
+  double-counted the speech spectral tilt (envelope or de-emphasis already
+  carries it), leaving every LPC output ~15 dB dark above 1 kHz.
   Outputs: analysis/plugin_outputs/hybrid_v18d  (dir name lags version; scores in
   analysis/results/hybrid_v18d)
 
@@ -62,21 +63,21 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v19c, METRIC v2, 30.0 avg):
+Per-case scores (v20, METRIC v2, 32.0 avg):
   -- Sine 440 Hz --
-  sine_440_formant_downmax   28.7  (LPC, pre-emph)
-  sine_440_formant_upmax     21.7  (LPC, bypassed)
+  sine_440_formant_downmax   39.6  (LPC, pre-emph)
+  sine_440_formant_upmax     31.5  (LPC, bypassed)
   sine_440_pitch_down12st    44.0  (PV)
   sine_440_pitch_up7st       35.7  (PV)
   sine_440_time_2x           27.6  (PV)
   sine_440_time_halfspeed    20.0  (PV)
 
   -- Vocal "aah" --
-  vocal_aah_formant_upmax    20.6  (LPC)  [old 34.5 was echo-mask artifact]
-  vocal_aah_formant_up4st    19.2  (LPC)
-  vocal_aah_formant_downmax  16.4  (LPC)
-  vocal_aah_pitch_up7st      18.2  (LPC)
-  vocal_aah_pitch_down12st   25.5  (LPC)
+  vocal_aah_formant_upmax    18.1  (LPC)
+  vocal_aah_formant_up4st    21.1  (LPC)
+  vocal_aah_formant_downmax  18.5  (LPC)
+  vocal_aah_pitch_up7st      18.5  (LPC)
+  vocal_aah_pitch_down12st   32.6  (LPC)
   vocal_aah_time_2x          57.7  (PV)   <- best case ever
   vocal_aah_time_halfspeed   34.9  (PV)
 
@@ -89,9 +90,9 @@ Per-case scores (v19c, METRIC v2, 30.0 avg):
   -- Chord C major --
   chord_Cmaj_time_2x         44.6  (PV)
   chord_Cmaj_pitch_up7st     49.8  (PV)
-  chord_Cmaj_formant_max     32.4  (LPC)
+  chord_Cmaj_formant_max     41.7  (LPC)
 
-Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0
+Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -137,13 +138,20 @@ F0 ESTIMATION (v19b/c, SourceFilterModel::estimateF0):
   - Verified output fundamentals: sine cases 441.0 Hz (target 440); vocal
     pitch+7 190.5 Hz (target 195.9).
 
-Next highest-value work (metric v2, v19c numbers):
-  1. Vocal LPC spectral tilt — output upper bands are ~15 dB below the V-Synth
-     reference (1-2 kHz: 26.7 vs 43.2 dB; 2-4 kHz: 6.9 vs 21.7 dB on pitch+7).
-     F0 is now correct, so this is the remaining gap for the whole vocal group
-     (16.4-25.5). Candidates: brighter excitation (slower than 1/k harmonic
-     decay), or flatter LPC envelope (higher effective order / less bandwidth
-     expansion).
+EXCITATION (v20): FLAT harmonic weighting in synthesiseExcitation (band-limited
+  impulse train). DO NOT use 1/k sawtooth weighting: the spectral tilt is
+  already carried once per path (pre-emph path: output de-emphasis filter;
+  bypass path: LPC envelope of the untilted frame) — 1/k double-counts it,
+  ~15 dB dark above 1 kHz. Tried and reverted (Session 15): output-domain
+  energy normalization (de-emphasise synthFrame copy for the energy estimate,
+  target original frame energy) — fixed the ~10 dB level deficit but scored
+  31.9 vs 32.0; metric prefers the current pre-emph-domain normalization.
+
+Next highest-value work (metric v2, v20 numbers):
+  1. Vocal formant group (17.1-21.3) — now the weakest cluster. F0 correct,
+     tilt fixed; remaining issues are formant placement accuracy after pole
+     shifts and the ~10 dB level deficit (see reverted normalization note —
+     fixing level may need a different metric-compatible approach).
   2. drum time compression (24.4/23.1) — transient-synchronous OLA (V-Synth
      BACKING event stamps); now measurable with correct compression rendering.
   3. sine_440_time_halfspeed (20.0) — PV path; check for metric noise vs real
