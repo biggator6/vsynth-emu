@@ -207,11 +207,24 @@ Tried and reverted (Session 15, late):
     on vowel onsets) and drum_halfspeed -1.3. Net negative; Session 10's
     conclusion stands even with correct phase propagation.
 
+vocal_aah_formant_downmax (16.8) — EXHAUSTED EXPERIMENTS (do not retry):
+  - down calibration 0.75x: 12.1; 0.85x: 12.1 — wants nominal ratio
+  - cross-frame pole tracking (match-by-angle, 60/40 blend): flat (16.6)
+  - split shift (hold poles >2.5 kHz on down-shift): 15.6
+  - autocorrelation smoothing beyond alpha 0.7: worse
+  Placement is measurably near-exact; whatever formant_sim penalises here
+  (0.31) is not pole position, stability, or shift mapping. Next credible
+  step would be analysing the metric itself on this pair, or more reference
+  recordings to determine the V-Synth's actual downshift envelope over time.
+
 Next highest-value work (metric v3, v25 numbers):
-  1. vocal_aah_formant_downmax (16.8) — placement near-exact; trajectory
-     jitter limits the metric. Cross-frame pole tracking is the remaining
-     untried idea.
-  2. vocal_aah_formant group generally (16.8-24.2) — investigate whether the
-     V-Synth shifts only F1-F2 down (ref 3170/4172 Hz peaks don't match x0.5).
-  3. drum_hit_pitch_up7st (36.9) — event-based handling could extend to
-     pitch ops on BACKING (currently time-only).
+  1. Broaden the reference set — record more V-Synth material (other vowels,
+     melodic phrases, polyphonic sustains, kit loops). The 20-case suite is 4
+     source recordings; remaining per-case gaps may not generalise, and the
+     score ceiling is increasingly metric/coverage-bound rather than
+     algorithm-bound.
+  2. drum_hit_pitch_up7st (36.9) — extend event-based handling to pitch ops
+     on BACKING (attacks verbatim, pitch-shift only tails).
+  3. Real-time plugin parity — the offline renderer has diverged (drain mode,
+     event-based stretch are offline-only); decide what the JUCE plugin
+     should do live and wire the engine improvements into it.
