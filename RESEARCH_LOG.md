@@ -1748,18 +1748,32 @@ propagation).
 Metric v3 history: v17 27.5 → v22 32.4 → v22b 32.7 → v23 35.5 → v24 35.7 →
 v24b 36.2 → **v25 36.5**.
 
+### vocal_aah_formant_downmax: experiments exhausted (no fix landed)
+
+Four interventions tested against the 16.8 baseline, all worse or flat:
+calibrated down-shift (0.75×: 12.1; 0.85×: 12.1), cross-frame pole tracking
+(match-by-angle, 60/40 blend: 16.6 — also flat on every other dsLPC case),
+split shift holding poles above 2.5 kHz (15.6), and stronger autocorrelation
+smoothing (worse).  Formant placement is measurably near-exact; whatever
+formant_similarity penalises (0.31) is not pole position, stability, or shift
+mapping.  Next credible steps are analysing the metric's behaviour on this
+specific pair, or recording more reference material to characterise the
+V-Synth's downshift envelope over time.  **Do not retry the four above.**
+
 ### Next Steps (final for Session 15)
 
-1. **vocal_aah_formant_downmax (16.8)** — placement near-exact; trajectory
-   jitter limits the metric.  Cross-frame pole tracking is the remaining
-   untried idea.
+1. **Broaden the reference set** — the 20-case suite derives from 4 source
+   recordings.  Remaining per-case gaps may not generalise; the score ceiling
+   is increasingly coverage/metric-bound rather than algorithm-bound.  More
+   V-Synth recordings (other vowels, melodic phrases, polyphonic sustains,
+   kit loops) would validate the routing against overfitting.
 
-2. **Vocal formant group (16.8–24.2)** — investigate whether the V-Synth
-   shifts only F1–F2 down (the reference's 3170/4172 Hz peaks don't match
-   ×0.5 scaling).
+2. **drum_hit_pitch_up7st (36.9)** — extend event-based handling to pitch
+   operations on BACKING content (attacks verbatim, pitch-shift only tails).
 
-3. **drum_hit_pitch_up7st (36.9)** — extend event-based handling to pitch
-   operations on BACKING content (currently time-only).
+3. **Real-time plugin parity** — drain mode and event-based stretch are
+   offline-only; decide live behaviour for the JUCE plugin and wire the
+   Session 15 engine improvements into it.
 
 ---
 
