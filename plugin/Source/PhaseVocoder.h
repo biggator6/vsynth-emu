@@ -89,7 +89,9 @@ private:
     int outputReadPos_  = 0;  // where output samples are read from
     int outputAvail_    = 0;  // queued samples between read and write pointers
     int lastValidOutput_= 0;  // see getLastValidOutput()
-    float synthHopAccum_= 0.0f; // fractional synthesis-hop accumulator
+    float synthHopAccum_= 0.0f; // fractional synthesis-hop accumulator (WSOLA path)
+    float anaHopAccum_  = 0.0f; // fractional analysis-hop accumulator (PV path)
+    int   lastAnaHop_   = kHopSize; // analysis hop between previous and current frame
 
     // ── Phase vocoder state ──────────────────────────────────────────────────
     std::vector<float> lastPhase_;     // previous analysis frame phases (per bin)
@@ -157,13 +159,13 @@ private:
 
     // Phase vocoder synthesis frame → time-domain frame (kFFTSize samples)
     // stretchRatio = totalStretch (timeStretch * pitchRatio)
-    // lockToAnalysis: if true, synthesis phases are reset to the current analysis
-    //   phases rather than being accumulated.  Used on transient onset frames to
-    //   eliminate OLA pre-ringing and preserve attack timing.
+    // synthHop: the synthesis hop this frame will be OLA'd at (the phase
+    //   recursion advances peak phases by −omega × synthHop; see the sign-
+    //   convention note in the implementation).
     void synthesizeFrame(const std::vector<std::complex<float>>& spectrum,
                          std::vector<float>& frame,
                          float stretchRatio,
-                         bool lockToAnalysis = false);
+                         int synthHop = kHopSize);
 
     // Time-domain WSOLA time-stretch — processes all available analysis frames
     // and writes to outputBuffer_.  Called from processMono when pitch and

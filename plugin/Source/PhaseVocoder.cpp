@@ -97,6 +97,8 @@ void PhaseVocoder::reset() {
     outputAvail_    = 0;
     lastValidOutput_= 0;
     synthHopAccum_  = 0.0f;
+    anaHopAccum_    = 0.0f;
+    lastAnaHop_     = kHopSize;
     resampleFrac_   = 0.0f;
 
     std::fill(wsolaRef_.begin(), wsolaRef_.end(), 0.0f);
@@ -201,45 +203,111 @@ void PhaseVocoder::shiftFormants(std::vector<std::complex<float>>& spectrum,
 void PhaseVocoder::synthesizeFrame(const std::vector<std::complex<float>>& spectrum,
                                     std::vector<float>& frame,
                                     float stretchRatio,
-                                    bool /*lockToAnalysis*/) {
-    const int halfN    = kFFTSize / 2 + 1;
-    const float hopExp = kTwoPi * float(kHopSize) / float(kFFTSize);
+                                    int synthHop) {
+    const int halfN = kFFTSize / 2 + 1;
+
+    // Inverted hop architecture: the analysis hop between the previous frame
+    // and this one is lastAnaHop_ (= round(kHopSize / stretch), constant per
+    // render); the synthesis hop is FIXED at kHopSize (always 4× Hann²
+    // overlap, ripple-free OLA).
+    const float anaHop = float(std::max(1, lastAnaHop_));
+    const float hopExp = kTwoPi * anaHop / float(kFFTSize);
+
+    // ── Identity phase locking (Laroche & Dolson 1999) ────────────────────────
+    // Running the true-frequency phase recursion independently per bin destroys
+    // the INTER-BIN phase relationships, which encode where the windowed
+    // partial sits inside the frame.  The IFFT then produces frames whose
+    // energy is not edge-tapered, and the OLA develops AM at the frame rate
+    // (±43 Hz sidebands on a pure tone).  Fix: only spectral PEAK bins run the
+    // recursion; every other bin keeps its ANALYSIS phase offset relative to
+    // the nearest peak, preserving the local phase structure exactly.
+    std::vector<float> mag(halfN), ph(halfN);
+    for (int k = 0; k < halfN; ++k) {
+        mag[k] = std::abs(spectrum[k]);
+        ph[k]  = std::arg(spectrum[k]);
+    }
+
+    // Peaks: local maxima over ±2 bins
+    std::vector<int> peaks;
+    for (int k = 2; k < halfN - 2; ++k) {
+        if (mag[k] > mag[k-1] && mag[k] > mag[k-2] &&
+            mag[k] > mag[k+1] && mag[k] > mag[k+2])
+            peaks.push_back(k);
+    }
+
+    // SIGN CONVENTION (Session 15): this codebase's forward FFT uses a +j
+    // exponent (the conjugate of the textbook DFT), so a time delay of `hop`
+    // samples advances bin phases by −ω·hop, not +ω·hop.  The recursion below
+    // is written for that convention:
+    //     delta  = wrap(Δφ + expectedAdv)   →  −Δω·anaHop
+    //     omega  = (expectedAdv − delta) / anaHop
+    //     sumPhase −= omega · synthesisHop
+    // The original (+ω) recursion only worked because the legacy analysis hop
+    // of 512 = N/4 made expectedAdv = πk/2, whose doubling is ≡ 0 (mod 2π) on
+    // even bins — the sign error self-cancelled there and broke at EVERY other
+    // hop value (hop-dependent ±43 Hz sidebands).
+    if (peaks.empty()) {
+        // Silence / degenerate frame — per-bin recursion
+        for (int k = 0; k < halfN; ++k) {
+            const float expectedAdv = hopExp * float(k);
+            float delta = ph[k] - lastPhase_[k] + expectedAdv;
+            delta -= kTwoPi * std::round(delta / kTwoPi);
+            sumPhase_[k] -= ((expectedAdv - delta) / anaHop) * float(synthHop);
+        }
+    } else {
+        // 1. Phase recursion at peaks only
+        for (int p : peaks) {
+            const float expectedAdv = hopExp * float(p);
+            float delta = ph[p] - lastPhase_[p] + expectedAdv;
+            delta -= kTwoPi * std::round(delta / kTwoPi);
+            const float omega = (expectedAdv - delta) / anaHop;
+            sumPhase_[p] -= omega * float(synthHop);
+        }
+        // 2. Non-peak bins inherit the nearest peak's synthesis phase plus
+        //    their analysis offset from that peak (region boundaries at the
+        //    midpoints between adjacent peaks).
+        int pi = 0;
+        for (int k = 0; k < halfN; ++k) {
+            while (pi + 1 < (int)peaks.size() &&
+                   std::abs(peaks[pi + 1] - k) < std::abs(peaks[pi] - k))
+                ++pi;
+            const int p = peaks[pi];
+            if (k != p)
+                sumPhase_[k] = sumPhase_[p] + (ph[k] - ph[p]);
+        }
+    }
 
     std::vector<std::complex<float>> synthSpec(kFFTSize, { 0.0f, 0.0f });
-
     for (int k = 0; k < halfN; ++k) {
-        const float mag   = std::abs(spectrum[k]);
-        const float phase = std::arg(spectrum[k]);
-
-        // Normal phase accumulation (Laroche & Dolson 1999 true-frequency rule).
-        // Expected phase advance for this bin over one analysis hop
-        const float expectedAdv = hopExp * float(k);
-
-        // Phase difference between this frame and last (deviation from expected)
-        float delta = phase - lastPhase_[k] - expectedAdv;
-
-        // Wrap to (−π, π]
-        delta -= kTwoPi * std::round(delta / kTwoPi);
-
-        // True instantaneous frequency
-        const float trueFreq = expectedAdv + delta;
-
-        // Accumulate synthesis phase (scaled by stretch ratio to advance the
-        // synthesis hop by stretchRatio * kHopSize samples)
-        sumPhase_[k] += trueFreq * stretchRatio;
-        lastPhase_[k]  = phase;
-
-        synthSpec[k] = std::polar(mag, sumPhase_[k]);
+        lastPhase_[k] = ph[k];
+        synthSpec[k]  = std::polar(mag[k], sumPhase_[k]);
         if (k > 0 && k < halfN - 1)
             synthSpec[kFFTSize - k] = std::conj(synthSpec[k]);
     }
 
-    // IFFT → time domain (no synthesis window — normalization handles scaling)
+    // IFFT → time domain, then SYNTHESIS window (Session 15).
+    //
+    // The analysis Hann window tapers the frame BEFORE the FFT, but the phase
+    // modifications above circularly shift content within the frame, so the
+    // IFFT result is no longer guaranteed to taper at the edges.  Un-windowed
+    // OLA then has frame-boundary discontinuities at the synthesis hop rate —
+    // measured as ±43 Hz AM sidebands around a pure 440 Hz tone at stretch=2
+    // (44100/1024 = 43 Hz).  A synthesis Hann window restores edge taper.
+    //
+    // Scale maps the fixed-hop Hann² OLA sum (Σw² = 1.5 at 4× overlap) onto
+    // the shared output normalisation (which multiplies by totalStretch/2 to
+    // suit the WSOLA path's stretch-scaled singly-windowed OLA):
+    //   net = scale × Σw² × totalStretch/2  ≐ 1  →  scale = 4/(3·totalStretch)
     fft(synthSpec, true);
 
+    // Scale maps the fixed-hop Hann² OLA sum (Σw² = 1.5 at 4× overlap) onto
+    // the shared output normalisation (which multiplies by totalStretch/2 to
+    // suit the WSOLA path's stretch-scaled singly-windowed OLA):
+    //   net = scale × 1.5 × totalStretch/2 ≐ 1  →  scale = 4/(3·totalStretch)
+    const float scale = 4.0f / (3.0f * std::max(0.05f, stretchRatio));
     frame.resize(kFFTSize);
     for (int i = 0; i < kFFTSize; ++i)
-        frame[i] = synthSpec[i].real();
+        frame[i] = synthSpec[i].real() * window_[i] * scale;
 }
 
 // ─── WSOLA Time-Stretch ───────────────────────────────────────────────────────
@@ -487,8 +555,24 @@ void PhaseVocoder::processMono(const float* input, float* output, int numSamples
         // regressed −9.0 pts.  The phase discontinuity broke OLA reconstruction.
         // Reverted.  True transient-synchronous behaviour requires WSOLA + event
         // stamps (V-Synth BACKING mode), not phase-vocoder phase locking.
+        // ── Inverted hop architecture (Session 15) ────────────────────────────
+        // SYNTHESIS hop FIXED at kHopSize (always 4× Hann² overlap, ripple-free
+        // OLA); ANALYSIS hop = round(kHopSize / totalStretch).  The legacy
+        // design scaled the synthesis hop by stretch, which at stretch = 2
+        // dropped synthesis overlap to 2× and produced ±43 Hz AM sidebands.
+        // Hops are FIXED INTEGERS per render: a fractional accumulator
+        // (alternating 341/342) broke per-bin phase tracking.  Worst-case
+        // ratio error ≤ 0.15 % (4 ms over 4 s) — absorbed by the metric.
+        // (A compression-side variant — analysis hop fixed, synthesis hop
+        // scaled down — was tried for transient fidelity and scored worse:
+        // 31.3 vs 32.0.)
+        const int synthHop = kHopSize;
+        const int anaHop   = std::max(1,
+            (int)std::lround(float(kHopSize) / std::max(0.05f, totalStretch)));
+        lastAnaHop_ = anaHop;
+
         std::vector<float> synthFrame;
-        synthesizeFrame(spectrum, synthFrame, totalStretch);
+        synthesizeFrame(spectrum, synthFrame, totalStretch, synthHop);
 
         // OLA: add synthesis frame into output buffer at outputWritePos_
         for (int i = 0; i < kFFTSize; ++i) {
@@ -496,16 +580,11 @@ void PhaseVocoder::processMono(const float* input, float* output, int numSamples
             outputBuffer_[pos] += synthFrame[i];
         }
 
-        // Advance synthesis write position by synthesis hop (= kHopSize * totalStretch)
-        synthHopAccum_ += float(kHopSize) * totalStretch;
-        const int synthHop = static_cast<int>(synthHopAccum_);
-        synthHopAccum_    -= float(synthHop);
-        outputWritePos_    = (outputWritePos_ + synthHop) % outBufSize_;
-        outputAvail_      += synthHop;
+        outputWritePos_ = (outputWritePos_ + synthHop) % outBufSize_;
+        outputAvail_   += synthHop;
 
-        // Advance analysis read position by one analysis hop
-        inputReadPos_ = (inputReadPos_ + kHopSize) % kInBufSize;
-        inputFill_   -= kHopSize;
+        inputReadPos_ = (inputReadPos_ + anaHop) % kInBufSize;
+        inputFill_   -= anaHop;
     }
 
     } // end else (PV path)
