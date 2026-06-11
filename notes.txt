@@ -193,14 +193,22 @@ VOCAL FORMANT (v24, implemented): downsampled LPC fixes pole placement —
   pole tracking could help further). V-Synth formant-knob mapping: upward
   saturates ~0.75x nominal, downward tracks nominal.
 
+Tried and reverted (Session 15, late):
+  - Down-shift formant calibration (0.85x and 0.75x nominal): both score
+    worse than nominal despite per-formant reference ratios suggesting
+    saturation (0.55-0.69) — the trajectory metric does not reward it.
+  - PV onset phase reset (retried on the FIXED v21 PV — sign-corrected +
+    identity locking): drum_2x +1.0 but vocal_time_2x -3.3 (false triggers
+    on vowel onsets) and drum_halfspeed -1.3. Net negative; Session 10's
+    conclusion stands even with correct phase propagation.
+
 Next highest-value work (metric v3, v24b numbers):
-  1. vocal_aah_formant_downmax (16.8) — lowest case. Placement is near-exact
-     (measured); trajectory jitter limits the metric. Smoothing alpha 0.85
-     tried: WORSE (-1.2). Next: cross-frame pole tracking/sorting, or check
-     whether the downmax reference keeps unshifted upper structure (3170/4172
-     peaks in ref don't match x0.5 scaling — V-Synth may shift only F1-F2 down).
-  2. drum_hit_time_halfspeed (31.1) — V-Synth BACKING event stamps
-     (transient-synchronous resynthesis) remain unimplemented.
-  3. sine_440_formant_upmax (31.6) — still on the full-rate 2-pole shift path
-     (non-speech); fine, but check the V-Synth's upward saturation (x1.67)
-     applies to sines too — calibration is currently speech-only.
+  1. vocal_aah_formant_downmax (16.8) — placement near-exact; trajectory
+     jitter limits the metric. Cross-frame pole tracking is the remaining
+     untried idea.
+  2. drum_hit_time_halfspeed (31.1) — true V-Synth BACKING event stamps
+     (segment-and-place resynthesis, not phase tricks): detect onsets at
+     encode time, place events verbatim at stretched positions, stretch only
+     inter-event regions. Session-sized.
+  3. Vocal formant group polish — investigate whether the V-Synth shifts
+     only F1-F2 down (ref's 3170/4172 Hz peaks don't match x0.5 scaling).
