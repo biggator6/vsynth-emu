@@ -124,6 +124,13 @@ private:
     // ── Analysis window ───────────────────────────────────────────────────────
     std::vector<float> window_;
 
+    // Window autocorrelation Σᵢ w[i]·w[i+lag], precomputed in prepare().
+    // Used by estimateF0 to unbias the windowed-frame ACF: the Hann taper makes
+    // the raw ACF decay with lag, pulling the parabolic peak toward shorter
+    // lags (≈1 % sharp at 440 Hz).  Dividing by winAcf_[lag] removes the
+    // deterministic window taper for stationary content.
+    std::vector<float> winAcf_;
+
     // ── DSP methods ───────────────────────────────────────────────────────────
 
     // Levinson-Durbin LPC analysis — returns coefficients and prediction gain.

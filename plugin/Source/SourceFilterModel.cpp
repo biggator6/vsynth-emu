@@ -59,6 +59,21 @@ SourceFilterModel::~SourceFilterModel() = default;
 void SourceFilterModel::prepare(double sampleRate, int /*maxBlockSize*/) {
     sampleRate_ = sampleRate;
 
+    // Autocorrelation of the SQUARED window, up to the largest F0 search lag
+    // (60 Hz minimum).  estimateF0 sees the frame tapered by Hann² (windowed
+    // once at extraction, once inside estimateF0), so the taper-bias
+    // correction must use w² as the effective window.
+    {
+        const int maxLag = static_cast<int>(sampleRate_ / 60.0);
+        winAcf_.assign(maxLag + 1, 0.0f);
+        for (int lag = 0; lag <= maxLag && lag < kFrameSize; ++lag) {
+            float s = 0.0f;
+            for (int i = 0; i + lag < kFrameSize; ++i)
+                s += (window_[i] * window_[i]) * (window_[i + lag] * window_[i + lag]);
+            winAcf_[lag] = s;
+        }
+    }
+
     inputBuffer_.assign(kFrameSize * 4, 0.0f);
     outputBuffer_.assign(kFrameSize * 16, 0.0f);
     outputBufferPlain_.assign(kFrameSize * 16, 0.0f);
@@ -571,7 +586,10 @@ void SourceFilterModel::shiftFormants(std::vector<float>& coeffs, float semitone
 float SourceFilterModel::estimateF0(const std::vector<float>& frame) const {
     const int N = static_cast<int>(frame.size());
 
-    // Pre-emphasised, windowed frame for ACF
+    // Pre-emphasised, windowed frame for ACF.  The caller's frame is already
+    // Hann-windowed; windowing again gives a Hann² taper, whose bias is
+    // corrected exactly by winAcf_ (computed on w²) below.  Removing the
+    // second window destabilises the estimate (end effects), so keep it.
     std::vector<float> x(N);
     for (int i = 1; i < N; ++i)
         x[i] = frame[i] - 0.97f * frame[i - 1];
@@ -588,21 +606,51 @@ float SourceFilterModel::estimateF0(const std::vector<float>& frame) const {
     for (int i = 0; i < N; ++i) r0 += x[i] * x[i];
     if (r0 < 1e-8f) return 0.0f;
 
+    // Unbias by the window autocorrelation: the Hann taper makes the raw ACF
+    // decay with lag, which pulls the interpolated peak toward shorter lags
+    // (≈1 % sharp at 440 Hz — audible against the coherent OLA).  For a
+    // stationary signal, ACF[lag]/winAcf[lag] removes the taper exactly.
+    // The correction factor winAcf[0]/winAcf[lag] grows without bound as the
+    // window ACF decays toward the frame length, amplifying noise into
+    // spurious long-lag peaks.  Clamp it: the F0 lags that matter (≥ 100 Hz →
+    // lag ≤ 0.45 N) need factors below ~2; longer lags get a partial
+    // correction, which only under-corrects very low F0 estimates slightly.
+    const bool haveWinAcf = ((int)winAcf_.size() > maxLag) && (winAcf_[0] > 0.0f);
     for (int lag = minLag; lag <= maxLag; ++lag) {
         float sum = 0.0f;
         for (int i = 0; i < N - lag; ++i)
             sum += x[i] * x[i + lag];
-        acf[lag] = sum / r0;
+        float corr = 1.0f;
+        if (haveWinAcf && winAcf_[lag] > 1e-6f)
+            corr = std::min(2.0f, winAcf_[0] / winAcf_[lag]);
+        acf[lag] = (sum * corr) / r0;
     }
 
-    // Find best peak
-    int bestLag = minLag;
-    float bestVal = acf[minLag];
-    for (int lag = minLag; lag <= maxLag; ++lag) {
-        if (acf[lag] > bestVal) { bestVal = acf[lag]; bestLag = lag; }
-    }
+    // Find best peak — with octave guard.
+    //
+    // For periodic signals the unbiased ACF has near-equal peaks at the true
+    // period and its multiples.  The taper correction above slightly favours
+    // LONGER lags (larger correction factor), which without a guard flips the
+    // estimate down an octave (sine 440 → 220: the lag-200 peak edged out
+    // lag-100 and put a 77 dB subharmonic in the output).  The biased ACF used
+    // before Session 15 favoured short lags by construction — an accidental
+    // octave guard this code now provides explicitly: take the SHORTEST local
+    // maximum within 5 % of the global maximum.
+    int   maxIdx = minLag;
+    float maxVal = acf[minLag];
+    for (int lag = minLag; lag <= maxLag; ++lag)
+        if (acf[lag] > maxVal) { maxVal = acf[lag]; maxIdx = lag; }
 
-    if (bestVal < 0.3f) return 0.0f;   // unvoiced threshold
+    if (maxVal < 0.3f) return 0.0f;   // unvoiced threshold
+
+    int bestLag = maxIdx;
+    for (int lag = minLag + 1; lag < maxIdx; ++lag) {
+        if (acf[lag] >= 0.95f * maxVal &&
+            acf[lag] >= acf[lag - 1] && acf[lag] >= acf[lag + 1]) {
+            bestLag = lag;
+            break;
+        }
+    }
 
     // Parabolic interpolation for sub-sample accuracy
     if (bestLag > minLag && bestLag < maxLag) {
