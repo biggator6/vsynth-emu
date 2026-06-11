@@ -1117,7 +1117,14 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         const bool wantDsLpc = hasFormantShiftBlock && voiced && isVoicedSpeechFrame
                                && !params_.polyphonicContent
                                && std::abs(formantShift) > 0.01f;
-        const bool usePreEmph = !(formantUpBypass || largePitchDown || wantDsLpc);
+        // The vocal PITCH path gets the same downsampled envelope (shift ratio
+        // 1.0): it previously used order-8 full-rate LPC whose poles miss
+        // F2/F3 just as the formant path's did.  The engine's SOLO gate means
+        // pitch-routed frames are speech; voiced check still applies.
+        const bool wantDsLpcPitch = !hasFormantShiftBlock && hasPitchShift && voiced
+                                    && !params_.polyphonicContent;
+        const bool usePreEmph = !(formantUpBypass || largePitchDown
+                                  || wantDsLpc || wantDsLpcPitch);
         const std::vector<float>& analysisFrame = usePreEmph ? frameEmph : frame;
 
         std::vector<float> lpcCoeffs;
@@ -1164,6 +1171,10 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
             }
             if (!dsOk)
                 shiftFormants(lpcCoeffs, formantShift);
+        } else if (wantDsLpcPitch) {
+            // Pitch-only on speech: unshifted downsampled envelope (ratio 1).
+            // Falls back to the direct-form path when degenerate.
+            computeDownsampledFormantBiquads(frame, 1.0f);
         }
 
         // Detect synthesis-mode switch (biquad ↔ direct-form).
