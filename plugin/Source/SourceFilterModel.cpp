@@ -1045,13 +1045,26 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         //
         // Reference: Kleijn & Paliwal, "Speech Coding and Synthesis", Ch. 4.
         {
-            // Compare synthesis energy against the same frame used for LPC analysis:
-            // both are in the same spectral domain so the ratio gives the correct
-            // normalisation gain regardless of whether pre-emphasis was applied.
+            // Output-domain normalisation (Session 15, take 2): target the
+            // ORIGINAL frame energy, compared against what this synthFrame
+            // becomes after de-emphasis (fresh-state IIR pass — inaccurate
+            // for synthesis, fine for an energy estimate).  Matching
+            // pre-emph-domain energies left the audible output ~10 dB quiet;
+            // metric v2's gain-sensitive null test rejected this fix, but
+            // metric v3 gain-matches, so per-frame level TRACKING (not just
+            // global gain) is what counts now.
             float inputEnergy = 0.0f;
-            for (float v : analysisFrame) inputEnergy += v * v;
+            for (float v : frame) inputEnergy += v * v;
             float synthEnergy = 0.0f;
-            for (float v : synthFrame) synthEnergy += v * v;
+            if (usePreEmph) {
+                float s = 0.0f;
+                for (float v : synthFrame) {
+                    s = v + 0.97f * s;
+                    synthEnergy += s * s;
+                }
+            } else {
+                for (float v : synthFrame) synthEnergy += v * v;
+            }
 
             if (synthEnergy > 1e-10f && inputEnergy > 1e-10f) {
                 const float normGain = std::sqrt(inputEnergy / synthEnergy);
