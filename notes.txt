@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-11)
 
-Current score: 36.2 / 100 under METRIC v3 (target: > 60)
+Current score: 36.5 / 100 under METRIC v3 (target: > 60)
   METRIC v3 (commit eb18467): null test scales output by least-squares optimal
   gain (clamped [0.25,4]) before subtraction — reference levels are recording-
   chain gain staging, not algorithm error. v17 re-baselined under v3 = 27.5.
@@ -11,7 +11,12 @@ Current score: 36.2 / 100 under METRIC v3 (target: > 60)
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 57.7
-Best version: v24b (commit c11cc1f) — v24 + downsampled envelope on the
+Best version: v25 (commit df565b6) — v24b + event-based stretch for BACKING
+  (onset stamps at encode time; attacks placed verbatim at stretched
+  positions, inter-event material PV-stretched; attack 2048 samples).
+  BACKING threshold raised peakToMean 5 -> 9 (chord 7.8 = ENSEMBLE,
+  drum 11.4 = BACKING).
+v24b (commit c11cc1f) — v24 + downsampled envelope on the
   vocal PITCH path too (ratio 1.0; vocal_aah_pitch_up7st 26.7 -> 36.1).
 v24 (commit 74620ca) — v23 + downsampled formant LPC for
   speech (decimate x4 -> order-12 LPC at ~12 kHz -> poles mapped back theta/4,
@@ -89,7 +94,7 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v24b, METRIC v3, 36.2 avg):
+Per-case scores (v25, METRIC v3, 36.5 avg):
   -- Sine 440 Hz --
   sine_440_formant_downmax   39.9  (LPC)
   sine_440_formant_upmax     31.6  (LPC)
@@ -109,9 +114,9 @@ Per-case scores (v24b, METRIC v3, 36.2 avg):
 
   -- Drum hit --
   drum_hit_pitch_up7st       36.9  (PV)  <- +6.6 via PV overhaul (transient 0.97)
-  drum_hit_time_2x           36.3  (PV)  <- +11.9 via PV overhaul
-  drum_hit_time_4x           33.6  (PV)  <- +10.5 via PV overhaul
-  drum_hit_time_halfspeed    31.1  (PV)  <- +5.1 via WSOLA->PV routing
+  drum_hit_time_2x           36.0  (event-based)
+  drum_hit_time_4x           38.6  (event-based)  <- +5.0 via event stamps
+  drum_hit_time_halfspeed    31.2  (event-based)  <- +5.1 via WSOLA->PV routing
 
   -- Chord C major --
   chord_Cmaj_time_2x         44.0  (PV)
@@ -119,7 +124,7 @@ Per-case scores (v24b, METRIC v3, 36.2 avg):
   chord_Cmaj_formant_max     41.7  (LPC)
 
 Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9
-Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7 → v23=35.5 → v24=35.7 → v24b=36.2
+Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7 → v23=35.5 → v24=35.7 → v24b=36.2 → v25=36.5
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -202,13 +207,11 @@ Tried and reverted (Session 15, late):
     on vowel onsets) and drum_halfspeed -1.3. Net negative; Session 10's
     conclusion stands even with correct phase propagation.
 
-Next highest-value work (metric v3, v24b numbers):
+Next highest-value work (metric v3, v25 numbers):
   1. vocal_aah_formant_downmax (16.8) — placement near-exact; trajectory
      jitter limits the metric. Cross-frame pole tracking is the remaining
      untried idea.
-  2. drum_hit_time_halfspeed (31.1) — true V-Synth BACKING event stamps
-     (segment-and-place resynthesis, not phase tricks): detect onsets at
-     encode time, place events verbatim at stretched positions, stretch only
-     inter-event regions. Session-sized.
-  3. Vocal formant group polish — investigate whether the V-Synth shifts
-     only F1-F2 down (ref's 3170/4172 Hz peaks don't match x0.5 scaling).
+  2. vocal_aah_formant group generally (16.8-24.2) — investigate whether the
+     V-Synth shifts only F1-F2 down (ref 3170/4172 Hz peaks don't match x0.5).
+  3. drum_hit_pitch_up7st (36.9) — event-based handling could extend to
+     pitch ops on BACKING (currently time-only).
