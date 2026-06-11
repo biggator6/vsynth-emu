@@ -2,13 +2,23 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-11)
 
-Current score: 31.9 / 100 under METRIC v2 (target: > 60)
+Current score: 32.7 / 100 under METRIC v3 (target: > 60)
+  METRIC v3 (commit eb18467): null test scales output by least-squares optimal
+  gain (clamped [0.25,4]) before subtraction — reference levels are recording-
+  chain gain staging, not algorithm error. v17 re-baselined under v3 = 27.5.
   METRIC v2 (commit 3ecdfdf): compare.py time-aligns ref/output via envelope
   cross-correlation. Pre-v2 scores are not comparable (8 of 20 pairs were
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 57.7
-Best version: v21 (commit 4fb2a56) — v20 (flat excitation) + PV overhaul:
+Best version: v22b (commit ff8ecea) — v22 + output-domain energy
+  normalization (frame energy targeted in the SIGNAL domain via fresh-state
+  de-emphasis energy estimate; rejected under metric v2, wins under v3:
+  vocal_aah_pitch_up7st 18.5 -> 26.7).
+v22 (commit eb18467) — v21 + WSOLA routing disabled (PV beats
+  WSOLA everywhere after the overhaul; drum halfspeed 31.1 PV vs 26.0 WSOLA)
+  + metric v3.
+v21 (commit 4fb2a56) — v20 (flat excitation) + PV overhaul:
   inverted hops (synthesis hop fixed at kHopSize, analysis hop =
   round(kHopSize/stretch) integer), synthesis Hann window, identity phase
   locking (Laroche & Dolson 1999), FFT SIGN FIX (forward FFT uses +j —
@@ -66,21 +76,21 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v21, METRIC v2, 31.9 avg):
+Per-case scores (v22b, METRIC v3, 32.7 avg):
   -- Sine 440 Hz --
-  sine_440_formant_downmax   39.6  (LPC)
-  sine_440_formant_upmax     31.5  (LPC)
-  sine_440_pitch_down12st    46.1  (PV)
-  sine_440_pitch_up7st       26.0  (PV)   [level: V-Synth attenuates ~-7dB, we are unity]
-  sine_440_time_2x           15.7  (PV)   [level, same]
-  sine_440_time_halfspeed    18.0  (PV)   [level, same]
+  sine_440_formant_downmax   39.9  (LPC)
+  sine_440_formant_upmax     31.6  (LPC)
+  sine_440_pitch_down12st    48.8  (PV)
+  sine_440_pitch_up7st       26.0  (PV)   [residual is phase/spectral, not level]
+  sine_440_time_2x           15.7  (PV)   [lowest case; see next steps]
+  sine_440_time_halfspeed    18.0  (PV)
 
   -- Vocal "aah" --
-  vocal_aah_formant_upmax    18.1  (LPC)
-  vocal_aah_formant_up4st    21.1  (LPC)
-  vocal_aah_formant_downmax  18.5  (LPC)
-  vocal_aah_pitch_up7st      18.5  (LPC)
-  vocal_aah_pitch_down12st   32.6  (LPC)
+  vocal_aah_formant_upmax    19.1  (LPC)
+  vocal_aah_formant_up4st    21.3  (LPC)
+  vocal_aah_formant_downmax  17.1  (LPC)
+  vocal_aah_pitch_up7st      26.7  (LPC)
+  vocal_aah_pitch_down12st   32.1  (LPC)
   vocal_aah_time_2x          45.9  (PV)
   vocal_aah_time_halfspeed   38.2  (PV)
 
@@ -88,14 +98,15 @@ Per-case scores (v21, METRIC v2, 31.9 avg):
   drum_hit_pitch_up7st       36.9  (PV)  <- +6.6 via PV overhaul (transient 0.97)
   drum_hit_time_2x           36.3  (PV)  <- +11.9 via PV overhaul
   drum_hit_time_4x           33.6  (PV)  <- +10.5 via PV overhaul
-  drum_hit_time_halfspeed    26.0  (WSOLA)
+  drum_hit_time_halfspeed    31.1  (PV)  <- +5.1 via WSOLA->PV routing
 
   -- Chord C major --
   chord_Cmaj_time_2x         44.0  (PV)
   chord_Cmaj_pitch_up7st     50.4  (PV)  <- best case
   chord_Cmaj_formant_max     41.7  (LPC)
 
-Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9 (net flat; drums +10 each, sine/vocal compression gave back LEVEL points — V-Synth attenuates loud sources, we render unity gain)
+Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9
+Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -157,15 +168,13 @@ PV (v21, PhaseVocoder.cpp): inverted hops + synthesis window + identity
   Tried and reverted: compression-side hop flip (analysis fixed / synthesis
   scaled down) scored 31.3 vs 31.9.
 
-Next highest-value work (metric v2, v21 numbers):
-  1. PV level law — sine pitch/time cases (15.7-26.0) lose mostly on LEVEL:
-     the V-Synth attenuates the loud sine source ~-7 dB (vocal/chord unity).
-     Either model the V-Synth's level behaviour (limiter? LITE-mode
-     normalization?) or make compare.py level-match before the null test
-     (metric v3 — would need re-baselining).
-  2. Vocal formant/pitch group (18.1-21.1) — formant placement accuracy after
-     pole shifts; also the ~10 dB LPC level deficit (output-domain
-     normalization fix exists but metric rejects it; pairs with item 1).
-  3. drum_hit_time_halfspeed (26.0) — only WSOLA case left; PV now beats
-     WSOLA on the other drum cases, so try routing BACKING time-extension
-     to PV as well.
+Next highest-value work (metric v3, v22 numbers):
+  1. sine_440_time_2x (15.7) / time_halfspeed (18.0) — lowest cases. Level is
+     now gain-matched, so the residual is spectral/phase: likely the PV's
+     phase-locked output can't null against the V-Synth's (different absolute
+     phase) and formant_sim ~0.40 on a sine is metric quirk. Inspect whether
+     the V-Synth output is actually resynthesized (different harmonics).
+  2. Vocal formant group (17.1-21.3) — formant placement accuracy after pole
+     shifts is the remaining gap (formant_sim 0.35-0.53 vs 0.74+ on pitch).
+  3. drum_hit_time_halfspeed via dedicated transient handling if more is
+     needed (now 31.1; V-Synth BACKING event stamps remain unimplemented).

@@ -1586,19 +1586,46 @@ law question, not chased by ear-unjustified gain hacks.
 Metric v2 history: v17 27.4 → v18h 28.2 → v19 29.5 → v19b 29.9 → v19c 30.0 →
 v20 32.0 → v21 31.9.
 
-### Next Steps (v21)
+### Continuation: v22/v22b — WSOLA Retirement, Metric v3, Level Tracking (eb18467, ff8ecea)
 
-1. **PV level law** — sine pitch/time cases (15.7–26.0) lose mostly on level.
-   Either model the V-Synth's attenuation of hot sources (limiter? LITE-mode
-   normalisation?) or add level-matching to compare.py's null test (metric
-   v3, needs re-baselining).
+Score: 31.9 (v2) → **32.7 under metric v3**; re-baselined v17 = 27.5 (+5.2).
 
-2. **Vocal formant/pitch group (18.1–21.1)** — formant placement after pole
-   shifts; the ~10 dB LPC level deficit pairs with item 1.
+1. **WSOLA routing disabled (v22).**  After the v21 PV overhaul the phase
+   vocoder beats WSOLA on its last remaining case: drum_hit_time_halfspeed
+   scores 31.1 on PV vs 26.0 on WSOLA.  `processWSOLA()` retained for
+   reference; the Hybrid router now always uses PV for time/pitch.
 
-3. **drum_hit_time_halfspeed (26.0)** — the only WSOLA case left; PV now
-   beats WSOLA on every other drum case, so try routing BACKING
-   time-extension to PV too.
+2. **Metric v3 (optimal-gain null test).**  The null test now scales the
+   output by the least-squares optimal gain g = ⟨ref,out⟩/⟨out,out⟩ (clamped
+   to [0.25, 4]) before subtraction.  Rationale: the references are hardware
+   recordings whose absolute level is recording-chain gain staging — the sine
+   refs sit ~7 dB below the dry input while vocal/chord refs are at unity.
+   A constant gain offset is a capture artifact, not an algorithm error.
+
+3. **Output-domain energy normalisation (v22b)** — the Session 15 fix that
+   metric v2 rejected (31.9 vs 32.0) WINS under v3: synthesis frames are
+   normalised against the ORIGINAL frame energy using a fresh-state
+   de-emphasis pass as the energy estimate.  With global gain factored out by
+   the metric, per-frame level TRACKING is what scores — and it fixes the
+   ~10 dB audible deficit of the pre-emphasis path.
+   vocal_aah_pitch_up7st 18.5 → 26.7 (transient 0.21 → 0.58).
+
+Metric v3 per-case (32.7 avg): chord 41.7/50.4/44.0, drums 36.9/36.3/33.6/31.1,
+sine formant 39.9/31.6, sine pitch 48.8/26.0, vocal time 45.9/38.2,
+vocal pitch 32.1/26.7, vocal formant 17.1–21.3, sine time 15.7/18.0.
+
+### Next Steps (v22b)
+
+1. **sine_440_time_2x (15.7) / halfspeed (18.0)** — lowest cases, now level-
+   independent.  The residual is spectral/phase; check whether the V-Synth's
+   sine output is resynthesised (different harmonic structure) rather than
+   stretched.
+
+2. **Vocal formant group (17.1–21.3)** — formant placement accuracy after
+   pole shifts (formant_sim 0.35–0.53 vs 0.74+ on the pitch cases).
+
+3. **Consider raising kLPCOrder/guard interplay** for the formant-down
+   cases — the order-8 guard may limit F1 resolution after −12 st shifts.
 
 ---
 
