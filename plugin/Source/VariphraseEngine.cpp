@@ -297,6 +297,106 @@ Algorithm VariphraseEngine::getAlgorithm() const {
 }
 
 std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& inputMono) {
+    // ── Event-based stretch for BACKING content (Session 15) ─────────────────
+    // V-Synth BACKING mode stores onset stamps at encode time and keeps the
+    // transients intact under time stretch: each attack is placed VERBATIM at
+    // its stretched output position; only the decay/silence between events is
+    // actually time-stretched.  Time-only operations on BACKING content with
+    // detected onsets take this path; everything else falls through to the
+    // normal streaming render below.
+    {
+        const float st = pImpl->params.timeStretchRatio;
+        const bool timeOnly =
+            std::abs(pImpl->params.pitchShiftSemitones)   < 0.01f &&
+            std::abs(pImpl->params.formantShiftSemitones) < 0.001f;
+        if (pImpl->analysis.contentType == VariphraseAnalysis::ContentType::BACKING &&
+            timeOnly && std::abs(st - 1.0f) > 0.01f &&
+            !pImpl->analysis.onsetSamples.empty()) {
+
+            const int n = (int)inputMono.size();
+            const int outLenTotal = std::max(1, (int)std::lround((double)n * st));
+            std::vector<float> out(outLenTotal, 0.0f);
+
+            // Helper: stretch a vector to an exact target length via the PV.
+            auto pvStretch = [&](const std::vector<float>& seg, int targetLen)
+                    -> std::vector<float> {
+                if (seg.empty() || targetLen <= 0) return {};
+                VariphraseParams p {};
+                p.timeStretchRatio = float(targetLen) / float(seg.size());
+                pImpl->phaseVocoder->setParams(p);
+                pImpl->phaseVocoder->reset();
+                pImpl->phaseVocoder->setOutputCapacity(targetLen + 8192);
+                pImpl->phaseVocoder->setForceWSOLA(false);
+
+                std::vector<float> res;
+                res.reserve(targetLen + 1024);
+                const int bs = pImpl->maxBlockSize;
+                std::vector<float> inBuf(bs), outBuf(bs);
+                int fed = 0;
+                const int maxIters = 4 * ((int)seg.size() + targetLen) / bs + 64;
+                for (int it = 0; it < maxIters &&
+                       (fed < (int)seg.size() || (int)res.size() < targetLen); ++it) {
+                    std::fill(inBuf.begin(), inBuf.end(), 0.0f);
+                    if (fed < (int)seg.size()) {
+                        const int c = std::min(bs, (int)seg.size() - fed);
+                        std::copy(seg.begin() + fed, seg.begin() + fed + c, inBuf.begin());
+                        fed += c;
+                    }
+                    pImpl->phaseVocoder->processMono(inBuf.data(), outBuf.data(), bs);
+                    const int valid = std::min(pImpl->phaseVocoder->getLastValidOutput(), bs);
+                    if (valid > 0)
+                        res.insert(res.end(), outBuf.begin(), outBuf.begin() + valid);
+                }
+                res.resize(targetLen, 0.0f);
+                return res;
+            };
+
+            // Segment boundaries: [0, onset_1, onset_2, …, n]
+            std::vector<int> bounds { 0 };
+            for (int e : pImpl->analysis.onsetSamples)
+                if (e > bounds.back() && e < n) bounds.push_back(e);
+            if (bounds.back() != n) bounds.push_back(n);
+
+            constexpr int kAttackLen = 2048;   // ≈43 ms at 48 kHz, kept verbatim
+            constexpr int kXfade     = 128;
+
+            for (int b = 0; b + 1 < (int)bounds.size(); ++b) {
+                const int s = bounds[b], e = bounds[b + 1];
+                const int segLen   = e - s;
+                const int outStart = (int)std::lround((double)s * st);
+                const int outEnd   = std::min(outLenTotal, (int)std::lround((double)e * st));
+                const int outLen   = outEnd - outStart;
+                if (segLen <= 0 || outLen <= 0) continue;
+
+                // Segments that begin at a detected onset keep their attack
+                // verbatim; the leading pre-onset segment has no attack.
+                const bool atOnset  = (b > 0);
+                const int attackLen = atOnset ? std::min({ kAttackLen, segLen, outLen })
+                                              : 0;
+                for (int i = 0; i < attackLen; ++i)
+                    out[outStart + i] = inputMono[s + i];
+
+                const int tailInLen  = segLen - attackLen;
+                const int tailOutLen = outLen - attackLen;
+                if (tailInLen > 0 && tailOutLen > 0) {
+                    std::vector<float> tail(inputMono.begin() + s + attackLen,
+                                            inputMono.begin() + e);
+                    std::vector<float> stretched = pvStretch(tail, tailOutLen);
+                    for (int i = 0; i < tailOutLen; ++i) {
+                        float v = stretched[i];
+                        // Short crossfade out of the verbatim attack
+                        if (attackLen > 0 && i < kXfade) {
+                            const float w = float(i) / float(kXfade);
+                            v = w * v + (1.0f - w) * out[outStart + attackLen + i];
+                        }
+                        out[outStart + attackLen + i] = v;
+                    }
+                }
+            }
+            return out;
+        }
+    }
+
     // Session 14 rework: drain mode for time stretch.
     //
     // The old implementation collected exactly inputLen output samples.  Two
@@ -505,9 +605,41 @@ VariphraseAnalysis VariphraseEngine::analyzeContent(const float* mono,
 
     } else {
         // Low median ACF confidence → polyphonic or transient-rich.
-        result.contentType = (result.peakToMeanEnergy > 5.0f)
+        // Threshold raised 5.0 → 9.0 (Session 15): a strummed chord's attack
+        // gives peakToMean ≈ 7.8 while a drum hit gives ≈ 11.4.  The chord is
+        // polyphonic sustained content (ENSEMBLE), and classifying it BACKING
+        // would route it through event-based stretching meant for percussion.
+        result.contentType = (result.peakToMeanEnergy > 9.0f)
             ? VariphraseAnalysis::ContentType::BACKING
             : VariphraseAnalysis::ContentType::ENSEMBLE;
+    }
+
+    // ── Event stamps (BACKING) ────────────────────────────────────────────────
+    // Onset = short-window RMS rising > 3× above the recent local maximum,
+    // above an absolute floor.  Used by the offline event-based stretch to
+    // place attacks verbatim at their stretched positions (V-Synth BACKING
+    // mode stores exactly this at encode time).
+    if (result.contentType == VariphraseAnalysis::ContentType::BACKING) {
+        const int hop = 256;
+        std::vector<float> env;
+        for (int s = 0; s + hop <= numSamples; s += hop) {
+            float e = 0.0f;
+            for (int i = s; i < s + hop; ++i) e += mono[i] * mono[i];
+            env.push_back(std::sqrt(e / hop));
+        }
+        float peak = 0.0f;
+        for (float v : env) peak = std::max(peak, v);
+        const float floorRms = 0.05f * peak;
+        int lastOnset = -100000;
+        for (int i = 4; i < (int)env.size(); ++i) {
+            float prevMax = 0.0f;
+            for (int k = i - 4; k < i; ++k) prevMax = std::max(prevMax, env[k]);
+            if (env[i] > floorRms && env[i] > 3.0f * std::max(prevMax, 1e-6f) &&
+                (i * hop - lastOnset) > 2048) {
+                result.onsetSamples.push_back(i * hop);
+                lastOnset = i * hop;
+            }
+        }
     }
 
     return result;
