@@ -1672,20 +1672,48 @@ band), then map pole angles back to the 48 kHz domain for synthesis.  This was
 also the conclusion of Sessions 8–10 by other routes.  Session-sized project;
 deferred.
 
-### Next Steps (v23, final for Session 15)
+### Continuation: v24 — Downsampled Formant LPC + Knob Calibration (74620ca), score 35.7
 
-1. **Downsampled LPC for speech formant analysis** (see diagnosis above) —
-   the only credible path for the vocal formant group (17.1–21.3).
+Implemented the diagnosis above as `computeDownsampledFormantBiquads()`:
+decimate the analysis frame ×4 (33-tap windowed-sinc FIR → ~12 kHz rate),
+pre-emphasis + order-12 Levinson-Durbin there (every pole lands in the speech
+band by construction), one-pole temporal smoothing of the normalised
+autocorrelation (α = 0.7), Laguerre root finding, map poles back to the full
+rate (θ/4, r^¼), apply the formant shift to the angles, emit biquad sections.
+
+Integration findings:
+- **Formant placement now physically correct**: downmax output envelope peaks
+  492/1395/2139 Hz vs reference 463/1441/2227 — near-exact.  The metric
+  improves less than the physics because formant_similarity scores
+  TRAJECTORIES and per-frame envelope jitter remains (the α=0.7 smoothing
+  recovers some; pole tracking would likely recover more).
+- **Polyphonic exclusion required**: chord frames pass the per-frame 2 kHz
+  speech check, but single-voice formant analysis on polyphony costs 10 pts
+  (chord_Cmaj_formant_max 41.7 → 31.6).  Gated on !polyphonicContent.
+- **Real (tilt) poles dropped** from this path — keeping them unshifted left
+  a low resonance the V-Synth's shifted envelope doesn't have (no score
+  effect either way; kept for spectral correctness).
+- **Formant-knob calibration**: the V-Synth's upward mapping saturates at
+  ~0.75× nominal ("+12 st" reference moves F1 by ×1.67 ≈ +9 st); downward
+  tracks nominal (calibrating it −25 % scored −4.7).  Applied 0.75× to
+  upward speech shifts only: vocal_aah_formant_upmax 20.8 → 24.2.
+
+Scores: vocal_aah_formant_upmax 19.1 → 24.2, up4st 21.3 → 22.0, downmax
+17.1 → 16.8.  Total 35.5 → **35.7**.
+Metric v3 history: v17 27.5 → v22 32.4 → v22b 32.7 → v23 35.5 → v24 35.7.
+
+### Next Steps (v24, final for Session 15)
+
+1. **Vocal formant trajectory stability (16.8–24.2)** — placement is correct;
+   per-frame jitter limits the trajectory metric.  Stronger smoothing or
+   cross-frame pole tracking.
 
 2. **drum_hit_time_halfspeed (31.1)** — BACKING event stamps
    (transient-synchronous resynthesis) remain unimplemented.
 
-3. **vocal_aah_pitch_up7st (26.7)** — formant_sim only 0.30; check whether
-   the vocal pitch references also show resynthesis artifacts worth matching.
-
-4. **V-Synth formant-knob mapping** — the reference's "+12 st" formant shift
-   measures as ~×1.67, not ×2.  Calibrating our shift ratio to the V-Synth's
-   actual mapping (once formant capture works) may be worth several points.
+3. **Apply downsampled formant analysis to the vocal PITCH path** —
+   vocal_aah_pitch_up7st (26.7) still uses order-8 full-rate LPC for its
+   envelope; the same pole-placement argument applies.
 
 ---
 
