@@ -1539,18 +1539,66 @@ the metric's level sensitivity changes.
 Metric v2 history: v17 27.4 → v18h 28.2 → v19 29.5 → v19b 29.9 → v19c 30.0 →
 **v20 32.0**.
 
-### Next Steps (v20)
+### Continuation: v21 — Phase Vocoder Overhaul (4fb2a56), score 31.9
 
-1. **Vocal formant group (17.1–21.3)** — the remaining weak cluster.  F0 is
-   correct and the tilt is fixed; what's left is formant placement accuracy
-   after pole shifting and the level deficit (whose obvious fix the metric
-   currently rejects — see above).
+Checking next-step #3 (sine_440_time_halfspeed "metric noise?") found a REAL
+artifact — ±43 Hz AM sidebands around 440 Hz — and unravelled three layered
+phase-vocoder defects:
 
-2. **Drum time compression (24.4 / 23.1)** — transient-synchronous OLA
-   (V-Synth BACKING event stamps).
+1. **Synthesis-overlap collapse.**  The legacy design scaled the synthesis hop
+   by stretch: at stretch 2 the hop is 1024 → only 2× Hann² overlap, which
+   ripples ±33 % (sideband spacing = fs/1024 = 43 Hz, exactly as measured).
+   Fix: INVERTED hops — synthesis hop fixed at kHopSize (always 4× overlap),
+   analysis hop = round(kHopSize/stretch), constant integer per render.
+   A synthesis Hann window was also added: phase modification circularly
+   shifts IFFT content, so frames are not edge-tapered without it.
 
-3. **sine_440_time_halfspeed (20.0)** — PV path; check for metric noise vs
-   real artifact before algorithm work.
+2. **Vertical phase incoherence.**  Independent per-bin phase recursion
+   destroys inter-bin phase relationships (they encode where the partial sits
+   inside the frame), so IFFT frames OLA'd with AM at the frame rate.
+   Fix: identity phase locking (Laroche & Dolson 1999) — only spectral peak
+   bins run the recursion; neighbours keep analysis offsets from their peak.
+
+3. **FFT sign convention bug (latent since the PV was written).**  The
+   codebase's forward FFT uses a +j exponent (conjugate of the textbook DFT),
+   so bin phases advance by −ω·hop.  The recursion assumed +ω·hop and only
+   worked because the legacy hop 512 = N/4 gives expectedAdv = πk/2, whose
+   error self-cancels on even bins.  Every non-512 hop was broken — which is
+   why fixes 1–2 alone still produced hop-dependent artifacts.  Recursion
+   rewritten for the actual convention (delta = wrap(Δφ + expectedAdv);
+   ω = (expectedAdv − delta)/anaHop; sumPhase −= ω·synthHop).
+
+**Verification:** pure-tone renders land exactly on target at every ratio
+tested — 440 Hz at stretches 1.28 / 1.4983 / 1.5 / 2.0 / 4.0; 659 Hz at
+pitch +7 st; 220 Hz at pitch −12 st — flat envelopes, no sidebands.
+
+**Tried and reverted:** compression-side hop flip (analysis hop fixed,
+synthesis hop scaled down, for transient fidelity): 31.3 vs 31.9.
+
+**Score:** 32.0 → 31.9, net flat with major redistribution:
+drum_hit_time_2x 24.4 → 36.3, drum_hit_time_4x 23.1 → 33.6,
+drum_hit_pitch_up7st 30.3 → 36.9, chord_Cmaj_pitch_up7st 49.8 → 50.4,
+vocal_aah_time_halfspeed 34.9 → 38.2.  The sine/vocal time-compression cases
+gave back points on LEVEL: the V-Synth attenuates the loud sine source ~−7 dB
+(vocal/chord pass at unity), and we render unity gain.  Documented as a level-
+law question, not chased by ear-unjustified gain hacks.
+
+Metric v2 history: v17 27.4 → v18h 28.2 → v19 29.5 → v19b 29.9 → v19c 30.0 →
+v20 32.0 → v21 31.9.
+
+### Next Steps (v21)
+
+1. **PV level law** — sine pitch/time cases (15.7–26.0) lose mostly on level.
+   Either model the V-Synth's attenuation of hot sources (limiter? LITE-mode
+   normalisation?) or add level-matching to compare.py's null test (metric
+   v3, needs re-baselining).
+
+2. **Vocal formant/pitch group (18.1–21.1)** — formant placement after pole
+   shifts; the ~10 dB LPC level deficit pairs with item 1.
+
+3. **drum_hit_time_halfspeed (26.0)** — the only WSOLA case left; PV now
+   beats WSOLA on every other drum case, so try routing BACKING
+   time-extension to PV too.
 
 ---
 
