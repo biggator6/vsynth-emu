@@ -57,3 +57,11 @@ sustained/        ← V-Synth processed outputs (all 20 current test cases)
 | drum_hit_passthrough.wav | All 4 drum_hit test cases |
 | chord_Cmaj_passthrough.wav | All 3 chord_Cmaj test cases |
 | sine_440_*.wav | Corresponding sine test case (all byte-identical) |
+
+---
+
+**Round 2 wishlist** (Session 15): see the root `RECORDING_GUIDE.md` — priority
+order is ① formant-knob calibration sweep (vocal at ±3/±6/±9/+2 st), ② second
+vowel ("ee") + higher-F0 voice, ③ multi-onset drum loop, ④ sustained pad chord,
+⑤ moving-pitch phrase, ⑥ duplicate-take metric noise floor.  Capture a
+passthrough for every new source, use a `_dry` suffix, keep lead-ins ~0.5 s.
