@@ -216,14 +216,13 @@ struct VariphraseEngine::Impl {
                     // SOLO and LITE content stays on PV — sine_440 and vocal
                     // pitch/formant cases both score better with PV (see
                     // Session 7 evidence in the comment block above).
-                    const bool isEnsembleOrBacking =
-                        (analysis.contentType == VariphraseAnalysis::ContentType::ENSEMBLE ||
-                         analysis.contentType == VariphraseAnalysis::ContentType::BACKING);
-                    // WSOLA only applies to pure time-stretch (no pitch shift).
-                    // For pitch-only cases on ENSEMBLE content we keep PV because
-                    // WSOLA is a time-domain method and cannot shift pitch.
-                    const bool wsolaCandidate = isEnsembleOrBacking && !hasPitch;
-                    phaseVocoder->setForceWSOLA(wsolaCandidate);
+                    // WSOLA routing disabled (Session 15): after the v21 PV
+                    // overhaul (inverted hops, identity phase locking, FFT
+                    // sign fix) the phase vocoder beats WSOLA on every case
+                    // that previously routed there — drum_hit_time_halfspeed,
+                    // the last WSOLA case, scores 31.1 on PV vs 26.0 on WSOLA.
+                    // processWSOLA() is retained in PhaseVocoder for reference.
+                    phaseVocoder->setForceWSOLA(false);
                     phaseVocoder->setParams(params);
                     phaseVocoder->processMono(input, output, numSamples);
                     lastValidOutput = phaseVocoder->getLastValidOutput();
