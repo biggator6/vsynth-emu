@@ -1717,19 +1717,49 @@ trajectory stability needs cross-frame pole tracking.
 Full history: v17 27.5 → v22 32.4 → v22b 32.7 → v23 35.5 → v24 35.7 →
 v24b 36.2.  (Old-metric session start: 27.1.)
 
+### Continuation: v25 — Event-Based Stretch for BACKING (df565b6), score 36.5
+
+Implemented the V-Synth BACKING event-stamp architecture:
+
+- **Encode pass**: `analyzeContent` now detects onsets (256-sample-hop RMS
+  envelope; onset = rise > 3× the recent 4-block local max, above a 5 %-of-
+  peak floor, ≥ 2048-sample refractory) and stores them in
+  `VariphraseAnalysis::onsetSamples` (the struct field existed since
+  Session 12, unpopulated until now).
+- **Offline render**: time-only stretches on BACKING content place each
+  attack (2048 samples ≈ 43 ms) VERBATIM at its stretched output position;
+  only the inter-event decay/silence is PV-stretched (per-segment exact-length
+  renders via feed+drain with valid-prefix compaction; short crossfade out of
+  each attack).  4096-sample attacks tested: slightly worse net.
+- **Classification fix**: BACKING threshold raised from peakToMean > 5 to
+  > 9.  The strummed chord measures 7.8 — polyphonic sustained content that
+  belongs in ENSEMBLE — vs the drum's 11.4.  Event-based stretching is for
+  percussion; the chord stays on the plain PV path (44.0, unchanged).
+
+Scores: drum_hit_time_4x 33.6 → **38.6**, halfspeed 31.1 → 31.2,
+2x 36.3 → 36.0.  Total 36.2 → **36.5**.
+
+Also tried and reverted this round: down-shift formant calibration (0.85×:
+12.1 vs 16.8 — the down direction wants nominal), and PV onset phase reset
+retried on the FIXED v21 engine (drum +1.0 but vocal_time_2x −3.3 from false
+vowel-onset triggers; Session 10's conclusion stands even with correct phase
+propagation).
+
+Metric v3 history: v17 27.5 → v22 32.4 → v22b 32.7 → v23 35.5 → v24 35.7 →
+v24b 36.2 → **v25 36.5**.
+
 ### Next Steps (final for Session 15)
 
-1. **vocal_aah_formant_downmax (16.8)** — lowest case.  Placement is
-   near-exact; trajectory jitter limits the metric.  Cross-frame pole
-   tracking, or investigate whether the V-Synth shifts only F1–F2 down
-   (the reference's 3170/4172 Hz peaks don't match ×0.5 scaling).
+1. **vocal_aah_formant_downmax (16.8)** — placement near-exact; trajectory
+   jitter limits the metric.  Cross-frame pole tracking is the remaining
+   untried idea.
 
-2. **drum_hit_time_halfspeed (31.1)** — BACKING event stamps
-   (transient-synchronous resynthesis) remain unimplemented.
+2. **Vocal formant group (16.8–24.2)** — investigate whether the V-Synth
+   shifts only F1–F2 down (the reference's 3170/4172 Hz peaks don't match
+   ×0.5 scaling).
 
-3. **sine_440_formant_upmax (31.6)** — check whether the V-Synth's upward
-   formant saturation (×1.67 at "max") applies to non-speech content too;
-   the 0.75× calibration is currently speech-only.
+3. **drum_hit_pitch_up7st (36.9)** — extend event-based handling to pitch
+   operations on BACKING content (currently time-only).
 
 ---
 
