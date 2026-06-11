@@ -168,6 +168,17 @@ private:
     // Shift formant frequencies by semitones via LPC pole angle scaling
     void shiftFormants(std::vector<float>& coeffs, float semitones);
 
+    // Downsampled formant analysis (Session 15).  At 48 kHz a direct order-8/16
+    // LPC wastes pole pairs on the 12–24 kHz noise floor (measured: poles at
+    // ~620 Hz, ~4.5 kHz, 12–20 kHz) and misses F2/F3 entirely.  This method
+    // decimates the frame ×4 (≈12 kHz rate), runs order-12 LPC there — forcing
+    // every pole into the speech band — then maps poles back to the full rate
+    // (θ/4, r^¼), applies the formant shift to the angles, and populates
+    // biquads_ with the shifted sections.  Returns false on degenerate frames
+    // (caller falls back to the full-rate path).
+    bool computeDownsampledFormantBiquads(const std::vector<float>& frame,
+                                          float shiftRatio);
+
     // Autocorrelation-based F0 detection with parabolic interpolation
     // Returns 0 if unvoiced or F0 undetectable
     float estimateF0(const std::vector<float>& frame) const;

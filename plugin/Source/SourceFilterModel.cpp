@@ -411,6 +411,171 @@ void SourceFilterModel::computeLPCCepstral(const std::vector<float>& frame,
 //   Press et al., "Numerical Recipes in C++", 3rd ed., §9.5 (Laguerre's Method)
 //   Jenkins & Traub (1970), "A Three-Stage Algorithm for Real Polynomials"
 
+bool SourceFilterModel::computeDownsampledFormantBiquads(
+        const std::vector<float>& frame, float shiftRatio) {
+    constexpr int kDecim = 4;     // 48 kHz → 12 kHz analysis rate
+    constexpr int kOrd   = 12;    // ~5 formant pairs within the speech band
+    const int N = kFrameSize / kDecim;
+
+    // ── 1. Anti-alias FIR (windowed sinc, built once) + decimate ─────────────
+    static const std::vector<float> fir = [] {
+        const int    taps = 33;
+        const double fc   = 0.45 / double(kDecim);
+        std::vector<float> h(taps);
+        double sum = 0.0;
+        for (int i = 0; i < taps; ++i) {
+            const int    m = i - taps / 2;
+            const double s = (m == 0) ? 2.0 * fc
+                : std::sin(2.0 * 3.14159265358979 * fc * m) / (3.14159265358979 * m);
+            const double w = 0.54 - 0.46 * std::cos(2.0 * 3.14159265358979 * i / (taps - 1));
+            h[i] = float(s * w);
+            sum += h[i];
+        }
+        for (auto& v : h) v = float(v / sum);
+        return h;
+    }();
+
+    std::vector<float> dec(N);
+    const int half = (int)fir.size() / 2;
+    for (int n = 0; n < N; ++n) {
+        const int center = n * kDecim;
+        float acc = 0.0f;
+        for (int t = 0; t < (int)fir.size(); ++t) {
+            const int idx = center + t - half;
+            if (idx >= 0 && idx < kFrameSize) acc += fir[t] * frame[idx];
+        }
+        dec[n] = acc;
+    }
+
+    // ── 2. Pre-emphasis at the decimated rate ────────────────────────────────
+    // Standard practice for formant LPC: at 12 kHz the speech band fills the
+    // full bandwidth, so pre-emphasis flattens harmonic decay without pushing
+    // poles to a noise floor (there is none — it was filtered out).
+    for (int i = N - 1; i > 0; --i) dec[i] -= 0.97f * dec[i - 1];
+
+    // ── 3. Levinson-Durbin, order 12, with temporal smoothing ────────────────
+    // The metric's formant-similarity score compares TRAJECTORIES; per-frame
+    // envelope jitter tanks it even when the time-averaged formants match the
+    // reference.  Smooth in the autocorrelation domain (well-defined however
+    // the pole configuration changes between frames): one-pole IIR over the
+    // normalised autocorrelation, α = 0.7.
+    double r[kOrd + 1] = {0};
+    for (int lag = 0; lag <= kOrd; ++lag)
+        for (int n2 = lag; n2 < N; ++n2)
+            r[lag] += double(dec[n2]) * double(dec[n2 - lag]);
+    if (r[0] < 1e-9) return false;
+
+    {
+        static thread_local double rSmooth[kOrd + 1] = {0};
+        static thread_local bool   rInit = false;
+        const double e0 = r[0];
+        if (!rInit || rSmooth[0] <= 0.0) {
+            for (int i = 0; i <= kOrd; ++i) rSmooth[i] = r[i] / e0;
+            rInit = true;
+        } else {
+            constexpr double alpha = 0.7;
+            for (int i = 0; i <= kOrd; ++i)
+                rSmooth[i] = alpha * rSmooth[i] + (1.0 - alpha) * (r[i] / e0);
+        }
+        for (int i = 0; i <= kOrd; ++i) r[i] = rSmooth[i] * e0;
+    }
+
+    double a[kOrd + 1] = {0};
+    double err = r[0];
+    for (int i = 1; i <= kOrd; ++i) {
+        double acc = r[i];
+        for (int j = 1; j < i; ++j) acc -= a[j] * r[i - j];
+        const double k = acc / err;
+        if (!(std::abs(k) < 1.0)) return false;
+        double tmp[kOrd + 1];
+        for (int j = 1; j < i; ++j) tmp[j] = a[j] - k * a[i - j];
+        for (int j = 1; j < i; ++j) a[j] = tmp[j];
+        a[i] = k;
+        err *= (1.0 - k * k);
+        if (err <= 0.0) return false;
+    }
+    // Bandwidth expansion (stability margin), λ = 0.994
+    { double lk = 0.994; for (int i = 1; i <= kOrd; ++i) { a[i] *= lk; lk *= 0.994; } }
+
+    // ── 4. Roots of z^12 − a₁z^11 − … − a₁₂ (Laguerre + deflation + polish) ──
+    std::vector<std::complex<double>> fullPoly(kOrd + 1);
+    fullPoly[0] = 1.0;
+    for (int i = 1; i <= kOrd; ++i) fullPoly[i] = -a[i];
+
+    auto laguerreStep = [](const std::vector<std::complex<double>>& p, int deg,
+                           std::complex<double> x) -> std::complex<double> {
+        std::complex<double> pv = p[0], dp = 0.0, d2p = 0.0;
+        for (int k = 1; k <= deg; ++k) {
+            d2p = d2p * x + dp;
+            dp  = dp  * x + pv;
+            pv  = pv  * x + p[k];
+        }
+        d2p *= 2.0;
+        if (std::abs(pv) < 1e-30) return x;
+        const std::complex<double> G   = dp / pv;
+        const std::complex<double> H   = G * G - d2p / pv;
+        const std::complex<double> sq  = std::sqrt(std::complex<double>(deg - 1) *
+                                                    (std::complex<double>(deg) * H - G * G));
+        const std::complex<double> d1  = G + sq;
+        const std::complex<double> d2  = G - sq;
+        const std::complex<double> den = (std::abs(d1) >= std::abs(d2)) ? d1 : d2;
+        if (std::abs(den) < 1e-30) return x;
+        return x - std::complex<double>(deg) / den;
+    };
+
+    std::vector<std::complex<double>> roots;
+    roots.reserve(kOrd);
+    {
+        std::vector<std::complex<double>> deflated = fullPoly;
+        for (int i = kOrd; i >= 1; --i) {
+            std::complex<double> x(0.2 + 0.07 * double(i), 0.3 - 0.05 * double(i));
+            for (int iter = 0; iter < 200; ++iter) {
+                auto xnew = laguerreStep(deflated, i, x);
+                const double ch = std::abs(xnew - x); x = xnew;
+                if (ch < 1e-12 * (1.0 + std::abs(x))) break;
+            }
+            for (int iter = 0; iter < 60; ++iter) {
+                auto xnew = laguerreStep(fullPoly, kOrd, x);
+                const double ch = std::abs(xnew - x); x = xnew;
+                if (ch < 1e-14 * (1.0 + std::abs(x))) break;
+            }
+            roots.push_back(x);
+            std::vector<std::complex<double>> q(i);
+            q[0] = deflated[0];
+            for (int k = 1; k < i; ++k)
+                q[k] = deflated[k] + x * q[k - 1];
+            deflated = q;
+        }
+    }
+
+    // ── 5. Map poles to the full rate, shift angles, build biquads ───────────
+    // Frequency is preserved in Hz: θ48 = θ12 / kDecim.  Bandwidth in Hz is
+    // preserved: r48 = r12^(1/kDecim).  The formant shift scales θ48.
+    biquads_.clear();
+    std::vector<double> realRoots;
+    for (const auto& rt : roots) {
+        const double absR = std::abs(rt);
+        if (absR < 1e-12) continue;
+        if (std::abs(rt.imag()) > 1e-5 * absR) {
+            if (rt.imag() > 0.0) {
+                const double mag48 = std::min(std::pow(std::min(absR, 0.999), 1.0 / kDecim), 0.995);
+                double theta = (std::arg(rt) / double(kDecim)) * double(shiftRatio);
+                theta = std::min(theta, 3.0);          // keep below π
+                biquads_.push_back({ float(-2.0 * mag48 * std::cos(theta)),
+                                     float(mag48 * mag48) });
+            }
+        }
+        // Real poles (spectral tilt / DC) are DROPPED for this path: keeping
+        // them unshifted leaves a strong low-frequency resonance that the
+        // V-Synth's shifted envelope does not have (its up-shift rolls off
+        // below the new F1).  The per-frame energy normalisation absorbs the
+        // overall gain change.
+    }
+    (void)realRoots;
+
+    return !biquads_.empty();
+}
+
 void SourceFilterModel::shiftFormants(std::vector<float>& coeffs, float semitones) {
     if (std::abs(semitones) < 0.01f) return;
 
@@ -941,7 +1106,18 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
                                     && (params_.pitchShiftSemitones < -6.0f);
         const bool formantUpBypass = hasFormantShiftBlock && voiced
                                      && (formantShift >= 0.0f);
-        const bool usePreEmph = !(formantUpBypass || largePitchDown);
+        // Speech formant frames use downsampled LPC (Session 15): the envelope
+        // is analysed at ~12 kHz where every pole lands in the speech band,
+        // then mapped back — see computeDownsampledFormantBiquads.  Its
+        // envelope includes the natural tilt, so these frames synthesise in
+        // the signal domain (no pre-emphasis / no output de-emphasis).
+        // polyphonicContent excluded: chord frames pass the per-frame 2 kHz
+        // speech check, but downsampled single-voice formant analysis on
+        // polyphony costs 10 pts (chord_Cmaj_formant_max 41.7 → 31.6).
+        const bool wantDsLpc = hasFormantShiftBlock && voiced && isVoicedSpeechFrame
+                               && !params_.polyphonicContent
+                               && std::abs(formantShift) > 0.01f;
+        const bool usePreEmph = !(formantUpBypass || largePitchDown || wantDsLpc);
         const std::vector<float>& analysisFrame = usePreEmph ? frameEmph : frame;
 
         std::vector<float> lpcCoeffs;
@@ -968,12 +1144,27 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         }
 
         // Formant shift via pole angle scaling.
-        // shiftFormants() populates biquads_ on success; we clear it first so
-        // that a bail-out (wrong factor count) leaves biquads_ empty and the
-        // code below falls back to direct-form synthesis.
+        // Speech frames first try the downsampled analysis (poles guaranteed
+        // in the speech band); other content — and the rare degenerate speech
+        // frame — uses the full-rate pole shift.  Either populates biquads_;
+        // a bail-out leaves it empty and the code below falls back to
+        // direct-form synthesis with the unshifted coefficients.
         biquads_.clear();
-        if (std::abs(formantShift) > 0.01f)
-            shiftFormants(lpcCoeffs, formantShift);
+        if (std::abs(formantShift) > 0.01f) {
+            bool dsOk = false;
+            if (wantDsLpc) {
+                // V-Synth formant-knob calibration (measured): its "+12 st"
+                // reference moves F1 by only ~×1.67 (≈ +9 st) — the upward
+                // mapping saturates at ~0.75× nominal.  Downward shifts track
+                // the nominal ratio (calibrating them −25 % scored −4.7).
+                const float effShift = (formantShift > 0.0f) ? 0.75f * formantShift
+                                                             : formantShift;
+                dsOk = computeDownsampledFormantBiquads(
+                           frame, std::pow(2.0f, effShift / 12.0f));
+            }
+            if (!dsOk)
+                shiftFormants(lpcCoeffs, formantShift);
+        }
 
         // Detect synthesis-mode switch (biquad ↔ direct-form).
         // Reset both filter states on switch to avoid feeding stale taps from
