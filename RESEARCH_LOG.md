@@ -1614,18 +1614,46 @@ Metric v3 per-case (32.7 avg): chord 41.7/50.4/44.0, drums 36.9/36.3/33.6/31.1,
 sine formant 39.9/31.6, sine pitch 48.8/26.0, vocal time 45.9/38.2,
 vocal pitch 32.1/26.7, vocal formant 17.1–21.3, sine time 15.7/18.0.
 
-### Next Steps (v22b)
+### Continuation: v23 — LITE Resynthesis Routing (80e0c3b), score 35.5
 
-1. **sine_440_time_2x (15.7) / halfspeed (18.0)** — lowest cases, now level-
-   independent.  The residual is spectral/phase; check whether the V-Synth's
-   sine output is resynthesised (different harmonic structure) rather than
-   stretched.
+Next-step #1 paid off with an architecture discovery: **the V-Synth
+resynthesizes pure tones even for time-only operations.**  The dry sine input
+is clean (harmonics at −46 dB), but the time-stretched V-Synth reference
+carries strong sawtooth harmonics (880 Hz at −18 dB rel, 1320 at −29) — a
+transparent PV stretch produces a different signal by design and can never
+null against it.  This extends the Session 3 source-filter finding (made for
+formant shift) to the entire VariPhrase pipeline on LITE content.
 
-2. **Vocal formant group (17.1–21.3)** — formant placement accuracy after
-   pole shifts (formant_sim 0.35–0.53 vs 0.74+ on the pitch cases).
+Routing change: LITE content → LPC source-filter for time-only and pitch-up
+operations.  Pitch-DOWN stays on PV: the LPC envelope is resonant at the
+original F0 and amplifies the wrong harmonic of the lowered excitation
+(pitch_down12st: 6.1 LPC vs 48.8 PV).
 
-3. **Consider raising kLPCOrder/guard interplay** for the formant-down
-   cases — the order-8 guard may limit F1 resolution after −12 st shifts.
+| Case | PV (v22b) | LPC (v23) |
+|---|---|---|
+| sine_440_time_2x | 15.7 | **36.6** |
+| sine_440_time_halfspeed | 18.0 | **35.2** |
+| sine_440_pitch_up7st | 26.0 | **43.1** |
+| sine_440_pitch_down12st | 48.8 (kept) | 6.1 (rejected) |
+
+Tested and not adopted: BACKING time cases split (drum compression prefers
+LPC +4/+5; drum extension and chord prefer PV −6/−8) — kept on PV rather than
+overfit a discriminator to N=1 examples each.
+
+Score: 32.7 → **35.5**.  Metric v3 history: v17 27.5 → v22 32.4 → v22b 32.7 →
+v23 35.5.
+
+### Next Steps (v23)
+
+1. **Vocal formant group (17.1–21.3)** — weakest cluster; formant placement
+   after pole shifts (formant_sim 0.35–0.53).  Measure shifted formant peaks
+   directly against the reference; revisit the order-8 guard for downshifts.
+
+2. **drum_hit_time_halfspeed (31.1)** — BACKING event stamps
+   (transient-synchronous resynthesis) remain unimplemented.
+
+3. **vocal_aah_pitch_up7st (26.7)** — formant_sim only 0.30; check whether
+   the vocal pitch references also show resynthesis artifacts worth matching.
 
 ---
 

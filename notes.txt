@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-11)
 
-Current score: 32.7 / 100 under METRIC v3 (target: > 60)
+Current score: 35.5 / 100 under METRIC v3 (target: > 60)
   METRIC v3 (commit eb18467): null test scales output by least-squares optimal
   gain (clamped [0.25,4]) before subtraction — reference levels are recording-
   chain gain staging, not algorithm error. v17 re-baselined under v3 = 27.5.
@@ -11,10 +11,15 @@ Current score: 32.7 / 100 under METRIC v3 (target: > 60)
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 57.7
-Best version: v22b (commit ff8ecea) — v22 + output-domain energy
-  normalization (frame energy targeted in the SIGNAL domain via fresh-state
-  de-emphasis energy estimate; rejected under metric v2, wins under v3:
-  vocal_aah_pitch_up7st 18.5 -> 26.7).
+Best version: v23 (commit 80e0c3b) — v22b + LITE content routes to LPC
+  resynthesis for time-only and pitch-UP ops. KEY ARCHITECTURE FINDING: the
+  V-Synth RESYNTHESIZES pure tones even for time stretch (its sine references
+  carry sawtooth harmonics the dry input lacks); transparent stretching can
+  never match. Pitch-DOWN stays on PV (LPC envelope resonant at original F0
+  boosts the wrong harmonic: 6.1 LPC vs 48.8 PV).
+v22b (commit ff8ecea) — output-domain energy normalization (frame energy
+  targeted in the SIGNAL domain via fresh-state de-emphasis estimate;
+  rejected under metric v2, wins under v3).
 v22 (commit eb18467) — v21 + WSOLA routing disabled (PV beats
   WSOLA everywhere after the overhaul; drum halfspeed 31.1 PV vs 26.0 WSOLA)
   + metric v3.
@@ -76,14 +81,14 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v22b, METRIC v3, 32.7 avg):
+Per-case scores (v23, METRIC v3, 35.5 avg):
   -- Sine 440 Hz --
   sine_440_formant_downmax   39.9  (LPC)
   sine_440_formant_upmax     31.6  (LPC)
   sine_440_pitch_down12st    48.8  (PV)
-  sine_440_pitch_up7st       26.0  (PV)   [residual is phase/spectral, not level]
-  sine_440_time_2x           15.7  (PV)   [lowest case; see next steps]
-  sine_440_time_halfspeed    18.0  (PV)
+  sine_440_pitch_up7st       43.1  (LPC)  <- +17.1 via LITE resynthesis routing
+  sine_440_time_2x           36.6  (LPC)  <- +20.9
+  sine_440_time_halfspeed    35.2  (LPC)  <- +17.2
 
   -- Vocal "aah" --
   vocal_aah_formant_upmax    19.1  (LPC)
@@ -106,7 +111,7 @@ Per-case scores (v22b, METRIC v3, 32.7 avg):
   chord_Cmaj_formant_max     41.7  (LPC)
 
 Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9
-Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7
+Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7 → v23=35.5
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -168,13 +173,16 @@ PV (v21, PhaseVocoder.cpp): inverted hops + synthesis window + identity
   Tried and reverted: compression-side hop flip (analysis fixed / synthesis
   scaled down) scored 31.3 vs 31.9.
 
-Next highest-value work (metric v3, v22 numbers):
-  1. sine_440_time_2x (15.7) / time_halfspeed (18.0) — lowest cases. Level is
-     now gain-matched, so the residual is spectral/phase: likely the PV's
-     phase-locked output can't null against the V-Synth's (different absolute
-     phase) and formant_sim ~0.40 on a sine is metric quirk. Inspect whether
-     the V-Synth output is actually resynthesized (different harmonics).
-  2. Vocal formant group (17.1-21.3) — formant placement accuracy after pole
-     shifts is the remaining gap (formant_sim 0.35-0.53 vs 0.74+ on pitch).
-  3. drum_hit_time_halfspeed via dedicated transient handling if more is
-     needed (now 31.1; V-Synth BACKING event stamps remain unimplemented).
+Routing (v23): LITE + (time-only OR pitch>-0.5st) → LPC resynthesis.
+  BACKING time cases tested both ways: drum compression prefers LPC (+4/+5),
+  drum extension + chord prefer PV (-6/-8) — kept on PV, too thin to split.
+
+Next highest-value work (metric v3, v23 numbers):
+  1. vocal_aah_formant_downmax (17.1) / formant_upmax (19.1) / up4st (21.3) —
+     weakest cluster. Formant placement after pole shifts (formant_sim
+     0.35-0.53). Ideas: check shifted-pole accuracy directly (synthesize,
+     measure formant peaks vs ref), revisit order-8 guard for downshift.
+  2. drum_hit_time_halfspeed (31.1) — V-Synth BACKING event stamps
+     (transient-synchronous resynthesis) remain unimplemented.
+  3. vocal_aah_pitch_up7st (26.7) — formant_sim only 0.30; vocal pitch refs
+     may also be resynthesized differently (check upper harmonic structure).
