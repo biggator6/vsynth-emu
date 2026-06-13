@@ -8,7 +8,7 @@ checklist and update `RESEARCH_LOG.md` with results.
 ## Recording Chain
 
 ```
-DAW (playback) → V-Synth audio input (rear panel) → V-Synth audio output → DAW (capture)
+DAW (playback) → Import and encode PCM sample →  V-Synth PCM oscillator → V-Synth audio output → DAW (capture)
 ```
 
 - Sample rate: **48000 Hz** (V-Synth native)
