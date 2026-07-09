@@ -122,37 +122,15 @@ with the same base name.  The offline renderer takes the passthrough as its `--i
 
 ## Next Recording Session — Priorities
 
-These would extend the test battery into currently under-tested territory.
+**Superseded by the "Round 2 — Recording Wishlist" section at the end of this
+file** (updated after v27).  Optional extras kept from the earlier list, worth
+grabbing only if time permits after the Round-2 priorities:
 
-### Priority 1 — Additional vocal time cases
-
-The vocal_aah_time_halfspeed case (32.5) lags behind time_2x (45.7). An additional
-mid-ratio case would help characterise the quality curve:
-
-| File | Pitch | Time | Formant | Dir |
+| File | Pitch | Time | Formant | Why |
 |---|---|---|---|---|
-| `vocal_aah_time_1_5x.wav` | 0 | **1.5×** | 0 | sustained/ |
-
-### Priority 2 — Chord compression and pitch
-
-The chord_Cmaj_pitch_up7st (25.1) is the weakest non-formant chord case.  An additional
-time-compression case would reveal how BACKING WSOLA handles short-stretch ratios:
-
-| File | Pitch | Time | Formant | Dir |
-|---|---|---|---|---|
-| `chord_Cmaj_time_halfspeed.wav` | 0 | **0.5×** | 0 | sustained/ |
-| `chord_Cmaj_pitch_down12st.wav` | **−12 st** | 1× | 0 | sustained/ |
-
-### Priority 3 — Second vocal material (female / higher F0)
-
-All current vocal tests use a male-range "aah" (~120 Hz F0). A higher-F0 source
-would stress-test the LPC formant extractor at a different range:
-
-| File | Pitch | Time | Formant | Dir |
-|---|---|---|---|---|
-| `vocal_female_passthrough.wav` | 0 | 1× | 0 | passthrough/ |
-| `vocal_female_time_2x.wav` | 0 | **2×** | 0 | sustained/ |
-| `vocal_female_formant_upmax.wav` | 0 | 1× | **+12 st** | sustained/ |
+| `vocal_aah_time_1_5x_dry`/ref | 0 | **1.5×** | 0 | mid-ratio quality curve |
+| `chord_Cmaj_time_halfspeed` | 0 | **0.5×** | 0 | subband engine at compression |
+| `chord_Cmaj_pitch_down12st` | **−12 st** | 1× | 0 | ENSEMBLE pitch, down direction |
 
 ---
 
@@ -194,13 +172,17 @@ mkdir -p "$BASE/plugin_outputs/$VER/sustained"
      --formant 12 --algo hybrid
 ```
 
-**Current hybrid routing summary:**
-| Condition | Sub-algorithm |
-|---|---|
-| `|formantShift| > 0.5 st` | LPC source-filter |
-| `hasPitch AND voiced speech` | LPC source-filter |
-| `ENSEMBLE or BACKING, time ≥ 1×, !hasPitch` | WSOLA |
-| everything else | Phase Vocoder |
+**Current hybrid routing summary (v27 — see research/PATENTS.md):**
+| Content type | Operation | Engine |
+|---|---|---|
+| SOLO (speech/melody) | any | pitch-synchronous granular (US6421642) |
+| LITE (pure tones) | time, pitch-up | LPC resynthesis |
+| LITE | pitch-down | Phase Vocoder |
+| LITE | formant | LPC source-filter |
+| ENSEMBLE (chords) | time-only | subband stretch (US6564187) |
+| ENSEMBLE | pitch/formant | Phase Vocoder / LPC |
+| BACKING (drums) | time-only | event-based stretch (attacks verbatim) |
+| BACKING | pitch | Phase Vocoder |
 
 The content type (LITE / SOLO / ENSEMBLE / BACKING) is printed to stdout during render:
 ```
