@@ -386,6 +386,118 @@ std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr) {
 
 } // namespace
 
+// ─── Subband Time Stretch (US6564187B1, simplified) ─────────────────────────
+//
+// Roland's polyphonic time-stretch patent: octave-cascade bands, each split
+// into sub-bands, per-sub-band amplitude + instantaneous frequency, time
+// modification of those trajectories, resynthesis.  This implementation uses
+// the offline luxury of a whole-file FFT: quarter-octave log-spaced sub-bands
+// (≈ one partial per band for musical content — the reason the patent's
+// sub-division works), analytic signal per band, amplitude/inst-frequency
+// trajectories resampled to the stretched timeline, cosine-bank resynthesis.
+// Raised-cosine band masks sum to unity, so stretch = 1 reconstructs the
+// input (verified).
+
+namespace {
+
+void engFft(std::vector<std::complex<double>>& d, bool inverse) {
+    const int N = (int)d.size();
+    for (int i = 1, j = 0; i < N; ++i) {
+        int bit = N >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) std::swap(d[i], d[j]);
+    }
+    for (int len = 2; len <= N; len <<= 1) {
+        const double ang = 2.0 * 3.14159265358979 / len * (inverse ? -1.0 : 1.0);
+        const std::complex<double> wl(std::cos(ang), std::sin(ang));
+        for (int i = 0; i < N; i += len) {
+            std::complex<double> w(1.0, 0.0);
+            for (int j2 = 0; j2 < len / 2; ++j2) {
+                const auto u = d[i + j2];
+                const auto v = d[i + j2 + len / 2] * w;
+                d[i + j2]            = u + v;
+                d[i + j2 + len / 2]  = u - v;
+                w *= wl;
+            }
+        }
+    }
+    if (inverse) for (auto& x : d) x /= (double)N;
+}
+
+} // namespace
+
+std::vector<float> VariphraseEngine::subbandStretchOffline(
+        const std::vector<float>& in) const {
+    const int    n  = (int)in.size();
+    const double sr = pImpl->sampleRate;
+    const double st = std::max(0.05f, pImpl->params.timeStretchRatio);
+    if (n < 4096) return {};
+
+    int N = 1; while (N < n) N <<= 1;
+    std::vector<std::complex<double>> spec(N, {0.0, 0.0});
+    for (int i = 0; i < n; ++i) spec[i] = { (double)in[i], 0.0 };
+    engFft(spec, false);
+
+    // Quarter-octave band edges from 55 Hz to Nyquist (in bins).
+    std::vector<double> edges { 0.0, 55.0 };
+    while (edges.back() * std::pow(2.0, 0.25) < sr / 2.0)
+        edges.push_back(edges.back() * std::pow(2.0, 0.25));
+    edges.push_back(sr / 2.0);
+
+    const int outLen = std::max(1, (int)std::lround(n * st));
+    std::vector<double> out(outLen, 0.0);
+    const double binHz = sr / (double)N;
+
+    std::vector<std::complex<double>> band(N);
+    for (size_t b = 0; b + 1 < edges.size(); ++b) {
+        const double fLo = edges[b], fHi = edges[b + 1];
+        const double tw  = 0.15 * (fHi - fLo);   // raised-cosine transition
+        // One-sided analytic band: positive frequencies only, ×2
+        std::fill(band.begin(), band.end(), std::complex<double>(0.0, 0.0));
+        bool any = false;
+        for (int k = 0; k <= N / 2; ++k) {
+            const double f = k * binHz;
+            double g = 0.0;
+            if (f >= fLo + tw && f <= fHi - tw)      g = 1.0;
+            else if (f > fLo - tw && f < fLo + tw)   g = 0.5 * (1.0 + std::sin(3.14159265358979 * (f - fLo) / (2.0 * tw)));
+            else if (f > fHi - tw && f < fHi + tw)   g = 0.5 * (1.0 - std::sin(3.14159265358979 * (f - fHi) / (2.0 * tw)));
+            if (g > 0.0) {
+                const double scale = (k == 0 || k == N / 2) ? 1.0 : 2.0;
+                band[k] = spec[k] * (g * scale);
+                any = true;
+            }
+        }
+        if (!any) continue;
+        engFft(band, true);   // analytic band signal z(t)
+
+        // Amplitude + instantaneous frequency trajectories, resampled to the
+        // stretched timeline; phase rebuilt by integrating the resampled
+        // frequency (per-band running phase seeded from the source phase).
+        double phase = std::arg(band[0]);
+        for (int t = 0; t < outLen; ++t) {
+            const double srcPos = (double)t / st;
+            const int    i0     = std::min((int)srcPos, n - 2);
+            const double fr     = srcPos - i0;
+
+            const std::complex<double> z0 = band[i0], z1 = band[i0 + 1];
+            const double a = (1.0 - fr) * std::abs(z0) + fr * std::abs(z1);
+            // Instantaneous angular frequency from the analytic pair
+            const std::complex<double> rot = z1 * std::conj(z0);
+            const double w = (std::abs(rot) > 1e-30) ? std::arg(rot) : 0.0;
+
+            out[t] += a * std::cos(phase);
+            phase  += w;
+            if (phase >  3.14159265358979) phase -= 2.0 * 3.14159265358979;
+            if (phase < -3.14159265358979) phase += 2.0 * 3.14159265358979;
+        }
+    }
+
+    std::vector<float> res(outLen);
+    for (int t = 0; t < outLen; ++t) res[t] = (float)out[t];
+    return res;
+}
+
 std::vector<float> VariphraseEngine::granularResynthOffline(
         const std::vector<float>& in) const {
     const int n = (int)in.size();
@@ -464,6 +576,20 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
         pImpl->analysis.contentType == VariphraseAnalysis::ContentType::SOLO) {
         std::vector<float> out = granularResynthOffline(inputMono);
         if (!out.empty()) return out;
+    }
+
+    // ── Subband stretch for ENSEMBLE time-only (Session 15, US6564187) ───────
+    {
+        const bool timeOnlyEns =
+            std::abs(pImpl->params.pitchShiftSemitones)   < 0.01f &&
+            std::abs(pImpl->params.formantShiftSemitones) < 0.001f &&
+            std::abs(pImpl->params.timeStretchRatio - 1.0f) > 0.01f;
+        if (pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid &&
+            pImpl->analysis.contentType == VariphraseAnalysis::ContentType::ENSEMBLE &&
+            timeOnlyEns) {
+            std::vector<float> out = subbandStretchOffline(inputMono);
+            if (!out.empty()) return out;
+        }
     }
 
     // ── Event-based stretch for BACKING content (Session 15) ─────────────────

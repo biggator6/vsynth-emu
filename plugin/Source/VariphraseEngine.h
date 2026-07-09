@@ -108,6 +108,11 @@ public:
     // input (caller falls back to the streaming path).
     std::vector<float> granularResynthOffline(const std::vector<float>& in) const;
 
+    // Subband time stretch per Roland US6564187B1 (simplified): quarter-octave
+    // analytic sub-bands, amplitude/inst-frequency trajectories resampled to
+    // the stretched timeline.  For ENSEMBLE time-only operations.
+    std::vector<float> subbandStretchOffline(const std::vector<float>& in) const;
+
     // ─── Encode / Analysis pass ───────────────────────────────────────────────
     // analyzeContent: offline analysis of a full mono audio buffer.
     //   Computes median ACF pitch confidence over all analysis frames,
