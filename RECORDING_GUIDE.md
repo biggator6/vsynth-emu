@@ -237,94 +237,88 @@ cd "$BASE" && python3 batch_test.py \
 
 ---
 
-## Round 2 — Recording Wishlist (after Session 15, score 36.5)
+## Round 2 — Recording Wishlist (updated after v27, score 51.5)
 
-Session 15 implemented every V-Synth architectural element identified so far
-(source-filter resynthesis with content routing, downsampled formant analysis,
-formant-knob saturation, BACKING event stamps).  The remaining score ceiling is
-increasingly **coverage- and metric-bound**: the suite is 20 cases from 4 source
-recordings, several behaviours are calibrated against a single example, and a
-few open questions can only be answered with new hardware captures.
+Session 15 ended with all three Roland VariPhrase patents implemented in
+their correct roles (see research/PATENTS.md): pitch-synchronous granular for
+SOLO (US6421642), quarter-octave subband stretch for ENSEMBLE (US6564187),
+and event stamps for BACKING.  The remaining ceiling is **coverage- and
+metric-bound**: the suite is 20 cases from 4 source recordings, several
+behaviours are calibrated against a single example, and the open questions
+below can only be answered with new hardware captures.
 
-Priority order below.  For every new source, **always capture the passthrough
-first** (all VariPhrase parameters zeroed) — Session 15 found the existing
-references carry recording-chain gain differences (the sine refs sit ~7 dB
-below their dry input; vocal/chord are at unity), and a passthrough per source
-pins down the unit's level law.
+**If hardware time is limited, record ① + ⑥ only** (nine takes of one vocal
+source) — they answer the two most important open questions: the true
+formant transfer curve and the metric ceiling.
 
-### Priority 1 — Formant-knob calibration sweep (one source, many settings)
+### Ground rules for every take
 
-The single highest-value set.  Session 15 measured the V-Synth's formant
-mapping from just two points: "+12 st" moves F1 by only ~×1.67 (≈ +9 st, i.e.
-the upward mapping saturates at ~0.75× nominal) while the downward direction
-appears to track nominal.  The current code hard-codes 0.75× for upward speech
-shifts off this one measurement.
+- **Capture the passthrough first** for every new source (all VariPhrase
+  parameters zeroed).  Reference levels are recording-chain gain staging
+  (the sine refs sit ~7 dB below their dry input; vocal/chord at unity);
+  a passthrough per source pins down the unit's level law.
+- **Name dry inputs with a `_dry` suffix.**  The sine set's identical names
+  across passthrough/ and sustained/ caused a wrong-input render and an
+  inflated score in Session 15.
+- **Short, consistent lead-ins (~0.5 s)** and **≥ 4 s of steady content** for
+  sustained sources (analysis windows reach 65 k samples).
+- **Note the exact displayed parameter values** — the panel-to-DSP mapping is
+  part of what is being reverse-engineered.
 
-Record the **vocal "aah"** at formant settings:
+### Priority ① — Formant-knob calibration sweep (7 takes)
+
+Vocal "aah" at formant settings:
 ```
 −9, −6, −3, +2, +3, +6, +9   (semitone display values, everything else zero)
 ```
-Seven takes map the full transfer curve, replace the hard-coded 0.75 with a
-measured function, and resolve whether the down-shift's odd upper structure
-(reference peaks at 3170/4172 Hz that don't match ×0.5 scaling — Session 15
-could not explain these) is real behaviour or measurement artifact.
+Now does double duty:
+- Maps the full formant transfer curve (currently measured from only two
+  points: "+12 st" moves F1 ~×1.67; downward tracks nominal).
+- **Directly tests the patent's window clamp** (`wl ≤ ppw`, US6421642), which
+  replaced the empirical 0.75× calibration in the granular engine — the
+  engine now makes a specific, falsifiable prediction at every knob setting.
+- Resolves whether the down-shift's odd upper structure (reference peaks at
+  3170/4172 Hz that don't fit ×0.5 scaling) is real behaviour or artifact.
 
-### Priority 2 — A second vowel and a higher voice
+### Priority ② — A second vowel and a higher voice (6 takes)
 
-All vocal behaviour (speech discriminant, downsampled LPC, F0 estimation,
-pre-emphasis routing) is tuned on ONE low-pitched "aah".
-- **"ee" vowel, sustained** (high F2 ≈ 2.3 kHz, low F1): the hardest formant
-  configuration for LPC capture; one take each of formant +12, −12, pitch +7.
+All vocal behaviour is tuned on ONE low-pitched "aah".
+- **"ee" vowel, sustained** (high F2 ≈ 2.3 kHz, low F1 — the hardest envelope
+  configuration): formant +12, −12, pitch +7.
 - **Higher-F0 voice** (female or falsetto, F0 ≈ 200–250 Hz), sustained "aah":
-  stresses the F0 octave guard and the pre-emphasis corner; same three takes.
+  same three takes.  Stresses the granular engine's period tracker and
+  integer-subharmonic octave guard.
 
-### Priority 3 — Drum loop (multiple onsets)
+### Priority ③ — Drum loop with multiple onsets (4 takes)
 
-The event-stamp system (onset detection, verbatim attack placement, segmented
-stretching) shipped in Session 15 tested against a SINGLE drum hit.  A 2–4 bar
-kit loop (kick/snare/hat) at a known tempo exercises:
-multi-onset detection, the 2048-sample refractory window, inter-event segment
-stretching, and cumulative timing placement.
-Takes: time 2×, time 0.5×, pitch +7 st, plus passthrough.
+A 2–4 bar kick/snare/hat loop at a known tempo: time 2×, time 0.5×,
+pitch +7 st, passthrough.  The event-stamp system has only ever been tested
+against a SINGLE drum hit; a loop exercises multi-onset detection, the
+2048-sample refractory window, inter-event segment stretching, and cumulative
+timing placement.
 
-### Priority 4 — Sustained polyphony without an attack
+### Priority ④ — Sustained pad chord (4 takes)
 
-The chord/drum classifier boundary (peakToMean > 9 → BACKING) was set from one
-strummed chord (7.8) and one drum hit (11.4).  A **pad-style sustained chord**
-(slow attack, e.g. organ or strings patch through the V-Synth) tests ENSEMBLE
-classification and polyphonic processing without the attack transient that
-made the strummed chord borderline.  Takes: time 2×, pitch +7, formant +12,
-passthrough.
+A slow-attack polyphonic sustain (organ/strings patch): time 2×, pitch +7,
+formant +12, passthrough.  Two jobs:
+- Tests the ENSEMBLE/BACKING classifier boundary (peakToMean > 9, set from
+  one strummed chord at 7.8 vs one drum at 11.4) without the borderline
+  attack transient.
+- **Direct validation for the new subband engine** (US6564187, v27) on clean
+  polyphony; the pitch take informs the planned subband-pitch extension
+  (chord_pitch is a queued target).
 
-### Priority 5 — Moving pitch (the real VariPhrase use case)
+### Priority ⑤ — Moving-pitch phrase (4 takes)
 
-Everything in the current suite is stationary.  A short **sung or spoken
-phrase** (2–4 s, natural pitch movement) is what VariPhrase exists for, and
-tests: per-frame F0 tracking under movement, dsLPC envelope smoothing
-(currently α = 0.7, tuned on stationary content), and SOLO routing stability.
-Takes: time 2×, time 0.5×, pitch +7, passthrough.
+A 2–4 s sung or spoken phrase with natural pitch movement: time 2×,
+time 0.5×, pitch +7, passthrough.  This is what VariPhrase exists for, and
+the real test of the granular encoder's grain tracking — everything in the
+current suite is stationary.
 
-### Priority 6 — Metric noise floor (cheap, do alongside any session)
+### Priority ⑥ — Duplicate takes (cheap; do alongside anything)
 
-Record the SAME setting twice in a row (e.g. vocal formant +12, two takes
-without touching anything).  Scoring take A against take B through compare.py
-measures the recording chain + metric noise floor — i.e. the best score any
-render could achieve.  Currently unknown; it bounds how much of the remaining
-gap to 100 is even reachable.
-
-### Capture conventions (lessons from Session 15)
-
-- **Name dry inputs distinctly** — the sine set's per-case dry files share
-  names with their references across directories
-  (passthrough/sine_440_formant_downmax.wav = 16-bit DRY,
-  sustained/sine_440_formant_downmax.wav = 24-bit REFERENCE), which caused a
-  wrong-input render and an inflated score.  Use a `_dry` suffix for new
-  material.
-- **Keep lead-ins short and consistent** (~0.5 s).  The old drum references
-  carried up to 2.6 s of lead-in silence, which combined with a then-unaligned
-  metric to make all drum scores measurement noise for 14 sessions.  The
-  metric now aligns, but short lead-ins maximise the comparable region.
-- **Record ≥ 4 s of steady content** for sustained sources (the analysis uses
-  windows up to 65 k samples), and note the displayed parameter value
-  (semitones/ratio) exactly — the encode/UI mapping is part of what is being
-  reverse-engineered.
+Record the SAME setting twice without touching anything (e.g. vocal formant
++12, two takes).  Scoring take A against take B through compare.py measures
+the recording-chain + metric noise floor — the best score ANY render can
+achieve.  With the suite at 51.5, knowing whether the ceiling is 65 or 85
+determines how much algorithm work actually remains.
