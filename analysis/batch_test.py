@@ -93,8 +93,8 @@ def print_summary_table(results: list[dict]):
     if not results:
         return
 
-    col_w = [38, 10, 10, 10, 10, 10]
-    headers = ['Test File', 'Null dBFS', 'SNR dB', 'Formants', 'Transient', 'SCORE']
+    col_w = [38, 10, 8, 8, 8, 8, 8]
+    headers = ['Test File', 'Null dBFS', 'SNR dB', 'Spectral', 'Formant', 'Transnt', 'SCORE']
     sep = '+' + '+'.join('-' * (w + 2) for w in col_w) + '+'
     row_fmt = '| ' + ' | '.join(f'{{:<{w}}}' for w in col_w) + ' |'
 
@@ -110,15 +110,16 @@ def print_summary_table(results: list[dict]):
         name = os.path.basename(r['test_file'])[:38]
         null_db = f"{r['null_rms_dbfs']:.1f}"
         snr = f"{r['snr_db']:.1f}"
+        spectral = f"{r.get('spectral_similarity', float('nan')):.3f}"
         formant = f"{r['formant_similarity']:.3f}"
         transient = f"{r['transient_score']:.3f}"
         score = f"{r['composite_score']:.1f}"
         scores.append(r['composite_score'])
-        print(row_fmt.format(name, null_db, snr, formant, transient, score))
+        print(row_fmt.format(name, null_db, snr, spectral, formant, transient, score))
 
     print(sep)
     avg = np.mean(scores)
-    print(row_fmt.format('AVERAGE', '', '', '', '', f"{avg:.1f}"))
+    print(row_fmt.format('AVERAGE', '', '', '', '', '', f"{avg:.1f}"))
     print(sep)
     print(f"\n  Overall composite score: {avg:.1f}/100")
 
@@ -184,16 +185,37 @@ def save_html_report(results: list[dict], json_path: str, output_dir: str):
                 img_b64 = base64.b64encode(f.read()).decode()
             img_tag = f'<img src="data:image/png;base64,{img_b64}" style="width:100%;margin-top:10px">'
 
+        # A/B audio players (metric v4): numbers can't hear — every batch run
+        # should be one click away from comparing reference vs render by ear.
+        # Relative paths so the report works wherever the repo is checked out.
+        audio_tag = ''
+        if r.get('ref_path') and r.get('plugin_path'):
+            ref_rel = os.path.relpath(os.path.abspath(r['ref_path']),
+                                      os.path.abspath(output_dir))
+            out_rel = os.path.relpath(os.path.abspath(r['plugin_path']),
+                                      os.path.abspath(output_dir))
+            audio_tag = (
+                f'<div style="display:flex;gap:24px;align-items:center;margin-top:6px">'
+                f'<span style="color:#4ecdc4">V-Synth ref</span>'
+                f'<audio controls preload="none" src="{ref_rel}"></audio>'
+                f'<span style="color:#ffd93d">our render</span>'
+                f'<audio controls preload="none" src="{out_rel}"></audio>'
+                f'</div>'
+            )
+
+        spec_sim = r.get('spectral_similarity', float('nan'))
+        cclass   = r.get('content_class', '?')
         rows += f"""
         <tr>
-          <td>{name}</td>
+          <td>{name}<br><span style="color:#666">{cclass}</span></td>
           <td>{r['null_rms_dbfs']:.1f}</td>
           <td>{r['snr_db']:.1f}</td>
+          <td>{spec_sim:.3f}</td>
           <td>{r['formant_similarity']:.3f}</td>
           <td>{r['transient_score']:.3f}</td>
           <td style="color:{score_color};font-weight:bold">{r['composite_score']:.1f}</td>
         </tr>
-        <tr><td colspan="6">{img_tag}</td></tr>
+        <tr><td colspan="7">{audio_tag}{img_tag}</td></tr>
         """
 
     html = f"""<!DOCTYPE html>
@@ -224,6 +246,7 @@ def save_html_report(results: list[dict], json_path: str, output_dir: str):
       <th>Test File</th>
       <th>Null RMS (dBFS)</th>
       <th>SNR (dB)</th>
+      <th>Spectral Sim</th>
       <th>Formant Similarity</th>
       <th>Transient Score</th>
       <th>Composite Score</th>

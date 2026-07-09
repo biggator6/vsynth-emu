@@ -264,22 +264,115 @@ def transient_smearing_score(ref: np.ndarray, out: np.ndarray, sr: int) -> float
 # Composite Score
 # ---------------------------------------------------------------------------
 
-def composite_score(null_result: dict, formant_sim: float, transient_score: float) -> float:
-    """
-    Weighted composite similarity score, 0-100 (higher = more similar to V-Synth).
-    
-    Weights reflect importance to VariPhrase's character:
-    - Formant accuracy: 40% (this IS the soul of VariPhrase)
-    - SNR / null test: 35%
-    - Transient preservation: 25%
-    """
-    # Normalize SNR: 0 dB → 0 pts, 60 dB → 100 pts
-    snr_score = np.clip(null_result['snr_db'] / 60.0, 0, 1) * 100
+# ---------------------------------------------------------------------------
+# Spectral similarity (metric v4) — phase-blind resynthesis comparison
+# ---------------------------------------------------------------------------
 
-    score = (
-        0.40 * formant_sim * 100 +
-        0.35 * snr_score +
-        0.25 * transient_score * 100
+def _optimal_gain(ref: np.ndarray, out: np.ndarray) -> float:
+    denom = float(np.dot(out, out))
+    if denom <= 1e-12:
+        return 1.0
+    return float(np.clip(float(np.dot(ref, out)) / denom, 0.25, 4.0))
+
+
+def spectral_similarity(ref: np.ndarray, out: np.ndarray, sr: int) -> float:
+    """
+    Phase-blind spectral similarity, 0–1 (1 = identical magnitude spectra).
+
+    Metric v4 (Session 15): the V-Synth RESYNTHESIZES — output phase never
+    matches the reference, so the phase-sensitive null test cannot measure
+    perceptual closeness.  This is the standard alternative from the neural-
+    vocoder literature: mean L1 distance between log-magnitude spectrograms at
+    multiple STFT resolutions, plus a log-mel term for perceptual band
+    weighting.  Distances map to a 0–1 score via exp(−d/τ).
+
+    Robustness details:
+      - signals are time-aligned and gain-matched first (same machinery as
+        the null test);
+      - magnitudes are floored at −60 dB relative to each spectrogram's peak
+        so silence/noise-floor bins don't dominate the log distance.
+    """
+    ref_a, out_a = align_length(ref, out, sr)
+    if len(ref_a) < 2048:
+        return 0.0
+    out_a = out_a * _optimal_gain(ref_a, out_a)
+
+    def logmag(x, n_fft):
+        S = np.abs(librosa.stft(x, n_fft=n_fft, hop_length=n_fft // 4))
+        floor = S.max() * 1e-3          # −60 dB relative floor
+        return np.log(np.maximum(S, max(floor, 1e-12)))
+
+    dists = []
+    for n_fft in (512, 1024, 2048):
+        R = logmag(ref_a, n_fft)
+        O = logmag(out_a, n_fft)
+        m = min(R.shape[1], O.shape[1])
+        dists.append(float(np.mean(np.abs(R[:, :m] - O[:, :m]))))
+    d_stft = float(np.mean(dists))
+
+    def logmel(x):
+        M = librosa.feature.melspectrogram(y=x, sr=sr, n_fft=2048,
+                                           hop_length=512, n_mels=64)
+        floor = M.max() * 1e-6          # −60 dB (power) relative floor
+        return np.log(np.maximum(M, max(floor, 1e-18)))
+
+    Rm, Om = logmel(ref_a), logmel(out_a)
+    m = min(Rm.shape[1], Om.shape[1])
+    d_mel = float(np.mean(np.abs(Rm[:, :m] - Om[:, :m])))
+
+    # τ chosen so identical → 1.0 and typical current renders spread over
+    # roughly 0.2–0.8 (calibrated on the v25 suite).
+    return float(0.5 * np.exp(-d_stft / 1.5) + 0.5 * np.exp(-d_mel / 3.0))
+
+
+def classify_content(name: str) -> str:
+    """Infer content class from the test-file naming convention."""
+    n = name.lower()
+    if n.startswith('vocal'):                       return 'speech'
+    if n.startswith('drum'):                        return 'percussive'
+    if n.startswith(('sine', 'saw', 'chord')):      return 'tonal'
+    return 'unknown'
+
+
+def composite_score(null_result: dict, formant_sim: float,
+                    transient_score: float, spectral_sim: float = 0.0,
+                    content_class: str = 'unknown') -> float:
+    """
+    Weighted composite similarity score, 0-100 (higher = more similar).
+
+    Metric v4 (Session 15): content-aware weights.  The old fixed weights
+    (formant 40 / SNR 35 / transient 25) applied formant similarity to
+    non-speech content where formants are meaningless, weighted a phase-
+    sensitive null test that a resynthesis engine can never satisfy, and
+    scored transient preservation on sustained material where it is ~0 by
+    nature — putting the per-case ceiling around 50–65 regardless of
+    perceptual quality.  v4 weights each term only where it means something,
+    and carries most of the score on the phase-blind spectral term.
+
+                    spectral  formant  transient  snr
+        speech        0.45     0.30      0.15     0.10
+        percussive    0.45     0.00      0.45     0.10
+        tonal         0.70     0.10      0.10     0.10
+        unknown       0.45     0.25      0.20     0.10
+    """
+    weights = {
+        'speech':     (0.45, 0.30, 0.15, 0.10),
+        'percussive': (0.45, 0.00, 0.45, 0.10),
+        'tonal':      (0.70, 0.10, 0.10, 0.10),
+        'unknown':    (0.45, 0.25, 0.20, 0.10),
+    }[content_class if content_class in ('speech', 'percussive', 'tonal')
+      else 'unknown']
+
+    # Normalize SNR: 0 dB → 0 pts, 30 dB → 100 pts (resynthesis nulls are
+    # bounded; 60 dB scaling made the term dead weight).
+    snr_score = float(np.clip(null_result['snr_db'] / 30.0, 0, 1))
+
+    w_spec, w_form, w_trans, w_snr = weights
+    score = 100.0 * (
+        w_spec  * spectral_sim +
+        w_form  * formant_sim +
+        w_trans * transient_score +
+        w_snr   * snr_score
     )
     return float(score)
 
@@ -321,7 +414,13 @@ def analyze(ref_path: str, out_path: str, output_dir: str = '.') -> dict:
     t_score = transient_smearing_score(ref, out, sr_ref)
     print(f"    Transient score: {t_score:.3f}")
 
-    score = composite_score(null_result, formant_sim, t_score)
+    print("  Measuring spectral similarity...")
+    spec_sim = spectral_similarity(ref, out, sr_ref)
+    content_class = classify_content(ref_label)
+    print(f"    Spectral similarity: {spec_sim:.3f}  (class: {content_class})")
+
+    score = composite_score(null_result, formant_sim, t_score,
+                            spec_sim, content_class)
     print(f"\n  ► COMPOSITE SCORE: {score:.1f}/100")
 
     print("  Generating spectrogram...")
@@ -335,6 +434,8 @@ def analyze(ref_path: str, out_path: str, output_dir: str = '.') -> dict:
         'snr_db': null_result['snr_db'],
         'formant_similarity': formant_sim,
         'transient_score': t_score,
+        'spectral_similarity': spec_sim,
+        'content_class': content_class,
         'composite_score': score,
         'spectrogram_path': spec_path,
     }
