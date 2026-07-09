@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-11)
 
-Current score: 47.8 / 100 under METRIC v4 (v17 baseline = 34.0)
+Current score: 50.4 / 100 under METRIC v4 (v17 baseline = 34.0)
   METRIC v4 (commit 7434abb): phase-blind spectral similarity (MR-STFT +
   log-mel, gain-matched) carries most of the composite; content-aware weights
   (speech/percussive/tonal by filename); SNR rescaled to 30 dB full marks.
@@ -15,7 +15,17 @@ Current score: 47.8 / 100 under METRIC v4 (v17 baseline = 34.0)
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 57.7
-Best version: v25 (commit df565b6) — v24b + event-based stretch for BACKING
+Best version: v26 (commit 1bd670c) — PITCH-SYNCHRONOUS GRANULAR ENGINE for
+  SOLO content, implementing Roland's actual VariPhrase patent US6421642B1
+  (see research/PATENTS.md). Encode cuts pitch-period grains; playback:
+  time = grain-list walk rate, pitch = grain re-trigger period (2 channels,
+  half-cycle offset, triangular windows), formant = grain read velocity with
+  the patent's wl<=ppw window clamp (replaces the 0.75x calibration).
+  SOLO only: granular lifted every vocal case but dropped every sine case —
+  LITE is Roland's reduced-analysis mode, keeps v23 routing. v24b's dsLPC
+  pitch path removed (obsolete: vocal pitch no longer reaches SFM; it was
+  quietly costing sine_pitch_up7st 62.3->23.9 on re-render).
+v25 (commit df565b6) — v24b + event-based stretch for BACKING
   (onset stamps at encode time; attacks placed verbatim at stretched
   positions, inter-event material PV-stretched; attack 2048 samples).
   BACKING threshold raised peakToMean 5 -> 9 (chord 7.8 = ENSEMBLE,
@@ -98,13 +108,14 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v25, METRIC v4, 47.8 avg) — see latest report HTML for the
-full table with spectral column and audio players. Highlights:
-  strong (50-68): drum_time_4x 67.8, sine_formant_upmax 65.6, chord_formant
-    63.3, drum_pitch 62.9, sine_formant_downmax 62.7, sine_pitch_up7st 62.3
-  weak (25-41): vocal formant group 25.2-32.2 (spectral sim ~0.3 — genuinely
-    different spectra, the real remaining gap), chord pitch/time 39-40,
-    sine time 40 (spectral 0.44)
+Per-case scores (v26, METRIC v4, 50.4 avg) — see latest report HTML:
+  strong (48-68): drum_time_4x 67.8, sine_formant_upmax 65.6, chord_formant
+    63.3, drum_pitch 62.9, sine_formant_downmax 62.7, sine_pitch_up7st 62.3,
+    vocal_time_2x 53.2, drum_time_2x 51.9, vocal_pitch_down 51.1,
+    drum_halfspeed 49.6, vocal_time_halfspeed 48.6, vocal_formant_upmax 48.5
+  weak (32-46): vocal_formant_downmax 35.7, vocal_pitch_up7st 37.5,
+    chord pitch/time 39-40, sine time 40, vocal_formant_up4st 41.5,
+    sine_pitch_down 45.6
 
 Old per-case table (METRIC v3, 36.5 avg):
   -- Sine 440 Hz --
@@ -137,7 +148,7 @@ Old per-case table (METRIC v3, 36.5 avg):
 
 Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
-Metric v4 history: v17=34.0 → v25=47.8
+Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -246,14 +257,14 @@ PATENT FINDINGS (Session 15, research/PATENTS.md — READ THIS FIRST):
   Our LPC source-filter path approximates grain resynthesis; black-box was
   directionally right, mechanistically wrong.
 
-Next highest-value work (see PROJECT_REVIEW.md + research/PATENTS.md):
-  1. IMPLEMENT PITCH-SYNCHRONOUS GRANULAR (US6421642) as a new engine path;
-     route SOLO/LITE there. All prerequisites exist (F0, voiced detect,
-     onsets, offline encode). Expected: big wins on the vocal group
-     (spectral sim ~0.3 — the reference's ACTUAL mechanism, not an
-     approximation). Replace the 0.75x formant calibration with the
-     wl <= ppw window clamp.
-  2. LISTEN to the A/B players in the latest batch report; log impressions.
-  3. Round-2 recordings (RECORDING_GUIDE.md) — duplicate takes measure the
-     metric-v4 ceiling.
-  4. ENSEMBLE path: consider US6564187 subband stretch for chord content.
+Next highest-value work:
+  1. LISTEN to the A/B players (latest report HTML) — especially the new
+     granular vocal renders; log the project's first listening impressions.
+  2. Granular engine polish: pitch_up7st is the weakest vocal case (37.5) —
+     grain re-trigger at shorter ppw may need window/overlap care; also try
+     granular for chord pitch (ENSEMBLE currently PV, 40.1).
+  3. Round-2 recordings (RECORDING_GUIDE.md) — duplicate takes give the
+     metric-v4 ceiling; formant sweep validates the wl<=ppw clamp directly.
+  4. ENSEMBLE path per US6564187 (octave-cascade subband stretch) for chord
+     time (39.3).
+  5. Real-time parity: granular + drain + event stretch are offline-only.
