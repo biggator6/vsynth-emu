@@ -1818,23 +1818,61 @@ our LPC source-filter path is an approximation of grain resynthesis.
 Fifteen sessions of inference were directionally right, mechanistically
 wrong; the black-box scores were nonetheless what located the right patents.
 
-### Next Steps (final for Session 15 — see PROJECT_REVIEW.md + research/PATENTS.md)
+### v26 — The Patent Engine (1bd670c), score 50.4
 
-1. **Implement pitch-synchronous granular (US6421642) as a new engine path**
-   and route SOLO/LITE content there.  All prerequisites exist in the engine
-   (per-frame F0, voiced detection, onset stamps, offline encode pass).
-   Expected: major wins on the vocal group (spectral sim ~0.3) since it
-   reproduces the reference's actual mechanism.  Replace the empirical
-   0.75× formant calibration with the patent's wl ≤ ppw window clamp.
+Implemented US6421642B1 as `granularResynthOffline()` in VariphraseEngine —
+the project's first mechanism-faithful synthesis path:
 
-2. **Listen** — A/B players are in every batch report now; record the
-   project's first listening impressions here.
+- **Encode**: pitch-period grain cutting (`encodeGrainCuts`): local ACF period
+  tracker (unbiased normalisation, integer-subharmonic octave guard, ±25 %
+  search window seeded from the previous period), fixed 256-sample cuts for
+  unvoiced regions.
+- **Playback**: time = grain-list walk rate (1/stretch per output sample);
+  pitch = grain re-trigger period ppw = cwp/pitchRatio on two channels offset
+  by half a period with triangular windows; formant = grain read velocity
+  (linear-interp resampling), window length cwp/fsv clamped ≤ ppw — the
+  patent's clamp replaces the empirical 0.75× calibration outright.
 
-3. **Round-2 recordings** (RECORDING_GUIDE.md) — duplicate takes measure the
-   metric-v4 ceiling.
+**Routing finding**: granular lifted every vocal case but dropped every sine
+case (formant_upmax −38.6).  Consistent with Roland's "LITE" being the
+reduced-analysis encode mode that does NOT run the full phrase engine —
+routed SOLO-only; LITE keeps the v23 LPC/PV routing.
 
-4. **ENSEMBLE path**: consider the US6564187 subband method for chord
-   content once the granular path lands.
+**Cleanup**: v24b's downsampled-envelope pitch path in SourceFilterModel
+removed — vocal pitch no longer reaches that class, and the only content
+still hitting it (LITE sawtooth) regressed 62.3 → 23.9 under it (an
+unmeasured regression: the sine pitch files had never been re-rendered
+after v24b — a lesson about partial re-renders).
+
+| Vocal case | v25 | v26 |
+|---|---|---|
+| formant_downmax | 25.2 | **35.7** |
+| formant_up4st | 29.6 | **41.5** |
+| formant_upmax | 32.2 | **48.5** |
+| pitch_down12st | 41.2 | **51.1** |
+| pitch_up7st | 38.8 | 37.5 |
+| time_2x | 51.3 | **53.2** |
+| time_halfspeed | 46.3 | **48.6** |
+
+Vocal spectral similarity moved from 0.29–0.41 to 0.38–0.56 — the mechanism
+match is measurable.  Metric v4 history: v17 34.0 → v25 47.8 → **v26 50.4**.
+
+### Next Steps (final for Session 15)
+
+1. **Listen** — especially the new granular vocal renders (A/B players in
+   the latest report).  First listening pass of the project.
+
+2. **Granular polish** — vocal_pitch_up7st (37.5) is now the weakest vocal
+   case; examine grain windowing at short ppw.  Try granular for ENSEMBLE
+   pitch (chord_pitch 40.1).
+
+3. **Round-2 recordings** — duplicate takes give the metric ceiling; the
+   formant sweep now directly validates the wl ≤ ppw clamp.
+
+4. **ENSEMBLE time path** per US6564187 (chord_time 39.3).
+
+5. **Real-time parity** — granular, drain mode, and event stretch are
+   offline-only; the JUCE plugin needs a live strategy.
 
 ---
 
