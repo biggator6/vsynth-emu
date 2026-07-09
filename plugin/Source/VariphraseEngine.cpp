@@ -420,8 +420,17 @@ std::vector<float> VariphraseEngine::granularResynthOffline(
 
         for (int c = 0; c < 2; ++c) {
             if ((double)t >= nextTrig[c]) {
-                ch[c].srcStart = (double)cut.start;
-                ch[c].wl  = std::min((double)cut.cwp / (double)fsv, ppw);
+                const double wlFull = (double)cut.cwp / (double)fsv;
+                ch[c].wl  = std::min(wlFull, ppw);
+                // Patent read offset (US6421642): when the window clamps to
+                // ppw, the grain reads the LAST ppw×fsv samples of the cut
+                // (os = cwp − ppw·fsv), not the first — the read region is
+                // anchored to the cut END so the covered content stays
+                // centred as ppw shrinks (pitch-up).
+                const double os = (wlFull > ppw)
+                    ? (double)cut.cwp - ppw * (double)fsv
+                    : 0.0;
+                ch[c].srcStart = (double)cut.start + os;
                 ch[c].age = 0.0;
                 nextTrig[c] += ppw;
             }
