@@ -230,14 +230,30 @@ vocal_aah_formant_downmax (16.8) — EXHAUSTED EXPERIMENTS (do not retry):
   step would be analysing the metric itself on this pair, or more reference
   recordings to determine the V-Synth's actual downshift envelope over time.
 
-Next highest-value work (see PROJECT_REVIEW.md for full rationale):
-  1. LISTEN to the A/B players in the latest batch report; record impressions
-     in RESEARCH_LOG. First human listening pass of the project.
-  2. Patent search — Roland VariPhrase patents (~1999-2003) may verify or
-     correct 15 sessions of black-box inference in an afternoon.
-  3. Round-2 recordings (RECORDING_GUIDE.md): calibration sweep + duplicate
-     takes first (the duplicate takes measure the metric v4 ceiling).
-  4. Vocal formant group (25-32, spectral sim ~0.3) — the confirmed real gap.
-     With a trustworthy spectral metric, iterate on WHAT the spectra differ
-     by (band-by-band comparison of render vs ref).
-  5. Engine consolidation + C++ invariant unit tests (PROJECT_REVIEW.md #4).
+PATENT FINDINGS (Session 15, research/PATENTS.md — READ THIS FIRST):
+  US6421642B1 (Roland, filed 2000-05) IS VariPhrase. The real SOLO algorithm
+  is PITCH-SYNCHRONOUS GRANULAR, not LPC:
+    encode: cut phrase into ~1-pitch-period grains, store per-grain pitch
+            (cwp) + syllable marks (= our event stamps)
+    time   = rate of walking the grain list (tcv)
+    pitch  = grain re-trigger period ppw = cwp x pitchRatio; TWO channels,
+             half-cycle offset, triangular windows
+    formant= grain READ VELOCITY fsv (resample grain content);
+             window length = cwp/fsv CLAMPED <= ppw (explains our measured
+             ~0.75x upward saturation mechanistically)
+  US6564187B1: multiband subband time stretch — the ENSEMBLE/BACKING path.
+  US6201175B1: band-wise sinusoidal modelling variant.
+  Our LPC source-filter path approximates grain resynthesis; black-box was
+  directionally right, mechanistically wrong.
+
+Next highest-value work (see PROJECT_REVIEW.md + research/PATENTS.md):
+  1. IMPLEMENT PITCH-SYNCHRONOUS GRANULAR (US6421642) as a new engine path;
+     route SOLO/LITE there. All prerequisites exist (F0, voiced detect,
+     onsets, offline encode). Expected: big wins on the vocal group
+     (spectral sim ~0.3 — the reference's ACTUAL mechanism, not an
+     approximation). Replace the 0.75x formant calibration with the
+     wl <= ppw window clamp.
+  2. LISTEN to the A/B players in the latest batch report; log impressions.
+  3. Round-2 recordings (RECORDING_GUIDE.md) — duplicate takes measure the
+     metric-v4 ceiling.
+  4. ENSEMBLE path: consider US6564187 subband stretch for chord content.
