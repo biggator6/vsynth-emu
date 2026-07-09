@@ -2,10 +2,14 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-11)
 
-Current score: 36.5 / 100 under METRIC v3 (target: > 60)
-  METRIC v3 (commit eb18467): null test scales output by least-squares optimal
-  gain (clamped [0.25,4]) before subtraction — reference levels are recording-
-  chain gain staging, not algorithm error. v17 re-baselined under v3 = 27.5.
+Current score: 47.8 / 100 under METRIC v4 (v17 baseline = 34.0)
+  METRIC v4 (commit 7434abb): phase-blind spectral similarity (MR-STFT +
+  log-mel, gain-matched) carries most of the composite; content-aware weights
+  (speech/percussive/tonal by filename); SNR rescaled to 30 dB full marks.
+  Rationale in PROJECT_REVIEW.md: the V-Synth resynthesizes, so phase-
+  sensitive null testing cannot measure perceptual closeness. HTML batch
+  report now embeds A/B audio players — LISTEN, then read numbers.
+  METRIC v3 (commit eb18467): optimal-gain null test. v17 under v3 = 27.5.
   METRIC v2 (commit 3ecdfdf): compare.py time-aligns ref/output via envelope
   cross-correlation. Pre-v2 scores are not comparable (8 of 20 pairs were
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
@@ -94,7 +98,15 @@ Pre-emphasis logic (Sessions 13-14, the v18 series):
   the integrator needs cross-frame state at F0 ~ 120 Hz; dual streams with
   continuous state per stream is the working design.
 
-Per-case scores (v25, METRIC v3, 36.5 avg):
+Per-case scores (v25, METRIC v4, 47.8 avg) — see latest report HTML for the
+full table with spectral column and audio players. Highlights:
+  strong (50-68): drum_time_4x 67.8, sine_formant_upmax 65.6, chord_formant
+    63.3, drum_pitch 62.9, sine_formant_downmax 62.7, sine_pitch_up7st 62.3
+  weak (25-41): vocal formant group 25.2-32.2 (spectral sim ~0.3 — genuinely
+    different spectra, the real remaining gap), chord pitch/time 39-40,
+    sine time 40 (spectral 0.44)
+
+Old per-case table (METRIC v3, 36.5 avg):
   -- Sine 440 Hz --
   sine_440_formant_downmax   39.9  (LPC)
   sine_440_formant_upmax     31.6  (LPC)
@@ -124,7 +136,8 @@ Per-case scores (v25, METRIC v3, 36.5 avg):
   chord_Cmaj_formant_max     41.7  (LPC)
 
 Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9
-Metric v3 history: v17=27.5 → v22=32.4 → v22b=32.7 → v23=35.5 → v24=35.7 → v24b=36.2 → v25=36.5
+Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
+Metric v4 history: v17=34.0 → v25=47.8
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -217,14 +230,14 @@ vocal_aah_formant_downmax (16.8) — EXHAUSTED EXPERIMENTS (do not retry):
   step would be analysing the metric itself on this pair, or more reference
   recordings to determine the V-Synth's actual downshift envelope over time.
 
-Next highest-value work (metric v3, v25 numbers):
-  1. Broaden the reference set — record more V-Synth material (other vowels,
-     melodic phrases, polyphonic sustains, kit loops). The 20-case suite is 4
-     source recordings; remaining per-case gaps may not generalise, and the
-     score ceiling is increasingly metric/coverage-bound rather than
-     algorithm-bound.
-  2. drum_hit_pitch_up7st (36.9) — extend event-based handling to pitch ops
-     on BACKING (attacks verbatim, pitch-shift only tails).
-  3. Real-time plugin parity — the offline renderer has diverged (drain mode,
-     event-based stretch are offline-only); decide what the JUCE plugin
-     should do live and wire the engine improvements into it.
+Next highest-value work (see PROJECT_REVIEW.md for full rationale):
+  1. LISTEN to the A/B players in the latest batch report; record impressions
+     in RESEARCH_LOG. First human listening pass of the project.
+  2. Patent search — Roland VariPhrase patents (~1999-2003) may verify or
+     correct 15 sessions of black-box inference in an afternoon.
+  3. Round-2 recordings (RECORDING_GUIDE.md): calibration sweep + duplicate
+     takes first (the duplicate takes measure the metric v4 ceiling).
+  4. Vocal formant group (25-32, spectral sim ~0.3) — the confirmed real gap.
+     With a trustworthy spectral metric, iterate on WHAT the spectra differ
+     by (band-by-band comparison of render vs ref).
+  5. Engine consolidation + C++ invariant unit tests (PROJECT_REVIEW.md #4).
