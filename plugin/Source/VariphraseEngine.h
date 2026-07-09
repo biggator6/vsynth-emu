@@ -102,6 +102,12 @@ public:
     // Returns processed output as a vector of float samples.
     std::vector<float> processOffline(const std::vector<float>& inputMono);
 
+    // Pitch-synchronous granular resynthesis per Roland US6421642B1 — the
+    // actual VariPhrase algorithm (see research/PATENTS.md).  Used by
+    // processOffline for SOLO/LITE content; returns empty on degenerate
+    // input (caller falls back to the streaming path).
+    std::vector<float> granularResynthOffline(const std::vector<float>& in) const;
+
     // ─── Encode / Analysis pass ───────────────────────────────────────────────
     // analyzeContent: offline analysis of a full mono audio buffer.
     //   Computes median ACF pitch confidence over all analysis frames,

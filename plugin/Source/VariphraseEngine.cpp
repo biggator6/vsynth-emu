@@ -296,7 +296,167 @@ Algorithm VariphraseEngine::getAlgorithm() const {
     return pImpl->algorithm.load(std::memory_order_relaxed);
 }
 
+// ─── Pitch-Synchronous Granular Resynthesis (US6421642B1) ────────────────────
+//
+// The actual VariPhrase algorithm per Roland's playback patent (filed
+// 2000-05-02; see research/PATENTS.md).  Encode cuts the phrase into
+// ~one-pitch-period grains ("cut waveforms"), each with its measured pitch
+// (cwp).  Playback:
+//   TIME    — playing position pp advances by 1/timeStretch per output
+//             sample; pp selects WHICH grain is current.
+//   PITCH   — grains re-trigger at the target period ppw = cwp / pitchRatio,
+//             on TWO channels offset by half a period, each with a
+//             triangular window (offset triangles sum to a constant).
+//   FORMANT — grain READ VELOCITY fsv: resampling the grain content scales
+//             the spectral envelope.  Window length wl = cwp / fsv, CLAMPED
+//             to ≤ ppw (the patent's clamp — the mechanism behind the
+//             ~0.75× upward formant saturation measured in Session 15).
+
+namespace {
+
+struct GrainCut { int start; float cwp; bool voiced; };
+
+// Local pitch-period estimate around `start` — normalized ACF with an
+// integer-subharmonic octave guard (same guards as SourceFilterModel's
+// estimateF0, compact form).  prevPeriod, when > 0, narrows the search ±25 %
+// for speed and continuity; a low-confidence result falls back to full range.
+float estimateLocalPeriod(const std::vector<float>& x, int start, double sr,
+                          float prevPeriod) {
+    const int n = (int)x.size();
+    const int w = std::min(1024, n - start);
+    if (w < 256) return 0.0f;
+
+    int lagLo = std::max(2, (int)(sr / 500.0));
+    int lagHi = std::min(w - 1, (int)(sr / 60.0));
+    if (prevPeriod > 0.0f) {
+        lagLo = std::max(lagLo, (int)(prevPeriod * 0.75f));
+        lagHi = std::min(lagHi, (int)(prevPeriod * 1.25f));
+        if (lagHi <= lagLo) { lagLo = std::max(2, (int)(sr / 500.0));
+                              lagHi = std::min(w - 1, (int)(sr / 60.0)); }
+    }
+
+    double e0 = 0.0;
+    for (int i = 0; i < w; ++i) e0 += double(x[start+i]) * x[start+i];
+    if (e0 < 1e-9) return 0.0f;
+
+    int bestLag = 0; double bestV = 0.0;
+    for (int lag = lagLo; lag <= lagHi; ++lag) {
+        double s = 0.0;
+        for (int i = 0; i + lag < w; ++i)
+            s += double(x[start+i]) * x[start+i+lag];
+        const double v = (s / e0) * (double(w) / double(w - lag));  // unbiased
+        if (v > bestV) { bestV = v; bestLag = lag; }
+    }
+    if (bestV < 0.3) {
+        // Retry full range once before declaring unvoiced
+        if (prevPeriod > 0.0f) return estimateLocalPeriod(x, start, sr, 0.0f);
+        return 0.0f;
+    }
+    // Octave guard: prefer lag/2 if nearly as strong
+    if (bestLag / 2 >= lagLo) {
+        const int half = bestLag / 2;
+        double s = 0.0;
+        for (int i = 0; i + half < w; ++i)
+            s += double(x[start+i]) * x[start+i+half];
+        const double v = (s / e0) * (double(w) / double(w - half));
+        if (v >= 0.95 * bestV) bestLag = half;
+    }
+    return float(bestLag);
+}
+
+std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr) {
+    std::vector<GrainCut> cuts;
+    const int n = (int)x.size();
+    int pos = 0;
+    float prev = 0.0f;
+    while (pos + 256 < n) {
+        const float p = estimateLocalPeriod(x, pos, sr, prev);
+        if (p > 0.0f) {
+            cuts.push_back({ pos, p, true });
+            prev = p;
+            pos += std::max(2, (int)std::lround(p));
+        } else {
+            cuts.push_back({ pos, 256.0f, false });
+            prev = 0.0f;
+            pos += 256;
+        }
+    }
+    return cuts;
+}
+
+} // namespace
+
+std::vector<float> VariphraseEngine::granularResynthOffline(
+        const std::vector<float>& in) const {
+    const int n = (int)in.size();
+    const double sr = pImpl->sampleRate;
+    const float stretch    = std::max(0.05f, pImpl->params.timeStretchRatio);
+    const float pitchRatio = std::pow(2.0f, pImpl->params.pitchShiftSemitones / 12.0f);
+    const float fsv        = std::pow(2.0f, pImpl->params.formantShiftSemitones / 12.0f);
+
+    const std::vector<GrainCut> cuts = encodeGrainCuts(in, sr);
+    if (cuts.size() < 2) return {};
+
+    const int outLen = std::max(1, (int)std::lround((double)n * stretch));
+    std::vector<float> out(outLen, 0.0f);
+
+    // One active grain per channel (wl ≤ ppw guarantees no within-channel
+    // overlap).  age is in output samples since trigger.
+    struct Grain { double srcStart = 0, wl = 0, age = 1e18; };
+    Grain ch[2];
+    double nextTrig[2] = { 0.0, -1.0 };   // ch2 initialised at first ppw/2
+
+    const double ppInc = 1.0 / stretch;   // playing-position advance per output sample
+    double pp = 0.0;
+    size_t cutIdx = 0;
+
+    for (int t = 0; t < outLen; ++t, pp += ppInc) {
+        // Track the current cut from the playing position
+        while (cutIdx + 1 < cuts.size() && pp >= (double)cuts[cutIdx + 1].start)
+            ++cutIdx;
+        const GrainCut& cut = cuts[cutIdx];
+        const double ppw = std::max(2.0, (double)cut.cwp / (double)pitchRatio);
+        if (nextTrig[1] < 0.0) nextTrig[1] = ppw * 0.5;
+
+        for (int c = 0; c < 2; ++c) {
+            if ((double)t >= nextTrig[c]) {
+                ch[c].srcStart = (double)cut.start;
+                ch[c].wl  = std::min((double)cut.cwp / (double)fsv, ppw);
+                ch[c].age = 0.0;
+                nextTrig[c] += ppw;
+            }
+            if (ch[c].age < ch[c].wl) {
+                const double srcPos = ch[c].srcStart + ch[c].age * (double)fsv;
+                const int    i0     = (int)srcPos;
+                if (i0 >= 0 && i0 + 1 < n) {
+                    const double frac = srcPos - i0;
+                    const double s    = in[i0] * (1.0 - frac) + in[i0 + 1] * frac;
+                    // Triangular window 0→1→0 over wl
+                    const double ph = ch[c].age / ch[c].wl;
+                    const double wv = 1.0 - std::abs(2.0 * ph - 1.0);
+                    out[t] += (float)(s * wv);
+                }
+                ch[c].age += 1.0;
+            }
+        }
+    }
+    return out;
+}
+
 std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& inputMono) {
+    // ── Pitch-synchronous granular for SOLO (Session 15, US6421642) ──────────
+    // The patent engine handles all three axes in one mechanism.  SOLO only:
+    // measured on the suite, granular lifts every vocal case (formant_upmax
+    // +16.3, spectral sim 0.29-0.41 → 0.38-0.56) but drops every sine case
+    // (formant_upmax −38.6) — consistent with Roland's "LITE" being the
+    // reduced-analysis mode that does NOT run the full phrase engine.  LITE
+    // keeps the v23 routing (LPC resynthesis / PV).
+    if (pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid &&
+        pImpl->analysis.contentType == VariphraseAnalysis::ContentType::SOLO) {
+        std::vector<float> out = granularResynthOffline(inputMono);
+        if (!out.empty()) return out;
+    }
+
     // ── Event-based stretch for BACKING content (Session 15) ─────────────────
     // V-Synth BACKING mode stores onset stamps at encode time and keeps the
     // transients intact under time stretch: each attack is placed VERBATIM at

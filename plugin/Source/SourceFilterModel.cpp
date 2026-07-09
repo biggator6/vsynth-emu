@@ -1117,12 +1117,11 @@ void SourceFilterModel::processMono(const float* input, float* output, int numSa
         const bool wantDsLpc = hasFormantShiftBlock && voiced && isVoicedSpeechFrame
                                && !params_.polyphonicContent
                                && std::abs(formantShift) > 0.01f;
-        // The vocal PITCH path gets the same downsampled envelope (shift ratio
-        // 1.0): it previously used order-8 full-rate LPC whose poles miss
-        // F2/F3 just as the formant path's did.  The engine's SOLO gate means
-        // pitch-routed frames are speech; voiced check still applies.
-        const bool wantDsLpcPitch = !hasFormantShiftBlock && hasPitchShift && voiced
-                                    && !params_.polyphonicContent;
+        // v24b's downsampled-envelope pitch path was REMOVED in v26: vocal
+        // pitch now routes to the granular engine (US6421642) before reaching
+        // this class, so the only pitch content left here is LITE sawtooth —
+        // where the ds envelope hurt (sine_440_pitch_up7st 62.3 → 23.9).
+        const bool wantDsLpcPitch = false;
         const bool usePreEmph = !(formantUpBypass || largePitchDown
                                   || wantDsLpc || wantDsLpcPitch);
         const std::vector<float>& analysisFrame = usePreEmph ? frameEmph : frame;
