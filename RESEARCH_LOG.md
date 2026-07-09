@@ -1760,20 +1760,53 @@ mapping.  Next credible steps are analysing the metric's behaviour on this
 specific pair, or recording more reference material to characterise the
 V-Synth's downshift envelope over time.  **Do not retry the four above.**
 
-### Next Steps (final for Session 15)
+### Project Review + Metric v4 (7434abb)
 
-1. **Broaden the reference set** — the 20-case suite derives from 4 source
-   recordings.  Remaining per-case gaps may not generalise; the score ceiling
-   is increasingly coverage/metric-bound rather than algorithm-bound.  More
-   V-Synth recordings (other vowels, melodic phrases, polyphonic sustains,
-   kit loops) would validate the routing against overfitting.
+A step-back review of the whole project was written to **PROJECT_REVIEW.md**.
+Core finding: the metric no longer matched the goal.  The v3 composite —
+35 % phase-sensitive null (unsatisfiable by a resynthesis engine, which the
+V-Synth is proven to be), 40 % formant similarity on content without
+formants, 25 % transient score on sustained material — had a per-case ceiling
+of ~50–65 by construction, and late iterations were optimising metric noise.
+No listening notes existed anywhere in the log.
 
-2. **drum_hit_pitch_up7st (36.9)** — extend event-based handling to pitch
-   operations on BACKING content (attacks verbatim, pitch-shift only tails).
+**Metric v4** implements review recommendation #1:
 
-3. **Real-time plugin parity** — drain mode and event-based stretch are
-   offline-only; decide live behaviour for the JUCE plugin and wire the
-   Session 15 engine improvements into it.
+- `spectral_similarity()`: phase-blind multi-resolution STFT log-magnitude L1
+  (512/1024/2048) + log-mel L1 (64 bands), time-aligned, gain-matched,
+  −60 dB relative floors, exp(−d/τ) mapping.  Self-comparison = 1.0 exactly.
+- Content-aware composite weights (spectral/formant/transient/SNR):
+  speech .45/.30/.15/.10, percussive .45/0/.45/.10, tonal .70/.10/.10/.10.
+  SNR rescaled to 30 dB full marks.
+- The HTML batch report now embeds **A/B audio players** (reference vs
+  render) for every case — one click from numbers to ears.
+
+Scores (v4, not comparable to v3): **v25 = 47.8**, re-baselined v17 = 34.0.
+The v4 gap (+13.8, vs +9.0 under v3) confirms the old metric under-reported
+real improvements.  The distribution is finally informative:
+
+- Strong (50–68): drum_time_4x 67.8, sine_formant_upmax 65.6, chord_formant
+  63.3, drum_pitch 62.9, sine_formant_downmax 62.7, sine_pitch_up7st 62.3.
+- Weak (25–41): **vocal formant group 25.2–32.2 with spectral sim ~0.3** —
+  genuinely different spectra, the confirmed real gap — plus chord pitch/time
+  (39–40) and sine time (~40).
+
+### Next Steps (final for Session 15 — see PROJECT_REVIEW.md)
+
+1. **Listen** — open the latest batch report, A/B every case, record
+   impressions here.  First human listening pass of the project.
+
+2. **Patent search** — Roland VariPhrase patents (~1999–2003) could verify or
+   correct 15 sessions of black-box inference in an afternoon.
+
+3. **Round-2 recordings** (RECORDING_GUIDE.md) — calibration sweep and
+   duplicate takes first; duplicate takes measure the metric-v4 ceiling.
+
+4. **Vocal formant group** — with a trustworthy spectral metric, compare the
+   render and reference band-by-band to see WHAT differs (spectral sim ~0.3
+   leaves a lot of signal to diagnose).
+
+5. **Engine consolidation + C++ invariant unit tests** (review rec. #4).
 
 ---
 
