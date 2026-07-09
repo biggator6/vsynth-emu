@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 15 (2026-06-11)
 
-Current score: 50.4 / 100 under METRIC v4 (v17 baseline = 34.0)
+Current score: 51.5 / 100 under METRIC v4 (v17 baseline = 34.0)
   METRIC v4 (commit 7434abb): phase-blind spectral similarity (MR-STFT +
   log-mel, gain-matched) carries most of the composite; content-aware weights
   (speech/percussive/tonal by filename); SNR rescaled to 30 dB full marks.
@@ -15,7 +15,12 @@ Current score: 50.4 / 100 under METRIC v4 (v17 baseline = 34.0)
   scored against reference lead-in silence). v17 baseline under v2 = 27.4.
   20 cases: 6 sine + 7 vocal-aah + 4 drum + 3 chord
   Best single case: vocal_aah_time_2x = 57.7
-Best version: v26 (commit 1bd670c) — PITCH-SYNCHRONOUS GRANULAR ENGINE for
+Best version: v27 — v26 + SUBBAND TIME STRETCH for ENSEMBLE time-only, per
+  Roland US6564187B1 (quarter-octave analytic sub-bands ≈ one partial each,
+  amplitude/inst-freq trajectories resampled, cosine-bank resynthesis;
+  identity check 0.958). chord_Cmaj_time_2x 39.3 -> 62.7.
+  v26b: patent grain read offset (os = cwp - ppw*fsv on window clamp).
+v26 (commit 1bd670c) — PITCH-SYNCHRONOUS GRANULAR ENGINE for
   SOLO content, implementing Roland's actual VariPhrase patent US6421642B1
   (see research/PATENTS.md). Encode cuts pitch-period grains; playback:
   time = grain-list walk rate, pitch = grain re-trigger period (2 channels,
@@ -148,7 +153,7 @@ Old per-case table (METRIC v3, 36.5 avg):
 
 Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
-Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4
+Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -257,14 +262,21 @@ PATENT FINDINGS (Session 15, research/PATENTS.md — READ THIS FIRST):
   Our LPC source-filter path approximates grain resynthesis; black-box was
   directionally right, mechanistically wrong.
 
+Subband/granular A/B results (Session 15, do not re-run):
+  - granular on ENSEMBLE: chord_time 31.5, chord_pitch 36.7 — worse than PV;
+    pitch-sync cutting unsuitable for polyphony (why Roland filed US6564187).
+  - subband on BACKING: drum_halfspeed 38.1 (worse than event-based 49.6 —
+    trajectory resampling smears transients), drum_time_2x 54.9 (+3.0 vs
+    event-based) — not adopted (one-case marginal; idea queued below).
+
 Next highest-value work:
-  1. LISTEN to the A/B players (latest report HTML) — especially the new
-     granular vocal renders; log the project's first listening impressions.
-  2. Granular engine polish: pitch_up7st is the weakest vocal case (37.5) —
-     grain re-trigger at shorter ppw may need window/overlap care; also try
-     granular for chord pitch (ENSEMBLE currently PV, 40.1).
-  3. Round-2 recordings (RECORDING_GUIDE.md) — duplicate takes give the
-     metric-v4 ceiling; formant sweep validates the wl<=ppw clamp directly.
-  4. ENSEMBLE path per US6564187 (octave-cascade subband stretch) for chord
-     time (39.3).
-  5. Real-time parity: granular + drain + event stretch are offline-only.
+  1. LISTEN to the A/B players — granular vocal + subband chord renders are
+     new mechanisms; ears needed before more tuning.
+  2. Subband-stretched TAILS inside the event-based BACKING path (attacks
+     verbatim + subband tails instead of PV tails; +3 measured on drum_2x
+     standalone). Needs subbandStretchOffline refactored to take an explicit
+     ratio/target length.
+  3. chord_Cmaj_pitch_up7st (40.1, PV) — the patent picture suggests V-Synth
+     ENSEMBLE pitch = subband with per-band frequency scaling; extend
+     subbandStretchOffline with a pitch ratio on the inst-freq trajectories.
+  4. Round-2 recordings + engine consolidation + real-time parity (unchanged).
