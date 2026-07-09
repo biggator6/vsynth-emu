@@ -1,0 +1,95 @@
+# macOS / filesystem noise
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100/
+.Trashes/
+.fseventsd/
+
+# Local editor and AI-agent state
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.remember/
+.claude/
+
+# Secrets, local config, signing material
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+*.mobileprovision
+
+# CMake / native build products
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+Makefile
+_deps/
+Testing/
+*.ninja
+.ninja_*
+
+# Native compiler/linker outputs
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.d
+*.dSYM/
+
+# Apple / JUCE plugin artifacts
+*.app/
+*.component/
+*.vst3/
+*.appex/
+*.pkg
+DerivedData/
+
+# Python local environments and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Generated analysis artifacts.
+#
+# Policy: the offline-renderer binary is reproducible from source and stays
+# out of the repo. BUT analysis/plugin_outputs/ and analysis/results/ are
+# intentionally tracked — ARCHITECTURE.md and CLAUDE.md treat per-version
+# renders and scored reports as the project's score history, and cross-
+# version comparison depends on them. Keep adding new plugin_outputs/<algo>_vN/
+# and results/<algo>_vN/ directories to the repo; do NOT add those paths here.
+# Curated reference fixtures under analysis/test_files/ are also tracked.
+analysis/variphrase_render
+analysis/*_comparison.png
+analysis/tmp/
+analysis/.cache/
+
+# Scratch / local output
+tmp/
+scratch/
+*.log
