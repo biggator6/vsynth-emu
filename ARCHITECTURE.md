@@ -99,174 +99,96 @@ Full options: `./variphrase_render --help`
 
 ---
 
-## Hybrid Algorithm — Routing Logic (current, Session 12)
+## Hybrid Algorithm — Routing Logic (current, v28 / Session 15)
 
-### Step 1 — Offline encode pass (runs once before block processing)
+The offline encode pass (`analyzeContent`) classifies content once per sample
+(LITE / SOLO / ENSEMBLE / BACKING) and detects onset stamps.  Offline
+rendering then routes by content type and operation — each engine implements
+the corresponding Roland patent (see `research/PATENTS.md`):
 
-`VariphraseEngine::analyzeContent()` classifies the full input buffer into one of four
-V-Synth encode types using global ACF statistics:
+| Content type | Operation | Engine |
+|---|---|---|
+| SOLO (speech/melody) | any | **pitch-synchronous granular** (US6421642) |
+| LITE (pure tones) | time, pitch-up | LPC resynthesis |
+| LITE | pitch-down | Phase Vocoder |
+| LITE | formant | LPC source-filter (pole shift) |
+| ENSEMBLE (chords) | time-only | **subband stretch** (US6564187) |
+| ENSEMBLE | pitch / formant | Phase Vocoder / LPC |
+| BACKING (drums) | time-only | **event-based stretch** (attacks verbatim, subband tails) |
+| BACKING | pitch | Phase Vocoder |
 
-```
-medianUnbiasedACF > 0.95 AND 1–4 kHz band energy > 5% of total  →  SOLO
-medianUnbiasedACF > 0.95 AND low 1–4 kHz band energy             →  LITE
-medianUnbiasedACF ≤ 0.95 AND peakToMeanEnergy > 5.0              →  BACKING
-medianUnbiasedACF ≤ 0.95 AND peakToMeanEnergy ≤ 5.0              →  ENSEMBLE
-```
+The real-time (`processMono`) path still runs the older streaming PV/LPC
+routing — see "Real-Time Parity Plan" below.
 
-ACF parameters: frame = 2048 samples, step = 512, lag range = sr/500 to sr/60 (88–735 samples @ 44.1 kHz).
-Unbiased normalisation: biased[lag] × N/(N−lag) / ACF[0].
+## Confirmed V-Synth Architecture (patents + black-box, Session 15)
 
-Observed values from test material:
+Roland's three patents (filed Feb–May 2000) describe the system completely:
 
-| Signal | medianConf | peakToMean | ContentType |
-|--------|-----------|------------|-------------|
-| vocal_aah | 0.985 | 2.0 | **SOLO** |
-| chord_Cmaj | 0.895 | 7.8 | **BACKING** |
-| drum_hit | 0.489 | 11.4 | **BACKING** |
-| sine_440 | 1.000 | 1.0 | **LITE** |
+1. **US6421642** — the VariPhrase playback engine: the phrase is cut into
+   one-pitch-period grains at encode time (per-grain pitch + syllable marks);
+   playback walks the grain list at the time-stretch rate, re-triggers grains
+   at the target pitch period (two channels, half-cycle offset, triangular
+   windows), and scales the formant envelope via grain read velocity with the
+   window clamped to the re-trigger period.
+2. **US6564187** — subband time stretch for polyphony: log-spaced sub-bands
+   (~one partial each), per-band amplitude/instantaneous-frequency
+   trajectories, time-modified and resynthesised.
+3. **US6201175** — band-wise sinusoidal variant (not currently used).
 
-The result is stored in `VariphraseEngine::Impl::analysis_` via `setAnalysis()`.
+Black-box findings that led to / confirm this: the V-Synth RESYNTHESIZES all
+content (a time-stretched pure sine reference carries sawtooth-like grain
+harmonics); the formant knob saturates upward (~×1.67 at "+12") — explained
+by the patent's window clamp; syllable marks = onset event stamps.
 
-### Step 2 — Per-block routing (real-time)
+## Measurement & Scoring (metric v4)
 
-```
-hasFormant (|formantShift| > 0.5 st)            →  LPC source-filter
-hasPitch AND isVoicedSpeech                      →  LPC source-filter
-  (voiced = ZCR < 0.15 AND 1–4 kHz band > 5%)
-isEnsembleOrBacking AND !hasPitch AND time ≥ 1×  →  WSOLA (time-domain OLA)
-else                                             →  Phase Vocoder
-```
+`analysis/compare.py` per test pair (see PROJECT_REVIEW.md for rationale):
+- **Spectral similarity** — phase-blind multi-resolution STFT log-magnitude
+  L1 + log-mel L1, time-aligned (envelope cross-correlation) and gain-matched
+  (least-squares optimal gain).  The V-Synth resynthesizes, so phase-sensitive
+  null testing cannot measure closeness; this term carries most of the score.
+- **Formant trajectory similarity** (order-50 LPC) — speech content.
+- **Transient preservation** — percussive content.
+- **SNR** (gain-matched null) — small weight, 30 dB = full marks.
 
-WSOLA is only applied for time EXTENSION (timeStretch ≥ 1.0). Compression falls back
-to PV because the WSOLA synthesis hop would be smaller than the analysis hop, causing
-the output buffer to drain faster than it fills.
+Content-aware composite weights (spectral/formant/transient/snr):
+speech .45/.30/.15/.10 · percussive .45/0/.45/.10 · tonal .70/.10/.10/.10.
 
-### WSOLA Implementation Notes
+The HTML batch report embeds **A/B audio players** per case.
+Fast engine invariants: `plugin/Source/EngineTests.cpp`
+(`-DENGINE_TESTS_MAIN`, 10 checks, runs in seconds).
 
-`PhaseVocoder::processWSOLA(timeStretch)` — called when `forceWSOLA_` is set:
-- Guard: `inputFill_ >= kFFTSize + kWsolaSearchLen` (2048 + 256 = 2304 samples)
-- Similarity search: normalised cross-correlation over ±256 samples
-- Overlap region: kFFTSize − kHopSize = 1536 samples compared
-- Synthesis hop: kHopSize × timeStretch; OLA normalisation: totalStretch / 2.0
+## Current Scores (v28, metric v4)
 
----
+**51.8 / 100 average** (re-baselined v17 = 34.0).  Strong: drum_time_4x 64.7,
+chord_formant 63.3, sine_formant_upmax 65.6, drum_pitch 62.9, chord_time
+62.7, drum_2x 57.2, vocal_time_2x 53.2.  Weak: vocal_formant_downmax 35.7,
+vocal_pitch_up7st 37.5, chord pitch/time-residual ~40.
+Full history in `notes.txt`; per-case tables in `analysis/results/`.
 
-## Confirmed V-Synth Architecture (from analysis)
+## Real-Time Parity Plan (next major work)
 
-VariPhrase operates as a **source-filter vocoder** for voiced content, not a spectral manipulator:
+The offline path has diverged from real-time: granular, subband, event-based
+stretch, and drain mode are offline-only.  Plan:
 
-1. **F0 detection** — ACF-based, per analysis frame
-2. **Voiced/unvoiced decision** — ZCR + energy threshold
-3. **LPC analysis** — Levinson-Durbin, order 16, bandwidth-expanded (λ=0.994)
-4. **Formant shift** — Laguerre root-finding → scale pole angles by 2^(st/12) → cascade biquad
-5. **Excitation synthesis** — band-limited sawtooth at pitch-shifted F0; harmonics 1/k
-6. **LPC synthesis filter** — cascade of 8 all-pole biquad sections
-7. **OLA output** — Hann-window overlap-add; synthesis hop = kHopSize × timeStretch
-
-**For polyphonic / ENSEMBLE content** the V-Synth uses WSOLA (waveform similarity OLA)
-rather than the source-filter model — confirmed by improved chord_Cmaj_time_2x scores
-when WSOLA is applied (+3.8 pts vs PV).
-
-**Key confirmed facts:**
-- F0 is preserved exactly during formant shift
-- Pitch shift moves only the excitation F0; formant filter poles are unchanged
-- Polyphonic content (chords) uses WSOLA encode type, not LPC
-
----
-
-## Measurement & Scoring
-
-Every algorithm version is scored by `batch_test.py`:
-- **Null test residual (dBFS)** — lower (more negative) is better; target < −30 dBFS
-- **SNR (dB)** — signal-to-noise of residual vs reference
-- **Formant accuracy** — LPC formant trajectory comparison (0–1)
-- **Transient smearing** — energy spread around detected transients (0–1)
-- **Composite score** — weighted sum; target > 60/100
-
-### Score Progression
-
-| Session | Version | Avg Score | Notes |
-|---------|---------|-----------|-------|
-| Baseline | Passthrough | 13.2 | No processing |
-| Session 2 | Phase Vocoder v1 | 21.6 | |
-| Session 3 | Mixed PV+LPC | 26.5 | Per-case oracle routing |
-| Session 4 | LPC Biquad (NaN fix) | 24.0 | Energy normalisation fix |
-| Session 5 | Hybrid v3 | 28.7 | Calibrated rule: formant→LPC, else→PV |
-| Session 6 | Hybrid v5 | 28.3 | Adaptive LPC; 6 sine-only cases |
-| Session 7 | Hybrid v6 | 25.8 | 20-case battery; ceiling 45.7 (vocal time_2x) |
-| Session 8 | Hybrid v8 | 26.8 | Voiced-pitch routing: vocal pitch cases +9 pts |
-| Session 9 | Hybrid v10b | 26.9 | Voiced-formant LPC order fix (+2.8 chord/sine) |
-| Sessions 10–11 | hybrid_v11_clean | 26.9 | WSOLA routing attempts failed (per-frame ACF) |
-| **Session 12** | **hybrid_v17c** | **27.2** | Offline encode pass; chord_Cmaj_time_2x +3.8 |
-| **Target** | — | **> 60** | |
-
----
-
-## Current Per-Case Scores (hybrid_v17c, 20 test files)
-
-| Test File | Score | Routing Used |
-|-----------|-------|-------------|
-| vocal_aah_time_2x | **45.7** | PV (SOLO, time-only) |
-| vocal_aah_time_halfspeed | 32.5 | PV (SOLO, time-only) |
-| vocal_aah_formant_upmax | 34.4 | LPC (formant shift) |
-| vocal_aah_formant_up4st | 28.5 | LPC (formant shift) |
-| vocal_aah_formant_downmax | 17.0 | LPC (formant shift) |
-| vocal_aah_pitch_up7st | 19.0 | LPC (voiced pitch) |
-| vocal_aah_pitch_down12st | 27.5 | LPC (voiced pitch) |
-| sine_440_pitch_up7st | 36.3 | PV (LITE) |
-| sine_440_pitch_down12st | 26.7 | PV (LITE) |
-| sine_440_time_2x | 20.1 | PV (LITE) |
-| sine_440_time_halfspeed | 28.6 | PV (LITE) |
-| sine_440_formant_upmax | 32.8 | PV (LITE, formant via PV envelope) |
-| sine_440_formant_downmax | 25.4 | PV (LITE) |
-| chord_Cmaj_time_2x | **35.0** | **WSOLA (BACKING, time ext.)** |
-| chord_Cmaj_pitch_up7st | 25.1 | PV (BACKING, hasPitch) |
-| chord_Cmaj_formant_max | 17.9 | LPC (formant shift) |
-| drum_hit_time_2x | 19.7 | WSOLA (BACKING, time ext.) |
-| drum_hit_time_4x | 19.8 | WSOLA (BACKING, time ext.) |
-| drum_hit_time_halfspeed | 36.1 | PV (BACKING, time < 1× → fallback) |
-| drum_hit_pitch_up7st | 15.4 | PV (BACKING, hasPitch) |
-| **AVERAGE** | **27.2** | |
-
----
+1. **Granular real-time is the easy one** (the V-Synth did it on 2000-era
+   hardware): run the encode (grain cutting) when a sample is loaded — or
+   incrementally, ~1 frame behind the write head for live input — then
+   playback is O(2 grains)/sample.  Port `granularResynthOffline` to a
+   streaming class with a grain-list ring.
+2. **Subband real-time** needs the patent's actual octave-cascade filter bank
+   (the offline version uses a whole-file FFT); implement per US6564187's
+   halfband cascade, or accept PV for live ENSEMBLE.
+3. **Event stamps** work live with lookahead latency (onsets detected
+   ~2048 samples behind the write head).
+4. Keep the current streaming PV/LPC as the fallback for unclassified /
+   low-latency modes.
 
 ## Known Gaps / Next Work
 
-### Largest score levers remaining
-
-1. **LPC order-collapse on voiced speech** — highest priority  
-   The strong fundamental of voiced vowels dominates the LPC MSE, causing the Levinson-Durbin
-   solver to converge to a 2-pole model (pitch resonance) rather than the vocal-tract formants
-   (F1–F4). This limits ALL vocal formant and pitch cases.  
-   - `vocal_aah_formant_downmax` = 17.0 (formant_sim 0.329) — formants not captured  
-   - `vocal_aah_pitch_up7st` = 19.0 — LPC pitch shift with 2-pole model  
-   **Planned fix:** pre-emphasis (`x[n] − 0.97×x[n−1]`) flattens the spectrum before LPC
-   analysis, making the fundamental less dominant relative to F1/F2/F3 peaks.
-
-2. **Chord time-compression and pitch shift** — medium priority  
-   - `chord_Cmaj_pitch_up7st` = 25.1 — PV used (hasPitch prevents WSOLA), but PV on
-     polyphonic content is architecturally wrong. WSOLA cannot shift pitch; a proper
-     polyphonic pitch-shifter is needed for ENSEMBLE content.  
-   - `chord_Cmaj_formant_max` = 17.9 — LPC formant shift on a chord is incoherent (LPC
-     designed for monophonic voiced speech). No improvement possible without a separate
-     polyphonic formant model.
-
-3. **Drum time-compression (timeStretch < 1)** — medium priority  
-   WSOLA does not handle compression: synthesis hop < analysis hop → output read drains
-   buffer faster than write fills it → silence. Falls back to PV (36.1 on drum_hit_time_halfspeed
-   is deceivingly high — output is near-silence that happens to null-test well against a
-   near-silence reference).  
-   **Planned fix:** discard-frame approach — for BACKING + compression, use WSOLA similarity
-   search to select which input frames to keep, discarding the worst-matching ones.
-
-4. **Score gap: 27.2 → 60 target** — ~33 pts needed  
-   Estimated levers:
-   - Pre-emphasis LPC fix: ~8–10 pts (vocal formant + pitch cases)
-   - Polyphonic pitch shift for ENSEMBLE content: ~4 pts
-   - WSOLA compression for BACKING content: ~2 pts
-   - Drum transient timing: ~2 pts
-
----
+See `notes.txt` (always current) and `RESEARCH_LOG.md` Session 15 final
+next-steps.  Headlines: listening pass (A/B players ready), Round-2
+recordings (`RECORDING_GUIDE.md`), real-time parity above.
 
 ## Known Constraints
 - Cannot license Roland's PCM ROM content — custom samples required for oscillators
