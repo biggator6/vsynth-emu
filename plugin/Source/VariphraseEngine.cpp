@@ -428,10 +428,11 @@ void engFft(std::vector<std::complex<double>>& d, bool inverse) {
 } // namespace
 
 std::vector<float> VariphraseEngine::subbandStretchOffline(
-        const std::vector<float>& in) const {
+        const std::vector<float>& in, float stretch, float pitchRatio) const {
     const int    n  = (int)in.size();
     const double sr = pImpl->sampleRate;
-    const double st = std::max(0.05f, pImpl->params.timeStretchRatio);
+    const double st = std::max(0.05, (double)stretch);
+    const double pr = std::max(0.05, (double)pitchRatio);
     if (n < 4096) return {};
 
     int N = 1; while (N < n) N <<= 1;
@@ -484,7 +485,9 @@ std::vector<float> VariphraseEngine::subbandStretchOffline(
             const double a = (1.0 - fr) * std::abs(z0) + fr * std::abs(z1);
             // Instantaneous angular frequency from the analytic pair
             const std::complex<double> rot = z1 * std::conj(z0);
-            const double w = (std::abs(rot) > 1e-30) ? std::arg(rot) : 0.0;
+            // Pitch shift (subband method): scale each band's instantaneous
+            // frequency; amplitude timeline unchanged.
+            const double w = ((std::abs(rot) > 1e-30) ? std::arg(rot) : 0.0) * pr;
 
             out[t] += a * std::cos(phase);
             phase  += w;
@@ -579,6 +582,8 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
     }
 
     // ── Subband stretch for ENSEMBLE time-only (Session 15, US6564187) ───────
+    // Pitch via per-band inst-frequency scaling was tested (chord_pitch_up7st
+    // 39.6 vs 40.1 PV — a wash) and not adopted; ENSEMBLE pitch stays on PV.
     {
         const bool timeOnlyEns =
             std::abs(pImpl->params.pitchShiftSemitones)   < 0.01f &&
@@ -587,7 +592,8 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
         if (pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid &&
             pImpl->analysis.contentType == VariphraseAnalysis::ContentType::ENSEMBLE &&
             timeOnlyEns) {
-            std::vector<float> out = subbandStretchOffline(inputMono);
+            std::vector<float> out = subbandStretchOffline(
+                inputMono, pImpl->params.timeStretchRatio, 1.0f);
             if (!out.empty()) return out;
         }
     }
@@ -676,7 +682,14 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
                 if (tailInLen > 0 && tailOutLen > 0) {
                     std::vector<float> tail(inputMono.begin() + s + attackLen,
                                             inputMono.begin() + e);
-                    std::vector<float> stretched = pvStretch(tail, tailOutLen);
+                    // Subband-stretched tails (v28): +3 measured standalone on
+                    // drum_time_2x vs PV tails.  Falls back to PV for segments
+                    // too short for the whole-file-FFT subband method.
+                    std::vector<float> stretched = subbandStretchOffline(
+                        tail, float(tailOutLen) / float(tail.size()), 1.0f);
+                    if ((int)stretched.size() < tailOutLen)
+                        stretched = pvStretch(tail, tailOutLen);
+                    stretched.resize(tailOutLen, 0.0f);
                     for (int i = 0; i < tailOutLen; ++i) {
                         float v = stretched[i];
                         // Short crossfade out of the verbatim attack

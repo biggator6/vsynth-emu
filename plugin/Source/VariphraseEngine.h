@@ -111,7 +111,9 @@ public:
     // Subband time stretch per Roland US6564187B1 (simplified): quarter-octave
     // analytic sub-bands, amplitude/inst-frequency trajectories resampled to
     // the stretched timeline.  For ENSEMBLE time-only operations.
-    std::vector<float> subbandStretchOffline(const std::vector<float>& in) const;
+    std::vector<float> subbandStretchOffline(const std::vector<float>& in,
+                                             float stretch,
+                                             float pitchRatio = 1.0f) const;
 
     // ─── Encode / Analysis pass ───────────────────────────────────────────────
     // analyzeContent: offline analysis of a full mono audio buffer.
