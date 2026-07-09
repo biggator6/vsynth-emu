@@ -1857,22 +1857,51 @@ after v24b — a lesson about partial re-renders).
 Vocal spectral similarity moved from 0.29–0.41 to 0.38–0.56 — the mechanism
 match is measurable.  Metric v4 history: v17 34.0 → v25 47.8 → **v26 50.4**.
 
+### v26b/v27 — Patent Mining Round 2 + The Subband Engine (51.5)
+
+**Patent mining round 2** (research/PATENTS.md updated): recovered the grain
+read offset from US6421642 (`os = cwp − ppw·fsv` when the window clamps — the
+grain reads the LAST portion of the cut; applied as v26b, scores unchanged,
+patent-faithful).  The continuation US6748357 confirms Roland never claimed a
+cut-detection or syllable-detection algorithm — our ACF cutter and onset
+stamps are legitimate fill-ins.  Diagnostics on the granular pitch-up render:
+**F0 matches the reference exactly** (195.9 Hz both) and bands are within
+±4 dB — the remaining composite gap on that case is metric residue.
+
+**v27 — subband time stretch (US6564187B1, simplified)** for ENSEMBLE
+time-only: quarter-octave log-spaced analytic sub-bands from a whole-file FFT
+(raised-cosine masks summing to unity; ≈ one partial per band for musical
+content — the reason the patent's sub-division works), per-band amplitude and
+instantaneous-frequency trajectories resampled to the stretched timeline,
+cosine-bank resynthesis.  Near-identity check: stretch 1.02 reconstructs the
+input at spectral sim 0.958.
+
+**chord_Cmaj_time_2x: 39.3 → 62.7** (spectral sim 0.353 → 0.689).
+
+A/B results this round (negative, not adopted — do not re-run):
+- Granular on ENSEMBLE: chord_time 31.5 / chord_pitch 36.7, both worse than
+  PV.  Pitch-sync cutting is unsuitable for polyphony — exactly why Roland
+  filed the separate subband patent.
+- Subband on BACKING: drum_halfspeed 38.1 (much worse than event-based 49.6 —
+  trajectory resampling smears transients), drum_time_2x 54.9 (+3.0).
+
+Metric v4 history: v17 34.0 → v25 47.8 → v26 50.4 → **v27 51.5**.
+
 ### Next Steps (final for Session 15)
 
-1. **Listen** — especially the new granular vocal renders (A/B players in
-   the latest report).  First listening pass of the project.
+1. **Listen** — the granular vocal and subband chord renders are new
+   mechanisms; ears before more tuning (A/B players in the latest report).
 
-2. **Granular polish** — vocal_pitch_up7st (37.5) is now the weakest vocal
-   case; examine grain windowing at short ppw.  Try granular for ENSEMBLE
-   pitch (chord_pitch 40.1).
+2. **Subband tails inside the event-based BACKING path** — attacks verbatim +
+   subband-stretched tails (+3 measured standalone on drum_2x); needs
+   subbandStretchOffline refactored to take an explicit ratio.
 
-3. **Round-2 recordings** — duplicate takes give the metric ceiling; the
-   formant sweep now directly validates the wl ≤ ppw clamp.
+3. **ENSEMBLE pitch via subband** — extend the inst-freq trajectories with a
+   pitch ratio (chord_pitch_up7st, 40.1, is the likely target of Roland's
+   subband engine for pitch too).
 
-4. **ENSEMBLE time path** per US6564187 (chord_time 39.3).
-
-5. **Real-time parity** — granular, drain mode, and event stretch are
-   offline-only; the JUCE plugin needs a live strategy.
+4. **Round-2 recordings, engine consolidation + unit tests, real-time
+   parity** — unchanged from the review.
 
 ---
 
