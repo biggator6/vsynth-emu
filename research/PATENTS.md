@@ -91,3 +91,30 @@ variant; possibly an alternative or earlier approach to the same problem.
    (resynthesis, encode pass, event stamps, independent axes, envelope/
    excitation decoupling) but wrong about the mechanism (LPC vs granular).
    The black-box scores were nonetheless what located the correct patents.
+
+---
+
+## Round 2 mining (same session)
+
+### US6421642 implementation details recovered
+
+- **cwp is an address difference** (`ncsa − ccsa`), not a frequency estimate:
+  the encode stores cut START addresses; pitch falls out of their spacing.
+- **Grain read offset `os`** — when the window clamps (`wl > ppw → wl = ppw`),
+  the read start moves: `os = cwp − ppw × fsv`, i.e. the grain reads the LAST
+  `ppw × fsv` samples of the cut, not the first.  (Our v26 implementation read
+  from the cut start always — corrected in v26b.)
+- **No crossfade between adjacent cuts** — grain renewal is instantaneous when
+  `pp` passes `ncsa`; the triangular envelopes do all the smoothing.
+- **No special unvoiced handling** in either patent — noise regions re-trigger
+  like everything else.
+- **Syllable marks are pre-stored metadata** (manual annotation in the
+  patent); no detection algorithm is claimed.
+
+### US6748357B1 (continuation, filed 2001)
+https://patents.google.com/patent/US6748357B1/en
+Same mechanism; adds operational detail (waveform read END address bookkeeping,
+per-window phase relations).  Confirms: cut detection and syllable detection
+are NOT claimed algorithms — Roland left the encode analysis open.  Our
+ACF-based grain cutter and onset-based event stamps are legitimate fill-ins,
+not deviations.
