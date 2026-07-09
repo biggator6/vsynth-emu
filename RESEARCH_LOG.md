@@ -1791,22 +1791,50 @@ real improvements.  The distribution is finally informative:
   genuinely different spectra, the confirmed real gap — plus chord pitch/time
   (39–40) and sine time (~40).
 
-### Next Steps (final for Session 15 — see PROJECT_REVIEW.md)
+### Patent Search — THE Answer Was Filed in May 2000 (research/PATENTS.md)
 
-1. **Listen** — open the latest batch report, A/B every case, record
-   impressions here.  First human listening pass of the project.
+Review recommendation #2 executed.  Three Roland patents filed Feb–May 2000
+(the VP-9000 launch window) describe VariPhrase completely:
 
-2. **Patent search** — Roland VariPhrase patents (~1999–2003) could verify or
-   correct 15 sessions of black-box inference in an afternoon.
+- **US6421642B1** (filed 2000-05-02) is the playback patent.  The real SOLO
+  algorithm is **pitch-synchronous granular (PSOLA-family), not LPC**:
+  the encode pass cuts the phrase into ~one-pitch-period grains storing
+  per-grain pitch (cwp) and syllable marks (= our event stamps).  At
+  playback: TIME = the rate the grain list is walked (tcv); PITCH = the
+  grain re-trigger period (ppw = cwp × pitch ratio) using two channels
+  offset by half a cycle with triangular windows; FORMANT = the grain READ
+  VELOCITY (fsv — resampling the grain content scales the envelope), with
+  window length cwp/fsv **clamped ≤ ppw** — a mechanistic explanation for
+  the ~0.75× upward formant saturation we calibrated empirically.
+- **US6564187B1** (2000-03-28): octave-cascade subband time stretch — the
+  plausible ENSEMBLE/BACKING path (pitch-sync cutting is impossible on
+  polyphony).
+- **US6201175B1** (2000-02-22): band-wise sinusoidal-modelling variant.
 
-3. **Round-2 recordings** (RECORDING_GUIDE.md) — calibration sweep and
-   duplicate takes first; duplicate takes measure the metric-v4 ceiling.
+This explains every black-box finding of the project — the resynthesis
+harmonics on stretched sines (grain re-triggering), the independent axes,
+the formant saturation, the event stamps — while correcting the mechanism:
+our LPC source-filter path is an approximation of grain resynthesis.
+Fifteen sessions of inference were directionally right, mechanistically
+wrong; the black-box scores were nonetheless what located the right patents.
 
-4. **Vocal formant group** — with a trustworthy spectral metric, compare the
-   render and reference band-by-band to see WHAT differs (spectral sim ~0.3
-   leaves a lot of signal to diagnose).
+### Next Steps (final for Session 15 — see PROJECT_REVIEW.md + research/PATENTS.md)
 
-5. **Engine consolidation + C++ invariant unit tests** (review rec. #4).
+1. **Implement pitch-synchronous granular (US6421642) as a new engine path**
+   and route SOLO/LITE content there.  All prerequisites exist in the engine
+   (per-frame F0, voiced detection, onset stamps, offline encode pass).
+   Expected: major wins on the vocal group (spectral sim ~0.3) since it
+   reproduces the reference's actual mechanism.  Replace the empirical
+   0.75× formant calibration with the patent's wl ≤ ppw window clamp.
+
+2. **Listen** — A/B players are in every batch report now; record the
+   project's first listening impressions here.
+
+3. **Round-2 recordings** (RECORDING_GUIDE.md) — duplicate takes measure the
+   metric-v4 ceiling.
+
+4. **ENSEMBLE path**: consider the US6564187 subband method for chord
+   content once the granular path lands.
 
 ---
 
