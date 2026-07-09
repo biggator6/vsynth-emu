@@ -1905,6 +1905,40 @@ Metric v4 history: v17 34.0 → v25 47.8 → v26 50.4 → **v27 51.5**.
 
 ---
 
+### v28 + Session Close-Out (final)
+
+**v28 — subband tails in the event-based BACKING path** (adopted, +4.7 net):
+`subbandStretchOffline` refactored to explicit `(stretch, pitchRatio)`; drum
+tails now subband-stretched (attacks verbatim, PV fallback for short
+segments).  drum_time_2x 51.9 → 57.2, halfspeed 49.6 → 52.1, 4x 67.8 → 64.7.
+Tested, not adopted: ENSEMBLE pitch via per-band inst-frequency scaling
+(chord_pitch_up7st 39.6 vs 40.1 PV — a wash).
+
+**Engine invariant unit tests** — `plugin/Source/EngineTests.cpp`
+(`-DENGINE_TESTS_MAIN`), 10 checks in seconds: drain duration at 0.5/1/2×,
+frequency preservation, pitch accuracy (interpolated ACF), no-dropout gating
+invariant, SOLO classification, granular F0, subband identity.  ALL PASS.
+Writing them found a real edge case: **bit-exact periodic input destabilises
+the per-frame F0 estimate** — a mathematically perfect 440 Hz sine renders
+with a spurious 472 Hz component at −4 dB, while the same signal through a
+16-bit WAV (quantisation noise floor) renders perfectly (659.26 Hz measured
+vs 659.3 target).  Real captures always carry a noise floor; logged as a
+known low-priority issue; tests use −80 dB dithered signals.
+
+**Housekeeping**: git tags v17-baseline, v25–v28; ARCHITECTURE.md refreshed
+(patent-engine routing table, metric v4 description, real-time parity plan);
+RECORDING_GUIDE Round-2 wishlist updated for the patent engines.
+
+**Session 15 final: 51.8 / 100** (metric v4; v17 baseline 34.0; session
+opened at 27.1 on the original metric).  Metric v4 history:
+v17 34.0 → v25 47.8 → v26 50.4 → v27 51.5 → **v28 51.8**.
+
+Awaiting user input: listening pass (A/B players in every batch report) and
+Round-2 recordings.  First build-out after that: real-time granular port
+(plan in ARCHITECTURE.md).
+
+---
+
 ## Session Template (copy for each new session)
 
 ## Session N — [Title]

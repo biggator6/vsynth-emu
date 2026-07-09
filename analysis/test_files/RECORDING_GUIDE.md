@@ -47,7 +47,9 @@ sustained/        ← V-Synth processed outputs (all 20 current test cases)
 | sine_440_formant_upmax.wav | Formant +12 st | 32.8 |
 | sine_440_formant_downmax.wav | Formant −12 st | 25.4 |
 
-**Overall average: 27.2 / 100** (hybrid_v17c, Session 12)
+**Overall average: 27.2 / 100** (hybrid_v17c, Session 12 — HISTORICAL:
+scores above predate metric v4 and the patent engines; current state is
+51.8/100 at v28.  See `notes.txt` for current per-case scores.)
 
 ## Passthrough Files (in passthrough/)
 

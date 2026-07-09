@@ -98,3 +98,25 @@ The algorithm work has caught up with the measurement apparatus.  The next
 points come from better ground truth (recordings, patents, ears) and a metric
 that can see improvements already being made — not from more iterations
 against the current score.
+
+---
+
+## Status addendum (end of Session 15)
+
+Every recommendation except the hardware-dependent ones was executed the same
+session:
+
+1. **Metric fixed** — metric v4 (spectral similarity, content-aware weights,
+   A/B audio players).  ✅
+2. **Patent search** — paid off beyond expectation: all three Roland
+   VariPhrase patents found and IMPLEMENTED (granular SOLO engine, subband
+   ENSEMBLE stretch, event-stamp BACKING path).  See research/PATENTS.md.  ✅
+3. **Round-2 recordings** — guide updated; awaiting hardware.  ⏳
+4. **Consolidation + unit tests** — EngineTests.cpp (10 invariant checks,
+   all passing); version tags; ARCHITECTURE.md refreshed.  ✅
+5. **Target reframing** — pending the duplicate-take ceiling measurement.  ⏳
+
+Score at review time: 36.5 (v3) ≈ 47.8 (v4).  Score at session close:
+**51.8 (v4)** — the review's central claim (points were waiting in ground
+truth and measurement, not algorithm iteration) was confirmed within hours:
+the patents alone were worth ~4 points and rewrote the architecture.
