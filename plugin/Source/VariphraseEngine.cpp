@@ -316,6 +316,10 @@ namespace {
 
 struct GrainCut { int start; float cwp; bool voiced; };
 
+// Encoder window lengths in samples at rate sr (1024 / 256 at 48 kHz).
+int grainAcfWindow(double sr)   { return (int)std::lround(1024.0 * sr / 48000.0); }
+int grainUnvoicedHop(double sr) { return (int)std::lround( 256.0 * sr / 48000.0); }
+
 // Local pitch-period estimate around `start` — normalized ACF with an
 // integer-subharmonic octave guard (same guards as SourceFilterModel's
 // estimateF0, compact form).  prevPeriod, when > 0, narrows the search ±25 %
@@ -323,8 +327,10 @@ struct GrainCut { int start; float cwp; bool voiced; };
 float estimateLocalPeriod(const std::vector<float>& x, int start, double sr,
                           float prevPeriod) {
     const int n = (int)x.size();
-    const int w = std::min(1024, n - start);
-    if (w < 256) return 0.0f;
+    // Window sizes are defined in time (tuned as 1024 / 256 samples at
+    // 48 kHz) so the encoder behaves the same at any sample rate.
+    const int w = std::min(grainAcfWindow(sr), n - start);
+    if (w < grainUnvoicedHop(sr)) return 0.0f;
 
     int lagLo = std::max(2, (int)(sr / 500.0));
     int lagHi = std::min(w - 1, (int)(sr / 60.0));
@@ -367,18 +373,19 @@ float estimateLocalPeriod(const std::vector<float>& x, int start, double sr,
 std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr) {
     std::vector<GrainCut> cuts;
     const int n = (int)x.size();
+    const int hop = grainUnvoicedHop(sr);
     int pos = 0;
     float prev = 0.0f;
-    while (pos + 256 < n) {
+    while (pos + hop < n) {
         const float p = estimateLocalPeriod(x, pos, sr, prev);
         if (p > 0.0f) {
             cuts.push_back({ pos, p, true });
             prev = p;
             pos += std::max(2, (int)std::lround(p));
         } else {
-            cuts.push_back({ pos, 256.0f, false });
+            cuts.push_back({ pos, (float)hop, false });
             prev = 0.0f;
-            pos += 256;
+            pos += hop;
         }
     }
     return cuts;

@@ -1939,6 +1939,55 @@ Round-2 recordings.  First build-out after that: real-time granular port
 
 ---
 
+## Session 16 — Firmware RE, 44.1 kHz Test, Metric v5
+**Date:** 2026-10-10
+**Phase:** Analysis / Measurement
+
+### What Was Done
+- **Firmware reverse engineering started** (details:
+  `research/HARDWARE_FIRMWARE.md`). Hardware is a V-Synth XT. Its v2.02
+  update is plain zlib; the V-Synth app is little-endian SH-4 code loaded at
+  0x89300000; Ghidra (12.1.4) project in gitignored `firmware/ghidra/`.
+  The SH-4 runs the 32-bit float sound engine in software (32-sample
+  blocks). **The engine runs at 44.1 kHz**; a hardware SRC (CS8420) converts
+  to 48/96 kHz on output. The encoder starts via a C++ virtual call (not
+  statically traceable yet); decompiling needs per-range FPSCR mode tracking.
+- **44.1 kHz render test.** First run (v4) showed chord_pitch +22.8 and
+  every vocal −5..−16. Both were bugs:
+  1. *Metric bug*: spectral_similarity's least-squares gain is phase-
+     sensitive (LS gain −0.57 → clipped 0.25; a 20 ms offset moved
+     chord_pitch spectral 0.35 → 0.67). → **metric v5**: RMS-ratio gain.
+     Offset spread now ≤ 0.034 on all cases.
+  2. *Engine bug*: granular encoder windows were fixed sample counts.
+     Now defined in time (48k renders bit-identical; 10/10 EngineTests pass).
+  After fixes: 48k 68.08 vs 44.1k 68.14 — not distinguishable. Rendering
+  stays at the input's native rate.
+- **Stale snapshot found**: committed v28 renders of vocal_formant_downmax
+  and vocal_pitch_up7st predated the granular engine. True v28 = 52.5 (v4).
+- **Tooling**: project `.venv/` (system python lacks numpy); renderer must
+  be built with Xcode's toolchain on this macOS 27 host (notes.txt).
+
+### Batch Test Results
+| Metric | v28 (48k) | v28 (44.1k, rate-scaled granular) |
+|---|---|---|
+| v4 | 52.5 | — |
+| v5 | **68.1** | 68.1 |
+
+### Findings / Hypothesis Update
+- Dry-input floor under v5 exposes two things: (a) the spectral term is
+  envelope-dominated — formant-preserving pitch shifts score near the
+  unshifted input; pitch cases need an F0-accuracy term; (b) chord_formant:
+  dry 0.935 > render 0.785 — ENSEMBLE ignores the formant knob, so our
+  chord formant render should be ~passthrough.
+
+### Next Steps
+1. Add a pitch-accuracy term to the metric (metric v6) — the floor test
+   shows pitch is barely measured.
+2. ENSEMBLE + formant → passthrough (formant ignored), per (b).
+3. Firmware: FPSCR-tracking decompile script; find the encoder/voice.
+
+---
+
 ## Session Template (copy for each new session)
 
 ## Session N — [Title]

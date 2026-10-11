@@ -1,8 +1,8 @@
 V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
-Last updated: Session 15 (2026-06-11)
+Last updated: Session 16 (2026-10-10) — firmware RE started
 
-Current score: 51.8 / 100 under METRIC v4 (v17 baseline = 34.0)
+Current score: 68.1 / 100 under METRIC v5 (= 52.5 under v4; the 51.8 reported at v28 used 2 stale renders) (v17 baseline = 34.0)
   METRIC v4 (commit 7434abb): phase-blind spectral similarity (MR-STFT +
   log-mel, gain-matched) carries most of the composite; content-aware weights
   (speech/percussive/tonal by filename); SNR rescaled to 30 dB full marks.
@@ -160,7 +160,8 @@ Old per-case table (METRIC v3, 36.5 avg):
 
 Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30.0 → v20=32.0 → v21=31.9
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
-Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8
+Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8 (true 52.5)
+Metric v5 history: v28=68.1 (granular rate-scaling: identical at 48k)
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -276,6 +277,80 @@ Subband/granular A/B results (Session 15, do not re-run):
     trajectory resampling smears transients), drum_time_2x 54.9 (+3.0 vs
     event-based) — not adopted (one-case marginal; idea queued below).
 
+FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
+  Hardware is a V-SYNTH XT (rack). Firmware = XT System Update v2.02, kept in
+  firmware/ (GITIGNORED — Roland copyright; never commit firmware, listings or
+  copied tables). Unpacked blobs in firmware/unpacked/.
+  - No encryption: zlib streams behind "MI004" headers. V-SynthXT.rom holds
+    boot (0.09), kernel (2.02), V-Synth app (VAPP1, rom.2), VC-1 D-50 (rom.3),
+    VC-2 Vocoder (rom.4).
+  - Code = little-endian SH-4 (SH7750R, 266 MHz per XT service notes).
+    V-Synth app loads at 0x89300000. Ghidra: SuperH4:LE:32:default.
+  - XT specs: sound generator 32-bit FLOAT, effects 24-bit fixed — hypothesis:
+    VariPhrase runs as SH-4 software (unconfirmed until disassembly).
+  - App has "Encode Depth" parameter — not modelled by us.
+  - rom.2+0x20ee00: 64-phase x 6-tap polyphase interpolation kernel (likely
+    the grain/sample read resampler); +0x4eebb0: 129-tap lowpass FIR.
+  - Ghidra pass 1 done (Ghidra 12.1.4 via brew; project firmware/ghidra/):
+    5,671 functions. SH-4 DOES THE AUDIO DSP IN FLOAT, 32-sample blocks
+    (0x894f8a70 = filter/drive chain). Decompile with FPSCR_PR=SZ=0.
+    0x8952dc60 = 8-phase x 16-tap polyphase int16 resampler (import SRC).
+  - Ghidra pass 2: V-SYNTH ENGINE RUNS AT 44.1 kHz; hardware SRC (CS8420)
+    converts to 48k/96k on output ("SRC Output(44.1K) -> Output(48K)").
+    Our 48 kHz references went 44.1k engine -> SRC -> 48k. Our engine runs
+    at 48k: sample-count constants may be off by 1.088x. TEST: render at
+    44.1k, resample to 48k, re-score.
+  - Encoder starts via C++ virtual call (from 0x89440ae0 "NOW ENCODING") —
+    not statically traceable. Decompiler needs per-range FPSCR mode
+    tracking (fschg / lds FPSCR) before the audio cluster reads cleanly.
+  - Next: FPSCR-tracking script; then 0x894e1920 (voice update) and the
+    0x89503980-0x89507000 FPU cluster; resolve the 64x6 kernel reader.
+
+44.1 kHz EXPERIMENT (Session 16, 2026-10-10) — NO MEASURABLE DIFFERENCE:
+  Method: resample 48k dry inputs (vocal/chord/drum) to 44.1k, render,
+  compare.py resamples output to 48k (sine inputs were already 44.1k).
+  First run (metric v4) looked like chord_pitch +22.8 / vocal -5..-16 —
+  BOTH were bugs, not signal:
+  - chord +22.8 = METRIC BUG (fixed -> metric v5, below).
+  - vocal drops = ENGINE BUG: granular encoder used fixed sample counts
+    (1024-sample ACF window, 256-sample unvoiced hop). Now defined in time
+    (grainAcfWindow / grainUnvoicedHop, = 1024/256 at 48k; 48k renders
+    bit-identical). Also matters for the real-time plugin at any host rate.
+  After both fixes (metric v5): 48k engine 68.08, 44.1k engine 68.14.
+  The references cannot distinguish the two rates at current fidelity.
+  Keep rendering at the input's native rate.
+
+METRIC v5 (Session 16): spectral_similarity level-matches by RMS ratio
+  (_energy_gain) instead of the least-squares _optimal_gain. The LS gain is
+  PHASE-SENSITIVE: on resynthesized content it swung -0.57..+0.68 with ms
+  shifts and clipped at 0.25 (chord_pitch spectral 0.35 <-> 0.67 from a
+  20 ms offset). v5 spread under 0-20 ms offsets <= 0.034 on all 20 cases.
+  v5 scores are much higher than v4 and NOT comparable. v28 under v5 = 68.1.
+  Known v5 limits (dry-input floor test): spectral term is envelope-
+  dominated — at n_fft 512-2048 low-voice harmonics are unresolved, so
+  formant-preserving pitch shifts score close to the UNSHIFTED dry input
+  (vocal_pitch_down12st: dry 0.825 > render 0.782). Pitch cases need a
+  pitch-accuracy term. Dry also beats render on chord_formant (0.935 vs
+  0.785) — consistent with ENSEMBLE ignoring the formant knob: our chord
+  formant render is genuinely wrong (should be ~passthrough).
+  Floor numbers: run dry passthrough vs each ref (see Session 16 log).
+
+TRUE v28 BASELINE = 52.5 (not 51.8): the committed hybrid_v18d renders of
+  vocal_aah_formant_downmax (35.7) and vocal_aah_pitch_up7st (37.5) were
+  STALE (pre-granular). Current source renders them 38.8 / 49.0. Other 18
+  cases bit-identical.
+
+BUILD NOTE (macOS 27 host): /usr/bin/clang++ fails to link (CLT SDK 27 tbd
+  "unknown architecture"). Build with Xcode's toolchain:
+    TC=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+    SDK=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+    env -u SDKROOT $TC/clang++ -isysroot $SDK -std=c++20 -O2 -DOFFLINE_RENDERER_MAIN \
+      OfflineRenderer.cpp VariphraseEngine.cpp PhaseVocoder.cpp SourceFilterModel.cpp -o ...
+PYTHON: system python has no numpy. Use the project venv: .venv/bin/python
+  (created Session 16 from analysis/requirements.txt; .venv/ gitignored).
+  Other Roland software (V-Producer, V-Synth Librarian) in Vsynth_software/
+  (gitignored).
+
 Next highest-value work (awaiting user input):
   1. LISTENING PASS — A/B players in the latest report; log impressions.
   2. ROUND-2 RECORDINGS — RECORDING_GUIDE.md (formant sweep + duplicate takes
@@ -283,3 +358,4 @@ Next highest-value work (awaiting user input):
   3. Real-time parity — plan in ARCHITECTURE.md ("Real-Time Parity Plan");
      granular streaming port is the first build-out.
   4. Perfect-periodic F0 instability (low priority; see EngineTests.cpp note).
+  5. Firmware reverse engineering — see FIRMWARE RE above.

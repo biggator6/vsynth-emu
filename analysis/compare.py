@@ -275,6 +275,21 @@ def _optimal_gain(ref: np.ndarray, out: np.ndarray) -> float:
     return float(np.clip(float(np.dot(ref, out)) / denom, 0.25, 4.0))
 
 
+def _energy_gain(ref: np.ndarray, out: np.ndarray) -> float:
+    """Phase-blind level match: RMS ratio ref/out.
+
+    Metric v5 (Session 16): spectral_similarity used _optimal_gain, a
+    least-squares fit that depends on waveform PHASE.  On resynthesized
+    content it swung from −0.57 to +0.68 with millisecond shifts and was
+    clipped to 0.25 — chord_Cmaj_pitch_up7st jumped 0.35 ↔ 0.67 spectral
+    from a 20 ms offset.  A phase-blind metric needs a phase-blind gain.
+    """
+    e_out = float(np.dot(out, out))
+    if e_out <= 1e-12:
+        return 1.0
+    return float(np.clip(np.sqrt(float(np.dot(ref, ref)) / e_out), 0.01, 100.0))
+
+
 def spectral_similarity(ref: np.ndarray, out: np.ndarray, sr: int) -> float:
     """
     Phase-blind spectral similarity, 0–1 (1 = identical magnitude spectra).
@@ -287,15 +302,16 @@ def spectral_similarity(ref: np.ndarray, out: np.ndarray, sr: int) -> float:
     weighting.  Distances map to a 0–1 score via exp(−d/τ).
 
     Robustness details:
-      - signals are time-aligned and gain-matched first (same machinery as
-        the null test);
+      - signals are time-aligned, then level-matched by RMS ratio (metric
+        v5 — NOT the null test's least-squares gain, which is phase-
+        sensitive; see _energy_gain);
       - magnitudes are floored at −60 dB relative to each spectrogram's peak
         so silence/noise-floor bins don't dominate the log distance.
     """
     ref_a, out_a = align_length(ref, out, sr)
     if len(ref_a) < 2048:
         return 0.0
-    out_a = out_a * _optimal_gain(ref_a, out_a)
+    out_a = out_a * _energy_gain(ref_a, out_a)
 
     def logmag(x, n_fft):
         S = np.abs(librosa.stft(x, n_fft=n_fft, hop_length=n_fft // 4))

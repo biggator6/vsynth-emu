@@ -140,12 +140,12 @@ content (a time-stretched pure sine reference carries sawtooth-like grain
 harmonics); the formant knob saturates upward (~×1.67 at "+12") — explained
 by the patent's window clamp; syllable marks = onset event stamps.
 
-## Measurement & Scoring (metric v4)
+## Measurement & Scoring (metric v5)
 
 `analysis/compare.py` per test pair (see PROJECT_REVIEW.md for rationale):
 - **Spectral similarity** — phase-blind multi-resolution STFT log-magnitude
-  L1 + log-mel L1, time-aligned (envelope cross-correlation) and gain-matched
-  (least-squares optimal gain).  The V-Synth resynthesizes, so phase-sensitive
+  L1 + log-mel L1, time-aligned (envelope cross-correlation) and level-
+  matched by RMS ratio (v5; v4 used a phase-sensitive least-squares gain).  The V-Synth resynthesizes, so phase-sensitive
   null testing cannot measure closeness; this term carries most of the score.
 - **Formant trajectory similarity** (order-50 LPC) — speech content.
 - **Transient preservation** — percussive content.
@@ -158,9 +158,11 @@ The HTML batch report embeds **A/B audio players** per case.
 Fast engine invariants: `plugin/Source/EngineTests.cpp`
 (`-DENGINE_TESTS_MAIN`, 10 checks, runs in seconds).
 
-## Current Scores (v28, metric v4)
+## Current Scores (v28, metric v5)
 
-**51.8 / 100 average** (re-baselined v17 = 34.0).  Strong: drum_time_4x 64.7,
+**68.1 / 100 average** under metric v5 (= 52.5 under v4; v4 history in
+notes.txt).  Per-case v4 detail below is historical.  Earlier text:
+51.8 / 100 under v4 (re-baselined v17 = 34.0).  Strong: drum_time_4x 64.7,
 chord_formant 63.3, sine_formant_upmax 65.6, drum_pitch 62.9, chord_time
 62.7, drum_2x 57.2, vocal_time_2x 53.2.  Weak: vocal_formant_downmax 35.7,
 vocal_pitch_up7st 37.5, chord pitch/time-residual ~40.
