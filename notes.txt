@@ -340,6 +340,12 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     30-partial additive layer + 3 biquads -> leading SOLO candidate.
     Next: read e760/f400/f4c0 fully; find where f(+0x70)*f(+0x9c) rates
     are computed (formant -63..+63 mapping).
+  - PASS 6: PLAYER ROUTING FOUND (0x894f3660, mode field voice+0x80):
+    modes 1/6 -> cd90/d0f0/d380 = TWO-CHANNEL GRAINS WITH READ VELOCITY
+    (formant) = SOLO(+LITE?); mode 5 -> db20 = 5 bands x 6 sinusoids
+    (US6564187) = ENSEMBLE?; mode 3 -> e6e0 = 5-band decimated PCM grains
+    = BACKING?; mode 8 -> e1e0 period-jump = ?. Window-param maths in
+    0x8950cde0 (1.2, 1.9 cap, 3.0962/4.4208 cubic) — formant saturation?
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4
     emulator (JE-8086 style, user-supplied ROM, never distributed) is a

@@ -351,6 +351,50 @@ window, read offset — compare with the patent's wl ≤ ppw clamp); find
 where f(+0x70)/f(+0x9c) are computed (pitch vs formant vs sample-rate
 ratio) — that is where the −63…+63 formant mapping lives.
 
+## Ghidra pass 6 (2026-10-10) — player routing and the SOLO engine
+
+**Oscillator setup `0x894f2010`** switches on oscillator type (1–4). For
+type 2 (PCM), `0x894f3660` installs the per-voice player from a mode
+field (voice +0x80, values 1/3/5/6/8 — encode type, plus a Vari-OFF
+fallback). The pitch dispatcher `0x8950bf70` uses the same field:
+
+| mode | setup | update | player entry → body | what it is |
+|---|---|---|---|---|
+| 1, 6 | `8950fb70` / `8950fba0` | `8950fed0` | `8950cd90` → `cde0`, `ce80`, `d0f0`, `d380` | **two-channel grain player with grain READ VELOCITY** (formant) — SOLO (and probably LITE) |
+| 3 | `89510980` | `89510bf0` | `8950e6e0` → `e760` + `eab0`×4 (r12 = 8,4,2,1) | 5 band streams of decimated PCM, 64×6-kernel reads, per-band grain re-trigger — BACKING candidate |
+| 5 | `89510130` | `89510bf0` | `8950db10` → `db20` | 5 bands × 6 sinusoids (amp/freq frames, 12 values/frame) + octave biquad cascade = US6564187 — **ENSEMBLE candidate** |
+| 8 | `895107d0` | `89510870` | `8950e1d0` → `e1e0` | period-jump player (pass 4), no formant — type not yet pinned |
+(Flag 0x20 at voice +0xb4 swaps in linear players `89509870` / `89509f52`
+— likely Vari OFF.) Mapping of mode numbers to the manual's
+LITE/SOLO/BACKING/ENSEMBLE is inferred from behaviour, not yet from the
+code that writes +0x80.
+
+**SOLO engine details found so far**
+- `0x8950d380` (per sample): two grain channels; each has a window
+  envelope (+0x44 / +0x48) ramping by +0x40 per sample, clamped at 1;
+  each channel's age counter steps by 0x1000 (1/4096 units) and its read
+  position is `start + age × f(+0x2c) / 4096` (+ 1/16-sample start
+  fraction) → **grains are read at velocity f(+0x2c) = the formant
+  ratio** (patent fsv). Reads use 2-point linear interpolation.
+- `0x8950cde0` (per block): rate = f(+0x70)·f(+0x9c) (the f9c factor is
+  skipped when flag 0x10 is set); with parameter g = f(+0x78)
+  (formant/Energy?) it computes a window parameter: g == 0 → 1.2 (and a
+  second value ×0.125); else piecewise over rate ∈ [0.5,1) and [1,2)
+  around (1.2 − g); a cubic shaping `x·(3.0962 − 4.4208·x²)·2`; both
+  smoothed (×0.125 per block) and capped `v ≤ 1.9 − w`. Likely the
+  window-length clamp behind the measured upward formant saturation.
+- `0x8950d0f0`: the per-sample loop (two channels, crossfaded taps,
+  grain retrigger via `0x8950d420`) — partially read.
+
+**Consistency checks:** ENSEMBLE ⇒ subband/sinusoidal (mode 5) agrees
+with v30's move of ENSEMBLE pitch to our subband engine; SOLO ⇒ two-
+channel read-velocity grains agrees with our patent-based granular SOLO
+path (which we can now make firmware-exact).
+
+**Next:** finish d0f0/d420 (trigger spacing ppw, window shape, read
+offset); find who computes f(+0x2c) (formant ratio from the −63…+63
+knob) and f(+0x70)/f(+0x9c); pin mode↔type by the encoder.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).
