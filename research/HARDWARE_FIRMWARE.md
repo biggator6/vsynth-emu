@@ -299,6 +299,58 @@ triangular windows.
 - The SOLO (formant-capable) player is still not found — it must
   re-trigger grains at a new period (PSOLA-style); search next.
 
+## Owner's manual cross-check (V-SYNTH_XT_OM.pdf, Session 16)
+
+Facts that bear on the firmware and our engine (paraphrased):
+- **Encode types** (p. 119): LITE (default, simplest), SOLO (monophonic
+  voice/wind; enables formant + robot voice; may make pitch "incorrect by
+  one octave" and dislikes reverb → manual suggests re-encoding as
+  BACKING/ENSEMBLE), BACKING (decay-type, clear attacks: drums,
+  percussion, guitar chords), ENSEMBLE (sustain, smooth tone changes:
+  choir, strings). → SOLO relies on pitch detection; BACKING/ENSEMBLE do
+  not.
+- **Formant (PCM)** (p. 92): ignored when Vari Sw is OFF or encode type is
+  BACKING/ENSEMBLE — so **LITE and SOLO both have formant control** (the
+  Session 8 table saying LITE had none was wrong; v29 matches the manual).
+  **Formant knob range is −63…+63** (not semitones); "max" test cases =
+  ±63. Firmware holds the knob→ratio mapping (open question since S15).
+  **Energy** (SOLO): OFF/1–127, emphasises the fundamental.
+- **Encode Depth** 0–127 (p. 120): density of auto-detected attack
+  **events**; events drive Playback Mode STEP/EVENT.
+- **PCM OSC** (p. 87): Vari Sw (ON = VariPhrase, OFF = "linear" playback),
+  Playback Mode RETRIGGER/LEGATO/STEP/EVENT, Time Trip, Beat Keep, Loop,
+  Robot Voice (holds pitch steady), Tempo Sync.
+- **Analog OSC waveforms** (p. 86): SAW, SQUARE, TRI, SINE, RAMP, JUNO,
+  HQ-SAW, HQ-SQUARE, NOISE, LA-SAW, LA-SQUARE, SUPER-SAW, FEEDBACK-OSC,
+  X-MOD-OSC; plus PCM and EXT IN oscillator types.
+
+## Ghidra pass 5 (2026-10-10) — second player is a grain re-trigger engine
+
+`0x8950db20` (r0-mode player) =
+1. **grain scheduler `0x8950e760`**: walks a list of 16-bit grain lengths
+   (pointer at r9+0x20); when the playback position reaches the next
+   grain start it starts a new grain (start r9+0x14/0x2c, record ptr,
+   read offset 0, end = start + r9+0x30); read rate +0x30 =
+   2²⁵·f(+0x70)·f(+0x9c) (same form as e1e0); forward/backward grain
+   steppers `0x8950f400` / `0x8950f4c0`; 16 × 2 samples per block;
+   samples read by `0x8950e980` with 2-point linear interp at 1/16 sample
+   (mono int16 or packed stereo). → **grain re-triggering = the
+   independent-formant mechanism → leading candidate for the SOLO player.**
+2. **optional additive layer** (when a flag is set): `0x8950dbe0` ×5 →
+   `0x8950dc50`, 6 cosine-table oscillators each (256-entry table at
+   0x8950ddd0, 16-bit phases, increments scaled by the voice rate);
+   per-frame data (12 values/frame) loaded by `0x8950dcb0` every 64
+   position units. Candidate: SOLO "Energy" (fundamental emphasis) or
+   robot voice.
+3. **three cascaded biquad sections** `0x8950c570`→`c650`→`c720`.
+Mapping of the dispatcher (0x8950bf70, cases 1/3/5/6/8) and the asm
+oscillators to the manual's waveform list is still open.
+
+**Next:** read e760/f400/f4c0/f5a0/f6a0 fully (grain length source,
+window, read offset — compare with the patent's wl ≤ ppw clamp); find
+where f(+0x70)/f(+0x9c) are computed (pitch vs formant vs sample-rate
+ratio) — that is where the −63…+63 formant mapping lives.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).

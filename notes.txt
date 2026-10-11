@@ -331,6 +331,15 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
   - v30: ENSEMBLE pitch -> SUBBAND (Session 15's rejection was metric-v4
     noise). chord_pitch 66.8 -> 71.6. The PV had been DROPPING the
     transposed C and E of the chord (only G + a stray unshifted 523 Hz).
+  - MANUAL (Vsynth_software/V-SYNTH_XT_OM.pdf, gitignored): LITE + SOLO
+    have formant; BACKING/ENSEMBLE ignore it (v29 correct). Formant knob
+    is -63..+63, test "max" = +-63. SOLO has Energy (fundamental emphasis)
+    and robot voice; SOLO can make octave errors (pitch detection).
+  - PASS 5: 0x8950db20 = grain RE-TRIGGER player (e760 scheduler over a
+    16-bit grain-length list, 1/16-sample linear reads) + optional
+    30-partial additive layer + 3 biquads -> leading SOLO candidate.
+    Next: read e760/f400/f4c0 fully; find where f(+0x70)*f(+0x9c) rates
+    are computed (formant -63..+63 mapping).
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4
     emulator (JE-8086 style, user-supplied ROM, never distributed) is a
