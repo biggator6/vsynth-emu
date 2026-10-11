@@ -170,15 +170,23 @@ int main() {
     // (v26: granular pitch = grain re-trigger period).
     {
         auto in = sine(130.0, 2.0, 0.4);
-        auto f2 = sine(2000.0, 2.0, 0.1);            // pseudo-formant energy
+        // Pseudo-formant energy in the 2 kHz detection band.  Harmonic
+        // (15 × 130 Hz): an inharmonic 2000 Hz partial cannot be reproduced
+        // periodically by pitch-synchronous grain players and made the
+        // firmware SOLO path read a spurious period (real voices are
+        // harmonic — checked: no subharmonic on vocal_aah_pitch_up7st).
+        auto f2 = sine(1950.0, 2.0, 0.1);
         for (size_t i = 0; i < in.size(); ++i) in[i] += f2[i];
         auto an = VariphraseEngine::analyzeContent(in.data(), (int)in.size(), kSR);
         const bool solo = (an.contentType == VariphraseAnalysis::ContentType::SOLO);
         check(solo, "classifier: F0+2kHz tone reads SOLO", "contentType wrong");
         if (solo) {
+            // Full pipeline: SOLO now renders through the firmware player
+            // (v31).  150 Hz floor: a clean periodic output ties the ACF at
+            // one and two periods (see test 7).
             auto out = render(in, 1.0f, 7.0f, 0.0f);
-            const double f0 = acfF0(out, 80.0, 400.0);
-            check(std::abs(f0 - 194.8) < 8.0, "granular pitch +7st F0",
+            const double f0 = acfF0(out, 150.0, 400.0);
+            check(std::abs(f0 - 194.8) < 8.0, "SOLO pipeline pitch +7st F0",
                   "acf F0 " + std::to_string(f0) + " want 194.8");
         }
     }
@@ -244,6 +252,40 @@ int main() {
         check(std::labs((long)st.size() - 2L * (long)in.size()) <= 1 &&
               std::abs(f1 - 130.0) < 3.0, "period-jump time 2x keeps F0",
               "len " + std::to_string(st.size()) + " F0 " + std::to_string(f1));
+    }
+
+    // ── 8. Firmware SOLO player (0x8950cd90 chain transcription) ───────────
+    // Pitch +7 st must land on F0×1.498; time ×2 must keep F0 and double
+    // the length; formant shift must leave F0 unchanged.
+    {
+        std::vector<float> in = sine(130.0, 2.0, 0.3);
+        for (int h = 2; h <= 8; ++h) {
+            auto hv = sine(130.0 * h, 2.0, 0.3 / h);
+            for (size_t i = 0; i < in.size(); ++i) in[i] += hv[i];
+        }
+        auto fw = [&](float time, float pitch, float formant) {
+            VariphraseEngine eng;
+            eng.prepare(kSR, 512);
+            VariphraseParams p;
+            p.timeStretchRatio      = time;
+            p.pitchShiftSemitones   = pitch;
+            p.formantShiftSemitones = formant;
+            eng.setParams(p);
+            return eng.soloFirmwareResynthOffline(in);
+        };
+        auto up = fw(1.0f, 7.0f, 0.0f);
+        const double f0 = up.empty() ? 0.0 : acfF0(up, 150.0, 400.0);
+        check(std::abs(f0 - 194.8) < 4.0, "firmware SOLO pitch +7st F0",
+              "acf F0 " + std::to_string(f0) + " want 194.8");
+        auto st = fw(2.0f, 0.0f, 0.0f);
+        const double f1 = st.empty() ? 0.0 : acfF0(st, 100.0, 250.0);
+        check(std::labs((long)st.size() - 2L * (long)in.size()) <= 1 &&
+              std::abs(f1 - 130.0) < 3.0, "firmware SOLO time 2x keeps F0",
+              "len " + std::to_string(st.size()) + " F0 " + std::to_string(f1));
+        auto fm = fw(1.0f, 0.0f, 6.0f);
+        const double f2 = fm.empty() ? 0.0 : acfF0(fm, 100.0, 250.0);
+        check(std::abs(f2 - 130.0) < 3.0, "firmware SOLO formant keeps F0",
+              "acf F0 " + std::to_string(f2) + " want 130");
     }
 
     std::printf(gFailures ? "\n%d FAILURE(S)\n" : "\nALL PASS\n", gFailures);

@@ -406,7 +406,15 @@ float estimateLocalPeriod(const std::vector<float>& x, int start, double sr,
     return float(std::round(lag * 16.0) / 16.0);
 }
 
-std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr) {
+// epochAlign: snap each voiced cut to the largest positive peak within
+// ±period/4 of its predicted position, so cut boundaries sit on pitch
+// epochs.  The firmware SOLO player centres every grain window on the next
+// cut boundary (window peak at os + wl = C), which assumes epoch-aligned
+// records; with alignment the firmware player gains +2.1 on the vocal set
+// (formant downmax +7.4) while the patent-based engine loses −7.3 — the
+// player and the record layout were evidently designed together.
+std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr,
+                                      bool epochAlign = false) {
     std::vector<GrainCut> cuts;
     const int n = (int)x.size();
     // Records are contiguous (firmware format: each record's length is the
@@ -417,6 +425,16 @@ std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr) {
     float prev = 0.0f;
     while ((int)pos + hop < n) {
         const float p = estimateLocalPeriod(x, (int)std::lround(pos), sr, prev);
+        if (p > 0.0f && epochAlign) {
+            // Snap the cut to the largest positive peak within ±p/4 of the
+            // predicted position (pitch-epoch alignment).
+            const int c  = (int)std::lround(pos);
+            const int lo = std::max(0, c - (int)(p / 4)), hi = std::min(n - 1, c + (int)(p / 4));
+            int best = c;
+            for (int i = lo; i <= hi; ++i) if (x[i] > x[best]) best = i;
+            if (!cuts.empty()) pos = std::max(cuts.back().start + 2.0, (double)best);
+            else pos = best;
+        }
         if (p > 0.0f) {
             cuts.push_back({ pos, p, true });
             prev = p;
@@ -676,6 +694,146 @@ std::vector<float> VariphraseEngine::periodJumpResynthOffline(
     return out;
 }
 
+std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
+        const std::vector<float>& in) const {
+    // Units: the firmware works in 1/16-sample fixed point; here everything
+    // is in samples (floats), which is the same arithmetic without the
+    // quantisation.  C = current grain period, N = next grain's period.
+    //
+    // Per output sample:
+    //   P += 1/stretch                       phrase walk (time)        [ce80]
+    //   segment = record containing P; frac = (P − segStart)/C          [d5a0]
+    //   timer += 1; if timer ≥ ppw: timer −= ppw, TRIGGER on the other channel
+    //   each channel: e = min(e,1); w = 2·min(e, 1−e); e += 0.5/wl     [d380]
+    //                 pos = start + age·v; s = lerp(pos);
+    //                 s += (lerp(pos + Ctap) − s)·fracTap;  age += 1   [d0f0]
+    //   out = wA·sA + wB·sB → highpass SVF (Energy OFF: fc = f0/8, q = 1.2)
+    // TRIGGER (voiced record, firmware info bit 0x4 with pitch ratio A):
+    //   Ci  = C + frac·(N − C)               interpolated period
+    //   ppw = Ci / A                         re-trigger spacing (pitch)
+    //   v   = F                              read velocity (formant)
+    //   wl  = Ci / F; if wl > ppw: os = Ci − ppw·F, wl = ppw, else os = 0
+    //   start = segStart + os; age = timer remainder; e = remainder·0.5/wl
+    // Unvoiced records (no bit 0x4): S = A (formant gate off) — ppw = Ci/S,
+    //   v = S, wl = ppw, os = 0 (plain pitch resampling of noise grains).
+    const int n = (int)in.size();
+    const double sr = pImpl->sampleRate;
+    const double stretch = std::max(0.05, (double)pImpl->params.timeStretchRatio);
+    const double A = std::pow(2.0, pImpl->params.pitchShiftSemitones / 12.0);
+    const double F = std::clamp(std::pow(2.0, pImpl->params.formantShiftSemitones / 12.0),
+                                0.5, 2.0);   // firmware clamps the formant ratio to [0.5, 2]
+
+    const std::vector<GrainCut> cuts = encodeGrainCuts(in, sr, /*epochAlign=*/true);
+    if (cuts.size() < 2) return {};
+    const size_t nc = cuts.size();
+    std::vector<double> segStart(nc), segLen(nc);
+    for (size_t i = 0; i < nc; ++i) {
+        segStart[i] = cuts[i].start;
+        const double end = (i + 1 < nc) ? cuts[i + 1].start : (double)n;
+        segLen[i] = std::max(10.0, end - cuts[i].start);   // firmware floor: 160/16 samples
+    }
+
+    auto lerp = [&](double pos) -> double {
+        const int i0 = (int)std::floor(pos);
+        if (i0 < 0 || i0 + 1 >= n) return 0.0;
+        const double fr = pos - i0;
+        return in[i0] + (in[i0 + 1] - in[i0]) * fr;
+    };
+
+    struct Chan { double start = 0, age = 0, v = 1, e = 1.0, slope = 0, tap = 0, tapW = 0; };
+    Chan ch[2];
+    int next = 0;
+
+    const int outLen = std::max(1, (int)std::lround((double)n * stretch));
+    std::vector<float> out(outLen, 0.0f);
+    const double walk = 1.0 / stretch;
+    double P = 0.0, timer = 1e9, ppw = segLen[0];
+    size_t seg = 0;
+    // Energy-OFF highpass (Chamberlin SVF), coefficients smoothed per
+    // 32-sample block as in 0x8950cde0.
+    double low = 0, band = 0, fCoef = 0, q = 1.2;
+    // SOLO "Energy" (manual p. 92). The firmware's g = voice param +0x78;
+    // its knob scaling (OFF/1–127 → g) is not yet decoded.  Experiment hook.
+    double energy = 0.0;
+    if (const char* e = std::getenv("VSE_ENERGY")) energy = std::atof(e);
+
+    for (int t = 0; t < outLen; ++t) {
+        while (seg + 1 < nc && P >= segStart[seg + 1]) ++seg;
+        const double C = segLen[seg];
+        const double N = (seg + 1 < nc) ? segLen[seg + 1] : C;
+        const double frac = std::clamp((P - segStart[seg]) / C, 0.0, 1.0);
+
+        timer += 1.0;
+        if (timer >= ppw) {
+            timer = std::min(timer - ppw, ppw);
+            const double Ci = C + frac * (N - C);
+            const bool voiced = cuts[seg].voiced;
+            double v, wl, os = 0.0;
+            if (voiced) {
+                ppw = Ci / A;
+                v   = F;
+                wl  = Ci / F;
+                if (wl > ppw) { os = Ci - ppw * F; wl = ppw; }
+            } else {
+                ppw = Ci / A;
+                v   = A;
+                wl  = ppw;
+            }
+            Chan& c  = ch[next];
+            next ^= 1;
+            c.start  = segStart[seg] + os;
+            c.age    = timer;
+            c.v      = v;
+            c.slope  = 0.5 / wl;
+            c.e      = timer * c.slope;
+            c.tap    = C;
+            c.tapW   = frac;
+        }
+
+        double y = 0.0;
+        for (Chan& c : ch) {
+            const double e = std::min(c.e, 1.0);
+            const double w = 2.0 * std::min(e, 1.0 - e);
+            if (w > 0.0) {
+                const double pos = c.start + c.age * c.v;
+                double s = lerp(pos);
+                if (c.tapW > 0.0) s += (lerp(pos + c.tap) - s) * c.tapW;
+                y += w * s;
+            }
+            c.e = e + c.slope;
+            c.age += 1.0;
+        }
+
+        if ((t & 31) == 0) {   // per-block coefficient update        [cde0]
+            // Energy g = 0 (OFF): cutoff f0/8, damping 1.2 (rumble filter).
+            // Energy g > 0: cutoff at the output fundamental, damping
+            // (1.2 − g) + p(rate) with p = g·(2r − 1) on [0.5, 1),
+            // g·(2 − r) on [1, 2), 0 outside — neutral at no pitch shift,
+            // strongest resonance at ≥ an octave of shift.
+            const double r = A;
+            double x = std::min(1.0 / ppw, 0.5), qt;
+            if (energy <= 0.0) { x *= 0.125; qt = 1.2; }
+            else {
+                double pr = 0.0;
+                if (r >= 0.5 && r < 1.0)      pr = (2.0 * r - 1.0) * energy;
+                else if (r >= 1.0 && r < 2.0) pr = (2.0 - r) * energy;
+                qt = (1.2 - energy) + pr;
+            }
+            const double ft = x * (3.0962 - 4.4208 * x * x) * 2.0;
+            q     = (qt - q) * 0.125 + q;
+            fCoef = (ft - fCoef) * 0.125 + fCoef;
+            fCoef = std::min(fCoef, 1.9 - q);
+        }
+        low += fCoef * band;
+        const double high = y - q * band - low;
+        band += fCoef * high;
+        out[t] = (float)high;
+
+        P += walk;
+    }
+    return out;
+}
+
 std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& inputMono) {
     // ── Pitch-synchronous granular for SOLO (Session 15, US6421642) ──────────
     // The patent engine handles all three axes in one mechanism.  SOLO only:
@@ -686,6 +844,18 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
     // keeps the v23 routing (LPC resynthesis / PV).
     if (pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid &&
         pImpl->analysis.contentType == VariphraseAnalysis::ContentType::SOLO) {
+        // v31 (Session 16): the firmware SOLO player is the default.  Vocal
+        // cases vs the patent-based granular engine (metric v6): time ×½
+        // 64.1 → 69.1, time 2× 63.6 → 67.7, pitch −12 63.3 → 70.0, formant
+        // up 61.1 → 62.9 / +4 56.2 → 58.8; formant downmax 58.9 → 55.3,
+        // pitch +7 63.8 → 61.2.  The time-only gains (no knob-mapping
+        // assumptions involved) validate the transcribed structure.
+        // VSE_SOLO=patent selects the older engine for comparison.
+        const char* m = std::getenv("VSE_SOLO");
+        if (!(m && std::string(m) == "patent")) {
+            std::vector<float> fw = soloFirmwareResynthOffline(inputMono);
+            if (!fw.empty()) return fw;
+        }
         std::vector<float> out = granularResynthOffline(inputMono);
         if (!out.empty()) return out;
     }

@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 16 (2026-10-10) — firmware RE started
 
-Current score: 68.4 / 100 under METRIC v6 — v30 (v28 = 66.6 v6 / 68.1 v5 / 52.5 v4) (v17 baseline = 34.0)
+Current score: 69.8 / 100 under METRIC v6 — v32 (v28 = 66.6 v6 / 68.1 v5 / 52.5 v4) (v17 baseline = 34.0)
   METRIC v4 (commit 7434abb): phase-blind spectral similarity (MR-STFT +
   log-mel, gain-matched) carries most of the composite; content-aware weights
   (speech/percussive/tonal by filename); SNR rescaled to 30 dB full marks.
@@ -162,7 +162,7 @@ Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
 Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8 (true 52.5)
 Metric v5 history: v28=68.1 (granular rate-scaling: identical at 48k)
-Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4
+Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -356,6 +356,15 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     (base + env*depth + lfo*depth). Depth knobs: sign(k)*(k/63)^2*range.
     S15 asymmetry (down = 0.5, up ~1.68) consistent with clamp + SOLO
     window mechanics (0x8950cde0), not knob mapping — confirm next.
+  - PASS 8 / v31-v32: SOLO ENGINE DECODED AND IMPLEMENTED
+    (soloFirmwareResynthOffline, default SOLO path; VSE_SOLO=patent for the
+    old one). Two alternating channels, triangle windows over 2*wl,
+    velocity = formant, patent clamp, 2nd tap one period later weighted by
+    progress through the record, highpass SVF (Energy). Epoch-aligned cuts
+    (snap to + peak) are part of the design: fw +2.1 vocal, patent -7.3.
+    Vocal: fmt_down 62.7, fmt_up4 58.0, fmt_up 65.5, pitch_down 70.6,
+    pitch_up 63.9, time_2x 71.8, time_half 66.7. Energy (VSE_ENERGY=g)
+    decoded but scaling unknown; off by default.
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4
     emulator (JE-8086 style, user-supplied ROM, never distributed) is a

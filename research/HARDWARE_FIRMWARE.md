@@ -424,6 +424,65 @@ mechanics (`0x8950cde0`: window param 1.2, cap 1.9 − w, rate-dependent
 pieces over [0.5, 1) and [1, 2)), i.e. the patent's wl ≤ ppw clamp, not
 the knob mapping. To confirm by finishing `cde0` / `d0f0`.
 
+## Ghidra pass 8 (2026-10-11) — SOLO engine fully decoded and implemented
+
+Chain (mode 6 / 1): `0x8950cd90` → `cde0` (per block) → per sample
+`ce80` (walk/records/trigger) + `d0f0` (output) with `d380`/`d420`.
+Units: 1/16 sample for positions and periods; 12.20 fixed point for the
+phrase position; 1/4096 sample for the trigger timer and grain ages.
+
+**Records** (`d4c0` next / `d530` prev): `{u16 length, u16 info}`,
+0xFFFF = continue. `info` bits used by the player: **0x4 = patent path**
+(voiced), 0x1 gates the pitch factor, 0x2 gates the formant factor,
+`(info & 0x1F8) << 6` = a per-record repeat/hold count (+0x7E00 marks the
+last record).
+
+**Walk / record selection (`ce80`, forward):** P += time/2 (12.20). An
+anchor advances at max(A,1)·16 per sample; when it passes the current
+record's end: if P has not passed it, the anchor wraps back (record
+REPEATS); else load the next record(s) until P is inside (SKIP).
+
+**Trigger (`ce80` tail + `d5a0`):** timer += 1 sample; when timer ≥ ppw:
+timer −= ppw; (skip if playback ended); compute grain params; assign to
+the OTHER channel (bit toggled; confirmed at instruction level): age =
+timer remainder, window phase e = remainder·slope, start = recordStart +
+os, velocity, second-tap weight = frac, second-tap offset = C.
+
+**Grain params (`d5a0`):** C, N = this/next record period (min 160/16 =
+10 samples); frac = (P − recStart)/C (1 if past the end); Ci = C +
+frac·(N − C). Patent path (info 0x4) with pitch ratio A:
+`ppw = Ci/A`, **velocity = F**, `wl = Ci/F`; if wl > ppw: `os = Ci −
+ppw·F`, `wl = ppw`. Robot voice (A = 0): `ppw = 1603.64/R` (A440·R
+absolute, 1603.64 = 44100·16/440). Non-patent path: S = A·F (gated by
+bits 0x1/0x2), ppw = Ci/S, velocity S, wl = ppw. Window slope = 0.5/wl
+per sample.
+
+**Per sample (`d380`/`d0f0`):** each channel: e = min(e,1);
+w = 2·min(e, 1−e) (triangle spanning 2·wl); e += slope; pos = start +
+age·v; s = lerp(pos); s += (lerp(pos + C) − s)·frac (second tap, if
+weight > 0); age += 1. out = wA·sA + wB·sB → Chamberlin SVF, HIGHPASS
+output: f = x·(3.0962 − 4.4208x²)·2 with x = f0_out/fs (Energy on) or
+f0_out/(8·fs) (Energy off); damping q = 1.2 (off) or (1.2 − g) + p(r)
+with p = g(2r−1) on [0.5,1), g(2−r) on [1,2), else 0; coefficients
+smoothed ×0.125 per block, f ≤ 1.9 − q → then gain smoothed 1/64 per
+sample, ×65536.
+
+**Window placement implies epoch-aligned records:** the triangle peaks at
+os + wl = Ci — exactly the next record boundary. Implementing the encoder
+with cuts snapped to the waveform's positive peak (±period/4): firmware
+player +2.1 on the vocal set (formant downmax 55.3 → 62.7, pitch +7
+61.2 → 63.9, time 2× 67.7 → 71.8), while the patent-based engine LOSES
+7.3 with the same cuts — the player and the record layout were designed
+together.
+
+**Implemented** as `VariphraseEngine::soloFirmwareResynthOffline`
+(default SOLO path since v31; v32 adds epoch alignment). Suite v6:
+v30 68.4 → v31 69.1 → **v32 69.8**. Energy implemented (decoded logic,
+knob scaling unknown → off by default); sweeping g 0.25–1.0 moves vocal
+scores ±0.6, so the residual low-harmonic deficit at pitch +7 is not
+Energy. Remaining unknowns: the real encoder (epoch detection, voiced
+flags, info bits), and the mode→encode-type mapping.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).

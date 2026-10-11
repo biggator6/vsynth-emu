@@ -116,6 +116,14 @@ public:
     // the ENSEMBLE/BACKING behaviour.  Returns empty on degenerate input.
     std::vector<float> periodJumpResynthOffline(const std::vector<float>& in) const;
 
+    // SOLO grain player transcribed from the V-Synth XT firmware (0x8950cd90
+    // chain: ce80 trigger, d5a0 grain params, d0f0/d380 per-sample loop;
+    // research/HARDWARE_FIRMWARE.md pass 8).  Two alternating channels,
+    // triangular windows spanning 2·wl, read velocity = formant ratio,
+    // patent window clamp, second tap one period later weighted by the
+    // phrase position's progress through the current grain record.
+    std::vector<float> soloFirmwareResynthOffline(const std::vector<float>& in) const;
+
     // Subband time stretch per Roland US6564187B1 (simplified): quarter-octave
     // analytic sub-bands, amplitude/inst-frequency trajectories resampled to
     // the stretched timeline.  For ENSEMBLE time-only operations.

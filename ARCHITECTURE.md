@@ -108,7 +108,7 @@ the corresponding Roland patent (see `research/PATENTS.md`):
 
 | Content type | Operation | Engine |
 |---|---|---|
-| SOLO (speech/melody) | any | **pitch-synchronous granular** (US6421642) |
+| SOLO (speech/melody) | any | **firmware SOLO player** (v31/v32: two-channel grains, velocity = formant, epoch-aligned records — transcribed from V-Synth XT firmware; US6421642) |
 | LITE (pure tones) | time, pitch-up | LPC resynthesis |
 | LITE | pitch-down | Phase Vocoder |
 | LITE | formant | LPC source-filter (pole shift) |
@@ -162,9 +162,9 @@ The HTML batch report embeds **A/B audio players** per case.
 Fast engine invariants: `plugin/Source/EngineTests.cpp`
 (`-DENGINE_TESTS_MAIN`, 10 checks, runs in seconds).
 
-## Current Scores (v30, metric v6)
+## Current Scores (v32, metric v6)
 
-**68.4 / 100 average** (v30) under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
+**69.8 / 100 average** (v32) under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
 history in notes.txt).  Per-case v4 detail below is historical.  Earlier text:
 51.8 / 100 under v4 (re-baselined v17 = 34.0).  Strong: drum_time_4x 64.7,
 chord_formant 63.3, sine_formant_upmax 65.6, drum_pitch 62.9, chord_time
