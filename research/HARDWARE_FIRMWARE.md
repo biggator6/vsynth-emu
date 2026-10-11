@@ -217,9 +217,29 @@ engine.** For our engine: Vari-OFF playback should use this kind of
 6-tap polyphase interpolator; the kernel's phase 0 is not an identity
 (−0.106, 0.123, 0.859, 0.123, −0.106, 0.004), so it slightly band-limits.
 
-**Still not found:** the VariPhrase grain player and the encoder. Next:
-look for code reading encoded grain data (per-grain pitch records) with
-two overlapping windowed channels — likely elsewhere in 0x894D–0x8954.
+**Probable VariPhrase phrase player — `0x8950e1e0`** (sibling
+`0x8950d890` shares all helpers; likely another encode type's variant):
+- two 12.20 fixed-point position accumulators: phrase position
+  (+0x38 int / +0x3c frac) advanced by a time rate (+0x11c, halved per
+  step), and a second accumulator (+0x110/+0x114) advanced by +0x30, which
+  is 2²⁵ (unity) when a flag is clear or 2²⁵·x² from a parameter
+  otherwise — consistent with the patent's separate walk-rate vs
+  read-rate (not yet proven which is time / pitch / formant);
+- crossing the next boundary (+0x2c) calls `0x8950c880` (forward) /
+  `0x8950ca70` (backward); bounds +0x104 / +0x108 call `0x8950e560` /
+  `0x8950e500`;
+- a 0.6 limit (0x3f199999) appears in the grain-length arithmetic;
+- 32-sample block loop.
+**Event-table walker — `0x8950c880`:** index +0xc, count +0xe over
+16-bit entries with flag bits (`& 0xb`); handles loop modes 1/2/3 and
+direction reversal. Very likely the encoder's event/syllable marks (our
+"onset stamps"). Parts of `e1e0` are still mode-garbled: there FPSCR is
+loaded from r0 (not a constant) — needs FpscrFix to follow
+`mov.l @(disp,pc),r0` / caller-set modes.
+
+**Next:** fix the r0-loaded FPSCR case; read `e1e0` / `d890` /
+`e500` / `e560` fully to recover grain length, window shape, the 0.6
+limit's role, and how the two rates map to time / pitch / formant.
 
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
