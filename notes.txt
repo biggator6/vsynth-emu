@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 16 (2026-10-10) — firmware RE started
 
-Current score: 68.2 / 100 under METRIC v6 — v29 (v28 = 66.6 v6 / 68.1 v5 / 52.5 v4) (v17 baseline = 34.0)
+Current score: 68.4 / 100 under METRIC v6 — v30 (v28 = 66.6 v6 / 68.1 v5 / 52.5 v4) (v17 baseline = 34.0)
   METRIC v4 (commit 7434abb): phase-blind spectral similarity (MR-STFT +
   log-mel, gain-matched) carries most of the composite; content-aware weights
   (speech/percussive/tonal by filename); SNR rescaled to 30 dB full marks.
@@ -162,7 +162,7 @@ Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
 Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8 (true 52.5)
 Metric v5 history: v28=68.1 (granular rate-scaling: identical at 48k)
-Metric v6 history: v28=66.6 → v29=68.2
+Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -318,7 +318,24 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     taps at Q and Q+L, w = 5*(clamp(lag/L,0.4,0.6)-0.4); 2-pt linear interp
     at 1/16 sample. No formant control (formant follows pitch) = the
     ENSEMBLE/BACKING player. SOLO/formant player not yet found.
-    NEXT: implement this player for ENSEMBLE/BACKING pitch + test.
+  - PLAYER IMPLEMENTED: VariphraseEngine::periodJumpResynthOffline (exact
+    transcription of the decoded behaviour; EngineTests 7). Results (v6):
+    chord_pitch 52.3 (v29 PV 66.8), chord_time 52.2 (subband 72.9), drum
+    pitch +2.3, drum time +1.0/-3.6/-0.5. Chord problem: a tempered chord
+    is not periodic at any L — splice sidebands -30..-40 dB that the
+    reference lacks (< -52 dB). With exact L the player reproduces all
+    three transposed notes at reference levels. Available via env
+    VSE_PERIODJUMP=B/D/T (offline experiment switch); BACKING decision
+    waits on the drum re-recording check. Our encoder stores INTEGER
+    periods; firmware stores 1/16 sample — TODO sub-sample periods.
+  - v30: ENSEMBLE pitch -> SUBBAND (Session 15's rejection was metric-v4
+    noise). chord_pitch 66.8 -> 71.6. The PV had been DROPPING the
+    transposed C and E of the chord (only G + a stray unshifted 523 Hz).
+  - On "use the firmware directly": we transcribe behaviour + constants
+    into our own code (safe). Running Roland's machine code under an SH-4
+    emulator (JE-8086 style, user-supplied ROM, never distributed) is a
+    possible LOCAL reference renderer — large effort, legally grey for a
+    plugin. Do not paste decompiled code into the repo.
 
 44.1 kHz EXPERIMENT (Session 16, 2026-10-10) — NO MEASURABLE DIFFERENCE:
   Method: resample 48k dry inputs (vocal/chord/drum) to 44.1k, render,

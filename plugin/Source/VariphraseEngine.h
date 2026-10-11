@@ -108,6 +108,14 @@ public:
     // input (caller falls back to the streaming path).
     std::vector<float> granularResynthOffline(const std::vector<float>& in) const;
 
+    // Period-jump grain player, transcribed from the V-Synth XT firmware
+    // (0x8950e1e0; research/HARDWARE_FIRMWARE.md, pass 4).  A phrase position
+    // walks the grain records at the time rate; a read pointer resamples at
+    // the pitch ratio and jumps by exactly one (interpolated) grain period to
+    // stay within a period of the phrase position.  Formants follow pitch —
+    // the ENSEMBLE/BACKING behaviour.  Returns empty on degenerate input.
+    std::vector<float> periodJumpResynthOffline(const std::vector<float>& in) const;
+
     // Subband time stretch per Roland US6564187B1 (simplified): quarter-octave
     // analytic sub-bands, amplitude/inst-frequency trajectories resampled to
     // the stretched timeline.  For ENSEMBLE time-only operations.

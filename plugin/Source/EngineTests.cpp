@@ -212,6 +212,40 @@ int main() {
         }
     }
 
+    // ── 7. Firmware period-jump player (0x8950e1e0 transcription) ──────────
+    // On a periodic tone the player is resampling + whole-period jumps, so
+    // pitch +7 st must land on F0×1.498 and time ×2 must keep F0 and double
+    // the length.
+    {
+        std::vector<float> in = sine(130.0, 2.0, 0.3);
+        for (int h = 2; h <= 6; ++h) {
+            auto hv = sine(130.0 * h, 2.0, 0.3 / h);
+            for (size_t i = 0; i < in.size(); ++i) in[i] += hv[i];
+        }
+        auto pj = [&](float time, float pitch) {
+            VariphraseEngine eng;
+            eng.prepare(kSR, 512);
+            VariphraseParams p;
+            p.timeStretchRatio    = time;
+            p.pitchShiftSemitones = pitch;
+            eng.setParams(p);
+            return eng.periodJumpResynthOffline(in);
+        };
+        auto up = pj(1.0f, 7.0f);
+        // Search above 150 Hz: our encoder stores INTEGER periods (369 vs
+        // 369.23), so each splice leaves a tiny step and the output also
+        // repeats at the ~2-period splice pattern (97 Hz).  The firmware
+        // stores periods in 1/16-sample units — TODO: sub-sample periods.
+        const double f0 = up.empty() ? 0.0 : acfF0(up, 150.0, 400.0);
+        check(std::abs(f0 - 194.8) < 4.0, "period-jump pitch +7st F0",
+              "acf F0 " + std::to_string(f0) + " want 194.8");
+        auto st = pj(2.0f, 0.0f);
+        const double f1 = st.empty() ? 0.0 : acfF0(st, 80.0, 400.0);
+        check(std::labs((long)st.size() - 2L * (long)in.size()) <= 1 &&
+              std::abs(f1 - 130.0) < 3.0, "period-jump time 2x keeps F0",
+              "len " + std::to_string(st.size()) + " F0 " + std::to_string(f1));
+    }
+
     std::printf(gFailures ? "\n%d FAILURE(S)\n" : "\nALL PASS\n", gFailures);
     return gFailures ? 1 : 0;
 }

@@ -113,7 +113,7 @@ the corresponding Roland patent (see `research/PATENTS.md`):
 | LITE | pitch-down | Phase Vocoder |
 | LITE | formant | LPC source-filter (pole shift) |
 | ENSEMBLE (chords) | time-only | **subband stretch** (US6564187) |
-| ENSEMBLE | pitch | Phase Vocoder |
+| ENSEMBLE | pitch | **subband** (per-band inst-freq × ratio; v30) |
 | ENSEMBLE, BACKING | formant | **ignored** — no formant control on these encode types (v29) |
 | BACKING (drums) | time-only | **event-based stretch** (attacks verbatim, subband tails) |
 | BACKING | pitch | Phase Vocoder |
@@ -162,9 +162,9 @@ The HTML batch report embeds **A/B audio players** per case.
 Fast engine invariants: `plugin/Source/EngineTests.cpp`
 (`-DENGINE_TESTS_MAIN`, 10 checks, runs in seconds).
 
-## Current Scores (v29, metric v6)
+## Current Scores (v30, metric v6)
 
-**68.2 / 100 average** under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
+**68.4 / 100 average** (v30) under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
 history in notes.txt).  Per-case v4 detail below is historical.  Earlier text:
 51.8 / 100 under v4 (re-baselined v17 = 34.0).  Strong: drum_time_4x 64.7,
 chord_formant 63.3, sine_formant_upmax 65.6, drum_pitch 62.9, chord_time

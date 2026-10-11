@@ -8,6 +8,8 @@
 #include <cassert>
 #include <atomic>
 #include <mutex>
+#include <string>
+#include <cstdlib>
 
 namespace VSE {
 
@@ -591,6 +593,69 @@ std::vector<float> VariphraseEngine::granularResynthOffline(
     return out;
 }
 
+std::vector<float> VariphraseEngine::periodJumpResynthOffline(
+        const std::vector<float>& in) const {
+    // Transcription of the firmware player 0x8950e1e0 (per output sample):
+    //   P  += 1/stretch                         phrase walk (time)
+    //   L   = cur + (P − segStart)/cur·(next − cur)   period, interpolated
+    //                                           toward the next grain record
+    //   Q  += pitchRatio                        read pointer (resampling)
+    //   P' = clamp(P, L, n − L)
+    //   if Q > P'       Q −= L                  stay within one period behind
+    //   if Q + L ≤ P'   Q += L
+    //   w   = 5·(clamp((P − Q)/L, 0.4, 0.6) − 0.4)
+    //   out = s(Q) + (s(Q+L) − s(Q))·w           two taps one period apart
+    // s() is 2-point linear interpolation at 1/16-sample resolution, as in
+    // the firmware (positions there are 1/16-sample fixed point).
+    const int n = (int)in.size();
+    const double sr = pImpl->sampleRate;
+    const double stretch    = std::max(0.05, (double)pImpl->params.timeStretchRatio);
+    const double pitchRatio = std::pow(2.0, pImpl->params.pitchShiftSemitones / 12.0);
+
+    const std::vector<GrainCut> cuts = encodeGrainCuts(in, sr);
+    if (cuts.size() < 2) return {};
+    // Grain records: contiguous segments, length = distance to the next cut.
+    std::vector<double> segStart(cuts.size()), segLen(cuts.size());
+    for (size_t i = 0; i < cuts.size(); ++i) {
+        segStart[i] = cuts[i].start;
+        const int end = (i + 1 < cuts.size()) ? cuts[i + 1].start : n;
+        segLen[i] = std::max(2, end - cuts[i].start);
+    }
+
+    auto tap = [&](double pos) -> double {
+        const double q  = std::floor(pos * 16.0) / 16.0;   // 1/16-sample grid
+        const int    i0 = (int)std::floor(q);
+        if (i0 < 0 || i0 + 1 >= n) return 0.0;
+        const double fr = q - i0;
+        return in[i0] + (in[i0 + 1] - in[i0]) * fr;
+    };
+
+    const int outLen = std::max(1, (int)std::lround((double)n * stretch));
+    std::vector<float> out(outLen, 0.0f);
+    const double walk = 1.0 / stretch;
+    double P = 0.0, Q = 0.0;
+    size_t seg = 0;
+    for (int t = 0; t < outLen; ++t) {
+        while (seg + 1 < cuts.size() && P >= segStart[seg + 1]) ++seg;
+        const double cur  = segLen[seg];
+        const double next = (seg + 1 < cuts.size()) ? segLen[seg + 1] : cur;
+        const double L = cur + (P - segStart[seg]) / cur * (next - cur);
+
+        const double Pc = std::clamp(P, L, std::max(L, (double)n - 1.0 - L));
+        if (Q > Pc)      Q -= L;
+        if (Q + L <= Pc) Q += L;
+
+        const double lag = (P - Q) / L;
+        const double w   = 5.0 * (std::clamp(lag, 0.4, 0.6) - 0.4);
+        const double s1  = tap(Q);
+        out[t] = (float)(s1 + (tap(Q + L) - s1) * w);
+
+        P += walk;
+        Q += pitchRatio;
+    }
+    return out;
+}
+
 std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& inputMono) {
     // ── Pitch-synchronous granular for SOLO (Session 15, US6421642) ──────────
     // The patent engine handles all three axes in one mechanism.  SOLO only:
@@ -606,6 +671,46 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
     }
 
     const VariphraseParams hp = pImpl->hybridParams();
+
+    // ── Subband pitch for ENSEMBLE (Session 16, US6564187) ───────────────────
+    // Per-band instantaneous-frequency scaling.  Rejected in Session 15
+    // (39.6 vs 40.1 PV) under metric v4, whose phase-sensitive gain made the
+    // chord score noise.  Under v6: chord_Cmaj_pitch_up7st 66.8 → 71.6
+    // (spectral 0.879 → 0.892, pitch 0.510 → 0.689).  The PV path dropped the
+    // transposed C and E of the chord entirely (only G survived, plus an
+    // unshifted 523 Hz partial).  The firmware period-jump player was also
+    // tried here: it reproduces all three notes at reference levels but adds
+    // splice sidebands (−30…−40 dB) a tempered chord cannot avoid and the
+    // reference does not show — scored 52.3.
+    if (pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid &&
+        pImpl->analysis.contentType == VariphraseAnalysis::ContentType::ENSEMBLE &&
+        std::abs(hp.pitchShiftSemitones) >= 0.01f) {
+        std::vector<float> out = subbandStretchOffline(
+            inputMono, hp.timeStretchRatio,
+            std::pow(2.0f, hp.pitchShiftSemitones / 12.0f));
+        if (!out.empty()) return out;
+    }
+
+    // EXPERIMENT: route to the firmware period-jump player instead of the
+    // defaults.  VSE_PERIODJUMP letters: B = BACKING pitch, D = BACKING
+    // time-only, T = ENSEMBLE time-only.  Session 16 (metric v6): B +2.3,
+    // D +1.0 / −3.6 / −0.5, T −20.7.  Not adopted for BACKING until the drum
+    // references are verified (they look mis-recorded — see notes.txt).
+    if (const char* pj = std::getenv("VSE_PERIODJUMP");
+        pj && pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid) {
+        const std::string mode(pj);
+        const auto ct = pImpl->analysis.contentType;
+        const bool hasPitch = std::abs(hp.pitchShiftSemitones) >= 0.01f;
+        const bool hasTime  = std::abs(hp.timeStretchRatio - 1.0f) > 0.01f;
+        const bool ens = ct == VariphraseAnalysis::ContentType::ENSEMBLE;
+        const bool bak = ct == VariphraseAnalysis::ContentType::BACKING;
+        if ((ens && !hasPitch && hasTime && mode.find('T') != std::string::npos) ||
+            (bak && hasPitch && mode.find('B') != std::string::npos) ||
+            (bak && !hasPitch && hasTime && mode.find('D') != std::string::npos)) {
+            std::vector<float> out = periodJumpResynthOffline(inputMono);
+            if (!out.empty()) return out;
+        }
+    }
 
     // ── Subband stretch for ENSEMBLE time-only (Session 15, US6564187) ───────
     // Pitch via per-band inst-frequency scaling was tested (chord_pitch_up7st
