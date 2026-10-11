@@ -1980,11 +1980,24 @@ Round-2 recordings.  First build-out after that: real-time granular port
   dry 0.935 > render 0.785 — ENSEMBLE ignores the formant knob, so our
   chord formant render should be ~passthrough.
 
+### Later in session: metric v6 + v29
+- **Metric v6**: pitch term `harmonic_similarity` (harmonic-comb
+  correlation). Render-vs-dry margin on pitch cases +11.5 → +20.8.
+  pYIN median-F0 rejected (octave jumps on faint subharmonics).
+- **v29**: ENSEMBLE/BACKING ignore formant (`hybridParams`).
+  chord_formant 49.7 → 81.5; suite 66.6 → **68.2** (v6).
+- **Drum references suspect**: pitch_up7st ref not transposed (same peaks
+  as dry); time_2x ref ~3.5 st below dry.
+
+| Version | v4 | v5 | v6 |
+|---|---|---|---|
+| v28 | 52.5 | 68.1 | 66.6 |
+| v29 | — | — | **68.2** |
+
 ### Next Steps
-1. Add a pitch-accuracy term to the metric (metric v6) — the floor test
-   shows pitch is barely measured.
-2. ENSEMBLE + formant → passthrough (formant ignored), per (b).
-3. Firmware: FPSCR-tracking decompile script; find the encoder/voice.
+1. Firmware: FPSCR-tracking decompile script; find the encoder/voice.
+2. Verify the drum references (recording settings) before drum tuning.
+3. vocal_time_halfspeed still scores below the dry input — investigate.
 
 ---
 

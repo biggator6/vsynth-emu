@@ -341,6 +341,45 @@ def spectral_similarity(ref: np.ndarray, out: np.ndarray, sr: int) -> float:
     return float(0.5 * np.exp(-d_stft / 1.5) + 0.5 * np.exp(-d_mel / 3.0))
 
 
+def harmonic_similarity(ref: np.ndarray, out: np.ndarray, sr: int) -> float:
+    """
+    Pitch similarity, 0–1: correlation of the harmonic fine structure.
+
+    Metric v6 (Session 16).  The spectral term is envelope-dominated — at
+    n_fft ≤ 2048 a 130 Hz voice's harmonics are unresolved — so a formant-
+    preserving pitch shift scored about the same as the UNSHIFTED input
+    (vocal_pitch_down12st: dry 0.825 vs render 0.782).  This term looks at
+    pitch only:
+      - long-term average power spectrum at n_fft 16384 (~3 Hz bins),
+        50–4000 Hz, in dB floored 60 dB below peak;
+      - spectral envelope removed (80 Hz moving average subtracted), leaving
+        the harmonic comb;
+      - Pearson correlation of the two combs, clipped to [0, 1].
+    Time-averaged, so time-stretch cases compare cleanly.  Monophonic and
+    polyphonic content both work (a transposed chord moves every partial).
+    Meaningless for unpitched content — percussive weight is 0.
+    Dry-input floor vs render on pitch cases: vocal −12 0.61/0.94,
+    vocal +7 0.29/0.84, sine −12 0.03/0.99, chord +7 0.17/0.51.
+    """
+    nfft, lo, hi = 16384, 50.0, 4000.0
+    f = np.fft.rfftfreq(nfft, 1.0 / sr)
+    band = (f >= lo) & (f <= hi)
+    k = max(3, int(80.0 / (sr / nfft)))
+
+    def comb(x):
+        if len(x) < nfft:
+            x = np.pad(x, (0, nfft - len(x)))
+        S = np.abs(librosa.stft(x, n_fft=nfft, hop_length=nfft // 4)) ** 2
+        d = 10.0 * np.log10(S.mean(axis=1)[band] + 1e-20)
+        d = np.maximum(d, d.max() - 60.0)
+        return d - np.convolve(d, np.ones(k) / k, mode='same')
+
+    a, b = comb(ref), comb(out)
+    if np.std(a) < 1e-9 or np.std(b) < 1e-9:
+        return 0.0
+    return float(np.clip(np.corrcoef(a, b)[0, 1], 0.0, 1.0))
+
+
 def classify_content(name: str) -> str:
     """Infer content class from the test-file naming convention."""
     n = name.lower()
@@ -352,7 +391,8 @@ def classify_content(name: str) -> str:
 
 def composite_score(null_result: dict, formant_sim: float,
                     transient_score: float, spectral_sim: float = 0.0,
-                    content_class: str = 'unknown') -> float:
+                    content_class: str = 'unknown',
+                    pitch_sim: float = 0.0) -> float:
     """
     Weighted composite similarity score, 0-100 (higher = more similar).
 
@@ -365,17 +405,20 @@ def composite_score(null_result: dict, formant_sim: float,
     perceptual quality.  v4 weights each term only where it means something,
     and carries most of the score on the phase-blind spectral term.
 
-                    spectral  formant  transient  snr
-        speech        0.45     0.30      0.15     0.10
-        percussive    0.45     0.00      0.45     0.10
-        tonal         0.70     0.10      0.10     0.10
-        unknown       0.45     0.25      0.20     0.10
+    Metric v6 (Session 16) adds the pitch term (harmonic_similarity) for
+    pitched content, taken from the spectral and formant weights:
+
+                    spectral  pitch  formant  transient  snr
+        speech        0.35    0.20    0.20      0.15     0.10
+        percussive    0.45    0.00    0.00      0.45     0.10
+        tonal         0.50    0.30    0.00      0.10     0.10
+        unknown       0.40    0.10    0.20      0.20     0.10
     """
     weights = {
-        'speech':     (0.45, 0.30, 0.15, 0.10),
-        'percussive': (0.45, 0.00, 0.45, 0.10),
-        'tonal':      (0.70, 0.10, 0.10, 0.10),
-        'unknown':    (0.45, 0.25, 0.20, 0.10),
+        'speech':     (0.35, 0.20, 0.20, 0.15, 0.10),
+        'percussive': (0.45, 0.00, 0.00, 0.45, 0.10),
+        'tonal':      (0.50, 0.30, 0.00, 0.10, 0.10),
+        'unknown':    (0.40, 0.10, 0.20, 0.20, 0.10),
     }[content_class if content_class in ('speech', 'percussive', 'tonal')
       else 'unknown']
 
@@ -383,9 +426,10 @@ def composite_score(null_result: dict, formant_sim: float,
     # bounded; 60 dB scaling made the term dead weight).
     snr_score = float(np.clip(null_result['snr_db'] / 30.0, 0, 1))
 
-    w_spec, w_form, w_trans, w_snr = weights
+    w_spec, w_pitch, w_form, w_trans, w_snr = weights
     score = 100.0 * (
         w_spec  * spectral_sim +
+        w_pitch * pitch_sim +
         w_form  * formant_sim +
         w_trans * transient_score +
         w_snr   * snr_score
@@ -435,8 +479,12 @@ def analyze(ref_path: str, out_path: str, output_dir: str = '.') -> dict:
     content_class = classify_content(ref_label)
     print(f"    Spectral similarity: {spec_sim:.3f}  (class: {content_class})")
 
+    print("  Measuring pitch (harmonic structure)...")
+    pitch_sim = harmonic_similarity(ref, out, sr_ref)
+    print(f"    Pitch similarity: {pitch_sim:.3f}")
+
     score = composite_score(null_result, formant_sim, t_score,
-                            spec_sim, content_class)
+                            spec_sim, content_class, pitch_sim)
     print(f"\n  ► COMPOSITE SCORE: {score:.1f}/100")
 
     print("  Generating spectrogram...")
@@ -451,6 +499,7 @@ def analyze(ref_path: str, out_path: str, output_dir: str = '.') -> dict:
         'formant_similarity': formant_sim,
         'transient_score': t_score,
         'spectral_similarity': spec_sim,
+        'pitch_similarity': pitch_sim,
         'content_class': content_class,
         'composite_score': score,
         'spectrogram_path': spec_path,

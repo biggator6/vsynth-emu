@@ -60,6 +60,20 @@ struct VariphraseEngine::Impl {
         if (sourceFilter) sourceFilter->reset();
     }
 
+    // Parameters as the Hybrid router applies them.  Only SOLO and LITE
+    // encodings have formant control on the V-Synth; ENSEMBLE and BACKING
+    // ignore the formant knob (owner's manual, Session 8).  Confirmed on
+    // the reference set (Session 16): chord_Cmaj_formant_max's reference
+    // matches the dry input (spectral 0.935, harmonic 0.913) while our
+    // formant-shifted render scored 0.785 / 0.097.
+    VariphraseParams hybridParams() const {
+        VariphraseParams p = params;
+        if (analysis.contentType == VariphraseAnalysis::ContentType::ENSEMBLE ||
+            analysis.contentType == VariphraseAnalysis::ContentType::BACKING)
+            p.formantShiftSemitones = 0.0f;
+        return p;
+    }
+
     void processMono(const float* input, float* output, int numSamples) {
         const Algorithm algo = algorithm.load(std::memory_order_relaxed);
         lastValidOutput = numSamples;
@@ -90,6 +104,9 @@ struct VariphraseEngine::Impl {
                 break;
 
             case Algorithm::Hybrid: {
+                // Shadows the member: formant zeroed for encode types without
+                // formant control (see hybridParams).
+                const VariphraseParams params = hybridParams();
                 // ── Hybrid routing (Algorithm v5) ────────────────────────────
                 // Updated Session 8: voiced-speech pitch shift now routes to LPC.
                 //
@@ -588,13 +605,15 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
         if (!out.empty()) return out;
     }
 
+    const VariphraseParams hp = pImpl->hybridParams();
+
     // ── Subband stretch for ENSEMBLE time-only (Session 15, US6564187) ───────
     // Pitch via per-band inst-frequency scaling was tested (chord_pitch_up7st
     // 39.6 vs 40.1 PV — a wash) and not adopted; ENSEMBLE pitch stays on PV.
     {
         const bool timeOnlyEns =
-            std::abs(pImpl->params.pitchShiftSemitones)   < 0.01f &&
-            std::abs(pImpl->params.formantShiftSemitones) < 0.001f &&
+            std::abs(hp.pitchShiftSemitones)   < 0.01f &&
+            std::abs(hp.formantShiftSemitones) < 0.001f &&
             std::abs(pImpl->params.timeStretchRatio - 1.0f) > 0.01f;
         if (pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid &&
             pImpl->analysis.contentType == VariphraseAnalysis::ContentType::ENSEMBLE &&
@@ -615,8 +634,8 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
     {
         const float st = pImpl->params.timeStretchRatio;
         const bool timeOnly =
-            std::abs(pImpl->params.pitchShiftSemitones)   < 0.01f &&
-            std::abs(pImpl->params.formantShiftSemitones) < 0.001f;
+            std::abs(hp.pitchShiftSemitones)   < 0.01f &&
+            std::abs(hp.formantShiftSemitones) < 0.001f;
         if (pImpl->analysis.contentType == VariphraseAnalysis::ContentType::BACKING &&
             timeOnly && std::abs(st - 1.0f) > 0.01f &&
             !pImpl->analysis.onsetSamples.empty()) {

@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 16 (2026-10-10) — firmware RE started
 
-Current score: 68.1 / 100 under METRIC v5 (= 52.5 under v4; the 51.8 reported at v28 used 2 stale renders) (v17 baseline = 34.0)
+Current score: 68.2 / 100 under METRIC v6 — v29 (v28 = 66.6 v6 / 68.1 v5 / 52.5 v4) (v17 baseline = 34.0)
   METRIC v4 (commit 7434abb): phase-blind spectral similarity (MR-STFT +
   log-mel, gain-matched) carries most of the composite; content-aware weights
   (speech/percussive/tonal by filename); SNR rescaled to 30 dB full marks.
@@ -162,6 +162,7 @@ Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
 Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8 (true 52.5)
 Metric v5 history: v28=68.1 (granular rate-scaling: identical at 48k)
+Metric v6 history: v28=66.6 → v29=68.2
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -334,6 +335,32 @@ METRIC v5 (Session 16): spectral_similarity level-matches by RMS ratio
   0.785) — consistent with ENSEMBLE ignoring the formant knob: our chord
   formant render is genuinely wrong (should be ~passthrough).
   Floor numbers: run dry passthrough vs each ref (see Session 16 log).
+
+METRIC v6 (Session 16): adds PITCH term harmonic_similarity — Pearson
+  correlation of the envelope-removed long-term spectrum (n_fft 16384,
+  50-4000 Hz): the harmonic comb, independent of formants and timing.
+  Weights (spectral/pitch/formant/transient/snr):
+    speech .35/.20/.20/.15/.10  tonal .50/.30/0/.10/.10
+    percussive .45/0/0/.45/.10 (unchanged — drum comb is meaningless)
+  Render-vs-dry margin on pitch cases: v5 +11.5 -> v6 +20.8 (vocal
+  pitch_down12st now beats dry: +3.6, was -3.5). pYIN median F0 was tried
+  first and rejected: it octave-jumped on a -36 dB subharmonic in the sine
+  formant renders (those renders are NOT an octave off — fundamental is
+  correct).
+  Remaining render<dry cases: drum_pitch (-7.3, see below),
+  vocal_time_halfspeed (-6.9).
+
+v29 (Session 16): ENSEMBLE/BACKING ignore the formant knob
+  (VariphraseEngine::Impl::hybridParams zeroes formantShift for those
+  encode types; owner's manual + chord ref ~ dry input). chord_formant
+  49.7 -> 81.5 (v6); only render that changed. Outputs:
+  analysis/plugin_outputs/hybrid_v29, results analysis/results/hybrid_v29.
+
+DRUM REFERENCES SUSPECT (Session 16): drum_hit_pitch_up7st reference has
+  the SAME spectral peaks as the dry sample (62/92/219/495/669 Hz) — not
+  transposed. drum_hit_time_2x reference peaks sit ~3.5 st BELOW dry.
+  Either recorded from a different key than the original, or settings
+  not as named. Check RECORDING_GUIDE / re-record before tuning drums.
 
 TRUE v28 BASELINE = 52.5 (not 51.8): the committed hybrid_v18d renders of
   vocal_aah_formant_downmax (35.7) and vocal_aah_pitch_up7st (37.5) were

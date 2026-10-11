@@ -93,8 +93,8 @@ def print_summary_table(results: list[dict]):
     if not results:
         return
 
-    col_w = [38, 10, 8, 8, 8, 8, 8]
-    headers = ['Test File', 'Null dBFS', 'SNR dB', 'Spectral', 'Formant', 'Transnt', 'SCORE']
+    col_w = [38, 10, 8, 8, 8, 8, 8, 8]
+    headers = ['Test File', 'Null dBFS', 'SNR dB', 'Spectral', 'Pitch', 'Formant', 'Transnt', 'SCORE']
     sep = '+' + '+'.join('-' * (w + 2) for w in col_w) + '+'
     row_fmt = '| ' + ' | '.join(f'{{:<{w}}}' for w in col_w) + ' |'
 
@@ -111,15 +111,16 @@ def print_summary_table(results: list[dict]):
         null_db = f"{r['null_rms_dbfs']:.1f}"
         snr = f"{r['snr_db']:.1f}"
         spectral = f"{r.get('spectral_similarity', float('nan')):.3f}"
+        pitch = f"{r.get('pitch_similarity', float('nan')):.3f}"
         formant = f"{r['formant_similarity']:.3f}"
         transient = f"{r['transient_score']:.3f}"
         score = f"{r['composite_score']:.1f}"
         scores.append(r['composite_score'])
-        print(row_fmt.format(name, null_db, snr, spectral, formant, transient, score))
+        print(row_fmt.format(name, null_db, snr, spectral, pitch, formant, transient, score))
 
     print(sep)
     avg = np.mean(scores)
-    print(row_fmt.format('AVERAGE', '', '', '', '', '', f"{avg:.1f}"))
+    print(row_fmt.format('AVERAGE', '', '', '', '', '', '', f"{avg:.1f}"))
     print(sep)
     print(f"\n  Overall composite score: {avg:.1f}/100")
 
