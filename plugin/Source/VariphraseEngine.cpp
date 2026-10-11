@@ -10,6 +10,7 @@
 #include <mutex>
 #include <string>
 #include <cstdlib>
+#include <cstdio>
 
 namespace VSE {
 
@@ -448,6 +449,155 @@ std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr,
     return cuts;
 }
 
+// V-Trainer-style SOLO encoder (vpenc.dll, VP-9000 encoder shipped with
+// V-Producer; research/HARDWARE_FIRMWARE.md "V-Trainer encoder").
+//   voicing  : D/E < kVoicedErr, D = Σ (x[i−L] − x[i])² and E = Σ x[i]²
+//              over one period (template 0: tbr = 3 → (1 − 0.3)/2 = 0.35)
+//   tracking : from mark m with period L, hill-climb the lag minimising D
+//              (window fixed at L), parabolic refinement, next mark m + L'
+//   epoch    : first mark of a voiced run = centre of the max-energy
+//              window of length L/4 within the first period (+L/8)
+//   range    : 22–2000 Hz (template pmin/pmax); unvoiced records ≈ 1 ms
+// Ported: run-level octave correction (0x10008da0 vote rule).  Not yet
+// ported: the 11.025 kHz decimated tracker, the candidate-list onset search
+// (0x100085d0), the backward run extension.
+std::vector<GrainCut> encodeGrainCutsVTrainer(const std::vector<float>& x, double sr) {
+    constexpr double kVoicedErr = 0.35;
+    std::vector<GrainCut> cuts;
+    const int n = (int)x.size();
+    const double Lmin = std::max(2.0, sr / 2000.0);
+    const double Lmax = std::min(sr / 22.0, 2047.0 * sr / 44100.0);
+    const int unvoicedLen = std::max(8, (int)std::lround(sr / 1000.0));
+    const int searchHop   = std::max(16, (int)std::lround(421.0 * sr / 44100.0));
+
+    auto D = [&](double m, int lag, int len) {
+        const int b = (int)std::lround(m);
+        double d = 0.0;
+        for (int i = 0; i < len; ++i) {
+            const int k = b + i;
+            if (k - lag < 0 || k >= n) return 1e30;
+            const double e = (double)x[k - lag] - (double)x[k];
+            d += e * e;
+        }
+        return d;
+    };
+    auto E = [&](double m, int len) {
+        const int b = (int)std::lround(m);
+        double e = 0.0;
+        for (int i = 0; i < len && b + i < n; ++i) e += (double)x[b + i] * x[b + i];
+        return e;
+    };
+    // Hill-climb + parabolic refinement of the lag around L0, window len.
+    auto track = [&](double m, double L0, double& err) {
+        const int len = std::max(2, (int)std::lround(L0));
+        int L = (int)std::lround(L0);
+        L = std::clamp(L, (int)std::ceil(Lmin), (int)std::floor(Lmax));
+        double dL = D(m, L, len);
+        for (int dir : {+1, -1}) {
+            while (true) {
+                const int Ln = L + dir;
+                if (Ln < Lmin || Ln > Lmax) break;
+                const double dn = D(m, Ln, len);
+                if (!(dn < dL)) break;
+                L = Ln; dL = dn;
+            }
+        }
+        double Lf = L;
+        const double d0 = D(m, L - 1, len), d2 = D(m, L + 1, len);
+        const double den = d0 - 2.0 * dL + d2;
+        if (den > 1e-20 && d0 < 1e29 && d2 < 1e29) {
+            const double off = 0.5 * (d0 - d2) / den;
+            if (std::abs(off) < 1.0) Lf += off;
+        }
+        const double e = E(m, len);
+        err = (e > 1e-12) ? dL / e : 1e9;
+        return std::round(Lf * 16.0) / 16.0;    // 1/16-sample record units
+    };
+    auto epochIn = [&](double start, double L) {
+        const int w = std::max(1, (int)std::lround(L / 4.0));
+        const int b = (int)std::lround(start), P = (int)std::lround(L);
+        if (b + P + w >= n) return start;
+        double acc = 0.0;
+        for (int i = 0; i < w; ++i) acc += (double)x[b + i] * x[b + i];
+        double best = acc; int bi = 0;
+        for (int i = 1; i < P; ++i) {
+            acc += (double)x[b + i + w - 1] * x[b + i + w - 1] - (double)x[b + i - 1] * x[b + i - 1];
+            if (acc > best) { best = acc; bi = i; }
+        }
+        int c = bi + (int)std::lround(L / 8.0);
+        while (c >= P) c -= P;
+        return start + c;
+    };
+
+    double pos = 0.0;
+    while ((int)pos + searchHop < n) {
+        // Onset search: candidate period from the ACF estimator, verified
+        // with the period-difference test one period later.
+        const float pc = estimateLocalPeriod(x, (int)std::lround(pos), sr, 0.0f);
+        bool voiced = false;
+        double L = pc, err = 1e9;
+        if (pc > 0.0f && pos + 3 * pc < n) {
+            L = track(pos + pc, pc, err);
+            voiced = err < kVoicedErr;
+        }
+        if (!voiced) {
+            // Unvoiced: fill this hop with ~1 ms records.
+            const double end = std::min((double)n, pos + searchHop);
+            while (pos + unvoicedLen <= end) {
+                cuts.push_back({ pos, (float)unvoicedLen, false });
+                pos += unvoicedLen;
+            }
+            if (pos < end) { cuts.push_back({ pos, (float)(end - pos), false }); pos = end; }
+            continue;
+        }
+        // Voiced run: align the first mark to the energy epoch, then step.
+        const double ep = epochIn(pos, L);
+        if (ep > pos + 0.5) { cuts.push_back({ pos, (float)(ep - pos), false }); }
+        std::vector<std::pair<double,double>> run;     // (mark, period)
+        double m = ep;
+        while (m + L < n - 1) {
+            double e2;
+            const double Ln = track(m + L, L, e2);
+            if (e2 >= kVoicedErr) break;
+            run.push_back({ m, L });
+            m += L;
+            L = Ln;
+        }
+        run.push_back({ m, L });
+        // Octave correction (0x10008da0): up to 32 sample points; P/k votes
+        // when D(P/k) ≤ D(P) or (D(P/k) − D(P))/E < oru/2 (oru = 0.04);
+        // the largest k with votes·32 ≥ checks·9 splits every interval.
+        constexpr double kOru = 0.04;
+        int bestK = 1;
+        {
+            const size_t R = run.size(), step = std::max<size_t>(1, R / 32);
+            int checks = 0, votes[7] = {0};
+            for (size_t i = 0; i < R; i += step) {
+                const double mm = run[i].first, P = run[i].second;
+                const int len = std::max(2, (int)std::lround(P));
+                const double dP = D(mm + P, len, len), eP = E(mm + P, len);
+                if (dP > 1e29 || eP < 1e-12) continue;
+                ++checks;
+                for (int k = 2; k <= 6; ++k) {
+                    const int lk = (int)std::lround(P / k);
+                    if (lk < Lmin) break;
+                    const double dk = D(mm + P, lk, len);
+                    if (dk <= dP || (dk - dP) / eP < kOru * 0.5) ++votes[k];
+                }
+            }
+            for (int k = 2; k <= 6; ++k)
+                if (checks > 0 && votes[k] * 32 >= checks * 9) bestK = k;
+        }
+        for (const auto& [mk, P] : run) {
+            const double sub = P / bestK;
+            for (int j = 0; j < bestK; ++j)
+                cuts.push_back({ mk + j * sub, (float)(std::round(sub * 16.0) / 16.0), true });
+        }
+        pos = run.back().first + run.back().second;
+    }
+    return cuts;
+}
+
 } // namespace
 
 // ─── Subband Time Stretch (US6564187B1, simplified) ─────────────────────────
@@ -723,9 +873,24 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     const double F = std::clamp(std::pow(2.0, pImpl->params.formantShiftSemitones / 12.0),
                                 0.5, 2.0);   // firmware clamps the formant ratio to [0.5, 2]
 
-    const std::vector<GrainCut> cuts = encodeGrainCuts(in, sr, /*epochAlign=*/true);
+    // VSE_ENC=vt selects the V-Trainer-style encoder (experiment).  Session
+    // 16 on the vocal set: 64.2 vs 65.6 for epoch-snapped cuts (V-Trainer
+    // aligns only each voiced run's first mark to the energy epoch, then
+    // steps by the tracked period; re-anchoring every mark to the energy
+    // epoch scored 62.5).  The VP-9000 encoder may differ from the V-Synth's.
+    const char* encSel = std::getenv("VSE_ENC");
+    const std::vector<GrainCut> cuts = (encSel && std::string(encSel) == "vt")
+        ? encodeGrainCutsVTrainer(in, sr)
+        : encodeGrainCuts(in, sr, /*epochAlign=*/true);
     if (cuts.size() < 2) return {};
     const size_t nc = cuts.size();
+    if (std::getenv("VSE_DEBUG")) {
+        size_t nv = 0; double sumL = 0, voicedSpan = 0;
+        for (size_t i = 0; i < nc; ++i) if (cuts[i].voiced) { ++nv; sumL += cuts[i].cwp; }
+        for (size_t i = 0; i + 1 < nc; ++i) if (cuts[i].voiced) voicedSpan += cuts[i+1].start - cuts[i].start;
+        std::fprintf(stderr, "cuts %zu voiced %zu meanL %.2f voiced-span %.0f of %d samples\n",
+                     nc, nv, nv ? sumL / nv : 0.0, voicedSpan, (int)in.size());
+    }
     std::vector<double> segStart(nc), segLen(nc);
     for (size_t i = 0; i < nc; ++i) {
         segStart[i] = cuts[i].start;

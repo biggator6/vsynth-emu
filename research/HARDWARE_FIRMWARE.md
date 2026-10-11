@@ -483,6 +483,60 @@ scores ±0.6, so the residual low-harmonic deficit at pitch +7 is not
 Energy. Remaining unknowns: the real encoder (epoch detection, voiced
 flags, info bits), and the mode→encode-type mapping.
 
+## V-Trainer encoder (VP-9000 V-Producer CD, Session 16)
+
+Source: `Vsynth_software/V-Producer*.zip` (gitignored; both editions
+unpack to identical files). Extract with `unshield` (Homebrew). The PC
+encoder is **`vpenc.dll`** (x86, 139 KB, C++ exports) used by
+`VTrainer.exe`; Ghidra project `Vsynth_software/ghidra_vt` (gitignored).
+The code is integer/fixed-point (Newton–Raphson reciprocal divide etc.) —
+evidently a port of the VP-9000's own encoder.
+
+**Encode types (`Vpenc_GetAlgoCaps`):** 1 = "Solo" (monophonic pitch
+sounds), 3 = "Backing" (polyphonic sounds 1), 5 = "Ensemble" (polyphonic
+sounds 2); VTrainer also knows hidden types 2 "XFG" and 4 "POL". **These
+are the V-Synth firmware's player-mode numbers** → mode 1 = SOLO (cd90
+read-velocity grain player), 3 = BACKING (e6e0 5-band decimated PCM
+grains), 5 = ENSEMBLE (db20 5-band × 6-sinusoid model). The V-Synth-only
+modes 6 (shares the SOLO player) and 8 (period-jump) include LITE.
+
+**Templates** (`Vpenc_SetTemplate(t, tbr, tsr, pmin, pmax, oru)`, read by
+VTrainer from the profile section "Template", template 0 selected):
+t0 = (3, 0, 22, 2000, 4), t1 = (8, 0, 22, 2000, 10), t2 = (1, 0, 22, 2000,
+5), t3 = (8, 5, 22, 2000, 5) [VTrainer reads key "oru1" for every
+template — a bug]. Encoder uses: period range 44100/pmax … min(44100/pmin,
+2047) samples; thresholds tsr/10, tbr/10, oru/100 (Q15). Default
+sensitivity (Vpenc_SetSens) = 127.
+
+**SOLO encoder (`Vpenc_Encode` type 1 → `0x100079d0` setup, `0x10007c70`
+main loop):** 44.1 kHz; 12288-sample buffers; two signal copies (×4
+decimated for tracking, full rate for refinement); positions in
+1/16-sample units, periods in 16.16.
+- distance `D(lag) = Σ (x[i−lag] − x[i])²` over a window of ONE PERIOD
+  (`0x1000a050`), energy `E = Σ x²` (`0x1000a0b0`); hill-climb from the
+  previous period + 3-point parabolic refinement (`0x1000aac0`,
+  `0x1000a3f0`); full re-search (`0x10009480`) when D > E/4;
+- **voicing: D/E < (1 − tbr/10)/2 = 0.35** (template 0);
+- **first mark of a voiced run** (`0x10008480`): centre of the max-energy
+  window of length P/4 within one period (+P/8, wrapped) — energy epoch;
+  later marks step by the tracked (sub-sample) period;
+- onset search (`0x10008240`/`0x10008540`/`0x100085d0`/`0x10008730`):
+  hop 421 samples, energy gate, candidate periods with octave checks
+  (D(2L), D(3L)), full-rate refine stopping at normalised diff 0.5;
+- **post-run octave correction** (`0x10008da0`): 32 sample points; P/k
+  (k = 2…6) votes when D(P/k) ≤ D(P) or (D(P/k) − D(P))/E < oru/2; the
+  largest k with votes·32 ≥ checks·9 splits every interval; also a
+  2P/merge check and backward extension of the run;
+- unvoiced regions: short records (~44 samples = 1 ms constant).
+
+**Ported** as `encodeGrainCutsVTrainer` (experiment, `VSE_ENC=vt`):
+voicing test, tracker, first-mark energy epoch, run-level octave
+correction, 22–2000 Hz, 1 ms unvoiced records. Vocal set with the
+firmware SOLO player: 64.2 vs **65.6** for the v32 positive-peak-snapped
+cuts (without octave correction 56.0 — tracks locked an octave low;
+re-anchoring every mark to the energy epoch 62.5). The v32 encoder stays
+default; the VP-9000 encoder may not equal the V-Synth's.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).
