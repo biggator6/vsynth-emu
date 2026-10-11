@@ -326,8 +326,13 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     reference lacks (< -52 dB). With exact L the player reproduces all
     three transposed notes at reference levels. Available via env
     VSE_PERIODJUMP=B/D/T (offline experiment switch); BACKING decision
-    waits on the drum re-recording check. Our encoder stores INTEGER
-    periods; firmware stores 1/16 sample — TODO sub-sample periods.
+    waits on the drum re-recording check.
+  - Session 16 late: grain periods now SUB-SAMPLE (parabolic ACF peak,
+    quantised to 1/16 sample) and grain starts accumulate fractionally,
+    as in the firmware's contiguous records. Score-neutral (68.42 ->
+    68.40, all cases within +-0.6); kept as firmware-faithful. The
+    period-jump test's "97 Hz subharmonic" was an ACF-estimator tie, not
+    the player (-119 dB on a perfect tone).
   - v30: ENSEMBLE pitch -> SUBBAND (Session 15's rejection was metric-v4
     noise). chord_pitch 66.8 -> 71.6. The PV had been DROPPING the
     transposed C and E of the chord (only G + a stray unshifted 523 Hz).

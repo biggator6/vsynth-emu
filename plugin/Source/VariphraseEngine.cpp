@@ -333,7 +333,7 @@ Algorithm VariphraseEngine::getAlgorithm() const {
 
 namespace {
 
-struct GrainCut { int start; float cwp; bool voiced; };
+struct GrainCut { double start; float cwp; bool voiced; };
 
 // Encoder window lengths in samples at rate sr (1024 / 256 at 48 kHz).
 int grainAcfWindow(double sr)   { return (int)std::lround(1024.0 * sr / 48000.0); }
@@ -386,21 +386,41 @@ float estimateLocalPeriod(const std::vector<float>& x, int start, double sr,
         const double v = (s / e0) * (double(w) / double(w - half));
         if (v >= 0.95 * bestV) bestLag = half;
     }
-    return float(bestLag);
+    // Sub-sample period: parabolic interpolation on the ACF peak, quantised
+    // to 1/16 sample — the V-Synth stores grain periods in 1/16-sample units
+    // (firmware record format, research/HARDWARE_FIRMWARE.md pass 4).
+    auto acf = [&](int lag) {
+        double s = 0.0;
+        for (int i = 0; i + lag < w; ++i) s += double(x[start+i]) * x[start+i+lag];
+        return (s / e0) * (double(w) / double(w - lag));
+    };
+    double lag = bestLag;
+    if (bestLag - 1 >= 2 && bestLag + 1 < w) {
+        const double y0 = acf(bestLag - 1), y1 = acf(bestLag), y2 = acf(bestLag + 1);
+        const double den = y0 - 2.0 * y1 + y2;
+        if (den < -1e-12) {
+            const double d = 0.5 * (y0 - y2) / den;
+            if (std::abs(d) < 1.0) lag += d;
+        }
+    }
+    return float(std::round(lag * 16.0) / 16.0);
 }
 
 std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr) {
     std::vector<GrainCut> cuts;
     const int n = (int)x.size();
+    // Records are contiguous (firmware format: each record's length is the
+    // period in 1/16-sample units), so grain starts accumulate the
+    // fractional periods; analysis windows start at the nearest sample.
     const int hop = grainUnvoicedHop(sr);
-    int pos = 0;
+    double pos = 0.0;
     float prev = 0.0f;
-    while (pos + hop < n) {
-        const float p = estimateLocalPeriod(x, pos, sr, prev);
+    while ((int)pos + hop < n) {
+        const float p = estimateLocalPeriod(x, (int)std::lround(pos), sr, prev);
         if (p > 0.0f) {
             cuts.push_back({ pos, p, true });
             prev = p;
-            pos += std::max(2, (int)std::lround(p));
+            pos += std::max(2.0f, p);
         } else {
             cuts.push_back({ pos, (float)hop, false });
             prev = 0.0f;
@@ -618,8 +638,8 @@ std::vector<float> VariphraseEngine::periodJumpResynthOffline(
     std::vector<double> segStart(cuts.size()), segLen(cuts.size());
     for (size_t i = 0; i < cuts.size(); ++i) {
         segStart[i] = cuts[i].start;
-        const int end = (i + 1 < cuts.size()) ? cuts[i + 1].start : n;
-        segLen[i] = std::max(2, end - cuts[i].start);
+        const double end = (i + 1 < cuts.size()) ? cuts[i + 1].start : (double)n;
+        segLen[i] = std::max(2.0, end - cuts[i].start);
     }
 
     auto tap = [&](double pos) -> double {

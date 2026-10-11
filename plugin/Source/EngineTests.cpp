@@ -232,10 +232,10 @@ int main() {
             return eng.periodJumpResynthOffline(in);
         };
         auto up = pj(1.0f, 7.0f);
-        // Search above 150 Hz: our encoder stores INTEGER periods (369 vs
-        // 369.23), so each splice leaves a tiny step and the output also
-        // repeats at the ~2-period splice pattern (97 Hz).  The firmware
-        // stores periods in 1/16-sample units — TODO: sub-sample periods.
+        // Search 150–400 Hz: on a perfectly periodic output the unnormalised
+        // ACF has equal peaks at one and two periods (246 / 493 samples),
+        // and an 80 Hz floor admits the second (reads 97.4 Hz).  The output
+        // itself has no subharmonic (−119 dB at 97 Hz, checked offline).
         const double f0 = up.empty() ? 0.0 : acfF0(up, 150.0, 400.0);
         check(std::abs(f0 - 194.8) < 4.0, "period-jump pitch +7st F0",
               "acf F0 " + std::to_string(f0) + " want 194.8");
