@@ -304,8 +304,11 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
   - Encoder starts via C++ virtual call (from 0x89440ae0 "NOW ENCODING") —
     not statically traceable. Decompiler needs per-range FPSCR mode
     tracking (fschg / lds FPSCR) before the audio cluster reads cleanly.
-  - Next: FPSCR-tracking script; then 0x894e1920 (voice update) and the
-    0x89503980-0x89507000 FPU cluster; resolve the 64x6 kernel reader.
+  - Ghidra pass 3: DECOMPILER FIXED (research/ghidra_scripts/README.md).
+    Analog OSCs = asm at 0x89508800.. (phase step x 220/44100 -> 44.1k
+    confirmed). 64x6 kernel = PCM playback interpolator (0x8950eb60,
+    6 frac bits, int16, + one-pole LPF) — plain resampling, not grains.
+  - Next: find the VariPhrase grain player + encoder.
 
 44.1 kHz EXPERIMENT (Session 16, 2026-10-10) — NO MEASURABLE DIFFERENCE:
   Method: resample 48k dry inputs (vocal/chord/drum) to 44.1k, render,

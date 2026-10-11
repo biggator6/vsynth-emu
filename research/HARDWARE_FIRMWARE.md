@@ -184,6 +184,43 @@ precision). A single global FPSCR_PR/SZ assumption mis-decompiles these
 linearly, tracks `fschg` / `lds …,FPSCR` (constant-loaded) and sets the
 FPSCR_PR/FPSCR_SZ register values per address range before decompiling.
 
+## Ghidra pass 3 (2026-10-10) — decompiler fixed, DSP region mapped
+
+**Decompiler fix** (scripts in `research/ghidra_scripts/`, see README):
+`FpscrFix` tracks `fschg` / `lds rN,fpscr` per address; `ReadOnlyCode`
+makes 0x89300000–0x8955FFFF read-only so literal-pool constants fold;
+`DumpRange` decompiles with RespectReadOnly. Float code now reads cleanly.
+`SweepRegion` added 262 functions in 0x894D0000–0x89540000 (hand-written
+asm Ghidra had skipped).
+
+**Hand-written DSP asm** sets FPSCR = 0x00040001: single precision,
+round-to-zero, denormals flushed. Block size **32 samples**.
+
+**Analog oscillators** — `0x89508800`, `…8aa0`, `…8c20`, `…8db0`,
+`0x89509030`, `0x895094c0` (no static callers; function-pointer slots):
+phase accumulator `phase += freq × 0.004988662` (= 220/44100 — confirms
+the **44.1 kHz** engine rate), piecewise waveform with shape and per-sample
+hard sync, one-pole parameter smoothing (×0.03125 per block), output ×2³¹,
+written as stereo pairs. Dispatcher `0x8950bf70` switches on a mode field
+(+0x80: cases 1/3/5/6/8) for setup / update / parameter routines; driven
+from the pitch code at `0x894f3110` (which uses 1/1200 cents constants).
+
+**PCM sample playback** — `0x8950eb60` (called by `0x8950eab0`): the
+**64×6 interpolation kernel at 0x8950ee00 is the PCM playback
+interpolator** (addressed PC-relative, hence no pointer). Read position is
+fixed-point with 6 fractional bits → kernel phase (64 phases × 6 taps
+over int16 samples; stereo = packed halves). Output = Σ·gain, then a
+per-voice one-pole lowpass `y += (x·g − y)·c`. Caller handles loop
+start/end, forward and backward loops, octave-shifted step. **No grain
+windows → this is plain resampling (VariPhrase OFF), not the grain
+engine.** For our engine: Vari-OFF playback should use this kind of
+6-tap polyphase interpolator; the kernel's phase 0 is not an identity
+(−0.106, 0.123, 0.859, 0.123, −0.106, 0.004), so it slightly band-limits.
+
+**Still not found:** the VariPhrase grain player and the encoder. Next:
+look for code reading encoded grain data (per-grain pitch records) with
+two overlapping windowed channels — likely elsewhere in 0x894D–0x8954.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).
