@@ -395,6 +395,35 @@ path (which we can now make firmware-exact).
 offset); find who computes f(+0x2c) (formant ratio from the −63…+63
 knob) and f(+0x70)/f(+0x9c); pin mode↔type by the encoder.
 
+## Ghidra pass 7 (2026-10-10) — parameter converters and the formant ratio
+
+**PCM voice note-on `0x8950b5b0`** fills the player's rate fields (player
+struct = voice + 0xd4) from converters over a voice-parameter block V:
+
+| converter | → player field | formula (V offsets) |
+|---|---|---|
+| `894f3a00` pitch | +0x70 | x = V8 + env·V1c + lfo·V34 + keyfollow + bend; clamp **±6000 cents**; ratio = 2^(x/1200) (× V+0xc) |
+| `894f3ac0` time | +0x7c (signed → reverse) | x = V10 + env·V24 + lfo·V3c, × modulation; clamp **±5.0** |
+| `894f3b30` formant | +0x74 | x = **V14 + env·V2c + lfo·V44 (octaves)**; ratio = **clamp(ctl·2^x, 0.5, 2.0)** — ±1 octave hard limit (`ctl` = modulation value from V+0x8c8, normally 1) |
+| `894f3dc0` / `894f3e20` | +0x80 / +0x84 | clamp(±1)·V5c (level/pan-type modulators) |
+(`894f3c90` / `894f3d40` / `894f3ba0` are update-time variants.)
+SOLO grain read velocity (player +0x150/+0x154) is copied from +0x14c at
+mode-6 setup (`0x8950fba0`), which also seeds the window parameter 1.2
+(+0x174) used by `0x8950cde0`.
+
+**Knob curves** (patch → voice conversion, 0x894dc8b0–0x894de110): depth
+knobs (−63…+63) map as **sign(k)·(k/63)²·range** (signed square; range
+constant per destination at +0x34/+0x38 of the source block). The main
+Formant knob's store into V+0x14 is not yet pinned (converters write via
+float-array indices).
+
+**Interpretation of the Session 15 formant asymmetry:** knob ±63 → at most
+±1 octave, then clamp [0.5, 2]. Formant-down measured ≈ 0.5 = the clamp;
+formant-up saturated ≈ ×1.68 — plausibly the SOLO engine's window
+mechanics (`0x8950cde0`: window param 1.2, cap 1.9 − w, rate-dependent
+pieces over [0.5, 1) and [1, 2)), i.e. the patent's wl ≤ ppw clamp, not
+the knob mapping. To confirm by finishing `cde0` / `d0f0`.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).

@@ -9,7 +9,9 @@ public class FindConsts extends GhidraScript {
     @Override public void run() throws Exception {
         String[] args = getScriptArgs();
         PrintWriter out = new PrintWriter(new FileWriter(args[0]));
-        double[] cs = {440.0, 1.4426950, 0.6931472, 0.0577623, 17.312340, 1.0594631, 0.9438743, 69.0, 3.3219281, 0.30103,
+        double[] cs;
+        if (args.length > 1) { cs = new double[args.length - 1]; for (int i = 1; i < args.length; i++) cs[i-1] = Double.parseDouble(args[i]); }
+        else cs = new double[]{440.0, 1.4426950, 0.6931472, 0.0577623, 17.312340, 1.0594631, 0.9438743, 69.0, 3.3219281, 0.30103,
                        8.17579891, 1200.0, 0.0008333333, 48000.0, 44100.0, 2.0833333e-05, 0.6666667, 1.6666666, 0.75};
         Memory mem = currentProgram.getMemory();
         Address a = currentProgram.getMinAddress(); long n = currentProgram.getMaxAddress().subtract(a);

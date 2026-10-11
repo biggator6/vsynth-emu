@@ -351,6 +351,11 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     (US6564187) = ENSEMBLE?; mode 3 -> e6e0 = 5-band decimated PCM grains
     = BACKING?; mode 8 -> e1e0 period-jump = ?. Window-param maths in
     0x8950cde0 (1.2, 1.9 cap, 3.0962/4.4208 cubic) — formant saturation?
+  - PASS 7: converters decoded. Pitch = 2^(clamp(cents,+-6000)/1200);
+    time clamp +-5; FORMANT RATIO = clamp(2^x, 0.5, 2.0), x in octaves
+    (base + env*depth + lfo*depth). Depth knobs: sign(k)*(k/63)^2*range.
+    S15 asymmetry (down = 0.5, up ~1.68) consistent with clamp + SOLO
+    window mechanics (0x8950cde0), not knob mapping — confirm next.
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4
     emulator (JE-8086 style, user-supplied ROM, never distributed) is a
