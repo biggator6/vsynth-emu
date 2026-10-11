@@ -16,7 +16,10 @@ Rebuild the project from scratch (order matters):
    `$H firmware/ghidra vsynthxt -import firmware/unpacked/V-SynthXT.rom.2.bin -loader BinaryLoader -loader-baseAddr 0x89300000 -processor SuperH4:LE:32:default -scriptPath $S -preScript SetupSH4.java`
 3. Fill in the DSP region's functions, then FPU modes, then mark code read-only:
    `$H firmware/ghidra vsynthxt -process V-SynthXT.rom.2.bin -noanalysis -scriptPath $S -postScript SweepRegion.java 894d0000 89540000 -postScript FpscrFix.java /tmp/fpscr.txt -postScript ReadOnlyCode.java 89560000`
+3b. `-postScript AssumeR0.java` — players that take the FPU mode from the
+    caller in r0 (`lds r0,fpscr`): assume r0 = 0x00040001 at entry.
 4. Dump/decompile a range: `-postScript DumpRange.java <lo> <hi> <outprefix>` (writes `.idx` + `.c`).
+   `Disasm.java <out> <addr> <count> ...` — raw listing with pool values.
 
 Why each step: SH-4 code switches FPU mode (`fschg`, `lds rN,fpscr`) inside
 functions; Ghidra's decompiler needs FPSCR_PR/SZ assumed per address

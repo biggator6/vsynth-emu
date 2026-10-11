@@ -311,7 +311,14 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
   - PROBABLE VARIPHRASE PLAYER: 0x8950e1e0 (+ sibling 0x8950d890): two
     12.20 accumulators (phrase walk vs read rate), event-table walker
     0x8950c880 (= syllable/event marks), 0.6 limit in grain-length math.
-    Next: fix r0-loaded FPSCR in e1e0, then read it fully.
+  - PASS 4: GRAIN PLAYER DECODED (0x8950e1e0) — see HARDWARE_FIRMWARE.md.
+    Records {u16 period in 1/16 smp (0xFFFF=continue), u16 info}; period
+    interpolated to next record; read ptr at pitch rate jumps +-1 period to
+    stay within one period of the phrase walk; output = linear crossfade of
+    taps at Q and Q+L, w = 5*(clamp(lag/L,0.4,0.6)-0.4); 2-pt linear interp
+    at 1/16 sample. No formant control (formant follows pitch) = the
+    ENSEMBLE/BACKING player. SOLO/formant player not yet found.
+    NEXT: implement this player for ENSEMBLE/BACKING pitch + test.
 
 44.1 kHz EXPERIMENT (Session 16, 2026-10-10) — NO MEASURABLE DIFFERENCE:
   Method: resample 48k dry inputs (vocal/chord/drum) to 44.1k, render,

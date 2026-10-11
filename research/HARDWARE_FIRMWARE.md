@@ -241,6 +241,64 @@ loaded from r0 (not a constant) — needs FpscrFix to follow
 `e500` / `e560` fully to recover grain length, window shape, the 0.6
 limit's role, and how the two rates map to time / pitch / formant.
 
+## Ghidra pass 4 (2026-10-10) — VariPhrase grain player decoded
+
+Players `0x8950e1e0`, `0x8950d890`, `0x8950db20` take the FPU mode from the
+caller in r0 (`AssumeR0.java`). With that, `e1e0` decompiles cleanly.
+
+### Encoded phrase format (`0x8950e500` next / `0x8950e560` prev)
+A stream of 4-byte **grain records** `{u16 length, u16 info}`:
+- `length` = the grain's pitch period in **1/16-sample units**; 0xFFFF =
+  "continue" (lengths accumulate across records, for long unvoiced spans);
+- `info & 0x1F8` → a per-grain field (`(info & 0x1F8) << 6` stored at +4);
+- the loader also reads the NEXT record's length, so the player can
+  interpolate the period across the grain.
+Positions throughout are 1/16-sample units with a 20-bit fraction (12.20).
+
+### Grain player `0x8950e1e0` (per output sample, 32/block)
+1. Phrase position `P` += time rate (struct +0x11c, halved per step).
+   Crossing the segment end → load next record; crossing the next event
+   boundary (+0x2c) → event walker `0x8950c880` / `0x8950ca70`.
+2. Current period `L = cur + (P − segStart)·(1/cur)·(next − cur)` —
+   linear interpolation from this grain's period to the next one's.
+3. Read pointer `Q` += read rate (+0x30 = 2²⁵·f(+0x70)·f(+0x9c); 2²⁵ =
+   unity when a flag at +0xec is clear). P is clamped to [L, end − L];
+   if `Q > P` → `Q −= L`; if `Q + L ≤ P` → `Q += L` (forward-play case;
+   mirrored for reverse). **Q stays within one period behind P, jumping
+   by exactly one (interpolated) period.**
+4. Output = `s(Q) + (s(Q+L) − s(Q))·w`, `w = 5·(clamp((P−Q)/L, 0.4, 0.6) −
+   0.4)`: two taps one period apart, **linear crossfade across 20 % of a
+   period centred on half-period lag**. Each tap is 2-point linear
+   interpolation at 1/16-sample resolution (`(pos & 0xF)·0.0625`).
+5. Gain: one-pole smoothed amplitude, output × g² × 65536; mono written to
+   both channels, stereo samples packed as 16-bit halves.
+
+**Interpretation.** A period-synchronous delay-line pitch shifter: the
+read pointer resamples at the read rate (pitch AND formants scale
+together) while period-exact jumps keep it locked to the phrase walk
+(time). **No formant control** — matches the manual for ENSEMBLE/BACKING
+(formant follows pitch) and Session 16's v29 change. The crossfade is
+linear over 0.4–0.6 period, NOT the patent's two half-period-offset
+triangular windows.
+
+### Other players
+- `0x8950d890`: plain resampling, single position at `rate·f70·f9c` with
+  24-bit fraction and linear interpolation; walks the event table but no
+  period jumps (pitch and time coupled) — likely an encoded-sample mode
+  with VariPhrase time control off.
+- `0x8950db20`: additive bank — 6 cosine-table oscillators per call
+  (`0x8950dc50`, 256-entry table at 0x8950ddd0, 16-bit phases), ×5, then
+  3 biquads (`0x8950c720`). Unidentified oscillator type.
+- `0x8950eab0`/`eb60`: Vari-OFF PCM playback with the 64×6 kernel (pass 3).
+
+### Implications for our engine
+- ENSEMBLE / BACKING pitch: implement this player (resample at pitch
+  ratio + one-period jumps + 0.4–0.6 linear crossfade, linear interp at
+  1/16 sample) instead of the phase vocoder; time = phrase-walk rate.
+- Grain periods are per-record and interpolated to the next record.
+- The SOLO (formant-capable) player is still not found — it must
+  re-trigger grains at a new period (PSOLA-style); search next.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).
