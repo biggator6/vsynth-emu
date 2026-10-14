@@ -372,6 +372,13 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     epoch for the first mark, octave-correction vote). Ported as
     encodeGrainCutsVTrainer (VSE_ENC=vt): 64.2 vs 65.6 default -> not
     adopted. unshield installed via brew for the InstallShield cabs.
+  - V-TRAINER LIVE ORACLE (Session 16, 2026-10-14; research/VPENC_ABI.md §5):
+    real SOLO grain records = vpdt chunk (research/vpdt_parse.py). Real
+    marks used as our cuts: vocal 65.6 vs 66.3 default -> mark placement is
+    NOT the vocal gap; it is downstream. Real marks win time cases (time_2x
+    73.1), lose formant_down / pitch_up. Next suspect: per-record info>>3
+    field (firmware repeat/hold count) — unimplemented. Diagnostics:
+    VSE_DUMPCUTS=file, VSE_CUTSFILE=file.
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4
     emulator (JE-8086 style, user-supplied ROM, never distributed) is a

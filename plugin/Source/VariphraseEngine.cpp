@@ -879,11 +879,32 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     // steps by the tracked period; re-anchoring every mark to the energy
     // epoch scored 62.5).  The VP-9000 encoder may differ from the V-Synth's.
     const char* encSel = std::getenv("VSE_ENC");
-    const std::vector<GrainCut> cuts = (encSel && std::string(encSel) == "vt")
+    std::vector<GrainCut> cuts = (encSel && std::string(encSel) == "vt")
         ? encodeGrainCutsVTrainer(in, sr)
         : encodeGrainCuts(in, sr, /*epochAlign=*/true);
+    // Diagnostic: VSE_CUTSFILE = "start len voiced" lines (e.g. the real
+    // V-Trainer records parsed from a VP-9000 sample's vpdt chunk).
+    if (const char* cf = std::getenv("VSE_CUTSFILE")) {
+        if (FILE* f = std::fopen(cf, "r")) {
+            std::vector<GrainCut> ext;
+            double st, len; int v;
+            while (std::fscanf(f, "%lf %lf %d", &st, &len, &v) == 3)
+                ext.push_back({ st, (float)len, v != 0 });
+            std::fclose(f);
+            if (ext.size() >= 2) cuts = ext;
+        }
+    }
     if (cuts.size() < 2) return {};
     const size_t nc = cuts.size();
+    if (const char* dump = std::getenv("VSE_DUMPCUTS")) {   // diagnostic: start len voiced
+        if (FILE* f = std::fopen(dump, "w")) {
+            for (size_t i = 0; i < nc; ++i) {
+                const double end = (i + 1 < nc) ? cuts[i + 1].start : (double)in.size();
+                std::fprintf(f, "%.4f %.4f %d\n", cuts[i].start, end - cuts[i].start, (int)cuts[i].voiced);
+            }
+            std::fclose(f);
+        }
+    }
     if (std::getenv("VSE_DEBUG")) {
         size_t nv = 0; double sumL = 0, voicedSpan = 0;
         for (size_t i = 0; i < nc; ++i) if (cuts[i].voiced) { ++nv; sumL += cuts[i].cwp; }
