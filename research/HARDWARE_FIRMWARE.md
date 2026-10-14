@@ -545,12 +545,19 @@ shown "ENSEMBLE"), 5 = ENSEMBLE, 6 = FOR4, 7 = FORO, 8 = UWA. Codes 1–5 =
 V-Trainer's algorithm numbers. So PCM player modes 6 and 8 are **FOR4** and
 **UWA** (internal types, presumably preset waves), not LITE.
 
-**Oscillator kinds** (`0x894f2010`, 1–4): 1 → `0x894f3590` (modes 0/1/2;
-mode 0 → `0x89509870`/`89509f52` dispatch through a waveform table into the
-asm analog oscillators → kind 1 = ANALOG), 2 → `0x894f3660` (PCM; mode − 1
-> 7 exits, so **mode 0 = LITE has no case here** — LITE must be mapped to
-another mode before this switch; mapping not yet found), 3 → `0x89505170`,
-4 → `0x895097d0` (EXT IN).
+**Oscillator kinds** (`0x894f2010`, 1–4) — corrected: **1 = PCM, Vari
+OFF** → `0x894f3590` (modes 0/1/2; mode 0 → `0x89509870`/`89509f52`: plain
+linear-interpolation resampler, int16 reads, position += pitch × time,
+gain smoothing 1/32 per sample, loop/end variants via a jump table at
+0x89509950/58); **2 = PCM, Vari ON** → `0x894f3660` (mode − 1 > 7 exits,
+so **mode 0 = LITE has no case** here); 3 → `0x89505170` (analog); 4 →
+`0x895097d0` (EXT IN). The per-block renderer `0x894f2800` calls the
+installed player (+0x964, or +0x968/+0x96c for kind-1 mode 0xd). All 14
+sites that build offset 0x964 are in these switches — **no separate LITE
+install exists**, so LITE (Vari ON) must run through an existing mode,
+most plausibly mode 1 (the SOLO player, the only other formant-capable
+one), differing only in its records' info bits (0x4 patent path, 0x1 pitch
+gate, 0x2 formant gate). Needs an exported LITE sample to confirm.
 
 **V-Synth sample files use the VP-9000 RIFF layout**: chunk table at
 0x897a7de4 = vpfl, vmdl, vpsc, vpno, vplp, vpdt, LIST, rdmd, data, link;
