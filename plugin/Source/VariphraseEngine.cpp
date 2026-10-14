@@ -334,7 +334,7 @@ Algorithm VariphraseEngine::getAlgorithm() const {
 
 namespace {
 
-struct GrainCut { double start; float cwp; bool voiced; };
+struct GrainCut { double start; float cwp; bool voiced; int info = -1; };   // info: record info word (−1 = unknown)
 
 // Encoder window lengths in samples at rate sr (1024 / 256 at 48 kHz).
 int grainAcfWindow(double sr)   { return (int)std::lround(1024.0 * sr / 48000.0); }
@@ -887,9 +887,12 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     if (const char* cf = std::getenv("VSE_CUTSFILE")) {
         if (FILE* f = std::fopen(cf, "r")) {
             std::vector<GrainCut> ext;
-            double st, len; int v;
-            while (std::fscanf(f, "%lf %lf %d", &st, &len, &v) == 3)
-                ext.push_back({ st, (float)len, v != 0 });
+            char line[256];
+            while (std::fgets(line, sizeof line, f)) {
+                double st, len; int v, info = -1;
+                const int k = std::sscanf(line, "%lf %lf %d %d", &st, &len, &v, &info);
+                if (k >= 3) ext.push_back({ st, (float)len, v != 0, k == 4 ? info : -1 });
+            }
             std::fclose(f);
             if (ext.size() >= 2) cuts = ext;
         }
@@ -935,6 +938,24 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     const double walk = 1.0 / stretch;
     double P = 0.0, timer = 1e9, ppw = segLen[0];
     size_t seg = 0;
+    // Record selection.  Default: the record containing P.  VSE_ANCHOR:
+    // firmware scheduler (0x8950ce80 / d6f0) — an anchor walks the source at
+    // max(rate,1); when it passes the record end while P is still inside,
+    // the record REPEATS if its budget ((info & 0x1F8) << 6; unknown info or
+    // last record = unlimited) covers the repeat cost, else playback moves
+    // on to the next record; records P has already passed are skipped.
+    const bool anchorMode = std::getenv("VSE_ANCHOR") != nullptr;
+    double anchor = 0.0, anchorStep = std::max(A, 1.0);
+    auto budgetOf = [&](size_t i) -> double {
+        if (i + 1 >= nc || cuts[i].info < 0) return 1e30;          // unlimited
+        return (double)((cuts[i].info & 0x1F8) << 6);
+    };
+    double budget = budgetOf(0);
+    auto repeatCost = [&](double a, double t) {
+        double x = (a < 1.0 ? (3.0 - 2.0 * a) : (1.5 - 0.5 * a));
+        x = std::max(0.0, x) * std::abs(t) * 8192.0;
+        return x >= 2048.0 ? x : std::max(0.0, 2.0 * x - 2048.0);
+    };
     // Energy-OFF highpass (Chamberlin SVF), coefficients smoothed per
     // 32-sample block as in 0x8950cde0.
     double low = 0, band = 0, fCoef = 0, q = 1.2;
@@ -944,7 +965,25 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     if (const char* e = std::getenv("VSE_ENERGY")) energy = std::atof(e);
 
     for (int t = 0; t < outLen; ++t) {
-        while (seg + 1 < nc && P >= segStart[seg + 1]) ++seg;
+        if (!anchorMode) {
+            while (seg + 1 < nc && P >= segStart[seg + 1]) ++seg;
+        } else {
+            anchor += anchorStep;
+            const double segEnd = segStart[seg] + segLen[seg];
+            if (anchor >= segEnd) {
+                const double cost = repeatCost(anchorStep, walk);
+                if (P < segEnd && budget > 0.0 && budget >= cost) {
+                    if (budget < 1e29) budget -= cost;
+                    while (anchor >= segStart[seg] + segLen[seg]) anchor -= segLen[seg];
+                } else if (seg + 1 < nc) {
+                    ++seg; budget = budgetOf(seg);
+                    while (seg + 1 < nc && budget > 0.0 && P >= segStart[seg] + segLen[seg]) {
+                        anchor += segLen[seg];
+                        ++seg; budget = budgetOf(seg);
+                    }
+                }
+            }
+        }
         const double C = segLen[seg];
         const double N = (seg + 1 < nc) ? segLen[seg + 1] : C;
         const double frac = std::clamp((P - segStart[seg]) / C, 0.0, 1.0);
@@ -965,6 +1004,7 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
                 v   = A;
                 wl  = ppw;
             }
+            anchorStep = std::max(voiced ? A : v, 1.0);
             Chan& c  = ch[next];
             next ^= 1;
             c.start  = segStart[seg] + os;

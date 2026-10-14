@@ -378,7 +378,12 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     NOT the vocal gap; it is downstream. Real marks win time cases (time_2x
     73.1), lose formant_down / pitch_up. Next suspect: per-record info>>3
     field (firmware repeat/hold count) — unimplemented. Diagnostics:
-    VSE_DUMPCUTS=file, VSE_CUTSFILE=file.
+    VSE_DUMPCUTS=file, VSE_CUTSFILE=file (optional 4th column = info).
+  - Repeat budget + anchor scheduler decoded (0x8950d6f0) and implemented
+    (VSE_ANCHOR, default off): 66.26 -> 66.00 default cuts, 65.63 -> 65.51
+    real cuts. Scheduler ruled out too. BACKING and ENSEMBLE encodes have
+    byte-identical vpdt (5 band streams) — encode type only picks the
+    player.
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4
     emulator (JE-8086 style, user-supplied ROM, never distributed) is a

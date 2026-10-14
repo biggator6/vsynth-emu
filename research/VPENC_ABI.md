@@ -189,3 +189,28 @@ pitch +7 (63.5 vs 66.7). **Conclusion: grain-mark placement is not the
 remaining vocal gap — it is downstream** (player details, e.g. the
 unimplemented per-record `info >> 3` repeat/hold field, Energy, or
 reference/metric factors).
+
+## 6. Repeat budget, anchor scheduler, BACKING/ENSEMBLE data (2026-10-14)
+
+**Repeat budget (`0x8950d6f0`, decoded exactly):** a = max(rate, 1) (anchor
+speed), t = |time rate|; x = (1.5 − 0.5a)·t·8192 (a ≥ 1; (3 − 2a) for
+a < 1), ≥ 0; cost = x if x ≥ 2048 else max(0, 2x − 2048). Budget per
+record = (info & 0x1F8) << 6 = (info >> 3)·512 (last record 0x7E00 =
+unlimited). When the anchor passes a record's end while P is still inside
+it, the record repeats if budget ≥ cost (budget −= cost), else playback
+moves on to the next record; records P has passed are skipped (anchor +=
+their length). Implemented in the firmware SOLO player behind
+`VSE_ANCHOR` (default off).
+
+**Result (44.1 k vocal input, vocal mean):** default cuts 66.26 → 66.00
+with the anchor scheduler; real V-Trainer records + real info 65.63 →
+65.51. Every case within ±0.1 except time 2× (−1.1…−1.3). **The scheduler
+and repeat budget do not explain the gap either** — together with §5,
+SOLO encoding and record scheduling are ruled out.
+
+**BACKING vs ENSEMBLE:** V-Trainer writes **byte-identical** `vpdt`,
+`vmdl`, `vpno` for both (only `vpsc`, `vpfl`, LIST/date and `rdmd` differ):
+the analysis is the same; the encode type selects the player. The
+`vpdt` header (29 u32) indexes **five per-band streams** (~1.9 kB each for
+3.67 s) — matching the firmware's 5-band BACKING (mode 3) and ENSEMBLE
+(mode 5) players. Band record format not yet decoded.
