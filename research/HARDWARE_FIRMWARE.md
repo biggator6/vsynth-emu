@@ -537,6 +537,37 @@ cuts (without octave correction 56.0 — tracks locked an octave low;
 re-anchoring every mark to the energy epoch 62.5). The v32 encoder stays
 default; the VP-9000 encoder may not equal the V-Synth's.
 
+## LITE investigation (2026-10-14)
+
+**V-Synth encode codes** (wave-info name tables at 0x89854480 / 0x89840f40,
+indexed by code): 0 = **LITE**, 1 = SOLO, 2 = XFG, 3 = BACKING, 4 = (POL,
+shown "ENSEMBLE"), 5 = ENSEMBLE, 6 = FOR4, 7 = FORO, 8 = UWA. Codes 1–5 =
+V-Trainer's algorithm numbers. So PCM player modes 6 and 8 are **FOR4** and
+**UWA** (internal types, presumably preset waves), not LITE.
+
+**Oscillator kinds** (`0x894f2010`, 1–4): 1 → `0x894f3590` (modes 0/1/2;
+mode 0 → `0x89509870`/`89509f52` dispatch through a waveform table into the
+asm analog oscillators → kind 1 = ANALOG), 2 → `0x894f3660` (PCM; mode − 1
+> 7 exits, so **mode 0 = LITE has no case here** — LITE must be mapped to
+another mode before this switch; mapping not yet found), 3 → `0x89505170`,
+4 → `0x895097d0` (EXT IN).
+
+**V-Synth sample files use the VP-9000 RIFF layout**: chunk table at
+0x897a7de4 = vpfl, vmdl, vpsc, vpno, vplp, vpdt, LIST, rdmd, data, link;
+used by five file routines 0x894939d0 / 0x89494620 / 0x89495580 /
+0x89497d40 / 0x89499000. → a sample exported from the XT can be parsed
+with `research/vpdt_parse.py`-style code (and VP-9000 files import).
+
+**LITE fingerprint (sine references, dry inputs are pure sines):** LITE
+adds a pure harmonic series of the OUTPUT fundamental — h2 −18, h3 −28,
+h4 −34, h5 −39, h6 −43, h7 −46, h8 −49 dB — identical for time 2×, time
+×½ and formant −12; slightly stronger for pitch +7 (h2 −16, h3 −25);
+**absent for pitch −12** (pure 220 Hz). None of the decoded players
+reproduces this set: SOLO patent path matches formant −12 only (time cases
+pure, pitch +7 far too strong, pitch −12 keeps 440 dominant); non-patent
+path and period-jump stay pure where the reference has harmonics.
+Experiment hooks: `VSE_LITE=solo-p|solo-np|pj`.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).

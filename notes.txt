@@ -384,6 +384,12 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     real cuts. Scheduler ruled out too. BACKING and ENSEMBLE encodes have
     byte-identical vpdt (5 band streams) — encode type only picks the
     player.
+  - LITE (2026-10-14): encode codes 0 LITE,1 SOLO,2 XFG,3 BACKING,4 POL,
+    5 ENSEMBLE,6 FOR4,7 FORO,8 UWA -> modes 6/8 are FOR4/UWA, not LITE.
+    LITE adds a harmonic series (h2 -18 ... h8 -49) for time/formant/
+    pitch-up, none for pitch-down; no decoded player matches. V-Synth
+    samples use the VP-9000 RIFF chunk layout -> NEED an exported LITE
+    sample from the XT. Hooks: VSE_LITE=solo-p|solo-np|pj.
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4
     emulator (JE-8086 style, user-supplied ROM, never distributed) is a

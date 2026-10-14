@@ -992,7 +992,8 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
         if (timer >= ppw) {
             timer = std::min(timer - ppw, ppw);
             const double Ci = C + frac * (N - C);
-            const bool voiced = cuts[seg].voiced;
+            bool voiced = cuts[seg].voiced;
+            if (const char* lm = std::getenv("VSE_LITE"); lm && std::string(lm) == "solo-np") voiced = false;
             double v, wl, os = 0.0;
             if (voiced) {
                 ppw = Ci / A;
@@ -1087,6 +1088,19 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
     }
 
     const VariphraseParams hp = pImpl->hybridParams();
+
+    // EXPERIMENT (LITE player search): VSE_LITE = solo-p | solo-np | pj
+    // routes LITE content to the firmware SOLO player (patent / non-patent
+    // record path) or the period-jump player.
+    if (const char* lm = std::getenv("VSE_LITE");
+        lm && pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid &&
+        pImpl->analysis.contentType == VariphraseAnalysis::ContentType::LITE) {
+        const std::string m(lm);
+        std::vector<float> out;
+        if (m == "pj") out = periodJumpResynthOffline(inputMono);
+        else if (m == "solo-p" || m == "solo-np") out = soloFirmwareResynthOffline(inputMono);
+        if (!out.empty()) return out;
+    }
 
     // ── Subband pitch for ENSEMBLE (Session 16, US6564187) ───────────────────
     // Per-band instantaneous-frequency scaling.  Rejected in Session 15

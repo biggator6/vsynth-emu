@@ -9,7 +9,7 @@ public class Disasm extends GhidraScript {
         for (int k = 1; k + 1 < a.length; k += 2) {
             Address s = toAddr(Long.parseUnsignedLong(a[k],16)); int n = Integer.parseInt(a[k+1]);
             out.println("=== " + s);
-            Instruction ins = getInstructionAt(s);
+            Instruction ins = getInstructionAt(s); if (ins == null) ins = getInstructionAfter(s);
             for (int i = 0; i < n && ins != null; i++, ins = ins.getNext()) {
                 String extra = "";
                 for (var r : ins.getReferencesFrom()) {
