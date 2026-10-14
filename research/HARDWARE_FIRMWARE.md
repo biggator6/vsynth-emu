@@ -557,7 +557,13 @@ sites that build offset 0x964 are in these switches — **no separate LITE
 install exists**, so LITE (Vari ON) must run through an existing mode,
 most plausibly mode 1 (the SOLO player, the only other formant-capable
 one), differing only in its records' info bits (0x4 patent path, 0x1 pitch
-gate, 0x2 formant gate). Needs an exported LITE sample to confirm.
+gate, 0x2 formant gate). **Tested and rejected as implemented**
+(`VSE_LITEINFO=b`, 2026-10-14): forcing each info pattern on the sine
+cases, no pattern matches more than one or two cases, and all keep time 2×
+perfectly pure where LITE adds h2 −18 / h3 −28 … — LITE's time-stretch
+mechanism generates harmonics even at unity pitch and formant, which none
+of our grain paths do. Needs an exported LITE sample (records, info bits,
+vpsc/vpfl) from the XT.
 
 **V-Synth sample files use the VP-9000 RIFF layout**: chunk table at
 0x897a7de4 = vpfl, vmdl, vpsc, vpno, vplp, vpdt, LIST, rdmd, data, link;

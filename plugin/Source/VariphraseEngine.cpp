@@ -994,6 +994,11 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
             const double Ci = C + frac * (N - C);
             bool voiced = cuts[seg].voiced;
             if (const char* lm = std::getenv("VSE_LITE"); lm && std::string(lm) == "solo-np") voiced = false;
+            // EXPERIMENT: VSE_LITEINFO=b forces the record info low bits:
+            // bit 0x4 → patent path; else non-patent with S = A'·F',
+            // A' = (b & 1 ? A : 1), F' = (b & 2 ? F : 1)   (0x8950d5a0).
+            int forcedInfo = -1;
+            if (const char* fi = std::getenv("VSE_LITEINFO")) { forcedInfo = std::atoi(fi); voiced = (forcedInfo & 4) != 0; }
             double v, wl, os = 0.0;
             if (voiced) {
                 ppw = Ci / A;
@@ -1001,8 +1006,10 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
                 wl  = Ci / F;
                 if (wl > ppw) { os = Ci - ppw * F; wl = ppw; }
             } else {
-                ppw = Ci / A;
-                v   = A;
+                double S = A;
+                if (forcedInfo >= 0) S = ((forcedInfo & 1) ? A : 1.0) * ((forcedInfo & 2) ? F : 1.0);
+                ppw = Ci / S;
+                v   = S;
                 wl  = ppw;
             }
             anchorStep = std::max(voiced ? A : v, 1.0);
