@@ -2,7 +2,7 @@ V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
 Last updated: Session 16 (2026-10-10) — firmware RE started
 
-Current score: 69.8 / 100 under METRIC v6 — v32 (v28 = 66.6 v6 / 68.1 v5 / 52.5 v4) (v17 baseline = 34.0)
+Current score: 73.0 / 100 under METRIC v6 — v33 (same engine as v32; vocal now rendered from the RAW source) (v28 = 66.6 v6 / 68.1 v5 / 52.5 v4) (v17 baseline = 34.0)
   METRIC v4 (commit 7434abb): phase-blind spectral similarity (MR-STFT +
   log-mel, gain-matched) carries most of the composite; content-aware weights
   (speech/percussive/tonal by filename); SNR rescaled to 30 dB full marks.
@@ -162,7 +162,7 @@ Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
 Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8 (true 52.5)
 Metric v5 history: v28=68.1 (granular rate-scaling: identical at 48k)
-Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8
+Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8 → v33=73.0 (input fix)
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -183,6 +183,9 @@ Run a test case (use explicit args — variable expansion can silently drop para
   input in passthrough/ (e.g. passthrough/sine_440_formant_downmax.wav is the
   16-bit DRY input; sustained/sine_440_formant_downmax.wav is the 24-bit V-Synth
   reference — easy to confuse, identical names).
+
+Render the suite (from project root; uses the RAW sources — see INPUT FIX):
+  python3 analysis/render_suite.py analysis/plugin_outputs/hybrid_vNN
 
 Run the full batch test (from project root):
   python3 analysis/batch_test.py \
@@ -390,6 +393,16 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     pitch-up, none for pitch-down; no decoded player matches. V-Synth
     samples use the VP-9000 RIFF chunk layout -> NEED an exported LITE
     sample from the XT. Hooks: VSE_LITE=solo-p|solo-np|pj.
+  - INPUT FIX (2026-10-15, v33): passthrough/vocal_aah_passthrough.wav is
+    the V-Synth's OWN output at zero settings (2895-sample offset, +8.7 dB,
+    waveform rebuilt: residual only -8.3 dB after gain match) — NOT the
+    source. Rendering from raw/solo_male_aah_raw.wav: vocal 65.6 -> 74.6.
+    Use analysis/render_suite.py (in repo) — it maps every case to its raw
+    source. Sine passthrough files are byte copies of raw/sine_440hz_raw
+    (no V-Synth identity capture exists; user re-recording). Chord and drum
+    have no raw source in the repo — their passthrough files may also be
+    V-Synth captures. Engine choices re-checked on raw input: firmware SOLO
+    + epoch cuts 74.6 > V-Trainer encoder 70.5 > patent engine 69.7.
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4
     emulator (JE-8086 style, user-supplied ROM, never distributed) is a

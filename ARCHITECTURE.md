@@ -162,9 +162,9 @@ The HTML batch report embeds **A/B audio players** per case.
 Fast engine invariants: `plugin/Source/EngineTests.cpp`
 (`-DENGINE_TESTS_MAIN`, 10 checks, runs in seconds).
 
-## Current Scores (v32, metric v6)
+## Current Scores (v33, metric v6)
 
-**69.8 / 100 average** (v32) under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
+**73.0 / 100 average** (v33 — v32 engine, vocal rendered from the raw source; render with `analysis/render_suite.py`) under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
 history in notes.txt).  Per-case v4 detail below is historical.  Earlier text:
 51.8 / 100 under v4 (re-baselined v17 = 34.0).  Strong: drum_time_4x 64.7,
 chord_formant 63.3, sine_formant_upmax 65.6, drum_pitch 62.9, chord_time

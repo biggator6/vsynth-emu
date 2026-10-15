@@ -235,6 +235,11 @@ formant transfer curve and the metric ceiling.
 
 ### Ground rules for every take
 
+- **Keep the RAW source of every sample in `test_files/raw/`** — the file
+  you sampled into the V-Synth.  The engine must render from the raw source,
+  never from a V-Synth capture: the V-Synth is not transparent at zero
+  settings (Session 16: using the vocal passthrough capture as input cost
+  ~9 points).  Chord and drum raw sources are still missing.
 - **Capture the passthrough first** for every new source (all VariPhrase
   parameters zeroed).  Reference levels are recording-chain gain staging
   (the sine refs sit ~7 dB below their dry input; vocal/chord at unity);
