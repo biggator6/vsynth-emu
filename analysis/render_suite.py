@@ -14,8 +14,9 @@ into the V-Synth, never from a V-Synth capture.  passthrough/vocal_aah_
 passthrough.wav is the V-Synth's own output at zero settings — it is not
 transparent (waveform rebuilt; 8 dB below signal after gain match), and
 using it as the engine input cost ~9 points on the vocal set (65.6 vs 74.6).
-Chord and drum have no raw source in the repo yet, so they still render
-from their passthrough files.
+Chord and drum: raw/*_original.wav are byte-identical to their old
+passthrough/ files (verified 2026-10-18) — those were always the originals.
+Only the vocal passthrough is a V-Synth capture.
 """
 import argparse, os, subprocess, sys
 
@@ -25,8 +26,8 @@ TF = os.path.join(ROOT, 'test_files')
 INPUTS = {
     'sine_440':   os.path.join(TF, 'raw', 'sine_440hz_raw.wav'),
     'vocal_aah':  os.path.join(TF, 'raw', 'solo_male_aah_raw.wav'),
-    'chord_Cmaj': os.path.join(TF, 'passthrough', 'chord_Cmaj_passthrough.wav'),
-    'drum_hit':   os.path.join(TF, 'passthrough', 'drum_hit_passthrough.wav'),
+    'chord_Cmaj': os.path.join(TF, 'raw', 'chord_Cmaj_original.wav'),
+    'drum_hit':   os.path.join(TF, 'raw', 'drum_hit_original.wav'),
 }
 # Render ratios (Session 15): time_2x = twice as FAST → --time 0.5.
 OPS = {

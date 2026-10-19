@@ -400,8 +400,11 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     Use analysis/render_suite.py (in repo) — it maps every case to its raw
     source. Sine passthrough files are byte copies of raw/sine_440hz_raw
     (no V-Synth identity capture exists; user re-recording). Chord and drum
-    have no raw source in the repo — their passthrough files may also be
-    V-Synth captures. Engine choices re-checked on raw input: firmware SOLO
+    raw originals (raw/*_original.wav, 2026-10-18) are byte-identical to
+    their passthrough files -> those were always the originals; only the
+    vocal passthrough is a V-Synth capture. passthrough/sine_400hz_raw_lite
+    .wav (2026-10-18) is ALSO byte-identical to the raw sine — not a LITE
+    capture; still needed. Engine choices re-checked on raw input: firmware SOLO
     + epoch cuts 74.6 > V-Trainer encoder 70.5 > patent engine 69.7.
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4

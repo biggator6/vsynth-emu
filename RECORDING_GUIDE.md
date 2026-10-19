@@ -239,7 +239,10 @@ formant transfer curve and the metric ceiling.
   you sampled into the V-Synth.  The engine must render from the raw source,
   never from a V-Synth capture: the V-Synth is not transparent at zero
   settings (Session 16: using the vocal passthrough capture as input cost
-  ~9 points).  Chord and drum raw sources are still missing.
+  ~9 points).  Chord and drum originals: `raw/*_original.wav` (identical to
+  their old passthrough files).  Still needed: a real V-Synth LITE capture
+  of the sine at zero settings (`passthrough/sine_400hz_raw_lite.wav` is a
+  copy of the raw sine).
 - **Capture the passthrough first** for every new source (all VariPhrase
   parameters zeroed).  Reference levels are recording-chain gain staging
   (the sine refs sit ~7 dB below their dry input; vocal/chord at unity);
