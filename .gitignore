@@ -1,0 +1,13 @@
+# Roland firmware — copyrighted, never commit
+firmware/
+Vsynth_software/
+.venv/
+analysis/projects/
+
+# Roland manuals (copyright) — reference copies only, see research/README.md
+research/*.pdf
+research/*.txt
+
+# macOS metadata and CMake build output
+.DS_Store
+build/
