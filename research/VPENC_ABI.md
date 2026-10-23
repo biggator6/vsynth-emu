@@ -214,3 +214,38 @@ the analysis is the same; the encode type selects the player. The
 `vpdt` header (29 u32) indexes **five per-band streams** (~1.9 kB each for
 3.67 s) — matching the firmware's 5-band BACKING (mode 3) and ENSEMBLE
 (mode 5) players. Band record format not yet decoded.
+
+## 7. The XT's own SOLO records — and whether V-Trainer is the XT's encoder (2026-10-18)
+
+The user's XT project (`analysis/projects/Emu_test.prj`, gitignored) holds
+SOLO encodes made **on the XT** of `raw/sine_440hz_raw.wav` (wave 003) and
+`raw/solo_male_aah_raw.wav` (wave 004); their `data` is sample-identical to
+the raw files. The XT writes `vpfl` version **"0102"** (V-Trainer: "0101"):
+88-byte `vpdt` header, record count at byte 84, same `{u16 len, u16 info}`
+records from byte 88, `(256, 1)` terminator. Parser:
+`research/vpdt_parse.py` `xt_solo_records()`.
+
+| | V-Trainer (old capture input) | XT (raw input) |
+|---|---|---|
+| records | 600 (463 voiced + 137 unvoiced 1 ms) | 461, **all voiced** |
+| onset | ramp ¼, ½ period | one voiced lead-in record (0 → 209.94) |
+| mark phase | ≈ 114 samples after the positive peak | ≈ 15 after the positive peak |
+
+The capture is the same polarity as raw (r = 0.93), so the phase difference
+is not an inversion artefact. **The VP-9000 encoder and the XT's encoder
+probably differ** (or are different revisions). Decisive test: a V-Trainer SOLO
+encode of the exact file `raw/solo_male_aah_raw.wav`, then diff its `vpdt`
+against XT wave 004. If they match, porting the rest of `vpenc.dll` (the
+onset candidate search 0x100085d0, backward run extension, 11.025 kHz
+tracker) gives the hardware encoder. If not, the XT's encoder is in `rom.2`
+(the XT encodes on-board) and is the target instead.
+
+The XT sine records show the encoder's arithmetic. After a 6.625-sample
+lead-in, every record is 1603/16 = 100.1875 samples, but the true period × 16
+is 1603.6. The period is **truncated** (fixed point), and marks step freely
+without re-snapping.
+
+Rendering the vocal with the XT records: 74.61 → **78.04** (firmware SOLO
+player); our v34 epoch rule reaches 77.40 (details in notes.txt). Unlike the
+§5 V-Trainer marks, the XT's marks *do* matter: the gain came from the onset,
+where peak-snapping locked onto the secondary pulse.

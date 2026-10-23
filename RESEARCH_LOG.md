@@ -2020,3 +2020,35 @@ Round-2 recordings.  First build-out after that: real-time granular port
 ### Next Steps
 
 ---
+
+### Session 16 addendum (2026-10-18) — the XT's own SOLO records; v34
+
+- `analysis/projects/Emu_test.prj` (the user's XT project) contains XT SOLO
+  encodes of our exact raw sine and vocal. The `vpdt` format is version 0102,
+  now parsed (`research/vpdt_parse.py`). LITE waves store no analysis chunk.
+- Vocal rendered with the XT's records: 74.61 → 78.04. The gain is in the
+  onset: our peak snap locked onto the secondary glottal pulse for the first
+  ~90 ms.
+- **v34:** run-start mark at the max-energy p/6 window over the first period
+  (voiced lead-in record); later marks snap to the energy epoch. Matches XT
+  marks to a median of −1.6 samples with no slips. Vocal 77.40, **suite 73.9**
+  (v33 73.0). Non-vocal renders are bit-identical to v33.
+- Firmware SOLO player + XT sine records reproduces the sine formant_upmax
+  reference's harmonic pattern to within 1–2 dB, and lifts the formant and
+  pitch-up sine cases by 15–18. The pitch −12 and time sine references don't
+  fit (pure 220 Hz tone; formant-down-like series), so the sine references
+  may mix SOLO and LITE waves. Still open with the user.
+- V-Trainer vs XT encoder: they likely differ (VPENC_ABI.md §7). Pending: a
+  V-Trainer encode of the raw vocal.
+- **Sine references explained.** The user confirmed all sine references came
+  from SOLO wave 003. The firmware SOLO player with the XT's records
+  reproduces all six if four were recorded with formant at minimum. Pitch −12
+  with formant at minimum is a pure 220 Hz tone: perfect overlap-add of
+  half-speed content. The user changed one parameter at a time (formant knob
+  0), so the offset probably came from Formant KF, the formant envelope or the
+  formant LFO. A re-record is planned (RECORDING_GUIDE.md, "Sine Re-record").
+- **v35:** the octave guard now checks submultiples 2–8 (the pure sine had
+  locked to multiples of the period), and epochs are refined to 1/16 sample.
+  Sine (SOLO, settings as recorded) 74.6; vocal 77.41; suite 73.9.
+- Retracted a "0.93 formant warp" in the vocal references. It was a
+  48k-vs-44.1k FFT bin-index comparison in my own script.

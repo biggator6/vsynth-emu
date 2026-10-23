@@ -378,14 +378,24 @@ float estimateLocalPeriod(const std::vector<float>& x, int start, double sr,
         if (prevPeriod > 0.0f) return estimateLocalPeriod(x, start, sr, 0.0f);
         return 0.0f;
     }
-    // Octave guard: prefer lag/2 if nearly as strong
-    if (bestLag / 2 >= lagLo) {
-        const int half = bestLag / 2;
-        double s = 0.0;
-        for (int i = 0; i + half < w; ++i)
-            s += double(x[start+i]) * x[start+i+half];
-        const double v = (s / e0) * (double(w) / double(w - half));
-        if (v >= 0.95 * bestV) bestLag = half;
+    // Octave guard: prefer the shortest integer submultiple lag/k (k = 8..2,
+    // local maximum within ±1) that is nearly as strong.  v34: k = 2 only
+    // picked a multiple of the period on a pure sine, where every multiple
+    // is an equal ACF peak (the 440 Hz sine came out as 476–827-sample
+    // records; the XT's own encode is 100.19).
+    {
+        auto acfAt = [&](int lag) {
+            double s = 0.0;
+            for (int i = 0; i + lag < w; ++i) s += double(x[start+i]) * x[start+i+lag];
+            return (s / e0) * (double(w) / double(w - lag));
+        };
+        for (int k = 8; k >= 2; --k) {
+            const int c = (int)std::lround((double)bestLag / k);
+            if (c - 1 < lagLo) continue;
+            int bl = c; double bv = acfAt(c);
+            for (int l = c - 1; l <= c + 1; l += 2) { const double v = acfAt(l); if (v > bv) { bv = v; bl = l; } }
+            if (bv >= 0.95 * bestV) { bestLag = bl; break; }
+        }
     }
     // Sub-sample period: parabolic interpolation on the ACF peak, quantised
     // to 1/16 sample — the V-Synth stores grain periods in 1/16-sample units
@@ -407,13 +417,23 @@ float estimateLocalPeriod(const std::vector<float>& x, int start, double sr,
     return float(std::round(lag * 16.0) / 16.0);
 }
 
-// epochAlign: snap each voiced cut to the largest positive peak within
-// ±period/4 of its predicted position, so cut boundaries sit on pitch
-// epochs.  The firmware SOLO player centres every grain window on the next
-// cut boundary (window peak at os + wl = C), which assumes epoch-aligned
-// records; with alignment the firmware player gains +2.1 on the vocal set
-// (formant downmax +7.4) while the patent-based engine loses −7.3 — the
-// player and the record layout were evidently designed together.
+// epochAlign: place each voiced cut on a pitch epoch.  The firmware SOLO
+// player centres every grain window on the next cut boundary (window peak
+// at os + wl = C), which assumes epoch-aligned records.
+//
+// v34 (Session 16): epochs follow the V-Synth XT's own SOLO records (the
+// vpdt of the user's XT-encoded copy of raw/solo_male_aah_raw.wav,
+// format 0102).  The XT starts a voiced run at its strongest excitation
+// (a voiced lead-in record covers the samples before it) and its marks sit
+// ≈ 15 samples after the positive peak.  Rule here: the run's first mark is
+// the centre of the max-energy p/6 window over the whole first period;
+// later marks snap to the same energy epoch within ±p/4.  Against the XT's
+// 461 marks: median offset −1.6 samples, 78 % within 5, no half-period
+// slips (v33 peak snap: −14.9, 2 %, 10 slips — it locked onto the
+// secondary pulse through the onset, where it is the taller peak).
+// Vocal mean 74.61 → 77.40 (the XT's own records: 78.04); sub-sample
+// epochs (v35) 77.41.
+// VSE_EPOCH=peak restores the v33 rule (largest sample within ±p/4).
 std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr,
                                       bool epochAlign = false) {
     std::vector<GrainCut> cuts;
@@ -424,11 +444,51 @@ std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr,
     const int hop = grainUnvoicedHop(sr);
     double pos = 0.0;
     float prev = 0.0f;
+    const char* epSel = std::getenv("VSE_EPOCH");
+    const bool peakSnap = epSel && std::string(epSel) == "peak";
+    std::vector<double> cumE;   // prefix sums of x² for the energy epoch
+    if (epochAlign && !peakSnap) {
+        cumE.assign(n + 1, 0.0);
+        for (int i = 0; i < n; ++i) cumE[i + 1] = cumE[i] + double(x[i]) * x[i];
+    }
+    // Centre in [lo, hi] of the length-win window holding the most energy.
+    auto winE = [&](int c, int win) {
+        return cumE[std::min(n, std::max(0, c + win / 2))] - cumE[std::max(0, std::min(n, c - win / 2))];
+    };
+    auto energyEpoch = [&](int lo, int hi, int win) -> double {
+        int best = lo; double bestE = -1.0;
+        for (int c = lo; c <= hi; ++c) {
+            const double e = winE(c, win);
+            if (e > bestE) { bestE = e; best = c; }
+        }
+        if (best <= lo || best >= hi) return best;
+        // Sub-sample epoch (parabola through best−1, best, best+1), kept in
+        // 1/16 sample like the XT's records: the integer version stuttered
+        // 100/101-sample records on the 100.23-sample sine period.
+        const double y0 = winE(best - 1, win), y1 = bestE, y2 = winE(best + 1, win);
+        const double den = y0 - 2.0 * y1 + y2;
+        double d = (den < -1e-12) ? 0.5 * (y0 - y2) / den : 0.0;
+        d = std::clamp(d, -0.5, 0.5);
+        return std::round((best + d) * 16.0) / 16.0;    // records are in 1/16 sample
+    };
     while ((int)pos + hop < n) {
         const float p = estimateLocalPeriod(x, (int)std::lround(pos), sr, prev);
-        if (p > 0.0f && epochAlign) {
-            // Snap the cut to the largest positive peak within ±p/4 of the
-            // predicted position (pitch-epoch alignment).
+        if (p > 0.0f && epochAlign && !peakSnap) {
+            const int c = (int)std::lround(pos);
+            const int win = std::max(2, (int)(p / 6));
+            if (cuts.empty() || !cuts.back().voiced) {
+                // Run start: strongest epoch in the first period, voiced
+                // lead-in record before it.
+                const double best = energyEpoch(c, std::min(n - 1, c + (int)p - 1), win);
+                if (best - c >= 2) cuts.push_back({ pos, p, true });
+                pos = best;
+            } else {
+                const double best = energyEpoch(std::max(0, c - (int)(p / 4)),
+                                                std::min(n - 1, c + (int)(p / 4)), win);
+                pos = std::max(cuts.back().start + 2.0, best);
+            }
+        } else if (p > 0.0f && epochAlign) {
+            // v33: snap to the largest positive peak within ±p/4.
             const int c  = (int)std::lround(pos);
             const int lo = std::max(0, c - (int)(p / 4)), hi = std::min(n - 1, c + (int)(p / 4));
             int best = c;

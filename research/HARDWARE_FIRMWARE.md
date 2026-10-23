@@ -565,6 +565,14 @@ mechanism generates harmonics even at unity pitch and formant, which none
 of our grain paths do. Needs an exported LITE sample (records, info bits,
 vpsc/vpfl) from the XT.
 
+**Correction (2026-10-18):** the sine references were never LITE. They
+were played from a SOLO wave (user's XT wave 003). The firmware SOLO
+player with that wave's own records reproduces all six if four were
+recorded with formant at minimum (notes.txt, "SINE REFERENCES
+EXPLAINED"). The harmonic series is the SOLO player's half-speed grain
+content (F = 0.5) inside full-period grains, not a LITE mechanism. XT LITE
+waves (005/006) store no `vpdt`, `vpfl` or `vpno` at all.
+
 **V-Synth sample files use the VP-9000 RIFF layout**: chunk table at
 0x897a7de4 = vpfl, vmdl, vpsc, vpno, vplp, vpdt, LIST, rdmd, data, link;
 used by five file routines 0x894939d0 / 0x89494620 / 0x89495580 /

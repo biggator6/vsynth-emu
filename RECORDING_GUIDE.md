@@ -120,6 +120,40 @@ with the same base name.  The offline renderer takes the passthrough as its `--i
 
 ---
 
+## Sine Re-record (added 2026-10-18) — do this first
+
+**Why:** in 5 of the 6 May sine takes (all except formant +63), the decoded
+firmware SOLO player only matches if the formant sits an octave low (read
+speed ½). Pitch −12 came out as a *pure* 220 Hz tone, which the SOLO player
+produces only with formant at its minimum; at formant 0 it keeps the 440 Hz
+content. The takes were made changing one parameter at a time, so something
+else was probably lowering the formant: **Formant KF** (key follow,
+relative to C4), the formant envelope or the formant LFO (PCM Formant
+screen, manual p. 92). The vocal takes show no such offset.
+(notes.txt, "SINE REFERENCES EXPLAINED")
+
+**Setup:** wave 003 (SOLO), PCM oscillator with Vari ON. On the Formant (PCM)
+screen set **Formant 0, Formant KF 0, Fmt LFO Depth 0**, formant envelope depth
+0, Energy OFF; Robot voice off. Play the key that sounds 440 Hz and **note
+which key**. Same capture chain as the vocal takes (48 kHz stereo); ~0.5 s
+lead-in; record each take to its natural end (time ½ runs about 8 s; the May take
+stopped at 4 s). Save with an `_r2` suffix so the May takes stay for
+comparison.
+
+| Take | Pitch | Time | Formant | Note |
+|---|---|---|---|---|
+| `sine_440_identity_r2` | 0 | 1× | 0 | **Decisive.** Should be a pure 440 Hz sine; overtones (2nd harmonic ≈ −18 dB) mean the formant is still offset |
+| `sine_440_pitch_down12st_r2` | −12 | 1× | 0 | |
+| `sine_440_pitch_up7st_r2` | +7 | 1× | 0 | |
+| `sine_440_time_2x_r2` | 0 | 2× faster | 0 | |
+| `sine_440_time_halfspeed_r2` | 0 | ½ speed | 0 | full length |
+| `sine_440_formant_downmax_r2` | 0 | 1× | −63 | optional: same chain as the rest |
+| `sine_440_formant_upmax_r2` | 0 | 1× | +63 | optional |
+
+If the identity take is clean but the May takes are reproduced when you put
+back a setting (e.g. Formant KF), record which setting it was: that tells us
+how the firmware combines KF with the knob.
+
 ## Next Recording Session — Priorities
 
 **Superseded by the "Round 2 — Recording Wishlist" section at the end of this

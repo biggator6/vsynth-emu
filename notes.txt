@@ -1,8 +1,8 @@
 V-Synth VariPhrase Emulator — Quick Reference
 ==============================================
-Last updated: Session 16 (2026-10-10) — firmware RE started
+Last updated: Session 16 (2026-10-18) — XT SOLO records; v34 epoch encoder
 
-Current score: 73.0 / 100 under METRIC v6 — v33 (same engine as v32; vocal now rendered from the RAW source) (v28 = 66.6 v6 / 68.1 v5 / 52.5 v4) (v17 baseline = 34.0)
+Current score: 73.9 / 100 under METRIC v6 — v35 (SOLO encoder epochs matched to the XT's own records, sub-sample; vocal 74.6 -> 77.4) (v28 = 66.6 v6 / 68.1 v5 / 52.5 v4) (v17 baseline = 34.0)
   METRIC v4 (commit 7434abb): phase-blind spectral similarity (MR-STFT +
   log-mel, gain-matched) carries most of the composite; content-aware weights
   (speech/percussive/tonal by filename); SNR rescaled to 30 dB full marks.
@@ -162,7 +162,7 @@ Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
 Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8 (true 52.5)
 Metric v5 history: v28=68.1 (granular rate-scaling: identical at 48k)
-Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8 → v33=73.0 (input fix)
+Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8 → v33=73.0 (input fix) → v34=73.9 (XT epochs) → v35=73.9 (1/16 epochs, octave guard)
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:
@@ -389,8 +389,10 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     player.
   - LITE (2026-10-14): encode codes 0 LITE,1 SOLO,2 XFG,3 BACKING,4 POL,
     5 ENSEMBLE,6 FOR4,7 FORO,8 UWA -> modes 6/8 are FOR4/UWA, not LITE.
-    LITE adds a harmonic series (h2 -18 ... h8 -49) for time/formant/
-    pitch-up, none for pitch-down; no decoded player matches. V-Synth
+    [SUPERSEDED 2026-10-18: those refs were SOLO with formant at min —
+    see SINE REFERENCES EXPLAINED.] LITE adds a harmonic series (h2 -18
+    ... h8 -49) for time/formant/pitch-up, none for pitch-down; no decoded
+    player matches. V-Synth
     samples use the VP-9000 RIFF chunk layout -> NEED an exported LITE
     sample from the XT. Hooks: VSE_LITE=solo-p|solo-np|pj.
   - INPUT FIX (2026-10-15, v33): passthrough/vocal_aah_passthrough.wav is
@@ -406,6 +408,86 @@ FIRMWARE RE (started 2026-10-10, research/HARDWARE_FIRMWARE.md — READ IT):
     .wav (2026-10-18) is ALSO byte-identical to the raw sine — not a LITE
     capture; still needed. Engine choices re-checked on raw input: firmware SOLO
     + epoch cuts 74.6 > V-Trainer encoder 70.5 > patent engine 69.7.
+  - XT SOLO RECORDS (2026-10-18, v34): analysis/projects/Emu_test.prj
+    (user's XT project, gitignored). Waves 003 sine / 004 vocal are SOLO
+    (vpsc byte 1 = 1, vpfl "0102") and their audio is sample-identical to
+    raw/sine_440hz_raw.wav and raw/solo_male_aah_raw.wav -> the vpdt is
+    the XT's own grain analysis of our exact inputs. 005/006 sine are LITE
+    (code 0): NO vpdt/vpfl/vpno at all -> LITE stores no analysis.
+    0102 layout: 88-byte header (u32[10] = samples*16, u32[21] = count),
+    records from byte 88, (256,1) terminator. research/vpdt_parse.py
+    xt_solo_records(); CLI prints VSE_CUTSFILE lines.
+    Vocal: 461 records, ALL voiced (lead-in record 0..209.94, info 0x87),
+    budgets info>>3 = 11..20. Sine: lead-in 6.625, then exactly 1603/16 =
+    100.1875 every record (true period*16 = 1603.6 -> TRUNCATED, fixed
+    point; marks free-step and drift ~0.7 period over the file).
+    Rendering the vocal with the XT records (VSE_CUTSFILE, firmware SOLO
+    player): 74.61 -> 78.04; + VSE_ANCHOR 77.86. Isolation: phase shift of
+    the XT marks by -15 costs 0.8; rounding to integers 0.1; swapping in
+    only the XT ONSET (first ~90 ms) recovers +3.2 -> the onset was the
+    bug: the vocal onset has two pulses per period and the taller one is
+    the secondary for 4 cycles; peak-snap locked onto it and slipped half
+    a period later (267/292-sample records). v34 rule: run-start mark at
+    the max-energy p/6 window over the whole first period (+ voiced
+    lead-in record), later marks snap to the energy epoch within +-p/4.
+    vs XT marks: median -1.6 samples, 78% within 5, 0 slips (v33: -14.9,
+    2%, 10 slips). Vocal 77.40; suite 73.9; non-vocal bit-identical.
+    VSE_EPOCH=peak restores v33. No feature tracks XT marks tighter than
+    IQR ~3.7 samples (consistent with free stepping).
+    V-Trainer vs XT: V-Trainer (vpfl 0101) on the old capture input put
+    marks ~114 after the positive peak with 137 unvoiced records; the XT
+    puts them ~15 after the peak, all voiced. Capture is same polarity
+    (r = 0.93) -> the two encoders likely DIFFER. Decisive test: V-Trainer
+    SOLO encode of raw/solo_male_aah_raw.wav, diff vs XT 004 records.
+  - SINE REFERENCES EXPLAINED (2026-10-18). User: all sine refs were
+    played from wave 003 (SOLO); 005/006 LITE were made only on 2026-10-18.
+    So the "LITE harmonic series" below was never LITE. Firmware SOLO
+    player + the XT's 003 records reproduce ALL SIX refs if four were
+    recorded with FORMANT AT MINIMUM (left over from formant_downmax):
+      formant_downmax ref -18/-27/-34 vs ours -21/-31/-38
+      formant_upmax   ref -11,0,-8,-65,-29,-56,-38 vs -9,0,-8,-,-28,-,-38
+      time_2x/½ (+formant min)   ref -18/-28/-34 vs -21/-31/-38
+      pitch_up7st (+formant min) ref -16/-25/-31 vs -18/-27/-33
+      pitch_down12st (+formant min): A = F = 0.5 -> v = 0.5, wl = ppw ->
+        perfect OLA of half-speed content -> PURE 220 Hz = the ref (h2 -64);
+        at formant 0 the player gives 440 content in 220 Hz grains.
+    The four share a capture level (peak -12.4 dBFS, asymmetric +7835/
+    -6824); formant_upmax / pitch_down12st are -6 dBFS. Sine refs are
+    44.1 kHz mono with exact lengths (time_halfspeed truncated to 4.0 s);
+    vocal/chord/drum refs are 48 kHz stereo captures.
+    Sine mean, SOLO player: XT records 77.3, our v35 cuts 74.6 (as
+    recorded: formant -12 added to pitch -12, pitch +7, time 2x, time ½);
+    current LITE routing 60.2 as recorded / 66.8 as labelled (it fits the
+    mislabelled refs by accident, e.g. pitch -12 resampling -> pure 220).
+    USER (2026-10-18): takes changed ONE parameter at a time; formant
+    knob was 0 for pitch/time. So something else lowered the formant an
+    octave in the sine patch — candidates Formant KF (relative to C4,
+    -200..+200), formant envelope, formant LFO (manual p. 92). Vocal refs
+    show no offset. User will re-record: RECORDING_GUIDE.md "Sine
+    Re-record" (identity take is decisive). Until then the four May takes
+    are NOT valid for their labels; keep sine routing unchanged (hooks:
+    VSE_LITE=solo-p routes the sine to the SOLO player).
+  - v35 ENCODER (2026-10-18): estimateLocalPeriod octave guard now checks
+    submultiples k = 8..2 (was k = 2): on the pure sine every multiple of
+    the period is an equal ACF peak and records came out 476-827 samples
+    (XT: 100.19). Energy epochs refined to 1/16 sample (parabola) — the
+    integer version stuttered 100/101. Sine (as recorded, SOLO) 36.2 ->
+    71.8 -> 74.6; vocal 77.40 -> 77.41; everything else bit-identical.
+  - RETRACTED (2026-10-18): a "0.93 formant warp in every vocal ref"
+    was my analysis bug — refs are 48 kHz, raw/renders 44.1 kHz, and the
+    envelope script compared FFT bins by index (44.1/48 = 0.919). LPC
+    formants (sr-aware) of the refs match raw. Always compare in Hz.
+  - PATCH FILES (.p00, 2026-10-22, partial): Roland SVD container ("SVD0",
+    "PAT" chunk, data from byte 0x20, 5370 B). Data is a BIT-PACKED stream
+    of raw SysEx values in address-map order (research/V-Synth_Owners_
+    Manual.txt ~10567). Patch name = 12 x 7-bit chars at bit 264 (verified
+    on presets). Zone blocks repeat: oscillator 624 bits x16 (zone 1 near
+    bit 2098), envelope 896 x16 (from ~12071), 272 x16 (from ~33324).
+    Field width ~ bit_length(max value) (keyfollow 44-84 -> 7 bits, not the
+    manual's 6), but osc sums to 611 not 624, so a sequential decode drifts.
+    Goal: read OSC1 Formant / Formant KF (0x39/0x3A) / Fmt LFO / Fmt Env
+    depth of the sine patch. Cheapest fix: two saves of one patch differing
+    in ONE known parameter -> bit diff pins the field. Or read the XT screen.
   - On "use the firmware directly": we transcribe behaviour + constants
     into our own code (safe). Running Roland's machine code under an SH-4
     emulator (JE-8086 style, user-supplied ROM, never distributed) is a
