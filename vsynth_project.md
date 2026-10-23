@@ -56,7 +56,7 @@ oscillators, or external audio input
 
 •D-Beam controller — infrared proximity sensor for gestural control (can be mapped to a mod wheel or expression input in a VST)
 
-•Touch-sensitive ribbon controllers (two) — map to pitch bend / filter / any parameter
+•Time Trip Pad — XY touch pad that scrubs VariPhrase playback (the V-Synth has no ribbon; see CONTROLLERS.md)
 
 •Knob/slider automation — all parameters fully automatable
 
@@ -83,7 +83,7 @@ oscillators, or external audio input
 |--|--|
 | VariPhrase | Requires high-quality phase vocoder or similar time-domain stretching |
 | COSM  | Complex modal/physical modeling — computationally expensive  |
-| Ribbon controller|Needs MPE or custom MIDI mapping in a VST context |
+| Time Trip Pad|Needs MPE or custom MIDI mapping in a VST context (CONTROLLERS.md) |
 | D-Beam|Can only be approximated via MIDI CC |
 |Internal sample ROM | Licensing Roland's PCM content is not possible — custom samples needed|
 

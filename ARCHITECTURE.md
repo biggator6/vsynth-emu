@@ -26,6 +26,7 @@ vsynth-emu/
 ├── ARCHITECTURE.md        # this file — living design document
 ├── RESEARCH_LOG.md        # session-by-session findings and hypotheses
 ├── RECORDING_GUIDE.md     # V-Synth recording setup, file naming, completed checklist
+├── CONTROLLERS.md         # controller MIDI surface + emulation requirements
 ├── analysis/              # Python analysis pipeline (independent of plugin)
 │   ├── compare.py         # null test + spectrogram + LPC comparison
 │   ├── lpc.py             # formant extraction utilities
@@ -198,7 +199,8 @@ recordings (`RECORDING_GUIDE.md`), real-time parity above.
 
 ## Known Constraints
 - Cannot license Roland's PCM ROM content — custom samples required for oscillators
-- D-Beam controller mapped to MIDI CC in plugin context
-- Ribbon controllers mapped to MPE or standard CC
+- Expressive controllers are the Time Trip Pad, twin D Beam and C1/C2 knobs (E1–E8 on
+  the XT); there is **no ribbon**. MIDI surface and the MPE recommendation for the pad:
+  `CONTROLLERS.md`
 - Audio files from V-Synth: 48 kHz, 24-bit PCM, stereo — renderer downmixes to mono and
   handles both sample rates transparently
