@@ -11,3 +11,8 @@ research/*.txt
 # macOS metadata and CMake build output
 .DS_Store
 build/
+
+# REAPER peak caches; local Claude Code settings and worktrees
+*.reapeaks
+.claude/settings.local.json
+.claude/worktrees/
