@@ -509,6 +509,49 @@ std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr,
     return cuts;
 }
 
+// Record info word for voiced cuts: 7 | (b << 3), b = the per-record repeat
+// budget the SOLO player spends on repeats ((info & 0x1F8) << 6 = b·512).
+// From vpenc.dll (shared source with the XT's encoder): at the mark that
+// ENDS a record (0x10004fa0 / 0x100045e0 pair each record with its closing
+// mark), q = min(32768·D/E, 32768) with D = Σ (x[i − lag] − x[i])² over one
+// period from the mark (lag hill-climbed from the period), E = Σ x² over
+// that window (0x1000a050 / a0b0 / ad60); s = 32768 − 2q; v = 0x5999 +
+// (0xa666 − 0x5999)·(s − 0x1999)/0x6667 for s > 0x1999 (0x5999 for smaller
+// s > 0, 0 for s ≤ 0; 0x10009fb0); b = v >> 11, so 11…20.  Measured at
+// full rate: matches the XT's own vocal records 94 % exactly, 99 % within
+// ±1 (sine: all).  Records without a following mark keep info −1
+// (unlimited; the firmware wraps the last record for free anyway).
+void assignRecordBudgets(std::vector<GrainCut>& cuts, const std::vector<float>& x) {
+    const int n = (int)x.size();
+    for (size_t i = 0; i + 1 < cuts.size(); ++i) {
+        if (!cuts[i].voiced) continue;
+        const int s0 = (int)std::lround(cuts[i + 1].start);
+        const int L  = std::max(2, (int)std::lround(cuts[i].cwp));
+        if (s0 - 2 * L < 0 || s0 + L >= n) continue;
+        auto D = [&](int lag) {
+            if (lag < 2 || s0 - lag < 0) return 1e300;
+            double d = 0.0;
+            for (int k = 0; k < L; ++k) { const double e = (double)x[s0 + k - lag] - x[s0 + k]; d += e * e; }
+            return d;
+        };
+        double d = D(L);
+        if (const double d1 = D(L + 1); d1 < d) {
+            d = d1;
+            for (int l = L + 2; l < 2 * L; ++l) { const double dn = D(l); if (dn >= d) break; d = dn; }
+        } else {
+            for (int l = L - 1; l > 2; --l) { const double dn = D(l); if (dn >= d) break; d = dn; }
+        }
+        double e = 0.0;
+        for (int k = 0; k < L; ++k) e += (double)x[s0 + k] * x[s0 + k];
+        if (e <= 0.0) continue;
+        const int q = (int)std::min(32768.0, std::floor(32768.0 * d / e));
+        const int s = 32768 - 2 * q;
+        const int v = (s <= 0) ? 0 : (s <= 0x1999) ? 0x5999
+                    : 0x5999 + (int)((long long)(0xa666 - 0x5999) * (s - 0x1999) / 0x6667);
+        cuts[i].info = 7 | ((v >> 11) << 3);
+    }
+}
+
 // V-Trainer-style SOLO encoder (vpenc.dll, VP-9000 encoder shipped with
 // V-Producer; research/HARDWARE_FIRMWARE.md "V-Trainer encoder").
 //   voicing  : D/E < kVoicedErr, D = Σ (x[i−L] − x[i])² and E = Σ x[i]²
@@ -947,6 +990,10 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     std::vector<GrainCut> cuts = (encSel && std::string(encSel) == "vt")
         ? encodeGrainCutsVTrainer(in, sr)
         : encodeGrainCuts(in, sr, /*epochAlign=*/true);
+    // Per-record repeat budgets as the XT's encoder writes them (v38).
+    // VSE_BUDGET=off: unlimited (pre-v38).
+    if (const char* bs = std::getenv("VSE_BUDGET"); !(bs && std::string(bs) == "off"))
+        assignRecordBudgets(cuts, in);
     // Diagnostic: VSE_CUTSFILE = "start len voiced" lines (e.g. the real
     // V-Trainer records parsed from a VP-9000 sample's vpdt chunk).
     if (const char* cf = std::getenv("VSE_CUTSFILE")) {
@@ -964,11 +1011,11 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     }
     if (cuts.size() < 2) return {};
     const size_t nc = cuts.size();
-    if (const char* dump = std::getenv("VSE_DUMPCUTS")) {   // diagnostic: start len voiced
+    if (const char* dump = std::getenv("VSE_DUMPCUTS")) {   // diagnostic: start len voiced info
         if (FILE* f = std::fopen(dump, "w")) {
             for (size_t i = 0; i < nc; ++i) {
                 const double end = (i + 1 < nc) ? cuts[i + 1].start : (double)in.size();
-                std::fprintf(f, "%.4f %.4f %d\n", cuts[i].start, end - cuts[i].start, (int)cuts[i].voiced);
+                std::fprintf(f, "%.4f %.4f %d %d\n", cuts[i].start, end - cuts[i].start, (int)cuts[i].voiced, cuts[i].info);
             }
             std::fclose(f);
         }

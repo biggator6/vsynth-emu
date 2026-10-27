@@ -2085,3 +2085,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
   note-on fix).
 - **Firmware player + XT records vs references:** vocal mean **79.3**. That
   is the ceiling for this player; our encoder's cuts cost about 1 point.
+- **Repeat budget decoded** (V-Trainer `vpenc.dll`; the XT shares the code).
+  Each record's `info >> 3` = (0x5999 + 0x4ccd·(s − 0.2)/0.8) >> 11, where
+  s = 1 − 2·D/E is the Q15 similarity at the record's closing mark (the next
+  period against the previous one). Its range is 11–20.
+  - The XT's own vocal records are reproduced 94 % exactly (99 % within ±1)
+    when D/E is measured at full rate; the sine, 100 %.
+  - Implemented in our encoder (v38). The budgets bind only at slowdowns of
+    ≥ 4×, so the suite is unchanged at 74.25.

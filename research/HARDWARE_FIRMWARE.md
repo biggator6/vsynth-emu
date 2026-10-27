@@ -676,8 +676,62 @@ chain and the metric. Sine (wave 003, settings as recorded): 78.2 / 78.7 /
 don't fit SOLO at those settings (see the sine-reference note in
 RESEARCH_LOG).
 
-Next targets: the encoder's per-record budget field (XT vocal info >> 3 =
-11–20; ours unlimited), and the LITE player.
+Next targets: the encoder's per-record budget field (done: next
+subsection) and the LITE player.
+
+### How the encoder sets the repeat budget (2026-10-27, v38)
+
+Found in `vpenc.dll` (V-Trainer), whose code the XT shares:
+- **Writer `0x10004fa0`:** each mark node holds a u16 value v (+0xc) and
+  low bits (+0xe, 7 = voiced).
+- **Info word:** `info = ((v >> 8) & 0xf8) | low`, so the budget field is
+  `v >> 11`.
+- **Pairing:** `0x10004fa0` and the converter `0x100045e0` give each
+  record [mark_k, mark_k+1) the value of its **closing** mark, mark_k+1.
+- **Where v comes from:** the SOLO main loop (`0x10007c70`) inserts each
+  voiced mark through `0x1000aa70`. That routine stores
+  `v = 0x10009fb0(0x8000 − 2q)` with q from the period tracker
+  (`0x1000aac0` → `0x1000ad60`):
+  - `q = min(32768·D/E, 32768)` (Q15, divide `0x1000af00`);
+  - `D = Σ (x[i − lag] − x[i])²` over one period starting at the mark,
+    i.e. the following period compared with the preceding one, with the
+    lag hill-climbed from the tracked period (`0x1000a050`);
+  - `E = Σ x²` over that window (`0x1000a0b0`).
+- **Mapping `0x10009fb0`**, with s = 0x8000 − 2q: s ≤ 0 → 0; s ≤ 0x1999
+  → 0x5999; else `0x5999 + (0xa666 − 0x5999)·(s − 0x1999)/0x6667`. The
+  constants (set in `0x100079d0`) make the field **11…20**: 20 means D/E
+  ≲ 0.033, and 11 means s ≤ 0.2.
+- **Decimation:** the tracker works on a ×4-decimated copy (21-tap Q15
+  FIR, `0x10008c90`; taps 4289, 4165, 3810, 3277, 2639, 1976, 1361, 849,
+  458, 228, 36). The voicing threshold is q < (0x8000 − tbr·0x8000/10)/2.
+
+**Checked against the XT's own records** (Emu_test.prj wave 004, 461
+records):
+
+| D/E measured on | exactly right | within ±1 |
+|---|---|---|
+| decimated signal | 80 % | 99 % |
+| full-rate signal | **94 %** | 99 % |
+
+The sine (wave 003) matches 100 %. Pairing records with their opening
+mark instead drops the match to 69 %, which confirms the closing-mark
+pairing. So the XT computes the field with this rule; its quality value
+appears to come from the full-rate refinement.
+
+**Implemented** as `assignRecordBudgets` (default since v38;
+`VSE_BUDGET=off` = unlimited). On our own encoder's cuts it matches the
+XT's field on 96 % of the aligned marks exactly, and all within ±1.
+
+**Effect.** A repeat costs 6400 at pitch +7, 4096 at time ×½ and 2048 per
+repeat at ×¼ (`d6f0`). The budget is b·512 = 5632…10240, so it binds only
+from about 3–4 repeats per record, i.e. slowdowns of ≥ 4×. There a record
+whose budget is spent is left early: vocal at time ×4 with our records
+differs by −3.7 dB from the unlimited version. Emulator check in this
+regime (vocal ×4 slower, the XT's records): the engine matches the
+firmware at **−54.3 dB** with budgets, against −28.3 dB with budgets
+ignored. The suite has no such
+SOLO case, so the score is unchanged (74.25; vocal 78.28; time ×½ 80.89 →
+80.93).
 
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).

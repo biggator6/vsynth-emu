@@ -196,7 +196,9 @@ reference/metric factors).
 speed), t = |time rate|; x = (1.5 − 0.5a)·t·8192 (a ≥ 1; (3 − 2a) for
 a < 1), ≥ 0; cost = x if x ≥ 2048 else max(0, 2x − 2048). Budget per
 record = (info & 0x1F8) << 6 = (info >> 3)·512 (last record 0x7E00 =
-unlimited). When the anchor passes a record's end while P is still inside
+unlimited). *How the encoder computes `info >> 3` (a Q15 period-similarity
+mapped to 11–20, at each record's closing mark) is in HARDWARE_FIRMWARE.md,
+"How the encoder sets the repeat budget" (v38).* When the anchor passes a record's end while P is still inside
 it, the record repeats if budget ≥ cost (budget −= cost), else playback
 moves on to the next record; records P has passed are skipped (anchor +=
 their length). Implemented in the firmware SOLO player behind
