@@ -26,6 +26,14 @@ Rebuild the project from scratch (order matters):
    per case; use `-readOnly` so the project isn't modified. The script is
    the template for emulating other leaf routines: preset memory and
    registers, set PR to a sentinel, run to it, read the fields back.
+6. Render a whole note with the firmware's SOLO player (0x8950cd90, one
+   32-sample block per call), about 1 ms per output sample:
+   `python3 -I $S/emu_inputs.py <xt_wave.wav> <raw.wav> /tmp/x` (records,
+   samples and a VSE_CUTSFILE from an XT SOLO wave), then
+   `-postScript EmuSolo.java /tmp/x_recs.bin /tmp/x_samp.bin out.f32 <R> <F> <walk> [energy] [maxOut] [trace.tsv] [traceFrom]`.
+   The optional trace dumps the player state per sample in the same columns
+   as the engine's `VSE_TRACE=file`, for diffing. For parallel runs I used
+   one copy of the Ghidra project per process.
 
 Why each step: SH-4 code switches FPU mode (`fschg`, `lds rN,fpscr`) inside
 functions; Ghidra's decompiler needs FPSCR_PR/SZ assumed per address

@@ -906,15 +906,20 @@ std::vector<float> VariphraseEngine::periodJumpResynthOffline(
 
 std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
         const std::vector<float>& in) const {
-    // Units: the firmware works in 1/16-sample fixed point; here everything
-    // is in samples (floats), which is the same arithmetic without the
-    // quantisation.  C = current grain period, N = next grain's period.
+    // Units: in samples (doubles), with the firmware's fixed-point grids
+    // applied where they change behaviour: P's whole-1/16 part, os in 1/16,
+    // ppw in 1/4096, the anchor step in 1/16.  C = current grain period,
+    // N = next grain's period.  Checked sample by sample against the
+    // firmware in Ghidra's P-code emulator (EmuSolo.java) on the XT's own
+    // records: −50…−115 dB on 13 cases.  The residual is the SH-4's
+    // single-precision round-to-zero arithmetic.
     //
-    // Per output sample:
+    // Per output sample (order as in 0x8950cd90):
     //   P += 1/stretch                       phrase walk (time)        [ce80]
-    //   segment = record containing P; frac = (P − segStart)/C          [d5a0]
+    //   record scheduler (anchor, below); frac = (P − segStart)/C       [d5a0]
     //   timer += 1; if timer ≥ ppw: timer −= ppw, TRIGGER on the other channel
-    //   each channel: e = min(e,1); w = 2·min(e, 1−e); e += 0.5/wl     [d380]
+    //   each channel: e = min(e,1); w = 2·min(e, 1−e); e += slope      [d380]
+    //                 (slope = 0.5/wl of the LATEST trigger, shared)
     //                 pos = start + age·v; s = lerp(pos);
     //                 s += (lerp(pos + Ctap) − s)·fracTap;  age += 1   [d0f0]
     //   out = wA·sA + wB·sB → highpass SVF (Energy OFF: fc = f0/8, q = 1.2)
@@ -979,32 +984,51 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     for (size_t i = 0; i < nc; ++i) {
         segStart[i] = cuts[i].start;
         const double end = (i + 1 < nc) ? cuts[i + 1].start : (double)n;
-        segLen[i] = std::max(10.0, end - cuts[i].start);   // firmware floor: 160/16 samples
+        segLen[i] = std::max(1.0 / 16.0, end - cuts[i].start);   // raw record length
     }
 
-    auto lerp = [&](double pos) -> double {
-        const int i0 = (int)std::floor(pos);
-        if (i0 < 0 || i0 + 1 >= n) return 0.0;
-        const double fr = pos - i0;
-        return in[i0] + (in[i0 + 1] - in[i0]) * fr;
+    // Sample reads (0x8950d380 / d0f0): the grain's read index is clamped
+    // to the last sample (fraction 0); the second tap, one record period
+    // further on, is not clamped and reads silence past the end.
+    auto at = [&](int i) -> double { return (i >= 0 && i < n) ? (double)in[i] : 0.0; };
+    auto readGrain = [&](double pos, double tap, double tapW) -> double {
+        int i0 = (int)std::floor(pos);
+        double fr = pos - i0;
+        if (i0 >= n - 1) { i0 = n - 1; fr = 0.0; }
+        double s = at(i0) + (at(i0 + 1) - at(i0)) * fr;
+        if (tapW > 0.0) {
+            const double p2 = fr + tap;
+            const int j = i0 + (int)std::floor(p2);
+            const double f2 = p2 - std::floor(p2);
+            s += (at(j) + (at(j + 1) - at(j)) * f2 - s) * tapW;
+        }
+        return s;
     };
 
-    struct Chan { double start = 0, age = 0, v = 1, e = 1.0, slope = 0, tap = 0, tapW = 0; };
+    // Two grain channels (A, B).  The window slope is ONE shared value,
+    // rewritten by every trigger (grain +0x40), not per channel.
+    struct Chan { double start = 0, age = 0, v = 1, e = 1.0, tap = 0, tapW = 0; };
     Chan ch[2];
-    int next = 0;
+    int next = 1;            // trigger toggle starts at 0 → first trigger → B
+    double slope = 0.0;
 
     const int outLen = std::max(1, (int)std::lround((double)n * stretch));
     std::vector<float> out(outLen, 0.0f);
     const double walk = 1.0 / stretch;
-    double P = 0.0, timer = 1e9, ppw = segLen[0];
+    double P = 0.0, Pq = 0.0, timer = 0.0, ppw = 0.0;
+    bool ended = false;
     size_t seg = 0;
-    // Record selection.  Default: the record containing P.  VSE_ANCHOR:
-    // firmware scheduler (0x8950ce80 / d6f0) — an anchor walks the source at
-    // max(rate,1); when it passes the record end while P is still inside,
-    // the record REPEATS if its budget ((info & 0x1F8) << 6; unknown info or
-    // last record = unlimited) covers the repeat cost, else playback moves
-    // on to the next record; records P has already passed are skipped.
-    const bool anchorMode = std::getenv("VSE_ANCHOR") != nullptr;
+    // Record selection: the firmware scheduler (0x8950ce80 / d6f0), the
+    // default since the emulator showed it is what the XT runs (time 2x:
+    // −74 dB vs firmware; record-containing-P: +3.7 dB).  An anchor walks
+    // the source at trunc(16·max(rate,1))/16; when it passes the record end
+    // while P is still inside, the record REPEATS if its budget
+    // ((info & 0x1F8) << 6; unknown info or last record = unlimited) covers
+    // the repeat cost, else playback moves on to the next record; records P
+    // has already passed are skipped.  VSE_SCHED=pos: the record containing
+    // P (pre-v37 behaviour, diagnostic).
+    const char* schedSel = std::getenv("VSE_SCHED");
+    const bool anchorMode = !(schedSel && std::string(schedSel) == "pos");
     double anchor = 0.0, anchorStep = std::max(A, 1.0);
     auto budgetOf = [&](size_t i) -> double {
         if (i + 1 >= nc || cuts[i].info < 0) return 1e30;          // unlimited
@@ -1027,6 +1051,67 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     // triggers (0x8950d5a0); unvoiced records keep the last voiced value.
     // Zeroed at note-on (0x8950fba0).  Verified in the P-code emulator.
     double f0n = 0.0;
+    double anchorStepInit = 1.0;
+
+    // Grain parameters for a trigger at phrase position P in record seg
+    // (0x8950d5a0).  Returns the grain's start, velocity and second-tap
+    // weight; sets ppw, slope, the anchor step and (voiced only) f0n.
+    struct Grain { double start, v, frac, C; };
+    auto grainParams = [&](size_t sg, bool setF0) -> Grain {
+        // Only the PERIOD is floored (160/16 samples); the record's extent,
+        // the anchor wrap and the second-tap offset use the raw length.
+        const double C = std::max(10.0, segLen[sg]);
+        // After the last record the XT's stream holds a (256, 1) terminator:
+        // the last record's next period is 16 samples.
+        const double N = std::max(10.0, (sg + 1 < nc) ? segLen[sg + 1] : 16.0);
+        const double frac = (Pq > segStart[sg] + segLen[sg]) ? 1.0
+                          : (Pq > segStart[sg]) ? (Pq - segStart[sg]) / C : 0.0;
+        const double Ci = C + frac * (N - C);
+        bool voiced = cuts[sg].voiced;
+        if (const char* lm = std::getenv("VSE_LITE"); lm && std::string(lm) == "solo-np") voiced = false;
+        // EXPERIMENT: VSE_LITEINFO=b forces the record info low bits:
+        // bit 0x4 → patent path; else non-patent with S = A'·F',
+        // A' = (b & 1 ? A : 1), F' = (b & 2 ? F : 1)   (0x8950d5a0).
+        int forcedInfo = -1;
+        if (const char* fi = std::getenv("VSE_LITEINFO")) { forcedInfo = std::atoi(fi); voiced = (forcedInfo & 4) != 0; }
+        double v, wl, os = 0.0, pw;
+        if (voiced) {
+            pw  = std::min(Ci / A, 524287.0 / 16.0);
+            v   = F;
+            wl  = Ci / F;
+            // os is stored in whole 1/16 samples (truncated)
+            if (wl > pw) { os = std::trunc(16.0 * (Ci - pw * F)) / 16.0; wl = pw; }
+            if (setF0) f0n = std::min(1.0 / pw, 0.5);
+        } else {
+            double S = A;
+            if (forcedInfo >= 0) S = ((forcedInfo & 1) ? A : 1.0) * ((forcedInfo & 2) ? F : 1.0);
+            pw  = std::min(Ci / S, 524287.0 / 16.0);
+            v   = S;
+            wl  = pw;
+        }
+        // The trigger timer runs in 1/4096 samples against ppw truncated to
+        // that grid (grain +4); unrounded ppw drifts a trigger by a sample
+        // within ~1700 samples on the XT sine.
+        ppw   = std::floor(pw * 4096.0) / 4096.0;
+        slope = 0.5 / wl;
+        // Anchor step (player +0x30) is stored in whole 1/16 samples:
+        // trunc(16·rate), at least 16 — pitch +7 steps 23/16, not 1.498.
+        anchorStepInit = std::max(std::floor(16.0 * (voiced ? A : v)), 16.0) / 16.0;
+        return { segStart[sg] + os, v, frac, segLen[sg] };
+    };
+
+    // Note-on (0x8950fba0): grain params at P = 0, timer and ages 0, both
+    // channels reading from the record start, A's window at 0 and B's at
+    // 0.5 (the two sum to 1), f0n zeroed after the params are computed.
+    {
+        const Grain g = grainParams(0, false);
+        for (Chan& c : ch) { c.start = segStart[0]; c.age = 0; c.v = g.v; c.tap = g.C; c.tapW = g.frac; }
+        ch[0].e = 0.0; ch[1].e = 0.5;
+        anchorStep = anchorStepInit;
+    }
+
+    FILE* traceF = nullptr;
+    if (const char* tf = std::getenv("VSE_TRACE")) traceF = std::fopen(tf, "w");
 
     for (int t = 0; t < outLen; ++t) {
         if ((t & 31) == 0) {   // per-block coefficient update        [cde0]
@@ -1051,77 +1136,62 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
             fCoef = (ft - fCoef) * 0.125 + fCoef;
             fCoef = std::min(fCoef, 1.9 - q);
         }
+        P += walk;
+        // Record logic sees only the whole-1/16 part of P (player +0x38).
+        Pq = std::floor(P * 16.0) / 16.0;
+        // End of the wave (+0x1c): position holds, no further triggers
+        // (+4 set); the two running grains play out.
+        if (Pq >= (double)n) { P = Pq = (double)n; ended = true; }
         if (!anchorMode) {
-            while (seg + 1 < nc && P >= segStart[seg + 1]) ++seg;
+            while (seg + 1 < nc && Pq >= segStart[seg + 1]) ++seg;
         } else {
             anchor += anchorStep;
             const double segEnd = segStart[seg] + segLen[seg];
             if (anchor >= segEnd) {
                 const double cost = repeatCost(anchorStep, walk);
-                if (P < segEnd && budget > 0.0 && budget >= cost) {
+                if (Pq < segEnd && budget > 0.0 && budget >= cost) {
                     if (budget < 1e29) budget -= cost;
                     while (anchor >= segStart[seg] + segLen[seg]) anchor -= segLen[seg];
                 } else if (seg + 1 < nc) {
                     ++seg; budget = budgetOf(seg);
-                    while (seg + 1 < nc && budget > 0.0 && P >= segStart[seg] + segLen[seg]) {
+                    while (seg + 1 < nc && budget > 0.0 && Pq >= segStart[seg] + segLen[seg]) {
                         anchor += segLen[seg];
                         ++seg; budget = budgetOf(seg);
                     }
                 }
             }
         }
-        const double C = segLen[seg];
-        const double N = (seg + 1 < nc) ? segLen[seg + 1] : C;
-        const double frac = std::clamp((P - segStart[seg]) / C, 0.0, 1.0);
-
         timer += 1.0;
-        if (timer >= ppw) {
-            timer = std::min(timer - ppw, ppw);
-            const double Ci = C + frac * (N - C);
-            bool voiced = cuts[seg].voiced;
-            if (const char* lm = std::getenv("VSE_LITE"); lm && std::string(lm) == "solo-np") voiced = false;
-            // EXPERIMENT: VSE_LITEINFO=b forces the record info low bits:
-            // bit 0x4 → patent path; else non-patent with S = A'·F',
-            // A' = (b & 1 ? A : 1), F' = (b & 2 ? F : 1)   (0x8950d5a0).
-            int forcedInfo = -1;
-            if (const char* fi = std::getenv("VSE_LITEINFO")) { forcedInfo = std::atoi(fi); voiced = (forcedInfo & 4) != 0; }
-            double v, wl, os = 0.0;
-            if (voiced) {
-                ppw = Ci / A;
-                v   = F;
-                wl  = Ci / F;
-                if (wl > ppw) { os = Ci - ppw * F; wl = ppw; }
-                f0n = std::min(1.0 / ppw, 0.5);
-            } else {
-                double S = A;
-                if (forcedInfo >= 0) S = ((forcedInfo & 1) ? A : 1.0) * ((forcedInfo & 2) ? F : 1.0);
-                ppw = Ci / S;
-                v   = S;
-                wl  = ppw;
-            }
-            anchorStep = std::max(voiced ? A : v, 1.0);
+        const bool due = timer >= ppw;
+        if (due) timer -= ppw;
+        if (due && !ended) {
+            const Grain g = grainParams(seg, true);
+            anchorStep = anchorStepInit;
             Chan& c  = ch[next];
             next ^= 1;
-            c.start  = segStart[seg] + os;
+            c.start  = g.start;
             c.age    = timer;
-            c.v      = v;
-            c.slope  = 0.5 / wl;
-            c.e      = timer * c.slope;
-            c.tap    = C;
-            c.tapW   = frac;
+            c.v      = g.v;
+            c.e      = timer * slope;
+            c.tap    = g.C;
+            c.tapW   = g.frac;
         }
+
+        if (traceF)   // VSE_TRACE: same fields/units as EmuSolo.java's trace
+            std::fprintf(traceF, "%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%.7g\t%.7g\t%.7g\t%.7g\t%.7g\t%.7g\t%.7g\t%.0f\t%.0f\n",
+                t, std::floor(P * 16), std::floor(anchor * 16), segStart[seg] * 16, (segStart[seg] + segLen[seg]) * 16,
+                segLen[seg] * 16, timer * 4096, ppw * 4096, ch[0].age * 4096, ch[1].age * 4096,
+                std::floor(ch[0].start * 16), std::floor(ch[1].start * 16), next ^ 1, ch[0].e, ch[1].e,
+                ch[0].v, ch[1].v, ch[0].tapW, ch[1].tapW, slope, ch[0].tap * 16, ch[1].tap * 16);
 
         double y = 0.0;
         for (Chan& c : ch) {
             const double e = std::min(c.e, 1.0);
             const double w = 2.0 * std::min(e, 1.0 - e);
             if (w > 0.0) {
-                const double pos = c.start + c.age * c.v;
-                double s = lerp(pos);
-                if (c.tapW > 0.0) s += (lerp(pos + c.tap) - s) * c.tapW;
-                y += w * s;
+                y += w * readGrain(c.start + c.age * c.v, c.tap, c.tapW);
             }
-            c.e = e + c.slope;
+            c.e = e + slope;
             c.age += 1.0;
         }
 
@@ -1129,9 +1199,8 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
         const double high = y - q * band - low;
         band += fCoef * high;
         out[t] = (float)high;
-
-        P += walk;
     }
+    if (traceF) std::fclose(traceF);
     return out;
 }
 

@@ -200,7 +200,9 @@ unlimited). When the anchor passes a record's end while P is still inside
 it, the record repeats if budget ≥ cost (budget −= cost), else playback
 moves on to the next record; records P has passed are skipped (anchor +=
 their length). Implemented in the firmware SOLO player behind
-`VSE_ANCHOR` (default off).
+`VSE_ANCHOR` (default off). *Since v37 this scheduler is the default: the
+P-code emulator showed it is what the XT runs (HARDWARE_FIRMWARE.md, "Full
+SOLO player"); `VSE_SCHED=pos` selects the old record-containing-P rule.*
 
 **Result (44.1 k vocal input, vocal mean):** default cuts 66.26 → 66.00
 with the anchor scheduler; real V-Trainer records + real info 65.63 →

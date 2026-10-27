@@ -626,9 +626,58 @@ renders change at −64 to −81 dB relative; scores are unchanged (suite
 73.9, vocal 77.41).
 
 **Template.** Any leaf routine can be run this way: point the PR at a
-sentinel, preset memory, step to the sentinel, read the fields back. The
-next targets are the per-sample loop (`ce80`/`d380`/`d420` on a real
-record stream plus a sample buffer) and the unidentified LITE player.
+sentinel, preset memory, step to the sentinel, read the fields back.
+
+### Full SOLO player (2026-10-27, v37)
+
+`EmuSolo.java` renders whole notes through `0x8950cd90`, one 32-sample
+block per call, at about 1 ms per sample. Inputs are the XT's own `vpdt`
+records (Emu_test.prj waves 003/004, terminator included) and the raw
+samples. Note-on state is set by hand from the `0x8950fba0` decompile,
+because that routine also touches global RAM through `fa60`. The output is
+read before the gain stage (gain = 1/65536).
+
+Thirteen cases were rendered (vocal ×7, sine ×6) and diffed against the C++
+engine on the same records. Sample-by-sample traces at each `d380` entry
+(engine: `VSE_TRACE`) located each difference. The firmware facts below
+are all now in the engine:
+
+| firmware behaviour | where | effect before the fix |
+|---|---|---|
+| P advances before scheduling/trigger | `ce80` | 1-sample lag |
+| note-on: timer = ages = 0; A and B both read from the record start, A's window at 0 and B's at 0.5; first trigger goes to B | `fba0` | wrong first grain; double trigger at t = 1 |
+| no clamp on `timer −= ppw` | `ce80` | — |
+| window slope is ONE shared field (+0x40), set by the latest trigger | `d380` | wrong decay of the older grain |
+| record scheduler = the anchor/budget scheduler | `ce80`, `d6f0` | time 2x +3.7 dB vs −74 dB |
+| anchor step stored as trunc(16·rate)/16, min 1 | `d5a0` | pitch +7 −3 dB |
+| only the period is floored to 160/16; extent, wrap and tap use the raw length | `d4c0`, `d5a0` | XT sine lead-in record (6.6 samples) |
+| frac = 1 and Ci = N once P is past the record end | `d5a0` | — |
+| ppw on a 1/4096 grid (truncated), os on 1/16 (truncated), ppw ≤ 524287/16 | `d5a0` | trigger drifts a sample in ~1700 samples |
+| record logic sees P's whole-1/16 part (+0x38) | `ce80` | — |
+| end of wave: P holds, no more triggers; primary read clamps to the last sample, second tap reads silence | `ce80`, `d380` | tail |
+| after the last record the stream holds a (256, 1) terminator → last record's N = 16 samples | `d4c0` | last record |
+
+**Result:** engine vs firmware, whole files: vocal formant −12/+12/+4
+−68/−64/−68 dB, pitch −12/+7 −50/−56, time 2x/½ −77/−56; sine
+formant −71/−64, pitch −110/−78, time −115/−70 dB. The residual is
+float32 round-to-zero (FPSCR RM = 1) vs double: ppw differs by one 1/4096
+step on some triggers. The peaks (≤ 4e-3) are in the last ~100 samples,
+where the second tap reads across the end of the wave. The record
+scheduler's decoded repeat cost (`d6f0`) was confirmed instruction by
+instruction.
+
+**Firmware player + XT records vs the hardware references** (metric v6):
+vocal 78.0 / 71.9 / 80.9 / 87.6 / 79.5 / 74.6 / 82.4, mean **79.3**. This
+is the ceiling for the player with the XT's records. Our own encoder's
+cuts reach 78.29 (v37), so the encoder accounts for about 1 point. The
+remaining ~20 points are outside the SOLO player: references, the output
+chain and the metric. Sine (wave 003, settings as recorded): 78.2 / 78.7 /
+49.6 / 71.8 / 56.4 / 62.2. The pitch −12 and time sine references again
+don't fit SOLO at those settings (see the sine-reference note in
+RESEARCH_LOG).
+
+Next targets: the encoder's per-record budget field (XT vocal info >> 3 =
+11–20; ours unlimited), and the LITE player.
 
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).

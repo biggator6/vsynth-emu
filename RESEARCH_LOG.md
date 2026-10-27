@@ -2068,3 +2068,20 @@ Round-2 recordings.  First build-out after that: real-time granular port
   Both are fixed in v36.
 - **v36 = 73.9** (vocal 77.41). Only the vocal renders change, at −64 to
   −81 dB relative; the other 13 cases are bit-identical. EngineTests: 15 PASS.
+- **Full player emulated** (`EmuSolo.java`). Whole notes rendered through
+  `0x8950cd90` on the XT's own records, 13 cases, diffed against the engine
+  with per-sample state traces. I fixed 12 behaviours (table in
+  HARDWARE_FIRMWARE.md, "Full SOLO player"). The main ones:
+  - note-on starts channels A and B half a window apart;
+  - P advances before use;
+  - one shared window slope;
+  - the anchor scheduler is the firmware's own (now the default; the old
+    rule is `VSE_SCHED=pos`);
+  - the firmware's fixed-point grids for ppw, os and the anchor step;
+  - end-of-wave handling and the terminator record.
+- The engine now matches the firmware at −50 to −115 dB on all 13 cases. The
+  residual is single-precision round-to-zero arithmetic.
+- **v37 = 74.2** (vocal 77.41 → 78.29; pitch −12 81.8 → 86.2 from the
+  note-on fix).
+- **Firmware player + XT records vs references:** vocal mean **79.3**. That
+  is the ceiling for this player; our encoder's cuts cost about 1 point.
