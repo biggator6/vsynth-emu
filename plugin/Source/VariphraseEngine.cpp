@@ -1023,8 +1023,34 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     // its knob scaling (OFF/1–127 → g) is not yet decoded.  Experiment hook.
     double energy = 0.0;
     if (const char* e = std::getenv("VSE_ENERGY")) energy = std::atof(e);
+    // Highpass cutoff (grain +0x24): min(1/ppw, 0.5), written only by voiced
+    // triggers (0x8950d5a0); unvoiced records keep the last voiced value.
+    // Zeroed at note-on (0x8950fba0).  Verified in the P-code emulator.
+    double f0n = 0.0;
 
     for (int t = 0; t < outLen; ++t) {
+        if ((t & 31) == 0) {   // per-block coefficient update        [cde0]
+            // Energy g = 0 (OFF): cutoff f0/8, damping 1.2 (rumble filter).
+            // Energy g > 0: cutoff at the output fundamental, damping
+            // (1.2 − g) + p(rate) with p = g·(2r − 1) on [0.5, 1),
+            // g·(2 − r) on [1, 2), 0 outside — neutral at no pitch shift,
+            // strongest resonance at ≥ an octave of shift.
+            // Runs at block start, before the block's triggers (0x8950cd90),
+            // and reads the cutoff f0n that only voiced triggers write.
+            const double r = A;
+            double x = f0n, qt;
+            if (energy <= 0.0) { x *= 0.125; qt = 1.2; }
+            else {
+                double pr = 0.0;
+                if (r >= 0.5 && r < 1.0)      pr = (2.0 * r - 1.0) * energy;
+                else if (r >= 1.0 && r < 2.0) pr = (2.0 - r) * energy;
+                qt = (1.2 - energy) + pr;
+            }
+            const double ft = x * (3.0962 - 4.4208 * x * x) * 2.0;
+            q     = (qt - q) * 0.125 + q;
+            fCoef = (ft - fCoef) * 0.125 + fCoef;
+            fCoef = std::min(fCoef, 1.9 - q);
+        }
         if (!anchorMode) {
             while (seg + 1 < nc && P >= segStart[seg + 1]) ++seg;
         } else {
@@ -1065,6 +1091,7 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
                 v   = F;
                 wl  = Ci / F;
                 if (wl > ppw) { os = Ci - ppw * F; wl = ppw; }
+                f0n = std::min(1.0 / ppw, 0.5);
             } else {
                 double S = A;
                 if (forcedInfo >= 0) S = ((forcedInfo & 1) ? A : 1.0) * ((forcedInfo & 2) ? F : 1.0);
@@ -1098,26 +1125,6 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
             c.age += 1.0;
         }
 
-        if ((t & 31) == 0) {   // per-block coefficient update        [cde0]
-            // Energy g = 0 (OFF): cutoff f0/8, damping 1.2 (rumble filter).
-            // Energy g > 0: cutoff at the output fundamental, damping
-            // (1.2 − g) + p(rate) with p = g·(2r − 1) on [0.5, 1),
-            // g·(2 − r) on [1, 2), 0 outside — neutral at no pitch shift,
-            // strongest resonance at ≥ an octave of shift.
-            const double r = A;
-            double x = std::min(1.0 / ppw, 0.5), qt;
-            if (energy <= 0.0) { x *= 0.125; qt = 1.2; }
-            else {
-                double pr = 0.0;
-                if (r >= 0.5 && r < 1.0)      pr = (2.0 * r - 1.0) * energy;
-                else if (r >= 1.0 && r < 2.0) pr = (2.0 - r) * energy;
-                qt = (1.2 - energy) + pr;
-            }
-            const double ft = x * (3.0962 - 4.4208 * x * x) * 2.0;
-            q     = (qt - q) * 0.125 + q;
-            fCoef = (ft - fCoef) * 0.125 + fCoef;
-            fCoef = std::min(fCoef, 1.9 - q);
-        }
         low += fCoef * band;
         const double high = y - q * band - low;
         band += fCoef * high;

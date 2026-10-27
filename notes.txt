@@ -162,7 +162,7 @@ Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
 Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8 (true 52.5)
 Metric v5 history: v28=68.1 (granular rate-scaling: identical at 48k)
-Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8 → v33=73.0 (input fix) → v34=73.9 (XT epochs) → v35=73.9 (1/16 epochs, octave guard)
+Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8 → v33=73.0 (input fix) → v34=73.9 (XT epochs) → v35=73.9 (1/16 epochs, octave guard) → v36=73.9 (emulator-verified highpass state; vocal −64…−81 dB change)
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 Rebuild the offline renderer:

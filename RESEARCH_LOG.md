@@ -2052,3 +2052,19 @@ Round-2 recordings.  First build-out after that: real-time granular port
   Sine (SOLO, settings as recorded) 74.6; vocal 77.41; suite 73.9.
 - Retracted a "0.93 formant warp" in the vocal references. It was a
   48k-vs-44.1k FFT bin-index comparison in my own script.
+
+### Session 16 addendum (2026-10-27) — firmware executed in the P-code emulator; v36
+
+- Ghidra's emulator now runs Roland's SH-4 code
+  (`research/ghidra_scripts/EmuD5A0.java`). I ran the SOLO grain-parameter
+  routine `0x8950d5a0` on 288 cases, varying period, pitch, formant, record
+  info and robot gate. Against our transcribed formulas in float32 there
+  were 0 mismatches.
+- I found two differences in the engine's highpass (details in
+  HARDWARE_FIRMWARE.md, "P-code emulation"):
+  - the cutoff is written only by voiced triggers, and is held through
+    unvoiced records;
+  - the coefficients update at block start, before the block's triggers.
+  Both are fixed in v36.
+- **v36 = 73.9** (vocal 77.41). Only the vocal renders change, at −64 to
+  −81 dB relative; the other 13 cases are bit-identical. EngineTests: 15 PASS.

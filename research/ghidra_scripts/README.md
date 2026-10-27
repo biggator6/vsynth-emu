@@ -20,6 +20,12 @@ Rebuild the project from scratch (order matters):
     caller in r0 (`lds r0,fpscr`): assume r0 = 0x00040001 at entry.
 4. Dump/decompile a range: `-postScript DumpRange.java <lo> <hi> <outprefix>` (writes `.idx` + `.c`).
    `Disasm.java <out> <addr> <count> ...` — raw listing with pool values.
+5. Execute firmware code in the P-code emulator:
+   `-postScript EmuD5A0.java <out.tsv> [f0n preset]` runs the SOLO grain-
+   parameter routine `0x8950d5a0` over an input grid. It prints one TSV row
+   per case; use `-readOnly` so the project isn't modified. The script is
+   the template for emulating other leaf routines: preset memory and
+   registers, set PR to a sentinel, run to it, read the fields back.
 
 Why each step: SH-4 code switches FPU mode (`fschg`, `lds rN,fpscr`) inside
 functions; Ghidra's decompiler needs FPSCR_PR/SZ assumed per address

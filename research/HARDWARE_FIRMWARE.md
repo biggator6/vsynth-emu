@@ -589,6 +589,47 @@ pure, pitch +7 far too strong, pitch −12 keeps 440 dominant); non-patent
 path and period-jump stay pure where the reference has harmonics.
 Experiment hooks: `VSE_LITE=solo-p|solo-np|pj`.
 
+## P-code emulation (2026-10-27) — firmware vs our C++, executed
+
+Ghidra's `EmulatorHelper` runs the SH-4 code directly (script
+`research/ghidra_scripts/EmuD5A0.java`). The script lays out the player
+struct as `0x8950cd90` sets it up: r8 = player, r9 = r8 + 0xe8 (record
+state), r10 = r9 + 0x3c (grain). It sets FPSCR = 0x00040001, calls
+`0x8950d5a0` with PR at a breakpoint sentinel, and reads back the grain
+fields.
+- **Grid:** C ∈ {5427, 3200}/16, R ∈ {1, 1.4983, 0.5}, F ∈ {1, 0.5, 2,
+  1.25}, info ∈ {7, 3, 1, 2, 0, 4}, K = grain[0] ∈ {256, 0}.
+- **Result:** 288 cases, no emulator failure. Diffed against the Pass 8
+  formulas in float32: **0 mismatches**. ppw, os and the anchor step match
+  exactly; the float fields match to print precision.
+
+The run also pinned down several fields:
+- **Pitch factor:** A = grain[0]·R/256. grain[0] = 0 is the robot voice
+  (voiced) or A' = 1 (non-patent).
+- **Voiced gate:** bit 0x4 alone selects the patent path; info = 4 and
+  info = 7 behave the same.
+- **Non-patent path:** S = A'·F' with the 0x1/0x2 gates (confirmed on every
+  combination).
+- **Clamps:** ppw ≤ 524287/16 samples; anchor step (player +0x30) =
+  max(16·A_eff, 16), where A_eff = Ci/ppw on the robot path.
+- **The highpass cutoff (grain +0x24 = min(1/ppw, 0.5)) is written only
+  on voiced triggers.** A sentinel preset survives every non-voiced
+  record. Note-on (`0x8950fba0`) zeroes it and sets q = 1.2.
+- **`cde0` runs at block start**, before the block's 32 samples and their
+  triggers (`cd90`: `c280` → `cde0` → `ccc0` → 32 × (`ce80`, `d380`)). The
+  per-sample mono path in `cd90` is the Chamberlin highpass as transcribed,
+  then gain smoothing, ×65536, written to L and R.
+
+**Engine fixes (v36).** The cutoff now holds through non-voiced records
+and the coefficients update before the block's triggers. The vocal
+renders change at −64 to −81 dB relative; scores are unchanged (suite
+73.9, vocal 77.41).
+
+**Template.** Any leaf routine can be run this way: point the PR at a
+sentinel, preset memory, step to the sentinel, read the fields back. The
+next targets are the per-sample loop (`ce80`/`d380`/`d420` on a real
+record stream plus a sample buffer) and the unidentified LITE player.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).
