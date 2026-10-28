@@ -219,6 +219,37 @@ the natural end: about 14 s of audio for the 3.5 s source.
 `render_suite.py` already maps it (`--time 4.0`), so it scores automatically
 once it's in `sustained/`.
 
+## XT encodes of the chord and drum (added 2026-10-28) — no audio capture needed
+
+**Why:** the BACKING/ENSEMBLE work needs the XT's own analysis of our exact
+inputs, as waves 003/004 gave for SOLO (where the encoder port now
+reproduces the XT bit-exactly). The BACKING/ENSEMBLE waves in Emu_test.prj
+are factory presets, possibly encoded offline by Roland, so they can't serve
+as ground truth for the XT's on-board encoder. With the XT's own encodes we
+can:
+- run the XT's BACKING and ENSEMBLE players on exactly what the hardware
+  stored, and score them against the existing chord and drum references;
+- validate the emulated multi-band encoder.
+
+(research/HARDWARE_FIRMWARE.md, "BACKING / ENSEMBLE: first findings")
+
+**Question first:** which **Encode Type** did you use for the existing chord
+and drum takes (BACKING or ENSEMBLE)? The formant +12 chord take shows no
+formant change, so it was one of the two.
+
+**Steps:** import `raw/chord_Cmaj_original.wav` and
+`raw/drum_hit_original.wav` into the XT (note whether the XT converts them
+from 48 kHz). Encode each **twice**, once as BACKING and once as ENSEMBLE,
+keeping Encode Depth at whatever you normally use (note the value). Then save
+the project, as with Emu_test.prj, and copy it into `analysis/projects/`.
+
+| Wave | Source | Encode Type |
+|---|---|---|
+| `chord_backing` | raw/chord_Cmaj_original.wav | BACKING |
+| `chord_ensemble` | raw/chord_Cmaj_original.wav | ENSEMBLE |
+| `drum_backing` | raw/drum_hit_original.wav | BACKING |
+| `drum_ensemble` | raw/drum_hit_original.wav | ENSEMBLE |
+
 ## Next Recording Session — Priorities
 
 **Superseded by the "Round 2 — Recording Wishlist" section at the end of this
