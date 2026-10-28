@@ -3,9 +3,10 @@
 // writer 0x89512f10, and dump the heap for offline analysis.
 // Usage: -postScript EmuBand.java <samp.bin> <channels> <out.heap> [trace.txt hexaddr...]
 //   samp.bin  int16 LE samples (interleaved if 2 channels), 44.1 kHz
-// Setup as the UI would leave it: .bss zeroed, frame count [0x8987c948],
-// channels [0x8987c942], sample pointer [0x8987c9bc], pool factor
-// [0x8987ca90] = 50.  Stubs: 0x89511360 (progress/UI) returns; 0x89512570
+// Setup as the C startup and the UI would leave it: .data copied from ROM,
+// .bss zeroed, frame count [0x8987c948], channels [0x8987c942], sample
+// pointer [0x8987c9bc]; pool factor [0x8987ca90] left at the ROM default.
+// EMUBAND_FULL=1 stubs the writer and runs on.  Stubs: 0x89511360 (progress/UI) returns; 0x89512570
 // (attack-event list from the sample's markers) returns {2, (0,0), (n,n)};
 // malloc 0x89527910 / free 0x89527950 / calloc-like 0x89527930 bump-allocate.
 import ghidra.app.script.GhidraScript;
@@ -41,10 +42,13 @@ public class EmuBand extends GhidraScript {
             for (int i = 4; i < a.length; ++i) { long t = Long.parseLong(a[i], 16); traceAt.add(t); emu.setBreakpoint(toAddr(t)); }
         }
         try {
-            wb(0x8985858cL, new byte[0x89b5858d - 0x8985858c]);     // .bss = 0
+            // C startup (entry 0x89300040): .data image ROM [0x89834018, 0x8985858c)
+            // → RAM [0x8985858c, 0x8987cb00); zero [0x8987cb00, 0x8a01ceb4).
+            wb(0x8985858cL, emu.readMemory(toAddr(0x89834018L), 0x8985858c - 0x89834018));
+            wb(0x8987cb00L, new byte[0x8a01ceb4 - 0x8987cb00]);
             wb(SAMP, samp); wb(SAMP + samp.length, new byte[1 << 16]);
             w32(0x8987c948L, n); wb(0x8987c942L, new byte[]{ (byte)ch }); w32(0x8987c9bcL, (int)SAMP);
-            w32(0x8987ca90L, 50);
+            // pool factor [0x8987ca90]: ROM default (5); more chunks are allocated as needed
             int[] ev = { 2, 0, 0, n, n };
             for (int i = 0; i < ev.length; ++i) w32(EV + 4 * i, ev[i]);
             emu.writeRegister("r15", STACK); emu.writeRegister("r0", 0x00040001L);
@@ -61,7 +65,12 @@ public class EmuBand extends GhidraScript {
                 if (at == CALLOC) { ret(alloc((reg("r4") & 0xffffffffL) * (reg("r5") & 0xffffffffL))); continue; }
                 if (at == FREE || at == UI) { ret(0); continue; }
                 if (at == EVLIST) { ret(EV); continue; }
-                if (at == WRITER) { why = "reached writer 0x89512f10"; break; }
+                if (at == WRITER) {
+                    if (System.getenv("EMUBAND_FULL") == null) { why = "reached writer 0x89512f10"; break; }
+                    // dump at the writer, then stub it (marker rescale; returns 1) and run on
+                    try (FileOutputStream f = new FileOutputStream(a[2] + ".atwriter")) { f.write(emu.readMemory(toAddr(HEAP), (int)(heap - HEAP))); }
+                    ret(1); continue;
+                }
                 if (traceAt.contains(at)) {
                     trace.printf("%x r0=%d r4=%d r5=%d r6=%d r7=%d pr=%x%n", at, (int)reg("r0"), (int)reg("r4"), (int)reg("r5"),
                                  (int)reg("r6"), (int)reg("r7"), reg("PR"));

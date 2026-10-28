@@ -1008,16 +1008,20 @@ std::vector<XtRecord> xtSoloEncode(const int16_t* x, int n) {
 
 #ifdef XT_ENCODER_MAIN
 #include <cstdio>
-// xt_encode <rom.2.bin> <samp.bin (int16 LE mono)> : prints "start len info" (1/16 sample)
+// xt_encode <rom.2.bin> <samp.bin (int16 LE)> [stereo] : prints "start len info"
+// (1/16 sample).  "stereo": interleaved L/R, encoded from (L+R) >> 1 as the
+// XT's stereo reader (0x8951f6f0) does.
 int main(int argc, char** argv) {
-    if (argc < 3) { std::fprintf(stderr, "usage: %s V-SynthXT.rom.2.bin samp.bin\n", argv[0]); return 1; }
+    if (argc < 3) { std::fprintf(stderr, "usage: %s V-SynthXT.rom.2.bin samp.bin [stereo]\n", argv[0]); return 1; }
     if (!xtLoadTables(argv[1])) { std::fprintf(stderr, "cannot read the low-pass table from %s\n", argv[1]); return 1; }
+    const bool stereo = argc > 3 && std::string(argv[3]) == "stereo";
     ++argv;
     FILE* f = std::fopen(argv[1], "rb");
     if (!f) return 1;
     std::vector<int16_t> x;
-    int16_t s;
-    while (std::fread(&s, 2, 1, f) == 1) x.push_back(s);
+    int16_t s[2];
+    while (std::fread(s, 2, stereo ? 2 : 1, f) == (stereo ? 2u : 1u))
+        x.push_back(stereo ? (int16_t)((s[0] + s[1]) >> 1) : s[0]);
     std::fclose(f);
     for (const XtRecord& r : xtSoloEncode(x.data(), (int)x.size()))
         std::printf("%d\t%d\t%d\n", r.start16, r.len16, r.info);

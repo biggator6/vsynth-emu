@@ -223,10 +223,12 @@ once it's in `sustained/`.
 
 **Why:** the BACKING/ENSEMBLE work needs the XT's own analysis of our exact
 inputs, as waves 003/004 gave for SOLO (where the encoder port now
-reproduces the XT bit-exactly). The BACKING/ENSEMBLE waves in Emu_test.prj
-are factory presets, possibly encoded offline by Roland, so they can't serve
-as ground truth for the XT's on-board encoder. With the XT's own encodes we
-can:
+reproduces the XT bit-exactly). Every BACKING/ENSEMBLE wave in Emu_test.prj
+(362, 376, 377, 380, 381, 415) is factory content stamped "V-Synth Ver.1.50"
+— encoded on an original V-Synth in 2003, not on the XT — and that version's
+encoder is measurably different (see "Factory waves" in
+research/HARDWARE_FIRMWARE.md). So these four encodes are the only possible
+ground truth for the XT's multi-band encoder. With them we can:
 - run the XT's BACKING and ENSEMBLE players on exactly what the hardware
   stored, and score them against the existing chord and drum references;
 - validate the emulated multi-band encoder.

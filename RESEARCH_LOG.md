@@ -2127,3 +2127,24 @@ Round-2 recordings.  First build-out after that: real-time granular port
   - **v40: suite 74.79, vocal 79.83** (every vocal case up).
   - Still needed: the patch's Energy value read on the XT, and the knob → g
     mapping.
+
+### Session 16 addendum (2026-10-28) — factory waves are V-Synth 1.50 encodes; stereo SOLO input
+
+- The `LIST/ISFT` stamp shows that every BACKING/ENSEMBLE wave in
+  Emu_test.prj (362, 376, 377, 380, 381, 415) came from an original V-Synth
+  on firmware 1.50 (2003). The XT's own waves say "V-Synth Ver.2.01" (001, 003,
+  004). So the project has no XT-made multi-band ground truth. The XT
+  encodes of the chord and drum in RECORDING_GUIDE.md are the only way to
+  get it.
+- The XT's stereo SOLO encode reads (L+R) >> 1 (reader `0x8951f6f0`).
+  With that input, the native XT encoder port reproduces 8 of the 24
+  single-segment stereo factory SOLO waves bit-exactly. The others differ in
+  unvoiced-record lengths, voicing in decaying tails and 1/16-sample steps,
+  which fits an earlier build of the same encoder.
+- The engine's int16 conversion before the XT encoder now floors, so a
+  stereo source (0.5·(L+R)) gives the XT's half-sum. Mono renders are
+  bit-identical; `xt_encode` takes a `stereo` argument.
+- Harnesses: `EmuEnc.java` and `EmuBand.java` now copy `.data` from ROM as
+  the C startup does, instead of zeroing it. SOLO is still bit-exact, and
+  the band lists are unchanged.
+

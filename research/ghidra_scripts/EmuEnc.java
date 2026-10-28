@@ -10,10 +10,9 @@
 // Setup as the encode driver 0x89515e20 does it: 0x8951dc40(n, samples,
 // eventCount, events) with the event list {n·16} (a sustained note has no
 // attack events), template defaults (no 0x8951dbb0 call), then
-// 0x8951e120(2) = mono.  The image's .bss (0x8985858c to the end, 0xFF in
-// the file) is zeroed as the C startup would; DAT_8987caa0 (node-pool size
-// factor, set through 0x89522a30, default 5) = 50, so the pool holds n/16
-// nodes.  malloc (0x89527910) / free (0x89527950) are stubbed
+// 0x8951e120(2) = mono.  Memory as the C startup leaves it: .data copied
+// from ROM, .bss zeroed; DAT_8987caa0 (node-pool size factor, set through
+// 0x89522a30) at its ROM default.  malloc (0x89527910) / free (0x89527950) are stubbed
 // with a bump allocator.  Reproduces the XT's own wave 004 records (raw
 // vocal): positions 458/462 exact, the rest ±1/16 (FPU rounding), info 100 %.
 import ghidra.app.script.GhidraScript;
@@ -92,8 +91,11 @@ public class EmuEnc extends GhidraScript {
             }
         }
         try {
-            wb(0x8985858cL, new byte[0x89b5858d - 0x8985858c]);     // .bss = 0
-            w32(0x8987caa0L, 50); wb(0x8987ca9aL, new byte[]{1});
+            // C startup (entry 0x89300040): .data image ROM [0x89834018, 0x8985858c)
+            // → RAM [0x8985858c, 0x8987cb00); zero [0x8987cb00, 0x8a01ceb4).
+            wb(0x8985858cL, emu.readMemory(toAddr(0x89834018L), 0x8985858c - 0x89834018));
+            wb(0x8987cb00L, new byte[0x8a01ceb4 - 0x8987cb00]);
+            // pool factor [0x8987caa0]: ROM default (5); more chunks are allocated as needed
             wb(SAMP, samp); wb(SAMP + samp.length, new byte[1 << 16]);
             w32(EV, n * 16);
             long t0 = System.currentTimeMillis();

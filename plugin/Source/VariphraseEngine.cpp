@@ -1016,7 +1016,9 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
             const double p = i * k;
             const int i0 = std::min((int)p, (int)in.size() - 1), i1 = std::min(i0 + 1, (int)in.size() - 1);
             const double v = (in[i0] + (in[i1] - in[i0]) * (p - i0)) * 32768.0;
-            x16[i] = (int16_t)std::clamp(std::lround(v), -32768L, 32767L);
+            // floor, not round: a stereo source arrives as 0.5·(L+R), and the
+            // XT's stereo reader (0x8951f6f0) takes (L+R) >> 1.
+            x16[i] = (int16_t)std::clamp(std::floor(v), -32768.0, 32767.0);
         }
         for (const XtRecord& r : xtSoloEncode(x16.data(), m))
             cuts.push_back({ r.start16 / 16.0 * k, (float)(r.len16 / 16.0 * k), (r.info & 4) != 0, r.info });

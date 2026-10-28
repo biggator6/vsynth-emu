@@ -170,6 +170,9 @@ SOLO encoder (v39): plugin/Source/XtSoloEncoder.cpp needs one table from the
   keep the unpacked copy at firmware/unpacked/ (gitignored; the renderer looks
   there relative to the working directory). Without it the v38 epoch encoder
   is used. VSE_ENC=epoch|vt forces the older encoders.
+  Stereo sources: the XT encodes (L+R) >> 1, so the engine floors its int16
+  conversion of the 0.5·(L+R) mono input; `xt_encode rom samp.bin stereo`
+  takes interleaved L/R.
 
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \

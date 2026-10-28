@@ -765,8 +765,10 @@ None of `vpenc`'s integer tables appear anywhere in the firmware.
 - **Records:** [mark_k, mark_k+1) with info `((v_k+1 >> 8) & 0xf8) | low`.
 
 **Harness:** `EmuEnc.java` sets up memory as the C startup and the UI would:
-- the image's `.bss` (0x8985858c to the end, 0xFF in the file) is zeroed;
-- the pool factor is 50;
+- `.data` is copied from its ROM image [0x89834018, 0x8985858c) to RAM at
+  0x8985858c, and `.bss` [0x8987cb00, 0x8a01ceb4) is zeroed (until
+  2026-10-28 the harness zeroed both, with the same SOLO records);
+- the pool factor is the ROM default;
 - `malloc` (`0x89527910`) and `free` (`0x89527950`) are stubbed with a bump
   allocator.
 
@@ -882,9 +884,11 @@ So the chord was encoded as BACKING or ENSEMBLE, not LITE or SOLO. Which of
 the two is still open: the players differ (mode 3 against mode 5), the
 analysis does not. The drum's type is unknown.
 
-**Ground truth in the user's project.** XT-encoded BACKING waves 376, 377,
-380 and 381, and ENSEMBLE waves 362 and 415, each with its own audio. They
-validate a multi-band encoder the way waves 003/004 validated SOLO.
+**Multi-band waves in the user's project.** BACKING waves 376, 377, 380 and
+381, and ENSEMBLE waves 362 and 415, each with its own audio. *Correction
+(see "Factory waves" below): these are factory content written by an
+original V-Synth, firmware 1.50, not by the XT. They show the format, but
+they are not ground truth for the XT's encoder.*
 
 **Multi-band analysis layout** (vpfl 0102, e.g. wave 376). A directory
 header of (offset, size, …) entries and 28-byte sub-headers (at 384, 440,
@@ -922,16 +926,71 @@ vpenc's `v/625` rule.
 
 **The step that turns the dense lists into the stored records has not been
 found.** It isn't in `0x89512f10` (which rescales the marker list) or in
-`0x89515960`, and nothing loads 625. It probably runs at sample save, where
-the vpdt chunk is serialised.
+`0x89515960`, and nothing loads 625. It may run at sample save, where the
+vpdt chunk is serialised. Or there may be no such step in the XT: wave 376
+was encoded by V-Synth 1.50, whose SOLO encoder already differs from the
+XT's (below), so its multi-band encoder may differ too.
 
 **Next:**
-1. Find that step (start from the RIFF/vpdt serialiser) and reproduce wave
-   376's stored records.
+1. Get the XT's own BACKING and ENSEMBLE encodes of the raw chord and drum
+   (RECORDING_GUIDE.md). Then diff `EmuBand.java`'s lists against them; if
+   they differ, look for the thinning step from the vpdt serialiser.
 2. Emulate the BACKING (`0x8950e6e0`) and ENSEMBLE (`0x8950db10`) players
    on a stored wave's records and band PCM.
 3. Run the chord and drum through both and score them against the
    references to settle the encode types; then port what matches.
+
+### Factory waves: V-Synth 1.50 encodes, and the stereo reader (2026-10-28)
+
+**Who wrote each wave.** The `LIST/ISFT` chunk names the writer:
+- "V-Synth Ver.2.01" (the XT): waves 001, 003, 004;
+- "VTrainer Ver1.00": wave 002;
+- "V-Synth Ver.1.50" (an original V-Synth, © 2003): the 40 factory waves
+  343–382 and 415, including every BACKING/ENSEMBLE wave;
+- no `LIST`: LITE waves.
+
+`vpsc` byte 1 is the encode type (0 LITE, 1 SOLO, 3 BACKING, 5 ENSEMBLE),
+and byte 10 the original key.
+
+**SOLO vpdt layouts.**
+- *Mono, one segment* (003, 004, 345): count at byte 84, records from 88.
+- *Stereo* (343–382): one record stream, count at byte 136, records from 140.
+- *Several segments* (001: 10, 002: 13, 346: 7, 347: 11): the high half of
+  u32[2] is the segment count. Each segment has its own directory entry
+  holding its first record length and position. They are probably the
+  attack events (markers or Encode Depth). The u32[2] high half is 2 for a
+  single segment.
+
+**The XT's stereo SOLO encode reads (L+R) >> 1.** The setup routine sets
+the sample reader by channel mode:
+- mode 2 (mono) → `0x8951f6e0`, which reads one sample, stride 1;
+- mode 3 (stereo) → `0x8951f6f0`, which loads L and R, adds them and
+  shifts right arithmetically by one (the floor of the half-sum), stride 2;
+- modes 0 and 1 read one channel of a stereo pair, stride 2.
+
+`xt_encode … stereo` and the engine's int16 conversion (floor, not round)
+now do the same. Round-to-nearest of the half-sum breaks one wave (359).
+
+**V-Synth 1.50's SOLO encoder is nearly the XT's.** I ran the native XT
+port on the 24 single-segment stereo factory SOLO waves with (L+R) >> 1:
+- **8 are bit-exact** — every start, length and info word (358, 359, 360,
+  365, 374, 378, 379, 382);
+- the rest diverge in small ways:
+  - 1/16-sample steps on otherwise identical tracks (344, 364, 375);
+  - unvoiced records: always 704 (44 samples) on V-Synth 1.50, against the
+    XT's 702–710, or 32080 for long unvoiced runs at the start (361, 368,
+    373);
+  - voicing in decaying tails: V-Synth 1.50 keeps voiced records where the
+    XT goes unvoiced (363, 367, 370, 372).
+
+So the 2003 encoder is an earlier build of the same algorithm, with
+different unvoiced-record and voicing details. The port's
+`xt_encode … stereo` reproduces 003, 004 and the eight waves above
+bit-exactly.
+
+Mono factory waves: BassDrum1 (345) diverges from its first mark (1381
+against the XT's 6816). The multi-segment waves need the event list; the
+port only takes {n·16}.
 
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
