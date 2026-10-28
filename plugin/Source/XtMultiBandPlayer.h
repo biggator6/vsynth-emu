@@ -1,0 +1,53 @@
+#pragma once
+// The V-Synth XT's multi-band VariPhrase players — BACKING (encode type 3,
+// rom.2 0x8950e6e0) and ENSEMBLE (type 5, 0x8950db10) — ported from the
+// firmware and checked against it in Ghidra's P-code emulator
+// (research/ghidra_scripts/EmuBacking.java).  See XtMultiBandPlayer.cpp.
+#include <cstddef>
+#include <cstdint>
+
+// The players' interpolation kernel, recombination-filter coefficients and
+// per-band constants are firmware tables.  They are read from the user's own
+// rom.2 image (research/ghidra_scripts/unpack_firmware.py), never shipped:
+// returns false if the file is missing or does not look right.
+bool xtMbLoadTables(const char* romPath);
+bool xtMbTablesLoaded();
+
+// One band as the player addresses it: int16 data (interleaved L/R for
+// stereo).  Reads are allowed at frame indices [lo, hi) relative to `data`
+// and give 0 outside, so a band can be a slice of one sample-memory image.
+struct XtMbBand { const int16_t* data = nullptr; long lo = 0, hi = 0; };
+
+// A loaded multi-band wave: its vpdt chunk (read in place) and the six bands
+// the player uses — loader slots 0 and 2..6.  BACKING bands are PCM (band 0
+// at the original rate, bands 1..5 decimated ×4 … ×64); ENSEMBLE bands 1..5
+// are the six-sinusoid frames built at load time.
+struct XtMbWave {
+    const uint8_t* vpdt = nullptr;
+    size_t vpdtBytes = 0;
+    int channels = 1;
+    XtMbBand band[6];
+};
+
+class XtMbPlayer {
+public:
+    // Note-on (0x89510980 / 0x89510130): mode 3 = BACKING, 5 = ENSEMBLE.
+    // pitch = frequency ratio, walk = playback speed (1/stretch, > 0).
+    // Returns false if the tables are not loaded or the wave is unusable.
+    bool noteOn(const XtMbWave& w, int mode, float pitch, float walk);
+    // One 32-frame block: out[2·i] = L, out[2·i + 1] = R, int16 scale.  Runs
+    // in round-to-zero like the SH-4 (XT_ROUND=nearest: the emulator's mode).
+    void block(float* out);
+    bool ended() const;
+
+    struct Band;   // a band's player state (firmware struct, 0x88 bytes)
+    struct State;
+private:
+    State* s = nullptr;
+    static void blockImpl(State& S, float* out);
+public:
+    XtMbPlayer();
+    ~XtMbPlayer();
+    XtMbPlayer(const XtMbPlayer&) = delete;
+    XtMbPlayer& operator=(const XtMbPlayer&) = delete;
+};

@@ -2167,3 +2167,19 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Next: a C++ port of both players validated against these renders. The
   chord/drum scoring waits on the XT's own encodes.
 
+### Session 16 addendum (2026-10-28) — C++ port of the BACKING and ENSEMBLE players
+
+- `plugin/Source/XtMultiBandPlayer.cpp` is a literal port of both
+  players. Its tables are read from the user's rom.2 at run time.
+- It is **bit-exact** against the firmware players in the emulator on all
+  11 test renders:
+  - wave 376 BACKING: identity, pitch +7, time ×2, time ×½;
+  - wave 380 BACKING: pitch −12, quarter speed, both;
+  - wave 362 ENSEMBLE: identity, pitch +7, time ×2, time ×½.
+- With the hardware's round-to-zero (the default), it moves by −118 to
+  −120 dB relative.
+- ENSEMBLE's note-on packs the first frame the other way round from the
+  frame loader. The quirk is reproduced.
+- It is not wired into the engine yet. It needs the load-time band rebuild
+  and the multi-band encoder's vpdt, neither of which is ported.
+

@@ -1018,10 +1018,61 @@ run correctly in the emulator: pitch and time are independent, and the
 level is right.
 
 **Next:**
-- Port both players to C++, validated against these renders as the SOLO
-  player was.
+- ~~Port both players to C++, validated against these renders~~ — done
+  (next section).
 - Scoring against the chord and drum references still needs the XT's own
   vpdt for those inputs (RECORDING_GUIDE.md), or the step that writes it.
+
+### C++ port of the BACKING and ENSEMBLE players (2026-10-28)
+
+`plugin/Source/XtMultiBandPlayer.cpp` ports both players operation by
+operation from the SH-4 code. It uses float arithmetic with no
+contraction, `fmac` as a product then a sum (as Ghidra's P-code does it),
+and `fipr` as a double sum rounded once. The arithmetic-heavy routines are
+transliterated register by register: `0x8950e980`, `0x8950eb60`, the
+recombination tree `0x8950c650` / `0x8950c720`, the output stage
+`0x8950c570`, and the oscillators `0x8950dc50` / `0x8950dcb0`.
+
+Like the SOLO encoder, it reads its firmware tables from the user's own
+rom.2 at run time: the 64×6 kernel, the tree coefficients, the per-band
+shift/mask/offset/stride constants, the oscillator constants and the
+cosine table. Nothing is copied into the source. The kernel phases sum to
+about 0.9, so the band reads carry a gain of about −0.9 dB.
+
+**Validation** against `EmuBacking.java`, with the emulator's
+round-to-nearest (`XT_ROUND=nearest`):
+
+| wave | settings | result |
+|---|---|---|
+| 376 BACKING | identity, pitch +7, time ×2, time ×½ | **bit-exact**, every frame |
+| 380 BACKING | pitch −12, time ×4 (quarter speed), both | **bit-exact** (repeat budget exercised) |
+| 362 ENSEMBLE | identity, pitch +7, time ×2, time ×½ | **bit-exact** |
+
+By default the port runs in round-to-zero, as the SH-4 does (FPSCR RM = 1).
+That moves the output by −118 to −120 dB relative, i.e. LSB-level. The
+hardware's own `fmac`/`fipr` precision is not modelled beyond this.
+
+**A firmware quirk, reproduced:** ENSEMBLE's note-on (`0x89510130`) packs
+each band's first frame as {base, delta}. The frame loader and the
+oscillators use {delta, base}. So the first frame of each band (64
+band-1 samples, longer for the lower bands) plays with swapped values. The
+emulator does the same.
+
+**Ported:** forward playback from the start event, with no loop points and
+default voice flags.
+
+**Not ported:**
+- reverse playback (`0x8950e8f0`, `0x8950f4c0`, `0x8950f5d0`);
+- loops and the event walker at the bounds (`0x8950c880` / `0x8950ca70`);
+- event seeks (`0x89510bf0`);
+- the voice flags 0x2 / 0x4 / 0x8 / 0x20;
+- the loop struct's cache bounds.
+
+**Not yet in the engine.** The player needs a loaded wave's band data and
+its vpdt. Both come from firmware not yet ported: the load-time rebuild
+(`0x894a9940`: the filter bank for BACKING, the sinusoidal analysis for
+ENSEMBLE) and the multi-band encoder (`0x89516000` and the step that writes
+the vpdt).
 
 ### Factory waves: V-Synth 1.50 encodes, and the stereo reader (2026-10-28)
 

@@ -174,6 +174,17 @@ SOLO encoder (v39): plugin/Source/XtSoloEncoder.cpp needs one table from the
   conversion of the 0.5·(L+R) mono input; `xt_encode rom samp.bin stereo`
   takes interleaved L/R.
 
+BACKING / ENSEMBLE players (2026-10-28): plugin/Source/XtMultiBandPlayer.cpp,
+  bit-exact against the firmware players run in the P-code emulator. Like
+  the SOLO encoder it reads its tables from the user's rom.2 at run time.
+  Not wired into the engine yet: it needs the load-time band data and the
+  vpdt, which come from the multi-band encoder (not ported). Validation CLI:
+    clang++ -std=c++20 -O2 -ffp-contract=off -DXT_MBPLAYER_MAIN \
+      plugin/Source/XtMultiBandPlayer.cpp -o xt_mbplay
+    xt_mbplay rom.2.bin vpdt.bin mem.samp b1,..,b5 <ch> out.f32 <pitch> <walk>
+  (inputs as research/ghidra_scripts/EmuBacking.java; XT_MODE=5 ENSEMBLE,
+  XT_ROUND=nearest to match the emulator's rounding).
+
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \
     plugin/Source/OfflineRenderer.cpp \
