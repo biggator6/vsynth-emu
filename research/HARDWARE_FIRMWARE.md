@@ -787,6 +787,37 @@ the reference against which to validate a native port of the encoder
 (`vpenc`'s fixed-point algorithm with the float decimator; the existing
 `encodeGrainCutsVTrainer` port is only approximate).
 
+### Native encoder port: notes so far (2026-10-27, not started in code)
+
+- **Source:** vpenc's SOLO path is ~50 functions, ~2600 decompiled lines.
+  The roots are `0x100079d0` (setup) and `0x10007c70` (main loop, buffers
+  of 0x3000 samples). Regenerate the decompile with `DecompFn.java ... range
+  0x10001000 0x1001a000` on `Vsynth_software/ghidra_vt`.
+- **Validate** record for record against `EmuEnc.java` (XT) and against
+  V-Trainer's own `~/V-Trainer Samples/VP9SAMvocal_aah_44---.WAV` (the
+  integer-decimation variant).
+- **XT difference:** the decimated buffer (0x8a00f0f4) holds 4-byte floats,
+  so the decimated-domain sums are float on the XT. Read XT `0x8951f790`,
+  `0x89520f30`, `0x89521090`, `0x895211e0` and `0x89521a80` before porting
+  those parts.
+- **Routines decoded so far:**
+  - `0x10008540`: energy gate over 2·maxPeriod samples.
+  - `0x100085d0`: onset candidates.
+    - Lags come from the table built by `0x10007be0`.
+    - Each is scored on the decimated signal (`0x1000a260`, lag >> 2),
+      re-checked at three further offsets.
+    - Octave checks: D(2L), D(3L) < 2·D.
+    - It must then pass at full rate (`0x1000a100`).
+  - `0x10008730`: full-rate lag refinement, then parabola (`0x1000a370`),
+    giving a 16.16 period.
+  - `0x10008480`: the first mark is the max-energy window of length P/4
+    (samples >> 8, squared), + P/8, wrapped.
+  - `0x1000a1c0` returns Σ(a+b)² and Σ(a−b)². `a100`/`a260` turn these into
+    32768·Σ(a−b)² / (Σ(a+b)² + Σ(a−b)²), with a signed variant for
+    param 4 = 0.
+  - Decompiler caveat: several functions are shown `void`, but their EAX
+    result is used (e.g. `0x10008480`). Check the disassembly.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).
