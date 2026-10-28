@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <map>
 #include <memory>
 #include <set>
@@ -17,6 +18,12 @@ namespace {
 constexpr uint32_t kMalloc = 0x89527910, kCalloc = 0x89527930, kFree = 0x89527950, kOsInit = 0x895278f0, kUi = 0x89511360;
 constexpr uint32_t kSoloNew = 0x8951dc40, kSoloEncode = 0x8951e120;
 constexpr uint32_t kLoadInit = 0x89529e90, kLoad = 0x894a9940;
+constexpr uint32_t kEncMulti = 0x89516000;                       // BACKING/ENSEMBLE encode driver
+constexpr uint32_t kOsAlloc = 0x895113a0, kOsFree = 0x895113e0;  // sample-memory chunks (OS pointers 0x8987c8f0/8f8)
+constexpr uint32_t kAfterVpdt = 0x89515b40;                       // the note chunk, after the vpdt is written
+constexpr uint32_t kSmp = 0x8987c940;    // sample block: +0 type, +2 channels, +8 frames, +0x20 start, +0x24 end, +0x7c samples
+constexpr uint32_t kChunks = 0x8987c97c; // (ptr, size) per chunk kind 0..8, set by 0x89517320
+constexpr uint32_t kMarkCount = 0x89ff0cfc, kMarkHead = 0x89ff0d04;
 // harness memory (as the emulator scripts use it)
 constexpr uint32_t kRam = 0x8C000000, kRamSize = 0x02000000;
 constexpr uint32_t kStack = 0x8C0E0000, kEv = 0x8C0F0000, kL = 0x8C0F0000, kInfo = 0x8C0F0100;
@@ -94,6 +101,64 @@ bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out) {
     return true;
 }
 
+bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, std::vector<uint8_t>& vpdt) {
+    vpdt.clear();
+    if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5)) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    const size_t bytes = (size_t)frames * channels * 2;
+    if (kSamp + bytes + 0x800000 > kHeap) return false;
+    c.write(kSamp, pcm, bytes);
+    // the sample being encoded
+    c.wr8(kSmp, (uint8_t)type);
+    c.wr8(kSmp + 2, (uint8_t)channels);
+    c.wr32(kSmp + 8, (uint32_t)frames);
+    c.wr32(kSmp + 0x20, 0);
+    c.wr32(kSmp + 0x24, (uint32_t)frames);
+    c.wr32(kSmp + 0x7c, kSamp);
+    // markers: a list head and {start (type 1), end (type 2)}, doubly linked
+    auto marker = [&](uint32_t at, uint32_t pos, uint8_t kind) {
+        c.wr32(at, pos); c.wr32(at + 4, pos);
+        c.wr8(at + 0xc, kind); c.wr8(at + 0xd, 1); c.wr8(at + 0xe, 1);
+    };
+    const uint32_t head = M->heap; M->heap += 0x100;
+    const uint32_t m0 = M->heap; M->heap += 0x100;
+    const uint32_t m1 = M->heap; M->heap += 0x100;
+    for (uint32_t a = head; a < M->heap; a += 4) c.wr32(a, 0);
+    marker(m0, 0, 1);
+    marker(m1, (uint32_t)frames, 2);
+    c.wr32(head + 0xbc, m0); c.wr32(m0 + 0xc0, head);    // next at +0xbc, previous at +0xc0
+    c.wr32(m0 + 0xbc, m1);   c.wr32(m1 + 0xc0, m0);
+    c.wr32(kMarkHead, head);
+    c.wr32(kMarkCount, 2);
+    // OS sample-memory chunks: hand out heap blocks
+    c.hook(kOsAlloc, [&M](Sh4& cpu) {
+        const uint32_t sz = 0x400000, p = M->heap;
+        if (p + sz > kRam + kRamSize) { cpu.ret(0); return; }
+        if (uint8_t* m = cpu.ptr(p, sz)) std::memset(m, 0, sz);
+        M->heap += sz;
+        cpu.ret(p);
+    });
+    c.hook(kOsFree, [](Sh4& cpu) { cpu.ret(0); });
+    // The vpdt is complete when the driver moves on to the note chunk
+    // (0x89515b40, after 0x89515a70 succeeded): take it there and stop.
+    bool done = false;
+    c.hook(kAfterVpdt, [&](Sh4& cpu) {
+        const uint32_t p = cpu.rd32(kChunks + 8 * 5), n = cpu.rd32(kChunks + 8 * 5 + 4);
+        if ((int32_t)cpu.rd32(0x89ff0dd0) == 0 && p && n && n <= 0x400000) {
+            vpdt.resize(n);
+            cpu.read(p, vpdt.data(), n);
+            done = true;
+        }
+        cpu.ret(0);
+    });
+    uint32_t rc = 0;
+    if (!c.call(kEncMulti, { 0 }, kStack, &rc)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    if (std::getenv("XT_FW_TRACE")) std::fprintf(stderr, "encode driver returned %u; [89ff0dd0]=%d; vpdt %zu bytes\n", rc, (int)c.rd32(0x89ff0dd0), vpdt.size());
+    return done;
+}
+
 bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMbBands& out) {
     if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5)) return false;
     auto M = std::make_unique<Machine>(g_rom);
@@ -132,6 +197,7 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 #ifdef XT_FW_MAIN
 // xt_fw <rom.2.bin> solo <samp.bin>                         : SOLO records "start len info"
 // xt_fw <rom.2.bin> load <3|5> <samp.bin> <channels> <out>  : the six bands, concatenated
+// xt_fw <rom.2.bin> encode <3|5> <samp.bin> <channels> <out.vpdt> : the multi-band encoder
 // xt_fw <rom.2.bin> play <3|5> <samp.bin> <channels> <vpdt.bin> <pitch> <walk> <out.f32>
 //   : bands from the firmware, then XtMbPlayer; float32 L/R pairs scaled to ±1
 //   (XT_ROUND=nearest: round to nearest, as Ghidra's emulator)
@@ -163,6 +229,15 @@ int main(int argc, char** argv) {
         if (!fo) return 1;
         for (int k = 0; k < 6; ++k) { std::fprintf(stderr, "band %d: %ld frames\n", k, b.len[k]); std::fwrite(b.buf[k].data(), 2, b.buf[k].size(), fo); }
         std::fclose(fo);
+    } else if (mode == "encode" && argc >= 7) {
+        std::vector<uint8_t> raw = slurp(argv[4]), vpdt;
+        const int type = std::atoi(argv[3]), ch = std::atoi(argv[5]);
+        if (!xtFwEncodeMulti(type, reinterpret_cast<const int16_t*>(raw.data()), (long)(raw.size() / (2 * ch)), ch, vpdt)) { std::fprintf(stderr, "encode failed\n"); return 1; }
+        FILE* fo = std::fopen(argv[6], "wb");
+        if (!fo) return 1;
+        std::fwrite(vpdt.data(), 1, vpdt.size(), fo);
+        std::fclose(fo);
+        std::fprintf(stderr, "vpdt %zu bytes\n", vpdt.size());
     } else if (mode == "play" && argc >= 10) {
         std::vector<uint8_t> raw = slurp(argv[4]), vpdt = slurp(argv[6]);
         const int type = std::atoi(argv[3]), ch = std::atoi(argv[5]);

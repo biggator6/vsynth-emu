@@ -22,5 +22,11 @@ bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out);
 // the player sees it.
 bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMbBands& out);
 
+// The multi-band encoder for BACKING (3) / ENSEMBLE (5): the encode driver
+// 0x89516000 run to completion, with a start and an end marker (one
+// segment, as a sustained note).  `vpdt` receives the chunk the firmware
+// builds (0x89511a20 / 0x89511de0 / 0x89511e90 / 0x89511c10).
+bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, std::vector<uint8_t>& vpdt);
+
 // Round to nearest instead of FPSCR.RM (to match Ghidra's P-code emulator).
 void xtFwForceNearest(bool on);

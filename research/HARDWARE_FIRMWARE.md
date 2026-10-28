@@ -1198,9 +1198,53 @@ Ghidra's emulator takes minutes for each.
 - `xtFwLoadBands(type, pcm, …)` builds the band data for BACKING (3) or
   ENSEMBLE (5), ready for `xtMbAttach()` and `XtMbPlayer`.
 
-**What remains for BACKING/ENSEMBLE from raw input is the vpdt.** With the
-interpreter, the multi-band encode driver (`0x89516000`) can now be run
-past its writer, looking for the step that serialises the vpdt.
+**The multi-band encoder runs to its vpdt** (`xtFwEncodeMulti`). The driver
+`0x89516000` (analysis, then the writer `0x89512f10`) is followed by
+`0x89515a70`:
+- `0x89511a20` sizes the chunk: header + band records + segment lists.
+  It allocates it through the OS (`0x895113a0`, a function pointer at
+  0x8987c8f0, served by a hook) and registers it with `0x89517320` as
+  chunk kind 5, at 0x8987c9a4 / 9a8.
+- `0x89511de0` writes the records (`0x89514d50` for types 3 and 5).
+- `0x89511e90` writes the segment lists.
+- `0x89511c10` writes the header and the event table from the marker
+  list.
+
+The marker list hangs off a head at [0x89ff0d04] (count [0x89ff0cfc]),
+doubly linked at +0xbc / +0xc0. The harness gives it a start marker (type
+1) and an end marker (type 2), both with +0xd = +0xe = 1. Those are the
+flags wave 376's events carry, i.e. a sustained note with no attack
+events. The harness stops at `0x89515b40`, the next (note) chunk, by which
+point the vpdt is complete.
+
+Encoding 376's audio gives the factory vpdt's exact layout: the same
+header, event table and first band entries. The record streams are
+longer (33,792 bytes against 5,680), because the XT's analysis keeps the
+dense mark lists `EmuBand.java` showed. So the "thinning" question was the
+2003 encoder's difference, not a missing XT step.
+
+**Scored against the references** (raw → resampled to 44.1 kHz int16 →
+firmware encode → firmware bands → C++ player → 48 kHz):
+
+| case | v40 engine | XT BACKING | XT ENSEMBLE |
+|---|---|---|---|
+| chord identity (formant_max) | 81.5 | 77.9 | **89.8** |
+| chord pitch +7 | 71.6 | 53.4 | **86.6** |
+| chord time ×2 | 72.9 | 57.5 | **86.5** |
+| drum pitch +7 | **80.8** | 75.3 | 75.8 |
+| drum time ×2 | **78.2** | 74.1 | 70.8 |
+| drum time ×4 | **75.3** | 71.7 | 65.8 |
+| drum time ×½ | **76.0** | 45.9 | 65.3 |
+
+So the chord references are ENSEMBLE encodes, and the firmware chain
+reproduces them far better than the engine did. The drum scores lower
+through either type. Its encode settings, such as attack events from
+Encode Depth (markers), are not modelled yet.
+
+**v41** routes ENSEMBLE content through this chain
+(`VariphraseEngine::multiBandFirmwareOffline`, with its own windowed-sinc
+resampling). The suite goes 74.79 → **76.56**: the chord cases score
+89.84 / 86.60 / 84.98, and no other case changes.
 
 ### Factory waves: V-Synth 1.50 encodes, and the stereo reader (2026-10-28)
 

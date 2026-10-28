@@ -235,9 +235,12 @@ ground truth for the XT's multi-band encoder. With them we can:
 
 (research/HARDWARE_FIRMWARE.md, "BACKING / ENSEMBLE: first findings")
 
-**Question first:** which **Encode Type** did you use for the existing chord
-and drum takes (BACKING or ENSEMBLE)? The formant +12 chord take shows no
-formant change, so it was one of the two.
+**Question first:** which **Encode Type** did you use for the existing drum
+takes (BACKING or ENSEMBLE), and which **Encode Depth**? *(The chord is
+answered: rendered through the XT's own firmware, ENSEMBLE scores 87.1 and
+BACKING 62.9 against its references, so the chord was ENSEMBLE. The drum
+scores below the current engine either way, 66.7 BACKING / 69.4 ENSEMBLE,
+so its settings, for example attack events from Encode Depth, matter.)*
 
 **Steps:** import `raw/chord_Cmaj_original.wav` and
 `raw/drum_hit_original.wav` into the XT (note whether the XT converts them

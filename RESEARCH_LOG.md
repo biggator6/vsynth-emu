@@ -2208,3 +2208,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - ENSEMBLE's band data is therefore exact without a port. Next: run the
   multi-band encoder through its writer in the interpreter to get the vpdt.
 
+### Session 16 addendum (2026-10-28) — v41: ENSEMBLE through the XT's own firmware chain
+
+- The multi-band encoder now runs to completion in the interpreter
+  (`xtFwEncodeMulti`). Its vpdt is the chunk `0x89511a20` / `de0` / `e90` /
+  `c10` build, with the OS chunk allocator hooked and a start/end marker
+  list. It has the factory layout, with denser records: the XT keeps the
+  dense lists, and the 2003 encoder was sparser.
+- Scoring raw → XT encode → XT bands → player shows the **chord was
+  ENSEMBLE**: XT ENSEMBLE scores 87.6 on average, BACKING 62.9, the v40
+  engine 75.4. The drum scores lower either way: its encode settings
+  (Encode Depth events) are unknown.
+- **v41 = 76.56** (v40 74.79). ENSEMBLE content takes the firmware chain.
+  The chord cases score 89.84 / 86.60 / 84.98; nothing else changes.
+

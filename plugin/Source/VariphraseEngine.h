@@ -129,6 +129,13 @@ public:
     // phrase position's progress through the current grain record.
     std::vector<float> soloFirmwareResynthOffline(const std::vector<float>& in) const;
 
+    // The XT's own multi-band chain, run from the user's rom.2 (v41): the
+    // firmware encoder (vpdt) and load-time band rebuild in the SH-4
+    // interpreter (XtFirmware.cpp), then the ported BACKING (type 3) or
+    // ENSEMBLE (type 5) player (XtMultiBandPlayer.cpp).  At 44.1 kHz, the
+    // input resampled to it and the output back.  Empty if the ROM is absent.
+    std::vector<float> multiBandFirmwareOffline(const std::vector<float>& in, int type) const;
+
     // Subband time stretch per Roland US6564187B1 (simplified): quarter-octave
     // analytic sub-bands, amplitude/inst-frequency trajectories resampled to
     // the stretched timeline.  For ENSEMBLE time-only operations.

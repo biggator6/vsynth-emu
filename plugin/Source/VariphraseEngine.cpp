@@ -2,6 +2,8 @@
 #include "PhaseVocoder.h"
 #include "SourceFilterModel.h"
 #include "XtSoloEncoder.h"
+#include "XtFirmware.h"
+#include "XtMultiBandPlayer.h"
 
 #include <cmath>
 #include <algorithm>
@@ -948,6 +950,87 @@ std::vector<float> VariphraseEngine::periodJumpResynthOffline(
     return out;
 }
 
+// The user's rom.2: VSE_XT_ROM, else the repo's gitignored firmware/unpacked
+// copy (relative to the working directory).
+static const char* findXtRom() {
+    static std::string path = [] {
+        std::vector<std::string> cand;
+        if (const char* p = std::getenv("VSE_XT_ROM")) cand.push_back(p);
+        for (const char* p : { "firmware/unpacked/V-SynthXT.rom.2.bin", "../firmware/unpacked/V-SynthXT.rom.2.bin",
+                               "../../firmware/unpacked/V-SynthXT.rom.2.bin" })
+            cand.push_back(p);
+        for (const std::string& c : cand)
+            if (FILE* f = std::fopen(c.c_str(), "rb")) { std::fclose(f); return c; }
+        return std::string();
+    }();
+    return path.empty() ? nullptr : path.c_str();
+}
+
+// Rational resampling by up/down with a Kaiser-windowed sinc (β = 8, 32
+// zero crossings each side at the lower of the two rates).
+static std::vector<double> resampleSinc(const std::vector<double>& x, int up, int down) {
+    if (up == down || x.empty()) return x;
+    const double ratio = (double)up / down, fc = 0.5 * std::min(1.0, ratio);   // cycles per input sample
+    const int half = (int)std::ceil(32.0 / (2.0 * fc));                          // taps each side (input samples)
+    const long nOut = (long)std::floor((double)x.size() * ratio);
+    auto bessel0 = [](double v) { double s = 1, t = 1; for (int k = 1; k < 40; ++k) { t *= (v / (2 * k)) * (v / (2 * k)); s += t; } return s; };
+    const double beta = 8.0, i0b = bessel0(beta);
+    std::vector<double> y((size_t)nOut, 0.0);
+    for (long j = 0; j < nOut; ++j) {
+        const double t = (double)j / ratio;
+        const long c = (long)std::floor(t);
+        double acc = 0;
+        for (long k = c - half + 1; k <= c + half; ++k) {
+            if (k < 0 || k >= (long)x.size()) continue;
+            const double d = t - (double)k, u = d / half;
+            if (std::abs(u) >= 1.0) continue;
+            const double a = 2 * fc * d * 3.14159265358979323846;
+            const double sinc = std::abs(a) < 1e-12 ? 1.0 : std::sin(a) / a;
+            acc += x[(size_t)k] * 2 * fc * sinc * bessel0(beta * std::sqrt(1 - u * u)) / i0b;
+        }
+        y[(size_t)j] = acc;
+    }
+    return y;
+}
+
+std::vector<float> VariphraseEngine::multiBandFirmwareOffline(const std::vector<float>& in, int type) const {
+    static const bool ready = [] { const char* p = findXtRom(); return p && xtFwOpen(p) && xtMbLoadTables(p); }();
+    if (!ready || in.empty()) return {};
+    const VariphraseParams hp = pImpl->hybridParams();
+    const double sr = pImpl->sampleRate;
+    const long isr = std::lround(sr);
+    long g = std::gcd(isr, 44100L);
+    const int up = (int)(44100L / g), down = (int)(isr / g);
+    // to 44.1 kHz int16, as the XT stores a sample
+    std::vector<double> x(in.begin(), in.end());
+    std::vector<double> x44 = resampleSinc(x, up, down);
+    std::vector<int16_t> pcm(x44.size());
+    for (size_t i = 0; i < x44.size(); ++i) pcm[i] = (int16_t)std::clamp(std::lround(x44[i] * 32768.0), -32768L, 32767L);
+    std::vector<uint8_t> vpdt;
+    XtMbBands bands;
+    if (!xtFwEncodeMulti(type, pcm.data(), (long)pcm.size(), 1, vpdt) || !xtFwLoadBands(type, pcm.data(), (long)pcm.size(), 1, bands)) return {};
+    XtMbWave w;
+    w.vpdt = vpdt.data();
+    w.vpdtBytes = vpdt.size();
+    xtMbAttach(bands, w);
+    const float pitch = std::pow(2.0f, hp.pitchShiftSemitones / 12.0f);
+    const float walk = 1.0f / std::max(0.2f, hp.timeStretchRatio);      // the XT's time range is ±5
+    XtMbPlayer pl;
+    if (!pl.noteOn(w, type, pitch, walk)) return {};
+    const long frames = std::lround((double)pcm.size() / walk);
+    std::vector<double> y44((size_t)frames);
+    float blk[64];
+    for (long done = 0; done < frames; done += 32) {
+        pl.block(blk);
+        for (long i = 0; i < 32 && done + i < frames; ++i) y44[(size_t)(done + i)] = blk[2 * i] / 32768.0;
+    }
+    std::vector<double> y = resampleSinc(y44, down, up);
+    const long want = std::lround((double)in.size() * hp.timeStretchRatio);
+    std::vector<float> out((size_t)std::max(1L, want), 0.0f);
+    for (size_t i = 0; i < out.size() && i < y.size(); ++i) out[i] = (float)y[i];
+    return out;
+}
+
 std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
         const std::vector<float>& in) const {
     // Units: in samples (doubles), with the firmware's fixed-point grids
@@ -994,13 +1077,7 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     // The XT encoder reads one table from the user's firmware image
     // (VSE_XT_ROM, else the repo's gitignored firmware/unpacked copy);
     // without it the epoch encoder is used.
-    static const bool xtReady = [] {
-        if (const char* p = std::getenv("VSE_XT_ROM")) return xtLoadTables(p);
-        for (const char* p : { "firmware/unpacked/V-SynthXT.rom.2.bin", "../firmware/unpacked/V-SynthXT.rom.2.bin",
-                               "../../firmware/unpacked/V-SynthXT.rom.2.bin" })
-            if (xtLoadTables(p)) return true;
-        return false;
-    }();
+    static const bool xtReady = [] { const char* p = findXtRom(); return p && xtLoadTables(p); }();
     if (enc == "vt") cuts = encodeGrainCutsVTrainer(in, sr);
     else if (enc == "epoch" || !xtReady) {
         cuts = encodeGrainCuts(in, sr, /*epochAlign=*/true);
@@ -1320,6 +1397,26 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
         if (m == "pj") out = periodJumpResynthOffline(inputMono);
         else if (m == "solo-p" || m == "solo-np") out = soloFirmwareResynthOffline(inputMono);
         if (!out.empty()) return out;
+    }
+
+    // ── The XT's own multi-band chain (v41) ──────────────────────────────────
+    // ENSEMBLE content plays through the firmware encoder, band rebuild and
+    // player (multiBandFirmwareOffline).  Chord (an ENSEMBLE encode on the
+    // XT): mean 75.4 → 87.6 over its three cases.  BACKING stays on the paths
+    // below for now: the drum scored lower through the firmware BACKING
+    // chain (66.7 vs 77.6); its encode type and events are not known yet.
+    // VSE_MB=off: the older paths; VSE_MB=backing: BACKING content too.
+    if (pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid) {
+        const char* mb = std::getenv("VSE_MB");
+        const std::string mbs = mb ? mb : "";
+        const auto ct = pImpl->analysis.contentType;
+        int type = 0;
+        if (ct == VariphraseAnalysis::ContentType::ENSEMBLE && mbs != "off") type = 5;
+        if (ct == VariphraseAnalysis::ContentType::BACKING && mbs == "backing") type = 3;
+        if (type) {
+            std::vector<float> out = multiBandFirmwareOffline(inputMono, type);
+            if (!out.empty()) return out;
+        }
     }
 
     // ── Subband pitch for ENSEMBLE (Session 16, US6564187) ───────────────────
