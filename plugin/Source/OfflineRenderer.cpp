@@ -223,6 +223,7 @@ int renderOffline(const RenderConfig& config) {
     std::cout << "  Pitch:   " << config.params.pitchShiftSemitones << " st\n";
     std::cout << "  Time:    " << config.params.timeStretchRatio << "x\n";
     std::cout << "  Formant: " << config.params.formantShiftSemitones << " st\n";
+    if (config.params.soloEnergy > 0.0f) std::cout << "  Energy:  " << config.params.soloEnergy << "\n";
 
     // ── Offline encode pass (V-Synth-style) ──────────────────────────────────
     // Analyse the full input buffer ONCE to determine content type.
@@ -267,6 +268,7 @@ int main(int argc, char** argv) {
         else if (arg == "--pitch"   && i+1 < argc) cfg.params.pitchShiftSemitones   = std::stof(argv[++i]);
         else if (arg == "--time"    && i+1 < argc) cfg.params.timeStretchRatio       = std::stof(argv[++i]);
         else if (arg == "--formant" && i+1 < argc) cfg.params.formantShiftSemitones  = std::stof(argv[++i]);
+        else if (arg == "--energy"  && i+1 < argc) cfg.params.soloEnergy             = std::stof(argv[++i]);
         else if (arg == "--robot")                  cfg.params.robotMode = true;
         else if (arg == "--block"   && i+1 < argc) cfg.blockSize = std::stoi(argv[++i]);
         else if (arg == "--algo"    && i+1 < argc) {
@@ -282,6 +284,7 @@ int main(int argc, char** argv) {
                       << "  --pitch <semitones>   Pitch shift (-24 to +24)\n"
                       << "  --time <ratio>        Time stretch (0.25 to 4.0)\n"
                       << "  --formant <semitones> Formant shift (-12 to +12)\n"
+                      << "  --energy <g>          SOLO Energy amount (0 = OFF; the references fit 0.05)\n"
                       << "  --algo <name>         passthrough|pv|sms|lpc|hybrid\n"
                       << "  --robot               Enable robot mode\n"
                       << "  --block <samples>     Processing block size (default 512)\n";

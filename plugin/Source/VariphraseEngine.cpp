@@ -1117,9 +1117,10 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     // Energy-OFF highpass (Chamberlin SVF), coefficients smoothed per
     // 32-sample block as in 0x8950cde0.
     double low = 0, band = 0, fCoef = 0, q = 1.2;
-    // SOLO "Energy" (manual p. 92). The firmware's g = voice param +0x78;
-    // its knob scaling (OFF/1–127 → g) is not yet decoded.  Experiment hook.
-    double energy = 0.0;
+    // SOLO "Energy" (manual p. 92): g = player +0x78, smoothed ×0.7 per
+    // update toward a voice target (0x8950c1b0).  Its knob scaling (OFF,
+    // 1–127 → g) is not decoded.  VSE_ENERGY overrides (experiments).
+    double energy = pImpl->params.soloEnergy;
     if (const char* e = std::getenv("VSE_ENERGY")) energy = std::atof(e);
     // Highpass cutoff (grain +0x24): min(1/ppw, 0.5), written only by voiced
     // triggers (0x8950d5a0); unvoiced records keep the last voiced value.

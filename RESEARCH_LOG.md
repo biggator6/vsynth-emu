@@ -2114,3 +2114,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
     engine falls back to the v38 encoder.
   - **Suite 74.59** (v38 74.25), vocal **79.25** (78.28): the XT records'
     ceiling, every vocal case up.
+- **Output chain** (identity render vs the XT's vocal passthrough capture).
+  - The linear chain is transparent for scoring: +9.4 dB gain, 60 ms
+    latency, 16 ppm clock drift, flat 150 Hz–6 kHz, −0.8 dB at 10–14 kHz, a
+    noise floor 56 dB down and no effects. Modelling the droop moves the
+    suite by +0.02.
+  - The low-end difference is the SOLO **Energy** high-pass at the output
+    fundamental: every reference's F0 sits 1.6–1.9 dB low, sub-F0 is cut, and
+    the pattern follows F0 under pitch shift. So the references were recorded
+    with Energy on, at a small g (≈ 0.05).
+  - New `soloEnergy` parameter (`--energy`); the suite renders at 0.05.
+  - **v40: suite 74.79, vocal 79.83** (every vocal case up).
+  - Still needed: the patch's Energy value read on the XT, and the knob → g
+    mapping.

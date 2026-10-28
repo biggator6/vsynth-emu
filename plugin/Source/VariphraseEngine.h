@@ -20,6 +20,11 @@ struct VariphraseParams {
     float pitchShiftSemitones  = 0.0f;   // -24 to +24
     float timeStretchRatio     = 1.0f;   // 0.25 to 4.0
     float formantShiftSemitones= 0.0f;   // -12 to +12
+    float soloEnergy           = 0.0f;   // SOLO "Energy" g (0 = OFF): the player's
+                                         // highpass moves from f0/8 to the output
+                                         // fundamental, damping (1.2 − g) + p(rate).
+                                         // The XT knob (OFF, 1–127) → g mapping is
+                                         // not decoded; the references fit g ≈ 0.05.
     bool  robotMode            = false;  // forced monophonic voiced analysis
     bool  polyphonicContent    = false;  // encode-pass said ENSEMBLE/BACKING;
                                          // set by Hybrid routing, read by

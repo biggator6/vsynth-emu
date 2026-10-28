@@ -825,6 +825,54 @@ artefact.
 **Effect** (metric v6): suite 74.25 → **74.59**. Vocal 78.28 → **79.25**,
 which is the XT records' ceiling: every vocal case rises by +0.1 to +1.6.
 
+## Output chain (2026-10-27, v40)
+
+**Method.** The vocal passthrough (`passthrough/vocal_aah_passthrough.wav`)
+is the XT's output for the raw vocal with every VariPhrase parameter at zero.
+Our identity render reproduces the XT's SOLO player exactly (v37–v39), so
+comparing the two isolates everything downstream of the player.
+
+**What the capture shows:**
+- **Level and latency:** gain +9.4 dB; L = R (mono, centre); latency 60.3 ms.
+- **Clock drift:** the lag drifts by +2.3 samples over 3 s, about 16 ppm,
+  from the XT and the interface running on separate clocks.
+- **Frequency response:** flat to ±0.3 dB from 150 Hz to 6 kHz, then −0.4 to
+  −0.8 dB from 6 to 14 kHz.
+- **Noise and effects:** a noise floor about 56 dB below the signal, and no
+  reverb tail (the capture decays within 20 ms of the note's end).
+- **High band:** the excess above 17 kHz is just that noise; a 44.1 kHz
+  engine has nothing up there.
+
+Modelling the droop (first-order low-pass at 14 or 20 kHz) changes the
+suite by only +0.02, so the linear chain is effectively transparent for this
+material.
+
+**The low end is not the chain.** Every vocal reference has:
+- its fundamental about 1.6–1.9 dB low;
+- content below the fundamental cut by 4–9 dB.
+
+At pitch −12 that pattern sits at the 65 Hz fundamental, so no fixed filter
+explains it. The SOLO player's **Energy** high-pass does (`0x8950cde0`, manual
+p. 92 "Energy: OFF, 1–127"). When Energy is on, the cutoff moves from f0/8 to
+the output fundamental with damping q = (1.2 − g) + p(rate), giving 1/q =
+−1.6 dB at F0 with no pitch shift.
+
+The fundamental-band ratios fit g ≈ 0.02–0.05 at pitch −12 and ≈ 0.08 at
+pitch +7. With g on, the time 2× mismatch at F0 drops from −1.9 to −0.2 dB
+for any g. So **the references were recorded with Energy on**, at a small
+amount.
+
+**Implemented** as `VariphraseParams::soloEnergy` (renderer `--energy`;
+default OFF, as on the XT). `render_suite.py` renders at 0.05. Result: suite
+74.59 → **74.79**, vocal 79.25 → **79.83**, every vocal case up (formant −12
++2.3).
+
+**Open:**
+- The knob → g mapping. g is smoothed ×0.7 per update toward a voice float
+  at +0x18 (`0x8950c1b0`); its converter is probably inside `0x894e1920`.
+- The EMU-TEST patch's actual Energy value. The patch file is bit-packed; the
+  value is easiest to read on the XT (OSC → Formant (PCM) page).
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).

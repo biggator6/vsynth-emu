@@ -37,10 +37,17 @@ OPS = {
     'time_2x': ['--time', '0.5'], 'time_4x': ['--time', '0.25'], 'time_halfspeed': ['--time', '2.0'],
 }
 
+# The references were recorded with SOLO "Energy" on (output chain study,
+# 2026-10-27: the fundamental sits ~1.6 dB low and sub-F0 is cut in every
+# vocal reference, as the player's Energy highpass at the output fundamental
+# predicts; pitch −12 / +7 fit g ≈ 0.05).  Only the SOLO player reads it.
+SUITE_ENERGY = 0.05
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('outdir')
     ap.add_argument('--renderer', default=os.path.join(ROOT, 'variphrase_render'))
+    ap.add_argument('--energy', type=float, default=SUITE_ENERGY, help='SOLO Energy g (0 = OFF)')
     a = ap.parse_args()
     os.makedirs(os.path.join(a.outdir, 'sustained'), exist_ok=True)
     for f in sorted(os.listdir(os.path.join(TF, 'sustained'))):
@@ -53,6 +60,7 @@ def main():
             print('skip (no mapping):', case); continue
         out = os.path.join(a.outdir, 'sustained', f)
         cmd = [a.renderer, '--input', INPUTS[src], '--output', out, '--algo', 'hybrid'] + OPS[op]
+        if a.energy > 0: cmd += ['--energy', str(a.energy)]
         r = subprocess.run(cmd, capture_output=True, text=True)
         print(f'{case}: rc={r.returncode} args={OPS[op]}')
         if r.returncode != 0:
