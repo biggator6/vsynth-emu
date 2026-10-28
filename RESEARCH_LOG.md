@@ -2236,3 +2236,21 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - **v42 = 76.60** (v41 76.56): both multi-band types use the firmware
   chain, and the markers come from detection.
 
+### Session 16 addendum (2026-10-28) — v43: the plugin plays through the XT's own players
+
+- The plugin now encodes a loaded sample off the audio thread as the XT
+  does: 44.1 kHz int16, then SOLO (encoder port) or BACKING / ENSEMBLE
+  (firmware encoder with attack detection, and band rebuild, in the
+  interpreter). Encode Type defaults to Auto (the engine's classifier).
+- Each note runs its own firmware player (`XtSynth`: 16 voices; pitch from
+  the note against the Original Key; live Time / Formant / Energy;
+  release fade). A streaming sinc resampler takes the mix to the host
+  rate.
+- The SOLO player moved into `XtSoloVoice`, shared with the offline
+  engine. All 20 suite renders are bit-identical to v42.
+- The processor's output is bit-identical to `XtSynth` at 48 kHz on chord,
+  drum and vocal (`Tests/PluginTest.cpp`). One fix came out of that test:
+  JUCE's snapped parameter ranges returned 0.99999994 for Time 1×, which
+  the firmware's fixed-point steps play as a different walk, so controls
+  are snapped to their steps. `auval` passes.
+

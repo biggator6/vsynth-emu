@@ -57,6 +57,8 @@ public:
     // in round-to-zero like the SH-4 (XT_ROUND=nearest: the emulator's mode).
     void block(float* out);
     bool ended() const;
+    // Pitch and walk may change while the note plays (read every block).
+    void setRates(float pitch, float walk);
 
     struct Band;   // a band's player state (firmware struct, 0x88 bytes)
     struct State;

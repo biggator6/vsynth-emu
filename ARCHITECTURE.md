@@ -40,12 +40,19 @@ vsynth-emu/
 ├── plugin/                # JUCE project
 │   ├── CMakeLists.txt
 │   └── Source/
-│       ├── PluginProcessor.h/cpp      # JUCE boilerplate
-│       ├── PluginEditor.h/cpp         # UI
-│       ├── VariphraseEngine.h/cpp     # core algorithm router — isolated + testable
+│       ├── PluginProcessor.h/cpp      # JUCE processor: XT voices, encode thread, MIDI
+│       ├── PluginEditor.h/cpp         # UI (ROM, Encode Type, Key, Depth, knobs)
+│       ├── XtSynth.h/cpp              # polyphonic XT playback (no JUCE): encode + voices + resampler
+│       ├── XtSoloEncoder.h/cpp        # the XT's SOLO encoder, ported (bit-exact)
+│       ├── XtSoloVoice.h/cpp          # the XT's SOLO player as a block voice
+│       ├── XtMultiBandPlayer.h/cpp    # the XT's BACKING / ENSEMBLE players, ported (bit-exact)
+│       ├── Sh4Interp.h/cpp            # SH-4 interpreter: runs rom.2's load/encode-time code
+│       ├── XtFirmware.h/cpp           # firmware harnesses: multi-band encoder, band rebuild
+│       ├── VariphraseEngine.h/cpp     # offline router for the test suite — isolated + testable
 │       ├── PhaseVocoder.h/cpp         # phase vocoder + WSOLA time-stretch
 │       ├── SourceFilterModel.h/cpp    # LPC source-filter (formant shift)
 │       └── OfflineRenderer.h/cpp      # WAV file renderer for batch testing
+│   └── Tests/PluginTest.cpp           # processor end-to-end test (target VSynthEmuTest)
 └── research/              # papers, notes, spectrogram images, session exports
 ```
 
@@ -67,7 +74,7 @@ the engine, and writes the output — no JUCE, no libsndfile, no DAW required.
 ```bash
 cd plugin/Source && g++ -std=c++20 -O2 -DOFFLINE_RENDERER_MAIN \
     OfflineRenderer.cpp VariphraseEngine.cpp \
-    PhaseVocoder.cpp SourceFilterModel.cpp XtSoloEncoder.cpp \
+    PhaseVocoder.cpp SourceFilterModel.cpp XtSoloEncoder.cpp XtSoloVoice.cpp \
     XtMultiBandPlayer.cpp Sh4Interp.cpp XtFirmware.cpp \
     -o ../../analysis/variphrase_render
 ```
@@ -164,9 +171,11 @@ The HTML batch report embeds **A/B audio players** per case.
 Fast engine invariants: `plugin/Source/EngineTests.cpp`
 (`-DENGINE_TESTS_MAIN`, 15 checks, runs in seconds).
 
-## Current Scores (v35, metric v6)
+## Current Scores (v42, metric v6)
 
-**73.9 / 100 average** (v35 — SOLO encoder epochs matched to the V-Synth XT's own grain records, vocal 74.6 → 77.4; v33 = 73.0; four sine references show the formant an octave low although the Formant knob was 0 (likely Formant KF / envelope / LFO in the sine patch; re-record pending, see notes.txt); render with `analysis/render_suite.py`) under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
+**76.6 / 100 average** (v42: BACKING and ENSEMBLE through the XT's own
+firmware chain, chord 75.4 → 87.3; v40 74.8; full history in notes.txt).
+Earlier: **73.9 / 100 average** (v35 — SOLO encoder epochs matched to the V-Synth XT's own grain records, vocal 74.6 → 77.4; v33 = 73.0; four sine references show the formant an octave low although the Formant knob was 0 (likely Formant KF / envelope / LFO in the sine patch; re-record pending, see notes.txt); render with `analysis/render_suite.py`) under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
 history in notes.txt).  Per-case v4 detail below is historical.  Earlier text:
 51.8 / 100 under v4 (re-baselined v17 = 34.0).  Strong: drum_time_4x 64.7,
 chord_formant 63.3, sine_formant_upmax 65.6, drum_pitch 62.9, chord_time
@@ -174,23 +183,48 @@ chord_formant 63.3, sine_formant_upmax 65.6, drum_pitch 62.9, chord_time
 vocal_pitch_up7st 37.5, chord pitch/time-residual ~40.
 Full history in `notes.txt`; per-case tables in `analysis/results/`.
 
-## Real-Time Parity Plan (next major work)
+## The plugin: the XT's own players in real time (v43)
 
-The offline path has diverged from real-time: granular, subband, event-based
-stretch, and drain mode are offline-only.  Plan:
+The plugin plays a loaded sample the way the XT plays an encoded wave:
 
-1. **Granular real-time is the easy one** (the V-Synth did it on 2000-era
-   hardware): run the encode (grain cutting) when a sample is loaded — or
-   incrementally, ~1 frame behind the write head for live input — then
-   playback is O(2 grains)/sample.  Port `granularResynthOffline` to a
-   streaming class with a grain-list ring.
-2. **Subband real-time** needs the patent's actual octave-cascade filter bank
-   (the offline version uses a whole-file FFT); implement per US6564187's
-   halfband cascade, or accept PV for live ENSEMBLE.
-3. **Event stamps** work live with lookahead latency (onsets detected
-   ~2048 samples behind the write head).
-4. Keep the current streaming PV/LPC as the fallback for unclassified /
-   low-latency modes.
+1. **Encode at load, off the audio thread** (`VSynthEmuProcessor::reencode`
+   → `xtSynthEncode`):
+   - resample to 44.1 kHz int16;
+   - encode as the chosen **Encode Type**. Auto uses the engine's content
+     classifier; LITE plays on the SOLO player.
+   - SOLO: the XT's SOLO encoder port.
+   - BACKING / ENSEMBLE: the firmware's multi-band encoder, with attack
+     detection at the **Encode Depth**, and the load-time band rebuild. Both
+     run from `rom.2` in the SH-4 interpreter, about 1–2 s.
+2. **One firmware player per note** (`XtSynth`, 16 voices, oldest stolen):
+   - `XtSoloVoice` or `XtMbPlayer` render 32-frame blocks at 44.1 kHz;
+   - pitch = 2^((note − Original Key + Pitch)/12); Time, Formant (SOLO) and
+     Energy (SOLO) apply live;
+   - velocity is a linear gain; note-off fades over Release.
+3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
+   polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
+
+**The firmware image.** The plugin looks for `VSE_XT_ROM`, then
+`~/Library/Application Support/V-Synth Emu/V-SynthXT.rom.2.bin`; the
+**ROM...** button sets a path, saved with the session. Without it, the
+plugin falls back to the engine's streaming path (pre-v43 behaviour).
+
+**Checks:**
+- At a 44.1 kHz host rate, `XtSynth` output is bit-exact against the
+  firmware chain: `xt_fw play`, and the engine's SOLO render.
+- `Tests/PluginTest.cpp` drives the real processor (ROM, file load,
+  background encode, sample-accurate MIDI) at 48 kHz. Its output is
+  **bit-identical** to `XtSynth` on the chord (ENSEMBLE), drum (BACKING) and
+  vocal (SOLO).
+- `auval -v aumu VsEm Ystu` passes.
+
+**Not yet:**
+- SOLO plays the encoder's mono mix ((L+R) >> 1), while the XT's SOLO
+  player reads both channels;
+- no amp envelope beyond the release fade, and no V-Synth voice layer
+  (filters, LFOs, effects);
+- no loops, reverse, step/event playback or Time Trip;
+- the Energy knob → g mapping is undecoded, so Energy is g directly.
 
 ## Known Gaps / Next Work
 

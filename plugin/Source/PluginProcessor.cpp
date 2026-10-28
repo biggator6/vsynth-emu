@@ -7,6 +7,11 @@ namespace Params {
     static const juce::String kTimeStretch  = "timeStretch";
     static const juce::String kFormantShift = "formantShift";
     static const juce::String kRobot        = "robot";
+    static const juce::String kEncodeType   = "encodeType";    // Auto, SOLO, BACKING, ENSEMBLE
+    static const juce::String kEncodeDepth  = "encodeDepth";   // multi-band attack detection
+    static const juce::String kRootKey      = "rootKey";       // note that plays the sample unshifted
+    static const juce::String kEnergy       = "energy";        // SOLO Energy g (knob mapping undecoded)
+    static const juce::String kRelease      = "release";       // note-off fade, ms
 }
 
 // ─── Parameter Layout ─────────────────────────────────────────────────────────
@@ -37,6 +42,31 @@ VSynthEmuProcessor::createParameterLayout() {
         Params::kRobot, "Robot Mode", false
     ));
 
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        Params::kEncodeType, "Encode Type",
+        juce::StringArray { "Auto", "SOLO", "BACKING", "ENSEMBLE" }, 0
+    ));
+
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        Params::kEncodeDepth, "Encode Depth", 0, 127, 64
+    ));
+
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        Params::kRootKey, "Original Key", 0, 127, 60
+    ));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kEnergy, "Energy",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f
+    ));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kRelease, "Release",
+        juce::NormalisableRange<float>(1.0f, 2000.0f, 0.1f, 0.4f),
+        30.0f, "ms"
+    ));
+
     return { params.begin(), params.end() };
 }
 
@@ -50,17 +80,46 @@ VSynthEmuProcessor::VSynthEmuProcessor()
 {
     formatManager_.registerBasicFormats();   // WAV, AIFF, OGG, FLAC
 
-    apvts.addParameterListener(Params::kPitchShift,   this);
-    apvts.addParameterListener(Params::kTimeStretch,  this);
-    apvts.addParameterListener(Params::kFormantShift, this);
-    apvts.addParameterListener(Params::kRobot,        this);
+    for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
+                            Params::kEncodeType, Params::kEncodeDepth })
+        apvts.addParameterListener(id, this);
+    findRom();
 }
 
 VSynthEmuProcessor::~VSynthEmuProcessor() {
-    apvts.removeParameterListener(Params::kPitchShift,   this);
-    apvts.removeParameterListener(Params::kTimeStretch,  this);
-    apvts.removeParameterListener(Params::kFormantShift, this);
-    apvts.removeParameterListener(Params::kRobot,        this);
+    for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
+                            Params::kEncodeType, Params::kEncodeDepth })
+        apvts.removeParameterListener(id, this);
+    encodePool_.removeAllJobs(true, 10000);
+}
+
+// ─── The firmware image ───────────────────────────────────────────────────────
+
+// VSE_XT_ROM, else ~/Library/Application Support/V-Synth Emu/V-SynthXT.rom.2.bin
+// (rom.2 as research/ghidra_scripts/unpack_firmware.py writes it).
+void VSynthEmuProcessor::findRom() {
+    juce::StringArray cand;
+    if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(p);
+    cand.add(juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                 .getChildFile("Application Support/V-Synth Emu/V-SynthXT.rom.2.bin").getFullPathName());
+    for (const auto& c : cand)
+        if (juce::File(c).existsAsFile() && xtSynthSetRom(c.toStdString())) {
+            apvts.state.setProperty("romPath", c, nullptr);
+            setStatus("ROM ready");
+            return;
+        }
+    setStatus("No ROM: choose V-SynthXT.rom.2.bin to play through the XT's firmware");
+}
+
+bool VSynthEmuProcessor::setRomFile(const juce::File& file) {
+    if (!file.existsAsFile() || !xtSynthSetRom(file.getFullPathName().toStdString())) {
+        setStatus("Not a usable rom.2 image: " + file.getFileName());
+        return false;
+    }
+    apvts.state.setProperty("romPath", file.getFullPathName(), nullptr);
+    setStatus("ROM ready");
+    reencode();
+    return true;
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
@@ -70,6 +129,8 @@ void VSynthEmuProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     engine_.setAlgorithm(VSE::Algorithm::Passthrough);
     syncParamsToEngine();
     setLatencySamples(engine_.getLatencySamples());
+    synth_.prepare(sampleRate);
+    scratch_.assign((size_t)std::max(samplesPerBlock, 1) * 2, 0.0f);
     playbackPos_  = -1;
     activeVoices_ = 0;
 }
@@ -80,6 +141,21 @@ void VSynthEmuProcessor::releaseResources() {
 
 // ─── Process ──────────────────────────────────────────────────────────────────
 
+XtSynth::Controls VSynthEmuProcessor::xtControls() const {
+    // Snapped to the parameters' steps: the ranges' float conversions leave
+    // the defaults at e.g. 0.99999994, and the firmware's fixed-point steps
+    // would play that, not 1 (a centred XT knob is exact).
+    auto snap = [](float v, float stepSize) { return std::round(v / stepSize) * stepSize; };
+    XtSynth::Controls c;
+    c.pitchSemis   = snap(apvts.getRawParameterValue(Params::kPitchShift)->load(), 0.01f);
+    c.timeStretch  = snap(apvts.getRawParameterValue(Params::kTimeStretch)->load(), 0.001f);
+    c.formantSemis = snap(apvts.getRawParameterValue(Params::kFormantShift)->load(), 0.01f);
+    c.energy       = apvts.getRawParameterValue(Params::kEnergy)->load();
+    c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
+    c.releaseMs    = apvts.getRawParameterValue(Params::kRelease)->load();
+    return c;
+}
+
 void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                        juce::MidiBuffer& midi)
 {
@@ -89,7 +165,31 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     const int numOut     = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 
-    // ── MIDI: note-on starts playback, note-off decrements voice count ────────
+    // ── The XT's own players: one voice per note, sample-accurate MIDI ───────
+    if (xtActive_.load() && numOut > 0) {
+        synth_.setControls(xtControls());
+        float* L = buffer.getWritePointer(0);
+        float* R = numOut > 1 ? buffer.getWritePointer(1) : nullptr;
+        if (!R) {
+            if ((int)scratch_.size() < numSamples) scratch_.resize((size_t)numSamples);   // normally sized in prepareToPlay
+            R = scratch_.data();
+        }
+        int pos = 0;
+        for (const auto meta : midi) {
+            const int at = std::clamp(meta.samplePosition, pos, numSamples);
+            if (at > pos) { synth_.render(L + pos, R + pos, at - pos); pos = at; }
+            const auto msg = meta.getMessage();
+            if (msg.isNoteOn()) synth_.noteOn(msg.getNoteNumber(), msg.getFloatVelocity());
+            else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber());
+            else if (msg.isAllNotesOff() || msg.isAllSoundOff()) synth_.allNotesOff();
+        }
+        if (pos < numSamples) synth_.render(L + pos, R + pos, numSamples - pos);
+        if (numOut == 1) for (int i = 0; i < numSamples; ++i) L[i] = 0.5f * (L[i] + R[i]);
+        return;
+    }
+
+    // ── Without the firmware: the loaded file through the engine ─────────────
+    // MIDI: note-on starts playback, note-off decrements voice count
     for (const auto meta : midi)
     {
         const auto msg = meta.getMessage();
@@ -194,14 +294,10 @@ void VSynthEmuProcessor::loadFile(const juce::File& file)
     juce::AudioBuffer<float> newBuffer(numChans, totalSamples);
     reader->read(&newBuffer, 0, totalSamples, 0, true, true);
 
-    // TODO: resample to getSampleRate() if reader->sampleRate differs.
-    // For now, files are assumed to be at 44.1 kHz. The VariphraseEngine's
-    // time-stretch handles the perceptual impact of small rate mismatches
-    // during batch testing.
-
     {
         juce::CriticalSection::ScopedLockType lock(bufferLock_);
         fileBuffer_ = std::move(newBuffer);
+        fileRate_ = reader->sampleRate;
         fileLoaded_.store(true);
     }
 
@@ -211,11 +307,67 @@ void VSynthEmuProcessor::loadFile(const juce::File& file)
 
     // Persist the file path so it survives DAW project reload
     apvts.state.setProperty("loadedFilePath", file.getFullPathName(), nullptr);
+    reencode();
 }
+
+// ─── Encoding ─────────────────────────────────────────────────────────────────
+
+void VSynthEmuProcessor::setStatus(const juce::String& s) {
+    const juce::ScopedLock l(statusLock_);
+    status_ = s;
+}
+
+juce::String VSynthEmuProcessor::getStatusText() const {
+    const juce::ScopedLock l(statusLock_);
+    return status_;
+}
+
+// Encodes the loaded file as the XT would (XtSynth.h) on the pool thread;
+// a newer request discards an older result.
+void VSynthEmuProcessor::reencode() {
+    if (!fileLoaded_.load()) return;
+    if (!xtSynthRomReady()) { xtActive_.store(false); return; }
+    std::vector<std::vector<float>> chans;
+    double rate;
+    {
+        juce::CriticalSection::ScopedLockType lock(bufferLock_);
+        for (int c = 0; c < std::min(2, fileBuffer_.getNumChannels()); ++c)
+            chans.emplace_back(fileBuffer_.getReadPointer(c), fileBuffer_.getReadPointer(c) + fileBuffer_.getNumSamples());
+        rate = fileRate_;
+    }
+    const int choice = (int)apvts.getRawParameterValue(Params::kEncodeType)->load();
+    const int depth  = (int)apvts.getRawParameterValue(Params::kEncodeDepth)->load();
+    const int gen = ++encodeGen_;
+    setStatus("Encoding...");
+    encodePool_.addJob([this, chans = std::move(chans), rate, choice, depth, gen] {
+        int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : 0;
+        if (type == 0) {   // Auto: the engine's content classifier
+            std::vector<float> mono(chans[0].size());
+            for (size_t i = 0; i < mono.size(); ++i) {
+                float s = 0; for (const auto& c : chans) s += c[i];
+                mono[i] = s / (float)chans.size();
+            }
+            using CT = VSE::VariphraseAnalysis::ContentType;
+            const auto a = VSE::VariphraseEngine::analyzeContent(mono.data(), (int)mono.size(), rate);
+            type = a.contentType == CT::BACKING ? 3 : a.contentType == CT::ENSEMBLE ? 5 : 1;   // LITE plays on the SOLO player
+        }
+        std::string err;
+        auto e = xtSynthEncode(chans, rate, type, depth, &err);
+        if (gen != encodeGen_.load()) return;
+        if (!e) { setStatus("Encode failed: " + juce::String(err)); return; }
+        synth_.setSample(e);
+        xtActive_.store(true);
+        static const char* names[] = { "", "SOLO", "", "BACKING", "", "ENSEMBLE" };
+        setStatus(juce::String("Encoded as ") + names[type] + (choice == 0 ? " (auto)" : ""));
+    });
+}
+
+void VSynthEmuProcessor::handleAsyncUpdate() { reencode(); }
 
 // ─── Parameters ───────────────────────────────────────────────────────────────
 
-void VSynthEmuProcessor::parameterChanged(const juce::String& /*paramID*/, float /*newValue*/) {
+void VSynthEmuProcessor::parameterChanged(const juce::String& paramID, float /*newValue*/) {
+    if (paramID == Params::kEncodeType || paramID == Params::kEncodeDepth) { triggerAsyncUpdate(); return; }
     syncParamsToEngine();
 }
 
@@ -251,7 +403,10 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
 
     apvts.replaceState(juce::ValueTree::fromXml(*xml));
 
-    // Reload the file if a path was persisted
+    // The firmware image and the file, if their paths were persisted
+    const juce::String rom = apvts.state.getProperty("romPath").toString();
+    if (rom.isNotEmpty() && !xtSynthRomReady() && juce::File(rom).existsAsFile())
+        setRomFile(juce::File(rom));
     juce::String path = apvts.state.getProperty("loadedFilePath").toString();
     if (path.isNotEmpty())
     {

@@ -207,6 +207,24 @@ Multi-band (v41): ENSEMBLE content renders through the XT's own chain
   default 64; −1 = start and end markers only). VSE_MB=off: the v40 paths;
   VSE_MB=ensemble: BACKING on the v40 paths.
 
+PLUGIN (v43, 2026-10-28): plays through the XT's own encoders and players
+  (ARCHITECTURE.md, "The plugin"). Firmware image: VSE_XT_ROM, or
+  ~/Library/Application Support/V-Synth Emu/V-SynthXT.rom.2.bin, or the
+  ROM... button. Build (JUCE checked out at ./JUCE):
+    SDK=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+    TC=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+    SDKROOT=$SDK cmake -S plugin -B build/plugin -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_C_COMPILER=$TC/clang -DCMAKE_CXX_COMPILER=$TC/clang++ -DCMAKE_OSX_SYSROOT=$SDK
+    SDKROOT=$SDK cmake --build build/plugin -j 10        (AU, VST3, Standalone; installs to ~/Library/Audio/Plug-Ins)
+    SDKROOT=$SDK cmake --build build/plugin --target VSynthEmuTest
+    build/plugin/VSynthEmuTest firmware/unpacked/V-SynthXT.rom.2.bin <file.wav> [note]
+      (processor end to end vs XtSynth at 48 kHz; exit 0 = bit-identical)
+    auval -v aumu VsEm Ystu
+  VST3_AUTO_MANIFEST is off: JUCE's manifest helper cannot load the build-tree
+  bundle on macOS 27 ("library load disallowed by system policy"); the
+  installed copy loads. XtSynth CLI: -DXT_SYNTH_MAIN XtSynth.cpp + the Xt*/Sh4
+  sources (renders note lists from a raw sample).
+
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \
     plugin/Source/OfflineRenderer.cpp \
@@ -214,6 +232,7 @@ Rebuild the offline renderer:
     plugin/Source/PhaseVocoder.cpp \
     plugin/Source/SourceFilterModel.cpp \
     plugin/Source/XtSoloEncoder.cpp \
+    plugin/Source/XtSoloVoice.cpp \
     plugin/Source/XtMultiBandPlayer.cpp \
     plugin/Source/Sh4Interp.cpp \
     plugin/Source/XtFirmware.cpp \
@@ -606,7 +625,7 @@ BUILD NOTE (macOS 27 host): /usr/bin/clang++ fails to link (CLT SDK 27 tbd
     SDK=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
     env -u SDKROOT $TC/clang++ -isysroot $SDK -std=c++20 -O2 -DOFFLINE_RENDERER_MAIN \
       OfflineRenderer.cpp VariphraseEngine.cpp PhaseVocoder.cpp SourceFilterModel.cpp XtSoloEncoder.cpp \
-      XtMultiBandPlayer.cpp Sh4Interp.cpp XtFirmware.cpp -o ...
+      XtSoloVoice.cpp XtMultiBandPlayer.cpp Sh4Interp.cpp XtFirmware.cpp -o ...
 PYTHON: system python has no numpy. Use the project venv: .venv/bin/python
   (created Session 16 from analysis/requirements.txt; .venv/ gitignored).
   Other Roland software (V-Producer, V-Synth Librarian) in Vsynth_software/

@@ -44,6 +44,9 @@ juce_add_plugin(VSynthEmu
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
 
     COPY_PLUGIN_AFTER_BUILD TRUE
+    # The manifest helper cannot load the ad-hoc-signed bundle on macOS 27
+    # ("couldn't be loaded", though dlopen works); moduleinfo.json is optional.
+    VST3_AUTO_MANIFEST      FALSE
 )
 
 # ─── Sources ─────────────────────────────────────────────────────────────────
@@ -54,6 +57,8 @@ target_sources(VSynthEmu PRIVATE
     Source/PhaseVocoder.cpp
     Source/SourceFilterModel.cpp
     Source/XtSoloEncoder.cpp
+    Source/XtSoloVoice.cpp
+    Source/XtSynth.cpp
     Source/XtMultiBandPlayer.cpp
     Source/Sh4Interp.cpp
     Source/XtFirmware.cpp
@@ -78,6 +83,13 @@ target_compile_definitions(VSynthEmu PUBLIC
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
+
+# ─── End-to-end test of the processor's XT path (not built by default) ──────
+add_executable(VSynthEmuTest EXCLUDE_FROM_ALL Tests/PluginTest.cpp)
+target_link_libraries(VSynthEmuTest PRIVATE VSynthEmu)
+# JUCE's headers and settings as the plugin's shared code sees them
+target_include_directories(VSynthEmuTest PRIVATE $<TARGET_PROPERTY:VSynthEmu,INCLUDE_DIRECTORIES>)
+target_compile_definitions(VSynthEmuTest PRIVATE $<TARGET_PROPERTY:VSynthEmu,COMPILE_DEFINITIONS>)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.

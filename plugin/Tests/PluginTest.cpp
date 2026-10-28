@@ -1,0 +1,70 @@
+// End-to-end check of the plugin processor's XT path: ROM, file load,
+// background encode, sample-accurate MIDI, render — against XtSynth driven
+// directly on the same input.  Build: cmake --build <dir> --target VSynthEmuTest
+// Run:   VSynthEmuTest <rom.2.bin> <file.wav> [note]
+#include "../Source/PluginProcessor.h"
+#include <juce_audio_formats/juce_audio_formats.h>
+#include <cstdio>
+#include <thread>
+
+int main(int argc, char** argv) {
+    if (argc < 3) { std::fprintf(stderr, "usage: %s rom.2.bin file.wav [note]\n", argv[0]); return 1; }
+    juce::ScopedJuceInitialiser_GUI init;
+    const int note = argc > 3 ? std::atoi(argv[3]) : 60;
+    const double rate = 48000.0;
+    const int block = 512;
+
+    VSynthEmuProcessor p;
+    if (!p.setRomFile(juce::File(argv[1]))) { std::fprintf(stderr, "ROM rejected: %s\n", p.getStatusText().toRawUTF8()); return 1; }
+    p.prepareToPlay(rate, block);
+    p.loadFile(juce::File(argv[2]));
+    for (int i = 0; i < 600 && !p.getStatusText().startsWith("Encoded"); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));   // the encode runs on the pool thread
+        if (p.getStatusText().startsWith("Encode failed")) break;
+    }
+    std::printf("status: %s\n", p.getStatusText().toRawUTF8());
+    for (const char* id : { "pitchShift", "timeStretch", "formantShift", "energy", "rootKey", "release", "encodeDepth" })
+        std::printf("  %s = %.9g\n", id, (double)p.apvts.getRawParameterValue(id)->load());
+    if (!p.getStatusText().startsWith("Encoded")) return 1;
+
+    // the same input straight through XtSynth
+    juce::AudioFormatManager fm; fm.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> rd(fm.createReaderFor(juce::File(argv[2])));
+    juce::AudioBuffer<float> in((int)rd->numChannels, (int)rd->lengthInSamples);
+    rd->read(&in, 0, in.getNumSamples(), 0, true, true);
+    std::vector<std::vector<float>> chans;
+    for (int c = 0; c < std::min(2, in.getNumChannels()); ++c) chans.emplace_back(in.getReadPointer(c), in.getReadPointer(c) + in.getNumSamples());
+    const juce::String st = p.getStatusText();
+    const int type = st.contains("ENSEMBLE") ? 5 : st.contains("BACKING") ? 3 : 1;
+    auto E = xtSynthEncode(chans, rd->sampleRate, type, 64);
+    {   // the encode must be repeatable
+        auto E2 = xtSynthEncode(chans, rd->sampleRate, type, 64);
+        bool same = E->vpdt == E2->vpdt && E->solo.segStart == E2->solo.segStart && E->solo.in == E2->solo.in;
+        for (int k = 0; k < 6; ++k) same = same && E->bands.buf[k] == E2->bands.buf[k];
+        std::printf("encode repeatable: %s\n", same ? "yes" : "NO");
+    }
+    XtSynth ref; ref.prepare(rate); ref.setSample(E);
+
+    const int total = (int)(in.getNumSamples() * rate / rd->sampleRate);
+    double maxDiff = 0, energy = 0;
+    long firstDiff = -1;
+    juce::AudioBuffer<float> buf(2, block);
+    std::vector<float> rl(block), rr(block);
+    for (int done = 0; done < total; done += block) {
+        juce::MidiBuffer midi;
+        if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)127), 100); }
+        p.processBlock(buf, midi);
+        juce::ScopedNoDenormals ftz;   // processBlock runs with denormals flushed (as the SH-4 does, FPSCR.DN = 1)
+        if (std::getenv("TEST_CONTROLS")) ref.setControls(XtSynth::Controls());   // as processBlock does each block
+        if (done == 0) { ref.render(rl.data(), rr.data(), 100); ref.noteOn(note, 1.0f); ref.render(rl.data() + 100, rr.data() + 100, block - 100); }
+        else ref.render(rl.data(), rr.data(), block);
+        for (int i = 0; i < block; ++i) {
+            if (firstDiff < 0 && (buf.getSample(0, i) != rl[(size_t)i] || buf.getSample(1, i) != rr[(size_t)i])) firstDiff = done + i;
+            maxDiff = std::max(maxDiff, (double)std::abs(buf.getSample(0, i) - rl[(size_t)i]));
+            maxDiff = std::max(maxDiff, (double)std::abs(buf.getSample(1, i) - rr[(size_t)i]));
+            energy += (double)buf.getSample(0, i) * buf.getSample(0, i);
+        }
+    }
+    std::printf("rendered %d frames at %.0f Hz: rms %.4f, max |plugin - XtSynth| = %g (first at frame %ld)\n", total, rate, std::sqrt(energy / total), maxDiff, firstDiff);
+    return maxDiff == 0 && energy > 0 ? 0 : 2;
+}

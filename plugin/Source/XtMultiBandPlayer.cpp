@@ -345,8 +345,8 @@ void XtMbPlayer::State::initRecords() {
 bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
     if (!T.ok || !w.vpdt || w.vpdtBytes < 64 || (w.channels != 1 && w.channels != 2) || !(walk > 0.0f)) return false;
     if (mode != 3 && mode != 5) return false;
-    delete s;
-    s = new State;
+    if (!s) s = new State;
+    *s = State();                                   // no allocation: safe on the audio thread
     State& S = *s;
     S.w = w;
     S.mode = mode;
@@ -401,6 +401,12 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
 }
 
 bool XtMbPlayer::ended() const { return !s || s->ended; }
+
+void XtMbPlayer::setRates(float pitch, float walk) {
+    if (!s || !(walk > 0.0f)) return;
+    s->pitch = pitch;   // the block reads +0x70 / +0x7c each time (0x8950c280, 0x8950e760)
+    s->walk = walk;
+}
 
 // 0x8950e860: fill the walk-position list for this block (forward).
 void XtMbPlayer::State::walkList() {
@@ -817,7 +823,7 @@ void xtMbAttach(const XtMbBands& b, XtMbWave& w) {
     }
 }
 
-XtMbPlayer::XtMbPlayer() = default;
+XtMbPlayer::XtMbPlayer() : s(new State) {}
 XtMbPlayer::~XtMbPlayer() { delete s; }
 
 #ifdef XT_MBPLAYER_MAIN
