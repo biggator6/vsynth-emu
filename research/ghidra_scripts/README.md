@@ -41,6 +41,18 @@ Rebuild the project from scratch (order matters):
    (see HARDWARE_FIRMWARE.md, "The XT's own SOLO encoder, emulated").
 8. `DecompFn.java <out.c> <addr>...` or `... range <lo> <hi>` decompiles the
    functions of any program (used on vpenc.dll in `Vsynth_software/ghidra_vt`).
+   `DisasmX.java <out> <addr> <count> ...` gives a plain listing for any
+   processor.
+9. Tracing the emulated encoder: `EmuEnc.java samp.bin out.tsv trace.txt
+   <hexaddr>... [r4=<value>]`.
+   - At each listed address it logs r0, r4–r7, PR, the position globals and
+     [r5].
+   - With `r4=`, it dumps the decimated and full-rate buffers when r4 equals
+     that value.
+   - At the first shift (`89521fc0`) it dumps the FIR table.
+   The native port has matching hooks: `XT_TRACE=file` (inserts, tracker
+   calls, first marks), `XT_DUMPDEC`, `XT_DUMPFIR`, and `XT_ROUND=nearest` to
+   match the emulator.
 
 Why each step: SH-4 code switches FPU mode (`fschg`, `lds rN,fpscr`) inside
 functions; Ghidra's decompiler needs FPSCR_PR/SZ assumed per address

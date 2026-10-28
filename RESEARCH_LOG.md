@@ -2101,3 +2101,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
     (FPU rounding).
   We now have a ground-truth encoder for any input. A native port validated
   against it is the next step.
+- **v39: native port of the XT's SOLO encoder** (`plugin/Source/XtSoloEncoder.cpp`).
+  - It reproduces the XT's own records **bit-exactly**: vocal 461/461, sine
+    1761/1761 (round-to-zero, as the SH-4 runs).
+  - Diffing against the emulator found these XT departures from V-Trainer:
+    a band-passed 127-tap float decimator designed at run time, a
+    zero-crossing first-mark rule, drift correction every 6912 samples,
+    float onset distances, an L/12 lag table, swapped thresholds and the
+    end-of-wave handling.
+  - The one firmware table it needs is read from the user's own ROM image at
+    run time (`VSE_XT_ROM`, else `firmware/unpacked/`); without it the
+    engine falls back to the v38 encoder.
+  - **Suite 74.59** (v38 74.25), vocal **79.25** (78.28): the XT records'
+    ceiling, every vocal case up.

@@ -162,8 +162,14 @@ Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
 Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8 (true 52.5)
 Metric v5 history: v28=68.1 (granular rate-scaling: identical at 48k)
-Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8 → v33=73.0 (input fix) → v34=73.9 (XT epochs) → v35=73.9 (1/16 epochs, octave guard) → v36=73.9 (emulator-verified highpass state; vocal −64…−81 dB change) → v37=74.2 (SOLO player matched to the firmware run in the P-code emulator; vocal 78.29) → v38=74.2 (encoder writes the XT's per-record repeat budgets; binds only at ≥4x slowdown)
+Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8 → v33=73.0 (input fix) → v34=73.9 (XT epochs) → v35=73.9 (1/16 epochs, octave guard) → v36=73.9 (emulator-verified highpass state; vocal −64…−81 dB change) → v37=74.2 (SOLO player matched to the firmware run in the P-code emulator; vocal 78.29) → v38=74.2 (encoder writes the XT's per-record repeat budgets; binds only at ≥4x slowdown) → v39=74.6 (native port of the XT's own SOLO encoder, bit-exact vs the XT's records; vocal 79.25)
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
+
+SOLO encoder (v39): plugin/Source/XtSoloEncoder.cpp needs one table from the
+  user's XT firmware image — set VSE_XT_ROM=<path to V-SynthXT.rom.2.bin> or
+  keep the unpacked copy at firmware/unpacked/ (gitignored; the renderer looks
+  there relative to the working directory). Without it the v38 epoch encoder
+  is used. VSE_ENC=epoch|vt forces the older encoders.
 
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \
@@ -171,6 +177,7 @@ Rebuild the offline renderer:
     plugin/Source/VariphraseEngine.cpp \
     plugin/Source/PhaseVocoder.cpp \
     plugin/Source/SourceFilterModel.cpp \
+    plugin/Source/XtSoloEncoder.cpp \
     -o analysis/variphrase_render
 
 Run a test case (use explicit args — variable expansion can silently drop params):
@@ -559,7 +566,7 @@ BUILD NOTE (macOS 27 host): /usr/bin/clang++ fails to link (CLT SDK 27 tbd
     TC=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
     SDK=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
     env -u SDKROOT $TC/clang++ -isysroot $SDK -std=c++20 -O2 -DOFFLINE_RENDERER_MAIN \
-      OfflineRenderer.cpp VariphraseEngine.cpp PhaseVocoder.cpp SourceFilterModel.cpp -o ...
+      OfflineRenderer.cpp VariphraseEngine.cpp PhaseVocoder.cpp SourceFilterModel.cpp XtSoloEncoder.cpp -o ...
 PYTHON: system python has no numpy. Use the project venv: .venv/bin/python
   (created Session 16 from analysis/requirements.txt; .venv/ gitignored).
   Other Roland software (V-Producer, V-Synth Librarian) in Vsynth_software/

@@ -249,6 +249,10 @@ tracker) gives the hardware encoder. If not, the XT's encoder is in `rom.2`
 decimation table. Run in the P-code emulator on the raw files, it reproduces
 waves 003 and 004 (HARDWARE_FIRMWARE.md, "The XT's own SOLO encoder,
 emulated"). V-Trainer itself has still not been run on the raw vocal.
+The XT build differs from vpenc in decimation (a band-passed 127-tap float
+FIR), first-mark rule, lag table, drift correction and thresholds. The native
+port `plugin/Source/XtSoloEncoder.cpp` reproduces the XT records bit-exactly
+(HARDWARE_FIRMWARE.md, "Native port of the XT's SOLO encoder").
 
 The XT sine records show the encoder's arithmetic. After a 6.625-sample
 lead-in, every record is 1603/16 = 100.1875 samples, but the true period × 16

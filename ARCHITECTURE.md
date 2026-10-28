@@ -67,7 +67,7 @@ the engine, and writes the output — no JUCE, no libsndfile, no DAW required.
 ```bash
 cd plugin/Source && g++ -std=c++20 -O2 -DOFFLINE_RENDERER_MAIN \
     OfflineRenderer.cpp VariphraseEngine.cpp \
-    PhaseVocoder.cpp SourceFilterModel.cpp \
+    PhaseVocoder.cpp SourceFilterModel.cpp XtSoloEncoder.cpp \
     -o ../../analysis/variphrase_render
 ```
 

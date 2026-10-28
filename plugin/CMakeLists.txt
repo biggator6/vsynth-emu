@@ -53,6 +53,7 @@ target_sources(VSynthEmu PRIVATE
     Source/VariphraseEngine.cpp
     Source/PhaseVocoder.cpp
     Source/SourceFilterModel.cpp
+    Source/XtSoloEncoder.cpp
     Source/OfflineRenderer.cpp
 )
 

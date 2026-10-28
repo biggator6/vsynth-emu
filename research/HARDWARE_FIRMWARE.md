@@ -702,8 +702,8 @@ Found in `vpenc.dll` (V-Trainer), whose code the XT shares:
   constants (set in `0x100079d0`) make the field **11…20**: 20 means D/E
   ≲ 0.033, and 11 means s ≤ 0.2.
 - **Decimation:** the tracker works on a ×4-decimated copy (21-tap Q15
-  FIR, `0x10008c90`; taps 4289, 4165, 3810, 3277, 2639, 1976, 1361, 849,
-  458, 228, 36). The voicing threshold is q < (0x8000 − tbr·0x8000/10)/2.
+  FIR, `0x10008c90`; table at vpenc 0x1001a2b8). The voicing threshold is
+  q < (0x8000 − tbr·0x8000/10)/2.
 
 **Checked against the XT's own records** (Emu_test.prj wave 004, 461
 records):
@@ -743,8 +743,8 @@ line for line:
 - the thresholds `(0x8000 − t) >> 1`, and 0x2000 for re-search.
 
 **The one difference: float decimation.** The decimation filter is a float
-table. At 0x897ee1e4 it holds `vpenc`'s 21-tap filter as floats (0.13087 =
-4289/32768, …); at 0x897ee198 a 19-tap one is used for pmax > 3000 Hz.
+table. At 0x897ee1e4 it holds a float version of `vpenc`'s 21-tap filter;
+at 0x897ee198 a 19-tap one is used for pmax > 3000 Hz.
 None of `vpenc`'s integer tables appear anywhere in the firmware.
 
 **API (driver `0x89515e20`):**
@@ -787,36 +787,43 @@ the reference against which to validate a native port of the encoder
 (`vpenc`'s fixed-point algorithm with the float decimator; the existing
 `encodeGrainCutsVTrainer` port is only approximate).
 
-### Native encoder port: notes so far (2026-10-27, not started in code)
+### Native port of the XT's SOLO encoder (2026-10-27, v39)
 
-- **Source:** vpenc's SOLO path is ~50 functions, ~2600 decompiled lines.
-  The roots are `0x100079d0` (setup) and `0x10007c70` (main loop, buffers
-  of 0x3000 samples). Regenerate the decompile with `DecompFn.java ... range
-  0x10001000 0x1001a000` on `Vsynth_software/ghidra_vt`.
-- **Validate** record for record against `EmuEnc.java` (XT) and against
-  V-Trainer's own `~/V-Trainer Samples/VP9SAMvocal_aah_44---.WAV` (the
-  integer-decimation variant).
-- **XT difference:** the decimated buffer (0x8a00f0f4) holds 4-byte floats,
-  so the decimated-domain sums are float on the XT. Read XT `0x8951f790`,
-  `0x89520f30`, `0x89521090`, `0x895211e0` and `0x89521a80` before porting
-  those parts.
-- **Routines decoded so far:**
-  - `0x10008540`: energy gate over 2·maxPeriod samples.
-  - `0x100085d0`: onset candidates.
-    - Lags come from the table built by `0x10007be0`.
-    - Each is scored on the decimated signal (`0x1000a260`, lag >> 2),
-      re-checked at three further offsets.
-    - Octave checks: D(2L), D(3L) < 2·D.
-    - It must then pass at full rate (`0x1000a100`).
-  - `0x10008730`: full-rate lag refinement, then parabola (`0x1000a370`),
-    giving a 16.16 period.
-  - `0x10008480`: the first mark is the max-energy window of length P/4
-    (samples >> 8, squared), + P/8, wrapped.
-  - `0x1000a1c0` returns Σ(a+b)² and Σ(a−b)². `a100`/`a260` turn these into
-    32768·Σ(a−b)² / (Σ(a+b)² + Σ(a−b)²), with a signed variant for
-    param 4 = 0.
-  - Decompiler caveat: several functions are shown `void`, but their EAX
-    result is used (e.g. `0x10008480`). Check the disassembly.
+`plugin/Source/XtSoloEncoder.cpp` ports the encoder literally from
+`vpenc.dll`'s x86 decompile, with every XT difference applied. The
+differences were found by diffing against `EmuEnc.java`, using breakpoint
+traces (inserts, tracker calls) and buffer dumps.
+
+**Result.** With the SH-4's round-to-zero float mode, it reproduces the XT's
+own stored records **bit-exactly**: wave 004 vocal 461/461 and wave 003 sine
+1761/1761 (start, length, info). With round-to-nearest, it matches the P-code
+emulator exactly. It runs in about 20 ms per file. It is the engine's default
+SOLO encoder from v39 (`VSE_ENC=epoch` / `vt` select the older ones).
+
+**Where the XT differs from vpenc** (rom.2 addresses):
+
+| | vpenc (V-Trainer) | XT |
+|---|---|---|
+| decimation filter | 21-tap Q15 low-pass, int16 output | 127-tap float FIR designed at run time (`0x8951f380`): the 19-entry low-pass table at 0x897ee1e4 ⊛ a Kaiser-windowed high-pass at (pmin + 307.95)/44100; float buffer `0x8a00f0f4` |
+| decimated D/E sums | int16 | `ftrc` of the float values (`0x89521a00` / `a50`) |
+| onset normalised distance | int squares | float squares, wrapped at 2³², truncated (`0x89521970`) |
+| candidate lag table | step L/8, 64 entries | step L/12 (multiple of 4), up to 128 |
+| first mark | strongest P/4 energy window + P/8 | largest \|band-passed\| sample, then the nearer zero crossing (`0x8951e900`) |
+| drift correction | none | every 0x1b000 (6912 samples) of forward marks: zero-crossing phase drift between the segment's first and newest mark (`0x89520d30`), spread linearly over the segment (`0x89520f30`); tracking re-bases on the corrected mark |
+| thresholds | template 0 | onset 11469, voicing 0x4000 (swapped roles), hop 200, energy gate (10·32)²>>8 and `≤`, octave 0.2 |
+| end of wave | zero tail past n | past n + maxLag; event pointer not advanced (`0x89521fc0`) |
+
+**Common to both, but my first reading was wrong:**
+- the parabolic vertex sign (`0x89521d00`: (p1 − p3));
+- the Newton–Raphson divide, which can come out one above floor
+  (`0x1000b060` / `0x89522940`; ported literally);
+- the end node's low bits are 0.
+
+The single-step up-climb in the tracker is real in both, not a decompiler
+artefact.
+
+**Effect** (metric v6): suite 74.25 → **74.59**. Vocal 78.28 → **79.25**,
+which is the XT records' ceiling: every vocal case rises by +0.1 to +1.6.
 
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).

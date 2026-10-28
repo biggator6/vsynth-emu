@@ -1,6 +1,9 @@
 // Run the V-Synth XT's own SOLO encoder (0x8951e120, the vpenc.dll algorithm
 // compiled for the SH-4) in Ghidra's P-code emulator and print its marks.
-// Usage: -postScript EmuEnc.java <samp.bin> <out.tsv>
+// Usage: -postScript EmuEnc.java <samp.bin> <out.tsv> [trace.txt hexaddr...]
+//   With trace addresses: at each hit, log r0 r4..r7 PR and the encoder's
+//   position globals (onset 8a015100, cur 8a0150f8, back 8a0150fc, buffer
+//   offset 8a0150f4) — for diffing against the native port.
 //   samp.bin  int16 LE mono samples (44.1 kHz)
 //   out.tsv   one line per record: start len info (1/16 sample; the vpdt
 //             record stream without its (256, 1) terminator)
@@ -31,6 +34,9 @@ public class EmuEnc extends GhidraScript {
     int r16(long a)          throws Exception { return ByteBuffer.wrap(emu.readMemory(toAddr(a), 2)).order(ByteOrder.LITTLE_ENDIAN).getShort() & 0xffff; }
     long reg(String r)       { return emu.readRegister(r).longValue(); }
 
+    PrintWriter trace = null;
+    String trace_path = null; int dumpN = 0; Integer dumpR4 = null;
+    Set<Long> traceAt = new HashSet<>();
     long call(long pc, long... args) throws Exception {
         String[] ar = { "r4", "r5", "r6", "r7" };
         for (int i = 0; i < args.length; ++i) emu.writeRegister(ar[i], args[i]);
@@ -51,6 +57,23 @@ public class EmuEnc extends GhidraScript {
                 continue;
             }
             if (at == FREE) { emu.writeRegister(emu.getPCRegister(), reg("PR")); continue; }
+            if (traceAt.contains(at) && at == 0x89521fc0L && dumpN < 3) {   // decimated buffer at each shift
+                if (dumpN == 0) try (FileOutputStream df = new FileOutputStream(trace_path + ".fir")) { df.write(emu.readMemory(toAddr(0x8a015108L), 4 * 64)); }
+                try (FileOutputStream df = new FileOutputStream(trace_path + ".dec" + (dumpN++))) { df.write(emu.readMemory(toAddr(0x8a00f0f4L), 4 * 3072)); }
+            }
+            if (traceAt.contains(at) && dumpR4 != null && (int)reg("r4") == dumpR4) {
+                try (FileOutputStream df = new FileOutputStream(trace_path + ".decR4")) { df.write(emu.readMemory(toAddr(0x8a00f0f4L), 4 * 3072)); }
+                try (FileOutputStream df = new FileOutputStream(trace_path + ".fullR4")) { df.write(emu.readMemory(toAddr(0x8a0090f4L), 2 * 0x3000)); }
+            }
+            if (traceAt.contains(at)) {
+                long r5 = reg("r5") & 0xffffffffL;
+                trace.printf("%x r0=%d r4=%d r5=%d r6=%d r7=%d pr=%x onset=%d cur=%d back=%d off=%d [r5]=%d%n", at,
+                    (int)reg("r0"), (int)reg("r4"), (int)reg("r5"), (int)reg("r6"), (int)reg("r7"), reg("PR"),
+                    r32(0x8a015100L), r32(0x8a0150f8L), r32(0x8a0150fcL), r32(0x8a0150f4L),
+                    (r5 >= 0x80000000L && r5 < 0x8f000000L) ? r32(r5) : 0);
+                emu.step(monitor);
+                continue;
+            }
             throw new RuntimeException("stopped at " + Long.toHexString(at) + " " + emu.getLastError());
         }
     }
@@ -61,6 +84,13 @@ public class EmuEnc extends GhidraScript {
         int n = samp.length / 2;
         emu = new EmulatorHelper(currentProgram);
         emu.setBreakpoint(toAddr(SENTINEL)); emu.setBreakpoint(toAddr(MALLOC)); emu.setBreakpoint(toAddr(FREE));
+        if (a.length > 3) {
+            trace = new PrintWriter(new FileWriter(a[2])); trace_path = a[2];
+            for (int i = 3; i < a.length; ++i) {
+                if (a[i].startsWith("r4=")) { dumpR4 = Integer.parseInt(a[i].substring(3)); continue; }   // dump buffers when r4 == value
+                long t = Long.parseLong(a[i], 16); traceAt.add(t); emu.setBreakpoint(toAddr(t));
+            }
+        }
         try {
             wb(0x8985858cL, new byte[0x89b5858d - 0x8985858c]);     // .bss = 0
             w32(0x8987caa0L, 50); wb(0x8987ca9aL, new byte[]{1});
@@ -98,6 +128,7 @@ public class EmuEnc extends GhidraScript {
                 out.printf("%d\t%d\t%d%n", best.get(k)[2], c[2] - best.get(k)[2], ((c[1] >> 8) & 0xf8) | c[0]);
             }
             out.close();
+            if (trace != null) trace.close();
             println("marks " + best.size() + ", records " + Math.max(0, best.size() - 1) + " (pos len info, 1/16 sample)");
         } finally { emu.dispose(); }
     }

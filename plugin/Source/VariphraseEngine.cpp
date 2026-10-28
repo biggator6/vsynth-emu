@@ -1,6 +1,7 @@
 #include "VariphraseEngine.h"
 #include "PhaseVocoder.h"
 #include "SourceFilterModel.h"
+#include "XtSoloEncoder.h"
 
 #include <cmath>
 #include <algorithm>
@@ -981,19 +982,45 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     const double F = std::clamp(std::pow(2.0, pImpl->params.formantShiftSemitones / 12.0),
                                 0.5, 2.0);   // firmware clamps the formant ratio to [0.5, 2]
 
-    // VSE_ENC=vt selects the V-Trainer-style encoder (experiment).  Session
-    // 16 on the vocal set: 64.2 vs 65.6 for epoch-snapped cuts (V-Trainer
-    // aligns only each voiced run's first mark to the energy epoch, then
-    // steps by the tracked period; re-anchoring every mark to the energy
-    // epoch scored 62.5).  The VP-9000 encoder may differ from the V-Synth's.
+    // Grain records.  Default (v39): the XT's own SOLO encoder
+    // (XtSoloEncoder.cpp, a port of rom.2's encoder that reproduces the XT's
+    // stored records bit-exactly).  It runs at 44.1 kHz on 16-bit samples;
+    // other rates are resampled for the analysis and the record positions
+    // scaled back.  VSE_ENC=epoch: the v34–v38 epoch encoder (+ budgets);
+    // VSE_ENC=vt: the earlier V-Trainer approximation.
     const char* encSel = std::getenv("VSE_ENC");
-    std::vector<GrainCut> cuts = (encSel && std::string(encSel) == "vt")
-        ? encodeGrainCutsVTrainer(in, sr)
-        : encodeGrainCuts(in, sr, /*epochAlign=*/true);
-    // Per-record repeat budgets as the XT's encoder writes them (v38).
-    // VSE_BUDGET=off: unlimited (pre-v38).
-    if (const char* bs = std::getenv("VSE_BUDGET"); !(bs && std::string(bs) == "off"))
-        assignRecordBudgets(cuts, in);
+    const std::string enc = encSel ? encSel : "xt";
+    std::vector<GrainCut> cuts;
+    // The XT encoder reads one table from the user's firmware image
+    // (VSE_XT_ROM, else the repo's gitignored firmware/unpacked copy);
+    // without it the epoch encoder is used.
+    static const bool xtReady = [] {
+        if (const char* p = std::getenv("VSE_XT_ROM")) return xtLoadTables(p);
+        for (const char* p : { "firmware/unpacked/V-SynthXT.rom.2.bin", "../firmware/unpacked/V-SynthXT.rom.2.bin",
+                               "../../firmware/unpacked/V-SynthXT.rom.2.bin" })
+            if (xtLoadTables(p)) return true;
+        return false;
+    }();
+    if (enc == "vt") cuts = encodeGrainCutsVTrainer(in, sr);
+    else if (enc == "epoch" || !xtReady) {
+        cuts = encodeGrainCuts(in, sr, /*epochAlign=*/true);
+        // Per-record repeat budgets as the XT's encoder writes them (v38).
+        // VSE_BUDGET=off: unlimited (pre-v38).
+        if (const char* bs = std::getenv("VSE_BUDGET"); !(bs && std::string(bs) == "off"))
+            assignRecordBudgets(cuts, in);
+    } else {
+        const double k = sr / 44100.0;
+        const int m = std::max(1, (int)std::floor((double)in.size() / k));
+        std::vector<int16_t> x16(m);
+        for (int i = 0; i < m; ++i) {
+            const double p = i * k;
+            const int i0 = std::min((int)p, (int)in.size() - 1), i1 = std::min(i0 + 1, (int)in.size() - 1);
+            const double v = (in[i0] + (in[i1] - in[i0]) * (p - i0)) * 32768.0;
+            x16[i] = (int16_t)std::clamp(std::lround(v), -32768L, 32767L);
+        }
+        for (const XtRecord& r : xtSoloEncode(x16.data(), m))
+            cuts.push_back({ r.start16 / 16.0 * k, (float)(r.len16 / 16.0 * k), (r.info & 4) != 0, r.info });
+    }
     // Diagnostic: VSE_CUTSFILE = "start len voiced" lines (e.g. the real
     // V-Trainer records parsed from a VP-9000 sample's vpdt chunk).
     if (const char* cf = std::getenv("VSE_CUTSFILE")) {
