@@ -35,6 +35,7 @@ OPS = {
     'formant_max': ['--formant', '12'],      'formant_up4st': ['--formant', '4'],
     'pitch_down12st': ['--pitch', '-12'],    'pitch_up7st': ['--pitch', '7'],
     'time_2x': ['--time', '0.5'], 'time_4x': ['--time', '0.25'], 'time_halfspeed': ['--time', '2.0'],
+    'time_quarterspeed': ['--time', '4.0'],
 }
 
 # The references were recorded with SOLO "Energy" on (output chain study,

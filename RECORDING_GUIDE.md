@@ -197,6 +197,28 @@ those takes cross-check the mapping.
 Save them in `sustained/`. They need no renderer mapping yet; they're used to
 fit the knob → g curve.
 
+## Repeat-budget check (added 2026-10-28) — one take
+
+**Why:** each SOLO record carries a repeat budget (v38: the XT's encoder
+writes it; our encoder now reproduces it bit-exactly, v39). A budget only
+changes the sound when a record has to repeat three or more times, i.e. at
+slowdowns of about 4× or more. Every take so far is at ½ speed or faster, so
+the budget behaviour has only been checked against the firmware emulator,
+not the hardware. (research/HARDWARE_FIRMWARE.md, "How the encoder sets the
+repeat budget")
+
+**Setup:** wave 004 (SOLO vocal), with the same patch settings and capture
+chain as the other vocal takes (including the Energy setting, whatever it
+is). Pitch 0, Formant 0, Time at **¼ speed (0.25×, 4× slower)**. Record to
+the natural end: about 14 s of audio for the 3.5 s source.
+
+| Take | Pitch | Time | Formant | Note |
+|---|---|---|---|---|
+| `vocal_aah_time_quarterspeed` | 0 | **0.25×** | 0 | full length |
+
+`render_suite.py` already maps it (`--time 4.0`), so it scores automatically
+once it's in `sustained/`.
+
 ## Next Recording Session — Priorities
 
 **Superseded by the "Round 2 — Recording Wishlist" section at the end of this
