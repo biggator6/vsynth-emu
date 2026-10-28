@@ -1129,6 +1129,37 @@ of 12 values every 16 band samples. Its code is `0x89525360` / `0x89525640`
 `0x89526b50`; integer block routines `0x89527f00` / `0x89528cb0`. It is
 not ported yet.
 
+**ENSEMBLE analysis, findings so far** (prototype against `EmuLoad.java`,
+wave 362):
+- **Filter bank.** Stage 1 is the same 81-tap ×4 decimator as BACKING (own
+  copy at 0x897ee530), clamped to ±32767 in float. The ×2 decimator
+  (`0x895263a0`) is a third-band design: centre plus taps ±1, ±2, ±4, ±5,
+  … ±41, skipping multiples of 3, with the table stored without its zeros.
+  Unlike BACKING, every stage starts from zero history, so decimated
+  signals are 0 before time 0. The end is flushed with zeros
+  (`0x895255c0`).
+- **Band 0** (`0x89526090`) is the residual against a polyphase ×4
+  interpolator (10 iterations × 6 coefficients, three phases plus the
+  direct sample), clamped to ±32767, subtracted as wrapping int16.
+- **×2 residuals** (`0x89526600`): in[2m] −= low[m];
+  in[2m+1] −= clamp(Σ cⱼ·(low[m−j] + low[m+1+j])).
+- **The ×4 low band goes through a lossy block codec first.**
+  `0x89527f00` encodes 16-sample blocks into slot 1. That is the extra,
+  non-null band, 16 bytes per 16 samples. `0x89528cb0` decodes them back
+  in place: two 8-sample halves, each with a header nibble → a shift and
+  one of 8 decoder modes (function pointers at `.data` 0x8987cac0). The
+  values recovered from the XT's band 0 are all multiples of 4 and differ
+  from the plain decimated signal by up to about 14. Band 0 and the later
+  stages use the decoded signal.
+- **Frames** (`0x89526a20` → `0x89526bc0`; last band `0x89526b50` →
+  `0x89526db0`):
+  - a 6-tap antisymmetric (quadrature) filter with sign alternation fills
+    a 128-entry circular buffer, 8 pairs per frame;
+  - a 57-tap window and 36-point cosine/sine tables correlate it at three
+    frequencies;
+  - the result is six amplitude/phase pairs, ordered by the index table
+    at 0x897eea40.
+
 ### Factory waves: V-Synth 1.50 encodes, and the stereo reader (2026-10-28)
 
 **Who wrote each wave.** The `LIST/ISFT` chunk names the writer:
