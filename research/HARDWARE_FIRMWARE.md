@@ -873,6 +873,66 @@ default OFF, as on the XT). `render_suite.py` renders at 0.05. Result: suite
 - The EMU-TEST patch's actual Energy value. The patch file is bit-packed; the
   value is easiest to read on the XT (OSC → Formant (PCM) page).
 
+## BACKING / ENSEMBLE: first findings (2026-10-28, in progress)
+
+**Which type the chord references used.** The manual says formant is
+ignored for BACKING and ENSEMBLE, and `chord_Cmaj_formant_max` (formant +12)
+matches the raw chord's long-term spectrum to ±1.3 dB in every octave band.
+So the chord was encoded as BACKING or ENSEMBLE, not LITE or SOLO. Which of
+the two is still open: the players differ (mode 3 against mode 5), the
+analysis does not. The drum's type is unknown.
+
+**Ground truth in the user's project.** XT-encoded BACKING waves 376, 377,
+380 and 381, and ENSEMBLE waves 362 and 415, each with its own audio. They
+validate a multi-band encoder the way waves 003/004 validated SOLO.
+
+**Multi-band analysis layout** (vpfl 0102, e.g. wave 376). A directory
+header of (offset, size, …) entries and 28-byte sub-headers (at 384, 440,
+468, 496, 524 and 552 in 376) leads to **12 record streams**: 6 bands × 2
+channels. Each stream uses SOLO's record format, {u16 length (1/16 sample),
+u16 info}:
+- the first record is a lead-in with info 1;
+- the other info words have low bits 1 (pitch gate only, which is why
+  formant is ignored) and budget fields of 15–19 (121, 137, 153);
+- five bands have records of about 336 samples, the lowest band about 672.
+
+BACKING (376) and ENSEMBLE (362) share the layout.
+
+**The XT's multi-band encoder** (driver `0x89516000`; `SUB_8987c940` = 3):
+1. Setup: `0x89522af0` (sample pointer, frames, channels; a 7-node band
+   chain), `0x8951ab00(44100, n, ch, events)` and `0x8951a2e0` (a 0x3f00
+   work buffer at `[0x8987cab0]`; pool factor `[0x8987ca90]`, default 5).
+2. Per 4096-frame chunk: `0x89522e20` → `0x89523050` (the filter bank;
+   coefficient tables at 0x897ee24c, 0x897ee39c, 0x897ee44c and 0x897ee4fc),
+   `0x8951ac60` (per-band analysis) and `0x8951a420` → `0x8951a6f0` →
+   `0x8951bf70` (marks, run once per channel).
+3. `0x89515960` collects seven band-buffer pointers into `[0x89ff0dd4]`.
+   **The band PCM is written into the sample memory after the original
+   audio**: band 0 = the original, band 1 null, bands 2–6 decimated. The wave
+   file holds only the n original frames, so the XT presumably rebuilds the
+   bands when it loads a sample.
+
+**Emulated** (`EmuBand.java`: `.bss` zeroed; UI, event-list and allocator
+stubs; stops at the writer `0x89512f10`; 405 s for 35730 stereo frames). It
+produces **12 node lists** in SOLO's XT node layout, and five of the six
+bands start at exactly the stored first marks (14121, 14214, 14641, 14404,
+16370). But the lists are about 14× denser than the stored records, and the
+node values (e.g. 0x1ebf) don't map to the stored info words through
+vpenc's `v/625` rule.
+
+**The step that turns the dense lists into the stored records has not been
+found.** It isn't in `0x89512f10` (which rescales the marker list) or in
+`0x89515960`, and nothing loads 625. It probably runs at sample save, where
+the vpdt chunk is serialised.
+
+**Next:**
+1. Find that step (start from the RIFF/vpdt serialiser) and reproduce wave
+   376's stored records.
+2. Emulate the BACKING (`0x8950e6e0`) and ENSEMBLE (`0x8950db10`) players
+   on a stored wave's records and band PCM.
+3. Run the chord and drum through both and score them against the
+   references to settle the encode types; then port what matches.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).
