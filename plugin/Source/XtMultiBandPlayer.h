@@ -5,6 +5,7 @@
 // (research/ghidra_scripts/EmuBacking.java).  See XtMultiBandPlayer.cpp.
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 // The players' interpolation kernel, recombination-filter coefficients and
 // per-band constants are firmware tables.  They are read from the user's own
@@ -28,6 +29,23 @@ struct XtMbWave {
     int channels = 1;
     XtMbBand band[6];
 };
+
+// The band data the XT builds when it loads a BACKING wave (0x894a9940 with
+// the filter bank 0x89522af0 / 0x89522e20 / 0x89523050): a ×4 then four ×2
+// decimate-and-interpolate stages over the zero-extended wave.  Band 0 is the
+// full-rate residual (it replaces the original audio in sample memory),
+// bands 1..4 the residuals at ×4 … ×32, band 5 the last low-pass at ×64.
+// Each band is stored as the XT lays it out: L = length rounded up to 64
+// frames (shifted per band), then 256 frames of padding holding the stage
+// input past the end and ten reversed samples from before the start.
+struct XtMbBands {
+    int channels = 1;
+    long len[6] = {};                  // frames of band data (without padding)
+    std::vector<int16_t> buf[6];       // interleaved, (len + 256) frames
+};
+bool xtMbBuildBacking(const int16_t* pcm, long frames, int channels, XtMbBands& out);
+// Point a wave's bands at a built set (band k readable over its buffer).
+void xtMbAttach(const XtMbBands& b, XtMbWave& w);
 
 class XtMbPlayer {
 public:

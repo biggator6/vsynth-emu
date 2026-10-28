@@ -1069,10 +1069,65 @@ default voice flags.
 - the loop struct's cache bounds.
 
 **Not yet in the engine.** The player needs a loaded wave's band data and
-its vpdt. Both come from firmware not yet ported: the load-time rebuild
-(`0x894a9940`: the filter bank for BACKING, the sinusoidal analysis for
-ENSEMBLE) and the multi-band encoder (`0x89516000` and the step that writes
-the vpdt).
+its vpdt. The BACKING band data is now ported (next section). Still to
+port: ENSEMBLE's analysis, and the multi-band encoder (`0x89516000` and
+the step that writes the vpdt).
+
+### The BACKING load-time band rebuild, ported (2026-10-28)
+
+`xtMbBuildBacking()` (in `XtMultiBandPlayer.cpp`) rebuilds what
+`0x894a9940` writes for a type-3 wave.
+
+**Filter bank** (`0x89522af0` init, `0x89522e20` / `0x89523050` per
+chunk). It is a Laplacian pyramid over the wave, each channel separately:
+- stage 1 decimates by 4;
+- stages 2–5 decimate by 2.
+
+Each stage:
+1. **Decimate.** The decimating FIR `0x89523aa0` computes
+   c₀·x₀ + Σ cᵢ·(xᵢ + x₋ᵢ). Each pair sum is an integer add; the taps
+   are accumulated in float, one after another. The result is truncated
+   and clamped to int16.
+2. **Zero-stuff** that low signal.
+3. **Interpolate.** Stage 1 uses a full half-kernel (`0x89523c60`); the
+   others use a half-band (`0x89523fd0`, 0.5·x₀ + Σ cⱼ·(x₂ⱼ₊₁ + x₋₍₂ⱼ₊₁₎)).
+   The result is scaled by the decimation factor and truncated.
+4. **Residual.** It is subtracted from the stage input, with int16
+   clamping. That residual is the band.
+
+The four tables are half-kernels whose first float is the length. The
+port reads them from rom.2 at run time.
+
+**Equivalent to whole-signal filtering of the zero-extended wave.** The
+XT streams the wave in 0x2000-frame chunks (the encoder uses 0x1000) and
+rounds the length up to 64 frames. It carries the decimated signals'
+tails before time 0 as history. So the result equals filtering the whole
+wave, extended with zeros, and keeping every stage's signal beyond both
+ends.
+
+**Memory layout:**
+- band k holds (n rounded up to 64) >> {0, 2, 3, 4, 5, 6} frames;
+- 256 frames of padding follow each band;
+- bands 1–5 hold the stage input continued past the end (41 frames for
+  band 1, 10 for the others);
+- 128 frames on, they hold the stage input's ten samples from before time
+  0, reversed;
+- the bands follow one another in sample memory; band 0 overwrites the
+  wave.
+
+**Result.** With round-to-nearest, the rebuilt sample memory equals
+`EmuLoad.java`'s, int16 for int16, for waves 376 and 380. That includes
+the padding and the band addresses. It takes well under a second.
+Together with the player port, a BACKING wave now goes from raw PCM and
+its vpdt to the firmware's output bit-exactly.
+
+ENSEMBLE uses a different filter bank: its band 0 differs from BACKING's
+for the same wave. Its layout is n rounded up to 512 frames, then frames
+of 12 values every 16 band samples. Its code is `0x89525360` / `0x89525640`
+→ `0x89525840` (mono) / `0x89525ae0` (stereo); stage filters `0x89525e20`,
+`0x89526090`, `0x895263a0`, `0x89526600`; frame analysis `0x89526a20` /
+`0x89526b50`; integer block routines `0x89527f00` / `0x89528cb0`. It is
+not ported yet.
 
 ### Factory waves: V-Synth 1.50 encodes, and the stereo reader (2026-10-28)
 

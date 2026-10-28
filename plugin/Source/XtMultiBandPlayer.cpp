@@ -60,6 +60,8 @@ constexpr uint32_t kStride = 0x897edfcc;   // u32 ×6: walk-list stride
 constexpr uint32_t kEShift = 0x897edf78;   // s16 ×6: ENSEMBLE frame shift
 constexpr uint32_t kOscC   = 0x8950dd9c;   // u32 ×12: oscillator phase constants (bands 1..4, band 5)
 constexpr uint32_t kCos    = 0x8950ddd0;   // 256 floats: cosine table
+// load-time filter bank: half-kernels {float length, centre tap, taps…}
+constexpr uint32_t kDec4 = 0x897ee24c, kDec2 = 0x897ee39c, kInt4 = 0x897ee44c, kInt2 = 0x897ee4fc;
 
 struct Tables {
     float kernel[64][6];
@@ -69,6 +71,7 @@ struct Tables {
     int16_t eshift[6];
     uint32_t oscC[12];
     float cosTab[256];
+    std::vector<float> dec4, dec2, int4, int2;
     bool ok = false;
 } T;
 
@@ -99,6 +102,13 @@ bool xtMbLoadTables(const char* romPath) {
            && readAt(f, kFShift, T.fshift, 6) && readAt(f, kSShift, T.sshift, 6) && readAt(f, kOffset, T.offset, 6)
            && readAt(f, kMask, T.mask, 6) && readAt(f, kStride, T.stride, 6) && readAt(f, kEShift, T.eshift, 6)
            && readAt(f, kOscC, T.oscC, 12) && readAt(f, kCos, T.cosTab, 256);
+    auto half = [&](uint32_t a, std::vector<float>& v, int lo, int hi) {
+        float n = 0;
+        if (!readAt(f, a, &n, 1) || !(n >= lo && n <= hi)) return false;
+        v.resize((size_t)n);
+        return readAt(f, a + 4, v.data(), v.size());
+    };
+    ok = ok && half(kDec4, T.dec4, 16, 256) && half(kDec2, T.dec2, 8, 128) && half(kInt4, T.int4, 8, 128) && half(kInt2, T.int2, 2, 64);
     std::fclose(f);
     if (!ok) return false;
     // Sanity: each kernel phase is an interpolator (taps sum to about 0.9);
@@ -709,6 +719,104 @@ void XtMbPlayer::State::ensembleBand(int k, int n, const uint32_t* C, float*& o)
     }
 }
 
+// ── Load-time band rebuild (BACKING) ────────────────────────────────────────
+namespace {
+
+inline int16_t sat16(long v) { return (int16_t)(v < -32768 ? -32768 : v > 32767 ? 32767 : v); }
+
+// A signal on indices [-off, size - off), zero outside.
+struct Sig {
+    std::vector<int32_t> v;
+    long off = 0;
+    int32_t at(long i) const { i += off; return i < 0 || i >= (long)v.size() ? 0 : v[(size_t)i]; }
+};
+
+// 0x89523aa0: decimating FIR at centre i, c0·x0 + Σ ci·(x_i + x_−i).
+float firDec(const Sig& x, long i, const std::vector<float>& c) {
+    float acc = (float)x.at(i) * c[0];
+    for (size_t k = 1; k < c.size(); ++k) { float t = (float)(x.at(i + (long)k) + x.at(i - (long)k)) * c[k]; acc = t + acc; }
+    return acc;
+}
+
+// One stage: decimate x by D into `low`, interpolate back (×4: the full
+// half-kernel, 0x89523c60; ×2: the half-band 0x89523fd0) and write the
+// residual x − D·interp on [0, L).  Signals are kept `M` samples beyond both
+// ends, which covers the filters' tails (the XT carries them as history).
+void stage(const Sig& x, long L, int D, const std::vector<float>& cd, const std::vector<float>& ci, Sig& low, std::vector<int32_t>& res) {
+    const long M = 256;
+    const long Lo = L / D;
+    low.off = M;
+    low.v.assign((size_t)(Lo + 2 * M), 0);
+    for (long m = -M; m < Lo + M; ++m) {
+        const float y = firDec(x, D * m, cd);
+        low.v[(size_t)(m + M)] = sat16(ftrc(y));
+    }
+    auto z = [&](long t) -> int32_t { return (t % D) ? 0 : low.at(t / D); };   // zero-stuffed low
+    res.assign((size_t)L, 0);
+    for (long t = 0; t < L; ++t) {
+        float acc;
+        if (D == 2) {
+            acc = (float)z(t) * 0.5f;
+            for (size_t j = 0; j < ci.size(); ++j) { const long d = 2 * (long)j + 1; float u = (float)(z(t + d) + z(t - d)) * ci[j]; acc = u + acc; }
+        } else {
+            acc = (float)z(t) * ci[0];
+            for (size_t k = 1; k < ci.size(); ++k) { float u = (float)(z(t + (long)k) + z(t - (long)k)) * ci[k]; acc = u + acc; }
+        }
+        float y = acc * (float)D;
+        res[(size_t)t] = sat16((long)x.at(t) - ftrc(y));
+    }
+}
+
+} // namespace
+
+bool xtMbBuildBacking(const int16_t* pcm, long frames, int channels, XtMbBands& out) {
+    if (!T.ok || !pcm || frames <= 0 || (channels != 1 && channels != 2)) return false;
+    // The SH-4's rounding (round to zero); XT_ROUND=nearest: the emulator's.
+    const int saved = std::fegetround();
+    const char* rm = std::getenv("XT_ROUND");
+    if (!(rm && std::string(rm) == "nearest")) std::fesetround(FE_TOWARDZERO);
+    out.channels = channels;
+    const long n64 = (frames + 63) / 64 * 64;                 // chunks are rounded up to 64 frames
+    const int shift[6] = { 0, 2, 3, 4, 5, 6 };
+    for (int k = 0; k < 6; ++k) {
+        out.len[k] = n64 >> shift[k];
+        out.buf[k].assign((size_t)((out.len[k] + 256) * channels), 0);
+    }
+    for (int c = 0; c < channels; ++c) {
+        Sig x;
+        x.v.resize((size_t)n64, 0);
+        for (long i = 0; i < frames; ++i) x.v[(size_t)i] = pcm[i * channels + c];
+        std::vector<int32_t> res;
+        for (int k = 0; k < 5; ++k) {
+            Sig low;
+            stage(x, out.len[k], k == 0 ? 4 : 2, k == 0 ? T.dec4 : T.dec2, k == 0 ? T.int4 : T.int2, low, res);
+            int16_t* b = out.buf[k].data();
+            for (long t = 0; t < out.len[k]; ++t) b[t * channels + c] = (int16_t)res[(size_t)t];
+            if (k >= 1) {   // padding: the stage input past the end, ten reversed samples from before 0
+                const long carry = k == 1 ? (long)T.int4.size() : (long)T.int2.size();
+                for (long j = 0; j < carry; ++j) b[(out.len[k] + j) * channels + c] = (int16_t)x.at(out.len[k] + j);
+                for (long j = 0; j < 10; ++j) b[(out.len[k] + 128 + j) * channels + c] = (int16_t)x.at(-1 - j);
+            }
+            x = std::move(low);
+        }
+        int16_t* b = out.buf[5].data();                       // band 5: the last low-pass
+        for (long t = 0; t < out.len[5]; ++t) b[t * channels + c] = (int16_t)x.at(t);
+        for (long j = 0; j < (long)T.int2.size(); ++j) b[(out.len[5] + j) * channels + c] = (int16_t)x.at(out.len[5] + j);
+        for (long j = 0; j < 10; ++j) b[(out.len[5] + 128 + j) * channels + c] = (int16_t)x.at(-1 - j);
+    }
+    std::fesetround(saved);
+    return true;
+}
+
+void xtMbAttach(const XtMbBands& b, XtMbWave& w) {
+    w.channels = b.channels;
+    for (int k = 0; k < 6; ++k) {
+        w.band[k].data = b.buf[k].data();
+        w.band[k].lo = 0;
+        w.band[k].hi = (long)(b.buf[k].size() / (size_t)b.channels);
+    }
+}
+
 XtMbPlayer::XtMbPlayer() = default;
 XtMbPlayer::~XtMbPlayer() { delete s; }
 
@@ -729,6 +837,26 @@ static std::vector<uint8_t> slurp(const char* p) {
     return v;
 }
 int main(int argc, char** argv) {
+    // xt_mbplay rom.2.bin --bands samp.bin <channels> out.samp : the load-time
+    // band rebuild, written as the XT's sample memory (band k after band k−1)
+    if (argc >= 6 && std::string(argv[2]) == "--bands") {
+        if (!xtMbLoadTables(argv[1])) { std::fprintf(stderr, "cannot read the tables from %s\n", argv[1]); return 1; }
+        std::vector<uint8_t> raw = slurp(argv[3]);
+        const int ch = std::atoi(argv[4]);
+        XtMbBands b;
+        if (!xtMbBuildBacking(reinterpret_cast<const int16_t*>(raw.data()), (long)(raw.size() / (2 * ch)), ch, b)) return 1;
+        FILE* fo = std::fopen(argv[5], "wb");
+        if (!fo) return 1;
+        long addr = 0x8C100000L;
+        for (int k = 0; k < 6; ++k) {
+            if (k) std::printf("%s%lx", k > 1 ? "," : "", addr);
+            std::fwrite(b.buf[k].data(), 2, b.buf[k].size(), fo);
+            addr += (long)b.buf[k].size() * 2;
+        }
+        std::printf("\n");
+        std::fclose(fo);
+        return 0;
+    }
     if (argc < 9) { std::fprintf(stderr, "usage: %s rom.2.bin vpdt.bin mem.samp b1,b2,b3,b4,b5 channels out.f32 pitch walk [frames]\n", argv[0]); return 1; }
     if (!xtMbLoadTables(argv[1])) { std::fprintf(stderr, "cannot read the player tables from %s\n", argv[1]); return 1; }
     std::vector<uint8_t> vpdt = slurp(argv[2]), mem = slurp(argv[3]);

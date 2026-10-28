@@ -184,6 +184,9 @@ BACKING / ENSEMBLE players (2026-10-28): plugin/Source/XtMultiBandPlayer.cpp,
     xt_mbplay rom.2.bin vpdt.bin mem.samp b1,..,b5 <ch> out.f32 <pitch> <walk>
   (inputs as research/ghidra_scripts/EmuBacking.java; XT_MODE=5 ENSEMBLE,
   XT_ROUND=nearest to match the emulator's rounding).
+    xt_mbplay rom.2.bin --bands samp.bin <ch> out.samp
+  rebuilds a BACKING wave's band data (xtMbBuildBacking) as the XT's sample
+  memory and prints the band addresses, for comparison with EmuLoad.java.
 
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \

@@ -2183,3 +2183,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - It is not wired into the engine yet. It needs the load-time band rebuild
   and the multi-band encoder's vpdt, neither of which is ported.
 
+### Session 16 addendum (2026-10-28) — BACKING band rebuild ported
+
+- `xtMbBuildBacking()` reproduces the XT's load-time BACKING band data
+  exactly for waves 376 and 380. That covers every int16 of sample memory,
+  including the padding and band addresses.
+- The firmware streams in chunks, but its output equals whole-signal
+  filtering of the zero-extended wave: a ×4, then four ×2,
+  decimate/interpolate stages, with residuals as bands.
+- I found the model with a Python float32 prototype against `EmuLoad.java`'s
+  output. The interior matched first time; the edges matched once the
+  decimated tails before time 0 were kept, as the XT keeps them as history.
+- ENSEMBLE has its own filter bank and frame analysis, not yet ported.
+
