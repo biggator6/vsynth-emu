@@ -935,10 +935,93 @@ XT's (below), so its multi-band encoder may differ too.
 1. Get the XT's own BACKING and ENSEMBLE encodes of the raw chord and drum
    (RECORDING_GUIDE.md). Then diff `EmuBand.java`'s lists against them; if
    they differ, look for the thinning step from the vpdt serialiser.
-2. Emulate the BACKING (`0x8950e6e0`) and ENSEMBLE (`0x8950db10`) players
-   on a stored wave's records and band PCM.
+2. ~~Emulate the BACKING (`0x8950e6e0`) and ENSEMBLE (`0x8950db10`)
+   players on a stored wave's records and band PCM~~ — done (next section).
 3. Run the chord and drum through both and score them against the
    references to settle the encode types; then port what matches.
+
+### BACKING and ENSEMBLE players, emulated (2026-10-28)
+
+**What a loaded multi-band wave looks like in memory.** On load the XT
+rebuilds the band data with `0x894a9940`. It calls the type's chunk routine
+over 0x2000-frame chunks: `0x89529f20` → filter bank `0x89522e20` for
+BACKING, the sinusoidal analysis `0x89525640` for ENSEMBLE (init
+`0x89525360`, finish `0x895255c0`). It then fetches seven band pointers
+through `0x8952a1c0`. The player's wave struct holds:
+- +0: the vpdt chunk, read in place (all offsets in it are relative to
+  its start);
+- +4: band 0. The rebuild **overwrites the original audio in place** with
+  the top band;
+- +8 … +0x18: bands 1–5, i.e. loader slots 2–6. Slot 1 is null for BACKING,
+  and the vpdt has an empty slot there too.
+  - BACKING: int16 PCM decimated ×4, ×8, ×16, ×32 and ×64.
+  - ENSEMBLE: frames of 12 int16 per channel (six value pairs). The frame
+    count halves from band to band (wave 362: 424, 220, 118, 67, 65).
+- +0x28: a tuning struct (two s16 read as x/12000; zero here);
+- +0x2c: the loop/cache struct.
+
+For wave 376 the load-time BACKING bands are **bit-identical** to the
+encoder's (`EmuBand.java`), sample for sample.
+
+**vpdt image** (stereo; mono halves the strides):
+- The event table sits at byte 28. There are 88 u16 per event (46 mono),
+  and the header's u32[2] high half is the event count. Each event is {u32
+  flags, u32 position (1/16 sample)}, then per band one 24-byte pair of
+  channel entries {u32 segment-list offset, u32 record-stream offset, u16
+  first mark}. An empty 24-byte slot follows band 0.
+- Segment lists are entries {u32 record-stream offset, u32 flags, u32
+  start}, each starting a grain run at its own record stream (`0x8950f6a0`).
+- Records are SOLO's {u16 length, u16 info} (`0x8950f5a0` / `0x8950f5d0`).
+
+**Players.**
+- **BACKING** `0x8950e6e0`:
+  - band 0 through the grain scheduler `0x8950e760`, at full rate;
+  - bands 1–5 through `0x8950eab0`, producing 8, 4, 2, 1 and 1 samples per
+    32-sample block (×4, ×8, ×16, ×32, ×32). They read with the 64×6
+    interpolation kernel (`0x8950eb60`) and re-trigger per segment.
+  - The recombination tree `0x8950c650` / `0x8950c720` upsamples ×2 per
+    stage through a 4th-order recursive interpolator. `0x8950c570`
+    applies the output gain.
+- **ENSEMBLE** `0x8950db10`:
+  - band 0 through the same scheduler;
+  - each other band through six cosine oscillators (`0x8950dbe0` /
+    `0x8950dc50`). Their frames are reloaded every 64 band samples
+    (`0x8950dcb0`) and interpolated linearly.
+  - The same recombination tree.
+- Note-on for both is the setup alone (`0x89510980`, `0x89510130`).
+  `0x89510bf0` seeks only when the start offset is non-zero.
+
+**Ghidra emulator bug.** Ghidra's little-endian SH-4 spec stores the float
+registers pairwise swapped (fr1, fr0, fr3, fr2, …). Its `fipr` P-code
+addresses FVn by offset, so it writes the dot product to fr2 instead of
+fr3. The recombination tree's four `fipr`s then integrate, and the low
+bands ramp without bound. `EmuBacking.java` executes those four itself.
+`fipr`/`ftrv` appear nowhere else in the players (`0x8950c000`–`0x89511000`)
+or the encoders (`0x89511000`–`0x89528000`), so the SOLO and encoder
+emulations were unaffected.
+
+**Results** (full-length renders; octave levels against the original,
+62.5 Hz – 8 kHz):
+
+| wave | setting | length | measured pitch | octave levels |
+|---|---|---|---|---|
+| 376 BACKING | identity | 1.000× | 1.000 | ±0.5 dB, same rms |
+| 376 BACKING | pitch +7 | 1.000× | 1.498 (expect 1.498) | — |
+| 376 BACKING | time ×2 / ×½ | 2.000× / 0.500× | 1.000 / 1.002 | within 1 dB / up to −3.6 dB at 8 kHz |
+| 362 ENSEMBLE | identity | 1.000× | 1.000 | 0 to −2.8 dB, rms −1.6 dB |
+| 362 ENSEMBLE | pitch +7 | 1.000× | 1.498 | — |
+| 362 ENSEMBLE | time ×2 / ×½ | 2.000× / 0.500× | 1.000 / 1.000 | — |
+
+At identity, BACKING correlates 0.77 with the original waveform at zero lag.
+The ENSEMBLE envelope follows the original block by block. So both players
+run correctly in the emulator: pitch and time are independent, and the
+level is right.
+
+**Next:**
+- Port both players to C++, validated against these renders as the SOLO
+  player was.
+- Scoring against the chord and drum references still needs the XT's own
+  vpdt for those inputs (RECORDING_GUIDE.md), or the step that writes it.
 
 ### Factory waves: V-Synth 1.50 encodes, and the stereo reader (2026-10-28)
 

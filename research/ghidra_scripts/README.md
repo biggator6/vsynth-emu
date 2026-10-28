@@ -54,6 +54,23 @@ Rebuild the project from scratch (order matters):
    calls, first marks), `XT_DUMPDEC`, `XT_DUMPFIR`, and `XT_ROUND=nearest` to
    match the emulator.
 
+10. BACKING / ENSEMBLE:
+    - `EmuBand.java samp.bin <ch> out.heap` runs the multi-band encoder to
+      its writer. It dumps the heap, `.ram` and sample memory (`.samp`, the
+      band PCM after the audio) and prints the band pointers.
+    - `EmuLoad.java samp.bin <ch> <3|5> out` runs the load-time band rebuild
+      (`0x894a9940`) as the XT does when it loads a BACKING (3) or ENSEMBLE
+      (5) wave.
+    - `EmuBacking.java vpdt.bin mem.samp <band1..5 hex,> <ch> out.f32 <R>
+      <walk> [maxOut]` plays a note through the BACKING player
+      (`0x89510980` setup, `0x8950e6e0` per block), about 1 ms per output
+      sample. `EMUBK_TRACE=file` dumps the band accumulators per block.
+    - **Ghidra bug:** the little-endian SH-4 spec's `fipr` writes fr2
+      instead of fr3, because the float registers are stored pairwise
+      swapped. `EmuBacking.java` executes the four `fipr`s in the
+      recombination tree itself. No other emulated routine (SOLO player,
+      encoders) contains `fipr` or `ftrv`.
+
 Why each step: SH-4 code switches FPU mode (`fschg`, `lds rN,fpscr`) inside
 functions; Ghidra's decompiler needs FPSCR_PR/SZ assumed per address
 (FpscrFix) and needs literal pools in read-only memory to fold the mode

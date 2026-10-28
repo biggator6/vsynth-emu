@@ -2148,3 +2148,22 @@ Round-2 recordings.  First build-out after that: real-time granular port
   the C startup does, instead of zeroing it. SOLO is still bit-exact, and
   the band lists are unchanged.
 
+### Session 16 addendum (2026-10-28) — BACKING and ENSEMBLE players emulated
+
+- `EmuBacking.java` plays a note through the BACKING player (`0x89510980`
+  setup, `0x8950e6e0` per block). With `EMUBK_MODE=5` it plays the ENSEMBLE
+  player (`0x89510130`, `0x8950db10`). `EmuLoad.java` runs the XT's
+  load-time band rebuild (`0x894a9940`) for type 3 or 5.
+- **Ghidra bug:** the LE SH-4 `fipr` writes fr2 instead of fr3, because the
+  float registers are stored pairwise swapped. It made the band
+  recombination tree integrate. The harness executes the four `fipr`s
+  itself. The SOLO player and encoders have none.
+- Wave 376 (BACKING) and 362 (ENSEMBLE) render correctly: identity within
+  ±0.5 dB per octave (ENSEMBLE −1.6 dB rms), pitch +7 measured 1.498,
+  time ×2 / ×½ lengths exact with pitch held.
+- The load-time BACKING bands are bit-identical to the encoder's. The
+  rebuild overwrites the original audio with the top band. ENSEMBLE's lower
+  bands are six-sinusoid frames, not PCM.
+- Next: a C++ port of both players validated against these renders. The
+  chord/drum scoring waits on the XT's own encodes.
+

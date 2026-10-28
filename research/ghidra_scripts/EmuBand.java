@@ -88,6 +88,11 @@ public class EmuBand extends GhidraScript {
             for (int k = 0; k < 7; ++k) sb.append(String.format(" %08x", r32(0x89ff0dd4L + 4 * k)));
             println(sb + String.format("  [89ff0df0]=%d", r32(0x89ff0df0L)));
             try (FileOutputStream f = new FileOutputStream(a[2] + ".ram")) { f.write(emu.readMemory(toAddr(0x89ff0000L), 0x30000)); }
+            // sample memory: the original audio followed by the band PCM (base SAMP)
+            long end = SAMP + samp.length;
+            for (int k = 0; k < 7; ++k) end = Math.max(end, (r32(0x89ff0dd4L + 4 * k) & 0xffffffffL));
+            end = Math.min(end + 0x40000, HEAP);
+            try (FileOutputStream f = new FileOutputStream(a[2] + ".samp")) { f.write(emu.readMemory(toAddr(SAMP), (int)(end - SAMP))); }
             if (trace != null) trace.close();
         } finally { emu.dispose(); }
     }
