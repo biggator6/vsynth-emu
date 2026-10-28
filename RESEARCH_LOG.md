@@ -2093,3 +2093,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
     when D/E is measured at full rate; the sine, 100 %.
   - Implemented in our encoder (v38). The budgets bind only at slowdowns of
     ≥ 4×, so the suite is unchanged at 74.25.
+- **The XT's own encoder, run in the emulator** (`EmuEnc.java`). It is
+  `vpenc`'s algorithm in `rom.2` at `0x8951dd70`/`0x8951e120`, with a float
+  decimator. From the raw files it reproduces the XT's encodes:
+  - sine: bit-exact (1761 records);
+  - vocal: info 100 %, starts 457/461 exact, the other 4 off by 1/16 sample
+    (FPU rounding).
+  We now have a ground-truth encoder for any input. A native port validated
+  against it is the next step.

@@ -733,6 +733,60 @@ ignored. The suite has no such
 SOLO case, so the score is unchanged (74.25; vocal 78.28; time ×½ 80.89 →
 80.93).
 
+## The XT's own SOLO encoder, emulated (2026-10-27)
+
+**Location.** The XT encodes on-board with `vpenc.dll`'s algorithm compiled
+for the SH-4. Its setup routine `0x8951dd70` repeats `vpenc 0x100079d0`
+line for line:
+- the same divide helper (`0x89522940` = `0x1000b060`);
+- the budget constants lo = 0x5999, hi = 0xa666;
+- the thresholds `(0x8000 − t) >> 1`, and 0x2000 for re-search.
+
+**The one difference: float decimation.** The decimation filter is a float
+table. At 0x897ee1e4 it holds `vpenc`'s 21-tap filter as floats (0.13087 =
+4289/32768, …); at 0x897ee198 a 19-tap one is used for pmax > 3000 Hz.
+None of `vpenc`'s integer tables appear anywhere in the firmware.
+
+**API (driver `0x89515e20`):**
+
+| routine | does |
+|---|---|
+| `0x8951dc40(n, samples, nEvents, events)` | new document; defaults pmin 22, pmax 2000, thresholds 3/10, 200, 10 |
+| `0x8951dbb0` | template (not called for these encodes) |
+| `0x89522a30` | node-pool size factor `[0x8987caa0]` |
+| `0x8951e120(2)` | encode, mono (3 = stereo) |
+
+- **Events:** a u32 list of attack positions (1/16 sample); the last must
+  be n·16, so a sustained note uses {n·16}.
+- **Node pool:** 16-byte nodes allocated by `0x895222a0` from the chunk
+  list `[0x8a015260]` (base `[0x8a015240]`, count `[0x8a015244]`).
+- **XT node layout** (differs from vpenc's): {u16 low (7 = voiced), u16 v,
+  i32 pos (1/16), u32 lower neighbour, u32 higher neighbour}.
+- **Records:** [mark_k, mark_k+1) with info `((v_k+1 >> 8) & 0xf8) | low`.
+
+**Harness:** `EmuEnc.java` sets up memory as the C startup and the UI would:
+- the image's `.bss` (0x8985858c to the end, 0xFF in the file) is zeroed;
+- the pool factor is 50;
+- `malloc` (`0x89527910`) and `free` (`0x89527950`) are stubbed with a bump
+  allocator.
+
+It runs the encoder and writes the record stream. Runtime is about 3
+minutes per second of audio.
+
+**Result: the XT's own encodes, reproduced from the raw files.**
+
+| wave | records | result |
+|---|---|---|
+| 003, sine | 1761 | **bit-exact**: every start, length and info word |
+| 004, vocal | 461 | info 100 %; starts 457/461 exact, the other 4 off by 1/16 sample |
+
+The 1/16-sample misses are FPU rounding: the hardware runs round-to-zero
+(FPSCR RM = 1). So the template defaults from `0x8951dc40` are the XT's SOLO
+encode settings. This is the ground-truth encoder for any input. It is also
+the reference against which to validate a native port of the encoder
+(`vpenc`'s fixed-point algorithm with the float decimator; the existing
+`encodeGrainCutsVTrainer` port is only approximate).
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).

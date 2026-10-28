@@ -34,6 +34,13 @@ Rebuild the project from scratch (order matters):
    The optional trace dumps the player state per sample in the same columns
    as the engine's `VSE_TRACE=file`, for diffing. For parallel runs I used
    one copy of the Ghidra project per process.
+7. Run the XT's own SOLO encoder (0x8951e120) on a raw wave:
+   `-postScript EmuEnc.java /tmp/x_samp.bin out.tsv` (int16 LE mono 44.1 kHz
+   in; record stream "start len info" in 1/16 samples out). It takes about 3
+   minutes per second of audio, and reproduces the XT's wave 003/004 encodes
+   (see HARDWARE_FIRMWARE.md, "The XT's own SOLO encoder, emulated").
+8. `DecompFn.java <out.c> <addr>...` or `... range <lo> <hi>` decompiles the
+   functions of any program (used on vpenc.dll in `Vsynth_software/ghidra_vt`).
 
 Why each step: SH-4 code switches FPU mode (`fschg`, `lds rN,fpscr`) inside
 functions; Ghidra's decompiler needs FPSCR_PR/SZ assumed per address

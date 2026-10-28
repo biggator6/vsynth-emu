@@ -244,6 +244,12 @@ onset candidate search 0x100085d0, backward run extension, 11.025 kHz
 tracker) gives the hardware encoder. If not, the XT's encoder is in `rom.2`
 (the XT encodes on-board) and is the target instead.
 
+**Answered 2026-10-27:** the XT's encoder in `rom.2` (`0x8951dd70` /
+`0x8951e120`) is this algorithm compiled for the SH-4, with a float
+decimation table. Run in the P-code emulator on the raw files, it reproduces
+waves 003 and 004 (HARDWARE_FIRMWARE.md, "The XT's own SOLO encoder,
+emulated"). V-Trainer itself has still not been run on the raw vocal.
+
 The XT sine records show the encoder's arithmetic. After a 6.625-sample
 lead-in, every record is 1603/16 = 100.1875 samples, but the true period × 16
 is 1603.6. The period is **truncated** (fixed point), and marks step freely
