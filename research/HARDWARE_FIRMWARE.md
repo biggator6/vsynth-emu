@@ -1160,6 +1160,48 @@ wave 362):
   - the result is six amplitude/phase pairs, ordered by the index table
     at 0x897eea40.
 
+### Running the firmware itself: an SH-4 interpreter (2026-10-28)
+
+ENSEMBLE's load-time analysis has three parts: a filter bank with its own
+tables and zero history, a lossy block codec for the ×4 low band, and a
+sinusoid fit. Together that is about 4,000 instructions, and the
+multi-band encoder is larger. So instead of porting them,
+`plugin/Source/Sh4Interp.cpp` executes them from the user's rom.2.
+`plugin/Source/XtFirmware.cpp` provides the harnesses. As with the tables,
+no Roland code is in the source; the code runs from the user's image.
+
+**The interpreter** covers:
+- the SH-4 integer set, including division steps, MAC and the shifts;
+- the FPU: single and double precision, both banks, SZ = 1 pair moves,
+  `fipr`/`ftrv` writing the correct register, and the host rounding mode
+  taken from FPSCR.RM;
+- paged memory, with rom.2 at 0x89300000 and the C startup's `.data` copy
+  and `.bss` clear;
+- C++ hooks for the OS calls (malloc, calloc, free, UI).
+
+It runs the SOLO encoder in about 0.7 s and a band rebuild in about 0.2 s.
+Ghidra's emulator takes minutes for each.
+
+**Validation:**
+
+| test | result |
+|---|---|
+| SOLO encoder (`0x8951dc40`, `0x8951e120`) on the raw sine and vocal, FPSCR.RM honoured | **bit-exact against the XT's own stored records** (003: 1761, 004: 461) |
+| BACKING load of wave 376, round-to-nearest | identical to `EmuLoad.java` (238,724 int16) |
+| BACKING load, round-to-zero | identical to the native port `xtMbBuildBacking()` |
+| ENSEMBLE load of wave 362 (codec and sinusoid fit included), round-to-nearest | identical to `EmuLoad.java` (74,112 int16) |
+| raw wave + vpdt → interpreter bands → C++ player, 362 ENSEMBLE and 376 BACKING, identity / pitch +7 / time ×2 / time ×½ | **bit-exact against `EmuBacking.java`**, every frame |
+
+**API:**
+- `xtFwSoloEncode()` runs the SOLO encoder; its records match
+  XtSoloEncoder's.
+- `xtFwLoadBands(type, pcm, …)` builds the band data for BACKING (3) or
+  ENSEMBLE (5), ready for `xtMbAttach()` and `XtMbPlayer`.
+
+**What remains for BACKING/ENSEMBLE from raw input is the vpdt.** With the
+interpreter, the multi-band encode driver (`0x89516000`) can now be run
+past its writer, looking for the step that serialises the vpdt.
+
 ### Factory waves: V-Synth 1.50 encodes, and the stereo reader (2026-10-28)
 
 **Who wrote each wave.** The `LIST/ISFT` chunk names the writer:

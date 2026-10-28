@@ -55,6 +55,8 @@ target_sources(VSynthEmu PRIVATE
     Source/SourceFilterModel.cpp
     Source/XtSoloEncoder.cpp
     Source/XtMultiBandPlayer.cpp
+    Source/Sh4Interp.cpp
+    Source/XtFirmware.cpp
     Source/OfflineRenderer.cpp
 )
 

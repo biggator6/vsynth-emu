@@ -188,6 +188,16 @@ BACKING / ENSEMBLE players (2026-10-28): plugin/Source/XtMultiBandPlayer.cpp,
   rebuilds a BACKING wave's band data (xtMbBuildBacking) as the XT's sample
   memory and prints the band addresses, for comparison with EmuLoad.java.
 
+SH-4 interpreter (2026-10-28): plugin/Source/Sh4Interp.cpp runs rom.2 code;
+  plugin/Source/XtFirmware.cpp wraps it (xtFwSoloEncode, xtFwLoadBands).
+  CLI:
+    clang++ -std=c++20 -O2 -ffp-contract=off -DXT_FW_MAIN plugin/Source/XtFirmware.cpp \
+      plugin/Source/Sh4Interp.cpp plugin/Source/XtMultiBandPlayer.cpp -o xt_fw
+    xt_fw rom.2.bin solo samp.bin                       (SOLO records)
+    xt_fw rom.2.bin load <3|5> samp.bin <ch> out        (band data)
+    xt_fw rom.2.bin play <3|5> samp.bin <ch> vpdt.bin <pitch> <walk> out.f32
+  XT_ROUND=nearest rounds to nearest (Ghidra's emulator) instead of FPSCR.RM.
+
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \
     plugin/Source/OfflineRenderer.cpp \

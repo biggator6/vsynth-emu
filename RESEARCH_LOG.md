@@ -2196,3 +2196,15 @@ Round-2 recordings.  First build-out after that: real-time granular port
   decimated tails before time 0 were kept, as the XT keeps them as history.
 - ENSEMBLE has its own filter bank and frame analysis, not yet ported.
 
+### Session 16 addendum (2026-10-28) — SH-4 interpreter runs the firmware's load-time code
+
+- At the user's choice (instead of hand-porting ENSEMBLE's ~4,000
+  instruction analysis), `plugin/Source/Sh4Interp.cpp` interprets rom.2
+  directly. `XtFirmware.cpp` wraps the SOLO encoder and the band rebuild.
+- Its SOLO encode is bit-exact against the XT's own stored records.
+  Its BACKING and ENSEMBLE loads equal Ghidra's emulator. Raw wave + vpdt
+  → interpreter bands → C++ player is bit-exact against the emulated
+  players for both types. It runs about 1000× faster than the emulator.
+- ENSEMBLE's band data is therefore exact without a port. Next: run the
+  multi-band encoder through its writer in the interpreter to get the vpdt.
+
