@@ -35,6 +35,8 @@ Document current settings here; update if anything changes between sessions.
 | VariPhrase Pitch | As needed | Set per test case |
 | VariPhrase Time | As needed | Set per test case |
 | VariPhrase Formant | As needed | Set per test case |
+| Formant (PCM) page: Energy | **unknown — please read and note** | The references fit Energy **on**, at a small amount (see "Energy check and calibration" below) |
+| Formant (PCM) page: Formant KF, Fmt LFO Depth, formant envelope depth | **unknown — please read and note** | A non-zero value would explain the formant offset in the May sine takes |
 
 **Critical:** zero all VariPhrase parameters first, confirm passthrough is clean (null test
 should show > 40 dB null when comparing passthrough to input), THEN set the test parameter.
@@ -153,6 +155,47 @@ comparison.
 If the identity take is clean but the May takes are reproduced when you put
 back a setting (e.g. Formant KF), record which setting it was: that tells us
 how the firmware combines KF with the knob.
+
+## Energy check and calibration (added 2026-10-28) — no new takes needed for step 1
+
+**Why:** the output-chain study (v40) found that every vocal reference has
+its fundamental 1.6–1.9 dB low and the content below it cut. That pattern
+follows F0 under pitch shift, which is what the SOLO player's **Energy**
+high-pass does when Energy is on. The engine reproduces it with a small
+internal amount (g ≈ 0.05), but the mapping from the XT's Energy knob
+(OFF, 1–127) to g is not decoded yet. (research/HARDWARE_FIRMWARE.md,
+"Output chain")
+
+**Step 1 — read the EMU-TEST patch (no recording).** On the XT, open the
+EMU-TEST patch, then OSC → **Formant (PCM)** page (manual p. 92). Note these
+values in the patch table above:
+
+| Parameter | Value |
+|---|---|
+| Energy | |
+| Formant KF | |
+| Fmt LFO Depth | |
+| Formant envelope depth (formant envelope screen) | |
+
+**Step 2 — Energy calibration takes.** Use wave 004 (the SOLO vocal), the
+same capture chain as the other vocal takes (48 kHz stereo), and ~0.5 s of
+lead-in. Pitch **−12** for every take, because the Energy amount only
+changes the sound when the pitch is shifted. Keep every other setting as in
+the original vocal takes and change only Energy:
+
+| Take | Pitch | Time | Formant | Energy |
+|---|---|---|---|---|
+| `vocal_aah_pitch_down12st_energy_off` | −12 | 1× | 0 | OFF |
+| `vocal_aah_pitch_down12st_energy_032` | −12 | 1× | 0 | 32 |
+| `vocal_aah_pitch_down12st_energy_064` | −12 | 1× | 0 | 64 |
+| `vocal_aah_pitch_down12st_energy_127` | −12 | 1× | 0 | 127 |
+
+Optional: repeat at pitch **+7** with the same four Energy values. The +7
+damping depends on g differently (1.2 − 0.5g against 1.2 − g at −12), so
+those takes cross-check the mapping.
+
+Save them in `sustained/`. They need no renderer mapping yet; they're used to
+fit the knob → g curve.
 
 ## Next Recording Session — Priorities
 
