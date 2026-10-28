@@ -6,9 +6,11 @@
 // hard-won engine invariants on SYNTHETIC inputs in seconds.
 //
 // Build & run:
-//   clang++ -std=c++17 -O2 -DENGINE_TESTS_MAIN \
+//   clang++ -std=c++20 -O2 -DENGINE_TESTS_MAIN \
 //       plugin/Source/EngineTests.cpp plugin/Source/VariphraseEngine.cpp \
 //       plugin/Source/PhaseVocoder.cpp plugin/Source/SourceFilterModel.cpp \
+//       plugin/Source/XtSoloEncoder.cpp plugin/Source/XtMultiBandPlayer.cpp \
+//       plugin/Source/Sh4Interp.cpp plugin/Source/XtFirmware.cpp \
 //       -o /tmp/engine_tests && /tmp/engine_tests
 //
 // Exit code 0 = all pass.  Each failure prints a line and sets the code.
