@@ -2222,3 +2222,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - **v41 = 76.56** (v40 74.79). ENSEMBLE content takes the firmware chain.
   The chord cases score 89.84 / 86.60 / 84.98; nothing else changes.
 
+### Session 16 addendum (2026-10-28) — v42: the XT's attack detection; BACKING through the firmware
+
+- The encode page's attack detection (`0x895164c0(depth)`: detect, rank,
+  keep by a depth threshold) now makes the markers. The drum gets one
+  attack at 577 ms at every depth, the chord none.
+- The player port is bit-exact against the emulator on the three-event
+  drum: event crossings don't reload records in forward playback.
+- Drum BACKING: 66.7 → 76.5 in the standalone test, 77.68 in the engine
+  (mono, its resampler), against 77.58 for the old paths. But the drum
+  references are suspect (pitch +7 untransposed); a re-record is requested
+  in RECORDING_GUIDE.md.
+- **v42 = 76.60** (v41 76.56): both multi-band types use the firmware
+  chain, and the markers come from detection.
+

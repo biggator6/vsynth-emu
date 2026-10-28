@@ -162,7 +162,7 @@ Metric v2 history: v17=27.4 → v18h=28.2 → v19=29.5 → v19b=29.9 → v19c=30
 Metric v3 history: v17=27.5 → v22=32.4 → ... → v25=36.5
 Metric v4 history: v17=34.0 → v25=47.8 → v26=50.4 → v27=51.5 → v28=51.8 (true 52.5)
 Metric v5 history: v28=68.1 (granular rate-scaling: identical at 48k)
-Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8 → v33=73.0 (input fix) → v34=73.9 (XT epochs) → v35=73.9 (1/16 epochs, octave guard) → v36=73.9 (emulator-verified highpass state; vocal −64…−81 dB change) → v37=74.2 (SOLO player matched to the firmware run in the P-code emulator; vocal 78.29) → v38=74.2 (encoder writes the XT's per-record repeat budgets; binds only at ≥4x slowdown) → v39=74.6 (native port of the XT's own SOLO encoder, bit-exact vs the XT's records; vocal 79.25) → v40=74.8 (references recorded with SOLO Energy on; suite renders --energy 0.05; vocal 79.83) → v41=76.6 (ENSEMBLE content through the XT's own encoder, band rebuild and player; chord 75.4 → 87.1)
+Metric v6 history: v28=66.6 → v29=68.2 → v30=68.4 → v31=69.1 → v32=69.8 → v33=73.0 (input fix) → v34=73.9 (XT epochs) → v35=73.9 (1/16 epochs, octave guard) → v36=73.9 (emulator-verified highpass state; vocal −64…−81 dB change) → v37=74.2 (SOLO player matched to the firmware run in the P-code emulator; vocal 78.29) → v38=74.2 (encoder writes the XT's per-record repeat budgets; binds only at ≥4x slowdown) → v39=74.6 (native port of the XT's own SOLO encoder, bit-exact vs the XT's records; vocal 79.25) → v40=74.8 (references recorded with SOLO Energy on; suite renders --energy 0.05; vocal 79.83) → v41=76.6 (ENSEMBLE content through the XT's own encoder, band rebuild and player; chord 75.4 → 87.1) → v42=76.6 (the XT's attack detection makes the markers; BACKING content through the firmware chain too; drum 77.6 → 77.7 on suspect references)
 (Old-metric history, not comparable: v10b=26.9 → v17c=27.2 → v18e-g=27.4-27.7 → v18h=28.0)
 
 SOLO encoder (v39): plugin/Source/XtSoloEncoder.cpp needs one table from the
@@ -202,8 +202,10 @@ Multi-band (v41): ENSEMBLE content renders through the XT's own chain
   (VariphraseEngine::multiBandFirmwareOffline): resample to 44.1 kHz,
   firmware encoder (xtFwEncodeMulti) and band rebuild (xtFwLoadBands) in the
   SH-4 interpreter, ported player (XtMultiBandPlayer), resample back. Needs
-  the ROM (as the SOLO encoder). VSE_MB=off: the v40 paths; VSE_MB=backing:
-  BACKING content too (drum 66.7 vs 77.6 on v40's paths, so not the default).
+  the ROM (as the SOLO encoder). v42: BACKING content too, and the markers
+  come from the XT's own attack detection at the Encode Depth (VSE_DEPTH,
+  default 64; −1 = start and end markers only). VSE_MB=off: the v40 paths;
+  VSE_MB=ensemble: BACKING on the v40 paths.
 
 Rebuild the offline renderer:
   clang++ -std=c++17 -O2 -DOFFLINE_RENDERER_MAIN \

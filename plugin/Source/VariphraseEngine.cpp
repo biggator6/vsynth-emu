@@ -1006,9 +1006,15 @@ std::vector<float> VariphraseEngine::multiBandFirmwareOffline(const std::vector<
     std::vector<double> x44 = resampleSinc(x, up, down);
     std::vector<int16_t> pcm(x44.size());
     for (size_t i = 0; i < x44.size(); ++i) pcm[i] = (int16_t)std::clamp(std::lround(x44[i] * 32768.0), -32768L, 32767L);
+    // Markers as the XT's encode page makes them: its attack detection at
+    // the Encode Depth (VSE_DEPTH, default 64; −1 = start and end only).
+    // Neither suite input changes with depth (the drum has one attack, the
+    // chord none).
+    int depth = 64;
+    if (const char* d = std::getenv("VSE_DEPTH")) depth = std::atoi(d);
     std::vector<uint8_t> vpdt;
     XtMbBands bands;
-    if (!xtFwEncodeMulti(type, pcm.data(), (long)pcm.size(), 1, vpdt) || !xtFwLoadBands(type, pcm.data(), (long)pcm.size(), 1, bands)) return {};
+    if (!xtFwEncodeMulti(type, pcm.data(), (long)pcm.size(), 1, vpdt, depth) || !xtFwLoadBands(type, pcm.data(), (long)pcm.size(), 1, bands)) return {};
     XtMbWave w;
     w.vpdt = vpdt.data();
     w.vpdtBytes = vpdt.size();
@@ -1399,20 +1405,21 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
         if (!out.empty()) return out;
     }
 
-    // ── The XT's own multi-band chain (v41) ──────────────────────────────────
-    // ENSEMBLE content plays through the firmware encoder, band rebuild and
-    // player (multiBandFirmwareOffline).  Chord (an ENSEMBLE encode on the
-    // XT): mean 75.4 → 87.6 over its three cases.  BACKING stays on the paths
-    // below for now: the drum scored lower through the firmware BACKING
-    // chain (66.7 vs 77.6); its encode type and events are not known yet.
-    // VSE_MB=off: the older paths; VSE_MB=backing: BACKING content too.
+    // ── The XT's own multi-band chain (v41, v42) ─────────────────────────────
+    // ENSEMBLE and BACKING content play through the firmware encoder (with
+    // the XT's attack detection), band rebuild and player
+    // (multiBandFirmwareOffline).  Chord (an ENSEMBLE encode on the XT):
+    // mean 75.4 → 87.3.  Drum through BACKING: mean 77.6 → 77.7, a tie, and
+    // its references are suspect (notes.txt), but this is the XT's own
+    // algorithm.  VSE_MB=off: the older paths for both; VSE_MB=ensemble:
+    // BACKING on the older paths.
     if (pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid) {
         const char* mb = std::getenv("VSE_MB");
         const std::string mbs = mb ? mb : "";
         const auto ct = pImpl->analysis.contentType;
         int type = 0;
         if (ct == VariphraseAnalysis::ContentType::ENSEMBLE && mbs != "off") type = 5;
-        if (ct == VariphraseAnalysis::ContentType::BACKING && mbs == "backing") type = 3;
+        if (ct == VariphraseAnalysis::ContentType::BACKING && mbs != "off" && mbs != "ensemble") type = 3;
         if (type) {
             std::vector<float> out = multiBandFirmwareOffline(inputMono, type);
             if (!out.empty()) return out;

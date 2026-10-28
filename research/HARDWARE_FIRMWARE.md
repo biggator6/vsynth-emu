@@ -1246,6 +1246,42 @@ Encode Depth (markers), are not modelled yet.
 resampling). The suite goes 74.79 → **76.56**: the chord cases score
 89.84 / 86.60 / 84.98, and no other case changes.
 
+**Attack detection and Encode Depth** (`xtFwEncodeMulti(…, depth)`). The
+encode page runs the encode module's init (`0x89516400`), then
+`0x895164c0(depth)`. That routine stores the depth at 0x8987c943, then:
+1. `0x89512000` detects attacks (init `0x89519db0(44100, frames,
+   channels)`, analysis `0x89519e70`, count `0x8951a090`);
+2. `0x89512080` turns each attack into a ranked marker, plus an end marker
+   (`0x89513390`);
+3. `0x89512160` keeps the markers whose rank is below a threshold looked up
+   from the depth (byte table 0x897edfe4, values 10…81 over depths
+   0…127). The kept markers become the vpdt's events.
+
+On the suite inputs:
+- the drum gets one attack event at 577 ms, the hit after its leading
+  silence, at every depth;
+- the chord gets none.
+
+Detection markers carry flags 4, not the 13/14 of the factory waves'
+start and end markers. The encoder then places different first marks, for
+example 19905 against 14133 for the chord's band 0.
+
+The player port is **bit-exact on this three-event wave** too: drum pitch
++7 and time ×½ against `EmuBacking.java`. For forward playback with no
+play-mode flags, crossing an event (`0x8950c880`) only advances the event
+index and the limit. It never reloads the bands' records, so the unported
+walker changes nothing there.
+
+Drum through BACKING: 66.7 with the start/end markers, **76.5** with the
+detected event (time ×½ 45.9 → 73.1). Through ENSEMBLE it stays at 69.3,
+so the drum was likely a BACKING encode. Its references are suspect,
+though: the pitch +7 take is untransposed (RECORDING_GUIDE.md).
+
+**v42** makes detection (depth 64, `VSE_DEPTH`) the markers and sends
+BACKING content through the firmware chain too. Chord 89.88 / 86.57 / 85.42;
+drum 82.07 / 78.55 / 73.91 / 76.18 (mean 77.68 against 77.58). Suite
+**76.60**.
+
 ### Factory waves: V-Synth 1.50 encodes, and the stereo reader (2026-10-28)
 
 **Who wrote each wave.** The `LIST/ISFT` chunk names the writer:

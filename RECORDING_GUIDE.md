@@ -219,6 +219,28 @@ the natural end: about 14 s of audio for the 3.5 s source.
 `render_suite.py` already maps it (`--time 4.0`), so it scores automatically
 once it's in `sustained/`.
 
+## Re-record the drum references (added 2026-10-28)
+
+**Why:** the existing drum takes don't match their settings, so they can't
+judge the drum engine.
+- `drum_hit_pitch_up7st` has the same spectral peaks as the dry sample
+  (62 / 218 / 669 Hz): it was not transposed.
+- `drum_hit_time_2x` and `drum_hit_time_halfspeed` have peaks that are
+  neither the dry sample's nor a time-stretched copy's.
+
+Rendered through the XT's own firmware BACKING chain, the drum transposes
+correctly but scores only level with the old engine against these takes.
+
+**Steps:**
+1. Import `raw/drum_hit_original.wav` and encode it as **BACKING**. Note
+   the **Encode Depth**; any value is fine, the firmware finds one attack
+   at every depth.
+2. With the patch's other settings at their EMU-TEST values, record:
+   `drum_hit_pitch_up7st` (pitch **+7** exactly), `drum_hit_time_2x`,
+   `drum_hit_time_4x` and `drum_hit_time_halfspeed`.
+3. Before each take, check on the display that the Pitch and Time values
+   are as named.
+
 ## XT encodes of the chord and drum (added 2026-10-28) — no audio capture needed
 
 **Why:** the BACKING/ENSEMBLE work needs the XT's own analysis of our exact
