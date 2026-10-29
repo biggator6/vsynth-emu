@@ -45,7 +45,8 @@ inline int16_t to16(double v) { return (int16_t)std::clamp(std::lround(v * 32768
 } // namespace
 
 bool xtSynthSetRom(const std::string& path) {
-    g_romReady = xtLoadTables(path.c_str()) && xtMbLoadTables(path.c_str()) && xtFwOpen(path.c_str());
+    g_romReady = xtLoadTables(path.c_str()) && xtMbLoadTables(path.c_str()) && xtEnvLoadTables(path.c_str())
+              && xtFwOpen(path.c_str());
     return g_romReady;
 }
 bool xtSynthRomReady() { return g_romReady; }
@@ -164,8 +165,14 @@ void XtSynth::voiceRates(Voice& v) const {
 }
 
 void XtSynth::setControls(const Controls& c) {
+    const bool envChanged = c.attack != ctl.attack || c.decay != ctl.decay || c.sustain != ctl.sustain || c.release != ctl.release;
     ctl = c;
-    for (Voice& v : voice) if (v.active) voiceRates(v);
+    const XtEnvParams ep = xtEnvAdsr(ctl.attack, ctl.decay, ctl.sustain, ctl.release);
+    for (Voice& v : voice) {
+        if (!v.active) continue;
+        voiceRates(v);
+        if (envChanged) v.env.update(ep);
+    }
 }
 
 void XtSynth::noteOn(int note, float velocity) {
@@ -180,7 +187,11 @@ void XtSynth::noteOn(int note, float velocity) {
     v->age = clock++;
     v->tail = 0;
     v->gain = std::clamp(velocity, 0.0f, 1.0f);
-    v->env = 1.0f;
+    // The player starts from the envelope's output when there is no attack,
+    // else from its start level (0x894f3e20).
+    const XtEnvParams ep = xtEnvAdsr(ctl.attack, ctl.decay, ctl.sustain, ctl.release);
+    v->env.noteOn(ep);
+    v->amp = ep.time[0] == 0.0f ? v->env.level() : ep.level[0];
     const double A = std::pow(2.0, ((double)(note - ctl.rootKey) + ctl.pitchSemis) / 12.0);
     const double stretch = std::clamp((double)ctl.timeStretch, 0.2, 5.0);
     const double F = std::clamp(std::pow(2.0, ctl.formantSemis / 12.0), 0.5, 2.0);
@@ -189,7 +200,8 @@ void XtSynth::noteOn(int note, float velocity) {
 }
 
 void XtSynth::noteOff(int note) {
-    for (Voice& v : voice) if (v.active && v.note == note) v.releasing = true;
+    for (Voice& v : voice)
+        if (v.active && v.note == note && !v.releasing) { v.releasing = true; v.env.noteOff(); }
 }
 
 void XtSynth::allNotesOff() {
@@ -199,7 +211,9 @@ void XtSynth::allNotesOff() {
 void XtSynth::mixBlock(float* lr) {
     std::fill(lr, lr + 64, 0.0f);
     if (!cur) return;
-    const float rel = 1.0f / std::max(1.0f, ctl.releaseMs * 44.1f);
+    // The control clock: one envelope step at this block's frame tickAt.
+    const int tickAt = tickCount == 0 ? 0 : kTickFrames - tickCount < 32 ? kTickFrames - tickCount : -1;
+    tickCount = (tickCount + 32) % kTickFrames;
     float tmp[64];
     for (Voice& v : voice) {
         if (!v.active) continue;
@@ -215,12 +229,14 @@ void XtSynth::mixBlock(float* lr) {
             if (v.mb.ended()) v.tail += 32;
         }
         for (int i = 0; i < 32; ++i) {
-            if (v.releasing) v.env = std::max(0.0f, v.env - rel);
-            const float g = scale * v.env;
+            if (i == tickAt) v.env.tick();
+            v.amp += (v.env.level() - v.amp) * v.env.smooth();   // the player's per-sample follower
+            const float g = scale * v.amp;
             lr[2 * i] += tmp[2 * i] * g;
             lr[2 * i + 1] += tmp[2 * i + 1] * g;
         }
-        if ((v.releasing && v.env <= 0.0f) || v.tail > 8192) v.active = false;
+        // A released voice stops once its gain is below 2^-16 (0x894f2090).
+        if ((v.releasing && v.amp <= 1.0f / 65536.0f) || v.tail > 8192) v.active = false;
     }
 }
 
@@ -272,6 +288,7 @@ void XtSynth::render(float* left, float* right, int n) {
 #ifdef XT_SYNTH_MAIN
 // xt_synth <rom.2.bin> <samp.bin int16> <channels> <rate> <type 1|3|5> <hostRate> <frames> <out.f32> note[@onset[:off]]...
 //   Renders notes (onset/off in host frames) to float32 L/R pairs.
+//   XT_ADSR="a,d,s,r": amp envelope knobs (default 0,0,127,16).
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -296,6 +313,11 @@ int main(int argc, char** argv) {
     XtSynth syn;
     syn.prepare(host);
     syn.setSample(E);
+    if (const char* e = std::getenv("XT_ADSR")) {   // amp envelope knobs "a,d,s,r"
+        XtSynth::Controls c;
+        std::sscanf(e, "%d,%d,%d,%d", &c.attack, &c.decay, &c.sustain, &c.release);
+        syn.setControls(c);
+    }
     struct Ev { long at; int note; bool on; };
     std::vector<Ev> ev;
     for (int a = 9; a < argc; ++a) {

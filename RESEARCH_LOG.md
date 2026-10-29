@@ -2275,3 +2275,28 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - **v44 = 76.601** (v42 76.600): only seven vocal renders change, by
   −55 dB or less. The plugin's output stays bit-identical to `XtSynth`,
   now on stereo SOLO as well. `auval` passes; engine tests pass.
+
+### Session 16 addendum (2026-10-29) — v45: the XT's envelope generator
+
+- Located the XT's envelopes. Each tone's control update (`0x894f75f0`, a
+  virtual call) advances 14 envelopes, 8 LFOs and both oscillator voices
+  with the same step n. Decoded the generator:
+  - stage machine and rate, 655360/T per tick;
+  - linear output, plus the amp curve: an attack table, then an
+    exponential-like reshaping of every segment through a second table;
+  - note-on, note-off and live-edit handling;
+  - the ADSR converter: times from a 0–127 table in ms; levels 0, 1, 1, S, 0
+    with S from a table.
+- Units: the tempo-sync formula and the manual's tempo resolution put T in
+  ms. A stage takes T/10 ticks, so the clock is 100 Hz, and the LFO rates
+  in Hz agree. The scheduler itself (a virtual call) is not located, so
+  RECORDING_GUIDE.md asks for two envelope takes.
+- `XtEnvelope` is tick-for-tick identical to the firmware run in the SH-4
+  interpreter on 18 cases.
+- The plugin's voices use it in place of the release fade:
+  - parameters ampAttack/Decay/Sustain/Release, 0–127;
+  - a 10 ms clock shared by the voices, and a per-sample follower;
+  - voices end below 2^-16.
+- PluginTest stays bit-identical with envelopes and a note-off; `auval`
+  passes; engine tests pass. `XtFloat.h` now holds the SH-4 float helpers
+  shared by the SOLO voice and the envelope.

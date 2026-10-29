@@ -23,13 +23,24 @@ int main(int argc, char** argv) {
         auto* prm = p.apvts.getParameter("encodeType");
         prm->setValueNotifyingHost(prm->convertTo0to1((float)idx));
     }
+    // TEST_ADSR="a,d,s,r": amp envelope knobs for the processor and the reference
+    XtSynth::Controls refCtl;
+    if (const char* e = std::getenv("TEST_ADSR")) {
+        std::sscanf(e, "%d,%d,%d,%d", &refCtl.attack, &refCtl.decay, &refCtl.sustain, &refCtl.release);
+        const std::pair<const char*, int> knobs[] = { { "ampAttack", refCtl.attack }, { "ampDecay", refCtl.decay },
+                                                      { "ampSustain", refCtl.sustain }, { "ampRelease", refCtl.release } };
+        for (auto [id, v] : knobs) {
+            auto* prm = p.apvts.getParameter(id);
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+        }
+    }
     p.loadFile(juce::File(argv[2]));
     for (int i = 0; i < 600 && !p.getStatusText().startsWith("Encoded"); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));   // the encode runs on the pool thread
         if (p.getStatusText().startsWith("Encode failed")) break;
     }
     std::printf("status: %s\n", p.getStatusText().toRawUTF8());
-    for (const char* id : { "pitchShift", "timeStretch", "formantShift", "energy", "rootKey", "release", "encodeDepth" })
+    for (const char* id : { "pitchShift", "timeStretch", "formantShift", "energy", "rootKey", "ampAttack", "ampDecay", "ampSustain", "ampRelease", "encodeDepth" })
         std::printf("  %s = %.9g\n", id, (double)p.apvts.getRawParameterValue(id)->load());
     if (!p.getStatusText().startsWith("Encoded")) return 1;
 
@@ -50,20 +61,23 @@ int main(int argc, char** argv) {
         for (int k = 0; k < 6; ++k) same = same && E->bands.buf[k] == E2->bands.buf[k];
         std::printf("encode repeatable: %s\n", same ? "yes" : "NO");
     }
-    XtSynth ref; ref.prepare(rate); ref.setSample(E);
+    XtSynth ref; ref.prepare(rate); ref.setSample(E); ref.setControls(refCtl);
 
     const int total = (int)(in.getNumSamples() * rate / rd->sampleRate);
     double maxDiff = 0, energy = 0, side = 0;
     long firstDiff = -1;
     juce::AudioBuffer<float> buf(2, block);
     std::vector<float> rl(block), rr(block);
+    const int offBlock = total / 2 / block * block, offAt = 37;    // note-off halfway, inside a block
     for (int done = 0; done < total; done += block) {
         juce::MidiBuffer midi;
         if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)127), 100); }
+        if (done == offBlock) { midi.addEvent(juce::MidiMessage::noteOff(1, note), offAt); }
         p.processBlock(buf, midi);
         juce::ScopedNoDenormals ftz;   // processBlock runs with denormals flushed (as the SH-4 does, FPSCR.DN = 1)
-        if (std::getenv("TEST_CONTROLS")) ref.setControls(XtSynth::Controls());   // as processBlock does each block
+        if (std::getenv("TEST_CONTROLS")) ref.setControls(refCtl);   // as processBlock does each block
         if (done == 0) { ref.render(rl.data(), rr.data(), 100); ref.noteOn(note, 1.0f); ref.render(rl.data() + 100, rr.data() + 100, block - 100); }
+        else if (done == offBlock) { ref.render(rl.data(), rr.data(), offAt); ref.noteOff(note); ref.render(rl.data() + offAt, rr.data() + offAt, block - offAt); }
         else ref.render(rl.data(), rr.data(), block);
         for (int i = 0; i < block; ++i) {
             if (firstDiff < 0 && (buf.getSample(0, i) != rl[(size_t)i] || buf.getSample(1, i) != rr[(size_t)i])) firstDiff = done + i;

@@ -5,12 +5,14 @@
 //   BACKING/ENSEMBLE  the firmware's multi-band encoder and load-time band
 //                     rebuild, run from the user's rom.2 (XtFirmware)
 // Each note then runs its own firmware player (XtSoloVoice / XtMbPlayer) at
-// the XT's 44.1 kHz, and the mix is resampled to the host rate.  No JUCE.
+// the XT's 44.1 kHz under the XT's amp envelope (XtEnvelope), and the mix is
+// resampled to the host rate.  No JUCE.
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
+#include "XtEnvelope.h"
 #include "XtMultiBandPlayer.h"
 #include "XtSoloVoice.h"
 
@@ -40,7 +42,8 @@ public:
     struct Controls {
         float pitchSemis = 0, timeStretch = 1, formantSemis = 0, energy = 0;
         int rootKey = 60;
-        float releaseMs = 30;
+        // amp envelope knobs, 0..127 as on the XT (release 16 = 30 ms)
+        int attack = 0, decay = 0, sustain = 127, release = 16;
     };
 
     XtSynth();
@@ -62,7 +65,9 @@ private:
         bool active = false, releasing = false;
         int note = -1;
         long age = 0, tail = 0;
-        float gain = 1, env = 1;
+        float gain = 1;               // velocity
+        float amp = 0;                // the envelope as the player follows it, per sample
+        XtEnvelope env;
         XtMbPlayer mb;
         XtSoloVoice solo;
     };
@@ -72,6 +77,9 @@ private:
     Controls ctl;
     Voice voice[kVoices];
     long clock = 0;
+    // The XT's control clock: envelopes step every 10 ms (441 frames).
+    static constexpr int kTickFrames = 441;
+    int tickCount = 0;
     double hostRate = 44100;
 
     // 44.1 kHz mix, produced in 32-frame blocks, read by the resampler

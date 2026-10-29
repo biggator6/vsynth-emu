@@ -277,6 +277,27 @@ the project, as with Emu_test.prj, and copy it into `analysis/projects/`.
 | `drum_backing` | raw/drum_hit_original.wav | BACKING |
 | `drum_ensemble` | raw/drum_hit_original.wav | ENSEMBLE |
 
+## Amp envelope timing (added 2026-10-29) — two short takes
+
+**Why:** the plugin's amp envelope is the XT's own generator, matched
+bit-for-bit against the firmware, but its clock is inferred. Each stage of
+T ms is meant to advance in 10 ms steps, and nothing in the firmware has
+confirmed that rate directly (research/HARDWARE_FIRMWARE.md, "The envelope
+generator"). Two takes settle it: one for the stage times, and one to show
+whether the level moves in 10 ms steps.
+
+**Setup:** an INIT patch with OSC1 playing a plain sustained PCM wave (a
+sine or any steady tone), VariPhrase OFF, no LFO or filter movement. Set
+the envelope on **OSC1's amp envelope** (OSC → TVA envelope). If it is
+easier, use the patch TVA envelope instead and note which one you used.
+Hold C4 for 6 s, then release, and record 10 s in all, as for the other
+takes.
+
+| File | A | D | S | R | What it shows |
+|---|---|---|---|---|---|
+| `env_64_64_64_64` | 64 | 64 | 64 | 64 | each stage should take 2.13 s; sustain about −12 dB |
+| `env_slow_attack` | 100 | 0 | 127 | 64 | a 10.4 s ramp: smooth or in 10 ms steps |
+
 ## Next Recording Session — Priorities
 
 **Superseded by the "Round 2 — Recording Wishlist" section at the end of this

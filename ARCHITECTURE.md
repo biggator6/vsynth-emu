@@ -203,7 +203,11 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - `XtSoloVoice` or `XtMbPlayer` render 32-frame blocks at 44.1 kHz;
    - pitch = 2^((note − Original Key + Pitch)/12); Time, Formant (SOLO) and
      Energy (SOLO) apply live;
-   - velocity is a linear gain; note-off fades over Release.
+   - the amp envelope is the XT's own generator (`XtEnvelope`, v45): A/D/S/R
+     knobs 0–127 through the firmware's time and sustain tables, its attack
+     and segment curves, stepped on a 10 ms clock and followed per sample.
+     A released voice ends below 2^-16, as on the XT. Velocity is a linear
+     gain.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -215,18 +219,23 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 **Checks:**
 - At a 44.1 kHz host rate, `XtSynth` output is bit-exact against the
   firmware chain: `xt_fw play`, and the engine's SOLO render.
+- `XtEnvelope` is tick-for-tick identical to the firmware's envelope
+  routines run in the SH-4 interpreter (`xt_env`, 18 cases).
 - The SOLO player (`XtSoloVoice`, mono and stereo) is within −101…−118 dB
   of the firmware player in the P-code emulator, on 13 mono cases and 4
   stereo ones (v44).
 - `Tests/PluginTest.cpp` drives the real processor (ROM, file load,
   background encode, sample-accurate MIDI) at 48 kHz. Its output is
   **bit-identical** to `XtSynth` on the chord (ENSEMBLE), drum (BACKING),
-  vocal (SOLO) and the stereo factory wave 358 (SOLO).
+  vocal (SOLO) and the stereo factory wave 358 (SOLO), with any envelope
+  and a note-off (`TEST_ADSR`).
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
-- no amp envelope beyond the release fade, and no V-Synth voice layer
-  (filters, LFOs, effects);
+- the envelope's 100 Hz clock is inferred, not observed (two takes in
+  RECORDING_GUIDE.md confirm it). Not yet modelled: each player's own gain
+  follower, envelope velocity and key follow, and the patch-level TVA;
+- no V-Synth voice layer (filters, LFOs, effects);
 - no loops, reverse, step/event playback or Time Trip;
 - the Energy knob → g mapping is undecoded, so Energy is g directly.
 

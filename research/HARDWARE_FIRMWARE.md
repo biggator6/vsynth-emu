@@ -1390,6 +1390,127 @@ Result, port against the emulator:
 Seven vocal suite renders move by −55 dB or less; the suite average goes
 from 76.600 to 76.601.
 
+### The envelope generator (2026-10-29, v45)
+
+**Where it runs.** The XT keeps a pool of 24 tones (0x2264 bytes each,
+0x89fb1500, vptr at +0x18, vtable 0x89833fac). A tone's control update is
+its virtual slot 1, `0x894f75f0(tone, n)`. It advances, all with the same
+n:
+- its envelopes: 14 objects of 0x70 bytes at +0x1780, those with +0x68
+  set, through `0x894efdf0`;
+- its LFOs: 8 objects of 0x98 bytes at +0x1da0, through `0x894f1050`;
+- both oscillator voices (+0x20, +0x9d4), through `0x894f2090`. The
+  voices' converters read the envelopes through pointers at voice
+  +0x970…+0x97c (pitch, time, formant, amp; output at +0x4c) and the LFOs
+  at +0x980…+0x98c (output at +0x38).
+
+The tone renders through a pointer-to-member at +0x1774 (`0x894f6d40`:
+OSC2, OSC1, mixer, the two COSM sections, then the output stage).
+
+**The envelope object.**
+
+| Offset | Field |
+|---|---|
+| +0x00 | stage: −1 idle, 0 attack, 1, 2 decay, 3 sustain, 4 release, 5 done, 6 hold at L1 |
+| +0x08 | curve |
+| +0x0c | time scale |
+| +0x10 / +0x18 | tempo sync |
+| +0x1c…+0x28 | stage times T (ms): attack, second stage, decay, release |
+| +0x2c…+0x3c | levels L0…L4 |
+| +0x40 | rate |
+| +0x44 | 16-bit phase |
+| +0x4c | output |
+| +0x50 | release start |
+| +0x54 | follower coefficient |
+| +0x5c…+0x64 | output pointer-to-member |
+
+**Routines.**
+- **Rate** `0x894ef520`: 655360 / T, or 0x10000 when T ≤ 10. Every stage
+  but the release is then scaled by +0xc.
+- **Tick** `0x894efdf0(env, n)`:
+  1. At phase 0, outside sustain, it moves to the next stage.
+  2. It re-reads the stage's rate and adds n·rate to the phase.
+  3. On overflow it sets the stage's end level (L1, L2, L3, L3, L4).
+     Otherwise it calls the output function.
+  4. It sets the follower coefficient: 1/32, or (1 − T/30)/32 when the
+     stage is under 10 ms (`0x894efd00`).
+- **Output**, chosen by curve type (pointers-to-member at RAM 0x8987af00,
+  af0c, af18):
+  - curve 0, `0x894ef7d0`: linear between the levels. The release runs
+    from +0x50 to L4 and is done once |out| ≤ 2^-16.
+  - curve 2, `0x894efca0` = `0x894ef7d0`, then `0x894ef960`:
+    - the attack first follows a u16 attack table (0x897d1934, 257
+      entries);
+    - each segment is then reshaped as
+      out = low + range·C(32767·(out − low)/range), with C the u16 table at
+      0x897d1b36 (129 entries, 0…65535, via `0x894efcc0`);
+    - the result is a slow-starting attack and exponential-like decay and
+      release. Segments with both levels negative are mirrored.
+- **Note-on** `0x894f0130`:
+  - it copies the parameter block and installs the output function;
+  - attack T = 0 starts in stage 1 at its end, at full level;
+  - 0 < T < 10 sets the output to L1 at once, and the follower's
+    (1 − T/30)/32 makes the ramp;
+  - every path leaves with the phase equal to the rate.
+- **Note-off** `0x894f03e0`: stage 4, with the release starting from the
+  current output.
+- **Live edits** `0x894f0080`: copies new times, levels and scale; in
+  sustain the output moves to the new S at once.
+
+**ADSR parameters** (`0x894df240`, one converter for every envelope kind:
+0–3 OSC1 pitch, time, formant, amp; 4–7 OSC2; 8–11 COSM; 12 TVA):
+- curve 0 for pitch, time and formant envelopes, 2 for amp and filter
+  envelopes;
+- times [A, 0, D, R] from the u16 table at 0x897cec24, through
+  `0x894df7b0`. That routine also applies key follow, as (key − 64)·amount
+  >> 8 clamped to 1…12000, and a 16.16 time scale;
+- levels [0, 1, 1, S, 0], with S = the u16 table at 0x897cfcb8 / 32768
+  (S 64 = 0.254, −12 dB);
+- matrix modulation offsets the knob values (`0x894deb60`…).
+
+The time table runs 0, 1, 2, … 2130 at knob 64 … 60000 at 127.
+
+**Units.** T is in milliseconds. In tempo sync the converter writes
+T = clocks/(24·tempo)·600000, with the clock counts from 0x897cfeb8 (3,
+6, … 24 for a quarter, 96 for a bar). The manual gives the Patch Tempo as
+20.0–250.0, so the tempo is stored ×10, which makes T = 60000·beats/BPM.
+
+A stage takes T/10 ticks of n, so the tick is 10 ms. Two other facts agree:
+- the LFO step (`0x894f1320`) is f·65535/100 per tick, with f from the LFO
+  rate table (0.001–40, in Hz);
+- stages under 10 ms skip the generator, which only makes sense if one
+  tick is 10 ms.
+
+The scheduler that calls the tone update is a virtual call I have not
+located, so the 100 Hz clock is inferred, not observed.
+RECORDING_GUIDE.md asks for two takes to confirm it.
+
+**Consumer.** The oscillator amp envelope (voice +0x97c) drives the
+player's gain target, V5c·clamp(V54·env·(1 + V58·LFO)) (`0x894f3dc0`).
+The player follows that target per sample. At note-on it starts from the
+envelope's output if the attack is 0, otherwise from L0 (`0x894f3e20`). A
+released voice is stopped once that gain is ≤ 2^-16 (`0x894f2090` →
+`0x894f2da0`).
+
+**Port.** `plugin/Source/XtEnvelope.cpp` is tick-for-tick identical to the
+firmware routines run in the SH-4 interpreter (`xt_env`, notes.txt):
+stage, phase, output and coefficient on 18 cases. The cases cover attacks
+0, under 10 and long, D = 0, S = 0 and 127, R = 0, note-off in each stage,
+knob 127 and curve 0. The tables are read from the user's rom.2.
+
+The plugin runs one envelope per voice:
+- it steps every 441 frames (10 ms at 44.1 kHz) on a clock shared by all
+  voices;
+- each voice follows it per sample with the envelope's coefficient;
+- voices end as on the XT.
+
+**Not yet:**
+- which follower coefficient each player applies (the SOLO player's own is
+  1/64);
+- the multi-band players' squared gain (`0x8950e1e0`);
+- velocity curves, envelope depth, A/D/R velocity sensitivity and Time KF;
+- the patch-level TVA (kind 12), as distinct from the oscillator's.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).

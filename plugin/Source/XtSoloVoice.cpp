@@ -1,11 +1,10 @@
 // SOLO grain player as a voice — see XtSoloVoice.h and the description in
 // VariphraseEngine.cpp (soloFirmwareResynthOffline).
 #include "XtSoloVoice.h"
+#include "XtFloat.h"
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <string>
 
 // Sample reads (0x8950d380 / d0f0): the grain's read index is clamped to the
 // last sample (fraction 0); so is the second tap, one record period further
@@ -39,23 +38,6 @@ double XtSoloVoice::repeatCost(double a, double tw) {
     return x >= 2048.0 ? x : std::max(0.0, 2.0 * x - 2048.0);
 }
 
-namespace {
-// Single precision in the XT's rounding mode (FPSCR.RM = round to zero;
-// XT_ROUND=nearest: the P-code emulator's).  One operation on two floats is
-// exact in double (a quotient is never within double rounding of a float
-// boundary), so rounding that result once gives the SH-4's.
-const bool kNearest = [] { const char* r = std::getenv("XT_ROUND"); return r && std::string(r) == "nearest"; }();
-float rnd(double x) {
-    float f = (float)x;
-    if (!kNearest && std::abs((double)f) > std::abs(x)) f = std::nextafter(f, 0.0f);
-    return f;
-}
-float fmul(float a, float b) { return rnd((double)a * b); }
-float fdiv(float a, float b) { return rnd((double)a / b); }
-float fsub(float a, float b) { return rnd((double)a - b); }
-float fadd(float a, float b) { return rnd((double)a + b); }
-}
-
 // Grain parameters for a trigger at phrase position P in record sg
 // (0x8950d5a0).  Returns the grain's start, velocity and second-tap weight;
 // sets ppw, slope, the anchor step and (voiced only) f0n.  Computed as the
@@ -73,8 +55,8 @@ XtSoloVoice::Grain XtSoloVoice::grainParams(size_t sg, bool setF0) {
     float frac = 0.0f, Ci = C;
     if (Pq > p->segStart[sg] + p->segLen[sg]) { frac = 1.0f; Ci = N; }
     else if (Pq > p->segStart[sg]) {
-        frac = fdiv((float)(16.0 * (Pq - p->segStart[sg])), C);
-        Ci = fadd(fmul(frac, fsub(N, C)), C);          // fmac: product, then sum
+        frac = xtf::div((float)(16.0 * (Pq - p->segStart[sg])), C);
+        Ci = xtf::add(xtf::mul(frac, xtf::sub(N, C)), C);          // fmac: product, then sum
     }
     bool voiced = p->voiced[sg] != 0;
     if (p->forceUnvoiced) voiced = false;
@@ -88,21 +70,21 @@ XtSoloVoice::Grain XtSoloVoice::grainParams(size_t sg, bool setF0) {
         // XT's unvoiced records (low bits 0) play at S = 1.  Unknown info
         // (a cuts file without it): S = A.
         rate = Af;
-        if (info >= 0) rate = fmul((info & 1) ? Af : 1.0f, (info & 2) ? Ff : 1.0f);
+        if (info >= 0) rate = xtf::mul((info & 1) ? Af : 1.0f, (info & 2) ? Ff : 1.0f);
         v = rate;
     }
-    const float pw = std::min(fdiv(Ci, rate), 524287.0f);   // 1/16 samples
-    float wl = fdiv(Ci, v), os = 0.0f;
-    if (wl > pw) { os = std::trunc(fsub(Ci, fmul(pw, v))); wl = pw; }   // os in whole 1/16 samples
-    if (voiced && setF0) f0n = std::min(fdiv(16.0f, pw), 0.5f);
+    const float pw = std::min(xtf::div(Ci, rate), 524287.0f);   // 1/16 samples
+    float wl = xtf::div(Ci, v), os = 0.0f;
+    if (wl > pw) { os = std::trunc(xtf::sub(Ci, xtf::mul(pw, v))); wl = pw; }   // os in whole 1/16 samples
+    if (voiced && setF0) f0n = std::min(xtf::div(16.0f, pw), 0.5f);
     // The trigger timer runs in 1/4096 samples against ppw truncated to that
     // grid (grain +4); unrounded ppw drifts a trigger by a sample within
     // ~1700 samples on the XT sine.
-    ppw   = std::trunc(fmul(pw, 256.0f)) / 4096.0;
-    slope = fdiv(8.0f, wl);                              // 8/(16·wl) = 0.5/wl per sample
+    ppw   = std::trunc(xtf::mul(pw, 256.0f)) / 4096.0;
+    slope = xtf::div(8.0f, wl);                              // 8/(16·wl) = 0.5/wl per sample
     // Anchor step (player +0x30) is stored in whole 1/16 samples:
     // trunc(16·rate), at least 16 — pitch +7 steps 23/16, not 1.498.
-    anchorStepInit = std::trunc(std::max(fmul(rate, 16.0f), 16.0f)) / 16.0;
+    anchorStepInit = std::trunc(std::max(xtf::mul(rate, 16.0f), 16.0f)) / 16.0;
     return { p->segStart[sg] + os / 16.0, v, frac, p->segLen[sg] };
 }
 

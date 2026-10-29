@@ -39,9 +39,14 @@ private:
     juce::Slider     keySlider_     { juce::Slider::IncDecButtons, juce::Slider::TextBoxLeft };
     juce::Slider     depthSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     energySlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    // amp envelope, the XT's 0..127 knobs
+    juce::Slider     attackSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     decaySlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     sustainSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     releaseSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label encodeLabel_ { {}, "Encode" }, keyLabel_ { {}, "Key" }, depthLabel_ { {}, "Depth" },
-                energyLabel_ { {}, "Energy" }, releaseLabel_ { {}, "Release" };
+                energyLabel_ { {}, "Energy" }, attackLabel_ { {}, "A" }, decayLabel_ { {}, "D" },
+                sustainLabel_ { {}, "S" }, releaseLabel_ { {}, "R" };
     std::unique_ptr<juce::FileChooser> romChooser_;
 
     // ── Algorithm selector ───────────────────────────────────────────────────
@@ -55,7 +60,7 @@ private:
     using ComboAtt  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
     std::unique_ptr<SliderAtt> pitchAtt_, timeAtt_, formantAtt_;
     std::unique_ptr<ButtonAtt> robotAtt_;
-    std::unique_ptr<SliderAtt> keyAtt_, depthAtt_, energyAtt_, releaseAtt_;
+    std::unique_ptr<SliderAtt> keyAtt_, depthAtt_, energyAtt_, attackAtt_, decayAtt_, sustainAtt_, releaseAtt_;
     std::unique_ptr<ComboAtt>  encodeAtt_;
 
     void comboBoxChanged(juce::ComboBox* box) override;

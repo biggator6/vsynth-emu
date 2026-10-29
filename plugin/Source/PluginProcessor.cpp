@@ -11,7 +11,11 @@ namespace Params {
     static const juce::String kEncodeDepth  = "encodeDepth";   // multi-band attack detection
     static const juce::String kRootKey      = "rootKey";       // note that plays the sample unshifted
     static const juce::String kEnergy       = "energy";        // SOLO Energy g (knob mapping undecoded)
-    static const juce::String kRelease      = "release";       // note-off fade, ms
+    // Amp envelope, the XT's 0..127 knobs (XtEnvelope: times from the firmware's table)
+    static const juce::String kAttack       = "ampAttack";
+    static const juce::String kDecay        = "ampDecay";
+    static const juce::String kSustain      = "ampSustain";
+    static const juce::String kRelease      = "ampRelease";
 }
 
 // ─── Parameter Layout ─────────────────────────────────────────────────────────
@@ -61,11 +65,10 @@ VSynthEmuProcessor::createParameterLayout() {
         0.0f
     ));
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        Params::kRelease, "Release",
-        juce::NormalisableRange<float>(1.0f, 2000.0f, 0.1f, 0.4f),
-        30.0f, "ms"
-    ));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kSustain, "Sustain", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kRelease, "Release", 0, 127, 16));
 
     return { params.begin(), params.end() };
 }
@@ -152,7 +155,10 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.formantSemis = snap(apvts.getRawParameterValue(Params::kFormantShift)->load(), 0.01f);
     c.energy       = apvts.getRawParameterValue(Params::kEnergy)->load();
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
-    c.releaseMs    = apvts.getRawParameterValue(Params::kRelease)->load();
+    c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();
+    c.decay        = (int)apvts.getRawParameterValue(Params::kDecay)->load();
+    c.sustain      = (int)apvts.getRawParameterValue(Params::kSustain)->load();
+    c.release      = (int)apvts.getRawParameterValue(Params::kRelease)->load();
     return c;
 }
 
