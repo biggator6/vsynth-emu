@@ -70,7 +70,7 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
     E->frames = frames;
     if (type == 1) {
         // The SOLO encoder reads (L+R) >> 1 for a stereo wave (0x8951f6f0);
-        // this player plays that mono signal.
+        // the player reads both channels through those records (0x8950d1f0).
         std::vector<int16_t> x16((size_t)frames);
         for (long i = 0; i < frames; ++i)
             x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[(size_t)(2 * i)] + (int)pcm[(size_t)(2 * i + 1)]) >> 1) : pcm[(size_t)i];
@@ -78,7 +78,11 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         if (recs.size() < 2) return fail("SOLO encoder found no records");
         XtSoloPlan& P = E->solo;
         P.in.resize((size_t)frames);
-        for (long i = 0; i < frames; ++i) P.in[(size_t)i] = (float)x16[(size_t)i] / 32768.0f;
+        if (ch == 2) P.inR.resize((size_t)frames);
+        for (long i = 0; i < frames; ++i) {
+            P.in[(size_t)i] = (float)pcm[(size_t)(i * ch)] / 32768.0f;
+            if (ch == 2) P.inR[(size_t)i] = (float)pcm[(size_t)(2 * i + 1)] / 32768.0f;
+        }
         const size_t nc = recs.size();
         P.segStart.resize(nc); P.segLen.resize(nc); P.voiced.resize(nc); P.info.resize(nc);
         for (size_t i = 0; i < nc; ++i) {
@@ -88,7 +92,7 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
             P.voiced[i] = (recs[i].info & 4) != 0;
             P.info[i] = recs[i].info;
         }
-        E->channels = 1;
+        E->channels = ch;
     } else {
         if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth)) return fail("multi-band encoder failed");
         if (!xtFwLoadBands(type, pcm.data(), frames, ch, E->bands)) return fail("band rebuild failed");
@@ -201,9 +205,9 @@ void XtSynth::mixBlock(float* lr) {
         if (!v.active) continue;
         float scale = v.gain;
         if (cur->type == 1) {
-            float mono[32];
-            v.solo.render(mono, 32);
-            for (int i = 0; i < 32; ++i) { tmp[2 * i] = mono[i]; tmp[2 * i + 1] = mono[i]; }
+            float l[32], r[32];
+            v.solo.render(l, r, 32);
+            for (int i = 0; i < 32; ++i) { tmp[2 * i] = l[i]; tmp[2 * i + 1] = r[i]; }
             if (v.solo.ended()) v.tail += 32;
         } else {
             v.mb.block(tmp);

@@ -33,7 +33,10 @@ Rebuild the project from scratch (order matters):
    `-postScript EmuSolo.java /tmp/x_recs.bin /tmp/x_samp.bin out.f32 <R> <F> <walk> [energy] [maxOut] [trace.tsv] [traceFrom]`.
    The optional trace dumps the player state per sample in the same columns
    as the engine's `VSE_TRACE=file`, for diffing. For parallel runs I used
-   one copy of the Ghidra project per process.
+   one copy of the Ghidra project per process. `EMUSOLO_CH=2` plays a
+   stereo wave: samp.bin holds L/R pairs, the player's stereo flag is set,
+   and out.f32 gets L/R pairs. The native `xt_solo` CLI (notes.txt, v44)
+   takes the same inputs.
 7. Run the XT's own SOLO encoder (0x8951e120) on a raw wave:
    `-postScript EmuEnc.java /tmp/x_samp.bin out.tsv` (int16 LE mono 44.1 kHz
    in; record stream "start len info" in 1/16 samples out). It takes about 3

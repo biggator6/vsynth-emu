@@ -1334,6 +1334,62 @@ Mono factory waves: BassDrum1 (345) diverges from its first mark (1381
 against the XT's 6816). The multi-segment waves need the event list; the
 port only takes {n·16}.
 
+### Stereo SOLO playback, and three player corrections (2026-10-29, v44)
+
+**The stereo read path.** `0x8950d0f0` tests the player's byte 0 bit 0x40
+and branches to `0x8950d1f0` for a stereo wave. That path is the mono path
+run on packed frames:
+- each frame is a 32-bit word of two int16s, L in the low half;
+- both channels are read at the same index and fraction, and the second
+  tap and its weight are shared;
+- the window weights are shared, and so is the clamp `0x8950d420`;
+- the highpass SVF runs once per channel, with shared coefficients
+  (+0x4c/+0x50) and separate state (L at +0x54/+0x58, R at +0x5c/+0x60);
+- the smoothed gain (+0x80…+0x88) multiplies both channels.
+
+The record stream is the one the encoder writes from (L+R) >> 1. So the
+port keeps one plan with a second channel, and `XtSoloVoice::render(L, R)`
+reads both through the same grains. `EmuSolo.java` with `EMUSOLO_CH=2` sets
+the flag and writes L/R pairs.
+
+**Three corrections that the stereo check turned up** (on factory wave 358,
+whose records are V-Synth 1.50's). They apply to mono as well:
+1. *Unvoiced records keep their rate.* `0x8950d5a0` builds the
+   non-voiced rate as S = (info & 1 ? A : 1)·(info & 2 ? F : 1), with
+   A = 0 read as 1. The port used S = A whenever the info was known. Both
+   the XT's encoder and V-Synth 1.50 write unvoiced records with low bits 0
+   (wave 001 has 189 of them; 358's tail is all info 128), so noise grains
+   play at S = 1. Voiced records (bit 0x4) use A and F ungated.
+2. *Grain parameters in single precision.* `d5a0` works in floats on the
+   1/16 grid:
+   - Ci = frac·(N − C) + C, and ppw = Ci / rate (at most 524287);
+   - +4 = trunc(ppw·256) (1/4096), and the anchor step
+     +0x30 = trunc(max(16·rate, 16));
+   - wl = Ci / v; if wl > ppw, os = trunc(Ci − ppw·v) and wl = ppw;
+   - slope = 8 / wl, and f0n = min(16 / ppw, 0.5).
+
+   In double, a value that is exactly on the grid comes out just below it:
+   os = 5365·(1 − 0.8) = 1073 gave 1072, a 1/16-sample start error. That
+   was the −50 dB residual on the mono cases, not round-to-zero noise.
+   The port now does these operations in single precision, with the XT's
+   round-to-zero (or the emulator's round-to-nearest under
+   `XT_ROUND=nearest`). Each is done in double and rounded once, which is
+   exact for one operation on two floats.
+3. *The second tap is clamped at the end of the wave.* After adding the
+   record period, the tap indices go through `0x8950d420` again: an index
+   at or past n − 1 reads s[n − 1] with fraction 0. The port read silence
+   there.
+
+Result, port against the emulator:
+
+| Material | Cases | Before | After |
+|---|---|---|---|
+| Wave 358, stereo | 4: identity, pitch ×1.5, formant 0.8 at 2×, Energy 0.6 | −22 to −75 dB | −103 to −111 dB on both channels |
+| XT-made mono | 13 | −50 to −115 dB | −101 to −118 dB |
+
+Seven vocal suite renders move by −55 dB or less; the suite average goes
+from 76.600 to 76.601.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).

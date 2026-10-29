@@ -2,8 +2,11 @@
 // 32-sample block per call) in Ghidra's P-code emulator.
 // Usage: -postScript EmuSolo.java <recs.bin> <samp.bin> <out.f32> <R> <F> <walk> [energy] [maxOut] [trace.tsv] [traceFrom]
 //   recs.bin  raw vpdt records {u16 len/16, u16 info} incl. the terminator
-//   samp.bin  int16 LE mono samples (the wave)
-//   out.f32   float32 output, scaled to ±1 (left channel; mono path writes L = R)
+//   samp.bin  int16 LE samples (the wave): mono, or L/R pairs with EMUSOLO_CH=2
+//   out.f32   float32 output, scaled to ±1: the left channel (the mono path
+//             writes L = R), or L/R pairs with EMUSOLO_CH=2
+// EMUSOLO_CH=2 sets the player's stereo flag (byte 0 bit 0x40), which selects
+// the packed-L/R read path in 0x8950d0f0 (0x8950d1f0).
 //   R pitch ratio (+0x70), F formant ratio (+0x74), walk = 1/stretch (+0x7c)
 // Note-on state is built by hand following 0x8950fba0 (which also touches
 // global RAM via 0x8950fa60): first record loaded by 0x8950d4c0, grain params
@@ -64,7 +67,8 @@ public class EmuSolo extends GhidraScript {
         byte[] samp = Files.readAllBytes(Paths.get(a[1]));
         float R = Float.parseFloat(a[3]), F = Float.parseFloat(a[4]), walk = Float.parseFloat(a[5]);
         float energy = a.length > 6 ? Float.parseFloat(a[6]) : 0f;
-        int n = samp.length / 2;
+        int ch = "2".equals(System.getenv("EMUSOLO_CH")) ? 2 : 1;
+        int n = samp.length / (2 * ch);
         int outLen = a.length > 7 && Integer.parseInt(a[7]) > 0 ? Integer.parseInt(a[7]) : Math.max(1, Math.round(n / walk));
         emu = new EmulatorHelper(currentProgram);
         emu.setBreakpoint(toAddr(SENTINEL));
@@ -79,6 +83,7 @@ public class EmuSolo extends GhidraScript {
             // wave-2 struct (r8+0x6c): no loop points / cache bounds
             w32(W2 + 0x16c, 0x7fffffff); w32(W2 + 0xb8, 0x7fffffff);
             // player
+            if (ch == 2) w8(R8 + 0, 0x40);
             w8(R8 + 3, 0x80); w8(R8 + 7, 8); w8(R8 + 8, 10); w8(R8 + 9, 6);
             w32(R8 + 0x10, (int)REC);
             w32(R8 + 0x18, 0); w32(R8 + 0x1c, n * 16); w32(R8 + 0x20, n * 16);
@@ -119,8 +124,9 @@ public class EmuSolo extends GhidraScript {
                 byte[] blk = emu.readMemory(toAddr(OUT), 32 * 8);
                 ByteBuffer bb = ByteBuffer.wrap(blk).order(ByteOrder.LITTLE_ENDIAN);
                 for (int i = 0; i < 32 && done + i < outLen; ++i) {
-                    float l = bb.getFloat(i * 8);
-                    le.clear(); le.putFloat(l / 32768f); out.write(le.array());
+                    for (int c = 0; c < ch; ++c) {
+                        le.clear(); le.putFloat(bb.getFloat(i * 8 + c * 4) / 32768f); out.write(le.array());
+                    }
                 }
                 if ((done & 0x7fff) == 0) println("block " + (done / 32) + " of " + (outLen / 32) + "  " + (System.currentTimeMillis() - t0) + " ms");
             }

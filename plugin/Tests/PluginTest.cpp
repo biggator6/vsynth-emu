@@ -8,7 +8,7 @@
 #include <thread>
 
 int main(int argc, char** argv) {
-    if (argc < 3) { std::fprintf(stderr, "usage: %s rom.2.bin file.wav [note]\n", argv[0]); return 1; }
+    if (argc < 3) { std::fprintf(stderr, "usage: %s rom.2.bin file.wav [note] [auto|solo|backing|ensemble]\n", argv[0]); return 1; }
     juce::ScopedJuceInitialiser_GUI init;
     const int note = argc > 3 ? std::atoi(argv[3]) : 60;
     const double rate = 48000.0;
@@ -17,6 +17,12 @@ int main(int argc, char** argv) {
     VSynthEmuProcessor p;
     if (!p.setRomFile(juce::File(argv[1]))) { std::fprintf(stderr, "ROM rejected: %s\n", p.getStatusText().toRawUTF8()); return 1; }
     p.prepareToPlay(rate, block);
+    if (argc > 4) {   // Encode Type (choice index 0 Auto, 1 SOLO, 2 BACKING, 3 ENSEMBLE)
+        const juce::String t(argv[4]);
+        const int idx = t == "solo" ? 1 : t == "backing" ? 2 : t == "ensemble" ? 3 : 0;
+        auto* prm = p.apvts.getParameter("encodeType");
+        prm->setValueNotifyingHost(prm->convertTo0to1((float)idx));
+    }
     p.loadFile(juce::File(argv[2]));
     for (int i = 0; i < 600 && !p.getStatusText().startsWith("Encoded"); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));   // the encode runs on the pool thread
@@ -39,14 +45,15 @@ int main(int argc, char** argv) {
     auto E = xtSynthEncode(chans, rd->sampleRate, type, 64);
     {   // the encode must be repeatable
         auto E2 = xtSynthEncode(chans, rd->sampleRate, type, 64);
-        bool same = E->vpdt == E2->vpdt && E->solo.segStart == E2->solo.segStart && E->solo.in == E2->solo.in;
+        bool same = E->vpdt == E2->vpdt && E->solo.segStart == E2->solo.segStart && E->solo.in == E2->solo.in
+                 && E->solo.inR == E2->solo.inR;
         for (int k = 0; k < 6; ++k) same = same && E->bands.buf[k] == E2->bands.buf[k];
         std::printf("encode repeatable: %s\n", same ? "yes" : "NO");
     }
     XtSynth ref; ref.prepare(rate); ref.setSample(E);
 
     const int total = (int)(in.getNumSamples() * rate / rd->sampleRate);
-    double maxDiff = 0, energy = 0;
+    double maxDiff = 0, energy = 0, side = 0;
     long firstDiff = -1;
     juce::AudioBuffer<float> buf(2, block);
     std::vector<float> rl(block), rr(block);
@@ -63,8 +70,10 @@ int main(int argc, char** argv) {
             maxDiff = std::max(maxDiff, (double)std::abs(buf.getSample(0, i) - rl[(size_t)i]));
             maxDiff = std::max(maxDiff, (double)std::abs(buf.getSample(1, i) - rr[(size_t)i]));
             energy += (double)buf.getSample(0, i) * buf.getSample(0, i);
+            side += (double)(buf.getSample(0, i) - buf.getSample(1, i)) * (buf.getSample(0, i) - buf.getSample(1, i));
         }
     }
-    std::printf("rendered %d frames at %.0f Hz: rms %.4f, max |plugin - XtSynth| = %g (first at frame %ld)\n", total, rate, std::sqrt(energy / total), maxDiff, firstDiff);
+    std::printf("rendered %d frames at %.0f Hz: rms %.4f (L-R %.4f), max |plugin - XtSynth| = %g (first at frame %ld)\n",
+                total, rate, std::sqrt(energy / total), std::sqrt(side / total), maxDiff, firstDiff);
     return maxDiff == 0 && energy > 0 ? 0 : 2;
 }

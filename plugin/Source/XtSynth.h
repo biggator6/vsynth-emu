@@ -16,7 +16,7 @@
 
 struct XtEncoded {
     int type = 0;                  // 1 SOLO, 3 BACKING, 5 ENSEMBLE
-    int channels = 1;              // the players' channels (SOLO plays mono)
+    int channels = 1;              // the wave's channels (1 or 2)
     long frames = 0;               // at 44.1 kHz
     std::vector<uint8_t> vpdt;     // multi-band
     XtMbBands bands;

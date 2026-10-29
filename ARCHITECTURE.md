@@ -171,10 +171,11 @@ The HTML batch report embeds **A/B audio players** per case.
 Fast engine invariants: `plugin/Source/EngineTests.cpp`
 (`-DENGINE_TESTS_MAIN`, 15 checks, runs in seconds).
 
-## Current Scores (v42, metric v6)
+## Current Scores (v44, metric v6)
 
-**76.6 / 100 average** (v42: BACKING and ENSEMBLE through the XT's own
-firmware chain, chord 75.4 → 87.3; v40 74.8; full history in notes.txt).
+**76.6 / 100 average** (v44 76.601: SOLO player corrections, vocal +0.008
+at most; v42 76.600: BACKING and ENSEMBLE through the XT's own firmware
+chain, chord 75.4 → 87.3; v40 74.8; full history in notes.txt).
 Earlier: **73.9 / 100 average** (v35 — SOLO encoder epochs matched to the V-Synth XT's own grain records, vocal 74.6 → 77.4; v33 = 73.0; four sine references show the formant an octave low although the Formant knob was 0 (likely Formant KF / envelope / LFO in the sine patch; re-record pending, see notes.txt); render with `analysis/render_suite.py`) under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
 history in notes.txt).  Per-case v4 detail below is historical.  Earlier text:
 51.8 / 100 under v4 (re-baselined v17 = 34.0).  Strong: drum_time_4x 64.7,
@@ -192,7 +193,9 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - resample to 44.1 kHz int16;
    - encode as the chosen **Encode Type**. Auto uses the engine's content
      classifier; LITE plays on the SOLO player.
-   - SOLO: the XT's SOLO encoder port.
+   - SOLO: the XT's SOLO encoder port. A stereo wave has one record stream,
+     encoded from (L+R) >> 1, and the player reads both channels through it
+     (v44).
    - BACKING / ENSEMBLE: the firmware's multi-band encoder, with attack
      detection at the **Encode Depth**, and the load-time band rebuild. Both
      run from `rom.2` in the SH-4 interpreter, about 1–2 s.
@@ -212,15 +215,16 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 **Checks:**
 - At a 44.1 kHz host rate, `XtSynth` output is bit-exact against the
   firmware chain: `xt_fw play`, and the engine's SOLO render.
+- The SOLO player (`XtSoloVoice`, mono and stereo) is within −101…−118 dB
+  of the firmware player in the P-code emulator, on 13 mono cases and 4
+  stereo ones (v44).
 - `Tests/PluginTest.cpp` drives the real processor (ROM, file load,
   background encode, sample-accurate MIDI) at 48 kHz. Its output is
-  **bit-identical** to `XtSynth` on the chord (ENSEMBLE), drum (BACKING) and
-  vocal (SOLO).
+  **bit-identical** to `XtSynth` on the chord (ENSEMBLE), drum (BACKING),
+  vocal (SOLO) and the stereo factory wave 358 (SOLO).
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
-- SOLO plays the encoder's mono mix ((L+R) >> 1), while the XT's SOLO
-  player reads both channels;
 - no amp envelope beyond the release fade, and no V-Synth voice layer
   (filters, LFOs, effects);
 - no loops, reverse, step/event playback or Time Trip;

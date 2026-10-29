@@ -207,6 +207,16 @@ Multi-band (v41): ENSEMBLE content renders through the XT's own chain
   default 64; −1 = start and end markers only). VSE_MB=off: the v40 paths;
   VSE_MB=ensemble: BACKING on the v40 paths.
 
+SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
+  record stream (0x8950d1f0); unvoiced records play at S = 1 (info low
+  bits gate A/F); grain parameters in single precision; the second tap
+  clamps at the end. Port vs emulator −101…−118 dB (HARDWARE_FIRMWARE.md,
+  "Stereo SOLO playback"). Validation CLI, same inputs as EmuSolo.java:
+    clang++ -std=c++20 -O2 -DXT_SOLO_MAIN plugin/Source/XtSoloVoice.cpp -o xt_solo
+    xt_solo cuts.txt samp.bin <1|2> <R> <F> <walk> [energy] [maxOut] out.f32
+  (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
+  EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
+
 PLUGIN (v43, 2026-10-28): plays through the XT's own encoders and players
   (ARCHITECTURE.md, "The plugin"). Firmware image: VSE_XT_ROM, or
   ~/Library/Application Support/V-Synth Emu/V-SynthXT.rom.2.bin, or the
@@ -217,7 +227,7 @@ PLUGIN (v43, 2026-10-28): plays through the XT's own encoders and players
       -DCMAKE_C_COMPILER=$TC/clang -DCMAKE_CXX_COMPILER=$TC/clang++ -DCMAKE_OSX_SYSROOT=$SDK
     SDKROOT=$SDK cmake --build build/plugin -j 10        (AU, VST3, Standalone; installs to ~/Library/Audio/Plug-Ins)
     SDKROOT=$SDK cmake --build build/plugin --target VSynthEmuTest
-    build/plugin/VSynthEmuTest firmware/unpacked/V-SynthXT.rom.2.bin <file.wav> [note]
+    build/plugin/VSynthEmuTest firmware/unpacked/V-SynthXT.rom.2.bin <file.wav> [note] [auto|solo|backing|ensemble]
       (processor end to end vs XtSynth at 48 kHz; exit 0 = bit-identical)
     auval -v aumu VsEm Ystu
   VST3_AUTO_MANIFEST is off: JUCE's manifest helper cannot load the build-tree

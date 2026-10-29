@@ -2254,3 +2254,24 @@ Round-2 recordings.  First build-out after that: real-time granular port
   the firmware's fixed-point steps play as a different walk, so controls
   are snapped to their steps. `auval` passes.
 
+
+### Session 16 addendum (2026-10-29) — v44: stereo SOLO, and three SOLO player corrections
+
+- The XT's SOLO player reads a stereo wave as packed L/R frames
+  (`0x8950d1f0`). Both channels go through the same grains, with one
+  highpass state per channel. `XtSoloPlan` carries the second channel and
+  `XtSoloVoice::render(L, R)` plays it. The plugin's stereo SOLO samples
+  now play in stereo; before, they played the encoder's (L+R) >> 1 mix.
+- Checking stereo against the emulator (factory wave 358) turned up three
+  player differences, which hold for mono too:
+  - unvoiced records play at S = 1, because the XT writes them with info
+    low bits 0 and those bits gate the pitch and formant factors (the port
+    had S = A);
+  - the grain parameters are computed in single precision, since an
+    exact grid value can come out one step short in double (os 1073 → 1072);
+  - the second tap is clamped at the wave's end.
+- The port is now within −101…−118 dB of the emulator on the 13 mono cases
+  (from −50…−115) and −103…−111 dB on 4 stereo ones.
+- **v44 = 76.601** (v42 76.600): only seven vocal renders change, by
+  −55 dB or less. The plugin's output stays bit-identical to `XtSynth`,
+  now on stereo SOLO as well. `auval` passes; engine tests pass.

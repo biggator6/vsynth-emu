@@ -1042,11 +1042,12 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
         const std::vector<float>& in) const {
     // Units: in samples (doubles), with the firmware's fixed-point grids
     // applied where they change behaviour: P's whole-1/16 part, os in 1/16,
-    // ppw in 1/4096, the anchor step in 1/16.  C = current grain period,
+    // ppw in 1/4096, the anchor step in 1/16 (the grain parameters in single
+    // precision, as the firmware computes them).  C = current grain period,
     // N = next grain's period.  Checked sample by sample against the
     // firmware in Ghidra's P-code emulator (EmuSolo.java) on the XT's own
-    // records: −50…−115 dB on 13 cases.  The residual is the SH-4's
-    // single-precision round-to-zero arithmetic.
+    // records: −101…−118 dB on 13 cases (v44; XT_ROUND=nearest, the
+    // emulator's rounding).
     //
     // Per output sample (order as in 0x8950cd90):
     //   P += 1/stretch                       phrase walk (time)        [ce80]
@@ -1063,8 +1064,9 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     //   v   = F                              read velocity (formant)
     //   wl  = Ci / F; if wl > ppw: os = Ci − ppw·F, wl = ppw, else os = 0
     //   start = segStart + os; age = timer remainder; e = remainder·0.5/wl
-    // Unvoiced records (no bit 0x4): S = A (formant gate off) — ppw = Ci/S,
-    //   v = S, wl = ppw, os = 0 (plain pitch resampling of noise grains).
+    // Unvoiced records (no bit 0x4): S = (info & 1 ? A : 1)·(info & 2 ? F : 1)
+    //   — ppw = Ci/S, v = S, wl = ppw, os = 0.  The XT's unvoiced records
+    //   have low bits 0: noise grains keep their rate (S = 1).
     const int n = (int)in.size();
     const double sr = pImpl->sampleRate;
     const double stretch = std::max(0.05, (double)pImpl->params.timeStretchRatio);
