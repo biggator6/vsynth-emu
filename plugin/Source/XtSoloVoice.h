@@ -31,6 +31,7 @@ public:
     void noteOn(const XtSoloPlan& plan, double A, double F, double stretch, double energy);
     // Pitch, formant and time may change while the note plays.
     void setRates(double A, double F, double stretch);
+    void setEnergy(double g) { energy = g; }
     // Renders `count` samples: mono (a stereo plan's left channel), or both
     // channels (a mono plan plays L = R, as the firmware writes it).
     void render(float* out, int count) { render(out, nullptr, count); }

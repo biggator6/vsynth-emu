@@ -13,9 +13,11 @@ constexpr uint32_t kTimeTab = 0x897cec24;     // u16 ×128: knob → ms (0x894df
 constexpr uint32_t kSustainTab = 0x897cfcb8;  // u16 ×128: knob → level ×32768 (0x894df240)
 constexpr uint32_t kAttackTab = 0x897d1934;   // u16 ×257: attack curve (0x894ef7d0)
 constexpr uint32_t kShapeTab = 0x897d1b36;    // u16 ×129 (+ what follows): segment shape (0x894ef960)
+constexpr uint32_t kDepthTab = 0x897cef44;    // u8 ×13: pitch depth 0..12 in cents (0x894e0ce0)
 
 struct Tables {
     uint16_t time[128], sustain[128], attack[257], shape[257];
+    uint8_t depth[13];
     uint32_t keyScale[41][128];
     bool ok = false, keyScales = false;
 } T;
@@ -31,7 +33,8 @@ bool xtEnvLoadTables(const char* romPath) {
     FILE* f = romPath ? std::fopen(romPath, "rb") : nullptr;
     if (!f) return false;
     const bool ok = readAt(f, kTimeTab, T.time, 128) && readAt(f, kSustainTab, T.sustain, 128)
-                 && readAt(f, kAttackTab, T.attack, 257) && readAt(f, kShapeTab, T.shape, 257);
+                 && readAt(f, kAttackTab, T.attack, 257) && readAt(f, kShapeTab, T.shape, 257)
+                 && readAt(f, kDepthTab, T.depth, 13);
     std::fclose(f);
     if (!ok) return false;
     // Sanity: the three tables rise from 0 (time and sustain strictly).
@@ -42,7 +45,9 @@ bool xtEnvLoadTables(const char* romPath) {
     for (int i = 1; i < 129; ++i)
         if (T.shape[i] < T.shape[i - 1]) return false;
     if (T.time[0] != 0 || T.sustain[0] != 0 || T.sustain[127] != 32768 || T.attack[0] != 0
-        || T.shape[0] != 0 || T.shape[128] != 65535) return false;
+        || T.shape[0] != 0 || T.shape[128] != 65535 || T.depth[0] != 0) return false;
+    for (int i = 1; i < 13; ++i)
+        if (T.depth[i] < T.depth[i - 1]) return false;
     T.ok = true;
     return true;
 }
@@ -84,6 +89,18 @@ uint32_t xtEnvKeyScale(int key, int kf) {
     const float e = xtf::div(xtf::flt((key - 60) * -(int)(int16_t)kf), 1200.0f);
     const double v = std::pow(2.0, (double)e) * 65536.0;   // the firmware's powf, then ×65536
     return v >= 2147483648.0 ? (uint32_t)(int64_t)(v - 4294967296.0) : (uint32_t)(int32_t)v;
+}
+
+float xtPitchDepthCents(float d) {
+    using namespace xtf;
+    const float s = d < 0.0f ? -1.0f : 1.0f;
+    const float a = d < 0.0f ? -d : d;
+    auto line = [&](float base, float per) { return mul(add(mul(a, per), base), s); };   // fmac, then the sign
+    if (!(a > 12.0f)) return mul(flt(T.depth[ftrc(a)]), s);
+    if (!(a > 36.0f)) return line(-600.0f, 50.0f);
+    if (!(a > 48.0f)) return line(-2400.0f, 100.0f);
+    if (!(a > 60.0f)) return line(-7200.0f, 200.0f);
+    return line(-19200.0f, 400.0f);
 }
 
 XtEnvParams xtEnvAdsr(const XtEnvKnobs& k, int key, int velocity, int releaseVelocity, int curve) {
@@ -322,7 +339,16 @@ int main(int argc, char** argv) {
                         if (fw != pt && bad++ < 10) std::printf("time knob %d vel %d sens %d scale %x: fw %d port %d\n", knob, vel, sens, sc, fw, pt);
                     }
         std::printf("time converter: %ld cases, %ld differ\n", n, bad);
-        return bad ? 3 : 0;
+        long bad2 = 0;
+        for (int d = -63; d <= 63; ++d) {
+            // fr4 = depth; result in fr0
+            c.fb[0][4] = 0; float fd = (float)d; std::memcpy(&c.fb[0][4], &fd, 4);
+            if (!c.call(0x894e0ce0, {}, sp)) { std::fprintf(stderr, "%s\n", c.error().c_str()); return 1; }
+            float fw; std::memcpy(&fw, &c.fb[0][0], 4);
+            if (fw != xtPitchDepthCents(fd) && bad2++ < 10) std::printf("pitch depth %d: fw %g port %g\n", d, fw, xtPitchDepthCents(fd));
+        }
+        std::printf("pitch depth: 127 cases, %ld differ\n", bad2);
+        return bad || bad2 ? 3 : 0;
     }
     if (argc < 8) { std::fprintf(stderr, "usage: xt_env rom.2.bin A D S R offTick ticks [curve] | xt_env rom.2.bin conv\n"); return 2; }
     if (!xtEnvLoadTables(argv[1])) { std::fprintf(stderr, "cannot read the tables\n"); return 1; }

@@ -38,6 +38,17 @@ int main(int argc, char** argv) {
             prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
         }
     }
+    // TEST_PENV="a,d,s,r,depth": the pitch envelope
+    if (const char* e = std::getenv("TEST_PENV")) {
+        std::sscanf(e, "%d,%d,%d,%d,%d", &refCtl.pAttack, &refCtl.pDecay, &refCtl.pSustain, &refCtl.pRelease, &refCtl.pDepth);
+        const std::pair<const char*, int> knobs[] = { { "pitchEnvAttack", refCtl.pAttack }, { "pitchEnvDecay", refCtl.pDecay },
+                                                      { "pitchEnvSustain", refCtl.pSustain }, { "pitchEnvRelease", refCtl.pRelease },
+                                                      { "pitchEnvDepth", refCtl.pDepth } };
+        for (auto [id, v] : knobs) {
+            auto* prm = p.apvts.getParameter(id);
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+        }
+    }
     p.loadFile(juce::File(argv[2]));
     for (int i = 0; i < 600 && !p.getStatusText().startsWith("Encoded"); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));   // the encode runs on the pool thread

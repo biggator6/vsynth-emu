@@ -47,6 +47,9 @@ int xtEnvTime(int knob, int velocity, int sens, uint32_t scale16);
 uint32_t xtEnvKeyScale(int key, int kf);
 // 41 × 128 values, kf = −200, −190, … 200 by key (xtFwEnvKeyScales).
 void xtEnvSetKeyScales(const uint32_t* table);
+// 0x894e0ce0: a pitch depth knob (−63..+63) in cents — a table up to 12,
+// then 50, 100, 200 and 400 cents per step (±1200 at 36, ±6000 at 63).
+float xtPitchDepthCents(float depth);
 
 class XtEnvelope {
 public:

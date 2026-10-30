@@ -1,13 +1,13 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 156;  // height of the XT strip below it
+static constexpr int kXtStripH   = 186;  // height of the XT strip below it
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 520);
+    setSize(560, 550);
     setResizable(true, true);
     setResizeLimits(480, 400, 960, 760);
 
@@ -37,7 +37,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     addAndMakeVisible(encodeBox_);
     encodeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "encodeType", encodeBox_);
     for (juce::Slider* sl : { &keySlider_, &depthSlider_, &energySlider_, &attackSlider_, &decaySlider_, &sustainSlider_, &releaseSlider_,
-                              &aSensSlider_, &dSensSlider_, &rSensSlider_, &kfSlider_ }) {
+                              &aSensSlider_, &dSensSlider_, &rSensSlider_, &kfSlider_,
+                              &pAttackSlider_, &pDecaySlider_, &pSustainSlider_, &pReleaseSlider_, &pDepthSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
@@ -55,8 +56,14 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     dSensAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "ampDecaySens",   dSensSlider_);
     rSensAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "ampReleaseSens", rSensSlider_);
     kfAtt_      = std::make_unique<SliderAtt>(processor_.apvts, "ampTimeKF",      kfSlider_);
+    pAttackAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvAttack",  pAttackSlider_);
+    pDecayAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvDecay",   pDecaySlider_);
+    pSustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvSustain", pSustainSlider_);
+    pReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvRelease", pReleaseSlider_);
+    pDepthAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvDepth",   pDepthSlider_);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
-                            &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_ }) styleSmall(*l);
+                            &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
+                            &pAttackLabel_, &pDecayLabel_, &pSustainLabel_, &pReleaseLabel_, &pDepthLabel_ }) styleSmall(*l);
     timerCallback();
     startTimerHz(4);
 
@@ -205,6 +212,17 @@ void VSynthEmuEditor::resized() {
         auto cell = row5.removeFromLeft(q);
         l->setBounds(cell.removeFromLeft(38));
         sl->setBounds(cell.withTrimmedRight(8));
+    }
+    xt.removeFromTop(6);
+    auto row6 = xt.removeFromTop(24);                // pitch envelope
+    const int fifth = row6.getWidth() / 5;
+    std::pair<juce::Label*, juce::Slider*> penv[] = { { &pAttackLabel_, &pAttackSlider_ }, { &pDecayLabel_, &pDecaySlider_ },
+                                                      { &pSustainLabel_, &pSustainSlider_ }, { &pReleaseLabel_, &pReleaseSlider_ },
+                                                      { &pDepthLabel_, &pDepthSlider_ } };
+    for (auto& [l, sl] : penv) {
+        auto cell = row6.removeFromLeft(fifth);
+        l->setBounds(cell.removeFromLeft(30));
+        sl->setBounds(cell.withTrimmedRight(6));
     }
 
     // ── Knobs area ─────────────────────────────────────────────────────────

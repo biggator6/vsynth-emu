@@ -50,6 +50,8 @@ public:
         // velocity → time sensitivities −63..+63; Time KF −200..+200
         int attack = 0, decay = 0, sustain = 127, release = 16;
         int aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
+        // pitch envelope knobs 0..127 and its depth −63..+63 (0x894e0ce0 cents)
+        int pAttack = 0, pDecay = 64, pSustain = 0, pRelease = 64, pDepth = 0;
     };
 
     XtSynth();
@@ -74,6 +76,10 @@ private:
         float gain = 1;               // velocity
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
         XtEnvelope env;
+        XtEnvelope penv;               // pitch envelope (curve 0)
+        // the player's pitch ratio, formant ratio, walk and Energy as the
+        // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
+        float curA = 1, curF = 1, curWalk = 1, curG = 0;
         // The TVA that applies the envelope (0x894f5360 / 0x894f5720): gain,
         // its target and per-sample step, frames since the last update.
         float cur = 0, target = 0, step = 0, elapsed = 0;
@@ -102,7 +108,9 @@ private:
 
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames
-    void voiceRates(Voice& v) const;
+    void targets(const Voice& v, float& A, float& F, float& walk, float& g) const;
+    void applyRates(Voice& v);
     void tvaUpdate(Voice& v);
     XtEnvParams envParams(const Voice& v) const;
+    XtEnvParams pitchEnvParams(const Voice& v) const;
 };

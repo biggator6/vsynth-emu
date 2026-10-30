@@ -20,6 +20,12 @@ namespace Params {
     static const juce::String kDecaySens    = "ampDecaySens";
     static const juce::String kReleaseSens  = "ampReleaseSens";  // note-off velocity
     static const juce::String kTimeKF       = "ampTimeKF";       // −200..+200, decay and release
+    // Pitch envelope: 0..127 knobs, depth −63..+63 (±6000 cents at 63)
+    static const juce::String kPAttack      = "pitchEnvAttack";
+    static const juce::String kPDecay       = "pitchEnvDecay";
+    static const juce::String kPSustain     = "pitchEnvSustain";
+    static const juce::String kPRelease     = "pitchEnvRelease";
+    static const juce::String kPDepth       = "pitchEnvDepth";
 }
 
 // ─── Parameter Layout ─────────────────────────────────────────────────────────
@@ -78,6 +84,11 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kReleaseSens, "Release Velocity Sens", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kTimeKF, "Env Time KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPAttack, "Pitch Env Attack", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPDecay, "Pitch Env Decay", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPSustain, "Pitch Env Sustain", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPRelease, "Pitch Env Release", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPDepth, "Pitch Env Depth", -63, 63, 0));
 
     return { params.begin(), params.end() };
 }
@@ -172,6 +183,11 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.dSens        = (int)apvts.getRawParameterValue(Params::kDecaySens)->load();
     c.rSens        = (int)apvts.getRawParameterValue(Params::kReleaseSens)->load();
     c.timeKF       = 10 * (int)std::lround(apvts.getRawParameterValue(Params::kTimeKF)->load() / 10.0f);
+    c.pAttack      = (int)apvts.getRawParameterValue(Params::kPAttack)->load();
+    c.pDecay       = (int)apvts.getRawParameterValue(Params::kPDecay)->load();
+    c.pSustain     = (int)apvts.getRawParameterValue(Params::kPSustain)->load();
+    c.pRelease     = (int)apvts.getRawParameterValue(Params::kPRelease)->load();
+    c.pDepth       = (int)apvts.getRawParameterValue(Params::kPDepth)->load();
     return c;
 }
 

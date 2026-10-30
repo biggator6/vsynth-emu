@@ -182,12 +182,29 @@ constexpr float kSilent = 0x1.0000fep-16f;     // 2^-16
 constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
 }
 
-void XtSynth::voiceRates(Voice& v) const {
-    const double A = std::pow(2.0, ((double)(v.note - ctl.rootKey) + ctl.pitchSemis) / 12.0);
-    const double stretch = std::clamp((double)ctl.timeStretch, 0.2, 5.0);   // the XT's time range is ±5
-    const double F = std::clamp(std::pow(2.0, ctl.formantSemis / 12.0), 0.5, 2.0);
-    if (cur && cur->type == 1) v.solo.setRates(A, F, stretch);
-    else v.mb.setRates((float)A, (float)(1.0 / stretch));
+// The player's targets (0x894f3ba0 pitch, 0x894f3d40 formant, 0x894f3c90
+// time, voice +0x18 Energy): pitch in cents with the pitch envelope at its
+// depth, clamped to ±6000; formant clamped to [0.5, 2]; the XT's time range
+// is ±5.
+void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g) const {
+    double cents = ((double)(v.note - ctl.rootKey) + ctl.pitchSemis) * 100.0
+                 + (double)v.penv.level() * (double)xtPitchDepthCents((float)ctl.pDepth);
+    cents = std::clamp(cents, -6000.0, 6000.0);
+    A = (float)std::exp2(cents / 1200.0);
+    F = (float)std::clamp(std::pow(2.0, ctl.formantSemis / 12.0), 0.5, 2.0);
+    walk = (float)(1.0 / std::clamp((double)ctl.timeStretch, 0.2, 5.0));
+    g = ctl.energy;
+}
+
+void XtSynth::applyRates(Voice& v) {
+    if (cur->type == 1) { v.solo.setRates(v.curA, v.curF, 1.0 / v.curWalk); v.solo.setEnergy(v.curG); }
+    else v.mb.setRates(v.curA, v.curWalk);
+}
+
+XtEnvParams XtSynth::pitchEnvParams(const Voice& v) const {
+    XtEnvKnobs k;
+    k.attack = ctl.pAttack; k.decay = ctl.pDecay; k.sustain = ctl.pSustain; k.release = ctl.pRelease;
+    return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);
 }
 
 XtEnvParams XtSynth::envParams(const Voice& v) const {
@@ -197,14 +214,17 @@ XtEnvParams XtSynth::envParams(const Voice& v) const {
     return xtEnvAdsr(k, v.note, v.vel, v.relVel);
 }
 
+// New knob values reach a playing voice at the next update (mixBlock),
+// through the voice update's smoothing, as on the XT.
 void XtSynth::setControls(const Controls& c) {
     const bool envChanged = c.attack != ctl.attack || c.decay != ctl.decay || c.sustain != ctl.sustain || c.release != ctl.release
                          || c.aSens != ctl.aSens || c.dSens != ctl.dSens || c.rSens != ctl.rSens || c.timeKF != ctl.timeKF;
+    const bool penvChanged = c.pAttack != ctl.pAttack || c.pDecay != ctl.pDecay || c.pSustain != ctl.pSustain || c.pRelease != ctl.pRelease;
     ctl = c;
     for (Voice& v : voice) {
         if (!v.active) continue;
-        voiceRates(v);
         if (envChanged) v.env.update(envParams(v));
+        if (penvChanged) v.penv.update(pitchEnvParams(v));
     }
 }
 
@@ -232,11 +252,11 @@ void XtSynth::noteOn(int note, float velocity) {
     const float ms = ep.time[0] == 0.0f ? (ep.time[1] == 0.0f ? 0.1f : ep.time[1]) : std::min(ep.time[0], 10.0f);
     v->step = (v->target - v->cur) / (ms * kFramesPerMs);
     v->elapsed = 0;
-    const double A = std::pow(2.0, ((double)(note - ctl.rootKey) + ctl.pitchSemis) / 12.0);
-    const double stretch = std::clamp((double)ctl.timeStretch, 0.2, 5.0);
-    const double F = std::clamp(std::pow(2.0, ctl.formantSemis / 12.0), 0.5, 2.0);
-    if (cur->type == 1) v->solo.noteOn(cur->solo, A, F, stretch, ctl.energy);
-    else if (!v->mb.noteOn(cur->wave, cur->type, (float)A, (float)(1.0 / stretch))) v->active = false;
+    // The note-on converters set the player directly (0x894f3a00…)
+    v->penv.noteOn(pitchEnvParams(*v));
+    targets(*v, v->curA, v->curF, v->curWalk, v->curG);
+    if (cur->type == 1) v->solo.noteOn(cur->solo, v->curA, v->curF, 1.0 / v->curWalk, v->curG);
+    else if (!v->mb.noteOn(cur->wave, cur->type, v->curA, v->curWalk)) v->active = false;
 }
 
 // The release time follows the note-off velocity (R-Sens): the times are
@@ -248,6 +268,8 @@ void XtSynth::noteOff(int note, float velocity) {
             v.relVel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
             v.env.update(envParams(v));
             v.env.noteOff();
+            v.penv.update(pitchEnvParams(v));
+            v.penv.noteOff();
         }
 }
 
@@ -259,7 +281,6 @@ void XtSynth::allNotesOff() {
 // (0x894f54b0), else aim at the envelope's new output with a linear ramp of
 // 10 ms, shorter when the stage itself is (0x894f5360).
 void XtSynth::tvaUpdate(Voice& v) {
-    v.env.tick();
     if (v.env.done() && v.cur <= kSilent) { v.active = false; return; }
     v.target = v.env.level();
     const float T = v.env.stageTime();
@@ -283,7 +304,22 @@ void XtSynth::mixBlock(float* lr) {
     float tmp[64];
     for (Voice& v : voice) {
         if (!v.active) continue;
-        if (tick) { tvaUpdate(v); if (!v.active) continue; }
+        if (tick) {
+            // the tone update (0x894f75f0): envelopes step, the voice update
+            // moves the player 70% toward its targets (0x8950c1b0), then the TVA
+            v.env.tick();
+            v.penv.tick();
+            float A, F, w, g;
+            targets(v, A, F, w, g);
+            constexpr float k = 0.699999988f;                  // 0x3f333333
+            v.curA = (A - v.curA) * k + v.curA;
+            v.curF = (F - v.curF) * k + v.curF;
+            v.curWalk = (w - v.curWalk) * k + v.curWalk;
+            v.curG = (g - v.curG) * k + v.curG;
+            applyRates(v);
+            tvaUpdate(v);
+            if (!v.active) continue;
+        }
         float scale = v.gain;
         if (cur->type == 1) {
             float l[32], r[32];
@@ -359,6 +395,7 @@ void XtSynth::render(float* left, float* right, int n) {
 // xt_synth <rom.2.bin> <samp.bin int16> <channels> <rate> <type 1|3|5> <hostRate> <frames> <out.f32> note[@onset[:off]]...
 //   Renders notes (onset/off in host frames) to float32 L/R pairs.
 //   XT_ADSR="a,d,s,r": amp envelope knobs (default 0,0,127,16).
+//   XT_PENV="a,d,s,r,depth": pitch envelope knobs.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -386,6 +423,12 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_ADSR")) {   // amp envelope knobs "a,d,s,r"
         XtSynth::Controls c;
         std::sscanf(e, "%d,%d,%d,%d", &c.attack, &c.decay, &c.sustain, &c.release);
+        syn.setControls(c);
+    }
+    if (const char* e = std::getenv("XT_PENV")) {   // pitch envelope "a,d,s,r,depth"
+        XtSynth::Controls c;
+        if (const char* f = std::getenv("XT_ADSR")) std::sscanf(f, "%d,%d,%d,%d", &c.attack, &c.decay, &c.sustain, &c.release);
+        std::sscanf(e, "%d,%d,%d,%d,%d", &c.pAttack, &c.pDecay, &c.pSustain, &c.pRelease, &c.pDepth);
         syn.setControls(c);
     }
     struct Ev { long at; int note; bool on; };

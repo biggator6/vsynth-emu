@@ -216,6 +216,10 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      (A/D/R-Sens, release from the note-off velocity), and Time KF scales
      decay and release by key (v48). Velocity's effect on level is still a
      linear gain.
+   - a pitch envelope (v49): the same generator, linear, with the XT's depth
+     curve (±6000 cents). Voices are updated as on the XT: every 10 ms the
+     envelopes step and pitch, formant, time and Energy move 70% toward
+     their targets, so knob changes glide in 10 ms steps.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 

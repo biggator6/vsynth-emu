@@ -1543,6 +1543,55 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The voice update and the pitch envelope (2026-10-29, v49)
+
+**Voice update** (`0x8950c1b0`, every 10 ms from the tone update). Each
+player value moves 70% of the way to its new target (0x3f333333 = 0.7):
+- the pitch ratio (+0x70), from `0x894f3ba0`;
+- the formant ratio (+0x74), from `0x894f3d40`;
+- Energy (+0x78), toward voice +0x18;
+- the walk (+0x7c), from `0x894f3c90`;
+- the gain target (+0x80), from `0x894f3dc0`.
+
+Note-on sets them directly (`0x894f3a00`…). So knob changes and
+modulation reach the player in 10 ms steps, 70% per step.
+
+**Pitch** (`0x894f3a00`, update twin `0x894f3ba0`):
+1. cents = V8 + env(+0x970)·V1c + LFO(+0x980)·V34 + ramp(+0x880) + V+0x994.
+2. Clamp to ±6000.
+3. Ratio = exp2(cents/1200) (`0x894ec090`, with 1/1200 as 0x3a5a740d),
+   × V+0xc × V+0x990, clamped to ±32.
+
+Time (`0x894f3ac0`) and formant (`0x894f3b30`) have the same shape with
+their envelopes and LFOs at +0x974/+0x984 and +0x978/+0x988.
+
+**Depth knob → cents** (`0x894e0ce0`; the pitch envelope's V1c and the
+pitch LFO's V34):
+- |d| ≤ 12: a 13-byte table at 0x897cef44 (0 to 40 cents);
+- then 50·|d| − 600 (to 36), 100·|d| − 2400 (to 48), 200·|d| − 7200
+  (to 60), and 400·|d| − 19200, with d's sign (±1200 cents at 36, ±6000 at
+  63).
+
+The converter `0x894e1920` multiplies the envelope depth by the envelope's
+velocity factor (the curve function `0x894ebd60`, whose Velocity Sens unit
+is open, see v48).
+
+**Port.**
+- `xtPitchDepthCents` equals `0x894e0ce0` on all 127 depths (`xt_env rom
+  conv`), with the table read from rom.2.
+- The plugin has a pitch envelope (ADSR through the same generator, curve 0,
+  and Depth), and its voices are updated as the XT updates them: the
+  envelopes step, then pitch, formant, walk and Energy move 70% toward their
+  targets, then the TVA.
+
+**Not yet:**
+- the time and formant envelopes and the OSC LFO depths: their converter,
+  the VariPhrase one that also writes time, formant and Energy, is not
+  found (see v48, Energy);
+- the LFO itself (`0x894f1050` tick, rate `0x894f1320` = f·65535/100 phase
+  per tick with f in Hz, setup `0x894f0cf0`; tempo sync, delay and fade, and
+  a shared-LFO link at +0x7c).
+
 ### Envelope velocity and key follow; velocity to level; Energy (2026-10-29, v48)
 
 **Times** (`0x894df7b0`, knob, velocity, sens, 16.16 scale):

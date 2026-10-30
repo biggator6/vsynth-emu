@@ -2355,3 +2355,21 @@ Round-2 recordings.  First build-out after that: real-time granular port
   still a linear gain.
 - Energy: the OSC block's path (context +0x434 → `0x894f2600` → voice +0x18)
   is mapped, but the routine that writes the Energy value is not found.
+
+### Session 16 addendum (2026-10-29) — v49: pitch envelope and the XT's voice update
+
+- The Vari voice update `0x8950c1b0` runs from the tone update every
+  10 ms. It moves the player's pitch ratio, formant ratio, Energy, walk and
+  gain target 70% toward their targets (0x3f333333); note-on sets them
+  directly.
+- Pitch is V8 + env·V1c + LFO·V34 + ramp + bend in cents, clamped to ±6000,
+  then exp2(cents/1200) × base ratios, clamped to ±32.
+- The depth knob → cents mapping `0x894e0ce0` is piecewise (a small table to
+  12, then 50/100/200/400 cents per step, ±6000 at 63). Its port equals the
+  firmware on all 127 depths.
+- The plugin gains a pitch envelope (curve 0 through `XtEnvelope`) and
+  updates its voices as the XT does, so knob changes now glide in 10 ms
+  steps. Checked on a sine: +600 cents at depth 24, falling linearly in
+  cents over the decay. PluginTest stays bit-identical; `auval` passes.
+- Still open: time and formant envelopes and the OSC LFO depths (the
+  VariPhrase converter is not found), and the LFO generator.

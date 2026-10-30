@@ -217,6 +217,13 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+PITCH ENVELOPE v49 (2026-10-29): voice update as 0x8950c1b0 (70% toward the
+  targets every 10 ms for pitch, formant, walk, Energy); pitch envelope
+  (pitchEnvAttack/Decay/Sustain/Release 0..127, pitchEnvDepth −63..+63 via
+  the depth curve 0x894e0ce0, equal to the firmware on all 127 depths).
+  XtSynth CLI: XT_PENV="a,d,s,r,depth"; PluginTest: TEST_PENV. Open: time and
+  formant envelopes and OSC LFO depths (their converter not found), the LFO.
+
 ENVELOPE VELOCITY v48 (2026-10-29): A/D/R-Sens and Time KF in the amp
   envelope's times (0x894df7b0 time converter ported, 1,045,760 cases equal
   to the firmware; Time KF scales 0x894df760 computed by the firmware at ROM
