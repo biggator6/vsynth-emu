@@ -2393,3 +2393,41 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The plugin gains a pitch LFO with eight parameters. Checked as vibrato:
   ±47 cents at depth 13, a 1.03 s period at rate 64. PluginTest stays
   bit-identical; `auval` passes.
+
+### Session 16 addendum (2026-10-30) — v51: the VariPhrase converter (time, formant, Energy)
+
+- Found the VariPhrase OSC converter. The OSC converter `0x894e48a0` hands
+  a VariPhrase OSC to `0x894e2f20`. That routine writes pitch, time and
+  formant with their envelope and LFO depths, plus the gain and level. Then
+  a tail chosen by encode type (`0x894e4030` for SOLO/BACKING/ENSEMBLE,
+  `0x894e3d50` for LITE) writes Energy and the pitch offsets.
+- Time (`0x894e0da0`) is the walk speed:
+  - x/20 + base within ±60, then on to ±5 at ±63;
+  - base −1/0/+1 for Time Offset BWD/ZERO/FWD (the labels are in the ROM);
+  - then × 2^(KF·(key − 60)/1200), clamped to ±5.
+  With FWD, Time 0 plays as recorded, +20 doubles the speed, and −20
+  freezes.
+- Formant is f/63 + KF·(key − 60)/1200 octaves, clamped to ±1. The voice
+  ratio is 2^(formant + env·depth + LFO·depth), clamped to [0.5, 2],
+  through the firmware's table-based exp2 (`0x894ec090`).
+- Energy is the level curve 32768·(k/127)² at 0x897cfcb8, so g = (k/127)².
+  The references' g ≈ 0.05 is Energy ≈ 28.
+- `XtOsc` equals `0x894e2f20` on 310,545 cases × 6 values, run in the
+  interpreter with the matrix fetch hooked:
+  - knob + matrix sums −100…+100;
+  - all offsets, ten KFs, every key.
+  Its exp2 equals the firmware's on 17,143 arguments.
+- The plugin, with a ROM:
+  - TIME and FORMANT are the XT's knobs;
+  - new: Time Offset, Time KF and Formant KF, Energy OFF/1–127, time and
+    formant envelopes, and the LFO's time and formant depths;
+  - at the defaults the output is bit-identical to v50;
+  - on the vocal, Time +20 plays it in 1.79 s (3.55 s at 0), −10 in
+    7.07 s, and −20 holds;
+  - the band players now accept walk 0 (before, they rejected it and the
+    voice went silent).
+- PluginTest is bit-identical on all four files with the new knobs set;
+  engine tests and `auval` pass. PluginTest can also snapshot the editor
+  (`TEST_SNAPSHOT`).
+- Not modelled: backward walk (it holds at 0), the envelope depths' velocity
+  sensitivity, and controllers, the matrix and Time Trip.

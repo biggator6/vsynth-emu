@@ -284,7 +284,7 @@ int main(int argc, char** argv) {
                       << "  --pitch <semitones>   Pitch shift (-24 to +24)\n"
                       << "  --time <ratio>        Time stretch (0.25 to 4.0)\n"
                       << "  --formant <semitones> Formant shift (-12 to +12)\n"
-                      << "  --energy <g>          SOLO Energy amount (0 = OFF; the references fit 0.05)\n"
+                      << "  --energy <g>          SOLO Energy amount g = (knob/127)² (0 = OFF; the references fit 0.05)\n"
                       << "  --algo <name>         passthrough|pv|sms|lpc|hybrid\n"
                       << "  --robot               Enable robot mode\n"
                       << "  --block <samples>     Processing block size (default 512)\n";

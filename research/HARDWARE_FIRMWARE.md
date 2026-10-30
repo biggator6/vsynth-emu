@@ -870,8 +870,8 @@ default OFF, as on the XT). `render_suite.py` renders at 0.05. Result: suite
 +2.3).
 
 **Open:**
-- The knob → g mapping. g is smoothed ×0.7 per update toward a voice float
-  at +0x18 (`0x8950c1b0`); its converter is probably inside `0x894e1920`.
+- ~~The knob → g mapping~~: g = (k/127)², from the VariPhrase converter's
+  tail `0x894e4030` (v51). The references' g ≈ 0.05 is Energy ≈ 28.
 - The EMU-TEST patch's actual Energy value. The patch file is bit-packed; the
   value is easiest to read on the XT (OSC → Formant (PCM) page).
 
@@ -1543,6 +1543,149 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The VariPhrase converter: time, formant and Energy (2026-10-30, v51)
+
+**Where.** The OSC converter `0x894e48a0` (called for OSC1 and OSC2 by the
+conversion pass `0x894ebbd0`) hands a VariPhrase OSC to `0x894e2f20(input,
+OSC block)`. That routine fills:
+- the pitch, time and formant slots;
+- their envelope and LFO depths;
+- the gain and level.
+
+It then calls a tail chosen by the encode type (+0x87):
+- `0x894e4030` for SOLO, BACKING and ENSEMBLE;
+- `0x894e3d50` for LITE.
+
+The tail writes the pitch offsets (+0x08, +0x68), the flags (+0xb4) and
+Energy.
+
+**Input block** (bytes unless noted). Matrix destinations are given as
+OSC1/OSC2:
+
+| Offset | Parameter | Matrix |
+|---|---|---|
+| +0x48 | Time | 7/21 |
+| +0x4a (s16) | Time KF | |
+| +0x4c | Time LFO Depth | 13/27 |
+| +0x4d | Time Envelope Depth | 8/22 |
+| +0x4e, +0x50 (s16) | time envelope velocity curve, sens | |
+| +0x52 | Formant | 9/23 |
+| +0x54 (s16) | Formant KF | |
+| +0x56 | Formant LFO Depth | 14/28 |
+| +0x57 | Formant Envelope Depth | 10/24 |
+| +0x58, +0x5a (s16) | formant envelope velocity curve, sens | |
+| +0x61 | Time Offset: 0 BWD, 1 ZERO, 2 FWD (labels at 0x8977c4dc) | |
+| +0x62 | Energy (OFF, 1–127) | none |
+
+Each knob is added to its matrix value (`0x894d96d0`, a 16-bit sum). It
+also gets a realtime-controller term:
+- the structs behind `0x894e7010`/`0x894e7320`;
+- the part's bytes at +0x180…+0x183.
+
+These terms are 0 with no controller assigned.
+
+**Time** (+0x10): `0x894e0da0(t, controller, part bytes, Time KF, key −
+60, base)`.
+1. base = −1, 0, +1 for BWD, ZERO, FWD.
+2. x = t + controller·63/12000, clamped to ±63.
+3. For |x| ≤ 60: x/20 + base. Beyond that, a line on to ±5 at ±63:
+   ((5 − (base + 3))·(x − 60))/3 + (base + 3), and its mirror below −60.
+4. Add (b1 − 3·b0)/127 from the part bytes, multiply by
+   2^(KF·(key − 60)/1200) (the firmware's powf `0x8952ff9c`), clamp to ±5.
+
+This is the player's walk speed. With FWD:
+- Time 0 plays as recorded;
+- +20 plays at double speed, and −10 at half speed;
+- −20 holds (the VariPhrase freeze);
+- −40 plays backward at normal speed.
+
+**Time envelope and LFO depths** (+0x24, +0x3c): d/20 within ±60, then
+3 + (2d − 120)/3 out to ±5 at ±63.
+- The envelope's d is not clamped. It is multiplied by its velocity factor
+  (the curve function `0x894ebd60`, /32768).
+- The LFO's d is clamped to ±63 first.
+
+**Formant** (+0x14), in octaves:
+1. f·12000/63 + controller, clamped to ±12000.
+2. Then /12000·63/63, plus KF·(key − 60)/1200.
+3. Clamp to ±1.
+
+**Formant envelope and LFO depths** (+0x2c, +0x44): d/63 octaves. The
+envelope's is multiplied by its velocity factor; the LFO's is clamped to ±63
+first.
+
+**Energy** (+0x18, in `0x894e4030`): the u16 level curve at 0x897cfcb8 at
+the Energy byte, divided by 32768.
+- The curve is 32768·(k/127)², truncated, so g = (k/127)²: OFF → 0,
+  64 → 0.254, 127 → 1.
+- The vocal references' g ≈ 0.05 is Energy ≈ 28.
+- The same curve scales the OSC's level and gain (+0x54, +0x5c).
+- No matrix value is added.
+
+**The other slots it writes:**
+- +0x0c, the pitch ratio: 2^(curve(Pitch)/1200 + a part term);
+- the pitch envelope and LFO depths (+0x1c, +0x34), through the depth curve
+  `0x894e0ce0`, as already ported;
+- the gain (+0x5c): 2^(Wave Gain/6) times the level curve at +0x84 and at
+  +0x86;
+- the level (+0x54) and its LFO depth (+0x58, the signed square of d/63);
+- the envelope indices: pitch 1/5 (+0x20), time 2/6 (+0x28), formant 3/7
+  (+0x30), level 4/8 (+0x4c);
+- the LFO index 1/2.
+
+All three depths ride the same OSC LFO.
+
+**The voice's targets.** Note-on uses `0x894f3ac0`/`0x894f3b30`; the
+update uses `0x894f3c90`/`0x894f3d40`.
+- walk = (time + env(+0x974)·time env depth + LFO(+0x984)·time LFO depth)·k,
+  clamped to ±5. For LITE with Vari on (the LITE tail sets +0x80 = 2; 0
+  with Vari off) and with voice flag +0xd4 bit 1, it is also × voice +0x99c.
+- formant ratio = 2^(formant + env(+0x978)·depth + LFO(+0x988)·depth)·k,
+  clamped to [0.5, 2], × voice +0x9a0.
+- k (`0x894f4c00`) is 1 unless the Time Trip object (+0x910, +0x8c8) is
+  active. Then k is that object's value at +0x3c.
+
+The update moves the player 70% of the way to these every 10 ms (v49).
+
+**exp2** (`0x894ec090`, for the formant and pitch ratios):
+- n = trunc(|x|) and q = trunc(frac·65536);
+- 2^x = hi[q >> 8]·int[n]·lo[q & 0xff].
+
+The tables are at 0x897d0228 (hi), 0x897d0628 (lo) and 0x897d1228
+(2^0…2^6). Their negative-argument counterparts are at 0x897d0a28,
+0x897d0e28 and 0x897d1244.
+
+**Port.** `plugin/Source/XtOsc.cpp` equals the firmware's `0x894e2f20` on
+all 310,545 cases, six values each (`xt_osc`, notes.txt):
+- knob + matrix sums −100…+100;
+- the three offsets;
+- ten KFs;
+- every key.
+
+The firmware runs in the SH-4 interpreter with the matrix fetch hooked. The
+port's exp2 equals `0x894ec090` on 17,143 arguments. The Time KF scales come
+from the firmware's powf at ROM load (`xtFwOscTimeKeyScales`).
+
+**Plugin.**
+- With a ROM, the TIME and FORMANT knobs are the XT's Time and Formant
+  (−63…+63).
+- New: Time Offset, Time KF, Formant KF, and Energy OFF/1–127.
+- New: the time and formant envelopes (curve 0, like the pitch envelope)
+  and the LFO's time and formant depths.
+- At the defaults the output is bit-identical to v50 (SOLO, BACKING,
+  ENSEMBLE, stereo).
+- On the vocal: Time 0 plays 3.55 s, +20 plays 1.79 s, −10 plays 7.07 s,
+  and −20 holds.
+- The band players now accept walk 0 (they rejected it): their forward path
+  holds the walk position.
+
+**Not modelled:**
+- backward play: walk < 0 holds at 0, because the players' backward paths
+  (`0x8950e8f0`, `0x8950f4b0`) are not ported;
+- the time and formant envelope depths' velocity factor (their curve and
+  sens are not exposed);
+- controllers, the matrix, and Time Trip.
+
 ### The LFO (2026-10-29, v50)
 
 **Converter** (`0x894e0290`, patch → block):
@@ -1658,7 +1801,7 @@ is open, see v48).
 **Not yet:**
 - the time and formant envelopes and the OSC LFO depths: their converter,
   the VariPhrase one that also writes time, formant and Energy, is not
-  found (see v48, Energy);
+  found (see v48, Energy). Found in v51 (`0x894e2f20`);
 - the LFO itself (`0x894f1050` tick, rate `0x894f1320` = f·65535/100 phase
   per tick with f in Hz, setup `0x894f0cf0`; tempo sync, delay and fade, and
   a shared-LFO link at +0x7c).
@@ -1708,15 +1851,16 @@ Sens is −63…+63. The scaling between them, in the code that fills the
 per-part table at 0x89d2a6d0, is not found. So the plugin keeps a linear
 velocity gain for now.
 
-**Energy: still open.**
+**Energy: found in v51** (`0x894e4030`, g = (k/127)²). What v48 knew:
 - The OSC parameter block lives at conversion context +0x434 (OSC2 at
   +0x508). The glue `0x894db8a0` passes it on, and `0x894f2600` copies it
   into the voice; +0x18 is the Energy target that `0x8950c1b0` smooths.
 - The OSC converter `0x894e1920` writes +8/+0xc and the envelope and LFO
   depths, but not +0x10, +0x14 or +0x18 (time, formant, Energy).
-- The parameter names ("OSC 1 Energy" at 0x8975e3d4) sit in matrix
-  destination descriptors {name, short name, id} at 0x89835b5c, not in the
-  patch layout.
+- The parameter names ("OSC 1 Energy" at 0x8975e3d4) sit in descriptors
+  {name, short name, id} at 0x89835b5c, not in the patch layout. (v51: their
+  ids, 0x2ae…0x370, are not the converter's matrix destinations, and the
+  converter fetches none for Energy.)
 - The routine that writes +0x18 is not found yet.
 
 ### The WAV import converter (2026-10-29, v47)

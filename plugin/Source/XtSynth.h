@@ -15,6 +15,7 @@
 #include "XtEnvelope.h"
 #include "XtLfo.h"
 #include "XtMultiBandPlayer.h"
+#include "XtOsc.h"
 #include "XtSoloVoice.h"
 
 struct XtEncoded {
@@ -45,20 +46,28 @@ class XtSynth {
 public:
     static constexpr int kVoices = 16;
     struct Controls {
-        float pitchSemis = 0, timeStretch = 1, formantSemis = 0, energy = 0;
+        float pitchSemis = 0;
         int rootKey = 60;
+        // the VariPhrase OSC (XtOsc): Time and Formant −63..+63, Time Offset
+        // 0 BWD / 1 ZERO / 2 FWD, Time and Formant KF −200..+200 (% per
+        // octave, steps of 10), Energy 0 (OFF)..127
+        int oscTime = 0, oscTimeOffset = 2, oscTimeKF = 0, oscFormant = 0, oscFormantKF = 0, energy = 0;
         // amp envelope knobs, 0..127 as on the XT (release 16 = 30 ms);
         // velocity → time sensitivities −63..+63; Time KF −200..+200
         int attack = 0, decay = 0, sustain = 127, release = 16;
         int aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
         // pitch envelope knobs 0..127 and its depth −63..+63 (0x894e0ce0 cents)
         int pAttack = 0, pDecay = 64, pSustain = 0, pRelease = 64, pDepth = 0;
+        // time and formant envelopes, the same, with their depths −63..+63
+        // (time: ±3 at ±60, ±5 at ±63; formant: d/63 octaves)
+        int tAttack = 0, tDecay = 64, tSustain = 0, tRelease = 64, tDepth = 0;
+        int fAttack = 0, fDecay = 64, fSustain = 0, fRelease = 64, fDepth = 0;
         // LFO: waveform 0..7 in the XT's order (SIN, TRI, SAW, SQR, RND, TRP,
         // S&H, CHAOS), rate/delay/fade 0..127, offset 0..4 (−100…+100), fade
         // mode 0..3 (ON <<, ON >>, OFF <<, OFF >>); its pitch depth −63..+63
         int lfoWave = 0, lfoRate = 64, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
         bool lfoKeySync = true;
-        int lfoPitchDepth = 0;
+        int lfoPitchDepth = 0, lfoTimeDepth = 0, lfoFormantDepth = 0;
     };
 
     XtSynth();
@@ -83,7 +92,7 @@ private:
         float gain = 1;               // velocity
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
         XtEnvelope env;
-        XtEnvelope penv;               // pitch envelope (curve 0)
+        XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtLfo lfo;
         // the player's pitch ratio, formant ratio, walk and Energy as the
         // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
@@ -123,7 +132,7 @@ private:
     void applyRates(Voice& v);
     void tvaUpdate(Voice& v);
     XtEnvParams envParams(const Voice& v) const;
-    XtEnvParams pitchEnvParams(const Voice& v) const;
+    XtEnvParams oscEnvParams(const Voice& v, int a, int d, int s, int r) const;   // pitch, time, formant
     XtLfoParams lfoParams() const;
     float drawSeed();
 };

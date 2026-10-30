@@ -35,7 +35,7 @@ Document current settings here; update if anything changes between sessions.
 | VariPhrase Pitch | As needed | Set per test case |
 | VariPhrase Time | As needed | Set per test case |
 | VariPhrase Formant | As needed | Set per test case |
-| Formant (PCM) page: Energy | **unknown — please read and note** | The references fit Energy **on**, at a small amount (see "Energy check and calibration" below) |
+| Formant (PCM) page: Energy | **unknown — please read and note** | The references fit Energy **on**, about 28 by the decoded curve (see "Energy check and calibration" below) |
 | Formant (PCM) page: Formant KF, Fmt LFO Depth, formant envelope depth | **unknown — please read and note** | A non-zero value would explain the formant offset in the May sine takes |
 
 **Critical:** zero all VariPhrase parameters first, confirm passthrough is clean (null test
@@ -162,9 +162,10 @@ how the firmware combines KF with the knob.
 its fundamental 1.6–1.9 dB low and the content below it cut. That pattern
 follows F0 under pitch shift, which is what the SOLO player's **Energy**
 high-pass does when Energy is on. The engine reproduces it with a small
-internal amount (g ≈ 0.05), but the mapping from the XT's Energy knob
-(OFF, 1–127) to g is not decoded yet. (research/HARDWARE_FIRMWARE.md,
-"Output chain")
+internal amount (g ≈ 0.05). The firmware maps the Energy knob (OFF, 1–127)
+to g = (k/127)² (v51), so that fit says Energy ≈ 28.
+(research/HARDWARE_FIRMWARE.md, "Output chain" and "The VariPhrase
+converter")
 
 **Step 1 — read the EMU-TEST patch (no recording).** On the XT, open the
 EMU-TEST patch, then OSC → **Formant (PCM)** page (manual p. 92). Note these
@@ -177,7 +178,8 @@ values in the patch table above:
 | Fmt LFO Depth | |
 | Formant envelope depth (formant envelope screen) | |
 
-**Step 2 — Energy calibration takes.** Use wave 004 (the SOLO vocal), the
+**Step 2 — Energy calibration takes (now optional: they check the decoded
+mapping, g = 0, 0.063, 0.254 and 1 for the four values below).** Use wave 004 (the SOLO vocal), the
 same capture chain as the other vocal takes (48 kHz stereo), and ~0.5 s of
 lead-in. Pitch **−12** for every take, because the Energy amount only
 changes the sound when the pitch is shifted. Keep every other setting as in
@@ -194,8 +196,8 @@ Optional: repeat at pitch **+7** with the same four Energy values. The +7
 damping depends on g differently (1.2 − 0.5g against 1.2 − g at −12), so
 those takes cross-check the mapping.
 
-Save them in `sustained/`. They need no renderer mapping yet; they're used to
-fit the knob → g curve.
+Save them in `sustained/`. The plugin's Energy knob now uses the decoded
+curve, so they can be rendered at the same knob values and compared.
 
 ## Repeat-budget check (added 2026-10-28) — one take
 

@@ -46,9 +46,11 @@ inline int16_t to16(double v) { return (int16_t)std::clamp(std::lround(v * 32768
 
 bool xtSynthSetRom(const std::string& path) {
     g_romReady = xtLoadTables(path.c_str()) && xtMbLoadTables(path.c_str()) && xtEnvLoadTables(path.c_str())
-              && xtLfoLoadTables(path.c_str()) && xtFwOpen(path.c_str());
+              && xtLfoLoadTables(path.c_str()) && xtOscLoadTables(path.c_str()) && xtFwOpen(path.c_str());
     std::vector<uint32_t> ks;
     if (g_romReady && xtFwEnvKeyScales(ks)) xtEnvSetKeyScales(ks.data());
+    std::vector<float> ts;
+    if (g_romReady && xtFwOscTimeKeyScales(ts)) xtOscSetTimeKeyScales(ts.data());
     return g_romReady;
 }
 bool xtSynthRomReady() { return g_romReady; }
@@ -183,22 +185,28 @@ constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
 }
 
 // The player's targets (0x894f3ba0 pitch, 0x894f3d40 formant, 0x894f3c90
-// time, voice +0x18 Energy): pitch in cents with the pitch envelope at its
-// depth, clamped to ±6000; formant clamped to [0.5, 2]; the XT's time range
-// is ±5.
+// walk, voice +0x18 Energy): pitch in cents with the pitch envelope at its
+// depth, clamped to ±6000; formant and walk from the VariPhrase converter
+// (XtOsc) with their envelopes and the LFO, the formant ratio within
+// [0.5, 2], the walk within ±5.
 void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g) const {
     double cents = ((double)(v.note - ctl.rootKey) + ctl.pitchSemis) * 100.0
                  + (double)v.penv.level() * (double)xtPitchDepthCents((float)ctl.pDepth)
                  + (double)v.lfo.out() * (double)xtPitchDepthCents((float)ctl.lfoPitchDepth);
     cents = std::clamp(cents, -6000.0, 6000.0);
     A = (float)std::exp2(cents / 1200.0);
-    F = (float)std::clamp(std::pow(2.0, ctl.formantSemis / 12.0), 0.5, 2.0);
-    walk = (float)(1.0 / std::clamp((double)ctl.timeStretch, 0.2, 5.0));
-    g = ctl.energy;
+    F = xtOscFormantRatio(xtOscFormant(ctl.oscFormant, ctl.oscFormantKF, v.note), v.fenv.level(),
+                          xtOscFormantEnvDepth(ctl.fDepth), v.lfo.out(), xtOscFormantLfoDepth(ctl.lfoFormantDepth));
+    walk = xtOscWalk(xtOscTime(ctl.oscTime, ctl.oscTimeOffset, ctl.oscTimeKF, v.note), v.tenv.level(),
+                     xtOscTimeEnvDepth(ctl.tDepth), v.lfo.out(), xtOscTimeLfoDepth(ctl.lfoTimeDepth));
+    // A negative walk plays backward on the XT; the players' backward paths
+    // are not ported, so it holds as at 0.
+    walk = std::max(walk, 0.0f);
+    g = xtOscEnergy(ctl.energy);
 }
 
 void XtSynth::applyRates(Voice& v) {
-    if (cur->type == 1) { v.solo.setRates(v.curA, v.curF, 1.0 / v.curWalk); v.solo.setEnergy(v.curG); }
+    if (cur->type == 1) { v.solo.setRates(v.curA, v.curF, v.curWalk); v.solo.setEnergy(v.curG); }
     else v.mb.setRates(v.curA, v.curWalk);
 }
 
@@ -213,9 +221,9 @@ float XtSynth::drawSeed() {
     return std::fabs(chaosSeed * 2.0f - 1.0f);
 }
 
-XtEnvParams XtSynth::pitchEnvParams(const Voice& v) const {
+XtEnvParams XtSynth::oscEnvParams(const Voice& v, int a, int d, int s, int r) const {
     XtEnvKnobs k;
-    k.attack = ctl.pAttack; k.decay = ctl.pDecay; k.sustain = ctl.pSustain; k.release = ctl.pRelease;
+    k.attack = a; k.decay = d; k.sustain = s; k.release = r;
     return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);
 }
 
@@ -232,6 +240,8 @@ void XtSynth::setControls(const Controls& c) {
     const bool envChanged = c.attack != ctl.attack || c.decay != ctl.decay || c.sustain != ctl.sustain || c.release != ctl.release
                          || c.aSens != ctl.aSens || c.dSens != ctl.dSens || c.rSens != ctl.rSens || c.timeKF != ctl.timeKF;
     const bool penvChanged = c.pAttack != ctl.pAttack || c.pDecay != ctl.pDecay || c.pSustain != ctl.pSustain || c.pRelease != ctl.pRelease;
+    const bool tenvChanged = c.tAttack != ctl.tAttack || c.tDecay != ctl.tDecay || c.tSustain != ctl.tSustain || c.tRelease != ctl.tRelease;
+    const bool fenvChanged = c.fAttack != ctl.fAttack || c.fDecay != ctl.fDecay || c.fSustain != ctl.fSustain || c.fRelease != ctl.fRelease;
     const bool lfoChanged = c.lfoWave != ctl.lfoWave || c.lfoRate != ctl.lfoRate || c.lfoOffset != ctl.lfoOffset || c.lfoDelay != ctl.lfoDelay
                          || c.lfoFadeMode != ctl.lfoFadeMode || c.lfoFade != ctl.lfoFade;
     ctl = c;
@@ -239,7 +249,9 @@ void XtSynth::setControls(const Controls& c) {
     for (Voice& v : voice) {
         if (!v.active) continue;
         if (envChanged) v.env.update(envParams(v));
-        if (penvChanged) v.penv.update(pitchEnvParams(v));
+        if (penvChanged) v.penv.update(oscEnvParams(v, ctl.pAttack, ctl.pDecay, ctl.pSustain, ctl.pRelease));
+        if (tenvChanged) v.tenv.update(oscEnvParams(v, ctl.tAttack, ctl.tDecay, ctl.tSustain, ctl.tRelease));
+        if (fenvChanged) v.fenv.update(oscEnvParams(v, ctl.fAttack, ctl.fDecay, ctl.fSustain, ctl.fRelease));
         if (lfoChanged) v.lfo.update(lfoParams());
     }
 }
@@ -269,11 +281,13 @@ void XtSynth::noteOn(int note, float velocity) {
     v->step = (v->target - v->cur) / (ms * kFramesPerMs);
     v->elapsed = 0;
     // The note-on converters set the player directly (0x894f3a00…)
-    v->penv.noteOn(pitchEnvParams(*v));
+    v->penv.noteOn(oscEnvParams(*v, ctl.pAttack, ctl.pDecay, ctl.pSustain, ctl.pRelease));
+    v->tenv.noteOn(oscEnvParams(*v, ctl.tAttack, ctl.tDecay, ctl.tSustain, ctl.tRelease));
+    v->fenv.noteOn(oscEnvParams(*v, ctl.fAttack, ctl.fDecay, ctl.fSustain, ctl.fRelease));
     v->lfo.noteOn(lfoParams(), drawSeed());
     if (!ctl.lfoKeySync && freeLfoOn) v->lfo.setPhase(freeLfo.phase());
     targets(*v, v->curA, v->curF, v->curWalk, v->curG);
-    if (cur->type == 1) v->solo.noteOn(cur->solo, v->curA, v->curF, 1.0 / v->curWalk, v->curG);
+    if (cur->type == 1) v->solo.noteOn(cur->solo, v->curA, v->curF, v->curWalk, v->curG);
     else if (!v->mb.noteOn(cur->wave, cur->type, v->curA, v->curWalk)) v->active = false;
 }
 
@@ -286,8 +300,12 @@ void XtSynth::noteOff(int note, float velocity) {
             v.relVel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
             v.env.update(envParams(v));
             v.env.noteOff();
-            v.penv.update(pitchEnvParams(v));
+            v.penv.update(oscEnvParams(v, ctl.pAttack, ctl.pDecay, ctl.pSustain, ctl.pRelease));
             v.penv.noteOff();
+            v.tenv.update(oscEnvParams(v, ctl.tAttack, ctl.tDecay, ctl.tSustain, ctl.tRelease));
+            v.tenv.noteOff();
+            v.fenv.update(oscEnvParams(v, ctl.fAttack, ctl.fDecay, ctl.fSustain, ctl.fRelease));
+            v.fenv.noteOff();
             v.lfo.noteOff();
         }
 }
@@ -338,6 +356,8 @@ void XtSynth::mixBlock(float* lr) {
             // moves the player 70% toward its targets (0x8950c1b0), then the TVA
             v.env.tick();
             v.penv.tick();
+            v.tenv.tick();
+            v.fenv.tick();
             v.lfo.tick(1);
             float A, F, w, g;
             targets(v, A, F, w, g);
@@ -426,7 +446,10 @@ void XtSynth::render(float* left, float* right, int n) {
 //   Renders notes (onset/off in host frames) to float32 L/R pairs.
 //   XT_ADSR="a,d,s,r": amp envelope knobs (default 0,0,127,16).
 //   XT_PENV="a,d,s,r,depth": pitch envelope knobs.
+//   XT_TENV, XT_FENV="a,d,s,r,depth": time and formant envelope knobs.
 //   XT_LFO="wave,rate,depth,delay,mode,fade,offset,keysync": the LFO.
+//   XT_OSC="time,offset,timeKF,formant,formantKF,energy[,lfoTime,lfoFormant]":
+//     the VariPhrase OSC knobs (Time Offset 0 BWD, 1 ZERO, 2 FWD).
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -451,25 +474,25 @@ int main(int argc, char** argv) {
     XtSynth syn;
     syn.prepare(host);
     syn.setSample(E);
-    if (const char* e = std::getenv("XT_ADSR")) {   // amp envelope knobs "a,d,s,r"
-        XtSynth::Controls c;
+    XtSynth::Controls c;
+    if (const char* e = std::getenv("XT_ADSR"))     // amp envelope knobs "a,d,s,r"
         std::sscanf(e, "%d,%d,%d,%d", &c.attack, &c.decay, &c.sustain, &c.release);
-        syn.setControls(c);
-    }
     if (const char* e = std::getenv("XT_LFO")) {    // LFO "wave,rate,depth,delay,mode,fade,offset,keysync"
-        XtSynth::Controls c;
         int ks = 1;
         std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &c.lfoWave, &c.lfoRate, &c.lfoPitchDepth, &c.lfoDelay, &c.lfoFadeMode, &c.lfoFade,
                     &c.lfoOffset, &ks);
         c.lfoKeySync = ks != 0;
-        syn.setControls(c);
     }
-    if (const char* e = std::getenv("XT_PENV")) {   // pitch envelope "a,d,s,r,depth"
-        XtSynth::Controls c;
-        if (const char* f = std::getenv("XT_ADSR")) std::sscanf(f, "%d,%d,%d,%d", &c.attack, &c.decay, &c.sustain, &c.release);
+    if (const char* e = std::getenv("XT_PENV"))     // pitch envelope "a,d,s,r,depth"
         std::sscanf(e, "%d,%d,%d,%d,%d", &c.pAttack, &c.pDecay, &c.pSustain, &c.pRelease, &c.pDepth);
-        syn.setControls(c);
-    }
+    if (const char* e = std::getenv("XT_TENV"))
+        std::sscanf(e, "%d,%d,%d,%d,%d", &c.tAttack, &c.tDecay, &c.tSustain, &c.tRelease, &c.tDepth);
+    if (const char* e = std::getenv("XT_FENV"))
+        std::sscanf(e, "%d,%d,%d,%d,%d", &c.fAttack, &c.fDecay, &c.fSustain, &c.fRelease, &c.fDepth);
+    if (const char* e = std::getenv("XT_OSC"))
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &c.oscTime, &c.oscTimeOffset, &c.oscTimeKF, &c.oscFormant, &c.oscFormantKF,
+                    &c.energy, &c.lfoTimeDepth, &c.lfoFormantDepth);
+    syn.setControls(c);
     struct Ev { long at; int note; bool on; };
     std::vector<Ev> ev;
     for (int a = 9; a < argc; ++a) {

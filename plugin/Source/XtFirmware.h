@@ -44,5 +44,10 @@ bool xtFwImport(const int16_t* pcm, long frames, int channels, int rate, std::ve
 // keys 0..127: 41 × 128 values, by kf then key.
 bool xtFwEnvKeyScales(std::vector<uint32_t>& out);
 
+// The VariPhrase Time KF scales: 2^(kf·(key − 60)/1200) by the firmware's
+// powf (0x8952ff9c), the exponent formed as 0x894e0da0 forms it, for the
+// same 41 kf × 128 keys (XtOsc).
+bool xtFwOscTimeKeyScales(std::vector<float>& out);
+
 // Round to nearest instead of FPSCR.RM (to match Ghidra's P-code emulator).
 void xtFwForceNearest(bool on);

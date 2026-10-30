@@ -2,6 +2,7 @@
 // The setup mirrors research/ghidra_scripts/EmuEnc.java and EmuLoad.java.
 #include "XtFirmware.h"
 #include "Sh4Interp.h"
+#include "XtFloat.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -207,6 +208,25 @@ bool xtFwEnvKeyScales(std::vector<uint32_t>& out) {
             uint32_t r0 = 0;
             if (!M->cpu.call(0x894df760, { (uint32_t)key, (uint32_t)(-200 + 10 * i) }, kStack, &r0)) { out.clear(); return false; }
             out[(size_t)(i * 128 + key)] = r0;
+        }
+    return true;
+}
+
+bool xtFwOscTimeKeyScales(std::vector<float>& out) {
+    out.clear();
+    if (g_rom.empty()) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    out.resize(41 * 128);
+    for (int i = 0; i < 41; ++i)
+        for (int key = 0; key < 128; ++key) {
+            // fr4 = 2, fr5 = (float)(kf·(key − 60)) / 1200
+            const float two = 2.0f, e = xtf::div(xtf::flt((-200 + 10 * i) * (key - 60)), 1200.0f);
+            std::memcpy(&c.fb[0][4], &two, 4);
+            std::memcpy(&c.fb[0][5], &e, 4);
+            if (!c.call(0x8952ff9c, {}, kStack)) { out.clear(); return false; }
+            std::memcpy(&out[(size_t)(i * 128 + key)], &c.fb[0][0], 4);
         }
     return true;
 }

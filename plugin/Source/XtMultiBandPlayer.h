@@ -50,7 +50,8 @@ void xtMbAttach(const XtMbBands& b, XtMbWave& w);
 class XtMbPlayer {
 public:
     // Note-on (0x89510980 / 0x89510130): mode 3 = BACKING, 5 = ENSEMBLE.
-    // pitch = frequency ratio, walk = playback speed (1/stretch, > 0).
+    // pitch = frequency ratio, walk = playback speed (1/stretch; 0 holds the
+    // walk position; the backward path for walk < 0 is not ported).
     // Returns false if the tables are not loaded or the wave is unusable.
     bool noteOn(const XtMbWave& w, int mode, float pitch, float walk);
     // One 32-frame block: out[2·i] = L, out[2·i + 1] = R, int16 scale.  Runs

@@ -1,0 +1,231 @@
+// The XT's VariPhrase OSC converter — see XtOsc.h.  Single precision as the
+// SH-4 computes it (XtFloat.h).
+#include "XtOsc.h"
+#include "XtFloat.h"
+
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+
+namespace {
+
+constexpr uint32_t kRomBase = 0x89300000;
+constexpr uint32_t kLevelTab = 0x897cfcb8;   // u16 ×128: 32768·(k/127)², truncated (Energy, OSC levels)
+// exp2 (0x894ec090): 2^(hi/256) and 2^(lo/65536) for the bytes of a 16-bit
+// fraction, 2^n for the integer part; then the same for negative arguments.
+constexpr uint32_t kExpHi = 0x897d0228, kExpLo = 0x897d0628, kExpInt = 0x897d1228;
+constexpr uint32_t kExpHiNeg = 0x897d0a28, kExpLoNeg = 0x897d0e28, kExpIntNeg = 0x897d1244;
+
+struct Tables {
+    uint16_t level[128];
+    float hi[256], lo[256], in[7], hiN[256], loN[256], inN[7];
+    float keyScale[41][128];                  // xtOscSetTimeKeyScales
+    bool keyScales = false, ok = false;
+} T;
+
+template <class V> bool readAt(FILE* f, uint32_t addr, V* v, size_t n) {
+    return std::fseek(f, (long)(addr - kRomBase), SEEK_SET) == 0 && std::fread(v, sizeof(V), n, f) == n;
+}
+
+// 2^(kf·(key − 60)/1200): the exponent as 0x894e0da0 forms it, then powf
+float timeKeyScale(int kf, int key) {
+    if (kf == 0) return 1.0f;
+    if (T.keyScales && kf >= -200 && kf <= 200 && kf % 10 == 0 && key >= 0 && key < 128)
+        return T.keyScale[(kf + 200) / 10][key];
+    const float e = xtf::div(xtf::flt((int16_t)kf * (int16_t)(key - 60)), 1200.0f);
+    return (float)std::pow(2.0, (double)e);
+}
+
+// The depth curve the time envelope and LFO depths share: d/20 within ±60,
+// then on to ±5 at ±63 (2d − 120 is formed with FMAC).
+float timeDepth(int d) {
+    using namespace xtf;
+    const float x = flt(d);
+    if (x > 60.0f) return add(3.0f, div(add(mul(x, 2.0f), -120.0f), 3.0f));
+    if (-60.0f > x) return add(-3.0f, div(add(mul(x, -2.0f), -120.0f), -3.0f));
+    return add(div(x, 20.0f), 0.0f);
+}
+
+int clamp63(int d) { return d > 63 ? 63 : d < -63 ? -63 : d; }
+
+} // namespace
+
+bool xtOscLoadTables(const char* romPath) {
+    T.ok = false;
+    FILE* f = romPath ? std::fopen(romPath, "rb") : nullptr;
+    if (!f) return false;
+    const bool ok = readAt(f, kLevelTab, T.level, 128)
+                 && readAt(f, kExpHi, T.hi, 256) && readAt(f, kExpLo, T.lo, 256) && readAt(f, kExpInt, T.in, 7)
+                 && readAt(f, kExpHiNeg, T.hiN, 256) && readAt(f, kExpLoNeg, T.loN, 256) && readAt(f, kExpIntNeg, T.inN, 7);
+    std::fclose(f);
+    if (!ok) return false;
+    // Sanity: the level curve runs 0…32768 and rises; the exp2 tables start
+    // at 1 and the integer ones double and halve.
+    if (T.level[0] != 0 || T.level[127] != 32768) return false;
+    for (int i = 1; i < 128; ++i)
+        if (!(T.level[i] > T.level[i - 1])) return false;
+    if (T.hi[0] != 1.0f || T.lo[0] != 1.0f || T.hiN[0] != 1.0f || T.loN[0] != 1.0f) return false;
+    for (int i = 0; i < 7; ++i)
+        if (T.in[i] != std::ldexp(1.0f, i) || T.inN[i] != std::ldexp(1.0f, -i)) return false;
+    T.ok = true;
+    return true;
+}
+
+bool xtOscTablesLoaded() { return T.ok; }
+
+void xtOscSetTimeKeyScales(const float* t) {
+    for (int i = 0; i < 41; ++i)
+        for (int k = 0; k < 128; ++k) T.keyScale[i][k] = t[i * 128 + k];
+    T.keyScales = true;
+}
+
+float xtOscEnergy(int k) {
+    if (!T.ok || k <= 0) return 0.0f;
+    return xtf::div((float)T.level[k > 127 ? 127 : k], 32768.0f);
+}
+
+float xtOscTime(int t, int offset, int kf, int key) {
+    using namespace xtf;
+    // Time Offset (+0x61, 0x894e31d6): BWD −1, ZERO 0, FWD and above +1
+    const float base = offset == 0 ? -1.0f : offset == 1 ? 0.0f : 1.0f;
+    const float s = timeKeyScale(kf, key);
+    // x = t + controller·63/12000, the controller 0
+    float x = flt((int16_t)t), y;
+    bool up = false, down = false;
+    if (x > 63.0f) { x = 63.0f; up = true; }
+    else if (-63.0f > x) { x = -63.0f; down = true; }
+    else if (x > 60.0f) up = true;
+    else if (-60.0f > x) down = true;
+    if (up) {
+        const float u = add(base, 3.0f);
+        y = add(div(mul(sub(5.0f, u), add(x, -60.0f)), 3.0f), u);
+    } else if (down) {
+        const float u = add(base, -3.0f);
+        y = add(div(mul(sub(-5.0f, u), add(x, 60.0f)), -3.0f), u);
+    } else {
+        y = add(div(x, 20.0f), base);
+    }
+    // + (b1 − 3·b0)/127 from the part's bytes at +0x180 (0 with no controller)
+    y = mul(y, s);
+    return y > 5.0f ? 5.0f : (-5.0f > y ? -5.0f : y);
+}
+
+float xtOscTimeEnvDepth(int d) { return timeDepth((int16_t)d); }          // × the velocity factor (sens 0: 1)
+float xtOscTimeLfoDepth(int d) { return timeDepth(clamp63((int16_t)d)); }
+
+float xtOscFormant(int f, int kf, int key) {
+    using namespace xtf;
+    const float k = div(flt((int16_t)(key - 60) * (int16_t)kf), 1200.0f);
+    // f·12000/63 + the controller (0), within ±12000, back to /63
+    float v = div(mul(flt((int16_t)f), 12000.0f), 63.0f);
+    if (v > 12000.0f) v = 12000.0f;
+    else if (-12000.0f > v) v = -12000.0f;
+    const float r = add(div(mul(div(v, 12000.0f), 63.0f), 63.0f), k);
+    return r > 1.0f ? 1.0f : (-1.0f > r ? -1.0f : r);
+}
+
+float xtOscFormantEnvDepth(int d) { return xtf::div(xtf::flt((int16_t)d), 63.0f); }   // × the velocity factor (1)
+float xtOscFormantLfoDepth(int d) { return xtf::div(xtf::flt(clamp63((int16_t)d)), 63.0f); }
+
+float xtOscExp2(float x) {
+    using namespace xtf;
+    const bool neg = 0.0f > x;
+    if (neg) x = -x;
+    int n = ftrc(x);
+    const int q = ftrc(mul(sub(x, flt(n)), 65536.0f));    // the fraction, 16 bits
+    if (n > 6) n = 6;                                      // the integer tables end at 2^±6
+    const float* hi = neg ? T.hiN : T.hi;
+    const float* lo = neg ? T.loN : T.lo;
+    const float* in = neg ? T.inN : T.in;
+    return mul(mul(hi[(q >> 8) & 0xff], in[n]), lo[q & 0xff]);
+}
+
+float xtOscWalk(float time, float env, float envDepth, float lfo, float lfoDepth) {
+    using namespace xtf;
+    // (time + (env·depth + lfo·depth)) × the Time Trip factor (0x894f4c00: 1
+    // without Time Trip), clamped
+    const float w = add(time, add(mul(env, envDepth), mul(lfo, lfoDepth)));
+    return w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w);
+}
+
+float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, float lfoDepth) {
+    using namespace xtf;
+    const float r = xtOscExp2(add(formant, add(mul(env, envDepth), mul(lfo, lfoDepth))));
+    return r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r);
+}
+
+#ifdef XT_OSC_MAIN
+// xt_osc <rom.2.bin> : the firmware's VariPhrase converter (0x894e2f20) run
+// in the SH-4 interpreter beside the port, over knob + matrix sums −100…+100,
+// the three Time Offsets, Time and Formant KF and every key; and the
+// firmware's exp2 (0x894ec090) on a grid.  The matrix fetch (0x894d96d0)
+// is hooked to return the case's modulation; the controller getters return
+// a zeroed block, as with no controller assigned.  Run it without XT_ROUND:
+// this interpreter rounds toward zero, as the SH-4 does.
+#include "Sh4Interp.h"
+#include "XtFirmware.h"
+#include <cstring>
+#include <vector>
+int main(int argc, char** argv) {
+    if (argc < 2 || !xtOscLoadTables(argv[1]) || !xtFwOpen(argv[1])) { std::fprintf(stderr, "usage: xt_osc rom.2.bin\n"); return 2; }
+    std::vector<float> ks;
+    if (!xtFwOscTimeKeyScales(ks)) { std::fprintf(stderr, "time key scales failed\n"); return 1; }
+    xtOscSetTimeKeyScales(ks.data());
+    Sh4 c;
+    if (!c.loadRom(argv[1])) return 1;
+    const uint32_t ram = 0x8C000000, P = ram, out = ram + 0x400, part = ram + 0x800, zero = ram + 0xC00, sp = ram + 0xF0000;
+    c.mapRam(ram, 0x100000);
+    int mtx = 0;
+    c.hook(0x894d96d0, [&](Sh4& m) { m.ret((uint32_t)mtx); });
+    for (uint32_t a : { 0x894e7010u, 0x894e70b0u, 0x894e7320u, 0x894e7520u }) c.hook(a, [&](Sh4& m) { m.ret(zero); });
+    auto f32 = [&](uint32_t a) { const uint32_t v = c.rd32(a); float x; std::memcpy(&x, &v, 4); return x; };
+    auto bitsEq = [](float a, float b) { return std::memcmp(&a, &b, 4) == 0; };
+    long cases = 0, bad = 0;
+    float lo[6], hi[6];
+    for (int i = 0; i < 6; ++i) lo[i] = hi[i] = 0.0f;
+    const int kfs[] = { -200, -150, -100, -30, 0, 10, 50, 100, 170, 200 };
+    for (int sum = -100; sum <= 100; ++sum) {
+        const int knob = sum > 63 ? 63 : sum < -63 ? -63 : sum;
+        mtx = sum - knob;
+        for (int off = 0; off < 3; ++off)
+            for (int kf : kfs)
+                for (int key = 0; key < 128; key += (kf == 0 ? 1 : 3)) {
+                    std::vector<uint8_t> z(0x400, 0);
+                    c.write(P, z.data(), z.size()); c.write(out, z.data(), 0x100); c.write(part, z.data(), 0x200);
+                    c.wr8(P + 3, (uint8_t)key); c.wr8(P + 4, 100);
+                    for (uint32_t o : { 0x48u, 0x4cu, 0x4du, 0x52u, 0x56u, 0x57u }) c.wr8(P + o, (uint8_t)(int8_t)knob);
+                    c.wr16(P + 0x4a, (uint16_t)(int16_t)kf); c.wr16(P + 0x54, (uint16_t)(int16_t)kf);
+                    c.wr8(P + 0x61, (uint8_t)off);
+                    c.wr8(P + 0x87, 6);                                  // no encode-type tail
+                    c.wr32(P + 0xdc, part);
+                    if (!c.call(0x894e2f20, { P, out }, sp)) { std::fprintf(stderr, "convert: %s\n", c.error().c_str()); return 1; }
+                    const float fw[6] = { f32(out + 0x10), f32(out + 0x14), f32(out + 0x24), f32(out + 0x2c), f32(out + 0x3c), f32(out + 0x44) };
+                    const float po[6] = { xtOscTime(sum, off, kf, key), xtOscFormant(sum, kf, key), xtOscTimeEnvDepth(sum),
+                                          xtOscFormantEnvDepth(sum), xtOscTimeLfoDepth(sum), xtOscFormantLfoDepth(sum) };
+                    static const char* name[6] = { "time", "formant", "time env depth", "formant env depth", "time LFO depth", "formant LFO depth" };
+                    ++cases;
+                    for (int i = 0; i < 6; ++i) { lo[i] = std::fmin(lo[i], fw[i]); hi[i] = std::fmax(hi[i], fw[i]); }
+                    for (int i = 0; i < 6; ++i)
+                        if (!bitsEq(fw[i], po[i]) && bad++ < 12)
+                            std::printf("  %s: sum %d offset %d kf %d key %d: fw %.9g port %.9g\n", name[i], sum, off, kf, key, fw[i], po[i]);
+                }
+    }
+    std::printf("converter: %ld cases × 6 values, %ld different\n", cases, bad);
+    std::printf("  firmware ranges: time %g…%g, formant %g…%g, time env depth %g…%g, formant env depth %g…%g,\n"
+                "  time LFO depth %g…%g, formant LFO depth %g…%g\n", lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], lo[3], hi[3],
+                lo[4], hi[4], lo[5], hi[5]);
+    std::printf("  e.g. FWD at key 60: Time −20 → %g, +20 → %g, +63 → %g; Formant +21 → %g octave\n",
+                xtOscTime(-20, 2, 0, 60), xtOscTime(20, 2, 0, 60), xtOscTime(63, 2, 0, 60), xtOscFormant(21, 0, 60));
+    long eb = 0, en = 0;
+    for (int i = -60000; i <= 60000; i += 7) {
+        const float x = (float)i / 10007.0f;
+        uint32_t xb; std::memcpy(&xb, &x, 4); c.fb[0][4] = xb;
+        if (!c.call(0x894ec090, {}, sp)) { std::fprintf(stderr, "exp2: %s\n", c.error().c_str()); return 1; }
+        float fw; std::memcpy(&fw, &c.fb[0][0], 4);
+        ++en;
+        if (!bitsEq(fw, xtOscExp2(x)) && eb++ < 5) std::printf("  exp2(%.9g): fw %.9g port %.9g\n", x, fw, xtOscExp2(x));
+    }
+    std::printf("exp2: %ld arguments, %ld different\n", en, eb);
+    return bad || eb ? 3 : 0;
+}
+#endif

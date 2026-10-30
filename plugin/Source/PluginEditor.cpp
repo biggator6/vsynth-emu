@@ -1,15 +1,15 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 246;  // height of the XT strip below it
+static constexpr int kXtStripH   = 340;  // height of the XT strip below it
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 610);
+    setSize(560, 700);
     setResizable(true, true);
-    setResizeLimits(480, 400, 960, 760);
+    setResizeLimits(480, 480, 960, 860);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -37,13 +37,15 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     addAndMakeVisible(encodeBox_);
     encodeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "encodeType", encodeBox_);
     for (juce::Slider* sl : { &keySlider_, &depthSlider_, &energySlider_, &attackSlider_, &decaySlider_, &sustainSlider_, &releaseSlider_,
-                              &aSensSlider_, &dSensSlider_, &rSensSlider_, &kfSlider_,
+                              &aSensSlider_, &dSensSlider_, &rSensSlider_, &kfSlider_, &oscTkfSlider_, &oscFkfSlider_,
                               &pAttackSlider_, &pDecaySlider_, &pSustainSlider_, &pReleaseSlider_, &pDepthSlider_,
-                              &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_ }) {
+                              &tAttackSlider_, &tDecaySlider_, &tSustainSlider_, &tReleaseSlider_, &tDepthSlider_,
+                              &fAttackSlider_, &fDecaySlider_, &fSustainSlider_, &fReleaseSlider_, &fDepthSlider_,
+                              &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_, &lfoTimeSlider_, &lfoFmtSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
-        sl->setTextBoxStyle(sl->getTextBoxPosition(), false, 56, 20);
+        sl->setTextBoxStyle(sl->getTextBoxPosition(), false, sl == &keySlider_ ? 56 : 44, 20);
         addAndMakeVisible(*sl);
     }
     keyAtt_     = std::make_unique<SliderAtt>(processor_.apvts, "rootKey",     keySlider_);
@@ -62,6 +64,21 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     pSustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvSustain", pSustainSlider_);
     pReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvRelease", pReleaseSlider_);
     pDepthAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvDepth",   pDepthSlider_);
+    tAttackAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvAttack",   tAttackSlider_);
+    tDecayAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvDecay",    tDecaySlider_);
+    tSustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvSustain",  tSustainSlider_);
+    tReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvRelease",  tReleaseSlider_);
+    tDepthAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvDepth",    tDepthSlider_);
+    fAttackAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvAttack",  fAttackSlider_);
+    fDecayAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvDecay",   fDecaySlider_);
+    fSustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvSustain", fSustainSlider_);
+    fReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvRelease", fReleaseSlider_);
+    fDepthAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvDepth",   fDepthSlider_);
+    oscTkfAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "oscTimeKF",    oscTkfSlider_);
+    oscFkfAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "oscFormantKF", oscFkfSlider_);
+    timeOffsetBox_.addItemList({ "BWD", "ZERO", "FWD" }, 1);
+    addAndMakeVisible(timeOffsetBox_);
+    timeOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "oscTimeOffset", timeOffsetBox_);
     lfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);
     lfoModeBox_.addItemList({ "ON <<", "ON >>", "OFF <<", "OFF >>" }, 1);
     lfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
@@ -75,10 +92,16 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     lfoDepthAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "lfoPitchDepth", lfoDepthSlider_);
     lfoDelayAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "lfoDelay", lfoDelaySlider_);
     lfoFadeAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "lfoFade", lfoFadeSlider_);
+    lfoTimeAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "lfoTimeDepth", lfoTimeSlider_);
+    lfoFmtAtt_    = std::make_unique<SliderAtt>(processor_.apvts, "lfoFormantDepth", lfoFmtSlider_);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
                             &pAttackLabel_, &pDecayLabel_, &pSustainLabel_, &pReleaseLabel_, &pDepthLabel_,
-                            &lfoLabel_, &lfoRateLabel_, &lfoDepthLabel_, &lfoDelayLabel_, &lfoFadeLabel_ }) styleSmall(*l);
+                            &tAttackLabel_, &tDecayLabel_, &tSustainLabel_, &tReleaseLabel_, &tDepthLabel_,
+                            &fAttackLabel_, &fDecayLabel_, &fSustainLabel_, &fReleaseLabel_, &fDepthLabel_,
+                            &offsetLabel_, &oscTkfLabel_, &oscFkfLabel_,
+                            &lfoLabel_, &lfoRateLabel_, &lfoDepthLabel_, &lfoDelayLabel_, &lfoFadeLabel_,
+                            &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_ }) styleSmall(*l);
     timerCallback();
     startTimerHz(4);
 
@@ -88,8 +111,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     styleSlider(formantSlider_, formantLabel_);
 
     pitchAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "pitchShift",   pitchSlider_);
-    timeAtt_    = std::make_unique<SliderAtt>(processor_.apvts, "timeStretch",  timeSlider_);
-    formantAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "formantShift", formantSlider_);
+    attachMainKnobs(processor_.hasRom());
     robotAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, "robot",        robotBtn_);
 
     robotBtn_.setColour(juce::ToggleButton::textColourId,     juce::Colours::lightblue);
@@ -117,7 +139,16 @@ VSynthEmuEditor::~VSynthEmuEditor() {
     algoBox_.removeListener(this);
 }
 
+void VSynthEmuEditor::attachMainKnobs(bool xt) {
+    timeAtt_.reset();
+    formantAtt_.reset();
+    timeAtt_    = std::make_unique<SliderAtt>(processor_.apvts, xt ? "oscTime" : "timeStretch", timeSlider_);
+    formantAtt_ = std::make_unique<SliderAtt>(processor_.apvts, xt ? "oscFormant" : "formantShift", formantSlider_);
+    mainKnobsXt_ = xt;
+}
+
 void VSynthEmuEditor::timerCallback() {
+    if (timeAtt_ && processor_.hasRom() != mainKnobsXt_) attachMainKnobs(processor_.hasRom());
     statusLabel_.setText(processor_.getStatusText(), juce::dontSendNotification);
     statusLabel_.setColour(juce::Label::textColourId, processor_.hasRom() ? juce::Colours::lightgrey : juce::Colours::orange);
 }
@@ -206,9 +237,16 @@ void VSynthEmuEditor::resized() {
     depthLabel_.setBounds(row2.removeFromLeft(44));
     depthSlider_.setBounds(row2);
     xt.removeFromTop(6);
-    auto row3 = xt.removeFromTop(24);
-    energyLabel_.setBounds(row3.removeFromLeft(52));
-    energySlider_.setBounds(row3.withWidth(row3.getWidth() / 2));
+    auto row3 = xt.removeFromTop(24);                // the OSC: Energy, Time Offset, Time KF, Formant KF
+    const int sw = (row3.getWidth() - 46 - 38 - 80 - 50 - 46) / 3;   // the three sliders share what the labels leave
+    energyLabel_.setBounds(row3.removeFromLeft(46));
+    energySlider_.setBounds(row3.removeFromLeft(sw).withTrimmedRight(6));
+    offsetLabel_.setBounds(row3.removeFromLeft(38));
+    timeOffsetBox_.setBounds(row3.removeFromLeft(80).withTrimmedRight(6));
+    oscTkfLabel_.setBounds(row3.removeFromLeft(50));
+    oscTkfSlider_.setBounds(row3.removeFromLeft(sw).withTrimmedRight(6));
+    oscFkfLabel_.setBounds(row3.removeFromLeft(46));
+    oscFkfSlider_.setBounds(row3);
     xt.removeFromTop(6);
     auto row4 = xt.removeFromTop(24);                // amp envelope
     const int q = row4.getWidth() / 4;
@@ -240,13 +278,31 @@ void VSynthEmuEditor::resized() {
         sl->setBounds(cell.withTrimmedRight(6));
     }
     xt.removeFromTop(6);
-    auto row7 = xt.removeFromTop(24);                // LFO: waveform, rate, pitch depth, key sync
+    auto row6t = xt.removeFromTop(24);               // time envelope
+    std::pair<juce::Label*, juce::Slider*> tenv[] = { { &tAttackLabel_, &tAttackSlider_ }, { &tDecayLabel_, &tDecaySlider_ },
+                                                      { &tSustainLabel_, &tSustainSlider_ }, { &tReleaseLabel_, &tReleaseSlider_ },
+                                                      { &tDepthLabel_, &tDepthSlider_ } };
+    for (auto& [l, sl] : tenv) {
+        auto cell = row6t.removeFromLeft(fifth);
+        l->setBounds(cell.removeFromLeft(30));
+        sl->setBounds(cell.withTrimmedRight(6));
+    }
+    xt.removeFromTop(6);
+    auto row6f = xt.removeFromTop(24);               // formant envelope
+    std::pair<juce::Label*, juce::Slider*> fenv[] = { { &fAttackLabel_, &fAttackSlider_ }, { &fDecayLabel_, &fDecaySlider_ },
+                                                      { &fSustainLabel_, &fSustainSlider_ }, { &fReleaseLabel_, &fReleaseSlider_ },
+                                                      { &fDepthLabel_, &fDepthSlider_ } };
+    for (auto& [l, sl] : fenv) {
+        auto cell = row6f.removeFromLeft(fifth);
+        l->setBounds(cell.removeFromLeft(30));
+        sl->setBounds(cell.withTrimmedRight(6));
+    }
+    xt.removeFromTop(6);
+    auto row7 = xt.removeFromTop(24);                // LFO: waveform, rate, key sync
     lfoLabel_.setBounds(row7.removeFromLeft(30));
     lfoWaveBox_.setBounds(row7.removeFromLeft(80).withTrimmedRight(6));
     lfoRateLabel_.setBounds(row7.removeFromLeft(34));
-    lfoRateSlider_.setBounds(row7.removeFromLeft(140).withTrimmedRight(6));
-    lfoDepthLabel_.setBounds(row7.removeFromLeft(36));
-    lfoDepthSlider_.setBounds(row7.removeFromLeft(140).withTrimmedRight(6));
+    lfoRateSlider_.setBounds(row7.removeFromLeft(220).withTrimmedRight(6));
     lfoSyncBtn_.setBounds(row7);
     xt.removeFromTop(6);
     auto row8 = xt.removeFromTop(24);                // LFO: delay, fade, fade mode, offset
@@ -256,6 +312,17 @@ void VSynthEmuEditor::resized() {
     lfoFadeSlider_.setBounds(row8.removeFromLeft(130).withTrimmedRight(6));
     lfoModeBox_.setBounds(row8.removeFromLeft(90).withTrimmedRight(6));
     lfoOffsetBox_.setBounds(row8.removeFromLeft(70));
+    xt.removeFromTop(6);
+    auto row9 = xt.removeFromTop(24);                // LFO depths: pitch, time, formant
+    lfoDepthsLabel_.setBounds(row9.removeFromLeft(46));
+    const int third = row9.getWidth() / 3;
+    std::pair<juce::Label*, juce::Slider*> lfoDepths[] = { { &lfoDepthLabel_, &lfoDepthSlider_ }, { &lfoTimeLabel_, &lfoTimeSlider_ },
+                                                           { &lfoFmtLabel_, &lfoFmtSlider_ } };
+    for (auto& [l, sl] : lfoDepths) {
+        auto cell = row9.removeFromLeft(third);
+        l->setBounds(cell.removeFromLeft(34));
+        sl->setBounds(cell.withTrimmedRight(6));
+    }
 
     // ── Knobs area ─────────────────────────────────────────────────────────
     const int knobTop = titleH + kFileStripH + kXtStripH + 8;

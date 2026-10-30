@@ -27,10 +27,12 @@ struct XtSoloPlan {
 class XtSoloVoice {
 public:
     // A = pitch ratio, F = formant ratio (clamped to [0.5, 2] by the caller),
-    // stretch = time stretch, energy = SOLO Energy g (0 = OFF).
-    void noteOn(const XtSoloPlan& plan, double A, double F, double stretch, double energy);
+    // walk = playback speed (player +0x7c: 1 as recorded, 0 holds; the
+    // backward path for walk < 0 is not ported), energy = SOLO Energy g
+    // (0 = OFF).
+    void noteOn(const XtSoloPlan& plan, double A, double F, double walk, double energy);
     // Pitch, formant and time may change while the note plays.
-    void setRates(double A, double F, double stretch);
+    void setRates(double A, double F, double walk);
     void setEnergy(double g) { energy = g; }
     // Renders `count` samples: mono (a stereo plan's left channel), or both
     // channels (a mono plan plays L = R, as the firmware writes it).

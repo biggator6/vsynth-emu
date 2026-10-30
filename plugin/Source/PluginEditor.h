@@ -32,13 +32,18 @@ private:
     juce::Label timeLabel_    { {}, "TIME" };
     juce::Label formantLabel_ { {}, "FORMANT" };
 
-    // ── The XT strip: firmware image, encode type and depth, key, energy ────
+    // ── The XT strip: firmware image, encode type and depth, key, the OSC ───
     juce::TextButton romButton_ { "ROM..." };
     juce::Label      statusLabel_;
     juce::ComboBox   encodeBox_;
     juce::Slider     keySlider_     { juce::Slider::IncDecButtons, juce::Slider::TextBoxLeft };
     juce::Slider     depthSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     energySlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    // the VariPhrase OSC: Time Offset, Time KF, Formant KF (Time and Formant
+    // themselves are the TIME and FORMANT knobs while the XT plays)
+    juce::ComboBox   timeOffsetBox_;
+    juce::Slider     oscTkfSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     oscFkfSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     // amp envelope, the XT's 0..127 knobs
     juce::Slider     attackSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     decaySlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -54,6 +59,17 @@ private:
     juce::Slider     pSustainSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     pReleaseSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     pDepthSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    // time and formant envelopes
+    juce::Slider     tAttackSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     tDecaySlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     tSustainSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     tReleaseSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     tDepthSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     fAttackSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     fDecaySlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     fSustainSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     fReleaseSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     fDepthSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     // LFO
     juce::ComboBox   lfoWaveBox_, lfoModeBox_, lfoOffsetBox_;
     juce::ToggleButton lfoSyncBtn_ { "Key Sync" };
@@ -61,6 +77,8 @@ private:
     juce::Slider     lfoDepthSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     lfoDelaySlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     lfoFadeSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     lfoTimeSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     lfoFmtSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label encodeLabel_ { {}, "Encode" }, keyLabel_ { {}, "Key" }, depthLabel_ { {}, "Depth" },
                 energyLabel_ { {}, "Energy" }, attackLabel_ { {}, "A" }, decayLabel_ { {}, "D" },
                 sustainLabel_ { {}, "S" }, releaseLabel_ { {}, "R" }, aSensLabel_ { {}, "A-Sns" },
@@ -68,7 +86,13 @@ private:
                 pAttackLabel_ { {}, "PA" }, pDecayLabel_ { {}, "PD" }, pSustainLabel_ { {}, "PS" },
                 pReleaseLabel_ { {}, "PR" }, pDepthLabel_ { {}, "PDep" }, lfoLabel_ { {}, "LFO" },
                 lfoRateLabel_ { {}, "Rate" }, lfoDepthLabel_ { {}, "Pitch" }, lfoDelayLabel_ { {}, "Delay" },
-                lfoFadeLabel_ { {}, "Fade" };
+                lfoFadeLabel_ { {}, "Fade" }, lfoTimeLabel_ { {}, "Time" }, lfoFmtLabel_ { {}, "Fmt" },
+                lfoDepthsLabel_ { {}, "LFO Dp" }, offsetLabel_ { {}, "Offset" }, oscTkfLabel_ { {}, "Time KF" },
+                oscFkfLabel_ { {}, "Fmt KF" },
+                tAttackLabel_ { {}, "TA" }, tDecayLabel_ { {}, "TD" }, tSustainLabel_ { {}, "TS" },
+                tReleaseLabel_ { {}, "TR" }, tDepthLabel_ { {}, "TDep" },
+                fAttackLabel_ { {}, "FA" }, fDecayLabel_ { {}, "FD" }, fSustainLabel_ { {}, "FS" },
+                fReleaseLabel_ { {}, "FR" }, fDepthLabel_ { {}, "FDep" };
     std::unique_ptr<juce::FileChooser> romChooser_;
 
     // ── Algorithm selector ───────────────────────────────────────────────────
@@ -85,10 +109,19 @@ private:
     std::unique_ptr<SliderAtt> keyAtt_, depthAtt_, energyAtt_, attackAtt_, decayAtt_, sustainAtt_, releaseAtt_;
     std::unique_ptr<SliderAtt> aSensAtt_, dSensAtt_, rSensAtt_, kfAtt_;
     std::unique_ptr<SliderAtt> pAttackAtt_, pDecayAtt_, pSustainAtt_, pReleaseAtt_, pDepthAtt_;
-    std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_;
+    std::unique_ptr<SliderAtt> tAttackAtt_, tDecayAtt_, tSustainAtt_, tReleaseAtt_, tDepthAtt_;
+    std::unique_ptr<SliderAtt> fAttackAtt_, fDecayAtt_, fSustainAtt_, fReleaseAtt_, fDepthAtt_;
+    std::unique_ptr<SliderAtt> oscTkfAtt_, oscFkfAtt_;
+    std::unique_ptr<ComboAtt>  timeOffsetAtt_;
+    std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_, lfoTimeAtt_, lfoFmtAtt_;
     std::unique_ptr<ComboAtt>  lfoWaveAtt_, lfoModeAtt_, lfoOffsetAtt_;
     std::unique_ptr<ButtonAtt> lfoSyncAtt_;
     std::unique_ptr<ComboAtt>  encodeAtt_;
+
+    // TIME and FORMANT: the XT's Time and Formant (−63..+63) with a ROM, the
+    // engine's stretch and semitones without
+    bool mainKnobsXt_ = false;
+    void attachMainKnobs(bool xt);
 
     void comboBoxChanged(juce::ComboBox* box) override;
     void styleSlider(juce::Slider& s, juce::Label& l);

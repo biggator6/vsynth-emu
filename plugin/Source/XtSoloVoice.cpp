@@ -88,9 +88,9 @@ XtSoloVoice::Grain XtSoloVoice::grainParams(size_t sg, bool setF0) {
     return { p->segStart[sg] + os / 16.0, v, frac, p->segLen[sg] };
 }
 
-void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double stretch, double energy_) {
+void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double walk_, double energy_) {
     p = &plan;
-    A = A_; F = F_; walk = 1.0 / stretch; energy = energy_;
+    A = A_; F = F_; walk = walk_; energy = energy_;
     for (Chan& c : ch) c = Chan();
     next = 1;            // trigger toggle starts at 0 → first trigger → B
     slope = 0.0;
@@ -114,7 +114,7 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double st
     anchorStep = anchorStepInit;
 }
 
-void XtSoloVoice::setRates(double A_, double F_, double stretch) { A = A_; F = F_; walk = 1.0 / stretch; }
+void XtSoloVoice::setRates(double A_, double F_, double walk_) { A = A_; F = F_; walk = walk_; }
 
 void XtSoloVoice::render(float* out, float* right, int count) {
     if (!p || p->size() < 2) {
@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
     std::vector<float> L((size_t)outLen), Rt((size_t)outLen);
     XtSoloVoice voice;
     if (const char* tf = std::getenv("VSE_TRACE")) voice.trace = std::fopen(tf, "w");
-    voice.noteOn(plan, R, F, 1.0 / walk, energy);
+    voice.noteOn(plan, R, F, walk, energy);
     voice.render(L.data(), Rt.data(), (int)outLen);
     if (!(f = std::fopen(argv[argc - 1], "wb"))) return 1;
     for (long i = 0; i < outLen; ++i) {

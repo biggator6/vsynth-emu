@@ -206,7 +206,11 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
 2. **One firmware player per note** (`XtSynth`, 16 voices, oldest stolen):
    - `XtSoloVoice` or `XtMbPlayer` render 32-frame blocks at 44.1 kHz;
    - pitch = 2^((note − Original Key + Pitch)/12); Time, Formant (SOLO) and
-     Energy (SOLO) apply live;
+     Energy (SOLO) apply live, from the XT's own knobs (v51): Time −63…+63
+     with Time Offset BWD/ZERO/FWD and Time KF; Formant −63…+63 (±1
+     octave) with Formant KF; Energy OFF/1–127, g = (k/127)². These go
+     through the firmware's VariPhrase converter (`XtOsc`, `0x894e2f20`);
+     with a ROM, the TIME and FORMANT knobs are the XT's;
    - the amp envelope is the XT's own generator (`XtEnvelope`, v45): A/D/S/R
      knobs 0–127 through the firmware's time and sustain tables, and its
      attack and segment curves. It is applied as the patch TVA applies it
@@ -223,6 +227,10 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - an LFO on pitch (v50): the XT's LFO with all eight waveforms, delay,
      fade modes, offset and key sync, tick-for-tick identical to the
      firmware's, and the same depth curve as the pitch envelope.
+   - time and formant envelopes and the LFO's time and formant depths
+     (v51), as the converter scales them: time depth ±3 at ±60 and ±5 at
+     ±63 (walk speed), formant depth d/63 octaves. The voice's walk is
+     clamped to ±5, its formant ratio to [0.5, 2].
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -243,7 +251,11 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   background encode, sample-accurate MIDI) at 48 kHz. Its output is
   **bit-identical** to `XtSynth` on the chord (ENSEMBLE), drum (BACKING),
   vocal (SOLO) and the stereo factory wave 358 (SOLO), with any envelope
-  and a note-off (`TEST_ADSR`).
+  and a note-off (`TEST_ADSR`), and with the OSC knobs and the time and
+  formant envelopes set (`TEST_OSC`, `TEST_TENV`, `TEST_FENV`).
+  `TEST_SNAPSHOT=file.png` draws the editor offscreen.
+- `XtOsc` equals the firmware's VariPhrase converter on 310,545 cases × 6
+  values and its exp2 on 17,143 arguments (`xt_osc`, v51).
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
@@ -251,8 +263,11 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   envelope velocity and key follow, and the TVA's level, pan and LFO terms
   are not modelled;
 - no V-Synth voice layer (filters, LFOs, effects);
-- no loops, reverse, step/event playback or Time Trip;
-- the Energy knob → g mapping is undecoded, so Energy is g directly.
+- no loops, reverse, step/event playback or Time Trip; a negative walk
+  (Time below −20 with FWD, or BWD) holds as at walk 0 instead of playing
+  backward;
+- no matrix or realtime controllers on the OSC knobs, and the time and
+  formant envelope depths' velocity sensitivity is not exposed.
 
 ## Known Gaps / Next Work
 

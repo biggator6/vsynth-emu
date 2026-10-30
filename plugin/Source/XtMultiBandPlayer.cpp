@@ -343,7 +343,7 @@ void XtMbPlayer::State::initRecords() {
 }
 
 bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
-    if (!T.ok || !w.vpdt || w.vpdtBytes < 64 || (w.channels != 1 && w.channels != 2) || !(walk > 0.0f)) return false;
+    if (!T.ok || !w.vpdt || w.vpdtBytes < 64 || (w.channels != 1 && w.channels != 2) || !(walk >= 0.0f)) return false;
     if (mode != 3 && mode != 5) return false;
     if (!s) s = new State;
     *s = State();                                   // no allocation: safe on the audio thread
@@ -403,7 +403,7 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
 bool XtMbPlayer::ended() const { return !s || s->ended; }
 
 void XtMbPlayer::setRates(float pitch, float walk) {
-    if (!s || !(walk > 0.0f)) return;
+    if (!s || !(walk >= 0.0f)) return;   // the backward path (walk < 0) is not ported
     s->pitch = pitch;   // the block reads +0x70 / +0x7c each time (0x8950c280, 0x8950e760)
     s->walk = walk;
 }
@@ -887,6 +887,7 @@ int main(int argc, char** argv) {
     if (!pl.noteOn(w, md && std::string(md) == "5" ? 5 : 3, pitch, walk)) { std::fprintf(stderr, "noteOn failed\n"); return 1; }
     long frames = argc > 9 ? std::atol(argv[9]) : 0;
     if (frames <= 0) {   // n / walk, n from the end event
+        if (!(walk > 0.0f)) { std::fprintf(stderr, "give the frame count when walk is 0\n"); return 1; }
         uint32_t cnt = 0; std::memcpy(&cnt, vpdt.data() + 8, 4); cnt >>= 16;
         const long e = ((long)(cnt - 1) * (ch == 2 ? 0x58 : 0x2e) + 0xe) * 2;
         uint32_t endPos = 0; std::memcpy(&endPos, vpdt.data() + e + 4, 4);

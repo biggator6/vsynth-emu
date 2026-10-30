@@ -1177,8 +1177,8 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     // F' = (b & 2 ? F : 1)   (0x8950d5a0).
     if (const char* fi = std::getenv("VSE_LITEINFO")) plan.forcedInfo = std::atoi(fi);
     // SOLO "Energy" (manual p. 92): g = player +0x78, smoothed ×0.7 per
-    // update toward a voice target (0x8950c1b0).  Its knob scaling (OFF,
-    // 1–127 → g) is not decoded.  VSE_ENERGY overrides (experiments).
+    // update toward a voice target (0x8950c1b0).  The knob (OFF, 1–127)
+    // gives g = (k/127)² (0x894e4030, XtOsc).  VSE_ENERGY overrides.
     double energy = pImpl->params.soloEnergy;
     if (const char* e = std::getenv("VSE_ENERGY")) energy = std::atof(e);
 
@@ -1186,7 +1186,7 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     std::vector<float> out(outLen, 0.0f);
     XtSoloVoice voice;
     if (const char* tf = std::getenv("VSE_TRACE")) voice.trace = std::fopen(tf, "w");
-    voice.noteOn(plan, A, F, stretch, energy);
+    voice.noteOn(plan, A, F, 1.0 / stretch, energy);
     voice.render(out.data(), outLen);
     if (voice.trace) std::fclose(voice.trace);
     return out;

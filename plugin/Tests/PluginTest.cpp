@@ -17,6 +17,17 @@ int main(int argc, char** argv) {
     VSynthEmuProcessor p;
     if (!p.setRomFile(juce::File(argv[1]))) { std::fprintf(stderr, "ROM rejected: %s\n", p.getStatusText().toRawUTF8()); return 1; }
     p.prepareToPlay(rate, block);
+    // TEST_SNAPSHOT=file.png: the editor drawn offscreen, for checking the layout
+    if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
+        std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
+        const juce::Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 2.0f);
+        juce::File f(juce::File::getCurrentWorkingDirectory().getChildFile(snap));
+        f.deleteFile();
+        juce::FileOutputStream os(f);
+        juce::PNGImageFormat png;
+        if (!os.openedOk() || !png.writeImageToStream(img, os)) { std::fprintf(stderr, "snapshot failed\n"); return 1; }
+        std::printf("snapshot: %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
+    }
     if (argc > 4) {   // Encode Type (choice index 0 Auto, 1 SOLO, 2 BACKING, 3 ENSEMBLE)
         const juce::String t(argv[4]);
         const int idx = t == "solo" ? 1 : t == "backing" ? 2 : t == "ensemble" ? 3 : 0;
@@ -64,13 +75,47 @@ int main(int argc, char** argv) {
             prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
         }
     }
+    // TEST_OSC="time,offset,timeKF,formant,formantKF,energy[,lfoTime,lfoFormant]":
+    // the VariPhrase OSC knobs (Time Offset 0 BWD, 1 ZERO, 2 FWD) and the LFO's
+    // time and formant depths
+    if (const char* e = std::getenv("TEST_OSC")) {
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &refCtl.oscTime, &refCtl.oscTimeOffset, &refCtl.oscTimeKF, &refCtl.oscFormant,
+                    &refCtl.oscFormantKF, &refCtl.energy, &refCtl.lfoTimeDepth, &refCtl.lfoFormantDepth);
+        const std::pair<const char*, int> knobs[] = { { "oscTime", refCtl.oscTime }, { "oscTimeOffset", refCtl.oscTimeOffset },
+                                                      { "oscTimeKF", refCtl.oscTimeKF }, { "oscFormant", refCtl.oscFormant },
+                                                      { "oscFormantKF", refCtl.oscFormantKF }, { "energy", refCtl.energy },
+                                                      { "lfoTimeDepth", refCtl.lfoTimeDepth }, { "lfoFormantDepth", refCtl.lfoFormantDepth } };
+        for (auto [id, v] : knobs) {
+            auto* prm = p.apvts.getParameter(id);
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+        }
+    }
+    // TEST_TENV / TEST_FENV="a,d,s,r,depth": the time and formant envelopes
+    for (const char* which : { "TEST_TENV", "TEST_FENV" }) {
+        const char* e = std::getenv(which);
+        if (!e) continue;
+        const bool t = which[5] == 'T';
+        int k[5] = { 0, 64, 0, 64, 0 };
+        std::sscanf(e, "%d,%d,%d,%d,%d", &k[0], &k[1], &k[2], &k[3], &k[4]);
+        int* dst[5] = { t ? &refCtl.tAttack : &refCtl.fAttack, t ? &refCtl.tDecay : &refCtl.fDecay,
+                        t ? &refCtl.tSustain : &refCtl.fSustain, t ? &refCtl.tRelease : &refCtl.fRelease,
+                        t ? &refCtl.tDepth : &refCtl.fDepth };
+        static const char* ids[2][5] = { { "formantEnvAttack", "formantEnvDecay", "formantEnvSustain", "formantEnvRelease", "formantEnvDepth" },
+                                         { "timeEnvAttack", "timeEnvDecay", "timeEnvSustain", "timeEnvRelease", "timeEnvDepth" } };
+        for (int i = 0; i < 5; ++i) {
+            *dst[i] = k[i];
+            auto* prm = p.apvts.getParameter(ids[t][i]);
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)k[i]));
+        }
+    }
     p.loadFile(juce::File(argv[2]));
     for (int i = 0; i < 600 && !p.getStatusText().startsWith("Encoded"); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));   // the encode runs on the pool thread
         if (p.getStatusText().startsWith("Encode failed")) break;
     }
     std::printf("status: %s\n", p.getStatusText().toRawUTF8());
-    for (const char* id : { "pitchShift", "timeStretch", "formantShift", "energy", "rootKey", "ampAttack", "ampDecay", "ampSustain", "ampRelease", "encodeDepth" })
+    for (const char* id : { "pitchShift", "oscTime", "oscTimeOffset", "oscFormant", "energy", "rootKey", "ampAttack", "ampDecay", "ampSustain",
+                            "ampRelease", "encodeDepth" })
         std::printf("  %s = %.9g\n", id, (double)p.apvts.getRawParameterValue(id)->load());
     if (!p.getStatusText().startsWith("Encoded")) return 1;
 

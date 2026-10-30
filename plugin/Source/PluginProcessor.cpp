@@ -10,7 +10,14 @@ namespace Params {
     static const juce::String kEncodeType   = "encodeType";    // Auto, SOLO, BACKING, ENSEMBLE
     static const juce::String kEncodeDepth  = "encodeDepth";   // multi-band attack detection
     static const juce::String kRootKey      = "rootKey";       // note that plays the sample unshifted
-    static const juce::String kEnergy       = "energy";        // SOLO Energy g (knob mapping undecoded)
+    static const juce::String kEnergy       = "energy";        // SOLO Energy, OFF/1..127 (g = (k/127)²)
+    // The VariPhrase OSC (XtOsc): Time and Formant −63..+63 (the XT path's
+    // TIME and FORMANT knobs), Time Offset, Time and Formant KF
+    static const juce::String kOscTime       = "oscTime";
+    static const juce::String kOscTimeOffset = "oscTimeOffset";   // BWD, ZERO, FWD
+    static const juce::String kOscTimeKF     = "oscTimeKF";       // −200..+200 % per octave
+    static const juce::String kOscFormant    = "oscFormant";
+    static const juce::String kOscFormantKF  = "oscFormantKF";
     // Amp envelope, the XT's 0..127 knobs (XtEnvelope: times from the firmware's table)
     static const juce::String kAttack       = "ampAttack";
     static const juce::String kDecay        = "ampDecay";
@@ -26,10 +33,24 @@ namespace Params {
     static const juce::String kPSustain     = "pitchEnvSustain";
     static const juce::String kPRelease     = "pitchEnvRelease";
     static const juce::String kPDepth       = "pitchEnvDepth";
+    // Time and formant envelopes, the same knobs; time depth ±3 at ±60 and
+    // ±5 at ±63 (walk speed), formant depth d/63 octaves
+    static const juce::String kTAttack      = "timeEnvAttack";
+    static const juce::String kTDecay       = "timeEnvDecay";
+    static const juce::String kTSustain     = "timeEnvSustain";
+    static const juce::String kTRelease     = "timeEnvRelease";
+    static const juce::String kTDepth       = "timeEnvDepth";
+    static const juce::String kFAttack      = "formantEnvAttack";
+    static const juce::String kFDecay       = "formantEnvDecay";
+    static const juce::String kFSustain     = "formantEnvSustain";
+    static const juce::String kFRelease     = "formantEnvRelease";
+    static const juce::String kFDepth       = "formantEnvDepth";
     // LFO (XtLfo) and its pitch depth
     static const juce::String kLfoWave      = "lfoWave";
     static const juce::String kLfoRate      = "lfoRate";
     static const juce::String kLfoDepth     = "lfoPitchDepth";
+    static const juce::String kLfoTimeDepth = "lfoTimeDepth";
+    static const juce::String kLfoFmtDepth  = "lfoFormantDepth";
     static const juce::String kLfoDelay     = "lfoDelay";
     static const juce::String kLfoFadeMode  = "lfoFadeMode";
     static const juce::String kLfoFade      = "lfoFade";
@@ -78,11 +99,19 @@ VSynthEmuProcessor::createParameterLayout() {
         Params::kRootKey, "Original Key", 0, 127, 60
     ));
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        Params::kEnergy, "Energy",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
-        0.0f
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        Params::kEnergy, "Energy", 0, 127, 0,
+        juce::AudioParameterIntAttributes().withStringFromValueFunction(
+            [](int v, int) { return v == 0 ? juce::String("OFF") : juce::String(v); })
     ));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscTime, "Time", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kOscTimeOffset, "Time Offset",
+        juce::StringArray { "BWD", "ZERO", "FWD" }, 2));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kOscTimeKF, "Time KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscFormant, "Formant", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kOscFormantKF, "Formant KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
@@ -98,10 +127,22 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPSustain, "Pitch Env Sustain", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPRelease, "Pitch Env Release", 0, 127, 64));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPDepth, "Pitch Env Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTAttack, "Time Env Attack", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTDecay, "Time Env Decay", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTSustain, "Time Env Sustain", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTRelease, "Time Env Release", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTDepth, "Time Env Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFAttack, "Formant Env Attack", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFDecay, "Formant Env Decay", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFSustain, "Formant Env Sustain", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFRelease, "Formant Env Release", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFDepth, "Formant Env Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLfoWave, "LFO Waveform",
         juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoRate, "LFO Rate", 0, 127, 64));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoDepth, "LFO Pitch Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoTimeDepth, "LFO Time Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoFmtDepth, "LFO Formant Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoDelay, "LFO Delay", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLfoFadeMode, "LFO Fade Mode",
         juce::StringArray { "ON <<", "ON >>", "OFF <<", "OFF >>" }, 0));
@@ -190,10 +231,15 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     // would play that, not 1 (a centred XT knob is exact).
     auto snap = [](float v, float stepSize) { return std::round(v / stepSize) * stepSize; };
     XtSynth::Controls c;
+    auto knob = [this](const juce::String& id) { return (int)std::lround(apvts.getRawParameterValue(id)->load()); };
+    auto kf = [this](const juce::String& id) { return 10 * (int)std::lround(apvts.getRawParameterValue(id)->load() / 10.0f); };
     c.pitchSemis   = snap(apvts.getRawParameterValue(Params::kPitchShift)->load(), 0.01f);
-    c.timeStretch  = snap(apvts.getRawParameterValue(Params::kTimeStretch)->load(), 0.001f);
-    c.formantSemis = snap(apvts.getRawParameterValue(Params::kFormantShift)->load(), 0.01f);
-    c.energy       = apvts.getRawParameterValue(Params::kEnergy)->load();
+    c.oscTime      = knob(Params::kOscTime);
+    c.oscTimeOffset = knob(Params::kOscTimeOffset);
+    c.oscTimeKF    = kf(Params::kOscTimeKF);
+    c.oscFormant   = knob(Params::kOscFormant);
+    c.oscFormantKF = kf(Params::kOscFormantKF);
+    c.energy       = knob(Params::kEnergy);
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();
     c.decay        = (int)apvts.getRawParameterValue(Params::kDecay)->load();
@@ -208,6 +254,18 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.pSustain     = (int)apvts.getRawParameterValue(Params::kPSustain)->load();
     c.pRelease     = (int)apvts.getRawParameterValue(Params::kPRelease)->load();
     c.pDepth       = (int)apvts.getRawParameterValue(Params::kPDepth)->load();
+    c.tAttack      = knob(Params::kTAttack);
+    c.tDecay       = knob(Params::kTDecay);
+    c.tSustain     = knob(Params::kTSustain);
+    c.tRelease     = knob(Params::kTRelease);
+    c.tDepth       = knob(Params::kTDepth);
+    c.fAttack      = knob(Params::kFAttack);
+    c.fDecay       = knob(Params::kFDecay);
+    c.fSustain     = knob(Params::kFSustain);
+    c.fRelease     = knob(Params::kFRelease);
+    c.fDepth       = knob(Params::kFDepth);
+    c.lfoTimeDepth = knob(Params::kLfoTimeDepth);
+    c.lfoFormantDepth = knob(Params::kLfoFmtDepth);
     c.lfoWave      = (int)apvts.getRawParameterValue(Params::kLfoWave)->load();
     c.lfoRate      = (int)apvts.getRawParameterValue(Params::kLfoRate)->load();
     c.lfoPitchDepth = (int)apvts.getRawParameterValue(Params::kLfoDepth)->load();

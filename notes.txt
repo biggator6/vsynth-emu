@@ -217,6 +217,23 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+VARIPHRASE OSC v51 (2026-10-30): plugin/Source/XtOsc.cpp, the VariPhrase
+  converter 0x894e2f20 (time, formant, their envelope and LFO depths) and
+  Energy from its tail 0x894e4030 (g = (k/127)²), equal to the firmware on
+  310,545 cases × 6 values, and its exp2 0x894ec090:
+    $TC/clang++ -isysroot $SDK -std=c++20 -O2 -DXT_OSC_MAIN plugin/Source/XtOsc.cpp \
+      plugin/Source/XtFirmware.cpp plugin/Source/Sh4Interp.cpp -o xt_osc
+    xt_osc rom.2.bin            ("0 different" twice)
+  (/usr/bin/clang++ links against a CommandLineTools SDK whose .tbd files
+  this ld rejects; use the Xcode toolchain and SDK as for the plugin.)
+  Plugin: oscTime/oscFormant (the TIME/FORMANT knobs with a ROM), oscTimeOffset
+  (BWD/ZERO/FWD), oscTimeKF/oscFormantKF, energy (int OFF..127), timeEnv*/
+  formantEnv* (A/D/S/R/Depth), lfoTimeDepth/lfoFormantDepth. XtSynth CLI:
+  XT_OSC="time,offset,timeKF,formant,formantKF,energy[,lfoTime,lfoFormant]",
+  XT_TENV/XT_FENV="a,d,s,r,depth" (the CLI's env vars now combine; each
+  used to reset the others). PluginTest: TEST_OSC, TEST_TENV, TEST_FENV.
+  Walk < 0 (backward) holds at 0: the players' backward paths are not ported.
+
 LFO v50 (2026-10-29): plugin/Source/XtLfo.cpp, the XT's LFO (converter
   0x894e0290, object 0x894f0b40 with its delay/fade base, tick 0x894f1050),
   tick-for-tick identical to the firmware run in the interpreter:
@@ -231,7 +248,7 @@ PITCH ENVELOPE v49 (2026-10-29): voice update as 0x8950c1b0 (70% toward the
   (pitchEnvAttack/Decay/Sustain/Release 0..127, pitchEnvDepth −63..+63 via
   the depth curve 0x894e0ce0, equal to the firmware on all 127 depths).
   XtSynth CLI: XT_PENV="a,d,s,r,depth"; PluginTest: TEST_PENV. Open: time and
-  formant envelopes and OSC LFO depths (their converter not found), the LFO.
+  formant envelopes and OSC LFO depths (their converter not found; v51), the LFO.
 
 ENVELOPE VELOCITY v48 (2026-10-29): A/D/R-Sens and Time KF in the amp
   envelope's times (0x894df7b0 time converter ported, 1,045,760 cases equal
