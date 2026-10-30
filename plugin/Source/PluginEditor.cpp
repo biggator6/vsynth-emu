@@ -1,13 +1,13 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 126;  // height of the XT strip below it
+static constexpr int kXtStripH   = 156;  // height of the XT strip below it
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 490);
+    setSize(560, 520);
     setResizable(true, true);
     setResizeLimits(480, 400, 960, 760);
 
@@ -36,7 +36,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     encodeBox_.addItemList({ "Auto", "SOLO", "BACKING", "ENSEMBLE" }, 1);
     addAndMakeVisible(encodeBox_);
     encodeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "encodeType", encodeBox_);
-    for (juce::Slider* sl : { &keySlider_, &depthSlider_, &energySlider_, &attackSlider_, &decaySlider_, &sustainSlider_, &releaseSlider_ }) {
+    for (juce::Slider* sl : { &keySlider_, &depthSlider_, &energySlider_, &attackSlider_, &decaySlider_, &sustainSlider_, &releaseSlider_,
+                              &aSensSlider_, &dSensSlider_, &rSensSlider_, &kfSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
@@ -50,8 +51,12 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     decayAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "ampDecay",    decaySlider_);
     sustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "ampSustain",  sustainSlider_);
     releaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "ampRelease",  releaseSlider_);
+    aSensAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "ampAttackSens",  aSensSlider_);
+    dSensAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "ampDecaySens",   dSensSlider_);
+    rSensAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "ampReleaseSens", rSensSlider_);
+    kfAtt_      = std::make_unique<SliderAtt>(processor_.apvts, "ampTimeKF",      kfSlider_);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
-                            &sustainLabel_, &releaseLabel_ }) styleSmall(*l);
+                            &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_ }) styleSmall(*l);
     timerCallback();
     startTimerHz(4);
 
@@ -190,6 +195,15 @@ void VSynthEmuEditor::resized() {
     for (auto& [l, sl] : adsr) {
         auto cell = row4.removeFromLeft(q);
         l->setBounds(cell.removeFromLeft(18));
+        sl->setBounds(cell.withTrimmedRight(8));
+    }
+    xt.removeFromTop(6);
+    auto row5 = xt.removeFromTop(24);                // velocity → time, Time KF
+    std::pair<juce::Label*, juce::Slider*> sens[] = { { &aSensLabel_, &aSensSlider_ }, { &dSensLabel_, &dSensSlider_ },
+                                                      { &rSensLabel_, &rSensSlider_ }, { &kfLabel_, &kfSlider_ } };
+    for (auto& [l, sl] : sens) {
+        auto cell = row5.removeFromLeft(q);
+        l->setBounds(cell.removeFromLeft(38));
         sl->setBounds(cell.withTrimmedRight(8));
     }
 

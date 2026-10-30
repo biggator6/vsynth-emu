@@ -46,8 +46,10 @@ public:
     struct Controls {
         float pitchSemis = 0, timeStretch = 1, formantSemis = 0, energy = 0;
         int rootKey = 60;
-        // amp envelope knobs, 0..127 as on the XT (release 16 = 30 ms)
+        // amp envelope knobs, 0..127 as on the XT (release 16 = 30 ms);
+        // velocity → time sensitivities −63..+63; Time KF −200..+200
         int attack = 0, decay = 0, sustain = 127, release = 16;
+        int aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
     };
 
     XtSynth();
@@ -60,7 +62,7 @@ public:
     // Audio thread
     void setControls(const Controls& c);
     void noteOn(int note, float velocity);
-    void noteOff(int note);
+    void noteOff(int note, float velocity = 0.5f);
     void allNotesOff();
     void render(float* left, float* right, int n);
 
@@ -70,6 +72,7 @@ private:
         int note = -1;
         long age = 0, tail = 0;
         float gain = 1;               // velocity
+        int vel = 64, relVel = 64;     // 0..127, for the envelope's times
         XtEnvelope env;
         // The TVA that applies the envelope (0x894f5360 / 0x894f5720): gain,
         // its target and per-sample step, frames since the last update.
@@ -101,4 +104,5 @@ private:
     void mixBlock(float* lr);      // 32 frames
     void voiceRates(Voice& v) const;
     void tvaUpdate(Voice& v);
+    XtEnvParams envParams(const Voice& v) const;
 };

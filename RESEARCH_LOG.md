@@ -2336,3 +2336,22 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - **v47 = 76.765** (v44 76.601): chord +0.27/+0.76/+2.47, drum
   −0.21…+0.10. The plugin stays bit-identical to `XtSynth` (chord 24-bit,
   drum 16-bit stereo, vocal and stereo SOLO); `auval` and engine tests pass.
+
+### Session 16 addendum (2026-10-29) — v48: envelope velocity and Time KF
+
+- Decoded the envelope time converter `0x894df7b0`:
+  T = table[knob] − ((velocity − 64)·sens·40) >> 8, then capped at 12000
+  when sens ≠ 0, then the 16.16 Time KF scale `0x894df760`,
+  2^(−kf·(key − 60)/1200).
+- `xtEnvTime` equals the firmware on 1,045,760 cases. The KF scales come
+  from the firmware itself, because its powf differs from std::pow in 251
+  of 5248 values.
+- The plugin gains A/D/R-Sens and Time KF. The release is converted again
+  with the note-off velocity. PluginTest stays bit-identical; `auval`
+  passes.
+- Velocity to level: the TVA's curve function `0x894ebd60` is decoded (a
+  linear sensitivity table, 7 curve tables, squared gain), but how the
+  patch's ±63 Velocity Sens becomes its ±200 input is not, so velocity is
+  still a linear gain.
+- Energy: the OSC block's path (context +0x434 → `0x894f2600` → voice +0x18)
+  is mapped, but the routine that writes the Energy value is not found.

@@ -16,6 +16,10 @@ namespace Params {
     static const juce::String kDecay        = "ampDecay";
     static const juce::String kSustain      = "ampSustain";
     static const juce::String kRelease      = "ampRelease";
+    static const juce::String kAttackSens   = "ampAttackSens";   // velocity → time, −63..+63
+    static const juce::String kDecaySens    = "ampDecaySens";
+    static const juce::String kReleaseSens  = "ampReleaseSens";  // note-off velocity
+    static const juce::String kTimeKF       = "ampTimeKF";       // −200..+200, decay and release
 }
 
 // ─── Parameter Layout ─────────────────────────────────────────────────────────
@@ -69,6 +73,11 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kSustain, "Sustain", 0, 127, 127));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kRelease, "Release", 0, 127, 16));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttackSens, "Attack Velocity Sens", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecaySens, "Decay Velocity Sens", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kReleaseSens, "Release Velocity Sens", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kTimeKF, "Env Time KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
 
     return { params.begin(), params.end() };
 }
@@ -159,6 +168,10 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.decay        = (int)apvts.getRawParameterValue(Params::kDecay)->load();
     c.sustain      = (int)apvts.getRawParameterValue(Params::kSustain)->load();
     c.release      = (int)apvts.getRawParameterValue(Params::kRelease)->load();
+    c.aSens        = (int)apvts.getRawParameterValue(Params::kAttackSens)->load();
+    c.dSens        = (int)apvts.getRawParameterValue(Params::kDecaySens)->load();
+    c.rSens        = (int)apvts.getRawParameterValue(Params::kReleaseSens)->load();
+    c.timeKF       = 10 * (int)std::lround(apvts.getRawParameterValue(Params::kTimeKF)->load() / 10.0f);
     return c;
 }
 
@@ -186,7 +199,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             if (at > pos) { synth_.render(L + pos, R + pos, at - pos); pos = at; }
             const auto msg = meta.getMessage();
             if (msg.isNoteOn()) synth_.noteOn(msg.getNoteNumber(), msg.getFloatVelocity());
-            else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber());
+            else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber(), msg.getFloatVelocity());
             else if (msg.isAllNotesOff() || msg.isAllSoundOff()) synth_.allNotesOff();
         }
         if (pos < numSamples) synth_.render(L + pos, R + pos, numSamples - pos);

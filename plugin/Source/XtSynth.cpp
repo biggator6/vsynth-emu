@@ -47,6 +47,8 @@ inline int16_t to16(double v) { return (int16_t)std::clamp(std::lround(v * 32768
 bool xtSynthSetRom(const std::string& path) {
     g_romReady = xtLoadTables(path.c_str()) && xtMbLoadTables(path.c_str()) && xtEnvLoadTables(path.c_str())
               && xtFwOpen(path.c_str());
+    std::vector<uint32_t> ks;
+    if (g_romReady && xtFwEnvKeyScales(ks)) xtEnvSetKeyScales(ks.data());
     return g_romReady;
 }
 bool xtSynthRomReady() { return g_romReady; }
@@ -188,14 +190,21 @@ void XtSynth::voiceRates(Voice& v) const {
     else v.mb.setRates((float)A, (float)(1.0 / stretch));
 }
 
+XtEnvParams XtSynth::envParams(const Voice& v) const {
+    XtEnvKnobs k;
+    k.attack = ctl.attack; k.decay = ctl.decay; k.sustain = ctl.sustain; k.release = ctl.release;
+    k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens; k.timeKF = ctl.timeKF;
+    return xtEnvAdsr(k, v.note, v.vel, v.relVel);
+}
+
 void XtSynth::setControls(const Controls& c) {
-    const bool envChanged = c.attack != ctl.attack || c.decay != ctl.decay || c.sustain != ctl.sustain || c.release != ctl.release;
+    const bool envChanged = c.attack != ctl.attack || c.decay != ctl.decay || c.sustain != ctl.sustain || c.release != ctl.release
+                         || c.aSens != ctl.aSens || c.dSens != ctl.dSens || c.rSens != ctl.rSens || c.timeKF != ctl.timeKF;
     ctl = c;
-    const XtEnvParams ep = xtEnvAdsr(ctl.attack, ctl.decay, ctl.sustain, ctl.release);
     for (Voice& v : voice) {
         if (!v.active) continue;
         voiceRates(v);
-        if (envChanged) v.env.update(ep);
+        if (envChanged) v.env.update(envParams(v));
     }
 }
 
@@ -211,10 +220,12 @@ void XtSynth::noteOn(int note, float velocity) {
     v->age = clock++;
     v->tail = 0;
     v->gain = std::clamp(velocity, 0.0f, 1.0f);
+    v->vel = (int)std::lround(v->gain * 127.0f);
+    v->relVel = 64;
     // TVA note-on (0x894f5160): the gain starts from the envelope's onset
     // level (full with no attack, else 0) and ramps to its output over the
     // attack time, at most 10 ms (0.1 ms with no attack).
-    const XtEnvParams ep = xtEnvAdsr(ctl.attack, ctl.decay, ctl.sustain, ctl.release);
+    const XtEnvParams ep = envParams(*v);
     v->env.noteOn(ep);
     v->cur = v->env.onsetLevel();
     v->target = v->env.level();
@@ -228,9 +239,16 @@ void XtSynth::noteOn(int note, float velocity) {
     else if (!v->mb.noteOn(cur->wave, cur->type, (float)A, (float)(1.0 / stretch))) v->active = false;
 }
 
-void XtSynth::noteOff(int note) {
+// The release time follows the note-off velocity (R-Sens): the times are
+// converted again before the release starts.
+void XtSynth::noteOff(int note, float velocity) {
     for (Voice& v : voice)
-        if (v.active && v.note == note && !v.releasing) { v.releasing = true; v.env.noteOff(); }
+        if (v.active && v.note == note && !v.releasing) {
+            v.releasing = true;
+            v.relVel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
+            v.env.update(envParams(v));
+            v.env.noteOff();
+        }
 }
 
 void XtSynth::allNotesOff() {

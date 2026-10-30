@@ -16,7 +16,8 @@ constexpr uint32_t kShapeTab = 0x897d1b36;    // u16 ×129 (+ what follows): seg
 
 struct Tables {
     uint16_t time[128], sustain[128], attack[257], shape[257];
-    bool ok = false;
+    uint32_t keyScale[41][128];
+    bool ok = false, keyScales = false;
 } T;
 
 template <class V> bool readAt(FILE* f, uint32_t addr, V* v, size_t n) {
@@ -48,17 +49,55 @@ bool xtEnvLoadTables(const char* romPath) {
 
 bool xtEnvTablesLoaded() { return T.ok; }
 
-XtEnvParams xtEnvAdsr(int a, int d, int s, int r, int curve) {
-    auto knob = [](int k) { return k < 0 ? 0 : k > 127 ? 127 : k; };
+int xtEnvTime(int knob, int velocity, int sens, uint32_t scale) {
+    int t = (int16_t)T.time[knob & 0x7f];               // mov.w: sign-extended
+    if (t == 0) return 0;
+    sens = (int8_t)sens;
+    if (sens != 0) {
+        // sens·256000 / 6400 by a reciprocal multiply, rounded toward zero
+        const int64_t prod = (int64_t)(sens * 256000) * (int64_t)0x51eb851f;
+        int q = (int32_t)(prod >> 32) >> 11;
+        q += q < 0;
+        int u = (t & 0xffff) - (((velocity & 0xff) - 64) * q >> 8);
+        if (u <= 0) return 0;
+        t = u > 12000 ? 12000 : u;
+    }
+    if (scale == 0x10000) return t & 0xffff;
+    uint32_t u;
+    if (scale < 0x10000) u = ((uint32_t)(t & 0xffff) * (scale & 0xffff)) >> 16;
+    else {
+        u = (((uint32_t)(t & 0xffff) * (scale & 0xffff)) >> 16) + (uint32_t)(t & 0xffff) * ((scale >> 16) & 0xffff);
+        if (u > 12000) u = 12000;
+    }
+    if ((u & 0xffff) == 0) u = 1;
+    return (int)(u & 0xffff);
+}
+
+void xtEnvSetKeyScales(const uint32_t* t) {
+    for (int i = 0; i < 41; ++i)
+        for (int k = 0; k < 128; ++k) T.keyScale[i][k] = t[i * 128 + k];
+    T.keyScales = true;
+}
+
+uint32_t xtEnvKeyScale(int key, int kf) {
+    if (T.keyScales && kf % 10 == 0 && kf >= -200 && kf <= 200 && key >= 0 && key < 128) return T.keyScale[(kf + 200) / 10][key];
+    const float e = xtf::div(xtf::flt((key - 60) * -(int)(int16_t)kf), 1200.0f);
+    const double v = std::pow(2.0, (double)e) * 65536.0;   // the firmware's powf, then ×65536
+    return v >= 2147483648.0 ? (uint32_t)(int64_t)(v - 4294967296.0) : (uint32_t)(int32_t)v;
+}
+
+XtEnvParams xtEnvAdsr(const XtEnvKnobs& k, int key, int velocity, int releaseVelocity, int curve) {
+    auto knob = [](int v) { return v < 0 ? 0 : v > 127 ? 127 : v; };
+    const uint32_t kfScale = xtEnvKeyScale(key, k.timeKF);
     XtEnvParams p;
     p.curve = curve;
-    p.time[0] = (float)T.time[knob(a)];
+    p.time[0] = (float)xtEnvTime(knob(k.attack), velocity, k.aSens, 0x10000);
     p.time[1] = 0.0f;
-    p.time[2] = (float)T.time[knob(d)];
-    p.time[3] = (float)T.time[knob(r)];
+    p.time[2] = (float)xtEnvTime(knob(k.decay), velocity, k.dSens, kfScale);
+    p.time[3] = (float)xtEnvTime(knob(k.release), releaseVelocity, k.rSens, kfScale);
     p.level[0] = 0.0f;
     p.level[1] = p.level[2] = 1.0f;
-    p.level[3] = xtf::div((float)T.sustain[knob(s)], 32768.0f);
+    p.level[3] = xtf::div((float)T.sustain[knob(k.sustain)], 32768.0f);
     p.level[4] = 0.0f;
     return p;
 }
@@ -245,7 +284,47 @@ void XtEnvelope::tick(int n) {
 #include <cstdlib>
 #include <cstring>
 int main(int argc, char** argv) {
-    if (argc < 8) { std::fprintf(stderr, "usage: xt_env rom.2.bin A D S R offTick ticks [curve]\n"); return 2; }
+    if (argc == 3 && std::string(argv[2]) == "conv") {
+        // the time converter and the Time KF scale against the firmware, exhaustively
+        if (!xtEnvLoadTables(argv[1])) return 1;
+        Sh4 c;
+        if (!c.loadRom(argv[1])) return 1;
+        const uint32_t sp = 0x8C0F0000;
+        c.mapRam(0x8C000000, 0x100000);
+        long n = 0, bad = 0;
+        for (int key = 0; key < 128; ++key)
+            for (int kf = -200; kf <= 200; kf += 10) {
+                uint32_t r0 = 0;
+                if (!c.call(0x894df760, { (uint32_t)key, (uint32_t)kf }, sp, &r0)) { std::fprintf(stderr, "%s\n", c.error().c_str()); return 1; }
+                ++n;
+                if (r0 != xtEnvKeyScale(key, kf) && bad++ < 10) std::printf("kf scale key %d kf %d: fw %08x port %08x\n", key, kf, r0, xtEnvKeyScale(key, kf));
+            }
+        std::printf("Time KF scale, std::pow: %ld cases, %ld differ\n", n, bad);
+        std::vector<uint32_t> tab(41 * 128);
+        for (int i = 0; i < 41; ++i)
+            for (int key = 0; key < 128; ++key) {
+                uint32_t r0 = 0;
+                c.call(0x894df760, { (uint32_t)key, (uint32_t)(-200 + 10 * i) }, sp, &r0);
+                tab[(size_t)(i * 128 + key)] = r0;
+            }
+        xtEnvSetKeyScales(tab.data());
+        bad = 0;   // the KF scale is not part of the time converter's verdict once the firmware's values are used
+        const uint32_t scales[] = { 0x10000, 0x8000, 0x4a3d, 0xffff, 0x10001, 0x1a000, 0x28000, 0x40000, 0x1, 0x0 };
+        n = bad = 0;
+        for (int knob = 0; knob < 128; ++knob)
+            for (int vel = 0; vel < 128; vel += 3)
+                for (int sens = -63; sens <= 63; sens += 7)
+                    for (uint32_t sc : scales) {
+                        uint32_t r0 = 0;
+                        if (!c.call(0x894df7b0, { (uint32_t)knob, (uint32_t)vel, (uint32_t)(int32_t)sens, sc }, sp, &r0)) { std::fprintf(stderr, "%s\n", c.error().c_str()); return 1; }
+                        ++n;
+                        const int fw = (int)(r0 & 0xffff), pt = xtEnvTime(knob, vel, sens, sc);
+                        if (fw != pt && bad++ < 10) std::printf("time knob %d vel %d sens %d scale %x: fw %d port %d\n", knob, vel, sens, sc, fw, pt);
+                    }
+        std::printf("time converter: %ld cases, %ld differ\n", n, bad);
+        return bad ? 3 : 0;
+    }
+    if (argc < 8) { std::fprintf(stderr, "usage: xt_env rom.2.bin A D S R offTick ticks [curve] | xt_env rom.2.bin conv\n"); return 2; }
     if (!xtEnvLoadTables(argv[1])) { std::fprintf(stderr, "cannot read the tables\n"); return 1; }
     const int off = std::atoi(argv[6]), ticks = std::atoi(argv[7]);
     const XtEnvParams prm = xtEnvAdsr(std::atoi(argv[2]), std::atoi(argv[3]), std::atoi(argv[4]), std::atoi(argv[5]),

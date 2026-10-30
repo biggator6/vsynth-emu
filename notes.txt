@@ -217,6 +217,14 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+ENVELOPE VELOCITY v48 (2026-10-29): A/D/R-Sens and Time KF in the amp
+  envelope's times (0x894df7b0 time converter ported, 1,045,760 cases equal
+  to the firmware; Time KF scales 0x894df760 computed by the firmware at ROM
+  load). Check: xt_env rom.2.bin conv. Plugin params ampAttackSens,
+  ampDecaySens, ampReleaseSens (−63..+63), ampTimeKF (−200..+200 step 10);
+  TEST_ADSR takes 8 values. Open: velocity → level (curve 0x894ebd60
+  decoded, the Velocity Sens unit not), the Energy knob mapping.
+
 WAV IMPORT v47 (2026-10-29): the XT's import converter (setup 0x8952dec0,
   16-bit driver 0x8952e4d0, resampler 0x8952dc60/dd20) run from rom.2 in the
   interpreter: xtFwImport. The plugin imports through it (sources wider

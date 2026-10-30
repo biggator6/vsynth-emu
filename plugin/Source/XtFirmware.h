@@ -40,5 +40,9 @@ bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, st
 // interleaved int16 at 44.1 kHz.
 bool xtFwImport(const int16_t* pcm, long frames, int channels, int rate, std::vector<int16_t>& out);
 
+// The envelope Time KF scales (0x894df760) for kf = −200, −190, … 200 and
+// keys 0..127: 41 × 128 values, by kf then key.
+bool xtFwEnvKeyScales(std::vector<uint32_t>& out);
+
 // Round to nearest instead of FPSCR.RM (to match Ghidra's P-code emulator).
 void xtFwForceNearest(bool on);

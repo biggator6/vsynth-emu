@@ -23,12 +23,16 @@ int main(int argc, char** argv) {
         auto* prm = p.apvts.getParameter("encodeType");
         prm->setValueNotifyingHost(prm->convertTo0to1((float)idx));
     }
-    // TEST_ADSR="a,d,s,r": amp envelope knobs for the processor and the reference
+    // TEST_ADSR="a,d,s,r[,aSens,dSens,rSens,timeKF]": amp envelope knobs for the
+    // processor and the reference
     XtSynth::Controls refCtl;
     if (const char* e = std::getenv("TEST_ADSR")) {
-        std::sscanf(e, "%d,%d,%d,%d", &refCtl.attack, &refCtl.decay, &refCtl.sustain, &refCtl.release);
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &refCtl.attack, &refCtl.decay, &refCtl.sustain, &refCtl.release,
+                    &refCtl.aSens, &refCtl.dSens, &refCtl.rSens, &refCtl.timeKF);
         const std::pair<const char*, int> knobs[] = { { "ampAttack", refCtl.attack }, { "ampDecay", refCtl.decay },
-                                                      { "ampSustain", refCtl.sustain }, { "ampRelease", refCtl.release } };
+                                                      { "ampSustain", refCtl.sustain }, { "ampRelease", refCtl.release },
+                                                      { "ampAttackSens", refCtl.aSens }, { "ampDecaySens", refCtl.dSens },
+                                                      { "ampReleaseSens", refCtl.rSens }, { "ampTimeKF", refCtl.timeKF } };
         for (auto [id, v] : knobs) {
             auto* prm = p.apvts.getParameter(id);
             prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
@@ -73,12 +77,12 @@ int main(int argc, char** argv) {
     for (int done = 0; done < total; done += block) {
         juce::MidiBuffer midi;
         if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)127), 100); }
-        if (done == offBlock) { midi.addEvent(juce::MidiMessage::noteOff(1, note), offAt); }
+        if (done == offBlock) { midi.addEvent(juce::MidiMessage::noteOff(1, note, (juce::uint8)100), offAt); }
         p.processBlock(buf, midi);
         juce::ScopedNoDenormals ftz;   // processBlock runs with denormals flushed (as the SH-4 does, FPSCR.DN = 1)
         if (std::getenv("TEST_CONTROLS")) ref.setControls(refCtl);   // as processBlock does each block
         if (done == 0) { ref.render(rl.data(), rr.data(), 100); ref.noteOn(note, 1.0f); ref.render(rl.data() + 100, rr.data() + 100, block - 100); }
-        else if (done == offBlock) { ref.render(rl.data(), rr.data(), offAt); ref.noteOff(note); ref.render(rl.data() + offAt, rr.data() + offAt, block - offAt); }
+        else if (done == offBlock) { ref.render(rl.data(), rr.data(), offAt); ref.noteOff(note, 100 / 127.0f); ref.render(rl.data() + offAt, rr.data() + offAt, block - offAt); }
         else ref.render(rl.data(), rr.data(), block);
         for (int i = 0; i < block; ++i) {
             if (firstDiff < 0 && (buf.getSample(0, i) != rl[(size_t)i] || buf.getSample(1, i) != rr[(size_t)i])) firstDiff = done + i;

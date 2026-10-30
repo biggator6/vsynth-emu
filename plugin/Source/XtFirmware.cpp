@@ -196,6 +196,21 @@ bool xtFwImport(const int16_t* pcm, long frames, int channels, int rate, std::ve
     return true;
 }
 
+bool xtFwEnvKeyScales(std::vector<uint32_t>& out) {
+    out.clear();
+    if (g_rom.empty()) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    out.resize(41 * 128);
+    for (int i = 0; i < 41; ++i)
+        for (int key = 0; key < 128; ++key) {
+            uint32_t r0 = 0;
+            if (!M->cpu.call(0x894df760, { (uint32_t)key, (uint32_t)(-200 + 10 * i) }, kStack, &r0)) { out.clear(); return false; }
+            out[(size_t)(i * 128 + key)] = r0;
+        }
+    return true;
+}
+
 bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMbBands& out) {
     if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5)) return false;
     auto M = std::make_unique<Machine>(g_rom);

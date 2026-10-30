@@ -212,7 +212,10 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      attack and segment curves. It is applied as the patch TVA applies it
      (v46): an update every 441 frames, linear gain ramps with the TVA's
      ramp-length and landing rules, and voices end at the TVA's done check.
-     Velocity is a linear gain.
+     Velocity shortens or lengthens the times as the XT's converter does
+     (A/D/R-Sens, release from the note-off velocity), and Time KF scales
+     decay and release by key (v48). Velocity's effect on level is still a
+     linear gain.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 

@@ -44,9 +44,14 @@ private:
     juce::Slider     decaySlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     sustainSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     releaseSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     aSensSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     dSensSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     rSensSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     kfSlider_      { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label encodeLabel_ { {}, "Encode" }, keyLabel_ { {}, "Key" }, depthLabel_ { {}, "Depth" },
                 energyLabel_ { {}, "Energy" }, attackLabel_ { {}, "A" }, decayLabel_ { {}, "D" },
-                sustainLabel_ { {}, "S" }, releaseLabel_ { {}, "R" };
+                sustainLabel_ { {}, "S" }, releaseLabel_ { {}, "R" }, aSensLabel_ { {}, "A-Sns" },
+                dSensLabel_ { {}, "D-Sns" }, rSensLabel_ { {}, "R-Sns" }, kfLabel_ { {}, "T-KF" };
     std::unique_ptr<juce::FileChooser> romChooser_;
 
     // ── Algorithm selector ───────────────────────────────────────────────────
@@ -61,6 +66,7 @@ private:
     std::unique_ptr<SliderAtt> pitchAtt_, timeAtt_, formantAtt_;
     std::unique_ptr<ButtonAtt> robotAtt_;
     std::unique_ptr<SliderAtt> keyAtt_, depthAtt_, energyAtt_, attackAtt_, decayAtt_, sustainAtt_, releaseAtt_;
+    std::unique_ptr<SliderAtt> aSensAtt_, dSensAtt_, rSensAtt_, kfAtt_;
     std::unique_ptr<ComboAtt>  encodeAtt_;
 
     void comboBoxChanged(juce::ComboBox* box) override;

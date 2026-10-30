@@ -1543,6 +1543,62 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### Envelope velocity and key follow; velocity to level; Energy (2026-10-29, v48)
+
+**Times** (`0x894df7b0`, knob, velocity, sens, 16.16 scale):
+1. T = the time table at the knob (a sign-extended u16).
+2. If sens ≠ 0, T −= ((velocity − 64)·q) >> 8, with q = sens·40 (a
+   reciprocal multiply rounded toward zero). T ≤ 0 means no time, and T is
+   then capped at 12000.
+3. The 16.16 scale applies: (T·frac) >> 16 + T·int, capped at 12000, at
+   least 1.
+
+The converter `0x894df240` calls it three times:
+- attack with the note-on velocity, A-Sens and no scale;
+- decay with the note-on velocity, D-Sens and the Time KF scale;
+- release with the note-off velocity, R-Sens and the Time KF scale.
+
+**Time KF scale** (`0x894df760`): 2^(−kf·(key − 60)/1200)·65536,
+truncated, with kf −200…+200. The firmware's powf is not correctly rounded:
+251 of the 5248 (kf, key) values differ from std::pow by a few units.
+
+**Port.**
+- `xtEnvTime` matches `0x894df7b0` on all 1,045,760 cases tried in the
+  interpreter (`xt_env rom conv`).
+- The KF scales are the firmware's own, computed at ROM load
+  (`xtFwEnvKeyScales`, 41 × 128).
+- The plugin has A/D/R-Sens and Time KF; a note-off converts the times
+  again with its velocity before the release starts.
+
+**Velocity to level** (the TVA):
+- The TVA object (`0x894ea990`) computes gain = (c(velocity, sens,
+  curve)/32768)².
+- c is `0x894ebd60`:
+  - s comes from a linear table (0x897cfeda, 200 entries, 65536 at 200);
+  - curve is one of 7 tables of 128 bytes (pointers at 0x897cfb9c; about
+    255 at velocity 0, falling to 0 at 127);
+  - c = 32768 + s·(256 − curve[v])/256, minus s when s > 0, clamped to
+    0…32768. Sens 0 or curve ≥ 7 gives 32768.
+- The level converter (`0x894eab40`) multiplies this by three level-table
+  entries: the Level knob with matrix and Level KF·(key − 60), and two
+  patch levels.
+
+Open: the sens the TVA reads ranges over ±200, while the patch's Velocity
+Sens is −63…+63. The scaling between them, in the code that fills the
+per-part table at 0x89d2a6d0, is not found. So the plugin keeps a linear
+velocity gain for now.
+
+**Energy: still open.**
+- The OSC parameter block lives at conversion context +0x434 (OSC2 at
+  +0x508). The glue `0x894db8a0` passes it on, and `0x894f2600` copies it
+  into the voice; +0x18 is the Energy target that `0x8950c1b0` smooths.
+- The OSC converter `0x894e1920` writes +8/+0xc and the envelope and LFO
+  depths, but not +0x10, +0x14 or +0x18 (time, formant, Energy).
+- The parameter names ("OSC 1 Energy" at 0x8975e3d4) sit in matrix
+  destination descriptors {name, short name, id} at 0x89835b5c, not in the
+  patch layout.
+- The routine that writes +0x18 is not found yet.
+
 ### The WAV import converter (2026-10-29, v47)
 
 The resampler found in pass 1 (`0x8952dc60` mono, `0x8952dd20` stereo) is

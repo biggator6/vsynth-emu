@@ -21,9 +21,32 @@ struct XtEnvParams {
     float time[4] = {};             // stage times, ms: attack, (none), decay, release
     float level[5] = {};            // start, peak, peak, sustain, end
 };
-// ADSR knobs 0..127 as the converter maps them with no modulation, velocity
-// or key follow.
-XtEnvParams xtEnvAdsr(int attack, int decay, int sustain, int release, int curve = 2);
+// An envelope's knobs as the patch stores them.
+struct XtEnvKnobs {
+    int attack = 0, decay = 0, sustain = 127, release = 16;   // 0..127
+    int aSens = 0, dSens = 0, rSens = 0;                        // velocity → time, −63..+63
+    int timeKF = 0;                                             // −200..+200 (decay and release)
+};
+// The converter (0x894df240) for an ADSR with no matrix modulation: the
+// attack time from the note-on velocity and A-Sens; decay and release from
+// D-/R-Sens and the Time KF scale for `key`; the release from the note-off
+// velocity.  Levels 0, 1, 1, S, 0.
+XtEnvParams xtEnvAdsr(const XtEnvKnobs& k, int key = 60, int velocity = 64, int releaseVelocity = 64, int curve = 2);
+inline XtEnvParams xtEnvAdsr(int attack, int decay, int sustain, int release, int curve = 2) {
+    XtEnvKnobs k; k.attack = attack; k.decay = decay; k.sustain = sustain; k.release = release;
+    return xtEnvAdsr(k, 60, 64, 64, curve);
+}
+// The time converter 0x894df7b0: ms from the knob table, less
+// ((velocity − 64)·sens·40) >> 8 when sens ≠ 0 (then at most 12000), then
+// the 16.16 time scale (result at least 1).  0: no time.
+int xtEnvTime(int knob, int velocity, int sens, uint32_t scale16);
+// 0x894df760: the Time KF scale 2^(−kf·(key − 60)/1200), 16.16.  The
+// firmware's own values once xtEnvSetKeyScales has them (its powf is not
+// correctly rounded: 251 of the 5248 values differ by a few units from
+// std::pow); kf in steps of 10.
+uint32_t xtEnvKeyScale(int key, int kf);
+// 41 × 128 values, kf = −200, −190, … 200 by key (xtFwEnvKeyScales).
+void xtEnvSetKeyScales(const uint32_t* table);
 
 class XtEnvelope {
 public:
