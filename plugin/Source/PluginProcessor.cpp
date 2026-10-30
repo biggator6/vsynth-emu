@@ -304,6 +304,7 @@ void VSynthEmuProcessor::loadFile(const juce::File& file)
         juce::CriticalSection::ScopedLockType lock(bufferLock_);
         fileBuffer_ = std::move(newBuffer);
         fileRate_ = reader->sampleRate;
+        fileBits_ = reader->usesFloatingPointData ? 16 : (int)reader->bitsPerSample;   // float WAVs: rounded
         fileLoaded_.store(true);
     }
 
@@ -335,17 +336,19 @@ void VSynthEmuProcessor::reencode() {
     if (!xtSynthRomReady()) { xtActive_.store(false); return; }
     std::vector<std::vector<float>> chans;
     double rate;
+    int bits;
     {
         juce::CriticalSection::ScopedLockType lock(bufferLock_);
         for (int c = 0; c < std::min(2, fileBuffer_.getNumChannels()); ++c)
             chans.emplace_back(fileBuffer_.getReadPointer(c), fileBuffer_.getReadPointer(c) + fileBuffer_.getNumSamples());
         rate = fileRate_;
+        bits = fileBits_;
     }
     const int choice = (int)apvts.getRawParameterValue(Params::kEncodeType)->load();
     const int depth  = (int)apvts.getRawParameterValue(Params::kEncodeDepth)->load();
     const int gen = ++encodeGen_;
     setStatus("Encoding...");
-    encodePool_.addJob([this, chans = std::move(chans), rate, choice, depth, gen] {
+    encodePool_.addJob([this, chans = std::move(chans), rate, bits, choice, depth, gen] {
         int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : 0;
         if (type == 0) {   // Auto: the engine's content classifier
             std::vector<float> mono(chans[0].size());
@@ -358,7 +361,7 @@ void VSynthEmuProcessor::reencode() {
             type = a.contentType == CT::BACKING ? 3 : a.contentType == CT::ENSEMBLE ? 5 : 1;   // LITE plays on the SOLO player
         }
         std::string err;
-        auto e = xtSynthEncode(chans, rate, type, depth, &err);
+        auto e = xtSynthEncode(chans, rate, type, depth, &err, bits);
         if (gen != encodeGen_.load()) return;
         if (!e) { setStatus("Encode failed: " + juce::String(err)); return; }
         synth_.setSample(e);

@@ -53,9 +53,10 @@ int main(int argc, char** argv) {
     for (int c = 0; c < std::min(2, in.getNumChannels()); ++c) chans.emplace_back(in.getReadPointer(c), in.getReadPointer(c) + in.getNumSamples());
     const juce::String st = p.getStatusText();
     const int type = st.contains("ENSEMBLE") ? 5 : st.contains("BACKING") ? 3 : 1;
-    auto E = xtSynthEncode(chans, rd->sampleRate, type, 64);
+    const int bits = rd->usesFloatingPointData ? 16 : (int)rd->bitsPerSample;
+    auto E = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits);
     {   // the encode must be repeatable
-        auto E2 = xtSynthEncode(chans, rd->sampleRate, type, 64);
+        auto E2 = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits);
         bool same = E->vpdt == E2->vpdt && E->solo.segStart == E2->solo.segStart && E->solo.in == E2->solo.in
                  && E->solo.inR == E2->solo.inR;
         for (int k = 0; k < 6; ++k) same = same && E->bands.buf[k] == E2->bands.buf[k];

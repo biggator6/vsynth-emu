@@ -171,11 +171,13 @@ The HTML batch report embeds **A/B audio players** per case.
 Fast engine invariants: `plugin/Source/EngineTests.cpp`
 (`-DENGINE_TESTS_MAIN`, 15 checks, runs in seconds).
 
-## Current Scores (v44, metric v6)
+## Current Scores (v47, metric v6)
 
-**76.6 / 100 average** (v44 76.601: SOLO player corrections, vocal +0.008
-at most; v42 76.600: BACKING and ENSEMBLE through the XT's own firmware
-chain, chord 75.4 → 87.3; v40 74.8; full history in notes.txt).
+**76.8 / 100 average** (v47 76.765: BACKING/ENSEMBLE inputs imported
+through the XT's own WAV converter, chord time 2× 85.4 → 87.9; v44 76.601:
+SOLO player corrections; v42 76.600: BACKING and ENSEMBLE through the XT's
+own firmware chain, chord 75.4 → 87.3; v40 74.8; full history in
+notes.txt).
 Earlier: **73.9 / 100 average** (v35 — SOLO encoder epochs matched to the V-Synth XT's own grain records, vocal 74.6 → 77.4; v33 = 73.0; four sine references show the formant an octave low although the Formant knob was 0 (likely Formant KF / envelope / LFO in the sine patch; re-record pending, see notes.txt); render with `analysis/render_suite.py`) under metric v6 (v28: 66.6 v6 / 68.1 v5 / 52.5 v4;
 history in notes.txt).  Per-case v4 detail below is historical.  Earlier text:
 51.8 / 100 under v4 (re-baselined v17 = 34.0).  Strong: drum_time_4x 64.7,
@@ -190,7 +192,9 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
 
 1. **Encode at load, off the audio thread** (`VSynthEmuProcessor::reencode`
    → `xtSynthEncode`):
-   - resample to 44.1 kHz int16;
+   - import as the XT imports a WAV (v47): to int16, a 24-bit source keeping
+     its top 16 bits, then the XT's own converter to 44.1 kHz (`xtFwImport`,
+     run from rom.2), unless the file is already 44.1 kHz;
    - encode as the chosen **Encode Type**. Auto uses the engine's content
      classifier; LITE plays on the SOLO player.
    - SOLO: the XT's SOLO encoder port. A stereo wave has one record stream,

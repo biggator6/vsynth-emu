@@ -32,5 +32,13 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, std::vector<uint8_t>& vpdt,
                      int depth = -1, int* events = nullptr);
 
+// The XT's WAV import converter to 44.1 kHz: setup 0x8952dec0 (step =
+// rate·2^24/44100), the 16-bit driver 0x8952e4d0 over the whole sample, then
+// its flush.  The resampler (0x8952dc60 mono / 0x8952dd20 stereo) is an
+// 8-phase × 16-tap polyphase FIR with linear interpolation between phases,
+// clipped to int16.  `pcm` is interleaved int16 at `rate`; `out` receives
+// interleaved int16 at 44.1 kHz.
+bool xtFwImport(const int16_t* pcm, long frames, int channels, int rate, std::vector<int16_t>& out);
+
 // Round to nearest instead of FPSCR.RM (to match Ghidra's P-code emulator).
 void xtFwForceNearest(bool on);

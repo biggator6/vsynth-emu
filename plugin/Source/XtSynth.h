@@ -33,8 +33,12 @@ bool xtSynthRomReady();
 
 // Encodes planar float channels at `sampleRate`.  type: 1 SOLO, 3 BACKING,
 // 5 ENSEMBLE; depth: Encode Depth 0..127 (multi-band attack detection).
+// The sample is imported as the XT imports a WAV: to int16 (sources wider
+// than 16 bits keep their top 16, as the XT's 24/32-bit readers do), then
+// the XT's own converter to 44.1 kHz (xtFwImport) when the rate differs.
+// `bits`: the source's bits per sample.
 std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& channels, double sampleRate,
-                                         int type, int depth, std::string* err = nullptr);
+                                         int type, int depth, std::string* err = nullptr, int bits = 16);
 
 class XtSynth {
 public:

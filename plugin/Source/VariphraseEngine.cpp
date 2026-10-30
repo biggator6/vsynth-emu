@@ -1002,11 +1002,25 @@ std::vector<float> VariphraseEngine::multiBandFirmwareOffline(const std::vector<
     const long isr = std::lround(sr);
     long g = std::gcd(isr, 44100L);
     const int up = (int)(44100L / g), down = (int)(isr / g);
-    // to 44.1 kHz int16, as the XT stores a sample
-    std::vector<double> x(in.begin(), in.end());
-    std::vector<double> x44 = resampleSinc(x, up, down);
-    std::vector<int16_t> pcm(x44.size());
-    for (size_t i = 0; i < x44.size(); ++i) pcm[i] = (int16_t)std::clamp(std::lround(x44[i] * 32768.0), -32768L, 32767L);
+    // to 44.1 kHz int16 as the XT imports a WAV (v47): int16 by floor (the
+    // XT keeps a 24-bit sample's top 16 bits; a stereo source's half-sum
+    // floors too), then the XT's own converter (xtFwImport).  VSE_SRC=sinc:
+    // the windowed sinc of v41–v46.
+    std::vector<int16_t> pcm;
+    const char* srcSel = std::getenv("VSE_SRC");
+    const bool useSinc = srcSel && std::string(srcSel) == "sinc";
+    if (!useSinc) {
+        std::vector<int16_t> p48(in.size());
+        for (size_t i = 0; i < in.size(); ++i) p48[i] = (int16_t)std::clamp(std::floor((double)in[i] * 32768.0), -32768.0, 32767.0);
+        if (isr == 44100) pcm = std::move(p48);
+        else if (!xtFwImport(p48.data(), (long)p48.size(), 1, (int)isr, pcm)) pcm.clear();
+    }
+    if (pcm.empty()) {
+        std::vector<double> x(in.begin(), in.end());
+        std::vector<double> x44 = resampleSinc(x, up, down);
+        pcm.resize(x44.size());
+        for (size_t i = 0; i < x44.size(); ++i) pcm[i] = (int16_t)std::clamp(std::lround(x44[i] * 32768.0), -32768L, 32767L);
+    }
     // Markers as the XT's encode page makes them: its attack detection at
     // the Encode Depth (VSE_DEPTH, default 64; −1 = start and end only).
     // Neither suite input changes with depth (the drum has one attack, the

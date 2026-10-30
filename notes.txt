@@ -217,6 +217,14 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+WAV IMPORT v47 (2026-10-29): the XT's import converter (setup 0x8952dec0,
+  16-bit driver 0x8952e4d0, resampler 0x8952dc60/dd20) run from rom.2 in the
+  interpreter: xtFwImport. The plugin imports through it (sources wider
+  than 16 bits keep their top 16 bits; 44.1 kHz files are not converted),
+  and so does the engine's BACKING/ENSEMBLE path (VSE_SRC=sinc: the old
+  windowed sinc). Suite 76.601 -> 76.765 (chord +0.3/+0.8/+2.5, drum ±0.2).
+    xt_fw rom.2.bin import samp.bin <ch> <rate> out.bin     (int16 in and out)
+
 AMP ENVELOPE v45 (2026-10-29): plugin/Source/XtEnvelope.cpp is the XT's
   envelope generator (HARDWARE_FIRMWARE.md, "The envelope generator"):
   A/D/S/R 0..127 through the firmware's time table (ms) and sustain table,

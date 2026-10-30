@@ -25,6 +25,7 @@ constexpr uint32_t kEncInit = 0x89516400, kDetect = 0x895164c0;   // encode modu
 constexpr uint32_t kSmp = 0x8987c940;    // sample block: +0 type, +2 channels, +8 frames, +0x20 start, +0x24 end, +0x7c samples
 constexpr uint32_t kChunks = 0x8987c97c; // (ptr, size) per chunk kind 0..8, set by 0x89517320
 constexpr uint32_t kMarkCount = 0x89ff0cfc, kMarkHead = 0x89ff0d04;
+constexpr uint32_t kSrcSetup = 0x8952dec0, kSrcFeed16 = 0x8952e4d0;  // WAV import converter (16-bit input)
 // harness memory (as the emulator scripts use it)
 constexpr uint32_t kRam = 0x8C000000, kRamSize = 0x02000000;
 constexpr uint32_t kStack = 0x8C0E0000, kEv = 0x8C0F0000, kL = 0x8C0F0000, kInfo = 0x8C0F0100;
@@ -170,6 +171,31 @@ bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, st
     return done;
 }
 
+bool xtFwImport(const int16_t* pcm, long frames, int channels, int rate, std::vector<int16_t>& out) {
+    out.clear();
+    if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || rate <= 0) return false;
+    const size_t bytes = (size_t)frames * channels * 2;
+    // input below the heap; the output, at most rate/44100 shorter or longer, above it
+    const double outMax = ((double)frames * 44100.0 / rate + 64.0) * channels * 2;
+    if (kSamp + bytes > kHeap || (double)kHeap + outMax > (double)kRam + kRamSize) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    c.write(kSamp, pcm, bytes);
+    // parameter block {output, channels, bits, rate}; the converter's context follows it
+    const uint32_t prm = kInfo, ctx = kInfo + 0x40;
+    const uint32_t p[4] = { kHeap, (uint32_t)channels, 16, (uint32_t)rate };
+    for (int i = 0; i < 4; ++i) c.wr32(prm + 4 * i, p[i]);
+    if (!c.call(kSrcSetup, { ctx, prm }, kStack)) { std::fprintf(stderr, "sh4 src setup: %s\n", c.error().c_str()); return false; }
+    if (!c.call(kSrcFeed16, { ctx, (uint32_t)bytes, kSamp }, kStack)) { std::fprintf(stderr, "sh4 src: %s\n", c.error().c_str()); return false; }
+    if (!c.call(kSrcFeed16, { ctx, 0, 0 }, kStack)) { std::fprintf(stderr, "sh4 src flush: %s\n", c.error().c_str()); return false; }
+    const uint32_t end = c.rd32(ctx + 8);
+    if (end < kHeap || end > kRam + kRamSize) return false;
+    out.resize((end - kHeap) / 2);
+    c.read(kHeap, out.data(), out.size() * 2);
+    return true;
+}
+
 bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMbBands& out) {
     if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5)) return false;
     auto M = std::make_unique<Machine>(g_rom);
@@ -209,6 +235,7 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 // xt_fw <rom.2.bin> solo <samp.bin>                         : SOLO records "start len info"
 // xt_fw <rom.2.bin> load <3|5> <samp.bin> <channels> <out>  : the six bands, concatenated
 // xt_fw <rom.2.bin> encode <3|5> <samp.bin> <channels> <out.vpdt> [depth] : the multi-band encoder
+// xt_fw <rom.2.bin> import <samp.bin> <channels> <rate> <out.bin> : the WAV import converter to 44.1 kHz (int16)
 // xt_fw <rom.2.bin> play <3|5> <samp.bin> <channels> <vpdt.bin> <pitch> <walk> <out.f32>
 //   : bands from the firmware, then XtMbPlayer; float32 L/R pairs scaled to ±1
 //   (XT_ROUND=nearest: round to nearest, as Ghidra's emulator)
@@ -231,6 +258,16 @@ int main(int argc, char** argv) {
         std::vector<XtRecord> recs;
         if (!xtFwSoloEncode(reinterpret_cast<const int16_t*>(raw.data()), (int)(raw.size() / 2), recs)) return 1;
         for (const XtRecord& r : recs) std::printf("%d\t%d\t%d\n", r.start16, r.len16, r.info);
+    } else if (mode == "import" && argc >= 7) {
+        std::vector<uint8_t> raw = slurp(argv[3]);
+        const int ch = std::atoi(argv[4]), rate = std::atoi(argv[5]);
+        std::vector<int16_t> out;
+        if (!xtFwImport(reinterpret_cast<const int16_t*>(raw.data()), (long)(raw.size() / (2 * ch)), ch, rate, out)) return 1;
+        FILE* fo = std::fopen(argv[6], "wb");
+        if (!fo) return 1;
+        std::fwrite(out.data(), 2, out.size(), fo);
+        std::fclose(fo);
+        std::fprintf(stderr, "%ld frames in, %zu out\n", (long)(raw.size() / (2 * ch)), out.size() / (size_t)ch);
     } else if (mode == "load" && argc >= 7) {
         std::vector<uint8_t> raw = slurp(argv[4]);
         const int type = std::atoi(argv[3]), ch = std::atoi(argv[5]);

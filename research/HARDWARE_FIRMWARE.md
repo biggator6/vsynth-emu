@@ -1543,6 +1543,52 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The WAV import converter (2026-10-29, v47)
+
+The resampler found in pass 1 (`0x8952dc60` mono, `0x8952dd20` stereo) is
+the XT's WAV import converter to 44.1 kHz.
+
+**Format drivers.** One per input format, each taking (context, bytes,
+data); a call with no data flushes 8 zero samples per channel. Each turns
+the input into int16:
+
+| Driver | Input | Conversion to int16 |
+|---|---|---|
+| `0x8952e4d0` | 16-bit | as is |
+| `0x8952e620` | 8-bit unsigned | (b − 0x80)·256 |
+| `0x8952e740` | 24-bit | the top two bytes (a truncation) |
+| `0x8952eab0` | 32-bit | the top two bytes (a truncation) |
+
+The int16 samples go into a 1024-sample buffer (`0x8952dbf0` makes room),
+and the resampler runs while 8 samples per channel are available beyond
+the read point. Output goes to the context's output pointer.
+
+**Setup** `0x8952dec0` (state at RAM 0x8a0154f0):
+- step = rate·2^24/44100, in 8.24 fixed point, with the phase at 0;
+- write index 7·ch and read index 8·ch;
+- the buffer cleared.
+
+**Resampler**, per output sample:
+1. 16 taps around the read point, at two adjacent phases of the 129-tap
+   table at 0x897eebb0 (8 phases, phase from bits 21–23).
+2. The two dot products are blended by the remaining 21 bits.
+3. The result is clipped to ±32767 and truncated to int16.
+4. The phase advances by the step and the read index by its integer part.
+
+**Measured** on our 48 kHz sources against scipy's resample_poly:
+- no delay, +0.08 dB;
+- ±0.2 dB to 15 kHz, then +0.6 to +5 dB above 19.5 kHz (a short filter);
+- −42 to −48 dB of residual.
+
+44.1 kHz files are not converted: the XT's waves 003/004 are
+sample-identical to their sources.
+
+**Use.** `xtFwImport` runs setup, the 16-bit driver and the flush from
+rom.2 in the interpreter (0.1–0.2 s for a few seconds of audio). The plugin
+imports through it, keeping a wider source's top 16 bits first, as the
+24-bit and 32-bit drivers do. The engine's BACKING/ENSEMBLE path does the
+same. Suite 76.601 → 76.765: chord +0.3 to +2.5, drum within ±0.2.
+
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).
 2. ~~First-pass triage~~ — done (above).

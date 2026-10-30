@@ -80,6 +80,7 @@ private:
     std::atomic<bool>        fileLoaded_ { false };
     juce::String             loadedFileName_;
     double                   fileRate_ = 44100.0;
+    int                      fileBits_ = 16;
 
     // ── Encoding (background) ────────────────────────────────────────────────
     juce::ThreadPool encodePool_ { 1 };

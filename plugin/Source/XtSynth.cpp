@@ -52,19 +52,35 @@ bool xtSynthSetRom(const std::string& path) {
 bool xtSynthRomReady() { return g_romReady; }
 
 std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& channels, double sampleRate,
-                                         int type, int depth, std::string* err) {
+                                         int type, int depth, std::string* err, int bits) {
     auto fail = [&](const char* m) -> std::shared_ptr<XtEncoded> { if (err) *err = m; return nullptr; };
     if (!g_romReady) return fail("no firmware image (rom.2) loaded");
     if (channels.empty() || channels[0].size() < 64) return fail("sample too short");
     if (type != 1 && type != 3 && type != 5) return fail("unknown encode type");
     const int ch = channels.size() >= 2 ? 2 : 1;
-    // to 44.1 kHz int16, as the XT stores an imported sample
-    std::vector<std::vector<double>> r;
-    for (int c = 0; c < ch; ++c) r.push_back(resample(channels[(size_t)c], sampleRate, 44100.0));
-    const long frames = (long)r[0].size();
-    std::vector<int16_t> pcm((size_t)frames * ch);
-    for (long i = 0; i < frames; ++i)
-        for (int c = 0; c < ch; ++c) pcm[(size_t)(i * ch + c)] = to16(r[(size_t)c][(size_t)i]);
+    // to int16 as the XT's WAV readers do (0x8952e4d0 16-bit, 0x8952e740
+    // 24-bit, 0x8952eab0 32-bit: the top two bytes), then its converter to
+    // 44.1 kHz (0x8952dec0…).  Without the converter (sample too large for the
+    // interpreter's memory): the windowed-sinc resampler.
+    const long n = (long)channels[0].size();
+    std::vector<int16_t> src((size_t)n * ch);
+    for (long i = 0; i < n; ++i)
+        for (int c = 0; c < ch; ++c) {
+            const double v = (double)channels[(size_t)c][(size_t)i] * 32768.0;
+            const double q = bits > 16 ? std::floor(v) : std::nearbyint(v);
+            src[(size_t)(i * ch + c)] = (int16_t)std::clamp(q, -32768.0, 32767.0);
+        }
+    const int irate = (int)std::lround(sampleRate);
+    std::vector<int16_t> pcm;
+    if (irate == 44100) pcm = std::move(src);
+    else if (!xtFwImport(src.data(), n, ch, irate, pcm)) {
+        std::vector<std::vector<double>> r;
+        for (int c = 0; c < ch; ++c) r.push_back(resample(channels[(size_t)c], sampleRate, 44100.0));
+        pcm.assign(r[0].size() * (size_t)ch, 0);
+        for (size_t i = 0; i < r[0].size(); ++i)
+            for (int c = 0; c < ch; ++c) pcm[i * (size_t)ch + (size_t)c] = to16(r[(size_t)c][i]);
+    }
+    const long frames = (long)(pcm.size() / (size_t)ch);
 
     auto E = std::make_shared<XtEncoded>();
     E->type = type;

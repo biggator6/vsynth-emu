@@ -2318,3 +2318,21 @@ Round-2 recordings.  First build-out after that: real-time granular port
   done check. `XtEnvelope` also matches the firmware on the stage-time and
   onset fields the TVA reads (18 cases). PluginTest stays bit-identical
   with envelopes and note-offs; `auval` passes.
+
+### Session 16 addendum (2026-10-29) — v47: the XT's own WAV import converter
+
+- The pass-1 resampler (`0x8952dc60`/`dd20`) is the WAV import converter.
+  - Per-format drivers turn 8-, 16-, 24- and 32-bit input into int16, the
+    wider ones by keeping their top 16 bits.
+  - Setup `0x8952dec0` sets step = rate·2^24/44100.
+  - The filter is 8 phases × 16 taps of the 129-tap table at 0x897eebb0,
+    with linear interpolation between phases, clipped and truncated to
+    int16.
+- `xtFwImport` runs it from rom.2 in the interpreter. Against
+  resample_poly it has no delay, +0.08 dB, more energy above 19.5 kHz, and
+  −42…−48 dB of residual.
+- The plugin and the engine's BACKING/ENSEMBLE path now import through it
+  (`VSE_SRC=sinc` gives the old path).
+- **v47 = 76.765** (v44 76.601): chord +0.27/+0.76/+2.47, drum
+  −0.21…+0.10. The plugin stays bit-identical to `XtSynth` (chord 24-bit,
+  drum 16-bit stereo, vocal and stereo SOLO); `auval` and engine tests pass.
