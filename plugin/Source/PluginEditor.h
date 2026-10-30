@@ -54,12 +54,21 @@ private:
     juce::Slider     pSustainSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     pReleaseSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     pDepthSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    // LFO
+    juce::ComboBox   lfoWaveBox_, lfoModeBox_, lfoOffsetBox_;
+    juce::ToggleButton lfoSyncBtn_ { "Key Sync" };
+    juce::Slider     lfoRateSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     lfoDepthSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     lfoDelaySlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     lfoFadeSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label encodeLabel_ { {}, "Encode" }, keyLabel_ { {}, "Key" }, depthLabel_ { {}, "Depth" },
                 energyLabel_ { {}, "Energy" }, attackLabel_ { {}, "A" }, decayLabel_ { {}, "D" },
                 sustainLabel_ { {}, "S" }, releaseLabel_ { {}, "R" }, aSensLabel_ { {}, "A-Sns" },
                 dSensLabel_ { {}, "D-Sns" }, rSensLabel_ { {}, "R-Sns" }, kfLabel_ { {}, "T-KF" },
                 pAttackLabel_ { {}, "PA" }, pDecayLabel_ { {}, "PD" }, pSustainLabel_ { {}, "PS" },
-                pReleaseLabel_ { {}, "PR" }, pDepthLabel_ { {}, "PDep" };
+                pReleaseLabel_ { {}, "PR" }, pDepthLabel_ { {}, "PDep" }, lfoLabel_ { {}, "LFO" },
+                lfoRateLabel_ { {}, "Rate" }, lfoDepthLabel_ { {}, "Pitch" }, lfoDelayLabel_ { {}, "Delay" },
+                lfoFadeLabel_ { {}, "Fade" };
     std::unique_ptr<juce::FileChooser> romChooser_;
 
     // ── Algorithm selector ───────────────────────────────────────────────────
@@ -76,6 +85,9 @@ private:
     std::unique_ptr<SliderAtt> keyAtt_, depthAtt_, energyAtt_, attackAtt_, decayAtt_, sustainAtt_, releaseAtt_;
     std::unique_ptr<SliderAtt> aSensAtt_, dSensAtt_, rSensAtt_, kfAtt_;
     std::unique_ptr<SliderAtt> pAttackAtt_, pDecayAtt_, pSustainAtt_, pReleaseAtt_, pDepthAtt_;
+    std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_;
+    std::unique_ptr<ComboAtt>  lfoWaveAtt_, lfoModeAtt_, lfoOffsetAtt_;
+    std::unique_ptr<ButtonAtt> lfoSyncAtt_;
     std::unique_ptr<ComboAtt>  encodeAtt_;
 
     void comboBoxChanged(juce::ComboBox* box) override;

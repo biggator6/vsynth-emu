@@ -38,6 +38,21 @@ int main(int argc, char** argv) {
             prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
         }
     }
+    // TEST_LFO="wave,rate,depth,delay,mode,fade,offset,keysync": the LFO
+    if (const char* e = std::getenv("TEST_LFO")) {
+        int ks = 1;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &refCtl.lfoWave, &refCtl.lfoRate, &refCtl.lfoPitchDepth, &refCtl.lfoDelay,
+                    &refCtl.lfoFadeMode, &refCtl.lfoFade, &refCtl.lfoOffset, &ks);
+        refCtl.lfoKeySync = ks != 0;
+        const std::pair<const char*, int> knobs[] = { { "lfoWave", refCtl.lfoWave }, { "lfoRate", refCtl.lfoRate },
+                                                      { "lfoPitchDepth", refCtl.lfoPitchDepth }, { "lfoDelay", refCtl.lfoDelay },
+                                                      { "lfoFadeMode", refCtl.lfoFadeMode }, { "lfoFade", refCtl.lfoFade },
+                                                      { "lfoOffset", refCtl.lfoOffset }, { "lfoKeySync", ks } };
+        for (auto [id, v] : knobs) {
+            auto* prm = p.apvts.getParameter(id);
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+        }
+    }
     // TEST_PENV="a,d,s,r,depth": the pitch envelope
     if (const char* e = std::getenv("TEST_PENV")) {
         std::sscanf(e, "%d,%d,%d,%d,%d", &refCtl.pAttack, &refCtl.pDecay, &refCtl.pSustain, &refCtl.pRelease, &refCtl.pDepth);

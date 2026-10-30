@@ -1,13 +1,13 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 186;  // height of the XT strip below it
+static constexpr int kXtStripH   = 246;  // height of the XT strip below it
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 550);
+    setSize(560, 610);
     setResizable(true, true);
     setResizeLimits(480, 400, 960, 760);
 
@@ -38,7 +38,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     encodeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "encodeType", encodeBox_);
     for (juce::Slider* sl : { &keySlider_, &depthSlider_, &energySlider_, &attackSlider_, &decaySlider_, &sustainSlider_, &releaseSlider_,
                               &aSensSlider_, &dSensSlider_, &rSensSlider_, &kfSlider_,
-                              &pAttackSlider_, &pDecaySlider_, &pSustainSlider_, &pReleaseSlider_, &pDepthSlider_ }) {
+                              &pAttackSlider_, &pDecaySlider_, &pSustainSlider_, &pReleaseSlider_, &pDepthSlider_,
+                              &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
@@ -61,9 +62,23 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     pSustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvSustain", pSustainSlider_);
     pReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvRelease", pReleaseSlider_);
     pDepthAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvDepth",   pDepthSlider_);
+    lfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);
+    lfoModeBox_.addItemList({ "ON <<", "ON >>", "OFF <<", "OFF >>" }, 1);
+    lfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
+    for (juce::Component* cpt : { (juce::Component*)&lfoWaveBox_, (juce::Component*)&lfoModeBox_,
+                                   (juce::Component*)&lfoOffsetBox_, (juce::Component*)&lfoSyncBtn_ }) addAndMakeVisible(*cpt);
+    lfoWaveAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "lfoWave", lfoWaveBox_);
+    lfoModeAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "lfoFadeMode", lfoModeBox_);
+    lfoOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "lfoOffset", lfoOffsetBox_);
+    lfoSyncAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, "lfoKeySync", lfoSyncBtn_);
+    lfoRateAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "lfoRate", lfoRateSlider_);
+    lfoDepthAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "lfoPitchDepth", lfoDepthSlider_);
+    lfoDelayAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "lfoDelay", lfoDelaySlider_);
+    lfoFadeAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "lfoFade", lfoFadeSlider_);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
-                            &pAttackLabel_, &pDecayLabel_, &pSustainLabel_, &pReleaseLabel_, &pDepthLabel_ }) styleSmall(*l);
+                            &pAttackLabel_, &pDecayLabel_, &pSustainLabel_, &pReleaseLabel_, &pDepthLabel_,
+                            &lfoLabel_, &lfoRateLabel_, &lfoDepthLabel_, &lfoDelayLabel_, &lfoFadeLabel_ }) styleSmall(*l);
     timerCallback();
     startTimerHz(4);
 
@@ -224,6 +239,23 @@ void VSynthEmuEditor::resized() {
         l->setBounds(cell.removeFromLeft(30));
         sl->setBounds(cell.withTrimmedRight(6));
     }
+    xt.removeFromTop(6);
+    auto row7 = xt.removeFromTop(24);                // LFO: waveform, rate, pitch depth, key sync
+    lfoLabel_.setBounds(row7.removeFromLeft(30));
+    lfoWaveBox_.setBounds(row7.removeFromLeft(80).withTrimmedRight(6));
+    lfoRateLabel_.setBounds(row7.removeFromLeft(34));
+    lfoRateSlider_.setBounds(row7.removeFromLeft(140).withTrimmedRight(6));
+    lfoDepthLabel_.setBounds(row7.removeFromLeft(36));
+    lfoDepthSlider_.setBounds(row7.removeFromLeft(140).withTrimmedRight(6));
+    lfoSyncBtn_.setBounds(row7);
+    xt.removeFromTop(6);
+    auto row8 = xt.removeFromTop(24);                // LFO: delay, fade, fade mode, offset
+    lfoDelayLabel_.setBounds(row8.removeFromLeft(40));
+    lfoDelaySlider_.setBounds(row8.removeFromLeft(130).withTrimmedRight(6));
+    lfoFadeLabel_.setBounds(row8.removeFromLeft(34));
+    lfoFadeSlider_.setBounds(row8.removeFromLeft(130).withTrimmedRight(6));
+    lfoModeBox_.setBounds(row8.removeFromLeft(90).withTrimmedRight(6));
+    lfoOffsetBox_.setBounds(row8.removeFromLeft(70));
 
     // ── Knobs area ─────────────────────────────────────────────────────────
     const int knobTop = titleH + kFileStripH + kXtStripH + 8;

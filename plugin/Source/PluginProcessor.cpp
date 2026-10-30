@@ -26,6 +26,15 @@ namespace Params {
     static const juce::String kPSustain     = "pitchEnvSustain";
     static const juce::String kPRelease     = "pitchEnvRelease";
     static const juce::String kPDepth       = "pitchEnvDepth";
+    // LFO (XtLfo) and its pitch depth
+    static const juce::String kLfoWave      = "lfoWave";
+    static const juce::String kLfoRate      = "lfoRate";
+    static const juce::String kLfoDepth     = "lfoPitchDepth";
+    static const juce::String kLfoDelay     = "lfoDelay";
+    static const juce::String kLfoFadeMode  = "lfoFadeMode";
+    static const juce::String kLfoFade      = "lfoFade";
+    static const juce::String kLfoOffset    = "lfoOffset";
+    static const juce::String kLfoKeySync   = "lfoKeySync";
 }
 
 // ─── Parameter Layout ─────────────────────────────────────────────────────────
@@ -89,6 +98,17 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPSustain, "Pitch Env Sustain", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPRelease, "Pitch Env Release", 0, 127, 64));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPDepth, "Pitch Env Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLfoWave, "LFO Waveform",
+        juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoRate, "LFO Rate", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoDepth, "LFO Pitch Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoDelay, "LFO Delay", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLfoFadeMode, "LFO Fade Mode",
+        juce::StringArray { "ON <<", "ON >>", "OFF <<", "OFF >>" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoFade, "LFO Fade", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLfoOffset, "LFO Offset",
+        juce::StringArray { "-100", "-50", "0", "+50", "+100" }, 2));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kLfoKeySync, "LFO Key Sync", true));
 
     return { params.begin(), params.end() };
 }
@@ -188,6 +208,14 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.pSustain     = (int)apvts.getRawParameterValue(Params::kPSustain)->load();
     c.pRelease     = (int)apvts.getRawParameterValue(Params::kPRelease)->load();
     c.pDepth       = (int)apvts.getRawParameterValue(Params::kPDepth)->load();
+    c.lfoWave      = (int)apvts.getRawParameterValue(Params::kLfoWave)->load();
+    c.lfoRate      = (int)apvts.getRawParameterValue(Params::kLfoRate)->load();
+    c.lfoPitchDepth = (int)apvts.getRawParameterValue(Params::kLfoDepth)->load();
+    c.lfoDelay     = (int)apvts.getRawParameterValue(Params::kLfoDelay)->load();
+    c.lfoFadeMode  = (int)apvts.getRawParameterValue(Params::kLfoFadeMode)->load();
+    c.lfoFade      = (int)apvts.getRawParameterValue(Params::kLfoFade)->load();
+    c.lfoOffset    = (int)apvts.getRawParameterValue(Params::kLfoOffset)->load();
+    c.lfoKeySync   = apvts.getRawParameterValue(Params::kLfoKeySync)->load() > 0.5f;
     return c;
 }
 

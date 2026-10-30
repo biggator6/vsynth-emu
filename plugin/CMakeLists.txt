@@ -58,6 +58,7 @@ target_sources(VSynthEmu PRIVATE
     Source/SourceFilterModel.cpp
     Source/XtSoloEncoder.cpp
     Source/XtEnvelope.cpp
+    Source/XtLfo.cpp
     Source/XtSoloVoice.cpp
     Source/XtSynth.cpp
     Source/XtMultiBandPlayer.cpp

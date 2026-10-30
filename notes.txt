@@ -217,6 +217,15 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+LFO v50 (2026-10-29): plugin/Source/XtLfo.cpp, the XT's LFO (converter
+  0x894e0290, object 0x894f0b40 with its delay/fade base, tick 0x894f1050),
+  tick-for-tick identical to the firmware run in the interpreter:
+    clang++ -std=c++20 -O2 -DXT_LFO_MAIN plugin/Source/XtLfo.cpp plugin/Source/Sh4Interp.cpp -o xt_lfo
+    xt_lfo rom.2.bin            (18 cases; "identical" each)
+  Plugin: lfoWave/lfoRate/lfoPitchDepth/lfoDelay/lfoFadeMode/lfoFade/
+  lfoOffset/lfoKeySync; XtSynth CLI XT_LFO, PluginTest TEST_LFO. Not
+  modelled: tempo sync, LFO destinations other than pitch.
+
 PITCH ENVELOPE v49 (2026-10-29): voice update as 0x8950c1b0 (70% toward the
   targets every 10 ms for pitch, formant, walk, Energy); pitch envelope
   (pitchEnvAttack/Decay/Sustain/Release 0..127, pitchEnvDepth −63..+63 via

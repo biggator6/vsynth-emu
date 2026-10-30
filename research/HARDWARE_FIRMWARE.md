@@ -1543,6 +1543,77 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The LFO (2026-10-29, v50)
+
+**Converter** (`0x894e0290`, patch → block):
+- waveform: SIN, TRI, SAW, SQR, RND, TRP, S&H, CHAOS map to internal 1, 0,
+  2, 3, 6, 4, 5, 7 (`0x894e0010`);
+- rate: the float table at 0x897ced34, in Hz (0.001…40). Tempo sync takes
+  the clock table instead;
+- delay and fade: (k/127)²·10000 ms;
+- offset index 0–4, fade mode 0–3, key sync.
+
+**Object** (`0x894f0b40`, 0x98 bytes). A delay/fade base (vtable
+0x89833ef8) holds:
+- state (+0), direction (+1), a delay counter in ms (+2);
+- fade times (+4/+8), delay (+0xc), rates (+0x10/+0x14);
+- rest and target levels (+0x18/+0x1c) and the amplitude (+0x20,
+  0…131072).
+
+Its methods (some reached only through the vtable):
+- `0x894f04a0` init;
+- `0x894f04d0` start: delay, then fade, then full;
+- `0x894f0520` direction: in 0 → full, or out full → 0;
+- `0x894f0560` delay;
+- `0x894f05a0` and `0x894f0570`, the fade rates: 131072/(T/10) per tick,
+  signed by the direction;
+- `0x894f05d0` tick: the delay counts n·10 ms, then the fade moves by n·rate
+  to its target, clamped to 0…131072.
+
+The LFO's own fields: phase +0x40, held values +0x44/+0x48, chaos state
++0x6c, output +0x38.
+
+**Note-on** `0x894f0cf0`:
+- phase 0;
+- trigger `0x894f0bf0`: direction by fade mode (`0x894f0780`), then the
+  times;
+- ON modes start the fade now, OFF modes at note-off (`0x894f0810`);
+- then one tick with n = 0.
+
+A key-unsynced LFO takes its phase from a shared one (`0x894f0e60`, +0x7c).
+
+**Tick** `0x894f1050`:
+1. phase += n·rate, with rate = Hz·65535/100 clamped to 1…65535
+   (`0x894f1320`); wrap at 65535.
+2. The waveform, on the 16-bit phase:
+   - triangle and trapezoid: piecewise lines;
+   - sine: the .data table of 257 floats, interpolated on the low byte;
+   - saw: (p − 32768)/32768; square: ±1;
+   - S&H, RND and CHAOS draw from a logistic map, x ← 3.997·x·(1 − x),
+     output 2x − 1 (`0x894f4cd0`). S&H holds a value per cycle, RND ramps to
+     the next, CHAOS takes one per tick.
+3. Add the offset (−1, −0.5, 0, +0.5, +1).
+4. Times amplitude/131072.
+
+The constructor seeds +0x6c with |2x − 1| from a global logistic map.
+
+**Port.** `plugin/Source/XtLfo.cpp` is tick-for-tick identical to the
+firmware's LFO built and run in the SH-4 interpreter (`xt_lfo`, 18 cases):
+output, phase and amplitude. The cases cover every waveform, rates 0–127,
+the offsets, delay and fade, and all four fade modes with note-off. The 3.997
+is the ROM's 0x407fced8, one unit in the last place below the nearest float.
+
+**Plugin.**
+- An LFO per voice, stepped with the envelopes, drives pitch through the
+  depth curve `0x894e0ce0`. A rate-64 triangle at depth 13 measures ±47
+  cents at a 1.03 s period.
+- Key Sync off follows a free-running LFO.
+- Edits take effect while notes play: new times and rates, keeping the phase
+  and the fade state.
+
+Not modelled: tempo-synced rates, and the LFO's other destinations (time,
+formant, filter, level, pan).
+
 ### The voice update and the pitch envelope (2026-10-29, v49)
 
 **Voice update** (`0x8950c1b0`, every 10 ms from the tone update). Each

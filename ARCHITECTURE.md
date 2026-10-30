@@ -220,6 +220,9 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      curve (±6000 cents). Voices are updated as on the XT: every 10 ms the
      envelopes step and pitch, formant, time and Energy move 70% toward
      their targets, so knob changes glide in 10 ms steps.
+   - an LFO on pitch (v50): the XT's LFO with all eight waveforms, delay,
+     fade modes, offset and key sync, tick-for-tick identical to the
+     firmware's, and the same depth curve as the pitch envelope.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 

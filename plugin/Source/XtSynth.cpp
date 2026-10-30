@@ -46,7 +46,7 @@ inline int16_t to16(double v) { return (int16_t)std::clamp(std::lround(v * 32768
 
 bool xtSynthSetRom(const std::string& path) {
     g_romReady = xtLoadTables(path.c_str()) && xtMbLoadTables(path.c_str()) && xtEnvLoadTables(path.c_str())
-              && xtFwOpen(path.c_str());
+              && xtLfoLoadTables(path.c_str()) && xtFwOpen(path.c_str());
     std::vector<uint32_t> ks;
     if (g_romReady && xtFwEnvKeyScales(ks)) xtEnvSetKeyScales(ks.data());
     return g_romReady;
@@ -188,7 +188,8 @@ constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
 // is ±5.
 void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g) const {
     double cents = ((double)(v.note - ctl.rootKey) + ctl.pitchSemis) * 100.0
-                 + (double)v.penv.level() * (double)xtPitchDepthCents((float)ctl.pDepth);
+                 + (double)v.penv.level() * (double)xtPitchDepthCents((float)ctl.pDepth)
+                 + (double)v.lfo.out() * (double)xtPitchDepthCents((float)ctl.lfoPitchDepth);
     cents = std::clamp(cents, -6000.0, 6000.0);
     A = (float)std::exp2(cents / 1200.0);
     F = (float)std::clamp(std::pow(2.0, ctl.formantSemis / 12.0), 0.5, 2.0);
@@ -199,6 +200,17 @@ void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g)
 void XtSynth::applyRates(Voice& v) {
     if (cur->type == 1) { v.solo.setRates(v.curA, v.curF, 1.0 / v.curWalk); v.solo.setEnergy(v.curG); }
     else v.mb.setRates(v.curA, v.curWalk);
+}
+
+XtLfoParams XtSynth::lfoParams() const {
+    return xtLfoConvert(ctl.lfoWave, ctl.lfoRate, ctl.lfoOffset, ctl.lfoDelay, ctl.lfoFadeMode, ctl.lfoFade, ctl.lfoKeySync);
+}
+
+// The LFO constructor seeds each LFO's chaos state from a global logistic
+// map (0x894f4cd0, then |2x − 1| by 0x894f4ca0).
+float XtSynth::drawSeed() {
+    chaosSeed = (1.0f - chaosSeed) * chaosSeed * 0x1.ff9db0p+1f;
+    return std::fabs(chaosSeed * 2.0f - 1.0f);
 }
 
 XtEnvParams XtSynth::pitchEnvParams(const Voice& v) const {
@@ -220,11 +232,15 @@ void XtSynth::setControls(const Controls& c) {
     const bool envChanged = c.attack != ctl.attack || c.decay != ctl.decay || c.sustain != ctl.sustain || c.release != ctl.release
                          || c.aSens != ctl.aSens || c.dSens != ctl.dSens || c.rSens != ctl.rSens || c.timeKF != ctl.timeKF;
     const bool penvChanged = c.pAttack != ctl.pAttack || c.pDecay != ctl.pDecay || c.pSustain != ctl.pSustain || c.pRelease != ctl.pRelease;
+    const bool lfoChanged = c.lfoWave != ctl.lfoWave || c.lfoRate != ctl.lfoRate || c.lfoOffset != ctl.lfoOffset || c.lfoDelay != ctl.lfoDelay
+                         || c.lfoFadeMode != ctl.lfoFadeMode || c.lfoFade != ctl.lfoFade;
     ctl = c;
+    if (lfoChanged && freeLfoOn) freeLfo.update(lfoParams());
     for (Voice& v : voice) {
         if (!v.active) continue;
         if (envChanged) v.env.update(envParams(v));
         if (penvChanged) v.penv.update(pitchEnvParams(v));
+        if (lfoChanged) v.lfo.update(lfoParams());
     }
 }
 
@@ -254,6 +270,8 @@ void XtSynth::noteOn(int note, float velocity) {
     v->elapsed = 0;
     // The note-on converters set the player directly (0x894f3a00…)
     v->penv.noteOn(pitchEnvParams(*v));
+    v->lfo.noteOn(lfoParams(), drawSeed());
+    if (!ctl.lfoKeySync && freeLfoOn) v->lfo.setPhase(freeLfo.phase());
     targets(*v, v->curA, v->curF, v->curWalk, v->curG);
     if (cur->type == 1) v->solo.noteOn(cur->solo, v->curA, v->curF, 1.0 / v->curWalk, v->curG);
     else if (!v->mb.noteOn(cur->wave, cur->type, v->curA, v->curWalk)) v->active = false;
@@ -270,6 +288,7 @@ void XtSynth::noteOff(int note, float velocity) {
             v.env.noteOff();
             v.penv.update(pitchEnvParams(v));
             v.penv.noteOff();
+            v.lfo.noteOff();
         }
 }
 
@@ -301,6 +320,16 @@ void XtSynth::mixBlock(float* lr) {
     const bool tick = tickCount >= kTickFrames;
     if (tick) tickCount -= kTickFrames;
     tickCount += 32;
+    if (tick) {   // the free-running LFO (no delay or fade: only its phase is used)
+        if (!freeLfoOn) {
+            XtLfoParams fp = lfoParams();
+            fp.delayMs = fp.fadeMs = 0.0f;
+            fp.fadeMode = 0;
+            freeLfo.noteOn(fp);
+            freeLfoOn = true;
+        }
+        freeLfo.tick(1);
+    }
     float tmp[64];
     for (Voice& v : voice) {
         if (!v.active) continue;
@@ -309,6 +338,7 @@ void XtSynth::mixBlock(float* lr) {
             // moves the player 70% toward its targets (0x8950c1b0), then the TVA
             v.env.tick();
             v.penv.tick();
+            v.lfo.tick(1);
             float A, F, w, g;
             targets(v, A, F, w, g);
             constexpr float k = 0.699999988f;                  // 0x3f333333
@@ -396,6 +426,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   Renders notes (onset/off in host frames) to float32 L/R pairs.
 //   XT_ADSR="a,d,s,r": amp envelope knobs (default 0,0,127,16).
 //   XT_PENV="a,d,s,r,depth": pitch envelope knobs.
+//   XT_LFO="wave,rate,depth,delay,mode,fade,offset,keysync": the LFO.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -423,6 +454,14 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_ADSR")) {   // amp envelope knobs "a,d,s,r"
         XtSynth::Controls c;
         std::sscanf(e, "%d,%d,%d,%d", &c.attack, &c.decay, &c.sustain, &c.release);
+        syn.setControls(c);
+    }
+    if (const char* e = std::getenv("XT_LFO")) {    // LFO "wave,rate,depth,delay,mode,fade,offset,keysync"
+        XtSynth::Controls c;
+        int ks = 1;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &c.lfoWave, &c.lfoRate, &c.lfoPitchDepth, &c.lfoDelay, &c.lfoFadeMode, &c.lfoFade,
+                    &c.lfoOffset, &ks);
+        c.lfoKeySync = ks != 0;
         syn.setControls(c);
     }
     if (const char* e = std::getenv("XT_PENV")) {   // pitch envelope "a,d,s,r,depth"

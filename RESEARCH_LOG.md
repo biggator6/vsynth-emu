@@ -2373,3 +2373,23 @@ Round-2 recordings.  First build-out after that: real-time granular port
   cents over the decay. PluginTest stays bit-identical; `auval` passes.
 - Still open: time and formant envelopes and the OSC LFO depths (the
   VariPhrase converter is not found), and the LFO generator.
+
+### Session 16 addendum (2026-10-29) — v50: the XT's LFO
+
+- Decoded the LFO end to end:
+  - the converter: waveform order, rate table in Hz, (k/127)²·10 s delay
+    and fade;
+  - the object and its delay/fade base, including the vtable-only methods,
+    created in a scratch Ghidra project;
+  - note-on, trigger and note-off: ON fade modes start at note-on, OFF modes
+    at note-off;
+  - the tick: rate Hz·655.35 per 10 ms, the eight waveforms, a logistic map
+    for S&H/RND/CHAOS, the offset table and the amplitude.
+- Also found the tone scheduler `0x894f4d40`: n = elapsed blocks × 0.000726
+  / 0.01, at least 1, so the tone update runs in 10 ms units.
+- `XtLfo` is tick-for-tick identical to the firmware's LFO in the
+  interpreter on 18 cases. The one fix needed was the ROM's 3.997
+  (0x407fced8, one unit in the last place below the nearest float).
+- The plugin gains a pitch LFO with eight parameters. Checked as vibrato:
+  ±47 cents at depth 13, a 1.03 s period at rate 64. PluginTest stays
+  bit-identical; `auval` passes.

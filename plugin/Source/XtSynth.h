@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include "XtEnvelope.h"
+#include "XtLfo.h"
 #include "XtMultiBandPlayer.h"
 #include "XtSoloVoice.h"
 
@@ -52,6 +53,12 @@ public:
         int aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
         // pitch envelope knobs 0..127 and its depth −63..+63 (0x894e0ce0 cents)
         int pAttack = 0, pDecay = 64, pSustain = 0, pRelease = 64, pDepth = 0;
+        // LFO: waveform 0..7 in the XT's order (SIN, TRI, SAW, SQR, RND, TRP,
+        // S&H, CHAOS), rate/delay/fade 0..127, offset 0..4 (−100…+100), fade
+        // mode 0..3 (ON <<, ON >>, OFF <<, OFF >>); its pitch depth −63..+63
+        int lfoWave = 0, lfoRate = 64, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
+        bool lfoKeySync = true;
+        int lfoPitchDepth = 0;
     };
 
     XtSynth();
@@ -77,6 +84,7 @@ private:
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
         XtEnvelope env;
         XtEnvelope penv;               // pitch envelope (curve 0)
+        XtLfo lfo;
         // the player's pitch ratio, formant ratio, walk and Energy as the
         // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
         float curA = 1, curF = 1, curWalk = 1, curG = 0;
@@ -96,6 +104,9 @@ private:
     // runs between blocks once per 441 frames (10 ms).
     static constexpr int kTickFrames = 441;
     int tickCount = 0;                // frames since the last update
+    XtLfo freeLfo;                    // the free-running LFO a key-unsynced voice follows
+    bool freeLfoOn = false;
+    float chaosSeed = 0.3141f;        // the global logistic map the LFOs draw their seeds from
     double hostRate = 44100;
 
     // 44.1 kHz mix, produced in 32-frame blocks, read by the resampler
@@ -113,4 +124,6 @@ private:
     void tvaUpdate(Voice& v);
     XtEnvParams envParams(const Voice& v) const;
     XtEnvParams pitchEnvParams(const Voice& v) const;
+    XtLfoParams lfoParams() const;
+    float drawSeed();
 };
