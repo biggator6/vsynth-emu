@@ -156,6 +156,14 @@ void XtSynth::pickUpSample() {
     for (Voice& v : voice) v.active = false;
 }
 
+namespace {
+// The TVA's constants as rom.2 stores them (each one below the nearest float)
+constexpr float kInvMs = 0x1.7384eep-6f;      // 1/44.1
+constexpr float kFramesPerMs = 0x1.60cccap+5f; // 44.1
+constexpr float kSilent = 0x1.0000fep-16f;     // 2^-16
+constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
+}
+
 void XtSynth::voiceRates(Voice& v) const {
     const double A = std::pow(2.0, ((double)(v.note - ctl.rootKey) + ctl.pitchSemis) / 12.0);
     const double stretch = std::clamp((double)ctl.timeStretch, 0.2, 5.0);   // the XT's time range is ±5
@@ -187,11 +195,16 @@ void XtSynth::noteOn(int note, float velocity) {
     v->age = clock++;
     v->tail = 0;
     v->gain = std::clamp(velocity, 0.0f, 1.0f);
-    // The player starts from the envelope's output when there is no attack,
-    // else from its start level (0x894f3e20).
+    // TVA note-on (0x894f5160): the gain starts from the envelope's onset
+    // level (full with no attack, else 0) and ramps to its output over the
+    // attack time, at most 10 ms (0.1 ms with no attack).
     const XtEnvParams ep = xtEnvAdsr(ctl.attack, ctl.decay, ctl.sustain, ctl.release);
     v->env.noteOn(ep);
-    v->amp = ep.time[0] == 0.0f ? v->env.level() : ep.level[0];
+    v->cur = v->env.onsetLevel();
+    v->target = v->env.level();
+    const float ms = ep.time[0] == 0.0f ? (ep.time[1] == 0.0f ? 0.1f : ep.time[1]) : std::min(ep.time[0], 10.0f);
+    v->step = (v->target - v->cur) / (ms * kFramesPerMs);
+    v->elapsed = 0;
     const double A = std::pow(2.0, ((double)(note - ctl.rootKey) + ctl.pitchSemis) / 12.0);
     const double stretch = std::clamp((double)ctl.timeStretch, 0.2, 5.0);
     const double F = std::clamp(std::pow(2.0, ctl.formantSemis / 12.0), 0.5, 2.0);
@@ -208,15 +221,35 @@ void XtSynth::allNotesOff() {
     for (Voice& v : voice) v.active = false;
 }
 
+// The tone update's TVA part (0x894f75f0 tail): stop a finished voice
+// (0x894f54b0), else aim at the envelope's new output with a linear ramp of
+// 10 ms, shorter when the stage itself is (0x894f5360).
+void XtSynth::tvaUpdate(Voice& v) {
+    v.env.tick();
+    if (v.env.done() && v.cur <= kSilent) { v.active = false; return; }
+    v.target = v.env.level();
+    const float T = v.env.stageTime();
+    float frames = 441.0f;
+    if (!(0.0f > T)) {
+        const float d = T - v.elapsed * kInvMs;               // the stage time less the time since the last update
+        if (d > 0.0f) { if (10.0f > d) frames = d * kFramesPerMs; }
+        else frames = 0.1f * kFramesPerMs;
+    }
+    v.step = (v.target - v.cur) / frames;
+    v.elapsed = 0;
+}
+
 void XtSynth::mixBlock(float* lr) {
     std::fill(lr, lr + 64, 0.0f);
     if (!cur) return;
-    // The control clock: one envelope step at this block's frame tickAt.
-    const int tickAt = tickCount == 0 ? 0 : kTickFrames - tickCount < 32 ? kTickFrames - tickCount : -1;
-    tickCount = (tickCount + 32) % kTickFrames;
+    // The control clock: the tone update runs between blocks every 441 frames.
+    const bool tick = tickCount >= kTickFrames;
+    if (tick) tickCount -= kTickFrames;
+    tickCount += 32;
     float tmp[64];
     for (Voice& v : voice) {
         if (!v.active) continue;
+        if (tick) { tvaUpdate(v); if (!v.active) continue; }
         float scale = v.gain;
         if (cur->type == 1) {
             float l[32], r[32];
@@ -228,15 +261,18 @@ void XtSynth::mixBlock(float* lr) {
             scale /= 32768.0f;
             if (v.mb.ended()) v.tail += 32;
         }
+        // TVA render (0x894f5720): a step that would pass the target within
+        // the block is cut to (target − gain)/32.5; gain applied, then stepped.
+        const float d = v.target - v.cur;
+        const float s = std::fabs(v.step * 32.0f) > std::fabs(d) ? d * kLand : v.step;
         for (int i = 0; i < 32; ++i) {
-            if (i == tickAt) v.env.tick();
-            v.amp += (v.env.level() - v.amp) * v.env.smooth();   // the player's per-sample follower
-            const float g = scale * v.amp;
+            const float g = scale * v.cur;
             lr[2 * i] += tmp[2 * i] * g;
             lr[2 * i + 1] += tmp[2 * i + 1] * g;
+            v.cur += s;
         }
-        // A released voice stops once its gain is below 2^-16 (0x894f2090).
-        if ((v.releasing && v.amp <= 1.0f / 65536.0f) || v.tail > 8192) v.active = false;
+        v.elapsed += 32.0f;
+        if (v.tail > 8192) v.active = false;
     }
 }
 

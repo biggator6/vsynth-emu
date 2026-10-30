@@ -66,8 +66,10 @@ private:
         int note = -1;
         long age = 0, tail = 0;
         float gain = 1;               // velocity
-        float amp = 0;                // the envelope as the player follows it, per sample
         XtEnvelope env;
+        // The TVA that applies the envelope (0x894f5360 / 0x894f5720): gain,
+        // its target and per-sample step, frames since the last update.
+        float cur = 0, target = 0, step = 0, elapsed = 0;
         XtMbPlayer mb;
         XtSoloVoice solo;
     };
@@ -77,9 +79,10 @@ private:
     Controls ctl;
     Voice voice[kVoices];
     long clock = 0;
-    // The XT's control clock: envelopes step every 10 ms (441 frames).
+    // The XT's control clock: the tone update (envelope step, TVA targets)
+    // runs between blocks once per 441 frames (10 ms).
     static constexpr int kTickFrames = 441;
-    int tickCount = 0;
+    int tickCount = 0;                // frames since the last update
     double hostRate = 44100;
 
     // 44.1 kHz mix, produced in 32-frame blocks, read by the resampler
@@ -93,4 +96,5 @@ private:
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames
     void voiceRates(Voice& v) const;
+    void tvaUpdate(Voice& v);
 };

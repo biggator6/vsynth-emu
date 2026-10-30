@@ -1481,16 +1481,42 @@ A stage takes T/10 ticks of n, so the tick is 10 ms. Two other facts agree:
 - stages under 10 ms skip the generator, which only makes sense if one
   tick is 10 ms.
 
-The scheduler that calls the tone update is a virtual call I have not
-located, so the 100 Hz clock is inferred, not observed.
-RECORDING_GUIDE.md asks for two takes to confirm it.
+The patch TVA settles it (v46, below): each update ramps its gain to the
+new target over exactly 441 samples. It counts the samples since the
+previous update in steps of the 32-sample block. So the tone update runs
+between blocks once per 441 samples, 10 ms at 44.1 kHz. The scheduler
+itself (a virtual call) is still not located, but nothing about the clock
+is left to infer.
 
-**Consumer.** The oscillator amp envelope (voice +0x97c) drives the
-player's gain target, V5c·clamp(V54·env·(1 + V58·LFO)) (`0x894f3dc0`).
-The player follows that target per sample. At note-on it starts from the
-envelope's output if the attack is 0, otherwise from L0 (`0x894f3e20`). A
-released voice is stopped once that gain is ≤ 2^-16 (`0x894f2090` →
-`0x894f2da0`).
+**Consumers.**
+- *The oscillator amp envelope* (voice +0x97c) drives the player's gain
+  target, V5c·clamp(V54·env·(1 + V58·LFO)) (`0x894f3dc0`). The player
+  follows that target per sample. At note-on it starts from the envelope's
+  output if the attack is 0, otherwise from L0 (`0x894f3e20`). A released
+  oscillator voice is stopped once that gain is ≤ 2^-16 (`0x894f2090` →
+  `0x894f2da0`).
+- *The patch TVA* (tone +0x1650, envelope pointer at +0x94), the manual's
+  amp envelope:
+  - **Update** `0x894f5360`, from the tone update after a done check.
+    1. The targets are level·env·(1 + LFO·depth)·(1 ∓ pan), clamped to ±1,
+       one per channel (+0x60/+0x64).
+    2. The ramp lasts 441 samples. When the stage is short, it lasts
+       d = T − elapsed/44.1 ms instead: d·44.1 samples if 0 < d < 10, 0.1 ms
+       if d ≤ 0. T is the envelope's stage time (+0x6c, −1 in sustain) and
+       elapsed is +0x90.
+    3. step = (target − gain)/ramp (+0x58/+0x5c); elapsed = 0.
+  - **Render** `0x894f5720`, per 32-sample block. If 32 steps would pass the
+    target, the step becomes (target − gain)/32.5, so the gain lands on the
+    target without overshooting. Per sample the gain is applied, then
+    stepped. After the block, elapsed += 32. (The same code smooths the
+    effect sends.)
+  - **Note-on** (`0x894f5160`…): the gain starts at level × the envelope's
+    onset level (+0x58: L1 with no attack, else L0). The first ramp lasts
+    min(attack T, 10) ms, or 0.1 ms with no attack.
+  - **Done** `0x894f54b0`: the envelope is in stage 5 and both gains are
+    ≤ 2^-16. The tone is then marked finished.
+  - Its constants (1/44.1, 44.1, 2^-16, 1/32.5) are each one unit in the
+    last place below the nearest float.
 
 **Port.** `plugin/Source/XtEnvelope.cpp` is tick-for-tick identical to the
 firmware routines run in the SH-4 interpreter (`xt_env`, notes.txt):
@@ -1498,18 +1524,24 @@ stage, phase, output and coefficient on 18 cases. The cases cover attacks
 0, under 10 and long, D = 0, S = 0 and 127, R = 0, note-off in each stage,
 knob 127 and curve 0. The tables are read from the user's rom.2.
 
-The plugin runs one envelope per voice:
-- it steps every 441 frames (10 ms at 44.1 kHz) on a clock shared by all
-  voices;
-- each voice follows it per sample with the envelope's coefficient;
-- voices end as on the XT.
+The plugin runs one envelope per voice and applies it as the patch TVA
+does (v46):
+- updates come between blocks once per 441 frames, on a clock shared by
+  all voices;
+- the gain ramps linearly with the TVA's ramp-length rule and block
+  landing;
+- voices end at the TVA's done check.
+
+The port also matches the firmware on the two fields the TVA reads, the
+stage time (+0x6c) and the onset level (+0x58).
 
 **Not yet:**
-- which follower coefficient each player applies (the SOLO player's own is
-  1/64);
-- the multi-band players' squared gain (`0x8950e1e0`);
+- the oscillator amp envelope beside the TVA (two envelopes in series on
+  the XT), with the player's own follower (SOLO 1/64) and the multi-band
+  players' squared gain (`0x8950e1e0`);
 - velocity curves, envelope depth, A/D/R velocity sensitivity and Time KF;
-- the patch-level TVA (kind 12), as distinct from the oscillator's.
+- the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
+  no LFO; velocity stays a linear gain).
 
 ## Next steps
 1. ~~Obtain firmware~~ — done (XT v2.02, user's copy, in `firmware/`).

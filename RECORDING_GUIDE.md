@@ -279,12 +279,12 @@ the project, as with Emu_test.prj, and copy it into `analysis/projects/`.
 
 ## Amp envelope timing (added 2026-10-29) — two short takes
 
-**Why:** the plugin's amp envelope is the XT's own generator, matched
-bit-for-bit against the firmware, but its clock is inferred. Each stage of
-T ms is meant to advance in 10 ms steps, and nothing in the firmware has
-confirmed that rate directly (research/HARDWARE_FIRMWARE.md, "The envelope
-generator"). Two takes settle it: one for the stage times, and one to show
-whether the level moves in 10 ms steps.
+**Why (optional since v46):** the plugin's amp envelope is the XT's own
+generator and TVA, matched against the firmware. Its 10 ms update clock
+is now confirmed in the firmware: the TVA ramps over exactly 441 samples
+per update (research/HARDWARE_FIRMWARE.md, "The envelope generator").
+These two takes are a final check against the hardware: one for the stage
+times, and one for the shape of a slow ramp.
 
 **Setup:** an INIT patch with OSC1 playing a plain sustained PCM wave (a
 sine or any steady tone), VariPhrase OFF, no LFO or filter movement. Set

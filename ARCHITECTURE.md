@@ -204,10 +204,11 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - pitch = 2^((note − Original Key + Pitch)/12); Time, Formant (SOLO) and
      Energy (SOLO) apply live;
    - the amp envelope is the XT's own generator (`XtEnvelope`, v45): A/D/S/R
-     knobs 0–127 through the firmware's time and sustain tables, its attack
-     and segment curves, stepped on a 10 ms clock and followed per sample.
-     A released voice ends below 2^-16, as on the XT. Velocity is a linear
-     gain.
+     knobs 0–127 through the firmware's time and sustain tables, and its
+     attack and segment curves. It is applied as the patch TVA applies it
+     (v46): an update every 441 frames, linear gain ramps with the TVA's
+     ramp-length and landing rules, and voices end at the TVA's done check.
+     Velocity is a linear gain.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -232,9 +233,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
-- the envelope's 100 Hz clock is inferred, not observed (two takes in
-  RECORDING_GUIDE.md confirm it). Not yet modelled: each player's own gain
-  follower, envelope velocity and key follow, and the patch-level TVA;
+- the oscillator amp envelope (in series with the TVA on the XT),
+  envelope velocity and key follow, and the TVA's level, pan and LFO terms
+  are not modelled;
 - no V-Synth voice layer (filters, LFOs, effects);
 - no loops, reverse, step/event playback or Time Trip;
 - the Energy knob → g mapping is undecoded, so Energy is g directly.

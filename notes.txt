@@ -226,7 +226,10 @@ AMP ENVELOPE v45 (2026-10-29): plugin/Source/XtEnvelope.cpp is the XT's
     xt_env rom.2.bin A D S R offTick ticks [curve]        (prints "identical" or the first difference)
   XtSynth CLI: XT_ADSR="a,d,s,r"; PluginTest: TEST_ADSR="a,d,s,r" (note-off halfway).
   Plugin parameters ampAttack/ampDecay/ampSustain/ampRelease replace "release" (ms).
-  Open: the 100 Hz clock is inferred (RECORDING_GUIDE.md, "Amp envelope timing").
+  v46: applied as the XT's patch TVA (0x894f5360 update, 0x894f5720 render):
+  linear ramps over 441 frames per update (shorter for short stages), block
+  landing at 1/32.5, done at env stage 5 and gain <= 2^-16. The TVA's ramp
+  confirms the 10 ms clock; the RECORDING_GUIDE takes are now an optional check.
 
 PLUGIN (v43, 2026-10-28): plays through the XT's own encoders and players
   (ARCHITECTURE.md, "The plugin"). Firmware image: VSE_XT_ROM, or

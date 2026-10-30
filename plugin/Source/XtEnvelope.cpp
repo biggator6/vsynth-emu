@@ -167,6 +167,8 @@ void XtEnvelope::noteOn(const XtEnvParams& prm) {
     p = prm;
     phase = 0;
     st = 0;
+    stT = p.time[0];
+    onset = p.time[0] == 0.0f ? p.level[1] : p.level[0];
     if (p.time[0] == 0.0f) {
         // no attack: straight into the (instant) second stage at its end
         st = 1;
@@ -216,6 +218,8 @@ void XtEnvelope::tick(int n) {
         rate = stageRate();
     }
     if (st < 0 || st > 4) return;
+    static const int stageTimeIndex[5] = { 0, 1, 2, -1, 3 };
+    stT = stageTimeIndex[st] < 0 ? -1.0f : p.time[stageTimeIndex[st]];
     if (st == 0 && p.scale < 0.0f) return;
     if (st != 3) rate = stageRate();
     const int ph = n * rate + phase;
@@ -270,11 +274,13 @@ int main(int argc, char** argv) {
         if (t == off) { run(0x894f03e0, { env }); e.noteOff(); }
         if (t > 0) { run(0x894efdf0, { env, 1 }); e.tick(1); }
         const int fst = (int)cpu.rd32(env), fph = (int)cpu.rd32(env + 0x44);
-        const float fo = f32(env + 0x4c), fc = f32(env + 0x54);
-        const bool same = fst == e.stage() && fph == e.phase16() && fo == e.level() && fc == e.smooth();
+        const float fo = f32(env + 0x4c), fc = f32(env + 0x54), fon = f32(env + 0x58), fT = f32(env + 0x6c);
+        const bool same = fst == e.stage() && fph == e.phase16() && fo == e.level() && fc == e.smooth()
+                       && fon == e.onsetLevel() && fT == e.stageTime();
         if (!same || t % 50 == 0 || t == off)
-            std::printf("%5d  fw st %d ph %5d out %.8g coef %.6g | port st %d ph %5d out %.8g coef %.6g%s\n", t, fst, fph, fo, fc,
-                        e.stage(), e.phase16(), e.level(), e.smooth(), same ? "" : "  <-- differs");
+            std::printf("%5d  fw st %d ph %5d out %.8g coef %.6g T %g on %g | port st %d ph %5d out %.8g coef %.6g T %g on %g%s\n",
+                        t, fst, fph, fo, fc, fT, fon, e.stage(), e.phase16(), e.level(), e.smooth(), e.stageTime(),
+                        e.onsetLevel(), same ? "" : "  <-- differs");
         bad += !same;
         if (fst == 5 && e.done()) { std::printf("%5d  both done\n", t); break; }
     }

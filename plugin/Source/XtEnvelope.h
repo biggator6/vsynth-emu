@@ -5,8 +5,9 @@
 //   0x894df240 fills them from the A/D/S/R knobs.
 // The generator steps once per tick of the control clock; a stage of T ms
 // takes T/10 ticks, so the tick is 10 ms (see HARDWARE_FIRMWARE.md, "The
-// envelope generator").  Its consumer follows the output per sample with the
-// coefficient smooth().  The knob tables are read from the user's rom.2.
+// envelope generator").  The patch TVA ramps its gain to the output over
+// each tick (XtSynth); smooth() is the coefficient per-sample followers use.
+// The knob tables are read from the user's rom.2.
 #include <cstdint>
 
 // rom.2 tables: knob → time (ms), knob → sustain level, attack curve.
@@ -37,6 +38,10 @@ public:
     int stage() const { return st; }         // 0 attack, 1, 2 decay, 3 sustain, 4 release, 5 done
     bool done() const { return st == 5; }
     int phase16() const { return phase; }
+    // For the TVA: the stage's time in ms (−1 in sustain, +0x6c) and the level
+    // its gain starts from at note-on (+0x58).
+    float stageTime() const { return stT; }
+    float onsetLevel() const { return onset; }
 
 private:
     XtEnvParams p;
@@ -46,6 +51,8 @@ private:
     float out = 1.0f;               // +0x4c
     float rel = 0.0f;               // +0x50 release start
     float coef = 1.0f / 32.0f;      // +0x54
+    float onset = 1.0f;             // +0x58
+    float stT = 0.0f;               // +0x6c
     int stageRate() const;
     void linear();
     void shape();

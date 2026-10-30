@@ -2300,3 +2300,21 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - PluginTest stays bit-identical with envelopes and a note-off; `auval`
   passes; engine tests pass. `XtFloat.h` now holds the SH-4 float helpers
   shared by the SOLO voice and the envelope.
+
+### Session 16 addendum (2026-10-29) — v46: the patch TVA, and the 10 ms clock confirmed
+
+- Found the patch TVA, the manual's amp envelope:
+  - update `0x894f5360`, run from the tone update after a done check;
+  - render `0x894f5720`, per 32-sample block;
+  - note-on at `0x894f5160`.
+- How it applies the envelope: each update ramps the gain linearly to
+  level·env over 441 samples, or over the rest of the stage when that is
+  under 10 ms. A step that would overshoot within a block is cut to
+  (target − gain)/32.5. It counts samples since the last update in blocks
+  of 32. This confirms the 10 ms clock (441 samples) from the firmware
+  itself; the envelope takes in RECORDING_GUIDE.md are now optional.
+- The plugin applies its envelope this way instead of a per-sample
+  one-pole: updates between blocks every 441 frames, voices end at the TVA's
+  done check. `XtEnvelope` also matches the firmware on the stage-time and
+  onset fields the TVA reads (18 cases). PluginTest stays bit-identical
+  with envelopes and note-offs; `auval` passes.
