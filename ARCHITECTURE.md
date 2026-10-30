@@ -231,6 +231,9 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      (v51), as the converter scales them: time depth ±3 at ±60 and ±5 at
      ±63 (walk speed), formant depth d/63 octaves. The voice's walk is
      clamped to ±5, its formant ratio to [0.5, 2].
+   - reverse (v52): a negative walk (Time Offset BWD, Time below −20 with
+     FWD, or the time envelope or LFO) plays backward, a note starting at
+     the wave's end, and walk 0 holds, as the XT's players do.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -256,6 +259,11 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   `TEST_SNAPSHOT=file.png` draws the editor offscreen.
 - `XtOsc` equals the firmware's VariPhrase converter on 310,545 cases × 6
   values and its exp2 on 17,143 arguments (`xt_osc`, v51).
+- Reverse and held playback (v52), against the firmware's own players run
+  in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
+  ENSEMBLE are bit-exact forward, backward, held and through walk changes.
+  SOLO agrees at −94…−109 dB in every direction, the port's usual
+  output-stage residual.
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
@@ -263,9 +271,7 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   envelope velocity and key follow, and the TVA's level, pan and LFO terms
   are not modelled;
 - no V-Synth voice layer (filters, LFOs, effects);
-- no loops, reverse, step/event playback or Time Trip; a negative walk
-  (Time below −20 with FWD, or BWD) holds as at walk 0 instead of playing
-  backward;
+- no loops, step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and
   formant envelope depths' velocity sensitivity is not exposed.
 

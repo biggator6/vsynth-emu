@@ -51,7 +51,8 @@ class XtMbPlayer {
 public:
     // Note-on (0x89510980 / 0x89510130): mode 3 = BACKING, 5 = ENSEMBLE.
     // pitch = frequency ratio, walk = playback speed (1/stretch; 0 holds the
-    // walk position; the backward path for walk < 0 is not ported).
+    // walk position; < 0 plays backward from the end event, the grains read
+    // backward and inverted, as the firmware plays them).
     // Returns false if the tables are not loaded or the wave is unusable.
     bool noteOn(const XtMbWave& w, int mode, float pitch, float walk);
     // One 32-frame block: out[2·i] = L, out[2·i + 1] = R, int16 scale.  Runs

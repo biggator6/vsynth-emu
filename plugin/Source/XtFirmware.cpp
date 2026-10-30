@@ -212,6 +212,139 @@ bool xtFwEnvKeyScales(std::vector<uint32_t>& out) {
     return true;
 }
 
+bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long frames, int channels,
+                  const XtFwSoloNote& note, long outFrames, std::vector<float>& out) {
+    out.clear();
+    if (g_rom.empty() || recs.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2)) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    constexpr uint32_t R8 = kRam, R9 = R8 + 0xe8, R10 = R9 + 0x3c, W2 = kRam + 0x1000, VP = kRam + 0x10000, OUT = 0x8D800000;
+    const uint32_t endPos = (uint32_t)frames * 16;
+    // The vpdt: events at (stride·e + 8)·2, each {u32 flags, u32 position,
+    // u32 segment-list offset, u32 record offset, u16 first mark}; segment
+    // entries {u32 record offset, u32 flags, u32 start}; the record count,
+    // then {u16 length, u16 info} with 0xFFFF continuing a length.
+    const int st = channels == 2 ? 16 : 10;
+    const uint32_t ev0 = 16, ev1 = (uint32_t)(st + 8) * 2, seg0 = (uint32_t)(2 * st + 8) * 2, seg1 = seg0 + 12;
+    const uint32_t cnt = seg1 + 12, rec0 = cnt + 4;
+    std::vector<uint16_t> stream;
+    for (const XtRecord& r : recs) {
+        int len = r.len16;
+        while (len >= 0xffff) { stream.push_back(0xffff); stream.push_back((uint16_t)r.info); len -= 0xffff; }
+        stream.push_back((uint16_t)len); stream.push_back((uint16_t)r.info);
+    }
+    const uint32_t term = rec0 + (uint32_t)stream.size() * 2;
+    stream.push_back(256); stream.push_back(1);
+    if (VP + term + 0x100 > kStack - 0x1000 || kSamp + (uint32_t)(frames * channels * 2) + 0x10000 > OUT) return false;
+    std::vector<uint8_t> v(term + 4, 0);
+    auto w32 = [&](uint32_t o, uint32_t x) { std::memcpy(&v[o], &x, 4); };
+    auto w16 = [&](uint32_t o, uint16_t x) { std::memcpy(&v[o], &x, 2); };
+    w32(8, 2u << 16);
+    w32(ev0, 0x0d); w32(ev0 + 4, 0); w32(ev0 + 8, seg0); w32(ev0 + 12, rec0); w16(ev0 + 16, stream[0]);
+    w32(ev1, 0x0e); w32(ev1 + 4, endPos); w32(ev1 + 8, seg1); w32(ev1 + 12, term); w16(ev1 + 16, 256);
+    w32(seg0, rec0); w32(seg0 + 4, 1); w32(seg0 + 8, 0);
+    w32(seg1, term); w32(seg1 + 4, 1); w32(seg1 + 8, endPos);
+    w32(cnt, (uint32_t)(stream.size() / 2));
+    std::memcpy(&v[rec0], stream.data(), stream.size() * 2);
+    c.write(VP, v.data(), v.size());
+    c.write(kSamp, pcm, (size_t)(frames * channels * 2));
+    auto wf = [&](uint32_t a, float x) { uint32_t u; std::memcpy(&u, &x, 4); c.wr32(a, u); };
+    auto rf = [&](uint32_t a) { const uint32_t u = c.rd32(a); float x; std::memcpy(&x, &u, 4); return x; };
+    // the player (0x8950fba0 / 0x8950fa60 as EmuSolo.java sets them)
+    c.wr32(W2 + 0x16c, 0x7fffffff); c.wr32(W2 + 0xb8, 0x7fffffff);   // no loop points or cache bounds
+    if (channels == 2) c.wr8(R8 + 0, 0x40);
+    c.wr8(R8 + 3, 0x80); c.wr8(R8 + 7, 8); c.wr8(R8 + 8, (uint8_t)st); c.wr8(R8 + 9, channels == 2 ? 12 : 6);
+    c.wr16(R8 + 0xc, note.walk < 0.0f ? 1 : 0); c.wr16(R8 + 0xe, 1); c.wr16(R8 + 0x14, 0); c.wr16(R8 + 0x16, 1);
+    c.wr32(R8 + 0x10, VP);
+    c.wr32(R8 + 0x18, 0); c.wr32(R8 + 0x1c, endPos); c.wr32(R8 + 0x20, endPos);
+    c.wr32(R8 + 0x48, 44100); c.wr32(R8 + 0x4c, 44100);
+    c.wr32(R8 + 0x50, (uint32_t)(int)(5.644799e11 / 44100)); c.wr32(R8 + 0x54, 2u * (uint32_t)(int)(5.644799e11 / 44100));
+    c.wr32(R8 + 0x6c, W2);
+    wf(R8 + 0x70, note.pitch); wf(R8 + 0x98, note.pitch); wf(R8 + 0x74, note.formant); wf(R8 + 0x78, note.energy);
+    wf(R8 + 0x7c, note.walk); wf(R8 + 0x8c, 1.0f); wf(R8 + 0x90, 1.0f); wf(R8 + 0x9c, 1.0f);
+    wf(R8 + 0x80, 1.0f / 65536.0f); wf(R8 + 0x84, 1.0f / 65536.0f); wf(R8 + 0x88, 1.0f / 64.0f);
+    c.wr32(R9 + 0, kSamp);
+    if (!c.call(0x8950d790, { R8 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    c.wr32(R10 + 0, 256);
+    if (!c.call(0x8950d580, { R8, R9 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    // 0x8950fba0's tail: timer and ages (anchor − record start)·256, both
+    // grains at the record start, B's window at 0.5, q 1.2, no cutoff
+    const uint32_t age = (c.rd32(R9 + 0x28) - c.rd32(R9 + 0x20)) * 256u;
+    c.wr32(R10 + 0xc, age); c.wr32(R10 + 0x10, age); c.wr32(R10 + 0x14, age);
+    c.wr32(R10 + 0x18, c.rd32(R9 + 0x20)); c.wr32(R10 + 0x1c, c.rd32(R9 + 0x20));
+    c.wr32(R10 + 0x20, (uint32_t)frames - 1);
+    wf(R10 + 0x44, 0.0f); wf(R10 + 0x48, 0.5f);
+    c.wr32(R10 + 0x2c, c.rd32(R10 + 0x28)); c.wr32(R10 + 0x30, c.rd32(R10 + 0x28));
+    c.wr32(R10 + 0x38, c.rd32(R10 + 0x34)); c.wr32(R10 + 0x3c, c.rd32(R10 + 0x34));
+    c.wr32(R9 + 0x34, c.rd32(R9 + 0x2c)); c.wr32(R9 + 0x38, c.rd32(R9 + 0x2c));
+    wf(R10 + 0x24, 0.0f); wf(R10 + 0x4c, 0.0f); wf(R10 + 0x50, 1.2f);
+    out.assign((size_t)outFrames * 2, 0.0f);
+    size_t next = 0;
+    for (long done = 0; done < outFrames; done += 32) {
+        while (next < note.walkAt.size() && note.walkAt[next].first <= done) wf(R8 + 0x7c, note.walkAt[next++].second);
+        if (!c.call(0x8950cd90, { OUT, R8 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+        for (long i = 0; i < 32 && done + i < outFrames; ++i) {
+            out[(size_t)(2 * (done + i))] = rf(OUT + (uint32_t)(8 * i)) / 32768.0f;
+            out[(size_t)(2 * (done + i) + 1)] = rf(OUT + (uint32_t)(8 * i + 4)) / 32768.0f;
+        }
+    }
+    return true;
+}
+
+bool xtFwBandPlay(int type, const int16_t* pcm, long frames, int channels, const std::vector<uint8_t>& vpdt,
+                  const XtFwSoloNote& note, long outFrames, std::vector<float>& out) {
+    out.clear();
+    if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5) || vpdt.size() < 64) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    constexpr uint32_t P = kRam, W = kRam + 0x2000, TUNE = kRam + 0x2100, W2 = kRam + 0x3000, VP = kRam + 0x10000;
+    const size_t bytes = (size_t)frames * (size_t)channels * 2;
+    if (kSamp + bytes + 0x400000 > kHeap || VP + vpdt.size() + 0x1000 > kStack - 0x10000) return false;
+    // the load-time band rebuild, in place (as xtFwLoadBands)
+    c.write(kSamp, pcm, bytes);
+    c.wr32(kL + 4, (uint32_t)frames);
+    const uint32_t info[7] = { (uint32_t)type, kSamp, (uint32_t)frames, (uint32_t)channels, 0, 0, 0 };
+    for (uint32_t i = 0; i < 7; ++i) c.wr32(kInfo + 4 * i, info[i]);
+    if (!c.call(kLoadInit, { kL + 0x34, kInfo }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    if (!c.call(kLoad, { kL }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    const uint32_t OUT = (M->heap + 0xfff) & ~0xfffu;
+    if (OUT + 0x1000 > kRam + kRamSize) return false;
+    c.write(VP, vpdt.data(), vpdt.size());
+    // the wave struct: vpdt, band 0 (the audio) and bands 1..5, tuning, loop/cache struct
+    c.wr32(W, VP); c.wr32(W + 4, kSamp);
+    const uint32_t use[5] = { 2, 3, 4, 5, 6 };
+    for (uint32_t k = 0; k < 5; ++k) c.wr32(W + 8 + 4 * k, c.rd32(kL + 0x10 + 4 * use[k]));
+    c.wr32(W + 0x28, TUNE); c.wr32(W + 0x2c, W2);
+    c.wr32(W2 + 0x16c, 0x7fffffff); c.wr32(W2 + 0xb8, 0x7fffffff);   // no loop points or cache bounds
+    auto wf = [&](uint32_t a, float x) { uint32_t u; std::memcpy(&u, &x, 4); c.wr32(a, u); };
+    auto rf = [&](uint32_t a) { const uint32_t u = c.rd32(a); float x; std::memcpy(&x, &u, 4); return x; };
+    if (channels == 2) c.wr8(P, 0x40);
+    c.wr16(P + 0x14, 0); c.wr16(P + 0x16, 0xffff);                     // start / end event
+    c.wr32(P + 0x28, 0x7fffffff); c.wr32(P + 0x2c, 0x7fffffff);
+    c.wr32(P + 0x44, W);
+    c.wr32(P + 0x48, 44100); c.wr32(P + 0x4c, 44100);
+    wf(P + 0x70, note.pitch); wf(P + 0x98, note.pitch); wf(P + 0x74, 1.0f); wf(P + 0x78, 0.0f);
+    wf(P + 0x7c, note.walk); wf(P + 0x9c, 1.0f);
+    wf(P + 0x80, 1.0f / 65536.0f); wf(P + 0x84, 1.0f / 65536.0f); wf(P + 0x88, 1.0f / 64.0f);
+    if (!c.call(type == 5 ? 0x89510130 : 0x89510980, { P, 0 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    c.wr32(P + 0x20, c.rd32(P + 0x1c) / 16 * 16);
+    out.assign((size_t)outFrames * 2, 0.0f);
+    size_t next = 0;
+    std::vector<uint8_t> zero(32 * 8, 0);
+    for (long done = 0; done < outFrames; done += 32) {
+        while (next < note.walkAt.size() && note.walkAt[next].first <= done) wf(P + 0x7c, note.walkAt[next++].second);
+        c.write(OUT, zero.data(), zero.size());
+        if (!c.call(type == 5 ? 0x8950db10 : 0x8950e6e0, { OUT, P }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+        for (long i = 0; i < 32 && done + i < outFrames; ++i) {
+            out[(size_t)(2 * (done + i))] = rf(OUT + (uint32_t)(8 * i)) / 32768.0f;
+            out[(size_t)(2 * (done + i) + 1)] = rf(OUT + (uint32_t)(8 * i + 4)) / 32768.0f;
+        }
+    }
+    return true;
+}
+
 bool xtFwOscTimeKeyScales(std::vector<float>& out) {
     out.clear();
     if (g_rom.empty()) return false;
@@ -274,9 +407,18 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 // xt_fw <rom.2.bin> play <3|5> <samp.bin> <channels> <vpdt.bin> <pitch> <walk> <out.f32>
 //   : bands from the firmware, then XtMbPlayer; float32 L/R pairs scaled to ±1
 //   (XT_ROUND=nearest: round to nearest, as Ghidra's emulator)
+// xt_fw <rom.2.bin> soloplay <samp.bin> <channels> <R> <F> <walk> <energy> <frames> <out.f32> [frame:walk ...]
+//   : the firmware's SOLO encoder and player (xtFwSoloPlay); L/R pairs
+// xt_fw <rom.2.bin> solocmp <samp.bin> <channels> <R> <F> <walk> <energy> <frames> [frame:walk ...]
+//   : the same against XtSoloVoice on the same records: the largest
+//   difference and the difference's level against the signal
+// xt_fw <rom.2.bin> bandcmp <3|5> <samp.bin> <channels> <pitch> <walk> <frames> [frame:walk ...]
+//   : the firmware's multi-band encoder, band rebuild and player
+//   (xtFwBandPlay) against XtMbPlayer on the same bands
 #include <cmath>
 #include <cstdlib>
 #include <chrono>
+#include "XtSoloVoice.h"
 static std::vector<uint8_t> slurp(const char* p) {
     std::vector<uint8_t> v; FILE* f = std::fopen(p, "rb"); if (!f) return v;
     std::fseek(f, 0, SEEK_END); v.resize((size_t)std::ftell(f)); std::fseek(f, 0, SEEK_SET);
@@ -324,6 +466,115 @@ int main(int argc, char** argv) {
         std::fwrite(vpdt.data(), 1, vpdt.size(), fo);
         std::fclose(fo);
         std::fprintf(stderr, "vpdt %zu bytes\n", vpdt.size());
+    } else if ((mode == "soloplay" && argc >= 11) || (mode == "solocmp" && argc >= 10)) {
+        std::vector<uint8_t> raw = slurp(argv[3]);
+        const int ch = std::atoi(argv[4]);
+        const long frames = (long)(raw.size() / (2 * (size_t)ch));
+        const int16_t* pcm = reinterpret_cast<const int16_t*>(raw.data());
+        XtFwSoloNote note;
+        note.pitch = (float)std::atof(argv[5]); note.formant = (float)std::atof(argv[6]);
+        note.walk = (float)std::atof(argv[7]); note.energy = (float)std::atof(argv[8]);
+        const long outFrames = std::atol(argv[9]);
+        for (int a = mode == "soloplay" ? 11 : 10; a < argc; ++a) {
+            long at = 0; float w = 0;
+            if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
+        }
+        // the SOLO encoder reads (L+R) >> 1 (0x8951f6f0)
+        std::vector<int16_t> x16((size_t)frames);
+        for (long i = 0; i < frames; ++i)
+            x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[2 * i] + (int)pcm[2 * i + 1]) >> 1) : pcm[i];
+        std::vector<XtRecord> recs;
+        if (!xtFwSoloEncode(x16.data(), (int)frames, recs) || recs.size() < 2) { std::fprintf(stderr, "encode failed\n"); return 1; }
+        for (size_t i = 0; i < recs.size(); ++i)   // the vpdt holds lengths only: records must run from 0, back to back
+            if (recs[i].start16 != (i ? recs[i - 1].start16 + recs[i - 1].len16 : 0)) { std::fprintf(stderr, "record %zu not contiguous\n", i); return 1; }
+        std::vector<float> fw;
+        if (!xtFwSoloPlay(recs, pcm, frames, ch, note, outFrames, fw)) { std::fprintf(stderr, "play failed\n"); return 1; }
+        if (mode == "soloplay") {
+            FILE* fo = std::fopen(argv[10], "wb");
+            if (!fo) return 1;
+            std::fwrite(fw.data(), sizeof(float), fw.size(), fo);
+            std::fclose(fo);
+        } else {
+            // the plan as xtSynthEncode builds it
+            XtSoloPlan P;
+            P.in.resize((size_t)frames);
+            if (ch == 2) P.inR.resize((size_t)frames);
+            for (long i = 0; i < frames; ++i) {
+                P.in[(size_t)i] = (float)pcm[i * ch] / 32768.0f;
+                if (ch == 2) P.inR[(size_t)i] = (float)pcm[2 * i + 1] / 32768.0f;
+            }
+            const size_t nc = recs.size();
+            P.segStart.resize(nc); P.segLen.resize(nc); P.voiced.resize(nc); P.info.resize(nc);
+            for (size_t i = 0; i < nc; ++i) {
+                P.segStart[i] = recs[i].start16 / 16.0;
+                const double end = (i + 1 < nc) ? recs[i + 1].start16 / 16.0 : (double)frames;
+                P.segLen[i] = std::max(1.0 / 16.0, end - P.segStart[i]);
+                P.voiced[i] = (recs[i].info & 4) != 0;
+                P.info[i] = recs[i].info;
+            }
+            XtSoloVoice v;
+            v.noteOn(P, note.pitch, note.formant, note.walk, note.energy);
+            std::vector<float> L(32), R(32);
+            double maxd = 0, sig = 0, dif = 0;
+            long first = -1;
+            size_t next = 0;
+            for (long done = 0; done < outFrames; done += 32) {
+                while (next < note.walkAt.size() && note.walkAt[next].first <= done) {
+                    v.setRates(note.pitch, note.formant, note.walkAt[next++].second);
+                }
+                v.render(L.data(), R.data(), 32);
+                for (long i = 0; i < 32 && done + i < outFrames; ++i)
+                    for (int k = 0; k < 2; ++k) {
+                        const double a = fw[(size_t)(2 * (done + i) + k)], b = k ? R[(size_t)i] : L[(size_t)i];
+                        const double d = std::fabs(a - b);
+                        if (d > 0 && first < 0) first = done + i;
+                        maxd = std::max(maxd, d); sig += a * a; dif += d * d;
+                    }
+            }
+            std::printf("%zu records, %ld frames: max |firmware - port| %.3g, difference %.1f dB against the signal (rms %.4f), first at %ld\n",
+                        nc, outFrames, maxd, 10.0 * std::log10(std::max(dif, 1e-30) / std::max(sig, 1e-30)),
+                        std::sqrt(sig / std::max(1L, 2 * outFrames)), first);
+        }
+    } else if (mode == "bandcmp" && argc >= 9) {
+        std::vector<uint8_t> raw = slurp(argv[4]), vpdt;
+        const int type = std::atoi(argv[3]), ch = std::atoi(argv[5]);
+        const long frames = (long)(raw.size() / (2 * (size_t)ch));
+        const int16_t* pcm = reinterpret_cast<const int16_t*>(raw.data());
+        XtFwSoloNote note;
+        note.pitch = (float)std::atof(argv[6]); note.walk = (float)std::atof(argv[7]);
+        const long outFrames = std::atol(argv[8]);
+        for (int a = 9; a < argc; ++a) {
+            long at = 0; float w = 0;
+            if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
+        }
+        if (!xtFwEncodeMulti(type, pcm, frames, ch, vpdt, 64)) { std::fprintf(stderr, "encode failed\n"); return 1; }
+        std::vector<float> fw;
+        if (!xtFwBandPlay(type, pcm, frames, ch, vpdt, note, outFrames, fw)) { std::fprintf(stderr, "firmware play failed\n"); return 1; }
+        XtMbBands b;
+        if (!xtFwLoadBands(type, pcm, frames, ch, b) || !xtMbLoadTables(argv[1])) return 1;
+        XtMbWave w;
+        w.vpdt = vpdt.data(); w.vpdtBytes = vpdt.size();
+        xtMbAttach(b, w);
+        XtMbPlayer pl;
+        if (!pl.noteOn(w, type, note.pitch, note.walk)) { std::fprintf(stderr, "port note-on failed\n"); return 1; }
+        float blk[64];
+        double maxd = 0, sig = 0, dif = 0;
+        long first = -1;
+        size_t next = 0;
+        for (long done = 0; done < outFrames; done += 32) {
+            while (next < note.walkAt.size() && note.walkAt[next].first <= done) pl.setRates(note.pitch, note.walkAt[next++].second);
+            pl.block(blk);
+            for (long i = 0; i < 32 && done + i < outFrames; ++i)
+                for (int k = 0; k < 2; ++k) {
+                    const double a = fw[(size_t)(2 * (done + i) + k)], bb = blk[2 * i + k] / 32768.0;
+                    const double d = std::fabs(a - bb);
+                    if (d > 0 && first < 0) first = done + i;
+                    maxd = std::max(maxd, d); sig += a * a; dif += d * d;
+                }
+        }
+        std::printf("%s, %ld frames: max |firmware - port| %.3g, difference %.1f dB against the signal (rms %.4f), first at %ld\n",
+                    type == 5 ? "ENSEMBLE" : "BACKING", outFrames, maxd, 10.0 * std::log10(std::max(dif, 1e-30) / std::max(sig, 1e-30)),
+                    std::sqrt(sig / std::max(1L, 2 * outFrames)), first);
     } else if (mode == "play" && argc >= 10) {
         std::vector<uint8_t> raw = slurp(argv[4]), vpdt = slurp(argv[6]);
         const int type = std::atoi(argv[3]), ch = std::atoi(argv[5]);

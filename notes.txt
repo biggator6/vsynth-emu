@@ -192,7 +192,7 @@ SH-4 interpreter (2026-10-28): plugin/Source/Sh4Interp.cpp runs rom.2 code;
   plugin/Source/XtFirmware.cpp wraps it (xtFwSoloEncode, xtFwLoadBands).
   CLI:
     clang++ -std=c++20 -O2 -ffp-contract=off -DXT_FW_MAIN plugin/Source/XtFirmware.cpp \
-      plugin/Source/Sh4Interp.cpp plugin/Source/XtMultiBandPlayer.cpp -o xt_fw
+      plugin/Source/Sh4Interp.cpp plugin/Source/XtMultiBandPlayer.cpp plugin/Source/XtSoloVoice.cpp -o xt_fw
     xt_fw rom.2.bin solo samp.bin                       (SOLO records)
     xt_fw rom.2.bin load <3|5> samp.bin <ch> out        (band data)
     xt_fw rom.2.bin play <3|5> samp.bin <ch> vpdt.bin <pitch> <walk> out.f32
@@ -217,6 +217,19 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+REVERSE v52 (2026-10-30): all three players run backward (walk < 0, a note
+  starting at the end event) and hold at walk 0, as the firmware does
+  (HARDWARE_FIRMWARE.md, "Reverse and held playback"). References: the
+  firmware's own players in the interpreter (xtFwSoloPlay, xtFwBandPlay):
+    $TC/clang++ -isysroot $SDK -std=c++20 -O2 -ffp-contract=off -DXT_FW_MAIN plugin/Source/XtFirmware.cpp \
+      plugin/Source/Sh4Interp.cpp plugin/Source/XtMultiBandPlayer.cpp plugin/Source/XtSoloVoice.cpp -o xt_fw
+    xt_fw rom.2.bin solocmp samp.bin <ch> <R> <F> <walk> <energy> <frames> [frame:walk ...]
+    xt_fw rom.2.bin soloplay samp.bin <ch> <R> <F> <walk> <energy> <frames> out.f32 [frame:walk ...]
+    xt_fw rom.2.bin bandcmp <3|5> samp.bin <ch> <pitch> <walk> <frames> [frame:walk ...]
+  (samp.bin int16 at 44.1 kHz; walk changes at block starts.) Results:
+  BACKING/ENSEMBLE bit-exact both ways (denormal-level differences aside);
+  SOLO −94…−109 dB in every direction (its double output stage).
+
 VARIPHRASE OSC v51 (2026-10-30): plugin/Source/XtOsc.cpp, the VariPhrase
   converter 0x894e2f20 (time, formant, their envelope and LFO depths) and
   Energy from its tail 0x894e4030 (g = (k/127)²), equal to the firmware on
@@ -232,7 +245,8 @@ VARIPHRASE OSC v51 (2026-10-30): plugin/Source/XtOsc.cpp, the VariPhrase
   XT_OSC="time,offset,timeKF,formant,formantKF,energy[,lfoTime,lfoFormant]",
   XT_TENV/XT_FENV="a,d,s,r,depth" (the CLI's env vars now combine; each
   used to reset the others). PluginTest: TEST_OSC, TEST_TENV, TEST_FENV.
-  Walk < 0 (backward) holds at 0: the players' backward paths are not ported.
+  Walk < 0 (backward) holds at 0: the players' backward paths are not ported
+  (ported in v52).
 
 LFO v50 (2026-10-29): plugin/Source/XtLfo.cpp, the XT's LFO (converter
   0x894e0290, object 0x894f0b40 with its delay/fade base, tick 0x894f1050),

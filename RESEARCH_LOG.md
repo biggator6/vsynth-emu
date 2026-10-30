@@ -2431,3 +2431,43 @@ Round-2 recordings.  First build-out after that: real-time granular port
   (`TEST_SNAPSHOT`).
 - Not modelled: backward walk (it holds at 0), the envelope depths' velocity
   sensitivity, and controllers, the matrix and Time Trip.
+
+### Session 16 addendum (2026-10-30) — v52: reverse and held playback
+
+- New reference: the firmware's own players run natively in the SH-4
+  interpreter. `xtFwSoloPlay` rebuilds the XT's one-segment SOLO vpdt (two
+  events, two segment entries, records and terminator) and uses the
+  firmware's event jump for note-on. `xtFwBandPlay` builds the bands in
+  place and calls the BACKING/ENSEMBLE note-on. Each note takes under a
+  second, against minutes in Ghidra's emulator.
+- SOLO (`0x8950ce80`) has three branches:
+  - forward;
+  - backward: the anchor moves back, repeating below the record start or
+    loading previous records through `0x8950d530`;
+  - held (walk step 0): the anchor closes on the position from either
+    side.
+- A backward note starts at the end event, on the stream's (256, 1)
+  terminator.
+- The port now keeps the firmware's fixed-point position, a record cursor,
+  the 0x7E00 unlimited budget, the exact float repeat cost and the
+  firmware's wrap loop.
+- Results:
+  - SOLO matches the firmware at −94…−109 dB forward, held, backward and
+    through walk changes;
+  - a hold mid-note was −8 dB before;
+  - the defaults are bit-identical to v51.
+- BACKING/ENSEMBLE:
+  - The backward walk list is `0x8950e8f0`; the segment cursor moves back
+    in `0x8950e820`/`0x8950eb20`; the backward stepper is `0x8950f4c0`,
+    with previous records from `0x8950f5d0`.
+  - ENSEMBLE's frame loader has a backward branch.
+  - A band's gain sign is its direction, so reversed bands play inverted
+    and turn at record edges by reflecting.
+  - The port is bit-exact against the firmware in every case tried
+    (denormal-level differences aside).
+- The plugin no longer holds a negative walk at 0: Time Offset BWD, or Time
+  below −20, plays the wave backward from its end. PluginTest is
+  bit-identical, and engine tests and `auval` pass.
+- The engine renderer was rebuilt. Its SOLO output moves only where the
+  walk is not a float (time 1.5: −38.6 dB). The suite's time cases are
+  exact walks and unchanged.

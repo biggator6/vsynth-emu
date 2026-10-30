@@ -11,6 +11,12 @@
 //   0x8950eab0 / 0x8950eb60: band reads with the 64×6 kernel and a one-pole
 //              smoother; 0x8950f400 the grain stepper (repeat budget, cost
 //              0x8950f620); records 0x8950f5a0, segments 0x8950f6a0
+//   Backward (walk < 0): the list 0x8950e8f0, the segment move back in the
+//              triggers (0x8950e820 / 0x8950eb20), the stepper 0x8950f4c0
+//              with the previous record 0x8950f5d0.  A band's gain sign is
+//              its direction (+1 forward, −1 backward, so a reversed band
+//              plays inverted); a band reaching a record edge against the
+//              walk turns, reflecting its read position.
 //   0x8950c650 / 0x8950c720: the recombination tree
 // Note-on: 0x89510980 → 0x8950fa60 → 0x8950f6f0 (records), 0x8950f860.
 //
@@ -26,11 +32,12 @@
 // Arithmetic follows the SH-4 code operation by operation (float, no
 // contraction; fmac as a product then a sum, as the P-code emulator runs it;
 // fipr as a double sum rounded once).  Validated against
-// research/ghidra_scripts/EmuBacking.java.  Ported: forward playback from the
-// start event with no loop points and default voice flags.  Not ported:
-// reverse playback, loops (0x8950c880 / 0x8950ca70 at the bounds), event
-// seeks (0x89510bf0), the voice flags 0x2 / 0x4 / 0x8 / 0x20 and the cache
-// bounds in the loop struct.
+// research/ghidra_scripts/EmuBacking.java, and forward, held and backward
+// against the firmware run in the SH-4 interpreter (xt_fw bandcmp).  Ported:
+// playback either way from the start or end event, with no loop points and
+// default voice flags.  Not ported: loops (0x8950c880 / 0x8950ca70 at the
+// bounds), event seeks (0x89510bf0), the voice flags 0x2 / 0x4 / 0x8 / 0x20
+// and the cache bounds in the loop struct.
 #include "XtMultiBandPlayer.h"
 
 #include <algorithm>
@@ -159,7 +166,8 @@ struct XtMbPlayer::State {
     int mode = 3;
     bool stereo = false;
     bool rtz = true;
-    uint8_t flags0 = 0, flags3 = 0, ended = 0;   // +0x00, +0x03, +0x04
+    uint8_t flags0 = 0, flags3 = 0;              // +0x00, +0x03
+    int8_t ended = 0;                            // +0x04: 1 at the end, −1 at the start
     uint8_t flags5 = 0, flags6 = 0;              // +0x05, +0x06
     int stride8 = 46, off7 = 14, stride9 = 6;    // bytes +0x08, +0x07, +0x09
     int16_t step16 = 0;                          // +0x0a
@@ -193,11 +201,14 @@ struct XtMbPlayer::State {
 
     int  segment(Band& B);          // 0x8950f6a0
     int  record(Band& B);           // 0x8950f5a0
+    int  recordPrev(Band& B);       // 0x8950f5d0
     int  cost(const Band& B, int* c) const;   // 0x8950f620
     void step(Band& B, int fshift, int walkPos);   // 0x8950f400
+    void stepBack(Band& B, int fshift, int walkPos);   // 0x8950f4c0
     void initRecords();             // 0x8950f6f0
-    void walkList();                // 0x8950e860
+    void walkList();                // 0x8950e860 / 0x8950e8f0
     void trigger(Band& B, int walkPos);
+    void triggerBack(Band& B, int walkPos);
     void readBand0(float*& o);      // 0x8950e980
     void readBand(int k, float*& o);// 0x8950eb60
     void stage(int in, int out, int st, int n, const float* c);   // 0x8950c720
@@ -238,6 +249,24 @@ int XtMbPlayer::State::record(Band& B) {
     return B.budget;
 }
 
+// 0x8950f5d0: the previous record, ending where the current one starts (at 0
+// at the earliest); the pointer ends up after it.
+int XtMbPlayer::State::recordPrev(Band& B) {
+    long p = B.recPtr - 8;
+    unsigned len = rd16u(p);
+    int info = rd16s(p + 2);
+    while (len == 0xffff) { p -= 4; len = rd16u(p); info = rd16s(p + 2); }
+    B.recPtr = p + 4;
+    int total = 0;
+    for (long q = p - 4;; q -= 4) { total += (int)len; len = rd16u(q); if (len != 0xffff) break; }
+    int start = B.recStart - total;
+    B.recEnd = B.recStart;
+    if (0 > start) { B.recEnd = total; start = 0; }
+    B.recStart = start;
+    B.budget = (int)(((unsigned)info << 6) & 0x7e00);
+    return B.budget;
+}
+
 // 0x8950f620: the repeat cost at this pitch and walk speed (as SOLO's).
 int XtMbPlayer::State::cost(const Band& B, int* c) const {
     const float a = rateF;
@@ -266,7 +295,11 @@ void XtMbPlayer::State::step(Band& B, int fshift, int walkPos) {
     B.readFrac = r2 & B.mask;
     r2 = B.recEnd;
     if (r1 < r2) return;
-    // (walkStep < 0: 0x8950f4b0, reverse playback — not ported)
+    if (0 > walkStep) {                             // 0x8950f4b0: the walk runs backward: turn
+        B.gain = -1.0f;
+        B.readPos = 2 * r2 - r1;
+        return;
+    }
     bool repeat = false;
     int r0 = B.budget;
     if (r2 > walkPos && r0 > 0) {
@@ -295,6 +328,53 @@ void XtMbPlayer::State::step(Band& B, int fshift, int walkPos) {
     float g = 0.0f;
     if (ended != 1 && !(B.recEnd > endPos)) g = 1.0f;
     B.gain = g;
+}
+
+// 0x8950f4c0: the stepper moving backward, the mirror image of 0x8950f400.
+// Below the record's start: turn if the walk runs forward; else repeat the
+// record (the walk position still inside it, the budget allowing, or the
+// record the first) or load the previous records.
+void XtMbPlayer::State::stepBack(Band& B, int fshift, int walkPos) {
+    int r2 = B.readFrac - (rate >> 1);
+    int r1 = B.readPos + (r2 >> fshift);
+    B.readPos = r1;
+    B.readFrac = r2 & B.mask;
+    r2 = B.recStart;
+    if (!(r2 > r1)) return;
+    if (walkStep > 0) {                             // 0x8950f570: turn forward
+        B.gain = 1.0f;
+        B.readPos = 2 * r2 - r1;
+        return;
+    }
+    bool repeat = false;
+    int r0 = B.budget;
+    if (walkPos >= r2 && r0 > 0) {
+        if (r0 == 0x7e00) repeat = true;
+        else {
+            int c;
+            r0 = cost(B, &c);
+            if (r0 >= c) { B.budget = r0 - c; repeat = true; }
+        }
+    }
+    if (!repeat && ((flags3 & 8) ? 0 : startPos) >= r2) repeat = true;
+    if (repeat) {                                   // 0x8950f50a
+        int r3 = B.recEnd;
+        r1 -= r2;
+        bool more;
+        do { r1 += r3; more = r2 >= r1; r3 -= r2; } while (more);
+        B.readPos = r1;
+    } else {                                        // 0x8950f52e
+        for (;;) {
+            if (recordPrev(B) <= 0) break;
+            if (!(B.recStart > walkPos)) break;
+            B.readPos = B.readPos + B.recStart - B.recEnd;
+        }
+    }
+    // 0x8950f550: −1, or just below 0 once the walk has stopped at the start
+    uint32_t u = 0xb3d6bf94u;
+    float tiny;
+    std::memcpy(&tiny, &u, 4);
+    B.gain = ended == -1 ? tiny : -1.0f;
 }
 
 // 0x8950f6f0 (via 0x8950f6c0): every band's segments and first record at
@@ -343,7 +423,7 @@ void XtMbPlayer::State::initRecords() {
 }
 
 bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
-    if (!T.ok || !w.vpdt || w.vpdtBytes < 64 || (w.channels != 1 && w.channels != 2) || !(walk >= 0.0f)) return false;
+    if (!T.ok || !w.vpdt || w.vpdtBytes < 64 || (w.channels != 1 && w.channels != 2) || !std::isfinite(walk)) return false;
     if (mode != 3 && mode != 5) return false;
     if (!s) s = new State;
     *s = State();                                   // no allocation: safe on the audio thread
@@ -403,26 +483,41 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
 bool XtMbPlayer::ended() const { return !s || s->ended; }
 
 void XtMbPlayer::setRates(float pitch, float walk) {
-    if (!s || !(walk >= 0.0f)) return;   // the backward path (walk < 0) is not ported
+    if (!s || !std::isfinite(walk)) return;
     s->pitch = pitch;   // the block reads +0x70 / +0x7c each time (0x8950c280, 0x8950e760)
     s->walk = walk;
 }
 
-// 0x8950e860: fill the walk-position list for this block (forward).
+// 0x8950e860 (forward) / 0x8950e8f0 (walk step < 0): fill the walk-position
+// list for this block, stopping at the wave's end or start.
 void XtMbPlayer::State::walkList() {
     int r1 = pos, r2 = posFrac;
-    const int r3 = walkStep >> 1, r4 = endPos;
-    if (r4 > r1)
-        for (int i = 0; i < 16; ++i) { r2 += r3; const int r0 = r2; list[i] = r1; r2 &= 0x7ffff; r1 += r0 >> 19; }
-    if (r1 >= r4) {                                 // end of the wave (no loop)
-        ended = 1;
-        r1 = r4;
-        r2 = 0;
-        for (int& v : list) v = r1;
+    const int r3 = walkStep >> 1;
+    if (walkStep >= 0) {
+        const int r4 = endPos;
+        if (r4 > r1)
+            for (int i = 0; i < 16; ++i) { r2 += r3; const int r0 = r2; list[i] = r1; r2 &= 0x7ffff; r1 += r0 >> 19; }
+        if (r1 >= r4) {                             // end of the wave (no loop)
+            ended = 1;
+            r1 = r4;
+            r2 = 0;
+            for (int& v : list) v = r1;
+        }
+    } else {
+        const int r4 = (flags3 & 8) ? 0 : startPos;
+        if (r1 > r4)
+            for (int i = 0; i < 16; ++i) { r2 += r3; const int r0 = r2; list[i] = r1; r2 &= 0x7ffff; r1 += r0 >> 19; }
+        if (r4 >= r1) {                             // the start of the wave
+            ended = -1;
+            r1 = r4;
+            r2 = 0;
+            for (int& v : list) v = r1;
+        }
     }
     pos = r1;
     posFrac = r2;
-    // (r1 ≥ limit calls the event walker 0x8950c880 — not ported)
+    // (crossing the limit calls the event walker 0x8950c880 / 0x8950ca70,
+    // bookkeeping only here — not ported)
 }
 
 // A band reaching its next segment start begins a new grain there.
@@ -439,6 +534,15 @@ void XtMbPlayer::State::trigger(Band& B, int walkPos) {
     B.readPos = r2 + B.startOff;
     segment(B);
     record(B);
+}
+
+// 0x8950e820 / 0x8950eb20: a band walking backward past its grain's start
+// moves its segment cursor back one (the records follow in the stepper).
+void XtMbPlayer::State::triggerBack(Band& B, int walkPos) {
+    if (!(B.grainStart > walkPos)) return;
+    B.segList -= 0x24;
+    B.grainStart = segment(B);
+    segment(B);
 }
 
 // 0x8950e980: band 0, two output samples by linear interpolation.
@@ -636,10 +740,17 @@ void XtMbPlayer::blockImpl(State& S, float* out) {
     float* o = S.M;
     for (int i = 0; i < 16; ++i) {
         Band& B = S.b[0];
-        S.trigger(B, S.list[i]);
-        S.step16 = (int16_t)(S.rate >> 21);
-        S.readBand0(o);
-        S.step(B, 19, S.list[i]);
+        if (0.0f > B.gain) {                        // reading backward
+            S.triggerBack(B, S.list[i]);
+            S.step16 = (int16_t)((-S.rate) >> 21);
+            S.readBand0(o);
+            S.stepBack(B, 19, S.list[i]);
+        } else {
+            S.trigger(B, S.list[i]);
+            S.step16 = (int16_t)(S.rate >> 21);
+            S.readBand0(o);
+            S.step(B, 19, S.list[i]);
+        }
     }
     if (S.mode == 5) {                              // 0x8950db20
         S.rate = ftrc(S.rateF * 134217728.0f);      // 2^27
@@ -662,28 +773,42 @@ void XtMbPlayer::blockImpl(State& S, float* out) {
         const int n = k == 5 ? 1 : 8 >> (k - 1);
         int li = 0;
         for (int j = 0; j < n; ++j) {
-            S.trigger(B, S.list[li]);
-            S.step16 = (int16_t)(S.rate >> B.sshift);
-            S.readBand(k, o);
-            S.step(B, B.fshift, S.list[li]);
+            if (0.0f > B.gain) {
+                S.triggerBack(B, S.list[li]);
+                S.step16 = (int16_t)((-S.rate) >> B.sshift);
+                S.readBand(k, o);
+                S.stepBack(B, B.fshift, S.list[li]);
+            } else {
+                S.trigger(B, S.list[li]);
+                S.step16 = (int16_t)(S.rate >> B.sshift);
+                S.readBand(k, o);
+                S.step(B, B.fshift, S.list[li]);
+            }
             li += B.stride;
         }
     }
     S.output(out);
 }
 
-// 0x8950dcb0 (forward): move to frame f.  Each value becomes {delta, base}
-// with base = old base + old delta and delta = value(f + 1) − base (16-bit).
+// 0x8950dcb0: move to frame f.  Each value is {delta, base} (low, high).
+// Walking forward, base = old base + old delta and delta = value(f + 1) −
+// base; backward (walk step < 0), base = value(f) and delta = old base −
+// base (16-bit).
 void XtMbPlayer::State::loadFrame(Band& B, int k, int f) {
     B.frame = f;
     for (int c = 0; c < (stereo ? 2 : 1); ++c)
         for (int j = 0; j < 12; ++j) {
             uint32_t r5 = B.packed[c][j];
             const uint32_t sw = (r5 >> 16) | (r5 << 16);
-            r5 += sw;
-            uint32_t r2 = (uint32_t)(int32_t)frameVal(k, (long)f + 1, j, c) - r5;
-            r5 <<= 16;
-            B.packed[c][j] = (r2 & 0xffff) + r5;
+            if (walkStep >= 0) {
+                r5 += sw;
+                uint32_t r2 = (uint32_t)(int32_t)frameVal(k, (long)f + 1, j, c) - r5;
+                r5 <<= 16;
+                B.packed[c][j] = (r2 & 0xffff) + r5;
+            } else {
+                const uint32_t v = (uint32_t)(int32_t)frameVal(k, (long)f, j, c);
+                B.packed[c][j] = ((sw - v) & 0xffff) + (v << 16);
+            }
         }
 }
 

@@ -1062,7 +1062,8 @@ emulator does the same.
 default voice flags.
 
 **Not ported:**
-- reverse playback (`0x8950e8f0`, `0x8950f4c0`, `0x8950f5d0`);
+- reverse playback (`0x8950e8f0`, `0x8950f4c0`, `0x8950f5d0`) — ported in
+  v52;
 - loops and the event walker at the bounds (`0x8950c880` / `0x8950ca70`);
 - event seeks (`0x89510bf0`);
 - the voice flags 0x2 / 0x4 / 0x8 / 0x20;
@@ -1543,6 +1544,117 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### Reverse and held playback (2026-10-30, v52)
+
+The XT plays a VariPhrase wave backward when the walk is negative. That
+happens with Time Offset BWD, or Time below −20 with FWD, or a time
+envelope or LFO crossing zero. All three players are now ported both ways.
+
+**Reference: the firmware's players in the SH-4 interpreter.** The players
+used to be checked in Ghidra's P-code emulator (EmuSolo.java,
+EmuBacking.java) at about 1 ms per sample. `XtFirmware.cpp` now runs the
+same setups natively, in under a second per note:
+- `xtFwSoloPlay` writes the records as the XT lays out a one-segment SOLO
+  vpdt and calls the firmware's own event jump for note-on;
+- `xtFwBandPlay` builds the bands in place and calls the BACKING or
+  ENSEMBLE note-on.
+
+Both take walk changes at block starts. `xt_fw solocmp` and `xt_fw
+bandcmp` compare them with the ports (notes.txt).
+
+**SOLO vpdt events** (single segment):
+- Event e sits at (stride·e + 8)·2, where the stride is 10 u16 mono and 16
+  stereo. Each is {u32 flags, u32 position, u32 segment-list offset, u32
+  record offset, u16 first mark}.
+- Event 0 is at position 0. It points at record 0, with mark = that
+  record's length.
+- Event 1 is at the wave's end. It points at the stream's (256, 1)
+  terminator, with mark 256.
+- The segment entries {record offset, 1, start} follow, then the record
+  count and the records. The XT's waves 003, 004 and 358 have exactly this
+  layout.
+- Note-on (`0x8950fa60`) takes event 0, or event 1 when walk < 0. The event
+  jump (`0x8950d7b0`) puts the position and the anchor at the event and
+  places its first record to end at position + mark. So a backward note
+  starts at the end, on the terminator (unlimited budget, length 16
+  samples).
+
+**SOLO walk** (`0x8950ce80`, per sample). The position steps by
+(walk step >> 1) in 12.20, with walk step = trunc(walk·2^25) per block
+(`0x8950c280`). There are three branches:
+- **Forward** (as ported before): the anchor advances. Past the record's
+  end it repeats the record, or the next records load.
+- **Backward:** the position stops at the start (+0x18, ended −1). The
+  anchor moves back. Below the record's start it repeats the record if the
+  position is still inside it and the budget allows (or it is the first
+  record), else the previous records load (`0x8950d530`). That reader
+  steps back over 0xFFFF continuation entries and keeps the following
+  record's length as the next period.
+- **Walk step 0:** the position holds, and the anchor steps toward it from
+  either side, forward when at or below it, backward when above. So a
+  frozen note keeps its record. Before v52 the port always advanced the
+  anchor, and that could walk through records with no repeat budget (−8 dB
+  against the firmware on a hold mid-note).
+
+Details the port now follows:
+- A budget of 0x7E00 means unlimited.
+- The last record repeats past the wave's end whatever its budget (its real
+  budget matters backward).
+- The repeat cost is computed in floats from the integer anchor and walk
+  steps (`0x8950d6f0`).
+- The anchor wraps with the firmware's loop. It differs from "minus the
+  length" only when one step spans more than a record.
+- The trigger part (`0x8950d080`…) and the grain parameters do not depend
+  on direction. Reversed SOLO grains still play forward.
+
+**BACKING / ENSEMBLE walk.**
+- The walk list is filled backward by `0x8950e8f0` when the walk step is
+  negative. It stops at the start bound with ended −1.
+- Each band's gain field is its direction. Note-on sets it to the sign of
+  walk. The stepper sets it to 1 or 0 going forward, and to −1 going
+  backward, or just below 0 (0xb3d6bf94, about −1e−7) once stopped at the
+  start.
+- With a negative gain the band:
+  - moves its segment cursor back one when the walk passes its grain's
+    start (`0x8950e820` / `0x8950eb20`);
+  - reads with step (−rate) >> shift;
+  - steps with `0x8950f4c0`, the mirror of `0x8950f400`, repeating below
+    the record start or loading previous records (`0x8950f5d0`).
+- The reads are multiplied by the gain, so reversed bands come out
+  inverted.
+- A band that reaches a record edge running against the walk turns: gain
+  ±1, read position reflected about the edge (`0x8950f4b0`, `0x8950f570`).
+  That is how a direction change spreads through the bands.
+- ENSEMBLE's frame loader (`0x8950dcb0`) builds each {delta, base} from
+  frame f when the walk step is negative: base = value(f), delta = old
+  base − base.
+
+**Ports and checks:**
+- `XtSoloVoice`:
+  - now in the firmware's terms: fixed-point position, a record cursor
+    with the terminator, both anchor directions and the hold;
+  - against the firmware on vocal, sine and stereo wave 358:
+    - forward, held and backward walks;
+    - schedules 1 → 0 → 1, 1 → −1, −1 → 0 → 1;
+    - a sine sweep through zero;
+  - all agree at −94…−109 dB, the same level as forward before (the port's
+    output stage runs in double);
+  - the hold mid-note goes from −8 dB to −95 dB.
+- `XtMbPlayer`:
+  - **bit-exact** against the firmware for BACKING and ENSEMBLE: forward,
+    backward, held, schedules and the sweep, on the drum and the chord;
+  - the only exceptions are differences of about 7e−46: the interpreter
+    flushes denormals, as the SH-4 does with FPSCR.DN, and the test CLI
+    does not.
+- At the default controls the plugin's output is bit-identical to v51, for
+  every type.
+- The engine's SOLO render moves only where its walk is not a float: the
+  firmware stores walk as a float. The suite's time cases are unaffected.
+
+**Plugin:** the walk is no longer held at 0. Time Offset BWD, or Time
+below −20 with FWD, starts the note at the wave's end and plays it
+backward, and the time envelope or LFO can swing it through zero.
+
 ### The VariPhrase converter: time, formant and Energy (2026-10-30, v51)
 
 **Where.** The OSC converter `0x894e48a0` (called for OSC1 and OSC2 by the
@@ -1681,7 +1793,7 @@ from the firmware's powf at ROM load (`xtFwOscTimeKeyScales`).
 
 **Not modelled:**
 - backward play: walk < 0 holds at 0, because the players' backward paths
-  (`0x8950e8f0`, `0x8950f4b0`) are not ported;
+  (`0x8950e8f0`, `0x8950f4b0`) are not ported — ported in v52;
 - the time and formant envelope depths' velocity factor (their curve and
   sens are not exposed);
 - controllers, the matrix, and Time Trip.

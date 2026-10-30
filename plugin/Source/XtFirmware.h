@@ -16,6 +16,31 @@ bool xtFwOpened();
 // The SOLO encoder (0x8951dc40 + 0x8951e120), as XtSoloEncoder.cpp ports it.
 bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out);
 
+// The firmware's own SOLO player, for validation: the records written as the
+// XT lays out a one-segment SOLO vpdt (a start and an end event, their
+// segment entries, the records and the (256, 1) terminator); note-on through
+// the firmware's event jump (0x8950d790) at the start event, or at the end
+// event when walk < 0 (0x8950fa60 picks it by the sign); the rest of the
+// note-on state as 0x8950fba0 leaves it (research/ghidra_scripts/
+// EmuSolo.java); then 0x8950cd90 per 32-frame block.  pcm: mono or
+// interleaved stereo int16.  walkAt: (frame, walk) changes, applied at the
+// first block starting at or after the frame.  out: L/R pairs, ±1.
+struct XtFwSoloNote {
+    float pitch = 1, formant = 1, walk = 1, energy = 0;
+    std::vector<std::pair<long, float>> walkAt;
+};
+bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long frames, int channels,
+                  const XtFwSoloNote& note, long outFrames, std::vector<float>& out);
+
+// The firmware's own BACKING (3) or ENSEMBLE (5) player, for validation: the
+// load-time band rebuild, then the player set up by its note-on (0x89510980
+// / 0x89510130, the start or end event by the sign of walk) and run per
+// 32-frame block (0x8950e6e0 / 0x8950db10), as research/ghidra_scripts/
+// EmuBacking.java runs it.  pitch and the walk changes as for xtFwSoloPlay
+// (formant and energy unused).  out: L/R pairs, ±1.
+bool xtFwBandPlay(int type, const int16_t* pcm, long frames, int channels, const std::vector<uint8_t>& vpdt,
+                  const XtFwSoloNote& note, long outFrames, std::vector<float>& out);
+
 // The band data the XT builds when it loads a BACKING (3) or ENSEMBLE (5)
 // wave (0x89529e90, 0x894a9940).  Each of the six bands the players use
 // (loader slots 0, 2..6) is copied with the memory up to the next band, as

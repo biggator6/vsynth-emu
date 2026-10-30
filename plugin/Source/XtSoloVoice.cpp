@@ -27,41 +27,133 @@ double XtSoloVoice::readGrain(const std::vector<float>& x, double pos, double ta
     return s;
 }
 
+namespace { constexpr double kUnlimited = 1e30; }
+
+// A record's length in samples; past the last record, the terminator's 16.
+double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }
+
+// The repeat budget, (info & 0x1F8) << 6; 0x7E00 (all bits) means
+// unlimited, as do the terminator and unknown info.
 double XtSoloVoice::budgetOf(size_t i) const {
-    if (i + 1 >= p->size() || p->info[i] < 0) return 1e30;          // unlimited
-    return (double)((p->info[i] & 0x1F8) << 6);
+    if (i >= p->size() || p->info[i] < 0) return kUnlimited;
+    const int b = (p->info[i] & 0x1F8) << 6;
+    return b == 0x7E00 ? kUnlimited : (double)b;
 }
 
-double XtSoloVoice::repeatCost(double a, double tw) {
-    double x = (a < 1.0 ? (3.0 - 2.0 * a) : (1.5 - 0.5 * a));
-    x = std::max(0.0, x) * std::abs(tw) * 8192.0;
-    return x >= 2048.0 ? x : std::max(0.0, 2.0 * x - 2048.0);
+// 0x8950d4c0: the next record starts where this one ends.  One reaching past
+// the wave's end (the terminator) may repeat without limit.
+void XtSoloVoice::loadNext() {
+    if (seg < p->size()) ++seg;
+    recStart = recEnd;
+    recEnd = recStart + lenOf(seg);
+    budget = recEnd > (double)p->in.size() ? kUnlimited : budgetOf(seg);
 }
 
-// Grain parameters for a trigger at phrase position P in record sg
+// 0x8950d530: the previous record ends where this one starts (at 0 at the
+// earliest).
+void XtSoloVoice::loadPrev() {
+    if (seg > 0) --seg;
+    recEnd = recStart;
+    recStart = recEnd - lenOf(seg);
+    if (recStart < 0.0) { recStart = 0.0; recEnd = lenOf(seg); }
+    budget = budgetOf(seg);
+}
+
+// 0x8950d6f0: the budget one repeat costs at this anchor step and walk,
+// x = (3 − 2a or 1.5 − 0.5a)·|walk|·2^29 >> 16, with the low end doubled
+// down to 0 below 0x800.
+double XtSoloVoice::repeatCost() const {
+    using namespace xtf;
+    const float a = mul(flt((int)std::lround(anchorStep * 16.0)), 0.0625f);
+    float w = mul(flt(walkStep), 2.98023224e-8f);                   // 2^-25
+    float x = 1.0f > a ? add(mul(a, -2.0f), 3.0f) : add(mul(a, -0.5f), 1.5f);
+    if (0.0f > x) x = 0.0f;
+    if (0.0f > w) w = -w;
+    x = mul(mul(x, w), 536870912.0f);                                // 2^29
+    int c = (int)((uint32_t)ftrc(x) >> 16);
+    if (0x800 > c) { c = 2 * c - 0x800; if (c < 0) c = 0; }
+    return (double)c;
+}
+
+// The anchor moving forward (0x8950cf12).  Past the record's end it wraps
+// back to repeat the record, if the position has not passed the end and the
+// budget allows (or the record ends the wave); else the next records load,
+// skipping those the position has passed while their budget lasts.
+void XtSoloVoice::anchorForward() {
+    anchor += anchorStep;
+    if (anchor < recEnd) return;
+    bool wrap = false;
+    if (recEnd > Pq && budget > 0.0) {
+        if (budget >= kUnlimited) wrap = true;
+        else { const double c = repeatCost(); if (budget >= c) { budget -= c; wrap = true; } }
+    }
+    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;
+    if (wrap) {
+        // 0x8950cf4a: one wrap is anchor − length; more (a step longer than
+        // the record) follow the firmware's loop
+        double r1 = anchor - recEnd, r3 = recStart;
+        bool again;
+        do { r1 += r3; again = r1 >= recEnd; r3 -= recEnd; } while (again);
+        anchor = r1;
+        return;
+    }
+    for (;;) {
+        loadNext();
+        if (!(budget > 0.0) || !(Pq >= recEnd)) return;
+        anchor += recEnd - recStart;
+    }
+}
+
+// The anchor moving backward (0x8950cfee), the mirror image: below the
+// record's start it wraps up to repeat it, or the previous records load.
+void XtSoloVoice::anchorBackward() {
+    anchor -= anchorStep;
+    if (!(recStart > anchor)) return;
+    bool wrap = false;
+    if (Pq >= recStart && budget > 0.0) {
+        if (budget >= kUnlimited) wrap = true;
+        else { const double c = repeatCost(); if (budget >= c) { budget -= c; wrap = true; } }
+    }
+    if (!wrap && 0.0 >= recStart) wrap = true;                      // the first record
+    if (wrap) {
+        double r1 = anchor - recStart, r3 = recEnd;                  // 0x8950d01a
+        bool again;
+        do { r1 += r3; again = recStart >= r1; r3 -= recStart; } while (again);
+        anchor = r1;
+        return;
+    }
+    for (;;) {
+        loadPrev();
+        if (!(budget > 0.0) || !(recStart > Pq)) return;
+        anchor += recStart - recEnd;
+    }
+}
+
+// Grain parameters for a trigger at phrase position P in the current record
 // (0x8950d5a0).  Returns the grain's start, velocity and second-tap weight;
 // sets ppw, slope, the anchor step and (voiced only) f0n.  Computed as the
 // firmware does, in single precision on the 1/16-sample grid: the truncated
 // results (os, ppw, the anchor step) differ by a grid step in double when the
 // exact value lands on the grid (os = 5365·(1 − 0.8) = 1073).
-XtSoloVoice::Grain XtSoloVoice::grainParams(size_t sg, bool setF0) {
-    const size_t nc = p->size();
+XtSoloVoice::Grain XtSoloVoice::grainParams(bool setF0) {
+    const size_t nc = p->size(), sg = seg;
     // Only the PERIOD is floored (160/16 samples); the record's extent, the
     // anchor wrap and the second-tap offset use the raw length.
-    const float C = std::max(160.0f, (float)(16.0 * p->segLen[sg]));
+    const float C = std::max(160.0f, (float)(16.0 * (recEnd - recStart)));
     // After the last record the XT's stream holds a (256, 1) terminator: the
-    // last record's next period is 16 samples.
-    const float N = std::max(160.0f, (sg + 1 < nc) ? (float)(16.0 * p->segLen[sg + 1]) : 256.0f);
+    // last record's next period is 16 samples, and the terminator's own is
+    // its length (0x8950d4c0).
+    const float N = std::max(160.0f, (float)(16.0 * lenOf(sg < nc ? sg + 1 : sg)));
     float frac = 0.0f, Ci = C;
-    if (Pq > p->segStart[sg] + p->segLen[sg]) { frac = 1.0f; Ci = N; }
-    else if (Pq > p->segStart[sg]) {
-        frac = xtf::div((float)(16.0 * (Pq - p->segStart[sg])), C);
+    if (Pq > recEnd) { frac = 1.0f; Ci = N; }
+    else if (Pq > recStart) {
+        frac = xtf::div((float)(16.0 * (Pq - recStart)), C);
         Ci = xtf::add(xtf::mul(frac, xtf::sub(N, C)), C);          // fmac: product, then sum
     }
-    bool voiced = p->voiced[sg] != 0;
+    bool voiced = sg < nc && p->voiced[sg] != 0;                   // the terminator: info 1
     if (p->forceUnvoiced) voiced = false;
     if (p->forcedInfo >= 0) voiced = (p->forcedInfo & 4) != 0;
-    const int info = p->forcedInfo >= 0 ? p->forcedInfo : p->info[sg];
+    const int info = p->forcedInfo >= 0 ? p->forcedInfo : sg < nc ? p->info[sg] : 1;
     const float Af = std::max((float)A, 4.76837e-07f), Ff = std::max((float)F, 4.76837e-07f);
     float rate, v;                                     // ppw divisor, read velocity
     if (voiced) { rate = Af; v = Ff; }
@@ -85,7 +177,7 @@ XtSoloVoice::Grain XtSoloVoice::grainParams(size_t sg, bool setF0) {
     // Anchor step (player +0x30) is stored in whole 1/16 samples:
     // trunc(16·rate), at least 16 — pitch +7 steps 23/16, not 1.498.
     anchorStepInit = std::trunc(std::max(xtf::mul(rate, 16.0f), 16.0f)) / 16.0;
-    return { p->segStart[sg] + os / 16.0, v, frac, p->segLen[sg] };
+    return { recStart + os / 16.0, v, frac, recEnd - recStart };
 }
 
 void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double walk_, double energy_) {
@@ -94,22 +186,37 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
     for (Chan& c : ch) c = Chan();
     next = 1;            // trigger toggle starts at 0 → first trigger → B
     slope = 0.0;
-    P = Pq = timer = ppw = 0.0;
-    ended_ = false;
-    seg = 0;
-    anchor = 0.0;
+    Pf = walkStep = 0;
+    timer = ppw = 0.0;
+    ended_ = 0;
+    // The event jump (0x8950d7b0) at the start event, or at the end event
+    // when walk < 0 (0x8950fa60): the position and the anchor at the event,
+    // and the record it points at, record 0 or the stream's terminator
+    // (ending 16 samples past the wave's end, an unlimited budget).
+    const double n = (double)p->in.size();
+    if (walk < 0.0) {
+        seg = p->size();
+        recStart = n; recEnd = n + lenOf(seg);
+        budget = kUnlimited;
+    } else {
+        seg = 0;
+        recStart = 0.0; recEnd = lenOf(0);
+        budget = recEnd > n ? kUnlimited : budgetOf(0);
+    }
+    anchor = recStart;
+    Pi = (int32_t)std::lround(recStart * 16.0);
+    Pq = recStart;
     anchorStep = std::max(A, 1.0);
-    budget = budgetOf(0);
     low[0] = low[1] = band[0] = band[1] = fCoef = 0.0;
     q = 1.2;
     f0n = 0.0;
     anchorStepInit = 1.0;
     t = 0;
-    // Note-on (0x8950fba0): grain params at P = 0, timer and ages 0, both
+    // Note-on (0x8950fba0): grain params at the event, timer and ages 0, both
     // channels reading from the record start, A's window at 0 and B's at 0.5
     // (the two sum to 1), f0n zeroed after the params are computed.
-    const Grain g = grainParams(0, false);
-    for (Chan& c : ch) { c.start = p->segStart[0]; c.age = 0; c.v = g.v; c.tap = g.C; c.tapW = g.frac; }
+    const Grain g = grainParams(false);
+    for (Chan& c : ch) { c.start = recStart; c.age = 0; c.v = g.v; c.tap = g.C; c.tapW = g.frac; }
     ch[0].e = 0.0; ch[1].e = 0.5;
     anchorStep = anchorStepInit;
 }
@@ -124,9 +231,10 @@ void XtSoloVoice::render(float* out, float* right, int count) {
     }
     const bool st = right && p->stereo();
     const size_t nc = p->size();
-    const double n = (double)p->in.size();
+    const int32_t endPos = (int32_t)p->in.size() * 16;
     for (int k = 0; k < count; ++k, ++t) {
-        if ((t & 31) == 0) {   // per-block coefficient update        [cde0]
+        if ((t & 31) == 0) {   // per-block walk step [c280] and coefficient update [cde0]
+            walkStep = xtf::ftrc(xtf::mul((float)walk, 33554432.0f));   // walk·2^25
             // Energy g = 0 (OFF): cutoff f0/8, damping 1.2 (rumble filter).
             // Energy g > 0: cutoff at the output fundamental, damping
             // (1.2 − g) + p(rate) with p = g·(2r − 1) on [0.5, 1),
@@ -147,36 +255,28 @@ void XtSoloVoice::render(float* out, float* right, int count) {
             fCoef = (ft - fCoef) * 0.125 + fCoef;
             fCoef = std::min(fCoef, 1.9 - q);
         }
-        P += walk;
-        // Record logic sees only the whole-1/16 part of P (player +0x38).
-        Pq = std::floor(P * 16.0) / 16.0;
-        // End of the wave (+0x1c): position holds, no further triggers (+4
+        // Walk and records (0x8950ce80).  The position moves by half the walk
+        // step in 12.20; the record logic sees its whole-1/16 part.  At the
+        // wave's end (+0x1c) or start (+0x18) it holds and triggers stop (+4
         // set); the two running grains play out.
-        if (Pq >= n) { P = Pq = n; ended_ = true; }
-        if (!p->anchorMode) {
-            while (seg + 1 < nc && Pq >= p->segStart[seg + 1]) ++seg;
-        } else {
-            anchor += anchorStep;
-            const double segEnd = p->segStart[seg] + p->segLen[seg];
-            if (anchor >= segEnd) {
-                const double cost = repeatCost(anchorStep, walk);
-                if (Pq < segEnd && budget > 0.0 && budget >= cost) {
-                    if (budget < 1e29) budget -= cost;
-                    while (anchor >= p->segStart[seg] + p->segLen[seg]) anchor -= p->segLen[seg];
-                } else if (seg + 1 < nc) {
-                    ++seg; budget = budgetOf(seg);
-                    while (seg + 1 < nc && budget > 0.0 && Pq >= p->segStart[seg] + p->segLen[seg]) {
-                        anchor += p->segLen[seg];
-                        ++seg; budget = budgetOf(seg);
-                    }
-                }
-            }
-        }
+        const int32_t s = walkStep >> 1, sum = Pf + s;
+        int32_t np = Pi + (sum >> 20), nf = sum & 0xfffff;
+        if (s > 0 && np >= endPos) { ended_ = 1; np = endPos; nf = 0; }
+        if (s < 0 && 0 >= np) { ended_ = -1; np = 0; nf = 0; }
+        Pi = np; Pf = nf;
+        Pq = Pi / 16.0;
+        if (!p->anchorMode) {           // diagnostic: the record containing P
+            while (seg < nc && Pq >= recEnd) loadNext();
+            while (seg > 0 && Pq < recStart) loadPrev();
+        } else if (s > 0) anchorForward();
+        else if (s < 0) anchorBackward();
+        else if (Pq >= anchor) anchorForward();     // holding: the anchor closes on P from either side
+        else anchorBackward();
         timer += 1.0;
         const bool due = timer >= ppw;
         if (due) timer -= ppw;
         if (due && !ended_) {
-            const Grain g = grainParams(seg, true);
+            const Grain g = grainParams(true);
             anchorStep = anchorStepInit;
             Chan& c  = ch[next];
             next ^= 1;
@@ -190,8 +290,8 @@ void XtSoloVoice::render(float* out, float* right, int count) {
 
         if (trace)   // VSE_TRACE: same fields/units as EmuSolo.java's trace
             std::fprintf(trace, "%ld\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%.7g\t%.7g\t%.7g\t%.7g\t%.7g\t%.7g\t%.7g\t%.0f\t%.0f\n",
-                t, std::floor(P * 16), std::floor(anchor * 16), p->segStart[seg] * 16, (p->segStart[seg] + p->segLen[seg]) * 16,
-                p->segLen[seg] * 16, timer * 4096, ppw * 4096, ch[0].age * 4096, ch[1].age * 4096,
+                t, (double)Pi, std::floor(anchor * 16), recStart * 16, recEnd * 16,
+                (recEnd - recStart) * 16, timer * 4096, ppw * 4096, ch[0].age * 4096, ch[1].age * 4096,
                 std::floor(ch[0].start * 16), std::floor(ch[1].start * 16), next ^ 1, ch[0].e, ch[1].e,
                 ch[0].v, ch[1].v, ch[0].tapW, ch[1].tapW, slope, ch[0].tap * 16, ch[1].tap * 16);
 

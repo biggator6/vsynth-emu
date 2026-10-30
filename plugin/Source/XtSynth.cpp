@@ -188,7 +188,8 @@ constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
 // walk, voice +0x18 Energy): pitch in cents with the pitch envelope at its
 // depth, clamped to ±6000; formant and walk from the VariPhrase converter
 // (XtOsc) with their envelopes and the LFO, the formant ratio within
-// [0.5, 2], the walk within ±5.
+// [0.5, 2], the walk within ±5 (negative: the players run backward, a note
+// starting at the wave's end).
 void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g) const {
     double cents = ((double)(v.note - ctl.rootKey) + ctl.pitchSemis) * 100.0
                  + (double)v.penv.level() * (double)xtPitchDepthCents((float)ctl.pDepth)
@@ -199,9 +200,6 @@ void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g)
                           xtOscFormantEnvDepth(ctl.fDepth), v.lfo.out(), xtOscFormantLfoDepth(ctl.lfoFormantDepth));
     walk = xtOscWalk(xtOscTime(ctl.oscTime, ctl.oscTimeOffset, ctl.oscTimeKF, v.note), v.tenv.level(),
                      xtOscTimeEnvDepth(ctl.tDepth), v.lfo.out(), xtOscTimeLfoDepth(ctl.lfoTimeDepth));
-    // A negative walk plays backward on the XT; the players' backward paths
-    // are not ported, so it holds as at 0.
-    walk = std::max(walk, 0.0f);
     g = xtOscEnergy(ctl.energy);
 }
 
