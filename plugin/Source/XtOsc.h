@@ -54,3 +54,32 @@ float xtOscExp2(float x);
 // formant = 2^(formant + env·envDepth + lfo·lfoDepth), clamped to [0.5, 2].
 float xtOscWalk(float time, float env, float envDepth, float lfo, float lfoDepth);
 float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, float lfoDepth);
+
+// ── Level (the OSC TVA) and velocity ────────────────────────────────────────
+// Velocity Sens and Curve as the patch → table updaters store them:
+// 0x894ebe20, ±63 → ±200 (s·100/32 up to ±32, then 100 + (|s| − 32)·100/31);
+// 0x894ebed0, curve 1…7 → 0…6, 0 → 7 (no velocity effect).
+int xtVelSens(int patchSens);
+int xtVelCurve(int patchCurve);
+// 0x894ebd60: the velocity factor 0…32768 for an internal sens and curve.
+int xtVelCurveValue(int velocity, int sens, int curve);
+// (c/32768)², the patch TVA's (0x894ea990) and the OSC level's velocity
+// gain, from the patch's Velocity Sens (−63…+63) and Curve (0…7).
+float xtVelGain(int velocity, int patchSens, int patchCurve);
+
+// The firmware's powf(2, dB/6) for Wave Gain −12…+12 dB (xtFwOscWaveGains).
+void xtOscSetWaveGains(const float* gains25);
+
+// The OSC level (+0x54): the level curve at Level + Level KF·(key − 60)
+// (0x894e0c90: level + trunc(127·kf·(key − 60)/6000), within 0…127), times
+// the velocity gain.  Level 0…127 (+ modulation), Level KF −200…+200.
+float xtOscLevel(int level, int kf, int key, float velGain);
+// Level LFO depth (+0x58): (d/63)·|d/63|, d clamped to ±63.
+float xtOscLevelLfoDepth(int d);
+// The OSC gain (+0x5c): 2^(Wave Gain/6), times the level curve at two
+// further levels (+0x84 / +0x86, set with the wave) taken as full here.
+float xtOscGain(int waveGainDb);
+// The player's gain target (0x894f3dc0): gain·clamp((1 + lfo·lfoDepth)·
+// env·level, ±1), env the OSC amp envelope's output (at note-on,
+// 0x894f3e20, its start level unless the attack time is 0).
+float xtOscGainTarget(float gain, float level, float env, float lfo, float lfoDepth);

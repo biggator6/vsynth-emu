@@ -15,12 +15,18 @@ constexpr uint32_t kLevelTab = 0x897cfcb8;   // u16 ×128: 32768·(k/127)², tru
 // fraction, 2^n for the integer part; then the same for negative arguments.
 constexpr uint32_t kExpHi = 0x897d0228, kExpLo = 0x897d0628, kExpInt = 0x897d1228;
 constexpr uint32_t kExpHiNeg = 0x897d0a28, kExpLoNeg = 0x897d0e28, kExpIntNeg = 0x897d1244;
+// velocity (0x894ebd60): the sens table (u16 ×200, 65536·s/200) and the
+// pointers to the seven 128-byte velocity curves
+constexpr uint32_t kVelSens = 0x897cfeda, kVelCurves = 0x897cfb9c;
 
 struct Tables {
     uint16_t level[128];
     float hi[256], lo[256], in[7], hiN[256], loN[256], inN[7];
     float keyScale[41][128];                  // xtOscSetTimeKeyScales
-    bool keyScales = false, ok = false;
+    uint16_t velSens[200];
+    uint8_t velCurve[7][128];
+    float waveGain[25];                       // xtOscSetWaveGains, −12…+12 dB
+    bool keyScales = false, waveGains = false, ok = false;
 } T;
 
 template <class V> bool readAt(FILE* f, uint32_t addr, V* v, size_t n) {
@@ -54,11 +60,19 @@ bool xtOscLoadTables(const char* romPath) {
     T.ok = false;
     FILE* f = romPath ? std::fopen(romPath, "rb") : nullptr;
     if (!f) return false;
-    const bool ok = readAt(f, kLevelTab, T.level, 128)
-                 && readAt(f, kExpHi, T.hi, 256) && readAt(f, kExpLo, T.lo, 256) && readAt(f, kExpInt, T.in, 7)
-                 && readAt(f, kExpHiNeg, T.hiN, 256) && readAt(f, kExpLoNeg, T.loN, 256) && readAt(f, kExpIntNeg, T.inN, 7);
+    uint32_t curvePtr[7];
+    bool ok = readAt(f, kLevelTab, T.level, 128)
+           && readAt(f, kExpHi, T.hi, 256) && readAt(f, kExpLo, T.lo, 256) && readAt(f, kExpInt, T.in, 7)
+           && readAt(f, kExpHiNeg, T.hiN, 256) && readAt(f, kExpLoNeg, T.loN, 256) && readAt(f, kExpIntNeg, T.inN, 7)
+           && readAt(f, kVelSens, T.velSens, 200) && readAt(f, kVelCurves, curvePtr, 7);
+    for (int c = 0; ok && c < 7; ++c)
+        ok = curvePtr[c] >= kRomBase && curvePtr[c] < 0x89900000u && readAt(f, curvePtr[c], T.velCurve[c], 128);
     std::fclose(f);
     if (!ok) return false;
+    // the sens table rises from 0; each curve runs from about 255 down to 0
+    if (T.velSens[0] != 0 || !(T.velSens[199] > T.velSens[100]) || T.velSens[100] != 32768) return false;
+    for (int c = 0; c < 7; ++c)
+        if (T.velCurve[c][127] != 0 || T.velCurve[c][0] < 200) return false;
     // Sanity: the level curve runs 0…32768 and rises; the exp2 tables start
     // at 1 and the integer ones double and halve.
     if (T.level[0] != 0 || T.level[127] != 32768) return false;
@@ -154,6 +168,73 @@ float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, flo
     return r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r);
 }
 
+int xtVelSens(int s) {
+    if (-32 > s) return -(100 + (-32 - s) * 100 / 31);
+    if (0 > s) return -(-s * 100 / 32);
+    if (32 >= s) return s * 100 / 32;
+    return 100 + (s - 32) * 100 / 31;
+}
+
+int xtVelCurve(int c) { return c >= 1 && c <= 7 ? c - 1 : 7; }
+
+int xtVelCurveValue(int velocity, int sens, int curve) {
+    if (sens == 0 || curve >= 7 || curve < 0 || !T.ok) return 0x8000;
+    int s;
+    if (sens > 0) s = sens >= 200 ? 0x10000 : T.velSens[sens];
+    else s = -200 < sens ? -(int)T.velSens[-sens] : -0x10000;
+    const int v = velocity < 0 ? 0 : velocity > 127 ? 127 : velocity;
+    int r = (s * (256 - T.velCurve[curve][v])) >> 8;
+    r += 0x8000;
+    if (s > 0) r -= s;
+    return r > 0x8000 ? 0x8000 : r < 0 ? 0 : r;
+}
+
+float xtVelGain(int velocity, int patchSens, int patchCurve) {
+    using namespace xtf;
+    const float c = div(flt(xtVelCurveValue(velocity, xtVelSens(patchSens), xtVelCurve(patchCurve))), 32768.0f);
+    return mul(c, c);
+}
+
+void xtOscSetWaveGains(const float* g) {
+    for (int i = 0; i < 25; ++i) T.waveGain[i] = g[i];
+    T.waveGains = true;
+}
+
+float xtOscLevel(int level, int kf, int key, float velGain) {
+    using namespace xtf;
+    int x = level > 127 ? 127 : level < 0 ? 0 : level;
+    // 0x894e0c90: 127·kf·(key − 60)/6000 by a reciprocal multiply, toward zero
+    const int32_t p = 127 * (int32_t)(int16_t)kf * (int32_t)(int16_t)(key - 60);
+    int32_t q = (int32_t)(((int64_t)p * 0x057619f1) >> 32) >> 7;
+    q += (int32_t)((uint32_t)q >> 31);
+    x = (int16_t)(x + q);
+    x = x > 127 ? 127 : x < 0 ? 0 : x;
+    return mul(div((float)T.level[x], 32768.0f), velGain);
+}
+
+float xtOscLevelLfoDepth(int d) {
+    using namespace xtf;
+    const int x = clamp63((int16_t)d);
+    const float v = div(flt(x), 63.0f);
+    return mul(x < 0 ? -v : v, v);
+}
+
+float xtOscGain(int db) {
+    using namespace xtf;
+    db = db > 12 ? 12 : db < -12 ? -12 : db;
+    const float g = T.waveGains ? T.waveGain[db + 12] : (float)std::pow(2.0, (double)div(flt(db), 6.0f));
+    // × level curve(+0x84)/32768 × level curve(+0x86)/32768, both full
+    return mul(mul(div((float)T.level[127], 32768.0f), g), div((float)T.level[127], 32768.0f));
+}
+
+float xtOscGainTarget(float gain, float level, float env, float lfo, float lfoDepth) {
+    using namespace xtf;
+    float a = add(mul(lfo, lfoDepth), 1.0f);                         // fmac: product, then sum
+    a = mul(a, mul(env, level));
+    a = a > 1.0f ? 1.0f : (-1.0f > a ? -1.0f : a);
+    return mul(gain, a);
+}
+
 #ifdef XT_OSC_MAIN
 // xt_osc <rom.2.bin> : the firmware's VariPhrase converter (0x894e2f20) run
 // in the SH-4 interpreter beside the port, over knob + matrix sums −100…+100,
@@ -171,6 +252,8 @@ int main(int argc, char** argv) {
     std::vector<float> ks;
     if (!xtFwOscTimeKeyScales(ks)) { std::fprintf(stderr, "time key scales failed\n"); return 1; }
     xtOscSetTimeKeyScales(ks.data());
+    if (!xtFwOscWaveGains(ks)) { std::fprintf(stderr, "wave gains failed\n"); return 1; }
+    xtOscSetWaveGains(ks.data());
     Sh4 c;
     if (!c.loadRom(argv[1])) return 1;
     const uint32_t ram = 0x8C000000, P = ram, out = ram + 0x400, part = ram + 0x800, zero = ram + 0xC00, sp = ram + 0xF0000;
@@ -226,6 +309,89 @@ int main(int argc, char** argv) {
         if (!bitsEq(fw, xtOscExp2(x)) && eb++ < 5) std::printf("  exp2(%.9g): fw %.9g port %.9g\n", x, fw, xtOscExp2(x));
     }
     std::printf("exp2: %ld arguments, %ld different\n", en, eb);
-    return bad || eb ? 3 : 0;
+
+    // Velocity: the curve function (0x894ebd60) over every velocity, sens
+    // −210…+210 and curve 0…8; the patch converters 0x894ebe20 / 0x894ebed0.
+    long vb = 0, vn = 0;
+    for (int curve = 0; curve <= 8; ++curve)
+        for (int sens = -210; sens <= 210; ++sens)
+            for (int vel = 0; vel < 128; ++vel) {
+                uint32_t r0 = 0;
+                if (!c.call(0x894ebd60, { (uint32_t)vel, (uint32_t)sens, (uint32_t)curve }, sp, &r0)) { std::fprintf(stderr, "vel: %s\n", c.error().c_str()); return 1; }
+                ++vn;
+                if ((int)(r0 & 0xffff) != xtVelCurveValue(vel, sens, curve) && vb++ < 5)
+                    std::printf("  velocity %d sens %d curve %d: fw %u port %d\n", vel, sens, curve, r0 & 0xffff, xtVelCurveValue(vel, sens, curve));
+            }
+    for (int s = -100; s <= 100; ++s) {
+        uint32_t r0 = 0;
+        c.call(0x894ebe20, { (uint32_t)s }, sp, &r0);
+        ++vn;
+        if ((int16_t)r0 != xtVelSens(s) && vb++ < 10) std::printf("  sens %d: fw %d port %d\n", s, (int16_t)r0, xtVelSens(s));
+    }
+    for (int k = -3; k <= 12; ++k) {
+        uint32_t r0 = 0;
+        c.call(0x894ebed0, { (uint32_t)k }, sp, &r0);
+        ++vn;
+        if ((int)r0 != xtVelCurve(k) && vb++ < 15) std::printf("  curve %d: fw %d port %d\n", k, (int)r0, xtVelCurve(k));
+    }
+    std::printf("velocity: %ld cases, %ld different\n", vn, vb);
+
+    // The level slots of the converter (+0x54 level, +0x58 LFO depth, +0x5c gain)
+    long lb = 0, ln = 0;
+    mtx = 0;
+    const int lkfs[] = { -200, -110, -30, 0, 50, 200 };
+    const int sens[][2] = { { 0, 1 }, { 32, 1 }, { 63, 2 }, { -40, 3 }, { 7, 4 }, { 33, 5 }, { -63, 6 }, { 50, 7 }, { 20, 0 } };
+    for (int level = 0; level < 128; ++level)
+        for (int kf : lkfs)
+            for (int key = 0; key < 128; key += 5)
+                for (const auto& sv : sens) {
+                    std::vector<uint8_t> z(0x400, 0);
+                    c.write(P, z.data(), z.size()); c.write(out, z.data(), 0x100); c.write(part, z.data(), 0x200);
+                    const int vel = (level * 7 + key) & 127, gainDb = (level % 25) - 12, lfo = ((level * 3 + kf) % 200 + 200) % 200 - 100;
+                    c.wr8(P + 3, (uint8_t)key); c.wr8(P + 4, (uint8_t)vel);
+                    c.wr8(P + 0xa, (uint8_t)(int8_t)gainDb);
+                    c.wr8(P + 0x1c, (uint8_t)level); c.wr16(P + 0x1e, (uint16_t)(int16_t)kf); c.wr8(P + 0x20, (uint8_t)(int8_t)lfo);
+                    c.wr8(P + 0x21, (uint8_t)xtVelCurve(sv[1])); c.wr16(P + 0x22, (uint16_t)(int16_t)xtVelSens(sv[0]));
+                    c.wr8(P + 0x84, 127); c.wr8(P + 0x86, 127);
+                    c.wr8(P + 0x61, 2); c.wr8(P + 0x87, 6);
+                    c.wr32(P + 0xdc, part);
+                    if (!c.call(0x894e2f20, { P, out }, sp)) { std::fprintf(stderr, "convert: %s\n", c.error().c_str()); return 1; }
+                    const float fw[3] = { f32(out + 0x54), f32(out + 0x58), f32(out + 0x5c) };
+                    const float po[3] = { xtOscLevel(level, kf, key, xtVelGain(vel, sv[0], sv[1])), xtOscLevelLfoDepth(lfo), xtOscGain(gainDb) };
+                    static const char* name[3] = { "level", "level LFO depth", "gain" };
+                    ++ln;
+                    for (int i = 0; i < 3; ++i)
+                        if (!bitsEq(fw[i], po[i]) && lb++ < 8)
+                            std::printf("  %s: level %d kf %d key %d vel %d sens %d curve %d gain %d: fw %.9g port %.9g\n", name[i], level, kf, key, vel,
+                                        sv[0], sv[1], gainDb, fw[i], po[i]);
+                }
+    std::printf("level slots: %ld cases × 3 values, %ld different\n", ln, lb);
+
+    // The gain target (0x894f3dc0) and its note-on form (0x894f3e20) on a
+    // voice whose OSC amp envelope and LFO are given objects.
+    const uint32_t V = ram + 0x10000, ENV = ram + 0x18000, LFO = ram + 0x18200;
+    auto wf = [&](uint32_t a, float x) { uint32_t u; std::memcpy(&u, &x, 4); c.wr32(a, u); };
+    long gb = 0, gn = 0;
+    const float envs[] = { 0.0f, 0.13f, 0.5f, 0.99999f, 1.0f }, lfos[] = { -1.0f, -0.37f, 0.0f, 0.62f, 1.0f };
+    const float depths[] = { -1.0f, -0.25f, 0.0f, 0.3f, 1.0f }, levels[] = { 0.0f, 0.2f, 0.75f, 1.0f }, gains[] = { 0.25f, 1.0f, 4.0f };
+    for (float e : envs) for (float l : lfos) for (float d : depths) for (float lv : levels) for (float g : gains) for (int atk = 0; atk < 2; ++atk) {
+        std::vector<uint8_t> z(0x1000, 0);
+        c.write(V, z.data(), z.size());
+        c.write(ENV, z.data(), 0x100); c.write(LFO, z.data(), 0x100);
+        c.wr32(V + 0x97c, ENV); c.wr32(V + 0x98c, LFO);
+        wf(ENV + 0x4c, e); wf(ENV + 0x1c, atk ? 25.0f : 0.0f); wf(ENV + 0x2c, 0.0f);
+        wf(LFO + 0x38, l);
+        wf(V + 0x54, lv); wf(V + 0x58, d); wf(V + 0x5c, g);
+        for (int on = 0; on < 2; ++on) {
+            if (!c.call(on ? 0x894f3e20 : 0x894f3dc0, { V }, sp)) { std::fprintf(stderr, "gain: %s\n", c.error().c_str()); return 1; }
+            float fw; std::memcpy(&fw, &c.fb[0][0], 4);
+            const float po = xtOscGainTarget(g, lv, on && atk ? 0.0f : e, l, d);
+            ++gn;
+            if (!bitsEq(fw, po) && gb++ < 5) std::printf("  gain target%s: env %g lfo %g depth %g level %g gain %g: fw %.9g port %.9g\n",
+                                                          on ? " (note-on)" : "", e, l, d, lv, g, fw, po);
+        }
+    }
+    std::printf("gain target: %ld cases, %ld different\n", gn, gb);
+    return bad || eb || vb || lb || gb ? 3 : 0;
 }
 #endif

@@ -108,6 +108,33 @@ int main(int argc, char** argv) {
             prm->setValueNotifyingHost(prm->convertTo0to1((float)k[i]));
         }
     }
+    // TEST_OLEV="level,levelKF,lfoDepth,waveGainDb", TEST_OENV="a,d,s,r,aSens,dSens,rSens,timeKF",
+    // TEST_VEL="ampSens,ampCurve,oscSens,oscCurve": the OSC TVA and velocity to level
+    auto setKnobs = [&](std::initializer_list<std::pair<const char*, int>> knobs) {
+        for (auto [id, v] : knobs) {
+            auto* prm = p.apvts.getParameter(id);
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+        }
+    };
+    if (const char* e = std::getenv("TEST_OLEV")) {
+        std::sscanf(e, "%d,%d,%d,%d", &refCtl.oscLevel, &refCtl.oscLevelKF, &refCtl.oscLevelLfoDepth, &refCtl.waveGain);
+        setKnobs({ { "oscLevel", refCtl.oscLevel }, { "oscLevelKF", refCtl.oscLevelKF }, { "oscLevelLfoDepth", refCtl.oscLevelLfoDepth },
+                   { "waveGain", refCtl.waveGain } });
+    }
+    if (const char* e = std::getenv("TEST_OENV")) {
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &refCtl.oAttack, &refCtl.oDecay, &refCtl.oSustain, &refCtl.oRelease,
+                    &refCtl.oASens, &refCtl.oDSens, &refCtl.oRSens, &refCtl.oTimeKF);
+        setKnobs({ { "oscEnvAttack", refCtl.oAttack }, { "oscEnvDecay", refCtl.oDecay }, { "oscEnvSustain", refCtl.oSustain },
+                   { "oscEnvRelease", refCtl.oRelease }, { "oscEnvAttackSens", refCtl.oASens }, { "oscEnvDecaySens", refCtl.oDSens },
+                   { "oscEnvReleaseSens", refCtl.oRSens }, { "oscEnvTimeKF", refCtl.oTimeKF } });
+    }
+    if (const char* e = std::getenv("TEST_VEL")) {
+        std::sscanf(e, "%d,%d,%d,%d", &refCtl.ampVelSens, &refCtl.ampVelCurve, &refCtl.oscVelSens, &refCtl.oscVelCurve);
+        setKnobs({ { "ampVelSens", refCtl.ampVelSens }, { "ampVelCurve", refCtl.ampVelCurve }, { "oscVelSens", refCtl.oscVelSens },
+                   { "oscVelCurve", refCtl.oscVelCurve } });
+    }
+    // TEST_VELOCITY=v: the note-on velocity (1..127, default 127)
+    const int noteVel = std::getenv("TEST_VELOCITY") ? std::clamp(std::atoi(std::getenv("TEST_VELOCITY")), 1, 127) : 127;
     p.loadFile(juce::File(argv[2]));
     for (int i = 0; i < 600 && !p.getStatusText().startsWith("Encoded"); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));   // the encode runs on the pool thread
@@ -147,12 +174,12 @@ int main(int argc, char** argv) {
     const int offBlock = total / 2 / block * block, offAt = 37;    // note-off halfway, inside a block
     for (int done = 0; done < total; done += block) {
         juce::MidiBuffer midi;
-        if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)127), 100); }
+        if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)noteVel), 100); }
         if (done == offBlock) { midi.addEvent(juce::MidiMessage::noteOff(1, note, (juce::uint8)100), offAt); }
         p.processBlock(buf, midi);
         juce::ScopedNoDenormals ftz;   // processBlock runs with denormals flushed (as the SH-4 does, FPSCR.DN = 1)
         if (std::getenv("TEST_CONTROLS")) ref.setControls(refCtl);   // as processBlock does each block
-        if (done == 0) { ref.render(rl.data(), rr.data(), 100); ref.noteOn(note, 1.0f); ref.render(rl.data() + 100, rr.data() + 100, block - 100); }
+        if (done == 0) { ref.render(rl.data(), rr.data(), 100); ref.noteOn(note, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + 100, rr.data() + 100, block - 100); }
         else if (done == offBlock) { ref.render(rl.data(), rr.data(), offAt); ref.noteOff(note, 100 / 127.0f); ref.render(rl.data() + offAt, rr.data() + offAt, block - offAt); }
         else ref.render(rl.data(), rr.data(), block);
         for (int i = 0; i < block; ++i) {

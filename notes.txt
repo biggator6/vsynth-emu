@@ -217,6 +217,20 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+OSC LEVEL v53 (2026-10-30): the OSC TVA and velocity to level, as the XT
+  converts them (HARDWARE_FIRMWARE.md, "The OSC level, its amp envelope,
+  and velocity"). XtOsc: xtVelSens/xtVelCurve (patch → internal),
+  xtVelCurveValue (0x894ebd60), xtVelGain, xtOscLevel/LevelLfoDepth/Gain,
+  xtOscGainTarget; all equal to the firmware (xt_osc). Players: XtSoloVoice
+  setGain/resetGain (per-sample 1/64 follower), XtMbPlayer setGain. Fix:
+  A/D/R-Sens stored ×100/63 before the time converter (were 1.6× weak).
+  Plugin params oscLevel, oscLevelKF, oscLevelLfoDepth, waveGain,
+  oscEnvAttack/Decay/Sustain/Release, oscEnvAttackSens/DecaySens/
+  ReleaseSens, oscEnvTimeKF, oscVelSens, oscVelCurve, ampVelSens (+16),
+  ampVelCurve (1). XtSynth CLI: XT_OLEV, XT_OENV, XT_VEL, XT_VELOCITY;
+  PluginTest: TEST_OLEV, TEST_OENV, TEST_VEL, TEST_VELOCITY; xt_fw
+  soloplay/solocmp/bandcmp take frame:gX gain changes.
+
 REVERSE v52 (2026-10-30): all three players run backward (walk < 0, a note
   starting at the end event) and hold at walk 0, as the firmware does
   (HARDWARE_FIRMWARE.md, "Reverse and held playback"). References: the

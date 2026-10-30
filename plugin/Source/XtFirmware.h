@@ -28,6 +28,7 @@ bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out);
 struct XtFwSoloNote {
     float pitch = 1, formant = 1, walk = 1, energy = 0;
     std::vector<std::pair<long, float>> walkAt;
+    std::vector<std::pair<long, float>> gainAt;   // output gain targets (1 = unity)
 };
 bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long frames, int channels,
                   const XtFwSoloNote& note, long outFrames, std::vector<float>& out);
@@ -73,6 +74,10 @@ bool xtFwEnvKeyScales(std::vector<uint32_t>& out);
 // powf (0x8952ff9c), the exponent formed as 0x894e0da0 forms it, for the
 // same 41 kf × 128 keys (XtOsc).
 bool xtFwOscTimeKeyScales(std::vector<float>& out);
+
+// The Wave Gain factors 2^(dB/6) by the firmware's powf, the exponent formed
+// as the VariPhrase converter forms it (0x894e3568), dB = −12…+12.
+bool xtFwOscWaveGains(std::vector<float>& out);
 
 // Round to nearest instead of FPSCR.RM (to match Ghidra's P-code emulator).
 void xtFwForceNearest(bool on);

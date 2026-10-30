@@ -316,8 +316,10 @@ void XtSoloVoice::render(float* out, float* right, int count) {
             high[c] = y[c] - q * band[c] - low[c];
             band[c] += fCoef * high[c];
         }
-        out[k] = (float)high[0];
-        if (right) right[k] = (float)high[st ? 1 : 0];
+        // output gain (0x8950d1c2): gain += (target − gain)/64, then the scale
+        gain = xtf::add(xtf::mul(xtf::sub(gainTarget, gain), 0.015625f), gain);   // fmac: product, then sum
+        out[k] = (float)(high[0] * gain);
+        if (right) right[k] = (float)(high[st ? 1 : 0] * gain);
     }
 }
 

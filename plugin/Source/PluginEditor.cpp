@@ -1,15 +1,24 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 340;  // height of the XT strip below it
+static constexpr int kXtStripH   = 460;  // height of the XT strip below it
+
+// The level rows: parameter and label, four per row, and the rows' names
+static const char* const kLevelIds[16][2] = {
+    { "oscLevel", "Lvl" },         { "oscLevelKF", "KF" },          { "oscLevelLfoDepth", "LFO" },   { "waveGain", "Gain" },
+    { "oscEnvAttack", "A" },       { "oscEnvDecay", "D" },          { "oscEnvSustain", "S" },        { "oscEnvRelease", "R" },
+    { "oscEnvAttackSens", "A-Sns" }, { "oscEnvDecaySens", "D-Sns" }, { "oscEnvReleaseSens", "R-Sns" }, { "oscEnvTimeKF", "T-KF" },
+    { "ampVelSens", "Sens" },      { "ampVelCurve", "Curve" },      { "oscVelSens", "O Sens" },      { "oscVelCurve", "O Curve" },
+};
+static const char* const kLevelRowNames[4] = { "OSC TVA", "O Env", "O Env", "Velocity" };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 700);
+    setSize(560, 820);
     setResizable(true, true);
-    setResizeLimits(480, 480, 960, 860);
+    setResizeLimits(480, 600, 960, 980);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -94,6 +103,22 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     lfoFadeAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "lfoFade", lfoFadeSlider_);
     lfoTimeAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "lfoTimeDepth", lfoTimeSlider_);
     lfoFmtAtt_    = std::make_unique<SliderAtt>(processor_.apvts, "lfoFormantDepth", lfoFmtSlider_);
+    for (int i = 0; i < kLevelKnobs; ++i) {
+        juce::Slider& sl = levelSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        levelAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, kLevelIds[i][0], sl);
+        levelLabels_[i].setText(kLevelIds[i][1], juce::dontSendNotification);
+        styleSmall(levelLabels_[i]);
+    }
+    for (int r = 0; r < kLevelRows; ++r) {
+        levelRowLabels_[r].setText(kLevelRowNames[r], juce::dontSendNotification);
+        styleSmall(levelRowLabels_[r]);
+    }
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
                             &pAttackLabel_, &pDecayLabel_, &pSustainLabel_, &pReleaseLabel_, &pDepthLabel_,
@@ -322,6 +347,17 @@ void VSynthEmuEditor::resized() {
         auto cell = row9.removeFromLeft(third);
         l->setBounds(cell.removeFromLeft(34));
         sl->setBounds(cell.withTrimmedRight(6));
+    }
+    for (int r = 0; r < kLevelRows; ++r) {          // the OSC TVA and velocity rows
+        xt.removeFromTop(6);
+        auto row = xt.removeFromTop(24);
+        levelRowLabels_[r].setBounds(row.removeFromLeft(56));
+        const int quarter = row.getWidth() / 4;
+        for (int i = 4 * r; i < 4 * r + 4; ++i) {
+            auto cell = row.removeFromLeft(quarter);
+            levelLabels_[i].setBounds(cell.removeFromLeft(r == 2 || i >= 14 ? 46 : 34));
+            levelSliders_[i].setBounds(cell.withTrimmedRight(6));
+        }
     }
 
     // ── Knobs area ─────────────────────────────────────────────────────────

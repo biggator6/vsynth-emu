@@ -35,6 +35,11 @@ public:
     // Pitch, formant and time may change while the note plays.
     void setRates(double A, double F, double walk);
     void setEnergy(double g) { energy = g; }
+    // The output gain (player +0x80 target, +0x84 current): each sample the
+    // gain moves 1/64 toward the target, then scales the output (1 = unity;
+    // the firmware's int16 scale has 1/65536).  resetGain sets both (note-on).
+    void setGain(float target) { gainTarget = target; }
+    void resetGain(float g) { gainTarget = gain = g; }
     // Renders `count` samples: mono (a stereo plan's left channel), or both
     // channels (a mono plan plays L = R, as the firmware writes it).
     void render(float* out, int count) { render(out, nullptr, count); }
@@ -63,6 +68,7 @@ private:
     double recStart = 0.0, recEnd = 0.0;
     double anchor = 0.0, anchorStep = 1.0, budget = 0.0;
     double low[2] = {}, band[2] = {}, fCoef = 0, q = 1.2;   // SVF state per channel
+    float gainTarget = 1.0f, gain = 1.0f;
     double f0n = 0.0, anchorStepInit = 1.0;
     long t = 0;
 

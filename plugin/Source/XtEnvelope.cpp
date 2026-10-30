@@ -105,13 +105,15 @@ float xtPitchDepthCents(float d) {
 
 XtEnvParams xtEnvAdsr(const XtEnvKnobs& k, int key, int velocity, int releaseVelocity, int curve) {
     auto knob = [](int v) { return v < 0 ? 0 : v > 127 ? 127 : v; };
+    // the envelope table stores each time sens as trunc(knob·100/63) (0x894df8b0)
+    auto sens = [](int s) { s = s < -63 ? -63 : s > 63 ? 63 : s; return s * 100 / 63; };
     const uint32_t kfScale = xtEnvKeyScale(key, k.timeKF);
     XtEnvParams p;
     p.curve = curve;
-    p.time[0] = (float)xtEnvTime(knob(k.attack), velocity, k.aSens, 0x10000);
+    p.time[0] = (float)xtEnvTime(knob(k.attack), velocity, sens(k.aSens), 0x10000);
     p.time[1] = 0.0f;
-    p.time[2] = (float)xtEnvTime(knob(k.decay), velocity, k.dSens, kfScale);
-    p.time[3] = (float)xtEnvTime(knob(k.release), releaseVelocity, k.rSens, kfScale);
+    p.time[2] = (float)xtEnvTime(knob(k.decay), velocity, sens(k.dSens), kfScale);
+    p.time[3] = (float)xtEnvTime(knob(k.release), releaseVelocity, sens(k.rSens), kfScale);
     p.level[0] = 0.0f;
     p.level[1] = p.level[2] = 1.0f;
     p.level[3] = xtf::div((float)T.sustain[knob(k.sustain)], 32768.0f);

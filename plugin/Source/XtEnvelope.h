@@ -30,7 +30,9 @@ struct XtEnvKnobs {
 // The converter (0x894df240) for an ADSR with no matrix modulation: the
 // attack time from the note-on velocity and A-Sens; decay and release from
 // D-/R-Sens and the Time KF scale for `key`; the release from the note-off
-// velocity.  Levels 0, 1, 1, S, 0.
+// velocity.  The sens knobs go in as the patch's −63…+63 and are stored as
+// the envelope table stores them, trunc(knob·100/63) (0x894df8b0).  Levels
+// 0, 1, 1, S, 0.
 XtEnvParams xtEnvAdsr(const XtEnvKnobs& k, int key = 60, int velocity = 64, int releaseVelocity = 64, int curve = 2);
 inline XtEnvParams xtEnvAdsr(int attack, int decay, int sustain, int release, int curve = 2) {
     XtEnvKnobs k; k.attack = attack; k.decay = decay; k.sustain = sustain; k.release = release;

@@ -217,9 +217,9 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      (v46): an update every 441 frames, linear gain ramps with the TVA's
      ramp-length and landing rules, and voices end at the TVA's done check.
      Velocity shortens or lengthens the times as the XT's converter does
-     (A/D/R-Sens, release from the note-off velocity), and Time KF scales
-     decay and release by key (v48). Velocity's effect on level is still a
-     linear gain.
+     (A/D/R-Sens, stored as the XT stores them since v53), and Time KF
+     scales decay and release by key (v48). Velocity sets the level through
+     the XT's velocity curves (v53: Velocity Sens and Curve).
    - a pitch envelope (v49): the same generator, linear, with the XT's depth
      curve (±6000 cents). Voices are updated as on the XT: every 10 ms the
      envelopes step and pitch, formant, time and Energy move 70% toward
@@ -234,6 +234,10 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - reverse (v52): a negative walk (Time Offset BWD, Time below −20 with
      FWD, or the time envelope or LFO) plays backward, a note starting at
      the wave's end, and walk 0 holds, as the XT's players do.
+   - the OSC TVA (v53): Level, Level KF, Level LFO depth, Wave Gain, the
+     oscillator's own amp envelope in series with the patch TVA, and
+     velocity to level, through the firmware's level path and the player's
+     per-sample gain.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -259,6 +263,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   `TEST_SNAPSHOT=file.png` draws the editor offscreen.
 - `XtOsc` equals the firmware's VariPhrase converter on 310,545 cases × 6
   values and its exp2 on 17,143 arguments (`xt_osc`, v51).
+- The level path (v53): the velocity curve, the OSC level slots and the
+  gain target equal the firmware (`xt_osc`); the players' gain stages
+  match the firmware players with gain changes.
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.
@@ -267,9 +274,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
-- the oscillator amp envelope (in series with the TVA on the XT),
-  envelope velocity and key follow, and the TVA's level, pan and LFO terms
-  are not modelled;
+- the patch TVA's own Level, Level KF, pan and LFO terms are not
+  modelled;
 - no V-Synth voice layer (filters, LFOs, effects);
 - no loops, step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and

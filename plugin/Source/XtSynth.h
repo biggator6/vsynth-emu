@@ -68,6 +68,14 @@ public:
         int lfoWave = 0, lfoRate = 64, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
         bool lfoKeySync = true;
         int lfoPitchDepth = 0, lfoTimeDepth = 0, lfoFormantDepth = 0;
+        // the OSC TVA (XtOsc): Level 0..127, Level KF −200..+200, Level LFO
+        // depth −63..+63, Wave Gain −12..+12 dB; its amp envelope (curve 2,
+        // in series with the patch TVA) with A/D/R-Sens and Time KF; velocity
+        // to level for the OSC and for the patch TVA: Sens −63..+63, Curve
+        // 0 (off), 1..7
+        int oscLevel = 127, oscLevelKF = 0, oscLevelLfoDepth = 0, waveGain = 0;
+        int oAttack = 0, oDecay = 0, oSustain = 127, oRelease = 127, oASens = 0, oDSens = 0, oRSens = 0, oTimeKF = 0;
+        int oscVelSens = 0, oscVelCurve = 1, ampVelSens = 16, ampVelCurve = 1;
     };
 
     XtSynth();
@@ -89,14 +97,15 @@ private:
         bool active = false, releasing = false;
         int note = -1;
         long age = 0, tail = 0;
-        float gain = 1;               // velocity
+        float gain = 1;               // the patch TVA's velocity gain (0x894ea990)
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
         XtEnvelope env;
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
+        XtEnvelope oenv;               // the OSC amp envelope (curve 2)
         XtLfo lfo;
         // the player's pitch ratio, formant ratio, walk and Energy as the
         // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
-        float curA = 1, curF = 1, curWalk = 1, curG = 0;
+        float curA = 1, curF = 1, curWalk = 1, curG = 0, curGain = 1;
         // The TVA that applies the envelope (0x894f5360 / 0x894f5720): gain,
         // its target and per-sample step, frames since the last update.
         float cur = 0, target = 0, step = 0, elapsed = 0;
@@ -129,6 +138,8 @@ private:
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames
     void targets(const Voice& v, float& A, float& F, float& walk, float& g) const;
+    float gainTarget(const Voice& v, float env) const;   // 0x894f3dc0 / 0x894f3e20
+    XtEnvParams ampEnvParams(const Voice& v) const;      // the OSC amp envelope
     void applyRates(Voice& v);
     void tvaUpdate(Voice& v);
     XtEnvParams envParams(const Voice& v) const;

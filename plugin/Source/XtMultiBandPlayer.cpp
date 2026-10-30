@@ -482,6 +482,12 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
 
 bool XtMbPlayer::ended() const { return !s || s->ended; }
 
+void XtMbPlayer::setGain(float target, bool now) {
+    if (!s) return;
+    s->gainTarget = target * (1.0f / 65536.0f);     // the firmware's int16 scale
+    if (now) s->gain = s->gainTarget;
+}
+
 void XtMbPlayer::setRates(float pitch, float walk) {
     if (!s || !std::isfinite(walk)) return;
     s->pitch = pitch;   // the block reads +0x70 / +0x7c each time (0x8950c280, 0x8950e760)

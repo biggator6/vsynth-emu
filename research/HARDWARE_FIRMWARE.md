@@ -1544,6 +1544,103 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The OSC level, its amp envelope, and velocity (2026-10-30, v53)
+
+**From the patch to the converters.** On an update, a tone (`0x894dc0b0`)
+runs three steps:
+- `0x894ebaa0` copies the per-part tables into the converters' input
+  blocks (`0x894e4e90` the OSC, `0x894df600` the envelopes, `0x894eaae0`
+  the TVA);
+- the conversion pass `0x894ebbd0` converts them;
+- the result goes to the voices.
+
+The tables are written from the patch by `0x894dfe10`, one updater per
+table, which read parameters by ID (`0x8947d310`):
+- **OSC** (`0x894e6330` → `0x894e55d0` per oscillator, IDs 0x2a4 + 0x34·osc):
+  - the input block is the table entry plus 8;
+  - Wave Gain in dB → +0xa;
+  - Level → +0x1c, Level KF ×10 → +0x1e, Level LFO depth → +0x20;
+  - Time → +0x48, Time KF ×10 → +0x4a;
+  - Time Offset → +0x61 and Energy → +0x62, both raw;
+  - Formant KF ×10 → +0x54; Pitch KF ×100 → +0xe.
+
+  The ×10 makes the converters see the displayed ±200: the patch stores
+  KFs in steps of 10.
+- **Velocity pairs** (`0x894e5c70`): each oscillator envelope's Velocity
+  Curve and Sens go through the converters below. The level envelope's pair
+  goes to +0x21/+0x22, the time envelope's to +0x4e/+0x50, the formant
+  envelope's to +0x58/+0x5a.
+- **Envelopes** (`0x894dfac0` → `0x894df8b0`, 16 tones × 13 envelopes, 10
+  bytes each, 13 parameter IDs per envelope from 0x315 + 13e):
+  - the group is [A, ·, D, S, ·, R, curve, sens, A-Sens, D-Sens, R-Sens,
+    Time KF, …];
+  - A-, D- and R-Sens are stored as trunc(knob·100/63);
+  - Time KF is stored ×10.
+- **TVA** (`0x894eb360` → `0x894eb170`): IDs 0x299…0x2a3; Velocity Curve
+  0x3b7 and Sens 0x3b8 go through the converters.
+
+**Velocity converters:**
+- Sens (`0x894ebe20`) maps ±63 to ±200: s·100/32 up to ±32, then
+  ±(100 + (|s| − 32)·100/31).
+- Curve (`0x894ebed0`) maps 1…7 to the internal curves 0…6, and 0 to 7
+  (no velocity effect).
+- The curve function `0x894ebd60` (v48) then gives c, and the gain is
+  (c/32768)². That holds for the patch TVA (`0x894ea990`, TVA +0x1c) and
+  for the OSC level.
+
+**The OSC level** (the converter's level slots):
+- +0x54 = the level curve at L, times the velocity gain, where L comes from
+  `0x894e0c90`:
+  - L = level + trunc(127·KF·(key − 60)/6000), by a reciprocal multiply,
+    within 0…127.
+- +0x58, the level LFO depth: (d/63)·|d/63|.
+- +0x5c, the gain: 2^(Wave Gain/6) (the firmware's powf), times the level
+  curve at +0x84 and at +0x86. Those two bytes are set with the wave, are
+  not decoded, and are taken as full.
+
+**The voice:**
+- The gain target is `0x894f3dc0`:
+  - +0x5c · clamp((1 + LFO·+0x58) · env · +0x54, ±1);
+  - env is the oscillator's amp envelope (+0x97c, envelope 4 or 8, curve 2
+    like the TVA's);
+  - the LFO is the oscillator's LFO (+0x98c).
+- At note-on (`0x894f3e20`) the envelope term is its start level, or its
+  output when the attack time is 0, and the player's gain starts there.
+- The voice update moves the player's target (+0x80; the player sits at
+  voice +0xd4) 70% of the way per 10 ms.
+- Per sample, the player's gain moves 1/64 of the way to the target, then
+  scales the output (×65536 for the int16 sample scale; `0x8950d1c2`).
+
+**Port and checks** (`xt_osc`, in the interpreter):
+- the curve function on every velocity, sens −210…+210 and curve 0…8:
+  485,209 cases, identical;
+- both converters: identical;
+- the converter's level slots: 179,712 cases × 3 values, identical;
+- the gain target and its note-on form: 6,000 cases, identical;
+- the gain stage against the firmware players with gain changes: SOLO
+  −95.6 / −100 dB (its usual residual), BACKING and ENSEMBLE bit-exact.
+
+**A fix from this:** the plugin passed the A/D/R-Sens knobs (±63) to the
+time converter, which expects the stored trunc(knob·100/63). So velocity
+changed envelope times about 1.6× too little. Now fixed, for every
+envelope.
+
+**Plugin:**
+- OSC TVA: Level, Level KF, Level LFO depth and Wave Gain; its amp envelope
+  (A/D/S/R, A/D/R-Sens, Time KF) in series with the patch TVA; OSC
+  Velocity Sens and Curve.
+- The patch TVA's velocity now uses the curve, with Velocity Sens and Curve
+  (default +16 and curve 1, close to the former linear gain).
+- Defaults leave the level unchanged. Against v52 the output differs only
+  in release tails, by −89…−95 dB, because the OSC envelope (release 127)
+  now runs under the TVA's release.
+
+**Open:**
+- +0x84/+0x86;
+- the patch TVA's own Level, Level KF and LFO;
+- the velocity sens of the pitch, time and formant envelope depths;
+- matrix and controllers.
+
 ### Reverse and held playback (2026-10-30, v52)
 
 The XT plays a VariPhrase wave backward when the walk is negative. That
@@ -1961,7 +2058,7 @@ truncated, with kf −200…+200. The firmware's powf is not correctly rounded:
 Open: the sens the TVA reads ranges over ±200, while the patch's Velocity
 Sens is −63…+63. The scaling between them, in the code that fills the
 per-part table at 0x89d2a6d0, is not found. So the plugin keeps a linear
-velocity gain for now.
+velocity gain for now. — Found in v53 (`0x894ebe20`).
 
 **Energy: found in v51** (`0x894e4030`, g = (k/127)²). What v48 knew:
 - The OSC parameter block lives at conversion context +0x434 (OSC2 at

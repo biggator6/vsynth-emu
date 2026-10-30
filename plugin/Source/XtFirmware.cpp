@@ -280,9 +280,10 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
     c.wr32(R9 + 0x34, c.rd32(R9 + 0x2c)); c.wr32(R9 + 0x38, c.rd32(R9 + 0x2c));
     wf(R10 + 0x24, 0.0f); wf(R10 + 0x4c, 0.0f); wf(R10 + 0x50, 1.2f);
     out.assign((size_t)outFrames * 2, 0.0f);
-    size_t next = 0;
+    size_t next = 0, nextG = 0;
     for (long done = 0; done < outFrames; done += 32) {
         while (next < note.walkAt.size() && note.walkAt[next].first <= done) wf(R8 + 0x7c, note.walkAt[next++].second);
+        while (nextG < note.gainAt.size() && note.gainAt[nextG].first <= done) wf(R8 + 0x80, note.gainAt[nextG++].second / 65536.0f);
         if (!c.call(0x8950cd90, { OUT, R8 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
         for (long i = 0; i < 32 && done + i < outFrames; ++i) {
             out[(size_t)(2 * (done + i))] = rf(OUT + (uint32_t)(8 * i)) / 32768.0f;
@@ -331,10 +332,11 @@ bool xtFwBandPlay(int type, const int16_t* pcm, long frames, int channels, const
     if (!c.call(type == 5 ? 0x89510130 : 0x89510980, { P, 0 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
     c.wr32(P + 0x20, c.rd32(P + 0x1c) / 16 * 16);
     out.assign((size_t)outFrames * 2, 0.0f);
-    size_t next = 0;
+    size_t next = 0, nextG = 0;
     std::vector<uint8_t> zero(32 * 8, 0);
     for (long done = 0; done < outFrames; done += 32) {
         while (next < note.walkAt.size() && note.walkAt[next].first <= done) wf(P + 0x7c, note.walkAt[next++].second);
+        while (nextG < note.gainAt.size() && note.gainAt[nextG].first <= done) wf(P + 0x80, note.gainAt[nextG++].second / 65536.0f);
         c.write(OUT, zero.data(), zero.size());
         if (!c.call(type == 5 ? 0x8950db10 : 0x8950e6e0, { OUT, P }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
         for (long i = 0; i < 32 && done + i < outFrames; ++i) {
@@ -361,6 +363,23 @@ bool xtFwOscTimeKeyScales(std::vector<float>& out) {
             if (!c.call(0x8952ff9c, {}, kStack)) { out.clear(); return false; }
             std::memcpy(&out[(size_t)(i * 128 + key)], &c.fb[0][0], 4);
         }
+    return true;
+}
+
+bool xtFwOscWaveGains(std::vector<float>& out) {
+    out.clear();
+    if (g_rom.empty()) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    out.resize(25);
+    for (int i = 0; i < 25; ++i) {
+        const float two = 2.0f, e = xtf::div(xtf::flt(i - 12), 6.0f);
+        std::memcpy(&c.fb[0][4], &two, 4);
+        std::memcpy(&c.fb[0][5], &e, 4);
+        if (!c.call(0x8952ff9c, {}, kStack)) { out.clear(); return false; }
+        std::memcpy(&out[(size_t)i], &c.fb[0][0], 4);
+    }
     return true;
 }
 
@@ -408,7 +427,8 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 //   : bands from the firmware, then XtMbPlayer; float32 L/R pairs scaled to ±1
 //   (XT_ROUND=nearest: round to nearest, as Ghidra's emulator)
 // xt_fw <rom.2.bin> soloplay <samp.bin> <channels> <R> <F> <walk> <energy> <frames> <out.f32> [frame:walk ...]
-//   : the firmware's SOLO encoder and player (xtFwSoloPlay); L/R pairs
+//   : the firmware's SOLO encoder and player (xtFwSoloPlay); L/R pairs.
+//   frame:walk changes the walk, frame:gX the output gain target (1 = unity)
 // xt_fw <rom.2.bin> solocmp <samp.bin> <channels> <R> <F> <walk> <energy> <frames> [frame:walk ...]
 //   : the same against XtSoloVoice on the same records: the largest
 //   difference and the difference's level against the signal
@@ -477,7 +497,8 @@ int main(int argc, char** argv) {
         const long outFrames = std::atol(argv[9]);
         for (int a = mode == "soloplay" ? 11 : 10; a < argc; ++a) {
             long at = 0; float w = 0;
-            if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
+            if (std::sscanf(argv[a], "%ld:g%f", &at, &w) == 2) note.gainAt.push_back({ at, w });
+            else if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
         }
         // the SOLO encoder reads (L+R) >> 1 (0x8951f6f0)
         std::vector<int16_t> x16((size_t)frames);
@@ -517,11 +538,12 @@ int main(int argc, char** argv) {
             std::vector<float> L(32), R(32);
             double maxd = 0, sig = 0, dif = 0;
             long first = -1;
-            size_t next = 0;
+            size_t next = 0, nextG = 0;
             for (long done = 0; done < outFrames; done += 32) {
                 while (next < note.walkAt.size() && note.walkAt[next].first <= done) {
                     v.setRates(note.pitch, note.formant, note.walkAt[next++].second);
                 }
+                while (nextG < note.gainAt.size() && note.gainAt[nextG].first <= done) v.setGain(note.gainAt[nextG++].second);
                 v.render(L.data(), R.data(), 32);
                 for (long i = 0; i < 32 && done + i < outFrames; ++i)
                     for (int k = 0; k < 2; ++k) {
@@ -545,7 +567,8 @@ int main(int argc, char** argv) {
         const long outFrames = std::atol(argv[8]);
         for (int a = 9; a < argc; ++a) {
             long at = 0; float w = 0;
-            if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
+            if (std::sscanf(argv[a], "%ld:g%f", &at, &w) == 2) note.gainAt.push_back({ at, w });
+            else if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
         }
         if (!xtFwEncodeMulti(type, pcm, frames, ch, vpdt, 64)) { std::fprintf(stderr, "encode failed\n"); return 1; }
         std::vector<float> fw;
@@ -560,9 +583,10 @@ int main(int argc, char** argv) {
         float blk[64];
         double maxd = 0, sig = 0, dif = 0;
         long first = -1;
-        size_t next = 0;
+        size_t next = 0, nextG = 0;
         for (long done = 0; done < outFrames; done += 32) {
             while (next < note.walkAt.size() && note.walkAt[next].first <= done) pl.setRates(note.pitch, note.walkAt[next++].second);
+            while (nextG < note.gainAt.size() && note.gainAt[nextG].first <= done) pl.setGain(note.gainAt[nextG++].second);
             pl.block(blk);
             for (long i = 0; i < 32 && done + i < outFrames; ++i)
                 for (int k = 0; k < 2; ++k) {

@@ -61,6 +61,9 @@ public:
     bool ended() const;
     // Pitch and walk may change while the note plays (read every block).
     void setRates(float pitch, float walk);
+    // The output gain target (+0x80; 1 = unity), followed per sample pair
+    // (0x8950c570); now: the gain jumps there too (note-on).
+    void setGain(float target, bool now = false);
 
     struct Band;   // a band's player state (firmware struct, 0x88 bytes)
     struct State;

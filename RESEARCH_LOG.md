@@ -2471,3 +2471,39 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The engine renderer was rebuilt. Its SOLO output moves only where the
   walk is not a float (time 1.5: −38.6 dB). The suite's time cases are
   exact walks and unchanged.
+
+### Session 16 addendum (2026-10-30) — v53: the OSC level and velocity
+
+- Traced how a patch reaches the converters:
+  - the tone update `0x894dc0b0` copies per-part tables into the input
+    blocks (`0x894ebaa0`), then converts them (`0x894ebbd0`);
+  - the tables are written from patch parameters by ID (`0x894dfe10` and
+    its updaters).
+- This answered the open velocity question from v48:
+  - Velocity Sens goes through `0x894ebe20` (±63 → ±200, piecewise
+    linear);
+  - Velocity Curve goes through `0x894ebed0` (1…7 → 0…6, 0 → no effect);
+  - the KF parameters are stored ×10;
+  - the envelope time sensitivities are stored ×100/63.
+- The plugin had passed the time sensitivities unscaled, so velocity moved
+  envelope times about 1.6× too little. Fixed.
+- The OSC TVA:
+  - level curve × velocity gain, with Level KF via a reciprocal multiply;
+  - the level LFO depth as a signed square;
+  - the Wave Gain by the firmware's powf;
+  - the oscillator's own amp envelope (curve 2);
+  - the gain target `0x894f3dc0` (and the note-on `0x894f3e20`), smoothed
+    70% per 10 ms by the voice update, then 1/64 per sample in the player.
+- Everything equals the firmware in the interpreter:
+  - 485,209 velocity cases;
+  - 179,712 × 3 level slots;
+  - 6,000 gain targets.
+- The gain stage matches the firmware players with gain changes (BACKING
+  and ENSEMBLE bit-exact, SOLO at its usual −95 dB).
+- The plugin gains 16 parameters: the OSC TVA, its envelope, and velocity
+  for the OSC and the patch TVA.
+- PluginTest is bit-identical with all of them set and at velocity 64.
+  Engine tests and `auval` pass.
+- The defaults differ from v52 only in release tails (−89…−95 dB).
+- Open: two wave-level bytes (+0x84/+0x86), the patch TVA's Level/KF/LFO,
+  and the depth velocity sens of the other envelopes.

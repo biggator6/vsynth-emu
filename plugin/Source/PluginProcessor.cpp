@@ -51,6 +51,24 @@ namespace Params {
     static const juce::String kLfoDepth     = "lfoPitchDepth";
     static const juce::String kLfoTimeDepth = "lfoTimeDepth";
     static const juce::String kLfoFmtDepth  = "lfoFormantDepth";
+    // The OSC TVA (XtOsc): level, key follow, tremolo depth, wave gain; its
+    // amp envelope (in series with the patch TVA); velocity to level
+    static const juce::String kOscLevel     = "oscLevel";
+    static const juce::String kOscLevelKF   = "oscLevelKF";
+    static const juce::String kOscLevelLfo  = "oscLevelLfoDepth";
+    static const juce::String kWaveGain     = "waveGain";          // −12..+12 dB
+    static const juce::String kOAttack      = "oscEnvAttack";
+    static const juce::String kODecay       = "oscEnvDecay";
+    static const juce::String kOSustain     = "oscEnvSustain";
+    static const juce::String kORelease     = "oscEnvRelease";
+    static const juce::String kOASens       = "oscEnvAttackSens";
+    static const juce::String kODSens       = "oscEnvDecaySens";
+    static const juce::String kORSens       = "oscEnvReleaseSens";
+    static const juce::String kOTimeKF      = "oscEnvTimeKF";
+    static const juce::String kOscVelSens   = "oscVelSens";        // −63..+63
+    static const juce::String kOscVelCurve  = "oscVelCurve";       // OFF, 1..7
+    static const juce::String kAmpVelSens   = "ampVelSens";        // the patch TVA
+    static const juce::String kAmpVelCurve  = "ampVelCurve";
     static const juce::String kLfoDelay     = "lfoDelay";
     static const juce::String kLfoFadeMode  = "lfoFadeMode";
     static const juce::String kLfoFade      = "lfoFade";
@@ -143,6 +161,27 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoDepth, "LFO Pitch Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoTimeDepth, "LFO Time Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoFmtDepth, "LFO Formant Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscLevel, "OSC Level", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kOscLevelKF, "OSC Level KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscLevelLfo, "OSC Level LFO Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kWaveGain, "Wave Gain", -12, 12, 0,
+        juce::AudioParameterIntAttributes().withLabel("dB")));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOAttack, "OSC Env Attack", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kODecay, "OSC Env Decay", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOSustain, "OSC Env Sustain", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kORelease, "OSC Env Release", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOASens, "OSC Env Attack Velocity Sens", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kODSens, "OSC Env Decay Velocity Sens", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kORSens, "OSC Env Release Velocity Sens", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kOTimeKF, "OSC Env Time KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    auto curveName = juce::AudioParameterIntAttributes().withStringFromValueFunction(
+        [](int v, int) { return v == 0 ? juce::String("OFF") : juce::String(v); });
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscVelSens, "OSC Velocity Sens", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscVelCurve, "OSC Velocity Curve", 0, 7, 1, curveName));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAmpVelSens, "Velocity Sens", -63, 63, 16));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAmpVelCurve, "Velocity Curve", 0, 7, 1, curveName));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoDelay, "LFO Delay", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLfoFadeMode, "LFO Fade Mode",
         juce::StringArray { "ON <<", "ON >>", "OFF <<", "OFF >>" }, 0));
@@ -266,6 +305,22 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.fDepth       = knob(Params::kFDepth);
     c.lfoTimeDepth = knob(Params::kLfoTimeDepth);
     c.lfoFormantDepth = knob(Params::kLfoFmtDepth);
+    c.oscLevel     = knob(Params::kOscLevel);
+    c.oscLevelKF   = kf(Params::kOscLevelKF);
+    c.oscLevelLfoDepth = knob(Params::kOscLevelLfo);
+    c.waveGain     = knob(Params::kWaveGain);
+    c.oAttack      = knob(Params::kOAttack);
+    c.oDecay       = knob(Params::kODecay);
+    c.oSustain     = knob(Params::kOSustain);
+    c.oRelease     = knob(Params::kORelease);
+    c.oASens       = knob(Params::kOASens);
+    c.oDSens       = knob(Params::kODSens);
+    c.oRSens       = knob(Params::kORSens);
+    c.oTimeKF      = kf(Params::kOTimeKF);
+    c.oscVelSens   = knob(Params::kOscVelSens);
+    c.oscVelCurve  = knob(Params::kOscVelCurve);
+    c.ampVelSens   = knob(Params::kAmpVelSens);
+    c.ampVelCurve  = knob(Params::kAmpVelCurve);
     c.lfoWave      = (int)apvts.getRawParameterValue(Params::kLfoWave)->load();
     c.lfoRate      = (int)apvts.getRawParameterValue(Params::kLfoRate)->load();
     c.lfoPitchDepth = (int)apvts.getRawParameterValue(Params::kLfoDepth)->load();

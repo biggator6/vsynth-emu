@@ -51,6 +51,7 @@ bool xtSynthSetRom(const std::string& path) {
     if (g_romReady && xtFwEnvKeyScales(ks)) xtEnvSetKeyScales(ks.data());
     std::vector<float> ts;
     if (g_romReady && xtFwOscTimeKeyScales(ts)) xtOscSetTimeKeyScales(ts.data());
+    if (g_romReady && xtFwOscWaveGains(ts)) xtOscSetWaveGains(ts.data());
     return g_romReady;
 }
 bool xtSynthRomReady() { return g_romReady; }
@@ -203,9 +204,23 @@ void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g)
     g = xtOscEnergy(ctl.energy);
 }
 
+// The player's gain target (0x894f3dc0): the OSC gain times the OSC level
+// (velocity included) times the OSC amp envelope, with the LFO's tremolo.
+float XtSynth::gainTarget(const Voice& v, float env) const {
+    const float level = xtOscLevel(ctl.oscLevel, ctl.oscLevelKF, v.note, xtVelGain(v.vel, ctl.oscVelSens, ctl.oscVelCurve));
+    return xtOscGainTarget(xtOscGain(ctl.waveGain), level, env, v.lfo.out(), xtOscLevelLfoDepth(ctl.oscLevelLfoDepth));
+}
+
+XtEnvParams XtSynth::ampEnvParams(const Voice& v) const {
+    XtEnvKnobs k;
+    k.attack = ctl.oAttack; k.decay = ctl.oDecay; k.sustain = ctl.oSustain; k.release = ctl.oRelease;
+    k.aSens = ctl.oASens; k.dSens = ctl.oDSens; k.rSens = ctl.oRSens; k.timeKF = ctl.oTimeKF;
+    return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);
+}
+
 void XtSynth::applyRates(Voice& v) {
-    if (cur->type == 1) { v.solo.setRates(v.curA, v.curF, v.curWalk); v.solo.setEnergy(v.curG); }
-    else v.mb.setRates(v.curA, v.curWalk);
+    if (cur->type == 1) { v.solo.setRates(v.curA, v.curF, v.curWalk); v.solo.setEnergy(v.curG); v.solo.setGain(v.curGain); }
+    else { v.mb.setRates(v.curA, v.curWalk); v.mb.setGain(v.curGain); }
 }
 
 XtLfoParams XtSynth::lfoParams() const {
@@ -240,6 +255,8 @@ void XtSynth::setControls(const Controls& c) {
     const bool penvChanged = c.pAttack != ctl.pAttack || c.pDecay != ctl.pDecay || c.pSustain != ctl.pSustain || c.pRelease != ctl.pRelease;
     const bool tenvChanged = c.tAttack != ctl.tAttack || c.tDecay != ctl.tDecay || c.tSustain != ctl.tSustain || c.tRelease != ctl.tRelease;
     const bool fenvChanged = c.fAttack != ctl.fAttack || c.fDecay != ctl.fDecay || c.fSustain != ctl.fSustain || c.fRelease != ctl.fRelease;
+    const bool oenvChanged = c.oAttack != ctl.oAttack || c.oDecay != ctl.oDecay || c.oSustain != ctl.oSustain || c.oRelease != ctl.oRelease
+                          || c.oASens != ctl.oASens || c.oDSens != ctl.oDSens || c.oRSens != ctl.oRSens || c.oTimeKF != ctl.oTimeKF;
     const bool lfoChanged = c.lfoWave != ctl.lfoWave || c.lfoRate != ctl.lfoRate || c.lfoOffset != ctl.lfoOffset || c.lfoDelay != ctl.lfoDelay
                          || c.lfoFadeMode != ctl.lfoFadeMode || c.lfoFade != ctl.lfoFade;
     ctl = c;
@@ -250,6 +267,7 @@ void XtSynth::setControls(const Controls& c) {
         if (penvChanged) v.penv.update(oscEnvParams(v, ctl.pAttack, ctl.pDecay, ctl.pSustain, ctl.pRelease));
         if (tenvChanged) v.tenv.update(oscEnvParams(v, ctl.tAttack, ctl.tDecay, ctl.tSustain, ctl.tRelease));
         if (fenvChanged) v.fenv.update(oscEnvParams(v, ctl.fAttack, ctl.fDecay, ctl.fSustain, ctl.fRelease));
+        if (oenvChanged) v.oenv.update(ampEnvParams(v));
         if (lfoChanged) v.lfo.update(lfoParams());
     }
 }
@@ -265,9 +283,9 @@ void XtSynth::noteOn(int note, float velocity) {
     v->note = note;
     v->age = clock++;
     v->tail = 0;
-    v->gain = std::clamp(velocity, 0.0f, 1.0f);
-    v->vel = (int)std::lround(v->gain * 127.0f);
+    v->vel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
     v->relVel = 64;
+    v->gain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);
     // TVA note-on (0x894f5160): the gain starts from the envelope's onset
     // level (full with no attack, else 0) and ramps to its output over the
     // attack time, at most 10 ms (0.1 ms with no attack).
@@ -282,11 +300,17 @@ void XtSynth::noteOn(int note, float velocity) {
     v->penv.noteOn(oscEnvParams(*v, ctl.pAttack, ctl.pDecay, ctl.pSustain, ctl.pRelease));
     v->tenv.noteOn(oscEnvParams(*v, ctl.tAttack, ctl.tDecay, ctl.tSustain, ctl.tRelease));
     v->fenv.noteOn(oscEnvParams(*v, ctl.fAttack, ctl.fDecay, ctl.fSustain, ctl.fRelease));
+    const XtEnvParams oe = ampEnvParams(*v);
+    v->oenv.noteOn(oe);
     v->lfo.noteOn(lfoParams(), drawSeed());
     if (!ctl.lfoKeySync && freeLfoOn) v->lfo.setPhase(freeLfo.phase());
     targets(*v, v->curA, v->curF, v->curWalk, v->curG);
-    if (cur->type == 1) v->solo.noteOn(cur->solo, v->curA, v->curF, v->curWalk, v->curG);
+    // the OSC gain starts from the amp envelope's start level, or its output
+    // when there is no attack (0x894f3e20)
+    v->curGain = gainTarget(*v, oe.time[0] == 0.0f ? v->oenv.level() : oe.level[0]);
+    if (cur->type == 1) { v->solo.noteOn(cur->solo, v->curA, v->curF, v->curWalk, v->curG); v->solo.resetGain(v->curGain); }
     else if (!v->mb.noteOn(cur->wave, cur->type, v->curA, v->curWalk)) v->active = false;
+    else v->mb.setGain(v->curGain, true);
 }
 
 // The release time follows the note-off velocity (R-Sens): the times are
@@ -304,6 +328,8 @@ void XtSynth::noteOff(int note, float velocity) {
             v.tenv.noteOff();
             v.fenv.update(oscEnvParams(v, ctl.fAttack, ctl.fDecay, ctl.fSustain, ctl.fRelease));
             v.fenv.noteOff();
+            v.oenv.update(ampEnvParams(v));
+            v.oenv.noteOff();
             v.lfo.noteOff();
         }
 }
@@ -356,14 +382,17 @@ void XtSynth::mixBlock(float* lr) {
             v.penv.tick();
             v.tenv.tick();
             v.fenv.tick();
+            v.oenv.tick();
             v.lfo.tick(1);
             float A, F, w, g;
             targets(v, A, F, w, g);
+            const float gt = gainTarget(v, v.oenv.level());
             constexpr float k = 0.699999988f;                  // 0x3f333333
             v.curA = (A - v.curA) * k + v.curA;
             v.curF = (F - v.curF) * k + v.curF;
             v.curWalk = (w - v.curWalk) * k + v.curWalk;
             v.curG = (g - v.curG) * k + v.curG;
+            v.curGain = (gt - v.curGain) * k + v.curGain;
             applyRates(v);
             tvaUpdate(v);
             if (!v.active) continue;
@@ -448,6 +477,10 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_LFO="wave,rate,depth,delay,mode,fade,offset,keysync": the LFO.
 //   XT_OSC="time,offset,timeKF,formant,formantKF,energy[,lfoTime,lfoFormant]":
 //     the VariPhrase OSC knobs (Time Offset 0 BWD, 1 ZERO, 2 FWD).
+//   XT_OLEV="level,levelKF,levelLfoDepth,waveGainDb": the OSC TVA.
+//   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.
+//   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
+//   XT_VELOCITY=v: note-on velocity 1..127 (default 127).
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -490,6 +523,13 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_OSC"))
         std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &c.oscTime, &c.oscTimeOffset, &c.oscTimeKF, &c.oscFormant, &c.oscFormantKF,
                     &c.energy, &c.lfoTimeDepth, &c.lfoFormantDepth);
+    if (const char* e = std::getenv("XT_OLEV"))
+        std::sscanf(e, "%d,%d,%d,%d", &c.oscLevel, &c.oscLevelKF, &c.oscLevelLfoDepth, &c.waveGain);
+    if (const char* e = std::getenv("XT_OENV"))
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &c.oAttack, &c.oDecay, &c.oSustain, &c.oRelease, &c.oASens, &c.oDSens, &c.oRSens, &c.oTimeKF);
+    if (const char* e = std::getenv("XT_VEL"))
+        std::sscanf(e, "%d,%d,%d,%d", &c.ampVelSens, &c.ampVelCurve, &c.oscVelSens, &c.oscVelCurve);
+    const float noteVel = std::getenv("XT_VELOCITY") ? std::atoi(std::getenv("XT_VELOCITY")) / 127.0f : 1.0f;
     syn.setControls(c);
     struct Ev { long at; int note; bool on; };
     std::vector<Ev> ev;
@@ -504,7 +544,7 @@ int main(int argc, char** argv) {
     while (done < frames) {
         long next = frames;
         for (const Ev& e : ev) if (e.at >= done && e.at < next) next = e.at;
-        for (const Ev& e : ev) if (e.at == done) { if (e.on) syn.noteOn(e.note, 1.0f); else syn.noteOff(e.note); }
+        for (const Ev& e : ev) if (e.at == done) { if (e.on) syn.noteOn(e.note, noteVel); else syn.noteOff(e.note); }
         if (next == done) next = done + 1;
         syn.render(L.data() + done, R.data() + done, (int)(next - done));
         done = next;

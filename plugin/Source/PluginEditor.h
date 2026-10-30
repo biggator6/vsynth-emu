@@ -79,6 +79,10 @@ private:
     juce::Slider     lfoFadeSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     lfoTimeSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     lfoFmtSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    // the OSC TVA, its amp envelope and velocity to level: four rows of four
+    static constexpr int kLevelRows = 4, kLevelKnobs = 4 * kLevelRows;
+    juce::Slider     levelSliders_[kLevelKnobs];
+    juce::Label      levelLabels_[kLevelKnobs], levelRowLabels_[kLevelRows];
     juce::Label encodeLabel_ { {}, "Encode" }, keyLabel_ { {}, "Key" }, depthLabel_ { {}, "Depth" },
                 energyLabel_ { {}, "Energy" }, attackLabel_ { {}, "A" }, decayLabel_ { {}, "D" },
                 sustainLabel_ { {}, "S" }, releaseLabel_ { {}, "R" }, aSensLabel_ { {}, "A-Sns" },
@@ -114,6 +118,7 @@ private:
     std::unique_ptr<SliderAtt> oscTkfAtt_, oscFkfAtt_;
     std::unique_ptr<ComboAtt>  timeOffsetAtt_;
     std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_, lfoTimeAtt_, lfoFmtAtt_;
+    std::unique_ptr<SliderAtt> levelAtts_[kLevelKnobs];
     std::unique_ptr<ComboAtt>  lfoWaveAtt_, lfoModeAtt_, lfoOffsetAtt_;
     std::unique_ptr<ButtonAtt> lfoSyncAtt_;
     std::unique_ptr<ComboAtt>  encodeAtt_;
