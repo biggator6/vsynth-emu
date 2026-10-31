@@ -52,6 +52,7 @@ bool xtSynthSetRom(const std::string& path) {
     std::vector<float> ts;
     if (g_romReady && xtFwOscTimeKeyScales(ts)) xtOscSetTimeKeyScales(ts.data());
     if (g_romReady && xtFwOscWaveGains(ts)) xtOscSetWaveGains(ts.data());
+    if (g_romReady && xtFwOscPitchRatios(ts)) xtOscSetPitchRatios(ts.data());
     return g_romReady;
 }
 bool xtSynthRomReady() { return g_romReady; }
@@ -186,19 +187,22 @@ constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
 }
 
 // The player's targets (0x894f3ba0 pitch, 0x894f3d40 formant, 0x894f3c90
-// walk, voice +0x18 Energy): pitch in cents with the pitch envelope at its
-// depth, clamped to ±6000; formant and walk from the VariPhrase converter
-// (XtOsc) with their envelopes and the LFO, the formant ratio within
-// [0.5, 2], the walk within ±5 (negative: the players run backward, a note
-// starting at the wave's end).
+// walk, voice +0x18 Energy), from the converters' values (XtOsc): the pitch
+// ratio from the note's cents with the pitch envelope and the LFO at their
+// depths, within ±32; formant and walk with their envelopes and the LFO,
+// the formant ratio within [0.5, 2], the walk within ±5 (negative: the
+// players run backward, a note starting at the wave's end).
 void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g) const {
-    // Robot Voice: the pitch is the note's against A4 (0x894e4030: key·1000
-    // − 69000 tenth-cents), not against the wave's Original Key
-    double cents = ((double)(v.note - (v.robot ? 69 : ctl.rootKey)) + ctl.pitchSemis) * 100.0
-                 + (double)v.penv.level() * (double)xtPitchDepthCents((float)ctl.pDepth)
-                 + (double)v.lfo.out() * (double)xtPitchDepthCents((float)ctl.lfoPitchDepth);
-    cents = std::clamp(cents, -6000.0, 6000.0);
-    A = (float)std::exp2(cents / 1200.0);
+    // Pitch Shift as semitones and the cents left (±50), added to Coarse and
+    // Fine (the converter's +0x68 and +0x70, Fine in tenths of a cent);
+    // Robot Voice takes the pitch against A4 (0x894e4030), not against the
+    // wave's Original Key
+    const long shift = std::lround((double)ctl.pitchSemis * 100.0);
+    const int semis = (int)std::lround((double)shift / 100.0);
+    const int coarse = ctl.oscCoarse + semis, fine = (ctl.oscFine + (int)(shift - semis * 100L)) * 10;
+    const float cents = xtPitchCents(v.note, coarse, 10 * ctl.pitchKF, fine, ctl.rootKey, v.robot);
+    A = xtPitchTarget(cents, v.penv.level(), xtPitchDepthCents((float)std::clamp(ctl.pDepth, -63, 63)), v.lfo.out(),
+                      xtPitchDepthCents((float)std::clamp(ctl.lfoPitchDepth, -63, 63)), xtPitchRatio(ctl.oscPitch));
     F = xtOscFormantRatio(xtOscFormant(ctl.oscFormant, ctl.oscFormantKF, v.note), v.fenv.level(),
                           xtOscFormantEnvDepth(ctl.fDepth), v.lfo.out(), xtOscFormantLfoDepth(ctl.lfoFormantDepth));
     walk = xtOscWalk(xtOscTime(ctl.oscTime, ctl.oscTimeOffset, ctl.oscTimeKF, v.note), v.tenv.level(),
@@ -394,12 +398,11 @@ void XtSynth::mixBlock(float* lr) {
             float A, F, w, g;
             targets(v, A, F, w, g);
             const float gt = gainTarget(v, v.oenv.level());
-            constexpr float k = 0.699999988f;                  // 0x3f333333
-            v.curA = (A - v.curA) * k + v.curA;
-            v.curF = (F - v.curF) * k + v.curF;
-            v.curWalk = (w - v.curWalk) * k + v.curWalk;
-            v.curG = (g - v.curG) * k + v.curG;
-            v.curGain = (gt - v.curGain) * k + v.curGain;
+            v.curA = xtOscSmooth(v.curA, A);
+            v.curF = xtOscSmooth(v.curF, F);
+            v.curWalk = xtOscSmooth(v.curWalk, w);
+            v.curG = xtOscSmooth(v.curG, g);
+            v.curGain = xtOscSmooth(v.curGain, gt);
             applyRates(v);
             tvaUpdate(v);
             if (!v.active) continue;
@@ -489,6 +492,9 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
 //   XT_VELOCITY=v: note-on velocity 1..127 (default 127).
 //   XT_ROBOT=1: Robot Voice.
+//   XT_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]": Pitch Shift
+//     (semitones), the Pitch knob, Pitch KF (%), Coarse, Fine (cents) and the
+//     Original Key (default 0,0,100,0,0,60).
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -539,6 +545,8 @@ int main(int argc, char** argv) {
         std::sscanf(e, "%d,%d,%d,%d", &c.ampVelSens, &c.ampVelCurve, &c.oscVelSens, &c.oscVelCurve);
     const float noteVel = std::getenv("XT_VELOCITY") ? std::atoi(std::getenv("XT_VELOCITY")) / 127.0f : 1.0f;
     c.robot = std::getenv("XT_ROBOT") && std::atoi(std::getenv("XT_ROBOT")) != 0;
+    if (const char* e = std::getenv("XT_PITCH"))
+        std::sscanf(e, "%f,%d,%d,%d,%d,%d", &c.pitchSemis, &c.oscPitch, &c.pitchKF, &c.oscCoarse, &c.oscFine, &c.rootKey);
     syn.setControls(c);
     struct Ev { long at; int note; bool on; };
     std::vector<Ev> ev;

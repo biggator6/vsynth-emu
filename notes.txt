@@ -217,6 +217,20 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+OSC PITCH v55 (2026-10-31): the pitch path as the XT computes it
+  (HARDWARE_FIRMWARE.md, "The OSC pitch"). XtOsc: xtPitch10 (0x894e1250),
+  xtPitchCents (the tail's +8), xtPitchRatio (+0xc, the firmware's powf
+  through xtFwOscPitchRatios at ROM load), xtPitchTarget (0x894f3a00 /
+  0x894f3ba0), xtOscSmooth (0x8950c1b0's 70% step, now used for all five
+  smoothed values). All equal to the firmware (xt_osc; it now also needs
+  XtEnvelope.cpp):
+    $TC/clang++ -isysroot $SDK -std=c++20 -O2 -DXT_OSC_MAIN plugin/Source/XtOsc.cpp plugin/Source/XtEnvelope.cpp \
+      plugin/Source/XtFirmware.cpp plugin/Source/Sh4Interp.cpp -o xt_osc
+  Plugin params oscCoarse (−48..+48), oscFine (−50..+50), oscPitch
+  (−63..+63), pitchKF (−200..+200, 100); pitchShift adds to Coarse/Fine.
+  XtSynth CLI: XT_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]";
+  PluginTest: TEST_PITCH (same order).
+
 ROBOT VOICE v54 (2026-10-31): XtSoloVoice::setRobot (before noteOn); voiced
   grains at period 1603.6364/A (A = pitch against A440), unvoiced at rate 1.
   XtSynth latches Controls::robot per voice (SOLO only) and takes the pitch
@@ -254,7 +268,7 @@ REVERSE v52 (2026-10-30): all three players run backward (walk < 0, a note
 VARIPHRASE OSC v51 (2026-10-30): plugin/Source/XtOsc.cpp, the VariPhrase
   converter 0x894e2f20 (time, formant, their envelope and LFO depths) and
   Energy from its tail 0x894e4030 (g = (k/127)²), equal to the firmware on
-  310,545 cases × 6 values, and its exp2 0x894ec090:
+  310,545 cases × 6 values, and its exp2 0x894ec090 (build: see v55):
     $TC/clang++ -isysroot $SDK -std=c++20 -O2 -DXT_OSC_MAIN plugin/Source/XtOsc.cpp \
       plugin/Source/XtFirmware.cpp plugin/Source/Sh4Interp.cpp -o xt_osc
     xt_osc rom.2.bin            ("0 different" twice)

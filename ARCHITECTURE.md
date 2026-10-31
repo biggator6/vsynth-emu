@@ -240,6 +240,10 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      per-sample gain.
    - Robot Voice (v54, SOLO): voiced grains at the note's fixed pitch
      against A440, from the plugin's Robot button.
+   - the OSC pitch (v55): Coarse, Fine, the Pitch knob and Pitch KF, with
+     the pitch envelope and LFO, through the firmware's pitch functions and
+     exp2, so the XT's tiny departures from equal temperament (±0.02 cents)
+     come out too. Pitch Shift adds to Coarse and Fine.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -269,6 +273,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   gain target equal the firmware (`xt_osc`); the players' gain stages
   match the firmware players with gain changes.
 - Robot Voice (v54) matches the firmware's SOLO player at −94.5…−110 dB.
+- The pitch path (v55): the note's pitch, the cents, the Pitch ratio, the
+  target and the voice update's step equal the firmware (`xt_osc`, 385,240
+  cases).
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.
@@ -282,7 +289,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - no V-Synth voice layer (filters, LFOs, effects);
 - no loops, step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and
-  formant envelope depths' velocity sensitivity is not exposed.
+  formant envelope depths' velocity sensitivity is not exposed;
+- no portamento or Random Pitch Depth.
 
 ## Known Gaps / Next Work
 

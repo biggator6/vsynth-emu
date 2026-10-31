@@ -2522,3 +2522,23 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The plugin's Robot button is the XT's Robot Voice for SOLO waves.
   PluginTest is bit-identical, engine tests and `auval` pass, and the
   defaults are unchanged.
+
+### Session 16 addendum (2026-10-31) — v55: the OSC pitch
+
+- The note's pitch is formed in 1/1000 semitone (`0x894e1250`): Coarse,
+  Pitch KF ×10 and Fine in tenths of a cent, around key 60. The tail turns
+  it into cents against the Original Key (Robot: against A4), within ±6000.
+- The Pitch knob is a ratio through the depth curve and the firmware's
+  powf. The target adds the envelope and LFO by FMAC, clamps, and takes the
+  firmware's exp2 with its 1/1200 constant (a little under 1/1200).
+- A VariPhrase wave's own terms are neutral: the header stores 44000 for
+  the rate ratio's 44000, and SOLO without Robot zeroes the offsets.
+- All of it equals the firmware in the interpreter: 385,240 cases, 0
+  different. The XT is very slightly off equal temperament: an octave up
+  plays 0.018 cents flat.
+- Plugin: Coarse, Fine, OSC Pitch and Pitch KF; Pitch Shift adds to Coarse
+  and Fine. The voice update's 70% step now rounds as the SH-4 does.
+- PluginTest is bit-identical, including the new controls, Robot, the pitch
+  envelope and the LFO. Engine tests and `auval` pass. At the Original Key
+  the output differs from v54 at −141…−189 dB; other keys drift at
+  −31…−41 dB over a second, from the corrected ratios.

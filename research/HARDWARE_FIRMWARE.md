@@ -1544,6 +1544,129 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The OSC pitch (2026-10-31, v55)
+
+The pitch, from the OSC's pitch values to the player's ratio, now follows
+the firmware.
+
+**The note's pitch** (`0x894e1250`), in 1/1000 semitone, from:
+- the key;
+- Coarse (+0x68, semitones);
+- Pitch KF (+0x0e, ×10: 1000 = 100%);
+- Fine (+0x70, tenths of a cent);
+- a centre key, 60.
+
+It is computed as:
+- KF 0: (60 + coarse)·1000 + fine;
+- KF 1000: (key + coarse)·1000 + fine;
+- otherwise: (60 + coarse)·1000 + KF·(key − 60) + fine.
+
+The encode-type tail `0x894e4030` runs for SOLO, BACKING and ENSEMBLE
+(+0x87 = 1, 3, 5; 0 goes to `0x894e3d50`). It computes the pitch twice:
+- at the key (+0x74);
+- at the key in +0x7c (+0x78).
+
+It also forms an integer key for key follow (out+4, `0x894e12c0`).
+
+**Cents** (out+0x08; out+0x68 from the second key):
+- (pitch − (Original Key − shift)·1000)/10, clamped to ±6000. The
+  Original Key is the byte at +0x88; the shift is the signed byte at +0x85.
+- With SOLO Robot Voice: (pitch − 69000)/10.
+- The tail switches on +0x5e. Values 2 and 3 have their own branches
+  (probably STEP and EVENT, by the order of the playback modes); one of
+  them can move the centre key. Values 0 and 1 compute the pitch as above.
+
+**The Pitch knob** (out+0x0c) is a ratio, 2^(c/1200 + (2·b183 − b182)/127),
+computed by the firmware's powf (`0x8952ff9c`):
+- c is the depth curve's cents (`0x894e0ce0`) at the knob plus
+  modulation, clamped to ±63. That gives ±1200 cents at ±36 and ±6000 at
+  ±63.
+- b182 and b183 are the part's controller bytes; they are 0 without a
+  controller.
+- The pitch envelope's depth (+0x1c, times its velocity factor) and the
+  LFO's depth (+0x34) go through the same curve.
+
+**The wave's terms**, set by the voice setup `0x894f21c0` from the wave's
+header (out+0xa4) and a second wave record (out+0xac):
+- +0x990 = 44000 / the header's u16 at +8. Every wave in Emu_test.prj
+  stores 44000 there (in its `vpsc` chunk, which also holds the Original
+  Pitch at +0xa), so the ratio is 1.
+- When +0x80 is 1, 6, 7 or 8 (SOLO's tail sets 6), +0 is 2, and Robot is
+  off: +0x994 = +0x998 = 0, and +0x9a4 = 440.
+- Otherwise (BACKING and ENSEMBLE, whose tail sets +0x80 to 3 and 5, and
+  Robot):
+  - +0x994 = the header's s32 at +0x18, plus 0.01 × the second record's s8
+    at +0x1b (cents);
+  - +0x998 = 0.01 × that record's s32 at +0;
+  - +0x9a4 = the wave's root frequency, 440·2^((Original Pitch − 69)/12),
+    with those terms.
+  - The header's term is 0 in every Emu_test.prj wave.
+
+**The target**: `0x894f3a00` at note-on and `0x894f3ba0` in the update are
+the same code. They compute:
+1. Start from the cents.
+2. Add env(+0x970)·(+0x1c), then LFO(+0x980)·(+0x34), each by FMAC.
+3. Add the ramp at +0x880, then +0x994.
+4. Clamp to ±6000.
+5. Multiply by 0x3a5a740d (1/1200, a little under) and take exp2
+   (`0x894ec090`).
+6. Multiply by +0x0c, then by +0x990.
+7. Clamp to ±32.
+8. Multiply by exp2(−(+0x998)·0x3a5a740d).
+
+The ramp `0x894f4c00` returns its value at +0x3c while active. When it is
+inactive, it returns 1 for a factor ramp and 0 for an additive one. The
+voice constructor (`0x894f1f50`) makes +0x880 additive (pitch: the
+portamento) and +0x8c8 and +0x910 factors (Time Trip).
+
+**The update step** (`0x8950c1b0`): pitch (+0x144), formant, Energy, walk
+and gain each become cur + (target − cur)·0.7, by FMAC (0.7 as 0x3f333333).
+
+**What it does to the pitch.** The exp2 tables and the short 1/1200 leave
+the XT slightly off equal temperament:
+- +1, +4 and +7 semitones play 0.008 cents flat;
+- −1 and −7 play 0.006 cents sharp;
+- +12 plays 0.018 cents flat (a ratio of 1.99997914);
+- −12 plays 0.020 cents sharp.
+
+**Port and checks** (`xt_osc`, in the interpreter):
+- `xtPitch10` equals `0x894e1250` on 238,080 cases (keys; Coarse
+  −60…+60; KF −2000…+2000 including 0 and 1000; Fine).
+- The converter with the SOLO tail gives 0 differences on 17,160 cases × 5
+  values. The values are the cents at both keys, the Pitch ratio and both
+  depths. The inputs cover knob + matrix sums −100…+100, KFs, keys,
+  Coarse, Fine, Original Keys, shifts and Robot.
+- `xtPitchTarget` equals both target functions on 117,000 cases, including
+  an active ramp and set +0x990/+0x994/+0x998.
+- `xtOscSmooth` equals the update's step on 13,000 cases.
+- The firmware's powf differs from std::pow on 59 of the 127 Pitch ratios.
+  So the firmware computes them at ROM load (`xtFwOscPitchRatios`).
+
+**Plugin:**
+- New: Coarse (−48…+48), Fine (−50…+50 cents), OSC Pitch (−63…+63) and
+  Pitch KF (−200…+200%, default 100).
+- Pitch Shift adds to Coarse and Fine, to the cent.
+- The voice update's 70% step now rounds as the SH-4 does; it used to be
+  host float.
+- Measured on the sine (SOLO, 440 Hz at the Original Key):
+  - Pitch KF 50 at note 72: 622.249 Hz (622.254 exact);
+  - OSC Pitch +36: 880.001 Hz; −63: 13.750 Hz;
+  - Coarse +7 with Fine −25: 649.83 Hz;
+  - Robot at note 57: 220.004 Hz.
+- Against v54:
+  - a note at the Original Key differs at −141…−189 dB (the step's
+    rounding);
+  - other notes drift apart at −31…−41 dB over a second, from the XT's
+    slightly flat and sharp ratios.
+
+**Not modelled:**
+- Random Pitch Depth;
+- realtime controllers and the matrix;
+- portamento (the ramp);
+- the patch's own Coarse/Fine Tune path (Pitch Shift stands in for it);
+- where the wave's Original Fine Tune enters: for a SOLO wave without
+  Robot, none of the wave's terms apply.
+
 ### Robot Voice (2026-10-31, v54)
 
 Robot Voice (SOLO, with Vari on) plays the voiced parts at one steady pitch,

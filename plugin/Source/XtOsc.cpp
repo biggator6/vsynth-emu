@@ -1,6 +1,7 @@
 // The XT's VariPhrase OSC converter — see XtOsc.h.  Single precision as the
 // SH-4 computes it (XtFloat.h).
 #include "XtOsc.h"
+#include "XtEnvelope.h"
 #include "XtFloat.h"
 
 #include <cmath>
@@ -26,7 +27,8 @@ struct Tables {
     uint16_t velSens[200];
     uint8_t velCurve[7][128];
     float waveGain[25];                       // xtOscSetWaveGains, −12…+12 dB
-    bool keyScales = false, waveGains = false, ok = false;
+    float pitchRatio[127];                    // xtOscSetPitchRatios, Pitch −63…+63
+    bool keyScales = false, waveGains = false, pitchRatios = false, ok = false;
 } T;
 
 template <class V> bool readAt(FILE* f, uint32_t addr, V* v, size_t n) {
@@ -168,6 +170,54 @@ float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, flo
     return r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r);
 }
 
+int xtPitch10(int key, int coarse, int kf, int fine) {
+    const int k = (uint8_t)key, c = (int16_t)coarse, f = (int16_t)kf;
+    if (f == 0) return (60 + c) * 1000 + fine;
+    if (f == 1000) return (k + c) * 1000 + fine;
+    return (60 + c) * 1000 + (k - 60) * f + fine;
+}
+
+float xtPitchCents(int key, int coarse, int kf, int fine, int origKey, bool robot) {
+    using namespace xtf;
+    // the Original Key less the wave's shift (+0x88, +0x85: 0 here), ×1000
+    const int ref = robot ? 69000 : (int16_t)origKey * 1000;
+    const float c = div(flt(xtPitch10(key, coarse, kf, fine) - ref), 10.0f);
+    return c > 6000.0f ? 6000.0f : (-6000.0f > c ? -6000.0f : c);
+}
+
+void xtOscSetPitchRatios(const float* r) {
+    for (int i = 0; i < 127; ++i) T.pitchRatio[i] = r[i];
+    T.pitchRatios = true;
+}
+
+float xtPitchRatio(int pitch) {
+    using namespace xtf;
+    // knob + modulation + controller·63/12000 (no controller), within ±63
+    const int p = clamp63((int16_t)pitch);
+    if (T.pitchRatios) return T.pitchRatio[p + 63];
+    // + (2·b183 − b182)/127 from the part's bytes at +0x180 (0 with no controller)
+    const float e = add(div(0.0f, 127.0f), div(xtPitchDepthCents(flt(p)), 1200.0f));
+    return (float)std::pow(2.0, (double)e);
+}
+
+float xtPitchTarget(float cents, float env, float envDepth, float lfo, float lfoDepth, float ratio,
+                    float ramp, float offset, float rate, float detune) {
+    using namespace xtf;
+    constexpr float kPerCent = 0x1.b4e81ap-11f;           // 1/1200 as rom.2 stores it (0x3a5a740d)
+    float c = add(mul(env, envDepth), cents);              // fmac: product, then sum
+    c = add(mul(lfo, lfoDepth), c);
+    c = add(add(c, ramp), offset);
+    c = c > 6000.0f ? 6000.0f : (-6000.0f > c ? -6000.0f : c);
+    float r = mul(mul(xtOscExp2(mul(c, kPerCent)), ratio), rate);
+    r = r > 32.0f ? 32.0f : (-32.0f > r ? -32.0f : r);
+    return mul(r, xtOscExp2(mul(-detune, kPerCent)));
+}
+
+float xtOscSmooth(float cur, float target) {
+    using namespace xtf;
+    return add(mul(sub(target, cur), 0.699999988f), cur);  // 0x3f333333
+}
+
 int xtVelSens(int s) {
     if (-32 > s) return -(100 + (-32 - s) * 100 / 31);
     if (0 > s) return -(-s * 100 / 32);
@@ -248,12 +298,20 @@ float xtOscGainTarget(float gain, float level, float env, float lfo, float lfoDe
 #include <cstring>
 #include <vector>
 int main(int argc, char** argv) {
-    if (argc < 2 || !xtOscLoadTables(argv[1]) || !xtFwOpen(argv[1])) { std::fprintf(stderr, "usage: xt_osc rom.2.bin\n"); return 2; }
+    if (argc < 2 || !xtOscLoadTables(argv[1]) || !xtEnvLoadTables(argv[1]) || !xtFwOpen(argv[1])) { std::fprintf(stderr, "usage: xt_osc rom.2.bin\n"); return 2; }
     std::vector<float> ks;
     if (!xtFwOscTimeKeyScales(ks)) { std::fprintf(stderr, "time key scales failed\n"); return 1; }
     xtOscSetTimeKeyScales(ks.data());
     if (!xtFwOscWaveGains(ks)) { std::fprintf(stderr, "wave gains failed\n"); return 1; }
     xtOscSetWaveGains(ks.data());
+    {   // the Pitch ratios: std::pow before the firmware's powf is loaded
+        std::vector<float> pr;
+        if (!xtFwOscPitchRatios(pr)) { std::fprintf(stderr, "pitch ratios failed\n"); return 1; }
+        int d = 0;
+        for (int p = -63; p <= 63; ++p) d += xtPitchRatio(p) != pr[(size_t)(p + 63)];
+        xtOscSetPitchRatios(pr.data());
+        std::printf("pitch ratios: std::pow differs from the firmware's powf on %d of 127\n", d);
+    }
     Sh4 c;
     if (!c.loadRom(argv[1])) return 1;
     const uint32_t ram = 0x8C000000, P = ram, out = ram + 0x400, part = ram + 0x800, zero = ram + 0xC00, sp = ram + 0xF0000;
@@ -392,6 +450,107 @@ int main(int argc, char** argv) {
         }
     }
     std::printf("gain target: %ld cases, %ld different\n", gn, gb);
-    return bad || eb || vb || lb || gb ? 3 : 0;
+
+    // Pitch.  0x894e1250 (its fifth argument, the centre key, on the stack)
+    // over keys, Coarse, Pitch KF and Fine.
+    long pb = 0, pn = 0;
+    const int pkfs[] = { -2000, -1500, -1000, -990, -10, 0, 10, 500, 990, 1000, 1010, 2000 };
+    for (int key = 0; key < 128; ++key)
+        for (int coarse = -60; coarse <= 60; coarse += 4)
+            for (int kf : pkfs)
+                for (int fine : { -500, -37, 0, 1, 499 }) {
+                    c.wr32(sp, 60);
+                    uint32_t r0 = 0;
+                    if (!c.call(0x894e1250, { (uint32_t)key, (uint32_t)(int32_t)coarse, (uint32_t)(int32_t)kf, (uint32_t)(int32_t)fine }, sp, &r0)) {
+                        std::fprintf(stderr, "pitch10: %s\n", c.error().c_str()); return 1;
+                    }
+                    ++pn;
+                    if ((int32_t)r0 != xtPitch10(key, coarse, kf, fine) && pb++ < 5)
+                        std::printf("  pitch10 key %d coarse %d kf %d fine %d: fw %d port %d\n", key, coarse, kf, fine, (int32_t)r0, xtPitch10(key, coarse, kf, fine));
+                }
+    std::printf("pitch10: %ld cases, %ld different\n", pn, pb);
+
+    // The converter's pitch slots with the SOLO tail (+0x87 = 1, playback
+    // mode RETRIGGER): +8 and +0x68 (the cents at the key and at +0x7c's key),
+    // +0xc (the Pitch ratio), +0x1c and +0x34 (the envelope and LFO depths),
+    // over knob + matrix sums, keys, Coarse, KF, Fine, Original Key, the
+    // wave's shift (+0x85) and Robot.
+    long cb = 0, cn = 0;
+    const int ckfs[] = { -2000, -730, 0, 500, 1000, 2000 };
+    for (int sum = -100; sum <= 100; ++sum) {
+        const int knob = sum > 63 ? 63 : sum < -63 ? -63 : sum;
+        mtx = sum - knob;
+        for (int kf : ckfs)
+            for (int key = (sum + 100) % 9; key < 128; key += 9) {
+                const int coarse = ((sum * 7 + key) % 97) - 48, fine = ((key * 13 + sum) % 1001) - 500;
+                const int orig = (key * 5 + 3 * sum + 300) % 128, shift = ((sum + key) % 25) - 12, key2 = (key * 3 + 11) % 128;
+                const bool robot = ((key + sum) & 3) == 1;
+                std::vector<uint8_t> z(0x400, 0);
+                c.write(P, z.data(), z.size()); c.write(out, z.data(), 0x100); c.write(part, z.data(), 0x200);
+                c.wr8(P + 3, (uint8_t)key); c.wr8(P + 4, 100);
+                for (uint32_t o : { 0x0cu, 0x10u, 0x11u }) c.wr8(P + o, (uint8_t)(int8_t)knob);
+                c.wr16(P + 0xe, (uint16_t)(int16_t)kf); c.wr16(P + 0x68, (uint16_t)(int16_t)coarse); c.wr32(P + 0x70, (uint32_t)(int32_t)fine);
+                c.wr8(P + 0x7c, (uint8_t)key2); c.wr8(P + 0x85, (uint8_t)(int8_t)shift); c.wr8(P + 0x88, (uint8_t)orig);
+                c.wr8(P + 0x5d, robot ? 1 : 0); c.wr8(P + 0x60, robot ? 1 : 0);
+                c.wr8(P + 0x61, 2); c.wr8(P + 0x87, 1);
+                c.wr32(P + 0xdc, part);
+                if (!c.call(0x894e2f20, { P, out }, sp)) { std::fprintf(stderr, "convert: %s\n", c.error().c_str()); return 1; }
+                const float fw[5] = { f32(out + 8), f32(out + 0x68), f32(out + 0xc), f32(out + 0x1c), f32(out + 0x34) };
+                const float dc = xtPitchDepthCents((float)knob);
+                const float po[5] = { xtPitchCents(key, coarse, kf, fine, orig - shift, robot), xtPitchCents(key2, coarse, kf, fine, orig - shift, robot),
+                                      xtPitchRatio(sum), dc, dc };
+                static const char* name[5] = { "cents", "cents (+0x7c)", "pitch ratio", "env depth", "LFO depth" };
+                ++cn;
+                for (int i = 0; i < 5; ++i)
+                    if (!bitsEq(fw[i], po[i]) && cb++ < 10)
+                        std::printf("  %s: sum %d kf %d key %d coarse %d fine %d orig %d shift %d robot %d: fw %.9g port %.9g\n", name[i], sum, kf, key,
+                                    coarse, fine, orig, shift, (int)robot, fw[i], po[i]);
+                if (((c.rd8(out + 0xb4) & 0x10) != 0) != robot && cb++ < 10) std::printf("  robot flag: key %d sum %d\n", key, sum);
+            }
+    }
+    std::printf("pitch slots: %ld cases × 5 values, %ld different\n", cn, cb);
+
+    // The pitch target (0x894f3a00 note-on, 0x894f3ba0 update) on a voice
+    // with given envelope and LFO objects, the portamento ramp (+0x880)
+    // inactive or running, and the wave's +0x990/+0x994/+0x998; and the voice
+    // update's 70% step (0x8950c1b0, its pitch slot +0x144).
+    const uint32_t RAMP = V + 0x880;
+    long tb = 0, tn = 0, sb = 0, sn = 0;
+    const float tcents[] = { -9000.0f, -6000.0f, -1234.5f, -100.0f, -0.3f, 0.0f, 0.1f, 37.0f, 700.0f, 1200.0f, 5999.9f, 6000.0f, 7000.0f };
+    const float tenv[] = { 0.0f, 0.25f, 1.0f }, tedep[] = { -6000.0f, -100.0f, 0.0f, 40.0f, 1200.0f };
+    const float tlfo[] = { -1.0f, -0.4f, 0.0f, 0.7f, 1.0f }, tldep[] = { -1200.0f, 0.0f, 13.0f, 6000.0f };
+    const float tratio[] = { 0.03125f, 0.5f, 1.0f, 1.0594631f, 32.0f };
+    for (float ce : tcents) for (float e : tenv) for (float ed : tedep) for (float l : tlfo) for (float ld : tldep) for (float ra : tratio)
+        for (int variant = 0; variant < 3; ++variant) {
+            std::vector<uint8_t> z(0x1000, 0);
+            c.write(V, z.data(), z.size());
+            c.write(ENV, z.data(), 0x100); c.write(LFO, z.data(), 0x100);
+            for (uint32_t o = 0; o < 16; o += 4) { c.wr32(V + 0x970 + o, ENV); c.wr32(V + 0x980 + o, LFO); }
+            wf(ENV + 0x4c, e); wf(LFO + 0x38, l);
+            wf(V + 8, ce); wf(V + 0xc, ra); wf(V + 0x1c, ed); wf(V + 0x34, ld);
+            float ramp = 0.0f, rate = 1.0f, offset = 0.0f, detune = 0.0f;
+            if (variant == 1) { ramp = -250.0f; c.wr32(RAMP + 4, 1); wf(RAMP + 0x3c, ramp); }
+            if (variant == 2) { rate = 44000.0f / 44100.0f; offset = 12.5f; detune = -7.25f; }
+            wf(V + 0x990, rate); wf(V + 0x994, offset); wf(V + 0x998, detune);
+            const float po = xtPitchTarget(ce, e, ed, l, ld, ra, ramp, offset, rate, detune);
+            for (int on = 0; on < 2; ++on) {
+                if (!c.call(on ? 0x894f3a00 : 0x894f3ba0, { V }, sp)) { std::fprintf(stderr, "pitch target: %s\n", c.error().c_str()); return 1; }
+                float fw; std::memcpy(&fw, &c.fb[0][0], 4);
+                ++tn;
+                if (!bitsEq(fw, po) && tb++ < 8)
+                    std::printf("  pitch target%s: cents %g env %g×%g lfo %g×%g ratio %g variant %d: fw %.9g port %.9g\n", on ? " (note-on)" : "",
+                                ce, e, ed, l, ld, ra, variant, fw, po);
+            }
+            if (variant == 0 && e != 1.0f) {
+                const float cur = 0.37f * ra + 0.001f * ce;
+                wf(V + 0x144, cur);
+                if (!c.call(0x8950c1b0, { V }, sp)) { std::fprintf(stderr, "voice update: %s\n", c.error().c_str()); return 1; }
+                ++sn;
+                if (!bitsEq(f32(V + 0x144), xtOscSmooth(cur, po)) && sb++ < 5)
+                    std::printf("  70%% step from %.9g to %.9g: fw %.9g port %.9g\n", cur, po, f32(V + 0x144), xtOscSmooth(cur, po));
+            }
+        }
+    std::printf("pitch target: %ld cases, %ld different; voice update step: %ld cases, %ld different\n", tn, tb, sn, sb);
+    return bad || eb || vb || lb || gb || pb || cb || tb || sb ? 3 : 0;
 }
 #endif

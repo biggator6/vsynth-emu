@@ -138,6 +138,17 @@ int main(int argc, char** argv) {
         refCtl.robot = true;
         setKnobs({ { "robot", 1 } });
     }
+    // TEST_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]": Pitch Shift
+    // (semitones), the OSC's Pitch knob, Pitch KF (%), Coarse, Fine (cents)
+    // and the Original Key
+    if (const char* e = std::getenv("TEST_PITCH")) {
+        std::sscanf(e, "%f,%d,%d,%d,%d,%d", &refCtl.pitchSemis, &refCtl.oscPitch, &refCtl.pitchKF, &refCtl.oscCoarse, &refCtl.oscFine,
+                    &refCtl.rootKey);
+        auto* prm = p.apvts.getParameter("pitchShift");
+        prm->setValueNotifyingHost(prm->convertTo0to1(refCtl.pitchSemis));
+        setKnobs({ { "oscPitch", refCtl.oscPitch }, { "pitchKF", refCtl.pitchKF }, { "oscCoarse", refCtl.oscCoarse },
+                   { "oscFine", refCtl.oscFine }, { "rootKey", refCtl.rootKey } });
+    }
     // TEST_VELOCITY=v: the note-on velocity (1..127, default 127)
     const int noteVel = std::getenv("TEST_VELOCITY") ? std::clamp(std::atoi(std::getenv("TEST_VELOCITY")), 1, 127) : 127;
     p.loadFile(juce::File(argv[2]));
@@ -146,8 +157,8 @@ int main(int argc, char** argv) {
         if (p.getStatusText().startsWith("Encode failed")) break;
     }
     std::printf("status: %s\n", p.getStatusText().toRawUTF8());
-    for (const char* id : { "pitchShift", "oscTime", "oscTimeOffset", "oscFormant", "energy", "rootKey", "ampAttack", "ampDecay", "ampSustain",
-                            "ampRelease", "encodeDepth" })
+    for (const char* id : { "pitchShift", "oscCoarse", "oscFine", "oscPitch", "pitchKF", "oscTime", "oscTimeOffset", "oscFormant", "energy",
+                            "rootKey", "ampAttack", "ampDecay", "ampSustain", "ampRelease", "encodeDepth" })
         std::printf("  %s = %.9g\n", id, (double)p.apvts.getRawParameterValue(id)->load());
     if (!p.getStatusText().startsWith("Encoded")) return 1;
 

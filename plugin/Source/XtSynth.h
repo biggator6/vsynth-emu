@@ -46,8 +46,14 @@ class XtSynth {
 public:
     static constexpr int kVoices = 16;
     struct Controls {
+        // the OSC's pitch (XtOsc): the XT's Coarse −48..+48 and Fine −50..+50
+        // (cents), with Pitch Shift (semitones, to the cent) added to them;
+        // the wave's Original Key 0..127; the Pitch knob −63..+63 (the depth
+        // curve: ±1200 cents at ±36, ±6000 at ±63) and Pitch KF −200..+200
+        // (% per octave, steps of 10; 100 plays the keyboard in semitones)
         float pitchSemis = 0;
         int rootKey = 60;
+        int oscCoarse = 0, oscFine = 0, oscPitch = 0, pitchKF = 100;
         // the VariPhrase OSC (XtOsc): Time and Formant −63..+63, Time Offset
         // 0 BWD / 1 ZERO / 2 FWD, Time and Formant KF −200..+200 (% per
         // octave, steps of 10), Energy 0 (OFF)..127

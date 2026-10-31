@@ -18,6 +18,12 @@ namespace Params {
     static const juce::String kOscTimeKF     = "oscTimeKF";       // −200..+200 % per octave
     static const juce::String kOscFormant    = "oscFormant";
     static const juce::String kOscFormantKF  = "oscFormantKF";
+    // The OSC's pitch (XtOsc): Coarse and Fine (Pitch Shift adds to them),
+    // the Pitch knob −63..+63 (±6000 cents at 63) and Pitch KF
+    static const juce::String kOscCoarse     = "oscCoarse";       // −48..+48 semitones
+    static const juce::String kOscFine       = "oscFine";         // −50..+50 cents
+    static const juce::String kOscPitch      = "oscPitch";
+    static const juce::String kPitchKF       = "pitchKF";         // −200..+200 % per octave
     // Amp envelope, the XT's 0..127 knobs (XtEnvelope: times from the firmware's table)
     static const juce::String kAttack       = "ampAttack";
     static const juce::String kDecay        = "ampDecay";
@@ -130,6 +136,11 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscFormant, "Formant", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kOscFormantKF, "Formant KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscCoarse, "Coarse", -48, 48, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscFine, "Fine", -50, 50, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscPitch, "OSC Pitch", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kPitchKF, "Pitch KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 100.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
@@ -278,6 +289,10 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.oscTimeKF    = kf(Params::kOscTimeKF);
     c.oscFormant   = knob(Params::kOscFormant);
     c.oscFormantKF = kf(Params::kOscFormantKF);
+    c.oscCoarse    = knob(Params::kOscCoarse);
+    c.oscFine      = knob(Params::kOscFine);
+    c.oscPitch     = knob(Params::kOscPitch);
+    c.pitchKF      = kf(Params::kPitchKF);
     c.energy       = knob(Params::kEnergy);
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();

@@ -1,22 +1,24 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 460;  // height of the XT strip below it
+static constexpr int kXtStripH   = 490;  // height of the XT strip below it
 
-// The level rows: parameter and label, four per row, and the rows' names
-static const char* const kLevelIds[16][2] = {
+// The OSC pitch, level and velocity rows: parameter and label, four per
+// row, and the rows' names
+static const char* const kLevelIds[20][2] = {
+    { "oscCoarse", "Crs" },        { "oscFine", "Fine" },           { "oscPitch", "Pitch" },         { "pitchKF", "P-KF" },
     { "oscLevel", "Lvl" },         { "oscLevelKF", "KF" },          { "oscLevelLfoDepth", "LFO" },   { "waveGain", "Gain" },
     { "oscEnvAttack", "A" },       { "oscEnvDecay", "D" },          { "oscEnvSustain", "S" },        { "oscEnvRelease", "R" },
     { "oscEnvAttackSens", "A-Sns" }, { "oscEnvDecaySens", "D-Sns" }, { "oscEnvReleaseSens", "R-Sns" }, { "oscEnvTimeKF", "T-KF" },
     { "ampVelSens", "Sens" },      { "ampVelCurve", "Curve" },      { "oscVelSens", "O Sens" },      { "oscVelCurve", "O Curve" },
 };
-static const char* const kLevelRowNames[4] = { "OSC TVA", "O Env", "O Env", "Velocity" };
+static const char* const kLevelRowNames[5] = { "OSC Pitch", "OSC TVA", "O Env", "O Env", "Velocity" };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 820);
+    setSize(560, 850);
     setResizable(true, true);
     setResizeLimits(480, 600, 960, 980);
 
@@ -348,14 +350,14 @@ void VSynthEmuEditor::resized() {
         l->setBounds(cell.removeFromLeft(34));
         sl->setBounds(cell.withTrimmedRight(6));
     }
-    for (int r = 0; r < kLevelRows; ++r) {          // the OSC TVA and velocity rows
+    for (int r = 0; r < kLevelRows; ++r) {          // the OSC pitch, TVA and velocity rows
         xt.removeFromTop(6);
         auto row = xt.removeFromTop(24);
         levelRowLabels_[r].setBounds(row.removeFromLeft(56));
         const int quarter = row.getWidth() / 4;
         for (int i = 4 * r; i < 4 * r + 4; ++i) {
             auto cell = row.removeFromLeft(quarter);
-            levelLabels_[i].setBounds(cell.removeFromLeft(r == 2 || i >= 14 ? 46 : 34));
+            levelLabels_[i].setBounds(cell.removeFromLeft(r == 0 || r == 3 || i >= 18 ? 46 : 34));
             levelSliders_[i].setBounds(cell.withTrimmedRight(6));
         }
     }

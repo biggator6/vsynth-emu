@@ -55,6 +55,36 @@ float xtOscExp2(float x);
 float xtOscWalk(float time, float env, float envDepth, float lfo, float lfoDepth);
 float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, float lfoDepth);
 
+// ── Pitch ───────────────────────────────────────────────────────────────────
+// The note's pitch in 1/1000 semitone (0x894e1250): (60 + Coarse)·1000 +
+// Pitch KF·(key − 60) + Fine, with KF 0 and 1000 formed without the
+// product.  Coarse in semitones; Pitch KF ×10 (the displayed −200…+200%:
+// 1000 = 100%, the keyboard in semitones); Fine in 1/10 cents.
+int xtPitch10(int key, int coarse, int kf, int fine);
+// The voice's pitch in cents (+8, the encode-type tail 0x894e4030): that
+// pitch against the wave's Original Key (SOLO Robot Voice: against A4,
+// 69000), /10, within ±6000.
+float xtPitchCents(int key, int coarse, int kf, int fine, int origKey, bool robot);
+// The Pitch knob (+0xc): 2^(c/1200), c the depth curve's cents (0x894e0ce0)
+// at the knob (−63…+63, + modulation, clamped).  The firmware's powf once
+// xtOscSetPitchRatios has its 127 values (xtFwOscPitchRatios), else std::pow.
+float xtPitchRatio(int pitch);
+void xtOscSetPitchRatios(const float* ratios127);
+// The player's pitch ratio (0x894f3a00 at note-on, 0x894f3ba0 in the
+// update): the cents plus the pitch envelope's and the LFO's (their depths
+// in cents, 0x894e0ce0), the portamento ramp (+0x880) and the wave's offset
+// (+0x994), within ±6000; then exp2 (1/1200 as 0x3a5a740d), × the Pitch
+// ratio × the wave's rate ratio (+0x990), within ±32; × exp2(−detune/1200)
+// (+0x998).  The rate ratio is 44000 over the wave header's 44000, i.e. 1;
+// offset and detune are 0 for SOLO without Robot and come from the wave's
+// headers otherwise (0 in every wave seen); the ramp is 0 without portamento.
+float xtPitchTarget(float cents, float env, float envDepth, float lfo, float lfoDepth, float ratio,
+                    float ramp = 0.0f, float offset = 0.0f, float rate = 1.0f, float detune = 0.0f);
+
+// The voice update's step toward a target (0x8950c1b0): 70% of the way,
+// cur + (target − cur)·0.7 by FMAC.
+float xtOscSmooth(float cur, float target);
+
 // ── Level (the OSC TVA) and velocity ────────────────────────────────────────
 // Velocity Sens and Curve as the patch → table updaters store them:
 // 0x894ebe20, ±63 → ±200 (s·100/32 up to ±32, then 100 + (|s| − 32)·100/31);

@@ -80,5 +80,10 @@ bool xtFwOscTimeKeyScales(std::vector<float>& out);
 // as the VariPhrase converter forms it (0x894e3568), dB = −12…+12.
 bool xtFwOscWaveGains(std::vector<float>& out);
 
+// The Pitch knob's ratios 2^(c/1200) by the firmware's powf, c the depth
+// curve's cents (0x894e0ce0, run here too), the exponent formed as the
+// VariPhrase converter forms it (+0xc), Pitch = −63…+63 (XtOsc).
+bool xtFwOscPitchRatios(std::vector<float>& out);
+
 // Round to nearest instead of FPSCR.RM (to match Ghidra's P-code emulator).
 void xtFwForceNearest(bool on);

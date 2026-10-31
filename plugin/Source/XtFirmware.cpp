@@ -383,6 +383,29 @@ bool xtFwOscWaveGains(std::vector<float>& out) {
     return true;
 }
 
+bool xtFwOscPitchRatios(std::vector<float>& out) {
+    out.clear();
+    if (g_rom.empty()) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    out.resize(127);
+    for (int i = 0; i < 127; ++i) {
+        const float knob = xtf::flt(i - 63);
+        std::memcpy(&c.fb[0][4], &knob, 4);                 // fr4 = the knob; cents in fr0
+        if (!c.call(0x894e0ce0, {}, kStack)) { out.clear(); return false; }
+        float cents;
+        std::memcpy(&cents, &c.fb[0][0], 4);
+        // fr5 = (2·b183 − b182)/127 + cents/1200, the part's term 0
+        const float two = 2.0f, e = xtf::add(xtf::div(0.0f, 127.0f), xtf::div(cents, 1200.0f));
+        std::memcpy(&c.fb[0][4], &two, 4);
+        std::memcpy(&c.fb[0][5], &e, 4);
+        if (!c.call(0x8952ff9c, {}, kStack)) { out.clear(); return false; }
+        std::memcpy(&out[(size_t)i], &c.fb[0][0], 4);
+    }
+    return true;
+}
+
 bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMbBands& out) {
     if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5)) return false;
     auto M = std::make_unique<Machine>(g_rom);
