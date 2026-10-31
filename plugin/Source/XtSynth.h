@@ -85,6 +85,13 @@ public:
         // Robot Voice (SOLO): voiced grains at a fixed pitch, the note's
         // pitch against A440 instead of the Original Key
         bool robot = false;
+        // Loop (SOLO waves): the OSC's Loop switch and the wave's Loop Mode
+        // (0 One Shot: no loop, 1 One Way, 2 Alternate) and loop region, as
+        // fractions of the wave (end 1 = the last sample, the XT's default),
+        // for forward and backward play alike
+        bool loop = false;
+        int loopMode = 1;
+        float loopStart = 0.0f, loopEnd = 1.0f;
     };
 
     XtSynth();
@@ -150,6 +157,7 @@ private:
     void targets(const Voice& v, float& A, float& F, float& walk, float& g) const;
     float gainTarget(const Voice& v, float env) const;   // 0x894f3dc0 / 0x894f3e20
     XtEnvParams ampEnvParams(const Voice& v) const;      // the OSC amp envelope
+    XtSoloLoop soloLoop() const;                         // the SOLO player's loop
     void applyRates(Voice& v);
     void tvaUpdate(Voice& v);
     XtEnvParams envParams(const Voice& v) const;

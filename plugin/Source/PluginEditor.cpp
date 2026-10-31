@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 490;  // height of the XT strip below it
+static constexpr int kXtStripH   = 520;  // height of the XT strip below it
 
 // The OSC pitch, level and velocity rows: parameter and label, four per
 // row, and the rows' names
@@ -18,7 +18,7 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 850);
+    setSize(560, 880);
     setResizable(true, true);
     setResizeLimits(480, 600, 960, 980);
 
@@ -52,7 +52,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                               &pAttackSlider_, &pDecaySlider_, &pSustainSlider_, &pReleaseSlider_, &pDepthSlider_,
                               &tAttackSlider_, &tDecaySlider_, &tSustainSlider_, &tReleaseSlider_, &tDepthSlider_,
                               &fAttackSlider_, &fDecaySlider_, &fSustainSlider_, &fReleaseSlider_, &fDepthSlider_,
-                              &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_, &lfoTimeSlider_, &lfoFmtSlider_ }) {
+                              &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_, &lfoTimeSlider_, &lfoFmtSlider_,
+                              &loopStartSlider_, &loopEndSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
@@ -90,6 +91,15 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     timeOffsetBox_.addItemList({ "BWD", "ZERO", "FWD" }, 1);
     addAndMakeVisible(timeOffsetBox_);
     timeOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "oscTimeOffset", timeOffsetBox_);
+    loopModeBox_.addItemList({ "One Shot", "One Way", "Alternate" }, 1);
+    loopBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    loopBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    addAndMakeVisible(loopBtn_);
+    addAndMakeVisible(loopModeBox_);
+    loopAtt_      = std::make_unique<ButtonAtt>(processor_.apvts, "loop", loopBtn_);
+    loopModeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "loopMode", loopModeBox_);
+    loopStartAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "loopStart", loopStartSlider_);
+    loopEndAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "loopEnd", loopEndSlider_);
     lfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);
     lfoModeBox_.addItemList({ "ON <<", "ON >>", "OFF <<", "OFF >>" }, 1);
     lfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
@@ -128,7 +138,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                             &fAttackLabel_, &fDecayLabel_, &fSustainLabel_, &fReleaseLabel_, &fDepthLabel_,
                             &offsetLabel_, &oscTkfLabel_, &oscFkfLabel_,
                             &lfoLabel_, &lfoRateLabel_, &lfoDepthLabel_, &lfoDelayLabel_, &lfoFadeLabel_,
-                            &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_ }) styleSmall(*l);
+                            &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_ }) styleSmall(*l);
     timerCallback();
     startTimerHz(4);
 
@@ -274,6 +284,16 @@ void VSynthEmuEditor::resized() {
     oscTkfSlider_.setBounds(row3.removeFromLeft(sw).withTrimmedRight(6));
     oscFkfLabel_.setBounds(row3.removeFromLeft(46));
     oscFkfSlider_.setBounds(row3);
+    xt.removeFromTop(6);
+    auto row3l = xt.removeFromTop(24);               // Loop: switch, mode, region
+    loopBtn_.setBounds(row3l.removeFromLeft(64));
+    loopModeBox_.setBounds(row3l.removeFromLeft(110).withTrimmedRight(10));
+    const int lh = row3l.getWidth() / 2;
+    auto ls = row3l.removeFromLeft(lh);
+    loopStartLabel_.setBounds(ls.removeFromLeft(38));
+    loopStartSlider_.setBounds(ls.withTrimmedRight(8));
+    loopEndLabel_.setBounds(row3l.removeFromLeft(32));
+    loopEndSlider_.setBounds(row3l);
     xt.removeFromTop(6);
     auto row4 = xt.removeFromTop(24);                // amp envelope
     const int q = row4.getWidth() / 4;

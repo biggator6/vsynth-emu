@@ -138,6 +138,21 @@ int main(int argc, char** argv) {
         refCtl.robot = true;
         setKnobs({ { "robot", 1 } });
     }
+    // TEST_LOOP="mode,start%,end%": Loop on, Loop Mode (0 One Shot, 1 One
+    // Way, 2 Alternate) and the loop region in % of the wave
+    if (const char* e = std::getenv("TEST_LOOP")) {
+        float st = 0, en = 100;
+        refCtl.loop = true;
+        std::sscanf(e, "%d,%f,%f", &refCtl.loopMode, &st, &en);
+        auto* ps = p.apvts.getParameter("loopStart");
+        ps->setValueNotifyingHost(ps->convertTo0to1(st));
+        auto* pe = p.apvts.getParameter("loopEnd");
+        pe->setValueNotifyingHost(pe->convertTo0to1(en));
+        setKnobs({ { "loop", 1 }, { "loopMode", refCtl.loopMode } });
+        // as the processor reads them back: snapped to the 0.01% steps
+        refCtl.loopStart = std::round(p.apvts.getRawParameterValue("loopStart")->load() / 0.01f) * 0.01f / 100.0f;
+        refCtl.loopEnd = std::round(p.apvts.getRawParameterValue("loopEnd")->load() / 0.01f) * 0.01f / 100.0f;
+    }
     // TEST_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]": Pitch Shift
     // (semitones), the OSC's Pitch knob, Pitch KF (%), Coarse, Fine (cents)
     // and the Original Key

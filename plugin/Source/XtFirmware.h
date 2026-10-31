@@ -7,6 +7,7 @@
 #include <vector>
 #include "XtMultiBandPlayer.h"
 #include "XtSoloEncoder.h"
+#include "XtSoloVoice.h"
 
 // rom.2 path (research/ghidra_scripts/unpack_firmware.py).  Returns false if
 // the image cannot be read.
@@ -19,17 +20,22 @@ bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out);
 // The firmware's own SOLO player, for validation: the records written as the
 // XT lays out a one-segment SOLO vpdt (a start and an end event, their
 // segment entries, the records and the (256, 1) terminator); note-on through
-// the firmware's event jump (0x8950d790) at the start event, or at the end
-// event when walk < 0 (0x8950fa60 picks it by the sign); the rest of the
-// note-on state as 0x8950fba0 leaves it (research/ghidra_scripts/
-// EmuSolo.java); then 0x8950cd90 per 32-frame block.  pcm: mono or
-// interleaved stereo int16.  walkAt: (frame, walk) changes, applied at the
-// first block starting at or after the frame.  out: L/R pairs, ±1.
+// the firmware's start (0x8950fa60, normal playback: a seek to the wave's
+// start, or its end when walk < 0); the rest of the note-on state as
+// 0x8950fba0 leaves it (research/ghidra_scripts/EmuSolo.java); then
+// 0x8950cd90 per 32-frame block.  pcm: mono or interleaved stereo int16.
+// walkAt: (frame, walk) changes, applied at the first block starting at or
+// after the frame.  out: L/R pairs, ±1.
 struct XtFwSoloNote {
     float pitch = 1, formant = 1, walk = 1, energy = 0;
     std::vector<std::pair<long, float>> walkAt;
     std::vector<std::pair<long, float>> gainAt;   // output gain targets (1 = unity)
     bool robot = false;                           // Robot Voice (player byte 0 bit 0x10)
+    // Loop playback: the player's cached loop events (+0x6c) built for these
+    // points, each the record containing its point as an event jump reads
+    // it; player byte 0 bit 0 = on.  The firmware's own builder of these
+    // events is not found; this is the state its jump (0x8950d7d0) loads.
+    XtSoloLoop loop;
 };
 bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long frames, int channels,
                   const XtFwSoloNote& note, long outFrames, std::vector<float>& out);

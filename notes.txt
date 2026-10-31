@@ -217,6 +217,18 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+SOLO LOOPS v56 (2026-10-31): loop playback in the SOLO player
+  (HARDWARE_FIRMWARE.md, "Loop playback, SOLO"). XtSoloVoice::setLoop
+  (XtSoloLoop: on, forward/backward modes and points in samples) before
+  noteOn: the next crossing per block (0x8950ccc0), crossing forward/
+  backward (0x8950c880/0x8950ca70), the jump (0x8950d7d0), the walk
+  step's bounce flags (0x8950c280). Check against the firmware player:
+    xt_fw rom.2.bin solocmp samp.bin <ch> <R> <F> <walk> <energy> <frames> loop:on,fwdMode,bwdMode,fs,fe,bs,be [frame:walk ...]
+  (xt_fw's SOLO harness now starts notes through 0x8950fa60, as the XT
+  does, and builds the cached loop events itself.) Plugin params loop,
+  loopMode (One Shot/One Way/Alternate), loopStart/loopEnd (%); XtSynth CLI
+  XT_LOOP="mode,start,end" (fractions); PluginTest TEST_LOOP="mode,start%,end%".
+
 OSC PITCH v55 (2026-10-31): the pitch path as the XT computes it
   (HARDWARE_FIRMWARE.md, "The OSC pitch"). XtOsc: xtPitch10 (0x894e1250),
   xtPitchCents (the tail's +8), xtPitchRatio (+0xc, the firmware's powf

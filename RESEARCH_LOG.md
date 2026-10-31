@@ -2542,3 +2542,26 @@ Round-2 recordings.  First build-out after that: real-time granular port
   envelope and the LFO. Engine tests and `auval` pass. At the Original Key
   the output differs from v54 at −141…−189 dB; other keys drift at
   −31…−41 dB over a second, from the corrected ratios.
+
+### Session 16 addendum (2026-10-31) — v56: loop playback (SOLO)
+
+- The SOLO player loops through four cached events at the loop points
+  (player +0x6c), with the same fields as the wave's own events.
+  - Each block it finds its next crossing.
+  - At the forward end, One Way jumps to the forward start and Alternate
+    turns the walk round. Backward play mirrors it at the backward
+    region.
+  - A third mode jumps to the start and holds until the walk turns.
+- The code that builds the cached events was not found, so the port builds
+  them as the jump reads them. Given the same events, the port matches the
+  firmware player at −92…−107 dB across modes, directions, walk reversals,
+  stereo and Robot.
+- One reset was easy to miss: a jump that lands in an unvoiced record zeroes
+  the Energy filter's cutoff.
+- Correction to v55: the wave's own tuning fields are zeroed with Robot, not
+  without it. The numbers don't change, because every wave seen has them at
+  0.
+- The XT starts notes by seeking to the start or end with event 0 current.
+  The SOLO harness now does the same. v52's results are unchanged.
+- Plugin: Loop, Loop Mode and Loop Start/End for SOLO waves. With Loop off
+  the output is bit-identical to v55. BACKING and ENSEMBLE loops are next.

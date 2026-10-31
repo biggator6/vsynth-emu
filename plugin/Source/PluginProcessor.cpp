@@ -24,6 +24,12 @@ namespace Params {
     static const juce::String kOscFine       = "oscFine";         // −50..+50 cents
     static const juce::String kOscPitch      = "oscPitch";
     static const juce::String kPitchKF       = "pitchKF";         // −200..+200 % per octave
+    // Loop (SOLO waves): the OSC's Loop switch, the wave's Loop Mode (One
+    // Shot, One Way, Alternate) and its loop region in % of the wave
+    static const juce::String kLoop          = "loop";
+    static const juce::String kLoopMode      = "loopMode";
+    static const juce::String kLoopStart     = "loopStart";
+    static const juce::String kLoopEnd       = "loopEnd";
     // Amp envelope, the XT's 0..127 knobs (XtEnvelope: times from the firmware's table)
     static const juce::String kAttack       = "ampAttack";
     static const juce::String kDecay        = "ampDecay";
@@ -141,6 +147,13 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscPitch, "OSC Pitch", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kPitchKF, "Pitch KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 100.0f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kLoop, "Loop", false));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLoopMode, "Loop Mode",
+        juce::StringArray { "One Shot", "One Way", "Alternate" }, 1));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 0.0f, "%"));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kLoopEnd, "Loop End", juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 100.0f, "%"));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
@@ -293,6 +306,10 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.oscFine      = knob(Params::kOscFine);
     c.oscPitch     = knob(Params::kOscPitch);
     c.pitchKF      = kf(Params::kPitchKF);
+    c.loop         = apvts.getRawParameterValue(Params::kLoop)->load() >= 0.5f;
+    c.loopMode     = knob(Params::kLoopMode);
+    c.loopStart    = snap(apvts.getRawParameterValue(Params::kLoopStart)->load(), 0.01f) / 100.0f;
+    c.loopEnd      = snap(apvts.getRawParameterValue(Params::kLoopEnd)->load(), 0.01f) / 100.0f;
     c.energy       = knob(Params::kEnergy);
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();

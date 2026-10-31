@@ -229,7 +229,9 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
     const uint32_t ev0 = 16, ev1 = (uint32_t)(st + 8) * 2, seg0 = (uint32_t)(2 * st + 8) * 2, seg1 = seg0 + 12;
     const uint32_t cnt = seg1 + 12, rec0 = cnt + 4;
     std::vector<uint16_t> stream;
+    std::vector<uint32_t> recOff;                 // each record's first stream entry
     for (const XtRecord& r : recs) {
+        recOff.push_back(rec0 + (uint32_t)stream.size() * 2);
         int len = r.len16;
         while (len >= 0xffff) { stream.push_back(0xffff); stream.push_back((uint16_t)r.info); len -= 0xffff; }
         stream.push_back((uint16_t)len); stream.push_back((uint16_t)r.info);
@@ -252,10 +254,28 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
     auto wf = [&](uint32_t a, float x) { uint32_t u; std::memcpy(&u, &x, 4); c.wr32(a, u); };
     auto rf = [&](uint32_t a) { const uint32_t u = c.rd32(a); float x; std::memcpy(&x, &u, 4); return x; };
     // the player (0x8950fba0 / 0x8950fa60 as EmuSolo.java sets them)
-    c.wr32(W2 + 0x16c, 0x7fffffff); c.wr32(W2 + 0xb8, 0x7fffffff);   // no loop points or cache bounds
-    c.wr8(R8 + 0, (uint8_t)((channels == 2 ? 0x40 : 0) | (note.robot ? 0x10 : 0)));
+    if (!note.loop.on) {
+        c.wr32(W2 + 0x16c, 0x7fffffff); c.wr32(W2 + 0xb8, 0x7fffffff);   // no loop points or cache bounds
+    } else {
+        // the cached loop events at W2 + 0xb4·k (forward start, forward end,
+        // backward end, backward start): {u16 event, u16 mode, u32 position,
+        // u32 segment entry, u32 record, u16 mark}; the event jump puts the
+        // record's start at position + mark − its first length
+        const int pts[4] = { note.loop.fwdStart, note.loop.fwdEnd, note.loop.bwdEnd, note.loop.bwdStart };
+        const int modes[4] = { 0, note.loop.fwdMode, 0, note.loop.bwdMode };
+        for (uint32_t k = 0; k < 4; ++k) {
+            const int pos = pts[k] * 16;
+            uint32_t off = term;
+            int start = (int)endPos, first = 256;
+            for (size_t i = 0, s0 = 0; i < recs.size(); s0 += (size_t)recs[i].len16, ++i)
+                if ((int)s0 + recs[i].len16 > pos) { off = recOff[i]; start = (int)s0; first = std::min(recs[i].len16, 0xffff); break; }
+            const uint32_t R = W2 + 0xb4 * k;
+            c.wr16(R, 0); c.wr16(R + 2, (uint16_t)modes[k]); c.wr32(R + 4, (uint32_t)pos);
+            c.wr32(R + 8, seg0); c.wr32(R + 12, off); c.wr16(R + 16, (uint16_t)(start + first - pos));
+        }
+    }
+    c.wr8(R8 + 0, (uint8_t)(0x80 | (channels == 2 ? 0x40 : 0) | (note.robot ? 0x10 : 0) | (note.loop.on ? 1 : 0)));
     c.wr8(R8 + 3, 0x80); c.wr8(R8 + 7, 8); c.wr8(R8 + 8, (uint8_t)st); c.wr8(R8 + 9, channels == 2 ? 12 : 6);
-    c.wr16(R8 + 0xc, note.walk < 0.0f ? 1 : 0); c.wr16(R8 + 0xe, 1); c.wr16(R8 + 0x14, 0); c.wr16(R8 + 0x16, 1);
     c.wr32(R8 + 0x10, VP);
     c.wr32(R8 + 0x18, 0); c.wr32(R8 + 0x1c, endPos); c.wr32(R8 + 0x20, endPos);
     c.wr32(R8 + 0x48, 44100); c.wr32(R8 + 0x4c, 44100);
@@ -264,8 +284,9 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
     wf(R8 + 0x70, note.pitch); wf(R8 + 0x98, note.pitch); wf(R8 + 0x74, note.formant); wf(R8 + 0x78, note.energy);
     wf(R8 + 0x7c, note.walk); wf(R8 + 0x8c, 1.0f); wf(R8 + 0x90, 1.0f); wf(R8 + 0x9c, 1.0f);
     wf(R8 + 0x80, 1.0f / 65536.0f); wf(R8 + 0x84, 1.0f / 65536.0f); wf(R8 + 0x88, 1.0f / 64.0f);
+    wf(R8 + 0xa0, 1.0f); wf(R8 + 0xa4, 1.0f);                         // the loop regions' rate factors
     c.wr32(R9 + 0, kSamp);
-    if (!c.call(0x8950d790, { R8 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    if (!c.call(0x8950fa60, { R8, 1 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
     // (the event jump's 0x8950c7e0 set R10+0: 256, or 0 for Robot Voice)
     if (!c.call(0x8950d580, { R8, R9 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
     // 0x8950fba0's tail: timer and ages (anchor − record start)·256, both
@@ -521,7 +542,12 @@ int main(int argc, char** argv) {
         const long outFrames = std::atol(argv[9]);
         for (int a = mode == "soloplay" ? 11 : 10; a < argc; ++a) {
             long at = 0; float w = 0;
+            int lo[7];
             if (std::string(argv[a]) == "robot") note.robot = true;
+            else if (std::sscanf(argv[a], "loop:%d,%d,%d,%d,%d,%d,%d", &lo[0], &lo[1], &lo[2], &lo[3], &lo[4], &lo[5], &lo[6]) == 7) {
+                note.loop.on = lo[0] != 0; note.loop.fwdMode = lo[1]; note.loop.bwdMode = lo[2];
+                note.loop.fwdStart = lo[3]; note.loop.fwdEnd = lo[4]; note.loop.bwdStart = lo[5]; note.loop.bwdEnd = lo[6];
+            }
             else if (std::sscanf(argv[a], "%ld:g%f", &at, &w) == 2) note.gainAt.push_back({ at, w });
             else if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
         }
@@ -560,6 +586,7 @@ int main(int argc, char** argv) {
             }
             XtSoloVoice v;
             v.setRobot(note.robot);
+            v.setLoop(note.loop);
             v.noteOn(P, note.pitch, note.formant, note.walk, note.energy);
             std::vector<float> L(32), R(32);
             double maxd = 0, sig = 0, dif = 0;

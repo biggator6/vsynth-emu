@@ -129,6 +129,108 @@ void XtSoloVoice::anchorBackward() {
     }
 }
 
+// The loop jump (0x8950d7d0, then 0x8950d4c0): position and anchor at the
+// cached event, the record containing it loaded (the stream's terminator at
+// the wave's end), event 0 current (a SOLO wave's events are its start and
+// its end).  The running grains and the trigger timer carry on; landing in
+// an unvoiced record clears the Energy filter's cutoff (+0x148), as an event
+// jump does.
+void XtSoloVoice::jumpTo(int32_t pos16) {
+    Pi = pos16;
+    Pf = 0;
+    const double L = pos16 / 16.0;
+    const size_t nc = p->size();
+    size_t i = (size_t)(std::upper_bound(p->segStart.begin(), p->segStart.end(), L) - p->segStart.begin());
+    i = i > 0 ? i - 1 : 0;
+    if (i + 1 == nc && L >= p->segStart[i] + p->segLen[i]) i = nc;
+    seg = i;
+    recStart = i < nc ? p->segStart[i] : p->segStart[nc - 1] + p->segLen[nc - 1];
+    recEnd = recStart + lenOf(i);
+    budget = recEnd > (double)p->in.size() ? kUnlimited : budgetOf(i);
+    anchor = L;
+    if (i >= nc || !p->voiced[i]) f0n = 0.0;
+    curEv = 0;
+    prevEv = 0;
+    nextEv = endPos16;
+}
+
+// The next crossing (0x8950ccc0, each block and after each crossing): the
+// next event, and the loop points ahead in the walk's direction.  Walking
+// back inside an Alternate bounce, only its far end counts.
+void XtSoloVoice::crossings() {
+    int32_t X;
+    if (walkStep >= 0) {
+        X = nextEv;
+        if (f3 & 4) { if (X > lp[2]) X = lp[2]; nextCross = X; return; }
+        if (lp[2] > Pi && X > lp[2]) X = lp[2];
+        if (lmode1 > 0) {
+            if (loopOn) { if (X > lp[1]) X = lp[1]; }
+            else if (lp[1] > Pi && X > lp[1]) X = lp[1];
+        }
+    } else {
+        X = prevEv;
+        if (f3 & 8) { if (lp[0] > X) X = lp[0]; nextCross = X; return; }
+        if (Pi > lp[0] && lp[0] > X) X = lp[0];
+        if (lmode3 > 0) {
+            if (loopOn) { if (lp[3] > X) X = lp[3]; }
+            else if (Pi > lp[3] && lp[3] > X) X = lp[3];
+        }
+    }
+    nextCross = X;
+}
+
+// Crossing forward (0x8950c880 for SOLO): the backward loop's end ends a
+// bounce there; the forward loop's end loops (One Way: to the forward start;
+// Alternate: the walk turns round; mode 3: to the forward start, holding);
+// the next event (the wave's end) ends the note.  The loop regions' rate
+// factors (+0xa0/+0xa4 into +0x9c) are 1 on a VariPhrase voice.
+void XtSoloVoice::crossForward() {
+    const int32_t X = nextCross;
+    if (lp[2] == X) {
+        if (f3 & 4) { walkStep = -walkStep; f3 &= 0xfb; return; }
+        f3 &= 0xef;
+    }
+    if (lp[1] == X && !(f3 & 4)) {
+        if (!loopOn) f3 &= 0xdf;
+        else {
+            f3 |= 0x20;
+            ended_ = 0;
+            if (lmode1 == 1) { jumpTo(lp[0]); return; }
+            if (lmode1 == 2) { f3 |= 8; walkStep = -walkStep; return; }
+            if (lmode1 == 3) { walkStep = 0; f3 |= 0x40; jumpTo(lp[0]); return; }
+        }
+    }
+    if (nextEv != X) return;
+    curEv = 1;                          // the end event, the last
+    prevEv = nextEv;
+    nextEv = endPos16 + 16;
+    ended_ = 1;
+}
+
+// Crossing backward (0x8950ca70): the mirror image, at the forward start and
+// the backward start (One Way: to the backward end; mode 3: holding there);
+// event 0 (the wave's start) ends the note.
+void XtSoloVoice::crossBackward() {
+    const int32_t X = nextCross;
+    if (lp[0] == X) {
+        if (f3 & 8) { walkStep = -walkStep; f3 &= 0xf7; return; }
+        f3 &= 0xdf;
+    }
+    if (lp[3] == X && !(f3 & 8)) {
+        if (loopOn) {
+            f3 |= 0x10;
+            ended_ = 0;
+            if (lmode3 == 1) { jumpTo(lp[2]); return; }
+            if (lmode3 == 2) { f3 |= 4; walkStep = -walkStep; return; }
+            if (lmode3 == 3) { walkStep = 0; f3 |= 0x40; jumpTo(lp[3]); return; }
+        }
+        f3 &= 0xef;
+    }
+    if (prevEv != X) return;
+    if (curEv > 0) { --curEv; prevEv = 0; nextEv = endPos16; return; }
+    ended_ = -1;
+}
+
 // Grain parameters for a trigger at phrase position P in the current record
 // (0x8950d5a0).  Returns the grain's start, velocity and second-tap weight;
 // sets ppw, slope, the anchor step and (voiced only) f0n.  Computed as the
@@ -197,10 +299,28 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
     Pf = walkStep = 0;
     timer = ppw = 0.0;
     ended_ = 0;
-    // The event jump (0x8950d7b0) at the start event, or at the end event
-    // when walk < 0 (0x8950fa60): the position and the anchor at the event,
-    // and the record it points at, record 0 or the stream's terminator
-    // (ending 16 samples past the wave's end, an unlimited budget).
+    // Loops: the cached events (none: the forward end and the backward end
+    // out of reach) and the walk flags as note-on leaves them (0x8950fba0),
+    // event 0 current.
+    endPos16 = (int32_t)p->in.size() * 16;
+    loopOn = loopCfg.on;
+    if (loopOn) {
+        lp[0] = loopCfg.fwdStart * 16; lp[1] = loopCfg.fwdEnd * 16;
+        lp[2] = loopCfg.bwdEnd * 16;   lp[3] = loopCfg.bwdStart * 16;
+        lmode1 = loopCfg.fwdMode; lmode3 = loopCfg.bwdMode;
+    } else {
+        lp[0] = 0; lp[1] = lp[2] = 0x7fffffff; lp[3] = 0;
+        lmode1 = lmode3 = 0;
+    }
+    f3 = 0x80;
+    curEv = 0;
+    prevEv = 0;
+    nextEv = endPos16;
+    nextCross = 0;
+    // The start (0x8950fa60): a seek (0x8950fed0) to the wave's start, or to
+    // its end when walk < 0: the position and the anchor there, and the
+    // record from there on, record 0 or the stream's terminator (ending 16
+    // samples past the wave's end, an unlimited budget).
     const double n = (double)p->in.size();
     if (walk < 0.0) {
         seg = p->size();
@@ -242,7 +362,20 @@ void XtSoloVoice::render(float* out, float* right, int count) {
     const int32_t endPos = (int32_t)p->in.size() * 16;
     for (int k = 0; k < count; ++k, ++t) {
         if ((t & 31) == 0) {   // per-block walk step [c280] and coefficient update [cde0]
-            walkStep = xtf::ftrc(xtf::mul((float)walk, 33554432.0f));   // walk·2^25
+            // walk·2^25 (0x8950c280), turned round inside an Alternate
+            // bounce until the walk itself turns; held at 0 after a mode-3
+            // loop until the walk turns away from the loop
+            const float fs = xtf::mul((float)walk, 33554432.0f);
+            if (!(f3 & 0x40)) {
+                int32_t step = xtf::ftrc(fs);
+                const bool neg = 0.0f > fs;
+                if (f3 & 8) { if (neg) f3 &= 0xf7; else step = -step; }
+                if (f3 & 4) { if (neg) step = -step; else f3 &= 0xf7; }   // (sic: 0x08)
+                walkStep = step;
+            } else {
+                if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0x8f;
+                walkStep = 0;
+            }
             // Energy g = 0 (OFF): cutoff f0/8, damping 1.2 (rumble filter).
             // Energy g > 0: cutoff at the output fundamental, damping
             // (1.2 − g) + p(rate) with p = g·(2r − 1) on [0.5, 1),
@@ -262,16 +395,24 @@ void XtSoloVoice::render(float* out, float* right, int count) {
             q     = (qt - q) * 0.125 + q;
             fCoef = (ft - fCoef) * 0.125 + fCoef;
             fCoef = std::min(fCoef, 1.9 - q);
+            crossings();                // [ccc0]
         }
         // Walk and records (0x8950ce80).  The position moves by half the walk
         // step in 12.20; the record logic sees its whole-1/16 part.  At the
         // wave's end (+0x1c) or start (+0x18) it holds and triggers stop (+4
-        // set); the two running grains play out.
+        // set); the two running grains play out.  Reaching the next crossing
+        // runs the loop and event logic, which may jump or turn the walk.
         const int32_t s = walkStep >> 1, sum = Pf + s;
         int32_t np = Pi + (sum >> 20), nf = sum & 0xfffff;
-        if (s > 0 && np >= endPos) { ended_ = 1; np = endPos; nf = 0; }
-        if (s < 0 && 0 >= np) { ended_ = -1; np = 0; nf = 0; }
-        Pi = np; Pf = nf;
+        if (s > 0) {
+            if (np >= endPos) { ended_ = 1; np = endPos; nf = 0; }
+            Pi = np; Pf = nf;
+            if (nextCross <= Pi) { crossForward(); crossings(); }
+        } else if (s < 0) {
+            if (0 >= np) { ended_ = -1; np = 0; nf = 0; }      // +0x18: the start, 0
+            Pi = np; Pf = nf;
+            if (Pi <= nextCross) { crossBackward(); crossings(); }
+        }
         Pq = Pi / 16.0;
         if (!p->anchorMode) {           // diagnostic: the record containing P
             while (seg < nc && Pq >= recEnd) loadNext();

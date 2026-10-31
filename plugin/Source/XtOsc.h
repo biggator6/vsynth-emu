@@ -76,8 +76,8 @@ void xtOscSetPitchRatios(const float* ratios127);
 // (+0x994), within ±6000; then exp2 (1/1200 as 0x3a5a740d), × the Pitch
 // ratio × the wave's rate ratio (+0x990), within ±32; × exp2(−detune/1200)
 // (+0x998).  The rate ratio is 44000 over the wave header's 44000, i.e. 1;
-// offset and detune are 0 for SOLO without Robot and come from the wave's
-// headers otherwise (0 in every wave seen); the ramp is 0 without portamento.
+// offset and detune come from the wave's header and loop record (0 in every
+// wave seen; 0 with Robot Voice); the ramp is 0 without portamento.
 float xtPitchTarget(float cents, float env, float envDepth, float lfo, float lfoDepth, float ratio,
                     float ramp = 0.0f, float offset = 0.0f, float rate = 1.0f, float detune = 0.0f);
 

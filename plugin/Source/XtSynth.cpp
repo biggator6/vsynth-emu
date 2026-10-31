@@ -217,6 +217,24 @@ float XtSynth::gainTarget(const Voice& v, float env) const {
     return xtOscGainTarget(xtOscGain(ctl.waveGain), level, env, v.lfo.out(), xtOscLevelLfoDepth(ctl.oscLevelLfoDepth));
 }
 
+// The loop the SOLO player gets (its cached loop events, player +0x6c, and
+// byte 0 bit 0): the region in samples, at least 16 long as on the XT; One
+// Shot leaves the Loop switch without effect (loop modes 0).
+XtSoloLoop XtSynth::soloLoop() const {
+    XtSoloLoop l;
+    const int last = (int)cur->solo.in.size() - 1;
+    if (last < 16) return l;
+    int a = (int)std::lround((double)std::clamp(ctl.loopStart, 0.0f, 1.0f) * last);
+    int b = (int)std::lround((double)std::clamp(ctl.loopEnd, 0.0f, 1.0f) * last);
+    if (b < a) std::swap(a, b);
+    if (b - a < 16) { b = std::min(a + 16, last); a = b - 16; }
+    l.on = ctl.loop;
+    l.fwdMode = l.bwdMode = std::clamp(ctl.loopMode, 0, 2);
+    l.fwdStart = l.bwdStart = a;
+    l.fwdEnd = l.bwdEnd = b;
+    return l;
+}
+
 XtEnvParams XtSynth::ampEnvParams(const Voice& v) const {
     XtEnvKnobs k;
     k.attack = ctl.oAttack; k.decay = ctl.oDecay; k.sustain = ctl.oSustain; k.release = ctl.oRelease;
@@ -317,6 +335,7 @@ void XtSynth::noteOn(int note, float velocity) {
     v->curGain = gainTarget(*v, oe.time[0] == 0.0f ? v->oenv.level() : oe.level[0]);
     if (cur->type == 1) {
         v->solo.setRobot(v->robot);
+        v->solo.setLoop(soloLoop());
         v->solo.noteOn(cur->solo, v->curA, v->curF, v->curWalk, v->curG);
         v->solo.resetGain(v->curGain);
     }
@@ -492,6 +511,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
 //   XT_VELOCITY=v: note-on velocity 1..127 (default 127).
 //   XT_ROBOT=1: Robot Voice.
+//   XT_LOOP="mode,start,end": Loop on, Loop Mode (0 One Shot, 1 One Way,
+//     2 Alternate) and the region as fractions of the wave (SOLO).
 //   XT_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]": Pitch Shift
 //     (semitones), the Pitch knob, Pitch KF (%), Coarse, Fine (cents) and the
 //     Original Key (default 0,0,100,0,0,60).
@@ -545,6 +566,10 @@ int main(int argc, char** argv) {
         std::sscanf(e, "%d,%d,%d,%d", &c.ampVelSens, &c.ampVelCurve, &c.oscVelSens, &c.oscVelCurve);
     const float noteVel = std::getenv("XT_VELOCITY") ? std::atoi(std::getenv("XT_VELOCITY")) / 127.0f : 1.0f;
     c.robot = std::getenv("XT_ROBOT") && std::atoi(std::getenv("XT_ROBOT")) != 0;
+    if (const char* e = std::getenv("XT_LOOP")) {
+        c.loop = true;
+        std::sscanf(e, "%d,%f,%f", &c.loopMode, &c.loopStart, &c.loopEnd);
+    }
     if (const char* e = std::getenv("XT_PITCH"))
         std::sscanf(e, "%f,%d,%d,%d,%d,%d", &c.pitchSemis, &c.oscPitch, &c.pitchKF, &c.oscCoarse, &c.oscFine, &c.rootKey);
     syn.setControls(c);

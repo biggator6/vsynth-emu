@@ -26,6 +26,17 @@ struct XtSoloPlan {
     bool stereo() const { return !inR.empty(); }
 };
 
+// Loop playback (the OSC's Loop switch with the wave's loop points): the
+// points the player crosses, in samples, and the loop modes at the forward
+// end and the backward start (0 none, 1 One Way, 2 Alternate, 3 jump to the
+// start and hold).  Forward play loops between fwdStart and fwdEnd, backward
+// play between bwdStart and bwdEnd.
+struct XtSoloLoop {
+    bool on = false;                    // player byte 0 bit 0
+    int fwdMode = 0, bwdMode = 0;
+    int fwdStart = 0, fwdEnd = 0, bwdStart = 0, bwdEnd = 0;
+};
+
 class XtSoloVoice {
 public:
     // A = pitch ratio, F = formant ratio (clamped to [0.5, 2] by the caller),
@@ -44,6 +55,13 @@ public:
     // A is then the pitch against A440 and voiced grains come at that fixed
     // pitch (0x8950d5a0).
     void setRobot(bool on) { robot = on; }
+    // Loop playback (set before noteOn; off by default).  The firmware keeps
+    // the loop points as four cached events (player +0x6c: forward start,
+    // forward end, backward end, backward start); the player recomputes its
+    // next crossing (+0x2c) each block (0x8950ccc0) and acts on it in the
+    // walk (0x8950c880 forward, 0x8950ca70 backward): One Way jumps to the
+    // other end (0x8950d7d0), Alternate turns the walk round.
+    void setLoop(const XtSoloLoop& l) { loopCfg = l; }
     // Renders `count` samples: mono (a stereo plan's left channel), or both
     // channels (a mono plan plays L = R, as the firmware writes it).
     void render(float* out, int count) { render(out, nullptr, count); }
@@ -74,6 +92,20 @@ private:
     double low[2] = {}, band[2] = {}, fCoef = 0, q = 1.2;   // SVF state per channel
     float gainTarget = 1.0f, gain = 1.0f;
     bool robot = false;
+    // Loops: the cached events' positions (1/16 sample: forward start,
+    // forward end, backward end, backward start) and the modes at the
+    // forward end and the backward start; the walk flags (player +3: 0x04 /
+    // 0x08 turned round in the backward / forward loop, 0x10 / 0x20 inside
+    // it, 0x40 holding); the wave's two events (0 at the start, 1 at the end:
+    // +0xc current, +0x24 its position, +0x28 the next's) and the next
+    // crossing (+0x2c).
+    XtSoloLoop loopCfg;
+    int32_t lp[4] = { 0, 0x7fffffff, 0x7fffffff, 0 };
+    int lmode1 = 0, lmode3 = 0;
+    bool loopOn = false;
+    uint8_t f3 = 0x80;
+    int curEv = 0;
+    int32_t prevEv = 0, nextEv = 0, nextCross = 0, endPos16 = 0;
     double f0n = 0.0, anchorStepInit = 1.0;
     long t = 0;
 
@@ -85,5 +117,9 @@ private:
     double repeatCost() const;
     void anchorForward();
     void anchorBackward();
+    void crossings();
+    void crossForward();
+    void crossBackward();
+    void jumpTo(int32_t pos16);
     Grain grainParams(bool setF0);
 };

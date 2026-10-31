@@ -44,6 +44,12 @@ private:
     juce::ComboBox   timeOffsetBox_;
     juce::Slider     oscTkfSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     oscFkfSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    // Loop (SOLO waves): the OSC's Loop switch, the wave's Loop Mode and region
+    juce::ToggleButton loopBtn_ { "Loop" };
+    juce::ComboBox   loopModeBox_;
+    juce::Slider     loopStartSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     loopEndSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Label      loopStartLabel_ { {}, "Start" }, loopEndLabel_ { {}, "End" };
     // amp envelope, the XT's 0..127 knobs
     juce::Slider     attackSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     decaySlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -117,6 +123,9 @@ private:
     std::unique_ptr<SliderAtt> fAttackAtt_, fDecayAtt_, fSustainAtt_, fReleaseAtt_, fDepthAtt_;
     std::unique_ptr<SliderAtt> oscTkfAtt_, oscFkfAtt_;
     std::unique_ptr<ComboAtt>  timeOffsetAtt_;
+    std::unique_ptr<ButtonAtt> loopAtt_;
+    std::unique_ptr<ComboAtt>  loopModeAtt_;
+    std::unique_ptr<SliderAtt> loopStartAtt_, loopEndAtt_;
     std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_, lfoTimeAtt_, lfoFmtAtt_;
     std::unique_ptr<SliderAtt> levelAtts_[kLevelKnobs];
     std::unique_ptr<ComboAtt>  lfoWaveAtt_, lfoModeAtt_, lfoOffsetAtt_;

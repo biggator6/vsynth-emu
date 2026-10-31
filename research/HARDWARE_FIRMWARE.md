@@ -1544,6 +1544,134 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### Loop playback, SOLO (2026-10-31, v56)
+
+**Settings.** The OSC's Loop switch and the wave's loop:
+- The switch reaches the player as byte 0 bit 0 (out+0xb4 bit 0). The
+  encode-type tail sets it to (+0x5f ≠ 0) or (+0x90 = 0) in its normal
+  playback branch.
+- The wave's loop record (the `vplp` chunk, out+0xac) holds:
+  - +4 and +8: the forward loop's start and end, in samples;
+  - +0x10 and +0xc: the backward loop's start and end;
+  - +0x18 and +0x19: the forward and backward Loop Modes;
+  - +0, +0x1b: tuning (see v55).
+- Emu_test.prj's waves loop the whole wave (end = frames − 1), in mode 1.
+- With Vari off, the voice start `0x894f3110` sets up a PCM-style loop from
+  the same record. That path isn't modelled.
+
+**The cache.** The player reaches four cached loop events through +0x6c, at
++0xb4·k:
+- k = 0: the forward start;
+- k = 1: the forward end, whose mode is at +2;
+- k = 2: the backward end;
+- k = 3: the backward start, whose mode is at +2.
+
+Each holds the same fields as a vpdt event at that point:
+- {u16 event index, u16 mode, u32 position (1/16 sample);
+- u32 segment-entry offset, u32 record offset;
+- u16 mark}.
+
+The event jump puts the record's start at position + mark − its first length.
+- No code that writes these events was found. Literal-pool and pattern
+  searches cover the player, the converter, the voice and the wave loader.
+  The voice setup, run in the interpreter, leaves them untouched. So they
+  are built per wave, elsewhere.
+- The port builds each one as the jump needs it: the record containing the
+  point, and the mark to that record's end.
+
+**The next crossing** (`0x8950ccc0`) is computed at every block start
+(`0x8950cd90`) and after each crossing. It is the nearest of:
+- walking forward: the next event, the backward end if it lies ahead, and
+  the forward end (mode > 0; always with Loop on, else only if ahead);
+- walking backward: the mirror image, with the current event, the forward
+  start and the backward start.
+
+Inside an Alternate bounce only the bounce's far end counts.
+
+**Crossing forward** (`0x8950c880`, from the walk `0x8950ce80`):
+1. At the backward end:
+   - if a backward bounce is turned round (flag 4), the walk turns back and
+     the flag clears;
+   - otherwise the flag "inside the backward loop" (0x10) clears.
+2. At the forward end (not in a backward bounce), with Loop on:
+   - flag 0x20 is set, the ended flag clears, and the rate factor becomes
+     +0xa0;
+   - mode 1 (One Way): the cached forward start loads (`0x8950d7d0`);
+   - mode 2 (Alternate): flag 8 is set and the walk step negates;
+   - mode 3: the step and position are zeroed, flag 0x40 is set, and the
+     forward start loads.
+3. With Loop off, flag 0x20 clears.
+4. At the next event: the event step; at the last event, the note ends.
+
+**Crossing backward** (`0x8950ca70`) mirrors it, at the forward start and
+the backward start:
+- One Way loads the backward end;
+- mode 3 loads the backward start itself.
+
+**The jump** (`0x8950d7d0`) loads:
+- the event index, the position and the anchor;
+- the segment and record pointers;
+- the record end, from the mark (`0x8950d4c0`);
+- the next event, from the vpdt.
+
+The running grains and the trigger timer carry on. If the record landed in
+is unvoiced, the Energy filter's cutoff (+0x148) is zeroed, as after an
+event jump. The port missed that at first, and a stereo Alternate case was
+off by −29 dB until it was added.
+
+**The walk step** (`0x8950c280`, each block): ftrc(walk·2^25).
+- Flag 8 (forward bounce): negated while the walk is ≥ 0; the flag clears
+  once the walk itself is negative.
+- Flag 4 (backward bounce): negated while the walk is negative. When the
+  walk turns positive, the firmware clears flag 8, not 4 (sic). The port
+  does the same.
+- Flag 0x40 (mode 3): the step is 0. It is released once the walk turns
+  away from the loop, which also clears 0x40, 0x20 and 0x10.
+
+**The rate factors** +0x9c, +0xa0 and +0xa4 are 1 on a VariPhrase voice, as
+the voice setup leaves them in the interpreter. So a loop region plays at
+the voice's rate.
+
+**Note-on.** In normal playback, `0x8950fa60` seeks (`0x8950fed0`) to the
+start, or to the end when walk < 0, with event 0 current. It does not jump
+to the end event. The SOLO harness now starts notes through it.
+- The record cursor and anchor are the same either way, so v52's results
+  stand: the no-loop comparisons are unchanged at −94…−98 dB.
+
+**Port and checks** (`xt_fw solocmp … loop:on,fwdMode,bwdMode,fs,fe,bs,be`):
+- `XtSoloVoice` against the firmware SOLO player run in the interpreter,
+  with the same cached events: One Way, Alternate and mode 3 in both
+  directions;
+- also walk reversals and holds mid-loop, Robot with a loop, a 16-sample
+  loop, the stereo wave and the sine;
+- all at −92…−107 dB, the player's usual residual.
+
+**Plugin:**
+- Loop (switch), Loop Mode (One Shot, One Way, Alternate) and Loop
+  Start/End (% of the wave; forward and backward alike; at least 16
+  samples).
+- One Shot keeps the switch without effect (modes 0).
+- With Loop off the output is bit-identical to v55.
+- On the vocal, a 10 s note sustains with One Way and Alternate; without a
+  loop it ends after 3.5 s.
+
+**Not yet:**
+- loops on BACKING and ENSEMBLE. Found so far:
+  - their block (`0x8950e760`) computes the next crossing first;
+  - the walk list (`0x8950e860` forward, `0x8950e8f0` backward) checks it
+    once per block, after its 16 entries, calling `0x8950c880`/`0x8950ca70`
+    with type 0x10. With that type the handlers don't negate the step; the
+    bounce flags turn it from the next block (`0x8950c280`);
+  - their jump (`0x8950f710`, the loop entry of the event jump `0x8950f6f0`)
+    keeps the overshoot (position = cached position + position − crossing);
+  - it fills the block's walk list with the cached position;
+  - it restores six bands from per-band {segment, record, mark} entries, a
+    stride of player byte 9 apart in the 0xb4-byte cached event; ENSEMBLE
+    (+3 bit 0x80) restores band 0 only;
+- separate backward loop points in the plugin;
+- the PCM-style loop with Vari off;
+- Time Trip.
+
 ### The OSC pitch (2026-10-31, v55)
 
 The pitch, from the OSC's pitch values to the player's ratio, now follows
@@ -1587,20 +1715,23 @@ computed by the firmware's powf (`0x8952ff9c`):
   LFO's depth (+0x34) go through the same curve.
 
 **The wave's terms**, set by the voice setup `0x894f21c0` from the wave's
-header (out+0xa4) and a second wave record (out+0xac):
+header (out+0xa4) and its loop record (out+0xac, the `vplp` chunk):
 - +0x990 = 44000 / the header's u16 at +8. Every wave in Emu_test.prj
   stores 44000 there (in its `vpsc` chunk, which also holds the Original
   Pitch at +0xa), so the ratio is 1.
-- When +0x80 is 1, 6, 7 or 8 (SOLO's tail sets 6), +0 is 2, and Robot is
-  off: +0x994 = +0x998 = 0, and +0x9a4 = 440.
-- Otherwise (BACKING and ENSEMBLE, whose tail sets +0x80 to 3 and 5, and
-  Robot):
-  - +0x994 = the header's s32 at +0x18, plus 0.01 × the second record's s8
+- With Robot Voice (+0x80 is 1, 6, 7 or 8, +0 is 2 and the Robot flag is
+  set): +0x994 = +0x998 = 0, and +0x9a4 = 440, the robot's reference.
+- Otherwise, a normal SOLO voice included:
+  - +0x994 = the header's s32 at +0x18, plus 0.01 × the loop record's s8
     at +0x1b (cents);
-  - +0x998 = 0.01 × that record's s32 at +0;
+  - +0x998 = 0.01 × the loop record's s32 at +0;
   - +0x9a4 = the wave's root frequency, 440·2^((Original Pitch − 69)/12),
     with those terms.
-  - The header's term is 0 in every Emu_test.prj wave.
+  - All three fields are 0 in every Emu_test.prj wave. They are where the
+    wave's own fine tuning enters.
+- v55 had the Robot condition the wrong way round. v56 corrects it, from
+  the disassembly and from the firmware run in the interpreter. The plugin's
+  numbers are unchanged: an imported wave has 0 in all three fields.
 
 **The target**: `0x894f3a00` at note-on and `0x894f3ba0` in the update are
 the same code. They compute:
@@ -1664,8 +1795,8 @@ the XT slightly off equal temperament:
 - realtime controllers and the matrix;
 - portamento (the ramp);
 - the patch's own Coarse/Fine Tune path (Pitch Shift stands in for it);
-- where the wave's Original Fine Tune enters: for a SOLO wave without
-  Robot, none of the wave's terms apply.
+- the wave's own tuning fields (the header's +0x18, the loop record's +0
+  and +0x1b): the plugin's imported waves have them at 0.
 
 ### Robot Voice (2026-10-31, v54)
 
