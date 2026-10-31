@@ -217,6 +217,13 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+EXACT SUMS v62 (2026-10-31): XtFloat add/sub round the double sum and its
+  exact error (TwoSum), so a tiny addend still moves a large value one unit
+  toward zero as on the SH-4 (XT_ROUND=nearest: ties decided exactly).
+  Every firmware harness and render unchanged from v61 (all checks rebuilt
+  and re-run from one script); 300,000 random sums equal exact rational
+  arithmetic in both modes. XtCosm's local copy removed.
+
 COSM TVF v61 (2026-10-31): COSM 1 as a TVF (HARDWARE_FIRMWARE.md, "COSM:
   the TVF"). XtCosm: xtTvfBlock (converter 0x894dd870), xtCosmVelocity,
   xtTvfQ/xtTvfCutoff (the update 0x894eecb0, tables from rom.2 at run

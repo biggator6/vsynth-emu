@@ -2669,3 +2669,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
   unchanged.
 - Plugin: COSM 1 TVF with its envelopes and LFO 3. With it off the output
   is bit-identical to v60.
+
+### Session 16 addendum (2026-10-31) — v62: exact sums in XtFloat
+
+- XtFloat's add/sub now round exactly (TwoSum). The old double-then-
+  truncate sum was wrong in about 8% of random sums with large exponent
+  gaps; the new one matches exact rational arithmetic in both rounding
+  modes.
+- Every firmware check and render is unchanged from v61. The SOLO player's
+  −83…−100 dB residual is unchanged too, so it has another cause.

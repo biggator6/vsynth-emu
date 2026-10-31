@@ -1544,6 +1544,31 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### Exact sums in XtFloat (2026-10-31, v62)
+
+XtFloat's `add` and `sub` (the SH-4's single precision, round to zero) used
+to round the double sum toward zero. That is exact only while the operands'
+exponents are within about 29 bits. Further apart, the double sum is already
+rounded, and a tiny addend is lost; the SH-4 instead moves the large value
+one unit toward zero. The COSM TVF met this as its cutoff decayed (v61,
+which fixed it locally).
+
+- `add`/`sub` now use TwoSum: the double sum plus its exact error. That
+  decides the truncation, or for XT_ROUND=nearest a tie.
+- Against exact rational arithmetic, on 300,000 random sums (exponent gaps 0
+  to 63 bits, with sparse mantissas for ties):
+  - round to zero: 0 different (the old sum: 23,755 different);
+  - round to nearest: 0 different (the old: 0).
+- Every firmware check gives the same results as v61:
+  - xt_osc, xt_cosm, xt_lfo and xt_env exact;
+  - BACKING and ENSEMBLE bit-exact against the firmware players;
+  - SOLO −83…−100 dB on the same cases. Its residual does not come from
+    this.
+- Renders are bit-identical to v61 at the defaults, with the TVF, and with
+  the pitch envelope, LFO, OSC knobs and portamento set. The speed is
+  unchanged.
+- XtCosm now uses the shared sum.
+
 ### COSM: the TVF (2026-10-31, v61)
 
 **The COSM sections.**
@@ -1641,8 +1666,7 @@ Beyond that the double sum is already rounded, and a tiny addend is lost.
 The SH-4 instead moves a large value one unit toward zero. The TVF meets
 this when the cutoff decays toward 0: its states then drift by a unit per
 sample. `XtCosm` uses an exact round-to-zero sum (TwoSum, then the
-truncation). XtFloat itself is unchanged for now; the other ports may meet
-the same case.
+truncation). XtFloat itself took the same exact sum in v62.
 
 **Port and checks** (`xt_cosm`, in the interpreter, denormals flushed as
 on the SH-4):

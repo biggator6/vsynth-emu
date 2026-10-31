@@ -3,7 +3,6 @@
 #include "XtCosm.h"
 #include "XtFloat.h"
 #include "XtOsc.h"
-#include <cmath>
 #include <cstdio>
 
 namespace {
@@ -18,22 +17,7 @@ struct Tables {
 } T;
 
 using namespace xtf;
-// A sum rounded toward zero exactly.  xtf::add forms the sum in double
-// first, which is not exact when the exponents differ by more than about 29
-// bits; the filter's states then miss the SH-4's one-unit steps toward zero
-// (a large state plus a tiny product, as the cutoff decays).  TwoSum gives
-// the double sum's exact error, which decides the truncation.
-inline float addz(float a, float b) {
-    const double x = a, y = b, s = x + y, bb = s - x, err = (x - (s - bb)) + (y - bb);
-    float f = (float)s;
-    if (nearest()) return f;
-    const double d = (double)f - s;                  // exact
-    const bool pos = s > 0.0 || (s == 0.0 && err > 0.0);
-    if (pos ? d > err : d < err) f = std::nextafter(f, 0.0f);
-    return f;
-}
-inline float subz(float a, float b) { return addz(a, -b); }
-inline float fmac(float a, float b, float c) { return addz(mul(a, b), c); }   // FMAC: the product, then the sum
+inline float fmac(float a, float b, float c) { return add(mul(a, b), c); }   // FMAC: the product, then the sum
 inline float sq63(int d) {                                                    // (d/63)·|d/63|
     const float v = div(flt(d), 63.0f);
     return mul(0.0f > v ? -v : v, v);
@@ -45,27 +29,27 @@ inline int clampi(int x, int lo, int hi) { return x < lo ? lo : x > hi ? hi : x;
 void stage24(float* lr, float* s, float& c1, float& c2, float d1, float d2, int mode) {
     float a = s[0], b = s[1], d = s[2], e = s[3];
     for (int i = 0; i < 32; ++i) {
-        if ((i & 3) == 0) { c1 = addz(c1, d1); c2 = addz(c2, d2); }
+        if ((i & 3) == 0) { c1 = add(c1, d1); c2 = add(c2, d2); }
         const float x = lr[2 * i];
         b = fmac(a, c2, b);
         float t = mul(-x, c1);
-        t = subz(t, b);
+        t = sub(t, b);
         t = fmac(a, c1, t);
         a = fmac(c2, t, a);
         e = fmac(c2, d, e);
         float in2 = t;                                 // HP24
         if (mode == 0) in2 = b;                        // LP24
         else if (mode == 1) in2 = a;                   // BP24
-        else if (mode == 3) in2 = addz(t, a);           // NOTCH24
-        else if (mode == 4) in2 = subz(t, a);           // PEAK24
-        float u = subz(in2, e);
+        else if (mode == 3) in2 = add(t, a);           // NOTCH24
+        else if (mode == 4) in2 = sub(t, a);           // PEAK24
+        float u = sub(in2, e);
         u = fmac(c1, d, u);
         d = fmac(u, c2, d);
         float y = u;                                   // HP24
         if (mode == 0) y = e;
         else if (mode == 1) y = d;
-        else if (mode == 3) y = addz(u, e);
-        else if (mode == 4) y = subz(u, e);
+        else if (mode == 3) y = add(u, e);
+        else if (mode == 4) y = sub(u, e);
         lr[2 * i] = lr[2 * i + 1] = y;
     }
     s[0] = a; s[1] = b; s[2] = d; s[3] = e;
@@ -75,18 +59,18 @@ void stage12(float* lr, float* s, float& c1, float& c2, float d1, float d2, int 
     const float k = fmac(-c1, 0.5f, 0.5f);             // the input gain, from c1 at the block's start
     float a = s[0], b = s[1];
     for (int i = 0; i < 32; ++i) {
-        if ((i & 3) == 0) { c1 = addz(c1, d1); c2 = addz(c2, d2); }
+        if ((i & 3) == 0) { c1 = add(c1, d1); c2 = add(c2, d2); }
         const float x = lr[2 * i];
         b = fmac(a, c2, b);
         float t = mode == 5 ? mul(x, k) : mul(-x, k);  // LP12 keeps the sign
-        t = subz(t, b);
+        t = sub(t, b);
         t = fmac(a, c1, t);
         a = fmac(t, c2, a);
         float y = t;                                   // HP12
         if (mode == 5) y = b;
         else if (mode == 6) y = a;
-        else if (mode == 8) y = addz(t, b);
-        else if (mode == 9) y = subz(t, b);
+        else if (mode == 8) y = add(t, b);
+        else if (mode == 9) y = sub(t, b);
         lr[2 * i] = lr[2 * i + 1] = y;
     }
     s[0] = a; s[1] = b;
@@ -95,8 +79,8 @@ void stage12(float* lr, float* s, float& c1, float& c2, float d1, float d2, int 
 void stage6(float* lr, float* s, float& c2, float d2, bool hp) {
     float a = s[0];
     for (int i = 0; i < 32; ++i) {
-        if ((i & 3) == 0) c2 = addz(c2, d2);
-        const float y = subz(lr[2 * i], a);
+        if ((i & 3) == 0) c2 = add(c2, d2);
+        const float y = sub(lr[2 * i], a);
         a = fmac(y, c2, a);
         lr[2 * i] = lr[2 * i + 1] = hp ? y : a;
     }
@@ -123,7 +107,7 @@ XtTvfBlock xtTvfBlock(const XtTvfParams& p, int key, float velA, float velB) {
     b.mode = p.filter;
     const int c = clampi((int16_t)p.cutoff, 0, 127);
     float f = div(div(mul(flt((int16_t)(key - 60)), flt((int16_t)(p.keyfollow * 10))), 100.0f), 127.0f);
-    f = addz(addz(f, div(flt(c), 127.0f)), 0.0f);
+    f = add(add(f, div(flt(c), 127.0f)), 0.0f);
     b.cutoff = f > 1.0f ? 1.0f : (0.0f > f ? 0.0f : f);
     b.cutoffLfo = sq63(clampi((int16_t)p.cutoffLfo, -63, 63));
     {
@@ -131,7 +115,7 @@ XtTvfBlock xtTvfBlock(const XtTvfParams& p, int key, float velA, float velB) {
         b.cutoffEnv = mul(velA, mul(0.0f > v ? -v : v, v));
     }
     const int q = clampi((int16_t)p.q, 0, 127);
-    b.q = addz(div(mul(flt(q), 0.984375f), 127.0f), -1.0f);
+    b.q = add(div(mul(flt(q), 0.984375f), 127.0f), -1.0f);
     b.qLfo = sq63(clampi((int16_t)p.qLfo, -63, 63));
     {
         const float v = div(flt((int16_t)p.qEnv), 63.0f);
@@ -158,10 +142,10 @@ float xtTvfCutoff(float cutoff, float envDepth, float env, float lfoDepth, float
     if (0.0f > y) return 0.0f;
     const float z = mul(y, 127.0f);
     int i = ftrc(z);
-    const float frac = subz(z, flt(ftrc(z)));
+    const float frac = sub(z, flt(ftrc(z)));
     if (i > 127) i = 127;
     const int j = ftrc(mul(-q, 127.0f));
-    const float c = fmac(T.cut[i], subz(1.0f, frac), mul(T.cut[i + 1], frac));
+    const float c = fmac(T.cut[i], sub(1.0f, frac), mul(T.cut[i + 1], frac));
     const float cap = T.cap[127 - j];
     return c > cap ? cap : c;
 }
@@ -195,7 +179,7 @@ void XtCosmTvf::setState(const float st[4], float c1, float c2, float t1, float 
 }
 
 void XtCosmTvf::process(float* lr) {
-    const float d1 = mul(rate1, subz(tgt1, cur1)), d2 = mul(rate2, subz(tgt2, cur2));
+    const float d1 = mul(rate1, sub(tgt1, cur1)), d2 = mul(rate2, sub(tgt2, cur2));
     const int m = blk.mode;
     if (m >= 0 && m <= 4) stage24(lr, s, cur1, cur2, d1, d2, m);
     else if (m >= 5 && m <= 9) stage12(lr, s, cur1, cur2, d1, d2, m);
