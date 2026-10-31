@@ -296,12 +296,25 @@ XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {
     p.cutoff = c.cutoff; p.keyfollow = c.kf / 10; p.cutoffLfo = c.cutoffLfo; p.cutoffEnv = c.cutoffEnv;
     p.qOwn = c.resoOwn; p.cutoffOwn = c.cutoffOwn;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
-    return v.cs[k].dynamic ? xtDtvfBlock(p, v.note, va, vb) : xtTvfBlock(p, v.note, va, vb);
+    return v.cs[k].type == 1 ? xtDtvfBlock(p, v.note, va, vb) : xtTvfBlock(p, v.note, va, vb);
 }
 
+// A Dual Filter's block (0x894dd690): Filter 1's Env depth by A, Filter 2's by B.
+XtDualBlock XtSynth::dualBlock(const Voice& v, int k) const {
+    const Controls::Cosm& c = ctl.cosm[k];
+    XtDualParams p;
+    p.type = c.dualType;
+    p.freq1 = c.freq1; p.kf1 = c.kf1 / 10; p.q1 = c.q1; p.lfo1 = c.lfo1; p.env1 = c.env1;
+    p.freq2 = c.freq2; p.kf2 = c.kf2 / 10; p.q2 = c.q2; p.lfo2 = c.lfo2; p.env2 = c.env2;
+    const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
+    return xtDualBlock(p, v.note, va, vb);
+}
+
+// The TVF's slot 1 is its Q (envB), the Dual Filter's Filter 1 (envA).
 void XtSynth::cosmSetBlock(Voice& v, int k) {
     Voice::CosmVoice& c = v.cs[k];
-    c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
+    if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
+    else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
 }
 
 // The LFO constructor seeds each LFO's chaos state from a global logistic
@@ -358,7 +371,9 @@ void XtSynth::setControls(const Controls& c) {
                       || n.lfoFadeMode != o.lfoFadeMode || n.lfoFade != o.lfoFade;
         cosmChanged[k] = n.resoOwn != o.resoOwn || n.cutoffOwn != o.cutoffOwn || n.filter != o.filter || n.cutoff != o.cutoff || n.reso != o.reso || n.kf != o.kf || n.cutoffEnv != o.cutoffEnv
                       || n.cutoffLfo != o.cutoffLfo || n.resoEnv != o.resoEnv || n.resoLfo != o.resoLfo || n.envA.velCurve != o.envA.velCurve
-                      || n.envA.velSens != o.envA.velSens || n.envB.velCurve != o.envB.velCurve || n.envB.velSens != o.envB.velSens;
+                      || n.envA.velSens != o.envA.velSens || n.envB.velCurve != o.envB.velCurve || n.envB.velSens != o.envB.velSens
+                      || n.dualType != o.dualType || n.freq1 != o.freq1 || n.kf1 != o.kf1 || n.q1 != o.q1 || n.lfo1 != o.lfo1 || n.env1 != o.env1
+                      || n.freq2 != o.freq2 || n.kf2 != o.kf2 || n.q2 != o.q2 || n.lfo2 != o.lfo2 || n.env2 != o.env2;
     }
     ctl = c;
     for (int k = 0; k < 2; ++k)
@@ -462,20 +477,24 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->oenv.noteOn(oe);
     v->lfo.noteOn(lfoParams(), drawSeed());
     if (!ctl.lfoKeySync && freeLfoOn) v->lfo.setPhase(freeLfo.phase());
-    // the COSM sections as TVFs (0x894edf70, COSM 1 then 2): their
+    // the COSM sections (0x894edf70, COSM 1 then 2): their
     // envelopes and LFOs start with the others; the filters' states clear and
     // their coefficients start from the envelopes' start levels
     for (int k = 0; k < 2; ++k) {
         Voice::CosmVoice& c = v->cs[k];
         c.on = ctl.cosm[k].on;
         if (!c.on) continue;
-        c.dynamic = ctl.cosm[k].type == 1;
+        c.type = ctl.cosm[k].type;
         c.envA.noteOn(cosmEnvParams(*v, ctl.cosm[k].envA));
         c.envB.noteOn(cosmEnvParams(*v, ctl.cosm[k].envB));
         c.lfo.noteOn(clfoParams(k), drawSeed());
         if (!ctl.cosm[k].lfoKeySync && freeClfoOn[k]) c.lfo.setPhase(freeClfo[k].phase());
-        c.tvf.noteOn(cosmBlock(*v, k), c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out(),
-                     c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
+        if (c.type == 2)
+            c.dual.noteOn(dualBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
+                          c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
+        else
+            c.tvf.noteOn(cosmBlock(*v, k), c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out(),
+                         c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
     }
     targets(*v, v->curA, v->curF, v->curWalk, v->curG);
     // the OSC gain starts from the amp envelope's start level, or its output
@@ -662,8 +681,11 @@ void XtSynth::mixBlock(float* lr) {
             v.curGain = xtOscSmooth(v.curGain, gt);
             applyRates(v);
             // the COSM updates (0x894ee6a0, COSM 1 then 2), after the voices', before the TVA
-            for (Voice::CosmVoice& c : v.cs)
-                if (c.on) c.tvf.update(c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
+            for (Voice::CosmVoice& c : v.cs) {
+                if (!c.on) continue;
+                if (c.type == 2) c.dual.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
+                else c.tvf.update(c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
+            }
             tvaUpdate(v);
             if (!v.active) continue;
         }
@@ -681,8 +703,11 @@ void XtSynth::mixBlock(float* lr) {
         // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA; the
         // Dynamic TVF's follower reads the XT's scale: int16 × 65536, i.e.
         // the SOLO buffer (±1) × 2^31, the band players' (int16) × 2^16
-        for (Voice::CosmVoice& c : v.cs)
-            if (c.on) c.tvf.process(tmp, cur->type == 1 ? 0x1p31f : 0x1p16f);
+        for (Voice::CosmVoice& c : v.cs) {
+            if (!c.on) continue;
+            if (c.type == 2) c.dual.process(tmp);
+            else c.tvf.process(tmp, cur->type == 1 ? 0x1p31f : 0x1p16f);
+        }
         if (v.damping) {
             // truncated (0x894f5570): the gain held, times a fade that falls
             // by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16
@@ -788,6 +813,9 @@ void XtSynth::render(float* left, float* right, int n) {
 //     COSM 1 on, a TVF (type 0) or Dynamic TVF (1); XT_CENV="a,d,s,r[,velCurve,velSens]" its cutoff envelope
 //     (Env 9); XT_CLFO="wave,rate,offset,delay,fadeMode,fade,keySync" LFO 3.
 //     XT_COSM2, XT_CENV2, XT_CLFO2: the same for COSM 2 (Env 11, LFO 4).
+//   XT_DUAL="type,freq1,kf1,q1,lfo1,env1,freq2,kf2,q2,lfo2,env2": COSM 1 on, a Dual
+//     Filter (KF in %); XT_CENV its Filter 1 envelope (Env 9), XT_CENVB its
+//     Filter 2 envelope (Env 10). XT_DUAL2, XT_CENVB2: COSM 2's.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -869,8 +897,16 @@ int main(int argc, char** argv) {
             std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.filter, &m.cutoff, &m.reso, &m.kf, &m.cutoffEnv, &m.cutoffLfo, &m.resoEnv,
                         &m.resoLfo, &m.type, &m.resoOwn, &m.cutoffOwn);
         }
+        if (const char* e = std::getenv(("XT_DUAL" + sfx).c_str())) {   // "type,freq1,kf1,q1,lfo1,env1,freq2,kf2,q2,lfo2,env2"
+            m.on = true;
+            m.type = 2;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.dualType, &m.freq1, &m.kf1, &m.q1, &m.lfo1, &m.env1, &m.freq2, &m.kf2,
+                        &m.q2, &m.lfo2, &m.env2);
+        }
         if (const char* e = std::getenv(("XT_CENV" + sfx).c_str()))     // the cutoff's envelope "a,d,s,r[,velCurve,velSens]"
             std::sscanf(e, "%d,%d,%d,%d,%d,%d", &m.envA.attack, &m.envA.decay, &m.envA.sustain, &m.envA.release, &m.envA.velCurve, &m.envA.velSens);
+        if (const char* e = std::getenv(("XT_CENVB" + sfx).c_str()))    // Env B "a,d,s,r[,velCurve,velSens]"
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d", &m.envB.attack, &m.envB.decay, &m.envB.sustain, &m.envB.release, &m.envB.velCurve, &m.envB.velSens);
         if (const char* e = std::getenv(("XT_CLFO" + sfx).c_str())) {   // its LFO "wave,rate,offset,delay,fadeMode,fade,keySync"
             int ks = 0;
             std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &m.lfoWave, &m.lfoRate, &m.lfoOffset, &m.lfoDelay, &m.lfoFadeMode, &m.lfoFade, &ks);

@@ -1544,6 +1544,136 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Dual Filter, and the map of the types (2026-10-31, v65)
+
+**The types in rom.2.** The COSM converter (`0x894de3b0`) switches on the
+type to a converter per type, which writes a block code. The voice's COSM
+routine table (.data 0x8987c7ec) is indexed by that code. The block copy
+(`0x894ee4a0`), binding (`0x894f7330`), start values (`0x894ec340`), note-on
+(`0x894edf70`) and update (`0x894ee6a0`) all switch on the code too.
+
+| Type | Name | IDs | Converter | Code | DSP |
+|---|---|---|---|---|---|
+| 1 | OD/Dist | 0x8d0–0x8d8 | `0x894dc8b0` | 1 or 2 | `0x894fef70`, `0x894fc570` |
+| 2 | Wave Shape | 0x8d9–0x8e1 | `0x894dcbf0` | 3 | `0x89503ef0` |
+| 3 | Amp Simulator | 0x8e2–0x8e9 | `0x894dcd80` | 4 | `0x894f8a30` |
+| 4 | Speaker Simulator | 0x8ea | inline | 5 | `0x89501300` |
+| 5 | Resonator | 0x8eb–0x8f2 | `0x894dcf00` | | |
+| 6 | 1st Side Band Filter | 0x8f3–0x900 | `0x894dd0a0` | | |
+| 7 | 2nd Side Band Filter | 0x901–0x90d | `0x894dd2c0` | | |
+| 8 | Comb Filter | 0x90e–0x914 | `0x894dd4f0` | 9 | `0x894fa8d0` |
+| 9 | Dual Filter | 0x915–0x91f | `0x894dd690` | 12 | `0x894fd090` |
+| 10 | TVF | 0x920–0x927 | `0x894dd870` | 13 | `0x89502890` |
+| 11 | Dynamic TVF | 0x928–0x931 | `0x894dda40` | 14 | `0x89502920` |
+| 12 | Compressor | 0x932–0x934 | `0x894ddc50` | 15 | `0x894fab80` |
+| 13 | Limiter | 0x935–0x939 | `0x894ddd20` | 16 | `0x894fe450` |
+| 14 | Frequency Shifter | 0x93a–0x940 | `0x894ddde0` | | |
+| 15 | Lo-Fi | 0x941–0x949 | `0x894ddf80` | | |
+| 16 | TB Filter | 0x94a–0x954 | `0x894de110` | 20 | `0x89501950` |
+
+The routine table by code (0…20): `0x894fb280`, `0x894fef70`,
+`0x894fc570`, `0x89503ef0`, `0x894f8a30`, `0x89501300`, `0x894ffa10`,
+`0x89500640`, `0x89500d40`, `0x894fa8d0`, `0x894fb2b0`, `0x89501bf0`,
+`0x894fd090`, `0x89502890`, `0x89502920`, `0x894fab80`, `0x894fe450`,
+`0x894fb530`, `0x894fda60`, `0x894fe9c0`, `0x89501950`. Blank cells were not
+traced: those converters choose their code at run time. The codes left
+over are 0 (Through) and 6–8, 10, 11 and 17–19, presumably theirs. The ID ranges are from the table at 0x897cebd8.
+
+**The Dual Filter** (COSM Type 9, block code 12).
+
+Parameters (0x915…0x91f, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x915 | Filter Type | 0…2 | 0 |
+| 0x916 | Filter 1 Frequency | 0…127 | 90 |
+| 0x917 | Filter 1 Frequency Keyfollow | ±20 | 10 |
+| 0x918 | Filter 1 Q | 0…127 | 108 |
+| 0x919 | Filter 1 LFO Depth | ±63 | 0 |
+| 0x91a | Filter 1 Env Depth | ±63 | 0 |
+| 0x91b | Filter 2 Frequency | 0…127 | 80 |
+| 0x91c | Filter 2 Frequency Keyfollow | ±20 | 10 |
+| 0x91d | Filter 2 Q (named "Filter 1 Q" in rom.2) | 0…127 | 120 |
+| 0x91e | Filter 2 LFO Depth | ±63 | 0 |
+| 0x91f | Filter 2 Env Depth | ±63 | 0 |
+
+The Filter Types, from the UI strings: LPF/HPF, LPF->HPF, BPF/BPF.
+
+**The converter** (`0x894dd690`) per filter forms the TVF's sums:
+- Frequency: the keyfollowed cutoff (`0x894dc660`: (key − 60)·KF·10/100/127
+  + clamp(F, 0…127)/127, within 0…1; the same as the TVF's inline sum);
+- Q: clamp(Q)·0.984375/127 − 1;
+- LFO depth: (d/63)·|d/63| of the clamped depth;
+- Env depth: A (Filter 1) or B (Filter 2) × (d/63)·|d/63|.
+
+The block: [1] type, [2…7] Filter 1 (Frequency, Env, Q, envelope 9/11,
+LFO, LFO 3/4), [8…13] Filter 2 (envelope 10/12). So Filter 1 runs on Env A
+(Env 9, COSM 2 Env 11) and Filter 2 on Env B (Env 10, 12), both on LFO 3
+(LFO 4). The binding puts Filter 1's envelope in slot 1 (+0x150). That is
+the slot the TVF gives its Q.
+
+**The object.**
+- Both coefficients (D+0xbc, +0xc0) are cutoffs, one per filter. Each is
+  the TVF's table step (`0x894ec140`) at Frequency + Env depth × envelope +
+  LFO depth × LFO, capped by that filter's own Q:
+  - the start values use the envelopes' start levels (`0x894ec340`);
+  - the targets use their outputs: at note-on and on a new block
+    (`0x894ed5d0`), and every 10 ms (`0x894ee6a0`).
+- The step rates are the TVF's: 4 × the envelopes' follower coefficients.
+- At note-on (`0x894edf70`, code 12) D+0x90/+0x94 take the two Qs. The
+  filter does not read them there.
+- The filter (`0x894fd090`):
+  - computes each step as rate·(target − c);
+  - passes both Qs from the block itself (+0x10, +0x28). So a new block
+    changes Q at once, unsmoothed;
+  - jumps to the kernel for the type (table at 0x894fd0f0, no bounds
+    check).
+
+**The kernels** (`0x894fcbe0` LPF/HPF, `0x894fcd70` LPF->HPF, `0x894fcef0`
+BPF/BPF). Each runs 32 frames; the coefficients step before every fourth
+frame. Each filter is two 24-dB SVF stages. For a filter with cutoff c,
+Q q, input x and states s0…s3:
+- s1 += c·s0; t = x·q − s1 + q·s0; s0 += c·t;
+- s3 += c·s2; u = in₂ − s3 + q·s2; s2 += c·u;
+- in₂ is s1 (LP) or, for BPF/BPF, s0 (BP).
+
+The kernels differ in how the two filters connect:
+- **LPF/HPF:** Filter 1 is LP24 (output s3). Filter 2 is HP24 on the input,
+  with in₂ = t and output u. The output is the sum of the two.
+- **LPF->HPF:** Filter 2's input is Filter 1's LP24 output; the output is
+  Filter 2's HP24.
+- **BPF/BPF:** both filters are BP24 (output s2), and the output is their
+  sum.
+
+The kernel reads L and writes both channels. The states are D+0x1c…0x38.
+Unlike the TVF's, the input is multiplied by q itself, not −q.
+
+**Port and checks** (`xt_cosm`, new lines; TVF results unchanged):
+- the converter: 200,000 cases;
+- the start values, block targets (at note-on and on new blocks while the
+  note sounds) and updates: 14,993 cases;
+- the filter: 120,000 blocks, all three types, the coefficients stepping;
+- all 0 different.
+
+**Plugin.**
+- COSM Type gains Dual Filter (index 2, latched at note-on).
+- Per section the Dual Filter has its own parameters, with the XT's
+  defaults (as on the XT, each type keeps its own):
+  - Dual Filter Type;
+  - Filter 1 and 2 Frequency, Keyfollow (±200%), Q, LFO and Env depths.
+- Its Env A/B and LFO are the section's.
+- The editor: the Dual Filter Type on the Type row, and a row per filter.
+- Checks:
+  - the existing renders are bit-identical to v64;
+  - PluginTest is bit-identical with the Dual Filter at its defaults; as
+    LPF->HPF with both envelopes, the LFO and a second note; and as BPF/BPF
+    on COSM 2 behind a TVF on COSM 1, in MONO legato.
+- On noise (BACKING; Dual Filter on against COSM off, third-octave bands):
+  - LPF/HPF (F1 60, F2 110, Q 100): resonant peaks at about 250 Hz and
+    8 kHz, −47 dB at 1–2 kHz;
+  - LPF->HPF (F1 100, F2 60): a band from about 500 Hz to 4 kHz;
+  - BPF/BPF (60, 100, Q 110): peaks at about 250 Hz and 4 kHz.
+
 ### COSM: the Dynamic TVF (2026-10-31, v64)
 
 COSM Type 11, block code 14. It is the TVF with a follower of the section's
@@ -1798,7 +1928,7 @@ on the SH-4):
 
 **Not modelled yet:**
 - COSM 2 (since modelled, v63);
-- the other fifteen types (Dynamic TVF since modelled, v64);
+- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;

@@ -114,8 +114,9 @@ public:
         bool mono = false, legato = true;
         int octave = 0;
         // The COSM sections (XtCosm), COSM 1 then COSM 2 in series: the
-        // switch; the type, 0 TVF or 1 Dynamic TVF (its Q and Cutoff also
-        // follow the input's level by their Own Env depths −63..+63); Filter
+        // switch; the type, 0 TVF, 1 Dynamic TVF (its Q and Cutoff also
+        // follow the input's level by their Own Env depths −63..+63) or 2
+        // Dual Filter (its own parameters below); Filter
         // Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
         // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
         // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
@@ -133,6 +134,11 @@ public:
             int type = 0, resoOwn = 0, cutoffOwn = 0;
             int filter = 5, cutoff = 127, reso = 0, kf = 0;
             int cutoffEnv = 0, cutoffLfo = 0, resoEnv = 0, resoLfo = 0;
+            // the Dual Filter: Filter Type 0..2 (LPF/HPF, LPF->HPF, BPF/BPF);
+            // per filter Frequency and Q 0..127, Keyfollow −200..+200 (steps
+            // of 10), LFO and Env depths −63..+63; Filter 1 on envA, 2 on envB
+            int dualType = 0, freq1 = 90, kf1 = 100, q1 = 108, lfo1 = 0, env1 = 0;
+            int freq2 = 80, kf2 = 100, q2 = 120, lfo2 = 0, env2 = 0;
             CosmEnv envA, envB;
             int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
             bool lfoKeySync = false;
@@ -175,11 +181,14 @@ private:
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
         XtLfo lfo;
-        // the COSM sections: on as at note-on; each its TVF, envelopes (the
-        // Cutoff's, the Q's) and LFO
+        // the COSM sections: on as at note-on; each its TVF or Dual Filter,
+        // envelopes (A: the Cutoff's or Filter 1's; B: the Q's or Filter 2's)
+        // and LFO
         struct CosmVoice {
-            bool on = false, dynamic = false;  // the type as at note-on
+            bool on = false;
+            int type = 0;                      // the type as at note-on
             XtCosmTvf tvf;
+            XtCosmDual dual;
             XtEnvelope envA, envB;
             XtLfo lfo;
         };
@@ -243,6 +252,7 @@ private:
     XtLfoParams clfoParams(int k) const;             // LFO 3 (COSM 1), LFO 4 (COSM 2)
     XtEnvParams cosmEnvParams(const Voice& v, const Controls::CosmEnv& e) const;
     XtTvfBlock cosmBlock(const Voice& v, int k) const;
+    XtDualBlock dualBlock(const Voice& v, int k) const;
     void cosmSetBlock(Voice& v, int k);              // a new block for a sounding section (0x894ed8f0)
     float drawSeed();
 };

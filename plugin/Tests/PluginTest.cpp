@@ -170,7 +170,9 @@ int main(int argc, char** argv) {
     // TEST_COSM="filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo[,type,
     // resoOwn,cutOwn]": COSM 1, a TVF (type 0) or Dynamic TVF (1); TEST_CENV="a,d,s,r,velCurve,velSens": its cutoff envelope
     // (Env A); TEST_CLFO="wave,rate": its LFO.  TEST_COSM2, TEST_CENV2,
-    // TEST_CLFO2: the same for COSM 2.
+    // TEST_CLFO2: the same for COSM 2.  TEST_DUAL="type,freq1,kf1,q1,lfo1,env1,
+    // freq2,kf2,q2,lfo2,env2": COSM 1 a Dual Filter (KF in %); TEST_CENVB its
+    // Env B (Filter 2's); TEST_DUAL2, TEST_CENVB2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -184,6 +186,21 @@ int main(int argc, char** argv) {
                         &m.resoLfo, &m.type, &m.resoOwn, &m.cutoffOwn);
             set("Switch", 1); set("Type", m.type); set("ResoOwn", m.resoOwn); set("CutoffOwn", m.cutoffOwn); set("Filter", m.filter); set("Cutoff", m.cutoff); set("Reso", m.reso); set("CutoffKF", m.kf);
             set("CutoffEnv", m.cutoffEnv); set("CutoffLfo", m.cutoffLfo); set("ResoEnv", m.resoEnv); set("ResoLfo", m.resoLfo);
+        }
+        if (const char* e = std::getenv(("TEST_DUAL" + sfx).c_str())) {
+            m.on = true;
+            m.type = 2;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.dualType, &m.freq1, &m.kf1, &m.q1, &m.lfo1, &m.env1, &m.freq2, &m.kf2,
+                        &m.q2, &m.lfo2, &m.env2);
+            set("Switch", 1); set("Type", 2); set("DualType", m.dualType);
+            set("Dual1Freq", m.freq1); set("Dual1KF", m.kf1); set("Dual1Q", m.q1); set("Dual1Lfo", m.lfo1); set("Dual1Env", m.env1);
+            set("Dual2Freq", m.freq2); set("Dual2KF", m.kf2); set("Dual2Q", m.q2); set("Dual2Lfo", m.lfo2); set("Dual2Env", m.env2);
+        }
+        if (const char* e = std::getenv(("TEST_CENVB" + sfx).c_str())) {
+            auto& b = m.envB;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d", &b.attack, &b.decay, &b.sustain, &b.release, &b.velCurve, &b.velSens);
+            set("EnvBAttack", b.attack); set("EnvBDecay", b.decay); set("EnvBSustain", b.sustain); set("EnvBRelease", b.release);
+            set("EnvBVelCurve", b.velCurve); set("EnvBVelSens", b.velSens);
         }
         if (const char* e = std::getenv(("TEST_CENV" + sfx).c_str())) {
             auto& a = m.envA;

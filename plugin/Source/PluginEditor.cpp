@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 760;  // height of the XT strip below it
+static constexpr int kXtStripH   = 820;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -16,14 +16,16 @@ static const char* const kLevelIds[32][2] = {
     { "cosmEnvAAttack", "A" },     { "cosmEnvADecay", "D" },        { "cosmEnvASustain", "S" },      { "cosmEnvARelease", "R" },
 };
 static const char* const kLevelRowNames[8] = { "OSC Pitch", "Tune", "OSC TVA", "O Env", "O Env", "Velocity", "COSM Mod", "COSM Env" };
+// The Dual Filter's rows: the id suffixes after "cosmDual1"/"cosmDual2", and labels
+static const char* const kDualIds[5][2] = { { "Freq", "Frq" }, { "Q", "Q" }, { "KF", "KF" }, { "Lfo", "LFO" }, { "Env", "Env" } };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1060);
+    setSize(560, 1120);
     setResizable(true, true);
-    setResizeLimits(480, 600, 960, 1200);
+    setResizeLimits(480, 660, 960, 1260);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -130,7 +132,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF" }, 1);
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter" }, 1);
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
         addAndMakeVisible(*cpt);
@@ -167,6 +169,23 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     for (int r = 0; r < kLevelRows; ++r) {
         levelRowLabels_[r].setText(kLevelRowNames[r], juce::dontSendNotification);
         styleSmall(levelRowLabels_[r]);
+    }
+    dualTypeBox_.addItemList({ "LPF/HPF", "LPF->HPF", "BPF/BPF" }, 1);
+    addAndMakeVisible(dualTypeBox_);
+    for (int i = 0; i < kDualKnobs; ++i) {
+        juce::Slider& sl = dualSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        dualLabels_[i].setText(kDualIds[i % 5][1], juce::dontSendNotification);
+        styleSmall(dualLabels_[i]);
+    }
+    for (int r = 0; r < 2; ++r) {
+        dualRowLabels_[r].setText(r ? "Filter 2" : "Filter 1", juce::dontSendNotification);
+        styleSmall(dualRowLabels_[r]);
     }
     attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
@@ -228,7 +247,8 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 }
 
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
-// the depth and Env A rows (level slots 24..31) and its LFO.
+// the depth and Env A rows (level slots 24..31), the Dual Filter's rows and
+// its LFO.
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
     cosmAtt_.reset(); cosmFilterAtt_.reset(); cosmCutAtt_.reset(); cosmResoAtt_.reset(); cosmKfAtt_.reset();
@@ -248,6 +268,12 @@ void VSynthEmuEditor::attachCosm(int k) {
     for (int i = 24; i < kLevelKnobs; ++i) {            // "cosm…" ids: the suffix after "cosm"
         levelAtts_[i].reset();
         levelAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + juce::String(kLevelIds[i][0] + 4), levelSliders_[i]);
+    }
+    dualTypeAtt_.reset();
+    dualTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "DualType", dualTypeBox_);
+    for (int i = 0; i < kDualKnobs; ++i) {
+        dualAtts_[i].reset();
+        dualAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + "Dual" + juce::String(i / 5 + 1) + kDualIds[i % 5][0], dualSliders_[i]);
     }
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
 }
@@ -481,15 +507,27 @@ void VSynthEmuEditor::resized() {
         }
     }
     xt.removeFromTop(6);
-    auto rd = xt.removeFromTop(24);                  // the COSM's type and its Dynamic TVF Own Env depths
+    auto rd = xt.removeFromTop(24);                  // the COSM's type, the Dual Filter's type, the Dynamic TVF's Own Env depths
     cosmTypeLabel_.setBounds(rd.removeFromLeft(46));
-    cosmTypeBox_.setBounds(rd.removeFromLeft(130).withTrimmedRight(8));
+    cosmTypeBox_.setBounds(rd.removeFromLeft(120).withTrimmedRight(8));
+    dualTypeBox_.setBounds(rd.removeFromLeft(100).withTrimmedRight(8));
     const int half = rd.getWidth() / 2;
     auto rd1 = rd.removeFromLeft(half);
     cosmCutOwnLabel_.setBounds(rd1.removeFromLeft(46));
     cosmCutOwnSlider_.setBounds(rd1.withTrimmedRight(6));
     cosmResoOwnLabel_.setBounds(rd.removeFromLeft(46));
     cosmResoOwnSlider_.setBounds(rd);
+    for (int r = 0; r < 2; ++r) {                    // the Dual Filter: Filter 1, Filter 2
+        xt.removeFromTop(6);
+        auto row = xt.removeFromTop(24);
+        dualRowLabels_[r].setBounds(row.removeFromLeft(56));
+        const int fifth = row.getWidth() / 5;
+        for (int i = 5 * r; i < 5 * r + 5; ++i) {
+            auto cell = row.removeFromLeft(fifth);
+            dualLabels_[i].setBounds(cell.removeFromLeft(28));
+            dualSliders_[i].setBounds(cell.withTrimmedRight(4));
+        }
+    }
     xt.removeFromTop(6);
     auto rl = xt.removeFromTop(24);                  // LFO 3: waveform, rate, key sync
     clfoLabel_.setBounds(rl.removeFromLeft(46));

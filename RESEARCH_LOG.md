@@ -2701,3 +2701,14 @@ Round-2 recordings.  First build-out after that: real-time granular port
   buffers map to it by exact powers of two.
 - All of it equals the firmware in the interpreter. In the plugin, the
   per-section Type and Own depths.
+
+### Session 16 addendum (2026-10-31) — v65: Dual Filter
+
+- The COSM types are mapped: each converter, block code and DSP routine,
+  so the remaining types can be found directly.
+- The Dual Filter is two of the TVF's 24-dB SVFs, each with its own cutoff,
+  capped by its own Q. They run in parallel (LPF/HPF, BPF/BPF) or in series
+  (LPF->HPF). Filter 1 follows Env A and Filter 2 Env B. The kernel reads
+  both Qs from the block, so Q changes apply at once.
+- All of it equals the firmware in the interpreter. In the plugin: Type 2
+  and its own parameters with the XT's defaults.

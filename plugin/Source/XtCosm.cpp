@@ -23,6 +23,18 @@ inline float sq63(int d) {                                                    //
     return mul(0.0f > v ? -v : v, v);
 }
 inline int clampi(int x, int lo, int hi) { return x < lo ? lo : x > hi ? hi : x; }
+// A cutoff with its keyfollow (0x894dc660): (key − 60)·KF·10/100/127 + Cutoff/127, within 0…1
+inline float keyCutoff(int cutoff, int kf, int key) {
+    const int c = clampi((int16_t)cutoff, 0, 127);
+    float f = div(div(mul(flt((int16_t)(key - 60)), flt((int16_t)(kf * 10))), 100.0f), 127.0f);
+    f = add(add(f, div(flt(c), 127.0f)), 0.0f);
+    return f > 1.0f ? 1.0f : (0.0f > f ? 0.0f : f);
+}
+inline float qValue(int q) { return add(div(mul(flt(clampi((int16_t)q, 0, 127)), 0.984375f), 127.0f), -1.0f); }
+inline float envDepth(float vel, int d) {                                    // vel × (d/63)·|d/63|, d as stored
+    const float v = div(flt((int16_t)d), 63.0f);
+    return mul(vel, mul(0.0f > v ? -v : v, v));
+}
 
 // The kernels (0x89502050…0x89502840): 32 frames, the coefficients stepped
 // before every fourth frame; s[0..3] the states at D+0x1c…0x28.
@@ -87,6 +99,38 @@ void stage6(float* lr, float* s, float& c2, float d2, bool hp) {
     s[0] = a;
 }
 
+// The Dual Filter's kernels (0x894fcbe0 LPF/HPF, 0x894fcd70 LPF->HPF,
+// 0x894fcef0 BPF/BPF): per filter two of the TVF's 24-dB stages, the input
+// times Q; c1, c2 the filters' cutoffs, stepped before every fourth frame.
+// Filter 1 is LP24 (BP24 for BPF/BPF), Filter 2 HP24 (BP24), on the input or,
+// for LPF->HPF, on Filter 1's output; the output their sum (or Filter 2's).
+void dual(float* lr, float* s, float& c1, float& c2, float d1, float d2, float q1, float q2, int mode) {
+    float s0 = s[0], s1 = s[1], s2 = s[2], s3 = s[3], s4 = s[4], s5 = s[5], s6 = s[6], s7 = s[7];
+    for (int i = 0; i < 32; ++i) {
+        if ((i & 3) == 0) { c1 = add(c1, d1); c2 = add(c2, d2); }
+        const float x = lr[2 * i];
+        s1 = fmac(c1, s0, s1);
+        float t = sub(mul(x, q1), s1);
+        t = fmac(q1, s0, t);
+        s0 = fmac(c1, t, s0);
+        s3 = fmac(c1, s2, s3);
+        float u = sub(mode == 2 ? s0 : s1, s3);
+        u = fmac(q1, s2, u);
+        s2 = fmac(c1, u, s2);
+        s5 = fmac(c2, s4, s5);
+        float t2 = sub(mul(mode == 1 ? s3 : x, q2), s5);
+        t2 = fmac(q2, s4, t2);
+        s4 = fmac(c2, t2, s4);
+        s7 = fmac(c2, s6, s7);
+        float u2 = sub(mode == 2 ? s4 : t2, s7);
+        u2 = fmac(q2, s6, u2);
+        s6 = fmac(c2, u2, s6);
+        const float y = mode == 0 ? add(u2, s3) : mode == 1 ? u2 : add(s6, s2);
+        lr[2 * i] = lr[2 * i + 1] = y;
+    }
+    s[0] = s0; s[1] = s1; s[2] = s2; s[3] = s3; s[4] = s4; s[5] = s5; s[6] = s6; s[7] = s7;
+}
+
 } // namespace
 
 bool xtCosmLoadTables(const char* romPath) {
@@ -105,22 +149,12 @@ bool xtCosmTablesLoaded() { return T.ok; }
 XtTvfBlock xtTvfBlock(const XtTvfParams& p, int key, float velA, float velB) {
     XtTvfBlock b;
     b.mode = p.filter;
-    const int c = clampi((int16_t)p.cutoff, 0, 127);
-    float f = div(div(mul(flt((int16_t)(key - 60)), flt((int16_t)(p.keyfollow * 10))), 100.0f), 127.0f);
-    f = add(add(f, div(flt(c), 127.0f)), 0.0f);
-    b.cutoff = f > 1.0f ? 1.0f : (0.0f > f ? 0.0f : f);
+    b.cutoff = keyCutoff(p.cutoff, p.keyfollow, key);
     b.cutoffLfo = sq63(clampi((int16_t)p.cutoffLfo, -63, 63));
-    {
-        const float v = div(flt((int16_t)p.cutoffEnv), 63.0f);
-        b.cutoffEnv = mul(velA, mul(0.0f > v ? -v : v, v));
-    }
-    const int q = clampi((int16_t)p.q, 0, 127);
-    b.q = add(div(mul(flt(q), 0.984375f), 127.0f), -1.0f);
+    b.cutoffEnv = envDepth(velA, p.cutoffEnv);
+    b.q = qValue(p.q);
     b.qLfo = sq63(clampi((int16_t)p.qLfo, -63, 63));
-    {
-        const float v = div(flt((int16_t)p.qEnv), 63.0f);
-        b.qEnv = mul(velB, mul(0.0f > v ? -v : v, v));
-    }
+    b.qEnv = envDepth(velB, p.qEnv);
     return b;
 }
 
@@ -229,8 +263,53 @@ void XtCosmTvf::process(float* lr, float scale) {
     else if (m == 10 || m == 11) stage6(lr, s, cur2, d2, m == 11);
 }
 
+XtDualBlock xtDualBlock(const XtDualParams& p, int key, float velA, float velB) {
+    XtDualBlock b;
+    b.mode = (int16_t)p.type;
+    b.cut1 = keyCutoff(p.freq1, p.kf1, key);
+    b.q1 = qValue(p.q1);
+    b.lfo1 = sq63(clampi((int16_t)p.lfo1, -63, 63));
+    b.env1 = envDepth(velA, p.env1);
+    b.cut2 = keyCutoff(p.freq2, p.kf2, key);
+    b.q2 = qValue(p.q2);
+    b.lfo2 = sq63(clampi((int16_t)p.lfo2, -63, 63));
+    b.env2 = envDepth(velB, p.env2);
+    return b;
+}
+
+void XtCosmDual::noteOn(const XtDualBlock& b, float env1Start, float env1Out, float r1, float lfo1,
+                        float env2Start, float env2Out, float r2, float lfo2) {
+    for (float& x : s) x = 0.0f;
+    cur1 = xtTvfCutoff(b.cut1, b.env1, env1Start, b.lfo1, lfo1, b.q1);
+    cur2 = xtTvfCutoff(b.cut2, b.env2, env2Start, b.lfo2, lfo2, b.q2);
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    setBlock(b, env1Out, lfo1, env2Out, lfo2);
+}
+
+void XtCosmDual::setBlock(const XtDualBlock& b, float env1, float lfo1, float env2, float lfo2) {
+    blk = b;
+    targets(env1, lfo1, env2, lfo2);
+}
+
+void XtCosmDual::update(float env1, float r1, float lfo1, float env2, float r2, float lfo2) {
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    targets(env1, lfo1, env2, lfo2);
+}
+
+void XtCosmDual::targets(float env1, float lfo1, float env2, float lfo2) {
+    tgt1 = xtTvfCutoff(blk.cut1, blk.env1, env1, blk.lfo1, lfo1, blk.q1);
+    tgt2 = xtTvfCutoff(blk.cut2, blk.env2, env2, blk.lfo2, lfo2, blk.q2);
+}
+
+void XtCosmDual::process(float* lr) {
+    const float d1 = mul(sub(tgt1, cur1), rate1), d2 = mul(sub(tgt2, cur2), rate2);
+    if (blk.mode >= 0 && blk.mode <= 2) dual(lr, s, cur1, cur2, d1, d2, blk.q1, blk.q2, blk.mode);
+}
+
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF and the Dual Filter against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -401,6 +480,117 @@ int main(int argc, char** argv) {
     }
     std::printf("start, block and update: %ld cases, %ld different\n", un, ub);
     std::printf("filter: %ld blocks of 32 frames, %ld different\n", dn, db);
-    return cb || ub || db ? 3 : 0;
+
+    // The Dual Filter (block code 12): the converter (0x894dd690) …
+    auto dualParams = [&]() {
+        XtDualParams p;
+        p.type = (int)(rnd() % 3);
+        p.freq1 = (int)(rnd() % 128); p.kf1 = (int)(rnd() % 41) - 20; p.q1 = (int)(rnd() % 128); p.lfo1 = (int)(rnd() % 127) - 63;
+        p.env1 = (int)(rnd() % 127) - 63;
+        p.freq2 = (int)(rnd() % 128); p.kf2 = (int)(rnd() % 41) - 20; p.q2 = (int)(rnd() % 128); p.lfo2 = (int)(rnd() % 127) - 63;
+        p.env2 = (int)(rnd() % 127) - 63;
+        return p;
+    };
+    long xb = 0, xn = 0;
+    for (int k = 0; k < 200000; ++k) {
+        const XtDualParams p = dualParams();
+        const int key = (int)(rnd() % 128), cosm = (int)(rnd() & 1);
+        const float va = (float)(rnd() % 32769) / 32768.0f, vb = (float)(rnd() % 32769) / 32768.0f;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100);
+        c.wr8(IN + 2, (uint8_t)cosm); c.wr8(IN + 3, (uint8_t)key);
+        const int vals[11] = { p.type, p.freq1, p.kf1, p.q1, p.lfo1, p.env1, p.freq2, p.kf2, p.q2, p.lfo2, p.env2 };
+        for (int i = 0; i < 11; ++i) c.wr16(IN + 0x12 + 2 * (uint32_t)i, (uint16_t)(int16_t)vals[i]);
+        wf(IN + 0x34, va); wf(IN + 0x38, vb);
+        if (!c.call(0x894dd690, { IN, OUT }, sp)) { std::fprintf(stderr, "dual converter: %s\n", c.error().c_str()); return 1; }
+        const XtDualBlock b = xtDualBlock(p, key, va, vb);
+        ++xn;
+        const bool ok = c.rd32(OUT) == 12 && (int)c.rd32(OUT + 4) == b.mode && same(f32(OUT + 8), b.cut1) && same(f32(OUT + 0xc), b.env1)
+                     && same(f32(OUT + 0x10), b.q1) && same(f32(OUT + 0x18), b.lfo1) && same(f32(OUT + 0x20), b.cut2)
+                     && same(f32(OUT + 0x24), b.env2) && same(f32(OUT + 0x28), b.q2) && same(f32(OUT + 0x30), b.lfo2)
+                     && c.rd32(OUT + 0x14) == (cosm ? 11u : 9u) && c.rd32(OUT + 0x2c) == (cosm ? 12u : 10u)
+                     && c.rd32(OUT + 0x1c) == (cosm ? 4u : 3u) && c.rd32(OUT + 0x34) == (cosm ? 4u : 3u);
+        if (!ok && xb++ < 5)
+            std::printf("  dual converter key %d: fw cut %.9g %.9g q %.9g %.9g env %.9g %.9g, port %.9g %.9g %.9g %.9g %.9g %.9g\n", key,
+                        f32(OUT + 8), f32(OUT + 0x20), f32(OUT + 0x10), f32(OUT + 0x28), f32(OUT + 0xc), f32(OUT + 0x24),
+                        b.cut1, b.cut2, b.q1, b.q2, b.env1, b.env2);
+    }
+    std::printf("dual converter: %ld cases, %ld different\n", xn, xb);
+
+    // … the start values (0x894ec340), the block (0x894ed5d0, also while the
+    // note sounds), the 10-ms update (0x894ee6a0) and the filter (0x894fd090)
+    auto writeDual = [&](const XtDualBlock& b) {
+        c.wr32(BLK, 12); c.wr32(BLK + 4, (uint32_t)b.mode); wf(BLK + 8, b.cut1); wf(BLK + 0xc, b.env1); wf(BLK + 0x10, b.q1);
+        c.wr32(BLK + 0x14, 9); wf(BLK + 0x18, b.lfo1); c.wr32(BLK + 0x1c, 3); wf(BLK + 0x20, b.cut2); wf(BLK + 0x24, b.env2);
+        wf(BLK + 0x28, b.q2); c.wr32(BLK + 0x2c, 10); wf(BLK + 0x30, b.lfo2); c.wr32(BLK + 0x34, 3);
+    };
+    long yb = 0, yn = 0, zb = 0, zn = 0;
+    for (int g = 0; g < nCases; ++g) {
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200); c.write(BLK, z.data(), 0x80);
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        c.wr8(D, 12);                                // slot 1: Filter 1's envelope (EQ) and LFO (LQ); slot 2: Filter 2's
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);
+        const int bkey = (int)(rnd() % 128);
+        const float bva = frnd(0, 1), bvb = frnd(0, 1);
+        const XtDualBlock b = xtDualBlock(dualParams(), bkey, bva, bvb);
+        writeDual(b);
+        const float e1S = frnd(-1, 1), e2S = frnd(-1, 1), l1 = frnd(-1, 1), l2 = frnd(-1, 1), e1O = frnd(-1, 1), e2O = frnd(-1, 1);
+        const float r1 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f, r2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+        wf(EQ + 0x58, e1S); wf(EC + 0x58, e2S); wf(LQ + 0x38, l1); wf(LC + 0x38, l2);
+        const uint32_t s0 = sp - 16;
+        c.wr32(s0, EQ); c.wr32(s0 + 4, LQ); c.wr32(s0 + 8, EC); c.wr32(s0 + 12, LC);
+        if (!c.call(0x894ec340, { OBJ, BLK, D, OBJ }, s0)) { std::fprintf(stderr, "dual start: %s\n", c.error().c_str()); return 1; }
+        wf(OBJ + 0x104, e1O); wf(OBJ + 0x108, e2O); wf(OBJ + 0x10c, l1); wf(OBJ + 0x110, l2);
+        if (!c.call(0x894ed5d0, { OBJ, BLK + 4 }, sp)) { std::fprintf(stderr, "dual block: %s\n", c.error().c_str()); return 1; }
+        wf(OBJ + 0x11c, 4.0f * r1); wf(OBJ + 0x120, 4.0f * r2);
+        XtCosmDual port;
+        port.noteOn(b, e1S, e1O, r1, l1, e2S, e2O, r2, l2);
+        float o1 = e1O, o2 = e2O, ol1 = l1, ol2 = l2;  // the outputs the object holds (+0x104…)
+        ++yn;
+        if ((!same(f32(D + 0xbc), port.c1()) || !same(f32(D + 0xc0), port.c2()) || !same(f32(OBJ + 0xfc), port.target1())
+             || !same(f32(OBJ + 0x100), port.target2()) || (int)c.rd32(OBJ + 0x14) != b.mode) && yb++ < 5)
+            std::printf("  dual note-on %d: fw c %.9g %.9g t %.9g %.9g, port %.9g %.9g %.9g %.9g\n", g, f32(D + 0xbc), f32(D + 0xc0),
+                        f32(OBJ + 0xfc), f32(OBJ + 0x100), port.c1(), port.c2(), port.target1(), port.target2());
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 13) {                                   // an update every 10 ms
+                o1 = frnd(-1, 1); o2 = frnd(-1, 1); ol1 = frnd(-1, 1); ol2 = frnd(-1, 1);
+                const float nr1 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f, nr2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+                wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2); wf(LQ + 0x38, ol1); wf(LC + 0x38, ol2); wf(EQ + 0x54, nr1); wf(EC + 0x54, nr2);
+                c.fb[0][4] = 0;
+                if (!c.call(0x894ee6a0, { OBJ }, sp)) { std::fprintf(stderr, "dual update: %s\n", c.error().c_str()); return 1; }
+                port.update(o1, nr1, ol1, o2, nr2, ol2);
+                ++yn;
+                if ((!same(f32(OBJ + 0xfc), port.target1()) || !same(f32(OBJ + 0x100), port.target2())) && yb++ < 5)
+                    std::printf("  dual update %d.%d: fw %.9g %.9g port %.9g %.9g\n", g, blkN, f32(OBJ + 0xfc), f32(OBJ + 0x100), port.target1(), port.target2());
+            } else if (blkN % 14 == 6 && (rnd() & 1)) {               // a parameter change while the note sounds: a new block
+                const XtDualBlock nb = xtDualBlock(dualParams(), bkey, bva, bvb);
+                writeDual(nb);
+                if (!c.call(0x894ed5d0, { OBJ, BLK + 4 }, sp)) { std::fprintf(stderr, "dual block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb, o1, ol1, o2, ol2);
+                ++yn;
+                if ((!same(f32(OBJ + 0xfc), port.target1()) || !same(f32(OBJ + 0x100), port.target2())) && yb++ < 5)
+                    std::printf("  dual block %d.%d: fw %.9g %.9g port %.9g %.9g\n", g, blkN, f32(OBJ + 0xfc), f32(OBJ + 0x100), port.target1(), port.target2());
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 4);
+            const float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e9f : ar == 2 ? 4.0e8f : 1.0f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(0x894fd090, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "dual filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++zn;
+            bool ok = same(f32(D + 0xbc), port.c1()) && same(f32(D + 0xc0), port.c2());
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            for (int i = 0; i < 8; ++i) ok = ok && same(f32(D + 0x1c + 4 * (uint32_t)i), port.state()[i]);
+            if (!ok && zb++ < 6)
+                std::printf("  dual filter %d block %d mode %d: fw out %.9g c %.9g %.9g s %.9g %.9g, port %.9g %.9g %.9g %.9g %.9g\n", g, blkN,
+                            (int)c.rd32(OBJ + 0x14), f32(BUF), f32(D + 0xbc), f32(D + 0xc0), f32(D + 0x1c), f32(D + 0x38), lr[0], port.c1(),
+                            port.c2(), port.state()[0], port.state()[7]);
+        }
+    }
+    std::printf("dual start, block and update: %ld cases, %ld different\n", yn, yb);
+    std::printf("dual filter: %ld blocks of 32 frames, %ld different\n", zn, zb);
+    return cb || ub || db || xb || yb || zb ? 3 : 0;
 }
 #endif

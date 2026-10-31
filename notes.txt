@@ -217,6 +217,17 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+DUAL FILTER v65 (2026-10-31): COSM Type 9 (HARDWARE_FIRMWARE.md, "COSM:
+  the Dual Filter, and the map of the types": every type's converter, block
+  code and DSP routine). XtCosm: XtDualParams, xtDualBlock (0x894dd690),
+  XtCosmDual (slot 1 = Filter 1 = Env A; 0x894ec340, 0x894ed5d0,
+  0x894ee6a0, 0x894fd090 and its three kernels). xt_cosm checks it on new
+  lines. XtSynth: Cosm.type 2 with dualType, freq/kf/q/lfo/env 1 and 2 (KF
+  in %). Plugin params cosmDualType, cosmDual1Freq/KF/Q/Lfo/Env,
+  cosmDual2… (and cosm2…). XT_DUAL / TEST_DUAL
+  "type,freq1,kf1,q1,lfo1,env1,freq2,kf2,q2,lfo2,env2"; XT_CENVB /
+  TEST_CENVB set Env B.
+
 DYNAMIC TVF v64 (2026-10-31): COSM Type 11 (HARDWARE_FIRMWARE.md, "COSM:
   the Dynamic TVF"). XtCosm: xtDtvfBlock (0x894dda40), XtTvfBlock.dynamic
   with qOwn/cutoffOwn, raw targets, the follower and slews in

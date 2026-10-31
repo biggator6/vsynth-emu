@@ -1,5 +1,6 @@
 #pragma once
-// The V-Synth XT's COSM sections, TVF type (COSM Type 10).  Each oscillator
+// The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11)
+// and the Dual Filter (9, below XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -106,6 +107,56 @@ private:
     float rate1 = 0, rate2 = 0;       // the step rates (D+0xc4, +0xc8)
     float qOwnS = 0, cutOwnS = 0, lev = 0;
     void targets(float qEnv, float qLfo, float cutEnv, float cutLfo);
+};
+
+// The Dual Filter (COSM Type 9, block code 12): two of the TVF's 24-dB
+// stages, each with its own Frequency, Q and depths.  Parameters 0x915…0x91f:
+// Filter Type 0…2 (LPF/HPF, LPF->HPF, BPF/BPF; default 0); per filter
+// Frequency 0…127 (90, 80), Frequency Keyfollow ±20 (10, 10), Q 0…127 (108,
+// 120), LFO Depth and Env Depth ±63.  Filter 1 takes Env A (Env 9, COSM 2
+// Env 11) and its velocity factor, Filter 2 Env B (10, 12); both LFO 3 (4).
+struct XtDualParams {
+    int type = 0, freq1 = 90, kf1 = 10, q1 = 108, lfo1 = 0, env1 = 0;
+    int freq2 = 80, kf2 = 10, q2 = 120, lfo2 = 0, env2 = 0;
+};
+
+// The converter's block (0x894dd690): per filter the TVF's sums (0x894dc660
+// for the Frequency and its keyfollow), Env depth × A (Filter 1) or B.
+struct XtDualBlock {
+    int mode = 0;
+    float cut1 = 0, env1 = 0, q1 = -1.0f, lfo1 = 0, cut2 = 0, env2 = 0, q2 = -1.0f, lfo2 = 0;
+};
+XtDualBlock xtDualBlock(const XtDualParams& p, int key, float velA, float velB);
+
+// The object for block code 12.  Its coefficients are both cutoffs: each the
+// TVF's table step (0x894ec140) at Frequency + its depths × the envelope and
+// LFO, capped by the filter's own Q.  The arguments go by the object's slots:
+// 1 Filter 1 (Env A), 2 Filter 2 (Env B).  The kernel reads both Qs from the
+// block as they stand (0x894fd090), so a new block changes them at once.
+class XtCosmDual {
+public:
+    // Note-on (0x894edf70): the states cleared, the coefficients from the
+    // envelopes' start levels (0x894ec340), the targets from their outputs
+    // (0x894ed5d0), the step rates 4 × the envelopes' follower coefficients.
+    void noteOn(const XtDualBlock& b, float env1Start, float env1Out, float rate1, float lfo1,
+                float env2Start, float env2Out, float rate2, float lfo2);
+    void setBlock(const XtDualBlock& b, float env1, float lfo1, float env2, float lfo2);    // 0x894ed5d0
+    void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);  // 0x894ee6a0
+    // 32 frames, interleaved L/R, in place (0x894fd090 → 0x894fcbe0, …cd70,
+    // …cef0): reads L, writes both.
+    void process(float* lr);
+
+    float c1() const { return cur1; }
+    float c2() const { return cur2; }
+    float target1() const { return tgt1; }
+    float target2() const { return tgt2; }
+    const float* state() const { return s; }
+
+private:
+    XtDualBlock blk;
+    float s[8] = {};                  // the four stages' states (D+0x1c…0x38)
+    float cur1 = 0, cur2 = 0, tgt1 = 0, tgt2 = 0, rate1 = 0, rate2 = 0;
+    void targets(float env1, float lfo1, float env2, float lfo2);
 };
 
 // The coefficients from the modulated values (0x894eecb0): Q + its depths ×
