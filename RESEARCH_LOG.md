@@ -2565,3 +2565,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
   The SOLO harness now does the same. v52's results are unchanged.
 - Plugin: Loop, Loop Mode and Loop Start/End for SOLO waves. With Loop off
   the output is bit-identical to v55. BACKING and ENSEMBLE loops are next.
+
+### Session 16 addendum (2026-10-31) — v57: loop playback (BACKING, ENSEMBLE)
+
+- The multi-band players share SOLO's loop logic, but check the crossing
+  once per block. Their jump restores every band from a cached event laid
+  out like the wave's own events, and keeps the walk's overshoot.
+- The cached events are built per band: the segment containing the point,
+  then the record containing it. Rebuilt at the encoder's event positions,
+  they equal the encoder's events exactly.
+- Given the same cached events, the port is bit-exact against the firmware
+  players (BACKING stereo and mono, ENSEMBLE mono and stereo, all modes,
+  both directions, walk reversals).
+- The plugin's Loop controls now apply to all three types. With Loop off
+  the output is bit-identical to v56.

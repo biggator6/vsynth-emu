@@ -217,6 +217,14 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+BAND LOOPS v57 (2026-10-31): loop playback in the BACKING/ENSEMBLE players
+  (HARDWARE_FIRMWARE.md, "Loop playback, BACKING and ENSEMBLE").
+  XtMbPlayer::setLoop (XtLoop, now shared with XtSoloVoice in XtLoop.h;
+  XtSoloLoop renamed) before noteOn; xtMbLoopEvents builds the cached loop
+  events as bytes (also written into the firmware harness). Check, bit-exact:
+    xt_fw rom.2.bin bandcmp <3|5> samp.bin <ch> <pitch> <walk> <frames> loop:on,fwdMode,bwdMode,fs,fe,bs,be [frame:walk ...]
+  The plugin's Loop controls apply to all three types (XtSynth::waveLoop).
+
 SOLO LOOPS v56 (2026-10-31): loop playback in the SOLO player
   (HARDWARE_FIRMWARE.md, "Loop playback, SOLO"). XtSoloVoice::setLoop
   (XtSoloLoop: on, forward/backward modes and points in samples) before

@@ -217,12 +217,12 @@ float XtSynth::gainTarget(const Voice& v, float env) const {
     return xtOscGainTarget(xtOscGain(ctl.waveGain), level, env, v.lfo.out(), xtOscLevelLfoDepth(ctl.oscLevelLfoDepth));
 }
 
-// The loop the SOLO player gets (its cached loop events, player +0x6c, and
+// The loop the players get (their cached loop events, player +0x6c, and
 // byte 0 bit 0): the region in samples, at least 16 long as on the XT; One
 // Shot leaves the Loop switch without effect (loop modes 0).
-XtSoloLoop XtSynth::soloLoop() const {
-    XtSoloLoop l;
-    const int last = (int)cur->solo.in.size() - 1;
+XtLoop XtSynth::waveLoop() const {
+    XtLoop l;
+    const int last = (int)cur->frames - 1;
     if (last < 16) return l;
     int a = (int)std::lround((double)std::clamp(ctl.loopStart, 0.0f, 1.0f) * last);
     int b = (int)std::lround((double)std::clamp(ctl.loopEnd, 0.0f, 1.0f) * last);
@@ -335,12 +335,15 @@ void XtSynth::noteOn(int note, float velocity) {
     v->curGain = gainTarget(*v, oe.time[0] == 0.0f ? v->oenv.level() : oe.level[0]);
     if (cur->type == 1) {
         v->solo.setRobot(v->robot);
-        v->solo.setLoop(soloLoop());
+        v->solo.setLoop(waveLoop());
         v->solo.noteOn(cur->solo, v->curA, v->curF, v->curWalk, v->curG);
         v->solo.resetGain(v->curGain);
     }
-    else if (!v->mb.noteOn(cur->wave, cur->type, v->curA, v->curWalk)) v->active = false;
-    else v->mb.setGain(v->curGain, true);
+    else {
+        v->mb.setLoop(waveLoop());
+        if (!v->mb.noteOn(cur->wave, cur->type, v->curA, v->curWalk)) v->active = false;
+        else v->mb.setGain(v->curGain, true);
+    }
 }
 
 // The release time follows the note-off velocity (R-Sens): the times are
@@ -512,7 +515,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_VELOCITY=v: note-on velocity 1..127 (default 127).
 //   XT_ROBOT=1: Robot Voice.
 //   XT_LOOP="mode,start,end": Loop on, Loop Mode (0 One Shot, 1 One Way,
-//     2 Alternate) and the region as fractions of the wave (SOLO).
+//     2 Alternate) and the region as fractions of the wave.
 //   XT_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]": Pitch Shift
 //     (semitones), the Pitch knob, Pitch KF (%), Coarse, Fine (cents) and the
 //     Original Key (default 0,0,100,0,0,60).

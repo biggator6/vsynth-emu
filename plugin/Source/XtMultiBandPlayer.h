@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include "XtLoop.h"
 
 // The players' interpolation kernel, recombination-filter coefficients and
 // per-band constants are firmware tables.  They are read from the user's own
@@ -47,6 +48,18 @@ bool xtMbBuildBacking(const int16_t* pcm, long frames, int channels, XtMbBands& 
 // Point a wave's bands at a built set (band k readable over its buffer).
 void xtMbAttach(const XtMbBands& b, XtMbWave& w);
 
+// The four cached loop events (forward start, forward end, backward end,
+// backward start) of a multi-band wave as its player reads them (player
+// +0x6c, 0xb4 bytes apart): {u16 event, u16 mode, u32 position (1/16
+// sample)}, then each band's {u32 segment entry, u32 record, u16 mark} in
+// the vpdt's event layout.  A band's slot holds the record containing the
+// point and the mark to that record's end, as the wave's own events do (the
+// encoder's events, rebuilt this way, come out identical); the event is the
+// last one before the point (0x8950f9c0).  The firmware's own builder of
+// these events is not found.
+constexpr int kXtMbLoopEventBytes = 0xb4;
+bool xtMbLoopEvents(const XtMbWave& w, const XtLoop& l, uint8_t out[4][kXtMbLoopEventBytes]);
+
 class XtMbPlayer {
 public:
     // Note-on (0x89510980 / 0x89510130): mode 3 = BACKING, 5 = ENSEMBLE.
@@ -64,11 +77,19 @@ public:
     // The output gain target (+0x80; 1 = unity), followed per sample pair
     // (0x8950c570); now: the gain jumps there too (note-on).
     void setGain(float target, bool now = false);
+    // Loop playback (set before noteOn; off by default): the cached loop
+    // events (xtMbLoopEvents) and byte 0 bit 0.  Each block finds its next
+    // crossing (0x8950ccc0); the walk list acts on it once per block
+    // (0x8950c880 / 0x8950ca70, type 0x10: an Alternate bounce turns the
+    // walk from the next block on); a loop jump (0x8950f710) restores the
+    // bands from the cached event, keeping the walk's overshoot.
+    void setLoop(const XtLoop& l) { loopCfg = l; }
 
     struct Band;   // a band's player state (firmware struct, 0x88 bytes)
     struct State;
 private:
     State* s = nullptr;
+    XtLoop loopCfg;
     static void blockImpl(State& S, float* out);
 public:
     XtMbPlayer();

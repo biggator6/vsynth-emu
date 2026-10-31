@@ -1544,6 +1544,60 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### Loop playback, BACKING and ENSEMBLE (2026-10-31, v57)
+
+The multi-band players loop through the same cache and logic as SOLO (v56),
+with these differences.
+
+**Once per block.**
+- The block (`0x8950e760`, for BACKING and ENSEMBLE alike) computes the
+  next crossing first (`0x8950ccc0`).
+- The walk list (`0x8950e860` forward, `0x8950e8f0` backward) fills its 16
+  positions, then checks the crossing once (`0x8950c880`/`0x8950ca70`, type
+  0x10).
+- With type 0x10 the handlers set the bounce flags but don't negate the
+  step. The step turns at the next block (`0x8950c280`).
+
+**The jump** (`0x8950f710`, the loop entry of the event jump
+`0x8950f6f0`):
+- the cached event's index becomes current (`0x8950c830`);
+- the position moves on by the cached position: the walk has had the
+  crossing subtracted, so the overshoot is kept, unlike SOLO;
+- the block's 16 walk positions are all set to it;
+- each band restores its segment and record from its slot, the same
+  {u32 segment entry, u32 record, u16 mark} as a vpdt event (band 0, an
+  empty slot, bands 1..5; 12 bytes each mono, 24 stereo);
+- ENSEMBLE restores band 0 only; its oscillator bands follow the walk
+  position.
+- Mode 3 zeroes the position before the jump, so it lands on the cached
+  point.
+
+**The cached events.** A band's slot is the segment entry containing the
+point (one per event), then the record containing it, walked from the
+segment's start; the event index is the last event before the point.
+- Rebuilt this way at the encoder's own event positions, every slot comes
+  out identical to the encoder's events (drum, vocal and chord: 0
+  mismatches).
+- The records tile each segment exactly.
+- As for SOLO, the firmware's builder of the cached events is not found.
+
+**Port and checks.** `xtMbLoopEvents` builds the four cached events as
+bytes. `XtMbPlayer` loads them through its event-jump code (`restore`,
+shared with note-on). `xt_fw bandcmp … loop:…` gives the firmware player
+the same bytes. Results:
+- BACKING stereo (the drum, three events), BACKING mono and ENSEMBLE mono
+  and stereo, 14 cases: **bit-exact** (max difference 0);
+- the cases cover One Way, Alternate and mode 3 in both directions, loops
+  across and at an event, an 84-sample loop and a whole-wave loop, and walk
+  reversals and holds.
+
+**Plugin.**
+- Loop, Loop Mode and Loop Start/End now apply to all three types.
+- With Loop off the output is bit-identical to v56.
+
+**Not modelled:** the event types 1–3 of STEP/EVENT playback in the event
+steps (with normal playback they only clear flags that are never set).
+
 ### Loop playback, SOLO (2026-10-31, v56)
 
 **Settings.** The OSC's Loop switch and the wave's loop:
@@ -1656,7 +1710,7 @@ to the end event. The SOLO harness now starts notes through it.
   loop it ends after 3.5 s.
 
 **Not yet:**
-- loops on BACKING and ENSEMBLE. Found so far:
+- loops on BACKING and ENSEMBLE (done in v57). Found so far:
   - their block (`0x8950e760`) computes the next crossing first;
   - the walk list (`0x8950e860` forward, `0x8950e8f0` backward) checks it
     once per block, after its 16 entries, calling `0x8950c880`/`0x8950ca70`

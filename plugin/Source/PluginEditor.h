@@ -44,7 +44,7 @@ private:
     juce::ComboBox   timeOffsetBox_;
     juce::Slider     oscTkfSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     oscFkfSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
-    // Loop (SOLO waves): the OSC's Loop switch, the wave's Loop Mode and region
+    // Loop: the OSC's Loop switch, the wave's Loop Mode and region
     juce::ToggleButton loopBtn_ { "Loop" };
     juce::ComboBox   loopModeBox_;
     juce::Slider     loopStartSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

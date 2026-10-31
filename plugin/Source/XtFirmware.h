@@ -35,7 +35,7 @@ struct XtFwSoloNote {
     // points, each the record containing its point as an event jump reads
     // it; player byte 0 bit 0 = on.  The firmware's own builder of these
     // events is not found; this is the state its jump (0x8950d7d0) loads.
-    XtSoloLoop loop;
+    XtLoop loop;
 };
 bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long frames, int channels,
                   const XtFwSoloNote& note, long outFrames, std::vector<float>& out);
@@ -45,7 +45,8 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
 // / 0x89510130, the start or end event by the sign of walk) and run per
 // 32-frame block (0x8950e6e0 / 0x8950db10), as research/ghidra_scripts/
 // EmuBacking.java runs it.  pitch and the walk changes as for xtFwSoloPlay
-// (formant and energy unused).  out: L/R pairs, ±1.
+// (formant and energy unused); note.loop: the cached loop events as
+// xtMbLoopEvents builds them.  out: L/R pairs, ±1.
 bool xtFwBandPlay(int type, const int16_t* pcm, long frames, int channels, const std::vector<uint8_t>& vpdt,
                   const XtFwSoloNote& note, long outFrames, std::vector<float>& out);
 

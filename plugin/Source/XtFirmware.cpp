@@ -339,10 +339,21 @@ bool xtFwBandPlay(int type, const int16_t* pcm, long frames, int channels, const
     const uint32_t use[5] = { 2, 3, 4, 5, 6 };
     for (uint32_t k = 0; k < 5; ++k) c.wr32(W + 8 + 4 * k, c.rd32(kL + 0x10 + 4 * use[k]));
     c.wr32(W + 0x28, TUNE); c.wr32(W + 0x2c, W2);
-    c.wr32(W2 + 0x16c, 0x7fffffff); c.wr32(W2 + 0xb8, 0x7fffffff);   // no loop points or cache bounds
+    bool loopOn = false;
+    if (note.loop.on) {   // the cached loop events at W2 + 0xb4·k, as the port builds them
+        XtMbWave lw;
+        lw.vpdt = vpdt.data(); lw.vpdtBytes = vpdt.size(); lw.channels = channels;
+        uint8_t ev[4][kXtMbLoopEventBytes];
+        if (xtMbLoopEvents(lw, note.loop, ev)) {
+            for (uint32_t k = 0; k < 4; ++k) c.write(W2 + (uint32_t)kXtMbLoopEventBytes * k, ev[k], kXtMbLoopEventBytes);
+            loopOn = true;
+        }
+    }
+    if (!loopOn) { c.wr32(W2 + 0x16c, 0x7fffffff); c.wr32(W2 + 0xb8, 0x7fffffff); }   // no loop points or cache bounds
     auto wf = [&](uint32_t a, float x) { uint32_t u; std::memcpy(&u, &x, 4); c.wr32(a, u); };
     auto rf = [&](uint32_t a) { const uint32_t u = c.rd32(a); float x; std::memcpy(&x, &u, 4); return x; };
-    if (channels == 2) c.wr8(P, 0x40);
+    c.wr8(P, (uint8_t)((channels == 2 ? 0x40 : 0) | (loopOn ? 1 : 0)));
+    wf(P + 0xa0, 1.0f); wf(P + 0xa4, 1.0f);                           // the loop regions' rate factors
     c.wr16(P + 0x14, 0); c.wr16(P + 0x16, 0xffff);                     // start / end event
     c.wr32(P + 0x28, 0x7fffffff); c.wr32(P + 0x2c, 0x7fffffff);
     c.wr32(P + 0x44, W);
@@ -477,7 +488,7 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 // xt_fw <rom.2.bin> solocmp <samp.bin> <channels> <R> <F> <walk> <energy> <frames> [frame:walk ...]
 //   : the same against XtSoloVoice on the same records: the largest
 //   difference and the difference's level against the signal
-// xt_fw <rom.2.bin> bandcmp <3|5> <samp.bin> <channels> <pitch> <walk> <frames> [frame:walk ...]
+// xt_fw <rom.2.bin> bandcmp <3|5> <samp.bin> <channels> <pitch> <walk> <frames> [frame:walk ...] [loop:on,fwdMode,bwdMode,fs,fe,bs,be]
 //   : the firmware's multi-band encoder, band rebuild and player
 //   (xtFwBandPlay) against XtMbPlayer on the same bands
 #include <cmath>
@@ -620,7 +631,12 @@ int main(int argc, char** argv) {
         const long outFrames = std::atol(argv[8]);
         for (int a = 9; a < argc; ++a) {
             long at = 0; float w = 0;
-            if (std::sscanf(argv[a], "%ld:g%f", &at, &w) == 2) note.gainAt.push_back({ at, w });
+            int lo[7];
+            if (std::sscanf(argv[a], "loop:%d,%d,%d,%d,%d,%d,%d", &lo[0], &lo[1], &lo[2], &lo[3], &lo[4], &lo[5], &lo[6]) == 7) {
+                note.loop.on = lo[0] != 0; note.loop.fwdMode = lo[1]; note.loop.bwdMode = lo[2];
+                note.loop.fwdStart = lo[3]; note.loop.fwdEnd = lo[4]; note.loop.bwdStart = lo[5]; note.loop.bwdEnd = lo[6];
+            }
+            else if (std::sscanf(argv[a], "%ld:g%f", &at, &w) == 2) note.gainAt.push_back({ at, w });
             else if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
         }
         if (!xtFwEncodeMulti(type, pcm, frames, ch, vpdt, 64)) { std::fprintf(stderr, "encode failed\n"); return 1; }
@@ -632,6 +648,7 @@ int main(int argc, char** argv) {
         w.vpdt = vpdt.data(); w.vpdtBytes = vpdt.size();
         xtMbAttach(b, w);
         XtMbPlayer pl;
+        pl.setLoop(note.loop);
         if (!pl.noteOn(w, type, note.pitch, note.walk)) { std::fprintf(stderr, "port note-on failed\n"); return 1; }
         float blk[64];
         double maxd = 0, sig = 0, dif = 0;

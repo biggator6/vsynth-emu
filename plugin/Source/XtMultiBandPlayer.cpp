@@ -34,10 +34,11 @@
 // fipr as a double sum rounded once).  Validated against
 // research/ghidra_scripts/EmuBacking.java, and forward, held and backward
 // against the firmware run in the SH-4 interpreter (xt_fw bandcmp).  Ported:
-// playback either way from the start or end event, with no loop points and
-// default voice flags.  Not ported: loops (0x8950c880 / 0x8950ca70 at the
-// bounds), event seeks (0x89510bf0), the voice flags 0x2 / 0x4 / 0x8 / 0x20
-// and the cache bounds in the loop struct.
+// playback either way from the start or end event, loops (0x8950ccc0, then
+// 0x8950c880 / 0x8950ca70 and the jump 0x8950f710; the cached loop events
+// built by xtMbLoopEvents), default voice flags.  Not ported: event seeks
+// (0x89510bf0), the voice flags 0x2 / 0x4 / 0x8, the event types 1..3
+// (step and event playback).
 #include "XtMultiBandPlayer.h"
 
 #include <algorithm>
@@ -184,6 +185,13 @@ struct XtMbPlayer::State {
     float rateF = 1, f9c = 1;                    // +0x98, +0x9c
     int list[16] = {};                           // +0xa8
     Band b[6];                                   // +0xe8 + 0x88·k
+    // Loops: the switch (byte 0 bit 0), the cached events (+0x6c → 0xb4
+    // bytes each), their positions and the modes at the forward end and the
+    // backward start (records 1 and 3)
+    bool loopOn = false;
+    uint8_t lrec[4][kXtMbLoopEventBytes] = {};
+    int lp[4] = { 0, 0x7fffffff, 0x7fffffff, 0 };
+    int lmode1 = 0, lmode3 = 0;
     float M[2 * 114] = {};                       // +0x418 … +0x7a8: band outputs and tree state (R at +0x1c8)
 
     // vpdt access (offsets from the chunk start; out of range reads 0)
@@ -206,6 +214,12 @@ struct XtMbPlayer::State {
     void step(Band& B, int fshift, int walkPos);   // 0x8950f400
     void stepBack(Band& B, int fshift, int walkPos);   // 0x8950f4c0
     void initRecords();             // 0x8950f6f0
+    void restore(int r7, const uint8_t* slots, long slotBytes);   // 0x8950f722
+    void loopJump(int r);           // 0x8950f710
+    void crossings();               // 0x8950ccc0
+    void crossForward();            // 0x8950c880 (type 0x10)
+    void crossBackward();           // 0x8950ca70 (type 0x10)
+    void eventSetup();              // 0x8950c830
     void walkList();                // 0x8950e860 / 0x8950e8f0
     void trigger(Band& B, int walkPos);
     void triggerBack(Band& B, int walkPos);
@@ -377,14 +391,44 @@ void XtMbPlayer::State::stepBack(Band& B, int fshift, int walkPos) {
     B.gain = ended == -1 ? tiny : -1.0f;
 }
 
+// 0x8950c830: the current event's type bits and position.
+void XtMbPlayer::State::eventSetup() {
+    const long e = entry(ev);
+    flags5 = (uint8_t)(rd16u(e) & 0xb);
+    evPos = (int)rd32(e + 4);
+}
+
 // 0x8950f6f0 (via 0x8950f6c0): every band's segments and first record at
 // the current event.
 void XtMbPlayer::State::initRecords() {
-    const long e = entry(ev);                       // 0x8950c830
-    flags5 = (uint8_t)(rd16u(e) & 0xb);
-    const int r7 = (int)rd32(e + 4);
-    evPos = r7;
-    long r5 = e + 8;
+    eventSetup();
+    const long e = entry(ev);
+    const long n = (long)w.vpdtBytes - (e + 8);
+    restore(evPos, n > 0 ? w.vpdt + e + 8 : nullptr, n);
+}
+
+// 0x8950f710: a cached loop event: its event current (0x8950c830), the
+// position and the bands' segments and records from the cache.
+void XtMbPlayer::State::loopJump(int r) {
+    const uint8_t* c = lrec[r];
+    uint16_t e;
+    int32_t p;
+    std::memcpy(&e, c, 2);
+    std::memcpy(&p, c + 4, 4);
+    ev = e;
+    eventSetup();
+    restore(p, c + 8, kXtMbLoopEventBytes - 8);
+}
+
+// 0x8950f722, after either: the walk position moves on by the event's
+// position (an event jump starts from 0; a loop keeps the overshoot), the
+// block's walk list holds it, and each band's slot {u32 segment entry, u32
+// record, u16 mark} (band 0, an empty slot, bands 1..5) loads its segments
+// and the record containing the position; then the next event.
+void XtMbPlayer::State::restore(int r7, const uint8_t* slots, long slotBytes) {
+    auto rs32 = [&](long o) -> uint32_t { if (!slots || o < 0 || o + 4 > slotBytes) return 0; uint32_t v; std::memcpy(&v, slots + o, 4); return v; };
+    auto rs16 = [&](long o) -> unsigned { if (!slots || o < 0 || o + 2 > slotBytes) return 0; uint16_t v; std::memcpy(&v, slots + o, 2); return v; };
+    long r5 = 0;
     pos += r7;
     posFrac = 0;
     for (int& v : list) v = r7;
@@ -393,9 +437,9 @@ void XtMbPlayer::State::initRecords() {
         Band& B = b[k];
         B.readPos = B.startOff + r7;
         B.readFrac = 0;
-        B.segList = (long)rd32(r5);
-        B.recPtr = (long)rd32(r5 + 4);
-        const int mark = (int)rd16u(r5 + 8);
+        B.segList = (long)rs32(r5);
+        B.recPtr = (long)rs32(r5 + 4);
+        const int mark = (int)rs16(r5 + 8);
         r5 += 8 + (stride9 - 4) * 2;
         B.grainStart = segment(B);
         segment(B);
@@ -417,9 +461,108 @@ void XtMbPlayer::State::initRecords() {
     }
     int r2 = lastEvPos + 0x10;
     uint8_t f = 0;
-    if ((int16_t)evLast > (int16_t)ev) { const long n = e + stride8 * 2; f = (uint8_t)(rd16u(n) & 0xb); r2 = (int)rd32(n + 4); }
+    if ((int16_t)evLast > (int16_t)ev) { const long n = entry(ev) + stride8 * 2; f = (uint8_t)(rd16u(n) & 0xb); r2 = (int)rd32(n + 4); }
     flags6 = f;
     nextEvPos = r2;
+}
+
+// The next crossing (0x8950ccc0, each block and after each crossing): the
+// next event, and the loop points ahead in the walk's direction; inside an
+// Alternate bounce only its far end.
+void XtMbPlayer::State::crossings() {
+    int X;
+    if (walkStep >= 0) {
+        X = nextEvPos;
+        if (flags3 & 4) { if (X > lp[2]) X = lp[2]; limit = X; return; }
+        if (lp[2] > pos && X > lp[2]) X = lp[2];
+        if (lmode1 > 0) {
+            if (loopOn) { if (X > lp[1]) X = lp[1]; }
+            else if (lp[1] > pos && X > lp[1]) X = lp[1];
+        }
+    } else {
+        X = evPos;
+        if (flags3 & 8) { if (lp[0] > X) X = lp[0]; limit = X; return; }
+        if (pos > lp[0] && lp[0] > X) X = lp[0];
+        if (lmode3 > 0) {
+            if (loopOn) { if (lp[3] > X) X = lp[3]; }
+            else if (pos > lp[3] && lp[3] > X) X = lp[3];
+        }
+    }
+    limit = X;
+}
+
+// Crossing forward (0x8950c880, type 0x10): the backward loop's end ends a
+// bounce there; the forward loop's end loops (One Way: to the forward start,
+// keeping the overshoot; Alternate: the walk turns from the next block;
+// mode 3: to the forward start, holding); an event moves on to the next,
+// the last ending the note.  The loop regions' rate factors (+0xa0/+0xa4
+// into +0x9c) are 1.  (The event types 1..3 of step and event playback are
+// not ported.)
+void XtMbPlayer::State::crossForward() {
+    const int X = limit;
+    if (lp[2] == X) {
+        if (flags3 & 4) { flags3 &= 0xfb; return; }
+        if (flags3 & 0x10) { flags3 &= 0xef; f9c = 1.0f; }
+    }
+    if (lp[1] == X && !(flags3 & 4)) {
+        if (!loopOn) { flags3 &= 0xdf; f9c = 1.0f; }
+        else {
+            flags3 |= 0x20;
+            f9c = 1.0f;
+            ended = 0;
+            if (lmode1 == 1) { pos -= X; loopJump(0); return; }
+            if (lmode1 == 2) { flags3 |= 8; return; }
+            if (lmode1 == 3) { walkStep = 0; pos = 0; flags3 |= 0x40; loopJump(0); return; }
+        }
+    }
+    if (nextEvPos != X) return;
+    if ((int16_t)evLast > (int16_t)ev) {
+        ++ev;
+        eventSetup();
+        if ((int16_t)evLast > (int16_t)ev) {
+            const long n = entry(ev) + stride8 * 2;
+            flags6 = (uint8_t)(rd16u(n) & 0xb);
+            nextEvPos = (int)rd32(n + 4);
+            return;
+        }
+    }
+    evPos = nextEvPos;
+    nextEvPos = lastEvPos + 0x10;
+    ended = 1;
+}
+
+// Crossing backward (0x8950ca70, type 0x10): the mirror image, at the
+// forward start and the backward start (One Way: to the backward end; mode
+// 3: holding at the backward start); an event moves back to the one before,
+// the first ending the note.
+void XtMbPlayer::State::crossBackward() {
+    const int X = limit;
+    if (lp[0] == X) {
+        if (flags3 & 8) { flags3 &= 0xf7; return; }
+        if (flags3 & 0x20) { flags3 &= 0xdf; f9c = 1.0f; }
+    }
+    if (lp[3] == X && !(flags3 & 8)) {
+        if (loopOn) {
+            flags3 |= 0x10;
+            f9c = 1.0f;
+            ended = 0;
+            if (lmode3 == 1) { pos -= X; loopJump(2); return; }
+            if (lmode3 == 2) { flags3 |= 4; return; }
+            if (lmode3 == 3) { walkStep = 0; pos = 0; flags3 |= 0x40; loopJump(3); return; }
+        }
+        flags3 &= 0xef;
+        f9c = 1.0f;
+    }
+    if (evPos != X) return;
+    if ((int16_t)ev > 0) {
+        --ev;
+        eventSetup();
+        const long n = entry(ev) + stride8 * 2;
+        flags6 = (uint8_t)(rd16u(n) & 0xb);
+        nextEvPos = (int)rd32(n + 4);
+        return;
+    }
+    ended = -1;
 }
 
 bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
@@ -459,6 +602,15 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
     S.endPos = (int)S.rd32(S.entry(S.evEnd) + 4);
     S.ev = (0.0f > walk) ? S.evEnd : S.evStart;
     S.pos = 0;
+    // the cached loop events and the switch (none: the forward and backward
+    // ends out of reach)
+    S.loopOn = loopCfg.on && xtMbLoopEvents(w, loopCfg, S.lrec);
+    if (S.loopOn) {
+        for (int r = 0; r < 4; ++r) std::memcpy(&S.lp[r], S.lrec[r] + 4, 4);
+        S.lmode1 = loopCfg.fwdMode;
+        S.lmode3 = loopCfg.bwdMode;
+        S.flags0 |= 1;
+    }
     if (mode == 5) S.flags3 = 0x80;                 // 0x89510130: band 0's records only
     S.initRecords();
     // tree state is zeroed; 0x89510760: f9c = 1; 0x8950f860: (rate ratio 1)
@@ -522,8 +674,9 @@ void XtMbPlayer::State::walkList() {
     }
     pos = r1;
     posFrac = r2;
-    // (crossing the limit calls the event walker 0x8950c880 / 0x8950ca70,
-    // bookkeeping only here — not ported)
+    // reaching the next crossing: the loop and event logic, once per block
+    if (walkStep >= 0) { if (limit <= pos) { crossForward(); crossings(); } }
+    else if (pos <= limit) { crossBackward(); crossings(); }
 }
 
 // A band reaching its next segment start begins a new grain there.
@@ -733,13 +886,24 @@ void XtMbPlayer::block(float* out) {
 }
 
 void XtMbPlayer::blockImpl(State& S, float* out) {
-    // 0x8950c280 (default flags): the walk step for this block
+    // 0x8950c280: the walk step for this block, turned round inside an
+    // Alternate bounce until the walk itself turns; held at 0 after a mode-3
+    // loop until the walk turns away from the loop
     float w = 1.0f;
     w = w * S.walk;
     w = w * 33554432.0f;
-    S.walkStep = ftrc(w);
+    if (!(S.flags3 & 0x40)) {
+        int st = ftrc(w);
+        const bool neg = 0.0f > w;
+        if (S.flags3 & 8) { if (neg) S.flags3 &= 0xf7; else st = -st; }
+        if (S.flags3 & 4) { if (neg) st = -st; else S.flags3 &= 0xf7; }   // (sic: 0x08)
+        S.walkStep = st;
+    } else {
+        if ((S.flags3 & 0x20) ? 0.0f > w : w > 0.0f) { S.f9c = 1.0f; S.flags3 &= 0x8f; }
+        S.walkStep = 0;
+    }
     // 0x8950e760: band 0
-    S.limit = S.nextEvPos;                          // 0x8950ccc0 (no loop bounds)
+    S.crossings();                                  // 0x8950ccc0
     S.rateF = S.pitch * S.f9c;
     S.rate = ftrc(S.rateF * 33554432.0f);
     S.walkList();
@@ -952,6 +1116,56 @@ void xtMbAttach(const XtMbBands& b, XtMbWave& w) {
         w.band[k].lo = 0;
         w.band[k].hi = (long)(b.buf[k].size() / (size_t)b.channels);
     }
+}
+
+bool xtMbLoopEvents(const XtMbWave& w, const XtLoop& l, uint8_t out[4][kXtMbLoopEventBytes]) {
+    if (!w.vpdt || w.vpdtBytes < 64 || (w.channels != 1 && w.channels != 2)) return false;
+    const long n = (long)w.vpdtBytes;
+    auto rd32 = [&](long o) -> uint32_t { if (o < 0 || o + 4 > n) return 0; uint32_t v; std::memcpy(&v, w.vpdt + o, 4); return v; };
+    auto rd16 = [&](long o) -> unsigned { if (o < 0 || o + 2 > n) return 0; uint16_t v; std::memcpy(&v, w.vpdt + o, 2); return v; };
+    const long stride8 = w.channels == 2 ? 0x58 : 0x2e, stride9 = w.channels == 2 ? 0xc : 6;
+    auto entry = [&](long e) { return (e * stride8 + 0xe) * 2; };
+    auto slot = [&](int k) { return 8 + (k == 0 ? 0 : k + 1) * 2 * stride9; };   // band 0, an empty slot, bands 1..5
+    const long nev = (long)(rd32(8) >> 16);
+    if (nev < 2) return false;
+    const int pts[4] = { l.fwdStart, l.fwdEnd, l.bwdEnd, l.bwdStart };
+    const int modes[4] = { 0, l.fwdMode, 0, l.bwdMode };
+    for (int r = 0; r < 4; ++r) {
+        uint8_t* o = out[r];
+        std::memset(o, 0, kXtMbLoopEventBytes);
+        const int L = pts[r] * 16;
+        long ev = 0;                                // the last event before the point
+        while (ev + 1 < nev && (int)rd32(entry(ev + 1) + 4) < L) ++ev;
+        const uint16_t e16 = (uint16_t)ev, m16 = (uint16_t)modes[r];
+        std::memcpy(o, &e16, 2);
+        std::memcpy(o + 2, &m16, 2);
+        std::memcpy(o + 4, &L, 4);
+        for (int k = 0; k < 6; ++k) {
+            // the band's segment entry containing the point (one per event),
+            // then the record containing it, walked from the segment's start
+            long seg = (long)rd32(entry(0) + slot(k));
+            const long last = (long)rd32(entry(nev - 1) + slot(k));
+            while (seg < last && !(L < (int)rd32(seg + 12 + 8))) seg += 12;
+            long p = (long)(rd32(seg) & ~1u);
+            int start = (int)rd32(seg + 8);
+            unsigned first;
+            for (;;) {
+                first = rd16(p);
+                int total = (int)first;
+                long q = p + 4;
+                while (rd16(q - 4) == 0xffff && q + 4 <= n) { total += (int)rd16(q); q += 4; }
+                if (start + total > L || q >= n) break;
+                start += total;
+                p = q;
+            }
+            const uint32_t s32 = (uint32_t)seg, p32 = (uint32_t)p;
+            const uint16_t mark = (uint16_t)(start + (int)first - L);
+            std::memcpy(o + slot(k), &s32, 4);
+            std::memcpy(o + slot(k) + 4, &p32, 4);
+            std::memcpy(o + slot(k) + 8, &mark, 2);
+        }
+    }
+    return true;
 }
 
 XtMbPlayer::XtMbPlayer() : s(new State) {}

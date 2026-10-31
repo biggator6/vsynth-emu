@@ -244,9 +244,9 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      the pitch envelope and LFO, through the firmware's pitch functions and
      exp2, so the XT's tiny departures from equal temperament (±0.02 cents)
      come out too. Pitch Shift adds to Coarse and Fine.
-   - loop playback (v56, SOLO): Loop, Loop Mode (One Shot, One Way,
-     Alternate) and a loop region, played by the firmware's loop logic in
-     the SOLO player (crossings, jumps, Alternate bounces).
+   - loop playback (v56 SOLO, v57 BACKING/ENSEMBLE): Loop, Loop Mode (One
+     Shot, One Way, Alternate) and a loop region, played by the firmware's
+     loop logic in each player (crossings, jumps, Alternate bounces).
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -280,7 +280,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   target and the voice update's step equal the firmware (`xt_osc`, 385,240
   cases).
 - SOLO loops (v56) match the firmware's SOLO player, given the same cached
-  loop events, at −92…−107 dB (`xt_fw solocmp … loop:…`).
+  loop events, at −92…−107 dB (`xt_fw solocmp … loop:…`). BACKING and
+  ENSEMBLE loops (v57) are bit-exact against the firmware players
+  (`xt_fw bandcmp … loop:…`).
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.
@@ -292,7 +294,7 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - the patch TVA's own Level, Level KF, pan and LFO terms are not
   modelled;
 - no V-Synth voice layer (filters, LFOs, effects);
-- no loops on BACKING/ENSEMBLE, no step/event playback or Time Trip;
+- no step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and
   formant envelope depths' velocity sensitivity is not exposed;
 - no portamento or Random Pitch Depth.

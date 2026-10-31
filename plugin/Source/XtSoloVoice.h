@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <vector>
+#include "XtLoop.h"
 
 // A sample prepared for SOLO playback: the samples and their grain records.
 // A stereo wave has one record stream (encoded from (L+R) >> 1); the player
@@ -24,17 +25,6 @@ struct XtSoloPlan {
     int forcedInfo = -1;                // VSE_LITEINFO
     size_t size() const { return segStart.size(); }
     bool stereo() const { return !inR.empty(); }
-};
-
-// Loop playback (the OSC's Loop switch with the wave's loop points): the
-// points the player crosses, in samples, and the loop modes at the forward
-// end and the backward start (0 none, 1 One Way, 2 Alternate, 3 jump to the
-// start and hold).  Forward play loops between fwdStart and fwdEnd, backward
-// play between bwdStart and bwdEnd.
-struct XtSoloLoop {
-    bool on = false;                    // player byte 0 bit 0
-    int fwdMode = 0, bwdMode = 0;
-    int fwdStart = 0, fwdEnd = 0, bwdStart = 0, bwdEnd = 0;
 };
 
 class XtSoloVoice {
@@ -61,7 +51,7 @@ public:
     // next crossing (+0x2c) each block (0x8950ccc0) and acts on it in the
     // walk (0x8950c880 forward, 0x8950ca70 backward): One Way jumps to the
     // other end (0x8950d7d0), Alternate turns the walk round.
-    void setLoop(const XtSoloLoop& l) { loopCfg = l; }
+    void setLoop(const XtLoop& l) { loopCfg = l; }
     // Renders `count` samples: mono (a stereo plan's left channel), or both
     // channels (a mono plan plays L = R, as the firmware writes it).
     void render(float* out, int count) { render(out, nullptr, count); }
@@ -99,7 +89,7 @@ private:
     // it, 0x40 holding); the wave's two events (0 at the start, 1 at the end:
     // +0xc current, +0x24 its position, +0x28 the next's) and the next
     // crossing (+0x2c).
-    XtSoloLoop loopCfg;
+    XtLoop loopCfg;
     int32_t lp[4] = { 0, 0x7fffffff, 0x7fffffff, 0 };
     int lmode1 = 0, lmode3 = 0;
     bool loopOn = false;

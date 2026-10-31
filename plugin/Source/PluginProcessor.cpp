@@ -24,7 +24,7 @@ namespace Params {
     static const juce::String kOscFine       = "oscFine";         // −50..+50 cents
     static const juce::String kOscPitch      = "oscPitch";
     static const juce::String kPitchKF       = "pitchKF";         // −200..+200 % per octave
-    // Loop (SOLO waves): the OSC's Loop switch, the wave's Loop Mode (One
+    // Loop: the OSC's Loop switch, the wave's Loop Mode (One
     // Shot, One Way, Alternate) and its loop region in % of the wave
     static const juce::String kLoop          = "loop";
     static const juce::String kLoopMode      = "loopMode";
