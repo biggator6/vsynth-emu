@@ -1544,6 +1544,36 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM 2 (2026-10-31, v63)
+
+COSM 2 is a second COSM section after COSM 1, on the same buffer: the tone
+render (`0x894f6d40`) runs COSM 1's routine, then COSM 2's, and the tone
+update (`0x894f75f0`) updates them in the same order. As a TVF it is the
+same object and code, with its own sources:
+- Env 11 (Cutoff) and Env 12 (Q), whose Velocity Curve/Sens give its A/B
+  factors;
+- LFO 4.
+
+The converter's COSM index (+2) changes only those indices.
+
+**Plugin.**
+- New: COSM 2 as a TVF with its own Env A/B and LFO 4. Its parameters are
+  COSM 1's with the prefix "cosm2"; COSM 1 keeps its v61 IDs.
+- The editor's COSM rows show one section at a time, chosen by a
+  COSM 1/COSM 2 selector that re-attaches them.
+- XtSynth keeps both sections per voice and a free-running LFO for each.
+  The LFO seeds are drawn COSM 1 first.
+- Checks:
+  - with COSM 2 off, the output is bit-identical to v62, with COSM 1 off
+    or on;
+  - COSM 2 alone renders bit-identically to COSM 1 alone with the same
+    settings;
+  - the two in series (LP24 85 then HP24 70) give exactly the product of
+    their responses;
+  - PluginTest is bit-identical with COSM 1, COSM 2, and both with MONO
+    legato and a second note;
+  - the editor renders with the selector on COSM 2.
+
 ### Exact sums in XtFloat (2026-10-31, v62)
 
 XtFloat's `add` and `sub` (the SH-4's single precision, round to zero) used
@@ -1703,7 +1733,7 @@ on the SH-4):
   - Cutoff 127 is transparent.
 
 **Not modelled yet:**
-- COSM 2;
+- COSM 2 (since modelled, v63);
 - the other fifteen types, and Dynamic TVF (code 14, the raw-sum update at
   `0x894eeda0`);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's

@@ -51,27 +51,13 @@ namespace Params {
     static const juce::String kMonoPoly      = "monoPoly";
     static const juce::String kLegato        = "legatoSwitch";
     static const juce::String kOctave        = "octaveShift";
-    // COSM 1 as a TVF: switch, Filter Type, Cutoff, Resonance, Cutoff KF,
-    // the Cutoff's and Resonance's Env and LFO depths; its envelopes (A: the
-    // cutoff's, Env 9; B: the resonance's, Env 10) and LFO 3
-    static const juce::String kCosm          = "cosmSwitch";
-    static const juce::String kCosmFilter    = "cosmFilter";
-    static const juce::String kCosmCutoff    = "cosmCutoff";
-    static const juce::String kCosmReso      = "cosmReso";
-    static const juce::String kCosmKF        = "cosmCutoffKF";
-    static const juce::String kCosmCutEnv    = "cosmCutoffEnv";
-    static const juce::String kCosmCutLfo    = "cosmCutoffLfo";
-    static const juce::String kCosmResoEnv   = "cosmResoEnv";
-    static const juce::String kCosmResoLfo   = "cosmResoLfo";
+    // The COSM sections as TVFs, COSM 1 ("cosm…") and COSM 2 ("cosm2…"):
+    // Switch, Filter, Cutoff, Reso, CutoffKF, CutoffEnv/Lfo, ResoEnv/Lfo; the
+    // envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
+    // Attack…TimeKF; the LFO, LfoWave…LfoKeySync
+    static juce::String cosmId(int k, const char* name) { return juce::String(k ? "cosm2" : "cosm") + name; }
     static const char* const kCosmEnvKnobs[10] = { "Attack", "Decay", "Sustain", "Release", "VelCurve", "VelSens",
                                                    "AttackSens", "DecaySens", "ReleaseSens", "TimeKF" };
-    static const juce::String kClfoWave      = "cosmLfoWave";
-    static const juce::String kClfoRate      = "cosmLfoRate";
-    static const juce::String kClfoOffset    = "cosmLfoOffset";
-    static const juce::String kClfoDelay     = "cosmLfoDelay";
-    static const juce::String kClfoFadeMode  = "cosmLfoFadeMode";
-    static const juce::String kClfoFade      = "cosmLfoFade";
-    static const juce::String kClfoKeySync   = "cosmLfoKeySync";
     // Amp envelope, the XT's 0..127 knobs (XtEnvelope: times from the firmware's table)
     static const juce::String kAttack       = "ampAttack";
     static const juce::String kDecay        = "ampDecay";
@@ -222,41 +208,46 @@ VSynthEmuProcessor::createParameterLayout() {
         juce::StringArray { "MONO", "POLY" }, 1));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kLegato, "Legato Switch", true));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOctave, "Octave Shift", -3, 3, 0));
-    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kCosm, "COSM 1 TVF", false));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kCosmFilter, "COSM Filter Type",
-        juce::StringArray { "LP24", "BP24", "HP24", "NOTCH24", "PEAK24", "LP12", "BP12", "HP12", "NOTCH12", "PEAK12", "LP6", "HP6" }, 5));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kCosmCutoff, "COSM Cutoff", 0, 127, 127));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kCosmReso, "COSM Resonance", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        Params::kCosmKF, "COSM Cutoff Keyfollow", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kCosmCutEnv, "COSM Cutoff Env Depth", -63, 63, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kCosmCutLfo, "COSM Cutoff LFO Depth", -63, 63, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kCosmResoEnv, "COSM Resonance Env Depth", -63, 63, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kCosmResoLfo, "COSM Resonance LFO Depth", -63, 63, 0));
-    for (const char* ab : { "A", "B" }) {
-        const juce::String id = juce::String("cosmEnv") + ab, name = juce::String("COSM Env ") + ab + " ";
-        params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Attack", name + "Attack", 0, 127, 0));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Decay", name + "Decay", 0, 127, 0));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Sustain", name + "Sustain", 0, 127, 127));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Release", name + "Release", 0, 127, 127));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(id + "VelCurve", name + "Velocity Curve", 0, 7, 0));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(id + "VelSens", name + "Velocity Sens", -63, 63, 32));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(id + "AttackSens", name + "Attack Velocity Sens", -63, 63, 0));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(id + "DecaySens", name + "Decay Velocity Sens", -63, 63, 0));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(id + "ReleaseSens", name + "Release Velocity Sens", -63, 63, 0));
+    for (int k = 0; k < 2; ++k) {
+        using Params::cosmId;
+        const juce::String n = k ? "COSM 2 " : "COSM 1 ";
+        params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "Switch"), n + "TVF", false));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Filter"), n + "Filter Type",
+            juce::StringArray { "LP24", "BP24", "HP24", "NOTCH24", "PEAK24", "LP12", "BP12", "HP12", "NOTCH12", "PEAK12", "LP6", "HP6" }, 5));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "Cutoff"), n + "Cutoff", 0, 127, 127));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "Reso"), n + "Resonance", 0, 127, 0));
         params.push_back(std::make_unique<juce::AudioParameterFloat>(
-            id + "TimeKF", name + "Time Keyfollow", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+            cosmId(k, "CutoffKF"), n + "Cutoff Keyfollow", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CutoffEnv"), n + "Cutoff Env Depth", -63, 63, 0));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CutoffLfo"), n + "Cutoff LFO Depth", -63, 63, 0));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResoEnv"), n + "Resonance Env Depth", -63, 63, 0));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResoLfo"), n + "Resonance LFO Depth", -63, 63, 0));
+        for (const char* ab : { "A", "B" }) {
+            const juce::String id = cosmId(k, "Env") + ab, name = n + "Env " + ab + " ";
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Attack", name + "Attack", 0, 127, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Decay", name + "Decay", 0, 127, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Sustain", name + "Sustain", 0, 127, 127));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Release", name + "Release", 0, 127, 127));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "VelCurve", name + "Velocity Curve", 0, 7, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "VelSens", name + "Velocity Sens", -63, 63, 32));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "AttackSens", name + "Attack Velocity Sens", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "DecaySens", name + "Decay Velocity Sens", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "ReleaseSens", name + "Release Velocity Sens", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                id + "TimeKF", name + "Time Keyfollow", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+        }
+        const juce::String ln = k ? "LFO 4 " : "LFO 3 ";
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "LfoWave"), ln + "Waveform",
+            juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "LfoRate"), ln + "Rate", 0, 127, 98));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "LfoOffset"), ln + "Offset",
+            juce::StringArray { "-100", "-50", "0", "+50", "+100" }, 2));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "LfoDelay"), ln + "Delay", 0, 127, 0));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "LfoFadeMode"), ln + "Fade Mode",
+            juce::StringArray { "ON <<", "ON >>", "OFF <<", "OFF >>" }, 0));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "LfoFade"), ln + "Fade", 0, 127, 0));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "LfoKeySync"), ln + "Key Sync", false));
     }
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kClfoWave, "COSM LFO Waveform",
-        juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kClfoRate, "COSM LFO Rate", 0, 127, 98));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kClfoOffset, "COSM LFO Offset",
-        juce::StringArray { "-100", "-50", "0", "+50", "+100" }, 2));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kClfoDelay, "COSM LFO Delay", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kClfoFadeMode, "COSM LFO Fade Mode",
-        juce::StringArray { "ON <<", "ON >>", "OFF <<", "OFF >>" }, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kClfoFade, "COSM LFO Fade", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kClfoKeySync, "COSM LFO Key Sync", false));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
@@ -428,29 +419,33 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.mono         = knob(Params::kMonoPoly) == 0;
     c.legato       = apvts.getRawParameterValue(Params::kLegato)->load() >= 0.5f;
     c.octave       = knob(Params::kOctave);
-    c.cosm         = apvts.getRawParameterValue(Params::kCosm)->load() >= 0.5f;
-    c.cosmFilter   = knob(Params::kCosmFilter);
-    c.cosmCutoff   = knob(Params::kCosmCutoff);
-    c.cosmReso     = knob(Params::kCosmReso);
-    c.cosmKF       = kf(Params::kCosmKF);
-    c.cosmCutoffEnv = knob(Params::kCosmCutEnv);
-    c.cosmCutoffLfo = knob(Params::kCosmCutLfo);
-    c.cosmResoEnv  = knob(Params::kCosmResoEnv);
-    c.cosmResoLfo  = knob(Params::kCosmResoLfo);
     for (int k = 0; k < 2; ++k) {
-        XtSynth::Controls::CosmEnv& e = k == 0 ? c.cosmEnvA : c.cosmEnvB;
-        const juce::String id = k == 0 ? "cosmEnvA" : "cosmEnvB";
-        int* const f[9] = { &e.attack, &e.decay, &e.sustain, &e.release, &e.velCurve, &e.velSens, &e.aSens, &e.dSens, &e.rSens };
-        for (int i = 0; i < 9; ++i) *f[i] = knob(id + Params::kCosmEnvKnobs[i]);
-        e.timeKF = kf(id + "TimeKF");
+        using Params::cosmId;
+        XtSynth::Controls::Cosm& m = c.cosm[k];
+        m.on        = apvts.getRawParameterValue(cosmId(k, "Switch"))->load() >= 0.5f;
+        m.filter    = knob(cosmId(k, "Filter"));
+        m.cutoff    = knob(cosmId(k, "Cutoff"));
+        m.reso      = knob(cosmId(k, "Reso"));
+        m.kf        = kf(cosmId(k, "CutoffKF"));
+        m.cutoffEnv = knob(cosmId(k, "CutoffEnv"));
+        m.cutoffLfo = knob(cosmId(k, "CutoffLfo"));
+        m.resoEnv   = knob(cosmId(k, "ResoEnv"));
+        m.resoLfo   = knob(cosmId(k, "ResoLfo"));
+        for (int ab = 0; ab < 2; ++ab) {
+            XtSynth::Controls::CosmEnv& e = ab == 0 ? m.envA : m.envB;
+            const juce::String id = cosmId(k, ab == 0 ? "EnvA" : "EnvB");
+            int* const f[9] = { &e.attack, &e.decay, &e.sustain, &e.release, &e.velCurve, &e.velSens, &e.aSens, &e.dSens, &e.rSens };
+            for (int i = 0; i < 9; ++i) *f[i] = knob(id + Params::kCosmEnvKnobs[i]);
+            e.timeKF = kf(id + "TimeKF");
+        }
+        m.lfoWave     = knob(cosmId(k, "LfoWave"));
+        m.lfoRate     = knob(cosmId(k, "LfoRate"));
+        m.lfoOffset   = knob(cosmId(k, "LfoOffset"));
+        m.lfoDelay    = knob(cosmId(k, "LfoDelay"));
+        m.lfoFadeMode = knob(cosmId(k, "LfoFadeMode"));
+        m.lfoFade     = knob(cosmId(k, "LfoFade"));
+        m.lfoKeySync  = apvts.getRawParameterValue(cosmId(k, "LfoKeySync"))->load() >= 0.5f;
     }
-    c.clfoWave     = knob(Params::kClfoWave);
-    c.clfoRate     = knob(Params::kClfoRate);
-    c.clfoOffset   = knob(Params::kClfoOffset);
-    c.clfoDelay    = knob(Params::kClfoDelay);
-    c.clfoFadeMode = knob(Params::kClfoFadeMode);
-    c.clfoFade     = knob(Params::kClfoFade);
-    c.clfoKeySync  = apvts.getRawParameterValue(Params::kClfoKeySync)->load() >= 0.5f;
     c.energy       = knob(Params::kEnergy);
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();

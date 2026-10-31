@@ -5,6 +5,7 @@
 #include "../Source/PluginProcessor.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <cstdio>
+#include <string>
 #include <thread>
 
 int main(int argc, char** argv) {
@@ -17,9 +18,13 @@ int main(int argc, char** argv) {
     VSynthEmuProcessor p;
     if (!p.setRomFile(juce::File(argv[1]))) { std::fprintf(stderr, "ROM rejected: %s\n", p.getStatusText().toRawUTF8()); return 1; }
     p.prepareToPlay(rate, block);
-    // TEST_SNAPSHOT=file.png: the editor drawn offscreen, for checking the layout
+    // TEST_SNAPSHOT=file.png: the editor drawn offscreen, for checking the
+    // layout (TEST_SNAPSHOT_COSM2=1: with the COSM rows on COSM 2)
     if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
         std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
+        if (std::getenv("TEST_SNAPSHOT_COSM2"))      // the COSM rows switched to COSM 2 (the selector re-attaches them)
+            for (juce::Component* ch : ed->getChildren())
+                if (auto* cb = dynamic_cast<juce::ComboBox*>(ch); cb && cb->getItemText(0) == "COSM 1") cb->setSelectedId(2, juce::sendNotificationSync);
         const juce::Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 2.0f);
         juce::File f(juce::File::getCurrentWorkingDirectory().getChildFile(snap));
         f.deleteFile();
@@ -164,24 +169,31 @@ int main(int argc, char** argv) {
     }
     // TEST_COSM="filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo": COSM 1
     // as a TVF; TEST_CENV="a,d,s,r,velCurve,velSens": its cutoff envelope
-    // (Env A); TEST_CLFO="wave,rate": LFO 3
-    if (const char* e = std::getenv("TEST_COSM")) {
-        refCtl.cosm = true;
-        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &refCtl.cosmFilter, &refCtl.cosmCutoff, &refCtl.cosmReso, &refCtl.cosmKF,
-                    &refCtl.cosmCutoffEnv, &refCtl.cosmCutoffLfo, &refCtl.cosmResoEnv, &refCtl.cosmResoLfo);
-        setKnobs({ { "cosmSwitch", 1 }, { "cosmFilter", refCtl.cosmFilter }, { "cosmCutoff", refCtl.cosmCutoff }, { "cosmReso", refCtl.cosmReso },
-                   { "cosmCutoffKF", refCtl.cosmKF }, { "cosmCutoffEnv", refCtl.cosmCutoffEnv }, { "cosmCutoffLfo", refCtl.cosmCutoffLfo },
-                   { "cosmResoEnv", refCtl.cosmResoEnv }, { "cosmResoLfo", refCtl.cosmResoLfo } });
-    }
-    if (const char* e = std::getenv("TEST_CENV")) {
-        auto& a = refCtl.cosmEnvA;
-        std::sscanf(e, "%d,%d,%d,%d,%d,%d", &a.attack, &a.decay, &a.sustain, &a.release, &a.velCurve, &a.velSens);
-        setKnobs({ { "cosmEnvAAttack", a.attack }, { "cosmEnvADecay", a.decay }, { "cosmEnvASustain", a.sustain }, { "cosmEnvARelease", a.release },
-                   { "cosmEnvAVelCurve", a.velCurve }, { "cosmEnvAVelSens", a.velSens } });
-    }
-    if (const char* e = std::getenv("TEST_CLFO")) {
-        std::sscanf(e, "%d,%d", &refCtl.clfoWave, &refCtl.clfoRate);
-        setKnobs({ { "cosmLfoWave", refCtl.clfoWave }, { "cosmLfoRate", refCtl.clfoRate } });
+    // (Env A); TEST_CLFO="wave,rate": its LFO.  TEST_COSM2, TEST_CENV2,
+    // TEST_CLFO2: the same for COSM 2.
+    for (int k = 0; k < 2; ++k) {
+        auto& m = refCtl.cosm[k];
+        const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
+        auto set = [&](const char* name, int v) {
+            auto* prm = p.apvts.getParameter(juce::String(pre + name));
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+        };
+        if (const char* e = std::getenv(("TEST_COSM" + sfx).c_str())) {
+            m.on = true;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &m.filter, &m.cutoff, &m.reso, &m.kf, &m.cutoffEnv, &m.cutoffLfo, &m.resoEnv, &m.resoLfo);
+            set("Switch", 1); set("Filter", m.filter); set("Cutoff", m.cutoff); set("Reso", m.reso); set("CutoffKF", m.kf);
+            set("CutoffEnv", m.cutoffEnv); set("CutoffLfo", m.cutoffLfo); set("ResoEnv", m.resoEnv); set("ResoLfo", m.resoLfo);
+        }
+        if (const char* e = std::getenv(("TEST_CENV" + sfx).c_str())) {
+            auto& a = m.envA;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d", &a.attack, &a.decay, &a.sustain, &a.release, &a.velCurve, &a.velSens);
+            set("EnvAAttack", a.attack); set("EnvADecay", a.decay); set("EnvASustain", a.sustain); set("EnvARelease", a.release);
+            set("EnvAVelCurve", a.velCurve); set("EnvAVelSens", a.velSens);
+        }
+        if (const char* e = std::getenv(("TEST_CLFO" + sfx).c_str())) {
+            std::sscanf(e, "%d,%d", &m.lfoWave, &m.lfoRate);
+            set("LfoWave", m.lfoWave); set("LfoRate", m.lfoRate);
+        }
     }
     // TEST_MONO="mono,legato[,octave]": Mono/Poly (1 MONO), Legato Switch,
     // Octave Shift

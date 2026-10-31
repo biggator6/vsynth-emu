@@ -2678,3 +2678,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
   modes.
 - Every firmware check and render is unchanged from v61. The SOLO player's
   −83…−100 dB residual is unchanged too, so it has another cause.
+
+### Session 16 addendum (2026-10-31) — v63: COSM 2
+
+- COSM 2 is the same object as COSM 1, run after it on the same buffer,
+  with Env 11/12 and LFO 4.
+- Plugin: the second section, its parameters prefixed "cosm2", and an
+  editor selector between the two.
+- COSM 2 alone equals COSM 1 alone with the same settings. In series the
+  two give the product of their responses. With COSM 2 off the output is
+  bit-identical to v62.

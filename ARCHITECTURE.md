@@ -255,10 +255,11 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - key assign (v60): Mono/Poly, Legato Switch and Octave Shift through the
      XT's key state; a MONO legato note takes over the sounding voice,
      otherwise the old voice is truncated (0.70 ms).
-   - COSM 1 as a TVF (v61, XtCosm): the twelve filter types, Cutoff,
-     Resonance and Keyfollow, with its own envelopes (Env 9/10) and LFO 3,
-     through the XT's converter, control and filter kernels, between the
-     player and the TVA.
+   - the COSM sections as TVFs (v61 COSM 1, v63 COSM 2 in series; XtCosm):
+     the twelve filter types, Cutoff, Resonance and Keyfollow, each with its
+     own envelopes (Env 9/10, 11/12) and LFO (3, 4), through the XT's
+     converter, control and filter kernels, between the player and the
+     TVA.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 

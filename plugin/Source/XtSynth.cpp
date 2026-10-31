@@ -272,8 +272,9 @@ XtLfoParams XtSynth::lfoParams() const {
     return xtLfoConvert(ctl.lfoWave, ctl.lfoRate, ctl.lfoOffset, ctl.lfoDelay, ctl.lfoFadeMode, ctl.lfoFade, ctl.lfoKeySync);
 }
 
-XtLfoParams XtSynth::clfoParams() const {
-    return xtLfoConvert(ctl.clfoWave, ctl.clfoRate, ctl.clfoOffset, ctl.clfoDelay, ctl.clfoFadeMode, ctl.clfoFade, ctl.clfoKeySync);
+XtLfoParams XtSynth::clfoParams(int k) const {
+    const Controls::Cosm& c = ctl.cosm[k];
+    return xtLfoConvert(c.lfoWave, c.lfoRate, c.lfoOffset, c.lfoDelay, c.lfoFadeMode, c.lfoFade, c.lfoKeySync);
 }
 
 // A COSM envelope (ADSR kinds 8..11, curve 2): its times as the other
@@ -285,14 +286,20 @@ XtEnvParams XtSynth::cosmEnvParams(const Voice& v, const Controls::CosmEnv& e) c
     return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);
 }
 
-// The TVF's block (0x894dd870) at the voice's key, with the velocity factors
-// of Env 9 (A: the Cutoff's depth) and Env 10 (B: the Q's).
-XtTvfBlock XtSynth::cosmBlock(const Voice& v) const {
+// A TVF's block (0x894dd870) at the voice's key, with the velocity factors
+// of its envelopes (A: the Cutoff's depth, Env 9 or 11; B: the Q's, Env 10
+// or 12).
+XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {
+    const Controls::Cosm& c = ctl.cosm[k];
     XtTvfParams p;
-    p.filter = ctl.cosmFilter; p.q = ctl.cosmReso; p.qLfo = ctl.cosmResoLfo; p.qEnv = ctl.cosmResoEnv;
-    p.cutoff = ctl.cosmCutoff; p.keyfollow = ctl.cosmKF / 10; p.cutoffLfo = ctl.cosmCutoffLfo; p.cutoffEnv = ctl.cosmCutoffEnv;
-    return xtTvfBlock(p, v.note, xtCosmVelocity(v.vel, ctl.cosmEnvA.velSens, ctl.cosmEnvA.velCurve),
-                      xtCosmVelocity(v.vel, ctl.cosmEnvB.velSens, ctl.cosmEnvB.velCurve));
+    p.filter = c.filter; p.q = c.reso; p.qLfo = c.resoLfo; p.qEnv = c.resoEnv;
+    p.cutoff = c.cutoff; p.keyfollow = c.kf / 10; p.cutoffLfo = c.cutoffLfo; p.cutoffEnv = c.cutoffEnv;
+    return xtTvfBlock(p, v.note, xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve));
+}
+
+void XtSynth::cosmSetBlock(Voice& v, int k) {
+    Voice::CosmVoice& c = v.cs[k];
+    c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
 }
 
 // The LFO constructor seeds each LFO's chaos state from a global logistic
@@ -334,22 +341,26 @@ void XtSynth::setControls(const Controls& c) {
                            || c.portaType != ctl.portaType;
     const bool keyChanged = c.oscCoarse != ctl.oscCoarse || c.patchCoarse != ctl.patchCoarse || c.pitchKF != ctl.pitchKF
                          || c.pitchSemis != ctl.pitchSemis;
-    // COSM 1: a new block for the sounding voices (0x894ed8f0), its
-    // envelopes and LFO 3 new settings
+    // the COSM sections: a new block for the sounding voices (0x894ed8f0),
+    // their envelopes and LFOs new settings
     auto envDiff = [](const Controls::CosmEnv& a, const Controls::CosmEnv& b) {
         return a.attack != b.attack || a.decay != b.decay || a.sustain != b.sustain || a.release != b.release || a.aSens != b.aSens
             || a.dSens != b.dSens || a.rSens != b.rSens || a.timeKF != b.timeKF;
     };
-    const bool cenvAChanged = envDiff(c.cosmEnvA, ctl.cosmEnvA), cenvBChanged = envDiff(c.cosmEnvB, ctl.cosmEnvB);
-    const bool clfoChanged = c.clfoWave != ctl.clfoWave || c.clfoRate != ctl.clfoRate || c.clfoOffset != ctl.clfoOffset
-                          || c.clfoDelay != ctl.clfoDelay || c.clfoFadeMode != ctl.clfoFadeMode || c.clfoFade != ctl.clfoFade;
-    const bool cosmChanged = c.cosmFilter != ctl.cosmFilter || c.cosmCutoff != ctl.cosmCutoff || c.cosmReso != ctl.cosmReso
-                          || c.cosmKF != ctl.cosmKF || c.cosmCutoffEnv != ctl.cosmCutoffEnv || c.cosmCutoffLfo != ctl.cosmCutoffLfo
-                          || c.cosmResoEnv != ctl.cosmResoEnv || c.cosmResoLfo != ctl.cosmResoLfo
-                          || c.cosmEnvA.velCurve != ctl.cosmEnvA.velCurve || c.cosmEnvA.velSens != ctl.cosmEnvA.velSens
-                          || c.cosmEnvB.velCurve != ctl.cosmEnvB.velCurve || c.cosmEnvB.velSens != ctl.cosmEnvB.velSens;
+    bool cenvAChanged[2], cenvBChanged[2], clfoChanged[2], cosmChanged[2];
+    for (int k = 0; k < 2; ++k) {
+        const Controls::Cosm &n = c.cosm[k], &o = ctl.cosm[k];
+        cenvAChanged[k] = envDiff(n.envA, o.envA);
+        cenvBChanged[k] = envDiff(n.envB, o.envB);
+        clfoChanged[k] = n.lfoWave != o.lfoWave || n.lfoRate != o.lfoRate || n.lfoOffset != o.lfoOffset || n.lfoDelay != o.lfoDelay
+                      || n.lfoFadeMode != o.lfoFadeMode || n.lfoFade != o.lfoFade;
+        cosmChanged[k] = n.filter != o.filter || n.cutoff != o.cutoff || n.reso != o.reso || n.kf != o.kf || n.cutoffEnv != o.cutoffEnv
+                      || n.cutoffLfo != o.cutoffLfo || n.resoEnv != o.resoEnv || n.resoLfo != o.resoLfo || n.envA.velCurve != o.envA.velCurve
+                      || n.envA.velSens != o.envA.velSens || n.envB.velCurve != o.envB.velCurve || n.envB.velSens != o.envB.velSens;
+    }
     ctl = c;
-    if (clfoChanged && freeClfoOn) freeClfo.update(clfoParams());
+    for (int k = 0; k < 2; ++k)
+        if (clfoChanged[k] && freeClfoOn[k]) freeClfo[k].update(clfoParams(k));
     if (lfoChanged && freeLfoOn) freeLfo.update(lfoParams());
     for (Voice& v : voice) {
         if (!v.active) continue;
@@ -360,11 +371,13 @@ void XtSynth::setControls(const Controls& c) {
         if (oenvChanged) v.oenv.update(ampEnvParams(v));
         if (lfoChanged) v.lfo.update(lfoParams());
         if (portaChanged) v.porta.update(xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v.vel));
-        if (v.cosmOn) {
-            if (cenvAChanged) v.cenvA.update(cosmEnvParams(v, ctl.cosmEnvA));
-            if (cenvBChanged) v.cenvB.update(cosmEnvParams(v, ctl.cosmEnvB));
-            if (clfoChanged) v.clfo.update(clfoParams());
-            if (cosmChanged) v.cosm.setBlock(cosmBlock(v), v.cenvB.level(), v.clfo.out(), v.cenvA.level(), v.clfo.out());
+        for (int k = 0; k < 2; ++k) {
+            Voice::CosmVoice& cv = v.cs[k];
+            if (!cv.on) continue;
+            if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));
+            if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));
+            if (clfoChanged[k]) cv.lfo.update(clfoParams(k));
+            if (cosmChanged[k]) cosmSetBlock(v, k);
         }
         if (keyChanged) {
             const int k = keyFollowKey(v);
@@ -447,17 +460,19 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->oenv.noteOn(oe);
     v->lfo.noteOn(lfoParams(), drawSeed());
     if (!ctl.lfoKeySync && freeLfoOn) v->lfo.setPhase(freeLfo.phase());
-    // COSM 1, TVF (0x894edf70): its envelopes and LFO 3 start with the
-    // others; the filter's states clear and its coefficients start from the
-    // envelopes' start levels
-    v->cosmOn = ctl.cosm;
-    if (v->cosmOn) {
-        v->cenvA.noteOn(cosmEnvParams(*v, ctl.cosmEnvA));
-        v->cenvB.noteOn(cosmEnvParams(*v, ctl.cosmEnvB));
-        v->clfo.noteOn(clfoParams(), drawSeed());
-        if (!ctl.clfoKeySync && freeClfoOn) v->clfo.setPhase(freeClfo.phase());
-        v->cosm.noteOn(cosmBlock(*v), v->cenvB.onsetLevel(), v->cenvB.level(), v->cenvB.smooth(), v->clfo.out(),
-                       v->cenvA.onsetLevel(), v->cenvA.level(), v->cenvA.smooth(), v->clfo.out());
+    // the COSM sections as TVFs (0x894edf70, COSM 1 then 2): their
+    // envelopes and LFOs start with the others; the filters' states clear and
+    // their coefficients start from the envelopes' start levels
+    for (int k = 0; k < 2; ++k) {
+        Voice::CosmVoice& c = v->cs[k];
+        c.on = ctl.cosm[k].on;
+        if (!c.on) continue;
+        c.envA.noteOn(cosmEnvParams(*v, ctl.cosm[k].envA));
+        c.envB.noteOn(cosmEnvParams(*v, ctl.cosm[k].envB));
+        c.lfo.noteOn(clfoParams(k), drawSeed());
+        if (!ctl.cosm[k].lfoKeySync && freeClfoOn[k]) c.lfo.setPhase(freeClfo[k].phase());
+        c.tvf.noteOn(cosmBlock(*v, k), c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out(),
+                     c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
     }
     targets(*v, v->curA, v->curF, v->curWalk, v->curG);
     // the OSC gain starts from the amp envelope's start level, or its output
@@ -502,11 +517,12 @@ void XtSynth::legatoNote(int key, int vel) {
         v.fenv.update(oscEnvParams(v, ctl.fAttack, ctl.fDecay, ctl.fSustain, ctl.fRelease));
         v.oenv.update(ampEnvParams(v));
         v.lfo.update(lfoParams());
-        if (v.cosmOn) {
-            v.cenvA.update(cosmEnvParams(v, ctl.cosmEnvA));
-            v.cenvB.update(cosmEnvParams(v, ctl.cosmEnvB));
-            v.clfo.update(clfoParams());
-            v.cosm.setBlock(cosmBlock(v), v.cenvB.level(), v.clfo.out(), v.cenvA.level(), v.clfo.out());
+        for (int k = 0; k < 2; ++k) {
+            if (!v.cs[k].on) continue;
+            v.cs[k].envA.update(cosmEnvParams(v, ctl.cosm[k].envA));
+            v.cs[k].envB.update(cosmEnvParams(v, ctl.cosm[k].envB));
+            v.cs[k].lfo.update(clfoParams(k));
+            cosmSetBlock(v, k);
         }
         v.porta.update(xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v.vel));
         const int k = keyFollowKey(v);
@@ -551,12 +567,14 @@ void XtSynth::noteOff(int note, float velocity) {
             v.oenv.update(ampEnvParams(v));
             v.oenv.noteOff();
             v.lfo.noteOff();
-            if (v.cosmOn) {
-                v.cenvA.update(cosmEnvParams(v, ctl.cosmEnvA));
-                v.cenvA.noteOff();
-                v.cenvB.update(cosmEnvParams(v, ctl.cosmEnvB));
-                v.cenvB.noteOff();
-                v.clfo.noteOff();
+            for (int k = 0; k < 2; ++k) {
+                Voice::CosmVoice& c = v.cs[k];
+                if (!c.on) continue;
+                c.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));
+                c.envA.noteOff();
+                c.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));
+                c.envB.noteOff();
+                c.lfo.noteOff();
             }
         }
 }
@@ -605,14 +623,16 @@ void XtSynth::mixBlock(float* lr) {
             freeLfoOn = true;
         }
         freeLfo.tick(1);
-        if (!freeClfoOn) {
-            XtLfoParams fp = clfoParams();
-            fp.delayMs = fp.fadeMs = 0.0f;
-            fp.fadeMode = 0;
-            freeClfo.noteOn(fp);
-            freeClfoOn = true;
+        for (int k = 0; k < 2; ++k) {
+            if (!freeClfoOn[k]) {
+                XtLfoParams fp = clfoParams(k);
+                fp.delayMs = fp.fadeMs = 0.0f;
+                fp.fadeMode = 0;
+                freeClfo[k].noteOn(fp);
+                freeClfoOn[k] = true;
+            }
+            freeClfo[k].tick(1);
         }
-        freeClfo.tick(1);
     }
     float tmp[64];
     for (Voice& v : voice) {
@@ -626,7 +646,8 @@ void XtSynth::mixBlock(float* lr) {
             v.fenv.tick();
             v.oenv.tick();
             v.lfo.tick(1);
-            if (v.cosmOn) { v.cenvA.tick(); v.cenvB.tick(); v.clfo.tick(1); }
+            for (Voice::CosmVoice& c : v.cs)
+                if (c.on) { c.envA.tick(); c.envB.tick(); c.lfo.tick(1); }
             v.porta.tick(1);                                   // 0x894f4b00, before the voice update
             float A, F, w, g;
             targets(v, A, F, w, g);
@@ -637,8 +658,9 @@ void XtSynth::mixBlock(float* lr) {
             v.curG = xtOscSmooth(v.curG, g);
             v.curGain = xtOscSmooth(v.curGain, gt);
             applyRates(v);
-            // the COSM's update (0x894ee6a0), after the voices', before the TVA
-            if (v.cosmOn) v.cosm.update(v.cenvB.level(), v.cenvB.smooth(), v.clfo.out(), v.cenvA.level(), v.cenvA.smooth(), v.clfo.out());
+            // the COSM updates (0x894ee6a0, COSM 1 then 2), after the voices', before the TVA
+            for (Voice::CosmVoice& c : v.cs)
+                if (c.on) c.tvf.update(c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
             tvaUpdate(v);
             if (!v.active) continue;
         }
@@ -653,7 +675,8 @@ void XtSynth::mixBlock(float* lr) {
             scale /= 32768.0f;
             if (v.mb.ended()) v.tail += 32;
         }
-        if (v.cosmOn) v.cosm.process(tmp);              // COSM 1 (the tone render 0x894f6d40), before the TVA
+        for (Voice::CosmVoice& c : v.cs)                 // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA
+            if (c.on) c.tvf.process(tmp);
         if (v.damping) {
             // truncated (0x894f5570): the gain held, times a fade that falls
             // by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16
@@ -758,6 +781,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_COSM="filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo": COSM 1 on
 //     as a TVF; XT_CENV="a,d,s,r[,velCurve,velSens]" its cutoff envelope
 //     (Env 9); XT_CLFO="wave,rate,offset,delay,fadeMode,fade,keySync" LFO 3.
+//     XT_COSM2, XT_CENV2, XT_CLFO2: the same for COSM 2 (Env 11, LFO 4).
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -831,19 +855,20 @@ int main(int argc, char** argv) {
         c.mono = m != 0;
         c.legato = l != 0;
     }
-    if (const char* e = std::getenv("XT_COSM")) {   // "filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo"
-        c.cosm = true;
-        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &c.cosmFilter, &c.cosmCutoff, &c.cosmReso, &c.cosmKF, &c.cosmCutoffEnv, &c.cosmCutoffLfo,
-                    &c.cosmResoEnv, &c.cosmResoLfo);
-    }
-    if (const char* e = std::getenv("XT_CENV"))     // the cutoff's envelope (Env 9) "a,d,s,r[,velCurve,velSens]"
-        std::sscanf(e, "%d,%d,%d,%d,%d,%d", &c.cosmEnvA.attack, &c.cosmEnvA.decay, &c.cosmEnvA.sustain, &c.cosmEnvA.release,
-                    &c.cosmEnvA.velCurve, &c.cosmEnvA.velSens);
-    if (const char* e = std::getenv("XT_CLFO"))     // LFO 3 "wave,rate,offset,delay,fadeMode,fade,keySync"
-    {
-        int ks = 0;
-        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &c.clfoWave, &c.clfoRate, &c.clfoOffset, &c.clfoDelay, &c.clfoFadeMode, &c.clfoFade, &ks);
-        c.clfoKeySync = ks != 0;
+    for (int k = 0; k < 2; ++k) {                   // COSM 1 (XT_COSM…), COSM 2 (XT_COSM2…)
+        XtSynth::Controls::Cosm& m = c.cosm[k];
+        const std::string sfx = k ? "2" : "";
+        if (const char* e = std::getenv(("XT_COSM" + sfx).c_str())) {   // "filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo"
+            m.on = true;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &m.filter, &m.cutoff, &m.reso, &m.kf, &m.cutoffEnv, &m.cutoffLfo, &m.resoEnv, &m.resoLfo);
+        }
+        if (const char* e = std::getenv(("XT_CENV" + sfx).c_str()))     // the cutoff's envelope "a,d,s,r[,velCurve,velSens]"
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d", &m.envA.attack, &m.envA.decay, &m.envA.sustain, &m.envA.release, &m.envA.velCurve, &m.envA.velSens);
+        if (const char* e = std::getenv(("XT_CLFO" + sfx).c_str())) {   // its LFO "wave,rate,offset,delay,fadeMode,fade,keySync"
+            int ks = 0;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &m.lfoWave, &m.lfoRate, &m.lfoOffset, &m.lfoDelay, &m.lfoFadeMode, &m.lfoFade, &ks);
+            m.lfoKeySync = ks != 0;
+        }
     }
     int bendValue = 8192;
     long bendAt = 0;

@@ -129,17 +129,12 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    for (juce::Component* cpt : { (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_, (juce::Component*)&clfoWaveBox_,
-                                  (juce::Component*)&clfoSyncBtn_ })
+    for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
+                                  (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_ })
         addAndMakeVisible(*cpt);
-    cosmAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, "cosmSwitch", cosmBtn_);
-    cosmFilterAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "cosmFilter", cosmFilterBox_);
-    cosmCutAtt_    = std::make_unique<SliderAtt>(processor_.apvts, "cosmCutoff", cosmCutSlider_);
-    cosmResoAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "cosmReso", cosmResoSlider_);
-    cosmKfAtt_     = std::make_unique<SliderAtt>(processor_.apvts, "cosmCutoffKF", cosmKfSlider_);
-    clfoWaveAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "cosmLfoWave", clfoWaveBox_);
-    clfoRateAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "cosmLfoRate", clfoRateSlider_);
-    clfoSyncAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, "cosmLfoKeySync", clfoSyncBtn_);
+    cosmSelBox_.addItemList({ "COSM 1", "COSM 2" }, 1);
+    cosmSelBox_.setSelectedId(1, juce::dontSendNotification);
+    cosmSelBox_.onChange = [this] { attachCosm(cosmSelBox_.getSelectedId() == 2 ? 1 : 0); };
     lfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);
     lfoModeBox_.addItemList({ "ON <<", "ON >>", "OFF <<", "OFF >>" }, 1);
     lfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
@@ -171,6 +166,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         levelRowLabels_[r].setText(kLevelRowNames[r], juce::dontSendNotification);
         styleSmall(levelRowLabels_[r]);
     }
+    attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
                             &pAttackLabel_, &pDecayLabel_, &pSustainLabel_, &pReleaseLabel_, &pDepthLabel_,
@@ -227,6 +223,27 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
     timeAtt_    = std::make_unique<SliderAtt>(processor_.apvts, xt ? "oscTime" : "timeStretch", timeSlider_);
     formantAtt_ = std::make_unique<SliderAtt>(processor_.apvts, xt ? "oscFormant" : "formantShift", formantSlider_);
     mainKnobsXt_ = xt;
+}
+
+// The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
+// the depth and Env A rows (level slots 24..31) and its LFO.
+void VSynthEmuEditor::attachCosm(int k) {
+    const juce::String pre = k ? "cosm2" : "cosm";
+    cosmAtt_.reset(); cosmFilterAtt_.reset(); cosmCutAtt_.reset(); cosmResoAtt_.reset(); cosmKfAtt_.reset();
+    clfoWaveAtt_.reset(); clfoRateAtt_.reset(); clfoSyncAtt_.reset();
+    cosmAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, pre + "Switch", cosmBtn_);
+    cosmFilterAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "Filter", cosmFilterBox_);
+    cosmCutAtt_    = std::make_unique<SliderAtt>(processor_.apvts, pre + "Cutoff", cosmCutSlider_);
+    cosmResoAtt_   = std::make_unique<SliderAtt>(processor_.apvts, pre + "Reso", cosmResoSlider_);
+    cosmKfAtt_     = std::make_unique<SliderAtt>(processor_.apvts, pre + "CutoffKF", cosmKfSlider_);
+    clfoWaveAtt_   = std::make_unique<ComboAtt>(processor_.apvts, pre + "LfoWave", clfoWaveBox_);
+    clfoRateAtt_   = std::make_unique<SliderAtt>(processor_.apvts, pre + "LfoRate", clfoRateSlider_);
+    clfoSyncAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, pre + "LfoKeySync", clfoSyncBtn_);
+    for (int i = 24; i < kLevelKnobs; ++i) {            // "cosm…" ids: the suffix after "cosm"
+        levelAtts_[i].reset();
+        levelAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + juce::String(kLevelIds[i][0] + 4), levelSliders_[i]);
+    }
+    clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
 }
 
 void VSynthEmuEditor::timerCallback() {
@@ -444,15 +461,16 @@ void VSynthEmuEditor::resized() {
         if (r == 5) {                                // COSM 1: switch, Filter Type, Cutoff, Resonance, KF
             xt.removeFromTop(6);
             auto rc = xt.removeFromTop(24);
-            cosmBtn_.setBounds(rc.removeFromLeft(70));
-            cosmFilterBox_.setBounds(rc.removeFromLeft(96).withTrimmedRight(8));
+            cosmSelBox_.setBounds(rc.removeFromLeft(90).withTrimmedRight(6));
+            cosmBtn_.setBounds(rc.removeFromLeft(48));
+            cosmFilterBox_.setBounds(rc.removeFromLeft(92).withTrimmedRight(6));
             const int w3 = rc.getWidth() / 3;
             std::pair<juce::Label*, juce::Slider*> cells[] = { { &cosmCutLabel_, &cosmCutSlider_ }, { &cosmResoLabel_, &cosmResoSlider_ },
                                                                { &cosmKfLabel_, &cosmKfSlider_ } };
             for (auto& [l, sl] : cells) {
                 auto cell = rc.removeFromLeft(w3);
-                l->setBounds(cell.removeFromLeft(30));
-                sl->setBounds(cell.withTrimmedRight(6));
+                l->setBounds(cell.removeFromLeft(28));
+                sl->setBounds(cell.withTrimmedRight(4));
             }
         }
     }

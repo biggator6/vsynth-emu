@@ -217,6 +217,13 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+COSM 2 v63 (2026-10-31): COSM 2 as a TVF after COSM 1 (Env 11/12, LFO 4).
+  XtSynth::Controls::Cosm cosm[2] and Voice::CosmVoice cs[2] replace v61's
+  COSM 1 fields. Plugin params as COSM 1's with prefix "cosm2" (COSM 1 keeps
+  "cosm…"); the editor's COSM rows follow a COSM 1/2 selector. XtSynth CLI
+  XT_COSM2/XT_CENV2/XT_CLFO2; PluginTest TEST_COSM2/TEST_CENV2/TEST_CLFO2,
+  TEST_SNAPSHOT_COSM2=1.
+
 EXACT SUMS v62 (2026-10-31): XtFloat add/sub round the double sum and its
   exact error (TwoSum), so a tiny addend still moves a large value one unit
   toward zero as on the SH-4 (XT_ROUND=nearest: ties decided exactly).

@@ -113,23 +113,28 @@ public:
         // Octave Shift −3..+3 (the XT's defaults: POLY, ON, 0)
         bool mono = false, legato = true;
         int octave = 0;
-        // COSM 1, TVF (XtCosm): the switch; Filter Type 0..11 (LP24, BP24,
-        // HP24, NOTCH24, PEAK24, LP12, BP12, HP12, NOTCH12, PEAK12, LP6,
-        // HP6); Cutoff and Resonance (Q) 0..127; Cutoff Keyfollow −200..+200
-        // (steps of 10); the Cutoff's and Q's Env and LFO depths −63..+63.
-        // Its envelopes (curve 2): Env 9 drives the Cutoff, Env 10 the Q,
-        // each with the Velocity Curve 0 (off), 1..7 and Sens −63..+63 that
-        // scale its depth; its LFO is LFO 3.  The XT's defaults.
+        // The COSM sections as TVFs (XtCosm), COSM 1 then COSM 2 in series:
+        // the switch; Filter Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
+        // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
+        // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
+        // and Q's Env and LFO depths −63..+63.  Their envelopes (curve 2):
+        // envA drives the Cutoff (Env 9, COSM 2 Env 11), envB the Q (Env 10,
+        // 12), each with the Velocity Curve 0 (off), 1..7 and Sens −63..+63
+        // that scale its depth; the LFO is LFO 3 (COSM 2 LFO 4).  The XT's
+        // defaults.
         struct CosmEnv {
             int attack = 0, decay = 0, sustain = 127, release = 127;
             int velCurve = 0, velSens = 32, aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
         };
-        bool cosm = false;
-        int cosmFilter = 5, cosmCutoff = 127, cosmReso = 0, cosmKF = 0;
-        int cosmCutoffEnv = 0, cosmCutoffLfo = 0, cosmResoEnv = 0, cosmResoLfo = 0;
-        CosmEnv cosmEnvA, cosmEnvB;
-        int clfoWave = 1, clfoRate = 98, clfoOffset = 2, clfoDelay = 0, clfoFadeMode = 0, clfoFade = 0;
-        bool clfoKeySync = false;
+        struct Cosm {
+            bool on = false;
+            int filter = 5, cutoff = 127, reso = 0, kf = 0;
+            int cutoffEnv = 0, cutoffLfo = 0, resoEnv = 0, resoLfo = 0;
+            CosmEnv envA, envB;
+            int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
+            bool lfoKeySync = false;
+        };
+        Cosm cosm[2];
     };
 
     XtSynth();
@@ -167,12 +172,15 @@ private:
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
         XtLfo lfo;
-        // COSM 1 (TVF): on as at note-on; its envelopes (Env 9 cutoff, Env 10
-        // Q) and LFO 3
-        bool cosmOn = false;
-        XtCosmTvf cosm;
-        XtEnvelope cenvA, cenvB;
-        XtLfo clfo;
+        // the COSM sections: on as at note-on; each its TVF, envelopes (the
+        // Cutoff's, the Q's) and LFO
+        struct CosmVoice {
+            bool on = false;
+            XtCosmTvf tvf;
+            XtEnvelope envA, envB;
+            XtLfo lfo;
+        };
+        CosmVoice cs[2];
         XtPitchRamp porta;             // the pitch ramp (+0x880): kept across notes, as the XT's voices keep it
         // the player's pitch ratio, formant ratio, walk and Energy as the
         // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
@@ -194,8 +202,8 @@ private:
     static constexpr int kTickFrames = 441;
     int tickCount = 0;                // frames since the last update
     XtLfo freeLfo;                    // the free-running LFO a key-unsynced voice follows
-    XtLfo freeClfo;                   // the same for LFO 3
-    bool freeClfoOn = false;
+    XtLfo freeClfo[2];                // the same for LFO 3 and 4
+    bool freeClfoOn[2] = {};
     XtKeyState keys;                  // the channel's key state (0x894d6330 / 0x894d63c0)
     long hostFrames = 0;              // the system clock (ms) the key state reads
     XtPitchRandom pitchRandom;        // the XT's one random pitch generator (from its power-on seed)
@@ -229,8 +237,9 @@ private:
     XtEnvParams envParams(const Voice& v) const;
     XtEnvParams oscEnvParams(const Voice& v, int a, int d, int s, int r) const;   // pitch, time, formant
     XtLfoParams lfoParams() const;
-    XtLfoParams clfoParams() const;                  // LFO 3
+    XtLfoParams clfoParams(int k) const;             // LFO 3 (COSM 1), LFO 4 (COSM 2)
     XtEnvParams cosmEnvParams(const Voice& v, const Controls::CosmEnv& e) const;
-    XtTvfBlock cosmBlock(const Voice& v) const;
+    XtTvfBlock cosmBlock(const Voice& v, int k) const;
+    void cosmSetBlock(Voice& v, int k);              // a new block for a sounding section (0x894ed8f0)
     float drawSeed();
 };
