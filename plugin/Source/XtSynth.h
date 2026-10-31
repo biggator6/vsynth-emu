@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include "XtEnvelope.h"
+#include "XtKeys.h"
 #include "XtLfo.h"
 #include "XtMultiBandPlayer.h"
 #include "XtOsc.h"
@@ -103,9 +104,14 @@ public:
         float loopStart = 0.0f, loopEnd = 1.0f;
         // Portamento: the switch, Mode (0 NORMAL, 1 LEGATO: only while a key
         // is held), Type (0 RATE: Time per octave, 1 TIME), Time 0..127
-        // (k²·10000/127² ms) and Time Velo Sens −63..+63
+        // (k²·10000/127² ms; the XT's default 20) and Time Velo Sens −63..+63
         bool portamento = false;
-        int portaMode = 0, portaType = 0, portaTime = 32, portaVeloSens = 0;
+        int portaMode = 0, portaType = 0, portaTime = 20, portaVeloSens = 0;
+        // the patch's key assign: Mono/Poly, Legato Switch (MONO: a note
+        // played while a key is held takes over the sounding voice) and
+        // Octave Shift −3..+3 (the XT's defaults: POLY, ON, 0)
+        bool mono = false, legato = true;
+        int octave = 0;
     };
 
     XtSynth();
@@ -128,7 +134,12 @@ public:
 private:
     struct Voice {
         bool active = false, releasing = false;
-        int note = -1;
+        int note = -1;                 // the key, with the Octave Shift
+        int raw = -1;                  // the key as played (the tone's +0x42), for note-off
+        int srcKey = -1;               // the key portamento glides from (the OSC's +0x7c)
+        int kfKey = -1;                // the key-follow key (+4): a change restarts the glide
+        bool damping = false;          // truncated (0x894f5500): fading out over the Truncate Time
+        float damp = 0;                // the TVA's fade (+0x54)
         long age = 0, tail = 0;
         float gain = 1;               // the patch TVA's velocity gain (0x894ea990)
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
@@ -159,7 +170,8 @@ private:
     static constexpr int kTickFrames = 441;
     int tickCount = 0;                // frames since the last update
     XtLfo freeLfo;                    // the free-running LFO a key-unsynced voice follows
-    int lastKey = -1;                 // the key portamento glides from (the previous note's)
+    XtKeyState keys;                  // the channel's key state (0x894d6330 / 0x894d63c0)
+    long hostFrames = 0;              // the system clock (ms) the key state reads
     XtPitchRandom pitchRandom;        // the XT's one random pitch generator (from its power-on seed)
     int bender = 8192;
     bool freeLfoOn = false;
@@ -181,6 +193,11 @@ private:
     XtEnvParams ampEnvParams(const Voice& v) const;      // the OSC amp envelope
     XtLoop waveLoop() const;                         // the players' loop
     float noteCents(const Voice& v, int key) const;  // voice +8 at a key (+0x68 at the previous one)
+    int keyFollowKey(const Voice& v) const;          // the OSC's +4
+    int shiftKey(int key) const;                     // + the Octave Shift, within 0..127
+    void startVoice(int raw, int key, int vel);
+    void legatoNote(int key, int vel);               // the sounding voice takes a note (0x894dc1e0)
+    void truncate(Voice& v);
     void applyRates(Voice& v);
     void tvaUpdate(Voice& v);
     XtEnvParams envParams(const Voice& v) const;

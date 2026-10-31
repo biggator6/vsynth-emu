@@ -162,6 +162,15 @@ int main(int argc, char** argv) {
         setKnobs({ { "portamento", 1 }, { "portaMode", refCtl.portaMode }, { "portaType", refCtl.portaType },
                    { "portaTime", refCtl.portaTime }, { "portaVeloSens", refCtl.portaVeloSens } });
     }
+    // TEST_MONO="mono,legato[,octave]": Mono/Poly (1 MONO), Legato Switch,
+    // Octave Shift
+    if (const char* e = std::getenv("TEST_MONO")) {
+        int m = 0, l = 1;
+        std::sscanf(e, "%d,%d,%d", &m, &l, &refCtl.octave);
+        refCtl.mono = m != 0;
+        refCtl.legato = l != 0;
+        setKnobs({ { "monoPoly", refCtl.mono ? 0 : 1 }, { "legatoSwitch", l != 0 ? 1 : 0 }, { "octaveShift", refCtl.octave } });
+    }
     // TEST_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]": Pitch Shift
     // (semitones), the OSC's Pitch knob, Pitch KF (%), Coarse, Fine (cents)
     // and the Original Key

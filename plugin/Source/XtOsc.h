@@ -148,17 +148,32 @@ XtPortaSettings xtPortaSettings(bool on, int type, int time, int veloSens, int v
 // the start, then (phase/65536 − 1)·(to − from) as the phase grows by
 // 65536·10/T per tick (T the time, or for RATE the time per 1200 cents of
 // the span; at most 65536), 0 when done and when off.
+// A legato note (the voice set up again, 0x894db8a0) first gives the ramp
+// the note's settings (0x894f48b0: the switch and time, not the type; the
+// increment again from the span; running or not, as it was), then, when the
+// key-follow key (xtKeyFollowKey) has changed, starts it again from the
+// previous key's cents to the note's with those settings (0x894f2600 →
+// 0x894f4920, the same start as at note-on).
 class XtPitchRamp {
 public:
     void start(float from, float to, const XtPortaSettings& s);
+    void update(const XtPortaSettings& s);
+    void restart(float from, float to);
     void tick(int n = 1);
     float value() const { return active ? cur : 0.0f; }
     bool running() const { return active && state != 3; }
 private:
-    bool active = false;
-    int state = 0;
-    float span = 0, phase = 0, inc = 0, cur = 0;
+    bool active = false, on = false;
+    int state = 0, type = 0;
+    float span = 0, phase = 0, inc = 0, cur = 0, timeMs = 0;
+    void step();                         // the increment from the span and the time
 };
+
+// The OSC's key-follow key (+4, 0x894e12c0), which a legato note compares to
+// restart the glide: KF 0: 60 + coarse; KF 1000: key + coarse; otherwise
+// ((60 + coarse)·1000 + KF·(key − 60) + 999)/1000, toward zero; within
+// 0…127.  KF as xtPitch10 takes it (×10).
+int xtKeyFollowKey(int key, int coarse, int kf);
 
 // ── Level (the OSC TVA) and velocity ────────────────────────────────────────
 // Velocity Sens and Curve as the patch → table updaters store them:

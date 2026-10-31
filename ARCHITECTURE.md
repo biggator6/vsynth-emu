@@ -252,6 +252,9 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - the note's tuning (v59): the patch's Coarse/Fine Tune and Scale Tune,
      Random Pitch Depth (the XT's own generator) and the pitch wheel with
      Bend Range Up/Down, summed as the per-note OSC setup does.
+   - key assign (v60): Mono/Poly, Legato Switch and Octave Shift through the
+     XT's key state; a MONO legato note takes over the sounding voice,
+     otherwise the old voice is truncated (0.70 ms).
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -293,6 +296,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - The note's tuning (v59): the per-note OSC setup's coarse, fine and random
   offset (300,000 cases, the generator running on) and the bend (802,816
   cases) equal the firmware (`xt_osc`).
+- Mono/Poly (v60): the key state (120,000 events), the ramp's legato update
+  and restart (2.05 million values) and the key-follow key equal the
+  firmware (`xt_osc`).
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.

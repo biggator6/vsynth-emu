@@ -56,6 +56,11 @@ private:
     juce::Slider     portaTimeSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     portaSensSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label      portaTimeLabel_ { {}, "Time" }, portaSensLabel_ { {}, "V-Sns" };
+    // Key assign: Mono/Poly, Legato Switch, Octave Shift
+    juce::ComboBox   monoBox_;
+    juce::ToggleButton legatoBtn_ { "Legato" };
+    juce::Slider     octSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Label      octLabel_ { {}, "Oct" };
     // amp envelope, the XT's 0..127 knobs
     juce::Slider     attackSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     decaySlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -136,6 +141,9 @@ private:
     std::unique_ptr<ButtonAtt> portaAtt_;
     std::unique_ptr<ComboAtt>  portaModeAtt_, portaTypeAtt_;
     std::unique_ptr<SliderAtt> portaTimeAtt_, portaSensAtt_;
+    std::unique_ptr<ComboAtt>  monoAtt_;
+    std::unique_ptr<ButtonAtt> legatoAtt_;
+    std::unique_ptr<SliderAtt> octAtt_;
     std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_, lfoTimeAtt_, lfoFmtAtt_;
     std::unique_ptr<SliderAtt> levelAtts_[kLevelKnobs];
     std::unique_ptr<ComboAtt>  lfoWaveAtt_, lfoModeAtt_, lfoOffsetAtt_;

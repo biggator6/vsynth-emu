@@ -217,6 +217,16 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+MONO/POLY v60 (2026-10-31): the part's note-on/off (0x894dbcb0/0x894dbea0)
+  and key state (0x894d6330/0x894d63c0; XtKeys.h XtKeyState), the legato
+  re-setup (0x894dc1e0: XtPitchRamp::update/restart, xtKeyFollowKey) and
+  truncate (0x894f5500, Truncate Time 0.70 ms); HARDWARE_FIRMWARE.md,
+  "Mono/Poly, Legato and Octave Shift". All equal to the firmware (xt_osc).
+  Plugin params monoPoly, legatoSwitch, octaveShift; portaTime default 20.
+  XtSynth CLI XT_MONO="mono,legato[,octave]"; PluginTest TEST_MONO (same).
+  Parameter names by ID: pointers from 0x89790338; descriptors (centre,
+  default, min, max) 12 bytes per ID from 0x897a167c.
+
 TUNING v59 (2026-10-31): the note's Coarse and Fine as the per-note OSC
   setup forms them (0x894e4940/4c30/4e90; HARDWARE_FIRMWARE.md, "The note's
   tuning"). XtOsc: XtTuning, xtNoteCoarse, xtNoteFine, xtPitchBend

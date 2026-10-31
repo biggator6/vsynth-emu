@@ -47,6 +47,10 @@ namespace Params {
     static const juce::String kPortaType     = "portaType";
     static const juce::String kPortaTime     = "portaTime";
     static const juce::String kPortaVeloSens = "portaVeloSens";
+    // Key assign: Mono/Poly (MONO, POLY), Legato Switch, Octave Shift −3..+3
+    static const juce::String kMonoPoly      = "monoPoly";
+    static const juce::String kLegato        = "legatoSwitch";
+    static const juce::String kOctave        = "octaveShift";
     // Amp envelope, the XT's 0..127 knobs (XtEnvelope: times from the firmware's table)
     static const juce::String kAttack       = "ampAttack";
     static const juce::String kDecay        = "ampDecay";
@@ -191,8 +195,12 @@ VSynthEmuProcessor::createParameterLayout() {
         juce::StringArray { "NORMAL", "LEGATO" }, 0));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kPortaType, "Portamento Type",
         juce::StringArray { "RATE", "TIME" }, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPortaTime, "Portamento Time", 0, 127, 32));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPortaTime, "Portamento Time", 0, 127, 20));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPortaVeloSens, "Portamento Time Velo Sens", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kMonoPoly, "Mono/Poly",
+        juce::StringArray { "MONO", "POLY" }, 1));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kLegato, "Legato Switch", true));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOctave, "Octave Shift", -3, 3, 0));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
@@ -361,6 +369,9 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.portaType    = knob(Params::kPortaType);
     c.portaTime    = knob(Params::kPortaTime);
     c.portaVeloSens = knob(Params::kPortaVeloSens);
+    c.mono         = knob(Params::kMonoPoly) == 0;
+    c.legato       = apvts.getRawParameterValue(Params::kLegato)->load() >= 0.5f;
+    c.octave       = knob(Params::kOctave);
     c.energy       = knob(Params::kEnergy);
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();

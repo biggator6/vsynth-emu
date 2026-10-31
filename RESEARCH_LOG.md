@@ -2622,3 +2622,27 @@ Round-2 recordings.  First build-out after that: real-time granular port
     Depth, and Scale Tune (host parameters);
   - the big PITCH knob is the OSC's Pitch with the XT;
   - at the defaults, the output is bit-identical to v58.
+
+### Session 16 addendum (2026-10-31) — v60: Mono/Poly, Legato, Octave Shift
+
+- The part keeps a key state per MIDI channel: previous and last keys for
+  POLY and MONO, whether a key is held, and a chord window.
+  - A note-on within the window (32 ms, narrowing by 1 ms per chord note)
+    doesn't move the POLY previous key, so a chord glides from one key.
+  - On note-off a MONO part falls back to the highest key still held.
+- MONO: a note played while a key is held takes over the sounding voice
+  when Legato is on.
+  - The re-setup draws a new random offset and updates the envelopes and
+    LFO without restarting them.
+  - The pitch ramp restarts only if the key-follow key changed, so with
+    Pitch KF 0 there is no glide.
+  - Otherwise the old voice is truncated: a 0.70 ms linear fade (the hidden
+    Truncate Time, 70).
+- Octave Shift is added to the played key at note-on.
+- rom.2 holds a table of parameter names and one of descriptors (centre,
+  default, range) by ID. The XT's Portamento Time default is 20.
+- Key state, ramp update/restart and key-follow key all equal the firmware
+  in the interpreter (120,000 events, 2.05 million values, 1.46 million
+  cases).
+- Plugin: Mono/Poly, Legato Switch, Octave Shift. At the defaults, and with
+  portamento on the A/B's notes, the output is bit-identical to v59.

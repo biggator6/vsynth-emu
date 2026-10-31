@@ -2,6 +2,7 @@
 #include "XtSynth.h"
 #include "XtFirmware.h"
 #include "XtSoloEncoder.h"
+#include "XtFloat.h"
 
 #include <algorithm>
 #include <cmath>
@@ -184,6 +185,13 @@ constexpr float kInvMs = 0x1.7384eep-6f;      // 1/44.1
 constexpr float kFramesPerMs = 0x1.60cccap+5f; // 44.1
 constexpr float kSilent = 0x1.0000fep-16f;     // 2^-16
 constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
+// The truncate fade's step per sample (0x894ea380): 1/(T/100·44.1), T the
+// Truncate Time (system 0x51f, 1/100 ms; its default 70), in the SH-4's
+// arithmetic.
+float truncateStep() {
+    static const float s = xtf::div(1.0f, xtf::mul(xtf::div(xtf::flt(70), 100.0f), kFramesPerMs));
+    return s;
+}
 }
 
 // The player's targets (0x894f3ba0 pitch, 0x894f3d40 formant, 0x894f3c90
@@ -296,6 +304,13 @@ void XtSynth::setControls(const Controls& c) {
                           || c.oASens != ctl.oASens || c.oDSens != ctl.oDSens || c.oRSens != ctl.oRSens || c.oTimeKF != ctl.oTimeKF;
     const bool lfoChanged = c.lfoWave != ctl.lfoWave || c.lfoRate != ctl.lfoRate || c.lfoOffset != ctl.lfoOffset || c.lfoDelay != ctl.lfoDelay
                          || c.lfoFadeMode != ctl.lfoFadeMode || c.lfoFade != ctl.lfoFade;
+    // the tone update also gives the voices' pitch ramps the new portamento
+    // settings (0x894ebd34 → 0x894f48b0) and, when the key-follow key moved
+    // (Coarse, Pitch KF), glides again from the voice's source key (0x894f2600)
+    const bool portaChanged = c.portamento != ctl.portamento || c.portaTime != ctl.portaTime || c.portaVeloSens != ctl.portaVeloSens
+                           || c.portaType != ctl.portaType;
+    const bool keyChanged = c.oscCoarse != ctl.oscCoarse || c.patchCoarse != ctl.patchCoarse || c.pitchKF != ctl.pitchKF
+                         || c.pitchSemis != ctl.pitchSemis;
     ctl = c;
     if (lfoChanged && freeLfoOn) freeLfo.update(lfoParams());
     for (Voice& v : voice) {
@@ -306,27 +321,64 @@ void XtSynth::setControls(const Controls& c) {
         if (fenvChanged) v.fenv.update(oscEnvParams(v, ctl.fAttack, ctl.fDecay, ctl.fSustain, ctl.fRelease));
         if (oenvChanged) v.oenv.update(ampEnvParams(v));
         if (lfoChanged) v.lfo.update(lfoParams());
+        if (portaChanged) v.porta.update(xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v.vel));
+        if (keyChanged) {
+            const int k = keyFollowKey(v);
+            if (k != v.kfKey) {
+                v.kfKey = k;
+                v.porta.restart(noteCents(v, v.srcKey), noteCents(v, v.note));
+            }
+        }
     }
 }
 
+int XtSynth::shiftKey(int key) const {
+    return std::clamp(key + 12 * ctl.octave, 0, 127);
+}
+
+int XtSynth::keyFollowKey(const Voice& v) const {
+    const long shift = std::lround((double)ctl.pitchSemis * 100.0);
+    XtTuning t;
+    t.coarse = ctl.patchCoarse + (int)std::lround((double)shift / 100.0);
+    return xtKeyFollowKey(v.note, xtNoteCoarse(t, ctl.oscCoarse), 10 * ctl.pitchKF);
+}
+
+// The part's note-on (0x894dbcb0): the key state moves on (0x894d6330),
+// the key takes the Octave Shift (and the system's Transpose, 0 here).
+// POLY: a new voice.  MONO with a key already held and Legato on: the
+// sounding voice takes the note (0x894d4e00).  MONO otherwise: the part's
+// voices are truncated (0x894d4a80) and a new one starts.
 void XtSynth::noteOn(int note, float velocity) {
     pickUpSample();
     if (!cur) return;
-    // portamento's source key: the previous note's; with LEGATO only while
-    // a key is still held (else the note's own: no glide)
-    bool held = false;
-    for (const Voice& w : voice) held = held || (w.active && !w.releasing);
-    const int srcKey = (lastKey < 0 || (ctl.portaMode == 1 && !held)) ? note : lastKey;
-    lastKey = note;
+    keys.press(note);
+    keys.noteOn(note, (int32_t)std::floor((double)hostFrames * 1000.0 / hostRate));
+    const int key = shiftKey(note), vel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
+    if (ctl.mono) {
+        if (keys.prevMonoHeld && ctl.legato) { legatoNote(key, vel); return; }
+        for (Voice& v : voice) if (v.active) truncate(v);
+    }
+    startVoice(note, key, vel);
+}
+
+void XtSynth::startVoice(int raw, int note, int vel) {
+    // portamento's source key (0x894e4940): the previous key plus the Octave
+    // Shift; with LEGATO the note's own (no glide) unless a key was held
+    // then (POLY: or Hold is down, not modelled)
+    const bool held = ctl.mono ? keys.prevMonoHeld : keys.prevPolyHeld;
+    const int srcKey = ctl.portaMode == 1 && !held ? note : shiftKey(ctl.mono ? keys.prevMono : keys.prevPoly);
     Voice* v = nullptr;
     for (Voice& w : voice) if (!w.active) { v = &w; break; }
     if (!v) { v = &voice[0]; for (Voice& w : voice) if (w.age < v->age) v = &w; }   // steal the oldest
     v->active = true;
     v->releasing = false;
+    v->damping = false;
     v->note = note;
+    v->raw = raw;
+    v->srcKey = srcKey;
     v->age = clock++;
     v->tail = 0;
-    v->vel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
+    v->vel = vel;
     v->relVel = 64;
     v->robot = ctl.robot && cur->type == 1;           // SOLO only (the converter's SOLO tail)
     // the OSC's random pitch (0x894e4940): the shared generator steps once
@@ -368,15 +420,62 @@ void XtSynth::noteOn(int note, float velocity) {
     }
     // portamento (0x894f2440, after the voice setup): the pitch ramp from the
     // source key's cents to the note's; it moves from the next update on
+    v->kfKey = keyFollowKey(*v);
     v->porta.start(noteCents(*v, srcKey), noteCents(*v, note),
                    xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v->vel));
 }
 
+// A sounding voice takes a note (0x894dc1e0 for each voice of the part not
+// released): the per-note setup again (0x894e4c30: the key, velocity, a new
+// random offset; portamento from the previous MONO key), then the voice
+// takes the new settings without a restart (0x894db8a0): the envelopes and
+// the LFO update, the pitch ramp takes the note's portamento settings and,
+// when the key-follow key changed, glides again (0x894f2600).
+void XtSynth::legatoNote(int key, int vel) {
+    for (Voice& v : voice) {
+        if (!v.active || v.releasing || v.damping) continue;
+        v.note = key;
+        v.raw = keys.cur;
+        v.srcKey = shiftKey(keys.prevMono);
+        v.vel = vel;
+        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
+        v.gain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);
+        v.env.update(envParams(v));
+        v.penv.update(oscEnvParams(v, ctl.pAttack, ctl.pDecay, ctl.pSustain, ctl.pRelease));
+        v.tenv.update(oscEnvParams(v, ctl.tAttack, ctl.tDecay, ctl.tSustain, ctl.tRelease));
+        v.fenv.update(oscEnvParams(v, ctl.fAttack, ctl.fDecay, ctl.fSustain, ctl.fRelease));
+        v.oenv.update(ampEnvParams(v));
+        v.lfo.update(lfoParams());
+        v.porta.update(xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v.vel));
+        const int k = keyFollowKey(v);
+        if (k != v.kfKey) {
+            v.kfKey = k;
+            v.porta.restart(noteCents(v, v.srcKey), noteCents(v, v.note));
+        }
+    }
+}
+
+// Truncate (0x894d5ba0 → 0x894f5500): the TVA holds its gain and fades out
+// linearly over the Truncate Time (0x51f, 0.70 ms; 0x894f5570).
+void XtSynth::truncate(Voice& v) {
+    if (v.damping) return;
+    v.damping = true;
+    v.damp = 1.0f;
+}
+
 // The release time follows the note-off velocity (R-Sens): the times are
 // converted again before the release starts.
+// The part's note-off (0x894dbea0): the key state (0x894d63c0); a MONO part
+// whose sounding key was released while others are held takes the highest
+// of them (Legato on or off), else the note's voices release.
 void XtSynth::noteOff(int note, float velocity) {
+    keys.release(note);
+    const int r = keys.noteOff(note);
+    if (ctl.mono && r >= 0)
+        for (const Voice& v : voice)
+            if (v.active && !v.releasing && !v.damping) { legatoNote(shiftKey(r), v.vel); break; }
     for (Voice& v : voice)
-        if (v.active && v.note == note && !v.releasing) {
+        if (v.active && v.raw == note && !v.releasing && !v.damping) {
             v.releasing = true;
             v.relVel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
             v.env.update(envParams(v));
@@ -395,6 +494,8 @@ void XtSynth::noteOff(int note, float velocity) {
 
 void XtSynth::allNotesOff() {
     for (Voice& v : voice) v.active = false;
+    for (uint16_t& w : keys.held) w = 0;
+    keys.lastMonoHeld = keys.prevMonoHeld = keys.lastPolyHeld = keys.prevPolyHeld = false;
 }
 
 void XtSynth::pitchBend(int value) {
@@ -405,6 +506,7 @@ void XtSynth::pitchBend(int value) {
 // (0x894f54b0), else aim at the envelope's new output with a linear ramp of
 // 10 ms, shorter when the stage itself is (0x894f5360).
 void XtSynth::tvaUpdate(Voice& v) {
+    if (v.damping) return;                                    // done when the fade is (0x894f5510)
     if (v.env.done() && v.cur <= kSilent) { v.active = false; return; }
     v.target = v.env.level();
     const float T = v.env.stageTime();
@@ -471,6 +573,18 @@ void XtSynth::mixBlock(float* lr) {
             scale /= 32768.0f;
             if (v.mb.ended()) v.tail += 32;
         }
+        if (v.damping) {
+            // truncated (0x894f5570): the gain held, times a fade that falls
+            // by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16
+            for (int i = 0; i < 32; ++i) {
+                v.damp -= truncateStep();
+                if (!(v.damp > kSilent)) { v.damp = 0.0f; v.active = false; break; }
+                const float g = scale * v.cur * v.damp;
+                lr[2 * i] += tmp[2 * i] * g;
+                lr[2 * i + 1] += tmp[2 * i + 1] * g;
+            }
+            continue;
+        }
         // TVA render (0x894f5720): a step that would pass the target within
         // the block is cut to (target − gain)/32.5; gain applied, then stepped.
         const float d = v.target - v.cur;
@@ -522,6 +636,7 @@ void XtSynth::render(float* left, float* right, int n) {
             readPos += step;
         }
     }
+    hostFrames += n;
     // drop consumed frames, keeping the history the kernel needs
     const long keep = (long)std::floor(readPos) - kHalf;
     if (keep > 4096) {
@@ -557,6 +672,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //     Range (default 0,0,0,2,2).
 //   XT_SCALE="c,c#,…,b": Scale Tune on, the 12 values in cents.
 //   XT_BEND="value[@frame]": the bender (0..16383), from a frame on (0).
+//   XT_MONO="mono,legato[,octave]": Mono/Poly (1 MONO), Legato Switch and
+//     Octave Shift (default 0,1,0).
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -623,6 +740,12 @@ int main(int argc, char** argv) {
         c.scaleTune = true;
         int* t = c.scale;
         std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", t, t + 1, t + 2, t + 3, t + 4, t + 5, t + 6, t + 7, t + 8, t + 9, t + 10, t + 11);
+    }
+    if (const char* e = std::getenv("XT_MONO")) {
+        int m = 0, l = 1;
+        std::sscanf(e, "%d,%d,%d", &m, &l, &c.octave);
+        c.mono = m != 0;
+        c.legato = l != 0;
     }
     int bendValue = 8192;
     long bendAt = 0;

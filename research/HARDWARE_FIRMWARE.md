@@ -1544,6 +1544,160 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### Mono/Poly, Legato and Octave Shift (2026-10-31, v60)
+
+**Parameter tables.** rom.2 has two tables indexed by parameter ID:
+- names: one pointer per ID from 0x89790338 (for example 0x113 "Mono/Poly",
+  0x51f "Truncate Time");
+- descriptors: 12 bytes per ID from 0x897a167c (through `0x89484310`):
+  - a u16 and two bytes (the value's storage);
+  - then int16 centre, default, minimum and maximum.
+  - For example, Coarse Tune (0x110) is 64, 64, 16, 112: −48…+48, default 0.
+
+Some defaults from the descriptors:
+- Mono/Poly POLY; Legato Switch ON; Octave Shift 0;
+- Portamento Time 20, where the plugin had 32;
+- Bend Range 2/2; Master Tune ±1000 (1/10 cent); Master Key Shift ±24;
+- Truncate Time (0x51f, a system setting) 70, in 1/100 ms.
+
+**The patch-common block** (`0x894dbfa0`, 0x16 bytes per part from
+0x89d021d0):
+- +0: Octave Shift (0x112) × 12;
+- +1: 1 for MONO (0x113 = 0);
+- +2: Legato Switch (0x114);
+- +4: Patch Tempo (0x11d);
+- +6…: the zones' upper keys.
+
+**The key state** (0x24 bytes per part and MIDI channel, from 0x89cf52d8;
+reset by `0x894d6420` to key 60, nothing held, window 32). Its fields:
+- +0xc: the sounding key, as played.
+- +0x10: the time of the last note-on; +0x14: the chord window; +0x1e: the
+  time since the note-on before.
+- +0x1a/+0x1b: the POLY previous key, and whether a key was held then.
+- +0x1c/+0x1d: the POLY last key, and whether a key is held.
+- +0x20/+0x21 and +0x22/+0x23: the same for MONO.
+
+The channel's held keys are a bitmap (bit k & 15 of word k >> 4).
+
+- **Note-on** (`0x894d6330`):
+  - dt = now − the last note-on, at most 0xffff, from the system clock
+    (`0x89301940` → the kernel's 0x880080d0, taken to be in ms).
+  - If dt is under the window, the window narrows by 1 and the POLY
+    previous key stays. Otherwise the window resets to 32 and the POLY
+    previous key and flag take the last ones. A chord's notes therefore
+    all glide from the key before the chord.
+  - The MONO previous key and flag always move on.
+  - The note becomes the last key and the sounding key; both flags are set.
+- **Note-off** (`0x894d63c0`), after the key left the bitmap:
+  - With no key held, all four flags clear.
+  - If the released key is the sounding one, the highest key still held
+    (`0x894d66b0`) becomes the sounding key. The MONO previous key takes
+    the released one, and the result is that key; otherwise the result is −1.
+
+**The part's note-on** (`0x894dbcb0`, the part's vtable at 0x89833e30):
+- The key is the played key plus the system's Transpose plus the Octave
+  Shift, within 0…127. It picks the zone (the first upper key ≥ it).
+- POLY: new tone and voices (`0x894dbc20` → the allocator `0x894d4af0`).
+- MONO:
+  - no key held before: the part's tones are truncated (`0x894d4a80`), then
+    a new note;
+  - a key held, Legato Switch OFF: the same;
+  - a key held, Legato Switch ON: `0x894d4e00` calls vtable +0x20
+    (`0x894dc1e0`) on each of the part's tones not released, with the new
+    key.
+
+**The part's note-off** (`0x894dbea0`): after the key state, a MONO part
+whose sounding key was released while others are held calls `0x894d4e00`
+with the highest of them (plus the shift). It does so whether Legato is on
+or off.
+
+**A tone taking a note** (`0x894dc1e0`):
+- The tone's key, played key and velocity are updated (`0x894d5c90`).
+- The re-setup `0x894eb910` runs: the portamento settings (`0x894e6690`)
+  and the per-note OSC setup `0x894e4c30` (a new random offset; +0x7c = the
+  MONO previous key + the shift), then the envelope, LFO and TVA
+  converters.
+- `0x894db8a0` hands the results to the voice without a restart:
+  - the ramps take the new settings (`0x894f5e20` → `0x894f27c0` →
+    `0x894f48b0`);
+  - the OSC blocks are copied (`0x894f2600`); when the block's key-follow
+    key (+4, `0x894e12c0`) changed, the ramps restart from +0x68 to +8
+    (`0x894f4920`, the same code as `0x894f4680` at note-on);
+  - the 13 envelopes, the LFOs and the TVA take their new settings.
+- The tone update (`0x894ebbd0`) also recomputes the portamento settings
+  and the OSC blocks. So a Portamento knob reaches a gliding note, and a
+  Coarse change that moves the key-follow key restarts the glide from
+  +0x7c.
+- `0x894f48b0` copies the switch and time but not the type. It recomputes
+  the increment from the span and leaves the ramp running or stopped as it
+  was; the start then sets "running" from the switch.
+
+**The key-follow key** (`0x894e12c0`, from the key, coarse and KF):
+- KF 0: 60 + coarse;
+- KF 1000: key + coarse;
+- otherwise: ((60 + coarse)·1000 + KF·(key − 60) + 999)/1000, toward zero;
+- in all cases within 0…127.
+
+With Pitch KF 0 a legato note does not glide.
+
+**Truncate** (`0x894d5ba0` → `0x894dbb70`, once → `0x894f5500`): the patch
+TVA's +0x48 = 1 and +0x54 = 1.0. Then:
+- The render (`0x894f5570`) holds the gains. Each sample, +0x54 falls by a
+  step, and the output is the input × the gain × +0x54. At ≤ 2^-16 the TVA
+  goes silent and the tone is done (`0x894f5510`).
+- The step is 1/(T/100·44.1), with T the Truncate Time (`0x894ea380`: the
+  system short at 0x89d2a6d0 + 0x1602). At 70 that is 0.0324: a 0.70 ms
+  linear fade, 31 samples.
+
+**Portamento's source key at a new note** (`0x894e4940`, +0x7c, within
+0…127):
+- POLY: the POLY previous key plus the shift. With LEGATO, the note's own
+  key instead when nothing was held (+0x1b = 0) and the controller byte
+  +0x11c of the channel is below 64 (perhaps Hold).
+- MONO: the MONO previous key plus the shift. With LEGATO, the note's own
+  key when +0x21 is 0.
+- Before any note, the previous keys are 60.
+
+**Port and checks** (`xt_osc`, in the interpreter):
+- `XtKeyState` (`XtKeys.h`) against `0x894d6330`/`0x894d63c0`, after the
+  reset `0x894d6420`: 400 random sequences, 120,000 note-ons and note-offs
+  (chords, fast and slow), every field and result after each event. 0
+  different.
+- `XtPitchRamp::update`/`restart` against `0x894f48b0`/`0x894f4920`, mixed
+  with starts and ticks: 2,052,895 values, 0 different.
+- `xtKeyFollowKey` against `0x894e12c0`: 1,464,448 cases, 0 different.
+
+**Plugin.**
+- New controls: Mono/Poly, Legato Switch (default ON) and Octave Shift
+  (−3…+3).
+- Portamento Time now defaults to the XT's 20.
+- The plugin's system clock is the host frames rendered, in ms.
+- MONO:
+  - a note played while a key is held takes over the sounding voice when
+    Legato is on: a new random offset, new velocity, the envelopes and LFO
+    updated not restarted, and a glide from the previous key;
+  - otherwise the old voice is truncated (0.70 ms) and a new one starts;
+  - releasing the sounding key while others are held returns to the
+    highest of them.
+- POLY, NORMAL or LEGATO: portamento starts from the POLY previous key. The
+  chord window and the first note's glide from key 60 are as on the XT.
+- Changing a Portamento knob reaches a voice already gliding. A
+  Coarse/Pitch KF change that moves the key-follow key restarts its glide.
+- Note-offs match the key as played.
+- Checks:
+  - at the defaults, and with portamento NORMAL or LEGATO on the A/B's two
+    overlapping notes, the output is bit-identical to v59;
+  - PluginTest is bit-identical with MONO legato + portamento, MONO without
+    legato + Octave −1 + random, and a second note;
+  - on the sine, Octave +1 on note 60 equals note 72 bit for bit, and a
+    truncated voice falls linearly to silence in 31 samples.
+- Not modelled:
+  - Hold (the plugin ignores the pedal);
+  - the system's Transpose;
+  - zones;
+  - the voice allocator's CPU budget and its stealing (the plugin steals
+    the oldest voice outright).
+
 ### The note's tuning (2026-10-31, v59)
 
 The OSC's Coarse (+0x68) and Fine (+0x70), which the note's pitch (v55)
@@ -1618,8 +1772,8 @@ a structure that holds the previous keys:
   byte at +0x11c is below 64 (perhaps Hold).
 - part +4 ≠ 0: its +0x20, plus the Octave Shift. With LEGATO and its +0x21
   = 0, the note's own key.
-- These fields are the next step, with Mono/Poly. `0x894e4c30` takes +0x20
-  in every case.
+- These fields are traced in v60 ("Mono/Poly, Legato and Octave Shift").
+  `0x894e4c30` takes +0x20 in every case.
 
 **Port and checks** (`xt_osc`, in the interpreter):
 - The power-on seed is 0x7ab7.
@@ -1659,7 +1813,8 @@ a structure that holds the previous keys:
   - a bend of +4096 at range 2 = Coarse +1;
   - full down at range 12 = Coarse −12.
 - Not modelled:
-  - Octave Shift (where the note's key takes it is not traced);
+  - Octave Shift (since modelled, v60: the part's note-on adds it to the
+    key);
   - the system's Master Tune and Key Shift;
   - the matrix;
   - a second oscillator, which would step the generator too.
@@ -1737,9 +1892,8 @@ Tune, bend, Random Pitch Depth), ported in v59 ("The note's tuning").
 - The glide starts from the previous note-on's key. LEGATO glides only while
   another key is held.
 - Where the XT keeps the previous key and applies LEGATO (Mode, 0x116) was
-  not traced; the plugin follows the manual. v59 found the selection
-  (`0x894e4940`, "The note's tuning"); the fields behind it are not
-  traced yet.
+  not traced; the plugin followed the manual. v60 ports the XT's own rule
+  ("Mono/Poly, Legato and Octave Shift").
 - With Portamento off, the output is bit-identical to v57.
 - On the sine (RATE, Time 64), note 72 after note 60 glides from 440 to
   880 Hz, linearly in cents, over 2.54 s.

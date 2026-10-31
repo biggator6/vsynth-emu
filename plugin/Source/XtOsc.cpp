@@ -283,19 +283,46 @@ XtPortaSettings xtPortaSettings(bool on, int type, int time, int veloSens, int v
     return st;
 }
 
+void XtPitchRamp::step() {
+    using namespace xtf;
+    float T = type == 1 ? timeMs : div(mul(std::fabs(span), timeMs), 1200.0f);
+    if (T == 0.0f) T = 1.0f;
+    inc = div(655360.0f, T);
+    if (!(65536.0f > inc)) inc = 65536.0f;
+}
+
 void XtPitchRamp::start(float from, float to, const XtPortaSettings& st) {
+    on = st.on;
+    timeMs = st.timeMs;
+    type = st.type;
+    restart(from, to);
+}
+
+void XtPitchRamp::update(const XtPortaSettings& st) {
+    on = st.on;
+    timeMs = st.timeMs;
+    step();
+}
+
+void XtPitchRamp::restart(float from, float to) {
     using namespace xtf;
     state = 1;
     span = sub(to, from);
     phase = 0.0f;
-    float T = st.type == 1 ? st.timeMs : div(mul(std::fabs(span), st.timeMs), 1200.0f);
-    if (T == 0.0f) T = 1.0f;
-    inc = div(655360.0f, T);
-    if (!(65536.0f > inc)) inc = 65536.0f;
+    step();
     if (span == 0.0f) phase = 65536.0f;
-    if (65536.0f > phase && st.timeMs != 0.0f) cur = mul(add(div(phase, 65536.0f), -1.0f), span);
+    if (65536.0f > phase && timeMs != 0.0f) cur = mul(add(div(phase, 65536.0f), -1.0f), span);
     else { state = 3; cur = 0.0f; }
-    active = st.on;
+    active = on;
+}
+
+int xtKeyFollowKey(int key, int coarse, int kf) {
+    const int c = (int16_t)coarse, f = (int16_t)kf, k = (uint8_t)key;
+    int r;
+    if (f == 0) r = 60 + c;
+    else if (f == 1000) r = k + c;
+    else r = ((60 + c) * 1000 + f * (k - 60) + 999) / 1000;
+    return r < 0 ? 0 : r > 127 ? 127 : r;
 }
 
 void XtPitchRamp::tick(int n) {
@@ -387,6 +414,7 @@ float xtOscGainTarget(float gain, float level, float env, float lfo, float lfoDe
 // this interpreter rounds toward zero, as the SH-4 does.
 #include "Sh4Interp.h"
 #include "XtFirmware.h"
+#include "XtKeys.h"
 #include <cstring>
 #include <vector>
 int main(int argc, char** argv) {
@@ -766,6 +794,123 @@ int main(int argc, char** argv) {
                 std::printf("  bend %d up %d down %d: fw %d port %d\n", b, up, down, (int32_t)c.rd32(BO + 0x174), xtPitchBend(b, up, down));
         }
     std::printf("pitch bend: %ld cases, %ld different (full up at 2: %d, full down: %d)\n", bn, bb, xtPitchBend(16383, 2, 2), xtPitchBend(0, 2, 2));
-    return bad || eb || vb || lb || gb || pb || cb || tb || sb || ob || rb || nb || bb ? 3 : 0;
+
+    // Mono/Poly: the channel's key state (reset 0x894d6420, note-on
+    // 0x894d6330 with the system clock 0x89301940 hooked to the case's ms,
+    // note-off 0x894d63c0 over keys 0…127) through random note sequences,
+    // every field compared after each event; the ramp's legato update and
+    // restart (0x894f48b0, 0x894f4920) mixed with starts and ticks; and the
+    // key-follow key (0x894e12c0).
+    int32_t nowMs = 0;
+    c.hook(0x89301940, [&](Sh4& m) { m.ret((uint32_t)nowMs); });
+    long kb = 0, kn = 0;
+    const uint32_t KS = ram + 0x32000, KC = ram + 0x32100;
+    for (int seq = 0; seq < 400; ++seq) {
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(KS, z.data(), 0x24); c.write(KC, z.data(), 0x40);
+        c.wr32(KS, KC);
+        if (!c.call(0x894d6420, { KS }, sp)) { std::fprintf(stderr, "key reset: %s\n", c.error().c_str()); return 1; }
+        XtKeyState ks;
+        nowMs = (int32_t)(rnd() % 100000);
+        const int span = 1 + (int)(rnd() % 3) * 20;                  // a few keys, or many
+        for (int e = 0; e < 300; ++e) {
+            const int r3 = (int)(rnd() % 4);
+            nowMs += r3 == 0 ? (int32_t)(rnd() % 6) : r3 == 1 ? (int32_t)(rnd() % 60) : (int32_t)(rnd() % 3000);
+            const int key = 40 + (int)(rnd() % (uint32_t)span);
+            const bool isOn = !(ks.held[key >> 4] & (1u << (key & 15))) && rnd() % 3 != 0;
+            int fr = -1, pr = -1;
+            if (isOn) {
+                ks.press(key);
+                c.wr16(KC + 0xc + 2 * (uint32_t)(key >> 4), ks.held[key >> 4]);
+                c.wr8(KC + 7, (uint8_t)key);
+                if (!c.call(0x894d6330, { KS }, sp)) { std::fprintf(stderr, "key on: %s\n", c.error().c_str()); return 1; }
+                ks.noteOn(key, nowMs);
+            } else {
+                ks.release(key);
+                c.wr16(KC + 0xc + 2 * (uint32_t)(key >> 4), ks.held[key >> 4]);
+                c.wr8(KC + 9, (uint8_t)key);
+                uint32_t r0 = 0;
+                if (!c.call(0x894d63c0, { KS, 0, 0x7f }, sp, &r0)) { std::fprintf(stderr, "key off: %s\n", c.error().c_str()); return 1; }
+                fr = (int32_t)r0;
+                pr = ks.noteOff(key);
+            }
+            ++kn;
+            const bool same = fr == pr && (int8_t)c.rd8(KS + 0xc) == (int8_t)ks.cur && (int32_t)c.rd32(KS + 0x10) == ks.lastMs
+                && c.rd8(KS + 0x14) == ks.window && c.rd8(KS + 0x1a) == ks.prevPoly && (c.rd8(KS + 0x1b) != 0) == ks.prevPolyHeld
+                && c.rd8(KS + 0x1c) == ks.lastPoly && (c.rd8(KS + 0x1d) != 0) == ks.lastPolyHeld && c.rd8(KS + 0x20) == ks.prevMono
+                && (c.rd8(KS + 0x21) != 0) == ks.prevMonoHeld && c.rd8(KS + 0x22) == ks.lastMono && (c.rd8(KS + 0x23) != 0) == ks.lastMonoHeld;
+            if (!same && kb++ < 5)
+                std::printf("  key state seq %d event %d (%s %d at %d ms): fw r %d cur %d win %d poly %d/%d %d/%d mono %d/%d %d/%d; port r %d cur %d win %d"
+                            " poly %d/%d %d/%d mono %d/%d %d/%d\n", seq, e, isOn ? "on" : "off", key, nowMs, fr, (int8_t)c.rd8(KS + 0xc),
+                            c.rd8(KS + 0x14), c.rd8(KS + 0x1a), c.rd8(KS + 0x1b), c.rd8(KS + 0x1c), c.rd8(KS + 0x1d), c.rd8(KS + 0x20),
+                            c.rd8(KS + 0x21), c.rd8(KS + 0x22), c.rd8(KS + 0x23), pr, ks.cur, ks.window, ks.prevPoly, (int)ks.prevPolyHeld,
+                            ks.lastPoly, (int)ks.lastPolyHeld, ks.prevMono, (int)ks.prevMonoHeld, ks.lastMono, (int)ks.lastMonoHeld);
+        }
+    }
+    std::printf("key state: %ld events, %ld different\n", kn, kb);
+    long lb2 = 0, lgn = 0;
+    for (int g = 0; g < 4000; ++g) {
+        std::vector<uint8_t> z(0x60, 0);
+        c.write(RO, z.data(), z.size());
+        if (!c.call(0x894f4860, { RO, 0 }, sp)) { std::fprintf(stderr, "ramp ctor: %s\n", c.error().c_str()); return 1; }
+        XtPitchRamp port;
+        auto settings = [&]() {
+            const XtPortaSettings st = xtPortaSettings(rnd() % 4 != 0, (int)(rnd() & 1), (int)(rnd() % 128), (int)(rnd() % 127) - 63, (int)(rnd() % 128));
+            c.write(RS, z.data(), 0x20);
+            c.wr32(RS, st.on ? 1 : 0); wf(RS + 12, st.timeMs); c.wr32(RS + 16, (uint32_t)st.type);
+            return st;
+        };
+        auto cents = [&]() { return rnd() % 7 == 0 ? 0.0f : (float)((int)(rnd() % 12001) - 6000) * (rnd() % 3 == 0 ? 1.0f : 0.1f); };
+        for (int op = 0; op < 60; ++op) {
+            const int what = op == 0 ? 0 : (int)(rnd() % 8);
+            if (what == 0 || what == 1) {                            // a note-on start
+                const float from = cents(), to = cents();
+                const XtPortaSettings st = settings();
+                uint32_t ub; std::memcpy(&ub, &from, 4); c.fb[0][4] = ub; std::memcpy(&ub, &to, 4); c.fb[0][5] = ub;
+                if (!c.call(0x894f4890, { RO, RS }, sp)) { std::fprintf(stderr, "ramp start: %s\n", c.error().c_str()); return 1; }
+                port.start(from, to, st);
+            } else if (what == 2 || what == 3) {                     // a legato note: new settings, then a restart or not
+                const XtPortaSettings st = settings();
+                if (!c.call(0x894f48b0, { RO, RS }, sp)) { std::fprintf(stderr, "ramp update: %s\n", c.error().c_str()); return 1; }
+                port.update(st);
+                if (what == 2) {
+                    const float from = cents(), to = cents();
+                    uint32_t ub; std::memcpy(&ub, &from, 4); c.fb[0][4] = ub; std::memcpy(&ub, &to, 4); c.fb[0][5] = ub;
+                    if (!c.call(0x894f4920, { RO }, sp)) { std::fprintf(stderr, "ramp restart: %s\n", c.error().c_str()); return 1; }
+                    port.restart(from, to);
+                }
+            } else {
+                const int n = (int)(rnd() % 30);
+                for (int k = 0; k < n; ++k) {
+                    if (!c.call(0x894f4b00, { RO, 1 }, sp)) { std::fprintf(stderr, "ramp tick: %s\n", c.error().c_str()); return 1; }
+                    port.tick(1);
+                    if (!c.call(0x894f4c00, { RO }, sp)) { std::fprintf(stderr, "ramp value: %s\n", c.error().c_str()); return 1; }
+                    float fw; std::memcpy(&fw, &c.fb[0][0], 4);
+                    ++lgn;
+                    if (!bitsEq(fw, port.value()) && lb2++ < 6)
+                        std::printf("  legato ramp %d op %d tick %d: fw %.9g port %.9g\n", g, op, k, fw, port.value());
+                }
+            }
+            if (!c.call(0x894f4c00, { RO }, sp)) { std::fprintf(stderr, "ramp value: %s\n", c.error().c_str()); return 1; }
+            float fw; std::memcpy(&fw, &c.fb[0][0], 4);
+            ++lgn;
+            if (!bitsEq(fw, port.value()) && lb2++ < 6) std::printf("  legato ramp %d op %d (%d): fw %.9g port %.9g\n", g, op, what, fw, port.value());
+        }
+    }
+    std::printf("legato ramp: %ld values, %ld different\n", lgn, lb2);
+    long fb2 = 0, fn = 0;
+    for (int kf = -2000; kf <= 2000; kf += 10)
+        for (int co = -60; co <= 60; co += (kf % 100 == 0 ? 1 : 7))
+            for (int key = 0; key < 128; ++key) {
+                uint32_t r0 = 0;
+                if (!c.call(0x894e12c0, { (uint32_t)key, (uint32_t)(int32_t)co, (uint32_t)(int32_t)kf, 60 }, sp, &r0)) {
+                    std::fprintf(stderr, "key-follow key: %s\n", c.error().c_str()); return 1;
+                }
+                ++fn;
+                if ((int)(r0 & 0xff) != xtKeyFollowKey(key, co, kf) && fb2++ < 5)
+                    std::printf("  key-follow key %d coarse %d kf %d: fw %u port %d\n", key, co, kf, r0 & 0xff, xtKeyFollowKey(key, co, kf));
+            }
+    std::printf("key-follow key: %ld cases, %ld different\n", fn, fb2);
+    return bad || eb || vb || lb || gb || pb || cb || tb || sb || ob || rb || nb || bb || kb || lb2 || fb2 ? 3 : 0;
 }
 #endif

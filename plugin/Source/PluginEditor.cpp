@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 580;  // height of the XT strip below it
+static constexpr int kXtStripH   = 610;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level and velocity rows: parameter and
 // label, four per row, and the rows' names
@@ -19,7 +19,7 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 940);
+    setSize(560, 970);
     setResizable(true, true);
     setResizeLimits(480, 600, 960, 980);
 
@@ -54,7 +54,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                               &tAttackSlider_, &tDecaySlider_, &tSustainSlider_, &tReleaseSlider_, &tDepthSlider_,
                               &fAttackSlider_, &fDecaySlider_, &fSustainSlider_, &fReleaseSlider_, &fDepthSlider_,
                               &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_, &lfoTimeSlider_, &lfoFmtSlider_,
-                              &loopStartSlider_, &loopEndSlider_, &portaTimeSlider_, &portaSensSlider_ }) {
+                              &loopStartSlider_, &loopEndSlider_, &portaTimeSlider_, &portaSensSlider_, &octSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
@@ -112,6 +112,14 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     portaTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "portaType", portaTypeBox_);
     portaTimeAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "portaTime", portaTimeSlider_);
     portaSensAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "portaVeloSens", portaSensSlider_);
+    monoBox_.addItemList({ "MONO", "POLY" }, 1);
+    legatoBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    legatoBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    addAndMakeVisible(monoBox_);
+    addAndMakeVisible(legatoBtn_);
+    monoAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "monoPoly", monoBox_);
+    legatoAtt_ = std::make_unique<ButtonAtt>(processor_.apvts, "legatoSwitch", legatoBtn_);
+    octAtt_    = std::make_unique<SliderAtt>(processor_.apvts, "octaveShift", octSlider_);
     lfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);
     lfoModeBox_.addItemList({ "ON <<", "ON >>", "OFF <<", "OFF >>" }, 1);
     lfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
@@ -151,7 +159,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                             &offsetLabel_, &oscTkfLabel_, &oscFkfLabel_,
                             &lfoLabel_, &lfoRateLabel_, &lfoDepthLabel_, &lfoDelayLabel_, &lfoFadeLabel_,
                             &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_,
-                            &portaTimeLabel_, &portaSensLabel_ }) styleSmall(*l);
+                            &portaTimeLabel_, &portaSensLabel_, &octLabel_ }) styleSmall(*l);
     timerCallback();
     startTimerHz(4);
 
@@ -321,6 +329,11 @@ void VSynthEmuEditor::resized() {
     portaTimeSlider_.setBounds(pt.withTrimmedRight(8));
     portaSensLabel_.setBounds(row3p.removeFromLeft(40));
     portaSensSlider_.setBounds(row3p);
+    auto row3k = xt.removeFromTop(24);               // Key assign: Mono/Poly, Legato, Octave Shift
+    monoBox_.setBounds(row3k.removeFromLeft(96).withTrimmedRight(8));
+    legatoBtn_.setBounds(row3k.removeFromLeft(80));
+    octLabel_.setBounds(row3k.removeFromLeft(36));
+    octSlider_.setBounds(row3k.removeFromLeft(200));
     xt.removeFromTop(6);
     auto row4 = xt.removeFromTop(24);                // amp envelope
     const int q = row4.getWidth() / 4;
