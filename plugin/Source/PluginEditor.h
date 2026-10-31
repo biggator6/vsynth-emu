@@ -61,6 +61,16 @@ private:
     juce::ToggleButton legatoBtn_ { "Legato" };
     juce::Slider     octSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label      octLabel_ { {}, "Oct" };
+    // COSM 1 (TVF): switch, Filter Type, Cutoff, Resonance, Cutoff KF; LFO 3
+    juce::ToggleButton cosmBtn_ { "COSM" };
+    juce::ComboBox   cosmFilterBox_, clfoWaveBox_;
+    juce::Slider     cosmCutSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     cosmResoSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     cosmKfSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     clfoRateSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::ToggleButton clfoSyncBtn_ { "Key Sync" };
+    juce::Label      cosmCutLabel_ { {}, "Cut" }, cosmResoLabel_ { {}, "Reso" }, cosmKfLabel_ { {}, "KF" },
+                     clfoLabel_ { {}, "LFO 3" }, clfoRateLabel_ { {}, "Rate" };
     // amp envelope, the XT's 0..127 knobs
     juce::Slider     attackSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     decaySlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -96,9 +106,10 @@ private:
     juce::Slider     lfoFadeSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     lfoTimeSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     lfoFmtSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
-    // the OSC pitch, the patch's tuning, the OSC TVA, its amp envelope and
-    // velocity to level: six rows of four
-    static constexpr int kLevelRows = 6, kLevelKnobs = 4 * kLevelRows;
+    // the OSC pitch, the patch's tuning, the OSC TVA, its amp envelope,
+    // velocity to level, the COSM's depths and its cutoff envelope: eight
+    // rows of four
+    static constexpr int kLevelRows = 8, kLevelKnobs = 4 * kLevelRows;
     juce::Slider     levelSliders_[kLevelKnobs];
     juce::Label      levelLabels_[kLevelKnobs], levelRowLabels_[kLevelRows];
     juce::Label encodeLabel_ { {}, "Encode" }, keyLabel_ { {}, "Key" }, depthLabel_ { {}, "Depth" },
@@ -144,6 +155,9 @@ private:
     std::unique_ptr<ComboAtt>  monoAtt_;
     std::unique_ptr<ButtonAtt> legatoAtt_;
     std::unique_ptr<SliderAtt> octAtt_;
+    std::unique_ptr<ButtonAtt> cosmAtt_, clfoSyncAtt_;
+    std::unique_ptr<ComboAtt>  cosmFilterAtt_, clfoWaveAtt_;
+    std::unique_ptr<SliderAtt> cosmCutAtt_, cosmResoAtt_, cosmKfAtt_, clfoRateAtt_;
     std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_, lfoTimeAtt_, lfoFmtAtt_;
     std::unique_ptr<SliderAtt> levelAtts_[kLevelKnobs];
     std::unique_ptr<ComboAtt>  lfoWaveAtt_, lfoModeAtt_, lfoOffsetAtt_;

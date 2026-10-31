@@ -162,6 +162,27 @@ int main(int argc, char** argv) {
         setKnobs({ { "portamento", 1 }, { "portaMode", refCtl.portaMode }, { "portaType", refCtl.portaType },
                    { "portaTime", refCtl.portaTime }, { "portaVeloSens", refCtl.portaVeloSens } });
     }
+    // TEST_COSM="filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo": COSM 1
+    // as a TVF; TEST_CENV="a,d,s,r,velCurve,velSens": its cutoff envelope
+    // (Env A); TEST_CLFO="wave,rate": LFO 3
+    if (const char* e = std::getenv("TEST_COSM")) {
+        refCtl.cosm = true;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &refCtl.cosmFilter, &refCtl.cosmCutoff, &refCtl.cosmReso, &refCtl.cosmKF,
+                    &refCtl.cosmCutoffEnv, &refCtl.cosmCutoffLfo, &refCtl.cosmResoEnv, &refCtl.cosmResoLfo);
+        setKnobs({ { "cosmSwitch", 1 }, { "cosmFilter", refCtl.cosmFilter }, { "cosmCutoff", refCtl.cosmCutoff }, { "cosmReso", refCtl.cosmReso },
+                   { "cosmCutoffKF", refCtl.cosmKF }, { "cosmCutoffEnv", refCtl.cosmCutoffEnv }, { "cosmCutoffLfo", refCtl.cosmCutoffLfo },
+                   { "cosmResoEnv", refCtl.cosmResoEnv }, { "cosmResoLfo", refCtl.cosmResoLfo } });
+    }
+    if (const char* e = std::getenv("TEST_CENV")) {
+        auto& a = refCtl.cosmEnvA;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d", &a.attack, &a.decay, &a.sustain, &a.release, &a.velCurve, &a.velSens);
+        setKnobs({ { "cosmEnvAAttack", a.attack }, { "cosmEnvADecay", a.decay }, { "cosmEnvASustain", a.sustain }, { "cosmEnvARelease", a.release },
+                   { "cosmEnvAVelCurve", a.velCurve }, { "cosmEnvAVelSens", a.velSens } });
+    }
+    if (const char* e = std::getenv("TEST_CLFO")) {
+        std::sscanf(e, "%d,%d", &refCtl.clfoWave, &refCtl.clfoRate);
+        setKnobs({ { "cosmLfoWave", refCtl.clfoWave }, { "cosmLfoRate", refCtl.clfoRate } });
+    }
     // TEST_MONO="mono,legato[,octave]": Mono/Poly (1 MONO), Legato Switch,
     // Octave Shift
     if (const char* e = std::getenv("TEST_MONO")) {

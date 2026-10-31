@@ -60,6 +60,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtEnvelope.cpp
     Source/XtLfo.cpp
     Source/XtOsc.cpp
+    Source/XtCosm.cpp
     Source/XtSoloVoice.cpp
     Source/XtSynth.cpp
     Source/XtMultiBandPlayer.cpp

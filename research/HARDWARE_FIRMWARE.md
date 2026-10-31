@@ -1544,6 +1544,151 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the TVF (2026-10-31, v61)
+
+**The COSM sections.**
+- Each tone has two COSM sections in series. The tone render (`0x894f6d40`)
+  runs OSC2, OSC1, the mixer, COSM 1 (object at voice +0x1388), COSM 2
+  (+0x14ec), then the TVA.
+- COSM Type (ID 0x3e8), 0…16: Through, OD/Dist, Wave Shape, Amp Simulator,
+  Speaker Simulator, Resonator, 1st and 2nd Side Band Filter, Comb Filter,
+  Dual Filter, TVF, Dynamic TVF, Compressor, Limiter, Frequency Shifter,
+  Lo-Fi, TB Filter. COSM Switch is 0x3e7.
+- **Patch storage** (`0x894de820`): 0x2a bytes per part, tone and COSM:
+  - +0: the switch; +1: the type;
+  - from +10: the type's parameters (shorts). Each type has its own ID
+    range, from the table at 0x897cebd8: the TVF's is 0x920…0x927.
+- IDs from 0x55d up read their ranges from a second descriptor bank (8
+  bytes per ID from 0x897a56d8: offset, default, minimum, maximum). The TVF:
+
+  | ID | Parameter | Range | Default |
+  |---|---|---|---|
+  | 0x920 | Filter Type | 0…11 | 5 |
+  | 0x921 | Q | 0…127 | 0 |
+  | 0x922 | Q LFO Depth | ±63 | 0 |
+  | 0x923 | Q Env Depth | ±63 | 0 |
+  | 0x924 | Cutoff | 0…127 | 127 |
+  | 0x925 | Cutoff Keyfollow | ±20 | 0 |
+  | 0x926 | Cutoff LFO Depth | ±63 | 0 |
+  | 0x927 | Cutoff Env Depth | ±63 | 0 |
+
+  The filter types, from the UI strings: LP24, BP24, HP24, NOTCH24, PEAK24,
+  LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6.
+- **The velocity factors A and B** (`0x894de8f0`) take the Velocity Curve
+  and Sens of Env 9 and 10 (COSM 1) or Env 11 and 12 (COSM 2). They go
+  through the curve and sens converters; the converter (`0x894de3b0`)
+  forms factor = the velocity curve (`0x894ebd60`) / 32768, not squared.
+
+**The TVF's converter** (`0x894dd870`; block code 13), with the matrix and
+controller terms 0:
+- Q: clamp(Q, 0…127)·0.984375/127 − 1. Its LFO depth is (d/63)·|d/63|
+  (LFO 3, or 4 for COSM 2). Its Env depth is B × (d/63)·|d/63| (Env 10, or
+  12).
+- Cutoff: (key − 60)·(KF·10)/100/127 + clamp(Cutoff)/127, within 0…1. Its
+  LFO depth uses the same LFO; its Env depth is A × (d/63)·|d/63| (Env 9,
+  or 11).
+- The filter type, as is.
+- The products are formed as velocity × ((d/63)·|d/63|).
+
+**The voice's COSM object** (0x160 bytes; the DSP context D = object +
+0x58):
+- **Binding** (`0x894f7330` → `0x894ee680`). For the TVF: +0x150 = the Q's
+  envelope, +0x154 = the Cutoff's, +0x158/+0x15c = the LFO. They are
+  flagged active so they tick.
+- **Note-on** (`0x894edf70`):
+  - the filter states clear;
+  - `0x894ec340` sets the coefficients c1/c2 (D+0xbc/+0xc0) from the
+    envelopes' start levels (+0x58) and the LFO;
+  - `0x894ed8f0` copies the block and sets the targets (+0xfc/+0x100) from
+    the envelopes' outputs (+0x4c);
+  - the step rates (+0x11c/+0x120) are 4 × the envelopes' follower
+    coefficients (+0x54).
+- **The 10-ms update** (vtable +0x14 = `0x894ee6a0`, type 13 at
+  `0x894eecb0`). The tone update `0x894f75f0` runs it after the envelopes,
+  LFOs, voices and mixer and before the TVA:
+  - Q target: Q + its depths × the envelope and LFO, within −1…−1/64
+    (`0x89501900`: if lo > x then lo; if x > hi then hi).
+  - Cutoff target: Cutoff + its depths × the envelope and LFO. Below 0 it
+    is 0. Otherwise z = y·127 and i = trunc(z) (at most 127):
+    A[i]·(1 − frac) + A[i+1]·frac, where A is 129 floats at 0x897d1264
+    (0.00155…1.4517, about 11 Hz…11.4 kHz as an SVF coefficient). It is
+    capped at B[127 − trunc(−Q·127)], with B 128 floats at 0x897d1468.
+- **The filter** (the per-type routine table, .data at 0x8987c7ec; TVF
+  `0x89502890` → one of twelve kernels from 0x895028f0):
+  - Per 32-sample block, each coefficient's step is rate·(target − c). It
+    is added before every fourth sample, so the coefficients reach their
+    targets in eight steps.
+  - The kernel reads the left channel and writes the result to both.
+  - **24 dB** (LP/BP/HP/NOTCH/PEAK24, `0x89502050`…), states a, b, d, e:
+    - b += a·c2; t = −x·c1 − b + a·c1; a += c2·t; e += c2·d;
+    - the second stage's input s is b (LP), a (BP), t (HP), t + a (NOTCH)
+      or t − a (PEAK);
+    - u = s − e + c1·d; d += u·c2;
+    - output e, d, u, u + e or u − e.
+  - **12 dB** (LP/BP/HP/NOTCH/PEAK12):
+    - the input gain K = 0.5·(1 − c1), from c1 at the block's start;
+    - b += a·c2; t = ∓x·K − b + a·c1 (LP12 alone keeps x's sign);
+      a += t·c2;
+    - output b, a, t, t + b or t − b.
+  - **6 dB**: y = x − s; s += y·c2; output s (LP6) or y (HP6). Only c2
+    steps.
+- Arithmetic: single precision, round toward zero, FMAC as the product
+  then the sum.
+
+**A rounding finding.** XtFloat's `add` rounds the double sum toward zero.
+That is exact only while the operands' exponents are within about 29 bits.
+Beyond that the double sum is already rounded, and a tiny addend is lost.
+The SH-4 instead moves a large value one unit toward zero. The TVF meets
+this when the cutoff decays toward 0: its states then drift by a unit per
+sample. `XtCosm` uses an exact round-to-zero sum (TwoSum, then the
+truncation). XtFloat itself is unchanged for now; the other ports may meet
+the same case.
+
+**Port and checks** (`xt_cosm`, in the interpreter, denormals flushed as
+on the SH-4):
+- the converter: 200,000 random cases;
+- the start values, block targets and updates: 90,000 cases;
+- the filter: 1,200,000 blocks (38 million samples), all twelve types, the
+  coefficients stepping and the targets updated every 14 blocks.
+- All 0 different.
+
+**Plugin.**
+- New: COSM 1 as a TVF:
+  - switch, Filter Type, Cutoff, Resonance, Cutoff KF (±200%);
+  - the Cutoff's and Resonance's Env and LFO depths;
+  - Env A (the cutoff's, Env 9) and Env B (the resonance's, Env 10), each
+    with ADSR, Velocity Curve/Sens, A/D/R-Sens and Time KF;
+  - LFO 3, with its own free-running phase when not key-synced.
+- The defaults are the XT's: Filter Type LP12, Cutoff 127, LFO 3 TRI, rate
+  98, key sync off, and envelopes A 0, D 0, S 127, R 127, Velocity Sens
+  +32.
+- The editor's new rows: the switch, type, Cutoff, Resonance, KF; the four
+  depths; Env A's ADSR; LFO 3's waveform, rate and key sync. The rest are
+  host parameters.
+- The COSM is latched at note-on. Parameter changes reach sounding voices
+  as a new block; the envelopes and LFO update.
+- With the COSM off the output is bit-identical to v60, also with mono,
+  portamento and tuning set. PluginTest is bit-identical with LP24 and
+  resonance, BP12 with envelope and LFO depths and a second note, and HP24
+  in MONO legato.
+- On the vocal:
+  - LP24 at Cutoff 90 (table fc ≈ 1.97 kHz) is flat below, −18 dB at 4
+    kHz and −34 dB at 6 kHz.
+  - Resonance 110 adds +12 dB at the cutoff and lowers the passband by
+    16 dB (the input scaling by |c1|).
+  - Cutoff 127 is transparent.
+
+**Not modelled yet:**
+- COSM 2;
+- the other fifteen types, and Dynamic TVF (code 14, the raw-sum update at
+  `0x894eeda0`);
+- the mixer's channel layout for stereo waves. The TVF takes the buffer's
+  left channel; whether the XT's mixer leaves L or a mono sum there is not
+  traced;
+- the matrix and controllers;
+- LFO rates above 127 (tempo sync);
+- switching the COSM on or off for a sounding note.
+
 ### Mono/Poly, Legato and Octave Shift (2026-10-31, v60)
 
 **Parameter tables.** rom.2 has two tables indexed by parameter ID:

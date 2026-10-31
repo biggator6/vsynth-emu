@@ -2646,3 +2646,26 @@ Round-2 recordings.  First build-out after that: real-time granular port
   cases).
 - Plugin: Mono/Poly, Legato Switch, Octave Shift. At the defaults, and with
   portamento on the A/B's notes, the output is bit-identical to v59.
+
+### Session 16 addendum (2026-10-31) — v61: COSM TVF
+
+- The COSM sections: 17 types, two in series after the oscillator mixer.
+  Each type has its own parameter IDs and a second descriptor bank (IDs
+  from 0x55d up) for ranges and defaults.
+- The TVF path:
+  - the converter forms the block;
+  - the voice's COSM object binds Env 9/10 and LFO 3;
+  - every 10 ms the cutoff becomes an SVF coefficient through a 129-entry
+    table, capped by a 128-entry table indexed by Q;
+  - per 32-sample block the coefficients step toward their targets every
+    4 samples;
+  - twelve kernels (24/12/6 dB, LP/BP/HP/NOTCH/PEAK) of cascaded
+    state-variable stages.
+- All of it equals the firmware in the interpreter: 38 million samples, 0
+  different.
+- That needed an exact round-to-zero sum. XtFloat's double-then-truncate
+  sum drops tiny addends that the SH-4 turns into one-unit steps toward
+  zero; it shows up as the cutoff decays toward 0. XtFloat itself is
+  unchanged.
+- Plugin: COSM 1 TVF with its envelopes and LFO 3. With it off the output
+  is bit-identical to v60.
