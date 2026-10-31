@@ -217,6 +217,13 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+ROBOT VOICE v54 (2026-10-31): XtSoloVoice::setRobot (before noteOn); voiced
+  grains at period 1603.6364/A (A = pitch against A440), unvoiced at rate 1.
+  XtSynth latches Controls::robot per voice (SOLO only) and takes the pitch
+  against key 69. The plugin's Robot button drives it with a ROM. Checks:
+  xt_fw solocmp … robot (token), XtSynth CLI XT_ROBOT=1, PluginTest
+  TEST_ROBOT=1.
+
 OSC LEVEL v53 (2026-10-30): the OSC TVA and velocity to level, as the XT
   converts them (HARDWARE_FIRMWARE.md, "The OSC level, its amp envelope,
   and velocity"). XtOsc: xtVelSens/xtVelCurve (patch → internal),

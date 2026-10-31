@@ -1544,6 +1544,48 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### Robot Voice (2026-10-31, v54)
+
+Robot Voice (SOLO, with Vari on) plays the voiced parts at one steady pitch,
+the note's.
+
+**Converter.** In the SOLO tail `0x894e4030`, Robot and Vari on set flag
+0x10 at +0xb4. The pitch (+0x08) then becomes the note's against A4:
+(key·1000 + coarse/fine − 69000)/10 cents, clamped to ±6000, instead of
+against the wave's Original Key.
+
+**Player:**
+- The flag reaches the player as byte 0 bit 0x10.
+- The event jump's `0x8950c7e0` then sets the grain routine's pitch term
+  (player +0x124) to 0 instead of 256.
+- The block step (`0x8950cde0`) takes the rate from +0x70 without the
+  sample-rate factor +0x9c.
+
+**Grains** (`0x8950d5a0`), with that term 0:
+- A voiced record's period is 1603.6364/A, i.e. A·440 Hz. The constant is
+  0x44c8745d, 44100·16/440 as a float. The rate is the record period over
+  that.
+- An unvoiced record plays at rate 1, still gated by its info bits, times
+  the formant.
+
+So intonation, vibrato and pitch drift in the voiced parts disappear. Time,
+formant and Energy work as before.
+
+**Port and checks:**
+- `XtSoloVoice::setRobot`, compared against the firmware player in the
+  interpreter (`xt_fw solocmp … robot`):
+  - ratios 0.297…1, with formant and walk changes, reverse and Energy;
+  - the stereo wave and the sine;
+  - all at −94.5…−110 dB, the port's usual residual.
+- Measured on the vocal: normally 127–135 Hz and wandering; with Robot,
+  note 57 holds 220 Hz and note 69 holds 440 Hz.
+
+**Plugin:**
+- The existing Robot button is the XT's Robot Voice when a ROM is loaded,
+  for SOLO waves (the firmware applies it only in the SOLO tail).
+- It is latched per voice at note-on, as the player latches it. Toggling it
+  mid-note on the XT would switch the pitch reference but not the player.
+
 ### The OSC level, its amp envelope, and velocity (2026-10-30, v53)
 
 **From the patch to the converters.** On an update, a tone (`0x894dc0b0`)

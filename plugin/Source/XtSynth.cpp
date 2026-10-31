@@ -192,7 +192,9 @@ constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
 // [0.5, 2], the walk within ±5 (negative: the players run backward, a note
 // starting at the wave's end).
 void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g) const {
-    double cents = ((double)(v.note - ctl.rootKey) + ctl.pitchSemis) * 100.0
+    // Robot Voice: the pitch is the note's against A4 (0x894e4030: key·1000
+    // − 69000 tenth-cents), not against the wave's Original Key
+    double cents = ((double)(v.note - (v.robot ? 69 : ctl.rootKey)) + ctl.pitchSemis) * 100.0
                  + (double)v.penv.level() * (double)xtPitchDepthCents((float)ctl.pDepth)
                  + (double)v.lfo.out() * (double)xtPitchDepthCents((float)ctl.lfoPitchDepth);
     cents = std::clamp(cents, -6000.0, 6000.0);
@@ -285,6 +287,7 @@ void XtSynth::noteOn(int note, float velocity) {
     v->tail = 0;
     v->vel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
     v->relVel = 64;
+    v->robot = ctl.robot && cur->type == 1;           // SOLO only (the converter's SOLO tail)
     v->gain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);
     // TVA note-on (0x894f5160): the gain starts from the envelope's onset
     // level (full with no attack, else 0) and ramps to its output over the
@@ -308,7 +311,11 @@ void XtSynth::noteOn(int note, float velocity) {
     // the OSC gain starts from the amp envelope's start level, or its output
     // when there is no attack (0x894f3e20)
     v->curGain = gainTarget(*v, oe.time[0] == 0.0f ? v->oenv.level() : oe.level[0]);
-    if (cur->type == 1) { v->solo.noteOn(cur->solo, v->curA, v->curF, v->curWalk, v->curG); v->solo.resetGain(v->curGain); }
+    if (cur->type == 1) {
+        v->solo.setRobot(v->robot);
+        v->solo.noteOn(cur->solo, v->curA, v->curF, v->curWalk, v->curG);
+        v->solo.resetGain(v->curGain);
+    }
     else if (!v->mb.noteOn(cur->wave, cur->type, v->curA, v->curWalk)) v->active = false;
     else v->mb.setGain(v->curGain, true);
 }
@@ -481,6 +488,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.
 //   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
 //   XT_VELOCITY=v: note-on velocity 1..127 (default 127).
+//   XT_ROBOT=1: Robot Voice.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -530,6 +538,7 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_VEL"))
         std::sscanf(e, "%d,%d,%d,%d", &c.ampVelSens, &c.ampVelCurve, &c.oscVelSens, &c.oscVelCurve);
     const float noteVel = std::getenv("XT_VELOCITY") ? std::atoi(std::getenv("XT_VELOCITY")) / 127.0f : 1.0f;
+    c.robot = std::getenv("XT_ROBOT") && std::atoi(std::getenv("XT_ROBOT")) != 0;
     syn.setControls(c);
     struct Ev { long at; int note; bool on; };
     std::vector<Ev> ev;

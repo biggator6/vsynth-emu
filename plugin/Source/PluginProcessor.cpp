@@ -6,7 +6,7 @@ namespace Params {
     static const juce::String kPitchShift   = "pitchShift";
     static const juce::String kTimeStretch  = "timeStretch";
     static const juce::String kFormantShift = "formantShift";
-    static const juce::String kRobot        = "robot";
+    static const juce::String kRobot        = "robot";         // the engine's robot mode; with the XT, Robot Voice
     static const juce::String kEncodeType   = "encodeType";    // Auto, SOLO, BACKING, ENSEMBLE
     static const juce::String kEncodeDepth  = "encodeDepth";   // multi-band attack detection
     static const juce::String kRootKey      = "rootKey";       // note that plays the sample unshifted
@@ -321,6 +321,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.oscVelCurve  = knob(Params::kOscVelCurve);
     c.ampVelSens   = knob(Params::kAmpVelSens);
     c.ampVelCurve  = knob(Params::kAmpVelCurve);
+    c.robot        = apvts.getRawParameterValue(Params::kRobot)->load() > 0.5f;   // Robot Voice (SOLO)
     c.lfoWave      = (int)apvts.getRawParameterValue(Params::kLfoWave)->load();
     c.lfoRate      = (int)apvts.getRawParameterValue(Params::kLfoRate)->load();
     c.lfoPitchDepth = (int)apvts.getRawParameterValue(Params::kLfoDepth)->load();

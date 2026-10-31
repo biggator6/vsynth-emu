@@ -133,6 +133,11 @@ int main(int argc, char** argv) {
         setKnobs({ { "ampVelSens", refCtl.ampVelSens }, { "ampVelCurve", refCtl.ampVelCurve }, { "oscVelSens", refCtl.oscVelSens },
                    { "oscVelCurve", refCtl.oscVelCurve } });
     }
+    // TEST_ROBOT=1: Robot Voice
+    if (std::getenv("TEST_ROBOT") && std::atoi(std::getenv("TEST_ROBOT")) != 0) {
+        refCtl.robot = true;
+        setKnobs({ { "robot", 1 } });
+    }
     // TEST_VELOCITY=v: the note-on velocity (1..127, default 127)
     const int noteVel = std::getenv("TEST_VELOCITY") ? std::clamp(std::atoi(std::getenv("TEST_VELOCITY")), 1, 127) : 127;
     p.loadFile(juce::File(argv[2]));

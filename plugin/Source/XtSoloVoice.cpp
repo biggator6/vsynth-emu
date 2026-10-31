@@ -155,17 +155,25 @@ XtSoloVoice::Grain XtSoloVoice::grainParams(bool setF0) {
     if (p->forcedInfo >= 0) voiced = (p->forcedInfo & 4) != 0;
     const int info = p->forcedInfo >= 0 ? p->forcedInfo : sg < nc ? p->info[sg] : 1;
     const float Af = std::max((float)A, 4.76837e-07f), Ff = std::max((float)F, 4.76837e-07f);
-    float rate, v;                                     // ppw divisor, read velocity
-    if (voiced) { rate = Af; v = Ff; }
-    else {
+    float rate, v, pw;                                 // ppw divisor, read velocity, period
+    // Robot voice: the pitch term (player +0x124 · A/256) is 0, so a voiced
+    // record's grains come at a fixed period, A·440 Hz (1603.64 = 44100·16/440),
+    // and an unvoiced one plays at rate 1.
+    const float Ar = robot ? 0.0f : Af;
+    if (voiced) {
+        v = Ff;
+        if (robot) { pw = xtf::div(0x1.90e8bap+10f, Af); rate = xtf::div(Ci, pw); }
+        else { rate = Af; pw = xtf::div(Ci, rate); }
+    } else {
         // Info bit 0x1 gates the pitch factor, 0x2 the formant factor: the
         // XT's unvoiced records (low bits 0) play at S = 1.  Unknown info
         // (a cuts file without it): S = A.
-        rate = Af;
-        if (info >= 0) rate = xtf::mul((info & 1) ? Af : 1.0f, (info & 2) ? Ff : 1.0f);
+        rate = Ar == 0.0f ? 1.0f : Ar;
+        if (info >= 0) rate = xtf::mul((info & 1) ? rate : 1.0f, (info & 2) ? Ff : 1.0f);
         v = rate;
+        pw = xtf::div(Ci, rate);
     }
-    const float pw = std::min(xtf::div(Ci, rate), 524287.0f);   // 1/16 samples
+    pw = std::min(pw, 524287.0f);                      // 1/16 samples
     float wl = xtf::div(Ci, v), os = 0.0f;
     if (wl > pw) { os = std::trunc(xtf::sub(Ci, xtf::mul(pw, v))); wl = pw; }   // os in whole 1/16 samples
     if (voiced && setF0) f0n = std::min(xtf::div(16.0f, pw), 0.5f);

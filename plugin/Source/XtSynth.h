@@ -76,6 +76,9 @@ public:
         int oscLevel = 127, oscLevelKF = 0, oscLevelLfoDepth = 0, waveGain = 0;
         int oAttack = 0, oDecay = 0, oSustain = 127, oRelease = 127, oASens = 0, oDSens = 0, oRSens = 0, oTimeKF = 0;
         int oscVelSens = 0, oscVelCurve = 1, ampVelSens = 16, ampVelCurve = 1;
+        // Robot Voice (SOLO): voiced grains at a fixed pitch, the note's
+        // pitch against A440 instead of the Original Key
+        bool robot = false;
     };
 
     XtSynth();
@@ -99,6 +102,7 @@ private:
         long age = 0, tail = 0;
         float gain = 1;               // the patch TVA's velocity gain (0x894ea990)
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
+        bool robot = false;            // Robot Voice, as at note-on (the player latches it)
         XtEnvelope env;
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)

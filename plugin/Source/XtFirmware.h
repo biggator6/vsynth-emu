@@ -29,6 +29,7 @@ struct XtFwSoloNote {
     float pitch = 1, formant = 1, walk = 1, energy = 0;
     std::vector<std::pair<long, float>> walkAt;
     std::vector<std::pair<long, float>> gainAt;   // output gain targets (1 = unity)
+    bool robot = false;                           // Robot Voice (player byte 0 bit 0x10)
 };
 bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long frames, int channels,
                   const XtFwSoloNote& note, long outFrames, std::vector<float>& out);

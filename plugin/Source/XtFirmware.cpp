@@ -253,7 +253,7 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
     auto rf = [&](uint32_t a) { const uint32_t u = c.rd32(a); float x; std::memcpy(&x, &u, 4); return x; };
     // the player (0x8950fba0 / 0x8950fa60 as EmuSolo.java sets them)
     c.wr32(W2 + 0x16c, 0x7fffffff); c.wr32(W2 + 0xb8, 0x7fffffff);   // no loop points or cache bounds
-    if (channels == 2) c.wr8(R8 + 0, 0x40);
+    c.wr8(R8 + 0, (uint8_t)((channels == 2 ? 0x40 : 0) | (note.robot ? 0x10 : 0)));
     c.wr8(R8 + 3, 0x80); c.wr8(R8 + 7, 8); c.wr8(R8 + 8, (uint8_t)st); c.wr8(R8 + 9, channels == 2 ? 12 : 6);
     c.wr16(R8 + 0xc, note.walk < 0.0f ? 1 : 0); c.wr16(R8 + 0xe, 1); c.wr16(R8 + 0x14, 0); c.wr16(R8 + 0x16, 1);
     c.wr32(R8 + 0x10, VP);
@@ -266,7 +266,7 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
     wf(R8 + 0x80, 1.0f / 65536.0f); wf(R8 + 0x84, 1.0f / 65536.0f); wf(R8 + 0x88, 1.0f / 64.0f);
     c.wr32(R9 + 0, kSamp);
     if (!c.call(0x8950d790, { R8 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
-    c.wr32(R10 + 0, 256);
+    // (the event jump's 0x8950c7e0 set R10+0: 256, or 0 for Robot Voice)
     if (!c.call(0x8950d580, { R8, R9 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
     // 0x8950fba0's tail: timer and ages (anchor − record start)·256, both
     // grains at the record start, B's window at 0.5, q 1.2, no cutoff
@@ -428,7 +428,8 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 //   (XT_ROUND=nearest: round to nearest, as Ghidra's emulator)
 // xt_fw <rom.2.bin> soloplay <samp.bin> <channels> <R> <F> <walk> <energy> <frames> <out.f32> [frame:walk ...]
 //   : the firmware's SOLO encoder and player (xtFwSoloPlay); L/R pairs.
-//   frame:walk changes the walk, frame:gX the output gain target (1 = unity)
+//   frame:walk changes the walk, frame:gX the output gain target (1 = unity);
+//   "robot" turns Robot Voice on (R is then the pitch against A440)
 // xt_fw <rom.2.bin> solocmp <samp.bin> <channels> <R> <F> <walk> <energy> <frames> [frame:walk ...]
 //   : the same against XtSoloVoice on the same records: the largest
 //   difference and the difference's level against the signal
@@ -497,7 +498,8 @@ int main(int argc, char** argv) {
         const long outFrames = std::atol(argv[9]);
         for (int a = mode == "soloplay" ? 11 : 10; a < argc; ++a) {
             long at = 0; float w = 0;
-            if (std::sscanf(argv[a], "%ld:g%f", &at, &w) == 2) note.gainAt.push_back({ at, w });
+            if (std::string(argv[a]) == "robot") note.robot = true;
+            else if (std::sscanf(argv[a], "%ld:g%f", &at, &w) == 2) note.gainAt.push_back({ at, w });
             else if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
         }
         // the SOLO encoder reads (L+R) >> 1 (0x8951f6f0)
@@ -534,6 +536,7 @@ int main(int argc, char** argv) {
                 P.info[i] = recs[i].info;
             }
             XtSoloVoice v;
+            v.setRobot(note.robot);
             v.noteOn(P, note.pitch, note.formant, note.walk, note.energy);
             std::vector<float> L(32), R(32);
             double maxd = 0, sig = 0, dif = 0;

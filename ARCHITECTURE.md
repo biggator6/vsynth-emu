@@ -238,6 +238,8 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      oscillator's own amp envelope in series with the patch TVA, and
      velocity to level, through the firmware's level path and the player's
      per-sample gain.
+   - Robot Voice (v54, SOLO): voiced grains at the note's fixed pitch
+     against A440, from the plugin's Robot button.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -266,6 +268,7 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - The level path (v53): the velocity curve, the OSC level slots and the
   gain target equal the firmware (`xt_osc`); the players' gain stages
   match the firmware players with gain changes.
+- Robot Voice (v54) matches the firmware's SOLO player at −94.5…−110 dB.
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.

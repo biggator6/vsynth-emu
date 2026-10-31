@@ -2507,3 +2507,18 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The defaults differ from v52 only in release tails (−89…−95 dB).
 - Open: two wave-level bytes (+0x84/+0x86), the patch TVA's Level/KF/LFO,
   and the depth velocity sens of the other envelopes.
+
+### Session 16 addendum (2026-10-31) — v54: Robot Voice
+
+- The SOLO converter tail sets flag 0x10 for Robot (with Vari), and the
+  pitch becomes the note's against A4. The event jump then zeroes the grain
+  routine's pitch term (player +0x124).
+- Voiced grains come every 1603.6364/A sixteenth-samples (A·440 Hz).
+  Unvoiced grains play at rate 1.
+- The port matches the firmware player at −94.5…−110 dB, including formant,
+  walk, reverse and Energy.
+- Measured on the vocal: its natural 127–135 Hz wander becomes a steady
+  220 Hz at note 57 and 440 Hz at note 69.
+- The plugin's Robot button is the XT's Robot Voice for SOLO waves.
+  PluginTest is bit-identical, engine tests and `auval` pass, and the
+  defaults are unchanged.
