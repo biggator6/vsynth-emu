@@ -28,6 +28,7 @@ bool xtCosmTablesLoaded();
 // Env Depth ±63.
 struct XtTvfParams {
     int filter = 5, q = 0, qLfo = 0, qEnv = 0, cutoff = 127, keyfollow = 0, cutoffLfo = 0, cutoffEnv = 0;
+    int qOwn = 0, cutoffOwn = 0;      // Dynamic TVF only: Own Env Depth ±63 (IDs 0x92b, 0x930)
 };
 
 // The converter's block (0x894dd870; the matrix and controller terms 0):
@@ -40,8 +41,15 @@ struct XtTvfParams {
 struct XtTvfBlock {
     int mode = 5;
     float q = -1.0f, qEnv = 0, qLfo = 0, cutoff = 1.0f, cutoffEnv = 0, cutoffLfo = 0;
+    bool dynamic = false;
+    float qOwn = 0, cutoffOwn = 0;    // Dynamic TVF: (d/63)·|d/63|
 };
 XtTvfBlock xtTvfBlock(const XtTvfParams& p, int key, float velA, float velB);
+// The Dynamic TVF (COSM Type 11, block code 14; 0x894dda40): the TVF's block
+// plus the Q's and Cutoff's Own Env depths (parameters 0x928…0x931: Filter
+// Type, Q, Q LFO, Q Own Env, Q Env, Cutoff, Cutoff KF, Cutoff LFO, Cutoff
+// Own Env, Cutoff Env).
+XtTvfBlock xtDtvfBlock(const XtTvfParams& p, int key, float velA, float velB);
 
 // The COSM velocity factors (0x894de3b0, +0x34/+0x38): the velocity curve
 // (0x894ebd60) at the envelope's Velocity Curve and Sens (patch values,
@@ -49,6 +57,14 @@ XtTvfBlock xtTvfBlock(const XtTvfParams& p, int key, float velA, float velB);
 // (COSM 1) or 11, B from Env 10 or 12.
 float xtCosmVelocity(int velocity, int patchSens, int patchCurve);
 
+// The Dynamic TVF's targets are the raw sums (0x894eda10, 0x894eeda0); per
+// 32-sample block (0x89502920) a follower of the input level (0x895017e0:
+// the sum of |L| over the block, the eighth frame of each eight counted
+// twice, × 2^-34, on the XT's int32 scale; smoothed 10% a block) moves Q by
+// its Own depth and the Cutoff by its, each depth slewing 0.001 a block
+// toward the block's value (Q's toward its negative, from its positive at
+// note-on: the XT's own quirk); Q is then clamped and the Cutoff tabled as
+// the TVF's, per block.
 class XtCosmTvf {
 public:
     // Note-on (0x894edf70): the states cleared; the start values from the
@@ -59,10 +75,13 @@ public:
                 float cutEnvStart, float cutEnvOut, float cutRate, float cutLfo);
     // A new block while the note sounds (0x894ed8f0): new targets.
     void setBlock(const XtTvfBlock& b, float qEnv, float qLfo, float cutEnv, float cutLfo);
-    // The 10-ms update (0x894ee6a0, type 13): targets and step rates.
+    // The 10-ms update (0x894ee6a0: type 13 0x894eecb0, type 14 0x894eeda0):
+    // targets and step rates.
     void update(float qEnv, float qRate, float qLfo, float cutEnv, float cutRate, float cutLfo);
-    // 32 frames, interleaved L/R, in place (0x89502890).
-    void process(float* lr);
+    // 32 frames, interleaved L/R, in place (0x89502890; 0x89502920 for the
+    // Dynamic TVF).  `scale`: the buffer's units against the XT's (int16 ×
+    // 65536), for the Dynamic TVF's follower.
+    void process(float* lr, float scale = 1.0f);
 
     // The coefficients, for the firmware checks.
     float c1() const { return cur1; }
@@ -71,6 +90,13 @@ public:
     float target2() const { return tgt2; }
     const float* state() const { return s; }
     void setState(const float st[4], float cur1, float cur2, float tgt1, float tgt2, float rate1, float rate2);
+    // The Dynamic TVF's follower (D+0x98) and slewed Own depths (D+0x90 Q,
+    // +0x94 Cutoff).  The level is not cleared at note-on: it carries on from
+    // the voice's previous note, as on the XT.
+    float level() const { return lev; }
+    float qOwnSlewed() const { return qOwnS; }
+    float cutoffOwnSlewed() const { return cutOwnS; }
+    void setFollower(float qOwnSlewed, float cutoffOwnSlewed, float level) { qOwnS = qOwnSlewed; cutOwnS = cutoffOwnSlewed; lev = level; }
 
 private:
     XtTvfBlock blk;
@@ -78,6 +104,8 @@ private:
     float cur1 = 0, cur2 = 0;         // the coefficients (D+0xbc, +0xc0)
     float tgt1 = 0, tgt2 = 0;         // their targets (D+0xa4, +0xa8)
     float rate1 = 0, rate2 = 0;       // the step rates (D+0xc4, +0xc8)
+    float qOwnS = 0, cutOwnS = 0, lev = 0;
+    void targets(float qEnv, float qLfo, float cutEnv, float cutLfo);
 };
 
 // The coefficients from the modulated values (0x894eecb0): Q + its depths ×
@@ -86,3 +114,5 @@ private:
 // trunc(−q·127); 0 below 0.
 float xtTvfQ(float q, float envDepth, float env, float lfoDepth, float lfo);
 float xtTvfCutoff(float cutoff, float envDepth, float env, float lfoDepth, float lfo, float q);
+// The table step alone (0x894ec140): y within 0…1 (0 below 0) to the coefficient at Q.
+float xtTvfCoef(float y, float q);

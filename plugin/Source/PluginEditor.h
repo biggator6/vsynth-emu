@@ -65,7 +65,10 @@ private:
     // Filter Type, Cutoff, Resonance, Cutoff KF; the depth and Env A rows;
     // the LFO (3 or 4)
     juce::ToggleButton cosmBtn_ { "On" };
-    juce::ComboBox   cosmSelBox_, cosmFilterBox_, clfoWaveBox_;
+    juce::ComboBox   cosmSelBox_, cosmFilterBox_, clfoWaveBox_, cosmTypeBox_;
+    juce::Slider     cosmCutOwnSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     cosmResoOwnSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Label      cosmTypeLabel_ { {}, "Type" }, cosmCutOwnLabel_ { {}, "C-Own" }, cosmResoOwnLabel_ { {}, "R-Own" };
     juce::Slider     cosmCutSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     cosmResoSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     cosmKfSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -158,7 +161,8 @@ private:
     std::unique_ptr<ButtonAtt> legatoAtt_;
     std::unique_ptr<SliderAtt> octAtt_;
     std::unique_ptr<ButtonAtt> cosmAtt_, clfoSyncAtt_;
-    std::unique_ptr<ComboAtt>  cosmFilterAtt_, clfoWaveAtt_;
+    std::unique_ptr<ComboAtt>  cosmFilterAtt_, clfoWaveAtt_, cosmTypeAtt_;
+    std::unique_ptr<SliderAtt> cosmCutOwnAtt_, cosmResoOwnAtt_;
     std::unique_ptr<SliderAtt> cosmCutAtt_, cosmResoAtt_, cosmKfAtt_, clfoRateAtt_;
     void attachCosm(int k);             // COSM 1 (0) or 2 (1) on the COSM rows
     std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_, lfoTimeAtt_, lfoFmtAtt_;

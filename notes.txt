@@ -217,6 +217,15 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+DYNAMIC TVF v64 (2026-10-31): COSM Type 11 (HARDWARE_FIRMWARE.md, "COSM:
+  the Dynamic TVF"). XtCosm: xtDtvfBlock (0x894dda40), XtTvfBlock.dynamic
+  with qOwn/cutoffOwn, raw targets, the follower and slews in
+  XtCosmTvf::process(lr, scale) (0x89502920), xtTvfCoef (0x894ec140). All
+  equal to the firmware (xt_cosm [cases]: both types now). Plugin params
+  cosmType/cosm2Type (TVF, Dynamic TVF), cosmResoOwn, cosmCutoffOwn (and
+  cosm2…). XT_COSM / TEST_COSM take ",type,resoOwn,cutOwn" after the eight
+  values.
+
 COSM 2 v63 (2026-10-31): COSM 2 as a TVF after COSM 1 (Env 11/12, LFO 4).
   XtSynth::Controls::Cosm cosm[2] and Voice::CosmVoice cs[2] replace v61's
   COSM 1 fields. Plugin params as COSM 1's with prefix "cosm2" (COSM 1 keeps

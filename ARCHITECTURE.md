@@ -255,7 +255,8 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - key assign (v60): Mono/Poly, Legato Switch and Octave Shift through the
      XT's key state; a MONO legato note takes over the sounding voice,
      otherwise the old voice is truncated (0.70 ms).
-   - the COSM sections as TVFs (v61 COSM 1, v63 COSM 2 in series; XtCosm):
+   - the COSM sections as TVFs or Dynamic TVFs (v61 COSM 1, v63 COSM 2 in
+     series, v64 the Dynamic TVF's level follower; XtCosm):
      the twelve filter types, Cutoff, Resonance and Keyfollow, each with its
      own envelopes (Env 9/10, 11/12) and LFO (3, 4), through the XT's
      converter, control and filter kernels, between the player and the
@@ -304,8 +305,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - Mono/Poly (v60): the key state (120,000 events), the ramp's legato update
   and restart (2.05 million values) and the key-follow key equal the
   firmware (`xt_osc`).
-- COSM TVF (v61): the converter, start values, targets and updates and the
-  twelve filter kernels equal the firmware (`xt_cosm`, 38 million samples).
+- COSM TVF (v61) and Dynamic TVF (v64): the converters, start values,
+  targets and updates, the follower and the twelve filter kernels equal the
+  firmware (`xt_cosm`).
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.

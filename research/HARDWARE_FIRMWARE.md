@@ -1544,6 +1544,70 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Dynamic TVF (2026-10-31, v64)
+
+COSM Type 11, block code 14. It is the TVF with a follower of the section's
+input level, which moves Q and the Cutoff.
+
+**Parameters** (0x928…0x931, second descriptor bank):
+- Filter Type 0…11 (default 5) and Q;
+- Q LFO Depth, Q Own Env Depth, Q Env Depth;
+- Cutoff (default 127) and Cutoff Keyfollow (±20);
+- Cutoff LFO Depth, Cutoff Own Env Depth, Cutoff Env Depth.
+
+All depths are ±63.
+
+**The converter** (`0x894dda40`) forms the TVF's block at the same places.
+It adds the Own Env depths as (d/63)·|d/63|, with no clamp: Q's in [6] and
+the Cutoff's in [12].
+
+**The object.**
+- The binding and the start values (`0x894ec340`) are the TVF's.
+- The block copy (`0x894eda10`) and the 10-ms update (`0x894eeda0`) set the
+  targets to the raw sums: Q (or Cutoff) + its depths × the envelope and
+  LFO, with no clamp and no table.
+- At note-on (`0x894edf70`, type 14) the two slewed Own depths (D+0x90,
+  +0x94) start at the block's depths.
+- The follower (D+0x98) is not reset; it carries on from the voice's
+  previous note.
+
+**Per 32-sample block** (`0x89502920`):
+1. The level is Σ|L| over the block × 0x2e7fffff (a unit below 2^-34)
+   (`0x895017e0`). It counts the eighth frame of every eight twice. The
+   XT's buffer is int16 × 65536.
+2. e += 0.1·(level − e).
+3. The Q depth slews 0.001 a block toward −(Q Own depth): it starts at
+   +depth, so Q's response is inverted at first and turns around over
+   about a second. The Cutoff depth slews toward +(Cutoff Own depth). The
+   0.001 is 0x3a83126e, a unit below the nearest float.
+4. Q = clamp(Q target − slewed Q depth · e, −1…−1/64).
+5. The cutoff coefficient = the table step (`0x894ec140`, the TVF's) at
+   Cutoff target + e · slewed Cutoff depth.
+6. Both coefficients step toward these targets as in the TVF, through the
+   same twelve kernels (0x895028f0).
+
+**Port and checks** (`xt_cosm`):
+- the converter: 200,000 cases;
+- start values, block targets and updates: 120,000 cases, half TVF and half
+  Dynamic TVF;
+- the filter: 1,600,000 blocks, with the follower starting from random
+  levels and buffers at the XT's int32 scale.
+- All 0 different.
+
+**Plugin.**
+- New per section: Type (TVF, Dynamic TVF; latched at note-on), and the
+  Cutoff and Resonance Own Env depths, on a new editor row.
+- The follower reads XtSynth's buffer scaled to the XT's: SOLO (±1) ×
+  2^31, BACKING/ENSEMBLE (int16) × 2^16. These scalings are exact.
+- XtSynth also keeps each voice's follower across notes.
+- Checks:
+  - with the type at TVF the output is bit-identical to v62 (COSM off, and
+    COSM 1 on);
+  - PluginTest is bit-identical with the Dynamic TVF on COSM 1, on COSM 2
+    behind a TVF on COSM 1 with a second note, and in MONO legato;
+  - on the drum (LP24, Cutoff 30, Cutoff Own +63), the spectral centroid
+    rises from 54 Hz to 332 Hz with the hit and falls back with the level.
+
 ### COSM 2 (2026-10-31, v63)
 
 COSM 2 is a second COSM section after COSM 1, on the same buffer: the tone
@@ -1734,8 +1798,7 @@ on the SH-4):
 
 **Not modelled yet:**
 - COSM 2 (since modelled, v63);
-- the other fifteen types, and Dynamic TVF (code 14, the raw-sum update at
-  `0x894eeda0`);
+- the other fifteen types (Dynamic TVF since modelled, v64);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;

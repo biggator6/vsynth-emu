@@ -167,8 +167,8 @@ int main(int argc, char** argv) {
         setKnobs({ { "portamento", 1 }, { "portaMode", refCtl.portaMode }, { "portaType", refCtl.portaType },
                    { "portaTime", refCtl.portaTime }, { "portaVeloSens", refCtl.portaVeloSens } });
     }
-    // TEST_COSM="filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo": COSM 1
-    // as a TVF; TEST_CENV="a,d,s,r,velCurve,velSens": its cutoff envelope
+    // TEST_COSM="filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo[,type,
+    // resoOwn,cutOwn]": COSM 1, a TVF (type 0) or Dynamic TVF (1); TEST_CENV="a,d,s,r,velCurve,velSens": its cutoff envelope
     // (Env A); TEST_CLFO="wave,rate": its LFO.  TEST_COSM2, TEST_CENV2,
     // TEST_CLFO2: the same for COSM 2.
     for (int k = 0; k < 2; ++k) {
@@ -180,8 +180,9 @@ int main(int argc, char** argv) {
         };
         if (const char* e = std::getenv(("TEST_COSM" + sfx).c_str())) {
             m.on = true;
-            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &m.filter, &m.cutoff, &m.reso, &m.kf, &m.cutoffEnv, &m.cutoffLfo, &m.resoEnv, &m.resoLfo);
-            set("Switch", 1); set("Filter", m.filter); set("Cutoff", m.cutoff); set("Reso", m.reso); set("CutoffKF", m.kf);
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.filter, &m.cutoff, &m.reso, &m.kf, &m.cutoffEnv, &m.cutoffLfo, &m.resoEnv,
+                        &m.resoLfo, &m.type, &m.resoOwn, &m.cutoffOwn);
+            set("Switch", 1); set("Type", m.type); set("ResoOwn", m.resoOwn); set("CutoffOwn", m.cutoffOwn); set("Filter", m.filter); set("Cutoff", m.cutoff); set("Reso", m.reso); set("CutoffKF", m.kf);
             set("CutoffEnv", m.cutoffEnv); set("CutoffLfo", m.cutoffLfo); set("ResoEnv", m.resoEnv); set("ResoLfo", m.resoLfo);
         }
         if (const char* e = std::getenv(("TEST_CENV" + sfx).c_str())) {

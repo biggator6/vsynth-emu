@@ -2688,3 +2688,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - COSM 2 alone equals COSM 1 alone with the same settings. In series the
   two give the product of their responses. With COSM 2 off the output is
   bit-identical to v62.
+
+### Session 16 addendum (2026-10-31) — v64: Dynamic TVF
+
+- The Dynamic TVF is the TVF plus a level follower: Σ|L| per block, an
+  8th-frame double count, 10% smoothing. Q and the Cutoff move by their Own
+  Env depths, which slew 0.001 a block.
+- Q's depth slews toward its negative from a positive start, so its effect
+  is inverted for about a second after note-on. That is a firmware quirk,
+  kept in the port.
+- The follower needed the XT's buffer scale (int16 × 65536): the plugin's
+  buffers map to it by exact powers of two.
+- All of it equals the firmware in the interpreter. In the plugin, the
+  per-section Type and Own depths.

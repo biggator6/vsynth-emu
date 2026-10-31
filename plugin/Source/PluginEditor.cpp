@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 730;  // height of the XT strip below it
+static constexpr int kXtStripH   = 760;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -21,7 +21,7 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1030);
+    setSize(560, 1060);
     setResizable(true, true);
     setResizeLimits(480, 600, 960, 1200);
 
@@ -57,7 +57,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                               &fAttackSlider_, &fDecaySlider_, &fSustainSlider_, &fReleaseSlider_, &fDepthSlider_,
                               &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_, &lfoTimeSlider_, &lfoFmtSlider_,
                               &loopStartSlider_, &loopEndSlider_, &portaTimeSlider_, &portaSensSlider_, &octSlider_,
-                              &cosmCutSlider_, &cosmResoSlider_, &cosmKfSlider_, &clfoRateSlider_ }) {
+                              &cosmCutSlider_, &cosmResoSlider_, &cosmKfSlider_, &clfoRateSlider_, &cosmCutOwnSlider_,
+                              &cosmResoOwnSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
@@ -129,8 +130,9 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF" }, 1);
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
-                                  (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_ })
+                                  (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
         addAndMakeVisible(*cpt);
     cosmSelBox_.addItemList({ "COSM 1", "COSM 2" }, 1);
     cosmSelBox_.setSelectedId(1, juce::dontSendNotification);
@@ -176,7 +178,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                             &lfoLabel_, &lfoRateLabel_, &lfoDepthLabel_, &lfoDelayLabel_, &lfoFadeLabel_,
                             &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_,
                             &portaTimeLabel_, &portaSensLabel_, &octLabel_, &cosmCutLabel_, &cosmResoLabel_, &cosmKfLabel_,
-                            &clfoLabel_, &clfoRateLabel_ }) styleSmall(*l);
+                            &clfoLabel_, &clfoRateLabel_, &cosmTypeLabel_, &cosmCutOwnLabel_, &cosmResoOwnLabel_ }) styleSmall(*l);
     timerCallback();
     startTimerHz(4);
 
@@ -230,6 +232,10 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
     cosmAtt_.reset(); cosmFilterAtt_.reset(); cosmCutAtt_.reset(); cosmResoAtt_.reset(); cosmKfAtt_.reset();
+    cosmTypeAtt_.reset(); cosmCutOwnAtt_.reset(); cosmResoOwnAtt_.reset();
+    cosmTypeAtt_    = std::make_unique<ComboAtt>(processor_.apvts, pre + "Type", cosmTypeBox_);
+    cosmCutOwnAtt_  = std::make_unique<SliderAtt>(processor_.apvts, pre + "CutoffOwn", cosmCutOwnSlider_);
+    cosmResoOwnAtt_ = std::make_unique<SliderAtt>(processor_.apvts, pre + "ResoOwn", cosmResoOwnSlider_);
     clfoWaveAtt_.reset(); clfoRateAtt_.reset(); clfoSyncAtt_.reset();
     cosmAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, pre + "Switch", cosmBtn_);
     cosmFilterAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "Filter", cosmFilterBox_);
@@ -474,6 +480,16 @@ void VSynthEmuEditor::resized() {
             }
         }
     }
+    xt.removeFromTop(6);
+    auto rd = xt.removeFromTop(24);                  // the COSM's type and its Dynamic TVF Own Env depths
+    cosmTypeLabel_.setBounds(rd.removeFromLeft(46));
+    cosmTypeBox_.setBounds(rd.removeFromLeft(130).withTrimmedRight(8));
+    const int half = rd.getWidth() / 2;
+    auto rd1 = rd.removeFromLeft(half);
+    cosmCutOwnLabel_.setBounds(rd1.removeFromLeft(46));
+    cosmCutOwnSlider_.setBounds(rd1.withTrimmedRight(6));
+    cosmResoOwnLabel_.setBounds(rd.removeFromLeft(46));
+    cosmResoOwnSlider_.setBounds(rd);
     xt.removeFromTop(6);
     auto rl = xt.removeFromTop(24);                  // LFO 3: waveform, rate, key sync
     clfoLabel_.setBounds(rl.removeFromLeft(46));

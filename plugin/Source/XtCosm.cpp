@@ -124,6 +124,15 @@ XtTvfBlock xtTvfBlock(const XtTvfParams& p, int key, float velA, float velB) {
     return b;
 }
 
+XtTvfBlock xtDtvfBlock(const XtTvfParams& p, int key, float velA, float velB) {
+    XtTvfBlock b = xtTvfBlock(p, key, velA, velB);   // the same sums at the same places
+    b.dynamic = true;
+    const float qo = div(flt((int16_t)p.qOwn), 63.0f), co = div(flt((int16_t)p.cutoffOwn), 63.0f);
+    b.qOwn = mul(0.0f > qo ? -qo : qo, qo);
+    b.cutoffOwn = mul(0.0f > co ? -co : co, co);
+    return b;
+}
+
 float xtCosmVelocity(int velocity, int patchSens, int patchCurve) {
     return div(flt(xtVelCurveValue(velocity, xtVelSens(patchSens), xtVelCurve(patchCurve))), 32768.0f);
 }
@@ -139,6 +148,10 @@ float xtTvfQ(float q, float envDepth, float env, float lfoDepth, float lfo) {
 float xtTvfCutoff(float cutoff, float envDepth, float env, float lfoDepth, float lfo, float q) {
     float y = fmac(envDepth, env, cutoff);
     y = fmac(lfoDepth, lfo, y);
+    return xtTvfCoef(y, q);
+}
+
+float xtTvfCoef(float y, float q) {
     if (0.0f > y) return 0.0f;
     const float z = mul(y, 127.0f);
     int i = ftrc(z);
@@ -158,17 +171,27 @@ void XtCosmTvf::noteOn(const XtTvfBlock& b, float qEnvStart, float qEnvOut, floa
     rate1 = mul(qRate, 4.0f);
     rate2 = mul(cutRate, 4.0f);
     setBlock(b, qEnvOut, qLfo, cutEnvOut, cutLfo);
+    qOwnS = b.qOwn;                                   // 0x894edf70, type 14: the slews start at the block's depths
+    cutOwnS = b.cutoffOwn;
 }
 
 void XtCosmTvf::setBlock(const XtTvfBlock& b, float qEnv, float qLfo, float cutEnv, float cutLfo) {
     blk = b;
-    tgt1 = xtTvfQ(b.q, b.qEnv, qEnv, b.qLfo, qLfo);
-    tgt2 = xtTvfCutoff(b.cutoff, b.cutoffEnv, cutEnv, b.cutoffLfo, cutLfo, tgt1);
+    targets(qEnv, qLfo, cutEnv, cutLfo);
 }
 
 void XtCosmTvf::update(float qEnv, float qRate, float qLfo, float cutEnv, float cutRate, float cutLfo) {
     rate1 = mul(qRate, 4.0f);
     rate2 = mul(cutRate, 4.0f);
+    targets(qEnv, qLfo, cutEnv, cutLfo);
+}
+
+void XtCosmTvf::targets(float qEnv, float qLfo, float cutEnv, float cutLfo) {
+    if (blk.dynamic) {                                // the raw sums (0x894eda10, 0x894eeda0)
+        tgt1 = fmac(blk.qLfo, qLfo, fmac(blk.qEnv, qEnv, blk.q));
+        tgt2 = fmac(blk.cutoffLfo, cutLfo, fmac(blk.cutoffEnv, cutEnv, blk.cutoff));
+        return;
+    }
     tgt1 = xtTvfQ(blk.q, blk.qEnv, qEnv, blk.qLfo, qLfo);
     tgt2 = xtTvfCutoff(blk.cutoff, blk.cutoffEnv, cutEnv, blk.cutoffLfo, cutLfo, tgt1);
 }
@@ -178,8 +201,28 @@ void XtCosmTvf::setState(const float st[4], float c1, float c2, float t1, float 
     cur1 = c1; cur2 = c2; tgt1 = t1; tgt2 = t2; rate1 = r1; rate2 = r2;
 }
 
-void XtCosmTvf::process(float* lr) {
-    const float d1 = mul(rate1, sub(tgt1, cur1)), d2 = mul(rate2, sub(tgt2, cur2));
+void XtCosmTvf::process(float* lr, float scale) {
+    float t1 = tgt1, t2 = tgt2;
+    if (blk.dynamic) {
+        // the follower (0x895017e0): Σ|L|, every eighth frame twice
+        float sum = 0.0f;
+        for (int i = 0; i < 32; ++i) {
+            const float a = lr[2 * i] < 0.0f ? -lr[2 * i] : lr[2 * i];
+            sum = add(sum, a);
+            if ((i & 7) == 7) sum = add(sum, a);
+        }
+        const float level = mul(mul(sum, scale), 0x1.fffffep-35f);       // 0x2e7fffff
+        lev = fmac(0.1f, sub(level, lev), lev);
+        constexpr float kSlew = 0x1.0624dcp-10f;       // 0.001 as rom.2 stores it (0x3a83126e, a unit below)
+        qOwnS = fmac(kSlew, sub(-blk.qOwn, qOwnS), qOwnS);
+        cutOwnS = fmac(kSlew, sub(blk.cutoffOwn, cutOwnS), cutOwnS);
+        float q = sub(tgt1, mul(qOwnS, lev));
+        if (-1.0f > q) q = -1.0f;
+        if (q > -0.015625f) q = -0.015625f;
+        t1 = q;
+        t2 = xtTvfCoef(fmac(lev, cutOwnS, tgt2), q);
+    }
+    const float d1 = mul(rate1, sub(t1, cur1)), d2 = mul(rate2, sub(t2, cur2));
     const int m = blk.mode;
     if (m >= 0 && m <= 4) stage24(lr, s, cur1, cur2, d1, d2, m);
     else if (m >= 5 && m <= 9) stage12(lr, s, cur1, cur2, d1, d2, m);
@@ -244,25 +287,56 @@ int main(int argc, char** argv) {
                         f32(OUT + 4), f32(OUT + 0x1c), f32(OUT + 0x20), b.q, b.cutoff, b.cutoffEnv);
     }
     std::printf("converter: %ld cases, %ld different\n", cn, cb);
+    long cb2 = 0, cn2 = 0;
+    for (int k = 0; k < 200000; ++k) {
+        XtTvfParams p;
+        p.filter = (int)(rnd() % 12); p.q = (int)(rnd() % 128); p.qLfo = (int)(rnd() % 127) - 63; p.qOwn = (int)(rnd() % 127) - 63;
+        p.qEnv = (int)(rnd() % 127) - 63; p.cutoff = (int)(rnd() % 128); p.keyfollow = (int)(rnd() % 41) - 20;
+        p.cutoffLfo = (int)(rnd() % 127) - 63; p.cutoffOwn = (int)(rnd() % 127) - 63; p.cutoffEnv = (int)(rnd() % 127) - 63;
+        const int key = (int)(rnd() % 128), cosm = (int)(rnd() & 1);
+        const float va = (float)(rnd() % 32769) / 32768.0f, vb = (float)(rnd() % 32769) / 32768.0f;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100);
+        c.wr8(IN + 2, (uint8_t)cosm); c.wr8(IN + 3, (uint8_t)key);
+        const int vals[10] = { p.filter, p.q, p.qLfo, p.qOwn, p.qEnv, p.cutoff, p.keyfollow, p.cutoffLfo, p.cutoffOwn, p.cutoffEnv };
+        for (int i = 0; i < 10; ++i) c.wr16(IN + 0x12 + 2 * (uint32_t)i, (uint16_t)(int16_t)vals[i]);
+        wf(IN + 0x34, va); wf(IN + 0x38, vb);
+        if (!c.call(0x894dda40, { IN, OUT }, sp)) { std::fprintf(stderr, "converter 11: %s\n", c.error().c_str()); return 1; }
+        const XtTvfBlock b = xtDtvfBlock(p, key, va, vb);
+        ++cn2;
+        const bool ok = c.rd32(OUT) == 14 && (int)c.rd32(OUT + 0x34) == b.mode && same(f32(OUT + 4), b.q) && same(f32(OUT + 8), b.qEnv)
+                     && same(f32(OUT + 0x10), b.qLfo) && same(f32(OUT + 0x18), b.qOwn) && same(f32(OUT + 0x1c), b.cutoff)
+                     && same(f32(OUT + 0x20), b.cutoffEnv) && same(f32(OUT + 0x28), b.cutoffLfo) && same(f32(OUT + 0x30), b.cutoffOwn)
+                     && c.rd32(OUT + 0xc) == (cosm ? 12u : 10u) && c.rd32(OUT + 0x24) == (cosm ? 11u : 9u);
+        if (!ok && cb2++ < 5)
+            std::printf("  dynamic converter key %d: fw qown %.9g cown %.9g cut %.9g, port %.9g %.9g %.9g\n", key, f32(OUT + 0x18), f32(OUT + 0x30),
+                        f32(OUT + 0x1c), b.qOwn, b.cutoffOwn, b.cutoff);
+    }
+    std::printf("dynamic converter: %ld cases, %ld different\n", cn2, cb2);
+    cb += cb2;
 
     // the object: D = obj + 0x58; the envelopes and LFOs it reads
     const uint32_t OBJ = ram + 0x2000, D = OBJ + 0x58, EQ = ram + 0x3000, EC = ram + 0x3100, LQ = ram + 0x3200, LC = ram + 0x3300,
                    BLK = ram + 0x3400, BUF = ram + 0x4000;
     long ub = 0, un = 0, db = 0, dn = 0;
     const int nCases = argc > 2 ? std::atoi(argv[2]) : 3000;
-    for (int g = 0; g < nCases; ++g) {
+    for (int g = 0; g < 2 * nCases; ++g) {
+        const bool dyn = g >= nCases;                // the TVF (code 13), then the Dynamic TVF (code 14)
         std::vector<uint8_t> z(0x200, 0);
         c.write(OBJ, z.data(), 0x200); c.write(BLK, z.data(), 0x80);
         for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
-        c.wr8(D, 13);
+        c.wr8(D, dyn ? 14 : 13);
         c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);
         XtTvfParams p;
         p.filter = (int)(rnd() % 12); p.q = (int)(rnd() % 128); p.qLfo = (int)(rnd() % 127) - 63; p.qEnv = (int)(rnd() % 127) - 63;
         p.cutoff = (int)(rnd() % 128); p.keyfollow = (int)(rnd() % 41) - 20; p.cutoffLfo = (int)(rnd() % 127) - 63;
         p.cutoffEnv = (int)(rnd() % 127) - 63;
-        const XtTvfBlock b = xtTvfBlock(p, (int)(rnd() % 128), frnd(0, 1), frnd(0, 1));
+        p.qOwn = (int)(rnd() % 127) - 63; p.cutoffOwn = (int)(rnd() % 127) - 63;
+        const int bkey = (int)(rnd() % 128);
+        const float bva = frnd(0, 1), bvb = frnd(0, 1);
+        const XtTvfBlock b = dyn ? xtDtvfBlock(p, bkey, bva, bvb) : xtTvfBlock(p, bkey, bva, bvb);
         // the block as the converter leaves it
-        c.wr32(BLK, 13); wf(BLK + 4, b.q); wf(BLK + 8, b.qEnv); c.wr32(BLK + 0xc, 10); wf(BLK + 0x10, b.qLfo); c.wr32(BLK + 0x14, 3);
+        c.wr32(BLK, dyn ? 14 : 13); wf(BLK + 4, b.q); wf(BLK + 0x18, b.qOwn); wf(BLK + 0x30, b.cutoffOwn); wf(BLK + 8, b.qEnv); c.wr32(BLK + 0xc, 10); wf(BLK + 0x10, b.qLfo); c.wr32(BLK + 0x14, 3);
         wf(BLK + 0x1c, b.cutoff); wf(BLK + 0x20, b.cutoffEnv); c.wr32(BLK + 0x24, 9); wf(BLK + 0x28, b.cutoffLfo); c.wr32(BLK + 0x2c, 3);
         c.wr32(BLK + 0x34, (uint32_t)b.mode);
         // note-on: the start values (0x894ec340, the envelopes' +0x58 and the LFOs' +0x38) …
@@ -274,10 +348,16 @@ int main(int argc, char** argv) {
         if (!c.call(0x894ec340, { OBJ, BLK, D, OBJ }, s0)) { std::fprintf(stderr, "start: %s\n", c.error().c_str()); return 1; }
         // … and the targets (0x894ed8f0, from the outputs the object holds at +0x104…)
         wf(OBJ + 0x104, eqO); wf(OBJ + 0x108, ecO); wf(OBJ + 0x10c, lq); wf(OBJ + 0x110, lc);
-        if (!c.call(0x894ed8f0, { OBJ, BLK + 4 }, sp)) { std::fprintf(stderr, "block: %s\n", c.error().c_str()); return 1; }
+        if (!c.call(dyn ? 0x894eda10 : 0x894ed8f0, { OBJ, BLK + 4 }, sp)) { std::fprintf(stderr, "block: %s\n", c.error().c_str()); return 1; }
         wf(OBJ + 0x11c, 4.0f * rq); wf(OBJ + 0x120, 4.0f * rc);
         XtCosmTvf port;
         port.noteOn(b, eqS, eqO, rq, lq, ecS, ecO, rc, lc);
+        if (dyn) {                                   // 0x894edf70, type 14: the slews from the block; the follower carries on
+            c.wr32(OBJ + 0xe8, c.rd32(OBJ + 0x28)); c.wr32(OBJ + 0xec, c.rd32(OBJ + 0x40));
+            const float lev0 = (rnd() & 1) ? 0.0f : frnd(0, 3);
+            wf(OBJ + 0xf0, lev0);
+            port.setFollower(port.qOwnSlewed(), port.cutoffOwnSlewed(), lev0);
+        }
         ++un;
         if ((!same(f32(D + 0xbc), port.c1()) || !same(f32(D + 0xc0), port.c2()) || !same(f32(OBJ + 0xfc), port.target1())
              || !same(f32(OBJ + 0x100), port.target2()) || (int)c.rd32(OBJ + 0x44) != b.mode) && ub++ < 5)
@@ -296,24 +376,27 @@ int main(int argc, char** argv) {
                     std::printf("  update %d.%d: fw %.9g %.9g port %.9g %.9g\n", g, blkN, f32(OBJ + 0xfc), f32(OBJ + 0x100), port.target1(), port.target2());
             }
             float lr[64];
-            const float amp = (rnd() % 3 == 0) ? 30000.0f : 1.0f;
+            const int ar = (int)(rnd() % 4);
+            const float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e9f : ar == 2 ? 4.0e8f : 1.0f;   // the XT's scale is int16 × 65536
             for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
             for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
-            if (!c.call(0x89502890, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "filter: %s\n", c.error().c_str()); return 1; }
+            if (!c.call(dyn ? 0x89502920 : 0x89502890, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "filter: %s\n", c.error().c_str()); return 1; }
             port.process(lr);
             ++dn;
             bool ok = same(f32(D + 0xbc), port.c1()) && same(f32(D + 0xc0), port.c2());
             for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
             const int nst = b.mode <= 4 ? 4 : b.mode <= 9 ? 2 : 1;
             for (int i = 0; i < nst; ++i) ok = ok && same(f32(D + 0x1c + 4 * (uint32_t)i), port.state()[i]);
+            if (dyn) ok = ok && same(f32(D + 0x90), port.qOwnSlewed()) && same(f32(D + 0x94), port.cutoffOwnSlewed()) && same(f32(D + 0x98), port.level());
             if (std::getenv("XT_COSM_TRACE") && g == std::atoi(std::getenv("XT_COSM_TRACE")))
                 std::printf("    trace %d: fw s %.9g %.9g %.9g %.9g c %.9g %.9g t %.9g %.9g r %.9g %.9g | port s %.9g %.9g %.9g %.9g c %.9g %.9g t %.9g %.9g\n",
                             blkN, f32(D + 0x1c), f32(D + 0x20), f32(D + 0x24), f32(D + 0x28), f32(D + 0xbc), f32(D + 0xc0), f32(OBJ + 0xfc),
                             f32(OBJ + 0x100), f32(OBJ + 0x11c), f32(OBJ + 0x120), port.state()[0], port.state()[1], port.state()[2],
                             port.state()[3], port.c1(), port.c2(), port.target1(), port.target2());
             if (!ok && db++ < 6)
-                std::printf("  filter %d block %d mode %d: fw out %.9g c %.9g %.9g, port %.9g %.9g %.9g\n", g, blkN, b.mode, f32(BUF), f32(D + 0xbc),
-                            f32(D + 0xc0), lr[0], port.c1(), port.c2());
+                std::printf("  filter %d (%s) block %d mode %d: fw out %.9g c %.9g %.9g lev %.9g own %.9g %.9g, port %.9g %.9g %.9g %.9g %.9g %.9g\n",
+                            g, dyn ? "dynamic" : "tvf", blkN, b.mode, f32(BUF), f32(D + 0xbc), f32(D + 0xc0), f32(D + 0x98), f32(D + 0x90), f32(D + 0x94),
+                            lr[0], port.c1(), port.c2(), port.level(), port.qOwnSlewed(), port.cutoffOwnSlewed());
         }
     }
     std::printf("start, block and update: %ld cases, %ld different\n", un, ub);

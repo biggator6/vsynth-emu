@@ -113,8 +113,10 @@ public:
         // Octave Shift −3..+3 (the XT's defaults: POLY, ON, 0)
         bool mono = false, legato = true;
         int octave = 0;
-        // The COSM sections as TVFs (XtCosm), COSM 1 then COSM 2 in series:
-        // the switch; Filter Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
+        // The COSM sections (XtCosm), COSM 1 then COSM 2 in series: the
+        // switch; the type, 0 TVF or 1 Dynamic TVF (its Q and Cutoff also
+        // follow the input's level by their Own Env depths −63..+63); Filter
+        // Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
         // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
         // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
         // and Q's Env and LFO depths −63..+63.  Their envelopes (curve 2):
@@ -128,6 +130,7 @@ public:
         };
         struct Cosm {
             bool on = false;
+            int type = 0, resoOwn = 0, cutoffOwn = 0;
             int filter = 5, cutoff = 127, reso = 0, kf = 0;
             int cutoffEnv = 0, cutoffLfo = 0, resoEnv = 0, resoLfo = 0;
             CosmEnv envA, envB;
@@ -175,7 +178,7 @@ private:
         // the COSM sections: on as at note-on; each its TVF, envelopes (the
         // Cutoff's, the Q's) and LFO
         struct CosmVoice {
-            bool on = false;
+            bool on = false, dynamic = false;  // the type as at note-on
             XtCosmTvf tvf;
             XtEnvelope envA, envB;
             XtLfo lfo;

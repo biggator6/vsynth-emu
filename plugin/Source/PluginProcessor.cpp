@@ -52,7 +52,8 @@ namespace Params {
     static const juce::String kLegato        = "legatoSwitch";
     static const juce::String kOctave        = "octaveShift";
     // The COSM sections as TVFs, COSM 1 ("cosm…") and COSM 2 ("cosm2…"):
-    // Switch, Filter, Cutoff, Reso, CutoffKF, CutoffEnv/Lfo, ResoEnv/Lfo; the
+    // Switch, Type (TVF, Dynamic TVF), ResoOwn/CutoffOwn (the Dynamic TVF's
+    // Own Env depths), Filter, Cutoff, Reso, CutoffKF, CutoffEnv/Lfo, ResoEnv/Lfo; the
     // envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
     // Attack…TimeKF; the LFO, LfoWave…LfoKeySync
     static juce::String cosmId(int k, const char* name) { return juce::String(k ? "cosm2" : "cosm") + name; }
@@ -211,7 +212,11 @@ VSynthEmuProcessor::createParameterLayout() {
     for (int k = 0; k < 2; ++k) {
         using Params::cosmId;
         const juce::String n = k ? "COSM 2 " : "COSM 1 ";
-        params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "Switch"), n + "TVF", false));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "Switch"), n + "Switch", false));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Type"), n + "Type",
+            juce::StringArray { "TVF", "Dynamic TVF" }, 0));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResoOwn"), n + "Resonance Own Env Depth", -63, 63, 0));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CutoffOwn"), n + "Cutoff Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Filter"), n + "Filter Type",
             juce::StringArray { "LP24", "BP24", "HP24", "NOTCH24", "PEAK24", "LP12", "BP12", "HP12", "NOTCH12", "PEAK12", "LP6", "HP6" }, 5));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "Cutoff"), n + "Cutoff", 0, 127, 127));
@@ -423,6 +428,9 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         using Params::cosmId;
         XtSynth::Controls::Cosm& m = c.cosm[k];
         m.on        = apvts.getRawParameterValue(cosmId(k, "Switch"))->load() >= 0.5f;
+        m.type      = knob(cosmId(k, "Type"));
+        m.resoOwn   = knob(cosmId(k, "ResoOwn"));
+        m.cutoffOwn = knob(cosmId(k, "CutoffOwn"));
         m.filter    = knob(cosmId(k, "Filter"));
         m.cutoff    = knob(cosmId(k, "Cutoff"));
         m.reso      = knob(cosmId(k, "Reso"));

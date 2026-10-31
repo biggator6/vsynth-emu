@@ -294,7 +294,9 @@ XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {
     XtTvfParams p;
     p.filter = c.filter; p.q = c.reso; p.qLfo = c.resoLfo; p.qEnv = c.resoEnv;
     p.cutoff = c.cutoff; p.keyfollow = c.kf / 10; p.cutoffLfo = c.cutoffLfo; p.cutoffEnv = c.cutoffEnv;
-    return xtTvfBlock(p, v.note, xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve));
+    p.qOwn = c.resoOwn; p.cutoffOwn = c.cutoffOwn;
+    const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
+    return v.cs[k].dynamic ? xtDtvfBlock(p, v.note, va, vb) : xtTvfBlock(p, v.note, va, vb);
 }
 
 void XtSynth::cosmSetBlock(Voice& v, int k) {
@@ -354,7 +356,7 @@ void XtSynth::setControls(const Controls& c) {
         cenvBChanged[k] = envDiff(n.envB, o.envB);
         clfoChanged[k] = n.lfoWave != o.lfoWave || n.lfoRate != o.lfoRate || n.lfoOffset != o.lfoOffset || n.lfoDelay != o.lfoDelay
                       || n.lfoFadeMode != o.lfoFadeMode || n.lfoFade != o.lfoFade;
-        cosmChanged[k] = n.filter != o.filter || n.cutoff != o.cutoff || n.reso != o.reso || n.kf != o.kf || n.cutoffEnv != o.cutoffEnv
+        cosmChanged[k] = n.resoOwn != o.resoOwn || n.cutoffOwn != o.cutoffOwn || n.filter != o.filter || n.cutoff != o.cutoff || n.reso != o.reso || n.kf != o.kf || n.cutoffEnv != o.cutoffEnv
                       || n.cutoffLfo != o.cutoffLfo || n.resoEnv != o.resoEnv || n.resoLfo != o.resoLfo || n.envA.velCurve != o.envA.velCurve
                       || n.envA.velSens != o.envA.velSens || n.envB.velCurve != o.envB.velCurve || n.envB.velSens != o.envB.velSens;
     }
@@ -467,6 +469,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
         Voice::CosmVoice& c = v->cs[k];
         c.on = ctl.cosm[k].on;
         if (!c.on) continue;
+        c.dynamic = ctl.cosm[k].type == 1;
         c.envA.noteOn(cosmEnvParams(*v, ctl.cosm[k].envA));
         c.envB.noteOn(cosmEnvParams(*v, ctl.cosm[k].envB));
         c.lfo.noteOn(clfoParams(k), drawSeed());
@@ -675,8 +678,11 @@ void XtSynth::mixBlock(float* lr) {
             scale /= 32768.0f;
             if (v.mb.ended()) v.tail += 32;
         }
-        for (Voice::CosmVoice& c : v.cs)                 // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA
-            if (c.on) c.tvf.process(tmp);
+        // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA; the
+        // Dynamic TVF's follower reads the XT's scale: int16 × 65536, i.e.
+        // the SOLO buffer (±1) × 2^31, the band players' (int16) × 2^16
+        for (Voice::CosmVoice& c : v.cs)
+            if (c.on) c.tvf.process(tmp, cur->type == 1 ? 0x1p31f : 0x1p16f);
         if (v.damping) {
             // truncated (0x894f5570): the gain held, times a fade that falls
             // by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16
@@ -778,8 +784,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_BEND="value[@frame]": the bender (0..16383), from a frame on (0).
 //   XT_MONO="mono,legato[,octave]": Mono/Poly (1 MONO), Legato Switch and
 //     Octave Shift (default 0,1,0).
-//   XT_COSM="filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo": COSM 1 on
-//     as a TVF; XT_CENV="a,d,s,r[,velCurve,velSens]" its cutoff envelope
+//   XT_COSM="filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo[,type,resoOwn,cutOwn]":
+//     COSM 1 on, a TVF (type 0) or Dynamic TVF (1); XT_CENV="a,d,s,r[,velCurve,velSens]" its cutoff envelope
 //     (Env 9); XT_CLFO="wave,rate,offset,delay,fadeMode,fade,keySync" LFO 3.
 //     XT_COSM2, XT_CENV2, XT_CLFO2: the same for COSM 2 (Env 11, LFO 4).
 #include <cstdio>
@@ -860,7 +866,8 @@ int main(int argc, char** argv) {
         const std::string sfx = k ? "2" : "";
         if (const char* e = std::getenv(("XT_COSM" + sfx).c_str())) {   // "filter,cutoff,reso,kf,cutEnv,cutLfo,resoEnv,resoLfo"
             m.on = true;
-            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &m.filter, &m.cutoff, &m.reso, &m.kf, &m.cutoffEnv, &m.cutoffLfo, &m.resoEnv, &m.resoLfo);
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.filter, &m.cutoff, &m.reso, &m.kf, &m.cutoffEnv, &m.cutoffLfo, &m.resoEnv,
+                        &m.resoLfo, &m.type, &m.resoOwn, &m.cutoffOwn);
         }
         if (const char* e = std::getenv(("XT_CENV" + sfx).c_str()))     // the cutoff's envelope "a,d,s,r[,velCurve,velSens]"
             std::sscanf(e, "%d,%d,%d,%d,%d,%d", &m.envA.attack, &m.envA.decay, &m.envA.sustain, &m.envA.release, &m.envA.velCurve, &m.envA.velSens);
