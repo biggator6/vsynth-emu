@@ -2597,3 +2597,28 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Plugin: the portamento controls. With them off the output is
   bit-identical to v57. The previous-key rule and LEGATO follow the manual;
   where the XT applies them is untraced.
+
+### Session 16 addendum (2026-10-31) — v59: the note's tuning
+
+- The per-note OSC setup sums the OSC's Coarse and Fine:
+  - Coarse: Patch Coarse, OSC Coarse, the system's key shift and the
+    matrix;
+  - Fine: the Scale Tune at the key's pitch class, Patch and OSC Fine, the
+    part's pitch bend, the random offset, the system's Master Tune and the
+    matrix.
+- The patch's terms sit in a per-part block, which also holds the Octave
+  Shift, a Mono/Poly flag and Portamento Mode.
+- Random Pitch Depth uses one 16-bit generator for the whole instrument:
+  seed 0x7ab7 at power-on, x·0x497d + 1, the offset (x·depth) >> 15 within
+  ±depth.
+- The bend is (bender − 8192)·range·1000 >> 13, with separate up and down
+  ranges.
+- The setup, the generator and the bend all equal the firmware in the
+  interpreter: 300,000 and 802,816 cases, 0 different.
+- The selection of portamento's source key turned up as well, keyed on the
+  Mono/Poly flag and LEGATO. The fields it reads are next, with Mono/Poly.
+- Plugin:
+  - new: Patch Coarse/Fine, Bend Range and the pitch wheel, Random Pitch
+    Depth, and Scale Tune (host parameters);
+  - the big PITCH knob is the OSC's Pitch with the XT;
+  - at the defaults, the output is bit-identical to v58.

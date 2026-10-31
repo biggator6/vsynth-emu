@@ -243,12 +243,15 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - the OSC pitch (v55): Coarse, Fine, the Pitch knob and Pitch KF, with
      the pitch envelope and LFO, through the firmware's pitch functions and
      exp2, so the XT's tiny departures from equal temperament (±0.02 cents)
-     come out too. Pitch Shift adds to Coarse and Fine.
+     come out too. Pitch Shift adds to the patch's Coarse and Fine.
    - loop playback (v56 SOLO, v57 BACKING/ENSEMBLE): Loop, Loop Mode (One
      Shot, One Way, Alternate) and a loop region, played by the firmware's
      loop logic in each player (crossings, jumps, Alternate bounces).
    - portamento (v58): Mode, Type, Time and Time Velo Sens through the
      firmware's settings converter and the voice's pitch ramp.
+   - the note's tuning (v59): the patch's Coarse/Fine Tune and Scale Tune,
+     Random Pitch Depth (the XT's own generator) and the pitch wheel with
+     Bend Range Up/Down, summed as the per-note OSC setup does.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -287,6 +290,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   (`xt_fw bandcmp … loop:…`).
 - Portamento (v58): the settings converter and the pitch ramp equal the
   firmware (`xt_osc`, 6.5 million values).
+- The note's tuning (v59): the per-note OSC setup's coarse, fine and random
+  offset (300,000 cases, the generator running on) and the bend (802,816
+  cases) equal the firmware (`xt_osc`).
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.

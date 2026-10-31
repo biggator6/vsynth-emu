@@ -47,13 +47,22 @@ public:
     static constexpr int kVoices = 16;
     struct Controls {
         // the OSC's pitch (XtOsc): the XT's Coarse −48..+48 and Fine −50..+50
-        // (cents), with Pitch Shift (semitones, to the cent) added to them;
-        // the wave's Original Key 0..127; the Pitch knob −63..+63 (the depth
-        // curve: ±1200 cents at ±36, ±6000 at ±63) and Pitch KF −200..+200
-        // (% per octave, steps of 10; 100 plays the keyboard in semitones)
-        float pitchSemis = 0;
+        // (cents); the wave's Original Key 0..127; the Pitch knob −63..+63
+        // (the depth curve: ±1200 cents at ±36, ±6000 at ±63), Pitch KF
+        // −200..+200 (% per octave, steps of 10; 100 plays the keyboard in
+        // semitones) and Random Pitch Depth 0..30 (0…1200 cents,
+        // xtRandomPitchDepth)
         int rootKey = 60;
-        int oscCoarse = 0, oscFine = 0, oscPitch = 0, pitchKF = 100;
+        int oscCoarse = 0, oscFine = 0, oscPitch = 0, pitchKF = 100, randomPitch = 0;
+        // the patch's tuning (XtOsc XtTuning): Coarse Tune −48..+48 and Fine
+        // Tune −50..+50 (cents), with Pitch Shift (semitones, to the cent)
+        // added to them; Scale Tune (the switch, and C…B −64..+63 cents);
+        // Bend Range Up and Down 0..48 semitones
+        float pitchSemis = 0;
+        int patchCoarse = 0, patchFine = 0;
+        bool scaleTune = false;
+        int scale[12] = {};
+        int bendUp = 2, bendDown = 2;
         // the VariPhrase OSC (XtOsc): Time and Formant −63..+63, Time Offset
         // 0 BWD / 1 ZERO / 2 FWD, Time and Formant KF −200..+200 (% per
         // octave, steps of 10), Energy 0 (OFF)..127
@@ -111,6 +120,9 @@ public:
     void noteOn(int note, float velocity);
     void noteOff(int note, float velocity = 0.5f);
     void allNotesOff();
+    // The bender, 0..16383 (8192 centre): the part's bend (xtPitchBend),
+    // in every voice's pitch from the next update on.
+    void pitchBend(int value);
     void render(float* left, float* right, int n);
 
 private:
@@ -121,6 +133,7 @@ private:
         float gain = 1;               // the patch TVA's velocity gain (0x894ea990)
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
         bool robot = false;            // Robot Voice, as at note-on (the player latches it)
+        int rnd = 0;                   // the note's random pitch offset (+0x6c), 1/10 cent
         XtEnvelope env;
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
@@ -147,6 +160,8 @@ private:
     int tickCount = 0;                // frames since the last update
     XtLfo freeLfo;                    // the free-running LFO a key-unsynced voice follows
     int lastKey = -1;                 // the key portamento glides from (the previous note's)
+    XtPitchRandom pitchRandom;        // the XT's one random pitch generator (from its power-on seed)
+    int bender = 8192;
     bool freeLfoOn = false;
     float chaosSeed = 0.3141f;        // the global logistic map the LFOs draw their seeds from
     double hostRate = 44100;

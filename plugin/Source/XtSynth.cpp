@@ -193,14 +193,23 @@ constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
 // the formant ratio within [0.5, 2], the walk within ±5 (negative: the
 // players run backward, a note starting at the wave's end).
 // The voice's cents at a key (the converter's +8; at the previous key its
-// +0x68): Pitch Shift as semitones and the cents left (±50), added to Coarse
-// and Fine (the converter's +0x68 and +0x70, Fine in tenths of a cent);
+// +0x68): the note's Coarse and Fine (+0x68, +0x70) as the per-note setup
+// forms them, from the patch's tuning (Pitch Shift as semitones and the cents
+// left, ±50, added to Patch Coarse and Fine), the OSC's, the Scale Tune at
+// the note's key, the bend and the note's random offset; formed again at
+// every update, as an update does on the XT (0x894e4e90, the random kept).
 // Robot Voice takes the pitch against A4 (0x894e4030), not against the
 // wave's Original Key.
 float XtSynth::noteCents(const Voice& v, int key) const {
     const long shift = std::lround((double)ctl.pitchSemis * 100.0);
     const int semis = (int)std::lround((double)shift / 100.0);
-    const int coarse = ctl.oscCoarse + semis, fine = (ctl.oscFine + (int)(shift - semis * 100L)) * 10;
+    XtTuning t;
+    t.coarse = ctl.patchCoarse + semis;
+    t.fine = ctl.patchFine + (int)(shift - semis * 100L);
+    t.scaleOn = ctl.scaleTune;
+    std::copy(std::begin(ctl.scale), std::end(ctl.scale), t.scale);
+    const int coarse = xtNoteCoarse(t, ctl.oscCoarse);
+    const int fine = xtNoteFine(t, v.note, ctl.oscFine, xtPitchBend(bender, ctl.bendUp, ctl.bendDown), v.rnd);
     return xtPitchCents(key, coarse, 10 * ctl.pitchKF, fine, ctl.rootKey, v.robot);
 }
 
@@ -320,6 +329,9 @@ void XtSynth::noteOn(int note, float velocity) {
     v->vel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
     v->relVel = 64;
     v->robot = ctl.robot && cur->type == 1;           // SOLO only (the converter's SOLO tail)
+    // the OSC's random pitch (0x894e4940): the shared generator steps once
+    // per note when the OSC has a depth
+    v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
     v->gain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);
     // TVA note-on (0x894f5160): the gain starts from the envelope's onset
     // level (full with no attack, else 0) and ramps to its output over the
@@ -383,6 +395,10 @@ void XtSynth::noteOff(int note, float velocity) {
 
 void XtSynth::allNotesOff() {
     for (Voice& v : voice) v.active = false;
+}
+
+void XtSynth::pitchBend(int value) {
+    bender = std::clamp(value, 0, 16383);
 }
 
 // The tone update's TVA part (0x894f75f0 tail): stop a finished voice
@@ -536,6 +552,11 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]": Pitch Shift
 //     (semitones), the Pitch knob, Pitch KF (%), Coarse, Fine (cents) and the
 //     Original Key (default 0,0,100,0,0,60).
+//   XT_TUNE="patchCoarse,patchFine,random[,bendUp,bendDown]": the patch's
+//     Coarse/Fine Tune, the OSC's Random Pitch Depth (0..30) and the Bend
+//     Range (default 0,0,0,2,2).
+//   XT_SCALE="c,c#,…,b": Scale Tune on, the 12 values in cents.
+//   XT_BEND="value[@frame]": the bender (0..16383), from a frame on (0).
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -596,6 +617,16 @@ int main(int argc, char** argv) {
     }
     if (const char* e = std::getenv("XT_PITCH"))
         std::sscanf(e, "%f,%d,%d,%d,%d,%d", &c.pitchSemis, &c.oscPitch, &c.pitchKF, &c.oscCoarse, &c.oscFine, &c.rootKey);
+    if (const char* e = std::getenv("XT_TUNE"))
+        std::sscanf(e, "%d,%d,%d,%d,%d", &c.patchCoarse, &c.patchFine, &c.randomPitch, &c.bendUp, &c.bendDown);
+    if (const char* e = std::getenv("XT_SCALE")) {
+        c.scaleTune = true;
+        int* t = c.scale;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", t, t + 1, t + 2, t + 3, t + 4, t + 5, t + 6, t + 7, t + 8, t + 9, t + 10, t + 11);
+    }
+    int bendValue = 8192;
+    long bendAt = 0;
+    if (const char* e = std::getenv("XT_BEND")) std::sscanf(e, "%d@%ld", &bendValue, &bendAt);
     syn.setControls(c);
     struct Ev { long at; int note; bool on; };
     std::vector<Ev> ev;
@@ -610,6 +641,8 @@ int main(int argc, char** argv) {
     while (done < frames) {
         long next = frames;
         for (const Ev& e : ev) if (e.at >= done && e.at < next) next = e.at;
+        if (bendAt >= done && bendAt < next) next = bendAt;
+        if (bendAt == done) syn.pitchBend(bendValue);
         for (const Ev& e : ev) if (e.at == done) { if (e.on) syn.noteOn(e.note, noteVel); else syn.noteOff(e.note); }
         if (next == done) next = done + 1;
         syn.render(L.data() + done, R.data() + done, (int)(next - done));

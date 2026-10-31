@@ -173,6 +173,23 @@ int main(int argc, char** argv) {
         setKnobs({ { "oscPitch", refCtl.oscPitch }, { "pitchKF", refCtl.pitchKF }, { "oscCoarse", refCtl.oscCoarse },
                    { "oscFine", refCtl.oscFine }, { "rootKey", refCtl.rootKey } });
     }
+    // TEST_TUNE="patchCoarse,patchFine,random[,bendUp,bendDown]": the
+    // patch's Coarse/Fine Tune, Random Pitch Depth (0..30) and Bend Range;
+    // TEST_SCALE="c,c#,…,b": Scale Tune on with the 12 values (cents)
+    if (const char* e = std::getenv("TEST_TUNE")) {
+        std::sscanf(e, "%d,%d,%d,%d,%d", &refCtl.patchCoarse, &refCtl.patchFine, &refCtl.randomPitch, &refCtl.bendUp, &refCtl.bendDown);
+        setKnobs({ { "patchCoarse", refCtl.patchCoarse }, { "patchFine", refCtl.patchFine }, { "randomPitch", refCtl.randomPitch },
+                   { "bendRangeUp", refCtl.bendUp }, { "bendRangeDown", refCtl.bendDown } });
+    }
+    if (const char* e = std::getenv("TEST_SCALE")) {
+        refCtl.scaleTune = true;
+        int* t = refCtl.scale;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", t, t + 1, t + 2, t + 3, t + 4, t + 5, t + 6, t + 7, t + 8, t + 9, t + 10, t + 11);
+        static const char* const ids[12] = { "scaleTuneC", "scaleTuneCs", "scaleTuneD", "scaleTuneDs", "scaleTuneE", "scaleTuneF",
+                                             "scaleTuneFs", "scaleTuneG", "scaleTuneGs", "scaleTuneA", "scaleTuneAs", "scaleTuneB" };
+        setKnobs({ { "scaleTune", 1 } });
+        for (int i = 0; i < 12; ++i) setKnobs({ { ids[i], t[i] } });
+    }
     // TEST_VELOCITY=v: the note-on velocity (1..127, default 127)
     const int noteVel = std::getenv("TEST_VELOCITY") ? std::clamp(std::atoi(std::getenv("TEST_VELOCITY")), 1, 127) : 127;
     p.loadFile(juce::File(argv[2]));
@@ -181,7 +198,7 @@ int main(int argc, char** argv) {
         if (p.getStatusText().startsWith("Encode failed")) break;
     }
     std::printf("status: %s\n", p.getStatusText().toRawUTF8());
-    for (const char* id : { "pitchShift", "oscCoarse", "oscFine", "oscPitch", "pitchKF", "oscTime", "oscTimeOffset", "oscFormant", "energy",
+    for (const char* id : { "pitchShift", "patchCoarse", "patchFine", "randomPitch", "oscCoarse", "oscFine", "oscPitch", "pitchKF", "oscTime", "oscTimeOffset", "oscFormant", "energy",
                             "rootKey", "ampAttack", "ampDecay", "ampSustain", "ampRelease", "encodeDepth" })
         std::printf("  %s = %.9g\n", id, (double)p.apvts.getRawParameterValue(id)->load());
     if (!p.getStatusText().startsWith("Encoded")) return 1;
@@ -216,17 +233,23 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("TEST_NOTE2")) std::sscanf(e, "%d,%d", &note2, &at2);
     const int n2Block = note2 >= 0 ? at2 / block * block : -1, n2At = at2 % block;
     if (n2Block == 0 || n2Block == offBlock) { std::fprintf(stderr, "TEST_NOTE2 must fall in another block\n"); return 1; }
+    int bendValue = -1, bendFrame = 0;                               // TEST_BEND="value,frame": the pitch wheel
+    if (const char* e = std::getenv("TEST_BEND")) std::sscanf(e, "%d,%d", &bendValue, &bendFrame);
+    const int bBlock = bendValue >= 0 ? bendFrame / block * block : -1, bAt = bendFrame % block;
+    if (bendValue >= 0 && (bBlock == 0 || bBlock == offBlock || bBlock == n2Block)) { std::fprintf(stderr, "TEST_BEND must fall in another block\n"); return 1; }
     for (int done = 0; done < total; done += block) {
         juce::MidiBuffer midi;
         if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)noteVel), 100); }
         if (done == offBlock) { midi.addEvent(juce::MidiMessage::noteOff(1, note, (juce::uint8)100), offAt); }
         if (done == n2Block) { midi.addEvent(juce::MidiMessage::noteOn(1, note2, (juce::uint8)noteVel), n2At); }
+        if (done == bBlock) { midi.addEvent(juce::MidiMessage::pitchWheel(1, bendValue), bAt); }
         p.processBlock(buf, midi);
         juce::ScopedNoDenormals ftz;   // processBlock runs with denormals flushed (as the SH-4 does, FPSCR.DN = 1)
         if (std::getenv("TEST_CONTROLS")) ref.setControls(refCtl);   // as processBlock does each block
         if (done == 0) { ref.render(rl.data(), rr.data(), 100); ref.noteOn(note, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + 100, rr.data() + 100, block - 100); }
         else if (done == offBlock) { ref.render(rl.data(), rr.data(), offAt); ref.noteOff(note, 100 / 127.0f); ref.render(rl.data() + offAt, rr.data() + offAt, block - offAt); }
         else if (done == n2Block) { ref.render(rl.data(), rr.data(), n2At); ref.noteOn(note2, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + n2At, rr.data() + n2At, block - n2At); }
+        else if (done == bBlock) { ref.render(rl.data(), rr.data(), bAt); ref.pitchBend(bendValue); ref.render(rl.data() + bAt, rr.data() + bAt, block - bAt); }
         else ref.render(rl.data(), rr.data(), block);
         for (int i = 0; i < block; ++i) {
             if (firstDiff < 0 && (buf.getSample(0, i) != rl[(size_t)i] || buf.getSample(1, i) != rr[(size_t)i])) firstDiff = done + i;

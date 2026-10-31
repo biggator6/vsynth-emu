@@ -91,8 +91,9 @@ private:
     juce::Slider     lfoFadeSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     lfoTimeSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     lfoFmtSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
-    // the OSC TVA, its amp envelope and velocity to level: four rows of four
-    static constexpr int kLevelRows = 5, kLevelKnobs = 4 * kLevelRows;
+    // the OSC pitch, the patch's tuning, the OSC TVA, its amp envelope and
+    // velocity to level: six rows of four
+    static constexpr int kLevelRows = 6, kLevelKnobs = 4 * kLevelRows;
     juce::Slider     levelSliders_[kLevelKnobs];
     juce::Label      levelLabels_[kLevelKnobs], levelRowLabels_[kLevelRows];
     juce::Label encodeLabel_ { {}, "Encode" }, keyLabel_ { {}, "Key" }, depthLabel_ { {}, "Depth" },

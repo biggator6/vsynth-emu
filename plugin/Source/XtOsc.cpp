@@ -218,6 +218,41 @@ float xtOscSmooth(float cur, float target) {
     return add(mul(sub(target, cur), 0.699999988f), cur);  // 0x3f333333
 }
 
+int xtNoteCoarse(const XtTuning& t, int oscCoarse) {
+    // the system's key shift (byte at part base + 0xc202) and the matrix: 0
+    return (int16_t)((int8_t)t.coarse + (int8_t)oscCoarse);
+}
+
+int xtNoteFine(const XtTuning& t, int key, int oscFine, int bend, int random) {
+    // the part's shorts as the updater stores them (×10); the system's
+    // Master Tune (short at part base + 0xc200) and the matrix: 0
+    const int scale = t.scaleOn ? (int16_t)(t.scale[(uint8_t)key % 12] * 10) : 0;
+    return scale + (int16_t)(t.fine * 10) + (int16_t)(oscFine * 10) + bend + random;
+}
+
+int xtPitchBend(int bender, int upSemis, int downSemis) {
+    const int b = (int16_t)(uint16_t)(bender + 0xe000);
+    const uint32_t up = (uint16_t)(upSemis * 1000), down = (uint16_t)(downSemis * 1000);
+    if (b == 0) return 0;
+    if (b > 0) return (int)(((uint32_t)b * up & 0x1fffffffu) >> 13);
+    return -(int)((((uint32_t)-b & 0xffffu) * down & 0x1fffffffu) >> 13);
+}
+
+int xtRandomPitchDepth(int index) {
+    if (index <= 0) return 0;
+    if (index <= 10) return index * 10;
+    if (index <= 19) return (index - 9) * 100;
+    if (index <= 29) return (index - 18) * 1000;
+    return 12000;
+}
+
+int XtPitchRandom::next(int depth10) {
+    const int d = (int16_t)depth10;
+    if (d == 0) return 0;
+    x = (int16_t)(x * 0x497d + 1);
+    return (int16_t)((((uint32_t)x * (uint32_t)d) & 0x7fffffffu) >> 15);
+}
+
 XtPortaSettings xtPortaSettings(bool on, int type, int time, int veloSens, int velocity) {
     XtPortaSettings st;
     st.on = on;
@@ -672,6 +707,65 @@ int main(int argc, char** argv) {
         }
     }
     std::printf("pitch ramp: %ld values, %ld different\n", rn, rb);
-    return bad || eb || vb || lb || gb || pb || cb || tb || sb || ob || rb ? 3 : 0;
+
+    // The note's tuning: the random generator's power-on seed (0x894e5010),
+    // then the per-note OSC setup (0x894e4c30; the converter it calls,
+    // 0x894e48a0, returns at once) over random parts, keys, patch Coarse/
+    // Fine/Scale Tune, OSC Coarse/Fine, Random Pitch Depth and bend, the
+    // generator running on from case to case; and the bend (0x894e9fe0) on
+    // every bender value and range.
+    c.hook(0x894e48a0, [](Sh4& m) { m.ret(0); });
+    mtx = 0;
+    constexpr uint32_t kPartBase = 0x89d1b070, kSeed = 0x89d1b068;
+    if (!c.call(0x894e5010, {}, sp)) { std::fprintf(stderr, "random seed: %s\n", c.error().c_str()); return 1; }
+    long nb = 0, nn = 0;
+    if (c.rd16(kSeed) != 0x7ab7) { std::printf("  power-on seed: fw %04x\n", c.rd16(kSeed)); ++nb; }
+    const uint32_t NP = ram + 0x30000, NQ = ram + 0x30200, NN = ram + 0x30300, NB = ram + 0x30400, NR = ram + 0x30500, NO = ram + 0x30600;
+    XtPitchRandom gen;
+    for (int k = 0; k < 300000; ++k) {
+        const int part = (int)(rnd() % 16), key = (int)(rnd() % 128), prev = (int)(rnd() % 128);
+        XtTuning t;
+        t.coarse = (int)(rnd() % 97) - 48; t.fine = (int)(rnd() % 101) - 50;
+        t.scaleOn = rnd() % 3 != 0;
+        for (int& s : t.scale) s = (int)(rnd() % 128) - 64;
+        const int oc = (int)(rnd() % 97) - 48, of = (int)(rnd() % 101) - 50, ri = rnd() % 4 == 0 ? 0 : (int)(rnd() % 31);
+        const int bend = rnd() % 3 == 0 ? 0 : xtPitchBend((int)(rnd() % 16384), (int)(rnd() % 49), (int)(rnd() % 49));
+        const uint32_t hdr = kPartBase + (uint32_t)part * 0xc20;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(hdr, z.data(), 0x20); c.write(NP, z.data(), 0x100); c.write(NO, z.data(), 0x100);
+        c.wr8(hdr + 1, (uint8_t)(int8_t)t.coarse); c.wr16(hdr + 2, (uint16_t)(int16_t)(t.fine * 10));
+        for (int i = 0; i < 12; ++i) c.wr16(hdr + 6 + 2 * (uint32_t)i, (uint16_t)(int16_t)(t.scaleOn ? t.scale[i] * 10 : 0));
+        c.wr32(NQ, NN); c.wr8(NN + 0xd, (uint8_t)key); c.wr8(NN + 0xf, 100); c.wr32(NN + 8, NB); c.wr8(NB, (uint8_t)part);
+        c.wr32(NN + 4, NR); c.wr8(NR + 0x20, (uint8_t)prev);
+        c.wr8(NP, (uint8_t)part); c.wr8(NP + 2, (uint8_t)(k & 1));
+        c.wr8(NP + 0x16, (uint8_t)(int8_t)oc); c.wr16(NP + 0x18, (uint16_t)(int16_t)(of * 10));
+        c.wr16(NP + 0x1a, (uint16_t)xtRandomPitchDepth(ri));
+        c.wr32(NP + 0xdc, NO); c.wr32(NO + 0x174, (uint32_t)bend);
+        if (!c.call(0x894e4c30, { NP, NQ, out }, sp)) { std::fprintf(stderr, "note setup: %s\n", c.error().c_str()); return 1; }
+        const int r = gen.next(xtRandomPitchDepth(ri));
+        const int fc = (int16_t)c.rd16(NP + 0x68), fr = (int32_t)c.rd32(NP + 0x6c), ff = (int32_t)c.rd32(NP + 0x70);
+        const int pc = xtNoteCoarse(t, oc), pf = xtNoteFine(t, key, of, bend, r);
+        ++nn;
+        if ((fc != pc || fr != r || ff != pf || (int16_t)c.rd16(kSeed) != gen.state()) && nb++ < 6)
+            std::printf("  note setup part %d key %d: fw coarse %d random %d fine %d seed %d, port %d %d %d %d\n", part, key, fc, fr, ff,
+                        (int16_t)c.rd16(kSeed), pc, r, pf, gen.state());
+    }
+    std::printf("note tuning: %ld cases, %ld different\n", nn, nb);
+    long bb = 0, bn = 0;
+    const uint32_t BO = ram + 0x31000, BC = ram + 0x31400;
+    for (int up = 0; up <= 48; ++up)
+        for (int b = 0; b < 16384; ++b) {
+            const int down = 48 - up;
+            std::vector<uint8_t> z(0x200, 0);
+            c.write(BO, z.data(), 0x184); c.write(BC, z.data(), 0x100);
+            c.wr32(BO + 0x168, BC); c.wr16(BC, (uint16_t)b);
+            c.wr16(BO + 0x170, (uint16_t)(up * 1000)); c.wr16(BO + 0x172, (uint16_t)(down * 1000));
+            if (!c.call(0x894e9fe0, { BO }, sp)) { std::fprintf(stderr, "bend: %s\n", c.error().c_str()); return 1; }
+            ++bn;
+            if ((int32_t)c.rd32(BO + 0x174) != xtPitchBend(b, up, down) && bb++ < 5)
+                std::printf("  bend %d up %d down %d: fw %d port %d\n", b, up, down, (int32_t)c.rd32(BO + 0x174), xtPitchBend(b, up, down));
+        }
+    std::printf("pitch bend: %ld cases, %ld different (full up at 2: %d, full down: %d)\n", bn, bb, xtPitchBend(16383, 2, 2), xtPitchBend(0, 2, 2));
+    return bad || eb || vb || lb || gb || pb || cb || tb || sb || ob || rb || nb || bb ? 3 : 0;
 }
 #endif

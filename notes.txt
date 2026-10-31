@@ -217,6 +217,19 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+TUNING v59 (2026-10-31): the note's Coarse and Fine as the per-note OSC
+  setup forms them (0x894e4940/4c30/4e90; HARDWARE_FIRMWARE.md, "The note's
+  tuning"). XtOsc: XtTuning, xtNoteCoarse, xtNoteFine, xtPitchBend
+  (0x894e9fe0), xtRandomPitchDepth, XtPitchRandom (seed 0x7ab7, x·0x497d+1);
+  all equal to the firmware (xt_osc, which now also needs
+  XtMultiBandPlayer.cpp). XtSynth keeps the random offset per voice, one
+  generator and the bender (pitchBend); noteCents forms the tuning at each
+  update. Plugin params patchCoarse, patchFine, randomPitch, bendRangeUp/Down,
+  scaleTune + scaleTuneC…scaleTuneB; the pitch wheel; with the XT the big
+  PITCH knob is oscPitch. XtSynth CLI XT_TUNE="pc,pf,random[,up,down]",
+  XT_SCALE="c,…,b", XT_BEND="value[@frame]"; PluginTest TEST_TUNE,
+  TEST_SCALE, TEST_BEND="value,frame".
+
 PORTAMENTO v58 (2026-10-31): the tone's portamento settings (0x894e66e0)
   and the voice's pitch ramp (0x894f4860/4890/4680/4b00/4c00), as XtOsc's
   xtPortaSettings and XtPitchRamp, equal to the firmware (xt_osc). XtSynth
@@ -254,7 +267,7 @@ OSC PITCH v55 (2026-10-31): the pitch path as the XT computes it
   smoothed values). All equal to the firmware (xt_osc; it now also needs
   XtEnvelope.cpp):
     $TC/clang++ -isysroot $SDK -std=c++20 -O2 -DXT_OSC_MAIN plugin/Source/XtOsc.cpp plugin/Source/XtEnvelope.cpp \
-      plugin/Source/XtFirmware.cpp plugin/Source/Sh4Interp.cpp -o xt_osc
+      plugin/Source/XtFirmware.cpp plugin/Source/XtMultiBandPlayer.cpp plugin/Source/Sh4Interp.cpp -o xt_osc
   Plugin params oscCoarse (−48..+48), oscFine (−50..+50), oscPitch
   (−63..+63), pitchKF (−200..+200, 100); pitchShift adds to Coarse/Fine.
   XtSynth CLI: XT_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]";

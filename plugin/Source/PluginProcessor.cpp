@@ -18,12 +18,22 @@ namespace Params {
     static const juce::String kOscTimeKF     = "oscTimeKF";       // −200..+200 % per octave
     static const juce::String kOscFormant    = "oscFormant";
     static const juce::String kOscFormantKF  = "oscFormantKF";
-    // The OSC's pitch (XtOsc): Coarse and Fine (Pitch Shift adds to them),
-    // the Pitch knob −63..+63 (±6000 cents at 63) and Pitch KF
+    // The OSC's pitch (XtOsc): Coarse and Fine, the Pitch knob −63..+63
+    // (±6000 cents at 63), Pitch KF and Random Pitch Depth
     static const juce::String kOscCoarse     = "oscCoarse";       // −48..+48 semitones
     static const juce::String kOscFine       = "oscFine";         // −50..+50 cents
     static const juce::String kOscPitch      = "oscPitch";
     static const juce::String kPitchKF       = "pitchKF";         // −200..+200 % per octave
+    static const juce::String kRandomPitch   = "randomPitch";     // 0..1200 cents in the XT's 31 steps
+    // The patch's tuning: Coarse and Fine Tune (Pitch Shift adds to them),
+    // Bend Range Up/Down, Scale Tune (switch, C…B)
+    static const juce::String kPatchCoarse   = "patchCoarse";     // −48..+48 semitones
+    static const juce::String kPatchFine     = "patchFine";       // −50..+50 cents
+    static const juce::String kBendUp        = "bendRangeUp";     // 0..48 semitones
+    static const juce::String kBendDown      = "bendRangeDown";
+    static const juce::String kScaleTune     = "scaleTune";
+    static const juce::String kScaleTunes[12] = { "scaleTuneC", "scaleTuneCs", "scaleTuneD", "scaleTuneDs", "scaleTuneE", "scaleTuneF",
+                                                  "scaleTuneFs", "scaleTuneG", "scaleTuneGs", "scaleTuneA", "scaleTuneAs", "scaleTuneB" };
     // Loop: the OSC's Loop switch, the wave's Loop Mode (One
     // Shot, One Way, Alternate) and its loop region in % of the wave
     static const juce::String kLoop          = "loop";
@@ -154,6 +164,21 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscPitch, "OSC Pitch", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kPitchKF, "Pitch KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 100.0f));
+    {
+        juce::StringArray depths;
+        for (int i = 0; i <= 30; ++i) depths.add(juce::String(xtRandomPitchDepth(i) / 10));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kRandomPitch, "Random Pitch Depth", depths, 0));
+    }
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPatchCoarse, "Patch Coarse Tune", -48, 48, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPatchFine, "Patch Fine Tune", -50, 50, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kBendUp, "Bend Range Up", 0, 48, 2));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kBendDown, "Bend Range Down", 0, 48, 2));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kScaleTune, "Scale Tune Switch", false));
+    {
+        static const char* const names[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        for (int i = 0; i < 12; ++i)
+            params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kScaleTunes[i], juce::String("Scale Tune ") + names[i], -64, 63, 0));
+    }
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kLoop, "Loop", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLoopMode, "Loop Mode",
         juce::StringArray { "One Shot", "One Way", "Alternate" }, 1));
@@ -320,6 +345,13 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.oscFine      = knob(Params::kOscFine);
     c.oscPitch     = knob(Params::kOscPitch);
     c.pitchKF      = kf(Params::kPitchKF);
+    c.randomPitch  = knob(Params::kRandomPitch);
+    c.patchCoarse  = knob(Params::kPatchCoarse);
+    c.patchFine    = knob(Params::kPatchFine);
+    c.bendUp       = knob(Params::kBendUp);
+    c.bendDown     = knob(Params::kBendDown);
+    c.scaleTune    = apvts.getRawParameterValue(Params::kScaleTune)->load() >= 0.5f;
+    for (int i = 0; i < 12; ++i) c.scale[i] = knob(Params::kScaleTunes[i]);
     c.loop         = apvts.getRawParameterValue(Params::kLoop)->load() >= 0.5f;
     c.loopMode     = knob(Params::kLoopMode);
     c.loopStart    = snap(apvts.getRawParameterValue(Params::kLoopStart)->load(), 0.01f) / 100.0f;
@@ -409,6 +441,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             const auto msg = meta.getMessage();
             if (msg.isNoteOn()) synth_.noteOn(msg.getNoteNumber(), msg.getFloatVelocity());
             else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber(), msg.getFloatVelocity());
+            else if (msg.isPitchWheel()) synth_.pitchBend(msg.getPitchWheelValue());
             else if (msg.isAllNotesOff() || msg.isAllSoundOff()) synth_.allNotesOff();
         }
         if (pos < numSamples) synth_.render(L + pos, R + pos, numSamples - pos);

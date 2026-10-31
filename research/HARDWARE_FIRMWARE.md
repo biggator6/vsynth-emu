@@ -1544,6 +1544,126 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The note's tuning (2026-10-31, v59)
+
+The OSC's Coarse (+0x68) and Fine (+0x70), which the note's pitch (v55)
+reads, are sums the per-note OSC setup forms. It has three forms:
+- `0x894e4940` at note-on, once per oscillator (from `0x894eb4d0`). It also
+  copies the OSC's table entry into the block (+8) and sets the portamento's
+  source key (+0x7c).
+- `0x894e4c30` when a voice is set up again (`0x894eb910`, from
+  `0x894dc1e0`).
+- `0x894e4e90` on an update (`0x894ebaa0`): the same sums, keeping the
+  random offset (+0x6c).
+
+**Coarse** (semitones, int16): the system's key shift (the byte at part
+base + 0xc202), plus Patch Coarse Tune, plus OSC Coarse, plus two matrix
+terms (destinations 0 and 3; 0x11 for OSC 2).
+
+**Fine** (1/10 cent, int32), the sum of:
+- the Scale Tune at the key's pitch class (key % 12, by a reciprocal
+  multiply);
+- the system's Master Tune (the short at part base + 0xc200);
+- Patch Fine Tune and OSC Fine;
+- the part's pitch bend (+0x174 of the part object at +0xdc);
+- the random offset;
+- the matrix's fine terms (destinations 1 and 4, or 0x12) × 10.
+
+**Where the terms come from.** The OSC table updater `0x894e6330` writes one
+0xc20-byte block per part, from 0x89d1b070 (RAM):
+- +0: Octave Shift (ID 0x112) × 12;
+- +1: Coarse Tune (0x110);
+- +2: Fine Tune (0x111) × 10;
+- +4: 1 when 0x113 is 0 (probably Mono/Poly; it selects the source key
+  below);
+- +5: Portamento Mode (0x116);
+- +6…+0x1d: Scale Tune C…B (IDs 0x136, 0x138, …, 0x14c) × 10, all 0 when
+  the switch (0x134) is off;
+- +0x20 + 0xc0·tone + 0x60·osc: the OSC entries (`0x894e55d0`). OSC Coarse
+  is the byte at +0xe (ID 0x2ab), OSC Fine × 10 the short at +0x10 (0x2ac),
+  and Random Pitch Depth the short at +0x12 (0x2ad).
+- Random Pitch Depth goes through a 31-way switch, in 1/10 cent: 0…9 →
+  0…90, 10 → 100, 11…19 → 200…1000, 20…29 → 2000…11000, 30 → 12000. That
+  is 0…9 cents in 1s, 10…100 in 10s and 200…1200 in 100s.
+- The system's terms come from IDs 0x3c (+0xc200) and 0x3d (+0xc202)
+  (`0x894e5f20`). Their units are not checked; the port leaves them at 0.
+
+**Random Pitch Depth.**
+- There is one 16-bit state (0x89d1b068) for every voice and oscillator.
+  A power-on initialiser seeds it with 0x7ab7 (`0x894e5010`, listed in the
+  table at 0x897f0078).
+- Each setup with a depth steps it: x = x·0x497d + 1, as an int16. The
+  offset is ((x·depth) & 0x7fffffff) >> 15, taken as an int16: x·depth/32768
+  rounded down, within ±depth.
+- A depth of 0 leaves the state alone. The period is the full 65,536.
+- From power-on at 1200 cents, the first offsets are +24.71, +25.24,
+  −64.95, +51.39, −14.98 and +116.16 cents.
+
+**Pitch bend** (`0x894e9fe0`, run when the part object is built, `0x894ea190`,
+or rebuilt, `0x894ea290`):
+- b = the bender − 8192 (the controller's u16 + 0xe000, as an int16);
+- up: ((b·Up) & 0x1fffffff) >> 13;
+- down: −((((−b)·Down) & 0x1fffffff) >> 13);
+- Up and Down are Bend Range Up and Down (IDs 0x11e/0x11f) × 1000
+  (`0x894e9330`, per part, 0x84 bytes each from 0x89d276b4).
+- With a range of 2 semitones, full up gives +1999 and full down −2000
+  (1/10 cent).
+- How a bender move reaches a voice that is already sounding is not traced.
+
+**Portamento's source key** (+0x7c, in `0x894e4940`; clamped to 0…127; the
+note's own key means no glide). The note object at *param_2 points (+4) to
+a structure that holds the previous keys:
+- part +4 = 0: its +0x1a, plus the Octave Shift. With Mode LEGATO (part +5
+  = 1), the note's own key instead when its +0x1b is 0 and the controller
+  byte at +0x11c is below 64 (perhaps Hold).
+- part +4 ≠ 0: its +0x20, plus the Octave Shift. With LEGATO and its +0x21
+  = 0, the note's own key.
+- These fields are the next step, with Mono/Poly. `0x894e4c30` takes +0x20
+  in every case.
+
+**Port and checks** (`xt_osc`, in the interpreter):
+- The power-on seed is 0x7ab7.
+- `0x894e4c30` (with the converter it calls, `0x894e48a0`, returning at
+  once) was run on 300,000 random cases:
+  - inputs: part, key, the patch's Coarse, Fine and Scale Tune (on and
+    off), OSC Coarse and Fine, every Random Pitch Depth, and bend;
+  - the generator runs on from case to case;
+  - coarse, fine, the random offset and the generator's state: 0 different.
+- The bend, on every bender value with Up 0…48 and Down 48 − Up: 802,816
+  cases, 0 different.
+
+**Plugin.**
+- New controls:
+  - Patch Coarse Tune (−48…+48) and Patch Fine Tune (−50…+50);
+  - Bend Range Up and Down (0…48, default 2) and the MIDI pitch wheel;
+  - Random Pitch Depth (the XT's 31 steps);
+  - Scale Tune: the switch and C…B (−64…+63 cents), as host parameters
+    only.
+- Pitch Shift now adds to the patch's Coarse and Fine, not the OSC's. The
+  sum, and so the output, is the same.
+- With the XT, the big PITCH knob is now the OSC's Pitch knob, as TIME and
+  FORMANT already were. Random Pitch Depth takes its place in the OSC Pitch
+  row (Crs, Fine, Rnd, P-KF, as on the XT's OSC page), and a Tune row holds
+  the patch's Coarse, Fine and Bend Range. Pitch Shift stays a host
+  parameter.
+- The random offset is drawn at note-on and kept for the note. Each plugin
+  instance has one generator, starting from the XT's power-on seed.
+- The tuning is formed again at every 10-ms update, as the XT's update
+  does, so a bend takes effect at the next update.
+- With the new controls at their defaults the output is bit-identical to
+  v58; it is also identical with Pitch Shift, Coarse/Fine and portamento
+  set.
+- Each new term renders bit-identically to an existing equivalent:
+  - Patch Coarse 7 = OSC Coarse 7;
+  - Scale Tune C +37 at note 60 = OSC Fine +37;
+  - a bend of +4096 at range 2 = Coarse +1;
+  - full down at range 12 = Coarse −12.
+- Not modelled:
+  - Octave Shift (where the note's key takes it is not traced);
+  - the system's Master Tune and Key Shift;
+  - the matrix;
+  - a second oscillator, which would step the generator too.
+
 ### Portamento (2026-10-31, v58)
 
 **Settings** (`0x894e66e0`). This is the tone's common block at +0xc. It is
@@ -1571,9 +1691,9 @@ type 2) and walk (+0x910, type 1) ramps are factors.
 - `0x894f2440` runs at every note-on, after the voice setup (in
   `0x894f5e60`). It starts the pitch ramp from the converter's +0x68 to its
   +8 (`0x894f4890` copies the settings, `0x894f4680` starts):
-  - +0x68 is the cents at the previous key. The per-note OSC setup
-    `0x894e4c30` sets +0x7c to the part's previous key plus the part's key
-    shift.
+  - +0x68 is the cents at the previous key. The per-note OSC setup sets
+    +0x7c to the previous key plus the part's Octave Shift (v59, "The
+    note's tuning").
   - +8 is the note's cents.
   - For VariPhrase it also starts the formant and walk ramps, which the
     settings leave off.
@@ -1601,16 +1721,8 @@ type 2) and walk (+0x910, type 1) ramps are factors.
   - the glide starts at the next update, with the voice's 70% step first
     taking the pitch toward the previous note.
 
-**Also found, not modelled yet.** The per-note OSC setup `0x894e4c30`
-forms:
-- the coarse (+0x68): patch and OSC Coarse plus the matrix;
-- the fine (+0x70):
-  - the scale tune for the key's pitch class;
-  - patch and OSC Fine;
-  - the part's tuning;
-  - the matrix;
-- Random Pitch Depth (+0x1a, into +0x6c), from a linear congruential
-  generator (x·0x497d + 1).
+**Also found:** the per-note OSC setup's Coarse and Fine (patch, OSC, Scale
+Tune, bend, Random Pitch Depth), ported in v59 ("The note's tuning").
 
 **Port and checks** (`xt_osc`):
 - `xtPortaSettings` equals `0x894e66e0` on 1,664,612 cases (Time × Time Velo
@@ -1624,8 +1736,10 @@ forms:
   (0..127, default 32) and Time Velo Sens.
 - The glide starts from the previous note-on's key. LEGATO glides only while
   another key is held.
-- Where the XT keeps the previous key (the part's +0x20) and applies LEGATO
-  (Mode, 0x116) is not traced; the plugin follows the manual.
+- Where the XT keeps the previous key and applies LEGATO (Mode, 0x116) was
+  not traced; the plugin follows the manual. v59 found the selection
+  (`0x894e4940`, "The note's tuning"); the fields behind it are not
+  traced yet.
 - With Portamento off, the output is bit-identical to v57.
 - On the sine (RATE, Time 64), note 72 after note 60 glides from 440 to
   880 Hz, linearly in cents, over 2.54 s.
@@ -1931,10 +2045,11 @@ the XT slightly off equal temperament:
     slightly flat and sharp ratios.
 
 **Not modelled:**
-- Random Pitch Depth;
+- Random Pitch Depth (since modelled, v59);
 - realtime controllers and the matrix;
-- portamento (the ramp);
-- the patch's own Coarse/Fine Tune path (Pitch Shift stands in for it);
+- portamento (the ramp; since modelled, v58);
+- the patch's own Coarse/Fine Tune path, where Pitch Shift stood in (since
+  modelled, v59);
 - the wave's own tuning fields (the header's +0x18, the loop record's +0
   and +0x1b): the plugin's imported waves have them at 0.
 

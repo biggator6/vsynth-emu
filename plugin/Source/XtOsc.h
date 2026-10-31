@@ -11,6 +11,8 @@
 // and the part bytes at +0x180) are 0 here: no controller is assigned.
 // Tables are read from the user's rom.2 at run time.
 
+#include <cstdint>
+
 bool xtOscLoadTables(const char* romPath);
 bool xtOscTablesLoaded();
 
@@ -84,6 +86,45 @@ float xtPitchTarget(float cents, float env, float envDepth, float lfo, float lfo
 // The voice update's step toward a target (0x8950c1b0): 70% of the way,
 // cur + (target − cur)·0.7 by FMAC.
 float xtOscSmooth(float cur, float target);
+
+// ── The note's tuning ───────────────────────────────────────────────────────
+// The Coarse (+0x68) and Fine (+0x70) above, as the per-note OSC setup forms
+// them (0x894e4940 at note-on, 0x894e4c30 when a voice is set up again;
+// 0x894e4e90 forms them again on an update, keeping the random offset).
+// The patch's terms, as the OSC table updater (0x894e6330) stores them per
+// part: Coarse Tune (ID 0x110, semitones), Fine Tune (0x111, cents, ×10), and
+// Scale Tune (switch 0x134; C…B at 0x136…0x14c, cents, ×10; 0 when off).
+struct XtTuning {
+    int coarse = 0, fine = 0;
+    bool scaleOn = false;
+    int scale[12] = {};
+};
+// The coarse: Patch Coarse + OSC Coarse (semitones), plus the system's Key
+// Shift and the matrix's pitch terms (both 0 here).
+int xtNoteCoarse(const XtTuning& t, int oscCoarse);
+// The fine, 1/10 cent: the Scale Tune at key % 12 + Patch Fine + OSC Fine
+// (cents) + the part's pitch bend + the random offset (both 1/10 cent), plus
+// the system's Master Tune and the matrix's fine terms (both 0 here).
+int xtNoteFine(const XtTuning& t, int key, int oscFine, int bend, int random);
+// The part's pitch bend (0x894e9fe0, its +0x174), 1/10 cent: b = the bender
+// (0…16383) − 8192; b·up·1000 >> 13 up, −(−b·down·1000 >> 13) down, with
+// Bend Range Up/Down 0…48 (IDs 0x11e/0x11f, stored ×1000).
+int xtPitchBend(int bender, int upSemis, int downSemis);
+
+// Random Pitch Depth (OSC, ID 0x2ad, 0…30) in 1/10 cent, as the OSC updater
+// (0x894e55d0) stores it: 0…9 cents in 1s, 10…100 in 10s, 200…1200 in 100s.
+int xtRandomPitchDepth(int index);
+// The XT's random pitch: one 16-bit generator for every voice, seeded 0x7ab7
+// at power-on (0x894e5010).  Each OSC set up with a depth steps it, x =
+// x·0x497d + 1, and takes ((x·depth) & 0x7fffffff) >> 15 as an int16: the
+// offset (+0x6c), 1/10 cent, within ±depth.  With no depth it stays put.
+class XtPitchRandom {
+public:
+    int next(int depth10);
+    int state() const { return x; }
+private:
+    int16_t x = 0x7ab7;
+};
 
 // ── Portamento ──────────────────────────────────────────────────────────────
 // The tone's portamento settings (0x894e66e0, the block every voice ramp
