@@ -1,6 +1,6 @@
 #pragma once
-// The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11)
-// and the Dual Filter (9, below XtCosmTvf).  Each oscillator
+// The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
+// the Dual Filter (9) and the TB Filter (16; below XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -156,6 +156,60 @@ private:
     XtDualBlock blk;
     float s[8] = {};                  // the four stages' states (D+0x1c…0x38)
     float cur1 = 0, cur2 = 0, tgt1 = 0, tgt2 = 0, rate1 = 0, rate2 = 0;
+    void targets(float env1, float lfo1, float env2, float lfo2);
+};
+
+// The TB Filter (COSM Type 16, block code 20): a three-pole lowpass with
+// resonance feedback into a two-pole highpass and a gain, its coefficients
+// computed in Hz.  Parameters 0x94a…0x954: LPF Cutoff 0…127 (90), LPF
+// Cutoff Keyfollow ±20, LPF LFO and Env depths ±63, LPF Q 0…127 (100), LPF
+// Q Follow ±63 (25), HPF Cutoff 0…127 (45), HPF Keyfollow ±20, HPF LFO and
+// Env depths ±63, Gain 0…127 (127).  The LPF takes Env A (Env 9, COSM 2
+// Env 11) and its velocity factor, the HPF Env B (10, 12); both LFO 3 (4).
+struct XtTbParams {
+    int lpfCutoff = 90, lpfKf = 0, lpfLfo = 0, lpfEnv = 0, q = 100, qFollow = 25;
+    int hpfCutoff = 45, hpfKf = 0, hpfLfo = 0, hpfEnv = 0, gain = 127;
+};
+
+// The converter's block (0x894de110): cutoffs and Q /127; keyfollows
+// (KF·10 + 200)·4/400 − 2 (octaves per octave); Q Follow (F + 63)·2/126 − 1;
+// LFO depths (d/63)·|d/63|; Env depths A or B × (d/63)·|d/63|; the gain from
+// rom.2's table (0x897cfcb8) /32768 × 2; the key.
+struct XtTbBlock {
+    float gain = 0, lcut = 0, lkf = 0, q = 0, qf = 0, hcut = 0, hkf = 0, lenv = 0, llfo = 0, henv = 0, hlfo = 0;
+    int key = 60;
+};
+XtTbBlock xtTbBlock(const XtTbParams& p, int key, float velA, float velB);
+
+// The object for block code 20.  Its targets (0x894fbdc0 every 10 ms, and
+// 0x894fc110 with a new block) come from the envelopes' and LFOs' outputs:
+// slot 1 the LPF's (Env A), slot 2 the HPF's (Env B).  The LPF cutoff is
+// 278·2^(G·P(c) + G' + modulation + 0.647)·2^(KF·(key − 60)/12) Hz (P a cubic,
+// rom.2's exp2 tables 0x897d0228…), within 1…20,000 Hz; Q is shaped by Q
+// Follow and the cutoff, within 0…7.9; the HPF is 2^(13·(c + mod)) Hz,
+// within 1…10,000.  The coefficients are bilinear one-poles; the targets are
+// kept ×0.01, and each coefficient moves 1% toward its target every sample.
+class XtCosmTb {
+public:
+    // Note-on (0x894edf70 → 0x894fc110, 0x894fbd20): the targets, the
+    // coefficients at them, the states cleared.
+    void noteOn(const XtTbBlock& b, float env1, float lfo1, float env2, float lfo2);
+    void setBlock(const XtTbBlock& b, float env1, float lfo1, float env2, float lfo2);  // 0x894fc110
+    void update(float env1, float lfo1, float env2, float lfo2);                       // 0x894fbdc0
+    // 32 frames, interleaved L/R, in place (0x89501950): reads L, writes both.
+    void process(float* lr);
+
+    // D+0x1c…0x28 the LPF's c0, c1, c2, Q; D+0x5c…0x64 the HPF's c0, c1 and
+    // the gain (7); their targets ×0.01 at D+0x3c…, D+0x78…; the states
+    // D+0x2c…0x38 (LPF) and D+0x68…0x74 (HPF).
+    const float* coef() const { return c; }
+    const float* target() const { return t; }
+    const float* lpState() const { return s; }
+    const float* hpState() const { return h; }
+
+private:
+    XtTbBlock blk;
+    float c[7] = {}, t[7] = {}, s[4] = {}, h[4] = {};
     void targets(float env1, float lfo1, float env2, float lfo2);
 };
 

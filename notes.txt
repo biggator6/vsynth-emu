@@ -217,6 +217,17 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+TB FILTER v66 (2026-10-31): COSM Type 16 (HARDWARE_FIRMWARE.md, "COSM:
+  the TB Filter"). XtCosm: XtTbParams, xtTbBlock (0x894de110), XtCosmTb
+  (targets 0x894fbdc0/0x894fc110, note-on 0x894fbd20, filter 0x89501950),
+  exp2t (0x894ec090) and fipr (the interpreter's: double sums rounded
+  toward zero). It reads the exp2 tables (0x897d0228…) and the gain table
+  (0x897cfcb8) at run time. xt_cosm calls 0x894fc4c0 first (the globals).
+  XtSynth: Cosm.type 3 with tbCutoff…tbGain. Plugin params cosmTbCutoff,
+  TbKF, TbLfo, TbEnv, TbQ, TbQFollow, TbHpf, TbHpfKF, TbHpfLfo, TbHpfEnv,
+  TbGain (and cosm2…). XT_TB / TEST_TB
+  "cutoff,kf,lfo,env,q,qFollow,hpf,hpfKf,hpfLfo,hpfEnv,gain" (KF in %).
+
 DUAL FILTER v65 (2026-10-31): COSM Type 9 (HARDWARE_FIRMWARE.md, "COSM:
   the Dual Filter, and the map of the types": every type's converter, block
   code and DSP routine). XtCosm: XtDualParams, xtDualBlock (0x894dd690),

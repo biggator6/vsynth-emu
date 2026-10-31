@@ -2712,3 +2712,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
   both Qs from the block, so Q changes apply at once.
 - All of it equals the firmware in the interpreter. In the plugin: Type 2
   and its own parameters with the XT's defaults.
+
+### Session 16 addendum (2026-10-31) — v66: TB Filter
+
+- The TB Filter is the first COSM type to compute in Hz. Its LPF cutoff is
+  278·2^(…) from a cubic in Cutoff and the modulation, with rom.2's exp2
+  tables. Q is shaped by Q Follow and the cutoff.
+- The bilinear coefficients are smoothed per sample, 1% toward targets kept
+  ×0.01.
+- The filter is hand-written FIPR code: three one-pole lowpasses with
+  feedback, two one-pole highpasses, then a gain. The port forms FIPR as
+  the interpreter does.
+- Four constants come from a start-up routine that the harness now runs.
+- All of it equals the firmware in the interpreter.

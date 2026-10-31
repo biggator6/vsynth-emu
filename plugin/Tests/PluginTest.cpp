@@ -172,7 +172,9 @@ int main(int argc, char** argv) {
     // (Env A); TEST_CLFO="wave,rate": its LFO.  TEST_COSM2, TEST_CENV2,
     // TEST_CLFO2: the same for COSM 2.  TEST_DUAL="type,freq1,kf1,q1,lfo1,env1,
     // freq2,kf2,q2,lfo2,env2": COSM 1 a Dual Filter (KF in %); TEST_CENVB its
-    // Env B (Filter 2's); TEST_DUAL2, TEST_CENVB2: COSM 2's.
+    // Env B (Filter 2's); TEST_DUAL2, TEST_CENVB2: COSM 2's.  TEST_TB="cutoff,kf,
+    // lfo,env,q,qFollow,hpf,hpfKf,hpfLfo,hpfEnv,gain": a TB Filter (KF in %);
+    // TEST_TB2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -195,6 +197,16 @@ int main(int argc, char** argv) {
             set("Switch", 1); set("Type", 2); set("DualType", m.dualType);
             set("Dual1Freq", m.freq1); set("Dual1KF", m.kf1); set("Dual1Q", m.q1); set("Dual1Lfo", m.lfo1); set("Dual1Env", m.env1);
             set("Dual2Freq", m.freq2); set("Dual2KF", m.kf2); set("Dual2Q", m.q2); set("Dual2Lfo", m.lfo2); set("Dual2Env", m.env2);
+        }
+        if (const char* e = std::getenv(("TEST_TB" + sfx).c_str())) {
+            m.on = true;
+            m.type = 3;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.tbCutoff, &m.tbKf, &m.tbLfo, &m.tbEnv, &m.tbQ, &m.tbQFollow, &m.tbHpf,
+                        &m.tbHpfKf, &m.tbHpfLfo, &m.tbHpfEnv, &m.tbGain);
+            set("Switch", 1); set("Type", 3);
+            set("TbCutoff", m.tbCutoff); set("TbKF", m.tbKf); set("TbLfo", m.tbLfo); set("TbEnv", m.tbEnv); set("TbQ", m.tbQ);
+            set("TbQFollow", m.tbQFollow); set("TbHpf", m.tbHpf); set("TbHpfKF", m.tbHpfKf); set("TbHpfLfo", m.tbHpfLfo);
+            set("TbHpfEnv", m.tbHpfEnv); set("TbGain", m.tbGain);
         }
         if (const char* e = std::getenv(("TEST_CENVB" + sfx).c_str())) {
             auto& b = m.envB;

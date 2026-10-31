@@ -1544,6 +1544,123 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the TB Filter (2026-10-31, v66)
+
+COSM Type 16, block code 20: a three-pole lowpass with resonance feedback,
+then a two-pole highpass and a gain. Unlike the TVF, it computes its
+coefficients from frequencies in Hz.
+
+**Parameters** (0x94a…0x954, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x94a | LPF Cutoff | 0…127 | 90 |
+| 0x94b | LPF Cutoff Freq Keyfollow | ±20 | 0 |
+| 0x94c | LPF Cutoff LFO Depth | ±63 | 0 |
+| 0x94d | LPF Cutoff Env Depth | ±63 | 0 |
+| 0x94e | LPF Q | 0…127 | 100 |
+| 0x94f | LPF Q Follow | ±63 | 25 |
+| 0x950 | HPF Cutoff Freq | 0…127 | 45 |
+| 0x951 | HPF Cutoff Freq Keyfollow | ±20 | 0 |
+| 0x952 | HPF Cutoff LFO Depth | ±63 | 0 |
+| 0x953 | HPF Cutoff Env Depth | ±63 | 0 |
+| 0x954 | Gain | 0…127 | 127 |
+
+**The converter** (`0x894de110`) writes 17 words:
+- [1] the gain: rom.2's table of 128 shorts at 0x897cfcb8, /32768 × 2;
+- [2] LPF Cutoff, [4] Q and [6] HPF Cutoff: clamp(0…127)/127;
+- [3], [7] the keyfollows: (clamp(KF·10, ±200) + 200)·4/400 − 2, i.e.
+  −2…+2 octaves per octave;
+- [5] Q Follow: (clamp(F, ±63) + 63)·2/126 − 1;
+- [8] the LPF Env depth (A × (d/63)·|d/63|) and [9] its envelope, 9 or 11;
+- [10] the LPF LFO depth and [11] its LFO, 3 or 4;
+- [12] the HPF Env depth (B) and [13] its envelope, 10 or 12;
+- [14] the HPF LFO depth (not clamped) and [15] its LFO;
+- [16] the key, a byte.
+
+The matrix terms add to the LPF Cutoff, its LFO depth and Q.
+
+**Constants.** A start-up routine (`0x894fc4c0`) sets five globals at
+0x89fe4e60…70: 0.009375, 3.2677, −0.062, 3.57981 and 1.34468. Call the last
+four G1…G4. The interpreter does not run it, so the harness calls it.
+
+**exp2** (`0x894ec090`), through rom.2's tables from 0x897d0228. For x ≥ 0,
+i = trunc(x) and f = trunc(frac·65536):
+2^x = T[f>>8] (2^(k/256)) × T[i] (2^i, 0x897d1228) × T[f&255] (2^(k/65536)),
+multiplied in that order. For x < 0 it uses the inverse tables (0x897d0a28,
+0x897d1244, 0x897d0e28) on −x. An i past the seven entries of the 2^i table
+reads on into the next table.
+
+**The targets**, from the envelopes' and LFOs' outputs: at note-on and on a
+new block (`0x894fc110`, which also copies the block), and every 10 ms
+(`0x894fbdc0`). Slot 1 is the LPF's (Env A), slot 2 the HPF's (Env B).
+- P(c) = ((−1.161c + 2.1096)c − 0.1344)c − 0.1, with c the LPF Cutoff.
+- m = (LFO·G4)(depth·G3) + (Env depth·G3)(Env·G4) + 0.64717.
+- fc = 278 · exp2(½(G1·P + G2 + m))² · exp2(KF·(key − 60)/24)². That is
+  278·2^(G1·P + G2 + m) Hz, keyfollowed in octaves.
+- fc is clamped to 1…20,000 Hz. The cutoff alone reaches about 2.1 kHz at
+  127; the Env and LFO terms carry it further.
+- Q = (Q + Q Follow·m·0.2) · (P/3.5 + 0.7) · 7.9, clamped to 0…7.9. Above
+  3,700 Hz it is also × (1.09077 − 2.48205e-5·fc).
+- w = 1.2π·fc/44100 and r = (w − 2)/(w + 2). The LPF's targets are
+  c0 = (r + 1)/1.3, c1 = 0.3·c0, c2 = −r, and Q.
+- HPF: y = 13·(Cutoff + depths × Env and LFO). Below 0 the frequency is
+  1 Hz; above 14 it is 10,000 Hz; otherwise it is exp2(y/2)². It is then
+  keyfollowed and capped at 10,000 Hz.
+- Above 1 Hz, with w = 2π·f/44100: c0 = 2/(w + 2) and c1 = (2 − w)/(w + 2).
+  At 1 Hz or below, both are 1.
+- The gain is the block's gain.
+- All seven targets are stored × 0.01.
+
+**Note-on** (`0x894edf70`, code 20):
+- the block copy sets the targets;
+- `0x894fbd20` sets the coefficients to target/0.01 and clears the states.
+
+The start-value routine is empty for this type, so the envelopes' start
+levels and step rates go unused.
+
+**The filter** (`0x89501950`) is hand-written. It holds the LPF in one FPU
+bank and the HPF in the other, and forms each stage with FIPR. Per sample:
+- u = x − Q·s3;
+- three one-poles: y = c0·in + c1·in′ + c2·y′. That is
+  y1 = (Q, c1, c2, c0)·(0, s0, s1, u) by FIPR, then y2 on (0, s1, s2, y1),
+  then y3 on (0, s2, s3, y2);
+- the states become s0 = x − Q·y3, s1 = y1, s2 = y2, s3 = y3;
+- the LPF's output is Q·y3 + y3;
+- two one-pole highpasses, y = c0·(in − in′) + c1·y′, each with FIPR;
+- the output is the second highpass × the gain, written to L and R.
+
+After use in each sample, every coefficient moves 1% toward its target:
+c = c·0.99 + target·0.01. The states are at D+0x2c…0x38 (LPF) and
+D+0x68…0x74 (HPF); the coefficients at D+0x1c…0x28 and D+0x5c…0x64; the
+targets at D+0x3c… and D+0x78….
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converter: 200,000 cases;
+- note-on, blocks while the note sounds, and updates: 12,982 cases;
+- the filter: 120,000 blocks;
+- all 0 different.
+
+FIPR is ported as the interpreter forms it: the products summed in double,
+each sum rounded toward zero, then the float rounded toward zero. Real
+hardware FIPR is not modelled beyond this, as elsewhere in the project.
+
+**Plugin.**
+- COSM Type gains TB Filter (index 3, latched at note-on).
+- Its 11 parameters per section use the XT's defaults.
+- The editor has a TB LPF row (Cut, KF, Q, QF, LFO, Env) and a TB HPF row
+  (Cut, KF, LFO, Env, Gain).
+- Checks:
+  - renders are bit-identical to v65;
+  - PluginTest is bit-identical with the TB Filter at its defaults; with
+    both envelopes, the LFO, keyfollow and a second note; and on COSM 2
+    behind a Dual Filter in MONO legato.
+- On noise (BACKING; TB on against COSM off):
+  - the LPF falls about 18 dB an octave;
+  - Q 110 at Cutoff 70 gives a +12 dB peak near 500 Hz;
+  - the defaults give +20 dB near 1 kHz;
+  - HPF 90 is −32 dB at 63 Hz.
+
 ### COSM: the Dual Filter, and the map of the types (2026-10-31, v65)
 
 **The types in rom.2.** The COSM converter (`0x894de3b0`) switches on the
@@ -1569,7 +1686,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | 13 | Limiter | 0x935–0x939 | `0x894ddd20` | 16 | `0x894fe450` |
 | 14 | Frequency Shifter | 0x93a–0x940 | `0x894ddde0` | | |
 | 15 | Lo-Fi | 0x941–0x949 | `0x894ddf80` | | |
-| 16 | TB Filter | 0x94a–0x954 | `0x894de110` | 20 | `0x89501950` |
+| 16 | TB Filter | 0x94a–0x954 | `0x894de110` | 20 | `0x89501950` (v66) |
 
 The routine table by code (0…20): `0x894fb280`, `0x894fef70`,
 `0x894fc570`, `0x89503ef0`, `0x894f8a30`, `0x89501300`, `0x894ffa10`,
@@ -1928,7 +2045,7 @@ on the SH-4):
 
 **Not modelled yet:**
 - COSM 2 (since modelled, v63);
-- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65);
+- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;

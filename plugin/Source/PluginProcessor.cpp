@@ -52,9 +52,11 @@ namespace Params {
     static const juce::String kLegato        = "legatoSwitch";
     static const juce::String kOctave        = "octaveShift";
     // The COSM sections as TVFs, COSM 1 ("cosm…") and COSM 2 ("cosm2…"):
-    // Switch, Type (TVF, Dynamic TVF, Dual Filter), ResoOwn/CutoffOwn (the Dynamic TVF's
+    // Switch, Type (TVF, Dynamic TVF, Dual Filter, TB Filter), ResoOwn/CutoffOwn (the Dynamic TVF's
     // Own Env depths), Filter, Cutoff, Reso, CutoffKF, CutoffEnv/Lfo, ResoEnv/Lfo; the
-    // Dual Filter's DualType and Dual1…/Dual2… Freq, KF, Q, Lfo, Env; the
+    // Dual Filter's DualType and Dual1…/Dual2… Freq, KF, Q, Lfo, Env; the TB
+    // Filter's TbCutoff, TbKF, TbLfo, TbEnv, TbQ, TbQFollow, TbHpf, TbHpfKF,
+    // TbHpfLfo, TbHpfEnv, TbGain; the
     // envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
     // Attack…TimeKF; the LFO, LfoWave…LfoKeySync
     static juce::String cosmId(int k, const char* name) { return juce::String(k ? "cosm2" : "cosm") + name; }
@@ -215,7 +217,7 @@ VSynthEmuProcessor::createParameterLayout() {
         const juce::String n = k ? "COSM 2 " : "COSM 1 ";
         params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "Switch"), n + "Switch", false));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Type"), n + "Type",
-            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter" }, 0));
+            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter", "TB Filter" }, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResoOwn"), n + "Resonance Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CutoffOwn"), n + "Cutoff Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Filter"), n + "Filter Type",
@@ -238,6 +240,24 @@ VSynthEmuProcessor::createParameterLayout() {
             params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Q", name + "Q", 0, 127, f == 1 ? 108 : 120));
             params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Lfo", name + "LFO Depth", -63, 63, 0));
             params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Env", name + "Env Depth", -63, 63, 0));
+        }
+        {                                            // the TB Filter, the XT's defaults
+            const juce::String tn = n + "TB ";
+            auto kfParam = [&](const char* id, const juce::String& name) {
+                params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                    cosmId(k, id), tn + name, juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+            };
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbCutoff"), tn + "LPF Cutoff", 0, 127, 90));
+            kfParam("TbKF", "LPF Cutoff Keyfollow");
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbLfo"), tn + "LPF Cutoff LFO Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbEnv"), tn + "LPF Cutoff Env Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbQ"), tn + "LPF Q", 0, 127, 100));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbQFollow"), tn + "LPF Q Follow", -63, 63, 25));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbHpf"), tn + "HPF Cutoff", 0, 127, 45));
+            kfParam("TbHpfKF", "HPF Cutoff Keyfollow");
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbHpfLfo"), tn + "HPF Cutoff LFO Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbHpfEnv"), tn + "HPF Cutoff Env Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbGain"), tn + "Gain", 0, 127, 127));
         }
         for (const char* ab : { "A", "B" }) {
             const juce::String id = cosmId(k, "Env") + ab, name = n + "Env " + ab + " ";
@@ -456,6 +476,10 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         m.lfo1  = knob(cosmId(k, "Dual1Lfo"));  m.env1 = knob(cosmId(k, "Dual1Env"));
         m.freq2 = knob(cosmId(k, "Dual2Freq")); m.kf2 = kf(cosmId(k, "Dual2KF")); m.q2 = knob(cosmId(k, "Dual2Q"));
         m.lfo2  = knob(cosmId(k, "Dual2Lfo"));  m.env2 = knob(cosmId(k, "Dual2Env"));
+        m.tbCutoff = knob(cosmId(k, "TbCutoff")); m.tbKf = kf(cosmId(k, "TbKF")); m.tbLfo = knob(cosmId(k, "TbLfo"));
+        m.tbEnv = knob(cosmId(k, "TbEnv")); m.tbQ = knob(cosmId(k, "TbQ")); m.tbQFollow = knob(cosmId(k, "TbQFollow"));
+        m.tbHpf = knob(cosmId(k, "TbHpf")); m.tbHpfKf = kf(cosmId(k, "TbHpfKF")); m.tbHpfLfo = knob(cosmId(k, "TbHpfLfo"));
+        m.tbHpfEnv = knob(cosmId(k, "TbHpfEnv")); m.tbGain = knob(cosmId(k, "TbGain"));
         for (int ab = 0; ab < 2; ++ab) {
             XtSynth::Controls::CosmEnv& e = ab == 0 ? m.envA : m.envB;
             const juce::String id = cosmId(k, ab == 0 ? "EnvA" : "EnvB");

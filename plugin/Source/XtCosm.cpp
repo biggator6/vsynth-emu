@@ -3,6 +3,8 @@
 #include "XtCosm.h"
 #include "XtFloat.h"
 #include "XtOsc.h"
+#include <bit>
+#include <cmath>
 #include <cstdio>
 
 namespace {
@@ -10,9 +12,16 @@ namespace {
 constexpr uint32_t kRomBase = 0x89300000;
 // the cutoff table (129 floats) and the cap by Q (128 floats), 0x894eecb0
 constexpr uint32_t kCutTab = 0x897d1264, kCapTab = 0x897d1468;
+// the TB Filter: the exp2 tables (0x894ec090), read as one span from
+// 0x897d0228 to the cap table's end (2^(i/256), 2^(i/65536), their inverses,
+// 2^i, 2^−i); the gain table (128 shorts, 0x894de110)
+constexpr uint32_t kExpTab = 0x897d0228, kGainTab = 0x897cfcb8;
+constexpr int kExpN = (int)((kCapTab + 128 * 4 - kExpTab) / 4);
 
 struct Tables {
     float cut[129], cap[128];
+    float exp[kExpN];
+    uint16_t gain[128];
     bool ok = false;
 } T;
 
@@ -23,6 +32,7 @@ inline float sq63(int d) {                                                    //
     return mul(0.0f > v ? -v : v, v);
 }
 inline int clampi(int x, int lo, int hi) { return x < lo ? lo : x > hi ? hi : x; }
+constexpr float K(uint32_t u) { return std::bit_cast<float>(u); }               // a constant as rom.2 stores it
 // A cutoff with its keyfollow (0x894dc660): (key − 60)·KF·10/100/127 + Cutoff/127, within 0…1
 inline float keyCutoff(int cutoff, int kf, int key) {
     const int c = clampi((int16_t)cutoff, 0, 127);
@@ -131,6 +141,36 @@ void dual(float* lr, float* s, float& c1, float& c2, float d1, float d2, float q
     s[0] = s0; s[1] = s1; s[2] = s2; s[3] = s3; s[4] = s4; s[5] = s5; s[6] = s6; s[7] = s7;
 }
 
+// 2^x through rom.2's tables (0x894ec090): for x ≥ 0, i = trunc(x) and the
+// fraction's 16 bits f, 2^(f>>8 /256) · 2^i · 2^((f&255)/65536); for x < 0
+// the same of −x through the inverse tables.  An i past the 2^i table reads
+// on, as the firmware does.
+float exp2t(float x) {
+    const bool neg = 0.0f > x;
+    if (neg) x = -x;
+    const int i = ftrc(x);
+    const int f = ftrc(mul(sub(x, flt(i)), 65536.0f));
+    const int hi = neg ? 512 : 0, lo = neg ? 768 : 256, in = neg ? 1031 : 1024;
+    const float a = T.exp[clampi(hi + (f >> 8), 0, kExpN - 1)], b = T.exp[clampi(in + i, 0, kExpN - 1)];
+    return mul(mul(a, b), T.exp[clampi(lo + (f & 255), 0, kExpN - 1)]);
+}
+
+// FIPR as the interpreter forms it: the products summed in double, each sum
+// rounded toward zero (the FPU mode), then the float toward zero.
+inline double addRz(double x, double y) {
+    const double s = x + y;
+    if (nearest()) return s;
+    const double bb = s - x, err = (x - (s - bb)) + (y - bb);
+    return err != 0.0 && (s > 0.0 ? err < 0.0 : err > 0.0) ? std::nextafter(s, 0.0) : s;
+}
+inline float fipr(float a0, float a1, float a2, float a3, float b0, float b1, float b2, float b3) {
+    double s = (double)a0 * b0;
+    s = addRz(s, (double)a1 * b1);
+    s = addRz(s, (double)a2 * b2);
+    s = addRz(s, (double)a3 * b3);
+    return rnd(s);
+}
+
 } // namespace
 
 bool xtCosmLoadTables(const char* romPath) {
@@ -138,7 +178,9 @@ bool xtCosmLoadTables(const char* romPath) {
     FILE* f = romPath ? std::fopen(romPath, "rb") : nullptr;
     if (!f) return false;
     const bool ok = std::fseek(f, (long)(kCutTab - kRomBase), SEEK_SET) == 0 && std::fread(T.cut, 4, 129, f) == 129
-                 && std::fseek(f, (long)(kCapTab - kRomBase), SEEK_SET) == 0 && std::fread(T.cap, 4, 128, f) == 128;
+                 && std::fseek(f, (long)(kCapTab - kRomBase), SEEK_SET) == 0 && std::fread(T.cap, 4, 128, f) == 128
+                 && std::fseek(f, (long)(kExpTab - kRomBase), SEEK_SET) == 0 && std::fread(T.exp, 4, kExpN, f) == (size_t)kExpN
+                 && std::fseek(f, (long)(kGainTab - kRomBase), SEEK_SET) == 0 && std::fread(T.gain, 2, 128, f) == 128;
     std::fclose(f);
     T.ok = ok;
     return ok;
@@ -308,8 +350,130 @@ void XtCosmDual::process(float* lr) {
     if (blk.mode >= 0 && blk.mode <= 2) dual(lr, s, cur1, cur2, d1, d2, blk.q1, blk.q2, blk.mode);
 }
 
+XtTbBlock xtTbBlock(const XtTbParams& p, int key, float velA, float velB) {
+    auto cut = [](int c) { return add(div(flt(clampi((int16_t)c, 0, 127)), 127.0f), 0.0f); };
+    auto kf = [](int k) { return add(div(mul(flt(clampi((int16_t)(k * 10), -200, 200) + 200), 4.0f), 400.0f), -2.0f); };
+    XtTbBlock b;
+    b.gain = mul(div(flt(T.gain[clampi((int16_t)p.gain, 0, 127)]), 32768.0f), 2.0f);
+    b.lcut = cut(p.lpfCutoff);
+    b.lkf = kf(p.lpfKf);
+    b.q = cut(p.q);
+    b.qf = add(div(mul(flt(clampi((int16_t)p.qFollow, -63, 63) + 63), 2.0f), 126.0f), -1.0f);
+    b.hcut = cut(p.hpfCutoff);
+    b.hkf = kf(p.hpfKf);
+    b.lenv = envDepth(velA, p.lpfEnv);
+    b.llfo = sq63(clampi((int16_t)p.lpfLfo, -63, 63));
+    b.henv = envDepth(velB, p.hpfEnv);
+    b.hlfo = sq63((int16_t)p.hpfLfo);
+    b.key = key;
+    return b;
+}
+
+void XtCosmTb::noteOn(const XtTbBlock& b, float env1, float lfo1, float env2, float lfo2) {
+    setBlock(b, env1, lfo1, env2, lfo2);
+    for (int i = 0; i < 7; ++i) c[i] = div(t[i], K(0x3c23d709));      // 0x894fbd20: the targets / 0.01
+    for (float& x : s) x = 0.0f;
+    for (float& x : h) x = 0.0f;
+}
+
+void XtCosmTb::setBlock(const XtTbBlock& b, float env1, float lfo1, float env2, float lfo2) {
+    blk = b;
+    targets(env1, lfo1, env2, lfo2);
+}
+
+void XtCosmTb::update(float env1, float lfo1, float env2, float lfo2) { targets(env1, lfo1, env2, lfo2); }
+
+void XtCosmTb::targets(float env1, float lfo1, float env2, float lfo2) {
+    constexpr float kG64 = K(0x405121fe), kG68 = K(0xbd7df3b8), kG6c = K(0x40651b9a), kG70 = K(0x3fac1e79);   // set by 0x894fc4c0
+    const float k01 = K(0x3c23d709);                   // 0.01
+    // the LPF: P(c) = ((−1.161c + 2.1096)c − 0.1344)c − 0.1, the modulation
+    // m = LFO·depth + Env·depth (scaled) + 0.647
+    const float cc = blk.lcut;
+    float p = fmac(cc, K(0xbf949ba5), K(0x400703af));
+    p = fmac(p, cc, K(0xbe09a026));
+    p = fmac(p, cc, K(0xbdcccccd));
+    const float base = fmac(kG64, p, kG68);
+    float m = mul(add(mul(lfo1, kG70), 0.0f), mul(blk.llfo, kG6c));
+    m = fmac(add(mul(blk.lenv, kG6c), 0.0f), add(mul(env1, kG70), 0.0f), m);
+    m = add(m, K(0x3f25acee));
+    float e = exp2t(mul(add(base, m), 0.5f));
+    float fc = mul(mul(e, e), 278.0f);
+    const float oct = div(add(flt(blk.key), -60.0f), 24.0f);
+    e = exp2t(mul(oct, blk.lkf));
+    fc = mul(fc, mul(e, e));
+    bool scale;
+    if (fc > 20000.0f) { fc = 20000.0f; scale = true; }
+    else if (1.0f > fc) { fc = 1.0f; scale = false; }
+    else scale = fc > 3700.0f;
+    float q = fmac(mul(blk.qf, m), K(0x3e4ccccd), blk.q);
+    q = mul(mul(q, add(div(p, 3.5f), K(0x3f333333))), K(0x40fccccc));
+    if (0.0f > q) q = 0.0f;
+    else if (q > K(0x40fccccc)) q = K(0x40fccccc);
+    if (scale) q = mul(q, fmac(fc, K(0xb7d0359e), K(0x3f8b9e53)));
+    const float w = div(mul(fc, K(0x40714637)), 44100.0f);
+    const float r = div(add(w, -2.0f), add(w, 2.0f));
+    t[0] = mul(div(add(r, 1.0f), K(0x3fa66665)), k01);
+    t[1] = mul(t[0], K(0x3e999999));
+    t[2] = mul(-r, k01);
+    t[3] = mul(q, k01);
+    // the HPF: 2^(13·(c + mods)) Hz, keyfollowed
+    float y = fmac(blk.henv, env2, blk.hcut);
+    y = fmac(blk.hlfo, lfo2, y);
+    y = mul(y, 13.0f);
+    float hf;
+    if (0.0f > y) hf = 1.0f;
+    else if (y > 14.0f) hf = 10000.0f;
+    else { e = exp2t(mul(y, 0.5f)); hf = mul(e, e); }
+    e = exp2t(mul(oct, blk.hkf));
+    hf = mul(hf, mul(e, e));
+    if (!(10000.0f > hf)) hf = 10000.0f;
+    if (hf > 1.0f) {
+        const float w2 = div(mul(hf, K(0x40c90fda)), 44100.0f);
+        t[4] = mul(div(2.0f, add(w2, 2.0f)), k01);
+        t[5] = mul(div(sub(2.0f, w2), add(w2, 2.0f)), k01);
+    } else {
+        t[4] = t[5] = k01;
+    }
+    t[6] = mul(blk.gain, k01);
+}
+
+void XtCosmTb::process(float* lr) {
+    constexpr float k99 = K(0x3f7d70a3);
+    float c0 = c[0], c1 = c[1], c2 = c[2], q = c[3], h0c = c[4], h1c = c[5], g = c[6];
+    float s0 = s[0], s1 = s[1], s2 = s[2], s3 = s[3], h0 = h[0], h1 = h[1], h2 = h[2], h3 = h[3];
+    for (int i = 0; i < 32; ++i) {
+        const float x = lr[2 * i];
+        // the LPF: three bilinear one-poles, y = c0·in + c1·in' + c2·y',
+        // the input less Q × the third's last output
+        const float u = add(-mul(q, s3), x);
+        const float y1 = fipr(q, c1, c2, c0, 0.0f, s0, s1, u);
+        const float y2 = fipr(q, c1, c2, c0, 0.0f, s1, s2, y1);
+        const float y3 = fipr(q, c1, c2, c0, 0.0f, s2, s3, y2);
+        c0 = add(mul(c0, k99), t[0]);
+        s1 = y1; s2 = y2; s3 = y3;
+        const float qy = mul(y3, q);
+        c1 = add(mul(c1, k99), t[1]);
+        s0 = sub(x, qy);
+        const float lp = add(qy, y3);
+        c2 = add(mul(c2, k99), t[2]);
+        q = add(mul(q, k99), t[3]);
+        // the HPF: two one-poles, y = c0·(in − in') + c1·y'; then the gain
+        const float hp1 = fipr(h0c, -h0c, 0.0f, h1c, lp, h0, g, h1);
+        h0 = lp; h1 = hp1;
+        const float hp2 = fipr(h0c, -h0c, 0.0f, h1c, hp1, h2, 0.0f, h3);
+        h0c = add(mul(h0c, k99), t[4]);
+        h2 = hp1; h3 = hp2;
+        const float out = mul(hp2, g);
+        h1c = add(mul(h1c, k99), t[5]);
+        lr[2 * i] = lr[2 * i + 1] = out;
+        g = add(mul(g, k99), t[6]);
+    }
+    c[0] = c0; c[1] = c1; c[2] = c2; c[3] = q; c[4] = h0c; c[5] = h1c; c[6] = g;
+    s[0] = s0; s[1] = s1; s[2] = s2; s[3] = s3; h[0] = h0; h[1] = h1; h[2] = h2; h[3] = h3;
+}
+
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF and the Dual Filter against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual Filter and the TB Filter against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -591,6 +755,117 @@ int main(int argc, char** argv) {
     }
     std::printf("dual start, block and update: %ld cases, %ld different\n", yn, yb);
     std::printf("dual filter: %ld blocks of 32 frames, %ld different\n", zn, zb);
-    return cb || ub || db || xb || yb || zb ? 3 : 0;
+
+    // The TB Filter (block code 20): its constants (0x894fc4c0, run at start-up) …
+    if (!c.call(0x894fc4c0, {}, sp)) { std::fprintf(stderr, "tb init: %s\n", c.error().c_str()); return 1; }
+    auto tbParams = [&]() {
+        XtTbParams p;
+        p.lpfCutoff = (int)(rnd() % 128); p.lpfKf = (int)(rnd() % 41) - 20; p.lpfLfo = (int)(rnd() % 127) - 63; p.lpfEnv = (int)(rnd() % 127) - 63;
+        p.q = (int)(rnd() % 128); p.qFollow = (int)(rnd() % 127) - 63;
+        p.hpfCutoff = (int)(rnd() % 128); p.hpfKf = (int)(rnd() % 41) - 20; p.hpfLfo = (int)(rnd() % 127) - 63; p.hpfEnv = (int)(rnd() % 127) - 63;
+        p.gain = (int)(rnd() % 128);
+        return p;
+    };
+    // … the converter (0x894de110) …
+    long tb = 0, tn = 0;
+    for (int k = 0; k < 200000; ++k) {
+        const XtTbParams p = tbParams();
+        const int key = (int)(rnd() % 128), cosm = (int)(rnd() & 1);
+        const float va = (float)(rnd() % 32769) / 32768.0f, vb = (float)(rnd() % 32769) / 32768.0f;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100);
+        c.wr8(IN + 2, (uint8_t)cosm); c.wr8(IN + 3, (uint8_t)key);
+        const int vals[11] = { p.lpfCutoff, p.lpfKf, p.lpfLfo, p.lpfEnv, p.q, p.qFollow, p.hpfCutoff, p.hpfKf, p.hpfLfo, p.hpfEnv, p.gain };
+        for (int i = 0; i < 11; ++i) c.wr16(IN + 0x12 + 2 * (uint32_t)i, (uint16_t)(int16_t)vals[i]);
+        wf(IN + 0x34, va); wf(IN + 0x38, vb);
+        if (!c.call(0x894de110, { IN, OUT }, sp)) { std::fprintf(stderr, "tb converter: %s\n", c.error().c_str()); return 1; }
+        const XtTbBlock b = xtTbBlock(p, key, va, vb);
+        ++tn;
+        const float fv[16] = { 0, b.gain, b.lcut, b.lkf, b.q, b.qf, b.hcut, b.hkf, b.lenv, 0, b.llfo, 0, b.henv, 0, b.hlfo, 0 };
+        bool ok = c.rd32(OUT) == 20 && c.rd8(OUT + 0x40) == (uint8_t)key && c.rd32(OUT + 0x24) == (cosm ? 11u : 9u)
+               && c.rd32(OUT + 0x34) == (cosm ? 12u : 10u) && c.rd32(OUT + 0x2c) == (cosm ? 4u : 3u) && c.rd32(OUT + 0x3c) == (cosm ? 4u : 3u);
+        for (int i : { 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14 }) ok = ok && same(f32(OUT + 4 * (uint32_t)i), fv[i]);
+        if (!ok && tb++ < 5) {
+            std::printf("  tb converter key %d:", key);
+            for (int i : { 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14 }) std::printf(" [%d] %.9g/%.9g", i, f32(OUT + 4 * (uint32_t)i), fv[i]);
+            std::printf("\n");
+        }
+    }
+    std::printf("tb converter: %ld cases, %ld different\n", tn, tb);
+
+    // … the note-on (0x894fc110, 0x894fbd20), the update (0x894ee6a0), new
+    // blocks while the note sounds (0x894fc110) and the filter (0x89501950)
+    auto writeTb = [&](const XtTbBlock& b) {
+        c.wr32(BLK, 20); wf(BLK + 4, b.gain); wf(BLK + 8, b.lcut); wf(BLK + 0xc, b.lkf); wf(BLK + 0x10, b.q); wf(BLK + 0x14, b.qf);
+        wf(BLK + 0x18, b.hcut); wf(BLK + 0x1c, b.hkf); wf(BLK + 0x20, b.lenv); c.wr32(BLK + 0x24, 9); wf(BLK + 0x28, b.llfo); c.wr32(BLK + 0x2c, 3);
+        wf(BLK + 0x30, b.henv); c.wr32(BLK + 0x34, 10); wf(BLK + 0x38, b.hlfo); c.wr32(BLK + 0x3c, 3); c.wr32(BLK + 0x40, (uint32_t)b.key);
+    };
+    auto tbSame = [&](const XtCosmTb& port, bool states) {
+        bool ok = true;
+        for (int i = 0; i < 4; ++i) ok = ok && same(f32(D + 0x1c + 4 * (uint32_t)i), port.coef()[i]) && same(f32(D + 0x3c + 4 * (uint32_t)i), port.target()[i]);
+        for (int i = 0; i < 3; ++i) ok = ok && same(f32(D + 0x5c + 4 * (uint32_t)i), port.coef()[4 + i]) && same(f32(D + 0x78 + 4 * (uint32_t)i), port.target()[4 + i]);
+        if (states)
+            for (int i = 0; i < 4; ++i) ok = ok && same(f32(D + 0x2c + 4 * (uint32_t)i), port.lpState()[i]) && same(f32(D + 0x68 + 4 * (uint32_t)i), port.hpState()[i]);
+        return ok;
+    };
+    long ob = 0, on = 0, fb = 0, fn = 0;
+    for (int g = 0; g < nCases; ++g) {
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200); c.write(BLK, z.data(), 0x80);
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        c.wr8(D, 20);                                // slot 1: the LPF's envelope (EQ) and LFO (LQ); slot 2: the HPF's
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);
+        const int bkey = (int)(rnd() % 128);
+        const float bva = frnd(0, 1), bvb = frnd(0, 1);
+        const XtTbBlock b = xtTbBlock(tbParams(), bkey, bva, bvb);
+        writeTb(b);
+        float o1 = frnd(-1, 1), o2 = frnd(-1, 1), ol1 = frnd(-1, 1), ol2 = frnd(-1, 1);
+        wf(OBJ + 0x104, o1); wf(OBJ + 0x108, o2); wf(OBJ + 0x10c, ol1); wf(OBJ + 0x110, ol2);
+        if (!c.call(0x894fc110, { OBJ, BLK + 4 }, sp) || !c.call(0x894fbd20, { OBJ }, sp)) { std::fprintf(stderr, "tb note-on: %s\n", c.error().c_str()); return 1; }
+        XtCosmTb port;
+        port.noteOn(b, o1, ol1, o2, ol2);
+        ++on;
+        if (!tbSame(port, true) && ob++ < 5)
+            std::printf("  tb note-on %d: fw c %.9g %.9g %.9g %.9g t %.9g %.9g, port c %.9g %.9g %.9g %.9g t %.9g %.9g\n", g, f32(D + 0x1c), f32(D + 0x20),
+                        f32(D + 0x24), f32(D + 0x28), f32(D + 0x78), f32(D + 0x7c), port.coef()[0], port.coef()[1], port.coef()[2], port.coef()[3],
+                        port.target()[4], port.target()[5]);
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 13) {                                   // an update every 10 ms
+                o1 = frnd(-1, 1); o2 = frnd(-1, 1); ol1 = frnd(-1, 1); ol2 = frnd(-1, 1);
+                wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2); wf(LQ + 0x38, ol1); wf(LC + 0x38, ol2); wf(EQ + 0x54, 1.0f / 32.0f); wf(EC + 0x54, 1.0f / 32.0f);
+                c.fb[0][4] = 0;
+                if (!c.call(0x894ee6a0, { OBJ }, sp)) { std::fprintf(stderr, "tb update: %s\n", c.error().c_str()); return 1; }
+                port.update(o1, ol1, o2, ol2);
+                ++on;
+                if (!tbSame(port, false) && ob++ < 5)
+                    std::printf("  tb update %d.%d: fw t %.9g %.9g %.9g %.9g port %.9g %.9g %.9g %.9g\n", g, blkN, f32(D + 0x3c), f32(D + 0x40), f32(D + 0x44),
+                                f32(D + 0x48), port.target()[0], port.target()[1], port.target()[2], port.target()[3]);
+            } else if (blkN % 14 == 6 && (rnd() & 1)) {               // a parameter change while the note sounds
+                const XtTbBlock nb = xtTbBlock(tbParams(), bkey, bva, bvb);
+                writeTb(nb);
+                if (!c.call(0x894fc110, { OBJ, BLK + 4 }, sp)) { std::fprintf(stderr, "tb block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb, o1, ol1, o2, ol2);
+                ++on;
+                if (!tbSame(port, false) && ob++ < 5)
+                    std::printf("  tb block %d.%d: fw t %.9g %.9g port %.9g %.9g\n", g, blkN, f32(D + 0x3c), f32(D + 0x48), port.target()[0], port.target()[3]);
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 4);
+            const float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e9f : ar == 2 ? 4.0e8f : 1.0f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(0x89501950, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "tb filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++fn;
+            bool ok = tbSame(port, true);
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            if (!ok && fb++ < 6)
+                std::printf("  tb filter %d block %d: fw out %.9g %.9g c %.9g s %.9g h %.9g, port %.9g %.9g %.9g %.9g %.9g\n", g, blkN, f32(BUF), f32(BUF + 248),
+                            f32(D + 0x1c), f32(D + 0x2c), f32(D + 0x68), lr[0], lr[62], port.coef()[0], port.lpState()[0], port.hpState()[0]);
+        }
+    }
+    std::printf("tb note-on, block and update: %ld cases, %ld different\n", on, ob);
+    std::printf("tb filter: %ld blocks of 32 frames, %ld different\n", fn, fb);
+    return cb || ub || db || xb || yb || zb || tb || ob || fb ? 3 : 0;
 }
 #endif
