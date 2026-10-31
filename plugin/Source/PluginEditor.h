@@ -50,6 +50,12 @@ private:
     juce::Slider     loopStartSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     loopEndSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label      loopStartLabel_ { {}, "Start" }, loopEndLabel_ { {}, "End" };
+    // Portamento: switch, Mode, Type, Time, Time Velo Sens
+    juce::ToggleButton portaBtn_ { "Porta" };
+    juce::ComboBox   portaModeBox_, portaTypeBox_;
+    juce::Slider     portaTimeSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     portaSensSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Label      portaTimeLabel_ { {}, "Time" }, portaSensLabel_ { {}, "V-Sns" };
     // amp envelope, the XT's 0..127 knobs
     juce::Slider     attackSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     decaySlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -126,6 +132,9 @@ private:
     std::unique_ptr<ButtonAtt> loopAtt_;
     std::unique_ptr<ComboAtt>  loopModeAtt_;
     std::unique_ptr<SliderAtt> loopStartAtt_, loopEndAtt_;
+    std::unique_ptr<ButtonAtt> portaAtt_;
+    std::unique_ptr<ComboAtt>  portaModeAtt_, portaTypeAtt_;
+    std::unique_ptr<SliderAtt> portaTimeAtt_, portaSensAtt_;
     std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_, lfoTimeAtt_, lfoFmtAtt_;
     std::unique_ptr<SliderAtt> levelAtts_[kLevelKnobs];
     std::unique_ptr<ComboAtt>  lfoWaveAtt_, lfoModeAtt_, lfoOffsetAtt_;

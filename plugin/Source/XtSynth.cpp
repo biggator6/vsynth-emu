@@ -192,17 +192,21 @@ constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
 // depths, within ±32; formant and walk with their envelopes and the LFO,
 // the formant ratio within [0.5, 2], the walk within ±5 (negative: the
 // players run backward, a note starting at the wave's end).
-void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g) const {
-    // Pitch Shift as semitones and the cents left (±50), added to Coarse and
-    // Fine (the converter's +0x68 and +0x70, Fine in tenths of a cent);
-    // Robot Voice takes the pitch against A4 (0x894e4030), not against the
-    // wave's Original Key
+// The voice's cents at a key (the converter's +8; at the previous key its
+// +0x68): Pitch Shift as semitones and the cents left (±50), added to Coarse
+// and Fine (the converter's +0x68 and +0x70, Fine in tenths of a cent);
+// Robot Voice takes the pitch against A4 (0x894e4030), not against the
+// wave's Original Key.
+float XtSynth::noteCents(const Voice& v, int key) const {
     const long shift = std::lround((double)ctl.pitchSemis * 100.0);
     const int semis = (int)std::lround((double)shift / 100.0);
     const int coarse = ctl.oscCoarse + semis, fine = (ctl.oscFine + (int)(shift - semis * 100L)) * 10;
-    const float cents = xtPitchCents(v.note, coarse, 10 * ctl.pitchKF, fine, ctl.rootKey, v.robot);
-    A = xtPitchTarget(cents, v.penv.level(), xtPitchDepthCents((float)std::clamp(ctl.pDepth, -63, 63)), v.lfo.out(),
-                      xtPitchDepthCents((float)std::clamp(ctl.lfoPitchDepth, -63, 63)), xtPitchRatio(ctl.oscPitch));
+    return xtPitchCents(key, coarse, 10 * ctl.pitchKF, fine, ctl.rootKey, v.robot);
+}
+
+void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g) const {
+    A = xtPitchTarget(noteCents(v, v.note), v.penv.level(), xtPitchDepthCents((float)std::clamp(ctl.pDepth, -63, 63)), v.lfo.out(),
+                      xtPitchDepthCents((float)std::clamp(ctl.lfoPitchDepth, -63, 63)), xtPitchRatio(ctl.oscPitch), v.porta.value());
     F = xtOscFormantRatio(xtOscFormant(ctl.oscFormant, ctl.oscFormantKF, v.note), v.fenv.level(),
                           xtOscFormantEnvDepth(ctl.fDepth), v.lfo.out(), xtOscFormantLfoDepth(ctl.lfoFormantDepth));
     walk = xtOscWalk(xtOscTime(ctl.oscTime, ctl.oscTimeOffset, ctl.oscTimeKF, v.note), v.tenv.level(),
@@ -299,6 +303,12 @@ void XtSynth::setControls(const Controls& c) {
 void XtSynth::noteOn(int note, float velocity) {
     pickUpSample();
     if (!cur) return;
+    // portamento's source key: the previous note's; with LEGATO only while
+    // a key is still held (else the note's own: no glide)
+    bool held = false;
+    for (const Voice& w : voice) held = held || (w.active && !w.releasing);
+    const int srcKey = (lastKey < 0 || (ctl.portaMode == 1 && !held)) ? note : lastKey;
+    lastKey = note;
     Voice* v = nullptr;
     for (Voice& w : voice) if (!w.active) { v = &w; break; }
     if (!v) { v = &voice[0]; for (Voice& w : voice) if (w.age < v->age) v = &w; }   // steal the oldest
@@ -344,6 +354,10 @@ void XtSynth::noteOn(int note, float velocity) {
         if (!v->mb.noteOn(cur->wave, cur->type, v->curA, v->curWalk)) v->active = false;
         else v->mb.setGain(v->curGain, true);
     }
+    // portamento (0x894f2440, after the voice setup): the pitch ramp from the
+    // source key's cents to the note's; it moves from the next update on
+    v->porta.start(noteCents(*v, srcKey), noteCents(*v, note),
+                   xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v->vel));
 }
 
 // The release time follows the note-off velocity (R-Sens): the times are
@@ -417,6 +431,7 @@ void XtSynth::mixBlock(float* lr) {
             v.fenv.tick();
             v.oenv.tick();
             v.lfo.tick(1);
+            v.porta.tick(1);                                   // 0x894f4b00, before the voice update
             float A, F, w, g;
             targets(v, A, F, w, g);
             const float gt = gainTarget(v, v.oenv.level());
@@ -516,6 +531,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_ROBOT=1: Robot Voice.
 //   XT_LOOP="mode,start,end": Loop on, Loop Mode (0 One Shot, 1 One Way,
 //     2 Alternate) and the region as fractions of the wave.
+//   XT_PORTA="mode,type,time,veloSens": Portamento on, Mode (0 NORMAL,
+//     1 LEGATO), Type (0 RATE, 1 TIME), Time 0..127, Time Velo Sens.
 //   XT_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]": Pitch Shift
 //     (semitones), the Pitch knob, Pitch KF (%), Coarse, Fine (cents) and the
 //     Original Key (default 0,0,100,0,0,60).
@@ -572,6 +589,10 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_LOOP")) {
         c.loop = true;
         std::sscanf(e, "%d,%f,%f", &c.loopMode, &c.loopStart, &c.loopEnd);
+    }
+    if (const char* e = std::getenv("XT_PORTA")) {
+        c.portamento = true;
+        std::sscanf(e, "%d,%d,%d,%d", &c.portaMode, &c.portaType, &c.portaTime, &c.portaVeloSens);
     }
     if (const char* e = std::getenv("XT_PITCH"))
         std::sscanf(e, "%f,%d,%d,%d,%d,%d", &c.pitchSemis, &c.oscPitch, &c.pitchKF, &c.oscCoarse, &c.oscFine, &c.rootKey);

@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 520;  // height of the XT strip below it
+static constexpr int kXtStripH   = 550;  // height of the XT strip below it
 
 // The OSC pitch, level and velocity rows: parameter and label, four per
 // row, and the rows' names
@@ -18,7 +18,7 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 880);
+    setSize(560, 910);
     setResizable(true, true);
     setResizeLimits(480, 600, 960, 980);
 
@@ -53,7 +53,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                               &tAttackSlider_, &tDecaySlider_, &tSustainSlider_, &tReleaseSlider_, &tDepthSlider_,
                               &fAttackSlider_, &fDecaySlider_, &fSustainSlider_, &fReleaseSlider_, &fDepthSlider_,
                               &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_, &lfoTimeSlider_, &lfoFmtSlider_,
-                              &loopStartSlider_, &loopEndSlider_ }) {
+                              &loopStartSlider_, &loopEndSlider_, &portaTimeSlider_, &portaSensSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
@@ -100,6 +100,17 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     loopModeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "loopMode", loopModeBox_);
     loopStartAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "loopStart", loopStartSlider_);
     loopEndAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "loopEnd", loopEndSlider_);
+    portaModeBox_.addItemList({ "NORMAL", "LEGATO" }, 1);
+    portaTypeBox_.addItemList({ "RATE", "TIME" }, 1);
+    portaBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    portaBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    for (juce::Component* cpt : { (juce::Component*)&portaBtn_, (juce::Component*)&portaModeBox_, (juce::Component*)&portaTypeBox_ })
+        addAndMakeVisible(*cpt);
+    portaAtt_     = std::make_unique<ButtonAtt>(processor_.apvts, "portamento", portaBtn_);
+    portaModeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "portaMode", portaModeBox_);
+    portaTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "portaType", portaTypeBox_);
+    portaTimeAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "portaTime", portaTimeSlider_);
+    portaSensAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "portaVeloSens", portaSensSlider_);
     lfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);
     lfoModeBox_.addItemList({ "ON <<", "ON >>", "OFF <<", "OFF >>" }, 1);
     lfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
@@ -138,7 +149,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                             &fAttackLabel_, &fDecayLabel_, &fSustainLabel_, &fReleaseLabel_, &fDepthLabel_,
                             &offsetLabel_, &oscTkfLabel_, &oscFkfLabel_,
                             &lfoLabel_, &lfoRateLabel_, &lfoDepthLabel_, &lfoDelayLabel_, &lfoFadeLabel_,
-                            &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_ }) styleSmall(*l);
+                            &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_,
+                            &portaTimeLabel_, &portaSensLabel_ }) styleSmall(*l);
     timerCallback();
     startTimerHz(4);
 
@@ -294,6 +306,17 @@ void VSynthEmuEditor::resized() {
     loopStartSlider_.setBounds(ls.withTrimmedRight(8));
     loopEndLabel_.setBounds(row3l.removeFromLeft(32));
     loopEndSlider_.setBounds(row3l);
+    xt.removeFromTop(6);
+    auto row3p = xt.removeFromTop(24);               // Portamento: switch, mode, type, time, velocity sens
+    portaBtn_.setBounds(row3p.removeFromLeft(64));
+    portaModeBox_.setBounds(row3p.removeFromLeft(96).withTrimmedRight(8));
+    portaTypeBox_.setBounds(row3p.removeFromLeft(80).withTrimmedRight(10));
+    const int ph = row3p.getWidth() / 2;
+    auto pt = row3p.removeFromLeft(ph);
+    portaTimeLabel_.setBounds(pt.removeFromLeft(36));
+    portaTimeSlider_.setBounds(pt.withTrimmedRight(8));
+    portaSensLabel_.setBounds(row3p.removeFromLeft(40));
+    portaSensSlider_.setBounds(row3p);
     xt.removeFromTop(6);
     auto row4 = xt.removeFromTop(24);                // amp envelope
     const int q = row4.getWidth() / 4;

@@ -153,6 +153,15 @@ int main(int argc, char** argv) {
         refCtl.loopStart = std::round(p.apvts.getRawParameterValue("loopStart")->load() / 0.01f) * 0.01f / 100.0f;
         refCtl.loopEnd = std::round(p.apvts.getRawParameterValue("loopEnd")->load() / 0.01f) * 0.01f / 100.0f;
     }
+    // TEST_PORTA="mode,type,time,sens": Portamento on, Mode (0 NORMAL,
+    // 1 LEGATO), Type (0 RATE, 1 TIME), Time, Time Velo Sens; with
+    // TEST_NOTE2="note,frame" a second note glides from the first
+    if (const char* e = std::getenv("TEST_PORTA")) {
+        refCtl.portamento = true;
+        std::sscanf(e, "%d,%d,%d,%d", &refCtl.portaMode, &refCtl.portaType, &refCtl.portaTime, &refCtl.portaVeloSens);
+        setKnobs({ { "portamento", 1 }, { "portaMode", refCtl.portaMode }, { "portaType", refCtl.portaType },
+                   { "portaTime", refCtl.portaTime }, { "portaVeloSens", refCtl.portaVeloSens } });
+    }
     // TEST_PITCH="shift,pitch,pitchKF,coarse,fine[,origKey]": Pitch Shift
     // (semitones), the OSC's Pitch knob, Pitch KF (%), Coarse, Fine (cents)
     // and the Original Key
@@ -203,15 +212,21 @@ int main(int argc, char** argv) {
     juce::AudioBuffer<float> buf(2, block);
     std::vector<float> rl(block), rr(block);
     const int offBlock = total / 2 / block * block, offAt = 37;    // note-off halfway, inside a block
+    int note2 = -1, at2 = 0;                                         // TEST_NOTE2="note,frame": a second note-on
+    if (const char* e = std::getenv("TEST_NOTE2")) std::sscanf(e, "%d,%d", &note2, &at2);
+    const int n2Block = note2 >= 0 ? at2 / block * block : -1, n2At = at2 % block;
+    if (n2Block == 0 || n2Block == offBlock) { std::fprintf(stderr, "TEST_NOTE2 must fall in another block\n"); return 1; }
     for (int done = 0; done < total; done += block) {
         juce::MidiBuffer midi;
         if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)noteVel), 100); }
         if (done == offBlock) { midi.addEvent(juce::MidiMessage::noteOff(1, note, (juce::uint8)100), offAt); }
+        if (done == n2Block) { midi.addEvent(juce::MidiMessage::noteOn(1, note2, (juce::uint8)noteVel), n2At); }
         p.processBlock(buf, midi);
         juce::ScopedNoDenormals ftz;   // processBlock runs with denormals flushed (as the SH-4 does, FPSCR.DN = 1)
         if (std::getenv("TEST_CONTROLS")) ref.setControls(refCtl);   // as processBlock does each block
         if (done == 0) { ref.render(rl.data(), rr.data(), 100); ref.noteOn(note, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + 100, rr.data() + 100, block - 100); }
         else if (done == offBlock) { ref.render(rl.data(), rr.data(), offAt); ref.noteOff(note, 100 / 127.0f); ref.render(rl.data() + offAt, rr.data() + offAt, block - offAt); }
+        else if (done == n2Block) { ref.render(rl.data(), rr.data(), n2At); ref.noteOn(note2, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + n2At, rr.data() + n2At, block - n2At); }
         else ref.render(rl.data(), rr.data(), block);
         for (int i = 0; i < block; ++i) {
             if (firstDiff < 0 && (buf.getSample(0, i) != rl[(size_t)i] || buf.getSample(1, i) != rr[(size_t)i])) firstDiff = done + i;

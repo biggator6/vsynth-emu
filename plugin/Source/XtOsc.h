@@ -85,6 +85,40 @@ float xtPitchTarget(float cents, float env, float envDepth, float lfo, float lfo
 // cur + (target − cur)·0.7 by FMAC.
 float xtOscSmooth(float cur, float target);
 
+// ── Portamento ──────────────────────────────────────────────────────────────
+// The tone's portamento settings (0x894e66e0, the block every voice ramp
+// copies at note-on): the switch; type 0 RATE, 1 TIME; the time in ms from
+// Time (0..127, + modulation): k²·10000/127² (1 ms at 1), less t·v²·sens/
+// 258064 (the product in 32 bits, as the firmware wraps it), at least 0;
+// v = the velocity, or 127 − it for a negative Time Velo Sens (−63..+63).
+// The time and formant ramps stay off (the glide is the pitch's only).
+struct XtPortaSettings {
+    bool on = false;
+    int type = 0;
+    float timeMs = 0;
+};
+XtPortaSettings xtPortaSettings(bool on, int type, int time, int veloSens, int velocity);
+
+// The voice's pitch ramp (+0x880, the additive ramp, 0x894f4860 type 0):
+// started at note-on from the previous key's cents to the note's (0x894f4890
+// → 0x894f4680), after the note-on targets; ticked once per 10 ms update
+// before the voice update (0x894f4b00; the first tick only arms it); its
+// value is added to the pitch target's cents (0x894f4c00): −(to − from) at
+// the start, then (phase/65536 − 1)·(to − from) as the phase grows by
+// 65536·10/T per tick (T the time, or for RATE the time per 1200 cents of
+// the span; at most 65536), 0 when done and when off.
+class XtPitchRamp {
+public:
+    void start(float from, float to, const XtPortaSettings& s);
+    void tick(int n = 1);
+    float value() const { return active ? cur : 0.0f; }
+    bool running() const { return active && state != 3; }
+private:
+    bool active = false;
+    int state = 0;
+    float span = 0, phase = 0, inc = 0, cur = 0;
+};
+
 // ── Level (the OSC TVA) and velocity ────────────────────────────────────────
 // Velocity Sens and Curve as the patch → table updaters store them:
 // 0x894ebe20, ±63 → ±200 (s·100/32 up to ±32, then 100 + (|s| − 32)·100/31);

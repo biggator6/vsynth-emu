@@ -247,6 +247,8 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - loop playback (v56 SOLO, v57 BACKING/ENSEMBLE): Loop, Loop Mode (One
      Shot, One Way, Alternate) and a loop region, played by the firmware's
      loop logic in each player (crossings, jumps, Alternate bounces).
+   - portamento (v58): Mode, Type, Time and Time Velo Sens through the
+     firmware's settings converter and the voice's pitch ramp.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -283,6 +285,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   loop events, at −92…−107 dB (`xt_fw solocmp … loop:…`). BACKING and
   ENSEMBLE loops (v57) are bit-exact against the firmware players
   (`xt_fw bandcmp … loop:…`).
+- Portamento (v58): the settings converter and the pitch ramp equal the
+  firmware (`xt_osc`, 6.5 million values).
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.
@@ -297,7 +301,7 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - no step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and
   formant envelope depths' velocity sensitivity is not exposed;
-- no portamento or Random Pitch Depth.
+- no Random Pitch Depth, scale tune or patch Coarse/Fine path.
 
 ## Known Gaps / Next Work
 

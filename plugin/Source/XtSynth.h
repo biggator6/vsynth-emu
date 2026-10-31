@@ -92,6 +92,11 @@ public:
         bool loop = false;
         int loopMode = 1;
         float loopStart = 0.0f, loopEnd = 1.0f;
+        // Portamento: the switch, Mode (0 NORMAL, 1 LEGATO: only while a key
+        // is held), Type (0 RATE: Time per octave, 1 TIME), Time 0..127
+        // (k²·10000/127² ms) and Time Velo Sens −63..+63
+        bool portamento = false;
+        int portaMode = 0, portaType = 0, portaTime = 32, portaVeloSens = 0;
     };
 
     XtSynth();
@@ -120,6 +125,7 @@ private:
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
         XtLfo lfo;
+        XtPitchRamp porta;             // the pitch ramp (+0x880): kept across notes, as the XT's voices keep it
         // the player's pitch ratio, formant ratio, walk and Energy as the
         // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
         float curA = 1, curF = 1, curWalk = 1, curG = 0, curGain = 1;
@@ -140,6 +146,7 @@ private:
     static constexpr int kTickFrames = 441;
     int tickCount = 0;                // frames since the last update
     XtLfo freeLfo;                    // the free-running LFO a key-unsynced voice follows
+    int lastKey = -1;                 // the key portamento glides from (the previous note's)
     bool freeLfoOn = false;
     float chaosSeed = 0.3141f;        // the global logistic map the LFOs draw their seeds from
     double hostRate = 44100;
@@ -158,6 +165,7 @@ private:
     float gainTarget(const Voice& v, float env) const;   // 0x894f3dc0 / 0x894f3e20
     XtEnvParams ampEnvParams(const Voice& v) const;      // the OSC amp envelope
     XtLoop waveLoop() const;                         // the players' loop
+    float noteCents(const Voice& v, int key) const;  // voice +8 at a key (+0x68 at the previous one)
     void applyRates(Voice& v);
     void tvaUpdate(Voice& v);
     XtEnvParams envParams(const Voice& v) const;

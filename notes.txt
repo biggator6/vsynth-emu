@@ -217,6 +217,15 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+PORTAMENTO v58 (2026-10-31): the tone's portamento settings (0x894e66e0)
+  and the voice's pitch ramp (0x894f4860/4890/4680/4b00/4c00), as XtOsc's
+  xtPortaSettings and XtPitchRamp, equal to the firmware (xt_osc). XtSynth
+  keeps a ramp per voice and the previous note's key; the ramp starts after
+  the note-on targets and ticks before each update. Plugin params
+  portamento, portaMode, portaType, portaTime, portaVeloSens; XtSynth CLI
+  XT_PORTA="mode,type,time,sens"; PluginTest TEST_PORTA (same order) with
+  TEST_NOTE2="note,frame" for a second note.
+
 BAND LOOPS v57 (2026-10-31): loop playback in the BACKING/ENSEMBLE players
   (HARDWARE_FIRMWARE.md, "Loop playback, BACKING and ENSEMBLE").
   XtMbPlayer::setLoop (XtLoop, now shared with XtSoloVoice in XtLoop.h;

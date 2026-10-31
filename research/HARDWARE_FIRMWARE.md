@@ -1544,6 +1544,92 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### Portamento (2026-10-31, v58)
+
+**Settings** (`0x894e66e0`). This is the tone's common block at +0xc. It is
+recomputed for every note by `0x894e6690`, with the note's key and
+velocity.
+- Word 0 is the Portamento switch (patch parameter 0x115). Word 4 is the
+  Type (0x117: 0 RATE, 1 TIME).
+- Words 1 and 2 are 0. They switch the VariPhrase voice's formant and walk
+  ramps, so only the pitch glides.
+- Word 3 is the time in ms, as a float. For k = Time (0x118) plus
+  modulation (the matrix `0x894d9750`), clamped to 127:
+  - t = k²·10000/127² (1 ms at k = 1; 10 s at 127);
+  - then t − t·v²·s/258064, at least 0;
+  - s = |Time Velo Sens| (0x119, stored as is); v = the velocity, or 127 − v
+    for a negative sensitivity.
+  - The product t·v²·s is formed in 32 bits and wraps at high settings:
+    Time 127, velocity 127, sensitivity +63 leaves 3911 ms instead of 0.
+    The port keeps the wrap.
+- The per-part table of 0x115, 0x117, 0x118 and 0x119 is written by
+  `0x894e6920`. Mode (0x116) is not in it.
+
+**The ramp** (voice +0x880). It is a 0x48-byte object built by the
+constructor `0x894f4860` as type 0, additive. The voice's formant (+0x8c8,
+type 2) and walk (+0x910, type 1) ramps are factors.
+- `0x894f2440` runs at every note-on, after the voice setup (in
+  `0x894f5e60`). It starts the pitch ramp from the converter's +0x68 to its
+  +8 (`0x894f4890` copies the settings, `0x894f4680` starts):
+  - +0x68 is the cents at the previous key. The per-note OSC setup
+    `0x894e4c30` sets +0x7c to the part's previous key plus the part's key
+    shift.
+  - +8 is the note's cents.
+  - For VariPhrase it also starts the formant and walk ramps, which the
+    settings leave off.
+- **Start.**
+  - span = to − from.
+  - T is the time (TIME), or |span|·time/1200 (RATE: the time per octave);
+    1 if T is 0.
+  - The increment is 655360/T, at most 65536.
+  - The phase starts at 0 (65536 if the span is 0).
+  - The value starts at (phase/65536 − 1)·span, i.e. −span. With time 0 or
+    no span it is done at once (value 0).
+  - The ramp is active when the switch is on.
+- **Tick** (`0x894f4b00`), in the 10-ms voice update `0x894f2090`, before
+  the voice update. Its argument is the ticks since the last update, 1.
+  - The first tick after a start only arms the ramp.
+  - Each later tick adds the increment to the phase (FMAC). The value is
+    (phase/65536 − 1)·span until the phase reaches 65536; then the ramp is
+    done (value 0).
+- **Value** (`0x894f4c00`): the ramp's value while active. Inactive, it is
+  0 for the additive ramp and 1 for the factors. The pitch target adds it to
+  the cents (v55).
+- The note-on targets are computed before the ramp starts:
+  - the note's first 10 ms play at its own pitch, plus whatever the voice's
+    ramp held from its previous note;
+  - the glide starts at the next update, with the voice's 70% step first
+    taking the pitch toward the previous note.
+
+**Also found, not modelled yet.** The per-note OSC setup `0x894e4c30`
+forms:
+- the coarse (+0x68): patch and OSC Coarse plus the matrix;
+- the fine (+0x70):
+  - the scale tune for the key's pitch class;
+  - patch and OSC Fine;
+  - the part's tuning;
+  - the matrix;
+- Random Pitch Depth (+0x1a, into +0x6c), from a linear congruential
+  generator (x·0x497d + 1).
+
+**Port and checks** (`xt_osc`):
+- `xtPortaSettings` equals `0x894e66e0` on 1,664,612 cases (Time × Time Velo
+  Sens × velocity × type × switch).
+- `XtPitchRamp` equals the firmware's ramp (constructor, start, tick and
+  value) on 4,886,610 values. These come from 4,000 random glides, each
+  restarted mid-way.
+
+**Plugin.**
+- New: Portamento (switch), Mode (NORMAL/LEGATO), Type (RATE/TIME), Time
+  (0..127, default 32) and Time Velo Sens.
+- The glide starts from the previous note-on's key. LEGATO glides only while
+  another key is held.
+- Where the XT keeps the previous key (the part's +0x20) and applies LEGATO
+  (Mode, 0x116) is not traced; the plugin follows the manual.
+- With Portamento off, the output is bit-identical to v57.
+- On the sine (RATE, Time 64), note 72 after note 60 glides from 440 to
+  880 Hz, linearly in cents, over 2.54 s.
+
 ### Loop playback, BACKING and ENSEMBLE (2026-10-31, v57)
 
 The multi-band players loop through the same cache and logic as SOLO (v56),

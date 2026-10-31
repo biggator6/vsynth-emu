@@ -30,6 +30,13 @@ namespace Params {
     static const juce::String kLoopMode      = "loopMode";
     static const juce::String kLoopStart     = "loopStart";
     static const juce::String kLoopEnd       = "loopEnd";
+    // Portamento: switch, Mode (NORMAL, LEGATO), Type (RATE, TIME), Time
+    // 0..127, Time Velo Sens −63..+63
+    static const juce::String kPorta         = "portamento";
+    static const juce::String kPortaMode     = "portaMode";
+    static const juce::String kPortaType     = "portaType";
+    static const juce::String kPortaTime     = "portaTime";
+    static const juce::String kPortaVeloSens = "portaVeloSens";
     // Amp envelope, the XT's 0..127 knobs (XtEnvelope: times from the firmware's table)
     static const juce::String kAttack       = "ampAttack";
     static const juce::String kDecay        = "ampDecay";
@@ -154,6 +161,13 @@ VSynthEmuProcessor::createParameterLayout() {
         Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 0.0f, "%"));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kLoopEnd, "Loop End", juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 100.0f, "%"));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kPorta, "Portamento", false));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kPortaMode, "Portamento Mode",
+        juce::StringArray { "NORMAL", "LEGATO" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kPortaType, "Portamento Type",
+        juce::StringArray { "RATE", "TIME" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPortaTime, "Portamento Time", 0, 127, 32));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPortaVeloSens, "Portamento Time Velo Sens", -63, 63, 0));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
@@ -310,6 +324,11 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.loopMode     = knob(Params::kLoopMode);
     c.loopStart    = snap(apvts.getRawParameterValue(Params::kLoopStart)->load(), 0.01f) / 100.0f;
     c.loopEnd      = snap(apvts.getRawParameterValue(Params::kLoopEnd)->load(), 0.01f) / 100.0f;
+    c.portamento   = apvts.getRawParameterValue(Params::kPorta)->load() >= 0.5f;
+    c.portaMode    = knob(Params::kPortaMode);
+    c.portaType    = knob(Params::kPortaType);
+    c.portaTime    = knob(Params::kPortaTime);
+    c.portaVeloSens = knob(Params::kPortaVeloSens);
     c.energy       = knob(Params::kEnergy);
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();

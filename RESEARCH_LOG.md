@@ -2579,3 +2579,21 @@ Round-2 recordings.  First build-out after that: real-time granular port
   both directions, walk reversals).
 - The plugin's Loop controls now apply to all three types. With Loop off
   the output is bit-identical to v56.
+
+### Session 16 addendum (2026-10-31) — v58: portamento
+
+- The settings come from the tone's common converter.
+  - The time is k²·10000/127² ms, less a velocity term whose 32-bit product
+    the firmware lets wrap.
+  - Only the pitch glides: the walk and formant ramps are switched off.
+- The voice's pitch ramp starts at every note-on, after the note's targets
+  are computed. It is armed on the first 10-ms tick and moves on the next;
+  its value is added to the pitch target's cents.
+- The settings converter and the ramp both equal the firmware in the
+  interpreter: 1.66 million and 4.9 million values, 0 different.
+- Also found, not ported yet: the per-note OSC setup forms Coarse and Fine
+  from the patch, the OSC, scale tune and the part, plus Random Pitch Depth
+  (from a linear congruential generator).
+- Plugin: the portamento controls. With them off the output is
+  bit-identical to v57. The previous-key rule and LEGATO follow the manual;
+  where the XT applies them is untraced.

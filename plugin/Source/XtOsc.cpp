@@ -218,6 +218,63 @@ float xtOscSmooth(float cur, float target) {
     return add(mul(sub(target, cur), 0.699999988f), cur);  // 0x3f333333
 }
 
+XtPortaSettings xtPortaSettings(bool on, int type, int time, int veloSens, int velocity) {
+    XtPortaSettings st;
+    st.on = on;
+    st.type = type ? 1 : 0;
+    constexpr int64_t M = (int32_t)0x82061029;     // the reciprocal multiply for /16129 (127²)
+    int v = velocity & 0xff, sens = (int16_t)veloSens;
+    if (0 > sens) { v = 127 - v; sens = -sens; }
+    int k = time & 0xff;                            // Time + the matrix's modulation (0), as a byte
+    if (k > 127) k = 127;
+    int32_t t;
+    if (k == 1) t = 1;
+    else {
+        const int32_t x = (int32_t)((uint32_t)k * (uint32_t)k * 10000u);
+        t = (int32_t)((x * M) >> 32) + x;
+        t >>= 13;
+        t += (int32_t)((uint32_t)t >> 31);
+    }
+    // t·v²·sens in 32 bits (mul.l), divided by 258064 the same way
+    uint32_t y = (uint32_t)(int16_t)sens * (uint32_t)(v & 0xff);
+    y *= (uint32_t)(v & 0xff);
+    y *= (uint32_t)(int32_t)(int16_t)t;
+    int32_t d = (int32_t)(((int64_t)(int32_t)y * M) >> 32) + (int32_t)y;
+    d >>= 17;
+    d += (int32_t)((uint32_t)d >> 31);
+    int32_t r = (int16_t)(int32_t)((uint32_t)(int16_t)t - (uint32_t)d);
+    if (0 > r) r = 0;
+    st.timeMs = (float)(uint16_t)r;
+    return st;
+}
+
+void XtPitchRamp::start(float from, float to, const XtPortaSettings& st) {
+    using namespace xtf;
+    state = 1;
+    span = sub(to, from);
+    phase = 0.0f;
+    float T = st.type == 1 ? st.timeMs : div(mul(std::fabs(span), st.timeMs), 1200.0f);
+    if (T == 0.0f) T = 1.0f;
+    inc = div(655360.0f, T);
+    if (!(65536.0f > inc)) inc = 65536.0f;
+    if (span == 0.0f) phase = 65536.0f;
+    if (65536.0f > phase && st.timeMs != 0.0f) cur = mul(add(div(phase, 65536.0f), -1.0f), span);
+    else { state = 3; cur = 0.0f; }
+    active = st.on;
+}
+
+void XtPitchRamp::tick(int n) {
+    using namespace xtf;
+    if (!active) return;
+    if (state > 3) { state = 3; cur = 0.0f; return; }
+    if (state == 1) { state = 2; return; }
+    if (state == 3) { cur = 0.0f; return; }
+    if (state != 2) return;
+    phase = add(mul(inc, flt((int16_t)n)), phase);    // fmac
+    if (!(65536.0f > phase)) { state = 3; cur = 0.0f; return; }
+    cur = mul(add(div(phase, 65536.0f), -1.0f), span);
+}
+
 int xtVelSens(int s) {
     if (-32 > s) return -(100 + (-32 - s) * 100 / 31);
     if (0 > s) return -(-s * 100 / 32);
@@ -551,6 +608,70 @@ int main(int argc, char** argv) {
             }
         }
     std::printf("pitch target: %ld cases, %ld different; voice update step: %ld cases, %ld different\n", tn, tb, sn, sb);
-    return bad || eb || vb || lb || gb || pb || cb || tb || sb ? 3 : 0;
+
+    // Portamento: the settings converter (0x894e66e0; its matrix fetch
+    // 0x894d9750 gives 0) over Time × Time Velo Sens × velocity × type ×
+    // switch, and the pitch ramp (constructor 0x894f4860 type 0, start
+    // 0x894f4890, tick 0x894f4b00, value 0x894f4c00) over random glides,
+    // restarted mid-way too.
+    c.hook(0x894d9750, [](Sh4& m) { m.ret(0); });
+    long ob = 0, on_ = 0;
+    const uint32_t PC = ram + 0x20000, PO = ram + 0x20100;
+    for (int sw = 0; sw < 2; ++sw)
+        for (int ty = 0; ty < 2; ++ty)
+            for (int tm = 0; tm < 128; ++tm)
+                for (int sens = -63; sens <= 63; ++sens)
+                    for (int vel = (tm + sens + 64) % 5; vel < 128; vel += 5) {
+                        std::vector<uint8_t> z(0x40, 0);
+                        c.write(PC, z.data(), z.size()); c.write(PO, z.data(), z.size());
+                        c.wr8(PC + 2, (uint8_t)vel); c.wr8(PC + 6, (uint8_t)sw); c.wr8(PC + 7, (uint8_t)ty);
+                        c.wr8(PC + 8, (uint8_t)tm); c.wr16(PC + 10, (uint16_t)(int16_t)sens);
+                        if (!c.call(0x894e66e0, { PC, PO }, sp)) { std::fprintf(stderr, "porta settings: %s\n", c.error().c_str()); return 1; }
+                        const XtPortaSettings st = xtPortaSettings(sw != 0, ty, tm, sens, vel);
+                        ++on_;
+                        const bool same = c.rd32(PO) == (uint32_t)st.on && c.rd32(PO + 4) == 0 && c.rd32(PO + 8) == 0
+                                       && c.rd32(PO + 16) == (uint32_t)st.type && bitsEq(f32(PO + 12), st.timeMs);
+                        if (!same && ob++ < 5)
+                            std::printf("  porta settings sw %d type %d time %d sens %d vel %d: fw %u/%u %g, port %d/%d %g\n", sw, ty, tm, sens, vel,
+                                        c.rd32(PO), c.rd32(PO + 16), f32(PO + 12), (int)st.on, st.type, st.timeMs);
+                    }
+    std::printf("portamento settings: %ld cases, %ld different\n", on_, ob);
+    long rb = 0, rn = 0;
+    const uint32_t RO = ram + 0x20200, RS = ram + 0x20300;
+    uint32_t seed = 12345;
+    auto rnd = [&]() { seed = seed * 1103515245u + 12345u; return (seed >> 8) & 0xffff; };
+    for (int g = 0; g < 4000; ++g) {
+        std::vector<uint8_t> z(0x60, 0);
+        c.write(RO, z.data(), z.size());
+        uint32_t r0 = 0;
+        if (!c.call(0x894f4860, { RO, 0 }, sp, &r0)) { std::fprintf(stderr, "ramp ctor: %s\n", c.error().c_str()); return 1; }
+        XtPitchRamp port;
+        for (int seg = 0; seg < 2; ++seg) {   // a glide, then a new one mid-way
+            const float from = (float)((int)(rnd() % 12001) - 6000) * (rnd() % 3 == 0 ? 1.0f : 0.1f);
+            const float to = rnd() % 7 == 0 ? from : (float)((int)(rnd() % 12001) - 6000) * 0.1f;
+            const XtPortaSettings st = xtPortaSettings(rnd() % 5 != 0, (int)(rnd() & 1), (int)(rnd() % 128), (int)(rnd() % 127) - 63, (int)(rnd() % 128));
+            c.write(RS, z.data(), 0x20);
+            c.wr32(RS, st.on ? 1 : 0); wf(RS + 12, st.timeMs); c.wr32(RS + 16, (uint32_t)st.type);
+            wf(0, 0.0f);
+            uint32_t ub; std::memcpy(&ub, &from, 4); c.fb[0][4] = ub; std::memcpy(&ub, &to, 4); c.fb[0][5] = ub;
+            if (!c.call(0x894f4890, { RO, RS }, sp)) { std::fprintf(stderr, "ramp start: %s\n", c.error().c_str()); return 1; }
+            port.start(from, to, st);
+            const int ticks = seg == 0 ? (int)(rnd() % 40) : 1200;
+            for (int k = 0; k <= ticks; ++k) {
+                if (k > 0) {
+                    if (!c.call(0x894f4b00, { RO, 1 }, sp)) { std::fprintf(stderr, "ramp tick: %s\n", c.error().c_str()); return 1; }
+                    port.tick(1);
+                }
+                if (!c.call(0x894f4c00, { RO }, sp)) { std::fprintf(stderr, "ramp value: %s\n", c.error().c_str()); return 1; }
+                float fw; std::memcpy(&fw, &c.fb[0][0], 4);
+                ++rn;
+                if (!bitsEq(fw, port.value()) && rb++ < 6)
+                    std::printf("  ramp %d.%d tick %d (from %g to %g, on %d type %d time %g): fw %.9g port %.9g\n", g, seg, k, from, to, (int)st.on,
+                                st.type, st.timeMs, fw, port.value());
+            }
+        }
+    }
+    std::printf("pitch ramp: %ld values, %ld different\n", rn, rb);
+    return bad || eb || vb || lb || gb || pb || cb || tb || sb || ob || rb ? 3 : 0;
 }
 #endif
