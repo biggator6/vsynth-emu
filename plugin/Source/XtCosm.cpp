@@ -31,6 +31,8 @@ constexpr uint32_t kSinTab = 0x897d3dec, kHilbTab = 0x897d45f0;
 // and lowpass coefficients, by Bit Down its scales 2^−b and 2^b (0x894edd60)
 constexpr uint32_t kLofiBalTab = 0x897d1668, kLofiMaskTab = 0x897d187c, kLofiCoefTab = 0x897d1894, kLofiDownTab = 0x897d18ac,
                    kLofiUpTab = 0x897d18ec;
+// the Limiter's slopes above the threshold by Ratio (4 floats, 0x894edb20)
+constexpr uint32_t kLimSlopeTab = 0x897d1884;
 
 struct Tables {
     float cut[129], cap[128];
@@ -43,6 +45,7 @@ struct Tables {
     float sine[129], hilb[32];
     float lofiBal[128], lofiCoef[6], lofiDown[16], lofiUp[16];
     int8_t lofiMask[6];
+    float limSlope[4];
     bool ok = false, keySqOk = false;
 } T;
 
@@ -219,7 +222,8 @@ bool xtCosmLoadTables(const char* romPath) {
                  && std::fseek(f, (long)(kLofiMaskTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiMask, 1, 6, f) == 6
                  && std::fseek(f, (long)(kLofiCoefTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiCoef, 4, 6, f) == 6
                  && std::fseek(f, (long)(kLofiDownTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiDown, 4, 16, f) == 16
-                 && std::fseek(f, (long)(kLofiUpTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiUp, 4, 16, f) == 16;
+                 && std::fseek(f, (long)(kLofiUpTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiUp, 4, 16, f) == 16
+                 && std::fseek(f, (long)(kLimSlopeTab - kRomBase), SEEK_SET) == 0 && std::fread(T.limSlope, 4, 4, f) == 4;
     std::fclose(f);
     T.ok = ok;
     return ok;
@@ -1175,8 +1179,65 @@ void XtCosmComp::process(float* lr, float scale) {
 }
 
 
+// ── The Limiter ──
+
+XtLimBlock xtLimBlock(const XtLimParams& p) {
+    XtLimBlock b;
+    b.ratio = (int8_t)p.ratio;
+    b.threshold = div(flt(T.gain[clampi((int16_t)p.threshold, 0, 127)]), 32768.0f);   // not clamped in rom.2: 0…127 as stored
+    b.attack = div(flt(T.gain[clampi((int16_t)p.attack, 0, 127)]), 32768.0f);
+    b.release = div(flt(T.gain[clampi((int16_t)p.release, 0, 127)]), 32768.0f);
+    const int l = (int16_t)p.level;
+    if (l > 100) b.gain = fmac(div(flt(l - 100), 27.0f), 3.0f, 1.0f);
+    else { const float g = div(flt(l), 100.0f); b.gain = mul(g, g); }
+    return b;
+}
+
+XtCosmLim::XtCosmLim() : buf(kLen, 0.0f) {}
+
+void XtCosmLim::noteOn(const XtLimBlock& b) {
+    w = kLen;                                          // 0xcc2: the first sample goes to 0
+    std::fill(buf.begin(), buf.end(), 0.0f);
+    setBlock(b);
+    g = s = 1.0f;                                      // 0x894ee410
+}
+
+void XtCosmLim::setBlock(const XtLimBlock& b) {
+    slp = T.limSlope[b.ratio & 3];                     // the byte as an index (0…3)
+    thr = fmac(b.threshold, K(0x4d800000), K(0x49800000));                     // ·2^28 + 2^20
+    att = fmac(sub(1.0f, b.attack), K(0x2e5be6ff), K(0x2cafebfe));            // ·5e-11 + 5e-12
+    rel = fmac(sub(1.0f, b.release), K(0x2e5be6ff), K(0x29e12e13));           // ·5e-11 + 1e-13
+    gn = b.gain;
+    sl[0] = thr; sl[1] = att; sl[2] = rel; sl[3] = gn;
+}
+
+void XtCosmLim::process(float* lr, float scale) {
+    const float k01 = K(0x3dcccccd);
+    sl[1] = fmac(k01, sub(att, sl[1]), sl[1]);
+    sl[2] = fmac(k01, sub(rel, sl[2]), sl[2]);
+    sl[0] = fmac(k01, sub(thr, sl[0]), sl[0]);
+    sl[3] = fmac(k01, sub(gn, sl[3]), sl[3]);
+    const float t = sl[0], ra = sl[1], rr = sl[2], gain = sl[3], unscale = 1.0f / scale;
+    float* const B = buf.data();
+    for (int i = 0; i < 32; ++i) {
+        if (++w >= kLen) w = 0;
+        int r = w - 10;
+        if (r < 0) r += kLen;
+        const float x = mul(lr[2 * i], scale);
+        B[w] = x;
+        const float a = x < 0.0f ? -x : x;
+        float want = a;
+        if (a > t) want = fmac(sub(1.0f, slp), t, mul(a, slp));
+        const float now = mul(a, g);
+        g = fmac(sub(want, now), want > now ? rr : ra, g);
+        s = fmac(sub(g, s), K(0x3c23d709), s);                                      // 0.01
+        lr[2 * i] = lr[2 * i + 1] = mul(mul(mul(B[r], s), gain), unscale);
+    }
+}
+
+
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi and the Compressor against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi, the Compressor and the Limiter against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -2298,7 +2359,97 @@ int main(int argc, char** argv) {
     }
     std::printf("comp note-on and block: %ld cases, %ld different\n", on2, ob2);
     std::printf("comp filter: %ld blocks of 32 frames, %ld different\n", fn2, fb2);
+
+    // The Limiter (block code 16): the converter (0x894ddd20), then the
+    // note-on, new blocks (0x894edb20) and the filter (0x894fe450), its ring
+    // compared
+    auto limParams = [&]() {
+        XtLimParams p;
+        p.threshold = (int)(rnd() % 128); p.ratio = (int)(rnd() % 4); p.attack = (int)(rnd() % 128); p.release = (int)(rnd() % 128);
+        p.level = (int)(rnd() % 128);
+        return p;
+    };
+    auto writeLim = [&](const XtLimBlock& b) {
+        c.wr32(BLK, 16); c.wr32(BLK + 4, (uint32_t)(uint8_t)b.ratio); wf(BLK + 8, b.threshold); wf(BLK + 0xc, b.attack); wf(BLK + 0x10, b.release);
+        wf(BLK + 0x14, b.gain);
+    };
+    long kb3 = 0, kn3 = 0;
+    for (int k = 0; k < 200000; ++k) {
+        const XtLimParams p = limParams();
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100); c.write(BLK, z.data(), 0x18);
+        c.wr8(IN + 2, (uint8_t)(rnd() & 1)); c.wr8(IN + 3, (uint8_t)(rnd() % 128));
+        c.wr16(IN + 0x12, (uint16_t)p.threshold); c.wr16(IN + 0x14, (uint16_t)p.ratio); c.wr16(IN + 0x16, (uint16_t)p.attack);
+        c.wr16(IN + 0x18, (uint16_t)p.release); c.wr16(IN + 0x1a, (uint16_t)p.level);
+        if (!c.call(0x894ddd20, { IN, OUT }, sp)) { std::fprintf(stderr, "lim converter: %s\n", c.error().c_str()); return 1; }
+        writeLim(xtLimBlock(p));
+        ++kn3;
+        std::vector<uint8_t> fw(0x18), pt(0x18);
+        c.read(OUT, fw.data(), 0x18); c.read(BLK, pt.data(), 0x18);
+        if (fw != pt && kb3++ < 5)
+            std::printf("  lim converter %d %d %d %d %d: fw %08x %08x %08x %08x %08x port %08x %08x %08x %08x %08x\n", p.threshold, p.ratio, p.attack,
+                        p.release, p.level, c.rd32(OUT + 4), c.rd32(OUT + 8), c.rd32(OUT + 0xc), c.rd32(OUT + 0x10), c.rd32(OUT + 0x14),
+                        c.rd32(BLK + 4), c.rd32(BLK + 8), c.rd32(BLK + 0xc), c.rd32(BLK + 0x10), c.rd32(BLK + 0x14));
+    }
+    std::printf("lim converter: %ld cases, %ld different\n", kn3, kb3);
+    auto limSame = [&](const XtCosmLim& port) {
+        bool ok = same(f32(D + 0x8c), port.slope()) && same(f32(D + 0x90), port.gain()) && same(f32(D + 0x94), port.smooth())
+               && same(f32(D + 0xa0), port.slews()[3]) && (int)c.rd32(D + 4) == port.writeIndex();
+        for (uint32_t i = 0; i < 3; ++i) ok = ok && same(f32(D + 0xcc + 4 * i), port.slews()[i]);
+        return ok;
+    };
+    long ob3 = 0, on3 = 0, fb3 = 0, fn3 = 0;
+    for (int g = 0; g < nCases; ++g) {
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200);
+        for (uint32_t o = 0x74; o < 0x150; o += 4) wf(OBJ + o, frnd(-1, 1));                        // the last note's state
+        for (uint32_t bI = 0; bI < 4; ++bI)
+            for (uint32_t i = 0; i < 3267; ++i) wf(CB[bI] + 4 * i, frnd(-1, 1));                    // the last note's junk
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);   // read by the note-on, unused here
+        c.write(BLK, z.data(), 0x18);
+        const XtLimBlock b = xtLimBlock(limParams());
+        writeLim(b);
+        if (!c.call(0x894edf70, { OBJ, BLK, 0 }, sp)) { std::fprintf(stderr, "lim note-on: %s\n", c.error().c_str()); return 1; }
+        XtCosmLim port;
+        port.noteOn(b);
+        ++on3;
+        bool ok0 = limSame(port);
+        for (uint32_t i = 0; i < 3266; ++i) ok0 = ok0 && f32(CB[0] + 4 * i) == 0.0f;
+        if (!ok0 && ob3++ < 5)
+            std::printf("  lim note-on %d: fw slope %.9g g %.9g s %.9g thr %.9g w %d, port %.9g %.9g %.9g %.9g %d\n", g, f32(D + 0x8c), f32(D + 0x90),
+                        f32(D + 0x94), f32(D + 0xcc), (int)c.rd32(D + 4), port.slope(), port.gain(), port.smooth(), port.slews()[0], port.writeIndex());
+        const int quiet = (int)(rnd() % 4);                  // some notes fade, so the gain recovers
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 8 && (rnd() & 1)) {             // a parameter change while the note sounds
+                const XtLimBlock nb3 = xtLimBlock(limParams());
+                writeLim(nb3);
+                if (!c.call(0x894ee4a0, { OBJ, BLK }, sp)) { std::fprintf(stderr, "lim block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb3);
+                ++on3;
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 5);
+            float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e9f : ar == 2 ? 4.0e8f : ar == 3 ? 2.1e9f : 1.0f;
+            if (quiet == 0 && blkN > 20) amp = 0.0f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            if (ar == 3)                                     // some samples exactly at the threshold
+                for (int i = 0; i < 32; i += 1 + (int)(rnd() % 4)) lr[2 * i] = (rnd() & 1) ? f32(D + 0xcc) : -f32(D + 0xcc);
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(0x894fe450,{ D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "lim filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++fn3;
+            bool ok = limSame(port);
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            for (uint32_t i = 0; i < 3266; ++i) ok = ok && same(f32(CB[0] + 4 * i), port.buffer()[i]);
+            if (!ok && fb3++ < 6)
+                std::printf("  lim filter %d block %d: fw out %.9g %.9g g %.9g s %.9g, port %.9g %.9g %.9g %.9g\n", g, blkN, f32(BUF), f32(BUF + 248),
+                            f32(D + 0x90), f32(D + 0x94), lr[0], lr[62], port.gain(), port.smooth());
+        }
+    }
+    std::printf("lim note-on and block: %ld cases, %ld different\n", on3, ob3);
+    std::printf("lim filter: %ld blocks of 32 frames, %ld different\n", fn3, fb3);
     return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb || sb[0] || sb[1] || nb[0] || nb[1] || pb[0] || pb[1]
-        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 ? 3 : 0;
+        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 || kb3 || ob3 || fb3 ? 3 : 0;
 }
 #endif

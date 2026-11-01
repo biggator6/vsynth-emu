@@ -2,7 +2,7 @@
 // The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
 // the Dual Filter (9), the TB Filter (16), the Comb Filter (8), the Side
 // Band Filters (6, 7), the Resonator (5), the Frequency Shifter (14), Lo-Fi
-// (15) and the Compressor (12; below XtCosmTvf).  Each oscillator
+// (15), the Compressor (12) and the Limiter (13; below XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -620,6 +620,58 @@ private:
     static constexpr int kLen = 3266;
     float fac = 1.0f, sus = 0, gn = 1.0f;            // the block copy's (+0x14, +0x18, +0x1c)
     float sl[3] = {}, gt = 1.0f, gs = 1.0f, env = 0;
+    int w = 0;
+    std::vector<float> buf;
+};
+
+// The Limiter (COSM Type 13, block code 16): a gain follower with a 10-sample
+// lookahead.  Parameters 0x935…0x939: Threshold Level 0…127 (64), Ratio 0…3
+// (1; shown 1.5:1, 2:1, 4:1, 100:1), Attack 0…127 (64), Release 0…127 (64),
+// Output Level 0…127 (115).  No envelopes or LFOs.
+struct XtLimParams {
+    int threshold = 64, ratio = 1, attack = 64, release = 64, level = 115;
+};
+
+// The converter's block (0x894ddd20): the Ratio as a byte; Threshold, Attack
+// and Release through rom.2's 128 shorts at 0x897cfcb8 (the TB Filter's gain
+// curve, about 32768·(i/127)²) / 32768; the Level's gain as the Compressor's.
+struct XtLimBlock {
+    int ratio = 1;
+    float threshold = 0, attack = 0, release = 0, gain = 1.0f;
+};
+XtLimBlock xtLimBlock(const XtLimParams& p);
+
+// The object for block code 16 (0x894fe450).  The block (0x894edb20) gives
+// the slope above the threshold by Ratio (rom.2: 0.5, 0.25, 0.0625, 0.01, so
+// "1.5:1" is 2:1), the threshold t = Threshold·2^28 + 2^20 on the XT's scale,
+// and the rates (1 − Attack)·5e-11 + 5e-12 and (1 − Release)·5e-11 + 1e-13;
+// it sets them and the gain at once, so the per-block slew of 0.1 toward them
+// changes nothing.  Per sample: x into a 3266-sample ring; the wanted level
+// w = |x|, or t + slope·(|x| − t) above t; the gain g += rate·(w − |x|·g),
+// Release's rate when w > |x|·g, Attack's otherwise; s += 0.01·(g − s); out =
+// x 10 samples back × s × the Level's gain, on L and R from L.  Note-on
+// (0x894ee410) starts g and s at 1.
+class XtCosmLim {
+public:
+    XtCosmLim();
+    void noteOn(const XtLimBlock& b);
+    void setBlock(const XtLimBlock& b);                                        // 0x894edb20
+    // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
+    // the buffer's units against the XT's (int16 × 65536), for the levels.
+    void process(float* lr, float scale = 1.0f);
+
+    // The state, for the firmware checks (D = object + 0x58).
+    float slope() const { return slp; }              // D+0x8c
+    float gain() const { return g; }                 // D+0x90
+    float smooth() const { return s; }               // D+0x94
+    const float* slews() const { return sl; }        // D+0xcc the threshold, +0xd0 Attack's rate, +0xd4 Release's, +0xa0 (sl[3]) the Level's gain
+    int writeIndex() const { return w; }             // D+4
+    const float* buffer() const { return buf.data(); }
+
+private:
+    static constexpr int kLen = 3266;
+    float thr = 0, att = 0, rel = 0, gn = 1.0f;      // the block copy's (+0x18, +0x1c, +0x20, +0x24)
+    float slp = 0.5f, g = 1.0f, s = 1.0f, sl[4] = {};
     int w = 0;
     std::vector<float> buf;
 };

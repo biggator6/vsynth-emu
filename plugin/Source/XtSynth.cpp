@@ -386,6 +386,14 @@ XtCompBlock XtSynth::compBlock(int k) const {
     return xtCompBlock(p);
 }
 
+// A Limiter's block (0x894ddd20).
+XtLimBlock XtSynth::limBlock(int k) const {
+    const Controls::Cosm& c = ctl.cosm[k];
+    XtLimParams p;
+    p.threshold = c.limThreshold; p.ratio = c.limRatio; p.attack = c.limAttack; p.release = c.limRelease; p.level = c.limLevel;
+    return xtLimBlock(p);
+}
+
 // The TVF's slot 1 is its Q (envB), the Dual Filter's Filter 1, the TB
 // Filter's LPF, the Resonator's Size, the Frequency Shifter's Depth and the
 // Lo-Fi Filter (envA), the Comb and Side Band Filters' Detune (envB).
@@ -397,6 +405,7 @@ void XtSynth::cosmSetBlock(Voice& v, int k) {
     if (c.type == 8) { c.fs.setBlock(fsBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
     if (c.type == 9) { c.lofi.setBlock(lofiBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
     if (c.type == 10) { c.comp.setBlock(compBlock(k)); return; }
+    if (c.type == 11) { c.lim.setBlock(limBlock(k)); return; }
     if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else if (c.type == 3) c.tb.setBlock(tbBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
@@ -472,7 +481,8 @@ void XtSynth::setControls(const Controls& c) {
                       || n.lofiRate != o.lofiRate || n.lofiFilter != o.lofiFilter || n.lofiFilterKf != o.lofiFilterKf
                       || n.lofiFilterLfo != o.lofiFilterLfo || n.lofiFilterEnv != o.lofiFilterEnv || n.lofiBalance != o.lofiBalance
                       || n.lofiBalanceLfo != o.lofiBalanceLfo || n.lofiBalanceEnv != o.lofiBalanceEnv || n.compAttack != o.compAttack
-                      || n.compSustain != o.compSustain || n.compLevel != o.compLevel;
+                      || n.compSustain != o.compSustain || n.compLevel != o.compLevel || n.limThreshold != o.limThreshold
+                      || n.limRatio != o.limRatio || n.limAttack != o.limAttack || n.limRelease != o.limRelease || n.limLevel != o.limLevel;
     }
     ctl = c;
     for (int k = 0; k < 2; ++k)
@@ -604,6 +614,8 @@ void XtSynth::startVoice(int raw, int note, int vel) {
                           c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
         else if (c.type == 10)
             c.comp.noteOn(compBlock(k));
+        else if (c.type == 11)
+            c.lim.noteOn(limBlock(k));
         else if (c.type >= 4)
             ;                                          // below, once the voice's pitch is set
         else
@@ -817,6 +829,7 @@ void XtSynth::mixBlock(float* lr) {
                 else if (c.type == 7) c.res.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type == 8) c.fs.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type == 9) c.lofi.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
+                else if (c.type >= 10) ;                // the Compressor and Limiter have no update
                 else if (c.type >= 5) c.sbf.update(v.curA, c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
                 else c.tvf.update(c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
             }
@@ -836,7 +849,8 @@ void XtSynth::mixBlock(float* lr) {
         }
         // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA; the
         // Dynamic TVF's and Side Band Filters' followers, the Lo-Fi
-        // quantizer and the Compressor's envelope read the XT's scale: int16 × 65536, i.e. the SOLO buffer
+        // quantizer, the Compressor's envelope and the Limiter's levels read
+        // the XT's scale: int16 × 65536, i.e. the SOLO buffer
         // (±1) × 2^31, the band players' (int16) × 2^16
         const float fs = cur->type == 1 ? 0x1p31f : 0x1p16f;
         for (Voice::CosmVoice& c : v.cs) {
@@ -848,6 +862,7 @@ void XtSynth::mixBlock(float* lr) {
             else if (c.type == 8) c.fs.process(tmp);
             else if (c.type == 9) c.lofi.process(tmp, fs);
             else if (c.type == 10) c.comp.process(tmp, fs);
+            else if (c.type == 11) c.lim.process(tmp, fs);
             else if (c.type >= 5) c.sbf.process(tmp, fs);
             else c.tvf.process(tmp, fs);
         }
@@ -973,6 +988,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_LOFI="bit,rate,filter,filterKf,filterLfo,filterEnv,balance,balanceLfo,balanceEnv": COSM 1 on,
 //     Lo-Fi (KF in %); XT_CENV the Filter's envelope, XT_CENVB Balance's. XT_LOFI2: COSM 2's.
 //   XT_COMP="attack,sustain,level": COSM 1 on, a Compressor. XT_COMP2: COSM 2's.
+//   XT_LIM="threshold,ratio,attack,release,level": COSM 1 on, a Limiter (ratio 0..3). XT_LIM2: COSM 2's.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -1076,6 +1092,11 @@ int main(int argc, char** argv) {
             m.on = true;
             m.type = 10;
             std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
+        }
+        if (const char* e = std::getenv(("XT_LIM" + sfx).c_str())) {    // "threshold,ratio,attack,release,level"
+            m.on = true;
+            m.type = 11;
+            std::sscanf(e, "%d,%d,%d,%d,%d", &m.limThreshold, &m.limRatio, &m.limAttack, &m.limRelease, &m.limLevel);
         }
         if (const char* e = std::getenv(("XT_LOFI" + sfx).c_str())) {   // "bit,rate,filter,filterKf,filterLfo,filterEnv,balance,balanceLfo,balanceEnv"
             m.on = true;

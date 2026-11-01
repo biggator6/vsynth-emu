@@ -1544,6 +1544,100 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Limiter (2026-11-01, v74)
+
+COSM Type 13, block code 16: a gain follower with a 10-sample lookahead. As
+with the Compressor, the binding gives it no envelopes or LFOs, and it uses
+the first of the allocator's four buffers as a 3266-sample ring.
+
+**Parameters** (0x935…0x939, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x935 | Threshold Level | 0…127 | 64 |
+| 0x936 | Ratio (1.5:1, 2:1, 4:1, 100:1) | 0…3 | 1 |
+| 0x937 | Attack | 0…127 | 64 |
+| 0x938 | Release | 0…127 | 64 |
+| 0x939 | Output Level | 0…127 | 115 |
+
+**The converter** (`0x894ddd20`) writes the block:
+- +4 Ratio, a byte;
+- +8 Threshold, +0xc Attack and +0x10 Release, each through the 128 shorts
+  at 0x897cfcb8 / 32768. That is the TB Filter's gain curve: about
+  32768·(i/127)², and 32768 at 127.
+  - Attack and Release each add a controller term (0 without one) and are
+    clamped to 0…127 first.
+  - Threshold is used as stored.
+- +0x14 the Output Level's gain, as the Compressor's: (L/100)², or 1 + 3·(L
+  − 100)/27 above 100.
+
+**The object**:
+- The block copy (`0x894edb20`) stores:
+  - the slope above the threshold, by Ratio from the 4 floats at 0x897d1884:
+    0.5, 0.25, 0.0625, 0.01 (D+0x8c);
+  - the threshold t = Threshold·2^28 + 2^20, on the XT's scale (int16 ×
+    65536);
+  - Attack's rate, (1 − Attack)·5e-11 + 5e-12;
+  - Release's rate, (1 − Release)·5e-11 + 1e-13;
+  - the gain.
+- It writes the last four twice, with interrupts masked:
+  - to the targets (+0x18…0x24);
+  - to the values the filter slews (D+0xcc…0xd4, D+0xa0).
+  So the filter's per-block slew of 0.1 toward them never moves anything.
+- There are no start values or update.
+- Note-on (`0x894ee410`) sets D+0x90…0x9c to 1: the gain g, its smoothed s,
+  and two more, presumably the stereo routine's. The allocator clears the
+  ring. The write index starts at 0xcc2.
+
+**The filter** (`0x894fe450`; the stereo table's entry is `0x894fe67e`):
+- Per block, the threshold, both rates and the gain slew 0.1 toward the
+  block copy's (0x3dcccccd).
+- Per sample, from L:
+  - the write index steps, wrapping at 3266, and x goes into the ring;
+  - the wanted level w = |x|, or (1 − slope)·t + slope·|x| when |x| > t;
+  - g += rate·(w − |x|·g): Release's rate when w > |x|·g, Attack's
+    otherwise;
+  - s += 0.01·(g − s);
+  - out = (the ring 10 samples back × s) × the gain, on L and R.
+- The state written back: the write index, g and s, and the slope
+  (unchanged).
+
+Quirks:
+- The Ratio's names do not match its slopes. "1.5:1" is a 2:1 slope, "2:1"
+  4:1, "4:1" 16:1, and "100:1" 100:1.
+- The rate multiplies a level difference, so the gain moves faster on loud
+  signals. At Attack 64 (4.2e-11) and a full-scale peak (2^31) it closes 9%
+  of the gap per sample. So g follows the waveform within a cycle, and s
+  averages it.
+- Threshold 127 is t = 2^28 + 2^20: 18 dB below the buffer's full scale.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converter: 200,000 cases;
+- note-on (the firmware's own, with the pool hooked) and new blocks: 7,582
+  cases;
+- the filter: 120,000 blocks, the ring compared after every block. Some
+  notes fade to silence, and some samples sit exactly at ±t;
+- all 0 different.
+- Deliberate errors are caught: a 9-sample delay, the two rates swapped,
+  0.01 as C rounds it (0x3c23d70a, one unit from the firmware's), g starting
+  at 0, and Release's floor at 5e-12.
+- ≥ for > at the threshold is caught only because of the samples at ±t:
+  random samples never land on it.
+- XtSynth runs it in the XT's units, as the Compressor.
+
+**Plugin.**
+- COSM Type gains Limiter (index 11), with its own parameters (cosmLim… and
+  cosm2…) at the XT's defaults. They sit on one Limiter row in the type
+  area: Ratio, Thr, Atk, Rel, Lvl.
+- Measured on steady 1 kHz sines, levels as peaks in the SOLO buffer (±1):
+  - At Threshold 64 (−29.8 dB) with Level 100, sines at −30 dB and below
+    pass at unity.
+  - Between −20 and −6 dB the output rises 11.6, 8.8, 4.1 and 1.4 dB for
+    the four Ratios. That is about 1.2, 1.6, 3.4 and 10:1: softer than the
+    slopes, because the gain follows each cycle.
+  - At the defaults (Level 115, ×2.67): +8.5 dB on quiet sines, +3.9 dB at
+    −20 dB and −1.3 dB at −6 dB.
+
 ### COSM: the Compressor (2026-11-01, v73)
 
 COSM Type 12, block code 15: a sustainer with a 60-sample lookahead. It has
@@ -2282,7 +2376,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | 10 | TVF | 0x920–0x927 | `0x894dd870` | 13 | `0x89502890` |
 | 11 | Dynamic TVF | 0x928–0x931 | `0x894dda40` | 14 | `0x89502920` |
 | 12 | Compressor | 0x932–0x934 | `0x894ddc50` | 15 | `0x894fab80` (v73) |
-| 13 | Limiter | 0x935–0x939 | `0x894ddd20` | 16 | `0x894fe450` |
+| 13 | Limiter | 0x935–0x939 | `0x894ddd20` | 16 | `0x894fe450` (v74) |
 | 14 | Frequency Shifter | 0x93a–0x940 | `0x894ddde0` | 18 | `0x894fda60` (v71) |
 | 15 | Lo-Fi | 0x941–0x949 | `0x894ddf80` | 19 | `0x894fe9c0` (v72) |
 | 16 | TB Filter | 0x94a–0x954 | `0x894de110` | 20 | `0x89501950` (v66) |

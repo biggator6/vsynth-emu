@@ -217,6 +217,17 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+LIMITER v74 (2026-11-01): COSM Type 13 (HARDWARE_FIRMWARE.md, "COSM: the
+  Limiter"). XtCosm: XtLimParams, xtLimBlock (0x894ddd20; Threshold, Attack
+  and Release through the TB Filter's gain curve 0x897cfcb8), XtCosmLim
+  (block 0x894edb20 with the slopes at 0x897d1884, note-on 0x894ee410,
+  filter 0x894fe450: a 3266-sample ring, 10 samples of lookahead;
+  process(lr, scale) in the XT's units). XtSynth: Cosm.type 11 with
+  limThreshold, limRatio, limAttack, limRelease, limLevel (no envelopes or
+  LFO). Plugin params cosmLimThreshold, LimRatio (a choice), LimAttack,
+  LimRelease, LimLevel (and cosm2…). XT_LIM / TEST_LIM
+  "threshold,ratio,attack,release,level".
+
 COMPRESSOR v73 (2026-11-01): COSM Type 12 (HARDWARE_FIRMWARE.md, "COSM: the
   Compressor"). XtCosm: XtCompParams, xtCompBlock (0x894ddc50), XtCosmComp
   (block 0x894ee5c0, note-on 0x894ee390, filter 0x894fab80: a 3266-sample

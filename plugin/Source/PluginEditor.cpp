@@ -44,6 +44,8 @@ static const char* const kLofiIds[9][2] = { { "LofiBit", "Bit" }, { "LofiRate", 
                                             { "LofiFilterLfo", "LFO" }, { "LofiFilterEnv", "Env" } };
 // The Compressor's row: the id suffixes after "cosm"/"cosm2", and labels
 static const char* const kCompIds[3][2] = { { "CompAttack", "Atk" }, { "CompSustain", "Sus" }, { "CompLevel", "Lvl" } };
+// The Limiter's row after its Ratio
+static const char* const kLimIds[4][2] = { { "LimThreshold", "Thr" }, { "LimAttack", "Atk" }, { "LimRelease", "Rel" }, { "LimLevel", "Lvl" } };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
@@ -158,7 +160,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor" }, 1);
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter" }, 1);
     cosmTypeBox_.onChange = [this] { attachSideBand(); showCosmType(); };
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
@@ -327,6 +329,21 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     }
     compRowLabel_.setText("Comp", juce::dontSendNotification);
     styleSmall(compRowLabel_);
+    limRatioBox_.addItemList({ "1.5:1", "2:1", "4:1", "100:1" }, 1);
+    addAndMakeVisible(limRatioBox_);
+    for (int i = 0; i < kLimKnobs; ++i) {
+        juce::Slider& sl = limSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        limLabels_[i].setText(kLimIds[i][1], juce::dontSendNotification);
+        styleSmall(limLabels_[i]);
+    }
+    limRowLabel_.setText("Limiter", juce::dontSendNotification);
+    styleSmall(limRowLabel_);
     attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
@@ -389,8 +406,8 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
 // the depth and Env A rows (level slots 24..31), the Dual, TB, Comb and Side
-// Band Filters', the Resonator's, the Frequency Shifter's, Lo-Fi's and the
-// Compressor's rows and its LFO.
+// Band Filters', the Resonator's, the Frequency Shifter's, Lo-Fi's, the
+// Compressor's and the Limiter's rows and its LFO.
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
     cosmK_ = k;
@@ -446,6 +463,12 @@ void VSynthEmuEditor::attachCosm(int k) {
         compAtts_[i].reset();
         compAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kCompIds[i][0], compSliders_[i]);
     }
+    limRatioAtt_.reset();
+    limRatioAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "LimRatio", limRatioBox_);
+    for (int i = 0; i < kLimKnobs; ++i) {
+        limAtts_[i].reset();
+        limAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kLimIds[i][0], limSliders_[i]);
+    }
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
     attachSideBand();
     showCosmType();
@@ -456,7 +479,8 @@ void VSynthEmuEditor::attachCosm(int k) {
 // Dynamic TVF, with the Own depths for the Dynamic TVF).
 void VSynthEmuEditor::showCosmType() {
     const int t = cosmTypeBox_.getSelectedItemIndex();
-    const bool tvf = t <= 1, dtvf = t == 1, dual = t == 2, tb = t == 3, comb = t == 4, sb = t == 5 || t == 6, res = t == 7, fs = t == 8, lofi = t == 9, comp = t == 10;
+    const bool tvf = t <= 1, dtvf = t == 1, dual = t == 2, tb = t == 3, comb = t == 4, sb = t == 5 || t == 6, res = t == 7, fs = t == 8, lofi = t == 9, comp = t == 10,
+               lim = t == 11;
     for (juce::Component* cpt : { (juce::Component*)&tvfLabel_, (juce::Component*)&cosmFilterBox_, (juce::Component*)&cosmCutLabel_,
                                   (juce::Component*)&cosmCutSlider_, (juce::Component*)&cosmResoLabel_, (juce::Component*)&cosmResoSlider_,
                                   (juce::Component*)&cosmKfLabel_, (juce::Component*)&cosmKfSlider_, (juce::Component*)&levelRowLabels_[6] })
@@ -490,6 +514,9 @@ void VSynthEmuEditor::showCosmType() {
     for (juce::Label& l : lofiRowLabels_) l.setVisible(lofi);
     for (int i = 0; i < kCompKnobs; ++i) { compLabels_[i].setVisible(comp); compSliders_[i].setVisible(comp); }
     compRowLabel_.setVisible(comp);
+    limRatioBox_.setVisible(lim);
+    for (int i = 0; i < kLimKnobs; ++i) { limLabels_[i].setVisible(lim); limSliders_[i].setVisible(lim); }
+    limRowLabel_.setVisible(lim);
 }
 
 // The Side Band rows show the 1st's parameters, or the 2nd's when the type
@@ -908,6 +935,17 @@ void VSynthEmuEditor::layoutCosm(juce::Rectangle<int>& xt) {
             auto cell = row.removeFromLeft(w);
             compLabels_[i].setBounds(cell.removeFromLeft(34));
             compSliders_[i].setBounds(cell.withTrimmedRight(4));
+        }
+    }
+    {                                                // the Limiter: Ratio, Threshold, Attack, Release, Level
+        auto row = rowOf(0);
+        limRowLabel_.setBounds(row.removeFromLeft(56));
+        limRatioBox_.setBounds(row.removeFromLeft(70).withTrimmedRight(6));
+        const int w = row.getWidth() / kLimKnobs;
+        for (int i = 0; i < kLimKnobs; ++i) {
+            auto cell = row.removeFromLeft(w);
+            limLabels_[i].setBounds(cell.removeFromLeft(30));
+            limSliders_[i].setBounds(cell.withTrimmedRight(3));
         }
     }
 }

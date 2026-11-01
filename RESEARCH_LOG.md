@@ -2829,3 +2829,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
   (about 1.05), and its first gain leaves out the Output Level.
 - All of it equals the firmware in the interpreter. On sines 30 dB apart the
   defaults leave 14.3 dB.
+
+### Session 16 addendum (2026-11-01) — v74: Limiter
+
+- The Limiter (COSM Type 13, block code 16) is a gain follower with a
+  10-sample lookahead. Above the threshold the wanted level leans toward it
+  by the Ratio's slope. The gain moves toward that at Attack's rate or
+  Release's, then is smoothed by 0.01.
+- Firmware quirks kept:
+  - the Ratio's slopes are 0.5, 0.25, 0.0625 and 0.01, though the names
+    say 1.5:1, 2:1, 4:1 and 100:1;
+  - the gain follows each cycle of the waveform, so on steady sines the
+    limiting is softer than the slopes (about 1.2, 1.6, 3.4 and 10:1).
+- All of it equals the firmware in the interpreter. The check now puts some
+  samples exactly at the threshold, so that > against ≥ is tested too.

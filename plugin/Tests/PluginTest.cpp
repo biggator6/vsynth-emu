@@ -191,6 +191,8 @@ int main(int argc, char** argv) {
     // TEST_LOFI="bit,rate,filter,filterKf,filterLfo,filterEnv,balance,
     // balanceLfo,balanceEnv": Lo-Fi (KF in %); TEST_LOFI2: COSM 2's.
     // TEST_COMP="attack,sustain,level": a Compressor; TEST_COMP2: COSM 2's.
+    // TEST_LIM="threshold,ratio,attack,release,level": a Limiter (ratio 0..3);
+    // TEST_LIM2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -238,6 +240,13 @@ int main(int argc, char** argv) {
             m.type = 10;
             std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
             set("Switch", 1); set("Type", 10); set("CompAttack", m.compAttack); set("CompSustain", m.compSustain); set("CompLevel", m.compLevel);
+        }
+        if (const char* e = std::getenv(("TEST_LIM" + sfx).c_str())) {
+            m.on = true;
+            m.type = 11;
+            std::sscanf(e, "%d,%d,%d,%d,%d", &m.limThreshold, &m.limRatio, &m.limAttack, &m.limRelease, &m.limLevel);
+            set("Switch", 1); set("Type", 11); set("LimThreshold", m.limThreshold); set("LimRatio", m.limRatio); set("LimAttack", m.limAttack);
+            set("LimRelease", m.limRelease); set("LimLevel", m.limLevel);
         }
         if (const char* e = std::getenv(("TEST_LOFI" + sfx).c_str())) {
             m.on = true;
