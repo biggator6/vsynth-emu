@@ -35,6 +35,8 @@ constexpr uint32_t kLofiBalTab = 0x897d1668, kLofiMaskTab = 0x897d187c, kLofiCoe
 constexpr uint32_t kLimSlopeTab = 0x897d1884;
 // Wave Shape's three curves (128 floats each, 0x89503980)
 constexpr uint32_t kWsCurveTab = 0x897d3ff0;
+// the Speaker Simulator's coefficients, 27 floats per Speaker Type (0x89501300)
+constexpr uint32_t kSpkTab = 0x897d4670;
 
 struct Tables {
     float cut[129], cap[128];
@@ -49,6 +51,7 @@ struct Tables {
     int8_t lofiMask[6];
     float limSlope[4];
     float wsCurve[3][128];
+    float spk[12][27];
     bool ok = false, keySqOk = false;
 } T;
 
@@ -227,7 +230,8 @@ bool xtCosmLoadTables(const char* romPath) {
                  && std::fseek(f, (long)(kLofiDownTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiDown, 4, 16, f) == 16
                  && std::fseek(f, (long)(kLofiUpTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiUp, 4, 16, f) == 16
                  && std::fseek(f, (long)(kLimSlopeTab - kRomBase), SEEK_SET) == 0 && std::fread(T.limSlope, 4, 4, f) == 4
-                 && std::fseek(f, (long)(kWsCurveTab - kRomBase), SEEK_SET) == 0 && std::fread(T.wsCurve, 4, 384, f) == 384;
+                 && std::fseek(f, (long)(kWsCurveTab - kRomBase), SEEK_SET) == 0 && std::fread(T.wsCurve, 4, 384, f) == 384
+                 && std::fseek(f, (long)(kSpkTab - kRomBase), SEEK_SET) == 0 && std::fread(T.spk, 4, 12 * 27, f) == 12 * 27;
     std::fclose(f);
     T.ok = ok;
     return ok;
@@ -1439,6 +1443,37 @@ void XtCosmAmp::process(float* lr, float scale) {
 }
 
 
+// ── The Speaker Simulator ──
+
+void XtCosmSpk::noteOn(const XtSpkBlock& b) {
+    for (float& x : s) x = 0.0f;
+    type = b.type;
+}
+
+void XtCosmSpk::process(float* lr) {
+    const float* const C = T.spk[clampi(type, 0, 11)];
+    // s[k] is the routine's fr(k + 2): band, lo, y', y'', w', w'', o1', o1'',
+    // o2', o2'', o3', o3'', o4', and one it never writes
+    for (int i = 0; i < 32; ++i) {
+        s[1] = fmac(C[8], s[0], s[1]);
+        const float hp = sub(fmac(C[9], s[0], lr[2 * i]), s[1]);
+        s[0] = fmac(C[8], hp, s[0]);
+        const float y = fmac(C[2], s[3], fmac(C[1], s[2], mul(hp, C[0])));
+        s[3] = s[2]; s[2] = y;
+        const float w = fmac(C[11], s[5], fmac(C[10], s[4], mul(y, C[3])));
+        const float o1 = fmac(C[16], s[7], fmac(C[15], s[6], fmac(C[14], s[5], fmac(C[13], s[4], mul(w, C[12])))));
+        s[5] = s[4]; s[4] = w;
+        const float o2 = fmac(C[21], s[9], fmac(C[20], s[8], fmac(C[19], s[7], fmac(C[18], s[6], mul(o1, C[17])))));
+        s[7] = s[6]; s[6] = o1;
+        const float o3 = fmac(C[26], s[11], fmac(C[25], s[10], fmac(C[24], s[9], fmac(C[23], s[8], mul(o2, C[22])))));
+        s[9] = s[8]; s[8] = o2;
+        const float o4 = fmac(C[7], s[13], fmac(C[6], s[12], fmac(C[5], s[11], mul(o3, C[4]))));   // o3'', not o3'
+        s[11] = s[10]; s[10] = o3; s[12] = o4;
+        lr[2 * i] = lr[2 * i + 1] = fmac(0.5f, o4, o3);
+    }
+}
+
+
 // ── The Compressor ──
 
 XtCompBlock xtCompBlock(const XtCompParams& p) {
@@ -1548,7 +1583,7 @@ void XtCosmLim::process(float* lr, float scale) {
 
 
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi, the Compressor, the Limiter, Wave Shape, OD/Dist and the Amp Simulator against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi, the Compressor, the Limiter, Wave Shape, OD/Dist, the Amp and Speaker Simulators against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -3102,7 +3137,76 @@ int main(int argc, char** argv) {
     }
     std::printf("amp note-on, block and update: %ld cases, %ld different\n", bn3, bb3);
     std::printf("amp filter: %ld blocks of 32 frames, %ld different\n", cn3, cb3);
+
+    // The Speaker Simulator (block code 5): the converter's case (0x894de3b0,
+    // inline), then the note-on, new blocks (0x894ee4a0) and the filter
+    // (0x89501300)
+    long pb3 = 0, pn3 = 0;
+    for (int k = 0; k < 2000; ++k) {
+        const int type = k % 12;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100);
+        c.wr8(IN + 2, (uint8_t)(rnd() & 1)); c.wr8(IN + 3, (uint8_t)(rnd() % 128));
+        c.wr16(IN + 0x12, (uint16_t)type);
+        if (!c.call(0x894dcef0, { IN, OUT }, sp)) { std::fprintf(stderr, "spk converter: %s\n", c.error().c_str()); return 1; }
+        ++pn3;
+        if ((c.rd32(OUT) != 5 || c.rd8(OUT + 4) != type) && pb3++ < 5)
+            std::printf("  spk converter %d: fw code %u type %u\n", type, c.rd32(OUT), c.rd8(OUT + 4));
+    }
+    std::printf("spk converter: %ld cases, %ld different\n", pn3, pb3);
+    auto spkSame = [&](const XtCosmSpk& port) {
+        bool ok = true;
+        for (uint32_t i = 0; i < 14; ++i) ok = ok && same(f32(D + 0x1c + 4 * i), port.state()[i]);
+        return ok;
+    };
+    long qb3 = 0, qn3 = 0, rb3 = 0, rn3 = 0;
+    for (int g = 0; g < nCases; ++g) {
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200);
+        for (uint32_t o = 0x74; o < 0x150; o += 4) wf(OBJ + o, frnd(-1, 1));                        // the last note's state
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);   // read by the note-on, unused here
+        std::vector<uint8_t> zb(0x10, 0);
+        c.write(BLK, zb.data(), 0x10);
+        XtSpkBlock b;
+        b.type = g % 12;
+        c.wr32(BLK, 5); c.wr8(BLK + 4, (uint8_t)b.type);
+        if (!c.call(0x894edf70, { OBJ, BLK, 0 }, sp)) { std::fprintf(stderr, "spk note-on: %s\n", c.error().c_str()); return 1; }
+        XtCosmSpk port;
+        port.noteOn(b);
+        ++qn3;
+        if (!spkSame(port) && qb3++ < 5) std::printf("  spk note-on %d: fw state differs\n", g);
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 8 && (rnd() & 1)) {                      // a type change while the note sounds
+                XtSpkBlock nb;
+                nb.type = (int)(rnd() % 12);
+                c.wr8(BLK + 4, (uint8_t)nb.type);
+                if (!c.call(0x894ee4a0, { OBJ, BLK }, sp)) { std::fprintf(stderr, "spk block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb);
+                ++qn3;
+                if (c.rd8(OBJ + 0x14) != nb.type && qb3++ < 5) std::printf("  spk block %d.%d: fw type %u\n", g, blkN, c.rd8(OBJ + 0x14));
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 4);
+            const float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e9f : ar == 2 ? 1.0f : 2.1e9f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(0x89501300, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "spk filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++rn3;
+            bool ok = spkSame(port);
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            if (!ok && rb3++ < 6) {
+                std::printf("  spk filter %d block %d: fw out %.9g %.9g, port %.9g %.9g; states", g, blkN, f32(BUF), f32(BUF + 248), lr[0], lr[62]);
+                for (uint32_t i = 0; i < 14; ++i)
+                    if (!same(f32(D + 0x1c + 4 * i), port.state()[i])) std::printf(" [%u] %.9g/%.9g", i, f32(D + 0x1c + 4 * i), port.state()[i]);
+                std::printf("\n");
+            }
+        }
+    }
+    std::printf("spk note-on and block: %ld cases, %ld different\n", qn3, qb3);
+    std::printf("spk filter: %ld blocks of 32 frames, %ld different\n", rn3, rb3);
     return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb || sb[0] || sb[1] || nb[0] || nb[1] || pb[0] || pb[1]
-        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 || kb3 || ob3 || fb3 || wb3 || xb3 || yb3 || ub3 || vb3 || tb3 || ab3 || bb3 || cb3 ? 3 : 0;
+        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 || kb3 || ob3 || fb3 || wb3 || xb3 || yb3 || ub3 || vb3 || tb3 || ab3 || bb3 || cb3 || pb3 || qb3 || rb3 ? 3 : 0;
 }
 #endif

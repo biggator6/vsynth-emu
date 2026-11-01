@@ -169,7 +169,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter", "Wave Shape", "OD/Dist", "Amp Simulator" }, 1);
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter", "Wave Shape", "OD/Dist", "Amp Simulator", "Speaker Simulator" }, 1);
     cosmTypeBox_.onChange = [this] { attachSideBand(); showCosmType(); };
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
@@ -404,6 +404,10 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         ampRowLabels_[r].setText(r ? "Amp EQ" : "Amp", juce::dontSendNotification);
         styleSmall(ampRowLabels_[r]);
     }
+    spkTypeBox_.addItemList({ "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }, 1);
+    addAndMakeVisible(spkTypeBox_);
+    spkRowLabel_.setText("Speaker", juce::dontSendNotification);
+    styleSmall(spkRowLabel_);
     attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
@@ -467,8 +471,8 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
 // the depth and Env A rows (level slots 24..31), the Dual, TB, Comb and Side
 // Band Filters', the Resonator's, the Frequency Shifter's, Lo-Fi's, the
-// Compressor's, the Limiter's, Wave Shape's, OD/Dist's and the Amp
-// Simulator's rows and its LFO.
+// Compressor's, the Limiter's, Wave Shape's, OD/Dist's and the Amp and
+// Speaker Simulators' rows and its LFO.
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
     cosmK_ = k;
@@ -548,6 +552,8 @@ void VSynthEmuEditor::attachCosm(int k) {
         ampAtts_[i].reset();
         ampAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kAmpIds[i][0], ampSliders_[i]);
     }
+    spkTypeAtt_.reset();
+    spkTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "SpkType", spkTypeBox_);
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
     attachSideBand();
     showCosmType();
@@ -559,7 +565,7 @@ void VSynthEmuEditor::attachCosm(int k) {
 void VSynthEmuEditor::showCosmType() {
     const int t = cosmTypeBox_.getSelectedItemIndex();
     const bool tvf = t <= 1, dtvf = t == 1, dual = t == 2, tb = t == 3, comb = t == 4, sb = t == 5 || t == 6, res = t == 7, fs = t == 8, lofi = t == 9, comp = t == 10,
-               lim = t == 11, ws = t == 12, od = t == 13, amp = t == 14;
+               lim = t == 11, ws = t == 12, od = t == 13, amp = t == 14, spk = t == 15;
     for (juce::Component* cpt : { (juce::Component*)&tvfLabel_, (juce::Component*)&cosmFilterBox_, (juce::Component*)&cosmCutLabel_,
                                   (juce::Component*)&cosmCutSlider_, (juce::Component*)&cosmResoLabel_, (juce::Component*)&cosmResoSlider_,
                                   (juce::Component*)&cosmKfLabel_, (juce::Component*)&cosmKfSlider_, (juce::Component*)&levelRowLabels_[6] })
@@ -605,6 +611,8 @@ void VSynthEmuEditor::showCosmType() {
     ampTypeBox_.setVisible(amp);
     for (int i = 0; i < kAmpKnobs; ++i) { ampLabels_[i].setVisible(amp); ampSliders_[i].setVisible(amp); }
     for (juce::Label& l : ampRowLabels_) l.setVisible(amp);
+    spkTypeBox_.setVisible(spk);
+    spkRowLabel_.setVisible(spk);
 }
 
 // The Side Band rows show the 1st's parameters, or the 2nd's when the type
@@ -902,7 +910,7 @@ void VSynthEmuEditor::layoutCosm(juce::Rectangle<int>& xt) {
     cosmSelBox_.setBounds(rc.removeFromLeft(90).withTrimmedRight(6));
     cosmBtn_.setBounds(rc.removeFromLeft(48));
     cosmTypeLabel_.setBounds(rc.removeFromLeft(40));
-    cosmTypeBox_.setBounds(rc.removeFromLeft(130).withTrimmedRight(8));
+    cosmTypeBox_.setBounds(rc.removeFromLeft(160).withTrimmedRight(8));
     const juce::Rectangle<int> area = xt.removeFromTop(3 * 30);
     auto rowOf = [&](int r) { return area.withTrimmedTop(30 * r + 6).withHeight(24); };
     {                                                // the TVF: Filter Type, Cutoff, Resonance, KF; the depths; the Own depths
@@ -1036,6 +1044,11 @@ void VSynthEmuEditor::layoutCosm(juce::Rectangle<int>& xt) {
             ampLabels_[i].setBounds(cell.removeFromLeft(32));
             ampSliders_[i].setBounds(cell.withTrimmedRight(3));
         }
+    }
+    {                                                // the Speaker Simulator: Speaker Type
+        auto row = rowOf(0);
+        spkRowLabel_.setBounds(row.removeFromLeft(56));
+        spkTypeBox_.setBounds(row.removeFromLeft(70).withTrimmedRight(6));
     }
     {                                                // the Limiter: Ratio, Threshold, Attack, Release, Level
         auto row = rowOf(0);

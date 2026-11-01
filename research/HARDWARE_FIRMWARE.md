@@ -1544,6 +1544,78 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Speaker Simulator (2026-11-01, v78)
+
+COSM Type 4, block code 5: a fixed linear filter for each of twelve
+Speaker Types. It has no envelopes, LFO, buffers, start values, note-on case
+or update. This is the last COSM type: all sixteen are now ported.
+
+**Parameter**: 0x8ea, Speaker Type 0…11 (shown 1–12), default 0.
+
+**The converter** (`0x894dcef0`): +0 code 5, +4 the type as a byte. The
+block case (`0x894ee520`) only stores the type (OBJ+0x14). A new type takes
+effect at the next block, with no crossfade.
+
+**The filter** (`0x89501300`; the stereo table's entry is `0x895014c0`):
+- It uses the type's 27 floats C at 0x897d4670 + 0x6c × type, one sample at
+  a time, from L.
+- A state-variable stage (C8 its frequency, C9 its damping, about −0.99 or
+  −0.5):
+  - lo += C8·band;
+  - hp = x + C9·band − lo;
+  - band += C8·hp.
+- Two all-pole sections:
+  - y = C0·hp + C1·y' + C2·y'';
+  - w = C3·y + C10·w' + C11·w''.
+- Three biquads in direct form I:
+  - o1 = C12·w + C13·w' + C14·w'' + C15·o1' + C16·o1'';
+  - o2 (C17…C21) on o1;
+  - o3 (C22…C26) on o2.
+  Several types leave some as a plain gain (0.9999, 0 …).
+- A last section, o4 = C4·o3 + C5·o3'' + C6·o4' + C7·s. Two register quirks:
+  - it takes o3 two samples back where o3' would be expected;
+  - s (D+0x58) is never written, so after note-on that term is 0.
+- out = o3 + 0.5·o4, on L and R.
+- The states D+0x1c…0x58 (fr2…fr15) clear at note-on.
+- The filter is linear, so it runs at any scale.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converter: 2,000 cases;
+- note-on (the firmware's own) and type changes through the block
+  dispatcher: 7,667 cases;
+- the filter: 120,000 blocks, all twelve types, at levels from 1 to 2.1e9;
+- all 0 different.
+- Deliberate errors are caught:
+  - o4 from o3' instead of o3'';
+  - 0.25 for 0.5;
+  - the state-variable sum regrouped;
+  - o1's feedback states swapped;
+  - the table one type off;
+  - o4's state given o3.
+
+**Plugin.**
+- COSM Type gains Speaker Simulator (index 15), with its Speaker Type
+  (cosmSpkType, cosm2SpkType) on one row.
+- The COSM Type box is 30 px wider, so "Speaker Simulator" fits.
+- Responses, from the impulse (dB):
+
+| Type | 50 Hz | 100 | 200 | 500 | 1k | 2k | 4k | 6k | 8k | 12k |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | −23.8 | −11.1 | 0.1 | 0.9 | 0.8 | 1.8 | 3.0 | 4.9 | −7.1 | −23.5 |
+| 2 | −23.4 | −9.7 | 6.6 | 3.0 | 3.7 | 4.0 | 3.2 | −19.8 | −31.5 | −45.2 |
+| 3 | −17.0 | −4.1 | 2.7 | 1.1 | −1.6 | −7.1 | 2.9 | −3.5 | −9.3 | −22.8 |
+| 4 | −11.0 | 0.3 | 1.7 | 1.8 | 1.4 | 2.3 | 3.4 | 5.0 | −7.5 | −25.2 |
+| 5 | −18.5 | −5.6 | 1.3 | 0.5 | −0.4 | −0.5 | −9.5 | −6.9 | −16.8 | −30.8 |
+| 6 | −18.5 | −5.6 | 1.7 | 4.7 | 2.7 | 3.6 | 3.6 | −5.3 | −19.2 | −33.9 |
+| 7 | −19.2 | −4.2 | 4.0 | 6.7 | 3.1 | 2.1 | 0.1 | −9.4 | −20.6 | −34.8 |
+| 8 | −15.5 | −1.1 | 6.6 | 3.4 | 3.1 | 2.8 | −6.4 | −9.7 | −21.5 | −35.3 |
+| 9 | −15.4 | −0.5 | 7.6 | 3.4 | 2.0 | −7.1 | −7.4 | −15.9 | −26.8 | −40.0 |
+| 10 | −14.1 | 0.5 | 7.4 | 0.2 | −2.4 | 1.9 | 4.4 | 0.4 | −14.8 | −30.3 |
+| 11 | −18.2 | −3.5 | 7.4 | 5.3 | 2.5 | 1.0 | 2.3 | −16.3 | −28.9 | −42.9 |
+| 12 | −8.2 | 8.0 | 4.8 | 9.3 | 3.3 | 1.9 | 4.1 | −11.5 | −18.4 | −40.3 |
+
+All roll off below 100 Hz and above 6–8 kHz, like guitar cabinets.
+
 ### COSM: the Amp Simulator (2026-11-01, v77)
 
 COSM Type 3, block code 4: three guitar amps, each a chain of one-pole
@@ -2679,7 +2751,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | 1 | OD/Dist | 0x8d0–0x8d8 | `0x894dc8b0` | 1 or 2 | `0x894fef70`, `0x894fc570` (v76) |
 | 2 | Wave Shape | 0x8d9–0x8e1 | `0x894dcbf0` | 3 | `0x89503ef0` (v75) |
 | 3 | Amp Simulator | 0x8e2–0x8e9 | `0x894dcd80` | 4 | `0x894f8a30` (v77) |
-| 4 | Speaker Simulator | 0x8ea | inline | 5 | `0x89501300` |
+| 4 | Speaker Simulator | 0x8ea | `0x894dcef0` | 5 | `0x89501300` (v78) |
 | 5 | Resonator | 0x8eb–0x8f2 | `0x894dcf00` | 6 | `0x894ffa10` (v69) |
 | 6 | 1st Side Band Filter | 0x8f3–0x900 | `0x894dd0a0` | 7 | `0x89500640` (v68) |
 | 7 | 2nd Side Band Filter | 0x901–0x90d | `0x894dd2c0` | 8 | `0x89500d40` (v68) |
@@ -2702,6 +2774,10 @@ traced. The Side Band converters turned out to write fixed codes (v68), so
 "chosen at run time" was wrong for them. The codes left over are 0 (Through),
 10, 11 and 17 (the Resonator's is 6, v69; the Frequency Shifter's 18, v71;
 Lo-Fi's 19, v72). The ID ranges are from the table at 0x897cebd8.
+
+All sixteen types are ported and equal the firmware (v61–v78). The Speaker
+Simulator's converter is a small function of its own (`0x894dcef0`), not
+inline as first noted.
 
 **The Dual Filter** (COSM Type 9, block code 12).
 

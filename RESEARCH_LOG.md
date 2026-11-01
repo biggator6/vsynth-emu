@@ -2887,3 +2887,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
   term is always clipped to 0.5, so the cubic sees a fixed bias, which adds
   even harmonics. The last highpass removes the DC.
 - All of it equals the firmware in the interpreter, all three Types.
+
+### Session 16 addendum (2026-11-01) — v78: Speaker Simulator, the last COSM type
+
+- The Speaker Simulator (COSM Type 4) is a fixed filter per Speaker Type,
+  with 27 coefficients from rom.2 for each. It is a state-variable highpass,
+  two all-pole sections, three biquads, and a last section mixed in at half
+  level.
+- The last section takes its input from two samples back, and one of its
+  states is never written. Both are kept.
+- All twelve speakers equal the firmware in the interpreter. Each rolls off
+  below 100 Hz and above 6–8 kHz.
+- With it, all sixteen COSM types are ported (v61–v78), each equal to the
+  firmware in `xt_cosm`.

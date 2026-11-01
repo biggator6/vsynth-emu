@@ -217,6 +217,13 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
+  the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
+  (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from
+  0x897d4670; linear, no scale). XtSynth: Cosm.type 15 with spkType (no
+  envelopes, LFO or update). Plugin param cosmSpkType (1–12, and
+  cosm2SpkType). XT_SPK / TEST_SPK "type".
+
 AMP SIMULATOR v77 (2026-11-01): COSM Type 3 (HARDWARE_FIRMWARE.md, "COSM:
   the Amp Simulator"). XtCosm: XtAmpParams, xtAmpBlock (0x894dcd80),
   XtCosmAmp (start 0x894ec540, block 0x894ecfe0, update 0x894ee920, note-on

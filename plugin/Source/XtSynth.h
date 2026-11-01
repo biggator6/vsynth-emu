@@ -118,8 +118,8 @@ public:
         // follow the input's level by their Own Env depths −63..+63), 2
         // Dual Filter, 3 TB Filter, 4 Comb Filter, 5 or 6 the 1st or 2nd Side
         // Band Filter, 7 Resonator, 8 Frequency Shifter, 9 Lo-Fi, 10
-        // Compressor, 11 Limiter, 12 Wave Shape, 13 OD/Dist, 14 Amp Simulator
-        // (their own parameters below); Filter
+        // Compressor, 11 Limiter, 12 Wave Shape, 13 OD/Dist, 14 Amp Simulator,
+        // 15 Speaker Simulator (their own parameters below); Filter
         // Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
         // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
         // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
@@ -194,6 +194,8 @@ public:
             // and Output Level 0..127; Gain 0..127 with its LFO and Env
             // depths −63..+63 (envA)
             int ampType = 0, ampBass = 64, ampMiddle = 64, ampTreble = 64, ampLevel = 127, ampGain = 0, ampGainLfo = 0, ampGainEnv = 0;
+            // the Speaker Simulator: Speaker Type 0..11 (1..12)
+            int spkType = 0;
             CosmEnv envA, envB;
             int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
             bool lfoKeySync = false;
@@ -238,7 +240,7 @@ private:
         XtLfo lfo;
         // the COSM sections: on as at note-on; each its TVF, Dual, TB, Comb or
         // Side Band Filter, Resonator, Frequency Shifter, Lo-Fi, Compressor,
-        // Limiter, Wave Shape, OD/Dist or Amp Simulator, envelopes
+        // Limiter, Wave Shape, OD/Dist, Amp or Speaker Simulator, envelopes
         // (A: the Cutoff's, Filter 1's, the LPF's, Tone's, Width's, Size's,
         // Depth's, the Lo-Fi Filter's or Drive's; B: the Q's, Filter 2's, the
         // HPF's, Detune's, Balance's or Wave Shape's Tone) and LFO
@@ -258,6 +260,7 @@ private:
             XtCosmWs ws;
             XtCosmOd od;
             XtCosmAmp amp;
+            XtCosmSpk spk;
             XtEnvelope envA, envB;
             XtLfo lfo;
         };

@@ -52,7 +52,7 @@ namespace Params {
     static const juce::String kLegato        = "legatoSwitch";
     static const juce::String kOctave        = "octaveShift";
     // The COSM sections as TVFs, COSM 1 ("cosm…") and COSM 2 ("cosm2…"):
-    // Switch, Type (TVF, Dynamic TVF, Dual Filter, TB Filter, Comb Filter, 1st and 2nd Side Band, Resonator, Frequency Shifter, Lo-Fi, Compressor, Limiter, Wave Shape, OD/Dist, Amp Simulator), ResoOwn/CutoffOwn (the Dynamic TVF's
+    // Switch, Type (TVF, Dynamic TVF, Dual Filter, TB Filter, Comb Filter, 1st and 2nd Side Band, Resonator, Frequency Shifter, Lo-Fi, Compressor, Limiter, Wave Shape, OD/Dist, Amp Simulator, Speaker Simulator), ResoOwn/CutoffOwn (the Dynamic TVF's
     // Own Env depths), Filter, Cutoff, Reso, CutoffKF, CutoffEnv/Lfo, ResoEnv/Lfo; the
     // Dual Filter's DualType and Dual1…/Dual2… Freq, KF, Q, Lfo, Env; the TB
     // Filter's TbCutoff, TbKF, TbLfo, TbEnv, TbQ, TbQFollow, TbHpf, TbHpfKF,
@@ -70,7 +70,8 @@ namespace Params {
     // LimAttack, LimRelease, LimLevel; Wave Shape's WsType, WsLevel, WsDrive,
     // WsDriveLfo, WsDriveEnv, WsTone, WsToneKF, WsToneLfo, WsToneEnv; OD/Dist's
     // the same with Od…; the Amp Simulator's AmpType, AmpBass, AmpMiddle,
-    // AmpTreble, AmpLevel, AmpGain, AmpGainLfo, AmpGainEnv; the envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
+    // AmpTreble, AmpLevel, AmpGain, AmpGainLfo, AmpGainEnv; the Speaker
+    // Simulator's SpkType; the envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
     // Attack…TimeKF; the LFO, LfoWave…LfoKeySync
     static juce::String cosmId(int k, const char* name) { return juce::String(k ? "cosm2" : "cosm") + name; }
     static const char* const kCosmEnvKnobs[10] = { "Attack", "Decay", "Sustain", "Release", "VelCurve", "VelSens",
@@ -230,7 +231,7 @@ VSynthEmuProcessor::createParameterLayout() {
         const juce::String n = k ? "COSM 2 " : "COSM 1 ";
         params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "Switch"), n + "Switch", false));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Type"), n + "Type",
-            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter", "Wave Shape", "OD/Dist", "Amp Simulator" }, 0));
+            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter", "Wave Shape", "OD/Dist", "Amp Simulator", "Speaker Simulator" }, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResoOwn"), n + "Resonance Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CutoffOwn"), n + "Cutoff Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Filter"), n + "Filter Type",
@@ -397,6 +398,8 @@ VSynthEmuProcessor::createParameterLayout() {
             params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "AmpGainLfo"), an + "Gain LFO Depth", -63, 63, 0));
             params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "AmpGainEnv"), an + "Gain Env Depth", -63, 63, 0));
         }
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "SpkType"), n + "Speaker Simulator Speaker Type",
+            juce::StringArray { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }, 0));
         for (const char* ab : { "A", "B" }) {
             const juce::String id = cosmId(k, "Env") + ab, name = n + "Env " + ab + " ";
             params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Attack", name + "Attack", 0, 127, 0));
@@ -643,6 +646,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         m.ampType = knob(cosmId(k, "AmpType")); m.ampBass = knob(cosmId(k, "AmpBass")); m.ampMiddle = knob(cosmId(k, "AmpMiddle"));
         m.ampTreble = knob(cosmId(k, "AmpTreble")); m.ampLevel = knob(cosmId(k, "AmpLevel")); m.ampGain = knob(cosmId(k, "AmpGain"));
         m.ampGainLfo = knob(cosmId(k, "AmpGainLfo")); m.ampGainEnv = knob(cosmId(k, "AmpGainEnv"));
+        m.spkType = knob(cosmId(k, "SpkType"));
         for (int t = 0; t < 2; ++t) {
             XtSynth::Controls::Cosm::SideBand& b = m.sb[t];
             const juce::String id = cosmId(k, "Sb") + juce::String(t + 1);

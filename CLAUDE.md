@@ -68,7 +68,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `xt_fw solocmp` takes R and F as ratios (F 0 = none) and Energy as a gain
   0..1; `bandcmp` type 3 BACKING / 5 ENSEMBLE.
 
-## Porting a COSM type (v65–v73 did it this way)
+## Porting a COSM type (v65–v78 did it this way; all sixteen are done)
 The type map (converters, block codes, DSP routines, which types are done) is
 in HARDWARE_FIRMWARE.md, "COSM: the Dual Filter, and the map of the types".
 1. `pnames.py` on the type's IDs; disassemble the converter (`ghidra.sh

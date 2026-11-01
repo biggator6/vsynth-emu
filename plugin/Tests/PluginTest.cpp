@@ -196,7 +196,8 @@ int main(int argc, char** argv) {
     // toneKf,toneLfo,toneEnv": Wave Shape (type 0..5, KF in %); TEST_WS2: COSM 2's.
     // TEST_OD="type,…": OD/Dist (type 0 OD, 1 DS; the rest as TEST_WS); TEST_OD2.
     // TEST_AMP="type,bass,middle,treble,level,gain,gainLfo,gainEnv": the Amp
-    // Simulator (type 0..2); TEST_AMP2: COSM 2's.
+    // Simulator (type 0..2); TEST_AMP2: COSM 2's.  TEST_SPK="type": the
+    // Speaker Simulator (type 0..11); TEST_SPK2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -244,6 +245,12 @@ int main(int argc, char** argv) {
             m.type = 10;
             std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
             set("Switch", 1); set("Type", 10); set("CompAttack", m.compAttack); set("CompSustain", m.compSustain); set("CompLevel", m.compLevel);
+        }
+        if (const char* e = std::getenv(("TEST_SPK" + sfx).c_str())) {
+            m.on = true;
+            m.type = 15;
+            m.spkType = std::atoi(e);
+            set("Switch", 1); set("Type", 15); set("SpkType", m.spkType);
         }
         if (const char* e = std::getenv(("TEST_AMP" + sfx).c_str())) {
             m.on = true;

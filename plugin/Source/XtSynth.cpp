@@ -440,6 +440,7 @@ void XtSynth::cosmSetBlock(Voice& v, int k) {
     if (c.type == 12) { c.ws.setBlock(wsBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
     if (c.type == 13) { c.od.setBlock(odBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
     if (c.type == 14) { c.amp.setBlock(ampBlock(v, k), c.envA.level(), c.lfo.out()); return; }
+    if (c.type == 15) { c.spk.setBlock({ ctl.cosm[k].spkType }); return; }
     if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else if (c.type == 3) c.tb.setBlock(tbBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
@@ -523,7 +524,7 @@ void XtSynth::setControls(const Controls& c) {
                       || n.odDriveLfo != o.odDriveLfo || n.odDriveEnv != o.odDriveEnv || n.odTone != o.odTone || n.odToneKf != o.odToneKf
                       || n.odToneLfo != o.odToneLfo || n.odToneEnv != o.odToneEnv || n.ampType != o.ampType || n.ampBass != o.ampBass
                       || n.ampMiddle != o.ampMiddle || n.ampTreble != o.ampTreble || n.ampLevel != o.ampLevel || n.ampGain != o.ampGain
-                      || n.ampGainLfo != o.ampGainLfo || n.ampGainEnv != o.ampGainEnv;
+                      || n.ampGainLfo != o.ampGainLfo || n.ampGainEnv != o.ampGainEnv || n.spkType != o.spkType;
     }
     ctl = c;
     for (int k = 0; k < 2; ++k)
@@ -665,6 +666,8 @@ void XtSynth::startVoice(int raw, int note, int vel) {
                         c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
         else if (c.type == 14)
             c.amp.noteOn(ampBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
+        else if (c.type == 15)
+            c.spk.noteOn({ ctl.cosm[k].spkType });
         else if (c.type >= 4)
             ;                                          // below, once the voice's pitch is set
         else
@@ -881,7 +884,7 @@ void XtSynth::mixBlock(float* lr) {
                 else if (c.type == 12) c.ws.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type == 13) c.od.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type == 14) c.amp.update(c.envA.level(), c.envA.smooth(), c.lfo.out());
-                else if (c.type >= 10) ;                // the Compressor and Limiter have no update
+                else if (c.type >= 10) ;                // the Compressor, Limiter and Speaker Simulator have no update
                 else if (c.type >= 5) c.sbf.update(v.curA, c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
                 else c.tvf.update(c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
             }
@@ -918,6 +921,7 @@ void XtSynth::mixBlock(float* lr) {
             else if (c.type == 12) c.ws.process(tmp, fs);
             else if (c.type == 13) c.od.process(tmp, fs);
             else if (c.type == 14) c.amp.process(tmp, fs);
+            else if (c.type == 15) c.spk.process(tmp);
             else if (c.type >= 5) c.sbf.process(tmp, fs);
             else c.tvf.process(tmp, fs);
         }
@@ -1050,6 +1054,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //     (type 0 OD, 1 DS; KF in %); XT_CENV Drive's envelope, XT_CENVB Tone's. XT_OD2: COSM 2's.
 //   XT_AMP="type,bass,middle,treble,level,gain,gainLfo,gainEnv": COSM 1 on, the Amp Simulator
 //     (type 0..2); XT_CENV Gain's envelope. XT_AMP2: COSM 2's.
+//   XT_SPK="type": COSM 1 on, the Speaker Simulator (type 0..11). XT_SPK2: COSM 2's.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -1153,6 +1158,11 @@ int main(int argc, char** argv) {
             m.on = true;
             m.type = 10;
             std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
+        }
+        if (const char* e = std::getenv(("XT_SPK" + sfx).c_str())) {    // "type"
+            m.on = true;
+            m.type = 15;
+            m.spkType = std::atoi(e);
         }
         if (const char* e = std::getenv(("XT_AMP" + sfx).c_str())) {    // "type,bass,middle,treble,level,gain,gainLfo,gainEnv"
             m.on = true;

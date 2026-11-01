@@ -2,8 +2,9 @@
 // The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
 // the Dual Filter (9), the TB Filter (16), the Comb Filter (8), the Side
 // Band Filters (6, 7), the Resonator (5), the Frequency Shifter (14), Lo-Fi
-// (15), the Compressor (12), the Limiter (13), Wave Shape (2), OD/Dist (1)
-// and the Amp Simulator (3; below XtCosmTvf).  Each oscillator
+// (15), the Compressor (12), the Limiter (13), Wave Shape (2), OD/Dist (1),
+// the Amp Simulator (3) and the Speaker Simulator (4; below XtCosmTvf).
+// Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -804,6 +805,39 @@ private:
     float g = 1.0f, gT = 1.0f, rate1 = 0, sl[4] = { 1.0f, 0, 0, 0 };
     float st[10] = {};
     float gainOf(float env, float lfo) const;
+};
+
+// The Speaker Simulator (COSM Type 4, block code 5): a fixed filter per
+// Speaker Type 0…11 (shown 1…12; 0 by default; parameter 0x8ea, written
+// straight into the block, +4, by the COSM converter).  No envelopes or LFO.
+//
+// The object (block 0x894ee520: the type; no start values, note-on case or
+// update; filter 0x89501300), per sample from L with the type's 27 floats C
+// from rom.2 (0x897d4670):
+//   a state-variable stage: lo += C8·band; hp = x + C9·band − lo;
+//     band += C8·hp;
+//   y = C0·hp + C1·y' + C2·y''; w = C3·y + C10·w' + C11·w'';
+//   three biquads o1 = C12·w + C13·w' + C14·w'' + C15·o1' + C16·o1'', o2
+//   (C17…C21) on o1, o3 (C22…C26) on o2;
+//   o4 = C4·o3 + C5·o3'' + C6·o4' + C7·s, s a state the routine never writes
+//   (0 after note-on);
+//   out = o3 + 0.5·o4, on L and R.
+// It is linear, so it runs at any scale.
+struct XtSpkBlock {
+    int type = 0;
+};
+
+class XtCosmSpk {
+public:
+    void noteOn(const XtSpkBlock& b);                  // 0x894edf70: the states cleared
+    void setBlock(const XtSpkBlock& b) { type = b.type; }                      // 0x894ee520
+    // 32 frames, interleaved L/R, in place: reads L, writes both.
+    void process(float* lr);
+    const float* state() const { return s; }         // D+0x1c…0x58 (fr2…fr15)
+
+private:
+    int type = 0;
+    float s[14] = {};
 };
 
 // The Limiter (COSM Type 13, block code 16): a gain follower with a 10-sample
