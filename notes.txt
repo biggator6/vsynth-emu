@@ -217,6 +217,18 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+FREQUENCY SHIFTER v71 (2026-11-01): COSM Type 14 (HARDWARE_FIRMWARE.md,
+  "COSM: the Frequency Shifter"). XtCosm: XtFsParams, xtFsBlock (0x894ddde0;
+  its Depth curve 0x894dc7a0 = the Side Band Width's), XtCosmFs (start
+  0x894ec9f0, block 0x894edc80, update 0x894eee60, note-on 0x894ee430,
+  filter 0x894fda60: a 3266-sample ring, the Hilbert FIR's sums in the
+  firmware's order). It reads the sine table (0x897d3dec, 129 floats) and
+  the Hilbert taps (0x897d45f0, 32) at run time. XtSynth: Cosm.type 8 with
+  fsDepth…fsBalanceEnv; slot 1 envA (Depth), slot 2 envB (Balance). Plugin
+  params cosmFsDepth, FsDepthKF, FsDepthLfo, FsDepthEnv, FsBalance,
+  FsBalanceLfo, FsBalanceEnv (and cosm2…). XT_FS / TEST_FS
+  "depth,depthKf,depthLfo,depthEnv,balance,balanceLfo,balanceEnv" (KF in %).
+
 EDITOR v70 (2026-10-31): the COSM rows show only the selected type's own
   rows, in one three-row area under a header row (selector, switch, Type):
   the TVF's Filter Type, Cutoff, Resonance, KF and TVF Mod depths (with the

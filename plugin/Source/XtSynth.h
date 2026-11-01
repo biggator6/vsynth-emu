@@ -117,7 +117,8 @@ public:
         // switch; the type, 0 TVF, 1 Dynamic TVF (its Q and Cutoff also
         // follow the input's level by their Own Env depths −63..+63), 2
         // Dual Filter, 3 TB Filter, 4 Comb Filter, 5 or 6 the 1st or 2nd Side
-        // Band Filter, 7 Resonator (their own parameters below); Filter
+        // Band Filter, 7 Resonator, 8 Frequency Shifter (their own parameters
+        // below); Filter
         // Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
         // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
         // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
@@ -166,6 +167,10 @@ public:
             // −200..+200 (steps of 10), LFO and Env depths −63..+63 (envA);
             // Balance 0..100 with its depths (envB)
             int resType = 0, resSize = 64, resSizeKf = 0, resSizeLfo = 0, resSizeEnv = 0, resBalance = 50, resBalanceLfo = 0, resBalanceEnv = 0;
+            // the Frequency Shifter: Effect Depth 0..127 with Keyfollow
+            // −200..+200 (steps of 10), LFO and Env depths −63..+63 (envA);
+            // Dry/Effect Balance 0..100 with its depths (envB)
+            int fsDepth = 80, fsDepthKf = 0, fsDepthLfo = 0, fsDepthEnv = 0, fsBalance = 50, fsBalanceLfo = 0, fsBalanceEnv = 0;
             CosmEnv envA, envB;
             int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
             bool lfoKeySync = false;
@@ -209,9 +214,9 @@ private:
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
         XtLfo lfo;
         // the COSM sections: on as at note-on; each its TVF, Dual, TB, Comb or
-        // Side Band Filter or Resonator, envelopes (A: the Cutoff's, Filter
-        // 1's, the LPF's, Tone's, Width's or Size's; B: the Q's, Filter 2's,
-        // the HPF's, Detune's or Balance's) and LFO
+        // Side Band Filter, Resonator or Frequency Shifter, envelopes (A: the
+        // Cutoff's, Filter 1's, the LPF's, Tone's, Width's, Size's or Depth's;
+        // B: the Q's, Filter 2's, the HPF's, Detune's or Balance's) and LFO
         struct CosmVoice {
             bool on = false;
             int type = 0;                      // the type as at note-on
@@ -221,6 +226,7 @@ private:
             XtCosmComb comb;
             XtCosmSbf sbf;
             XtCosmRes res;
+            XtCosmFs fs;
             XtEnvelope envA, envB;
             XtLfo lfo;
         };
@@ -289,6 +295,7 @@ private:
     XtCombBlock combBlock(const Voice& v, int k) const;
     XtSbfBlock sbfBlock(const Voice& v, int k) const;
     XtResBlock resBlock(const Voice& v, int k) const;
+    XtFsBlock fsBlock(const Voice& v, int k) const;
     void cosmSetBlock(Voice& v, int k);              // a new block for a sounding section (0x894ed8f0)
     float drawSeed();
 };

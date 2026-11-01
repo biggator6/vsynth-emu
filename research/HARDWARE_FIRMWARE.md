@@ -1544,6 +1544,90 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Frequency Shifter (2026-11-01, v71)
+
+COSM Type 14, block code 18. It is a single-sideband shifter: the input's
+Hilbert pair times a quadrature oscillator, mixed with the dry input.
+
+**Parameters** (0x93a…0x940, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x93a | Effect Depth | 0…127 | 80 |
+| 0x93b | Effect Depth Keyfollow | ±20 | 0 |
+| 0x93c | Effect LFO Depth | ±63 | 0 |
+| 0x93d | Effect Env Depth | ±63 | 0 |
+| 0x93e | Dry/Effect Balance | 0…100 | 50 |
+| 0x93f | Balance LFO Depth | ±63 | 0 |
+| 0x940 | Balance Env Depth | ±63 | 0 |
+
+**The converter** (`0x894ddde0`) writes the block:
+- +4 Depth through `0x894dc7a0`, which is the same code as the Side Band
+  Width's `0x894dc5f0`: (D/127 + 0) × powf(2, KF·10·(key − 60)/1200),
+  within 0…1;
+- +8 its Env depth (A), +0xc its envelope (9 or 11), +0x10 its LFO depth,
+  +0x14 its LFO;
+- +0x18 Balance/100 + 0, +0x1c its Env depth (B), +0x20 its envelope (10 or
+  12), +0x24 its LFO depth, +0x28 its LFO.
+
+The binding puts Depth's envelope in slot 1 and Balance's in slot 2.
+
+**The object** (start values `0x894ec9f0`; block copy `0x894edc80`, a plain
+copy; update `0x894eee60`; note-on case `0x894ee430`):
+- Depth' = 0.0126 × clamp(Depth + Env·depth + LFO·depth, 0…1) + 0.001
+  (D+0xbc; target D+0xa4). This is the oscillator's phase step per sample:
+  44 Hz at 0 to 600 Hz at full depth.
+- Balance' = clamp(Balance + Env·depth + LFO·depth, 0…1) (D+0xc0; target
+  D+0xa8).
+- Note-on clears the phase (D+0x94). The allocator gives code 18 the Comb's
+  four cleared buffers, and the shifter uses the first as a 3266-sample
+  ring; the write index starts at 3266, so the first sample goes to 0.
+
+**The filter** (`0x894fda60`; the stereo table's entry is `0x894fde84`):
+- The steps rate·(target − value) for Depth' and Balance' are taken once per
+  block. Before every fourth sample both step; then the increment is |Depth'|
+  and the sign s is −1 (Depth' ≥ 0) or +1.
+- Per sample: the write index steps, wrapping at 3266, and x (L) goes into
+  the ring.
+- H, the Hilbert output, is a 32-tap FIR on every other sample: H(n) =
+  Σ c_j·x(n − 2j), with c_j from 0x897d45f0 and its centre at n − 31. The
+  firmware forms four outputs at once in the back register bank: at each
+  group's first sample, every term whose sample is already in the ring, in
+  ascending j; at each later sample, that sample's terms in the outputs
+  still to come. A plain ascending sum differs in 86% of blocks.
+- Phase += increment, less 1 when above 1. At y = 127·phase, i = trunc(y),
+  f = y − i: sin = (1 − f)·T[i] + f·T[i+1], and cos the same at i + 32
+  (mod 128). T is 129 floats at 0x897d3dec, 128 a cycle. The 127 is a
+  firmware quirk: each phase cycle reads 127 of the table's 128 steps, then
+  jumps back, which adds small spurs at multiples of the shift.
+- out = Balance' × (s·x(n − 31)·cos + H·2·sin) + (1 − Balance')·x, on L and
+  R.
+- The state written back: the write index (D+4), the phase (D+0x94), Depth'
+  and Balance'.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- The FIR's order of additions was taken from the code mechanically: a
+  symbolic run of its unrolled loop listed each accumulator's (tap, sample)
+  terms.
+- the converter: 200,000 cases;
+- note-on (the firmware's own, with the pool hooked as for the Comb),
+  updates and new blocks: 22,844 cases;
+- the filter: 120,000 blocks, with the ring compared after every block;
+- all 0 different.
+- Deliberate errors are caught: the plain FIR order, a 128 for the 127, and
+  the oscillator's sign. A `>=` for the phase's `>` is not: the phase never
+  lands on exactly 1 in these cases.
+
+**Plugin.**
+- COSM Type gains Frequency Shifter (index 8, latched at note-on), with its
+  own parameters (cosmFs… and cosm2…) at the XT's defaults.
+- Its Shift and FS Bal rows are in the editor's type area (v70).
+- On a 1 kHz sine, fully wet:
+  - Depth 80 moves it to 1,394 Hz, Depth 0 to 1,044 Hz, and Depth 127 to
+    1,600 Hz;
+  - no other line is above −34 dB;
+  - Balance 50 gives both lines at the same level.
+
 ### COSM: the Resonator (2026-10-31, v69)
 
 COSM Type 5, block code 6: six two-pole resonators in parallel, their
@@ -2051,7 +2135,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | 11 | Dynamic TVF | 0x928–0x931 | `0x894dda40` | 14 | `0x89502920` |
 | 12 | Compressor | 0x932–0x934 | `0x894ddc50` | 15 | `0x894fab80` |
 | 13 | Limiter | 0x935–0x939 | `0x894ddd20` | 16 | `0x894fe450` |
-| 14 | Frequency Shifter | 0x93a–0x940 | `0x894ddde0` | | |
+| 14 | Frequency Shifter | 0x93a–0x940 | `0x894ddde0` | 18 | `0x894fda60` (v71) |
 | 15 | Lo-Fi | 0x941–0x949 | `0x894ddf80` | | |
 | 16 | TB Filter | 0x94a–0x954 | `0x894de110` | 20 | `0x89501950` (v66) |
 
@@ -2062,8 +2146,8 @@ The routine table by code (0…20): `0x894fb280`, `0x894fef70`,
 `0x894fb530`, `0x894fda60`, `0x894fe9c0`, `0x89501950`. Blank cells were not
 traced. The Side Band converters turned out to write fixed codes (v68), so
 "chosen at run time" was wrong for them. The codes left over are 0 (Through),
-10, 11 and 17–19, presumably the Frequency Shifter's and Lo-Fi's (the
-Resonator's is 6, v69). The ID ranges are from the table at 0x897cebd8.
+10, 11, 17 and 19, presumably Lo-Fi's among them (the Resonator's is 6, v69;
+the Frequency Shifter's 18, v71). The ID ranges are from the table at 0x897cebd8.
 
 **The Dual Filter** (COSM Type 9, block code 12).
 
@@ -2414,7 +2498,7 @@ on the SH-4):
 
 **Not modelled yet:**
 - COSM 2 (since modelled, v63);
-- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67; Side Band Filters, v68; Resonator, v69);
+- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67; Side Band Filters, v68; Resonator, v69; Frequency Shifter, v71);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;

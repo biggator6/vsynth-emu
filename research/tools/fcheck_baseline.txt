@@ -39,6 +39,9 @@ expf: 400000 cases, 0 different
 res converter: 200000 cases, 0 different
 res note-on, block and update: 22500 cases, 0 different
 res filter: 120000 blocks of 32 frames, 0 different
+fs converter: 200000 cases, 0 different
+fs note-on, block and update: 22844 cases, 0 different
+fs filter: 120000 blocks of 32 frames, 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

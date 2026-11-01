@@ -35,6 +35,9 @@ static const char* const kSbIds[13][2] = { { "Hpf", "HPF" }, { "Lpf", "LPF" }, {
 // The Resonator's rows (Size; Balance): the id suffixes after "cosm"/"cosm2", and labels
 static const char* const kResIds[7][2] = { { "ResSize", "Size" }, { "ResSizeKF", "KF" }, { "ResSizeLfo", "LFO" }, { "ResSizeEnv", "Env" },
                                            { "ResBalance", "Bal" }, { "ResBalanceLfo", "LFO" }, { "ResBalanceEnv", "Env" } };
+// The Frequency Shifter's rows (Depth; Balance): the id suffixes after "cosm"/"cosm2", and labels
+static const char* const kFsIds[7][2] = { { "FsDepth", "Dep" }, { "FsDepthKF", "KF" }, { "FsDepthLfo", "LFO" }, { "FsDepthEnv", "Env" },
+                                          { "FsBalance", "Bal" }, { "FsBalanceLfo", "LFO" }, { "FsBalanceEnv", "Env" } };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
@@ -149,7 +152,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator" }, 1);
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter" }, 1);
     cosmTypeBox_.onChange = [this] { attachSideBand(); showCosmType(); };
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
@@ -275,6 +278,21 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         resRowLabels_[r].setText(r ? "Res Bal" : "Res", juce::dontSendNotification);
         styleSmall(resRowLabels_[r]);
     }
+    for (int i = 0; i < kFsKnobs; ++i) {
+        juce::Slider& sl = fsSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        fsLabels_[i].setText(kFsIds[i][1], juce::dontSendNotification);
+        styleSmall(fsLabels_[i]);
+    }
+    for (int r = 0; r < 2; ++r) {
+        fsRowLabels_[r].setText(r ? "FS Bal" : "Shift", juce::dontSendNotification);
+        styleSmall(fsRowLabels_[r]);
+    }
     attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
@@ -337,7 +355,7 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
 // the depth and Env A rows (level slots 24..31), the Dual, TB, Comb and Side
-// Band Filters' and the Resonator's rows and its LFO.
+// Band Filters', the Resonator's and the Frequency Shifter's rows and its LFO.
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
     cosmK_ = k;
@@ -381,6 +399,10 @@ void VSynthEmuEditor::attachCosm(int k) {
         resAtts_[i].reset();
         resAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kResIds[i][0], resSliders_[i]);
     }
+    for (int i = 0; i < kFsKnobs; ++i) {
+        fsAtts_[i].reset();
+        fsAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kFsIds[i][0], fsSliders_[i]);
+    }
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
     attachSideBand();
     showCosmType();
@@ -391,7 +413,7 @@ void VSynthEmuEditor::attachCosm(int k) {
 // Dynamic TVF, with the Own depths for the Dynamic TVF).
 void VSynthEmuEditor::showCosmType() {
     const int t = cosmTypeBox_.getSelectedItemIndex();
-    const bool tvf = t <= 1, dtvf = t == 1, dual = t == 2, tb = t == 3, comb = t == 4, sb = t == 5 || t == 6, res = t == 7;
+    const bool tvf = t <= 1, dtvf = t == 1, dual = t == 2, tb = t == 3, comb = t == 4, sb = t == 5 || t == 6, res = t == 7, fs = t == 8;
     for (juce::Component* cpt : { (juce::Component*)&tvfLabel_, (juce::Component*)&cosmFilterBox_, (juce::Component*)&cosmCutLabel_,
                                   (juce::Component*)&cosmCutSlider_, (juce::Component*)&cosmResoLabel_, (juce::Component*)&cosmResoSlider_,
                                   (juce::Component*)&cosmKfLabel_, (juce::Component*)&cosmKfSlider_, (juce::Component*)&levelRowLabels_[6] })
@@ -419,6 +441,8 @@ void VSynthEmuEditor::showCosmType() {
     resTypeBox_.setVisible(res);
     for (int i = 0; i < kResKnobs; ++i) { resLabels_[i].setVisible(res); resSliders_[i].setVisible(res); }
     for (juce::Label& l : resRowLabels_) l.setVisible(res);
+    for (int i = 0; i < kFsKnobs; ++i) { fsLabels_[i].setVisible(fs); fsSliders_[i].setVisible(fs); }
+    for (juce::Label& l : fsRowLabels_) l.setVisible(fs);
 }
 
 // The Side Band rows show the 1st's parameters, or the 2nd's when the type
@@ -807,6 +831,16 @@ void VSynthEmuEditor::layoutCosm(juce::Rectangle<int>& xt) {
             auto cell = row.removeFromLeft(w);
             resLabels_[i].setBounds(cell.removeFromLeft(34));
             resSliders_[i].setBounds(cell.withTrimmedRight(4));
+        }
+    }
+    for (int r = 0; r < 2; ++r) {                    // the Frequency Shifter: Depth, KF, LFO, Env; then Balance, LFO, Env
+        auto row = rowOf(r);
+        fsRowLabels_[r].setBounds(row.removeFromLeft(56));
+        const int first = r ? 4 : 0, n = r ? 3 : 4, w = row.getWidth() / 4;
+        for (int i = first; i < first + n; ++i) {
+            auto cell = row.removeFromLeft(w);
+            fsLabels_[i].setBounds(cell.removeFromLeft(34));
+            fsSliders_[i].setBounds(cell.withTrimmedRight(4));
         }
     }
 }

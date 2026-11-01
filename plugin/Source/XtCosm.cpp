@@ -24,6 +24,9 @@ constexpr int kCombLen = 3267;                 // the delay buffer (0x894ecb00)
 // the Resonator's coefficients, per Filter Type six (f, d, g) (0x894ffa10);
 // the firmware expf's two polynomials (0x89531a28)
 constexpr uint32_t kResTab = 0x897d4b80, kExpPTab = 0x897eeebc, kExpQTab = 0x897eeed8;
+// the Frequency Shifter's sine table (129 floats, 128 a cycle) and Hilbert
+// taps (32 floats), 0x894fda60
+constexpr uint32_t kSinTab = 0x897d3dec, kHilbTab = 0x897d45f0;
 
 struct Tables {
     float cut[129], cap[128];
@@ -33,6 +36,7 @@ struct Tables {
     float keySq[41][128];                       // xtCosmSetKeySquares
     float res[3][18];
     float expP[7], expQ[7];
+    float sine[129], hilb[32];
     bool ok = false, keySqOk = false;
 } T;
 
@@ -202,7 +206,9 @@ bool xtCosmLoadTables(const char* romPath) {
                  && std::fseek(f, (long)(kOctTab - kRomBase), SEEK_SET) == 0 && std::fread(T.oct, 4, 5, f) == 5
                  && std::fseek(f, (long)(kResTab - kRomBase), SEEK_SET) == 0 && std::fread(T.res, 4, 54, f) == 54
                  && std::fseek(f, (long)(kExpPTab - kRomBase), SEEK_SET) == 0 && std::fread(T.expP, 4, 7, f) == 7
-                 && std::fseek(f, (long)(kExpQTab - kRomBase), SEEK_SET) == 0 && std::fread(T.expQ, 4, 7, f) == 7;
+                 && std::fseek(f, (long)(kExpQTab - kRomBase), SEEK_SET) == 0 && std::fread(T.expQ, 4, 7, f) == 7
+                 && std::fseek(f, (long)(kSinTab - kRomBase), SEEK_SET) == 0 && std::fread(T.sine, 4, 129, f) == 129
+                 && std::fseek(f, (long)(kHilbTab - kRomBase), SEEK_SET) == 0 && std::fread(T.hilb, 4, 32, f) == 32;
     std::fclose(f);
     T.ok = ok;
     return ok;
@@ -615,7 +621,8 @@ float sbfLpf(int cutoff, int kf, int key) {
     return 0.5f > y ? 0.5f : y;
 }
 
-// The Width with its keyfollow (0x894dc5f0): (Width/127 + 0)·2^(KF·10·(key − 60)/1200), within 0…1
+// The Width with its keyfollow (0x894dc5f0; the Frequency Shifter's Depth,
+// 0x894dc7a0, is the same): (Width/127 + 0)·2^(KF·10·(key − 60)/1200), within 0…1
 float sbfWidth(int width, int kf, int key) {
     const float y = mul(xtOscTimeKeyScale((int16_t)(kf * 10), key), add(div(flt(clampi((int16_t)width, 0, 127)), 127.0f), 0.0f));
     return y > 1.0f ? 1.0f : (0.0f > y ? 0.0f : y);
@@ -932,8 +939,102 @@ void XtCosmRes::process(float* lr) {
 }
 
 
+// ── The Frequency Shifter ──
+
+XtFsBlock xtFsBlock(const XtFsParams& p, int key, float velA, float velB) {
+    XtFsBlock b;
+    b.depth = sbfWidth(p.depth, p.depthKf, key);
+    b.depthEnv = envDepth(velA, p.depthEnv);
+    b.depthLfo = sq63(clampi((int16_t)p.depthLfo, -63, 63));
+    b.balance = add(div(flt(clampi((int16_t)p.balance, 0, 100)), 100.0f), 0.0f);
+    b.balanceEnv = envDepth(velB, p.balanceEnv);
+    b.balanceLfo = sq63(clampi((int16_t)p.balanceLfo, -63, 63));
+    return b;
+}
+
+XtCosmFs::XtCosmFs() : buf(kLen, 0.0f) {}
+
+float XtCosmFs::depthOf(float env, float lfo) const {
+    const float d = clampf(fmac(blk.depthLfo, lfo, fmac(blk.depthEnv, env, blk.depth)), 0.0f, 1.0f);
+    return fmac(d, K(0x3c4e703b), K(0x3a83126e));                                 // ·0.0126 + 0.001
+}
+
+float XtCosmFs::balanceOf(float env, float lfo) const {
+    return clampf(fmac(blk.balanceLfo, lfo, fmac(blk.balanceEnv, env, blk.balance)), 0.0f, 1.0f);
+}
+
+void XtCosmFs::noteOn(const XtFsBlock& b, float env1Start, float env1Out, float r1, float lfo1,
+                      float env2Start, float env2Out, float r2, float lfo2) {
+    w = kLen;                                          // 0xcc2: the first sample goes to 0
+    std::fill(buf.begin(), buf.end(), 0.0f);
+    blk = b;
+    dep = depthOf(env1Start, lfo1);                    // 0x894ec9f0
+    bal = balanceOf(env2Start, lfo2);
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    setBlock(b, env1Out, lfo1, env2Out, lfo2);
+    ph = 0.0f;                                         // 0x894ee430
+}
+
+void XtCosmFs::setBlock(const XtFsBlock& b, float env1, float lfo1, float env2, float lfo2) {
+    blk = b;
+    depT = depthOf(env1, lfo1);
+    balT = balanceOf(env2, lfo2);
+}
+
+void XtCosmFs::update(float env1, float r1, float lfo1, float env2, float r2, float lfo2) {
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    depT = depthOf(env1, lfo1);
+    balT = balanceOf(env2, lfo2);
+}
+
+void XtCosmFs::process(float* lr) {
+    const float d1 = mul(sub(depT, dep), rate1), d2 = mul(sub(balT, bal), rate2);
+    const float* const C = T.hilb;
+    const float* const S = T.sine;
+    float* const B = buf.data();
+    auto at = [&](int k) { const int j = w + k; return B[j < 0 ? j + kLen : j]; };   // k ≤ 0 samples back
+    float acc[4] = {}, inc = 0, sgn = 0;
+    for (int i = 0; i < 32; ++i) {
+        const int m = i & 3;
+        if (m == 0) {                                  // before every fourth sample
+            dep = add(dep, d1);
+            bal = add(bal, d2);
+            if (0.0f > dep) { inc = -dep; sgn = 1.0f; }
+            else { inc = dep; sgn = -1.0f; }
+        }
+        if (++w >= kLen) w = 0;
+        const float x = lr[2 * i];
+        B[w] = x;
+        if (m == 0) {                                  // the four outputs' terms of the samples present
+            for (int a = 0; a < 4; ++a) {
+                acc[a] = 0.0f;
+                for (int j = (a + 1) / 2; j < 32; ++j) acc[a] = fmac(C[j], at(a - 2 * j - m), acc[a]);
+            }
+        } else {                                       // this sample's terms in the outputs still to come
+            for (int a = m; a < 4; a += 2) acc[a] = fmac(C[(a - m) / 2], x, acc[a]);
+        }
+        int di = w - 31;
+        if (di < 0) di += kLen;
+        const float d = B[di];
+        ph = add(ph, inc);
+        if (ph > 1.0f) ph = sub(ph, 1.0f);
+        const float y = mul(ph, 127.0f);
+        const int k = ftrc(y);
+        const float f = sub(y, flt(k)), g = sub(1.0f, f);
+        const float sn = fmac(f, S[k + 1], mul(g, S[k]));
+        int k2 = k + 32;
+        if (k2 > 127) k2 -= 128;
+        const float cs = fmac(f, S[k2 + 1], mul(g, S[k2]));
+        const float v = mul(fmac(sgn, mul(d, cs), mul(acc[m], mul(2.0f, sn))), bal);
+        lr[2 * i] = lr[2 * i + 1] = add(mul(sub(1.0f, bal), x), v);
+    }
+}
+
+
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters and the Resonator against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator and the Frequency Shifter against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -1743,7 +1844,122 @@ int main(int argc, char** argv) {
     }
     std::printf("res note-on, block and update: %ld cases, %ld different\n", an, ab);
     std::printf("res filter: %ld blocks of 32 frames, %ld different\n", gn, gb);
+
+    // The Frequency Shifter (block code 18): the converter (0x894ddde0), then
+    // the note-on, updates, new blocks (0x894edc80) and the filter
+    // (0x894fda60), its ring buffer compared
+    auto fsParams = [&]() {
+        XtFsParams p;
+        p.depth = (int)(rnd() % 128); p.depthKf = (int)(rnd() % 41) - 20; p.depthLfo = (int)(rnd() % 127) - 63;
+        p.depthEnv = (int)(rnd() % 127) - 63; p.balance = (int)(rnd() % 101); p.balanceLfo = (int)(rnd() % 127) - 63;
+        p.balanceEnv = (int)(rnd() % 127) - 63;
+        return p;
+    };
+    auto writeFs = [&](const XtFsBlock& b, int cosm) {
+        std::vector<uint8_t> z(0x2c, 0);
+        c.write(BLK, z.data(), 0x2c);
+        c.wr32(BLK, 18); wf(BLK + 4, b.depth); wf(BLK + 8, b.depthEnv); c.wr32(BLK + 0xc, cosm ? 11 : 9); wf(BLK + 0x10, b.depthLfo);
+        c.wr32(BLK + 0x14, cosm ? 4 : 3); wf(BLK + 0x18, b.balance); wf(BLK + 0x1c, b.balanceEnv); c.wr32(BLK + 0x20, cosm ? 12 : 10);
+        wf(BLK + 0x24, b.balanceLfo); c.wr32(BLK + 0x28, cosm ? 4 : 3);
+    };
+    long hb = 0, hn = 0;
+    for (int k = 0; k < 200000; ++k) {
+        const XtFsParams p = fsParams();
+        const int cosm = (int)(rnd() & 1), key = (int)(rnd() % 128);
+        const float va = (float)(rnd() % 32769) / 32768.0f, vb = (float)(rnd() % 32769) / 32768.0f;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100);
+        c.wr8(IN + 2, (uint8_t)cosm); c.wr8(IN + 3, (uint8_t)key);
+        const int vals[7] = { p.depth, p.depthKf, p.depthLfo, p.depthEnv, p.balance, p.balanceLfo, p.balanceEnv };
+        for (int i = 0; i < 7; ++i) c.wr16(IN + 0x12 + 2 * (uint32_t)i, (uint16_t)(int16_t)vals[i]);
+        wf(IN + 0x34, va); wf(IN + 0x38, vb);
+        if (!c.call(0x894ddde0, { IN, OUT }, sp)) { std::fprintf(stderr, "fs converter: %s\n", c.error().c_str()); return 1; }
+        writeFs(xtFsBlock(p, key, va, vb), cosm);
+        ++hn;
+        std::vector<uint8_t> fw(0x2c), pt(0x2c);
+        c.read(OUT, fw.data(), 0x2c); c.read(BLK, pt.data(), 0x2c);
+        if (fw != pt && hb++ < 5) {
+            std::printf("  fs converter key %d:", key);
+            for (uint32_t i = 0; i < 0x2c; i += 4)
+                if (c.rd32(OUT + i) != c.rd32(BLK + i)) std::printf(" +%02x fw %08x port %08x", i, c.rd32(OUT + i), c.rd32(BLK + i));
+            std::printf("\n");
+        }
+    }
+    std::printf("fs converter: %ld cases, %ld different\n", hn, hb);
+    auto fsSame = [&](const XtCosmFs& port) {
+        return same(f32(D + 0xbc), port.depth()) && same(f32(D + 0xc0), port.balance()) && same(f32(D + 0xa4), port.depthTarget())
+            && same(f32(D + 0xa8), port.balanceTarget()) && same(f32(D + 0x94), port.phase()) && (int)c.rd32(D + 4) == port.writeIndex();
+    };
+    long vb2 = 0, vn = 0, wb = 0, wn = 0;
+    for (int g = 0; g < nCases; ++g) {
+        const int cosm = (int)(rnd() & 1);
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200);
+        for (uint32_t o = 0x74; o < 0x150; o += 4) wf(OBJ + o, frnd(-1, 1));                        // the last note's state
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        for (uint32_t bI = 0; bI < 4; ++bI)
+            for (uint32_t i = 0; i < 3267; ++i) wf(CB[bI] + 4 * i, frnd(-1, 1));                    // the last note's junk
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);   // slot 1 Depth's, slot 2 Balance's
+        const int key = (int)(rnd() % 128);
+        const float bva = frnd(0, 1), bvb = frnd(0, 1);
+        const XtFsBlock b = xtFsBlock(fsParams(), key, bva, bvb);
+        writeFs(b, cosm);
+        const float e1S = frnd(-1, 1), e2S = frnd(-1, 1), l1 = frnd(-1, 1), l2 = frnd(-1, 1);
+        float o1 = frnd(-1, 1), o2 = frnd(-1, 1), ol1 = l1, ol2 = l2;
+        const float r1 = frnd(0.2f, 1.0f) / 32.0f, r2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+        wf(EQ + 0x58, e1S); wf(EC + 0x58, e2S); wf(LQ + 0x38, l1); wf(LC + 0x38, l2); wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2);
+        wf(EQ + 0x54, r1); wf(EC + 0x54, r2);
+        if (!c.call(0x894edf70, { OBJ, BLK, 0 }, sp)) { std::fprintf(stderr, "fs note-on: %s\n", c.error().c_str()); return 1; }
+        XtCosmFs port;
+        port.noteOn(b, e1S, o1, r1, l1, e2S, o2, r2, l2);
+        ++vn;
+        bool ok0 = fsSame(port);
+        for (uint32_t i = 0; i < 3266; ++i) ok0 = ok0 && f32(CB[0] + 4 * i) == 0.0f;
+        if (!ok0 && vb2++ < 5)
+            std::printf("  fs note-on %d: fw depth %.9g bal %.9g t %.9g %.9g ph %.9g w %d, port %.9g %.9g %.9g %.9g %.9g %d\n", g, f32(D + 0xbc),
+                        f32(D + 0xc0), f32(D + 0xa4), f32(D + 0xa8), f32(D + 0x94), (int)c.rd32(D + 4), port.depth(), port.balance(),
+                        port.depthTarget(), port.balanceTarget(), port.phase(), port.writeIndex());
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 13 || blkN % 14 == 3) {                  // updates
+                o1 = frnd(-1, 1); o2 = frnd(-1, 1); ol1 = frnd(-1, 1); ol2 = frnd(-1, 1);
+                const float nr1 = frnd(0.2f, 1.0f) / 32.0f, nr2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+                wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2); wf(LQ + 0x38, ol1); wf(LC + 0x38, ol2); wf(EQ + 0x54, nr1); wf(EC + 0x54, nr2);
+                c.fb[0][4] = 0x3f800000;
+                if (!c.call(0x894ee6a0, { OBJ }, sp)) { std::fprintf(stderr, "fs update: %s\n", c.error().c_str()); return 1; }
+                port.update(o1, nr1, ol1, o2, nr2, ol2);
+                ++vn;
+                if (!fsSame(port) && vb2++ < 5)
+                    std::printf("  fs update %d.%d: fw t %.9g %.9g, port %.9g %.9g\n", g, blkN, f32(D + 0xa4), f32(D + 0xa8), port.depthTarget(),
+                                port.balanceTarget());
+            } else if (blkN % 14 == 8 && (rnd() & 1)) {               // a parameter change while the note sounds
+                const XtFsBlock nb2 = xtFsBlock(fsParams(), key, bva, bvb);
+                writeFs(nb2, cosm);
+                if (!c.call(0x894edc80, { OBJ, BLK + 4 }, sp)) { std::fprintf(stderr, "fs block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb2, o1, ol1, o2, ol2);
+                ++vn;
+                if (!fsSame(port) && vb2++ < 5)
+                    std::printf("  fs block %d.%d: fw t %.9g %.9g, port %.9g %.9g\n", g, blkN, f32(D + 0xa4), f32(D + 0xa8), port.depthTarget(),
+                                port.balanceTarget());
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 4);
+            const float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e9f : ar == 2 ? 4.0e8f : 1.0f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(0x894fda60, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "fs filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++wn;
+            bool ok = fsSame(port);
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            for (uint32_t i = 0; i < 3266; ++i) ok = ok && same(f32(CB[0] + 4 * i), port.buffer()[i]);
+            if (!ok && wb++ < 6)
+                std::printf("  fs filter %d block %d: fw out %.9g %.9g depth %.9g ph %.9g, port %.9g %.9g %.9g %.9g\n", g, blkN, f32(BUF),
+                            f32(BUF + 248), f32(D + 0xbc), f32(D + 0x94), lr[0], lr[62], port.depth(), port.phase());
+        }
+    }
+    std::printf("fs note-on, block and update: %ld cases, %ld different\n", vn, vb2);
+    std::printf("fs filter: %ld blocks of 32 frames, %ld different\n", wn, wb);
     return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb || sb[0] || sb[1] || nb[0] || nb[1] || pb[0] || pb[1]
-        || eb || rb || ab || gb ? 3 : 0;
+        || eb || rb || ab || gb || hb || vb2 || wb ? 3 : 0;
 }
 #endif

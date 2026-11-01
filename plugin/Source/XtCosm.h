@@ -1,7 +1,8 @@
 #pragma once
 // The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
 // the Dual Filter (9), the TB Filter (16), the Comb Filter (8), the Side
-// Band Filters (6, 7) and the Resonator (5; below XtCosmTvf).  Each oscillator
+// Band Filters (6, 7), the Resonator (5) and the Frequency Shifter (14; below
+// XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -447,6 +448,69 @@ private:
     float sz = 1.0f, bal = 0, szT = 1.0f, balT = 0, rate1 = 0, rate2 = 0;
     float s[12] = {};
     float sizeOf(float env, float lfo) const;
+    float balanceOf(float env, float lfo) const;
+};
+
+// The Frequency Shifter (COSM Type 14, block code 18): a single-sideband
+// shifter, the input's Hilbert pair (a 32-tap FIR on every other sample, its
+// centre 31 samples back) times a quadrature oscillator, mixed with the dry
+// input by Balance.  Parameters 0x93a…0x940: Effect Depth 0…127 (80) with
+// Keyfollow ±20, LFO and Env depths ±63; Dry/Effect Balance 0…100 (50) with
+// LFO and Env depths.  Depth takes Env A (Env 9, COSM 2 Env 11) and its
+// velocity factor, Balance Env B (10, 12); both LFO 3 (4).
+struct XtFsParams {
+    int depth = 80, depthKf = 0, depthLfo = 0, depthEnv = 0, balance = 50, balanceLfo = 0, balanceEnv = 0;
+};
+
+// The converter's block (0x894ddde0): Depth through 0x894dc7a0 (the Side
+// Band Width's curve: Depth/127 · 2^(KF·10·(key − 60)/1200), within 0…1);
+// Balance/100; LFO depths (d/63)·|d/63|; Env depths A (Depth) or B
+// (Balance) × (d/63)·|d/63|.
+struct XtFsBlock {
+    float depth = 0, depthEnv = 0, depthLfo = 0, balance = 0.5f, balanceEnv = 0, balanceLfo = 0;
+};
+XtFsBlock xtFsBlock(const XtFsParams& p, int key, float velA, float velB);
+
+// The object for block code 18 (0x894fda60).  Depth' = 0.0126 × (Depth +
+// depths × Env A and the LFO, within 0…1) + 0.001, the oscillator's phase
+// step per sample (about 44…600 Hz); Balance' = Balance + depths, within 0…1
+// (start values 0x894ec9f0; targets from the block 0x894edc80 and the update
+// 0x894eee60).  Per block both step toward their targets by rate·(target −
+// value) before every fourth sample.  Per sample: the input into a 3266-sample
+// ring (cleared at note-on, 0x894ecb00); the phase += |Depth'|, less 1 above
+// 1; sin and cos from a 128-step table at 127·phase (a firmware quirk: the
+// cycle skips the last step), linearly between entries; out = Balance' ×
+// (∓ x(n − 31)·cos + 2·sin·H) + (1 − Balance')·x, on L and R from L, the sign
+// − for a positive Depth'.  H sums its 32 taps as the firmware does: four
+// outputs at once, the samples present first, each later one's terms as it
+// arrives.
+class XtCosmFs {
+public:
+    XtCosmFs();
+    // Note-on (0x894edf70, then 0x894ee430: the phase cleared).
+    void noteOn(const XtFsBlock& b, float env1Start, float env1Out, float rate1, float lfo1,
+                float env2Start, float env2Out, float rate2, float lfo2);
+    void setBlock(const XtFsBlock& b, float env1, float lfo1, float env2, float lfo2);       // 0x894edc80
+    void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);    // 0x894eee60
+    // 32 frames, interleaved L/R, in place: reads L, writes both.
+    void process(float* lr);
+
+    // The state, for the firmware checks (D = object + 0x58).
+    float depth() const { return dep; }              // D+0xbc
+    float balance() const { return bal; }            // D+0xc0
+    float depthTarget() const { return depT; }       // D+0xa4
+    float balanceTarget() const { return balT; }     // D+0xa8
+    float phase() const { return ph; }               // D+0x94
+    int writeIndex() const { return w; }             // D+4
+    const float* buffer() const { return buf.data(); }
+
+private:
+    static constexpr int kLen = 3266;
+    XtFsBlock blk;
+    float dep = 0, bal = 0, depT = 0, balT = 0, rate1 = 0, rate2 = 0, ph = 0;
+    int w = 0;
+    std::vector<float> buf;
+    float depthOf(float env, float lfo) const;
     float balanceOf(float env, float lfo) const;
 };
 

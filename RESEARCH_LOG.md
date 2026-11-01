@@ -2790,3 +2790,18 @@ Round-2 recordings.  First build-out after that: real-time granular port
   into that area too.
 - The window is 300 px shorter (1,090 px). New COSM types fit in the area
   without changing the size. Audio is unchanged.
+
+### Session 16 addendum (2026-11-01) — v71: Frequency Shifter
+
+- The Frequency Shifter (COSM Type 14, block code 18) is a single-sideband
+  shifter. A 32-tap Hilbert FIR runs on every other sample over a 3266-sample
+  ring, and its output is multiplied by a quadrature oscillator from a sine
+  table. Depth sets the shift, 44 to 600 Hz.
+- The firmware computes four FIR outputs at once and adds each newer
+  sample's terms as it arrives. That order of additions changes the result
+  in 86% of blocks, so I took it from the code mechanically, with a small
+  symbolic run of the unrolled loop, and ported it exactly.
+- A firmware quirk is kept: the oscillator's phase reads 127 of the table's
+  128 steps per cycle.
+- All of it equals the firmware in the interpreter. On a 1 kHz sine, Depth 80
+  gives a clean line at 1,394 Hz.

@@ -186,7 +186,8 @@ int main(int argc, char** argv) {
     // Filter (KFs in %, octave 0..2); TEST_SBF2="q,lpf,…" (no subDetune) the
     // 2nd; TEST_SBF12, TEST_SBF22: COSM 2's.  TEST_RES="type,size,sizeKf,
     // sizeLfo,sizeEnv,balance,balanceLfo,balanceEnv": a Resonator (KF in %);
-    // TEST_RES2: COSM 2's.
+    // TEST_RES2: COSM 2's.  TEST_FS="depth,depthKf,depthLfo,depthEnv,balance,
+    // balanceLfo,balanceEnv": a Frequency Shifter (KF in %); TEST_FS2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -228,6 +229,14 @@ int main(int argc, char** argv) {
             set("Switch", 1); set("Type", 4); set("CombOctave", m.combOctave); set("CombDetune", m.combDetune);
             set("CombDetuneLfo", m.combDetuneLfo); set("CombDetuneEnv", m.combDetuneEnv); set("CombTone", m.combTone);
             set("CombToneLfo", m.combToneLfo); set("CombToneEnv", m.combToneEnv);
+        }
+        if (const char* e = std::getenv(("TEST_FS" + sfx).c_str())) {
+            m.on = true;
+            m.type = 8;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &m.fsDepth, &m.fsDepthKf, &m.fsDepthLfo, &m.fsDepthEnv, &m.fsBalance, &m.fsBalanceLfo,
+                        &m.fsBalanceEnv);
+            set("Switch", 1); set("Type", 8); set("FsDepth", m.fsDepth); set("FsDepthKF", m.fsDepthKf); set("FsDepthLfo", m.fsDepthLfo);
+            set("FsDepthEnv", m.fsDepthEnv); set("FsBalance", m.fsBalance); set("FsBalanceLfo", m.fsBalanceLfo); set("FsBalanceEnv", m.fsBalanceEnv);
         }
         if (const char* e = std::getenv(("TEST_RES" + sfx).c_str())) {
             m.on = true;
