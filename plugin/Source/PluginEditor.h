@@ -61,7 +61,7 @@ private:
     juce::ToggleButton legatoBtn_ { "Legato" };
     juce::Slider     octSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label      octLabel_ { {}, "Oct" };
-    // The COSM sections (TVF, Dynamic TVF, Dual Filter, TB Filter), one at a time by the selector: switch,
+    // The COSM sections (TVF, Dynamic TVF, Dual, TB and Comb Filters), one at a time by the selector: switch,
     // Filter Type, Cutoff, Resonance, Cutoff KF; the depth and Env A rows;
     // the LFO (3 or 4)
     juce::ToggleButton cosmBtn_ { "On" };
@@ -179,6 +179,14 @@ private:
     juce::Slider     tbSliders_[kTbKnobs];
     juce::Label      tbLabels_[kTbKnobs], tbRowLabels_[2];
     std::unique_ptr<SliderAtt> tbAtts_[kTbKnobs];
+    // the Comb Filter: Octave, then Detune's row (Detune, LFO, Env) and
+    // Tone's (Tone, LFO, Env)
+    static constexpr int kCombKnobs = 6;
+    juce::ComboBox   combOctBox_;
+    juce::Slider     combSliders_[kCombKnobs];
+    juce::Label      combLabels_[kCombKnobs], combRowLabels_[2];
+    std::unique_ptr<ComboAtt>  combOctAtt_;
+    std::unique_ptr<SliderAtt> combAtts_[kCombKnobs];
     std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_, lfoTimeAtt_, lfoFmtAtt_;
     std::unique_ptr<SliderAtt> levelAtts_[kLevelKnobs];
     std::unique_ptr<ComboAtt>  lfoWaveAtt_, lfoModeAtt_, lfoOffsetAtt_;

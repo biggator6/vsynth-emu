@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 880;  // height of the XT strip below it
+static constexpr int kXtStripH   = 940;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -22,14 +22,17 @@ static const char* const kDualIds[5][2] = { { "Freq", "Frq" }, { "Q", "Q" }, { "
 static const char* const kTbIds[11][2] = { { "TbCutoff", "Cut" }, { "TbKF", "KF" }, { "TbQ", "Q" }, { "TbQFollow", "QF" }, { "TbLfo", "LFO" },
                                            { "TbEnv", "Env" }, { "TbHpf", "Cut" }, { "TbHpfKF", "KF" }, { "TbHpfLfo", "LFO" }, { "TbHpfEnv", "Env" },
                                            { "TbGain", "Gain" } };
+// The Comb Filter's rows (Detune, Tone): the id suffixes after "cosm"/"cosm2", and labels
+static const char* const kCombIds[6][2] = { { "CombDetune", "Det" }, { "CombDetuneLfo", "LFO" }, { "CombDetuneEnv", "Env" },
+                                            { "CombTone", "Tone" }, { "CombToneLfo", "LFO" }, { "CombToneEnv", "Env" } };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1180);
+    setSize(560, 1240);
     setResizable(true, true);
-    setResizeLimits(480, 720, 960, 1320);
+    setResizeLimits(480, 780, 960, 1380);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -136,7 +139,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter" }, 1);
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter" }, 1);
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
         addAndMakeVisible(*cpt);
@@ -206,6 +209,23 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         tbRowLabels_[r].setText(r ? "TB HPF" : "TB LPF", juce::dontSendNotification);
         styleSmall(tbRowLabels_[r]);
     }
+    combOctBox_.addItemList({ "-2", "-1", "0", "+1", "+2" }, 1);
+    addAndMakeVisible(combOctBox_);
+    for (int i = 0; i < kCombKnobs; ++i) {
+        juce::Slider& sl = combSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        combLabels_[i].setText(kCombIds[i][1], juce::dontSendNotification);
+        styleSmall(combLabels_[i]);
+    }
+    for (int r = 0; r < 2; ++r) {
+        combRowLabels_[r].setText(r ? "Comb T" : "Comb", juce::dontSendNotification);
+        styleSmall(combRowLabels_[r]);
+    }
     attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
@@ -266,8 +286,8 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 }
 
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
-// the depth and Env A rows (level slots 24..31), the Dual and TB Filters'
-// rows and its LFO.
+// the depth and Env A rows (level slots 24..31), the Dual, TB and Comb
+// Filters' rows and its LFO.
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
     cosmAtt_.reset(); cosmFilterAtt_.reset(); cosmCutAtt_.reset(); cosmResoAtt_.reset(); cosmKfAtt_.reset();
@@ -297,6 +317,12 @@ void VSynthEmuEditor::attachCosm(int k) {
     for (int i = 0; i < kTbKnobs; ++i) {
         tbAtts_[i].reset();
         tbAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kTbIds[i][0], tbSliders_[i]);
+    }
+    combOctAtt_.reset();
+    combOctAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "CombOctave", combOctBox_);
+    for (int i = 0; i < kCombKnobs; ++i) {
+        combAtts_[i].reset();
+        combAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kCombIds[i][0], combSliders_[i]);
     }
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
 }
@@ -561,6 +587,19 @@ void VSynthEmuEditor::resized() {
             const juce::String t = kTbIds[i][1];
             tbLabels_[i].setBounds(cell.removeFromLeft(t.length() >= 3 ? (t == "Gain" ? 32 : 27) : 20));
             tbSliders_[i].setBounds(cell.withTrimmedRight(3));
+        }
+    }
+    for (int r = 0; r < 2; ++r) {                    // the Comb Filter: Octave + Detune, then Tone
+        xt.removeFromTop(6);
+        auto row = xt.removeFromTop(24);
+        combRowLabels_[r].setBounds(row.removeFromLeft(46));
+        if (r == 0) combOctBox_.setBounds(row.removeFromLeft(70).withTrimmedRight(6));
+        else row.removeFromLeft(70);
+        const int w = row.getWidth() / 3;
+        for (int i = 3 * r; i < 3 * r + 3; ++i) {
+            auto cell = row.removeFromLeft(w);
+            combLabels_[i].setBounds(cell.removeFromLeft(34));
+            combSliders_[i].setBounds(cell.withTrimmedRight(4));
         }
     }
     xt.removeFromTop(6);

@@ -217,6 +217,19 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+COMB FILTER v67 (2026-10-31): COSM Type 8 (HARDWARE_FIRMWARE.md, "COSM:
+  the Comb Filter"). XtCosm: XtCombParams, xtCombBlock (0x894dd4f0),
+  xtCosmRootHz (the voice's +0x9a4, from 0x894f21c0), XtCosmComb (note-on
+  0x894edf70 with 0x894ec740/0x894ed390/0x894ee300, update 0x894eea90,
+  filter 0x894fa8d0; a 3267-float buffer behind one zero guard word). It
+  reads the octave table (0x897d1868) at run time. xt_cosm runs the real
+  note-on with the buffer pool's slot finder 0x894ec2b0 hooked. XtSynth:
+  Cosm.type 4, combOctave…combToneEnv; the comb's note-on runs after the
+  voice's targets (curA). Plugin params cosmCombOctave, CombDetune,
+  CombDetuneLfo, CombDetuneEnv, CombTone, CombToneLfo, CombToneEnv (and
+  cosm2…). XT_COMB / TEST_COMB
+  "octave,detune,detuneLfo,detuneEnv,tone,toneLfo,toneEnv".
+
 TB FILTER v66 (2026-10-31): COSM Type 16 (HARDWARE_FIRMWARE.md, "COSM:
   the TB Filter"). XtCosm: XtTbParams, xtTbBlock (0x894de110), XtCosmTb
   (targets 0x894fbdc0/0x894fc110, note-on 0x894fbd20, filter 0x89501950),

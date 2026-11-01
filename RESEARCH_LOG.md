@@ -2725,3 +2725,22 @@ Round-2 recordings.  First build-out after that: real-time granular port
   the interpreter does.
 - Four constants come from a start-up routine that the harness now runs.
 - All of it equals the firmware in the interpreter.
+
+### Session 16 addendum (2026-10-31) — v67: Comb Filter
+
+- The Comb Filter is a feedforward comb tuned to the note. Its delay is
+  44100·F/(ratio × root) samples, where ratio and root are the voice's
+  pitch ratio and root frequency, which the tone note-on and update hand to
+  the COSM object.
+- A new delay crossfades in over 500 samples. The buffer is cleared at
+  every note-on.
+- Firmware quirks kept:
+  - the block stores 1 − Detune/2400 where the update reads Detune, so
+    Detune is lost after the first update;
+  - Tone steps only once per block;
+  - the delay's fraction is not kept;
+  - at the longest delay, a tap reads the word before the buffer.
+- That last read crashed the check now and then until the port gained a
+  guard word: AddressSanitizer found it.
+- All of it equals the firmware in the interpreter, including the
+  firmware's own note-on and allocator.

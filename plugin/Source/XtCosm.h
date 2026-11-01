@@ -1,6 +1,7 @@
 #pragma once
 // The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
-// the Dual Filter (9) and the TB Filter (16; below XtCosmTvf).  Each oscillator
+// the Dual Filter (9), the TB Filter (16) and the Comb Filter (8; below
+// XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -17,6 +18,7 @@
 // targets in eight steps per block.  It reads the left channel and writes
 // both.  Tables are read from the user's rom.2 at run time.
 #include <cstdint>
+#include <vector>
 
 bool xtCosmLoadTables(const char* romPath);
 bool xtCosmTablesLoaded();
@@ -211,6 +213,79 @@ private:
     XtTbBlock blk;
     float c[7] = {}, t[7] = {}, s[4] = {}, h[4] = {};
     void targets(float env1, float lfo1, float env2, float lfo2);
+};
+
+// The Comb Filter (COSM Type 8, block code 9): the input less a slow DC
+// follower, plus Tone × itself delayed by the note's period × the Octave's
+// factor (4, 2, 1, ½, ¼ for −2…+2).  Parameters 0x90e…0x914: Octave Select
+// 0…4 (3, +1), Detune ±100 with its LFO and Env depths ±63, Tone 0…127 with
+// its LFO and Env depths.  Detune takes Env B (Env 10, COSM 2 Env 12) and its
+// velocity factor, Tone Env A (9, 11); both LFO 3 (4).
+struct XtCombParams {
+    int octave = 3, detune = 0, detuneLfo = 0, detuneEnv = 0, tone = 0, toneLfo = 0, toneEnv = 0;
+};
+
+// The converter's block (0x894dd4f0): Tone ·2/127 − 1; Detune as is (±100);
+// LFO depths (d/63)·|d/63|; Env depths B (Detune) or A (Tone) × (d/63)·|d/63|.
+struct XtCombBlock {
+    int octave = 3;
+    float tone = -1.0f, toneEnv = 0, toneLfo = 0, detune = 0, detuneEnv = 0, detuneLfo = 0;
+};
+XtCombBlock xtCombBlock(const XtCombParams& p, float velA, float velB);
+
+// The wave's root frequency, the voice's +0x9a4 (the voice setup
+// 0x894f21c0): 440·2^((Original Pitch − 69)/12) Hz through exp2, for a wave
+// without fine tuning; 440 with Robot Voice.
+float xtCosmRootHz(int originalPitch, bool robot);
+
+// The object for block code 9.  The delay in samples is 44100 · factor ·
+// (1 − Detune/2400 + Env·depth + LFO·depth) / (pitch × root), within 0…3267:
+// pitch the voice's pitch ratio (+0x144, as the 10-ms update leaves it; the
+// object's +0), root its root frequency (+4).  Slot 1 is Detune's (Env B),
+// slot 2 Tone's (Env A).  A new delay is taken only when the last has
+// finished crossfading (500 samples); the buffer (3267 samples) is cleared at
+// note-on (0x894ecb00).  Firmware quirks kept: a new block stores
+// 1 − Detune/2400 where the update reads Detune, so after the first update the
+// Detune is about −0.7 cents whatever its setting; Tone steps toward its target
+// once per block, not every 4 samples; until a crossfade ends both reads use
+// the old delay's fraction, which is not kept from block to block.
+class XtCosmComb {
+public:
+    XtCosmComb();
+    // Note-on (0x894edf70): buffer cleared, start values (0x894ec740) from the
+    // envelopes' start levels, rates 4 × their follower coefficients, the
+    // block (0x894ed390) with their outputs, then the delay settled.
+    void noteOn(const XtCombBlock& b, float pitch, float root, float env1Start, float env1Out, float rate1, float lfo1,
+                float env2Start, float env2Out, float rate2, float lfo2);
+    void setBlock(const XtCombBlock& b, float env1, float lfo1, float env2, float lfo2);                    // 0x894ed390
+    void update(float pitch, float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);     // 0x894eea90
+    // 32 frames, interleaved L/R, in place (0x894fa8d0): reads L, writes both.
+    void process(float* lr);
+
+    float delay() const { return dly; }
+    float tone() const { return tn; }
+    float toneTarget() const { return tnTgt; }
+    float newDelay() const { return nDly; }
+    float fraction() const { return frac; }
+    float newFraction() const { return nFrac; }
+    float progress() const { return prog; }
+    float dc() const { return dcy; }
+    int writeIndex() const { return w; }
+    const float* buffer() const { return buf.data() + 1; }
+
+private:
+    XtCombBlock blk;
+    float det = 1.0f;                 // +0x2c: 1 − Detune/2400 after a block
+    float pitch = 1.0f, root = 440.0f;
+    float dly = 0, tn = 0, tnTgt = 0, rate1 = 0, rate2 = 0;
+    float nDly = 0, frac = 0, nFrac = 0, prog = 1.0f;
+    float dcy = 0, dcK = 0;
+    int w = 0;
+    // the buffer, after one word that stays 0: at the longest delay (3267) the
+    // firmware's second tap reads the word before its buffer (index −1)
+    std::vector<float> buf;
+    float delayFrom(float d, float env1, float lfo1) const;
+    void newTarget(float d);
 };
 
 // The coefficients from the modulated values (0x894eecb0): Q + its depths ×

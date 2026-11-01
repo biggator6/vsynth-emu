@@ -174,7 +174,8 @@ int main(int argc, char** argv) {
     // freq2,kf2,q2,lfo2,env2": COSM 1 a Dual Filter (KF in %); TEST_CENVB its
     // Env B (Filter 2's); TEST_DUAL2, TEST_CENVB2: COSM 2's.  TEST_TB="cutoff,kf,
     // lfo,env,q,qFollow,hpf,hpfKf,hpfLfo,hpfEnv,gain": a TB Filter (KF in %);
-    // TEST_TB2: COSM 2's.
+    // TEST_TB2: COSM 2's.  TEST_COMB="octave,detune,detuneLfo,detuneEnv,tone,
+    // toneLfo,toneEnv": a Comb Filter (octave 0..4); TEST_COMB2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -207,6 +208,15 @@ int main(int argc, char** argv) {
             set("TbCutoff", m.tbCutoff); set("TbKF", m.tbKf); set("TbLfo", m.tbLfo); set("TbEnv", m.tbEnv); set("TbQ", m.tbQ);
             set("TbQFollow", m.tbQFollow); set("TbHpf", m.tbHpf); set("TbHpfKF", m.tbHpfKf); set("TbHpfLfo", m.tbHpfLfo);
             set("TbHpfEnv", m.tbHpfEnv); set("TbGain", m.tbGain);
+        }
+        if (const char* e = std::getenv(("TEST_COMB" + sfx).c_str())) {
+            m.on = true;
+            m.type = 4;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &m.combOctave, &m.combDetune, &m.combDetuneLfo, &m.combDetuneEnv, &m.combTone, &m.combToneLfo,
+                        &m.combToneEnv);
+            set("Switch", 1); set("Type", 4); set("CombOctave", m.combOctave); set("CombDetune", m.combDetune);
+            set("CombDetuneLfo", m.combDetuneLfo); set("CombDetuneEnv", m.combDetuneEnv); set("CombTone", m.combTone);
+            set("CombToneLfo", m.combToneLfo); set("CombToneEnv", m.combToneEnv);
         }
         if (const char* e = std::getenv(("TEST_CENVB" + sfx).c_str())) {
             auto& b = m.envB;

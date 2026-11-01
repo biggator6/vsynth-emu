@@ -116,7 +116,8 @@ public:
         // The COSM sections (XtCosm), COSM 1 then COSM 2 in series: the
         // switch; the type, 0 TVF, 1 Dynamic TVF (its Q and Cutoff also
         // follow the input's level by their Own Env depths −63..+63), 2
-        // Dual Filter or 3 TB Filter (their own parameters below); Filter
+        // Dual Filter, 3 TB Filter or 4 Comb Filter (their own parameters
+        // below); Filter
         // Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
         // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
         // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
@@ -145,6 +146,9 @@ public:
             // 0..127; the LPF on envA, the HPF on envB
             int tbCutoff = 90, tbKf = 0, tbLfo = 0, tbEnv = 0, tbQ = 100, tbQFollow = 25;
             int tbHpf = 45, tbHpfKf = 0, tbHpfLfo = 0, tbHpfEnv = 0, tbGain = 127;
+            // the Comb Filter: Octave 0..4 (−2..+2), Detune −100..+100 with
+            // its LFO and Env depths (envB), Tone 0..127 with its depths (envA)
+            int combOctave = 3, combDetune = 0, combDetuneLfo = 0, combDetuneEnv = 0, combTone = 0, combToneLfo = 0, combToneEnv = 0;
             CosmEnv envA, envB;
             int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
             bool lfoKeySync = false;
@@ -187,15 +191,16 @@ private:
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
         XtLfo lfo;
-        // the COSM sections: on as at note-on; each its TVF, Dual Filter or
-        // TB Filter, envelopes (A: the Cutoff's, Filter 1's or the LPF's; B:
-        // the Q's, Filter 2's or the HPF's) and LFO
+        // the COSM sections: on as at note-on; each its TVF, Dual, TB or Comb
+        // Filter, envelopes (A: the Cutoff's, Filter 1's, the LPF's or Tone's;
+        // B: the Q's, Filter 2's, the HPF's or Detune's) and LFO
         struct CosmVoice {
             bool on = false;
             int type = 0;                      // the type as at note-on
             XtCosmTvf tvf;
             XtCosmDual dual;
             XtCosmTb tb;
+            XtCosmComb comb;
             XtEnvelope envA, envB;
             XtLfo lfo;
         };
@@ -261,6 +266,7 @@ private:
     XtTvfBlock cosmBlock(const Voice& v, int k) const;
     XtDualBlock dualBlock(const Voice& v, int k) const;
     XtTbBlock tbBlock(const Voice& v, int k) const;
+    XtCombBlock combBlock(const Voice& v, int k) const;
     void cosmSetBlock(Voice& v, int k);              // a new block for a sounding section (0x894ed8f0)
     float drawSeed();
 };

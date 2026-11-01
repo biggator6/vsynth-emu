@@ -17,11 +17,15 @@ constexpr uint32_t kCutTab = 0x897d1264, kCapTab = 0x897d1468;
 // 2^i, 2^−i); the gain table (128 shorts, 0x894de110)
 constexpr uint32_t kExpTab = 0x897d0228, kGainTab = 0x897cfcb8;
 constexpr int kExpN = (int)((kCapTab + 128 * 4 - kExpTab) / 4);
+// the Comb Filter's octave factors (5 floats: 4, 2, 1, ½, ¼)
+constexpr uint32_t kOctTab = 0x897d1868;
+constexpr int kCombLen = 3267;                 // the delay buffer (0x894ecb00)
 
 struct Tables {
     float cut[129], cap[128];
     float exp[kExpN];
     uint16_t gain[128];
+    float oct[5];
     bool ok = false;
 } T;
 
@@ -163,6 +167,13 @@ inline double addRz(double x, double y) {
     const double bb = s - x, err = (x - (s - bb)) + (y - bb);
     return err != 0.0 && (s > 0.0 ? err < 0.0 : err > 0.0) ? std::nextafter(s, 0.0) : s;
 }
+inline float clampf(float x, float lo, float hi) {             // 0x89501900
+    if (lo > x) x = lo;
+    if (x > hi) x = hi;
+    return x;
+}
+inline float fracOf(float x) { return sub(x, flt(ftrc(x))); }
+
 inline float fipr(float a0, float a1, float a2, float a3, float b0, float b1, float b2, float b3) {
     double s = (double)a0 * b0;
     s = addRz(s, (double)a1 * b1);
@@ -180,7 +191,8 @@ bool xtCosmLoadTables(const char* romPath) {
     const bool ok = std::fseek(f, (long)(kCutTab - kRomBase), SEEK_SET) == 0 && std::fread(T.cut, 4, 129, f) == 129
                  && std::fseek(f, (long)(kCapTab - kRomBase), SEEK_SET) == 0 && std::fread(T.cap, 4, 128, f) == 128
                  && std::fseek(f, (long)(kExpTab - kRomBase), SEEK_SET) == 0 && std::fread(T.exp, 4, kExpN, f) == (size_t)kExpN
-                 && std::fseek(f, (long)(kGainTab - kRomBase), SEEK_SET) == 0 && std::fread(T.gain, 2, 128, f) == 128;
+                 && std::fseek(f, (long)(kGainTab - kRomBase), SEEK_SET) == 0 && std::fread(T.gain, 2, 128, f) == 128
+                 && std::fseek(f, (long)(kOctTab - kRomBase), SEEK_SET) == 0 && std::fread(T.oct, 4, 5, f) == 5;
     std::fclose(f);
     T.ok = ok;
     return ok;
@@ -472,8 +484,108 @@ void XtCosmTb::process(float* lr) {
     s[0] = s0; s[1] = s1; s[2] = s2; s[3] = s3; h[0] = h0; h[1] = h1; h[2] = h2; h[3] = h3;
 }
 
+XtCombBlock xtCombBlock(const XtCombParams& p, float velA, float velB) {
+    XtCombBlock b;
+    b.octave = (int8_t)p.octave;
+    b.detune = flt(clampi((int16_t)p.detune, -100, 100));
+    b.detuneLfo = sq63(clampi((int16_t)p.detuneLfo, -63, 63));
+    b.detuneEnv = envDepth(velB, p.detuneEnv);
+    b.tone = add(div(mul(flt(clampi((int16_t)p.tone, 0, 127)), 2.0f), 127.0f), -1.0f);
+    b.toneLfo = sq63(clampi((int16_t)p.toneLfo, -63, 63));
+    b.toneEnv = envDepth(velA, p.toneEnv);
+    return b;
+}
+
+float xtCosmRootHz(int originalPitch, bool robot) {
+    if (robot) return 440.0f;
+    // 0x894f21c0: (P·100 − 0 + 0)/1200 − 5.75 (as stored), exp2, × 44000 × 0.01
+    float x = sub(mul(flt(originalPitch), 100.0f), 0.0f);
+    x = add(x, 0.0f);
+    x = fmac(x, K(0x3a5a740d), K(0xc0b7ffff));
+    return mul(mul(exp2t(x), 44000.0f), K(0x3c23d709));
+}
+
+XtCosmComb::XtCosmComb() : buf(kCombLen + 1, 0.0f) {}
+
+float XtCosmComb::delayFrom(float d, float env1, float lfo1) const {
+    float x = fmac(blk.detuneEnv, env1, d);
+    x = fmac(blk.detuneLfo, lfo1, x);
+    x = mul(mul(x, T.oct[clampi(blk.octave, 0, 4)]), 44100.0f);
+    return clampf(div(x, mul(root, pitch)), 0.0f, 3267.0f);
+}
+
+void XtCosmComb::newTarget(float d) {
+    if (1.0f > prog || d == nDly) return;              // only after a crossfade, and only a new delay
+    nDly = d;
+    nFrac = fracOf(d);
+    prog = 0.0f;
+}
+
+void XtCosmComb::noteOn(const XtCombBlock& b, float p, float r, float env1Start, float env1Out, float r1, float lfo1,
+                        float env2Start, float env2Out, float r2, float lfo2) {
+    pitch = p; root = r;
+    w = kCombLen - 1;                                  // 0xcc2
+    dcy = 0.0f;
+    for (float& x : buf) x = 0.0f;
+    blk = b;
+    dly = delayFrom(sub(1.0f, mul(b.detune, K(0x39da7419))), env1Start, lfo1);
+    tn = clampf(fmac(b.toneLfo, lfo2, fmac(b.toneEnv, env2Start, b.tone)), -1.0f, 1.0f);
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    setBlock(b, env1Out, lfo1, env2Out, lfo2);
+    nDly = dly;                                        // 0x894ee300: settled at the start delay
+    frac = nFrac = fracOf(dly);
+    prog = 1.0f;
+    dcK = K(0x3acb4aec);                               // 0.001551
+}
+
+void XtCosmComb::setBlock(const XtCombBlock& b, float env1, float lfo1, float env2, float lfo2) {
+    blk = b;
+    det = sub(1.0f, mul(b.detune, K(0x39da7419)));
+    const float d = delayFrom(det, env1, lfo1);
+    tnTgt = clampf(fmac(b.toneLfo, lfo2, fmac(b.toneEnv, env2, b.tone)), -1.0f, 1.0f);
+    newTarget(d);
+}
+
+void XtCosmComb::update(float p, float env1, float r1, float lfo1, float env2, float r2, float lfo2) {
+    pitch = p;
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    tnTgt = clampf(fmac(blk.toneLfo, lfo2, fmac(blk.toneEnv, env2, blk.tone)), -1.0f, 1.0f);
+    if (1.0f > prog) return;
+    newTarget(delayFrom(sub(1.0f, mul(det, K(0x39da7419))), env1, lfo1));   // +0x2c read as Detune
+}
+
+void XtCosmComb::process(float* lr) {
+    const float d2 = mul(sub(tnTgt, tn), rate2);
+    const int r13 = ftrc(dly), r14 = ftrc(nDly);
+    float c = tn, y = dcy, p = prog, f = frac;
+    float* const B = buf.data() + 1;                   // B[−1] is the guard word
+    for (int i = 0; i < 32; ++i) {
+        if (++w >= kCombLen) w = 0;
+        if (i == 0) c = add(c, d2);                    // the step meant for every 4th sample runs once
+        const float x = lr[2 * i];
+        const float e = sub(x, y);
+        y = fmac(e, dcK, y);
+        int a = w - r13, b = a - 1, n = w - r14, m = n - 1;
+        if (a < 0) a += kCombLen;
+        if (b < 0) b += kCombLen;                      // once: w = 0 at the longest delay leaves −1
+        if (n < 0) n += kCombLen;
+        if (m < 0) m += kCombLen;
+        const float g = sub(1.0f, f);
+        const float ra = add(mul(B[a], g), mul(B[b], f));
+        const float rb = add(mul(B[n], g), mul(B[m], f));
+        const float s2 = add(mul(ra, sub(1.0f, p)), mul(rb, p));
+        B[w] = e;
+        lr[2 * i] = lr[2 * i + 1] = add(mul(s2, c), e);
+        p = add(p, K(0x3b03126e));                     // 0.002
+        if (p > 1.0f) { p = 1.0f; dly = nDly; f = nFrac; }
+    }
+    tn = c; dcy = y; prog = p;                         // the fraction is not kept
+}
+
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual Filter and the TB Filter against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB and Comb Filters against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -866,6 +978,128 @@ int main(int argc, char** argv) {
     }
     std::printf("tb note-on, block and update: %ld cases, %ld different\n", on, ob);
     std::printf("tb filter: %ld blocks of 32 frames, %ld different\n", fn, fb);
-    return cb || ub || db || xb || yb || zb || tb || ob || fb ? 3 : 0;
+
+    // The Comb Filter (block code 9): the converter (0x894dd4f0) …
+    auto combParams = [&]() {
+        XtCombParams p;
+        p.octave = (int)(rnd() % 5); p.detune = (int)(rnd() % 201) - 100; p.detuneLfo = (int)(rnd() % 127) - 63;
+        p.detuneEnv = (int)(rnd() % 127) - 63; p.tone = (int)(rnd() % 128); p.toneLfo = (int)(rnd() % 127) - 63; p.toneEnv = (int)(rnd() % 127) - 63;
+        return p;
+    };
+    long kb = 0, kn = 0;
+    for (int k = 0; k < 200000; ++k) {
+        const XtCombParams p = combParams();
+        const int cosm = (int)(rnd() & 1);
+        const float va = (float)(rnd() % 32769) / 32768.0f, vb = (float)(rnd() % 32769) / 32768.0f;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100);
+        c.wr8(IN + 2, (uint8_t)cosm); c.wr8(IN + 3, (uint8_t)(rnd() % 128));
+        const int vals[7] = { p.octave, p.detune, p.detuneLfo, p.detuneEnv, p.tone, p.toneLfo, p.toneEnv };
+        for (int i = 0; i < 7; ++i) c.wr16(IN + 0x12 + 2 * (uint32_t)i, (uint16_t)(int16_t)vals[i]);
+        wf(IN + 0x34, va); wf(IN + 0x38, vb);
+        if (!c.call(0x894dd4f0, { IN, OUT }, sp)) { std::fprintf(stderr, "comb converter: %s\n", c.error().c_str()); return 1; }
+        const XtCombBlock b = xtCombBlock(p, va, vb);
+        ++kn;
+        const bool ok = c.rd32(OUT) == 9 && (int)(int8_t)c.rd8(OUT + 4) == b.octave && same(f32(OUT + 8), b.tone) && same(f32(OUT + 0xc), b.toneEnv)
+                     && same(f32(OUT + 0x14), b.toneLfo) && same(f32(OUT + 0x1c), b.detune) && same(f32(OUT + 0x20), b.detuneEnv)
+                     && same(f32(OUT + 0x28), b.detuneLfo) && c.rd32(OUT + 0x10) == (cosm ? 11u : 9u) && c.rd32(OUT + 0x24) == (cosm ? 12u : 10u)
+                     && c.rd32(OUT + 0x18) == (cosm ? 4u : 3u) && c.rd32(OUT + 0x2c) == (cosm ? 4u : 3u);
+        if (!ok && kb++ < 5)
+            std::printf("  comb converter: fw tone %.9g %.9g %.9g det %.9g %.9g %.9g, port %.9g %.9g %.9g %.9g %.9g %.9g\n", f32(OUT + 8), f32(OUT + 0xc),
+                        f32(OUT + 0x14), f32(OUT + 0x1c), f32(OUT + 0x20), f32(OUT + 0x28), b.tone, b.toneEnv, b.toneLfo, b.detune, b.detuneEnv, b.detuneLfo);
+    }
+    std::printf("comb converter: %ld cases, %ld different\n", kn, kb);
+
+    // … the note-on itself (0x894edf70; the buffer pool's slot finder
+    // 0x894ec2b0 hooked to hand out four buffers, which the allocator clears),
+    // the update with a moving pitch (0x894ee6a0), new blocks while the note
+    // sounds (0x894ed390) and the filter (0x894fa8d0), its buffer compared
+    const uint32_t CB[4] = { ram + 0x20000, ram + 0x24000, ram + 0x28000, ram + 0x2c000 };
+    c.hook(0x894ec2b0, [&](Sh4& m) { for (uint32_t i = 0; i < 4; ++i) m.wr32(m.r[5] + 4 * i, CB[i]); m.ret(0); });
+    auto writeComb = [&](const XtCombBlock& b) {
+        c.wr32(BLK, 9); c.wr32(BLK + 4, 0); c.wr8(BLK + 4, (uint8_t)b.octave); wf(BLK + 8, b.tone); wf(BLK + 0xc, b.toneEnv); c.wr32(BLK + 0x10, 9);
+        wf(BLK + 0x14, b.toneLfo); c.wr32(BLK + 0x18, 3); wf(BLK + 0x1c, b.detune); wf(BLK + 0x20, b.detuneEnv); c.wr32(BLK + 0x24, 10);
+        wf(BLK + 0x28, b.detuneLfo); c.wr32(BLK + 0x2c, 3);
+    };
+    auto combSame = [&](const XtCosmComb& port) {
+        return same(f32(D + 0xbc), port.delay()) && same(f32(D + 0xc0), port.tone()) && same(f32(OBJ + 0x100), port.toneTarget())
+            && same(f32(OBJ + 0x130), port.newDelay()) && same(f32(OBJ + 0x134), port.fraction()) && same(f32(OBJ + 0x138), port.newFraction())
+            && same(f32(OBJ + 0x13c), port.progress()) && same(f32(D + 0x34), port.dc()) && (int)c.rd32(D + 4) == port.writeIndex();
+    };
+    auto pitchOf = [&]() { const int r = (int)(rnd() % 4); return r == 0 ? 1.0f : r == 1 ? frnd(0.5f, 2.0f) : r == 2 ? frnd(0.03f, 0.2f) : frnd(2.0f, 32.0f); };
+    long mb = 0, mn = 0, qb = 0, qn = 0;
+    for (int g = 0; g < nCases; ++g) {
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200); c.write(BLK, z.data(), 0x80);
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        for (uint32_t bI = 0; bI < 4; ++bI)
+            for (uint32_t i = 0; i < 3267; ++i) wf(CB[bI] + 4 * i, frnd(-1, 1));    // the last note's junk
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);   // slot 1 Detune's, slot 2 Tone's
+        float pitch = pitchOf();
+        const float root = xtCosmRootHz((int)(rnd() % 128), (rnd() % 4) == 0);
+        wf(OBJ, pitch); wf(OBJ + 4, root);
+        wf(OBJ + 0x13c, (rnd() & 1) ? 0.0f : 1.5f);                              // the last note's crossfade
+        const float bva = frnd(0, 1), bvb = frnd(0, 1);
+        const XtCombBlock b = xtCombBlock(combParams(), bva, bvb);
+        writeComb(b);
+        const float e1S = frnd(-1, 1), e2S = frnd(-1, 1), l1 = frnd(-1, 1), l2 = frnd(-1, 1);
+        float o1 = frnd(-1, 1), o2 = frnd(-1, 1), ol1 = l1, ol2 = l2;
+        const float r1 = frnd(0.2f, 1.0f) / 32.0f, r2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+        wf(EQ + 0x58, e1S); wf(EC + 0x58, e2S); wf(LQ + 0x38, l1); wf(LC + 0x38, l2); wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2);
+        wf(EQ + 0x54, r1); wf(EC + 0x54, r2);
+        if (!c.call(0x894edf70, { OBJ, BLK, 0 }, sp)) { std::fprintf(stderr, "comb note-on: %s\n", c.error().c_str()); return 1; }
+        XtCosmComb port;
+        port.noteOn(b, pitch, root, e1S, o1, r1, l1, e2S, o2, r2, l2);
+        ++mn;
+        bool ok0 = combSame(port);
+        for (uint32_t i = 0; i < 3267; ++i) ok0 = ok0 && f32(CB[0] + 4 * i) == 0.0f;
+        if (!ok0 && mb++ < 5)
+            std::printf("  comb note-on %d: fw delay %.9g tone %.9g t %.9g new %.9g frac %.9g p %.9g w %d, port %.9g %.9g %.9g %.9g %.9g %.9g %d\n", g,
+                        f32(D + 0xbc), f32(D + 0xc0), f32(OBJ + 0x100), f32(OBJ + 0x130), f32(OBJ + 0x134), f32(OBJ + 0x13c), (int)c.rd32(D + 4),
+                        port.delay(), port.tone(), port.toneTarget(), port.newDelay(), port.fraction(), port.progress(), port.writeIndex());
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 13 || blkN % 14 == 3) {                  // updates, the pitch moving
+                if (rnd() % 3) pitch = (rnd() & 1) ? pitchOf() : mul(pitch, frnd(0.98f, 1.02f));
+                o1 = frnd(-1, 1); o2 = frnd(-1, 1); ol1 = frnd(-1, 1); ol2 = frnd(-1, 1);
+                const float nr1 = frnd(0.2f, 1.0f) / 32.0f, nr2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+                wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2); wf(LQ + 0x38, ol1); wf(LC + 0x38, ol2); wf(EQ + 0x54, nr1); wf(EC + 0x54, nr2);
+                uint32_t pb; std::memcpy(&pb, &pitch, 4);
+                c.fb[0][4] = pb;                                       // the voice's pitch ratio (+0x144) in fr4
+                if (!c.call(0x894ee6a0, { OBJ }, sp)) { std::fprintf(stderr, "comb update: %s\n", c.error().c_str()); return 1; }
+                port.update(pitch, o1, nr1, ol1, o2, nr2, ol2);
+                ++mn;
+                if (!combSame(port) && mb++ < 5)
+                    std::printf("  comb update %d.%d: fw t %.9g new %.9g nfrac %.9g p %.9g, port %.9g %.9g %.9g %.9g\n", g, blkN, f32(OBJ + 0x100),
+                                f32(OBJ + 0x130), f32(OBJ + 0x138), f32(OBJ + 0x13c), port.toneTarget(), port.newDelay(), port.newFraction(), port.progress());
+            } else if (blkN % 14 == 8 && (rnd() & 1)) {               // a parameter change while the note sounds
+                const XtCombBlock nb = xtCombBlock(combParams(), bva, bvb);
+                writeComb(nb);
+                if (!c.call(0x894ed390, { OBJ, BLK + 4 }, sp)) { std::fprintf(stderr, "comb block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb, o1, ol1, o2, ol2);
+                ++mn;
+                if (!combSame(port) && mb++ < 5)
+                    std::printf("  comb block %d.%d: fw t %.9g new %.9g p %.9g, port %.9g %.9g %.9g\n", g, blkN, f32(OBJ + 0x100), f32(OBJ + 0x130),
+                                f32(OBJ + 0x13c), port.toneTarget(), port.newDelay(), port.progress());
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 4);
+            const float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e9f : ar == 2 ? 4.0e8f : 1.0f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(0x894fa8d0, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "comb filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++qn;
+            bool ok = combSame(port);
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            for (uint32_t i = 0; i < 3267; ++i) ok = ok && same(f32(CB[0] + 4 * i), port.buffer()[i]);
+            if (!ok && qb++ < 6)
+                std::printf("  comb filter %d block %d: fw out %.9g %.9g delay %.9g tone %.9g p %.9g dc %.9g, port %.9g %.9g %.9g %.9g %.9g %.9g\n", g, blkN,
+                            f32(BUF), f32(BUF + 248), f32(D + 0xbc), f32(D + 0xc0), f32(OBJ + 0x13c), f32(D + 0x34), lr[0], lr[62], port.delay(),
+                            port.tone(), port.progress(), port.dc());
+        }
+    }
+    std::printf("comb note-on, block and update: %ld cases, %ld different\n", mn, mb);
+    std::printf("comb filter: %ld blocks of 32 frames, %ld different\n", qn, qb);
+    return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb ? 3 : 0;
 }
 #endif

@@ -1544,6 +1544,128 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Comb Filter (2026-10-31, v67)
+
+COSM Type 8, block code 9. A feedforward comb tuned to the note: the input,
+with its DC removed, plus Tone × itself delayed by the note's period × the
+Octave's factor.
+
+**Parameters** (0x90e…0x914, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x90e | Octave Select | 0…4 (−2…+2) | 3 (+1) |
+| 0x90f | Detune | ±100 | 0 |
+| 0x910 | Detune LFO Depth | ±63 | 0 |
+| 0x911 | Detune Env Depth | ±63 | 0 |
+| 0x912 | Tone | 0…127 | 0 |
+| 0x913 | Tone LFO Depth | ±63 | 0 |
+| 0x914 | Tone Env Depth | ±63 | 0 |
+
+**The converter** (`0x894dd4f0`) writes the block:
+- [1]: the Octave, as a byte;
+- [2] Tone·2/127 − 1, [3] its Env depth (A × (d/63)·|d/63|), [4] its
+  envelope (9 or 11), [5] its LFO depth, [6] its LFO;
+- [7] Detune as a float (±100), [8] its Env depth (B), [9] its envelope (10
+  or 12), [10] its LFO depth, [11] its LFO.
+
+The binding puts Detune's envelope in slot 1 and Tone's in slot 2.
+
+**The pitch.** Before each COSM note-on, the tone note-on (`0x894f5e60`) runs
+the voice's own note-on (the voice struct is at tone +0x20). It then copies
+two values into the COSM object (`0x894ee480`):
+- obj+0 = the voice's pitch ratio (+0x144, the slot the 10-ms voice update
+  moves 70%);
+- obj+4 = the voice's root frequency (+0x9a4). The voice setup
+  (`0x894f21c0`) forms it as exp2((Original Pitch·100 − offset +
+  detune)/1200 − 5.75)·44000·0.01, i.e. 440·2^((P − 69)/12) for a wave
+  without fine tuning, or 440 for Robot Voice.
+
+The 10-ms update (`0x894ee6a0`) stores its fr4 argument at obj+0. The tone
+update (`0x894f75f0`) passes the voice's +0x144: OSC 1's, or OSC 2's
+(+0xb18/+0x1378) in one structure branch.
+
+**The delay**, in samples, is
+44100 · F · (1 − Detune/2400 + Env·depth + LFO·depth) / (ratio × root),
+within 0…3267 (`0x89501900`). F is the octave factor (4, 2, 1, ½, ¼, table
+0x897d1868).
+- Start values (`0x894ec740`, the start table indexed by code − 1) use the
+  envelopes' start levels. Tone's start is clamp(Tone + depths, ±1).
+- The block (`0x894ed390`) computes the delay from the outputs. It takes
+  it as a new target only if the last crossfade has ended (obj+0x13c ≥ 1) and
+  the delay differs from the current target. A new target sets
+  obj+0x130 = the delay, +0x138 = its fraction, +0x13c = 0.
+- The update (`0x894eea90`, the update table also indexed by code − 1)
+  works the same way, after the Tone target.
+- **Quirk:** the block stores 1 − Detune/2400 at obj+0x2c, where the update
+  reads Detune. After the first update the factor is
+  1 − (1 − Detune/2400)/2400: about −0.7 cents, whatever the Detune.
+
+**Note-on** (`0x894edf70`, code 9):
+- The allocator (`0x894ecb00`) takes buffers from a pool (0x89f91884, or
+  0x89f91a64 for COSM 2) and clears them: 3,267 floats each.
+- The write index starts at 3266.
+- The start values and the block run.
+- Then `0x894ee300` sets the new target to the start delay, both fractions
+  to its fraction, the crossfade to 1, and the DC coefficient to 0.001551.
+
+**The filter** (`0x894fa8d0`), per sample:
+- the write index steps, wrapping at 3267;
+- e = x − dc; dc += e·0.001551;
+- the read is linearly interpolated, a·(1 − f) + b·f, at index − delay and
+  index − new delay;
+- the two reads are mixed by the crossfade p: A·(1 − p) + B·p;
+- the buffer takes e;
+- out = mix·Tone + e, written to L and R;
+- p += 0.002 (500 samples). Above 1: p = 1, delay = new delay, and
+  fraction = new fraction.
+
+Quirks:
+- Tone steps toward its target only on the first sample of each block. The
+  every-fourth-sample test sits outside the loop.
+- Both reads use the current fraction.
+- The delays' integer parts are taken once per block.
+- The fraction set at the crossfade's end is not stored back. The stored
+  one (obj+0x134) is the note-on's for the rest of the note.
+- At the longest delay (3267) with the write index at 0, the second tap
+  wraps once, to −1: the firmware reads the word before its buffer, weighted
+  by the fraction. That word is 0 in the check. On the XT it is whatever
+  precedes the pooled buffer (not traced). The port keeps a guard word of 0
+  there. Without it, the port's read ran off the vector, and the check
+  crashed now and then.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converter: 200,000 cases;
+- note-on, run as the firmware's own `0x894edf70`, with the pool's slot
+  finder `0x894ec2b0` hooked to hand out buffers full of junk, which the
+  allocator clears;
+- updates with a moving pitch (crossfades starting, ending mid-block and
+  being refused), and new blocks while the note sounds: 22,517 cases;
+- the filter: 120,000 blocks, the whole delay buffer compared after every
+  block;
+- all 0 different. 12 runs in a row, and a run with AddressSanitizer and
+  UBSan, are clean.
+
+**Plugin.**
+- COSM Type gains Comb Filter (index 4, latched at note-on).
+- Its own parameters per section use the XT's defaults (Octave +1).
+- The editor has a Comb row (Octave, Detune and its LFO and Env depths) and
+  a Comb T row (Tone and its depths).
+- The comb's note-on runs after the voice's pitch is set, as on the XT. It
+  takes the voice's pitch ratio (`curA`, the +0x144 the update moves) and the
+  root frequency at the patch's Original Key. Each 10-ms update passes the
+  ratio again.
+- Checks:
+  - renders are bit-identical to v66;
+  - PluginTest is bit-identical with the Comb Filter at its defaults; with
+    Detune, Tone, both envelopes, the LFO and a second note; and on COSM 2
+    behind a TB Filter in MONO legato.
+- On noise at key 60 (root 261.6 Hz):
+  - Tone +1 at Octave 0 gives peaks every 261.4 Hz (+6 dB, notches below
+    −28 dB);
+  - Octave +1 gives peaks every 523.2 Hz;
+  - Tone −1 moves the peaks to between the harmonics.
+
 ### COSM: the TB Filter (2026-10-31, v66)
 
 COSM Type 16, block code 20: a three-pole lowpass with resonance feedback,
@@ -1678,7 +1800,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | 5 | Resonator | 0x8eb–0x8f2 | `0x894dcf00` | | |
 | 6 | 1st Side Band Filter | 0x8f3–0x900 | `0x894dd0a0` | | |
 | 7 | 2nd Side Band Filter | 0x901–0x90d | `0x894dd2c0` | | |
-| 8 | Comb Filter | 0x90e–0x914 | `0x894dd4f0` | 9 | `0x894fa8d0` |
+| 8 | Comb Filter | 0x90e–0x914 | `0x894dd4f0` | 9 | `0x894fa8d0` (v67) |
 | 9 | Dual Filter | 0x915–0x91f | `0x894dd690` | 12 | `0x894fd090` |
 | 10 | TVF | 0x920–0x927 | `0x894dd870` | 13 | `0x89502890` |
 | 11 | Dynamic TVF | 0x928–0x931 | `0x894dda40` | 14 | `0x89502920` |
@@ -2045,7 +2167,7 @@ on the SH-4):
 
 **Not modelled yet:**
 - COSM 2 (since modelled, v63);
-- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66);
+- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;

@@ -52,11 +52,12 @@ namespace Params {
     static const juce::String kLegato        = "legatoSwitch";
     static const juce::String kOctave        = "octaveShift";
     // The COSM sections as TVFs, COSM 1 ("cosm…") and COSM 2 ("cosm2…"):
-    // Switch, Type (TVF, Dynamic TVF, Dual Filter, TB Filter), ResoOwn/CutoffOwn (the Dynamic TVF's
+    // Switch, Type (TVF, Dynamic TVF, Dual Filter, TB Filter, Comb Filter), ResoOwn/CutoffOwn (the Dynamic TVF's
     // Own Env depths), Filter, Cutoff, Reso, CutoffKF, CutoffEnv/Lfo, ResoEnv/Lfo; the
     // Dual Filter's DualType and Dual1…/Dual2… Freq, KF, Q, Lfo, Env; the TB
     // Filter's TbCutoff, TbKF, TbLfo, TbEnv, TbQ, TbQFollow, TbHpf, TbHpfKF,
-    // TbHpfLfo, TbHpfEnv, TbGain; the
+    // TbHpfLfo, TbHpfEnv, TbGain; the Comb Filter's CombOctave, CombDetune,
+    // CombDetuneLfo, CombDetuneEnv, CombTone, CombToneLfo, CombToneEnv; the
     // envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
     // Attack…TimeKF; the LFO, LfoWave…LfoKeySync
     static juce::String cosmId(int k, const char* name) { return juce::String(k ? "cosm2" : "cosm") + name; }
@@ -217,7 +218,7 @@ VSynthEmuProcessor::createParameterLayout() {
         const juce::String n = k ? "COSM 2 " : "COSM 1 ";
         params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "Switch"), n + "Switch", false));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Type"), n + "Type",
-            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter", "TB Filter" }, 0));
+            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter" }, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResoOwn"), n + "Resonance Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CutoffOwn"), n + "Cutoff Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Filter"), n + "Filter Type",
@@ -258,6 +259,17 @@ VSynthEmuProcessor::createParameterLayout() {
             params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbHpfLfo"), tn + "HPF Cutoff LFO Depth", -63, 63, 0));
             params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbHpfEnv"), tn + "HPF Cutoff Env Depth", -63, 63, 0));
             params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "TbGain"), tn + "Gain", 0, 127, 127));
+        }
+        {                                            // the Comb Filter, the XT's defaults (Octave +1)
+            const juce::String cn = n + "Comb ";
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "CombOctave"), cn + "Octave",
+                juce::StringArray { "-2", "-1", "0", "+1", "+2" }, 3));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CombDetune"), cn + "Detune", -100, 100, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CombDetuneLfo"), cn + "Detune LFO Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CombDetuneEnv"), cn + "Detune Env Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CombTone"), cn + "Tone", 0, 127, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CombToneLfo"), cn + "Tone LFO Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CombToneEnv"), cn + "Tone Env Depth", -63, 63, 0));
         }
         for (const char* ab : { "A", "B" }) {
             const juce::String id = cosmId(k, "Env") + ab, name = n + "Env " + ab + " ";
@@ -480,6 +492,9 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         m.tbEnv = knob(cosmId(k, "TbEnv")); m.tbQ = knob(cosmId(k, "TbQ")); m.tbQFollow = knob(cosmId(k, "TbQFollow"));
         m.tbHpf = knob(cosmId(k, "TbHpf")); m.tbHpfKf = kf(cosmId(k, "TbHpfKF")); m.tbHpfLfo = knob(cosmId(k, "TbHpfLfo"));
         m.tbHpfEnv = knob(cosmId(k, "TbHpfEnv")); m.tbGain = knob(cosmId(k, "TbGain"));
+        m.combOctave = knob(cosmId(k, "CombOctave")); m.combDetune = knob(cosmId(k, "CombDetune"));
+        m.combDetuneLfo = knob(cosmId(k, "CombDetuneLfo")); m.combDetuneEnv = knob(cosmId(k, "CombDetuneEnv"));
+        m.combTone = knob(cosmId(k, "CombTone")); m.combToneLfo = knob(cosmId(k, "CombToneLfo")); m.combToneEnv = knob(cosmId(k, "CombToneEnv"));
         for (int ab = 0; ab < 2; ++ab) {
             XtSynth::Controls::CosmEnv& e = ab == 0 ? m.envA : m.envB;
             const juce::String id = cosmId(k, ab == 0 ? "EnvA" : "EnvB");
