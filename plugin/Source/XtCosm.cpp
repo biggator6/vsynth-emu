@@ -1124,8 +1124,59 @@ void XtCosmLofi::process(float* lr, float scale) {
 }
 
 
+// ── The Compressor ──
+
+XtCompBlock xtCompBlock(const XtCompParams& p) {
+    XtCompBlock b;
+    b.attack = add(div(flt(clampi((int16_t)p.attack, 0, 127)), 127.0f), 0.0f);
+    b.sustain = add(div(flt(clampi((int16_t)p.sustain, 0, 127)), 127.0f), 0.0f);
+    const int l = (int16_t)p.level;
+    if (l > 100) b.gain = fmac(div(flt(l - 100), 27.0f), 3.0f, 1.0f);
+    else { const float g = div(flt(l), 100.0f); b.gain = mul(g, g); }
+    return b;
+}
+
+XtCosmComp::XtCosmComp() : buf(kLen, 0.0f) {}
+
+void XtCosmComp::noteOn(const XtCompBlock& b) {
+    w = kLen;                                          // 0xcc2: the first sample goes to 0
+    std::fill(buf.begin(), buf.end(), 0.0f);
+    setBlock(b);
+    sl[0] = fac; sl[1] = sus; sl[2] = gn;              // 0x894ee390
+    gt = gs = add(div(mul(sus, K(0x4d000000)), add(fac, K(0x49800000))), sub(1.0f, sus));
+    env = fac;
+}
+
+void XtCosmComp::setBlock(const XtCompBlock& b) {
+    fac = fmac(sub(1.0f, b.attack), K(0x3d8f5c29), K(0x3f83d709));               // 1.03 + 0.07·(1 − Attack)
+    sus = b.sustain;
+    gn = b.gain;
+}
+
+void XtCosmComp::process(float* lr, float scale) {
+    const float k01 = K(0x3dcccccd);
+    sl[0] = fmac(k01, sub(fac, sl[0]), sl[0]);
+    sl[1] = fmac(k01, sub(sus, sl[1]), sl[1]);
+    sl[2] = fmac(k01, sub(gn, sl[2]), sl[2]);
+    const float f = sl[0], s = sl[1], g = sl[2], unscale = 1.0f / scale;
+    float* const B = buf.data();
+    for (int i = 0; i < 32; ++i) {
+        if (++w >= kLen) w = 0;
+        int r = w - 60;
+        if (r < 0) r += kLen;
+        const float x = mul(lr[2 * i], scale);
+        B[w] = x;
+        gs = fmac(sub(gt, gs), K(0x3d4ccccd), gs);                                 // 0.05
+        lr[2 * i] = lr[2 * i + 1] = mul(mul(B[r], gs), unscale);
+        if ((x < 0.0f ? -x : x) > env) env = add(mul(env, f), K(0x48010e80));     // + 132154
+        else env = mul(env, K(0x3f7fdf3a));                                         // × 0.9995
+        gt = mul(add(sub(mul(div(K(0x4d000000), add(env, K(0x49800000))), s), s), 1.0f), g);   // 2^27/(e + 2^20)
+    }
+}
+
+
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter and Lo-Fi against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi and the Compressor against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -2162,7 +2213,92 @@ int main(int argc, char** argv) {
     }
     std::printf("lofi note-on, block and update: %ld cases, %ld different\n", jn, jb);
     std::printf("lofi filter: %ld blocks of 32 frames, %ld different\n", ln, lb);
+
+    // The Compressor (block code 15): the converter (0x894ddc50), then the
+    // note-on, new blocks (0x894ee5c0) and the filter (0x894fab80), its ring
+    // compared
+    auto compParams = [&]() {
+        XtCompParams p;
+        p.attack = (int)(rnd() % 128); p.sustain = (int)(rnd() % 128); p.level = (int)(rnd() % 128);
+        return p;
+    };
+    auto writeComp = [&](const XtCompBlock& b) {
+        c.wr32(BLK, 15); wf(BLK + 4, b.attack); wf(BLK + 8, b.sustain); wf(BLK + 0xc, b.gain);
+    };
+    long kb2 = 0, kn2 = 0;
+    for (int k = 0; k < 200000; ++k) {
+        const XtCompParams p = compParams();
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100); c.write(BLK, z.data(), 0x10);
+        c.wr8(IN + 2, (uint8_t)(rnd() & 1)); c.wr8(IN + 3, (uint8_t)(rnd() % 128));
+        c.wr16(IN + 0x12, (uint16_t)p.attack); c.wr16(IN + 0x14, (uint16_t)p.sustain); c.wr16(IN + 0x16, (uint16_t)p.level);
+        if (!c.call(0x894ddc50, { IN, OUT }, sp)) { std::fprintf(stderr, "comp converter: %s\n", c.error().c_str()); return 1; }
+        writeComp(xtCompBlock(p));
+        ++kn2;
+        std::vector<uint8_t> fw(0x10), pt(0x10);
+        c.read(OUT, fw.data(), 0x10); c.read(BLK, pt.data(), 0x10);
+        if (fw != pt && kb2++ < 5)
+            std::printf("  comp converter %d %d %d: fw %08x %08x %08x port %08x %08x %08x\n", p.attack, p.sustain, p.level, c.rd32(OUT + 4),
+                        c.rd32(OUT + 8), c.rd32(OUT + 0xc), c.rd32(BLK + 4), c.rd32(BLK + 8), c.rd32(BLK + 0xc));
+    }
+    std::printf("comp converter: %ld cases, %ld different\n", kn2, kb2);
+    auto compSame = [&](const XtCosmComp& port) {
+        bool ok = same(f32(D + 0x98), port.gainTarget()) && same(f32(D + 0x9c), port.gain()) && same(f32(D + 0xa0), port.envelope())
+               && (int)c.rd32(D + 4) == port.writeIndex();
+        for (uint32_t i = 0; i < 3; ++i) ok = ok && same(f32(D + 0x8c + 4 * i), port.slews()[i]);
+        return ok;
+    };
+    long ob2 = 0, on2 = 0, fb2 = 0, fn2 = 0;
+    for (int g = 0; g < nCases; ++g) {
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200);
+        for (uint32_t o = 0x74; o < 0x150; o += 4) wf(OBJ + o, frnd(-1, 1));                        // the last note's state
+        for (uint32_t bI = 0; bI < 4; ++bI)
+            for (uint32_t i = 0; i < 3267; ++i) wf(CB[bI] + 4 * i, frnd(-1, 1));                    // the last note's junk
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);   // read by the note-on, unused here
+        c.write(BLK, z.data(), 0x10);
+        const XtCompBlock b = xtCompBlock(compParams());
+        writeComp(b);
+        if (!c.call(0x894edf70, { OBJ, BLK, 0 }, sp)) { std::fprintf(stderr, "comp note-on: %s\n", c.error().c_str()); return 1; }
+        XtCosmComp port;
+        port.noteOn(b);
+        ++on2;
+        bool ok0 = compSame(port);
+        for (uint32_t i = 0; i < 3266; ++i) ok0 = ok0 && f32(CB[0] + 4 * i) == 0.0f;
+        if (!ok0 && ob2++ < 5)
+            std::printf("  comp note-on %d: fw gt %.9g gs %.9g env %.9g, port %.9g %.9g %.9g\n", g, f32(D + 0x98), f32(D + 0x9c), f32(D + 0xa0),
+                        port.gainTarget(), port.gain(), port.envelope());
+        const int quiet = (int)(rnd() % 4);                  // some notes fade, so the envelope releases
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 8 && (rnd() & 1)) {             // a parameter change while the note sounds
+                const XtCompBlock nb2 = xtCompBlock(compParams());
+                writeComp(nb2);
+                if (!c.call(0x894ee4a0, { OBJ, BLK }, sp)) { std::fprintf(stderr, "comp block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb2);
+                ++on2;
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 4);
+            float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e9f : ar == 2 ? 4.0e8f : 1.0f;
+            if (quiet == 0 && blkN > 20) amp = 0.0f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(0x894fab80, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "comp filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++fn2;
+            bool ok = compSame(port);
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            for (uint32_t i = 0; i < 3266; ++i) ok = ok && same(f32(CB[0] + 4 * i), port.buffer()[i]);
+            if (!ok && fb2++ < 6)
+                std::printf("  comp filter %d block %d: fw out %.9g %.9g gt %.9g gs %.9g env %.9g, port %.9g %.9g %.9g %.9g %.9g\n", g, blkN,
+                            f32(BUF), f32(BUF + 248), f32(D + 0x98), f32(D + 0x9c), f32(D + 0xa0), lr[0], lr[62], port.gainTarget(), port.gain(),
+                            port.envelope());
+        }
+    }
+    std::printf("comp note-on and block: %ld cases, %ld different\n", on2, ob2);
+    std::printf("comp filter: %ld blocks of 32 frames, %ld different\n", fn2, fb2);
     return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb || sb[0] || sb[1] || nb[0] || nb[1] || pb[0] || pb[1]
-        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb ? 3 : 0;
+        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 ? 3 : 0;
 }
 #endif

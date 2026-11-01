@@ -45,6 +45,9 @@ fs filter: 120000 blocks of 32 frames, 0 different
 lofi converter: 200000 cases, 0 different
 lofi note-on, block and update: 23999 cases, 0 different
 lofi filter: 120000 blocks of 32 frames, 0 different
+comp converter: 200000 cases, 0 different
+comp note-on and block: 7154 cases, 0 different
+comp filter: 120000 blocks of 32 frames, 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

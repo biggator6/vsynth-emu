@@ -1544,6 +1544,69 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Compressor (2026-11-01, v73)
+
+COSM Type 12, block code 15: a sustainer with a 60-sample lookahead. It has
+no envelopes or LFOs: the binding gives code 15 none.
+
+**Parameters** (0x932…0x934, second descriptor bank): Attack 0…127 (64),
+Sustain 0…127 (64), Output Level 0…127 (115).
+
+**The converter** (`0x894ddc50`) writes the block:
+- +4 Attack/127 + 0 and +8 Sustain/127 + 0, each plus a controller term
+  (0 without one), clamped to 0…127 first;
+- +0xc the gain: (L/100)² for L ≤ 100; 1 + 3·(L − 100)/27 above, which is
+  2.67 at 115 and 4 at 127.
+
+**The object**:
+- The block copy (`0x894ee5c0`) stores the attack factor 1.03 + 0.07·(1 −
+  Attack), Sustain and the gain.
+- There are no start values or update.
+- Note-on (`0x894ee390`):
+  - the allocator gives code 15 the Comb's four cleared buffers, and it uses
+    the first as a 3266-sample ring;
+  - the slewed factor, Sustain and gain (D+0x8c…0x94) start at the block's;
+  - the gain and its target (D+0x9c, +0x98) start at Sustain·2^27/(factor +
+    2^20) + 1 − Sustain, without the gain;
+  - the envelope (D+0xa0) starts at the attack factor.
+  The last two are quirks: the factor stands where the envelope belongs.
+  D+0xcc…0xd4 get copies, presumably for the stereo routine.
+
+**The filter** (`0x894fab80`; the stereo table's entry is `0x894fadcc`):
+- Per block, the factor, Sustain and gain each slew 0.1 toward the block's
+  (0.1 here is 0x3dcccccd).
+- Per sample, from L:
+  - the write index steps, wrapping at 3266, and x goes into the ring;
+  - g += 0.05·(target − g);
+  - out = g × the ring 60 samples back, on L and R;
+  - the envelope e, on the XT's scale: e·factor + 132154 while |x| > e,
+    otherwise e·0.9995;
+  - the new target: (2^27/(e + 2^20)·Sustain − Sustain + 1) × gain.
+- So silence gets up to (1 + 127·Sustain) × gain, and a full-scale signal
+  (1 − Sustain) × gain.
+- The state written back: the write index, the target, e and g.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converter: 200,000 cases;
+- note-on (the firmware's own, with the pool hooked) and new blocks: 7,154
+  cases;
+- the filter: 120,000 blocks, the ring compared after every block, with some
+  notes fading to silence so the envelope releases;
+- all 0 different.
+- Deliberate errors are caught: the envelope starting at 0, the note-on gain
+  with the Level, a 59-sample delay, and 0.9995 as C rounds it
+  (0x3f7fdf3b, one unit from the firmware's).
+- XtSynth runs it in the XT's units, as Lo-Fi.
+
+**Plugin.**
+- COSM Type gains Compressor (index 10), with its own parameters (cosmComp…
+  and cosm2…) at the XT's defaults, on one Comp row in the type area.
+- On steady 1 kHz sines 30 dB apart, at the defaults:
+  - +3.7 dB on the loud one and +18.0 dB on the quiet one, so the 30 dB
+    becomes 14.3;
+  - Sustain 0 is unity;
+  - Sustain 127 at Level 100 leaves 0.2 dB of the 30.
+
 ### COSM: Lo-Fi (2026-11-01, v72)
 
 COSM Type 15, block code 19: an anti-alias lowpass, a sample hold, a bit
@@ -2218,7 +2281,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | 9 | Dual Filter | 0x915–0x91f | `0x894dd690` | 12 | `0x894fd090` |
 | 10 | TVF | 0x920–0x927 | `0x894dd870` | 13 | `0x89502890` |
 | 11 | Dynamic TVF | 0x928–0x931 | `0x894dda40` | 14 | `0x89502920` |
-| 12 | Compressor | 0x932–0x934 | `0x894ddc50` | 15 | `0x894fab80` |
+| 12 | Compressor | 0x932–0x934 | `0x894ddc50` | 15 | `0x894fab80` (v73) |
 | 13 | Limiter | 0x935–0x939 | `0x894ddd20` | 16 | `0x894fe450` |
 | 14 | Frequency Shifter | 0x93a–0x940 | `0x894ddde0` | 18 | `0x894fda60` (v71) |
 | 15 | Lo-Fi | 0x941–0x949 | `0x894ddf80` | 19 | `0x894fe9c0` (v72) |
@@ -2583,7 +2646,7 @@ on the SH-4):
 
 **Not modelled yet:**
 - COSM 2 (since modelled, v63);
-- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67; Side Band Filters, v68; Resonator, v69; Frequency Shifter, v71; Lo-Fi, v72);
+- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67; Side Band Filters, v68; Resonator, v69; Frequency Shifter, v71; Lo-Fi, v72; Compressor, v73);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;

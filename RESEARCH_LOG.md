@@ -2818,3 +2818,14 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The quantizer depends on absolute level, so XtSynth runs Lo-Fi in the XT's
   units (exact power-of-two scaling in and out).
 - All of it equals the firmware in the interpreter.
+
+### Session 16 addendum (2026-11-01) — v73: Compressor
+
+- The Compressor (COSM Type 12, block code 15) is a sustainer with a
+  60-sample lookahead. An envelope on the XT's own scale sets a gain from
+  1 + 127·Sustain in silence to 1 − Sustain at full scale, times the Output
+  Level's gain. The applied gain moves 5% toward that each sample.
+- Firmware quirks kept: the note-on starts the envelope at the attack factor
+  (about 1.05), and its first gain leaves out the Output Level.
+- All of it equals the firmware in the interpreter. On sines 30 dB apart the
+  defaults leave 14.3 dB.

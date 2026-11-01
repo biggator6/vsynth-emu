@@ -117,8 +117,8 @@ public:
         // switch; the type, 0 TVF, 1 Dynamic TVF (its Q and Cutoff also
         // follow the input's level by their Own Env depths −63..+63), 2
         // Dual Filter, 3 TB Filter, 4 Comb Filter, 5 or 6 the 1st or 2nd Side
-        // Band Filter, 7 Resonator, 8 Frequency Shifter, 9 Lo-Fi (their own
-        // parameters below); Filter
+        // Band Filter, 7 Resonator, 8 Frequency Shifter, 9 Lo-Fi, 10
+        // Compressor (their own parameters below); Filter
         // Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
         // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
         // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
@@ -176,6 +176,9 @@ public:
             // −63..+63 (envA); Dry/Effect Balance 0..100 with its depths (envB)
             int lofiBit = 10, lofiRate = 4, lofiFilter = 64, lofiFilterKf = 0, lofiFilterLfo = 0, lofiFilterEnv = 0;
             int lofiBalance = 50, lofiBalanceLfo = 0, lofiBalanceEnv = 0;
+            // the Compressor: Attack, Sustain and Output Level 0..127 (no
+            // envelopes or LFO)
+            int compAttack = 64, compSustain = 64, compLevel = 115;
             CosmEnv envA, envB;
             int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
             bool lfoKeySync = false;
@@ -234,6 +237,7 @@ private:
             XtCosmRes res;
             XtCosmFs fs;
             XtCosmLofi lofi;
+            XtCosmComp comp;
             XtEnvelope envA, envB;
             XtLfo lfo;
         };
@@ -304,6 +308,7 @@ private:
     XtResBlock resBlock(const Voice& v, int k) const;
     XtFsBlock fsBlock(const Voice& v, int k) const;
     XtLofiBlock lofiBlock(const Voice& v, int k) const;
+    XtCompBlock compBlock(int k) const;
     void cosmSetBlock(Voice& v, int k);              // a new block for a sounding section (0x894ed8f0)
     float drawSeed();
 };

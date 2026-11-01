@@ -1,8 +1,8 @@
 #pragma once
 // The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
 // the Dual Filter (9), the TB Filter (16), the Comb Filter (8), the Side
-// Band Filters (6, 7), the Resonator (5), the Frequency Shifter (14) and
-// Lo-Fi (15; below XtCosmTvf).  Each oscillator
+// Band Filters (6, 7), the Resonator (5), the Frequency Shifter (14), Lo-Fi
+// (15) and the Compressor (12; below XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -573,6 +573,55 @@ private:
     float s[6] = {};
     float filterOf(float env, float lfo) const;
     float balanceOf(float env, float lfo) const;
+};
+
+// The Compressor (COSM Type 12, block code 15): a sustainer with a 60-sample
+// lookahead.  Parameters 0x932…0x934: Attack 0…127 (64), Sustain 0…127 (64),
+// Output Level 0…127 (115).  No envelopes or LFOs.
+struct XtCompParams {
+    int attack = 64, sustain = 64, level = 115;
+};
+
+// The converter's block (0x894ddc50): Attack/127, Sustain/127; the Level's
+// gain (L/100)², or 1 + 3·(L − 100)/27 above 100.
+struct XtCompBlock {
+    float attack = 0, sustain = 0, gain = 1.0f;
+};
+XtCompBlock xtCompBlock(const XtCompParams& p);
+
+// The object for block code 15 (0x894fab80).  The block (0x894ee5c0) gives
+// the attack factor 1.03 + 0.07·(1 − Attack); per block the factor, Sustain
+// and the gain slew 0.1 toward theirs.  Per sample: x into a 3266-sample ring
+// (cleared at note-on, 0x894ecb00); the gain g moves 0.05 toward its target;
+// out = g × x 60 samples back, on L and R from L; then the envelope e (on the
+// XT's scale) = e·factor + 132154 while |x| > e, else e·0.9995, and the
+// target (2^27/(e + 2^20)·Sustain − Sustain + 1) × gain: up to 1 + 127·Sustain
+// in silence, 1 − Sustain when loud.  The note-on (0x894ee390) starts e at
+// the attack factor and the gain and its target at Sustain·2^27/(factor +
+// 2^20) + 1 − Sustain, without the Level (firmware quirks, kept).
+class XtCosmComp {
+public:
+    XtCosmComp();
+    void noteOn(const XtCompBlock& b);
+    void setBlock(const XtCompBlock& b);                                       // 0x894ee5c0
+    // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
+    // the buffer's units against the XT's (int16 × 65536), for the envelope.
+    void process(float* lr, float scale = 1.0f);
+
+    // The state, for the firmware checks (D = object + 0x58).
+    const float* slews() const { return sl; }        // D+0x8c the attack factor, +0x90 Sustain, +0x94 the gain
+    float gainTarget() const { return gt; }          // D+0x98
+    float gain() const { return gs; }                // D+0x9c
+    float envelope() const { return env; }           // D+0xa0
+    int writeIndex() const { return w; }             // D+4
+    const float* buffer() const { return buf.data(); }
+
+private:
+    static constexpr int kLen = 3266;
+    float fac = 1.0f, sus = 0, gn = 1.0f;            // the block copy's (+0x14, +0x18, +0x1c)
+    float sl[3] = {}, gt = 1.0f, gs = 1.0f, env = 0;
+    int w = 0;
+    std::vector<float> buf;
 };
 
 // The coefficients from the modulated values (0x894eecb0): Q + its depths ×

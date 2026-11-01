@@ -378,6 +378,14 @@ XtLofiBlock XtSynth::lofiBlock(const Voice& v, int k) const {
     return xtLofiBlock(p, v.note, va, vb);
 }
 
+// A Compressor's block (0x894ddc50).
+XtCompBlock XtSynth::compBlock(int k) const {
+    const Controls::Cosm& c = ctl.cosm[k];
+    XtCompParams p;
+    p.attack = c.compAttack; p.sustain = c.compSustain; p.level = c.compLevel;
+    return xtCompBlock(p);
+}
+
 // The TVF's slot 1 is its Q (envB), the Dual Filter's Filter 1, the TB
 // Filter's LPF, the Resonator's Size, the Frequency Shifter's Depth and the
 // Lo-Fi Filter (envA), the Comb and Side Band Filters' Detune (envB).
@@ -388,6 +396,7 @@ void XtSynth::cosmSetBlock(Voice& v, int k) {
     if (c.type == 7) { c.res.setBlock(resBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
     if (c.type == 8) { c.fs.setBlock(fsBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
     if (c.type == 9) { c.lofi.setBlock(lofiBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
+    if (c.type == 10) { c.comp.setBlock(compBlock(k)); return; }
     if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else if (c.type == 3) c.tb.setBlock(tbBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
@@ -462,7 +471,8 @@ void XtSynth::setControls(const Controls& c) {
                       || n.fsBalanceLfo != o.fsBalanceLfo || n.fsBalanceEnv != o.fsBalanceEnv || n.lofiBit != o.lofiBit
                       || n.lofiRate != o.lofiRate || n.lofiFilter != o.lofiFilter || n.lofiFilterKf != o.lofiFilterKf
                       || n.lofiFilterLfo != o.lofiFilterLfo || n.lofiFilterEnv != o.lofiFilterEnv || n.lofiBalance != o.lofiBalance
-                      || n.lofiBalanceLfo != o.lofiBalanceLfo || n.lofiBalanceEnv != o.lofiBalanceEnv;
+                      || n.lofiBalanceLfo != o.lofiBalanceLfo || n.lofiBalanceEnv != o.lofiBalanceEnv || n.compAttack != o.compAttack
+                      || n.compSustain != o.compSustain || n.compLevel != o.compLevel;
     }
     ctl = c;
     for (int k = 0; k < 2; ++k)
@@ -592,6 +602,8 @@ void XtSynth::startVoice(int raw, int note, int vel) {
         else if (c.type == 9)
             c.lofi.noteOn(lofiBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
                           c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
+        else if (c.type == 10)
+            c.comp.noteOn(compBlock(k));
         else if (c.type >= 4)
             ;                                          // below, once the voice's pitch is set
         else
@@ -823,8 +835,8 @@ void XtSynth::mixBlock(float* lr) {
             if (v.mb.ended()) v.tail += 32;
         }
         // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA; the
-        // Dynamic TVF's and Side Band Filters' followers and the Lo-Fi
-        // quantizer read the XT's scale: int16 × 65536, i.e. the SOLO buffer
+        // Dynamic TVF's and Side Band Filters' followers, the Lo-Fi
+        // quantizer and the Compressor's envelope read the XT's scale: int16 × 65536, i.e. the SOLO buffer
         // (±1) × 2^31, the band players' (int16) × 2^16
         const float fs = cur->type == 1 ? 0x1p31f : 0x1p16f;
         for (Voice::CosmVoice& c : v.cs) {
@@ -835,6 +847,7 @@ void XtSynth::mixBlock(float* lr) {
             else if (c.type == 7) c.res.process(tmp);
             else if (c.type == 8) c.fs.process(tmp);
             else if (c.type == 9) c.lofi.process(tmp, fs);
+            else if (c.type == 10) c.comp.process(tmp, fs);
             else if (c.type >= 5) c.sbf.process(tmp, fs);
             else c.tvf.process(tmp, fs);
         }
@@ -959,6 +972,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //     Frequency Shifter (KF in %); XT_CENV Depth's envelope, XT_CENVB Balance's. XT_FS2: COSM 2's.
 //   XT_LOFI="bit,rate,filter,filterKf,filterLfo,filterEnv,balance,balanceLfo,balanceEnv": COSM 1 on,
 //     Lo-Fi (KF in %); XT_CENV the Filter's envelope, XT_CENVB Balance's. XT_LOFI2: COSM 2's.
+//   XT_COMP="attack,sustain,level": COSM 1 on, a Compressor. XT_COMP2: COSM 2's.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -1057,6 +1071,11 @@ int main(int argc, char** argv) {
             m.type = 4;
             std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &m.combOctave, &m.combDetune, &m.combDetuneLfo, &m.combDetuneEnv, &m.combTone, &m.combToneLfo,
                         &m.combToneEnv);
+        }
+        if (const char* e = std::getenv(("XT_COMP" + sfx).c_str())) {   // "attack,sustain,level"
+            m.on = true;
+            m.type = 10;
+            std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
         }
         if (const char* e = std::getenv(("XT_LOFI" + sfx).c_str())) {   // "bit,rate,filter,filterKf,filterLfo,filterEnv,balance,balanceLfo,balanceEnv"
             m.on = true;

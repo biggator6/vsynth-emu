@@ -217,6 +217,14 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+COMPRESSOR v73 (2026-11-01): COSM Type 12 (HARDWARE_FIRMWARE.md, "COSM: the
+  Compressor"). XtCosm: XtCompParams, xtCompBlock (0x894ddc50), XtCosmComp
+  (block 0x894ee5c0, note-on 0x894ee390, filter 0x894fab80: a 3266-sample
+  ring, 60 samples of lookahead; process(lr, scale) in the XT's units).
+  XtSynth: Cosm.type 10 with compAttack, compSustain, compLevel (no
+  envelopes or LFO). Plugin params cosmCompAttack, CompSustain, CompLevel
+  (and cosm2…). XT_COMP / TEST_COMP "attack,sustain,level".
+
 LO-FI v72 (2026-11-01): COSM Type 15 (HARDWARE_FIRMWARE.md, "COSM: Lo-Fi").
   XtCosm: XtLofiParams, xtLofiBlock (0x894ddf80 with the Filter curve
   0x894dc810), XtCosmLofi (start 0x894eca70, block 0x894edd60, update
