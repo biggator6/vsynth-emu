@@ -2780,3 +2780,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - All of it equals the firmware in the interpreter. Four deliberate errors
   in the port are caught, among them a 1.6 one unit off: the converter and
   the start values store different 1.6s.
+
+### Session 16 addendum (2026-10-31) — v70: a compact COSM editor
+
+- The editor showed every COSM type's rows at once: 11 rows of type
+  parameters, with eight types still to come. It now shows only the
+  selected type's rows, in one three-row area under a header row (the
+  COSM 1/2 selector, the switch and the type). The TVF's own controls move
+  into that area too.
+- The window is 300 px shorter (1,090 px). New COSM types fit in the area
+  without changing the size. Audio is unchanged.

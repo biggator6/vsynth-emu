@@ -66,4 +66,6 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - Use `.venv/bin/python3` (system python lacks numpy). Write multi-step shell
   work as bash scripts (zsh word-splits differently).
 - The editor is fixed-layout: new rows need `kXtStripH`, `setSize` and the
-  resize limits raised together.
+  resize limits raised together. A COSM type's own rows go in the shared
+  three-row type area instead (`layoutCosm`, shown by `showCosmType`), which
+  needs no size change.

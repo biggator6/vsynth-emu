@@ -217,6 +217,15 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+EDITOR v70 (2026-10-31): the COSM rows show only the selected type's own
+  rows, in one three-row area under a header row (selector, switch, Type):
+  the TVF's Filter Type, Cutoff, Resonance, KF and TVF Mod depths (with the
+  Own depths for the Dynamic TVF), or the Dual, TB, Comb, Side Band or
+  Resonator rows. COSM Env (Env A) and the LFO row stay for every type.
+  PluginEditor: layoutCosm, showCosmType; kXtStripH 1090 → 790, window 1390
+  → 1090. TEST_SNAPSHOT_TYPE=n (PluginTest) opens the editor on COSM 1's
+  type n.
+
 RESONATOR v69 (2026-10-31): COSM Type 5 (HARDWARE_FIRMWARE.md, "COSM: the
   Resonator"). XtCosm: XtResParams, xtResBlock (0x894dcf00 with the Size
   curve 0x894dc700), xtCosmExpf (the firmware's expf 0x8952f6f4 →

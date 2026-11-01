@@ -166,6 +166,8 @@ private:
     std::unique_ptr<SliderAtt> cosmCutAtt_, cosmResoAtt_, cosmKfAtt_, clfoRateAtt_;
     void attachCosm(int k);             // COSM 1 (0) or 2 (1) on the COSM rows
     void attachSideBand();              // the 1st or 2nd Side Band Filter's set, by the type
+    void showCosmType();                // only the selected type's rows
+    void layoutCosm(juce::Rectangle<int>& xt);
     // the Dual Filter: its type (on the Own row) and a row per filter of
     // Frequency, Q, KF, LFO and Env depths
     static constexpr int kDualKnobs = 10;
@@ -197,6 +199,7 @@ private:
     std::unique_ptr<ComboAtt>  sbOctAtt_;
     std::unique_ptr<SliderAtt> sbAtts_[kSbKnobs];
     int cosmK_ = 0;                     // the COSM section on the rows
+    juce::Label      tvfLabel_, dualLabel_; // the TVF's and Dual Filter's first rows
     // the Resonator: Filter Type, then Size's row (Size, KF, LFO, Env) and
     // Balance's (Balance, LFO, Env)
     static constexpr int kResKnobs = 7;

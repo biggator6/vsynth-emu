@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 1090;  // height of the XT strip below it
+static constexpr int kXtStripH   = 790;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -15,7 +15,7 @@ static const char* const kLevelIds[32][2] = {
     { "cosmCutoffEnv", "C-Env" },  { "cosmCutoffLfo", "C-LFO" },    { "cosmResoEnv", "R-Env" },      { "cosmResoLfo", "R-LFO" },
     { "cosmEnvAAttack", "A" },     { "cosmEnvADecay", "D" },        { "cosmEnvASustain", "S" },      { "cosmEnvARelease", "R" },
 };
-static const char* const kLevelRowNames[8] = { "OSC Pitch", "Tune", "OSC TVA", "O Env", "O Env", "Velocity", "COSM Mod", "COSM Env" };
+static const char* const kLevelRowNames[8] = { "OSC Pitch", "Tune", "OSC TVA", "O Env", "O Env", "Velocity", "TVF Mod", "COSM Env" };
 // The Dual Filter's rows: the id suffixes after "cosmDual1"/"cosmDual2", and labels
 static const char* const kDualIds[5][2] = { { "Freq", "Frq" }, { "Q", "Q" }, { "KF", "KF" }, { "Lfo", "LFO" }, { "Env", "Env" } };
 // The TB Filter's rows (6 LPF, 5 HPF): the id suffixes after "cosm"/"cosm2", and labels
@@ -40,9 +40,9 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1390);
+    setSize(560, 1090);
     setResizable(true, true);
-    setResizeLimits(480, 780, 960, 1530);
+    setResizeLimits(480, 780, 960, 1230);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -150,7 +150,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
     cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator" }, 1);
-    cosmTypeBox_.onChange = [this] { attachSideBand(); };
+    cosmTypeBox_.onChange = [this] { attachSideBand(); showCosmType(); };
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
         addAndMakeVisible(*cpt);
@@ -254,6 +254,10 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         sbRowLabels_[r].setText(r == 0 ? "SB" : r == 1 ? "SB Det" : "SB Wid", juce::dontSendNotification);
         styleSmall(sbRowLabels_[r]);
     }
+    tvfLabel_.setText("TVF", juce::dontSendNotification);
+    styleSmall(tvfLabel_);
+    dualLabel_.setText("Dual", juce::dontSendNotification);
+    styleSmall(dualLabel_);
     resTypeBox_.addItemList({ "1", "2", "3" }, 1);
     addAndMakeVisible(resTypeBox_);
     for (int i = 0; i < kResKnobs; ++i) {
@@ -282,6 +286,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                             &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_,
                             &portaTimeLabel_, &portaSensLabel_, &octLabel_, &cosmCutLabel_, &cosmResoLabel_, &cosmKfLabel_,
                             &clfoLabel_, &clfoRateLabel_, &cosmTypeLabel_, &cosmCutOwnLabel_, &cosmResoOwnLabel_ }) styleSmall(*l);
+    showCosmType();                                  // after styleSmall, which shows every label
     timerCallback();
     startTimerHz(4);
 
@@ -378,6 +383,42 @@ void VSynthEmuEditor::attachCosm(int k) {
     }
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
     attachSideBand();
+    showCosmType();
+}
+
+// The type's own rows share one area: only the selected type's are shown
+// (the TVF's Filter Type, Cutoff, Resonance, KF and depths for the TVF and
+// Dynamic TVF, with the Own depths for the Dynamic TVF).
+void VSynthEmuEditor::showCosmType() {
+    const int t = cosmTypeBox_.getSelectedItemIndex();
+    const bool tvf = t <= 1, dtvf = t == 1, dual = t == 2, tb = t == 3, comb = t == 4, sb = t == 5 || t == 6, res = t == 7;
+    for (juce::Component* cpt : { (juce::Component*)&tvfLabel_, (juce::Component*)&cosmFilterBox_, (juce::Component*)&cosmCutLabel_,
+                                  (juce::Component*)&cosmCutSlider_, (juce::Component*)&cosmResoLabel_, (juce::Component*)&cosmResoSlider_,
+                                  (juce::Component*)&cosmKfLabel_, (juce::Component*)&cosmKfSlider_, (juce::Component*)&levelRowLabels_[6] })
+        cpt->setVisible(tvf);
+    for (int i = 24; i < 28; ++i) { levelLabels_[i].setVisible(tvf); levelSliders_[i].setVisible(tvf); }
+    for (juce::Component* cpt : { (juce::Component*)&cosmCutOwnLabel_, (juce::Component*)&cosmCutOwnSlider_, (juce::Component*)&cosmResoOwnLabel_,
+                                  (juce::Component*)&cosmResoOwnSlider_ })
+        cpt->setVisible(dtvf);
+    dualLabel_.setVisible(dual);
+    dualTypeBox_.setVisible(dual);
+    for (int i = 0; i < kDualKnobs; ++i) { dualLabels_[i].setVisible(dual); dualSliders_[i].setVisible(dual); }
+    for (juce::Label& l : dualRowLabels_) l.setVisible(dual);
+    for (int i = 0; i < kTbKnobs; ++i) { tbLabels_[i].setVisible(tb); tbSliders_[i].setVisible(tb); }
+    for (juce::Label& l : tbRowLabels_) l.setVisible(tb);
+    combOctBox_.setVisible(comb);
+    for (int i = 0; i < kCombKnobs; ++i) { combLabels_[i].setVisible(comb); combSliders_[i].setVisible(comb); }
+    for (juce::Label& l : combRowLabels_) l.setVisible(comb);
+    sbOctBox_.setVisible(sb);
+    for (int i = 0; i < kSbKnobs; ++i) {
+        const bool on = sb && !(t == 6 && i == 3);   // the 2nd has no Sub Detune
+        sbLabels_[i].setVisible(on);
+        sbSliders_[i].setVisible(on);
+    }
+    for (juce::Label& l : sbRowLabels_) l.setVisible(sb);
+    resTypeBox_.setVisible(res);
+    for (int i = 0; i < kResKnobs; ++i) { resLabels_[i].setVisible(res); resSliders_[i].setVisible(res); }
+    for (juce::Label& l : resRowLabels_) l.setVisible(res);
 }
 
 // The Side Band rows show the 1st's parameters, or the 2nd's when the type
@@ -389,10 +430,8 @@ void VSynthEmuEditor::attachSideBand() {
     sbOctAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "Octave", sbOctBox_);
     for (int i = 0; i < kSbKnobs; ++i) {
         sbAtts_[i].reset();
-        const bool none = second && i == 3;
-        sbSliders_[i].setVisible(!none);
-        sbLabels_[i].setVisible(!none);
-        if (!none) sbAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + (second && i == 0 ? "Q" : kSbIds[i][0]), sbSliders_[i]);
+        if (!(second && i == 3))
+            sbAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + (second && i == 0 ? "Q" : kSbIds[i][0]), sbSliders_[i]);
     }
     sbLabels_[0].setText(second ? "Q" : "HPF", juce::dontSendNotification);
 }
@@ -599,7 +638,8 @@ void VSynthEmuEditor::resized() {
         l->setBounds(cell.removeFromLeft(34));
         sl->setBounds(cell.withTrimmedRight(6));
     }
-    for (int r = 0; r < kLevelRows; ++r) {          // the OSC pitch, tuning, TVA and velocity rows
+    for (int r = 0; r < kLevelRows; ++r) {          // the OSC pitch, tuning, TVA and velocity rows; COSM Env
+        if (r == 6) continue;                        // TVF Mod: in the type's area
         xt.removeFromTop(6);
         auto row = xt.removeFromTop(24);
         levelRowLabels_[r].setBounds(row.removeFromLeft(56));
@@ -609,94 +649,7 @@ void VSynthEmuEditor::resized() {
             levelLabels_[i].setBounds(cell.removeFromLeft(r <= 1 || r == 4 || i >= 22 ? 46 : 34));
             levelSliders_[i].setBounds(cell.withTrimmedRight(6));
         }
-        if (r == 5) {                                // COSM 1: switch, Filter Type, Cutoff, Resonance, KF
-            xt.removeFromTop(6);
-            auto rc = xt.removeFromTop(24);
-            cosmSelBox_.setBounds(rc.removeFromLeft(90).withTrimmedRight(6));
-            cosmBtn_.setBounds(rc.removeFromLeft(48));
-            cosmFilterBox_.setBounds(rc.removeFromLeft(92).withTrimmedRight(6));
-            const int w3 = rc.getWidth() / 3;
-            std::pair<juce::Label*, juce::Slider*> cells[] = { { &cosmCutLabel_, &cosmCutSlider_ }, { &cosmResoLabel_, &cosmResoSlider_ },
-                                                               { &cosmKfLabel_, &cosmKfSlider_ } };
-            for (auto& [l, sl] : cells) {
-                auto cell = rc.removeFromLeft(w3);
-                l->setBounds(cell.removeFromLeft(28));
-                sl->setBounds(cell.withTrimmedRight(4));
-            }
-        }
-    }
-    xt.removeFromTop(6);
-    auto rd = xt.removeFromTop(24);                  // the COSM's type, the Dual Filter's type, the Dynamic TVF's Own Env depths
-    cosmTypeLabel_.setBounds(rd.removeFromLeft(46));
-    cosmTypeBox_.setBounds(rd.removeFromLeft(120).withTrimmedRight(8));
-    dualTypeBox_.setBounds(rd.removeFromLeft(100).withTrimmedRight(8));
-    const int half = rd.getWidth() / 2;
-    auto rd1 = rd.removeFromLeft(half);
-    cosmCutOwnLabel_.setBounds(rd1.removeFromLeft(46));
-    cosmCutOwnSlider_.setBounds(rd1.withTrimmedRight(6));
-    cosmResoOwnLabel_.setBounds(rd.removeFromLeft(46));
-    cosmResoOwnSlider_.setBounds(rd);
-    for (int r = 0; r < 2; ++r) {                    // the Dual Filter: Filter 1, Filter 2
-        xt.removeFromTop(6);
-        auto row = xt.removeFromTop(24);
-        dualRowLabels_[r].setBounds(row.removeFromLeft(56));
-        const int fifth = row.getWidth() / 5;
-        for (int i = 5 * r; i < 5 * r + 5; ++i) {
-            auto cell = row.removeFromLeft(fifth);
-            dualLabels_[i].setBounds(cell.removeFromLeft(28));
-            dualSliders_[i].setBounds(cell.withTrimmedRight(4));
-        }
-    }
-    for (int r = 0; r < 2; ++r) {                    // the TB Filter: LPF (6), HPF (5)
-        xt.removeFromTop(6);
-        auto row = xt.removeFromTop(24);
-        tbRowLabels_[r].setBounds(row.removeFromLeft(46));
-        const int first = r ? 6 : 0, n = r ? 5 : 6, w = row.getWidth() / n;
-        for (int i = first; i < first + n; ++i) {
-            auto cell = row.removeFromLeft(w);
-            const juce::String t = kTbIds[i][1];
-            tbLabels_[i].setBounds(cell.removeFromLeft(t.length() >= 3 ? (t == "Gain" ? 32 : 27) : 20));
-            tbSliders_[i].setBounds(cell.withTrimmedRight(3));
-        }
-    }
-    for (int r = 0; r < 2; ++r) {                    // the Comb Filter: Octave + Detune, then Tone
-        xt.removeFromTop(6);
-        auto row = xt.removeFromTop(24);
-        combRowLabels_[r].setBounds(row.removeFromLeft(46));
-        if (r == 0) combOctBox_.setBounds(row.removeFromLeft(70).withTrimmedRight(6));
-        else row.removeFromLeft(70);
-        const int w = row.getWidth() / 3;
-        for (int i = 3 * r; i < 3 * r + 3; ++i) {
-            auto cell = row.removeFromLeft(w);
-            combLabels_[i].setBounds(cell.removeFromLeft(34));
-            combSliders_[i].setBounds(cell.withTrimmedRight(4));
-        }
-    }
-    for (int r = 0; r < 3; ++r) {                    // the Side Band Filters: Octave + HPF/Q, LPF, KF, Sub; Detune; Width
-        xt.removeFromTop(6);
-        auto row = xt.removeFromTop(24);
-        sbRowLabels_[r].setBounds(row.removeFromLeft(46));
-        const int first = r == 0 ? 0 : r == 1 ? 4 : 8, n = r == 2 ? 5 : 4;
-        if (r == 0) sbOctBox_.setBounds(row.removeFromLeft(62).withTrimmedRight(6));
-        const int w = row.getWidth() / n;
-        for (int i = first; i < first + n; ++i) {
-            auto cell = row.removeFromLeft(w);
-            sbLabels_[i].setBounds(cell.removeFromLeft(28));
-            sbSliders_[i].setBounds(cell.withTrimmedRight(3));
-        }
-    }
-    for (int r = 0; r < 2; ++r) {                    // the Resonator: Type + Size, KF, LFO, Env; then Balance, LFO, Env
-        xt.removeFromTop(6);
-        auto row = xt.removeFromTop(24);
-        resRowLabels_[r].setBounds(row.removeFromLeft(46));
-        if (r == 0) resTypeBox_.setBounds(row.removeFromLeft(62).withTrimmedRight(6));
-        else row.removeFromLeft(62);
-        const int first = r ? 4 : 0, n = r ? 3 : 4, w = row.getWidth() / n;
-        for (int i = first; i < first + n; ++i) {
-            auto cell = row.removeFromLeft(w);
-            resLabels_[i].setBounds(cell.removeFromLeft(34));
-            resSliders_[i].setBounds(cell.withTrimmedRight(4));
-        }
+        if (r == 5) layoutCosm(xt);
     }
     xt.removeFromTop(6);
     auto rl = xt.removeFromTop(24);                  // LFO 3: waveform, rate, key sync
@@ -753,6 +706,109 @@ void VSynthEmuEditor::openFileChooser() {
                                        juce::dontSendNotification);
             }
         });
+}
+
+// The COSM rows: the selector, switch and type, then the type's own area
+// (three rows; only the selected type's rows are visible, see showCosmType).
+void VSynthEmuEditor::layoutCosm(juce::Rectangle<int>& xt) {
+    xt.removeFromTop(6);
+    auto rc = xt.removeFromTop(24);
+    cosmSelBox_.setBounds(rc.removeFromLeft(90).withTrimmedRight(6));
+    cosmBtn_.setBounds(rc.removeFromLeft(48));
+    cosmTypeLabel_.setBounds(rc.removeFromLeft(40));
+    cosmTypeBox_.setBounds(rc.removeFromLeft(130).withTrimmedRight(8));
+    const juce::Rectangle<int> area = xt.removeFromTop(3 * 30);
+    auto rowOf = [&](int r) { return area.withTrimmedTop(30 * r + 6).withHeight(24); };
+    {                                                // the TVF: Filter Type, Cutoff, Resonance, KF; the depths; the Own depths
+        auto row = rowOf(0);
+        tvfLabel_.setBounds(row.removeFromLeft(56));
+        cosmFilterBox_.setBounds(row.removeFromLeft(92).withTrimmedRight(6));
+        const int w3 = row.getWidth() / 3;
+        std::pair<juce::Label*, juce::Slider*> cells[] = { { &cosmCutLabel_, &cosmCutSlider_ }, { &cosmResoLabel_, &cosmResoSlider_ },
+                                                           { &cosmKfLabel_, &cosmKfSlider_ } };
+        for (auto& [l, sl] : cells) {
+            auto cell = row.removeFromLeft(w3);
+            l->setBounds(cell.removeFromLeft(28));
+            sl->setBounds(cell.withTrimmedRight(4));
+        }
+        row = rowOf(1);
+        levelRowLabels_[6].setBounds(row.removeFromLeft(56));
+        const int quarter = row.getWidth() / 4;
+        for (int i = 24; i < 28; ++i) {
+            auto cell = row.removeFromLeft(quarter);
+            levelLabels_[i].setBounds(cell.removeFromLeft(46));
+            levelSliders_[i].setBounds(cell.withTrimmedRight(6));
+        }
+        row = rowOf(2);
+        row.removeFromLeft(56);
+        auto half = row.removeFromLeft(row.getWidth() / 2);
+        cosmCutOwnLabel_.setBounds(half.removeFromLeft(46));
+        cosmCutOwnSlider_.setBounds(half.withTrimmedRight(6));
+        cosmResoOwnLabel_.setBounds(row.removeFromLeft(46));
+        cosmResoOwnSlider_.setBounds(row);
+    }
+    {                                                // the Dual Filter: its type, Filter 1, Filter 2
+        auto row = rowOf(0);
+        dualLabel_.setBounds(row.removeFromLeft(56));
+        dualTypeBox_.setBounds(row.removeFromLeft(110).withTrimmedRight(8));
+        for (int r = 0; r < 2; ++r) {
+            row = rowOf(r + 1);
+            dualRowLabels_[r].setBounds(row.removeFromLeft(56));
+            const int fifth = row.getWidth() / 5;
+            for (int i = 5 * r; i < 5 * r + 5; ++i) {
+                auto cell = row.removeFromLeft(fifth);
+                dualLabels_[i].setBounds(cell.removeFromLeft(28));
+                dualSliders_[i].setBounds(cell.withTrimmedRight(4));
+            }
+        }
+    }
+    for (int r = 0; r < 2; ++r) {                    // the TB Filter: LPF (6), HPF (5)
+        auto row = rowOf(r);
+        tbRowLabels_[r].setBounds(row.removeFromLeft(46));
+        const int first = r ? 6 : 0, n = r ? 5 : 6, w = row.getWidth() / n;
+        for (int i = first; i < first + n; ++i) {
+            auto cell = row.removeFromLeft(w);
+            const juce::String t = kTbIds[i][1];
+            tbLabels_[i].setBounds(cell.removeFromLeft(t.length() >= 3 ? (t == "Gain" ? 32 : 27) : 20));
+            tbSliders_[i].setBounds(cell.withTrimmedRight(3));
+        }
+    }
+    for (int r = 0; r < 2; ++r) {                    // the Comb Filter: Octave + Detune, then Tone
+        auto row = rowOf(r);
+        combRowLabels_[r].setBounds(row.removeFromLeft(46));
+        if (r == 0) combOctBox_.setBounds(row.removeFromLeft(70).withTrimmedRight(6));
+        else row.removeFromLeft(70);
+        const int w = row.getWidth() / 3;
+        for (int i = 3 * r; i < 3 * r + 3; ++i) {
+            auto cell = row.removeFromLeft(w);
+            combLabels_[i].setBounds(cell.removeFromLeft(34));
+            combSliders_[i].setBounds(cell.withTrimmedRight(4));
+        }
+    }
+    for (int r = 0; r < 3; ++r) {                    // the Side Band Filters: Octave + HPF/Q, LPF, KF, Sub; Detune; Width
+        auto row = rowOf(r);
+        sbRowLabels_[r].setBounds(row.removeFromLeft(46));
+        const int first = r == 0 ? 0 : r == 1 ? 4 : 8, n = r == 2 ? 5 : 4;
+        if (r == 0) sbOctBox_.setBounds(row.removeFromLeft(62).withTrimmedRight(6));
+        const int w = row.getWidth() / n;
+        for (int i = first; i < first + n; ++i) {
+            auto cell = row.removeFromLeft(w);
+            sbLabels_[i].setBounds(cell.removeFromLeft(28));
+            sbSliders_[i].setBounds(cell.withTrimmedRight(3));
+        }
+    }
+    for (int r = 0; r < 2; ++r) {                    // the Resonator: Type + Size, KF, LFO, Env; then Balance, LFO, Env
+        auto row = rowOf(r);
+        resRowLabels_[r].setBounds(row.removeFromLeft(46));
+        if (r == 0) resTypeBox_.setBounds(row.removeFromLeft(62).withTrimmedRight(6));
+        else row.removeFromLeft(62);
+        const int first = r ? 4 : 0, n = r ? 3 : 4, w = row.getWidth() / n;
+        for (int i = first; i < first + n; ++i) {
+            auto cell = row.removeFromLeft(w);
+            resLabels_[i].setBounds(cell.removeFromLeft(34));
+            resSliders_[i].setBounds(cell.withTrimmedRight(4));
+        }
+    }
 }
 
 // ─── Combo box ───────────────────────────────────────────────────────────────
