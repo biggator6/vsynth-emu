@@ -2843,3 +2843,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
     limiting is softer than the slopes (about 1.2, 1.6, 3.4 and 10:1).
 - All of it equals the firmware in the interpreter. The check now puts some
   samples exactly at the threshold, so that > against ≥ is tested too.
+
+### Session 16 addendum (2026-11-01) — v75: Wave Shape
+
+- Wave Shape (COSM Type 2, block code 3) runs the signal through one of three
+  curves from rom.2, mixed with the dry signal by Drive.
+  - Types 1–3 filter first: a two-pole filter whose damping falls as Drive
+    rises. Types 4–6 shape first, then filter with Tone.
+  - Type n and n + 3 share a curve.
+  - A DC blocker follows.
+- The curves span ±1/10 of the XT's full scale, so the effect depends on
+  level. XtSynth runs it in the XT's units, like Lo-Fi.
+- Tone's keyfollow helper is the same code as Lo-Fi's Filter curve, so the
+  two now share one function.
+- All of it equals the firmware in the interpreter, all six Types.

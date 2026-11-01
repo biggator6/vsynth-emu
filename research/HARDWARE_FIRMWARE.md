@@ -1544,6 +1544,114 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: Wave Shape (2026-11-01, v75)
+
+COSM Type 2, block code 3: a waveshaper through one of three curves, with a
+two-pole filter and a DC blocker. It has no buffers.
+
+**Parameters** (0x8d9…0x8e1, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x8d9 | Type (shown 1–6) | 0…5 | 0 |
+| 0x8da | Output Level | 0…127 | 127 |
+| 0x8db | Drive | 0…127 | 127 |
+| 0x8dc | Drive Env Depth | ±63 | 0 |
+| 0x8dd | Drive LFO Depth | ±63 | 0 |
+| 0x8de | Tone | 0…127 | 127 |
+| 0x8df | Tone Keyfollow | ±20 | 0 |
+| 0x8e0 | Tone LFO Depth | ±63 | 0 |
+| 0x8e1 | Tone Env Depth | ±63 | 0 |
+
+**The converter** (`0x894dcbf0`) writes the block:
+- +4 Type, a byte;
+- +0x30 Level and +8 Drive, each through the 128 shorts at 0x897cfcb8 /
+  32768 (about (i/127)²). Drive adds a controller term and is clamped to
+  0…127 first. Level is used as stored.
+- +0xc Drive's Env depth (A), +0x10 its envelope (9 or 11), +0x14 its LFO
+  depth, +0x18 its LFO;
+- +0x1c Tone through `0x894dc4b0`, which is the same code as Lo-Fi's Filter
+  curve (`0x894dc810`): (T·0.9/127 + 0.1) × powf(2, KF·10·(key − 60)/1200),
+  within 0.1…1;
+- +0x20 Tone's Env depth (B), +0x24 its envelope (10 or 12), +0x28 its LFO
+  depth, +0x2c its LFO.
+
+The Env depths are not clamped; the LFO depths are, with their controller
+terms. The binding puts Drive's envelope in slot 1 and Tone's in slot 2.
+
+**The object** (start values `0x894ec4c0`; block copy `0x894ecee0`; update
+`0x894ee8a0`):
+- Drive' = clamp(Drive + Env·depth + LFO·depth, 0…1) (D+0xbc; target
+  D+0xa4).
+- Tone' = B[trunc(127 × clamp(Tone + depths, 0.1…1))] (D+0xc0; target
+  D+0xa8). B is Lo-Fi's Balance curve (128 floats at 0x897d1668).
+- The block copy also stores the gain, Level/8. Note-on (`0x894ee160`) sets
+  the gain in use (D+0x8c) to it.
+- The rates are Lo-Fi's: 4 × the envelopes' follower coefficients.
+
+**The filter** (`0x89503ef0`; the stereo table's entry is `0x89504890`):
+- It calls `0x89503980` for Types 0–2 and `0x89503c40` for Types 3–5.
+  (The stereo routine calls `0x89503f4c` and `0x89504400`.)
+- Per block:
+  - the gain slews 0.1 toward Level/8;
+  - the steps rate·(target − value) for Drive' and Tone' are taken once,
+    and both step before every fourth sample.
+- The shaper, on the XT's scale (int16 × 65536):
+  - y = 64 + 64·(v · 10/2^31), with 10/2^31 one unit low (0x319fffff);
+  - the curve C at y: rom.2 has three curves of 128 floats at 0x897d3ff0,
+    and Type n and n + 3 share curve n. It is linear between entries, holds
+    C[127] from 127 up and C[0] below 0, and extrapolates for −1 < y < 0
+    (FTRC truncates toward zero);
+  - s = (Drive'·C + (1 − Drive')·(y/64 − 1)) × 2^31.
+  So Drive 0 is the input × 10, and the curves span ±1/10 of full scale.
+- Types 0–2, from L, with k = 0.95·(1 − Drive')² + 0.05 (computed after
+  each step):
+  - b += Tone'·a; a += k·(x − b − a);
+  - v = s(b).
+- Types 3–5:
+  - w = s(x);
+  - b += Tone'·a; a += Tone'·(w − a − b);
+  - v = b.
+- Then the DC blocker: d = v − c; c += 0.001·d (0x3a83126e, a unit low);
+  out = d × the gain, on L and R.
+- The states: Types 0–2 use D+0x1c…0x24 (a, b, c), Types 3–5 D+0x28…0x30.
+  Note-on clears them all.
+
+The curves:
+- 0 is sin(θ) for θ from −126° to +126°: −0.81 at the low end, through −1,
+  0 at the centre, +1, and 0.81 at the top.
+- 1 is a triangle over about one cycle: from 0 down to −0.97, up to +0.9,
+  and back to 0.03. It is not odd, so it adds even harmonics.
+- 2 is about 2.5 cycles of a sine, 0.12 at the centre.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converter: 200,000 cases;
+- note-on (the firmware's own), updates and new blocks: 23,996 cases;
+- the filter: 120,000 blocks, all six Types, at levels from 1 to 1e9;
+- all 0 different.
+- Deliberate errors are caught: k's 0.95 a unit off, the dry term weighted
+  by Drive', each end of the curve held at the wrong entry, 0.001 as C
+  rounds it, Drive' stepped once per block, the gain not slewed, Tone
+  clamped at 0, 10/2^31 as C rounds it, Types 3–5's filter using the old b,
+  and Type 3 sent to the other routine.
+- Lo-Fi's Filter curve is now shared with Tone (`keyTone`). Lo-Fi's checks
+  are unchanged.
+- XtSynth runs it in the XT's units, as Lo-Fi.
+
+**Plugin.**
+- COSM Type gains Wave Shape (index 12), with its own parameters (cosmWs…
+  and cosm2…) at the XT's defaults. Its W-Shape and WS Tone rows are in the
+  type area.
+- Measured on a 441 Hz sine (Level 127, Tone 127, Drive 127 unless noted;
+  levels as peaks in the SOLO buffer, ±1):
+  - Drive 0 is clean at +1.9 dB for every Type: ×10 × 1/8.
+  - Types 1 and 4 (curve 0) are odd-order. At −20 dB the 3rd harmonic is
+    10 dB under the fundamental.
+  - Types 2 and 5 (curve 1) give a strong 3rd and 5th at −20 dB. At −6 dB
+    the fold leaves the fundamental under its harmonics (−23 dB overall).
+  - Types 3 and 6 (curve 2) are steep at the centre: +19.6 dB at −40 dB,
+    with 2nd and 3rd harmonics about 30 dB down.
+
 ### COSM: the Limiter (2026-11-01, v74)
 
 COSM Type 13, block code 16: a gain follower with a 10-sample lookahead. As
@@ -2365,7 +2473,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | Type | Name | IDs | Converter | Code | DSP |
 |---|---|---|---|---|---|
 | 1 | OD/Dist | 0x8d0–0x8d8 | `0x894dc8b0` | 1 or 2 | `0x894fef70`, `0x894fc570` |
-| 2 | Wave Shape | 0x8d9–0x8e1 | `0x894dcbf0` | 3 | `0x89503ef0` |
+| 2 | Wave Shape | 0x8d9–0x8e1 | `0x894dcbf0` | 3 | `0x89503ef0` (v75) |
 | 3 | Amp Simulator | 0x8e2–0x8e9 | `0x894dcd80` | 4 | `0x894f8a30` |
 | 4 | Speaker Simulator | 0x8ea | inline | 5 | `0x89501300` |
 | 5 | Resonator | 0x8eb–0x8f2 | `0x894dcf00` | 6 | `0x894ffa10` (v69) |

@@ -51,6 +51,9 @@ comp filter: 120000 blocks of 32 frames, 0 different
 lim converter: 200000 cases, 0 different
 lim note-on and block: 7582 cases, 0 different
 lim filter: 120000 blocks of 32 frames, 0 different
+ws converter: 200000 cases, 0 different
+ws note-on, block and update: 23996 cases, 0 different
+ws filter: 120000 blocks of 32 frames, 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

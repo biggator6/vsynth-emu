@@ -44,6 +44,9 @@ static const char* const kLofiIds[9][2] = { { "LofiBit", "Bit" }, { "LofiRate", 
                                             { "LofiFilterLfo", "LFO" }, { "LofiFilterEnv", "Env" } };
 // The Compressor's row: the id suffixes after "cosm"/"cosm2", and labels
 static const char* const kCompIds[3][2] = { { "CompAttack", "Atk" }, { "CompSustain", "Sus" }, { "CompLevel", "Lvl" } };
+// Wave Shape's rows after its Type: Level, Drive and its depths; Tone, KF and depths
+static const char* const kWsIds[8][2] = { { "WsLevel", "Lvl" }, { "WsDrive", "Drv" }, { "WsDriveLfo", "LFO" }, { "WsDriveEnv", "Env" },
+                                          { "WsTone", "Tone" }, { "WsToneKF", "KF" }, { "WsToneLfo", "LFO" }, { "WsToneEnv", "Env" } };
 // The Limiter's row after its Ratio
 static const char* const kLimIds[4][2] = { { "LimThreshold", "Thr" }, { "LimAttack", "Atk" }, { "LimRelease", "Rel" }, { "LimLevel", "Lvl" } };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
@@ -160,7 +163,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter" }, 1);
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter", "Wave Shape" }, 1);
     cosmTypeBox_.onChange = [this] { attachSideBand(); showCosmType(); };
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
@@ -344,6 +347,23 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     }
     limRowLabel_.setText("Limiter", juce::dontSendNotification);
     styleSmall(limRowLabel_);
+    wsTypeBox_.addItemList({ "1", "2", "3", "4", "5", "6" }, 1);
+    addAndMakeVisible(wsTypeBox_);
+    for (int i = 0; i < kWsKnobs; ++i) {
+        juce::Slider& sl = wsSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        wsLabels_[i].setText(kWsIds[i][1], juce::dontSendNotification);
+        styleSmall(wsLabels_[i]);
+    }
+    for (int r = 0; r < 2; ++r) {
+        wsRowLabels_[r].setText(r ? "WS Tone" : "W-Shape", juce::dontSendNotification);
+        styleSmall(wsRowLabels_[r]);
+    }
     attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
@@ -407,7 +427,7 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
 // the depth and Env A rows (level slots 24..31), the Dual, TB, Comb and Side
 // Band Filters', the Resonator's, the Frequency Shifter's, Lo-Fi's, the
-// Compressor's and the Limiter's rows and its LFO.
+// Compressor's, the Limiter's and Wave Shape's rows and its LFO.
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
     cosmK_ = k;
@@ -469,6 +489,12 @@ void VSynthEmuEditor::attachCosm(int k) {
         limAtts_[i].reset();
         limAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kLimIds[i][0], limSliders_[i]);
     }
+    wsTypeAtt_.reset();
+    wsTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "WsType", wsTypeBox_);
+    for (int i = 0; i < kWsKnobs; ++i) {
+        wsAtts_[i].reset();
+        wsAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kWsIds[i][0], wsSliders_[i]);
+    }
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
     attachSideBand();
     showCosmType();
@@ -480,7 +506,7 @@ void VSynthEmuEditor::attachCosm(int k) {
 void VSynthEmuEditor::showCosmType() {
     const int t = cosmTypeBox_.getSelectedItemIndex();
     const bool tvf = t <= 1, dtvf = t == 1, dual = t == 2, tb = t == 3, comb = t == 4, sb = t == 5 || t == 6, res = t == 7, fs = t == 8, lofi = t == 9, comp = t == 10,
-               lim = t == 11;
+               lim = t == 11, ws = t == 12;
     for (juce::Component* cpt : { (juce::Component*)&tvfLabel_, (juce::Component*)&cosmFilterBox_, (juce::Component*)&cosmCutLabel_,
                                   (juce::Component*)&cosmCutSlider_, (juce::Component*)&cosmResoLabel_, (juce::Component*)&cosmResoSlider_,
                                   (juce::Component*)&cosmKfLabel_, (juce::Component*)&cosmKfSlider_, (juce::Component*)&levelRowLabels_[6] })
@@ -517,6 +543,9 @@ void VSynthEmuEditor::showCosmType() {
     limRatioBox_.setVisible(lim);
     for (int i = 0; i < kLimKnobs; ++i) { limLabels_[i].setVisible(lim); limSliders_[i].setVisible(lim); }
     limRowLabel_.setVisible(lim);
+    wsTypeBox_.setVisible(ws);
+    for (int i = 0; i < kWsKnobs; ++i) { wsLabels_[i].setVisible(ws); wsSliders_[i].setVisible(ws); }
+    for (juce::Label& l : wsRowLabels_) l.setVisible(ws);
 }
 
 // The Side Band rows show the 1st's parameters, or the 2nd's when the type
@@ -946,6 +975,18 @@ void VSynthEmuEditor::layoutCosm(juce::Rectangle<int>& xt) {
             auto cell = row.removeFromLeft(w);
             limLabels_[i].setBounds(cell.removeFromLeft(30));
             limSliders_[i].setBounds(cell.withTrimmedRight(3));
+        }
+    }
+    for (int r = 0; r < 2; ++r) {                    // Wave Shape: Type + Level, Drive, LFO, Env; then Tone, KF, LFO, Env
+        auto row = rowOf(r);
+        wsRowLabels_[r].setBounds(row.removeFromLeft(56));
+        if (r == 0) wsTypeBox_.setBounds(row.removeFromLeft(62).withTrimmedRight(6));
+        else row.removeFromLeft(62);
+        const int first = r ? 4 : 0, w = row.getWidth() / 4;
+        for (int i = first; i < first + 4; ++i) {
+            auto cell = row.removeFromLeft(w);
+            wsLabels_[i].setBounds(cell.removeFromLeft(32));
+            wsSliders_[i].setBounds(cell.withTrimmedRight(3));
         }
     }
 }

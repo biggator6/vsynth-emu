@@ -217,6 +217,18 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+WAVE SHAPE v75 (2026-11-01): COSM Type 2 (HARDWARE_FIRMWARE.md, "COSM: Wave
+  Shape"). XtCosm: XtWsParams, xtWsBlock (0x894dcbf0; Tone through Lo-Fi's
+  Filter curve, now keyTone), XtCosmWs (start 0x894ec4c0, block 0x894ecee0,
+  update 0x894ee8a0, note-on 0x894ee160, filter 0x89503ef0 → 0x89503980
+  Types 0–2, 0x89503c40 Types 3–5; process(lr, scale) in the XT's units).
+  It reads the three curves (0x897d3ff0, 3 × 128 floats) at run time.
+  XtSynth: Cosm.type 12 with wsType…wsToneEnv; slot 1 envA (Drive), slot 2
+  envB (Tone). Plugin params cosmWsType (a choice), WsLevel, WsDrive,
+  WsDriveLfo, WsDriveEnv, WsTone, WsToneKF, WsToneLfo, WsToneEnv (and
+  cosm2…). XT_WS / TEST_WS
+  "type,level,drive,driveLfo,driveEnv,tone,toneKf,toneLfo,toneEnv" (KF in %).
+
 LIMITER v74 (2026-11-01): COSM Type 13 (HARDWARE_FIRMWARE.md, "COSM: the
   Limiter"). XtCosm: XtLimParams, xtLimBlock (0x894ddd20; Threshold, Attack
   and Release through the TB Filter's gain curve 0x897cfcb8), XtCosmLim

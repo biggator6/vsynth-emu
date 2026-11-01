@@ -192,7 +192,8 @@ int main(int argc, char** argv) {
     // balanceLfo,balanceEnv": Lo-Fi (KF in %); TEST_LOFI2: COSM 2's.
     // TEST_COMP="attack,sustain,level": a Compressor; TEST_COMP2: COSM 2's.
     // TEST_LIM="threshold,ratio,attack,release,level": a Limiter (ratio 0..3);
-    // TEST_LIM2: COSM 2's.
+    // TEST_LIM2: COSM 2's.  TEST_WS="type,level,drive,driveLfo,driveEnv,tone,
+    // toneKf,toneLfo,toneEnv": Wave Shape (type 0..5, KF in %); TEST_WS2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -240,6 +241,15 @@ int main(int argc, char** argv) {
             m.type = 10;
             std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
             set("Switch", 1); set("Type", 10); set("CompAttack", m.compAttack); set("CompSustain", m.compSustain); set("CompLevel", m.compLevel);
+        }
+        if (const char* e = std::getenv(("TEST_WS" + sfx).c_str())) {
+            m.on = true;
+            m.type = 12;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.wsType, &m.wsLevel, &m.wsDrive, &m.wsDriveLfo, &m.wsDriveEnv, &m.wsTone,
+                        &m.wsToneKf, &m.wsToneLfo, &m.wsToneEnv);
+            set("Switch", 1); set("Type", 12); set("WsType", m.wsType); set("WsLevel", m.wsLevel); set("WsDrive", m.wsDrive);
+            set("WsDriveLfo", m.wsDriveLfo); set("WsDriveEnv", m.wsDriveEnv); set("WsTone", m.wsTone); set("WsToneKF", m.wsToneKf);
+            set("WsToneLfo", m.wsToneLfo); set("WsToneEnv", m.wsToneEnv);
         }
         if (const char* e = std::getenv(("TEST_LIM" + sfx).c_str())) {
             m.on = true;

@@ -33,6 +33,8 @@ constexpr uint32_t kLofiBalTab = 0x897d1668, kLofiMaskTab = 0x897d187c, kLofiCoe
                    kLofiUpTab = 0x897d18ec;
 // the Limiter's slopes above the threshold by Ratio (4 floats, 0x894edb20)
 constexpr uint32_t kLimSlopeTab = 0x897d1884;
+// Wave Shape's three curves (128 floats each, 0x89503980)
+constexpr uint32_t kWsCurveTab = 0x897d3ff0;
 
 struct Tables {
     float cut[129], cap[128];
@@ -46,6 +48,7 @@ struct Tables {
     float lofiBal[128], lofiCoef[6], lofiDown[16], lofiUp[16];
     int8_t lofiMask[6];
     float limSlope[4];
+    float wsCurve[3][128];
     bool ok = false, keySqOk = false;
 } T;
 
@@ -223,7 +226,8 @@ bool xtCosmLoadTables(const char* romPath) {
                  && std::fseek(f, (long)(kLofiCoefTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiCoef, 4, 6, f) == 6
                  && std::fseek(f, (long)(kLofiDownTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiDown, 4, 16, f) == 16
                  && std::fseek(f, (long)(kLofiUpTab - kRomBase), SEEK_SET) == 0 && std::fread(T.lofiUp, 4, 16, f) == 16
-                 && std::fseek(f, (long)(kLimSlopeTab - kRomBase), SEEK_SET) == 0 && std::fread(T.limSlope, 4, 4, f) == 4;
+                 && std::fseek(f, (long)(kLimSlopeTab - kRomBase), SEEK_SET) == 0 && std::fread(T.limSlope, 4, 4, f) == 4
+                 && std::fseek(f, (long)(kWsCurveTab - kRomBase), SEEK_SET) == 0 && std::fread(T.wsCurve, 4, 384, f) == 384;
     std::fclose(f);
     T.ok = ok;
     return ok;
@@ -1050,14 +1054,19 @@ void XtCosmFs::process(float* lr) {
 
 // ── Lo-Fi ──
 
+// Lo-Fi's Filter and Wave Shape's Tone (0x894dc810, 0x894dc4b0: the same
+// code): (v·0.9/127 + 0.1)·2^(KF·10·(key − 60)/1200), within 0.1…1
+static float keyTone(int v, int kf, int key) {
+    const float y = mul(add(div(mul(flt(clampi((int16_t)v, 0, 127)), K(0x3f666666)), 127.0f), K(0x3dcccccd)),
+                        xtOscTimeKeyScale((int16_t)(kf * 10), key));
+    return y > 1.0f ? 1.0f : (K(0x3dcccccd) > y ? K(0x3dcccccd) : y);
+}
+
 XtLofiBlock xtLofiBlock(const XtLofiParams& p, int key, float velA, float velB) {
     XtLofiBlock b;
     b.bitDown = (int8_t)p.bitDown;
     b.rateDown = (int8_t)p.rateDown;
-    // 0x894dc810: (Filter·0.9/127 + 0.1)·2^(KF·10·(key − 60)/1200), within 0.1…1
-    const float y = mul(add(div(mul(flt(clampi((int16_t)p.filter, 0, 127)), K(0x3f666666)), 127.0f), K(0x3dcccccd)),
-                        xtOscTimeKeyScale((int16_t)(p.filterKf * 10), key));
-    b.filter = y > 1.0f ? 1.0f : (K(0x3dcccccd) > y ? K(0x3dcccccd) : y);
+    b.filter = keyTone(p.filter, p.filterKf, key);
     b.filterEnv = envDepth(velA, p.filterEnv);
     b.filterLfo = sq63(clampi((int16_t)p.filterLfo, -63, 63));
     b.balance = add(div(flt(clampi((int16_t)p.balance, 0, 100)), 100.0f), 0.0f);
@@ -1125,6 +1134,99 @@ void XtCosmLofi::process(float* lr, float scale) {
         lr[2 * i] = lr[2 * i + 1] = mul(fmac(bal, b3, mul(sub(1.0f, bal), x)), unscale);
     }
     s[0] = a1; s[1] = b1; s[2] = a2; s[3] = b2; s[4] = a3; s[5] = b3;
+}
+
+
+// ── Wave Shape ──
+
+XtWsBlock xtWsBlock(const XtWsParams& p, int key, float velA, float velB) {
+    XtWsBlock b;
+    b.type = (int8_t)p.type;
+    b.level = div(flt(T.gain[clampi((int16_t)p.level, 0, 127)]), 32768.0f);       // not clamped in rom.2: 0…127 as stored
+    b.drive = div(flt(T.gain[clampi((int16_t)p.drive, 0, 127)]), 32768.0f);
+    b.driveLfo = sq63(clampi((int16_t)p.driveLfo, -63, 63));
+    b.driveEnv = envDepth(velA, p.driveEnv);
+    b.tone = keyTone(p.tone, p.toneKf, key);
+    b.toneLfo = sq63(clampi((int16_t)p.toneLfo, -63, 63));
+    b.toneEnv = envDepth(velB, p.toneEnv);
+    return b;
+}
+
+float XtCosmWs::driveOf(float env, float lfo) const {
+    return clampf(fmac(blk.driveLfo, lfo, fmac(blk.driveEnv, env, blk.drive)), 0.0f, 1.0f);
+}
+
+float XtCosmWs::toneOf(float env, float lfo) const {
+    const float t = clampf(fmac(blk.toneLfo, lfo, fmac(blk.toneEnv, env, blk.tone)), K(0x3dcccccd), 1.0f);
+    return T.lofiBal[clampi(ftrc(mul(t, 127.0f)), 0, 127)];
+}
+
+void XtCosmWs::noteOn(const XtWsBlock& b, float env1Start, float env1Out, float r1, float lfo1,
+                      float env2Start, float env2Out, float r2, float lfo2) {
+    for (float& x : s) x = 0.0f;                       // 0x894edf70 clears D+0x1c…0x88
+    blk = b;
+    drv = driveOf(env1Start, lfo1);                    // 0x894ec4c0
+    ton = toneOf(env2Start, lfo2);
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    setBlock(b, env1Out, lfo1, env2Out, lfo2);
+    lvl = lvlT;                                        // 0x894ee160
+}
+
+void XtCosmWs::setBlock(const XtWsBlock& b, float env1, float lfo1, float env2, float lfo2) {
+    blk = b;
+    lvlT = mul(b.level, 0.125f);
+    drvT = driveOf(env1, lfo1);
+    tonT = toneOf(env2, lfo2);
+}
+
+void XtCosmWs::update(float env1, float r1, float lfo1, float env2, float r2, float lfo2) {
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    drvT = driveOf(env1, lfo1);
+    tonT = toneOf(env2, lfo2);
+}
+
+void XtCosmWs::process(float* lr, float scale) {
+    const float d1 = mul(sub(drvT, drv), rate1), d2 = mul(sub(tonT, ton), rate2);
+    lvl = fmac(K(0x3dcccccd), sub(lvlT, lvl), lvl);
+    const bool post = blk.type >= 3;                   // 0x89503ef0: types 3…5 shape first
+    const float* const C = T.wsCurve[clampi(post ? blk.type - 3 : blk.type, 0, 2)];
+    const float in = K(0x319fffff), unscale = 1.0f / scale;    // 10/2^31, a unit below
+    auto shape = [&](float x) {                        // x on the XT's scale, out too
+        const float y = fmac(mul(x, in), 64.0f, 64.0f);
+        const int i = ftrc(y);
+        const float f = sub(y, flt(i));
+        float c;
+        if (i >= 127) c = C[127];
+        else if (i < 0) c = C[0];
+        else c = fmac(sub(1.0f, f), C[i], mul(C[i + 1], f));
+        return mul(add(mul(sub(mul(K(0x3c800000), y), 1.0f), sub(1.0f, drv)), mul(c, drv)), K(0x4f000000));
+    };
+    const float kDc = K(0x3a83126e);                   // 0.001, a unit below
+    float a = s[post ? 3 : 0], b = s[post ? 4 : 1], c = s[post ? 5 : 2], k = 0;
+    for (int i = 0; i < 32; ++i) {
+        if ((i & 3) == 0) {                            // before every fourth sample
+            drv = add(drv, d1);
+            ton = add(ton, d2);
+            if (!post) { const float u = sub(1.0f, drv); k = add(mul(mul(u, u), K(0x3f733333)), K(0x3d4ccccd)); }   // 0.95, 0.05
+        }
+        const float x = mul(lr[2 * i], scale);
+        float v;
+        if (!post) {
+            b = fmac(a, ton, b);
+            a = fmac(sub(sub(x, b), a), k, a);
+            v = sub(shape(b), c);
+        } else {
+            const float w = shape(x);
+            b = fmac(ton, a, b);
+            a = fmac(ton, sub(sub(w, a), b), a);
+            v = sub(b, c);
+        }
+        c = fmac(kDc, v, c);
+        lr[2 * i] = lr[2 * i + 1] = mul(mul(v, lvl), unscale);
+    }
+    s[post ? 3 : 0] = a; s[post ? 4 : 1] = b; s[post ? 5 : 2] = c;
 }
 
 
@@ -1237,7 +1339,7 @@ void XtCosmLim::process(float* lr, float scale) {
 
 
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi, the Compressor and the Limiter against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi, the Compressor, the Limiter and Wave Shape against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -2449,7 +2551,119 @@ int main(int argc, char** argv) {
     }
     std::printf("lim note-on and block: %ld cases, %ld different\n", on3, ob3);
     std::printf("lim filter: %ld blocks of 32 frames, %ld different\n", fn3, fb3);
+
+    // Wave Shape (block code 3): the converter (0x894dcbf0), then the
+    // note-on, updates, new blocks (0x894ecee0) and the filter (0x89503ef0,
+    // types 0…2 by 0x89503980, 3…5 by 0x89503c40)
+    auto wsParams = [&]() {
+        XtWsParams p;
+        p.type = (int)(rnd() % 6); p.level = (int)(rnd() % 128); p.drive = (int)(rnd() % 128); p.driveEnv = (int)(rnd() % 127) - 63;
+        p.driveLfo = (int)(rnd() % 127) - 63; p.tone = (int)(rnd() % 128); p.toneKf = (int)(rnd() % 41) - 20;
+        p.toneLfo = (int)(rnd() % 127) - 63; p.toneEnv = (int)(rnd() % 127) - 63;
+        return p;
+    };
+    auto writeWs = [&](const XtWsBlock& b, int cosm) {
+        std::vector<uint8_t> z(0x34, 0);
+        c.write(BLK, z.data(), 0x34);
+        c.wr32(BLK, 3); c.wr8(BLK + 4, (uint8_t)b.type); wf(BLK + 8, b.drive); wf(BLK + 0xc, b.driveEnv); c.wr32(BLK + 0x10, cosm ? 11 : 9);
+        wf(BLK + 0x14, b.driveLfo); c.wr32(BLK + 0x18, cosm ? 4 : 3); wf(BLK + 0x1c, b.tone); wf(BLK + 0x20, b.toneEnv);
+        c.wr32(BLK + 0x24, cosm ? 12 : 10); wf(BLK + 0x28, b.toneLfo); c.wr32(BLK + 0x2c, cosm ? 4 : 3); wf(BLK + 0x30, b.level);
+    };
+    long wb3 = 0, wn3 = 0;
+    for (int k = 0; k < 200000; ++k) {
+        const XtWsParams p = wsParams();
+        const int cosm = (int)(rnd() & 1), key = (int)(rnd() % 128);
+        const float va = (float)(rnd() % 32769) / 32768.0f, vb = (float)(rnd() % 32769) / 32768.0f;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100);
+        c.wr8(IN + 2, (uint8_t)cosm); c.wr8(IN + 3, (uint8_t)key);
+        const int vals[9] = { p.type, p.level, p.drive, p.driveEnv, p.driveLfo, p.tone, p.toneKf, p.toneLfo, p.toneEnv };
+        for (int i = 0; i < 9; ++i) c.wr16(IN + 0x12 + 2 * (uint32_t)i, (uint16_t)(int16_t)vals[i]);
+        wf(IN + 0x34, va); wf(IN + 0x38, vb);
+        if (!c.call(0x894dcbf0, { IN, OUT }, sp)) { std::fprintf(stderr, "ws converter: %s\n", c.error().c_str()); return 1; }
+        writeWs(xtWsBlock(p, key, va, vb), cosm);
+        ++wn3;
+        std::vector<uint8_t> fw(0x34), pt(0x34);
+        c.read(OUT, fw.data(), 0x34); c.read(BLK, pt.data(), 0x34);
+        if (fw != pt && wb3++ < 5) {
+            std::printf("  ws converter key %d:", key);
+            for (uint32_t i = 0; i < 0x34; i += 4)
+                if (c.rd32(OUT + i) != c.rd32(BLK + i)) std::printf(" +%02x fw %08x port %08x", i, c.rd32(OUT + i), c.rd32(BLK + i));
+            std::printf("\n");
+        }
+    }
+    std::printf("ws converter: %ld cases, %ld different\n", wn3, wb3);
+    auto wsSame = [&](const XtCosmWs& port) {
+        bool ok = same(f32(D + 0xbc), port.drive()) && same(f32(D + 0xc0), port.tone()) && same(f32(D + 0xa4), port.driveTarget())
+               && same(f32(D + 0xa8), port.toneTarget()) && same(f32(D + 0x8c), port.gain());
+        for (uint32_t i = 0; i < 6; ++i) ok = ok && same(f32(D + 0x1c + 4 * i), port.state()[i]);
+        return ok;
+    };
+    long xb3 = 0, xn3 = 0, yb3 = 0, yn3 = 0;
+    for (int g = 0; g < nCases; ++g) {
+        const int cosm = (int)(rnd() & 1);
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200);
+        for (uint32_t o = 0x74; o < 0x150; o += 4) wf(OBJ + o, frnd(-1, 1));                        // the last note's state
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);   // slot 1 Drive's, slot 2 Tone's
+        const int key = (int)(rnd() % 128);
+        const float bva = frnd(0, 1), bvb = frnd(0, 1);
+        const XtWsBlock b = xtWsBlock(wsParams(), key, bva, bvb);
+        writeWs(b, cosm);
+        const float e1S = frnd(-1, 1), e2S = frnd(-1, 1), l1 = frnd(-1, 1), l2 = frnd(-1, 1);
+        float o1 = frnd(-1, 1), o2 = frnd(-1, 1), ol1 = l1, ol2 = l2;
+        const float r1 = frnd(0.2f, 1.0f) / 32.0f, r2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+        wf(EQ + 0x58, e1S); wf(EC + 0x58, e2S); wf(LQ + 0x38, l1); wf(LC + 0x38, l2); wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2);
+        wf(EQ + 0x54, r1); wf(EC + 0x54, r2);
+        if (!c.call(0x894edf70, { OBJ, BLK, 0 }, sp)) { std::fprintf(stderr, "ws note-on: %s\n", c.error().c_str()); return 1; }
+        XtCosmWs port;
+        port.noteOn(b, e1S, o1, r1, l1, e2S, o2, r2, l2);
+        ++xn3;
+        if (!wsSame(port) && xb3++ < 5)
+            std::printf("  ws note-on %d: fw drive %.9g tone %.9g t %.9g %.9g gain %.9g, port %.9g %.9g %.9g %.9g %.9g\n", g, f32(D + 0xbc),
+                        f32(D + 0xc0), f32(D + 0xa4), f32(D + 0xa8), f32(D + 0x8c), port.drive(), port.tone(), port.driveTarget(),
+                        port.toneTarget(), port.gain());
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 13 || blkN % 14 == 3) {                  // updates
+                o1 = frnd(-1, 1); o2 = frnd(-1, 1); ol1 = frnd(-1, 1); ol2 = frnd(-1, 1);
+                const float nr1 = frnd(0.2f, 1.0f) / 32.0f, nr2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+                wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2); wf(LQ + 0x38, ol1); wf(LC + 0x38, ol2); wf(EQ + 0x54, nr1); wf(EC + 0x54, nr2);
+                c.fb[0][4] = 0x3f800000;
+                if (!c.call(0x894ee6a0, { OBJ }, sp)) { std::fprintf(stderr, "ws update: %s\n", c.error().c_str()); return 1; }
+                port.update(o1, nr1, ol1, o2, nr2, ol2);
+                ++xn3;
+                if (!wsSame(port) && xb3++ < 5)
+                    std::printf("  ws update %d.%d: fw t %.9g %.9g, port %.9g %.9g\n", g, blkN, f32(D + 0xa4), f32(D + 0xa8), port.driveTarget(),
+                                port.toneTarget());
+            } else if (blkN % 14 == 8 && (rnd() & 1)) {               // a parameter change while the note sounds
+                const XtWsBlock nb3 = xtWsBlock(wsParams(), key, bva, bvb);
+                writeWs(nb3, cosm);
+                if (!c.call(0x894ecee0, { OBJ, BLK + 4 }, sp)) { std::fprintf(stderr, "ws block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb3, o1, ol1, o2, ol2);
+                ++xn3;
+                if (!wsSame(port) && xb3++ < 5)
+                    std::printf("  ws block %d.%d: fw t %.9g %.9g, port %.9g %.9g\n", g, blkN, f32(D + 0xa4), f32(D + 0xa8), port.driveTarget(),
+                                port.toneTarget());
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 5);
+            const float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e8f : ar == 2 ? 2.2e8f : ar == 3 ? 1.0e9f : 1.0f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(0x89503ef0, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "ws filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++yn3;
+            bool ok = wsSame(port);
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            if (!ok && yb3++ < 6)
+                std::printf("  ws filter %d block %d type %d: fw out %.9g %.9g drive %.9g tone %.9g, port %.9g %.9g %.9g %.9g\n", g, blkN,
+                            c.rd8(OBJ + 0x14), f32(BUF), f32(BUF + 248), f32(D + 0xbc), f32(D + 0xc0), lr[0], lr[62], port.drive(), port.tone());
+        }
+    }
+    std::printf("ws note-on, block and update: %ld cases, %ld different\n", xn3, xb3);
+    std::printf("ws filter: %ld blocks of 32 frames, %ld different\n", yn3, yb3);
     return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb || sb[0] || sb[1] || nb[0] || nb[1] || pb[0] || pb[1]
-        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 || kb3 || ob3 || fb3 ? 3 : 0;
+        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 || kb3 || ob3 || fb3 || wb3 || xb3 || yb3 ? 3 : 0;
 }
 #endif

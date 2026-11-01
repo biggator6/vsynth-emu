@@ -2,7 +2,8 @@
 // The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
 // the Dual Filter (9), the TB Filter (16), the Comb Filter (8), the Side
 // Band Filters (6, 7), the Resonator (5), the Frequency Shifter (14), Lo-Fi
-// (15), the Compressor (12) and the Limiter (13; below XtCosmTvf).  Each oscillator
+// (15), the Compressor (12), the Limiter (13) and Wave Shape (2; below
+// XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -622,6 +623,67 @@ private:
     float sl[3] = {}, gt = 1.0f, gs = 1.0f, env = 0;
     int w = 0;
     std::vector<float> buf;
+};
+
+// Wave Shape (COSM Type 2, block code 3): a waveshaper with a two-pole
+// filter and a DC blocker.  Parameters 0x8d9…0x8e1: Type 0…5 (shown 1…6;
+// 0 by default), Output Level 0…127 (127), Drive 0…127 (127) with Env and
+// LFO depths ±63, Tone 0…127 (127) with Keyfollow ±20, LFO and Env depths.
+// Drive takes Env A (Env 9, COSM 2 Env 11) and its velocity factor, Tone Env
+// B (10, 12); both LFO 3 (4).
+struct XtWsParams {
+    int type = 0, level = 127, drive = 127, driveEnv = 0, driveLfo = 0, tone = 127, toneKf = 0, toneLfo = 0, toneEnv = 0;
+};
+
+// The converter's block (0x894dcbf0): the Type as a byte; Level and Drive
+// through rom.2's 128 shorts at 0x897cfcb8 / 32768 (about (i/127)²); Tone
+// through Lo-Fi's Filter curve (0x894dc4b0, the same code as 0x894dc810);
+// LFO depths (d/63)·|d/63|; Env depths A (Drive) or B (Tone) × (d/63)·|d/63|.
+struct XtWsBlock {
+    int type = 0;
+    float drive = 1.0f, driveEnv = 0, driveLfo = 0, tone = 1.0f, toneEnv = 0, toneLfo = 0, level = 1.0f;
+};
+XtWsBlock xtWsBlock(const XtWsParams& p, int key, float velA, float velB);
+
+// The object for block code 3 (0x89503ef0).  Drive' = Drive + depths × Env A
+// and the LFO, within 0…1; Tone' = Lo-Fi's Balance curve at trunc(127 ×
+// (Tone + depths, within 0.1…1)) (start values 0x894ec4c0; targets from the
+// block 0x894ecee0 and the update 0x894ee8a0).  Per block both step toward
+// their targets by rate·(target − value) before every fourth sample, and the
+// gain (Level/8; 0x894ee160 at note-on) slews 0.1 toward its block's.
+// Types 0…2 (0x89503980): a two-pole filter, b += Tone'·a, a += k·(x − b −
+// a) with k = 0.95·(1 − Drive')² + 0.05, then the shaper on b.  Types 3…5
+// (0x89503c40): the shaper on x, then the filter with Tone' for both.  The
+// shaper: y = 64 + 64·10·v/2^31 (v on the XT's scale) into the type's curve
+// (rom.2, 3 × 128 floats, linearly between entries, its ends held beyond),
+// mixed as Drive'·curve + (1 − Drive')·(y/64 − 1), × 2^31.  Then c += 0.001·
+// (v − c), out = (v − c)·the gain, on L and R from L.
+class XtCosmWs {
+public:
+    // Note-on (0x894edf70): states cleared, start values, rates, then the
+    // block with the envelopes' outputs, and the gain at the block's.
+    void noteOn(const XtWsBlock& b, float env1Start, float env1Out, float rate1, float lfo1,
+                float env2Start, float env2Out, float rate2, float lfo2);
+    void setBlock(const XtWsBlock& b, float env1, float lfo1, float env2, float lfo2);       // 0x894ecee0
+    void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);    // 0x894ee8a0
+    // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
+    // the buffer's units against the XT's (int16 × 65536), for the shaper.
+    void process(float* lr, float scale = 1.0f);
+
+    // The state, for the firmware checks (D = object + 0x58).
+    float drive() const { return drv; }              // D+0xbc
+    float tone() const { return ton; }               // D+0xc0
+    float driveTarget() const { return drvT; }       // D+0xa4
+    float toneTarget() const { return tonT; }        // D+0xa8
+    float gain() const { return lvl; }               // D+0x8c
+    const float* state() const { return s; }         // D+0x1c…0x30: types 0…2's a, b, c, then 3…5's
+
+private:
+    XtWsBlock blk;
+    float drv = 1.0f, ton = 1.0f, drvT = 1.0f, tonT = 1.0f, rate1 = 0, rate2 = 0, lvl = 0.125f, lvlT = 0.125f;
+    float s[6] = {};
+    float driveOf(float env, float lfo) const;
+    float toneOf(float env, float lfo) const;
 };
 
 // The Limiter (COSM Type 13, block code 16): a gain follower with a 10-sample
