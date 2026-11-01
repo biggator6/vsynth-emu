@@ -2900,3 +2900,26 @@ Round-2 recordings.  First build-out after that: real-time granular port
   below 100 Hz and above 6–8 kHz.
 - With it, all sixteen COSM types are ported (v61–v78), each equal to the
   firmware in `xt_cosm`.
+
+### Session 16 addendum (2026-11-01) — v79: the analog oscillator, SAW
+
+- After COSM, the next piece of the tone is its oscillators. OSC Type
+  ANALOG runs one of fourteen DSP routines, chosen by the waveform. This
+  version maps all fourteen and ports SAW, the default.
+- The patch's waveform number is not the routine's code. HQ-SAW is code 0
+  (a band-limited saw from rom.2 tables); the plain SAW is code 2.
+- SAW is a four-segment wave: a phase of 0…1 holds two cycles. Fat moves
+  the breakpoint between them, which adds the sub-octave. The Pulse Width
+  shapes the rising edges. Impact adds a DC term that falls 90 dB in one
+  period.
+- The level and the Saw's edge follow hidden system parameters: the XT's
+  analog calibration (per-waveform level, key-follow bias and slopes,
+  Alias Cancel). The port uses their defaults from rom.2's descriptors.
+- Impact's decay is the firmware's powf of a constant base. Its powf is its
+  expf of y·logf(x), so the expf already ported for the Resonator gives it
+  exactly.
+- Firmware quirk noted: SAW returns an address where its sync mask should
+  be, which matters once OSC SYNC is ported.
+- All of it equals the firmware in the interpreter. In the plugin, an
+  analog patch plays without a sample. The Waveform box shows all fourteen
+  waveforms, with SAW the only one enabled for now.

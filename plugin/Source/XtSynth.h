@@ -6,12 +6,14 @@
 //                     rebuild, run from the user's rom.2 (XtFirmware)
 // Each note then runs its own firmware player (XtSoloVoice / XtMbPlayer) at
 // the XT's 44.1 kHz under the XT's amp envelope (XtEnvelope), and the mix is
-// resampled to the host rate.  No JUCE.
+// resampled to the host rate.  With OSC Type ANALOG a note plays the XT's
+// analog oscillator instead (XtAnalog), with or without a sample.  No JUCE.
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
+#include "XtAnalog.h"
 #include "XtCosm.h"
 #include "XtEnvelope.h"
 #include "XtKeys.h"
@@ -56,6 +58,15 @@ public:
         // xtRandomPitchDepth)
         int rootKey = 60;
         int oscCoarse = 0, oscFine = 0, oscPitch = 0, pitchKF = 100, randomPitch = 0;
+        // OSC Type: 0 ANALOG, the analog oscillator (XtAnalog; it needs no
+        // sample, and its pitch is against A4), 1 PCM, the loaded sample
+        // (the plugin's default).  The analog knobs as the patch stores them:
+        // Waveform 0..13 in the XT's order (the port plays SAW), Impact 0..40,
+        // Pulse Width −63..+63 on the time envelope, Fat 0..127 on the
+        // formant envelope, their Keyfollows ±20 (×10 = the displayed ±200)
+        // and LFO and Env depths −63..+63
+        int oscType = 1;
+        XtAnalogParams ana;
         // the patch's tuning (XtOsc XtTuning): Coarse Tune −48..+48 and Fine
         // Tune −50..+50 (cents), with Pitch Shift (semitones, to the cent)
         // added to them; Scale Tune (the switch, and C…B −64..+63 cents);
@@ -209,6 +220,9 @@ public:
     // Any thread: the next render() starts using this sample (voices stop).
     void setSample(std::shared_ptr<const XtEncoded> e);
     bool hasSample() const { return cur != nullptr; }
+    // Audio thread: whether a note would sound (a sample, or an analog
+    // waveform the port plays).
+    bool canPlay() const;
 
     // Audio thread
     void setControls(const Controls& c);
@@ -233,6 +247,7 @@ private:
         float gain = 1;               // the patch TVA's velocity gain (0x894ea990)
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
         bool robot = false;            // Robot Voice, as at note-on (the player latches it)
+        bool analog = false;           // OSC Type ANALOG at note-on: the analog oscillator plays
         int rnd = 0;                   // the note's random pitch offset (+0x6c), 1/10 cent
         XtEnvelope env;
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
@@ -274,6 +289,7 @@ private:
         float cur = 0, target = 0, step = 0, elapsed = 0;
         XtMbPlayer mb;
         XtSoloVoice solo;
+        XtAnalogOsc ana;               // kept across notes: its phase runs on
     };
     std::shared_ptr<const XtEncoded> cur, pending, retired;
     std::mutex swapLock;
@@ -311,6 +327,8 @@ private:
     XtEnvParams ampEnvParams(const Voice& v) const;      // the OSC amp envelope
     XtLoop waveLoop() const;                         // the players' loop
     float noteCents(const Voice& v, int key) const;  // voice +8 at a key (+0x68 at the previous one)
+    void noteTuning(const Voice& v, int& coarse, int& fine) const;   // the per-note setup's +0x68 and +0x70
+    XtAnalogBlock analogBlock(const Voice& v) const; // the analog converter's block
     int keyFollowKey(const Voice& v) const;          // the OSC's +4
     int shiftKey(int key) const;                     // + the Octave Shift, within 0..127
     void startVoice(int raw, int key, int vel);

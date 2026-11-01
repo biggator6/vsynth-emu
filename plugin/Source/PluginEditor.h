@@ -44,6 +44,13 @@ private:
     juce::ComboBox   timeOffsetBox_;
     juce::Slider     oscTkfSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     oscFkfSlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    // OSC Type (ANALOG, PCM); with ANALOG the analog oscillator's Waveform,
+    // Impact, Pulse Width and Fat with their KFs, LFO and Env depths take the
+    // three rows the PCM OSC uses (Encode, the VariPhrase knobs, Loop)
+    juce::ComboBox   oscTypeBox_, anaWaveBox_;
+    static constexpr int kAnaKnobs = 9;   // Impact; PW, PW KF, Fat, Fat KF; PW LFO, PW Env, Fat LFO, Fat Env
+    juce::Slider     anaSliders_[kAnaKnobs];
+    juce::Label      anaLabels_[kAnaKnobs], oscTypeLabel_ { {}, "OSC" }, anaWaveLabel_ { {}, "Wave" };
     // Loop: the OSC's Loop switch, the wave's Loop Mode and region
     juce::ToggleButton loopBtn_ { "Loop" };
     juce::ComboBox   loopModeBox_;
@@ -150,7 +157,9 @@ private:
     std::unique_ptr<SliderAtt> tAttackAtt_, tDecayAtt_, tSustainAtt_, tReleaseAtt_, tDepthAtt_;
     std::unique_ptr<SliderAtt> fAttackAtt_, fDecayAtt_, fSustainAtt_, fReleaseAtt_, fDepthAtt_;
     std::unique_ptr<SliderAtt> oscTkfAtt_, oscFkfAtt_;
-    std::unique_ptr<ComboAtt>  timeOffsetAtt_;
+    std::unique_ptr<ComboAtt>  timeOffsetAtt_, oscTypeAtt_, anaWaveAtt_;
+    std::unique_ptr<SliderAtt> anaAtt_[kAnaKnobs];
+    void showOscType();                 // the analog rows or the PCM OSC's
     std::unique_ptr<ButtonAtt> loopAtt_;
     std::unique_ptr<ComboAtt>  loopModeAtt_;
     std::unique_ptr<SliderAtt> loopStartAtt_, loopEndAtt_;

@@ -20,8 +20,13 @@ int main(int argc, char** argv) {
     p.prepareToPlay(rate, block);
     // TEST_SNAPSHOT=file.png: the editor drawn offscreen, for checking the
     // layout (TEST_SNAPSHOT_COSM2=1: with the COSM rows on COSM 2;
-    // TEST_SNAPSHOT_TYPE=n: COSM 1's type, e.g. 6 for the 2nd Side Band rows)
+    // TEST_SNAPSHOT_TYPE=n: COSM 1's type, e.g. 6 for the 2nd Side Band rows;
+    // TEST_SNAPSHOT_ANALOG=1: OSC Type ANALOG, its rows shown)
     if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
+        if (std::getenv("TEST_SNAPSHOT_ANALOG")) {
+            auto* prm = p.apvts.getParameter("oscType");
+            prm->setValueNotifyingHost(prm->convertTo0to1(0.0f));
+        }
         if (const char* t = std::getenv("TEST_SNAPSHOT_TYPE")) {
             auto* prm = p.apvts.getParameter("cosmType");
             prm->setValueNotifyingHost(prm->convertTo0to1((float)std::atoi(t)));
@@ -99,6 +104,24 @@ int main(int argc, char** argv) {
             auto* prm = p.apvts.getParameter(id);
             prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
         }
+    }
+    // TEST_ANALOG="wave,impact,pw,pwKf,pwLfo,pwEnv,fat,fatKf,fatLfo,fatEnv": OSC
+    // Type ANALOG, the analog oscillator's knobs (KFs in %; PW on the time
+    // envelope, Fat on the formant envelope)
+    if (const char* e = std::getenv("TEST_ANALOG")) {
+        XtAnalogParams& a = refCtl.ana;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &a.wave, &a.impact, &a.pw, &a.pwKf, &a.pwLfo, &a.pwEnv, &a.fat, &a.fatKf, &a.fatLfo,
+                    &a.fatEnv);
+        refCtl.oscType = 0;
+        const std::pair<const char*, int> knobs[] = { { "oscType", 0 }, { "anaWave", a.wave }, { "anaImpact", a.impact }, { "anaPw", a.pw },
+                                                      { "anaPwKF", a.pwKf }, { "anaPwLfo", a.pwLfo }, { "anaPwEnv", a.pwEnv }, { "anaFat", a.fat },
+                                                      { "anaFatKF", a.fatKf }, { "anaFatLfo", a.fatLfo }, { "anaFatEnv", a.fatEnv } };
+        for (auto [id, v] : knobs) {
+            auto* prm = p.apvts.getParameter(id);
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+        }
+        a.pwKf /= 10;                                // as the patch stores them
+        a.fatKf /= 10;
     }
     // TEST_TENV / TEST_FENV="a,d,s,r,depth": the time and formant envelopes
     for (const char* which : { "TEST_TENV", "TEST_FENV" }) {

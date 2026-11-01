@@ -390,10 +390,15 @@ float xtOscLevelLfoDepth(int d) {
     return mul(x < 0 ? -v : v, v);
 }
 
-float xtOscGain(int db) {
+float xtOscWaveGainFactor(int db) {
     using namespace xtf;
     db = db > 12 ? 12 : db < -12 ? -12 : db;
-    const float g = T.waveGains ? T.waveGain[db + 12] : (float)std::pow(2.0, (double)div(flt(db), 6.0f));
+    return T.waveGains ? T.waveGain[db + 12] : (float)std::pow(2.0, (double)div(flt(db), 6.0f));
+}
+
+float xtOscGain(int db) {
+    using namespace xtf;
+    const float g = xtOscWaveGainFactor(db);
     // × level curve(+0x84)/32768 × level curve(+0x86)/32768, both full
     return mul(mul(div((float)T.level[127], 32768.0f), g), div((float)T.level[127], 32768.0f));
 }

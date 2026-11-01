@@ -8,7 +8,7 @@ REV=${1:-HEAD}; A="$WORK/ab"; mkdir -p "$A"
 rm -rf "$A/src" && mkdir -p "$A/src" && (cd "$REPO" && git archive "$REV" plugin/Source | tar -x -C "$A/src") || exit 1
 cc() { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_SYNTH_MAIN "$@" 2>&1 | grep -E " error"; return 0; }
 synth() { (cd "$1" && cc XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
-           $( [ -f XtCosm.cpp ] && echo XtCosm.cpp ) XtFirmware.cpp Sh4Interp.cpp -o "$2"); }
+           $( [ -f XtCosm.cpp ] && echo XtCosm.cpp ) $( [ -f XtAnalog.cpp ] && echo XtAnalog.cpp ) XtFirmware.cpp Sh4Interp.cpp -o "$2"); }
 rm -f "$A/old" "$A/new"; synth "$A/src/plugin/Source" "$A/old"; synth "$REPO/plugin/Source" "$A/new"
 [ -x "$A/old" ] && [ -x "$A/new" ] || { echo "ab: build failed"; exit 1; }
 ok=0; msg=""

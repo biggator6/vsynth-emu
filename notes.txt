@@ -217,6 +217,19 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+ANALOG OSC v79 (2026-11-01): OSC Type ANALOG with SAW (HARDWARE_FIRMWARE.md,
+  "The analog oscillator, and SAW"). XtAnalog: XtAnalogParams, xtAnalogBlock
+  (converter 0x894e1920: PW 0x894e0ea0, Fat 0x894e1010, level 0x894e1350,
+  slope 0x894e14a0), XtAnalogOsc (note-on 0x89504af0, update 0x89505400, SAW
+  0x89508c20); the hidden calibration (IDs 0x528–0x55b) from the descriptors'
+  defaults. xt_analog checks it (fcheck); PORT=analog mutate.sh. XtSynth:
+  Controls.oscType (0 ANALOG, 1 PCM) and .ana; a voice's analog flag; pitch
+  against A4, no glide; PW on the time envelope, Fat on the formant one;
+  plays without a sample. Plugin params oscType, anaWave, anaImpact, anaPw…
+  anaFatEnv; the editor's ANALOG rows replace Encode/VariPhrase/Loop.
+  XT_ANALOG / TEST_ANALOG "wave,impact,pw,pwKf,pwLfo,pwEnv,fat,fatKf,fatLfo,
+  fatEnv" (KFs in %); TEST_SNAPSHOT_ANALOG=1.
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from

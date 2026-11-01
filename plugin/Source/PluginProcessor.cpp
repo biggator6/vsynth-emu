@@ -18,6 +18,21 @@ namespace Params {
     static const juce::String kOscTimeKF     = "oscTimeKF";       // −200..+200 % per octave
     static const juce::String kOscFormant    = "oscFormant";
     static const juce::String kOscFormantKF  = "oscFormantKF";
+    // OSC Type and the analog oscillator (XtAnalog): Waveform in the XT's
+    // order (SAW so far), Impact 0..40 (0.0–4.0), Pulse Width and Fat with
+    // their Keyfollows, LFO and Env depths (PW on the time envelope, Fat on
+    // the formant envelope)
+    static const juce::String kOscType       = "oscType";        // ANALOG, PCM
+    static const juce::String kAnaWave       = "anaWave";
+    static const juce::String kAnaImpact     = "anaImpact";
+    static const juce::String kAnaPw         = "anaPw";
+    static const juce::String kAnaPwKF       = "anaPwKF";
+    static const juce::String kAnaPwLfo      = "anaPwLfo";
+    static const juce::String kAnaPwEnv      = "anaPwEnv";
+    static const juce::String kAnaFat        = "anaFat";
+    static const juce::String kAnaFatKF      = "anaFatKF";
+    static const juce::String kAnaFatLfo     = "anaFatLfo";
+    static const juce::String kAnaFatEnv     = "anaFatEnv";
     // The OSC's pitch (XtOsc): Coarse and Fine, the Pitch knob −63..+63
     // (±6000 cents at 63), Pitch KF and Random Pitch Depth
     static const juce::String kOscCoarse     = "oscCoarse";       // −48..+48 semitones
@@ -188,6 +203,22 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscFormant, "Formant", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kOscFormantKF, "Formant KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kOscType, "OSC Type", juce::StringArray { "ANALOG", "PCM" }, 1));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kAnaWave, "Analog Waveform",
+        juce::StringArray { "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
+                            "SUPER-SAW", "FEEDBACK-OSC", "X-MOD" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaImpact, "Impact", 0, 40, 10,
+        juce::AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return juce::String(v / 10.0, 1); })));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaPw, "Pulse Width", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kAnaPwKF, "PW KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaPwLfo, "PW LFO Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaPwEnv, "PW Env Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaFat, "Fat", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kAnaFatKF, "Fat KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaFatLfo, "Fat LFO Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaFatEnv, "Fat Env Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscCoarse, "Coarse", -48, 48, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscFine, "Fine", -50, 50, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscPitch, "OSC Pitch", -63, 63, 0));
@@ -574,6 +605,17 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.oscTimeKF    = kf(Params::kOscTimeKF);
     c.oscFormant   = knob(Params::kOscFormant);
     c.oscFormantKF = kf(Params::kOscFormantKF);
+    c.oscType      = knob(Params::kOscType);
+    c.ana.wave     = knob(Params::kAnaWave);
+    c.ana.impact   = knob(Params::kAnaImpact);
+    c.ana.pw       = knob(Params::kAnaPw);
+    c.ana.pwKf     = kf(Params::kAnaPwKF) / 10;             // as the patch stores it
+    c.ana.pwLfo    = knob(Params::kAnaPwLfo);
+    c.ana.pwEnv    = knob(Params::kAnaPwEnv);
+    c.ana.fat      = knob(Params::kAnaFat);
+    c.ana.fatKf    = kf(Params::kAnaFatKF) / 10;
+    c.ana.fatLfo   = knob(Params::kAnaFatLfo);
+    c.ana.fatEnv   = knob(Params::kAnaFatEnv);
     c.oscCoarse    = knob(Params::kOscCoarse);
     c.oscFine      = knob(Params::kOscFine);
     c.oscPitch     = knob(Params::kOscPitch);
@@ -737,7 +779,9 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     const int numSamples = buffer.getNumSamples();
 
     // ── The XT's own players: one voice per note, sample-accurate MIDI ───────
-    if (xtActive_.load() && numOut > 0) {
+    // (an analog OSC needs the firmware image but no sample)
+    const bool analog = xtSynthRomReady() && apvts.getRawParameterValue(Params::kOscType)->load() < 0.5f;
+    if ((xtActive_.load() || analog) && numOut > 0) {
         synth_.setControls(xtControls());
         float* L = buffer.getWritePointer(0);
         float* R = numOut > 1 ? buffer.getWritePointer(1) : nullptr;

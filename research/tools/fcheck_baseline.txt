@@ -63,6 +63,10 @@ amp filter: 120000 blocks of 32 frames, 0 different
 spk converter: 2000 cases, 0 different
 spk note-on and block: 7667 cases, 0 different
 spk filter: 120000 blocks of 32 frames, 0 different
+== xt_analog
+converter: 200000 cases, 0 different
+note-on and update: 27000 cases, 0 different
+saw: 120000 blocks of 32 frames, 0 different (peak 5.178 of 2^31)
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

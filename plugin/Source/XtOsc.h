@@ -192,6 +192,8 @@ float xtVelGain(int velocity, int patchSens, int patchCurve);
 
 // The firmware's powf(2, dB/6) for Wave Gain −12…+12 dB (xtFwOscWaveGains).
 void xtOscSetWaveGains(const float* gains25);
+// One of them, dB within ±12 (std::pow before they are set).
+float xtOscWaveGainFactor(int db);
 
 // The OSC level (+0x54): the level curve at Level + Level KF·(key − 60)
 // (0x894e0c90: level + trunc(127·kf·(key − 60)/6000), within 0…127), times

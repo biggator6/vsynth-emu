@@ -1544,6 +1544,192 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The analog oscillator, and SAW (2026-11-01, v79)
+
+OSC Type ANALOG plays one of fourteen DSP routines, chosen by the waveform.
+This version maps the analog oscillator and ports SAW, the default
+waveform, without the sub oscillator.
+
+**Where it runs.**
+- The OSC converter dispatch (`0x894e48a0`) picks by OSC Type (input +9):
+  0 ANALOG → `0x894e1920`, 1 PCM → `0x894e2f20` (VariPhrase), 2 EXT IN →
+  `0x894e3830`.
+- A voice of kind 3 (analog) has its own routines: install `0x89505170`
+  (from `0x894f2010`), note-on `0x89504af0`, the 10-ms update `0x89505400`,
+  and a FEEDBACK-OSC reset `0x895053c0` (from `0x894f1fd0`).
+- The per-block renderer (`0x894f2800`) calls the routine at voice +0x968
+  (X-MOD: +0x96c) as fn(out, voice + 0xd4, the sync mask at +0x95c), 32
+  stereo frames. It returns the mask of samples where the phase wrapped:
+  the other oscillator's OSC SYNC input.
+- With the sub oscillator on (voice +0xb4 = 1.0) a second set runs: install
+  `0x895069d0`, note-on `0x89506700`, update `0x89506bf0`.
+- The voice setup (`0x894f21c0`) gives a kind-3 voice rate ratio 1, no
+  offsets, and root frequency 440 (+0x9a4), as for Robot Voice.
+
+**The waveforms.** The patch numbers them in the display's order. The
+converter turns them into codes (+0x80), and the install routine switches on
+the code:
+
+| Patch | Waveform | Code | Routine |
+|---|---|---|---|
+| 0 | SAW | 2 | `0x89508c20` |
+| 1 | SQUARE | 3 | `0x89508aa0` |
+| 2 | TRIANGLE | 4 | `0x895094c0` |
+| 3 | SINE | 6 | `0x89509030` |
+| 4 | RAMP | 5 | `0x89508800` |
+| 5 | JUNO | 7 | `0x89508db0` |
+| 6 | HQ-SAW | 0 | `0x895063f0` |
+| 7 | HQ-SQUARE | 1 | `0x895060e0` |
+| 8 | NOISE | 8 | `0x89504a40` |
+| 9 | LA-SAW | 10 | `0x895081f0` |
+| 10 | LA-SQUARE | 9 | `0x89508540` |
+| 11 | SUPER-SAW | 11 | `0x89507520` |
+| 12 | FEEDBACK-OSC | 12 | `0x89507900` |
+| 13 | X-MOD | 13 | `0x89507b60` (at +0x96c) |
+
+The install also stores one constant per code at +0x9ac (about 1e−5;
+5.698e−6 for SAW), not yet explained. HQ-SAW is a leaky integrator of a
+band-limited impulse built from two rom.2 tables (0x897d94dc, 0x897e5ce0;
+pointers at 0x8987c898/c89c), minus a DC term.
+
+**The converter's input** (the OSC table updater `0x894e55d0`). I found the
+layout by running the updater in the interpreter with the parameter getter
+hooked to return a tag per ID:
+- +0x24 Waveform (ID 0x2b1), +0x25 Impact;
+- +0x26 Pulse Width, +0x28 PW KF ×10, +0x2a PW LFO depth, +0x2b PW Env
+  depth, +0x2c/+0x2e the PW envelope's Velocity Curve and Sens;
+- +0x30 Fat, +0x32 Fat KF ×10, +0x34 Fat LFO, +0x35 Fat Env, +0x36/+0x38
+  the Fat envelope's pair;
+- +0x3a Detune (0x30d), +0x3b Sub Octave, +0x3c Sub Level.
+
+**The converter** (`0x894e1920`). Its first part is the VariPhrase
+converter's: the pitch, the Pitch knob, the pitch envelope's and LFO's
+depths, the level and its LFO depth. The cents are against A4: +8 =
+(pitch10 − 69000)/10, within ±6000, as for Robot Voice. Then:
+- +0x80 the code; +0xac Impact·4/40; +0xb0 the Saw or Square Slope
+  (`0x894e14a0`, below).
+- +0x5c = 2^(Wave Gain/6) × the waveform's level at the note's pitch
+  (`0x894e1350`, below), in place of the VariPhrase's level curves.
+- +0x98 the Pulse Width (`0x894e0ea0`):
+  - x = PW (within ±63) + (key − 60)·KF·126/1200 + 63;
+  - its integer part (toward zero) is wrapped into 0…126, the fraction
+    kept, then /126.
+  - So at PW KF 100% the width sweeps its whole range once an octave.
+- +0x9c its envelope depth, (d/63)·|d/63| × the velocity factor; +0xa0 its
+  LFO depth, (d/63)·|d/63|, d within ±63.
+- +0xa4/+0xa8 its envelope and LFO: 2 and 1 (OSC 2: 6 and 2).
+- Sub Octave OFF: +0xb4 = 0.
+  - +0x84 Fat (`0x894e1010`): F/127 within 0…1, then + (key − 60)·KF/1200,
+    within 0…1.
+  - +0x88/+0x90 its depths, as the Pulse Width's.
+  - +0x8c/+0x94 its envelope and LFO: 3 and 1 (OSC 2: 7 and 2).
+- Sub Octave on: +0xb4 = 1.0, and +0x84 holds the Detune curve
+  (`0x894e1090`) plus −2, −1 or 0 octaves. Its envelope depth is piecewise
+  in cents (to 10: d; to 15: 2d − 10; to 31: 5d − 55; to 51: 25d − 675;
+  above: 50d − 1950), /1200. Not ported.
+- +0xb8 Sub Level through the level curve; +0xbc/+0xc0 the LA Tone settings.
+
+The voice binds +0x8c's envelope at +0x974 and +0xa4's at +0x978. So Fat
+follows the OSC's third envelope (the formant slot) and the Pulse Width its
+second (the time slot).
+
+**The analog calibration.** Hidden system parameters 0x528…0x55b go to the
+OSC table at +0xc204… (`0x894e5f80`):
+- LA Saw and LA Square Tone, and their Tone Keyfollows (+0xc205…+0xc208);
+- Alias Cancel (+0xc209, default on), Saw Slope (+0xc20a, 100), Square
+  Slope (+0xc20c, 200);
+- for each waveform SAW…LA-SQUARE, four bytes from +0xc20e: KF Bias Point,
+  Upper Level KF, Lower Level KF, Level. The KFs are stored as value − 128
+  (the getter's value). Saw: 60, −15, +20, 68.
+
+`0x894e1350` uses them for the waveform's level, by the patch's waveform
+(SUPER-SAW, FEEDBACK-OSC and X-MOD take the Saw's):
+- level curve(Level)/32768 × max(0, 1 + d·KF/6e6);
+- d = pitch10 − bias·1000, with the Upper KF above the bias point and the
+  Lower KF (and −d) below it.
+- The Saw loses 3% an octave above C4 and gains 4% an octave below.
+
+`0x894e14a0` gives SAW the Saw Slope/100 and SQUARE the Square Slope/100
+when Alias Cancel is on, else 0. The port uses the descriptors' defaults. A
+unit could hold other values, if they were set at the factory.
+
+**Note-on** (`0x89504af0`, every waveform):
+- +0x1bc = the code. +0x144 = the pitch ratio: `0x894f3960`, which is
+  xtPitchTarget without the detune term.
+- +0x154/+0x158: the gain target (`0x894f3dc0`) and its start
+  (`0x894f3e20`).
+- +0x1dc, the routine's flags, = 0.
+- Impact: +0x1d8 = +0xac. Its decay per sample, +0x1d0, is powf(3.05185e−5,
+  ratio/100.227), so Impact falls 90 dB in one period.
+  - The firmware's powf is its expf core (`0x89531a28`) of y × its logf core
+    (`0x89531b78`). With the constant base it is xtCosmExpf(K(0xc1265ad5)·y),
+    equal on 400,000 cases.
+- The phase, +0x1d4, is kept from the voice's last note. It is scaled by
+  Impact when Impact is below 1, then set to 0 if outside 0…1.
+- Fat: x = clamp(+0x84 + env·+0x88 + LFO·+0x90, 0…1). +0x1c0 = +0x1c4 =
+  ½ − ½x; at or below 0.0039 it is 0.002.
+- Pulse Width: x = clamp(+0x98 + …, 0…1), p = 0.0039683 + 0.992063·x.
+  - SAW folds it to ½ or above (1 − p below ½).
+  - It adds s = ratio·Slope·0.01 (0.01 is stored a unit low), at most 1 − s.
+  - +0x1c8 = +0x1cc = the result.
+
+**The update** (`0x89505400`):
+- +0x144 = the pitch target: no 70% step, so the analog pitch has no glide;
+- +0x154 = the gain target;
+- +0x1c0 moves 70% of the way toward ½ − ½·Fat;
+- +0x1c8 = SAW's folded Pulse Width.
+
+**SAW** (`0x89508c20`, FPSCR 0x40001):
+- The phase steps by ratio·220/44100 (0x3ba377ee). A phase of 0…1 holds two
+  cycles, so ratio 1 is 440 Hz.
+- a = +0x1c4 (Fat); d = ½ − +0x1cc (PW), plus 1 with the wave inverted when
+  negative. The breakpoints are a·d, a and b = a + d − a·d.
+- The wave rises over 0…a·d and a…b and falls over a·d…a and b…1, each
+  segment linear from −1 to +1.
+  - At Fat 0 the two cycles are equal saws.
+  - Fat moves a, and the unequal cycles add the sub-octave: Fat 64 on A2
+    puts 55 Hz at +2.3 dB to the 110 Hz fundamental.
+  - At Fat 0 and PW 0, the harmonics fall as 1/n (−6.0, −9.6, −12.1 dB…).
+- out = ((y + Impact)·gain)·(2^31 − 128), on L and R. The gain moves 1/32
+  toward its target every sample, and Impact by its decay.
+- Once a block, Fat's and PW's current values move 1/32 toward their
+  targets.
+- A set bit in the sync mask resets the phase at that sample.
+- Firmware quirk: it collects its wrap bits in r2 but returns r0, the
+  address voice + 0xd4 + 0x84. A SAW as OSC SYNC's master would give the
+  other oscillator a meaningless mask. This matters once the MOD section is
+  ported.
+- With the Slope on, d is never 0, so the inverted branch always runs.
+
+**Port and checks** (`xt_analog`, new; the others unchanged):
+- the converter: 200,000 cases over SAW…LA-SQUARE, with knob + matrix sums
+  and velocity curves: the analog block, +8 and +0x5c;
+- note-on and update: 27,000 cases, the voice's fields;
+- SAW: 120,000 blocks, the outputs and the state, with sync masks and with
+  the phase set exactly on the breakpoints;
+- all 0 different. The check sets the calibration by running `0x894e5f80`
+  with the getter returning the descriptors' defaults.
+- Deliberate errors are caught (`PORT=analog mutate.sh`):
+  - the Slope's 0.01 a unit off;
+  - a segment's > as ≥ (two of three; the third gives the same value at the
+    point);
+  - Impact added after the gain;
+  - 2^31 for 2^31 − 128;
+  - the flags' reset;
+  - the PW wrap one off;
+  - the level KF's side;
+  - the phase not scaled;
+  - the decay's grouping.
+
+**Plugin.**
+- OSC Type (ANALOG, PCM; PCM the default) sits on the ROM row.
+- ANALOG shows the Waveform (only SAW enabled), Impact, Pulse Width and
+  Fat, with their KFs and their LFO and Env depths, where the Encode,
+  VariPhrase and Loop rows are.
+- An analog patch plays without a sample. Its level and pitch run through
+  the same OSC TVA, COSM sections and patch TVA as a sample's.
+- PW follows the time envelope and Fat the formant envelope.
+
 ### COSM: the Speaker Simulator (2026-11-01, v78)
 
 COSM Type 4, block code 5: a fixed linear filter for each of twelve

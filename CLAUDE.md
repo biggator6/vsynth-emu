@@ -18,7 +18,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 
 ## Where things are
 - `plugin/Source/`: `XtSynth` (the synth: voices, controls, tick), the ports
-  (`XtOsc`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`,
+  (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`,
   `XtMultiBandPlayer`, `XtSoloEncoder`), `XtFirmware` (firmware harness: runs
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
   `PluginEditor`. Each port's firmware check is its `XT_*_MAIN` block.
@@ -48,7 +48,8 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   and its cases in the binding, note-on, start values, block copy, update and
   buffer allocator.
 - `mutate.sh <name> <old> <new> [cases] [pattern]`: builds xt_cosm with one
-  deliberate error in XtCosm.cpp and runs it, to show the check catches it.
+  deliberate error in XtCosm.cpp (`PORT=analog`: xt_analog, XtAnalog.cpp)
+  and runs it, to show the check catches it.
 - `firorder.py <listing>`: the order of additions in an unrolled sum, by a
   symbolic run of its disassembly (written for the Frequency Shifter's FIR).
 
@@ -67,6 +68,10 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   ×2^31 from it, the band players' (int16) ×2^16.
 - `xt_fw solocmp` takes R and F as ratios (F 0 = none) and Energy as a gain
   0..1; `bandcmp` type 3 BACKING / 5 ENSEMBLE.
+- The analog oscillator's map (waveform codes, routines, the converter's
+  input, the hidden calibration IDs 0x528…0x55b) is in HARDWARE_FIRMWARE.md,
+  "The analog oscillator, and SAW". A patch's waveform number is not the
+  routine's code.
 
 ## Porting a COSM type (v65–v78 did it this way; all sixteen are done)
 The type map (converters, block codes, DSP routines, which types are done) is

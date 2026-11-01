@@ -261,6 +261,12 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      own envelopes (Env 9/10, 11/12) and LFO (3, 4), through the XT's
      converter, control and filter kernels, between the player and the
      TVA.
+   - the analog oscillator (v79, XtAnalog): OSC Type ANALOG plays the XT's
+     SAW with Impact, Pulse Width and Fat (their KFs, LFO and envelope
+     depths, on the time and formant envelopes), through the analog
+     converter, note-on, update and routine, its level from the XT's hidden
+     analog calibration. It needs no sample. Its pitch is against A4 and has
+     no glide.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -305,6 +311,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - Mono/Poly (v60): the key state (120,000 events), the ramp's legato update
   and restart (2.05 million values) and the key-follow key equal the
   firmware (`xt_osc`).
+- The analog oscillator (v79): the converter's block, the note-on, the
+  update and SAW equal the firmware (`xt_analog`).
 - COSM TVF (v61) and Dynamic TVF (v64): the converters, start values,
   targets and updates, the follower and the twelve filter kernels equal the
   firmware (`xt_cosm`).
@@ -318,6 +326,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 **Not yet:**
 - the patch TVA's own Level, Level KF, pan and LFO terms are not
   modelled;
+- the analog oscillator plays SAW only, without the sub oscillator; no OSC 2,
+  MOD section (MIX, RING, FM, ENV RING, OSC SYNC) or Structure Type;
 - no V-Synth voice layer (filters, LFOs, effects);
 - no step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and

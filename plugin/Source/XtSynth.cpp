@@ -47,7 +47,8 @@ inline int16_t to16(double v) { return (int16_t)std::clamp(std::lround(v * 32768
 
 bool xtSynthSetRom(const std::string& path) {
     g_romReady = xtLoadTables(path.c_str()) && xtMbLoadTables(path.c_str()) && xtEnvLoadTables(path.c_str())
-              && xtLfoLoadTables(path.c_str()) && xtOscLoadTables(path.c_str()) && xtCosmLoadTables(path.c_str()) && xtFwOpen(path.c_str());
+              && xtLfoLoadTables(path.c_str()) && xtOscLoadTables(path.c_str()) && xtCosmLoadTables(path.c_str())
+              && xtAnalogLoadTables(path.c_str()) && xtFwOpen(path.c_str());
     std::vector<uint32_t> ks;
     if (g_romReady && xtFwEnvKeyScales(ks)) xtEnvSetKeyScales(ks.data());
     std::vector<float> ts;
@@ -208,8 +209,8 @@ float truncateStep() {
 // the note's key, the bend and the note's random offset; formed again at
 // every update, as an update does on the XT (0x894e4e90, the random kept).
 // Robot Voice takes the pitch against A4 (0x894e4030), not against the
-// wave's Original Key.
-float XtSynth::noteCents(const Voice& v, int key) const {
+// wave's Original Key, and so does the analog oscillator (0x894e1920).
+void XtSynth::noteTuning(const Voice& v, int& coarse, int& fine) const {
     const long shift = std::lround((double)ctl.pitchSemis * 100.0);
     const int semis = (int)std::lround((double)shift / 100.0);
     XtTuning t;
@@ -217,9 +218,30 @@ float XtSynth::noteCents(const Voice& v, int key) const {
     t.fine = ctl.patchFine + (int)(shift - semis * 100L);
     t.scaleOn = ctl.scaleTune;
     std::copy(std::begin(ctl.scale), std::end(ctl.scale), t.scale);
-    const int coarse = xtNoteCoarse(t, ctl.oscCoarse);
-    const int fine = xtNoteFine(t, v.note, ctl.oscFine, xtPitchBend(bender, ctl.bendUp, ctl.bendDown), v.rnd);
-    return xtPitchCents(key, coarse, 10 * ctl.pitchKF, fine, ctl.rootKey, v.robot);
+    coarse = xtNoteCoarse(t, ctl.oscCoarse);
+    fine = xtNoteFine(t, v.note, ctl.oscFine, xtPitchBend(bender, ctl.bendUp, ctl.bendDown), v.rnd);
+}
+
+float XtSynth::noteCents(const Voice& v, int key) const {
+    int coarse, fine;
+    noteTuning(v, coarse, fine);
+    return xtPitchCents(key, coarse, 10 * ctl.pitchKF, fine, v.analog ? 69 : ctl.rootKey, v.robot);
+}
+
+// The analog converter's block at the voice's note, formed again at every
+// update as the knobs are (the level follows the note's pitch, the bend and
+// the random offset included).  The time and formant envelopes' velocity
+// curves are off: factors 1.
+XtAnalogBlock XtSynth::analogBlock(const Voice& v) const {
+    int coarse, fine;
+    noteTuning(v, coarse, fine);
+    return xtAnalogBlock(ctl.ana, v.note, xtPitch10(v.note, coarse, 10 * ctl.pitchKF, fine), ctl.waveGain);
+}
+
+// Audio thread (it reads the sample the last render picked up).
+bool XtSynth::canPlay() const {
+    if (ctl.oscType == 0) return xtAnalogTablesLoaded() && xtAnalogPlays(ctl.ana.wave);
+    return cur != nullptr;
 }
 
 void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g) const {
@@ -234,9 +256,12 @@ void XtSynth::targets(const Voice& v, float& A, float& F, float& walk, float& g)
 
 // The player's gain target (0x894f3dc0): the OSC gain times the OSC level
 // (velocity included) times the OSC amp envelope, with the LFO's tremolo.
+// The analog oscillator's gain carries its waveform's level instead of the
+// wave's (the converter's +0x5c).
 float XtSynth::gainTarget(const Voice& v, float env) const {
     const float level = xtOscLevel(ctl.oscLevel, ctl.oscLevelKF, v.note, xtVelGain(v.vel, ctl.oscVelSens, ctl.oscVelCurve));
-    return xtOscGainTarget(xtOscGain(ctl.waveGain), level, env, v.lfo.out(), xtOscLevelLfoDepth(ctl.oscLevelLfoDepth));
+    const float gain = v.analog ? analogBlock(v).gain : xtOscGain(ctl.waveGain);
+    return xtOscGainTarget(gain, level, env, v.lfo.out(), xtOscLevelLfoDepth(ctl.oscLevelLfoDepth));
 }
 
 // The loop the players get (their cached loop events, player +0x6c, and
@@ -575,7 +600,7 @@ int XtSynth::keyFollowKey(const Voice& v) const {
 // voices are truncated (0x894d4a80) and a new one starts.
 void XtSynth::noteOn(int note, float velocity) {
     pickUpSample();
-    if (!cur) return;
+    if (!canPlay()) return;
     keys.press(note);
     keys.noteOn(note, (int32_t)std::floor((double)hostFrames * 1000.0 / hostRate));
     const int key = shiftKey(note), vel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
@@ -605,7 +630,8 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->tail = 0;
     v->vel = vel;
     v->relVel = 64;
-    v->robot = ctl.robot && cur->type == 1;           // SOLO only (the converter's SOLO tail)
+    v->analog = ctl.oscType == 0;                      // canPlay: a waveform the port plays
+    v->robot = ctl.robot && !v->analog && cur->type == 1;   // SOLO only (the converter's SOLO tail)
     // the OSC's random pitch (0x894e4940): the shared generator steps once
     // per note when the OSC has a depth
     v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
@@ -681,7 +707,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     for (int k = 0; k < 2; ++k) {
         Voice::CosmVoice& c = v->cs[k];
         if (!c.on || c.type < 4 || c.type > 6) continue;
-        const float root = xtCosmRootHz(ctl.rootKey, v->robot);
+        const float root = xtCosmRootHz(ctl.rootKey, v->robot || v->analog);   // the analog voice's root is 440 too (0x894f21c0)
         if (c.type == 4)
             c.comb.noteOn(combBlock(*v, k), v->curA, root, c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
                           c.lfo.out(), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
@@ -692,7 +718,9 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     // the OSC gain starts from the amp envelope's start level, or its output
     // when there is no attack (0x894f3e20)
     v->curGain = gainTarget(*v, oe.time[0] == 0.0f ? v->oenv.level() : oe.level[0]);
-    if (cur->type == 1) {
+    if (v->analog)   // the analog note-on (0x89504af0): Fat on the formant envelope, the Pulse Width on the time envelope
+        v->ana.noteOn(analogBlock(*v), v->curA, gainTarget(*v, v->oenv.level()), v->curGain, v->fenv.level(), v->tenv.level(), v->lfo.out());
+    else if (cur->type == 1) {
         v->solo.setRobot(v->robot);
         v->solo.setLoop(waveLoop());
         v->solo.noteOn(cur->solo, v->curA, v->curF, v->curWalk, v->curG);
@@ -823,7 +851,7 @@ void XtSynth::tvaUpdate(Voice& v) {
 
 void XtSynth::mixBlock(float* lr) {
     std::fill(lr, lr + 64, 0.0f);
-    if (!cur) return;
+    if (!cur && std::none_of(std::begin(voice), std::end(voice), [](const Voice& v) { return v.active; })) return;
     // The control clock: the tone update runs between blocks every 441 frames.
     const bool tick = tickCount >= kTickFrames;
     if (tick) tickCount -= kTickFrames;
@@ -866,12 +894,17 @@ void XtSynth::mixBlock(float* lr) {
             float A, F, w, g;
             targets(v, A, F, w, g);
             const float gt = gainTarget(v, v.oenv.level());
-            v.curA = xtOscSmooth(v.curA, A);
-            v.curF = xtOscSmooth(v.curF, F);
-            v.curWalk = xtOscSmooth(v.curWalk, w);
-            v.curG = xtOscSmooth(v.curG, g);
-            v.curGain = xtOscSmooth(v.curGain, gt);
-            applyRates(v);
+            if (v.analog) {   // the analog update (0x89505400): the pitch at its target, no glide
+                v.curA = A;
+                v.ana.update(analogBlock(v), A, gt, v.fenv.level(), v.tenv.level(), v.lfo.out());
+            } else {
+                v.curA = xtOscSmooth(v.curA, A);
+                v.curF = xtOscSmooth(v.curF, F);
+                v.curWalk = xtOscSmooth(v.curWalk, w);
+                v.curG = xtOscSmooth(v.curG, g);
+                v.curGain = xtOscSmooth(v.curGain, gt);
+                applyRates(v);
+            }
             // the COSM updates (0x894ee6a0, COSM 1 then 2), after the voices', before the TVA
             for (Voice::CosmVoice& c : v.cs) {
                 if (!c.on) continue;
@@ -892,7 +925,10 @@ void XtSynth::mixBlock(float* lr) {
             if (!v.active) continue;
         }
         float scale = v.gain;
-        if (cur->type == 1) {
+        if (v.analog) {   // the XT's units (±2^31) to the SOLO buffer's (±1), exactly
+            v.ana.process(tmp);
+            for (float& x : tmp) x *= 0x1p-31f;
+        } else if (cur->type == 1) {
             float l[32], r[32];
             v.solo.render(l, r, 32);
             for (int i = 0; i < 32; ++i) { tmp[2 * i] = l[i]; tmp[2 * i + 1] = r[i]; }
@@ -907,7 +943,7 @@ void XtSynth::mixBlock(float* lr) {
         // quantizer, the Compressor's envelope, the Limiter's levels, the
         // Wave Shape curves and the OD/Dist and Amp clips read the XT's scale: int16 × 65536, i.e. the SOLO buffer
         // (±1) × 2^31, the band players' (int16) × 2^16
-        const float fs = cur->type == 1 ? 0x1p31f : 0x1p16f;
+        const float fs = v.analog || cur->type == 1 ? 0x1p31f : 0x1p16f;
         for (Voice::CosmVoice& c : v.cs) {
             if (!c.on) continue;
             if (c.type == 2) c.dual.process(tmp);
@@ -1007,6 +1043,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_LFO="wave,rate,depth,delay,mode,fade,offset,keysync": the LFO.
 //   XT_OSC="time,offset,timeKF,formant,formantKF,energy[,lfoTime,lfoFormant]":
 //     the VariPhrase OSC knobs (Time Offset 0 BWD, 1 ZERO, 2 FWD).
+//   XT_ANALOG="wave,impact,pw,pwKf,pwLfo,pwEnv,fat,fatKf,fatLfo,fatEnv": OSC
+//     Type ANALOG (KFs in %; PW on XT_TENV's envelope, Fat on XT_FENV's).
 //   XT_OLEV="level,levelKF,levelLfoDepth,waveGainDb": the OSC TVA.
 //   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.
 //   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
@@ -1097,6 +1135,14 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_OSC"))
         std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &c.oscTime, &c.oscTimeOffset, &c.oscTimeKF, &c.oscFormant, &c.oscFormantKF,
                     &c.energy, &c.lfoTimeDepth, &c.lfoFormantDepth);
+    if (const char* e = std::getenv("XT_ANALOG")) {
+        XtAnalogParams& a = c.ana;
+        c.oscType = 0;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &a.wave, &a.impact, &a.pw, &a.pwKf, &a.pwLfo, &a.pwEnv, &a.fat, &a.fatKf, &a.fatLfo,
+                    &a.fatEnv);
+        a.pwKf /= 10;
+        a.fatKf /= 10;
+    }
     if (const char* e = std::getenv("XT_OLEV"))
         std::sscanf(e, "%d,%d,%d,%d", &c.oscLevel, &c.oscLevelKF, &c.oscLevelLfoDepth, &c.waveGain);
     if (const char* e = std::getenv("XT_OENV"))

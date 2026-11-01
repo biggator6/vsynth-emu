@@ -135,6 +135,31 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     timeOffsetBox_.addItemList({ "BWD", "ZERO", "FWD" }, 1);
     addAndMakeVisible(timeOffsetBox_);
     timeOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "oscTimeOffset", timeOffsetBox_);
+    oscTypeBox_.addItemList({ "ANALOG", "PCM" }, 1);
+    anaWaveBox_.addItemList({ "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
+                              "SUPER-SAW", "FEEDBACK-OSC", "X-MOD" }, 1);
+    for (int w = 0; w < 14; ++w) anaWaveBox_.setItemEnabled(w + 1, xtAnalogPlays(w));   // the waveforms the port plays
+    addAndMakeVisible(oscTypeBox_);
+    addAndMakeVisible(anaWaveBox_);
+    oscTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "oscType", oscTypeBox_);
+    anaWaveAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "anaWave", anaWaveBox_);
+    oscTypeBox_.onChange = [this] { showOscType(); };
+    {
+        static const char* const ids[kAnaKnobs] = { "anaImpact", "anaPw", "anaPwKF", "anaFat", "anaFatKF", "anaPwLfo", "anaPwEnv", "anaFatLfo", "anaFatEnv" };
+        static const char* const names[kAnaKnobs] = { "Impact", "PW", "PW KF", "Fat", "Fat KF", "PW LFO", "PW Env", "Fat LFO", "Fat Env" };
+        for (int i = 0; i < kAnaKnobs; ++i) {
+            juce::Slider& sl = anaSliders_[i];
+            sl.setSliderStyle(juce::Slider::LinearHorizontal);
+            sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+            sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+            sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+            sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+            addAndMakeVisible(sl);
+            anaAtt_[i] = std::make_unique<SliderAtt>(processor_.apvts, ids[i], sl);
+            anaLabels_[i].setText(names[i], juce::dontSendNotification);
+            styleSmall(anaLabels_[i]);
+        }
+    }
     loopModeBox_.addItemList({ "One Shot", "One Way", "Alternate" }, 1);
     loopBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
     loopBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
@@ -418,8 +443,10 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                             &lfoLabel_, &lfoRateLabel_, &lfoDepthLabel_, &lfoDelayLabel_, &lfoFadeLabel_,
                             &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_,
                             &portaTimeLabel_, &portaSensLabel_, &octLabel_, &cosmCutLabel_, &cosmResoLabel_, &cosmKfLabel_,
-                            &clfoLabel_, &clfoRateLabel_, &cosmTypeLabel_, &cosmCutOwnLabel_, &cosmResoOwnLabel_ }) styleSmall(*l);
+                            &clfoLabel_, &clfoRateLabel_, &cosmTypeLabel_, &cosmCutOwnLabel_, &cosmResoOwnLabel_,
+                            &oscTypeLabel_, &anaWaveLabel_ }) styleSmall(*l);
     showCosmType();                                  // after styleSmall, which shows every label
+    showOscType();
     timerCallback();
     startTimerHz(4);
 
@@ -557,6 +584,23 @@ void VSynthEmuEditor::attachCosm(int k) {
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
     attachSideBand();
     showCosmType();
+}
+
+// ANALOG shows the analog oscillator's three rows where the PCM OSC's
+// (Encode, Key and Depth; Energy and the VariPhrase knobs; Loop) are.
+void VSynthEmuEditor::showOscType() {
+    const bool ana = oscTypeBox_.getSelectedItemIndex() == 0;
+    for (juce::Component* cpt : { (juce::Component*)&encodeLabel_, (juce::Component*)&encodeBox_, (juce::Component*)&keyLabel_,
+                                  (juce::Component*)&keySlider_, (juce::Component*)&depthLabel_, (juce::Component*)&depthSlider_,
+                                  (juce::Component*)&energyLabel_, (juce::Component*)&energySlider_, (juce::Component*)&offsetLabel_,
+                                  (juce::Component*)&timeOffsetBox_, (juce::Component*)&oscTkfLabel_, (juce::Component*)&oscTkfSlider_,
+                                  (juce::Component*)&oscFkfLabel_, (juce::Component*)&oscFkfSlider_, (juce::Component*)&loopBtn_,
+                                  (juce::Component*)&loopModeBox_, (juce::Component*)&loopStartLabel_, (juce::Component*)&loopStartSlider_,
+                                  (juce::Component*)&loopEndLabel_, (juce::Component*)&loopEndSlider_ })
+        cpt->setVisible(!ana);
+    anaWaveLabel_.setVisible(ana);
+    anaWaveBox_.setVisible(ana);
+    for (int i = 0; i < kAnaKnobs; ++i) { anaLabels_[i].setVisible(ana); anaSliders_[i].setVisible(ana); }
 }
 
 // The type's own rows share one area: only the selected type's are shown
@@ -708,9 +752,27 @@ void VSynthEmuEditor::resized() {
     auto row1 = xt.removeFromTop(26);
     romButton_.setBounds(row1.removeFromLeft(70));
     row1.removeFromLeft(10);
+    oscTypeBox_.setBounds(row1.removeFromRight(90).reduced(0, 1));
+    oscTypeLabel_.setBounds(row1.removeFromRight(30));
     statusLabel_.setBounds(row1);
     xt.removeFromTop(6);
     auto row2 = xt.removeFromTop(24);
+    {   // the analog rows, in rows 2, 3 and Loop's places (showOscType)
+        auto a1 = row2, a2 = row2.translated(0, 30), a3 = row2.translated(0, 60);
+        anaWaveLabel_.setBounds(a1.removeFromLeft(36));
+        anaWaveBox_.setBounds(a1.removeFromLeft(130).withTrimmedRight(10));
+        anaLabels_[0].setBounds(a1.removeFromLeft(44));
+        anaSliders_[0].setBounds(a1.removeFromLeft(220));
+        for (int r = 0; r < 2; ++r) {
+            auto& a = r ? a3 : a2;
+            const int cw = a.getWidth() / 4;
+            for (int i = 1 + 4 * r; i < 5 + 4 * r; ++i) {
+                auto cell = a.removeFromLeft(cw);
+                anaLabels_[i].setBounds(cell.removeFromLeft(46));
+                anaSliders_[i].setBounds(cell.withTrimmedRight(6));
+            }
+        }
+    }
     encodeLabel_.setBounds(row2.removeFromLeft(52));
     encodeBox_.setBounds(row2.removeFromLeft(120));
     row2.removeFromLeft(12);
