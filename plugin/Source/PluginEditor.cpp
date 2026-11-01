@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 1030;  // height of the XT strip below it
+static constexpr int kXtStripH   = 1090;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -32,14 +32,17 @@ static const char* const kSbIds[13][2] = { { "Hpf", "HPF" }, { "Lpf", "LPF" }, {
                                            { "Detune", "Det" }, { "DetuneLfo", "LFO" }, { "DetuneOwn", "Own" }, { "DetuneEnv", "Env" },
                                            { "Width", "Wid" }, { "WidthKF", "KF" }, { "WidthLfo", "LFO" }, { "WidthOwn", "Own" },
                                            { "WidthEnv", "Env" } };
+// The Resonator's rows (Size; Balance): the id suffixes after "cosm"/"cosm2", and labels
+static const char* const kResIds[7][2] = { { "ResSize", "Size" }, { "ResSizeKF", "KF" }, { "ResSizeLfo", "LFO" }, { "ResSizeEnv", "Env" },
+                                           { "ResBalance", "Bal" }, { "ResBalanceLfo", "LFO" }, { "ResBalanceEnv", "Env" } };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1330);
+    setSize(560, 1390);
     setResizable(true, true);
-    setResizeLimits(480, 780, 960, 1470);
+    setResizeLimits(480, 780, 960, 1530);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -146,7 +149,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band" }, 1);
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator" }, 1);
     cosmTypeBox_.onChange = [this] { attachSideBand(); };
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
@@ -251,6 +254,23 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         sbRowLabels_[r].setText(r == 0 ? "SB" : r == 1 ? "SB Det" : "SB Wid", juce::dontSendNotification);
         styleSmall(sbRowLabels_[r]);
     }
+    resTypeBox_.addItemList({ "1", "2", "3" }, 1);
+    addAndMakeVisible(resTypeBox_);
+    for (int i = 0; i < kResKnobs; ++i) {
+        juce::Slider& sl = resSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        resLabels_[i].setText(kResIds[i][1], juce::dontSendNotification);
+        styleSmall(resLabels_[i]);
+    }
+    for (int r = 0; r < 2; ++r) {
+        resRowLabels_[r].setText(r ? "Res Bal" : "Res", juce::dontSendNotification);
+        styleSmall(resRowLabels_[r]);
+    }
     attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
@@ -312,7 +332,7 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
 // the depth and Env A rows (level slots 24..31), the Dual, TB, Comb and Side
-// Band Filters' rows and its LFO.
+// Band Filters' and the Resonator's rows and its LFO.
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
     cosmK_ = k;
@@ -349,6 +369,12 @@ void VSynthEmuEditor::attachCosm(int k) {
     for (int i = 0; i < kCombKnobs; ++i) {
         combAtts_[i].reset();
         combAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kCombIds[i][0], combSliders_[i]);
+    }
+    resTypeAtt_.reset();
+    resTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "ResType", resTypeBox_);
+    for (int i = 0; i < kResKnobs; ++i) {
+        resAtts_[i].reset();
+        resAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kResIds[i][0], resSliders_[i]);
     }
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
     attachSideBand();
@@ -657,6 +683,19 @@ void VSynthEmuEditor::resized() {
             auto cell = row.removeFromLeft(w);
             sbLabels_[i].setBounds(cell.removeFromLeft(28));
             sbSliders_[i].setBounds(cell.withTrimmedRight(3));
+        }
+    }
+    for (int r = 0; r < 2; ++r) {                    // the Resonator: Type + Size, KF, LFO, Env; then Balance, LFO, Env
+        xt.removeFromTop(6);
+        auto row = xt.removeFromTop(24);
+        resRowLabels_[r].setBounds(row.removeFromLeft(46));
+        if (r == 0) resTypeBox_.setBounds(row.removeFromLeft(62).withTrimmedRight(6));
+        else row.removeFromLeft(62);
+        const int first = r ? 4 : 0, n = r ? 3 : 4, w = row.getWidth() / n;
+        for (int i = first; i < first + n; ++i) {
+            auto cell = row.removeFromLeft(w);
+            resLabels_[i].setBounds(cell.removeFromLeft(34));
+            resSliders_[i].setBounds(cell.withTrimmedRight(4));
         }
     }
     xt.removeFromTop(6);

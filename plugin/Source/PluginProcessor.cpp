@@ -52,7 +52,7 @@ namespace Params {
     static const juce::String kLegato        = "legatoSwitch";
     static const juce::String kOctave        = "octaveShift";
     // The COSM sections as TVFs, COSM 1 ("cosm…") and COSM 2 ("cosm2…"):
-    // Switch, Type (TVF, Dynamic TVF, Dual Filter, TB Filter, Comb Filter, 1st and 2nd Side Band), ResoOwn/CutoffOwn (the Dynamic TVF's
+    // Switch, Type (TVF, Dynamic TVF, Dual Filter, TB Filter, Comb Filter, 1st and 2nd Side Band, Resonator), ResoOwn/CutoffOwn (the Dynamic TVF's
     // Own Env depths), Filter, Cutoff, Reso, CutoffKF, CutoffEnv/Lfo, ResoEnv/Lfo; the
     // Dual Filter's DualType and Dual1…/Dual2… Freq, KF, Q, Lfo, Env; the TB
     // Filter's TbCutoff, TbKF, TbLfo, TbEnv, TbQ, TbQFollow, TbHpf, TbHpfKF,
@@ -60,7 +60,8 @@ namespace Params {
     // CombDetuneLfo, CombDetuneEnv, CombTone, CombToneLfo, CombToneEnv; the
     // Side Band Filters' Sb1…/Sb2… (the 1st's Hpf and SubDetune, the 2nd's Q)
     // Lpf, LpfKF, Octave, Detune, DetuneLfo/Own/Env, Width, WidthKF,
-    // WidthLfo/Own/Env; the envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
+    // WidthLfo/Own/Env; the Resonator's ResType, ResSize, ResSizeKF,
+    // ResSizeLfo, ResSizeEnv, ResBalance, ResBalanceLfo, ResBalanceEnv; the envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
     // Attack…TimeKF; the LFO, LfoWave…LfoKeySync
     static juce::String cosmId(int k, const char* name) { return juce::String(k ? "cosm2" : "cosm") + name; }
     static const char* const kCosmEnvKnobs[10] = { "Attack", "Decay", "Sustain", "Release", "VelCurve", "VelSens",
@@ -220,7 +221,7 @@ VSynthEmuProcessor::createParameterLayout() {
         const juce::String n = k ? "COSM 2 " : "COSM 1 ";
         params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "Switch"), n + "Switch", false));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Type"), n + "Type",
-            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band" }, 0));
+            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator" }, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResoOwn"), n + "Resonance Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CutoffOwn"), n + "Cutoff Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Filter"), n + "Filter Type",
@@ -297,6 +298,18 @@ VSynthEmuProcessor::createParameterLayout() {
             num("WidthLfo", "Side Band Width LFO Depth", -63, 63, 0);
             num("WidthOwn", "Side Band Width Own Env Depth", -63, 63, 0);
             num("WidthEnv", "Side Band Width Env Depth", -63, 63, 0);
+        }
+        {                                            // the Resonator, the XT's defaults
+            const juce::String rn = n + "Resonator ";
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "ResType"), rn + "Filter Type", juce::StringArray { "1", "2", "3" }, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResSize"), rn + "Size", 0, 127, 64));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                cosmId(k, "ResSizeKF"), rn + "Size Keyfollow", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResSizeLfo"), rn + "Size LFO Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResSizeEnv"), rn + "Size Env Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResBalance"), rn + "Balance", 0, 100, 50));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResBalanceLfo"), rn + "Balance LFO Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResBalanceEnv"), rn + "Balance Env Depth", -63, 63, 0));
         }
         for (const char* ab : { "A", "B" }) {
             const juce::String id = cosmId(k, "Env") + ab, name = n + "Env " + ab + " ";
@@ -522,6 +535,9 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         m.combOctave = knob(cosmId(k, "CombOctave")); m.combDetune = knob(cosmId(k, "CombDetune"));
         m.combDetuneLfo = knob(cosmId(k, "CombDetuneLfo")); m.combDetuneEnv = knob(cosmId(k, "CombDetuneEnv"));
         m.combTone = knob(cosmId(k, "CombTone")); m.combToneLfo = knob(cosmId(k, "CombToneLfo")); m.combToneEnv = knob(cosmId(k, "CombToneEnv"));
+        m.resType = knob(cosmId(k, "ResType")); m.resSize = knob(cosmId(k, "ResSize")); m.resSizeKf = kf(cosmId(k, "ResSizeKF"));
+        m.resSizeLfo = knob(cosmId(k, "ResSizeLfo")); m.resSizeEnv = knob(cosmId(k, "ResSizeEnv")); m.resBalance = knob(cosmId(k, "ResBalance"));
+        m.resBalanceLfo = knob(cosmId(k, "ResBalanceLfo")); m.resBalanceEnv = knob(cosmId(k, "ResBalanceEnv"));
         for (int t = 0; t < 2; ++t) {
             XtSynth::Controls::Cosm::SideBand& b = m.sb[t];
             const juce::String id = cosmId(k, "Sb") + juce::String(t + 1);

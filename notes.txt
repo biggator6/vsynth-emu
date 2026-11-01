@@ -217,6 +217,18 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+RESONATOR v69 (2026-10-31): COSM Type 5 (HARDWARE_FIRMWARE.md, "COSM: the
+  Resonator"). XtCosm: XtResParams, xtResBlock (0x894dcf00 with the Size
+  curve 0x894dc700), xtCosmExpf (the firmware's expf 0x8952f6f4 →
+  0x89531a28, ldexpf 0x89532ea8), XtCosmRes (start 0x894ec580, block
+  0x894ed0a0, update 0x894ee960, filter 0x894ffa10). It reads the
+  resonator table (0x897d4b80, 3 × 18 floats) and expf's polynomials
+  (0x897eeebc, 0x897eeed8) at run time. XtSynth: Cosm.type 7 with resType…
+  resBalanceEnv; slot 1 envA (Size), slot 2 envB (Balance). Plugin params
+  cosmResType, ResSize, ResSizeKF, ResSizeLfo, ResSizeEnv, ResBalance,
+  ResBalanceLfo, ResBalanceEnv (and cosm2…). XT_RES / TEST_RES
+  "type,size,sizeKf,sizeLfo,sizeEnv,balance,balanceLfo,balanceEnv" (KF in %).
+
 SIDE BAND FILTERS v68 (2026-10-31): COSM Types 6 and 7 (HARDWARE_FIRMWARE.md,
   "COSM: the Side Band Filters"). XtCosm: XtSbfParams (second = the 2nd),
   xtSbfBlock (0x894dd0a0/0x894dd2c0, with 0x894dc540/0x894dc5f0),

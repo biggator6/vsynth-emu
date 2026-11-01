@@ -2765,3 +2765,18 @@ Round-2 recordings.  First build-out after that: real-time granular port
   the port are caught.
 - A second, stereo routine table exists (`0x8987c840`), picked by the
   tone's +0x980 flag. The ports so far are all the mono routines; open.
+
+### Session 16 addendum (2026-10-31) — v69: Resonator
+
+- The Resonator (COSM Type 5, block code 6) is six two-pole resonators in
+  parallel, with coefficients per Filter Type in a rom.2 table. Size scales
+  their frequencies by expf(1.6·s), up to ±2.3 octaves. Balance mixes them
+  with the dry input.
+- Size's target goes through the firmware's expf every 10 ms, on a
+  continuously varying argument, so a load-time table would not do. The
+  port reproduces that expf exactly: a degree-6 rational approximation,
+  with its coefficients read from rom.2. It equals the firmware's on
+  400,000 inputs.
+- All of it equals the firmware in the interpreter. Four deliberate errors
+  in the port are caught, among them a 1.6 one unit off: the converter and
+  the start values store different 1.6s.

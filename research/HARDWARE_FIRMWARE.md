@@ -1544,6 +1544,92 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Resonator (2026-10-31, v69)
+
+COSM Type 5, block code 6: six two-pole resonators in parallel, their
+frequencies scaled by Size, mixed with the dry input by Balance. It has no
+delay buffers (the allocator skips code 6) and no note-on case of its own.
+
+**Parameters** (0x8eb…0x8f2, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x8eb | Filter Type | 0…2 | 0 |
+| 0x8ec | Size | 0…127 | 64 |
+| 0x8ed | Size Keyfollow | ±20 | 0 |
+| 0x8ee | Size LFO Depth | ±63 | 0 |
+| 0x8ef | Size ENV Depth | ±63 | 0 |
+| 0x8f0 | Balance | 0…100 | 50 |
+| 0x8f1 | Balance LFO Depth | ±63 | 0 |
+| 0x8f2 | Balance ENV Depth | ±63 | 0 |
+
+The plugin labels the types 1–3; the XT's names for them are not traced.
+
+**The converter** (`0x894dcf00`) writes the block:
+- +4 the Filter Type (a byte);
+- +8 Size (`0x894dc700`): x = (key − 60)·KF·10/100/12; x·logf(2)/1.6 +
+  2·Size/127 − 1, within ±1. The 1.6 here is 0x3fcccccc, and logf(2) is the
+  firmware's (0x3f317219, as in v68);
+- +0xc its Env depth, A × (d/63)·|d/63|; +0x10 its envelope (9 or 11);
+  +0x14 its LFO depth; +0x18 its LFO;
+- +0x1c Balance/100 + 0 (plus a controller term, 0 without one); +0x20 its
+  Env depth (B); +0x24 its envelope (10 or 12); +0x28 its LFO depth; +0x2c
+  its LFO.
+
+The binding (`0x894f7330`, by code: the block offsets of slot 1's and 2's
+envelopes and LFOs) puts Size's envelope in slot 1 and Balance's in slot 2.
+
+**The object** (start values `0x894ec580`; block copy `0x894ed0a0`, a
+plain copy; update `0x894ee960`):
+- Size' = expf(1.6 × clamp(Size + Env·depth + LFO·depth, ±1)), with this
+  1.6 at 0x3fcccccd, one unit above the converter's;
+- Balance' = clamp(Balance + Env·depth + LFO·depth, 0…1);
+- note-on takes the start values from the envelopes' start levels (D+0xbc,
+  D+0xc0), and the block and update put the targets at D+0xa4 and D+0xa8;
+- rates are 4 × the envelopes' coefficients, as for the TVF.
+
+**The firmware's expf** (`0x8952f6f4`, errno around `0x89531a28`):
+- NaN gives 0x7fc00001; 0 gives 1; |x| ≥ 2^15 gives 0 or ∞.
+- y = x·log2 e (0x3fb8aa3b); n = trunc(y) (with y's sign, so −0 for small
+  negatives); f = y − n.
+- If |f| ≥ ½, n moves one step toward f and f one unit the other way.
+- t = f·ln 2 (0x3f317218); P(t)/P(−t), where P has degree 6 and its two
+  coefficient tables (0x897eeebc, 0x897eeed8) are read from rom.2; then
+  ldexpf (`0x89532ea8`, the exponent field moved: 0 below, ∞ above).
+- It is within a few units of the true e^x (e.g. expf(1) = 2.71828151).
+
+**The filter** (`0x894ffa10`; the stereo table's entry is `0x894ffe4c`):
+- The steps rate·(target − value) for Size' and Balance' are taken once per
+  block. Before every fourth sample both step, and the six coefficients
+  become c_i = f_i·Size'.
+- The table at 0x897d4b80 holds 18 floats per Filter Type: (f_i, d_i, g_i)
+  for each resonator. Type 1's f_i are 0.0224…0.0943, about 157…662 Hz at
+  Size' = 1.
+- Per sample, from L, each resonator: b += c·a; t = d·a + x − b; a += c·t.
+  Out = Balance' × Σ g_i·a_i + (1 − Balance')·x, written to L and R.
+- The states (a, b per resonator, D+0x1c…0x48) clear at note-on.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- expf: 400,000 cases, half on its range here (±1.6) and half random bit
+  patterns;
+- the converter: 200,000 cases, the whole block compared;
+- note-on (the firmware's own), updates and new blocks: 22,500 cases;
+- the filter: 120,000 blocks;
+- all 0 different. Four deliberate errors are caught: the 1.6 one unit low,
+  expf without its |f| ≥ ½ step, the first step skipped, and a resonator's b
+  updated after its t.
+
+**Plugin.**
+- COSM Type gains Resonator (index 7, latched at note-on), with its own
+  parameters per section (cosmResType… and cosm2…) at the XT's defaults.
+- The editor has a Res row (Type, Size and its KF, LFO and Env depths) and a
+  Res Bal row (Balance and its depths). The window is 60 px taller.
+- On noise at key 60, fully wet (Balance 100):
+  - Type 1 at Size 64 peaks near 169, 270 and 673 Hz;
+  - Size 127 moves its peaks up by e^1.6 = 4.95 (top peak 3,319 Hz);
+  - Size 0 moves them down by the same factor;
+  - Balance 0 is the dry input exactly.
+
 ### COSM: the Side Band Filters (2026-10-31, v68)
 
 COSM Types 6 and 7, block codes 7 and 8. Each converter writes a fixed
@@ -1956,7 +2042,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | 2 | Wave Shape | 0x8d9–0x8e1 | `0x894dcbf0` | 3 | `0x89503ef0` |
 | 3 | Amp Simulator | 0x8e2–0x8e9 | `0x894dcd80` | 4 | `0x894f8a30` |
 | 4 | Speaker Simulator | 0x8ea | inline | 5 | `0x89501300` |
-| 5 | Resonator | 0x8eb–0x8f2 | `0x894dcf00` | | |
+| 5 | Resonator | 0x8eb–0x8f2 | `0x894dcf00` | 6 | `0x894ffa10` (v69) |
 | 6 | 1st Side Band Filter | 0x8f3–0x900 | `0x894dd0a0` | 7 | `0x89500640` (v68) |
 | 7 | 2nd Side Band Filter | 0x901–0x90d | `0x894dd2c0` | 8 | `0x89500d40` (v68) |
 | 8 | Comb Filter | 0x90e–0x914 | `0x894dd4f0` | 9 | `0x894fa8d0` (v67) |
@@ -1976,8 +2062,8 @@ The routine table by code (0…20): `0x894fb280`, `0x894fef70`,
 `0x894fb530`, `0x894fda60`, `0x894fe9c0`, `0x89501950`. Blank cells were not
 traced. The Side Band converters turned out to write fixed codes (v68), so
 "chosen at run time" was wrong for them. The codes left over are 0 (Through),
-6, 10, 11 and 17–19, presumably the Resonator's, Frequency Shifter's and
-Lo-Fi's. The ID ranges are from the table at 0x897cebd8.
+10, 11 and 17–19, presumably the Frequency Shifter's and Lo-Fi's (the
+Resonator's is 6, v69). The ID ranges are from the table at 0x897cebd8.
 
 **The Dual Filter** (COSM Type 9, block code 12).
 
@@ -2328,7 +2414,7 @@ on the SH-4):
 
 **Not modelled yet:**
 - COSM 2 (since modelled, v63);
-- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67; Side Band Filters, v68);
+- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67; Side Band Filters, v68; Resonator, v69);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;

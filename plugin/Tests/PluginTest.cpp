@@ -184,7 +184,9 @@ int main(int argc, char** argv) {
     // TEST_SBF1="hpf,lpf,lpfKf,subDetune,octave,detune,detuneLfo,detuneOwn,
     // detuneEnv,width,widthKf,widthLfo,widthOwn,widthEnv": the 1st Side Band
     // Filter (KFs in %, octave 0..2); TEST_SBF2="q,lpf,…" (no subDetune) the
-    // 2nd; TEST_SBF12, TEST_SBF22: COSM 2's.
+    // 2nd; TEST_SBF12, TEST_SBF22: COSM 2's.  TEST_RES="type,size,sizeKf,
+    // sizeLfo,sizeEnv,balance,balanceLfo,balanceEnv": a Resonator (KF in %);
+    // TEST_RES2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -226,6 +228,15 @@ int main(int argc, char** argv) {
             set("Switch", 1); set("Type", 4); set("CombOctave", m.combOctave); set("CombDetune", m.combDetune);
             set("CombDetuneLfo", m.combDetuneLfo); set("CombDetuneEnv", m.combDetuneEnv); set("CombTone", m.combTone);
             set("CombToneLfo", m.combToneLfo); set("CombToneEnv", m.combToneEnv);
+        }
+        if (const char* e = std::getenv(("TEST_RES" + sfx).c_str())) {
+            m.on = true;
+            m.type = 7;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &m.resType, &m.resSize, &m.resSizeKf, &m.resSizeLfo, &m.resSizeEnv, &m.resBalance,
+                        &m.resBalanceLfo, &m.resBalanceEnv);
+            set("Switch", 1); set("Type", 7); set("ResType", m.resType); set("ResSize", m.resSize); set("ResSizeKF", m.resSizeKf);
+            set("ResSizeLfo", m.resSizeLfo); set("ResSizeEnv", m.resSizeEnv); set("ResBalance", m.resBalance);
+            set("ResBalanceLfo", m.resBalanceLfo); set("ResBalanceEnv", m.resBalanceEnv);
         }
         for (int t = 0; t < 2; ++t)
             if (const char* e = std::getenv(("TEST_SBF" + std::to_string(t + 1) + sfx).c_str())) {

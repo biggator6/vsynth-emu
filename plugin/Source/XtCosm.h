@@ -1,7 +1,7 @@
 #pragma once
 // The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
-// the Dual Filter (9), the TB Filter (16), the Comb Filter (8) and the Side
-// Band Filters (6, 7; below XtCosmTvf).  Each oscillator
+// the Dual Filter (9), the TB Filter (16), the Comb Filter (8), the Side
+// Band Filters (6, 7) and the Resonator (5; below XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -389,6 +389,65 @@ private:
     float sl[5] = {}, fr[2] = {}, s[6] = {};
     int w = 0;
     std::vector<float> buf1, buf2;                   // buf2 after kGuard words that stay 0
+};
+
+// The Resonator (COSM Type 5, block code 6): six two-pole resonators in
+// parallel, their frequencies scaled by Size, mixed with the dry input by
+// Balance.  Parameters 0x8eb…0x8f2: Filter Type 0…2 (each its six
+// resonators' coefficients, a table in rom.2), Size 0…127 (64) with
+// Keyfollow ±20, LFO and Env depths ±63, Balance 0…100 (50) with LFO and Env
+// depths.  Size takes Env A (Env 9, COSM 2 Env 11) and its velocity factor,
+// Balance Env B (10, 12); both LFO 3 (4).
+struct XtResParams {
+    int type = 0, size = 64, sizeKf = 0, sizeLfo = 0, sizeEnv = 0, balance = 50, balanceLfo = 0, balanceEnv = 0;
+};
+
+// The converter's block (0x894dcf00): Size through 0x894dc700, 2·Size/127 −
+// 1 + (key − 60)·KF·10/100/12 · ln 2/1.6, within ±1; Balance/100; LFO depths
+// (d/63)·|d/63|; Env depths A (Size) or B (Balance) × (d/63)·|d/63|.
+struct XtResBlock {
+    int type = 0;
+    float size = 0, sizeEnv = 0, sizeLfo = 0, balance = 0.5f, balanceEnv = 0, balanceLfo = 0;
+};
+XtResBlock xtResBlock(const XtResParams& p, int key, float velA, float velB);
+
+// The firmware's expf (0x8952f6f4 → 0x89531a28): y = x·log2 e = n + f, |f|
+// < ½; 2^n · P(f·ln 2)/P(−f·ln 2), P of degree 6 (its coefficients from rom.2).
+float xtCosmExpf(float x);
+
+// The object for block code 6 (0x894ffa10).  Size' = expf(1.6 × (Size +
+// depths × Env A and the LFO, within ±1)), Balance' = Balance + depths ×
+// Env B and the LFO, within 0…1 (start values 0x894ec580 from the
+// envelopes' start levels; targets from the block 0x894ed0a0 and the update
+// 0x894ee960 from their outputs).  Per block both step toward their targets
+// by rate·(target − value) before every fourth sample (rates 4 × the
+// envelopes' coefficients), the resonators' coefficients then f_i·Size'.
+// Each resonator: b += c·a; t = d_i·a + x − b; a += c·t.  Out = Balance ×
+// Σ g_i·a_i + (1 − Balance)·x, on L and R from L.
+class XtCosmRes {
+public:
+    // Note-on (0x894edf70, no case of its own): states cleared, start values,
+    // rates, then the block with the envelopes' outputs.
+    void noteOn(const XtResBlock& b, float env1Start, float env1Out, float rate1, float lfo1,
+                float env2Start, float env2Out, float rate2, float lfo2);
+    void setBlock(const XtResBlock& b, float env1, float lfo1, float env2, float lfo2);       // 0x894ed0a0
+    void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);    // 0x894ee960
+    // 32 frames, interleaved L/R, in place: reads L, writes both.
+    void process(float* lr);
+
+    // The state, for the firmware checks (D = object + 0x58).
+    float size() const { return sz; }                // D+0xbc
+    float balance() const { return bal; }            // D+0xc0
+    float sizeTarget() const { return szT; }         // D+0xa4
+    float balanceTarget() const { return balT; }     // D+0xa8
+    const float* state() const { return s; }         // D+0x1c…0x48: a, b of each resonator
+
+private:
+    XtResBlock blk;
+    float sz = 1.0f, bal = 0, szT = 1.0f, balT = 0, rate1 = 0, rate2 = 0;
+    float s[12] = {};
+    float sizeOf(float env, float lfo) const;
+    float balanceOf(float env, float lfo) const;
 };
 
 // The coefficients from the modulated values (0x894eecb0): Q + its depths ×

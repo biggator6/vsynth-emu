@@ -61,7 +61,7 @@ private:
     juce::ToggleButton legatoBtn_ { "Legato" };
     juce::Slider     octSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label      octLabel_ { {}, "Oct" };
-    // The COSM sections (TVF, Dynamic TVF, Dual, TB, Comb and Side Band Filters), one at a time by the selector: switch,
+    // The COSM sections (TVF, Dynamic TVF, Dual, TB, Comb and Side Band Filters, Resonator), one at a time by the selector: switch,
     // Filter Type, Cutoff, Resonance, Cutoff KF; the depth and Env A rows;
     // the LFO (3 or 4)
     juce::ToggleButton cosmBtn_ { "On" };
@@ -197,6 +197,14 @@ private:
     std::unique_ptr<ComboAtt>  sbOctAtt_;
     std::unique_ptr<SliderAtt> sbAtts_[kSbKnobs];
     int cosmK_ = 0;                     // the COSM section on the rows
+    // the Resonator: Filter Type, then Size's row (Size, KF, LFO, Env) and
+    // Balance's (Balance, LFO, Env)
+    static constexpr int kResKnobs = 7;
+    juce::ComboBox   resTypeBox_;
+    juce::Slider     resSliders_[kResKnobs];
+    juce::Label      resLabels_[kResKnobs], resRowLabels_[2];
+    std::unique_ptr<ComboAtt>  resTypeAtt_;
+    std::unique_ptr<SliderAtt> resAtts_[kResKnobs];
     std::unique_ptr<SliderAtt> lfoRateAtt_, lfoDepthAtt_, lfoDelayAtt_, lfoFadeAtt_, lfoTimeAtt_, lfoFmtAtt_;
     std::unique_ptr<SliderAtt> levelAtts_[kLevelKnobs];
     std::unique_ptr<ComboAtt>  lfoWaveAtt_, lfoModeAtt_, lfoOffsetAtt_;
