@@ -2805,3 +2805,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
   128 steps per cycle.
 - All of it equals the firmware in the interpreter. On a 1 kHz sine, Depth 80
   gives a clean line at 1,394 Hz.
+
+### Session 16 addendum (2026-11-01) — v72: Lo-Fi
+
+- Lo-Fi (COSM Type 15, block code 19) runs two anti-alias lowpasses at
+  1/2^Rate, then a sample hold, then trunc(x·2^−(Bit+15)) on the XT's own
+  scale, then a two-pole lowpass at the Filter. Balance mixes it with the
+  dry input through a curve table.
+- Firmware quirk: the hold is decided per group of four samples, with a count
+  that steps by 4. So Sample Rate Down 1 and 2 never hold, and only change
+  the anti-alias lowpass.
+- The quantizer depends on absolute level, so XtSynth runs Lo-Fi in the XT's
+  units (exact power-of-two scaling in and out).
+- All of it equals the firmware in the interpreter.

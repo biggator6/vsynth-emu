@@ -188,6 +188,8 @@ int main(int argc, char** argv) {
     // sizeLfo,sizeEnv,balance,balanceLfo,balanceEnv": a Resonator (KF in %);
     // TEST_RES2: COSM 2's.  TEST_FS="depth,depthKf,depthLfo,depthEnv,balance,
     // balanceLfo,balanceEnv": a Frequency Shifter (KF in %); TEST_FS2: COSM 2's.
+    // TEST_LOFI="bit,rate,filter,filterKf,filterLfo,filterEnv,balance,
+    // balanceLfo,balanceEnv": Lo-Fi (KF in %); TEST_LOFI2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -229,6 +231,15 @@ int main(int argc, char** argv) {
             set("Switch", 1); set("Type", 4); set("CombOctave", m.combOctave); set("CombDetune", m.combDetune);
             set("CombDetuneLfo", m.combDetuneLfo); set("CombDetuneEnv", m.combDetuneEnv); set("CombTone", m.combTone);
             set("CombToneLfo", m.combToneLfo); set("CombToneEnv", m.combToneEnv);
+        }
+        if (const char* e = std::getenv(("TEST_LOFI" + sfx).c_str())) {
+            m.on = true;
+            m.type = 9;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.lofiBit, &m.lofiRate, &m.lofiFilter, &m.lofiFilterKf, &m.lofiFilterLfo,
+                        &m.lofiFilterEnv, &m.lofiBalance, &m.lofiBalanceLfo, &m.lofiBalanceEnv);
+            set("Switch", 1); set("Type", 9); set("LofiBit", m.lofiBit); set("LofiRate", m.lofiRate); set("LofiFilter", m.lofiFilter);
+            set("LofiFilterKF", m.lofiFilterKf); set("LofiFilterLfo", m.lofiFilterLfo); set("LofiFilterEnv", m.lofiFilterEnv);
+            set("LofiBalance", m.lofiBalance); set("LofiBalanceLfo", m.lofiBalanceLfo); set("LofiBalanceEnv", m.lofiBalanceEnv);
         }
         if (const char* e = std::getenv(("TEST_FS" + sfx).c_str())) {
             m.on = true;

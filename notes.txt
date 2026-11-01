@@ -217,6 +217,19 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+LO-FI v72 (2026-11-01): COSM Type 15 (HARDWARE_FIRMWARE.md, "COSM: Lo-Fi").
+  XtCosm: XtLofiParams, xtLofiBlock (0x894ddf80 with the Filter curve
+  0x894dc810), XtCosmLofi (start 0x894eca70, block 0x894edd60, update
+  0x894eeee0, filter 0x894fe9c0; process(lr, scale) works in the XT's units).
+  It reads the Balance curve (0x897d1668, 128 floats) and the Rate/Bit tables
+  (0x897d187c masks, 0x897d1894, 0x897d18ac, 0x897d18ec) at run time.
+  XtSynth: Cosm.type 9 with lofiBit…lofiBalanceEnv; slot 1 envA (Filter),
+  slot 2 envB (Balance). Plugin params cosmLofiBit, LofiRate, LofiFilter,
+  LofiFilterKF, LofiFilterLfo, LofiFilterEnv, LofiBalance, LofiBalanceLfo,
+  LofiBalanceEnv (and cosm2…). XT_LOFI / TEST_LOFI
+  "bit,rate,filter,filterKf,filterLfo,filterEnv,balance,balanceLfo,balanceEnv"
+  (KF in %).
+
 FREQUENCY SHIFTER v71 (2026-11-01): COSM Type 14 (HARDWARE_FIRMWARE.md,
   "COSM: the Frequency Shifter"). XtCosm: XtFsParams, xtFsBlock (0x894ddde0;
   its Depth curve 0x894dc7a0 = the Side Band Width's), XtCosmFs (start

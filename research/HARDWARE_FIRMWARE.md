@@ -1544,6 +1544,91 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: Lo-Fi (2026-11-01, v72)
+
+COSM Type 15, block code 19: an anti-alias lowpass, a sample hold, a bit
+quantizer and a lowpass after, mixed with the dry input. It has no delay
+buffers and no note-on case of its own.
+
+**Parameters** (0x941…0x949, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x941 | Sample Bit Down | 0…15 | 10 |
+| 0x942 | Sample Rate Down | 0…5 | 4 |
+| 0x943 | Filter | 0…127 | 64 |
+| 0x944 | Filter Keyfollow | ±20 | 0 |
+| 0x945 | Filter LFO Depth | ±63 | 0 |
+| 0x946 | Filter Env Depth | ±63 | 0 |
+| 0x947 | Dry/Effect Balance | 0…100 | 50 |
+| 0x948 | Balance LFO Depth | ±63 | 0 |
+| 0x949 | Balance Env Depth | ±63 | 0 |
+
+**The converter** (`0x894ddf80`) writes the block:
+- +4 Bit Down and +5 Rate Down (bytes);
+- +8 Filter (`0x894dc810`): (F·0.9/127 + 0.1) × powf(2, KF·10·(key −
+  60)/1200), within 0.1…1;
+- +0xc its Env depth (A), +0x10 its envelope (9 or 11), +0x14 its LFO depth,
+  +0x18 its LFO;
+- +0x1c Balance/100 + 0, +0x20 its Env depth (B), +0x24 its envelope (10 or
+  12), +0x28 its LFO depth, +0x2c its LFO.
+
+The binding puts the Filter's envelope in slot 1 and Balance's in slot 2.
+
+**The object** (start values `0x894eca70`; block copy `0x894edd60`; update
+`0x894eeee0`):
+- Filter' = clamp(Filter + Env·depth + LFO·depth, 0.1…1) (D+0xbc; target
+  D+0xa4).
+- Balance' = B[trunc(127 × clamp(Balance + depths, 0…1))] (D+0xc0; target
+  D+0xa8). B is 128 floats at 0x897d1668, from 0 through 0.5004 at 64 to
+  0.9966.
+- The block copy also stores, from tables:
+  - by Rate Down (0…5): the hold mask (bytes at 0x897d187c: 0, 1, 3, 7, 15,
+    31; D+1) and the lowpass coefficient (0x897d1894: 1/2^r; D+0x94);
+  - by Bit Down (0…15): 2^b (0x897d18ec; D+0x98) and 2^−b (0x897d18ac;
+    D+0x9c).
+
+**The filter** (`0x894fe9c0`; the stereo table's entry is `0x894febe0`):
+- The steps rate·(target − value) for Filter' and Balance' are taken once per
+  block, and both step before every fourth sample.
+- Per sample, from L, with c = 1/2^Rate:
+  - two two-pole lowpasses: b1 += c·a1; a1 += c·(x − b1 − a1); b2 += c·a2;
+    a2 += c·(b1 − b2 − a2);
+  - the hold takes b2 in the four-sample groups whose count (0, 4, … 28,
+    restarting each block) has no bit in common with the mask;
+  - q = trunc(hold·2^−b·2^−15), on the XT's scale (int16 × 65536);
+  - a two-pole lowpass at Filter' over q·2^b·32768: b3 += f·a3; a3 += f·(q'
+    − b3 − a3);
+  - out = Balance'·b3 + (1 − Balance')·x, on L and R.
+- The six states (D+0x1c…0x30) clear at note-on.
+
+Quirks:
+- The count steps by 4 per group, so masks 1 and 3 (Rate Down 1 and 2) never
+  hold. Those settings only change the anti-alias lowpass.
+- Rate Down 3–5 hold whole groups of four samples.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converter: 200,000 cases;
+- note-on (the firmware's own), updates and new blocks: 23,999 cases;
+- the filter: 120,000 blocks;
+- all 0 different.
+- Deliberate errors are caught: the hold per sample, the Balance index
+  rounded, and the second lowpass fed from x. Folding 2^−b·2^−15 into one
+  factor is exact either way.
+- XtSynth runs Lo-Fi in the XT's units: its buffer × 2^31 (SOLO) or × 2^16
+  (BACKING/ENSEMBLE) in, and back out. These scalings are exact.
+
+**Plugin.**
+- COSM Type gains Lo-Fi (index 9, latched at note-on), with its own
+  parameters (cosmLofi… and cosm2…) at the XT's defaults.
+- Its Lo-Fi and Lo-Fi F rows are in the editor's type area.
+- On a 1 kHz sine at −8.7 dBFS, fully wet:
+  - Bit Down 10 puts harmonics 33 dB down;
+  - Bit Down 15 silences it: it is below one step;
+  - Rate Down 2 only filters;
+  - Rate Down 3 adds images 14 dB down;
+  - Rate Down 5's 1/32 lowpass removes most of it.
+
 ### COSM: the Frequency Shifter (2026-11-01, v71)
 
 COSM Type 14, block code 18. It is a single-sideband shifter: the input's
@@ -2136,7 +2221,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | 12 | Compressor | 0x932–0x934 | `0x894ddc50` | 15 | `0x894fab80` |
 | 13 | Limiter | 0x935–0x939 | `0x894ddd20` | 16 | `0x894fe450` |
 | 14 | Frequency Shifter | 0x93a–0x940 | `0x894ddde0` | 18 | `0x894fda60` (v71) |
-| 15 | Lo-Fi | 0x941–0x949 | `0x894ddf80` | | |
+| 15 | Lo-Fi | 0x941–0x949 | `0x894ddf80` | 19 | `0x894fe9c0` (v72) |
 | 16 | TB Filter | 0x94a–0x954 | `0x894de110` | 20 | `0x89501950` (v66) |
 
 The routine table by code (0…20): `0x894fb280`, `0x894fef70`,
@@ -2146,8 +2231,8 @@ The routine table by code (0…20): `0x894fb280`, `0x894fef70`,
 `0x894fb530`, `0x894fda60`, `0x894fe9c0`, `0x89501950`. Blank cells were not
 traced. The Side Band converters turned out to write fixed codes (v68), so
 "chosen at run time" was wrong for them. The codes left over are 0 (Through),
-10, 11, 17 and 19, presumably Lo-Fi's among them (the Resonator's is 6, v69;
-the Frequency Shifter's 18, v71). The ID ranges are from the table at 0x897cebd8.
+10, 11 and 17 (the Resonator's is 6, v69; the Frequency Shifter's 18, v71;
+Lo-Fi's 19, v72). The ID ranges are from the table at 0x897cebd8.
 
 **The Dual Filter** (COSM Type 9, block code 12).
 
@@ -2498,7 +2583,7 @@ on the SH-4):
 
 **Not modelled yet:**
 - COSM 2 (since modelled, v63);
-- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67; Side Band Filters, v68; Resonator, v69; Frequency Shifter, v71);
+- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67; Side Band Filters, v68; Resonator, v69; Frequency Shifter, v71; Lo-Fi, v72);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;
