@@ -20,6 +20,9 @@ bool xtOscTablesLoaded();
 // in steps of 10, key 0…127 (41 × 128, from xtFwOscTimeKeyScales).  Without
 // it, std::pow (which differs from the firmware's powf in the last bit).
 void xtOscSetTimeKeyScales(const float* scales);
+// One of them (kf −200…+200, key 0…127): the COSM Side Band Filters' Width
+// keyfollow (0x894dc5f0) is the same power.
+float xtOscTimeKeyScale(int kf, int key);
 
 // Energy (+0x18): 0 = OFF, 1…127 → the level curve at 0x897cfcb8 / 32768,
 // (k/127)² truncated.

@@ -95,6 +95,8 @@ void xtOscSetTimeKeyScales(const float* t) {
     T.keyScales = true;
 }
 
+float xtOscTimeKeyScale(int kf, int key) { return timeKeyScale(kf, key); }
+
 float xtOscEnergy(int k) {
     if (!T.ok || k <= 0) return 0.0f;
     return xtf::div((float)T.level[k > 127 ? 127 : k], 32768.0f);

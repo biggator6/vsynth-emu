@@ -29,6 +29,12 @@ tb filter: 120000 blocks of 32 frames, 0 different
 comb converter: 200000 cases, 0 different
 comb note-on, block and update: 22517 cases, 0 different
 comb filter: 120000 blocks of 32 frames, 0 different
+sbf1 converter: 100000 cases, 0 different
+sbf2 converter: 100000 cases, 0 different
+sbf1 note-on, block and update: 11272 cases, 0 different
+sbf1 filter: 60000 blocks of 32 frames, 0 different
+sbf2 note-on, block and update: 11230 cases, 0 different
+sbf2 filter: 60000 blocks of 32 frames, 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

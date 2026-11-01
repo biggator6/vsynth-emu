@@ -438,6 +438,25 @@ bool xtFwOscPitchRatios(std::vector<float>& out) {
     return true;
 }
 
+bool xtFwCosmKeySquares(std::vector<float>& out) {
+    out.clear();
+    if (g_rom.empty()) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    out.resize(41 * 128);
+    for (int i = 0; i < 41; ++i)
+        for (int key = 0; key < 128; ++key) {
+            // fr4 = (float)(key − 60)·(float)(KF·10) / 100 / 12, fr5 = 2
+            const float x = xtf::div(xtf::div(xtf::mul(xtf::flt(key - 60), xtf::flt((i - 20) * 10)), 100.0f), 12.0f), two = 2.0f;
+            std::memcpy(&c.fb[0][4], &x, 4);
+            std::memcpy(&c.fb[0][5], &two, 4);
+            if (!c.call(0x8952ff9c, {}, kStack)) { out.clear(); return false; }
+            std::memcpy(&out[(size_t)(i * 128 + key)], &c.fb[0][0], 4);
+        }
+    return true;
+}
+
 bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMbBands& out) {
     if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5)) return false;
     auto M = std::make_unique<Machine>(g_rom);

@@ -1544,6 +1544,165 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Side Band Filters (2026-10-31, v68)
+
+COSM Types 6 and 7, block codes 7 and 8. Each converter writes a fixed
+code; the type map's note that they choose it at run time was wrong. Both
+remove the Comb's DC follower from the input and feed it through delay lines
+tuned to the note, fed back through the Side Band Width.
+
+**Parameters** (second descriptor bank; the patch values sit at +0x12, +0x14,
+… in ID order):
+
+| 1st (ID) | 2nd (ID) | Parameter | Range | Default (1st, 2nd) |
+|---|---|---|---|---|
+| 0x8f3 | | HPF Cutoff Freq | 0…127 | 48 |
+| | 0x901 | Q | 0…127 | 64 |
+| 0x8f4 | 0x902 | LPF Cutoff Freq | 0…127 | 64 |
+| 0x8f5 | 0x903 | LPF Cutoff Freq Keyfollow | ±20 | 10 |
+| 0x8f6 | | Sub Delay Line Detune | ±100 | 0 |
+| 0x8f7 | 0x904 | Octave Select | 0…2 (−2…0) | 1 |
+| 0x8f8 | 0x905 | Detune | ±100 | 0 |
+| 0x8f9 | 0x906 | Detune LFO Depth | ±63 | 0 |
+| 0x8fa | 0x907 | Detune Own Env Depth | ±63 | 0 |
+| 0x8fb | 0x908 | Detune Env Depth | ±63 | 0 |
+| 0x8fc | 0x909 | Side Band Width | 0…127 | 16, 32 |
+| 0x8fd | 0x90a | Side Band Width Keyfollow | ±20 | 0 |
+| 0x8fe | 0x90b | Side Band Width LFO Depth | ±63 | 0 |
+| 0x8ff | 0x90c | Side Band Width Own Env Depth | ±63 | 0 |
+| 0x900 | 0x90d | Side Band Width Env Depth | ±63 | 0 |
+
+The Octave Select labels are inferred: index i takes the factor at
+0x897d1868 + 4i (4, 2, 1), and the Comb's index 2 (factor 1) is "0".
+
+**The converters** (`0x894dd0a0`, `0x894dd2c0`). The 1st's block, by offset;
+the 2nd's is the same from Detune on, 4 bytes later, after its Q at +8, with
+no HPF or Sub Detune:
+- +4 the Octave (a byte); +8 Detune as a float (±100, plus a controller term
+  that is 0 without one); +0xc its Env depth, B × (d/63)·|d/63|; +0x10 its
+  envelope (10 or 12); +0x14 its LFO depth (d/63)·|d/63|; +0x18 its LFO (3
+  or 4); +0x1c its Own depth (d/63)·|d/63|;
+- +0x20 Width (`0x894dc5f0`): (W/127 + 0) × the firmware's powf(2,
+  KF·10·(key − 60)/1200), the VariPhrase Time KF's power (v58), within 0…1;
+- +0x24 its Env depth (A), +0x28 its envelope (9 or 11), +0x2c its LFO
+  depth, +0x30 its LFO, +0x34 its Own depth;
+- +0x38 −HPF/127 + 0; +0x3c the LPF (`0x894dc540`); +0x40 Sub Detune as a
+  float; +0x44 1.0. The 2nd's Q is Q·0.96875/127 − 1 and its 1.0 is at +0x40.
+- The LPF (`0x894dc540`): x = (key − 60)·KF·10/100/12; Cutoff/2/127 + ½, plus
+  or minus (by x's sign) powf(x, 2) × logf(2) × ¼, within ½…1. The
+  firmware's powf(x, 2) is not x·x: they differ in 4,330 of the 5,248 cases.
+  logf(2) is 0x3f317219 (the true ln 2 is 0x3f317218). The plugin builds
+  the 41 × 128 squares with the firmware's powf at load
+  (`xtFwCosmKeySquares`).
+- `0x8952f784` is the firmware's logf.
+
+**The object** (block copy `0x894ed1a0`/`0x894ed2a0`; start values
+`0x894ec5f0`/`0x894ec6b0`; note-on cases `0x894ee1a0`/`0x894ee260`; update
+cases `0x894ee9d0`/`0x894eea20`; D = obj + 0x58):
+- The block copy stores 1 − Detune/2400, 1 − Sub/2400 and HPF/2, the
+  Octave's factor (D+0x9c), and the modulated targets: Detune' = (1 −
+  Detune/2400) + Env·depth + LFO·depth (D+0xa4), and Width' = Width +
+  Env·depth + LFO·depth (D+0xa8). The update recomputes these two.
+  Unlike the Comb, the update reads the ratio correctly.
+- Start values: delay = 44100 · factor · (1 − Detune/2400 + Env start ·
+  depth + LFO · depth)/(pitch × root), within 0…3267 (D+0xbc); w = Width +
+  Env start · depth + LFO · depth, within 0…1, or 0…0.95 for the 2nd
+  (D+0xc0).
+- Note-on clears D+0x1c…0x88 (the states and the DC follower) and the
+  follower's level. The allocator takes the Comb's path: two of the slot's
+  four buffers, 3,267 floats each, cleared, with the write index at 3266.
+  The note-on case sets:
+  - the slews to their blocks' values (HPF/2 or Q at D+0x90, LPF at
+    D+0x94, the Sub factor at D+0x98 for the 1st, Own depths at D+0xcc and
+    D+0xd0);
+  - the gain to 2 − 2|Width'| + Width'², the unclamped target, D+0x8c;
+  - the new delay to the start delay, the crossfade to 1, and the DC
+    coefficient to 0.001551;
+  - the allpass fractions: frac(delay) (D+0xdc) and, for the 1st,
+    frac(delay × Sub factor) (D+0xe0).
+- Envelopes and LFOs: Detune takes slot 1 (Env B, Env 10 or 12), Width
+  slot 2 (Env A, Env 9 or 11); both use LFO 3 or 4.
+
+**The filters** (`0x89500640` 1st, `0x89500d40` 2nd). Per 32-sample block:
+- The level follower (`0x895017e0`, the Dynamic TVF's sum) moves the level
+  0.001 toward the block's. The Own depths, the LPF, the HPF or Q, and the
+  Sub factor each slew 0.1 toward their block values.
+- The Width target is Width' + Own × level, within 0…1 (0…0.95 for the 2nd).
+  Its step is (target − w) × rate 2 (4 × Env A's coefficient). The gain
+  target is 2(1 − |t|) + t² × the block's 1.0, or 0 when t = 0, so a Width
+  of exactly 0 is silent.
+- Once the last crossfade has ended (p ≥ 1), the new delay is 44100 ·
+  (Detune' + Own × level) · factor/(root × pitch), folded by `0x89501910`:
+  below 1 it is 1, otherwise halved until under 3267. If it differs from the
+  current one it becomes the new target and p = 0. The 1st's taps are
+  trunc(delay), trunc(delay × Sub), trunc(new), trunc(new × Sub); the 2nd's
+  trunc(delay) and trunc(new).
+- Every fourth sample from the first: w += step, gain += 0.0125·(target −
+  gain).
+- Per sample: the write index steps (wrapping at 3267); e = x − dc, dc +=
+  e·0.001551; each tap reads B[i − d] mixed by the crossfade, tap(new)·p +
+  tap(old)·(1 − p); p += 1/132. Above 1: p = 1, delay = new delay, and the
+  taps take the new ones.
+- **1st**, two lines (line 2 on buffer 2 at the Sub taps). For each line:
+  l = l·(1 − lpf) + tap·lpf; t = l − (1 − f)·a; o = (1 − f)·t + a; a = t;
+  v = (e − o)·w; y = h·hs + (1 + hs)·v + o; h = v; B[i] = y. Here f is the
+  line's fraction and hs the slewed HPF/2, −½…0. Out = (y₁ + y₂) × gain on
+  L and R.
+- **2nd**, one delay and both buffers: A = LPF(allpass(tap of buffer 2)),
+  B = LPF(allpass(tap of buffer 1)), with one fraction; buffer 2 ← A + w·B;
+  buffer 1 ← (Q·B + e − (A + w·B))·w + B; out = (A + w·B) × gain.
+- The states at D+0x1c…: the 1st's allpass 1, HPF 1, allpass 2, HPF 2,
+  LPF 1, LPF 2; the 2nd's LPF B, allpass B, LPF A, allpass A.
+- A second routine table follows the first (.data 0x8987c840, 21 more
+  entries). `0x894eef70` picks it when its flag is set: for COSM 1 the
+  tone's +0x980, and for COSM 2 what COSM 1's pick returns. These look like
+  the stereo versions (`0x89500940` for code 7 reads its follower from L and
+  R, `0x89501850`). All the ports so far are the mono routines; whether
+  XtSynth's stereo waves should take the second table is not traced.
+
+Quirks:
+- The allpass fractions are set only at note-on, from the start delay. They
+  are never updated, through crossfades or pitch changes.
+- The note-on gain uses the unclamped Width' and skips the t = 0 test.
+- Line 2's taps, at delay × (1 + 100/2400) and with the delay up to 3267,
+  reach up to 136 samples before buffer 2. The pool (`0x894ec1d0`) lays out
+  each kind of buffer as one array of 24 slots, 0x330c bytes apart: buffer 2
+  pointers from 0x89dc6150, after buffer 1's from 0x89d79830. So these reads
+  take the end of the previous slot's buffer 2, another voice's line (or,
+  for slot 0, the last buffer-1 slot's). The port reads zeros there, as the
+  check's memory holds; the XT's value depends on the other voices.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converters: 100,000 cases each, the whole block compared byte for
+  byte, with the keyfollow tables built by the interpreter's own powf;
+- note-on (the firmware's own, as for the Comb, with the state left from
+  the last note filled with junk), updates with a moving pitch and new
+  blocks: 11,272 (1st) and 11,230 (2nd) cases;
+- the filters: 60,000 blocks each, both buffers compared after every
+  block;
+- all 0 different. Three deliberate errors in the port are caught: the 1st
+  line's fraction on line 2 (1,483 blocks differ), the zero-Width test
+  removed (1st and 2nd), and a non-zero guard before buffer 2 (120 blocks).
+  The last shows the reads before buffer 2 do occur in the cases.
+- AddressSanitizer and UBSan: clean.
+
+**Plugin.**
+- COSM Type gains 1st Side Band and 2nd Side Band (indices 5 and 6,
+  latched at note-on). Each type has its own parameters (cosmSb1…,
+  cosmSb2…) at the XT's defaults.
+- The editor's three Side Band rows (Octave with HPF or Q, LPF, KF, Sub;
+  Detune and its depths; Width and its depths) show the 2nd's set when the
+  type is the 2nd, and the 1st's otherwise.
+- As for the Comb, the note-on runs after the voice's pitch is set. The
+  follower reads the buffer at the XT's scale, as the Dynamic TVF's does.
+- On noise at key 60 (root 261.6 Hz):
+  - the 1st at its defaults has peaks every 130.7 Hz (Octave −1), and every
+    261.4 Hz at Octave 0;
+  - Width 127 with HPF 0 is flat at +6 dB (each line passes e, and the two
+    are summed);
+  - Sub Delay −100 detunes line 2 (spacing 127.9 Hz);
+  - the 2nd at its defaults has the same spacing, with −31 dB notches.
+
 ### COSM: the Comb Filter (2026-10-31, v67)
 
 COSM Type 8, block code 9. A feedforward comb tuned to the note: the input,
@@ -1798,8 +1957,8 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 | 3 | Amp Simulator | 0x8e2–0x8e9 | `0x894dcd80` | 4 | `0x894f8a30` |
 | 4 | Speaker Simulator | 0x8ea | inline | 5 | `0x89501300` |
 | 5 | Resonator | 0x8eb–0x8f2 | `0x894dcf00` | | |
-| 6 | 1st Side Band Filter | 0x8f3–0x900 | `0x894dd0a0` | | |
-| 7 | 2nd Side Band Filter | 0x901–0x90d | `0x894dd2c0` | | |
+| 6 | 1st Side Band Filter | 0x8f3–0x900 | `0x894dd0a0` | 7 | `0x89500640` (v68) |
+| 7 | 2nd Side Band Filter | 0x901–0x90d | `0x894dd2c0` | 8 | `0x89500d40` (v68) |
 | 8 | Comb Filter | 0x90e–0x914 | `0x894dd4f0` | 9 | `0x894fa8d0` (v67) |
 | 9 | Dual Filter | 0x915–0x91f | `0x894dd690` | 12 | `0x894fd090` |
 | 10 | TVF | 0x920–0x927 | `0x894dd870` | 13 | `0x89502890` |
@@ -1815,8 +1974,10 @@ The routine table by code (0…20): `0x894fb280`, `0x894fef70`,
 `0x89500640`, `0x89500d40`, `0x894fa8d0`, `0x894fb2b0`, `0x89501bf0`,
 `0x894fd090`, `0x89502890`, `0x89502920`, `0x894fab80`, `0x894fe450`,
 `0x894fb530`, `0x894fda60`, `0x894fe9c0`, `0x89501950`. Blank cells were not
-traced: those converters choose their code at run time. The codes left
-over are 0 (Through) and 6–8, 10, 11 and 17–19, presumably theirs. The ID ranges are from the table at 0x897cebd8.
+traced. The Side Band converters turned out to write fixed codes (v68), so
+"chosen at run time" was wrong for them. The codes left over are 0 (Through),
+6, 10, 11 and 17–19, presumably the Resonator's, Frequency Shifter's and
+Lo-Fi's. The ID ranges are from the table at 0x897cebd8.
 
 **The Dual Filter** (COSM Type 9, block code 12).
 
@@ -2167,7 +2328,7 @@ on the SH-4):
 
 **Not modelled yet:**
 - COSM 2 (since modelled, v63);
-- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67);
+- the other fifteen types (Dynamic TVF since modelled, v64; Dual Filter, v65; TB Filter, v66; Comb Filter, v67; Side Band Filters, v68);
 - the mixer's channel layout for stereo waves. The TVF takes the buffer's
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;

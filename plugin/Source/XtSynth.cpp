@@ -54,6 +54,7 @@ bool xtSynthSetRom(const std::string& path) {
     if (g_romReady && xtFwOscTimeKeyScales(ts)) xtOscSetTimeKeyScales(ts.data());
     if (g_romReady && xtFwOscWaveGains(ts)) xtOscSetWaveGains(ts.data());
     if (g_romReady && xtFwOscPitchRatios(ts)) xtOscSetPitchRatios(ts.data());
+    if (g_romReady && xtFwCosmKeySquares(ts)) xtCosmSetKeySquares(ts.data());
     return g_romReady;
 }
 bool xtSynthRomReady() { return g_romReady; }
@@ -330,11 +331,27 @@ XtCombBlock XtSynth::combBlock(const Voice& v, int k) const {
     return xtCombBlock(p, va, vb);
 }
 
+// A Side Band Filter's block (0x894dd0a0, 0x894dd2c0): Width's Env depth by
+// A, Detune's by B.
+XtSbfBlock XtSynth::sbfBlock(const Voice& v, int k) const {
+    const Controls::Cosm& c = ctl.cosm[k];
+    const bool second = v.cs[k].type == 6;
+    const Controls::Cosm::SideBand& s = c.sb[second ? 1 : 0];
+    XtSbfParams p;
+    p.second = second;
+    p.hpf = s.hpf; p.q = s.q; p.lpf = s.lpf; p.lpfKf = s.lpfKf / 10; p.subDetune = s.subDetune; p.octave = s.octave;
+    p.detune = s.detune; p.detuneLfo = s.detuneLfo; p.detuneOwn = s.detuneOwn; p.detuneEnv = s.detuneEnv;
+    p.width = s.width; p.widthKf = s.widthKf / 10; p.widthLfo = s.widthLfo; p.widthOwn = s.widthOwn; p.widthEnv = s.widthEnv;
+    const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
+    return xtSbfBlock(p, v.note, va, vb);
+}
+
 // The TVF's slot 1 is its Q (envB), the Dual Filter's Filter 1 and the TB
-// Filter's LPF (envA), the Comb Filter's Detune (envB).
+// Filter's LPF (envA), the Comb and Side Band Filters' Detune (envB).
 void XtSynth::cosmSetBlock(Voice& v, int k) {
     Voice::CosmVoice& c = v.cs[k];
     if (c.type == 4) { c.comb.setBlock(combBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out()); return; }
+    if (c.type >= 5) { c.sbf.setBlock(sbfBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out()); return; }
     if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else if (c.type == 3) c.tb.setBlock(tbBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
@@ -401,7 +418,7 @@ void XtSynth::setControls(const Controls& c) {
                       || n.tbQFollow != o.tbQFollow || n.tbHpf != o.tbHpf || n.tbHpfKf != o.tbHpfKf || n.tbHpfLfo != o.tbHpfLfo
                       || n.tbHpfEnv != o.tbHpfEnv || n.tbGain != o.tbGain || n.combOctave != o.combOctave || n.combDetune != o.combDetune
                       || n.combDetuneLfo != o.combDetuneLfo || n.combDetuneEnv != o.combDetuneEnv || n.combTone != o.combTone
-                      || n.combToneLfo != o.combToneLfo || n.combToneEnv != o.combToneEnv;
+                      || n.combToneLfo != o.combToneLfo || n.combToneEnv != o.combToneEnv || n.sb[0] != o.sb[0] || n.sb[1] != o.sb[1];
     }
     ctl = c;
     for (int k = 0; k < 2; ++k)
@@ -522,21 +539,26 @@ void XtSynth::startVoice(int raw, int note, int vel) {
                           c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
         else if (c.type == 3)
             c.tb.noteOn(tbBlock(*v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
-        else if (c.type == 4)
+        else if (c.type >= 4)
             ;                                          // below, once the voice's pitch is set
         else
             c.tvf.noteOn(cosmBlock(*v, k), c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out(),
                          c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
     }
     targets(*v, v->curA, v->curF, v->curWalk, v->curG);
-    // the Comb Filter's note-on reads the voice's pitch ratio (+0x144) and
-    // root frequency (+0x9a4) as the voice's own note-on leaves them (the tone
-    // note-on 0x894f5e60 runs the voice first)
+    // the Comb and Side Band Filters' note-ons read the voice's pitch ratio
+    // (+0x144) and root frequency (+0x9a4) as the voice's own note-on leaves
+    // them (the tone note-on 0x894f5e60 runs the voice first)
     for (int k = 0; k < 2; ++k) {
         Voice::CosmVoice& c = v->cs[k];
-        if (c.on && c.type == 4)
-            c.comb.noteOn(combBlock(*v, k), v->curA, xtCosmRootHz(ctl.rootKey, v->robot), c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
+        if (!c.on || c.type < 4) continue;
+        const float root = xtCosmRootHz(ctl.rootKey, v->robot);
+        if (c.type == 4)
+            c.comb.noteOn(combBlock(*v, k), v->curA, root, c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
                           c.lfo.out(), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
+        else
+            c.sbf.noteOn(sbfBlock(*v, k), v->curA, root, c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
+                         c.lfo.out(), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
     }
     // the OSC gain starts from the amp envelope's start level, or its output
     // when there is no attack (0x894f3e20)
@@ -727,6 +749,7 @@ void XtSynth::mixBlock(float* lr) {
                 if (c.type == 2) c.dual.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type == 3) c.tb.update(c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
                 else if (c.type == 4) c.comb.update(v.curA, c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
+                else if (c.type >= 5) c.sbf.update(v.curA, c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
                 else c.tvf.update(c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
             }
             tvaUpdate(v);
@@ -744,14 +767,17 @@ void XtSynth::mixBlock(float* lr) {
             if (v.mb.ended()) v.tail += 32;
         }
         // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA; the
-        // Dynamic TVF's follower reads the XT's scale: int16 × 65536, i.e.
-        // the SOLO buffer (±1) × 2^31, the band players' (int16) × 2^16
+        // Dynamic TVF's and Side Band Filters' followers read the XT's scale:
+        // int16 × 65536, i.e. the SOLO buffer (±1) × 2^31, the band players'
+        // (int16) × 2^16
+        const float fs = cur->type == 1 ? 0x1p31f : 0x1p16f;
         for (Voice::CosmVoice& c : v.cs) {
             if (!c.on) continue;
             if (c.type == 2) c.dual.process(tmp);
             else if (c.type == 3) c.tb.process(tmp);
             else if (c.type == 4) c.comb.process(tmp);
-            else c.tvf.process(tmp, cur->type == 1 ? 0x1p31f : 0x1p16f);
+            else if (c.type >= 5) c.sbf.process(tmp, fs);
+            else c.tvf.process(tmp, fs);
         }
         if (v.damping) {
             // truncated (0x894f5570): the gain held, times a fade that falls
@@ -865,6 +891,9 @@ void XtSynth::render(float* left, float* right, int n) {
 //     Filter (KF in %); XT_CENV the LPF's envelope, XT_CENVB the HPF's. XT_TB2: COSM 2's.
 //   XT_COMB="octave,detune,detuneLfo,detuneEnv,tone,toneLfo,toneEnv": COSM 1 on, a Comb
 //     Filter (octave 0..4 = −2..+2); XT_CENV Tone's envelope, XT_CENVB Detune's. XT_COMB2: COSM 2's.
+//   XT_SBF1="hpf,lpf,lpfKf,subDetune,octave,detune,detuneLfo,detuneOwn,detuneEnv,width,widthKf,widthLfo,widthOwn,widthEnv":
+//     COSM 1 on, the 1st Side Band Filter (KFs in %, octave 0..2 = −2..0); XT_SBF2="q,lpf,…" (no
+//     subDetune) the 2nd; XT_CENV Width's envelope, XT_CENVB Detune's. XT_SBF12, XT_SBF22: COSM 2's.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -964,6 +993,18 @@ int main(int argc, char** argv) {
             std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &m.combOctave, &m.combDetune, &m.combDetuneLfo, &m.combDetuneEnv, &m.combTone, &m.combToneLfo,
                         &m.combToneEnv);
         }
+        for (int t = 0; t < 2; ++t)
+            if (const char* e = std::getenv(("XT_SBF" + std::to_string(t + 1) + sfx).c_str())) {
+                XtSynth::Controls::Cosm::SideBand& b = m.sb[t];
+                m.on = true;
+                m.type = 5 + t;
+                if (t == 0)
+                    std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &b.hpf, &b.lpf, &b.lpfKf, &b.subDetune, &b.octave, &b.detune,
+                                &b.detuneLfo, &b.detuneOwn, &b.detuneEnv, &b.width, &b.widthKf, &b.widthLfo, &b.widthOwn, &b.widthEnv);
+                else
+                    std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &b.q, &b.lpf, &b.lpfKf, &b.octave, &b.detune, &b.detuneLfo,
+                                &b.detuneOwn, &b.detuneEnv, &b.width, &b.widthKf, &b.widthLfo, &b.widthOwn, &b.widthEnv);
+            }
         if (const char* e = std::getenv(("XT_CENV" + sfx).c_str()))     // the cutoff's envelope "a,d,s,r[,velCurve,velSens]"
             std::sscanf(e, "%d,%d,%d,%d,%d,%d", &m.envA.attack, &m.envA.decay, &m.envA.sustain, &m.envA.release, &m.envA.velCurve, &m.envA.velSens);
         if (const char* e = std::getenv(("XT_CENVB" + sfx).c_str()))    // Env B "a,d,s,r[,velCurve,velSens]"

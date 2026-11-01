@@ -92,5 +92,10 @@ bool xtFwOscWaveGains(std::vector<float>& out);
 // VariPhrase converter forms it (+0xc), Pitch = −63…+63 (XtOsc).
 bool xtFwOscPitchRatios(std::vector<float>& out);
 
+// The COSM Side Band Filters' LPF keyfollow squares (0x894dc540): the
+// firmware's powf(x, 2), x = (key − 60)·KF·10/100/12 as it forms it, for KF
+// = −20…+20 and keys 0..127: 41 × 128 values, by KF then key (XtCosm).
+bool xtFwCosmKeySquares(std::vector<float>& out);
+
 // Round to nearest instead of FPSCR.RM (to match Ghidra's P-code emulator).
 void xtFwForceNearest(bool on);

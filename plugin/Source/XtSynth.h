@@ -116,8 +116,8 @@ public:
         // The COSM sections (XtCosm), COSM 1 then COSM 2 in series: the
         // switch; the type, 0 TVF, 1 Dynamic TVF (its Q and Cutoff also
         // follow the input's level by their Own Env depths −63..+63), 2
-        // Dual Filter, 3 TB Filter or 4 Comb Filter (their own parameters
-        // below); Filter
+        // Dual Filter, 3 TB Filter, 4 Comb Filter, 5 or 6 the 1st or 2nd Side
+        // Band Filter (their own parameters below); Filter
         // Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
         // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
         // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
@@ -149,6 +149,19 @@ public:
             // the Comb Filter: Octave 0..4 (−2..+2), Detune −100..+100 with
             // its LFO and Env depths (envB), Tone 0..127 with its depths (envA)
             int combOctave = 3, combDetune = 0, combDetuneLfo = 0, combDetuneEnv = 0, combTone = 0, combToneLfo = 0, combToneEnv = 0;
+            // the Side Band Filters, each its own set (sb[0] the 1st, sb[1]
+            // the 2nd): the 1st's HPF Cutoff, the 2nd's Q, 0..127; LPF Cutoff
+            // 0..127, Keyfollow −200..+200 (steps of 10); the 1st's Sub Delay
+            // Detune −100..+100; Octave 0..2 (−2..0); Detune −100..+100 with
+            // its LFO, Own Env and Env depths −63..+63 (envB); Width 0..127,
+            // its Keyfollow and the same depths (envA)
+            struct SideBand {
+                int hpf = 48, q = 64, lpf = 64, lpfKf = 100, subDetune = 0, octave = 1;
+                int detune = 0, detuneLfo = 0, detuneOwn = 0, detuneEnv = 0;
+                int width = 16, widthKf = 0, widthLfo = 0, widthOwn = 0, widthEnv = 0;
+                bool operator==(const SideBand&) const = default;
+            };
+            SideBand sb[2] = { {}, { .width = 32 } };
             CosmEnv envA, envB;
             int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
             bool lfoKeySync = false;
@@ -191,9 +204,10 @@ private:
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
         XtLfo lfo;
-        // the COSM sections: on as at note-on; each its TVF, Dual, TB or Comb
-        // Filter, envelopes (A: the Cutoff's, Filter 1's, the LPF's or Tone's;
-        // B: the Q's, Filter 2's, the HPF's or Detune's) and LFO
+        // the COSM sections: on as at note-on; each its TVF, Dual, TB, Comb or
+        // Side Band Filter, envelopes (A: the Cutoff's, Filter 1's, the LPF's,
+        // Tone's or Width's; B: the Q's, Filter 2's, the HPF's or Detune's)
+        // and LFO
         struct CosmVoice {
             bool on = false;
             int type = 0;                      // the type as at note-on
@@ -201,6 +215,7 @@ private:
             XtCosmDual dual;
             XtCosmTb tb;
             XtCosmComb comb;
+            XtCosmSbf sbf;
             XtEnvelope envA, envB;
             XtLfo lfo;
         };
@@ -267,6 +282,7 @@ private:
     XtDualBlock dualBlock(const Voice& v, int k) const;
     XtTbBlock tbBlock(const Voice& v, int k) const;
     XtCombBlock combBlock(const Voice& v, int k) const;
+    XtSbfBlock sbfBlock(const Voice& v, int k) const;
     void cosmSetBlock(Voice& v, int k);              // a new block for a sounding section (0x894ed8f0)
     float drawSeed();
 };

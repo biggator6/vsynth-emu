@@ -3,6 +3,7 @@
 #include "XtCosm.h"
 #include "XtFloat.h"
 #include "XtOsc.h"
+#include <algorithm>
 #include <bit>
 #include <cmath>
 #include <cstdio>
@@ -26,7 +27,8 @@ struct Tables {
     float exp[kExpN];
     uint16_t gain[128];
     float oct[5];
-    bool ok = false;
+    float keySq[41][128];                       // xtCosmSetKeySquares
+    bool ok = false, keySqOk = false;
 } T;
 
 using namespace xtf;
@@ -584,8 +586,227 @@ void XtCosmComb::process(float* lr) {
     tn = c; dcy = y; prog = p;                         // the fraction is not kept
 }
 
+// ── The Side Band Filters ──
+
+namespace {
+
+// x² by the firmware's powf (0x894dc540), KF −20…+20
+float keySquare(int kf, int key, float x) {
+    if (T.keySqOk && kf >= -20 && kf <= 20 && key >= 0 && key < 128) return T.keySq[kf + 20][key];
+    return (float)((double)x * (double)x);
+}
+
+// The LPF with its keyfollow (0x894dc540): Cutoff/2/127 + ½, ± ln 2 · x²/4
+// by the sign of x = (key − 60)·KF·10/100/12, within ½…1
+float sbfLpf(int cutoff, int kf, int key) {
+    const float x = div(div(mul(flt((int16_t)(key - 60)), flt((int16_t)(kf * 10))), 100.0f), 12.0f);
+    float y = add(div(mul(flt(clampi((int16_t)cutoff, 0, 127)), 0.5f), 127.0f), 0.5f);
+    const float d = mul(mul(keySquare(kf, key, x), K(0x3f317219)), 0.25f);       // × the firmware's logf(2)
+    y = 0.0f > x ? sub(y, d) : add(y, d);
+    if (y > 1.0f) return 1.0f;
+    return 0.5f > y ? 0.5f : y;
+}
+
+// The Width with its keyfollow (0x894dc5f0): (Width/127 + 0)·2^(KF·10·(key − 60)/1200), within 0…1
+float sbfWidth(int width, int kf, int key) {
+    const float y = mul(xtOscTimeKeyScale((int16_t)(kf * 10), key), add(div(flt(clampi((int16_t)width, 0, 127)), 127.0f), 0.0f));
+    return y > 1.0f ? 1.0f : (0.0f > y ? 0.0f : y);
+}
+
+// 0x89501910: below 1, 1; otherwise halved until under 3267
+float foldDelay(float x) {
+    if (1.0f > x) return 1.0f;
+    if (!(x < 3.0e38f)) return 1.0f;                   // ∞ or NaN: the XT would halve for ever (never met)
+    while (!(3267.0f > x)) x = mul(x, 0.5f);
+    return x;
+}
+
+constexpr float kSlow = K(0x3a83126e), kSlew = K(0x3dcccccc), kStep = K(0x3c4ccccc), kFade = K(0x3bf83e0f);   // 0.001, 0.1, 0.0125, 1/132
+
+} // namespace
+
+void xtCosmSetKeySquares(const float* t) {
+    for (int i = 0; i < 41; ++i)
+        for (int k = 0; k < 128; ++k) T.keySq[i][k] = t[i * 128 + k];
+    T.keySqOk = true;
+}
+
+XtSbfBlock xtSbfBlock(const XtSbfParams& p, int key, float velA, float velB) {
+    XtSbfBlock b;
+    b.second = p.second;
+    b.octave = (int8_t)p.octave;
+    if (p.second) {
+        b.q = add(div(mul(flt(clampi((int16_t)p.q, 0, 127)), 0.96875f), 127.0f), -1.0f);
+    } else {
+        b.hpf = add(div(-flt(clampi((int16_t)p.hpf, 0, 127)), 127.0f), 0.0f);
+        b.subDetune = flt(clampi((int16_t)p.subDetune, -100, 100));
+    }
+    b.lpf = sbfLpf(p.lpf, p.lpfKf, key);
+    b.detune = flt(clampi((int16_t)p.detune, -100, 100));
+    b.detuneLfo = sq63(clampi((int16_t)p.detuneLfo, -63, 63));
+    b.detuneOwn = sq63((int16_t)p.detuneOwn);
+    b.detuneEnv = envDepth(velB, p.detuneEnv);
+    b.width = sbfWidth(p.width, p.widthKf, key);
+    b.widthLfo = sq63(clampi((int16_t)p.widthLfo, -63, 63));
+    b.widthOwn = sq63((int16_t)p.widthOwn);
+    b.widthEnv = envDepth(velA, p.widthEnv);
+    return b;
+}
+
+XtCosmSbf::XtCosmSbf() : buf1(kCombLen, 0.0f), buf2(kGuard + kCombLen, 0.0f) {}
+
+void XtCosmSbf::noteOn(const XtSbfBlock& b, float p, float r, float env1Start, float env1Out, float r1, float lfo1,
+                       float env2Start, float env2Out, float r2, float lfo2) {
+    pitch = p; root = r;
+    for (float& x : s) x = 0.0f;                       // 0x894edf70 clears D+0x1c…0x88
+    dcy = 0.0f;
+    w = kCombLen - 1;                                  // 0xcc2
+    std::fill(buf1.begin(), buf1.end(), 0.0f);
+    std::fill(buf2.begin(), buf2.end(), 0.0f);
+    // the start values (0x894ec5f0, 0x894ec6b0)
+    float d = fmac(b.detuneEnv, env1Start, sub(1.0f, mul(b.detune, K(0x39da7419))));
+    d = mul(mul(fmac(b.detuneLfo, lfo1, d), T.oct[clampi(b.octave, 0, 4)]), 44100.0f);
+    dly = clampf(div(d, mul(root, pitch)), 0.0f, 3267.0f);
+    wid = clampf(fmac(b.widthLfo, lfo2, fmac(b.widthEnv, env2Start, b.width)), 0.0f, b.second ? K(0x3f733333) : 1.0f);
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    setBlock(b, env1Out, lfo1, env2Out, lfo2);
+    // 0x894ee1a0, 0x894ee260
+    sl[0] = b.second ? b.q : hpfH;
+    sl[1] = b.lpf;
+    if (!b.second) sl[2] = subR;
+    lev = 0.0f;
+    sl[3] = b.detuneOwn;
+    sl[4] = b.widthOwn;
+    gn = fmac(widT, widT, sub(2.0f, mul(0.0f > widT ? -widT : widT, 2.0f)));   // the unclamped target
+    nDly = dly;
+    fr[0] = fracOf(dly);
+    if (!b.second) fr[1] = fracOf(mul(dly, sl[2]));
+    prog = 1.0f;
+    dcK = K(0x3acb4aec);                               // 0.001551
+}
+
+void XtCosmSbf::setBlock(const XtSbfBlock& b, float env1, float lfo1, float env2, float lfo2) {
+    blk = b;
+    detR = sub(1.0f, mul(b.detune, K(0x39da7419)));
+    if (!b.second) {
+        subR = sub(1.0f, mul(b.subDetune, K(0x39da7419)));
+        hpfH = mul(b.hpf, 0.5f);
+    }
+    oct = T.oct[clampi(b.octave, 0, 4)];
+    detT = fmac(b.detuneLfo, lfo1, fmac(b.detuneEnv, env1, detR));
+    widT = fmac(b.widthLfo, lfo2, fmac(b.widthEnv, env2, b.width));
+}
+
+void XtCosmSbf::update(float p, float env1, float r1, float lfo1, float env2, float r2, float lfo2) {
+    pitch = p;
+    rate1 = mul(r1, 4.0f);
+    rate2 = mul(r2, 4.0f);
+    detT = fmac(blk.detuneLfo, lfo1, fmac(blk.detuneEnv, env1, detR));
+    widT = fmac(blk.widthLfo, lfo2, fmac(blk.widthEnv, env2, blk.width));
+}
+
+void XtCosmSbf::process(float* lr, float scale) {
+    // the follower (0x895017e0): Σ|L|, every eighth frame twice
+    float sum = 0.0f;
+    for (int i = 0; i < 32; ++i) {
+        const float a = lr[2 * i] < 0.0f ? -lr[2 * i] : lr[2 * i];
+        sum = add(sum, a);
+        if ((i & 7) == 7) sum = add(sum, a);
+    }
+    lev = fmac(sub(mul(mul(sum, scale), K(0x2e7fffff)), lev), kSlow, lev);
+    sl[3] = fmac(kSlew, sub(blk.detuneOwn, sl[3]), sl[3]);
+    sl[4] = fmac(kSlew, sub(blk.widthOwn, sl[4]), sl[4]);
+    const float wt = clampf(add(widT, mul(sl[4], lev)), 0.0f, blk.second ? K(0x3f733333) : 1.0f);
+    const float step = mul(sub(wt, wid), rate2);
+    float gt = 0.0f;                                   // × the block's 1.0
+    if (wt != 0.0f) {
+        const float a = sub(1.0f, 0.0f > wt ? -wt : wt);
+        gt = add(add(a, a), mul(wt, wt));
+    }
+    // a new delay only once the last crossfade has finished
+    float cur = dly, nd = nDly, p = prog;
+    if (!(1.0f > p)) {
+        const float x = div(oct, mul(root, pitch));
+        const float d = foldDelay(mul(mul(44100.0f, add(detT, mul(lev, sl[3]))), x));
+        if (d != cur) { p = 0.0f; nd = d; }
+    }
+    nDly = nd;
+    sl[0] = fmac(kSlew, sub(blk.second ? blk.q : hpfH, sl[0]), sl[0]);
+    sl[1] = fmac(kSlew, sub(blk.lpf, sl[1]), sl[1]);
+    if (!blk.second) sl[2] = fmac(kSlew, sub(subR, sl[2]), sl[2]);
+    const float hs = sl[0], ls = sl[1], g1 = sub(1.0f, fr[0]), lsI = sub(1.0f, ls);
+    float gc = gn, wd = wid, y = dcy;
+    float* const B1 = buf1.data();
+    float* const B2 = buf2.data() + kGuard;            // line 2 may read up to 136 before it (1st)
+    auto back = [&](int d) { const int j = w - d; return j < 0 ? j + kCombLen : j; };
+    if (!blk.second) {                                 // 0x89500640
+        const float g2 = sub(1.0f, fr[1]), sub2 = sl[2];
+        int ra = ftrc(cur), rb = ftrc(mul(cur, sub2)), rc = ftrc(nd), rd = ftrc(mul(nd, sub2));
+        float a1 = s[0], h1 = s[1], a2 = s[2], h2 = s[3], l1 = s[4], l2 = s[5];
+        for (int i = 0; i < 32; ++i) {
+            if ((i & 3) == 0) { wd = add(wd, step); gc = fmac(kStep, sub(gt, gc), gc); }
+            if (++w >= kCombLen) w = 0;
+            const float e = sub(lr[2 * i], y);
+            y = add(y, mul(e, dcK));
+            const float q = sub(1.0f, p);
+            // line 1: taps → LPF → allpass, then the Width and the HPF
+            l1 = add(mul(l1, lsI), mul(add(mul(B1[back(rc)], p), mul(q, B1[back(ra)])), ls));
+            float t = sub(l1, mul(g1, a1));
+            const float o1 = add(mul(g1, t), a1);
+            a1 = t;
+            float v = mul(sub(e, o1), wd);
+            const float y1 = add(add(mul(h1, hs), mul(add(1.0f, hs), v)), o1);
+            h1 = v;
+            B1[w] = y1;
+            // line 2, at the delay × the Sub Detune factor
+            l2 = add(mul(l2, lsI), mul(add(mul(B2[back(rd)], p), mul(q, B2[back(rb)])), ls));
+            t = sub(l2, mul(g2, a2));
+            const float o2 = add(mul(g2, t), a2);
+            a2 = t;
+            v = mul(sub(e, o2), wd);
+            const float y2 = add(add(mul(h2, hs), mul(add(1.0f, hs), v)), o2);
+            h2 = v;
+            B2[w] = y2;
+            lr[2 * i] = lr[2 * i + 1] = mul(add(y2, y1), gc);
+            p = add(p, kFade);
+            if (p > 1.0f) { p = 1.0f; cur = nd; ra = rc; rb = rd; }
+        }
+        s[0] = a1; s[1] = h1; s[2] = a2; s[3] = h2; s[4] = l1; s[5] = l2;
+    } else {                                           // 0x89500d40
+        int ra = ftrc(cur), rc = ftrc(nd);
+        float lb = s[0], ab = s[1], la = s[2], aa = s[3];
+        for (int i = 0; i < 32; ++i) {
+            if ((i & 3) == 0) { gc = fmac(kStep, sub(gt, gc), gc); wd = add(wd, step); }
+            if (++w >= kCombLen) w = 0;
+            const float e = sub(lr[2 * i], y);
+            y = add(y, mul(e, dcK));
+            const int ia = back(ra), ib = back(rc);
+            const float q = sub(1.0f, p);
+            // A: buffer 2's taps → allpass → LPF; B: buffer 1's
+            float t = sub(add(mul(B2[ib], p), mul(B2[ia], q)), mul(g1, aa));
+            const float oa = add(mul(g1, t), aa);
+            aa = t;
+            la = add(mul(la, lsI), mul(oa, ls));
+            t = sub(add(mul(B1[ib], p), mul(q, B1[ia])), mul(g1, ab));
+            const float ob = add(mul(g1, t), ab);
+            ab = t;
+            lb = add(mul(lb, lsI), mul(ob, ls));
+            const float ya = add(la, mul(lb, wd));
+            B2[w] = ya;
+            B1[w] = add(mul(add(mul(lb, hs), sub(e, ya)), wd), lb);
+            lr[2 * i] = lr[2 * i + 1] = mul(ya, gc);
+            p = add(p, kFade);
+            if (p > 1.0f) { p = 1.0f; cur = nd; ra = rc; }
+        }
+        s[0] = lb; s[1] = ab; s[2] = la; s[3] = aa;
+    }
+    gn = gc; wid = wd; dcy = y; dly = cur; prog = p;
+}
+
+
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB and Comb Filters against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -1100,6 +1321,173 @@ int main(int argc, char** argv) {
     }
     std::printf("comb note-on, block and update: %ld cases, %ld different\n", mn, mb);
     std::printf("comb filter: %ld blocks of 32 frames, %ld different\n", qn, qb);
-    return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb ? 3 : 0;
+
+    // The Side Band Filters (block codes 7 and 8): the keyfollow tables by
+    // the firmware's powf (0x8952ff9c), the converters (0x894dd0a0,
+    // 0x894dd2c0), then as the Comb: the note-on, updates, new blocks
+    // (0x894ed1a0, 0x894ed2a0) and the filters (0x89500640, 0x89500d40), both
+    // buffers compared; the words before the second buffer stay 0
+    {
+        std::vector<float> sq(41 * 128), ks(41 * 128);
+        for (int i = 0; i < 41; ++i)
+            for (int key = 0; key < 128; ++key) {
+                const float x = div(div(mul(flt(key - 60), flt((i - 20) * 10)), 100.0f), 12.0f), e = div(flt((i - 20) * 10 * (key - 60)), 1200.0f);
+                const float two = 2.0f;
+                uint32_t u;
+                std::memcpy(&u, &x, 4); c.fb[0][4] = u; std::memcpy(&u, &two, 4); c.fb[0][5] = u;
+                if (!c.call(0x8952ff9c, {}, sp)) { std::fprintf(stderr, "powf: %s\n", c.error().c_str()); return 1; }
+                std::memcpy(&sq[(size_t)(i * 128 + key)], &c.fb[0][0], 4);
+                std::memcpy(&u, &two, 4); c.fb[0][4] = u; std::memcpy(&u, &e, 4); c.fb[0][5] = u;
+                if (!c.call(0x8952ff9c, {}, sp)) { std::fprintf(stderr, "powf: %s\n", c.error().c_str()); return 1; }
+                std::memcpy(&ks[(size_t)(i * 128 + key)], &c.fb[0][0], 4);
+            }
+        xtCosmSetKeySquares(sq.data());
+        xtOscSetTimeKeyScales(ks.data());
+    }
+    auto sbfParams = [&](bool second) {
+        XtSbfParams p;
+        p.second = second;
+        p.hpf = (int)(rnd() % 128); p.q = (int)(rnd() % 128); p.lpf = (int)(rnd() % 128); p.lpfKf = (int)(rnd() % 41) - 20;
+        p.subDetune = (int)(rnd() % 201) - 100; p.octave = (int)(rnd() % 3); p.detune = (int)(rnd() % 201) - 100;
+        p.detuneLfo = (int)(rnd() % 127) - 63; p.detuneOwn = (int)(rnd() % 127) - 63; p.detuneEnv = (int)(rnd() % 127) - 63;
+        p.width = (int)(rnd() % 128); p.widthKf = (int)(rnd() % 41) - 20; p.widthLfo = (int)(rnd() % 127) - 63;
+        p.widthOwn = (int)(rnd() % 127) - 63; p.widthEnv = (int)(rnd() % 127) - 63;
+        if (rnd() % 4 == 0) p.width = (rnd() & 1) ? 0 : 127;
+        return p;
+    };
+    // the block as each converter lays it out
+    auto writeSbf = [&](const XtSbfBlock& b, int cosm) {
+        std::vector<uint8_t> z(0x48, 0);
+        c.write(BLK, z.data(), 0x48);
+        const uint32_t o = b.second ? 4 : 0;
+        c.wr32(BLK, b.second ? 8 : 7); c.wr8(BLK + 4, (uint8_t)b.octave);
+        if (b.second) wf(BLK + 8, b.q);
+        wf(BLK + o + 8, b.detune); wf(BLK + o + 0xc, b.detuneEnv); c.wr32(BLK + o + 0x10, cosm ? 12 : 10); wf(BLK + o + 0x14, b.detuneLfo);
+        c.wr32(BLK + o + 0x18, cosm ? 4 : 3); wf(BLK + o + 0x1c, b.detuneOwn); wf(BLK + o + 0x20, b.width); wf(BLK + o + 0x24, b.widthEnv);
+        c.wr32(BLK + o + 0x28, cosm ? 11 : 9); wf(BLK + o + 0x2c, b.widthLfo); c.wr32(BLK + o + 0x30, cosm ? 4 : 3); wf(BLK + o + 0x34, b.widthOwn);
+        if (b.second) { wf(BLK + 0x3c, b.lpf); wf(BLK + 0x40, 1.0f); }
+        else { wf(BLK + 0x38, b.hpf); wf(BLK + 0x3c, b.lpf); wf(BLK + 0x40, b.subDetune); wf(BLK + 0x44, 1.0f); }
+    };
+    long sb[2] = {}, sn[2] = {};
+    for (int k = 0; k < 200000; ++k) {
+        const bool second = (k & 1) != 0;
+        const XtSbfParams p = sbfParams(second);
+        const int cosm = (int)(rnd() & 1), key = (int)(rnd() % 128);
+        const float va = (float)(rnd() % 32769) / 32768.0f, vb = (float)(rnd() % 32769) / 32768.0f;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100);
+        c.wr8(IN + 2, (uint8_t)cosm); c.wr8(IN + 3, (uint8_t)key);
+        const int v1[14] = { p.hpf, p.lpf, p.lpfKf, p.subDetune, p.octave, p.detune, p.detuneLfo, p.detuneOwn, p.detuneEnv,
+                             p.width, p.widthKf, p.widthLfo, p.widthOwn, p.widthEnv };
+        const int v2[13] = { p.q, p.lpf, p.lpfKf, p.octave, p.detune, p.detuneLfo, p.detuneOwn, p.detuneEnv,
+                             p.width, p.widthKf, p.widthLfo, p.widthOwn, p.widthEnv };
+        for (int i = 0; i < (second ? 13 : 14); ++i) c.wr16(IN + 0x12 + 2 * (uint32_t)i, (uint16_t)(int16_t)(second ? v2[i] : v1[i]));
+        wf(IN + 0x34, va); wf(IN + 0x38, vb);
+        if (!c.call(second ? 0x894dd2c0 : 0x894dd0a0, { IN, OUT }, sp)) { std::fprintf(stderr, "sbf converter: %s\n", c.error().c_str()); return 1; }
+        const XtSbfBlock b = xtSbfBlock(p, key, va, vb);
+        writeSbf(b, cosm);
+        ++sn[second];
+        std::vector<uint8_t> fw(0x48), pt(0x48);
+        c.read(OUT, fw.data(), 0x48); c.read(BLK, pt.data(), 0x48);
+        if (fw != pt && sb[second]++ < 5) {
+            std::printf("  sbf%d converter key %d:", second ? 2 : 1, key);
+            for (uint32_t i = 0; i < 0x48; i += 4)
+                if (c.rd32(OUT + i) != c.rd32(BLK + i)) std::printf(" +%02x fw %08x port %08x", i, c.rd32(OUT + i), c.rd32(BLK + i));
+            std::printf("\n");
+        }
+    }
+    std::printf("sbf1 converter: %ld cases, %ld different\n", sn[0], sb[0]);
+    std::printf("sbf2 converter: %ld cases, %ld different\n", sn[1], sb[1]);
+
+    auto sbfSame = [&](const XtCosmSbf& port, bool second) {
+        bool ok = same(f32(D + 0xbc), port.delay()) && same(f32(D + 0xd8), port.newDelay()) && same(f32(D + 0xc0), port.width())
+               && same(f32(D + 0x8c), port.gain()) && same(f32(D + 0xe4), port.progress()) && same(f32(D + 0xa4), port.detuneTarget())
+               && same(f32(D + 0xa8), port.widthTarget()) && same(f32(D + (second ? 0x98 : 0xa0)), port.level())
+               && same(f32(D + 0x90), port.slews()[0]) && same(f32(D + 0x94), port.slews()[1]) && same(f32(D + 0xcc), port.slews()[3])
+               && same(f32(D + 0xd0), port.slews()[4]) && same(f32(D + 0xdc), port.fractions()[0]) && same(f32(D + 0x34), port.dc())
+               && (int)c.rd32(D + 4) == port.writeIndex();
+        if (!second) ok = ok && same(f32(D + 0x98), port.slews()[2]) && same(f32(D + 0xe0), port.fractions()[1]);
+        for (uint32_t i = 0; i < (second ? 4u : 6u); ++i) ok = ok && same(f32(D + 0x1c + 4 * i), port.state()[i]);
+        return ok;
+    };
+    long nb[2] = {}, nn[2] = {}, pb[2] = {}, pn[2] = {};
+    for (int g = 0; g < nCases; ++g) {
+        const bool second = (g & 1) != 0;
+        const int cosm = (int)(rnd() & 1);
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200);
+        for (uint32_t o = 0x74; o < 0x150; o += 4) wf(OBJ + o, frnd(-1, 1));                        // the last note's state
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        for (uint32_t bI = 0; bI < 4; ++bI)
+            for (uint32_t i = 0; i < 3267; ++i) wf(CB[bI] + 4 * i, frnd(-1, 1));                    // the last note's junk
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);   // slot 1 Detune's, slot 2 Width's
+        float pitch = pitchOf();
+        const float root = xtCosmRootHz((int)(rnd() % 128), (rnd() % 4) == 0);
+        wf(OBJ, pitch); wf(OBJ + 4, root);
+        const int key = (int)(rnd() % 128);
+        const float bva = frnd(0, 1), bvb = frnd(0, 1);
+        const XtSbfBlock b = xtSbfBlock(sbfParams(second), key, bva, bvb);
+        writeSbf(b, cosm);
+        const float e1S = frnd(-1, 1), e2S = frnd(-1, 1), l1 = frnd(-1, 1), l2 = frnd(-1, 1);
+        float o1 = frnd(-1, 1), o2 = frnd(-1, 1), ol1 = l1, ol2 = l2;
+        const float r1 = frnd(0.2f, 1.0f) / 32.0f, r2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+        wf(EQ + 0x58, e1S); wf(EC + 0x58, e2S); wf(LQ + 0x38, l1); wf(LC + 0x38, l2); wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2);
+        wf(EQ + 0x54, r1); wf(EC + 0x54, r2);
+        if (!c.call(0x894edf70, { OBJ, BLK, 0 }, sp)) { std::fprintf(stderr, "sbf note-on: %s\n", c.error().c_str()); return 1; }
+        XtCosmSbf port;
+        port.noteOn(b, pitch, root, e1S, o1, r1, l1, e2S, o2, r2, l2);
+        ++nn[second];
+        bool ok0 = sbfSame(port, second);
+        for (uint32_t i = 0; i < 3267; ++i) ok0 = ok0 && f32(CB[0] + 4 * i) == 0.0f && f32(CB[1] + 4 * i) == 0.0f;
+        if (!ok0 && nb[second]++ < 5)
+            std::printf("  sbf%d note-on %d: fw delay %.9g w %.9g gain %.9g frac %.9g %.9g wt %.9g, port %.9g %.9g %.9g %.9g %.9g %.9g\n", second ? 2 : 1, g,
+                        f32(D + 0xbc), f32(D + 0xc0), f32(D + 0x8c), f32(D + 0xdc), f32(D + 0xe0), f32(D + 0xa8), port.delay(), port.width(), port.gain(),
+                        port.fractions()[0], port.fractions()[1], port.widthTarget());
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 13 || blkN % 14 == 3) {                  // updates, the pitch moving
+                if (rnd() % 3) pitch = (rnd() & 1) ? pitchOf() : mul(pitch, frnd(0.98f, 1.02f));
+                o1 = frnd(-1, 1); o2 = frnd(-1, 1); ol1 = frnd(-1, 1); ol2 = frnd(-1, 1);
+                const float nr1 = frnd(0.2f, 1.0f) / 32.0f, nr2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+                wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2); wf(LQ + 0x38, ol1); wf(LC + 0x38, ol2); wf(EQ + 0x54, nr1); wf(EC + 0x54, nr2);
+                uint32_t pbits; std::memcpy(&pbits, &pitch, 4);
+                c.fb[0][4] = pbits;
+                if (!c.call(0x894ee6a0, { OBJ }, sp)) { std::fprintf(stderr, "sbf update: %s\n", c.error().c_str()); return 1; }
+                port.update(pitch, o1, nr1, ol1, o2, nr2, ol2);
+                ++nn[second];
+                if (!sbfSame(port, second) && nb[second]++ < 5)
+                    std::printf("  sbf%d update %d.%d: fw dt %.9g wt %.9g, port %.9g %.9g\n", second ? 2 : 1, g, blkN, f32(D + 0xa4), f32(D + 0xa8),
+                                port.detuneTarget(), port.widthTarget());
+            } else if (blkN % 14 == 8 && (rnd() & 1)) {               // a parameter change while the note sounds
+                const XtSbfBlock nb2 = xtSbfBlock(sbfParams(second), key, bva, bvb);
+                writeSbf(nb2, cosm);
+                if (!c.call(second ? 0x894ed2a0 : 0x894ed1a0, { OBJ, BLK + 4 }, sp)) { std::fprintf(stderr, "sbf block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb2, o1, ol1, o2, ol2);
+                ++nn[second];
+                if (!sbfSame(port, second) && nb[second]++ < 5)
+                    std::printf("  sbf%d block %d.%d: fw dt %.9g wt %.9g, port %.9g %.9g\n", second ? 2 : 1, g, blkN, f32(D + 0xa4), f32(D + 0xa8),
+                                port.detuneTarget(), port.widthTarget());
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 4);
+            const float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e9f : ar == 2 ? 4.0e8f : 1.0f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(second ? 0x89500d40 : 0x89500640, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "sbf filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++pn[second];
+            bool ok = sbfSame(port, second);
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            for (uint32_t i = 0; i < 3267; ++i) ok = ok && same(f32(CB[0] + 4 * i), port.buffer(0)[i]) && same(f32(CB[1] + 4 * i), port.buffer(1)[i]);
+            if (!ok && pb[second]++ < 6)
+                std::printf("  sbf%d filter %d block %d: fw out %.9g %.9g delay %.9g new %.9g w %.9g g %.9g p %.9g lev %.9g, port %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g\n",
+                            second ? 2 : 1, g, blkN, f32(BUF), f32(BUF + 248), f32(D + 0xbc), f32(D + 0xd8), f32(D + 0xc0), f32(D + 0x8c), f32(D + 0xe4),
+                            f32(D + (second ? 0x98 : 0xa0)), lr[0], lr[62], port.delay(), port.newDelay(), port.width(), port.gain(), port.progress(), port.level());
+        }
+    }
+    for (int t = 0; t < 2; ++t) {
+        std::printf("sbf%d note-on, block and update: %ld cases, %ld different\n", t + 1, nn[t], nb[t]);
+        std::printf("sbf%d filter: %ld blocks of 32 frames, %ld different\n", t + 1, pn[t], pb[t]);
+    }
+    return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb || sb[0] || sb[1] || nb[0] || nb[1] || pb[0] || pb[1] ? 3 : 0;
 }
 #endif

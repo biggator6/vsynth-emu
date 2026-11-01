@@ -217,6 +217,25 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+SIDE BAND FILTERS v68 (2026-10-31): COSM Types 6 and 7 (HARDWARE_FIRMWARE.md,
+  "COSM: the Side Band Filters"). XtCosm: XtSbfParams (second = the 2nd),
+  xtSbfBlock (0x894dd0a0/0x894dd2c0, with 0x894dc540/0x894dc5f0),
+  XtCosmSbf (note-on 0x894edf70, block 0x894ed1a0/0x894ed2a0, update
+  0x894ee9d0/0x894eea20, filters 0x89500640/0x89500d40; buffer 2 behind 136
+  zero guard words). The LPF keyfollow needs the firmware's powf(x, 2):
+  xtFwCosmKeySquares (XtFirmware) → xtCosmSetKeySquares, set in
+  xtSynthSetRom; the Width keyfollow is XtOsc's Time KF power
+  (xtOscTimeKeyScale). xt_cosm builds both tables with its own powf calls.
+  XtSynth: Cosm.type 5/6, Cosm.sb[2] (SideBand: hpf, q, lpf, lpfKf,
+  subDetune, octave, detune…, width…); the note-on runs after the voice's
+  targets, as the Comb's. Plugin params cosmSb1Hpf, Sb1Lpf, Sb1LpfKF,
+  Sb1SubDetune, Sb1Octave, Sb1Detune, Sb1DetuneLfo, Sb1DetuneOwn,
+  Sb1DetuneEnv, Sb1Width, Sb1WidthKF, Sb1WidthLfo, Sb1WidthOwn, Sb1WidthEnv;
+  cosmSb2Q, Sb2Lpf, … (no Hpf/SubDetune); and cosm2…. XT_SBF1 / TEST_SBF1
+  "hpf,lpf,lpfKf,subDetune,octave,detune,detuneLfo,detuneOwn,detuneEnv,
+  width,widthKf,widthLfo,widthOwn,widthEnv"; XT_SBF2 / TEST_SBF2 "q,lpf,…"
+  (KFs in %).
+
 COMB FILTER v67 (2026-10-31): COSM Type 8 (HARDWARE_FIRMWARE.md, "COSM:
   the Comb Filter"). XtCosm: XtCombParams, xtCombBlock (0x894dd4f0),
   xtCosmRootHz (the voice's +0x9a4, from 0x894f21c0), XtCosmComb (note-on

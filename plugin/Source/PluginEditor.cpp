@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 940;  // height of the XT strip below it
+static constexpr int kXtStripH   = 1030;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -25,14 +25,21 @@ static const char* const kTbIds[11][2] = { { "TbCutoff", "Cut" }, { "TbKF", "KF"
 // The Comb Filter's rows (Detune, Tone): the id suffixes after "cosm"/"cosm2", and labels
 static const char* const kCombIds[6][2] = { { "CombDetune", "Det" }, { "CombDetuneLfo", "LFO" }, { "CombDetuneEnv", "Env" },
                                             { "CombTone", "Tone" }, { "CombToneLfo", "LFO" }, { "CombToneEnv", "Env" } };
+// The Side Band Filters' rows (HPF or Q, LPF, KF, Sub; Detune; Width): the id
+// suffixes after "cosmSb1"/"cosmSb2" (the 2nd's Q for the 1st's Hpf, and no
+// SubDetune), and labels
+static const char* const kSbIds[13][2] = { { "Hpf", "HPF" }, { "Lpf", "LPF" }, { "LpfKF", "KF" }, { "SubDetune", "Sub" },
+                                           { "Detune", "Det" }, { "DetuneLfo", "LFO" }, { "DetuneOwn", "Own" }, { "DetuneEnv", "Env" },
+                                           { "Width", "Wid" }, { "WidthKF", "KF" }, { "WidthLfo", "LFO" }, { "WidthOwn", "Own" },
+                                           { "WidthEnv", "Env" } };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1240);
+    setSize(560, 1330);
     setResizable(true, true);
-    setResizeLimits(480, 780, 960, 1380);
+    setResizeLimits(480, 780, 960, 1470);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -139,7 +146,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter" }, 1);
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band" }, 1);
+    cosmTypeBox_.onChange = [this] { attachSideBand(); };
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
         addAndMakeVisible(*cpt);
@@ -226,6 +234,23 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         combRowLabels_[r].setText(r ? "Comb T" : "Comb", juce::dontSendNotification);
         styleSmall(combRowLabels_[r]);
     }
+    sbOctBox_.addItemList({ "-2", "-1", "0" }, 1);
+    addAndMakeVisible(sbOctBox_);
+    for (int i = 0; i < kSbKnobs; ++i) {
+        juce::Slider& sl = sbSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        sbLabels_[i].setText(kSbIds[i][1], juce::dontSendNotification);
+        styleSmall(sbLabels_[i]);
+    }
+    for (int r = 0; r < 3; ++r) {
+        sbRowLabels_[r].setText(r == 0 ? "SB" : r == 1 ? "SB Det" : "SB Wid", juce::dontSendNotification);
+        styleSmall(sbRowLabels_[r]);
+    }
     attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
@@ -286,10 +311,11 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 }
 
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
-// the depth and Env A rows (level slots 24..31), the Dual, TB and Comb
-// Filters' rows and its LFO.
+// the depth and Env A rows (level slots 24..31), the Dual, TB, Comb and Side
+// Band Filters' rows and its LFO.
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
+    cosmK_ = k;
     cosmAtt_.reset(); cosmFilterAtt_.reset(); cosmCutAtt_.reset(); cosmResoAtt_.reset(); cosmKfAtt_.reset();
     cosmTypeAtt_.reset(); cosmCutOwnAtt_.reset(); cosmResoOwnAtt_.reset();
     cosmTypeAtt_    = std::make_unique<ComboAtt>(processor_.apvts, pre + "Type", cosmTypeBox_);
@@ -325,6 +351,24 @@ void VSynthEmuEditor::attachCosm(int k) {
         combAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kCombIds[i][0], combSliders_[i]);
     }
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
+    attachSideBand();
+}
+
+// The Side Band rows show the 1st's parameters, or the 2nd's when the type
+// is the 2nd (its Q in the HPF's place, no Sub Detune).
+void VSynthEmuEditor::attachSideBand() {
+    const bool second = cosmTypeBox_.getSelectedItemIndex() == 6;
+    const juce::String pre = juce::String(cosmK_ ? "cosm2" : "cosm") + (second ? "Sb2" : "Sb1");
+    sbOctAtt_.reset();
+    sbOctAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "Octave", sbOctBox_);
+    for (int i = 0; i < kSbKnobs; ++i) {
+        sbAtts_[i].reset();
+        const bool none = second && i == 3;
+        sbSliders_[i].setVisible(!none);
+        sbLabels_[i].setVisible(!none);
+        if (!none) sbAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + (second && i == 0 ? "Q" : kSbIds[i][0]), sbSliders_[i]);
+    }
+    sbLabels_[0].setText(second ? "Q" : "HPF", juce::dontSendNotification);
 }
 
 void VSynthEmuEditor::timerCallback() {
@@ -600,6 +644,19 @@ void VSynthEmuEditor::resized() {
             auto cell = row.removeFromLeft(w);
             combLabels_[i].setBounds(cell.removeFromLeft(34));
             combSliders_[i].setBounds(cell.withTrimmedRight(4));
+        }
+    }
+    for (int r = 0; r < 3; ++r) {                    // the Side Band Filters: Octave + HPF/Q, LPF, KF, Sub; Detune; Width
+        xt.removeFromTop(6);
+        auto row = xt.removeFromTop(24);
+        sbRowLabels_[r].setBounds(row.removeFromLeft(46));
+        const int first = r == 0 ? 0 : r == 1 ? 4 : 8, n = r == 2 ? 5 : 4;
+        if (r == 0) sbOctBox_.setBounds(row.removeFromLeft(62).withTrimmedRight(6));
+        const int w = row.getWidth() / n;
+        for (int i = first; i < first + n; ++i) {
+            auto cell = row.removeFromLeft(w);
+            sbLabels_[i].setBounds(cell.removeFromLeft(28));
+            sbSliders_[i].setBounds(cell.withTrimmedRight(3));
         }
     }
     xt.removeFromTop(6);

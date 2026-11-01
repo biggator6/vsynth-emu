@@ -19,8 +19,13 @@ int main(int argc, char** argv) {
     if (!p.setRomFile(juce::File(argv[1]))) { std::fprintf(stderr, "ROM rejected: %s\n", p.getStatusText().toRawUTF8()); return 1; }
     p.prepareToPlay(rate, block);
     // TEST_SNAPSHOT=file.png: the editor drawn offscreen, for checking the
-    // layout (TEST_SNAPSHOT_COSM2=1: with the COSM rows on COSM 2)
+    // layout (TEST_SNAPSHOT_COSM2=1: with the COSM rows on COSM 2;
+    // TEST_SNAPSHOT_TYPE=n: COSM 1's type, e.g. 6 for the 2nd Side Band rows)
     if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
+        if (const char* t = std::getenv("TEST_SNAPSHOT_TYPE")) {
+            auto* prm = p.apvts.getParameter("cosmType");
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)std::atoi(t)));
+        }
         std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
         if (std::getenv("TEST_SNAPSHOT_COSM2"))      // the COSM rows switched to COSM 2 (the selector re-attaches them)
             for (juce::Component* ch : ed->getChildren())
@@ -176,6 +181,10 @@ int main(int argc, char** argv) {
     // lfo,env,q,qFollow,hpf,hpfKf,hpfLfo,hpfEnv,gain": a TB Filter (KF in %);
     // TEST_TB2: COSM 2's.  TEST_COMB="octave,detune,detuneLfo,detuneEnv,tone,
     // toneLfo,toneEnv": a Comb Filter (octave 0..4); TEST_COMB2: COSM 2's.
+    // TEST_SBF1="hpf,lpf,lpfKf,subDetune,octave,detune,detuneLfo,detuneOwn,
+    // detuneEnv,width,widthKf,widthLfo,widthOwn,widthEnv": the 1st Side Band
+    // Filter (KFs in %, octave 0..2); TEST_SBF2="q,lpf,…" (no subDetune) the
+    // 2nd; TEST_SBF12, TEST_SBF22: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -218,6 +227,27 @@ int main(int argc, char** argv) {
             set("CombDetuneLfo", m.combDetuneLfo); set("CombDetuneEnv", m.combDetuneEnv); set("CombTone", m.combTone);
             set("CombToneLfo", m.combToneLfo); set("CombToneEnv", m.combToneEnv);
         }
+        for (int t = 0; t < 2; ++t)
+            if (const char* e = std::getenv(("TEST_SBF" + std::to_string(t + 1) + sfx).c_str())) {
+                auto& b = m.sb[t];
+                m.on = true;
+                m.type = 5 + t;
+                if (t == 0)
+                    std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &b.hpf, &b.lpf, &b.lpfKf, &b.subDetune, &b.octave, &b.detune,
+                                &b.detuneLfo, &b.detuneOwn, &b.detuneEnv, &b.width, &b.widthKf, &b.widthLfo, &b.widthOwn, &b.widthEnv);
+                else
+                    std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &b.q, &b.lpf, &b.lpfKf, &b.octave, &b.detune, &b.detuneLfo,
+                                &b.detuneOwn, &b.detuneEnv, &b.width, &b.widthKf, &b.widthLfo, &b.widthOwn, &b.widthEnv);
+                const std::string id = "Sb" + std::to_string(t + 1);
+                auto sbSet = [&](const char* name, int v) { set((id + name).c_str(), v); };
+                set("Switch", 1); set("Type", m.type);
+                if (t == 0) { sbSet("Hpf", b.hpf); sbSet("SubDetune", b.subDetune); }
+                else sbSet("Q", b.q);
+                sbSet("Lpf", b.lpf); sbSet("LpfKF", b.lpfKf); sbSet("Octave", b.octave); sbSet("Detune", b.detune);
+                sbSet("DetuneLfo", b.detuneLfo); sbSet("DetuneOwn", b.detuneOwn); sbSet("DetuneEnv", b.detuneEnv);
+                sbSet("Width", b.width); sbSet("WidthKF", b.widthKf); sbSet("WidthLfo", b.widthLfo); sbSet("WidthOwn", b.widthOwn);
+                sbSet("WidthEnv", b.widthEnv);
+            }
         if (const char* e = std::getenv(("TEST_CENVB" + sfx).c_str())) {
             auto& b = m.envB;
             std::sscanf(e, "%d,%d,%d,%d,%d,%d", &b.attack, &b.decay, &b.sustain, &b.release, &b.velCurve, &b.velSens);

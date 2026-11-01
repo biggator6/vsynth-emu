@@ -2744,3 +2744,24 @@ Round-2 recordings.  First build-out after that: real-time granular port
   guard word: AddressSanitizer found it.
 - All of it equals the firmware in the interpreter, including the
   firmware's own note-on and allocator.
+
+### Session 16 addendum (2026-10-31) — v68: Side Band Filters
+
+- The 1st and 2nd Side Band Filters (COSM Types 6 and 7) write fixed block
+  codes, 7 and 8. Both are feedback delay lines tuned to the note, like the
+  Comb's delay: a crossfade between integer taps, a one-pole LPF and a
+  first-order allpass for the fraction, fed back through the Side Band
+  Width. Their Own Envs follow the input level, as the Dynamic TVF's do.
+- The 1st runs two lines, the second at the Sub Delay Detune, with a
+  one-zero HPF. The 2nd cross-feeds its two buffers through Q.
+- The LPF keyfollow squares through the firmware's powf, which is not
+  exactly x·x, so the plugin builds that table with the firmware at load.
+- Firmware quirks kept:
+  - the allpass fractions are the start delay's for the whole note;
+  - the note-on gain uses the unclamped Width.
+- Line 2 of the 1st can read up to 136 samples before its buffer. On the
+  XT that is another voice's line in the pool; the port reads zeros.
+- All of it equals the firmware in the interpreter. Deliberate errors in
+  the port are caught.
+- A second, stereo routine table exists (`0x8987c840`), picked by the
+  tone's +0x980 flag. The ports so far are all the mono routines; open.
