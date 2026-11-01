@@ -52,7 +52,7 @@ namespace Params {
     static const juce::String kLegato        = "legatoSwitch";
     static const juce::String kOctave        = "octaveShift";
     // The COSM sections as TVFs, COSM 1 ("cosm…") and COSM 2 ("cosm2…"):
-    // Switch, Type (TVF, Dynamic TVF, Dual Filter, TB Filter, Comb Filter, 1st and 2nd Side Band, Resonator, Frequency Shifter, Lo-Fi, Compressor, Limiter, Wave Shape), ResoOwn/CutoffOwn (the Dynamic TVF's
+    // Switch, Type (TVF, Dynamic TVF, Dual Filter, TB Filter, Comb Filter, 1st and 2nd Side Band, Resonator, Frequency Shifter, Lo-Fi, Compressor, Limiter, Wave Shape, OD/Dist), ResoOwn/CutoffOwn (the Dynamic TVF's
     // Own Env depths), Filter, Cutoff, Reso, CutoffKF, CutoffEnv/Lfo, ResoEnv/Lfo; the
     // Dual Filter's DualType and Dual1…/Dual2… Freq, KF, Q, Lfo, Env; the TB
     // Filter's TbCutoff, TbKF, TbLfo, TbEnv, TbQ, TbQFollow, TbHpf, TbHpfKF,
@@ -68,7 +68,8 @@ namespace Params {
     // LofiBalanceLfo, LofiBalanceEnv; the Compressor's CompAttack,
     // CompSustain, CompLevel; the Limiter's LimThreshold, LimRatio,
     // LimAttack, LimRelease, LimLevel; Wave Shape's WsType, WsLevel, WsDrive,
-    // WsDriveLfo, WsDriveEnv, WsTone, WsToneKF, WsToneLfo, WsToneEnv; the envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
+    // WsDriveLfo, WsDriveEnv, WsTone, WsToneKF, WsToneLfo, WsToneEnv; OD/Dist's
+    // the same with Od…; the envelopes EnvA (the cutoff's) and EnvB (the resonance's), each
     // Attack…TimeKF; the LFO, LfoWave…LfoKeySync
     static juce::String cosmId(int k, const char* name) { return juce::String(k ? "cosm2" : "cosm") + name; }
     static const char* const kCosmEnvKnobs[10] = { "Attack", "Decay", "Sustain", "Release", "VelCurve", "VelSens",
@@ -228,7 +229,7 @@ VSynthEmuProcessor::createParameterLayout() {
         const juce::String n = k ? "COSM 2 " : "COSM 1 ";
         params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "Switch"), n + "Switch", false));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Type"), n + "Type",
-            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter", "Wave Shape" }, 0));
+            juce::StringArray { "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter", "Wave Shape", "OD/Dist" }, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "ResoOwn"), n + "Resonance Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "CutoffOwn"), n + "Cutoff Own Env Depth", -63, 63, 0));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "Filter"), n + "Filter Type",
@@ -370,6 +371,19 @@ VSynthEmuProcessor::createParameterLayout() {
                 cosmId(k, "WsToneKF"), wn + "Tone Keyfollow", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
             params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "WsToneLfo"), wn + "Tone LFO Depth", -63, 63, 0));
             params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "WsToneEnv"), wn + "Tone Env Depth", -63, 63, 0));
+        }
+        {                                            // OD/Dist, the XT's defaults
+            const juce::String on = n + "OD/Dist ";
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "OdType"), on + "Type", juce::StringArray { "OD", "DS" }, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "OdLevel"), on + "Output Level", 0, 127, 127));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "OdDrive"), on + "Drive", 0, 127, 127));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "OdDriveLfo"), on + "Drive LFO Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "OdDriveEnv"), on + "Drive Env Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "OdTone"), on + "Tone", 0, 127, 127));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                cosmId(k, "OdToneKF"), on + "Tone Keyfollow", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "OdToneLfo"), on + "Tone LFO Depth", -63, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "OdToneEnv"), on + "Tone Env Depth", -63, 63, 0));
         }
         for (const char* ab : { "A", "B" }) {
             const juce::String id = cosmId(k, "Env") + ab, name = n + "Env " + ab + " ";
@@ -611,6 +625,9 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         m.wsType = knob(cosmId(k, "WsType")); m.wsLevel = knob(cosmId(k, "WsLevel")); m.wsDrive = knob(cosmId(k, "WsDrive"));
         m.wsDriveLfo = knob(cosmId(k, "WsDriveLfo")); m.wsDriveEnv = knob(cosmId(k, "WsDriveEnv")); m.wsTone = knob(cosmId(k, "WsTone"));
         m.wsToneKf = kf(cosmId(k, "WsToneKF")); m.wsToneLfo = knob(cosmId(k, "WsToneLfo")); m.wsToneEnv = knob(cosmId(k, "WsToneEnv"));
+        m.odType = knob(cosmId(k, "OdType")); m.odLevel = knob(cosmId(k, "OdLevel")); m.odDrive = knob(cosmId(k, "OdDrive"));
+        m.odDriveLfo = knob(cosmId(k, "OdDriveLfo")); m.odDriveEnv = knob(cosmId(k, "OdDriveEnv")); m.odTone = knob(cosmId(k, "OdTone"));
+        m.odToneKf = kf(cosmId(k, "OdToneKF")); m.odToneLfo = knob(cosmId(k, "OdToneLfo")); m.odToneEnv = knob(cosmId(k, "OdToneEnv"));
         for (int t = 0; t < 2; ++t) {
             XtSynth::Controls::Cosm::SideBand& b = m.sb[t];
             const juce::String id = cosmId(k, "Sb") + juce::String(t + 1);

@@ -1544,6 +1544,108 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: OD/Dist (2026-11-01, v76)
+
+COSM Type 1: a filtered hard clipper. The converter writes block code 1 (OD)
+or 2 (DS) by the Type. The two codes share their object code (start values,
+block copy, update, note-on) and differ only in the DSP routine. It has no
+buffers.
+
+**Parameters** (0x8d0…0x8d8, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x8d0 | Type (OD, DS) | 0…1 | 0 |
+| 0x8d1 | Output Level | 0…127 | 127 |
+| 0x8d2 | Drive | 0…127 | 127 |
+| 0x8d3 | Drive LFO Depth | ±63 | 0 |
+| 0x8d4 | Drive Env Depth | ±63 | 0 |
+| 0x8d5 | Tone | 0…127 | 127 |
+| 0x8d6 | Tone Keyfollow | ±20 | 0 |
+| 0x8d7 | Tone LFO Depth | ±63 | 0 |
+| 0x8d8 | Tone Env Depth | ±63 | 0 |
+
+**The converter** (`0x894dc8b0`) writes the block:
+- +0 code 1 when Type is 0, else 2;
+- +0x2c Level and +4 Drive, through the 128 shorts at 0x897cfcb8 / 32768,
+  as Wave Shape's;
+- +8 Drive's Env depth (A), +0xc its envelope (9 or 11), +0x10 its LFO
+  depth, +0x14 its LFO;
+- +0x18 Tone through `0x894dc420`, a third copy of Lo-Fi's Filter curve;
+- +0x1c Tone's Env depth (B), +0x20 its envelope (10 or 12), +0x24 its LFO
+  depth, +0x28 its LFO.
+
+The binding puts Drive's envelope in slot 1 and Tone's in slot 2.
+
+**The object** (codes 1 and 2: start values `0x894ec3a8` and `0x894ec430`;
+block copy `0x894ecce0` and `0x894ecdd0`; update `0x894ee78c` and
+`0x894ee810`):
+- Drive' = 1 + 12 × clamp(Drive + Env·depth + LFO·depth, 0…1): a gain of
+  1…13 (D+0xbc; target D+0xa4).
+- Tone' = B[trunc(127 × clamp(Tone + depths, lo…1))], B being Lo-Fi's Balance
+  curve (D+0xc0; target D+0xa8).
+  - lo is 0.1 in the start values and the update, but 0 in the block copy.
+    That is a firmware quirk: a new block with Tone + depths below 0.1 sets
+    a lower target than the next update does.
+- The block copy stores the Level. Note-on (`0x894ee142`) sets the gain in
+  use (D+0x8c) to it.
+- A new block of the other code (the Type changed while a note sounds) is
+  not copied: the block dispatcher (`0x894ee4a0`) returns when the code
+  differs. A Type change takes effect at the next note.
+
+**The filters** (OD `0x894fef70`, DS `0x894fc570`; the stereo table's
+entries are `0x894ff340` and `0x894fc7e0`), on the XT's scale (int16 ×
+65536):
+- Per block, like Wave Shape:
+  - the gain slews 0.1 toward the Level;
+  - Drive' and Tone' step before every fourth sample.
+- The clip stage, used once by DS and twice by OD, with gain g and limit L:
+  - c = clip(g·v, ±L);
+  - m = clip(g·(v + v')/2, ±L), v' being the last sample's v;
+  - out = 0.25·c + 0.5·m + 0.25·c', c' being the last sample's c.
+  So the clipper runs at twice the rate and is averaged back down.
+- DS, from L:
+  - hp = x − s0, then s0 += 0.03205·hp (0x3d0346db);
+  - s1 += 0.32769·(hp − s1) (0x3ea7c6fb);
+  - the clip stage on s1, with g = Drive' and L = 2^28.
+- OD, from L:
+  - hp = x − s0, then s0 += 0.0484·hp (0x3d463f14);
+  - the clip stage on hp, with g = Drive' and L = 2^29;
+  - s3 += 0.32769·(y − s3);
+  - h = s3 − s4, then s4 += 0.03205·h;
+  - the clip stage on h, with g = 1 and L = 2^28.
+- Then a two-pole lowpass at Tone' (b += Tone'·a; a += Tone'·(y − a − b);
+  OD subtracts b first, then a), and out = b × the gain, on L and R.
+- The states are D+0x1c…0x2c (DS) or …0x3c (OD), cleared at note-on.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converter: 200,000 cases, both Types;
+- note-on (the firmware's own), updates and new blocks through the
+  dispatcher: 26,359 cases, about a quarter of the new blocks of the other
+  code;
+- the filters: 120,000 blocks, at levels from 1 to 2.1e9;
+- all 0 different.
+- The first port read OD's first limit as 2^30. Its constant 0x4e000000 is
+  2^29, and the check caught it once signals reached the clip.
+- Deliberate errors are caught: each limit doubled or halved, the block
+  copy's Tone clamp at 0.1, a block of the other code copied, OD's Tone
+  subtractions swapped, OD's midpoint without Drive', 11 for 12, 0.32769 a
+  unit off, the gain not slewed, and DS's highpass at OD's 0.0484.
+- XtSynth runs it in the XT's units, as Lo-Fi.
+
+**Plugin.**
+- COSM Type gains OD/Dist (index 13), with its own parameters (cosmOd… and
+  cosm2…) at the XT's defaults. Its OD/Dist and OD Tone rows share Wave
+  Shape's layout.
+- Measured on a 441 Hz sine (Level 127, Tone 127; levels as peaks in the
+  SOLO buffer, ±1):
+  - The limit sets the output ceiling: 2^28 is 18 dB below the buffer's
+    full scale.
+  - At Drive 127 (×13), sines up to −40 dB pass at +19.4 dB (OD) or
+    +21.3 dB (DS).
+  - From −20 dB both clip to odd harmonics: 3rd −10, 5th −15, 7th −18 dB.
+  - At Drive 0 a −6 dB sine already clips.
+
 ### COSM: Wave Shape (2026-11-01, v75)
 
 COSM Type 2, block code 3: a waveshaper through one of three curves, with a
@@ -2472,7 +2574,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 
 | Type | Name | IDs | Converter | Code | DSP |
 |---|---|---|---|---|---|
-| 1 | OD/Dist | 0x8d0–0x8d8 | `0x894dc8b0` | 1 or 2 | `0x894fef70`, `0x894fc570` |
+| 1 | OD/Dist | 0x8d0–0x8d8 | `0x894dc8b0` | 1 or 2 | `0x894fef70`, `0x894fc570` (v76) |
 | 2 | Wave Shape | 0x8d9–0x8e1 | `0x894dcbf0` | 3 | `0x89503ef0` (v75) |
 | 3 | Amp Simulator | 0x8e2–0x8e9 | `0x894dcd80` | 4 | `0x894f8a30` |
 | 4 | Speaker Simulator | 0x8ea | inline | 5 | `0x89501300` |

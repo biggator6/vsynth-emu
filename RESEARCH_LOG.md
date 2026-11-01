@@ -2857,3 +2857,19 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Tone's keyfollow helper is the same code as Lo-Fi's Filter curve, so the
   two now share one function.
 - All of it equals the firmware in the interpreter, all six Types.
+
+### Session 16 addendum (2026-11-01) — v76: OD/Dist
+
+- OD/Dist (COSM Type 1) is a hard clipper. Its Type picks block code 1 (OD)
+  or 2 (DS). The two share their object code and differ in the DSP.
+  - DS: a highpass and a lowpass, then a clip at ±2^28 after a gain of
+    1…13.
+  - OD: the clip at ±2^29 straight after the highpass, then a lowpass, a
+    highpass, and a second clip at ±2^28 with no gain.
+  - Both clip each sample and the midpoint between samples, average them
+    0.25/0.5/0.25, and end in a two-pole lowpass at Tone.
+- Firmware quirks kept:
+  - a new block clamps Tone at 0 where the update clamps it at 0.1;
+  - a Type change during a note is ignored until the next note.
+- My first port misread OD's first limit as 2^30. The check caught it at the
+  first loud block. It now equals the firmware in the interpreter.

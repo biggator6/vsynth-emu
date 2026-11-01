@@ -194,6 +194,7 @@ int main(int argc, char** argv) {
     // TEST_LIM="threshold,ratio,attack,release,level": a Limiter (ratio 0..3);
     // TEST_LIM2: COSM 2's.  TEST_WS="type,level,drive,driveLfo,driveEnv,tone,
     // toneKf,toneLfo,toneEnv": Wave Shape (type 0..5, KF in %); TEST_WS2: COSM 2's.
+    // TEST_OD="type,…": OD/Dist (type 0 OD, 1 DS; the rest as TEST_WS); TEST_OD2.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -241,6 +242,15 @@ int main(int argc, char** argv) {
             m.type = 10;
             std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
             set("Switch", 1); set("Type", 10); set("CompAttack", m.compAttack); set("CompSustain", m.compSustain); set("CompLevel", m.compLevel);
+        }
+        if (const char* e = std::getenv(("TEST_OD" + sfx).c_str())) {
+            m.on = true;
+            m.type = 13;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.odType, &m.odLevel, &m.odDrive, &m.odDriveLfo, &m.odDriveEnv, &m.odTone,
+                        &m.odToneKf, &m.odToneLfo, &m.odToneEnv);
+            set("Switch", 1); set("Type", 13); set("OdType", m.odType); set("OdLevel", m.odLevel); set("OdDrive", m.odDrive);
+            set("OdDriveLfo", m.odDriveLfo); set("OdDriveEnv", m.odDriveEnv); set("OdTone", m.odTone); set("OdToneKF", m.odToneKf);
+            set("OdToneLfo", m.odToneLfo); set("OdToneEnv", m.odToneEnv);
         }
         if (const char* e = std::getenv(("TEST_WS" + sfx).c_str())) {
             m.on = true;

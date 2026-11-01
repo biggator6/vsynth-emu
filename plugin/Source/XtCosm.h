@@ -2,8 +2,8 @@
 // The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
 // the Dual Filter (9), the TB Filter (16), the Comb Filter (8), the Side
 // Band Filters (6, 7), the Resonator (5), the Frequency Shifter (14), Lo-Fi
-// (15), the Compressor (12), the Limiter (13) and Wave Shape (2; below
-// XtCosmTvf).  Each oscillator
+// (15), the Compressor (12), the Limiter (13), Wave Shape (2) and OD/Dist
+// (1; below XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -684,6 +684,69 @@ private:
     float s[6] = {};
     float driveOf(float env, float lfo) const;
     float toneOf(float env, float lfo) const;
+};
+
+// OD/Dist (COSM Type 1, block code 1 OD or 2 DS by its Type): a filtered
+// hard clipper.  Parameters 0x8d0…0x8d8: Type 0 OD, 1 DS; Output Level 0…127
+// (127); Drive 0…127 (127) with LFO and Env depths ±63; Tone 0…127 (127)
+// with Keyfollow ±20, LFO and Env depths.  Drive takes Env A (Env 9, COSM 2
+// Env 11) and its velocity factor, Tone Env B (10, 12); both LFO 3 (4).
+struct XtOdParams {
+    int type = 0, level = 127, drive = 127, driveLfo = 0, driveEnv = 0, tone = 127, toneKf = 0, toneLfo = 0, toneEnv = 0;
+};
+
+// The converter's block (0x894dc8b0): the code (DS when Type ≠ 0); Level
+// and Drive through rom.2's 128 shorts at 0x897cfcb8 / 32768; Tone through
+// Lo-Fi's Filter curve (0x894dc420, the same code); LFO depths
+// (d/63)·|d/63|; Env depths A (Drive) or B (Tone) × (d/63)·|d/63|.
+struct XtOdBlock {
+    bool ds = false;
+    float drive = 1.0f, driveEnv = 0, driveLfo = 0, tone = 1.0f, toneEnv = 0, toneLfo = 0, level = 1.0f;
+};
+XtOdBlock xtOdBlock(const XtOdParams& p, int key, float velA, float velB);
+
+// The object for block codes 1 and 2 (their cases are the same code).
+// Drive' = 1 + 12 × (Drive + depths × Env A and the LFO, within 0…1);
+// Tone' = Lo-Fi's Balance curve at trunc(127 × (Tone + depths, within 0.1…1;
+// within 0…1 in the block copy, a firmware quirk)) (start values 0x894ec3a8;
+// targets from the block 0x894ecce0 and the update 0x894ee78c).  Per block
+// both step toward their targets before every fourth sample, and the gain
+// (Level; 0x894ee142 at note-on) slews 0.1 toward the block's.  The clip
+// stage: c = clip(g·v), m = clip(g·(v + v')/2) with v' the last v, out
+// 0.25·c + 0.5·m + 0.25·c'.  On the XT's scale:
+//   DS (0x894fc570): a highpass (x − one-pole at 0.03205), a one-pole
+//   lowpass at 0.32769, the clip stage with g = Drive' at ±2^28;
+//   OD (0x894fef70): a highpass at 0.0484, the clip stage with g = Drive' at
+//   ±2^29, a one-pole lowpass at 0.32769, a highpass at 0.03205, the clip
+//   stage with g = 1 at ±2^28.
+// Then a two-pole lowpass at Tone' and out = × the gain, on L and R from L.
+class XtCosmOd {
+public:
+    // Note-on (0x894edf70): states cleared, start values, rates, then the
+    // block with the envelopes' outputs, and the gain at the block's.
+    void noteOn(const XtOdBlock& b, float env1Start, float env1Out, float rate1, float lfo1,
+                float env2Start, float env2Out, float rate2, float lfo2);
+    // A new block (0x894ee4a0): ignored when its code is not the note's.
+    void setBlock(const XtOdBlock& b, float env1, float lfo1, float env2, float lfo2);
+    void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);    // 0x894ee78c
+    // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
+    // the buffer's units against the XT's (int16 × 65536), for the clips.
+    void process(float* lr, float scale = 1.0f);
+
+    // The state, for the firmware checks (D = object + 0x58).
+    float drive() const { return drv; }              // D+0xbc
+    float tone() const { return ton; }               // D+0xc0
+    float driveTarget() const { return drvT; }       // D+0xa4
+    float toneTarget() const { return tonT; }        // D+0xa8
+    float gain() const { return lvl; }               // D+0x8c
+    const float* state() const { return s; }         // D+0x1c…0x3c (DS uses the first five)
+
+private:
+    XtOdBlock blk;
+    float drv = 13.0f, ton = 1.0f, drvT = 13.0f, tonT = 1.0f, rate1 = 0, rate2 = 0, lvl = 1.0f;
+    float s[9] = {};
+    float driveOf(float env, float lfo) const;
+    float toneOf(float env, float lfo, float lo) const;
 };
 
 // The Limiter (COSM Type 13, block code 16): a gain follower with a 10-sample

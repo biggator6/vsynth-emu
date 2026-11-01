@@ -217,6 +217,17 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+OD/DIST v76 (2026-11-01): COSM Type 1 (HARDWARE_FIRMWARE.md, "COSM:
+  OD/Dist"). XtCosm: XtOdParams, xtOdBlock (0x894dc8b0; block code 1 OD or 2
+  DS; Tone through keyTone), XtCosmOd (start 0x894ec3a8, block 0x894ecce0,
+  update 0x894ee78c, note-on 0x894ee142, filters 0x894fef70 OD and
+  0x894fc570 DS; process(lr, scale) in the XT's units; a block of the other
+  code is ignored, as the dispatcher 0x894ee4a0 does). XtSynth: Cosm.type 13
+  with odType…odToneEnv; slot 1 envA (Drive), slot 2 envB (Tone). Plugin
+  params cosmOdType (OD, DS), OdLevel, OdDrive, OdDriveLfo, OdDriveEnv,
+  OdTone, OdToneKF, OdToneLfo, OdToneEnv (and cosm2…). XT_OD / TEST_OD
+  "type,level,drive,driveLfo,driveEnv,tone,toneKf,toneLfo,toneEnv" (KF in %).
+
 WAVE SHAPE v75 (2026-11-01): COSM Type 2 (HARDWARE_FIRMWARE.md, "COSM: Wave
   Shape"). XtCosm: XtWsParams, xtWsBlock (0x894dcbf0; Tone through Lo-Fi's
   Filter curve, now keyTone), XtCosmWs (start 0x894ec4c0, block 0x894ecee0,

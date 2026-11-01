@@ -396,6 +396,16 @@ XtWsBlock XtSynth::wsBlock(const Voice& v, int k) const {
     return xtWsBlock(p, v.note, va, vb);
 }
 
+// An OD/Dist block (0x894dc8b0): Drive's Env depth by A, Tone's by B.
+XtOdBlock XtSynth::odBlock(const Voice& v, int k) const {
+    const Controls::Cosm& c = ctl.cosm[k];
+    XtOdParams p;
+    p.type = c.odType; p.level = c.odLevel; p.drive = c.odDrive; p.driveLfo = c.odDriveLfo; p.driveEnv = c.odDriveEnv;
+    p.tone = c.odTone; p.toneKf = c.odToneKf / 10; p.toneLfo = c.odToneLfo; p.toneEnv = c.odToneEnv;
+    const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
+    return xtOdBlock(p, v.note, va, vb);
+}
+
 // A Limiter's block (0x894ddd20).
 XtLimBlock XtSynth::limBlock(int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
@@ -406,7 +416,7 @@ XtLimBlock XtSynth::limBlock(int k) const {
 
 // The TVF's slot 1 is its Q (envB), the Dual Filter's Filter 1, the TB
 // Filter's LPF, the Resonator's Size, the Frequency Shifter's Depth, the
-// Lo-Fi Filter and Wave Shape's Drive (envA), the Comb and Side Band
+// Lo-Fi Filter, Wave Shape's and OD/Dist's Drive (envA), the Comb and Side Band
 // Filters' Detune (envB).
 void XtSynth::cosmSetBlock(Voice& v, int k) {
     Voice::CosmVoice& c = v.cs[k];
@@ -418,6 +428,7 @@ void XtSynth::cosmSetBlock(Voice& v, int k) {
     if (c.type == 10) { c.comp.setBlock(compBlock(k)); return; }
     if (c.type == 11) { c.lim.setBlock(limBlock(k)); return; }
     if (c.type == 12) { c.ws.setBlock(wsBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
+    if (c.type == 13) { c.od.setBlock(odBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
     if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else if (c.type == 3) c.tb.setBlock(tbBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
@@ -497,7 +508,9 @@ void XtSynth::setControls(const Controls& c) {
                       || n.limRatio != o.limRatio || n.limAttack != o.limAttack || n.limRelease != o.limRelease || n.limLevel != o.limLevel
                       || n.wsType != o.wsType || n.wsLevel != o.wsLevel || n.wsDrive != o.wsDrive || n.wsDriveLfo != o.wsDriveLfo
                       || n.wsDriveEnv != o.wsDriveEnv || n.wsTone != o.wsTone || n.wsToneKf != o.wsToneKf || n.wsToneLfo != o.wsToneLfo
-                      || n.wsToneEnv != o.wsToneEnv;
+                      || n.wsToneEnv != o.wsToneEnv || n.odType != o.odType || n.odLevel != o.odLevel || n.odDrive != o.odDrive
+                      || n.odDriveLfo != o.odDriveLfo || n.odDriveEnv != o.odDriveEnv || n.odTone != o.odTone || n.odToneKf != o.odToneKf
+                      || n.odToneLfo != o.odToneLfo || n.odToneEnv != o.odToneEnv;
     }
     ctl = c;
     for (int k = 0; k < 2; ++k)
@@ -633,6 +646,9 @@ void XtSynth::startVoice(int raw, int note, int vel) {
             c.lim.noteOn(limBlock(k));
         else if (c.type == 12)
             c.ws.noteOn(wsBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
+                        c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
+        else if (c.type == 13)
+            c.od.noteOn(odBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
                         c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
         else if (c.type >= 4)
             ;                                          // below, once the voice's pitch is set
@@ -848,6 +864,7 @@ void XtSynth::mixBlock(float* lr) {
                 else if (c.type == 8) c.fs.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type == 9) c.lofi.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type == 12) c.ws.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
+                else if (c.type == 13) c.od.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type >= 10) ;                // the Compressor and Limiter have no update
                 else if (c.type >= 5) c.sbf.update(v.curA, c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
                 else c.tvf.update(c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
@@ -868,8 +885,8 @@ void XtSynth::mixBlock(float* lr) {
         }
         // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA; the
         // Dynamic TVF's and Side Band Filters' followers, the Lo-Fi
-        // quantizer, the Compressor's envelope, the Limiter's levels and the
-        // Wave Shape curves read the XT's scale: int16 × 65536, i.e. the SOLO buffer
+        // quantizer, the Compressor's envelope, the Limiter's levels, the
+        // Wave Shape curves and the OD/Dist clips read the XT's scale: int16 × 65536, i.e. the SOLO buffer
         // (±1) × 2^31, the band players' (int16) × 2^16
         const float fs = cur->type == 1 ? 0x1p31f : 0x1p16f;
         for (Voice::CosmVoice& c : v.cs) {
@@ -883,6 +900,7 @@ void XtSynth::mixBlock(float* lr) {
             else if (c.type == 10) c.comp.process(tmp, fs);
             else if (c.type == 11) c.lim.process(tmp, fs);
             else if (c.type == 12) c.ws.process(tmp, fs);
+            else if (c.type == 13) c.od.process(tmp, fs);
             else if (c.type >= 5) c.sbf.process(tmp, fs);
             else c.tvf.process(tmp, fs);
         }
@@ -1011,6 +1029,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_LIM="threshold,ratio,attack,release,level": COSM 1 on, a Limiter (ratio 0..3). XT_LIM2: COSM 2's.
 //   XT_WS="type,level,drive,driveLfo,driveEnv,tone,toneKf,toneLfo,toneEnv": COSM 1 on, Wave Shape
 //     (type 0..5, KF in %); XT_CENV Drive's envelope, XT_CENVB Tone's. XT_WS2: COSM 2's.
+//   XT_OD="type,level,drive,driveLfo,driveEnv,tone,toneKf,toneLfo,toneEnv": COSM 1 on, OD/Dist
+//     (type 0 OD, 1 DS; KF in %); XT_CENV Drive's envelope, XT_CENVB Tone's. XT_OD2: COSM 2's.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -1114,6 +1134,12 @@ int main(int argc, char** argv) {
             m.on = true;
             m.type = 10;
             std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
+        }
+        if (const char* e = std::getenv(("XT_OD" + sfx).c_str())) {     // "type,level,drive,driveLfo,driveEnv,tone,toneKf,toneLfo,toneEnv"
+            m.on = true;
+            m.type = 13;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.odType, &m.odLevel, &m.odDrive, &m.odDriveLfo, &m.odDriveEnv, &m.odTone,
+                        &m.odToneKf, &m.odToneLfo, &m.odToneEnv);
         }
         if (const char* e = std::getenv(("XT_WS" + sfx).c_str())) {     // "type,level,drive,driveLfo,driveEnv,tone,toneKf,toneLfo,toneEnv"
             m.on = true;
