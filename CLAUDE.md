@@ -40,8 +40,17 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `ghidra.sh Script.java args`: headless Ghidra on rom.2 (DecompFn, Disasm,
   MkFunc then DecompFn for undefined functions, FuncAt, CallersOf).
 - `poolrefs.py [--16] <hex>`: code loading a constant/address, and raw words
-  equal to it (vtables, tables). `build/tools/fcheck/bin/rd <rom> <addr> <n>`:
+  equal to it (vtables, tables). `build/tools/bin/rd <rom> <addr> <n>`:
   RAM words after C startup (.data tables).
+- `pnames.py <lo> <hi>`: parameter names, defaults and ranges by ID (hex), and
+  each one's offset in a COSM converter's input.
+- `cosmcases.py <code>`: for a COSM block code, its DSP routines (mono, stereo)
+  and its cases in the binding, note-on, start values, block copy, update and
+  buffer allocator.
+- `mutate.sh <name> <old> <new> [cases] [pattern]`: builds xt_cosm with one
+  deliberate error in XtCosm.cpp and runs it, to show the check catches it.
+- `firorder.py <listing>`: the order of additions in an unrolled sum, by a
+  symbolic run of its disassembly (written for the Frequency Shifter's FIR).
 
 ## Firmware facts worth knowing
 - rom.2 maps at 0x89300000; .data/.bss up to 0x8a020000 (the interpreter sets
@@ -58,6 +67,36 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   ×2^31 from it, the band players' (int16) ×2^16.
 - `xt_fw solocmp` takes R and F as ratios (F 0 = none) and Energy as a gain
   0..1; `bandcmp` type 3 BACKING / 5 ENSEMBLE.
+
+## Porting a COSM type (v65–v73 did it this way)
+The type map (converters, block codes, DSP routines, which types are done) is
+in HARDWARE_FIRMWARE.md, "COSM: the Dual Filter, and the map of the types".
+1. `pnames.py` on the type's IDs; disassemble the converter (`ghidra.sh
+   Disasm.java`): it writes the code at +0 and the block. Note its curve
+   helpers (several call the firmware's powf/logf/expf; see v68, v69).
+2. `cosmcases.py <code>`, then disassemble each case and the mono DSP routine.
+   Read the asm, not the decompile. Note which envelope the binding puts in
+   slot 1 (it varies by type), what note-on clears (D+0x1c…0x88), and the
+   state the routine stores back.
+3. Port in XtCosm: Params, Block, `xt…Block` (the converter), and the object
+   (`noteOn`, `setBlock`, `update`, `process`). Read rom.2 tables in
+   `xtCosmLoadTables`; single precision through XtFloat, constants as `K()`
+   bit patterns (rom.2 often stores values a unit off the nearest float).
+   Types that depend on absolute level (followers, quantizers, envelopes) take
+   `process(lr, scale)` and work in the XT's units.
+4. Add a section to `XT_COSM_MAIN`, modelled on the last one: the converter's
+   whole block compared byte for byte; the firmware's own note-on
+   (`0x894edf70`, with the buffer pool's `0x894ec2b0` hooked for types with
+   buffers); updates; new blocks; the filter with its state and buffers
+   compared every block. Then `mutate.sh` a few likely mistakes.
+5. Wire it: XtSynth (`Controls::Cosm` fields, a type number, the block
+   function, `cosmSetBlock`, note-on, update, process), PluginProcessor
+   parameters (`cosm…`/`cosm2…`, the XT's defaults), the editor's type area
+   (`showCosmType`, `layoutCosm`), `TEST_*` in PluginTest, `XT_*` in the CLI.
+   Check `pt.sh` with the type, and a `TEST_SNAPSHOT_TYPE` snapshot.
+6. `fcheck.sh --update` (the diff must only add the new lines), `verify.sh`,
+   then the docs: a HARDWARE_FIRMWARE.md section (newest first) and its
+   type-map row, notes.txt, RESEARCH_LOG.md. Commit `vNN: …`.
 
 ## Building
 - Plugin (JUCE in ./JUCE): `SDKROOT=$SDK cmake --build build/plugin -j 10`
