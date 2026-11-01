@@ -195,6 +195,8 @@ int main(int argc, char** argv) {
     // TEST_LIM2: COSM 2's.  TEST_WS="type,level,drive,driveLfo,driveEnv,tone,
     // toneKf,toneLfo,toneEnv": Wave Shape (type 0..5, KF in %); TEST_WS2: COSM 2's.
     // TEST_OD="type,…": OD/Dist (type 0 OD, 1 DS; the rest as TEST_WS); TEST_OD2.
+    // TEST_AMP="type,bass,middle,treble,level,gain,gainLfo,gainEnv": the Amp
+    // Simulator (type 0..2); TEST_AMP2: COSM 2's.
     for (int k = 0; k < 2; ++k) {
         auto& m = refCtl.cosm[k];
         const std::string sfx = k ? "2" : "", pre = k ? "cosm2" : "cosm";
@@ -242,6 +244,15 @@ int main(int argc, char** argv) {
             m.type = 10;
             std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
             set("Switch", 1); set("Type", 10); set("CompAttack", m.compAttack); set("CompSustain", m.compSustain); set("CompLevel", m.compLevel);
+        }
+        if (const char* e = std::getenv(("TEST_AMP" + sfx).c_str())) {
+            m.on = true;
+            m.type = 14;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &m.ampType, &m.ampBass, &m.ampMiddle, &m.ampTreble, &m.ampLevel, &m.ampGain,
+                        &m.ampGainLfo, &m.ampGainEnv);
+            set("Switch", 1); set("Type", 14); set("AmpType", m.ampType); set("AmpBass", m.ampBass); set("AmpMiddle", m.ampMiddle);
+            set("AmpTreble", m.ampTreble); set("AmpLevel", m.ampLevel); set("AmpGain", m.ampGain); set("AmpGainLfo", m.ampGainLfo);
+            set("AmpGainEnv", m.ampGainEnv);
         }
         if (const char* e = std::getenv(("TEST_OD" + sfx).c_str())) {
             m.on = true;

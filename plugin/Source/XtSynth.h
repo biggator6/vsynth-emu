@@ -118,8 +118,8 @@ public:
         // follow the input's level by their Own Env depths −63..+63), 2
         // Dual Filter, 3 TB Filter, 4 Comb Filter, 5 or 6 the 1st or 2nd Side
         // Band Filter, 7 Resonator, 8 Frequency Shifter, 9 Lo-Fi, 10
-        // Compressor, 11 Limiter, 12 Wave Shape, 13 OD/Dist (their own
-        // parameters below); Filter
+        // Compressor, 11 Limiter, 12 Wave Shape, 13 OD/Dist, 14 Amp Simulator
+        // (their own parameters below); Filter
         // Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
         // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
         // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
@@ -190,6 +190,10 @@ public:
             // OD/Dist: Type 0 OD, 1 DS (latched at note-on), and the rest as
             // Wave Shape's
             int odType = 0, odLevel = 127, odDrive = 127, odDriveLfo = 0, odDriveEnv = 0, odTone = 127, odToneKf = 0, odToneLfo = 0, odToneEnv = 0;
+            // the Amp Simulator: Amp Type 0..2 (1..3); Bass, Middle, Treble
+            // and Output Level 0..127; Gain 0..127 with its LFO and Env
+            // depths −63..+63 (envA)
+            int ampType = 0, ampBass = 64, ampMiddle = 64, ampTreble = 64, ampLevel = 127, ampGain = 0, ampGainLfo = 0, ampGainEnv = 0;
             CosmEnv envA, envB;
             int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
             bool lfoKeySync = false;
@@ -234,7 +238,7 @@ private:
         XtLfo lfo;
         // the COSM sections: on as at note-on; each its TVF, Dual, TB, Comb or
         // Side Band Filter, Resonator, Frequency Shifter, Lo-Fi, Compressor,
-        // Limiter, Wave Shape or OD/Dist, envelopes
+        // Limiter, Wave Shape, OD/Dist or Amp Simulator, envelopes
         // (A: the Cutoff's, Filter 1's, the LPF's, Tone's, Width's, Size's,
         // Depth's, the Lo-Fi Filter's or Drive's; B: the Q's, Filter 2's, the
         // HPF's, Detune's, Balance's or Wave Shape's Tone) and LFO
@@ -253,6 +257,7 @@ private:
             XtCosmLim lim;
             XtCosmWs ws;
             XtCosmOd od;
+            XtCosmAmp amp;
             XtEnvelope envA, envB;
             XtLfo lfo;
         };
@@ -327,6 +332,7 @@ private:
     XtLimBlock limBlock(int k) const;
     XtWsBlock wsBlock(const Voice& v, int k) const;
     XtOdBlock odBlock(const Voice& v, int k) const;
+    XtAmpBlock ampBlock(const Voice& v, int k) const;
     void cosmSetBlock(Voice& v, int k);              // a new block for a sounding section (0x894ed8f0)
     float drawSeed();
 };

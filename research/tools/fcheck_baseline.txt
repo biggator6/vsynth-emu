@@ -57,6 +57,9 @@ ws filter: 120000 blocks of 32 frames, 0 different
 od converter: 200000 cases, 0 different
 od note-on, block and update: 26359 cases, 0 different
 od filter: 120000 blocks of 32 frames, 0 different
+amp converter: 200000 cases, 0 different
+amp note-on, block and update: 22871 cases, 0 different
+amp filter: 120000 blocks of 32 frames, 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

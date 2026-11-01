@@ -50,6 +50,9 @@ static const char* const kWsIds[8][2] = { { "WsLevel", "Lvl" }, { "WsDrive", "Dr
 // OD/Dist's, in the same places
 static const char* const kOdIds[8][2] = { { "OdLevel", "Lvl" }, { "OdDrive", "Drv" }, { "OdDriveLfo", "LFO" }, { "OdDriveEnv", "Env" },
                                           { "OdTone", "Tone" }, { "OdToneKF", "KF" }, { "OdToneLfo", "LFO" }, { "OdToneEnv", "Env" } };
+// The Amp Simulator's rows after its Type: Gain, its depths, Level; Bass, Middle, Treble
+static const char* const kAmpIds[7][2] = { { "AmpGain", "Gain" }, { "AmpGainLfo", "LFO" }, { "AmpGainEnv", "Env" }, { "AmpLevel", "Lvl" },
+                                           { "AmpBass", "Bass" }, { "AmpMiddle", "Mid" }, { "AmpTreble", "Treb" } };
 // The Limiter's row after its Ratio
 static const char* const kLimIds[4][2] = { { "LimThreshold", "Thr" }, { "LimAttack", "Atk" }, { "LimRelease", "Rel" }, { "LimLevel", "Lvl" } };
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
@@ -166,7 +169,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     }
-    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter", "Wave Shape", "OD/Dist" }, 1);
+    cosmTypeBox_.addItemList({ "TVF", "Dynamic TVF", "Dual Filter", "TB Filter", "Comb Filter", "1st Side Band", "2nd Side Band", "Resonator", "Frequency Shifter", "Lo-Fi", "Compressor", "Limiter", "Wave Shape", "OD/Dist", "Amp Simulator" }, 1);
     cosmTypeBox_.onChange = [this] { attachSideBand(); showCosmType(); };
     for (juce::Component* cpt : { (juce::Component*)&cosmSelBox_, (juce::Component*)&cosmBtn_, (juce::Component*)&cosmFilterBox_,
                                   (juce::Component*)&clfoWaveBox_, (juce::Component*)&clfoSyncBtn_, (juce::Component*)&cosmTypeBox_ })
@@ -384,6 +387,23 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         odRowLabels_[r].setText(r ? "OD Tone" : "OD/Dist", juce::dontSendNotification);
         styleSmall(odRowLabels_[r]);
     }
+    ampTypeBox_.addItemList({ "1", "2", "3" }, 1);
+    addAndMakeVisible(ampTypeBox_);
+    for (int i = 0; i < kAmpKnobs; ++i) {
+        juce::Slider& sl = ampSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        ampLabels_[i].setText(kAmpIds[i][1], juce::dontSendNotification);
+        styleSmall(ampLabels_[i]);
+    }
+    for (int r = 0; r < 2; ++r) {
+        ampRowLabels_[r].setText(r ? "Amp EQ" : "Amp", juce::dontSendNotification);
+        styleSmall(ampRowLabels_[r]);
+    }
     attachCosm(0);
     for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
@@ -447,7 +467,8 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
 // the depth and Env A rows (level slots 24..31), the Dual, TB, Comb and Side
 // Band Filters', the Resonator's, the Frequency Shifter's, Lo-Fi's, the
-// Compressor's, the Limiter's, Wave Shape's and OD/Dist's rows and its LFO.
+// Compressor's, the Limiter's, Wave Shape's, OD/Dist's and the Amp
+// Simulator's rows and its LFO.
 void VSynthEmuEditor::attachCosm(int k) {
     const juce::String pre = k ? "cosm2" : "cosm";
     cosmK_ = k;
@@ -521,6 +542,12 @@ void VSynthEmuEditor::attachCosm(int k) {
         odAtts_[i].reset();
         odAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kOdIds[i][0], odSliders_[i]);
     }
+    ampTypeAtt_.reset();
+    ampTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, pre + "AmpType", ampTypeBox_);
+    for (int i = 0; i < kAmpKnobs; ++i) {
+        ampAtts_[i].reset();
+        ampAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, pre + kAmpIds[i][0], ampSliders_[i]);
+    }
     clfoLabel_.setText(k ? "LFO 4" : "LFO 3", juce::dontSendNotification);
     attachSideBand();
     showCosmType();
@@ -532,7 +559,7 @@ void VSynthEmuEditor::attachCosm(int k) {
 void VSynthEmuEditor::showCosmType() {
     const int t = cosmTypeBox_.getSelectedItemIndex();
     const bool tvf = t <= 1, dtvf = t == 1, dual = t == 2, tb = t == 3, comb = t == 4, sb = t == 5 || t == 6, res = t == 7, fs = t == 8, lofi = t == 9, comp = t == 10,
-               lim = t == 11, ws = t == 12, od = t == 13;
+               lim = t == 11, ws = t == 12, od = t == 13, amp = t == 14;
     for (juce::Component* cpt : { (juce::Component*)&tvfLabel_, (juce::Component*)&cosmFilterBox_, (juce::Component*)&cosmCutLabel_,
                                   (juce::Component*)&cosmCutSlider_, (juce::Component*)&cosmResoLabel_, (juce::Component*)&cosmResoSlider_,
                                   (juce::Component*)&cosmKfLabel_, (juce::Component*)&cosmKfSlider_, (juce::Component*)&levelRowLabels_[6] })
@@ -575,6 +602,9 @@ void VSynthEmuEditor::showCosmType() {
     odTypeBox_.setVisible(od);
     for (int i = 0; i < kWsKnobs; ++i) { odLabels_[i].setVisible(od); odSliders_[i].setVisible(od); }
     for (juce::Label& l : odRowLabels_) l.setVisible(od);
+    ampTypeBox_.setVisible(amp);
+    for (int i = 0; i < kAmpKnobs; ++i) { ampLabels_[i].setVisible(amp); ampSliders_[i].setVisible(amp); }
+    for (juce::Label& l : ampRowLabels_) l.setVisible(amp);
 }
 
 // The Side Band rows show the 1st's parameters, or the 2nd's when the type
@@ -993,6 +1023,18 @@ void VSynthEmuEditor::layoutCosm(juce::Rectangle<int>& xt) {
             auto cell = row.removeFromLeft(w);
             compLabels_[i].setBounds(cell.removeFromLeft(34));
             compSliders_[i].setBounds(cell.withTrimmedRight(4));
+        }
+    }
+    for (int r = 0; r < 2; ++r) {                    // the Amp Simulator: Type + Gain, LFO, Env, Level; then Bass, Middle, Treble
+        auto row = rowOf(r);
+        ampRowLabels_[r].setBounds(row.removeFromLeft(56));
+        auto box = row.removeFromLeft(62);
+        if (r == 0) ampTypeBox_.setBounds(box.withTrimmedRight(6));
+        const int first = r ? 4 : 0, n = r ? 3 : 4, w = row.getWidth() / 4;
+        for (int i = first; i < first + n; ++i) {
+            auto cell = row.removeFromLeft(w);
+            ampLabels_[i].setBounds(cell.removeFromLeft(32));
+            ampSliders_[i].setBounds(cell.withTrimmedRight(3));
         }
     }
     {                                                // the Limiter: Ratio, Threshold, Attack, Release, Level

@@ -217,6 +217,16 @@ SOLO v44 (2026-10-29): stereo SOLO waves play both channels through one
   (XT_ROUND=nearest to match the emulator; VSE_TRACE=file traces as EmuSolo;
   EMUSOLO_CH=2 makes EmuSolo.java play L/R pairs.)
 
+AMP SIMULATOR v77 (2026-11-01): COSM Type 3 (HARDWARE_FIRMWARE.md, "COSM:
+  the Amp Simulator"). XtCosm: XtAmpParams, xtAmpBlock (0x894dcd80),
+  XtCosmAmp (start 0x894ec540, block 0x894ecfe0, update 0x894ee920, note-on
+  0x894ee170, filter 0x894f8a30 → 0x894f79d0 / 0x894f7f00 / 0x894f8450 by
+  Type; process(lr, scale) in the XT's units; Type 2's constant-16 quirk
+  kept). XtSynth: Cosm.type 14 with ampType…ampGainEnv; slot 1 envA (Gain),
+  no slot 2. Plugin params cosmAmpType (1–3), AmpBass, AmpMiddle, AmpTreble,
+  AmpLevel, AmpGain, AmpGainLfo, AmpGainEnv (and cosm2…). XT_AMP / TEST_AMP
+  "type,bass,middle,treble,level,gain,gainLfo,gainEnv".
+
 OD/DIST v76 (2026-11-01): COSM Type 1 (HARDWARE_FIRMWARE.md, "COSM:
   OD/Dist"). XtCosm: XtOdParams, xtOdBlock (0x894dc8b0; block code 1 OD or 2
   DS; Tone through keyTone), XtCosmOd (start 0x894ec3a8, block 0x894ecce0,

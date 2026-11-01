@@ -1330,6 +1330,115 @@ void XtCosmOd::process(float* lr, float scale) {
 }
 
 
+// ── The Amp Simulator ──
+
+XtAmpBlock xtAmpBlock(const XtAmpParams& p, float velA) {
+    XtAmpBlock b;
+    b.type = (int8_t)p.type;
+    b.bass = add(div(mul(flt(clampi((int16_t)p.bass, 0, 127)), 4.0f), 127.0f), 0.0f);
+    b.middle = add(div(flt(clampi((int16_t)p.middle, 0, 127)), 127.0f), 0.0f);
+    b.treble = add(div(mul(flt(clampi((int16_t)p.treble, 0, 127)), 2.0f), 127.0f), 0.0f);
+    b.level = div(flt(T.gain[clampi((int16_t)p.level, 0, 127)]), 32768.0f);       // not clamped in rom.2: 0…127 as stored
+    b.gain = div(flt(T.gain[clampi((int16_t)p.gain, 0, 127)]), 32768.0f);
+    b.gainEnv = envDepth(velA, p.gainEnv);
+    b.gainLfo = sq63(clampi((int16_t)p.gainLfo, -63, 63));
+    return b;
+}
+
+float XtCosmAmp::gainOf(float env, float lfo) const {
+    return fmac(clampf(fmac(blk.gainLfo, lfo, fmac(blk.gainEnv, env, blk.gain)), 0.0f, 1.0f), 7.0f, 1.0f);
+}
+
+void XtCosmAmp::noteOn(const XtAmpBlock& b, float env1Start, float env1Out, float r1, float lfo1) {
+    for (float& x : st) x = 0.0f;                      // 0x894edf70 clears D+0x1c…0x88
+    blk = b;
+    g = gainOf(env1Start, lfo1);                       // 0x894ec540
+    rate1 = mul(r1, 4.0f);
+    setBlock(b, env1Out, lfo1);
+    sl[0] = b.level; sl[1] = b.treble; sl[2] = b.middle; sl[3] = b.bass;   // 0x894ee170
+}
+
+void XtCosmAmp::setBlock(const XtAmpBlock& b, float env1, float lfo1) {
+    blk = b;
+    gT = gainOf(env1, lfo1);
+}
+
+void XtCosmAmp::update(float env1, float r1, float lfo1) {
+    rate1 = mul(r1, 4.0f);
+    gT = gainOf(env1, lfo1);
+}
+
+void XtCosmAmp::process(float* lr, float scale) {
+    const float d1 = mul(sub(gT, g), rate1);
+    const float k01 = K(0x3dcccccd);
+    sl[0] = fmac(k01, sub(blk.level, sl[0]), sl[0]);
+    sl[1] = fmac(k01, sub(blk.treble, sl[1]), sl[1]);
+    sl[2] = fmac(k01, sub(blk.middle, sl[2]), sl[2]);
+    sl[3] = fmac(k01, sub(blk.bass, sl[3]), sl[3]);
+    const float level = sl[0], treble = sl[1], mid = sl[2], bass = sl[3];
+    const float kIn = K(0x2fffffff), kOut = K(0x4f000000), unscale = 1.0f / scale;   // 2^−31 a unit low, 2^31
+    auto clip = [](float v) { return v > 0.5f ? 0.5f : (-0.5f > v ? -0.5f : v); };
+    // the clip stage: this sample (v) and the midpoint (m), both already doubled
+    auto stage = [&](float v, float m, float& last) {
+        const float c = clip(v), mc = clip(m), prev = last;
+        last = c;
+        return fmac(0.5f, mc, fmac(prev, 0.25f, mul(c, 0.25f)));
+    };
+    auto cubic = [](float y) {                         // (y³ − 0.5·y² − 4·y)/7
+        const float y2 = mul(y, y), y3 = mul(y, y2);
+        return fmac(y3, K(0x3e12491a), fmac(y2, K(0xbd92495d), mul(y, K(0xbf12492b))));
+    };
+    float* const s = st;
+    for (int i = 0; i < 32; ++i) {
+        if ((i & 3) == 0) g = add(g, d1);              // before every fourth sample
+        float u = mul(mul(mul(lr[2 * i], scale), kIn), g);
+        float out;
+        if (blk.type == 1) {                           // 0x894f7f00
+            u = sub(u, s[0]); s[0] = fmac(K(0x3b3e3630), u, s[0]);
+            const float p = s[1];
+            u = sub(u, s[1]); s[1] = fmac(K(0x3f149a55), u, s[1]);
+            const float z = cubic(stage(mul(2.0f, s[1]), add(p, s[1]), s[2]));
+            const float hi = sub(z, s[3]); s[3] = fmac(K(0x3e7531da), hi, s[3]);
+            const float h = sub(s[3], s[4]); s[4] = fmac(K(0x3d80db26), h, s[4]);
+            const float t = fmac(bass, s[4], fmac(mid, h, mul(hi, treble)));
+            const float m2 = mul(add(t, s[5]), 8.0f);
+            s[5] = t;
+            const float z2 = cubic(stage(mul(t, 16.0f), m2, s[6]));
+            const float hp = sub(z2, s[7]); s[7] = fmac(K(0x3bbe3631), hp, s[7]);
+            out = mul(mul(hp, level), kOut);
+        } else if (blk.type == 2) {                    // 0x894f8450
+            u = sub(u, s[0]); s[0] = fmac(K(0x3b39ecf5), u, s[0]);
+            u = sub(u, s[1]); s[1] = fmac(K(0x3e6d0586), u, s[1]);
+            const float h = sub(s[1], s[2]); s[2] = fmac(K(0x3cca1994), h, s[2]);
+            const float t = fmac(bass, s[2], fmac(mid, h, mul(u, treble)));
+            const float m = add(s[3], t);
+            s[3] = t;
+            const float z = cubic(stage(mul(t, 2.0f), m, s[4]));
+            const float hp = sub(z, s[5]); s[5] = fmac(K(0x3c88b6f3), hp, s[5]);
+            const float m2 = mul(add(s[6], hp), 8.0f);
+            s[6] = hp;
+            const float z2 = cubic(stage(16.0f, m2, s[7]));    // 16 in place of 16·hp, as the firmware has it
+            s[8] = fmac(K(0x3e8b50b1), sub(z2, s[8]), s[8]);
+            const float d = sub(s[8], s[9]); s[9] = fmac(K(0x3c3252ce), d, s[9]);
+            out = mul(mul(d, level), kOut);
+        } else {                                       // 0x894f79d0 (Type 0; D+0x28 unused)
+            u = sub(u, s[0]); s[0] = fmac(K(0x3bedc3bc), u, s[0]);
+            const float p = s[1];
+            u = sub(u, s[1]); s[1] = fmac(K(0x3f1de3fc), u, s[1]);
+            const float z = cubic(stage(mul(2.0f, s[1]), add(p, s[1]), s[2]));
+            const float p4 = s[4];
+            s[4] = fmac(K(0x3e05be1a), sub(z, s[4]), s[4]);
+            const float z2 = cubic(stage(mul(s[4], 16.0f), mul(add(p4, s[4]), 8.0f), s[5]));
+            const float hi = sub(z2, s[6]); s[6] = fmac(K(0x3e6c4751), hi, s[6]);
+            const float h = sub(s[6], s[7]); s[7] = fmac(K(0x3d1d84e1), h, s[7]);
+            const float t = fmac(bass, s[7], fmac(mid, h, mul(hi, treble)));
+            out = mul(mul(t, kOut), level);
+        }
+        lr[2 * i] = lr[2 * i + 1] = mul(out, unscale);
+    }
+}
+
+
 // ── The Compressor ──
 
 XtCompBlock xtCompBlock(const XtCompParams& p) {
@@ -1439,7 +1548,7 @@ void XtCosmLim::process(float* lr, float scale) {
 
 
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi, the Compressor, the Limiter, Wave Shape and OD/Dist against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi, the Compressor, the Limiter, Wave Shape, OD/Dist and the Amp Simulator against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -2880,7 +2989,120 @@ int main(int argc, char** argv) {
     }
     std::printf("od note-on, block and update: %ld cases, %ld different\n", vn3, vb3);
     std::printf("od filter: %ld blocks of 32 frames, %ld different\n", tn3, tb3);
+
+    // The Amp Simulator (block code 4): the converter (0x894dcd80), then the
+    // note-on, updates, new blocks (0x894ee4a0) and the filter (0x894f8a30,
+    // the three amps)
+    auto ampParams = [&]() {
+        XtAmpParams p;
+        p.type = (int)(rnd() % 3); p.bass = (int)(rnd() % 128); p.middle = (int)(rnd() % 128); p.treble = (int)(rnd() % 128);
+        p.level = (int)(rnd() % 128); p.gain = (int)(rnd() % 128); p.gainLfo = (int)(rnd() % 127) - 63; p.gainEnv = (int)(rnd() % 127) - 63;
+        return p;
+    };
+    auto writeAmp = [&](const XtAmpBlock& b, int cosm) {
+        std::vector<uint8_t> z(0x2c, 0);
+        c.write(BLK, z.data(), 0x2c);
+        c.wr32(BLK, 4); c.wr8(BLK + 4, (uint8_t)b.type); wf(BLK + 8, b.gain); wf(BLK + 0xc, b.gainEnv); c.wr32(BLK + 0x10, cosm ? 11 : 9);
+        wf(BLK + 0x14, b.gainLfo); c.wr32(BLK + 0x18, cosm ? 4 : 3); wf(BLK + 0x1c, b.bass); wf(BLK + 0x20, b.middle);
+        wf(BLK + 0x24, b.treble); wf(BLK + 0x28, b.level);
+    };
+    long ab3 = 0, an3 = 0;
+    for (int k = 0; k < 200000; ++k) {
+        const XtAmpParams p = ampParams();
+        const int cosm = (int)(rnd() & 1), key = (int)(rnd() % 128);
+        const float va = (float)(rnd() % 32769) / 32768.0f, vb = (float)(rnd() % 32769) / 32768.0f;
+        std::vector<uint8_t> z(0x100, 0);
+        c.write(IN, z.data(), 0x100); c.write(OUT, z.data(), 0x100);
+        c.wr8(IN + 2, (uint8_t)cosm); c.wr8(IN + 3, (uint8_t)key);
+        const int vals[8] = { p.type, p.bass, p.middle, p.treble, p.level, p.gain, p.gainLfo, p.gainEnv };
+        for (int i = 0; i < 8; ++i) c.wr16(IN + 0x12 + 2 * (uint32_t)i, (uint16_t)(int16_t)vals[i]);
+        wf(IN + 0x34, va); wf(IN + 0x38, vb);
+        if (!c.call(0x894dcd80, { IN, OUT }, sp)) { std::fprintf(stderr, "amp converter: %s\n", c.error().c_str()); return 1; }
+        writeAmp(xtAmpBlock(p, va), cosm);
+        ++an3;
+        std::vector<uint8_t> fw(0x2c), pt(0x2c);
+        c.read(OUT, fw.data(), 0x2c); c.read(BLK, pt.data(), 0x2c);
+        if (fw != pt && ab3++ < 5) {
+            std::printf("  amp converter key %d:", key);
+            for (uint32_t i = 0; i < 0x2c; i += 4)
+                if (c.rd32(OUT + i) != c.rd32(BLK + i)) std::printf(" +%02x fw %08x port %08x", i, c.rd32(OUT + i), c.rd32(BLK + i));
+            std::printf("\n");
+        }
+    }
+    std::printf("amp converter: %ld cases, %ld different\n", an3, ab3);
+    auto ampSame = [&](const XtCosmAmp& port) {
+        bool ok = same(f32(D + 0xbc), port.gain()) && same(f32(D + 0xa4), port.gainTarget());
+        for (uint32_t i = 0; i < 4; ++i) ok = ok && same(f32(D + 0x8c + 4 * i), port.slews()[i]);
+        for (uint32_t i = 0; i < 10; ++i) ok = ok && same(f32(D + 0x1c + 4 * i), port.state()[i]);
+        return ok;
+    };
+    long bb3 = 0, bn3 = 0, cb3 = 0, cn3 = 0;
+    for (int g = 0; g < nCases; ++g) {
+        const int cosm = (int)(rnd() & 1);
+        std::vector<uint8_t> z(0x200, 0);
+        c.write(OBJ, z.data(), 0x200);
+        for (uint32_t o = 0x74; o < 0x150; o += 4) wf(OBJ + o, frnd(-1, 1));                        // the last note's state
+        for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+        c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);   // slot 1 Gain's
+        const float bva = frnd(0, 1);
+        const XtAmpBlock b = xtAmpBlock(ampParams(), bva);
+        writeAmp(b, cosm);
+        const float e1S = frnd(-1, 1), l1 = frnd(-1, 1);
+        float o1 = frnd(-1, 1), ol1 = l1;
+        const float r1 = frnd(0.2f, 1.0f) / 32.0f;
+        wf(EQ + 0x58, e1S); wf(EC + 0x58, frnd(-1, 1)); wf(LQ + 0x38, l1); wf(LC + 0x38, frnd(-1, 1)); wf(EQ + 0x4c, o1);
+        wf(EC + 0x4c, frnd(-1, 1)); wf(EQ + 0x54, r1); wf(EC + 0x54, frnd(0.2f, 1.0f) / 32.0f);
+        if (!c.call(0x894edf70, { OBJ, BLK, 0 }, sp)) { std::fprintf(stderr, "amp note-on: %s\n", c.error().c_str()); return 1; }
+        XtCosmAmp port;
+        port.noteOn(b, e1S, o1, r1, l1);
+        ++bn3;
+        if (!ampSame(port) && bb3++ < 5)
+            std::printf("  amp note-on %d: fw gain %.9g t %.9g level %.9g, port %.9g %.9g %.9g\n", g, f32(D + 0xbc), f32(D + 0xa4), f32(D + 0x8c),
+                        port.gain(), port.gainTarget(), port.slews()[0]);
+        for (int blkN = 0; blkN < 40; ++blkN) {
+            if (blkN % 14 == 13 || blkN % 14 == 3) {                  // updates
+                o1 = frnd(-1, 1); ol1 = frnd(-1, 1);
+                const float nr1 = frnd(0.2f, 1.0f) / 32.0f;
+                wf(EQ + 0x4c, o1); wf(LQ + 0x38, ol1); wf(EQ + 0x54, nr1);
+                c.fb[0][4] = 0x3f800000;
+                if (!c.call(0x894ee6a0, { OBJ }, sp)) { std::fprintf(stderr, "amp update: %s\n", c.error().c_str()); return 1; }
+                port.update(o1, nr1, ol1);
+                ++bn3;
+                if (!ampSame(port) && bb3++ < 5)
+                    std::printf("  amp update %d.%d: fw t %.9g, port %.9g\n", g, blkN, f32(D + 0xa4), port.gainTarget());
+            } else if (blkN % 14 == 8 && (rnd() & 1)) {               // a parameter change while the note sounds
+                XtAmpParams np = ampParams();
+                np.type = b.type;
+                const XtAmpBlock nb3 = xtAmpBlock(np, bva);
+                writeAmp(nb3, cosm);
+                if (!c.call(0x894ee4a0, { OBJ, BLK }, sp)) { std::fprintf(stderr, "amp block: %s\n", c.error().c_str()); return 1; }
+                port.setBlock(nb3, o1, ol1);
+                ++bn3;
+                if (!ampSame(port) && bb3++ < 5)
+                    std::printf("  amp block %d.%d: fw t %.9g, port %.9g\n", g, blkN, f32(D + 0xa4), port.gainTarget());
+            }
+            float lr[64];
+            const int ar = (int)(rnd() % 6);
+            const float amp = ar == 0 ? 30000.0f : ar == 1 ? 1.0e7f : ar == 2 ? 1.0e8f : ar == 3 ? 6.0e8f : ar == 4 ? 2.1e9f : 1.0f;
+            for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-amp, amp); lr[2 * i + 1] = frnd(-amp, amp); }
+            for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+            if (!c.call(0x894f8a30, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "amp filter: %s\n", c.error().c_str()); return 1; }
+            port.process(lr);
+            ++cn3;
+            bool ok = ampSame(port);
+            for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
+            if (!ok && cb3++ < 6) {
+                std::printf("  amp filter %d block %d type %d: fw out %.9g %.9g gain %.9g, port %.9g %.9g %.9g; states", g, blkN, b.type, f32(BUF),
+                            f32(BUF + 248), f32(D + 0xbc), lr[0], lr[62], port.gain());
+                for (uint32_t i = 0; i < 10; ++i)
+                    if (!same(f32(D + 0x1c + 4 * i), port.state()[i])) std::printf(" [%u] %.9g/%.9g", i, f32(D + 0x1c + 4 * i), port.state()[i]);
+                std::printf("\n");
+            }
+        }
+    }
+    std::printf("amp note-on, block and update: %ld cases, %ld different\n", bn3, bb3);
+    std::printf("amp filter: %ld blocks of 32 frames, %ld different\n", cn3, cb3);
     return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb || sb[0] || sb[1] || nb[0] || nb[1] || pb[0] || pb[1]
-        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 || kb3 || ob3 || fb3 || wb3 || xb3 || yb3 || ub3 || vb3 || tb3 ? 3 : 0;
+        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 || kb3 || ob3 || fb3 || wb3 || xb3 || yb3 || ub3 || vb3 || tb3 || ab3 || bb3 || cb3 ? 3 : 0;
 }
 #endif

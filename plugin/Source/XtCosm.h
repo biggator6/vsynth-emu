@@ -2,8 +2,8 @@
 // The V-Synth XT's COSM sections: the TVF (COSM Type 10), the Dynamic TVF (11),
 // the Dual Filter (9), the TB Filter (16), the Comb Filter (8), the Side
 // Band Filters (6, 7), the Resonator (5), the Frequency Shifter (14), Lo-Fi
-// (15), the Compressor (12), the Limiter (13), Wave Shape (2) and OD/Dist
-// (1; below XtCosmTvf).  Each oscillator
+// (15), the Compressor (12), the Limiter (13), Wave Shape (2), OD/Dist (1)
+// and the Amp Simulator (3; below XtCosmTvf).  Each oscillator
 // pair's tone has two COSM sections in series between the oscillator mixer
 // and the TVA (the tone render 0x894f6d40).  The patch's parameters go
 // through a converter per type (0x894de3b0 → 0x894dd870 for the TVF) into a
@@ -747,6 +747,63 @@ private:
     float s[9] = {};
     float driveOf(float env, float lfo) const;
     float toneOf(float env, float lfo, float lo) const;
+};
+
+// The Amp Simulator (COSM Type 3, block code 4): three guitar amps, each a
+// chain of filters, clippers and a cubic shaper with a Bass/Middle/Treble
+// stack.  Parameters 0x8e2…0x8e9: Amp Type 0…2 (shown 1…3; 0), Bass,
+// Middle, Treble 0…127 (64), Output Level 0…127 (127), Gain 0…127 (0) with
+// LFO and Env depths ±63.  Gain takes Env A (Env 9, COSM 2 Env 11) and its
+// velocity factor and LFO 3 (4); nothing is bound to slot 2.
+struct XtAmpParams {
+    int type = 0, bass = 64, middle = 64, treble = 64, level = 127, gain = 0, gainLfo = 0, gainEnv = 0;
+};
+
+// The converter's block (0x894dcd80): the Type as a byte; Bass·4/127,
+// Middle/127, Treble·2/127; Level and Gain through rom.2's 128 shorts at
+// 0x897cfcb8 / 32768; Gain's LFO depth (d/63)·|d/63|, its Env depth A ×
+// (d/63)·|d/63|.
+struct XtAmpBlock {
+    int type = 0;
+    float gain = 0, gainEnv = 0, gainLfo = 0, bass = 0, middle = 0, treble = 0, level = 1.0f;
+};
+XtAmpBlock xtAmpBlock(const XtAmpParams& p, float velA);
+
+// The object for block code 4 (0x894f8a30 → 0x894f79d0, 0x894f7f00 or
+// 0x894f8450 by Type).  Gain' = 1 + 7 × (Gain + depths × Env A and the LFO,
+// within 0…1) (start values 0x894ec540; targets from the block 0x894ecfe0
+// and the update 0x894ee920), stepped before every fourth sample; Level,
+// Treble, Middle and Bass slew 0.1 per block toward the block's (0x894ee170
+// sets them at note-on).  Each amp works on x·Gain'/2^31 (2^−31 a unit low)
+// and ends × 2^31 × Level.  Its stages:
+//   the clip stage: c = clip(2·v, ±0.5), m = clip(v + v', ±0.5) (or 16·v and
+//   8·(v + v')), out 0.25·c + 0.25·c' + 0.5·m;
+//   the cubic: (y³ − 0.5·y² − 4·y)/7;
+//   the stack: Treble × the highpass + Middle × the band + Bass × the low.
+// Type 2's second clip stage takes 16 itself for 16·v (a firmware quirk:
+// that term always clips to 0.5, a bias of 0.25 before the cubic).
+class XtCosmAmp {
+public:
+    // Note-on (0x894edf70): states cleared, the start value, rate, then the
+    // block with the envelope's output, and the slewed values at the block's.
+    void noteOn(const XtAmpBlock& b, float env1Start, float env1Out, float rate1, float lfo1);
+    void setBlock(const XtAmpBlock& b, float env1, float lfo1);                // 0x894ecfe0
+    void update(float env1, float rate1, float lfo1);                          // 0x894ee920
+    // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
+    // the buffer's units against the XT's (int16 × 65536).
+    void process(float* lr, float scale = 1.0f);
+
+    // The state, for the firmware checks (D = object + 0x58).
+    float gain() const { return g; }                 // D+0xbc
+    float gainTarget() const { return gT; }          // D+0xa4
+    const float* slews() const { return sl; }        // D+0x8c Level, +0x90 Treble, +0x94 Middle, +0x98 Bass
+    const float* state() const { return st; }        // D+0x1c…0x40
+
+private:
+    XtAmpBlock blk;
+    float g = 1.0f, gT = 1.0f, rate1 = 0, sl[4] = { 1.0f, 0, 0, 0 };
+    float st[10] = {};
+    float gainOf(float env, float lfo) const;
 };
 
 // The Limiter (COSM Type 13, block code 16): a gain follower with a 10-sample

@@ -1544,6 +1544,108 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the Amp Simulator (2026-11-01, v77)
+
+COSM Type 3, block code 4: three guitar amps, each a chain of one-pole
+filters, double-rate clippers and a cubic shaper with a Bass/Middle/Treble
+stack. It has no buffers. Only slot 1 (Gain's Env A) and LFO 3 (4) are
+bound.
+
+**Parameters** (0x8e2…0x8e9, second descriptor bank):
+
+| ID | Parameter | Range | Default |
+|---|---|---|---|
+| 0x8e2 | Amp Type (shown 1–3) | 0…2 | 0 |
+| 0x8e3 | Bass | 0…127 | 64 |
+| 0x8e4 | Middle | 0…127 | 64 |
+| 0x8e5 | Treble | 0…127 | 64 |
+| 0x8e6 | Output Level | 0…127 | 127 |
+| 0x8e7 | Gain | 0…127 | 0 |
+| 0x8e8 | Gain LFO Depth | ±63 | 0 |
+| 0x8e9 | Gain Env Depth | ±63 | 0 |
+
+**The converter** (`0x894dcd80`) writes the block:
+- +4 Amp Type, a byte;
+- +0x1c Bass·4/127, +0x20 Middle/127, +0x24 Treble·2/127, each clamped to
+  0…127 first (Treble with a controller term);
+- +0x28 Level and +8 Gain, through the 128 shorts at 0x897cfcb8 / 32768;
+- +0xc Gain's Env depth (A), +0x10 its envelope (9 or 11), +0x14 its LFO
+  depth, +0x18 its LFO.
+
+**The object** (start values `0x894ec540`; block copy `0x894ecfe0`; update
+`0x894ee920`):
+- Gain' = 1 + 7 × clamp(Gain + Env·depth + LFO·depth, 0…1): ×1 to ×8
+  (D+0xbc; target D+0xa4).
+- Note-on (`0x894ee170`) sets Level, Treble, Middle and Bass in use
+  (D+0x8c…0x98) to the block's.
+
+**The filter** (`0x894f8a30`; the stereo table's entry is `0x894fa890`):
+- It calls `0x894f79d0`, `0x894f7f00` or `0x894f8450` by Type.
+- Per block:
+  - Level, Treble, Middle and Bass slew 0.1 toward the block's;
+  - Gain' steps before every fourth sample.
+- Each amp works on u = x · 2^−31 (one unit low, 0x2fffffff) · Gain', and
+  ends × 2^31 × Level.
+- The shared pieces:
+  - one-pole stages s += k·(in − s): their output s is a lowpass, and in − s
+    (before the step) a highpass;
+  - the clip stage: c = clip(a·v, ±0.5) and m = clip(a/2·(v + v'), ±0.5),
+    out = 0.25·c + 0.25·c' + 0.5·m (a = 2 or 16), so it clips at twice the
+    rate;
+  - the cubic (y³ − 0.5·y² − 4·y)/7 (0x3e12491a, 0xbd92495d, 0xbf12492b);
+  - the stack: Treble × the highpass + Middle × the band (a lowpass's step)
+    + Bass × the lowest lowpass.
+
+The three chains (k from rom.2; a for each clip stage):
+
+| Type | Chain |
+|---|---|
+| 0 | highpass 0.007256 → lowpass 0.61676 → clip (a 2) → cubic → lowpass 0.130608 → clip (a 16) → cubic → stack (0.230741, 0.0384568) |
+| 1 | highpass 0.0029024 → lowpass 0.58048 → clip (a 2) → cubic → stack (0.239448, 0.062918) → clip (a 16) → cubic → highpass 0.0058048 |
+| 2 | highpass 0.002837 → stack (0.231466, 0.0246704) → clip (a 2) → cubic → highpass 0.0166888 → clip (16, see below) → cubic → lowpass 0.2721 → highpass 0.010884 |
+
+Quirk: Type 2's second clip stage loads the constant 16 where Types 0 and 1
+multiply the signal by 16 (`fmov fr0,fr3` for `fmul fr0,fr3`), in all four
+unrolled copies.
+- That term always clips to 0.5.
+- The stage outputs 0.25 + 0.5·clip(8·(v + v')), so the cubic sees a bias of
+  0.25 and only the midpoint's signal.
+- The last highpass removes the bias from the output.
+
+The states are D+0x1c…0x40 (Type 0 leaves D+0x28 unused), cleared at
+note-on.
+
+**Port and checks** (`xt_cosm`, new lines; the others unchanged):
+- the converter: 200,000 cases;
+- note-on (the firmware's own), updates and new blocks: 22,871 cases;
+- the filter: 120,000 blocks, all three Types, at levels from 1 to 2.1e9;
+- all 0 different.
+- Deliberate errors are caught:
+  - Type 2's quirk replaced by 16·v;
+  - Type 0's midpoint from the new state alone;
+  - a one-sided clip;
+  - the cubic's y² sign flipped;
+  - 8 for 7;
+  - 2^−31 as C rounds it;
+  - Treble and Middle swapped;
+  - Bass not slewed;
+  - Gain' stepped every sample;
+  - Type 1's last highpass a unit off.
+- XtSynth runs it in the XT's units, as Lo-Fi.
+
+**Plugin.**
+- COSM Type gains Amp Simulator (index 14), with its own parameters
+  (cosmAmp… and cosm2…) at the XT's defaults. Its rows are Amp (Type, Gain
+  and its depths, Level) and Amp EQ (Bass, Middle, Treble).
+- Measured on a 441 Hz sine (EQ at 64, Level 127; levels as peaks in the
+  SOLO buffer, ±1):
+  - Types as shown (1–3, the firmware's 0–2). At Gain 0, quiet sines gain
+    +19.7, +23.1 and +11.6 dB for Types 1–3.
+    A −20 dB sine already clips to odd harmonics, 3rd about −10 to −14 dB.
+  - Gain 127 adds 18 dB more on quiet sines, and clips from −40 dB.
+  - The cubic's y² term adds a 2nd harmonic. It is strongest on Type 2
+    (−15 dB at −6 dB in).
+
 ### COSM: OD/Dist (2026-11-01, v76)
 
 COSM Type 1: a filtered hard clipper. The converter writes block code 1 (OD)
@@ -2576,7 +2678,7 @@ routine table (.data 0x8987c7ec) is indexed by that code. The block copy
 |---|---|---|---|---|---|
 | 1 | OD/Dist | 0x8d0–0x8d8 | `0x894dc8b0` | 1 or 2 | `0x894fef70`, `0x894fc570` (v76) |
 | 2 | Wave Shape | 0x8d9–0x8e1 | `0x894dcbf0` | 3 | `0x89503ef0` (v75) |
-| 3 | Amp Simulator | 0x8e2–0x8e9 | `0x894dcd80` | 4 | `0x894f8a30` |
+| 3 | Amp Simulator | 0x8e2–0x8e9 | `0x894dcd80` | 4 | `0x894f8a30` (v77) |
 | 4 | Speaker Simulator | 0x8ea | inline | 5 | `0x89501300` |
 | 5 | Resonator | 0x8eb–0x8f2 | `0x894dcf00` | 6 | `0x894ffa10` (v69) |
 | 6 | 1st Side Band Filter | 0x8f3–0x900 | `0x894dd0a0` | 7 | `0x89500640` (v68) |

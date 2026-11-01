@@ -2873,3 +2873,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
   - a Type change during a note is ignored until the next note.
 - My first port misread OD's first limit as 2^30. The check caught it at the
   first loud block. It now equals the firmware in the interpreter.
+
+### Session 16 addendum (2026-11-01) — v77: Amp Simulator
+
+- The Amp Simulator (COSM Type 3) has three amps, one routine each. Each is
+  a chain of one-pole filters, two double-rate clippers at ±0.5 of the
+  normalised signal, two cubic shapers and a Bass/Middle/Treble stack.
+  - Type 1: the stack comes last.
+  - Type 2: the stack sits between the stages.
+  - Type 3: the stack comes first.
+- Firmware quirk kept: Type 3's second clipper (Type 2 in the firmware)
+  loads the constant 16 where the others multiply the signal by 16. That
+  term is always clipped to 0.5, so the cubic sees a fixed bias, which adds
+  even harmonics. The last highpass removes the DC.
+- All of it equals the firmware in the interpreter, all three Types.

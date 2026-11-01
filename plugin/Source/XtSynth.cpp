@@ -406,6 +406,15 @@ XtOdBlock XtSynth::odBlock(const Voice& v, int k) const {
     return xtOdBlock(p, v.note, va, vb);
 }
 
+// An Amp Simulator block (0x894dcd80): Gain's Env depth by A.
+XtAmpBlock XtSynth::ampBlock(const Voice& v, int k) const {
+    const Controls::Cosm& c = ctl.cosm[k];
+    XtAmpParams p;
+    p.type = c.ampType; p.bass = c.ampBass; p.middle = c.ampMiddle; p.treble = c.ampTreble; p.level = c.ampLevel;
+    p.gain = c.ampGain; p.gainLfo = c.ampGainLfo; p.gainEnv = c.ampGainEnv;
+    return xtAmpBlock(p, xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve));
+}
+
 // A Limiter's block (0x894ddd20).
 XtLimBlock XtSynth::limBlock(int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
@@ -416,7 +425,8 @@ XtLimBlock XtSynth::limBlock(int k) const {
 
 // The TVF's slot 1 is its Q (envB), the Dual Filter's Filter 1, the TB
 // Filter's LPF, the Resonator's Size, the Frequency Shifter's Depth, the
-// Lo-Fi Filter, Wave Shape's and OD/Dist's Drive (envA), the Comb and Side Band
+// Lo-Fi Filter, Wave Shape's and OD/Dist's Drive and the Amp's Gain (envA),
+// the Comb and Side Band
 // Filters' Detune (envB).
 void XtSynth::cosmSetBlock(Voice& v, int k) {
     Voice::CosmVoice& c = v.cs[k];
@@ -429,6 +439,7 @@ void XtSynth::cosmSetBlock(Voice& v, int k) {
     if (c.type == 11) { c.lim.setBlock(limBlock(k)); return; }
     if (c.type == 12) { c.ws.setBlock(wsBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
     if (c.type == 13) { c.od.setBlock(odBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
+    if (c.type == 14) { c.amp.setBlock(ampBlock(v, k), c.envA.level(), c.lfo.out()); return; }
     if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else if (c.type == 3) c.tb.setBlock(tbBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
     else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
@@ -510,7 +521,9 @@ void XtSynth::setControls(const Controls& c) {
                       || n.wsDriveEnv != o.wsDriveEnv || n.wsTone != o.wsTone || n.wsToneKf != o.wsToneKf || n.wsToneLfo != o.wsToneLfo
                       || n.wsToneEnv != o.wsToneEnv || n.odType != o.odType || n.odLevel != o.odLevel || n.odDrive != o.odDrive
                       || n.odDriveLfo != o.odDriveLfo || n.odDriveEnv != o.odDriveEnv || n.odTone != o.odTone || n.odToneKf != o.odToneKf
-                      || n.odToneLfo != o.odToneLfo || n.odToneEnv != o.odToneEnv;
+                      || n.odToneLfo != o.odToneLfo || n.odToneEnv != o.odToneEnv || n.ampType != o.ampType || n.ampBass != o.ampBass
+                      || n.ampMiddle != o.ampMiddle || n.ampTreble != o.ampTreble || n.ampLevel != o.ampLevel || n.ampGain != o.ampGain
+                      || n.ampGainLfo != o.ampGainLfo || n.ampGainEnv != o.ampGainEnv;
     }
     ctl = c;
     for (int k = 0; k < 2; ++k)
@@ -650,6 +663,8 @@ void XtSynth::startVoice(int raw, int note, int vel) {
         else if (c.type == 13)
             c.od.noteOn(odBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
                         c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
+        else if (c.type == 14)
+            c.amp.noteOn(ampBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
         else if (c.type >= 4)
             ;                                          // below, once the voice's pitch is set
         else
@@ -865,6 +880,7 @@ void XtSynth::mixBlock(float* lr) {
                 else if (c.type == 9) c.lofi.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type == 12) c.ws.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
                 else if (c.type == 13) c.od.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
+                else if (c.type == 14) c.amp.update(c.envA.level(), c.envA.smooth(), c.lfo.out());
                 else if (c.type >= 10) ;                // the Compressor and Limiter have no update
                 else if (c.type >= 5) c.sbf.update(v.curA, c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
                 else c.tvf.update(c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
@@ -886,7 +902,7 @@ void XtSynth::mixBlock(float* lr) {
         // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA; the
         // Dynamic TVF's and Side Band Filters' followers, the Lo-Fi
         // quantizer, the Compressor's envelope, the Limiter's levels, the
-        // Wave Shape curves and the OD/Dist clips read the XT's scale: int16 × 65536, i.e. the SOLO buffer
+        // Wave Shape curves and the OD/Dist and Amp clips read the XT's scale: int16 × 65536, i.e. the SOLO buffer
         // (±1) × 2^31, the band players' (int16) × 2^16
         const float fs = cur->type == 1 ? 0x1p31f : 0x1p16f;
         for (Voice::CosmVoice& c : v.cs) {
@@ -901,6 +917,7 @@ void XtSynth::mixBlock(float* lr) {
             else if (c.type == 11) c.lim.process(tmp, fs);
             else if (c.type == 12) c.ws.process(tmp, fs);
             else if (c.type == 13) c.od.process(tmp, fs);
+            else if (c.type == 14) c.amp.process(tmp, fs);
             else if (c.type >= 5) c.sbf.process(tmp, fs);
             else c.tvf.process(tmp, fs);
         }
@@ -1031,6 +1048,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //     (type 0..5, KF in %); XT_CENV Drive's envelope, XT_CENVB Tone's. XT_WS2: COSM 2's.
 //   XT_OD="type,level,drive,driveLfo,driveEnv,tone,toneKf,toneLfo,toneEnv": COSM 1 on, OD/Dist
 //     (type 0 OD, 1 DS; KF in %); XT_CENV Drive's envelope, XT_CENVB Tone's. XT_OD2: COSM 2's.
+//   XT_AMP="type,bass,middle,treble,level,gain,gainLfo,gainEnv": COSM 1 on, the Amp Simulator
+//     (type 0..2); XT_CENV Gain's envelope. XT_AMP2: COSM 2's.
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -1134,6 +1153,12 @@ int main(int argc, char** argv) {
             m.on = true;
             m.type = 10;
             std::sscanf(e, "%d,%d,%d", &m.compAttack, &m.compSustain, &m.compLevel);
+        }
+        if (const char* e = std::getenv(("XT_AMP" + sfx).c_str())) {    // "type,bass,middle,treble,level,gain,gainLfo,gainEnv"
+            m.on = true;
+            m.type = 14;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &m.ampType, &m.ampBass, &m.ampMiddle, &m.ampTreble, &m.ampLevel, &m.ampGain,
+                        &m.ampGainLfo, &m.ampGainEnv);
         }
         if (const char* e = std::getenv(("XT_OD" + sfx).c_str())) {     // "type,level,drive,driveLfo,driveEnv,tone,toneKf,toneLfo,toneEnv"
             m.on = true;
