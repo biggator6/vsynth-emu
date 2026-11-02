@@ -535,6 +535,38 @@ XtCombBlock xtCombBlock(const XtCombParams& p, float velA, float velB) {
     return b;
 }
 
+void XtCosmSection::update(float pitch, float a, float aRate, float b, float bRate, float lfo) {
+    if (type == 2) dual.update(a, aRate, lfo, b, bRate, lfo);
+    else if (type == 3) tb.update(a, lfo, b, lfo);
+    else if (type == 4) comb.update(pitch, b, bRate, lfo, a, aRate, lfo);
+    else if (type == 7) res.update(a, aRate, lfo, b, bRate, lfo);
+    else if (type == 8) fs.update(a, aRate, lfo, b, bRate, lfo);
+    else if (type == 9) lofi.update(a, aRate, lfo, b, bRate, lfo);
+    else if (type == 12) ws.update(a, aRate, lfo, b, bRate, lfo);
+    else if (type == 13) od.update(a, aRate, lfo, b, bRate, lfo);
+    else if (type == 14) amp.update(a, aRate, lfo);
+    else if (type >= 10) ;                // the Compressor, Limiter and Speaker Simulator have no update
+    else if (type >= 5) sbf.update(pitch, b, bRate, lfo, a, aRate, lfo);
+    else tvf.update(b, bRate, lfo, a, aRate, lfo);
+}
+
+void XtCosmSection::process(float* lr, float scale) {
+    if (type == 2) dual.process(lr);
+    else if (type == 3) tb.process(lr);
+    else if (type == 4) comb.process(lr);
+    else if (type == 7) res.process(lr);
+    else if (type == 8) fs.process(lr);
+    else if (type == 9) lofi.process(lr, scale);
+    else if (type == 10) comp.process(lr, scale);
+    else if (type == 11) lim.process(lr, scale);
+    else if (type == 12) ws.process(lr, scale);
+    else if (type == 13) od.process(lr, scale);
+    else if (type == 14) amp.process(lr, scale);
+    else if (type == 15) spk.process(lr);
+    else if (type >= 5) sbf.process(lr, scale);
+    else tvf.process(lr, scale);
+}
+
 float xtCosmRootHz(int originalPitch, bool robot) {
     if (robot) return 440.0f;
     // 0x894f21c0: (P·100 − 0 + 0)/1200 − 5.75 (as stored), exp2, × 44000 × 0.01

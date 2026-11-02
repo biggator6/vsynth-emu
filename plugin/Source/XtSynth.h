@@ -229,6 +229,8 @@ public:
         // OSC SYNC, Original Level, Attack and Release Times, between the OSCs and
         // COSM 1.  Off, or MIX, is the sum.
         XtModParams mod;
+        // Structure Type (ID 0x293): 0…2, Type1…Type3 on the panel (xtToneOrder).
+        int structure = 0;
     };
 
     XtSynth();
@@ -274,6 +276,7 @@ private:
     struct Voice : OscVoice {                  // OSC 1's in the base
         OscVoice osc2;
         XtMod mod;                     // kept across notes, as the tone's
+        int structure = 0;             // the Structure Type as at note-on (the tone's +0x1770)
         bool active = false, releasing = false;
         int note = -1;                 // the key, with the Octave Shift
         int raw = -1;                  // the key as played (the tone's +0x42), for note-off
@@ -290,23 +293,8 @@ private:
         // (A: the Cutoff's, Filter 1's, the LPF's, Tone's, Width's, Size's,
         // Depth's, the Lo-Fi Filter's or Drive's; B: the Q's, Filter 2's, the
         // HPF's, Detune's, Balance's or Wave Shape's Tone) and LFO
-        struct CosmVoice {
+        struct CosmVoice : XtCosmSection {
             bool on = false;
-            int type = 0;                      // the type as at note-on
-            XtCosmTvf tvf;
-            XtCosmDual dual;
-            XtCosmTb tb;
-            XtCosmComb comb;
-            XtCosmSbf sbf;
-            XtCosmRes res;
-            XtCosmFs fs;
-            XtCosmLofi lofi;
-            XtCosmComp comp;
-            XtCosmLim lim;
-            XtCosmWs ws;
-            XtCosmOd od;
-            XtCosmAmp amp;
-            XtCosmSpk spk;
             XtEnvelope envA, envB;
             XtLfo lfo;
         };

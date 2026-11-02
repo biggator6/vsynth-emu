@@ -76,6 +76,7 @@ namespace Params {
     static const juce::String kModType       = "modType";        // MIX, RING, FM, ENV RING, OSC SYNC
     static const juce::String kModLevel      = "modLevel";
     static const juce::String kModAttack     = "modAttack";
+    static const juce::String kStructure     = "structure";      // Structure Type, Type1…Type3
     static const juce::String kModRelease    = "modRelease";
     // Key assign: Mono/Poly (MONO, POLY), Legato Switch, Octave Shift −3..+3
     static const juce::String kMonoPoly      = "monoPoly";
@@ -627,6 +628,8 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kModLevel, "MOD Original Level", 0, 127, 127));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kModAttack, "MOD Attack Time", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kModRelease, "MOD Release Time", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kStructure, "Structure Type",
+        juce::StringArray { "Type1", "Type2", "Type3" }, 0));
 
     return { params.begin(), params.end() };
 }
@@ -758,6 +761,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.mod.level    = knob(Params::kModLevel);
     c.mod.attack   = knob(Params::kModAttack);
     c.mod.release  = knob(Params::kModRelease);
+    c.structure    = knob(Params::kStructure);
     for (int k = 0; k < 2; ++k) {
         using Params::cosmId;
         XtSynth::Controls::Cosm& m = c.cosm[k];

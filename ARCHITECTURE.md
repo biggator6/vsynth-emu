@@ -272,13 +272,16 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      no glide.
    - OSC 2 (v86): a second analog oscillator on the same note, with its own
      pitch, level, envelopes (Env 5…8) and LFO 2, summed with OSC 1 before the
-     COSM sections, as the MOD section does when off or set to MIX. The
-     render is the first Structure Type's. X-MOD on OSC 1 (v87) reads OSC 2's
-     output instead, so OSC 2 is not heard.
+     COSM sections, as the MOD section does when off or set to MIX. X-MOD on OSC 1
+     (v87) reads OSC 2's output instead, so OSC 2 is not heard.
    - the MOD section (v88–v91, XtMod): between the OSCs and the COSMs, MIX, RING, FM,
      ENV RING and OSC SYNC, with the Original Level, Attack and Release; a held note keeps
      its routine when the knobs change, as the firmware's does. FM's delay lines are one
      pool for all voices, as on the XT.
+   - the Structure Type (v92): the order of the sections, latched at note-on (`xtToneOrder`).
+     Type1: OSC 2, OSC 1, MOD, COSM 1, COSM 2. Type2: COSM 1 on OSC 1 before the MOD. Type3:
+     COSM 2 on OSC 2, COSM 1 on OSC 1, then the MOD, with COSM 2 following OSC 2's pitch and
+     root (`xtCosmOsc`), and X-MOD reading OSC 2 after COSM 2.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -329,6 +332,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - The MOD section (v88–v91): the converter's block, the note-on, a new block on a
   held note, all five Types, FM's lines and OSC SYNC's mask and note-on rule, alone and in
   the firmware's own render and tone note-on, equal the firmware (`xt_analog`).
+- The Structure Types (v92): a tone run by the firmware's own note-on, update and three
+  renders, the MOD and both COSM sections live on all sixteen types, equals the port block by
+  block (`xt_analog`); `mixBlock` walks the same order table as the check.
 - X-MOD (v87): its converter case on both OSCs, and the routine alone and under
   the firmware's own OSC 2 in the tone's render, equal the firmware (`xt_analog`).
 - OSC 2 (v86): the converter with the input's OSC set, and both voices in a tone
@@ -348,7 +354,7 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 **Not yet:**
 - the patch TVA's own Level, Level KF, pan and LFO terms are not
   modelled;
-- OSC 2 plays only ANALOG, not PCM, and there is no Structure Type but the first;
+- OSC 2 plays only ANALOG, not PCM;
 - no V-Synth voice layer (filters, LFOs, effects);
 - no step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and

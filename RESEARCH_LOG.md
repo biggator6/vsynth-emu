@@ -3135,3 +3135,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - A PCM OSC 1 cannot be restarted. It gets a sample-and-hold subtracted at each mask bit, at half level. Nobody would call that sync, and I would like to hear a real one.
 - LA-SAW as the master quietly becomes SAW. The firmware does it to the block in the note-on, just for OSC 2 and just this waveform.
 - MOD checks: 99 deliberate errors over the four versions, one of them exact. The holes they showed were more useful than the 0s: c never moving, v never other than 1. The worst hole no planted error showed: the tone passes read a cleared OSC 2 for two versions, found by reading the code for the next pass.
+
+### Session 16 addendum (2026-11-02) — v92: the Structure Types
+
+- Type2 and Type3 are in. The renders are short and read plainly, but the note-on and the update each have their own switch on the Structure, so the difference is in four places, not one. In Type3 COSM 2 follows OSC 2's pitch and root at note-on and at every update. A Comb on COSM 2 tuned to E5 under an A4 OSC 1 shows it at once: 659 Hz at −9 dB against −52 dB in Type1.
+- For the first time the check runs a tone by the firmware's own note-on, update and render with the COSM sections live, and it passed once the tables XtSynth sets were set in the check. The types that looked wrong were the ones using them. It is worth remembering when a unit-sized difference appears: a missing key-scale table looks just like a rounding error.
+- Two old gaps showed up because the sections now run together. A COSM object's fields left by a note of another type, and FM reading below its line pool into memory that is no longer empty. Neither is a Structure error. Both are written down, and the second is one v89 predicted.
+- COSM on an OSC that is off can make sound. Wave Shape does. So in Type3 the mix cannot skip OSC 2's buffer because OSC 2 is off. I did not chase which types do it. It would make an odd patch: a filter section as a DC source.
+- Still only the firmware in the interpreter. Type3 with X-MOD under a filter is exactly the kind of patch I would like to hear from a real unit.

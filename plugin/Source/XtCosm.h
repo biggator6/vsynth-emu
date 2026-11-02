@@ -892,6 +892,38 @@ private:
     std::vector<float> buf;
 };
 
+// A COSM section's objects and what the tone's update and render do by its type: the
+// types by XtSynth's numbers, 0 TVF, 1 Dynamic TVF, 2 Dual, 3 TB, 4 Comb, 5 and 6 Side
+// Band, 7 Resonator, 8 Frequency Shifter, 9 Lo-Fi, 10 Compressor, 11 Limiter, 12 Wave
+// Shape, 13 OD/Dist, 14 Amp, 15 Speaker.  The envelopes: A is the Cutoff's, Filter 1's,
+// the LPF's, Tone's, Width's, Size's, Depth's, the Lo-Fi Filter's or Drive's; B the Q's,
+// Filter 2's, the HPF's, Detune's, Balance's or Wave Shape's Tone.
+struct XtCosmSection {
+    int type = 0;                      // the type as at note-on
+    XtCosmTvf tvf;
+    XtCosmDual dual;
+    XtCosmTb tb;
+    XtCosmComb comb;
+    XtCosmSbf sbf;
+    XtCosmRes res;
+    XtCosmFs fs;
+    XtCosmLofi lofi;
+    XtCosmComp comp;
+    XtCosmLim lim;
+    XtCosmWs ws;
+    XtCosmOd od;
+    XtCosmAmp amp;
+    XtCosmSpk spk;
+    // The update (0x894ee6a0).  pitch: the ratio of the OSC it follows (xtCosmOsc);
+    // each envelope's output and rate, and the LFO's.
+    void update(float pitch, float a, float aRate, float b, float bRate, float lfo);
+    // The mono routine.  scale: the buffer's units to the XT's, for the types that read
+    // absolute levels (the Dynamic TVF's and Side Band Filters' followers, the Lo-Fi
+    // quantizer, the Compressor's envelope, the Limiter's levels, the Wave Shape curves,
+    // the OD/Dist and Amp clips).
+    void process(float* lr, float scale);
+};
+
 // The coefficients from the modulated values (0x894eecb0): Q + its depths ×
 // the envelope and LFO, within −1…−1/64; Cutoff + its depths, through the
 // table at ·127 (linearly between entries), at most the cap at 127 −

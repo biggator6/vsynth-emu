@@ -207,6 +207,18 @@ void xtAnalogMix(float* lr, const float* b, float scale) {
     for (int i = 0; i < 64; ++i) lr[i] = add(lr[i], b[i] * scale);
 }
 
+const XtToneStep* xtToneOrder(int structure) {
+    using S = XtToneStep;
+    static const XtToneStep order[3][6] = {
+        { S::Osc2, S::Osc1, S::Mod, S::Cosm1, S::Cosm2, S::End },
+        { S::Osc2, S::Osc1, S::Cosm1, S::Mod, S::Cosm2, S::End },
+        { S::Osc2, S::Cosm2OnOsc2, S::Osc1, S::Cosm1, S::Mod, S::End },
+    };
+    return order[structure];
+}
+
+int xtCosmOsc(int structure, int k) { return structure == 2 && k == 1 ? 1 : 0; }
+
 void xtModBlock(const XtModParams& p, XtModBlock& b) {
     const int type = p.on ? p.type : 0;
     if (type < 1 || type > 4) { b.type = 0; b.a = b.b = 1.0f; return; }
@@ -1668,6 +1680,7 @@ uint32_t XtAnalogOsc::subLaSaw(float* lr, uint32_t sync) {
 #include "XtFirmware.h"
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <vector>
 int main(int argc, char** argv) {
     if (argc < 2 || !xtAnalogLoadTables(argv[1]) || !xtOscLoadTables(argv[1]) || !xtCosmLoadTables(argv[1]) || !xtFwOpen(argv[1])) {
@@ -2837,6 +2850,421 @@ int main(int argc, char** argv) {
     if (!modObjPass("mod osc sync", { 4, 4, 0, 1, 3 })) return 1;
     if (!modTonePass("mod osc sync", 4)) return 1;
     std::printf("mod osc sync tone: %ld blocks with OSC 2's mask at OSC 1, LA-SAW to SAW on %ld notes\n", modSyncBlocks, modLaSaw);
+
+    // The Structure Types.  A tone run by the firmware's own note-on (0x894f5e60), update
+    // (0x894f75f0) and render (through its pointer at +0x1774), the two OSCs, the MOD and
+    // both COSM sections live, on any of the sixteen types.  Only the envelopes' and LFOs'
+    // note-ons and ticks are hooked, for outputs the check sets, and the TVA stubbed.
+    for (uint32_t a : { 0x894ee480u, 0x894edf70u, 0x894eef70u, 0x894f7330u }) c.unhook(a);
+    const uint32_t kOs = ram + 0x3a900, SIN = ram + 0x3f500, kCosm[2] = { TN + 0x1388, TN + 0x14ec }, kCosmB[2] = { TB + 0x5ec, TB + 0x634 };
+    const uint32_t kCosmBuf = ram + 0x50000;
+    c.wr32(0x898585dc, kOs);                     // the OS's lock owner
+    for (uint32_t a : { 0x89301920u, 0x89301930u, 0x894f54b0u, 0x894f5560u, 0x894f5360u, 0x894efdf0u, 0x894f1050u }) c.hook(a, [](Sh4& m) { m.ret(0); });
+    for (uint32_t k : kCosm) if (!c.call(0x894edec0, { k }, sp)) { std::fprintf(stderr, "cosm: %s\n", c.error().c_str()); return 1; }   // its vtable
+    if (!c.call(0x894fc4c0, {}, sp)) { std::fprintf(stderr, "tb constants: %s\n", c.error().c_str()); return 1; }                       // run at start-up
+    {   // the keyfollow tables, as XtSynth sets them
+        std::vector<float> v;
+        if (!xtFwCosmKeySquares(v)) { std::fprintf(stderr, "key squares failed\n"); return 1; }
+        xtCosmSetKeySquares(v.data());
+        if (!xtFwOscTimeKeyScales(v)) { std::fprintf(stderr, "key scales failed\n"); return 1; }
+        xtOscSetTimeKeyScales(v.data());
+    }
+    float sEnv[14], sRate[14], sStart[14], sLfo[8];
+    bool sAtk[2] = {};
+    c.hook(0x894f0130, [&](Sh4& m) {             // an envelope's note-on: the outputs this note starts from
+        const uint32_t e = (m.r[4] - (TN + 0x1780)) / 0x70;
+        if (e < 14) {
+            const uint32_t E = envAt(e);
+            wf(E + 0x4c, sEnv[e]); wf(E + 0x54, sRate[e]); wf(E + 0x58, sStart[e]);
+            if (e == 4 || e == 8) { wf(E + 0x1c, sAtk[e / 4 - 1] ? 25.0f : 0.0f); wf(E + 0x2c, 0.0f); }
+        }
+        m.ret(0);
+    });
+    c.hook(0x894f0cf0, [&](Sh4& m) {             // a key-synced LFO's
+        const uint32_t l = (m.r[4] - (TN + 0x1da0)) / 0x98;
+        if (l < 8) wf(lfoAt(l) + 0x38, sLfo[l]);
+        m.ret(0);
+    });
+    uint32_t sBufNext = 0;
+    c.hook(0x894ec2b0, [&](Sh4& m) {             // the COSMs' buffers (the pool's slot finder), which the allocator clears
+        for (uint32_t i = 0; i < 4; ++i) m.wr32(m.r[5] + 4 * i, kCosmBuf + 0x4000 * sBufNext++);
+        m.ret(0);
+    });
+    uint32_t sm1 = 0, sm2 = 0;                   // the masks, as the renders hold them
+    c.hook(0x894f6d78, [&](Sh4& m) { sm2 = m.r[0]; m.r[6] = m.r[0]; m.pc += 2; });        // mov r0,r6
+    c.hook(0x894f6e5a, [&](Sh4& m) { sm2 = m.r[0]; m.r[6] = m.r[0]; m.pc += 2; });        // mov r0,r6
+    c.hook(0x894f6f7a, [&](Sh4& m) { sm2 = m.r[0]; m.r[2] = 0x15; m.pc += 2; });          // mov #0x15,r2
+    c.hook(0x894f6da8, [&](Sh4& m) { sm1 = m.r[0]; m.r[9] += 8; m.pc += 2; });            // add #8,r9
+    c.hook(0x894f6e86, [&](Sh4& m) { sm1 = m.r[0]; m.r[2] = 0x14; m.pc += 2; });          // mov #0x14,r2
+    c.hook(0x894f6fc4, [&](Sh4& m) { sm1 = m.r[0]; m.r[2] = 0x14; m.pc += 2; });          // mov #0x14,r2
+    struct SBlocks {
+        XtTvfBlock tvf; XtDualBlock dual; XtTbBlock tb; XtCombBlock comb; XtSbfBlock sbf; XtResBlock res; XtFsBlock fs; XtLofiBlock lofi;
+        XtCompBlock comp; XtLimBlock lim; XtWsBlock ws; XtOdBlock od; XtAmpBlock amp; XtSpkBlock spk;
+    };
+    // a parameter's draws, by the types' ranges
+    auto d63 = [&]() { return (int)(rnd() % 127) - 63; };
+    auto d127 = [&]() { return (int)(rnd() % 128); };
+    auto d20 = [&]() { return (int)(rnd() % 41) - 20; };
+    auto d100 = [&]() { return (int)(rnd() % 201) - 100; };
+    // COSM section k's block: the firmware's own converter into the tone block, the port's beside it
+    auto cosmConvert = [&](int k, int type, int key, SBlocks& b) {
+        const float va = frnd(0, 1), vb = frnd(0, 1);
+        std::vector<uint8_t> z2(0x80, 0);
+        c.write(SIN, z2.data(), 0x80);
+        c.wr8(SIN + 2, (uint8_t)k); c.wr8(SIN + 3, (uint8_t)key);
+        wf(SIN + 0x34, va); wf(SIN + 0x38, vb);
+        std::vector<int> v;
+        uint32_t conv = 0;
+        switch (type) {
+        case 0: case 1: {
+            XtTvfParams p;
+            p.filter = (int)(rnd() % 12); p.q = d127(); p.qLfo = d63(); p.qEnv = d63(); p.cutoff = d127(); p.keyfollow = d20(); p.cutoffLfo = d63(); p.cutoffEnv = d63();
+            if (type == 0) { v = { p.filter, p.q, p.qLfo, p.qEnv, p.cutoff, p.keyfollow, p.cutoffLfo, p.cutoffEnv }; conv = 0x894dd870; b.tvf = xtTvfBlock(p, key, va, vb); }
+            else {
+                p.qOwn = d63(); p.cutoffOwn = d63();
+                v = { p.filter, p.q, p.qLfo, p.qOwn, p.qEnv, p.cutoff, p.keyfollow, p.cutoffLfo, p.cutoffOwn, p.cutoffEnv };
+                conv = 0x894dda40; b.tvf = xtDtvfBlock(p, key, va, vb);
+            }
+            break;
+        }
+        case 2: {
+            XtDualParams p;
+            p.type = (int)(rnd() % 3); p.freq1 = d127(); p.kf1 = d20(); p.q1 = d127(); p.lfo1 = d63(); p.env1 = d63(); p.freq2 = d127(); p.kf2 = d20(); p.q2 = d127(); p.lfo2 = d63(); p.env2 = d63();
+            v = { p.type, p.freq1, p.kf1, p.q1, p.lfo1, p.env1, p.freq2, p.kf2, p.q2, p.lfo2, p.env2 };
+            conv = 0x894dd690; b.dual = xtDualBlock(p, key, va, vb);
+            break;
+        }
+        case 3: {
+            XtTbParams p;
+            p.lpfCutoff = d127(); p.lpfKf = d20(); p.lpfLfo = d63(); p.lpfEnv = d63(); p.q = d127(); p.qFollow = d63(); p.hpfCutoff = d127(); p.hpfKf = d20(); p.hpfLfo = d63(); p.hpfEnv = d63(); p.gain = d127();
+            v = { p.lpfCutoff, p.lpfKf, p.lpfLfo, p.lpfEnv, p.q, p.qFollow, p.hpfCutoff, p.hpfKf, p.hpfLfo, p.hpfEnv, p.gain };
+            conv = 0x894de110; b.tb = xtTbBlock(p, key, va, vb);
+            break;
+        }
+        case 4: {
+            XtCombParams p;
+            p.octave = (int)(rnd() % 5); p.detune = d100(); p.detuneLfo = d63(); p.detuneEnv = d63(); p.tone = d127(); p.toneLfo = d63(); p.toneEnv = d63();
+            v = { p.octave, p.detune, p.detuneLfo, p.detuneEnv, p.tone, p.toneLfo, p.toneEnv };
+            conv = 0x894dd4f0; b.comb = xtCombBlock(p, va, vb);
+            break;
+        }
+        case 5: case 6: {
+            XtSbfParams p;
+            p.second = type == 6;
+            p.hpf = d127(); p.q = d127(); p.lpf = d127(); p.lpfKf = d20(); p.subDetune = d100(); p.octave = (int)(rnd() % 3); p.detune = d100(); p.detuneLfo = d63(); p.detuneOwn = d63(); p.detuneEnv = d63();
+            p.width = d127(); p.widthKf = d20(); p.widthLfo = d63(); p.widthOwn = d63(); p.widthEnv = d63();
+            if (type == 5) v = { p.hpf, p.lpf, p.lpfKf, p.subDetune, p.octave, p.detune, p.detuneLfo, p.detuneOwn, p.detuneEnv, p.width, p.widthKf, p.widthLfo, p.widthOwn, p.widthEnv };
+            else v = { p.q, p.lpf, p.lpfKf, p.octave, p.detune, p.detuneLfo, p.detuneOwn, p.detuneEnv, p.width, p.widthKf, p.widthLfo, p.widthOwn, p.widthEnv };
+            conv = type == 5 ? 0x894dd0a0 : 0x894dd2c0; b.sbf = xtSbfBlock(p, key, va, vb);
+            break;
+        }
+        case 7: {
+            XtResParams p;
+            p.type = (int)(rnd() % 3); p.size = d127(); p.sizeKf = d20(); p.sizeLfo = d63(); p.sizeEnv = d63(); p.balance = (int)(rnd() % 101); p.balanceLfo = d63(); p.balanceEnv = d63();
+            v = { p.type, p.size, p.sizeKf, p.sizeLfo, p.sizeEnv, p.balance, p.balanceLfo, p.balanceEnv };
+            conv = 0x894dcf00; b.res = xtResBlock(p, key, va, vb);
+            break;
+        }
+        case 8: {
+            XtFsParams p;
+            p.depth = d127(); p.depthKf = d20(); p.depthLfo = d63(); p.depthEnv = d63(); p.balance = (int)(rnd() % 101); p.balanceLfo = d63(); p.balanceEnv = d63();
+            v = { p.depth, p.depthKf, p.depthLfo, p.depthEnv, p.balance, p.balanceLfo, p.balanceEnv };
+            conv = 0x894ddde0; b.fs = xtFsBlock(p, key, va, vb);
+            break;
+        }
+        case 9: {
+            XtLofiParams p;
+            p.bitDown = (int)(rnd() % 16); p.rateDown = (int)(rnd() % 6); p.filter = d127(); p.filterKf = d20(); p.filterLfo = d63(); p.filterEnv = d63(); p.balance = (int)(rnd() % 101); p.balanceLfo = d63(); p.balanceEnv = d63();
+            v = { p.bitDown, p.rateDown, p.filter, p.filterKf, p.filterLfo, p.filterEnv, p.balance, p.balanceLfo, p.balanceEnv };
+            conv = 0x894ddf80; b.lofi = xtLofiBlock(p, key, va, vb);
+            break;
+        }
+        case 10: {
+            XtCompParams p;
+            p.attack = d127(); p.sustain = d127(); p.level = d127();
+            v = { p.attack, p.sustain, p.level };
+            conv = 0x894ddc50; b.comp = xtCompBlock(p);
+            break;
+        }
+        case 11: {
+            XtLimParams p;
+            p.threshold = d127(); p.ratio = (int)(rnd() % 4); p.attack = d127(); p.release = d127(); p.level = d127();
+            v = { p.threshold, p.ratio, p.attack, p.release, p.level };
+            conv = 0x894ddd20; b.lim = xtLimBlock(p);
+            break;
+        }
+        case 12: {
+            XtWsParams p;
+            p.type = (int)(rnd() % 6); p.level = d127(); p.drive = d127(); p.driveEnv = d63(); p.driveLfo = d63(); p.tone = d127(); p.toneKf = d20(); p.toneLfo = d63(); p.toneEnv = d63();
+            v = { p.type, p.level, p.drive, p.driveEnv, p.driveLfo, p.tone, p.toneKf, p.toneLfo, p.toneEnv };
+            conv = 0x894dcbf0; b.ws = xtWsBlock(p, key, va, vb);
+            break;
+        }
+        case 13: {
+            XtOdParams p;
+            p.type = (int)(rnd() & 1); p.level = d127(); p.drive = d127(); p.driveLfo = d63(); p.driveEnv = d63(); p.tone = d127(); p.toneKf = d20(); p.toneLfo = d63(); p.toneEnv = d63();
+            v = { p.type, p.level, p.drive, p.driveLfo, p.driveEnv, p.tone, p.toneKf, p.toneLfo, p.toneEnv };
+            conv = 0x894dc8b0; b.od = xtOdBlock(p, key, va, vb);
+            break;
+        }
+        case 14: {
+            XtAmpParams p;
+            p.type = (int)(rnd() % 3); p.bass = d127(); p.middle = d127(); p.treble = d127(); p.level = d127(); p.gain = d127(); p.gainLfo = d63(); p.gainEnv = d63();
+            v = { p.type, p.bass, p.middle, p.treble, p.level, p.gain, p.gainLfo, p.gainEnv };
+            conv = 0x894dcd80; b.amp = xtAmpBlock(p, va);
+            break;
+        }
+        default: {
+            b.spk = { (int)(rnd() % 12) };
+            v = { b.spk.type };
+            conv = 0x894dcef0;
+            break;
+        }
+        }
+        for (size_t i = 0; i < v.size(); ++i) c.wr16(SIN + 0x12 + 2 * (uint32_t)i, (uint16_t)(int16_t)v[i]);
+        return c.call(conv, { SIN, kCosmB[k] }, sp);
+    };
+    // the port's note-on, the envelopes' and LFO's outputs as at the firmware's (XtSynth::startVoice)
+    auto cosmNoteOn = [&](XtCosmSection& s, const SBlocks& b, float pitch, float root, int k) {
+        const uint32_t ea = 9 + 2 * (uint32_t)k, eb = ea + 1;
+        const float aS = sStart[ea], aO = sEnv[ea], aR = sRate[ea], bS = sStart[eb], bO = sEnv[eb], bR = sRate[eb], l = sLfo[3 + k];
+        switch (s.type) {
+        case 2: s.dual.noteOn(b.dual, aS, aO, aR, l, bS, bO, bR, l); break;
+        case 3: s.tb.noteOn(b.tb, aO, l, bO, l); break;
+        case 4: s.comb.noteOn(b.comb, pitch, root, bS, bO, bR, l, aS, aO, aR, l); break;
+        case 5: case 6: s.sbf.noteOn(b.sbf, pitch, root, bS, bO, bR, l, aS, aO, aR, l); break;
+        case 7: s.res.noteOn(b.res, aS, aO, aR, l, bS, bO, bR, l); break;
+        case 8: s.fs.noteOn(b.fs, aS, aO, aR, l, bS, bO, bR, l); break;
+        case 9: s.lofi.noteOn(b.lofi, aS, aO, aR, l, bS, bO, bR, l); break;
+        case 10: s.comp.noteOn(b.comp); break;
+        case 11: s.lim.noteOn(b.lim); break;
+        case 12: s.ws.noteOn(b.ws, aS, aO, aR, l, bS, bO, bR, l); break;
+        case 13: s.od.noteOn(b.od, aS, aO, aR, l, bS, bO, bR, l); break;
+        case 14: s.amp.noteOn(b.amp, aS, aO, aR, l); break;
+        case 15: s.spk.noteOn(b.spk); break;
+        default: s.tvf.noteOn(b.tvf, bS, bO, bR, l, aS, aO, aR, l); break;
+        }
+    };
+    auto sect = std::make_unique<XtCosmSection[]>(2);
+    long sN = 0, sB = 0, sD[3] = {}, sNotes[3] = {}, sTypes[16] = {}, sOn2[3] = {}, sSync[3] = {}, sXmod = 0, sOff = 0, sPitch = 0;
+    float sPeak = 0;
+    static const uint32_t kRender[3] = { 0x894f6d40, 0x894f6e20, 0x894f6f40 };
+    // The tone's number, in the middle of FM's pool: past full scale FM reads other tones'
+    // lines, and below tone 0's what lies there, which here is real data (v89).  At 12 a
+    // modulator 23 times full scale still reads inside the pool, as the port does
+    constexpr int kSTone = 12;
+    c.wr32(MODO + 0x3c, (uint32_t)kSTone);
+    auto absMax = [](const float* a) { float p = 0; for (int i = 0; i < 64; ++i) p = std::fmax(p, std::fabs(a[i])); return p; };
+    auto structCase = [&](int g, int structure, int blocks) {
+        Case k[2] = { newCase(false), newCase(false) };
+        bool on[2] = { rnd() % 8 != 0, rnd() % 8 != 0 };
+        const int mt = (int)(rnd() % 5);
+        for (int n = 0; n < 2; ++n) {
+            k[n].p.wave = (int)(rnd() % 14);
+            if (mt != 0 && k[n].p.wave == 13 && n == 0) k[n].p.wave = 2;   // X-MOD would clear OSC 2 before the MOD; it has its own band below
+            if (k[n].p.wave >= 11 || rnd() % 3 == 0) k[n].p.detune = d63();
+            if (k[n].p.wave <= 10 && rnd() % 3 == 0) { k[n].p.subOctave = 1 + (int)(rnd() % 3); k[n].p.subLevel = (int)(rnd() % 128); }
+        }
+        if (g % 8 == 3) k[0].p.wave = 13;        // X-MOD on OSC 1: it reads OSC 2's buffer, in the third Structure after COSM 2
+        c.write(TB, std::vector<uint8_t>(0x800, 0).data(), 0x800);
+        c.wr32(TB, (uint32_t)structure);
+        c.wr32(TB + 4, 0xffffffffu);             // no wave
+        for (uint32_t i = 1; i < 8; ++i) c.wr32(TB + 0x24 + (i << 5) + 0x10, 1);   // every LFO key-synced
+        mtx = 0;
+        // the outputs the note starts from
+        for (uint32_t e = 1; e <= 13; ++e) { sEnv[e] = frnd(-1, 1); sRate[e] = rnd() & 1 ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f; sStart[e] = frnd(-1, 1); }
+        for (uint32_t l = 1; l <= 7; ++l) sLfo[l] = frnd(-1, 1);
+        sAtk[0] = rnd() & 1; sAtk[1] = rnd() & 1;
+        const uint32_t oscBlock[2] = { TB + 0x434, TB + 0x508 };
+        for (int n = 0; n < 2; ++n) {
+            oscIdx = n;
+            writeInput(k[n]);
+            c.wr8(P + 0xc, (uint8_t)(int8_t)d63()); c.wr8(P + 0x10, (uint8_t)(int8_t)d63());
+            c.wr8(P + 0x11, (uint8_t)(int8_t)d63()); c.wr8(P + 0x20, (uint8_t)(int8_t)d63());
+            c.wr32(oscBlock[n], on[n] ? 3u : 0u);
+            if (on[n] && !c.call(0x894e1920, { P, oscBlock[n] }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
+        }
+        toneB = XtModBlock();
+        if (!modConvert(modParams(mt), TB + 0x5dc, toneB)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
+        // the COSM sections, one in eight on Through: no converter runs for that (0x894de3b0).
+        // Each note from zeros: the firmware's one object holds every type's fields, which the
+        // note-on clears only in part, and the port's one object per type, so what a note of
+        // another type leaves is not modelled (XT_COSM_MAIN does the same, case by case)
+        const int key = k[0].key;
+        SBlocks cb[2];
+        bool cosmOn[2];
+        for (int s = 0; s < 2; ++s) {
+            c.write(kCosm[s], std::vector<uint8_t>(0x160, 0).data(), 0x160);
+            sect[s] = XtCosmSection();
+            cosmOn[s] = rnd() % 8 != 0;
+            sect[s].type = (int)(rnd() % 16);
+            if (s == 1 && g % 8 == 6) { sect[s].type = 4 + (int)(rnd() % 3); cosmOn[s] = true; }   // a band on the types that read the pitch and root
+            if (cosmOn[s]) {
+                if (!cosmConvert(s, sect[s].type, key, cb[s])) { std::fprintf(stderr, "cosm converter: %s\n", c.error().c_str()); return false; }
+                ++sTypes[sect[s].type];
+            }
+        }
+        c.wr32(0x89f91c50, 0); c.wr32(0x89f91c54, 0); c.wr32(0x89fa9094, 0);       // the lists of sounding tones
+        sBufNext = 0;
+        if (!c.call(0x894f5e60, { TN, TB }, sp)) { std::fprintf(stderr, "tone note-on: %s\n", c.error().c_str()); return false; }
+        c.wr32(TN + 0xc, 2);                     // sounding
+        ++sNotes[structure];
+        // the render's pointer
+        if (c.rd32(TN + 0x1770) != (uint32_t)structure || c.rd32(TN + 0x177c) != kRender[structure]) { std::fprintf(stderr, "render: %08x for %d\n", c.rd32(TN + 0x177c), structure); return false; }
+        auto ratioOf = [&](int n) {
+            const uint32_t Vn = tv[n], e = (uint32_t)n * 4;
+            return xtPitchTarget(f32(Vn + 8), sEnv[e + 1], f32(Vn + 0x1c), sLfo[n + 1], f32(Vn + 0x34), f32(Vn + 0xc));
+        };
+        auto gainOf = [&](int n, bool start) {
+            const uint32_t Vn = tv[n], e = (uint32_t)n * 4;
+            return xtOscGainTarget(f32(Vn + 0x5c), f32(Vn + 0x54), start && sAtk[n] ? 0.0f : sEnv[e + 4], sLfo[n + 1], f32(Vn + 0x58));
+        };
+        // the port, in the order of startVoice
+        XtAnalogBlock pb[2];
+        for (int n = 0; n < 2; ++n) {
+            oscIdx = n;
+            pb[n] = portBlock(k[n]);
+            oscIdx = 0;
+            if (n == 1 && on[1] && toneB.type == 4 && pb[1].code == 10) pb[1].code = 2;   // the tone's note-on
+            if (!on[n]) { to[n].setRatio(1.0f); continue; }
+            const uint32_t e = (uint32_t)n * 4;
+            to[n].noteOn(pb[n], ratioOf(n), gainOf(n, false), gainOf(n, true), sEnv[e + 3], sEnv[e + 2], sLfo[n + 1], shared);
+        }
+        toneMod.noteOn(toneB, false, false, on[0], *modPool, kSTone);
+        for (int s = 0; s < 2; ++s)
+            if (cosmOn[s]) cosmNoteOn(sect[s], cb[s], to[xtCosmOsc(structure, s)].ratio(), xtCosmRootHz(60, true), s);
+        ++sN;
+        if (structure == 2 && cosmOn[1] && sect[1].type >= 4 && sect[1].type <= 6 && on[1] && !same(to[0].ratio(), to[1].ratio())) ++sPitch;
+        // what each section was given, and the routines: analog voices have no stereo flag
+        bool okOn = fieldsSame(0) && fieldsSame(1) && modSame(MODO, toneMod) && c.rd32(MODO + 0x50) == toneMod.routine();
+        for (int s = 0; s < 2; ++s) {
+            const int osc = xtCosmOsc(structure, s);
+            okOn = okOn && same(f32(kCosm[s]), to[osc].ratio()) && same(f32(kCosm[s] + 4), xtCosmRootHz(60, true)) && c.rd32(kCosm[s] + 8) == 0;
+            okOn = okOn && c.rd32(kCosm[s] + 0x10) == (cosmOn[s] ? c.rd32(kCosmB[s]) : 0u) && c.rd32(kCosm[s] + 0x148) == c.rd32(0x8987c7ec + 4 * c.rd32(kCosm[s] + 0x10));   // the mono table
+        }
+        if (!okOn && sB++ < 8)
+            std::printf("  struct %d.%d note-on: osc %d %d mod %d/%d ratio %.9g %.9g root %.9g %.9g flags %u %u\n", structure, g, fieldsSame(0), fieldsSame(1), c.rd32(MODO), toneMod.type(),
+                        f32(kCosm[0]), f32(kCosm[1]), f32(kCosm[0] + 4), f32(kCosm[1] + 4), c.rd32(kCosm[0] + 8), c.rd32(kCosm[1] + 8));
+        for (int blk = 0; blk < blocks; ++blk) {
+            if (blk == 9) c.wr32(TB, (uint32_t)(structure + 1) % 3);   // the patch's Structure changes under the note: it keeps its own
+            if (blk % 5 == 4) {                  // the tone's update, on new outputs
+                for (uint32_t e = 1; e <= 12; ++e) { sEnv[e] = frnd(-1, 1); sRate[e] = rnd() & 1 ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f; wf(envAt(e) + 0x4c, sEnv[e]); wf(envAt(e) + 0x54, sRate[e]); }
+                for (uint32_t l = 1; l <= 4; ++l) { sLfo[l] = frnd(-1, 1); wf(lfoAt(l) + 0x38, sLfo[l]); }
+                if (!c.call(0x894f75f0, { TN, 1 }, sp)) { std::fprintf(stderr, "tone update: %s\n", c.error().c_str()); return false; }
+                for (int n = 0; n < 2; ++n) {
+                    if (!on[n]) continue;
+                    const uint32_t e = (uint32_t)n * 4;
+                    to[n].update(pb[n], ratioOf(n), gainOf(n, false), sEnv[e + 3], sEnv[e + 2], sLfo[n + 1]);
+                }
+                for (int s = 0; s < 2; ++s) {
+                    if (!cosmOn[s]) continue;
+                    const uint32_t ea = 9 + 2 * (uint32_t)s, eb = ea + 1;
+                    sect[s].update(to[xtCosmOsc(structure, s)].ratio(), sEnv[ea], sRate[ea], sEnv[eb], sRate[eb], sLfo[3 + s]);
+                }
+                ++sN;
+                if ((!fieldsSame(0) || !fieldsSame(1)) && sB++ < 8) std::printf("  struct %d.%d.%d update\n", structure, g, blk);
+            }
+            sm1 = sm2 = 0xdeadbeef;
+            if (!c.call(c.rd32(TN + 0x177c), { TN, BUF }, sp)) { std::fprintf(stderr, "render %d: %s\n", structure, c.error().c_str()); return false; }
+            float l1[64] = {}, l2[64] = {}, mix[64] = {};
+            uint32_t pm1 = 0, pm2 = 0;
+            float pk1 = 0, pk2 = 0;                  // what the MOD and X-MOD were given, the OSCs' with any COSM on them
+            bool modDone = false;
+            for (const XtToneStep* st = xtToneOrder(structure); *st != XtToneStep::End; ++st) {
+                switch (*st) {
+                case XtToneStep::Osc2:
+                    if (on[1]) pm2 = to[1].process(l2);
+                    break;
+                case XtToneStep::Cosm2OnOsc2:
+                    if (cosmOn[1]) sect[1].process(l2, 1.0f);
+                    break;
+                case XtToneStep::Osc1: {
+                    uint32_t sync = 0;
+                    if (toneMod.syncOn()) { sync = pm2; toneMod.setMask(pm2); }
+                    pk2 = absMax(l2);
+                    if (on[0]) pm1 = to[0].process(l1, sync, l2);
+                    break;
+                }
+                case XtToneStep::Mod:
+                    pk1 = absMax(l1);
+                    toneMod.process(mix, l1, l2);
+                    modDone = true;
+                    break;
+                case XtToneStep::Cosm1:
+                    if (cosmOn[0]) sect[0].process(modDone ? mix : l1, 1.0f);
+                    break;
+                case XtToneStep::Cosm2:
+                    if (cosmOn[1]) sect[1].process(mix, 1.0f);
+                    break;
+                case XtToneStep::End:
+                    break;
+                }
+            }
+            ++sD[structure];
+            int bad_i = -1;
+            for (int i = 0; i < 64 && bad_i < 0; ++i)
+                if (!same(f32(kBuf1 + 4 * (uint32_t)i), l1[i]) || !same(f32(kBuf2 + 4 * (uint32_t)i), l2[i]) || !same(f32(kBufMix + 4 * (uint32_t)i), mix[i])) bad_i = i;
+            // what the block ran: the check is no use on zeros
+            if (pk2 > 0) {
+                ++sOn2[structure];
+                if (structure == 2 && on[0] && k[0].p.wave == 13 && cosmOn[1]) ++sXmod;
+            }
+            if (toneMod.syncOn() && pm2) ++sSync[structure];
+            if ((structure == 2 && !on[1] && pk2 > 0) || (structure != 0 && !on[0] && pk1 > 0)) ++sOff;
+            sPeak = std::fmax(sPeak, absMax(mix));
+            const bool ok = bad_i < 0 && sm1 == pm1 && sm2 == pm2 && fieldsSame(0) && fieldsSame(1) && modSame(MODO, toneMod) && (int)c.rd32(MODO + 0x30) == toneMod.writeIndex() && modLinesSame(kSTone);
+            if (!ok && sB++ < 8) {
+                std::printf("  struct %d.%d.%d waves %d %d on %d %d mod %u cosm %d:%d %d:%d: first difference at %d, masks %08x/%08x %08x/%08x\n", structure, g, blk, k[0].p.wave, k[1].p.wave, on[0], on[1], toneMod.type(),
+                            cosmOn[0], sect[0].type, cosmOn[1], sect[1].type, bad_i, sm1, pm1, sm2, pm2);
+                if (bad_i >= 0)
+                    std::printf("    osc1 %.9g/%.9g osc2 %.9g/%.9g mix %.9g/%.9g\n", f32(kBuf1 + 4 * (uint32_t)bad_i), l1[bad_i], f32(kBuf2 + 4 * (uint32_t)bad_i), l2[bad_i], f32(kBufMix + 4 * (uint32_t)bad_i), mix[bad_i]);
+            }
+        }
+        for (int n = 0; n < 2; ++n) {
+            if (!c.call(0x894f1fd0, { tv[n] }, sp)) { std::fprintf(stderr, "stop: %s\n", c.error().c_str()); return false; }
+            if (on[n]) to[n].release();
+        }
+        if (!toneLines() && sB++ < 8) std::printf("  struct %d.%d stop: lines differ\n", structure, g);
+        c.wr32(0x89f91c50, 0); c.wr32(0x89f91c54, 0); c.wr32(0x89fa9094, 0);
+        return true;
+    };
+    for (const uint32_t w : { 0u, 4u, 8u, 0xcu }) c.wr32(TB + 0x5dc + w, 0);
+    for (int g = 0; g < nCases; ++g)             // each note a Structure other than the last's
+        if (!structCase(g, g % 3, 24)) return 1;
+    std::printf("structure tone: %ld notes on Type1, %ld on Type2, %ld on Type3, %ld note-ons and updates, blocks %ld %ld %ld, %ld different\n", sNotes[0], sNotes[1], sNotes[2], sN, sD[0], sD[1], sD[2], sB);
+    std::printf("structure tone: OSC 2 sounding in %ld %ld %ld blocks, its mask at OSC 1 in %ld %ld %ld, X-MOD reading OSC 2 after COSM 2 in %ld, a COSM making sound on an OSC that is off in %ld, COSM 2 on OSC 2's other pitch on %ld notes (peak %.4g of 2^31)\n",
+                sOn2[0], sOn2[1], sOn2[2], sSync[0], sSync[1], sSync[2], sXmod, sOff, sPitch, sPeak / 2147483648.0f);
+    std::printf("structure tone: the COSM sections on each type:");
+    for (long t : sTypes) std::printf(" %ld", t);
+    std::printf("\n");
+    // Which OSC's stereo flag picks each section's routines, the mono table (0x8987c7ec) or
+    // the stereo one (0x8987c840): the voices' installs hooked to leave the flags the check
+    // sets.  The port has only the mono routines, which is what an analog voice takes.
+    long fN = 0, fB = 0;
+    uint32_t fFlag[2] = {};
+    c.hook(0x894f2010, [&](Sh4& m) { m.wr32(m.r[4] + 0x960, fFlag[m.r[4] == V2 ? 1 : 0]); m.ret(0); });
+    for (int st = 0; st < 3; ++st)
+        for (uint32_t f = 0; f < 4; ++f) {
+            fFlag[0] = f & 1; fFlag[1] = f >> 1;
+            c.write(TB, std::vector<uint8_t>(0x800, 0).data(), 0x800);
+            c.wr32(TB, (uint32_t)st); c.wr32(TB + 4, 0xffffffffu);
+            for (uint32_t i = 1; i < 8; ++i) c.wr32(TB + 0x24 + (i << 5) + 0x10, 1);
+            SBlocks cb;
+            for (int k = 0; k < 2; ++k)
+                if (!cosmConvert(k, 0, 60, cb)) { std::fprintf(stderr, "cosm converter: %s\n", c.error().c_str()); return 1; }
+            c.wr32(0x89f91c50, 0); c.wr32(0x89f91c54, 0); c.wr32(0x89fa9094, 0);
+            sBufNext = 0;
+            if (!c.call(0x894f5e60, { TN, TB }, sp)) { std::fprintf(stderr, "tone note-on: %s\n", c.error().c_str()); return 1; }
+            for (int k = 0; k < 2; ++k) {
+                ++fN;
+                const uint32_t table = fFlag[xtCosmOsc(st, k)] ? 0x8987c840 : 0x8987c7ec;
+                if (c.rd32(kCosm[k] + 0x148) != c.rd32(table + 4 * 13) && fB++ < 6) std::printf("  structure %d flags %u %u: COSM %d's routine %08x\n", st, fFlag[0], fFlag[1], k + 1, c.rd32(kCosm[k] + 0x148));
+            }
+        }
+    c.unhook(0x894f2010);
+    std::printf("structure stereo flags: %ld routines, %ld different\n", fN, fB);
+    bad += fB;
+    bad += sB;
     return bad ? 3 : 0;
 }
 #endif

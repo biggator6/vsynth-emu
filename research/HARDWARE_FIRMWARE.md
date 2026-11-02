@@ -1545,6 +1545,102 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The Structure Types (2026-11-02, v92)
+
+Structure Types 1 and 2, the panel's Type2 and Type3, are ported. They set the order of the tone's sections. Type1 is what the port always played.
+
+**The parameter.** ID 0x293, Structure Type, 0…2, default 0, named Type1…Type3 in rom.2. The tone block's +0, kept at tone +0x1770, the render's pointer-to-member at +0x1774.
+
+**The renders** (read from the listings, buffers as in v86):
+
+| Structure | Routine | Order | COSM 1 on | COSM 2 on |
+|---|---|---|---|---|
+| 0, Type1 | `0x894f6d40` | OSC 2, OSC 1, MOD, COSM 1, COSM 2, TVA | the MOD's output | the MOD's output |
+| 1, Type2 | `0x894f6e20` | OSC 2, OSC 1, COSM 1, MOD, COSM 2, TVA | OSC 1's buffer | the MOD's output |
+| 2, Type3 | `0x894f6f40` | OSC 2, COSM 2, OSC 1, COSM 1, MOD, TVA | OSC 1's buffer | OSC 2's buffer |
+
+- All three clear both voices' sync inputs (+0x97c, +0x1330) first. The MOD always writes the third buffer, and the TVA reads that.
+- **OSC SYNC's mask.** The first two test the MOD's flag right after OSC 2. The third runs COSM 2 first, keeps the mask in r12 across it and tests after. The mask is OSC 2's own return, so COSM 2 cannot change it: the rule is the same in all three.
+- **X-MOD.** OSC 1's X-MOD reads and clears OSC 2's buffer, so in Type3 it reads OSC 2 after COSM 2, and COSM 2's output is what modulates. The MOD then gets zeros, as in the other two.
+- A value above 2 selects `0x894f7020`, a bare `rts`: nothing renders, not even the buffer clears. The parameter's range never gives it, so the port clamps.
+
+**The note-on** (`0x894f5e60`) switches on the Structure twice, Types 1 and 2 sharing a case:
+
+1. `0x894f6320`, the COSMs' first part (`0x894ee480`, then `0x894edf70`). Each COSM object takes four words:
+   +0 the pitch ratio (voice +0x144), +4 the root (voice +0x9a4), +8 the stereo flag (voice +0x960), +0xc a byte (voice +4).
+   Types 1 and 2 give both sections OSC 1's. **Type3 gives COSM 2 OSC 2's** (tone +0xb18, +0x1378, +0x1334, +0x9d8) and COSM 1 OSC 1's. That is every place the third Structure differs here.
+2. `0x894f6540`, the installs and choosers:
+   - Types 1, 2: install OSC 1, read its flag, install OSC 2, the MOD's chooser, COSM 1's chooser with that flag, COSM 2's chooser **with what COSM 1's returned**.
+   - Type3: install OSC 1, COSM 1's chooser with OSC 1's flag, install OSC 2, COSM 2's chooser with OSC 2's flag, then the MOD's chooser.
+
+So each section's chooser reads its flag after that OSC's install, and no chooser reads the other's work except by the return.
+
+**What the chooser returns** (`0x894eef70`). A stereo pick returns 1. A mono pick returns 1 only for block code 10, otherwise 0, and no converter writes code 10 (v65). So in Types 1 and 2 COSM 2's flag is OSC 1's, which is what v65 and v86 said without the condition. A decompile would show a plain flag; the `cmp/eq #0xa,r0; movt r2` at `0x894ef4d2` is in the listing.
+
+**Which flag each takes, run:** the voices' installs hooked to leave a chosen flag, on all four pairs and three Structures: 24 routines, 0 different against `xtCosmOsc`. The analog install (`0x89505170`) clears +0x960 itself, so an analog voice takes the mono routines in every Structure and every COSM port applies as it is. That was already true of HQ-SQUARE (see v88). The TVA's flag stays OSC 1's in all three, and is stored and never read.
+
+**The update** (`0x894f75f0`) switches a third time, at `0x894f76b0`, on one thing: the pitch given to each COSM's update in fr4. Types 1 and 2: OSC 1's ratio to both. Type3: OSC 1's to COSM 1, **OSC 2's to COSM 2**. Only the Comb and Side Band Filters read it. An OSC that is off holds 1.0 and root 440, as in v86, so a Comb on an OSC that is off follows neither OSC.
+
+**A sounding note keeps its Structure.** Only the note-on writes +0x1770 and +0x1774. That comes from a search of the tone's code (`0x894f0000`…) for those offsets built up in a register: one write, and reads in the note-on, the update and `0x894f6bf0`. The search can miss an offset built another way, and it did miss the note-on's first switch, found by reading it. The check's change of the patch's value under each note is the other evidence. A new value in the patch does nothing to a held note, or to a legato note, which takes no note-on. The next note gets it.
+
+**One more reader, not traced to a caller.** `0x894f6bf0` repeats the installs and choosers with the same order for each Structure. No pool load, raw word or `bsr` in the region reaches it. It changes nothing in the port.
+
+**+0xc looks unused.** The byte is voice +4. The only reader I found in the COSM code is `0x894ed750`, the block copy of a code no converter writes.
+
+**A COSM can make sound from a silent OSC.** Wave Shape (type 2, Level 127, Drive 90) on OSC 2 off in Type3 moves the output by up to 0.0077 against no COSM. So the mix can't skip OSC 2's buffer whenever OSC 2 is off. A COSM put out something on an OSC that was off in 3,490 blocks of the wide run, on either OSC, all equal to the firmware. I did not trace which types do it, or why.
+
+**In XtSynth.** `xtToneOrder` is a table of the steps by Structure, in XtAnalog, and `mixBlock` walks it, so the check and the synth run the same table. `xtCosmOsc` says which OSC a section follows; the note-on and the update use it. The COSM dispatch moved out of `mixBlock` into `XtCosmSection` (XtCosm), so its `update` and `process` are what the check calls too; `Voice::CosmVoice` derives from it and the fields keep their names. COSM 2 on OSC 2 runs in the XT's units (scale 1), as OSC 2's buffer is; everything on OSC 1's buffer and the MOD's output is in the player's units as before. `osc2.curA` is 1 at a note-on with OSC 2 off, as OSC 1's already was.
+
+**Sound** (A4 on OSC 1, E5 on OSC 2 at Coarse +7, both SAW; the TVF on LP24 at Cutoff 40; dB from renders):
+
+| Setting | 440 Hz | 659 Hz | 1320 Hz | 1978 Hz |
+|---|---|---|---|---|
+| Each OSC alone, no COSM | −16.1 | −15.0 | −25.4 | −24.9 |
+| Type1, LP on COSM 2 | −63.6 | −76.8 | −107.8 | −124.9 |
+| Type2, LP on COSM 2 | −63.6 | −76.8 | −107.8 | −124.9 |
+| Type3, LP on COSM 2 | −16.1 | −76.7 | −25.4 | −114.7 |
+| Type1, LP on COSM 1 | −63.6 | −76.8 | −107.8 | −124.9 |
+| Type2, LP on COSM 1 | −63.6 | −15.0 | −21.2 (OSC 2's 1319) | −24.9 |
+| Type3, LP on COSM 1 | −63.6 | −15.0 | −21.2 (OSC 2's 1319) | −24.9 |
+
+So each filter reaches what the table says, and the other OSC's partials stay as they were alone.
+
+- RING at Level 0, SAW × SINE at E5, LP on COSM 1. Type1 filters the sidebands: 219 Hz at −52.5, 1099 at −108.8. Type2 filters OSC 1 first, so each low partial keeps both its sidebands: 219 at −77.3, 1099 at −77.1. That equal pair is the signature of a filter before a ring modulator.
+- Comb on COSM 2, Tone 127. Type1 on the mix, tuned to OSC 1: 440 at −10.1, 659 at −51.8. Type3 on OSC 2, tuned to OSC 2: 440 at −16.1 as alone, 659 at −9.0. With OSC 1 off, Type1 still shows 659 at −51.8, as its Comb has ratio 1 and root 440, and Type3 shows −9.0.
+- X-MOD on OSC 1 at PW +63 under an E5 SAW. Type3 with COSM 2 off: 1099 at −25.7, 219 at −28.3. With the LP on COSM 2 the modulator is almost gone: 440 at −16.1, 880 at −20.9, as a plain SAW.
+
+**Checks** (`xt_analog`, further passes after the others; fcheck's baseline only added 4 lines):
+- A tone run by the firmware's own note-on, update and render (through its pointer at +0x1774), with the MOD and both COSM sections live, on the sixteen types by their own converters, buffers from a hooked pool slot finder. Only the envelopes' and LFOs' note-ons and ticks are hooked, so that the check sets their outputs, and the TVA stubbed. 3,000 notes in fcheck, a third on each Structure, each note a Structure other than the last, all five MOD Types, any waveform on either OSC, an OSC or a COSM sometimes off: 15,000 note-ons and updates, 72,000 blocks, 0 different. Compared every block: OSC 1's and OSC 2's buffers and the MOD's output, after whatever COSM ran on each; both masks; the voices' fields; the MOD's fields and lines. At each note-on: each COSM's ratio, root and flag, its code, and that its routine is the mono table's.
+- What the run reached, on the wide run: OSC 2 sounding in 325,128 blocks; its mask at OSC 1 in 154,444; X-MOD reading OSC 2 after COSM 2 in 11,089; COSM 2 on an OSC 2 of another pitch than OSC 1's on 1,544 notes of the three pitch-reading types. A band of cases keeps those types on COSM 2.
+- The patch's Structure changed under each note at its tenth block: the firmware's render is unmoved. Through the CLI, `XT_STRUCT_AT`: a change during a note changes no sample of it, and the next note plays the new one, equal to a render with that Structure from the start.
+- Wide run, 21,000 notes: 504,000 blocks, 0 different.
+- Deliberate errors: 38 planted at 600 notes, 37 caught, most by thousands of blocks.
+  - Nine in the order table, among them COSM 2 moved after OSC 1 in Type3, which only X-MOD can show (3,403 blocks).
+  - Five in `xtCosmOsc`, each also caught by the flags pass.
+  - In the check's wiring: the note-on's pitch and the update's taken from OSC 1, each alone; the root not 440; X-MOD given no buffer; the mask ignored; a stale ratio on an OSC that is off; the MOD given OSC 1 as its own modulator.
+  - In `XtCosmSection` (`PORT=analogcosm`): each type's envelopes swapped, the Comb's and Side Band Filters' pitch fixed at 1, three types not processing.
+  - The one missed is exact: Lo-Fi's scale dropped, as this check runs at scale 1. XtSynth's scale on OSC 1's buffer did not change (`ab.sh`, below).
+
+**Two things the first runs turned up, in the check.**
+- The firmware's one COSM object holds every type's fields and the note-on clears only some; the port has one object per type. So after a note of another type, a Dynamic TVF's follower starts from whatever that type left at D+0x98, and the port's from its own last note. The first run showed this as soon as types changed. Each note here starts from zeros on both sides, as `XT_COSM_MAIN` does case by case. It is an existing gap, it is one follower value at the start of a note, and since the port's voice allocation is not the XT's a real unit would differ here anyway.
+- FM past full scale reads below tone 0's line (v89). In the earlier passes that memory was zero. Here it holds real data, as this pass runs the TB Filter's start-up, so 23 blocks in 504,000 differed, all under FM with OSC 2 above 2^31. This pass puts its tone at 12 in the pool, where a modulator 23 times full scale still reads inside. That is the same gap v89 listed, seen for the first time; the port still reads 0 past the pool's ends.
+
+**Wiring.** With no check against the firmware at this level (the whole-tone check runs in its own session and does not yet cover the Structures):
+- CLI identities: no COSM, all three the same bits. COSM 2 alone, Type2 equals Type1. OSC 2 off with both COSMs, Type2 equals Type1. OSC 2 off with COSM 1, Type3 equals Type1. OSC 1 off with COSM 2, Type3 equals Type1. Type3 whole equals OSC 1 with COSM 1 plus OSC 2 with COSM 2, at most 3e−8 apart with a peak of 0.39.
+- PluginTest bit-identical at notes 30, 60 and 100: Type2 and Type3 with both COSMs over a PCM OSC 1 and an analog OSC 2 on all four inputs, a Comb on OSC 2 under RING, Type2 under FM, and Type3 under OSC SYNC with OSC 2 off. Set on the processor's side only, it fails 0/4, so the parameter is what is being tested.
+- With the Structure at Type1, `ab.sh` against v91 is 4/4 identical on five settings: the defaults, and OSC 2 on with both COSMs, RING, FM, and OSC 1 off, across TVF, Comb, Side Band, Wave Shape, Lo-Fi, OD/Dist and TB, also with both COSMs and OSC 2 on.
+
+**Not checked.**
+- Against real hardware. The check is the firmware in the interpreter.
+- A PCM voice in these passes, so a stereo flag is run only through the routines' choice. The COSM ports are the mono routines: a stereo PCM OSC 1 with a COSM on is the gap it was, now in three orders. In Type3 a stereo PCM OSC 2 would pick COSM 2's stereo routine, which matters once PCM on OSC 2 lands.
+- XtSynth's own COSM note-on chain: the check has its own copy of the argument order, equal to the firmware, as the blocks come from XtSynth's Controls. Its `update` and `process` are shared.
+- A Structure above 2.
+- The caller of `0x894f6bf0`.
+
+**Plugin.** Parameter `structure`, "Structure Type", Type1…Type3, default Type1, at the end of the layout. A row above the MOD with the selector and the order it gives, `kXtStripH` 880, `setSize` 1180. `XT_STRUCT`, `XT_STRUCT_AT`, `TEST_STRUCT`.
+
+**For PCM on OSC 2** (branch `osc2-pcm`, not merged here). Its `mixBlock` keeps both buffers in the XT's units with OSC 2 on, and changes to OSC 1's at the MOD. In Type2 and Type3 COSM 1 runs before that, so with OSC 2 on it takes scale 1, and `fs` only with OSC 2 off. COSM 2 on OSC 2 is scale 1 either way. With OSC 2 off and a COSM on it in Type3 the mix still has to run. `xtCosmOsc` already points COSM 2 at OSC 2's `curA` and root in Type3, for a PCM OSC 2 too.
+
 ### The MOD section: OSC SYNC (2026-11-02, v91)
 
 Type 4, the last. All five Types are now ported. OSC 2 restarts OSC 1, and OSC 2 itself is not heard at the block's level.

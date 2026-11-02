@@ -170,6 +170,10 @@ mod osc sync: 15000 note-ons and updates, 72000 blocks of 32 frames (7864 plain)
 mod osc sync tone: 3000 cases, 38250 note-ons and updates, 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different; OSC 2 sounding under the MOD in 45336 blocks, peak 6.54 of 2^31
 mod osc sync tone note-on: 1500 cases, 0 different
 mod osc sync tone: 16361 blocks with OSC 2's mask at OSC 1, LA-SAW to SAW on 519 notes
+structure tone: 1000 notes on Type1, 1000 on Type2, 1000 on Type3, 15000 note-ons and updates, blocks 24000 24000 24000, 0 different
+structure tone: OSC 2 sounding in 15288 15552 15082 blocks, its mask at OSC 1 in 7092 7063 7165, X-MOD reading OSC 2 after COSM 2 in 1666, a COSM making sound on an OSC that is off in 430, COSM 2 on OSC 2's other pitch on 230 notes (peak 136.7 of 2^31)
+structure tone: the COSM sections on each type: 291 339 244 322 430 430 412 356 305 325 246 327 272 322 283 338
+structure stereo flags: 24 routines, 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

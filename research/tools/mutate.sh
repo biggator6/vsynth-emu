@@ -1,7 +1,8 @@
 #!/bin/bash
 # mutate.sh <name> <old> <new> [cases] [pattern]: a deliberate error in a port, to
 # show its firmware check catches it.  Copies plugin/Source/XtCosm.cpp (with
-# PORT=analog, XtAnalog.cpp) with the first <old> replaced by <new> (exact
+# PORT=analog, XtAnalog.cpp; with PORT=analogcosm, XtCosm.cpp under xt_analog's
+# check) with the first <old> replaced by <new> (exact
 # text), builds xt_cosm (xt_analog) from it in $WORK/mut/<name>, runs it on
 # [cases] (100) and prints the lines matching [pattern] (an extended regex;
 # default every result line).  A check that
@@ -14,6 +15,9 @@ S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
 if [ "${PORT:-cosm}" = analog ]; then
     F=XtAnalog.cpp; D=XT_ANALOG_MAIN
     L=("$S/XtOsc.cpp" "$S/XtCosm.cpp" "$S/XtEnvelope.cpp" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/Sh4Interp.cpp")
+elif [ "$PORT" = analogcosm ]; then
+    F=XtCosm.cpp; D=XT_ANALOG_MAIN
+    L=("$S/XtOsc.cpp" "$S/XtAnalog.cpp" "$S/XtEnvelope.cpp" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/Sh4Interp.cpp")
 else
     F=XtCosm.cpp; D=XT_COSM_MAIN; L=("$S/XtOsc.cpp" "$S/XtEnvelope.cpp" "$S/Sh4Interp.cpp")
 fi

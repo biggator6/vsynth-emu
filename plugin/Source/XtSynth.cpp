@@ -657,6 +657,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->srcKey = srcKey;
     v->age = clock++;
     v->tail = 0;
+    v->structure = std::clamp(ctl.structure, 0, 2);
     v->vel = vel;
     v->relVel = 64;
     v->on = oscPlays(ctl);
@@ -731,19 +732,23 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     if (v->on) targets(*v, *v, ctl, v->curA, v->curF, v->curWalk, v->curG);
     else v->curA = 1.0f;                               // the note-on of an OSC that is off (0x894f2f80, kind 0)
     if (v->osc2.on) targets(*v, v->osc2, ctl.osc2, v->osc2.curA, v->osc2.curF, v->osc2.curWalk, v->osc2.curG);
+    else v->osc2.curA = 1.0f;
     // the Comb and Side Band Filters' note-ons read the voice's pitch ratio
     // (+0x144) and root frequency (+0x9a4) as the voice's own note-on leaves
     // them (the tone note-on 0x894f5e60 runs the voice first): OSC 1's, also with
-    // OSC 2 sounding; with OSC 1 off a ratio of 1 and a root of 440
+    // OSC 2 sounding, and for COSM 2 in the third Structure OSC 2's (xtCosmOsc); with
+    // that OSC off a ratio of 1 and a root of 440
     for (int k = 0; k < 2; ++k) {
         Voice::CosmVoice& c = v->cs[k];
         if (!c.on || c.type < 4 || c.type > 6) continue;
-        const float root = xtCosmRootHz(ctl.rootKey, v->robot || v->analog || !v->on);   // the analog voice's root is 440 too (0x894f21c0)
+        const bool second = xtCosmOsc(v->structure, k) != 0;
+        const OscVoice& s = second ? v->osc2 : *v;
+        const float root = xtCosmRootHz(second ? ctl.osc2.rootKey : ctl.rootKey, s.robot || s.analog || !s.on);   // the analog voice's root is 440 too (0x894f21c0)
         if (c.type == 4)
-            c.comb.noteOn(combBlock(*v, k), v->curA, root, c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
+            c.comb.noteOn(combBlock(*v, k), s.curA, root, c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
                           c.lfo.out(), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
         else
-            c.sbf.noteOn(sbfBlock(*v, k), v->curA, root, c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
+            c.sbf.noteOn(sbfBlock(*v, k), s.curA, root, c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
                          c.lfo.out(), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
     }
     // the voices' note-ons, OSC 1 then OSC 2 (0x894f21c0): SUPER-SAW's counter
@@ -989,82 +994,77 @@ void XtSynth::mixBlock(float* lr) {
             if (v.on) oscUpdate(v, ctl);
             if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);
             // the COSM updates (0x894ee6a0, COSM 1 then 2), after the voices', before the TVA
-            for (Voice::CosmVoice& c : v.cs) {
+            for (int k = 0; k < 2; ++k) {
+                Voice::CosmVoice& c = v.cs[k];
                 if (!c.on) continue;
-                if (c.type == 2) c.dual.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
-                else if (c.type == 3) c.tb.update(c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
-                else if (c.type == 4) c.comb.update(v.curA, c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
-                else if (c.type == 7) c.res.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
-                else if (c.type == 8) c.fs.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
-                else if (c.type == 9) c.lofi.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
-                else if (c.type == 12) c.ws.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
-                else if (c.type == 13) c.od.update(c.envA.level(), c.envA.smooth(), c.lfo.out(), c.envB.level(), c.envB.smooth(), c.lfo.out());
-                else if (c.type == 14) c.amp.update(c.envA.level(), c.envA.smooth(), c.lfo.out());
-                else if (c.type >= 10) ;                // the Compressor, Limiter and Speaker Simulator have no update
-                else if (c.type >= 5) c.sbf.update(v.curA, c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
-                else c.tvf.update(c.envB.level(), c.envB.smooth(), c.lfo.out(), c.envA.level(), c.envA.smooth(), c.lfo.out());
+                c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envA.level(), c.envA.smooth(), c.envB.level(), c.envB.smooth(), c.lfo.out());
             }
             tvaUpdate(v);
             if (!v.active) continue;
         }
         float scale = v.gain;
-        // OSC 2, then OSC 1 (the tone render 0x894f6d40).  While the MOD's flag is
-        // set OSC 2's mask goes to OSC 1's sync input and to the MOD
-        uint32_t mask2 = 0;
-        if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);
-        else std::fill(tmp2, tmp2 + 64, 0.0f);
-        uint32_t sync = 0;
-        if (v.mod.syncOn()) {
-            sync = mask2;
-            v.mod.setMask(mask2);
-        }
+        // The tone's render by its Structure Type (xtToneOrder).  OSC 2's buffer stays in
+        // the XT's units; OSC 1's, then the MOD's output, in the player's: the XT's
+        // scale is int16 × 65536, i.e. the SOLO buffer (±1) × 2^31, the band players'
+        // (int16) × 2^16
         const bool band = v.on && !v.analog && cur->type != 1;
-        if (!v.on) std::fill(tmp, tmp + 64, 0.0f);
-        else if (v.analog) {   // the XT's units (±2^31) to the SOLO buffer's (±1), exactly
-            v.ana.process(tmp, sync, tmp2);                    // X-MOD reads OSC 2's buffer and clears it
-            for (float& x : tmp) x *= 0x1p-31f;
-        } else if (!band) {
-            float l[32], r[32];
-            v.solo.render(l, r, 32);
-            for (int i = 0; i < 32; ++i) { tmp[2 * i] = l[i]; tmp[2 * i + 1] = r[i]; }
-            if (v.solo.ended() && !v.osc2.on) v.tail += 32;
-        } else {
-            v.mb.block(tmp);
-            scale /= 32768.0f;
-            if (v.mb.ended() && !v.osc2.on) v.tail += 32;
-        }
-        // The MOD (0x894f1d50).  Off, or MIX at gains of 1: the sum, in OSC 1's
-        // buffer's units.  Otherwise in the XT's units, as its routines read their
-        // levels from them
-        if (v.mod.plain()) {
-            if (v.osc2.on) xtAnalogMix(tmp, tmp2, band ? 0x1p-16f : 0x1p-31f);
-        } else {
-            for (float& x : tmp) x *= band ? 0x1p16f : 0x1p31f;
-            v.mod.process(tmp, tmp, tmp2);
-            for (float& x : tmp) x *= band ? 0x1p-16f : 0x1p-31f;
-        }
-        // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA; the
-        // Dynamic TVF's and Side Band Filters' followers, the Lo-Fi
-        // quantizer, the Compressor's envelope, the Limiter's levels, the
-        // Wave Shape curves and the OD/Dist and Amp clips read the XT's scale: int16 × 65536, i.e. the SOLO buffer
-        // (±1) × 2^31, the band players' (int16) × 2^16
         const float fs = band ? 0x1p16f : 0x1p31f;
-        for (Voice::CosmVoice& c : v.cs) {
-            if (!c.on) continue;
-            if (c.type == 2) c.dual.process(tmp);
-            else if (c.type == 3) c.tb.process(tmp);
-            else if (c.type == 4) c.comb.process(tmp);
-            else if (c.type == 7) c.res.process(tmp);
-            else if (c.type == 8) c.fs.process(tmp);
-            else if (c.type == 9) c.lofi.process(tmp, fs);
-            else if (c.type == 10) c.comp.process(tmp, fs);
-            else if (c.type == 11) c.lim.process(tmp, fs);
-            else if (c.type == 12) c.ws.process(tmp, fs);
-            else if (c.type == 13) c.od.process(tmp, fs);
-            else if (c.type == 14) c.amp.process(tmp, fs);
-            else if (c.type == 15) c.spk.process(tmp);
-            else if (c.type >= 5) c.sbf.process(tmp, fs);
-            else c.tvf.process(tmp, fs);
+        uint32_t mask2 = 0;
+        for (const XtToneStep* st = xtToneOrder(v.structure); *st != XtToneStep::End; ++st) {
+            switch (*st) {
+            case XtToneStep::Osc2:
+                if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);
+                else std::fill(tmp2, tmp2 + 64, 0.0f);
+                break;
+            case XtToneStep::Cosm2OnOsc2:
+                if (v.cs[1].on) v.cs[1].process(tmp2, 1.0f);
+                break;
+            case XtToneStep::Osc1: {
+                // While the MOD's flag is set OSC 2's mask goes to OSC 1's sync input
+                // and to the MOD
+                uint32_t sync = 0;
+                if (v.mod.syncOn()) {
+                    sync = mask2;
+                    v.mod.setMask(mask2);
+                }
+                if (!v.on) std::fill(tmp, tmp + 64, 0.0f);
+                else if (v.analog) {   // the XT's units (±2^31) to the SOLO buffer's (±1), exactly
+                    v.ana.process(tmp, sync, tmp2);            // X-MOD reads OSC 2's buffer and clears it
+                    for (float& x : tmp) x *= 0x1p-31f;
+                } else if (!band) {
+                    float l[32], r[32];
+                    v.solo.render(l, r, 32);
+                    for (int i = 0; i < 32; ++i) { tmp[2 * i] = l[i]; tmp[2 * i + 1] = r[i]; }
+                    if (v.solo.ended() && !v.osc2.on) v.tail += 32;
+                } else {
+                    v.mb.block(tmp);
+                    scale /= 32768.0f;
+                    if (v.mb.ended() && !v.osc2.on) v.tail += 32;
+                }
+                break;
+            }
+            case XtToneStep::Mod:
+                // The MOD (0x894f1d50).  Off, or MIX at gains of 1: the sum, in OSC 1's
+                // buffer's units.  Otherwise in the XT's units, as its routines read
+                // their levels from them.  A COSM on an OSC that is off can still put
+                // something in its buffer
+                if (v.mod.plain()) {
+                    if (v.osc2.on || (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2, band ? 0x1p-16f : 0x1p-31f);
+                } else {
+                    for (float& x : tmp) x *= fs;
+                    v.mod.process(tmp, tmp, tmp2);
+                    for (float& x : tmp) x *= band ? 0x1p-16f : 0x1p-31f;
+                }
+                break;
+            case XtToneStep::Cosm1:
+                if (v.cs[0].on) v.cs[0].process(tmp, fs);
+                break;
+            case XtToneStep::Cosm2:
+                if (v.cs[1].on) v.cs[1].process(tmp, fs);
+                break;
+            case XtToneStep::End:
+                break;
+            }
         }
         if (v.damping) {
             // truncated (0x894f5570): the gain held, times a fade that falls
@@ -1158,6 +1158,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
 //     3 ENV RING, 4 OSC SYNC, Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
 //     attack,release": new MOD knobs at a frame, on the notes then sounding.
+//   XT_STRUCT=n: the Structure Type, 0…2 (xtToneOrder).  XT_STRUCT_AT="frame,n": a new
+//     one at a frame; a sounding note keeps its own.
 //   XT_OLEV="level,levelKF,levelLfoDepth,waveGainDb": the OSC TVA.
 //   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.
 //   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
@@ -1270,6 +1272,7 @@ int main(int argc, char** argv) {
         c.mod.on = true;
         std::sscanf(e, "%d,%d,%d,%d", &c.mod.type, &c.mod.level, &c.mod.attack, &c.mod.release);
     }
+    if (const char* e = std::getenv("XT_STRUCT")) c.structure = std::atoi(e);
     {
         XtSynth::OscControls& o = c.osc2;
         if (const char* e = std::getenv("XT_PENV2")) std::sscanf(e, "%d,%d,%d,%d,%d", &o.pAttack, &o.pDecay, &o.pSustain, &o.pRelease, &o.pDepth);
@@ -1428,6 +1431,7 @@ int main(int argc, char** argv) {
         std::sscanf(e, "%ld,%d,%d,%d,%d,%d", &modAt, &on, &modLater.mod.type, &modLater.mod.level, &modLater.mod.attack, &modLater.mod.release);
         modLater.mod.on = on != 0;
     }
+    if (const char* e = std::getenv("XT_STRUCT_AT")) std::sscanf(e, "%ld,%d", &modAt, &modLater.structure);
     struct Ev { long at; int note; bool on; };
     std::vector<Ev> ev;
     for (int a = 9; a < argc; ++a) {

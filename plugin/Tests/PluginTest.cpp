@@ -455,6 +455,11 @@ int main(int argc, char** argv) {
         setKnobs({ { "modSwitch", 1 }, { "modType", refCtl.mod.type }, { "modLevel", refCtl.mod.level }, { "modAttack", refCtl.mod.attack },
                    { "modRelease", refCtl.mod.release } });
     }
+    // TEST_STRUCT=n: the Structure Type, 0…2
+    if (const char* e = std::getenv("TEST_STRUCT")) {
+        refCtl.structure = std::atoi(e);
+        setKnobs({ { "structure", refCtl.structure } });
+    }
     // TEST_MONO="mono,legato[,octave]": Mono/Poly (1 MONO), Legato Switch,
     // Octave Shift
     if (const char* e = std::getenv("TEST_MONO")) {

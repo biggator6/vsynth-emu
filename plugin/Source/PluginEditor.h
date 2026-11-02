@@ -64,6 +64,9 @@ private:
     juce::Slider     portaTimeSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     portaSensSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label      portaTimeLabel_ { {}, "Time" }, portaSensLabel_ { {}, "V-Sns" };
+    // The Structure Type, and the order of the tone's sections it gives
+    juce::Label      structLabel_ { {}, "Struct" }, structOrderLabel_;
+    juce::ComboBox   structBox_;
     // The MOD section: Switch, Type, Original Level, Attack and Release Times
     juce::ToggleButton modBtn_ { "MOD" };
     juce::ComboBox   modTypeBox_;
@@ -177,6 +180,7 @@ private:
     std::unique_ptr<ButtonAtt> portaAtt_;
     std::unique_ptr<ComboAtt>  portaModeAtt_, portaTypeAtt_;
     std::unique_ptr<SliderAtt> portaTimeAtt_, portaSensAtt_;
+    std::unique_ptr<ComboAtt>  structAtt_;
     std::unique_ptr<ButtonAtt> modAtt_;
     std::unique_ptr<ComboAtt>  modTypeAtt_;
     std::unique_ptr<SliderAtt> modLevelAtt_, modAttackAtt_, modReleaseAtt_;

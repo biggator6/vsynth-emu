@@ -166,6 +166,21 @@ private:
     void syncHold(float* out, const float* l1);
 };
 
+// The tone's render by Structure Type (ID 0x293, 0…2, Type1…Type3 on the panel: the
+// tone block's +0, kept at +0x1770, the routine's pointer at +0x1774).  The tone's
+// note-on is the only writer of either, so a sounding note keeps its Structure.
+//   0x894f6d40: OSC 2, OSC 1, MOD, COSM 1, COSM 2
+//   0x894f6e20: OSC 2, OSC 1, COSM 1, MOD, COSM 2
+//   0x894f6f40: OSC 2, COSM 2, OSC 1, COSM 1, MOD
+// Before the MOD a COSM has its OSC's buffer alone; from the MOD on, the MOD's output.
+// Each then goes to the TVA.
+enum class XtToneStep : uint8_t { Osc2, Osc1, Mod, Cosm1, Cosm2, Cosm2OnOsc2, End };
+const XtToneStep* xtToneOrder(int structure);
+// Which OSC, 0 or 1, COSM section k takes its pitch ratio (+0x144), root (+0x9a4) and
+// stereo flag (+0x960) from: OSC 2's only for COSM 2 in the third Structure (the tone's
+// note-on 0x894f6320, 0x894f6540, and its update 0x894f76b0).
+int xtCosmOsc(int structure, int k);
+
 // The waveform's code (+0x80) for the patch's 0…13; and whether the port
 // plays it.
 int xtAnalogCode(int wave);

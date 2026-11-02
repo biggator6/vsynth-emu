@@ -42,6 +42,7 @@ public:
     // Hooks: called when execution reaches addr (before the instruction).
     // A hook usually sets r[0] and returns to pr (see ret()).
     void hook(uint32_t addr, std::function<void(Sh4&)> fn);
+    void unhook(uint32_t addr) { hooks.erase(addr); }
     void ret(uint32_t v) { r[0] = v; pc = pr; }
 
     // Call a firmware routine: r4..r7 = args, stack at sp, returns r0.  Runs

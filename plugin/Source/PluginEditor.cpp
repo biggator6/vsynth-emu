@@ -2,7 +2,7 @@
 #include <tuple>
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 850;  // height of the XT strip below it
+static constexpr int kXtStripH   = 880;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -64,9 +64,9 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1150);
+    setSize(560, 1180);
     setResizable(true, true);
-    setResizeLimits(480, 840, 960, 1290);
+    setResizeLimits(480, 870, 960, 1320);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -163,6 +163,16 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     loopEndAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "loopEnd", loopEndSlider_);
     portaModeBox_.addItemList({ "NORMAL", "LEGATO" }, 1);
     portaTypeBox_.addItemList({ "RATE", "TIME" }, 1);
+    structBox_.addItemList({ "Type1", "Type2", "Type3" }, 1);
+    structBox_.onChange = [this] {
+        static const char* const order[3] = { "OSC 2, OSC 1, MOD, COSM 1, COSM 2", "OSC 2, OSC 1 > COSM 1, MOD, COSM 2", "OSC 2 > COSM 2, OSC 1 > COSM 1, MOD" };
+        structOrderLabel_.setText(order[juce::jlimit(0, 2, structBox_.getSelectedItemIndex())], juce::dontSendNotification);
+    };
+    addAndMakeVisible(structLabel_);
+    addAndMakeVisible(structBox_);
+    addAndMakeVisible(structOrderLabel_);
+    structAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "structure", structBox_);
+    structBox_.onChange();
     modBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
     modBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     modTypeBox_.addItemList({ "MIX", "RING", "FM", "ENV RING", "OSC SYNC" }, 1);
@@ -436,7 +446,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                             &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_,
                             &portaTimeLabel_, &portaSensLabel_, &octLabel_, &cosmCutLabel_, &cosmResoLabel_, &cosmKfLabel_,
                             &clfoLabel_, &clfoRateLabel_, &cosmTypeLabel_, &cosmCutOwnLabel_, &cosmResoOwnLabel_,
-                            &anaWaveLabel_, &modLevelLabel_, &modAttackLabel_, &modReleaseLabel_ }) styleSmall(*l);
+                            &anaWaveLabel_, &modLevelLabel_, &modAttackLabel_, &modReleaseLabel_, &structLabel_, &structOrderLabel_ }) styleSmall(*l);
     showCosmType();                                  // after styleSmall, which shows every label
     showOscType();
     timerCallback();
@@ -951,6 +961,11 @@ void VSynthEmuEditor::resized() {
             levelSliders_[i].setBounds(cell.withTrimmedRight(6));
         }
         if (r == 5) {
+            xt.removeFromTop(6);
+            auto rs = xt.removeFromTop(24);          // the Structure Type, the order of what follows
+            structLabel_.setBounds(rs.removeFromLeft(56));
+            structBox_.setBounds(rs.removeFromLeft(100).withTrimmedRight(8));
+            structOrderLabel_.setBounds(rs);
             xt.removeFromTop(6);
             auto rm = xt.removeFromTop(24);          // the MOD, between the OSCs and the COSMs
             modBtn_.setBounds(rm.removeFromLeft(56));

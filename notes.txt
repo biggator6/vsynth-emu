@@ -314,6 +314,13 @@ ANALOG X-MOD v87 (2026-11-02): X-MOD (code 13, 0x89507b60 at +0x96c)
   on the roadmap: MOD Types RING, FM, ENV RING, OSC SYNC; the other two Structure Types; the patch
   TVA's level and pan; PCM on OSC 2.
 
+Structure Types v92 (2026-11-02): Type2 and Type3 (HARDWARE_FIRMWARE.md, "The Structure Types"). xtToneOrder, xtCosmOsc in XtAnalog; XtCosmSection (update, process)
+  in XtCosm, XtSynth's CosmVoice derives from it. mixBlock walks the table; Voice::structure is latched at note-on, as the firmware only writes +0x1770 there. In Type3 COSM 2
+  takes OSC 2's ratio, root and flag at note-on and OSC 2's ratio at each update, and its buffer stays in the XT's units (scale 1). The Structure passes in xt_analog run a live
+  tone: note-on 0x894f5e60, update 0x894f75f0, the render through +0x177c, all sixteen COSM types by their converters. They need xtFwCosmKeySquares and xtFwOscTimeKeyScales set,
+  and the TB constants 0x894fc4c0 run, as XtSynth does. PORT=analogcosm in mutate.sh plants errors in XtCosm.cpp under xt_analog's check. Left on the roadmap: the patch TVA's
+  level and pan; PCM on OSC 2 (its own session, branch osc2-pcm, whose mixBlock takes a merge: see the v92 section's end).
+
 MOD OSC SYNC v91 (2026-11-02): Type 4, the last (HARDWARE_FIRMWARE.md, "The MOD section: OSC SYNC"). XtMod::syncAnalog 0x894f1aa0,
   syncHold 0x894f1a40, syncOn (+0x40), setMask (+0x44). XtSynth's mixBlock passes OSC 2's mask to OSC 1 and the MOD only while syncOn; oscStart turns OSC 2's LA-SAW into
   SAW under OSC SYNC. The flag stays set through later notes until a new block arrives. All five MOD Types done; xtModPlays gone. Left on the roadmap: the other two

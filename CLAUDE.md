@@ -48,8 +48,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   and its cases in the binding, note-on, start values, block copy, update and
   buffer allocator.
 - `mutate.sh <name> <old> <new> [cases] [pattern]`: builds xt_cosm with one
-  deliberate error in XtCosm.cpp (`PORT=analog`: xt_analog, XtAnalog.cpp)
-  and runs it, to show the check catches it.
+  deliberate error in XtCosm.cpp (`PORT=analog`: xt_analog, XtAnalog.cpp;
+  `PORT=analogcosm`: xt_analog, XtCosm.cpp) and runs it, to show the check
+  catches it.
 - `firorder.py <listing>`: the order of additions in an unrolled sum, by a
   symbolic run of its disassembly (written for the Frequency Shifter's FIR).
 
