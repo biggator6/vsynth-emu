@@ -25,17 +25,34 @@ struct XtLfoParams {
 // modelled.
 XtLfoParams xtLfoConvert(int wave, int rate, int offset, int delay, int fadeMode, int fade, bool keySync);
 
+// The free-running phase a key-unsynced LFO starts from (0x894f0950; a pool at
+// 0x89fa90b0 + 0x3040, one for each tone id and LFO number).  It runs at every
+// control tick, sounding or not (0x894f09b0, from the scheduler 0x894f4d10), at
+// the rate of the last note that took it (0x894f0a30): 1 Hz from power-on.
+class XtLfoFree {
+public:
+    void setRate(float hz) { rateHz = hz; }
+    void tick(int n = 1);
+    float phase() const { return ph; }
+private:
+    float rateHz = 1.0f, ph = 0.0f;
+};
+
 class XtLfo {
 public:
     // Note-on (0x894f0cf0): phase 0, fade per mode, then one tick with n = 0.
     // `chaos` seeds the chaos generator (+0x6c, 0..1).
     void noteOn(const XtLfoParams& p, float chaos = 0.5f);
+    // Key-unsynced with no other tone of the part sounding (0x894f0e60): the same
+    // from the free-running phase, which takes this note's rate.
+    void noteOnFree(const XtLfoParams& p, float chaos, XtLfoFree& free);
+    // Key-unsynced with another sounding (0x894f0db0): the same from that tone's
+    // LFO, its phase, chaos state and held values.
+    void noteOnFollow(const XtLfoParams& p, const XtLfo& other);
     void noteOff();
     // New settings while it runs (0x894f0f40): the phase and the fade state
     // carry on, the times and rates are set again.
     void update(const XtLfoParams& p);
-    // A key-unsynced LFO follows a free-running one (0x894f0e60 takes its phase).
-    void setPhase(float phase) { ph = phase; }
     void tick(int n = 1);
     float out() const { return o; }
     float phase() const { return ph; }
@@ -54,6 +71,7 @@ private:
     float o = 0;             // +0x38
     float rate() const;
     float chaos();
+    void start(const XtLfoParams& prm);
     void fadeStart();
     void fadeTick(int n);
     void setDir(int down);

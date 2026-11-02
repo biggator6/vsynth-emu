@@ -124,11 +124,41 @@ float XtLfo::chaos() {
 
 // 0x894f0cf0 → 0x894f0bf0
 void XtLfo::noteOn(const XtLfoParams& prm, float seed) {
-    using namespace xtf;
-    p = prm;
     x = seed;
     ph = 0.0f;
     prev = hold = 0.0f;                                            // as the constructor leaves them
+    start(prm);
+}
+
+void XtLfo::noteOnFree(const XtLfoParams& prm, float seed, XtLfoFree& free) {
+    x = seed;
+    free.setRate(prm.rate);
+    ph = free.phase();
+    prev = hold = 0.0f;
+    start(prm);
+}
+
+void XtLfo::noteOnFollow(const XtLfoParams& prm, const XtLfo& other) {
+    x = other.x;
+    ph = other.ph;
+    prev = other.prev;
+    hold = other.hold;
+    start(prm);
+}
+
+void XtLfoFree::tick(int n) {
+    using namespace xtf;
+    float v = div(mul(rateHz, 65535.0f), 100.0f);                  // 0x894f08f0
+    if (v > 65535.0f) v = 65535.0f;
+    else if (1.0f > v) v = 1.0f;
+    float pn = add(mul(flt(n), v), ph);                            // fmac
+    if (pn > 65535.0f) pn = add(pn, -65535.0f);
+    ph = pn;
+}
+
+void XtLfo::start(const XtLfoParams& prm) {
+    using namespace xtf;
+    p = prm;
     // the base as constructed (0x894f04a0)
     state = 0; tIn = tOut = 0.0f; amp = kFull; count = 0; delay = 0.0f; dir = 1; rest = 0.0f; target = kFull;
     // trigger: direction by fade mode, then the times
@@ -152,9 +182,10 @@ void XtLfo::setTimes() {
 
 // 0x894f0f40
 void XtLfo::update(const XtLfoParams& prm) {
-    const int keep = p.keySync;
+    const int keep = p.keySync, mode = p.fadeMode;   // the note-off goes by the mode as at note-on (+0x2c)
     p = prm;
     p.keySync = keep;
+    p.fadeMode = mode;
     setTimes();
 }
 

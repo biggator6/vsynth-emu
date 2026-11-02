@@ -478,11 +478,13 @@ void XtSynth::cosmSetBlock(Voice& v, int k) {
     else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
 }
 
-// The LFO constructor seeds each LFO's chaos state from a global logistic
-// map (0x894f4cd0, then |2x − 1| by 0x894f4ca0).
+// The LFO constructor (0x894f0b40) seeds each LFO's chaos state from a global
+// logistic map (0x894f4cd0, then |2x − 1| by 0x894f4ca0).  A tone is constructed
+// for each note, all eight of its LFOs in order, whichever are used.
 float XtSynth::drawSeed() {
-    chaosSeed = (1.0f - chaosSeed) * chaosSeed * 0x1.ff9db0p+1f;
-    return std::fabs(chaosSeed * 2.0f - 1.0f);
+    using namespace xtf;
+    chaosSeed = mul(mul(sub(1.0f, chaosSeed), chaosSeed), 0x1.ff9db0p+1f);
+    return std::fabs(add(mul(chaosSeed, 2.0f), -1.0f));
 }
 
 XtEnvParams XtSynth::oscEnvParams(const Voice& v, int a, int d, int s, int r) const {
@@ -569,10 +571,6 @@ void XtSynth::setControls(const Controls& c) {
                          || c.mod.release != ctl.mod.release;
     ctl = c;
     if (modChanged) xtModBlock(ctl.mod, modBlk);
-    for (int k = 0; k < 2; ++k)
-        if (clfoChanged[k] && freeClfoOn[k]) freeClfo[k].update(clfoParams(k));
-    if (d1.lfo && freeLfoOn) freeLfo.update(lfoParams(ctl));
-    if (d2.lfo && freeLfo2On) freeLfo2.update(lfoParams(ctl.osc2));
     for (Voice& v : voice) {
         if (!v.active) continue;
         if (envChanged) v.env.update(envParams(v));
@@ -670,8 +668,11 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
     v->osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
     v->gain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);
-    // the tone is constructed for each note (0x894f5860): the pitch ramps (0x894f4860)
-    // start off, so the note's first pitch has no glide in it
+    // the tone is constructed for each note (0x894f5860): LFOs 0…7 draw their
+    // chaos seeds, and the pitch ramps (0x894f4860) start off, so the note's
+    // first pitch has no glide in it
+    float seed[8];
+    for (float& x : seed) x = drawSeed();
     v->porta = XtPitchRamp{};
     v->osc2.porta = XtPitchRamp{};
     // TVA note-on (0x894f5160): the gain starts from the envelope's onset
@@ -685,20 +686,29 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->step = (v->target - v->cur) / (ms * kFramesPerMs);
     v->elapsed = 0;
     // The note-on converters set the player directly (0x894f3a00…)
-    if (v->on) oscEnvNoteOn(*v, *v, ctl, freeLfo, freeLfoOn);
-    if (v->osc2.on) oscEnvNoteOn(*v, v->osc2, ctl.osc2, freeLfo2, freeLfo2On);
+    // a key-unsynced LFO starts from the newest other tone of the part sounding, if
+    // there is one (the tones' lists at 0x89f91c50/54, newest first), else from its
+    // free-running phase
+    const Voice* other = nullptr;
+    for (const Voice& w : voice)
+        if (&w != v && w.active && (!other || w.age > other->age)) other = &w;
+    oscLfoNoteOn(*v, ctl, freeLfo, other ? &other->lfo : nullptr, seed[1]);
+    oscLfoNoteOn(v->osc2, ctl.osc2, freeLfo2, other ? &other->osc2.lfo : nullptr, seed[2]);
+    if (v->on) oscEnvNoteOn(*v, *v, ctl);
+    if (v->osc2.on) oscEnvNoteOn(*v, v->osc2, ctl.osc2);
     // the COSM sections (0x894edf70, COSM 1 then 2): their
     // envelopes and LFOs start with the others; the filters' states clear and
     // their coefficients start from the envelopes' start levels
     for (int k = 0; k < 2; ++k) {
         Voice::CosmVoice& c = v->cs[k];
         c.on = ctl.cosm[k].on;
+        if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(k), seed[3 + k]);
+        else if (other) c.lfo.noteOnFollow(clfoParams(k), other->cs[k].lfo);
+        else c.lfo.noteOnFree(clfoParams(k), seed[3 + k], freeClfo[k]);
         if (!c.on) continue;
         c.type = ctl.cosm[k].type;
         c.envA.noteOn(cosmEnvParams(*v, ctl.cosm[k].envA));
         c.envB.noteOn(cosmEnvParams(*v, ctl.cosm[k].envB));
-        c.lfo.noteOn(clfoParams(k), drawSeed());
-        if (!ctl.cosm[k].lfoKeySync && freeClfoOn[k]) c.lfo.setPhase(freeClfo[k].phase());
         if (c.type == 2)
             c.dual.noteOn(dualBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
                           c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
@@ -773,14 +783,20 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->mod.noteOn(modBlk, v->on && !v->analog && cur->channels == 2, false, v->on && v->analog, modShared, (int)(v - voice));
 }
 
-// An OSC's envelopes and LFO at note-on.
-void XtSynth::oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o, const XtLfo& free, bool freeOn) {
+// An OSC's LFO at note-on, whatever its Switch: every LFO of the tone starts
+// (0x894f5e60), and a key-unsynced one sets its free-running phase's rate.
+void XtSynth::oscLfoNoteOn(OscVoice& s, const OscControls& o, XtLfoFree& free, const XtLfo* other, float seed) {
+    if (o.lfoKeySync) s.lfo.noteOn(lfoParams(o), seed);
+    else if (other) s.lfo.noteOnFollow(lfoParams(o), *other);
+    else s.lfo.noteOnFree(lfoParams(o), seed, free);
+}
+
+// An OSC's envelopes at note-on.
+void XtSynth::oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o) {
     s.penv.noteOn(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
     s.tenv.noteOn(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));
     s.fenv.noteOn(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));
     s.oenv.noteOn(ampEnvParams(v, o));
-    s.lfo.noteOn(lfoParams(o), drawSeed());
-    if (!o.lfoKeySync && freeOn) s.lfo.setPhase(free.phase());
 }
 
 // An OSC's voice at note-on.  The OSC gain starts from the amp envelope's
@@ -933,39 +949,17 @@ void XtSynth::tvaUpdate(Voice& v) {
 
 void XtSynth::mixBlock(float* lr) {
     std::fill(lr, lr + 64, 0.0f);
-    if (!cur && std::none_of(std::begin(voice), std::end(voice), [](const Voice& v) { return v.active; })) return;
-    // The control clock: the tone update runs between blocks every 441 frames.
+    // The control clock: the tone update runs between blocks every 441 frames, and
+    // the free-running LFOs step with it, a tone sounding or not.
     const bool tick = tickCount >= kTickFrames;
     if (tick) tickCount -= kTickFrames;
     tickCount += 32;
-    if (tick) {   // the free-running LFO (no delay or fade: only its phase is used)
-        if (!freeLfoOn) {
-            XtLfoParams fp = lfoParams(ctl);
-            fp.delayMs = fp.fadeMs = 0.0f;
-            fp.fadeMode = 0;
-            freeLfo.noteOn(fp);
-            freeLfoOn = true;
-        }
+    if (tick) {
         freeLfo.tick(1);
-        if (!freeLfo2On) {
-            XtLfoParams fp = lfoParams(ctl.osc2);
-            fp.delayMs = fp.fadeMs = 0.0f;
-            fp.fadeMode = 0;
-            freeLfo2.noteOn(fp);
-            freeLfo2On = true;
-        }
         freeLfo2.tick(1);
-        for (int k = 0; k < 2; ++k) {
-            if (!freeClfoOn[k]) {
-                XtLfoParams fp = clfoParams(k);
-                fp.delayMs = fp.fadeMs = 0.0f;
-                fp.fadeMode = 0;
-                freeClfo[k].noteOn(fp);
-                freeClfoOn[k] = true;
-            }
-            freeClfo[k].tick(1);
-        }
+        for (XtLfoFree& f : freeClfo) f.tick(1);
     }
+    if (!cur && std::none_of(std::begin(voice), std::end(voice), [](const Voice& v) { return v.active; })) return;
     float tmp[64], tmp2[64];
     for (Voice& v : voice) {
         if (!v.active) continue;

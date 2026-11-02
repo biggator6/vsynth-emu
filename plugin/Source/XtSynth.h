@@ -313,15 +313,13 @@ private:
     // runs between blocks once per 441 frames (10 ms).
     static constexpr int kTickFrames = 441;
     int tickCount = 0;                // frames since the last update
-    XtLfo freeLfo, freeLfo2;          // the free-running LFO a key-unsynced voice follows (LFO 1, LFO 2)
-    XtLfo freeClfo[2];                // the same for LFO 3 and 4
-    bool freeClfoOn[2] = {};
+    XtLfoFree freeLfo, freeLfo2;      // the free-running phase a key-unsynced voice starts from (LFO 1, LFO 2)
+    XtLfoFree freeClfo[2];            // the same for LFO 3 and 4
     XtKeyState keys;                  // the channel's key state (0x894d6330 / 0x894d63c0)
     long hostFrames = 0;              // the system clock (ms) the key state reads
     XtPitchRandom pitchRandom;        // the XT's one random pitch generator (from its power-on seed)
     int bender = 8192;
-    bool freeLfoOn = false, freeLfo2On = false;
-    float chaosSeed = 0.3141f;        // the global logistic map the LFOs draw their seeds from
+    float chaosSeed = 0x1.666666p-1f; // the global logistic map the LFOs draw their seeds from (0.7 at power-on, 0x894f4c80)
     double hostRate = 44100;
 
     // 44.1 kHz mix, produced in 32-frame blocks, read by the resampler
@@ -350,7 +348,8 @@ private:
     void startVoice(int raw, int key, int vel);
     void legatoNote(int key, int vel);               // the sounding voice takes a note (0x894dc1e0)
     void oscStart(Voice& v, OscVoice& s, const OscControls& o);   // the voice's OSC note-on
-    void oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o, const XtLfo& free, bool freeOn);   // its envelopes and LFO
+    void oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o);   // its envelopes
+    void oscLfoNoteOn(OscVoice& s, const OscControls& o, XtLfoFree& free, const XtLfo* other, float seed);   // its LFO
     void truncate(Voice& v);
     void applyRates(OscVoice& s);
     void tvaUpdate(Voice& v);
