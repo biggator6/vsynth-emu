@@ -1544,6 +1544,101 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The analog waveform FEEDBACK-OSC (2026-11-01, v84)
+
+Code 12, patch waveform 12. With it every analog waveform is ported except
+X-MOD, which needs OSC 2 (see the v83 section). Left: X-MOD and the sub
+oscillator.
+
+**The converter's case** (`0x894e22c0`), +0xb4 = 0, the Saw Slope at +0xb0:
+- +0x98, the second tap's place, from the Pulse Width (`0x894e5210`): i = PW +
+  64, 0 if not above 1, within 0…127; i/254 + (key − 60)·KF·½/12000, within
+  0…½. +0x9c and +0xa0 are its depths, (d/63)·|d/63|·½ (`0x894e52c0`).
+- +0x84, the second tap's level, from the **Detune knob** (`0x894e5320`), with
+  Fat's KF: i likewise; 1 − ((127 − i)/127)² + (key − 60)·KF/12000, within 0…1.
+  +0x88 and +0x90 are Fat's depths, (d/63)·|d/63| (`0x894e53b0`). The Fat knob
+  is unused, as for SUPER-SAW.
+
+**The update** (`0x895054c0`): +0x154 the gain target; +0x24c = the place's sum
+within 0…½; +0x254 = the level's sum within 0…1.
+
+**The note-on** (`0x89504d30`):
+- +0x1c8 = +0x1cc = ratio·Slope·0.01; +0x250 = +0x24c; +0x258 = +0x254.
+- +0x274 = 0 (the DC block's state), +0x278 = 0 (the write place).
+- +0x27c = a delay line (`0x895049f0`): the first of eighteen flags at
+  `0x89ff0c4c` that is 0, set to 1. If all are set it returns line 0 and sets
+  nothing, so that voice shares line 0.
+- The line is cleared (`0x895049c0`).
+
+**The voice's stop** (`0x894f1fd0` → `0x895053c0`, for each oscillator): for code
+12 with no sub oscillator it clears the flag (`0x89504a20`). The plugin has 16
+voices and one oscillator, so it never runs out of the eighteen. The port frees
+a stopped voice's line just before the next note-on allocates one, which only a
+note-on could tell from the firmware's order.
+
+**The delay lines.** Eighteen lines of 2,700 **signed bytes** at `0x89fe4e74`,
+which end exactly at the flags. A sample is stored as ftrc(x·127), so the
+feedback path is 8 bits.
+- Write (`0x89504910`): w + 1, 0 at 2700; then the byte at the new w.
+- Tap (`0x89504950`) t samples back: n = ftrc(t), f = t − n; i0 = w − n and i1 =
+  i0 − 1, each + 2700 if negative; (line[i0]·(1 − f) + line[i1]·f)/127.
+
+**The routine** (`0x89507900`). The block's values:
+- step = ratio·440/44100 (0x3c2377ed);
+- t = 1/step, halved until at most 2699 (`0x895048f0`);
+- t2 = t·(½ + +0x250), so the second tap is ½ to 1 of t back;
+- lev = +0x258·1.6.
+
+Each sample:
+- A sync bit sets the phase to 0, nothing else.
+- v = p/s below s, else (1 − p)/(1 − s), then y = 2v − 1. The phase steps and
+  wraps by adding −1, which sets the mask's bit.
+- x = y·0.55 (0x3f0ccccc) + tap(t)·0.32 (0x3ea3d709) + tap(t2)·lev, within ±1.
+- z = x·0.99804 (0x3f7f7f8d) + state; state = z·(−0.003919) (0xbb806af3) + state:
+  a DC block.
+- Write z·0.66 (0x3f28f5c2) to the line.
+- out = (z + Impact)·gain·2^31. Impact by its decay, the gain 1/32 toward its
+  target.
+
+Once a block +0x250 and +0x258 move 0.2 of the way. The flags and Fat's and PW's
+moves are not used.
+
+**Sound** (A4; PW and Detune set the second tap, at PW 63 one period back):
+- PW −63, Detune −63 (the second tap's level 0): a plain saw's harmonics, −6.0,
+  −9.0, −12.1, −14.1 dB, because the remaining tap is one period back.
+- PW 0, Detune 0 (0.75 of a period back, 1.2): the 4th harmonic equals the
+  fundamental, with −9.2 and −10.1 dB between; −28 dB off the series.
+- PW +63, Detune +63 (one period back, 1.6, so past 1 and limited): still
+  harmonic, −14.6, −10.7, −15.9 dB, and about 8 dB louder than the other two.
+- PW −30, Detune 40: −0.3 dB off the series, the largest partial at 1355 Hz: the
+  loop rings at its own pitch rather than the note's.
+
+**Checks** (`xt_analog`, further passes after the others):
+- The converter's case: 200,000 cases, 0 different.
+- 3,000 cases in fcheck: 9,425 note-ons and updates and 42,840 blocks, with
+  +0x24c…+0x258, +0x274, +0x278, +0x27c; every eighth block and at both ends of
+  a note, the eighteen flags and the voice's whole line: 0 different. The voice's
+  stop runs the firmware's own reset.
+- One case in eight runs 120 blocks, so the line wraps. At block 90 of those, the
+  ratio is set for a period exactly at the 2699 limit, or past twice it, with the
+  line full. One in eight plays the lowest notes. One in eight marks other lines
+  in use, half of those all of them.
+- Deliberate errors caught, all 37: the index's "not above 1" rule; 254; the
+  KF's ½; each bound of each curve and target; the level's square, its clamp and
+  its input; the depths' ½ and clamp; the note-on's state and write place; line 0
+  when none is free; the flag not set; the line not cleared; the flag not freed;
+  a tap's interpolation, wrap and /127; the halving as a single step and at ≥; the
+  second tap on the target; 1.6, 0.55, 0.32 and both of the DC block's constants a
+  unit off; each side of x's limit; the line's wrap; the written value; z for x in
+  the output; the phase's wrap at 1.
+  - 0.66 a unit off, and (0.66·127) grouped the other way, change a byte so rarely
+    that they show only on the wide run (21,000 cases), not in fcheck's 3,000.
+
+**Plugin.** FEEDBACK-OSC is enabled in the Waveform box. The PluginTest is
+bit-identical with it at notes 30, 60 and 100, with modulation and at the
+extremes of PW and Detune. XtAnalogShared now holds the lines and flags (one per
+XtSynth, about 49 kB).
+
 ### The analog waveform SUPER-SAW (2026-11-01, v83)
 
 Code 11, patch waveform 11. Left: FEEDBACK-OSC (code 12), X-MOD (code 13,

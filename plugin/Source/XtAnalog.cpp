@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <bit>
 #include <cstdio>
+#include <cstring>
 
 namespace {
 
@@ -95,6 +96,24 @@ float ssMixCurve(int detune, int kf10, int dk) {
     return x > K(0x3e854110) ? K(0x3e854110) : (K(0x3c47ffde) > x ? K(0x3c47ffde) : x);
 }
 
+// FEEDBACK-OSC's, by the same index: Pulse Width the second tap's place
+// (0x894e5210), i/254 + (key − 60)·KF·½/12000, within 0…½
+float fbTapCurve(int pw, int kf10, int dk) {
+    int i = (int16_t)(pw + 64);
+    i = clampi(i > 1 ? i : 0, 0, 127);
+    const float x = add(div(mul(flt((int16_t)kf10 * (int16_t)dk), 0.5f), 12000.0f), div(flt(i), 254.0f));
+    return x > 0.5f ? 0.5f : (0.0f > x ? 0.0f : x);
+}
+
+// Detune the second tap's level (0x894e5320), with Fat's KF: 1 − ((127 − i)/
+// 127)² + (key − 60)·KF/12000, within 0…1
+float fbLevelCurve(int detune, int kf10, int dk) {
+    int i = (int16_t)(detune + 64);
+    i = clampi(i > 1 ? i : 0, 0, 127);
+    const float n = div(flt(127 - i), 127.0f);
+    return clamp01(add(div(flt((int16_t)kf10 * (int16_t)dk), 12000.0f), sub(1.0f, mul(n, n))));
+}
+
 // The waveform's level at the note's pitch (0x894e1350), for the patch's
 // waveform; SUPER-SAW, FEEDBACK-OSC and X-MOD take the Saw's
 float waveLevel(int wave, int pitch10) {
@@ -146,7 +165,7 @@ int xtAnalogCode(int wave) {
     return wave >= 1 && wave <= 13 ? code[wave] : 2;      // the converter's default case: SAW
 }
 
-bool xtAnalogPlays(int wave) { return xtAnalogCode(wave) <= 11; }
+bool xtAnalogPlays(int wave) { return xtAnalogCode(wave) <= 12; }
 
 XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw) {
     XtAnalogBlock b;
@@ -163,6 +182,13 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
         b.fat = ssMixCurve(p.detune, p.fatKf * 10, dk);
         b.fatEnv = mul(mul(sq63(p.fatEnv), kMix), velFat);
         b.fatLfo = mul(sq63(clampi((int16_t)p.fatLfo, -63, 63)), kMix);
+    } else if (p.wave == 12) {   // FEEDBACK-OSC (0x894e22c0)
+        b.pw = fbTapCurve(p.pw, p.pwKf * 10, dk);
+        b.pwEnv = mul(mul(sq63(p.pwEnv), 0.5f), velPw);
+        b.pwLfo = mul(sq63(clampi((int16_t)p.pwLfo, -63, 63)), 0.5f);
+        b.fat = fbLevelCurve(p.detune, p.fatKf * 10, dk);
+        b.fatEnv = mul(sq63(p.fatEnv), velFat);
+        b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
     } else {
         b.pw = pwCurve(p.pw, p.pwKf * 10, dk);
         b.pwEnv = mul(sq63(p.pwEnv), velPw);
@@ -308,6 +334,34 @@ void XtAnalogOsc::ssNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, fl
     shared.superSaw = x;
 }
 
+// FEEDBACK-OSC's targets (0x895054c0): the second tap's place and level
+void XtAnalogOsc::fbShape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo) {
+    const float t = fmac(lfo, b.pwLfo, fmac(pwEnv, b.pwEnv, b.pw));
+    ssDetT = 0.0f > t ? 0.0f : (t > kHalf ? kHalf : t);
+    ssMixT = clamp01(fmac(lfo, b.fatLfo, fmac(fatEnv, b.fatEnv, b.fat)));
+}
+
+// FEEDBACK-OSC's note-on (0x89504d30): one of the eighteen delay lines, the
+// first free (0x895049f0) or the first if none is, cleared (0x895049c0).
+void XtAnalogOsc::fbNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared) {
+    fbShape(b, fatEnv, pwEnv, lfo);
+    pwT = pwC = mul(mul(ratio_, b.slope), K(0x3c23d709));
+    ssDetC = ssDetT;
+    ssMixC = ssMixT;
+    fbZ = 0.0f;
+    fbW = 0;
+    fbSlot = 0;
+    for (int i = 0; i < XtAnalogShared::kLines; ++i)
+        if (!shared.lineUsed[i]) { shared.lineUsed[i] = 1; fbSlot = i; break; }
+    shared_ = &shared;
+    std::memset(shared.line[fbSlot], 0, XtAnalogShared::kLineLen);
+}
+
+void XtAnalogOsc::release() {
+    if (fbSlot >= 0 && shared_) shared_->lineUsed[fbSlot] = 0;
+    fbSlot = -1;
+}
+
 void XtAnalogOsc::noteOn(const XtAnalogBlock& b, float ratio, float gain, float gainStart, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared) {
     code = b.code;
     ratio_ = ratio;
@@ -320,6 +374,7 @@ void XtAnalogOsc::noteOn(const XtAnalogBlock& b, float ratio, float gain, float 
     if (ph > 1.0f || 0.0f > ph) ph = 0.0f;
     if (code == 9 || code == 10) laNoteOn(b, gain, gainStart, fatEnv, pwEnv, lfo);
     else if (code == 11) ssNoteOn(b, fatEnv, pwEnv, lfo, shared);
+    else if (code == 12) fbNoteOn(b, fatEnv, pwEnv, lfo, shared);
     else shape(b, fatEnv, pwEnv, lfo, true);
 }
 
@@ -328,6 +383,7 @@ void XtAnalogOsc::update(const XtAnalogBlock& b, float ratio, float gain, float 
     gainT = gain;
     if (code == 9 || code == 10) laShape(b, gain, fatEnv, pwEnv, lfo);
     else if (code == 11) ssShape(b, fatEnv, pwEnv, lfo);
+    else if (code == 12) fbShape(b, fatEnv, pwEnv, lfo);
     else shape(b, fatEnv, pwEnv, lfo, false);
 }
 
@@ -378,7 +434,7 @@ int XtAnalogOsc::breakpoints(float* p) const {
         p[0] = fatC;
         p[1] = sub(1.0f, laInc);
         return 2;
-    case 11:           // the sample that lands on 1, and the slope's turn
+    case 11: case 12:  // the sample that lands on 1, and the slope's turn
         p[0] = sub(1.0f, mul(ratio_, K(0x3c2377ed)));
         p[1] = pwT;
         return 2;
@@ -400,6 +456,7 @@ uint32_t XtAnalogOsc::process(float* lr, uint32_t sync) {
     case 9: return laSquare(lr, sync);
     case 10: return laSaw(lr, sync);
     case 11: return superSaw(lr, sync);
+    case 12: return feedbackOsc(lr, sync);
     default: return saw(lr, sync);
     }
 }
@@ -847,6 +904,56 @@ uint32_t XtAnalogOsc::superSaw(float* lr, uint32_t sync) {
     return wrap;
 }
 
+// A tap of the delay line (0x89504950), t samples back from w
+static float lineTap(const int8_t* line, int w, float t) {
+    const int n = ftrc(t);
+    const float f = sub(t, flt(n));
+    int i0 = w - n, i1 = i0 - 1;
+    if (i0 < 0) i0 += XtAnalogShared::kLineLen;
+    if (i1 < 0) i1 += XtAnalogShared::kLineLen;
+    return div(fmac(flt(line[i0]), sub(1.0f, f), mul(flt(line[i1]), f)), 127.0f);
+}
+
+// FEEDBACK-OSC (0x89507900): a saw (the phase of 0…1 a cycle at ratio·440/44100;
+// rising over 0…s, falling over s…1) into a delay line of signed bytes, 8 bits
+// at 44.1 kHz.  Two taps feed back: one period back (t = 1/step, halved until
+// it is at most 2699) at 0.32, and t·(½ + +0x250) back at 1.6·+0x258.  The sum
+// within ±1, z = x·0.99804 + state, state moving by z·(−0.003919) (+0x274, a
+// DC block); z·0.66·127 goes into the line, and out = (z + Impact)·gain·2^31.
+// The mask follows the phase.  A sync bit only resets the phase.  Once a block
+// +0x250 and +0x258 move 0.2 of the way.
+uint32_t XtAnalogOsc::feedbackOsc(float* lr, uint32_t sync) {
+    const float s = pwT, s1 = sub(1.0f, s);
+    const float step = mul(ratio_, K(0x3c2377ed));
+    float t = div(1.0f, step);
+    while (t > 2699.0f) t = div(t, 2.0f);
+    const float t2 = mul(t, add(ssDetC, kHalf)), lev = mul(ssMixC, K(0x3fcccccd));
+    int8_t* line = shared_->line[fbSlot];
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = 0.0f;
+        const float v = s > ph ? div(ph, s) : div(sub(1.0f, ph), s1);
+        ph = add(ph, step);
+        if (!(1.0f > ph)) { ph = add(ph, -1.0f); wrap |= bit; }
+        float x = mul(fmac(v, 2.0f, -1.0f), K(0x3f0ccccc));
+        x = fmac(lineTap(line, fbW, t), K(0x3ea3d709), x);
+        x = fmac(lineTap(line, fbW, t2), lev, x);
+        if (x > 1.0f) x = 1.0f;
+        else if (-1.0f > x) x = -1.0f;
+        const float z = fmac(x, K(0x3f7f7f8d), fbZ);
+        fbZ = fmac(z, K(0xbb806af3), fbZ);
+        if (++fbW >= XtAnalogShared::kLineLen) fbW = 0;
+        line[fbW] = (int8_t)ftrc(mul(mul(z, K(0x3f28f5c2)), 127.0f));
+        lr[2 * i] = lr[2 * i + 1] = mul(mul(add(z, imp), gainC), kFull31);
+        imp = mul(imp, dec);
+        gainC = fmac(sub(gainT, gainC), kStep, gainC);
+        bit <<= 1;
+    }
+    ssDetC = fmac(sub(ssDetT, ssDetC), K(0x3e4ccccd), ssDetC);
+    ssMixC = fmac(sub(ssMixT, ssMixC), K(0x3e4ccccd), ssMixC);
+    return wrap;
+}
+
 // NOISE (0x89504a40): integer random values (two states: +0x1dc, cleared at
 // note-on, and +0x244), each held for the hold's samples, the hold starting
 // again every block; (Impact + value)·gain, the value already ±2^31.  No
@@ -1005,16 +1112,29 @@ int main(int argc, char** argv) {
     c.write(V, z.data(), 0x1000);
     c.wr32(V + 0x970, EP); c.wr32(V + 0x974, EF); c.wr32(V + 0x978, EW); c.wr32(V + 0x97c, EA);
     for (uint32_t o = 0x980; o < 0x990; o += 4) c.wr32(V + o, LF);
-    static const int waves[12] = { 0, 1, 2, 3, 4, 5, 8, 6, 7, 10, 9, 11 };
-    static const char* waveName[12] = { "saw", "square", "triangle", "sine", "ramp", "juno", "noise", "hq-saw", "hq-square", "la-square", "la-saw", "super-saw" };
-    static const uint32_t routine[12] = { 0x895063f0, 0x895060e0, 0x89508c20, 0x89508aa0, 0x895094c0, 0x89508800, 0x89509030, 0x89508db0,
-                                          0x89504a40, 0x89508540, 0x895081f0, 0x89507520 };
+    static const int waves[13] = { 0, 1, 2, 3, 4, 5, 8, 6, 7, 10, 9, 11, 12 };
+    static const char* waveName[13] = { "saw", "square", "triangle", "sine", "ramp", "juno", "noise", "hq-saw", "hq-square", "la-square", "la-saw", "super-saw",
+                                        "feedback-osc" };
+    static const uint32_t routine[13] = { 0x895063f0, 0x895060e0, 0x89508c20, 0x89508aa0, 0x895094c0, 0x89508800, 0x89509030, 0x89508db0,
+                                          0x89504a40, 0x89508540, 0x895081f0, 0x89507520, 0x89507900 };
     XtAnalogOsc osc;
     XtAnalogShared shared;
     constexpr uint32_t kSsCount = 0x8987c894;
     shared.superSaw = f32(kSsCount);
-    long nb = 0, nn = 0, wb = 0, db[12] = {}, dn[12] = {}, mb = 0;
-    float peak[12] = {};
+    constexpr uint32_t kFbFlags = 0x89ff0c4c, kFbLines = 0x89fe4e74;
+    long nb = 0, nn = 0, wb = 0, db[13] = {}, dn[13] = {}, mb = 0;
+    float peak[13] = {};
+    // the eighteen flags and the voice's whole delay line
+    auto linesSame = [&] {
+        for (int i = 0; i < XtAnalogShared::kLines; ++i)
+            if (c.rd8(kFbFlags + (uint32_t)i) != shared.lineUsed[i]) return false;
+        const int sl = osc.fbSlotIndex();
+        if (sl < 0) return true;
+        const uint32_t base = kFbLines + (uint32_t)XtAnalogShared::kLineLen * (uint32_t)sl;
+        for (int i = 0; i < XtAnalogShared::kLineLen; ++i)
+            if ((int8_t)c.rd8(base + (uint32_t)i) != shared.line[sl][i]) return false;
+        return true;
+    };
     int code = 2;
     auto stateSame = [&](bool full) {
         bool ok = same(f32(V + 0x144), osc.ratio()) && same(f32(V + 0x154), osc.gainTarget()) && same(f32(V + 0x1c0), osc.fatTarget())
@@ -1024,6 +1144,12 @@ int main(int argc, char** argv) {
         if (code == 9 || code == 10) {
             ok = ok && same(f32(V + 0x1f4), osc.laStep()) && same(f32(V + 0x224), osc.laSteepTarget()) && c.rd32(V + 0x20c) == 0;
             if (full) ok = ok && same(f32(V + 0x228), osc.laSteep()) && same(f32(V + 0x218), osc.laPhase2());
+        }
+        if (code == 12) {
+            ok = ok && same(f32(V + 0x24c), osc.detuneTarget()) && same(f32(V + 0x254), osc.mixTarget());
+            if (full)
+                ok = ok && same(f32(V + 0x250), osc.detune()) && same(f32(V + 0x258), osc.mix()) && same(f32(V + 0x274), osc.fbState())
+                     && (int)c.rd32(V + 0x278) == osc.fbWrite() && (int)c.rd32(V + 0x27c) == osc.fbSlotIndex();
         }
         if (code == 11) {
             ok = ok && same(f32(V + 0x24c), osc.detuneTarget()) && same(f32(V + 0x254), osc.mixTarget()) && same(f32(kSsCount), shared.superSaw);
@@ -1050,6 +1176,10 @@ int main(int argc, char** argv) {
             std::printf("    ss: detune %.9g/%.9g %.9g/%.9g mix %.9g/%.9g %.9g/%.9g phases %.9g/%.9g %.9g/%.9g count %.9g/%.9g\n", f32(V + 0x24c), osc.detuneTarget(),
                         f32(V + 0x250), osc.detune(), f32(V + 0x254), osc.mixTarget(), f32(V + 0x258), osc.mix(), f32(V + 0x25c), osc.sidePhase(0), f32(V + 0x270),
                         osc.sidePhase(5), f32(kSsCount), shared.superSaw);
+        if (code == 12)
+            std::printf("    fb: tap %.9g/%.9g %.9g/%.9g level %.9g/%.9g %.9g/%.9g state %.9g/%.9g w %d/%d line %d/%d\n", f32(V + 0x24c), osc.detuneTarget(),
+                        f32(V + 0x250), osc.detune(), f32(V + 0x254), osc.mixTarget(), f32(V + 0x258), osc.mix(), f32(V + 0x274), osc.fbState(),
+                        (int)c.rd32(V + 0x278), osc.fbWrite(), (int)c.rd32(V + 0x27c), osc.fbSlotIndex());
         if (code == 9 || code == 10)
             std::printf("    la: step %.9g/%.9g steep %.9g/%.9g %.9g/%.9g z %.9g/%.9g +0x20c %08x\n", f32(V + 0x1f4), osc.laStep(), f32(V + 0x224),
                         osc.laSteepTarget(), f32(V + 0x228), osc.laSteep(), f32(V + 0x218), osc.laPhase2(), c.rd32(V + 0x20c));
@@ -1066,6 +1196,9 @@ int main(int argc, char** argv) {
             k.key = steps[rnd() % 5]; k.coarse = 0; k.fine = 0; k.kf = 1000;
         }
         code = xtAnalogCode(k.p.wave);
+        if (code == 12 && g % 8 == 4) {            // the lowest notes: the delay halved twice
+            k.key = (int)(rnd() % 6); k.coarse = -12; k.fine = 0; k.kf = 1000;
+        }
         mtx = 0;
         writeInput(k);
         if (!c.call(0x894e1920, { P, V }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
@@ -1079,6 +1212,13 @@ int main(int argc, char** argv) {
         wf(EA + 0x1c, atk ? 25.0f : 0.0f); wf(EA + 0x2c, 0.0f);
         auto ratioOf = [&]() { return xtPitchTarget(f32(V + 8), eP, f32(V + 0x1c), lfo, f32(V + 0x34), f32(V + 0xc)); };
         auto gainOf = [&](bool on) { return xtOscGainTarget(f32(V + 0x5c), f32(V + 0x54), on && atk ? 0.0f : eA, lfo, f32(V + 0x58)); };
+        if (code == 12 && g % 8 == 3) {            // other lines in use, sometimes all of them
+            const bool all = g % 16 == 3;
+            for (int i = 0; i < XtAnalogShared::kLines; ++i) {
+                const uint8_t u = all ? 1 : (uint8_t)(rnd() & 1);
+                c.wr8(kFbFlags + (uint32_t)i, u); shared.lineUsed[i] = u;
+            }
+        }
         if (code == 11 && g % 16 == 5) {           // the shared counter's step landing exactly on 1
             float x = sub(1.0f, K(0x3dcccccd));
             while (1.0f > add(x, K(0x3dcccccd))) x = std::nextafter(x, 2.0f);
@@ -1091,7 +1231,9 @@ int main(int argc, char** argv) {
         if (!c.call(0x89505170, { V }, sp)) { std::fprintf(stderr, "install: %s\n", c.error().c_str()); return false; }
         const uint32_t fn = c.rd32(V + 0x968);
         if (fn != routine[code] && wb++ < 4) std::printf("  install code %d: routine %08x, the map has %08x\n", code, fn, routine[code]);
-        for (int blk = 0; blk < 40; ++blk) {
+        if (code == 12 && !linesSame() && nb++ < 6) dump("lines at note-on", g, 0);
+        const int nBlk = code == 12 && g % 8 == 0 ? 120 : 40;     // FEEDBACK-OSC's line wraps after 85
+        for (int blk = 0; blk < nBlk; ++blk) {
             if (blk % 5 == 4) {
                 eP = frnd(-1, 1); eF = frnd(0, 1); eW = frnd(0, 1); eA = frnd(0, 1); lfo = frnd(-1, 1);
                 wf(EP + 0x4c, eP); wf(EF + 0x4c, eF); wf(EW + 0x4c, eW); wf(EA + 0x4c, eA); wf(LF + 0x38, lfo);
@@ -1112,6 +1254,16 @@ int main(int argc, char** argv) {
                 const float zs[3] = { add(add(add(add(-1.0f, s), s), s), s), 0.0f, 1.0f };
                 const float z = zs[rnd() % 3];
                 wf(V + 0x218, z); osc.setLaPhase2(z);
+            }
+            if (code == 12 && blk % 8 == 7 && !linesSame() && db[wi]++ < 4) dump("lines", g, blk);
+            if (code == 12 && g % 8 == 0 && blk == 90) {  // the line full: a period exactly at the delay's limit, or past twice it
+                float r = 0.0167f;
+                if (g % 16 == 0) {
+                    r = div(div(1.0f, 2699.0f), K(0x3c2377ed));
+                    while (div(1.0f, mul(r, K(0x3c2377ed))) > 2699.0f) r = std::nextafter(r, 2.0f);
+                    while (2699.0f > div(1.0f, mul(r, K(0x3c2377ed)))) r = std::nextafter(r, 0.0f);
+                }
+                wf(V + 0x144, r); osc.setRatio(r);
             }
             if (code == 11 && blk % 6 == 3) {      // the side saws landing on 1, or at the Slope's turn
                 const bool turn = rnd() & 1;
@@ -1139,6 +1291,12 @@ int main(int argc, char** argv) {
                             i < 64 ? f32(BUF + 4 * (uint32_t)i) : 0.0f, i < 64 ? lr[i] : 0.0f);
                 dump(waveName[wi], g, blk);
             }
+        }
+        if (code == 12) {                          // the voice's stop frees the line
+            if (!linesSame() && nb++ < 6) dump("lines at the end", g, 0);
+            if (!c.call(0x895053c0, { V }, sp)) { std::fprintf(stderr, "reset: %s\n", c.error().c_str()); return false; }
+            osc.release();
+            if (!linesSame() && nb++ < 6) dump("reset", g, 0);
         }
         return true;
     };
@@ -1187,6 +1345,14 @@ int main(int argc, char** argv) {
     for (int g = 0; g < nSs; ++g)
         if (!voiceCase(nCases + nHq + nLa + nCal + g, 11)) return 1;
     report("super-saw ", nSs, 11, 12);
+    // FEEDBACK-OSC, its converter case first
+    cn = cb = 0;
+    if (!converterCases(200000, 12)) return 1;
+    std::printf("feedback-osc converter: %ld cases, %ld different\n", cn, cb);
+    bad += cb;
+    for (int g = 0; g < nSs; ++g)
+        if (!voiceCase(nCases + nHq + nLa + nCal + nSs + g, 12)) return 1;
+    report("feedback-osc ", nSs, 12, 13);
     return bad ? 3 : 0;
 }
 #endif

@@ -620,6 +620,10 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     Voice* v = nullptr;
     for (Voice& w : voice) if (!w.active) { v = &w; break; }
     if (!v) { v = &voice[0]; for (Voice& w : voice) if (w.age < v->age) v = &w; }   // steal the oldest
+    // the voice's stop (0x895053c0) frees FEEDBACK-OSC's line; only a note-on can
+    // tell when it happened
+    for (Voice& w : voice) if (!w.active) w.ana.release();
+    v->ana.release();
     v->active = true;
     v->releasing = false;
     v->damping = false;

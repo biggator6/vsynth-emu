@@ -3008,3 +3008,22 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - X-MOD turns out to need OSC 2: the voice renders OSC 2 first and passes its
   buffer to OSC 1's routine, which uses it as a phase modulator and clears it.
   It stays until OSC 2 exists.
+
+### Session 16 addendum (2026-11-01) — v84: FEEDBACK-OSC
+
+- FEEDBACK-OSC is ported, the last analog waveform that OSC 1 can play alone.
+  Only X-MOD (which needs OSC 2) and the sub oscillator remain.
+- It feeds a saw into a delay line with two taps, one a period back and one set
+  by the Pulse Width, and the Detune knob sets the second tap's level. It can
+  ring at the loop's own pitch instead of the note's.
+- The firmware keeps those delay lines in 8-bit signed bytes, eighteen of them
+  shared by all voices, so the feedback path is really 8 bits. If all eighteen
+  are in use a new voice shares the first. The plugin has 16 voices, so it never
+  gets there, but the check exercises it.
+- I first took the line's length as 2,956 bytes, reading a constant wrongly
+  (0xb00 − 0x74 is 0xa8c, 2,700). The firmware comparison showed it within one
+  run; 18 × 2,700 also lands exactly on the flags' address, which confirms it.
+- Four planted errors were missed at first. Two were real gaps in the test: the
+  delay's limit only matters with a full line, so setting it early in a note
+  shows nothing, and the check now waits for that. The other two change an 8-bit
+  value so rarely that they show only on the wide run, not in fcheck's cases.

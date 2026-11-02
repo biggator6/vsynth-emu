@@ -271,6 +271,15 @@ ANALOG SUPER-SAW v83 (2026-11-01): SUPER-SAW (code 11, 0x89507520)
   optional eleventh value). X-MOD (0x89507b60) reads OSC 2's buffer, so it
   waits for OSC 2.
 
+ANALOG FEEDBACK-OSC v84 (2026-11-01): FEEDBACK-OSC (code 12, 0x89507900)
+  (HARDWARE_FIRMWARE.md, "The analog waveform FEEDBACK-OSC"). Converter case: PW
+  → the second tap's place (fbTapCurve), the Detune knob → its level
+  (fbLevelCurve). fbShape() is the update, fbNoteOn() 0x89504d30. XtAnalogShared
+  holds the eighteen 2,700-byte lines and flags; release() is 0x895053c0, called
+  from XtSynth::startVoice for stopped and stolen voices. It shares ssDet*/ssMix*
+  (+0x24c…+0x258) with SUPER-SAW; fbZ +0x274, fbW +0x278, fbSlot +0x27c.
+  xtAnalogPlays: codes 0…12. Only X-MOD and the sub oscillator remain.
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from

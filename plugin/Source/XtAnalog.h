@@ -16,9 +16,9 @@
 // The port plays the note-on's default case: HQ-SAW (0x895063f0), HQ-SQUARE
 // (0x895060e0), SAW (0x89508c20), SQUARE (0x89508aa0), TRIANGLE
 // (0x895094c0), SINE (0x89509030), RAMP (0x89508800), JUNO (0x89508db0) and
-// NOISE (0x89504a40); LA-SQUARE (0x89508540), LA-SAW (0x895081f0) and SUPER-SAW
-// (0x89507520); without the sub oscillator.  X-MOD (0x89507b60) reads OSC 2's
-// output, so it waits for OSC 2.
+// NOISE (0x89504a40); LA-SQUARE (0x89508540), LA-SAW (0x895081f0), SUPER-SAW
+// (0x89507520) and FEEDBACK-OSC (0x89507900); without the sub oscillator.
+// X-MOD (0x89507b60) reads OSC 2's output, so it waits for OSC 2.
 //
 // The level and the Saw's edge also follow hidden system parameters, the
 // XT's analog calibration (IDs 0x528…0x55b, through 0x894e5f80 to the OSC
@@ -34,9 +34,13 @@ bool xtAnalogLoadTables(const char* romPath);
 bool xtAnalogTablesLoaded();
 
 // What the firmware keeps for all voices: SUPER-SAW's phase counter
-// (0x8987c894, 0 at startup).
+// (0x8987c894, 0 at startup), FEEDBACK-OSC's eighteen delay lines of signed
+// bytes (0x89fe4e74) and their in-use flags (0x89ff0c4c).
 struct XtAnalogShared {
+    static constexpr int kLines = 18, kLineLen = 2700;
     float superSaw = 0;
+    uint8_t lineUsed[kLines] = {};
+    int8_t line[kLines][kLineLen] = {};
 };
 
 // The waveform's code (+0x80) for the patch's 0…13; and whether the port
@@ -74,7 +78,8 @@ struct XtAnalogParams {
 //           and the lower below (with −d)
 //           SUPER-SAW (patch 11) has its own curves: +0x98 the saws' spread
 //           from the Pulse Width, +0x84 the side saws' level from the Detune
-//           knob with Fat's KF, each with its depths
+//           knob with Fat's KF, each with its depths; FEEDBACK-OSC (12) too:
+//           +0x98 the second tap's place, +0x84 its level
 //   tone    +0xbc: LA-SQUARE's Tone (ID 0x529), the others' LA Saw Tone (0x528)
 //   toneKf  +0xc0: LA-SQUARE's Tone Keyfollow (0x52b), the others' (0x52a)
 // The envelopes: Fat's is the OSC's third (Env 3, OSC 2 Env 7; the formant
@@ -125,7 +130,10 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
 //             +0x154 = −gain·2^26, +0x1c0 and +0x1c8 the target × 0.002.
 //   ss        SUPER-SAW: +0x24c/+0x250 the spread, +0x254/+0x258 the side saws'
 //             level, targets and current values; +0x25c…+0x270 the side saws'
-//             phases, +0x1d4 the centre's.
+//             phases, +0x1d4 the centre's.  FEEDBACK-OSC's second tap's place
+//             and level are in the same fields.
+//   fb        FEEDBACK-OSC: +0x274 the DC block's state, +0x278 the line's write
+//             place, +0x27c which line.
 class XtAnalogOsc {
 public:
     // fatEnv/pwEnv: the envelopes' outputs (+0x4c); lfo: the LFO's (+0x38);
@@ -137,6 +145,9 @@ public:
     // resetting the phase at sample i.  Returns this oscillator's mask: bit
     // i set where a cycle's two halves have both been seen (NOISE: 0).
     uint32_t process(float* lr, uint32_t sync = 0);
+    // the voice's stop (0x895053c0): FEEDBACK-OSC frees its delay line; once is
+    // enough, and it does nothing for the other waveforms
+    void release();
 
     // the state, for the firmware check
     float ratio() const { return ratio_; }
@@ -164,12 +175,16 @@ public:
     float mixTarget() const { return ssMixT; }
     float mix() const { return ssMixC; }
     float sidePhase(int i) const { return ss[i]; }
+    float fbState() const { return fbZ; }
+    int fbWrite() const { return fbW; }
+    int fbSlotIndex() const { return fbSlot; }
     // the check's breakpoint cases: the points the routine compares the
     // phase with, as it forms them from the current Fat and PW (up to 8)
     int breakpoints(float* p) const;
     void setPhase(float p) { ph = p; }
     void setLaPhase2(float z) { ph2 = z; }
     void setSidePhase(int i, float p) { ss[i] = p; }
+    void setRatio(float r) { ratio_ = r; }
 
 private:
     int code = 2;
@@ -178,6 +193,9 @@ private:
     float ph = 0, imp = 0, dec = 0, edge_ = 0, hy = 0;
     float laInc = 0, ph2 = 0, qT = 0, qC = 0;
     float ssDetT = 0, ssDetC = 0, ssMixT = 0, ssMixC = 0, ss[6] = {};
+    float fbZ = 0;
+    int fbW = 0, fbSlot = -1;
+    XtAnalogShared* shared_ = nullptr;
     uint32_t fl = 0, s2 = 0;
     int hold = 1, hs = 0;
     // HQ-SAW's and HQ-SQUARE's lengths and factors for a block (samples ×
@@ -191,6 +209,9 @@ private:
     void ssShape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo);
     void ssNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared);
     uint32_t superSaw(float* lr, uint32_t sync);
+    void fbShape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo);
+    void fbNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared);
+    uint32_t feedbackOsc(float* lr, uint32_t sync);
     uint32_t laSquare(float* lr, uint32_t sync);
     uint32_t laSaw(float* lr, uint32_t sync);
     uint32_t hqSaw(float* lr, uint32_t sync);
