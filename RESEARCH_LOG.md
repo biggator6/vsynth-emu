@@ -2967,3 +2967,24 @@ Round-2 recordings.  First build-out after that: real-time granular port
   value, and the plugin test differed from its reference. It had passed
   in v80 only because that test played the note where a key-follow does
   nothing. TEST_ANALOG now rejects such values.
+
+### Session 16 addendum (2026-11-01) — v82: LA-SQUARE and LA-SAW
+
+- The first two analog waveforms with note-on and update cases of their own
+  are ported. SUPER-SAW, FEEDBACK-OSC, X-MOD and the sub oscillator remain.
+- Both shape a pulse with parabolic edges. The hidden LA Tone sets a corner
+  frequency, and its ratio to the note sets how steep the edges are, so at
+  high notes the harmonics fall away. LA-SAW multiplies the pulse by a second
+  wave running at the same rate, which turns it into a saw at twice the rate.
+- Their state moves every sample, not every block, and the routines use both
+  FPU banks and paired moves.
+- The note-on reads a field (+0x20c) that nothing writes. It is 0 in the
+  check, and the port takes it as 0.
+- Both matched the firmware on the first run, so most of the effort went
+  into showing the check could fail: 27 of 28 deliberate errors were caught,
+  and the one missed is an exact equivalent. One apparent miss was a
+  mistake in the test itself: the mutation had changed the same constant in
+  SQUARE's code instead.
+- The check also varies the LA Tones and Keyfollows through the firmware's
+  own calibration routine, since a real unit could hold other values than the
+  defaults the plugin uses.

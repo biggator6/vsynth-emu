@@ -250,6 +250,16 @@ ANALOG HQ v81 (2026-11-01): HQ-SAW (0x895063f0) and HQ-SQUARE (0x895060e0)
   lines) so the other waveforms' lines stay. TEST_ANALOG's KFs must be
   multiples of 10 (%): the parameters step by 10.
 
+ANALOG LA v82 (2026-11-01): LA-SQUARE (code 9, 0x89508540) and LA-SAW (code
+  10, 0x895081f0) (HARDWARE_FIRMWARE.md, "LA-SQUARE and LA-SAW"), with the map
+  of codes 9…13's note-on and update cases. laShape() is 0x89505950, for both
+  the note-on and the update; laNoteOn() is 0x89504bf6. Their gain and Fat/PW
+  targets are per sample (gainT = −gain·2^26). New state: laInc +0x1f4, ph2
+  +0x218, qT/qC +0x224/+0x228. XtAnalogBlock tone, toneKf (+0xbc, +0xc0);
+  T.toneKf from 0x897d4c6c. +0x20c is read and never written: taken as 0.
+  xtAnalogPlays: codes 0…10. xt_analog: "la" and "la tones" lines, the latter
+  with the calibration's Tones and KFs random through 0x894e5f80.
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from

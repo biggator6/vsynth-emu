@@ -1544,6 +1544,117 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The analog waveforms: LA-SQUARE and LA-SAW (2026-11-01, v82)
+
+Codes 9 and 10, the first two with note-on and update cases of their own.
+Left: SUPER-SAW, FEEDBACK-OSC, X-MOD (codes 11…13) and the sub oscillator.
+
+**The cases by code.** The first switch in the note-on (`braf` at
+`0x89504bc8`, table at `0x89504bec`) and in the update (`braf` at
+`0x89505448`, table at `0x89505494`), r2 = code − 9:
+
+| Code | Waveform | Note-on | Update |
+|---|---|---|---|
+| 9, 10 | LA-SQUARE, LA-SAW | `0x89504bf6` | `0x8950549e` |
+| 11 | SUPER-SAW | `0x89504d20` | `0x895054b0` |
+| 12 | FEEDBACK-OSC | `0x89504d30` | `0x895054c0` |
+| 13 | X-MOD | `0x89504e40` | `0x89505580` |
+
+**The converter** sets the LA Tone settings for every waveform: +0xbc =
+float of LA Squ Tone (+0xc206, ID 0x529) for patch waveform 10 and LA Saw
+Tone (+0xc205, 0x528) for the others; +0xc0 likewise from the Tone Keyfollows
+(+0xc208/+0xc207, 0x52b/0x52a). The defaults are Saw Tone 120, Square Tone
+117, both Keyfollows 3.
+
+**The targets** (`0x89505950`, from both the note-on and the update):
+- Fat: x as usual, F = ½ − ½x, at or below 0.0039 it is 0.002. Then
+  +0x1c0 = F·0.002.
+- Pulse Width: p = 0.0039683 + 0.992063·x, not folded.
+- The Tone is a corner frequency:
+  - c0 = powf(2, Tone/127·7)·156, about 156 Hz to 20 kHz;
+  - k = table[Tone KF], from the 15 floats at `0x897d4c6c` (−0.125, −0.0625,
+    −0.03125, 0, 0.125 … 1, 1.25, 1.5, 2; KF 3 is 0, so the corner stays put
+    by default);
+  - c = c0·(1 + k·(ratio·2^(9/12) − 1)).
+- With f = ratio·440 for LA-SQUARE and ratio·220 for LA-SAW:
+  - above 20 kHz: c = 20000, m = f/20000;
+  - else if 2f > c: c = 2f, m = ½;
+  - else m = f/c.
+- +0x1f4, the phase's step, is ratio·220/44100 for LA-SQUARE (0x3ba377ed)
+  and half that for LA-SAW (0x3b2377ed).
+- +0x224 = (c/f)·0.002, the steepness' target.
+- +0x1c8 = w·0.002, with w = p within m…1 − m (`0x89507480`).
+- +0x154 = −gain·2^26. The routine's move is per sample and its sign is
+  inverted: gain = gain·0.96875 + target, which settles at −gain·2^31.
+
+**The note-on** (`0x89504bf6`):
+- +0x158 = −(start gain)·2^31.
+- +0x1cc, +0x1c4 and +0x228 = their targets/0.002.
+- +0x1d4 (the phase): 0.25; with Impact below 1, 0.25·Impact + (½ + ½·PW)·a,
+  a being +0x1c4; 0 outside 0…1.
+- +0x218 (LA-SAW's second wave): 1 + 4·((½ + ½·½)·a − phase), less 2 if
+  above 1. So it sits in the same place in the cycle as the phase.
+- It reads +0x20c twice, as the lower limit of the same clamp. Nothing in
+  the voice's code writes +0x20c (`poolrefs.py` and the disassembly find no
+  store), and the check finds it 0 throughout, so the port takes 0: the
+  limits do nothing.
+
+**The routines** (LA-SAW `0x895081f0`, LA-SQUARE `0x89508540`). They keep
+their values in the FPU's two banks (`frchg`), and LA-SAW loads its targets
+with `fmov XD,DR` pair moves under `fschg`, so Ghidra's `fmov fr1,fr0` there
+means xf0, xf1 → fr0, fr1.
+- A phase of 0…1 holds two cycles, the first over 0…a; x = 0…1 within its
+  cycle. Flags: 2 in the first cycle, 1 in the second (the reverse of SAW's).
+- g = (w − |2x − 1|)·q within ±1, then g·(2 − |g|). This is a pulse with
+  parabolic edges: w sets its width, and q (+0x228, the corner's ratio to the
+  wave) its edges' steepness.
+- Per sample: a, w and q move by x·0.998 + target (0x3f7f7ced); Impact by
+  its decay; out = (y + Impact)·gain.
+- **LA-SQUARE**: y = g, at 2 × the phase's rate, so ratio 1 is 440 Hz. At the
+  turn it compares ph > a. A sync bit sets the phase to 0 but also forces the
+  second cycle's branch, so x starts at −a/(1 − a).
+- **LA-SAW**: the phase runs at half LA-SQUARE's rate, and y = g·w(2 − |w|)
+  with w = 2|z| − 1. z is the second wave (+0x218): it moves down by the step
+  four times a sample (four subtractions, not 4·step) and adds 2 when it
+  reaches −1. Each of g's half cycles flips the sign of one half of z's
+  triangle, and the two rise together: a saw at twice g's rate, so ratio 1 is
+  again 440 Hz. At the turn it compares a > ph. A sync bit sets the phase to
+  0 and z to ½.
+
+**Sound** (Fat 0, PW 0, default Tone):
+- LA-SQUARE at A2/A4/C7: odd harmonics only, the even ones below −84 dB;
+  −9.0, −14 and −17 dB for the 3rd, 5th and 7th at A4 (a square's are −9.5,
+  −14, −17). At C7 the corner starts to show: −10.3, −17.8, −26.5.
+- LA-SAW at A2/A4/C7: every harmonic: −8.9, −11.5, −15.2, −16.8 dB at A4.
+  SAW's are −6.0, −9.0, −12.1, −13.9, so it is about 3 dB duller from the
+  second harmonic. At C7: −9.1, −12.5, −17.4, −19.6.
+- The energy off the harmonic series is −31…−34 dB (SAW −28).
+
+**Checks** (`xt_analog`, a third pass after the others, so their lines are
+unchanged):
+- 3,000 cases in fcheck: 7,713 note-ons and updates, and 17,000 blocks of
+  each, with +0x1f4, +0x218, +0x224, +0x228 and +0x20c: 0 different. The
+  converter's check now also compares +0xbc and +0xc0 (0 different).
+- A fourth pass sets random Tones (0…127) and Tone KFs (0…14) in the
+  calibration through the firmware's `0x894e5f80`: 34,000 blocks of each, 0
+  different. The port's defaults are only one point of those.
+- Every sixth block sets the phase on a, or where a step lands exactly on 1.
+  For LA-SAW, z is set where its four subtractions land on −1, or on 0 or 1.
+- One LA case in eight plays Impact 0, PW 0: the second wave starting exactly
+  on 1.
+- Deliberate errors caught: the turn's compare in each routine; a flag; z's
+  four subtractions as one; z's wrap at −1 exactly; the phase's wrap at 1
+  exactly (both routines); z unshaped; the sync's z; LA-SQUARE's sync branch;
+  0.998 a unit off; the mask's bit; logf(2) and 2^(9/12) a unit off; the Tone
+  KF's index; the 20 kHz limit; the 2f limit; m's division; w's clamp; each
+  step constant; f; Impact's two terms; z's start, at exactly 1 and not
+  wrapped; the gain's sign and its move; the Tone's ID.
+- Missed: `2f > c` as `2f ≥ c`, which is exact (c and m come out the same).
+
+**Plugin.** LA-SAW and LA-SQUARE are enabled in the Waveform box. The
+PluginTest is bit-identical with each, at notes 30, 60 and 100, with and
+without key-follows, LFO and envelope depths.
+
 ### The analog waveforms: HQ-SAW and HQ-SQUARE (2026-11-01, v81)
 
 The two band-limited waveforms, codes 0 and 1. With them the note-on's

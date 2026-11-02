@@ -16,13 +16,15 @@
 // The port plays the note-on's default case: HQ-SAW (0x895063f0), HQ-SQUARE
 // (0x895060e0), SAW (0x89508c20), SQUARE (0x89508aa0), TRIANGLE
 // (0x895094c0), SINE (0x89509030), RAMP (0x89508800), JUNO (0x89508db0) and
-// NOISE (0x89504a40); without the sub oscillator.
+// NOISE (0x89504a40); and LA-SQUARE (0x89508540) and LA-SAW (0x895081f0);
+// without the sub oscillator.
 //
 // The level and the Saw's edge also follow hidden system parameters, the
 // XT's analog calibration (IDs 0x528…0x55b, through 0x894e5f80 to the OSC
 // table's +0xc204…): per waveform a key-follow bias point, upper and lower
 // level KFs and a level; the Alias Cancel switch and the Saw and Square
-// Slopes.  The port uses their defaults from rom.2's descriptors.
+// Slopes; the LA waveforms' Tones and Tone Keyfollows.  The port uses their
+// defaults from rom.2's descriptors.
 // Single precision as the SH-4 computes it (XtFloat.h); tables are read
 // from the user's rom.2 at run time.
 #include <cstdint>
@@ -60,6 +62,8 @@ struct XtAnalogParams {
 //           pitch (0x894e1350): level curve(Level)/32768 × max(0, 1 + d·KF/
 //           6e6), d = pitch10 − bias·1000, the upper KF above the bias point
 //           and the lower below (with −d)
+//   tone    +0xbc: LA-SQUARE's Tone (ID 0x529), the others' LA Saw Tone (0x528)
+//   toneKf  +0xc0: LA-SQUARE's Tone Keyfollow (0x52b), the others' (0x52a)
 // The envelopes: Fat's is the OSC's third (Env 3, OSC 2 Env 7; the formant
 // slot +0x974), the Pulse Width's its second (Env 2/6, the time slot +0x978);
 // both LFOs are the OSC's (LFO 1/2).
@@ -68,6 +72,7 @@ struct XtAnalogBlock {
     float fat = 0, fatEnv = 0, fatLfo = 0;
     float pw = 0.5f, pwEnv = 0, pwLfo = 0;
     float impact = 1.0f, slope = 0, gain = 1.0f;
+    float tone = 0, toneKf = 0;
 };
 // key: the note (the converter's +3); pitch10: its pitch in 1/1000
 // semitone (+0x74, xtPitch10 + the fine); velFat, velPw: the envelopes'
@@ -101,6 +106,10 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
 //             HQ-SQUARE's direction (both cleared at their note-on and by
 //             a sync bit).  Their phase is in their own units (±P·…), so
 //             the next note-on mostly finds it outside 0…1 and starts at 0.
+//   la        LA-SQUARE and LA-SAW: +0x1f4 the phase's step; +0x224/+0x228 the
+//             steepness' target and current value; +0x218 LA-SAW's second
+//             wave.  Their gain, Fat and PW targets are per sample: gain
+//             +0x154 = −gain·2^26, +0x1c0 and +0x1c8 the target × 0.002.
 class XtAnalogOsc {
 public:
     // fatEnv/pwEnv: the envelopes' outputs (+0x4c); lfo: the LFO's (+0x38);
@@ -130,16 +139,22 @@ public:
     int noiseHold() const { return hold; }
     float hqLevel() const { return hy; }
     int hqFalling() const { return hs; }
+    float laStep() const { return laInc; }
+    float laSteepTarget() const { return qT; }
+    float laSteep() const { return qC; }
+    float laPhase2() const { return ph2; }
     // the check's breakpoint cases: the points the routine compares the
     // phase with, as it forms them from the current Fat and PW (up to 8)
     int breakpoints(float* p) const;
     void setPhase(float p) { ph = p; }
+    void setLaPhase2(float z) { ph2 = z; }
 
 private:
     int code = 2;
     float ratio_ = 1.0f, gainT = 0, gainC = 0;
     float fatT = 0.5f, fatC = 0.5f, pwT = 0.5f, pwC = 0.5f;
     float ph = 0, imp = 0, dec = 0, edge_ = 0, hy = 0;
+    float laInc = 0, ph2 = 0, qT = 0, qC = 0;
     uint32_t fl = 0, s2 = 0;
     int hold = 1, hs = 0;
     // HQ-SAW's and HQ-SQUARE's lengths and factors for a block (samples ×
@@ -148,6 +163,10 @@ private:
     struct HqFrame { float p = 0, pc = 0, l1 = 0, l2 = 0, k1 = 0, k2 = 0, k3 = 0, leak = 0; };
     HqFrame hqFrame() const;
     void shape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, bool noteOn);
+    void laShape(const XtAnalogBlock& b, float gain, float fatEnv, float pwEnv, float lfo);
+    void laNoteOn(const XtAnalogBlock& b, float gain, float gainStart, float fatEnv, float pwEnv, float lfo);
+    uint32_t laSquare(float* lr, uint32_t sync);
+    uint32_t laSaw(float* lr, uint32_t sync);
     uint32_t hqSaw(float* lr, uint32_t sync);
     uint32_t hqSquare(float* lr, uint32_t sync);
     uint32_t saw(float* lr, uint32_t sync);
