@@ -52,6 +52,11 @@ struct XtAnalogShared {
     int8_t line[kLines][kLineLen] = {};
 };
 
+// MOD off, or MOD Type MIX (0x894f1d50 → 0x89527d80, at the converter's gains
+// of 1: 0x894e0920): a += b·scale.  The firmware sums in its own units;
+// scale is the exact power of two from b's units to a's.
+void xtAnalogMix(float* lr, const float* b, float scale = 1.0f);
+
 // The waveform's code (+0x80) for the patch's 0…13; and whether the port
 // plays it.
 int xtAnalogCode(int wave);
@@ -172,9 +177,10 @@ public:
     void noteOn(const XtAnalogBlock& b, float ratio, float gain, float gainStart, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared);
     void update(const XtAnalogBlock& b, float ratio, float gain, float fatEnv, float pwEnv, float lfo);
     // 32 frames into lr (interleaved L/R, the same on both), in the XT's
-    // units (±2^31 at full gain).  sync: the other oscillator's mask, bit i
-    // resetting the phase at sample i.  Returns this oscillator's mask: bit
-    // i set where a cycle's two halves have both been seen (NOISE: 0).
+    // units (±2^31 at full gain).  sync: bit i resets the phase at sample i;
+    // on the XT only OSC 1 gets one, OSC 2's mask, and only with MOD Type OSC
+    // SYNC (the tone's render).  Returns this oscillator's mask: bit i set
+    // where a cycle's two halves have both been seen (NOISE: 0).
     uint32_t process(float* lr, uint32_t sync = 0);
     // the voice's stop (0x895053c0): FEEDBACK-OSC frees its delay line; once is
     // enough, and it does nothing for the other waveforms

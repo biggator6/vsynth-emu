@@ -21,7 +21,8 @@ int main(int argc, char** argv) {
     // TEST_SNAPSHOT=file.png: the editor drawn offscreen, for checking the
     // layout (TEST_SNAPSHOT_COSM2=1: with the COSM rows on COSM 2;
     // TEST_SNAPSHOT_TYPE=n: COSM 1's type, e.g. 6 for the 2nd Side Band rows;
-    // TEST_SNAPSHOT_ANALOG=1: OSC Type ANALOG, its rows shown)
+    // TEST_SNAPSHOT_ANALOG=1: OSC Type ANALOG, its rows shown;
+    // TEST_SNAPSHOT_OSC2=1: with the OSC rows on OSC 2)
     if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
         if (std::getenv("TEST_SNAPSHOT_ANALOG")) {
             auto* prm = p.apvts.getParameter("oscType");
@@ -35,6 +36,9 @@ int main(int argc, char** argv) {
         if (std::getenv("TEST_SNAPSHOT_COSM2"))      // the COSM rows switched to COSM 2 (the selector re-attaches them)
             for (juce::Component* ch : ed->getChildren())
                 if (auto* cb = dynamic_cast<juce::ComboBox*>(ch); cb && cb->getItemText(0) == "COSM 1") cb->setSelectedId(2, juce::sendNotificationSync);
+        if (std::getenv("TEST_SNAPSHOT_OSC2"))       // the OSC rows switched to OSC 2
+            for (juce::Component* ch : ed->getChildren())
+                if (auto* cb = dynamic_cast<juce::ComboBox*>(ch); cb && cb->getItemText(0) == "OSC 1") cb->setSelectedId(2, juce::sendNotificationSync);
         const juce::Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 2.0f);
         juce::File f(juce::File::getCurrentWorkingDirectory().getChildFile(snap));
         f.deleteFile();
@@ -127,6 +131,72 @@ int main(int argc, char** argv) {
         }
         a.pwKf /= 10;                                // as the patch stores them
         a.fatKf /= 10;
+    }
+    // TEST_OSC2="wave,impact,pw,pwKf,pwLfo,pwEnv,fat,fatKf,fatLfo,fatEnv[,detune[,subOctave,subLevel]]": OSC 2 on, ANALOG.
+    // TEST_OSC2_PITCH="pitch,pitchKF,coarse,fine,random"; TEST_OSC2_ENV="pa,pd,ps,pr,pdepth,ta,td,ts,tr,tdepth,fa,fd,fs,fr,fdepth";
+    // TEST_OSC2_LEV="level,levelKF,levelLfo,gain,oa,od,os,or,oaSens,odSens,orSens,oTimeKF,velSens,velCurve";
+    // TEST_OSC2_LFO="wave,rate,pitchDepth,delay,mode,fade,offset,keysync"; TEST_OSC1_OFF=1: OSC 1's Switch off
+    {
+        XtSynth::OscControls& o = refCtl.osc2;
+        XtAnalogParams& a = o.ana;
+        auto set2 = [&](const char* id, int v) {
+            auto* prm = p.apvts.getParameter(VSynthEmuProcessor::oscParamId(1, id));
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+        };
+        if (const char* e = std::getenv("TEST_OSC2")) {
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &a.wave, &a.impact, &a.pw, &a.pwKf, &a.pwLfo, &a.pwEnv, &a.fat, &a.fatKf, &a.fatLfo,
+                        &a.fatEnv, &a.detune, &a.subOctave, &a.subLevel);
+            if (a.pwKf % 10 || a.fatKf % 10) {
+                std::fprintf(stderr, "TEST_OSC2: the KFs must be multiples of 10 (%%)\n");
+                return 1;
+            }
+            o.on = true;
+            o.oscType = 0;
+            const std::pair<const char*, int> knobs[] = { { "oscSwitch", 1 }, { "oscType", 0 }, { "anaWave", a.wave }, { "anaImpact", a.impact }, { "anaPw", a.pw },
+                                                          { "anaPwKF", a.pwKf }, { "anaPwLfo", a.pwLfo }, { "anaPwEnv", a.pwEnv }, { "anaFat", a.fat },
+                                                          { "anaFatKF", a.fatKf }, { "anaFatLfo", a.fatLfo }, { "anaFatEnv", a.fatEnv },
+                                                          { "anaDetune", a.detune }, { "anaSubOct", a.subOctave }, { "anaSubLevel", a.subLevel } };
+            for (auto [id, v] : knobs) set2(id, v);
+            a.pwKf /= 10;
+            a.fatKf /= 10;
+        }
+        if (const char* e = std::getenv("TEST_OSC2_PITCH")) {
+            std::sscanf(e, "%d,%d,%d,%d,%d", &o.oscPitch, &o.pitchKF, &o.oscCoarse, &o.oscFine, &o.randomPitch);
+            const std::pair<const char*, int> knobs[] = { { "oscPitch", o.oscPitch }, { "pitchKF", o.pitchKF }, { "oscCoarse", o.oscCoarse }, { "oscFine", o.oscFine },
+                                                          { "randomPitch", o.randomPitch } };
+            for (auto [id, v] : knobs) set2(id, v);
+        }
+        if (const char* e = std::getenv("TEST_OSC2_ENV")) {
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &o.pAttack, &o.pDecay, &o.pSustain, &o.pRelease, &o.pDepth, &o.tAttack, &o.tDecay, &o.tSustain,
+                        &o.tRelease, &o.tDepth, &o.fAttack, &o.fDecay, &o.fSustain, &o.fRelease, &o.fDepth);
+            const std::pair<const char*, int> knobs[] = { { "pitchEnvAttack", o.pAttack }, { "pitchEnvDecay", o.pDecay }, { "pitchEnvSustain", o.pSustain }, { "pitchEnvRelease", o.pRelease },
+                                                          { "pitchEnvDepth", o.pDepth }, { "timeEnvAttack", o.tAttack }, { "timeEnvDecay", o.tDecay }, { "timeEnvSustain", o.tSustain },
+                                                          { "timeEnvRelease", o.tRelease }, { "timeEnvDepth", o.tDepth }, { "formantEnvAttack", o.fAttack }, { "formantEnvDecay", o.fDecay },
+                                                          { "formantEnvSustain", o.fSustain }, { "formantEnvRelease", o.fRelease }, { "formantEnvDepth", o.fDepth } };
+            for (auto [id, v] : knobs) set2(id, v);
+        }
+        if (const char* e = std::getenv("TEST_OSC2_LEV")) {
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &o.oscLevel, &o.oscLevelKF, &o.oscLevelLfoDepth, &o.waveGain, &o.oAttack, &o.oDecay, &o.oSustain, &o.oRelease,
+                        &o.oASens, &o.oDSens, &o.oRSens, &o.oTimeKF, &o.oscVelSens, &o.oscVelCurve);
+            const std::pair<const char*, int> knobs[] = { { "oscLevel", o.oscLevel }, { "oscLevelKF", o.oscLevelKF }, { "oscLevelLfoDepth", o.oscLevelLfoDepth }, { "waveGain", o.waveGain },
+                                                          { "oscEnvAttack", o.oAttack }, { "oscEnvDecay", o.oDecay }, { "oscEnvSustain", o.oSustain }, { "oscEnvRelease", o.oRelease },
+                                                          { "oscEnvAttackSens", o.oASens }, { "oscEnvDecaySens", o.oDSens }, { "oscEnvReleaseSens", o.oRSens }, { "oscEnvTimeKF", o.oTimeKF },
+                                                          { "oscVelSens", o.oscVelSens }, { "oscVelCurve", o.oscVelCurve } };
+            for (auto [id, v] : knobs) set2(id, v);
+        }
+        if (const char* e = std::getenv("TEST_OSC2_LFO")) {
+            int ks = 1;
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &o.lfoWave, &o.lfoRate, &o.lfoPitchDepth, &o.lfoDelay, &o.lfoFadeMode, &o.lfoFade, &o.lfoOffset, &ks);
+            o.lfoKeySync = ks != 0;
+            const std::pair<const char*, int> knobs[] = { { "lfoWave", o.lfoWave }, { "lfoRate", o.lfoRate }, { "lfoPitchDepth", o.lfoPitchDepth }, { "lfoDelay", o.lfoDelay },
+                                                          { "lfoFadeMode", o.lfoFadeMode }, { "lfoFade", o.lfoFade }, { "lfoOffset", o.lfoOffset }, { "lfoKeySync", ks } };
+            for (auto [id, v] : knobs) set2(id, v);
+        }
+        if (std::getenv("TEST_OSC1_OFF") && std::atoi(std::getenv("TEST_OSC1_OFF")) != 0) {
+            refCtl.on = false;
+            auto* prm = p.apvts.getParameter("oscSwitch");
+            prm->setValueNotifyingHost(prm->convertTo0to1(0.0f));
+        }
     }
     // TEST_TENV / TEST_FENV="a,d,s,r,depth": the time and formant envelopes
     for (const char* which : { "TEST_TENV", "TEST_FENV" }) {

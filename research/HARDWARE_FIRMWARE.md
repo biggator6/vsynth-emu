@@ -1545,6 +1545,174 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### OSC 2, and how the two OSCs are mixed (2026-11-02, v86)
+
+A tone has two oscillator voices: OSC 1 at tone +0x20 and OSC 2 at tone +0x9d4, the
+same object 0x9b4 bytes apart. This version plays OSC 2 as ANALOG, with every analog
+waveform but X-MOD, and sums it with OSC 1 as the MOD section does when it is off or set
+to MIX. Left: X-MOD (next version), PCM on OSC 2, the MOD's other types and the
+Structure Types other than the first.
+
+**The tone's render** is a pointer-to-member at +0x1774, chosen by the Structure Type
+(ID 0x293, the tone block's +0, kept at +0x1770; table at `0x89858244`):
+
+| Structure | Routine | Order |
+|---|---|---|
+| 0 | `0x894f6d40` | OSC 2, OSC 1, MOD, COSM 1, COSM 2, TVA |
+| 1 | `0x894f6e20` | OSC 2, OSC 1, COSM 1 on OSC 1, MOD, COSM 2, TVA |
+| 2 | `0x894f6f40` | OSC 2, COSM 2 on OSC 2, OSC 1, COSM 1 on OSC 1, MOD, TVA |
+
+The buffers are `0x89d2c810` (OSC 1), `0x89d2c910` (OSC 2) and `0x89d2ca10` (the MOD's
+output). The port plays Structure 0, which is what it has always played.
+
+**What differs between the OSCs.** Nothing in the routines. A voice reads its own fields
+and the envelopes and LFOs it is bound to:
+- The analog converter (`0x894e1920`) tests the input's byte +2 only for the matrix
+  destinations, the controller getters (`0x894e70b0`, `0x894e7520` for OSC 2) and the
+  envelope and LFO numbers it stores: +0x20, +0xa4, +0x8c, +0x4c are Env 1, 2, 3, 4 for
+  OSC 1 and 5, 6, 7, 8 for OSC 2; +0x38, +0x94, +0xa8, +0x50 are LFO 1 or LFO 2.
+- With no matrix or controllers the block is the same, so `xtAnalogBlock` needs no OSC
+  argument yet. X-MOD's case is the exception (v87).
+- The binding (`0x894f7070`) turns those numbers into the pointers at voice +0x970…+0x98c.
+
+**The order.**
+- Per-note setup (`0x894e4940`): OSC 1 then OSC 2. The shared random pitch generator
+  steps for each OSC with a depth, whatever its Switch.
+- Tone note-on (`0x894f5e60`): the envelopes and LFOs; the voices' setup and note-on
+  (`0x894f21c0`) OSC 1 then OSC 2, so SUPER-SAW's shared counter and FEEDBACK-OSC's lines
+  go in that order; the pitch ramps; the installs, the MOD and the COSMs.
+- Tone update (`0x894f75f0`): envelopes, LFOs, OSC 1, OSC 2, the MOD, the COSMs, the TVA.
+- Render: OSC 2 first, because OSC 1 can read its output or its mask.
+
+**The OSC Switch** (IDs 0x2a4, 0x2d8, the input's +8): `0x894e4830` writes kind 0 into the
+block when it is off, and skips the converter. For kind 0:
+- the renderer (`0x894f2800`) clears the OSC's buffer and returns mask 0;
+- the update does nothing;
+- the note-on (`0x894f2f80`) sets +0x144 = 1.0, and the setup gives it root 440. So with
+  OSC 1 off the Comb and Side Band Filters, which read OSC 1's ratio and root, see 1 and
+  440, not what the voice's last note left. The port does this (`curA = 1`).
+
+**The MOD section.** One object at tone +0x1708. Its block is at the tone block's +0x5dc,
+from the converter `0x894e0920` (input +6 the Switch, ID 0x294; +7 the Type, 0x295):
+
+| Switch, Type | Block's type | +4 | +8 | +0xc | Routine |
+|---|---|---|---|---|---|
+| off, or Type 0 | 0 | 1 | 1 | | `0x89527d80` |
+| Type 1 | 1 | 1 | level curve(+8)/32768 | 1 | `0x89527e00` |
+| Type 2 | 2 | 1 | level curve(+8)/32768 | 1 | `0x89527b80`, `0x89527c50` |
+| Type 3 | 3 | (+9)/127 | (+0xa)/127 | 1 | `0x895279d0`, `0x89527aa0` |
+| Type 4 | 4 | 1 | | | `0x894f1a40`, `0x894f1aa0` with OSC 1 analog |
+
+The types are named at rom.2 file offset 0x49d6f0: MIX, RING, FM, ENV RING, OSC SYNC. Note-on
+`0x894f1b00`, routine chooser `0x894f1d90`, update `0x894f1c60`, dispatch `0x894f1d50`.
+The input's bytes +8, +9 and +0xa are the MOD Original Level, Attack and Release Times (IDs
+0x296…0x298). With Type 4 and an analog OSC 2 the tone's note-on turns OSC 2's code 10
+(LA-SAW) into 2 (SAW). Mapped, not ported.
+
+**MIX** (`0x89527d80`) is out = a·L1 + b·L2 with a and b moving toward +4 and +8. With the
+converter's gains of 1 they start at their targets and stay, so the block is the plain
+sum: L1 + L2, rounded once toward zero (`xtAnalogMix`). This is the path with the MOD off
+too, so nothing about the mix is left out by not having a MOD Switch yet.
+
+**OSC SYNC runs one way.** v79 called the mask "the other oscillator's OSC SYNC input".
+It is not symmetric. The render clears both voices' mask inputs (+0x95c) each block, and
+writes OSC 2's mask into OSC 1's only if the MOD's +0x40 is set, which only Type 4 does.
+OSC 2's input stays 0 and OSC 1's mask goes nowhere. So with the MOD off neither
+oscillator is synced. The port passes no mask.
+
+**The per-routine constants.** The install's +0x9ac (v79, v85: "unexplained") has a
+sibling: the MOD's chooser stores one per routine at +0x54, from the table at `0x897d0124`.
+Both look like a cost per routine. I did not find what reads them, and the port holds
+neither.
+
+**Sound** (A4, Impact 0, from renders):
+- OSC 1 SAW alone: 440 Hz at −14.9 dB, 880 Hz at −21.0 dB. OSC 2 SAW at Coarse +7: 659 Hz
+  at −15.1 dB, 1319 Hz at −21.5 dB. Together: all of them, at the same levels, except
+  where partials coincide.
+- Unison: exactly twice OSC 1 alone, every sample, as both phases start at 0.
+- OSC 2 SQUARE at Coarse −12 and Level 90: 219 Hz at −18.1 dB, beside OSC 1's unchanged.
+- Both on against each alone, summed: at most 6e−8 apart, with a peak of 0.56.
+- Against a PCM OSC 1 (SOLO, BACKING, ENSEMBLE): at most 5e−8 apart. So the two scales of
+  OSC 1's buffer, ±1 for SOLO and int16 for the band players, both line up.
+
+**Checks** (`xt_analog`, further passes after the others; fcheck's baseline only added 4
+lines):
+- The converter with the input's +2 set, on every waveform so far, the sub oscillator,
+  SUPER-SAW and FEEDBACK-OSC: 500,000 cases, 0 different. Every converter pass now also
+  compares the envelope and LFO numbers.
+- Both voices in a tone object, 3,000 cases in fcheck, each with its own random waveform,
+  knobs, pitch and level depths: the binding, the voice setup, the install, the MOD with its
+  Switch off, the updates and the firmware's own render, with the COSM sections and TVA
+  stubbed. 26,250 note-ons and updates, 126,000 oscillator blocks, 0 different. Compared
+  every block: 42 fields of each voice, both buffers, the mix, both masks and the shared
+  delay lines.
+- One case in eight has OSC 1 off, one OSC 2 off. Phases go on breakpoints. Both on
+  FEEDBACK-OSC, both on SUPER-SAW, and all eighteen lines taken so both voices share line 0.
+- The order, from the firmware's own tone note-on (`0x894f5e60`) on a whole block, with the
+  COSM sections, TVA and LFO note-ons stubbed: 1,500 cases, 0 different.
+- Wide run, 21,000 cases: 183,750 note-ons and updates, 882,000 blocks, and the note-on on
+  10,500, 0 different.
+- Deliberate errors: 19 planted in the mix and in the check's wiring, 19 caught. At first
+  four were missed, all real gaps:
+  - The pitch envelope, pitch LFO and level LFO numbers: no case had those depths, so
+    nothing read them. The tone pass now sets them.
+  - The note-on order: the check called the firmware's setup itself, so reversing it
+    reversed both sides. That is why the tone note-on pass exists.
+  - Rendering OSC 1 before OSC 2 is caught too, though no routine reads the other's
+    buffer yet: both voices sharing line 0 hear each other's writes.
+
+**The wiring.** The passes above run the voices as the firmware does, but they do not
+run XtSynth. Against that:
+- The same settings through OSC 1 alone and through OSC 2 alone render the same bits:
+  SAW, Fat and PW with their envelopes and LFO, the pitch envelope, the level with its KF,
+  LFO and Wave Gain, the OSC amp envelope, the sub oscillator, SUPER-SAW, FEEDBACK-OSC,
+  NOISE, HQ-SQUARE and LA-SAW.
+- OSC 2's envelopes and LFO are separate objects, so that check also shows they are not
+  OSC 1's.
+- With OSC 2 off the renders are identical to v85's (`ab.sh`).
+
+**Not checked.**
+- Against real hardware. The check is the firmware in the interpreter.
+- XtSynth as a whole against a firmware tone. The firmware's envelopes, LFOs and pitch
+  ramps are checked apart (`xt_env`, `xt_lfo`, `xt_osc`), and here their outputs are set by
+  the check. A run of the tone's note-on, update and render from a full tone block, compared
+  with XtSynth's mix, would close this.
+- An OSC's Switch or Type changed during a note. The port latches them at note-on. The
+  firmware's update copies a new block into the voice (`0x894f2600`), and I did not trace a
+  kind that changes.
+- The firmware's pointer for an off OSC: the binding leaves it on Env 0 and LFO 0, which
+  the port does not have. Nothing of an off OSC reads them.
+
+**What PCM on OSC 2 needs.** It is the same voice code, so the players, converter and
+pitch path are done and checked. What is left:
+- A wave for it. The plugin has one sample and one `XtEncoded`. The XT binds a wave per OSC
+  (`0x2be`, `0x2f2`), so this means a second load and encode, or OSC 2 sharing OSC 1's wave
+  as a first step.
+- The Time, Formant, Energy, Robot, Loop and Offset rows, re-attached by `attachOsc`, and
+  the PITCH, TIME and FORMANT knobs. The fields are already in `OscControls`.
+- The stereo flag. A voice's +0x960 is 1 for a stereo wave and for code 1 (HQ-SQUARE). In
+  Structures 0 and 1 both COSMs and the TVA take OSC 1's flag only (`0x894eef70`,
+  `0x894f50e0`), so a stereo OSC 2 under a mono OSC 1 goes through their mono routines. The
+  port's COSM and TVA treat both channels alike, which is right while both are the same on
+  L and R, as every analog waveform is, and has to be looked at again for this.
+- `xtAnalogMix` for its units, and the end of a wave: `tail` stops a voice only with OSC 2
+  off, and would have to wait for both players.
+- A pass with a PCM voice in the tone check.
+
+**Plugin.**
+- `XtSynth::Controls` now derives from `OscControls`, what an OSC has of its own, and holds
+  a second one as `osc2`, off by default. `Voice` likewise from `OscVoice`, with `osc2`.
+- OSC 1 keeps its fields' names, so nothing using them changed.
+- Parameters: `oscSwitch` (OSC 1, on) and for OSC 2 each of OSC 1's own with `osc2` before it
+  (`osc2OscSwitch`, off; `osc2OscType`; `osc2AnaWave`…), with OSC 1's ranges and defaults, at
+  the end of the layout.
+- Editor: an OSC 1 / OSC 2 selector and an On switch on the top row, like the COSM
+  selector. It re-attaches the OSC's own rows, so `kXtStripH` does not change. With OSC 2
+  selected PCM is disabled, and Encode, TIME and FORMANT stay OSC 1's.
+- `XT_ANALOG2`, `XT_PENV2`, `XT_TENV2`, `XT_FENV2`, `XT_LFO2`, `XT_OLEV2`, `XT_OENV2`,
+  `XT_VEL2`, `XT_PITCH2`, `XT_TUNE2`, `XT_OSC1OFF`; `TEST_OSC2`, `TEST_OSC2_PITCH`,
+  `TEST_OSC2_ENV`, `TEST_OSC2_LEV`, `TEST_OSC2_LFO`, `TEST_OSC1_OFF`, `TEST_SNAPSHOT_OSC2`.
+
 ### The analog sub oscillator (2026-11-02, v85)
 
 With Sub Octave above 0 an analog voice runs a second set of code, and most
@@ -2270,7 +2438,8 @@ waveform, without the sub oscillator.
 - The per-block renderer (`0x894f2800`) calls the routine at voice +0x968
   (X-MOD: +0x96c) as fn(out, voice + 0xd4, the sync mask at +0x95c), 32
   stereo frames. It returns the mask of samples where the phase wrapped:
-  the other oscillator's OSC SYNC input.
+  OSC SYNC's input. (Corrected in v86: only OSC 2's reaches OSC 1, and only with
+  MOD Type OSC SYNC.)
 - With the sub oscillator on (voice +0xb4 = 1.0) a second set runs: install
   `0x895069d0`, note-on `0x89506700`, update `0x89506bf0`.
 - The voice setup (`0x894f21c0`) gives a kind-3 voice rate ratio 1, no

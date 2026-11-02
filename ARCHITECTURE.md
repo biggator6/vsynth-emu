@@ -270,6 +270,10 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      converter, note-on, update and routine, its level from the XT's hidden
      analog calibration. It needs no sample. Its pitch is against A4 and has
      no glide.
+   - OSC 2 (v86): a second analog oscillator on the same note, with its own
+     pitch, level, envelopes (Env 5…8) and LFO 2, summed with OSC 1 before the
+     COSM sections, as the MOD section does when off or set to MIX. The
+     render is Structure Type 1's.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -317,6 +321,10 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - The analog oscillator (v79–v85): the converter's block, the note-on, the
   update, the install and the routines, the sub oscillator's eight too (outputs,
   state and wrap masks), equal the firmware (`xt_analog`).
+- OSC 2 (v86): the converter with the input's OSC set, and both voices in a tone
+  object through the firmware's binding, setup, install, updates and render
+  (both buffers, the mix, the masks, the fields and the shared delay lines),
+  equal the firmware (`xt_analog`).
 - COSM TVF (v61) and Dynamic TVF (v64): the converters, start values,
   targets and updates, the follower and the twelve filter kernels equal the
   firmware (`xt_cosm`).
@@ -330,9 +338,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 **Not yet:**
 - the patch TVA's own Level, Level KF, pan and LFO terms are not
   modelled;
-- the analog oscillator lacks LA-SAW, LA-SQUARE, SUPER-SAW, FEEDBACK-OSC
-  and X-MOD, and the sub oscillator; no OSC 2,
-  MOD section (MIX, RING, FM, ENV RING, OSC SYNC) or Structure Type;
+- the analog oscillator lacks X-MOD; OSC 2 plays only ANALOG, not PCM; the
+  MOD section has only its MIX path (no RING, FM, ENV RING or OSC SYNC), and
+  there is no Structure Type but the first;
 - no V-Synth voice layer (filters, LFOs, effects);
 - no step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and

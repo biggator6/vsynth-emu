@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include <tuple>
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
 static constexpr int kXtStripH   = 820;  // height of the XT strip below it
@@ -16,6 +17,9 @@ static const char* const kLevelIds[32][2] = {
     { "cosmEnvAAttack", "A" },     { "cosmEnvADecay", "D" },        { "cosmEnvASustain", "S" },      { "cosmEnvARelease", "R" },
 };
 static const char* const kLevelRowNames[8] = { "OSC Pitch", "Tune", "OSC TVA", "O Env", "O Env", "Velocity", "TVF Mod", "COSM Env" };
+// Which of those rows' knobs are the selected OSC's own (attachOsc): the OSC's
+// pitch, TVA, amp envelope and velocity to level
+static bool kLevelOsc(int i) { return i < 4 || (i >= 8 && i < 20) || i == 22 || i == 23; }
 // The Dual Filter's rows: the id suffixes after "cosmDual1"/"cosmDual2", and labels
 static const char* const kDualIds[5][2] = { { "Freq", "Frq" }, { "Q", "Q" }, { "KF", "KF" }, { "Lfo", "LFO" }, { "Env", "Env" } };
 // The TB Filter's rows (6 LPF, 5 HPF): the id suffixes after "cosm"/"cosm2", and labels
@@ -115,37 +119,26 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     dSensAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "ampDecaySens",   dSensSlider_);
     rSensAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "ampReleaseSens", rSensSlider_);
     kfAtt_      = std::make_unique<SliderAtt>(processor_.apvts, "ampTimeKF",      kfSlider_);
-    pAttackAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvAttack",  pAttackSlider_);
-    pDecayAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvDecay",   pDecaySlider_);
-    pSustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvSustain", pSustainSlider_);
-    pReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvRelease", pReleaseSlider_);
-    pDepthAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "pitchEnvDepth",   pDepthSlider_);
-    tAttackAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvAttack",   tAttackSlider_);
-    tDecayAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvDecay",    tDecaySlider_);
-    tSustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvSustain",  tSustainSlider_);
-    tReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvRelease",  tReleaseSlider_);
-    tDepthAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "timeEnvDepth",    tDepthSlider_);
-    fAttackAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvAttack",  fAttackSlider_);
-    fDecayAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvDecay",   fDecaySlider_);
-    fSustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvSustain", fSustainSlider_);
-    fReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvRelease", fReleaseSlider_);
-    fDepthAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "formantEnvDepth",   fDepthSlider_);
     oscTkfAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "oscTimeKF",    oscTkfSlider_);
     oscFkfAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "oscFormantKF", oscFkfSlider_);
     timeOffsetBox_.addItemList({ "BWD", "ZERO", "FWD" }, 1);
     addAndMakeVisible(timeOffsetBox_);
     timeOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "oscTimeOffset", timeOffsetBox_);
+    oscSelBox_.addItemList({ "OSC 1", "OSC 2" }, 1);
+    oscSelBox_.setSelectedId(1, juce::dontSendNotification);
+    oscSelBox_.onChange = [this] { attachOsc(oscSelBox_.getSelectedId() == 2 ? 1 : 0); };
+    oscOnBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    oscOnBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    addAndMakeVisible(oscSelBox_);
+    addAndMakeVisible(oscOnBtn_);
     oscTypeBox_.addItemList({ "ANALOG", "PCM" }, 1);
     anaWaveBox_.addItemList({ "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
                               "SUPER-SAW", "FEEDBACK-OSC", "X-MOD" }, 1);
     for (int w = 0; w < 14; ++w) anaWaveBox_.setItemEnabled(w + 1, xtAnalogPlays(w));   // the waveforms the port plays
     addAndMakeVisible(oscTypeBox_);
     addAndMakeVisible(anaWaveBox_);
-    oscTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "oscType", oscTypeBox_);
-    anaWaveAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "anaWave", anaWaveBox_);
     oscTypeBox_.onChange = [this] { showOscType(); };
     {
-        static const char* const ids[kAnaKnobs] = { "anaImpact", "anaPw", "anaPwKF", "anaFat", "anaFatKF", "anaPwLfo", "anaPwEnv", "anaFatLfo", "anaFatEnv", "anaDetune", "anaSubOct", "anaSubLevel" };
         static const char* const names[kAnaKnobs] = { "Impact", "PW", "PW KF", "Fat", "Fat KF", "PW LFO", "PW Env", "Fat LFO", "Fat Env", "Detune", "Sub Oct", "Sub Lev" };
         for (int i = 0; i < kAnaKnobs; ++i) {
             juce::Slider& sl = anaSliders_[i];
@@ -155,7 +148,6 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
             sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
             sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
             addAndMakeVisible(sl);
-            anaAtt_[i] = std::make_unique<SliderAtt>(processor_.apvts, ids[i], sl);
             anaLabels_[i].setText(names[i], juce::dontSendNotification);
             styleSmall(anaLabels_[i]);
         }
@@ -207,16 +199,6 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     lfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
     for (juce::Component* cpt : { (juce::Component*)&lfoWaveBox_, (juce::Component*)&lfoModeBox_,
                                    (juce::Component*)&lfoOffsetBox_, (juce::Component*)&lfoSyncBtn_ }) addAndMakeVisible(*cpt);
-    lfoWaveAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "lfoWave", lfoWaveBox_);
-    lfoModeAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "lfoFadeMode", lfoModeBox_);
-    lfoOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "lfoOffset", lfoOffsetBox_);
-    lfoSyncAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, "lfoKeySync", lfoSyncBtn_);
-    lfoRateAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "lfoRate", lfoRateSlider_);
-    lfoDepthAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "lfoPitchDepth", lfoDepthSlider_);
-    lfoDelayAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "lfoDelay", lfoDelaySlider_);
-    lfoFadeAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "lfoFade", lfoFadeSlider_);
-    lfoTimeAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "lfoTimeDepth", lfoTimeSlider_);
-    lfoFmtAtt_    = std::make_unique<SliderAtt>(processor_.apvts, "lfoFormantDepth", lfoFmtSlider_);
     for (int i = 0; i < kLevelKnobs; ++i) {
         juce::Slider& sl = levelSliders_[i];
         sl.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -225,7 +207,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
         addAndMakeVisible(sl);
-        levelAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, kLevelIds[i][0], sl);
+        if (!kLevelOsc(i)) levelAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, kLevelIds[i][0], sl);
         levelLabels_[i].setText(kLevelIds[i][1], juce::dontSendNotification);
         styleSmall(levelLabels_[i]);
     }
@@ -444,7 +426,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                             &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_,
                             &portaTimeLabel_, &portaSensLabel_, &octLabel_, &cosmCutLabel_, &cosmResoLabel_, &cosmKfLabel_,
                             &clfoLabel_, &clfoRateLabel_, &cosmTypeLabel_, &cosmCutOwnLabel_, &cosmResoOwnLabel_,
-                            &oscTypeLabel_, &anaWaveLabel_ }) styleSmall(*l);
+                            &anaWaveLabel_ }) styleSmall(*l);
     showCosmType();                                  // after styleSmall, which shows every label
     showOscType();
     timerCallback();
@@ -455,6 +437,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     styleSlider(timeSlider_,    timeLabel_);
     styleSlider(formantSlider_, formantLabel_);
 
+    attachOsc(0);
     attachMainKnobs(processor_.hasRom());
     robotAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, "robot",        robotBtn_);
 
@@ -489,7 +472,7 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
     formantAtt_.reset();
     // with the XT, the OSC's Pitch, Time and Formant knobs (Pitch Shift stays
     // a host parameter, added to the patch's Coarse/Fine Tune)
-    pitchAtt_   = std::make_unique<SliderAtt>(processor_.apvts, xt ? "oscPitch" : "pitchShift", pitchSlider_);
+    pitchAtt_   = std::make_unique<SliderAtt>(processor_.apvts, xt ? (oscK_ ? "osc2OscPitch" : "oscPitch") : "pitchShift", pitchSlider_);
     timeAtt_    = std::make_unique<SliderAtt>(processor_.apvts, xt ? "oscTime" : "timeStretch", timeSlider_);
     formantAtt_ = std::make_unique<SliderAtt>(processor_.apvts, xt ? "oscFormant" : "formantShift", formantSlider_);
     mainKnobsXt_ = xt;
@@ -586,10 +569,55 @@ void VSynthEmuEditor::attachCosm(int k) {
     showCosmType();
 }
 
+// The selected OSC's own rows: its switch, type, analog knobs, pitch, TVA, amp
+// envelope, velocity to level, pitch, time and formant envelopes and LFO; the
+// PITCH knob too.  OSC 2 is ANALOG only so far, so the PCM rows, the TIME and
+// FORMANT knobs and Encode stay OSC 1's.
+void VSynthEmuEditor::attachOsc(int k) {
+    oscK_ = k;
+    auto id = [k](const char* name) { return VSynthEmuProcessor::oscParamId(k, name); };
+    oscOnAtt_.reset(); oscTypeAtt_.reset(); anaWaveAtt_.reset();
+    oscOnAtt_ = std::make_unique<ButtonAtt>(processor_.apvts, id("oscSwitch"), oscOnBtn_);
+    oscTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("oscType"), oscTypeBox_);
+    anaWaveAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("anaWave"), anaWaveBox_);
+    oscTypeBox_.setItemEnabled(2, k == 0);
+    static const char* const anaIds[kAnaKnobs] = { "anaImpact", "anaPw", "anaPwKF", "anaFat", "anaFatKF", "anaPwLfo", "anaPwEnv", "anaFatLfo", "anaFatEnv", "anaDetune", "anaSubOct", "anaSubLevel" };
+    for (int i = 0; i < kAnaKnobs; ++i) {
+        anaAtt_[i].reset();
+        anaAtt_[i] = std::make_unique<SliderAtt>(processor_.apvts, id(anaIds[i]), anaSliders_[i]);
+    }
+    for (int i = 0; i < kLevelKnobs; ++i)
+        if (kLevelOsc(i)) {
+            levelAtts_[i].reset();
+            levelAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, id(kLevelIds[i][0]), levelSliders_[i]);
+        }
+    const std::tuple<std::unique_ptr<SliderAtt>*, const char*, juce::Slider*> sliders[] = {
+        { &pAttackAtt_, "pitchEnvAttack", &pAttackSlider_ }, { &pDecayAtt_, "pitchEnvDecay", &pDecaySlider_ }, { &pSustainAtt_, "pitchEnvSustain", &pSustainSlider_ },
+        { &pReleaseAtt_, "pitchEnvRelease", &pReleaseSlider_ }, { &pDepthAtt_, "pitchEnvDepth", &pDepthSlider_ },
+        { &tAttackAtt_, "timeEnvAttack", &tAttackSlider_ }, { &tDecayAtt_, "timeEnvDecay", &tDecaySlider_ }, { &tSustainAtt_, "timeEnvSustain", &tSustainSlider_ },
+        { &tReleaseAtt_, "timeEnvRelease", &tReleaseSlider_ }, { &tDepthAtt_, "timeEnvDepth", &tDepthSlider_ },
+        { &fAttackAtt_, "formantEnvAttack", &fAttackSlider_ }, { &fDecayAtt_, "formantEnvDecay", &fDecaySlider_ }, { &fSustainAtt_, "formantEnvSustain", &fSustainSlider_ },
+        { &fReleaseAtt_, "formantEnvRelease", &fReleaseSlider_ }, { &fDepthAtt_, "formantEnvDepth", &fDepthSlider_ },
+        { &lfoRateAtt_, "lfoRate", &lfoRateSlider_ }, { &lfoDepthAtt_, "lfoPitchDepth", &lfoDepthSlider_ }, { &lfoDelayAtt_, "lfoDelay", &lfoDelaySlider_ },
+        { &lfoFadeAtt_, "lfoFade", &lfoFadeSlider_ }, { &lfoTimeAtt_, "lfoTimeDepth", &lfoTimeSlider_ }, { &lfoFmtAtt_, "lfoFormantDepth", &lfoFmtSlider_ } };
+    for (const auto& [att, name, sl] : sliders) {
+        att->reset();
+        *att = std::make_unique<SliderAtt>(processor_.apvts, id(name), *sl);
+    }
+    lfoWaveAtt_.reset(); lfoModeAtt_.reset(); lfoOffsetAtt_.reset(); lfoSyncAtt_.reset();
+    lfoWaveAtt_   = std::make_unique<ComboAtt>(processor_.apvts, id("lfoWave"), lfoWaveBox_);
+    lfoModeAtt_   = std::make_unique<ComboAtt>(processor_.apvts, id("lfoFadeMode"), lfoModeBox_);
+    lfoOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("lfoOffset"), lfoOffsetBox_);
+    lfoSyncAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, id("lfoKeySync"), lfoSyncBtn_);
+    lfoLabel_.setText(k ? "LFO 2" : "LFO", juce::dontSendNotification);
+    if (timeAtt_) attachMainKnobs(mainKnobsXt_);
+    showOscType();
+}
+
 // ANALOG shows the analog oscillator's three rows where the PCM OSC's
 // (Encode, Key and Depth; Energy and the VariPhrase knobs; Loop) are.
 void VSynthEmuEditor::showOscType() {
-    const bool ana = oscTypeBox_.getSelectedItemIndex() == 0;
+    const bool ana = oscK_ == 1 || oscTypeBox_.getSelectedItemIndex() == 0;
     for (juce::Component* cpt : { (juce::Component*)&encodeLabel_, (juce::Component*)&encodeBox_, (juce::Component*)&keyLabel_,
                                   (juce::Component*)&keySlider_, (juce::Component*)&depthLabel_, (juce::Component*)&depthSlider_,
                                   (juce::Component*)&energyLabel_, (juce::Component*)&energySlider_, (juce::Component*)&offsetLabel_,
@@ -753,7 +781,8 @@ void VSynthEmuEditor::resized() {
     romButton_.setBounds(row1.removeFromLeft(70));
     row1.removeFromLeft(10);
     oscTypeBox_.setBounds(row1.removeFromRight(90).reduced(0, 1));
-    oscTypeLabel_.setBounds(row1.removeFromRight(30));
+    oscOnBtn_.setBounds(row1.removeFromRight(46));
+    oscSelBox_.setBounds(row1.removeFromRight(76).reduced(0, 1));
     statusLabel_.setBounds(row1);
     xt.removeFromTop(6);
     auto row2 = xt.removeFromTop(24);

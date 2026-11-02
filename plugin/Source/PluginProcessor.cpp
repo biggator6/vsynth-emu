@@ -23,6 +23,11 @@ namespace Params {
     // their Keyfollows, LFO and Env depths (PW on the time envelope, Fat on
     // the formant envelope)
     static const juce::String kOscType       = "oscType";        // ANALOG, PCM
+    // the OSC Switch, and OSC 2: each of OSC 1's own knobs with "osc2" before
+    // it (oscSwitch → osc2OscSwitch, anaWave → osc2AnaWave, lfoRate →
+    // osc2LfoRate); off by default, and ANALOG only so far
+    static const juce::String kOscSwitch     = "oscSwitch";
+    static juce::String oscId(int k, const juce::String& id) { return k ? "osc2" + id.substring(0, 1).toUpperCase() + id.substring(1) : id; }
     static const juce::String kAnaWave       = "anaWave";
     static const juce::String kAnaImpact     = "anaImpact";
     static const juce::String kAnaPw         = "anaPw";
@@ -151,6 +156,8 @@ namespace Params {
     static const juce::String kLfoOffset    = "lfoOffset";
     static const juce::String kLfoKeySync   = "lfoKeySync";
 }
+
+juce::String VSynthEmuProcessor::oscParamId(int k, const juce::String& id) { return Params::oscId(k, id); }
 
 // ─── Parameter Layout ─────────────────────────────────────────────────────────
 
@@ -524,6 +531,89 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLfoOffset, "LFO Offset",
         juce::StringArray { "-100", "-50", "0", "+50", "+100" }, 2));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kLfoKeySync, "LFO Key Sync", true));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kOscSwitch, "OSC 1 Switch", true));
+    {   // OSC 2, the ranges and defaults of OSC 1's
+        using Params::oscId;
+        const juce::String n = "OSC 2 ";
+        auto intP = [&](const juce::String& id, const char* name, int lo, int hi, int def) {
+            params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, id), n + name, lo, hi, def));
+        };
+        auto kfP = [&](const juce::String& id, const char* name, float def) {
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, id), n + name, juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), def));
+        };
+        params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kOscSwitch), n + "Switch", false));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kOscType), n + "Type", juce::StringArray { "ANALOG", "PCM" }, 0));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kAnaWave), n + "Analog Waveform",
+            juce::StringArray { "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
+                                "SUPER-SAW", "FEEDBACK-OSC", "X-MOD" }, 0));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kAnaImpact), n + "Impact", 0, 40, 10,
+            juce::AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return juce::String(v / 10.0, 1); })));
+        intP(Params::kAnaPw, "Pulse Width", -63, 63, 0);
+        kfP(Params::kAnaPwKF, "PW KF", 0.0f);
+        intP(Params::kAnaPwLfo, "PW LFO Depth", -63, 63, 0);
+        intP(Params::kAnaPwEnv, "PW Env Depth", -63, 63, 0);
+        intP(Params::kAnaFat, "Fat", 0, 127, 0);
+        kfP(Params::kAnaFatKF, "Fat KF", 0.0f);
+        intP(Params::kAnaFatLfo, "Fat LFO Depth", -63, 63, 0);
+        intP(Params::kAnaFatEnv, "Fat Env Depth", -63, 63, 0);
+        intP(Params::kAnaDetune, "Detune", -63, 63, 0);
+        params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kAnaSubOct), n + "Sub Octave", 0, 3, 0,
+            juce::AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return v == 0 ? juce::String("OFF") : juce::String(v - 3); })
+                .withValueFromStringFunction([](const juce::String& t) { return t.trim().equalsIgnoreCase("OFF") ? 0 : t.getIntValue() + 3; })));
+        intP(Params::kAnaSubLevel, "Sub Level", 0, 127, 127);
+        intP(Params::kOscCoarse, "Coarse", -48, 48, 0);
+        intP(Params::kOscFine, "Fine", -50, 50, 0);
+        intP(Params::kOscPitch, "Pitch", -63, 63, 0);
+        kfP(Params::kPitchKF, "Pitch KF", 100.0f);
+        {
+            juce::StringArray depths;
+            for (int i = 0; i <= 30; ++i) depths.add(juce::String(xtRandomPitchDepth(i) / 10));
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kRandomPitch), n + "Random Pitch Depth", depths, 0));
+        }
+        intP(Params::kPAttack, "Pitch Env Attack", 0, 127, 0);
+        intP(Params::kPDecay, "Pitch Env Decay", 0, 127, 64);
+        intP(Params::kPSustain, "Pitch Env Sustain", 0, 127, 0);
+        intP(Params::kPRelease, "Pitch Env Release", 0, 127, 64);
+        intP(Params::kPDepth, "Pitch Env Depth", -63, 63, 0);
+        intP(Params::kTAttack, "Time Env Attack", 0, 127, 0);
+        intP(Params::kTDecay, "Time Env Decay", 0, 127, 64);
+        intP(Params::kTSustain, "Time Env Sustain", 0, 127, 0);
+        intP(Params::kTRelease, "Time Env Release", 0, 127, 64);
+        intP(Params::kTDepth, "Time Env Depth", -63, 63, 0);
+        intP(Params::kFAttack, "Formant Env Attack", 0, 127, 0);
+        intP(Params::kFDecay, "Formant Env Decay", 0, 127, 64);
+        intP(Params::kFSustain, "Formant Env Sustain", 0, 127, 0);
+        intP(Params::kFRelease, "Formant Env Release", 0, 127, 64);
+        intP(Params::kFDepth, "Formant Env Depth", -63, 63, 0);
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kLfoWave), n + "LFO Waveform",
+            juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 0));
+        intP(Params::kLfoRate, "LFO Rate", 0, 127, 64);
+        intP(Params::kLfoDepth, "LFO Pitch Depth", -63, 63, 0);
+        intP(Params::kLfoTimeDepth, "LFO Time Depth", -63, 63, 0);
+        intP(Params::kLfoFmtDepth, "LFO Formant Depth", -63, 63, 0);
+        intP(Params::kLfoDelay, "LFO Delay", 0, 127, 0);
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kLfoFadeMode), n + "LFO Fade Mode",
+            juce::StringArray { "ON <<", "ON >>", "OFF <<", "OFF >>" }, 0));
+        intP(Params::kLfoFade, "LFO Fade", 0, 127, 0);
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kLfoOffset), n + "LFO Offset",
+            juce::StringArray { "-100", "-50", "0", "+50", "+100" }, 2));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kLfoKeySync), n + "LFO Key Sync", true));
+        intP(Params::kOscLevel, "Level", 0, 127, 127);
+        kfP(Params::kOscLevelKF, "Level KF", 0.0f);
+        intP(Params::kOscLevelLfo, "Level LFO Depth", -63, 63, 0);
+        params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kWaveGain), n + "Wave Gain", -12, 12, 0,
+            juce::AudioParameterIntAttributes().withLabel("dB")));
+        intP(Params::kOAttack, "Env Attack", 0, 127, 0);
+        intP(Params::kODecay, "Env Decay", 0, 127, 0);
+        intP(Params::kOSustain, "Env Sustain", 0, 127, 127);
+        intP(Params::kORelease, "Env Release", 0, 127, 127);
+        intP(Params::kOASens, "Env Attack Velocity Sens", -63, 63, 0);
+        intP(Params::kODSens, "Env Decay Velocity Sens", -63, 63, 0);
+        intP(Params::kORSens, "Env Release Velocity Sens", -63, 63, 0);
+        kfP(Params::kOTimeKF, "Env Time KF", 0.0f);
+        intP(Params::kOscVelSens, "Velocity Sens", -63, 63, 0);
+        params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kOscVelCurve), n + "Velocity Curve", 0, 7, 1, curveName));
+    }
 
     return { params.begin(), params.end() };
 }
@@ -777,6 +867,72 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.lfoFade      = (int)apvts.getRawParameterValue(Params::kLfoFade)->load();
     c.lfoOffset    = (int)apvts.getRawParameterValue(Params::kLfoOffset)->load();
     c.lfoKeySync   = apvts.getRawParameterValue(Params::kLfoKeySync)->load() > 0.5f;
+    c.on           = apvts.getRawParameterValue(Params::kOscSwitch)->load() >= 0.5f;
+    {   // OSC 2's own knobs
+        XtSynth::OscControls& o = c.osc2;
+        using Params::oscId;
+        auto knob2 = [&](const juce::String& id) { return knob(oscId(1, id)); };
+        auto kf2 = [&](const juce::String& id) { return kf(oscId(1, id)); };
+        o.on = apvts.getRawParameterValue(oscId(1, Params::kOscSwitch))->load() >= 0.5f;
+        o.oscType = knob2(Params::kOscType);
+        o.ana.wave = knob2(Params::kAnaWave);
+        o.ana.impact = knob2(Params::kAnaImpact);
+        o.ana.pw = knob2(Params::kAnaPw);
+        o.ana.pwKf = kf2(Params::kAnaPwKF) / 10;
+        o.ana.pwLfo = knob2(Params::kAnaPwLfo);
+        o.ana.pwEnv = knob2(Params::kAnaPwEnv);
+        o.ana.fat = knob2(Params::kAnaFat);
+        o.ana.fatKf = kf2(Params::kAnaFatKF) / 10;
+        o.ana.fatLfo = knob2(Params::kAnaFatLfo);
+        o.ana.fatEnv = knob2(Params::kAnaFatEnv);
+        o.ana.detune = knob2(Params::kAnaDetune);
+        o.ana.subOctave = knob2(Params::kAnaSubOct);
+        o.ana.subLevel = knob2(Params::kAnaSubLevel);
+        o.oscCoarse = knob2(Params::kOscCoarse);
+        o.oscFine = knob2(Params::kOscFine);
+        o.oscPitch = knob2(Params::kOscPitch);
+        o.pitchKF = kf2(Params::kPitchKF);
+        o.randomPitch = knob2(Params::kRandomPitch);
+        o.pAttack = knob2(Params::kPAttack);
+        o.pDecay = knob2(Params::kPDecay);
+        o.pSustain = knob2(Params::kPSustain);
+        o.pRelease = knob2(Params::kPRelease);
+        o.pDepth = knob2(Params::kPDepth);
+        o.tAttack = knob2(Params::kTAttack);
+        o.tDecay = knob2(Params::kTDecay);
+        o.tSustain = knob2(Params::kTSustain);
+        o.tRelease = knob2(Params::kTRelease);
+        o.tDepth = knob2(Params::kTDepth);
+        o.fAttack = knob2(Params::kFAttack);
+        o.fDecay = knob2(Params::kFDecay);
+        o.fSustain = knob2(Params::kFSustain);
+        o.fRelease = knob2(Params::kFRelease);
+        o.fDepth = knob2(Params::kFDepth);
+        o.lfoWave = knob2(Params::kLfoWave);
+        o.lfoRate = knob2(Params::kLfoRate);
+        o.lfoPitchDepth = knob2(Params::kLfoDepth);
+        o.lfoTimeDepth = knob2(Params::kLfoTimeDepth);
+        o.lfoFormantDepth = knob2(Params::kLfoFmtDepth);
+        o.lfoDelay = knob2(Params::kLfoDelay);
+        o.lfoFadeMode = knob2(Params::kLfoFadeMode);
+        o.lfoFade = knob2(Params::kLfoFade);
+        o.lfoOffset = knob2(Params::kLfoOffset);
+        o.lfoKeySync = apvts.getRawParameterValue(oscId(1, Params::kLfoKeySync))->load() > 0.5f;
+        o.oscLevel = knob2(Params::kOscLevel);
+        o.oscLevelKF = kf2(Params::kOscLevelKF);
+        o.oscLevelLfoDepth = knob2(Params::kOscLevelLfo);
+        o.waveGain = knob2(Params::kWaveGain);
+        o.oAttack = knob2(Params::kOAttack);
+        o.oDecay = knob2(Params::kODecay);
+        o.oSustain = knob2(Params::kOSustain);
+        o.oRelease = knob2(Params::kORelease);
+        o.oASens = knob2(Params::kOASens);
+        o.oDSens = knob2(Params::kODSens);
+        o.oRSens = knob2(Params::kORSens);
+        o.oTimeKF = kf2(Params::kOTimeKF);
+        o.oscVelSens = knob2(Params::kOscVelSens);
+        o.oscVelCurve = knob2(Params::kOscVelCurve);
+    }
     return c;
 }
 
@@ -791,7 +947,8 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     // ── The XT's own players: one voice per note, sample-accurate MIDI ───────
     // (an analog OSC needs the firmware image but no sample)
-    const bool analog = xtSynthRomReady() && apvts.getRawParameterValue(Params::kOscType)->load() < 0.5f;
+    const bool analog = xtSynthRomReady() && (apvts.getRawParameterValue(Params::kOscType)->load() < 0.5f
+                                              || apvts.getRawParameterValue(Params::oscId(1, Params::kOscSwitch))->load() >= 0.5f);
     if ((xtActive_.load() || analog) && numOut > 0) {
         synth_.setControls(xtControls());
         float* L = buffer.getWritePointer(0);

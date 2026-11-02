@@ -148,6 +148,10 @@ sub la-square: 5280 blocks of 32 frames, 0 different (peak 3.76 of 2^31)
 sub la-saw: 5840 blocks of 32 frames, 0 different (peak 4.437 of 2^31)
 mixed wrap masks: 0 different
 sub other words of the voice: 0 different
+osc 2 converter: 500000 cases, 0 different
+tone note-on: 1500 cases, 0 different
+tone: 3000 cases, 26250 note-ons and updates
+tone: 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

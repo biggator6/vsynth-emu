@@ -292,6 +292,18 @@ ANALOG SUB OSCILLATOR v85 (2026-11-02): Sub Octave above 0 on patch waveforms 0�
   Sh4Interp: SZ = 1 pair moves now put FR(n) at the lower address, as the SH7750
   does; only RAMP's sub routine depended on it.
 
+OSC 2 v86 (2026-11-02): a second analog voice on each note, and the mix
+  (HARDWARE_FIRMWARE.md, "OSC 2, and how the two OSCs are mixed"). XtSynth::Controls
+  derives from OscControls (OSC 1's fields keep their names) and holds osc2, off by default;
+  Voice derives from OscVoice with osc2. targets, gainTarget, noteCents, analogBlock,
+  keyFollowKey, ampEnvParams and lfoParams take the OSC. Order: per-note setup and note-on
+  OSC 1 then 2; render OSC 2 then 1. xtAnalogMix is the MOD off or MIX: the sum in OSC 1's
+  buffer's units. An OSC that is off has ratio 1 and root 440. OSC 2 is ANALOG only:
+  oscPlays gives PCM to OSC 1 alone. Sync runs OSC 2 → OSC 1 only with MOD Type OSC SYNC, so
+  the port passes none. Params oscSwitch, osc2… (Params::oscId); editor attachOsc.
+  XT_ANALOG2, XT_PENV2…; TEST_OSC2…. Left: X-MOD, PCM on OSC 2 (a wave per OSC, the rows, the
+  stereo flag), MOD Types RING, FM, ENV RING, OSC SYNC, the other two Structure Types.
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from

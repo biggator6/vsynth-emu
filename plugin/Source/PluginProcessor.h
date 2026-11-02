@@ -10,6 +10,7 @@ class VSynthEmuProcessor : public juce::AudioProcessor,
                            private juce::AsyncUpdater
 {
 public:
+    static juce::String oscParamId(int k, const juce::String& id);   // OSC k's parameter (OSC 2: "osc2" before it)
     VSynthEmuProcessor();
     ~VSynthEmuProcessor() override;
 

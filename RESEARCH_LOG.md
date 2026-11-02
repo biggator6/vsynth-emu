@@ -3048,3 +3048,21 @@ Round-2 recordings.  First build-out after that: real-time granular port
   terms are multiplied by zero at the default Tone KF, so those constants needed a pass
   with other calibration values, the same lesson v82 had already taught for the plain
   routines.
+
+### Session 16 addendum (2026-11-02) — v86: OSC 2 and the mix
+
+- OSC 2 plays. It turned out to be the same object as OSC 1 a fixed distance further along
+  the tone, so nothing in the routines changed. What changed is XtSynth, which only ever
+  thought in terms of one oscillator: each OSC now has its own knobs, envelopes, LFO and pitch
+  ramp, with OSC 2 off by default, and the renders with it off are identical to v85's.
+- Reading the tone's render also explained the MOD and the Structure Types: three routines
+  run the same pieces in three orders. With the MOD off, or at MIX, it is a plain sum. So the
+  part of the MOD that OSC 2 needed is one line, and the rest stays for its own version.
+- v79's idea that each oscillator's mask is the other's sync input was wrong. It runs one way,
+  OSC 2 to OSC 1, and only with OSC SYNC selected.
+- The check calling the firmware's pieces itself had a blind spot. Reversing the note-on order
+  reversed both sides, so it saw nothing. Running the firmware's own tone note-on on a whole
+  block closed that. It took less than expected: only the COSM sections, the TVA and the LFOs'
+  note-ons needed stubbing, which suggests a whole-tone check against XtSynth is within reach.
+- An OSC that is off still does one thing: its note-on sets the pitch ratio to 1. The Comb and
+  Side Band Filters read OSC 1's ratio, so a port holding the last note's would have differed.

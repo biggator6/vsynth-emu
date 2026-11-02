@@ -195,6 +195,10 @@ int xtAnalogCode(int wave) {
 
 bool xtAnalogPlays(int wave) { return xtAnalogCode(wave) <= 12; }
 
+void xtAnalogMix(float* lr, const float* b, float scale) {
+    for (int i = 0; i < 64; ++i) lr[i] = add(lr[i], b[i] * scale);
+}
+
 XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw) {
     XtAnalogBlock b;
     const int dk = key - 60;
@@ -1436,8 +1440,10 @@ int main(int argc, char** argv) {
         return k;
     };
     // the converter's input, as the OSC table updater (0x894e55d0) lays it out
+    int oscIdx = 0;                             // the input's +2: 0 OSC 1, 1 OSC 2
     auto writeInput = [&](const Case& k) {
         c.write(P, z.data(), 0x100); c.write(part, z.data(), 0x200);
+        c.wr8(P + 2, (uint8_t)oscIdx);
         c.wr8(P + 3, (uint8_t)k.key); c.wr8(P + 4, (uint8_t)k.vel); c.wr8(P + 0xa, (uint8_t)(int8_t)k.gainDb);
         c.wr16(P + 0xe, (uint16_t)(int16_t)k.kf); c.wr16(P + 0x68, (uint16_t)(int16_t)k.coarse); c.wr32(P + 0x70, (uint32_t)(int32_t)k.fine);
         c.wr8(P + 0x7c, (uint8_t)k.key2);
@@ -1480,8 +1486,11 @@ int main(int argc, char** argv) {
         const float po[14] = { b.fat, b.fatEnv, b.fatLfo, b.pw, b.pwEnv, b.pwLfo, b.impact, b.slope, b.gain,
                                xtPitchCents(k.key, k.coarse, k.kf, k.fine, 69, false), b.tone, b.toneKf, b.subOn, b.subLevel };
         static const char* name[14] = { "fat", "fat env", "fat lfo", "pw", "pw env", "pw lfo", "impact", "slope", "gain", "cents", "tone", "tone kf", "sub on", "sub level" };
-        bool ok = (int)c.rd32(OUT + 0x80) == b.code && c.rd32(OUT + 0x8c) == 3 && c.rd32(OUT + 0x94) == 1
-                  && c.rd32(OUT + 0xa4) == 2 && c.rd32(OUT + 0xa8) == 1;
+        // the envelopes (pitch, amp, Fat, PW) and LFOs the binding (0x894f7070) takes: OSC 1's 1…4 and LFO 1, OSC 2's 5…8 and LFO 2
+        const uint32_t e0 = oscIdx ? 4 : 0, l0 = oscIdx ? 2 : 1;
+        bool ok = (int)c.rd32(OUT + 0x80) == b.code && c.rd32(OUT + 0x8c) == e0 + 3 && c.rd32(OUT + 0x94) == l0
+                  && c.rd32(OUT + 0xa4) == e0 + 2 && c.rd32(OUT + 0xa8) == l0 && c.rd32(OUT + 0x20) == e0 + 1 && c.rd32(OUT + 0x38) == l0
+                  && c.rd32(OUT + 0x4c) == e0 + 4 && c.rd32(OUT + 0x50) == l0;
         for (int i = 0; i < 14; ++i) ok = ok && same(fw[i], po[i]);
         if (!ok && cb++ < 8) {
             std::printf("  converter wave %d key %d mtx %d pw %d kf %d fat %d kf %d: code %u/%d", k.p.wave, k.key, mtx, k.p.pw, k.p.pwKf, k.p.fat,
@@ -1866,6 +1875,270 @@ int main(int argc, char** argv) {
     report("mixed ", nMix, 0, kWaves);
     std::printf("sub other words of the voice: %ld different\n", ob);
     bad += ob;
+
+    // OSC 2.  The converter with the input's +2 set, every waveform and the sub
+    // oscillator; then both voices in a tone object: the binding (0x894f7070),
+    // the voice setup and note-on (0x894f21c0), the install (0x894f2010), the MOD
+    // with its Switch off (0x894e0920, 0x894f1b00, 0x894f1d90), the updates
+    // (0x894f2090, OSC 1 then 2) and the tone's render (0x894f6d40), with the COSM
+    // sections and the TVA stubbed.  Compared every block: both voices' fields,
+    // their buffers and masks, the mix, and the shared delay lines.
+    cn = cb = 0;
+    oscIdx = 1;
+    if (!converterCases(200000, -1)) return 1;
+    if (!converterCases(100000, -2)) return 1;
+    if (!converterCases(100000, 11)) return 1;
+    if (!converterCases(100000, 12)) return 1;
+    oscIdx = 0;
+    std::printf("osc 2 converter: %ld cases, %ld different\n", cn, cb);
+    bad += cb;
+    const uint32_t TN = ram + 0x40000, V1 = TN + 0x20, V2 = TN + 0x9d4, MODO = TN + 0x1708, BL1 = ram + 0x3f000, BL2 = ram + 0x3f100,
+                   MI = ram + 0x3f200, MB = ram + 0x3f300, STUB = ram + 0x3f400;
+    constexpr uint32_t kBuf1 = 0x89d2c810, kBuf2 = 0x89d2c910, kBufMix = 0x89d2ca10;
+    auto envAt = [&](uint32_t e) { return TN + 0x1780 + 0x70 * e; };
+    auto lfoAt = [&](uint32_t l) { return TN + 0x1da0 + 0x98 * l; };
+    uint32_t mask1 = 0, mask2 = 0;
+    c.hook(0x894f5570, [](Sh4& m) { m.ret(0); });                 // the TVA
+    c.hook(STUB, [](Sh4& m) { m.ret(0); });                       // the COSM sections
+    c.hook(0x894f6d78, [&](Sh4& m) { mask2 = m.r[0]; m.r[6] = m.r[0]; m.pc += 2; });       // mov r0,r6: OSC 2's mask
+    c.hook(0x894f6da8, [&](Sh4& m) { mask1 = m.r[0]; m.r[9] += 8; m.pc += 2; });           // add #8,r9: after OSC 1
+    XtAnalogOsc to[2];
+    const uint32_t tv[2] = { V1, V2 }, tb[2] = { BL1, BL2 };
+    struct Field { uint32_t off; float v; };
+    auto floats = [](const XtAnalogOsc& o) {
+        std::vector<Field> f = { { 0x144, o.ratio() }, { 0x154, o.gainTarget() }, { 0x158, o.gain() }, { 0x1c0, o.fatTarget() }, { 0x1c4, o.fat() }, { 0x1c8, o.pwTarget() },
+            { 0x1cc, o.pw() }, { 0x1d0, o.decay() }, { 0x1d4, o.phase() }, { 0x1d8, o.impact() }, { 0x1e0, o.edge() }, { 0x1e4, o.hqLevel() }, { 0x1ec, o.subPwTarget() },
+            { 0x1f0, o.subPw() }, { 0x1f4, o.laStep() }, { 0x1f8, o.subStep() }, { 0x1fc, o.subPhase() }, { 0x200, o.subLevelTarget() }, { 0x204, o.subLevel() },
+            { 0x208, o.rampEnd() }, { 0x210, o.rampEnd2() }, { 0x218, o.laPhase2() }, { 0x21c, o.laPhase3() }, { 0x224, o.laSteepTarget() }, { 0x228, o.laSteep() },
+            { 0x22c, o.laSteep2Target() }, { 0x230, o.laSteep2() }, { 0x234, o.steepTarget() }, { 0x238, o.steep() }, { 0x23c, o.steep2Target() }, { 0x240, o.steep2() },
+            { 0x24c, o.detuneTarget() }, { 0x250, o.detune() }, { 0x254, o.mixTarget() }, { 0x258, o.mix() }, { 0x274, o.fbState() } };
+        for (int i = 0; i < 6; ++i) f.push_back({ 0x25c + 4 * (uint32_t)i, o.sidePhase(i) });
+        return f;
+    };
+    // a fresh tone: the firmware's voices hold what the port's start with
+    c.write(TN, std::vector<uint8_t>(0x2400, 0).data(), 0x2400);
+    for (int n = 0; n < 2; ++n) {
+        for (const Field& f : floats(to[n])) wf(tv[n] + f.off, f.v);
+        c.wr8(tv[n] + 0x248, (uint8_t)to[n].noiseHold());
+    }
+    c.wr32(TN + 0x14d0, STUB); c.wr32(TN + 0x1634, STUB);
+    long tb_ = 0, tn_ = 0, tm_ = 0, tl_ = 0;
+    long waveBlocks[14] = {};
+    auto fieldsSame = [&](int n) {
+        const uint32_t Vn = tv[n];
+        const XtAnalogOsc& o = to[n];
+        bool ok = c.rd32(Vn + 0x1dc) == o.flags() && c.rd32(Vn + 0x244) == o.noiseState() && (int)(int8_t)c.rd8(Vn + 0x248) == o.noiseHold()
+               && (int)c.rd32(Vn + 0x1e8) == o.hqFalling() && (int)c.rd32(Vn + 0x278) == o.fbWrite();
+        for (const Field& f : floats(o)) if (!same(f32(Vn + f.off), f.v)) {
+            if (ok && tb_ < 8) std::printf("  osc %d +0x%x: fw %.9g port %.9g\n", n + 1, f.off, f32(Vn + f.off), f.v);
+            ok = false;
+        }
+        return ok;
+    };
+    auto toneLines = [&] {                       // the eighteen flags, and each FEEDBACK voice's line
+        for (int i = 0; i < XtAnalogShared::kLines; ++i)
+            if (c.rd8(kFbFlags + (uint32_t)i) != shared.lineUsed[i]) return false;
+        for (const XtAnalogOsc& o : to) {
+            const int sl = o.fbSlotIndex();
+            if (sl < 0) continue;
+            const uint32_t base = kFbLines + (uint32_t)XtAnalogShared::kLineLen * (uint32_t)sl;
+            for (int i = 0; i < XtAnalogShared::kLineLen; ++i)
+                if ((int8_t)c.rd8(base + (uint32_t)i) != shared.line[sl][i]) return false;
+        }
+        return true;
+    };
+    auto toneCase = [&](int g) {
+        Case k[2] = { newCase(false), newCase(false) };
+        bool on[2] = { true, true };
+        if (g % 8 == 5) on[0] = false;           // OSC 1 off, OSC 2 alone
+        if (g % 8 == 6) on[1] = false;           // OSC 2 off
+        for (int n = 0; n < 2; ++n) {
+            k[n].p.wave = (int)(rnd() % 13);
+            if (k[n].p.wave >= 11 || rnd() % 3 == 0) k[n].p.detune = (int)(rnd() % 127) - 63;
+            if (k[n].p.wave <= 10 && rnd() % 3 == 0) { k[n].p.subOctave = 1 + (int)(rnd() % 3); k[n].p.subLevel = (int)(rnd() % 128); }
+        }
+        if (g % 8 == 3) k[0].p.wave = k[1].p.wave = 12;          // both on FEEDBACK-OSC: two lines from one voice
+        if (g % 8 == 4) k[0].p.wave = k[1].p.wave = 11;          // both on SUPER-SAW: the counter, OSC 1 then 2
+        if (g % 16 == 3) {                                       // the eighteen lines all taken: both voices share line 0
+            for (int i = 0; i < XtAnalogShared::kLines; ++i) { c.wr8(kFbFlags + (uint32_t)i, 1); shared.lineUsed[i] = 1; }
+        }
+        float eOut[9], lOut[3];
+        bool atk[2];
+        auto drawOutputs = [&] {
+            for (uint32_t e = 1; e <= 8; ++e) { eOut[e] = frnd(-1, 1); wf(envAt(e) + 0x4c, eOut[e]); }
+            for (uint32_t l = 1; l <= 2; ++l) { lOut[l] = frnd(-1, 1); wf(lfoAt(l) + 0x38, lOut[l]); }
+        };
+        drawOutputs();
+        mtx = 0;
+        // the blocks, then the binding and note-ons as the tone's note-on runs them
+        for (int n = 0; n < 2; ++n) {
+            oscIdx = n;
+            writeInput(k[n]);
+            // the depths the note's pitch and level follow: the OSC's own envelope and LFO
+            c.wr8(P + 0xc, (uint8_t)(int8_t)((int)(rnd() % 127) - 63)); c.wr8(P + 0x10, (uint8_t)(int8_t)((int)(rnd() % 127) - 63));
+            c.wr8(P + 0x11, (uint8_t)(int8_t)((int)(rnd() % 127) - 63)); c.wr8(P + 0x20, (uint8_t)(int8_t)((int)(rnd() % 127) - 63));
+            c.write(tb[n], z.data(), 0xd4);
+            c.wr32(tb[n], on[n] ? 3u : 0u);
+            if (on[n] && !c.call(0x894e1920, { P, tb[n] }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
+            if (!c.call(0x894f7070, { TN, tb[n], (uint32_t)n }, sp)) { std::fprintf(stderr, "binding: %s\n", c.error().c_str()); return false; }
+        }
+        oscIdx = 0;
+        const uint32_t ampEnv[2] = { 4, 8 };
+        for (int n = 0; n < 2; ++n) {
+            atk[n] = rnd() & 1;
+            wf(envAt(ampEnv[n]) + 0x1c, atk[n] ? 25.0f : 0.0f); wf(envAt(ampEnv[n]) + 0x2c, 0.0f);
+        }
+        auto ratioOf = [&](int n) {
+            const uint32_t Vn = tv[n], e = (uint32_t)n * 4;
+            return xtPitchTarget(f32(Vn + 8), eOut[e + 1], f32(Vn + 0x1c), lOut[n + 1], f32(Vn + 0x34), f32(Vn + 0xc));
+        };
+        auto gainOf = [&](int n, bool start) {
+            const uint32_t Vn = tv[n], e = (uint32_t)n * 4;
+            return xtOscGainTarget(f32(Vn + 0x5c), f32(Vn + 0x54), start && atk[n] ? 0.0f : eOut[e + 4], lOut[n + 1], f32(Vn + 0x58));
+        };
+        XtAnalogBlock pb[2];
+        for (int n = 0; n < 2; ++n) {
+            pb[n] = portBlock(k[n]);
+            if (!c.call(0x894f21c0, { tv[n], tb[n], 0 }, sp)) { std::fprintf(stderr, "voice setup: %s\n", c.error().c_str()); return false; }
+            if (!on[n]) { to[n].setRatio(1.0f); continue; }      // the note-on of an OSC that is off (0x894f2f80, kind 0)
+            const uint32_t e = (uint32_t)n * 4;
+            to[n].noteOn(pb[n], ratioOf(n), gainOf(n, false), gainOf(n, true), eOut[e + 3], eOut[e + 2], lOut[n + 1], shared);
+            ++tn_;
+            if (!fieldsSame(n) && tb_++ < 8) std::printf("  tone %d note-on osc %d wave %d\n", g, n + 1, k[n].p.wave);
+        }
+        if (!toneLines() && tl_++ < 4) std::printf("  tone %d note-on: lines differ\n", g);
+        c.write(MI, z.data(), 0x10);
+        if (!c.call(0x894e0920, { MI, MB }, sp) || c.rd32(MB) != 0 || !same(f32(MB + 4), 1.0f) || !same(f32(MB + 8), 1.0f)) {
+            std::fprintf(stderr, "MOD off: type %u, gains %.9g %.9g\n", c.rd32(MB), f32(MB + 4), f32(MB + 8));
+            return false;
+        }
+        for (int n = 0; n < 2; ++n)
+            if (!c.call(0x894f2010, { tv[n] }, sp)) { std::fprintf(stderr, "install: %s\n", c.error().c_str()); return false; }
+        if (!c.call(0x894f1b00, { MODO, MB, c.rd32(V1 + 0x960), c.rd32(V2 + 0x960) }, sp)
+            || !c.call(0x894f1d90, { MODO, c.rd32(V1) == 3 ? 1u : 0u }, sp)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
+        if (c.rd32(MODO + 0x50) != 0x89527d80) { std::fprintf(stderr, "MOD: routine %08x\n", c.rd32(MODO + 0x50)); return false; }
+        for (int blk = 0; blk < 24; ++blk) {
+            if (blk % 5 == 4) {
+                drawOutputs();
+                for (int n = 0; n < 2; ++n) {
+                    if (!c.call(0x894f2090, { tv[n], 1 }, sp)) { std::fprintf(stderr, "update: %s\n", c.error().c_str()); return false; }
+                    if (!on[n]) continue;
+                    const uint32_t e = (uint32_t)n * 4;
+                    to[n].update(pb[n], ratioOf(n), gainOf(n, false), eOut[e + 3], eOut[e + 2], lOut[n + 1]);
+                    ++tn_;
+                    if (!fieldsSame(n) && tb_++ < 8) std::printf("  tone %d.%d update osc %d wave %d\n", g, blk, n + 1, k[n].p.wave);
+                }
+            }
+            if (blk % 6 == 2)                    // each phase exactly on a breakpoint, or on 0
+                for (int n = 0; n < 2; ++n) {
+                    if (!on[n] || k[n].p.wave == 8 || k[n].p.wave == 6 || k[n].p.wave == 7) continue;
+                    float pts[9];
+                    const int m = to[n].breakpoints(pts);
+                    pts[m] = 0.0f;
+                    const float p = pts[rnd() % (uint32_t)(m + 1)];
+                    if (p >= 0.0f && 1.0f > p) { wf(tv[n] + 0x1d4, p); to[n].setPhase(p); }
+                }
+            mask1 = mask2 = 0xdeadbeef;
+            if (!c.call(0x894f6d40, { TN, BUF }, sp)) { std::fprintf(stderr, "render: %s\n", c.error().c_str()); return false; }
+            float l[2][64] = {};
+            uint32_t pm[2] = {};
+            if (on[1]) pm[1] = to[1].process(l[1]);
+            if (on[0]) pm[0] = to[0].process(l[0]);
+            float mix[64];
+            std::copy(l[0], l[0] + 64, mix);
+            xtAnalogMix(mix, l[1]);
+            for (int n = 0; n < 2; ++n) if (on[n]) ++waveBlocks[k[n].p.wave];
+            if ((mask1 != pm[0] || mask2 != pm[1]) && tm_++ < 4) std::printf("  tone %d.%d masks: fw %08x %08x, port %08x %08x\n", g, blk, mask1, mask2, pm[0], pm[1]);
+            bool ok = fieldsSame(0) && fieldsSame(1);
+            int bad_i = -1;
+            for (int i = 0; i < 64 && bad_i < 0; ++i)
+                if (!same(f32(kBuf1 + 4 * (uint32_t)i), l[0][i]) || !same(f32(kBuf2 + 4 * (uint32_t)i), l[1][i]) || !same(f32(kBufMix + 4 * (uint32_t)i), mix[i])) bad_i = i;
+            ok = ok && bad_i < 0;
+            if (!ok && tb_++ < 8) {
+                std::printf("  tone %d.%d waves %d %d on %d %d: first difference at %d", g, blk, k[0].p.wave, k[1].p.wave, on[0], on[1], bad_i);
+                if (bad_i >= 0)
+                    std::printf(": osc1 %.9g/%.9g osc2 %.9g/%.9g mix %.9g/%.9g", f32(kBuf1 + 4 * (uint32_t)bad_i), l[0][bad_i], f32(kBuf2 + 4 * (uint32_t)bad_i), l[1][bad_i],
+                                f32(kBufMix + 4 * (uint32_t)bad_i), mix[bad_i]);
+                std::printf("\n");
+            }
+            if (blk % 8 == 7 && !toneLines() && tl_++ < 4) std::printf("  tone %d.%d: lines differ\n", g, blk);
+        }
+        // the tone's stop, OSC 1 then 2 (0x894f1fd0): their lines free
+        for (int n = 0; n < 2; ++n) {
+            if (!c.call(0x894f1fd0, { tv[n] }, sp)) { std::fprintf(stderr, "stop: %s\n", c.error().c_str()); return false; }
+            if (on[n]) to[n].release();
+        }
+        if (!toneLines() && tl_++ < 4) std::printf("  tone %d stop: lines differ\n", g);
+        if (g % 16 == 3)                         // the lines given back
+            for (int i = 0; i < XtAnalogShared::kLines; ++i) { c.wr8(kFbFlags + (uint32_t)i, 0); shared.lineUsed[i] = 0; }
+        return true;
+    };
+    const int nTone = nCases;
+    for (int g = 0; g < nTone; ++g)
+        if (!toneCase(g)) return 1;
+    // The order of the note-ons, from the tone's own (0x894f5e60): the whole block
+    // but the OSCs' and the MOD's left at zero, the COSM sections, the TVA and the
+    // LFOs' note-ons stubbed.  SUPER-SAW's counter and FEEDBACK-OSC's lines go OSC 1
+    // then OSC 2.
+    const uint32_t TB = ram + 0x3a000;
+    for (uint32_t a : { 0x894ee480u, 0x894edf70u, 0x894eef70u, 0x894f5160u, 0x894f50e0u, 0x894f7330u, 0x894f0cf0u })
+        c.hook(a, [](Sh4& m) { m.ret(m.r[5]); });
+    long oo = 0, on_ = 0;
+    auto orderCase = [&](int g) {
+        static const int pairs[6][2] = { { 11, 11 }, { 12, 12 }, { 11, 12 }, { 12, 11 }, { 0, 11 }, { 12, 0 } };
+        Case k[2] = { newCase(false), newCase(false) };
+        for (int n = 0; n < 2; ++n) { k[n].p.wave = pairs[g % 6][n]; k[n].p.detune = (int)(rnd() % 127) - 63; }
+        if (g % 12 == 7)                         // the eighteen lines all taken
+            for (int i = 0; i < XtAnalogShared::kLines; ++i) { c.wr8(kFbFlags + (uint32_t)i, 1); shared.lineUsed[i] = 1; }
+        c.write(TB, std::vector<uint8_t>(0x800, 0).data(), 0x800);
+        c.wr32(TB + 4, 0xffffffffu);             // no wave
+        for (uint32_t i = 1; i < 8; ++i) c.wr32(TB + 0x24 + (i << 5) + 0x10, 1);   // every LFO key-synced
+        mtx = 0;
+        const uint32_t oscBlock[2] = { TB + 0x434, TB + 0x508 };
+        for (int n = 0; n < 2; ++n) {
+            oscIdx = n;
+            writeInput(k[n]);
+            c.wr32(oscBlock[n], 3u);
+            if (!c.call(0x894e1920, { P, oscBlock[n] }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
+        }
+        c.write(MI, z.data(), 0x10);
+        if (!c.call(0x894e0920, { MI, TB + 0x5dc }, sp)) { std::fprintf(stderr, "MOD off: %s\n", c.error().c_str()); return false; }
+        c.wr32(0x89f91c50, 0); c.wr32(0x89f91c54, 0); c.wr32(0x89fa9094, 0);       // the lists of sounding tones
+        if (!c.call(0x894f5e60, { TN, TB }, sp)) { std::fprintf(stderr, "tone note-on: %s\n", c.error().c_str()); return false; }
+        ++on_;
+        const int order[2] = { 0, 1 };
+        for (int n : order) {
+            oscIdx = n;
+            const XtAnalogBlock pb = portBlock(k[n]);
+            oscIdx = 0;
+            const uint32_t Vn = tv[n], e = (uint32_t)n * 4, lf = lfoAt((uint32_t)n + 1) + 0x38;
+            const float eFat = f32(envAt(e + 3) + 0x4c), ePw = f32(envAt(e + 2) + 0x4c), ePitch = f32(envAt(e + 1) + 0x4c), eAmp = f32(envAt(e + 4) + 0x4c), l = f32(lf);
+            const float ratio = xtPitchTarget(f32(Vn + 8), ePitch, f32(Vn + 0x1c), l, f32(Vn + 0x34), f32(Vn + 0xc));
+            // the amp envelope's times are 0 here: the start is its output
+            const float gain = xtOscGainTarget(f32(Vn + 0x5c), f32(Vn + 0x54), eAmp, l, f32(Vn + 0x58));
+            to[n].noteOn(pb, ratio, gain, gain, eFat, ePw, l, shared);
+        }
+        const bool ok = fieldsSame(0) && fieldsSame(1) && toneLines() && same(f32(kSsCount), shared.superSaw);
+        if (!ok && oo++ < 6) std::printf("  order %d waves %d %d: lines %d counter %.9g/%.9g\n", g, k[0].p.wave, k[1].p.wave, toneLines(), f32(kSsCount), shared.superSaw);
+        for (int n = 0; n < 2; ++n) {
+            if (!c.call(0x894f1fd0, { tv[n] }, sp)) { std::fprintf(stderr, "stop: %s\n", c.error().c_str()); return false; }
+            to[n].release();
+        }
+        if (g % 12 == 7)
+            for (int i = 0; i < XtAnalogShared::kLines; ++i) { c.wr8(kFbFlags + (uint32_t)i, 0); shared.lineUsed[i] = 0; }
+        return true;
+    };
+    for (int g = 0; g < nCases / 2; ++g)
+        if (!orderCase(g)) return 1;
+    std::printf("tone note-on: %ld cases, %ld different\n", on_, oo);
+    bad += oo;
+    std::printf("tone: %d cases, %ld note-ons and updates\n", nTone, tn_);
+    {
+        long blocks = 0;
+        for (long w : waveBlocks) blocks += w;
+        std::printf("tone: %ld oscillator blocks, %ld different; wrap masks %ld different; delay lines %ld different\n", blocks, tb_, tm_, tl_);
+    }
+    bad += tb_ + tm_ + tl_;
     return bad ? 3 : 0;
 }
 #endif

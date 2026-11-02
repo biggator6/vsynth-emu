@@ -47,10 +47,11 @@ private:
     // OSC Type (ANALOG, PCM); with ANALOG the analog oscillator's Waveform,
     // Impact, Pulse Width and Fat with their KFs, LFO and Env depths take the
     // three rows the PCM OSC uses (Encode, the VariPhrase knobs, Loop)
-    juce::ComboBox   oscTypeBox_, anaWaveBox_;
+    juce::ComboBox   oscSelBox_, oscTypeBox_, anaWaveBox_;
+    juce::ToggleButton oscOnBtn_ { "On" };
     static constexpr int kAnaKnobs = 12;  // Impact; PW, PW KF, Fat, Fat KF; PW LFO, PW Env, Fat LFO, Fat Env; Detune, Sub Octave, Sub Level
     juce::Slider     anaSliders_[kAnaKnobs];
-    juce::Label      anaLabels_[kAnaKnobs], oscTypeLabel_ { {}, "OSC" }, anaWaveLabel_ { {}, "Wave" };
+    juce::Label      anaLabels_[kAnaKnobs], anaWaveLabel_ { {}, "Wave" };
     // Loop: the OSC's Loop switch, the wave's Loop Mode and region
     juce::ToggleButton loopBtn_ { "Loop" };
     juce::ComboBox   loopModeBox_;
@@ -159,7 +160,10 @@ private:
     std::unique_ptr<SliderAtt> oscTkfAtt_, oscFkfAtt_;
     std::unique_ptr<ComboAtt>  timeOffsetAtt_, oscTypeAtt_, anaWaveAtt_;
     std::unique_ptr<SliderAtt> anaAtt_[kAnaKnobs];
+    std::unique_ptr<ButtonAtt> oscOnAtt_;
     void showOscType();                 // the analog rows or the PCM OSC's
+    void attachOsc(int k);              // the OSC's own rows on OSC 1 or OSC 2
+    int oscK_ = 0;
     std::unique_ptr<ButtonAtt> loopAtt_;
     std::unique_ptr<ComboAtt>  loopModeAtt_;
     std::unique_ptr<SliderAtt> loopStartAtt_, loopEndAtt_;
