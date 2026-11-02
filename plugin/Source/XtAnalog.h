@@ -17,8 +17,8 @@
 // (0x895060e0), SAW (0x89508c20), SQUARE (0x89508aa0), TRIANGLE
 // (0x895094c0), SINE (0x89509030), RAMP (0x89508800), JUNO (0x89508db0) and
 // NOISE (0x89504a40); LA-SQUARE (0x89508540), LA-SAW (0x895081f0), SUPER-SAW
-// (0x89507520) and FEEDBACK-OSC (0x89507900).  X-MOD (0x89507b60) reads OSC 2's
-// output, so it waits for OSC 2.
+// (0x89507520), FEEDBACK-OSC (0x89507900) and X-MOD (0x89507b60), installed at
+// +0x96c rather than +0x968, which reads OSC 2's output.
 //
 // With the sub oscillator on (Sub Octave above 0: voice +0xb4 = 1.0) a second
 // set runs: install 0x895069d0, note-on 0x89506700, update 0x89506bf0, and by the
@@ -91,6 +91,9 @@ struct XtAnalogParams {
 //           pitch (0x894e1350): level curve(Level)/32768 × max(0, 1 + d·KF/
 //           6e6), d = pitch10 − bias·1000, the upper KF above the bias point
 //           and the lower below (with −d)
+//           X-MOD (patch 13): pw +0x98 the modulation's depth, i/127 +
+//           (key − 60)·KF/12000 within 0…1 with i = PW + 64 (below 2: 0), and
+//           its depths; all 0 on OSC 2 (0x894e208a)
 //           SUPER-SAW (patch 11) has its own curves: +0x98 the saws' spread
 //           from the Pulse Width, +0x84 the side saws' level from the Detune
 //           knob with Fat's KF, each with its depths; FEEDBACK-OSC (12) too:
@@ -119,7 +122,8 @@ struct XtAnalogBlock {
 // key: the note (the converter's +3); pitch10: its pitch in 1/1000
 // semitone (+0x74, xtPitch10 + the fine); velFat, velPw: the envelopes'
 // velocity factors (1 with no velocity curve).
-XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat = 1.0f, float velPw = 1.0f);
+// osc2: the input's +2 (only X-MOD's block depends on it without a matrix).
+XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat = 1.0f, float velPw = 1.0f, bool osc2 = false);
 
 // The analog voice: the fields after +0x144 that the note-on, the update and
 // the routine keep.
@@ -155,7 +159,9 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
 //   ss        SUPER-SAW: +0x24c/+0x250 the spread, +0x254/+0x258 the side saws'
 //             level, targets and current values; +0x25c…+0x270 the side saws'
 //             phases, +0x1d4 the centre's.  FEEDBACK-OSC's second tap's place
-//             and level are in the same fields.
+//             and level are in the same fields, and X-MOD's depth in +0x24c/
+//             +0x250.  X-MOD's Fat and PW have no 1/32 move and no 70%: their
+//             current values move 0.2 of the way each block.
 //   fb        FEEDBACK-OSC: +0x274 the DC block's state, +0x278 the line's write
 //             place, +0x27c which line.
 //   sub       With the sub oscillator on the two waves' shapes, the level and
@@ -180,8 +186,11 @@ public:
     // units (±2^31 at full gain).  sync: bit i resets the phase at sample i;
     // on the XT only OSC 1 gets one, OSC 2's mask, and only with MOD Type OSC
     // SYNC (the tone's render).  Returns this oscillator's mask: bit i set
-    // where a cycle's two halves have both been seen (NOISE: 0).
-    uint32_t process(float* lr, uint32_t sync = 0);
+    // where a cycle's two halves have both been seen (NOISE: 0).  mod: X-MOD's
+    // input, the other OSC's buffer in the XT's units, which it clears; null
+    // when its depth is 0, as on OSC 2, where the firmware reads and clears a
+    // buffer about to be written.  The others ignore it.
+    uint32_t process(float* lr, uint32_t sync = 0, float* mod = nullptr);
     // the voice's stop (0x895053c0): FEEDBACK-OSC frees its delay line; once is
     // enough, and it does nothing for the other waveforms
     void release();
@@ -272,6 +281,9 @@ private:
     void fbShape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo);
     void fbNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared);
     uint32_t feedbackOsc(float* lr, uint32_t sync);
+    void xmShape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo);
+    void xmNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo);
+    uint32_t xMod(float* lr, uint32_t sync, float* mod);
     uint32_t laSquare(float* lr, uint32_t sync);
     uint32_t laSaw(float* lr, uint32_t sync);
     uint32_t hqSaw(float* lr, uint32_t sync);

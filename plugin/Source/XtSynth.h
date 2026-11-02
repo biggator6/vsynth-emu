@@ -72,7 +72,8 @@ public:
         // stores them: Waveform 0..13 in the XT's order, Impact 0..40, Pulse
         // Width −63..+63 on the time envelope, Fat 0..127 on the formant
         // envelope, their Keyfollows ±20 (×10 = the displayed ±200) and LFO
-        // and Env depths −63..+63.  OSC 2 plays ANALOG only so far.
+        // and Env depths −63..+63.  OSC 2 plays ANALOG only so far.  X-MOD on
+        // OSC 1 uses OSC 2 up: OSC 2's output moves its phase and is not heard.
         int oscType = 1;
         XtAnalogParams ana;
         // the VariPhrase OSC (XtOsc): Time and Formant −63..+63, Time Offset

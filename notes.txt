@@ -304,6 +304,16 @@ OSC 2 v86 (2026-11-02): a second analog voice on each note, and the mix
   XT_ANALOG2, XT_PENV2…; TEST_OSC2…. Left: X-MOD, PCM on OSC 2 (a wave per OSC, the rows, the
   stereo flag), MOD Types RING, FM, ENV RING, OSC SYNC, the other two Structure Types.
 
+ANALOG X-MOD v87 (2026-11-02): X-MOD (code 13, 0x89507b60 at +0x96c)
+  (HARDWARE_FIRMWARE.md, "The analog waveform X-MOD"). Converter case: PW → the depth
+  (xmDepthCurve), all 0 on OSC 2 (xtAnalogBlock's osc2), Fat as SAW's. xmShape() is 0x89505f10,
+  xmNoteOn() 0x89505ec0; depth in ssDetT/ssDetC (+0x24c/+0x250). xMod(lr, sync, mod) moves the
+  phase by (L/2^31 + R/2^31)/2 × 0.2·depth and clears mod; process(lr, sync, mod) passes it,
+  XtSynth gives OSC 1 OSC 2's buffer in the XT's units and OSC 2 none (depth 0). The phase is
+  brought back by 1 once only, so it can stay out of range. xtAnalogPlays: all fourteen. Left
+  on the roadmap: MOD Types RING, FM, ENV RING, OSC SYNC; the other two Structure Types; the patch
+  TVA's level and pan; PCM on OSC 2.
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from

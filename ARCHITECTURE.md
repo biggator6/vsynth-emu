@@ -261,10 +261,10 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      own envelopes (Env 9/10, 11/12) and LFO (3, 4), through the XT's
      converter, control and filter kernels, between the player and the
      TVA.
-   - the analog oscillator (v79–v85, XtAnalog): OSC Type ANALOG plays the
+   - the analog oscillator (v79–v87, XtAnalog): OSC Type ANALOG plays the
      XT's SAW, SQUARE, TRIANGLE, SINE, RAMP, JUNO, NOISE, HQ-SAW and
      HQ-SQUARE (band-limited, from rom.2's tables), LA-SAW, LA-SQUARE,
-     SUPER-SAW and FEEDBACK-OSC, most with a sub oscillator, with Impact,
+     SUPER-SAW, FEEDBACK-OSC and X-MOD, most with a sub oscillator, with Impact,
      Pulse Width and Fat (their KFs, LFO and envelope
      depths, on the time and formant envelopes), through the analog
      converter, note-on, update and routine, its level from the XT's hidden
@@ -273,7 +273,8 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
    - OSC 2 (v86): a second analog oscillator on the same note, with its own
      pitch, level, envelopes (Env 5…8) and LFO 2, summed with OSC 1 before the
      COSM sections, as the MOD section does when off or set to MIX. The
-     render is Structure Type 1's.
+     render is the first Structure Type's. X-MOD on OSC 1 (v87) reads OSC 2's
+     output instead, so OSC 2 is not heard.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
@@ -321,6 +322,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - The analog oscillator (v79–v85): the converter's block, the note-on, the
   update, the install and the routines, the sub oscillator's eight too (outputs,
   state and wrap masks), equal the firmware (`xt_analog`).
+- X-MOD (v87): its converter case on both OSCs, and the routine alone and under
+  the firmware's own OSC 2 in the tone's render, equal the firmware (`xt_analog`).
 - OSC 2 (v86): the converter with the input's OSC set, and both voices in a tone
   object through the firmware's binding, setup, install, updates and render
   (both buffers, the mix, the masks, the fields and the shared delay lines),
@@ -338,9 +341,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 **Not yet:**
 - the patch TVA's own Level, Level KF, pan and LFO terms are not
   modelled;
-- the analog oscillator lacks X-MOD; OSC 2 plays only ANALOG, not PCM; the
-  MOD section has only its MIX path (no RING, FM, ENV RING or OSC SYNC), and
-  there is no Structure Type but the first;
+- OSC 2 plays only ANALOG, not PCM; the MOD section has only its MIX path (no
+  RING, FM, ENV RING or OSC SYNC), and there is no Structure Type but the first;
 - no V-Synth voice layer (filters, LFOs, effects);
 - no step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and

@@ -3066,3 +3066,21 @@ Round-2 recordings.  First build-out after that: real-time granular port
   note-ons needed stubbing, which suggests a whole-tone check against XtSynth is within reach.
 - An OSC that is off still does one thing: its note-on sets the pitch ratio to 1. The Comb and
   Side Band Filters read OSC 1's ratio, so a port holding the last note's would have differed.
+
+### Session 16 addendum (2026-11-02) — v87: X-MOD
+
+- X-MOD is ported, so all fourteen analog waveforms are done. It is SAW with its phase pushed by
+  the other OSC's output, and on OSC 2 its depth is 0, so it only does anything on OSC 1, where it
+  uses OSC 2 up.
+- The port matched on its first run, which is reason to distrust the check, so it got 50 deliberate
+  errors. Seven went unnoticed. Three were real: a whole copy of the routine's loop never ran, the
+  Pulse Width's move never mattered, and landing the phase exactly on 0 was being undone by the check
+  itself. The other four changed nothing. The prettiest: dividing by 2^31 − 128 instead of 2^31 gives
+  the same float for every input under round-to-zero, because the extra is always under a unit and
+  gets truncated away.
+- The three copies of the loop looked like a state machine. They are one test, a·d against a, spread
+  out by the compiler, and it is only true at a Pulse Width no note reaches.
+- Nothing limits the routine: the phase comes back in range only once, so a big enough modulator
+  throws y far off its line. Real settings stay in range, until Impact and Wave Gain are both at the
+  top. Whether the XT limits that later on has not been looked at.
+

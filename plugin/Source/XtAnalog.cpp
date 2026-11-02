@@ -114,6 +114,14 @@ float fbLevelCurve(int detune, int kf10, int dk) {
     return clamp01(add(div(flt((int16_t)kf10 * (int16_t)dk), 12000.0f), sub(1.0f, mul(n, n))));
 }
 
+// X-MOD's depth from the Pulse Width (0x894e53d0), by the same index: i/127 +
+// (key − 60)·KF/12000, within 0…1
+float xmDepthCurve(int pw, int kf10, int dk) {
+    int i = (int16_t)(pw + 64);
+    i = clampi(i > 1 ? i : 0, 0, 127);
+    return clamp01(add(div(flt((int16_t)kf10 * (int16_t)dk), 12000.0f), div(flt(i), 127.0f)));
+}
+
 // With the sub oscillator on, the second wave's depths and Detune in cents
 // (0x894e1090, 0x894e2974): |d| to 10: d; to 15: 2d − 10; to 31: 5d − 55; to 51:
 // 25d − 675; above: 50d − 1950; with d's sign
@@ -193,13 +201,13 @@ int xtAnalogCode(int wave) {
     return wave >= 1 && wave <= 13 ? code[wave] : 2;      // the converter's default case: SAW
 }
 
-bool xtAnalogPlays(int wave) { return xtAnalogCode(wave) <= 12; }
+bool xtAnalogPlays(int wave) { return xtAnalogCode(wave) <= 13; }
 
 void xtAnalogMix(float* lr, const float* b, float scale) {
     for (int i = 0; i < 64; ++i) lr[i] = add(lr[i], b[i] * scale);
 }
 
-XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw) {
+XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw, bool osc2) {
     XtAnalogBlock b;
     const int dk = key - 60;
     b.code = xtAnalogCode(p.wave);
@@ -219,6 +227,16 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
         b.pwEnv = mul(mul(sq63(p.pwEnv), 0.5f), velPw);
         b.pwLfo = mul(sq63(clampi((int16_t)p.pwLfo, -63, 63)), 0.5f);
         b.fat = fbLevelCurve(p.detune, p.fatKf * 10, dk);
+        b.fatEnv = mul(sq63(p.fatEnv), velFat);
+        b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
+    } else if (p.wave == 13) {   // X-MOD (0x894e208a): OSC 2's has no depth
+        b.pw = b.pwEnv = b.pwLfo = 0.0f;
+        if (!osc2) {
+            b.pw = xmDepthCurve(p.pw, p.pwKf * 10, dk);
+            b.pwEnv = mul(sq63(p.pwEnv), velPw);
+            b.pwLfo = sq63(clampi((int16_t)p.pwLfo, -63, 63));
+        }
+        b.fat = fatCurve(p.fat, p.fatKf * 10, dk);
         b.fatEnv = mul(sq63(p.fatEnv), velFat);
         b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
     } else {
@@ -395,6 +413,23 @@ void XtAnalogOsc::fbNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, fl
     std::memset(shared.line[fbSlot], 0, XtAnalogShared::kLineLen);
 }
 
+// X-MOD's targets (0x89505f10, the note-on's first step and the update): the
+// depth within 0…1; Fat at once, no 70%.
+void XtAnalogOsc::xmShape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo) {
+    ssDetT = clamp01(fmac(lfo, b.pwLfo, fmac(pwEnv, b.pwEnv, b.pw)));
+    const float fat = clamp01(fmac(lfo, b.fatLfo, fmac(fatEnv, b.fatEnv, b.fat)));
+    fatT = sub(kHalf, mul(fat, kHalf));
+    if (!(fatT > kFatMin)) fatT = kFatFloor;
+}
+// X-MOD's note-on (0x89505ec0): the Pulse Width is fixed by the pitch, ½ + the
+// Slope's width.
+void XtAnalogOsc::xmNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo) {
+    xmShape(b, fatEnv, pwEnv, lfo);
+    pwT = pwC = fmac(mul(ratio_, b.slope), K(0x3c23d709), kHalf);
+    ssDetC = ssDetT;
+    fatC = fatT;
+}
+
 void XtAnalogOsc::release() {
     if (fbSlot >= 0 && shared_) shared_->lineUsed[fbSlot] = 0;
     fbSlot = -1;
@@ -557,6 +592,7 @@ void XtAnalogOsc::noteOn(const XtAnalogBlock& b, float ratio, float gain, float 
     else if (code == 9 || code == 10) laNoteOn(b, gain, gainStart, fatEnv, pwEnv, lfo);
     else if (code == 11) ssNoteOn(b, fatEnv, pwEnv, lfo, shared);
     else if (code == 12) fbNoteOn(b, fatEnv, pwEnv, lfo, shared);
+    else if (code == 13) xmNoteOn(b, fatEnv, pwEnv, lfo);
     else shape(b, fatEnv, pwEnv, lfo, true);
 }
 
@@ -567,6 +603,7 @@ void XtAnalogOsc::update(const XtAnalogBlock& b, float ratio, float gain, float 
     else if (code == 9 || code == 10) laShape(b, gain, fatEnv, pwEnv, lfo);
     else if (code == 11) ssShape(b, fatEnv, pwEnv, lfo);
     else if (code == 12) fbShape(b, fatEnv, pwEnv, lfo);
+    else if (code == 13) xmShape(b, fatEnv, pwEnv, lfo);
     else shape(b, fatEnv, pwEnv, lfo, false);
 }
 
@@ -617,6 +654,13 @@ int XtAnalogOsc::breakpoints(float* p) const {
         p[0] = fatC;
         p[1] = sub(1.0f, laInc);
         return 2;
+    case 13: {
+        float d = sub(kHalf, w);
+        if (0.0f > d) d = add(d, 1.0f);
+        const float ad = mul(a, d);
+        p[0] = ad; p[1] = a; p[2] = fmac(sub(1.0f, a), d, a);
+        return 3;
+    }
     case 11: case 12:  // the sample that lands on 1, and the slope's turn
         p[0] = sub(1.0f, mul(ratio_, K(0x3c2377ed)));
         p[1] = pwT;
@@ -626,7 +670,7 @@ int XtAnalogOsc::breakpoints(float* p) const {
     }
 }
 
-uint32_t XtAnalogOsc::process(float* lr, uint32_t sync) {
+uint32_t XtAnalogOsc::process(float* lr, uint32_t sync, float* mod) {
     if (subOn_) switch (code) {
     case 2: return subPeak(lr, sync, false, false);
     case 3: return subSquare(lr, sync);
@@ -651,6 +695,7 @@ uint32_t XtAnalogOsc::process(float* lr, uint32_t sync) {
     case 10: return laSaw(lr, sync);
     case 11: return superSaw(lr, sync);
     case 12: return feedbackOsc(lr, sync);
+    case 13: return xMod(lr, sync, mod);
     default: return saw(lr, sync);
     }
 }
@@ -1152,6 +1197,54 @@ uint32_t XtAnalogOsc::feedbackOsc(float* lr, uint32_t sync) {
 // note-on, and +0x244), each held for the hold's samples, the hold starting
 // again every block; (Impact + value)·gain, the value already ±2^31.  No
 // phase, sync, Fat or PW; returns 0.
+// X-MOD (0x89507b60): SAW's wave with the phase moved by the other OSC's output,
+// (L/2^31 + R/2^31)/2 × 0.2·depth per sample, and that buffer cleared.  A wrap
+// sets a mask bit only if a·d == a, which never happens: the firmware keeps three
+// copies of its loop for that, and the port one test.  The phase comes back up by
+// 1 when the modulation takes it to 0 or below, and may stay out of range.  Out =
+// (y·sign + Impact)·gain·2^31.  Each block Fat, PW and depth move 0.2 of the way.
+uint32_t XtAnalogOsc::xMod(float* lr, uint32_t sync, float* mod) {
+    const float inc = mul(ratio_, K(0x3ba377ed));
+    float d = sub(kHalf, pwC), sign = 1.0f;
+    if (0.0f > d) { sign = -1.0f; d = add(d, 1.0f); }
+    const float a = fatC, ad = mul(a, d), bb = fmac(sub(1.0f, a), d, a);
+    const float k0 = div(2.0f, ad), kad = div(2.0f, sub(ad, a)), kba = div(2.0f, sub(bb, a)), kb1 = div(2.0f, add(bb, -1.0f));
+    const float depth = mul(ssDetC, K(0x3e4ccccd));
+    const bool wrapsMask = ad == a;
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = 0.0f;
+        float y;
+        if (!(bb > ph)) { y = fmac(add(ph, -1.0f), kb1, -1.0f); fl |= 2; }
+        else if (!(a > ph)) { y = fmac(add(ph, -a), kba, -1.0f); fl |= 2; }
+        else {
+            fl |= 1;
+            y = ad > ph ? fmac(ph, k0, -1.0f) : fmac(add(ph, -a), kad, -1.0f);
+        }
+        if (fl == 3) { fl = 0; wrap |= bit; }
+        float m = 0.0f;
+        if (mod) {
+            m = div(add(div(mod[2 * i], kFull31), div(mod[2 * i + 1], kFull31)), 2.0f);
+            mod[2 * i] = mod[2 * i + 1] = 0.0f;
+        }
+        ph = add(fmac(m, depth, ph), inc);
+        if (!(1.0f > ph)) {
+            ph = add(ph, -1.0f);
+            if (wrapsMask) wrap |= bit;
+        } else if (!(ph > 0.0f)) ph = add(ph, 1.0f);
+        const float out = mul(mul(fmac(y, sign, imp), gainC), kFull31);
+        lr[2 * i] = lr[2 * i + 1] = out;
+        imp = mul(imp, dec);
+        gainC = fmac(sub(gainT, gainC), kStep, gainC);
+        bit <<= 1;
+    }
+    constexpr float kMove = K(0x3e4ccccd);
+    fatC = fmac(sub(fatT, fatC), kMove, fatC);
+    pwC = fmac(sub(pwT, pwC), kMove, pwC);
+    ssDetC = fmac(sub(ssDetT, ssDetC), kMove, ssDetC);
+    return wrap;
+}
+
 uint32_t XtAnalogOsc::noise(float* lr) {
     const int n0 = hold > 0 ? hold : 1;        // the firmware never ends a block with a hold of 0; it never gets one
     int left = 32;
@@ -1463,7 +1556,7 @@ int main(int argc, char** argv) {
         XtAnalogParams q = k.p;
         q.pw += mtx; q.pwLfo += mtx; q.pwEnv += mtx; q.fat += mtx; q.fatLfo += mtx; q.fatEnv += mtx; q.detune += mtx;
         return xtAnalogBlock(q, k.key, xtPitch10(k.key, k.coarse, k.kf, k.fine), k.gainDb, velFactor(k.vel, k.fatCurve, k.fatSens),
-                             velFactor(k.vel, k.pwCurve, k.pwSens));
+                             velFactor(k.vel, k.pwCurve, k.pwSens), oscIdx != 0);
     };
 
     // The converter
@@ -1947,6 +2040,7 @@ int main(int argc, char** argv) {
         }
         return true;
     };
+    bool xmodPass = false;
     auto toneCase = [&](int g) {
         Case k[2] = { newCase(false), newCase(false) };
         bool on[2] = { true, true };
@@ -1954,6 +2048,7 @@ int main(int argc, char** argv) {
         if (g % 8 == 6) on[1] = false;           // OSC 2 off
         for (int n = 0; n < 2; ++n) {
             k[n].p.wave = (int)(rnd() % 13);
+            if (xmodPass) k[n].p.wave = n == 0 || g % 4 == 2 ? 13 : (int)(rnd() % 14);
             if (k[n].p.wave >= 11 || rnd() % 3 == 0) k[n].p.detune = (int)(rnd() % 127) - 63;
             if (k[n].p.wave <= 10 && rnd() % 3 == 0) { k[n].p.subOctave = 1 + (int)(rnd() % 3); k[n].p.subLevel = (int)(rnd() % 128); }
         }
@@ -1998,7 +2093,9 @@ int main(int argc, char** argv) {
         };
         XtAnalogBlock pb[2];
         for (int n = 0; n < 2; ++n) {
+            oscIdx = n;
             pb[n] = portBlock(k[n]);
+            oscIdx = 0;
             if (!c.call(0x894f21c0, { tv[n], tb[n], 0 }, sp)) { std::fprintf(stderr, "voice setup: %s\n", c.error().c_str()); return false; }
             if (!on[n]) { to[n].setRatio(1.0f); continue; }      // the note-on of an OSC that is off (0x894f2f80, kind 0)
             const uint32_t e = (uint32_t)n * 4;
@@ -2032,6 +2129,11 @@ int main(int argc, char** argv) {
             if (blk % 6 == 2)                    // each phase exactly on a breakpoint, or on 0
                 for (int n = 0; n < 2; ++n) {
                     if (!on[n] || k[n].p.wave == 8 || k[n].p.wave == 6 || k[n].p.wave == 7) continue;
+                    if (k[n].p.wave == 13 && rnd() % 2) {   // the sample that lands on 1, with OSC 2's output small enough
+                        float p = sub(1.0f, mul(to[n].ratio(), K(0x3ba377ed)));
+                        wf(tv[n] + 0x1d4, p); to[n].setPhase(p);
+                        continue;
+                    }
                     float pts[9];
                     const int m = to[n].breakpoints(pts);
                     pts[m] = 0.0f;
@@ -2043,7 +2145,7 @@ int main(int argc, char** argv) {
             float l[2][64] = {};
             uint32_t pm[2] = {};
             if (on[1]) pm[1] = to[1].process(l[1]);
-            if (on[0]) pm[0] = to[0].process(l[0]);
+            if (on[0]) pm[0] = to[0].process(l[0], 0, l[1]);
             float mix[64];
             std::copy(l[0], l[0] + 64, mix);
             xtAnalogMix(mix, l[1]);
@@ -2137,6 +2239,128 @@ int main(int argc, char** argv) {
         long blocks = 0;
         for (long w : waveBlocks) blocks += w;
         std::printf("tone: %ld oscillator blocks, %ld different; wrap masks %ld different; delay lines %ld different\n", blocks, tb_, tm_, tl_);
+    }
+    bad += tb_ + tm_ + tl_;
+
+    // X-MOD.  The converter's case on each OSC; then the voice alone, the routine
+    // called with a buffer the check fills, so that the phase lands on each
+    // turn, on 1, on 0 and below it; then both voices in the tone, X-MOD on OSC 1
+    // reading OSC 2's output through the firmware's own render, and on OSC 2.
+    cn = cb = 0;
+    if (!converterCases(200000, 13)) return 1;
+    std::printf("x-mod converter: %ld cases, %ld different\n", cn, cb);
+    bad += cb;
+    cn = cb = 0;
+    oscIdx = 1;
+    if (!converterCases(100000, 13)) return 1;
+    oscIdx = 0;
+    std::printf("x-mod converter, osc 2: %ld cases, %ld different\n", cn, cb);
+    bad += cb;
+    const uint32_t MODB = ram + 0x3e000;
+    long xb = 0, xn = 0, xd = 0, xm = 0;
+    float xPeak = 0;
+    auto xmCase = [&](int g) {
+        const int n = g % 4 == 3 ? 1 : 0;
+        const uint32_t Vn = tv[n], Bn = tb[n], e = (uint32_t)n * 4;
+        XtAnalogOsc& o = to[n];
+        Case k = newCase(false);
+        k.p.wave = 13;
+        k.p.detune = (int)(rnd() % 127) - 63;
+        k.p.subOctave = (int)(rnd() % 4);                 // it has no sub oscillator
+        if (g % 8 == 1) { k.p.fat = 0; k.p.fatKf = k.p.fatEnv = k.p.fatLfo = 0; }
+        if (g % 8 == 2) { k.p.fat = 127; k.p.fatKf = k.p.fatEnv = k.p.fatLfo = 0; }
+        if (g % 8 == 4) { k.p.pw = 63; k.p.pwKf = k.p.pwEnv = k.p.pwLfo = 0; }      // the deepest
+        if (g % 8 == 5) { k.p.pw = -63; k.p.pwKf = k.p.pwEnv = k.p.pwLfo = 0; }     // none, the index below 2
+        float eOut[9], lOut[3];
+        auto drawOutputs = [&] {
+            for (uint32_t i = 1; i <= 8; ++i) { eOut[i] = frnd(-1, 1); wf(envAt(i) + 0x4c, eOut[i]); }
+            for (uint32_t l = 1; l <= 2; ++l) { lOut[l] = frnd(-1, 1); wf(lfoAt(l) + 0x38, lOut[l]); }
+        };
+        drawOutputs();
+        mtx = 0;
+        oscIdx = n;
+        writeInput(k);
+        const XtAnalogBlock b = portBlock(k);
+        oscIdx = 0;
+        c.write(Bn, z.data(), 0xd4);
+        c.wr32(Bn, 3u);
+        if (!c.call(0x894e1920, { P, Bn }, sp) || !c.call(0x894f7070, { TN, Bn, (uint32_t)n }, sp)) { std::fprintf(stderr, "x-mod: %s\n", c.error().c_str()); return false; }
+        const bool atk = rnd() & 1;
+        wf(envAt(e + 4) + 0x1c, atk ? 25.0f : 0.0f); wf(envAt(e + 4) + 0x2c, 0.0f);
+        if (!c.call(0x894f21c0, { Vn, Bn, 0 }, sp)) { std::fprintf(stderr, "x-mod setup: %s\n", c.error().c_str()); return false; }
+        auto ratioOf = [&] { return xtPitchTarget(f32(Vn + 8), eOut[e + 1], f32(Vn + 0x1c), lOut[n + 1], f32(Vn + 0x34), f32(Vn + 0xc)); };
+        auto gainOf = [&](bool start) { return xtOscGainTarget(f32(Vn + 0x5c), f32(Vn + 0x54), start && atk ? 0.0f : eOut[e + 4], lOut[n + 1], f32(Vn + 0x58)); };
+        o.noteOn(b, ratioOf(), gainOf(false), gainOf(true), eOut[e + 3], eOut[e + 2], lOut[n + 1], shared);
+        ++xn;
+        if (!fieldsSame(n) && xb++ < 6) std::printf("  x-mod %d note-on\n", g);
+        if (!c.call(0x894f2010, { Vn }, sp)) { std::fprintf(stderr, "x-mod install: %s\n", c.error().c_str()); return false; }
+        if (c.rd32(Vn + 0x96c) != 0x89507b60) { std::fprintf(stderr, "x-mod install: %08x\n", c.rd32(Vn + 0x96c)); return false; }
+        for (int blk = 0; blk < 30; ++blk) {
+            if (blk % 5 == 4) {
+                drawOutputs();
+                if (!c.call(0x894f2090, { Vn, 1 }, sp)) { std::fprintf(stderr, "x-mod update: %s\n", c.error().c_str()); return false; }
+                o.update(b, ratioOf(), gainOf(false), eOut[e + 3], eOut[e + 2], lOut[n + 1]);
+                ++xn;
+                if (!fieldsSame(n) && xb++ < 6) std::printf("  x-mod %d.%d update\n", g, blk);
+            }
+            // the other OSC's output: none, a small tone, full level, far past it, or
+            // one channel only
+            float mb2[64];
+            const int kind = (int)(rnd() % 6);
+            const float amp = kind == 1 ? 3.0e7f : kind == 2 ? 2.0e9f : kind == 3 ? 2.0e10f : 0.0f;
+            for (int i = 0; i < 64; ++i) mb2[i] = amp * frnd(-1, 1);
+            if (kind == 4) for (int i = 0; i < 32; ++i) { mb2[2 * i] = 2.0e9f * frnd(-1, 1); mb2[2 * i + 1] = 0.0f; }
+            if (blk % 3 == 1) {                           // the phase on a turn, or a step from 1, or on 0
+                float pts[9];
+                const int m = o.breakpoints(pts);
+                pts[m] = 0.0f;
+                pts[m + 1] = sub(1.0f, mul(o.ratio(), K(0x3ba377ed)));
+                const float p = pts[rnd() % (uint32_t)(m + 2)];
+                wf(Vn + 0x1d4, p); o.setPhase(p);
+            }
+            if (blk % 7 == 5) {                           // a Pulse Width no note reaches: its move back, and a·d == a, the third copy of the loop
+                wf(Vn + 0x1cc, -0.5f); o.setPw(-0.5f);
+            }
+            if (kind == 5) {                              // the first sample's step landing exactly on 0
+                const float p = -mul(o.ratio(), K(0x3ba377ed));
+                wf(Vn + 0x1d4, p); o.setPhase(p);
+                mb2[0] = mb2[1] = 0.0f;
+            }
+            c.write(MODB, mb2, sizeof mb2);
+            const uint32_t sync = kind != 5 && rnd() % 8 == 0 ? ((uint32_t)rnd() << 16 | rnd()) & ((uint32_t)rnd() << 16 | rnd()) : 0u;
+            uint32_t mask = 0;
+            if (!c.call(c.rd32(Vn + 0x96c), { BUF, Vn + 0xd4, sync, MODB }, sp, &mask)) { std::fprintf(stderr, "x-mod: %s\n", c.error().c_str()); return false; }
+            float lr[64];
+            const uint32_t pm = o.process(lr, sync, mb2);
+            ++xd;
+            if (mask != pm && xm++ < 4) std::printf("  x-mod %d.%d: mask %08x, port %08x\n", g, blk, mask, pm);
+            bool ok = fieldsSame(n);
+            for (int i = 0; i < 64; ++i) {
+                ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]) && c.rd32(MODB + 4 * (uint32_t)i) == 0 && mb2[i] == 0.0f;
+                if (blk % 7 != 5) xPeak = std::fmax(xPeak, std::fabs(lr[i]));   // not with the forced Pulse Width: its slope is infinite
+            }
+            if (!ok && xb++ < 6) {
+                int i = 0;
+                while (i < 64 && same(f32(BUF + 4 * (uint32_t)i), lr[i])) ++i;
+                std::printf("  x-mod %d.%d: first difference at %d: fw %.9g port %.9g; phase %.9g/%.9g\n", g, blk, i, i < 64 ? f32(BUF + 4 * (uint32_t)i) : 0.0f, i < 64 ? lr[i] : 0.0f,
+                            f32(Vn + 0x1d4), o.phase());
+            }
+        }
+        return true;
+    };
+    for (int g = 0; g < nCases; ++g)
+        if (!xmCase(g)) return 1;
+    std::printf("x-mod: %ld note-ons and updates, %ld blocks of 32 frames, %ld different (peak %.4g of 2^31); masks %ld different\n", xn, xd, xb, xPeak / 2147483648.0f, xm);
+    bad += xb + xm;
+    tb_ = tm_ = tl_ = tn_ = 0;
+    for (long& w : waveBlocks) w = 0;
+    xmodPass = true;
+    for (int g = 0; g < nCases; ++g)
+        if (!toneCase(g)) return 1;
+    {
+        long blocks = 0;
+        for (long w : waveBlocks) blocks += w;
+        std::printf("x-mod tone: %d cases, %ld oscillator blocks (%ld of X-MOD), %ld different; wrap masks %ld different; delay lines %ld different\n", nCases, blocks, waveBlocks[13], tb_, tm_, tl_);
     }
     bad += tb_ + tm_ + tl_;
     return bad ? 3 : 0;

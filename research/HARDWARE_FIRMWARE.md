@@ -1545,6 +1545,110 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The analog waveform X-MOD (2026-11-02, v87)
+
+Code 13, patch waveform 13: a SAW whose phase is moved by the other OSC's output. With it
+all fourteen analog waveforms are ported.
+
+**The converter's case** (`0x894e208a`, from the switch at `0x894e206e`):
+- +0x98 is the modulation's depth (`0x894e53d0`). i = PW + 64, 0 if not above 1, within
+  0…127; then i/127 + (key − 60)·KF/12000, within 0…1. So PW −63 is none, 0 is 0.504 and +63
+  is 1.
+- +0x9c and +0xa0 are its depths, (d/63)·|d/63| (`0x894e5470`), the envelope's × its velocity
+  factor, the LFO's d within ±63.
+- **On OSC 2 all three are 0**, so its X-MOD has no modulation.
+- +0x84, +0x88, +0x90 are Fat's, as SAW's. +0xb4 = 0, so no sub oscillator. The Detune knob,
+  Sub Octave and Sub Level do nothing.
+- The level and Slope are the Saw's (v79, v83).
+
+**The targets** (`0x89505f10`, the note-on's first step and each update):
+- +0x154 = the gain target.
+- +0x24c = the depth's sum, within 0…1.
+- +0x1c0 = ½ − ½·Fat at once, without the plain update's 70%; 0.002 if not above 0.0039.
+- It does not write +0x1c8, so the Pulse Width below is fixed for the note.
+
+**The note-on** (`0x89505ec0`, after the common part): +0x1c8 = +0x1cc = ½ + ratio·Slope·0.01;
++0x250 = +0x24c; +0x1c4 = +0x1c0.
+
+**The routine** (`0x89507b60`), installed at +0x96c. The renderer (`0x894f2834`) tests the code
+and calls that one instead of +0x968, with the other OSC's buffer in r7 as for the others. Against
+SAW (v79):
+- The step's constant is 0x3ba377ed, a unit below SAW's. b = a + (1 − a)·d rather than a + d −
+  a·d, which rounds differently.
+- y and the half-cycle flags are SAW's, and a sync bit sets the phase to 0.
+- m = (L/2^31 + R/2^31)/2 from the other buffer, whose two words it then clears.
+- phase += m·0.2·(+0x250), then += the step, in that order.
+- At or above 1 the phase takes 1 off. At or below 0 it gets 1 added, so landing exactly on 0
+  gives 1.
+- It does this once, so a large modulation leaves the phase out of range, and y carries on along
+  whichever line it is on. Nothing limits the output.
+- out = (y·sign + Impact)·gain·2^31, the exact 2^31 and not SAW's 2^31 − 128.
+- The gain moves 1/32 per sample. Each block Fat, PW and depth move **0.2** of the way, not
+  1/32.
+
+**Three copies of the loop.** The listing has three, which look like a state machine but are
+not one. At the first wrap the routine compares a·d with a. If they differ it continues in a copy
+that never sets a mask bit for a wrap; if equal, in one that always does. Both are constant within a
+block, so one test does it. They are equal only at d = 1, a Pulse Width of −½, which no note
+reaches: the Pulse Width is ½ or above. So a wrap never sets a bit, and the mask comes from the
+flags alone. The check forces −½ to run that copy anyway.
+
+**Who it reads.**
+- OSC 1's X-MOD reads OSC 2's output and clears it, so OSC 2 is consumed and not heard: MIX then
+  adds zeros. OSC 2 keeps running, envelopes and all.
+- With OSC 2 off its buffer is zeros, so OSC 1 plays unmodulated.
+- OSC 2's X-MOD reads and clears OSC 1's buffer too, at depth 0. What is there is last block's,
+  about to be overwritten, so it changes nothing. It sounds like a SAW and is summed as any other.
+  The port passes no buffer; the check confirms that a stale one makes no difference.
+- In Structure 2 the render runs COSM 2 on OSC 2 first, so X-MOD would read OSC 2 after the filter.
+  That comes with the Structure Types.
+
+**Sound** (A4, Impact 0, against OSC 2 SINE at A4 unless noted; dB from renders):
+- OSC 2 off, or PW −63: partials exactly SAW's, −14.9, −21.0, −24.7 dB at 440, 880, 1320 Hz. With
+  PW −63 and OSC 2 on, the output equals the one with OSC 2 off in every sample.
+- PW 0: 440 Hz gone from the top partials; 880 Hz at −19.7, 1760 at −22.3, 3519 at −22.9 dB.
+- PW +63: 440 at −22.1, 1320 at −22.6, and energy out at 6160 (−23.1) and 7040 Hz (−23.5). The
+  RMS stays at 0.145, as SAW's, because the wave's range is unchanged.
+- OSC 2 up an octave at PW +63: 5720 Hz at −20.0 dB.
+- Fat 64, PW −63: 219 Hz at −18.0 dB, as SAW's Fat.
+- OSC 2's X-MOD alone equals OSC 1's at no depth, and SAW + OSC 2 X-MOD doubles (−8.9 dB).
+- On real notes the phase stays in range: PW +63 under SINE, SAW or a wide SUPER-SAW peaks at
+  0.28. With Impact 4.0 on both and OSC 2's Wave Gain at +12, OSC 2's start pushes it out and the
+  peak is 25.5. That is what the routine does, and it is unclamped here too; I did not check what
+  the rest of the XT's output path does with it.
+
+**Checks** (`xt_analog`, further passes after the others; fcheck's baseline only added 4 lines):
+- The converter's case: 200,000 cases on OSC 1, 100,000 on OSC 2, 0 different.
+- The voice alone, 3,000 cases in fcheck, a quarter on OSC 2: the setup, install, updates and the
+  routine with a buffer the check fills. 21,000 note-ons and updates, 90,000 blocks, 0 different,
+  with the fields, the mask, and the buffer cleared on both sides.
+- The buffer is none, a small tone, full level, ten times that, or one channel only. Phases go on
+  each turn, a step from 1, on 0, and on −step with nothing to add so the step lands exactly on 0.
+- One block in seven forces the Pulse Width to −½: a·d == a, and the move back.
+- Both voices through the firmware's render, X-MOD on OSC 1 and sometimes on OSC 2, every other
+  waveform under it: 126,000 oscillator blocks, 56,712 of X-MOD, 0 different. So X-MOD's input is
+  what the firmware's own OSC 2 wrote.
+- Wide run, 21,000 cases: 630,000 blocks alone and 882,000 in the tone, 0 different.
+- Deliberate errors: 50 planted, 46 caught. At first 7 were missed. Three showed real gaps, now
+  closed: no case reached the third copy; the move of the Pulse Width was never seen, as nothing else
+  changes it; and landing exactly on 0 was undone by the phase being set afterwards. The other four
+  are exact:
+  - The quotient by 2^31 − 128 for 2^31: under round-to-zero it truncates to the same float for
+    every input.
+  - Regrouping the division by 2^31 or the product by 2^31, which are powers of two.
+  - OSC 2's X-MOD given a stale buffer: depth 0, which is the claim above.
+
+**Not checked.**
+- Against real hardware. X-MOD's level and its out-of-range behaviour rest on the firmware in the
+  interpreter.
+- The output path after the voice with such a peak.
+- Structure 2's order, and the MOD's other types with X-MOD.
+
+**Plugin.** X-MOD is enabled in the Waveform box on both OSCs. No new parameters: PW is its depth,
+with PW KF, LFO and Env; Fat and its depths as SAW's. `XT_ANALOG`, `TEST_ANALOG`, `XT_ANALOG2` and
+`TEST_OSC2` take waveform 13. The PluginTest is bit-identical at notes 30, 60 and 100 with X-MOD over a
+SINE, with KFs and OSC 2 off, on both OSCs, and on OSC 2 over a PCM OSC 1.
+
 ### OSC 2, and how the two OSCs are mixed (2026-11-02, v86)
 
 A tone has two oscillator voices: OSC 1 at tone +0x20 and OSC 2 at tone +0x9d4, the

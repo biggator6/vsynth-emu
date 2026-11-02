@@ -235,7 +235,7 @@ float XtSynth::noteCents(const Voice& v, const OscVoice& s, const OscControls& o
 XtAnalogBlock XtSynth::analogBlock(const Voice& v, const OscVoice& s, const OscControls& o) const {
     int coarse, fine;
     noteTuning(v, s, o, coarse, fine);
-    return xtAnalogBlock(o.ana, v.note, xtPitch10(v.note, coarse, 10 * o.pitchKF, fine), o.waveGain);
+    return xtAnalogBlock(o.ana, v.note, xtPitch10(v.note, coarse, 10 * o.pitchKF, fine), o.waveGain, 1.0f, 1.0f, &s == &v.osc2);
 }
 
 // Audio thread (it reads the sample the last render picked up).  The plugin
@@ -995,10 +995,11 @@ void XtSynth::mixBlock(float* lr) {
         float scale = v.gain;
         // OSC 2, then OSC 1 (the tone render 0x894f6d40)
         if (v.osc2.on) v.osc2.ana.process(tmp2);
+        else std::fill(tmp2, tmp2 + 64, 0.0f);
         const bool band = v.on && !v.analog && cur->type != 1;
         if (!v.on) std::fill(tmp, tmp + 64, 0.0f);
         else if (v.analog) {   // the XT's units (±2^31) to the SOLO buffer's (±1), exactly
-            v.ana.process(tmp);
+            v.ana.process(tmp, 0, tmp2);                       // X-MOD reads OSC 2's buffer and clears it
             for (float& x : tmp) x *= 0x1p-31f;
         } else if (!band) {
             float l[32], r[32];
