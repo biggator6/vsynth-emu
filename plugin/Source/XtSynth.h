@@ -265,7 +265,7 @@ private:
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
         XtLfo lfo;
-        XtPitchRamp porta;             // the pitch ramp (+0x880): kept across notes, as the XT's voices keep it
+        XtPitchRamp porta;             // the pitch ramp (+0x880)
         // the player's pitch ratio, formant ratio, walk and Energy as the
         // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
         float curA = 1, curF = 1, curWalk = 1, curG = 0, curGain = 1;

@@ -670,6 +670,10 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
     v->osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
     v->gain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);
+    // the tone is constructed for each note (0x894f5860): the pitch ramps (0x894f4860)
+    // start off, so the note's first pitch has no glide in it
+    v->porta = XtPitchRamp{};
+    v->osc2.porta = XtPitchRamp{};
     // TVA note-on (0x894f5160): the gain starts from the envelope's onset
     // level (full with no attack, else 0) and ramps to its output over the
     // attack time, at most 10 ms (0.1 ms with no attack).
