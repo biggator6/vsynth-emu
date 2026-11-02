@@ -2946,3 +2946,24 @@ Round-2 recordings.  First build-out after that: real-time granular port
   installs. It sets the phase on each routine's own breakpoints and plays
   SQUARE's pitch steps exactly. Planted errors are caught, except a few
   that turned out exactly equivalent.
+
+### Session 16 addendum (2026-11-01) — v81: HQ-SAW and HQ-SQUARE
+
+- The two band-limited analog waveforms are ported. With them the
+  note-on's whole default case is done; LA-SAW, LA-SQUARE, SUPER-SAW,
+  FEEDBACK-OSC, X-MOD and the sub oscillator remain.
+- They work differently from the others. A leaky integrator sums a
+  band-limited impulse, built from two rom.2 tables (an impulse shape and
+  a window), at each edge. HQ-SAW adds a steady downward step for its
+  ramp. HQ-SQUARE's phase rises and falls between its two half-lengths,
+  with an impulse up at one edge and down at the other.
+- The tables are read from the user's rom.2 at run time, like the others.
+- Against SAW and SQUARE they keep the same harmonics, with 30–36 dB less
+  energy between them (the aliasing the plain waveforms have).
+- Both equal the firmware in the interpreter. Their check runs after the
+  other waveforms, so those results are unchanged.
+- A test-input trap was found and closed. The plugin's key-follow
+  parameters step by 10%, so a test value like 5% snapped to another
+  value, and the plugin test differed from its reference. It had passed
+  in v80 only because that test played the note where a key-follow does
+  nothing. TEST_ANALOG now rejects such values.

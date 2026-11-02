@@ -13,6 +13,11 @@ constexpr uint32_t kRomBase = 0x89300000;
 // the parameter descriptors (12 bytes per ID: storage, then int16 centre,
 // default, minimum, maximum) and the level curve (128 shorts)
 constexpr uint32_t kDescTab = 0x897a167c, kLevelTab = 0x897cfcb8;
+// HQ-SAW's and HQ-SQUARE's band-limited impulse (A, by its centre, ±4608)
+// and its window (B, ±8192), end to end in rom.2; the routines reach them
+// through the pointers at 0x8987c898/0x8987c89c, set at startup
+constexpr uint32_t kHqA = 0x897d94dc, kHqB = 0x897e5ce0;
+constexpr int kHqAHalf = 4608, kHqBHalf = 8192, kHqN = 2 * kHqAHalf + 1 + 2 * kHqBHalf + 1;
 // the analog calibration's system parameters
 constexpr int kSys0 = 0x528, kSysN = 0x55b - 0x528 + 1;
 enum : int {
@@ -23,6 +28,9 @@ enum : int {
 struct Tables {
     uint16_t level[128];
     int sys[kSysN];                 // default − centre, as the parameter getter returns them
+    float hq[kHqN];                 // A then B
+    const float* hqA = hq + kHqAHalf;
+    const float* hqB = hq + 2 * kHqAHalf + 1 + kHqBHalf;
     bool ok = false;
 } T;
 
@@ -91,8 +99,10 @@ bool xtAnalogLoadTables(const char* romPath) {
         ok = std::fseek(f, (long)(kDescTab + 12u * (uint32_t)(kSys0 + i) + 4 - kRomBase), SEEK_SET) == 0 && std::fread(d, 2, 2, f) == 2;
         T.sys[i] = d[1] - d[0];
     }
+    ok = ok && std::fseek(f, (long)(kHqA - 4u * kHqAHalf - kRomBase), SEEK_SET) == 0 && std::fread(T.hq, 4, kHqN, f) == (size_t)kHqN;
     std::fclose(f);
-    T.ok = ok && T.level[127] == 32768 && sys(kSawSlope) == 100;
+    static_assert(kHqA + 4u * (kHqAHalf + 1) == kHqB - 4u * kHqBHalf, "A ends where B starts");
+    T.ok = ok && T.level[127] == 32768 && sys(kSawSlope) == 100 && T.hqA[0] == 2.0f && T.hqB[0] == 1.0f && T.hqA[kHqAHalf] == 0.0f;
     return T.ok;
 }
 
@@ -103,7 +113,7 @@ int xtAnalogCode(int wave) {
     return wave >= 1 && wave <= 13 ? code[wave] : 2;      // the converter's default case: SAW
 }
 
-bool xtAnalogPlays(int wave) { const int c = xtAnalogCode(wave); return c >= 2 && c <= 8; }
+bool xtAnalogPlays(int wave) { return xtAnalogCode(wave) <= 8; }
 
 XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw) {
     XtAnalogBlock b;
@@ -137,6 +147,9 @@ void XtAnalogOsc::shape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float
     const float pw = clamp01(fmac(lfo, b.pwLfo, fmac(pwEnv, b.pwEnv, b.pw)));
     float x = fmac(pw, kPwSpan, kPwLo);
     switch (code) {
+    case 0: case 1:   // HQ-SAW, HQ-SQUARE: as is; the note-on clears the integrator (0x895060d0)
+        if (on) { hy = 0.0f; hs = 0; }
+        break;
     case 2: {   // SAW: folded to the upper half, widened by the Slope at the pitch
         if (kHalf > x) x = sub(1.0f, x);
         const float s = mul(mul(ratio_, b.slope), K(0x3c23d709));             // 0.01, a unit below
@@ -231,6 +244,13 @@ int XtAnalogOsc::breakpoints(float* p) const {
         p[0] = sub(a2, q0); p[1] = a2; p[2] = sub(a, q0); p[3] = a; p[4] = sub(h1, q1); p[5] = h1; p[6] = sub(1.0f, q1);
         return 7;
     }
+    case 0: case 1: {   // in the phase's units: the window's edges ±Pc, and HQ-SAW's wrap or HQ-SQUARE's turns
+        const HqFrame h = hqFrame();
+        p[0] = h.pc; p[1] = -h.pc;
+        if (code == 0) { p[2] = h.p; return 3; }
+        p[2] = h.l1; p[3] = -h.l2;
+        return 4;
+    }
     default:
         return 0;
     }
@@ -238,6 +258,8 @@ int XtAnalogOsc::breakpoints(float* p) const {
 
 uint32_t XtAnalogOsc::process(float* lr, uint32_t sync) {
     switch (code) {
+    case 0: return hqSaw(lr, sync);
+    case 1: return hqSquare(lr, sync);
     case 3: return square(lr, sync);
     case 4: return triangle(lr, sync);
     case 5: return ramp(lr, sync);
@@ -463,6 +485,120 @@ uint32_t XtAnalogOsc::juno(float* lr, uint32_t sync) {
     return wrap;
 }
 
+// HQ-SAW and HQ-SQUARE: a leaky integrator (+0x1e4) of a band-limited
+// impulse, A (interpolated) × B (the window) × k3, fired as the scaled phase
+// x crosses 0.  Lengths are in samples × 32768 (P the period; HQ-SQUARE's
+// halves L1 = P(1 − p), L2 = P·p).  The impulse is as wide as Pc, the
+// shorter half (the whole period for HQ-SAW) within 2…144 samples; x =
+// phase·8192/Pc, so the window is |x| < 8192 and x steps by 8192·65536/Pc.
+// The impulse's gain g = max(¼, ½ − 1.42845/(Pc/32768 − 1)).  The phase
+// (+0x1d4) is kept as x·Pc/8192.
+XtAnalogOsc::HqFrame XtAnalogOsc::hqFrame() const {
+    HqFrame h;
+    const float f = mul(ratio_, 440.0f), half = div(K(0x4e2c4400), f);        // 44100·16384/f
+    h.p = mul(half, 2.0f);
+    float m = h.p;
+    if (code == 1) {
+        const float d = mul(sub(1.0f, mul(pwC, 2.0f)), half);
+        h.l1 = add(half, d);
+        h.l2 = sub(half, d);
+        m = d > 0.0f ? h.l2 : h.l1;
+    }
+    h.pc = m > K(0x4a8ffffc) ? K(0x4a8ffffc) : (65536.0f > m ? 65536.0f : m);
+    float g = sub(kHalf, div(K(0x3fb6d75a), fmac(h.pc, K(0x37ffffff), -1.0f)));
+    if (0.25f > g) g = 0.25f;
+    h.k1 = div(8192.0f, h.pc);
+    h.k2 = div(mul(g, K(0x3affffff)), h.k1);                                   // 2^−9, a unit below
+    h.k3 = mul(g, K(0x380f1a9f));
+    h.leak = add(div(K(0xc6645a1d), h.p), 1.0f);                                // 1 − 14614.5/P
+    return h;
+}
+
+namespace {
+// The impulse's place for x (0x89506080): A at x·k2, interpolated, and B at x
+struct HqTap {
+    const float* a = nullptr;
+    const float* b = nullptr;
+    float frac = 0;
+    void at(float x, float k2) {
+        if (!(8192.0f > x) || !(add(x, 8192.0f) > 0.0f)) { a = nullptr; return; }
+        const float t = mul(k2, x);
+        const int i = ftrc(t);
+        a = T.hqA + i;
+        frac = sub(t, flt(i));
+        b = T.hqB + ftrc(x);
+    }
+    float value() const { return mul(fmac(sub(a[1], a[0]), frac, a[0]), *b); }
+};
+} // namespace
+
+constexpr float kHqY = K(0x57000000), kHqImp = K(0x4f000000), kHqDc = K(0xce800000);   // 2^47, 2^31, −2^30
+
+// HQ-SAW (0x895063f0): x runs over ±P·8192/Pc, an impulse up at each 0 and
+// a DC step of −1.118/P every sample; out = (y·2^47 + Impact·2^31 − 2^30)·gain.
+// No Fat or PW.
+uint32_t XtAnalogOsc::hqSaw(float* lr, uint32_t sync) {
+    const HqFrame h = hqFrame();
+    const float dc = -div(K(0x3f8f1aa0), h.p);
+    const float step = mul(h.k1, 65536.0f), top = mul(h.p, h.k1), back = mul(top, -2.0f);
+    float x = mul(ph, h.k1);
+    HqTap q;
+    q.at(x, h.k2);
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) { hy = 0.0f; hs = 0; x = 0.0f; }   // the tap stays where it was
+        hy = mul(hy, h.leak);
+        if (q.a) hy = fmac(q.value(), h.k3, hy);
+        hy = add(hy, dc);
+        x = add(x, step);
+        if (x > top) { wrap |= bit; x = add(x, back); }
+        q.at(x, h.k2);
+        const float y = mul(add(fmac(hy, kHqY, mul(imp, kHqImp)), kHqDc), gainC);
+        imp = mul(imp, dec);
+        lr[2 * i] = lr[2 * i + 1] = y;
+        gainC = fmac(sub(gainT, gainC), kStep, gainC);
+        bit <<= 1;
+    }
+    ph = div(x, h.k1);
+    return wrap;
+}
+
+// HQ-SQUARE (0x895060e0): x rises to L1 and falls to −L2 (×8192/Pc),
+// reflected at each (+0x1e8 the direction), an impulse up as it crosses 0
+// rising and down falling: high for the (1 − p) share.  The wrap bit at
+// each turn at L1.  PW moves 0.2 of the way once a block; Fat not.
+uint32_t XtAnalogOsc::hqSquare(float* lr, uint32_t sync) {
+    const HqFrame h = hqFrame();
+    const float step = mul(h.k1, 65536.0f), a1 = mul(h.l1, h.k1), a2 = mul(h.l2, h.k1);
+    const float a1x2 = mul(a1, 2.0f), a2x2 = mul(a2, -2.0f);
+    float x = mul(ph, h.k1);
+    HqTap q;
+    q.at(x, h.k2);
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) { x = 0.0f; hy = 0.0f; hs = 0; }
+        hy = mul(hy, h.leak);
+        if (hs == 0) {
+            if (q.a) hy = fmac(q.value(), h.k3, hy);
+            x = add(x, step);
+            if (x > a1) { x = sub(a1x2, x); hs = 1; wrap |= bit; }
+        } else {
+            if (q.a) hy = sub(hy, mul(q.value(), h.k3));
+            x = add(x, -step);
+            if (-a2 > x) { x = sub(a2x2, x); hs = 0; }
+        }
+        q.at(x, h.k2);
+        const float y = mul(add(fmac(hy, kHqY, mul(imp, kHqImp)), kHqDc), gainC);
+        lr[2 * i] = lr[2 * i + 1] = y;
+        imp = mul(imp, dec);
+        gainC = fmac(sub(gainT, gainC), kStep, gainC);
+        bit <<= 1;
+    }
+    pwC = fmac(sub(pwT, pwC), K(0x3e4ccccd), pwC);
+    ph = div(x, h.k1);
+    return wrap;
+}
+
 // NOISE (0x89504a40): integer random values (two states: +0x1dc, cleared at
 // note-on, and +0x244), each held for the hold's samples, the hold starting
 // again every block; (Impact + value)·gain, the value already ±2^31.  No
@@ -613,16 +749,18 @@ int main(int argc, char** argv) {
     // The voice: the converter's block, the note-on, the install, then blocks
     // of the installed routine with an update every few blocks, the state,
     // the output and the returned mask compared after each.  Each case
-    // takes one of the waveforms the port plays, in turn.
+    // takes one of the waveforms the port plays, in turn; HQ-SAW and
+    // HQ-SQUARE in a second pass, after the others.
     c.write(V, z.data(), 0x1000);
     c.wr32(V + 0x970, EP); c.wr32(V + 0x974, EF); c.wr32(V + 0x978, EW); c.wr32(V + 0x97c, EA);
     for (uint32_t o = 0x980; o < 0x990; o += 4) c.wr32(V + o, LF);
-    static const int waves[7] = { 0, 1, 2, 3, 4, 5, 8 };
-    static const char* waveName[7] = { "saw", "square", "triangle", "sine", "ramp", "juno", "noise" };
-    static const uint32_t routine[9] = { 0, 0, 0x89508c20, 0x89508aa0, 0x895094c0, 0x89508800, 0x89509030, 0x89508db0, 0x89504a40 };
+    static const int waves[9] = { 0, 1, 2, 3, 4, 5, 8, 6, 7 };
+    static const char* waveName[9] = { "saw", "square", "triangle", "sine", "ramp", "juno", "noise", "hq-saw", "hq-square" };
+    static const uint32_t routine[9] = { 0x895063f0, 0x895060e0, 0x89508c20, 0x89508aa0, 0x895094c0, 0x89508800, 0x89509030, 0x89508db0,
+                                         0x89504a40 };
     XtAnalogOsc osc;
-    long nb = 0, nn = 0, wb = 0, db[7] = {}, dn[7] = {}, mb = 0;
-    float peak[7] = {};
+    long nb = 0, nn = 0, wb = 0, db[9] = {}, dn[9] = {}, mb = 0;
+    float peak[9] = {};
     int code = 2;
     auto stateSame = [&](bool full) {
         bool ok = same(f32(V + 0x144), osc.ratio()) && same(f32(V + 0x154), osc.gainTarget()) && same(f32(V + 0x1c0), osc.fatTarget())
@@ -632,20 +770,20 @@ int main(int argc, char** argv) {
         if (full)
             ok = ok && same(f32(V + 0x158), osc.gain()) && same(f32(V + 0x1c4), osc.fat()) && same(f32(V + 0x1cc), osc.pw())
                  && same(f32(V + 0x1d0), osc.decay()) && same(f32(V + 0x1d4), osc.phase()) && same(f32(V + 0x1d8), osc.impact())
-                 && c.rd32(V + 0x1dc) == osc.flags() && c.rd32(V + 0x244) == osc.noiseState();
+                 && c.rd32(V + 0x1dc) == osc.flags() && c.rd32(V + 0x244) == osc.noiseState() && same(f32(V + 0x1e4), osc.hqLevel())
+                 && (int)c.rd32(V + 0x1e8) == osc.hqFalling();
         return ok;
     };
     auto dump = [&](const char* what, int g, int blk) {
         std::printf("  %s %d.%d code %d: ratio %.9g/%.9g gain %.9g/%.9g cur %.9g/%.9g fat %.9g/%.9g %.9g/%.9g pw %.9g/%.9g %.9g/%.9g dec %.9g/%.9g "
-                    "phase %.9g/%.9g imp %.9g/%.9g flags %u/%u edge %.9g/%.9g noise %u/%u hold %d/%d\n", what, g, blk, code, f32(V + 0x144),
+                    "phase %.9g/%.9g imp %.9g/%.9g flags %u/%u edge %.9g/%.9g noise %u/%u hold %d/%d hq %.9g/%.9g %d/%d\n", what, g, blk, code, f32(V + 0x144),
                     osc.ratio(), f32(V + 0x154), osc.gainTarget(), f32(V + 0x158), osc.gain(), f32(V + 0x1c0), osc.fatTarget(), f32(V + 0x1c4),
                     osc.fat(), f32(V + 0x1c8), osc.pwTarget(), f32(V + 0x1cc), osc.pw(), f32(V + 0x1d0), osc.decay(), f32(V + 0x1d4), osc.phase(),
                     f32(V + 0x1d8), osc.impact(), c.rd32(V + 0x1dc), osc.flags(), f32(V + 0x1e0), osc.edge(), c.rd32(V + 0x244), osc.noiseState(),
-                    (int)(int8_t)c.rd8(V + 0x248), osc.noiseHold());
+                    (int)(int8_t)c.rd8(V + 0x248), osc.noiseHold(), f32(V + 0x1e4), osc.hqLevel(), (int)c.rd32(V + 0x1e8), osc.hqFalling());
     };
-    for (int g = 0; g < nCases; ++g) {
+    auto voiceCase = [&](int g, int wi) {
         Case k = newCase(false);
-        const int wi = g % 7;
         k.p.wave = waves[wi];
         if (g % 8 == 1) {                          // SQUARE's pitch steps: G4, A4, A#4, C#5, F#5 untuned
             static const int steps[5] = { 67, 69, 70, 73, 78 };
@@ -654,7 +792,7 @@ int main(int argc, char** argv) {
         code = xtAnalogCode(k.p.wave);
         mtx = 0;
         writeInput(k);
-        if (!c.call(0x894e1920, { P, V }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return 1; }
+        if (!c.call(0x894e1920, { P, V }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
         wf(V + 0x990, 1.0f); wf(V + 0x994, 0.0f);
         const XtAnalogBlock b = portBlock(k);
         // the envelopes' and the LFO's outputs; the amp envelope's attack time for the note-on gain
@@ -665,18 +803,18 @@ int main(int argc, char** argv) {
         wf(EA + 0x1c, atk ? 25.0f : 0.0f); wf(EA + 0x2c, 0.0f);
         auto ratioOf = [&]() { return xtPitchTarget(f32(V + 8), eP, f32(V + 0x1c), lfo, f32(V + 0x34), f32(V + 0xc)); };
         auto gainOf = [&](bool on) { return xtOscGainTarget(f32(V + 0x5c), f32(V + 0x54), on && atk ? 0.0f : eA, lfo, f32(V + 0x58)); };
-        if (!c.call(0x89504af0, { V }, sp)) { std::fprintf(stderr, "note-on: %s\n", c.error().c_str()); return 1; }
+        if (!c.call(0x89504af0, { V }, sp)) { std::fprintf(stderr, "note-on: %s\n", c.error().c_str()); return false; }
         osc.noteOn(b, ratioOf(), gainOf(false), gainOf(true), eF, eW, lfo);
         ++nn;
         if (!stateSame(true) && nb++ < 6) dump("note-on", g, 0);
-        if (!c.call(0x89505170, { V }, sp)) { std::fprintf(stderr, "install: %s\n", c.error().c_str()); return 1; }
+        if (!c.call(0x89505170, { V }, sp)) { std::fprintf(stderr, "install: %s\n", c.error().c_str()); return false; }
         const uint32_t fn = c.rd32(V + 0x968);
         if (fn != routine[code] && wb++ < 4) std::printf("  install code %d: routine %08x, the map has %08x\n", code, fn, routine[code]);
         for (int blk = 0; blk < 40; ++blk) {
             if (blk % 5 == 4) {
                 eP = frnd(-1, 1); eF = frnd(0, 1); eW = frnd(0, 1); eA = frnd(0, 1); lfo = frnd(-1, 1);
                 wf(EP + 0x4c, eP); wf(EF + 0x4c, eF); wf(EW + 0x4c, eW); wf(EA + 0x4c, eA); wf(LF + 0x38, lfo);
-                if (!c.call(0x89505400, { V }, sp)) { std::fprintf(stderr, "update: %s\n", c.error().c_str()); return 1; }
+                if (!c.call(0x89505400, { V }, sp)) { std::fprintf(stderr, "update: %s\n", c.error().c_str()); return false; }
                 osc.update(b, ratioOf(), gainOf(false), eF, eW, lfo);
                 ++nn;
                 if (!stateSame(false) && nb++ < 6) dump("update", g, blk);
@@ -686,11 +824,11 @@ int main(int argc, char** argv) {
                 const int n = osc.breakpoints(pts);
                 pts[n] = 0.0f;
                 const float p = pts[rnd() % (uint32_t)(n + 1)];
-                if (code != 8 && p >= 0.0f && 1.0f > p) { wf(V + 0x1d4, p); osc.setPhase(p); }
+                if (code <= 1 || (code != 8 && p >= 0.0f && 1.0f > p)) { wf(V + 0x1d4, p); osc.setPhase(p); }   // HQ: its own units
             }
             const uint32_t sync = rnd() % 8 == 0 ? ((uint32_t)rnd() << 16 | rnd()) & ((uint32_t)rnd() << 16 | rnd()) : 0u;
             uint32_t mask = 0;
-            if (!c.call(fn, { BUF, V + 0xd4, sync }, sp, &mask)) { std::fprintf(stderr, "%s: %s\n", waveName[wi], c.error().c_str()); return 1; }
+            if (!c.call(fn, { BUF, V + 0xd4, sync }, sp, &mask)) { std::fprintf(stderr, "%s: %s\n", waveName[wi], c.error().c_str()); return false; }
             float lr[64];
             const uint32_t pm = osc.process(lr, sync);
             ++dn[wi];
@@ -706,15 +844,27 @@ int main(int argc, char** argv) {
                 dump(waveName[wi], g, blk);
             }
         }
-    }
-    std::printf("note-on and update: %ld cases, %ld different\n", nn, nb);
-    std::printf("install: %d cases, %ld routines not as the map\n", nCases, wb);
-    long dbad = mb;
-    for (int w = 0; w < 7; ++w) {
-        std::printf("%s: %ld blocks of 32 frames, %ld different (peak %.4g of 2^31)\n", waveName[w], dn[w], db[w], peak[w] / 2147483648.0f);
-        dbad += db[w];
-    }
-    std::printf("wrap masks: %ld different\n", mb);
-    return cb || nb || wb || dbad ? 3 : 0;
+        return true;
+    };
+    long bad = cb;
+    auto report = [&](const char* pass, int cases, int w0, int w1) {
+        std::printf("%snote-on and update: %ld cases, %ld different\n", pass, nn, nb);
+        std::printf("%sinstall: %d cases, %ld routines not as the map\n", pass, cases, wb);
+        bad += nb + wb + mb;
+        for (int w = w0; w < w1; ++w) {
+            std::printf("%s: %ld blocks of 32 frames, %ld different (peak %.4g of 2^31)\n", waveName[w], dn[w], db[w], peak[w] / 2147483648.0f);
+            bad += db[w];
+        }
+        std::printf("%swrap masks: %ld different\n", pass, mb);
+        nn = nb = wb = mb = 0;
+    };
+    for (int g = 0; g < nCases; ++g)
+        if (!voiceCase(g, g % 7)) return 1;
+    report("", nCases, 0, 7);
+    const int nHq = nCases * 2 / 7;
+    for (int g = 0; g < nHq; ++g)
+        if (!voiceCase(nCases + g, 7 + g % 2)) return 1;
+    report("hq ", nHq, 7, 9);
+    return bad ? 3 : 0;
 }
 #endif

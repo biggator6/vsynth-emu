@@ -241,6 +241,15 @@ ANALOG WAVEFORMS v80 (2026-11-01): SQUARE, TRIANGLE, SINE, RAMP, JUNO, NOISE
   each routine's points for its exact-phase cases. Left: HQ-SAW/HQ-SQUARE
   and codes 9…13, the sub oscillator.
 
+ANALOG HQ v81 (2026-11-01): HQ-SAW (0x895063f0) and HQ-SQUARE (0x895060e0)
+  (HARDWARE_FIRMWARE.md, "HQ-SAW and HQ-SQUARE"): a leaky integrator
+  (+0x1e4, hy) of a band-limited impulse from rom.2's tables A (0x897d94dc,
+  ±4608) and B (0x897e5ce0, ±8192), read at run time (T.hq). hqFrame() forms
+  the block's lengths and factors; HQ-SQUARE's direction is +0x1e8 (hs).
+  xtAnalogPlays: codes 0…8. xt_analog checks them in a second pass ("hq"
+  lines) so the other waveforms' lines stay. TEST_ANALOG's KFs must be
+  multiples of 10 (%): the parameters step by 10.
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from

@@ -112,6 +112,10 @@ int main(int argc, char** argv) {
         XtAnalogParams& a = refCtl.ana;
         std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &a.wave, &a.impact, &a.pw, &a.pwKf, &a.pwLfo, &a.pwEnv, &a.fat, &a.fatKf, &a.fatLfo,
                     &a.fatEnv);
+        if (a.pwKf % 10 || a.fatKf % 10) {           // the parameters step by 10%: another value would snap and differ from refCtl
+            std::fprintf(stderr, "TEST_ANALOG: the KFs must be multiples of 10 (%%)\n");
+            return 1;
+        }
         refCtl.oscType = 0;
         const std::pair<const char*, int> knobs[] = { { "oscType", 0 }, { "anaWave", a.wave }, { "anaImpact", a.impact }, { "anaPw", a.pw },
                                                       { "anaPwKF", a.pwKf }, { "anaPwLfo", a.pwLfo }, { "anaPwEnv", a.pwEnv }, { "anaFat", a.fat },

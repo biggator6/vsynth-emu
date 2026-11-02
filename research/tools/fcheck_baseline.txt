@@ -75,6 +75,11 @@ ramp: 17120 blocks of 32 frames, 0 different (peak 4.425 of 2^31)
 juno: 17120 blocks of 32 frames, 0 different (peak 2.347 of 2^31)
 noise: 17120 blocks of 32 frames, 0 different (peak 0.9753 of 2^31)
 wrap masks: 0 different
+hq note-on and update: 7713 cases, 0 different
+hq install: 857 cases, 0 routines not as the map
+hq-saw: 17160 blocks of 32 frames, 0 different (peak 4.371 of 2^31)
+hq-square: 17120 blocks of 32 frames, 0 different (peak 3.019 of 2^31)
+hq wrap masks: 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

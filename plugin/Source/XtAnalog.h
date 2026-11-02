@@ -13,10 +13,10 @@
 //   0 SAW 2, 1 SQUARE 3, 2 TRIANGLE 4, 3 SINE 6, 4 RAMP 5, 5 JUNO 7,
 //   6 HQ-SAW 0, 7 HQ-SQUARE 1, 8 NOISE 8, 9 LA-SAW 10, 10 LA-SQUARE 9,
 //   11 SUPER-SAW 11, 12 FEEDBACK-OSC 12, 13 X-MOD 13.
-// The port plays the note-on's default case without its HQ pair: SAW
-// (0x89508c20), SQUARE (0x89508aa0), TRIANGLE (0x895094c0), SINE
-// (0x89509030), RAMP (0x89508800), JUNO (0x89508db0) and NOISE
-// (0x89504a40); without the sub oscillator.
+// The port plays the note-on's default case: HQ-SAW (0x895063f0), HQ-SQUARE
+// (0x895060e0), SAW (0x89508c20), SQUARE (0x89508aa0), TRIANGLE
+// (0x895094c0), SINE (0x89509030), RAMP (0x89508800), JUNO (0x89508db0) and
+// NOISE (0x89504a40); without the sub oscillator.
 //
 // The level and the Saw's edge also follow hidden system parameters, the
 // XT's analog calibration (IDs 0x528…0x55b, through 0x894e5f80 to the OSC
@@ -97,6 +97,10 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
 //             × 220/44100
 //   noise     +0x244, NOISE's second random state (kept from note to note);
 //             +0x248, the samples it holds each value: 1 + 30·|1 − 2·PW|
+//   hq        +0x1e4, HQ-SAW's and HQ-SQUARE's integrator; +0x1e8,
+//             HQ-SQUARE's direction (both cleared at their note-on and by
+//             a sync bit).  Their phase is in their own units (±P·…), so
+//             the next note-on mostly finds it outside 0…1 and starts at 0.
 class XtAnalogOsc {
 public:
     // fatEnv/pwEnv: the envelopes' outputs (+0x4c); lfo: the LFO's (+0x38);
@@ -124,6 +128,8 @@ public:
     float edge() const { return edge_; }
     uint32_t noiseState() const { return s2; }
     int noiseHold() const { return hold; }
+    float hqLevel() const { return hy; }
+    int hqFalling() const { return hs; }
     // the check's breakpoint cases: the points the routine compares the
     // phase with, as it forms them from the current Fat and PW (up to 8)
     int breakpoints(float* p) const;
@@ -133,10 +139,17 @@ private:
     int code = 2;
     float ratio_ = 1.0f, gainT = 0, gainC = 0;
     float fatT = 0.5f, fatC = 0.5f, pwT = 0.5f, pwC = 0.5f;
-    float ph = 0, imp = 0, dec = 0, edge_ = 0;
+    float ph = 0, imp = 0, dec = 0, edge_ = 0, hy = 0;
     uint32_t fl = 0, s2 = 0;
-    int hold = 1;
+    int hold = 1, hs = 0;
+    // HQ-SAW's and HQ-SQUARE's lengths and factors for a block (samples ×
+    // 32768): the period, the impulse's width, HQ-SQUARE's halves, the
+    // phase scale, the table step, the impulse gain and the integrator leak
+    struct HqFrame { float p = 0, pc = 0, l1 = 0, l2 = 0, k1 = 0, k2 = 0, k3 = 0, leak = 0; };
+    HqFrame hqFrame() const;
     void shape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, bool noteOn);
+    uint32_t hqSaw(float* lr, uint32_t sync);
+    uint32_t hqSquare(float* lr, uint32_t sync);
     uint32_t saw(float* lr, uint32_t sync);
     uint32_t square(float* lr, uint32_t sync);
     uint32_t triangle(float* lr, uint32_t sync);

@@ -261,8 +261,9 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      own envelopes (Env 9/10, 11/12) and LFO (3, 4), through the XT's
      converter, control and filter kernels, between the player and the
      TVA.
-   - the analog oscillator (v79–v80, XtAnalog): OSC Type ANALOG plays the
-     XT's SAW, SQUARE, TRIANGLE, SINE, RAMP, JUNO and NOISE with Impact,
+   - the analog oscillator (v79–v81, XtAnalog): OSC Type ANALOG plays the
+     XT's SAW, SQUARE, TRIANGLE, SINE, RAMP, JUNO, NOISE, HQ-SAW and
+     HQ-SQUARE (band-limited, from rom.2's tables) with Impact,
      Pulse Width and Fat (their KFs, LFO and envelope
      depths, on the time and formant envelopes), through the analog
      converter, note-on, update and routine, its level from the XT's hidden
@@ -312,8 +313,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - Mono/Poly (v60): the key state (120,000 events), the ramp's legato update
   and restart (2.05 million values) and the key-follow key equal the
   firmware (`xt_osc`).
-- The analog oscillator (v79–v80): the converter's block, the note-on, the
-  update, the install and the seven routines (outputs, state and wrap
+- The analog oscillator (v79–v81): the converter's block, the note-on, the
+  update, the install and the nine routines (outputs, state and wrap
   masks) equal the firmware (`xt_analog`).
 - COSM TVF (v61) and Dynamic TVF (v64): the converters, start values,
   targets and updates, the follower and the twelve filter kernels equal the
@@ -328,8 +329,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 **Not yet:**
 - the patch TVA's own Level, Level KF, pan and LFO terms are not
   modelled;
-- the analog oscillator lacks HQ-SAW, HQ-SQUARE, LA-SAW, LA-SQUARE,
-  SUPER-SAW, FEEDBACK-OSC and X-MOD, and the sub oscillator; no OSC 2,
+- the analog oscillator lacks LA-SAW, LA-SQUARE, SUPER-SAW, FEEDBACK-OSC
+  and X-MOD, and the sub oscillator; no OSC 2,
   MOD section (MIX, RING, FM, ENV RING, OSC SYNC) or Structure Type;
 - no V-Synth voice layer (filters, LFOs, effects);
 - no step/event playback or Time Trip;

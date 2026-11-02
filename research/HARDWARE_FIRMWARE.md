@@ -1544,6 +1544,109 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The analog waveforms: HQ-SAW and HQ-SQUARE (2026-11-01, v81)
+
+The two band-limited waveforms, codes 0 and 1. With them the note-on's
+whole default case is ported. Left: codes 9…13 (LA-SQUARE, LA-SAW,
+SUPER-SAW, FEEDBACK-OSC, X-MOD) and the sub oscillator.
+
+**How they work.** Both are a leaky integrator (+0x1e4) of a band-limited
+impulse.
+- The impulse is A (interpolated) × B (a window) × k3, fired as a scaled
+  phase x crosses 0.
+- Integrating impulses gives the edges. HQ-SAW adds a DC step every sample
+  for its ramp.
+- Lengths are in samples × 32768:
+  - P = 2·722534400/(440·ratio), the period;
+  - HQ-SQUARE's halves are L1 = H + d and L2 = H − d, with H = P/2 and d =
+    (1 − 2p)·H. So L1 = P(1 − p) and L2 = P·p, p being +0x1cc.
+- The impulse's width Pc is the shorter length (HQ-SAW: P), within 65536…
+  4718590 (2 to 144 samples).
+  - k1 = 8192/Pc; x = phase·k1, so the window is |x| < 8192.
+  - x steps by k1·65536 a sample.
+  - g = max(¼, ½ − 1.42845/(Pc·2^−15 − 1)), with 2^−15 stored a unit low.
+  - k2 = g·2^−9/k1 (2^−9 a unit low), the step through A; k3 =
+    g·3.41186e−5, the impulse's gain.
+- The leak is 1 − 14614.5/P a sample.
+- out = (y·2^47 + Impact·2^31 − 2^30)·gain. The −2^30 gives a DC of about
+  −0.1 of full scale.
+- The phase is kept as x/k1 (+0x1d4), in these units. A later note-on
+  mostly finds it outside 0…1 and starts at 0.
+
+**The tables.** The pointers at `0x8987c898` and `0x8987c89c` are set at
+startup to A's centre `0x897d94dc` and B's centre `0x897e5ce0`.
+- A runs over ±4608 floats: symmetric, 2.0 at its centre and 0 at its ends.
+- B runs over ±8192: symmetric, 1 at its centre and 0.00095 at its ends.
+- They lie end to end, A's last float just before B's first. The port
+  reads the 25,602 floats from rom.2 at run time and checks the centres.
+- The tap (`0x89506080`, inlined in HQ-SAW): for −8192 < x < 8192, t =
+  k2·x, i = ftrc(t), and v = (A[i+1] − A[i])·(t − i) + A[i], × B[ftrc(x)].
+  - The truncation is toward zero, so for negative t it extrapolates from
+    A[i] toward A[i+1]. A is symmetric.
+  - Outside the window there is no impulse.
+- The tap for a sample is formed at the end of the sample before. So a sync
+  bit clears x, y and the direction, but the sample still takes the old
+  tap.
+
+**HQ-SAW** (`0x895063f0`).
+- x runs over ±P·k1. It wraps by −2·P·k1 as it passes P·k1, which sets the
+  sample's mask bit.
+- The impulse is added as x crosses 0, and −1.118/P every sample.
+- Within 2…144-sample periods the window covers the whole period; below
+  306 Hz the impulse is 144 samples wide.
+- No Fat or PW; it moves neither.
+
+**HQ-SQUARE** (`0x895060e0`).
+- x rises to L1·k1, then reflects (x = 2·L1·k1 − x). That turn sets the
+  direction (+0x1e8) and the mask bit.
+- It falls to −L2·k1 and reflects again, setting the direction back to
+  rising.
+- Rising, the impulse is added; falling, subtracted. So the wave is high
+  for the (1 − p) share.
+- PW moves 0.2 of the way to its target once a block (`0x3e4ccccd`), not
+  1/32. Fat is not moved.
+
+**The note-on** clears +0x1e4 and +0x1e8 (`0x895060d0`) after setting the
+Pulse Width target to p. The update only sets the target. Neither routine
+sets the FPSCR: they run in the renderer's 0x40001, as the interpreter's
+call sets it.
+
+**Sound** (A4, Fat 0, PW 0, against SAW and SQUARE):
+- the same harmonic series as SAW and SQUARE;
+- the energy off the harmonic series falls from −29 to −62 dB (HQ-SAW) and
+  from −24 to −63 dB (HQ-SQUARE);
+- at key 100 (2.6 kHz), from −21 to −57 dB and from −22 to −51 dB.
+
+**Checks** (`xt_analog`, a second pass after the other waveforms, so their
+lines are unchanged):
+- 21,000 cases: 54,000 note-ons and updates, and 120,000 blocks of each,
+  with the state (+0x1e4, +0x1e8) and the masks: all 0 different.
+- Every sixth block sets the phase on ±Pc and on HQ-SAW's P or HQ-SQUARE's
+  L1 and −L2.
+- Deliberate errors caught:
+  - the leak's, g's, the DC step's, the −2^30's and k2's constants a unit
+    off;
+  - the 144- and 2-sample clamps;
+  - the interpolation from A[i−1];
+  - the window's lower edge;
+  - the tap formed after a sync;
+  - the phase as x·(1/k1);
+  - the mask's bit;
+  - L2 as P − L1;
+  - PW moved by 1/32;
+  - a mask bit at the turn at −L2;
+  - the note-on not clearing the direction.
+- Missed:
+  - x ≥ L1 for x > L1, since x never lands on L1 exactly after a step;
+  - an exact equivalent (2·L2·k1 − x as an addition).
+
+**Plugin.** HQ-SAW and HQ-SQUARE are enabled in the Waveform box. The
+PluginTest is bit-identical with each, at notes 30, 60 and 100.
+TEST_ANALOG now rejects KFs that are not multiples of 10%: the plugin's
+parameters step by 10, so another value snapped and made the test differ
+from its reference. That is what a key-follow of "5" did in v80's test,
+unseen at note 60.
+
 ### The analog waveforms: SQUARE, TRIANGLE, SINE, RAMP, JUNO, NOISE (2026-11-01, v80)
 
 This version ports six more analog waveforms, the rest of the note-on's
