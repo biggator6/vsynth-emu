@@ -225,9 +225,9 @@ public:
             bool lfoKeySync = false;
         };
         Cosm cosm[2];
-        // The MOD section (XtMod): Switch, Type 0 MIX, 1 RING, Original Level,
-        // Attack and Release Times, between the OSCs and COSM 1.  Off, or MIX, is
-        // the sum.
+        // The MOD section (XtMod): Switch, Type 0 MIX, 1 RING, 2 FM, Original
+        // Level, Attack and Release Times, between the OSCs and COSM 1.  Off, or
+        // MIX, is the sum.
         XtModParams mod;
     };
 
@@ -355,6 +355,7 @@ private:
     void noteTuning(const Voice& v, const OscVoice& s, const OscControls& o, int& coarse, int& fine) const;   // the per-note setup's +0x68 and +0x70
     XtAnalogShared anaShared;                        // the analog voices' shared state
     XtModBlock modBlk;                               // the MOD's block (the tone block's +0x5dc)
+    XtModShared modShared;                           // FM's delay lines; a voice's index is its tone's number
     void modConvert();                               // the converter (0x894e0920) on the current knobs
     XtAnalogBlock analogBlock(const Voice& v, const OscVoice& s, const OscControls& o) const; // the analog converter's block
     int keyFollowKey(const Voice& v, const OscControls& o) const;   // the OSC's +4

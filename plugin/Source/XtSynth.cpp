@@ -767,7 +767,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     // the MOD (0x894f1b00, 0x894f1d90): the voices' stereo flags as their setups
     // leave them, a stereo wave's on a PCM OSC 1 and none on an analog voice
     modConvert();
-    v->mod.noteOn(modBlk, v->on && !v->analog && cur->channels == 2, false, v->on && v->analog);
+    v->mod.noteOn(modBlk, v->on && !v->analog && cur->channels == 2, false, v->on && v->analog, modShared, (int)(v - voice));
 }
 
 // An OSC's envelopes and LFO at note-on.
@@ -1151,7 +1151,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //     XT_OENV2 (Env 8), XT_VEL2="oscSens,oscCurve", XT_PITCH2="pitch,pitchKF,
 //     coarse,fine" and XT_TUNE2="random", as OSC 1's.  XT_OSC1OFF=1: OSC 1's
 //     Switch off.
-//   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING,
+//   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
 //     Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
 //     attack,release": new MOD knobs at a frame, on the notes then sounding.
 //   XT_OLEV="level,levelKF,levelLfoDepth,waveGainDb": the OSC TVA.

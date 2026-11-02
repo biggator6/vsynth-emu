@@ -79,6 +79,15 @@ void xtModBlock(const XtModParams& p, XtModBlock& b);
 // The Types the port plays.
 bool xtModPlays(uint32_t type);
 
+// FM's delay lines, for all tones: 496 floats per line, the 24 tones' L lines
+// (0x89f91c5c) followed by their R lines (0x89f9d65c).  A tone reads outside its own
+// lines when the modulator passes full scale, so they are one array here too; past
+// its ends the XT reads other memory, and the port reads 0.
+struct XtModShared {
+    static constexpr int kTones = 24, kLine = 496;
+    float line[2 * kTones * kLine] = {};
+};
+
 // The MOD object.  The note-on (0x894f1b00, then the chooser 0x894f1d90) takes
 // the type and the routine for the note; a new block on a held note (0x894f1c60)
 // changes neither, only the targets, by the note's type.  So a held note goes on
@@ -90,13 +99,20 @@ bool xtModPlays(uint32_t type);
 //   MIX       (0x89527d80) out = L1·a + L2·b.  At gains of 1 the plain sum.
 //   RING      (0x89527e00) out = ((L2·a + b)·c)·L1, with a's target (+4)/2^31,
 //             both channels; b is the Original Level
+//   FM        (0x89527b80, with either voice's stereo flag 0x89527c50) L1 goes
+//             into the tone's line at +0x30, kept from note to note (the note-on
+//             clears the lines); d = (L2 + (2^31 − 128))·a·1.15484e−7, so 0…496
+//             samples at full scale; out = (line[w − ⌊d⌋ − 1]·f + line[w − ⌊d⌋]·(1 −
+//             f) + L1·b)·c, each index brought back by 496 once.  c moves by (target
+//             − c)·(2^31 − 128) per sample, which only an unwritten block reaches.
+//             The first reads L only and writes both channels.
 // process: L1 and L2 in the XT's units, 32 frames of interleaved L/R; out may be
 // l1.
 class XtMod {
 public:
     // stereo1, stereo2: the voices' +0x960 as their setups leave them; osc1Analog:
-    // OSC 1's kind is 3
-    void noteOn(const XtModBlock& b, bool stereo1, bool stereo2, bool osc1Analog);
+    // OSC 1's kind is 3; tone: the tone's number (+0x3c), its lines in the pool
+    void noteOn(const XtModBlock& b, bool stereo1, bool stereo2, bool osc1Analog, XtModShared& shared, int tone);
     void setBlock(const XtModBlock& b);
     void process(float* out, const float* l1, const float* l2);
     // MIX at gains of 1, targets and current values: the plain sum
@@ -108,13 +124,20 @@ public:
     uint32_t routine() const;                           // the routine's address (+0x50)
     float target(int i) const { return t[i]; }
     float current(int i) const { return g[i]; }
+    int writeIndex() const { return w_; }
 
 private:
     uint32_t type_ = 0, stereo_ = 0;
     bool analog_ = false;
     float t[3] = {}, g[3] = {};                         // a, b, c: the targets and current values
+    XtModShared* shared_ = nullptr;
+    int lineL = 0, lineR = 0, w_ = 0;                   // the tone's lines in the pool, +0x30
+    float lineAt(int base, int i) const;
+    float fmTap(int base, float m, float x, float a, float b, float c) const;
     void mix(float* out, const float* l1, const float* l2);
     void ring(float* out, const float* l1, const float* l2);
+    void fm(float* out, const float* l1, const float* l2);
+    void fmStereo(float* out, const float* l1, const float* l2);
 };
 
 // The waveform's code (+0x80) for the patch's 0…13; and whether the port

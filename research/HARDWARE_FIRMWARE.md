@@ -1545,6 +1545,90 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The MOD section: FM (2026-11-02, v89)
+
+Type 2. OSC 2 moves a read point in a delay line that OSC 1 writes, so it is phase modulation of OSC 1 by
+OSC 2, not FM of an oscillator's pitch.
+
+**The routines.** `0x89527b80`, or `0x89527c50` when either voice's stereo flag was set (+0x38 not 0). They
+differ in channels, not in sum. Each sample, for a line of 496 floats:
+
+    w = w + 1, 0 at 496                                   +0x30, kept from note to note
+    line[w] = L1
+    d = ((L2 + K1)·a)·K2                                  K1 = 0x4effffff = 2^31 − 128, K2 = 0x33f80000
+    n = d truncated, f = d − n
+    i = w − n, j = i − 1, each +496 if negative, once
+    out = ((line[j]·f + line[i]·(1 − f)) + L1·b)·c
+
+- K1·K2 is 248, so at a = 1 the delay runs 0…496 samples across L2's ±2^31, and no modulator means 248.
+- The input goes in before the read, so a delay of 0 reads this very sample.
+- The first routine reads L only, writes one value to both channels and leaves the R line alone. The second
+  writes both lines before either tap, and uses one w for both.
+- b is the Original Level: the dry signal, added to the delayed one.
+- a and b move by 0.009375 of the difference per sample like the others. c moves by (target − c)·(2^31 − 128):
+  the compiler reloaded fr11 for K1 before that product. c is 1 in every block FM is given, so it never moves.
+  If it did it would run away, by about 2^36 a block.
+
+**The lines are one pool.**
+- +0x10 = 0x89f91c5c + tone·1984 and +0x14 = 0x89f9d65c + tone·1984, set at every note-on. +0x3c is the tone's
+  number (tone +0x10, copied at construction `0x894f5a48`). With 24 tones the L lines end exactly where the R
+  lines start, and the R lines end at 0x89fa905c.
+- The note-on clears both of the tone's lines. It does not reset w.
+- Nothing checks that i and j land in the line. When L2 passes full scale, by more than w/248 of it, the read is
+  in the tones next door: lower tones when d is too large, higher ones when d is negative (truncation toward
+  zero, f negative, and the wrap never fires).
+- So `XtModShared` is the whole pool as one array, and `lineAt` reads anywhere in it. Past its ends the XT reads
+  whatever is there. Just below are the lists of sounding tones (`0x89f91c50`, `0x89f91c54`); above, `0x89fa9094`.
+  The port reads 0. In the interpreter that memory is 0 too, so the check says nothing about it.
+- A voice can get there. OSC 2 with an Impact, or at Wave Gain +12, passes full scale. In a 200-case tone pass, truncating
+  toward −∞ instead changed 2 blocks in 8,400, so it is rare but real.
+- XtSynth's voices are tones 0…15 of the pool. Which voice a note lands on is not the XT's tone allocation, so out
+  of range the neighbour's contents will differ from a real unit's anyway.
+
+**The stereo flag.** A PCM OSC 1 with a stereo wave takes the second routine. An analog OSC 1 never does, not even
+HQ-SQUARE (v88), and OSC 2 plays only ANALOG so far.
+
+**Sound** (A4 SINE on OSC 1, SINE on OSC 2, Impact 0; dB from renders):
+- OSC 2 off, Level 0: exactly the delayed OSC 1, 440 Hz at −7.8.
+- OSC 2 off, Level 127: dry + a 248-sample delay. 440 Hz at −23.6: 248 samples is 2.47 cycles, so nearly a null,
+  and 2·|cos(π·2.474)| says −15.7 dB against one alone. That agrees.
+- OSC 2 at E5 and Level 40, Original Level 0: 440 Hz at −8.6, 219 and 1099 Hz at −18.6, 661 and 1979 at −41. A small
+  index: one strong pair of sidebands, and the second pair much weaker.
+- OSC 2 at E5, Level 127, Original Level 0: an index near 6. Partials at 219, 879, 1099, 1758, 2197… all near −19, to well
+  past 3700 Hz. RMS unchanged at 0.289: it is a delay, so it moves energy around without adding any.
+- OSC 2 at A4: harmonics of 440 Hz, 880 at −19.4, 1320 at −12.8, 2640 at −13.4.
+- SAW carrier under E5: 219, 878, 1099, 1759 Hz at about −26.
+- OSC 2 at Wave Gain +12: reads leave the line, and the energy lands up at 12–18 kHz, near −23. This is the out of
+  range case; that it matches is a statement about the interpreter's memory.
+
+**Checks** (`xt_analog`, further passes after the others; fcheck's baseline only added 3 lines):
+- The object alone, 3,000 cases in fcheck, on a tone number that varies, with 0 and 23 always among them, every stereo
+  flag, buffers up to ten times full scale, any Type's block on the held note: 15,741 note-ons and updates,
+  72,000 blocks, 0 different. Compared every block: the targets, current values, w, the output, both of the tone's
+  lines. At each note's end all 48 lines.
+- Both voices through the firmware's render, the firmware's real OSC 2 as the modulator: 38,250 note-ons and
+  updates, 126,000 oscillator blocks, 0 different, with the lines.
+- The firmware's own tone note-on: 1,500, 0 different, lines cleared and w kept.
+- Wide run, 21,000 cases: 504,000 blocks alone, 882,000 in the tone, the note-on on 10,500, 0 different.
+- Deliberate errors: 25 planted, 25 caught. Before the last check, 1 was missed: R's line written after L's tap. It takes
+  L's read landing exactly on R's newest sample, which is a modulator 48 times full scale. No voice gets there; one
+  sample a block now aims at it. Worth noting among the 25: reads kept to the tone's own line (shows the object pass
+  does read other lines), truncation toward −∞ (shows negative d is run), and c's step with the wrong constant (shows
+  c is moved at all, by a block written only for that, at a note's end so it cannot overflow).
+
+**Forced c.** Under FM the conversions no longer put other values in +0xc as they do for the rest, since c would run to
+infinity and the two sides' NaNs have no reason to agree. Instead a block near each note's end has c off target, for
+two blocks. So the peak the FM line prints, about 1e23 of 2^31, comes from that block.
+
+**Not checked.**
+- Against real hardware. The check is the firmware in the interpreter.
+- Reads past the pool's ends, on the XT.
+- FM with a real stereo PCM OSC 1 through the firmware's render. The routine is checked on buffers with L ≠ R, and
+  PluginTest runs it under stereo inputs, but no firmware PCM voice runs in `xt_analog`.
+
+**Plugin.** FM is enabled in the Type box. Original Level is the dry signal. `XT_MOD` and `TEST_MOD` take Type 2.
+PluginTest is bit-identical at notes 30, 60 and 100 on FM over analog voices and under PCM OSC 1s, stereo included.
+
 ### The MOD section, and RING (2026-11-02, v88)
 
 The MOD section gets its own object in the port (`XtMod`, in XtAnalog): the converter, the note-on,

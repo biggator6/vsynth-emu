@@ -3097,3 +3097,18 @@ Round-2 recordings.  First build-out after that: real-time granular port
   the code does and the port does it too.
 - v86 had the order wrong: the MOD's note-on comes before the installs, the chooser after. It never showed at gains
   of 1, which is a reminder of what a passing check does and does not say.
+
+### Session 16 addendum (2026-11-02) — v89: MOD FM
+
+- FM is a delay line. OSC 1 goes in, OSC 2 picks where to read it back, 0 to 496 samples, and the Original Level adds the
+  dry signal. So it is phase modulation, and with no modulator at all it is still a 248-sample delay: OSC 2 off under FM
+  does not sound like OSC 1 alone, and at Level 127 a 440 Hz note nearly cancels.
+- Nothing keeps the read inside the line. Past full scale it reads the tones next door, and the 24 tones' lines are laid out
+  so that L runs into R. So the port keeps the whole pool as one array rather than a buffer per voice. Past the pool's ends
+  the XT reads whatever is there, the port reads 0, and the interpreter happens to agree, which proves nothing about that case.
+- One compiler oddity: c's step is multiplied by 2^31 − 128, because the register was reloaded first. It cannot matter, c is
+  always on target, and if it were not it would blow up within blocks. The check had to be built around that: other values
+  in c only for a note's last two blocks.
+- Xcode updated itself in the middle of this, and two things followed. git and cmake stopped until its license was accepted,
+  and then the plugin would not link: with objects from two compilers in one archive, ar makes a new kind of archive, and ld
+  will not take it without a target. A clean rebuild cured it.
