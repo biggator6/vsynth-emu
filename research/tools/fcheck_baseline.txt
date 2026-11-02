@@ -158,11 +158,14 @@ x-mod: 21000 note-ons and updates, 90000 blocks of 32 frames, 0 different (peak 
 x-mod tone: 3000 cases, 126000 oscillator blocks (56712 of X-MOD), 0 different; wrap masks 0 different; delay lines 0 different
 mod converter: 200000 cases, 0 different
 mod mix, ring: 15000 note-ons and updates, 72000 blocks of 32 frames (14709 plain), 0 different (peak 159.4 of 2^31)
-mod ring tone: 3000 cases, 38250 note-ons and updates, 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different
+mod ring tone: 3000 cases, 38250 note-ons and updates, 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different; OSC 2 sounding under the MOD in 46128 blocks, peak 5.619 of 2^31
 mod ring tone note-on: 1500 cases, 0 different
-mod fm: 15741 note-ons and updates, 72000 blocks of 32 frames (3421 plain), 0 different (peak 9.634e+22 of 2^31)
-mod fm tone: 3000 cases, 38250 note-ons and updates, 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different
+mod fm: 15737 note-ons and updates, 72000 blocks of 32 frames (3438 plain), 0 different (peak 9.634e+22 of 2^31)
+mod fm tone: 3000 cases, 38250 note-ons and updates, 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different; OSC 2 sounding under the MOD in 44544 blocks, peak 4.747 of 2^31
 mod fm tone note-on: 1500 cases, 0 different
+mod env ring: 15000 note-ons and updates, 72000 blocks of 32 frames (2989 plain), 0 different (peak 218.7 of 2^31)
+mod env ring tone: 3000 cases, 38250 note-ons and updates, 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different; OSC 2 sounding under the MOD in 46248 blocks, peak 3.981 of 2^31
+mod env ring tone note-on: 1500 cases, 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

@@ -275,8 +275,8 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      COSM sections, as the MOD section does when off or set to MIX. The
      render is the first Structure Type's. X-MOD on OSC 1 (v87) reads OSC 2's
      output instead, so OSC 2 is not heard.
-   - the MOD section (v88–, XtMod): between the OSCs and the COSMs, MIX, RING and
-     FM so far, with the Original Level, Attack and Release; a held note keeps its
+   - the MOD section (v88–, XtMod): between the OSCs and the COSMs, MIX, RING, FM
+     and ENV RING so far, with the Original Level, Attack and Release; a held note keeps its
      routine when the knobs change, as the firmware's does. FM's delay lines are one
      pool for all voices, as on the XT.
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
@@ -326,9 +326,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - The analog oscillator (v79–v85): the converter's block, the note-on, the
   update, the install and the routines, the sub oscillator's eight too (outputs,
   state and wrap masks), equal the firmware (`xt_analog`).
-- The MOD section (v88, v89): the converter's block, the note-on, a new block on a
-  held note, MIX, RING and FM with its lines, alone and in the firmware's own render
-  and tone note-on, equal the firmware (`xt_analog`).
+- The MOD section (v88–v90): the converter's block, the note-on, a new block on a
+  held note, MIX, RING, FM with its lines and ENV RING, alone and in the firmware's own
+  render and tone note-on, equal the firmware (`xt_analog`).
 - X-MOD (v87): its converter case on both OSCs, and the routine alone and under
   the firmware's own OSC 2 in the tone's render, equal the firmware (`xt_analog`).
 - OSC 2 (v86): the converter with the input's OSC set, and both voices in a tone
@@ -348,8 +348,8 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 **Not yet:**
 - the patch TVA's own Level, Level KF, pan and LFO terms are not
   modelled;
-- OSC 2 plays only ANALOG, not PCM; the MOD section has no ENV RING or OSC SYNC
-  yet, and there is no Structure Type but the first;
+- OSC 2 plays only ANALOG, not PCM; the MOD section has no OSC SYNC yet, and there
+  is no Structure Type but the first;
 - no V-Synth voice layer (filters, LFOs, effects);
 - no step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and

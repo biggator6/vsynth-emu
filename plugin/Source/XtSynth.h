@@ -225,9 +225,9 @@ public:
             bool lfoKeySync = false;
         };
         Cosm cosm[2];
-        // The MOD section (XtMod): Switch, Type 0 MIX, 1 RING, 2 FM, Original
-        // Level, Attack and Release Times, between the OSCs and COSM 1.  Off, or
-        // MIX, is the sum.
+        // The MOD section (XtMod): Switch, Type 0 MIX, 1 RING, 2 FM, 3 ENV RING,
+        // Original Level, Attack and Release Times, between the OSCs and COSM 1.
+        // Off, or MIX, is the sum.
         XtModParams mod;
     };
 

@@ -3112,3 +3112,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Xcode updated itself in the middle of this, and two things followed. git and cmake stopped until its license was accepted,
   and then the plugin would not link: with objects from two compilers in one archive, ar makes a new kind of archive, and ld
   will not take it without a target. A clean rebuild cured it.
+
+### Session 16 addendum (2026-11-02) — v90: MOD ENV RING
+
+- ENV RING is OSC 1 under a follower of OSC 2's level. The follower adds the last of every eight samples twice. That looks like a slip left
+  in the firmware; it is why the level is 4.5 and not 4 times the mean. Worth remembering when a summary says "the sum of 32 samples".
+- The Attack knob seemed not to work, and that made me suspect the port before anything else. Attack 127 reached 63% in 35 ms where the rate
+  says 0.9 s. It is the firmware: each block picks Attack or Release by comparing its level with the last one, with no smoothing, and a sine's
+  level ripples, so half the blocks count as falling. With both knobs at 127 it takes 823 ms. The firmware check could never have told me
+  whether that was right as music, only that it is what the code does; the rates above are the part a recording could settle.
+- I found a hole in my own check while planning the next pass. The MOD's tone passes kept X-MOD's setting, so OSC 1 was X-MOD nearly every time and had
+  already cleared OSC 2's output. v88 and v89 said "the firmware's real OSC 2 as the modulator" and that was mostly not so. The filled-buffer passes covered
+  the routines, and with a real modulator it all stayed at 0 different, but those lines were not showing what they claimed. Each now prints how much of OSC 2
+  it was given.

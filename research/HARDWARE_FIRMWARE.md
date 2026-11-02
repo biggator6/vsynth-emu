@@ -1545,6 +1545,92 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The MOD section: ENV RING (2026-11-02, v90)
+
+Type 3. OSC 1 under OSC 2's level. OSC 2 itself is not heard. Attack and Release are the follower's rates.
+
+**The level** (`0x895017e0`), once a block, of L only in both routines, from OSC 2's buffer:
+
+    s = 0; for each of 32 samples: s += |x|, and again if it is the last of its eight
+    level = s·0x2e7fffff
+
+- The doubling is in the listing: `fadd fr2,fr4` twice at `0x89501826` and `0x8950182a`. It looks like a slip that stayed,
+  as the weights sum to 36 and not 32. A decompile would hide nothing here, but a summary of "sum over 32" would be wrong.
+- 0x2e7fffff is about 2^−34, so the level is 4.5 times mean|L2|/2^31: a full-scale square is 4.5, a SINE at 0.396 about 1.13.
+- `0x89501850` beside it looks like a stereo version. Neither routine calls it.
+
+**The routines** (`0x895279d0`, or `0x89527aa0` when either voice's stereo flag was set), block by block:
+
+    gain step = (+0xc − gain)·0.009375                  gain is +0x18, at note-on +0xc
+    t = last > level ? Release (+8) : Attack (+4)       last is +0x2c
+    last = level
+    rate = (1 − t)·0.005 + 0.0001                       product then sum; 0x3ba3d70a, 0x38d1b717
+    4 samples, 8 times:
+        gain += step
+        out = L1·(env·gain)                             env is +0x28, 0 at note-on
+      then env += (level − env)·rate
+
+- env moves once per 4 samples, and gain every sample.
+- +0x2c is not cleared at note-on. The note's first block compares with whatever the tone last held. It is also not read by
+  any other Type, so it can be very old.
+- Nothing limits env. It follows the level, which can pass 1 easily: out is L1 × 4.5·mean|L2| at most for a full-scale L2,
+  and more past full scale. The peak in the object pass, about 200 of 2^31, comes from buffers at ten times full scale.
+- The first routine reads L1's L and writes it to both channels. The second reads both.
+- gain's target is 1 in every real block, so gain stays 1. The check moves it by the words the converter leaves.
+
+**Attack and Release share a block-by-block test.** The test is on one block's level against the last, with no smoothing, so
+the level's own ripple picks the rate. Under a SINE, |L2| has a ripple that 32 samples do not span, and about half the blocks
+count as falling. So the note's env moves at Attack's rate half the time and Release's the other half, even on a steady
+modulator. With Release at 0, a long Attack does little:
+
+| Attack | Release | Time to 63%, rendered | From the rates |
+|---|---|---|---|
+| 0 | 0 | 16.9 ms | 17.8 ms (4 samples/0.0051) |
+| 64 | 0 | 21.5 ms | 23.6 ms (the two rates averaged) |
+| 127 | 0 | 35.1 ms | 34.9 ms (the same) |
+| 64 | 64 | 32.8 ms | 35.2 ms |
+| 127 | 64 | 59.0 ms | 67 ms |
+| 127 | 127 | 822.7 ms | 907 ms |
+
+The renders measure RMS in 2 ms windows on a tone that is also under its modulator's ripple, so they run a little short. Falling
+away after OSC 2's own decay, to 37%: 16.3 ms at 0, 0; 31.2 ms at 64, 64; 801.7 ms at 127, 127. So the real range only shows
+with both knobs up, and that is not a port artefact: it is what the code says, and the times above are what a player should get.
+It would be worth comparing with a recording.
+
+**Sound** (A4 SINE on OSC 1, E5 SINE on OSC 2, Impact 0; dB from renders):
+- Steady, Attack and Release 0: 440 Hz at −6.3, 1.5 dB over OSC 1 alone (−7.8), so a gain of about 1.19. No sign of 659 Hz or any
+  sideband above −57 dB: OSC 2 sets a slow gain and is not multiplied in.
+- OSC 2 Level 64: 440 Hz at −18.2, 11.9 dB down as curve(64) = 0.254 says.
+- OSC 2 SAW: −11.9.
+- OSC 2 off: silence, as the level is 0.
+- Under a PCM OSC 1 (vocal, stereo inputs too): runs, bit-identical to XtSynth in PluginTest.
+
+**Checks** (`xt_analog`, further passes after the others; fcheck's baseline added 3 lines, and see the correction below):
+- The object alone, 3,000 cases in fcheck, note after note, every stereo flag: 15,000 note-ons and updates, 72,000 blocks, 0
+  different. Compared every block: the targets, gain, env, last, the output. One block in eight aims one sample so the level lands on
+  the last block's, or a unit to either side of it, as a rising or falling test turns on that.
+- Both voices through the firmware's render, the firmware's OSC 2 as the modulator: 38,250 note-ons and updates, 126,000 oscillator
+  blocks, 46,248 of them with OSC 2 sounding, 0 different.
+- The firmware's own tone note-on: 1,500, 0 different.
+- Wide run, 21,000 cases: 504,000 blocks alone, 882,000 in the tone, the note-on on 10,500, 0 different.
+- Deliberate errors: 25 planted, 25 caught, none missed: among them the doubled sample dropped or moved, `>` for `>=`, env's move on
+  the wrong sample of its four, and a note-on clearing +0x2c.
+
+**A correction to v88 and v89.** Their tone passes were weaker than those sections said. `modTonePass` left X-MOD's pass on, so OSC 1
+was X-MOD in nearly every case, and X-MOD clears OSC 2's buffer before the MOD reads it. So L2 was zero outside the cases with OSC 1 off.
+The object passes, on filled buffers, were never affected. Now both OSCs take any of the fourteen waveforms, and each tone line prints how
+many blocks the MOD was given a sounding OSC 2, and its peak: RING 46,128 blocks, peak 5.6 of 2^31; FM 44,544, peak 4.7; ENV RING 46,248,
+peak 4.0. All still 0 different, so the port was right and the check was not showing it. The peaks are also the first direct sign that real
+voices go well past full scale: FM's reads outside its line are a normal case at high Impact and Wave Gain, not a corner. The change moves
+fcheck's lines for those passes, as the random stream moved: `mod ring tone` and `mod fm` and `mod fm tone` changed, with 0 different throughout.
+
+**Not checked.**
+- Against real hardware. The Attack and Release behaviour above is the one a recording would settle.
+- ENV RING with a real stereo PCM voice through the firmware's render, as with FM.
+
+**Plugin.** ENV RING is enabled in the Type box. Attack and Release are the knobs; Original Level does nothing here. `XT_MOD` and
+`TEST_MOD` take Type 3. PluginTest is bit-identical at notes 30, 60 and 100, on analog voices and under PCM OSC 1s.
+
 ### The MOD section: FM (2026-11-02, v89)
 
 Type 2. OSC 2 moves a read point in a delay line that OSC 1 writes, so it is phase modulation of OSC 1 by
@@ -1606,7 +1692,7 @@ HQ-SQUARE (v88), and OSC 2 plays only ANALOG so far.
   flag, buffers up to ten times full scale, any Type's block on the held note: 15,741 note-ons and updates,
   72,000 blocks, 0 different. Compared every block: the targets, current values, w, the output, both of the tone's
   lines. At each note's end all 48 lines.
-- Both voices through the firmware's render, the firmware's real OSC 2 as the modulator: 38,250 note-ons and
+- Both voices through the firmware's render (with OSC 2 mostly cleared by X-MOD until v90, see there): 38,250 note-ons and
   updates, 126,000 oscillator blocks, 0 different, with the lines.
 - The firmware's own tone note-on: 1,500, 0 different, lines cleared and w kept.
 - Wide run, 21,000 cases: 504,000 blocks alone, 882,000 in the tone, the note-on on 10,500, 0 different.
@@ -1713,7 +1799,7 @@ place and moves it back. RING with OSC 2 off is therefore b·L1, not L1. RING wi
   targets, current values, +0x34, +0x38, the routine and the output. Each update carries any Type's block.
 - A block in which `plain()` is true must also equal `xtAnalogMix`: 14,709 of them, 0 different. That is the
   shortcut XtSynth takes.
-- Both voices through the firmware's render with RING or MOD off, every waveform, OSCs sometimes off, new
+- Both voices through the firmware's render (with OSC 2 mostly cleared by X-MOD until v90, see there), RING or MOD off, every waveform, OSCs sometimes off, new
   blocks on held notes: 38,250 note-ons and updates, 126,000 oscillator blocks, 0 different.
 - The firmware's own tone note-on, all fourteen waveforms on both OSCs, an OSC sometimes off: 1,500, 0 different.
 - Wide run, 21,000 cases: 504,000 blocks alone, 882,000 in the tone, the note-on on 10,500, 0 different.

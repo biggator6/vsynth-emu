@@ -106,6 +106,14 @@ struct XtModShared {
 //             f) + L1·b)·c, each index brought back by 496 once.  c moves by (target
 //             − c)·(2^31 − 128) per sample, which only an unwritten block reaches.
 //             The first reads L only and writes both channels.
+//   ENV RING  (0x895279d0, with either voice's stereo flag 0x89527aa0) L1 under OSC
+//             2's level, and OSC 2 is not heard.  The level (0x895017e0): the sum of
+//             |L2| over 32 samples of L, the last of each eight counted twice, ×
+//             0x2e7fffff; compared with the last block's (+0x2c, kept from note to
+//             note): rising or equal the Attack's rate, falling the Release's.  env
+//             (+0x28, 0 at note-on) moves (level − env)·((1 − t)·0.005 + 0.0001) every
+//             4 samples; out = L1·(env·gain), gain moving toward +0xc each sample
+//             from +0x18.  The first reads L only.
 // process: L1 and L2 in the XT's units, 32 frames of interleaved L/R; out may be
 // l1.
 class XtMod {
@@ -125,6 +133,8 @@ public:
     float target(int i) const { return t[i]; }
     float current(int i) const { return g[i]; }
     int writeIndex() const { return w_; }
+    float env() const { return env_; }                  // +0x28
+    float lastLevel() const { return last_; }           // +0x2c
 
 private:
     uint32_t type_ = 0, stereo_ = 0;
@@ -132,12 +142,14 @@ private:
     float t[3] = {}, g[3] = {};                         // a, b, c: the targets and current values
     XtModShared* shared_ = nullptr;
     int lineL = 0, lineR = 0, w_ = 0;                   // the tone's lines in the pool, +0x30
+    float env_ = 0, last_ = 0;
     float lineAt(int base, int i) const;
     float fmTap(int base, float m, float x, float a, float b, float c) const;
     void mix(float* out, const float* l1, const float* l2);
     void ring(float* out, const float* l1, const float* l2);
     void fm(float* out, const float* l1, const float* l2);
     void fmStereo(float* out, const float* l1, const float* l2);
+    void envRing(float* out, const float* l1, const float* l2, bool stereo);
 };
 
 // The waveform's code (+0x80) for the patch's 0…13; and whether the port

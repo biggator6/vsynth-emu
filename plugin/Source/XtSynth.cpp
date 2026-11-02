@@ -1152,7 +1152,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //     coarse,fine" and XT_TUNE2="random", as OSC 1's.  XT_OSC1OFF=1: OSC 1's
 //     Switch off.
 //   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
-//     Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
+//     3 ENV RING, Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
 //     attack,release": new MOD knobs at a frame, on the notes then sounding.
 //   XT_OLEV="level,levelKF,levelLfoDepth,waveGainDb": the OSC TVA.
 //   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.

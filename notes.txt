@@ -314,6 +314,11 @@ ANALOG X-MOD v87 (2026-11-02): X-MOD (code 13, 0x89507b60 at +0x96c)
   on the roadmap: MOD Types RING, FM, ENV RING, OSC SYNC; the other two Structure Types; the patch
   TVA's level and pan; PCM on OSC 2.
 
+MOD ENV RING v90 (2026-11-02): Type 3 (HARDWARE_FIRMWARE.md, "The MOD section: ENV RING"). XtMod::envRing both routines
+  (0x895279d0, 0x89527aa0), modLevel 0x895017e0: |L2| over 32 samples, the last of each eight twice. Fields env +0x28, last +0x2c
+  (not cleared at note-on). The rate is picked each block by last > level, with no smoothing, so a modulator's ripple mixes Attack and
+  Release: a long Attack needs a long Release too. Left: OSC SYNC.
+
 MOD FM v89 (2026-11-02): Type 2 (HARDWARE_FIRMWARE.md, "The MOD section: FM"). XtMod::fm 0x89527b80,
   fmStereo 0x89527c50, fmTap the one channel. A 496-float line per tone; XtModShared is the 24 tones' L then R lines
   as one array (XtSynth::modShared), and a tap can read other tones' lines when L2 passes full scale: lineAt gives 0

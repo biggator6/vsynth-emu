@@ -222,7 +222,7 @@ void xtModBlock(const XtModParams& p, XtModBlock& b) {
     }
 }
 
-bool xtModPlays(uint32_t type) { return type <= 2; }
+bool xtModPlays(uint32_t type) { return type <= 3; }
 
 void XtMod::noteOn(const XtModBlock& b, bool stereo1, bool stereo2, bool osc1Analog, XtModShared& shared, int tone) {
     type_ = b.type;
@@ -235,6 +235,7 @@ void XtMod::noteOn(const XtModBlock& b, bool stereo1, bool stereo2, bool osc1Ana
     if (type_ == 1) t[0] = div(t[0], 2147483648.0f);
     if (type_ == 0) { g[0] = t[0]; g[1] = t[1]; }
     else if (type_ == 1 || type_ == 2) { g[0] = t[0]; g[1] = t[1]; g[2] = t[2]; }
+    else if (type_ == 3) { g[0] = t[2]; env_ = 0.0f; }
     if (type_ == 2)
         for (int i = 0; i < XtModShared::kLine; ++i) shared.line[lineL + i] = shared.line[lineR + i] = 0.0f;
 }
@@ -242,7 +243,7 @@ void XtMod::noteOn(const XtModBlock& b, bool stereo1, bool stereo2, bool osc1Ana
 void XtMod::setBlock(const XtModBlock& b) {
     if (type_ == 0) { t[0] = b.a; t[1] = b.b; }
     else if (type_ == 1) { t[0] = div(b.a, 2147483648.0f); t[1] = b.b; t[2] = b.c; }
-    else if (type_ == 2) { t[0] = b.a; t[1] = b.b; t[2] = b.c; }
+    else if (type_ == 2 || type_ == 3) { t[0] = b.a; t[1] = b.b; t[2] = b.c; }
 }
 
 bool XtMod::plain() const {
@@ -251,11 +252,13 @@ bool XtMod::plain() const {
 
 uint32_t XtMod::routine() const {
     if (type_ == 2) return stereo_ ? 0x89527c50u : 0x89527b80u;
+    if (type_ == 3) return stereo_ ? 0x89527aa0u : 0x895279d0u;
     return type_ == 1 ? 0x89527e00u : 0x89527d80u;
 }
 
 void XtMod::process(float* out, const float* l1, const float* l2) {
-    if (type_ == 2 && stereo_) fmStereo(out, l1, l2);
+    if (type_ == 3) envRing(out, l1, l2, stereo_ != 0);
+    else if (type_ == 2 && stereo_) fmStereo(out, l1, l2);
     else if (type_ == 2) fm(out, l1, l2);
     else if (type_ == 1) ring(out, l1, l2);
     else mix(out, l1, l2);
@@ -292,6 +295,36 @@ void XtMod::ring(float* out, const float* l1, const float* l2) {
     g[0] = a;
     g[1] = b;
     g[2] = c;
+}
+
+// ENV RING's level (0x895017e0), of L only in both routines.
+static float modLevel(const float* l2) {
+    float s = 0.0f;
+    for (int i = 0; i < 32; ++i) {
+        const float x = std::fabs(l2[2 * i]);
+        s = add(s, x);
+        if (i % 8 == 7) s = add(s, x);
+    }
+    return mul(s, K(0x2e7fffff));
+}
+
+void XtMod::envRing(float* out, const float* l1, const float* l2, bool stereo) {
+    const float dg = mul(sub(t[2], g[0]), kModStep);
+    float gain = g[0];
+    const float level = modLevel(l2);
+    const float tm = last_ > level ? t[1] : t[0];
+    last_ = level;
+    const float rate = fmac(sub(1.0f, tm), K(0x3ba3d70a), K(0x38d1b717));
+    float e = env_;
+    for (int i = 0; i < 32; ++i) {
+        gain = add(gain, dg);
+        const float m = mul(e, gain), x = l1[2 * i], y = l1[2 * i + 1];
+        out[2 * i] = mul(x, m);
+        out[2 * i + 1] = stereo ? mul(y, m) : out[2 * i];
+        if (i % 4 == 3) e = fmac(sub(level, e), rate, e);
+    }
+    env_ = e;
+    g[0] = gain;
 }
 
 float XtMod::lineAt(int base, int i) const {
@@ -2212,9 +2245,11 @@ int main(int argc, char** argv) {
     auto modSame = [&](uint32_t O, const XtMod& m) {
         bool ok = c.rd32(O) == m.type() && c.rd32(O + 0x38) == m.stereoCode() && (uint32_t)c.rd8(O + 0x34) == (m.type() & 0xff);
         for (int i = 0; i < 3; ++i) ok = ok && same(f32(O + 4 + 4 * (uint32_t)i), m.target(i)) && same(f32(O + 0x18 + 4 * (uint32_t)i), m.current(i));
-        return ok;
+        return ok && same(f32(O + 0x28), m.env()) && same(f32(O + 0x2c), m.lastLevel());
     };
     int modType = -1;                            // the tone passes with the MOD on: its Type
+    long modL2Blocks = 0;
+    float modL2Max = 0;
     XtMod toneMod;
     XtModBlock toneB;
     XtModShared* modPool = new XtModShared;      // and FM's lines, in step with the firmware's (0 at startup)
@@ -2236,6 +2271,7 @@ int main(int argc, char** argv) {
         for (int n = 0; n < 2; ++n) {
             k[n].p.wave = (int)(rnd() % 13);
             if (xmodPass) k[n].p.wave = n == 0 || g % 4 == 2 ? 13 : (int)(rnd() % 14);
+            if (modType >= 0) k[n].p.wave = (int)(rnd() % 14);   // X-MOD would clear OSC 2's output before the MOD reads it
             if (k[n].p.wave >= 11 || rnd() % 3 == 0) k[n].p.detune = (int)(rnd() % 127) - 63;
             if (k[n].p.wave <= 10 && rnd() % 3 == 0) { k[n].p.subOctave = 1 + (int)(rnd() % 3); k[n].p.subLevel = (int)(rnd() % 128); }
         }
@@ -2354,6 +2390,12 @@ int main(int argc, char** argv) {
             if (on[0]) pm[0] = to[0].process(l[0], 0, l[1]);
             float mix[64];
             std::copy(l[0], l[0] + 64, mix);
+            if (modType >= 0) {                  // what the MOD is given: the check is no use on zeros
+                float pk = 0;
+                for (int i = 0; i < 64; ++i) pk = std::fmax(pk, std::fabs(l[1][i]));
+                if (pk > 0) ++modL2Blocks;
+                modL2Max = std::fmax(modL2Max, pk);
+            }
             if (modType >= 0) toneMod.process(mix, mix, l[1]);
             else xtAnalogMix(mix, l[1]);
             for (int n = 0; n < 2; ++n) if (on[n]) ++waveBlocks[k[n].p.wave];
@@ -2648,6 +2690,17 @@ int main(int argc, char** argv) {
             float l1[64], l2[64];
             modFill(l1, (int)(rnd() % 6));
             modFill(l2, (int)(rnd() % 6));
+            if (type == 3) {                          // the level: the same as the last block's; and a unit either side
+                const float was = mObj.lastLevel();
+                const int k = blk % 8;
+                if (k == 2 && was > 0.0f) {           // one sample carries the sum: it lands on, or near, the last level
+                    for (float& x : l2) x = 0.0f;
+                    float y = div(was, K(0x2e7fffff));
+                    if (blk % 16 == 10) y = std::nextafter(y, 0.0f);
+                    else if (blk % 16 == 2 && g % 2) y = std::nextafter(y, 1.0e30f);
+                    l2[2 * (int)(rnd() % 7)] = g % 3 ? y : -y;
+                }
+            }
             if (type == 2 && blk % 6 == 1 && mObj.current(0) != 0.0f) {   // L's tap exactly on R's newest sample: 48 times full scale, which no voice reaches
                 const float aim = -((float)(XtModShared::kTones * XtModShared::kLine) + 0.5f);
                 l2[0] = sub(div(aim, mul(mObj.current(0), K(0x33f80000))), K(0x4effffff));
@@ -2695,14 +2748,15 @@ int main(int argc, char** argv) {
     // both voices through the firmware's render, with the MOD on; then its note-on
     auto modTonePass = [&](const char* name, int type) {
         modType = type;
-        xmodPass = true;
+        xmodPass = false;
+        modL2Blocks = modL2Max = 0;
         tb_ = tm_ = tl_ = tn_ = 0;
         for (long& w : waveBlocks) w = 0;
         for (int g = 0; g < nCases; ++g)
             if (!toneCase(g)) return false;
         long blocks = 0;
         for (long w : waveBlocks) blocks += w;
-        std::printf("%s tone: %d cases, %ld note-ons and updates, %ld oscillator blocks, %ld different; wrap masks %ld different; delay lines %ld different\n", name, nCases, tn_, blocks, tb_, tm_, tl_);
+        std::printf("%s tone: %d cases, %ld note-ons and updates, %ld oscillator blocks, %ld different; wrap masks %ld different; delay lines %ld different; OSC 2 sounding under the MOD in %ld blocks, peak %.4g of 2^31\n", name, nCases, tn_, blocks, tb_, tm_, tl_, modL2Blocks, modL2Max / 2147483648.0f);
         bad += tb_ + tm_ + tl_;
         oo = on_ = 0;
         for (int g = 0; g < nCases / 2; ++g)
@@ -2716,6 +2770,9 @@ int main(int argc, char** argv) {
     modForceC = false;
     if (!modObjPass("mod fm", { 2 })) return 1;
     if (!modTonePass("mod fm", 2)) return 1;
+    modForceC = true;
+    if (!modObjPass("mod env ring", { 3 })) return 1;
+    if (!modTonePass("mod env ring", 3)) return 1;
     return bad ? 3 : 0;
 }
 #endif

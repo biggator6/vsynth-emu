@@ -448,7 +448,7 @@ int main(int argc, char** argv) {
             set("LfoWave", m.lfoWave); set("LfoRate", m.lfoRate);
         }
     }
-    // TEST_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM
+    // TEST_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM, 3 ENV RING
     if (const char* e = std::getenv("TEST_MOD")) {
         refCtl.mod.on = true;
         std::sscanf(e, "%d,%d,%d,%d", &refCtl.mod.type, &refCtl.mod.level, &refCtl.mod.attack, &refCtl.mod.release);
