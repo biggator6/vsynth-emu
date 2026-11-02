@@ -51,11 +51,13 @@ public:
 
     // ── File loading ─────────────────────────────────────────────────────────
     // Message thread.  Reads the WAV/AIFF and encodes it in the background
-    // as the selected Encode Type (the XT path needs the firmware image).
-    void loadFile(const juce::File& file);
+    // as the selected Encode Type (the XT path needs the firmware image).  Each
+    // OSC has its own wave (osc: 0 OSC 1, 1 OSC 2), as on the XT; the engine path
+    // without the firmware plays OSC 1's.
+    void loadFile(const juce::File& file, int osc = 0);
 
-    juce::String getLoadedFileName() const  { return loadedFileName_; }
-    bool         hasFileLoaded()    const   { return fileLoaded_.load(); }
+    juce::String getLoadedFileName(int osc = 0) const  { return wave_[osc].name; }
+    bool         hasFileLoaded(int osc = 0)    const   { return wave_[osc].loaded.load(); }
 
     // ── The XT's firmware (rom.2) ────────────────────────────────────────────
     // Message thread.  Returns false if the file is not a usable image.
@@ -74,21 +76,25 @@ private:
 
     juce::AudioFormatManager formatManager_;
 
-    // ── File buffer ──────────────────────────────────────────────────────────
-    // Written on the message thread, read on the audio thread (legacy path).
-    juce::AudioBuffer<float> fileBuffer_;
+    // ── File buffers, one per OSC ────────────────────────────────────────────
+    // Written on the message thread, OSC 1's read on the audio thread (legacy path).
+    struct LoadedWave {
+        juce::AudioBuffer<float> buffer;
+        std::atomic<bool>        loaded { false };
+        juce::String             name;
+        double                   rate = 44100.0;
+        int                      bits = 16;
+        std::atomic<int>         gen { 0 };          // a newer encode request discards an older result
+        std::atomic<bool>        reencode { false }; // its Encode Type or Depth changed
+    };
+    LoadedWave               wave_[2];
     juce::CriticalSection    bufferLock_;
-    std::atomic<bool>        fileLoaded_ { false };
-    juce::String             loadedFileName_;
-    double                   fileRate_ = 44100.0;
-    int                      fileBits_ = 16;
 
     // ── Encoding (background) ────────────────────────────────────────────────
     juce::ThreadPool encodePool_ { 1 };
-    std::atomic<int> encodeGen_ { 0 };
     mutable juce::CriticalSection statusLock_;
     juce::String status_;
-    void reencode();
+    void reencode(int osc);
     void setStatus(const juce::String& s);
     void handleAsyncUpdate() override;          // re-encode after an Encode Type / Depth change
     void findRom();

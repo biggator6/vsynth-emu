@@ -301,6 +301,7 @@ private:
     void comboBoxChanged(juce::ComboBox* box) override;
     void styleSlider(juce::Slider& s, juce::Label& l);
     void openFileChooser();
+    void showFileName();
     void openRomChooser();
     void timerCallback() override;
     void styleSmall(juce::Label& l);

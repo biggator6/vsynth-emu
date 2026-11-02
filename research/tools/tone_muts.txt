@@ -46,7 +46,7 @@ legato-source|v.srcKey = shiftKey(keys.prevMono);|v.srcKey = shiftKey(keys.prevP
 legato-level|        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n|
 live-key|if (k != s.kfKey) {\n                    s.kfKey = k;\n                    s.porta.restart|if (k == s.kfKey) {\n                    s.kfKey = k;\n                    s.porta.restart
 order-osc|if (v->on) oscStart(*v, *v, ctl);\n    if (v->osc2.on) oscStart(*v, v->osc2, ctl.osc2);|if (v->osc2.on) oscStart(*v, v->osc2, ctl.osc2);\n    if (v->on) oscStart(*v, *v, ctl);
-order-render|                if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);\n                else std::fill(tmp2, tmp2 + 64, 0.0f);|                if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);\n                else std::fill(tmp2, tmp2 + 64, 1.0f);
+order-render|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 0.0f);|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 1.0f);
 mix-skip|if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);|
 cosm-order|            case XtToneStep::Cosm1:\n                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f);|            case XtToneStep::Cosm1:\n                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
 cosm-tvf-env|else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());|else c.tvf.setBlock(cosmBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
@@ -69,10 +69,10 @@ cosm-spk|c.spk.noteOn({ ctl.cosm[k].spkType });|c.spk.noteOn({ 0 });
 cosm-lfo|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(k), seed[3 + k]);|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(k), seed[6]);
 cosm-update-env|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envA.level(), c.envA.smooth(), c.envB.level(), c.envB.smooth(),|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envB.level(), c.envB.smooth(), c.envA.level(), c.envA.smooth(),
 cosm-comb-root|s.robot \|\| s.analog \|\| !s.on);|s.robot \|\| !s.on);
-robot-any|v->robot = ctl.robot && v->on && !v->analog && cur->type == 1;|v->robot = ctl.robot && v->on && !v->analog;
-loop-mode|l.fwdMode = l.bwdMode = std::clamp(ctl.loopMode, 0, 2);|l.fwdMode = l.bwdMode = std::clamp(ctl.loopMode, 0, 1);
-loop-switch|l.on = ctl.loop;|l.on = false;
-mod-flag|v->mod.noteOn(modBlk, v->on && !v->analog && cur->channels == 2, false, v->on && v->analog, modShared,|v->mod.noteOn(modBlk, false, false, false, modShared,
+robot-any|v->robot = ctl.robot && v->on && !v->analog && v->wave->type == 1;|v->robot = ctl.robot && v->on && !v->analog;
+loop-mode|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 2);|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 1);
+loop-switch|l.on = o.loop;|l.on = false;
+mod-flag|v->mod.noteOn(modBlk, stereo(*v), stereo(v->osc2), v->on && v->analog, modShared,|v->mod.noteOn(modBlk, false, false, false, modShared,
 live-order|            if (anyChanged) cosmSetBlock(v, k);\n            if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));\n            if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));|            if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));\n            if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));\n            if (anyChanged) cosmSetBlock(v, k);
 any-changed|const bool anyChanged = !(c == ctl);|const bool anyChanged = !(c.cosm[0] == ctl.cosm[0]) \|\| !(c.cosm[1] == ctl.cosm[1]);
 diff-tva|\|\| c.aSens != ctl.aSens \|\| c.dSens != ctl.dSens \|\| c.rSens != ctl.rSens \|\| c.timeKF != ctl.timeKF;|\|\| c.aSens != ctl.aSens \|\| c.dSens != ctl.dSens \|\| c.rSens != ctl.rSens;
@@ -102,3 +102,17 @@ tva-off-gain|    v->gain = ctl.tvaOn ? v->velGain : 1.0f;|    v->gain = v->velGa
 tva-legato-gain|        v.gain = ctl.tvaOn ? v.velGain : 1.0f;\n        v.env.update|        v.gain = v.velGain;\n        v.env.update
 tva-live-gain|        if (tvaChanged) v.gain = ctl.tvaOn ? v.velGain : 1.0f;\n|
 tva-latch|        if (tvaChanged) v.gain = ctl.tvaOn ? v.velGain : 1.0f;|        if (tvaChanged) v.gain = ctl.tvaOn ? xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve) : 1.0f;
+osc2-render|else pcmBlock(v.osc2, tmp2);|else std::fill(tmp2, tmp2 + 64, 0.0f);
+osc2-plays|return waveOf(o) != nullptr;|return cur[0] != nullptr;
+osc2-robot|v->osc2.robot = ctl.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;|v->osc2.robot = false;
+osc2-robot-osc1|v->osc2.robot = ctl.osc2.robot &&|v->osc2.robot = ctl.robot &&
+band-loop-knobs|s.mb.setLoop(waveLoop(s, o));|s.mb.setLoop(waveLoop(s, ctl));
+solo-loop-knobs|s.solo.setLoop(waveLoop(s, o));|s.solo.setLoop(waveLoop(s, ctl));
+loop-frames|const int last = (int)s.wave->frames - 1;|const int last = (int)s.wave->frames - 2;
+solo-unit|lr[2 * i + 1] = r[i] * 0x1p31f;|lr[2 * i + 1] = r[i] * 0x1p30f;
+mod-stereo2|stereo(*v), stereo(v->osc2), v->on|stereo(*v), false, v->on
+mod-stereo1|modBlk, stereo(*v), stereo(v->osc2)|modBlk, false, stereo(v->osc2)
+band-start-gain|s.mb.setGainXt(gainStart, true);|s.mb.setGainXt(s.curGain, true);
+solo-start-gain|s.solo.resetGain(gainStart);|s.solo.resetGain(s.curGain);
+band-type|s.mb.noteOn(s.wave->wave, s.wave->type,|s.mb.noteOn(s.wave->wave, s.wave->type == 3 ? 5 : 3,
+rates-type|if (s.wave->type == 1) { s.solo.setRates|if (s.wave->type == 3) { s.solo.setRates

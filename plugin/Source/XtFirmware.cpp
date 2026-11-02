@@ -212,14 +212,8 @@ bool xtFwEnvKeyScales(std::vector<uint32_t>& out) {
     return true;
 }
 
-bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long frames, int channels,
-                  const XtFwSoloNote& note, long outFrames, std::vector<float>& out) {
-    out.clear();
-    if (g_rom.empty() || recs.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2)) return false;
-    auto M = std::make_unique<Machine>(g_rom);
-    if (!M->ok) return false;
-    Sh4& c = M->cpu;
-    constexpr uint32_t R8 = kRam, R9 = R8 + 0xe8, R10 = R9 + 0x3c, W2 = kRam + 0x1000, VP = kRam + 0x10000, OUT = 0x8D800000;
+void xtFwSoloImage(const std::vector<XtRecord>& recs, long frames, int channels, const XtLoop& loop,
+                   std::vector<uint8_t>& vpdt, uint8_t events[4][kXtFwSoloEventBytes]) {
     const uint32_t endPos = (uint32_t)frames * 16;
     // The vpdt: events at (stride·e + 8)·2, each {u32 flags, u32 position,
     // u32 segment-list offset, u32 record offset, u16 first mark}; segment
@@ -238,8 +232,8 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
     }
     const uint32_t term = rec0 + (uint32_t)stream.size() * 2;
     stream.push_back(256); stream.push_back(1);
-    if (VP + term + 0x100 > kStack - 0x1000 || kSamp + (uint32_t)(frames * channels * 2) + 0x10000 > OUT) return false;
-    std::vector<uint8_t> v(term + 4, 0);
+    vpdt.assign(term + 4, 0);
+    std::vector<uint8_t>& v = vpdt;
     auto w32 = [&](uint32_t o, uint32_t x) { std::memcpy(&v[o], &x, 4); };
     auto w16 = [&](uint32_t o, uint16_t x) { std::memcpy(&v[o], &x, 2); };
     w32(8, 2u << 16);
@@ -249,6 +243,40 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
     w32(seg1, term); w32(seg1 + 4, 1); w32(seg1 + 8, endPos);
     w32(cnt, (uint32_t)(stream.size() / 2));
     std::memcpy(&v[rec0], stream.data(), stream.size() * 2);
+    // the cached loop events at W2 + 0xb4·k (forward start, forward end,
+    // backward end, backward start): {u16 event, u16 mode, u32 position,
+    // u32 segment entry, u32 record, u16 mark}; the event jump puts the
+    // record's start at position + mark − its first length
+    const int pts[4] = { loop.fwdStart, loop.fwdEnd, loop.bwdEnd, loop.bwdStart };
+    const int modes[4] = { 0, loop.fwdMode, 0, loop.bwdMode };
+    for (int k = 0; k < 4; ++k) {
+        const int pos = pts[k] * 16;
+        uint32_t off = term;
+        int start = (int)endPos, first = 256;
+        for (size_t i = 0, s0 = 0; i < recs.size(); s0 += (size_t)recs[i].len16, ++i)
+            if ((int)s0 + recs[i].len16 > pos) { off = recOff[i]; start = (int)s0; first = std::min(recs[i].len16, 0xffff); break; }
+        uint8_t* R = events[k];
+        const uint16_t ev = 0, mode = (uint16_t)modes[k], mark = (uint16_t)(start + first - pos);
+        const uint32_t p32 = (uint32_t)pos;
+        std::memcpy(R, &ev, 2); std::memcpy(R + 2, &mode, 2); std::memcpy(R + 4, &p32, 4);
+        std::memcpy(R + 8, &seg0, 4); std::memcpy(R + 12, &off, 4); std::memcpy(R + 16, &mark, 2);
+    }
+}
+
+bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long frames, int channels,
+                  const XtFwSoloNote& note, long outFrames, std::vector<float>& out) {
+    out.clear();
+    if (g_rom.empty() || recs.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2)) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    constexpr uint32_t R8 = kRam, R9 = R8 + 0xe8, R10 = R9 + 0x3c, W2 = kRam + 0x1000, VP = kRam + 0x10000, OUT = 0x8D800000;
+    const uint32_t endPos = (uint32_t)frames * 16;
+    const int st = channels == 2 ? 16 : 10;
+    std::vector<uint8_t> v;
+    uint8_t ev[4][kXtFwSoloEventBytes];
+    xtFwSoloImage(recs, frames, channels, note.loop, v, ev);
+    if (VP + v.size() + 0x100 > kStack - 0x1000 || kSamp + (uint32_t)(frames * channels * 2) + 0x10000 > OUT) return false;
     c.write(VP, v.data(), v.size());
     c.write(kSamp, pcm, (size_t)(frames * channels * 2));
     auto wf = [&](uint32_t a, float x) { uint32_t u; std::memcpy(&u, &x, 4); c.wr32(a, u); };
@@ -257,22 +285,7 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
     if (!note.loop.on) {
         c.wr32(W2 + 0x16c, 0x7fffffff); c.wr32(W2 + 0xb8, 0x7fffffff);   // no loop points or cache bounds
     } else {
-        // the cached loop events at W2 + 0xb4·k (forward start, forward end,
-        // backward end, backward start): {u16 event, u16 mode, u32 position,
-        // u32 segment entry, u32 record, u16 mark}; the event jump puts the
-        // record's start at position + mark − its first length
-        const int pts[4] = { note.loop.fwdStart, note.loop.fwdEnd, note.loop.bwdEnd, note.loop.bwdStart };
-        const int modes[4] = { 0, note.loop.fwdMode, 0, note.loop.bwdMode };
-        for (uint32_t k = 0; k < 4; ++k) {
-            const int pos = pts[k] * 16;
-            uint32_t off = term;
-            int start = (int)endPos, first = 256;
-            for (size_t i = 0, s0 = 0; i < recs.size(); s0 += (size_t)recs[i].len16, ++i)
-                if ((int)s0 + recs[i].len16 > pos) { off = recOff[i]; start = (int)s0; first = std::min(recs[i].len16, 0xffff); break; }
-            const uint32_t R = W2 + 0xb4 * k;
-            c.wr16(R, 0); c.wr16(R + 2, (uint16_t)modes[k]); c.wr32(R + 4, (uint32_t)pos);
-            c.wr32(R + 8, seg0); c.wr32(R + 12, off); c.wr16(R + 16, (uint16_t)(start + first - pos));
-        }
+        for (uint32_t k = 0; k < 4; ++k) c.write(W2 + 0xb4 * k, ev[k], kXtFwSoloEventBytes);
     }
     c.wr8(R8 + 0, (uint8_t)(0x80 | (channels == 2 ? 0x40 : 0) | (note.robot ? 0x10 : 0) | (note.loop.on ? 1 : 0)));
     c.wr8(R8 + 3, 0x80); c.wr8(R8 + 7, 8); c.wr8(R8 + 8, (uint8_t)st); c.wr8(R8 + 9, channels == 2 ? 12 : 6);

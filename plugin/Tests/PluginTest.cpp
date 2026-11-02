@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
     // layout (TEST_SNAPSHOT_COSM2=1: with the COSM rows on COSM 2;
     // TEST_SNAPSHOT_TYPE=n: COSM 1's type, e.g. 6 for the 2nd Side Band rows;
     // TEST_SNAPSHOT_ANALOG=1: OSC Type ANALOG, its rows shown;
-    // TEST_SNAPSHOT_OSC2=1: with the OSC rows on OSC 2)
+    // TEST_SNAPSHOT_OSC2=1: with the OSC rows on OSC 2; =pcm: with OSC 2 on PCM too)
     if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
         if (std::getenv("TEST_SNAPSHOT_ANALOG")) {
             auto* prm = p.apvts.getParameter("oscType");
@@ -31,6 +31,10 @@ int main(int argc, char** argv) {
         if (const char* t = std::getenv("TEST_SNAPSHOT_TYPE")) {
             auto* prm = p.apvts.getParameter("cosmType");
             prm->setValueNotifyingHost(prm->convertTo0to1((float)std::atoi(t)));
+        }
+        if (const char* o2 = std::getenv("TEST_SNAPSHOT_OSC2"); o2 && juce::String(o2) == "pcm") {
+            auto* prm = p.apvts.getParameter(VSynthEmuProcessor::oscParamId(1, "oscType"));
+            prm->setValueNotifyingHost(prm->convertTo0to1(1.0f));
         }
         std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
         if (std::getenv("TEST_SNAPSHOT_COSM2"))      // the COSM rows switched to COSM 2 (the selector re-attaches them)
@@ -136,6 +140,9 @@ int main(int argc, char** argv) {
     // TEST_OSC2_PITCH="pitch,pitchKF,coarse,fine,random"; TEST_OSC2_ENV="pa,pd,ps,pr,pdepth,ta,td,ts,tr,tdepth,fa,fd,fs,fr,fdepth";
     // TEST_OSC2_LEV="level,levelKF,levelLfo,gain,oa,od,os,or,oaSens,odSens,orSens,oTimeKF,velSens,velCurve";
     // TEST_OSC2_LFO="wave,rate,pitchDepth,delay,mode,fade,offset,keysync"; TEST_OSC1_OFF=1: OSC 1's Switch off
+    // TEST_OSC2_WAVE="file.wav,solo|backing|ensemble": OSC 2 on, PCM, its own wave and Encode Type;
+    // TEST_OSC2_OSC="time,offset,timeKF,formant,formantKF,energy"; TEST_OSC2_LOOP="mode,start%,end%";
+    // TEST_OSC2_KEY=n (its Original Key); TEST_OSC2_ROBOT=1
     {
         XtSynth::OscControls& o = refCtl.osc2;
         XtAnalogParams& a = o.ana;
@@ -192,6 +199,24 @@ int main(int argc, char** argv) {
                                                           { "lfoFadeMode", o.lfoFadeMode }, { "lfoFade", o.lfoFade }, { "lfoOffset", o.lfoOffset }, { "lfoKeySync", ks } };
             for (auto [id, v] : knobs) set2(id, v);
         }
+        if (const char* e = std::getenv("TEST_OSC2_OSC")) {
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d", &o.oscTime, &o.oscTimeOffset, &o.oscTimeKF, &o.oscFormant, &o.oscFormantKF, &o.energy);
+            const std::pair<const char*, int> knobs[] = { { "oscTime", o.oscTime }, { "oscTimeOffset", o.oscTimeOffset }, { "oscTimeKF", o.oscTimeKF }, { "oscFormant", o.oscFormant },
+                                                          { "oscFormantKF", o.oscFormantKF }, { "energy", o.energy } };
+            for (auto [id, v] : knobs) set2(id, v);
+        }
+        if (const char* e = std::getenv("TEST_OSC2_LOOP")) {
+            float a = 0, b = 100;
+            std::sscanf(e, "%d,%f,%f", &o.loopMode, &a, &b);
+            o.loop = true; o.loopStart = a / 100.0f; o.loopEnd = b / 100.0f;
+            set2("loop", 1); set2("loopMode", o.loopMode);
+            for (auto [id, v] : { std::pair<const char*, float>{ "loopStart", a }, { "loopEnd", b } }) {
+                auto* prm = p.apvts.getParameter(VSynthEmuProcessor::oscParamId(1, id));
+                prm->setValueNotifyingHost(prm->convertTo0to1(v));
+            }
+        }
+        if (const char* e = std::getenv("TEST_OSC2_KEY")) { o.rootKey = std::atoi(e); set2("rootKey", o.rootKey); }
+        if (std::getenv("TEST_OSC2_ROBOT") && std::atoi(std::getenv("TEST_OSC2_ROBOT")) != 0) { o.robot = true; set2("robot", 1); }
         if (std::getenv("TEST_OSC1_OFF") && std::atoi(std::getenv("TEST_OSC1_OFF")) != 0) {
             refCtl.on = false;
             auto* prm = p.apvts.getParameter("oscSwitch");
@@ -504,6 +529,28 @@ int main(int argc, char** argv) {
     }
     // TEST_VELOCITY=v: the note-on velocity (1..127, default 127)
     const int noteVel = std::getenv("TEST_VELOCITY") ? std::clamp(std::atoi(std::getenv("TEST_VELOCITY")), 1, 127) : 127;
+    // OSC 2's wave first: the encodes run in turn, so OSC 1's status comes last
+    std::shared_ptr<XtEncoded> E2;
+    if (const char* e = std::getenv("TEST_OSC2_WAVE")) {
+        const juce::String spec(e), path2 = spec.upToFirstOccurrenceOf(",", false, false), how = spec.fromFirstOccurrenceOf(",", false, false);
+        const int idx2 = how == "backing" ? 2 : how == "ensemble" ? 3 : 1, type2 = how == "backing" ? 3 : how == "ensemble" ? 5 : 1;
+        for (auto [id, v] : { std::pair<const char*, int>{ "oscSwitch", 1 }, { "oscType", 1 }, { "encodeType", idx2 } }) {
+            auto* prm = p.apvts.getParameter(VSynthEmuProcessor::oscParamId(1, id));
+            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+        }
+        refCtl.osc2.on = true;
+        refCtl.osc2.oscType = 1;
+        p.loadFile(juce::File(path2), 1);
+        juce::AudioFormatManager fm2; fm2.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> rd2(fm2.createReaderFor(juce::File(path2)));
+        if (!rd2) { std::fprintf(stderr, "TEST_OSC2_WAVE: cannot read %s\n", path2.toRawUTF8()); return 1; }
+        juce::AudioBuffer<float> in2((int)rd2->numChannels, (int)rd2->lengthInSamples);
+        rd2->read(&in2, 0, in2.getNumSamples(), 0, true, true);
+        std::vector<std::vector<float>> ch2;
+        for (int c = 0; c < std::min(2, in2.getNumChannels()); ++c) ch2.emplace_back(in2.getReadPointer(c), in2.getReadPointer(c) + in2.getNumSamples());
+        E2 = xtSynthEncode(ch2, rd2->sampleRate, type2, 64, nullptr, rd2->usesFloatingPointData ? 16 : (int)rd2->bitsPerSample);
+        if (!E2) { std::fprintf(stderr, "TEST_OSC2_WAVE: encode failed\n"); return 1; }
+    }
     p.loadFile(juce::File(argv[2]));
     for (int i = 0; i < 600 && !p.getStatusText().startsWith("Encoded"); ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));   // the encode runs on the pool thread
@@ -534,6 +581,7 @@ int main(int argc, char** argv) {
         std::printf("encode repeatable: %s\n", same ? "yes" : "NO");
     }
     XtSynth ref; ref.prepare(rate); ref.setSample(E); ref.setControls(refCtl);
+    if (E2) ref.setSample(E2, 1);
 
     const int total = (int)(in.getNumSamples() * rate / rd->sampleRate);
     double maxDiff = 0, energy = 0, side = 0;

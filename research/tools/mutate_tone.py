@@ -19,8 +19,8 @@ subprocess.run(['bash', script, 'zz-base', 'constexpr float kLand', 'constexpr f
 def run(m):
     r = subprocess.run(['bash', script, m[0], m[1], m[2], cases, 'different'], env=env, capture_output=True, text=True)
     out = r.stdout + r.stderr
-    tot = [l for l in out.splitlines() if l.startswith('tone:') and 'different' in l]
-    return m[0], tot[-1] if tot else None
+    tot = re.findall(r'^tone[^:\n]*: (\d+) different', out, re.M)
+    return m[0], f'tone: {sum(map(int, tot))} different' if tot else None
 with cf.ThreadPoolExecutor(8) as ex:
     res = list(ex.map(run, muts))
 missed = errors = 0

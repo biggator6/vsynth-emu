@@ -25,7 +25,7 @@ namespace Params {
     static const juce::String kOscType       = "oscType";        // ANALOG, PCM
     // the OSC Switch, and OSC 2: each of OSC 1's own knobs with "osc2" before
     // it (oscSwitch → osc2OscSwitch, anaWave → osc2AnaWave, lfoRate →
-    // osc2LfoRate); off by default, and ANALOG only so far
+    // osc2LfoRate, encodeType → osc2EncodeType); off by default
     static const juce::String kOscSwitch     = "oscSwitch";
     static juce::String oscId(int k, const juce::String& id) { return k ? "osc2" + id.substring(0, 1).toUpperCase() + id.substring(1) : id; }
     static const juce::String kAnaWave       = "anaWave";
@@ -623,6 +623,28 @@ VSynthEmuProcessor::createParameterLayout() {
         kfP(Params::kOTimeKF, "Env Time KF", 0.0f);
         intP(Params::kOscVelSens, "Velocity Sens", -63, 63, 0);
         params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kOscVelCurve), n + "Velocity Curve", 0, 7, 1, curveName));
+        // its wave and the VariPhrase knobs
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kEncodeType), n + "Encode Type",
+            juce::StringArray { "Auto", "SOLO", "BACKING", "ENSEMBLE" }, 0));
+        intP(Params::kEncodeDepth, "Encode Depth", 0, 127, 64);
+        intP(Params::kRootKey, "Original Key", 0, 127, 60);
+        params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kEnergy), n + "Energy", 0, 127, 0,
+            juce::AudioParameterIntAttributes().withStringFromValueFunction(
+                [](int v, int) { return v == 0 ? juce::String("OFF") : juce::String(v); })));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kRobot), n + "Robot Voice", false));
+        intP(Params::kOscTime, "Time", -63, 63, 0);
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kOscTimeOffset), n + "Time Offset",
+            juce::StringArray { "BWD", "ZERO", "FWD" }, 2));
+        kfP(Params::kOscTimeKF, "Time KF", 0.0f);
+        intP(Params::kOscFormant, "Formant", -63, 63, 0);
+        kfP(Params::kOscFormantKF, "Formant KF", 0.0f);
+        params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kLoop), n + "Loop", false));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kLoopMode), n + "Loop Mode",
+            juce::StringArray { "One Shot", "One Way", "Alternate" }, 1));
+        params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kLoopStart), n + "Loop Start",
+            juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 0.0f, "%"));
+        params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kLoopEnd), n + "Loop End",
+            juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 100.0f, "%"));
     }
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kModSwitch, "MOD Switch", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kModType, "MOD Type",
@@ -647,14 +669,14 @@ VSynthEmuProcessor::VSynthEmuProcessor()
     formatManager_.registerBasicFormats();   // WAV, AIFF, OGG, FLAC
 
     for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
-                            Params::kEncodeType, Params::kEncodeDepth })
+                            Params::kEncodeType, Params::kEncodeDepth, Params::oscId(1, Params::kEncodeType), Params::oscId(1, Params::kEncodeDepth) })
         apvts.addParameterListener(id, this);
     findRom();
 }
 
 VSynthEmuProcessor::~VSynthEmuProcessor() {
     for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
-                            Params::kEncodeType, Params::kEncodeDepth })
+                            Params::kEncodeType, Params::kEncodeDepth, Params::oscId(1, Params::kEncodeType), Params::oscId(1, Params::kEncodeDepth) })
         apvts.removeParameterListener(id, this);
     encodePool_.removeAllJobs(true, 10000);
 }
@@ -684,7 +706,8 @@ bool VSynthEmuProcessor::setRomFile(const juce::File& file) {
     }
     apvts.state.setProperty("romPath", file.getFullPathName(), nullptr);
     setStatus("ROM ready");
-    reencode();
+    reencode(0);
+    reencode(1);
     return true;
 }
 
@@ -957,6 +980,18 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         o.oTimeKF = kf2(Params::kOTimeKF);
         o.oscVelSens = knob2(Params::kOscVelSens);
         o.oscVelCurve = knob2(Params::kOscVelCurve);
+        o.energy = knob2(Params::kEnergy);
+        o.rootKey = knob2(Params::kRootKey);
+        o.robot = apvts.getRawParameterValue(oscId(1, Params::kRobot))->load() > 0.5f;
+        o.oscTime = knob2(Params::kOscTime);
+        o.oscTimeOffset = knob2(Params::kOscTimeOffset);
+        o.oscTimeKF = kf2(Params::kOscTimeKF);
+        o.oscFormant = knob2(Params::kOscFormant);
+        o.oscFormantKF = kf2(Params::kOscFormantKF);
+        o.loop = apvts.getRawParameterValue(oscId(1, Params::kLoop))->load() >= 0.5f;
+        o.loopMode = knob2(Params::kLoopMode);
+        o.loopStart = snap(apvts.getRawParameterValue(oscId(1, Params::kLoopStart))->load(), 0.01f) / 100.0f;
+        o.loopEnd = snap(apvts.getRawParameterValue(oscId(1, Params::kLoopEnd))->load(), 0.01f) / 100.0f;
     }
     return c;
 }
@@ -1021,7 +1056,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         }
     }
 
-    if (playbackPos_ < 0 || !fileLoaded_.load())
+    if (playbackPos_ < 0 || !wave_[0].loaded.load())
         return;   // nothing to play — buffer is already silent
 
     // ── Grab the file buffer (non-blocking) ───────────────────────────────────
@@ -1029,8 +1064,8 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     if (!lock.isLocked())
         return;   // file is being swapped out — skip this block silently
 
-    const int fileSamples = fileBuffer_.getNumSamples();
-    const int fileChans   = fileBuffer_.getNumChannels();
+    const int fileSamples = wave_[0].buffer.getNumSamples();
+    const int fileChans   = wave_[0].buffer.getNumChannels();
 
     if (fileSamples == 0 || fileChans == 0)
         return;
@@ -1050,7 +1085,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
         for (int ch = 0; ch < fileChans; ++ch)
             monoIn.addFrom(0, written,
-                           fileBuffer_, ch,
+                           wave_[0].buffer, ch,
                            playbackPos_, toCopy,
                            1.0f / float(fileChans));
 
@@ -1083,7 +1118,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
 // ─── File Loading ─────────────────────────────────────────────────────────────
 
-void VSynthEmuProcessor::loadFile(const juce::File& file)
+void VSynthEmuProcessor::loadFile(const juce::File& file, int osc)
 {
     std::unique_ptr<juce::AudioFormatReader> reader(
         formatManager_.createReaderFor(file));
@@ -1105,19 +1140,22 @@ void VSynthEmuProcessor::loadFile(const juce::File& file)
 
     {
         juce::CriticalSection::ScopedLockType lock(bufferLock_);
-        fileBuffer_ = std::move(newBuffer);
-        fileRate_ = reader->sampleRate;
-        fileBits_ = reader->usesFloatingPointData ? 16 : (int)reader->bitsPerSample;   // float WAVs: rounded
-        fileLoaded_.store(true);
+        LoadedWave& w = wave_[osc];
+        w.buffer = std::move(newBuffer);
+        w.rate = reader->sampleRate;
+        w.bits = reader->usesFloatingPointData ? 16 : (int)reader->bitsPerSample;   // float WAVs: rounded
+        w.loaded.store(true);
     }
 
-    playbackPos_  = -1;
-    activeVoices_ = 0;
-    loadedFileName_ = file.getFileName();
+    if (osc == 0) {
+        playbackPos_  = -1;
+        activeVoices_ = 0;
+    }
+    wave_[osc].name = file.getFileName();
 
     // Persist the file path so it survives DAW project reload
-    apvts.state.setProperty("loadedFilePath", file.getFullPathName(), nullptr);
-    reencode();
+    apvts.state.setProperty(osc ? "loadedFilePath2" : "loadedFilePath", file.getFullPathName(), nullptr);
+    reencode(osc);
 }
 
 // ─── Encoding ─────────────────────────────────────────────────────────────────
@@ -1134,24 +1172,26 @@ juce::String VSynthEmuProcessor::getStatusText() const {
 
 // Encodes the loaded file as the XT would (XtSynth.h) on the pool thread;
 // a newer request discards an older result.
-void VSynthEmuProcessor::reencode() {
-    if (!fileLoaded_.load()) return;
+void VSynthEmuProcessor::reencode(int osc) {
+    LoadedWave& w = wave_[osc];
+    if (!w.loaded.load()) return;
     if (!xtSynthRomReady()) { xtActive_.store(false); return; }
     std::vector<std::vector<float>> chans;
     double rate;
     int bits;
     {
         juce::CriticalSection::ScopedLockType lock(bufferLock_);
-        for (int c = 0; c < std::min(2, fileBuffer_.getNumChannels()); ++c)
-            chans.emplace_back(fileBuffer_.getReadPointer(c), fileBuffer_.getReadPointer(c) + fileBuffer_.getNumSamples());
-        rate = fileRate_;
-        bits = fileBits_;
+        for (int c = 0; c < std::min(2, w.buffer.getNumChannels()); ++c)
+            chans.emplace_back(w.buffer.getReadPointer(c), w.buffer.getReadPointer(c) + w.buffer.getNumSamples());
+        rate = w.rate;
+        bits = w.bits;
     }
-    const int choice = (int)apvts.getRawParameterValue(Params::kEncodeType)->load();
-    const int depth  = (int)apvts.getRawParameterValue(Params::kEncodeDepth)->load();
-    const int gen = ++encodeGen_;
-    setStatus("Encoding...");
-    encodePool_.addJob([this, chans = std::move(chans), rate, bits, choice, depth, gen] {
+    const int choice = (int)apvts.getRawParameterValue(Params::oscId(osc, Params::kEncodeType))->load();
+    const int depth  = (int)apvts.getRawParameterValue(Params::oscId(osc, Params::kEncodeDepth))->load();
+    const int gen = ++w.gen;
+    const juce::String who = osc ? "OSC 2: " : "";
+    setStatus(who + "Encoding...");
+    encodePool_.addJob([this, chans = std::move(chans), rate, bits, choice, depth, gen, osc, who] {
         int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : 0;
         if (type == 0) {   // Auto: the engine's content classifier
             std::vector<float> mono(chans[0].size());
@@ -1165,21 +1205,29 @@ void VSynthEmuProcessor::reencode() {
         }
         std::string err;
         auto e = xtSynthEncode(chans, rate, type, depth, &err, bits);
-        if (gen != encodeGen_.load()) return;
-        if (!e) { setStatus("Encode failed: " + juce::String(err)); return; }
-        synth_.setSample(e);
+        if (gen != wave_[osc].gen.load()) return;
+        if (!e) { setStatus(who + "Encode failed: " + juce::String(err)); return; }
+        synth_.setSample(e, osc);
         xtActive_.store(true);
         static const char* names[] = { "", "SOLO", "", "BACKING", "", "ENSEMBLE" };
-        setStatus(juce::String("Encoded as ") + names[type] + (choice == 0 ? " (auto)" : ""));
+        setStatus(who + "Encoded as " + names[type] + (choice == 0 ? " (auto)" : ""));
     });
 }
 
-void VSynthEmuProcessor::handleAsyncUpdate() { reencode(); }
+void VSynthEmuProcessor::handleAsyncUpdate() {
+    for (int k = 0; k < 2; ++k)
+        if (wave_[k].reencode.exchange(false)) reencode(k);
+}
 
 // ─── Parameters ───────────────────────────────────────────────────────────────
 
 void VSynthEmuProcessor::parameterChanged(const juce::String& paramID, float /*newValue*/) {
-    if (paramID == Params::kEncodeType || paramID == Params::kEncodeDepth) { triggerAsyncUpdate(); return; }
+    for (int k = 0; k < 2; ++k)
+        if (paramID == Params::oscId(k, Params::kEncodeType) || paramID == Params::oscId(k, Params::kEncodeDepth)) {
+            wave_[k].reencode.store(true);
+            triggerAsyncUpdate();
+            return;
+        }
     syncParamsToEngine();
 }
 
@@ -1219,12 +1267,15 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
     const juce::String rom = apvts.state.getProperty("romPath").toString();
     if (rom.isNotEmpty() && !xtSynthRomReady() && juce::File(rom).existsAsFile())
         setRomFile(juce::File(rom));
-    juce::String path = apvts.state.getProperty("loadedFilePath").toString();
-    if (path.isNotEmpty())
+    for (int k = 0; k < 2; ++k)
     {
-        juce::File f(path);
-        if (f.existsAsFile())
-            loadFile(f);
+        juce::String path = apvts.state.getProperty(k ? "loadedFilePath2" : "loadedFilePath").toString();
+        if (path.isNotEmpty())
+        {
+            juce::File f(path);
+            if (f.existsAsFile())
+                loadFile(f, k);
+        }
     }
 }
 

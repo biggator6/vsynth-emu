@@ -270,10 +270,11 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      converter, note-on, update and routine, its level from the XT's hidden
      analog calibration. It needs no sample. Its pitch is against A4 and has
      no glide.
-   - OSC 2 (v86): a second analog oscillator on the same note, with its own
-     pitch, level, envelopes (Env 5…8) and LFO 2, summed with OSC 1 before the
-     COSM sections, as the MOD section does when off or set to MIX. X-MOD on OSC 1
-     (v87) reads OSC 2's output instead, so OSC 2 is not heard.
+   - OSC 2 (v86, PCM v103): a second oscillator on the same note, analog or PCM on
+     its own wave and encode, with its own pitch, level, envelopes (Env 5…8) and
+     LFO 2, summed with OSC 1 before the COSM sections, as the MOD section does
+     when off or set to MIX. X-MOD on OSC 1 (v87) reads OSC 2's output instead, so
+     OSC 2 is not heard.
    - the MOD section (v88–v91, XtMod): between the OSCs and the COSMs, MIX, RING, FM,
      ENV RING and OSC SYNC, with the Original Level, Attack and Release; a held note keeps
      its routine when the knobs change, as the firmware's does. FM's delay lines are one
@@ -337,6 +338,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   block (`xt_analog`); `mixBlock` walks the same order table as the check.
 - X-MOD (v87): its converter case on both OSCs, and the routine alone and under
   the firmware's own OSC 2 in the tone's render, equal the firmware (`xt_analog`).
+- PCM on OSC 2 (v103): `xt_tone`, a whole firmware tone against XtSynth with a wave on OSC 2; and in `xt_analog`
+  real encoded waves through the firmware's converter, note-on, updates and render: BACKING and ENSEMBLE equal
+  the firmware, SOLO within 2e−4 of full scale. Notes whose firmware reads leave the wave are not compared.
 - OSC 2 (v86): the converter with the input's OSC set, and both voices in a tone
   object through the firmware's binding, setup, install, updates and render
   (both buffers, the mix, the masks, the fields and the shared delay lines),

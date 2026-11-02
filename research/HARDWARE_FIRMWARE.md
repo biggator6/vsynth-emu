@@ -1545,6 +1545,141 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### PCM on OSC 2, with its own wave (2026-11-02, v103)
+
+Each OSC now has its own loaded sample and encode, as the XT binds a wave per OSC (IDs
+`0x2be`, `0x2f2`). OSC 2 plays SOLO, BACKING and ENSEMBLE through the same players, with
+its own Time, Formant, Energy, Robot, Loop, Offset, Original Key and Encode settings.
+
+**A VariPhrase voice is kind 2.** The block's +0 comes from the note-time converter
+(`0x894e2d20`): Encode Type 0 gives kind 1, types 1, 3 and 5 kind 2. So the note-on of
+everything the port plays is `0x894f3110`, not `0x8950b5b0` as pass 7 and v49 took it;
+that one is kind 1's. `0x894f3110` computes the five values, takes one voice update
+(`0x8950c1b0`, which moves nothing, the values being at their targets) and calls `0x8950bf70`,
+which sets the gain target (+0x154) and the gain (+0x158). This work and `xt_tone` found the
+same gain error from different sides; v95 has the fix.
+
+**The wave in the block.** The converter copies the input's +0xac…+0xd8 to the block's
++0x84…+0xb0, which the voice keeps, and the player reaches them through its +0x44:
+
+| Block | What |
+|---|---|
+| +0x84, +0x88 | the vpdt; the samples (band 0) |
+| +0x8c…+0x9c | bands 1…5 |
+| +0xa4 | the wave's header: +2 stereo, +8 the rate (44000 gives +0x990 = 1), +0xa the key, +0x18 tune, +0x1c tempo |
+| +0xac | the loop record (v55): +4…+0x10 the points, +0x18, +0x19 the modes, +0, +0x1b tuning, +0x14, +0x16 rate offsets |
+| +0xb0 | the cached loop events; its +0x2d0 is a rate factor |
+| +0xb4 | flags: 0x80 positions in samples, 0x40 stereo, 0x20 no VariPhrase (input +0x60 = 0), 0x10 Robot, 1 loop |
+| +0xb8, +0xbc | start and end: samples, or event numbers with 0x80 clear |
+
+- The block's +0x60 is the tempo (`0x894e2d20`); ×10000 it goes to the player's +0x4c,
+  against the header's +0x1c at +0x48. The check sets them equal. The port has no tempo.
+- The Wave Number reaches the wave store (`0x8949e5c0`…) as 2999 + the number, in r4.
+- A PCM OSC 2's mask is 0 in every block, so under OSC SYNC it syncs nothing.
+
+**The stereo flag**, a voice's +0x960. The setup (`0x894f21c0`) clears it and sets it from the
+wave's header for a PCM voice. Corrects v86: an analog voice never has it, HQ-SQUARE included (`0x89505170`
+clears it again, and the check confirms it on every waveform).
+
+| Reads it | Takes | Does |
+|---|---|---|
+| COSM 1's pick (`0x894eef70`) | OSC 1's | 1: the stereo table; 0: the mono routines |
+| COSM 2's pick | OSC 1's; OSC 2's in Type3 (v92) | the same |
+| TVA (`0x894f50e0`) | OSC 1's | stores it at +0x4c; nothing reads it |
+| MOD note-on (`0x894f1b00`) | both | +0x38: 0 neither, 1 both, 2 OSC 1, 3 OSC 2 |
+
+- So a stereo OSC 2 under a mono OSC 1 (or OSC 1 off) goes through the mono COSM routines,
+  which read L and write it to both. With a COSM on its R is lost; with none, L and R reach
+  the TVA apart.
+- The TVA's render (`0x894f5720`) reads L and R apart, flag or no flag. Its pair at +8, a send
+  the port does not have, takes (L + R)/2.
+- All the port's COSMs are the mono routines, which already behave so, so this case needed no code.
+  The gap is the other one: **a stereo wave on OSC 1 with a COSM on, and a stereo OSC 2 with COSM 2 on
+  in Type3,** take the stereo table on the XT and the mono routines here. `xt_tone` leaves those out.
+- `XtSynth` now gives the MOD OSC 2's flag too. FM's and ENV RING's routines depend on the two together.
+
+**Where the firmware's reads leave the wave.** Backward, at high pitch, a band player's read
+position runs far outside its wave, and on the XT it would read whatever is in memory. Here the
+interpreter faults on unmapped memory, in `xt_fw bandcmp` as well:
+- BACKING stereo: at 3× the pitch with walk −1, 3.5× at −0.5, 4× at −2, 5× at −4.8. Forward at
+  7.5×: 0 different.
+- BACKING mono: seen from about 6× (5.8× at walk −3.4). ENSEMBLE mono: seen at 14× and above.
+- ENSEMBLE stereo: seen from about 7×, without a fault while the read lands in mapped memory.
+
+The port reads 0 outside a wave. The check in `xt_analog` stops comparing a note at 3× or above
+backward, or in an Alternate loop, which comes back. A fifth of its notes end so (4,186 of 21,000), because it draws wide pitches; none faulted first. `xt_tone` lays its waves among zeros and
+counts the notes that leave memory altogether.
+
+**Checks.**
+- **`xt_tone`, the real XtSynth against the firmware's whole tone**, with new cases after its others: a wave on
+  OSC 2, over OSC 1 off, analog or on another wave, with every COSM type, the MOD Types, the three Structures,
+  loops, Robot, second notes, legato, truncation and the panel moved during a note. Compared every block as in
+  v100: both OSC buffers, the mix, COSM's output, the TVA and the output. In fcheck, 1,000 such cases: 1,367 notes, 96,381 blocks, 1,870,252 checks,
+  0 different. Four other seeds, 1,500 cases each: 8,245 notes, 578,634 blocks, 11,176,012 checks, 0 different; 738 of
+  those notes were left off when a read left memory.
+- Its exceptions: a SOLO wave's buffers and what follows them keep v100's tolerance, as `XtSoloVoice` is not exact;
+  the stereo COSM cases above; Lo-Fi over SOLO; X-MOD over a SOLO OSC 2. A stereo OSC 2 under a mono OSC 1 stays
+  in with its COSMs on, so the mono routines' dropped R is compared.
+- `xt_analog`, a pass with six encoded waves, the players on their own, with the five values, both buffers, the
+  mix and the MOD's state every block, and RING, FM, ENV RING and OSC SYNC over a PCM OSC 2. In fcheck, 3,000 cases: 57,154 note-ons and updates, 133,531 blocks, 0
+  different. Wide, 21,000 cases: 409,838 and 959,388, 0 different.
+- **SOLO is not 0 different and cannot be yet:** its largest difference there is 4.14e−5 of full scale, against
+  a limit of 2e−4. Its five values are exact, and so is the firmware's sum of its own buffers.
+- The stereo flag at the firmware's own tone note-on (`0x894f5e60`): the six combinations of OSC 1 off, mono or
+  stereo with OSC 2 mono or stereo, 0 different. The TVA's flag: 0 words different with it 0 and 1; changing
+  R moved no word of the main pair's L and all 32 of its R.
+- Deliberate errors. In `xt_analog`, 37: 33 caught. The 4 unnoticed change nothing compared: one moves the loop
+  modes on both sides alike, so it is no error, and three change the wave's loop record, which the players do not
+  read on this path. In XtSynth through `xt_tone` (`mutate_tone.py`), 14 added on the two waves' paths: all caught.
+  The list now stands at 118, and 116 are caught at fcheck's 2,000 cases. The two others: `legato-order`, recorded as
+  exact in v100, and `loop-frames`, which moves a loop point by one sample only when the rounding flips, and which 6,000 cases
+  catch (560 differences).
+- Earlier rounds found real gaps, now closed. Two SOLO gain errors only moved the largest difference, hence the
+  limit. Energy's step changes nothing while its target stands still, hence Energy moving. And the analog OSC 1
+  skipped HQ-SQUARE: with it in, the check refused a correction I had made to the MOD's flags on the strength
+  of v86's note, which was wrong.
+
+**The wiring, through XtSynth's CLI and PluginTest:**
+- OSC 1 alone against OSC 2 alone, the same wave and settings (Time, Formant, Energy, Loop, level, amp envelope,
+  pitch, LFO, pitch envelope), all six wave types, and Robot on SOLO: bit-identical.
+- OSC 2 alone on wave B while OSC 1 holds wave A, against OSC 1 alone on wave B, four pairs: bit-identical.
+  No other comparison would notice OSC 2 playing OSC 1's wave.
+- Both OSCs on two different waves against each alone, summed: at most 1.64e−7 apart, peak up to 1.9.
+- No wave on OSC 1 is the same as OSC 1 off, bit for bit.
+- The Structures, by settings that must agree, on three pairs of waves: OSC 2 alone through COSM 2 after the mix
+  (Type1) and before it (Type3), and OSC 1 with a silent OSC 2 through COSM 1 after the MOD (Type1) and before it
+  (Type2), for ten COSM settings: 60 comparisons, all bit-identical.
+- PluginTest at notes 30, 60 and 100, with OSC 2 on BACKING, ENSEMBLE, SOLO, stereo SOLO with knobs and a loop, Robot,
+  and alone: 4/4 bit-identical each. Under Type2 and Type3 with a TVF on each COSM, 18 runs: the same.
+  All of this with the TVA Switch off, the default since v102, and again on (`TEST_TVA_ON=1`, `XT_TVA_ON=1`): the same results.
+
+**Not checked.**
+- Against real hardware. The check is the firmware in the interpreter.
+- `xtMbLoopEvents` and `xtFwSoloImage` build the cached loop events: the firmware's own builder is still
+  not found (v55), so a loop is compared from those events. `0x894f3110` also copies the wave's loop
+  record into the voice, but changing the record's points or modes changed nothing compared: on this path
+  the players act on the cached events.
+- An OSC Type changed between notes: the firmware's analog note then starts from what the player left
+  in the same words of the voice. The port keeps them apart.
+- A wave whose header has another rate, tune or tempo (the checks set them to the values that leave the
+  pitch alone, as the port assumes).
+- Two waves that share one record of cached loop events: `xt_tone` gives each OSC its own wave, as the port
+  computes a loop from each OSC's knobs.
+
+**Plugin.**
+- `XtSynth::setSample(e, osc)`, `cur`, `pending` and `retired` per OSC; a new wave on either stops the
+  voices. A voice latches its wave at note-on (`OscVoice::wave`). `waveLoop(s, o)` reads the OSC's own knobs.
+- Parameters at the end of the layout: `osc2EncodeType`, `osc2EncodeDepth`, `osc2RootKey`, `osc2Energy`,
+  `osc2Robot`, `osc2OscTime`, `osc2OscTimeOffset`, `osc2OscTimeKF`, `osc2OscFormant`, `osc2OscFormantKF`,
+  `osc2Loop`, `osc2LoopMode`, `osc2LoopStart`, `osc2LoopEnd`.
+- `VSynthEmuProcessor::loadFile(file, osc)`, one encode queue for both, the path saved as
+  `loadedFilePath2`. Status lines for OSC 2 start "OSC 2: ".
+- Editor: with OSC 2 selected, Load loads into it and the file name shows its wave; the PCM rows, the
+  TIME and FORMANT knobs and Robot re-attach (`attachOsc`), so `kXtStripH` does not change.
+- `XT_WAVE2`, `XT_WAVE1`, `XT_OSC2`, `XT_LOOP2`, `XT_ROBOT2`, `XT_KEY2`; `TEST_OSC2_WAVE`, `TEST_OSC2_OSC`,
+  `TEST_OSC2_LOOP`, `TEST_OSC2_KEY`, `TEST_OSC2_ROBOT`, `TEST_SNAPSHOT_OSC2=pcm`. `XT_ANALOG_ONLY=pcm` runs
+  `xt_analog`'s new passes alone.
+
 ### The TVA Switch off by default (2026-11-02, v102)
 
 The user chose the XT's default over v101's on. So a new patch has the TVA off: full level from the note's start, no velocity on the level, the amp envelope's knobs doing nothing until the box is ticked. The sound now ends with the note: a note-off ends the voice within one update, about 10 ms, whatever the Release, a COSM's tail or the OSC's own amp envelope would have done. Measured on a held note with the TVA Release at 64: off, the last non-zero frame is 431 after the note-off; on, it rings past 30,000.
@@ -2321,7 +2456,7 @@ pitch path are done and checked. What is left:
   as a first step.
 - The Time, Formant, Energy, Robot, Loop and Offset rows, re-attached by `attachOsc`, and
   the PITCH, TIME and FORMANT knobs. The fields are already in `OscControls`.
-- The stereo flag. A voice's +0x960 is 1 for a stereo wave and for code 1 (HQ-SQUARE). In
+- The stereo flag. A voice's +0x960 is 1 for a stereo wave (not for HQ-SQUARE, v103). In
   Structures 0 and 1 both COSMs and the TVA take OSC 1's flag only (`0x894eef70`,
   `0x894f50e0`), so a stereo OSC 2 under a mono OSC 1 goes through their mono routines. The
   port's COSM and TVA treat both channels alike, which is right while both are the same on

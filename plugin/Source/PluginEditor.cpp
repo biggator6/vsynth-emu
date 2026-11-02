@@ -463,7 +463,6 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
 
     attachOsc(0);
     attachMainKnobs(processor_.hasRom());
-    robotAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, "robot",        robotBtn_);
 
     robotBtn_.setColour(juce::ToggleButton::textColourId,     juce::Colours::lightblue);
     robotBtn_.setColour(juce::ToggleButton::tickColourId,     juce::Colour(0xFF00BFA5));
@@ -494,11 +493,14 @@ void VSynthEmuEditor::attachMainKnobs(bool xt) {
     pitchAtt_.reset();
     timeAtt_.reset();
     formantAtt_.reset();
-    // with the XT, the OSC's Pitch, Time and Formant knobs (Pitch Shift stays
-    // a host parameter, added to the patch's Coarse/Fine Tune)
-    pitchAtt_   = std::make_unique<SliderAtt>(processor_.apvts, xt ? (oscK_ ? "osc2OscPitch" : "oscPitch") : "pitchShift", pitchSlider_);
-    timeAtt_    = std::make_unique<SliderAtt>(processor_.apvts, xt ? "oscTime" : "timeStretch", timeSlider_);
-    formantAtt_ = std::make_unique<SliderAtt>(processor_.apvts, xt ? "oscFormant" : "formantShift", formantSlider_);
+    robotAtt_.reset();
+    // with the XT, the selected OSC's Pitch, Time and Formant knobs and Robot
+    // Voice (Pitch Shift stays a host parameter, added to the patch's Coarse/Fine Tune)
+    auto id = [this](const char* name) { return VSynthEmuProcessor::oscParamId(oscK_, name); };
+    pitchAtt_   = std::make_unique<SliderAtt>(processor_.apvts, xt ? id("oscPitch") : juce::String("pitchShift"), pitchSlider_);
+    timeAtt_    = std::make_unique<SliderAtt>(processor_.apvts, xt ? id("oscTime") : juce::String("timeStretch"), timeSlider_);
+    formantAtt_ = std::make_unique<SliderAtt>(processor_.apvts, xt ? id("oscFormant") : juce::String("formantShift"), formantSlider_);
+    robotAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, xt ? id("robot") : juce::String("robot"), robotBtn_);
     mainKnobsXt_ = xt;
 }
 
@@ -593,18 +595,31 @@ void VSynthEmuEditor::attachCosm(int k) {
     showCosmType();
 }
 
-// The selected OSC's own rows: its switch, type, analog knobs, pitch, TVA, amp
-// envelope, velocity to level, pitch, time and formant envelopes and LFO; the
-// PITCH knob too.  OSC 2 is ANALOG only so far, so the PCM rows, the TIME and
-// FORMANT knobs and Encode stay OSC 1's.
+// The selected OSC's own rows: its switch, type, wave (the Load button, the file
+// name, Encode), Key and Depth, Energy and the VariPhrase knobs, Loop, analog
+// knobs, pitch, TVA, amp envelope, velocity to level, pitch, time and formant
+// envelopes and LFO; the PITCH, TIME and FORMANT knobs and Robot too.
 void VSynthEmuEditor::attachOsc(int k) {
     oscK_ = k;
     auto id = [k](const char* name) { return VSynthEmuProcessor::oscParamId(k, name); };
+    showFileName();
     oscOnAtt_.reset(); oscTypeAtt_.reset(); anaWaveAtt_.reset();
     oscOnAtt_ = std::make_unique<ButtonAtt>(processor_.apvts, id("oscSwitch"), oscOnBtn_);
     oscTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("oscType"), oscTypeBox_);
     anaWaveAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("anaWave"), anaWaveBox_);
-    oscTypeBox_.setItemEnabled(2, k == 0);
+    encodeAtt_.reset(); keyAtt_.reset(); depthAtt_.reset(); energyAtt_.reset(); oscTkfAtt_.reset(); oscFkfAtt_.reset(); timeOffsetAtt_.reset();
+    loopAtt_.reset(); loopModeAtt_.reset(); loopStartAtt_.reset(); loopEndAtt_.reset();
+    encodeAtt_     = std::make_unique<ComboAtt>(processor_.apvts, id("encodeType"), encodeBox_);
+    keyAtt_        = std::make_unique<SliderAtt>(processor_.apvts, id("rootKey"), keySlider_);
+    depthAtt_      = std::make_unique<SliderAtt>(processor_.apvts, id("encodeDepth"), depthSlider_);
+    energyAtt_     = std::make_unique<SliderAtt>(processor_.apvts, id("energy"), energySlider_);
+    oscTkfAtt_     = std::make_unique<SliderAtt>(processor_.apvts, id("oscTimeKF"), oscTkfSlider_);
+    oscFkfAtt_     = std::make_unique<SliderAtt>(processor_.apvts, id("oscFormantKF"), oscFkfSlider_);
+    timeOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("oscTimeOffset"), timeOffsetBox_);
+    loopAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("loop"), loopBtn_);
+    loopModeAtt_   = std::make_unique<ComboAtt>(processor_.apvts, id("loopMode"), loopModeBox_);
+    loopStartAtt_  = std::make_unique<SliderAtt>(processor_.apvts, id("loopStart"), loopStartSlider_);
+    loopEndAtt_    = std::make_unique<SliderAtt>(processor_.apvts, id("loopEnd"), loopEndSlider_);
     static const char* const anaIds[kAnaKnobs] = { "anaImpact", "anaPw", "anaPwKF", "anaFat", "anaFatKF", "anaPwLfo", "anaPwEnv", "anaFatLfo", "anaFatEnv", "anaDetune", "anaSubOct", "anaSubLevel" };
     for (int i = 0; i < kAnaKnobs; ++i) {
         anaAtt_[i].reset();
@@ -641,7 +656,7 @@ void VSynthEmuEditor::attachOsc(int k) {
 // ANALOG shows the analog oscillator's three rows where the PCM OSC's
 // (Encode, Key and Depth; Energy and the VariPhrase knobs; Loop) are.
 void VSynthEmuEditor::showOscType() {
-    const bool ana = oscK_ == 1 || oscTypeBox_.getSelectedItemIndex() == 0;
+    const bool ana = oscTypeBox_.getSelectedItemIndex() == 0;
     for (juce::Component* cpt : { (juce::Component*)&encodeLabel_, (juce::Component*)&encodeBox_, (juce::Component*)&keyLabel_,
                                   (juce::Component*)&keySlider_, (juce::Component*)&depthLabel_, (juce::Component*)&depthSlider_,
                                   (juce::Component*)&energyLabel_, (juce::Component*)&energySlider_, (juce::Component*)&offsetLabel_,
@@ -1037,11 +1052,16 @@ void VSynthEmuEditor::openFileChooser() {
             auto result = fc.getResult();
             if (result.existsAsFile())
             {
-                processor_.loadFile(result);
-                fileNameLabel_.setText(processor_.getLoadedFileName(),
-                                       juce::dontSendNotification);
+                processor_.loadFile(result, oscK_);
+                showFileName();
             }
         });
+}
+
+// The selected OSC's wave: Load loads into that OSC.
+void VSynthEmuEditor::showFileName() {
+    const juce::String name = processor_.hasFileLoaded(oscK_) ? processor_.getLoadedFileName(oscK_) : juce::String("No file loaded");
+    fileNameLabel_.setText(oscK_ ? "OSC 2: " + name : name, juce::dontSendNotification);
 }
 
 // The COSM rows: the selector, switch and type, then the type's own area

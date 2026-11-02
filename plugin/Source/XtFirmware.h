@@ -40,6 +40,13 @@ struct XtFwSoloNote {
 bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long frames, int channels,
                   const XtFwSoloNote& note, long outFrames, std::vector<float>& out);
 
+// That one-segment SOLO vpdt, and the player's four cached loop events for
+// `loop` (18 bytes each, 0xb4 apart at the player's +0x6c), as xtFwSoloPlay
+// writes them.
+constexpr int kXtFwSoloEventBytes = 18;
+void xtFwSoloImage(const std::vector<XtRecord>& recs, long frames, int channels, const XtLoop& loop,
+                   std::vector<uint8_t>& vpdt, uint8_t events[4][kXtFwSoloEventBytes]);
+
 // The firmware's own BACKING (3) or ENSEMBLE (5) player, for validation: the
 // load-time band rebuild, then the player set up by its note-on (0x89510980
 // / 0x89510130, the start or end event by the sign of walk) and run per

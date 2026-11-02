@@ -1672,11 +1672,13 @@ uint32_t XtAnalogOsc::subLaSaw(float* lr, uint32_t sync) {
 #ifdef XT_ANALOG_MAIN
 // xt_analog <rom.2.bin> [cases]: the analog converter (0x894e1920), the
 // note-on (0x89504af0), the 10-ms update (0x89505400) and SAW (0x89508c20)
-// against the firmware in the SH-4 interpreter.  The system's analog
+// against the firmware in the SH-4 interpreter (XT_ANALOG_ONLY=pcm: the last
+// passes alone, a PCM voice on OSC 2 and the stereo flag).  The system's analog
 // calibration (0x894e5f80) is set from the descriptors' defaults; the matrix
 // fetch (0x894d96d0) returns the case's modulation, the controller getters a
 // zeroed block.
 #include "Sh4Interp.h"
+#include "XtEnvelope.h"
 #include "XtFirmware.h"
 #include <cstdlib>
 #include <cstring>
@@ -1711,7 +1713,9 @@ int main(int argc, char** argv) {
     uint32_t seed = 12345;
     auto rnd = [&]() { seed = seed * 1103515245u + 12345u; return (seed >> 8) & 0xffff; };
     auto frnd = [&](float lo, float hi) { return lo + (hi - lo) * (float)rnd() / 65535.0f; };
-    const int nCases = argc > 2 ? std::atoi(argv[2]) : 3000;
+    const int nPcm = argc > 2 ? std::atoi(argv[2]) : 3000;
+    const bool pcmOnly = std::getenv("XT_ANALOG_ONLY") != nullptr;   // XT_ANALOG_ONLY=pcm: the PCM pass alone
+    const int nCases = pcmOnly ? 0 : nPcm;
 
     // the analog calibration, as the system updater writes it from the parameters
     std::vector<uint8_t> z(0x1000, 0);
@@ -1772,7 +1776,7 @@ int main(int argc, char** argv) {
 
     // The converter
     long cb = 0, cn = 0;
-    auto converterCases = [&](int n, int wave) { for (int g = 0; g < n; ++g) {
+    auto converterCases = [&](int n, int wave) { if (pcmOnly) return true; for (int g = 0; g < n; ++g) {
         Case k = newCase(true);
         if (wave >= 0) { k.p.wave = wave; k.p.detune = (int)(rnd() % 127) - 63; }
         if (wave == -2) {                       // the sub oscillator: Sub Octave, Level and Detune; every depth's segment
@@ -3265,6 +3269,501 @@ int main(int argc, char** argv) {
     std::printf("structure stereo flags: %ld routines, %ld different\n", fN, fB);
     bad += fB;
     bad += sB;
+
+    // PCM on OSC 2.  Real encoded waves in the interpreter's memory, each OSC with
+    // its own: the VariPhrase converter (0x894e2f20) with the kind its note-time
+    // twin (0x894e2d20) gives, the binding, the voice setup and note-on (0x894f21c0,
+    // 0x894f3110), the install (0x894f3660), the MOD, the updates (0x894f2090) and
+    // the tone's render, with the COSM sections and the TVA stubbed.  Compared every
+    // block: the five values the update moves, both buffers and the mix.  OSC 1 is
+    // off, analog (X-MOD among them, reading OSC 2's PCM) or PCM.  The band players
+    // must be exact.  The SOLO player is not (`solocmp`), so its buffers count
+    // apart, within a limit of 2e-4 of full scale, and the mix of the firmware's own
+    // buffers stands in for the sum.  Energy, which only a new block moves, changes
+    // during some notes; some loop, some SOLO notes are Robot Voice, and on some
+    // the MOD is RING, FM, ENV RING or OSC SYNC.
+    // the stubs this pass runs on, whatever the passes before it left
+    c.hook(0x894f5570, [](Sh4& m) { m.ret(0); });
+    c.hook(STUB, [](Sh4& m) { m.ret(0); });
+    c.wr32(TN + 0x14d0, STUB); c.wr32(TN + 0x1634, STUB);
+    if (!xtMbLoadTables(argv[1]) || !xtEnvLoadTables(argv[1])) { std::fprintf(stderr, "pcm: player tables\n"); return 1; }
+    {
+        std::vector<float> v;
+        if (!xtFwOscTimeKeyScales(v)) { std::fprintf(stderr, "pcm: time key scales\n"); return 1; }
+        xtOscSetTimeKeyScales(v.data());
+        if (!xtFwOscPitchRatios(v)) { std::fprintf(stderr, "pcm: pitch ratios\n"); return 1; }
+        xtOscSetPitchRatios(v.data());
+    }
+    constexpr uint32_t kWaves2 = 0x8D000000;
+    c.mapRam(kWaves2, 0x2000000);
+    struct PcmWave {
+        int type = 1, ch = 1;
+        long frames = 0;
+        std::vector<int16_t> pcm;
+        std::vector<uint8_t> vpdt;
+        std::vector<XtRecord> recs;
+        XtMbBands bands;
+        XtMbWave w;
+        XtSoloPlan plan;
+        uint32_t vp = 0, samp = 0, band[5] = {}, hdr = 0, tune = 0, cache = 0;
+    };
+    constexpr int kPw = 6, kPwFrames = 6000;
+    constexpr int kPwTempo = 1200000;                     // the header's +0x1c, what the block's +0x60 is set to meet
+    static PcmWave pw[kPw];
+    {
+        uint32_t next = kWaves2;
+        auto place = [&](const void* d, size_t n) {
+            const uint32_t a = next;
+            if (d) c.write(a, d, n);
+            next = (a + (uint32_t)n + 0x40000u) & ~0xfffu;    // zeros between: reads past a band find what the port's do
+            return a;
+        };
+        const int types[kPw] = { 3, 3, 5, 5, 1, 1 };
+        for (int i = 0; i < kPw; ++i) {
+            PcmWave& W = pw[i];
+            W.type = types[i]; W.ch = 1 + (i & 1); W.frames = kPwFrames;
+            W.pcm.resize((size_t)(W.frames * W.ch));
+            uint32_t n = 0x9e3779b9u + (uint32_t)i;
+            for (long t = 0; t < W.frames; ++t) {
+                const double burst = std::exp(-(double)(t % 2000) / 700.0);
+                for (int k = 0; k < W.ch; ++k) {
+                    n = n * 1664525u + 1013904223u;
+                    const double p = 2.0 * 3.14159265358979 * (double)t;
+                    const double x = 9000.0 * std::sin(p / (97.0 + 13.0 * k + 5.0 * i)) + 3500.0 * std::sin(p / (31.0 + 7.0 * k)) + 400.0 * ((double)(n >> 16) / 32768.0 - 1.0);
+                    W.pcm[(size_t)(t * W.ch + k)] = (int16_t)(x * (0.35 + burst));
+                }
+            }
+            if (W.type == 1) {
+                std::vector<int16_t> x16((size_t)W.frames);
+                for (long t = 0; t < W.frames; ++t)
+                    x16[(size_t)t] = W.ch == 2 ? (int16_t)(((int)W.pcm[(size_t)(2 * t)] + (int)W.pcm[(size_t)(2 * t + 1)]) >> 1) : W.pcm[(size_t)t];
+                if (!xtFwSoloEncode(x16.data(), (int)W.frames, W.recs) || W.recs.size() < 2) { std::fprintf(stderr, "pcm: solo encode\n"); return 1; }
+                XtSoloPlan& Q = W.plan;
+                Q.in.resize((size_t)W.frames);
+                if (W.ch == 2) Q.inR.resize((size_t)W.frames);
+                for (long t = 0; t < W.frames; ++t) {
+                    Q.in[(size_t)t] = (float)W.pcm[(size_t)(t * W.ch)] / 32768.0f;
+                    if (W.ch == 2) Q.inR[(size_t)t] = (float)W.pcm[(size_t)(2 * t + 1)] / 32768.0f;
+                }
+                const size_t nc = W.recs.size();
+                Q.segStart.resize(nc); Q.segLen.resize(nc); Q.voiced.resize(nc); Q.info.resize(nc);
+                for (size_t r = 0; r < nc; ++r) {
+                    Q.segStart[r] = W.recs[r].start16 / 16.0;
+                    const double end = r + 1 < nc ? W.recs[r + 1].start16 / 16.0 : (double)W.frames;
+                    Q.segLen[r] = std::max(1.0 / 16.0, end - Q.segStart[r]);
+                    Q.voiced[r] = (W.recs[r].info & 4) != 0;
+                    Q.info[r] = W.recs[r].info;
+                }
+                uint8_t ev[4][kXtFwSoloEventBytes];
+                xtFwSoloImage(W.recs, W.frames, W.ch, XtLoop{}, W.vpdt, ev);
+                W.vp = place(W.vpdt.data(), W.vpdt.size());
+                W.samp = place(W.pcm.data(), W.pcm.size() * 2);
+            } else {
+                if (!xtFwEncodeMulti(W.type, W.pcm.data(), W.frames, W.ch, W.vpdt, 64) || !xtFwLoadBands(W.type, W.pcm.data(), W.frames, W.ch, W.bands)) {
+                    std::fprintf(stderr, "pcm: band encode\n");
+                    return 1;
+                }
+                W.w.vpdt = W.vpdt.data(); W.w.vpdtBytes = W.vpdt.size();
+                xtMbAttach(W.bands, W.w);
+                W.vp = place(W.vpdt.data(), W.vpdt.size());
+                W.samp = place(W.bands.buf[0].data(), W.bands.buf[0].size() * 2);
+                for (int k = 0; k < 5; ++k) W.band[k] = place(W.bands.buf[k + 1].data(), W.bands.buf[k + 1].size() * 2);
+            }
+            W.hdr = place(nullptr, 0x100);
+            W.tune = place(nullptr, 0x100);
+            W.cache = place(nullptr, 0x400);
+            c.wr8(W.hdr + 2, W.ch == 2 ? 1 : 0);
+            c.wr16(W.hdr + 8, 44000);                         // the rate ratio (+0x990) comes out 1
+            c.wr8(W.hdr + 0xa, 60);
+            c.wr32(W.hdr + 0x1c, (uint32_t)kPwTempo);
+            c.wr32(W.cache + 0x16c, 0x7fffffff); c.wr32(W.cache + 0xb8, 0x7fffffff);   // no loop points or cache bounds
+            wf(W.cache + 0x2d0, 1.0f);
+            if (W.type != 1) std::printf("pcm wave %d: type %d, %d channel(s), %zu bytes of vpdt\n", i, W.type, W.ch, W.vpdt.size());
+            else std::printf("pcm wave %d: type 1, %d channel(s), %zu records\n", i, W.ch, W.recs.size());
+        }
+    }
+    struct PcmKnobs { int key, key2, vel, coarse, kf, fine, gainDb, level, levelKf, levelLfo, velCurve, velSens, pitch, pEnv, pLfo, time, offset, timeKf, tEnv, tLfo, formant, formantKf, fEnv, fLfo, energy, orig; };
+    auto newPcm = [&] {
+        PcmKnobs k;
+        k.key = 24 + (int)(rnd() % 80); k.key2 = (int)(rnd() % 128); k.vel = 1 + (int)(rnd() % 127);
+        k.coarse = (int)(rnd() % 25) - 12; k.kf = (rnd() & 1) ? 1000 : (int)(rnd() % 41) * 100 - 2000; k.fine = (int)(rnd() % 1001) - 500;
+        k.gainDb = (int)(rnd() % 25) - 12; k.level = (int)(rnd() % 128); k.levelKf = (int)(rnd() % 41) * 10 - 200; k.levelLfo = (int)(rnd() % 127) - 63;
+        k.velCurve = (int)(rnd() % 8); k.velSens = (int)(rnd() % 127) - 63;
+        k.pitch = (int)(rnd() % 61) - 30; k.pEnv = (int)(rnd() % 61) - 30; k.pLfo = (int)(rnd() % 61) - 30;
+        k.time = (int)(rnd() % 127) - 63; k.offset = (int)(rnd() % 3); k.timeKf = (int)(rnd() % 41) * 10 - 200; k.tEnv = (int)(rnd() % 127) - 63; k.tLfo = (int)(rnd() % 127) - 63;
+        k.formant = (int)(rnd() % 127) - 63; k.formantKf = (int)(rnd() % 41) * 10 - 200; k.fEnv = (int)(rnd() % 127) - 63; k.fLfo = (int)(rnd() % 127) - 63;
+        k.energy = (rnd() & 1) ? 0 : (int)(rnd() % 128);
+        k.orig = 40 + (int)(rnd() % 50);
+        return k;
+    };
+    auto pcmInput = [&](const PcmKnobs& k, const PcmWave& W, int osc, bool loop = false, bool robot = false) {
+        c.write(P, z.data(), 0x100); c.write(part, z.data(), 0x200);
+        c.wr8(P + 2, (uint8_t)osc); c.wr8(P + 3, (uint8_t)k.key); c.wr8(P + 4, (uint8_t)k.vel); c.wr8(P + 0xa, (uint8_t)(int8_t)k.gainDb);
+        c.wr8(P + 0xc, (uint8_t)(int8_t)k.pitch); c.wr16(P + 0xe, (uint16_t)(int16_t)k.kf); c.wr8(P + 0x10, (uint8_t)(int8_t)k.pLfo); c.wr8(P + 0x11, (uint8_t)(int8_t)k.pEnv);
+        c.wr8(P + 0x1c, (uint8_t)k.level); c.wr16(P + 0x1e, (uint16_t)(int16_t)k.levelKf); c.wr8(P + 0x20, (uint8_t)(int8_t)k.levelLfo);
+        c.wr8(P + 0x21, (uint8_t)xtVelCurve(k.velCurve)); c.wr16(P + 0x22, (uint16_t)(int16_t)xtVelSens(k.velSens));
+        c.wr8(P + 0x48, (uint8_t)(int8_t)k.time); c.wr16(P + 0x4a, (uint16_t)(int16_t)k.timeKf); c.wr8(P + 0x4c, (uint8_t)(int8_t)k.tLfo); c.wr8(P + 0x4d, (uint8_t)(int8_t)k.tEnv);
+        c.wr8(P + 0x52, (uint8_t)(int8_t)k.formant); c.wr16(P + 0x54, (uint16_t)(int16_t)k.formantKf); c.wr8(P + 0x56, (uint8_t)(int8_t)k.fLfo); c.wr8(P + 0x57, (uint8_t)(int8_t)k.fEnv);
+        c.wr8(P + 0x5d, robot ? 1 : 0); c.wr8(P + 0x5f, loop ? 1 : 0); c.wr8(P + 0x60, 1); c.wr8(P + 0x61, (uint8_t)k.offset); c.wr8(P + 0x62, (uint8_t)k.energy);
+        c.wr16(P + 0x68, (uint16_t)(int16_t)k.coarse); c.wr32(P + 0x70, (uint32_t)(int32_t)k.fine); c.wr8(P + 0x7c, (uint8_t)k.key2);
+        c.wr8(P + 0x84, 127); c.wr8(P + 0x86, 127); c.wr8(P + 0x87, (uint8_t)W.type); c.wr8(P + 0x88, (uint8_t)k.orig);
+        c.wr32(P + 0x8c, W.ch == 2 ? 1u : 0u); c.wr8(P + 0x90, 1); c.wr32(P + 0x9c, (uint32_t)W.frames);
+        const uint32_t ptrs[12] = { W.vp, W.samp, W.band[0], W.band[1], W.band[2], W.band[3], W.band[4], 0, W.hdr, 0, W.tune, W.cache };
+        for (uint32_t i = 0; i < 12; ++i) c.wr32(P + 0xac + 4 * i, ptrs[i]);
+        c.wr32(P + 0xdc, part);
+    };
+    struct PcmVoice {
+        const PcmWave* W = nullptr;
+        XtMbPlayer mb;
+        XtSoloVoice solo;
+        PcmKnobs k{};
+        XtLoop loop;
+        bool robot = false;
+        float curA = 1, curF = 1, curWalk = 1, curG = 0, curGain = 0;
+    };
+    // A wave's loop, in its record and cached events, or none (the end points past every position)
+    auto pcmLoop = [&](const PcmWave& W, const XtLoop& l) {
+        c.write(W.cache, std::vector<uint8_t>(0x2d0, 0).data(), 0x2d0);
+        c.write(W.tune, z.data(), 0x20);
+        if (!l.on) { c.wr32(W.cache + 0x16c, 0x7fffffff); c.wr32(W.cache + 0xb8, 0x7fffffff); return; }
+        c.wr32(W.tune + 4, (uint32_t)l.fwdStart); c.wr32(W.tune + 8, (uint32_t)l.fwdEnd);
+        c.wr32(W.tune + 0xc, (uint32_t)l.bwdEnd); c.wr32(W.tune + 0x10, (uint32_t)l.bwdStart);
+        c.wr8(W.tune + 0x18, (uint8_t)l.fwdMode); c.wr8(W.tune + 0x19, (uint8_t)l.bwdMode);
+        if (W.type == 1) {
+            std::vector<uint8_t> v;
+            uint8_t ev[4][kXtFwSoloEventBytes];
+            xtFwSoloImage(W.recs, W.frames, W.ch, l, v, ev);
+            for (uint32_t i = 0; i < 4; ++i) c.write(W.cache + 0xb4 * i, ev[i], kXtFwSoloEventBytes);
+        } else {
+            uint8_t ev[4][kXtMbLoopEventBytes];
+            if (xtMbLoopEvents(W.w, l, ev))
+                for (uint32_t i = 0; i < 4; ++i) c.write(W.cache + (uint32_t)kXtMbLoopEventBytes * i, ev[i], kXtMbLoopEventBytes);
+        }
+    };
+    static PcmVoice pv[2];
+    // OSC 2's buffer as the firmware rendered it, before X-MOD reads and clears it: a SOLO
+    // OSC 2's is only close to the port's, and X-MOD's phase would drift on the difference
+    float fwOsc2[64];
+    c.hook(0x894f6d78, [&](Sh4& m) {
+        for (uint32_t i = 0; i < 64; ++i) { const uint32_t u = m.rd32(kBuf2 + 4 * i); std::memcpy(&fwOsc2[i], &u, 4); }
+        mask2 = m.r[0]; m.r[6] = m.r[0]; m.pc += 2;
+    });
+    // the ramps the voice's constructor (0x894f1f50) makes for Time Trip: types 2 and 1, their value 1 when idle
+    for (uint32_t Vn : { V1, V2 }) { c.wr32(Vn + 0x8c8, 2); c.wr32(Vn + 0x910, 1); }
+    long pn = 0, pd = 0, pb = 0, pm = 0, pm2 = 0, pbl = 0, ps = 0, pOut = 0, pOut2 = 0, pSoloOver = 0;
+    double pMax = 0, pSoloMax = 0;
+    long pByType[6] = {};
+    auto pcmCase = [&](int g) {
+        const int osc1 = g % 8;                      // 0 off, 1…3 analog, 4…7 PCM
+        const PcmWave* wave[2] = { osc1 >= 4 ? &pw[(g / 8 + 3) % kPw] : nullptr, &pw[g % kPw] };
+        Case k1 = newCase(false);
+        k1.p.wave = (int)(rnd() % 14);
+        const bool analog1 = osc1 >= 1 && osc1 <= 3;
+        float eOut[9], lOut[3];
+        bool atk[2];
+        auto drawOutputs = [&] {
+            for (uint32_t e = 1; e <= 8; ++e) { eOut[e] = frnd(-1, 1); wf(envAt(e) + 0x4c, eOut[e]); }
+            for (uint32_t l = 1; l <= 2; ++l) { lOut[l] = frnd(-1, 1); wf(lfoAt(l) + 0x38, lOut[l]); }
+        };
+        drawOutputs();
+        mtx = 0;
+        for (int n = 0; n < 2; ++n) {
+            c.write(tb[n], z.data(), 0xd4);
+            if (wave[n]) {
+                pv[n].W = wave[n];
+                pv[n].k = newPcm();
+                pv[n].robot = wave[n]->type == 1 && rnd() % 4 == 0;
+                if (n == 1 && wave[0] == wave[1]) pv[1].loop = pv[0].loop;   // one wave, one loop
+                else {
+                    XtLoop l;
+                    if (rnd() % 3 == 0) {                 // its points and modes, as XtSynth's waveLoop gives them
+                        const int a = (int)(rnd() % (rnd() & 1 ? 500u : kPwFrames - 2000u)), b = a + 64 + (int)(rnd() % 1800);   // half soon enough to reach in 30 blocks
+                        l.on = true;
+                        l.fwdMode = l.bwdMode = 1 + (int)(rnd() % 2);
+                        l.fwdStart = l.bwdStart = a;
+                        l.fwdEnd = l.bwdEnd = b;
+                    }
+                    pv[n].loop = l;
+                    pcmLoop(*wave[n], l);
+                }
+                pcmInput(pv[n].k, *wave[n], n, pv[n].loop.on, pv[n].robot);
+                c.wr32(tb[n], 2u);                    // the kind of an encode type 1, 3 or 5 (0x894e2d20)
+                wf(tb[n] + 0x60, 120.0f);             // the tempo (0x894e2d20): the player's +0x4c, against the header's
+                if (!c.call(0x894e2f20, { P, tb[n] }, sp)) { std::fprintf(stderr, "pcm converter: %s\n", c.error().c_str()); return false; }
+            } else if (n == 0 && analog1) {
+                oscIdx = 0;
+                writeInput(k1);
+                c.wr32(tb[0], 3u);
+                if (!c.call(0x894e1920, { P, tb[0] }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
+            } else c.wr32(tb[n], 0u);
+            if (!c.call(0x894f7070, { TN, tb[n], (uint32_t)n }, sp)) { std::fprintf(stderr, "binding: %s\n", c.error().c_str()); return false; }
+        }
+        const uint32_t ampEnv[2] = { 4, 8 };
+        for (int n = 0; n < 2; ++n) {
+            atk[n] = rnd() & 1;
+            wf(envAt(ampEnv[n]) + 0x1c, atk[n] ? 25.0f : 0.0f); wf(envAt(ampEnv[n]) + 0x2c, 0.0f);
+        }
+        auto targetsOf = [&](int n, float& A, float& F, float& w, float& e_, float& gt, bool start) {
+            const PcmKnobs& k = pv[n].k;
+            const uint32_t e = (uint32_t)n * 4;
+            const float l = lOut[n + 1];
+            A = xtPitchTarget(xtPitchCents(k.key, k.coarse, k.kf, k.fine, k.orig, pv[n].robot), eOut[e + 1], xtPitchDepthCents((float)k.pEnv), l,
+                              xtPitchDepthCents((float)k.pLfo), xtPitchRatio(k.pitch));
+            F = xtOscFormantRatio(xtOscFormant(k.formant, k.formantKf, k.key), eOut[e + 3], xtOscFormantEnvDepth(k.fEnv), l, xtOscFormantLfoDepth(k.fLfo));
+            w = xtOscWalk(xtOscTime(k.time, k.offset, k.timeKf, k.key), eOut[e + 2], xtOscTimeEnvDepth(k.tEnv), l, xtOscTimeLfoDepth(k.tLfo));
+            e_ = xtOscEnergy(k.energy);
+            gt = xtOscGainTarget(xtOscGain(k.gainDb), xtOscLevel(k.level, k.levelKf, k.key, xtVelGain(k.vel, k.velSens, k.velCurve)),
+                                 start && atk[n] ? 0.0f : eOut[e + 4], l, xtOscLevelLfoDepth(k.levelLfo));
+        };
+        auto valuesSame = [&](int n, const char* where, int blk) {
+            const PcmVoice& s = pv[n];
+            const uint32_t Vn = tv[n];
+            const float fw[5] = { f32(Vn + 0x144), f32(Vn + 0x148), f32(Vn + 0x14c), f32(Vn + 0x150), f32(Vn + 0x154) };
+            const float po[5] = { s.curA, s.curF, s.curG, s.curWalk, s.curGain };
+            static const char* name[5] = { "ratio", "formant", "energy", "walk", "gain" };
+            bool ok = true;
+            for (int i = 0; i < 5; ++i)
+                if (!same(fw[i], po[i])) {
+                    if (pd < 12) std::printf("  pcm %d.%d %s osc %d type %d: %s fw %.9g port %.9g\n", g, blk, where, n + 1, s.W->type, name[i], fw[i], po[i]);
+                    ok = false;
+                }
+            return ok;
+        };
+        XtAnalogBlock pb1;
+        for (int n = 0; n < 2; ++n) {
+            if (n == 0 && analog1) {
+                oscIdx = 0;
+                pb1 = portBlock(k1);
+                // the port's oscillator keeps its own state across notes; the firmware's has
+                // the players' fields in the same words, so an analog note after a PCM one
+                // starts from what the player left (not modelled: the OSC Type changed
+                // between notes).  Here it starts from the port's.
+                for (const Field& f : floats(to[0])) wf(V1 + f.off, f.v);
+                c.wr32(V1 + 0x1dc, to[0].flags()); c.wr32(V1 + 0x244, to[0].noiseState()); c.wr8(V1 + 0x248, (uint8_t)to[0].noiseHold());
+                c.wr32(V1 + 0x1e8, (uint32_t)to[0].hqFalling()); c.wr32(V1 + 0x278, (uint32_t)to[0].fbWrite());
+            }
+            if (!c.call(0x894f21c0, { tv[n], tb[n], 0 }, sp)) { std::fprintf(stderr, "voice setup: %s\n", c.error().c_str()); return false; }
+            if ((c.rd32(tv[n] + 0x960) != 0) != (wave[n] && wave[n]->ch == 2) && pd++ < 12)
+                std::printf("  pcm %d: osc %d stereo flag %u\n", g, n + 1, c.rd32(tv[n] + 0x960));
+            if (!wave[n]) {
+                if (n == 0 && analog1) {
+                    const float ratio = xtPitchTarget(f32(V1 + 8), eOut[1], f32(V1 + 0x1c), lOut[1], f32(V1 + 0x34), f32(V1 + 0xc));
+                    const float gt = xtOscGainTarget(f32(V1 + 0x5c), f32(V1 + 0x54), eOut[4], lOut[1], f32(V1 + 0x58));
+                    const float g0 = xtOscGainTarget(f32(V1 + 0x5c), f32(V1 + 0x54), atk[0] ? 0.0f : eOut[4], lOut[1], f32(V1 + 0x58));
+                    to[0].noteOn(pb1, ratio, gt, g0, eOut[3], eOut[2], lOut[1], shared);
+                    ++pn;
+                    if (!fieldsSame(0) && pd++ < 12) std::printf("  pcm %d analog note-on\n", g);
+                }
+                continue;
+            }
+            PcmVoice& s = pv[n];
+            float gt, g0, ign[4];
+            targetsOf(n, s.curA, s.curF, s.curWalk, s.curG, gt, false);
+            targetsOf(n, ign[0], ign[1], ign[2], ign[3], g0, true);
+            s.curGain = gt;
+            if (s.W->type == 1) {
+                s.solo.setRobot(s.robot);
+                s.solo.setLoop(s.loop);
+                s.solo.noteOn(s.W->plan, s.curA, s.curF, s.curWalk, s.curG);
+                s.solo.resetGain(g0);
+                s.solo.setGain(gt);
+            } else {
+                s.mb.setLoop(s.loop);
+                if (!s.mb.noteOn(s.W->w, s.W->type, s.curA, s.curWalk)) { std::fprintf(stderr, "pcm: port note-on\n"); return false; }
+                s.mb.setGainXt(g0, true);
+                s.mb.setGainXt(gt);
+            }
+            ++pn;
+            if (!valuesSame(n, "note-on", 0)) ++pd;
+        }
+        // the MOD: off, or on some notes RING, FM, ENV RING or OSC SYNC with OSC 2's PCM as its modulator, as
+        // the tone's note-on: the MOD before the installs, the chooser after
+        const bool modOn = g % 8 == 2 || g % 8 == 6;
+        XtModBlock pmb;                              // holding what the firmware's holds
+        pmb.type = c.rd32(MB); pmb.a = f32(MB + 4); pmb.b = f32(MB + 8); pmb.c = f32(MB + 0xc);
+        if (!modConvert(modOn ? modParams(g % 8 == 2 ? 1 : g % 16 == 6 ? 2 : g % 32 == 14 ? 3 : 4) : XtModParams{}, MB, pmb)
+            || !c.call(0x894f1b00, { MODO, MB, c.rd32(V1 + 0x960), c.rd32(V2 + 0x960) }, sp)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
+        XtMod& pMod = toneMod;                       // the same object note after note, as MODO is
+        // the flags as XtSynth gives them: a stereo wave's
+        pMod.noteOn(pmb, wave[0] && wave[0]->ch == 2, wave[1]->ch == 2, analog1, *modPool, 0);
+        for (int n = 0; n < 2; ++n)
+            if (!c.call(0x894f2010, { tv[n] }, sp)) { std::fprintf(stderr, "install: %s\n", c.error().c_str()); return false; }
+        if (!c.call(0x894f1d90, { MODO, c.rd32(V1) == 3 ? 1u : 0u }, sp)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
+        if ((!modSame(MODO, pMod) || c.rd32(MODO + 0x50) != pMod.routine()) && pd++ < 12)
+            std::printf("  pcm %d: MOD at note-on: type %u/%u stereo %u/%u routine %08x/%08x\n", g, c.rd32(MODO), pMod.type(), c.rd32(MODO + 0x38), pMod.stereoCode(), c.rd32(MODO + 0x50), pMod.routine());
+        const int nBlocks = g % 16 == 9 ? 420 : 30;  // some reach the end of the wave
+        for (int blk = 0; blk < nBlocks; ++blk) {
+            if (blk % 5 == 4) {
+                drawOutputs();
+                for (int n = 0; n < 2; ++n) {
+                    if (wave[n] && blk % 10 == 9) {      // a new Energy, as a new block leaves it at +0x18
+                        pv[n].k.energy = (int)(rnd() % 128);
+                        wf(tv[n] + 0x18, xtOscEnergy(pv[n].k.energy));
+                    }
+                    if (!c.call(0x894f2090, { tv[n], 1 }, sp)) { std::fprintf(stderr, "update: %s\n", c.error().c_str()); return false; }
+                    if (wave[n]) {
+                        PcmVoice& s = pv[n];
+                        float A, F, w, e_, gt;
+                        targetsOf(n, A, F, w, e_, gt, false);
+                        s.curA = xtOscSmooth(s.curA, A); s.curF = xtOscSmooth(s.curF, F); s.curG = xtOscSmooth(s.curG, e_);
+                        s.curWalk = xtOscSmooth(s.curWalk, w); s.curGain = xtOscSmooth(s.curGain, gt);
+                        if (s.W->type == 1) { s.solo.setRates(s.curA, s.curF, s.curWalk); s.solo.setEnergy(s.curG); s.solo.setGain(s.curGain); }
+                        else { s.mb.setRates(s.curA, s.curWalk); s.mb.setGainXt(s.curGain); }
+                        ++pn;
+                        if (!valuesSame(n, "update", blk)) ++pd;
+                    } else if (n == 0 && analog1) {
+                        const float ratio = xtPitchTarget(f32(V1 + 8), eOut[1], f32(V1 + 0x1c), lOut[1], f32(V1 + 0x34), f32(V1 + 0xc));
+                        const float gt = xtOscGainTarget(f32(V1 + 0x5c), f32(V1 + 0x54), eOut[4], lOut[1], f32(V1 + 0x58));
+                        to[0].update(pb1, ratio, gt, eOut[3], eOut[2], lOut[1]);
+                        ++pn;
+                        if (!fieldsSame(0) && pd++ < 12) std::printf("  pcm %d.%d analog update\n", g, blk);
+                    }
+                }
+            }
+            // A band player, backward (or in an Alternate loop, which comes back), at about
+            // three times the pitch and above: the firmware's reads leave the wave (xt_fw
+            // bandcmp faults there too), and on the XT they would read whatever is in memory.
+            // Such a note is not compared further.
+            bool leaves = false;
+            for (int n = 0; n < 2; ++n)
+                leaves = leaves || (wave[n] && wave[n]->type != 1 && (0.0f > pv[n].curWalk || (pv[n].loop.on && pv[n].loop.fwdMode == 2)) && pv[n].curA >= 3.0f);
+            if (leaves) { ++pOut; break; }
+            mask2 = 0xdeadbeef;
+            if (!c.call(0x894f6d40, { TN, BUF }, sp)) {
+                if (c.error().find("read") == std::string::npos) { std::fprintf(stderr, "pcm %d.%d render: %s\n", g, blk, c.error().c_str()); return false; }
+                ++pOut2;
+                break;
+            }
+            if (mask2 != 0 && pm2++ < 6) std::printf("  pcm %d.%d: OSC 2's mask %08x\n", g, blk, mask2);
+            // OSC 2, then OSC 1, in the XT's units, as XtSynth's mix takes them
+            float l[2][64] = {};
+            bool exact = true;
+            for (int n = 1; n >= 0; --n) {
+                if (wave[n]) {
+                    PcmVoice& s = pv[n];
+                    if (s.W->type == 1) {
+                        float a[32], b[32];
+                        s.solo.render(a, b, 32);
+                        for (int i = 0; i < 32; ++i) { l[n][2 * i] = a[i] * 0x1p31f; l[n][2 * i + 1] = b[i] * 0x1p31f; }
+                        exact = false;
+                    } else s.mb.block(l[n]);
+                    ++pByType[(s.W->type == 1 ? 4 : s.W->type == 3 ? 0 : 2) + (s.W->ch - 1)];
+                } else if (n == 0 && analog1) {
+                    if (wave[1]->type == 1 && k1.p.wave == 13) std::copy(fwOsc2, fwOsc2 + 64, l[1]);
+                    to[0].process(l[0], 0, l[1]);                 // a PCM OSC 2's mask is 0: nothing to sync to
+                    if (!fieldsSame(0) && pd++ < 12) std::printf("  pcm %d.%d analog state\n", g, blk);
+                }
+            }
+            float mix[64];
+            std::copy(l[0], l[0] + 64, mix);
+            if (modOn) pMod.process(mix, mix, l[1]);
+            else xtAnalogMix(mix, l[1]);
+            if (exact && !modSame(MODO, pMod) && pd++ < 12) std::printf("  pcm %d.%d: MOD state\n", g, blk);   // ENV RING's follower reads a SOLO OSC's small difference too
+            ++pbl;
+            int firstBad = -1;
+            for (int i = 0; i < 64; ++i) {
+                const float f1 = f32(kBuf1 + 4 * (uint32_t)i), f2 = f32(kBuf2 + 4 * (uint32_t)i), fm = f32(kBufMix + 4 * (uint32_t)i);
+                pMax = std::max(pMax, (double)std::fabs(fm) / 2147483648.0);
+                const bool solo1 = wave[0] && wave[0]->type == 1, solo2 = wave[1]->type == 1;
+                if ((!solo1 && !same(f1, l[0][i])) || (!solo2 && !same(f2, l[1][i]))) { if (firstBad < 0) firstBad = i; }
+                const double d1 = solo1 ? (double)std::fabs(f1 - l[0][i]) / 2147483648.0 : 0.0, d2 = solo2 ? (double)std::fabs(f2 - l[1][i]) / 2147483648.0 : 0.0;
+                pSoloMax = std::max(pSoloMax, std::max(d1, d2));
+                if (std::max(d1, d2) > 2e-4) ++pSoloOver;
+                if (exact && !same(fm, mix[i]) && firstBad < 0) firstBad = i;
+                // the firmware's own sum, whatever the players
+                const float sum = add(f1, f2);
+                if (!modOn && !same(sum, fm) && pm++ < 6) std::printf("  pcm %d.%d mix %d: fw %.9g, its buffers sum %.9g\n", g, blk, i, fm, sum);
+            }
+            if (!exact) ++ps;
+            if (firstBad >= 0 && pb++ < 12) {
+                const uint32_t i = (uint32_t)firstBad;
+                std::printf("  pcm %d.%d osc1 %s osc2 type %d ch %d: first difference at %d: osc1 %.9g/%.9g osc2 %.9g/%.9g mix %.9g/%.9g\n", g, blk,
+                            wave[0] ? "pcm" : analog1 ? "analog" : "off", wave[1]->type, wave[1]->ch, firstBad, f32(kBuf1 + 4 * i), l[0][i], f32(kBuf2 + 4 * i), l[1][i],
+                            f32(kBufMix + 4 * i), mix[i]);
+            }
+        }
+        for (int n = 0; n < 2; ++n) {
+            if (!c.call(0x894f1fd0, { tv[n] }, sp)) { std::fprintf(stderr, "stop: %s\n", c.error().c_str()); return false; }
+            if (n == 0 && analog1) to[0].release();
+        }
+        // what ENV RING's follower took from a SOLO OSC's small difference: the words it
+        // leaves stay through the next notes, so the firmware's take the port's
+        wf(MODO + 0x28, pMod.env()); wf(MODO + 0x2c, pMod.lastLevel());
+        return true;
+    };
+    for (int g = 0; g < nPcm; ++g)
+        if (!pcmCase(g)) return 1;
+    std::printf("pcm tone: %d cases, %ld note-ons and updates, %ld different; %ld blocks, %ld different; mix of the firmware's buffers %ld different (peak %.4g); %ld notes left off where the firmware's reads leave the wave, %ld more when they faulted\n",
+                nPcm, pn, pd, pbl, pb, pm, pMax, pOut, pOut2);
+    std::printf("pcm tone blocks by OSC wave: backing mono %ld stereo %ld, ensemble mono %ld stereo %ld, solo mono %ld stereo %ld; %ld with a SOLO player, largest difference %.3g of full scale, %ld samples past the limit\n",
+                pByType[0], pByType[1], pByType[2], pByType[3], pByType[4], pByType[5], ps, pSoloMax, pSoloOver);
+    std::printf("pcm tone: OSC 2's mask not 0 in %ld blocks\n", pm2);
+    bad += pd + pb + pm + pm2 + pSoloOver;
+
+    // The stereo flag.  A voice's +0x960 is 1 for a stereo wave.  The tone's note-on
+    // (0x894f5e60) gives both COSMs' routine pick (0x894eef70) and the TVA (0x894f50e0)
+    // OSC 1's alone, so a stereo OSC 2 under a mono OSC 1 goes through the mono routines,
+    // which read L only and write it to both (XT_COSM_MAIN feeds them L and R apart).
+    // The MOD takes both flags.  The TVA stores its flag and never reads it: its render
+    // (0x894f5720) reads L and R apart, with the flag either way.
+    uint32_t flagCosm[2] = {}, flagTva = 0;
+    int nCosm = 0;
+    c.hook(0x894eef70, [&](Sh4& m) { if (nCosm < 2) flagCosm[nCosm++] = m.r[5]; m.ret(m.r[5]); });
+    c.hook(0x894f50e0, [&](Sh4& m) { flagTva = m.r[6]; m.ret(m.r[5]); });
+    long fn = 0, fb = 0;
+    for (int w1 = -1; w1 < 2; ++w1)
+        for (int w2 = 0; w2 < 2; ++w2) {
+            c.write(TB, std::vector<uint8_t>(0x800, 0).data(), 0x800);
+            c.wr32(TB + 4, 0xffffffffu);
+            for (uint32_t i = 1; i < 8; ++i) c.wr32(TB + 0x24 + (i << 5) + 0x10, 1);
+            const uint32_t oscBlock[2] = { TB + 0x434, TB + 0x508 };
+            const PcmWave* wv[2] = { w1 >= 0 ? &pw[w1] : nullptr, &pw[w2] };
+            for (int n = 0; n < 2; ++n) {
+                if (!wv[n]) continue;
+                pcmInput(newPcm(), *wv[n], n);
+                c.wr32(oscBlock[n], 2u);
+                wf(oscBlock[n] + 0x60, 120.0f);
+                if (!c.call(0x894e2f20, { P, oscBlock[n] }, sp)) { std::fprintf(stderr, "flag converter: %s\n", c.error().c_str()); return 1; }
+            }
+            c.write(MI, z.data(), 0x10);
+            if (!c.call(0x894e0920, { MI, TB + 0x5dc }, sp)) { std::fprintf(stderr, "flag MOD: %s\n", c.error().c_str()); return 1; }
+            c.wr32(0x89f91c50, 0); c.wr32(0x89f91c54, 0); c.wr32(0x89fa9094, 0);
+            flagCosm[0] = flagCosm[1] = flagTva = 0xdeadbeef;
+            nCosm = 0;
+            if (!c.call(0x894f5e60, { TN, TB }, sp)) { std::fprintf(stderr, "flag note-on: %s\n", c.error().c_str()); return 1; }
+            const uint32_t f1 = w1 == 1 ? 1u : 0u, f2 = w2 == 1 ? 1u : 0u;
+            const uint32_t modeWant = f1 ? (f2 ? 1u : 2u) : (f2 ? 3u : 0u);
+            ++fn;
+            if ((flagCosm[0] != f1 || flagCosm[1] != f1 || flagTva != f1 || c.rd32(MODO + 0x38) != modeWant || c.rd32(V2 + 0x960) != f2) && fb++ < 6)
+                std::printf("  flags osc 1 %u osc 2 %u: cosm %u %u tva %u mod %u\n", f1, f2, flagCosm[0], flagCosm[1], flagTva, c.rd32(MODO + 0x38));
+            for (int n = 0; n < 2; ++n)
+                if (!c.call(0x894f1fd0, { tv[n] }, sp)) { std::fprintf(stderr, "flag stop: %s\n", c.error().c_str()); return 1; }
+        }
+    std::printf("stereo flag at the tone's note-on: %ld combinations, %ld different\n", fn, fb);
+    bad += fb;
+    {   // the TVA's render: its flag 0 and 1; then R alone changed, which moves R's words of
+        // the main pair only (the pair at +8, a send, takes (L + R)/2, and is not modelled)
+        constexpr uint32_t TVA = ram + 0x3d000, TOUT = ram + 0x3d800, TIN = ram + 0x3dc00;
+        std::vector<float> run[3];
+        for (int t = 0; t < 3; ++t) {
+            c.write(TVA, z.data(), 0x100);
+            c.wr32(TVA + 0x4c, t == 1 ? 1u : 0u);
+            for (uint32_t o = 0x20; o < 0x40; o += 4) wf(TVA + o, 0.25f + 0.01f * (float)o);
+            for (uint32_t o = 0x68; o < 0x88; o += 4) wf(TVA + o, 0.25f + 0.01f * (float)o);
+            wf(TVA + 0x60, 0.75f); wf(TVA + 0x64, 0.75f);
+            for (uint32_t i = 0; i < 64; ++i) wf(TIN + 4 * i, (i & 1) ? (t == 2 ? -700.0f : 1000.0f) + (float)i : -500.0f + 3.0f * (float)i);
+            c.write(TOUT, std::vector<uint8_t>(0x400, 0).data(), 0x400);
+            if (!c.call(0x894f5720, { TVA, TIN, TOUT }, sp)) { std::fprintf(stderr, "tva: %s\n", c.error().c_str()); return 1; }
+            for (uint32_t i = 0; i < 256; ++i) run[t].push_back(f32(TOUT + 4 * i));
+        }
+        long tf = 0, lMoved = 0, rMoved = 0;
+        for (uint32_t i = 0; i < 256; ++i) {
+            tf += !same(run[0][i], run[1][i]);
+            if ((i & 7) < 2 && !same(run[0][i], run[2][i])) ++((i & 1) ? rMoved : lMoved);
+        }
+        std::printf("TVA render: its flag 0 and 1, %ld words different; R alone changed, %ld of the main pair's L words moved, %ld of its R words\n", tf, lMoved, rMoved);
+        bad += tf + lMoved + (rMoved == 0);
+    }
     return bad ? 3 : 0;
 }
 #endif

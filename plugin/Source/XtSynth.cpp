@@ -168,19 +168,22 @@ void XtSynth::prepare(double rate) {
     for (Voice& v : voice) v.active = false;
 }
 
-void XtSynth::setSample(std::shared_ptr<const XtEncoded> e) {
+void XtSynth::setSample(std::shared_ptr<const XtEncoded> e, int osc) {
     std::lock_guard<std::mutex> g(swapLock);
-    retired.reset();                                // freed here, not on the audio thread
-    pending = std::move(e);
-    swapPending = true;
+    retired[osc].reset();                           // freed here, not on the audio thread
+    pending[osc] = std::move(e);
+    swapPending[osc] = true;
 }
 
 void XtSynth::pickUpSample() {
     std::unique_lock<std::mutex> g(swapLock, std::try_to_lock);
-    if (!g.owns_lock() || !swapPending) return;
-    retired = std::move(cur);
-    cur = std::move(pending);
-    swapPending = false;
+    if (!g.owns_lock() || !(swapPending[0] || swapPending[1])) return;
+    for (int k = 0; k < 2; ++k)
+        if (swapPending[k]) {
+            retired[k] = std::move(cur[k]);
+            cur[k] = std::move(pending[k]);
+            swapPending[k] = false;
+        }
     for (Voice& v : voice) v.active = false;
 }
 
@@ -242,12 +245,11 @@ XtAnalogBlock XtSynth::analogBlock(const Voice& v, const OscVoice& s, const OscC
     return xtAnalogBlock(o.ana, v.note, xtPitch10(v.note, coarse, 10 * o.pitchKF, fine), o.waveGain, 1.0f, 1.0f, &s == &v.osc2);
 }
 
-// Audio thread (it reads the sample the last render picked up).  The plugin
-// has one wave, OSC 1's: OSC 2 plays only ANALOG so far.
+// Audio thread (it reads the samples the last render picked up).
 bool XtSynth::oscPlays(const OscControls& o) const {
     if (!o.on) return false;
     if (o.oscType == 0) return xtAnalogTablesLoaded() && xtAnalogPlays(o.ana.wave);
-    return &o == &ctl && cur != nullptr;
+    return waveOf(o) != nullptr;
 }
 
 bool XtSynth::canPlay() const { return oscPlays(ctl) || oscPlays(ctl.osc2); }
@@ -275,16 +277,16 @@ float XtSynth::gainTarget(const Voice& v, const OscVoice& s, const OscControls& 
 // The loop the players get (their cached loop events, player +0x6c, and
 // byte 0 bit 0): the region in samples, at least 16 long as on the XT; One
 // Shot leaves the Loop switch without effect (loop modes 0).
-XtLoop XtSynth::waveLoop() const {
+XtLoop XtSynth::waveLoop(const OscVoice& s, const OscControls& o) const {
     XtLoop l;
-    const int last = (int)cur->frames - 1;
+    const int last = (int)s.wave->frames - 1;
     if (last < 16) return l;
-    int a = (int)std::lround((double)std::clamp(ctl.loopStart, 0.0f, 1.0f) * last);
-    int b = (int)std::lround((double)std::clamp(ctl.loopEnd, 0.0f, 1.0f) * last);
+    int a = (int)std::lround((double)std::clamp(o.loopStart, 0.0f, 1.0f) * last);
+    int b = (int)std::lround((double)std::clamp(o.loopEnd, 0.0f, 1.0f) * last);
     if (b < a) std::swap(a, b);
     if (b - a < 16) { b = std::min(a + 16, last); a = b - 16; }
-    l.on = ctl.loop;
-    l.fwdMode = l.bwdMode = std::clamp(ctl.loopMode, 0, 2);
+    l.on = o.loop;
+    l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 2);
     l.fwdStart = l.bwdStart = a;
     l.fwdEnd = l.bwdEnd = b;
     return l;
@@ -298,7 +300,7 @@ XtEnvParams XtSynth::ampEnvParams(const Voice& v, const OscControls& o) const {
 }
 
 void XtSynth::applyRates(OscVoice& s) {
-    if (cur->type == 1) { s.solo.setRates(s.curA, s.curF, s.curWalk); s.solo.setEnergy(s.curG); s.solo.setGain(s.curGain); }
+    if (s.wave->type == 1) { s.solo.setRates(s.curA, s.curF, s.curWalk); s.solo.setEnergy(s.curG); s.solo.setGain(s.curGain); }
     else { s.mb.setRates(s.curA, s.curWalk); s.mb.setGainXt(s.curGain); }
 }
 
@@ -648,7 +650,10 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->osc2.on = oscPlays(ctl.osc2);
     v->analog = ctl.oscType == 0;
     v->osc2.analog = ctl.osc2.oscType == 0;
-    v->robot = ctl.robot && v->on && !v->analog && cur->type == 1;   // SOLO only (the converter's SOLO tail)
+    v->wave = waveOf(ctl);
+    v->osc2.wave = waveOf(ctl.osc2);
+    v->robot = ctl.robot && v->on && !v->analog && v->wave->type == 1;   // SOLO only (the converter's SOLO tail)
+    v->osc2.robot = ctl.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;
     // the OSCs' random pitch (0x894e4940, OSC 1 then 2, each whatever its
     // Switch): the shared generator steps once per note for an OSC with a depth
     v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
@@ -768,8 +773,9 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     if (v->on) portaStart(*v, ctl);
     if (v->osc2.on) portaStart(v->osc2, ctl.osc2);
     // the MOD (0x894f1b00, 0x894f1d90): the voices' stereo flags as their setups
-    // leave them, a stereo wave's on a PCM OSC 1 and none on an analog voice
-    v->mod.noteOn(modBlk, v->on && !v->analog && cur->channels == 2, false, v->on && v->analog, modShared, (int)(v - voice));
+    // leave them: a stereo wave's on a PCM OSC, and none on an analog voice
+    auto stereo = [](const OscVoice& s) { return s.on && !s.analog && s.wave->channels == 2; };
+    v->mod.noteOn(modBlk, stereo(*v), stereo(v->osc2), v->on && v->analog, modShared, (int)(v - voice));
 }
 
 // An OSC's LFO at note-on, whatever its Switch: every LFO of the tone starts
@@ -800,21 +806,22 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
         if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;   // the tone's note-on (0x894f6148): under OSC SYNC OSC 2 plays LA-SAW as SAW
         s.ana.noteOn(b, s.curA, s.curGain, gainStart, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared);
     }
-    else if (cur->type == 1) {
+    else if (s.wave->type == 1) {
         s.solo.setRobot(s.robot);
-        s.solo.setLoop(waveLoop());
-        s.solo.noteOn(cur->solo, s.curA, s.curF, s.curWalk, s.curG);
+        s.solo.setLoop(waveLoop(s, o));
+        s.solo.noteOn(s.wave->solo, s.curA, s.curF, s.curWalk, s.curG);
         s.solo.resetGain(gainStart);
         s.solo.setGain(s.curGain);
     }
     else {
-        s.mb.setLoop(waveLoop());
-        if (s.mb.noteOn(cur->wave, cur->type, s.curA, s.curWalk)) {
+        s.mb.setLoop(waveLoop(s, o));
+        if (s.mb.noteOn(s.wave->wave, s.wave->type, s.curA, s.curWalk)) {
             s.mb.setGainXt(gainStart, true);
             s.mb.setGainXt(s.curGain);
+        } else {
+            s.on = false;
+            if (!v.on && !v.osc2.on) v.active = false;
         }
-        else if (v.osc2.on) s.on = false;
-        else v.active = false;
     }
 }
 
@@ -1009,9 +1016,16 @@ void XtSynth::mixBlock(float* lr) {
             tvaUpdate(v);
             if (!v.active) continue;
         }
+        // A PCM OSC's player, in the XT's units (int16 × 65536): the SOLO player's ±1 × 2^31;
+        // the band players' gain is the firmware's (setGainXt)
+        auto pcmBlock = [](OscVoice& s, float* lr) {
+            if (s.wave->type == 1) {
+                float l[32], r[32];
+                s.solo.render(l, r, 32);
+                for (int i = 0; i < 32; ++i) { lr[2 * i] = l[i] * 0x1p31f; lr[2 * i + 1] = r[i] * 0x1p31f; }
+            } else s.mb.block(lr);
+        };
         // The tone's render by its Structure Type (xtToneOrder), all in the XT's units
-        // (int16 × 65536), as an analog OSC runs: the SOLO player's ±1 × 2^31; the band
-        // players' gain is the firmware's (setGainXt)
         uint32_t mask2 = 0;
 #ifdef XT_TONE_CHECK
         bool modDone = false;
@@ -1019,8 +1033,9 @@ void XtSynth::mixBlock(float* lr) {
         for (const XtToneStep* st = xtToneOrder(v.structure); *st != XtToneStep::End; ++st) {
             switch (*st) {
             case XtToneStep::Osc2:
-                if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);
-                else std::fill(tmp2, tmp2 + 64, 0.0f);
+                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 0.0f);
+                else if (v.osc2.analog) mask2 = v.osc2.ana.process(tmp2);
+                else pcmBlock(v.osc2, tmp2);                   // a PCM OSC's mask is 0
                 break;
             case XtToneStep::Cosm2OnOsc2:
                 if (v.cs[1].on) v.cs[1].process(tmp2, 1.0f);
@@ -1035,11 +1050,7 @@ void XtSynth::mixBlock(float* lr) {
                 }
                 if (!v.on) std::fill(tmp, tmp + 64, 0.0f);
                 else if (v.analog) v.ana.process(tmp, sync, tmp2);   // X-MOD reads OSC 2's buffer and clears it
-                else if (cur->type == 1) {
-                    float l[32], r[32];
-                    v.solo.render(l, r, 32);
-                    for (int i = 0; i < 32; ++i) { tmp[2 * i] = l[i] * 0x1p31f; tmp[2 * i + 1] = r[i] * 0x1p31f; }
-                } else v.mb.block(tmp);
+                else pcmBlock(v, tmp);
                 break;
             }
             case XtToneStep::Mod:
@@ -1152,7 +1163,9 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_ANALOG2="wave,impact,pw,…,subLevel": OSC 2 on, ANALOG, as XT_ANALOG; its
 //     XT_PENV2, XT_TENV2, XT_FENV2, XT_LFO2 (Env 5, 6, 7, LFO 2), XT_OLEV2,
 //     XT_OENV2 (Env 8), XT_VEL2="oscSens,oscCurve", XT_PITCH2="pitch,pitchKF,
-//     coarse,fine" and XT_TUNE2="random", as OSC 1's.  XT_OSC1OFF=1: OSC 1's
+//     coarse,fine" and XT_TUNE2="random", as OSC 1's.  XT_WAVE2="file,channels,rate,
+//     type": OSC 2 on, PCM, its own wave, with XT_OSC2 as XT_OSC, XT_LOOP2, XT_ROBOT2
+//     and XT_KEY2 (its Original Key); XT_WAVE1=0: no wave on OSC 1.  XT_OSC1OFF=1: OSC 1's
 //     Switch off.
 //   XT_TVA_ON=1: the TVA Switch on (off by default: XT_ADSR then does nothing).
 //   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
@@ -1233,6 +1246,25 @@ int main(int argc, char** argv) {
     syn.prepare(host);
     syn.setSample(E);
     XtSynth::Controls c;
+    if (std::getenv("XT_WAVE1") && std::atoi(std::getenv("XT_WAVE1")) == 0) syn.setSample(nullptr);
+    if (const char* e = std::getenv("XT_WAVE2")) {
+        char path[1024] = {};
+        int ch2 = 1, type2 = 1;
+        double rate2 = 44100;
+        if (std::sscanf(e, "%1023[^,],%d,%lf,%d", path, &ch2, &rate2, &type2) != 4) { std::fprintf(stderr, "XT_WAVE2: file,channels,rate,type\n"); return 1; }
+        FILE* f2 = std::fopen(path, "rb");
+        if (!f2) { std::fprintf(stderr, "XT_WAVE2: cannot open %s\n", path); return 1; }
+        std::vector<std::vector<float>> chans2((size_t)ch2);
+        int16_t x;
+        for (size_t n = 0; std::fread(&x, 2, 1, f2) == 1; ++n) chans2[n % (size_t)ch2].push_back(x / 32768.0f);
+        std::fclose(f2);
+        for (auto& k : chans2) k.resize(chans2.back().size());
+        auto E2 = xtSynthEncode(chans2, rate2, type2, 64, &err);
+        if (!E2) { std::fprintf(stderr, "encode 2: %s\n", err.c_str()); return 1; }
+        syn.setSample(E2, 1);
+        c.osc2.on = true;
+        c.osc2.oscType = 1;
+    }
     if (const char* e = std::getenv("XT_ADSR"))     // amp envelope knobs "a,d,s,r"
         std::sscanf(e, "%d,%d,%d,%d", &c.attack, &c.decay, &c.sustain, &c.release);
     if (const char* e = std::getenv("XT_LFO")) {    // LFO "wave,rate,depth,delay,mode,fade,offset,keysync"
@@ -1290,6 +1322,15 @@ int main(int argc, char** argv) {
         if (const char* e = std::getenv("XT_VEL2")) std::sscanf(e, "%d,%d", &o.oscVelSens, &o.oscVelCurve);
         if (const char* e = std::getenv("XT_PITCH2")) std::sscanf(e, "%d,%d,%d,%d", &o.oscPitch, &o.pitchKF, &o.oscCoarse, &o.oscFine);
         if (const char* e = std::getenv("XT_TUNE2")) o.randomPitch = std::atoi(e);
+        if (const char* e = std::getenv("XT_OSC2"))   // OSC 2's as XT_OSC
+            std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &o.oscTime, &o.oscTimeOffset, &o.oscTimeKF, &o.oscFormant, &o.oscFormantKF,
+                        &o.energy, &o.lfoTimeDepth, &o.lfoFormantDepth);
+        o.robot = std::getenv("XT_ROBOT2") && std::atoi(std::getenv("XT_ROBOT2")) != 0;
+        if (const char* e = std::getenv("XT_LOOP2")) {
+            o.loop = true;
+            std::sscanf(e, "%d,%f,%f", &o.loopMode, &o.loopStart, &o.loopEnd);
+        }
+        if (const char* e = std::getenv("XT_KEY2")) o.rootKey = std::atoi(e);
     }
     if (const char* e = std::getenv("XT_OLEV"))
         std::sscanf(e, "%d,%d,%d,%d", &c.oscLevel, &c.oscLevelKF, &c.oscLevelLfoDepth, &c.waveGain);

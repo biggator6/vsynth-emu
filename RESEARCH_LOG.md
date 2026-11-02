@@ -3164,3 +3164,25 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The user chose the XT's default. It changes the plugin's character more than the one word suggests: a new patch has no amp envelope, no velocity on the level, and notes that end about 10 ms after the key comes up, cutting any COSM tail. That is what the firmware does with this switch off, so it is right by the rule here. Whether a real patch ever ships with it off is still a question for a real unit; the descriptor's default says nothing about the factory patches.
 - The A/B renders now turn the switch on themselves. Left at the default, they would have stopped exercising the TVA at all and would still have said identical.
 
+### Session 16 addendum (2026-11-02) — v103: PCM on OSC 2
+
+- Each OSC has its own wave now. The user chose that over OSC 2 sharing OSC 1's as a first step.
+- Running a real PCM voice through the firmware's own tone showed the docs had the wrong note-on since pass 7.
+  VariPhrase voices are kind 2, so they start at `0x894f3110`; the one we read, `0x8950b5b0`, is kind 1's.
+  It also showed the gain target wrong with an OSC amp attack. The whole-tone session found the same thing
+  meanwhile, from the other side, and fixed it first as v95.
+- The stereo question, which looked like the hard part, needed no code. The firmware gives the COSMs and TVA
+  OSC 1's flag, the TVA never reads it, and the mono routines take L. The real gap is the opposite case.
+- A value of 1e−34 changed the mix. Rounding toward zero, adding anything to a negative number moves it a
+  whole unit, and in the band player's units that value had already been flushed. I worked round it with units
+  on the band player; v96 then put the whole render in the XT's units, and my merge got simpler for it.
+- Backward at high pitch the firmware's band players read right out of the wave. The interpreter faults,
+  and `bandcmp` turned out to fault too, so the check did not cause it.
+- SOLO stays "close": its player is in double. It is the one place this version is not 0 different.
+- The check overruled me once. v86's notes said HQ-SQUARE sets the stereo flag, so I "corrected" the MOD's flags
+  in XtSynth, and my analog list happened to skip that waveform, so nothing objected. A deliberate error went
+  unnoticed, which is how it surfaced. With the waveform in, the firmware's flag is 0; v88 had it right.
+- One comparison was blind in a way worth remembering: OSC 1 alone against OSC 2 alone used the same file on both,
+  so OSC 2 playing OSC 1's wave passed. A planted error showed it, and "own wave" cases closed it.
+- This took several rebases, as MOD, Structure, whole-tone and TVA Switch versions landed around it. `xt_tone` came out of that,
+  and a wave on OSC 2 was 0 different in it on the first run, with COSMs, every MOD Type and the Structures.

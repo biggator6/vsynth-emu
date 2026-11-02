@@ -8,8 +8,8 @@
 // the XT's 44.1 kHz under the XT's amp envelope (XtEnvelope), and the mix is
 // resampled to the host rate.  With OSC Type ANALOG a note plays the XT's
 // analog oscillator instead (XtAnalog), with or without a sample.  A note has
-// two OSCs, as a tone on the XT does; OSC 2 runs before OSC 1, and the MOD section
-// (XtMod) combines them.  No JUCE.
+// two OSCs, as a tone on the XT does, each with its own wave; OSC 2 runs before
+// OSC 1, and the MOD section (XtMod) combines them.  No JUCE.
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -67,13 +67,13 @@ public:
         int rootKey = 60;
         int oscCoarse = 0, oscFine = 0, oscPitch = 0, pitchKF = 100, randomPitch = 0;
         // OSC Type: 0 ANALOG, the analog oscillator (XtAnalog; it needs no
-        // sample, and its pitch is against A4), 1 PCM, the loaded sample
+        // sample, and its pitch is against A4), 1 PCM, the OSC's loaded sample
         // (OSC 1's default in the plugin).  The analog knobs as the patch
         // stores them: Waveform 0..13 in the XT's order, Impact 0..40, Pulse
         // Width −63..+63 on the time envelope, Fat 0..127 on the formant
         // envelope, their Keyfollows ±20 (×10 = the displayed ±200) and LFO
-        // and Env depths −63..+63.  OSC 2 plays ANALOG only so far.  X-MOD on
-        // OSC 1 uses OSC 2 up: OSC 2's output moves its phase and is not heard.
+        // and Env depths −63..+63.  X-MOD on OSC 1 uses OSC 2 up: OSC 2's
+        // output moves its phase and is not heard.
         int oscType = 1;
         XtAnalogParams ana;
         // the VariPhrase OSC (XtOsc): Time and Formant −63..+63, Time Offset
@@ -243,9 +243,10 @@ public:
     XtSynth();
     ~XtSynth();
     void prepare(double hostRate);
-    // Any thread: the next render() starts using this sample (voices stop).
-    void setSample(std::shared_ptr<const XtEncoded> e);
-    bool hasSample() const { return cur != nullptr; }
+    // Any thread: the next render() starts using this sample on OSC `osc` (0
+    // OSC 1, 1 OSC 2; voices stop).  The XT binds a wave per OSC (IDs 0x2be, 0x2f2).
+    void setSample(std::shared_ptr<const XtEncoded> e, int osc = 0);
+    bool hasSample(int osc = 0) const { return cur[osc] != nullptr; }
     // Audio thread: whether a note would sound (a sample, or an analog
     // waveform the port plays).
     bool canPlay() const;
@@ -268,6 +269,7 @@ private:
         int kfKey = -1;                // the key-follow key (+4): a change restarts the glide
         bool robot = false;            // Robot Voice, as at note-on (the player latches it)
         bool analog = false;           // OSC Type ANALOG at note-on: the analog oscillator plays
+        const XtEncoded* wave = nullptr;   // the OSC's wave at note-on (a new wave stops the voices)
         int rnd = 0;                   // the note's random pitch offset (+0x6c), 1/10 cent
         XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
@@ -312,9 +314,9 @@ private:
         // last update.
         float cur = 0, target = 0, step = 0, elapsed = 0;
     };
-    std::shared_ptr<const XtEncoded> cur, pending, retired;
+    std::shared_ptr<const XtEncoded> cur[2], pending[2], retired[2];   // each OSC's wave
     std::mutex swapLock;
-    bool swapPending = false;
+    bool swapPending[2] = {};
     Controls ctl;
     Voice voice[kVoices];
     long clock = 0;
@@ -341,11 +343,12 @@ private:
 
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames
+    const XtEncoded* waveOf(const OscControls& o) const { return cur[&o == &ctl ? 0 : 1].get(); }
     bool oscPlays(const OscControls& o) const;       // switched on, with something to play
     void targets(const Voice& v, const OscVoice& s, const OscControls& o, float& A, float& F, float& walk, float& g) const;
     float gainTarget(const Voice& v, const OscVoice& s, const OscControls& o, float env) const;   // 0x894f3dc0 / 0x894f3e20
     XtEnvParams ampEnvParams(const Voice& v, const OscControls& o) const;   // the OSC amp envelope
-    XtLoop waveLoop() const;                         // the players' loop
+    XtLoop waveLoop(const OscVoice& s, const OscControls& o) const;   // the players' loop
     float noteCents(const Voice& v, const OscVoice& s, const OscControls& o, int key) const;  // voice +8 at a key (+0x68 at the previous one)
     void noteTuning(const Voice& v, const OscVoice& s, const OscControls& o, int& coarse, int& fine) const;   // the per-note setup's +0x68 and +0x70
     XtAnalogShared anaShared;                        // the analog voices' shared state

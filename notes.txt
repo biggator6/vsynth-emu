@@ -314,6 +314,16 @@ ANALOG X-MOD v87 (2026-11-02): X-MOD (code 13, 0x89507b60 at +0x96c)
   on the roadmap: MOD Types RING, FM, ENV RING, OSC SYNC; the other two Structure Types; the patch
   TVA's level and pan; PCM on OSC 2.
 
+PCM ON OSC 2 v103 (2026-11-02): each OSC its own wave and encode (HARDWARE_FIRMWARE.md, "PCM on
+  OSC 2, with its own wave"). XtSynth: setSample(e, osc), cur[2]; OscVoice::wave latched at note-on;
+  waveLoop(s, o); pcmBlock in the mix, either OSC. A VariPhrase voice is kind 2: note-on 0x894f3110. Stereo
+  flag: COSMs and TVA take OSC 1's (COSM 2 in Type3 OSC 2's), the TVA never reads it, the mono COSMs read L;
+  the MOD now gets OSC 2's too. No analog voice has the flag, HQ-SQUARE included. Left: a stereo wave on OSC 1
+  with a COSM on, or on OSC 2 with COSM 2 under Type3, needs the stereo routines; XtSoloVoice is close, not
+  exact. Backward at high pitch the firmware's band reads leave the wave; not compared. Params
+  osc2EncodeType…; loadFile(file, osc); XT_WAVE2…; TEST_OSC2_WAVE…; XT_ANALOG_ONLY=pcm. xt_tone: a wave on
+  OSC 2 in its last cases, Wave Number 2 (Firmware::wave2).
+
 TVA Switch v101, off by default v102 (2026-11-02): ID 0x299 (HARDWARE_FIRMWARE.md, "The TVA Switch"). Controls::tvaOn, parameter tvaSwitch, off as on the XT. Off: the TVA's level
   1, envelope 13 with times 0 and levels [0,1,1,1,0], a note ends about 10 ms after its note-off. Voice::velGain is latched at note-on and legato. XT_TVA_ON=1, TEST_TVA_ON=1;
   ab.sh turns it on unless XT_TVA_ON=0.
