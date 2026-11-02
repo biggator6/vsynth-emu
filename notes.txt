@@ -230,6 +230,17 @@ ANALOG OSC v79 (2026-11-01): OSC Type ANALOG with SAW (HARDWARE_FIRMWARE.md,
   XT_ANALOG / TEST_ANALOG "wave,impact,pw,pwKf,pwLfo,pwEnv,fat,fatKf,fatLfo,
   fatEnv" (KFs in %); TEST_SNAPSHOT_ANALOG=1.
 
+ANALOG WAVEFORMS v80 (2026-11-01): SQUARE, TRIANGLE, SINE, RAMP, JUNO, NOISE
+  (HARDWARE_FIRMWARE.md, "The analog waveforms"). XtAnalogOsc::process picks
+  the routine by code (saw/square/triangle/sine/ramp/juno/noise) and returns
+  the wrap mask (OSC SYNC's source; SAW's too: v79's "address" was wrong).
+  shape() forms the Pulse Width by code, SQUARE's edge (+0x1e0) and NOISE's
+  hold (+0x248); NOISE keeps its second state (+0x244) across notes.
+  xtAnalogPlays: codes 2…8. xt_analog runs the install (0x89505170) and the
+  routine it puts at +0x968, seven waveforms in turn; breakpoints() gives
+  each routine's points for its exact-phase cases. Left: HQ-SAW/HQ-SQUARE
+  and codes 9…13, the sub oscillator.
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from

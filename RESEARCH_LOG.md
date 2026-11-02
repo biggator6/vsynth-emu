@@ -2919,7 +2919,30 @@ Round-2 recordings.  First build-out after that: real-time granular port
   expf of y·logf(x), so the expf already ported for the Resonator gives it
   exactly.
 - Firmware quirk noted: SAW returns an address where its sync mask should
-  be, which matters once OSC SYNC is ported.
+  be, which matters once OSC SYNC is ported. (Wrong: see v80.)
 - All of it equals the firmware in the interpreter. In the plugin, an
   analog patch plays without a sample. The Waveform box shows all fourteen
   waveforms, with SAW the only one enabled for now.
+
+### Session 16 addendum (2026-11-01) — v80: six more analog waveforms
+
+- SQUARE, TRIANGLE, SINE, RAMP, JUNO and NOISE are ported, the rest of the
+  note-on's default case except HQ-SAW and HQ-SQUARE. Each is its own DSP
+  routine, read from the disassembly and equal to the firmware.
+- They share SAW's frame: Fat sets where the phase's first cycle ends, and
+  the Pulse Width sets the breakpoints within each cycle.
+  - SQUARE ramps its edges over a width that steps with the pitch (and the
+    hidden Square Slope).
+  - TRIANGLE and SINE use half the Pulse Width. SINE is built from
+    parabolas.
+  - RAMP and JUNO carry a DC offset. JUNO is a saw gated by a pulse at
+    twice its rate.
+  - NOISE is an integer random generator held for 1 to 31 samples by the
+    Pulse Width. Part of its state runs on from note to note.
+- Correction: SAW does return its wrap mask. v79 misread the return. The
+  check now compares the mask of every routine, so OSC SYNC can be built on
+  it.
+- The check runs the firmware's own install and plays whatever routine it
+  installs. It sets the phase on each routine's own breakpoints and plays
+  SQUARE's pitch steps exactly. Planted errors are caught, except a few
+  that turned out exactly equivalent.

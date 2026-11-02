@@ -1544,6 +1544,138 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The analog waveforms: SQUARE, TRIANGLE, SINE, RAMP, JUNO, NOISE (2026-11-01, v80)
+
+This version ports six more analog waveforms, the rest of the note-on's
+default case except its HQ pair. Left: HQ-SAW and HQ-SQUARE (codes 0, 1),
+and the five with note-on cases of their own (LA-SQUARE, LA-SAW, SUPER-SAW,
+FEEDBACK-OSC, X-MOD, codes 9…13). The map is in the v79 section below.
+
+**The note-on and the update by code.**
+- The note-on (`0x89504af0`) sends codes 9…13 to their own cases (table at
+  `0x89504bec`). Codes 0…8 share the default case (`0x89504e80`): SAW's
+  Fat, then p = 0.0039683 + 0.992063·x for the Pulse Width, then a switch
+  on the code (table at `0x89504fb0`).
+- The Pulse Width's target (+0x1c8) by code; the note-on also sets +0x1cc
+  to it:
+
+| Code | Waveform | +0x1c8 | Also |
+|---|---|---|---|
+| 0, 1 | HQ-SAW, HQ-SQUARE | p | `0x895060d0` sets up its state |
+| 2 | SAW | folded, + the Slope (v79) | |
+| 3 | SQUARE | p | +0x1e0, the edge |
+| 4, 6 | TRIANGLE, SINE | p/2 | |
+| 5, 7 | RAMP, JUNO | p | |
+| 8 | NOISE | p | +0x248, the hold |
+
+- The update (`0x89505400`, table at `0x89505698`) does the same, without
+  the HQ setup and without the note-on's 0 → 1 for NOISE's hold.
+- SQUARE's edge, +0x1e0 = Slope × (ratio × f) × 0.00498866 (0x3ba377ed, a
+  unit below the phase step's 0x3ba377ee).
+  - f steps with the pitch: 0 below 2^(−2/12) (G4), 0.05 below 1 (A4), 0.1
+    below 2^(1/12), 0.15 below 2^(4/12), 0.2 below 2^(9/12) (F#5), 0.25
+    above.
+  - The Slope is the Square Slope/100 (2 by default) with Alias Cancel on,
+    else 0: hard edges.
+- NOISE's hold, +0x248 (a byte), is ftrc of 1 + 30·(1 − 2p) below p = ½,
+  else of 1 − 30·(1 − 2p). So PW 0 holds 1 sample (white noise), and the
+  extremes 31.
+
+**The install** (`0x89505170`, from `0x894f2010` for a kind-3 voice):
+- +0x960 = 0; the code's routine at +0x968, and a constant at +0x9ac from
+  the table at `0x897d0070` (2.50969e−5 HQ-SAW, 5.69826e−6 SAW, 6.37251e−6
+  SQUARE, …).
+- With the sub oscillator on it jumps to `0x895069d0` instead.
+- The check runs it after the note-on and finds the map's routine for every
+  code.
+
+**The routines.** They share SAW's frame (v79):
+- a = +0x1c4 (Fat), p = +0x1cc, and a phase of 0…1 holding two cycles, the
+  first over 0…a;
+- the same per-sample tail: ((y + Impact)·gain)·(2^31 − 128), and the 1/32
+  moves;
+- each returns its wrap mask: bit i where the half-cycle flags (1 in the
+  first cycle, 2 in the second) have both been seen.
+
+Each waveform's breakpoints and segments:
+- **SQUARE** (`0x89508aa0`). pa = p·a, b = a + p − pa.
+  - −1 to pa, +1 to a, −1 to b, +1 to 1.
+  - Each edge is a ramp over ±s around it (s = +0x1e0): y = (ph −
+    edge)/s, or (edge − ph)/s on a falling edge. The edge at 0/1 is split:
+    −ph/s and (1 − ph)/s.
+  - Flags: 1 below a − s, 2 from there.
+  - With s = 0 the ramps are never reached, so 1/s = inf is never used.
+  - The Pulse Width widens the low parts: PW +40 is high for 18% of a
+    cycle.
+- **TRIANGLE** (`0x895094c0`), p halved.
+  - Each cycle rises 0…1, falls 1…−1 and rises −1…0.
+  - The first over 0…a·p, …a − a·p, …a; the second over a…p + a − a·p,
+    …1 − p + a·p, …1.
+  - Odd harmonics at 1/n².
+- **SINE** (`0x89509030`, FPSCR 0x40801, the invalid-operation trap on), p
+  halved.
+  - TRIANGLE's frame with eight parabolic quarters: x·(2 − x) toward each
+    peak and x·(x + 2) toward each trough, x the quarter's −1…1.
+  - The peaks at a·p and p + a − a·p; the zero crossings at a/2 and ½ +
+    a/2.
+  - Two quarters' slopes are 1/d for the same d formed by two different
+    sums; the port keeps both.
+  - The third harmonic is at −29 dB at Fat 0, PW 0.
+- **RAMP** (`0x89508800`). SAW's breakpoints with d = p, without the fold
+  or the inversion.
+  - Each cycle rises 0…1 (over 0…a·p and a…b) and falls 1…−1 (over a·p…a
+    and b…1).
+  - At PW 0 it is near a triangle that steps from −1 to 0 at each cycle's
+    start, with a DC of +¼ of its peak.
+- **JUNO** (`0x89508db0`). A rising saw each cycle (−1…1 over 0…a and
+  a…1).
+  - It is replaced by −1 − Impact while a pulse at twice its rate is low:
+    over the first (1 − p) share of each half cycle.
+  - At PW 0 its second harmonic is 4.9 dB above the fundamental.
+- **NOISE** (`0x89504a40`). Two 32-bit states:
+  - s1 at +0x1dc, the flags word, cleared at every note-on;
+  - s2 at +0x244, which the note-on never sets, so it runs on from note to
+    note (the port starts it at 0);
+  - s1 = −250·s1 + 127·s2 + 30, then s2 = 252·s2 + s1.
+  - out = (Impact + float(s1))·gain; s1 is already ±2^31.
+  - Each value is held for the hold's samples, and the hold starts again
+    every block.
+  - It ignores the phase, the sync mask and Fat; its PW and Fat are not
+    moved; it returns 0.
+
+**Correction to v79.** SAW returns its wrap mask like the others (see
+there). The check now compares every routine's returned mask.
+
+**Port and checks** (`xt_analog`):
+- Each voice case takes one of the seven waveforms in turn.
+  - The install's routine is checked against the map.
+  - Every block compares the outputs, the state (with +0x1e0, +0x244 and
+    +0x248) and the returned mask.
+  - Every sixth block sets the phase exactly on one of the routine's own
+    breakpoints.
+  - One case in eight plays G4, A4, A#4, C#5 or F#5 untuned: SQUARE's
+    pitch steps.
+- 21,000 cases: 189,000 note-ons and updates and 120,000 blocks of each
+  waveform, all 0 different. fcheck runs 3,000 cases.
+- Deliberate errors caught (`PORT=analog mutate.sh`):
+  - SQUARE: the edge constant a unit off, the A4 step's > as ≥, the edge
+    ramp's sign, a flag;
+  - TRIANGLE: the last breakpoint by another sum, a segment's > as ≥;
+  - SINE: the shorter sum for its second 1/d, a quarter's parabola, PW not
+    halved;
+  - RAMP: the rising slope doubled, Impact dropped;
+  - JUNO: the gate's > as ≥, the low value's Impact sign;
+  - NOISE: the increment, the hold, Impact;
+  - the mask's bit; PW's 1/32 move.
+- Missed:
+  - exact equivalents: independent statements reordered, a sign moved
+    between numerator and denominator, (1 + a)/2 as ½ + a/2;
+  - SINE's p + a − a·p by the other sum, which gave the same value in
+    every case tried.
+
+**Plugin.** The Waveform box now enables SQUARE, TRIANGLE, SINE, RAMP, JUNO
+and NOISE. The PluginTest is bit-identical with each.
+
 ### The analog oscillator, and SAW (2026-11-01, v79)
 
 OSC Type ANALOG plays one of fourteen DSP routines, chosen by the waveform.
@@ -1695,10 +1827,9 @@ unit could hold other values, if they were set at the factory.
 - Once a block, Fat's and PW's current values move 1/32 toward their
   targets.
 - A set bit in the sync mask resets the phase at that sample.
-- Firmware quirk: it collects its wrap bits in r2 but returns r0, the
-  address voice + 0xd4 + 0x84. A SAW as OSC SYNC's master would give the
-  other oscillator a meaningless mask. This matters once the MOD section is
-  ported.
+- It returns the wrap mask: r2 starts at 0, collects the bits, and moves to
+  r0 in rts's delay slot. (Corrected in v80: this section first said it
+  returned an address.)
 - With the Slope on, d is never 0, so the inverted branch always runs.
 
 **Port and checks** (`xt_analog`, new; the others unchanged):

@@ -103,7 +103,7 @@ int xtAnalogCode(int wave) {
     return wave >= 1 && wave <= 13 ? code[wave] : 2;      // the converter's default case: SAW
 }
 
-bool xtAnalogPlays(int wave) { return xtAnalogCode(wave) == 2; }
+bool xtAnalogPlays(int wave) { const int c = xtAnalogCode(wave); return c >= 2 && c <= 8; }
 
 XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw) {
     XtAnalogBlock b;
@@ -136,12 +136,42 @@ void XtAnalogOsc::shape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float
     }
     const float pw = clamp01(fmac(lfo, b.pwLfo, fmac(pwEnv, b.pwEnv, b.pw)));
     float x = fmac(pw, kPwSpan, kPwLo);
-    // SAW (code 2): folded to the upper half, widened by the Slope at the pitch
-    if (kHalf > x) x = sub(1.0f, x);
-    const float s = mul(mul(ratio_, b.slope), K(0x3c23d709));                 // 0.01, a unit below
-    x = add(x, s);
-    const float top = sub(1.0f, s);
-    if (x > top) x = top;
+    switch (code) {
+    case 2: {   // SAW: folded to the upper half, widened by the Slope at the pitch
+        if (kHalf > x) x = sub(1.0f, x);
+        const float s = mul(mul(ratio_, b.slope), K(0x3c23d709));             // 0.01, a unit below
+        x = add(x, s);
+        const float top = sub(1.0f, s);
+        if (x > top) x = top;
+        break;
+    }
+    case 3: {   // SQUARE: the edge's half-width, by the Slope and a step of the pitch
+        const float r = ratio_;
+        float f = 0.0f;
+        if (!(K(0x3f6411ef) > r)) {                                            // 2^(−2/12)
+            if (1.0f > r) f = K(0x3d4ccccd);
+            else if (K(0x3f879c7c) > r) f = K(0x3dcccccd);                     // 2^(1/12)
+            else if (K(0x3fa14518) > r) f = K(0x3e19999a);                     // 2^(4/12)
+            else if (K(0x3fd744fc) > r) f = K(0x3e4ccccd);                     // 2^(9/12)
+            else f = 0.25f;
+        }
+        edge_ = mul(mul(b.slope, mul(r, f)), K(0x3ba377ed));                   // 220/44100, a unit below the phase's
+        break;
+    }
+    case 4: case 6:   // TRIANGLE, SINE: halved
+        x = mul(x, kHalf);
+        break;
+    case 8: {   // NOISE: the hold, 1 + 30·|1 − 2x| samples, as a byte
+        const float d = sub(1.0f, mul(x, 2.0f));
+        int n = kHalf > x ? ftrc(fmac(d, 30.0f, 1.0f)) : ftrc(sub(1.0f, mul(d, 30.0f)));
+        n = (int8_t)n;
+        if (on && n == 0) n = 1;                                               // the note-on's, not the update's
+        hold = n;
+        break;
+    }
+    default:    // RAMP, JUNO: as is
+        break;
+    }
     pwT = x;
     if (on) pwC = x;
 }
@@ -165,18 +195,84 @@ void XtAnalogOsc::update(const XtAnalogBlock& b, float ratio, float gain, float 
     shape(b, fatEnv, pwEnv, lfo, false);
 }
 
-// SAW (0x89508c20).  A phase of 0…1 holds two cycles: with a = the Fat value
-// (½ at Fat 0) and d = ½ − PW (+1 and the wave inverted when negative), the
+int XtAnalogOsc::breakpoints(float* p) const {
+    const float a = fatC, w = pwC;
+    switch (code) {
+    case 2: {
+        float d = sub(kHalf, w);
+        if (0.0f > d) d = add(d, 1.0f);
+        const float ad = mul(a, d);
+        p[0] = ad; p[1] = a; p[2] = sub(add(a, d), ad);
+        return 3;
+    }
+    case 3: {
+        const float s = edge_, pa = mul(w, a), bb = sub(add(a, w), pa);
+        p[0] = s; p[1] = sub(pa, s); p[2] = add(pa, s); p[3] = sub(a, s); p[4] = add(a, s); p[5] = sub(bb, s); p[6] = add(bb, s);
+        p[7] = sub(1.0f, s);
+        return 8;
+    }
+    case 4: {
+        const float ap = mul(a, w), e9 = sub(a, ap);
+        p[0] = ap; p[1] = e9; p[2] = a; p[3] = add(w, e9); p[4] = add(sub(1.0f, w), ap);
+        return 5;
+    }
+    case 5: {
+        const float ap = mul(w, a);
+        p[0] = ap; p[1] = a; p[2] = sub(add(a, w), ap);
+        return 3;
+    }
+    case 6: {
+        const float ap = mul(a, w), a2 = mul(kHalf, a), d4 = sub(w, ap);
+        p[0] = ap; p[1] = a2; p[2] = sub(a, ap); p[3] = a; p[4] = add(d4, a); p[5] = add(kHalf, a2); p[6] = sub(1.0f, d4);
+        return 7;
+    }
+    case 7: {
+        const float h1 = mul(add(1.0f, a), kHalf), a2 = mul(a, kHalf), q0 = mul(a2, w), q1 = mul(sub(h1, a), w);
+        p[0] = sub(a2, q0); p[1] = a2; p[2] = sub(a, q0); p[3] = a; p[4] = sub(h1, q1); p[5] = h1; p[6] = sub(1.0f, q1);
+        return 7;
+    }
+    default:
+        return 0;
+    }
+}
+
+uint32_t XtAnalogOsc::process(float* lr, uint32_t sync) {
+    switch (code) {
+    case 3: return square(lr, sync);
+    case 4: return triangle(lr, sync);
+    case 5: return ramp(lr, sync);
+    case 6: return sine(lr, sync);
+    case 7: return juno(lr, sync);
+    case 8: return noise(lr);
+    default: return saw(lr, sync);
+    }
+}
+
+// The routines share their frame: a = the Fat value (+0x1c4, ½ at Fat 0),
+// p = the Pulse Width (+0x1cc), and a phase of 0…1 holding two cycles, the
+// first over 0…a.  Each sample: a set sync bit resets the phase; the wave
+// y, then ((y + Impact)·gain)·(2^31 − 128) on L and R; the phase steps by
+// ratio·220/44100 and wraps; the gain moves 1/32 toward its target, Impact
+// by its decay; the half-cycle flags (1 in the first cycle, 2 in the
+// second) collect, and both seen set the sample's bit in the returned mask.
+// Once a block Fat and PW move 1/32 toward their targets.
+constexpr float kStep = K(0x3d000000);     // 1/32
+
+inline void XtAnalogOsc::moveShape() {
+    fatC = fmac(kStep, sub(fatT, fatC), fatC);
+    pwC = fmac(kStep, sub(pwT, pwC), pwC);
+}
+
+// SAW (0x89508c20).  d = ½ − p (+1 and the wave inverted when negative); the
 // breakpoints a·d, a and b = a + d − a·d; the wave rises over 0…a·d and
-// a…b and falls over a·d…a and b…1, each segment −1…+1.  Impact is added,
-// then the gain, then 2^31.
-void XtAnalogOsc::process(float* lr, uint32_t sync) {
+// a…b and falls over a·d…a and b…1, each segment −1…+1.
+uint32_t XtAnalogOsc::saw(float* lr, uint32_t sync) {
     float d = sub(kHalf, pwC), sign = 1.0f;
     if (0.0f > d) { d = add(d, 1.0f); sign = -1.0f; }
     const float a = fatC, ad = mul(a, d), bb = sub(add(a, d), ad);
     const float kb1 = div(2.0f, sub(bb, 1.0f)), kba = div(2.0f, sub(bb, a)), kad = div(2.0f, sub(ad, a)), k0 = div(2.0f, ad);
     const float inc = mul(ratio_, kPhaseInc);
-    uint32_t bit = 1;
+    uint32_t bit = 1, wrap = 0;
     for (int i = 0; i < 32; ++i) {
         if (sync & bit) ph = 0.0f;
         float y;
@@ -188,17 +284,205 @@ void XtAnalogOsc::process(float* lr, uint32_t sync) {
         }
         y = sub(y, 1.0f);
         ph = add(ph, inc);
-        if (fl == 3) fl = 0;            // a cycle's two halves seen: the firmware collects the bit, then returns r0 = +0x84
+        if (fl == 3) { fl = 0; wrap |= bit; }
         y = mul(y, sign);
         if (!(1.0f > ph)) ph = sub(ph, 1.0f);
         y = mul(mul(add(y, imp), gainC), kFull);
         lr[2 * i] = lr[2 * i + 1] = y;
-        gainC = fmac(K(0x3d000000), sub(gainT, gainC), gainC);
+        gainC = fmac(kStep, sub(gainT, gainC), gainC);
         imp = mul(imp, dec);
         bit <<= 1;
     }
-    fatC = fmac(K(0x3d000000), sub(fatT, fatC), fatC);
-    pwC = fmac(K(0x3d000000), sub(pwT, pwC), pwC);
+    moveShape();
+    return wrap;
+}
+
+// SQUARE (0x89508aa0).  Breakpoints p·a, a and b = a + p − p·a: −1 up to
+// p·a, +1 to a, −1 to b, +1 to 1; each edge a ramp over ±s around it (s the
+// edge half-width, +0x1e0), the one at 0/1 split across the wrap.
+uint32_t XtAnalogOsc::square(float* lr, uint32_t sync) {
+    const float s = edge_, ks = div(1.0f, s);
+    const float a = fatC, p = pwC, pa = mul(p, a), bb = sub(add(a, p), pa);
+    const float e0 = sub(pa, s), e1 = add(pa, s), e2 = sub(a, s), e3 = add(a, s), e4 = sub(bb, s), e5 = add(bb, s), e6 = sub(1.0f, s);
+    const float inc = mul(ratio_, kPhaseInc);
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = 0.0f;
+        float y;
+        if (s > ph) { y = mul(-ph, ks); fl |= 1; }
+        else if (e0 > ph) { y = -1.0f; fl |= 1; }
+        else if (e1 > ph) { y = mul(sub(ph, pa), ks); fl |= 1; }
+        else if (e2 > ph) { y = 1.0f; fl |= 1; }
+        else if (e3 > ph) { y = mul(sub(a, ph), ks); fl |= 2; }
+        else if (e4 > ph) { y = -1.0f; fl |= 2; }
+        else if (e5 > ph) { y = mul(sub(ph, bb), ks); fl |= 2; }
+        else if (e6 > ph) { y = 1.0f; fl |= 2; }
+        else { y = mul(sub(1.0f, ph), ks); fl |= 2; }
+        y = mul(mul(add(y, imp), gainC), kFull);
+        lr[2 * i] = lr[2 * i + 1] = y;
+        imp = mul(imp, dec);
+        gainC = fmac(sub(gainT, gainC), kStep, gainC);
+        ph = add(ph, inc);
+        if (!(1.0f > ph)) ph = sub(ph, 1.0f);
+        if (fl == 3) { fl = 0; wrap |= bit; }
+        bit <<= 1;
+    }
+    moveShape();
+    return wrap;
+}
+
+// TRIANGLE (0x895094c0), p halved.  Each cycle rises 0…1, falls 1…−1 and
+// rises −1…0: the first over 0…a·p, …a − a·p, …a; the second over
+// a…p + a − a·p, …1 − p + a·p, …1.
+uint32_t XtAnalogOsc::triangle(float* lr, uint32_t sync) {
+    const float a = fatC, p = pwC, ap = mul(a, p);
+    const float k8 = div(1.0f, ap), k4 = div(1.0f, sub(p, ap));
+    const float e9 = sub(a, ap), e10 = add(p, e9), e11 = add(sub(1.0f, p), ap);
+    const float k12 = div(2.0f, sub(e10, e11)), k16 = div(2.0f, sub(ap, e9));
+    const float inc = mul(ratio_, kPhaseInc);
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = 0.0f;
+        float y;
+        if (!(e11 > ph)) { y = mul(sub(ph, 1.0f), k4); fl |= 2; }
+        else if (!(e10 > ph)) { y = sub(mul(sub(ph, e11), k12), 1.0f); fl |= 2; }
+        else if (!(a > ph)) { y = mul(sub(ph, a), k4); fl |= 2; }
+        else if (!(e9 > ph)) { y = mul(sub(ph, a), k8); fl |= 1; }
+        else if (!(ap > ph)) { y = sub(mul(sub(ph, e9), k16), 1.0f); fl |= 1; }
+        else { y = mul(ph, k8); fl |= 1; }
+        y = add(y, imp);
+        if (fl == 3) { fl = 0; wrap |= bit; }
+        y = mul(mul(y, gainC), kFull);
+        lr[2 * i] = lr[2 * i + 1] = y;
+        gainC = fmac(kStep, sub(gainT, gainC), gainC);
+        ph = add(ph, inc);
+        bit <<= 1;
+        imp = mul(imp, dec);
+        if (!(1.0f > ph)) ph = sub(ph, 1.0f);
+    }
+    moveShape();
+    return wrap;
+}
+
+// SINE (0x89509030), p halved: TRIANGLE's frame with each quarter a
+// parabola, x·(2 − x) toward a peak and x·(x + 2) toward a trough (x the
+// quarter's −1…1), the peaks at a·p and p + a − a·p, the zero crossings at
+// a/2 and ½ + a/2.
+uint32_t XtAnalogOsc::sine(float* lr, uint32_t sync) {
+    const float a = fatC, p = pwC, ap = mul(a, p);
+    const float k8 = div(1.0f, ap), a2 = mul(kHalf, a), e8 = sub(a, ap), d4 = sub(p, ap);
+    const float e9 = add(d4, a), e10 = add(kHalf, a2), e11 = sub(1.0f, d4), k4 = div(1.0f, d4);
+    const float d12 = sub(ap, a2), k12 = div(1.0f, d12);
+    const float d16 = sub(p, add(kHalf, d12)), k16 = div(1.0f, d16);
+    const float k20 = div(1.0f, sub(sub(add(d16, a), a2), a2));               // d16 again, by another sum
+    const float inc = mul(ratio_, kPhaseInc);
+    uint32_t bit = 1, wrap = 0;
+    auto up = [](float x) { return mul(add(x, 2.0f), x); };
+    auto down = [](float x) { return mul(add(-x, 2.0f), x); };
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = 0.0f;
+        float y;
+        if (!(e11 > ph)) { y = up(mul(sub(ph, 1.0f), k4)); fl |= 2; }
+        else if (!(e10 > ph)) { y = up(mul(sub(ph, e10), k16)); fl |= 2; }
+        else if (!(e9 > ph)) { y = down(mul(sub(ph, e10), k20)); fl |= 2; }
+        else if (!(a > ph)) { y = down(mul(sub(ph, a), k4)); fl |= 2; }
+        else if (!(e8 > ph)) { y = up(mul(sub(ph, a), k8)); fl |= 1; }
+        else if (!(a2 > ph)) { y = up(mul(sub(ph, a2), k12)); fl |= 1; }
+        else if (!(ap > ph)) { y = down(mul(sub(ph, a2), k12)); fl |= 1; }
+        else { y = down(mul(ph, k8)); fl |= 1; }
+        y = mul(mul(add(y, imp), gainC), kFull);
+        lr[2 * i] = lr[2 * i + 1] = y;
+        gainC = fmac(kStep, sub(gainT, gainC), gainC);
+        ph = add(ph, inc);
+        if (fl == 3) { fl = 0; wrap |= bit; }
+        bit <<= 1;
+        imp = mul(imp, dec);
+        if (!(1.0f > ph)) ph = sub(ph, 1.0f);
+    }
+    moveShape();
+    return wrap;
+}
+
+// RAMP (0x89508800).  SAW's breakpoints with d = p and no fold: each cycle
+// rises 0…1 (over 0…a·p, a…b) and falls 1…−1 (over a·p…a, b…1).
+uint32_t XtAnalogOsc::ramp(float* lr, uint32_t sync) {
+    const float a = fatC, p = pwC, ap = mul(p, a), bb = sub(add(a, p), ap);
+    const float k0 = div(1.0f, ap), kad = div(2.0f, sub(ap, a)), kba = div(1.0f, sub(bb, a)), kb1 = div(2.0f, sub(bb, 1.0f));
+    const float inc = mul(ratio_, kPhaseInc);
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = 0.0f;
+        float y;
+        if (!(bb > ph)) { y = sub(mul(sub(ph, 1.0f), kb1), 1.0f); fl |= 2; }
+        else if (!(a > ph)) { y = mul(sub(ph, a), kba); fl |= 2; }
+        else if (!(ap > ph)) { y = sub(mul(sub(ph, a), kad), 1.0f); fl |= 1; }
+        else { y = mul(ph, k0); fl |= 1; }
+        y = mul(add(y, imp), gainC);
+        if (fl == 3) { fl = 0; wrap |= bit; }
+        ph = add(ph, inc);
+        bit <<= 1;
+        y = mul(y, kFull);
+        lr[2 * i] = lr[2 * i + 1] = y;
+        if (!(1.0f > ph)) ph = sub(ph, 1.0f);
+        gainC = fmac(kStep, sub(gainT, gainC), gainC);
+        imp = mul(imp, dec);
+    }
+    moveShape();
+    return wrap;
+}
+
+// JUNO (0x89508db0): a rising saw each cycle (−1…1 over 0…a and a…1),
+// held at −1 − Impact by a pulse at twice its rate: low over each half
+// cycle's first (1 − p) part, so p is the share it is heard.
+uint32_t XtAnalogOsc::juno(float* lr, uint32_t sync) {
+    const float a = fatC, p = pwC;
+    const float k1 = div(2.0f, add(a, -1.0f)), k0 = div(2.0f, a);
+    const float h1 = mul(add(1.0f, a), kHalf), a2 = mul(a, kHalf);
+    const float q0 = mul(a2, p), e6 = sub(a2, q0), e8 = sub(a, q0);
+    const float q1 = mul(sub(h1, a), p), e9 = sub(h1, q1), e11 = sub(1.0f, q1);
+    const float inc = mul(ratio_, kPhaseInc);
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = 0.0f;
+        float y;
+        if (a > ph) { y = mul(k0, ph); fl |= 1; }
+        else { y = mul(k1, sub(a, ph)); fl |= 2; }
+        y = add(add(y, -1.0f), imp);
+        const bool high = ph > e11 || (!(ph > h1) && (ph > e9 || (!(ph > a) && (ph > e8 || (!(ph > a2) && ph > e6)))));
+        if (!high) y = sub(-1.0f, imp);
+        y = mul(mul(y, gainC), kFull);
+        lr[2 * i] = lr[2 * i + 1] = y;
+        gainC = fmac(kStep, sub(gainT, gainC), gainC);
+        ph = add(ph, inc);
+        if (fl == 3) { fl = 0; wrap |= bit; }
+        if (!(1.0f > ph)) ph = add(ph, -1.0f);
+        bit <<= 1;
+        imp = mul(imp, dec);
+    }
+    moveShape();
+    return wrap;
+}
+
+// NOISE (0x89504a40): integer random values (two states: +0x1dc, cleared at
+// note-on, and +0x244), each held for the hold's samples, the hold starting
+// again every block; (Impact + value)·gain, the value already ±2^31.  No
+// phase, sync, Fat or PW; returns 0.
+uint32_t XtAnalogOsc::noise(float* lr) {
+    const int n0 = hold > 0 ? hold : 1;        // the firmware never ends a block with a hold of 0; it never gets one
+    int left = 32;
+    while (left > 0) {
+        fl = fl * 0xffffff06u + s2 * 127u + 30u;     // −250·s1 + 127·s2 + 30
+        s2 = s2 * 252u + fl;
+        const float v = flt((int32_t)fl);
+        for (int n = n0; n > 0 && left > 0; --n, --left) {
+            const float y = mul(add(imp, v), gainC);
+            imp = mul(imp, dec);
+            lr[0] = lr[1] = y;
+            lr += 2;
+            gainC = fmac(sub(gainT, gainC), kStep, gainC);
+        }
+    }
+    return 0;
 }
 
 #ifdef XT_ANALOG_MAIN
@@ -326,33 +610,48 @@ int main(int argc, char** argv) {
     }
     std::printf("converter: %ld cases, %ld different\n", cn, cb);
 
-    // The voice: the converter's block, the note-on, then blocks of SAW with
-    // an update every few blocks, the state compared after each
+    // The voice: the converter's block, the note-on, the install, then blocks
+    // of the installed routine with an update every few blocks, the state,
+    // the output and the returned mask compared after each.  Each case
+    // takes one of the waveforms the port plays, in turn.
     c.write(V, z.data(), 0x1000);
     c.wr32(V + 0x970, EP); c.wr32(V + 0x974, EF); c.wr32(V + 0x978, EW); c.wr32(V + 0x97c, EA);
     for (uint32_t o = 0x980; o < 0x990; o += 4) c.wr32(V + o, LF);
+    static const int waves[7] = { 0, 1, 2, 3, 4, 5, 8 };
+    static const char* waveName[7] = { "saw", "square", "triangle", "sine", "ramp", "juno", "noise" };
+    static const uint32_t routine[9] = { 0, 0, 0x89508c20, 0x89508aa0, 0x895094c0, 0x89508800, 0x89509030, 0x89508db0, 0x89504a40 };
     XtAnalogOsc osc;
-    long nb = 0, nn = 0, db = 0, dn = 0;
-    float peak = 0;
+    long nb = 0, nn = 0, wb = 0, db[7] = {}, dn[7] = {}, mb = 0;
+    float peak[7] = {};
+    int code = 2;
     auto stateSame = [&](bool full) {
         bool ok = same(f32(V + 0x144), osc.ratio()) && same(f32(V + 0x154), osc.gainTarget()) && same(f32(V + 0x1c0), osc.fatTarget())
                && same(f32(V + 0x1c8), osc.pwTarget());
+        if (code == 3) ok = ok && same(f32(V + 0x1e0), osc.edge());
+        if (code == 8) ok = ok && (int)(int8_t)c.rd8(V + 0x248) == osc.noiseHold();
         if (full)
             ok = ok && same(f32(V + 0x158), osc.gain()) && same(f32(V + 0x1c4), osc.fat()) && same(f32(V + 0x1cc), osc.pw())
                  && same(f32(V + 0x1d0), osc.decay()) && same(f32(V + 0x1d4), osc.phase()) && same(f32(V + 0x1d8), osc.impact())
-                 && (int)c.rd32(V + 0x1dc) == osc.flags();
+                 && c.rd32(V + 0x1dc) == osc.flags() && c.rd32(V + 0x244) == osc.noiseState();
         return ok;
     };
     auto dump = [&](const char* what, int g, int blk) {
-        std::printf("  %s %d.%d: ratio %.9g/%.9g gain %.9g/%.9g cur %.9g/%.9g fat %.9g/%.9g %.9g/%.9g pw %.9g/%.9g %.9g/%.9g dec %.9g/%.9g "
-                    "phase %.9g/%.9g imp %.9g/%.9g flags %u/%d\n", what, g, blk, f32(V + 0x144), osc.ratio(), f32(V + 0x154), osc.gainTarget(),
-                    f32(V + 0x158), osc.gain(), f32(V + 0x1c0), osc.fatTarget(), f32(V + 0x1c4), osc.fat(), f32(V + 0x1c8), osc.pwTarget(),
-                    f32(V + 0x1cc), osc.pw(), f32(V + 0x1d0), osc.decay(), f32(V + 0x1d4), osc.phase(), f32(V + 0x1d8), osc.impact(),
-                    c.rd32(V + 0x1dc), osc.flags());
+        std::printf("  %s %d.%d code %d: ratio %.9g/%.9g gain %.9g/%.9g cur %.9g/%.9g fat %.9g/%.9g %.9g/%.9g pw %.9g/%.9g %.9g/%.9g dec %.9g/%.9g "
+                    "phase %.9g/%.9g imp %.9g/%.9g flags %u/%u edge %.9g/%.9g noise %u/%u hold %d/%d\n", what, g, blk, code, f32(V + 0x144),
+                    osc.ratio(), f32(V + 0x154), osc.gainTarget(), f32(V + 0x158), osc.gain(), f32(V + 0x1c0), osc.fatTarget(), f32(V + 0x1c4),
+                    osc.fat(), f32(V + 0x1c8), osc.pwTarget(), f32(V + 0x1cc), osc.pw(), f32(V + 0x1d0), osc.decay(), f32(V + 0x1d4), osc.phase(),
+                    f32(V + 0x1d8), osc.impact(), c.rd32(V + 0x1dc), osc.flags(), f32(V + 0x1e0), osc.edge(), c.rd32(V + 0x244), osc.noiseState(),
+                    (int)(int8_t)c.rd8(V + 0x248), osc.noiseHold());
     };
     for (int g = 0; g < nCases; ++g) {
         Case k = newCase(false);
-        k.p.wave = 0;
+        const int wi = g % 7;
+        k.p.wave = waves[wi];
+        if (g % 8 == 1) {                          // SQUARE's pitch steps: G4, A4, A#4, C#5, F#5 untuned
+            static const int steps[5] = { 67, 69, 70, 73, 78 };
+            k.key = steps[rnd() % 5]; k.coarse = 0; k.fine = 0; k.kf = 1000;
+        }
+        code = xtAnalogCode(k.p.wave);
         mtx = 0;
         writeInput(k);
         if (!c.call(0x894e1920, { P, V }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return 1; }
@@ -370,6 +669,9 @@ int main(int argc, char** argv) {
         osc.noteOn(b, ratioOf(), gainOf(false), gainOf(true), eF, eW, lfo);
         ++nn;
         if (!stateSame(true) && nb++ < 6) dump("note-on", g, 0);
+        if (!c.call(0x89505170, { V }, sp)) { std::fprintf(stderr, "install: %s\n", c.error().c_str()); return 1; }
+        const uint32_t fn = c.rd32(V + 0x968);
+        if (fn != routine[code] && wb++ < 4) std::printf("  install code %d: routine %08x, the map has %08x\n", code, fn, routine[code]);
         for (int blk = 0; blk < 40; ++blk) {
             if (blk % 5 == 4) {
                 eP = frnd(-1, 1); eF = frnd(0, 1); eW = frnd(0, 1); eA = frnd(0, 1); lfo = frnd(-1, 1);
@@ -379,32 +681,40 @@ int main(int argc, char** argv) {
                 ++nn;
                 if (!stateSame(false) && nb++ < 6) dump("update", g, blk);
             }
-            if (blk % 6 == 2) {                    // the phase exactly on a breakpoint: a·d, a or b (as the routine forms them), 0
-                float d = sub(kHalf, osc.pw());
-                if (0.0f > d) d = add(d, 1.0f);
-                const float a = osc.fat(), ad = mul(a, d), pts[4] = { ad, a, sub(add(a, d), ad), 0.0f };
-                const float p = pts[rnd() % 4];
-                if (p >= 0.0f && 1.0f > p) { wf(V + 0x1d4, p); osc.setPhase(p); }
+            if (blk % 6 == 2) {                    // the phase exactly on a breakpoint (as the routine forms it), or 0
+                float pts[9];
+                const int n = osc.breakpoints(pts);
+                pts[n] = 0.0f;
+                const float p = pts[rnd() % (uint32_t)(n + 1)];
+                if (code != 8 && p >= 0.0f && 1.0f > p) { wf(V + 0x1d4, p); osc.setPhase(p); }
             }
             const uint32_t sync = rnd() % 8 == 0 ? ((uint32_t)rnd() << 16 | rnd()) & ((uint32_t)rnd() << 16 | rnd()) : 0u;
-            if (!c.call(0x89508c20, { BUF, V + 0xd4, sync }, sp)) { std::fprintf(stderr, "saw: %s\n", c.error().c_str()); return 1; }
+            uint32_t mask = 0;
+            if (!c.call(fn, { BUF, V + 0xd4, sync }, sp, &mask)) { std::fprintf(stderr, "%s: %s\n", waveName[wi], c.error().c_str()); return 1; }
             float lr[64];
-            osc.process(lr, sync);
-            ++dn;
-            for (int i = 0; i < 64; i += 2) peak = std::fmax(peak, std::fabs(lr[i]));
+            const uint32_t pm = osc.process(lr, sync);
+            ++dn[wi];
+            for (int i = 0; i < 64; i += 2) peak[wi] = std::fmax(peak[wi], std::fabs(lr[i]));
             bool ok = stateSame(true);
             for (int i = 0; i < 64; ++i) ok = ok && same(f32(BUF + 4 * (uint32_t)i), lr[i]);
-            if (!ok && db++ < 6) {
+            if (mask != pm && mb++ < 4) std::printf("  %s %d block %d: mask %08x, port %08x\n", waveName[wi], g, blk, mask, pm);
+            if (!ok && db[wi]++ < 4) {
                 int i = 0;
                 while (i < 64 && same(f32(BUF + 4 * (uint32_t)i), lr[i])) ++i;
-                std::printf("  saw %d block %d: first difference at %d: fw %.9g port %.9g\n", g, blk, i, i < 64 ? f32(BUF + 4 * (uint32_t)i) : 0.0f,
-                            i < 64 ? lr[i] : 0.0f);
-                dump("saw", g, blk);
+                std::printf("  %s %d block %d: first difference at %d: fw %.9g port %.9g\n", waveName[wi], g, blk, i,
+                            i < 64 ? f32(BUF + 4 * (uint32_t)i) : 0.0f, i < 64 ? lr[i] : 0.0f);
+                dump(waveName[wi], g, blk);
             }
         }
     }
     std::printf("note-on and update: %ld cases, %ld different\n", nn, nb);
-    std::printf("saw: %ld blocks of 32 frames, %ld different (peak %.4g of 2^31)\n", dn, db, peak / 2147483648.0f);
-    return cb || nb || db ? 3 : 0;
+    std::printf("install: %d cases, %ld routines not as the map\n", nCases, wb);
+    long dbad = mb;
+    for (int w = 0; w < 7; ++w) {
+        std::printf("%s: %ld blocks of 32 frames, %ld different (peak %.4g of 2^31)\n", waveName[w], dn[w], db[w], peak[w] / 2147483648.0f);
+        dbad += db[w];
+    }
+    std::printf("wrap masks: %ld different\n", mb);
+    return cb || nb || wb || dbad ? 3 : 0;
 }
 #endif
