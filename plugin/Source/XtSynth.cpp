@@ -800,24 +800,30 @@ void XtSynth::oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o) {
 }
 
 // An OSC's voice at note-on.  The OSC gain starts from the amp envelope's
-// start level, or its output when there is no attack (0x894f3e20).
+// start level, or its output when there is no attack (0x894f3e20), and goes
+// to the envelope's output (0x894f3dc0).
 void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     const XtEnvParams oe = ampEnvParams(v, o);
-    s.curGain = gainTarget(v, s, o, oe.time[0] == 0.0f ? s.oenv.level() : oe.level[0]);
+    const float gainStart = gainTarget(v, s, o, oe.time[0] == 0.0f ? s.oenv.level() : oe.level[0]);   // +0x158 (0x894f3e20)
+    s.curGain = gainTarget(v, s, o, s.oenv.level());                                                  // +0x154 (0x894f3dc0)
     if (s.analog) {   // the analog note-on (0x89504af0): Fat on the formant envelope, the Pulse Width on the time envelope
         XtAnalogBlock b = analogBlock(v, s, o);
         if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;   // the tone's note-on (0x894f6148): under OSC SYNC OSC 2 plays LA-SAW as SAW
-        s.ana.noteOn(b, s.curA, gainTarget(v, s, o, s.oenv.level()), s.curGain, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared);
+        s.ana.noteOn(b, s.curA, s.curGain, gainStart, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared);
     }
     else if (cur->type == 1) {
         s.solo.setRobot(s.robot);
         s.solo.setLoop(waveLoop());
         s.solo.noteOn(cur->solo, s.curA, s.curF, s.curWalk, s.curG);
-        s.solo.resetGain(s.curGain);
+        s.solo.resetGain(gainStart);
+        s.solo.setGain(s.curGain);
     }
     else {
         s.mb.setLoop(waveLoop());
-        if (s.mb.noteOn(cur->wave, cur->type, s.curA, s.curWalk)) s.mb.setGain(s.curGain, true);
+        if (s.mb.noteOn(cur->wave, cur->type, s.curA, s.curWalk)) {
+            s.mb.setGain(gainStart, true);
+            s.mb.setGain(s.curGain);
+        }
         else if (v.osc2.on) s.on = false;
         else v.active = false;
     }
