@@ -1544,6 +1544,101 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The analog waveform SUPER-SAW (2026-11-01, v83)
+
+Code 11, patch waveform 11. Left: FEEDBACK-OSC (code 12), X-MOD (code 13,
+which needs OSC 2: see below) and the sub oscillator.
+
+**The converter has its own case** (`0x894e2500`, from the switch on the
+patch waveform − 11 at `0x894e206e`, table at `0x894e2084`: 11 `0x894e2500`, 12
+`0x894e22c0`, 13 `0x894e208a`). +0xb4 = 0: never the sub oscillator's routines.
+- **+0x98 is the saws' spread**, from the Pulse Width (`0x894e5060`):
+  - i = PW + 64, 0 if not above 1, within 0…127;
+  - (table[i]/2 + 2)/32767 + (key − 60)·KF·0.019532/12000, within 6.1e−5…
+    0.019593. The table is 128 shorts at `0x897cef58`.
+  - +0x9c and +0xa0 are its depths, (d/63)·|d/63|·0.019532 (`0x894e5120`), the
+    envelope's × the velocity factor.
+  - Outermost saws at PW −63, −32, 0, 32, 63: ±0.6, 10, 19, 47, 180 cents.
+- **+0x84 is the side saws' level m**, from the **Detune knob** (+0x3a, ID
+  0x30d), not Fat (`0x894e5140`):
+  - i as above from Detune (stored ±63, centre 64);
+  - (64·i + 400)/32767 + (key − 60)·KF·0.248055/12000, within 0.012207…
+    0.260262. The KF is Fat's (+0x32).
+  - +0x88 and +0x90 are Fat's depths, (d/63)·|d/63|·0.248055 (`0x894e51f0`).
+  - The Fat knob itself is unused.
+- **+0xb0 is the Saw Slope/100.** Correction to v79: the switch at `0x894e14a0`
+  (table at `0x894e14f0`) sends patch waveforms 11, 12 and 13 to SAW's branch.
+
+**The update** (`0x89505c90`):
+- +0x154 = the gain target;
+- +0x24c = the spread's sum, within 6.1e−5…0.019593;
+- +0x254 = m's sum, within 0.012207…0.260262.
+
+The bounds are the converter's, applied again.
+
+**The note-on** (`0x89505bc0`):
+- +0x1c8 = +0x1cc = ratio·Slope·0.01; this is the saws' s, fixed for the note.
+- +0x250 = +0x24c, +0x258 = +0x254.
+- The side saws' phases +0x25c…+0x270 start at a global counter, 0.1 apart
+  (each sum wrapped from 1); the counter (`0x8987c894`) ends 0.6 on. Only this
+  code uses it, so all voices share one sequence. It is 0 at startup. The port
+  keeps it in `XtAnalogShared`, one per XtSynth.
+- The centre's phase, +0x1d4, is kept from the last note as usual.
+
+**The routine** (`0x89507520`):
+- Seven saws, one phase of 0…1 a cycle. The step is ratio·440/44100
+  (0x3c2377ed) for the centre, and step ± d·{1, 3.2, 5.6} for the six others
+  (d = spread·step), in the order +, −, +3.2, −3.2, +5.6, −5.6.
+- Each saw: p/s below s, else (1 − p)/(1 − s), then ·2 − 1. It rises −1…+1 over
+  0…s and falls back over s…1.
+- out = ((centre·0.2 + sum·m)·4(1 − 2.2·m) + Impact)·gain·2^31; the sum is
+  added in order, the centre's product first in the FMAC.
+- At Detune −63, 0, +63 the centre weighs 0.78, 0.56, 0.34 and each side saw
+  0.05, 0.38, 0.45.
+- The mask follows the centre only. Each sum wraps by adding −1.
+- A sync bit sets the phases to 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6 (stored
+  0x3e999999 and 0x3f199999, units off the nearest float).
+- Once a block +0x250 and +0x258 move 0.2 of the way (0x3e4ccccd). It uses
+  neither the flags nor Fat's or PW's moves.
+
+**X-MOD needs OSC 2.** The voice's render (`0x894f6d40`) runs the oscillator at
+voice +0x9d4 (OSC 2) first, into `0x89d2c910`, then the one at +0x20 (OSC 1)
+into `0x89d2c810`, passing the other's buffer. The renderer (`0x894f2800`) hands
+it on in r7. X-MOD (`0x89507b60`) reads that buffer, adds (L/2^31 + R/2^31)/2 ×
+0.2·(+0x250, its Pulse Width's value) to its phase, and clears it, so OSC 2 is
+consumed and not heard. For OSC 2 itself the converter sets X-MOD's +0x98,
++0x9c and +0xa0 to 0. It stays unported until OSC 2 exists.
+
+**Sound** (A4):
+- PW 0, Detune 0: the harmonic series as SAW's at −8.9, −11.9, −14.8, −16.8 dB;
+  the energy off the series is −5.9 dB (the detuned saws).
+- PW −63, Detune −63: nearly one saw, −28 dB off the series, as SAW's −28.
+- PW +63, Detune +63: −0.4 dB off the series, with the largest partial at
+  488 Hz, the +5.6 saw.
+
+**Checks** (`xt_analog`, further passes after the others):
+- The converter's new case: 200,000 cases with knob + matrix sums and velocity
+  curves, 0 different.
+- 3,000 cases in fcheck: 7,713 note-ons and updates, and 34,000 blocks, with
+  every phase, +0x24c…+0x258 and the shared counter: 0 different.
+- Every sixth block sets the centre on s or where a step lands on 1. Likewise
+  each side saw, by its own step. One case in sixteen sets the counter where
+  its step lands exactly on 1.
+- Deliberate errors caught (32 of 33): the Slope off; the table's rounding; the
+  index's "not above 1" rule; each KF constant; each bound in the converter and
+  in the update; Fat for Detune; a depth's velocity factor; the LFO depth's
+  clamp; the counter not stored, its step, its wrap at 1 exactly; the note-on's
+  s; a current value not set; the step, 3.2, 5.6 and 2.2 constants; the order
+  of the increments; the sync's phases; both wraps at 1 exactly; the sum's
+  order; the centre's weight; 2^31 − 128 for 2^31; 1/32 for the move.
+- Missed: the saw's turn at s as ≥, which is exact (both branches give 1 there).
+
+**Plugin.** SUPER-SAW is enabled in the Waveform box, and a Detune knob joins
+the analog rows (`anaDetune`, ±63, default 0, used only by this waveform so
+far). `XT_ANALOG` and `TEST_ANALOG` take it as an optional eleventh value. The
+PluginTest is bit-identical with it at notes 30, 60 and 100, with modulation
+and at extreme PW and Detune.
+
 ### The analog waveforms: LA-SQUARE and LA-SAW (2026-11-01, v82)
 
 Codes 9 and 10, the first two with note-on and update cases of their own.
@@ -1996,7 +2091,8 @@ OSC table at +0xc204… (`0x894e5f80`):
 - The Saw loses 3% an octave above C4 and gains 4% an octave below.
 
 `0x894e14a0` gives SAW the Saw Slope/100 and SQUARE the Square Slope/100
-when Alias Cancel is on, else 0. The port uses the descriptors' defaults. A
+when Alias Cancel is on, else 0. (Corrected in v83: SUPER-SAW, FEEDBACK-OSC and
+X-MOD take the Saw's too.) The port uses the descriptors' defaults. A
 unit could hold other values, if they were set at the factory.
 
 **Note-on** (`0x89504af0`, every waveform):

@@ -260,6 +260,17 @@ ANALOG LA v82 (2026-11-01): LA-SQUARE (code 9, 0x89508540) and LA-SAW (code
   xtAnalogPlays: codes 0…10. xt_analog: "la" and "la tones" lines, the latter
   with the calibration's Tones and KFs random through 0x894e5f80.
 
+ANALOG SUPER-SAW v83 (2026-11-01): SUPER-SAW (code 11, 0x89507520)
+  (HARDWARE_FIRMWARE.md, "The analog waveform SUPER-SAW"). The converter has
+  its own case: PW → the saws' spread (ssDetuneCurve, table 0x897cef58), the
+  Detune knob → the side saws' level (ssMixCurve), and the Saw Slope (the
+  switch 0x894e14a0 sends patch waveforms 11…13 to SAW's branch). ssShape() is
+  the update 0x89505c90, ssNoteOn() 0x89505bc0. XtAnalogShared (one per
+  XtSynth, so a noteOn parameter): the counter 0x8987c894 the six side phases
+  start from, 0 at startup. New param anaDetune (XT_ANALOG/TEST_ANALOG's
+  optional eleventh value). X-MOD (0x89507b60) reads OSC 2's buffer, so it
+  waits for OSC 2.
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from

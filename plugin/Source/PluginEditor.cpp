@@ -145,8 +145,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     anaWaveAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "anaWave", anaWaveBox_);
     oscTypeBox_.onChange = [this] { showOscType(); };
     {
-        static const char* const ids[kAnaKnobs] = { "anaImpact", "anaPw", "anaPwKF", "anaFat", "anaFatKF", "anaPwLfo", "anaPwEnv", "anaFatLfo", "anaFatEnv" };
-        static const char* const names[kAnaKnobs] = { "Impact", "PW", "PW KF", "Fat", "Fat KF", "PW LFO", "PW Env", "Fat LFO", "Fat Env" };
+        static const char* const ids[kAnaKnobs] = { "anaImpact", "anaPw", "anaPwKF", "anaFat", "anaFatKF", "anaPwLfo", "anaPwEnv", "anaFatLfo", "anaFatEnv", "anaDetune" };
+        static const char* const names[kAnaKnobs] = { "Impact", "PW", "PW KF", "Fat", "Fat KF", "PW LFO", "PW Env", "Fat LFO", "Fat Env", "Detune" };
         for (int i = 0; i < kAnaKnobs; ++i) {
             juce::Slider& sl = anaSliders_[i];
             sl.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -763,6 +763,8 @@ void VSynthEmuEditor::resized() {
         anaWaveBox_.setBounds(a1.removeFromLeft(130).withTrimmedRight(10));
         anaLabels_[0].setBounds(a1.removeFromLeft(44));
         anaSliders_[0].setBounds(a1.removeFromLeft(220));
+        anaLabels_[9].setBounds(a1.removeFromLeft(46));
+        anaSliders_[9].setBounds(a1.removeFromLeft(220));
         for (int r = 0; r < 2; ++r) {
             auto& a = r ? a3 : a2;
             const int cw = a.getWidth() / 4;

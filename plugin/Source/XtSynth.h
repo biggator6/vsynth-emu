@@ -328,6 +328,7 @@ private:
     XtLoop waveLoop() const;                         // the players' loop
     float noteCents(const Voice& v, int key) const;  // voice +8 at a key (+0x68 at the previous one)
     void noteTuning(const Voice& v, int& coarse, int& fine) const;   // the per-note setup's +0x68 and +0x70
+    XtAnalogShared anaShared;                        // the analog voices' shared state
     XtAnalogBlock analogBlock(const Voice& v) const; // the analog converter's block
     int keyFollowKey(const Voice& v) const;          // the OSC's +4
     int shiftKey(int key) const;                     // + the Octave Shift, within 0..127

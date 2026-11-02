@@ -90,6 +90,11 @@ la tones install: 1714 cases, 0 routines not as the map
 la-square: 34280 blocks of 32 frames, 0 different (peak 4.154 of 2^31)
 la-saw: 34280 blocks of 32 frames, 0 different (peak 3.248 of 2^31)
 la tones wrap masks: 0 different
+super-saw converter: 200000 cases, 0 different
+super-saw note-on and update: 7713 cases, 0 different
+super-saw install: 857 cases, 0 routines not as the map
+super-saw: 34280 blocks of 32 frames, 0 different (peak 4.023 of 2^31)
+super-saw wrap masks: 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

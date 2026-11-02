@@ -2988,3 +2988,23 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The check also varies the LA Tones and Keyfollows through the firmware's
   own calibration routine, since a real unit could hold other values than the
   defaults the plugin uses.
+
+### Session 16 addendum (2026-11-01) — v83: SUPER-SAW
+
+- SUPER-SAW is ported: seven saws, the centre plus three detuned pairs at 1,
+  3.2 and 5.6 times a spread, the classic supersaw layout.
+- The knobs are not what their names suggest. Pulse Width sets the spread (up
+  to ±180 cents for the outer pair), and the Detune knob, which only the sub
+  oscillator seemed to use, sets how loud the side saws are. The Fat knob does
+  nothing here, though Fat's key-follow and depths still apply to the level.
+  The plugin gets a Detune knob for this.
+- The first check run found two things I had read wrongly: both the side
+  level's input (Detune, not Fat) and the Slope (this waveform takes the Saw's;
+  the switch table sends codes 11…13 to SAW's branch, not to the default, which
+  also corrects v79). Reading the switch's target list alone had hidden that.
+- The side saws' starting phases come from a counter all voices share, so two
+  notes never start alike. The port keeps it per synth instance, since the
+  plugin test compares two instances side by side.
+- X-MOD turns out to need OSC 2: the voice renders OSC 2 first and passes its
+  buffer to OSC 1's routine, which uses it as a phase modulator and clears it.
+  It stays until OSC 2 exists.

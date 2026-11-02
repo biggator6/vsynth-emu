@@ -719,7 +719,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     // when there is no attack (0x894f3e20)
     v->curGain = gainTarget(*v, oe.time[0] == 0.0f ? v->oenv.level() : oe.level[0]);
     if (v->analog)   // the analog note-on (0x89504af0): Fat on the formant envelope, the Pulse Width on the time envelope
-        v->ana.noteOn(analogBlock(*v), v->curA, gainTarget(*v, v->oenv.level()), v->curGain, v->fenv.level(), v->tenv.level(), v->lfo.out());
+        v->ana.noteOn(analogBlock(*v), v->curA, gainTarget(*v, v->oenv.level()), v->curGain, v->fenv.level(), v->tenv.level(), v->lfo.out(), anaShared);
     else if (cur->type == 1) {
         v->solo.setRobot(v->robot);
         v->solo.setLoop(waveLoop());
@@ -1043,8 +1043,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_LFO="wave,rate,depth,delay,mode,fade,offset,keysync": the LFO.
 //   XT_OSC="time,offset,timeKF,formant,formantKF,energy[,lfoTime,lfoFormant]":
 //     the VariPhrase OSC knobs (Time Offset 0 BWD, 1 ZERO, 2 FWD).
-//   XT_ANALOG="wave,impact,pw,pwKf,pwLfo,pwEnv,fat,fatKf,fatLfo,fatEnv": OSC
-//     Type ANALOG (KFs in %; PW on XT_TENV's envelope, Fat on XT_FENV's).
+//   XT_ANALOG="wave,impact,pw,pwKf,pwLfo,pwEnv,fat,fatKf,fatLfo,fatEnv[,detune]":
+//     OSC Type ANALOG (KFs in %; PW on XT_TENV's envelope, Fat on XT_FENV's).
 //   XT_OLEV="level,levelKF,levelLfoDepth,waveGainDb": the OSC TVA.
 //   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.
 //   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
@@ -1138,8 +1138,8 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_ANALOG")) {
         XtAnalogParams& a = c.ana;
         c.oscType = 0;
-        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &a.wave, &a.impact, &a.pw, &a.pwKf, &a.pwLfo, &a.pwEnv, &a.fat, &a.fatKf, &a.fatLfo,
-                    &a.fatEnv);
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &a.wave, &a.impact, &a.pw, &a.pwKf, &a.pwLfo, &a.pwEnv, &a.fat, &a.fatKf, &a.fatLfo,
+                    &a.fatEnv, &a.detune);
         a.pwKf /= 10;
         a.fatKf /= 10;
     }

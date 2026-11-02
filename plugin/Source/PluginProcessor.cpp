@@ -33,6 +33,7 @@ namespace Params {
     static const juce::String kAnaFatKF      = "anaFatKF";
     static const juce::String kAnaFatLfo     = "anaFatLfo";
     static const juce::String kAnaFatEnv     = "anaFatEnv";
+    static const juce::String kAnaDetune     = "anaDetune";
     // The OSC's pitch (XtOsc): Coarse and Fine, the Pitch knob −63..+63
     // (±6000 cents at 63), Pitch KF and Random Pitch Depth
     static const juce::String kOscCoarse     = "oscCoarse";       // −48..+48 semitones
@@ -219,6 +220,7 @@ VSynthEmuProcessor::createParameterLayout() {
         Params::kAnaFatKF, "Fat KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaFatLfo, "Fat LFO Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaFatEnv, "Fat Env Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaDetune, "Detune", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscCoarse, "Coarse", -48, 48, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscFine, "Fine", -50, 50, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscPitch, "OSC Pitch", -63, 63, 0));
@@ -616,6 +618,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.ana.fatKf    = kf(Params::kAnaFatKF) / 10;
     c.ana.fatLfo   = knob(Params::kAnaFatLfo);
     c.ana.fatEnv   = knob(Params::kAnaFatEnv);
+    c.ana.detune   = knob(Params::kAnaDetune);
     c.oscCoarse    = knob(Params::kOscCoarse);
     c.oscFine      = knob(Params::kOscFine);
     c.oscPitch     = knob(Params::kOscPitch);

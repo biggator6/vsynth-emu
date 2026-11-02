@@ -16,8 +16,9 @@
 // The port plays the note-on's default case: HQ-SAW (0x895063f0), HQ-SQUARE
 // (0x895060e0), SAW (0x89508c20), SQUARE (0x89508aa0), TRIANGLE
 // (0x895094c0), SINE (0x89509030), RAMP (0x89508800), JUNO (0x89508db0) and
-// NOISE (0x89504a40); and LA-SQUARE (0x89508540) and LA-SAW (0x895081f0);
-// without the sub oscillator.
+// NOISE (0x89504a40); LA-SQUARE (0x89508540), LA-SAW (0x895081f0) and SUPER-SAW
+// (0x89507520); without the sub oscillator.  X-MOD (0x89507b60) reads OSC 2's
+// output, so it waits for OSC 2.
 //
 // The level and the Saw's edge also follow hidden system parameters, the
 // XT's analog calibration (IDs 0x528…0x55b, through 0x894e5f80 to the OSC
@@ -32,6 +33,12 @@
 bool xtAnalogLoadTables(const char* romPath);
 bool xtAnalogTablesLoaded();
 
+// What the firmware keeps for all voices: SUPER-SAW's phase counter
+// (0x8987c894, 0 at startup).
+struct XtAnalogShared {
+    float superSaw = 0;
+};
+
 // The waveform's code (+0x80) for the patch's 0…13; and whether the port
 // plays it.
 int xtAnalogCode(int wave);
@@ -40,11 +47,13 @@ bool xtAnalogPlays(int wave);
 // The analog knobs as the patch stores them (IDs 0x2b1…0x2ba for OSC 1):
 // Waveform 0…13 (SAW); Impact 0…40 (0.0…4.0, default 10); Pulse Width
 // −63…+63, its Keyfollow ±20 (×10 = the displayed ±200), LFO and Env Depth
-// ±63; Fat 0…127 and the same.
+// ±63; Fat 0…127 and the same; Detune ±63 (ID 0x30d), used by SUPER-SAW and
+// FEEDBACK-OSC, and by the sub oscillator.
 struct XtAnalogParams {
     int wave = 0, impact = 10;
     int pw = 0, pwKf = 0, pwLfo = 0, pwEnv = 0;
     int fat = 0, fatKf = 0, fatLfo = 0, fatEnv = 0;
+    int detune = 0;
 };
 
 // The converter's analog block (the matrix and controller terms 0; the sub
@@ -56,12 +65,16 @@ struct XtAnalogParams {
 //   …Env    the envelope's velocity factor × (d/63)·|d/63| (+0x88, +0x9c)
 //   …Lfo    (d/63)·|d/63|, d within ±63 (+0x90, +0xa0)
 //   impact  +0xac: Impact·4/40
-//   slope   +0xb0: SAW the Saw Slope/100, SQUARE the Square Slope/100, with
-//           Alias Cancel on (0x894e14a0); 0 otherwise
+//   slope   +0xb0: SAW, SUPER-SAW, FEEDBACK-OSC and X-MOD the Saw Slope/100,
+//           SQUARE the Square Slope/100, with Alias Cancel on (0x894e14a0);
+//           0 otherwise
 //   gain    +0x5c: 2^(Wave Gain/6) × the waveform's level at the note's
 //           pitch (0x894e1350): level curve(Level)/32768 × max(0, 1 + d·KF/
 //           6e6), d = pitch10 − bias·1000, the upper KF above the bias point
 //           and the lower below (with −d)
+//           SUPER-SAW (patch 11) has its own curves: +0x98 the saws' spread
+//           from the Pulse Width, +0x84 the side saws' level from the Detune
+//           knob with Fat's KF, each with its depths
 //   tone    +0xbc: LA-SQUARE's Tone (ID 0x529), the others' LA Saw Tone (0x528)
 //   toneKf  +0xc0: LA-SQUARE's Tone Keyfollow (0x52b), the others' (0x52a)
 // The envelopes: Fat's is the OSC's third (Env 3, OSC 2 Env 7; the formant
@@ -110,11 +123,14 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
 //             steepness' target and current value; +0x218 LA-SAW's second
 //             wave.  Their gain, Fat and PW targets are per sample: gain
 //             +0x154 = −gain·2^26, +0x1c0 and +0x1c8 the target × 0.002.
+//   ss        SUPER-SAW: +0x24c/+0x250 the spread, +0x254/+0x258 the side saws'
+//             level, targets and current values; +0x25c…+0x270 the side saws'
+//             phases, +0x1d4 the centre's.
 class XtAnalogOsc {
 public:
     // fatEnv/pwEnv: the envelopes' outputs (+0x4c); lfo: the LFO's (+0x38);
     // gain, gainStart: 0x894f3dc0 and 0x894f3e20 (xtOscGainTarget)
-    void noteOn(const XtAnalogBlock& b, float ratio, float gain, float gainStart, float fatEnv, float pwEnv, float lfo);
+    void noteOn(const XtAnalogBlock& b, float ratio, float gain, float gainStart, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared);
     void update(const XtAnalogBlock& b, float ratio, float gain, float fatEnv, float pwEnv, float lfo);
     // 32 frames into lr (interleaved L/R, the same on both), in the XT's
     // units (±2^31 at full gain).  sync: the other oscillator's mask, bit i
@@ -143,11 +159,17 @@ public:
     float laSteepTarget() const { return qT; }
     float laSteep() const { return qC; }
     float laPhase2() const { return ph2; }
+    float detuneTarget() const { return ssDetT; }    // the spread
+    float detune() const { return ssDetC; }
+    float mixTarget() const { return ssMixT; }
+    float mix() const { return ssMixC; }
+    float sidePhase(int i) const { return ss[i]; }
     // the check's breakpoint cases: the points the routine compares the
     // phase with, as it forms them from the current Fat and PW (up to 8)
     int breakpoints(float* p) const;
     void setPhase(float p) { ph = p; }
     void setLaPhase2(float z) { ph2 = z; }
+    void setSidePhase(int i, float p) { ss[i] = p; }
 
 private:
     int code = 2;
@@ -155,6 +177,7 @@ private:
     float fatT = 0.5f, fatC = 0.5f, pwT = 0.5f, pwC = 0.5f;
     float ph = 0, imp = 0, dec = 0, edge_ = 0, hy = 0;
     float laInc = 0, ph2 = 0, qT = 0, qC = 0;
+    float ssDetT = 0, ssDetC = 0, ssMixT = 0, ssMixC = 0, ss[6] = {};
     uint32_t fl = 0, s2 = 0;
     int hold = 1, hs = 0;
     // HQ-SAW's and HQ-SQUARE's lengths and factors for a block (samples ×
@@ -165,6 +188,9 @@ private:
     void shape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, bool noteOn);
     void laShape(const XtAnalogBlock& b, float gain, float fatEnv, float pwEnv, float lfo);
     void laNoteOn(const XtAnalogBlock& b, float gain, float gainStart, float fatEnv, float pwEnv, float lfo);
+    void ssShape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo);
+    void ssNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared);
+    uint32_t superSaw(float* lr, uint32_t sync);
     uint32_t laSquare(float* lr, uint32_t sync);
     uint32_t laSaw(float* lr, uint32_t sync);
     uint32_t hqSaw(float* lr, uint32_t sync);

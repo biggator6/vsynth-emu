@@ -4,6 +4,7 @@
 #include "XtCosm.h"
 #include "XtFloat.h"
 #include "XtOsc.h"
+#include <algorithm>
 #include <bit>
 #include <cstdio>
 
@@ -20,6 +21,8 @@ constexpr uint32_t kHqA = 0x897d94dc, kHqB = 0x897e5ce0;
 constexpr int kHqAHalf = 4608, kHqBHalf = 8192, kHqN = 2 * kHqAHalf + 1 + 2 * kHqBHalf + 1;
 // the LA waveforms' Tone Keyfollow, by its value 0…14
 constexpr uint32_t kLaToneKf = 0x897d4c6c;
+// SUPER-SAW's Detune curve (128 shorts)
+constexpr uint32_t kSsDetuneTab = 0x897cef58;
 // the analog calibration's system parameters
 constexpr int kSys0 = 0x528, kSysN = 0x55b - 0x528 + 1;
 enum : int {
@@ -33,6 +36,7 @@ struct Tables {
     int sys[kSysN];                 // default − centre, as the parameter getter returns them
     float hq[kHqN];                 // A then B
     float toneKf[15];
+    uint16_t ssDetune[128];
     const float* hqA = hq + kHqAHalf;
     const float* hqB = hq + 2 * kHqAHalf + 1 + kHqBHalf;
     bool ok = false;
@@ -68,6 +72,27 @@ float pwCurve(int pw, int kf10, int dk) {
     if (i < 0) i = i % 126 + 126;
     else if (i > 126) i = i % 126;
     return div(add(flt(i), frac), 126.0f);
+}
+
+// SUPER-SAW's knobs index 0…127 from their value + 64 (below 2: 0), then:
+// Pulse Width the saws' spread (0x894e5060): (curve/2 + 2)/32767 + (key − 60)·KF·
+// 0.019532/12000, within 6.1e−5…0.019593
+float ssDetuneCurve(int pw, int kf10, int dk) {
+    int i = (int16_t)(pw + 64);
+    i = clampi(i > 1 ? i : 0, 0, 127);
+    const float x = add(div(flt((T.ssDetune[i] >> 1) + 2), K(0x46fffe00)),
+                        div(mul(flt((int16_t)kf10 * (int16_t)dk), K(0x3ca00193)), 12000.0f));
+    return x > K(0x3ca0817f) ? K(0x3ca0817f) : (K(0x387fda3f) > x ? K(0x387fda3f) : x);
+}
+
+// Detune the side saws' level (0x894e5140), with Fat's KF: (64·i + 400)/32767
+// + (key − 60)·KF·0.248055/12000, within 0.012207…0.260262
+float ssMixCurve(int detune, int kf10, int dk) {
+    int i = (int16_t)(detune + 64);
+    i = clampi(i > 1 ? i : 0, 0, 127);
+    const float x = add(div(flt((i << 6) + 400), K(0x46fffe00)),
+                        div(mul(flt((int16_t)kf10 * (int16_t)dk), K(0x3e7e0221)), 12000.0f));
+    return x > K(0x3e854110) ? K(0x3e854110) : (K(0x3c47ffde) > x ? K(0x3c47ffde) : x);
 }
 
 // The waveform's level at the note's pitch (0x894e1350), for the patch's
@@ -106,6 +131,7 @@ bool xtAnalogLoadTables(const char* romPath) {
     }
     ok = ok && std::fseek(f, (long)(kHqA - 4u * kHqAHalf - kRomBase), SEEK_SET) == 0 && std::fread(T.hq, 4, kHqN, f) == (size_t)kHqN;
     ok = ok && std::fseek(f, (long)(kLaToneKf - kRomBase), SEEK_SET) == 0 && std::fread(T.toneKf, 4, 15, f) == 15;
+    ok = ok && std::fseek(f, (long)(kSsDetuneTab - kRomBase), SEEK_SET) == 0 && std::fread(T.ssDetune, 2, 128, f) == 128;
     std::fclose(f);
     static_assert(kHqA + 4u * (kHqAHalf + 1) == kHqB - 4u * kHqBHalf, "A ends where B starts");
     T.ok = ok && T.level[127] == 32768 && sys(kSawSlope) == 100 && T.hqA[0] == 2.0f && T.hqB[0] == 1.0f && T.hqA[kHqAHalf] == 0.0f
@@ -120,21 +146,31 @@ int xtAnalogCode(int wave) {
     return wave >= 1 && wave <= 13 ? code[wave] : 2;      // the converter's default case: SAW
 }
 
-bool xtAnalogPlays(int wave) { return xtAnalogCode(wave) <= 10; }
+bool xtAnalogPlays(int wave) { return xtAnalogCode(wave) <= 11; }
 
 XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw) {
     XtAnalogBlock b;
     const int dk = key - 60;
     b.code = xtAnalogCode(p.wave);
     b.impact = div(mul(flt(p.impact & 0xff), 4.0f), 40.0f);
-    if (sys(kAliasCancel) && (p.wave == 0 || p.wave == 1))
-        b.slope = div(flt((uint16_t)sys(p.wave == 0 ? kSawSlope : kSquSlope)), 100.0f);
-    b.pw = pwCurve(p.pw, p.pwKf * 10, dk);
-    b.pwEnv = mul(sq63(p.pwEnv), velPw);
-    b.pwLfo = sq63(clampi((int16_t)p.pwLfo, -63, 63));
-    b.fat = fatCurve(p.fat, p.fatKf * 10, dk);
-    b.fatEnv = mul(sq63(p.fatEnv), velFat);
-    b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
+    if (sys(kAliasCancel) && (p.wave <= 1 || p.wave >= 11))                   // SUPER-SAW, FEEDBACK-OSC and X-MOD take the Saw's
+        b.slope = div(flt((uint16_t)sys(p.wave == 1 ? kSquSlope : kSawSlope)), 100.0f);
+    if (p.wave == 11) {   // SUPER-SAW (0x894e2500)
+        constexpr float kDet = K(0x3ca00193), kMix = K(0x3e7e0221);
+        b.pw = ssDetuneCurve(p.pw, p.pwKf * 10, dk);
+        b.pwEnv = mul(mul(sq63(p.pwEnv), kDet), velPw);
+        b.pwLfo = mul(sq63(clampi((int16_t)p.pwLfo, -63, 63)), kDet);
+        b.fat = ssMixCurve(p.detune, p.fatKf * 10, dk);
+        b.fatEnv = mul(mul(sq63(p.fatEnv), kMix), velFat);
+        b.fatLfo = mul(sq63(clampi((int16_t)p.fatLfo, -63, 63)), kMix);
+    } else {
+        b.pw = pwCurve(p.pw, p.pwKf * 10, dk);
+        b.pwEnv = mul(sq63(p.pwEnv), velPw);
+        b.pwLfo = sq63(clampi((int16_t)p.pwLfo, -63, 63));
+        b.fat = fatCurve(p.fat, p.fatKf * 10, dk);
+        b.fatEnv = mul(sq63(p.fatEnv), velFat);
+        b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
+    }
     b.gain = mul(waveLevel(p.wave, pitch10), xtOscWaveGainFactor(waveGainDb));
     b.tone = flt((uint8_t)sys(p.wave == 10 ? kLaSquTone : kLaSawTone));
     b.toneKf = flt((uint8_t)sys(p.wave == 10 ? kLaSquToneKf : kLaSawToneKf));
@@ -247,7 +283,32 @@ void XtAnalogOsc::laNoteOn(const XtAnalogBlock& b, float gain, float gainStart, 
     ph2 = z > 1.0f ? add(z, -2.0f) : z;
 }
 
-void XtAnalogOsc::noteOn(const XtAnalogBlock& b, float ratio, float gain, float gainStart, float fatEnv, float pwEnv, float lfo) {
+// SUPER-SAW's targets (0x89505c90): the spread from the Pulse Width's terms,
+// the side saws' level from Fat's
+void XtAnalogOsc::ssShape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo) {
+    const float det = fmac(lfo, b.pwLfo, fmac(pwEnv, b.pwEnv, b.pw));
+    ssDetT = K(0x387fda3f) > det ? K(0x387fda3f) : (det > K(0x3ca0817f) ? K(0x3ca0817f) : det);
+    const float mix = fmac(lfo, b.fatLfo, fmac(fatEnv, b.fatEnv, b.fat));
+    ssMixT = K(0x3c47ffde) > mix ? K(0x3c47ffde) : (mix > K(0x3e854110) ? K(0x3e854110) : mix);
+}
+
+// SUPER-SAW's note-on (0x89505bc0): the six side saws start 0.1 apart from a
+// counter all voices share (0x8987c894), which moves on by 0.6
+void XtAnalogOsc::ssNoteOn(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared) {
+    ssShape(b, fatEnv, pwEnv, lfo);
+    pwT = pwC = mul(mul(ratio_, b.slope), K(0x3c23d709));
+    ssDetC = ssDetT;
+    ssMixC = ssMixT;
+    float x = shared.superSaw;
+    auto next = [&] {
+        x = add(x, K(0x3dcccccd));
+        if (!(1.0f > x)) x = add(x, -1.0f);
+    };
+    for (float& p : ss) { p = x; next(); }
+    shared.superSaw = x;
+}
+
+void XtAnalogOsc::noteOn(const XtAnalogBlock& b, float ratio, float gain, float gainStart, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared) {
     code = b.code;
     ratio_ = ratio;
     gainT = gain;
@@ -258,6 +319,7 @@ void XtAnalogOsc::noteOn(const XtAnalogBlock& b, float ratio, float gain, float 
     if (1.0f > imp) ph = mul(ph, imp);
     if (ph > 1.0f || 0.0f > ph) ph = 0.0f;
     if (code == 9 || code == 10) laNoteOn(b, gain, gainStart, fatEnv, pwEnv, lfo);
+    else if (code == 11) ssNoteOn(b, fatEnv, pwEnv, lfo, shared);
     else shape(b, fatEnv, pwEnv, lfo, true);
 }
 
@@ -265,6 +327,7 @@ void XtAnalogOsc::update(const XtAnalogBlock& b, float ratio, float gain, float 
     ratio_ = ratio;
     gainT = gain;
     if (code == 9 || code == 10) laShape(b, gain, fatEnv, pwEnv, lfo);
+    else if (code == 11) ssShape(b, fatEnv, pwEnv, lfo);
     else shape(b, fatEnv, pwEnv, lfo, false);
 }
 
@@ -315,6 +378,10 @@ int XtAnalogOsc::breakpoints(float* p) const {
         p[0] = fatC;
         p[1] = sub(1.0f, laInc);
         return 2;
+    case 11:           // the sample that lands on 1, and the slope's turn
+        p[0] = sub(1.0f, mul(ratio_, K(0x3c2377ed)));
+        p[1] = pwT;
+        return 2;
     default:
         return 0;
     }
@@ -332,6 +399,7 @@ uint32_t XtAnalogOsc::process(float* lr, uint32_t sync) {
     case 8: return noise(lr);
     case 9: return laSquare(lr, sync);
     case 10: return laSaw(lr, sync);
+    case 11: return superSaw(lr, sync);
     default: return saw(lr, sync);
     }
 }
@@ -739,6 +807,46 @@ uint32_t XtAnalogOsc::laSquare(float* lr, uint32_t sync) {
     return wrap;
 }
 
+// SUPER-SAW (0x89507520): seven saws, each its own phase of 0…1 a cycle, at
+// ratio·440/44100 and ± the spread × that × 1, 3.2 and 5.6.  Each rises −1…+1
+// over 0…s (+0x1c8, ratio·Slope·0.01) and falls back over s…1.  out =
+// ((centre·0.2 + sum·m)·4(1 − 2.2·m) + Impact)·gain·2^31, m the side saws'
+// level.  The mask follows the centre.  A sync bit sets the phases 0, 0.1 …
+// 0.6.  Once a block the spread and m move 0.2 of the way.
+uint32_t XtAnalogOsc::superSaw(float* lr, uint32_t sync) {
+    const float s = pwT, s1 = sub(1.0f, s);
+    const float step = mul(ratio_, K(0x3c2377ed)), d = mul(ssDetC, step), d3 = mul(d, K(0x404ccccd)), d5 = mul(d, K(0x40b33333));
+    const float inc[6] = { add(step, d), sub(step, d), add(step, d3), sub(step, d3), add(step, d5), sub(step, d5) };
+    const float m = ssMixC, k = mul(sub(1.0f, mul(m, K(0x400ccccd))), 4.0f);
+    auto wave = [&](float p) { return fmac(s > p ? div(p, s) : div(sub(1.0f, p), s1), 2.0f, -1.0f); };
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) {
+            static constexpr float start[6] = { K(0x3dcccccd), K(0x3e4ccccd), K(0x3e999999), K(0x3ecccccd), K(0x3f000000), K(0x3f199999) };
+            ph = 0.0f;
+            std::copy(start, start + 6, ss);
+        }
+        const float y0 = wave(ph);
+        ph = add(ph, step);
+        if (!(1.0f > ph)) { ph = add(ph, -1.0f); wrap |= bit; }
+        float y[6];
+        for (int j = 0; j < 6; ++j) {
+            y[j] = wave(ss[j]);
+            ss[j] = add(ss[j], inc[j]);
+            if (!(1.0f > ss[j])) ss[j] = add(ss[j], -1.0f);
+        }
+        const float sum = add(add(add(add(add(y[0], y[1]), y[2]), y[3]), y[4]), y[5]);
+        const float x = fmac(fmac(sum, m, mul(y0, K(0x3e4ccccd))), k, imp);
+        lr[2 * i] = lr[2 * i + 1] = mul(mul(x, gainC), kFull31);
+        imp = mul(imp, dec);
+        gainC = fmac(sub(gainT, gainC), kStep, gainC);
+        bit <<= 1;
+    }
+    ssDetC = fmac(sub(ssDetT, ssDetC), K(0x3e4ccccd), ssDetC);
+    ssMixC = fmac(sub(ssMixT, ssMixC), K(0x3e4ccccd), ssMixC);
+    return wrap;
+}
+
 // NOISE (0x89504a40): integer random values (two states: +0x1dc, cleared at
 // note-on, and +0x244), each held for the hold's samples, the hold starting
 // again every block; (Impact + value)·gain, the value already ±2^31.  No
@@ -848,24 +956,26 @@ int main(int argc, char** argv) {
         c.wr8(P + 0x30, (uint8_t)k.p.fat); c.wr16(P + 0x32, (uint16_t)(int16_t)(k.p.fatKf * 10));
         c.wr8(P + 0x34, (uint8_t)(int8_t)k.p.fatLfo); c.wr8(P + 0x35, (uint8_t)(int8_t)k.p.fatEnv);
         c.wr8(P + 0x36, (uint8_t)xtVelCurve(k.fatCurve)); c.wr16(P + 0x38, (uint16_t)(int16_t)xtVelSens(k.fatSens));
+        c.wr8(P + 0x3a, (uint8_t)(int8_t)k.p.detune);
         c.wr32(P + 0xdc, part);
     };
     auto velFactor = [&](int vel, int curve, int sens) { return div(flt(xtVelCurveValue(vel, xtVelSens(sens), xtVelCurve(curve))), 32768.0f); };
     auto portBlock = [&](const Case& k) {
         XtAnalogParams q = k.p;
-        q.pw += mtx; q.pwLfo += mtx; q.pwEnv += mtx; q.fat += mtx; q.fatLfo += mtx; q.fatEnv += mtx;
+        q.pw += mtx; q.pwLfo += mtx; q.pwEnv += mtx; q.fat += mtx; q.fatLfo += mtx; q.fatEnv += mtx; q.detune += mtx;
         return xtAnalogBlock(q, k.key, xtPitch10(k.key, k.coarse, k.kf, k.fine), k.gainDb, velFactor(k.vel, k.fatCurve, k.fatSens),
                              velFactor(k.vel, k.pwCurve, k.pwSens));
     };
 
     // The converter
     long cb = 0, cn = 0;
-    for (int g = 0; g < 200000; ++g) {
-        const Case k = newCase(true);
+    auto converterCases = [&](int n, int wave) { for (int g = 0; g < n; ++g) {
+        Case k = newCase(true);
+        if (wave >= 0) { k.p.wave = wave; k.p.detune = (int)(rnd() % 127) - 63; }
         mtx = (g % 3 == 0) ? (int)(rnd() % 75) - 37 : 0;
         writeInput(k);
         c.write(OUT, z.data(), 0x100);
-        if (!c.call(0x894e1920, { P, OUT }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return 1; }
+        if (!c.call(0x894e1920, { P, OUT }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
         const XtAnalogBlock b = portBlock(k);
         ++cn;
         const float fw[12] = { f32(OUT + 0x84), f32(OUT + 0x88), f32(OUT + 0x90), f32(OUT + 0x98), f32(OUT + 0x9c), f32(OUT + 0xa0),
@@ -883,7 +993,8 @@ int main(int argc, char** argv) {
                 if (!same(fw[i], po[i])) std::printf(" %s %.9g/%.9g", name[i], fw[i], po[i]);
             std::printf("\n");
         }
-    }
+    } return true; };
+    if (!converterCases(200000, -1)) return 1;
     std::printf("converter: %ld cases, %ld different\n", cn, cb);
 
     // The voice: the converter's block, the note-on, the install, then blocks
@@ -894,13 +1005,16 @@ int main(int argc, char** argv) {
     c.write(V, z.data(), 0x1000);
     c.wr32(V + 0x970, EP); c.wr32(V + 0x974, EF); c.wr32(V + 0x978, EW); c.wr32(V + 0x97c, EA);
     for (uint32_t o = 0x980; o < 0x990; o += 4) c.wr32(V + o, LF);
-    static const int waves[11] = { 0, 1, 2, 3, 4, 5, 8, 6, 7, 10, 9 };
-    static const char* waveName[11] = { "saw", "square", "triangle", "sine", "ramp", "juno", "noise", "hq-saw", "hq-square", "la-square", "la-saw" };
-    static const uint32_t routine[11] = { 0x895063f0, 0x895060e0, 0x89508c20, 0x89508aa0, 0x895094c0, 0x89508800, 0x89509030, 0x89508db0,
-                                          0x89504a40, 0x89508540, 0x895081f0 };
+    static const int waves[12] = { 0, 1, 2, 3, 4, 5, 8, 6, 7, 10, 9, 11 };
+    static const char* waveName[12] = { "saw", "square", "triangle", "sine", "ramp", "juno", "noise", "hq-saw", "hq-square", "la-square", "la-saw", "super-saw" };
+    static const uint32_t routine[12] = { 0x895063f0, 0x895060e0, 0x89508c20, 0x89508aa0, 0x895094c0, 0x89508800, 0x89509030, 0x89508db0,
+                                          0x89504a40, 0x89508540, 0x895081f0, 0x89507520 };
     XtAnalogOsc osc;
-    long nb = 0, nn = 0, wb = 0, db[11] = {}, dn[11] = {}, mb = 0;
-    float peak[11] = {};
+    XtAnalogShared shared;
+    constexpr uint32_t kSsCount = 0x8987c894;
+    shared.superSaw = f32(kSsCount);
+    long nb = 0, nn = 0, wb = 0, db[12] = {}, dn[12] = {}, mb = 0;
+    float peak[12] = {};
     int code = 2;
     auto stateSame = [&](bool full) {
         bool ok = same(f32(V + 0x144), osc.ratio()) && same(f32(V + 0x154), osc.gainTarget()) && same(f32(V + 0x1c0), osc.fatTarget())
@@ -910,6 +1024,13 @@ int main(int argc, char** argv) {
         if (code == 9 || code == 10) {
             ok = ok && same(f32(V + 0x1f4), osc.laStep()) && same(f32(V + 0x224), osc.laSteepTarget()) && c.rd32(V + 0x20c) == 0;
             if (full) ok = ok && same(f32(V + 0x228), osc.laSteep()) && same(f32(V + 0x218), osc.laPhase2());
+        }
+        if (code == 11) {
+            ok = ok && same(f32(V + 0x24c), osc.detuneTarget()) && same(f32(V + 0x254), osc.mixTarget()) && same(f32(kSsCount), shared.superSaw);
+            if (full) {
+                ok = ok && same(f32(V + 0x250), osc.detune()) && same(f32(V + 0x258), osc.mix());
+                for (int i = 0; i < 6; ++i) ok = ok && same(f32(V + 0x25c + 4 * (uint32_t)i), osc.sidePhase(i));
+            }
         }
         if (full)
             ok = ok && same(f32(V + 0x158), osc.gain()) && same(f32(V + 0x1c4), osc.fat()) && same(f32(V + 0x1cc), osc.pw())
@@ -925,6 +1046,10 @@ int main(int argc, char** argv) {
                     osc.fat(), f32(V + 0x1c8), osc.pwTarget(), f32(V + 0x1cc), osc.pw(), f32(V + 0x1d0), osc.decay(), f32(V + 0x1d4), osc.phase(),
                     f32(V + 0x1d8), osc.impact(), c.rd32(V + 0x1dc), osc.flags(), f32(V + 0x1e0), osc.edge(), c.rd32(V + 0x244), osc.noiseState(),
                     (int)(int8_t)c.rd8(V + 0x248), osc.noiseHold(), f32(V + 0x1e4), osc.hqLevel(), (int)c.rd32(V + 0x1e8), osc.hqFalling());
+        if (code == 11)
+            std::printf("    ss: detune %.9g/%.9g %.9g/%.9g mix %.9g/%.9g %.9g/%.9g phases %.9g/%.9g %.9g/%.9g count %.9g/%.9g\n", f32(V + 0x24c), osc.detuneTarget(),
+                        f32(V + 0x250), osc.detune(), f32(V + 0x254), osc.mixTarget(), f32(V + 0x258), osc.mix(), f32(V + 0x25c), osc.sidePhase(0), f32(V + 0x270),
+                        osc.sidePhase(5), f32(kSsCount), shared.superSaw);
         if (code == 9 || code == 10)
             std::printf("    la: step %.9g/%.9g steep %.9g/%.9g %.9g/%.9g z %.9g/%.9g +0x20c %08x\n", f32(V + 0x1f4), osc.laStep(), f32(V + 0x224),
                         osc.laSteepTarget(), f32(V + 0x228), osc.laSteep(), f32(V + 0x218), osc.laPhase2(), c.rd32(V + 0x20c));
@@ -932,7 +1057,8 @@ int main(int argc, char** argv) {
     auto voiceCase = [&](int g, int wi) {
         Case k = newCase(false);
         k.p.wave = waves[wi];
-        if (k.p.wave >= 9 && g % 8 == 2) {         // the LA note-on's second wave starting exactly on 1
+        if (k.p.wave >= 11) k.p.detune = (int)(rnd() % 127) - 63;
+        if (k.p.wave >= 9 && k.p.wave <= 10 && g % 8 == 2) {         // the LA note-on's second wave starting exactly on 1
             k.p.impact = 0; k.p.pw = 0; k.p.pwKf = k.p.pwEnv = k.p.pwLfo = 0;
         }
         if (g % 8 == 1) {                          // SQUARE's pitch steps: G4, A4, A#4, C#5, F#5 untuned
@@ -953,8 +1079,13 @@ int main(int argc, char** argv) {
         wf(EA + 0x1c, atk ? 25.0f : 0.0f); wf(EA + 0x2c, 0.0f);
         auto ratioOf = [&]() { return xtPitchTarget(f32(V + 8), eP, f32(V + 0x1c), lfo, f32(V + 0x34), f32(V + 0xc)); };
         auto gainOf = [&](bool on) { return xtOscGainTarget(f32(V + 0x5c), f32(V + 0x54), on && atk ? 0.0f : eA, lfo, f32(V + 0x58)); };
+        if (code == 11 && g % 16 == 5) {           // the shared counter's step landing exactly on 1
+            float x = sub(1.0f, K(0x3dcccccd));
+            while (1.0f > add(x, K(0x3dcccccd))) x = std::nextafter(x, 2.0f);
+            wf(kSsCount, x); shared.superSaw = x;
+        }
         if (!c.call(0x89504af0, { V }, sp)) { std::fprintf(stderr, "note-on: %s\n", c.error().c_str()); return false; }
-        osc.noteOn(b, ratioOf(), gainOf(false), gainOf(true), eF, eW, lfo);
+        osc.noteOn(b, ratioOf(), gainOf(false), gainOf(true), eF, eW, lfo, shared);
         ++nn;
         if (!stateSame(true) && nb++ < 6) dump("note-on", g, 0);
         if (!c.call(0x89505170, { V }, sp)) { std::fprintf(stderr, "install: %s\n", c.error().c_str()); return false; }
@@ -981,6 +1112,15 @@ int main(int argc, char** argv) {
                 const float zs[3] = { add(add(add(add(-1.0f, s), s), s), s), 0.0f, 1.0f };
                 const float z = zs[rnd() % 3];
                 wf(V + 0x218, z); osc.setLaPhase2(z);
+            }
+            if (code == 11 && blk % 6 == 3) {      // the side saws landing on 1, or at the Slope's turn
+                const bool turn = rnd() & 1;
+                for (int i = 0; i < 6; ++i) {
+                    const float st = mul(osc.ratio(), K(0x3c2377ed)), d = mul(osc.detune(), st);
+                    const float inc[6] = { add(st, d), sub(st, d), add(st, mul(d, K(0x404ccccd))), sub(st, mul(d, K(0x404ccccd))), add(st, mul(d, K(0x40b33333))), sub(st, mul(d, K(0x40b33333))) };
+                    const float p = turn ? osc.pwTarget() : sub(1.0f, inc[i]);
+                    wf(V + 0x25c + 4 * (uint32_t)i, p); osc.setSidePhase(i, p);
+                }
             }
             const uint32_t sync = rnd() % 8 == 0 ? ((uint32_t)rnd() << 16 | rnd()) & ((uint32_t)rnd() << 16 | rnd()) : 0u;
             uint32_t mask = 0;
@@ -1036,7 +1176,17 @@ int main(int argc, char** argv) {
         if (!voiceCase(nCases + nHq + nLa + g, 9 + g % 2)) return 1;
     }
     for (int i = 0; i < 4; ++i) T.sys[kLaSawTone - kSys0 + i] = savedSys[i];
+    if (!c.call(0x894e5f80, { 0x89d1b070u, 0, 0, 0 }, sp)) { std::fprintf(stderr, "system: %s\n", c.error().c_str()); return 1; }
     report("la tones ", nCal, 9, 11);
+    // SUPER-SAW, its converter case first
+    cn = cb = 0;
+    if (!converterCases(200000, 11)) return 1;
+    std::printf("super-saw converter: %ld cases, %ld different\n", cn, cb);
+    bad += cb;
+    const int nSs = nCases * 2 / 7;
+    for (int g = 0; g < nSs; ++g)
+        if (!voiceCase(nCases + nHq + nLa + nCal + g, 11)) return 1;
+    report("super-saw ", nSs, 11, 12);
     return bad ? 3 : 0;
 }
 #endif
