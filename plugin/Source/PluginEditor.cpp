@@ -2,7 +2,7 @@
 #include <tuple>
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 820;  // height of the XT strip below it
+static constexpr int kXtStripH   = 850;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -64,9 +64,9 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1120);
+    setSize(560, 1150);
     setResizable(true, true);
-    setResizeLimits(480, 810, 960, 1260);
+    setResizeLimits(480, 840, 960, 1290);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -101,7 +101,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                               &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_, &lfoTimeSlider_, &lfoFmtSlider_,
                               &loopStartSlider_, &loopEndSlider_, &portaTimeSlider_, &portaSensSlider_, &octSlider_,
                               &cosmCutSlider_, &cosmResoSlider_, &cosmKfSlider_, &clfoRateSlider_, &cosmCutOwnSlider_,
-                              &cosmResoOwnSlider_ }) {
+                              &cosmResoOwnSlider_, &modLevelSlider_, &modAttackSlider_, &modReleaseSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
@@ -163,6 +163,17 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     loopEndAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "loopEnd", loopEndSlider_);
     portaModeBox_.addItemList({ "NORMAL", "LEGATO" }, 1);
     portaTypeBox_.addItemList({ "RATE", "TIME" }, 1);
+    modBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    modBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    modTypeBox_.addItemList({ "MIX", "RING", "FM", "ENV RING", "OSC SYNC" }, 1);
+    for (int t = 0; t < 5; ++t) modTypeBox_.setItemEnabled(t + 1, xtModPlays((uint32_t)t));   // the Types the port plays
+    addAndMakeVisible(modBtn_);
+    addAndMakeVisible(modTypeBox_);
+    modAtt_        = std::make_unique<ButtonAtt>(processor_.apvts, "modSwitch", modBtn_);
+    modTypeAtt_    = std::make_unique<ComboAtt>(processor_.apvts, "modType", modTypeBox_);
+    modLevelAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "modLevel", modLevelSlider_);
+    modAttackAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "modAttack", modAttackSlider_);
+    modReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "modRelease", modReleaseSlider_);
     portaBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
     portaBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     for (juce::Component* cpt : { (juce::Component*)&portaBtn_, (juce::Component*)&portaModeBox_, (juce::Component*)&portaTypeBox_ })
@@ -426,7 +437,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                             &lfoDepthsLabel_, &lfoTimeLabel_, &lfoFmtLabel_, &loopStartLabel_, &loopEndLabel_,
                             &portaTimeLabel_, &portaSensLabel_, &octLabel_, &cosmCutLabel_, &cosmResoLabel_, &cosmKfLabel_,
                             &clfoLabel_, &clfoRateLabel_, &cosmTypeLabel_, &cosmCutOwnLabel_, &cosmResoOwnLabel_,
-                            &anaWaveLabel_ }) styleSmall(*l);
+                            &anaWaveLabel_, &modLevelLabel_, &modAttackLabel_, &modReleaseLabel_ }) styleSmall(*l);
     showCosmType();                                  // after styleSmall, which shows every label
     showOscType();
     timerCallback();
@@ -940,7 +951,21 @@ void VSynthEmuEditor::resized() {
             levelLabels_[i].setBounds(cell.removeFromLeft(r <= 1 || r == 4 || i >= 22 ? 46 : 34));
             levelSliders_[i].setBounds(cell.withTrimmedRight(6));
         }
-        if (r == 5) layoutCosm(xt);
+        if (r == 5) {
+            xt.removeFromTop(6);
+            auto rm = xt.removeFromTop(24);          // the MOD, between the OSCs and the COSMs
+            modBtn_.setBounds(rm.removeFromLeft(56));
+            modTypeBox_.setBounds(rm.removeFromLeft(100).withTrimmedRight(8));
+            const int w3 = rm.getWidth() / 3;
+            std::pair<juce::Label*, juce::Slider*> cells[] = { { &modLevelLabel_, &modLevelSlider_ }, { &modAttackLabel_, &modAttackSlider_ },
+                                                               { &modReleaseLabel_, &modReleaseSlider_ } };
+            for (auto& [l, sl] : cells) {
+                auto cell = rm.removeFromLeft(w3);
+                l->setBounds(cell.removeFromLeft(34));
+                sl->setBounds(cell.withTrimmedRight(6));
+            }
+            layoutCosm(xt);
+        }
     }
     xt.removeFromTop(6);
     auto rl = xt.removeFromTop(24);                  // LFO 3: waveform, rate, key sync

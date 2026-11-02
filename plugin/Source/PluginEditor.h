@@ -64,6 +64,13 @@ private:
     juce::Slider     portaTimeSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     portaSensSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label      portaTimeLabel_ { {}, "Time" }, portaSensLabel_ { {}, "V-Sns" };
+    // The MOD section: Switch, Type, Original Level, Attack and Release Times
+    juce::ToggleButton modBtn_ { "MOD" };
+    juce::ComboBox   modTypeBox_;
+    juce::Slider     modLevelSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     modAttackSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     modReleaseSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Label      modLevelLabel_ { {}, "Level" }, modAttackLabel_ { {}, "Atk" }, modReleaseLabel_ { {}, "Rel" };
     // Key assign: Mono/Poly, Legato Switch, Octave Shift
     juce::ComboBox   monoBox_;
     juce::ToggleButton legatoBtn_ { "Legato" };
@@ -170,6 +177,9 @@ private:
     std::unique_ptr<ButtonAtt> portaAtt_;
     std::unique_ptr<ComboAtt>  portaModeAtt_, portaTypeAtt_;
     std::unique_ptr<SliderAtt> portaTimeAtt_, portaSensAtt_;
+    std::unique_ptr<ButtonAtt> modAtt_;
+    std::unique_ptr<ComboAtt>  modTypeAtt_;
+    std::unique_ptr<SliderAtt> modLevelAtt_, modAttackAtt_, modReleaseAtt_;
     std::unique_ptr<ComboAtt>  monoAtt_;
     std::unique_ptr<ButtonAtt> legatoAtt_;
     std::unique_ptr<SliderAtt> octAtt_;

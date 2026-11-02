@@ -132,7 +132,10 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
 
 // ── Voices ───────────────────────────────────────────────────────────────────
 
-XtSynth::XtSynth() { prepare(44100.0); }
+XtSynth::XtSynth() {
+    modConvert();
+    prepare(44100.0);
+}
 XtSynth::~XtSynth() = default;
 
 void XtSynth::prepare(double rate) {
@@ -561,7 +564,11 @@ void XtSynth::setControls(const Controls& c) {
                       || n.ampMiddle != o.ampMiddle || n.ampTreble != o.ampTreble || n.ampLevel != o.ampLevel || n.ampGain != o.ampGain
                       || n.ampGainLfo != o.ampGainLfo || n.ampGainEnv != o.ampGainEnv || n.spkType != o.spkType;
     }
+    // the MOD: a new block for the sounding voices (0x894f5da0)
+    const bool modChanged = c.mod.on != ctl.mod.on || c.mod.type != ctl.mod.type || c.mod.level != ctl.mod.level || c.mod.attack != ctl.mod.attack
+                         || c.mod.release != ctl.mod.release;
     ctl = c;
+    if (modChanged) modConvert();
     for (int k = 0; k < 2; ++k)
         if (clfoChanged[k] && freeClfoOn[k]) freeClfo[k].update(clfoParams(k));
     if (d1.lfo && freeLfoOn) freeLfo.update(lfoParams(ctl));
@@ -586,6 +593,7 @@ void XtSynth::setControls(const Controls& c) {
         };
         if (v.on) oscLive(v, ctl, d1);
         if (v.osc2.on) oscLive(v.osc2, ctl.osc2, d2);
+        if (modChanged) v.mod.setBlock(modBlk);
         for (int k = 0; k < 2; ++k) {
             Voice::CosmVoice& cv = v.cs[k];
             if (!cv.on) continue;
@@ -595,6 +603,12 @@ void XtSynth::setControls(const Controls& c) {
             if (cosmChanged[k]) cosmSetBlock(v, k);
         }
     }
+}
+
+void XtSynth::modConvert() {
+    XtModParams p = ctl.mod;
+    if (!xtModPlays((uint32_t)p.type)) p.on = false;   // a Type not ported yet plays as the Switch off
+    xtModBlock(p, modBlk);
 }
 
 int XtSynth::shiftKey(int key) const {
@@ -750,6 +764,10 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     };
     if (v->on) portaStart(*v, ctl);
     if (v->osc2.on) portaStart(v->osc2, ctl.osc2);
+    // the MOD (0x894f1b00, 0x894f1d90): the voices' stereo flags as their setups
+    // leave them, a stereo wave's on a PCM OSC 1 and none on an analog voice
+    modConvert();
+    v->mod.noteOn(modBlk, v->on && !v->analog && cur->channels == 2, false, v->on && v->analog);
 }
 
 // An OSC's envelopes and LFO at note-on.
@@ -1011,8 +1029,16 @@ void XtSynth::mixBlock(float* lr) {
             scale /= 32768.0f;
             if (v.mb.ended() && !v.osc2.on) v.tail += 32;
         }
-        // MOD off, or Type MIX: the sum, in OSC 1's buffer's units
-        if (v.osc2.on) xtAnalogMix(tmp, tmp2, band ? 0x1p-16f : 0x1p-31f);
+        // The MOD (0x894f1d50).  Off, or MIX at gains of 1: the sum, in OSC 1's
+        // buffer's units.  Otherwise in the XT's units, as its routines read their
+        // levels from them
+        if (v.mod.plain()) {
+            if (v.osc2.on) xtAnalogMix(tmp, tmp2, band ? 0x1p-16f : 0x1p-31f);
+        } else {
+            for (float& x : tmp) x *= band ? 0x1p16f : 0x1p31f;
+            v.mod.process(tmp, tmp, tmp2);
+            for (float& x : tmp) x *= band ? 0x1p-16f : 0x1p-31f;
+        }
         // COSM 1, then 2 (the tone render 0x894f6d40), before the TVA; the
         // Dynamic TVF's and Side Band Filters' followers, the Lo-Fi
         // quantizer, the Compressor's envelope, the Limiter's levels, the
@@ -1125,6 +1151,9 @@ void XtSynth::render(float* left, float* right, int n) {
 //     XT_OENV2 (Env 8), XT_VEL2="oscSens,oscCurve", XT_PITCH2="pitch,pitchKF,
 //     coarse,fine" and XT_TUNE2="random", as OSC 1's.  XT_OSC1OFF=1: OSC 1's
 //     Switch off.
+//   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING,
+//     Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
+//     attack,release": new MOD knobs at a frame, on the notes then sounding.
 //   XT_OLEV="level,levelKF,levelLfoDepth,waveGainDb": the OSC TVA.
 //   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.
 //   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
@@ -1233,6 +1262,10 @@ int main(int argc, char** argv) {
         a.fatKf /= 10;
     }
     if (std::getenv("XT_OSC1OFF") && std::atoi(std::getenv("XT_OSC1OFF")) != 0) c.on = false;
+    if (const char* e = std::getenv("XT_MOD")) {
+        c.mod.on = true;
+        std::sscanf(e, "%d,%d,%d,%d", &c.mod.type, &c.mod.level, &c.mod.attack, &c.mod.release);
+    }
     {
         XtSynth::OscControls& o = c.osc2;
         if (const char* e = std::getenv("XT_PENV2")) std::sscanf(e, "%d,%d,%d,%d,%d", &o.pAttack, &o.pDecay, &o.pSustain, &o.pRelease, &o.pDepth);
@@ -1384,6 +1417,13 @@ int main(int argc, char** argv) {
     long bendAt = 0;
     if (const char* e = std::getenv("XT_BEND")) std::sscanf(e, "%d@%ld", &bendValue, &bendAt);
     syn.setControls(c);
+    XtSynth::Controls modLater = c;
+    long modAt = -1;
+    if (const char* e = std::getenv("XT_MOD_AT")) {
+        int on = 1;
+        std::sscanf(e, "%ld,%d,%d,%d,%d,%d", &modAt, &on, &modLater.mod.type, &modLater.mod.level, &modLater.mod.attack, &modLater.mod.release);
+        modLater.mod.on = on != 0;
+    }
     struct Ev { long at; int note; bool on; };
     std::vector<Ev> ev;
     for (int a = 9; a < argc; ++a) {
@@ -1398,7 +1438,9 @@ int main(int argc, char** argv) {
         long next = frames;
         for (const Ev& e : ev) if (e.at >= done && e.at < next) next = e.at;
         if (bendAt >= done && bendAt < next) next = bendAt;
+        if (modAt >= done && modAt < next) next = modAt;
         if (bendAt == done) syn.pitchBend(bendValue);
+        if (modAt == done) syn.setControls(modLater);
         for (const Ev& e : ev) if (e.at == done) { if (e.on) syn.noteOn(e.note, noteVel); else syn.noteOff(e.note); }
         if (next == done) next = done + 1;
         syn.render(L.data() + done, R.data() + done, (int)(next - done));

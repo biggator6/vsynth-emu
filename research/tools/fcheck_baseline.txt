@@ -156,6 +156,10 @@ x-mod converter: 200000 cases, 0 different
 x-mod converter, osc 2: 100000 cases, 0 different
 x-mod: 21000 note-ons and updates, 90000 blocks of 32 frames, 0 different (peak 2838 of 2^31); masks 0 different
 x-mod tone: 3000 cases, 126000 oscillator blocks (56712 of X-MOD), 0 different; wrap masks 0 different; delay lines 0 different
+mod converter: 200000 cases, 0 different
+mod mix, ring: 15000 note-ons and updates, 72000 blocks of 32 frames (14709 plain), 0 different (peak 159.4 of 2^31)
+mod ring tone: 3000 cases, 38250 note-ons and updates, 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different
+mod ring tone note-on: 1500 cases, 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

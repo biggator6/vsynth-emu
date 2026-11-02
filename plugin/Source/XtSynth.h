@@ -8,8 +8,8 @@
 // the XT's 44.1 kHz under the XT's amp envelope (XtEnvelope), and the mix is
 // resampled to the host rate.  With OSC Type ANALOG a note plays the XT's
 // analog oscillator instead (XtAnalog), with or without a sample.  A note has
-// two OSCs, as a tone on the XT does; OSC 2 runs before OSC 1 and is summed with
-// it, as the MOD section does when off or set to MIX.  No JUCE.
+// two OSCs, as a tone on the XT does; OSC 2 runs before OSC 1, and the MOD section
+// (XtMod) combines them.  No JUCE.
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -225,6 +225,10 @@ public:
             bool lfoKeySync = false;
         };
         Cosm cosm[2];
+        // The MOD section (XtMod): Switch, Type 0 MIX, 1 RING, Original Level,
+        // Attack and Release Times, between the OSCs and COSM 1.  Off, or MIX, is
+        // the sum.
+        XtModParams mod;
     };
 
     XtSynth();
@@ -269,6 +273,7 @@ private:
     };
     struct Voice : OscVoice {                  // OSC 1's in the base
         OscVoice osc2;
+        XtMod mod;                     // kept across notes, as the tone's
         bool active = false, releasing = false;
         int note = -1;                 // the key, with the Octave Shift
         int raw = -1;                  // the key as played (the tone's +0x42), for note-off
@@ -349,6 +354,8 @@ private:
     float noteCents(const Voice& v, const OscVoice& s, const OscControls& o, int key) const;  // voice +8 at a key (+0x68 at the previous one)
     void noteTuning(const Voice& v, const OscVoice& s, const OscControls& o, int& coarse, int& fine) const;   // the per-note setup's +0x68 and +0x70
     XtAnalogShared anaShared;                        // the analog voices' shared state
+    XtModBlock modBlk;                               // the MOD's block (the tone block's +0x5dc)
+    void modConvert();                               // the converter (0x894e0920) on the current knobs
     XtAnalogBlock analogBlock(const Voice& v, const OscVoice& s, const OscControls& o) const; // the analog converter's block
     int keyFollowKey(const Voice& v, const OscControls& o) const;   // the OSC's +4
     int shiftKey(int key) const;                     // + the Octave Shift, within 0..127

@@ -207,6 +207,84 @@ void xtAnalogMix(float* lr, const float* b, float scale) {
     for (int i = 0; i < 64; ++i) lr[i] = add(lr[i], b[i] * scale);
 }
 
+void xtModBlock(const XtModParams& p, XtModBlock& b) {
+    const int type = p.on ? p.type : 0;
+    if (type < 1 || type > 4) { b.type = 0; b.a = b.b = 1.0f; return; }
+    b.type = (uint32_t)type;
+    if (type == 4) { b.a = 1.0f; return; }
+    b.c = 1.0f;
+    if (type == 3) {
+        b.a = div(flt(p.attack), 127.0f);
+        b.b = div(flt(p.release), 127.0f);
+    } else {
+        b.a = 1.0f;
+        b.b = div(flt(T.level[p.level]), 32768.0f);
+    }
+}
+
+bool xtModPlays(uint32_t type) { return type <= 1; }
+
+void XtMod::noteOn(const XtModBlock& b, bool stereo1, bool stereo2, bool osc1Analog) {
+    type_ = b.type;
+    t[0] = b.a; t[1] = b.b; t[2] = b.c;
+    stereo_ = stereo1 ? (stereo2 ? 1 : 2) : (stereo2 ? 3 : 0);
+    analog_ = osc1Analog;
+    if (type_ == 1) t[0] = div(t[0], 2147483648.0f);
+    if (type_ == 0) { g[0] = t[0]; g[1] = t[1]; }
+    else if (type_ == 1) { g[0] = t[0]; g[1] = t[1]; g[2] = t[2]; }
+}
+
+void XtMod::setBlock(const XtModBlock& b) {
+    if (type_ == 0) { t[0] = b.a; t[1] = b.b; }
+    else if (type_ == 1) { t[0] = div(b.a, 2147483648.0f); t[1] = b.b; t[2] = b.c; }
+}
+
+bool XtMod::plain() const {
+    return type_ == 0 && t[0] == 1.0f && t[1] == 1.0f && g[0] == 1.0f && g[1] == 1.0f;
+}
+
+uint32_t XtMod::routine() const {
+    return type_ == 1 ? 0x89527e00u : 0x89527d80u;
+}
+
+void XtMod::process(float* out, const float* l1, const float* l2) {
+    if (type_ == 1) ring(out, l1, l2);
+    else mix(out, l1, l2);
+}
+
+namespace { const float kModStep = K(0x3c199999); }   // 0.009375, a unit below
+
+void XtMod::mix(float* out, const float* l1, const float* l2) {
+    const float da = mul(sub(t[0], g[0]), kModStep), db = mul(sub(t[1], g[1]), kModStep);
+    float a = g[0], b = g[1];
+    for (int i = 0; i < 32; ++i) {
+        const float x = fmac(l2[2 * i], b, mul(l1[2 * i], a)), y = fmac(l2[2 * i + 1], b, mul(l1[2 * i + 1], a));
+        out[2 * i] = x;
+        out[2 * i + 1] = y;
+        a = add(a, da);
+        b = add(b, db);
+    }
+    g[0] = a;
+    g[1] = b;
+}
+
+void XtMod::ring(float* out, const float* l1, const float* l2) {
+    const float da = mul(sub(t[0], g[0]), kModStep), db = mul(sub(t[1], g[1]), kModStep), dc = mul(sub(t[2], g[2]), kModStep);
+    float a = g[0], b = g[1], c = g[2];
+    for (int i = 0; i < 64; i += 2) {
+        const float x = mul(mul(add(mul(l2[i], a), b), c), l1[i]);
+        const float y = mul(mul(add(mul(l2[i + 1], a), b), c), l1[i + 1]);
+        out[i] = x;
+        out[i + 1] = y;
+        a = add(a, da);
+        b = add(b, db);
+        c = add(c, dc);
+    }
+    g[0] = a;
+    g[1] = b;
+    g[2] = c;
+}
+
 XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw, bool osc2) {
     XtAnalogBlock b;
     const int dk = key - 60;
@@ -2040,6 +2118,40 @@ int main(int argc, char** argv) {
         }
         return true;
     };
+    auto modInput = [&](const XtModParams& p) {
+        c.write(MI, z.data(), 0x10);
+        c.wr8(MI + 6, p.on ? 1 : 0); c.wr8(MI + 7, (uint8_t)p.type);
+        c.wr8(MI + 8, (uint8_t)p.level); c.wr8(MI + 9, (uint8_t)p.attack); c.wr8(MI + 0xa, (uint8_t)p.release);
+    };
+    auto modParams = [&](int type) {
+        XtModParams p;
+        p.on = rnd() % 8 != 0;
+        p.type = type;
+        p.level = rnd() % 4 == 0 ? (rnd() % 2 ? 127 : 0) : (int)(rnd() % 128);
+        p.attack = (int)(rnd() % 128); p.release = (int)(rnd() % 128);
+        return p;
+    };
+    auto modBlockSame = [&](uint32_t B, const XtModBlock& b) {
+        return c.rd32(B) == b.type && same(f32(B + 4), b.a) && same(f32(B + 8), b.b) && same(f32(B + 0xc), b.c);
+    };
+    // the input, into the firmware's block and the port's, each holding what it held
+    auto modConvert = [&](const XtModParams& p, uint32_t B, XtModBlock& b) {
+        modInput(p);
+        if (rnd() % 8 == 0) {                    // what the converter may leave there: anything
+            b.b = frnd(-1, 2); b.c = frnd(-1, 2);
+            wf(B + 8, b.b); wf(B + 0xc, b.c);
+        }
+        xtModBlock(p, b);
+        return c.call(0x894e0920, { MI, B }, sp);
+    };
+    auto modSame = [&](uint32_t O, const XtMod& m) {
+        bool ok = c.rd32(O) == m.type() && c.rd32(O + 0x38) == m.stereoCode() && (uint32_t)c.rd8(O + 0x34) == (m.type() & 0xff);
+        for (int i = 0; i < 3; ++i) ok = ok && same(f32(O + 4 + 4 * (uint32_t)i), m.target(i)) && same(f32(O + 0x18 + 4 * (uint32_t)i), m.current(i));
+        return ok;
+    };
+    int modType = -1;                            // the tone passes with the MOD on: its Type
+    XtMod toneMod;
+    XtModBlock toneB;
     bool xmodPass = false;
     auto toneCase = [&](int g) {
         Case k[2] = { newCase(false), newCase(false) };
@@ -2104,6 +2216,7 @@ int main(int argc, char** argv) {
             if (!fieldsSame(n) && tb_++ < 8) std::printf("  tone %d note-on osc %d wave %d\n", g, n + 1, k[n].p.wave);
         }
         if (!toneLines() && tl_++ < 4) std::printf("  tone %d note-on: lines differ\n", g);
+        if (modType < 0) {
         c.write(MI, z.data(), 0x10);
         if (!c.call(0x894e0920, { MI, MB }, sp) || c.rd32(MB) != 0 || !same(f32(MB + 4), 1.0f) || !same(f32(MB + 8), 1.0f)) {
             std::fprintf(stderr, "MOD off: type %u, gains %.9g %.9g\n", c.rd32(MB), f32(MB + 4), f32(MB + 8));
@@ -2114,7 +2227,25 @@ int main(int argc, char** argv) {
         if (!c.call(0x894f1b00, { MODO, MB, c.rd32(V1 + 0x960), c.rd32(V2 + 0x960) }, sp)
             || !c.call(0x894f1d90, { MODO, c.rd32(V1) == 3 ? 1u : 0u }, sp)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
         if (c.rd32(MODO + 0x50) != 0x89527d80) { std::fprintf(stderr, "MOD: routine %08x\n", c.rd32(MODO + 0x50)); return false; }
+        } else {                                 // as the tone's note-on: the MOD before the installs, the chooser after
+            const XtModParams mp = modParams(modType);
+            if (!modConvert(mp, MB, toneB)
+                || !c.call(0x894f1b00, { MODO, MB, c.rd32(V1 + 0x960), c.rd32(V2 + 0x960) }, sp)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
+            toneMod.noteOn(toneB, false, false, on[0]);
+            for (int n = 0; n < 2; ++n)
+                if (!c.call(0x894f2010, { tv[n] }, sp)) { std::fprintf(stderr, "install: %s\n", c.error().c_str()); return false; }
+            if (!c.call(0x894f1d90, { MODO, c.rd32(V1) == 3 ? 1u : 0u }, sp)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
+            ++tn_;
+            if ((!modSame(MODO, toneMod) || c.rd32(MODO + 0x50) != toneMod.routine()) && tb_++ < 8)
+                std::printf("  tone %d mod note-on type %u/%u stereo %u/%u routine %08x/%08x\n", g, c.rd32(MODO), toneMod.type(), c.rd32(MODO + 0x38), toneMod.stereoCode(), c.rd32(MODO + 0x50), toneMod.routine());
+        }
         for (int blk = 0; blk < 24; ++blk) {
+            if (modType >= 0 && blk % 7 == 3) {   // a new block on the held note
+                if (!modConvert(modParams((int)(rnd() % 5)), MB, toneB) || !c.call(0x894f1c60, { MODO, MB }, sp)) { std::fprintf(stderr, "MOD update: %s\n", c.error().c_str()); return false; }
+                toneMod.setBlock(toneB);
+                ++tn_;
+                if (!modSame(MODO, toneMod) && tb_++ < 8) std::printf("  tone %d.%d mod update\n", g, blk);
+            }
             if (blk % 5 == 4) {
                 drawOutputs();
                 for (int n = 0; n < 2; ++n) {
@@ -2148,14 +2279,15 @@ int main(int argc, char** argv) {
             if (on[0]) pm[0] = to[0].process(l[0], 0, l[1]);
             float mix[64];
             std::copy(l[0], l[0] + 64, mix);
-            xtAnalogMix(mix, l[1]);
+            if (modType >= 0) toneMod.process(mix, mix, l[1]);
+            else xtAnalogMix(mix, l[1]);
             for (int n = 0; n < 2; ++n) if (on[n]) ++waveBlocks[k[n].p.wave];
             if ((mask1 != pm[0] || mask2 != pm[1]) && tm_++ < 4) std::printf("  tone %d.%d masks: fw %08x %08x, port %08x %08x\n", g, blk, mask1, mask2, pm[0], pm[1]);
             bool ok = fieldsSame(0) && fieldsSame(1);
             int bad_i = -1;
             for (int i = 0; i < 64 && bad_i < 0; ++i)
                 if (!same(f32(kBuf1 + 4 * (uint32_t)i), l[0][i]) || !same(f32(kBuf2 + 4 * (uint32_t)i), l[1][i]) || !same(f32(kBufMix + 4 * (uint32_t)i), mix[i])) bad_i = i;
-            ok = ok && bad_i < 0;
+            ok = ok && bad_i < 0 && (modType < 0 || modSame(MODO, toneMod));
             if (!ok && tb_++ < 8) {
                 std::printf("  tone %d.%d waves %d %d on %d %d: first difference at %d", g, blk, k[0].p.wave, k[1].p.wave, on[0], on[1], bad_i);
                 if (bad_i >= 0)
@@ -2190,6 +2322,10 @@ int main(int argc, char** argv) {
         static const int pairs[6][2] = { { 11, 11 }, { 12, 12 }, { 11, 12 }, { 12, 11 }, { 0, 11 }, { 12, 0 } };
         Case k[2] = { newCase(false), newCase(false) };
         for (int n = 0; n < 2; ++n) { k[n].p.wave = pairs[g % 6][n]; k[n].p.detune = (int)(rnd() % 127) - 63; }
+        bool on[2] = { true, true };
+        if (modType >= 0) {                      // any waveform, an OSC sometimes off
+            for (int n = 0; n < 2; ++n) { k[n].p.wave = (int)(rnd() % 14); on[n] = rnd() % 8 != 0; }
+        }
         if (g % 12 == 7)                         // the eighteen lines all taken
             for (int i = 0; i < XtAnalogShared::kLines; ++i) { c.wr8(kFbFlags + (uint32_t)i, 1); shared.lineUsed[i] = 1; }
         c.write(TB, std::vector<uint8_t>(0x800, 0).data(), 0x800);
@@ -2200,11 +2336,16 @@ int main(int argc, char** argv) {
         for (int n = 0; n < 2; ++n) {
             oscIdx = n;
             writeInput(k[n]);
-            c.wr32(oscBlock[n], 3u);
-            if (!c.call(0x894e1920, { P, oscBlock[n] }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
+            c.wr32(oscBlock[n], on[n] ? 3u : 0u);
+            if (on[n] && !c.call(0x894e1920, { P, oscBlock[n] }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
         }
+        if (modType >= 0) {
+            toneB = XtModBlock();
+            if (!modConvert(modParams(modType), TB + 0x5dc, toneB)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
+        } else {
         c.write(MI, z.data(), 0x10);
         if (!c.call(0x894e0920, { MI, TB + 0x5dc }, sp)) { std::fprintf(stderr, "MOD off: %s\n", c.error().c_str()); return false; }
+        }
         c.wr32(0x89f91c50, 0); c.wr32(0x89f91c54, 0); c.wr32(0x89fa9094, 0);       // the lists of sounding tones
         if (!c.call(0x894f5e60, { TN, TB }, sp)) { std::fprintf(stderr, "tone note-on: %s\n", c.error().c_str()); return false; }
         ++on_;
@@ -2213,6 +2354,7 @@ int main(int argc, char** argv) {
             oscIdx = n;
             const XtAnalogBlock pb = portBlock(k[n]);
             oscIdx = 0;
+            if (!on[n]) { to[n].setRatio(1.0f); continue; }
             const uint32_t Vn = tv[n], e = (uint32_t)n * 4, lf = lfoAt((uint32_t)n + 1) + 0x38;
             const float eFat = f32(envAt(e + 3) + 0x4c), ePw = f32(envAt(e + 2) + 0x4c), ePitch = f32(envAt(e + 1) + 0x4c), eAmp = f32(envAt(e + 4) + 0x4c), l = f32(lf);
             const float ratio = xtPitchTarget(f32(Vn + 8), ePitch, f32(Vn + 0x1c), l, f32(Vn + 0x34), f32(Vn + 0xc));
@@ -2220,11 +2362,13 @@ int main(int argc, char** argv) {
             const float gain = xtOscGainTarget(f32(Vn + 0x5c), f32(Vn + 0x54), eAmp, l, f32(Vn + 0x58));
             to[n].noteOn(pb, ratio, gain, gain, eFat, ePw, l, shared);
         }
-        const bool ok = fieldsSame(0) && fieldsSame(1) && toneLines() && same(f32(kSsCount), shared.superSaw);
-        if (!ok && oo++ < 6) std::printf("  order %d waves %d %d: lines %d counter %.9g/%.9g\n", g, k[0].p.wave, k[1].p.wave, toneLines(), f32(kSsCount), shared.superSaw);
+        if (modType >= 0) toneMod.noteOn(toneB, false, false, on[0]);
+        const bool modOk = modType < 0 || (modSame(MODO, toneMod) && c.rd32(MODO + 0x50) == toneMod.routine());
+        const bool ok = fieldsSame(0) && fieldsSame(1) && toneLines() && same(f32(kSsCount), shared.superSaw) && modOk;
+        if (!ok && oo++ < 6) std::printf("  order %d waves %d %d: lines %d counter %.9g/%.9g mod %d type %u/%u stereo %u/%u routine %08x/%08x\n", g, k[0].p.wave, k[1].p.wave, toneLines(), f32(kSsCount), shared.superSaw, modOk, c.rd32(MODO), toneMod.type(), c.rd32(MODO + 0x38), toneMod.stereoCode(), c.rd32(MODO + 0x50), toneMod.routine());
         for (int n = 0; n < 2; ++n) {
             if (!c.call(0x894f1fd0, { tv[n] }, sp)) { std::fprintf(stderr, "stop: %s\n", c.error().c_str()); return false; }
-            to[n].release();
+            if (on[n]) to[n].release();
         }
         if (g % 12 == 7)
             for (int i = 0; i < XtAnalogShared::kLines; ++i) { c.wr8(kFbFlags + (uint32_t)i, 0); shared.lineUsed[i] = 0; }
@@ -2363,6 +2507,116 @@ int main(int argc, char** argv) {
         std::printf("x-mod tone: %d cases, %ld oscillator blocks (%ld of X-MOD), %ld different; wrap masks %ld different; delay lines %ld different\n", nCases, blocks, waveBlocks[13], tb_, tm_, tl_);
     }
     bad += tb_ + tm_ + tl_;
+
+    // The MOD section.  The converter on blocks holding what the last one left;
+    // the object alone, note after note with nothing reset, on buffers the check
+    // fills, updates with any Type's block; then both voices through the
+    // firmware's render with the MOD on; then the firmware's own tone note-on.
+    const uint32_t MOBJ = ram + 0x3d000, MOB2 = ram + 0x3d100, ML1 = ram + 0x3d200, ML2 = ram + 0x3d300, MOUT = ram + 0x3d400;
+    long mcn = 0, mcb = 0;
+    auto modConverter = [&](int n, int types) {
+        XtModBlock pb;
+        for (const uint32_t w : { 0u, 4u, 8u, 0xcu }) c.wr32(MB + w, 0);
+        for (int g = 0; g < n; ++g) {
+            XtModParams p = modParams((int)(rnd() % (uint32_t)types));
+            if (g % 16 == 5) p.type = 5 + (int)(rnd() % 251);
+            if (!modConvert(p, MB, pb)) { std::fprintf(stderr, "mod converter: %s\n", c.error().c_str()); return false; }
+            ++mcn;
+            if (!modBlockSame(MB, pb) && mcb++ < 6)
+                std::printf("  mod converter on %d type %d level %d: type %u/%u a %.9g/%.9g b %.9g/%.9g c %.9g/%.9g\n", p.on, p.type, p.level, c.rd32(MB), pb.type, f32(MB + 4), pb.a,
+                            f32(MB + 8), pb.b, f32(MB + 0xc), pb.c);
+        }
+        return true;
+    };
+    if (!modConverter(200000, 5)) return 1;
+    std::printf("mod converter: %ld cases, %ld different\n", mcn, mcb);
+    bad += mcb;
+    // the object alone
+    long modN = 0, modD = 0, modB = 0, modPlain = 0;
+    float modPeak = 0;
+    XtMod mObj;
+    XtModBlock mB1, mB2;
+    auto modFill = [&](float* a, int kind) {
+        const float amp = kind == 1 ? 3.0e7f : kind == 2 ? 2.0e9f : kind == 3 ? 2.0e10f : 0.0f;
+        for (int i = 0; i < 64; ++i) a[i] = amp * frnd(-1, 1);
+        if (kind == 4) for (int i = 0; i < 32; ++i) { a[2 * i] = 2.0e9f * frnd(-1, 1); a[2 * i + 1] = 0.0f; }   // one channel only
+        if (kind == 5) for (int i = 0; i < 32; ++i) { a[2 * i] = 2.0e9f * frnd(-1, 1); a[2 * i + 1] = a[2 * i]; }   // the same on both
+    };
+    auto modObjCase = [&](int g, const std::vector<int>& types) {
+        const int type = types[(size_t)g % types.size()];
+        XtModParams p = modParams(type);
+        if (!modConvert(p, MOB2, mB1)) { std::fprintf(stderr, "mod: %s\n", c.error().c_str()); return false; }
+        const bool s1 = rnd() % 4 == 0, s2 = rnd() % 4 == 0, an = rnd() & 1;
+        if (!c.call(0x894f1b00, { MOBJ, MOB2, s1 ? 1u : 0u, s2 ? 1u : 0u }, sp) || !c.call(0x894f1d90, { MOBJ, an ? 1u : 0u }, sp)) { std::fprintf(stderr, "mod note-on: %s\n", c.error().c_str()); return false; }
+        mObj.noteOn(mB1, s1, s2, an);
+        ++modN;
+        if ((!modSame(MOBJ, mObj) || c.rd32(MOBJ + 0x50) != mObj.routine()) && modB++ < 6) std::printf("  mod %d note-on type %u/%u routine %08x/%08x\n", g, c.rd32(MOBJ), mObj.type(), c.rd32(MOBJ + 0x50), mObj.routine());
+        for (int blk = 0; blk < 24; ++blk) {
+            if (blk % 5 == 4) {                       // a new block, of any Type, on the held note
+                XtModParams q = modParams((int)(rnd() % 5));
+                if (!modConvert(q, MOB2, mB1) || !c.call(0x894f1c60, { MOBJ, MOB2 }, sp)) { std::fprintf(stderr, "mod update: %s\n", c.error().c_str()); return false; }
+                mObj.setBlock(mB1);
+                ++modN;
+                if (!modSame(MOBJ, mObj) && modB++ < 6) std::printf("  mod %d.%d update (type %d)\n", g, blk, q.type);
+            }
+            float l1[64], l2[64];
+            modFill(l1, (int)(rnd() % 6));
+            modFill(l2, (int)(rnd() % 6));
+            c.write(ML1, l1, sizeof l1);
+            c.write(ML2, l2, sizeof l2);
+            if (!c.call(0x894f1d50, { MOBJ, ML1, ML2, MOUT }, sp)) { std::fprintf(stderr, "mod: %s\n", c.error().c_str()); return false; }
+            const bool plainNow = mObj.plain();
+            float sum[64];
+            std::copy(l1, l1 + 64, sum);
+            xtAnalogMix(sum, l2);
+            mObj.process(l1, l1, l2);                // in place, as the synth runs it
+            ++modD;
+            int bad_i = -1;
+            if (plainNow) {                          // the synth's shortcut: the routine, at gains of 1, is the plain sum
+                ++modPlain;
+                if (std::memcmp(sum, l1, sizeof sum) != 0 && modB++ < 6) std::printf("  mod %d.%d: plain, but not the sum\n", g, blk);
+            }
+            for (int i = 0; i < 64; ++i) {
+                if (bad_i < 0 && !same(f32(MOUT + 4 * (uint32_t)i), l1[i])) bad_i = i;
+                modPeak = std::fmax(modPeak, std::fabs(l1[i]));
+            }
+            if ((bad_i >= 0 || !modSame(MOBJ, mObj)) && modB++ < 6)
+                std::printf("  mod %d.%d type %u: first difference at %d: fw %.9g port %.9g; a %.9g/%.9g b %.9g/%.9g\n", g, blk, mObj.type(), bad_i, bad_i >= 0 ? f32(MOUT + 4 * (uint32_t)bad_i) : 0.0f,
+                            bad_i >= 0 ? l1[bad_i] : 0.0f, f32(MOBJ + 0x18), mObj.current(0), f32(MOBJ + 0x1c), mObj.current(1));
+        }
+        return true;
+    };
+    c.write(MOBJ, z.data(), 0x100);
+    auto modObjPass = [&](const char* name, const std::vector<int>& types) {
+        modN = modD = modB = modPlain = 0; modPeak = 0;
+        for (int g = 0; g < nCases; ++g)
+            if (!modObjCase(g, types)) return false;
+        std::printf("%s: %ld note-ons and updates, %ld blocks of 32 frames (%ld plain), %ld different (peak %.4g of 2^31)\n", name, modN, modD, modPlain, modB, modPeak / 2147483648.0f);
+        bad += modB;
+        return true;
+    };
+    if (!modObjPass("mod mix, ring", { 0, 1 })) return 1;
+    // both voices through the firmware's render, with the MOD on; then its note-on
+    auto modTonePass = [&](const char* name, int type) {
+        modType = type;
+        xmodPass = true;
+        tb_ = tm_ = tl_ = tn_ = 0;
+        for (long& w : waveBlocks) w = 0;
+        for (int g = 0; g < nCases; ++g)
+            if (!toneCase(g)) return false;
+        long blocks = 0;
+        for (long w : waveBlocks) blocks += w;
+        std::printf("%s tone: %d cases, %ld note-ons and updates, %ld oscillator blocks, %ld different; wrap masks %ld different; delay lines %ld different\n", name, nCases, tn_, blocks, tb_, tm_, tl_);
+        bad += tb_ + tm_ + tl_;
+        oo = on_ = 0;
+        for (int g = 0; g < nCases / 2; ++g)
+            if (!orderCase(g)) return false;
+        std::printf("%s tone note-on: %ld cases, %ld different\n", name, on_, oo);
+        bad += oo;
+        modType = -1;
+        return true;
+    };
+    if (!modTonePass("mod ring", 1)) return 1;
     return bad ? 3 : 0;
 }
 #endif

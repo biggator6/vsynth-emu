@@ -70,6 +70,13 @@ namespace Params {
     static const juce::String kPortaType     = "portaType";
     static const juce::String kPortaTime     = "portaTime";
     static const juce::String kPortaVeloSens = "portaVeloSens";
+    // The MOD section (XtMod): Switch, Type, Original Level, Attack and Release
+    // Times, the XT's defaults
+    static const juce::String kModSwitch     = "modSwitch";
+    static const juce::String kModType       = "modType";        // MIX, RING, FM, ENV RING, OSC SYNC
+    static const juce::String kModLevel      = "modLevel";
+    static const juce::String kModAttack     = "modAttack";
+    static const juce::String kModRelease    = "modRelease";
     // Key assign: Mono/Poly (MONO, POLY), Legato Switch, Octave Shift −3..+3
     static const juce::String kMonoPoly      = "monoPoly";
     static const juce::String kLegato        = "legatoSwitch";
@@ -614,6 +621,12 @@ VSynthEmuProcessor::createParameterLayout() {
         intP(Params::kOscVelSens, "Velocity Sens", -63, 63, 0);
         params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kOscVelCurve), n + "Velocity Curve", 0, 7, 1, curveName));
     }
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kModSwitch, "MOD Switch", false));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kModType, "MOD Type",
+        juce::StringArray { "MIX", "RING", "FM", "ENV RING", "OSC SYNC" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kModLevel, "MOD Original Level", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kModAttack, "MOD Attack Time", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kModRelease, "MOD Release Time", 0, 127, 0));
 
     return { params.begin(), params.end() };
 }
@@ -740,6 +753,11 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.mono         = knob(Params::kMonoPoly) == 0;
     c.legato       = apvts.getRawParameterValue(Params::kLegato)->load() >= 0.5f;
     c.octave       = knob(Params::kOctave);
+    c.mod.on       = apvts.getRawParameterValue(Params::kModSwitch)->load() >= 0.5f;
+    c.mod.type     = knob(Params::kModType);
+    c.mod.level    = knob(Params::kModLevel);
+    c.mod.attack   = knob(Params::kModAttack);
+    c.mod.release  = knob(Params::kModRelease);
     for (int k = 0; k < 2; ++k) {
         using Params::cosmId;
         XtSynth::Controls::Cosm& m = c.cosm[k];

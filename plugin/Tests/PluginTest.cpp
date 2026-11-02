@@ -448,6 +448,13 @@ int main(int argc, char** argv) {
             set("LfoWave", m.lfoWave); set("LfoRate", m.lfoRate);
         }
     }
+    // TEST_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING
+    if (const char* e = std::getenv("TEST_MOD")) {
+        refCtl.mod.on = true;
+        std::sscanf(e, "%d,%d,%d,%d", &refCtl.mod.type, &refCtl.mod.level, &refCtl.mod.attack, &refCtl.mod.release);
+        setKnobs({ { "modSwitch", 1 }, { "modType", refCtl.mod.type }, { "modLevel", refCtl.mod.level }, { "modAttack", refCtl.mod.attack },
+                   { "modRelease", refCtl.mod.release } });
+    }
     // TEST_MONO="mono,legato[,octave]": Mono/Poly (1 MONO), Legato Switch,
     // Octave Shift
     if (const char* e = std::getenv("TEST_MONO")) {

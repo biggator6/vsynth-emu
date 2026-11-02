@@ -57,6 +57,66 @@ struct XtAnalogShared {
 // scale is the exact power of two from b's units to a's.
 void xtAnalogMix(float* lr, const float* b, float scale = 1.0f);
 
+// The MOD section: one object at tone +0x1708, after both OSCs in Structure 0.
+// The patch's values (input +6…+0xa, IDs 0x294…0x298): Switch, Type 0 MIX, 1
+// RING, 2 FM, 3 ENV RING, 4 OSC SYNC, Original Level, Attack and Release
+// Times, 0…127.
+struct XtModParams {
+    bool on = false;
+    int type = 0, level = 127, attack = 0, release = 0;
+};
+// The block (tone block +0x5dc), which the converter (0x894e0920) writes:
+//   off, or MIX    type 0, a = b = 1 (c left as it was)
+//   RING, FM       a = 1, b = level curve(Level)/32768, c = 1
+//   ENV RING       a = Attack/127, b = Release/127, c = 1
+//   OSC SYNC       a = 1 (b and c left as they were)
+// What it leaves stays in the block, and an update copies it into a held note.
+struct XtModBlock {
+    uint32_t type = 0;
+    float a = 0, b = 0, c = 0;
+};
+void xtModBlock(const XtModParams& p, XtModBlock& b);
+// The Types the port plays.
+bool xtModPlays(uint32_t type);
+
+// The MOD object.  The note-on (0x894f1b00, then the chooser 0x894f1d90) takes
+// the type and the routine for the note; a new block on a held note (0x894f1c60)
+// changes neither, only the targets, by the note's type.  So a held note goes on
+// with its routine under gains from another Type's block.  All of the fields
+// stay from note to note.
+//   a, b, c   +4, +8, +0xc the targets, +0x18, +0x1c, +0x20 the current values:
+//             each routine moves them 0.009375 of the way per sample, from the
+//             difference at the block's start
+//   MIX       (0x89527d80) out = L1·a + L2·b.  At gains of 1 the plain sum.
+//   RING      (0x89527e00) out = ((L2·a + b)·c)·L1, with a's target (+4)/2^31,
+//             both channels; b is the Original Level
+// process: L1 and L2 in the XT's units, 32 frames of interleaved L/R; out may be
+// l1.
+class XtMod {
+public:
+    // stereo1, stereo2: the voices' +0x960 as their setups leave them; osc1Analog:
+    // OSC 1's kind is 3
+    void noteOn(const XtModBlock& b, bool stereo1, bool stereo2, bool osc1Analog);
+    void setBlock(const XtModBlock& b);
+    void process(float* out, const float* l1, const float* l2);
+    // MIX at gains of 1, targets and current values: the plain sum
+    bool plain() const;
+
+    // the state, for the firmware check
+    uint32_t type() const { return type_; }
+    uint32_t stereoCode() const { return stereo_; }
+    uint32_t routine() const;                           // the routine's address (+0x50)
+    float target(int i) const { return t[i]; }
+    float current(int i) const { return g[i]; }
+
+private:
+    uint32_t type_ = 0, stereo_ = 0;
+    bool analog_ = false;
+    float t[3] = {}, g[3] = {};                         // a, b, c: the targets and current values
+    void mix(float* out, const float* l1, const float* l2);
+    void ring(float* out, const float* l1, const float* l2);
+};
+
 // The waveform's code (+0x80) for the patch's 0…13; and whether the port
 // plays it.
 int xtAnalogCode(int wave);

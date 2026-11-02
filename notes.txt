@@ -314,6 +314,14 @@ ANALOG X-MOD v87 (2026-11-02): X-MOD (code 13, 0x89507b60 at +0x96c)
   on the roadmap: MOD Types RING, FM, ENV RING, OSC SYNC; the other two Structure Types; the patch
   TVA's level and pan; PCM on OSC 2.
 
+MOD v88 (2026-11-02): the MOD section's object, and RING (HARDWARE_FIRMWARE.md, "The MOD section,
+  and RING"). XtAnalog: XtModParams, XtModBlock, xtModBlock (0x894e0920, writes only what it writes),
+  XtMod: noteOn (0x894f1b00, 0x894f1d90), setBlock (0x894f1c60, by the note's type), process (0x894f1d50),
+  mix 0x89527d80, ring 0x89527e00. Steps 0.009375 of the difference per sample. XtSynth: Controls::mod,
+  Voice::mod, modBlk, modConvert. plain() keeps xtAnalogMix; otherwise OSC 1's buffer to the XT's units
+  and back. Params modSwitch, modType, modLevel, modAttack, modRelease; editor row before COSM;
+  XT_MOD, XT_MOD_AT, TEST_MOD. Left: FM, ENV RING, OSC SYNC (xtModPlays).
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from

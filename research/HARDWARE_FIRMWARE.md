@@ -1545,6 +1545,116 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The MOD section, and RING (2026-11-02, v88)
+
+The MOD section gets its own object in the port (`XtMod`, in XtAnalog): the converter, the note-on,
+a new block on a held note, MIX with gains that can move, and Type 1, RING. FM, ENV RING and OSC SYNC
+follow. The map is in the v86 section.
+
+**The patch's values** (descriptors at `0x897a167c`): Switch 0…1, default 0; Type 0…4, default 0;
+Original Level 0…127, default 127; Attack and Release Times 0…127, default 0.
+
+**The converter** (`0x894e0920`) writes into the block and leaves what it does not write:
+
+| Switch, Type | +0 | +4 | +8 | +0xc |
+|---|---|---|---|---|
+| off, or Type 0, or above 4 | 0 | 1 | 1 | left |
+| RING, FM | 1, 2 | 1 | level curve(Level)/32768 | 1 |
+| ENV RING | 3 | Attack/127 | Release/127 | 1 |
+| OSC SYNC | 4 | 1 | left | left |
+
+So the block can hold another Type's words. `xtModBlock` writes into a block for that reason.
+
+**The note-on** (`0x894f1b00`) copies the four words and stores:
+- +0x34, the type's low byte.
+- +0x38 from the voices' stereo flags: 0 neither, 1 both, 2 OSC 1's only, 3 OSC 2's only.
+- By the type:
+  - MIX: +0x18 = +4, +0x1c = +8.
+  - RING: +4 /= 2^31, then +0x18 = +4, +0x1c = +8, +0x20 = +0xc.
+  - FM: the same with no division, and it clears both delay lines.
+  - ENV RING: +0x18 = +0xc, +0x28 = 0.
+  - OSC SYNC: +0x40 = 1, +0x18 = +0x1c = 0, +0x28 = +4.
+- It clears +0x40 only for a type above 4, which the converter never gives. So after an OSC SYNC note the
+  flag stays set through the next note of another Type. See v91.
+
+**The order** (corrects v86, which had the MOD after the installs). The tone's note-on runs the voices'
+setups, their ramps, the MOD's note-on, the COSMs' first part, then the installs, then the chooser
+(`0x894f1d90`) with r5 = OSC 1's kind is 3. The setup clears +0x960, and no analog voice has it set when
+the MOD reads it, HQ-SQUARE included: +0x38 is 0 on every pair of the fourteen waveforms. So the check's
+v86 pass, with the installs first, was out of order. It made no difference at gains of 1.
+
+**The update** (`0x894f1c60`) is not the 10-ms one; that is `0x894f1d40`, a bare `rts`. It runs from
+`0x894f5da0` when the patch's block changes, and it switches on the *object's* type, not the block's:
+- MIX: +4, +8 from the block, +0x40 = 0.
+- RING: +4 = (block +4)/2^31, +8, +0xc, +0x40 = 0.
+- FM, ENV RING: +4, +8, +0xc, +0x40 = 0.
+- OSC SYNC: +0x40 = 1, +0x28 = block +4.
+
+So a held note keeps its routine and takes gains meant for another Type. Turn the Switch off under a held
+RING and it stays RING at Level 1. Set a held MIX to RING at Level 0 and OSC 2 fades out with no sidebands.
+
+**The gains' move.** Each routine computes step = (target − current)·0.009375 (`0x3c199999`, a unit below
+the nearest float) at the block's start, and adds it each sample, so about 30% of the way per block. It
+rounds each add, so 32 of them do not land where one product would.
+
+**MIX** (`0x89527d80`): L1·a + L2·b as product, product, then sum; a and b move after each sample.
+
+**RING** (`0x89527e00`), both channels, with SZ = 1 pair moves:
+
+    out = ((L2·a + b)·c)·L1        a = 1/2^31, b = the Original Level, c = 1
+
+in that order, with a rounding at each step. L1 is not moved to ±1 first. c is 1 in every block a RING
+note can be given, except a block no converter has written to yet; the check forces other values anyway.
+
+**In XtSynth.** `plain()` means MIX with all four gains at 1. That path stays `xtAnalogMix` in OSC 1's
+units, so with the MOD off or on MIX nothing changed (`ab.sh` against v87: 4/4 identical). Anything else
+moves OSC 1's buffer to the XT's units (×2^31 for ±1, ×2^16 for the band players), runs the routine in
+place and moves it back. RING with OSC 2 off is therefore b·L1, not L1. RING with OSC 1 off is silence.
+
+**Sound** (A4 SINE on OSC 1, E5 SINE on OSC 2, Impact 0; dB from renders):
+- MOD off: 440 Hz at −7.8, 659 Hz at −8.2.
+- RING Level 127: 440 Hz at −7.8, 219 and 1099 Hz at −22.0. OSC 2's own partial is gone.
+- Level 64: 440 Hz falls to −19.7, 11.9 dB down as curve(64) = 0.254 says; the sidebands stay at −22.0.
+- Level 0: only the sidebands.
+- Level 0 with OSC 2's Wave Gain at +12: sidebands at −9.9.
+- OSC 2 off: Level 127 equals OSC 1 alone, Level 0 is silence.
+- SAW × SINE at Level 0: 220 Hz at −28.6, 661 at −38.6, 1099 at −29.3, 1539 at −35.5, sidebands of each
+  partial.
+
+**Checks** (`xt_analog`, further passes after the others; fcheck's baseline only added 4 lines):
+- The converter on 200,000 cases, a sixteenth with a Type above 4, block compared word by word: 0 different.
+- The object alone, 3,000 cases in fcheck, note after note with nothing reset, every stereo flag: firmware's
+  note-on, chooser, update and dispatch on buffers the check fills (none, small, full, ten times that, one
+  channel, the same on both). 15,000 note-ons and updates, 72,000 blocks, 0 different. Compared every block:
+  targets, current values, +0x34, +0x38, the routine and the output. Each update carries any Type's block.
+- A block in which `plain()` is true must also equal `xtAnalogMix`: 14,709 of them, 0 different. That is the
+  shortcut XtSynth takes.
+- Both voices through the firmware's render with RING or MOD off, every waveform, OSCs sometimes off, new
+  blocks on held notes: 38,250 note-ons and updates, 126,000 oscillator blocks, 0 different.
+- The firmware's own tone note-on, all fourteen waveforms on both OSCs, an OSC sometimes off: 1,500, 0 different.
+- Wide run, 21,000 cases: 504,000 blocks alone, 882,000 in the tone, the note-on on 10,500, 0 different.
+- Deliberate errors: 24 planted, 24 caught. At first 4 were missed, all one gap: c is never other than 1 in
+  real blocks, so c's move, its store and the regrouping of (x·c)·L1 changed nothing, and neither did the
+  converter writing +0xc for OSC SYNC. One conversion in eight now finds other values in the words the
+  converter leaves.
+
+**Wiring.** With no check against the firmware at this level:
+- PluginTest bit-identical at notes 30, 60 and 100: RING over analog voices, RING under a PCM OSC 1 (all
+  four inputs, band and SOLO), and MIX with the Switch on.
+- New knobs on held notes through `XT_MOD_AT`: as the Sound and update sections say.
+
+**Not checked.**
+- Against real hardware. The check is the firmware in the interpreter.
+- Who else calls `0x894f5da0`. The port runs the update on sounding voices when a MOD knob moves. On the XT
+  it goes through the block's +0x6bc, the tone bound to that block, and I did not trace when that pointer
+  goes away after a note ends. It matters only for what an idle voice's fields hold at its next note.
+- XtSynth as a whole against a firmware tone.
+
+**Plugin.** Parameters `modSwitch`, `modType`, `modLevel`, `modAttack`, `modRelease`, at the end of the layout.
+A row between the OSC rows and the COSM selector (`kXtStripH` 850, `setSize` 1150). The Type box enables
+what `xtModPlays` says, MIX and RING so far; a Type the port does not play yet is treated as the Switch off.
+`XT_MOD`, `XT_MOD_AT`, `TEST_MOD`.
+
 ### The analog waveform X-MOD (2026-11-02, v87)
 
 Code 13, patch waveform 13: a SAW whose phase is moved by the other OSC's output. With it

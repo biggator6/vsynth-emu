@@ -3084,3 +3084,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
   throws y far off its line. Real settings stay in range, until Impact and Wave Gain are both at the
   top. Whether the XT limits that later on has not been looked at.
 
+### Session 16 addendum (2026-11-02) — v88: the MOD section, and RING
+
+- The MOD has its own object now, with MIX's gains and RING. RING is (L2/2^31 + Level)·L1, so Level 0 is a pure
+  ring modulator and Level 127 keeps the carrier. It matched the firmware at the first run, so again the question
+  was the check, not the port.
+- 24 deliberate errors, 4 missed, all the same hole: c is 1 in every real block, so nothing c does can show. The
+  check now puts other values in the words the converter leaves.
+- The update is not the 10-ms one (that is a bare rts). It runs when the block changes and it goes by the note's
+  type, so a held note keeps its routine under another Type's gains. Turning the Switch off under a held RING does
+  not stop the ring: it goes to Level 1. Whether a player would ever hear that is another question, but it is what
+  the code does and the port does it too.
+- v86 had the order wrong: the MOD's note-on comes before the installs, the chooser after. It never showed at gains
+  of 1, which is a reminder of what a passing check does and does not say.
