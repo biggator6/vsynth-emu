@@ -76,8 +76,6 @@ struct XtModBlock {
     float a = 0, b = 0, c = 0;
 };
 void xtModBlock(const XtModParams& p, XtModBlock& b);
-// The Types the port plays.
-bool xtModPlays(uint32_t type);
 
 // FM's delay lines, for all tones: 496 floats per line, the 24 tones' L lines
 // (0x89f91c5c) followed by their R lines (0x89f9d65c).  A tone reads outside its own
@@ -114,6 +112,14 @@ struct XtModShared {
 //             (+0x28, 0 at note-on) moves (level − env)·((1 − t)·0.005 + 0.0001) every
 //             4 samples; out = L1·(env·gain), gain moving toward +0xc each sample
 //             from +0x18.  The first reads L only.
+//   OSC SYNC  OSC 2's mask (the tone's render: while +0x40 is set it goes to OSC 1's
+//             sync input and to +0x44) restarts OSC 1.  With OSC 1 analog (0x894f1aa0):
+//             out = L1·v + L2·(1 − v), v = +0x28 from the block's a, so at 1 OSC 2 is
+//             not heard.  Otherwise (0x894f1a40), a PCM OSC 1 or none: at a mask bit
+//             the held values (+0x18, +0x1c) become L1·v; out = (L1 − held)·(1 − v/2).
+//             The note-on sets +0x40 and only a note-on for another Type's block
+//             above 4 clears it, so it outlasts the note: the next note, of any Type,
+//             still syncs OSC 1, until a new block on it (setBlock).
 // process: L1 and L2 in the XT's units, 32 frames of interleaved L/R; out may be
 // l1.
 class XtMod {
@@ -135,6 +141,10 @@ public:
     int writeIndex() const { return w_; }
     float env() const { return env_; }                  // +0x28
     float lastLevel() const { return last_; }           // +0x2c
+    // the tone's render: while this is set OSC 2's mask goes to OSC 1 and to the MOD
+    bool syncOn() const { return sync_; }               // +0x40
+    void setMask(uint32_t m) { mask_ = m; }             // +0x44
+    uint32_t mask() const { return mask_; }
 
 private:
     uint32_t type_ = 0, stereo_ = 0;
@@ -143,6 +153,8 @@ private:
     XtModShared* shared_ = nullptr;
     int lineL = 0, lineR = 0, w_ = 0;                   // the tone's lines in the pool, +0x30
     float env_ = 0, last_ = 0;
+    bool sync_ = false;
+    uint32_t mask_ = 0;
     float lineAt(int base, int i) const;
     float fmTap(int base, float m, float x, float a, float b, float c) const;
     void mix(float* out, const float* l1, const float* l2);
@@ -150,6 +162,8 @@ private:
     void fm(float* out, const float* l1, const float* l2);
     void fmStereo(float* out, const float* l1, const float* l2);
     void envRing(float* out, const float* l1, const float* l2, bool stereo);
+    void syncAnalog(float* out, const float* l1, const float* l2);
+    void syncHold(float* out, const float* l1);
 };
 
 // The waveform's code (+0x80) for the patch's 0…13; and whether the port

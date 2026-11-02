@@ -3125,3 +3125,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
   already cleared OSC 2's output. v88 and v89 said "the firmware's real OSC 2 as the modulator" and that was mostly not so. The filled-buffer passes covered
   the routines, and with a real modulator it all stayed at 0 different, but those lines were not showing what they claimed. Each now prints how much of OSC 2
   it was given.
+
+### Session 16 addendum (2026-11-02) — v91: MOD OSC SYNC, and the MOD done
+
+- All five MOD Types are in. OSC SYNC sounds as it should straight off: A4 under an E4 master makes harmonics of 330 Hz with OSC 1's level, and the master's shape does not matter. With a 2:1 ratio it changes
+  nothing, and with no master it changes nothing.
+- The flag that lets the mask through is set by an OSC SYNC note-on and not cleared by the next note, only by a new block. So a voice can restart OSC 1 on a note that is not OSC SYNC. It looks like a bug in the firmware,
+  and it is ported as it is, because that is the rule here. If it ever sounds wrong against a real unit that is the first place to look.
+- A PCM OSC 1 cannot be restarted. It gets a sample-and-hold subtracted at each mask bit, at half level. Nobody would call that sync, and I would like to hear a real one.
+- LA-SAW as the master quietly becomes SAW. The firmware does it to the block in the note-on, just for OSC 2 and just this waveform.
+- MOD checks: 99 deliberate errors over the four versions, one of them exact. The holes they showed were more useful than the 0s: c never moving, v never other than 1. The worst hole no planted error showed: the tone passes read a cleared OSC 2 for two versions, found by reading the code for the next pass.

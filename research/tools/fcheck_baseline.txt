@@ -166,6 +166,10 @@ mod fm tone note-on: 1500 cases, 0 different
 mod env ring: 15000 note-ons and updates, 72000 blocks of 32 frames (2989 plain), 0 different (peak 218.7 of 2^31)
 mod env ring tone: 3000 cases, 38250 note-ons and updates, 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different; OSC 2 sounding under the MOD in 46248 blocks, peak 3.981 of 2^31
 mod env ring tone note-on: 1500 cases, 0 different
+mod osc sync: 15000 note-ons and updates, 72000 blocks of 32 frames (7864 plain), 0 different (peak 1.36e+11 of 2^31)
+mod osc sync tone: 3000 cases, 38250 note-ons and updates, 126000 oscillator blocks, 0 different; wrap masks 0 different; delay lines 0 different; OSC 2 sounding under the MOD in 45336 blocks, peak 6.54 of 2^31
+mod osc sync tone note-on: 1500 cases, 0 different
+mod osc sync tone: 16361 blocks with OSC 2's mask at OSC 1, LA-SAW to SAW on 519 notes
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

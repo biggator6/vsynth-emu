@@ -133,7 +133,7 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
 // ── Voices ───────────────────────────────────────────────────────────────────
 
 XtSynth::XtSynth() {
-    modConvert();
+    xtModBlock(ctl.mod, modBlk);
     prepare(44100.0);
 }
 XtSynth::~XtSynth() = default;
@@ -568,7 +568,7 @@ void XtSynth::setControls(const Controls& c) {
     const bool modChanged = c.mod.on != ctl.mod.on || c.mod.type != ctl.mod.type || c.mod.level != ctl.mod.level || c.mod.attack != ctl.mod.attack
                          || c.mod.release != ctl.mod.release;
     ctl = c;
-    if (modChanged) modConvert();
+    if (modChanged) xtModBlock(ctl.mod, modBlk);
     for (int k = 0; k < 2; ++k)
         if (clfoChanged[k] && freeClfoOn[k]) freeClfo[k].update(clfoParams(k));
     if (d1.lfo && freeLfoOn) freeLfo.update(lfoParams(ctl));
@@ -605,12 +605,6 @@ void XtSynth::setControls(const Controls& c) {
     }
 }
 
-void XtSynth::modConvert() {
-    XtModParams p = ctl.mod;
-    if (!xtModPlays((uint32_t)p.type)) p.on = false;   // a Type not ported yet plays as the Switch off
-    xtModBlock(p, modBlk);
-}
-
 int XtSynth::shiftKey(int key) const {
     return std::clamp(key + 12 * ctl.octave, 0, 127);
 }
@@ -641,6 +635,7 @@ void XtSynth::noteOn(int note, float velocity) {
 }
 
 void XtSynth::startVoice(int raw, int note, int vel) {
+    xtModBlock(ctl.mod, modBlk);                       // the tables may have loaded since the last knob moved
     // portamento's source key (0x894e4940): the previous key plus the Octave
     // Shift; with LEGATO the note's own (no glide) unless a key was held
     // then (POLY: or Hold is down, not modelled)
@@ -766,7 +761,6 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     if (v->osc2.on) portaStart(v->osc2, ctl.osc2);
     // the MOD (0x894f1b00, 0x894f1d90): the voices' stereo flags as their setups
     // leave them, a stereo wave's on a PCM OSC 1 and none on an analog voice
-    modConvert();
     v->mod.noteOn(modBlk, v->on && !v->analog && cur->channels == 2, false, v->on && v->analog, modShared, (int)(v - voice));
 }
 
@@ -785,8 +779,11 @@ void XtSynth::oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o, const Xt
 void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     const XtEnvParams oe = ampEnvParams(v, o);
     s.curGain = gainTarget(v, s, o, oe.time[0] == 0.0f ? s.oenv.level() : oe.level[0]);
-    if (s.analog)   // the analog note-on (0x89504af0): Fat on the formant envelope, the Pulse Width on the time envelope
-        s.ana.noteOn(analogBlock(v, s, o), s.curA, gainTarget(v, s, o, s.oenv.level()), s.curGain, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared);
+    if (s.analog) {   // the analog note-on (0x89504af0): Fat on the formant envelope, the Pulse Width on the time envelope
+        XtAnalogBlock b = analogBlock(v, s, o);
+        if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;   // the tone's note-on (0x894f6148): under OSC SYNC OSC 2 plays LA-SAW as SAW
+        s.ana.noteOn(b, s.curA, gainTarget(v, s, o, s.oenv.level()), s.curGain, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared);
+    }
     else if (cur->type == 1) {
         s.solo.setRobot(s.robot);
         s.solo.setLoop(waveLoop());
@@ -1011,13 +1008,20 @@ void XtSynth::mixBlock(float* lr) {
             if (!v.active) continue;
         }
         float scale = v.gain;
-        // OSC 2, then OSC 1 (the tone render 0x894f6d40)
-        if (v.osc2.on) v.osc2.ana.process(tmp2);
+        // OSC 2, then OSC 1 (the tone render 0x894f6d40).  While the MOD's flag is
+        // set OSC 2's mask goes to OSC 1's sync input and to the MOD
+        uint32_t mask2 = 0;
+        if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);
         else std::fill(tmp2, tmp2 + 64, 0.0f);
+        uint32_t sync = 0;
+        if (v.mod.syncOn()) {
+            sync = mask2;
+            v.mod.setMask(mask2);
+        }
         const bool band = v.on && !v.analog && cur->type != 1;
         if (!v.on) std::fill(tmp, tmp + 64, 0.0f);
         else if (v.analog) {   // the XT's units (±2^31) to the SOLO buffer's (±1), exactly
-            v.ana.process(tmp, 0, tmp2);                       // X-MOD reads OSC 2's buffer and clears it
+            v.ana.process(tmp, sync, tmp2);                    // X-MOD reads OSC 2's buffer and clears it
             for (float& x : tmp) x *= 0x1p-31f;
         } else if (!band) {
             float l[32], r[32];
@@ -1152,7 +1156,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //     coarse,fine" and XT_TUNE2="random", as OSC 1's.  XT_OSC1OFF=1: OSC 1's
 //     Switch off.
 //   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
-//     3 ENV RING, Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
+//     3 ENV RING, 4 OSC SYNC, Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
 //     attack,release": new MOD knobs at a frame, on the notes then sounding.
 //   XT_OLEV="level,levelKF,levelLfoDepth,waveGainDb": the OSC TVA.
 //   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.

@@ -1545,6 +1545,69 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The MOD section: OSC SYNC (2026-11-02, v91)
+
+Type 4, the last. All five Types are now ported. OSC 2 restarts OSC 1, and OSC 2 itself is not heard at the block's level.
+
+**The mask's path** (the render, `0x894f6d40`; `0x894f6e20` has the same lines, and `0x894f6f40` tests the same flag, though neither is ported). It clears both voices' sync inputs (+0x97c, +0x1330 of the tone) each
+block, runs OSC 2, then, if the MOD's +0x40 is set, writes OSC 2's returned mask to OSC 1's input and to the MOD's +0x44. Then OSC 1, then the MOD.
+So OSC 1 restarts at OSC 2's mask bits, within the same block. With OSC 2 off, or on NOISE, the mask is 0 and OSC 1 runs free. OSC 2's own input stays
+0, and OSC 1's mask goes nowhere.
+
+**The routines**, chosen at note-on by OSC 1's kind (`0x894f1d90`, r5 = kind is 3), not by the stereo flags:
+- OSC 1 analog (`0x894f1aa0`): out = L1·v + L2·(1 − v), both channels, v = +0x28. As product, product, then sum.
+- Otherwise (`0x894f1a40`), a PCM OSC 1 or none: at a mask bit, the held values (+0x18, +0x1c) become L1·v and R1·v. out = (L1 − held)·(1 − v/2), with the
+  held values changing before that sample's output. So a PCM wave gets no restart, only a step taken out at each mask bit, and half the level.
+- v comes from the block's a: 1 for OSC SYNC, so OSC 2 is multiplied by 0 and OSC 1 passes as it is. A held note given an ENV RING block takes v = Attack/127,
+  and then OSC 2 is heard. That is the only way to hear it.
+- OSC 1 off: the second routine on zeros, silence, whatever OSC 2 does.
+
+**The flag outlasts the note.** Note-on sets +0x40 for Type 4 and clears it only for a type above 4, which no converter writes. The others leave it, so a voice's next
+note, of any Type, still restarts OSC 1 at OSC 2's mask, until a new block arrives on it (`0x894f1c60` clears it for a held Type 0…3, and sets it for a held Type 4). It
+looks like an oversight, and the port keeps it: the field stays on the `XtMod`, and a voice keeps its `XtMod` across notes. On a patch whose Type never changes it does not
+show. Which voice a note gets is the port's allocation, not the XT's, so which note it would hit will differ.
+
+**The tone's note-on rule** (`0x894f6148`). If the block's MOD type is 4, OSC 2's block kind is 3 and OSC 2's code is 10 (LA-SAW), it writes 2 (SAW) into the block's code. Only the code
+changes: the level, gain and tones stay LA-SAW's, so it is a SAW at LA-SAW's level. Only OSC 2, and it looks at the block's +0 and not the Switch directly: with the Switch off the block
+says 0. The port does this in `oscStart`, before the voice's note-on. LA-SQUARE is left alone. I did not find why the firmware does this for LA-SAW.
+
+**Why the note-on's +0x18 is 0 and the update does not touch it.** Case 4 of the update writes +0x28 only, so a held note's holds carry on.
+
+**Sound** (A4 SAW on OSC 1, Impact 0; dB from renders):
+- OSC 1 alone: 440 Hz at −14.9, 880 at −20.9, 1320 at −24.4.
+- OSC 2 SAW at E4 (Coarse −5): 330 Hz at −15.2, 659 at −24.8, 989 at −24.0, 1319 at −25.8, 1648 at −28.6, all harmonics of the master and no 440 Hz, with OSC 1's level kept: peak 0.280 as OSC 1 alone.
+- OSC 2 SINE at E4: exactly those levels. The master's shape does not matter, only its period.
+- OSC 2 at A3 (2:1): as OSC 1 alone, as the restart lands where the phase already is.
+- OSC 2 NOISE, or off: as OSC 1 alone, every printed partial, as there is no mask.
+- OSC 2 LA-SAW at E4: as OSC 2 SAW. Alone with no MOD the same setting gives LA-SAW's own 330 Hz at −11.6.
+- OSC 1 off: silence.
+- PCM OSC 1 (vocal) under E4: partials near 648–663 Hz at about −37, and energy at a few Hz, from the held values' steps; RMS 0.040 against the MIX's 0.175.
+
+**Checks** (`xt_analog`, further passes after the others; fcheck's baseline only added 4 lines):
+- The object alone, 3,000 cases in fcheck, Types 4, 4, 0, 1, 3 in turn on one object with nothing reset, so the flag outlasts notes; any mask while it is set; both routines; one note in about 80 of a
+  type above 4: 15,000 note-ons and updates, 72,000 blocks, 0 different. Compared every block: the flag, the mask, the holds, v, the output.
+- Both voices through the firmware's render, a quarter of the notes of another Type after an OSC SYNC note: 38,250 note-ons and updates, 126,000 oscillator blocks, 0 different, with both buffers, the mix, both
+  masks and the fields; OSC 2's mask at OSC 1 in 16,361 blocks and 45,336 blocks with OSC 2 sounding.
+- The firmware's own tone note-on, a third of the cases LA-SAW on both OSCs, an OSC sometimes off: 1,500, 0 different. So the rule's conditions are the firmware's: 519 notes took it over the two tone passes.
+- Wide run, 21,000 cases: 504,000 blocks alone, 882,000 in the tone, the note-on on 10,500, 0 different.
+- Deliberate errors: 25 planted, 24 caught. The one left is exact: setting the flag again on a held Type 4 note, where the note-on has already set it. At first one more was missed: v taken as 1 at note-on, since a Type 4 block's a is always 1. One such block in four now has another value. The rule's errors (applied with the Switch off, to OSC 1, to LA-SQUARE, or not at all) are caught by the firmware's own note-on.
+
+**A slip in the check, fixed here.** Each tone pass started with the firmware's block holding what the last pass left and the port's empty, so if the first note was of a Type that leaves words, the two
+differed for that note. It only showed once the random stream moved. Both now start from zeros.
+
+**Wiring.** With no check against the firmware at this level:
+- The Sound section above, through `XT_MOD`: the mask reaches OSC 1, the master is not heard, the LA-SAW rule.
+- PluginTest bit-identical at notes 30, 60 and 100: analog over analog, under a PCM OSC 1, and an LA-SAW master.
+
+**Not checked.**
+- Against real hardware.
+- A PCM voice through the firmware's render: the routine for it is checked on filled buffers and masks only.
+- The rule's other effect: the block keeps code 2 after the note-on, so when the OSC's block is formed again and copied into a held voice (`0x894f2600`), the code returns to 10 under a SAW routine.
+  The port latches the code at note-on and I did not trace that path.
+- The other two Structure Types' renders, which are not ported.
+
+**Plugin.** OSC SYNC is enabled in the Type box, so all five are; `xtModPlays` is gone. `XT_MOD` and `TEST_MOD` take Type 4.
+
 ### The MOD section: ENV RING (2026-11-02, v90)
 
 Type 3. OSC 1 under OSC 2's level. OSC 2 itself is not heard. Attack and Release are the follower's rates.

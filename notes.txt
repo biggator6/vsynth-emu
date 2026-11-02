@@ -314,6 +314,11 @@ ANALOG X-MOD v87 (2026-11-02): X-MOD (code 13, 0x89507b60 at +0x96c)
   on the roadmap: MOD Types RING, FM, ENV RING, OSC SYNC; the other two Structure Types; the patch
   TVA's level and pan; PCM on OSC 2.
 
+MOD OSC SYNC v91 (2026-11-02): Type 4, the last (HARDWARE_FIRMWARE.md, "The MOD section: OSC SYNC"). XtMod::syncAnalog 0x894f1aa0,
+  syncHold 0x894f1a40, syncOn (+0x40), setMask (+0x44). XtSynth's mixBlock passes OSC 2's mask to OSC 1 and the MOD only while syncOn; oscStart turns OSC 2's LA-SAW into
+  SAW under OSC SYNC. The flag stays set through later notes until a new block arrives. All five MOD Types done; xtModPlays gone. Left on the roadmap: the other two
+  Structure Types; the patch TVA's level and pan; PCM on OSC 2 (its own session).
+
 MOD ENV RING v90 (2026-11-02): Type 3 (HARDWARE_FIRMWARE.md, "The MOD section: ENV RING"). XtMod::envRing both routines
   (0x895279d0, 0x89527aa0), modLevel 0x895017e0: |L2| over 32 samples, the last of each eight twice. Fields env +0x28, last +0x2c
   (not cleared at note-on). The rate is picked each block by last > level, with no smoothing, so a modulator's ripple mixes Attack and

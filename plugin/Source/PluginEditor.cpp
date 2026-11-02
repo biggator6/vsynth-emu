@@ -166,7 +166,6 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     modBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
     modBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     modTypeBox_.addItemList({ "MIX", "RING", "FM", "ENV RING", "OSC SYNC" }, 1);
-    for (int t = 0; t < 5; ++t) modTypeBox_.setItemEnabled(t + 1, xtModPlays((uint32_t)t));   // the Types the port plays
     addAndMakeVisible(modBtn_);
     addAndMakeVisible(modTypeBox_);
     modAtt_        = std::make_unique<ButtonAtt>(processor_.apvts, "modSwitch", modBtn_);

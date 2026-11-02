@@ -222,8 +222,6 @@ void xtModBlock(const XtModParams& p, XtModBlock& b) {
     }
 }
 
-bool xtModPlays(uint32_t type) { return type <= 3; }
-
 void XtMod::noteOn(const XtModBlock& b, bool stereo1, bool stereo2, bool osc1Analog, XtModShared& shared, int tone) {
     type_ = b.type;
     t[0] = b.a; t[1] = b.b; t[2] = b.c;
@@ -236,14 +234,20 @@ void XtMod::noteOn(const XtModBlock& b, bool stereo1, bool stereo2, bool osc1Ana
     if (type_ == 0) { g[0] = t[0]; g[1] = t[1]; }
     else if (type_ == 1 || type_ == 2) { g[0] = t[0]; g[1] = t[1]; g[2] = t[2]; }
     else if (type_ == 3) { g[0] = t[2]; env_ = 0.0f; }
+    else if (type_ == 4) { sync_ = true; g[0] = g[1] = 0.0f; env_ = t[0]; }
+    else sync_ = false;
     if (type_ == 2)
         for (int i = 0; i < XtModShared::kLine; ++i) shared.line[lineL + i] = shared.line[lineR + i] = 0.0f;
 }
 
 void XtMod::setBlock(const XtModBlock& b) {
+    if (type_ == 4) sync_ = true;
     if (type_ == 0) { t[0] = b.a; t[1] = b.b; }
     else if (type_ == 1) { t[0] = div(b.a, 2147483648.0f); t[1] = b.b; t[2] = b.c; }
     else if (type_ == 2 || type_ == 3) { t[0] = b.a; t[1] = b.b; t[2] = b.c; }
+    else if (type_ == 4) { env_ = b.a; return; }
+    else return;
+    sync_ = false;
 }
 
 bool XtMod::plain() const {
@@ -253,11 +257,13 @@ bool XtMod::plain() const {
 uint32_t XtMod::routine() const {
     if (type_ == 2) return stereo_ ? 0x89527c50u : 0x89527b80u;
     if (type_ == 3) return stereo_ ? 0x89527aa0u : 0x895279d0u;
+    if (type_ == 4) return analog_ ? 0x894f1aa0u : 0x894f1a40u;
     return type_ == 1 ? 0x89527e00u : 0x89527d80u;
 }
 
 void XtMod::process(float* out, const float* l1, const float* l2) {
-    if (type_ == 3) envRing(out, l1, l2, stereo_ != 0);
+    if (type_ == 4) { if (analog_) syncAnalog(out, l1, l2); else syncHold(out, l1); }
+    else if (type_ == 3) envRing(out, l1, l2, stereo_ != 0);
     else if (type_ == 2 && stereo_) fmStereo(out, l1, l2);
     else if (type_ == 2) fm(out, l1, l2);
     else if (type_ == 1) ring(out, l1, l2);
@@ -295,6 +301,24 @@ void XtMod::ring(float* out, const float* l1, const float* l2) {
     g[0] = a;
     g[1] = b;
     g[2] = c;
+}
+
+void XtMod::syncAnalog(float* out, const float* l1, const float* l2) {
+    const float v = env_, r = sub(1.0f, v);
+    for (int i = 0; i < 64; ++i) out[i] = fmac(l1[i], v, mul(l2[i], r));
+}
+
+void XtMod::syncHold(float* out, const float* l1) {
+    const float v = env_, k = sub(1.0f, mul(v, 0.5f));
+    float hl = g[0], hr = g[1];
+    for (int i = 0; i < 32; ++i) {
+        const float x = l1[2 * i], y = l1[2 * i + 1];
+        if (mask_ & (1u << i)) { hl = mul(x, v); hr = mul(y, v); }
+        out[2 * i] = mul(sub(x, hl), k);
+        out[2 * i + 1] = mul(sub(y, hr), k);
+    }
+    g[0] = hl;
+    g[1] = hr;
 }
 
 // ENV RING's level (0x895017e0), of L only in both routines.
@@ -2245,10 +2269,10 @@ int main(int argc, char** argv) {
     auto modSame = [&](uint32_t O, const XtMod& m) {
         bool ok = c.rd32(O) == m.type() && c.rd32(O + 0x38) == m.stereoCode() && (uint32_t)c.rd8(O + 0x34) == (m.type() & 0xff);
         for (int i = 0; i < 3; ++i) ok = ok && same(f32(O + 4 + 4 * (uint32_t)i), m.target(i)) && same(f32(O + 0x18 + 4 * (uint32_t)i), m.current(i));
-        return ok && same(f32(O + 0x28), m.env()) && same(f32(O + 0x2c), m.lastLevel());
+        return ok && same(f32(O + 0x28), m.env()) && same(f32(O + 0x2c), m.lastLevel()) && (c.rd32(O + 0x40) != 0) == m.syncOn() && c.rd32(O + 0x44) == m.mask();
     };
     int modType = -1;                            // the tone passes with the MOD on: its Type
-    long modL2Blocks = 0;
+    long modL2Blocks = 0, modLaSaw = 0, modSyncBlocks = 0;
     float modL2Max = 0;
     XtMod toneMod;
     XtModBlock toneB;
@@ -2315,10 +2339,19 @@ int main(int argc, char** argv) {
             return xtOscGainTarget(f32(Vn + 0x5c), f32(Vn + 0x54), start && atk[n] ? 0.0f : eOut[e + 4], lOut[n + 1], f32(Vn + 0x58));
         };
         XtAnalogBlock pb[2];
+        // the OSC SYNC pass: the block before the voices, as the tone's note-on's rule reads it.  Now
+        // and then a note of another Type after an OSC SYNC note: the flag stays set
+        const int mt = modType == 4 && g % 4 == 3 ? (int)(rnd() % 2) : modType;
+        if (modType == 4 && !modConvert(modParams(mt), MB, toneB)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
         for (int n = 0; n < 2; ++n) {
             oscIdx = n;
             pb[n] = portBlock(k[n]);
             oscIdx = 0;
+            if (modType == 4 && n == 1 && c.rd32(MB) == 4 && c.rd32(tb[1]) == 3 && c.rd32(tb[1] + 0x80) == 10) {   // 0x894f6148: LA-SAW to SAW
+                c.wr32(tb[1] + 0x80, 2);
+                pb[1].code = 2;
+                ++modLaSaw;
+            }
             if (!c.call(0x894f21c0, { tv[n], tb[n], 0 }, sp)) { std::fprintf(stderr, "voice setup: %s\n", c.error().c_str()); return false; }
             if (!on[n]) { to[n].setRatio(1.0f); continue; }      // the note-on of an OSC that is off (0x894f2f80, kind 0)
             const uint32_t e = (uint32_t)n * 4;
@@ -2339,8 +2372,7 @@ int main(int argc, char** argv) {
             || !c.call(0x894f1d90, { MODO, c.rd32(V1) == 3 ? 1u : 0u }, sp)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
         if (c.rd32(MODO + 0x50) != 0x89527d80) { std::fprintf(stderr, "MOD: routine %08x\n", c.rd32(MODO + 0x50)); return false; }
         } else {                                 // as the tone's note-on: the MOD before the installs, the chooser after
-            const XtModParams mp = modParams(modType);
-            if (!modConvert(mp, MB, toneB)
+            if ((modType != 4 && !modConvert(modParams(modType), MB, toneB))
                 || !c.call(0x894f1b00, { MODO, MB, c.rd32(V1 + 0x960), c.rd32(V2 + 0x960) }, sp)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
             toneMod.noteOn(toneB, false, false, on[0], *modPool, 0);
             for (int n = 0; n < 2; ++n)
@@ -2387,7 +2419,9 @@ int main(int argc, char** argv) {
             float l[2][64] = {};
             uint32_t pm[2] = {};
             if (on[1]) pm[1] = to[1].process(l[1]);
-            if (on[0]) pm[0] = to[0].process(l[0], 0, l[1]);
+            uint32_t syncIn = 0;                 // the render: OSC 2's mask, only while the MOD's flag is set
+            if (modType >= 0 && toneMod.syncOn()) { syncIn = pm[1]; toneMod.setMask(pm[1]); if (syncIn) ++modSyncBlocks; }
+            if (on[0]) pm[0] = to[0].process(l[0], syncIn, l[1]);
             float mix[64];
             std::copy(l[0], l[0] + 64, mix);
             if (modType >= 0) {                  // what the MOD is given: the check is no use on zeros
@@ -2459,6 +2493,17 @@ int main(int argc, char** argv) {
         if (modType >= 0) {
             toneB = XtModBlock();
             if (!modConvert(modParams(modType), TB + 0x5dc, toneB)) { std::fprintf(stderr, "MOD: %s\n", c.error().c_str()); return false; }
+            // LA-SAW on OSC 2 under OSC SYNC, with a band of cases, and on OSC 1 too, where the rule does not reach
+            if (modType == 4 && g % 3 == 0) {
+                for (int n = 0; n < 2; ++n) {
+                    k[n].p.wave = 9;
+                    oscIdx = n;
+                    writeInput(k[n]);
+                    c.wr32(oscBlock[n], on[n] ? 3u : 0u);
+                    if (on[n] && !c.call(0x894e1920, { P, oscBlock[n] }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
+                }
+                oscIdx = 0;
+            }
         } else {
         c.write(MI, z.data(), 0x10);
         if (!c.call(0x894e0920, { MI, TB + 0x5dc }, sp)) { std::fprintf(stderr, "MOD off: %s\n", c.error().c_str()); return false; }
@@ -2469,8 +2514,9 @@ int main(int argc, char** argv) {
         const int order[2] = { 0, 1 };
         for (int n : order) {
             oscIdx = n;
-            const XtAnalogBlock pb = portBlock(k[n]);
+            XtAnalogBlock pb = portBlock(k[n]);
             oscIdx = 0;
+            if (modType == 4 && n == 1 && on[1] && toneB.type == 4 && pb.code == 10) { pb.code = 2; ++modLaSaw; }
             if (!on[n]) { to[n].setRatio(1.0f); continue; }
             const uint32_t Vn = tv[n], e = (uint32_t)n * 4, lf = lfoAt((uint32_t)n + 1) + 0x38;
             const float eFat = f32(envAt(e + 3) + 0x4c), ePw = f32(envAt(e + 2) + 0x4c), ePitch = f32(envAt(e + 1) + 0x4c), eAmp = f32(envAt(e + 4) + 0x4c), l = f32(lf);
@@ -2664,6 +2710,14 @@ int main(int argc, char** argv) {
         const int type = types[(size_t)g % types.size()];
         XtModParams p = modParams(type);
         if (!modConvert(p, MOB2, mB1)) { std::fprintf(stderr, "mod: %s\n", c.error().c_str()); return false; }
+        if (type == 4 && g % 32 == 9) {               // a type no converter writes: the note-on clears the flag, the chooser takes MIX, the update does nothing
+            mB1.type = 5 + rnd() % 8;
+            c.wr32(MOB2, mB1.type);
+        }
+        if (type == 4 && mB1.type == 4 && g % 4 == 1) {   // v from the block, which the converter always sets to 1
+            mB1.a = frnd(0, 1);
+            wf(MOB2 + 4, mB1.a);
+        }
         const bool s1 = rnd() % 4 == 0, s2 = rnd() % 4 == 0, an = rnd() & 1;
         const int tone = type != 2 ? 0 : g % 8 == 1 ? 0 : g % 8 == 2 ? XtModShared::kTones - 1 : (int)(rnd() % XtModShared::kTones);
         c.wr32(MOBJ + 0x3c, (uint32_t)tone);
@@ -2705,6 +2759,11 @@ int main(int argc, char** argv) {
                 const float aim = -((float)(XtModShared::kTones * XtModShared::kLine) + 0.5f);
                 l2[0] = sub(div(aim, mul(mObj.current(0), K(0x33f80000))), K(0x4effffff));
                 l1[1] = 2.0e9f * frnd(-1, 1);
+            }
+            if (mObj.syncOn()) {                      // as the render does
+                const uint32_t mask = rnd() % 4 == 0 ? 0u : ((uint32_t)rnd() << 16 | rnd()) & (rnd() % 2 ? ((uint32_t)rnd() << 16 | rnd()) : 0xffffffffu);
+                c.wr32(MOBJ + 0x44, mask);
+                mObj.setMask(mask);
             }
             c.write(ML1, l1, sizeof l1);
             c.write(ML2, l2, sizeof l2);
@@ -2749,7 +2808,9 @@ int main(int argc, char** argv) {
     auto modTonePass = [&](const char* name, int type) {
         modType = type;
         xmodPass = false;
-        modL2Blocks = modL2Max = 0;
+        for (const uint32_t w : { 0u, 4u, 8u, 0xcu }) c.wr32(MB + w, 0);   // the block, in step: it keeps what a conversion leaves
+        toneB = XtModBlock();
+        modL2Blocks = modLaSaw = modSyncBlocks = 0; modL2Max = 0;
         tb_ = tm_ = tl_ = tn_ = 0;
         for (long& w : waveBlocks) w = 0;
         for (int g = 0; g < nCases; ++g)
@@ -2773,6 +2834,9 @@ int main(int argc, char** argv) {
     modForceC = true;
     if (!modObjPass("mod env ring", { 3 })) return 1;
     if (!modTonePass("mod env ring", 3)) return 1;
+    if (!modObjPass("mod osc sync", { 4, 4, 0, 1, 3 })) return 1;
+    if (!modTonePass("mod osc sync", 4)) return 1;
+    std::printf("mod osc sync tone: %ld blocks with OSC 2's mask at OSC 1, LA-SAW to SAW on %ld notes\n", modSyncBlocks, modLaSaw);
     return bad ? 3 : 0;
 }
 #endif
