@@ -114,6 +114,29 @@ float fbLevelCurve(int detune, int kf10, int dk) {
     return clamp01(add(div(flt((int16_t)kf10 * (int16_t)dk), 12000.0f), sub(1.0f, mul(n, n))));
 }
 
+// With the sub oscillator on, the second wave's depths and Detune in cents
+// (0x894e1090, 0x894e2974): |d| to 10: d; to 15: 2d − 10; to 31: 5d − 55; to 51:
+// 25d − 675; above: 50d − 1950; with d's sign
+float subCents(float d) {
+    const bool neg = 0.0f > d;
+    const float x = neg ? -d : d, s = neg ? -1.0f : 1.0f;
+    if (!(x > 10.0f)) return mul(add(x, 0.0f), s);
+    if (!(x > 15.0f)) return mul(fmac(x, 2.0f, -10.0f), s);
+    if (!(x > 31.0f)) return mul(fmac(x, 5.0f, -55.0f), s);
+    if (!(x > 51.0f)) return mul(fmac(x, 25.0f, -675.0f), s);
+    return mul(fmac(x, 50.0f, -1950.0f), s);
+}
+
+// Detune as octaves (0x894e1090): d/63 at ±12000, within that, through the curve
+// /1200, + (key − 60)·KF/120/1200, within ±1
+float subDetuneCurve(int detune, int kf10, int dk) {
+    const float kf = div(mul(flt((int16_t)kf10 * (int16_t)dk), K(0x3c088889)), 1200.0f);
+    float x = div(mul(flt((int16_t)detune), 12000.0f), 63.0f);
+    x = x > 12000.0f ? 12000.0f : (-12000.0f > x ? -12000.0f : x);
+    const float c = add(div(subCents(mul(div(x, 12000.0f), 63.0f)), 1200.0f), kf);
+    return c > 1.0f ? 1.0f : (-1.0f > c ? -1.0f : c);
+}
+
 // The waveform's level at the note's pitch (0x894e1350), for the patch's
 // waveform; SUPER-SAW, FEEDBACK-OSC and X-MOD take the Saw's
 float waveLevel(int wave, int pitch10) {
@@ -128,6 +151,11 @@ float waveLevel(int wave, int pitch10) {
 }
 
 constexpr float kHalf = 0.5f;
+// the Pulse Width within m…1 − m (0x89507480)
+inline float withinM(float x, float m) {
+    const float top = sub(1.0f, m);
+    return kHalf > x ? (m > x ? m : x) : (x > top ? top : x);
+}
 constexpr float kPwLo = K(0x3b820880), kPwSpan = K(0x3f7df7de);   // 0.0039683, 0.992063
 constexpr float kFatMin = K(0x3b7f9723), kFatFloor = K(0x3b03126f); // 0.0039, 0.002
 constexpr float kImpactLog = K(0xc1265ad5);    // the firmware's logf(3.05185e-5) (0x89531b78 on 0x38000100)
@@ -193,10 +221,18 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
         b.pw = pwCurve(p.pw, p.pwKf * 10, dk);
         b.pwEnv = mul(sq63(p.pwEnv), velPw);
         b.pwLfo = sq63(clampi((int16_t)p.pwLfo, -63, 63));
-        b.fat = fatCurve(p.fat, p.fatKf * 10, dk);
-        b.fatEnv = mul(sq63(p.fatEnv), velFat);
-        b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
+        if (p.subOctave != 0 && p.wave <= 10) {   // 0x894e288c
+            b.subOn = 1.0f;
+            b.fat = add(subDetuneCurve(p.detune, p.fatKf * 10, dk), p.subOctave == 1 ? -2.0f : p.subOctave == 2 ? -1.0f : 0.0f);
+            b.fatEnv = mul(div(subCents(flt((int16_t)p.fatEnv)), 1200.0f), velFat);
+            b.fatLfo = div(subCents(flt(clampi((int16_t)p.fatLfo, -63, 63))), 1200.0f);
+        } else {
+            b.fat = fatCurve(p.fat, p.fatKf * 10, dk);
+            b.fatEnv = mul(sq63(p.fatEnv), velFat);
+            b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
+        }
     }
+    b.subLevel = div(flt(T.level[p.subLevel & 0x7f]), 32768.0f);
     b.gain = mul(waveLevel(p.wave, pitch10), xtOscWaveGainFactor(waveGainDb));
     b.tone = flt((uint8_t)sys(p.wave == 10 ? kLaSquTone : kLaSawTone));
     b.toneKf = flt((uint8_t)sys(p.wave == 10 ? kLaSquToneKf : kLaSawToneKf));
@@ -285,9 +321,7 @@ void XtAnalogOsc::laShape(const XtAnalogBlock& b, float gain, float fatEnv, floa
         else m = div(hz, c);
     }
     gainT = mul(-gain, K(0x4c800000));                                          // 2^26: the sign, and 2^31/32
-    // the Pulse Width within m…1 − m (0x89507480)
-    const float top = sub(1.0f, m), w = kHalf > x ? (m > x ? m : x) : (x > top ? top : x);
-    pwT = mul(w, kFatFloor);
+    pwT = mul(withinM(x, m), kFatFloor);
     fatT = mul(half, kFatFloor);
     qT = mul(div(c, hz), kFatFloor);
 }
@@ -362,8 +396,151 @@ void XtAnalogOsc::release() {
     fbSlot = -1;
 }
 
+// The targets with the sub oscillator on (0x89506bf0, the note-on's first step
+// and the update).  The second wave's pitch is 2^(octaves) against the first's.
+// Each wave's Pulse Width is kept off its ends by a share of its own frequency;
+// that share, and each waveform's steps, by the routine.
+void XtAnalogOsc::subShape(const XtAnalogBlock& b, float gain, float fatEnv, float pwEnv, float lfo) {
+    fatT = xtCosmExpf(mul(fmac(lfo, b.fatLfo, fmac(fatEnv, b.fatEnv, b.fat)), K(0x3f317219)));   // powf(2, x)
+    const float sr = fatT;
+    const float w = clamp01(fmac(lfo, b.pwLfo, fmac(pwEnv, b.pwEnv, b.pw)));
+    if (code <= 1 || code == 8) {       // HQ-SAW, HQ-SQUARE, NOISE: their own routines, no second wave
+        gainT = gain;
+        pwT = w;
+        if (code == 8) {
+            const float d = sub(1.0f, mul(w, 2.0f));
+            int n = kHalf > w ? ftrc(fmac(d, 30.0f, 1.0f)) : ftrc(sub(1.0f, mul(d, 30.0f)));
+            n = (int8_t)n;
+            hold = n == 0 ? 1 : n;
+        }
+        return;
+    }
+    constexpr float kInc = K(0x3ba377ed), kFs = 44100.0f;
+    gainT = mul(gain, K(0x4c800000));                                           // 2^26
+    lvlT = mul(b.subLevel, kFatFloor);
+    const float r = mul(ratio_, 2.0f);
+    auto steps = [&](float a) { laInc = mul(a, kInc); subInc = mul(mul(a, sr), kInc); };
+    switch (code) {
+    case 3: case 7: {   // SQUARE, JUNO: the steepness' targets too
+        const float f = mul(r, 440.0f), f2 = mul(f, 2.0f), g2 = mul(mul(sr, f), 2.0f);
+        pwT = mul(withinM(w, mul(div(f2, kFs), 0.25f)), kFatFloor);
+        swT = mul(withinM(w, mul(div(g2, kFs), 0.25f)), kFatFloor);
+        steps(r);
+        sqT = mul(div(kFs, f2), K(0x3c03126f));
+        sq2T = mul(div(kFs, g2), K(0x3c03126f));
+        break;
+    }
+    case 4: case 6: {   // TRIANGLE, SINE
+        const float f = mul(r, 880.0f);
+        pwT = mul(withinM(w, mul(div(f, kFs), 0.25f)), kFatFloor);
+        swT = mul(withinM(w, mul(div(mul(sr, f), kFs), 0.25f)), kFatFloor);
+        steps(r);
+        break;
+    }
+    case 5: {   // RAMP: the last segment's width too
+        const float f = mul(r, 440.0f), e1 = div(mul(f, 2.0f), kFs), e2 = div(mul(mul(sr, f), 2.0f), kFs);
+        pwT = mul(withinM(w, mul(e1, 0.125f)), kFatFloor);
+        swT = mul(withinM(w, mul(e2, 0.125f)), kFatFloor);
+        steps(r);
+        rampK = mul(e1, 0.0625f);
+        rampK2 = mul(e2, 0.0625f);
+        break;
+    }
+    case 9: case 10: {   // LA-SQUARE, LA-SAW: the Tone's corner for each wave, as the plain ones
+        const float a = code == 10 ? mul(r, kHalf) : r;
+        const float tk = T.toneKf[ftrc(b.toneKf)];
+        laInc = mul(a, kInc);
+        const float ar = mul(a, sr), hz = mul(a, 440.0f);
+        subInc = mul(ar, kInc);
+        const float corner = mul(xtCosmExpf(mul(mul(div(b.tone, 127.0f), 7.0f), K(0x3f317219))), 156.0f);
+        float c = mul(fmac(tk, code == 10 ? fmac(a, K(0x3fd744fc), -1.0f) : fmac(a, K(0x3f5744fc), -1.0f), 1.0f), corner);
+        if (c > 20000.0f) c = 20000.0f;
+        float m = kHalf;
+        if (hz > c) c = hz;
+        else m = div(mul(a, 220.0f), c);
+        const float q1 = mul(div(c, hz), 2.0f);
+        float c2 = mul(fmac(tk, fmac(ar, K(0x3fd744fc), -1.0f), 1.0f), corner);
+        if (c2 > 20000.0f) c2 = 20000.0f;
+        float m2 = kHalf;
+        const float t = mul(sr, hz);
+        if (hz > c2) c2 = hz;
+        else m2 = div(t, c2);
+        const float q2 = mul(div(c2, t), 2.0f);
+        pwT = mul(withinM(w, m), kFatFloor);
+        swT = mul(withinM(w, m2), kFatFloor);
+        qT = mul(q1, kFatFloor);
+        q2T = mul(q2, kFatFloor);
+        break;
+    }
+    default: {   // SAW: from |w − ½|
+        const float f = mul(r, 880.0f), x = std::fabs(add(w, -0.5f));
+        steps(r);
+        pwT = mul(withinM(x, mul(div(f, kFs), K(0x3eb33332))), kFatFloor);
+        swT = mul(withinM(x, mul(div(mul(sr, f), kFs), K(0x3eb33332))), kFatFloor);
+        break;
+    }
+    }
+}
+
+// The note-on (0x89506700): the current values from the targets; Impact scales
+// the phase a second time; each waveform's start; the second phase in step.
+// It reads +0x20c and +0x214 as limits, which nothing writes (0), and +0x208,
+// which a RAMP note left on the voice.
+void XtAnalogOsc::subNoteOn(const XtAnalogBlock& b, float gain, float gainStart, float fatEnv, float pwEnv, float lfo) {
+    subShape(b, gain, fatEnv, pwEnv, lfo);
+    gainC = mul(gainStart, kFull31);
+    fatC = fatT;
+    pwC = div(pwT, kFatFloor);
+    swC = div(swT, kFatFloor);
+    lvlC = div(lvlT, K(0x3d000000));
+    float p = ph;
+    if (1.0f > imp) p = mul(p, imp);
+    auto steep = [&] { sqC = div(sqT, kFatFloor); sq2C = div(sq2T, kFatFloor); };
+    switch (code) {
+    case 0: case 1:
+        hy = 0.0f;
+        hs = 0;
+        [[fallthrough]];
+    case 8:
+        gainC = gainStart;
+        pwC = pwT;
+        ph = 0.0f > p || p > 1.0f ? 0.0f : p;
+        return;
+    case 3:
+        steep();
+        p = add(fmac(withinM(pwC, rampK), kHalf, p), kHalf);
+        break;
+    case 5:
+        p = add(p, 0.0f);
+        break;
+    case 7:
+        steep();
+        p = add(p, 0.0f);
+        break;
+    case 9: case 10: {
+        qC = div(qT, kFatFloor);
+        q2C = div(q2T, kFatFloor);
+        float x = add(fmac(withinM(pwC, 0.0f), kHalf, p), kHalf);
+        if (0.0f > x || x > 1.0f) x = 0.0f;
+        ph = x;
+        sph = mul(fatT, x);
+        ph2 = fmac(sub(0.25f, x), 2.0f, 2.0f);
+        ph3 = fmac(sub(0.25f, sph), 2.0f, 2.0f);
+        if (ph2 > 1.0f) ph2 = add(ph2, -2.0f);
+        if (ph3 > 1.0f) ph3 = add(ph3, -2.0f);
+        return;
+    }
+    default:
+        p = fmac(withinM(pwC, rampK), kHalf, p);
+        break;
+    }
+    if (0.0f > p || p > 1.0f) ph = sph = 0.0f;
+    else { ph = p; sph = mul(fatT, p); }
+}
+
 void XtAnalogOsc::noteOn(const XtAnalogBlock& b, float ratio, float gain, float gainStart, float fatEnv, float pwEnv, float lfo, XtAnalogShared& shared) {
     code = b.code;
+    subOn_ = b.subOn != 0.0f;
     ratio_ = ratio;
     gainT = gain;
     gainC = gainStart;
@@ -372,7 +549,8 @@ void XtAnalogOsc::noteOn(const XtAnalogBlock& b, float ratio, float gain, float 
     dec = xtCosmExpf(mul(kImpactLog, div(ratio_, kImpactPeriod)));            // powf(3.05185e-5, ratio/100.227)
     if (1.0f > imp) ph = mul(ph, imp);
     if (ph > 1.0f || 0.0f > ph) ph = 0.0f;
-    if (code == 9 || code == 10) laNoteOn(b, gain, gainStart, fatEnv, pwEnv, lfo);
+    if (subOn_) subNoteOn(b, gain, gainStart, fatEnv, pwEnv, lfo);
+    else if (code == 9 || code == 10) laNoteOn(b, gain, gainStart, fatEnv, pwEnv, lfo);
     else if (code == 11) ssNoteOn(b, fatEnv, pwEnv, lfo, shared);
     else if (code == 12) fbNoteOn(b, fatEnv, pwEnv, lfo, shared);
     else shape(b, fatEnv, pwEnv, lfo, true);
@@ -381,7 +559,8 @@ void XtAnalogOsc::noteOn(const XtAnalogBlock& b, float ratio, float gain, float 
 void XtAnalogOsc::update(const XtAnalogBlock& b, float ratio, float gain, float fatEnv, float pwEnv, float lfo) {
     ratio_ = ratio;
     gainT = gain;
-    if (code == 9 || code == 10) laShape(b, gain, fatEnv, pwEnv, lfo);
+    if (subOn_) subShape(b, gain, fatEnv, pwEnv, lfo);
+    else if (code == 9 || code == 10) laShape(b, gain, fatEnv, pwEnv, lfo);
     else if (code == 11) ssShape(b, fatEnv, pwEnv, lfo);
     else if (code == 12) fbShape(b, fatEnv, pwEnv, lfo);
     else shape(b, fatEnv, pwEnv, lfo, false);
@@ -444,6 +623,17 @@ int XtAnalogOsc::breakpoints(float* p) const {
 }
 
 uint32_t XtAnalogOsc::process(float* lr, uint32_t sync) {
+    if (subOn_) switch (code) {
+    case 2: return subPeak(lr, sync, false, false);
+    case 3: return subSquare(lr, sync);
+    case 4: return subPeak(lr, sync, true, false);
+    case 5: return subRamp(lr, sync);
+    case 6: return subPeak(lr, sync, true, true);
+    case 7: return subJuno(lr, sync);
+    case 9: return subLaSquare(lr, sync);
+    case 10: return subLaSaw(lr, sync);
+    default: break;       // HQ-SAW, HQ-SQUARE, NOISE: their own routines
+    }
     switch (code) {
     case 0: return hqSaw(lr, sync);
     case 1: return hqSquare(lr, sync);
@@ -976,6 +1166,202 @@ uint32_t XtAnalogOsc::noise(float* lr) {
     return 0;
 }
 
+// The sub oscillator's routines.  Two waves, each with a phase of 0…1 a cycle
+// (+0x1d4 at step +0x1f4, the mask following it; +0x1fc at step +0x1f8) and a
+// Pulse Width (+0x1cc, +0x1f0); out = (y + second·level + Impact)·gain.  Pulse
+// Widths, steepness and the level move x·0.998 + target every sample, the gain
+// x·0.96875 + target.
+static inline float clip1(float g) { return g > 1.0f ? 1.0f : (-1.0f > g ? -1.0f : g); }
+static inline float subWave(float p, float w) {   // rising to +1 at w, falling back
+    const float v = w > p ? div(p, w) : div(sub(1.0f, p), sub(1.0f, w));
+    return sub(add(v, v), 1.0f);
+}
+static inline float trapezium(float p, float w, float q) { return clip1(mul(sub(w, std::fabs(sub(add(p, p), 1.0f))), q)); }
+
+// SAW (0x89508f30), TRIANGLE (0x89509680) and SINE (0x89509230).  A sync bit sets
+// the phases to the Pulse Widths (SAW) or half of them.  SINE shapes each y·(2 − |y|),
+// the second wave after its level.
+uint32_t XtAnalogOsc::subPeak(float* lr, uint32_t sync, bool halfSync, bool shaped) {
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) {
+            ph = halfSync ? mul(pwC, kHalf) : pwC;
+            sph = halfSync ? mul(swC, kHalf) : swC;
+        }
+        float y = subWave(ph, pwC);
+        pwC = add(mul(pwC, kLaMove), pwT);
+        ph = add(ph, laInc);
+        if (!(1.0f > ph)) { wrap |= bit; ph = sub(ph, 1.0f); }
+        if (shaped) y = mul(y, sub(2.0f, std::fabs(y)));
+        float u = subWave(sph, swC);
+        swC = add(mul(swC, kLaMove), swT);
+        sph = add(sph, subInc);
+        if (!(1.0f > sph)) sph = sub(sph, 1.0f);
+        u = mul(u, lvlC);
+        if (shaped) u = mul(u, sub(2.0f, std::fabs(u)));
+        y = add(y, u);
+        lvlC = add(mul(lvlC, kLaMove), lvlT);
+        lr[2 * i] = lr[2 * i + 1] = mul(add(y, imp), gainC);
+        imp = mul(imp, dec);
+        gainC = add(mul(gainC, K(0x3f780000)), gainT);
+        bit <<= 1;
+    }
+    return wrap;
+}
+
+// SQUARE (0x89509360): trapezia, (w − |2p − 1|)·q within ±1.  A sync bit sets the
+// phases to (1 − w)/2.  out = −(y − Impact)·gain.
+uint32_t XtAnalogOsc::subSquare(float* lr, uint32_t sync) {
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) {
+            ph = mul(sub(1.0f, pwC), kHalf);
+            sph = mul(sub(1.0f, swC), kHalf);
+        }
+        const float g = trapezium(ph, pwC, sqC);
+        ph = add(ph, laInc);
+        if (!(1.0f > ph)) { wrap |= bit; ph = sub(ph, 1.0f); }
+        const float u = mul(trapezium(sph, swC, sq2C), lvlC);
+        sph = add(sph, subInc);
+        if (!(1.0f > sph)) sph = sub(sph, 1.0f);
+        pwC = add(mul(pwC, kLaMove), pwT);
+        lr[2 * i] = lr[2 * i + 1] = -mul(sub(add(g, u), imp), gainC);
+        imp = mul(imp, dec);
+        gainC = add(mul(gainC, K(0x3f780000)), gainT);
+        sqC = add(mul(sqC, kLaMove), sqT);
+        swC = add(mul(swC, kLaMove), swT);
+        lvlC = add(mul(lvlC, kLaMove), lvlT);
+        sq2C = add(mul(sq2C, kLaMove), sq2T);
+        bit <<= 1;
+    }
+    return wrap;
+}
+
+// RAMP (0x89508960): 0…1 over 0…w, 1…−1 over w…1 − k, −1…0 over the last k (+0x208,
+// +0x210).  A sync bit sets the phases to 0.
+static inline float subRampWave(float p, float w, float k) {
+    if (w > p) return div(p, w);
+    const float e = sub(1.0f, k);
+    if (e > p) { const float y = div(sub(w, p), sub(e, w)); return add(add(y, y), 1.0f); }
+    return div(sub(p, 1.0f), k);
+}
+uint32_t XtAnalogOsc::subRamp(float* lr, uint32_t sync) {
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = sph = 0.0f;
+        const float y = subRampWave(ph, pwC, rampK);
+        ph = add(ph, laInc);
+        pwC = add(mul(pwC, kLaMove), pwT);
+        if (!(1.0f > ph)) { wrap |= bit; ph = sub(ph, 1.0f); }
+        const float u = mul(subRampWave(sph, swC, rampK2), lvlC);
+        sph = add(sph, subInc);
+        if (!(1.0f > sph)) sph = sub(sph, 1.0f);
+        lr[2 * i] = lr[2 * i + 1] = mul(add(add(y, u), imp), gainC);
+        imp = mul(imp, dec);
+        gainC = add(mul(gainC, K(0x3f780000)), gainT);
+        lvlC = add(mul(lvlC, kLaMove), lvlT);
+        swC = add(mul(swC, kLaMove), swT);
+        bit <<= 1;
+    }
+    return wrap;
+}
+
+// JUNO (0x89508060): a rising saw 2p − 1 cut off by a pulse at twice its rate,
+// (|2x − 1| − 1 + w)·q, x = 2(p + w/4) wrapped to 0…1; the lower of the two, at
+// least −1.  A sync bit sets the phases to 0.
+static inline float subJunoWave(float p, float w, float q) {
+    float x = add(mul(0.25f, w), p);
+    x = add(x, x);
+    if (!(1.0f > x)) x = sub(x, 1.0f);
+    else if (0.0f > x) x = add(x, 1.0f);
+    x = mul(add(sub(std::fabs(sub(add(x, x), 1.0f)), 1.0f), w), q);
+    const float s = sub(add(p, p), 1.0f);
+    return x > s ? s : (-1.0f > x ? -1.0f : x);
+}
+uint32_t XtAnalogOsc::subJuno(float* lr, uint32_t sync) {
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = sph = 0.0f;
+        const float y = subJunoWave(ph, pwC, sqC);
+        ph = add(ph, laInc);
+        if (!(1.0f > ph)) { wrap |= bit; ph = sub(ph, 1.0f); }
+        const float u = mul(subJunoWave(sph, swC, sq2C), lvlC);
+        sph = add(sph, subInc);
+        if (!(1.0f > sph)) sph = sub(sph, 1.0f);
+        pwC = add(mul(pwC, kLaMove), pwT);
+        lr[2 * i] = lr[2 * i + 1] = mul(add(add(y, u), imp), gainC);
+        imp = mul(imp, dec);
+        gainC = add(mul(gainC, K(0x3f780000)), gainT);
+        swC = add(mul(swC, kLaMove), swT);
+        sqC = add(mul(sqC, kLaMove), sqT);
+        lvlC = add(mul(lvlC, kLaMove), lvlT);
+        sq2C = add(mul(sq2C, kLaMove), sq2T);
+        bit <<= 1;
+    }
+    return wrap;
+}
+
+// LA-SQUARE (0x89508670): trapezia shaped g·(2 − |g|), the steepness +0x228 and
+// +0x230.  A sync bit sets the phases to 0.  out = (−y + Impact)·gain.
+uint32_t XtAnalogOsc::subLaSquare(float* lr, uint32_t sync) {
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) ph = sph = 0.0f;
+        const float g = laOut(trapezium(ph, pwC, qC));
+        ph = add(ph, laInc);
+        if (!(1.0f > ph)) { wrap |= bit; ph = sub(ph, 1.0f); }
+        const float u = mul(laOut(trapezium(sph, swC, q2C)), lvlC);
+        sph = add(sph, subInc);
+        if (!(1.0f > sph)) sph = sub(sph, 1.0f);
+        const float y = add(g, u);
+        qC = add(mul(qC, kLaMove), qT);
+        q2C = add(mul(q2C, kLaMove), q2T);
+        lvlC = add(mul(lvlC, kLaMove), lvlT);
+        pwC = add(mul(pwC, kLaMove), pwT);
+        swC = add(mul(swC, kLaMove), swT);
+        lr[2 * i] = lr[2 * i + 1] = mul(add(-y, imp), gainC);
+        imp = mul(imp, dec);
+        gainC = add(mul(gainC, K(0x3f780000)), gainT);
+        bit <<= 1;
+    }
+    return wrap;
+}
+
+// LA-SAW (0x89508350): LA-SQUARE's waves, each × a second one (+0x218, +0x21c;
+// each step twice a sample, down over ±1, shaped alike).  A sync bit sets the
+// phases to 0 and these to ½.
+uint32_t XtAnalogOsc::subLaSaw(float* lr, uint32_t sync) {
+    auto second = [](float& z, float s) {
+        z = sub(sub(z, s), s);
+        if (!(z > -1.0f)) z = add(z, 2.0f);
+        const float a = std::fabs(z);
+        return laOut(sub(add(a, a), 1.0f));
+    };
+    uint32_t bit = 1, wrap = 0;
+    for (int i = 0; i < 32; ++i) {
+        if (sync & bit) { ph = sph = 0.0f; ph2 = ph3 = kHalf; }
+        float g = laOut(trapezium(ph, pwC, qC));
+        g = mul(g, second(ph2, laInc));
+        ph = add(ph, laInc);
+        if (!(1.0f > ph)) { wrap |= bit; ph = sub(ph, 1.0f); }
+        float u = mul(laOut(trapezium(sph, swC, q2C)), lvlC);
+        u = mul(u, second(ph3, subInc));
+        sph = add(sph, subInc);
+        if (!(1.0f > sph)) sph = sub(sph, 1.0f);
+        const float y = add(g, u);
+        lr[2 * i] = lr[2 * i + 1] = mul(add(-y, imp), gainC);
+        imp = mul(imp, dec);
+        gainC = add(mul(gainC, K(0x3f780000)), gainT);
+        lvlC = add(mul(lvlC, kLaMove), lvlT);
+        pwC = add(mul(pwC, kLaMove), pwT);
+        swC = add(mul(swC, kLaMove), swT);
+        qC = add(mul(qC, kLaMove), qT);
+        q2C = add(mul(q2C, kLaMove), q2T);
+        bit <<= 1;
+    }
+    return wrap;
+}
+
 #ifdef XT_ANALOG_MAIN
 // xt_analog <rom.2.bin> [cases]: the analog converter (0x894e1920), the
 // note-on (0x89504af0), the 10-ms update (0x89505400) and SAW (0x89508c20)
@@ -1063,7 +1449,7 @@ int main(int argc, char** argv) {
         c.wr8(P + 0x30, (uint8_t)k.p.fat); c.wr16(P + 0x32, (uint16_t)(int16_t)(k.p.fatKf * 10));
         c.wr8(P + 0x34, (uint8_t)(int8_t)k.p.fatLfo); c.wr8(P + 0x35, (uint8_t)(int8_t)k.p.fatEnv);
         c.wr8(P + 0x36, (uint8_t)xtVelCurve(k.fatCurve)); c.wr16(P + 0x38, (uint16_t)(int16_t)xtVelSens(k.fatSens));
-        c.wr8(P + 0x3a, (uint8_t)(int8_t)k.p.detune);
+        c.wr8(P + 0x3a, (uint8_t)(int8_t)k.p.detune); c.wr8(P + 0x3b, (uint8_t)k.p.subOctave); c.wr8(P + 0x3c, (uint8_t)k.p.subLevel);
         c.wr32(P + 0xdc, part);
     };
     auto velFactor = [&](int vel, int curve, int sens) { return div(flt(xtVelCurveValue(vel, xtVelSens(sens), xtVelCurve(curve))), 32768.0f); };
@@ -1079,24 +1465,28 @@ int main(int argc, char** argv) {
     auto converterCases = [&](int n, int wave) { for (int g = 0; g < n; ++g) {
         Case k = newCase(true);
         if (wave >= 0) { k.p.wave = wave; k.p.detune = (int)(rnd() % 127) - 63; }
+        if (wave == -2) {                       // the sub oscillator: Sub Octave, Level and Detune; every depth's segment
+            k.p.subOctave = (int)(rnd() % 4); k.p.subLevel = (int)(rnd() % 128); k.p.detune = (int)(rnd() % 127) - 63;
+        }
         mtx = (g % 3 == 0) ? (int)(rnd() % 75) - 37 : 0;
         writeInput(k);
         c.write(OUT, z.data(), 0x100);
         if (!c.call(0x894e1920, { P, OUT }, sp)) { std::fprintf(stderr, "converter: %s\n", c.error().c_str()); return false; }
         const XtAnalogBlock b = portBlock(k);
         ++cn;
-        const float fw[12] = { f32(OUT + 0x84), f32(OUT + 0x88), f32(OUT + 0x90), f32(OUT + 0x98), f32(OUT + 0x9c), f32(OUT + 0xa0),
-                               f32(OUT + 0xac), f32(OUT + 0xb0), f32(OUT + 0x5c), f32(OUT + 8), f32(OUT + 0xbc), f32(OUT + 0xc0) };
-        const float po[12] = { b.fat, b.fatEnv, b.fatLfo, b.pw, b.pwEnv, b.pwLfo, b.impact, b.slope, b.gain,
-                               xtPitchCents(k.key, k.coarse, k.kf, k.fine, 69, false), b.tone, b.toneKf };
-        static const char* name[12] = { "fat", "fat env", "fat lfo", "pw", "pw env", "pw lfo", "impact", "slope", "gain", "cents", "tone", "tone kf" };
-        bool ok = (int)c.rd32(OUT + 0x80) == b.code && f32(OUT + 0xb4) == 0.0f && c.rd32(OUT + 0x8c) == 3 && c.rd32(OUT + 0x94) == 1
+        const float fw[14] = { f32(OUT + 0x84), f32(OUT + 0x88), f32(OUT + 0x90), f32(OUT + 0x98), f32(OUT + 0x9c), f32(OUT + 0xa0),
+                               f32(OUT + 0xac), f32(OUT + 0xb0), f32(OUT + 0x5c), f32(OUT + 8), f32(OUT + 0xbc), f32(OUT + 0xc0),
+                               f32(OUT + 0xb4), f32(OUT + 0xb8) };
+        const float po[14] = { b.fat, b.fatEnv, b.fatLfo, b.pw, b.pwEnv, b.pwLfo, b.impact, b.slope, b.gain,
+                               xtPitchCents(k.key, k.coarse, k.kf, k.fine, 69, false), b.tone, b.toneKf, b.subOn, b.subLevel };
+        static const char* name[14] = { "fat", "fat env", "fat lfo", "pw", "pw env", "pw lfo", "impact", "slope", "gain", "cents", "tone", "tone kf", "sub on", "sub level" };
+        bool ok = (int)c.rd32(OUT + 0x80) == b.code && c.rd32(OUT + 0x8c) == 3 && c.rd32(OUT + 0x94) == 1
                   && c.rd32(OUT + 0xa4) == 2 && c.rd32(OUT + 0xa8) == 1;
-        for (int i = 0; i < 12; ++i) ok = ok && same(fw[i], po[i]);
+        for (int i = 0; i < 14; ++i) ok = ok && same(fw[i], po[i]);
         if (!ok && cb++ < 8) {
             std::printf("  converter wave %d key %d mtx %d pw %d kf %d fat %d kf %d: code %u/%d", k.p.wave, k.key, mtx, k.p.pw, k.p.pwKf, k.p.fat,
                         k.p.fatKf, c.rd32(OUT + 0x80), b.code);
-            for (int i = 0; i < 12; ++i)
+            for (int i = 0; i < 14; ++i)
                 if (!same(fw[i], po[i])) std::printf(" %s %.9g/%.9g", name[i], fw[i], po[i]);
             std::printf("\n");
         }
@@ -1112,18 +1502,22 @@ int main(int argc, char** argv) {
     c.write(V, z.data(), 0x1000);
     c.wr32(V + 0x970, EP); c.wr32(V + 0x974, EF); c.wr32(V + 0x978, EW); c.wr32(V + 0x97c, EA);
     for (uint32_t o = 0x980; o < 0x990; o += 4) c.wr32(V + o, LF);
-    static const int waves[13] = { 0, 1, 2, 3, 4, 5, 8, 6, 7, 10, 9, 11, 12 };
-    static const char* waveName[13] = { "saw", "square", "triangle", "sine", "ramp", "juno", "noise", "hq-saw", "hq-square", "la-square", "la-saw", "super-saw",
-                                        "feedback-osc" };
+    constexpr int kSub = 13, kWaves = 24;       // from kSub the same waveforms with the sub oscillator on
+    static const int waves[kWaves] = { 0, 1, 2, 3, 4, 5, 8, 6, 7, 10, 9, 11, 12, 0, 1, 2, 3, 4, 5, 8, 6, 7, 10, 9 };
+    static const char* waveName[kWaves] = { "saw", "square", "triangle", "sine", "ramp", "juno", "noise", "hq-saw", "hq-square", "la-square", "la-saw", "super-saw",
+                                            "feedback-osc", "sub saw", "sub square", "sub triangle", "sub sine", "sub ramp", "sub juno", "sub noise", "sub hq-saw",
+                                            "sub hq-square", "sub la-square", "sub la-saw" };
     static const uint32_t routine[13] = { 0x895063f0, 0x895060e0, 0x89508c20, 0x89508aa0, 0x895094c0, 0x89508800, 0x89509030, 0x89508db0,
                                           0x89504a40, 0x89508540, 0x895081f0, 0x89507520, 0x89507900 };
+    static const uint32_t subRoutine[11] = { 0x895063f0, 0x895060e0, 0x89508f30, 0x89509360, 0x89509680, 0x89508960, 0x89509230, 0x89508060,
+                                             0x89504a40, 0x89508670, 0x89508350 };
     XtAnalogOsc osc;
     XtAnalogShared shared;
     constexpr uint32_t kSsCount = 0x8987c894;
     shared.superSaw = f32(kSsCount);
     constexpr uint32_t kFbFlags = 0x89ff0c4c, kFbLines = 0x89fe4e74;
-    long nb = 0, nn = 0, wb = 0, db[13] = {}, dn[13] = {}, mb = 0;
-    float peak[13] = {};
+    long nb = 0, nn = 0, wb = 0, db[kWaves] = {}, dn[kWaves] = {}, mb = 0;
+    float peak[kWaves] = {};
     // the eighteen flags and the voice's whole delay line
     auto linesSame = [&] {
         for (int i = 0; i < XtAnalogShared::kLines; ++i)
@@ -1136,6 +1530,7 @@ int main(int argc, char** argv) {
         return true;
     };
     int code = 2;
+    bool allFields = false;                    // the sub passes
     auto stateSame = [&](bool full) {
         bool ok = same(f32(V + 0x144), osc.ratio()) && same(f32(V + 0x154), osc.gainTarget()) && same(f32(V + 0x1c0), osc.fatTarget())
                && same(f32(V + 0x1c8), osc.pwTarget());
@@ -1157,6 +1552,16 @@ int main(int argc, char** argv) {
                 ok = ok && same(f32(V + 0x250), osc.detune()) && same(f32(V + 0x258), osc.mix());
                 for (int i = 0; i < 6; ++i) ok = ok && same(f32(V + 0x25c + 4 * (uint32_t)i), osc.sidePhase(i));
             }
+        }
+        if (allFields) {                           // every field the sub oscillator's code touches or reads, whatever the waveform
+            ok = ok && same(f32(V + 0x1e0), osc.edge()) && (int)(int8_t)c.rd8(V + 0x248) == osc.noiseHold() && same(f32(V + 0x1ec), osc.subPwTarget())
+                 && same(f32(V + 0x1f4), osc.laStep()) && same(f32(V + 0x1f8), osc.subStep()) && same(f32(V + 0x200), osc.subLevelTarget())
+                 && same(f32(V + 0x208), osc.rampEnd()) && same(f32(V + 0x210), osc.rampEnd2()) && same(f32(V + 0x224), osc.laSteepTarget())
+                 && same(f32(V + 0x22c), osc.laSteep2Target()) && same(f32(V + 0x234), osc.steepTarget()) && same(f32(V + 0x23c), osc.steep2Target());
+            if (full)
+                ok = ok && same(f32(V + 0x1f0), osc.subPw()) && same(f32(V + 0x1fc), osc.subPhase()) && same(f32(V + 0x204), osc.subLevel())
+                     && same(f32(V + 0x218), osc.laPhase2()) && same(f32(V + 0x21c), osc.laPhase3()) && same(f32(V + 0x228), osc.laSteep())
+                     && same(f32(V + 0x230), osc.laSteep2()) && same(f32(V + 0x238), osc.steep()) && same(f32(V + 0x240), osc.steep2());
         }
         if (full)
             ok = ok && same(f32(V + 0x158), osc.gain()) && same(f32(V + 0x1c4), osc.fat()) && same(f32(V + 0x1cc), osc.pw())
@@ -1180,16 +1585,51 @@ int main(int argc, char** argv) {
             std::printf("    fb: tap %.9g/%.9g %.9g/%.9g level %.9g/%.9g %.9g/%.9g state %.9g/%.9g w %d/%d line %d/%d\n", f32(V + 0x24c), osc.detuneTarget(),
                         f32(V + 0x250), osc.detune(), f32(V + 0x254), osc.mixTarget(), f32(V + 0x258), osc.mix(), f32(V + 0x274), osc.fbState(),
                         (int)c.rd32(V + 0x278), osc.fbWrite(), (int)c.rd32(V + 0x27c), osc.fbSlotIndex());
+        if (allFields)
+            std::printf("    sub: pw %.9g/%.9g %.9g/%.9g step %.9g/%.9g %.9g/%.9g phase %.9g/%.9g level %.9g/%.9g %.9g/%.9g ramp %.9g/%.9g %.9g/%.9g\n"
+                        "    z %.9g/%.9g %.9g/%.9g q %.9g/%.9g %.9g/%.9g %.9g/%.9g %.9g/%.9g sq %.9g/%.9g %.9g/%.9g %.9g/%.9g %.9g/%.9g\n",
+                        f32(V + 0x1ec), osc.subPwTarget(), f32(V + 0x1f0), osc.subPw(), f32(V + 0x1f4), osc.laStep(), f32(V + 0x1f8), osc.subStep(), f32(V + 0x1fc),
+                        osc.subPhase(), f32(V + 0x200), osc.subLevelTarget(), f32(V + 0x204), osc.subLevel(), f32(V + 0x208), osc.rampEnd(), f32(V + 0x210), osc.rampEnd2(),
+                        f32(V + 0x218), osc.laPhase2(), f32(V + 0x21c), osc.laPhase3(), f32(V + 0x224), osc.laSteepTarget(), f32(V + 0x228), osc.laSteep(), f32(V + 0x22c),
+                        osc.laSteep2Target(), f32(V + 0x230), osc.laSteep2(), f32(V + 0x234), osc.steepTarget(), f32(V + 0x238), osc.steep(), f32(V + 0x23c), osc.steep2Target(),
+                        f32(V + 0x240), osc.steep2());
         if (code == 9 || code == 10)
             std::printf("    la: step %.9g/%.9g steep %.9g/%.9g %.9g/%.9g z %.9g/%.9g +0x20c %08x\n", f32(V + 0x1f4), osc.laStep(), f32(V + 0x224),
                         osc.laSteepTarget(), f32(V + 0x228), osc.laSteep(), f32(V + 0x218), osc.laPhase2(), c.rd32(V + 0x20c));
     };
+    // the voice's words after the converter's block that no port field holds: unchanged by the sub oscillator's code
+    long ob = 0;
+    std::vector<uint32_t> otherWords;
+    for (uint32_t o = 0x144; o < 0x280; o += 4) {
+        static const uint32_t held[] = { 0x144, 0x154, 0x158, 0x1bc, 0x1c0, 0x1c4, 0x1c8, 0x1cc, 0x1d0, 0x1d4, 0x1d8, 0x1dc, 0x1e0, 0x1e4, 0x1e8, 0x1ec, 0x1f0, 0x1f4, 0x1f8, 0x1fc,
+                                         0x200, 0x204, 0x208, 0x210, 0x218, 0x21c, 0x224, 0x228, 0x22c, 0x230, 0x234, 0x238, 0x23c, 0x240, 0x244, 0x248,
+                                         0x24c, 0x250, 0x254, 0x258, 0x25c, 0x260, 0x264, 0x268, 0x26c, 0x270, 0x274, 0x278, 0x27c };
+        if (std::find(std::begin(held), std::end(held), o) == std::end(held)) otherWords.push_back(o);
+    }
+    std::vector<uint32_t> otherAtStart;
+    auto otherSame = [&] {
+        for (size_t i = 0; i < otherWords.size(); ++i)
+            if (c.rd32(V + otherWords[i]) != otherAtStart[i]) {
+                if (ob++ < 4) std::printf("  word +0x%x was %08x, now %08x\n", otherWords[i], otherAtStart[i], c.rd32(V + otherWords[i]));
+                return false;
+            }
+        return true;
+    };
     auto voiceCase = [&](int g, int wi) {
         Case k = newCase(false);
         k.p.wave = waves[wi];
+        if (wi >= kSub) {
+            k.p.subOctave = 1 + (int)(rnd() % 3); k.p.subLevel = (int)(rnd() % 128); k.p.detune = (int)(rnd() % 127) - 63;
+            if (g % 8 == 6) k.p.detune = 0;        // the second wave an exact octave, or in unison
+            if (g % 8 == 7) {                      // Pulse Widths at the ends, and the highest notes: the limits past ½
+                k.p.pw = rnd() & 1 ? 63 : -63; k.p.pwKf = k.p.pwEnv = k.p.pwLfo = 0;
+                k.key = 90 + (int)(rnd() % 38); k.coarse = (int)(rnd() % 25);
+            }
+        }
         if (k.p.wave >= 11) k.p.detune = (int)(rnd() % 127) - 63;
         if (k.p.wave >= 9 && k.p.wave <= 10 && g % 8 == 2) {         // the LA note-on's second wave starting exactly on 1
             k.p.impact = 0; k.p.pw = 0; k.p.pwKf = k.p.pwEnv = k.p.pwLfo = 0;
+            if (wi >= kSub) { k.p.subOctave = 3; k.p.detune = 0; k.p.fatKf = k.p.fatEnv = k.p.fatLfo = 0; }   // and the second wave's, its pitch the first's
         }
         if (g % 8 == 1) {                          // SQUARE's pitch steps: G4, A4, A#4, C#5, F#5 untuned
             static const int steps[5] = { 67, 69, 70, 73, 78 };
@@ -1229,8 +1669,8 @@ int main(int argc, char** argv) {
         ++nn;
         if (!stateSame(true) && nb++ < 6) dump("note-on", g, 0);
         if (!c.call(0x89505170, { V }, sp)) { std::fprintf(stderr, "install: %s\n", c.error().c_str()); return false; }
-        const uint32_t fn = c.rd32(V + 0x968);
-        if (fn != routine[code] && wb++ < 4) std::printf("  install code %d: routine %08x, the map has %08x\n", code, fn, routine[code]);
+        const uint32_t fn = c.rd32(V + 0x968), want = wi >= kSub ? subRoutine[code] : routine[code];
+        if (fn != want && wb++ < 4) std::printf("  install code %d: routine %08x, the map has %08x\n", code, fn, want);
         if (code == 12 && !linesSame() && nb++ < 6) dump("lines at note-on", g, 0);
         const int nBlk = code == 12 && g % 8 == 0 ? 120 : 40;     // FEEDBACK-OSC's line wraps after 85
         for (int blk = 0; blk < nBlk; ++blk) {
@@ -1247,9 +1687,41 @@ int main(int argc, char** argv) {
                 const int n = osc.breakpoints(pts);
                 pts[n] = 0.0f;
                 const float p = pts[rnd() % (uint32_t)(n + 1)];
-                if (code <= 1 || (code != 8 && p >= 0.0f && 1.0f > p)) { wf(V + 0x1d4, p); osc.setPhase(p); }   // HQ: its own units
+                if (wi < kSub && (code <= 1 || (code != 8 && p >= 0.0f && 1.0f > p))) { wf(V + 0x1d4, p); osc.setPhase(p); }   // HQ: its own units
+                if (wi >= kSub && code <= 1) { wf(V + 0x1d4, p); osc.setPhase(p); }
             }
-            if (code == 10 && blk % 6 == 3) {      // LA-SAW's z landing on −1 after its four subtractions, or at its turns
+            if (osc.subActive() && code != 0 && code != 1 && code != 8 && blk % 6 == 2) {   // each phase on a turn of its wave, or a step from 1
+                auto place = [&](float w, float inc, float end) {
+                    float x = w;
+                    switch (rnd() % 5) {
+                    case 0: x = 0.0f; break;
+                    case 1: x = w; break;
+                    case 2: x = sub(1.0f, inc); while (1.0f > add(x, inc)) x = std::nextafter(x, 2.0f); break;
+                    case 3: x = code == 5 ? sub(1.0f, end) : mul(w, kHalf); break;
+                    default:                                // JUNO's pulse turning
+                        x = sub(kHalf, mul(0.25f, w));
+                        while (1.0f > add(add(mul(0.25f, w), x), add(mul(0.25f, w), x))) x = std::nextafter(x, 2.0f);
+                        break;
+                    }
+                    return 0.0f > x || !(1.0f > x) ? 0.0f : x;
+                };
+                const float pm = place(osc.pw(), osc.laStep(), osc.rampEnd()), ps = place(osc.subPw(), osc.subStep(), osc.rampEnd2());
+                wf(V + 0x1d4, pm); osc.setPhase(pm);
+                wf(V + 0x1fc, ps); osc.setSubPhase(ps);
+                if (code == 7 && rnd() % 4 == 0) { wf(V + 0x1cc, -0.25f); osc.setPw(-0.25f); }   // JUNO's x below 0, which no note here reaches
+            }
+            if (osc.subActive() && code == 10 && blk % 6 == 3) {   // LA-SAW's second waves landing on −1 after their two subtractions, or at their turns
+                auto landing = [&](float inc) {
+                    const float zs[3] = { add(add(-1.0f, inc), inc), 0.0f, 1.0f };
+                    float z = zs[rnd() % 3];
+                    if (z != 0.0f && z != 1.0f) while (sub(sub(z, inc), inc) > -1.0f) z = std::nextafter(z, -2.0f);
+                    return z;
+                };
+                const float z2 = landing(osc.laStep()), z3 = landing(osc.subStep());
+                wf(V + 0x218, z2); osc.setLaPhase2(z2);
+                wf(V + 0x21c, z3); osc.setLaPhase3(z3);
+            }
+            if (!osc.subActive() && code == 10 && blk % 6 == 3) {      // LA-SAW's z landing on −1 after its four subtractions, or at its turns
                 const float s = osc.laStep();
                 const float zs[3] = { add(add(add(add(-1.0f, s), s), s), s), 0.0f, 1.0f };
                 const float z = zs[rnd() % 3];
@@ -1297,6 +1769,14 @@ int main(int argc, char** argv) {
             if (!c.call(0x895053c0, { V }, sp)) { std::fprintf(stderr, "reset: %s\n", c.error().c_str()); return false; }
             osc.release();
             if (!linesSame() && nb++ < 6) dump("reset", g, 0);
+        }
+        if (allFields) {
+            if (code != 12) {                      // the voice's stop leaves these alone
+                if (!c.call(0x895053c0, { V }, sp)) { std::fprintf(stderr, "reset: %s\n", c.error().c_str()); return false; }
+                osc.release();
+                if (!stateSame(true) && nb++ < 6) dump("stop", g, 0);
+            }
+            otherSame();
         }
         return true;
     };
@@ -1353,6 +1833,39 @@ int main(int argc, char** argv) {
     for (int g = 0; g < nSs; ++g)
         if (!voiceCase(nCases + nHq + nLa + nCal + nSs + g, 12)) return 1;
     report("feedback-osc ", nSs, 12, 13);
+    // The sub oscillator: the converter, then each waveform with it on; the same
+    // voice throughout, so what a note leaves on it (+0x208) reaches the next
+    cn = cb = 0;
+    if (!converterCases(200000, -2)) return 1;
+    std::printf("sub converter: %ld cases, %ld different\n", cn, cb);
+    bad += cb;
+    allFields = true;
+    otherAtStart.clear();
+    for (uint32_t o : otherWords) otherAtStart.push_back(c.rd32(V + o));
+    const int nSub = nCases * 2 / 7, nSubAll = nSub * (kWaves - kSub);
+    for (int g = 0; g < nSubAll; ++g)
+        if (!voiceCase(nCases + g, kSub + g % (kWaves - kSub))) return 1;
+    report("sub ", nSubAll, kSub, kWaves);
+    // LA-SQUARE and LA-SAW with the system's other Tones and Tone KFs
+    const int nSubCal = nSub * 2;
+    for (int g = 0; g < nSubCal; ++g) {
+        T.sys[kLaSawTone - kSys0] = (int)(rnd() % 128); T.sys[kLaSquTone - kSys0] = (int)(rnd() % 128);
+        T.sys[kLaSawToneKf - kSys0] = (int)(rnd() % 15); T.sys[kLaSquToneKf - kSys0] = (int)(rnd() % 15);
+        if (!c.call(0x894e5f80, { 0x89d1b070u, 0, 0, 0 }, sp)) { std::fprintf(stderr, "system: %s\n", c.error().c_str()); return 1; }
+        if (!voiceCase(nCases + nSubAll + g, kSub + 9 + g % 2)) return 1;
+    }
+    for (int i = 0; i < 4; ++i) T.sys[kLaSawTone - kSys0 + i] = savedSys[i];
+    if (!c.call(0x894e5f80, { 0x89d1b070u, 0, 0, 0 }, sp)) { std::fprintf(stderr, "system: %s\n", c.error().c_str()); return 1; }
+    report("sub la tones ", nSubCal, kSub + 9, kSub + 11);
+    // with and without it on the same voice, in random order
+    const int nMix = nSub * 4;
+    for (int g = 0; g < nMix; ++g) {
+        const uint32_t w = rnd() % (uint32_t)kWaves;
+        if (!voiceCase(nCases + nSubAll + nSubCal + g, (int)w)) return 1;
+    }
+    report("mixed ", nMix, 0, kWaves);
+    std::printf("sub other words of the voice: %ld different\n", ob);
+    bad += ob;
     return bad ? 3 : 0;
 }
 #endif

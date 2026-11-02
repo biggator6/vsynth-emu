@@ -100,6 +100,54 @@ feedback-osc note-on and update: 9425 cases, 0 different
 feedback-osc install: 857 cases, 0 routines not as the map
 feedback-osc: 42840 blocks of 32 frames, 0 different (peak 3.319 of 2^31)
 feedback-osc wrap masks: 0 different
+sub converter: 200000 cases, 0 different
+sub note-on and update: 84843 cases, 0 different
+sub install: 9427 cases, 0 routines not as the map
+sub saw: 34280 blocks of 32 frames, 0 different (peak 2.801 of 2^31)
+sub square: 34280 blocks of 32 frames, 0 different (peak 3.054 of 2^31)
+sub triangle: 34280 blocks of 32 frames, 0 different (peak 8.319 of 2^31)
+sub sine: 34280 blocks of 32 frames, 0 different (peak 133 of 2^31)
+sub ramp: 34280 blocks of 32 frames, 0 different (peak 29.48 of 2^31)
+sub juno: 34280 blocks of 32 frames, 0 different (peak 3.233 of 2^31)
+sub noise: 34280 blocks of 32 frames, 0 different (peak 0.8894 of 2^31)
+sub hq-saw: 34280 blocks of 32 frames, 0 different (peak 7.661 of 2^31)
+sub hq-square: 34280 blocks of 32 frames, 0 different (peak 3.866 of 2^31)
+sub la-square: 34280 blocks of 32 frames, 0 different (peak 2.967 of 2^31)
+sub la-saw: 34280 blocks of 32 frames, 0 different (peak 4.437 of 2^31)
+sub wrap masks: 0 different
+sub la tones note-on and update: 15426 cases, 0 different
+sub la tones install: 1714 cases, 0 routines not as the map
+sub la-square: 34280 blocks of 32 frames, 0 different (peak 3.76 of 2^31)
+sub la-saw: 34280 blocks of 32 frames, 0 different (peak 4.437 of 2^31)
+sub la tones wrap masks: 0 different
+mixed note-on and update: 31124 cases, 0 different
+mixed install: 3428 cases, 0 routines not as the map
+saw: 6680 blocks of 32 frames, 0 different (peak 3.061 of 2^31)
+square: 4960 blocks of 32 frames, 0 different (peak 3.13 of 2^31)
+triangle: 5960 blocks of 32 frames, 0 different (peak 6.258 of 2^31)
+sine: 6080 blocks of 32 frames, 0 different (peak 6.04 of 2^31)
+ramp: 5680 blocks of 32 frames, 0 different (peak 4.425 of 2^31)
+juno: 5040 blocks of 32 frames, 0 different (peak 3.103 of 2^31)
+noise: 4560 blocks of 32 frames, 0 different (peak 0.9753 of 2^31)
+hq-saw: 5440 blocks of 32 frames, 0 different (peak 4.371 of 2^31)
+hq-square: 6640 blocks of 32 frames, 0 different (peak 4.169 of 2^31)
+la-square: 6440 blocks of 32 frames, 0 different (peak 4.154 of 2^31)
+la-saw: 5640 blocks of 32 frames, 0 different (peak 3.248 of 2^31)
+super-saw: 6880 blocks of 32 frames, 0 different (peak 4.023 of 2^31)
+feedback-osc: 6800 blocks of 32 frames, 0 different (peak 3.319 of 2^31)
+sub saw: 4360 blocks of 32 frames, 0 different (peak 2.801 of 2^31)
+sub square: 5720 blocks of 32 frames, 0 different (peak 3.056 of 2^31)
+sub triangle: 5320 blocks of 32 frames, 0 different (peak 8.319 of 2^31)
+sub sine: 6680 blocks of 32 frames, 0 different (peak 133 of 2^31)
+sub ramp: 5320 blocks of 32 frames, 0 different (peak 29.48 of 2^31)
+sub juno: 5560 blocks of 32 frames, 0 different (peak 3.233 of 2^31)
+sub noise: 6120 blocks of 32 frames, 0 different (peak 0.8894 of 2^31)
+sub hq-saw: 6240 blocks of 32 frames, 0 different (peak 7.661 of 2^31)
+sub hq-square: 5240 blocks of 32 frames, 0 different (peak 3.866 of 2^31)
+sub la-square: 5280 blocks of 32 frames, 0 different (peak 3.76 of 2^31)
+sub la-saw: 5840 blocks of 32 frames, 0 different (peak 4.437 of 2^31)
+mixed wrap masks: 0 different
+sub other words of the voice: 0 different
 == xt_lfo
 wave 0 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 wave 1 rate  64 offset 2 delay   0 mode 0 fade   0 off   -1: identical

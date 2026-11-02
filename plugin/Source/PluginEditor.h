@@ -48,7 +48,7 @@ private:
     // Impact, Pulse Width and Fat with their KFs, LFO and Env depths take the
     // three rows the PCM OSC uses (Encode, the VariPhrase knobs, Loop)
     juce::ComboBox   oscTypeBox_, anaWaveBox_;
-    static constexpr int kAnaKnobs = 10;  // Impact; PW, PW KF, Fat, Fat KF; PW LFO, PW Env, Fat LFO, Fat Env; Detune
+    static constexpr int kAnaKnobs = 12;  // Impact; PW, PW KF, Fat, Fat KF; PW LFO, PW Env, Fat LFO, Fat Env; Detune, Sub Octave, Sub Level
     juce::Slider     anaSliders_[kAnaKnobs];
     juce::Label      anaLabels_[kAnaKnobs], oscTypeLabel_ { {}, "OSC" }, anaWaveLabel_ { {}, "Wave" };
     // Loop: the OSC's Loop switch, the wave's Loop Mode and region

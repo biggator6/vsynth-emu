@@ -1173,7 +1173,8 @@ no Roland code is in the source; the code runs from the user's image.
 
 **The interpreter** covers:
 - the SH-4 integer set, including division steps, MAC and the shifts;
-- the FPU: single and double precision, both banks, SZ = 1 pair moves,
+- the FPU: single and double precision, both banks, SZ = 1 pair moves (their
+  word order corrected in v85),
   `fipr`/`ftrv` writing the correct register, and the host rounding mode
   taken from FPSCR.RM;
 - paged memory, with rom.2 at 0x89300000 and the C startup's `.data` copy
@@ -1544,6 +1545,178 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The analog sub oscillator (2026-11-02, v85)
+
+With Sub Octave above 0 an analog voice runs a second set of code, and most
+waveforms play two waves in one routine, each with its own phase and shape. All of
+it is ported. Left in the analog oscillator: X-MOD, which needs OSC 2. This
+version also corrects the SH-4 interpreter's pair-move order (below).
+
+**The map.** The install (`0x895069d0`, from the ordinary one at `0x89505170`):
+
+| Code | Waveform | Routine with the sub oscillator |
+|---|---|---|
+| 0, 1 | HQ-SAW, HQ-SQUARE | their plain routines: no second wave |
+| 2 | SAW | `0x89508f30` |
+| 3 | SQUARE | `0x89509360` |
+| 4 | TRIANGLE | `0x89509680` |
+| 5 | RAMP | `0x89508960` |
+| 6 | SINE | `0x89509230` |
+| 7 | JUNO | `0x89508060` |
+| 8 | NOISE | its plain routine: no second wave |
+| 9 | LA-SQUARE | `0x89508670` |
+| 10 | LA-SAW | `0x89508350` |
+| 11, 12, 13 | SUPER-SAW, FEEDBACK-OSC, X-MOD | stubs `0x895066d0/e0/f0` jumping to SAW's; never reached, as their converter cases set +0xb4 = 0 |
+
+The install also stores a different constant at +0x9ac per code, from the table at
+`0x897d00a8`; it is still unexplained and the port does not hold it.
+
+**The converter** (`0x894e288c`, patch waveforms 0…10 with Sub Octave above 0):
+- +0xb4 = 1.0.
+- +0x84, in octaves, is the Detune curve plus −2, −1 or 0 for Sub Octave 1, 2, 3.
+- The curve (`0x894e1090`), from Detune d (+0x3a) and Fat's KF:
+  - x = d·12000/63 within ±12000, then x/12000·63;
+  - cents(x)/1200 + (key − 60)·KF·10/120/1200, within ±1. The 1/120 is stored as
+    0x3c088889.
+- cents(v), with v's sign: |v| to 10: v; to 15: 2v − 10; to 31: 5v − 55; to 51:
+  25v − 675; above: 50v − 1950. So Detune ±63 is an octave, and +20 is 45 cents.
+- +0x88 = cents(Fat Env depth)/1200 × the velocity factor; +0x90 = cents(Fat LFO
+  depth, within ±63)/1200. The second wave's pitch therefore follows the OSC's third
+  envelope and its LFO, the slots Fat otherwise uses. The Fat knob is unused.
+- +0xb8 = level curve(Sub Level, +0x3c)/32768, for every waveform.
+
+**The targets** (`0x89506bf0`, the note-on's first step and each update):
+- +0x1c0 = powf(2, +0x84 + env·+0x88 + LFO·+0x90): sr, the second wave's pitch against
+  the first's.
+- w = +0x98 + env·+0x9c + LFO·+0xa0 within 0…1, without the plain code's span.
+- HQ-SAW, HQ-SQUARE, NOISE: +0x154 = the gain target, +0x1c8 = w. NOISE's hold is as
+  plain, set to 1 if 0 at every update, not only at note-on (w never gives 0).
+- The others, with r = 2·ratio: +0x154 = gain·2^26, +0x200 = level·0.002, and +0x1f4 =
+  r·k, +0x1f8 = (r·sr)·k, k = 0x3ba377ed. Each wave's Pulse Width is kept at least m
+  from its ends (`0x89507480`), m by its own frequency, then ×0.002 (+0x1c8, +0x1ec):
+  - SAW: |w − ½| with m = f/44100·0.35 (0x3eb33332), f = r·880 and sr·f.
+  - TRIANGLE, SINE: w with m = f/44100·¼, same f.
+  - SQUARE, JUNO: w with m = f/44100·¼, f = r·880 and r·440·sr·2. Also +0x234 and
+    +0x23c = 44100/f·0.008 (0x3c03126f), the steepness.
+  - RAMP: w with m = e/8, e = f/44100 as for SQUARE. Also +0x208 and +0x210 = e/16,
+    the last segment's width.
+- LA-SQUARE (a = r) and LA-SAW (a = ratio): the steps use a. The corner is 156·
+  2^(7·Tone/127)·(1 + KF factor·(p − 1)), at most 20 kHz, with hz = a·440:
+  - p is a·2^(9/12) for LA-SAW's first wave, but a·2^(−3/12) (0x3f5744fc) for
+    LA-SQUARE's. The second wave's is a·sr·2^(9/12) for both.
+  - If hz is above the corner: corner = hz and m = ½. Else m = a·220/corner, and for
+    the second wave sr·hz/corner.
+  - +0x224 = (corner/hz)·2·0.002; +0x22c = (corner/(sr·hz))·2·0.002.
+
+The Tone KF table these index, `0x897edd0c`, holds the same bytes as v82's
+`0x897d4c6c`, so the port reads one.
+
+**The note-on** (`0x89506700`, after the ordinary note-on's common part at
+`0x89504b98`):
+- +0x158 = start gain·2^31; +0x1c4 = +0x1c0; +0x1cc and +0x1f0 = target/0.002; +0x204 =
+  +0x200·32. So the level starts at 0.064 of its value and rises with a time constant
+  of about 11 ms.
+- p = the phase, scaled by Impact below 1: a second time, after the common part.
+- HQ-SAW, HQ-SQUARE (the integrator cleared) and NOISE: +0x158 = start gain, +0x1cc =
+  +0x1c8, p or 0 outside 0…1.
+- SAW, TRIANGLE, SINE: p + ½·(+0x1cc limited by +0x208). SQUARE: the same + ½, and the
+  steepness from its targets. RAMP, JUNO: p alone. Then +0x1d4 = p and +0x1fc = sr·p,
+  both 0 if p is outside 0…1.
+- LA-SQUARE, LA-SAW: x = p + ½·(+0x1cc limited by +0x20c) + ½, 0 outside 0…1; +0x1d4 =
+  x, +0x1fc = sr·x; +0x218 and +0x21c = 2·(¼ − phase) + 2, less 2 if above 1. It reads
+  +0x20c and +0x214 as limits.
+
+**+0x20c stays 0, and v82's port stands.** The sub oscillator's update, note-on and
+routines store to neither +0x20c nor +0x214. The check confirms it: every word of
++0x144…+0x27c that no port field holds is unchanged across the sub passes. What does
+carry over is **+0x208**, which only RAMP's update writes and which later SAW,
+SQUARE, TRIANGLE and SINE note-ons read. The port keeps it across notes (`rampK`).
+
+**The routines** use x·0.998 + target every sample for the Pulse Widths, steepness and
+level, x·0.96875 + target for the gain. The mask follows the first wave only.
+- SAW, TRIANGLE: y = 2v − 1, v = p/w below w, else (1 − p)/(1 − w). Out = (y + second·
+  level + Impact)·gain. A sync bit sets the phases to w (SAW) or w/2 (TRIANGLE).
+- SINE: as TRIANGLE, y·(2 − |y|). The second wave is shaped after its level is applied.
+- SQUARE: g = (w − |2p − 1|)·q within ±1, no shaping. Out = −(g + second·level −
+  Impact)·gain. A sync bit sets the phases to (1 − w)/2.
+- RAMP: 0…1 over 0…w, 1…−1 over w…1 − k, −1…0 over the last k. A sync bit sets 0.
+- JUNO: x = 2(p + w/4) wrapped to 0…1; (|2x − 1| − 1 + w)·q, at most 2p − 1, at least
+  −1. A sync bit sets 0.
+- LA-SQUARE: g as SQUARE's, shaped g·(2 − |g|). Out = (−(g + second·level) + Impact)·
+  gain. A sync bit sets 0.
+- LA-SAW: as LA-SQUARE, each wave × its own second wave z (+0x218, +0x21c): z moves
+  down by the wave's step twice a sample, adding 2 when it reaches −1, and multiplies by
+  (2|z| − 1) shaped alike. The second wave's level comes before its z. A sync bit sets
+  the phases to 0 and both z to ½.
+
+**Correction: the interpreter's pair moves.** Under FPSCR.SZ = 1, `fmov @Rm,DRn` moves
+two words. `Sh4Interp` put FR(n) at the higher address, an order it took from Ghidra's
+little-endian model and never checked. On this chip it is the lower address: the
+SH7750 Series Hardware Manual (Rev. 6.0: the note closing section 2.5, p. 54, and the
+programming note on FPSCR.SZ, p. 52) says 64-bit data gets no endian conversion, which
+is why in little-endian mode a double must be moved as two 32-bit words. The firmware
+agrees.
+RAMP's routine loads its constants this way, from 0.96875, 0.998 and 1.0, 0.998 at
+`0x89508a90`:
+- With FR(n) lower, the gain moves by 0.96875, the level and second width by 0.998,
+  the wrap is at 1.0 and the width moves by 0.998, which is what each register is
+  used for.
+- With the old order the width never decays, the phase wraps at 0.998 and the gain
+  settles 24 dB high. The port disagreed with the interpreter only there.
+
+Flipping the order changes no earlier result: all of fcheck's baseline lines are
+unchanged, and the A/B renders against v84 are identical. Logged across the harnesses,
+only three instructions move pairs through memory: RAMP's two loads, and
+SQUARE's store of L and R, which are equal. A simple scan of rom.2 finds this form in
+39 stretches of code between `fschg`s (for example `0x89500a90`, `0x89509ff0`,
+`0x8950a09c`, `0x8950b1b0`, `0x89527e2c`, and the stores at `0x895099ae…0x89509f3e`).
+Whoever ports those should read the pairs this way; Ghidra's listing shows them as
+plain `fmov.s`.
+
+**Sound** (A4, Impact 0, Sub Level 127, against the 440 Hz partial, from renders):
+- Sub Octave −2: 110 Hz at −2.4 dB. −1: 220 Hz at −4.8 dB. 0: in unison, twice the peak.
+- Sub Level 80: 220 Hz at −10.9 dB. Sub Level 0: the same partials as OFF.
+- Detune +20: the second wave at 226 Hz (45 cents).
+- SQUARE, TRIANGLE, SINE, LA-SQUARE: 220 Hz at −1.2 dB. LA-SAW's 220 Hz is 2.6 dB above
+  its 440 Hz; RAMP's is 2.3 dB and JUNO's 9.7 dB below. HQ-SAW and NOISE: no second wave.
+- A2 and C7 with Sub Octave −1: 55 Hz at −3.2 dB, 1047 Hz at −4.5 dB.
+
+**Checks** (`xt_analog`, further passes after the others; fcheck's baseline only
+added 48 lines):
+- The converter with Sub Octave, Sub Level and Detune, on waveforms 0…10: 200,000 cases,
+  0 different. +0xb4 and +0xb8 are now compared in every converter pass.
+- 3,000 cases in fcheck: 84,843 note-ons and updates, 34,280 blocks of each of eleven
+  waveforms, 0 different. Each compares every field above whatever the waveform, so
+  what a note leaves on the voice has to match too.
+- LA-SQUARE and LA-SAW with random Tones and Tone KFs through `0x894e5f80`: 34,280 blocks
+  each, 0 different.
+- Plain and sub cases in random order on one voice: 31,124 note-ons and updates, 0
+  different.
+- Wide run, 21,000 cases: 594,000 note-ons and updates, 240,000 blocks each, 0 different.
+- Blocks set each phase on 0, on w, on w/2 or RAMP's 1 − k, a step from 1, or where
+  JUNO's x turns; LA-SAW's z where its subtractions land on −1. One case in eight
+  plays Pulse Width ±63 on high notes, and JUNO's w is forced below 0.
+- Deliberate errors: 132 planted, 126 caught. At first 13 were missed. Seven showed real
+  gaps, now closed: the Tone KF's two constants and the 20 kHz limits never mattered at
+  the default Tones (hence the pass above), z never started exactly on 1 for the second
+  wave, and no note drives JUNO's x below 0. The other six are exact or unreachable: the
+  hold of 0; HQ's phase test after the common part's; a ×2 regrouped; and a compare at
+  equality in the rising wave, RAMP's first segment and JUNO's wrap, where both sides
+  give the same value.
+
+**Not checked.**
+- Against real hardware: the check is the firmware in the interpreter, so RAMP rests
+  on the manual and its constants, not on a listening test.
+- A held note whose Sub Octave changes. The firmware's update reads +0xb4 live; I did
+  not trace when it installs the routine again. The port latches +0xb4 at note-on, so
+  a change takes effect on the next note.
+
+**Plugin.** New parameters `anaSubOct` (OFF, −2, −1, 0; default OFF) and `anaSubLevel`
+(0…127; default 127), and a fourth analog row holding Detune, Sub Oct and Sub Lev, so
+`kXtStripH`, `setSize` and the limits rise by 30. PCM leaves that row empty. `XT_ANALOG`
+and `TEST_ANALOG` take them as optional twelfth and thirteenth values. The PluginTest
+is bit-identical with thirteen settings across the waveforms at notes 30, 60 and 100.
+
 ### The analog waveform FEEDBACK-OSC (2026-11-01, v84)
 
 Code 12, patch waveform 12. With it every analog waveform is ported except
@@ -1787,7 +1960,8 @@ Tone (+0xc205, 0x528) for the others; +0xc0 likewise from the Tone Keyfollows
 - It reads +0x20c twice, as the lower limit of the same clamp. Nothing in
   the voice's code writes +0x20c (`poolrefs.py` and the disassembly find no
   store), and the check finds it 0 throughout, so the port takes 0: the
-  limits do nothing.
+  limits do nothing. (v85 read the sub oscillator's code too: it does not write
+  +0x20c either.)
 
 **The routines** (LA-SAW `0x895081f0`, LA-SQUARE `0x89508540`). They keep
 their values in the FPU's two banks (`frchg`), and LA-SAW loads its targets
@@ -2162,7 +2336,7 @@ depths, the level and its LFO depth. The cents are against A4: +8 =
 - Sub Octave on: +0xb4 = 1.0, and +0x84 holds the Detune curve
   (`0x894e1090`) plus −2, −1 or 0 octaves. Its envelope depth is piecewise
   in cents (to 10: d; to 15: 2d − 10; to 31: 5d − 55; to 51: 25d − 675;
-  above: 50d − 1950), /1200. Not ported.
+  above: 50d − 1950), /1200. Ported in v85.
 - +0xb8 Sub Level through the level curve; +0xbc/+0xc0 the LA Tone settings.
 
 The voice binds +0x8c's envelope at +0x974 and +0xa4's at +0x978. So Fat

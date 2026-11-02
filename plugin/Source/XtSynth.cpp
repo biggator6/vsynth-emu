@@ -1047,7 +1047,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_LFO="wave,rate,depth,delay,mode,fade,offset,keysync": the LFO.
 //   XT_OSC="time,offset,timeKF,formant,formantKF,energy[,lfoTime,lfoFormant]":
 //     the VariPhrase OSC knobs (Time Offset 0 BWD, 1 ZERO, 2 FWD).
-//   XT_ANALOG="wave,impact,pw,pwKf,pwLfo,pwEnv,fat,fatKf,fatLfo,fatEnv[,detune]":
+//   XT_ANALOG="wave,impact,pw,pwKf,pwLfo,pwEnv,fat,fatKf,fatLfo,fatEnv[,detune[,subOctave,subLevel]]":
 //     OSC Type ANALOG (KFs in %; PW on XT_TENV's envelope, Fat on XT_FENV's).
 //   XT_OLEV="level,levelKF,levelLfoDepth,waveGainDb": the OSC TVA.
 //   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.
@@ -1142,8 +1142,8 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_ANALOG")) {
         XtAnalogParams& a = c.ana;
         c.oscType = 0;
-        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &a.wave, &a.impact, &a.pw, &a.pwKf, &a.pwLfo, &a.pwEnv, &a.fat, &a.fatKf, &a.fatLfo,
-                    &a.fatEnv, &a.detune);
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &a.wave, &a.impact, &a.pw, &a.pwKf, &a.pwLfo, &a.pwEnv, &a.fat, &a.fatKf, &a.fatLfo,
+                    &a.fatEnv, &a.detune, &a.subOctave, &a.subLevel);
         a.pwKf /= 10;
         a.fatKf /= 10;
     }

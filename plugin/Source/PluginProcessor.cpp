@@ -34,6 +34,8 @@ namespace Params {
     static const juce::String kAnaFatLfo     = "anaFatLfo";
     static const juce::String kAnaFatEnv     = "anaFatEnv";
     static const juce::String kAnaDetune     = "anaDetune";
+    static const juce::String kAnaSubOct     = "anaSubOct";
+    static const juce::String kAnaSubLevel   = "anaSubLevel";
     // The OSC's pitch (XtOsc): Coarse and Fine, the Pitch knob −63..+63
     // (±6000 cents at 63), Pitch KF and Random Pitch Depth
     static const juce::String kOscCoarse     = "oscCoarse";       // −48..+48 semitones
@@ -221,6 +223,10 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaFatLfo, "Fat LFO Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaFatEnv, "Fat Env Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaDetune, "Detune", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaSubOct, "Sub Octave", 0, 3, 0,
+        juce::AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return v == 0 ? juce::String("OFF") : juce::String(v - 3); })
+            .withValueFromStringFunction([](const juce::String& s) { return s.trim().equalsIgnoreCase("OFF") ? 0 : s.getIntValue() + 3; })));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAnaSubLevel, "Sub Level", 0, 127, 127));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscCoarse, "Coarse", -48, 48, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscFine, "Fine", -50, 50, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscPitch, "OSC Pitch", -63, 63, 0));
@@ -619,6 +625,8 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.ana.fatLfo   = knob(Params::kAnaFatLfo);
     c.ana.fatEnv   = knob(Params::kAnaFatEnv);
     c.ana.detune   = knob(Params::kAnaDetune);
+    c.ana.subOctave = knob(Params::kAnaSubOct);
+    c.ana.subLevel = knob(Params::kAnaSubLevel);
     c.oscCoarse    = knob(Params::kOscCoarse);
     c.oscFine      = knob(Params::kOscFine);
     c.oscPitch     = knob(Params::kOscPitch);

@@ -17,8 +17,17 @@
 // (0x895060e0), SAW (0x89508c20), SQUARE (0x89508aa0), TRIANGLE
 // (0x895094c0), SINE (0x89509030), RAMP (0x89508800), JUNO (0x89508db0) and
 // NOISE (0x89504a40); LA-SQUARE (0x89508540), LA-SAW (0x895081f0), SUPER-SAW
-// (0x89507520) and FEEDBACK-OSC (0x89507900); without the sub oscillator.
-// X-MOD (0x89507b60) reads OSC 2's output, so it waits for OSC 2.
+// (0x89507520) and FEEDBACK-OSC (0x89507900).  X-MOD (0x89507b60) reads OSC 2's
+// output, so it waits for OSC 2.
+//
+// With the sub oscillator on (Sub Octave above 0: voice +0xb4 = 1.0) a second
+// set runs: install 0x895069d0, note-on 0x89506700, update 0x89506bf0, and by the
+// waveform SAW 0x89508f30, SQUARE 0x89509360, TRIANGLE 0x89509680, RAMP
+// 0x89508960, SINE 0x89509230, JUNO 0x89508060, LA-SQUARE 0x89508670 and LA-SAW
+// 0x89508350: two waves in one routine, each with its own phase and shape.
+// HQ-SAW, HQ-SQUARE and NOISE keep their routines and play no second wave;
+// SUPER-SAW, FEEDBACK-OSC and X-MOD have no sub oscillator (their converter
+// cases set +0xb4 = 0).
 //
 // The level and the Saw's edge also follow hidden system parameters, the
 // XT's analog calibration (IDs 0x528…0x55b, through 0x894e5f80 to the OSC
@@ -51,17 +60,18 @@ bool xtAnalogPlays(int wave);
 // The analog knobs as the patch stores them (IDs 0x2b1…0x2ba for OSC 1):
 // Waveform 0…13 (SAW); Impact 0…40 (0.0…4.0, default 10); Pulse Width
 // −63…+63, its Keyfollow ±20 (×10 = the displayed ±200), LFO and Env Depth
-// ±63; Fat 0…127 and the same; Detune ±63 (ID 0x30d), used by SUPER-SAW and
-// FEEDBACK-OSC, and by the sub oscillator.
+// ±63; Fat 0…127 and the same; Detune ±63 (ID 0x30d), used by SUPER-SAW,
+// FEEDBACK-OSC and the sub oscillator; Sub Octave 0…3 (ID 0x30e: OFF, −2, −1
+// and 0 octaves) and Sub Level 0…127 (ID 0x30f, default 127).
 struct XtAnalogParams {
     int wave = 0, impact = 10;
     int pw = 0, pwKf = 0, pwLfo = 0, pwEnv = 0;
     int fat = 0, fatKf = 0, fatLfo = 0, fatEnv = 0;
     int detune = 0;
+    int subOctave = 0, subLevel = 127;
 };
 
-// The converter's analog block (the matrix and controller terms 0; the sub
-// oscillator off, Sub Octave 0):
+// The converter's analog block (the matrix and controller terms 0):
 //   code    +0x80, as above
 //   fat     +0x84: Fat/127 + (key − 60)·KF·10/1200, within 0…1 (0x894e1010)
 //   pw      +0x98: x = PW + (key − 60)·KF·10·126/1200 + 63, PW within ±63,
@@ -82,6 +92,14 @@ struct XtAnalogParams {
 //           +0x98 the second tap's place, +0x84 its level
 //   tone    +0xbc: LA-SQUARE's Tone (ID 0x529), the others' LA Saw Tone (0x528)
 //   toneKf  +0xc0: LA-SQUARE's Tone Keyfollow (0x52b), the others' (0x52a)
+//   subOn   +0xb4: 1 with Sub Octave above 0 on patch waveforms 0…10, else 0.
+//           Then fat holds the second wave's pitch in octaves: the Detune
+//           curve (0x894e1090) with Fat's KF, + −2, −1 or 0 by Sub Octave;
+//           fatEnv and fatLfo are its depths, each d through the same curve,
+//           /1200 (the envelope's × its velocity factor).  The curve: |d| to
+//           10: d; to 15: 2d − 10; to 31: 5d − 55; to 51: 25d − 675; above:
+//           50d − 1950, in cents
+//   subLevel +0xb8: level curve(Sub Level)/32768
 // The envelopes: Fat's is the OSC's third (Env 3, OSC 2 Env 7; the formant
 // slot +0x974), the Pulse Width's its second (Env 2/6, the time slot +0x978);
 // both LFOs are the OSC's (LFO 1/2).
@@ -91,6 +109,7 @@ struct XtAnalogBlock {
     float pw = 0.5f, pwEnv = 0, pwLfo = 0;
     float impact = 1.0f, slope = 0, gain = 1.0f;
     float tone = 0, toneKf = 0;
+    float subOn = 0, subLevel = 1.0f;
 };
 // key: the note (the converter's +3); pitch10: its pitch in 1/1000
 // semitone (+0x74, xtPitch10 + the fine); velFat, velPw: the envelopes'
@@ -134,6 +153,18 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
 //             and level are in the same fields.
 //   fb        FEEDBACK-OSC: +0x274 the DC block's state, +0x278 the line's write
 //             place, +0x27c which line.
+//   sub       With the sub oscillator on the two waves' shapes, the level and
+//             the gain move every sample (x·0.998 + target, the gain x·0.96875 +
+//             target, so the targets are ×0.002 and ×2^26).  +0x1c0/+0x1c4 hold
+//             the second wave's pitch against the first, 2^(octaves); +0x1c8/
+//             +0x1cc the first wave's Pulse Width, +0x1ec/+0x1f0 the second's;
+//             +0x1f4 and +0x1f8 the phases' steps; +0x1fc the second phase;
+//             +0x200/+0x204 the level.  SQUARE and JUNO: +0x234/+0x238 and
+//             +0x23c/+0x240 the steepness of each wave; LA-SQUARE and LA-SAW:
+//             +0x224/+0x228 and +0x22c/+0x230; LA-SAW also +0x218 and +0x21c,
+//             each wave's second wave.  RAMP: +0x208 and +0x210 the width of
+//             its last segment; +0x208 stays on the voice and other waveforms'
+//             note-ons read it.
 class XtAnalogOsc {
 public:
     // fatEnv/pwEnv: the envelopes' outputs (+0x4c); lfo: the LFO's (+0x38);
@@ -178,12 +209,31 @@ public:
     float fbState() const { return fbZ; }
     int fbWrite() const { return fbW; }
     int fbSlotIndex() const { return fbSlot; }
+    bool subActive() const { return subOn_; }
+    float subPwTarget() const { return swT; }
+    float subPw() const { return swC; }
+    float subStep() const { return subInc; }
+    float subPhase() const { return sph; }
+    float subLevelTarget() const { return lvlT; }
+    float subLevel() const { return lvlC; }
+    float rampEnd() const { return rampK; }
+    float rampEnd2() const { return rampK2; }
+    float laPhase3() const { return ph3; }
+    float laSteep2Target() const { return q2T; }
+    float laSteep2() const { return q2C; }
+    float steepTarget() const { return sqT; }
+    float steep() const { return sqC; }
+    float steep2Target() const { return sq2T; }
+    float steep2() const { return sq2C; }
     // the check's breakpoint cases: the points the routine compares the
     // phase with, as it forms them from the current Fat and PW (up to 8)
     int breakpoints(float* p) const;
     void setPhase(float p) { ph = p; }
     void setLaPhase2(float z) { ph2 = z; }
     void setSidePhase(int i, float p) { ss[i] = p; }
+    void setSubPhase(float p) { sph = p; }
+    void setPw(float w) { pwC = w; }
+    void setLaPhase3(float z) { ph3 = z; }
     void setRatio(float r) { ratio_ = r; }
 
 private:
@@ -198,6 +248,10 @@ private:
     XtAnalogShared* shared_ = nullptr;
     uint32_t fl = 0, s2 = 0;
     int hold = 1, hs = 0;
+    bool subOn_ = false;                                // +0xb4 at note-on
+    float swT = 0, swC = 0, subInc = 0, sph = 0, lvlT = 0, lvlC = 0;
+    float rampK = 0, rampK2 = 0, ph3 = 0, q2T = 0, q2C = 0;
+    float sqT = 0, sqC = 0, sq2T = 0, sq2C = 0;
     // HQ-SAW's and HQ-SQUARE's lengths and factors for a block (samples ×
     // 32768): the period, the impulse's width, HQ-SQUARE's halves, the
     // phase scale, the table step, the impulse gain and the integrator leak
@@ -224,4 +278,12 @@ private:
     uint32_t juno(float* lr, uint32_t sync);
     uint32_t noise(float* lr);
     void moveShape();
+    void subShape(const XtAnalogBlock& b, float gain, float fatEnv, float pwEnv, float lfo);
+    void subNoteOn(const XtAnalogBlock& b, float gain, float gainStart, float fatEnv, float pwEnv, float lfo);
+    uint32_t subPeak(float* lr, uint32_t sync, bool halfSync, bool shaped);
+    uint32_t subSquare(float* lr, uint32_t sync);
+    uint32_t subRamp(float* lr, uint32_t sync);
+    uint32_t subJuno(float* lr, uint32_t sync);
+    uint32_t subLaSquare(float* lr, uint32_t sync);
+    uint32_t subLaSaw(float* lr, uint32_t sync);
 };

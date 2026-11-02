@@ -3027,3 +3027,24 @@ Round-2 recordings.  First build-out after that: real-time granular port
   delay's limit only matters with a full line, so setting it early in a note
   shows nothing, and the check now waits for that. The other two change an 8-bit
   value so rarely that they show only on the wide run, not in fcheck's cases.
+
+### Session 16 addendum (2026-11-02) — v85: the sub oscillator
+
+- The sub oscillator is ported, which leaves X-MOD as the analog oscillator's last
+  piece. Most waveforms get their own routine that plays two waves at once, and the
+  second wave's pitch, Pulse Width and level all have their own targets.
+- The surprise was in the interpreter, not the port. Every waveform matched except
+  RAMP, where the firmware's gain ran up 24 dB and its pulse width never settled. RAMP
+  is the one routine that loads constants with a 64-bit pair move, and the interpreter
+  had that word order from Ghidra's model, unchecked. The SH7750 manual says the chip
+  does no endian conversion on 64-bit data, and RAMP's constants only make sense
+  that way. Flipping it fixed RAMP and changed no earlier result. So a port that
+  disagreed with the "firmware" was right; the reference was wrong, and it took the
+  manual to tell. This has not been heard on real hardware.
+- The question of whether something writes +0x20c, which the LA note-on reads, came
+  out no, so v82 stands. But the neighbouring +0x208 does carry over: a RAMP note with
+  the sub oscillator on leaves it behind, and later notes on that voice read it.
+- Seven of 13 missed deliberate errors were real gaps. The LA waveforms' Tone KF
+  terms are multiplied by zero at the default Tone KF, so those constants needed a pass
+  with other calibration values, the same lesson v82 had already taught for the plain
+  routines.

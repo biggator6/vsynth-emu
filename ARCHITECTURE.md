@@ -261,10 +261,10 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      own envelopes (Env 9/10, 11/12) and LFO (3, 4), through the XT's
      converter, control and filter kernels, between the player and the
      TVA.
-   - the analog oscillator (v79–v84, XtAnalog): OSC Type ANALOG plays the
+   - the analog oscillator (v79–v85, XtAnalog): OSC Type ANALOG plays the
      XT's SAW, SQUARE, TRIANGLE, SINE, RAMP, JUNO, NOISE, HQ-SAW and
      HQ-SQUARE (band-limited, from rom.2's tables), LA-SAW, LA-SQUARE,
-     SUPER-SAW and FEEDBACK-OSC with Impact,
+     SUPER-SAW and FEEDBACK-OSC, most with a sub oscillator, with Impact,
      Pulse Width and Fat (their KFs, LFO and envelope
      depths, on the time and formant envelopes), through the analog
      converter, note-on, update and routine, its level from the XT's hidden
@@ -314,9 +314,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - Mono/Poly (v60): the key state (120,000 events), the ramp's legato update
   and restart (2.05 million values) and the key-follow key equal the
   firmware (`xt_osc`).
-- The analog oscillator (v79–v84): the converter's block, the note-on, the
-  update, the install and the thirteen routines (outputs, state and wrap
-  masks) equal the firmware (`xt_analog`).
+- The analog oscillator (v79–v85): the converter's block, the note-on, the
+  update, the install and the routines, the sub oscillator's eight too (outputs,
+  state and wrap masks), equal the firmware (`xt_analog`).
 - COSM TVF (v61) and Dynamic TVF (v64): the converters, start values,
   targets and updates, the follower and the twelve filter kernels equal the
   firmware (`xt_cosm`).

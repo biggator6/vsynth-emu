@@ -2,8 +2,8 @@
 // SH-4 software manual.  Float arithmetic runs on the host in single or double
 // precision with no contraction (FMAC = product, then sum), in the rounding
 // mode FPSCR.RM selects; FIPR / FTRV form their sums in double and round once.
-// SZ = 1 pair moves keep FR(n) (the high word of DR(n)) at the higher address,
-// as Ghidra's little-endian SH-4 model does for DR registers.
+// SZ = 1 pair moves keep FR(n) at the lower address in little-endian mode too:
+// the SH7750 has no endian conversion for 64-bit data (hardware manual, 2.5).
 #include "Sh4Interp.h"
 
 #include <cfenv>
@@ -437,8 +437,8 @@ bool Sh4::exec(uint16_t op, bool slot, uint32_t& next) {
         const bool PR = fpscr & (1u << 19), SZ = fpscr & (1u << 20);
         // SZ = 1 pair access: n even → DR(n) = FR(n):FR(n+1); n odd → XD(n−1) = XF(n−1):XF(n).
         auto pairRef = [&](int k, int half) -> uint32_t& { return (k & 1) ? XF((k & ~1) + half) : FR(k + half); };
-        auto loadP = [&](int k, uint32_t a) { const uint32_t lo = rd32(a), hi = rd32(a + 4); pairRef(k, 1) = lo; pairRef(k, 0) = hi; };
-        auto storeP = [&](int k, uint32_t a) { wr32(a, pairRef(k, 1)); wr32(a + 4, pairRef(k, 0)); };
+        auto loadP = [&](int k, uint32_t a) { const uint32_t first = rd32(a), second = rd32(a + 4); pairRef(k, 0) = first; pairRef(k, 1) = second; };
+        auto storeP = [&](int k, uint32_t a) { wr32(a, pairRef(k, 0)); wr32(a + 4, pairRef(k, 1)); };
         switch (op & 0xf) {
         case 0x0: if (PR) setD(n, D(n) + D(m)); else setF(n, F(n) + F(m)); return true;
         case 0x1: if (PR) setD(n, D(n) - D(m)); else setF(n, F(n) - F(m)); return true;

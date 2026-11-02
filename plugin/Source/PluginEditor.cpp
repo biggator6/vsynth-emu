@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 790;  // height of the XT strip below it
+static constexpr int kXtStripH   = 820;  // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -60,9 +60,9 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1090);
+    setSize(560, 1120);
     setResizable(true, true);
-    setResizeLimits(480, 780, 960, 1230);
+    setResizeLimits(480, 810, 960, 1260);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -145,8 +145,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     anaWaveAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "anaWave", anaWaveBox_);
     oscTypeBox_.onChange = [this] { showOscType(); };
     {
-        static const char* const ids[kAnaKnobs] = { "anaImpact", "anaPw", "anaPwKF", "anaFat", "anaFatKF", "anaPwLfo", "anaPwEnv", "anaFatLfo", "anaFatEnv", "anaDetune" };
-        static const char* const names[kAnaKnobs] = { "Impact", "PW", "PW KF", "Fat", "Fat KF", "PW LFO", "PW Env", "Fat LFO", "Fat Env", "Detune" };
+        static const char* const ids[kAnaKnobs] = { "anaImpact", "anaPw", "anaPwKF", "anaFat", "anaFatKF", "anaPwLfo", "anaPwEnv", "anaFatLfo", "anaFatEnv", "anaDetune", "anaSubOct", "anaSubLevel" };
+        static const char* const names[kAnaKnobs] = { "Impact", "PW", "PW KF", "Fat", "Fat KF", "PW LFO", "PW Env", "Fat LFO", "Fat Env", "Detune", "Sub Oct", "Sub Lev" };
         for (int i = 0; i < kAnaKnobs; ++i) {
             juce::Slider& sl = anaSliders_[i];
             sl.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -758,13 +758,11 @@ void VSynthEmuEditor::resized() {
     xt.removeFromTop(6);
     auto row2 = xt.removeFromTop(24);
     {   // the analog rows, in rows 2, 3 and Loop's places (showOscType)
-        auto a1 = row2, a2 = row2.translated(0, 30), a3 = row2.translated(0, 60);
+        auto a1 = row2, a2 = row2.translated(0, 30), a3 = row2.translated(0, 60), a4 = row2.translated(0, 90);
         anaWaveLabel_.setBounds(a1.removeFromLeft(36));
         anaWaveBox_.setBounds(a1.removeFromLeft(130).withTrimmedRight(10));
         anaLabels_[0].setBounds(a1.removeFromLeft(44));
-        anaSliders_[0].setBounds(a1.removeFromLeft(220));
-        anaLabels_[9].setBounds(a1.removeFromLeft(46));
-        anaSliders_[9].setBounds(a1.removeFromLeft(220));
+        anaSliders_[0].setBounds(a1);
         for (int r = 0; r < 2; ++r) {
             auto& a = r ? a3 : a2;
             const int cw = a.getWidth() / 4;
@@ -773,6 +771,12 @@ void VSynthEmuEditor::resized() {
                 anaLabels_[i].setBounds(cell.removeFromLeft(46));
                 anaSliders_[i].setBounds(cell.withTrimmedRight(6));
             }
+        }
+        const int sw4 = a4.getWidth() / 3;           // Detune and the sub oscillator: a row only the analog oscillator uses
+        for (int i : { 9, 10, 11 }) {
+            auto cell = a4.removeFromLeft(sw4);
+            anaLabels_[i].setBounds(cell.removeFromLeft(46));
+            anaSliders_[i].setBounds(cell.withTrimmedRight(6));
         }
     }
     encodeLabel_.setBounds(row2.removeFromLeft(52));
@@ -804,7 +808,7 @@ void VSynthEmuEditor::resized() {
     loopStartSlider_.setBounds(ls.withTrimmedRight(8));
     loopEndLabel_.setBounds(row3l.removeFromLeft(32));
     loopEndSlider_.setBounds(row3l);
-    xt.removeFromTop(6);
+    xt.removeFromTop(36);                            // the analog oscillator's fourth row (above)
     auto row3p = xt.removeFromTop(24);               // Portamento: switch, mode, type, time, velocity sens
     portaBtn_.setBounds(row3p.removeFromLeft(64));
     portaModeBox_.setBounds(row3p.removeFromLeft(96).withTrimmedRight(8));

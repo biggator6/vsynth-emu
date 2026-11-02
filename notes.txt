@@ -280,6 +280,18 @@ ANALOG FEEDBACK-OSC v84 (2026-11-01): FEEDBACK-OSC (code 12, 0x89507900)
   (+0x24c…+0x258) with SUPER-SAW; fbZ +0x274, fbW +0x278, fbSlot +0x27c.
   xtAnalogPlays: codes 0…12. Only X-MOD and the sub oscillator remain.
 
+ANALOG SUB OSCILLATOR v85 (2026-11-02): Sub Octave above 0 on patch waveforms 0…10
+  (HARDWARE_FIRMWARE.md, "The analog sub oscillator"). xtAnalogBlock: subOn +0xb4,
+  subLevel +0xb8, fat +0x84 in octaves (subDetuneCurve, subCents). XtAnalogOsc latches
+  subOn_ at note-on; subShape() is 0x89506bf0, subNoteOn() 0x89506700; subPeak (SAW,
+  TRIANGLE, SINE), subSquare, subRamp, subJuno, subLaSquare, subLaSaw. HQ-SAW, HQ-SQUARE
+  and NOISE keep their routines. New fields swT/swC +0x1ec/+0x1f0, subInc +0x1f8, sph
+  +0x1fc, lvlT/lvlC +0x200/+0x204, rampK/rampK2 +0x208/+0x210 (rampK carries to later
+  notes), ph3 +0x21c, q2T/q2C +0x22c/+0x230, sqT/sqC/sq2T/sq2C +0x234…+0x240. Params
+  anaSubOct, anaSubLevel; XT_ANALOG/TEST_ANALOG's optional twelfth and thirteenth.
+  Sh4Interp: SZ = 1 pair moves now put FR(n) at the lower address, as the SH7750
+  does; only RAMP's sub routine depended on it.
+
 SPEAKER SIMULATOR v78 (2026-11-01): COSM Type 4 (HARDWARE_FIRMWARE.md, "COSM:
   the Speaker Simulator"), the last COSM type. XtCosm: XtSpkBlock, XtCosmSpk
   (block 0x894ee520, filter 0x89501300; 27 coefficients per type read from
