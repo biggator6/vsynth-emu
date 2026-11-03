@@ -175,6 +175,10 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     structBox_.onChange();
     modBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
     modBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    tvaBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    tvaBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    addAndMakeVisible(tvaBtn_);
+    tvaAtt_        = std::make_unique<ButtonAtt>(processor_.apvts, "tvaSwitch", tvaBtn_);
     modTypeBox_.addItemList({ "MIX", "RING", "FM", "ENV RING", "OSC SYNC" }, 1);
     addAndMakeVisible(modBtn_);
     addAndMakeVisible(modTypeBox_);
@@ -874,7 +878,8 @@ void VSynthEmuEditor::resized() {
     octLabel_.setBounds(row3k.removeFromLeft(36));
     octSlider_.setBounds(row3k.removeFromLeft(200));
     xt.removeFromTop(6);
-    auto row4 = xt.removeFromTop(24);                // amp envelope
+    auto row4 = xt.removeFromTop(24);                // the TVA Switch, amp envelope
+    tvaBtn_.setBounds(row4.removeFromLeft(56));
     const int q = row4.getWidth() / 4;
     std::pair<juce::Label*, juce::Slider*> adsr[] = { { &attackLabel_, &attackSlider_ }, { &decayLabel_, &decaySlider_ },
                                                       { &sustainLabel_, &sustainSlider_ }, { &releaseLabel_, &releaseSlider_ } };
@@ -885,6 +890,7 @@ void VSynthEmuEditor::resized() {
     }
     xt.removeFromTop(6);
     auto row5 = xt.removeFromTop(24);                // velocity → time, Time KF
+    row5.removeFromLeft(56);
     std::pair<juce::Label*, juce::Slider*> sens[] = { { &aSensLabel_, &aSensSlider_ }, { &dSensLabel_, &dSensSlider_ },
                                                       { &rSensLabel_, &rSensSlider_ }, { &kfLabel_, &kfSlider_ } };
     for (auto& [l, sl] : sens) {

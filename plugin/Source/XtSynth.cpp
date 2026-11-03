@@ -498,13 +498,19 @@ XtEnvParams XtSynth::envParams(const Voice& v) const {
     XtEnvKnobs k;
     k.attack = ctl.attack; k.decay = ctl.decay; k.sustain = ctl.sustain; k.release = ctl.release;
     k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens; k.timeKF = ctl.timeKF;
-    return xtEnvAdsr(k, v.note, v.vel, v.relVel);
+    XtEnvParams p = xtEnvAdsr(k, v.note, v.vel, v.relVel);
+    if (!ctl.tvaOn) {                                  // the TVA Switch off: no times, level 1
+        for (float& t : p.time) t = 0.0f;
+        p.level[3] = 1.0f;
+    }
+    return p;
 }
 
 // New knob values reach a playing voice at the next update (mixBlock),
 // through the voice update's smoothing, as on the XT.
 void XtSynth::setControls(const Controls& c) {
-    const bool envChanged = c.attack != ctl.attack || c.decay != ctl.decay || c.sustain != ctl.sustain || c.release != ctl.release
+    const bool tvaChanged = c.tvaOn != ctl.tvaOn;
+    const bool envChanged = tvaChanged || c.attack != ctl.attack || c.decay != ctl.decay || c.sustain != ctl.sustain || c.release != ctl.release
                          || c.aSens != ctl.aSens || c.dSens != ctl.dSens || c.rSens != ctl.rSens || c.timeKF != ctl.timeKF;
     // what changed for each OSC.  The tone update also gives the voices' pitch
     // ramps the new portamento settings (0x894ebd34 → 0x894f48b0) and, when the
@@ -552,6 +558,7 @@ void XtSynth::setControls(const Controls& c) {
     for (Voice& v : voice) {
         if (!v.active) continue;
         if (envChanged) v.env.update(envParams(v));
+        if (tvaChanged) v.gain = ctl.tvaOn ? v.velGain : 1.0f;
         auto oscLive = [&](OscVoice& s, const OscControls& o, const OscDiff& d) {
             if (d.penv) s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
             if (d.tenv) s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));
@@ -646,7 +653,8 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     // Switch): the shared generator steps once per note for an OSC with a depth
     v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
     v->osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
-    v->gain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);
+    v->velGain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);
+    v->gain = ctl.tvaOn ? v->velGain : 1.0f;
     // the tone is constructed for each note (0x894f5860): LFOs 0…7 draw their
     // chaos seeds, and the pitch ramps (0x894f4860) start off, so the note's
     // first pitch has no glide in it
@@ -825,7 +833,8 @@ void XtSynth::legatoNote(int key, int vel) {
         v.vel = vel;
         v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
         v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
-        v.gain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);
+        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);
+        v.gain = ctl.tvaOn ? v.velGain : 1.0f;
         v.env.update(envParams(v));
         auto oscUpdate = [&](OscVoice& s, const OscControls& o) {
             s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
@@ -1145,6 +1154,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //     XT_OENV2 (Env 8), XT_VEL2="oscSens,oscCurve", XT_PITCH2="pitch,pitchKF,
 //     coarse,fine" and XT_TUNE2="random", as OSC 1's.  XT_OSC1OFF=1: OSC 1's
 //     Switch off.
+//   XT_TVA_OFF=1: the TVA Switch off.
 //   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
 //     3 ENV RING, 4 OSC SYNC, Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
 //     attack,release": new MOD knobs at a frame, on the notes then sounding.
@@ -1258,6 +1268,7 @@ int main(int argc, char** argv) {
         a.fatKf /= 10;
     }
     if (std::getenv("XT_OSC1OFF") && std::atoi(std::getenv("XT_OSC1OFF")) != 0) c.on = false;
+    if (std::getenv("XT_TVA_OFF")) c.tvaOn = false;
     if (const char* e = std::getenv("XT_MOD")) {
         c.mod.on = true;
         std::sscanf(e, "%d,%d,%d,%d", &c.mod.type, &c.mod.level, &c.mod.attack, &c.mod.release);

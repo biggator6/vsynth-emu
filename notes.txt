@@ -314,6 +314,9 @@ ANALOG X-MOD v87 (2026-11-02): X-MOD (code 13, 0x89507b60 at +0x96c)
   on the roadmap: MOD Types RING, FM, ENV RING, OSC SYNC; the other two Structure Types; the patch
   TVA's level and pan; PCM on OSC 2.
 
+TVA Switch v101 (2026-11-02): ID 0x299 (HARDWARE_FIRMWARE.md, "The TVA Switch"). Controls::tvaOn, parameter tvaSwitch, default on although the XT's is off. Off: the TVA's level
+  1, envelope 13 with times 0 and levels [0,1,1,1,0]. Voice::velGain is latched at note-on and legato. XT_TVA_OFF=1, TEST_TVA_OFF=1.
+
 Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone (HARDWARE_FIRMWARE.md, "The whole tone against XtSynth"). xt_tone
   (XtToneCheck.cpp, XT_TONE_MAIN; XT_TONE_CHECK adds XtSynth's taps): the firmware from the parameter IDs on, only the OS hooked, compared inside the block,
   bit for bit but a SOLO wave's buffers. fcheck runs 2000 cases and the sweep. XT_TONE_FIRST=1 prints each case's first difference, XT_TONE_DUMP=<case>|a its

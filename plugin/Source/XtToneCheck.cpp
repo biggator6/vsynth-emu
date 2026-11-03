@@ -502,7 +502,7 @@ std::unordered_map<int, int> patchOf(const Ctl& c) {
     p[0x134] = c.scaleTune;
     for (int i = 0; i < 12; ++i) p[0x136 + 2 * i] = c.scale[i];
     p[0x293] = c.structure; p[0x294] = c.mod.on; p[0x295] = c.mod.type; p[0x296] = c.mod.level; p[0x297] = c.mod.attack; p[0x298] = c.mod.release;
-    p[0x299] = 1;                                     // the TVA Switch (Env 13): XtSynth's TVA always follows its envelope
+    p[0x299] = c.tvaOn;
     envParams(p, 12, c.attack, c.decay, c.sustain, c.release, c.ampVelCurve, c.ampVelSens, c.aSens, c.dSens, c.rSens, c.timeKF / 10);
     return p;
 }
@@ -587,6 +587,7 @@ Ctl drawControls(Rng& r, int g, bool pcm) {
     }
     drawCosm(r, c.cosm[0]); drawCosm(r, c.cosm[1]);
     c.structure = r.range(0, 2);
+    c.tvaOn = !r.one(4);
     c.mod.on = r.one(3); c.mod.type = r.range(0, 4); c.mod.level = r.range(0, 127); c.mod.attack = r.range(0, 127); c.mod.release = r.range(0, 127);
     c.cosm[0].on = g % 3 == 0;
     c.cosm[1].on = g % 6 == 3 || g % 4 == 1;
@@ -616,7 +617,7 @@ std::vector<size_t> listedFields() {
     std::vector<size_t> f;
     const auto add = [&](const auto& x) { f.push_back((size_t)(reinterpret_cast<const char*>(&x) - reinterpret_cast<const char*>(&c))); };
     for (const auto* x : { &c.attack, &c.decay, &c.sustain, &c.release, &c.aSens, &c.dSens, &c.rSens, &c.timeKF, &c.patchCoarse, &c.portaTime, &c.portaVeloSens, &c.portaType }) add(*x);
-    add(c.portamento);
+    add(c.portamento); add(c.tvaOn);
     for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) })
         for (const int* x : { &o->pAttack, &o->pDecay, &o->pSustain, &o->pRelease, &o->tAttack, &o->tDecay, &o->tSustain, &o->tRelease, &o->fAttack, &o->fDecay, &o->fSustain, &o->fRelease,
                               &o->oAttack, &o->oDecay, &o->oSustain, &o->oRelease, &o->oASens, &o->oDSens, &o->oRSens, &o->oTimeKF,
@@ -703,6 +704,7 @@ int XtToneProbe::run(int argc, char** argv) {
             // analog on both OSCs, all the envelopes and LFOs bound and running, a
             // portamento gliding: whatever a field moves can be seen
             ctl.on = ctl.osc2.on = true;
+            ctl.tvaOn = true;
             ctl.lfoKeySync = ctl.osc2.lfoKeySync = true;
             ctl.portamento = true;
             ctl.portaTime = 100;

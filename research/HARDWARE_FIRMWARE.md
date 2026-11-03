@@ -1545,6 +1545,18 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The TVA Switch (2026-11-02, v101)
+
+ID 0x299 is the first of the TVA's inputs (`0x894eb170` stores it at +4). `xt_tone` showed what it does, with the switch drawn in its cases and moved during notes:
+
+- **Off:** the TVA's level (+0xc) is exactly 1, so no velocity, and envelope 13's times are all 0 and its levels [0, 1, 1, 1, 0]. So the note sounds at full level from its start and the amp envelope's knobs do nothing. A note-off still ends it. The check keeps CC7, CC11 and TVA Level at rest, so whether those still count with the switch off is not known.
+- **Moved during a note:** it takes effect at once, on the level and the envelope.
+- **The velocity factor is latched at note-on and at a legato** (`0x894ea990`, TVA +0x1c), with the Sens and Curve of that moment. Switching back on returns to that factor and not to one from the knobs as they now are. `Voice::velGain` holds it, and `Voice::gain` is `tvaOn ? velGain : 1`.
+
+**Default.** The XT's descriptor default is off. The plugin's is on (`Controls::tvaOn`, parameter `tvaSwitch`, the TVA box at the left of the amp envelope row), because XtSynth has always followed its envelope and turning it off by default would silence every amp envelope knob and change every render. A saved session without the parameter comes up on.
+
+**Checks.** `p[0x299]` is now `Controls::tvaOn` in `patchOf`, off in a quarter of the cases, and the switch is in the sweep. fcheck's `xt_tone` counts change with the new draw, and it stays 0 different; four other seeds at 3000 cases and the sweep, 0 different. `tone_muts.txt` gains seven errors: 103 of 104 caught, the one missed still the exact `legato-order`. `TEST_TVA_OFF=1 pt.sh`: 4/4 bit-identical. With the switch on, the A/B renders are identical to v100.
+
 ### The whole tone against XtSynth (2026-11-02, v100)
 
 Each port has its own check, but XtSynth, which wires them together from the knobs, had never been compared with a firmware tone. `xt_tone` (`XtToneCheck.cpp`) does that: the firmware from the parameter IDs on, XtSynth on the same `Controls` and notes, compared inside XtSynth's block. v93…v100 are what it found.
@@ -1560,7 +1572,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 
 **Things the patch needs for it to sound as XtSynth's does.**
 - ID 0x113 Mono/Poly: 0 is MONO, 1 POLY.
-- ID 0x299 TVA Switch. Its default is off, which sets envelope 13's times to 0 and its levels to [0, 1, 1, 1, 0]. XtSynth has no such control and behaves as on. See the end of this section.
+- ID 0x299 TVA Switch. Its default is off, which sets envelope 13's times to 0 and its levels to [0, 1, 1, 1, 0]. The harness set it on here; v101 gave XtSynth the control.
 - CC7 and CC11 at 127 and CC10 at 64 (controllers at C + 0x84 + cc, C = *N, N = *K), or the TVA's level is 0. The bender is the u16 at C + 0.
 - A wave's chunks: 2 header (+1 type, +2 stereo, +8 44000 u16, +0xa original key), 3 steps, 4 vplp (+0x1a = 1 so the Loop switch decides), 5 vpdt, 10 loop events (no loop: W2+0xb8, W2+0x16c = 0x7fffffff). Bands in slots 0, 2…6.
 
@@ -1610,7 +1622,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 - **Stereo OSC 1 into a COSM** and **both OSCs off**: excluded, below.
 
 **Decisions left, not changed.**
-- TVA Switch (ID 0x299) is off by default on the XT and XtSynth has no such control; it behaves as on. The harness sets it on.
+- TVA Switch (ID 0x299): done in v101.
 - With a stereo OSC 1 the firmware's COSMs take their stereo routines, and `XtCosm` has only the mono ones. The check turns COSMs off for stereo waves.
 - With both OSCs off XtSynth starts no voice, so the key state, random pitch and LFO seeds do not advance. The firmware starts a tone. The check keeps one OSC on.
 - Lo-Fi on a SOLO wave is replaced by TVF in the check: its quantizer turns the SOLO player's small differences into a step of its own.

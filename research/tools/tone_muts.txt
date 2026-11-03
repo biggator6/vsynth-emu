@@ -19,8 +19,8 @@ amp-env-sens|k.aSens = o.oASens; k.dSens = o.oDSens; k.rSens = o.oRSens;|k.aSens
 amp-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nvoid XtSynth::applyRates|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nvoid XtSynth::applyRates
 osc-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nXtEnvParams XtSynth::envParams|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nXtEnvParams XtSynth::envParams
 tva-env-rsens|k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens;|k.aSens = ctl.aSens; k.dSens = ctl.rSens; k.rSens = ctl.dSens;
-tva-time-kf|k.timeKF = ctl.timeKF;\n    return xtEnvAdsr|k.timeKF = 0;\n    return xtEnvAdsr
-tva-level|v->gain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);|v->gain = xtVelGain(v->vel, ctl.oscVelSens, ctl.ampVelCurve);
+tva-time-kf|k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens; k.timeKF = ctl.timeKF;\n    XtEnvParams p = xtEnvAdsr|k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens;\n    XtEnvParams p = xtEnvAdsr
+tva-level|v->velGain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);|v->velGain = 1.0f;
 tva-frames|float frames = 441.0f;|float frames = 440.0f;
 tva-land|xtf::mul(d, kLand) : v.step|xtf::mul(d, 0.03125f) : v.step
 tva-elapsed|v.elapsed += 32.0f;|v.elapsed += 33.0f;
@@ -43,7 +43,7 @@ smooth-walk|s.curWalk = xtOscSmooth(s.curWalk, w);|s.curWalk = w;
 smooth-gain|s.curGain = xtOscSmooth(s.curGain, gt);|s.curGain = gt;
 legato-env|            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);|            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);
 legato-source|v.srcKey = shiftKey(keys.prevMono);|v.srcKey = shiftKey(keys.prevPoly);
-legato-level|v.gain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.env.update|v.env.update
+legato-level|        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n|
 live-key|if (k != s.kfKey) {\n                    s.kfKey = k;\n                    s.porta.restart|if (k == s.kfKey) {\n                    s.kfKey = k;\n                    s.porta.restart
 order-osc|if (v->on) oscStart(*v, *v, ctl);\n    if (v->osc2.on) oscStart(*v, v->osc2, ctl.osc2);|if (v->osc2.on) oscStart(*v, v->osc2, ctl.osc2);\n    if (v->on) oscStart(*v, *v, ctl);
 order-render|                if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);\n                else std::fill(tmp2, tmp2 + 64, 0.0f);|                if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);\n                else std::fill(tmp2, tmp2 + 64, 1.0f);
@@ -95,3 +95,10 @@ sync-mask|            v.mod.setMask(mask2);|
 sync-la|if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;|
 struct-latch|v->structure = std::clamp(ctl.structure, 0, 2);|v->structure = 0;
 struct-pitch|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA,|c.update(v.curA,
+tva-off-times|        for (float& t : p.time) t = 0.0f;\n|
+tva-off-level|        p.level[3] = 1.0f;\n|
+tva-diff|const bool tvaChanged = c.tvaOn != ctl.tvaOn;|const bool tvaChanged = false;
+tva-off-gain|    v->gain = ctl.tvaOn ? v->velGain : 1.0f;|    v->gain = v->velGain;
+tva-legato-gain|        v.gain = ctl.tvaOn ? v.velGain : 1.0f;\n        v.env.update|        v.gain = v.velGain;\n        v.env.update
+tva-live-gain|        if (tvaChanged) v.gain = ctl.tvaOn ? v.velGain : 1.0f;\n|
+tva-latch|        if (tvaChanged) v.gain = ctl.tvaOn ? v.velGain : 1.0f;|        if (tvaChanged) v.gain = ctl.tvaOn ? xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve) : 1.0f;

@@ -3153,3 +3153,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The first version of the check had three tolerances: a floor under one unit, a near tolerance after a flush, and a limit far up an ENSEMBLE wave. Each one was hiding something real or fixable: the band players working 2^16 below where the firmware works, the start above, zeros not wide enough around a wave. Only SOLO's is left, and that one is known, since `XtSoloVoice` is not bit-exact. I would keep being suspicious of the next tolerance anyone adds here, mine included.
 - Reads past the end of things are not checkable: a wave's data, FM's line pool. The firmware reads whatever is in memory, the port reads 0, and the harness arranges for zeros. On a real unit those notes do something else, and nothing here can say what.
 - What this does not check is said in HARDWARE_FIRMWARE.md. The biggest: everything is still the interpreter, and a voice's leftovers from its last note are copied into the firmware's tone, so the allocator's choices are not tested.
+
+### Session 16 addendum (2026-11-02) — v101: the TVA Switch
+
+- The user asked for the control. I first took the switch to gate only the envelope, as my v100 notes said, and `xt_tone` disagreed at once: the level is 1 as well, so velocity goes too. Then it disagreed again: switching back on returns to the velocity factor of the note's start, not the knobs' current one. Neither was in the notes. That is what the check is for.
+- The default is the one real choice here. The XT's is off, the plugin's stays on. On keeps every render as it was and the amp knobs doing what they have always done. Whether the plugin should follow the XT and start off is the user's call, and I would want to see a real patch before changing it.
+

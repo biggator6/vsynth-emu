@@ -108,6 +108,7 @@ namespace Params {
     static const char* const kCosmEnvKnobs[10] = { "Attack", "Decay", "Sustain", "Release", "VelCurve", "VelSens",
                                                    "AttackSens", "DecaySens", "ReleaseSens", "TimeKF" };
     // Amp envelope, the XT's 0..127 knobs (XtEnvelope: times from the firmware's table)
+    static const juce::String kTvaSwitch    = "tvaSwitch";
     static const juce::String kAttack       = "ampAttack";
     static const juce::String kDecay        = "ampDecay";
     static const juce::String kSustain      = "ampSustain";
@@ -481,6 +482,7 @@ VSynthEmuProcessor::createParameterLayout() {
         params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "LfoKeySync"), ln + "Key Sync", false));
     }
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTvaSwitch, "TVA Switch", true));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kSustain, "Sustain", 0, 127, 127));
@@ -839,6 +841,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     }
     c.energy       = knob(Params::kEnergy);
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
+    c.tvaOn        = apvts.getRawParameterValue(Params::kTvaSwitch)->load() >= 0.5f;
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();
     c.decay        = (int)apvts.getRawParameterValue(Params::kDecay)->load();
     c.sustain      = (int)apvts.getRawParameterValue(Params::kSustain)->load();

@@ -69,6 +69,7 @@ private:
     juce::ComboBox   structBox_;
     // The MOD section: Switch, Type, Original Level, Attack and Release Times
     juce::ToggleButton modBtn_ { "MOD" };
+    juce::ToggleButton tvaBtn_ { "TVA" };
     juce::ComboBox   modTypeBox_;
     juce::Slider     modLevelSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     modAttackSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -182,6 +183,7 @@ private:
     std::unique_ptr<SliderAtt> portaTimeAtt_, portaSensAtt_;
     std::unique_ptr<ComboAtt>  structAtt_;
     std::unique_ptr<ButtonAtt> modAtt_;
+    std::unique_ptr<ButtonAtt> tvaAtt_;
     std::unique_ptr<ComboAtt>  modTypeAtt_;
     std::unique_ptr<SliderAtt> modLevelAtt_, modAttackAtt_, modReleaseAtt_;
     std::unique_ptr<ComboAtt>  monoAtt_;
