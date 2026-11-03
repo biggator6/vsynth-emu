@@ -526,48 +526,25 @@ void XtSynth::setControls(const Controls& c) {
     const OscDiff d1 = oscDiff(c, ctl), d2 = oscDiff(c.osc2, ctl.osc2);
     const bool portaChanged = c.portamento != ctl.portamento || c.portaTime != ctl.portaTime || c.portaVeloSens != ctl.portaVeloSens
                            || c.portaType != ctl.portaType;
-    // the COSM sections: a new block for the sounding voices (0x894ed8f0),
-    // their envelopes and LFOs new settings
+    // Any change is a tone update (0x894dc0b0), and it gives the sounding voices' COSM
+    // sections (0x894ed8f0) and MOD (0x894f1c60) a new block, whatever moved: a block's
+    // targets take the envelopes' levels without their rates, and the MOD's clears an
+    // old note's sync flag, so it is heard even with no COSM or MOD knob moved.
+    // Their envelopes and LFOs new settings.
     auto envDiff = [](const Controls::CosmEnv& a, const Controls::CosmEnv& b) {
         return a.attack != b.attack || a.decay != b.decay || a.sustain != b.sustain || a.release != b.release || a.aSens != b.aSens
             || a.dSens != b.dSens || a.rSens != b.rSens || a.timeKF != b.timeKF;
     };
-    bool cenvAChanged[2], cenvBChanged[2], clfoChanged[2], cosmChanged[2];
+    const bool anyChanged = !(c == ctl);
+    bool cenvAChanged[2], cenvBChanged[2], clfoChanged[2];
     for (int k = 0; k < 2; ++k) {
         const Controls::Cosm &n = c.cosm[k], &o = ctl.cosm[k];
         cenvAChanged[k] = envDiff(n.envA, o.envA);
         cenvBChanged[k] = envDiff(n.envB, o.envB);
         clfoChanged[k] = n.lfoWave != o.lfoWave || n.lfoRate != o.lfoRate || n.lfoOffset != o.lfoOffset || n.lfoDelay != o.lfoDelay
                       || n.lfoFadeMode != o.lfoFadeMode || n.lfoFade != o.lfoFade;
-        cosmChanged[k] = n.resoOwn != o.resoOwn || n.cutoffOwn != o.cutoffOwn || n.filter != o.filter || n.cutoff != o.cutoff || n.reso != o.reso || n.kf != o.kf || n.cutoffEnv != o.cutoffEnv
-                      || n.cutoffLfo != o.cutoffLfo || n.resoEnv != o.resoEnv || n.resoLfo != o.resoLfo || n.envA.velCurve != o.envA.velCurve
-                      || n.envA.velSens != o.envA.velSens || n.envB.velCurve != o.envB.velCurve || n.envB.velSens != o.envB.velSens
-                      || n.dualType != o.dualType || n.freq1 != o.freq1 || n.kf1 != o.kf1 || n.q1 != o.q1 || n.lfo1 != o.lfo1 || n.env1 != o.env1
-                      || n.freq2 != o.freq2 || n.kf2 != o.kf2 || n.q2 != o.q2 || n.lfo2 != o.lfo2 || n.env2 != o.env2
-                      || n.tbCutoff != o.tbCutoff || n.tbKf != o.tbKf || n.tbLfo != o.tbLfo || n.tbEnv != o.tbEnv || n.tbQ != o.tbQ
-                      || n.tbQFollow != o.tbQFollow || n.tbHpf != o.tbHpf || n.tbHpfKf != o.tbHpfKf || n.tbHpfLfo != o.tbHpfLfo
-                      || n.tbHpfEnv != o.tbHpfEnv || n.tbGain != o.tbGain || n.combOctave != o.combOctave || n.combDetune != o.combDetune
-                      || n.combDetuneLfo != o.combDetuneLfo || n.combDetuneEnv != o.combDetuneEnv || n.combTone != o.combTone
-                      || n.combToneLfo != o.combToneLfo || n.combToneEnv != o.combToneEnv || n.sb[0] != o.sb[0] || n.sb[1] != o.sb[1]
-                      || n.resType != o.resType || n.resSize != o.resSize || n.resSizeKf != o.resSizeKf || n.resSizeLfo != o.resSizeLfo
-                      || n.resSizeEnv != o.resSizeEnv || n.resBalance != o.resBalance || n.resBalanceLfo != o.resBalanceLfo
-                      || n.resBalanceEnv != o.resBalanceEnv || n.fsDepth != o.fsDepth || n.fsDepthKf != o.fsDepthKf
-                      || n.fsDepthLfo != o.fsDepthLfo || n.fsDepthEnv != o.fsDepthEnv || n.fsBalance != o.fsBalance
-                      || n.fsBalanceLfo != o.fsBalanceLfo || n.fsBalanceEnv != o.fsBalanceEnv || n.lofiBit != o.lofiBit
-                      || n.lofiRate != o.lofiRate || n.lofiFilter != o.lofiFilter || n.lofiFilterKf != o.lofiFilterKf
-                      || n.lofiFilterLfo != o.lofiFilterLfo || n.lofiFilterEnv != o.lofiFilterEnv || n.lofiBalance != o.lofiBalance
-                      || n.lofiBalanceLfo != o.lofiBalanceLfo || n.lofiBalanceEnv != o.lofiBalanceEnv || n.compAttack != o.compAttack
-                      || n.compSustain != o.compSustain || n.compLevel != o.compLevel || n.limThreshold != o.limThreshold
-                      || n.limRatio != o.limRatio || n.limAttack != o.limAttack || n.limRelease != o.limRelease || n.limLevel != o.limLevel
-                      || n.wsType != o.wsType || n.wsLevel != o.wsLevel || n.wsDrive != o.wsDrive || n.wsDriveLfo != o.wsDriveLfo
-                      || n.wsDriveEnv != o.wsDriveEnv || n.wsTone != o.wsTone || n.wsToneKf != o.wsToneKf || n.wsToneLfo != o.wsToneLfo
-                      || n.wsToneEnv != o.wsToneEnv || n.odType != o.odType || n.odLevel != o.odLevel || n.odDrive != o.odDrive
-                      || n.odDriveLfo != o.odDriveLfo || n.odDriveEnv != o.odDriveEnv || n.odTone != o.odTone || n.odToneKf != o.odToneKf
-                      || n.odToneLfo != o.odToneLfo || n.odToneEnv != o.odToneEnv || n.ampType != o.ampType || n.ampBass != o.ampBass
-                      || n.ampMiddle != o.ampMiddle || n.ampTreble != o.ampTreble || n.ampLevel != o.ampLevel || n.ampGain != o.ampGain
-                      || n.ampGainLfo != o.ampGainLfo || n.ampGainEnv != o.ampGainEnv || n.spkType != o.spkType;
     }
-    // the MOD: a new block for the sounding voices (0x894f5da0)
+    // the MOD's converter
     const bool modChanged = c.mod.on != ctl.mod.on || c.mod.type != ctl.mod.type || c.mod.level != ctl.mod.level || c.mod.attack != ctl.mod.attack
                          || c.mod.release != ctl.mod.release;
     ctl = c;
@@ -592,14 +569,16 @@ void XtSynth::setControls(const Controls& c) {
         };
         if (v.on) oscLive(v, ctl, d1);
         if (v.osc2.on) oscLive(v.osc2, ctl.osc2, d2);
-        if (modChanged) v.mod.setBlock(modBlk);
+        if (anyChanged) v.mod.setBlock(modBlk);
         for (int k = 0; k < 2; ++k) {
             Voice::CosmVoice& cv = v.cs[k];
             if (!cv.on) continue;
+            // the block first, on the envelopes' levels before this update (0x894dba00:
+            // 0x894f5be0, then 0x894f5cc0): a Sustain moved reaches it at the next tick
+            if (anyChanged) cosmSetBlock(v, k);
             if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));
             if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));
             if (clfoChanged[k]) cv.lfo.update(clfoParams(k));
-            if (cosmChanged[k]) cosmSetBlock(v, k);
         }
     }
 }
@@ -857,12 +836,13 @@ void XtSynth::legatoNote(int key, int vel) {
         };
         if (v.on) oscUpdate(v, ctl);
         if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);
+        v.mod.setBlock(modBlk);
         for (int k = 0; k < 2; ++k) {
             if (!v.cs[k].on) continue;
+            cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update
             v.cs[k].envA.update(cosmEnvParams(v, ctl.cosm[k].envA));
             v.cs[k].envB.update(cosmEnvParams(v, ctl.cosm[k].envB));
             v.cs[k].lfo.update(clfoParams(k));
-            cosmSetBlock(v, k);
         }
         auto oscGlide = [&](OscVoice& s, const OscControls& o) {
             s.porta.update(xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v.vel));
@@ -933,8 +913,19 @@ void XtSynth::allNotesOff() {
     keys.lastMonoHeld = keys.prevMonoHeld = keys.lastPolyHeld = keys.prevPolyHeld = false;
 }
 
+// The conversion pass only runs in the tone update (0x894dc0b0: the only caller of
+// 0x894ebbd0, and of 0x894dba00), so a bender move reaches a sounding tone as an update:
+// the COSMs and the MOD get a new block, as for any knob (setControls).
 void XtSynth::pitchBend(int value) {
-    bender = std::clamp(value, 0, 16383);
+    const int b = std::clamp(value, 0, 16383);
+    if (b == bender) return;
+    bender = b;
+    for (Voice& v : voice) {
+        if (!v.active) continue;
+        v.mod.setBlock(modBlk);
+        for (int k = 0; k < 2; ++k)
+            if (v.cs[k].on) cosmSetBlock(v, k);
+    }
 }
 
 // The tone update's TVA part (0x894f75f0 tail): stop a finished voice

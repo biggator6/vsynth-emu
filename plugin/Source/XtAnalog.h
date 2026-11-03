@@ -64,6 +64,7 @@ void xtAnalogMix(float* lr, const float* b, float scale = 1.0f);
 struct XtModParams {
     bool on = false;
     int type = 0, level = 127, attack = 0, release = 0;
+    bool operator==(const XtModParams&) const = default;
 };
 // The block (tone block +0x5dc), which the converter (0x894e0920) writes:
 //   off, or MIX    type 0, a = b = 1 (c left as it was)
@@ -198,6 +199,7 @@ struct XtAnalogParams {
     int fat = 0, fatKf = 0, fatLfo = 0, fatEnv = 0;
     int detune = 0;
     int subOctave = 0, subLevel = 127;
+    bool operator==(const XtAnalogParams&) const = default;
 };
 
 // The converter's analog block (the matrix and controller terms 0):

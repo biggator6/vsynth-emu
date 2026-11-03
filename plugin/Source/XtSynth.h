@@ -109,6 +109,7 @@ public:
         bool loop = false;
         int loopMode = 1;
         float loopStart = 0.0f, loopEnd = 1.0f;
+        bool operator==(const OscControls&) const = default;
     };
     struct Controls : OscControls {                 // OSC 1's in the base
         OscControls osc2 = [] { OscControls o; o.on = false; o.oscType = 0; return o; }();   // off until switched on, as the plugin has always played
@@ -155,6 +156,7 @@ public:
         struct CosmEnv {
             int attack = 0, decay = 0, sustain = 127, release = 127;
             int velCurve = 0, velSens = 32, aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
+            bool operator==(const CosmEnv&) const = default;
         };
         struct Cosm {
             bool on = false;
@@ -223,6 +225,7 @@ public:
             CosmEnv envA, envB;
             int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
             bool lfoKeySync = false;
+            bool operator==(const Cosm&) const = default;
         };
         Cosm cosm[2];
         // The MOD section (XtMod): Switch, Type 0 MIX, 1 RING, 2 FM, 3 ENV RING, 4
@@ -231,6 +234,7 @@ public:
         XtModParams mod;
         // Structure Type (ID 0x293): 0…2, Type1…Type3 on the panel (xtToneOrder).
         int structure = 0;
+        bool operator==(const Controls&) const = default;
     };
 
     XtSynth();
