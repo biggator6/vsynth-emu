@@ -1487,8 +1487,8 @@ The patch TVA settles it (v46, below): each update ramps its gain to the
 new target over exactly 441 samples. It counts the samples since the
 previous update in steps of the 32-sample block. So the tone update runs
 between blocks once per 441 samples, 10 ms at 44.1 kHz. The scheduler
-itself (a virtual call) is still not located, but nothing about the clock
-is left to infer.
+itself was located later ("The whole tone against XtSynth"), but nothing
+about the clock was left to infer.
 
 **Consumers.**
 - *The oscillator amp envelope* (voice +0x97c) drives the player's gain
@@ -1544,6 +1544,76 @@ stage time (+0x6c) and the onset level (+0x58).
 - velocity curves, envelope depth, A/D/R velocity sensitivity and Time KF;
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
+
+### The whole tone against XtSynth (2026-11-02, v100)
+
+Each port has its own check, but XtSynth, which wires them together from the knobs, had never been compared with a firmware tone. `xt_tone` (`XtToneCheck.cpp`) does that: the firmware from the parameter IDs on, XtSynth on the same `Controls` and notes, compared inside XtSynth's block. v93…v100 are what it found.
+
+**What runs on the firmware's side.** Nothing of its path is set by hand.
+- The parameter getter (`0x8947d310`, `0x8947d330`) is hooked and answers from a table made from `Controls`; any other ID gets its default (descriptor default − centre).
+- The updaters `0x894dfe10` make the part's tables. The note's start `0x894dc130(note, K, msg, key, [stack] A1, layer)` makes the block (`0x894db740`, `0x894db770`), the input tables (`0x894eb4d0`, which runs each converter) and the tone.
+- **The tone's constructor is `0x894f5860(this or 0, id)`.** `0x894f1f50` is only the voice's. `0x894f5860` gives the LFOs their vtables, so no stubs are left. It runs for every note: 8 LFO constructors, each drawing a seed, and the ramps.
+- `0x894db830(block, prev, key)` runs the tone's note-on `0x894f5e60`, then `0x894f4f70` starts it (+0xc = 2, by the vtable slot `0x894f6be0`).
+- Every 441 frames `0x894f1540` then the update `0x894f75f0(tone, 1)`; every block the render at tone +0x177c. A note-off is `0x894dc270(note)`, with the release velocity at note +0x2f. A sounding tone taking a note is `0x894dc1e0`. Truncation is `0x894d5ba0`; the part's `0x894d4a80` truncates all its notes, released ones too. A knob moved is the updaters and `0x894dc0b0(note)`.
+- Hooked: only the OS. Its locks (`0x89301920`, `30`, `50`, `60`, `860`) and clock (`0x89301940`), the voice allocator's lists (`0x894d9230`, `0x894d91a0`), the tone-end callbacks (`0x894db720`, `730`), `0x894796d0`, the COSM section marker `0x894798a0`, the COSM buffer pool (`0x894ec2b0`), and the wave store (`0x8949e5c0`, `0x8949e850` chunks, `0x8949ed70` bands, `0x8949e790`).
+- Run once before the first note: `0x894e5010` (the random pitch's seed), `0x894f1820` (the LFOs' seed), `0x894f1400(0x89fa90b0)` (the free LFOs), `0x894e5f80` (system calibration), `0x894fc4c0` (the TB filter's constants), the Truncate Time at `0x89d2a6d0 + 0x1602`, the OS object at `0x898585dc`.
+
+**Things the patch needs for it to sound as XtSynth's does.**
+- ID 0x113 Mono/Poly: 0 is MONO, 1 POLY.
+- ID 0x299 TVA Switch. Its default is off, which sets envelope 13's times to 0 and its levels to [0, 1, 1, 1, 0]. XtSynth has no such control and behaves as on. See the end of this section.
+- CC7 and CC11 at 127 and CC10 at 64 (controllers at C + 0x84 + cc, C = *N, N = *K), or the TVA's level is 0. The bender is the u16 at C + 0.
+- A wave's chunks: 2 header (+1 type, +2 stereo, +8 44000 u16, +0xa original key), 3 steps, 4 vplp (+0x1a = 1 so the Loop switch decides), 5 vpdt, 10 loop events (no loop: W2+0xb8, W2+0x16c = 0x7fffffff). Bands in slots 0, 2…6.
+
+**Where it is compared.** XtSynth has taps behind `XT_TONE_CHECK`: OSC 1, OSC 2, the mix, COSM's output. Every block: the four buffers, the TVA (+0xc level, +0x68, +0x6c gain, +0x60, +0x64 target, +0x58, +0x5c step) and the output, which is the frame's third pair on the bus, Output Assign MFX (+0x10, +0x14 of each 32-byte frame). At every update: the envelopes' outputs and stages, LFOs, pitch terms and ramps, the voices' fields, the free LFOs' phases.
+
+**Tolerance: none, but for SOLO.** Everything is bit for bit in the XT's units, the last stage included, because I changed XtSynth's TVA and output sum to the firmware's arithmetic rather than widen the check (v96). The only tolerance is on a SOLO wave's buffers and what follows them: 2% of the block's peak plus −108 dB of full scale (`kSoloTol`, `kSoloFloor`), since `XtSoloVoice` is not bit-exact (`xt_fw solocmp`). The worst seen is printed; the SOLO wave's envelopes, LFOs, pitch, walk and gains are still bit for bit.
+
+**The result.** fcheck: 2000 cases and the sweep, 3259 notes, 1301 taken by a sounding tone, 400 truncated, 277,762 blocks, 6.2 million checks, 0 different. 3000 cases and the sweep on each of four other seeds (777, 31337, 9, 4242), 0 different.
+
+**The cases.** Random settings over the OSCs, envelopes, LFOs, portamento, velocity and key follow, all sixteen COSM types, all five MOD Types, all three Structure Types, loops; analog OSC 1 and 2, and four waves on OSC 1 (mono and stereo SOLO, stereo BACKING, mono ENSEMBLE). A fifth of the cases each: a second note on a POLY part, on a MONO part with Legato, and without. A third move knobs during a note: half the whole panel with the bender, half one word of `Controls`. Some run past the wave's end. Idle time between cases, so the free LFOs must keep up. After these, **the sweep**: each field in one of XtSynth's lists of what changed, moved alone in a held note, once per envelope stage, with the bender moved alone as one more field. Only there can a field left out of a list not be hidden by another.
+
+**What it found.**
+- v93. A note's first pitch included the previous note's glide. The tone is constructed for each note, so its ramps start off (`0x894f4860`). XtSynth kept them on the voice.
+- v94. The LFOs at note-on, several things:
+  - The seed map starts at 0.7, not 0.3141 (`0x894f1820`, at `0x89f91c48`), in SH-4 arithmetic, and a tone draws eight seeds in order whichever LFOs are used.
+  - All of a tone's LFOs start whatever the OSC or COSM Switch.
+  - **The scheduler, which earlier notes had not found:** around `0x894f4d10`–`0x894f4d9c`. It computes n from the frames passed (× 0.000726 / 0.01), ticks `0x894f1540(0x89fa90b0, n)`, 384 free-LFO objects of 0x38 bytes at pool + 0x3040 (tick `0x894f09b0`, constructor `0x894f0950`, 1 Hz, phase 0), then updates each tone. The free LFOs run with nothing sounding, and their rate is set only at a key-unsynced note-on (`0x894f0a30`), not by the knob. XtSynth's took the phase after a first output, followed the knob and stopped without a sample. `XtLfoFree` is now just rate and phase.
+  - A key-unsynced LFO with a tone of the same part sounding copies the newest one (`0x894f0db0`: phase, last value, hold, chaos state). Only with none does it take the free object (`0x894f1590`, `0x894f0e60`).
+  - The fade decision at note-off reads the mode latched at the trigger (+0x2c), so a live edit does not change it.
+- v95. A PCM OSC's gain target at note-on was its start level, so an attack did not begin moving until the first update. The target (+0x154) is the envelope's output (`0x894f3dc0`), the follower (+0x158) starts at the start level (`0x894f3e20`).
+- v96. The TVA's gain is level × envelope, not envelope with level applied afterward, and a voice is over at the envelope's end *and* gain ≤ 2^−16 (`0x894f54b0`). The whole block, all OSCs and COSMs, now runs in the XT's units, the TVA and the sum in SH-4 arithmetic, ±1 only at the very end. Band players take the firmware's own gain (`setGainXt`), so a value 2^16 below flush is not lost: that was the reason the check first needed a tolerance on them.
+- v97. XtSynth stopped a voice 8192 frames after a wave's end. The firmware keeps it until its envelope ends. A player past the end is silent, but a COSM's tail rings on through the release, and XtSynth cut it.
+- v98. **The band players' start.** An OSC's note-on sets byte 0 bit 7 of the player, and `0x8950fa60` then takes the other path: the event before the position (`0x8950f9c0`), that event's records, each band's segments and records forward to the position (`0x89510bf0`). `xt_fw bandcmp` had never set that bit, so the port was checked on the other path, and followed it. It only shows when a walk starts backward (at the wave's end) and then turns forward: the port read its next segment past the list and restarted from the wave's start, the firmware stayed at the end. Now `xtFwBandPlay` sets the bit and the port takes this path. Two bandcmp lines added.
+- v99. **A tone update.** `0x894dba00`'s order is OSCs (`0x894f5e20`), COSMs (`0x894f5be0` twice), MOD (`0x894f5da0`), TVA (`0x894f5d10` twice), envelopes (`0x894f5cc0`), LFOs (`0x894f5c70`), and a legato (`0x894db8a0`) runs the same.
+  - COSM blocks go first, on the levels the COSM cached at its last update (object +0x104, +0x108, +0x10c). XtSynth set them after the envelopes, so a Sustain moved reached the block at once; on the XT it waits for the next tick.
+  - The pass runs on any change, whatever moved. A COSM block's targets take the levels without the rates, so it can be heard with no COSM knob moved. XtSynth compared a long list of COSM fields; `Controls` now has `operator==`, and the list is gone.
+  - The same pass is how the MOD's new block (`0x894f1c60`) arrives, and it clears an old OSC SYNC note's flag on Types 0…3. So a legato or any knob clears it, not only a MOD knob.
+  - A bender move is the same pass. The conversion `0x894ebbd0` and `0x894dba00` have only `0x894dc0b0` as caller, so a new value can reach a sounding tone no other way. `pitchBend` now sends the blocks. The message's path to `0x894dc0b0` is still not traced (the slot is in the vtable at `0x89833e30`, 12 bytes per entry); this is inference from the callers.
+
+**What the check needs from outside the tone, and does.** All of it is in `carryFrom`.
+- A firmware tone comes from a pool, XtSynth's voice keeps its objects. So before each note the port's analog fields (phases and whatever a waveform leaves), the DTVF's follower (D+0x98) and the MOD's (+0x18…+0x20, +0x28, +0x2c, +0x30, +0x40) are copied into the tone, and the MOD's tone number (+0x3c) is the voice's. Without this a note's start is not defined on either side. **So whether XtSynth's voice allocation hands the same leftovers as the XT's pool is not checked.**
+- Past the wave's data a player reads what lies there. The waves lie among 256 KB of zeros, what the port reads. On a real XT it is other memory. A note whose read leaves memory altogether, far up an ENSEMBLE wave, is left off and counted (about 2.5% of notes).
+- FM's far tap reads below its line pool into the lists of sounding tones. Those words read 0 during a render here, as in the port.
+
+**Planted errors.** `research/tools/mutate_tone.py [cases]` plants each error in `tone_muts.txt` in XtSynth.cpp through `PORT=tone mutate.sh` and runs the check. 97 planted, at fcheck's 2000 cases and the sweep: the pitch, key, velocity, envelope, LFO, portamento, legato, TVA, COSM, MOD and Structure wiring, the order of the stages, and the change lists. 96 are caught. The one that is not, `legato-order`, the COSM block after the envelopes in a legato, is exact: a legato moves no knob and a COSM envelope's Sustain does not depend on velocity, so its update leaves the level where it was. The order stays the firmware's. `cosm-lim`, the Limiter's Attack and Release swapped, needs about 2000 cases to catch, which is why fcheck runs 2000: the level must be over the threshold.
+
+**What is not covered.**
+- A real XT. Everything here is rom.2 in the interpreter.
+- The voice allocator and stealing: two notes at most, the part's note-on logic chosen in the harness as `0x894dbcb0` and `0x894dbea0` do.
+- The tick's timing against the audio: the firmware's update runs on XtSynth's clock. The scheduler's n is not checked.
+- The start state, as above, and everything before a note on the real panel: patch load, the editor.
+- The matrix, controllers other than the bender (CC7, CC10, CC11 at rest), Hold, the TVA's Level, Pan, LFO and sends (at defaults), velocity on the pitch, time and formant envelopes' depth paths beyond what the OSC converter takes.
+- PCM on OSC 2. EXT IN. Tempo sync, Time Trip, playback modes, start offset, the wave's tuning fields.
+- The loop's cached events: the firmware's builder is not found, and the check's are built apart from the port's by the same rule.
+- Mid-note OSC Switch, Type, Waveform, Sub Octave, Time Offset, Key Sync, Robot, Structure, COSM Switch, COSM Type and loop edits: held fixed in the live cases.
+- `Controls::pitchSemis`, the plugin's own shift, has no patch parameter here.
+- **Stereo OSC 1 into a COSM** and **both OSCs off**: excluded, below.
+
+**Decisions left, not changed.**
+- TVA Switch (ID 0x299) is off by default on the XT and XtSynth has no such control; it behaves as on. The harness sets it on.
+- With a stereo OSC 1 the firmware's COSMs take their stereo routines, and `XtCosm` has only the mono ones. The check turns COSMs off for stereo waves.
+- With both OSCs off XtSynth starts no voice, so the key state, random pitch and LFO seeds do not advance. The firmware starts a tone. The check keeps one OSC on.
+- Lo-Fi on a SOLO wave is replaced by TVF in the check: its quantizer turns the SOLO player's small differences into a step of its own.
 
 ### The Structure Types (2026-11-02, v92)
 
@@ -4962,7 +5032,8 @@ or rebuilt, `0x894ea290`):
   (`0x894e9330`, per part, 0x84 bytes each from 0x89d276b4).
 - With a range of 2 semitones, full up gives +1999 and full down −2000
   (1/10 cent).
-- How a bender move reaches a voice that is already sounding is not traced.
+- How a bender move reaches a voice that is already sounding: only through the tone update
+  `0x894dc0b0`, by the callers of the conversion pass (v99); the message's own path is not traced.
 
 **Portamento's source key** (+0x7c, in `0x894e4940`; clamped to 0…127; the
 note's own key means no glide). The note object at *param_2 points (+4) to

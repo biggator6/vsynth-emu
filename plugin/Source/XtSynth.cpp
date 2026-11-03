@@ -1004,6 +1004,9 @@ void XtSynth::mixBlock(float* lr) {
         // (int16 × 65536), as an analog OSC runs: the SOLO player's ±1 × 2^31; the band
         // players' gain is the firmware's (setGainXt)
         uint32_t mask2 = 0;
+#ifdef XT_TONE_CHECK
+        bool modDone = false;
+#endif
         for (const XtToneStep* st = xtToneOrder(v.structure); *st != XtToneStep::End; ++st) {
             switch (*st) {
             case XtToneStep::Osc2:
@@ -1046,7 +1049,14 @@ void XtSynth::mixBlock(float* lr) {
             case XtToneStep::End:
                 break;
             }
+#ifdef XT_TONE_CHECK
+            if (*st == XtToneStep::Mod) { modDone = true; std::copy(tmp, tmp + 64, tapMix); }
+            if (!modDone) { std::copy(tmp, tmp + 64, tapOsc1); std::copy(tmp2, tmp2 + 64, tapOsc2); }
+#endif
         }
+#ifdef XT_TONE_CHECK
+        std::copy(tmp, tmp + 64, tapCosm);
+#endif
         if (v.damping) {
             // truncated (0x894f5570): the gain held, times a fade that falls
             // by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16

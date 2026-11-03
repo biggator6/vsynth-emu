@@ -314,6 +314,14 @@ ANALOG X-MOD v87 (2026-11-02): X-MOD (code 13, 0x89507b60 at +0x96c)
   on the roadmap: MOD Types RING, FM, ENV RING, OSC SYNC; the other two Structure Types; the patch
   TVA's level and pan; PCM on OSC 2.
 
+Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone (HARDWARE_FIRMWARE.md, "The whole tone against XtSynth"). xt_tone
+  (XtToneCheck.cpp, XT_TONE_MAIN; XT_TONE_CHECK adds XtSynth's taps): the firmware from the parameter IDs on, only the OS hooked, compared inside the block,
+  bit for bit but a SOLO wave's buffers. fcheck runs 2000 cases and the sweep. XT_TONE_FIRST=1 prints each case's first difference, XT_TONE_DUMP=<case>|a its
+  settings. mutate_tone.py runs the planted errors in tone_muts.txt through PORT=tone mutate.sh. Found and fixed: v93 a note's first pitch had the last note's glide; v94 LFO seeds, the
+  free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
+  v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
+  Left for the user: TVA Switch, stereo COSM routines, both OSCs off. The scheduler is found: around 0x894f4d10. The tone's constructor is 0x894f5860.
+
 Structure Types v92 (2026-11-02): Type2 and Type3 (HARDWARE_FIRMWARE.md, "The Structure Types"). xtToneOrder, xtCosmOsc in XtAnalog; XtCosmSection (update, process)
   in XtCosm, XtSynth's CosmVoice derives from it. mixBlock walks the table; Voice::structure is latched at note-on, as the firmware only writes +0x1770 there. In Type3 COSM 2
   takes OSC 2's ratio, root and flag at note-on and OSC 2's ratio at each update, and its buffer stays in the XT's units (scale 1). The Structure passes in xt_analog run a live

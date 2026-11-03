@@ -18,6 +18,7 @@ X="$O/bin"
   echo "== xt_env"; "$X/xt_env" "$ROM" conv | tail -3
   for c in "0 127 0 100 40 300 2" "10 60 64 30 50 400 2" "50 90 20 80 120 600 0" "127 127 127 127 200 900 2" "0 0 127 0 5 60 0" "30 70 90 50 80 500 2"; do
     echo "env $c: $("$X/xt_env" "$ROM" $c | tail -1)"; done
+  [ -x "$X/xt_tone" ] && { echo "== xt_tone"; "$X/xt_tone" "$ROM" 2000 2024 "$WORK/inputs" | grep -v "^  "; }
   cd "$WORK/inputs"
   # solocmp <file> <channels> <R pitch ratio> <F formant ratio, 0 = none> <walk> <energy gain 0..1> <frames> [frame:walk ...]
   echo "== solocmp"

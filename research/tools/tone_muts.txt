@@ -1,0 +1,97 @@
+stale-porta|    v->porta = XtPitchRamp{};\n|
+seed-shift|oscLfoNoteOn(*v, ctl, freeLfo, other ? &other->lfo : nullptr, seed[1]);|oscLfoNoteOn(*v, ctl, freeLfo, other ? &other->lfo : nullptr, seed[2]);
+seed-few|    for (float& x : seed) x = drawSeed();|    for (int i = 0; i < 7; ++i) seed[i] = drawSeed();
+voice-end|if (v.env.done() && v.cur <= kSilent)|if (v.env.done() && mul(v.cur, 2.0f) <= kSilent)
+lfo-pitch-depth|xtPitchDepthCents((float)std::clamp(o.lfoPitchDepth, -63, 63))|xtPitchDepthCents((float)std::clamp(o.lfoTimeDepth, -63, 63))
+penv-depth|xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63))|xtPitchDepthCents((float)std::clamp(o.tDepth, -63, 63))
+root-key|s.analog ? 69 : o.rootKey|s.analog ? 60 : o.rootKey
+formant-env|s.fenv.level(),\n                          xtOscFormantEnvDepth|s.tenv.level(),\n                          xtOscFormantEnvDepth
+time-kf|xtOscTime(o.oscTime, o.oscTimeOffset, o.oscTimeKF, v.note)|xtOscTime(o.oscTime, o.oscTimeOffset, o.oscFormantKF, v.note)
+energy|g = xtOscEnergy(o.energy);|g = xtOscEnergy(o.energy / 2);
+level-kf|xtOscLevel(o.oscLevel, o.oscLevelKF, v.note,|xtOscLevel(o.oscLevel, 0, v.note,
+level-vel|xtVelGain(v.vel, o.oscVelSens, o.oscVelCurve)|xtVelGain(v.vel, ctl.ampVelSens, o.oscVelCurve)
+level-lfo|xtOscLevelLfoDepth(o.oscLevelLfoDepth)|xtOscLevelLfoDepth(o.lfoPitchDepth)
+osc2-flag|o.waveGain, 1.0f, 1.0f, &s == &v.osc2)|o.waveGain, 1.0f, 1.0f, false)
+gain-start|s.curGain = gainTarget(v, s, o, s.oenv.level());                                                  // +0x154 (0x894f3dc0)|s.curGain = gainStart;
+ana-env-swap|s.curGain, gainStart, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared)|s.curGain, gainStart, s.tenv.level(), s.fenv.level(), s.lfo.out(), anaShared)
+ana-update-swap|s.ana.update(analogBlock(v, s, o), A, gt, s.fenv.level(), s.tenv.level(), s.lfo.out());|s.ana.update(analogBlock(v, s, o), A, gt, s.tenv.level(), s.fenv.level(), s.lfo.out());
+amp-env-sens|k.aSens = o.oASens; k.dSens = o.oDSens; k.rSens = o.oRSens;|k.aSens = o.oASens; k.dSens = o.oRSens; k.rSens = o.oDSens;
+amp-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nvoid XtSynth::applyRates|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nvoid XtSynth::applyRates
+osc-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nXtEnvParams XtSynth::envParams|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nXtEnvParams XtSynth::envParams
+tva-env-rsens|k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens;|k.aSens = ctl.aSens; k.dSens = ctl.rSens; k.rSens = ctl.dSens;
+tva-time-kf|k.timeKF = ctl.timeKF;\n    return xtEnvAdsr|k.timeKF = 0;\n    return xtEnvAdsr
+tva-level|v->gain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);|v->gain = xtVelGain(v->vel, ctl.oscVelSens, ctl.ampVelCurve);
+tva-frames|float frames = 441.0f;|float frames = 440.0f;
+tva-land|xtf::mul(d, kLand) : v.step|xtf::mul(d, 0.03125f) : v.step
+tva-elapsed|v.elapsed += 32.0f;|v.elapsed += 33.0f;
+tva-noattack|constexpr float kNoAttackMs = 0x1.99999ap-4f;|constexpr float kNoAttackMs = 0x1.8p-4f;
+tva-truncate|v.damping = true;\n    v.damp = 1.0f;|v.damping = true;\n    v.damp = 0.5f;
+key-octave|return std::clamp(key + 12 * ctl.octave, 0, 127);|return std::clamp(key + 11 * ctl.octave, 0, 127);
+source-key|shiftKey(ctl.mono ? keys.prevMono : keys.prevPoly)|shiftKey(ctl.mono ? keys.prevPoly : keys.prevMono)
+porta-legato|ctl.portaMode == 1 && !held ? note|ctl.portaMode == 1 && held ? note
+porta-velo|xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v->vel)|xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, 0, v->vel)
+porta-tick|s.porta.tick(1);                               // 0x894f4b00, before the voice update|;
+bend|xtPitchBend(bender, ctl.bendUp, ctl.bendDown)|xtPitchBend(bender, ctl.bendDown, ctl.bendUp)
+scale-tune|t.scaleOn = ctl.scaleTune;|t.scaleOn = false;
+patch-fine|t.fine = ctl.patchFine + (int)(shift - semis * 100L);|t.fine = (int)(shift - semis * 100L);
+pitch-kf|xtPitchCents(key, coarse, 10 * o.pitchKF, fine,|xtPitchCents(key, coarse, 1000, fine,
+release-velocity|v.relVel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);|v.relVel = v.vel;
+lfo-off|                s.lfo.noteOff();\n|
+free-run-tick|freeLfo.tick(1);|;
+free-follow|else if (other) s.lfo.noteOnFollow(lfoParams(o), *other);|
+smooth-walk|s.curWalk = xtOscSmooth(s.curWalk, w);|s.curWalk = w;
+smooth-gain|s.curGain = xtOscSmooth(s.curGain, gt);|s.curGain = gt;
+legato-env|            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);|            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);
+legato-source|v.srcKey = shiftKey(keys.prevMono);|v.srcKey = shiftKey(keys.prevPoly);
+legato-level|v.gain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.env.update|v.env.update
+live-key|if (k != s.kfKey) {\n                    s.kfKey = k;\n                    s.porta.restart|if (k == s.kfKey) {\n                    s.kfKey = k;\n                    s.porta.restart
+order-osc|if (v->on) oscStart(*v, *v, ctl);\n    if (v->osc2.on) oscStart(*v, v->osc2, ctl.osc2);|if (v->osc2.on) oscStart(*v, v->osc2, ctl.osc2);\n    if (v->on) oscStart(*v, *v, ctl);
+order-render|                if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);\n                else std::fill(tmp2, tmp2 + 64, 0.0f);|                if (v.osc2.on) mask2 = v.osc2.ana.process(tmp2);\n                else std::fill(tmp2, tmp2 + 64, 1.0f);
+mix-skip|if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);|
+cosm-order|            case XtToneStep::Cosm1:\n                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f);|            case XtToneStep::Cosm1:\n                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
+cosm-tvf-env|else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());|else c.tvf.setBlock(cosmBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
+cosm-tvf-kf|p.cutoff = c.cutoff; p.keyfollow = c.kf / 10;|p.cutoff = c.cutoff; p.keyfollow = c.kf;
+cosm-vel|xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1|xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1
+cosm-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\n// A TVF's block|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\n// A TVF's block
+cosm-dual-env|p.freq2 = c.freq2; p.kf2 = c.kf2 / 10; p.q2 = c.q2; p.lfo2 = c.lfo2; p.env2 = c.env2;|p.freq2 = c.freq2; p.kf2 = c.kf2 / 10; p.q2 = c.q2; p.lfo2 = c.env2; p.env2 = c.lfo2;
+cosm-tb|p.q = c.tbQ; p.qFollow = c.tbQFollow;|p.q = c.tbQ; p.qFollow = 0;
+cosm-comb|p.octave = c.combOctave; p.detune = c.combDetune;|p.octave = c.combOctave; p.detune = -c.combDetune;
+cosm-sbf|const bool second = v.cs[k].type == 6;|const bool second = v.cs[k].type == 5;
+cosm-res|p.balance = c.resBalance; p.balanceLfo = c.resBalanceLfo; p.balanceEnv = c.resBalanceEnv;|p.balance = c.resBalance; p.balanceLfo = c.resBalanceEnv; p.balanceEnv = c.resBalanceLfo;
+cosm-fs|p.depth = c.fsDepth; p.depthKf = c.fsDepthKf / 10;|p.depth = c.fsDepth; p.depthKf = 0;
+cosm-lofi|p.bitDown = c.lofiBit; p.rateDown = c.lofiRate;|p.bitDown = c.lofiRate; p.rateDown = c.lofiRate;
+cosm-comp|p.attack = c.compAttack; p.sustain = c.compSustain;|p.attack = c.compSustain; p.sustain = c.compAttack;
+cosm-lim|p.attack = c.limAttack; p.release = c.limRelease;|p.attack = c.limRelease; p.release = c.limAttack;
+cosm-ws|p.driveLfo = c.wsDriveLfo; p.driveEnv = c.wsDriveEnv;|p.driveLfo = c.wsDriveEnv; p.driveEnv = c.wsDriveLfo;
+cosm-od|p.tone = c.odTone; p.toneKf = c.odToneKf / 10;|p.tone = c.odTone; p.toneKf = 0;
+cosm-amp|p.bass = c.ampBass; p.middle = c.ampMiddle;|p.bass = c.ampMiddle; p.middle = c.ampBass;
+cosm-spk|c.spk.noteOn({ ctl.cosm[k].spkType });|c.spk.noteOn({ 0 });
+cosm-lfo|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(k), seed[3 + k]);|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(k), seed[6]);
+cosm-update-env|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envA.level(), c.envA.smooth(), c.envB.level(), c.envB.smooth(),|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envB.level(), c.envB.smooth(), c.envA.level(), c.envA.smooth(),
+cosm-comb-root|s.robot \|\| s.analog \|\| !s.on);|s.robot \|\| !s.on);
+robot-any|v->robot = ctl.robot && v->on && !v->analog && cur->type == 1;|v->robot = ctl.robot && v->on && !v->analog;
+loop-mode|l.fwdMode = l.bwdMode = std::clamp(ctl.loopMode, 0, 2);|l.fwdMode = l.bwdMode = std::clamp(ctl.loopMode, 0, 1);
+loop-switch|l.on = ctl.loop;|l.on = false;
+mod-flag|v->mod.noteOn(modBlk, v->on && !v->analog && cur->channels == 2, false, v->on && v->analog, modShared,|v->mod.noteOn(modBlk, false, false, false, modShared,
+live-order|            if (anyChanged) cosmSetBlock(v, k);\n            if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));\n            if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));|            if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));\n            if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));\n            if (anyChanged) cosmSetBlock(v, k);
+any-changed|const bool anyChanged = !(c == ctl);|const bool anyChanged = !(c.cosm[0] == ctl.cosm[0]) \|\| !(c.cosm[1] == ctl.cosm[1]);
+diff-tva|\|\| c.aSens != ctl.aSens \|\| c.dSens != ctl.dSens \|\| c.rSens != ctl.rSens \|\| c.timeKF != ctl.timeKF;|\|\| c.aSens != ctl.aSens \|\| c.dSens != ctl.dSens \|\| c.rSens != ctl.rSens;
+diff-oenv|\|\| n.oASens != o.oASens \|\| n.oDSens != o.oDSens \|\| n.oRSens != o.oRSens \|\| n.oTimeKF != o.oTimeKF;|\|\| n.oASens != o.oASens \|\| n.oDSens != o.oDSens \|\| n.oRSens != o.oRSens;
+diff-lfo|d.lfo = n.lfoWave != o.lfoWave \|\| n.lfoRate != o.lfoRate \|\| n.lfoOffset != o.lfoOffset|d.lfo = n.lfoWave != o.lfoWave \|\| n.lfoOffset != o.lfoOffset
+diff-key|\|\| n.pitchKF != o.pitchKF \|\| c.pitchSemis != ctl.pitchSemis;|\|\| c.pitchSemis != ctl.pitchSemis;
+diff-porta|\|\| c.portaVeloSens != ctl.portaVeloSens|
+diff-cenv|return a.attack != b.attack \|\| a.decay != b.decay|return a.attack != b.attack
+diff-clfo|clfoChanged[k] = n.lfoWave != o.lfoWave \|\| n.lfoRate != o.lfoRate|clfoChanged[k] = n.lfoWave != o.lfoWave
+mod-tone|modShared, (int)(v - voice));|modShared, 0);
+mod-plain|                if (v.mod.plain()) {\n                    if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);\n                } else v.mod.process(tmp, tmp, tmp2);|                if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);
+mod-convert|    if (modChanged) xtModBlock(ctl.mod, modBlk);|
+mod-order|v.mod.process(tmp, tmp, tmp2);|v.mod.process(tmp, tmp2, tmp);
+bend-block|    bender = b;\n    for (Voice& v : voice) {\n        if (!v.active) continue;\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmSetBlock(v, k);\n    }|    bender = b;
+mod-any|        if (anyChanged) v.mod.setBlock(modBlk);|        if (modChanged) v.mod.setBlock(modBlk);
+mod-legato|        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);|        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);
+legato-order|            cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update\n            v.cs[k].envA.update(cosmEnvParams(v, ctl.cosm[k].envA));\n            v.cs[k].envB.update(cosmEnvParams(v, ctl.cosm[k].envB));|            v.cs[k].envA.update(cosmEnvParams(v, ctl.cosm[k].envA));\n            v.cs[k].envB.update(cosmEnvParams(v, ctl.cosm[k].envB));\n            cosmSetBlock(v, k);
+sync-input|v.ana.process(tmp, sync, tmp2);|v.ana.process(tmp, 0, tmp2);
+sync-mask|            v.mod.setMask(mask2);|
+sync-la|if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;|
+struct-latch|v->structure = std::clamp(ctl.structure, 0, 2);|v->structure = 0;
+struct-pitch|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA,|c.update(v.curA,

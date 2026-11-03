@@ -349,6 +349,9 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.
   SOLO agrees at −94…−109 dB in every direction, the port's usual
   output-stage residual.
+- XtSynth's wiring (v93–v100): a whole firmware tone, from the parameter IDs on, equals XtSynth inside its
+  block and at its output, bit for bit but for a SOLO wave's buffers, over random settings and a sweep of
+  every field in its change lists (`xt_tone`). Not the voice allocator, and not a real unit.
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**

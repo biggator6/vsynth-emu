@@ -378,4 +378,10 @@ private:
     XtAmpBlock ampBlock(const Voice& v, int k) const;
     void cosmSetBlock(Voice& v, int k);              // a new block for a sounding section (0x894ed8f0)
     float drawSeed();
+#ifdef XT_TONE_CHECK
+    // The whole-tone check (XtToneCheck.cpp): it reads a voice between blocks,
+    // and the last voice's stages in the XT's units (int16 × 65536) here.
+    friend struct XtToneProbe;
+    float tapOsc1[64] = {}, tapOsc2[64] = {}, tapMix[64] = {}, tapCosm[64] = {};
+#endif
 };

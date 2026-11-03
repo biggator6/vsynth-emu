@@ -13,6 +13,8 @@ cc -ffp-contract=off -DXT_FW_MAIN XtFirmware.cpp Sh4Interp.cpp XtMultiBandPlayer
 [ -f XtAnalog.cpp ] && cc -DXT_ANALOG_MAIN XtAnalog.cpp XtOsc.cpp XtCosm.cpp XtEnvelope.cpp XtFirmware.cpp XtMultiBandPlayer.cpp Sh4Interp.cpp -o "$O/xt_analog"
 cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
    $( [ -f XtCosm.cpp ] && echo XtCosm.cpp ) $( [ -f XtAnalog.cpp ] && echo XtAnalog.cpp ) XtFirmware.cpp Sh4Interp.cpp -o "$O/xt_synth"
+[ -f XtToneCheck.cpp ] && cc -DXT_TONE_MAIN -DXT_TONE_CHECK XtToneCheck.cpp XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
+   XtCosm.cpp XtAnalog.cpp XtFirmware.cpp Sh4Interp.cpp -o "$O/xt_tone"
 cc -DENGINE_TESTS_MAIN EngineTests.cpp VariphraseEngine.cpp PhaseVocoder.cpp SourceFilterModel.cpp XtSoloEncoder.cpp XtSoloVoice.cpp \
    XtMultiBandPlayer.cpp Sh4Interp.cpp XtFirmware.cpp -o "$O/engine_tests"
 cc -I. "$REPO/research/tools/rd.cpp" Sh4Interp.cpp -o "$O/rd"
