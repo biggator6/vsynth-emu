@@ -655,7 +655,6 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->raw = raw;
     v->srcKey = srcKey;
     v->age = clock++;
-    v->tail = 0;
     v->structure = std::clamp(ctl.structure, 0, 2);
     v->vel = vel;
     v->relVel = 64;
@@ -1037,11 +1036,7 @@ void XtSynth::mixBlock(float* lr) {
                     float l[32], r[32];
                     v.solo.render(l, r, 32);
                     for (int i = 0; i < 32; ++i) { tmp[2 * i] = l[i] * 0x1p31f; tmp[2 * i + 1] = r[i] * 0x1p31f; }
-                    if (v.solo.ended() && !v.osc2.on) v.tail += 32;
-                } else {
-                    v.mb.block(tmp);
-                    if (v.mb.ended() && !v.osc2.on) v.tail += 32;
-                }
+                } else v.mb.block(tmp);
                 break;
             }
             case XtToneStep::Mod:
@@ -1082,7 +1077,6 @@ void XtSynth::mixBlock(float* lr) {
             v.cur = xtf::add(v.cur, s);
         }
         v.elapsed += 32.0f;
-        if (v.tail > 8192) v.active = false;
     }
     // the voices are summed in the XT's units, as its output bus does; ±1 here
     for (int i = 0; i < 64; ++i) lr[i] *= 0x1p-31f;

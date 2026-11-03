@@ -283,7 +283,7 @@ private:
         int srcKey = -1;               // the key portamento glides from (the OSC's +0x7c)
         bool damping = false;          // truncated (0x894f5500): fading out over the Truncate Time
         float damp = 0;                // the TVA's fade (+0x54)
-        long age = 0, tail = 0;
+        long age = 0;
         float gain = 1;               // the patch TVA's velocity gain (0x894ea990)
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
         XtEnvelope env;
