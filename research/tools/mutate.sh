@@ -2,7 +2,8 @@
 # mutate.sh <name> <old> <new> [cases] [pattern]: a deliberate error in a port, to
 # show its firmware check catches it.  Copies plugin/Source/XtCosm.cpp (with
 # PORT=analog, XtAnalog.cpp; with PORT=analogcosm, XtCosm.cpp under xt_analog's
-# check; with PORT=tone, XtSynth.cpp, PORT=tonecosm, XtCosm.cpp, and PORT=toneanalog, XtAnalog.cpp, under xt_tone) with the first <old> replaced by
+# check; with PORT=tone, XtSynth.cpp, PORT=tonecosm, XtCosm.cpp, PORT=toneanalog, XtAnalog.cpp, PORT=toneband, XtMultiBandPlayer.cpp, and PORT=tonecheck, XtToneCheck.cpp, under xt_tone,
+# on seed $SEED, default 2024) with the first <old> replaced by
 # <new> (exact text), builds xt_cosm (xt_analog, xt_tone) from it in $WORK/mut/<name>, runs it on
 # [cases] (100) and prints the lines matching [pattern] (an extended regex;
 # default every result line).  A check that
@@ -12,9 +13,9 @@ source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
-if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
-    F=XtSynth.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp
-    D=XT_TONE_MAIN; ARGS=(2024 "$WORK/inputs")
+if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ] || [ "$PORT" = toneband ] || [ "$PORT" = tonecheck ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
+    F=XtSynth.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp; [ "$PORT" = toneband ] && F=XtMultiBandPlayer.cpp; [ "$PORT" = tonecheck ] && F=XtToneCheck.cpp
+    D=XT_TONE_MAIN; ARGS=("${SEED:-2024}" "$WORK/inputs")
     OBJ="$M/tone_obj"; mkdir -p "$OBJ"; L=()
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
     for f in XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtMultiBandPlayer XtEnvelope XtLfo XtOsc XtCosm XtAnalog XtFirmware Sh4Interp; do

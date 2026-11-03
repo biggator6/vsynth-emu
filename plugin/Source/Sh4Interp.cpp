@@ -138,7 +138,11 @@ bool Sh4::call(uint32_t addr, std::initializer_list<uint32_t> args, uint32_t sp,
     while (pc != kSentinel) {
         if (hookFilter[(pc >> 1) & 0xffff]) {
             auto h = hooks.find(pc);
-            if (h != hooks.end()) { h->second(*this); continue; }
+            if (h != hooks.end()) {
+                const uint32_t at = pc;
+                h->second(*this);
+                if (pc != at) continue;
+            }
         }
         // One instruction (plus its delay slot); a fetch across two pages goes the long way
         const uint32_t p = phys(pc), off = p & ((1u << kPageBits) - 1);

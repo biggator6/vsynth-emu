@@ -3224,6 +3224,19 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Which is why the forced knobs are pinned. With random knobs 14 of 48 cases showed nothing in the audio, and a Comb on a Limiter showed nothing in any of its three. A planted error per type is what would have shown that up, so all eleven lines have one now.
 - The fix made `live-order` exact, as predicted before writing it. A planted error can stop meaning anything when the code under it changes, and only re-running the list shows it.
 
+### Session 16 addendum (2026-11-03) — v108: seed 90210 case 9398, a band read far from its wave
+
+- The brief's guess was the words past OSC 2's buffer, the last tone's mix. They were equal to the end. The first useful fact was smaller: the trace stopped at block 62. A difference in the last block compared, in a case where a note then leaves memory, points at the read and not at the COSM.
+- Logging the reads showed a position of 2,146,351,899 and an address in P2. Running the firmware's six-instruction loop by hand from the record's numbers gave that value to the digit, which settled it faster than reading on would have. The loop adds a record's length once and then keeps subtracting the start from what it adds.
+- So this is the firmware's own slip, ported faithfully. Both sides reach the same absurd position. They differ only in what lies there: for the port nothing, for the firmware whatever `xt_tone` happens to keep 283 KB under the band, which was the wave's own vpdt.
+- The pad was the check's assumption that this could not happen. It held only near the wave. Widening it would have made the failure rarer without removing it, since the landing goes up to tens of megabytes.
+- I tried three behaviours on the same seed before choosing: count only, zeros, and leave the note off. Zeros was the surprise. All 611 notes that used to be dropped now run to the end, 2.6 million far reads, and nothing differs. I'd expected to have to chase something there.
+- Zeros also moved the draws, because a note no longer cut plays out its later draws. So seeds 3 and 4 going to 0 different means nothing, and seeds 1007 and 40000 showing a new case means little. Dumping those two showed stereo SOLO waves past the tolerance. It would have been easy to claim the first or worry about the second.
+- A tracing hook of mine left `pc` alone, which `Sh4::call` answered by calling it again forever, and the log reached 84 GB before I looked. The harness now needs such a hook anyway, so a hook that leaves `pc` alone is now followed by the instruction. Scratch traces go through `head -c` from now on.
+- Taking the fix out brings back the original failure to the digit.
+- v107's number was taken while I worked, and master moved under this. Moving onto it was worth doing properly, since v107 changes what a COSM reads and this case ends in one. Every number came back the same.
+- A sibling asked about seed 2007's case 9186. It looked free of SOLO only because `XT_TONE_DUMP` prints OSC 1's wave alone. OSC 2 had a SOLO wave. That print has now misled two of us.
+
 ### Session 16 addendum (2026-11-03) — v109: cheaper checks
 
 - The user asked why each task took so much time and CPU. Timing every step first was worth it: compiling, the obvious suspect, was 27 seconds. One run of the planted-error list cost about as much as twenty runs of `verify.sh`, and every run carried on through all its cases after the first difference. Half of them differ within 13 cases.
