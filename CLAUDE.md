@@ -79,6 +79,8 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - A tone's path (constructor `0x894f5860`, note start, update, the scheduler, what is hooked) is in
   HARDWARE_FIRMWARE.md, "The whole tone against XtSynth". Any change is a tone update (`0x894dc0b0`): all
   the blocks again, COSMs before the envelopes.
+- A COSM's new block reads levels it holds from its note-on or last 10 ms update (object +0x104…+0x110),
+  not the envelopes' output: `CosmVoice::hold` (v107). So the order of blocks and envelopes in an update has no effect.
 - The analog oscillator's map (waveform codes, routines, the converter's
   input, the hidden calibration IDs 0x528…0x55b) is in HARDWARE_FIRMWARE.md,
   "The analog oscillator, and SAW". A patch's waveform number is not the

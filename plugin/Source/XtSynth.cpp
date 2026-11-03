@@ -465,20 +465,20 @@ XtLimBlock XtSynth::limBlock(int k) const {
 // Filters' Detune (envB).
 void XtSynth::cosmSetBlock(Voice& v, int k) {
     Voice::CosmVoice& c = v.cs[k];
-    if (c.type == 4) { c.comb.setBlock(combBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out()); return; }
-    if (c.type == 5 || c.type == 6) { c.sbf.setBlock(sbfBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out()); return; }
-    if (c.type == 7) { c.res.setBlock(resBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
-    if (c.type == 8) { c.fs.setBlock(fsBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
-    if (c.type == 9) { c.lofi.setBlock(lofiBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
+    if (c.type == 4) { c.comb.setBlock(combBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo); return; }
+    if (c.type == 5 || c.type == 6) { c.sbf.setBlock(sbfBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo); return; }
+    if (c.type == 7) { c.res.setBlock(resBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
+    if (c.type == 8) { c.fs.setBlock(fsBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
+    if (c.type == 9) { c.lofi.setBlock(lofiBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
     if (c.type == 10) { c.comp.setBlock(compBlock(k)); return; }
     if (c.type == 11) { c.lim.setBlock(limBlock(k)); return; }
-    if (c.type == 12) { c.ws.setBlock(wsBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
-    if (c.type == 13) { c.od.setBlock(odBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out()); return; }
-    if (c.type == 14) { c.amp.setBlock(ampBlock(v, k), c.envA.level(), c.lfo.out()); return; }
+    if (c.type == 12) { c.ws.setBlock(wsBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
+    if (c.type == 13) { c.od.setBlock(odBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
+    if (c.type == 14) { c.amp.setBlock(ampBlock(v, k), c.heldA, c.heldLfo); return; }
     if (c.type == 15) { c.spk.setBlock({ ctl.cosm[k].spkType }); return; }
-    if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
-    else if (c.type == 3) c.tb.setBlock(tbBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
-    else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());
+    if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo);
+    else if (c.type == 3) c.tb.setBlock(tbBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo);
+    else c.tvf.setBlock(cosmBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo);
 }
 
 // The LFO constructor (0x894f0b40) seeds each LFO's chaos state from a global
@@ -582,8 +582,8 @@ void XtSynth::setControls(const Controls& c) {
         for (int k = 0; k < 2; ++k) {
             Voice::CosmVoice& cv = v.cs[k];
             if (!cv.on) continue;
-            // the block first, on the envelopes' levels before this update (0x894dba00:
-            // 0x894f5d10, then 0x894f5cc0): a Sustain moved reaches it at the next tick
+            // the block first (0x894dba00: 0x894f5d10, then 0x894f5cc0), on the held levels:
+            // a Sustain moved reaches it at the next tick, however many updates come first
             if (anyChanged) cosmSetBlock(v, k);
             if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));
             if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));
@@ -708,6 +708,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
         c.type = ctl.cosm[k].type;
         c.envA.noteOn(cosmEnvParams(*v, ctl.cosm[k].envA));
         c.envB.noteOn(cosmEnvParams(*v, ctl.cosm[k].envB));
+        c.hold();
         if (c.type == 2)
             c.dual.noteOn(dualBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
                           c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
@@ -1016,6 +1017,7 @@ void XtSynth::mixBlock(float* lr) {
             for (int k = 0; k < 2; ++k) {
                 Voice::CosmVoice& c = v.cs[k];
                 if (!c.on) continue;
+                c.hold();
                 c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envA.level(), c.envA.smooth(), c.envB.level(), c.envB.smooth(), c.lfo.out());
             }
             tvaUpdate(v);

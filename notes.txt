@@ -335,8 +335,11 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+COSM held levels v107 (2026-11-03): a new block reads levels the COSM holds from its note-on or last 10 ms update (+0x104...), as on the XT (HARDWARE_FIRMWARE.md, "The COSMs' held levels"). CosmVoice::hold, cosmSetBlock reads nothing live.
+  So a second update inside one tick no longer reads a moved Sustain. xt_tone compares the held words at every update and has a last forced section, a second update in a tick. live-order was exact after this, so it became held-live and one held-* per type.
+
 legato-order v105 (2026-11-03): the planted error was exact: on a legato the COSM block and an envelope's update touch nothing in common (HARDWARE_FIRMWARE.md, "A legato's order, and the COSMs' held levels").
-  The entry now plants the block ahead of the new key and velocity. Open, not fixed: a second update inside one tick. XtSynth's block reads the envelopes' live level, the firmware's the levels held at the last tick (+0x104...).
+  The entry now plants the block ahead of the new key and velocity. Found next to it, fixed in v107: a second update inside one tick.
   v99's labels of 0x894f5be0 (OSCs) and 0x894f5d10 (COSMs) corrected. A worktree under .claude cannot run ghidra.sh (Ghidra refuses a path element starting with '.'): pass the main checkout's absolute project path.
 
 COSM stereo routines v104 (2026-11-02): a stereo wave on the section's OSC takes another set of COSM routines (HARDWARE_FIRMWARE.md, "COSM: the stereo routines"). process(…, stereo) in

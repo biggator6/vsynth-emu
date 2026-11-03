@@ -249,12 +249,15 @@ env 127 127 127 127 200 900 2: identical
 env 0 0 127 0 5 60 0: identical
 env 30 70 90 50 80 500 2: identical
 == xt_tone
-tone: 3278 notes, 1267 taken by a sounding tone, 407 truncated, 250114 blocks, 5581967 checks
+tone: 3278 notes, 1267 taken by a sounding tone, 407 truncated, 250114 blocks, 5673769 checks
 tone: a SOLO wave's buffers within 2.8e-03 of the block's peak; 70 notes left off, a read outside memory
 tone: 0 different
-tone, a wave on OSC 2: 1361 notes, 354 taken by a sounding tone, 185 truncated, 95031 blocks, 1805868 checks
+tone, a wave on OSC 2: 1361 notes, 354 taken by a sounding tone, 185 truncated, 95031 blocks, 1833484 checks
 tone, a wave on OSC 2: a SOLO wave's buffers within 1.2e-02 of the block's peak; 144 notes left off, a read outside memory
 tone, a wave on OSC 2: 0 different
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 103576 checks
+tone, a second update in a tick: a SOLO wave's buffers within 0.0e+00 of the block's peak; 0 notes left off, a read outside memory
+tone, a second update in a tick: 0 different
 == solocmp
 solo vocal.bin 1 1.0 0 1.0 0 30000: 461 records, 30000 frames: max |firmware - port| 3.05e-06, difference -83.6 dB against the signal (rms 0.0146), first at 1
 solo vocal.bin 1 1.5 1.25 1.0 0.25 30000: 461 records, 30000 frames: max |firmware - port| 3.23e-06, difference -99.5 dB against the signal (rms 0.0593), first at 2

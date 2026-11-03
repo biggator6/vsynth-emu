@@ -49,7 +49,7 @@ order-osc|if (v->on) oscStart(*v, *v, ctl);\n    if (v->osc2.on) oscStart(*v, v-
 order-render|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 0.0f);|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 1.0f);
 mix-skip|if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);|
 cosm-order|                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
-cosm-tvf-env|else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());|else c.tvf.setBlock(cosmBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
+cosm-tvf-env|else c.tvf.setBlock(cosmBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo);|else c.tvf.setBlock(cosmBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo);
 cosm-tvf-kf|p.cutoff = c.cutoff; p.keyfollow = c.kf / 10;|p.cutoff = c.cutoff; p.keyfollow = c.kf;
 cosm-vel|xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1|xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1
 cosm-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\n// A TVF's block|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\n// A TVF's block
@@ -73,7 +73,20 @@ robot-any|v->robot = ctl.robot && v->on && !v->analog && v->wave->type == 1;|v->
 loop-mode|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 2);|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 1);
 loop-switch|l.on = o.loop;|l.on = false;
 mod-flag|v->mod.noteOn(modBlk, stereo(*v), stereo(v->osc2), v->on && v->analog, modShared,|v->mod.noteOn(modBlk, false, false, false, modShared,
-live-order|            if (anyChanged) cosmSetBlock(v, k);\n            if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));\n            if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));|            if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));\n            if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));\n            if (anyChanged) cosmSetBlock(v, k);
+held-live|    Voice::CosmVoice& c = v.cs[k];\n    if (c.type == 4) { c.comb.setBlock|    Voice::CosmVoice& c = v.cs[k];\n    c.hold();\n    if (c.type == 4) { c.comb.setBlock
+held-note-on|        c.hold();\n        if (c.type == 2)\n|        if (c.type == 2)\n
+held-tick|                c.hold();\n                c.update(xtCosmOsc|                c.update(xtCosmOsc
+held-comb|c.comb.setBlock(combBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo)|c.comb.setBlock(combBlock(v, k), c.envB.level(), c.heldLfo, c.envA.level(), c.heldLfo)
+held-sbf|c.sbf.setBlock(sbfBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo)|c.sbf.setBlock(sbfBlock(v, k), c.envB.level(), c.heldLfo, c.envA.level(), c.heldLfo)
+held-res|c.res.setBlock(resBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo)|c.res.setBlock(resBlock(v, k), c.envA.level(), c.heldLfo, c.envB.level(), c.heldLfo)
+held-fs|c.fs.setBlock(fsBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo)|c.fs.setBlock(fsBlock(v, k), c.envA.level(), c.heldLfo, c.envB.level(), c.heldLfo)
+held-lofi|c.lofi.setBlock(lofiBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo)|c.lofi.setBlock(lofiBlock(v, k), c.envA.level(), c.heldLfo, c.envB.level(), c.heldLfo)
+held-ws|c.ws.setBlock(wsBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo)|c.ws.setBlock(wsBlock(v, k), c.envA.level(), c.heldLfo, c.envB.level(), c.heldLfo)
+held-od|c.od.setBlock(odBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo)|c.od.setBlock(odBlock(v, k), c.envA.level(), c.heldLfo, c.envB.level(), c.heldLfo)
+held-dual|c.dual.setBlock(dualBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo)|c.dual.setBlock(dualBlock(v, k), c.envA.level(), c.heldLfo, c.envB.level(), c.heldLfo)
+held-tb|c.tb.setBlock(tbBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo)|c.tb.setBlock(tbBlock(v, k), c.envA.level(), c.heldLfo, c.envB.level(), c.heldLfo)
+held-tvf|c.tvf.setBlock(cosmBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo)|c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.heldLfo, c.envA.level(), c.heldLfo)
+held-amp|c.amp.setBlock(ampBlock(v, k), c.heldA, c.heldLfo)|c.amp.setBlock(ampBlock(v, k), c.envA.level(), c.heldLfo)
 any-changed|const bool anyChanged = !(c == ctl);|const bool anyChanged = !(c.cosm[0] == ctl.cosm[0]) \|\| !(c.cosm[1] == ctl.cosm[1]);
 diff-tva|\|\| c.aSens != ctl.aSens \|\| c.dSens != ctl.dSens \|\| c.rSens != ctl.rSens \|\| c.timeKF != ctl.timeKF;|\|\| c.aSens != ctl.aSens \|\| c.dSens != ctl.dSens \|\| c.rSens != ctl.rSens;
 diff-oenv|\|\| n.oASens != o.oASens \|\| n.oDSens != o.oDSens \|\| n.oRSens != o.oRSens \|\| n.oTimeKF != o.oTimeKF;|\|\| n.oASens != o.oASens \|\| n.oDSens != o.oDSens \|\| n.oRSens != o.oRSens;

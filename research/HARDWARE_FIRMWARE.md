@@ -1545,9 +1545,41 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The COSMs' held levels (2026-11-03, v107)
+
+This fixes the difference v105 found: a second update inside one tick. A COSM's new block took the envelopes' live output, where the firmware takes the levels from its last tick. (v106 is on another branch.)
+
+**The firmware.** Two routines write a COSM's +0x104…+0x110, from the bound envelopes' +0x4c and LFOs' +0x38: the note-on (`0x894edf70`, just before it calls the block copy `0x894ee4a0`) and the 10 ms update (`0x894ee6a0`). A new block reads those words (`0x894ed8f0` for the TVF). So it gets the levels as of the last tick, however many updates come first.
+
+**XtSynth.** `CosmVoice` holds `heldA`, `heldB` and `heldLfo`. `hold()` takes them at the note-on and just before the update, and `cosmSetBlock` reads nothing else. An LFO's output only changes in its tick, so holding it changes nothing; it is held because the firmware does, and so that the block reads nothing live. The block still comes before the envelopes in `setControls` and `legatoNote`, the firmware's order, but that order now has no effect.
+
+**The check, two additions.**
+- The held words themselves, at every update and for every type, by what the binding put in each slot (`cosm N held level`). They are equal, so no other writer of those words shows up, which v105 could not say.
+- A last section of 48 cases, `tone, a second update in a tick`: each of the sixteen types on COSM 1, with COSM 2 seven types on, times three second updates. A Sustain moves in the sustain stage at block 60, followed straight away by a legato, the same knob again, or the bender. v105 ran only the legato; the other two were by reading.
+- The section's knobs are pinned to the middle. With them drawn at random, 14 of the 48 cases showed nothing in the audio. I did not work out why for each; a target at its limit and a silent output are the likely causes. That matters because an error in one type's `setBlock` line leaves the held words right, so only the audio can catch it.
+- The section comes last, so no earlier draw moves. The baseline's diff is two counts of checks and three new lines; notes and blocks are unchanged.
+
+**Results.**
+- fcheck's seed: 0 different in all three sections.
+- Seeds 1, 2, 3, 4, 5007 and 90210 at 6000 cases: the same differences as v105's build, apart from the new section, 0 different on all six. The four cases v105 listed on seeds 3, 4 and 90210 are still there. They have another cause.
+- The old behaviour planted (`held-live`): 0 and 0 different in the two earlier sections, 3541 in the new one. So only this section sees it.
+
+**Planted errors.** `live-order` is exact now, as v105 predicted, 0 different, so it is gone. `cosm-tvf-env` follows the new names. Fourteen are new, all caught at 2000 cases:
+
+| Planted | Different |
+|---|---|
+| `held-live`, the block on the live levels | 3541 |
+| `held-note-on`, not taken at the note-on | 112,233 |
+| `held-tick`, not taken at the update | 147,621 |
+| `held-tvf`, `-dual`, `-tb`, `-comb`, `-sbf`, `-res`, `-fs`, `-lofi`, `-ws`, `-od`, `-amp`: one type's line on the live levels | 240 to 962 |
+
+`mutate_tone.py`, the whole list of 142: all caught.
+
+**What it changes in sound.** Only a second update inside one tick after a Sustain moved in the sustain stage, and then a block's target by up to 10 ms. In the plugin that takes a host buffer under 441 samples, since `setControls` runs once per buffer. `verify.sh` green: fcheck as the new baseline, A/B 4/4 identical against v105, PluginTest 4/4 bit-identical, engine tests, auval.
+
 ### A legato's order, and the COSMs' held levels (2026-11-03, v105)
 
-The planted error `legato-order` moved `cosmSetBlock` after the two envelopes' `update` in `legatoNote`, and `xt_tone` passed it from v99 on. v99 called it exact without showing it. It is exact, and looking into why turned up a real difference next to it, which is not fixed here.
+The planted error `legato-order` moved `cosmSetBlock` after the two envelopes' `update` in `legatoNote`, and `xt_tone` passed it from v99 on. v99 called it exact without showing it. It is exact, and looking into why turned up a real difference next to it, which is not fixed here (v107 fixes it).
 
 **Why the order makes no difference.** On a legato the two touch nothing in common.
 - `cosmSetBlock` reads the envelopes' `level()`, the LFO's `out()`, the voice's note and velocity and the knobs, and writes only the section's block and targets.
@@ -1566,7 +1598,7 @@ The planted error `legato-order` moved `cosmSetBlock` after the two envelopes' `
 
 **What does matter on a legato.** Only that the block comes after the new key and velocity. `legato-order` now plants that: the block ahead of `v.note = key`. It is caught, 115,606 + 8,289 different at 2000 cases. Dropping the block altogether gives 116,409 + 8,032. Nothing in the list covered a legato's COSM block before.
 
-**Still different from the firmware, not fixed: a second update inside one tick.** XtSynth's block reads the envelopes' live `level()`. v99's "block first" stands in for the firmware's held levels, but only for the first update after a tick. Move a Sustain in the sustain stage, and a legato before the next tick gives:
+**Still different from the firmware, not fixed here (see v107): a second update inside one tick.** XtSynth's block reads the envelopes' live `level()`. v99's "block first" stands in for the firmware's held levels, but only for the first update after a tick. Move a Sustain in the sustain stage, and a legato before the next tick gives:
 - XtSynth: the block takes the moved level, because the knob's update has already moved the output.
 - Firmware: the block takes the held level, until the next tick.
 
@@ -1890,7 +1922,6 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 - A real XT. Everything here is rom.2 in the interpreter.
 - The voice allocator and stealing: two notes at most, the part's note-on logic chosen in the harness as `0x894dbcb0` and `0x894dbea0` do.
 - The tick's timing against the audio: the firmware's update runs on XtSynth's clock. The scheduler's n is not checked.
-- A second update inside one tick. Each case moves its knobs once, and XtSynth's COSM block reads the live level where the firmware's reads a held one: known different, see v105.
 - The start state, as above, and everything before a note on the real panel: patch load, the editor.
 - The matrix, controllers other than the bender (CC7, CC10, CC11 at rest), Hold, the TVA's Level, Pan, LFO and sends (at defaults), velocity on the pitch, time and formant envelopes' depth paths beyond what the OSC converter takes.
 - PCM on OSC 2. EXT IN. Tempo sync, Time Trip, playback modes, start offset, the wave's tuning fields.

@@ -3205,3 +3205,10 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Random cases would not have found this soon: of 3456 legato envelope updates at 2000 cases, 3 were in the sustain stage.
 - Reading the routines also showed two of v99's labels were wrong. Its conclusion was right anyway. Each label had looked plausible from the address order alone.
 - I did not fix the difference here: it changes XtSynth and makes `live-order` exact, so it is its own version.
+
+### Session 16 addendum (2026-11-03) — v107: the COSMs' held levels
+
+- The fix itself is small. Most of this version is the check around it.
+- Comparing the held words directly made the check much stronger than the forced case alone, and it answered what v105 left open, whether anything else writes those words. It can't see one type's `setBlock` line reading the live level, though, because the words stay right. Only the audio shows that.
+- Which is why the forced knobs are pinned. With random knobs 14 of 48 cases showed nothing in the audio, and a Comb on a Limiter showed nothing in any of its three. A planted error per type is what would have shown that up, so all eleven lines have one now.
+- The fix made `live-order` exact, as predicted before writing it. A planted error can stop meaning anything when the code under it changes, and only re-running the list shows it.

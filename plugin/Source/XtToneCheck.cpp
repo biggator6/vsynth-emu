@@ -31,7 +31,8 @@
 //
 // The random cases are followed by a sweep: each field XtSynth keeps in a list of what
 // has changed moved alone during a note, in each stage of the envelopes; then by cases
-// with a wave on OSC 2, its own, over OSC 1 off, analog or on another wave.
+// with a wave on OSC 2, its own, over OSC 1 off, analog or on another wave; then by
+// cases with a second update inside one tick, after a Sustain moved in the sustain stage.
 #ifdef XT_TONE_MAIN
 #include <algorithm>
 #include <cmath>
@@ -711,17 +712,20 @@ int XtToneProbe::run(int argc, char** argv) {
         worstSolo = 0;
     };
     const int nOsc2 = waves.empty() ? 0 : nCases / 2;
-    for (int g = 0; g < nCases + nSweep + nOsc2; ++g) {
+    const int tickFrom = nCases + nSweep + nOsc2, nTick = 16 * 3;     // each COSM type, each kind of second update
+    for (int g = 0; g < tickFrom + nTick; ++g) {
         rep.caseNo = g;
-        const bool osc2Case = g >= nCases + nSweep;
+        const bool twoInTick = g >= tickFrom;
+        const bool osc2Case = g >= nCases + nSweep && !twoInTick;
         if (g == nCases + nSweep) summary("tone");
-        const bool sweep = g >= nCases && !osc2Case;
+        if (nOsc2 && g == tickFrom) summary("tone, a wave on OSC 2");
+        const bool sweep = g >= nCases && g < nCases + nSweep;
         const size_t sweepAt = sweep ? listed[(size_t)(g - nCases) / 4] : 0;
         const int sweepStage = sweep ? (g - nCases) % 4 : 0;
         // one case in two plays a wave on OSC 1 (with the analog OSC 2 or alone); the last
         // ones a wave on OSC 2, over OSC 1 off, analog or on another wave
         const TestWave* wv2 = osc2Case ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
-        const TestWave* wv = !sweep && !waves.empty() && g % 2 == 1 ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
+        const TestWave* wv = !sweep && !twoInTick && !waves.empty() && g % 2 == 1 ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
         if (wv && wv == wv2) wv = &waves[(size_t)((wv - waves.data() + 1) % (long)waves.size())];   // a wave's loop is its own
         Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr);
         if (sweep) {
@@ -764,6 +768,32 @@ int XtToneProbe::run(int argc, char** argv) {
                 }
             ctl.aSens = ctl.dSens = ctl.rSens = 20;
         }
+        if (twoInTick) {
+            // analog on both OSCs, sounding at once, no MOD; both COSMs at a Sustain soon, every
+            // Env depth on, the knobs in the middle so that no target stands at a limit: what a
+            // new block takes from the envelopes can be heard
+            ctl.tvaOn = true;
+            ctl.mod.on = false;
+            ctl.attack = ctl.decay = 0; ctl.sustain = 100; ctl.ampVelSens = 0;
+            for (OscC* o : { static_cast<OscC*>(&ctl), static_cast<OscC*>(&ctl.osc2) }) {
+                o->on = true;
+                o->oscLevel = 100; o->oscLevelKF = 0; o->oscVelSens = 0;
+                o->oAttack = o->oDecay = 0; o->oSustain = 100;
+            }
+            for (int k = 0; k < 2; ++k) {
+                Ctl::Cosm& c = ctl.cosm[k];
+                c.on = true;
+                c.type = (g - tickFrom + 7 * k) % 16;
+                c.filter = 1; c.cutoff = c.reso = c.freq1 = c.q1 = c.freq2 = c.q2 = c.tbCutoff = c.tbQ = c.tbHpf = c.tbGain = c.combTone = c.resSize = c.fsDepth = c.lofiFilter = 64;
+                c.wsLevel = c.wsDrive = c.wsTone = c.odLevel = c.odDrive = c.odTone = c.ampLevel = c.ampGain = 64;
+                c.resBalance = c.fsBalance = c.lofiBalance = 50;
+                c.lofiBit = 2; c.lofiRate = 1;
+                c.cutoffEnv = c.resoEnv = c.env1 = c.env2 = c.tbEnv = c.tbHpfEnv = c.combDetuneEnv = c.combToneEnv = c.resSizeEnv = c.resBalanceEnv = 40;
+                c.fsDepthEnv = c.fsBalanceEnv = c.lofiFilterEnv = c.lofiBalanceEnv = c.wsDriveEnv = c.wsToneEnv = c.odDriveEnv = c.odToneEnv = c.ampGainEnv = 40;
+                for (Ctl::Cosm::SideBand& b : c.sb) { b.hpf = b.q = b.lpf = b.width = 64; b.detuneEnv = b.widthEnv = 40; }
+                for (Ctl::CosmEnv* e : { &c.envA, &c.envB }) { e->attack = e->decay = 0; e->sustain = 90; e->velSens = 0; }
+            }
+        }
         // Some stereo cases where the stereo Side Band follower's words past the block matter:
         // COSM 1 on OSC 1's buffer, OSC 2 sounding next to it, the level moving Width and Detune.
         // At random this is rare enough for 2000 cases to miss it.  Only with OSC 1 on already:
@@ -793,7 +823,7 @@ int XtToneProbe::run(int argc, char** argv) {
         if ((wv && wv->type == 1) || (wv2 && wv2->type == 1)) for (Ctl::Cosm& k : ctl.cosm) if (k.type == 9) k.type = 0;
         // what the case does besides one note: 0 none, 1 a second note on a POLY part,
         // 2 on a MONO part with Legato, 3 on a MONO part without
-        const int kind = sweep ? 2 : g % 5 == 0 ? 1 : g % 5 == 1 ? 2 : g % 5 == 2 ? 3 : 0;
+        const int kind = sweep || twoInTick ? 2 : g % 5 == 0 ? 1 : g % 5 == 1 ? 2 : g % 5 == 2 ? 3 : 0;
         ctl.mono = kind >= 2;
         ctl.legato = kind == 2;
         if (wv) {
@@ -810,11 +840,11 @@ int XtToneProbe::run(int argc, char** argv) {
             fw.wave2 = wv2->fw;
             fw.c.wr8(wv2->fw.chunk[2] + 0xa, (uint8_t)ctl.osc2.rootKey);
         }
-        const int raw[2] = { sweep ? 48 : r.range(0, 127), sweep ? 72 : r.range(0, 127) }, vel[2] = { r.range(1, 127), r.range(1, 127) }, relVel[2] = { r.range(1, 127), r.range(1, 127) };
-        const int nBlocks = sweep ? 90 : g % 23 == 7 ? 700 : 60 + r.range(0, 120);     // some long enough to run past a wave's end
-        const int secondAt = sweep ? 1 : kind && raw[0] != raw[1] ? r.range(1, 30) : -1;
-        const int offAt[2] = { sweep ? (sweepStage == 3 ? 3 : 1000) : 20 + r.range(0, 40), sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
-        const int liveAt = sweep ? (sweepStage >= 2 ? 50 : 20) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
+        const int raw[2] = { sweep || twoInTick ? 48 : r.range(0, 127), sweep || twoInTick ? 72 : r.range(0, 127) }, vel[2] = { r.range(1, 127), r.range(1, 127) }, relVel[2] = { r.range(1, 127), r.range(1, 127) };
+        const int nBlocks = sweep || twoInTick ? 90 : g % 23 == 7 ? 700 : 60 + r.range(0, 120);     // some long enough to run past a wave's end
+        const int secondAt = twoInTick ? -1 : sweep ? 1 : kind && raw[0] != raw[1] ? r.range(1, 30) : -1;
+        const int offAt[2] = { twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 3 : 1000) : 20 + r.range(0, 40), twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
+        const int liveAt = twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
         // the free-running LFOs' phases, once a note has shown which objects they are
         for (int n = 0; n < 2; ++n) {
             if (!fwFree[n]) continue;
@@ -901,6 +931,19 @@ int XtToneProbe::run(int argc, char** argv) {
                 ++rep.checks;
                 if (!bits(la, lb)) rep.bad("cosm " + std::to_string(k + 1) + " lfo output", "fw %.9g port %.9g", la, lb, blk);
             }
+            // the levels a new block reads, by what the binding put in each slot
+            for (int k = 0; k < 2; ++k) {
+                const XtSynth::Voice::CosmVoice& c = v.cs[k];
+                if (!c.on) continue;
+                const uint32_t O = n.TN + (k ? 0x14ec : 0x1388), a = Firmware::envAt(n, 9 + 2 * (uint32_t)k), b = Firmware::envAt(n, 10 + 2 * (uint32_t)k), l = Firmware::lfoAt(n, 3 + (uint32_t)k);
+                for (uint32_t s = 0; s < 4; ++s) {
+                    const uint32_t bound = fw.c.rd32(O + 0x150 + 4 * s);
+                    if (bound != a && bound != b && bound != l) continue;
+                    const float x = fw.f32(O + 0x104 + 4 * s), y = bound == a ? c.heldA : bound == b ? c.heldB : c.heldLfo;
+                    ++rep.checks;
+                    if (!bits(x, y)) rep.bad("cosm " + std::to_string(k + 1) + " held level", "fw %.9g port %.9g", x, y, blk);
+                }
+            }
             for (int o = 0; o < 2; ++o) {
                 XtSynth::OscVoice& s = osc(v, o);
                 if (!s.on) continue;
@@ -977,6 +1020,23 @@ int XtToneProbe::run(int argc, char** argv) {
             compareAll(blk);
             return true;
         };
+        // Knobs moved, or the bender: the part's tables and each note's update on the firmware's
+        // side, setControls or pitchBend on XtSynth's
+        auto moveLive = [&](const Ctl& n, int bentFrom, int blk) {
+            const bool panelMoved = !(n == ctl), moved = panelMoved || fw.bender != bentFrom;   // nothing moved, no update on either side
+            ctl = n;
+            fw.par = patchOf(ctl);
+            fw.frames = syn.hostFrames;
+            if (!fw.updatePatch()) return false;
+            for (FwNote& fnote : fn)
+                if (moved && fnote.live && !fnote.ended && !fw.liveUpdate(fnote)) return false;
+            if (panelMoved) {                        // the bender with the knobs, in the one update the firmware's gets
+                XtToneProbe::bend(syn, fw.bender);
+                syn.setControls(ctl);
+            } else syn.pitchBend(fw.bender);
+            compareAll(blk);
+            return true;
+        };
 
         for (FwNote& n : fn) { n.vi = -1; n.live = n.released = n.ended = false; }
         fw.cosmBuf = kRam + 0x1000000;
@@ -994,7 +1054,23 @@ int XtToneProbe::run(int argc, char** argv) {
             if (blk == secondAt) { if (!startNote(1, blk)) return 1; keyDown[1] = true; }
             for (int i = 0; i < 2; ++i)
                 if (blk == offAt[i] && keyDown[i]) { if (!stopNote(i, blk)) return 1; keyDown[i] = false; }
-            if (blk == liveAt) {                         // knobs moved, and the bender
+            if (blk == liveAt && twoInTick) {            // no tick between these
+                Ctl n = ctl;
+                for (Ctl::Cosm& k : n.cosm) k.envA.sustain = k.envB.sustain = 30;
+                if (!moveLive(n, fw.bender, blk)) return 1;
+                const int second = (g - tickFrom) / 16;
+                if (second == 0) {                       // a legato
+                    if (!startNote(1, blk)) return 1;
+                    keyDown[1] = true;
+                } else if (second == 1) {                // the knob again
+                    for (Ctl::Cosm& k : n.cosm) k.envA.sustain = k.envB.sustain = 60;
+                    if (!moveLive(n, fw.bender, blk)) return 1;
+                } else {                                 // the bender
+                    const int from = fw.bender;
+                    fw.bender = (from + 4000) % 16384;
+                    if (!moveLive(ctl, from, blk)) return 1;
+                }
+            } else if (blk == liveAt) {                  // knobs moved, and the bender
                 Ctl n = drawControls(r, g, wv != nullptr, wv2 != nullptr);
                 if (sweep && sweepAt == kBenderOnly) n = ctl;
                 else if (sweep || r.one(2)) {            // one word of the panel only: what XtSynth notices has changed
@@ -1016,18 +1092,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 for (int k = 0; k < 2; ++k) { n.cosm[k].on = ctl.cosm[k].on; n.cosm[k].type = ctl.cosm[k].type; n.cosm[k].lfoKeySync = ctl.cosm[k].lfoKeySync; n.cosm[k].odType = ctl.cosm[k].odType; n.cosm[k].ampType = ctl.cosm[k].ampType; }
                 const int bentFrom = fw.bender;
                 if (sweep ? sweepAt == kBenderOnly : r.one(2)) fw.bender = r.range(0, 16383);
-                const bool panelMoved = !(n == ctl), moved = panelMoved || fw.bender != bentFrom;   // nothing moved, no update on either side
-                ctl = n;
-                fw.par = patchOf(ctl);
-                fw.frames = syn.hostFrames;
-                if (!fw.updatePatch()) return 1;
-                for (FwNote& fnote : fn)
-                    if (moved && fnote.live && !fnote.ended && !fw.liveUpdate(fnote)) return 1;
-                if (panelMoved) {                        // the bender with the knobs, in the one update the firmware's gets
-                    XtToneProbe::bend(syn, fw.bender);
-                    syn.setControls(ctl);
-                } else syn.pitchBend(fw.bender);
-                compareAll(blk);
+                if (!moveLive(n, bentFrom, blk)) return 1;
             }
             const bool tick = syn.tickCount >= 441;
             fw.frames = syn.hostFrames;
@@ -1116,7 +1181,7 @@ int XtToneProbe::run(int argc, char** argv) {
         syn.allNotesOff();
         for (FwNote& n : fn) if (n.live && !fw.stop(n)) return 1;
     }
-    summary(nOsc2 ? "tone, a wave on OSC 2" : "tone");
+    summary("tone, a second update in a tick");
     return total ? 3 : 0;
 }
 #endif

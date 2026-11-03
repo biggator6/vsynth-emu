@@ -307,6 +307,10 @@ private:
             bool on = false;
             XtEnvelope envA, envB;
             XtLfo lfo;
+            // What a new block reads (object +0x104…+0x110): the outputs as the note-on or
+            // the last update took them, not the envelope's own, which a moved Sustain moves at once
+            float heldA = 0, heldB = 0, heldLfo = 0;
+            void hold() { heldA = envA.level(); heldB = envB.level(); heldLfo = lfo.out(); }
         };
         CosmVoice cs[2];
         // The TVA (0x894f5360 / 0x894f5720): its gain (the level, gain above, times
