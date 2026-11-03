@@ -215,6 +215,7 @@ struct XtMbPlayer::State {
     void stepBack(Band& B, int fshift, int walkPos);   // 0x8950f4c0
     void initRecords();             // 0x8950f6f0
     void restore(int r7, const uint8_t* slots, long slotBytes);   // 0x8950f722
+    void startAt(int target);       // 0x89510bf0
     void loopJump(int r);           // 0x8950f710
     void crossings();               // 0x8950ccc0
     void crossForward();            // 0x8950c880 (type 0x10)
@@ -405,6 +406,40 @@ void XtMbPlayer::State::initRecords() {
     const long e = entry(ev);
     const long n = (long)w.vpdtBytes - (e + 8);
     restore(evPos, n > 0 ? w.vpdt + e + 8 : nullptr, n);
+}
+
+// 0x89510bf0, the start an OSC's note-on takes (byte 0 bit 7, 0x8950fa8e): the
+// event before the position (0x8950f9c0), its records, and each band's segments
+// and records forward to the position.  A walk starting backward starts at the
+// wave's end, inside the last event, with the next segment still ahead.
+void XtMbPlayer::State::startAt(int target) {
+    if (0 > target) target = 0;
+    if (target > lastEvPos) target = lastEvPos;
+    auto evAt = [&](unsigned e) { return (int)rd32(entry(e) + 4); };
+    if (target > evAt(ev)) {
+        do {
+            if ((int)ev >= (int)evLast) break;
+            ++ev;
+        } while (target > evAt(ev));
+        --ev;
+    }
+    pos = 0;
+    initRecords();
+    pos = target;
+    for (int k = 0; k < 6; ++k) {
+        Band& B = b[k];
+        while (target >= B.nextSeg && lastEvPos > B.nextSeg) {
+            B.grainStart = B.nextSeg;
+            B.recEnd = B.nextSeg;
+            B.recPtr = B.nextRecs;
+            segment(B);
+            record(B);
+        }
+        while (target >= B.recEnd) record(B);
+        B.readPos = B.startOff + target;
+        B.readFrac = 0;
+        if (flags3 & 0x80) break;
+    }
 }
 
 // 0x8950f710: a cached loop event: its event current (0x8950c830), the
@@ -600,7 +635,7 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
     if (S.evLast < S.evEnd) S.evEnd = S.evLast;
     S.startPos = (int)S.rd32(S.entry(S.evStart) + 4);
     S.endPos = (int)S.rd32(S.entry(S.evEnd) + 4);
-    S.ev = (0.0f > walk) ? S.evEnd : S.evStart;
+    S.ev = 0;
     S.pos = 0;
     // the cached loop events and the switch (none: the forward and backward
     // ends out of reach)
@@ -612,7 +647,7 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
         S.flags0 |= 1;
     }
     if (mode == 5) S.flags3 = 0x80;                 // 0x89510130: band 0's records only
-    S.initRecords();
+    S.startAt((0.0f > walk) ? S.endPos : S.startPos);
     // tree state is zeroed; 0x89510760: f9c = 1; 0x8950f860: (rate ratio 1)
     S.f9c = 1.0f;
     if (mode == 5) {                                // 0x89510130: oscillator bands

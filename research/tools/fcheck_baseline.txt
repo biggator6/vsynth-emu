@@ -216,3 +216,5 @@ band 3 drum.bin 2 1.0 1.0 30000: BACKING, 30000 frames: max |firmware - port| 0,
 band 3 drum.bin 2 1.3 -1.0 30000: BACKING, 30000 frames: max |firmware - port| 0, difference -307.6 dB against the signal (rms 0.0098), first at -1
 band 5 chord.bin 1 0.8 1.5 30000: ENSEMBLE, 30000 frames: max |firmware - port| 0, difference -324.7 dB against the signal (rms 0.0701), first at -1
 band 5 chord.bin 1 1.0 0.0 20000 3000:1.0 8000:-0.5: ENSEMBLE, 20000 frames: max |firmware - port| 0, difference -327.5 dB against the signal (rms 0.1183), first at -1
+band 5 vocal.bin 1 0.03 -0.2 3000 0:0.015: ENSEMBLE, 3000 frames: max |firmware - port| 0, difference -295.4 dB against the signal (rms 0.0076), first at -1
+band 3 drum.bin 2 0.5 -0.5 8000 0:0.3: BACKING, 8000 frames: max |firmware - port| 7.01e-46, difference -257.2 dB against the signal (rms 0.0001), first at 3423

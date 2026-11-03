@@ -352,9 +352,19 @@ bool xtFwBandPlay(int type, const int16_t* pcm, long frames, int channels, const
     if (!loopOn) { c.wr32(W2 + 0x16c, 0x7fffffff); c.wr32(W2 + 0xb8, 0x7fffffff); }   // no loop points or cache bounds
     auto wf = [&](uint32_t a, float x) { uint32_t u; std::memcpy(&u, &x, 4); c.wr32(a, u); };
     auto rf = [&](uint32_t a) { const uint32_t u = c.rd32(a); float x; std::memcpy(&x, &u, 4); return x; };
-    c.wr8(P, (uint8_t)((channels == 2 ? 0x40 : 0) | (loopOn ? 1 : 0)));
+    // bit 7: start by position (the wave's start, or its end for a walk starting
+    // backward), as an OSC's note-on starts it
+    c.wr8(P, (uint8_t)(0x80 | (channels == 2 ? 0x40 : 0) | (loopOn ? 1 : 0)));
     wf(P + 0xa0, 1.0f); wf(P + 0xa4, 1.0f);                           // the loop regions' rate factors
     c.wr16(P + 0x14, 0); c.wr16(P + 0x16, 0xffff);                     // start / end event
+    {
+        uint32_t ev;
+        std::memcpy(&ev, vpdt.data() + 8, 4);
+        const size_t last = (((size_t)(ev >> 16) - 1) * (channels == 2 ? 0x58 : 0x2e) + 0xe) * 2;
+        uint32_t end = 0;
+        if (last + 8 <= vpdt.size()) std::memcpy(&end, vpdt.data() + last + 4, 4);
+        c.wr32(P + 0x18, 0); c.wr32(P + 0x1c, end); c.wr32(P + 0x20, end / 16 * 16);
+    }
     c.wr32(P + 0x28, 0x7fffffff); c.wr32(P + 0x2c, 0x7fffffff);
     c.wr32(P + 0x44, W);
     c.wr32(P + 0x48, 44100); c.wr32(P + 0x4c, 44100);
@@ -362,7 +372,6 @@ bool xtFwBandPlay(int type, const int16_t* pcm, long frames, int channels, const
     wf(P + 0x7c, note.walk); wf(P + 0x9c, 1.0f);
     wf(P + 0x80, 1.0f / 65536.0f); wf(P + 0x84, 1.0f / 65536.0f); wf(P + 0x88, 1.0f / 64.0f);
     if (!c.call(type == 5 ? 0x89510130 : 0x89510980, { P, 0 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
-    c.wr32(P + 0x20, c.rd32(P + 0x1c) / 16 * 16);
     out.assign((size_t)outFrames * 2, 0.0f);
     size_t next = 0, nextG = 0;
     std::vector<uint8_t> zero(32 * 8, 0);

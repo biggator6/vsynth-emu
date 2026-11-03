@@ -26,7 +26,8 @@ X="$O/bin"
     echo "solo $spec: $("$X/xt_fw" "$ROM" solocmp $spec 2>/dev/null | tail -1)"; done
   # bandcmp <3 BACKING|5 ENSEMBLE> <file> <channels> <pitch> <walk> <frames> [frame:walk ...]
   echo "== bandcmp"
-  for spec in "3 drum.bin 2 1.0 1.0 30000" "3 drum.bin 2 1.3 -1.0 30000" "5 chord.bin 1 0.8 1.5 30000" "5 chord.bin 1 1.0 0.0 20000 3000:1.0 8000:-0.5"; do
+  for spec in "3 drum.bin 2 1.0 1.0 30000" "3 drum.bin 2 1.3 -1.0 30000" "5 chord.bin 1 0.8 1.5 30000" "5 chord.bin 1 1.0 0.0 20000 3000:1.0 8000:-0.5" \
+              "5 vocal.bin 1 0.03 -0.2 3000 0:0.015" "3 drum.bin 2 0.5 -0.5 8000 0:0.3"; do
     echo "band $spec: $("$X/xt_fw" "$ROM" bandcmp $spec 2>&1 | tail -1)"; done
 } > "$O/results.txt" 2>&1
 if [ $UPDATE = 1 ]; then cp "$O/results.txt" "$B"; echo "fcheck: baseline updated ($(wc -l < "$B") lines)"; exit 0; fi
