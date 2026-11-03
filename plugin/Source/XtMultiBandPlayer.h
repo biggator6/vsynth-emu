@@ -77,6 +77,9 @@ public:
     // The output gain target (+0x80; 1 = unity), followed per sample pair
     // (0x8950c570); now: the gain jumps there too (note-on).
     void setGain(float target, bool now = false);
+    // The firmware's own gain (+0x80), as a tone sets it: the output in the XT's units
+    // (int16 × 65536), so values setGain's scale would take below a float's range stay.
+    void setGainXt(float target, bool now = false);
     // Loop playback (set before noteOn; off by default): the cached loop
     // events (xtMbLoopEvents) and byte 0 bit 0.  Each block finds its next
     // crossing (0x8950ccc0); the walk list acts on it once per block

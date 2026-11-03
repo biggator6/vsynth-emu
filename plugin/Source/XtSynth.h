@@ -299,8 +299,9 @@ private:
             XtLfo lfo;
         };
         CosmVoice cs[2];
-        // The TVA that applies the envelope (0x894f5360 / 0x894f5720): gain,
-        // its target and per-sample step, frames since the last update.
+        // The TVA (0x894f5360 / 0x894f5720): its gain (the level, gain above, times
+        // the envelope), the gain's target and per-sample step, frames since the
+        // last update.
         float cur = 0, target = 0, step = 0, elapsed = 0;
     };
     std::shared_ptr<const XtEncoded> cur, pending, retired;

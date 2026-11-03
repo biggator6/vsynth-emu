@@ -190,6 +190,7 @@ constexpr float kInvMs = 0x1.7384eep-6f;      // 1/44.1
 constexpr float kFramesPerMs = 0x1.60cccap+5f; // 44.1
 constexpr float kSilent = 0x1.0000fep-16f;     // 2^-16
 constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
+constexpr float kNoAttackMs = 0x1.99999ap-4f;  // 0.1
 // The truncate fade's step per sample (0x894ea380): 1/(T/100·44.1), T the
 // Truncate Time (system 0x51f, 1/100 ms; its default 70), in the SH-4's
 // arithmetic.
@@ -298,7 +299,7 @@ XtEnvParams XtSynth::ampEnvParams(const Voice& v, const OscControls& o) const {
 
 void XtSynth::applyRates(OscVoice& s) {
     if (cur->type == 1) { s.solo.setRates(s.curA, s.curF, s.curWalk); s.solo.setEnergy(s.curG); s.solo.setGain(s.curGain); }
-    else { s.mb.setRates(s.curA, s.curWalk); s.mb.setGain(s.curGain); }
+    else { s.mb.setRates(s.curA, s.curWalk); s.mb.setGainXt(s.curGain); }
 }
 
 XtLfoParams XtSynth::lfoParams(const OscControls& o) const {
@@ -675,15 +676,17 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     for (float& x : seed) x = drawSeed();
     v->porta = XtPitchRamp{};
     v->osc2.porta = XtPitchRamp{};
-    // TVA note-on (0x894f5160): the gain starts from the envelope's onset
-    // level (full with no attack, else 0) and ramps to its output over the
-    // attack time, at most 10 ms (0.1 ms with no attack).
+    // TVA note-on (0x894f5160): the gain starts from the level times the
+    // envelope's onset level (full with no attack, else 0) and ramps to the
+    // level times its output over the attack time, at most 10 ms (0.1 ms with
+    // no attack).  The TVA's LFO and pan terms are 0: factors of exactly 1.
+    using namespace xtf;
     const XtEnvParams ep = envParams(*v);
     v->env.noteOn(ep);
-    v->cur = v->env.onsetLevel();
-    v->target = v->env.level();
-    const float ms = ep.time[0] == 0.0f ? (ep.time[1] == 0.0f ? 0.1f : ep.time[1]) : std::min(ep.time[0], 10.0f);
-    v->step = (v->target - v->cur) / (ms * kFramesPerMs);
+    v->cur = mul(v->env.onsetLevel(), v->gain);
+    v->target = mul(v->env.level(), v->gain);
+    const float ms = ep.time[0] == 0.0f ? (ep.time[1] == 0.0f ? kNoAttackMs : ep.time[1]) : (10.0f > ep.time[0] ? ep.time[0] : 10.0f);
+    v->step = div(sub(v->target, v->cur), mul(ms, kFramesPerMs));
     v->elapsed = 0;
     // The note-on converters set the player directly (0x894f3a00…)
     // a key-unsynced LFO starts from the newest other tone of the part sounding, if
@@ -821,8 +824,8 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     else {
         s.mb.setLoop(waveLoop());
         if (s.mb.noteOn(cur->wave, cur->type, s.curA, s.curWalk)) {
-            s.mb.setGain(gainStart, true);
-            s.mb.setGain(s.curGain);
+            s.mb.setGainXt(gainStart, true);
+            s.mb.setGainXt(s.curGain);
         }
         else if (v.osc2.on) s.on = false;
         else v.active = false;
@@ -940,16 +943,17 @@ void XtSynth::pitchBend(int value) {
 // 10 ms, shorter when the stage itself is (0x894f5360).
 void XtSynth::tvaUpdate(Voice& v) {
     if (v.damping) return;                                    // done when the fade is (0x894f5510)
+    using namespace xtf;
     if (v.env.done() && v.cur <= kSilent) { v.active = false; return; }
-    v.target = v.env.level();
+    v.target = mul(v.env.level(), v.gain);
     const float T = v.env.stageTime();
     float frames = 441.0f;
     if (!(0.0f > T)) {
-        const float d = T - v.elapsed * kInvMs;               // the stage time less the time since the last update
-        if (d > 0.0f) { if (10.0f > d) frames = d * kFramesPerMs; }
-        else frames = 0.1f * kFramesPerMs;
+        const float d = sub(T, mul(v.elapsed, kInvMs));       // the stage time less the time since the last update
+        if (d > 0.0f) { if (10.0f > d) frames = mul(d, kFramesPerMs); }
+        else frames = mul(kNoAttackMs, kFramesPerMs);
     }
-    v.step = (v.target - v.cur) / frames;
+    v.step = div(sub(v.target, v.cur), frames);
     v.elapsed = 0;
 }
 
@@ -1006,13 +1010,9 @@ void XtSynth::mixBlock(float* lr) {
             tvaUpdate(v);
             if (!v.active) continue;
         }
-        float scale = v.gain;
-        // The tone's render by its Structure Type (xtToneOrder).  OSC 2's buffer stays in
-        // the XT's units; OSC 1's, then the MOD's output, in the player's: the XT's
-        // scale is int16 × 65536, i.e. the SOLO buffer (±1) × 2^31, the band players'
-        // (int16) × 2^16
-        const bool band = v.on && !v.analog && cur->type != 1;
-        const float fs = band ? 0x1p16f : 0x1p31f;
+        // The tone's render by its Structure Type (xtToneOrder), all in the XT's units
+        // (int16 × 65536), as an analog OSC runs: the SOLO player's ±1 × 2^31; the band
+        // players' gain is the firmware's (setGainXt)
         uint32_t mask2 = 0;
         for (const XtToneStep* st = xtToneOrder(v.structure); *st != XtToneStep::End; ++st) {
             switch (*st) {
@@ -1032,39 +1032,30 @@ void XtSynth::mixBlock(float* lr) {
                     v.mod.setMask(mask2);
                 }
                 if (!v.on) std::fill(tmp, tmp + 64, 0.0f);
-                else if (v.analog) {   // the XT's units (±2^31) to the SOLO buffer's (±1), exactly
-                    v.ana.process(tmp, sync, tmp2);            // X-MOD reads OSC 2's buffer and clears it
-                    for (float& x : tmp) x *= 0x1p-31f;
-                } else if (!band) {
+                else if (v.analog) v.ana.process(tmp, sync, tmp2);   // X-MOD reads OSC 2's buffer and clears it
+                else if (cur->type == 1) {
                     float l[32], r[32];
                     v.solo.render(l, r, 32);
-                    for (int i = 0; i < 32; ++i) { tmp[2 * i] = l[i]; tmp[2 * i + 1] = r[i]; }
+                    for (int i = 0; i < 32; ++i) { tmp[2 * i] = l[i] * 0x1p31f; tmp[2 * i + 1] = r[i] * 0x1p31f; }
                     if (v.solo.ended() && !v.osc2.on) v.tail += 32;
                 } else {
                     v.mb.block(tmp);
-                    scale /= 32768.0f;
                     if (v.mb.ended() && !v.osc2.on) v.tail += 32;
                 }
                 break;
             }
             case XtToneStep::Mod:
-                // The MOD (0x894f1d50).  Off, or MIX at gains of 1: the sum, in OSC 1's
-                // buffer's units.  Otherwise in the XT's units, as its routines read
-                // their levels from them.  A COSM on an OSC that is off can still put
-                // something in its buffer
+                // The MOD (0x894f1d50).  Off, or MIX at gains of 1: the sum.  A COSM on
+                // an OSC that is off can still put something in its buffer
                 if (v.mod.plain()) {
-                    if (v.osc2.on || (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2, band ? 0x1p-16f : 0x1p-31f);
-                } else {
-                    for (float& x : tmp) x *= fs;
-                    v.mod.process(tmp, tmp, tmp2);
-                    for (float& x : tmp) x *= band ? 0x1p-16f : 0x1p-31f;
-                }
+                    if (v.osc2.on || (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);
+                } else v.mod.process(tmp, tmp, tmp2);
                 break;
             case XtToneStep::Cosm1:
-                if (v.cs[0].on) v.cs[0].process(tmp, fs);
+                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f);
                 break;
             case XtToneStep::Cosm2:
-                if (v.cs[1].on) v.cs[1].process(tmp, fs);
+                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
                 break;
             case XtToneStep::End:
                 break;
@@ -1074,27 +1065,27 @@ void XtSynth::mixBlock(float* lr) {
             // truncated (0x894f5570): the gain held, times a fade that falls
             // by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16
             for (int i = 0; i < 32; ++i) {
-                v.damp -= truncateStep();
+                v.damp = xtf::sub(v.damp, truncateStep());
                 if (!(v.damp > kSilent)) { v.damp = 0.0f; v.active = false; break; }
-                const float g = scale * v.cur * v.damp;
-                lr[2 * i] += tmp[2 * i] * g;
-                lr[2 * i + 1] += tmp[2 * i + 1] * g;
+                lr[2 * i] = xtf::add(lr[2 * i], xtf::mul(xtf::mul(tmp[2 * i], v.cur), v.damp));
+                lr[2 * i + 1] = xtf::add(lr[2 * i + 1], xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur), v.damp));
             }
             continue;
         }
         // TVA render (0x894f5720): a step that would pass the target within
         // the block is cut to (target − gain)/32.5; gain applied, then stepped.
-        const float d = v.target - v.cur;
-        const float s = std::fabs(v.step * 32.0f) > std::fabs(d) ? d * kLand : v.step;
+        const float d = xtf::sub(v.target, v.cur);
+        const float s = std::fabs(xtf::mul(v.step, 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step;
         for (int i = 0; i < 32; ++i) {
-            const float g = scale * v.cur;
-            lr[2 * i] += tmp[2 * i] * g;
-            lr[2 * i + 1] += tmp[2 * i + 1] * g;
-            v.cur += s;
+            lr[2 * i] = xtf::add(lr[2 * i], xtf::mul(tmp[2 * i], v.cur));
+            lr[2 * i + 1] = xtf::add(lr[2 * i + 1], xtf::mul(tmp[2 * i + 1], v.cur));
+            v.cur = xtf::add(v.cur, s);
         }
         v.elapsed += 32.0f;
         if (v.tail > 8192) v.active = false;
     }
+    // the voices are summed in the XT's units, as its output bus does; ±1 here
+    for (int i = 0; i < 64; ++i) lr[i] *= 0x1p-31f;
 }
 
 void XtSynth::render(float* left, float* right, int n) {
