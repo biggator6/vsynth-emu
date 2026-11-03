@@ -53,10 +53,11 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   buffer allocator.
 - `mutate.sh <name> <old> <new> [cases] [pattern]`: builds xt_cosm with one
   deliberate error in XtCosm.cpp (`PORT=analog`: xt_analog, XtAnalog.cpp;
-  `PORT=analogcosm`: xt_analog, XtCosm.cpp; `PORT=tone`: xt_tone, XtSynth.cpp;
+  `PORT=analogcosm`: xt_analog, XtCosm.cpp; `PORT=analogband`: xt_analog, XtMultiBandPlayer.cpp;
+  `PORT=analogfw`: xt_analog, XtFirmware.cpp; `PORT=tone`: xt_tone, XtSynth.cpp;
   `PORT=tonecosm`: xt_tone, XtCosm.cpp; `PORT=toneanalog`: xt_tone, XtAnalog.cpp;
   `PORT=toneband`: xt_tone, XtMultiBandPlayer.cpp; `PORT=tonecheck`: xt_tone,
-  XtToneCheck.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
+  XtToneCheck.cpp; `PORT=tonefw`: xt_tone, XtFirmware.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
   solocmp on the baseline's cases, XtSoloVoice.cpp)
   and runs it, to show the check catches it. `mutate_tone.py [cases]`: the list in
   `tone_muts.txt`, each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
@@ -93,8 +94,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `xt_fw solocmp` takes R and F as ratios (F 0 = none) and Energy as a gain
   0..1; `bandcmp` type 3 BACKING / 5 ENSEMBLE.
 - A band player's backward repeat (`0x8950f50a`) can overflow its position to near 2^31, in the port too.
-  The reads then leave the wave, which on the XT gets whatever is in RAM. `xt_tone` gives them zeros, as
-  the port reads (HARDWARE_FIRMWARE.md, "A band read far from its wave").
+  An Alternate loop reaches it with the walk positive, as the bounce negates the step. The reads then leave the
+  wave, which on the XT gets whatever is in RAM. `xt_tone` and `xt_analog` give them zeros, as the port reads
+  (`xtFwHookBandReads`; HARDWARE_FIRMWARE.md, "A band read far from its wave", "`xt_analog` past the far band reads").
 - SOLO's anchor and grain timer are int32 on the XT and can overflow, so `XtSoloVoice` wraps them: a backward
   repeat ends only by overflowing (HARDWARE_FIRMWARE.md, "The anchor's overflow"). A loop ported to `double`
   from int32 may not end; `solocmp` dies by `alarm(120)` so a hang fails the check.

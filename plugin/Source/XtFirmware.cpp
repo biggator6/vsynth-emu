@@ -71,6 +71,24 @@ bool xtFwOpen(const char* romPath) {
     return true;
 }
 bool xtFwOpened() { return !g_rom.empty(); }
+// The reads are 0x8950e980's and 0x8950eb60's (mono, stereo; each twice): the bytes at r7,
+// from the band at r5 (for the kernel's, a few bytes before it), r7 loaded again before each.
+void xtFwHookBandReads(Sh4& c, XtFwBandReads& reads) {
+    static constexpr struct { uint32_t pc; int32_t bytes; } kReads[] = {
+        { 0x8950e99a, 4 }, { 0x8950e9cc, 4 }, { 0x8950ea00, 8 }, { 0x8950ea50, 8 },
+        { 0x8950eb96, 12 }, { 0x8950ec08, 12 }, { 0x8950ec7e, 24 }, { 0x8950ed4c, 24 } };
+    for (const auto& s : kReads)
+        c.hook(s.pc, [&reads, bytes = s.bytes](Sh4& m) {
+            auto b = reads.bandEnd.upper_bound(m.r[5] + 16);
+            if (b == reads.bandEnd.begin()) return;
+            --b;
+            const int32_t off = (int32_t)(m.r[7] - b->first), pad = (int32_t)kXtFwWavePad;
+            if (off >= -pad && off + bytes <= (int32_t)(b->second - b->first) + pad) return;
+            m.r[7] = b->first - (uint32_t)pad;
+            ++reads.far;
+        });
+}
+
 void xtFwForceNearest(bool on) { g_nearest = on; }
 
 bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out) {

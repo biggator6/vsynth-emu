@@ -1673,7 +1673,8 @@ uint32_t XtAnalogOsc::subLaSaw(float* lr, uint32_t sync) {
 // xt_analog <rom.2.bin> [cases]: the analog converter (0x894e1920), the
 // note-on (0x89504af0), the 10-ms update (0x89505400) and SAW (0x89508c20)
 // against the firmware in the SH-4 interpreter (XT_ANALOG_ONLY=pcm: the last
-// passes alone, a PCM voice on OSC 2 and the stereo flag).  The system's analog
+// passes alone, a PCM voice on OSC 2 and the stereo flag; XT_ANALOG_SEED: another
+// seed than 12345).  The system's analog
 // calibration (0x894e5f80) is set from the descriptors' defaults; the matrix
 // fetch (0x894d96d0) returns the case's modulation, the controller getters a
 // zeroed block.
@@ -1710,7 +1711,7 @@ int main(int argc, char** argv) {
     auto f32 = [&](uint32_t a) { const uint32_t v = c.rd32(a); float x; std::memcpy(&x, &v, 4); return x; };
     auto wf = [&](uint32_t a, float x) { uint32_t u; std::memcpy(&u, &x, 4); c.wr32(a, u); };
     auto same = [](float a, float b) { return std::memcmp(&a, &b, 4) == 0; };
-    uint32_t seed = 12345;
+    uint32_t seed = std::getenv("XT_ANALOG_SEED") ? (uint32_t)std::atol(std::getenv("XT_ANALOG_SEED")) : 12345u;
     auto rnd = [&]() { seed = seed * 1103515245u + 12345u; return (seed >> 8) & 0xffff; };
     auto frnd = [&](float lo, float hi) { return lo + (hi - lo) * (float)rnd() / 65535.0f; };
     const int nPcm = argc > 2 ? std::atoi(argv[2]) : 3000;
@@ -3310,12 +3311,14 @@ int main(int argc, char** argv) {
     constexpr int kPw = 6, kPwFrames = 6000;
     constexpr int kPwTempo = 1200000;                     // the header's +0x1c, what the block's +0x60 is set to meet
     static PcmWave pw[kPw];
+    XtFwBandReads bandReads;
+    xtFwHookBandReads(c, bandReads);
     {
         uint32_t next = kWaves2;
         auto place = [&](const void* d, size_t n) {
             const uint32_t a = next;
             if (d) c.write(a, d, n);
-            next = (a + (uint32_t)n + 0x40000u) & ~0xfffu;    // zeros between: reads past a band find what the port's do
+            next = (a + (uint32_t)n + kXtFwWavePad + 0xfffu) & ~0xfffu;   // zeros between: reads past a band find what the port's do
             return a;
         };
         const int types[kPw] = { 3, 3, 5, 5, 1, 1 };
@@ -3367,7 +3370,11 @@ int main(int argc, char** argv) {
                 xtMbAttach(W.bands, W.w);
                 W.vp = place(W.vpdt.data(), W.vpdt.size());
                 W.samp = place(W.bands.buf[0].data(), W.bands.buf[0].size() * 2);
-                for (int k = 0; k < 5; ++k) W.band[k] = place(W.bands.buf[k + 1].data(), W.bands.buf[k + 1].size() * 2);
+                bandReads.add(W.samp, W.bands.buf[0].size() * 2);
+                for (int k = 0; k < 5; ++k) {
+                    W.band[k] = place(W.bands.buf[k + 1].data(), W.bands.buf[k + 1].size() * 2);
+                    bandReads.add(W.band[k], W.bands.buf[k + 1].size() * 2);
+                }
             }
             W.hdr = place(nullptr, 0x100);
             W.tune = place(nullptr, 0x100);
@@ -3450,7 +3457,7 @@ int main(int argc, char** argv) {
     });
     // the ramps the voice's constructor (0x894f1f50) makes for Time Trip: types 2 and 1, their value 1 when idle
     for (uint32_t Vn : { V1, V2 }) { c.wr32(Vn + 0x8c8, 2); c.wr32(Vn + 0x910, 1); }
-    long pn = 0, pd = 0, pb = 0, pm = 0, pm2 = 0, pbl = 0, ps = 0, pOut = 0, pOut2 = 0, pSoloOver = 0;
+    long pn = 0, pd = 0, pb = 0, pm = 0, pm2 = 0, pbl = 0, ps = 0, pOut2 = 0, pSoloOver = 0;
     double pMax = 0, pSoloMax = 0;
     long pByType[6] = {};
     auto pcmCase = [&](int g) {
@@ -3620,14 +3627,6 @@ int main(int argc, char** argv) {
                     }
                 }
             }
-            // A band player, backward (or in an Alternate loop, which comes back), at about
-            // three times the pitch and above: the firmware's reads leave the wave (xt_fw
-            // bandcmp faults there too), and on the XT they would read whatever is in memory.
-            // Such a note is not compared further.
-            bool leaves = false;
-            for (int n = 0; n < 2; ++n)
-                leaves = leaves || (wave[n] && wave[n]->type != 1 && (0.0f > pv[n].curWalk || (pv[n].loop.on && pv[n].loop.fwdMode == 2)) && pv[n].curA >= 3.0f);
-            if (leaves) { ++pOut; break; }
             mask2 = 0xdeadbeef;
             if (!c.call(0x894f6d40, { TN, BUF }, sp)) {
                 if (c.error().find("read") == std::string::npos) { std::fprintf(stderr, "pcm %d.%d render: %s\n", g, blk, c.error().c_str()); return false; }
@@ -3693,8 +3692,8 @@ int main(int argc, char** argv) {
     };
     for (int g = 0; g < nPcm; ++g)
         if (!pcmCase(g)) return 1;
-    std::printf("pcm tone: %d cases, %ld note-ons and updates, %ld different; %ld blocks, %ld different; mix of the firmware's buffers %ld different (peak %.4g); %ld notes left off where the firmware's reads leave the wave, %ld more when they faulted\n",
-                nPcm, pn, pd, pbl, pb, pm, pMax, pOut, pOut2);
+    std::printf("pcm tone: %d cases, %ld note-ons and updates, %ld different; %ld blocks, %ld different; mix of the firmware's buffers %ld different (peak %.4g); %ld notes left off, a read outside memory; %ld band reads far from their wave\n",
+                nPcm, pn, pd, pbl, pb, pm, pMax, pOut2, bandReads.far);
     std::printf("pcm tone blocks by OSC wave: backing mono %ld stereo %ld, ensemble mono %ld stereo %ld, solo mono %ld stereo %ld; %ld with a SOLO player, largest difference %.3g of full scale, %ld samples past the limit\n",
                 pByType[0], pByType[1], pByType[2], pByType[3], pByType[4], pByType[5], ps, pSoloMax, pSoloOver);
     std::printf("pcm tone: OSC 2's mask not 0 in %ld blocks\n", pm2);

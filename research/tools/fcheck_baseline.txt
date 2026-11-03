@@ -214,8 +214,8 @@ pcm wave 2: type 5, 1 channel(s), 3060 bytes of vpdt
 pcm wave 3: type 5, 2 channel(s), 6108 bytes of vpdt
 pcm wave 4: type 1, 1 channel(s), 49 records
 pcm wave 5: type 1, 2 channel(s), 112 records
-pcm tone: 3000 cases, 57154 note-ons and updates, 0 different; 133531 blocks, 0 different; mix of the firmware's buffers 0 different (peak 4.235); 580 notes left off where the firmware's reads leave the wave, 0 more when they faulted
-pcm tone blocks by OSC wave: backing mono 16587 stereo 33952, ensemble mono 17303 stereo 35206, solo mono 20171 stereo 45244; 61635 with a SOLO player, largest difference 8.31e-06 of full scale, 0 samples past the limit
+pcm tone: 3000 cases, 68547 note-ons and updates, 0 different; 162930 blocks, 0 different; mix of the firmware's buffers 0 different (peak 4.535); 0 notes left off, a read outside memory; 253346 band reads far from their wave
+pcm tone blocks by OSC wave: backing mono 22440 stereo 46620, ensemble mono 22440 stereo 47130, solo mono 22560 stereo 46740; 65520 with a SOLO player, largest difference 2.5e-05 of full scale, 0 samples past the limit
 pcm tone: OSC 2's mask not 0 in 0 blocks
 stereo flag at the tone's note-on: 6 combinations, 0 different
 TVA render: its flag 0 and 1, 0 words different; R alone changed, 0 of the main pair's L words moved, 32 of its R words

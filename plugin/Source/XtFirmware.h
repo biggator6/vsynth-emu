@@ -4,6 +4,7 @@
 // bit-for-bit, with nothing of it in this source.  Used where a native port
 // does not exist (ENSEMBLE's load-time analysis) and to validate the ports.
 #include <cstdint>
+#include <map>
 #include <vector>
 #include "XtMultiBandPlayer.h"
 #include "XtSoloEncoder.h"
@@ -103,6 +104,20 @@ bool xtFwOscPitchRatios(std::vector<float>& out);
 // firmware's powf(x, 2), x = (key − 60)·KF·10/100/12 as it forms it, for KF
 // = −20…+20 and keys 0..127: 41 × 128 values, by KF then key (XtCosm).
 bool xtFwCosmKeySquares(std::vector<float>& out);
+
+// A band player's reads, for a check that runs the firmware's players on an Sh4 of its
+// own with the port beside them.  The backward repeat (0x8950f50a) can run a position to
+// where the XT reads whatever is in its RAM, which is not known here, and the port reads
+// 0.  The check lays kXtFwWavePad of zeros around each band, which cover the near reads;
+// a far one lands on anything mapped, so the hook gives it those zeros instead.
+constexpr uint32_t kXtFwWavePad = 0x40000;
+struct XtFwBandReads {
+    std::map<uint32_t, uint32_t> bandEnd;   // the waves' bands: start, end
+    long far = 0;                           // band reads far from their wave, given zeros
+    void add(uint32_t start, size_t bytes) { bandEnd[start] = start + (uint32_t)bytes; }
+};
+class Sh4;
+void xtFwHookBandReads(Sh4& c, XtFwBandReads& reads);
 
 // Round to nearest instead of FPSCR.RM (to match Ghidra's P-code emulator).
 void xtFwForceNearest(bool on);
