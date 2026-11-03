@@ -1545,6 +1545,80 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### `xt_analog` past the far band reads, and the Alternate loop (2026-11-03, v110)
+
+`xt_analog`'s wave pass stopped comparing a note at 3× or above going backward, or in an Alternate loop. It no longer does. It gives far band reads zeros, as `xt_tone` has since v108, and every note now runs to its end: **0 different**, on eight seeds. This changes the check and no audio.
+
+**The change.**
+- `xtFwHookBandReads` (XtFirmware) is v108's hook, moved out of `XtToneCheck.cpp` and now shared by both checks. `XtFwBandReads` holds the bands and the count, and `kXtFwWavePad` is the 256 KB of zeros. `xt_tone`'s results are the same line for line.
+- The stop is gone from `XT_ANALOG_MAIN`. A read that leaves memory by another path would still end its note and be counted, and none does.
+- The pass's wave layout rounded each gap down, so a gap could be up to 4 KB under the pad. The hook lands exactly one pad under a band, so a short gap could have put it on the piece before. The gaps now round up.
+- `XT_ANALOG_SEED` sets another seed. `mutate.sh` gains `PORT=analogband`, `PORT=analogfw` and `PORT=tonefw`, because `PORT=analog` plants only in `XtAnalog.cpp`, and neither the band player nor the hook is there.
+
+**Results.** `XT_ANALOG_ONLY=pcm` unless it says fcheck.
+
+| | Note-ons and updates | Blocks | Left off | Far reads | Different |
+|---|---|---|---|---|---|
+| fcheck, 3,000 cases, before | 57,154 | 133,531 | 580 | — | 0 |
+| fcheck, 3,000 cases, now | 68,547 | 162,930 | 0 | 253,346 | 0 |
+| Wide, 21,000 cases, before | 409,838 | 959,388 | 4,186 | — | 0 |
+| Wide, 21,000 cases, now | 480,297 | 1,141,680 | 0 | 2,347,470 | 0 |
+
+- Seven more seeds at 21,000 cases (1, 2, 3, 7, 2024, 31337, 90210): each 480,297 and 1,141,680, 0 left off, about 2.1 to 2.4 million far reads, 0 different. Those two counts are the same on every seed because no note is cut any more.
+- A SOLO player's largest difference over the eight seeds is 6.93e−5 of full scale, against the limit of 2e−4. In fcheck it goes from 8.31e−6 to 2.5e−5, still with 0 samples past the limit. SOLO has no far-read hook, and its limit is unchanged.
+- This pass has a mono BACKING wave, which `xt_tone` does not. So the mono kernel's two read groups, which v108 could not exercise, are reached and tested here (below).
+
+**The Alternate loop is the same thing.** The old comment, "an Alternate loop, which comes back", was about the playing direction and not about the reads. A traced build on seed 12345 at 21,000 cases, hooking the repeat at `0x8950f50a` and all eight read groups:
+- Crossing the loop's end in Alternate sets `flags3 |= 8` (`crossForward`), and the block's start then negates the walk step. So the stepper runs through `stepBack` with the walk knob positive, and reaches the same repeat.
+- In an Alternate loop, 70 notes ran away with the walk never negative, and 34 more with it positive at the time after going negative earlier. Outside Alternate, all 1,202 notes with a run-away had the walk negative at the time. So the old rule's two conditions, walk negative or Alternate, cover every run-away in this run.
+- An example, case 523, block 10: stereo BACKING on OSC 2, ratio 7.611, walk +4.952, loop 271…1426, `flags3` 0x28, walk step −166,168,032. The position is 22,835 under the record 23,707…23,971, which is 264 long and starts far above its length, as in v108. It goes to 2,138,927,766 in 428 rounds.
+- All 2,347,470 far reads follow a run-away in the same band. None comes from a repeat that ended normally, or from a band with no repeat yet.
+- **A far position does come back, but only through a loop jump, which Alternate never makes.** It came back 1,283 times, all after a jump (`0x8950f710`) and all on forward loops. Alternate only sets the flag (`if (lmode1 == 2) { flags3 |= 8; return; }`), so there its far position stays far until the note ends.
+- No run-away came before the old stop would have fired on its note, so the stop did cover them in this pass. The lowest ratio at any run-away was 2.905, on a note whose stop had already fired while the pitch was higher.
+- ENSEMBLE's upper bands are not in this. They read frames by the walk position (`ensembleBand`), not by the read position, so only its band 0 goes far.
+
+**Planted errors.** Each ran at 3,000 cases, with the check as it stood and as it is now.
+
+| Error | Before | Now |
+|---|---|---|
+| `band-repeat-meant`: the repeat as the firmware meant it, adding the record's length | **0** | 10,390 different |
+| `band-repeat-clamp`: a far result put back at the record's start | **0** | 10,357 |
+| `band-far-1`: the port reads 1 instead of 0 only 300,000 frames or more outside a band | **0** | 8,743 |
+| `band-outside-1`: the port reads 1 anywhere outside a band | 16,251 | 26,620 |
+| `band-back-tiny`: no tiny gain at the wave's start | 8,252 | 11,795 |
+| `band-back-prev`: the wrong sign loading the previous record | 41,187 | 46,794 |
+| `band-turn-forward`: the turn lands on the record's start | 22,737 | 35,038 |
+| `band-alt-flag`: Alternate does not set the bounce | 7,302 | 6,206 |
+| `band-bounce-huge`: the bounce's start test always repeats | 5,102 | 4,210 |
+
+The first three are the point: errors in what follows a run-away, which this check could not see at all. They used to be visible only through `xt_tone` (v108).
+
+Two more stayed at 0 in both, and neither is a gap in the far reads:
+- `band-bounce-start`, the bounce's start test taking the wave's start in place of 0, is exact in this pass: the wave's start was 0 at all 3.3 million steps looked at. `band-bounce-huge` shows the branch is reached.
+- `mod-level-tie`, `>=` for `>` in ENV RING's choice of time, needs two equal levels with the follower not yet at 0. At 21,000 cases that is 309 blocks, all with a SOLO OSC, where the MOD's state isn't compared. In the exact notes the follower is 0 at every tie.
+
+The check's own parts, now only:
+
+| Error | Result |
+|---|---|
+| `no-hook` (`PORT=analog`) and `far-reads-kept` (`PORT=analogfw`): nothing moved | 16 blocks different, 187 notes left off. Those 16 come only from reads the hook moves |
+| `pad-short` (`PORT=analog`): 4 KB between pieces | 2,972 different, 172 left off |
+| `bands-unlisted` (`PORT=analog`): bands 1…5 not listed | 61,361 different |
+| `far-reads-all`: every band read gets zeros | 108,196 different. The compare is alive on real samples |
+| `far-reads-wide`: the hook's bound doubled | Passes with the same counts, and is exact, as in v108 |
+| Stereo band 0's two out of the list | 33 different, 8 left off |
+| Mono band 0's two | 44 left off, 0 different |
+| The stereo kernel's two | 89 left off, 0 different |
+| **The mono kernel's two** | **80 left off, 0 different. v108 could not reach these; they are needed** |
+
+`far-reads-kept` through `PORT=tonefw`, seed 90210 at 6000 cases, gives v108's original failure through the moved hook: 226 + 385 notes left off, 3 different.
+
+`verify.sh`: fcheck as the new baseline, whose only changes are `xt_analog`'s two `pcm tone` lines, A/B 4/4 identical, PluginTest 4/4 bit-identical, engine tests, auval. `mutate_tone.py` at 2000 cases, the whole list of 144: all caught.
+
+**What this leaves.**
+- The limit is v108's: on the XT these reads get whatever is in its RAM, and that can't be compared. It also means an Alternate loop on a BACKING or ENSEMBLE wave, at about 3× and above with the walk positive, should reach the same reads on the hardware. Nobody has listened for that on the unit.
+- `xt_fw bandcmp` has no hook and still faults on these notes. fcheck's cases don't reach them. Not changed.
+
 ### A band read far from its wave: seed 90210, case 9398 (2026-11-03, v108)
 
 `xt_tone` on seed 90210 at 6000 cases gave 3 different, all in case 9398 and all in block 62: `osc 2 buffer`, `cosm output` and `output`, from word 24, fw −22236.084, port −18823.516. v106 left this open as possibly real. **It is not a fault in XtSynth or a port.** The firmware's band 0 read past the zeros `xt_tone` lays around a wave and landed on the wave's own vpdt, where the port reads 0. So this version changes the check and no audio. COSM 2's Side Band Filter, the words past OSC 2's buffer and the forced case only set the case up and carry the difference: `mixPast` is equal on both sides up to that block.
@@ -1561,7 +1635,7 @@ stage time (+0x6c) and the onset level (+0x58).
 **Why not more zeros.** Where r1 lands depends on the record's start, in no simple way. Run by hand over starts from 2,000 to 4,000,000, it lands from 160 KB to 23 MB under a stereo band 0. The upper bands go elsewhere: position >> shift >> 6 words puts band 1 at +128 MB and, by the same arithmetic, this wave's band 5 at +8 MB, among the COSMs' buffers. No layout of `xt_tone`'s memory keeps all that clear. Leaving a note off at its first far read also clears case 9398. I ran that as well: 652 notes left off, against 611 before and none now.
 
 **The change, in `xt_tone`.**
-- `Firmware::hookBandReads` hooks the band players' eight groups of reads (`0x8950e980` and `0x8950eb60`, mono and stereo, twice each). If `r7` is further than `kWavePad` from the band's data, measured in 32 bits so that an alias does not count as near, it moves `r7` into the zeros. `r7` is loaded again before each group, so nothing else sees this. Only the firmware's memory changes: its position, stepping and gains run on as they were.
+- `Firmware::hookBandReads` (since v110 `xtFwHookBandReads`, in XtFirmware) hooks the band players' eight groups of reads (`0x8950e980` and `0x8950eb60`, mono and stereo, twice each). If `r7` is further than `kWavePad` from the band's data, measured in 32 bits so that an alias does not count as near, it moves `r7` into the zeros. `r7` is loaded again before each group, so nothing else sees this. Only the firmware's memory changes: its position, stepping and gains run on as they were.
 - Each part's summary now counts these reads, so the baseline shows the path is used.
 - `Sh4::call`: a hook that leaves `pc` alone is now followed by the instruction. Before, it was called again forever. No hook relied on that.
 - `mutate.sh`: `PORT=toneband`, `PORT=tonecheck`, `SEED=`.
@@ -1594,7 +1668,7 @@ This was found and first run on v106, then moved onto master with v105 and v107,
 | One read group out of the list: stereo band 0's two | 512 + 183 and 512 + 210 different, 20 + 42 notes left off |
 | Mono band 0's two (ENSEMBLE) | 38 + 43 notes left off, against 0 in the baseline. 0 different, as these reads are unmapped |
 | The stereo kernel's two | 33 + 83 notes left off, likewise |
-| The mono kernel's two | Nothing changes. `xt_tone` has no mono BACKING wave, so these two hooks are not reached |
+| The mono kernel's two | Nothing changes. `xt_tone` has no mono BACKING wave, so these two hooks are not reached (v110: `xt_analog` reaches them, and they are needed) |
 | `far-reads-wide`: the hook's bound doubled (seed 90210, 6000) | Passes, same counts, and it's exact. A far read is about 2^29 off by its arithmetic, and none lies between one pad and two |
 | `band-repeat-meant`: the port's loop as the firmware meant it, adding the record's length | 14,911 + 24,573 different; on v106, 71 + 135 |
 | `band-far-1`: the port reads 1 instead of 0 only 300,000 frames or more outside a band | 14,907 + 22,328 different; on v106, 71 + 70 |
@@ -1610,7 +1684,7 @@ The two with v106's numbers are the point: an error in what follows a far read u
 - On the XT these reads get whatever is in its RAM, and XtSynth's get silence. That can't be compared, and it is the limit of this check: the firmware's note is compared with that one question taken out. I don't know what the XT does at the addresses outside its RAM, such as `0x9471a224`.
 - The port's loop relies on `int` wrapping, which C++ does not promise. Clang wraps here, at `-O2` and with the player at `-O3` (fcheck's seed: same counts, 0 different). Not changed.
 - `XtSoloVoice::anchorBackward` has the same loop in `double`, where nothing overflows, so two record lengths under the start would never end. No run here hung. I did not look into whether it can be reached.
-- `xt_analog` still stops comparing a note at 3× or above backward. The same hook could lift that. Not done.
+- `xt_analog` still stops comparing a note at 3× or above backward. The same hook could lift that. Not done. (Done in v110.)
 
 ### The COSMs' held levels (2026-11-03, v107)
 
@@ -1898,7 +1972,7 @@ interpreter faults on unmapped memory, in `xt_fw bandcmp` as well:
 
 The port reads 0 outside a wave. The check in `xt_analog` stops comparing a note at 3× or above
 backward, or in an Alternate loop, which comes back. A fifth of its notes end so (4,186 of 21,000), because it draws wide pitches; none faulted first. `xt_tone` lays its waves among zeros and
-counts the notes that leave memory altogether. (Since v108 a far read gets zeros too, and no note leaves memory.)
+counts the notes that leave memory altogether. (Since v108 a far read gets zeros too, and no note leaves memory. Since v110 so does `xt_analog`'s, and it no longer stops: the Alternate loop is the same repeat, and "comes back" meant its direction. See "`xt_analog` past the far band reads".)
 
 **Checks.**
 - **`xt_tone`, the real XtSynth against the firmware's whole tone**, with new cases after its others: a wave on
@@ -1912,7 +1986,7 @@ counts the notes that leave memory altogether. (Since v108 a far read gets zeros
   in with its COSMs on, so the mono routines' dropped R is compared.
 - `xt_analog`, a pass with six encoded waves, the players on their own, with the five values, both buffers, the
   mix and the MOD's state every block, and RING, FM, ENV RING and OSC SYNC over a PCM OSC 2. In fcheck, 3,000 cases: 57,154 note-ons and updates, 133,531 blocks, 0
-  different. Wide, 21,000 cases: 409,838 and 959,388, 0 different.
+  different. Wide, 21,000 cases: 409,838 and 959,388, 0 different. (v110, no note cut: 68,547 and 162,930; wide 480,297 and 1,141,680; 0 different.)
 - **SOLO is not 0 different and cannot be yet:** its largest difference there is 4.14e−5 of full scale, against
   a limit of 2e−4. Its five values are exact, and so is the firmware's sum of its own buffers.
 - The stereo flag at the firmware's own tone note-on (`0x894f5e60`): the six combinations of OSC 1 off, mono or

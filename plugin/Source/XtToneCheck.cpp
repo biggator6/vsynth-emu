@@ -29,7 +29,7 @@
 // only a SOLO wave's buffers and what follows them (kSoloTol of the block's peak),
 // since XtSoloVoice is not bit-exact (xt_fw solocmp).  Past the wave's data a player
 // reads whatever lies there: the waves lie among zeros, which is what the port reads;
-// a band player's read further off is given zeros too (hookBandReads), and a note
+// a band player's read further off is given zeros too (xtFwHookBandReads), and a note
 // whose read leaves memory by another path is left off and counted.
 //
 // The random cases are followed by a sweep: each field XtSynth keeps in a list of what
@@ -48,6 +48,7 @@
 #include <unordered_map>
 #include <vector>
 #include "Sh4Interp.h"
+#include "XtFirmware.h"
 #include "XtSoloEncoder.h"
 #include "XtSynth.h"
 
@@ -76,7 +77,6 @@ const uint32_t kRam = 0x8C000000, kSp = kRam + 0xF0000, kN = kRam + 0x1000, kK =
                kNote = kRam + 0x1600, kCtl = kRam + 0x1800, kBuf = kRam + 0x2000, kOs = kRam + 0x3000;
 constexpr uint32_t kBuf1 = 0x89d2c810, kBuf2 = 0x89d2c910, kBufMix = 0x89d2ca10;
 constexpr uint32_t kFmLines = 0x89f91c5c;     // FM's line pool, XtModShared
-constexpr uint32_t kWavePad = 0x40000;        // the zeros around each piece of a wave
 constexpr float kSoloTol = 2e-2f, kSoloFloor = 8192.0f;   // a SOLO wave's buffers: of the block's peak, plus a floor (−108 dB of full scale)
 
 constexpr uint32_t kDescTab = 0x897a167c, kRomBase = 0x89300000;
@@ -108,32 +108,10 @@ public:
     int cosmSection = 0;
     uint32_t cosmBuf = 0;
     uint16_t held[8] = {};
-    std::map<uint32_t, uint32_t> bandEnd;   // the waves' bands: start, end
-    long farReads = 0;                      // band reads far from their wave, given zeros
+    XtFwBandReads bandReads;
     const FwWave& waveOf(uint32_t id) const { return id == 2999 + 2 ? wave2 : wave; }
 
     float f32(uint32_t a) { const uint32_t v = c.rd32(a); float x; std::memcpy(&x, &v, 4); return x; }
-
-    // A band player's reads (0x8950e980, 0x8950eb60; mono, stereo; each twice): the bytes at r7,
-    // from the band at r5 (for the kernel's, a few bytes before it), r7 loaded again before each.
-    // The backward repeat (0x8950f50a) can run a position to where the XT reads whatever is in
-    // its RAM, which is not known here, and the port reads 0.  The zeros around a wave cover the
-    // near reads; a far one lands on anything mapped, so it reads those zeros instead.
-    void hookBandReads() {
-        static constexpr struct { uint32_t pc; int32_t bytes; } reads[] = {
-            { 0x8950e99a, 4 }, { 0x8950e9cc, 4 }, { 0x8950ea00, 8 }, { 0x8950ea50, 8 },
-            { 0x8950eb96, 12 }, { 0x8950ec08, 12 }, { 0x8950ec7e, 24 }, { 0x8950ed4c, 24 } };
-        for (const auto& s : reads)
-            c.hook(s.pc, [this, bytes = s.bytes](Sh4& m) {
-                auto b = bandEnd.upper_bound(m.r[5] + 16);
-                if (b == bandEnd.begin()) return;
-                --b;
-                const int32_t off = (int32_t)(m.r[7] - b->first), pad = (int32_t)kWavePad;
-                if (off >= -pad && off + bytes <= (int32_t)(b->second - b->first) + pad) return;
-                m.r[7] = b->first - (uint32_t)pad;
-                ++farReads;
-            });
-    }
     static uint32_t envAt(const FwNote& n, uint32_t e) { return n.TN + 0x1780 + 0x70 * e; }
     static uint32_t lfoAt(const FwNote& n, uint32_t l) { return n.TN + 0x1da0 + 0x98 * l; }
     static uint32_t voice(const FwNote& n, int o) { return n.TN + (o ? 0x9d4 : 0x20); }
@@ -208,7 +186,7 @@ public:
         if (!c.call(0x894fc4c0, {}, kSp)) { std::fprintf(stderr, "tb constants: %s\n", c.error().c_str()); return false; }
         c.hook(0x894796d0, [](Sh4& m) { m.ret(0); });
         if (!c.call(0x894e5f80, { 0x89d1b070u, 0, 0, 0 }, kSp)) { std::fprintf(stderr, "system: %s\n", c.error().c_str()); return false; }
-        hookBandReads();
+        xtFwHookBandReads(c, bandReads);
         return true;
     }
 
@@ -375,7 +353,7 @@ bool loadWave(Firmware& f, uint32_t& next, const std::string& path, int channels
     FwWave& w = out.fw;
     w.frames = out.enc->frames;
     auto put = [&](const void* data, size_t bytes) {
-        next += kWavePad;                                  // zeros around each, as a band's reads outside it get from the port
+        next += kXtFwWavePad;                              // zeros around each, as a band's reads outside it get from the port
         const uint32_t a = next;
         f.c.write(a, data, bytes);
         next = (next + (uint32_t)bytes + 0x1fff) & ~0xfffu;
@@ -404,7 +382,7 @@ bool loadWave(Firmware& f, uint32_t& next, const std::string& path, int channels
         for (int k = 0; k < 6; ++k) {
             const size_t bytes = out.enc->bands.buf[k].size() * 2;
             w.band[slot[k]] = put(out.enc->bands.buf[k].data(), bytes);
-            f.bandEnd[w.band[slot[k]]] = w.band[slot[k]] + (uint32_t)bytes;
+            f.bandReads.add(w.band[slot[k]], bytes);
         }
     }
     w.loaded = true;
@@ -737,13 +715,13 @@ int XtToneProbe::run(int argc, char** argv) {
     long total = 0;
     const auto summary = [&](const char* name) {
         std::printf("%s: %ld notes, %ld taken by a sounding tone, %ld truncated, %ld blocks, %ld checks\n", name, notes, legatos, truncates, blocks, rep.checks);
-        std::printf("%s: a SOLO wave's buffers within %.1e of the block's peak; %ld notes left off, a read outside memory; %ld band reads far from their wave\n", name, worstSolo, wild, fw.farReads);
+        std::printf("%s: a SOLO wave's buffers within %.1e of the block's peak; %ld notes left off, a read outside memory; %ld band reads far from their wave\n", name, worstSolo, wild, fw.bandReads.far);
         long sub = 0;
         for (const auto& k : rep.kinds) { std::printf("  %-28s %ld different\n", k.first.c_str(), k.second); sub += k.second; }
         std::printf("%s: %ld different\n", name, sub);
         total += sub;
         rep.kinds.clear();
-        rep.checks = notes = legatos = truncates = blocks = wild = fw.farReads = 0;
+        rep.checks = notes = legatos = truncates = blocks = wild = fw.bandReads.far = 0;
         worstSolo = 0;
     };
     const int nOsc2 = waves.empty() ? 0 : nCases / 2;

@@ -1,8 +1,8 @@
 #!/bin/bash
 # mutate.sh <name> <old> <new> [cases] [pattern]: a deliberate error in a port, to
 # show its firmware check catches it.  Copies plugin/Source/XtCosm.cpp (with
-# PORT=analog, XtAnalog.cpp; with PORT=analogcosm, XtCosm.cpp under xt_analog's
-# check; with PORT=tone, XtSynth.cpp, PORT=tonecosm, XtCosm.cpp, PORT=toneanalog, XtAnalog.cpp, PORT=toneband, XtMultiBandPlayer.cpp, and PORT=tonecheck, XtToneCheck.cpp, under xt_tone,
+# PORT=analog, XtAnalog.cpp; with PORT=analogcosm, XtCosm.cpp, PORT=analogband, XtMultiBandPlayer.cpp, and PORT=analogfw, XtFirmware.cpp, under xt_analog's
+# check (XT_ANALOG_ONLY=pcm, the PCM pass alone, is passed through); with PORT=tone, XtSynth.cpp, PORT=tonecosm, XtCosm.cpp, PORT=toneanalog, XtAnalog.cpp, PORT=toneband, XtMultiBandPlayer.cpp, PORT=tonecheck, XtToneCheck.cpp, and PORT=tonefw, XtFirmware.cpp, under xt_tone,
 # on seed $SEED, default 2024) with the first <old> replaced by
 # <new> (exact text), builds xt_cosm (xt_analog, xt_tone) from it in $WORK/mut/<name>, runs it on
 # [cases] (100) and prints the lines matching [pattern] (an extended regex;
@@ -13,8 +13,8 @@ source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
-if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ] || [ "$PORT" = toneband ] || [ "$PORT" = tonecheck ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
-    F=XtSynth.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp; [ "$PORT" = toneband ] && F=XtMultiBandPlayer.cpp; [ "$PORT" = tonecheck ] && F=XtToneCheck.cpp
+if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ] || [ "$PORT" = toneband ] || [ "$PORT" = tonecheck ] || [ "$PORT" = tonefw ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
+    F=XtSynth.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp; [ "$PORT" = toneband ] && F=XtMultiBandPlayer.cpp; [ "$PORT" = tonecheck ] && F=XtToneCheck.cpp; [ "$PORT" = tonefw ] && F=XtFirmware.cpp
     D=XT_TONE_MAIN; ARGS=("${SEED:-2024}" "$WORK/inputs")
     OBJ="$M/tone_obj"; mkdir -p "$OBJ"; L=()
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
@@ -30,6 +30,12 @@ elif [ "${PORT:-cosm}" = analog ]; then
 elif [ "$PORT" = analogcosm ]; then
     F=XtCosm.cpp; D=XT_ANALOG_MAIN
     L=("$S/XtOsc.cpp" "$S/XtAnalog.cpp" "$S/XtEnvelope.cpp" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp")
+elif [ "$PORT" = analogband ]; then
+    F=XtMultiBandPlayer.cpp; D=XT_ANALOG_MAIN
+    L=("$S/XtOsc.cpp" "$S/XtCosm.cpp" "$S/XtAnalog.cpp" "$S/XtEnvelope.cpp" "$S/XtFirmware.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp")
+elif [ "$PORT" = analogfw ]; then
+    F=XtFirmware.cpp; D=XT_ANALOG_MAIN
+    L=("$S/XtOsc.cpp" "$S/XtCosm.cpp" "$S/XtAnalog.cpp" "$S/XtEnvelope.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp")
 else
     F=XtCosm.cpp; D=XT_COSM_MAIN; L=("$S/XtOsc.cpp" "$S/XtEnvelope.cpp" "$S/Sh4Interp.cpp")
 fi

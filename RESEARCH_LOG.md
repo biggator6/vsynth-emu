@@ -3245,3 +3245,15 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Two tests here passed for the wrong reason. The first failure test planted nothing, because the constant it looked for wasn't in the file, and "as baseline" looked like a pass until the traceback above it was read. An early plugin rebuild of 1.3 s looked wonderfully fast and was a failed link, the "album file" error, whose failed links also deleted the test binary. It came back with no Xcode update this time. The clean rebuild cured it again; its cause here isn't known.
 - `verify.sh` had the same trap: with the plugin build failed, PluginTest and auval still printed passes against the old binaries. Both are skipped now.
 - PGO on the interpreter reached 31% against the hand-tuned loop's quarter. Not worth a training step in every build.
+
+### Session 16 addendum (2026-11-03) — v110: xt_analog past the far band reads
+
+- I expected lifting the stop to turn something up, and the brief allowed for it. It didn't: 0 different on the first run and on eight seeds, 18 million far reads. So the work moved to showing that this 0 means something.
+- A 0 like that could be a compare that had quietly stopped working. Three planted errors answered it. They were 0 different on the old check and thousands on the new, all three in what follows a run-away. `far-reads-all` shows the compare is alive on real samples.
+- The Alternate question looked open because of the old comment, "which comes back". Tracing the repeat settled it in one run: 70 notes ran away with the walk never negative, by the same loop. The bounce negates the step, so `stepBack` runs under a positive walk. "Comes back" was about the direction.
+- A far position can come back, 1,283 times here, but only through a loop jump, and those were all forward loops. Alternate has no jump, so its position stays far, which is the opposite of what the comment seemed to say.
+- `PORT=analog` couldn't do what the brief asked of it, as it plants only in `XtAnalog.cpp` and the errors that mattered are in the band player and the hook. Hence `PORT=analogband` and `PORT=analogfw`.
+- Moving the hook broke a build: `XtToneCheck.cpp` did not include `XtFirmware.h`. `PORT=tonefw` found it before fcheck did.
+- This pass has a mono BACKING wave, so v108's two unreached hooks finally ran. Without them 80 notes are left off, so they were right, and now that is known rather than assumed.
+- Two planted errors stayed at 0 in both checks. I looked rather than leave them. One is exact here, as each wave's first event is at 0. The other needs a tie in ENV RING's level with the follower not yet at 0, which happens only with a SOLO OSC, where the MOD's state isn't compared.
+- The pass's gaps rounded down, up to 4 KB under the pad, and the hook lands exactly one pad under a band. Nothing had shown that as a failure. It was found by reading the two layouts side by side.

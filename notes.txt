@@ -335,6 +335,10 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+xt_analog past the far band reads v110 (2026-11-03): its wave pass no longer stops a note at 3x or above backward or in an Alternate loop (HARDWARE_FIRMWARE.md, "xt_analog past the far band reads"). xtFwHookBandReads (XtFirmware) is v108's hook, shared with xt_tone, whose results are unchanged.
+  fcheck 133,531 blocks to 162,930, 580 notes left off to 0; wide 959,388 to 1,141,680, 4,186 to 0; eight seeds at 21,000, 0 different. No audio change. The Alternate loop is the same repeat (0x8950f50a), reached with the walk positive because the bounce negates the step: "comes back" meant its direction.
+  A far position comes back only through a loop jump, which Alternate never makes. band-repeat-meant, band-repeat-clamp and band-far-1 were 0 different before and thousands now. The mono kernel's two read groups, which v108 could not reach, are needed. XT_ANALOG_SEED; mutate.sh gains PORT=analogband, analogfw, tonefw.
+
 Cheaper checks v109 (2026-11-03): no check or result changes. verify.sh about 6.5 minutes to 1-2; mutate_tone.py about 2 CPU-hours to 19 CPU-minutes, 144 of 144 caught as before. xt_tone's XT_TONE_STOP ends a run at its first
   difference (mutate_tone.py sets it; `[cases] name ...` plants only those). fcheck.sh and build.sh run side by side; fcheck reuses a section whose binary, command, ROM and inputs are those of a run that matched the baseline (builds repeat
   byte for byte), --full runs them all, and a run that differs keeps nothing. Sh4::call fetches inline, the memory paths are inlined, a 64 K filter by address finds hooks in place of a flag per page: a quarter off every check. VSynthEmuVerify
@@ -342,7 +346,7 @@ Cheaper checks v109 (2026-11-03): no check or result changes. verify.sh about 6.
 
 A band read far from its wave v108 (2026-11-03): seed 90210's case 9398 in xt_tone was no fault of XtSynth or a port (HARDWARE_FIRMWARE.md, "A band read far from its wave"). From two record lengths under a record's start, the backward
   repeat (0x8950f50a) can run until the position overflows to near 2^31, in the firmware and the port alike. Stereo band 0's read then aliases to memory below the band: past xt_tone's 256 KB of zeros, here on the wave's own vpdt, where the port reads 0.
-  xt_tone now gives the firmware zeros for any band read further off than that (hookBandReads, eight read groups), so no note is left off and those notes are compared to their end. No audio change. On the XT those reads get whatever is in RAM, which can't be compared.
+  xt_tone now gives the firmware zeros for any band read further off than that (hookBandReads, since v110 xtFwHookBandReads; eight read groups), so no note is left off and those notes are compared to their end. No audio change. On the XT those reads get whatever is in RAM, which can't be compared.
   Seeds 3 and 4's SOLO cases are not this. Sh4 hooks that leave pc alone are now followed by the instruction. mutate.sh gains PORT=toneband, PORT=tonecheck, SEED=.
 
 COSM held levels v107 (2026-11-03): a new block reads levels the COSM holds from its note-on or last 10 ms update (+0x104...), as on the XT (HARDWARE_FIRMWARE.md, "The COSMs' held levels"). CosmVoice::hold, cosmSetBlock reads nothing live.
