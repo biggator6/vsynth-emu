@@ -140,3 +140,5 @@ cosm-stereo-analog|auto stereo = [](const OscVoice& s) { return s.on && !s.analo
 cosm-stereo-off|auto stereo = [](const OscVoice& s) { return s.on && !s.analog && s.wave->channels == 2; };|auto stereo = [](const OscVoice& s) { return !s.analog && s.wave && s.wave->channels == 2; };
 cosm-past2-none|v.cs[1].process(tmp2, 1.0f, mixPast);|v.cs[1].process(tmp2, 1.0f);
 cosm-past2-kept|        std::copy(tmp, tmp + 3, mixPast);\n|
+fm-tone-0|modShared, (int)(v - voice));|modShared, 0);
+fm-lines-cleared|    for (Voice& v : voice) v.active = false;\n    for (uint16_t& w : keys.held) w = 0;|    for (Voice& v : voice) v.active = false;\n    std::fill(std::begin(modShared.line), std::end(modShared.line), 0.0f);\n    for (uint16_t& w : keys.held) w = 0;

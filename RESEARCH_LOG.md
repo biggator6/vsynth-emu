@@ -3206,6 +3206,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Reading the routines also showed two of v99's labels were wrong. Its conclusion was right anyway. Each label had looked plausible from the address order alone.
 - I did not fix the difference here: it changes XtSynth and makes `live-order` exact, so it is its own version.
 
+### Session 16 addendum (2026-11-03) — v106: seed 2007, FM's lines between cases
+
+- The brief's guess was the Comb and Side Band reading the voice's pitch, and mine was FM reading below its pool, past the 8 words the harness zeroes. Logging the port's reads ruled mine out: the lowest was 0. The same log showed the highest was 506, and that was the answer: 10 words into the next tone's line.
+- Comparing the whole pool at every case gave it away in one run. Tone 1's line already differed before case 3066 played a note, and it went back to case 2967, a SOLO note under FM.
+- So nothing is wrong in the port. A tolerance given to one case leaks through anything that outlasts the case into cases that have none. v104 found the same thing within a case, through the follower's words past the block. This is the same again, across cases.
+- The first difference was two stages downstream of its cause, because the mix's tap is skipped with a COSM on. Hooking the firmware inside the FM routine showed one sample of the MOD's output differing, by what the two neighbour words predict.
+- Giving the firmware the port's lines could easily have hidden real errors, so I wanted that to cost nothing. The lines are now compared after every exact case, which they never were before. A planted error that clears the next tone's line is caught by that compare alone.
+- A planted `fm-own-line` passed on fcheck's seed. It looked like the fix had blinded something, but that seed has no exact case reading another tone's data. On seed 2007 it fails at exactly case 3066, and `xt_analog` catches it on any seed.
+- Removing the carry brings back the original failure to the digit, which is a better test of the explanation than the fix passing.
+- A sibling's list of differences at 6000 cases was worth trying against this. One of its four had this cause; the other three did not, and one of those has no SOLO wave in it at all.
+
 ### Session 16 addendum (2026-11-03) — v107: the COSMs' held levels
 
 - The fix itself is small. Most of this version is the check around it.
