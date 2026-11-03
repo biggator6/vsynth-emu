@@ -1547,6 +1547,104 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The SOLO encoder's stereo mode (2026-11-03, v113)
+
+`xtSoloEncode(x, n, 2)` now gives the records of `0x8951e120(3)`, the mode the XT's driver gives a stereo wave (`0x89515ecc`: channels 2 gives 3, otherwise 2). Before this, the port and `xt_enc`'s `:2` mixed to `(L+R)>>1` and ran mono mode, so the check compared two encoders on the wrong path. On all 87 stereo waves in the repo the port and `0x8951e120(3)` now agree on every start, length and info word, and so do 100 generated ones, bar one the firmware has no result for. The old path differed from mode 3 on 44 of the 87: `drum` 188 of 609 records from record 420, wave 403 with 47 records against 24. (v112 counted 45 of 89. My list leaves out a 32-bit test file, and I did not find what else it held.)
+
+**The modes.** `0x8951dd70` takes the mode through a jump table at `0x8951e044` and sets three function pointers and a stride.
+
+| mode | reader `0x8a015478` | samples `0x8a015470` | filter `0x8a015474` | stride `0x8a01547c` |
+|---|---|---|---|---|
+| 2, mono | `0x8951f5b0`: x | `0x8951f6e0`: x | `0x8951f700`: FIR(x) | 1 |
+| 3, stereo | `0x8951f5e0`: 0.5·(L+R) in float | `0x8951f6f0`: (L+R)>>1 | `0x8951f740`: 0.5·(FIR(L)+FIR(R)) | 2 |
+| 0, left | `0x8951f650`: L | `0x8951f6e0` | `0x8951f740` | 2 |
+| 1, right | `0x8951f620`: R | `0x8951f6e0`, the pointer 2 bytes on | `0x8951f740` | 2 |
+
+The driver only passes 2 or 3, so 0 and 1 are not ported. Their filter still averages both channels, which nothing reaches.
+
+**Who reads what.** Only these use the wave. Everything else works on the buffers.
+
+| | routine | samples | decimated or scratch values |
+|---|---|---|---|
+| first fill | `0x8951f790` from `0x8951e204` | samples | reader, through `0x8951f680` |
+| shift, `off + 0x3000 ≤ n − maxLag` | `0x8951f880` from `0x89522138` | samples | filter |
+| shift, otherwise, with its zero tail | `0x8951f790` | samples | reader |
+| scratch, away from the ends | `0x8951fab0` | | filter, every 4th sample |
+| scratch, within `0x3f` of either end | `0x8951fab0` | | reader, every sample |
+| drift | `0x89520d30` | | reader |
+| crossing scan | `0x895214b0` | | reader through FTRC, no filter |
+
+In mono the reader's path and the filter come to the same floats, which is why the port had one `decAtF`. In stereo they don't. The reader's sum is exact, as 16-bit sums fit a float, so the FIR runs once on 0.5·(L+R). The filter runs two FIRs, each with its own round-to-zero steps, and averages them. They differ by about one unit in the last place. FTRC then truncates 0.5·(L+R) where the samples floor: (−1, 0) reads as −1 from the samples and 0 in the crossing scan.
+
+By the arithmetic the filter stays inside the wave. Its callers test `pos ≥ u + 0x3f` and `pos + u + 0x3f < n`, or `off + 0x3000 ≤ n − maxLag`, with maxLag 2004 whenever a shift is reached. So its missing bounds check never matters, and the port's `firChannel` keeps one anyway.
+
+**The port.** `fetch` is the reader, `sample` the samples, `decAtF` the FIR through the reader, `decFast` the filter. `fill` takes a flag for `0x8951f880`. Mono is unchanged: `decFast` is `decAtF` there, and `fcheck`'s mono lines did not move. XtSynth, `XtToneCheck`, `xt_fw solocmp` and `xt_analog`'s PCM waves all give the encoder the interleaved wave now.
+
+**Why the check now compares memory.** Three planted errors changed no record on any wave here: the scratch through the reader's path, near-the-ends scratch through the filter, and drift through the filter. A scan of 400 random stereo waves showed none of them, and 46 waves built for it, a loud carrier cancelling between the channels, showed only the drift, on one wave. One unit in the last place rarely moves an FTRC, and a moved FTRC rarely moves a mark. So records alone cannot show these paths are right.
+
+`xt_enc cmp` now also hashes the encoder's memory after each step, on both sides:
+- after each fill and scratch fill, the whole 0xc000 bytes at `0x8a0090f4`: samples, decimated signal, scratch;
+- after each drift, the 0x18000 bytes at `0x89ff10c8`.
+
+It says so only when they differ, so the baseline's lines stay as they were. On all 275 waves, mono and stereo, every step of every wave with a firmware result is identical to the bit. `xtSoloEncode` and `xtFwSoloEncode` take an optional `trace`, and `xtEncHash` is the hash.
+
+**The waves.** `make_inputs.py` writes `enc2_*`, which `fcheck` runs in one section as 170 waves with `:2`, through `xargs -P 8`: 275 separate processes at once would be a lot.
+- the project's 70 stereo waves, by number (`enc2_prj_*`);
+- `drum`, `w358`, vocal against chord, and vocal against itself a sample later, each gated, quiet, clipped, reversed, padded and swapped;
+- the sum odd everywhere (`odd_`, `oddp_`, `anti_`), and gaps holding only −1, 0 and 1 (`dith_`), where floor and truncation differ;
+- both channels the same (`same_`), which by the arithmetic gives mono's records;
+- detuned tones, one channel silent, low notes, fast falls, fades on a constant, lengths from 2 to 14000, constants at the ends of the range, clicks in one channel, noise, and 12 mixes from a seed.
+
+`enc2_mix02` has no firmware result: the firmware reads outside memory after a NaN drift (`read32 at 8201xxxx`, pc `0x89521a1c`), as in v112. The port's records tile it. A random corpus outside `fcheck`, 1200 more stereo waves (tones, gated, quiet, short and noisy, with the channels a phase apart, one off, cancelling, the same, one silent or dithered): 1179 identical in records and memory, 344,011 records, and 21 with no firmware result, all gated. No wave differed, and the port's records tile those 21.
+
+**Planted errors.** `mutate_enc.py`: 34 of 34 caught, now about 8 minutes. The 11 new ones, in waves: `st-reader` 160, `st-first-fast` 157, `st-sample` 156, `st-fir-left` 138, `st-fir-mix` 134, `st-scratch-slow` 113, `st-shift-slow` 83, `st-shift-fast` 77, `st-scratch-end` 54, `st-drift-fast` 50, `st-cross` 4. `st-cross` is the one that only records can catch, as the crossing scan leaves nothing in that memory; its 4 waves include project wave 392, where it makes a record too many. Memory also raised the older ones, `fir-order` from 5 waves to 260 and `drift-stale` from 2 to 41. One is exact and left out of the list: the zero tail through the fast filter, which reads only zeros.
+
+`xt_tone` gives both sides the port's records, and `w358`, its stereo SOLO wave, has the same records in either mode. So the old path in XtSynth would pass it. It now also compares XtSynth's own records with the firmware's on `vocal.bin` and `drum.bin` ("the SOLO records of"), which does not change what it draws. `solo-old-mix` plants the old path in XtSynth: 187 different. `mutate_tone.py`: 145 of 145 caught.
+
+**Against records from an instrument.** The project's waves store their own records, and a stereo one holds the list twice: `xtrecs.py`, in `fcheck`, compares them with the port.
+
+| | waves | records | equal to stereo mode | equal to the old path |
+|---|---|---|---|---|
+| stereo, ISFT "V-Synth Ver.1.50" | 25 | 3190 | 24 | 18 |
+| mono, "V-Synth Ver.2.01" (003, 004) and "1.50" (345) | 3 | 2241 | 3 | not applicable |
+
+This is the strongest evidence there is that stereo mode is right, with a limit: those stereo records were written by the original V-Synth at 1.50, per the file, not by the XT's 2.02 that the harness runs. No project wave has XT-made stereo records.
+
+The one that differs is wave 373, 42 of 146 records, first at record 29 (1367 against 1366), the same again from record 100. The old path has 4 different on it. One step at one mark explains all 42:
+- At that mark two lag sums tie exactly: D(lag) = D(lag+1). So the fit's numerator is exactly half its denominator, and the exact quotient is 32768.
+- The divide (`0x89522800`) rounds its divisor up and gives 32767, on the rom as in the port.
+- The period comes out 5898236, one step (4 units of 1/65536 sample) under 5898240, where `per >> 12` goes up.
+- Raising that one period to 5898240 makes all 146 records equal the stored ones. Trying every tracker step of the wave, up and down, nothing else does; the next best leaves 2. The next mark falls 1/16 sample later, so the segment's drift changes, and that moves those 42 records by 1/16 sample.
+
+I don't know why the stored run has that step. What I tried:
+- An exact quotient wherever an exact tie meets this rounding is not it. That leaves 373 at 40 different and breaks 344, 352, 365 and 369, which match today. Many of these waves have such ties, up to 6 a wave, and elsewhere the stored records agree with rom.2's rounding.
+- Float rounding is not it: the filter everywhere through the reader, or everywhere through the fast path, round-to-nearest, or the older coefficient order (`(X·u)·u`) all leave those 42 records as they are.
+
+The firmware that wrote this file may differ here from 2.02, but I have no 1.50 image to test that on. On the XT's own rom the port is right, as it equals `0x8951e120(3)` on this wave too.
+
+**Playback.** `solocmp` gives both sides the firmware's records, now in mode 3. New cases, `drum` at 1.0 and at 0.8 with formant and walk: −101.1 and −98.2 dB, in line with the rest. Waves 405, 403 and 411 by hand: −104.7, −86.7 and −87.8 dB.
+
+**A/B.** `verify.sh` is 4/4 identical against v112, PluginTest 4/4, because `w358` has the same records in both modes and those renders' `drum` is BACKING. Stereo SOLO renders change where records do, as intended. XtSynth CLI, two notes as in `ab.sh`, against v112:
+
+| wave | frames | against v112 | from frame |
+|---|---|---|---|
+| `w358` | 13298 | identical | |
+| `drum` as SOLO | 64962 | identical: its records differ only from record 420, sample 42,567, which these notes don't reach | |
+| 343 | 22396 | −98.9 dB | 12,783 |
+| 386 | 27804 | −31.7 dB | 3,000 |
+| 397 | 28660 | −32.9 dB | 2,389 |
+| 403 | 7496 | −54.0 dB | 183 |
+| 405 | 45419 | −25.7 dB | 1,223 |
+| 411 | 41729 | −65.4 dB | 2,240 |
+| 376 | 35730 | −50.7 dB | 6,090 |
+
+Of the project's 70 stereo waves, 30 get different records.
+
+**What this leaves.**
+- Wave 373, above.
+- The events: the port still takes only {n·16}, as `xtFwSoloEncode` does. The 25 waves above have just that, so this did not need them.
+- `VariphraseEngine` still mixes and calls mono. The plugin only uses it for `analyzeContent` and the old offline renderer, not for what it plays.
+
 ### The SOLO encoder against the firmware's (2026-11-03, v112)
 
 `xtSoloEncode` now gives the records of rom.2's own encoder (`0x8951dc40`, `0x8951e120` in the interpreter), every start, length and info word, on all 2138 of the 2157 waves tried that have a firmware result: the project's 115 real waves (stereo mixed), sines, saws, gated, clipped and short waves, and random mixes. Before this, 73 of 413 generated waves came out the same.
@@ -1602,7 +1700,7 @@ The rest of the encoder (onset, candidates, refine, tracker, octave, gap fill, b
 **`xt_tone`.** Seeds 90210 and 2007 at 6000 cases: no line with a difference. `mutate_tone.py`: 144 of 144 caught, as the list needs re-running when a port changes.
 
 **What this leaves.**
-- **The firmware's stereo mode.** This check, like the numbers it set out to explain, gives the firmware `(L+R)>>1` in mono mode, as XtSynth gives the port. The XT encodes a stereo wave in mode 3 (`0x8951e120(3)`), which is not the same: the full-rate samples are that floor, but the filter reads `0.5·(L+R)` in float (`0x8951f5e0`, and `0x8951f740` on its fast path, which filters each channel and then averages), and the crossing scan truncates that float where the mix floors. On the project's 89 stereo waves, mode 3 and the port on the mix differ on 45; `drum` 188 of 609 from record 420 (713 against 717). It needs a stereo path through `xtSoloEncode` and XtSynth.
+- **The firmware's stereo mode** (done in v113, "The SOLO encoder's stereo mode"). This check, like the numbers it set out to explain, gives the firmware `(L+R)>>1` in mono mode, as XtSynth gives the port. The XT encodes a stereo wave in mode 3 (`0x8951e120(3)`), which is not the same: the full-rate samples are that floor, but the filter reads `0.5·(L+R)` in float (`0x8951f5e0`, and `0x8951f740` on its fast path, which filters each channel and then averages), and the crossing scan truncates that float where the mix floors. On the project's 89 stereo waves, mode 3 and the port on the mix differ on 45; `drum` 188 of 609 from record 420 (713 against 717). It needs a stereo path through `xtSoloEncode` and XtSynth.
 - The events: the port takes only {n·16}, as `xtFwSoloEncode` does.
 - Below the buffer (`0x89ff10c4` and down) only what a scan reached in these waves is modelled. Above it in `0x8a0150f4`, a read past the scratch, reads 0 here and rom.2's variables there; none was seen.
 

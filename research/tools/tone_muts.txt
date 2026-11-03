@@ -142,3 +142,4 @@ cosm-past2-none|v.cs[1].process(tmp2, 1.0f, mixPast);|v.cs[1].process(tmp2, 1.0f
 cosm-past2-kept|        std::copy(tmp, tmp + 3, mixPast);\n|
 fm-tone-0|modShared, (int)(v - voice));|modShared, 0);
 fm-lines-cleared|    for (Voice& v : voice) v.active = false;\n    for (uint16_t& w : keys.held) w = 0;|    for (Voice& v : voice) v.active = false;\n    std::fill(std::begin(modShared.line), std::end(modShared.line), 0.0f);\n    for (uint16_t& w : keys.held) w = 0;
+solo-old-mix|const std::vector<XtRecord> recs = xtSoloEncode(pcm.data(), (int)frames, ch);|std::vector<int16_t> x16((size_t)frames); for (long i = 0; i < frames; ++i) x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[(size_t)(2 * i)] + (int)pcm[(size_t)(2 * i + 1)]) >> 1) : pcm[(size_t)i]; const std::vector<XtRecord> recs = xtSoloEncode(x16.data(), (int)frames);

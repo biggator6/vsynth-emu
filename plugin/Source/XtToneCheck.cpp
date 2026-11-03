@@ -369,10 +369,7 @@ bool loadWave(Firmware& f, uint32_t& next, const std::string& path, int channels
     f.c.wr16(w.chunk[2] + 8, 44000);
     f.c.wr8(w.chunk[4] + 0x1a, 1);                        // the Loop switch decides
     if (type == 1) {
-        std::vector<int16_t> x16((size_t)frames);
-        for (long i = 0; i < frames; ++i)
-            x16[(size_t)i] = channels == 2 ? (int16_t)(((int)raw[(size_t)(2 * i)] + (int)raw[(size_t)(2 * i + 1)]) >> 1) : raw[(size_t)i];
-        out.recs = xtSoloEncode(x16.data(), (int)frames);
+        out.recs = xtSoloEncode(raw.data(), (int)frames, channels);
         const std::vector<uint8_t> v = soloVpdt(out.recs, frames, channels);
         w.chunk[5] = put(v.data(), v.size());
         w.band[0] = put(raw.data(), raw.size() * 2);
@@ -387,6 +384,31 @@ bool loadWave(Firmware& f, uint32_t& next, const std::string& path, int channels
     }
     w.loaded = true;
     return true;
+}
+
+// XtSynth's own SOLO records against the firmware's encoder.  The cases give both sides the port's
+// records, loadWave's, so nothing in them sees which mode XtSynth encodes in, on a wave where the modes differ.
+void checkSoloRecords(const std::string& dir, const char* file, int channels) {
+    std::vector<int16_t> raw;
+    if (FILE* fp = std::fopen((dir + file).c_str(), "rb")) {
+        int16_t x;
+        while (std::fread(&x, 2, 1, fp) == 1) raw.push_back(x);
+        std::fclose(fp);
+    }
+    const long frames = (long)raw.size() / channels;
+    std::vector<std::vector<float>> chans((size_t)channels);
+    for (long i = 0; i < frames; ++i)
+        for (int k = 0; k < channels; ++k) chans[(size_t)k].push_back((float)raw[(size_t)(i * channels + k)] / 32768.0f);
+    std::string err;
+    const std::shared_ptr<XtEncoded> e = xtSynthEncode(chans, 44100.0, 1, 64, &err);
+    std::vector<XtRecord> fw;
+    if (!e || !xtFwSoloEncode(raw.data(), (int)frames, fw, channels)) { std::printf("tone, the SOLO records of %s: cannot encode\n", file); return; }
+    const XtSoloPlan& P = e->solo;
+    const size_t both = std::min(P.segStart.size(), fw.size());
+    size_t diff = std::max(P.segStart.size(), fw.size()) - both;
+    for (size_t i = 0; i < both; ++i)
+        if (P.segStart[i] != fw[i].start16 / 16.0 || P.info[i] != fw[i].info) ++diff;
+    std::printf("tone, the SOLO records of %s: %zu different of %zu\n", file, diff, fw.size());
 }
 
 // The cached loop events a wave's player reads, for the loop XtSynth computes: the
@@ -697,6 +719,8 @@ int XtToneProbe::run(int argc, char** argv) {
             if (!loadWave(fw, next, dir + w.file, w.ch, w.type, 30000, t)) { std::fprintf(stderr, "wave %s\n", w.file); return 2; }
             waves.push_back(std::move(t));
         }
+        checkSoloRecords(dir, "vocal.bin", 1);
+        checkSoloRecords(dir, "drum.bin", 2);
     }
     XtSynth syn;
     syn.prepare(44100.0);

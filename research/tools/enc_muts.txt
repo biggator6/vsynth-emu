@@ -7,12 +7,12 @@ cross-ea|A = crossing(a, 1, A);|
 cross-eb|B = crossing(b, -1, B);|
 cross-limit|if (wshl(steps, 16) <= period \|\| steps >= 882)|if (wshl(steps, 16) <= period \|\| steps >= 441)
 cross-over|if (wshl(steps, 16) <= period \|\| steps >= 882) return period;|return period;
-cross-half|if ((int)fetch(i) * sg <= 0) while|if (false) while
+cross-half|if (at() * sg <= 0) while|if (false) while
 clamp-b|if (b < a) b = a;|
 next-a|na = f9de0(A, B);|na = f9de0(pa, B);
 lag-above|(fromTracker ? 21 : 17)|17
 lag-below|(fromTracker ? 12 : 15)|15
-scratch-step|? 1 : 4;|? 4 : 4;
+scratch-step|nearEnd ? decAtF(pos - u6 + j)|nearEnd ? decAtF(pos - u6 + 4 * j)
 end-mark|if (tail_->prev && 2 * tail_->pos - tail_->prev->pos < last) insert(2 * tail_->pos - tail_->prev->pos, 0, head_->low);|
 short-lag|if ((unsigned)n_ < (unsigned)maxLag_) {|if (false) {
 short-fir|((float)pmin_ + 307.94998f)|((float)22 + 307.94998f)
@@ -21,3 +21,14 @@ drift-stale|float* buf = driftBuf_.data();|std::fill(driftBuf_.begin(), driftBuf
 drift-nan|if (!std::isfinite(d)) return;|
 fir-order|(41.131832f - u2 * 74.14366f) * u2)|(41.131832f - u2 * 74.14366f) * u * u)
 drift-head|buf[pad - 1] = -4e-31f;|
+st-sample|((int)x_[2 * i] + (int)x_[2 * i + 1]) >> 1 : x_[i];|((int)x_[2 * i] + (int)x_[2 * i + 1]) / 2 : x_[i];
+st-reader|return stereo_ ? ((float)x_[2 * i] + (float)x_[2 * i + 1]) * 0.5f : (float)x_[i];|return stereo_ ? (float)(((int)x_[2 * i] + (int)x_[2 * i + 1]) >> 1) : (float)x_[i];
+st-cross|auto at = [&]() { return ftrc(fetch(i)); };|auto at = [&]() { return sample(i); };
+st-fir-mix|return stereo_ ? (firChannel(s, 0) + firChannel(s, 1)) * 0.5f : decAtF(s);|return decAtF(s);
+st-fir-left|return stereo_ ? (firChannel(s, 0) + firChannel(s, 1)) * 0.5f : decAtF(s);|return stereo_ ? firChannel(s, 0) : decAtF(s);
+st-shift-slow|} else fill(cnt, kBuf, false, true);|} else fill(cnt, kBuf, false);
+st-shift-fast|fill(cnt, kBuf, false);\n    } else|fill(cnt, kBuf, false, true);\n    } else
+st-first-fast|(unsigned)kBuf ? kBuf - n_ - maxLag_ : 0), false);|(unsigned)kBuf ? kBuf - n_ - maxLag_ : 0), false, true);
+st-scratch-slow|decFast(pos - u6 + 4 * j)|decAtF(pos - u6 + 4 * j)
+st-scratch-end|nearEnd ? decAtF(pos - u6 + j)|nearEnd ? decFast(pos - u6 + j)
+st-drift-fast|put(pad + P + k, decAtF(ia + k)); put(pad + half + P + k, decAtF(ib + k));|put(pad + P + k, decFast(ia + k)); put(pad + half + P + k, decFast(ib + k));

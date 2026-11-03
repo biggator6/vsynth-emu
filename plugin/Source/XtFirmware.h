@@ -15,8 +15,10 @@
 bool xtFwOpen(const char* romPath);
 bool xtFwOpened();
 
-// The SOLO encoder (0x8951dc40 + 0x8951e120), as XtSoloEncoder.cpp ports it.
-bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out);
+// The SOLO encoder (0x8951dc40 + 0x8951e120), as XtSoloEncoder.cpp ports it: n frames
+// of mono, or of interleaved stereo in the mode the XT's driver gives a stereo wave
+// (0x89515ed6: 0x8951e120(3), and (2) for mono).
+bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int channels = 1, std::vector<uint64_t>* trace = nullptr);
 
 // The firmware's own SOLO player, for validation: the records written as the
 // XT lays out a one-segment SOLO vpdt (a start and an end event, their

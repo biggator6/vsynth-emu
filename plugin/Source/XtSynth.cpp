@@ -95,12 +95,9 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
     E->type = type;
     E->frames = frames;
     if (type == 1) {
-        // The SOLO encoder reads (L+R) >> 1 for a stereo wave (0x8951f6f0);
-        // the player reads both channels through those records (0x8950d1f0).
-        std::vector<int16_t> x16((size_t)frames);
-        for (long i = 0; i < frames; ++i)
-            x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[(size_t)(2 * i)] + (int)pcm[(size_t)(2 * i + 1)]) >> 1) : pcm[(size_t)i];
-        const std::vector<XtRecord> recs = xtSoloEncode(x16.data(), (int)frames);
+        // A stereo wave has the encoder's stereo mode, one list of records from both
+        // channels (0x8951e120(3)); the player reads both through it (0x8950d1f0).
+        const std::vector<XtRecord> recs = xtSoloEncode(pcm.data(), (int)frames, ch);
         if (recs.size() < 2) return fail("SOLO encoder found no records");
         XtSoloPlan& P = E->solo;
         P.in.resize((size_t)frames);

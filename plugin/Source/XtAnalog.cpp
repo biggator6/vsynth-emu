@@ -3337,10 +3337,7 @@ int main(int argc, char** argv) {
                 }
             }
             if (W.type == 1) {
-                std::vector<int16_t> x16((size_t)W.frames);
-                for (long t = 0; t < W.frames; ++t)
-                    x16[(size_t)t] = W.ch == 2 ? (int16_t)(((int)W.pcm[(size_t)(2 * t)] + (int)W.pcm[(size_t)(2 * t + 1)]) >> 1) : W.pcm[(size_t)t];
-                if (!xtFwSoloEncode(x16.data(), (int)W.frames, W.recs) || W.recs.size() < 2) { std::fprintf(stderr, "pcm: solo encode\n"); return 1; }
+                if (!xtFwSoloEncode(W.pcm.data(), (int)W.frames, W.recs, W.ch) || W.recs.size() < 2) { std::fprintf(stderr, "pcm: solo encode\n"); return 1; }
                 XtSoloPlan& Q = W.plan;
                 Q.in.resize((size_t)W.frames);
                 if (W.ch == 2) Q.inR.resize((size_t)W.frames);

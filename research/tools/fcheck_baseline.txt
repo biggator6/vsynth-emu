@@ -249,6 +249,8 @@ env 127 127 127 127 200 900 2: identical
 env 0 0 127 0 5 60 0: identical
 env 30 70 90 50 80 500 2: identical
 == xt_tone
+tone, the SOLO records of vocal.bin: 0 different of 461
+tone, the SOLO records of drum.bin: 0 different of 609
 tone: 3286 notes, 1304 taken by a sounding tone, 409 truncated, 264311 blocks, 5916563 checks
 tone: a SOLO wave's buffers within 8.0e-03 of the block's peak; 0 notes left off, a read outside memory; 358940 band reads far from their wave
 tone: 0 different
@@ -266,6 +268,8 @@ solo vocal.bin 1 1.0 0 -1.0 0 30000: 461 records, 30000 frames: max |firmware - 
 solo vocal.bin 1 1.2 1.1 0.5 0.05 30000 4000:-1.0 9000:2.0: 461 records, 30000 frames: max |firmware - port| 3.23e-06, difference -95.2 dB against the signal (rms 0.0200), first at 1
 solo w358.bin 2 1.0 0 1.0 0 20000: 111 records, 20000 frames: max |firmware - port| 2.96e-05, difference -88.4 dB against the signal (rms 0.1408), first at 1
 solo w358.bin 2 0.8 1.5 1.5 0.4 20000: 111 records, 20000 frames: max |firmware - port| 2.61e-05, difference -100.1 dB against the signal (rms 0.0706), first at 1
+solo drum.bin 2 1.0 0 1.0 0 40000: 609 records, 40000 frames: max |firmware - port| 3.98e-06, difference -101.1 dB against the signal (rms 0.0459), first at 1
+solo drum.bin 2 0.8 1.5 1.5 0.4 40000: 609 records, 40000 frames: max |firmware - port| 4.69e-06, difference -98.2 dB against the signal (rms 0.0284), first at 1
 solo gated.bin 1 8 0 -0.5 0 60000: 451 records, 60000 frames: max |firmware - port| 6.1e-06, difference -105.9 dB against the signal (rms 0.0901), first at 2
 solo gated.bin 1 32 0 -1.0 0 31500 16000:1.0: 451 records, 31500 frames: max |firmware - port| 2.83e-06, difference -111.9 dB against the signal (rms 0.0778), first at 0
 solo gated.bin 1 32 0 -1.0 0 4300000 10464:-0.001: 451 records, 4300000 frames: max |firmware - port| 2.83e-06, difference -111.1 dB against the signal (rms 0.0067), first at 0
@@ -377,6 +381,205 @@ enc enc_w358_pad.bin: 182 records identical
 enc enc_w358_quiet.bin: 87 records identical
 enc enc_w358_rev.bin: 40 records identical
 enc enc_zeros.bin: 118 records identical
+enc enc2_alt.bin:2: 118 records identical
+enc enc2_anti_chirp.bin:2: 118 records identical
+enc enc2_anti_saw.bin:2: 118 records identical
+enc enc2_anti_sin.bin:2: 118 records identical
+enc enc2_anti_vocal.bin:2: 147 records identical
+enc enc2_chirpd.bin:2: 832 records identical
+enc enc2_chirpu.bin:2: 834 records identical
+enc enc2_clicks.bin:2: 118 records identical
+enc enc2_dc.bin:2: 1498 records identical
+enc enc2_dcfade100.bin:2: 401 records identical
+enc enc2_dchalf.bin:2: 118 records identical
+enc enc2_dcmax.bin:2: 1498 records identical
+enc enc2_dcmin.bin:2: 1498 records identical
+enc enc2_decay.bin:2: 298 records identical
+enc enc2_dith_chirp.bin:2: 966 records identical
+enc enc2_dith_saw.bin:2: 390 records identical
+enc enc2_dith_sin.bin:2: 842 records identical
+enc enc2_dith_vocal.bin:2: 711 records identical
+enc enc2_drum_clip.bin:2: 1469 records identical
+enc enc2_drum_g3.bin:2: 441 records identical
+enc enc2_drum_g47.bin:2: 380 records identical
+enc enc2_drum_g7.bin:2: 373 records identical
+enc enc2_drum_pad.bin:2: 355 records identical
+enc enc2_drum_quiet.bin:2: 88 records identical
+enc enc2_drum_rev.bin:2: 573 records identical
+enc enc2_drum_swap.bin:2: 609 records identical
+enc enc2_fall1500_4006.bin:2: 55 records identical
+enc enc2_fall1500_4048.bin:2: 56 records identical
+enc enc2_fall400_8087.bin:2: 34 records identical
+enc enc2_fall800_6156.bin:2: 48 records identical
+enc enc2_left.bin:2: 495 records identical
+enc enc2_mix00.bin:2: 96 records identical
+enc enc2_mix01.bin:2: 71 records identical
+enc enc2_mix02.bin:2: firmware has no result, port 38 records
+enc enc2_mix03.bin:2: 1389 records identical
+enc enc2_mix04.bin:2: 748 records identical
+enc enc2_mix05.bin:2: 679 records identical
+enc enc2_mix06.bin:2: 247 records identical
+enc enc2_mix07.bin:2: 1378 records identical
+enc enc2_mix08.bin:2: 39 records identical
+enc enc2_mix09.bin:2: 218 records identical
+enc enc2_mix10.bin:2: 10 records identical
+enc enc2_mix11.bin:2: 1437 records identical
+enc enc2_n100.bin:2: 3 records identical
+enc enc2_n1000.bin:2: 20 records identical
+enc enc2_n12288.bin:2: 123 records identical
+enc enc2_n14000.bin:2: 140 records identical
+enc enc2_n159.bin:2: 4 records identical
+enc enc2_n160.bin:2: 4 records identical
+enc enc2_n2.bin:2: 0 records identical
+enc enc2_n2003.bin:2: 20 records identical
+enc enc2_n2004.bin:2: 0 records identical
+enc enc2_n2005.bin:2: 0 records identical
+enc enc2_n2006.bin:2: 20 records identical
+enc enc2_n3.bin:2: 1 records identical
+enc enc2_n40.bin:2: 1 records identical
+enc enc2_n4000.bin:2: 40 records identical
+enc enc2_noise.bin:2: 1498 records identical
+enc enc2_odd_chirp.bin:2: 728 records identical
+enc enc2_odd_saw.bin:2: 165 records identical
+enc enc2_odd_sin.bin:2: 330 records identical
+enc enc2_odd_vocal.bin:2: 461 records identical
+enc enc2_oddp_chirp.bin:2: 728 records identical
+enc enc2_oddp_saw.bin:2: 165 records identical
+enc enc2_oddp_sin.bin:2: 330 records identical
+enc enc2_oddp_vocal.bin:2: 461 records identical
+enc enc2_prj_343.bin:2: 28 records identical
+enc enc2_prj_344.bin:2: 17 records identical
+enc enc2_prj_348.bin:2: 141 records identical
+enc enc2_prj_349.bin:2: 160 records identical
+enc enc2_prj_350.bin:2: 177 records identical
+enc enc2_prj_351.bin:2: 265 records identical
+enc enc2_prj_352.bin:2: 959 records identical
+enc enc2_prj_353.bin:2: 116 records identical
+enc enc2_prj_354.bin:2: 688 records identical
+enc enc2_prj_355.bin:2: 246 records identical
+enc enc2_prj_356.bin:2: 227 records identical
+enc enc2_prj_357.bin:2: 156 records identical
+enc enc2_prj_358.bin:2: 111 records identical
+enc enc2_prj_359.bin:2: 84 records identical
+enc enc2_prj_360.bin:2: 100 records identical
+enc enc2_prj_361.bin:2: 61 records identical
+enc enc2_prj_362.bin:2: 179 records identical
+enc enc2_prj_363.bin:2: 35 records identical
+enc enc2_prj_364.bin:2: 43 records identical
+enc enc2_prj_365.bin:2: 17 records identical
+enc enc2_prj_366.bin:2: 68 records identical
+enc enc2_prj_367.bin:2: 41 records identical
+enc enc2_prj_368.bin:2: 171 records identical
+enc enc2_prj_369.bin:2: 81 records identical
+enc enc2_prj_370.bin:2: 30 records identical
+enc enc2_prj_371.bin:2: 30 records identical
+enc enc2_prj_372.bin:2: 443 records identical
+enc enc2_prj_373.bin:2: 146 records identical
+enc enc2_prj_374.bin:2: 36 records identical
+enc enc2_prj_375.bin:2: 75 records identical
+enc enc2_prj_376.bin:2: 116 records identical
+enc enc2_prj_377.bin:2: 43 records identical
+enc enc2_prj_378.bin:2: 18 records identical
+enc enc2_prj_379.bin:2: 159 records identical
+enc enc2_prj_380.bin:2: 27 records identical
+enc enc2_prj_381.bin:2: 18 records identical
+enc enc2_prj_382.bin:2: 16 records identical
+enc enc2_prj_383.bin:2: 3 records identical
+enc enc2_prj_384.bin:2: 24 records identical
+enc enc2_prj_385.bin:2: 25 records identical
+enc enc2_prj_386.bin:2: 177 records identical
+enc enc2_prj_387.bin:2: 181 records identical
+enc enc2_prj_388.bin:2: 20 records identical
+enc enc2_prj_389.bin:2: 142 records identical
+enc enc2_prj_390.bin:2: 25 records identical
+enc enc2_prj_391.bin:2: 374 records identical
+enc enc2_prj_392.bin:2: 23 records identical
+enc enc2_prj_393.bin:2: 18 records identical
+enc enc2_prj_394.bin:2: 21 records identical
+enc enc2_prj_395.bin:2: 105 records identical
+enc enc2_prj_396.bin:2: 51 records identical
+enc enc2_prj_397.bin:2: 340 records identical
+enc enc2_prj_398.bin:2: 196 records identical
+enc enc2_prj_399.bin:2: 148 records identical
+enc enc2_prj_400.bin:2: 43 records identical
+enc enc2_prj_401.bin:2: 263 records identical
+enc enc2_prj_402.bin:2: 60 records identical
+enc enc2_prj_403.bin:2: 24 records identical
+enc enc2_prj_404.bin:2: 62 records identical
+enc enc2_prj_405.bin:2: 971 records identical
+enc enc2_prj_406.bin:2: 148 records identical
+enc enc2_prj_407.bin:2: 104 records identical
+enc enc2_prj_408.bin:2: 87 records identical
+enc enc2_prj_409.bin:2: 97 records identical
+enc enc2_prj_410.bin:2: 62 records identical
+enc enc2_prj_411.bin:2: 48 records identical
+enc enc2_prj_412.bin:2: 148 records identical
+enc enc2_prj_413.bin:2: 1238 records identical
+enc enc2_prj_414.bin:2: 178 records identical
+enc enc2_prj_415.bin:2: 229 records identical
+enc enc2_right.bin:2: 495 records identical
+enc enc2_same_gate.bin:2: 1112 records identical
+enc enc2_same_sin440.bin:2: 661 records identical
+enc enc2_same_vocal.bin:2: 461 records identical
+enc enc2_saw40.bin:2: 61 records identical
+enc enc2_saw440.bin:2: 662 records identical
+enc enc2_sin440.bin:2: 660 records identical
+enc enc2_sin440c.bin:2: 661 records identical
+enc enc2_square40.bin:2: 1432 records identical
+enc enc2_vc_clip.bin:2: 461 records identical
+enc enc2_vc_g3.bin:2: 501 records identical
+enc enc2_vc_g47.bin:2: 1216 records identical
+enc enc2_vc_g7.bin:2: 723 records identical
+enc enc2_vc_pad.bin:2: 552 records identical
+enc enc2_vc_quiet.bin:2: 43 records identical
+enc enc2_vc_rev.bin:2: 479 records identical
+enc enc2_vc_swap.bin:2: 511 records identical
+enc enc2_vv_clip.bin:2: 195 records identical
+enc enc2_vv_g3.bin:2: 518 records identical
+enc enc2_vv_g47.bin:2: 924 records identical
+enc enc2_vv_g7.bin:2: 421 records identical
+enc enc2_vv_pad.bin:2: 274 records identical
+enc enc2_vv_quiet.bin:2: 57 records identical
+enc enc2_vv_rev.bin:2: 196 records identical
+enc enc2_vv_swap.bin:2: 195 records identical
+enc enc2_w358_clip.bin:2: 124 records identical
+enc enc2_w358_g3.bin:2: 109 records identical
+enc enc2_w358_g47.bin:2: 250 records identical
+enc enc2_w358_g7.bin:2: 189 records identical
+enc enc2_w358_pad.bin:2: 182 records identical
+enc enc2_w358_quiet.bin:2: 87 records identical
+enc enc2_w358_rev.bin:2: 40 records identical
+enc enc2_w358_swap.bin:2: 111 records identical
+enc enc2_zeros.bin:2: 118 records identical
+== xtrecs
+xt 003, 1 ch, V-Synth Ver.2.01: 1761 records identical
+xt 004, 1 ch, V-Synth Ver.2.01: 461 records identical
+xt 343, 2 ch, V-Synth Ver.1.50: 28 records identical
+xt 344, 2 ch, V-Synth Ver.1.50: 17 records identical
+xt 345, 1 ch, V-Synth Ver.1.50: 19 records identical
+xt 351, 2 ch, V-Synth Ver.1.50: 265 records identical
+xt 352, 2 ch, V-Synth Ver.1.50: 959 records identical
+xt 357, 2 ch, V-Synth Ver.1.50: 156 records identical
+xt 358, 2 ch, V-Synth Ver.1.50: 111 records identical
+xt 359, 2 ch, V-Synth Ver.1.50: 84 records identical
+xt 360, 2 ch, V-Synth Ver.1.50: 100 records identical
+xt 361, 2 ch, V-Synth Ver.1.50: 61 records identical
+xt 363, 2 ch, V-Synth Ver.1.50: 35 records identical
+xt 364, 2 ch, V-Synth Ver.1.50: 43 records identical
+xt 365, 2 ch, V-Synth Ver.1.50: 17 records identical
+xt 366, 2 ch, V-Synth Ver.1.50: 68 records identical
+xt 367, 2 ch, V-Synth Ver.1.50: 41 records identical
+xt 368, 2 ch, V-Synth Ver.1.50: 171 records identical
+xt 369, 2 ch, V-Synth Ver.1.50: 81 records identical
+xt 370, 2 ch, V-Synth Ver.1.50: 30 records identical
+xt 371, 2 ch, V-Synth Ver.1.50: 30 records identical
+xt 372, 2 ch, V-Synth Ver.1.50: 443 records identical
+xt 373, 2 ch, V-Synth Ver.1.50: port 146, stored 146 records, 42 different, first at 29: port 1367 0x9f, stored 1366 0x9f
+xt 374, 2 ch, V-Synth Ver.1.50: 36 records identical
+xt 375, 2 ch, V-Synth Ver.1.50: 75 records identical
+xt 378, 2 ch, V-Synth Ver.1.50: 18 records identical
+xt 379, 2 ch, V-Synth Ver.1.50: 159 records identical
+xt 382, 2 ch, V-Synth Ver.1.50: 16 records identical
 == bandcmp
 band 3 drum.bin 2 1.0 1.0 30000: BACKING, 30000 frames: max |firmware - port| 0, difference -321.0 dB against the signal (rms 0.0458), first at -1
 band 3 drum.bin 2 1.3 -1.0 30000: BACKING, 30000 frames: max |firmware - port| 0, difference -307.6 dB against the signal (rms 0.0098), first at -1

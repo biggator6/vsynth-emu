@@ -65,9 +65,11 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   against a whole firmware tone. `XT_TONE_FIRST=1`: each case's first difference, `XT_TONE_DUMP=<case>|a`:
   its settings. A new `Controls` field needs its ID in `patchOf` and a draw in `drawControls`, and a field
   in a list of what changed in `listedFields`.
-- `xt_enc <rom> cmp <file[:2]> ...` (in fcheck): `xtSoloEncode` against the firmware's encoder, every record; `:2` mixes stereo
-  to `(L+R)>>1`. `xt_enc <rom> <file>` prints the records. `mutate_enc.py [names]`: the planted errors in `enc_muts.txt`, through
-  `PORT=enc mutate.sh`.
+- `xt_enc <rom> cmp <file[:2]> ...` (in fcheck): `xtSoloEncode` against the firmware's encoder, every record and the encoder's
+  memory after each step (said only if it differs); `:2` is stereo, the firmware's mode 3. `xt_enc <rom> <file> [stereo]` prints
+  the records. `mutate_enc.py [names]`: the planted errors in `enc_muts.txt`, through `PORT=enc mutate.sh`.
+- `xtrecs.py <xt_enc> <rom>` (in fcheck): the port against the records stored in the project's own waves, the only ones made by
+  an instrument.
 - `firorder.py <listing>`: the order of additions in an unrolled sum, by a
   symbolic run of its disassembly (written for the Frequency Shifter's FIR).
 
@@ -79,7 +81,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
   a difference, not as a routine.
-- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 2.5 minutes).
+- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes).
 - Before a push: `verify.sh --full`.
 
 ## Firmware facts worth knowing
@@ -104,10 +106,12 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - SOLO's anchor and grain timer are int32 on the XT and can overflow, so `XtSoloVoice` wraps them: a backward
   repeat ends only by overflowing (HARDWARE_FIRMWARE.md, "The anchor's overflow"). A loop ported to `double`
   from int32 may not end; `solocmp` dies by `alarm(120)` so a hang fails the check.
-- `xtSoloEncode` gives the records of the firmware's encoder run in mono mode (`xtFwSoloEncode`; `xt_enc cmp` in fcheck,
-  HARDWARE_FIRMWARE.md, "The SOLO encoder against the firmware's"). `solocmp` gives both sides the firmware's records and
-  `xt_tone` both sides the port's, so neither shows a difference. The firmware's stereo mode (`0x8951e120(3)`) is not the
-  same as mono on `(L+R)>>1`, which is what XtSynth does: open.
+- `xtSoloEncode` gives the records of the firmware's encoder, mono (`0x8951e120(2)`) and stereo (`(3)`, which is not mono on
+  `(L+R)>>1`): `xtFwSoloEncode`, `xt_enc cmp` in fcheck, HARDWARE_FIRMWARE.md, "The SOLO encoder against the firmware's" and "The
+  SOLO encoder's stereo mode". `solocmp` gives both sides the firmware's records and `xt_tone` both sides the port's, so neither
+  shows a difference, bar `xt_tone`'s "the SOLO records of" lines. A rounding in the filter's paths rarely reaches a record, which
+  is why `xt_enc` compares memory as well. The project's stored records were written by V-Synth 1.50 or 2.01, not the XT's 2.02:
+  27 of 28 waves equal (`xtrecs.py`). Wave 373 differs by one step of the tracker's period at one mark, cause not known.
 - A tone's path (constructor `0x894f5860`, note start, update, the scheduler, what is hooked) is in
   HARDWARE_FIRMWARE.md, "The whole tone against XtSynth". Any change is a tone update (`0x894dc0b0`): all
   the blocks again, COSMs before the envelopes.

@@ -89,16 +89,25 @@ void xtFwHookBandReads(Sh4& c, XtFwBandReads& reads) {
 
 void xtFwForceNearest(bool on) { g_nearest = on; }
 
-bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out) {
+bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int channels, std::vector<uint64_t>* trace) {
     out.clear();
-    if (g_rom.empty() || !x || n <= 0) return false;
+    if (g_rom.empty() || !x || n <= 0 || (channels != 1 && channels != 2)) return false;
     auto M = std::make_unique<Machine>(g_rom);
     if (!M->ok) return false;
     Sh4& c = M->cpu;
-    c.write(kSamp, x, (size_t)n * 2);
+    if (kSamp + (size_t)n * (size_t)channels * 2 > kHeap) return false;
+    c.write(kSamp, x, (size_t)n * (size_t)channels * 2);
     c.wr32(kEv, (uint32_t)n * 16);          // event list {n·16}: one sustained note
     if (!c.call(kSoloNew, { (uint32_t)n, kSamp, 1, kEv }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
-    if (!c.call(kSoloEncode, { 2 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    if (trace) {   // at the common exit of 0x8951f790, 0x8951f880, 0x8951fab0, 0x89520d30: as xtSoloEncode's
+        trace->clear();
+        auto add = [trace](Sh4& m, int kind, uint32_t at, uint32_t bytes) { trace->push_back(xtEncHash(kind, m.ptr(at, bytes), bytes)); };
+        c.hook(0x8951f860, [add](Sh4& m) { add(m, 0, 0x8a0090f4, 0xc000); });
+        c.hook(0x8951f8de, [add](Sh4& m) { add(m, 0, 0x8a0090f4, 0xc000); });
+        c.hook(0x8951fb48, [add](Sh4& m) { add(m, 1, 0x8a0090f4, 0xc000); });
+        c.hook(0x89520f16, [add](Sh4& m) { add(m, 2, 0x89ff10c8, 0x18000); });
+    }
+    if (!c.call(kSoloEncode, { channels == 2 ? 3u : 2u }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
     // The record list: 16-byte nodes {u8 low, u8, u16 v, i32 pos, u32 lower, u32 higher}, from the head at 0x89ff10c4.
     struct Node { uint32_t low, v; int32_t pos; };
     std::vector<Node> list;
@@ -611,12 +620,8 @@ int main(int argc, char** argv) {
             else if (std::sscanf(argv[a], "%ld:g%f", &at, &w) == 2) note.gainAt.push_back({ at, w });
             else if (std::sscanf(argv[a], "%ld:%f", &at, &w) == 2) note.walkAt.push_back({ at, w });
         }
-        // the SOLO encoder reads (L+R) >> 1 (0x8951f6f0)
-        std::vector<int16_t> x16((size_t)frames);
-        for (long i = 0; i < frames; ++i)
-            x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[2 * i] + (int)pcm[2 * i + 1]) >> 1) : pcm[i];
         std::vector<XtRecord> recs;
-        if (!xtFwSoloEncode(x16.data(), (int)frames, recs) || recs.size() < 2) { std::fprintf(stderr, "encode failed\n"); return 1; }
+        if (!xtFwSoloEncode(pcm, (int)frames, recs, ch) || recs.size() < 2) { std::fprintf(stderr, "encode failed\n"); return 1; }
         for (size_t i = 0; i < recs.size(); ++i)   // the vpdt holds lengths only: records must run from 0, back to back
             if (recs[i].start16 != (i ? recs[i - 1].start16 + recs[i - 1].len16 : 0)) { std::fprintf(stderr, "record %zu not contiguous\n", i); return 1; }
         std::vector<float> fw;

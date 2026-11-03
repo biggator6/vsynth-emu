@@ -12,11 +12,13 @@
 //     threshold 0x4000, 22…2000 Hz;
 //   - energy gate tests ≤ (vpenc: <);
 //   - unvoiced fills step along the wave's own zero crossings (0x895214b0);
-//   - the lag search is wider for the tracker than for the octave votes.
+//   - the lag search is wider for the tracker than for the octave votes;
+//   - a stereo wave has its own mode, 0x8951e120(3): see "the reader" below.
 // Function names give the vpenc address they port.  Positions are 1/16
 // sample; periods 16.16 samples; qualities Q15 normalised distances.
 // Reference: research/HARDWARE_FIRMWARE.md ("The XT's own SOLO encoder,
-// emulated"; "The SOLO encoder against the firmware's", v112).  Its check is
+// emulated"; "The SOLO encoder against the firmware's", v112; "The SOLO encoder's
+// stereo mode", v113).  Its check is
 // XT_ENCODER_MAIN below (xt_enc in fcheck).
 
 #include "XtSoloEncoder.h"
@@ -75,7 +77,7 @@ inline int ftrc(float x) {                                 // FTRC: truncates an
 
 class Enc {
 public:
-    Enc(const int16_t* x, int n) : x_(x), n_(n) {}
+    Enc(const int16_t* x, int n, int channels, std::vector<uint64_t>* trace) : x_(x), n_(n), stereo_(channels == 2), memTrace_(trace) {}
     std::vector<XtRecord> run();
 
 private:
@@ -154,15 +156,37 @@ private:
     int buf16(int a) const { return a - off_ * 16; }     // 0x100081f0
 
     // ── signal ─────────────────────────────────────────────────────────
-    float fetch(int i) const { return (i >= 0 && i < n_) ? (float)x_[i] : 0.0f; }
+    // The three readers 0x8951dd70 chooses by mode.  In mono (2) they come to the same
+    // values.  In stereo (3) each gives its own, which round differently:
+    //   the reader 0x8a015478, for the filter and the crossing scan: 0x8951f5b0, or
+    //     0x8951f5e0, 0.5*(L+R) in float.  0 outside the wave;
+    //   the samples 0x8a015470: 0x8951f6e0, or 0x8951f6f0, (L+R) >> 1, the floor;
+    //   the filter 0x8a015474, unchecked: 0x8951f700, or 0x8951f740, 0.5*(FIR(L)+FIR(R)).
+    float fetch(int i) const {
+        if (i < 0 || i >= n_) return 0.0f;
+        return stereo_ ? ((float)x_[2 * i] + (float)x_[2 * i + 1]) * 0.5f : (float)x_[i];
+    }
+    int sample(int i) const {
+        if (i < 0 || i >= n_) return 0;                    // the firmware reads on: zeros in xtFwSoloEncode
+        return stereo_ ? ((int)x_[2 * i] + (int)x_[2 * i + 1]) >> 1 : x_[i];
+    }
     void designFir();                                     // rom.2 0x8951f380
-    float decAtF(int s) const {                           // rom.2 0x8951f680 (float)
+    float decAtF(int s) const {                           // rom.2 0x8951f680 (float), through the reader
         float acc = c_[0] * fetch(s);
         for (int k = 1; k < 64; ++k) acc += c_[k] * (fetch(s - k) + fetch(s + k));
         return acc;
     }
+    float firChannel(int s, int c) const {                // rom.2 0x8951f700 with the stride of a stereo wave
+        auto at = [this, c](int i) { return (i >= 0 && i < n_) ? (float)x_[2 * i + c] : 0.0f; };
+        float acc = c_[0] * at(s);
+        for (int k = 1; k < 64; ++k) acc += c_[k] * (at(s - k) + at(s + k));
+        return acc;
+    }
+    float decFast(int s) const {                          // rom.2 0x8951f700 / 0x8951f740
+        return stereo_ ? (firChannel(s, 0) + firChannel(s, 1)) * 0.5f : decAtF(s);
+    }
     void setDec(int j, int s) { setF(kDec + j * 4, decAtF(s)); }
-    void fill(int b, int to, bool zeroTail);              // 0x10008a50 / rom.2 0x8951f790
+    void fill(int b, int to, bool zeroTail, bool fast = false);   // 0x10008a50 / rom.2 0x8951f790; fast: 0x8951f880
     int shift(int pos, int p3);                           // 0x1000a5b0
     int nextEvent();                                      // 0x10008210
 
@@ -254,7 +278,9 @@ private:
     }
 
     // ── state (vpenc globals) ──────────────────────────────────────────
-    const int16_t* x_; int n_;
+    const int16_t* x_; int n_; bool stereo_;   // n_ frames; stereo_: x_ interleaved
+    std::vector<uint64_t>* memTrace_;          // xtSoloEncode's trace
+    void traceWork(int kind) { if (memTrace_) memTrace_->push_back(xtEncHash(kind, mem_.data() + kFull, 0xc000)); }
     int rd_ = 0;                         // DAT_1002b800 input read index
     std::vector<int> ev_; int evi_ = 0;  // events, DAT_100227c4
     int minLag_ = 0, maxLag_ = 0;        // 227d4 / 227d8
@@ -328,19 +354,21 @@ void Enc::designFir() {
     }
 }
 
-// 0x10008a50 / rom.2 0x8951f790 (mono): full-rate copy + decimated every 4th.
-void Enc::fill(int b, int to, bool zeroTail) {
+// 0x10008a50 / rom.2 0x8951f790: full-rate copy + decimated every 4th.  fast is
+// 0x8951f880, the same through the other filter: the fills after a shift away from the end.
+void Enc::fill(int b, int to, bool zeroTail, bool fast) {
     int u = b & 3, j = b >> 2;
     if (u == 0) u = 4;
     for (; b < to; ++b, ++u, ++rd_) {
-        setFull(b, (rd_ >= 0 && rd_ < n_) ? x_[rd_] : 0);
-        if (u > 3) { u = 0; setDec(j++, b + off_); }
+        setFull(b, sample(rd_));
+        if (u > 3) { u = 0; if (fast) setF(kDec + j++ * 4, decFast(b + off_)); else setDec(j++, b + off_); }
     }
     if (zeroTail && b < kBuf) {
         setFull(b, 0);
         if (u > 3) setDec(j, b + off_);
         for (++b, ++rd_; b < kBuf; ++b, ++rd_) setFull(b, 0);
     }
+    traceWork(0);
 }
 
 int Enc::nextEvent() {                                     // 0x10008210
@@ -383,7 +411,7 @@ int Enc::shift(int pos, int p3) {                          // 0x1000a5b0
             evPos_ = buf16(ev_.back() & 0x7fffffff); state_ = 1; return 2;
         }
         fill(cnt, kBuf, false);
-    } else fill(cnt, kBuf, false);
+    } else fill(cnt, kBuf, false, true);
     evPos_ = nextEvent();
     return 0;
 }
@@ -647,12 +675,15 @@ int Enc::backExtend(int q0, Node** first) {                // 0x10008830
     return 0;
 }
 
-// rom.2 0x8951fab0 (mono).  Every 4th sample; within the filter's reach of either
-// end of the wave the slower path takes every sample instead, over the same count.
+// rom.2 0x8951fab0.  Every 4th sample through the unchecked filter; within the filter's
+// reach of either end of the wave the slower path takes every sample through the reader
+// instead, over the same count.
 void Enc::scratchFill(int pos, int span) {
     const int u6 = ((span * 9) >> 3) & ~3, h = (span * 9) >> 5;
-    const int step = (pos < u6 + 0x3f || n_ <= pos + u6 + 0x3f) ? 1 : 4;
-    for (int j = 0; j < 2 * h; ++j) setF(kScr + (j - h) * 4, decAtF(pos - u6 + step * j));
+    const bool nearEnd = pos < u6 + 0x3f || n_ <= pos + u6 + 0x3f;
+    for (int j = 0; j < 2 * h; ++j)
+        setF(kScr + (j - h) * 4, nearEnd ? decAtF(pos - u6 + j) : decFast(pos - u6 + 4 * j));
+    traceWork(1);
 }
 
 int Enc::octave(Node* first, Node* last, int chan, int hint) {   // 0x10008da0
@@ -794,6 +825,7 @@ float Enc::drift(const Node* A, const Node* B) {
         if (0.0f < s8) { do { --q; } while (0.0f < b(q) * sgB && -q < size); }
         cB = (float)q - b(q + 1) / (b(q + 1) - b(q)); cB = cB + 1.0f;
     }
+    if (memTrace_) memTrace_->push_back(xtEncHash(2, buf + pad, 0x18000));
     return (cB - fb) - (cA - fa);
 }
 
@@ -865,9 +897,10 @@ int Enc::crossing(int pos, int dir, int period) const {
         ++steps;
         return true;
     };
-    const int sg = (int)fetch(i) >= 0 ? 1 : -1;
-    while (steps < 882 && step() && (int)fetch(i) * sg >= 0) {}
-    if ((int)fetch(i) * sg <= 0) while (steps < 882 && step() && (int)fetch(i) * sg <= 0) {}
+    auto at = [&]() { return ftrc(fetch(i)); };            // through FTRC: in stereo it truncates where the samples floor
+    const int sg = at() >= 0 ? 1 : -1;
+    while (steps < 882 && step() && at() * sg >= 0) {}
+    if (at() * sg <= 0) while (steps < 882 && step() && at() * sg <= 0) {}
     if (wshl(steps, 16) <= period || steps >= 882) return period;
     const int d = wshl(i * 16 - pos, 12);
     return d < 0 ? wsub(0, d) : d;
@@ -973,7 +1006,7 @@ std::vector<XtRecord> Enc::run() {
     designFir();
     if (const char* fd = std::getenv("XT_DUMPFIR")) if (FILE* f = std::fopen(fd, "wb")) { std::fwrite(c_, 4, 64, f); std::fclose(f); }
 
-    // main loop (0x10007c70), mono
+    // main loop (0x10007c70)
     const int chan = 2;
     off_ = -maxLag_;
     fill(maxLag_, kBuf - ((unsigned)(n_ + maxLag_) < (unsigned)kBuf ? kBuf - n_ - maxLag_ : 0), false);
@@ -1098,15 +1131,15 @@ bool xtLoadTables(const char* romPath) {
 
 bool xtTablesLoaded() { return g_lpLoaded; }
 
-std::vector<XtRecord> xtSoloEncode(const int16_t* x, int n) {
-    if (!x || n <= 0 || !g_lpLoaded) return {};
+std::vector<XtRecord> xtSoloEncode(const int16_t* x, int n, int channels, std::vector<uint64_t>* trace) {
+    if (!x || n <= 0 || !g_lpLoaded || (channels != 1 && channels != 2)) return {};
     // The SH-4 runs with FPSCR RM = 1 (round to zero).  XT_ROUND=nearest
     // gives the P-code emulator's rounding instead (diagnostic).
     const char* rm = std::getenv("XT_ROUND");
     const bool rtz = !(rm && std::string(rm) == "nearest");
     const int saved = std::fegetround();
     if (rtz) std::fesetround(FE_TOWARDZERO);
-    Enc e(x, n);
+    Enc e(x, n, channels, trace);
     std::vector<XtRecord> out = e.run();
     std::fesetround(saved);
     return out;
@@ -1116,19 +1149,19 @@ std::vector<XtRecord> xtSoloEncode(const int16_t* x, int n) {
 #include "XtFirmware.h"
 #include <cstdio>
 // xt_enc <rom.2.bin> <samp.bin (int16 LE)> [stereo] : prints "start len info"
-// (1/16 sample).  "stereo": interleaved L/R, encoded from (L+R) >> 1 as the
-// XT's stereo reader (0x8951f6f0) does.
+// (1/16 sample).  "stereo": interleaved L/R, in the XT's stereo mode.
 // xt_enc <rom.2.bin> cmp <samp.bin[:2]> ... : against the firmware's encoder (rom.2
-// run in the interpreter), every record of each wave; :2 is stereo as above.  A wave
-// the firmware has no result for (it reads outside memory: see spreadDrift) is said
-// so, and the port's records still have to tile it.
-static std::vector<int16_t> readWave(const char* path, bool stereo) {
+// run in the interpreter), every record of each wave; :2 is stereo, the firmware's
+// mode 3.  A wave the firmware has no result for (it reads outside memory: see
+// spreadDrift) is said so, and the port's records still have to tile it.  Records can
+// hide a filter's rounding, so its memory is compared too (xtSoloEncode's trace): said
+// only when it differs.
+static std::vector<int16_t> readWave(const char* path, int channels) {
     std::vector<int16_t> x;
     FILE* f = std::fopen(path, "rb");
     if (!f) return x;
     int16_t s[2];
-    while (std::fread(s, 2, stereo ? 2 : 1, f) == (stereo ? 2u : 1u))
-        x.push_back(stereo ? (int16_t)((s[0] + s[1]) >> 1) : s[0]);
+    while (std::fread(s, 2, (size_t)channels, f) == (size_t)channels) x.insert(x.end(), s, s + channels);
     std::fclose(f);
     return x;
 }
@@ -1146,12 +1179,15 @@ static void compareWave(const std::string& spec) {
     const size_t colon = spec.rfind(":2");
     const bool stereo = colon != std::string::npos && colon + 2 == spec.size();
     const std::string path = stereo ? spec.substr(0, colon) : spec;
-    const std::vector<int16_t> x = readWave(path.c_str(), stereo);
+    const int channels = stereo ? 2 : 1;
+    const std::vector<int16_t> x = readWave(path.c_str(), channels);
     if (x.empty()) { std::printf("enc %s: cannot read\n", spec.c_str()); return; }
-    const std::vector<XtRecord> port = xtSoloEncode(x.data(), (int)x.size());
+    const int frames = (int)x.size() / channels;
+    std::vector<uint64_t> portMem, fwMem;
+    const std::vector<XtRecord> port = xtSoloEncode(x.data(), frames, channels, &portMem);
     std::vector<XtRecord> fw;
-    const char* tile = tiles(port, (int)x.size()) ? "" : ", PORT DOES NOT TILE THE WAVE";
-    if (!xtFwSoloEncode(x.data(), (int)x.size(), fw)) {
+    const char* tile = tiles(port, frames) ? "" : ", PORT DOES NOT TILE THE WAVE";
+    if (!xtFwSoloEncode(x.data(), frames, fw, channels, &fwMem)) {
         std::printf("enc %s: firmware has no result, port %zu records%s\n", spec.c_str(), port.size(), tile);
         return;
     }
@@ -1159,7 +1195,15 @@ static void compareWave(const std::string& spec) {
     const size_t both = std::min(port.size(), fw.size());
     for (size_t i = both; i-- > 0;)
         if (port[i].start16 != fw[i].start16 || port[i].len16 != fw[i].len16 || port[i].info != fw[i].info) { ++diff; first = i; }
-    if (diff == 0 && port.size() == fw.size()) { std::printf("enc %s: %zu records identical%s\n", spec.c_str(), fw.size(), tile); return; }
+    if (diff == 0 && port.size() == fw.size()) {
+        size_t step = 0;
+        while (step < portMem.size() && step < fwMem.size() && portMem[step] == fwMem[step]) ++step;
+        std::string mem;
+        if (step < portMem.size() || step < fwMem.size())
+            mem = ", MEMORY DIFFERENT from step " + std::to_string(step) + " (port " + std::to_string(portMem.size()) + " steps, firmware " + std::to_string(fwMem.size()) + ")";
+        std::printf("enc %s: %zu records identical%s%s\n", spec.c_str(), fw.size(), mem.c_str(), tile);
+        return;
+    }
     if (first == port.size()) first = both;
     std::printf("enc %s: port %zu, firmware %zu records, %zu different, first at %zu", spec.c_str(), port.size(), fw.size(), diff, first);
     if (first < both)
@@ -1174,9 +1218,10 @@ int main(int argc, char** argv) {
         for (int a = 3; a < argc; ++a) { compareWave(argv[a]); std::fflush(stdout); }
         return 0;
     }
-    const std::vector<int16_t> x = readWave(argv[2], argc > 3 && std::string(argv[3]) == "stereo");
+    const int channels = argc > 3 && std::string(argv[3]) == "stereo" ? 2 : 1;
+    const std::vector<int16_t> x = readWave(argv[2], channels);
     if (x.empty()) return 1;
-    for (const XtRecord& r : xtSoloEncode(x.data(), (int)x.size()))
+    for (const XtRecord& r : xtSoloEncode(x.data(), (int)x.size() / channels, channels))
         std::printf("%d\t%d\t%d\n", r.start16, r.len16, r.info);
     return 0;
 }

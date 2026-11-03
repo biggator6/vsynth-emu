@@ -20,7 +20,7 @@ if names:
     muts = [m for m in muts if m[0] in names]
 missed = errors = 0
 for m in muts:
-    r = subprocess.run(['bash', D + '/mutate.sh', m[0], m[1], m[2], '0', 'different|no result|TILE'], env=env, capture_output=True, text=True)
+    r = subprocess.run(['bash', D + '/mutate.sh', m[0], m[1], m[2], '0', 'different|DIFFERENT|no result|TILE'], env=env, capture_output=True, text=True)
     out = r.stdout + r.stderr
     n = re.search(r'^enc: (\d+) waves', out, re.M)
     if not n: errors += 1; print('ERROR  ', m[0].ljust(16), (out.strip().splitlines() or [''])[-1][:100]); continue
