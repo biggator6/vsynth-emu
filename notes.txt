@@ -335,14 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A band read far from its wave v108 (2026-11-03): seed 90210's case 9398 in xt_tone was no fault of XtSynth or a port (HARDWARE_FIRMWARE.md, "A band read far from its wave"). From two record lengths under a record's start, the backward
+  repeat (0x8950f50a) can run until the position overflows to near 2^31, in the firmware and the port alike. Stereo band 0's read then aliases to memory below the band: past xt_tone's 256 KB of zeros, here on the wave's own vpdt, where the port reads 0.
+  xt_tone now gives the firmware zeros for any band read further off than that (hookBandReads, eight read groups), so no note is left off and those notes are compared to their end. No audio change. On the XT those reads get whatever is in RAM, which can't be compared.
+  Seeds 3 and 4's SOLO cases are not this. Sh4 hooks that leave pc alone are now followed by the instruction. mutate.sh gains PORT=toneband, PORT=tonecheck, SEED=.
+
 COSM held levels v107 (2026-11-03): a new block reads levels the COSM holds from its note-on or last 10 ms update (+0x104...), as on the XT (HARDWARE_FIRMWARE.md, "The COSMs' held levels"). CosmVoice::hold, cosmSetBlock reads nothing live.
   So a second update inside one tick no longer reads a moved Sustain. xt_tone compares the held words at every update and has a last forced section, a second update in a tick. live-order was exact after this, so it became held-live and one held-* per type.
-  Merged with v106 after. Also open at 6000 cases: seed 2007 case 9186, the same on v106 alone.
+  Merged with v106 after. Also open at 6000 cases: seed 2007 case 9186, the same on v106 alone (v108: a mono SOLO wave on OSC 2, past the tolerance).
 
 FM's lines between cases v106 (2026-11-03): seed 2007's 140 differences in xt_tone, case 3066, were no fault of XtSynth or a port (HARDWARE_FIRMWARE.md, "FM's lines between cases"). A SOLO note under FM
   left its small differences (allowed in its own case) in tone 1's line, and 99 cases later an exact case's far tap read them. xt_tone now compares FM's whole pool at each case's end (`fm lines`), unless the case played SOLO
   or a note left memory, then gives the firmware the port's, so each case starts equal. No audio change. Sixteen seeds at 3000 cases 0 different; 131 planted, 130 caught. mutate.sh gains PORT=toneanalog.
-  Open: at 6000 cases seed 90210 case 9398 (no SOLO wave), seed 3 case 9455 and seed 4 case 529 (both past the SOLO tolerance). Not traced.
+  Open: at 6000 cases seed 90210 case 9398 (no SOLO wave; closed in v108), seed 3 case 9455 and seed 4 case 529 (both past the SOLO tolerance). Not traced.
 
 legato-order v105 (2026-11-03): the planted error was exact: on a legato the COSM block and an envelope's update touch nothing in common (HARDWARE_FIRMWARE.md, "A legato's order, and the COSMs' held levels").
   The entry now plants the block ahead of the new key and velocity. Found next to it, fixed in v107: a second update inside one tick.

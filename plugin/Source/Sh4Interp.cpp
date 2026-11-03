@@ -130,7 +130,11 @@ bool Sh4::call(uint32_t addr, std::initializer_list<uint32_t> args, uint32_t sp,
     while (pc != kSentinel) {
         if (hookPage[phys(pc) >> kPageBits]) {
             auto h = hooks.find(pc);
-            if (h != hooks.end()) { h->second(*this); continue; }
+            if (h != hooks.end()) {
+                const uint32_t at = pc;
+                h->second(*this);
+                if (pc != at) continue;
+            }
         }
         if (!step() || !err.empty()) { ok = false; break; }
         if (nsteps > limit) { err = "step limit"; ok = false; break; }

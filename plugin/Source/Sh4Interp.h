@@ -40,7 +40,8 @@ public:
     uint32_t fb[2][16] = {};                            // float banks (FPSCR.FR selects)
 
     // Hooks: called when execution reaches addr (before the instruction).
-    // A hook usually sets r[0] and returns to pr (see ret()).
+    // A hook usually sets r[0] and returns to pr (see ret()); one that leaves pc
+    // alone is followed by the instruction.
     void hook(uint32_t addr, std::function<void(Sh4&)> fn);
     void unhook(uint32_t addr) { hooks.erase(addr); }
     void ret(uint32_t v) { r[0] = v; pc = pr; }

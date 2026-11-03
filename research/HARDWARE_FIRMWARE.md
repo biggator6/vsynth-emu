@@ -1545,6 +1545,73 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### A band read far from its wave: seed 90210, case 9398 (2026-11-03, v108)
+
+`xt_tone` on seed 90210 at 6000 cases gave 3 different, all in case 9398 and all in block 62: `osc 2 buffer`, `cosm output` and `output`, from word 24, fw −22236.084, port −18823.516. v106 left this open as possibly real. **It is not a fault in XtSynth or a port.** The firmware's band 0 read past the zeros `xt_tone` lays around a wave and landed on the wave's own vpdt, where the port reads 0. So this version changes the check and no audio. COSM 2's Side Band Filter, the words past OSC 2's buffer and the forced case only set the case up and carry the difference: `mixPast` is equal on both sides up to that block.
+
+**The chain, each step run.**
+1. Stereo BACKING on OSC 2 (`drum.bin`), key 96. During block 61 the walk turns backward, and band 0's position falls 947 (1/16 sample) per list entry.
+2. The stepper's repeat (`0x8950f50a`, `stepBack` in the port) starts from position 47,390, under the record 49,551…49,944, which is 393 long. It does `r1 -= start; do { r1 += r3; more = start >= r1; r3 -= start; } while (more)`, r3 starting at the record's end. The first round adds the end, the second the length. Each round after that adds the start less than the one before. So with a start larger than the length, a position two lengths or more under the start never comes back: 785 under this record's start is fine, 786 is not. r1 falls until it overflows and wraps, here after 296 rounds, to 2,146,351,899. Run by hand from those three numbers, the loop gives exactly that.
+3. The port's loop is the same. All 184 read positions of blocks 58…63, logged on both sides, are equal, the far ones too. So the positions were never the difference.
+4. That position is 2^31 − 1,131,749. Stereo band 0 reads 4 bytes per frame, so the read is at `0xac67cec4`, in P2, the same memory as `0x8c67cec4`. That is 282,937 bytes below the band. The zeros reach 262,144. What lies there is this wave's vpdt, whose words (`0x00990400`…) the firmware takes as samples. The port reads 0 (`smp`, past the band's end).
+5. The last two reads of block 61 come out of the tree at word 24 of block 62. In block 63 band 1's own position has overflowed too. Near 2^31 that is +128 MB for it, `0x9471a224`, which is not mapped, so the note is left off. That is why only one block differed.
+
+**Why it is so rare.** Before this change, on this seed at 6000 cases, 626 cases made 4,203 far reads, and only two of those cases landed on anything but zeros. The other is 2499, where the read lands in block 41 and the note leaves memory in block 42, before the read reaches the output.
+
+**Why not more zeros.** Where r1 lands depends on the record's start, in no simple way. Run by hand over starts from 2,000 to 4,000,000, it lands from 160 KB to 23 MB under a stereo band 0. The upper bands go elsewhere: position >> shift >> 6 words puts band 1 at +128 MB and, by the same arithmetic, this wave's band 5 at +8 MB, among the COSMs' buffers. No layout of `xt_tone`'s memory keeps all that clear. Leaving a note off at its first far read also clears case 9398. I ran that as well: 652 notes left off, against 611 before and none now.
+
+**The change, in `xt_tone`.**
+- `Firmware::hookBandReads` hooks the band players' eight groups of reads (`0x8950e980` and `0x8950eb60`, mono and stereo, twice each). If `r7` is further than `kWavePad` from the band's data, measured in 32 bits so that an alias does not count as near, it moves `r7` into the zeros. `r7` is loaded again before each group, so nothing else sees this. Only the firmware's memory changes: its position, stepping and gains run on as they were.
+- Each part's summary now counts these reads, so the baseline shows the path is used.
+- `Sh4::call`: a hook that leaves `pc` alone is now followed by the instruction. Before, it was called again forever. No hook relied on that.
+- `mutate.sh`: `PORT=toneband`, `PORT=tonecheck`, `SEED=`.
+
+**Results.** So a band read outside a wave now means the same on both sides, however far. The notes that used to be cut at their first unmapped read are compared to their end.
+
+| Seed 90210, 6000 cases | Notes | Blocks | Checks | Left off | Far reads | Different |
+|---|---|---|---|---|---|---|
+| First part, on v106 | 8,864 | 675,278 | 14,797,712 | 226 | — | 0 |
+| First part, now | 8,918 | 689,015 | 15,327,654 | 0 | 1,125,256 | 0 |
+| A wave on OSC 2, on v106 | 4,120 | 289,565 | 5,560,791 | 385 | — | 3 |
+| A wave on OSC 2, now | 4,210 | 330,952 | 6,371,019 | 0 | 1,503,864 | 0 |
+
+This was found and first run on v106, then moved onto master with v105 and v107, and everything here was run again there. Notes, blocks, far reads and differences came out the same; the checks also count v107's new compares. v107's section makes no far reads, and is still 0 different.
+
+- Nineteen seeds, each part: no note left off. 2024, 2007, 3, 4 and 90210 at 6000 cases; 777, 31337, 9, 4242, 1007, 1, 2, 5, 11, 2025, 65535, 123456, 8086 and 40000 at 3000. On 17 of them, 0 different. So every note plays out the same on both sides to its end, over millions of far reads.
+- The other two are SOLO, past its tolerance, and new only because the draws moved (a note no longer cut plays out its later draws). Seed 1007 case 4888: stereo SOLO on OSC 2, COSMs off, `osc 2 buffer` in one block, 2.9e−2 of the peak. Seed 40000 case 4953: stereo SOLO on OSC 1 into a 1st Side Band, `cosm output` in 6 blocks, 2.4e−1 of the peak. Both are the family v104 and v106 describe. I did not trace them.
+- fcheck's baseline against master: only `xt_tone`'s count and SOLO lines change, in all three sections. Still 0 different.
+
+**Seed 3 case 9455, seed 4 case 529 and seed 2007 case 9186 are not this.** Counting on the old behaviour, none of them makes a far read that lands on anything but zeros. All three play SOLO waves (9186's is mono, on OSC 2, which `XT_TONE_DUMP` does not print). Those seeds now print 0 different, but only because the draws moved: those cases are no longer played. They stay open. SOLO's own reads are not among the eight, and I did not watch them.
+
+**Planted errors.**
+
+`mutate.sh` has new `PORT=toneband` and `PORT=tonecheck`, and `SEED=`. Fcheck's seed at 2000 cases unless it says otherwise. "a + b" is the two parts.
+
+| Error | Result |
+|---|---|
+| `far-reads-kept`: the hook moves nothing (seed 90210, 6000) | The original failure to the digit: case 9398, block 62, fw −22236.084, port −18823.5156, 3 different, 226 + 385 notes left off |
+| `far-reads-all`: every band read gets zeros (300 cases) | 13,179 + 17,880 different. The compare is alive on real samples |
+| One read group out of the list: stereo band 0's two | 512 + 183 and 512 + 210 different, 20 + 42 notes left off |
+| Mono band 0's two (ENSEMBLE) | 38 + 43 notes left off, against 0 in the baseline. 0 different, as these reads are unmapped |
+| The stereo kernel's two | 33 + 83 notes left off, likewise |
+| The mono kernel's two | Nothing changes. `xt_tone` has no mono BACKING wave, so these two hooks are not reached |
+| `far-reads-wide`: the hook's bound doubled (seed 90210, 6000) | Passes, same counts, and it's exact. A far read is about 2^29 off by its arithmetic, and none lies between one pad and two |
+| `band-repeat-meant`: the port's loop as the firmware meant it, adding the record's length | 14,911 + 24,573 different; on v106, 71 + 135 |
+| `band-far-1`: the port reads 1 instead of 0 only 300,000 frames or more outside a band | 14,907 + 22,328 different; on v106, 71 + 70 |
+| `band-outside-1`: the port reads 1 outside a band | 33,902 + 40,125 different |
+
+The two with v106's numbers are the point: an error in what follows a far read used to show only until the note was cut.
+
+`mutate_tone.py` at 2000 cases, the whole list of 144: all caught.
+
+`verify.sh` against master: fcheck as the new baseline, A/B 4/4 identical, PluginTest 4/4 bit-identical, engine tests, auval.
+
+**What this leaves.**
+- On the XT these reads get whatever is in its RAM, and XtSynth's get silence. That can't be compared, and it is the limit of this check: the firmware's note is compared with that one question taken out. I don't know what the XT does at the addresses outside its RAM, such as `0x9471a224`.
+- The port's loop relies on `int` wrapping, which C++ does not promise. Clang wraps here, at `-O2` and with the player at `-O3` (fcheck's seed: same counts, 0 different). Not changed.
+- `XtSoloVoice::anchorBackward` has the same loop in `double`, where nothing overflows, so two record lengths under the start would never end. No run here hung. I did not look into whether it can be reached.
+- `xt_analog` still stops comparing a note at 3× or above backward. The same hook could lift that. Not done.
+
 ### The COSMs' held levels (2026-11-03, v107)
 
 This fixes the difference v105 found: a second update inside one tick. A COSM's new block took the envelopes' live output, where the firmware takes the levels from its last tick.
@@ -1581,7 +1648,7 @@ This fixes the difference v105 found: a second update inside one tick. A COSM's 
 - `xt_tone` merged cleanly. The baseline was regenerated: notes and blocks unchanged, and the counts of checks are v107's plus v106's new compare (+1,994, +293, and +48 in the new section), so nothing else moved.
 - fcheck's seed: 0 different in all three sections. `mutate_tone.py`, the whole list of 144: all caught. `verify.sh` green, A/B 4/4 identical against v107.
 - At 6000 cases: seeds 1, 2 and 5007 are 0 different. Seed 90210's case 2055 is gone, as v106 reported, and its case 9398 remains. Seed 3 case 9455 and seed 4 case 529 remain. The new section is 0 different on all of these and on seed 2007.
-- Seed 2007's case 3066 is gone. At 6000 cases that seed has one more, past the 3000 v106 ran: case 9186, 2 different, block 58, `cosm output` fw −18281.9141, port −33263.25, then `output`. The values are the same on v106 alone, so neither this version nor the merge causes it. Not traced.
+- Seed 2007's case 3066 is gone. At 6000 cases that seed has one more, past the 3000 v106 ran: case 9186, 2 different, block 58, `cosm output` fw −18281.9141, port −33263.25, then `output`. The values are the same on v106 alone, so neither this version nor the merge causes it. Not traced. (v108: it plays a mono SOLO wave on OSC 2, past the tolerance. `XT_TONE_DUMP` prints only OSC 1's wave.)
 
 ### FM's lines between cases: seed 2007 (2026-11-03, v106)
 
@@ -1625,7 +1692,7 @@ This fixes the difference v105 found: a second update inside one tick. A COSM's 
 The last two are in `tone_muts.txt`. `mutate_tone.py` at 2000 cases, the whole list of 131: 130 caught. `legato-order` passes as it did before this work, and is v105's subject.
 
 **Still open, seen while testing, not traced.** At 6000 cases, with this fix and without it, unchanged:
-- Seed 90210, case 9398: 3 different, `osc 2 buffer` at block 62, fw −22236.084, port −18823.516. **No SOLO wave**: stereo BACKING on OSC 2, OSC 1 off, Type3, a 2nd Side Band on COSM 2, one of the forced cases. This one may be a real difference.
+- Seed 90210, case 9398: 3 different, `osc 2 buffer` at block 62, fw −22236.084, port −18823.516. **No SOLO wave**: stereo BACKING on OSC 2, OSC 1 off, Type3, a 2nd Side Band on COSM 2, one of the forced cases. This one may be a real difference. (Traced in v108, it is not: "A band read far from its wave".)
 - Seed 3, case 9455 (SOLO on both OSCs, `osc 1 buffer`) and seed 4, case 529 (stereo SOLO on OSC 1 into Wave Shape on COSM 2, `cosm output`): both past the SOLO tolerance. Their parts' worst are 5.5e−2 and 2.6e−2 of the peak. They look like v104's seed 5007, but I did not run its test of them.
 
 **Not covered.**
@@ -1831,7 +1898,7 @@ interpreter faults on unmapped memory, in `xt_fw bandcmp` as well:
 
 The port reads 0 outside a wave. The check in `xt_analog` stops comparing a note at 3× or above
 backward, or in an Alternate loop, which comes back. A fifth of its notes end so (4,186 of 21,000), because it draws wide pitches; none faulted first. `xt_tone` lays its waves among zeros and
-counts the notes that leave memory altogether.
+counts the notes that leave memory altogether. (Since v108 a far read gets zeros too, and no note leaves memory.)
 
 **Checks.**
 - **`xt_tone`, the real XtSynth against the firmware's whole tone**, with new cases after its others: a wave on
@@ -1968,7 +2035,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 
 **What the check needs from outside the tone, and does.** All of it is in `carryFrom`, but for FM's lines, at each case's end (v106).
 - A firmware tone comes from a pool, XtSynth's voice keeps its objects. So before each note the port's analog fields (phases and whatever a waveform leaves), the DTVF's follower (D+0x98) and the MOD's (+0x18…+0x20, +0x28, +0x2c, +0x30, +0x40) are copied into the tone, and the MOD's tone number (+0x3c) is the voice's. Without this a note's start is not defined on either side. **So whether XtSynth's voice allocation hands the same leftovers as the XT's pool is not checked.**
-- Past the wave's data a player reads what lies there. The waves lie among 256 KB of zeros, what the port reads. On a real XT it is other memory. A note whose read leaves memory altogether, far up an ENSEMBLE wave, is left off and counted (about 2.5% of notes).
+- Past the wave's data a player reads what lies there. The waves lie among 256 KB of zeros, what the port reads. On a real XT it is other memory. Until v108 a note whose read left memory altogether was left off and counted (about 2.5% of notes). Now a band read past those zeros reads them anyway ("A band read far from its wave"), and none is left off.
 - FM's far tap reads below its line pool into the lists of sounding tones. Those words read 0 during a render here, as in the port.
 
 **Planted errors.** `research/tools/mutate_tone.py [cases]` plants each error in `tone_muts.txt` in XtSynth.cpp through `PORT=tone mutate.sh` and runs the check. 97 planted, at fcheck's 2000 cases and the sweep: the pitch, key, velocity, envelope, LFO, portamento, legato, TVA, COSM, MOD and Structure wiring, the order of the stages, and the change lists. 96 are caught. The one that is not, `legato-order`, the COSM block after the envelopes in a legato, is exact: a legato moves no knob and a COSM envelope's Sustain does not depend on velocity, so its update leaves the level where it was. The order stays the firmware's. `cosm-lim`, the Limiter's Attack and Release swapped, needs about 2000 cases to catch, which is why fcheck runs 2000: the level must be over the threshold.
