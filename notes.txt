@@ -340,7 +340,7 @@ COSM stereo routines v104 (2026-11-02): a stereo wave on the section's OSC takes
   the Side Band follower skips three words and reads three past the block (XtSynth passes OSC 2's buffer for COSM 1 in Types 2, 3); the 2nd Side Band's R holds the block's first gain; the TB's R reads
   two words the note-on doesn't clear, so XtCosmSection tracks what each type leaves there. COSM 2 in Type3 goes by OSC 2's wave and reads the last tone's mix past the block (mixPast). xt_tone's exclusions are gone.
   mutate.sh gains PORT=tonecosm.
-  Left for the user: TVA Switch, stereo COSM routines, both OSCs off. The scheduler is found: around 0x894f4d10. The tone's constructor is 0x894f5860.
+  Decided since: TVA Switch (v101, v102), stereo COSM routines (v104), both OSCs off (2026-11-03: no voice, no sound, for now). The scheduler is found: around 0x894f4d10. The tone's constructor is 0x894f5860.
 
 Structure Types v92 (2026-11-02): Type2 and Type3 (HARDWARE_FIRMWARE.md, "The Structure Types"). xtToneOrder, xtCosmOsc in XtAnalog; XtCosmSection (update, process)
   in XtCosm, XtSynth's CosmVoice derives from it. mixBlock walks the table; Voice::structure is latched at note-on, as the firmware only writes +0x1770 there. In Type3 COSM 2

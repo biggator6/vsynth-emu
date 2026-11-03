@@ -1858,7 +1858,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 **Decisions left, not changed.**
 - TVA Switch (ID 0x299): done in v101.
 - With a stereo OSC 1 the firmware's COSMs take their stereo routines, and `XtCosm` had only the mono ones. The check turned COSMs off for stereo waves. Closed in v104 ("COSM: the stereo routines").
-- With both OSCs off XtSynth starts no voice, so the key state, random pitch and LFO seeds do not advance. The firmware starts a tone. The check keeps one OSC on.
+- With both OSCs off XtSynth starts no voice, so the key state, random pitch and LFO seeds do not advance. The firmware starts a tone. The check keeps one OSC on. The user's decision (2026-11-03): leave it for now, so such a note does nothing and makes no sound.
 - Lo-Fi on a SOLO wave is replaced by TVF in the check: its quantizer turns the SOLO player's small differences into a step of its own.
 
 ### The Structure Types (2026-11-02, v92)
