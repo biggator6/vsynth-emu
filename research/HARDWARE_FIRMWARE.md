@@ -1545,6 +1545,55 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### FM's lines between cases: seed 2007 (2026-11-03, v106)
+
+`xt_tone` on seed 2007 gave 140 different, all in one case, 3066: `cosm output` from block 2, fw −648220.562, port −648202.812. **It is not a fault in XtSynth or a port.** A SOLO wave's known small differences stayed in FM's line pool after one case, and another case 99 later, which has no tolerance, read them. So this version changes the check and no audio. The Comb, the Side Band Filter and the second note are not involved, except that COSM 2 carries the difference on and the mix's tap is skipped with a COSM on, which is why it first shows at `cosm output`.
+
+**The chain, each step run.**
+1. Case 2967: a SOLO wave on OSC 1 under FM, MONO without Legato. Its second note lands on voice 1, so OSC 1 goes into tone 1's line. `XtSoloVoice` is not bit-exact, so the two sides' words differ: at most 38.5 on a peak of 1.24 million, 3.1e−5, far inside `kSoloTol`, and allowed in that case. The line then stays. Only an FM note-on of tone 1 clears it.
+2. Case 3066: analog, Structure 1, FM at Level 77, on voice 0. At block 2, sample 24, OSC 2 is past negative full scale, so d is negative (f = −0.0639), the wrap never fires and the tap runs past the line's end, as v89 says it can. `0x89527bfc` and `0x89527c06` read words 506 and 505, which are words 10 and 9 of tone 1's line. `XtMod::lineAt` reads the same place.
+3. Those words are fw −465261.281 and −454445.844, port −465248.656 and −454434.469. With that f they predict a difference of −12.705 in the MOD's output, and the output differs by −12.719 (the outputs themselves are rounded). I took the firmware's samples from inside the routine (a scratch hook at `0x89527c1e`). This is the only far read of the case, one sample in one block. COSM 2's state carries it on, which is the rest of the 140.
+
+**Why it is so rare.** It takes all of these: a SOLO note under FM on one voice, nothing clearing that tone's line since, and later an exact case under FM with OSC 2 past full scale, on the voice below. In all 4,980 cases of seed 2007, 3066 is the only one that reads outside its own line at all. On fcheck's seed 2024 only 1439 does, 518 reads, and its OSC 1 is off, so its lines hold nothing.
+
+**The change, in `xt_tone`, at each case's end.**
+- FM's whole pool (`kFmLines`, 48 lines) is compared bit for bit: `fm lines`, a new check. Until now a line was only ever seen through a far read.
+- A case is exempt if it played a SOLO wave, for the reason above, or if a note left memory: the firmware's render stops inside that block and XtSynth's finishes it, up to 64 words.
+- Then the firmware's pool takes the port's, so each case starts equal. That is `carryFrom`'s reasoning, and only this one thing has to wait for the case's end.
+
+**Those two are the whole list, as far as this goes.** Counted before the carry, cases ending with unequal lines:
+
+| Seed | Cases | SOLO | Left memory | Any other |
+|---|---|---|---|---|
+| 2007 | 4,980 | 51 | 4 | 0 |
+| 2024 (fcheck) | 3,480 | 39 | 3 | 0 |
+
+**Results.**
+- Seed 2007: 0 different in both parts. Notes and blocks are as before (4,671 and 363,276 in the first part), so no later draw moved.
+- Taking the carry and the new compare out again brings back exactly the original: 140 different, case 3066, the same first values.
+- fcheck's baseline: only the two lines of `xt_tone` counts change (+1,994 and +293 checks), for the new compare.
+- Sixteen seeds at 3000 cases (2024, 777, 31337, 9, 4242, 1007, 1, 2, 3, 5, 11, 2025, 65535, 123456, 8086, 40000): 0 different in both parts.
+- Seed 90210 at 6000 cases: case 2055 had the same cause, 30 different at `cosm output` from block 2, fw 155.534515, port 155.534698. It is gone.
+
+**Planted errors.** `mutate.sh` has a new `PORT=toneanalog`, XtAnalog.cpp under `xt_tone`.
+
+| Error | Result |
+|---|---|
+| `fm-own-line`: reads kept to the tone's own line | Seed 2007: 176 different, first at case 3066, block 2. So the read that started this is still compared. Seed 2024: 0 different, as it has no such read; `xt_analog`, also in fcheck, catches it with 19,061 in `mod fm` and 125 in `structure tone` |
+| `fm-next-line`: a note-on also clears the next tone's line | Seed 2024: `fm lines` alone, 17 + 5 |
+| `fm-tone-0`: every voice on tone 0's lines | Seed 2024: 2,227 + 1,034 |
+| `fm-lines-cleared`: `allNotesOff` clears the pool | Seed 2024: `fm lines` alone, 99 + 15 |
+
+The last two are in `tone_muts.txt`. `mutate_tone.py` at 2000 cases, the whole list of 131: 130 caught. `legato-order` passes as it did before this work, and is v105's subject.
+
+**Still open, seen while testing, not traced.** At 6000 cases, with this fix and without it, unchanged:
+- Seed 90210, case 9398: 3 different, `osc 2 buffer` at block 62, fw −22236.084, port −18823.516. **No SOLO wave**: stereo BACKING on OSC 2, OSC 1 off, Type3, a 2nd Side Band on COSM 2, one of the forced cases. This one may be a real difference.
+- Seed 3, case 9455 (SOLO on both OSCs, `osc 1 buffer`) and seed 4, case 529 (stereo SOLO on OSC 1 into Wave Shape on COSM 2, `cosm output`): both past the SOLO tolerance. Their parts' worst are 5.5e−2 and 2.6e−2 of the peak. They look like v104's seed 5007, but I did not run its test of them.
+
+**Not covered.**
+- What a SOLO note's leftovers do in a later case. The check now starts from the port's words, so such a read compares equal by construction. It is the SOLO tolerance by another route.
+- Reads below the pool, as v89 and v100 say. Seed 2024's case 1439 reads 156 words below tone 0's line, which the interpreter holds at 0 (`rd`, after C startup, and 0 different here). On a real XT it is other memory.
+
 ### COSM: the stereo routines (2026-11-02, v104)
 
 With a stereo wave on the OSC a section follows, the firmware runs a second set of COSM routines. Until now `XtCosm` had only the mono ones, and `xt_tone` turned those COSMs off. Now all sixteen types have them.
@@ -1634,7 +1683,7 @@ Through (code 0, `0x894fb720`) is an `rts`. Codes 10, 11 and 17 have stereo rout
 
 **A SOLO wave beside a Side Band Filter.** The follower's words past the block carry a SOLO wave's small differences into the buffer beside it: a stereo BACKING OSC 1 with a Side Band COSM 1 next to a SOLO OSC 2, or a stereo BACKING OSC 2 with a Side Band COSM 2 in Type3 after a SOLO OSC 1's mix. Those buffers were compared bit for bit. fcheck's seed has no such case; on the six other seeds tried, 9 cases differed by a few units, and all had this shape. So with a SOLO wave and a Side Band Filter in a case, both OSC buffers take the SOLO tolerance (`soloBeside`).
 
-**Beyond this work.** Seed 2007 has 140 differences in one case (3066), in v103 alone as well: a sweep case, analog and mono, a Comb and a 1st Side Band with FM. Not looked into here.
+**Beyond this work.** Seed 2007 has 140 differences in one case (3066), in v103 alone as well: a sweep case, analog and mono, a Comb and a 1st Side Band with FM. Not looked into here. Traced in v106 ("FM's lines between cases").
 
 **Not checked.**
 - The bus's first pairs as past-the-block words with an Output Assign other than MFX: XtSynth has none.
@@ -1836,7 +1885,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
   - The same pass is how the MOD's new block (`0x894f1c60`) arrives, and it clears an old OSC SYNC note's flag on Types 0…3. So a legato or any knob clears it, not only a MOD knob.
   - A bender move is the same pass. The conversion `0x894ebbd0` and `0x894dba00` have only `0x894dc0b0` as caller, so a new value can reach a sounding tone no other way. `pitchBend` now sends the blocks. The message's path to `0x894dc0b0` is still not traced (the slot is in the vtable at `0x89833e30`, 12 bytes per entry); this is inference from the callers.
 
-**What the check needs from outside the tone, and does.** All of it is in `carryFrom`.
+**What the check needs from outside the tone, and does.** All of it is in `carryFrom`, but for FM's lines, at each case's end (v106).
 - A firmware tone comes from a pool, XtSynth's voice keeps its objects. So before each note the port's analog fields (phases and whatever a waveform leaves), the DTVF's follower (D+0x98) and the MOD's (+0x18…+0x20, +0x28, +0x2c, +0x30, +0x40) are copied into the tone, and the MOD's tone number (+0x3c) is the voice's. Without this a note's start is not defined on either side. **So whether XtSynth's voice allocation hands the same leftovers as the XT's pool is not checked.**
 - Past the wave's data a player reads what lies there. The waves lie among 256 KB of zeros, what the port reads. On a real XT it is other memory. A note whose read leaves memory altogether, far up an ENSEMBLE wave, is left off and counted (about 2.5% of notes).
 - FM's far tap reads below its line pool into the lists of sounding tones. Those words read 0 during a render here, as in the port.

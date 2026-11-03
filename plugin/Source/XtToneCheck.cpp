@@ -23,7 +23,8 @@
 // XtSynth runs on the same Controls and notes.  Compared, every block: both OSC
 // buffers, the mix, the output of the COSM stage, the TVA and the output; at every
 // update, the envelopes' and LFOs' outputs and stages, the pitch terms and ramps,
-// and each voice's fields; all bit for bit in the XT's units.  Within a tolerance:
+// and each voice's fields; at each case's end, FM's lines; all bit for bit in the
+// XT's units.  Within a tolerance:
 // only a SOLO wave's buffers and what follows them (kSoloTol of the block's peak),
 // since XtSoloVoice is not bit-exact (xt_fw solocmp).  Past the wave's data a player
 // reads whatever lies there: the waves lie among zeros, which is what the port reads,
@@ -71,6 +72,7 @@ namespace {
 const uint32_t kRam = 0x8C000000, kSp = kRam + 0xF0000, kN = kRam + 0x1000, kK = kRam + 0x1400, kMsg = kRam + 0x1500, kA1 = kRam + 0x1510,
                kNote = kRam + 0x1600, kCtl = kRam + 0x1800, kBuf = kRam + 0x2000, kOs = kRam + 0x3000;
 constexpr uint32_t kBuf1 = 0x89d2c810, kBuf2 = 0x89d2c910, kBufMix = 0x89d2ca10;
+constexpr uint32_t kFmLines = 0x89f91c5c;     // FM's line pool, XtModShared
 constexpr float kSoloTol = 2e-2f, kSoloFloor = 8192.0f;   // a SOLO wave's buffers: of the block's peak, plus a floor (−108 dB of full scale)
 
 constexpr uint32_t kDescTab = 0x897a167c, kRomBase = 0x89300000;
@@ -989,7 +991,7 @@ int XtToneProbe::run(int argc, char** argv) {
         if (dumpWhich && (dumpWhich[0] == 'a' || std::atoi(dumpWhich) == g))
             std::printf("case %d kind %d keys %d %d vel %d %d wave %d: osc1 on %d wave %d, osc2 on %d wave %d; cosm %d %d, %d %d; second at %d, off at %d %d, live at %d; mod %d type %d level %d a %d r %d, ch %d\n", g, kind, raw[0], raw[1], vel[0], vel[1], wv ? wv->type : 0, ctl.on, ctl.ana.wave,
                         ctl.osc2.on, ctl.osc2.ana.wave, ctl.cosm[0].on, ctl.cosm[0].type, ctl.cosm[1].on, ctl.cosm[1].type, secondAt, offAt[0], offAt[1], liveAt, ctl.mod.on, ctl.mod.type, ctl.mod.level, ctl.mod.attack, ctl.mod.release, wv ? wv->channels : 0);
-        bool over = false;
+        bool over = false, leftOff = false;
         for (int blk = 0; blk < nBlocks && !over; ++blk) {
             if (blk == secondAt) { if (!startNote(1, blk)) return 1; keyDown[1] = true; }
             for (int i = 0; i < 2; ++i)
@@ -1047,6 +1049,7 @@ int XtToneProbe::run(int argc, char** argv) {
             ++blocks;
             if (leftMemory) {                            // a player's read outside all memory: the note ends here
                 ++wild;
+                leftOff = true;
                 break;
             }
             for (FwNote* n : order) {
@@ -1115,6 +1118,18 @@ int XtToneProbe::run(int argc, char** argv) {
             }
         syn.allNotesOff();
         for (FwNote& n : fn) if (n.live && !fw.stop(n)) return 1;
+        // FM's lines outlast a note and a modulator past full scale reads the next tone's, so
+        // they must agree after a case.  A SOLO wave's are only close, and a note that left
+        // memory stopped a block before XtSynth's: a later case reading those has no tolerance
+        // to take them in.  So each case starts from the port's.
+        if (!soloCase && !leftOff) {
+            ++rep.checks;
+            for (uint32_t i = 0; i < 2 * XtModShared::kTones * XtModShared::kLine; ++i) {
+                const float a = fw.f32(kFmLines + 4 * i), b = syn.modShared.line[i];
+                if (!bits(a, b)) { rep.bad("fm lines", "fw %.9g port %.9g", a, b, nBlocks); break; }
+            }
+        }
+        fw.c.write(kFmLines, syn.modShared.line, sizeof(syn.modShared.line));
     }
     summary(nOsc2 ? "tone, a wave on OSC 2" : "tone");
     return total ? 3 : 0;

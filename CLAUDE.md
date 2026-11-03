@@ -51,7 +51,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `mutate.sh <name> <old> <new> [cases] [pattern]`: builds xt_cosm with one
   deliberate error in XtCosm.cpp (`PORT=analog`: xt_analog, XtAnalog.cpp;
   `PORT=analogcosm`: xt_analog, XtCosm.cpp; `PORT=tone`: xt_tone, XtSynth.cpp;
-  `PORT=tonecosm`: xt_tone, XtCosm.cpp)
+  `PORT=tonecosm`: xt_tone, XtCosm.cpp; `PORT=toneanalog`: xt_tone, XtAnalog.cpp)
   and runs it, to show the check catches it. `mutate_tone.py [cases]`: the list in
   `tone_muts.txt`.
 - `xt_tone <rom> [cases] [seed] [inputs]` (in fcheck; `build/tools/fcheck/bin`): XtSynth's wiring

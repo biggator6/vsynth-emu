@@ -335,6 +335,11 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+FM's lines between cases v106 (2026-11-03): seed 2007's 140 differences in xt_tone, case 3066, were no fault of XtSynth or a port (HARDWARE_FIRMWARE.md, "FM's lines between cases"). A SOLO note under FM
+  left its small differences (allowed in its own case) in tone 1's line, and 99 cases later an exact case's far tap read them. xt_tone now compares FM's whole pool at each case's end (`fm lines`), unless the case played SOLO
+  or a note left memory, then gives the firmware the port's, so each case starts equal. No audio change. Sixteen seeds at 3000 cases 0 different; 131 planted, 130 caught. mutate.sh gains PORT=toneanalog.
+  Open: at 6000 cases seed 90210 case 9398 (no SOLO wave), seed 3 case 9455 and seed 4 case 529 (both past the SOLO tolerance). Not traced.
+
 COSM stereo routines v104 (2026-11-02): a stereo wave on the section's OSC takes another set of COSM routines (HARDWARE_FIRMWARE.md, "COSM: the stereo routines"). process(…, stereo) in
   each XtCosm type, XtCosmSection::stereo latched at note-on. L and R apart on the same ramps, but not all two monos: a stereo Amp is always Type 0; LP12 inverted; NOTCH24, PEAK24, PEAK12 differ;
   the Side Band follower skips three words and reads three past the block (XtSynth passes OSC 2's buffer for COSM 1 in Types 2, 3); the 2nd Side Band's R holds the block's first gain; the TB's R reads

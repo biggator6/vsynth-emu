@@ -249,10 +249,10 @@ env 127 127 127 127 200 900 2: identical
 env 0 0 127 0 5 60 0: identical
 env 30 70 90 50 80 500 2: identical
 == xt_tone
-tone: 3278 notes, 1267 taken by a sounding tone, 407 truncated, 250114 blocks, 5581967 checks
+tone: 3278 notes, 1267 taken by a sounding tone, 407 truncated, 250114 blocks, 5583961 checks
 tone: a SOLO wave's buffers within 2.8e-03 of the block's peak; 70 notes left off, a read outside memory
 tone: 0 different
-tone, a wave on OSC 2: 1361 notes, 354 taken by a sounding tone, 185 truncated, 95031 blocks, 1805868 checks
+tone, a wave on OSC 2: 1361 notes, 354 taken by a sounding tone, 185 truncated, 95031 blocks, 1806161 checks
 tone, a wave on OSC 2: a SOLO wave's buffers within 1.2e-02 of the block's peak; 144 notes left off, a read outside memory
 tone, a wave on OSC 2: 0 different
 == solocmp
