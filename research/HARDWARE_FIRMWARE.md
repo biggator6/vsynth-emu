@@ -1545,6 +1545,12 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The TVA Switch off by default (2026-11-02, v102)
+
+The user chose the XT's default over v101's on. So a new patch has the TVA off: full level from the note's start, no velocity on the level, the amp envelope's knobs doing nothing until the box is ticked. The sound now ends with the note: a note-off ends the voice within one update, about 10 ms, whatever the Release, a COSM's tail or the OSC's own amp envelope would have done. Measured on a held note with the TVA Release at 64: off, the last non-zero frame is 431 after the note-off; on, it rings past 30,000.
+
+`Controls::tvaOn` and the parameter default to false. A session saved before v101 has no such parameter, so it comes up off too, and sounds different from when it was saved. `XT_TVA_ON=1` and `TEST_TVA_ON=1` turn it on. `ab.sh` turns it on unless `XT_TVA_ON=0`, so that its renders still go through the TVA, and it stays 4/4 identical against v101 that way. `xt_tone` sets the switch itself, so its results do not change.
+
 ### The TVA Switch (2026-11-02, v101)
 
 ID 0x299 is the first of the TVA's inputs (`0x894eb170` stores it at +4). `xt_tone` showed what it does, with the switch drawn in its cases and moved during notes:
@@ -1553,9 +1559,9 @@ ID 0x299 is the first of the TVA's inputs (`0x894eb170` stores it at +4). `xt_to
 - **Moved during a note:** it takes effect at once, on the level and the envelope.
 - **The velocity factor is latched at note-on and at a legato** (`0x894ea990`, TVA +0x1c), with the Sens and Curve of that moment. Switching back on returns to that factor and not to one from the knobs as they now are. `Voice::velGain` holds it, and `Voice::gain` is `tvaOn ? velGain : 1`.
 
-**Default.** The XT's descriptor default is off. The plugin's is on (`Controls::tvaOn`, parameter `tvaSwitch`, the TVA box at the left of the amp envelope row), because XtSynth has always followed its envelope and turning it off by default would silence every amp envelope knob and change every render. A saved session without the parameter comes up on.
+**Default.** The XT's descriptor default is off. v101 made the plugin's on (`Controls::tvaOn`, parameter `tvaSwitch`, the TVA box at the left of the amp envelope row), to keep every render as it was. v102 follows the XT.
 
-**Checks.** `p[0x299]` is now `Controls::tvaOn` in `patchOf`, off in a quarter of the cases, and the switch is in the sweep. fcheck's `xt_tone` counts change with the new draw, and it stays 0 different; four other seeds at 3000 cases and the sweep, 0 different. `tone_muts.txt` gains seven errors: 103 of 104 caught, the one missed still the exact `legato-order`. `TEST_TVA_OFF=1 pt.sh`: 4/4 bit-identical. With the switch on, the A/B renders are identical to v100.
+**Checks.** `p[0x299]` is now `Controls::tvaOn` in `patchOf`, off in a quarter of the cases, and the switch is in the sweep. fcheck's `xt_tone` counts change with the new draw, and it stays 0 different; four other seeds at 3000 cases and the sweep, 0 different. `tone_muts.txt` gains seven errors: 103 of 104 caught, the one missed still the exact `legato-order`. PluginTest with the switch off: 4/4 bit-identical. With the switch on, the A/B renders are identical to v100.
 
 ### The whole tone against XtSynth (2026-11-02, v100)
 

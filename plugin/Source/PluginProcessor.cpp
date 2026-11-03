@@ -482,7 +482,7 @@ VSynthEmuProcessor::createParameterLayout() {
         params.push_back(std::make_unique<juce::AudioParameterBool>(cosmId(k, "LfoKeySync"), ln + "Key Sync", false));
     }
 
-    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTvaSwitch, "TVA Switch", true));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTvaSwitch, "TVA Switch", false));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kSustain, "Sustain", 0, 127, 127));

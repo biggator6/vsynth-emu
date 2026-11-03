@@ -1154,7 +1154,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //     XT_OENV2 (Env 8), XT_VEL2="oscSens,oscCurve", XT_PITCH2="pitch,pitchKF,
 //     coarse,fine" and XT_TUNE2="random", as OSC 1's.  XT_OSC1OFF=1: OSC 1's
 //     Switch off.
-//   XT_TVA_OFF=1: the TVA Switch off.
+//   XT_TVA_ON=1: the TVA Switch on (off by default: XT_ADSR then does nothing).
 //   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
 //     3 ENV RING, 4 OSC SYNC, Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
 //     attack,release": new MOD knobs at a frame, on the notes then sounding.
@@ -1268,7 +1268,7 @@ int main(int argc, char** argv) {
         a.fatKf /= 10;
     }
     if (std::getenv("XT_OSC1OFF") && std::atoi(std::getenv("XT_OSC1OFF")) != 0) c.on = false;
-    if (std::getenv("XT_TVA_OFF")) c.tvaOn = false;
+    if (const char* e = std::getenv("XT_TVA_ON")) c.tvaOn = std::atoi(e) != 0;
     if (const char* e = std::getenv("XT_MOD")) {
         c.mod.on = true;
         std::sscanf(e, "%d,%d,%d,%d", &c.mod.type, &c.mod.level, &c.mod.attack, &c.mod.release);

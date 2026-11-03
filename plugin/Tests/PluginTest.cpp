@@ -448,10 +448,10 @@ int main(int argc, char** argv) {
             set("LfoWave", m.lfoWave); set("LfoRate", m.lfoRate);
         }
     }
-    // TEST_TVA_OFF=1: the TVA Switch off
-    if (std::getenv("TEST_TVA_OFF")) {
-        refCtl.tvaOn = false;
-        setKnobs({ { "tvaSwitch", 0 } });
+    // TEST_TVA_ON=1: the TVA Switch on
+    if (const char* e = std::getenv("TEST_TVA_ON")) {
+        refCtl.tvaOn = std::atoi(e) != 0;
+        setKnobs({ { "tvaSwitch", refCtl.tvaOn ? 1 : 0 } });
     }
     // TEST_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM, 3 ENV RING, 4 OSC SYNC
     if (const char* e = std::getenv("TEST_MOD")) {

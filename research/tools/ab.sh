@@ -1,8 +1,10 @@
 #!/bin/bash
 # ab.sh [git rev]: XtSynth CLI renders of a revision (default HEAD) against the
 # working tree: four inputs, two overlapping notes; XT_* settings pass through
-# the environment.  One line: "n/4 identical", or each difference in dB.
+# the environment.  One line: "n/4 identical", or each difference in dB.  The TVA
+# Switch is on unless XT_TVA_ON=0, so that the renders go through the TVA.
 source "$(dirname "$0")/env.sh"
+export XT_TVA_ON="${XT_TVA_ON:-1}"
 REV=${1:-HEAD}; A="$WORK/ab"; mkdir -p "$A"
 [ -f "$WORK/inputs/vocal.bin" ] || "$PY" "$REPO/research/tools/make_inputs.py" "$WORK/inputs" > /dev/null
 rm -rf "$A/src" && mkdir -p "$A/src" && (cd "$REPO" && git archive "$REV" plugin/Source | tar -x -C "$A/src") || exit 1

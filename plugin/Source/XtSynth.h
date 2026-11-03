@@ -127,8 +127,8 @@ public:
         int attack = 0, decay = 0, sustain = 127, release = 16;
         int aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
         // the TVA Switch (ID 0x299), off: the TVA's level is 1, with no envelope and no
-        // velocity.  On by default here, though the XT's own default is off
-        bool tvaOn = true;
+        // velocity.  Off by default, as on the XT
+        bool tvaOn = false;
         // velocity to level for the patch TVA: Sens −63..+63, Curve 0 (off), 1..7
         int ampVelSens = 16, ampVelCurve = 1;
         // Portamento: the switch, Mode (0 NORMAL, 1 LEGATO: only while a key

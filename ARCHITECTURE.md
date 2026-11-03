@@ -352,7 +352,7 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - XtSynth's wiring (v93–v100): a whole firmware tone, from the parameter IDs on, equals XtSynth inside its
   block and at its output, bit for bit but for a SOLO wave's buffers, over random settings and a sweep of
   every field in its change lists (`xt_tone`). Not the voice allocator, and not a real unit.
-- The TVA Switch (v101): off, the TVA's level is 1 and it has no envelope, as the firmware (`xt_tone`). On by default, though the XT's is off.
+- The TVA Switch (v101): off, the TVA's level is 1 and it has no envelope, as the firmware (`xt_tone`). Off by default, as on the XT (v102).
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**

@@ -3159,3 +3159,8 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The user asked for the control. I first took the switch to gate only the envelope, as my v100 notes said, and `xt_tone` disagreed at once: the level is 1 as well, so velocity goes too. Then it disagreed again: switching back on returns to the velocity factor of the note's start, not the knobs' current one. Neither was in the notes. That is what the check is for.
 - The default is the one real choice here. The XT's is off, the plugin's stays on. On keeps every render as it was and the amp knobs doing what they have always done. Whether the plugin should follow the XT and start off is the user's call, and I would want to see a real patch before changing it.
 
+### Session 16 addendum (2026-11-02) — v102: the TVA Switch off by default
+
+- The user chose the XT's default. It changes the plugin's character more than the one word suggests: a new patch has no amp envelope, no velocity on the level, and notes that end about 10 ms after the key comes up, cutting any COSM tail. That is what the firmware does with this switch off, so it is right by the rule here. Whether a real patch ever ships with it off is still a question for a real unit; the descriptor's default says nothing about the factory patches.
+- The A/B renders now turn the switch on themselves. Left at the default, they would have stopped exercising the TVA at all and would still have said identical.
+
