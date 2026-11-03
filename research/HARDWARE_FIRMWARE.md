@@ -1545,6 +1545,49 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### A legato's order, and the COSMs' held levels (2026-11-03, v105)
+
+The planted error `legato-order` moved `cosmSetBlock` after the two envelopes' `update` in `legatoNote`, and `xt_tone` passed it from v99 on. v99 called it exact without showing it. It is exact, and looking into why turned up a real difference next to it, which is not fixed here.
+
+**Why the order makes no difference.** On a legato the two touch nothing in common.
+- `cosmSetBlock` reads the envelopes' `level()`, the LFO's `out()`, the voice's note and velocity and the knobs, and writes only the section's block and targets.
+- `XtEnvelope::update` writes the times, the levels, the scale and the rate, none of which the block reads. It writes the output only in the sustain stage, as `level[3]`.
+- `level[3]` comes from the Sustain knob alone, with no key or velocity in it, and a moved knob has already been through `setControls`' update. In the sustain stage the output is already `level[3]`, so that write changes nothing.
+- The other two branches of `update` need a negative scale or stage 6. The scale is always 1 here.
+
+**What was measured.**
+- Counters round the legato's updates, at fcheck's 2000 cases: 3456 envelope updates (stage 0: 1822, 1: 1559, 2: 72, 3: 3), the level moved by none. Three in the sustain stage is thin, so a forced run (below) put more there: 58 of 2180, again none moved.
+- The planted error against the unplanted build, whole output compared: identical on seeds 1, 2, 3, 4, 5007 and 90210 at 6000 cases each, and on 300 forced cases each of a Comb, a TVF and a Resonator.
+- The block after the LFO's `update` as well: 0 different at 2000 cases. That `update` does not write the output either.
+
+**In the firmware the order cannot be seen at all.** A COSM's new block (`0x894f5d10` → `0x894ee4a0`, then `0x894ed8f0` for the TVF) takes the levels from the object's own +0x104…+0x110. The 10 ms update `0x894ee6a0` fills those from the envelopes' +0x4c and the LFOs' +0x38. The envelope's update (`0x894f5cc0` → `0x894f0080`) writes the envelope's +0x4c, not those. I read these routines; I did not search for every other writer of +0x104, and the note-on's path to them is unread. The scratch build below is the evidence that the picture is right.
+
+**A correction to v99.** Its list of `0x894dba00` had two labels wrong. `0x894f5be0`, twice, goes to `0x894f2600` on the OSC voices (+0x20, +0x9d4). `0x894f5d10`, twice, goes to `0x894ee4a0` on the COSMs (+0x1388, +0x14ec). v99 called them the COSMs and the TVA. The order it drew from them, COSM blocks before the envelopes, stands. Corrected there and in XtSynth's comment.
+
+**What does matter on a legato.** Only that the block comes after the new key and velocity. `legato-order` now plants that: the block ahead of `v.note = key`. It is caught, 115,606 + 8,289 different at 2000 cases. Dropping the block altogether gives 116,409 + 8,032. Nothing in the list covered a legato's COSM block before.
+
+**Still different from the firmware, not fixed: a second update inside one tick.** XtSynth's block reads the envelopes' live `level()`. v99's "block first" stands in for the firmware's held levels, but only for the first update after a tick. Move a Sustain in the sustain stage, and a legato before the next tick gives:
+- XtSynth: the block takes the moved level, because the knob's update has already moved the output.
+- Firmware: the block takes the held level, until the next tick.
+
+Forced in a scratch copy of the check (Sustain moved at block 40, the legato straight after, envelope depths on, 150 cases), compared with the same scratch build holding the levels:
+
+| COSM | as XtSynth is | levels held at note-on and at the update |
+|---|---|---|
+| Comb | 1460 different | 0 |
+| TVF | 1682 different | 0 |
+| Resonator | 1078 different | 0 |
+
+The differences are in the COSM output and the output, and in OSC 1's buffer where the COSM sits on it. They start at the legato's block. The scratch build is also 0 different on fcheck's 2000 cases. The planted error is exact here too: both orders read the same moved level.
+
+`xt_tone` has one knob move per case and no forced case for this, so fcheck's seed never gets there. By reading, two knob moves in a tick or a knob and then the bender take the same path; only the legato was run. In the plugin `setControls` runs once per host block, so buffers under 441 samples can do it. The block's target moves up to one tick (10 ms) early.
+
+Fixing it changes XtSynth, and it also makes `live-order` exact, since nothing the block reads would then depend on the order. That entry would become "the block reads the live level". So the fix and its forced case are left as their own version. The case cannot go into `xt_tone` before the fix, because fcheck would no longer be 0 different.
+
+**Other seeds.** At 6000 cases, four cases differ from the firmware on planted and unplanted builds alike: seed 3 case 9455 (OSC 1's buffer), seed 4 case 529 (COSM output), seed 90210 cases 2055 and 9398. The scratch build with held levels leaves them as they are, so they have another cause. Not traced here.
+
+**Checks.** No check or result changes: `XtSynth.cpp` changes by one address in a comment and `XtToneCheck.cpp` not at all, so `fcheck_baseline.txt` stands. `mutate_tone.py`, the whole list of 129 at 2000 cases: all caught, no standing miss. `verify.sh` green: fcheck as baseline, A/B 4/4 identical against v104, PluginTest 4/4 bit-identical, engine tests, auval.
+
 ### COSM: the stereo routines (2026-11-02, v104)
 
 With a stereo wave on the OSC a section follows, the firmware runs a second set of COSM routines. Until now `XtCosm` had only the mono ones, and `xt_tone` turned those COSMs off. Now all sixteen types have them.
@@ -1628,7 +1671,7 @@ Through (code 0, `0x894fb720`) is an `rts`. Codes 10, 11 and 17 have stereo rout
 - PluginTest with COSMs on the two stereo inputs: bit-identical to XtSynth. `ab.sh` with a COSM on: the two mono inputs identical to v100, the stereo ones different, as intended.
 - Planted errors, 72, all caught. 46 in `xt_cosm`: each difference above, R's states and buffers shared with L's, ramps not set back, R's start values at note-on, each row of the words table. 15 of those again under `xt_tone` (`PORT=tonecosm`, new), one per type, which shows the stereo paths really run there. 11 in XtSynth's wiring, added to `tone_muts.txt`.
 - Three of those passed at first, and changed the check. The Limiter's R start: each case began from a fresh port, whose values are what a reset gives, so each now begins from a port that has played. The wiring of OSC 2's words, and `!v->analog`: hence the two kinds of case above.
-- `mutate_tone.py`, the whole list of 129: 128 caught. `legato-order` passes, and passes on v103 without this work too (not looked into here).
+- `mutate_tone.py`, the whole list of 129: 128 caught. `legato-order` passes, and passes on v103 without this work too (not looked into here; v105 did: it is exact, and the entry is reworked).
 
 **A case left as it is.** 12,000 cases on each of seven more seeds, on v100 and before the forced cases: six 0 different, and seed 5007 has 4 differences in one case (2955). That's a stereo SOLO wave through a Compressor and a 1st Side Band Filter, past the SOLO tolerance of 2% of the block's peak (fw −545112, port −521479). With the firmware's own OSC 1 samples put into XtSynth's SOLO buffer for Structure 0's SOLO cases, and those compared bit for bit with no tolerance, 3100 cases on that seed are 0 different. So the COSMs are exact. `XtSoloVoice`'s small differences (not bit-exact, `xt_fw solocmp`) moved the follower, and with it a delay and a crossfade, as Lo-Fi's quantizer does (which the check replaces on SOLO waves). I did not exclude the Side Band Filters on SOLO, since the seed in fcheck passes and the case costs nothing else.
 
@@ -1830,7 +1873,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 - v96. The TVA's gain is level × envelope, not envelope with level applied afterward, and a voice is over at the envelope's end *and* gain ≤ 2^−16 (`0x894f54b0`). The whole block, all OSCs and COSMs, now runs in the XT's units, the TVA and the sum in SH-4 arithmetic, ±1 only at the very end. Band players take the firmware's own gain (`setGainXt`), so a value 2^16 below flush is not lost: that was the reason the check first needed a tolerance on them.
 - v97. XtSynth stopped a voice 8192 frames after a wave's end. The firmware keeps it until its envelope ends. A player past the end is silent, but a COSM's tail rings on through the release, and XtSynth cut it.
 - v98. **The band players' start.** An OSC's note-on sets byte 0 bit 7 of the player, and `0x8950fa60` then takes the other path: the event before the position (`0x8950f9c0`), that event's records, each band's segments and records forward to the position (`0x89510bf0`). `xt_fw bandcmp` had never set that bit, so the port was checked on the other path, and followed it. It only shows when a walk starts backward (at the wave's end) and then turns forward: the port read its next segment past the list and restarted from the wave's start, the firmware stayed at the end. Now `xtFwBandPlay` sets the bit and the port takes this path. Two bandcmp lines added.
-- v99. **A tone update.** `0x894dba00`'s order is OSCs (`0x894f5e20`), COSMs (`0x894f5be0` twice), MOD (`0x894f5da0`), TVA (`0x894f5d10` twice), envelopes (`0x894f5cc0`), LFOs (`0x894f5c70`), and a legato (`0x894db8a0`) runs the same.
+- v99. **A tone update.** `0x894dba00`'s order is OSCs (`0x894f5e20`, then `0x894f5be0` twice), MOD (`0x894f5da0`), COSMs (`0x894f5d10` twice), envelopes (`0x894f5cc0`), LFOs (`0x894f5c70`), and a legato (`0x894db8a0`) runs the same. (The two labels corrected in v105.)
   - COSM blocks go first, on the levels the COSM cached at its last update (object +0x104, +0x108, +0x10c). XtSynth set them after the envelopes, so a Sustain moved reached the block at once; on the XT it waits for the next tick.
   - The pass runs on any change, whatever moved. A COSM block's targets take the levels without the rates, so it can be heard with no COSM knob moved. XtSynth compared a long list of COSM fields; `Controls` now has `operator==`, and the list is gone.
   - The same pass is how the MOD's new block (`0x894f1c60`) arrives, and it clears an old OSC SYNC note's flag on Types 0…3. So a legato or any knob clears it, not only a MOD knob.
@@ -1847,6 +1890,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 - A real XT. Everything here is rom.2 in the interpreter.
 - The voice allocator and stealing: two notes at most, the part's note-on logic chosen in the harness as `0x894dbcb0` and `0x894dbea0` do.
 - The tick's timing against the audio: the firmware's update runs on XtSynth's clock. The scheduler's n is not checked.
+- A second update inside one tick. Each case moves its knobs once, and XtSynth's COSM block reads the live level where the firmware's reads a held one: known different, see v105.
 - The start state, as above, and everything before a note on the real panel: patch load, the editor.
 - The matrix, controllers other than the bender (CC7, CC10, CC11 at rest), Hold, the TVA's Level, Pan, LFO and sends (at defaults), velocity on the pitch, time and formant envelopes' depth paths beyond what the OSC converter takes.
 - PCM on OSC 2. EXT IN. Tempo sync, Time Trip, playback modes, start offset, the wave's tuning fields.

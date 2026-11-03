@@ -3196,3 +3196,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - 12,000 cases on one seed gave 4 differences in one case, all on a stereo SOLO wave. That could have been written off as the SOLO player's known error, so I fed the firmware's own OSC 1 samples in and compared with no tolerance: 0 different. It is the SOLO player's error, and now that's measured rather than assumed.
 - That follower also lets the SOLO player's error into a buffer the check holds exact, through the words past the block. It showed only on other seeds, on v103's new OSC 2 cases. The list of failing cases said so plainly, once it printed both waves.
 - Master moved twice under this work: the TVA Switch, then PCM on OSC 2. The second one helped, as it turned a hand-over note into two lines of code here and let the last exclusion go.
+
+### Session 16 addendum (2026-11-03) — v105: legato-order is exact, and what sits next to it
+
+- The question was whether the check couldn't see the order or the order didn't matter. It doesn't: on a legato the block and the envelope's update touch nothing in common. Base and planted print identical output on six seeds at 6000 cases.
+- v99 had already said "exact", in one line. That was right, but it didn't look at why the firmware has this order at all, and that is where the rest came from.
+- The firmware's block reads levels the COSM holds from its last update, so its order can't be seen either. XtSynth reads the live level and gets the same result by going first, which only works for the first update after a tick. So a Sustain moved and a legato inside one tick gave over a thousand differences in 150 forced cases, and holding the levels in a scratch build took all of them to 0.
+- Random cases would not have found this soon: of 3456 legato envelope updates at 2000 cases, 3 were in the sustain stage.
+- Reading the routines also showed two of v99's labels were wrong. Its conclusion was right anyway. Each label had looked plausible from the address order alone.
+- I did not fix the difference here: it changes XtSynth and makes `live-order` exact, so it is its own version.

@@ -583,7 +583,7 @@ void XtSynth::setControls(const Controls& c) {
             Voice::CosmVoice& cv = v.cs[k];
             if (!cv.on) continue;
             // the block first, on the envelopes' levels before this update (0x894dba00:
-            // 0x894f5be0, then 0x894f5cc0): a Sustain moved reaches it at the next tick
+            // 0x894f5d10, then 0x894f5cc0): a Sustain moved reaches it at the next tick
             if (anyChanged) cosmSetBlock(v, k);
             if (cenvAChanged[k]) cv.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));
             if (cenvBChanged[k]) cv.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));

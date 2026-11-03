@@ -335,6 +335,10 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+legato-order v105 (2026-11-03): the planted error was exact: on a legato the COSM block and an envelope's update touch nothing in common (HARDWARE_FIRMWARE.md, "A legato's order, and the COSMs' held levels").
+  The entry now plants the block ahead of the new key and velocity. Open, not fixed: a second update inside one tick. XtSynth's block reads the envelopes' live level, the firmware's the levels held at the last tick (+0x104...).
+  v99's labels of 0x894f5be0 (OSCs) and 0x894f5d10 (COSMs) corrected. A worktree under .claude cannot run ghidra.sh (Ghidra refuses a path element starting with '.'): pass the main checkout's absolute project path.
+
 COSM stereo routines v104 (2026-11-02): a stereo wave on the section's OSC takes another set of COSM routines (HARDWARE_FIRMWARE.md, "COSM: the stereo routines"). process(…, stereo) in
   each XtCosm type, XtCosmSection::stereo latched at note-on. L and R apart on the same ramps, but not all two monos: a stereo Amp is always Type 0; LP12 inverted; NOTCH24, PEAK24, PEAK12 differ;
   the Side Band follower skips three words and reads three past the block (XtSynth passes OSC 2's buffer for COSM 1 in Types 2, 3); the 2nd Side Band's R holds the block's first gain; the TB's R reads
