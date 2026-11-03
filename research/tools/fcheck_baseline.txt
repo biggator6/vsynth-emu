@@ -63,6 +63,40 @@ amp filter: 120000 blocks of 32 frames, 0 different
 spk converter: 2000 cases, 0 different
 spk note-on and block: 7667 cases, 0 different
 spk filter: 120000 blocks of 32 frames, 0 different
+tvf stereo note-on, block and update: 8535 cases, 0 different
+tvf stereo filter: 40000 blocks of 32 frames, 0 different
+dynamic stereo note-on, block and update: 8520 cases, 0 different
+dynamic stereo filter: 40000 blocks of 32 frames, 0 different
+dual stereo note-on, block and update: 8526 cases, 0 different
+dual stereo filter: 40000 blocks of 32 frames, 0 different
+tb stereo note-on, block and update: 8531 cases, 0 different
+tb stereo filter: 40000 blocks of 32 frames, 0 different
+comb stereo note-on, block and update: 8585 cases, 0 different
+comb stereo filter: 40000 blocks of 32 frames, 0 different
+sbf1 stereo note-on, block and update: 8539 cases, 0 different
+sbf1 stereo filter: 40000 blocks of 32 frames, 0 different
+sbf2 stereo note-on, block and update: 8558 cases, 0 different
+sbf2 stereo filter: 40000 blocks of 32 frames, 0 different
+res stereo note-on, block and update: 8470 cases, 0 different
+res stereo filter: 40000 blocks of 32 frames, 0 different
+fs stereo note-on, block and update: 8570 cases, 0 different
+fs stereo filter: 40000 blocks of 32 frames, 0 different
+lofi stereo note-on, block and update: 8491 cases, 0 different
+lofi stereo filter: 40000 blocks of 32 frames, 0 different
+comp stereo note-on, block and update: 8505 cases, 0 different
+comp stereo filter: 40000 blocks of 32 frames, 0 different
+lim stereo note-on, block and update: 8454 cases, 0 different
+lim stereo filter: 40000 blocks of 32 frames, 0 different
+ws stereo note-on, block and update: 8542 cases, 0 different
+ws stereo filter: 40000 blocks of 32 frames, 0 different
+od stereo note-on, block and update: 8572 cases, 0 different
+od stereo filter: 40000 blocks of 32 frames, 0 different
+ds stereo note-on, block and update: 8588 cases, 0 different
+ds stereo filter: 40000 blocks of 32 frames, 0 different
+amp stereo note-on, block and update: 8511 cases, 0 different
+amp stereo filter: 40000 blocks of 32 frames, 0 different
+spk stereo note-on, block and update: 8538 cases, 0 different
+spk stereo filter: 40000 blocks of 32 frames, 0 different
 == xt_analog
 converter: 200000 cases, 0 different
 note-on and update: 27000 cases, 0 different
@@ -215,11 +249,11 @@ env 127 127 127 127 200 900 2: identical
 env 0 0 127 0 5 60 0: identical
 env 30 70 90 50 80 500 2: identical
 == xt_tone
-tone: 3278 notes, 1267 taken by a sounding tone, 407 truncated, 250114 blocks, 5597162 checks
+tone: 3278 notes, 1267 taken by a sounding tone, 407 truncated, 250114 blocks, 5581967 checks
 tone: a SOLO wave's buffers within 2.8e-03 of the block's peak; 70 notes left off, a read outside memory
 tone: 0 different
-tone, a wave on OSC 2: 1367 notes, 366 taken by a sounding tone, 187 truncated, 96381 blocks, 1870252 checks
-tone, a wave on OSC 2: a SOLO wave's buffers within 5.0e-03 of the block's peak; 138 notes left off, a read outside memory
+tone, a wave on OSC 2: 1361 notes, 354 taken by a sounding tone, 185 truncated, 95031 blocks, 1805868 checks
+tone, a wave on OSC 2: a SOLO wave's buffers within 1.2e-02 of the block's peak; 144 notes left off, a read outside memory
 tone, a wave on OSC 2: 0 different
 == solocmp
 solo vocal.bin 1 1.0 0 1.0 0 30000: 461 records, 30000 frames: max |firmware - port| 3.05e-06, difference -83.6 dB against the signal (rms 0.0146), first at 1

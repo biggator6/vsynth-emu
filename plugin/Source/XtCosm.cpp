@@ -76,13 +76,45 @@ inline float envDepth(float vel, int d) {                                    // 
     return mul(vel, mul(0.0f > v ? -v : v, v));
 }
 
-// The kernels (0x89502050…0x89502840): 32 frames, the coefficients stepped
-// before every fourth frame; s[0..3] the states at D+0x1c…0x28.
-void stage24(float* lr, float* s, float& c1, float& c2, float d1, float d2, int mode) {
+// A block's channel as a routine sees it.  The mono routines read L and write both.
+// The stereo ones (the table at 0x8987c840, picked at note-on by 0x894eef70) run L and R
+// apart, each on its own states and delay buffers, on the block's ramps from the same
+// start: so here one pass per channel, the ramps set back for the second.
+struct Chan {
+    float* lr;
+    int c;
+    bool stereo;
+    float in(int i) const { return lr[2 * i + c]; }
+    void out(int i, float y) const {
+        lr[2 * i + c] = y;
+        if (!stereo) lr[2 * i + 1] = y;
+    }
+};
+inline int passes(bool stereo) { return stereo ? 2 : 1; }
+
+// The stereo follower (0x89501850), for the Side Band Filters: Σ|x| over the block's words,
+// but each of its four rounds reads sixteen words and steps seventeen, so words 16, 33 and 50
+// are skipped and the last round runs three words past the block (`past`: what lies there,
+// absent a run of zeros).  The firmware's quirk, kept.
+float sumBoth(const float* lr, const float* past) {
+    float sum = 0.0f;
+    for (int j = 0; j < 4; ++j)
+        for (int i = 0; i < 16; ++i) {
+            const int k = 17 * j + i;
+            const float x = k < 64 ? lr[k] : past ? past[k - 64] : 0.0f;
+            sum = add(sum, x < 0.0f ? -x : x);
+        }
+    return sum;
+}
+
+// The kernels (0x89502050…0x89502840; stereo 0x89502a00…0x895037a0): 32 frames, the
+// coefficients stepped before every fourth frame; s[0..3] the states at D+0x1c…0x28
+// (R's at D+0x54…0x60).
+void stage24(const Chan& lr, float* s, float& c1, float& c2, float d1, float d2, int mode) {
     float a = s[0], b = s[1], d = s[2], e = s[3];
     for (int i = 0; i < 32; ++i) {
         if ((i & 3) == 0) { c1 = add(c1, d1); c2 = add(c2, d2); }
-        const float x = lr[2 * i];
+        const float x = lr.in(i);
         b = fmac(a, c2, b);
         float t = mul(-x, c1);
         t = sub(t, b);
@@ -92,8 +124,8 @@ void stage24(float* lr, float* s, float& c1, float& c2, float d1, float d2, int 
         float in2 = t;                                 // HP24
         if (mode == 0) in2 = b;                        // LP24
         else if (mode == 1) in2 = a;                   // BP24
-        else if (mode == 3) in2 = add(t, a);           // NOTCH24
-        else if (mode == 4) in2 = sub(t, a);           // PEAK24
+        else if (mode == 3) in2 = add(t, lr.stereo ? b : a);   // NOTCH24 (the stereo one takes b)
+        else if (mode == 4) in2 = lr.stereo ? add(-t, b) : sub(t, a);   // PEAK24
         float u = sub(in2, e);
         u = fmac(c1, d, u);
         d = fmac(u, c2, d);
@@ -101,20 +133,20 @@ void stage24(float* lr, float* s, float& c1, float& c2, float d1, float d2, int 
         if (mode == 0) y = e;
         else if (mode == 1) y = d;
         else if (mode == 3) y = add(u, e);
-        else if (mode == 4) y = sub(u, e);
-        lr[2 * i] = lr[2 * i + 1] = y;
+        else if (mode == 4) y = lr.stereo ? -sub(u, e) : sub(u, e);
+        lr.out(i, y);
     }
     s[0] = a; s[1] = b; s[2] = d; s[3] = e;
 }
 
-void stage12(float* lr, float* s, float& c1, float& c2, float d1, float d2, int mode) {
+void stage12(const Chan& lr, float* s, float& c1, float& c2, float d1, float d2, int mode) {
     const float k = fmac(-c1, 0.5f, 0.5f);             // the input gain, from c1 at the block's start
     float a = s[0], b = s[1];
     for (int i = 0; i < 32; ++i) {
         if ((i & 3) == 0) { c1 = add(c1, d1); c2 = add(c2, d2); }
-        const float x = lr[2 * i];
+        const float x = lr.in(i);
         b = fmac(a, c2, b);
-        float t = mode == 5 ? mul(x, k) : mul(-x, k);  // LP12 keeps the sign
+        float t = mode == 5 && !lr.stereo ? mul(x, k) : mul(-x, k);  // the mono LP12 keeps the sign; the stereo one (0x895031b0) does not
         t = sub(t, b);
         t = fmac(a, c1, t);
         a = fmac(t, c2, a);
@@ -122,19 +154,19 @@ void stage12(float* lr, float* s, float& c1, float& c2, float d1, float d2, int 
         if (mode == 5) y = b;
         else if (mode == 6) y = a;
         else if (mode == 8) y = add(t, b);
-        else if (mode == 9) y = sub(t, b);
-        lr[2 * i] = lr[2 * i + 1] = y;
+        else if (mode == 9) y = lr.stereo ? -sub(t, b) : sub(t, b);
+        lr.out(i, y);
     }
     s[0] = a; s[1] = b;
 }
 
-void stage6(float* lr, float* s, float& c2, float d2, bool hp) {
+void stage6(const Chan& lr, float* s, float& c2, float d2, bool hp) {
     float a = s[0];
     for (int i = 0; i < 32; ++i) {
         if ((i & 3) == 0) c2 = add(c2, d2);
-        const float y = sub(lr[2 * i], a);
+        const float y = sub(lr.in(i), a);
         a = fmac(y, c2, a);
-        lr[2 * i] = lr[2 * i + 1] = hp ? y : a;
+        lr.out(i, hp ? y : a);
     }
     s[0] = a;
 }
@@ -144,11 +176,11 @@ void stage6(float* lr, float* s, float& c2, float d2, bool hp) {
 // times Q; c1, c2 the filters' cutoffs, stepped before every fourth frame.
 // Filter 1 is LP24 (BP24 for BPF/BPF), Filter 2 HP24 (BP24), on the input or,
 // for LPF->HPF, on Filter 1's output; the output their sum (or Filter 2's).
-void dual(float* lr, float* s, float& c1, float& c2, float d1, float d2, float q1, float q2, int mode) {
+void dual(const Chan& lr, float* s, float& c1, float& c2, float d1, float d2, float q1, float q2, int mode) {
     float s0 = s[0], s1 = s[1], s2 = s[2], s3 = s[3], s4 = s[4], s5 = s[5], s6 = s[6], s7 = s[7];
     for (int i = 0; i < 32; ++i) {
         if ((i & 3) == 0) { c1 = add(c1, d1); c2 = add(c2, d2); }
-        const float x = lr[2 * i];
+        const float x = lr.in(i);
         s1 = fmac(c1, s0, s1);
         float t = sub(mul(x, q1), s1);
         t = fmac(q1, s0, t);
@@ -166,7 +198,7 @@ void dual(float* lr, float* s, float& c1, float& c2, float d1, float d2, float q
         u2 = fmac(q2, s6, u2);
         s6 = fmac(c2, u2, s6);
         const float y = mode == 0 ? add(u2, s3) : mode == 1 ? u2 : add(s6, s2);
-        lr[2 * i] = lr[2 * i + 1] = y;
+        lr.out(i, y);
     }
     s[0] = s0; s[1] = s1; s[2] = s2; s[3] = s3; s[4] = s4; s[5] = s5; s[6] = s6; s[7] = s7;
 }
@@ -328,7 +360,7 @@ void XtCosmTvf::setState(const float st[4], float c1, float c2, float t1, float 
     cur1 = c1; cur2 = c2; tgt1 = t1; tgt2 = t2; rate1 = r1; rate2 = r2;
 }
 
-void XtCosmTvf::process(float* lr, float scale) {
+void XtCosmTvf::process(float* lr, float scale, bool stereo) {
     float t1 = tgt1, t2 = tgt2;
     if (blk.dynamic) {
         // the follower (0x895017e0): Σ|L|, every eighth frame twice
@@ -351,9 +383,15 @@ void XtCosmTvf::process(float* lr, float scale) {
     }
     const float d1 = mul(rate1, sub(t1, cur1)), d2 = mul(rate2, sub(t2, cur2));
     const int m = blk.mode;
-    if (m >= 0 && m <= 4) stage24(lr, s, cur1, cur2, d1, d2, m);
-    else if (m >= 5 && m <= 9) stage12(lr, s, cur1, cur2, d1, d2, m);
-    else if (m == 10 || m == 11) stage6(lr, s, cur2, d2, m == 11);
+    const float c10 = cur1, c20 = cur2;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan x{ lr, ch, stereo };
+        float* const st = s + 14 * ch;
+        cur1 = c10; cur2 = c20;
+        if (m >= 0 && m <= 4) stage24(x, st, cur1, cur2, d1, d2, m);
+        else if (m >= 5 && m <= 9) stage12(x, st, cur1, cur2, d1, d2, m);
+        else if (m == 10 || m == 11) stage6(x, st, cur2, d2, m == 11);
+    }
 }
 
 XtDualBlock xtDualBlock(const XtDualParams& p, int key, float velA, float velB) {
@@ -378,6 +416,7 @@ void XtCosmDual::noteOn(const XtDualBlock& b, float env1Start, float env1Out, fl
     rate1 = mul(r1, 4.0f);
     rate2 = mul(r2, 4.0f);
     setBlock(b, env1Out, lfo1, env2Out, lfo2);
+    q1Start = b.q1;                                   // 0x894edf70, type 12: D+0x90
 }
 
 void XtCosmDual::setBlock(const XtDualBlock& b, float env1, float lfo1, float env2, float lfo2) {
@@ -396,9 +435,14 @@ void XtCosmDual::targets(float env1, float lfo1, float env2, float lfo2) {
     tgt2 = xtTvfCutoff(blk.cut2, blk.env2, env2, blk.lfo2, lfo2, blk.q2);
 }
 
-void XtCosmDual::process(float* lr) {
+void XtCosmDual::process(float* lr, bool stereo) {
     const float d1 = mul(sub(tgt1, cur1), rate1), d2 = mul(sub(tgt2, cur2), rate2);
-    if (blk.mode >= 0 && blk.mode <= 2) dual(lr, s, cur1, cur2, d1, d2, blk.q1, blk.q2, blk.mode);
+    const float c10 = cur1, c20 = cur2;
+    if (blk.mode >= 0 && blk.mode <= 2)
+        for (int ch = 0; ch < passes(stereo); ++ch) {
+            cur1 = c10; cur2 = c20;
+            dual({ lr, ch, stereo }, s + 14 * ch, cur1, cur2, d1, d2, blk.q1, blk.q2, blk.mode);
+        }
 }
 
 XtTbBlock xtTbBlock(const XtTbParams& p, int key, float velA, float velB) {
@@ -424,7 +468,7 @@ void XtCosmTb::noteOn(const XtTbBlock& b, float env1, float lfo1, float env2, fl
     setBlock(b, env1, lfo1, env2, lfo2);
     for (int i = 0; i < 7; ++i) c[i] = div(t[i], K(0x3c23d709));      // 0x894fbd20: the targets / 0.01
     for (float& x : s) x = 0.0f;
-    for (float& x : h) x = 0.0f;
+    for (int i = 0; i < 6; ++i) h[i] = 0.0f;           // h[6], h[7] (D+0x8c, +0x90) are past what the note-on clears
 }
 
 void XtCosmTb::setBlock(const XtTbBlock& b, float env1, float lfo1, float env2, float lfo2) {
@@ -488,39 +532,44 @@ void XtCosmTb::targets(float env1, float lfo1, float env2, float lfo2) {
     t[6] = mul(blk.gain, k01);
 }
 
-void XtCosmTb::process(float* lr) {
+void XtCosmTb::process(float* lr, bool stereo) {
     constexpr float k99 = K(0x3f7d70a3);
-    float c0 = c[0], c1 = c[1], c2 = c[2], q = c[3], h0c = c[4], h1c = c[5], g = c[6];
-    float s0 = s[0], s1 = s[1], s2 = s[2], s3 = s[3], h0 = h[0], h1 = h[1], h2 = h[2], h3 = h[3];
-    for (int i = 0; i < 32; ++i) {
-        const float x = lr[2 * i];
-        // the LPF: three bilinear one-poles, y = c0·in + c1·in' + c2·y',
-        // the input less Q × the third's last output
-        const float u = add(-mul(q, s3), x);
-        const float y1 = fipr(q, c1, c2, c0, 0.0f, s0, s1, u);
-        const float y2 = fipr(q, c1, c2, c0, 0.0f, s1, s2, y1);
-        const float y3 = fipr(q, c1, c2, c0, 0.0f, s2, s3, y2);
-        c0 = add(mul(c0, k99), t[0]);
-        s1 = y1; s2 = y2; s3 = y3;
-        const float qy = mul(y3, q);
-        c1 = add(mul(c1, k99), t[1]);
-        s0 = sub(x, qy);
-        const float lp = add(qy, y3);
-        c2 = add(mul(c2, k99), t[2]);
-        q = add(mul(q, k99), t[3]);
-        // the HPF: two one-poles, y = c0·(in − in') + c1·y'; then the gain
-        const float hp1 = fipr(h0c, -h0c, 0.0f, h1c, lp, h0, g, h1);
-        h0 = lp; h1 = hp1;
-        const float hp2 = fipr(h0c, -h0c, 0.0f, h1c, hp1, h2, 0.0f, h3);
-        h0c = add(mul(h0c, k99), t[4]);
-        h2 = hp1; h3 = hp2;
-        const float out = mul(hp2, g);
-        h1c = add(mul(h1c, k99), t[5]);
-        lr[2 * i] = lr[2 * i + 1] = out;
-        g = add(mul(g, k99), t[6]);
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float* const S = s + 4 * ch;
+        float* const H = h + 4 * ch;
+        float c0 = c[0], c1 = c[1], c2 = c[2], q = c[3], h0c = c[4], h1c = c[5], g = c[6];
+        float s0 = S[0], s1 = S[1], s2 = S[2], s3 = S[3], h0 = H[0], h1 = H[1], h2 = H[2], h3 = H[3];
+        for (int i = 0; i < 32; ++i) {
+            const float x = X.in(i);
+            // the LPF: three bilinear one-poles, y = c0·in + c1·in' + c2·y',
+            // the input less Q × the third's last output
+            const float u = add(-mul(q, s3), x);
+            const float y1 = fipr(q, c1, c2, c0, 0.0f, s0, s1, u);
+            const float y2 = fipr(q, c1, c2, c0, 0.0f, s1, s2, y1);
+            const float y3 = fipr(q, c1, c2, c0, 0.0f, s2, s3, y2);
+            c0 = add(mul(c0, k99), t[0]);
+            s1 = y1; s2 = y2; s3 = y3;
+            const float qy = mul(y3, q);
+            c1 = add(mul(c1, k99), t[1]);
+            s0 = sub(x, qy);
+            const float lp = add(qy, y3);
+            c2 = add(mul(c2, k99), t[2]);
+            q = add(mul(q, k99), t[3]);
+            // the HPF: two one-poles, y = c0·(in − in') + c1·y'; then the gain
+            const float hp1 = fipr(h0c, -h0c, 0.0f, h1c, lp, h0, g, h1);
+            h0 = lp; h1 = hp1;
+            const float hp2 = fipr(h0c, -h0c, 0.0f, h1c, hp1, h2, 0.0f, h3);
+            h0c = add(mul(h0c, k99), t[4]);
+            h2 = hp1; h3 = hp2;
+            const float out = mul(hp2, g);
+            h1c = add(mul(h1c, k99), t[5]);
+            X.out(i, out);
+            g = add(mul(g, k99), t[6]);
+        }
+        if (ch == passes(stereo) - 1) { c[0] = c0; c[1] = c1; c[2] = c2; c[3] = q; c[4] = h0c; c[5] = h1c; c[6] = g; }
+        S[0] = s0; S[1] = s1; S[2] = s2; S[3] = s3; H[0] = h0; H[1] = h1; H[2] = h2; H[3] = h3;
     }
-    c[0] = c0; c[1] = c1; c[2] = c2; c[3] = q; c[4] = h0c; c[5] = h1c; c[6] = g;
-    s[0] = s0; s[1] = s1; s[2] = s2; s[3] = s3; h[0] = h0; h[1] = h1; h[2] = h2; h[3] = h3;
 }
 
 XtCombBlock xtCombBlock(const XtCombParams& p, float velA, float velB) {
@@ -550,21 +599,34 @@ void XtCosmSection::update(float pitch, float a, float aRate, float b, float bRa
     else tvf.update(b, bRate, lfo, a, aRate, lfo);
 }
 
-void XtCosmSection::process(float* lr, float scale) {
-    if (type == 2) dual.process(lr);
-    else if (type == 3) tb.process(lr);
-    else if (type == 4) comb.process(lr);
-    else if (type == 7) res.process(lr);
-    else if (type == 8) fs.process(lr);
-    else if (type == 9) lofi.process(lr, scale);
-    else if (type == 10) comp.process(lr, scale);
-    else if (type == 11) lim.process(lr, scale);
-    else if (type == 12) ws.process(lr, scale);
-    else if (type == 13) od.process(lr, scale);
-    else if (type == 14) amp.process(lr, scale);
-    else if (type == 15) spk.process(lr);
-    else if (type >= 5) sbf.process(lr, scale);
-    else tvf.process(lr, scale);
+void XtCosmSection::wordsNow(float& w8c, float& w90) const {
+    w8c = word8c; w90 = word90;
+    if (type == 1) w90 = tvf.qOwnSlewed();
+    else if (type == 2) w90 = dual.startQ1();
+    else if (type == 3) { w8c = tb.hpState()[6]; w90 = tb.hpState()[7]; }
+    else if (type == 5 || type == 6) { w8c = sbf.gain(); w90 = sbf.slews()[0]; }
+    else if (type == 10) { w8c = comp.slews()[0]; w90 = comp.slews()[1]; }
+    else if (type == 11) { w8c = lim.slope(); w90 = lim.gain(); }
+    else if (type == 12) w8c = ws.gain();
+    else if (type == 13) w8c = od.gain();
+    else if (type == 14) { w8c = amp.slews()[0]; w90 = amp.slews()[1]; }
+}
+
+void XtCosmSection::process(float* lr, float scale, const float* past) {
+    if (type == 2) dual.process(lr, stereo);
+    else if (type == 3) tb.process(lr, stereo);
+    else if (type == 4) comb.process(lr, stereo);
+    else if (type == 7) res.process(lr, stereo);
+    else if (type == 8) fs.process(lr, stereo);
+    else if (type == 9) lofi.process(lr, scale, stereo);
+    else if (type == 10) comp.process(lr, scale, stereo);
+    else if (type == 11) lim.process(lr, scale, stereo);
+    else if (type == 12) ws.process(lr, scale, stereo);
+    else if (type == 13) od.process(lr, scale, stereo);
+    else if (type == 14) amp.process(lr, scale, stereo);
+    else if (type == 15) spk.process(lr, stereo);
+    else if (type >= 5) sbf.process(lr, scale, stereo, past);
+    else tvf.process(lr, scale, stereo);
 }
 
 float xtCosmRootHz(int originalPitch, bool robot) {
@@ -576,7 +638,7 @@ float xtCosmRootHz(int originalPitch, bool robot) {
     return mul(mul(exp2t(x), 44000.0f), K(0x3c23d709));
 }
 
-XtCosmComb::XtCosmComb() : buf(kCombLen + 1, 0.0f) {}
+XtCosmComb::XtCosmComb() : buf(kCombLen + 1, 0.0f), bufR(kCombLen + 1, 0.0f) {}
 
 float XtCosmComb::delayFrom(float d, float env1, float lfo1) const {
     float x = fmac(blk.detuneEnv, env1, d);
@@ -596,8 +658,9 @@ void XtCosmComb::noteOn(const XtCombBlock& b, float p, float r, float env1Start,
                         float env2Start, float env2Out, float r2, float lfo2) {
     pitch = p; root = r;
     w = kCombLen - 1;                                  // 0xcc2
-    dcy = 0.0f;
+    dcy[0] = dcy[1] = 0.0f;
     for (float& x : buf) x = 0.0f;
+    for (float& x : bufR) x = 0.0f;
     blk = b;
     dly = delayFrom(sub(1.0f, mul(b.detune, K(0x39da7419))), env1Start, lfo1);
     tn = clampf(fmac(b.toneLfo, lfo2, fmac(b.toneEnv, env2Start, b.tone)), -1.0f, 1.0f);
@@ -627,32 +690,38 @@ void XtCosmComb::update(float p, float env1, float r1, float lfo1, float env2, f
     newTarget(delayFrom(sub(1.0f, mul(det, K(0x39da7419))), env1, lfo1));   // +0x2c read as Detune
 }
 
-void XtCosmComb::process(float* lr) {
+void XtCosmComb::process(float* lr, bool stereo) {
     const float d2 = mul(sub(tnTgt, tn), rate2);
     const int r13 = ftrc(dly), r14 = ftrc(nDly);
-    float c = tn, y = dcy, p = prog, f = frac;
-    float* const B = buf.data() + 1;                   // B[−1] is the guard word
-    for (int i = 0; i < 32; ++i) {
-        if (++w >= kCombLen) w = 0;
-        if (i == 0) c = add(c, d2);                    // the step meant for every 4th sample runs once
-        const float x = lr[2 * i];
-        const float e = sub(x, y);
-        y = fmac(e, dcK, y);
-        int a = w - r13, b = a - 1, n = w - r14, m = n - 1;
-        if (a < 0) a += kCombLen;
-        if (b < 0) b += kCombLen;                      // once: w = 0 at the longest delay leaves −1
-        if (n < 0) n += kCombLen;
-        if (m < 0) m += kCombLen;
-        const float g = sub(1.0f, f);
-        const float ra = add(mul(B[a], g), mul(B[b], f));
-        const float rb = add(mul(B[n], g), mul(B[m], f));
-        const float s2 = add(mul(ra, sub(1.0f, p)), mul(rb, p));
-        B[w] = e;
-        lr[2 * i] = lr[2 * i + 1] = add(mul(s2, c), e);
-        p = add(p, K(0x3b03126e));                     // 0.002
-        if (p > 1.0f) { p = 1.0f; dly = nDly; f = nFrac; }
+    const float tn0 = tn, p0 = prog, dly0 = dly;
+    const int w0 = w;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float c = tn0, y = dcy[ch], p = p0, f = frac;
+        w = w0; dly = dly0;
+        float* const B = (ch ? bufR : buf).data() + 1;     // B[−1] is the guard word; R's buffer is D+0x10
+        for (int i = 0; i < 32; ++i) {
+            if (++w >= kCombLen) w = 0;
+            if (i == 0) c = add(c, d2);                    // the step meant for every 4th sample runs once
+            const float x = X.in(i);
+            const float e = sub(x, y);
+            y = fmac(e, dcK, y);
+            int a = w - r13, b = a - 1, n = w - r14, m = n - 1;
+            if (a < 0) a += kCombLen;
+            if (b < 0) b += kCombLen;                      // once: w = 0 at the longest delay leaves −1
+            if (n < 0) n += kCombLen;
+            if (m < 0) m += kCombLen;
+            const float g = sub(1.0f, f);
+            const float ra = add(mul(B[a], g), mul(B[b], f));
+            const float rb = add(mul(B[n], g), mul(B[m], f));
+            const float s2 = add(mul(ra, sub(1.0f, p)), mul(rb, p));
+            B[w] = e;
+            X.out(i, add(mul(s2, c), e));
+            p = add(p, K(0x3b03126e));                     // 0.002
+            if (p > 1.0f) { p = 1.0f; dly = nDly; f = nFrac; }
+        }
+        tn = c; dcy[ch] = y; prog = p;                     // the fraction is not kept
     }
-    tn = c; dcy = y; prog = p;                         // the fraction is not kept
 }
 
 // ── The Side Band Filters ──
@@ -723,16 +792,18 @@ XtSbfBlock xtSbfBlock(const XtSbfParams& p, int key, float velA, float velB) {
     return b;
 }
 
-XtCosmSbf::XtCosmSbf() : buf1(kCombLen, 0.0f), buf2(kGuard + kCombLen, 0.0f) {}
+XtCosmSbf::XtCosmSbf() : buf1(kCombLen, 0.0f), buf2(kGuard + kCombLen, 0.0f), buf3(kCombLen, 0.0f), buf4(kGuard + kCombLen, 0.0f) {}
 
 void XtCosmSbf::noteOn(const XtSbfBlock& b, float p, float r, float env1Start, float env1Out, float r1, float lfo1,
                        float env2Start, float env2Out, float r2, float lfo2) {
     pitch = p; root = r;
     for (float& x : s) x = 0.0f;                       // 0x894edf70 clears D+0x1c…0x88
-    dcy = 0.0f;
+    dcy[0] = dcy[1] = 0.0f;
     w = kCombLen - 1;                                  // 0xcc2
     std::fill(buf1.begin(), buf1.end(), 0.0f);
     std::fill(buf2.begin(), buf2.end(), 0.0f);
+    std::fill(buf3.begin(), buf3.end(), 0.0f);
+    std::fill(buf4.begin(), buf4.end(), 0.0f);
     // the start values (0x894ec5f0, 0x894ec6b0)
     float d = fmac(b.detuneEnv, env1Start, sub(1.0f, mul(b.detune, K(0x39da7419))));
     d = mul(mul(fmac(b.detuneLfo, lfo1, d), T.oct[clampi(b.octave, 0, 4)]), 44100.0f);
@@ -776,10 +847,11 @@ void XtCosmSbf::update(float p, float env1, float r1, float lfo1, float env2, fl
     widT = fmac(blk.widthLfo, lfo2, fmac(blk.widthEnv, env2, blk.width));
 }
 
-void XtCosmSbf::process(float* lr, float scale) {
-    // the follower (0x895017e0): Σ|L|, every eighth frame twice
+void XtCosmSbf::process(float* lr, float scale, bool stereo, const float* past) {
+    // the follower (0x895017e0): Σ|L|, every eighth frame twice; stereo 0x89501850
     float sum = 0.0f;
-    for (int i = 0; i < 32; ++i) {
+    if (stereo) sum = sumBoth(lr, past);
+    else for (int i = 0; i < 32; ++i) {
         const float a = lr[2 * i] < 0.0f ? -lr[2 * i] : lr[2 * i];
         sum = add(sum, a);
         if ((i & 7) == 7) sum = add(sum, a);
@@ -806,72 +878,79 @@ void XtCosmSbf::process(float* lr, float scale) {
     sl[1] = fmac(kSlew, sub(blk.lpf, sl[1]), sl[1]);
     if (!blk.second) sl[2] = fmac(kSlew, sub(subR, sl[2]), sl[2]);
     const float hs = sl[0], ls = sl[1], g1 = sub(1.0f, fr[0]), lsI = sub(1.0f, ls);
-    float gc = gn, wd = wid, y = dcy;
-    float* const B1 = buf1.data();
-    float* const B2 = buf2.data() + kGuard;            // line 2 may read up to 136 before it (1st)
+    const float gn0 = gn, wid0 = wid, p0 = p, cur0 = cur;
+    const int w0 = w;
     auto back = [&](int d) { const int j = w - d; return j < 0 ? j + kCombLen : j; };
-    if (!blk.second) {                                 // 0x89500640
-        const float g2 = sub(1.0f, fr[1]), sub2 = sl[2];
-        int ra = ftrc(cur), rb = ftrc(mul(cur, sub2)), rc = ftrc(nd), rd = ftrc(mul(nd, sub2));
-        float a1 = s[0], h1 = s[1], a2 = s[2], h2 = s[3], l1 = s[4], l2 = s[5];
-        for (int i = 0; i < 32; ++i) {
-            if ((i & 3) == 0) { wd = add(wd, step); gc = fmac(kStep, sub(gt, gc), gc); }
-            if (++w >= kCombLen) w = 0;
-            const float e = sub(lr[2 * i], y);
-            y = add(y, mul(e, dcK));
-            const float q = sub(1.0f, p);
-            // line 1: taps → LPF → allpass, then the Width and the HPF
-            l1 = add(mul(l1, lsI), mul(add(mul(B1[back(rc)], p), mul(q, B1[back(ra)])), ls));
-            float t = sub(l1, mul(g1, a1));
-            const float o1 = add(mul(g1, t), a1);
-            a1 = t;
-            float v = mul(sub(e, o1), wd);
-            const float y1 = add(add(mul(h1, hs), mul(add(1.0f, hs), v)), o1);
-            h1 = v;
-            B1[w] = y1;
-            // line 2, at the delay × the Sub Detune factor
-            l2 = add(mul(l2, lsI), mul(add(mul(B2[back(rd)], p), mul(q, B2[back(rb)])), ls));
-            t = sub(l2, mul(g2, a2));
-            const float o2 = add(mul(g2, t), a2);
-            a2 = t;
-            v = mul(sub(e, o2), wd);
-            const float y2 = add(add(mul(h2, hs), mul(add(1.0f, hs), v)), o2);
-            h2 = v;
-            B2[w] = y2;
-            lr[2 * i] = lr[2 * i + 1] = mul(add(y2, y1), gc);
-            p = add(p, kFade);
-            if (p > 1.0f) { p = 1.0f; cur = nd; ra = rc; rb = rd; }
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float gc = gn0, wd = wid0, y = dcy[ch];
+        p = p0; cur = cur0; w = w0;
+        float* const st = s + 14 * ch;
+        float* const B1 = (ch ? buf3 : buf1).data();       // D+8, R's D+0x10
+        float* const B2 = (ch ? buf4 : buf2).data() + kGuard;   // D+0xc, R's D+0x14; line 2 may read up to 136 before it (1st)
+        if (!blk.second) {                                 // 0x89500640
+            const float g2 = sub(1.0f, fr[1]), sub2 = sl[2];
+            int ra = ftrc(cur), rb = ftrc(mul(cur, sub2)), rc = ftrc(nd), rd = ftrc(mul(nd, sub2));
+            float a1 = st[0], h1 = st[1], a2 = st[2], h2 = st[3], l1 = st[4], l2 = st[5];
+            for (int i = 0; i < 32; ++i) {
+                if ((i & 3) == 0) { wd = add(wd, step); gc = fmac(kStep, sub(gt, gc), gc); }
+                if (++w >= kCombLen) w = 0;
+                const float e = sub(X.in(i), y);
+                y = add(y, mul(e, dcK));
+                const float q = sub(1.0f, p);
+                // line 1: taps → LPF → allpass, then the Width and the HPF
+                l1 = add(mul(l1, lsI), mul(add(mul(B1[back(rc)], p), mul(q, B1[back(ra)])), ls));
+                float t = sub(l1, mul(g1, a1));
+                const float o1 = add(mul(g1, t), a1);
+                a1 = t;
+                float v = mul(sub(e, o1), wd);
+                const float y1 = add(add(mul(h1, hs), mul(add(1.0f, hs), v)), o1);
+                h1 = v;
+                B1[w] = y1;
+                // line 2, at the delay × the Sub Detune factor
+                l2 = add(mul(l2, lsI), mul(add(mul(B2[back(rd)], p), mul(q, B2[back(rb)])), ls));
+                t = sub(l2, mul(g2, a2));
+                const float o2 = add(mul(g2, t), a2);
+                a2 = t;
+                v = mul(sub(e, o2), wd);
+                const float y2 = add(add(mul(h2, hs), mul(add(1.0f, hs), v)), o2);
+                h2 = v;
+                B2[w] = y2;
+                X.out(i, mul(add(y2, y1), gc));
+                p = add(p, kFade);
+                if (p > 1.0f) { p = 1.0f; cur = nd; ra = rc; rb = rd; }
+            }
+            st[0] = a1; st[1] = h1; st[2] = a2; st[3] = h2; st[4] = l1; st[5] = l2;
+        } else {                                           // 0x89500d40
+            int ra = ftrc(cur), rc = ftrc(nd);
+            float lb = st[0], ab = st[1], la = st[2], aa = st[3];
+            for (int i = 0; i < 32; ++i) {
+                if ((i & 3) == 0) { gc = fmac(kStep, sub(gt, gc), gc); wd = add(wd, step); }
+                if (++w >= kCombLen) w = 0;
+                const float e = sub(X.in(i), y);
+                y = add(y, mul(e, dcK));
+                const int ia = back(ra), ib = back(rc);
+                const float q = sub(1.0f, p);
+                // A: buffer 2's taps → allpass → LPF; B: buffer 1's
+                float t = sub(add(mul(B2[ib], p), mul(B2[ia], q)), mul(g1, aa));
+                const float oa = add(mul(g1, t), aa);
+                aa = t;
+                la = add(mul(la, lsI), mul(oa, ls));
+                t = sub(add(mul(B1[ib], p), mul(q, B1[ia])), mul(g1, ab));
+                const float ob = add(mul(g1, t), ab);
+                ab = t;
+                lb = add(mul(lb, lsI), mul(ob, ls));
+                const float ya = add(la, mul(lb, wd));
+                B2[w] = ya;
+                B1[w] = add(mul(add(mul(lb, hs), sub(e, ya)), wd), lb);
+                X.out(i, mul(ya, ch ? gn0 : gc));          // the stereo routine's R keeps the block's first gain (its register is copied once)
+                p = add(p, kFade);
+                if (p > 1.0f) { p = 1.0f; cur = nd; ra = rc; }
+            }
+            st[0] = lb; st[1] = ab; st[2] = la; st[3] = aa;
         }
-        s[0] = a1; s[1] = h1; s[2] = a2; s[3] = h2; s[4] = l1; s[5] = l2;
-    } else {                                           // 0x89500d40
-        int ra = ftrc(cur), rc = ftrc(nd);
-        float lb = s[0], ab = s[1], la = s[2], aa = s[3];
-        for (int i = 0; i < 32; ++i) {
-            if ((i & 3) == 0) { gc = fmac(kStep, sub(gt, gc), gc); wd = add(wd, step); }
-            if (++w >= kCombLen) w = 0;
-            const float e = sub(lr[2 * i], y);
-            y = add(y, mul(e, dcK));
-            const int ia = back(ra), ib = back(rc);
-            const float q = sub(1.0f, p);
-            // A: buffer 2's taps → allpass → LPF; B: buffer 1's
-            float t = sub(add(mul(B2[ib], p), mul(B2[ia], q)), mul(g1, aa));
-            const float oa = add(mul(g1, t), aa);
-            aa = t;
-            la = add(mul(la, lsI), mul(oa, ls));
-            t = sub(add(mul(B1[ib], p), mul(q, B1[ia])), mul(g1, ab));
-            const float ob = add(mul(g1, t), ab);
-            ab = t;
-            lb = add(mul(lb, lsI), mul(ob, ls));
-            const float ya = add(la, mul(lb, wd));
-            B2[w] = ya;
-            B1[w] = add(mul(add(mul(lb, hs), sub(e, ya)), wd), lb);
-            lr[2 * i] = lr[2 * i + 1] = mul(ya, gc);
-            p = add(p, kFade);
-            if (p > 1.0f) { p = 1.0f; cur = nd; ra = rc; }
-        }
-        s[0] = lb; s[1] = ab; s[2] = la; s[3] = aa;
+        gn = gc; wid = wd; dcy[ch] = y; dly = cur; prog = p;
     }
-    gn = gc; wid = wd; dcy = y; dly = cur; prog = p;
 }
 
 
@@ -968,28 +1047,34 @@ void XtCosmRes::update(float env1, float r1, float lfo1, float env2, float r2, f
     balT = balanceOf(env2, lfo2);
 }
 
-void XtCosmRes::process(float* lr) {
+void XtCosmRes::process(float* lr, bool stereo) {
     const float* const C = T.res[clampi(blk.type, 0, 2)];
     const float d1 = mul(sub(szT, sz), rate1), d2 = mul(sub(balT, bal), rate2);
     float c[6];
-    for (int i = 0; i < 32; ++i) {
-        if ((i & 3) == 0) {                            // before every fourth sample
-            sz = add(sz, d1);
-            bal = add(bal, d2);
-            for (int j = 0; j < 6; ++j) c[j] = mul(C[3 * j], sz);
+    const float sz0 = sz, bal0 = bal;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float* const st = s + 14 * ch;
+        sz = sz0; bal = bal0;
+        for (int i = 0; i < 32; ++i) {
+            if ((i & 3) == 0) {                            // before every fourth sample
+                sz = add(sz, d1);
+                bal = add(bal, d2);
+                for (int j = 0; j < 6; ++j) c[j] = mul(C[3 * j], sz);
+            }
+            const float x = X.in(i);
+            for (int j = 0; j < 6; ++j) {
+                float& a = st[2 * j];
+                float& b = st[2 * j + 1];
+                b = fmac(c[j], a, b);
+                const float t = sub(fmac(C[3 * j + 1], a, x), b);
+                a = fmac(c[j], t, a);
+            }
+            const float dry = mul(sub(1.0f, bal), x);
+            float w = mul(C[2], st[0]);
+            for (int j = 1; j < 6; ++j) w = fmac(C[3 * j + 2], st[2 * j], w);
+            X.out(i, add(mul(w, bal), dry));
         }
-        const float x = lr[2 * i];
-        for (int j = 0; j < 6; ++j) {
-            float& a = s[2 * j];
-            float& b = s[2 * j + 1];
-            b = fmac(c[j], a, b);
-            const float t = sub(fmac(C[3 * j + 1], a, x), b);
-            a = fmac(c[j], t, a);
-        }
-        const float dry = mul(sub(1.0f, bal), x);
-        float w = mul(C[2], s[0]);
-        for (int j = 1; j < 6; ++j) w = fmac(C[3 * j + 2], s[2 * j], w);
-        lr[2 * i] = lr[2 * i + 1] = add(mul(w, bal), dry);
     }
 }
 
@@ -1007,7 +1092,7 @@ XtFsBlock xtFsBlock(const XtFsParams& p, int key, float velA, float velB) {
     return b;
 }
 
-XtCosmFs::XtCosmFs() : buf(kLen, 0.0f) {}
+XtCosmFs::XtCosmFs() : buf(kLen, 0.0f), bufR(kLen, 0.0f) {}
 
 float XtCosmFs::depthOf(float env, float lfo) const {
     const float d = clampf(fmac(blk.depthLfo, lfo, fmac(blk.depthEnv, env, blk.depth)), 0.0f, 1.0f);
@@ -1022,6 +1107,7 @@ void XtCosmFs::noteOn(const XtFsBlock& b, float env1Start, float env1Out, float 
                       float env2Start, float env2Out, float r2, float lfo2) {
     w = kLen;                                          // 0xcc2: the first sample goes to 0
     std::fill(buf.begin(), buf.end(), 0.0f);
+    std::fill(bufR.begin(), bufR.end(), 0.0f);
     blk = b;
     dep = depthOf(env1Start, lfo1);                    // 0x894ec9f0
     bal = balanceOf(env2Start, lfo2);
@@ -1044,46 +1130,52 @@ void XtCosmFs::update(float env1, float r1, float lfo1, float env2, float r2, fl
     balT = balanceOf(env2, lfo2);
 }
 
-void XtCosmFs::process(float* lr) {
+void XtCosmFs::process(float* lr, bool stereo) {
     const float d1 = mul(sub(depT, dep), rate1), d2 = mul(sub(balT, bal), rate2);
     const float* const C = T.hilb;
     const float* const S = T.sine;
-    float* const B = buf.data();
-    auto at = [&](int k) { const int j = w + k; return B[j < 0 ? j + kLen : j]; };   // k ≤ 0 samples back
-    float acc[4] = {}, inc = 0, sgn = 0;
-    for (int i = 0; i < 32; ++i) {
-        const int m = i & 3;
-        if (m == 0) {                                  // before every fourth sample
-            dep = add(dep, d1);
-            bal = add(bal, d2);
-            if (0.0f > dep) { inc = -dep; sgn = 1.0f; }
-            else { inc = dep; sgn = -1.0f; }
-        }
-        if (++w >= kLen) w = 0;
-        const float x = lr[2 * i];
-        B[w] = x;
-        if (m == 0) {                                  // the four outputs' terms of the samples present
-            for (int a = 0; a < 4; ++a) {
-                acc[a] = 0.0f;
-                for (int j = (a + 1) / 2; j < 32; ++j) acc[a] = fmac(C[j], at(a - 2 * j - m), acc[a]);
+    const float dep0 = dep, bal0 = bal, ph0 = ph;
+    const int w0 = w;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        dep = dep0; bal = bal0; ph = ph0; w = w0;
+        float* const B = (ch ? bufR : buf).data();         // D+8, R's D+0x10
+        auto at = [&](int k) { const int j = w + k; return B[j < 0 ? j + kLen : j]; };   // k ≤ 0 samples back
+        float acc[4] = {}, inc = 0, sgn = 0;
+        for (int i = 0; i < 32; ++i) {
+            const int m = i & 3;
+            if (m == 0) {                                  // before every fourth sample
+                dep = add(dep, d1);
+                bal = add(bal, d2);
+                if (0.0f > dep) { inc = -dep; sgn = 1.0f; }
+                else { inc = dep; sgn = -1.0f; }
             }
-        } else {                                       // this sample's terms in the outputs still to come
-            for (int a = m; a < 4; a += 2) acc[a] = fmac(C[(a - m) / 2], x, acc[a]);
+            if (++w >= kLen) w = 0;
+            const float x = X.in(i);
+            B[w] = x;
+            if (m == 0) {                                  // the four outputs' terms of the samples present
+                for (int a = 0; a < 4; ++a) {
+                    acc[a] = 0.0f;
+                    for (int j = (a + 1) / 2; j < 32; ++j) acc[a] = fmac(C[j], at(a - 2 * j - m), acc[a]);
+                }
+            } else {                                       // this sample's terms in the outputs still to come
+                for (int a = m; a < 4; a += 2) acc[a] = fmac(C[(a - m) / 2], x, acc[a]);
+            }
+            int di = w - 31;
+            if (di < 0) di += kLen;
+            const float d = B[di];
+            ph = add(ph, inc);
+            if (ph > 1.0f) ph = sub(ph, 1.0f);
+            const float y = mul(ph, 127.0f);
+            const int k = ftrc(y);
+            const float f = sub(y, flt(k)), g = sub(1.0f, f);
+            const float sn = fmac(f, S[k + 1], mul(g, S[k]));
+            int k2 = k + 32;
+            if (k2 > 127) k2 -= 128;
+            const float cs = fmac(f, S[k2 + 1], mul(g, S[k2]));
+            const float v = mul(fmac(sgn, mul(d, cs), mul(acc[m], mul(2.0f, sn))), bal);
+            X.out(i, add(mul(sub(1.0f, bal), x), v));
         }
-        int di = w - 31;
-        if (di < 0) di += kLen;
-        const float d = B[di];
-        ph = add(ph, inc);
-        if (ph > 1.0f) ph = sub(ph, 1.0f);
-        const float y = mul(ph, 127.0f);
-        const int k = ftrc(y);
-        const float f = sub(y, flt(k)), g = sub(1.0f, f);
-        const float sn = fmac(f, S[k + 1], mul(g, S[k]));
-        int k2 = k + 32;
-        if (k2 > 127) k2 -= 128;
-        const float cs = fmac(f, S[k2 + 1], mul(g, S[k2]));
-        const float v = mul(fmac(sgn, mul(d, cs), mul(acc[m], mul(2.0f, sn))), bal);
-        lr[2 * i] = lr[2 * i + 1] = add(mul(sub(1.0f, bal), x), v);
     }
 }
 
@@ -1149,27 +1241,33 @@ void XtCosmLofi::update(float env1, float r1, float lfo1, float env2, float r2, 
     balT = balanceOf(env2, lfo2);
 }
 
-void XtCosmLofi::process(float* lr, float scale) {
+void XtCosmLofi::process(float* lr, float scale, bool stereo) {
     const float d1 = mul(sub(fltT, flt_), rate1), d2 = mul(sub(balT, bal), rate2);
     const float unscale = 1.0f / scale;                // a power of 2: exact both ways
-    float a1 = s[0], b1 = s[1], a2 = s[2], b2 = s[3], a3 = s[4], b3 = s[5], hold = 0;
-    for (int i = 0; i < 32; ++i) {
-        if ((i & 3) == 0) {                            // before every fourth sample
-            flt_ = add(flt_, d1);
-            bal = add(bal, d2);
+    const float flt0 = flt_, bal0 = bal;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float* const st = s + 14 * ch;
+        flt_ = flt0; bal = bal0;
+        float a1 = st[0], b1 = st[1], a2 = st[2], b2 = st[3], a3 = st[4], b3 = st[5], hold = 0;
+        for (int i = 0; i < 32; ++i) {
+            if ((i & 3) == 0) {                            // before every fourth sample
+                flt_ = add(flt_, d1);
+                bal = add(bal, d2);
+            }
+            const float x = mul(X.in(i), scale);
+            b1 = fmac(coef, a1, b1);
+            a1 = fmac(coef, sub(sub(x, b1), a1), a1);
+            b2 = fmac(coef, a2, b2);
+            a2 = fmac(coef, sub(sub(b1, b2), a2), a2);
+            if (((i & ~3) & mask) == 0) hold = b2;         // the count steps by 4 a group
+            const int q = ftrc(mul(mul(hold, down), K(0x38000000)));
+            b3 = fmac(flt_, a3, b3);
+            a3 = fmac(flt_, sub(sub(mul(mul(flt(q), up), 32768.0f), b3), a3), a3);
+            X.out(i, mul(fmac(bal, b3, mul(sub(1.0f, bal), x)), unscale));
         }
-        const float x = mul(lr[2 * i], scale);
-        b1 = fmac(coef, a1, b1);
-        a1 = fmac(coef, sub(sub(x, b1), a1), a1);
-        b2 = fmac(coef, a2, b2);
-        a2 = fmac(coef, sub(sub(b1, b2), a2), a2);
-        if (((i & ~3) & mask) == 0) hold = b2;         // the count steps by 4 a group
-        const int q = ftrc(mul(mul(hold, down), K(0x38000000)));
-        b3 = fmac(flt_, a3, b3);
-        a3 = fmac(flt_, sub(sub(mul(mul(flt(q), up), 32768.0f), b3), a3), a3);
-        lr[2 * i] = lr[2 * i + 1] = mul(fmac(bal, b3, mul(sub(1.0f, bal), x)), unscale);
+        st[0] = a1; st[1] = b1; st[2] = a2; st[3] = b2; st[4] = a3; st[5] = b3;
     }
-    s[0] = a1; s[1] = b1; s[2] = a2; s[3] = b2; s[4] = a3; s[5] = b3;
 }
 
 
@@ -1223,7 +1321,7 @@ void XtCosmWs::update(float env1, float r1, float lfo1, float env2, float r2, fl
     tonT = toneOf(env2, lfo2);
 }
 
-void XtCosmWs::process(float* lr, float scale) {
+void XtCosmWs::process(float* lr, float scale, bool stereo) {
     const float d1 = mul(sub(drvT, drv), rate1), d2 = mul(sub(tonT, ton), rate2);
     lvl = fmac(K(0x3dcccccd), sub(lvlT, lvl), lvl);
     const bool post = blk.type >= 3;                   // 0x89503ef0: types 3…5 shape first
@@ -1240,29 +1338,35 @@ void XtCosmWs::process(float* lr, float scale) {
         return mul(add(mul(sub(mul(K(0x3c800000), y), 1.0f), sub(1.0f, drv)), mul(c, drv)), K(0x4f000000));
     };
     const float kDc = K(0x3a83126e);                   // 0.001, a unit below
-    float a = s[post ? 3 : 0], b = s[post ? 4 : 1], c = s[post ? 5 : 2], k = 0;
-    for (int i = 0; i < 32; ++i) {
-        if ((i & 3) == 0) {                            // before every fourth sample
-            drv = add(drv, d1);
-            ton = add(ton, d2);
-            if (!post) { const float u = sub(1.0f, drv); k = add(mul(mul(u, u), K(0x3f733333)), K(0x3d4ccccd)); }   // 0.95, 0.05
+    const float drv0 = drv, ton0 = ton;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float* const st = s + 14 * ch;
+        drv = drv0; ton = ton0;
+        float a = st[post ? 3 : 0], b = st[post ? 4 : 1], c = st[post ? 5 : 2], k = 0;
+        for (int i = 0; i < 32; ++i) {
+            if ((i & 3) == 0) {                            // before every fourth sample
+                drv = add(drv, d1);
+                ton = add(ton, d2);
+                if (!post) { const float u = sub(1.0f, drv); k = add(mul(mul(u, u), K(0x3f733333)), K(0x3d4ccccd)); }   // 0.95, 0.05
+            }
+            const float x = mul(X.in(i), scale);
+            float v;
+            if (!post) {
+                b = fmac(a, ton, b);
+                a = fmac(sub(sub(x, b), a), k, a);
+                v = sub(shape(b), c);
+            } else {
+                const float w = shape(x);
+                b = fmac(ton, a, b);
+                a = fmac(ton, sub(sub(w, a), b), a);
+                v = sub(b, c);
+            }
+            c = fmac(kDc, v, c);
+            X.out(i, mul(mul(v, lvl), unscale));
         }
-        const float x = mul(lr[2 * i], scale);
-        float v;
-        if (!post) {
-            b = fmac(a, ton, b);
-            a = fmac(sub(sub(x, b), a), k, a);
-            v = sub(shape(b), c);
-        } else {
-            const float w = shape(x);
-            b = fmac(ton, a, b);
-            a = fmac(ton, sub(sub(w, a), b), a);
-            v = sub(b, c);
-        }
-        c = fmac(kDc, v, c);
-        lr[2 * i] = lr[2 * i + 1] = mul(mul(v, lvl), unscale);
+        st[post ? 3 : 0] = a; st[post ? 4 : 1] = b; st[post ? 5 : 2] = c;
     }
-    s[post ? 3 : 0] = a; s[post ? 4 : 1] = b; s[post ? 5 : 2] = c;
 }
 
 
@@ -1316,7 +1420,7 @@ void XtCosmOd::update(float env1, float r1, float lfo1, float env2, float r2, fl
     tonT = toneOf(env2, lfo2, K(0x3dcccccd));
 }
 
-void XtCosmOd::process(float* lr, float scale) {
+void XtCosmOd::process(float* lr, float scale, bool stereo) {
     const float d1 = mul(sub(drvT, drv), rate1), d2 = mul(sub(tonT, ton), rate2);
     lvl = fmac(K(0x3dcccccd), sub(blk.level, lvl), lvl);
     const float unscale = 1.0f / scale;
@@ -1329,39 +1433,45 @@ void XtCosmOd::process(float* lr, float scale) {
         last = c;
         return y;
     };
-    for (int i = 0; i < 32; ++i) {
-        if ((i & 3) == 0) {                            // before every fourth sample
-            drv = add(drv, d1);
-            ton = add(ton, d2);
+    const float drv0 = drv, ton0 = ton;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float* const s = this->s + 14 * ch;
+        drv = drv0; ton = ton0;
+        for (int i = 0; i < 32; ++i) {
+            if ((i & 3) == 0) {                            // before every fourth sample
+                drv = add(drv, d1);
+                ton = add(ton, d2);
+            }
+            const float x = mul(X.in(i), scale);
+            float out;
+            if (blk.ds) {                                  // 0x894fc570
+                const float hp = sub(x, s[0]);
+                s[0] = fmac(hp, kHp1, s[0]);
+                const float p = s[1];
+                s[1] = fmac(sub(hp, s[1]), kLp, s[1]);
+                const float y = stage(mul(s[1], drv), mul(mul(add(p, s[1]), 0.5f), drv), 0x1p28f, s[2]);
+                s[4] = fmac(ton, s[3], s[4]);
+                s[3] = fmac(ton, sub(sub(y, s[3]), s[4]), s[3]);
+                out = mul(s[4], lvl);
+            } else {                                       // 0x894fef70
+                const float hp = sub(x, s[0]);
+                s[0] = fmac(hp, kHpOd, s[0]);
+                const float mid = mul(mul(add(hp, s[1]), 0.5f), drv);
+                s[1] = hp;
+                const float y = stage(mul(hp, drv), mid, 0x1p29f, s[2]);
+                s[3] = fmac(kLp, sub(y, s[3]), s[3]);
+                const float h2 = sub(s[3], s[4]);
+                s[4] = fmac(h2, kHp1, s[4]);
+                const float mid2 = mul(add(h2, s[5]), 0.5f);
+                s[5] = h2;
+                const float y2 = stage(h2, mid2, 0x1p28f, s[6]);
+                s[8] = fmac(ton, s[7], s[8]);
+                s[7] = fmac(ton, sub(sub(y2, s[8]), s[7]), s[7]);
+                out = mul(lvl, s[8]);
+            }
+            X.out(i, mul(out, unscale));
         }
-        const float x = mul(lr[2 * i], scale);
-        float out;
-        if (blk.ds) {                                  // 0x894fc570
-            const float hp = sub(x, s[0]);
-            s[0] = fmac(hp, kHp1, s[0]);
-            const float p = s[1];
-            s[1] = fmac(sub(hp, s[1]), kLp, s[1]);
-            const float y = stage(mul(s[1], drv), mul(mul(add(p, s[1]), 0.5f), drv), 0x1p28f, s[2]);
-            s[4] = fmac(ton, s[3], s[4]);
-            s[3] = fmac(ton, sub(sub(y, s[3]), s[4]), s[3]);
-            out = mul(s[4], lvl);
-        } else {                                       // 0x894fef70
-            const float hp = sub(x, s[0]);
-            s[0] = fmac(hp, kHpOd, s[0]);
-            const float mid = mul(mul(add(hp, s[1]), 0.5f), drv);
-            s[1] = hp;
-            const float y = stage(mul(hp, drv), mid, 0x1p29f, s[2]);
-            s[3] = fmac(kLp, sub(y, s[3]), s[3]);
-            const float h2 = sub(s[3], s[4]);
-            s[4] = fmac(h2, kHp1, s[4]);
-            const float mid2 = mul(add(h2, s[5]), 0.5f);
-            s[5] = h2;
-            const float y2 = stage(h2, mid2, 0x1p28f, s[6]);
-            s[8] = fmac(ton, s[7], s[8]);
-            s[7] = fmac(ton, sub(sub(y2, s[8]), s[7]), s[7]);
-            out = mul(lvl, s[8]);
-        }
-        lr[2 * i] = lr[2 * i + 1] = mul(out, unscale);
     }
 }
 
@@ -1404,7 +1514,7 @@ void XtCosmAmp::update(float env1, float r1, float lfo1) {
     gT = gainOf(env1, lfo1);
 }
 
-void XtCosmAmp::process(float* lr, float scale) {
+void XtCosmAmp::process(float* lr, float scale, bool stereo) {
     const float d1 = mul(sub(gT, g), rate1);
     const float k01 = K(0x3dcccccd);
     sl[0] = fmac(k01, sub(blk.level, sl[0]), sl[0]);
@@ -1424,53 +1534,60 @@ void XtCosmAmp::process(float* lr, float scale) {
         const float y2 = mul(y, y), y3 = mul(y, y2);
         return fmac(y3, K(0x3e12491a), fmac(y2, K(0xbd92495d), mul(y, K(0xbf12492b))));
     };
-    float* const s = st;
-    for (int i = 0; i < 32; ++i) {
-        if ((i & 3) == 0) g = add(g, d1);              // before every fourth sample
-        float u = mul(mul(mul(lr[2 * i], scale), kIn), g);
-        float out;
-        if (blk.type == 1) {                           // 0x894f7f00
-            u = sub(u, s[0]); s[0] = fmac(K(0x3b3e3630), u, s[0]);
-            const float p = s[1];
-            u = sub(u, s[1]); s[1] = fmac(K(0x3f149a55), u, s[1]);
-            const float z = cubic(stage(mul(2.0f, s[1]), add(p, s[1]), s[2]));
-            const float hi = sub(z, s[3]); s[3] = fmac(K(0x3e7531da), hi, s[3]);
-            const float h = sub(s[3], s[4]); s[4] = fmac(K(0x3d80db26), h, s[4]);
-            const float t = fmac(bass, s[4], fmac(mid, h, mul(hi, treble)));
-            const float m2 = mul(add(t, s[5]), 8.0f);
-            s[5] = t;
-            const float z2 = cubic(stage(mul(t, 16.0f), m2, s[6]));
-            const float hp = sub(z2, s[7]); s[7] = fmac(K(0x3bbe3631), hp, s[7]);
-            out = mul(mul(hp, level), kOut);
-        } else if (blk.type == 2) {                    // 0x894f8450
-            u = sub(u, s[0]); s[0] = fmac(K(0x3b39ecf5), u, s[0]);
-            u = sub(u, s[1]); s[1] = fmac(K(0x3e6d0586), u, s[1]);
-            const float h = sub(s[1], s[2]); s[2] = fmac(K(0x3cca1994), h, s[2]);
-            const float t = fmac(bass, s[2], fmac(mid, h, mul(u, treble)));
-            const float m = add(s[3], t);
-            s[3] = t;
-            const float z = cubic(stage(mul(t, 2.0f), m, s[4]));
-            const float hp = sub(z, s[5]); s[5] = fmac(K(0x3c88b6f3), hp, s[5]);
-            const float m2 = mul(add(s[6], hp), 8.0f);
-            s[6] = hp;
-            const float z2 = cubic(stage(16.0f, m2, s[7]));    // 16 in place of 16·hp, as the firmware has it
-            s[8] = fmac(K(0x3e8b50b1), sub(z2, s[8]), s[8]);
-            const float d = sub(s[8], s[9]); s[9] = fmac(K(0x3c3252ce), d, s[9]);
-            out = mul(mul(d, level), kOut);
-        } else {                                       // 0x894f79d0 (Type 0; D+0x28 unused)
-            u = sub(u, s[0]); s[0] = fmac(K(0x3bedc3bc), u, s[0]);
-            const float p = s[1];
-            u = sub(u, s[1]); s[1] = fmac(K(0x3f1de3fc), u, s[1]);
-            const float z = cubic(stage(mul(2.0f, s[1]), add(p, s[1]), s[2]));
-            const float p4 = s[4];
-            s[4] = fmac(K(0x3e05be1a), sub(z, s[4]), s[4]);
-            const float z2 = cubic(stage(mul(s[4], 16.0f), mul(add(p4, s[4]), 8.0f), s[5]));
-            const float hi = sub(z2, s[6]); s[6] = fmac(K(0x3e6c4751), hi, s[6]);
-            const float h = sub(s[6], s[7]); s[7] = fmac(K(0x3d1d84e1), h, s[7]);
-            const float t = fmac(bass, s[7], fmac(mid, h, mul(hi, treble)));
-            out = mul(mul(t, kOut), level);
+    // The stereo routine (0x894fa890) clears the Type it has just read: always the first amp
+    const int type = stereo ? 0 : blk.type;
+    const float g0 = g;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float* const s = st + 14 * ch;
+        g = g0;
+        for (int i = 0; i < 32; ++i) {
+            if ((i & 3) == 0) g = add(g, d1);              // before every fourth sample
+            float u = mul(mul(mul(X.in(i), scale), kIn), g);
+            float out;
+            if (type == 1) {                               // 0x894f7f00
+                u = sub(u, s[0]); s[0] = fmac(K(0x3b3e3630), u, s[0]);
+                const float p = s[1];
+                u = sub(u, s[1]); s[1] = fmac(K(0x3f149a55), u, s[1]);
+                const float z = cubic(stage(mul(2.0f, s[1]), add(p, s[1]), s[2]));
+                const float hi = sub(z, s[3]); s[3] = fmac(K(0x3e7531da), hi, s[3]);
+                const float h = sub(s[3], s[4]); s[4] = fmac(K(0x3d80db26), h, s[4]);
+                const float t = fmac(bass, s[4], fmac(mid, h, mul(hi, treble)));
+                const float m2 = mul(add(t, s[5]), 8.0f);
+                s[5] = t;
+                const float z2 = cubic(stage(mul(t, 16.0f), m2, s[6]));
+                const float hp = sub(z2, s[7]); s[7] = fmac(K(0x3bbe3631), hp, s[7]);
+                out = mul(mul(hp, level), kOut);
+            } else if (type == 2) {                        // 0x894f8450
+                u = sub(u, s[0]); s[0] = fmac(K(0x3b39ecf5), u, s[0]);
+                u = sub(u, s[1]); s[1] = fmac(K(0x3e6d0586), u, s[1]);
+                const float h = sub(s[1], s[2]); s[2] = fmac(K(0x3cca1994), h, s[2]);
+                const float t = fmac(bass, s[2], fmac(mid, h, mul(u, treble)));
+                const float m = add(s[3], t);
+                s[3] = t;
+                const float z = cubic(stage(mul(t, 2.0f), m, s[4]));
+                const float hp = sub(z, s[5]); s[5] = fmac(K(0x3c88b6f3), hp, s[5]);
+                const float m2 = mul(add(s[6], hp), 8.0f);
+                s[6] = hp;
+                const float z2 = cubic(stage(16.0f, m2, s[7]));    // 16 in place of 16·hp, as the firmware has it
+                s[8] = fmac(K(0x3e8b50b1), sub(z2, s[8]), s[8]);
+                const float d = sub(s[8], s[9]); s[9] = fmac(K(0x3c3252ce), d, s[9]);
+                out = mul(mul(d, level), kOut);
+            } else {                                       // 0x894f79d0 (Type 0; D+0x28 unused)
+                u = sub(u, s[0]); s[0] = fmac(K(0x3bedc3bc), u, s[0]);
+                const float p = s[1];
+                u = sub(u, s[1]); s[1] = fmac(K(0x3f1de3fc), u, s[1]);
+                const float z = cubic(stage(mul(2.0f, s[1]), add(p, s[1]), s[2]));
+                const float p4 = s[4];
+                s[4] = fmac(K(0x3e05be1a), sub(z, s[4]), s[4]);
+                const float z2 = cubic(stage(mul(s[4], 16.0f), mul(add(p4, s[4]), 8.0f), s[5]));
+                const float hi = sub(z2, s[6]); s[6] = fmac(K(0x3e6c4751), hi, s[6]);
+                const float h = sub(s[6], s[7]); s[7] = fmac(K(0x3d1d84e1), h, s[7]);
+                const float t = fmac(bass, s[7], fmac(mid, h, mul(hi, treble)));
+                out = mul(mul(t, kOut), level);
+            }
+            X.out(i, mul(out, unscale));
         }
-        lr[2 * i] = lr[2 * i + 1] = mul(out, unscale);
     }
 }
 
@@ -1482,26 +1599,30 @@ void XtCosmSpk::noteOn(const XtSpkBlock& b) {
     type = b.type;
 }
 
-void XtCosmSpk::process(float* lr) {
+void XtCosmSpk::process(float* lr, bool stereo) {
     const float* const C = T.spk[clampi(type, 0, 11)];
     // s[k] is the routine's fr(k + 2): band, lo, y', y'', w', w'', o1', o1'',
     // o2', o2'', o3', o3'', o4', and one it never writes
-    for (int i = 0; i < 32; ++i) {
-        s[1] = fmac(C[8], s[0], s[1]);
-        const float hp = sub(fmac(C[9], s[0], lr[2 * i]), s[1]);
-        s[0] = fmac(C[8], hp, s[0]);
-        const float y = fmac(C[2], s[3], fmac(C[1], s[2], mul(hp, C[0])));
-        s[3] = s[2]; s[2] = y;
-        const float w = fmac(C[11], s[5], fmac(C[10], s[4], mul(y, C[3])));
-        const float o1 = fmac(C[16], s[7], fmac(C[15], s[6], fmac(C[14], s[5], fmac(C[13], s[4], mul(w, C[12])))));
-        s[5] = s[4]; s[4] = w;
-        const float o2 = fmac(C[21], s[9], fmac(C[20], s[8], fmac(C[19], s[7], fmac(C[18], s[6], mul(o1, C[17])))));
-        s[7] = s[6]; s[6] = o1;
-        const float o3 = fmac(C[26], s[11], fmac(C[25], s[10], fmac(C[24], s[9], fmac(C[23], s[8], mul(o2, C[22])))));
-        s[9] = s[8]; s[8] = o2;
-        const float o4 = fmac(C[7], s[13], fmac(C[6], s[12], fmac(C[5], s[11], mul(o3, C[4]))));   // o3'', not o3'
-        s[11] = s[10]; s[10] = o3; s[12] = o4;
-        lr[2 * i] = lr[2 * i + 1] = fmac(0.5f, o4, o3);
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float* const s = this->s + 14 * ch;
+        for (int i = 0; i < 32; ++i) {
+            s[1] = fmac(C[8], s[0], s[1]);
+            const float hp = sub(fmac(C[9], s[0], X.in(i)), s[1]);
+            s[0] = fmac(C[8], hp, s[0]);
+            const float y = fmac(C[2], s[3], fmac(C[1], s[2], mul(hp, C[0])));
+            s[3] = s[2]; s[2] = y;
+            const float w = fmac(C[11], s[5], fmac(C[10], s[4], mul(y, C[3])));
+            const float o1 = fmac(C[16], s[7], fmac(C[15], s[6], fmac(C[14], s[5], fmac(C[13], s[4], mul(w, C[12])))));
+            s[5] = s[4]; s[4] = w;
+            const float o2 = fmac(C[21], s[9], fmac(C[20], s[8], fmac(C[19], s[7], fmac(C[18], s[6], mul(o1, C[17])))));
+            s[7] = s[6]; s[6] = o1;
+            const float o3 = fmac(C[26], s[11], fmac(C[25], s[10], fmac(C[24], s[9], fmac(C[23], s[8], mul(o2, C[22])))));
+            s[9] = s[8]; s[8] = o2;
+            const float o4 = fmac(C[7], s[13], fmac(C[6], s[12], fmac(C[5], s[11], mul(o3, C[4]))));   // o3'', not o3'
+            s[11] = s[10]; s[10] = o3; s[12] = o4;
+            X.out(i, fmac(0.5f, o4, o3));
+        }
     }
 }
 
@@ -1518,15 +1639,16 @@ XtCompBlock xtCompBlock(const XtCompParams& p) {
     return b;
 }
 
-XtCosmComp::XtCosmComp() : buf(kLen, 0.0f) {}
+XtCosmComp::XtCosmComp() : buf(kLen, 0.0f), bufR(kLen, 0.0f) {}
 
 void XtCosmComp::noteOn(const XtCompBlock& b) {
     w = kLen;                                          // 0xcc2: the first sample goes to 0
     std::fill(buf.begin(), buf.end(), 0.0f);
+    std::fill(bufR.begin(), bufR.end(), 0.0f);
     setBlock(b);
     sl[0] = fac; sl[1] = sus; sl[2] = gn;              // 0x894ee390
-    gt = gs = add(div(mul(sus, K(0x4d000000)), add(fac, K(0x49800000))), sub(1.0f, sus));
-    env = fac;
+    gt[0] = gs[0] = gt[1] = gs[1] = add(div(mul(sus, K(0x4d000000)), add(fac, K(0x49800000))), sub(1.0f, sus));
+    env[0] = env[1] = fac;
 }
 
 void XtCosmComp::setBlock(const XtCompBlock& b) {
@@ -1535,24 +1657,32 @@ void XtCosmComp::setBlock(const XtCompBlock& b) {
     gn = b.gain;
 }
 
-void XtCosmComp::process(float* lr, float scale) {
+void XtCosmComp::process(float* lr, float scale, bool stereo) {
     const float k01 = K(0x3dcccccd);
     sl[0] = fmac(k01, sub(fac, sl[0]), sl[0]);
     sl[1] = fmac(k01, sub(sus, sl[1]), sl[1]);
     sl[2] = fmac(k01, sub(gn, sl[2]), sl[2]);
     const float f = sl[0], s = sl[1], g = sl[2], unscale = 1.0f / scale;
-    float* const B = buf.data();
-    for (int i = 0; i < 32; ++i) {
-        if (++w >= kLen) w = 0;
-        int r = w - 60;
-        if (r < 0) r += kLen;
-        const float x = mul(lr[2 * i], scale);
-        B[w] = x;
-        gs = fmac(sub(gt, gs), K(0x3d4ccccd), gs);                                 // 0.05
-        lr[2 * i] = lr[2 * i + 1] = mul(mul(B[r], gs), unscale);
-        if ((x < 0.0f ? -x : x) > env) env = add(mul(env, f), K(0x48010e80));     // + 132154
-        else env = mul(env, K(0x3f7fdf3a));                                         // × 0.9995
-        gt = mul(add(sub(mul(div(K(0x4d000000), add(env, K(0x49800000))), s), s), 1.0f), g);   // 2^27/(e + 2^20)
+    const int w0 = w;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float* const B = (ch ? bufR : buf).data();         // D+8, R's D+0x10
+        float& gtc = gt[ch];
+        float& gsc = gs[ch];
+        float& e = env[ch];
+        w = w0;
+        for (int i = 0; i < 32; ++i) {
+            if (++w >= kLen) w = 0;
+            int r = w - 60;
+            if (r < 0) r += kLen;
+            const float x = mul(X.in(i), scale);
+            B[w] = x;
+            gsc = fmac(sub(gtc, gsc), K(0x3d4ccccd), gsc);                             // 0.05
+            X.out(i, mul(mul(B[r], gsc), unscale));
+            if ((x < 0.0f ? -x : x) > e) e = add(mul(e, f), K(0x48010e80));           // + 132154
+            else e = mul(e, K(0x3f7fdf3a));                                             // × 0.9995
+            gtc = mul(add(sub(mul(div(K(0x4d000000), add(e, K(0x49800000))), s), s), 1.0f), g);   // 2^27/(e + 2^20)
+        }
     }
 }
 
@@ -1571,13 +1701,14 @@ XtLimBlock xtLimBlock(const XtLimParams& p) {
     return b;
 }
 
-XtCosmLim::XtCosmLim() : buf(kLen, 0.0f) {}
+XtCosmLim::XtCosmLim() : buf(kLen, 0.0f), bufR(kLen, 0.0f) {}
 
 void XtCosmLim::noteOn(const XtLimBlock& b) {
     w = kLen;                                          // 0xcc2: the first sample goes to 0
     std::fill(buf.begin(), buf.end(), 0.0f);
+    std::fill(bufR.begin(), bufR.end(), 0.0f);
     setBlock(b);
-    g = s = 1.0f;                                      // 0x894ee410
+    g[0] = s[0] = g[1] = s[1] = 1.0f;                  // 0x894ee410
 }
 
 void XtCosmLim::setBlock(const XtLimBlock& b) {
@@ -1589,33 +1720,40 @@ void XtCosmLim::setBlock(const XtLimBlock& b) {
     sl[0] = thr; sl[1] = att; sl[2] = rel; sl[3] = gn;
 }
 
-void XtCosmLim::process(float* lr, float scale) {
+void XtCosmLim::process(float* lr, float scale, bool stereo) {
     const float k01 = K(0x3dcccccd);
     sl[1] = fmac(k01, sub(att, sl[1]), sl[1]);
     sl[2] = fmac(k01, sub(rel, sl[2]), sl[2]);
     sl[0] = fmac(k01, sub(thr, sl[0]), sl[0]);
     sl[3] = fmac(k01, sub(gn, sl[3]), sl[3]);
     const float t = sl[0], ra = sl[1], rr = sl[2], gain = sl[3], unscale = 1.0f / scale;
-    float* const B = buf.data();
-    for (int i = 0; i < 32; ++i) {
-        if (++w >= kLen) w = 0;
-        int r = w - 10;
-        if (r < 0) r += kLen;
-        const float x = mul(lr[2 * i], scale);
-        B[w] = x;
-        const float a = x < 0.0f ? -x : x;
-        float want = a;
-        if (a > t) want = fmac(sub(1.0f, slp), t, mul(a, slp));
-        const float now = mul(a, g);
-        g = fmac(sub(want, now), want > now ? rr : ra, g);
-        s = fmac(sub(g, s), K(0x3c23d709), s);                                      // 0.01
-        lr[2 * i] = lr[2 * i + 1] = mul(mul(mul(B[r], s), gain), unscale);
+    const int w0 = w;
+    for (int ch = 0; ch < passes(stereo); ++ch) {
+        const Chan X{ lr, ch, stereo };
+        float* const B = (ch ? bufR : buf).data();         // D+8, R's D+0x10
+        float& gc = g[ch];
+        float& sc = s[ch];
+        w = w0;
+        for (int i = 0; i < 32; ++i) {
+            if (++w >= kLen) w = 0;
+            int r = w - 10;
+            if (r < 0) r += kLen;
+            const float x = mul(X.in(i), scale);
+            B[w] = x;
+            const float a = x < 0.0f ? -x : x;
+            float want = a;
+            if (a > t) want = fmac(sub(1.0f, slp), t, mul(a, slp));
+            const float now = mul(a, gc);
+            gc = fmac(sub(want, now), want > now ? rr : ra, gc);
+            sc = fmac(sub(gc, sc), K(0x3c23d709), sc);                                  // 0.01
+            X.out(i, mul(mul(mul(B[r], sc), gain), unscale));
+        }
     }
 }
 
 
 #ifdef XT_COSM_MAIN
-// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi, the Compressor, the Limiter, Wave Shape, OD/Dist, the Amp and Speaker Simulators against the firmware in the SH-4 interpreter:
+// xt_cosm <rom.2.bin> [cases]: the TVF, the Dual, TB, Comb and Side Band Filters, the Resonator, the Frequency Shifter, Lo-Fi, the Compressor, the Limiter, Wave Shape, OD/Dist, the Amp and Speaker Simulators (mono, then stereo) against the firmware in the SH-4 interpreter:
 // the converter (0x894dd870), the start values (0x894ec340), the block's
 // targets (0x894ed8f0), the 10-ms update (0x894ee6a0) and the filter
 // (0x89502890 → the twelve kernels) on random states, coefficients and
@@ -3238,7 +3376,221 @@ int main(int argc, char** argv) {
     }
     std::printf("spk note-on and block: %ld cases, %ld different\n", qn3, qb3);
     std::printf("spk filter: %ld blocks of 32 frames, %ld different\n", rn3, rb3);
+
+    // The stereo routines (the table at 0x898582cc by block code; the chooser 0x894eef70 puts
+    // them in the object): each type's firmware note-on, updates, new blocks (0x894ee4a0) and
+    // routine against the port's with its stereo flag, L and R told apart in the input, and
+    // both channels' states and delay buffers compared
+    const int nStereo = argc > 2 ? std::atoi(argv[2]) / 3 : 1000;
+    long stBad = 0;
+    auto stateSame = [&](const float* st, int n) {
+        bool ok = true;
+        for (uint32_t i = 0; i < (uint32_t)n; ++i) ok = ok && same(f32(D + 0x1c + 4 * i), st[i]) && same(f32(D + 0x54 + 4 * i), st[14 + i]);
+        return ok;
+    };
+    auto bufSame = [&](uint32_t k, const float* p, int n) {
+        bool ok = true;
+        for (uint32_t i = 0; i < (uint32_t)n; ++i) ok = ok && same(f32(CB[k] + 4 * i), p[i]);
+        return ok;
+    };
+    auto runStereo = [&](auto port0, int secType, auto member, const char* name, uint32_t routine, bool buffers, auto draw, auto on, auto upd, auto set, auto proc, auto sameAs) {
+        long nb = 0, nn = 0, sb = 0, sn = 0;
+        XtCosmSection sec;                                            // for the two words the types share (wordsNow)
+        sec.type = secType;
+        // a port that has played: its notes must leave nothing of that, as a voice's do
+        auto played = port0;
+        {
+            auto b = draw(false);
+            on(played, b, 1.0f, 440.0f, 0.5f, 0.5f, 1.0f / 32.0f, 0.1f, 0.5f, 0.5f, 1.0f / 32.0f, 0.1f);
+            for (int n = 0; n < 8; ++n) {
+                float lr[64];
+                for (float& x : lr) x = frnd(-2.0e9f, 2.0e9f);
+                proc(played, lr, nullptr);
+            }
+        }
+        for (int g = 0; g < nStereo; ++g) {
+            std::vector<uint8_t> z(0x200, 0);
+            c.write(OBJ, z.data(), 0x200); c.write(BLK, z.data(), 0x80);
+            for (uint32_t o = 0x74; o <= 0xe8; o += 4) wf(OBJ + o, frnd(-1, 1));               // the last note's states
+            for (uint32_t o : { EQ, EC, LQ, LC }) c.write(o, z.data(), 0x100);
+            if (buffers && g % 16 == 0)
+                for (uint32_t bI = 0; bI < 4; ++bI)
+                    for (uint32_t i = 0; i < 3267; ++i) wf(CB[bI] + 4 * i, frnd(-1, 1));       // the last note's junk
+            c.wr32(OBJ + 0x150, EQ); c.wr32(OBJ + 0x154, EC); c.wr32(OBJ + 0x158, LQ); c.wr32(OBJ + 0x15c, LC);
+            float pitch = pitchOf();
+            const float root = xtCosmRootHz((int)(rnd() % 128), (rnd() % 4) == 0);
+            wf(OBJ, pitch); wf(OBJ + 4, root);
+            auto b = draw(false);
+            const float e1S = frnd(-1, 1), e2S = frnd(-1, 1), l1 = frnd(-1, 1), l2 = frnd(-1, 1);
+            float o1 = frnd(-1, 1), o2 = frnd(-1, 1), ol1 = l1, ol2 = l2;
+            const float r1 = frnd(0.2f, 1.0f) / 32.0f, r2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+            wf(EQ + 0x58, e1S); wf(EC + 0x58, e2S); wf(LQ + 0x38, l1); wf(LC + 0x38, l2); wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2);
+            wf(EQ + 0x54, r1); wf(EC + 0x54, r2);
+            sec.word8c = f32(D + 0x8c); sec.word90 = f32(D + 0x90);
+            if (!c.call(0x894edf70, { OBJ, BLK, 0 }, sp)) { std::fprintf(stderr, "%s stereo note-on: %s\n", name, c.error().c_str()); std::exit(1); }
+            auto port = played;
+            on(port, b, pitch, root, e1S, o1, r1, l1, e2S, o2, r2, l2);
+            ++nn;
+            if (!sameAs(port, 0) && nb++ < 3) std::printf("  %s stereo note-on %d differs\n", name, g);
+            for (int blkN = 0; blkN < 40; ++blkN) {
+                if (blkN % 14 == 13 || blkN % 14 == 3) {              // updates, the pitch moving
+                    if (rnd() % 3) pitch = (rnd() & 1) ? pitchOf() : mul(pitch, frnd(0.98f, 1.02f));
+                    o1 = frnd(-1, 1); o2 = frnd(-1, 1); ol1 = frnd(-1, 1); ol2 = frnd(-1, 1);
+                    const float nr1 = frnd(0.2f, 1.0f) / 32.0f, nr2 = (rnd() & 1) ? 1.0f / 32.0f : frnd(0.2f, 1.0f) / 32.0f;
+                    wf(EQ + 0x4c, o1); wf(EC + 0x4c, o2); wf(LQ + 0x38, ol1); wf(LC + 0x38, ol2); wf(EQ + 0x54, nr1); wf(EC + 0x54, nr2);
+                    uint32_t pb; std::memcpy(&pb, &pitch, 4);
+                    c.fb[0][4] = pb;
+                    if (!c.call(0x894ee6a0, { OBJ }, sp)) { std::fprintf(stderr, "%s stereo update: %s\n", name, c.error().c_str()); std::exit(1); }
+                    upd(port, pitch, o1, nr1, ol1, o2, nr2, ol2);
+                    ++nn;
+                    if (!sameAs(port, 1) && nb++ < 3) std::printf("  %s stereo update %d.%d differs\n", name, g, blkN);
+                } else if (blkN % 14 == 8 && (rnd() & 1)) {           // a parameter change while the note sounds
+                    auto nb2 = draw(true);
+                    if (!c.call(0x894ee4a0, { OBJ, BLK }, sp)) { std::fprintf(stderr, "%s stereo block: %s\n", name, c.error().c_str()); std::exit(1); }
+                    set(port, nb2, o1, ol1, o2, ol2);
+                    ++nn;
+                    if (!sameAs(port, 1) && nb++ < 3) std::printf("  %s stereo block %d.%d differs\n", name, g, blkN);
+                }
+                float lr[64];
+                const int ar = (int)(rnd() % 6), ar2 = (int)(rnd() % 6);
+                auto ampOf = [](int a) { return a == 0 ? 30000.0f : a == 1 ? 1.0e7f : a == 2 ? 1.0e8f : a == 3 ? 6.0e8f : a == 4 ? 2.1e9f : 1.0f; };
+                const float ampL = ampOf(ar), ampR = ampOf(ar2);
+                for (int i = 0; i < 32; ++i) { lr[2 * i] = frnd(-ampL, ampL); lr[2 * i + 1] = frnd(-ampR, ampR); }
+                for (int i = 0; i < 64; ++i) wf(BUF + 4 * (uint32_t)i, lr[i]);
+                float past[3];                                        // what lies after the block, for the Side Band Filters' follower
+                for (uint32_t i = 0; i < 3; ++i) { past[i] = frnd(-ampR, ampR); wf(BUF + 0x100 + 4 * i, past[i]); }
+                if (!c.call(routine, { D, OBJ + 0x10, OBJ, BUF }, sp)) { std::fprintf(stderr, "%s stereo: %s\n", name, c.error().c_str()); std::exit(1); }
+                proc(port, lr, past);
+                ++sn;
+                bool ok = sameAs(port, blkN % 8 == 7 ? 2 : 1), okL = true, okR = true;
+                for (int i = 0; i < 32; ++i) {
+                    okL = okL && same(f32(BUF + 8 * (uint32_t)i), lr[2 * i]);
+                    okR = okR && same(f32(BUF + 8 * (uint32_t)i + 4), lr[2 * i + 1]);
+                }
+                if (!(ok && okL && okR) && sb++ < 3)
+                    std::printf("  %s stereo case %d block %d: states %s L %s R %s; fw %.9g %.9g port %.9g %.9g\n", name, g, blkN, ok ? "same" : "differ", okL ? "same" : "differs",
+                                okR ? "same" : "differs", f32(BUF), f32(BUF + 4), lr[0], lr[1]);
+            }
+            // what the note leaves in the two words
+            sec.*member = port;
+            float w8c, w90;
+            sec.wordsNow(w8c, w90);
+            ++nn;
+            if (!(same(w8c, f32(D + 0x8c)) && same(w90, f32(D + 0x90))) && nb++ < 3)
+                std::printf("  %s stereo words %d: fw %.9g %.9g port %.9g %.9g\n", name, g, f32(D + 0x8c), f32(D + 0x90), w8c, w90);
+        }
+        std::printf("%s stereo note-on, block and update: %ld cases, %ld different\n", name, nn, nb);
+        std::printf("%s stereo filter: %ld blocks of 32 frames, %ld different\n", name, sn, sb);
+        stBad += nb + sb;
+    };
+    // the slots' common signatures
+    auto stOn = [](auto& p, const auto& b, float, float, float e1S, float o1, float r1, float l1, float e2S, float o2, float r2, float l2) { p.noteOn(b, e1S, o1, r1, l1, e2S, o2, r2, l2); };
+    auto stUpd = [](auto& p, float, float o1, float r1, float l1, float o2, float r2, float l2) { p.update(o1, r1, l1, o2, r2, l2); };
+    auto stSet = [](auto& p, const auto& b, float o1, float l1, float o2, float l2) { p.setBlock(b, o1, l1, o2, l2); };
+    auto stOnP = [](auto& p, const auto& b, float pitch, float root, float e1S, float o1, float r1, float l1, float e2S, float o2, float r2, float l2) { p.noteOn(b, pitch, root, e1S, o1, r1, l1, e2S, o2, r2, l2); };
+    auto stUpdP = [](auto& p, float pitch, float o1, float r1, float l1, float o2, float r2, float l2) { p.update(pitch, o1, r1, l1, o2, r2, l2); };
+    auto stOn0 = [](auto& p, const auto& b, float, float, float, float, float, float, float, float, float, float) { p.noteOn(b); };
+    auto stUpd0 = [](auto&, float, float, float, float, float, float, float) {};
+    auto stSet0 = [](auto& p, const auto& b, float, float, float, float) { p.setBlock(b); };
+    auto stProc1 = [](auto& p, float* lr, const float*) { p.process(lr, true); };
+    auto stProcS = [](auto& p, float* lr, const float*) { p.process(lr, 1.0f, true); };
+
+    for (const bool dyn : { false, true }) {
+        auto draw = [&](bool) {
+            XtTvfParams p;
+            p.filter = (int)(rnd() % 12); p.q = (int)(rnd() % 128); p.qLfo = (int)(rnd() % 127) - 63; p.qEnv = (int)(rnd() % 127) - 63;
+            p.cutoff = (int)(rnd() % 128); p.keyfollow = (int)(rnd() % 41) - 20; p.cutoffLfo = (int)(rnd() % 127) - 63; p.cutoffEnv = (int)(rnd() % 127) - 63;
+            p.qOwn = (int)(rnd() % 127) - 63; p.cutoffOwn = (int)(rnd() % 127) - 63;
+            const XtTvfBlock b = dyn ? xtDtvfBlock(p, (int)(rnd() % 128), frnd(0, 1), frnd(0, 1)) : xtTvfBlock(p, (int)(rnd() % 128), frnd(0, 1), frnd(0, 1));
+            c.wr32(BLK, dyn ? 14 : 13); wf(BLK + 4, b.q); wf(BLK + 8, b.qEnv); c.wr32(BLK + 0xc, 10); wf(BLK + 0x10, b.qLfo); c.wr32(BLK + 0x14, 3); wf(BLK + 0x18, b.qOwn);
+            wf(BLK + 0x1c, b.cutoff); wf(BLK + 0x20, b.cutoffEnv); c.wr32(BLK + 0x24, 9); wf(BLK + 0x28, b.cutoffLfo); c.wr32(BLK + 0x2c, 3); wf(BLK + 0x30, b.cutoffOwn);
+            c.wr32(BLK + 0x34, (uint32_t)b.mode);
+            return b;
+        };
+        runStereo(XtCosmTvf{}, dyn ? 1 : 0, &XtCosmSection::tvf, dyn ? "dynamic" : "tvf", dyn ? 0x895038a0 : 0x89503810, false, draw,
+                  [&](XtCosmTvf& p, const XtTvfBlock& b, float, float, float e1S, float o1, float r1, float l1, float e2S, float o2, float r2, float l2) {
+                      p.noteOn(b, e1S, o1, r1, l1, e2S, o2, r2, l2);
+                      p.setFollower(p.qOwnSlewed(), p.cutoffOwnSlewed(), f32(D + 0x98));   // the follower is not cleared: it carries on
+                  }, stUpd,
+                  [](XtCosmTvf& p, const XtTvfBlock& b, float o1, float l1, float o2, float l2) { p.setBlock(b, o1, l1, o2, l2); }, stProcS,
+                  [&](const XtCosmTvf& p, int) {
+                      return same(f32(D + 0xbc), p.c1()) && same(f32(D + 0xc0), p.c2()) && same(f32(OBJ + 0xfc), p.target1()) && same(f32(OBJ + 0x100), p.target2())
+                          && stateSame(p.state(), 4) && (!dyn || (same(f32(D + 0x90), p.qOwnSlewed()) && same(f32(D + 0x94), p.cutoffOwnSlewed()) && same(f32(D + 0x98), p.level())));
+                  });
+    }
+    runStereo(XtCosmDual{}, 2, &XtCosmSection::dual, "dual", 0x894fd9f0, false,
+              [&](bool) { const XtDualBlock b = xtDualBlock(dualParams(), (int)(rnd() % 128), frnd(0, 1), frnd(0, 1)); writeDual(b); return b; }, stOn, stUpd, stSet, stProc1,
+              [&](const XtCosmDual& p, int) { return same(f32(D + 0xbc), p.c1()) && same(f32(D + 0xc0), p.c2()) && same(f32(OBJ + 0xfc), p.target1()) && same(f32(OBJ + 0x100), p.target2()) && stateSame(p.state(), 8); });
+    runStereo(XtCosmTb{}, 3, &XtCosmSection::tb, "tb", 0x89501aa0, false,
+              [&](bool) { const XtTbBlock b = xtTbBlock(tbParams(), (int)(rnd() % 128), frnd(0, 1), frnd(0, 1)); writeTb(b); return b; },
+              [&](XtCosmTb& p, const XtTbBlock& b, float, float, float, float o1, float, float l1, float, float o2, float, float l2) {
+                  p.noteOn(b, o1, l1, o2, l2);
+                  p.setHpWords(f32(D + 0x8c), f32(D + 0x90));   // the note-on leaves them as the last note did
+              },
+              [](XtCosmTb& p, float, float o1, float, float l1, float o2, float, float l2) { p.update(o1, l1, o2, l2); }, stSet, stProc1,
+              [&](const XtCosmTb& p, int) {
+                  bool ok = tbSame(p, true);
+                  for (uint32_t i = 0; i < 4; ++i) ok = ok && same(f32(D + 0x4c + 4 * i), p.lpState()[4 + i]) && same(f32(D + 0x84 + 4 * i), p.hpState()[4 + i]);
+                  return ok;
+              });
+    runStereo(XtCosmComb{}, 4, &XtCosmSection::comb, "comb", 0x894faa00, true,
+              [&](bool) { const XtCombBlock b = xtCombBlock(combParams(), frnd(0, 1), frnd(0, 1)); writeComb(b); return b; }, stOnP, stUpdP, stSet, stProc1,
+              [&](const XtCosmComb& p, int level) {
+                  return combSame(p) && same(f32(D + 0x6c), p.dc(1)) && (level != 2 || (bufSame(0, p.buffer(0), 3267) && bufSame(2, p.buffer(1), 3267)))
+                      && (level != 0 || (bufSame(0, p.buffer(0), 3267) && bufSame(2, p.buffer(1), 3267)));
+              });
+    for (const bool second : { false, true })
+        runStereo(XtCosmSbf{}, second ? 6 : 5, &XtCosmSection::sbf, second ? "sbf2" : "sbf1", second ? 0x89500fc0 : 0x89500940, true,
+                  [&, second](bool) { const XtSbfBlock b = xtSbfBlock(sbfParams(second), (int)(rnd() % 128), frnd(0, 1), frnd(0, 1)); writeSbf(b, (int)(rnd() & 1)); return b; }, stOnP, stUpdP, stSet,
+                  [](XtCosmSbf& p, float* lr, const float* past) { p.process(lr, 1.0f, true, past); }, [&, second](const XtCosmSbf& p, int level) {
+                      bool ok = sbfSame(p, second) && same(f32(D + 0x6c), p.dc(1)) && stateSame(p.state(), second ? 4 : 6);
+                      if (level != 1) for (uint32_t k = 0; k < 4; ++k) ok = ok && bufSame(k, p.buffer((int)k), 3267);
+                      return ok;
+                  });
+    runStereo(XtCosmRes{}, 7, &XtCosmSection::res, "res", 0x894ffe4c, false,
+              [&](bool) { const XtResBlock b = xtResBlock(resParams(), (int)(rnd() % 128), frnd(0, 1), frnd(0, 1)); writeRes(b, (int)(rnd() & 1)); return b; }, stOn, stUpd, stSet, stProc1,
+              [&](const XtCosmRes& p, int) { return resSame(p) && stateSame(p.state(), 12); });
+    runStereo(XtCosmFs{}, 8, &XtCosmSection::fs, "fs", 0x894fde84, true,
+              [&](bool) { const XtFsBlock b = xtFsBlock(fsParams(), (int)(rnd() % 128), frnd(0, 1), frnd(0, 1)); writeFs(b, (int)(rnd() & 1)); return b; }, stOn, stUpd, stSet, stProc1,
+              [&](const XtCosmFs& p, int level) { return fsSame(p) && (level == 1 || (bufSame(0, p.buffer(0), 3266) && bufSame(2, p.buffer(1), 3266))); });
+    runStereo(XtCosmLofi{}, 9, &XtCosmSection::lofi, "lofi", 0x894febe0, false,
+              [&](bool next) { static XtLofiParams keep; XtLofiParams q = lofiParams(); if (next) { q.bitDown = keep.bitDown; q.rateDown = keep.rateDown; } else keep = q;
+                               const XtLofiBlock b = xtLofiBlock(q, (int)(rnd() % 128), frnd(0, 1), frnd(0, 1)); writeLofi(b, (int)(rnd() & 1)); return b; }, stOn, stUpd, stSet, stProcS,
+              [&](const XtCosmLofi& p, int) { return lofiSame(p) && stateSame(p.state(), 6); });
+    runStereo(XtCosmComp{}, 10, &XtCosmSection::comp, "comp", 0x894fadcc, true,
+              [&](bool) { const XtCompBlock b = xtCompBlock(compParams()); writeComp(b); return b; }, stOn0, stUpd0, stSet0, stProcS,
+              [&](const XtCosmComp& p, int level) {
+                  return compSame(p) && same(f32(D + 0xcc), p.gainTarget(1)) && same(f32(D + 0xd0), p.gain(1)) && same(f32(D + 0xd4), p.envelope(1))
+                      && (level == 1 || (bufSame(0, p.buffer(0), 3266) && bufSame(2, p.buffer(1), 3266)));
+              });
+    runStereo(XtCosmLim{}, 11, &XtCosmSection::lim, "lim", 0x894fe67e, true,
+              [&](bool) { const XtLimBlock b = xtLimBlock(limParams()); writeLim(b); return b; }, stOn0, stUpd0, stSet0, stProcS,
+              [&](const XtCosmLim& p, int level) {
+                  return limSame(p) && same(f32(D + 0x98), p.gain(1)) && same(f32(D + 0x9c), p.smooth(1)) && (level == 1 || (bufSame(0, p.buffer(0), 3266) && bufSame(2, p.buffer(1), 3266)));
+              });
+    {
+        int keepType = 0;
+        runStereo(XtCosmWs{}, 12, &XtCosmSection::ws, "ws", 0x89504890, false,
+                  [&](bool next) { XtWsParams q = wsParams(); if (next) q.type = keepType; else keepType = q.type;
+                                   const XtWsBlock b = xtWsBlock(q, (int)(rnd() % 128), frnd(0, 1), frnd(0, 1)); writeWs(b, (int)(rnd() & 1)); return b; }, stOn, stUpd, stSet, stProcS,
+                  [&](const XtCosmWs& p, int) { return wsSame(p) && stateSame(p.state(), 6); });
+        for (const bool ds : { false, true })
+            runStereo(XtCosmOd{}, 13, &XtCosmSection::od, ds ? "ds" : "od", ds ? 0x894fc7e0 : 0x894ff340, false,
+                      [&, ds](bool) { XtOdParams q = odParams(); q.type = ds ? 1 : 0;
+                                      const XtOdBlock b = xtOdBlock(q, (int)(rnd() % 128), frnd(0, 1), frnd(0, 1)); writeOd(b, (int)(rnd() & 1)); return b; }, stOn, stUpd, stSet, stProcS,
+                      [&](const XtCosmOd& p, int) { return odSame(p) && stateSame(p.state(), 9); });
+        runStereo(XtCosmAmp{}, 14, &XtCosmSection::amp, "amp", 0x894fa890, false,
+                  [&](bool next) { XtAmpParams q = ampParams(); if (next) q.type = keepType; else keepType = q.type;
+                                   const XtAmpBlock b = xtAmpBlock(q, frnd(0, 1)); writeAmp(b, (int)(rnd() & 1)); return b; },
+                  [](XtCosmAmp& p, const XtAmpBlock& b, float, float, float e1S, float o1, float r1, float l1, float, float, float, float) { p.noteOn(b, e1S, o1, r1, l1); },
+                  [](XtCosmAmp& p, float, float o1, float r1, float l1, float, float, float) { p.update(o1, r1, l1); },
+                  [](XtCosmAmp& p, const XtAmpBlock& b, float o1, float l1, float, float) { p.setBlock(b, o1, l1); }, stProcS,
+                  [&](const XtCosmAmp& p, int) { return ampSame(p) && stateSame(p.state(), 10); });
+        runStereo(XtCosmSpk{}, 15, &XtCosmSection::spk, "spk", 0x895014c0, false,
+                  [&](bool) { XtSpkBlock b; b.type = (int)(rnd() % 12); c.wr32(BLK, 5); c.wr8(BLK + 4, (uint8_t)b.type); return b; }, stOn0, stUpd0, stSet0, stProc1,
+                  [&](const XtCosmSpk& p, int) { return stateSame(p.state(), 14); });
+    }
     return cb || ub || db || xb || yb || zb || tb || ob || fb || kb || mb || qb || sb[0] || sb[1] || nb[0] || nb[1] || pb[0] || pb[1]
-        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 || kb3 || ob3 || fb3 || wb3 || xb3 || yb3 || ub3 || vb3 || tb3 || ab3 || bb3 || cb3 || pb3 || qb3 || rb3 ? 3 : 0;
+        || eb || rb || ab || gb || hb || vb2 || wb || ib || jb || lb || kb2 || ob2 || fb2 || kb3 || ob3 || fb3 || wb3 || xb3 || yb3 || ub3 || vb3 || tb3 || ab3 || bb3 || cb3 || pb3 || qb3 || rb3 || stBad ? 3 : 0;
 }
 #endif

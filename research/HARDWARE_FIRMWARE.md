@@ -1545,6 +1545,99 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### COSM: the stereo routines (2026-11-02, v104)
+
+With a stereo wave on the OSC a section follows, the firmware runs a second set of COSM routines. Until now `XtCosm` had only the mono ones, and `xt_tone` turned those COSMs off. Now all sixteen types have them.
+
+**What picks them.** The chooser `0x894eef70` takes the voice's flag (+0x960, see "The whole tone against XtSynth"). Set, it installs from the table at `0x8987c840` (the image at `0x898582cc`), otherwise from `0x8987c7ec`. `XtCosmSection::stereo` is that flag at note-on: the section's OSC (`xtCosmOsc`) is on, is PCM and holds a stereo wave. So COSM 2 in Type3 goes by OSC 2's wave, and the others by OSC 1's. The chooser also writes a value per code at object +0x14c (`0x897d01b4`, mono `0x897d0144`). The routines don't read it; I did not trace who does.
+
+| Type | Code | Mono | Stereo |
+|---|---|---|---|
+| OD | 1 | `0x894fef70` | `0x894ff340` |
+| DS | 2 | `0x894fc570` | `0x894fc7e0` |
+| Wave Shape | 3 | `0x89503ef0` | `0x89504890` → `0x89503f4c`, `0x89504400` |
+| Amp Simulator | 4 | `0x894f8a30` | `0x894fa890` → `0x894f8a70` |
+| Speaker Simulator | 5 | `0x89501300` | `0x895014c0` |
+| Resonator | 6 | `0x894ffa10` | `0x894ffe4c` |
+| 1st Side Band | 7 | `0x89500640` | `0x89500940` |
+| 2nd Side Band | 8 | `0x89500d40` | `0x89500fc0` |
+| Comb | 9 | `0x894fa8d0` | `0x894faa00` |
+| Dual Filter | 12 | `0x894fd090` | `0x894fd9f0` → `0x894fd100`, `0x894fd3f0`, `0x894fd6d0` |
+| TVF | 13 | `0x89502890` | `0x89503810` → `0x89502a00`…`0x895037a0` |
+| Dynamic TVF | 14 | `0x89502920` | `0x895038a0`, the same kernels |
+| Compressor | 15 | `0x894fab80` | `0x894fadcc` |
+| Limiter | 16 | `0x894fe450` | `0x894fe67e` |
+| Frequency Shifter | 18 | `0x894fda60` | `0x894fde84` |
+| Lo-Fi | 19 | `0x894fe9c0` | `0x894febe0` |
+| TB Filter | 20 | `0x89501950` | `0x89501aa0` |
+
+Through (code 0, `0x894fb720`) is an `rts`. Codes 10, 11 and 17 have stereo routines too, but no converter writes those codes.
+
+**The shape.** Each routine runs L and R apart: the mono routine's arithmetic on each channel, its own states and delay buffers, reading and writing its own channel. Everything per block (slews, targets, a new delay, Compressor and Limiter gains' slews) happens once. The ramps, the coefficients stepped before every fourth sample, the phase, the crossfade and the write index are the same for both. Some routines interleave L and R in a frame, some run 32 frames of L and go back. It makes no difference to the numbers, so the port makes one pass per channel and sets the ramps back for the second (`Chan`, `passes()`).
+
+**Where R lives.** D = object + 0x58.
+- States: L's D+0x1c…, R's 0x38 on, D+0x54…. All of them are in what the note-on clears (D+0x1c…0x88), except as below.
+- TB Filter: LPF L D+0x2c…0x38, R D+0x4c…0x58; HPF L D+0x68…0x74, R D+0x84…0x90.
+- Comb and Side Bands: the DC follower L D+0x34, R D+0x6c; D+0x38 the coefficient for both.
+- Buffers: D+8 L, D+0x10 R; the Side Bands' second line D+0xc L, D+0x14 R. The allocator clears all four, as it did.
+- Compressor: gain target, gain, envelope L D+0x98, 0x9c, 0xa0; R D+0xcc, 0xd0, 0xd4. The note-on (`0x894ee390`) starts both alike.
+- Limiter: gain, smoothed L D+0x90, 0x94; R D+0x98, 0x9c. The note-on (`0x894ee410`) starts all four at 1.
+
+**Where stereo is not two monos.** All kept:
+- **Amp Simulator.** `0x894fa890` reads the Type (`mov.b @(4,r5),r0`) and clears it on the next line (`mov #0,r0`), where the mono routine has `shll2 r0`. So a stereo wave always gets Type 0's amp. Its table has all three (`0x894f8a70`, `0x894f9400`, `0x894f9db0`), and the other two are never reached.
+- **TVF kernels.** LP24, BP24, HP24, NOTCH12, BP12, HP12, LP6 and HP6 are the mono ones per channel, on the mono's coefficients. The others are not:
+  - LP12 negates its input like the rest of the 12-dB kernels. The mono LP12 is the one that keeps the sign, so the default filter comes out inverted against mono.
+  - NOTCH24's second stage takes t + b (mono t + a).
+  - PEAK24's second stage takes −t + b (mono t − a) and it outputs −(u − e) (mono u − e).
+  - PEAK12 outputs −(t − b) (mono t − b).
+- **Dynamic TVF.** The stereo routine still calls the mono follower `0x895017e0`: Σ|L| only.
+- **Side Band followers** (`0x89501850`; v90 noted this routine and no caller, and these two are its callers). Each of its four rounds reads sixteen words and advances seventeen: the fourth group's `add #4,r4` and the branch's delay slot both step. So it sums words 0…15, 17…32, 34…49 and 51…66, of `lr` as L, R pairs. Words 16, 33 and 50 are never read. **Words 64, 65 and 66 are past the block.** No frame is counted twice, which the mono follower does.
+- **2nd Side Band, R's gain.** R's output multiplies by bank 1's fr9, copied once before the loop (`fschg; fmov DR8,XD8`). L's fr9 steps toward the gain's target every fourth sample, and is what's stored. So R uses the gain as the block began, for the whole block. The 1st Side Band reads its gain from memory and has no such difference.
+- **TB Filter.** R's second HPF stage is at D+0x8c and D+0x90, past the note-on's clear and past `0x894fbd20`'s, which only clears L's. So it starts from whatever the object's last note left there.
+
+**What's past the block.** Three of the Side Band follower's words depend on which buffer it was given (the render, `0x894f6d40`, `0x894f6e20`, `0x894f6f40`):
+- On the mix (`0x89d2ca10`): `0x89d2cb10`, which the voice loop hands to `0x894f4e50` (at `0x894dac9c`). I read it as the output bus, without following that call down to the tones. If so, the three words are its first pairs, zero while every tone's Output Assign is MFX, which is all XtSynth has. In `xt_tone` the bus is elsewhere and those words are zero too.
+- On OSC 1's buffer (`0x89d2c810`; COSM 1 in Types 2 and 3): OSC 2's buffer, `0x89d2c910`, its first L, R, L. XtSynth passes `tmp2`.
+- On OSC 2's (`0x89d2c910`; COSM 2 in Type3): the mix's, `0x89d2ca10`, as the last tone left it, since this tone's mix comes later. XtSynth keeps those three words between voices and blocks (`mixPast`).
+
+**One object, all the types.** The firmware has one COSM object per section, and every type's fields overlay. So the TB Filter's two uncleared words hold whatever the last type put there. What each type leaves, run on all sixteen with a sentinel in both words:
+
+| Type | D+0x8c | D+0x90 |
+|---|---|---|
+| Dynamic TVF | — | Q Own, slewed |
+| Dual Filter | — | Filter 1's Q at note-on |
+| TB Filter | R's HPF | R's HPF |
+| Side Bands | gain | HPF or Q, slewed |
+| Compressor | attack factor | Sustain |
+| Limiter | slope | L's gain |
+| Wave Shape, OD/Dist | gain | — |
+| Amp Simulator | Level | Treble |
+| TVF, Comb, Resonator, Frequency Shifter, Lo-Fi, Speaker | — | — |
+
+`XtCosmSection::wordsNow` is that table, and `holdWords()` takes them at each note-on before the type changes. XtSynth's voices are not the firmware's tones (the tones come from a pool), so `xt_tone`'s `carryFrom` starts the firmware's two words from the port's, as it does with the follower and the MOD. That makes the table invisible to `xt_tone`; `xt_cosm` checks it, against each type's own run. `xt_tone` does the same with `mixPast` at each case's start, since XtSynth's tails go on rendering between cases and the firmware's stop. Within a case those words are compared by their effect.
+
+**Checks.**
+- `xt_cosm`, `XT_COSM_MAIN`'s last section. Seventeen routines (OD and DS, both Side Bands, TVF and Dynamic TVF apart), each 1000 notes of 40 blocks through the firmware's own note-on (`0x894edf70`), updates, new blocks (`0x894ee4a0`) and routine: 680,000 blocks, L and R, all states, the buffers every eighth block and the two words at each note's end. All 0 different. The mono lines are unchanged.
+- The port starts each note from one that has played, so anything a note-on should clear shows.
+- `xt_tone`: both exclusions (a stereo OSC 1 with a COSM on, a stereo OSC 2 with COSM 2 in Type3) and their counterpart in the live update are gone. 2000 cases and the sweep: 3278 notes, 250,114 blocks, 5,581,967 checks, 0 different. A wave on OSC 2, 1000 cases: 1361 notes, 95,031 blocks, 1,805,868 checks, 0 different. 3000 cases on each of seeds 777, 31337, 9, 4242 and 1007, both parts: 0 different.
+- The baseline gains the new lines, and three existing lines change, all counts:
+  - The first part's checks, from 5,597,162: with a COSM on, the mix's own tap isn't compared, and the stereo cases now have COSMs on.
+  - The OSC 2 part's counts (from 1367 notes, 96,381 blocks, 1,870,252 checks) and its SOLO line (from 5.0e-03 of the peak to 1.2e-02, still inside 2%; from 138 notes left off to 144). Lifting the exclusions changes the draws of later cases. I did not trace which draw. The cases left off are all the band reads above, at the same three addresses, none in a COSM.
+- Some stereo BACKING cases with OSC 1 on (`g % 10 == 3`) are forced to a Side Band Filter on COSM 1 in Types 2 and 3, with OSC 2 on and Own depths, so that OSC 2's words past the block matter. At random, 2000 cases missed that wiring; 12,000 caught it on all seven seeds tried. Stereo BACKING cases on OSC 2 in Type3 likewise, for COSM 2 and the mix's words. Forcing OSC 1 on as well moved the rest of the run: a wave newly played can leave memory (the band reads, `0x8950e99a`, `0x8950ea00`, `0x8950ec7e`, none in a COSM), which ends a case early and changes the draws after it.
+- Some analog cases leave a stereo wave loaded in XtSynth (`g % 4 == 2`), with none in the firmware. Until now every analog case had no wave, so `!v->analog` in the flag was never tested. Nothing else moved: 0 different.
+- PluginTest with COSMs on the two stereo inputs: bit-identical to XtSynth. `ab.sh` with a COSM on: the two mono inputs identical to v100, the stereo ones different, as intended.
+- Planted errors, 72, all caught. 46 in `xt_cosm`: each difference above, R's states and buffers shared with L's, ramps not set back, R's start values at note-on, each row of the words table. 15 of those again under `xt_tone` (`PORT=tonecosm`, new), one per type, which shows the stereo paths really run there. 11 in XtSynth's wiring, added to `tone_muts.txt`.
+- Three of those passed at first, and changed the check. The Limiter's R start: each case began from a fresh port, whose values are what a reset gives, so each now begins from a port that has played. The wiring of OSC 2's words, and `!v->analog`: hence the two kinds of case above.
+- `mutate_tone.py`, the whole list of 129: 128 caught. `legato-order` passes, and passes on v103 without this work too (not looked into here).
+
+**A case left as it is.** 12,000 cases on each of seven more seeds, on v100 and before the forced cases: six 0 different, and seed 5007 has 4 differences in one case (2955). That's a stereo SOLO wave through a Compressor and a 1st Side Band Filter, past the SOLO tolerance of 2% of the block's peak (fw −545112, port −521479). With the firmware's own OSC 1 samples put into XtSynth's SOLO buffer for Structure 0's SOLO cases, and those compared bit for bit with no tolerance, 3100 cases on that seed are 0 different. So the COSMs are exact. `XtSoloVoice`'s small differences (not bit-exact, `xt_fw solocmp`) moved the follower, and with it a delay and a crossfade, as Lo-Fi's quantizer does (which the check replaces on SOLO waves). I did not exclude the Side Band Filters on SOLO, since the seed in fcheck passes and the case costs nothing else.
+
+**A SOLO wave beside a Side Band Filter.** The follower's words past the block carry a SOLO wave's small differences into the buffer beside it: a stereo BACKING OSC 1 with a Side Band COSM 1 next to a SOLO OSC 2, or a stereo BACKING OSC 2 with a Side Band COSM 2 in Type3 after a SOLO OSC 1's mix. Those buffers were compared bit for bit. fcheck's seed has no such case; on the six other seeds tried, 9 cases differed by a few units, and all had this shape. So with a SOLO wave and a Side Band Filter in a case, both OSC buffers take the SOLO tolerance (`soloBeside`).
+
+**Beyond this work.** Seed 2007 has 140 differences in one case (3066), in v103 alone as well: a sweep case, analog and mono, a Comb and a 1st Side Band with FM. Not looked into here.
+
+**Not checked.**
+- The bus's first pairs as past-the-block words with an Output Assign other than MFX: XtSynth has none.
 ### PCM on OSC 2, with its own wave (2026-11-02, v103)
 
 Each OSC now has its own loaded sample and encode, as the XT binds a wave per OSC (IDs
@@ -1595,7 +1688,7 @@ clears it again, and the check confirms it on every waveform).
   the port does not have, takes (L + R)/2.
 - All the port's COSMs are the mono routines, which already behave so, so this case needed no code.
   The gap is the other one: **a stereo wave on OSC 1 with a COSM on, and a stereo OSC 2 with COSM 2 on
-  in Type3,** take the stereo table on the XT and the mono routines here. `xt_tone` leaves those out.
+  in Type3,** take the stereo table on the XT and the mono routines here. `xt_tone` leaves those out. (Closed in v104.)
 - `XtSynth` now gives the MOD OSC 2's flag too. FM's and ENV RING's routines depend on the two together.
 
 **Where the firmware's reads leave the wave.** Backward, at high pitch, a band player's read
@@ -1618,7 +1711,7 @@ counts the notes that leave memory altogether.
   0 different. Four other seeds, 1,500 cases each: 8,245 notes, 578,634 blocks, 11,176,012 checks, 0 different; 738 of
   those notes were left off when a read left memory.
 - Its exceptions: a SOLO wave's buffers and what follows them keep v100's tolerance, as `XtSoloVoice` is not exact;
-  the stereo COSM cases above; Lo-Fi over SOLO; X-MOD over a SOLO OSC 2. A stereo OSC 2 under a mono OSC 1 stays
+  the stereo COSM cases above (until v104); Lo-Fi over SOLO; X-MOD over a SOLO OSC 2. A stereo OSC 2 under a mono OSC 1 stays
   in with its COSMs on, so the mono routines' dropped R is compared.
 - `xt_analog`, a pass with six encoded waves, the players on their own, with the five values, both buffers, the
   mix and the MOD's state every block, and RING, FM, ENV RING and OSC SYNC over a PCM OSC 2. In fcheck, 3,000 cases: 57,154 note-ons and updates, 133,531 blocks, 0
@@ -1760,11 +1853,11 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 - The loop's cached events: the firmware's builder is not found, and the check's are built apart from the port's by the same rule.
 - Mid-note OSC Switch, Type, Waveform, Sub Octave, Time Offset, Key Sync, Robot, Structure, COSM Switch, COSM Type and loop edits: held fixed in the live cases.
 - `Controls::pitchSemis`, the plugin's own shift, has no patch parameter here.
-- **Stereo OSC 1 into a COSM** and **both OSCs off**: excluded, below.
+- **Both OSCs off**: excluded, below. **Stereo OSC 1 into a COSM** was too, until v104.
 
 **Decisions left, not changed.**
 - TVA Switch (ID 0x299): done in v101.
-- With a stereo OSC 1 the firmware's COSMs take their stereo routines, and `XtCosm` has only the mono ones. The check turns COSMs off for stereo waves.
+- With a stereo OSC 1 the firmware's COSMs take their stereo routines, and `XtCosm` had only the mono ones. The check turned COSMs off for stereo waves. Closed in v104 ("COSM: the stereo routines").
 - With both OSCs off XtSynth starts no voice, so the key state, random pitch and LFO seeds do not advance. The firmware starts a tone. The check keeps one OSC on.
 - Lo-Fi on a SOLO wave is replaced by TVF in the check: its quantizer turns the SOLO player's small differences into a step of its own.
 
@@ -1939,7 +2032,7 @@ Type 3. OSC 1 under OSC 2's level. OSC 2 itself is not heard. Attack and Release
 - The doubling is in the listing: `fadd fr2,fr4` twice at `0x89501826` and `0x8950182a`. It looks like a slip that stayed,
   as the weights sum to 36 and not 32. A decompile would hide nothing here, but a summary of "sum over 32" would be wrong.
 - 0x2e7fffff is about 2^−34, so the level is 4.5 times mean|L2|/2^31: a full-scale square is 4.5, a SINE at 0.396 about 1.13.
-- `0x89501850` beside it looks like a stereo version. Neither routine calls it.
+- `0x89501850` beside it looks like a stereo version. Neither routine calls it. (The stereo Side Band Filters do: v104.)
 
 **The routines** (`0x895279d0`, or `0x89527aa0` when either voice's stereo flag was set), block by block:
 
@@ -4608,7 +4701,8 @@ Lo-Fi's 19, v72). The ID ranges are from the table at 0x897cebd8.
 
 All sixteen types are ported and equal the firmware (v61–v78). The Speaker
 Simulator's converter is a small function of its own (`0x894dcef0`), not
-inline as first noted.
+inline as first noted. Their stereo routines, by another table: v104, "COSM:
+the stereo routines".
 
 **The Dual Filter** (COSM Type 9, block code 12).
 

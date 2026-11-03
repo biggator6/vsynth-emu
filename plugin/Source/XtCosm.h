@@ -19,7 +19,10 @@
 // c1 (from Q, −1…−1/64) and c2 (from Cutoff, through a 129-entry table in
 // rom.2, capped by a 128-entry table indexed by Q) move toward their
 // targets in eight steps per block.  It reads the left channel and writes
-// both.  Tables are read from the user's rom.2 at run time.
+// both.  With a stereo wave on the section's OSC the firmware takes another
+// set of routines (the chooser 0x894eef70, the table at 0x8987c840): L and R
+// apart on the same ramps (`stereo` in each process).  Tables are read from
+// the user's rom.2 at run time.
 #include <cstdint>
 #include <vector>
 
@@ -86,8 +89,9 @@ public:
     void update(float qEnv, float qRate, float qLfo, float cutEnv, float cutRate, float cutLfo);
     // 32 frames, interleaved L/R, in place (0x89502890; 0x89502920 for the
     // Dynamic TVF).  `scale`: the buffer's units against the XT's (int16 ×
-    // 65536), for the Dynamic TVF's follower.
-    void process(float* lr, float scale = 1.0f);
+    // 65536), for the Dynamic TVF's follower.  `stereo`: the stereo routine (0x89503810,
+    // 0x895038a0), L and R apart on the same coefficients; the follower still reads L.
+    void process(float* lr, float scale = 1.0f, bool stereo = false);
 
     // The coefficients, for the firmware checks.
     float c1() const { return cur1; }
@@ -106,7 +110,7 @@ public:
 
 private:
     XtTvfBlock blk;
-    float s[4] = {};                  // the stages' states (D+0x1c…0x28)
+    float s[18] = {};                 // the stages' states (D+0x1c…0x28), R's from s[14] (D+0x54…)
     float cur1 = 0, cur2 = 0;         // the coefficients (D+0xbc, +0xc0)
     float tgt1 = 0, tgt2 = 0;         // their targets (D+0xa4, +0xa8)
     float rate1 = 0, rate2 = 0;       // the step rates (D+0xc4, +0xc8)
@@ -148,18 +152,20 @@ public:
     void setBlock(const XtDualBlock& b, float env1, float lfo1, float env2, float lfo2);    // 0x894ed5d0
     void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);  // 0x894ee6a0
     // 32 frames, interleaved L/R, in place (0x894fd090 → 0x894fcbe0, …cd70,
-    // …cef0): reads L, writes both.
-    void process(float* lr);
+    // …cef0): reads L, writes both.  `stereo`: 0x894fd9f0 → 0x894fd100, …3f0, …6d0.
+    void process(float* lr, bool stereo = false);
 
     float c1() const { return cur1; }
     float c2() const { return cur2; }
     float target1() const { return tgt1; }
     float target2() const { return tgt2; }
     const float* state() const { return s; }
+    float startQ1() const { return q1Start; }         // D+0x90, Filter 1's Q at note-on
 
 private:
     XtDualBlock blk;
-    float s[8] = {};                  // the four stages' states (D+0x1c…0x38)
+    float q1Start = 0;
+    float s[22] = {};                 // the four stages' states (D+0x1c…0x38), R's from s[14] (D+0x54…)
     float cur1 = 0, cur2 = 0, tgt1 = 0, tgt2 = 0, rate1 = 0, rate2 = 0;
     void targets(float env1, float lfo1, float env2, float lfo2);
 };
@@ -202,19 +208,23 @@ public:
     void setBlock(const XtTbBlock& b, float env1, float lfo1, float env2, float lfo2);  // 0x894fc110
     void update(float env1, float lfo1, float env2, float lfo2);                       // 0x894fbdc0
     // 32 frames, interleaved L/R, in place (0x89501950): reads L, writes both.
-    void process(float* lr);
+    // `stereo`: 0x89501aa0.
+    void process(float* lr, bool stereo = false);
 
     // D+0x1c…0x28 the LPF's c0, c1, c2, Q; D+0x5c…0x64 the HPF's c0, c1 and
     // the gain (7); their targets ×0.01 at D+0x3c…, D+0x78…; the states
-    // D+0x2c…0x38 (LPF) and D+0x68…0x74 (HPF).
+    // D+0x2c…0x38 (LPF) and D+0x68…0x74 (HPF), R's from index 4: D+0x4c…0x58, D+0x84…0x90.
     const float* coef() const { return c; }
     const float* target() const { return t; }
     const float* lpState() const { return s; }
     const float* hpState() const { return h; }
+    // R's second HPF stage (D+0x8c, +0x90) is past what the note-on clears: it starts from
+    // whatever the object's last note left in those two words (XtCosmSection::holdWords)
+    void setHpWords(float a, float b) { h[6] = a; h[7] = b; }
 
 private:
     XtTbBlock blk;
-    float c[7] = {}, t[7] = {}, s[4] = {}, h[4] = {};
+    float c[7] = {}, t[7] = {}, s[8] = {}, h[8] = {};
     void targets(float env1, float lfo1, float env2, float lfo2);
 };
 
@@ -263,7 +273,8 @@ public:
     void setBlock(const XtCombBlock& b, float env1, float lfo1, float env2, float lfo2);                    // 0x894ed390
     void update(float pitch, float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);     // 0x894eea90
     // 32 frames, interleaved L/R, in place (0x894fa8d0): reads L, writes both.
-    void process(float* lr);
+    // `stereo`: 0x894faa00, R on a buffer and a DC follower of its own.
+    void process(float* lr, bool stereo = false);
 
     float delay() const { return dly; }
     float tone() const { return tn; }
@@ -272,9 +283,9 @@ public:
     float fraction() const { return frac; }
     float newFraction() const { return nFrac; }
     float progress() const { return prog; }
-    float dc() const { return dcy; }
+    float dc(int ch = 0) const { return dcy[ch]; }   // D+0x34, R's D+0x6c
     int writeIndex() const { return w; }
-    const float* buffer() const { return buf.data() + 1; }
+    const float* buffer(int ch = 0) const { return (ch ? bufR : buf).data() + 1; }   // D+8, R's D+0x10
 
 private:
     XtCombBlock blk;
@@ -282,11 +293,11 @@ private:
     float pitch = 1.0f, root = 440.0f;
     float dly = 0, tn = 0, tnTgt = 0, rate1 = 0, rate2 = 0;
     float nDly = 0, frac = 0, nFrac = 0, prog = 1.0f;
-    float dcy = 0, dcK = 0;
+    float dcy[2] = {}, dcK = 0;
     int w = 0;
-    // the buffer, after one word that stays 0: at the longest delay (3267) the
+    // the buffers, each after one word that stays 0: at the longest delay (3267) the
     // firmware's second tap reads the word before its buffer (index −1)
-    std::vector<float> buf;
+    std::vector<float> buf, bufR;
     float delayFrom(float d, float env1, float lfo1) const;
     void newTarget(float d);
 };
@@ -363,8 +374,10 @@ public:
     void setBlock(const XtSbfBlock& b, float env1, float lfo1, float env2, float lfo2);                    // 0x894ed1a0/0x894ed2a0
     void update(float pitch, float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);     // 0x894ee9d0/0x894eea20
     // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
-    // the buffer's units against the XT's (int16 × 65536), for the follower.
-    void process(float* lr, float scale = 1.0f);
+    // the buffer's units against the XT's (int16 × 65536), for the follower.  `stereo`:
+    // 0x89500940, 0x89500fc0, R on buffers of its own; the follower reads both channels
+    // (0x89501850, which runs three words past the block: `past`, absent zeros).
+    void process(float* lr, float scale = 1.0f, bool stereo = false, const float* past = nullptr);
 
     // The state, for the firmware checks (D = object + 0x58).
     float delay() const { return dly; }              // D+0xbc
@@ -377,10 +390,12 @@ public:
     float level() const { return lev; }              // D+0xa0 (2nd: D+0x98)
     const float* slews() const { return sl; }        // D+0x90 HPF/Q, +0x94 LPF, +0x98 Sub (1st), +0xcc, +0xd0 the Own depths
     const float* fractions() const { return fr; }    // D+0xdc, +0xe0
-    float dc() const { return dcy; }                 // D+0x34
-    const float* state() const { return s; }         // D+0x1c…
+    float dc(int ch = 0) const { return dcy[ch]; }   // D+0x34, R's D+0x6c
+    const float* state() const { return s; }         // D+0x1c…, R's from s[14] (D+0x54…)
     int writeIndex() const { return w; }             // D+4
-    const float* buffer(int i) const { return (i ? buf2.data() + kGuard : buf1.data()); }
+    const float* buffer(int i) const {               // D+8, +0xc, R's +0x10, +0x14
+        return i == 0 ? buf1.data() : i == 1 ? buf2.data() + kGuard : i == 2 ? buf3.data() : buf4.data() + kGuard;
+    }
 
 private:
     static constexpr int kGuard = 136;
@@ -388,10 +403,10 @@ private:
     float detR = 1.0f, subR = 1.0f, hpfH = 0;        // the block copy's 1 − Detune/2400, 1 − Sub/2400, HPF/2
     float pitch = 1.0f, root = 440.0f, oct = 2.0f;
     float detT = 1.0f, widT = 0, dly = 0, wid = 0, rate1 = 0, rate2 = 0;
-    float nDly = 0, prog = 1.0f, gn = 0, lev = 0, dcy = 0, dcK = 0;
-    float sl[5] = {}, fr[2] = {}, s[6] = {};
+    float nDly = 0, prog = 1.0f, gn = 0, lev = 0, dcy[2] = {}, dcK = 0;
+    float sl[5] = {}, fr[2] = {}, s[20] = {};
     int w = 0;
-    std::vector<float> buf1, buf2;                   // buf2 after kGuard words that stay 0
+    std::vector<float> buf1, buf2, buf3, buf4;       // buf2, buf4 after kGuard words that stay 0
 };
 
 // The Resonator (COSM Type 5, block code 6): six two-pole resonators in
@@ -435,20 +450,20 @@ public:
                 float env2Start, float env2Out, float rate2, float lfo2);
     void setBlock(const XtResBlock& b, float env1, float lfo1, float env2, float lfo2);       // 0x894ed0a0
     void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);    // 0x894ee960
-    // 32 frames, interleaved L/R, in place: reads L, writes both.
-    void process(float* lr);
+    // 32 frames, interleaved L/R, in place: reads L, writes both.  `stereo`: 0x894ffe4c.
+    void process(float* lr, bool stereo = false);
 
     // The state, for the firmware checks (D = object + 0x58).
     float size() const { return sz; }                // D+0xbc
     float balance() const { return bal; }            // D+0xc0
     float sizeTarget() const { return szT; }         // D+0xa4
     float balanceTarget() const { return balT; }     // D+0xa8
-    const float* state() const { return s; }         // D+0x1c…0x48: a, b of each resonator
+    const float* state() const { return s; }         // D+0x1c…0x48: a, b of each resonator; R's from s[14] (D+0x54…)
 
 private:
     XtResBlock blk;
     float sz = 1.0f, bal = 0, szT = 1.0f, balT = 0, rate1 = 0, rate2 = 0;
-    float s[12] = {};
+    float s[26] = {};
     float sizeOf(float env, float lfo) const;
     float balanceOf(float env, float lfo) const;
 };
@@ -494,8 +509,9 @@ public:
                 float env2Start, float env2Out, float rate2, float lfo2);
     void setBlock(const XtFsBlock& b, float env1, float lfo1, float env2, float lfo2);       // 0x894edc80
     void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);    // 0x894eee60
-    // 32 frames, interleaved L/R, in place: reads L, writes both.
-    void process(float* lr);
+    // 32 frames, interleaved L/R, in place: reads L, writes both.  `stereo`: 0x894fde84,
+    // R on a buffer of its own.
+    void process(float* lr, bool stereo = false);
 
     // The state, for the firmware checks (D = object + 0x58).
     float depth() const { return dep; }              // D+0xbc
@@ -504,14 +520,14 @@ public:
     float balanceTarget() const { return balT; }     // D+0xa8
     float phase() const { return ph; }               // D+0x94
     int writeIndex() const { return w; }             // D+4
-    const float* buffer() const { return buf.data(); }
+    const float* buffer(int ch = 0) const { return (ch ? bufR : buf).data(); }   // D+8, R's D+0x10
 
 private:
     static constexpr int kLen = 3266;
     XtFsBlock blk;
     float dep = 0, bal = 0, depT = 0, balT = 0, rate1 = 0, rate2 = 0, ph = 0;
     int w = 0;
-    std::vector<float> buf;
+    std::vector<float> buf, bufR;
     float depthOf(float env, float lfo) const;
     float balanceOf(float env, float lfo) const;
 };
@@ -558,21 +574,22 @@ public:
     void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);    // 0x894eeee0
     // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
     // the buffer's units against the XT's (int16 × 65536), for the quantizer.
-    void process(float* lr, float scale = 1.0f);
+    // `stereo`: 0x894febe0.
+    void process(float* lr, float scale = 1.0f, bool stereo = false);
 
     // The state, for the firmware checks (D = object + 0x58).
     float filter() const { return flt_; }            // D+0xbc
     float balance() const { return bal; }            // D+0xc0
     float filterTarget() const { return fltT; }      // D+0xa4
     float balanceTarget() const { return balT; }     // D+0xa8
-    const float* state() const { return s; }         // D+0x1c…0x30: the three lowpasses' a, b
+    const float* state() const { return s; }         // D+0x1c…0x30: the three lowpasses' a, b; R's from s[14] (D+0x54…)
 
 private:
     XtLofiBlock blk;
     float flt_ = 0.1f, bal = 0, fltT = 0.1f, balT = 0, rate1 = 0, rate2 = 0;
     float coef = 1.0f, up = 1.0f, down = 1.0f;       // 1/2^Rate, 2^Bit, 2^−Bit (D+0x94, +0x98, +0x9c)
     int mask = 0;                                    // D+1
-    float s[6] = {};
+    float s[20] = {};
     float filterOf(float env, float lfo) const;
     float balanceOf(float env, float lfo) const;
 };
@@ -607,23 +624,24 @@ public:
     void noteOn(const XtCompBlock& b);
     void setBlock(const XtCompBlock& b);                                       // 0x894ee5c0
     // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
-    // the buffer's units against the XT's (int16 × 65536), for the envelope.
-    void process(float* lr, float scale = 1.0f);
+    // the buffer's units against the XT's (int16 × 65536), for the envelope.  `stereo`:
+    // 0x894fadcc, R with a buffer, gain and envelope of its own.
+    void process(float* lr, float scale = 1.0f, bool stereo = false);
 
     // The state, for the firmware checks (D = object + 0x58).
     const float* slews() const { return sl; }        // D+0x8c the attack factor, +0x90 Sustain, +0x94 the gain
-    float gainTarget() const { return gt; }          // D+0x98
-    float gain() const { return gs; }                // D+0x9c
-    float envelope() const { return env; }           // D+0xa0
+    float gainTarget(int ch = 0) const { return gt[ch]; }   // D+0x98, R's D+0xcc
+    float gain(int ch = 0) const { return gs[ch]; }         // D+0x9c, R's D+0xd0
+    float envelope(int ch = 0) const { return env[ch]; }    // D+0xa0, R's D+0xd4
     int writeIndex() const { return w; }             // D+4
-    const float* buffer() const { return buf.data(); }
+    const float* buffer(int ch = 0) const { return (ch ? bufR : buf).data(); }   // D+8, R's D+0x10
 
 private:
     static constexpr int kLen = 3266;
     float fac = 1.0f, sus = 0, gn = 1.0f;            // the block copy's (+0x14, +0x18, +0x1c)
-    float sl[3] = {}, gt = 1.0f, gs = 1.0f, env = 0;
+    float sl[3] = {}, gt[2] = { 1.0f, 1.0f }, gs[2] = { 1.0f, 1.0f }, env[2] = {};
     int w = 0;
-    std::vector<float> buf;
+    std::vector<float> buf, bufR;
 };
 
 // Wave Shape (COSM Type 2, block code 3): a waveshaper with a two-pole
@@ -668,8 +686,9 @@ public:
     void setBlock(const XtWsBlock& b, float env1, float lfo1, float env2, float lfo2);       // 0x894ecee0
     void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);    // 0x894ee8a0
     // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
-    // the buffer's units against the XT's (int16 × 65536), for the shaper.
-    void process(float* lr, float scale = 1.0f);
+    // the buffer's units against the XT's (int16 × 65536), for the shaper.  `stereo`:
+    // 0x89504890 → 0x89503f4c, 0x89504400.
+    void process(float* lr, float scale = 1.0f, bool stereo = false);
 
     // The state, for the firmware checks (D = object + 0x58).
     float drive() const { return drv; }              // D+0xbc
@@ -677,12 +696,12 @@ public:
     float driveTarget() const { return drvT; }       // D+0xa4
     float toneTarget() const { return tonT; }        // D+0xa8
     float gain() const { return lvl; }               // D+0x8c
-    const float* state() const { return s; }         // D+0x1c…0x30: types 0…2's a, b, c, then 3…5's
+    const float* state() const { return s; }         // D+0x1c…0x30: types 0…2's a, b, c, then 3…5's; R's from s[14] (D+0x54…)
 
 private:
     XtWsBlock blk;
     float drv = 1.0f, ton = 1.0f, drvT = 1.0f, tonT = 1.0f, rate1 = 0, rate2 = 0, lvl = 0.125f, lvlT = 0.125f;
-    float s[6] = {};
+    float s[20] = {};
     float driveOf(float env, float lfo) const;
     float toneOf(float env, float lfo) const;
 };
@@ -731,8 +750,9 @@ public:
     void setBlock(const XtOdBlock& b, float env1, float lfo1, float env2, float lfo2);
     void update(float env1, float rate1, float lfo1, float env2, float rate2, float lfo2);    // 0x894ee78c
     // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
-    // the buffer's units against the XT's (int16 × 65536), for the clips.
-    void process(float* lr, float scale = 1.0f);
+    // the buffer's units against the XT's (int16 × 65536), for the clips.  `stereo`:
+    // 0x894ff340, 0x894fc7e0.
+    void process(float* lr, float scale = 1.0f, bool stereo = false);
 
     // The state, for the firmware checks (D = object + 0x58).
     float drive() const { return drv; }              // D+0xbc
@@ -740,12 +760,12 @@ public:
     float driveTarget() const { return drvT; }       // D+0xa4
     float toneTarget() const { return tonT; }        // D+0xa8
     float gain() const { return lvl; }               // D+0x8c
-    const float* state() const { return s; }         // D+0x1c…0x3c (DS uses the first five)
+    const float* state() const { return s; }         // D+0x1c…0x3c (DS uses the first five); R's from s[14] (D+0x54…)
 
 private:
     XtOdBlock blk;
     float drv = 13.0f, ton = 1.0f, drvT = 13.0f, tonT = 1.0f, rate1 = 0, rate2 = 0, lvl = 1.0f;
-    float s[9] = {};
+    float s[23] = {};
     float driveOf(float env, float lfo) const;
     float toneOf(float env, float lfo, float lo) const;
 };
@@ -791,19 +811,20 @@ public:
     void setBlock(const XtAmpBlock& b, float env1, float lfo1);                // 0x894ecfe0
     void update(float env1, float rate1, float lfo1);                          // 0x894ee920
     // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
-    // the buffer's units against the XT's (int16 × 65536).
-    void process(float* lr, float scale = 1.0f);
+    // the buffer's units against the XT's (int16 × 65536).  `stereo`: 0x894fa890, which
+    // runs Type 0's amp (0x894f8a70) whatever the Type.
+    void process(float* lr, float scale = 1.0f, bool stereo = false);
 
     // The state, for the firmware checks (D = object + 0x58).
     float gain() const { return g; }                 // D+0xbc
     float gainTarget() const { return gT; }          // D+0xa4
     const float* slews() const { return sl; }        // D+0x8c Level, +0x90 Treble, +0x94 Middle, +0x98 Bass
-    const float* state() const { return st; }        // D+0x1c…0x40
+    const float* state() const { return st; }        // D+0x1c…0x40; R's from st[14] (D+0x54…)
 
 private:
     XtAmpBlock blk;
     float g = 1.0f, gT = 1.0f, rate1 = 0, sl[4] = { 1.0f, 0, 0, 0 };
-    float st[10] = {};
+    float st[24] = {};
     float gainOf(float env, float lfo) const;
 };
 
@@ -831,13 +852,13 @@ class XtCosmSpk {
 public:
     void noteOn(const XtSpkBlock& b);                  // 0x894edf70: the states cleared
     void setBlock(const XtSpkBlock& b) { type = b.type; }                      // 0x894ee520
-    // 32 frames, interleaved L/R, in place: reads L, writes both.
-    void process(float* lr);
-    const float* state() const { return s; }         // D+0x1c…0x58 (fr2…fr15)
+    // 32 frames, interleaved L/R, in place: reads L, writes both.  `stereo`: 0x895014c0.
+    void process(float* lr, bool stereo = false);
+    const float* state() const { return s; }         // D+0x1c…0x50 (fr2…fr15), R's from s[14] (D+0x54…0x88)
 
 private:
     int type = 0;
-    float s[14] = {};
+    float s[28] = {};
 };
 
 // The Limiter (COSM Type 13, block code 16): a gain follower with a 10-sample
@@ -873,23 +894,24 @@ public:
     void noteOn(const XtLimBlock& b);
     void setBlock(const XtLimBlock& b);                                        // 0x894edb20
     // 32 frames, interleaved L/R, in place: reads L, writes both.  `scale`:
-    // the buffer's units against the XT's (int16 × 65536), for the levels.
-    void process(float* lr, float scale = 1.0f);
+    // the buffer's units against the XT's (int16 × 65536), for the levels.  `stereo`:
+    // 0x894fe67e, R with a buffer and gains of its own.
+    void process(float* lr, float scale = 1.0f, bool stereo = false);
 
     // The state, for the firmware checks (D = object + 0x58).
     float slope() const { return slp; }              // D+0x8c
-    float gain() const { return g; }                 // D+0x90
-    float smooth() const { return s; }               // D+0x94
+    float gain(int ch = 0) const { return g[ch]; }   // D+0x90, R's D+0x98
+    float smooth(int ch = 0) const { return s[ch]; } // D+0x94, R's D+0x9c
     const float* slews() const { return sl; }        // D+0xcc the threshold, +0xd0 Attack's rate, +0xd4 Release's, +0xa0 (sl[3]) the Level's gain
     int writeIndex() const { return w; }             // D+4
-    const float* buffer() const { return buf.data(); }
+    const float* buffer(int ch = 0) const { return (ch ? bufR : buf).data(); }   // D+8, R's D+0x10
 
 private:
     static constexpr int kLen = 3266;
     float thr = 0, att = 0, rel = 0, gn = 1.0f;      // the block copy's (+0x18, +0x1c, +0x20, +0x24)
-    float slp = 0.5f, g = 1.0f, s = 1.0f, sl[4] = {};
+    float slp = 0.5f, g[2] = { 1.0f, 1.0f }, s[2] = { 1.0f, 1.0f }, sl[4] = {};
     int w = 0;
-    std::vector<float> buf;
+    std::vector<float> buf, bufR;
 };
 
 // A COSM section's objects and what the tone's update and render do by its type: the
@@ -900,6 +922,13 @@ private:
 // Filter 2's, the HPF's, Detune's, Balance's or Wave Shape's Tone.
 struct XtCosmSection {
     int type = 0;                      // the type as at note-on
+    bool stereo = false;               // its OSC's stereo flag at note-on (voice +0x960, the chooser 0x894eef70)
+    // The firmware has one object for all the types.  What its last note left in D+0x8c and
+    // D+0x90, which the stereo TB Filter reads uncleared (setHpWords): hold them before a note
+    // changes the type.  Types that don't write a word keep what they found there.
+    float word8c = 0, word90 = 0;
+    void wordsNow(float& w8c, float& w90) const;
+    void holdWords() { wordsNow(word8c, word90); }
     XtCosmTvf tvf;
     XtCosmDual dual;
     XtCosmTb tb;
@@ -917,11 +946,12 @@ struct XtCosmSection {
     // The update (0x894ee6a0).  pitch: the ratio of the OSC it follows (xtCosmOsc);
     // each envelope's output and rate, and the LFO's.
     void update(float pitch, float a, float aRate, float b, float bRate, float lfo);
-    // The mono routine.  scale: the buffer's units to the XT's, for the types that read
+    // The routine, mono or stereo by the flag.  scale: the buffer's units to the XT's, for the types that read
     // absolute levels (the Dynamic TVF's and Side Band Filters' followers, the Lo-Fi
     // quantizer, the Compressor's envelope, the Limiter's levels, the Wave Shape curves,
     // the OD/Dist and Amp clips).
-    void process(float* lr, float scale);
+    // past: what lies after the block, for the stereo Side Band Filters' follower (absent, zeros).
+    void process(float* lr, float scale, const float* past = nullptr);
 };
 
 // The coefficients from the modulated values (0x894eecb0): Q + its depths ×

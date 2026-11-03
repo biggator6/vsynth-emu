@@ -693,9 +693,14 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     // the COSM sections (0x894edf70, COSM 1 then 2): their
     // envelopes and LFOs start with the others; the filters' states clear and
     // their coefficients start from the envelopes' start levels
+    // the voices' stereo flags as their setups leave them: a stereo wave's on a PCM OSC, and
+    // none on an analog voice (0x89505170 clears it) or an OSC that is off
+    auto stereo = [](const OscVoice& s) { return s.on && !s.analog && s.wave->channels == 2; };
     for (int k = 0; k < 2; ++k) {
         Voice::CosmVoice& c = v->cs[k];
+        c.holdWords();
         c.on = ctl.cosm[k].on;
+        c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);   // the routines' flag (0x894eef70)
         if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(k), seed[3 + k]);
         else if (other) c.lfo.noteOnFollow(clfoParams(k), other->cs[k].lfo);
         else c.lfo.noteOnFree(clfoParams(k), seed[3 + k], freeClfo[k]);
@@ -706,8 +711,10 @@ void XtSynth::startVoice(int raw, int note, int vel) {
         if (c.type == 2)
             c.dual.noteOn(dualBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
                           c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
-        else if (c.type == 3)
+        else if (c.type == 3) {
             c.tb.noteOn(tbBlock(*v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
+            c.tb.setHpWords(c.word8c, c.word90);
+        }
         else if (c.type == 7)
             c.res.noteOn(resBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
                          c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
@@ -772,9 +779,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     };
     if (v->on) portaStart(*v, ctl);
     if (v->osc2.on) portaStart(v->osc2, ctl.osc2);
-    // the MOD (0x894f1b00, 0x894f1d90): the voices' stereo flags as their setups
-    // leave them: a stereo wave's on a PCM OSC, and none on an analog voice
-    auto stereo = [](const OscVoice& s) { return s.on && !s.analog && s.wave->channels == 2; };
+    // the MOD (0x894f1b00, 0x894f1d90)
     v->mod.noteOn(modBlk, stereo(*v), stereo(v->osc2), v->on && v->analog, modShared, (int)(v - voice));
 }
 
@@ -1038,7 +1043,8 @@ void XtSynth::mixBlock(float* lr) {
                 else pcmBlock(v.osc2, tmp2);                   // a PCM OSC's mask is 0
                 break;
             case XtToneStep::Cosm2OnOsc2:
-                if (v.cs[1].on) v.cs[1].process(tmp2, 1.0f);
+                // what follows OSC 2's buffer is the mix's, as the last tone left it
+                if (v.cs[1].on) v.cs[1].process(tmp2, 1.0f, mixPast);
                 break;
             case XtToneStep::Osc1: {
                 // While the MOD's flag is set OSC 2's mask goes to OSC 1's sync input
@@ -1061,7 +1067,9 @@ void XtSynth::mixBlock(float* lr) {
                 } else v.mod.process(tmp, tmp, tmp2);
                 break;
             case XtToneStep::Cosm1:
-                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f);
+                // on OSC 1's own buffer (Types 2, 3) what follows the block is OSC 2's; on the mix
+                // it is the bus's first pairs, zeros with Output Assign MFX
+                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);
                 break;
             case XtToneStep::Cosm2:
                 if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
@@ -1077,6 +1085,7 @@ void XtSynth::mixBlock(float* lr) {
 #ifdef XT_TONE_CHECK
         std::copy(tmp, tmp + 64, tapCosm);
 #endif
+        std::copy(tmp, tmp + 3, mixPast);
         if (v.damping) {
             // truncated (0x894f5570): the gain held, times a fade that falls
             // by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16

@@ -764,15 +764,31 @@ int XtToneProbe::run(int argc, char** argv) {
                 }
             ctl.aSens = ctl.dSens = ctl.rSens = 20;
         }
+        // Some stereo cases where the stereo Side Band follower's words past the block matter:
+        // COSM 1 on OSC 1's buffer, OSC 2 sounding next to it, the level moving Width and Detune.
+        // At random this is rare enough for 2000 cases to miss it.  Only with OSC 1 on already:
+        // a wave newly played can leave memory (band reads), which ends a case early and changes
+        // the draws of all the cases after it.
+        if (wv && wv->channels == 2 && wv->type != 1 && ctl.on && g % 10 == 3) {
+            ctl.osc2.on = true;
+            ctl.structure = g % 20 == 3 ? 1 : 2;
+            ctl.cosm[0].on = true;
+            ctl.cosm[0].type = g % 40 < 20 ? 5 : 6;
+            for (Ctl::Cosm::SideBand& b : ctl.cosm[0].sb) b.detuneOwn = b.widthOwn = 40;
+        }
+        // And COSM 2 on a stereo OSC 2's buffer in the third Structure, next to the last tone's mix
+        if (wv2 && wv2->channels == 2 && wv2->type != 1 && ctl.osc2.on && ctl.structure == 2) {
+            ctl.cosm[1].on = true;
+            ctl.cosm[1].type = g % 4 == 0 ? 5 : 6;
+            for (Ctl::Cosm::SideBand& b : ctl.cosm[1].sb) b.detuneOwn = b.widthOwn = 40;
+        }
         const bool solo1 = wv && wv->type == 1 && ctl.on, solo2 = wv2 && wv2->type == 1 && ctl.osc2.on, soloCase = solo1 || solo2;
+        // The stereo Side Band follower reads past its block, so a SOLO wave's small differences
+        // reach the buffer beside it: that one takes the SOLO tolerance too.
+        const auto sideBand = [&](int k) { return ctl.cosm[k].on && (ctl.cosm[k].type == 5 || ctl.cosm[k].type == 6); };
+        const bool soloBeside = soloCase && (sideBand(0) || sideBand(1));
         // X-MOD's phase on OSC 2's output, which a SOLO wave's gives only closely
         if (solo2 && ctl.ana.wave == 13) ctl.ana.wave = 0;
-        // On a stereo OSC 1 the firmware takes the COSMs' stereo routines; the port has only
-        // the mono ones (see the report): a difference known, and left out here.
-        if (wv && wv->channels == 2) ctl.cosm[0].on = ctl.cosm[1].on = false;
-        // In the third Structure COSM 2 takes OSC 2's flag; otherwise a stereo OSC 2 under a
-        // mono OSC 1 goes through the mono routines, which the port has: that case stays in.
-        if (wv2 && wv2->channels == 2 && ctl.structure == 2) ctl.cosm[1].on = false;
         // Lo-Fi's quantizer turns the SOLO player's small differences into a step of its own.
         if ((wv && wv->type == 1) || (wv2 && wv2->type == 1)) for (Ctl::Cosm& k : ctl.cosm) if (k.type == 9) k.type = 0;
         // what the case does besides one note: 0 none, 1 a second note on a POLY part,
@@ -785,7 +801,8 @@ int XtToneProbe::run(int argc, char** argv) {
             fw.wave = wv->fw;
             fw.c.wr8(wv->fw.chunk[2] + 0xa, (uint8_t)ctl.rootKey);
         } else {
-            syn.setSample(nullptr);
+            // an analog case: in some, a stereo wave left loaded, which it must not read or follow
+            syn.setSample(g % 4 == 2 && !waves.empty() ? waves[2].enc : nullptr);
             fw.wave = FwWave{};
         }
         if (osc2Case) {
@@ -824,6 +841,14 @@ int XtToneProbe::run(int argc, char** argv) {
             return [&, pv = &pv](FwNote& n) {
                 // the Dynamic TVF's follower, which its note-on does not clear
                 for (int k = 0; k < 2; ++k) { const float lev = pv->cs[k].tvf.level(); uint32_t u; std::memcpy(&u, &lev, 4); fw.c.wr32(n.TN + (k ? 0x14ec : 0x1388) + 0x58 + 0x98, u); }
+                // the two words the stereo TB Filter reads uncleared
+                for (int k = 0; k < 2; ++k) {
+                    float w8c, w90;
+                    pv->cs[k].wordsNow(w8c, w90);
+                    uint32_t u;
+                    std::memcpy(&u, &w8c, 4); fw.c.wr32(n.TN + (k ? 0x14ec : 0x1388) + 0x58 + 0x8c, u);
+                    std::memcpy(&u, &w90, 4); fw.c.wr32(n.TN + (k ? 0x14ec : 0x1388) + 0x58 + 0x90, u);
+                }
                 // FM's lines are by the tone's number, and a far tap reads the next tone's
                 fw.c.wr32(n.TN + 0x1708 + 0x3c, (uint32_t)(pv - syn.voice));
                 // the MOD's, which a note-on leaves: ENV RING's last level above all
@@ -956,6 +981,9 @@ int XtToneProbe::run(int argc, char** argv) {
         for (FwNote& n : fn) { n.vi = -1; n.live = n.released = n.ended = false; }
         fw.cosmBuf = kRam + 0x1000000;
         bool keyDown[2] = {};
+        // The mix's first words, which follow OSC 2's buffer: between the cases XtSynth's tails
+        // go on rendering and the firmware's stop, so the note starts from the port's.
+        for (uint32_t i = 0; i < 3; ++i) { uint32_t u; std::memcpy(&u, &syn.mixPast[i], 4); fw.c.wr32(kBufMix + 4 * i, u); }
         if (!startNote(0, -1)) return 1;
         keyDown[0] = true;
         if (dumpWhich && (dumpWhich[0] == 'a' || std::atoi(dumpWhich) == g))
@@ -985,7 +1013,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 n.mono = ctl.mono; n.legato = ctl.legato; n.robot = ctl.robot; n.loop = ctl.loop; n.loopMode = ctl.loopMode; n.loopStart = ctl.loopStart; n.loopEnd = ctl.loopEnd;
                 n.osc2.rootKey = ctl.osc2.rootKey; n.osc2.oscTimeOffset = ctl.osc2.oscTimeOffset; n.osc2.robot = ctl.osc2.robot; n.osc2.loop = ctl.osc2.loop;
                 n.osc2.loopMode = ctl.osc2.loopMode; n.osc2.loopStart = ctl.osc2.loopStart; n.osc2.loopEnd = ctl.osc2.loopEnd;
-                for (int k = 0; k < 2; ++k) { n.cosm[k].on = ctl.cosm[k].on && !(wv && wv->channels == 2); n.cosm[k].type = ctl.cosm[k].type; n.cosm[k].lfoKeySync = ctl.cosm[k].lfoKeySync; n.cosm[k].odType = ctl.cosm[k].odType; n.cosm[k].ampType = ctl.cosm[k].ampType; }
+                for (int k = 0; k < 2; ++k) { n.cosm[k].on = ctl.cosm[k].on; n.cosm[k].type = ctl.cosm[k].type; n.cosm[k].lfoKeySync = ctl.cosm[k].lfoKeySync; n.cosm[k].odType = ctl.cosm[k].odType; n.cosm[k].ampType = ctl.cosm[k].ampType; }
                 const int bentFrom = fw.bender;
                 if (sweep ? sweepAt == kBenderOnly : r.one(2)) fw.bender = r.range(0, 16383);
                 const bool panelMoved = !(n == ctl), moved = panelMoved || fw.bender != bentFrom;   // nothing moved, no update on either side
@@ -1034,7 +1062,7 @@ int XtToneProbe::run(int argc, char** argv) {
             if (!last) { if (secondAt > blk) continue; break; }
             if (tick) compareAll(blk);
             struct B { const char* name; uint32_t a; const float* p; bool solo; } bs[] = {
-                { "osc 2 buffer", kBuf2, syn.tapOsc2, solo2 }, { "osc 1 buffer", kBuf1, syn.tapOsc1, solo1 }, { "mix", kBufMix, syn.tapMix, soloCase }, { "cosm output", kBufMix, syn.tapCosm, soloCase } };
+                { "osc 2 buffer", kBuf2, syn.tapOsc2, solo2 || soloBeside }, { "osc 1 buffer", kBuf1, syn.tapOsc1, solo1 || soloBeside }, { "mix", kBufMix, syn.tapMix, soloCase }, { "cosm output", kBufMix, syn.tapCosm, soloCase } };
             for (const B& b : bs) {
                 // the COSMs work in place on the mix: a mix's own buffer is theirs with one on
                 if (b.p == syn.tapMix && (ctl.cosm[0].on || ctl.cosm[1].on)) continue;

@@ -354,6 +354,7 @@ private:
     XtAnalogShared anaShared;                        // the analog voices' shared state
     XtModBlock modBlk;                               // the MOD's block (the tone block's +0x5dc)
     XtModShared modShared;                           // FM's delay lines; a voice's index is its tone's number
+    float mixPast[3] = {};                           // the last tone's mix, its first words: they follow OSC 2's buffer on the XT
     XtAnalogBlock analogBlock(const Voice& v, const OscVoice& s, const OscControls& o) const; // the analog converter's block
     int keyFollowKey(const Voice& v, const OscControls& o) const;   // the OSC's +4
     int shiftKey(int key) const;                     // + the Octave Shift, within 0..127

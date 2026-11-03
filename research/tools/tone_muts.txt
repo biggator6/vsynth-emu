@@ -48,7 +48,7 @@ live-key|if (k != s.kfKey) {\n                    s.kfKey = k;\n                
 order-osc|if (v->on) oscStart(*v, *v, ctl);\n    if (v->osc2.on) oscStart(*v, v->osc2, ctl.osc2);|if (v->osc2.on) oscStart(*v, v->osc2, ctl.osc2);\n    if (v->on) oscStart(*v, *v, ctl);
 order-render|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 0.0f);|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 1.0f);
 mix-skip|if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);|
-cosm-order|            case XtToneStep::Cosm1:\n                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f);|            case XtToneStep::Cosm1:\n                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
+cosm-order|                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
 cosm-tvf-env|else c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.lfo.out(), c.envA.level(), c.lfo.out());|else c.tvf.setBlock(cosmBlock(v, k), c.envA.level(), c.lfo.out(), c.envB.level(), c.lfo.out());
 cosm-tvf-kf|p.cutoff = c.cutoff; p.keyfollow = c.kf / 10;|p.cutoff = c.cutoff; p.keyfollow = c.kf;
 cosm-vel|xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1|xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1
@@ -116,3 +116,14 @@ band-start-gain|s.mb.setGainXt(gainStart, true);|s.mb.setGainXt(s.curGain, true)
 solo-start-gain|s.solo.resetGain(gainStart);|s.solo.resetGain(s.curGain);
 band-type|s.mb.noteOn(s.wave->wave, s.wave->type,|s.mb.noteOn(s.wave->wave, s.wave->type == 3 ? 5 : 3,
 rates-type|if (s.wave->type == 1) { s.solo.setRates|if (s.wave->type == 3) { s.solo.setRates
+cosm-past-none|v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|v.cs[0].process(tmp, 1.0f);
+cosm-past-always|v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|v.cs[0].process(tmp, 1.0f, tmp2);
+cosm-words-held|        c.holdWords();\n|
+cosm-words-set|            c.tb.setHpWords(c.word8c, c.word90);\n|
+cosm-stereo-never|c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);|c.stereo = false;
+cosm-stereo-osc1|c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);|c.stereo = stereo(*v);
+cosm-stereo-osc2|c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);|c.stereo = stereo(v->osc2);
+cosm-stereo-analog|auto stereo = [](const OscVoice& s) { return s.on && !s.analog && s.wave->channels == 2; };|auto stereo = [](const OscVoice& s) { return s.on && s.wave && s.wave->channels == 2; };
+cosm-stereo-off|auto stereo = [](const OscVoice& s) { return s.on && !s.analog && s.wave->channels == 2; };|auto stereo = [](const OscVoice& s) { return !s.analog && s.wave && s.wave->channels == 2; };
+cosm-past2-none|v.cs[1].process(tmp2, 1.0f, mixPast);|v.cs[1].process(tmp2, 1.0f);
+cosm-past2-kept|        std::copy(tmp, tmp + 3, mixPast);\n|

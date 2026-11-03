@@ -334,6 +334,12 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   settings. mutate_tone.py runs the planted errors in tone_muts.txt through PORT=tone mutate.sh. Found and fixed: v93 a note's first pitch had the last note's glide; v94 LFO seeds, the
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
+
+COSM stereo routines v104 (2026-11-02): a stereo wave on the section's OSC takes another set of COSM routines (HARDWARE_FIRMWARE.md, "COSM: the stereo routines"). process(…, stereo) in
+  each XtCosm type, XtCosmSection::stereo latched at note-on. L and R apart on the same ramps, but not all two monos: a stereo Amp is always Type 0; LP12 inverted; NOTCH24, PEAK24, PEAK12 differ;
+  the Side Band follower skips three words and reads three past the block (XtSynth passes OSC 2's buffer for COSM 1 in Types 2, 3); the 2nd Side Band's R holds the block's first gain; the TB's R reads
+  two words the note-on doesn't clear, so XtCosmSection tracks what each type leaves there. COSM 2 in Type3 goes by OSC 2's wave and reads the last tone's mix past the block (mixPast). xt_tone's exclusions are gone.
+  mutate.sh gains PORT=tonecosm.
   Left for the user: TVA Switch, stereo COSM routines, both OSCs off. The scheduler is found: around 0x894f4d10. The tone's constructor is 0x894f5860.
 
 Structure Types v92 (2026-11-02): Type2 and Type3 (HARDWARE_FIRMWARE.md, "The Structure Types"). xtToneOrder, xtCosmOsc in XtAnalog; XtCosmSection (update, process)
