@@ -16,9 +16,10 @@ if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalo
     F=XtSynth.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp
     D=XT_TONE_MAIN; ARGS=(2024 "$WORK/inputs")
     OBJ="$M/tone_obj"; mkdir -p "$OBJ"; L=()
+    H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
     for f in XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtMultiBandPlayer XtEnvelope XtLfo XtOsc XtCosm XtAnalog XtFirmware Sh4Interp; do
         [ "$f.cpp" = "$F" ] && continue
-        [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] || "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_TONE_MAIN -DXT_TONE_CHECK -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
+        [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] || "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_TONE_MAIN -DXT_TONE_CHECK -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
         L+=("$OBJ/$f.o")
     done
     EXTRA=(-DXT_TONE_CHECK)

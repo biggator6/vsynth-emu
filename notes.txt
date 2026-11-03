@@ -335,6 +335,11 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Cheaper checks v109 (2026-11-03): no check or result changes. verify.sh about 6.5 minutes to 1-2; mutate_tone.py about 2 CPU-hours to 19 CPU-minutes, 144 of 144 caught as before. xt_tone's XT_TONE_STOP ends a run at its first
+  difference (mutate_tone.py sets it; `[cases] name ...` plants only those). fcheck.sh and build.sh run side by side; fcheck reuses a section whose binary, command, ROM and inputs are those of a run that matched the baseline (builds repeat
+  byte for byte), --full runs them all, and a run that differs keeps nothing. Sh4::call fetches inline, the memory paths are inlined, a 64 K filter by address finds hooks in place of a flag per page: a quarter off every check. VSynthEmuVerify
+  builds the plugin and the test in one make, 53 s to 27 s. Fixed on the way: build.sh leaves a binary that does not compile missing, not stale; mutate.sh rebuilds its objects on a changed header; verify.sh skips PluginTest and auval when the plugin did not build.
+
 COSM held levels v107 (2026-11-03): a new block reads levels the COSM holds from its note-on or last 10 ms update (+0x104...), as on the XT (HARDWARE_FIRMWARE.md, "The COSMs' held levels"). CosmVoice::hold, cosmSetBlock reads nothing live.
   So a second update inside one tick no longer reads a moved Sustain. xt_tone compares the held words at every update and has a last forced section, a second update in a tick. live-order was exact after this, so it became held-live and one held-* per type.
   Merged with v106 after. Also open at 6000 cases: seed 2007 case 9186, the same on v106 alone.

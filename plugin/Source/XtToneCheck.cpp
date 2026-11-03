@@ -2,6 +2,7 @@
 //
 // xt_tone <rom.2.bin> [cases] [seed] [inputs dir]
 //   XT_TONE_FIRST=1: only each case's first difference; XT_TONE_DUMP=<case>|a: its settings
+//   XT_TONE_STOP=1: end the run at its first difference ("tone: 1 different, at case ..."); mutate_tone.py
 //
 // The firmware runs in the SH-4 interpreter from the parameter IDs on, nothing
 // of its path set by hand:
@@ -646,7 +647,9 @@ struct Report {
     long checks = 0;
     int caseNo = 0, firstCase = -1;
     bool first = std::getenv("XT_TONE_FIRST") != nullptr;      // only each case's first difference
+    bool stop = std::getenv("XT_TONE_STOP") != nullptr;        // the run ends at its first difference
     void bad(const std::string& kind, const char* fmt, double a, double b, int blk) {
+        if (stop) { std::printf("tone: 1 different, at case %d: %s\n", caseNo, kind.c_str()); std::exit(0); }
         long& n = kinds[kind];
         const bool show = first ? firstCase != caseNo : n < 3;
         ++n;

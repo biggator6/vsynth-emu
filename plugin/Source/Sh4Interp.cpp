@@ -14,6 +14,14 @@
 #pragma clang fp contract(off)
 #pragma STDC FENV_ACCESS ON
 
+// Inlined into the loop and exec: the fetch and the memory paths are a quarter of
+// the run time of every firmware check.
+#if defined(__GNUC__)
+#define SH4_HOT __attribute__((always_inline))
+#else
+#define SH4_HOT
+#endif
+
 namespace {
 constexpr uint32_t kSentinel = 0x8EFFFFF0u;     // return address of call(); never mapped as code
 constexpr uint32_t kPageBits = 12;
@@ -30,7 +38,7 @@ inline int32_t ftrcF(double x) {                  // FTRC: truncate, saturate
 }
 } // namespace
 
-Sh4::Sh4() : page(1u << (29 - kPageBits), nullptr), hookPage(1u << (29 - kPageBits), 0) {}
+Sh4::Sh4() : page(1u << (29 - kPageBits), nullptr), hookFilter(1u << 16, 0) {}
 Sh4::~Sh4() { for (Region* g : regions) delete g; }
 
 void Sh4::addRegion(uint32_t base, uint32_t size) {
@@ -64,7 +72,7 @@ bool Sh4::loadRom(const char* path) {
     return true;
 }
 
-uint8_t* Sh4::at(uint32_t a, uint32_t n) {
+SH4_HOT uint8_t* Sh4::at(uint32_t a, uint32_t n) {
     const uint32_t p = phys(a);
     uint8_t* b = page[p >> kPageBits];
     if (!b) return nullptr;
@@ -78,12 +86,12 @@ uint8_t* Sh4::at(uint32_t a, uint32_t n) {
 }
 
 uint8_t* Sh4::ptr(uint32_t a, uint32_t n) { return at(a, n); }
-uint32_t Sh4::rd32(uint32_t a) { uint8_t* p = at(a, 4); uint32_t v = 0; if (p) std::memcpy(&v, p, 4); else fault("read32", a); return v; }
-uint16_t Sh4::rd16(uint32_t a) { uint8_t* p = at(a, 2); uint16_t v = 0; if (p) std::memcpy(&v, p, 2); else fault("read16", a); return v; }
-uint8_t Sh4::rd8(uint32_t a) { uint8_t* p = at(a, 1); if (!p) { fault("read8", a); return 0; } return *p; }
-void Sh4::wr32(uint32_t a, uint32_t v) { uint8_t* p = at(a, 4); if (p) std::memcpy(p, &v, 4); else fault("write32", a); }
-void Sh4::wr16(uint32_t a, uint16_t v) { uint8_t* p = at(a, 2); if (p) std::memcpy(p, &v, 2); else fault("write16", a); }
-void Sh4::wr8(uint32_t a, uint8_t v) { uint8_t* p = at(a, 1); if (p) *p = v; else fault("write8", a); }
+SH4_HOT uint32_t Sh4::rd32(uint32_t a) { uint8_t* p = at(a, 4); uint32_t v = 0; if (p) std::memcpy(&v, p, 4); else fault("read32", a); return v; }
+SH4_HOT uint16_t Sh4::rd16(uint32_t a) { uint8_t* p = at(a, 2); uint16_t v = 0; if (p) std::memcpy(&v, p, 2); else fault("read16", a); return v; }
+SH4_HOT uint8_t Sh4::rd8(uint32_t a) { uint8_t* p = at(a, 1); if (!p) { fault("read8", a); return 0; } return *p; }
+SH4_HOT void Sh4::wr32(uint32_t a, uint32_t v) { uint8_t* p = at(a, 4); if (p) std::memcpy(p, &v, 4); else fault("write32", a); }
+SH4_HOT void Sh4::wr16(uint32_t a, uint16_t v) { uint8_t* p = at(a, 2); if (p) std::memcpy(p, &v, 2); else fault("write16", a); }
+SH4_HOT void Sh4::wr8(uint32_t a, uint8_t v) { uint8_t* p = at(a, 1); if (p) *p = v; else fault("write8", a); }
 void Sh4::write(uint32_t a, const void* src, size_t n) {
     const uint8_t* s = (const uint8_t*)src;
     for (size_t i = 0; i < n; ) { uint32_t chunk = (uint32_t)std::min<size_t>(n - i, 4096 - ((a + i) & 4095)); uint8_t* p = at(a + (uint32_t)i, chunk); if (!p) { fault("write", a + (uint32_t)i); return; } std::memcpy(p, s + i, chunk); i += chunk; }
@@ -100,7 +108,7 @@ bool Sh4::fault(const char* what, uint32_t addr) {
 
 void Sh4::hook(uint32_t addr, std::function<void(Sh4&)> fn) {
     hooks[addr] = std::move(fn);
-    hookPage[phys(addr) >> kPageBits] = 1;
+    hookFilter[(addr >> 1) & 0xffff] = 1;
 }
 
 void Sh4::syncRound() {
@@ -128,27 +136,27 @@ bool Sh4::call(uint32_t addr, std::initializer_list<uint32_t> args, uint32_t sp,
     const uint64_t limit = nsteps + maxSteps;
     bool ok = true;
     while (pc != kSentinel) {
-        if (hookPage[phys(pc) >> kPageBits]) {
+        if (hookFilter[(pc >> 1) & 0xffff]) {
             auto h = hooks.find(pc);
             if (h != hooks.end()) { h->second(*this); continue; }
         }
-        if (!step() || !err.empty()) { ok = false; break; }
+        // One instruction (plus its delay slot); a fetch across two pages goes the long way
+        const uint32_t p = phys(pc), off = p & ((1u << kPageBits) - 1);
+        uint8_t* const b = page[p >> kPageBits];
+        uint16_t op;
+        if (b && off != (1u << kPageBits) - 1) std::memcpy(&op, b + off, 2);
+        else { op = rd16(pc); if (!err.empty()) { ok = false; break; } }
+        uint32_t next = pc + 2;
+        ++nsteps;
+        if (!exec(op, false, next)) { ok = false; break; }
+        pc = next;
+        if (!err.empty()) { ok = false; break; }
         if (nsteps > limit) { err = "step limit"; ok = false; break; }
     }
     std::fesetround(savedRound);
     hostRound = -1;
     if (r0out) *r0out = r[0];
     return ok && err.empty();
-}
-
-bool Sh4::step() {
-    const uint16_t op = rd16(pc);
-    if (!err.empty()) return false;
-    uint32_t next = pc + 2;
-    ++nsteps;
-    if (!exec(op, false, next)) return false;
-    pc = next;
-    return true;
 }
 
 // Executes one instruction at pc.  Delayed branches run their slot (at pc+2)

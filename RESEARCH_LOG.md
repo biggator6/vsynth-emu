@@ -3223,3 +3223,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Comparing the held words directly made the check much stronger than the forced case alone, and it answered what v105 left open, whether anything else writes those words. It can't see one type's `setBlock` line reading the live level, though, because the words stay right. Only the audio shows that.
 - Which is why the forced knobs are pinned. With random knobs 14 of 48 cases showed nothing in the audio, and a Comb on a Limiter showed nothing in any of its three. A planted error per type is what would have shown that up, so all eleven lines have one now.
 - The fix made `live-order` exact, as predicted before writing it. A planted error can stop meaning anything when the code under it changes, and only re-running the list shows it.
+
+### Session 16 addendum (2026-11-03) — v109: cheaper checks
+
+- The user asked why each task took so much time and CPU. Timing every step first was worth it: compiling, the obvious suspect, was 27 seconds. One run of the planted-error list cost about as much as twenty runs of `verify.sh`, and every run carried on through all its cases after the first difference. Half of them differ within 13 cases.
+- Reuse is safe only if the same source gives the same binary. My first test of that said no, because I had named the two outputs differently and a Mach-O carries its name in its signature. Under one name they are identical, from another folder too.
+- A section is kept only from a run that matched the baseline, so a truncated or wrong result can't be stored and handed back later. A planted error showed it: different, then different again on the next run, not reused.
+- Two tests here passed for the wrong reason. The first failure test planted nothing, because the constant it looked for wasn't in the file, and "as baseline" looked like a pass until the traceback above it was read. An early plugin rebuild of 1.3 s looked wonderfully fast and was a failed link, the "album file" error, whose failed links also deleted the test binary. It came back with no Xcode update this time. The clean rebuild cured it again; its cause here isn't known.
+- `verify.sh` had the same trap: with the plugin build failed, PluginTest and auval still printed passes against the old binaries. Both are skipped now.
+- PGO on the interpreter reached 31% against the hand-tuned loop's quarter. Not worth a training step in every build.

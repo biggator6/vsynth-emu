@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-# mutate_tone.py [cases]: every deliberate error in tone_muts.txt, each planted in
-# XtSynth.cpp by mutate.sh (PORT=tone) and run through xt_tone.  One line each:
-# caught, MISSED, or ERROR when the old text is no longer in the source.  From the
-# repo root.  tone_muts.txt: name|old|new, with \n and \| escaped.
+# mutate_tone.py [cases] [name ...]: every deliberate error in tone_muts.txt (or the
+# named ones), each planted in XtSynth.cpp by mutate.sh (PORT=tone) and run through
+# xt_tone, which stops at its first difference (XT_TONE_STOP): the verdict is the
+# whole run's, for the cases up to it.  One line each: caught, MISSED, or ERROR when
+# the old text is no longer in the source.  From the repo root.  tone_muts.txt:
+# name|old|new, with \n and \| escaped.
 import concurrent.futures as cf, os, re, subprocess, sys
 D = os.path.dirname(os.path.abspath(__file__))
 cases = sys.argv[1] if len(sys.argv) > 1 else '2000'
-env = dict(os.environ, PORT='tone')
+names = sys.argv[2:]
+env = dict(os.environ, PORT='tone', XT_TONE_STOP='1')
 muts = []
 for line in open(D + '/tone_muts.txt'):
     line = line.rstrip('\n')
@@ -14,11 +17,17 @@ for line in open(D + '/tone_muts.txt'):
     p = re.split(r'(?<!\\)\|', line)
     f = lambda x: x.replace('\\n', '\n').replace('\\|', '|')
     muts.append((p[0], f(p[1]), f(p[2]) if len(p) > 2 else ''))
+if names:
+    unknown = set(names) - {m[0] for m in muts}
+    if unknown: sys.exit('mutate_tone: not in tone_muts.txt: ' + ' '.join(sorted(unknown)))
+    muts = [m for m in muts if m[0] in names]
 script = D + '/mutate.sh'
 subprocess.run(['bash', script, 'zz-base', 'constexpr float kLand', 'constexpr float kLand', '1'], env=env, capture_output=True)   # builds the shared objects
 def run(m):
     r = subprocess.run(['bash', script, m[0], m[1], m[2], cases, 'different'], env=env, capture_output=True, text=True)
     out = r.stdout + r.stderr
+    at = re.search(r'^tone: 1 different, (at case .*)$', out, re.M)
+    if at: return m[0], at.group(1)
     tot = re.findall(r'^tone[^:\n]*: (\d+) different', out, re.M)
     return m[0], f'tone: {sum(map(int, tot))} different' if tot else None
 with cf.ThreadPoolExecutor(8) as ex:
