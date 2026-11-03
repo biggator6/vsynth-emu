@@ -266,6 +266,11 @@ solo vocal.bin 1 1.0 0 -1.0 0 30000: 461 records, 30000 frames: max |firmware - 
 solo vocal.bin 1 1.2 1.1 0.5 0.05 30000 4000:-1.0 9000:2.0: 461 records, 30000 frames: max |firmware - port| 3.23e-06, difference -95.2 dB against the signal (rms 0.0200), first at 1
 solo w358.bin 2 1.0 0 1.0 0 20000: 111 records, 20000 frames: max |firmware - port| 2.96e-05, difference -88.4 dB against the signal (rms 0.1408), first at 1
 solo w358.bin 2 0.8 1.5 1.5 0.4 20000: 111 records, 20000 frames: max |firmware - port| 2.61e-05, difference -100.1 dB against the signal (rms 0.0706), first at 1
+solo gated.bin 1 8 0 -0.5 0 60000: 451 records, 60000 frames: max |firmware - port| 6.1e-06, difference -105.9 dB against the signal (rms 0.0901), first at 2
+solo gated.bin 1 32 0 -1.0 0 31500 16000:1.0: 451 records, 31500 frames: max |firmware - port| 2.83e-06, difference -111.9 dB against the signal (rms 0.0778), first at 0
+solo gated.bin 1 32 0 -1.0 0 4300000 10464:-0.001: 451 records, 4300000 frames: max |firmware - port| 2.83e-06, difference -111.1 dB against the signal (rms 0.0067), first at 0
+solo gated.bin 1 32 0 -1.0 0 31500 robot: 451 records, 31500 frames: max |firmware - port| 6.48e-07, difference -117.9 dB against the signal (rms 0.0250), first at 16
+solo gated.bin 1 32 0 0.5 0 40000 10464:-0.25 robot: 451 records, 40000 frames: max |firmware - port| 3.97e-06, difference -108.8 dB against the signal (rms 0.1028), first at 2
 == bandcmp
 band 3 drum.bin 2 1.0 1.0 30000: BACKING, 30000 frames: max |firmware - port| 0, difference -321.0 dB against the signal (rms 0.0458), first at -1
 band 3 drum.bin 2 1.3 -1.0 30000: BACKING, 30000 frames: max |firmware - port| 0, difference -307.6 dB against the signal (rms 0.0098), first at -1

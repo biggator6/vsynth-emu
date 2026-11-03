@@ -56,7 +56,8 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=analogcosm`: xt_analog, XtCosm.cpp; `PORT=tone`: xt_tone, XtSynth.cpp;
   `PORT=tonecosm`: xt_tone, XtCosm.cpp; `PORT=toneanalog`: xt_tone, XtAnalog.cpp;
   `PORT=toneband`: xt_tone, XtMultiBandPlayer.cpp; `PORT=tonecheck`: xt_tone,
-  XtToneCheck.cpp; `SEED=<n>`: xt_tone's seed, default 2024)
+  XtToneCheck.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
+  solocmp on the baseline's cases, XtSoloVoice.cpp)
   and runs it, to show the check catches it. `mutate_tone.py [cases]`: the list in
   `tone_muts.txt`, each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
 - `xt_tone <rom> [cases] [seed] [inputs]` (in fcheck; `build/tools/fcheck/bin`): XtSynth's wiring
@@ -94,6 +95,11 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - A band player's backward repeat (`0x8950f50a`) can overflow its position to near 2^31, in the port too.
   The reads then leave the wave, which on the XT gets whatever is in RAM. `xt_tone` gives them zeros, as
   the port reads (HARDWARE_FIRMWARE.md, "A band read far from its wave").
+- SOLO's anchor and grain timer are int32 on the XT and can overflow, so `XtSoloVoice` wraps them: a backward
+  repeat ends only by overflowing (HARDWARE_FIRMWARE.md, "The anchor's overflow"). A loop ported to `double`
+  from int32 may not end; `solocmp` dies by `alarm(120)` so a hang fails the check.
+- `xtSoloEncode` and the firmware's encoder (`xtFwSoloEncode`) differ on many waves. `solocmp` gives both sides
+  the firmware's records and `xt_tone` both sides the port's, so neither shows it.
 - A tone's path (constructor `0x894f5860`, note start, update, the scheduler, what is hooked) is in
   HARDWARE_FIRMWARE.md, "The whole tone against XtSynth". Any change is a tone update (`0x894dc0b0`): all
   the blocks again, COSMs before the envelopes.

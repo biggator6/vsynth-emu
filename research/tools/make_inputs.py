@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """make_inputs.py <out dir>: the raw int16 test inputs the firmware checks and
 A/B renders read (vocal, drum, chord, sine, w358 .bin), from the project's WAVs.
-24-bit sources are reduced to int16 by dropping the low byte."""
-import struct, sys, os
+24-bit sources are reduced to int16 by dropping the low byte.  gated.bin is
+generated."""
+import math, struct, sys, os
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SOURCES = {
@@ -31,3 +32,13 @@ for name, rel in SOURCES.items():
     src = os.path.join(REPO, rel)
     if not os.path.exists(src): print(f'skip {name}: {rel} missing'); continue
     open(os.path.join(out, name + '.bin'), 'wb').write(pcm16(src))
+
+# A gated tone with vibrato.  The firmware's SOLO encoder ends its bursts with records of a few
+# samples, which a backward note's repeat leaves only by overflowing (HARDWARE_FIRMWARE.md,
+# "The anchor's overflow").
+ph, tone = 0.0, bytearray()
+for t in range(30000):
+    ph += 2335.7 * (1 + 0.1 * math.sin(2 * math.pi * 18.44 * t / 44100)) / 44100
+    x = math.sin(2 * math.pi * ph) if math.sin(2 * math.pi * 33.85 * t / 44100) > 0 else 0.0
+    tone += struct.pack('<h', int(22936 * x))
+open(os.path.join(out, 'gated.bin'), 'wb').write(bytes(tone))

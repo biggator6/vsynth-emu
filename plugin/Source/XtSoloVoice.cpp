@@ -27,7 +27,15 @@ double XtSoloVoice::readGrain(const std::vector<float>& x, double pos, double ta
     return s;
 }
 
-namespace { constexpr double kUnlimited = 1e30; }
+namespace {
+constexpr double kUnlimited = 1e30;
+// The anchor (player +0x28) is an int32 in 1/16 samples on the XT, and
+// overflows as one: 2^32/16 samples round.
+double wrapAnchor(double a) {
+    constexpr double kRound = 268435456.0;
+    return a >= kRound / 2 ? a - kRound : a < -kRound / 2 ? a + kRound : a;
+}
+}
 
 // A record's length in samples; past the last record, the terminator's 16.
 double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }
@@ -80,7 +88,7 @@ double XtSoloVoice::repeatCost() const {
 // budget allows (or the record ends the wave); else the next records load,
 // skipping those the position has passed while their budget lasts.
 void XtSoloVoice::anchorForward() {
-    anchor += anchorStep;
+    anchor = wrapAnchor(anchor + anchorStep);
     if (anchor < recEnd) return;
     bool wrap = false;
     if (recEnd > Pq && budget > 0.0) {
@@ -100,14 +108,14 @@ void XtSoloVoice::anchorForward() {
     for (;;) {
         loadNext();
         if (!(budget > 0.0) || !(Pq >= recEnd)) return;
-        anchor += recEnd - recStart;
+        anchor = wrapAnchor(anchor + recEnd - recStart);
     }
 }
 
 // The anchor moving backward (0x8950cfee), the mirror image: below the
 // record's start it wraps up to repeat it, or the previous records load.
 void XtSoloVoice::anchorBackward() {
-    anchor -= anchorStep;
+    anchor = wrapAnchor(anchor - anchorStep);
     if (!(recStart > anchor)) return;
     bool wrap = false;
     if (Pq >= recStart && budget > 0.0) {
@@ -116,16 +124,18 @@ void XtSoloVoice::anchorBackward() {
     }
     if (!wrap && 0.0 >= recStart) wrap = true;                      // the first record
     if (wrap) {
-        double r1 = anchor - recStart, r3 = recEnd;                  // 0x8950d01a
+        // 0x8950d01a.  r3 falls by the start each round, so an anchor two
+        // lengths under a start above the length comes back only by overflowing.
+        double r1 = wrapAnchor(anchor - recStart), r3 = recEnd;
         bool again;
-        do { r1 += r3; again = recStart >= r1; r3 -= recStart; } while (again);
+        do { r1 = wrapAnchor(r1 + r3); again = recStart >= r1; r3 = wrapAnchor(r3 - recStart); } while (again);
         anchor = r1;
         return;
     }
     for (;;) {
         loadPrev();
         if (!(budget > 0.0) || !(recStart > Pq)) return;
-        anchor += recStart - recEnd;
+        anchor = wrapAnchor(anchor + recStart - recEnd);
     }
 }
 
@@ -421,7 +431,11 @@ void XtSoloVoice::render(float* out, float* right, int count) {
         else if (s < 0) anchorBackward();
         else if (Pq >= anchor) anchorForward();     // holding: the anchor closes on P from either side
         else anchorBackward();
+        // The timer (grain +0xc) is an int32 in 1/4096 samples.  With a period
+        // under a sample it gains on every trigger until it overflows; the
+        // triggers then wait for it to climb back to the period.
         timer += 1.0;
+        if (timer >= 524288.0) timer -= 1048576.0;
         const bool due = timer >= ppw;
         if (due) timer -= ppw;
         if (due && !ended_) {

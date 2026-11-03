@@ -535,6 +535,7 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 #include <cmath>
 #include <cstdlib>
 #include <chrono>
+#include <unistd.h>
 #include "XtSoloVoice.h"
 static std::vector<uint8_t> slurp(const char* p) {
     std::vector<uint8_t> v; FILE* f = std::fopen(p, "rb"); if (!f) return v;
@@ -584,6 +585,7 @@ int main(int argc, char** argv) {
         std::fclose(fo);
         std::fprintf(stderr, "vpdt %zu bytes\n", vpdt.size());
     } else if ((mode == "soloplay" && argc >= 11) || (mode == "solocmp" && argc >= 10)) {
+        alarm(120);                        // a walk that never ends fails the check instead of hanging it
         std::vector<uint8_t> raw = slurp(argv[3]);
         const int ch = std::atoi(argv[4]);
         const long frames = (long)(raw.size() / (2 * (size_t)ch));

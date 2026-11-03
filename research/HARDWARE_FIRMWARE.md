@@ -1545,6 +1545,73 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The anchor's overflow: a SOLO note that never came back (2026-11-03, v111)
+
+`XtSoloVoice::render` could fail to return. Its backward repeat ran in `double` where the firmware's runs in int32 and ends by overflowing, so the plugin's audio call would hang on such a note. Checking the fix over a long render then showed a second int32 the port did not have, the grain timer. Both now behave as the firmware's.
+
+**The loop** (`0x8950d01a`, `anchorBackward`). Under the record's start, with the position still at or above the start and budget left, it does `r1 = anchor − start; r3 = end; do { r1 += r3; more = start ≥ r1; r3 −= start; } while (more)`.
+- r3 falls by the start each round. With a start above the length, r1 reaches at most anchor + 2·length and then falls.
+- So an anchor two lengths or more under the start never gets above it. The firmware's r1 runs down until it overflows to near +2^31, which ends the loop. In `double` it falls for ever.
+- Example, `gated.bin` at ×32, walk −1. At frame 10,440 the record is 19,558…19,561 and the anchor 19,514.875. It takes 119 rounds and lands at 133,446,453.875 samples.
+- The record then holds until the anchor comes back at one step per sample, at frame 4,180,031 here, about 94 seconds later.
+
+The forward loop (`0x8950cf4a`) has its r3 negative from the second round, so it always ends, and it does not overflow. It stays as it was.
+
+**What reaches it.** The step is the record's rate: at most 32 samples without Robot Voice, since the pitch stops at ×32. With Robot Voice it follows the period, up to the next record's length × pitch ÷ 100, so a voiced record next to a long one can step far past its own length.
+
+| records | settings | before v111 |
+|---|---|---|
+| the plugin's (XtSynth CLI), 11 waves with such a pair, from 454 | Robot Voice, Time Offset BWD, ×32 | 7 hung |
+| | ×28.5 | 6 hung |
+| | ×8 or lower | none (×8 to ×28.5 not tried) |
+| the plugin's, 466 waves | no Robot Voice | not reached: shortest record 18.6 samples, so two lengths is over 32 |
+| the firmware's encoder (`xt_fw solocmp`) | no Robot Voice, `gated.bin` ×8 walk −0.5, ×32 walk −1; another gated tone at ×4 | hung |
+
+The stack in a hung note was `XtSynth::render`, `mixBlock`, `XtSoloVoice::render`, `anchorBackward`. The firmware finishes the `solocmp` cases and the `xt_tone` notes below (the CLI runs have no firmware side). None of the checks' five inputs can reach it: their shortest record is 43.8 samples, and with Robot Voice at ×32 the worst step is 0.34 of two lengths.
+
+**The two encoders differ.** That is why the table has two kinds of records. The firmware's encoder ends a voiced run with records as short as 1/16 sample; `xtSoloEncode` has not been seen to. They were never compared: `solocmp` gives both sides the firmware's records and `xt_tone` both sides the port's. On 413 generated waves 73 came out the same; of the five inputs (stereo as (L+R)>>1) `drum` differs, 188 of 609 records. So "its records match" in the section on the interpreter holds for what it was checked on, not in general. If the port's records are made equal, this path opens to ordinary pitches without Robot Voice, and the fix here already covers that.
+
+**The timer** (`0x8950d080`, grain +0xc). It is an int32 in 1/4096 samples: +0x1000 each sample, minus the period at a trigger, and one trigger a sample at most.
+- With a period under a sample (a record under 32 samples at ×32) it gains on every trigger and overflows, about 17 seconds in.
+- It is then negative, so no trigger comes for 524,288 samples, about 12 seconds.
+- The rate here is 0x1000 − 0x500 a sample, so the first return should be at 10,440 + 762,601 + 524,288 = 1,297,329. The firmware's first burst is at 1,297,328, and the next is two cycles on.
+- The port's `double` timer kept triggering. That was −25.9 dB against the firmware on the long case, the only difference found after the anchor's fix. I did not look into why only every second return makes a sound.
+
+The grains' ages (+0x10, +0x14) are int32 too and stay `double` in the port. They wrap only after 524,288 samples without a trigger, and a grain's window has closed long before that (at most 32,768 samples), so it can't be heard. That is reasoning; no case plants it.
+
+**The fix.** `wrapAnchor` on every move of the anchor except the forward loop, and the timer's wrap. Values in range are returned untouched, so nothing changes until an overflow: A/B against the merge below it is 4/4 identical, PluginTest 4/4 bit-identical.
+
+**The checks.**
+- `make_inputs.py` generates `gated.bin`, a gated tone with vibrato, and `fcheck` gains five `solocmp` cases on it: backward at ×8, ×32 turned forward after the overflow, Robot Voice at ×32 backward, and Robot Voice forward then backward.
+- The fifth is 4.3 million frames: ×32, walk −1, then −0.001 from frame 10,464. The slow walk keeps grains firing until the anchor comes back, so its landing is heard. Without that, the anchor returns unseen or not at all, and a wrong landing passes.
+- All five are at the usual SOLO level, −105.9 to −117.9 dB. A `solocmp` that hangs now dies by `alarm(120)` and fails the check.
+- `mutate.sh` gains `PORT=solo`: XtSoloVoice.cpp against the baseline's `solocmp` cases, one verdict a case.
+
+| planted | result |
+|---|---|
+| nothing (a control) | 12 same |
+| the loop in `double` | the 5 new cases hang, and fail by the alarm in 123 s |
+| the landing 32 samples off, only when far | long case 0.0934, −38.4 dB |
+| the landing 256 samples off | 0.105, −32.2 dB |
+| the round 2^27, not 2^28 | 0.46, −23.2 dB |
+| the timer not wrapped | 0.317, −25.9 dB |
+| the timer wrapping at half its range | 0.317, −25.9 dB |
+| the timer's round 1 sample off | 0.511, −24.0 dB |
+| r3 not wrapped; `>` for `≥` in the loop; the first r1, either step or either skip not wrapped | 12 same: not reached by these cases |
+
+For that last row, one run outside the repo compared the wrapped arithmetic with the firmware's int32 instructions directly, on about 10 million random records and anchors, 7 million of them past 3 rounds: 0 different in the backward loop, the forward loop, and steps and skips at the edge. It left out 33,730 cases that run over 2 million rounds in int32 too (a very small start with a very far anchor). The real settings searched took at most 153 rounds.
+
+**Through the whole tone.** `xt_tone` at 1500 cases with the waves that hung in place of its two SOLO waves, 7 waves, 2 seeds:
+- The old build did not finish in 280 s on 3 runs (`f1000` on both seeds, `f2000` on seed 7). The new one finishes them in about 30 s, 0 different.
+- The other runs are the same on both builds. Some have differences, on SOLO waves about 3% off in a buffer: `f5000`, a 5 kHz gated tone, 15 and 8; a click train 2. Not traced.
+
+Seeds 90210 and 2007 at 6000 cases: 0 different, and seed 90210's counts are as in v108. `verify.sh`: fcheck as the new baseline (five lines added), A/B and PluginTest identical, engine tests, auval.
+
+**What this leaves.**
+- `xtSoloEncode` against the firmware's encoder, above. That is its own piece of work.
+- The band player's `stepBack` still relies on `int` wrapping (v108).
+- The SOLO cases past the tolerance stay open, these and seed 3 case 9455, seed 4 case 529, seed 2007 case 9186.
+
 ### A band read far from its wave: seed 90210, case 9398 (2026-11-03, v108)
 
 `xt_tone` on seed 90210 at 6000 cases gave 3 different, all in case 9398 and all in block 62: `osc 2 buffer`, `cosm output` and `output`, from word 24, fw −22236.084, port −18823.516. v106 left this open as possibly real. **It is not a fault in XtSynth or a port.** The firmware's band 0 read past the zeros `xt_tone` lays around a wave and landed on the wave's own vpdt, where the port reads 0. So this version changes the check and no audio. COSM 2's Side Band Filter, the words past OSC 2's buffer and the forced case only set the case up and carry the difference: `mixPast` is equal on both sides up to that block.
@@ -1609,7 +1676,7 @@ The two with v106's numbers are the point: an error in what follows a far read u
 **What this leaves.**
 - On the XT these reads get whatever is in its RAM, and XtSynth's get silence. That can't be compared, and it is the limit of this check: the firmware's note is compared with that one question taken out. I don't know what the XT does at the addresses outside its RAM, such as `0x9471a224`.
 - The port's loop relies on `int` wrapping, which C++ does not promise. Clang wraps here, at `-O2` and with the player at `-O3` (fcheck's seed: same counts, 0 different). Not changed.
-- `XtSoloVoice::anchorBackward` has the same loop in `double`, where nothing overflows, so two record lengths under the start would never end. No run here hung. I did not look into whether it can be reached.
+- `XtSoloVoice::anchorBackward` has the same loop in `double`, where nothing overflows, so two record lengths under the start would never end. No run here hung, but it can be reached: v111, "The anchor's overflow".
 - `xt_analog` still stops comparing a note at 3× or above backward. The same hook could lift that. Not done.
 
 ### The COSMs' held levels (2026-11-03, v107)
