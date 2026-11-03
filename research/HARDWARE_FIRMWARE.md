@@ -802,7 +802,7 @@ own stored records **bit-exactly**: wave 004 vocal 461/461 and wave 003 sine
 emulator exactly. It runs in about 20 ms per file. It is the engine's default
 SOLO encoder from v39 (`VSE_ENC=epoch` / `vt` select the older ones).
 
-**Where the XT differs from vpenc** (rom.2 addresses):
+**Where the XT differs from vpenc** (rom.2 addresses; v112 found more: the fills, the lag search, the ends of the wave, in "The SOLO encoder against the firmware's"):
 
 | | vpenc (V-Trainer) | XT |
 |---|---|---|
@@ -1195,8 +1195,10 @@ Ghidra's emulator takes minutes for each.
 | raw wave + vpdt → interpreter bands → C++ player, 362 ENSEMBLE and 376 BACKING, identity / pitch +7 / time ×2 / time ×½ | **bit-exact against `EmuBacking.java`**, every frame |
 
 **API:**
-- `xtFwSoloEncode()` runs the SOLO encoder; its records match
-  XtSoloEncoder's.
+- `xtFwSoloEncode()` runs the SOLO encoder. Its records match
+  XtSoloEncoder's since v112. When this was written that rested on waves 003
+  and 004 only, and on most generated waves they differed ("The SOLO encoder
+  against the firmware's").
 - `xtFwLoadBands(type, pcm, …)` builds the band data for BACKING (3) or
   ENSEMBLE (5), ready for `xtMbAttach()` and `XtMbPlayer`.
 
@@ -1545,6 +1547,65 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain).
 
+### The SOLO encoder against the firmware's (2026-11-03, v112)
+
+`xtSoloEncode` now gives the records of rom.2's own encoder (`0x8951dc40`, `0x8951e120` in the interpreter), every start, length and info word, on all 2138 of the 2157 waves tried that have a firmware result: the project's 115 real waves (stereo mixed), sines, saws, gated, clipped and short waves, and random mixes. Before this, 73 of 413 generated waves came out the same.
+
+Nothing had compared them: `solocmp` gives both sides the firmware's records and `xt_tone` both sides the port's. The port had been checked on waves 003 and 004 and eight factory waves, and those never reach most of what follows. It came from `vpenc.dll`, and the XT differs from `vpenc` in more places than the table in "Native port" lists.
+
+**What separated the sines.** Level. `sine.bin` peaks at 16423. The silence test (`0x8951ea80`) sums x²/256 over 2·maxLag samples, which passes 2³¹ on a sine of amplitude about 16564. So 0.5 of full scale was the same and 0.55 was not, and 0.8 was the same again because its wrapped sum happened to end above the gate.
+
+**The causes.**
+
+| | firmware | the port had | shows as |
+|---|---|---|---|
+| 1 | `0x8951ea80` adds in int32 and tests the sign: a sum that wraps counts as loud | the same in C, where signed overflow is undefined: clang dropped the test (deleting it from the fixed source gives the old records), so the wrapped sum could read as silent | 0.7 sine: port 128 records, firmware 661; the first 32080 0x80 against 106 0x87 |
+| 2 | fills (`0x89521750`, `0x895215a0`) step by `0x895214b0`: from the mark, one whole cycle of the wave's raw samples, up to 882; the period if that is shorter or the limit is hit | `vpenc`'s: always the period | gated vocal, record 247: 2361 against 2369; `drum`, record 420: 710 against 717 |
+| 3 | those fills change from the first routine to the second under span 0x44e0 (17632) | 16000 | same start and length, 0x5f against 0x87 |
+| 4 | `0x895215a0` clamps a to b and b to a after a step, and works out the next periods from the stepped ones | no clamp, the periods before the step | gated waves |
+| 5 | the lag search (`0x8951f8f0`) takes a flag: the tracker and the octave-down run look at 12/16 to 21/16 of the lag, the octave votes 15/16 to 17/16 | 15/16 to 17/16 for all | fast falls; same start and length with another info (0x9f against 0xa7: a voiced mark's quality comes from the lag found) |
+| 6 | `0x8951fab0` fills the scratch from every 4th sample; within the filter's reach of either end of the wave (`pos < u + 0x3f` or `pos + u + 0x3f ≥ n`) the slower path takes every sample, over the same count | every 4th, always | short waves, first and last notes |
+| 7 | after the last fill (`0x8951e880`), a mark at 2·tail − previous if that is before the end, with the first node's low bits | none | a wave that ends voiced with room for one more period: one record split in two |
+| 8 | setup (`0x8951dd70`): under maxLag samples, pmin = 44100 / (n / 2), maxLag = 44100 / pmin, and the filter is designed from that pmin | pmin 22 always | every wave under 2004 samples |
+| 9 | past the end at the first hop, with `0x8987caa8` still unset, the encoder returns −2 with no list (`0x8951e288`): n = 2, 2004, 2005 | records | those lengths. n = 1 divides by 0 and never returns; the port gives no records for it either |
+| 10 | filter design (`0x8951f380`): X·(u·u) | (X·u)·u | 5 of the 64 coefficients 1 ulp off; 3 of 240 fast falls differ, by 1/16 sample |
+| 11 | drift (`0x89520d30`) keeps its two buffers between calls, and the list head, a pointer, lies just under the first: as a float tiny and negative. Under that come small integers, which the FPU takes as 0 | a fresh buffer each call, 0 outside the window | a tone fading on a constant: a scan that finds no crossing within the period reads those, and the drift moves by a sample |
+
+Read from the disassembly and ported, but no wave here depends on them. Planting each error changes no record on 968 waves:
+- `0x89521a80` returns 0x8000 for an all-zero window, where the port returned 0.
+- `0x89522940` shifts with SHAD: a quotient over 2²⁴ shifts left. The port shifted right by the wrong amount and let the upward correction walk there.
+- The zero-crossing count for the octave hint is on the floats (`0x8951e320`), not the truncated values.
+- The work buffers are one block in the port now, because they are in rom.2: samples 0x8a0090f4, decimated 0x8a00f0f4, scratch 0x8a0120f4. A search near the top of the decimated signal reads on into the scratch, by the arithmetic up to about 1030 values on a long lag. 76 of 1055 waves read past the top, and it made no difference. The port used to read its own object layout there.
+- FTRC saturates. The port's `(int)` happened to on ARM.
+
+The rest of the encoder (onset, candidates, refine, tracker, octave, gap fill, back extend, shift, first mark, the fit, the node list) reads the same as the port. Signed products that wrap on the SH-4 now wrap in C too.
+
+**Where the firmware has no result.** A mark in a run of exact zeros makes drift 0/0. FTRC makes the NaN 2³¹, every mark after the segment moves by that, and the tracker reads outside memory (`read32 at 8201xxxx`, pc `0x89521a1c`). 16 of the 2157 waves do this. That is a fault in the harness. On the XT the read lands in unmapped P1 space and I don't know what it returns. Three more never return: n = 1, twice, and one 3504-sample random wave where `0x89522800` rounds its divisor down to 0 and `0x89522940` then loops for ever (the port's divide returns 0). So there is nothing to match: the port leaves the marks alone (`spreadDrift`), and the check requires its records to tile the wave. With the firmware's arithmetic they did not: 68275 records from 66150 samples, starting at −2³¹.
+
+**The harness.** `xtFwSoloEncode` now walks the list from the firmware's head (`0x89ff10c4`) rather than taking the longest chain in the node pool. No wave changed. The pool holds n/160 nodes, so under 160 samples the firmware calls `malloc(0)`. The bump allocator gave back the same block twice, which faulted, so `malloc(0)` now gives a block. The XT's own `malloc` is behind an OS pointer (`0x8987cab4`) and if it returns null there, the encode fails instead: not checked.
+
+**The check.** `xt_enc <rom> cmp <file[:2]>` (`XT_ENCODER_MAIN`), one line a wave, one `fcheck` section a wave, 105 waves in about 4 s of wall time: the five inputs and `gated.bin`, and `make_inputs.py`'s `enc_*`, in plain Python: loud sines and saws, the waves that first showed this, each input gated at 3, 7, 17 and 47 Hz, quiet, clipped, reversed and padded, low notes, fast falls, tones fading on a constant, lengths from 2 to 14000, silence, a constant, clicks, noise, and 12 mixes from a seed. The baseline gained those lines and changed none. `enc_vocal_g47` is the firmware-fault wave.
+
+`mutate_enc.py` runs the planted errors in `enc_muts.txt` through `PORT=enc mutate.sh`, about 2.5 minutes. 23 of 23 caught, on 1 to 25 waves each. Each cause above has at least one: `silent-wrap` (the original bug) 22 waves, `cross-a` 19, `fill-limit` 4, `lag-above` 9, `scratch-step` 3, `end-mark` 3, `short-lag` 14, `no-list` 6, `fir-order` 3, `drift-stale` 2, `drift-head` 2, `drift-nan` 1. One that is exact and left out of the list: `a` not clamped to `b` (`b` then only meets it in a comparison that gives the same answer).
+
+**A/B.** `verify.sh` is 4/4 identical against the merge below this, and PluginTest 4/4: of those renders only `vocal` and `w358` are SOLO, and their records did not change. Where the records changed, SOLO renders do, as intended (XtSynth CLI, two notes, against v111):
+
+| wave | against v111 | why |
+|---|---|---|
+| 0.7 sine at 440 Hz | −1.3 dB, RMS 0.64 to 0.50 | no longer unvoiced from the start |
+| 0.7 saw at 440 Hz | −0.3 dB, RMS 0.47 to 0.44 | the same |
+| vocal gated at 3 Hz | −30.0 dB, from frame 28,818 | the fills |
+| `drum` at 48 kHz, `chord` | identical | |
+
+**The anchor.** With these records a backward SOLO note reaches v111's overflow without Robot Voice. Through the XtSynth CLI, this encoder with v109's `XtSoloVoice`, Time Offset BWD, 200,000 frames: `gated` hangs at note 96 (×8) and note 120 (×32), and was killed after 25 s. With `wrapAnchor` both finish in a second. `enc_vocal_g3` and `enc_drum_g17` finish on either build. So v111 is needed here, and it is in this version. v111's table describes the records before this version.
+
+**`xt_tone`.** Seeds 90210 and 2007 at 6000 cases: no line with a difference. `mutate_tone.py`: 144 of 144 caught, as the list needs re-running when a port changes.
+
+**What this leaves.**
+- **The firmware's stereo mode.** This check, like the numbers it set out to explain, gives the firmware `(L+R)>>1` in mono mode, as XtSynth gives the port. The XT encodes a stereo wave in mode 3 (`0x8951e120(3)`), which is not the same: the full-rate samples are that floor, but the filter reads `0.5·(L+R)` in float (`0x8951f5e0`, and `0x8951f740` on its fast path, which filters each channel and then averages), and the crossing scan truncates that float where the mix floors. On the project's 89 stereo waves, mode 3 and the port on the mix differ on 45; `drum` 188 of 609 from record 420 (713 against 717). It needs a stereo path through `xtSoloEncode` and XtSynth.
+- The events: the port takes only {n·16}, as `xtFwSoloEncode` does.
+- Below the buffer (`0x89ff10c4` and down) only what a scan reached in these waves is modelled. Above it in `0x8a0150f4`, a read past the scratch, reads 0 here and rom.2's variables there; none was seen.
+
 ### The anchor's overflow: a SOLO note that never came back (2026-11-03, v111)
 
 `XtSoloVoice::render` could fail to return. Its backward repeat ran in `double` where the firmware's runs in int32 and ends by overflowing, so the plugin's audio call would hang on such a note. Checking the fix over a long render then showed a second int32 the port did not have, the grain timer. Both now behave as the firmware's.
@@ -1569,7 +1630,7 @@ The forward loop (`0x8950cf4a`) has its r3 negative from the second round, so it
 
 The stack in a hung note was `XtSynth::render`, `mixBlock`, `XtSoloVoice::render`, `anchorBackward`. The firmware finishes the `solocmp` cases and the `xt_tone` notes below (the CLI runs have no firmware side). None of the checks' five inputs can reach it: their shortest record is 43.8 samples, and with Robot Voice at ×32 the worst step is 0.34 of two lengths.
 
-**The two encoders differ.** That is why the table has two kinds of records. The firmware's encoder ends a voiced run with records as short as 1/16 sample; `xtSoloEncode` has not been seen to. They were never compared: `solocmp` gives both sides the firmware's records and `xt_tone` both sides the port's. On 413 generated waves 73 came out the same; of the five inputs (stereo as (L+R)>>1) `drum` differs, 188 of 609 records. So "its records match" in the section on the interpreter holds for what it was checked on, not in general. If the port's records are made equal, this path opens to ordinary pitches without Robot Voice, and the fix here already covers that.
+**The two encoders differ** (until v112, "The SOLO encoder against the firmware's"). That is why the table has two kinds of records. The firmware's encoder ends a voiced run with records as short as 1/16 sample; `xtSoloEncode` has not been seen to. They were never compared: `solocmp` gives both sides the firmware's records and `xt_tone` both sides the port's. On 413 generated waves 73 came out the same; of the five inputs (stereo as (L+R)>>1) `drum` differs, 188 of 609 records. So "its records match" in the section on the interpreter holds for what it was checked on, not in general. If the port's records are made equal, this path opens to ordinary pitches without Robot Voice, and the fix here already covers that.
 
 **The timer** (`0x8950d080`, grain +0xc). It is an int32 in 1/4096 samples: +0x1000 each sample, minus the period at a trigger, and one trigger a sample at most.
 - With a period under a sample (a record under 32 samples at ×32) it gains on every trigger and overflows, about 17 seconds in.
@@ -1608,7 +1669,7 @@ For that last row, one run outside the repo compared the wrapped arithmetic with
 Seeds 90210 and 2007 at 6000 cases: 0 different, and seed 90210's counts are as in v108. `verify.sh`: fcheck as the new baseline (five lines added), A/B and PluginTest identical, engine tests, auval.
 
 **What this leaves.**
-- `xtSoloEncode` against the firmware's encoder, above. That is its own piece of work.
+- `xtSoloEncode` against the firmware's encoder, above. That is its own piece of work (v112).
 - The band player's `stepBack` still relies on `int` wrapping (v108).
 - The SOLO cases past the tolerance stay open, these and seed 3 case 9455, seed 4 case 529, seed 2007 case 9186.
 

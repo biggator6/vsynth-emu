@@ -3,8 +3,9 @@
 # show its firmware check catches it.  Copies plugin/Source/XtCosm.cpp (with
 # PORT=analog, XtAnalog.cpp; with PORT=analogcosm, XtCosm.cpp, PORT=analogband, XtMultiBandPlayer.cpp, and PORT=analogfw, XtFirmware.cpp, under xt_analog's
 # check (XT_ANALOG_ONLY=pcm, the PCM pass alone, is passed through); with PORT=tone, XtSynth.cpp, PORT=tonecosm, XtCosm.cpp, PORT=toneanalog, XtAnalog.cpp, PORT=toneband, XtMultiBandPlayer.cpp, PORT=tonecheck, XtToneCheck.cpp, and PORT=tonefw, XtFirmware.cpp, under xt_tone,
-# on seed $SEED, default 2024; with PORT=solo, XtSoloVoice.cpp under xt_fw solocmp) with the first <old> replaced by
-# <new> (exact text), builds xt_cosm (xt_analog, xt_tone, xt_fw) from it in $WORK/mut/<name>, runs it on
+# on seed $SEED, default 2024; with PORT=solo, XtSoloVoice.cpp under xt_fw solocmp; with PORT=enc, XtSoloEncoder.cpp under
+# xt_enc on fcheck's waves, which prints only those that differ) with the first <old> replaced by
+# <new> (exact text), builds xt_cosm (xt_analog, xt_tone, xt_fw, xt_enc) from it in $WORK/mut/<name>, runs it on
 # [cases] (100) and prints the lines matching [pattern] (an extended regex;
 # default every result line).  A check that
 # still says 0 different missed the error: either the check is too weak, or
@@ -26,6 +27,8 @@ if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalo
     EXTRA=(-DXT_TONE_CHECK)
 elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck's baseline; [cases] is not used
     F=XtSoloVoice.cpp; D=XT_FW_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
+elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
+    F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
 elif [ "${PORT:-cosm}" = analog ]; then
     F=XtAnalog.cpp; D=XT_ANALOG_MAIN
     L=("$S/XtOsc.cpp" "$S/XtCosm.cpp" "$S/XtEnvelope.cpp" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp")
@@ -59,6 +62,14 @@ if [ "$PORT" = solo ]; then
     done < <(sed -n 's/^solo \(.*\): [0-9]* records.*/\1/p' "$B")
     wait
     cat "$T"/* | grep -E "$P"
+    exit
+fi
+if [ "$PORT" = enc ]; then
+    B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.base"; grep '^enc ' "$B" > "$T"
+    cd "$WORK/inputs"
+    sed -n 's/^enc \([^:]*\(:2\)\{0,1\}\): .*/\1/p' "$T" | xargs -n 1 -P "${JOBS:-8}" "$M/$N" "$ROM" cmp 2>/dev/null | grep -vxF -f "$T" > "$M/$N.out"
+    grep -E "$P" "$M/$N.out"
+    echo "enc: $(grep -c . "$M/$N.out") waves differ from the baseline"
     exit
 fi
 "$M/$N" "$ROM" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"

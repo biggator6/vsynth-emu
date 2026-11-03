@@ -15,5 +15,6 @@ bool xtTablesLoaded();
 
 // Encodes a mono 44.1 kHz wave.  Returns the record stream without the
 // (256, 1) terminator: contiguous records tiling [0, n·16); empty if the
-// tables are not loaded.
+// tables are not loaded, and for the lengths the firmware makes no list for
+// (1, 2, 2004 and 2005 samples).
 std::vector<XtRecord> xtSoloEncode(const int16_t* x, int n);

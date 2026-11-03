@@ -1,0 +1,23 @@
+silent-wrap|s = wadd(s, ((v >> 7) & 1) + (v >> 8));|s += ((v >> 7) & 1) + (v >> 8);
+silent-test|if (s < 0) { s = 0x7fffffff; break; }|
+fill-limit|if (span < 0x44e0 \|\||if (span < 16000 \|\|
+cross-a|const int p = crossing(a, 1, pa);|const int p = pa;
+cross-b|const int p = crossing(b, -1, pb);|const int p = pb;
+cross-ea|A = crossing(a, 1, A);|
+cross-eb|B = crossing(b, -1, B);|
+cross-limit|if (wshl(steps, 16) <= period \|\| steps >= 882)|if (wshl(steps, 16) <= period \|\| steps >= 441)
+cross-over|if (wshl(steps, 16) <= period \|\| steps >= 882) return period;|return period;
+cross-half|if ((int)fetch(i) * sg <= 0) while|if (false) while
+clamp-b|if (b < a) b = a;|
+next-a|na = f9de0(A, B);|na = f9de0(pa, B);
+lag-above|(fromTracker ? 21 : 17)|17
+lag-below|(fromTracker ? 12 : 15)|15
+scratch-step|? 1 : 4;|? 4 : 4;
+end-mark|if (tail_->prev && 2 * tail_->pos - tail_->prev->pos < last) insert(2 * tail_->pos - tail_->prev->pos, 0, head_->low);|
+short-lag|if ((unsigned)n_ < (unsigned)maxLag_) {|if (false) {
+short-fir|((float)pmin_ + 307.94998f)|((float)22 + 307.94998f)
+no-list|if (!started_) return {};|
+drift-stale|float* buf = driftBuf_.data();|std::fill(driftBuf_.begin(), driftBuf_.end(), 0.0f); float* buf = driftBuf_.data();
+drift-nan|if (!std::isfinite(d)) return;|
+fir-order|(41.131832f - u2 * 74.14366f) * u2)|(41.131832f - u2 * 74.14366f) * u * u)
+drift-head|buf[pad - 1] = -4e-31f;|

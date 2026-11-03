@@ -8,9 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
-#include <map>
 #include <memory>
-#include <set>
 #include <string>
 
 namespace {
@@ -44,7 +42,7 @@ struct Machine {
         cpu.mapRam(kRam, kRamSize);
         cpu.forceNearest = g_nearest;
         auto alloc = [this](uint32_t sz) -> uint32_t {
-            sz = (sz + 15) & ~15u;
+            sz = (std::max(sz, 1u) + 15) & ~15u;       // malloc(0) (the SOLO encoder's pool under 160 samples) still gives a block
             const uint32_t p = heap;
             if (heap + sz > kRam + kRamSize) return 0;
             if (uint8_t* m = cpu.ptr(p, sz)) std::memset(m, 0, sz);
@@ -101,24 +99,14 @@ bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out) {
     c.wr32(kEv, (uint32_t)n * 16);          // event list {n·16}: one sustained note
     if (!c.call(kSoloNew, { (uint32_t)n, kSamp, 1, kEv }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
     if (!c.call(kSoloEncode, { 2 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
-    // Node pool: 16-byte nodes {u16 low, u16 v, i32 pos, u32 lower, u32 higher};
-    // the record chain is the longest walk up from a node with no lower link.
-    struct Node { uint32_t low, v; int32_t pos; uint32_t lo, hi; };
-    std::map<uint32_t, Node> nodes;
-    for (uint32_t p = kHeap + 16; p + 16 <= M->heap; p += 16) {
-        Node d{ c.rd16(p), c.rd16(p + 2), (int32_t)c.rd32(p + 4), c.rd32(p + 8), c.rd32(p + 12) };
-        if (d.low || d.v || d.pos || d.lo || d.hi) nodes[p] = d;
-    }
-    std::vector<Node> best;
-    for (const auto& e : nodes) {
-        if (e.second.lo != 0 || !nodes.count(e.second.hi)) continue;
-        std::vector<Node> seq;
-        std::set<uint32_t> seen;
-        for (uint32_t p = e.first; nodes.count(p) && seen.insert(p).second; p = nodes[p].hi) seq.push_back(nodes[p]);
-        if (seq.size() > best.size()) best = seq;
-    }
-    for (size_t k = 0; k + 1 < best.size(); ++k)
-        out.push_back({ best[k].pos, best[k + 1].pos - best[k].pos, (int)(((best[k + 1].v >> 8) & 0xf8) | best[k + 1].low) });
+    // The record list: 16-byte nodes {u8 low, u8, u16 v, i32 pos, u32 lower, u32 higher}, from the head at 0x89ff10c4.
+    struct Node { uint32_t low, v; int32_t pos; };
+    std::vector<Node> list;
+    uint32_t count = c.rd32(0x89ff10c0);                     // the firmware's own node count
+    for (uint32_t p = c.rd32(0x89ff10c4); p && count; p = c.rd32(p + 12), --count)
+        list.push_back({ c.rd8(p), c.rd16(p + 2), (int32_t)c.rd32(p + 4) });
+    for (size_t k = 0; k + 1 < list.size(); ++k)
+        out.push_back({ list[k].pos, list[k + 1].pos - list[k].pos, (int)(((list[k + 1].v >> 8) & 0xf8) | list[k + 1].low) });
     return true;
 }
 
