@@ -28,11 +28,14 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `research/tools/`: the scripts below. `research/ghidra_scripts/`: Ghidra scripts.
 
 ## Tools (`research/tools/`, paths in `env.sh`; work files in `build/tools/`)
-- `verify.sh [rev]`: the standard validation, one line each — firmware checks
+- `verify.sh [--full] [rev]`: the standard validation, one line each — firmware checks
   vs baseline, A/B renders vs `rev` (default HEAD), plugin build, PluginTest,
-  engine tests, auval. Run it for every version.
-- `fcheck.sh [--update]`: every firmware harness on fixed cases against
-  `fcheck_baseline.txt`. `--update` only when adding checks/cases on purpose.
+  engine tests, auval. Run it for every version; `--full` before a push.
+- `fcheck.sh [--update] [--full]`: every firmware harness on fixed cases against
+  `fcheck_baseline.txt`, side by side. A section is reused when its binary, command,
+  ROM and inputs are those of a run that matched the baseline (`build/tools/fcheck/kept`
+  in the main checkout, shared by the worktrees); `--full` runs them all. `--update`
+  only when adding checks/cases on purpose.
 - `ab.sh [rev]`: XtSynth CLI renders, `rev` vs working tree; `XT_*` env vars
   set controls (see the `XT_SYNTH_MAIN` comment in XtSynth.cpp).
 - `pt.sh [note]`: PluginTest (processor vs XtSynth); `TEST_*` env vars (see
@@ -55,13 +58,23 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=toneband`: xt_tone, XtMultiBandPlayer.cpp; `PORT=tonecheck`: xt_tone,
   XtToneCheck.cpp; `SEED=<n>`: xt_tone's seed, default 2024)
   and runs it, to show the check catches it. `mutate_tone.py [cases]`: the list in
-  `tone_muts.txt`.
+  `tone_muts.txt`, each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
 - `xt_tone <rom> [cases] [seed] [inputs]` (in fcheck; `build/tools/fcheck/bin`): XtSynth's wiring
   against a whole firmware tone. `XT_TONE_FIRST=1`: each case's first difference, `XT_TONE_DUMP=<case>|a`:
   its settings. A new `Controls` field needs its ID in `patchOf` and a draw in `drawControls`, and a field
   in a list of what changed in `listedFields`.
 - `firorder.py <listing>`: the order of additions in an unrolled sum, by a
   symbolic run of its disassembly (written for the Frequency Shifter's FIR).
+
+## What to run when
+- While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
+  takes about 10 s), and `mutate_tone.py 2000 <new names>` for the planted errors just added.
+- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 3 minutes) if
+  `XtSynth.cpp`, `XtToneCheck.cpp` or a port changed: a planted error can stop meaning anything
+  when the code under it changes (v107), and only re-running the list shows it.
+- Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
+  a difference, not as a routine.
+- Before a push: `verify.sh --full`.
 
 ## Firmware facts worth knowing
 - rom.2 maps at 0x89300000; .data/.bss up to 0x8a020000 (the interpreter sets
@@ -125,7 +138,7 @@ checked in `XT_COSM_MAIN`'s last section.
 
 ## Building
 - Plugin (JUCE in ./JUCE): `SDKROOT=$SDK cmake --build build/plugin -j 10`
-  (installs AU/VST3), test: `--target VSynthEmuTest`. Configure once with
+  (installs AU/VST3), test: `--target VSynthEmuTest`, both (verify.sh): `--target VSynthEmuVerify`. Configure once with
   `cmake -S plugin -B build/plugin -DCMAKE_BUILD_TYPE=Release` (see notes.txt).
 - Use `.venv/bin/python3` (system python lacks numpy). Write multi-step shell
   work as bash scripts (zsh word-splits differently).

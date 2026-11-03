@@ -3236,3 +3236,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Taking the fix out brings back the original failure to the digit.
 - v107's number was taken while I worked, and master moved under this. Moving onto it was worth doing properly, since v107 changes what a COSM reads and this case ends in one. Every number came back the same.
 - A sibling asked about seed 2007's case 9186. It looked free of SOLO only because `XT_TONE_DUMP` prints OSC 1's wave alone. OSC 2 had a SOLO wave. That print has now misled two of us.
+
+### Session 16 addendum (2026-11-03) — v109: cheaper checks
+
+- The user asked why each task took so much time and CPU. Timing every step first was worth it: compiling, the obvious suspect, was 27 seconds. One run of the planted-error list cost about as much as twenty runs of `verify.sh`, and every run carried on through all its cases after the first difference. Half of them differ within 13 cases.
+- Reuse is safe only if the same source gives the same binary. My first test of that said no, because I had named the two outputs differently and a Mach-O carries its name in its signature. Under one name they are identical, from another folder too.
+- A section is kept only from a run that matched the baseline, so a truncated or wrong result can't be stored and handed back later. A planted error showed it: different, then different again on the next run, not reused.
+- Two tests here passed for the wrong reason. The first failure test planted nothing, because the constant it looked for wasn't in the file, and "as baseline" looked like a pass until the traceback above it was read. An early plugin rebuild of 1.3 s looked wonderfully fast and was a failed link, the "album file" error, whose failed links also deleted the test binary. It came back with no Xcode update this time. The clean rebuild cured it again; its cause here isn't known.
+- `verify.sh` had the same trap: with the plugin build failed, PluginTest and auval still printed passes against the old binaries. Both are skipped now.
+- PGO on the interpreter reached 31% against the hand-tuned loop's quarter. Not worth a training step in every build.

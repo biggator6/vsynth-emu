@@ -62,7 +62,7 @@ private:
     std::vector<Region*> regions;
     std::vector<uint8_t*> page;                         // 4 KB pages over the 29-bit physical space
     std::unordered_map<uint32_t, std::function<void(Sh4&)>> hooks;
-    std::vector<uint8_t> hookPage;
+    std::vector<uint8_t> hookFilter;                    // by an address's low bits: a hook may be there (hooks decides)
     std::string err;
     uint64_t nsteps = 0;
     int hostRound = -1;
@@ -71,7 +71,6 @@ private:
     uint8_t* at(uint32_t a, uint32_t n);
     void setFpscr(uint32_t v);
     void syncRound();
-    bool step();                                        // one instruction (plus its delay slot)
     bool exec(uint16_t op, bool slot, uint32_t& next);
     bool fault(const char* what, uint32_t addr);
 

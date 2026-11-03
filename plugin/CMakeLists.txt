@@ -95,6 +95,9 @@ target_link_libraries(VSynthEmuTest PRIVATE VSynthEmu)
 # JUCE's headers and settings as the plugin's shared code sees them
 target_include_directories(VSynthEmuTest PRIVATE $<TARGET_PROPERTY:VSynthEmu,INCLUDE_DIRECTORIES>)
 target_compile_definitions(VSynthEmuTest PRIVATE $<TARGET_PROPERTY:VSynthEmu,COMPILE_DEFINITIONS>)
+# What verify.sh builds, in one make: the plugin's links and the test's run side by side
+add_custom_target(VSynthEmuVerify)
+add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.
