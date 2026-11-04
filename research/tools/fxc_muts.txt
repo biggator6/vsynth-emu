@@ -86,5 +86,28 @@ unit-left-slot|lr[2 * i] = fromChip(chip.gram(0xa1))|lr[2 * i] = fromChip(chip.g
 unit-no-dir-l| + fromChip(chip.gram(0xa5));|;
 unit-no-dir-r| + fromChip(chip.gram(0xa7));|;
 unit-no-service|    for (int i = 0; i < frames; ++i) {\n        control_.service(chip);\n|    for (int i = 0; i < frames; ++i) {\n
-unit-no-settle|while (ok() && !control_.drained()) { control_.service(chip); chip.runFrame(); }|
-
+unit-no-settle|while (ok() && !control_.drained()) { control_.pump(); control_.service(chip); chip.runFrame(); }|
+tick-no-gate|    if (!drained()) return;\n    if (patchWanted_)|    if (patchWanted_)
+tick-no-patch|    if (patchWanted_) { patchWanted_ = false; loadPatch(); }\n    else update();|    update();
+tick-patch-twice|patchWanted_ = false; loadPatch();|loadPatch();
+tick-no-update|    else update();\n}|}
+clock-no-source|sh4_->wr8(kClock + 0x40, 1);|sh4_->wr8(kClock + 0x40, 0);
+clock-offset|sh4_->wr16(kClock + 0x48, (uint16_t)sixClocksMs);|sh4_->wr16(kClock + 0x4a, (uint16_t)sixClocksMs);
+clock-no-call|    call(0x894acb10, { kThis });\n|
+clock-no-flush|    call(0x894acb10, { kThis });\n    flush(0);|    call(0x894acb10, { kThis });
+cat-names-table|kMfxNames = 0x89788c98|kMfxNames = 0x89788cb0
+cat-names-stride|kMfxNames + 24 * (uint32_t)t|kMfxNames + 20 * (uint32_t)t
+cat-first|const int first = (int16_t)rom.rd16(table + 4 * (uint32_t)t), last|const int first = (int16_t)rom.rd16(table + 4 * (uint32_t)t) + 1, last
+cat-last|last = (int16_t)rom.rd16(table + 4 * (uint32_t)t + 2);|last = (int16_t)rom.rd16(table + 4 * (uint32_t)t + 2) - 1;
+cat-last-more|id <= last; ++id|id <= last + 1; ++id
+cat-mfx-table|types(kMfxIds, kMfxTypes, cat.mfx);|types(kChoIds, kChoTypes, cat.mfx);
+cat-cho-table|types(kChoIds, kChoTypes, cat.chorus);|types(kRevIds, kChoTypes, cat.chorus);
+cat-rev-table|types(kRevIds, kRevTypes, cat.reverb);|types(kChoIds, kRevTypes, cat.reverb);
+cat-star|if (star != std::string::npos) t.erase(star);|
+cat-space-front|return from == std::string::npos ? std::string() : t.substr(from, to - from + 1);|return from == std::string::npos ? std::string() : t.substr(0, to + 1);
+cat-space-back|return from == std::string::npos ? std::string() : t.substr(from, to - from + 1);|return from == std::string::npos ? std::string() : t.substr(from);
+cat-eq-first|for (int id = 0x65; id <= 0x6f; ++id)|for (int id = 0x66; id <= 0x6f; ++id)
+cat-eq-switch|cat.eq.push_back(param(0x70));|
+cat-ok|cat.ok = c.ok();|cat.ok = false;
+cat-hide-range|if (p.high > p.low) out[(size_t)t]|out[(size_t)t]
+clock-no-guard| sixClocksMs <= 0) return;| false) return;

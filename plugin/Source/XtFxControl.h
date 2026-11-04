@@ -50,9 +50,18 @@ public:
     void loadPatch();
     bool pending() const { return dirty_ != 0; }                                        // has anything been set since the last of those?
 
+    // Control thread, on a timer: update(), or loadPatch() if wantPatch() has asked, but only once the chip has all of the last one.  The XT's task takes a message at a time, and flags set
+    // while it's on one go as one.  The driver's sleep doesn't sleep here, so otherwise a stream of edits would run ahead of the chip by what its waits add up to.
+    void tick();
+    void wantPatch() { patchWanted_ = true; }
+
     // Control thread.  The Matrix's MFX-PRM1…3, as it sums them (its slots 9…0xb), which the firmware hands the MFX on each pass (0x894e7aa0).  Nothing happens unless a value has
     // changed and the type assigns it, and a new type starts from nothing, so it wants calling as often as the firmware does.
     void setMatrix(int prm1, int prm2, int prm3);
+
+    // Control thread.  The firmware's poll of an outside clock (0x894acb10): with Clock Source (ID 0x41) at 1 and sent, the tempo as the clock reads it, 150000 / its ms over the last six clocks,
+    // reaches the effects if it has moved by more than 2.5 BPM plus 1%.
+    void outsideClock(int sixClocksMs);
 
     // Control thread, when nothing else has called anything for a while: frees what the chip has taken and passes on what the queue had no room for.  Without audio running the
     // driver's writes wait here, without limit.
@@ -70,6 +79,7 @@ public:
     uint32_t word(unsigned index) const { return shadow_[index & 2047]; }
 
 private:
+    friend struct XtFxCatalog xtFxCatalog(const char* romPath);
     struct Word { uint32_t value; uint16_t index; uint8_t command; };
     struct Batch { std::vector<Word> words; uint32_t waitAfter = 0; };                  // reaches the chip whole; then the chip plays on for waitAfter samples before the next
     static constexpr uint32_t kSlots = 1024;
@@ -90,6 +100,7 @@ private:
     std::string error_;
     std::vector<int16_t> store_, low_, high_;
     unsigned dirty_ = 0;
+    bool patchWanted_ = false;
 
     // The control thread's side of the queue.
     uint32_t shadow_[2048] = {};
@@ -105,6 +116,17 @@ private:
     Observer observer_ = nullptr;
     void* observerContext_ = nullptr;
 };
+
+// What the firmware says about the effects' parameters, for an editor: read from rom.2 when it's asked for, so none of it is in this source.  For each type of each block, its
+// parameters; the system's EQ; and the MFX types' names.  (The Chorus's and Reverb's are the manual's, here.)  A value is what set() takes.
+struct XtFxParam { int id = 0; std::string name; int low = 0, high = 0, def = 0; };
+struct XtFxCatalog {
+    bool ok = false;
+    std::vector<std::string> mfxTypes, chorusTypes, reverbTypes;
+    std::vector<std::vector<XtFxParam>> mfx, chorus, reverb;
+    std::vector<XtFxParam> eq;
+};
+XtFxCatalog xtFxCatalog(const char* romPath);
 
 // The effects whole, as XtSynth uses them: the chip, its driver and the frame's way through.  One control thread and one audio thread, as above.
 class XtFxUnit : public XtBusSink {

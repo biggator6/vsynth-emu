@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
+#include "FxPanel.h"
 
 class VSynthEmuEditor : public juce::AudioProcessorEditor,
                         private juce::ComboBox::Listener,
@@ -51,6 +52,8 @@ private:
     juce::ToggleButton oscOnBtn_ { "On" };
     juce::ToggleButton fxOnBtn_ { "Effects" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> fxOnAtt_;
+    juce::TextButton fxPanelBtn_ { "FX Edit" };     // in the file strip; the panel takes the place of the strip below it
+    std::unique_ptr<FxPanel> fxPanel_;
     static constexpr int kAnaKnobs = 12;  // Impact; PW, PW KF, Fat, Fat KF; PW LFO, PW Env, Fat LFO, Fat Env; Detune, Sub Octave, Sub Level
     juce::Slider     anaSliders_[kAnaKnobs];
     juce::Label      anaLabels_[kAnaKnobs], anaWaveLabel_ { {}, "Wave" };

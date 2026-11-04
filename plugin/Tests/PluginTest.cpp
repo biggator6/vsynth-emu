@@ -3,8 +3,11 @@
 // directly on the same input.  Build: cmake --build <dir> --target VSynthEmuTest
 // Run:   VSynthEmuTest <rom.2.bin> <file.wav> [note]
 #include "../Source/PluginProcessor.h"
+#include "../Source/FxPanel.h"
+#include "../Source/Sh4Interp.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <cstdio>
+#include <map>
 #include <string>
 #include <thread>
 
@@ -22,7 +25,8 @@ int main(int argc, char** argv) {
     // layout (TEST_SNAPSHOT_COSM2=1: with the COSM rows on COSM 2;
     // TEST_SNAPSHOT_TYPE=n: COSM 1's type, e.g. 6 for the 2nd Side Band rows;
     // TEST_SNAPSHOT_ANALOG=1: OSC Type ANALOG, its rows shown;
-    // TEST_SNAPSHOT_OSC2=1: with the OSC rows on OSC 2; =pcm: with OSC 2 on PCM too)
+    // TEST_SNAPSHOT_OSC2=1: with the OSC rows on OSC 2; =pcm: with OSC 2 on PCM too;
+    // TEST_SNAPSHOT_FX=page: the effects' panel, 0 MFX, 1 Chorus, 2 Reverb, 3 EQ, with TEST_SNAPSHOT_FXTYPE=n the page's block's type)
     if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
         if (std::getenv("TEST_SNAPSHOT_ANALOG")) {
             auto* prm = p.apvts.getParameter("oscType");
@@ -43,6 +47,12 @@ int main(int argc, char** argv) {
         if (std::getenv("TEST_SNAPSHOT_OSC2"))       // the OSC rows switched to OSC 2
             for (juce::Component* ch : ed->getChildren())
                 if (auto* cb = dynamic_cast<juce::ComboBox*>(ch); cb && cb->getItemText(0) == "OSC 1") cb->setSelectedId(2, juce::sendNotificationSync);
+        if (const char* page = std::getenv("TEST_SNAPSHOT_FX")) {
+            static const char* const typeOf[] = { "fxMfxType", "fxChoType", "fxRevType", "fxMfxType" };
+            if (const char* t = std::getenv("TEST_SNAPSHOT_FXTYPE")) { auto* prm = p.apvts.getParameter(typeOf[std::atoi(page) & 3]); prm->setValueNotifyingHost(prm->convertTo0to1((float)std::atoi(t))); }
+            for (juce::Component* ch : ed->getChildren())
+                if (auto* panel = dynamic_cast<FxPanel*>(ch)) { panel->setVisible(true); panel->toFront(false); panel->showPage(std::atoi(page)); }
+        }
         const juce::Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 2.0f);
         juce::File f(juce::File::getCurrentWorkingDirectory().getChildFile(snap));
         f.deleteFile();
@@ -50,6 +60,50 @@ int main(int argc, char** argv) {
         juce::PNGImageFormat png;
         if (!os.openedOk() || !png.writeImageToStream(img, os)) { std::fprintf(stderr, "snapshot failed\n"); return 1; }
         std::printf("snapshot: %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
+    }
+    // TEST_FX_PANEL=1: every page and type of the effects' panel, then stop: it lists the catalog's parameters by name and range, shows each one's value, and a slider sets its parameter.
+    if (std::getenv("TEST_FX_PANEL")) {
+        std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
+        FxPanel* panel = nullptr;
+        for (juce::Component* ch : ed->getChildren()) if (auto* fp = dynamic_cast<FxPanel*>(ch)) panel = fp;
+        juce::Viewport* view = nullptr;
+        if (panel) for (juce::Component* ch : panel->getChildren()) if (auto* v = dynamic_cast<juce::Viewport*>(ch)) view = v;
+        if (!view) { std::fprintf(stderr, "panel: not found\n"); return 1; }
+        panel->setVisible(true);
+        const XtFxCatalog& cat = p.fxCatalog();
+        if (!cat.ok) { std::fprintf(stderr, "panel: no catalog\n"); return 1; }
+        int checked = 0;
+        const auto page = [&](int pg, const char* typeParam, int type, const std::vector<XtFxParam>& list) {
+            if (typeParam) { auto* prm = p.apvts.getParameter(typeParam); prm->setValueNotifyingHost(prm->convertTo0to1((float)type)); }
+            panel->showPage(pg);
+            std::vector<juce::Slider*> sliders; std::vector<juce::Label*> labels;
+            for (juce::Component* ch : view->getViewedComponent()->getChildren())
+                if (ch->isVisible()) { if (auto* sl = dynamic_cast<juce::Slider*>(ch)) sliders.push_back(sl); else if (auto* lb = dynamic_cast<juce::Label*>(ch)) labels.push_back(lb); }
+            if (sliders.size() != list.size() || labels.size() != list.size()) { std::fprintf(stderr, "panel: page %d type %d lists %zu, %zu names, against %zu\n", pg, type, sliders.size(), labels.size(), list.size()); return false; }
+            if (view->getViewedComponent()->getHeight() < 24 * (int)list.size()) { std::fprintf(stderr, "panel: page %d type %d doesn't fit its rows\n", pg, type); return false; }
+            for (size_t i = 0; i < list.size(); ++i) {
+                const XtFxParam& q = list[i];
+                if (labels[i]->getText().toStdString() != q.name || sliders[i]->getMinimum() != q.low || sliders[i]->getMaximum() != q.high || (int)sliders[i]->getValue() != q.def) { std::fprintf(stderr, "panel: page %d type %d row %zu shows %s %g..%g %g against %s %d..%d %d\n", pg, type, i, labels[i]->getText().toRawUTF8(), sliders[i]->getMinimum(), sliders[i]->getMaximum(), sliders[i]->getValue(), q.name.c_str(), q.low, q.high, q.def); return false; }
+                const int to = q.def == q.high ? q.low : q.high;
+                sliders[i]->setValue(to, juce::sendNotificationSync);
+                if (p.fxParam(q.id, INT_MIN) != to) { std::fprintf(stderr, "panel: %s's slider didn't set ID %x\n", q.name.c_str(), q.id); return false; }
+                panel->showPage(pg);
+                if ((int)sliders[i]->getValue() != to) { std::fprintf(stderr, "panel: %s's slider didn't keep its value\n", q.name.c_str()); return false; }
+                p.setFxParam(q.id, q.def);                                  // as a host's saved state does
+                panel->showPage(pg);
+                if ((int)sliders[i]->getValue() != q.def) { std::fprintf(stderr, "panel: %s's slider doesn't follow ID %x\n", q.name.c_str(), q.id); return false; }
+                checked++;
+            }
+            return true;
+        };
+        for (int t = 0; t < 42; ++t) if (!page(0, "fxMfxType", t, cat.mfx[(size_t)t])) return 1;
+        for (int t = 0; t < 9; ++t) if (!page(1, "fxChoType", t, cat.chorus[(size_t)t])) return 1;
+        for (int t = 0; t < 11; ++t) if (!page(2, "fxRevType", t, cat.reverb[(size_t)t])) return 1;
+        if (!page(3, nullptr, 0, cat.eq)) return 1;
+        // A page's change alone, with each block on the same type number.
+        for (int t = 1; t < 4; ++t) { if (!page(0, "fxMfxType", t, cat.mfx[(size_t)t]) || !page(1, "fxChoType", t, cat.chorus[(size_t)t]) || !page(2, "fxRevType", t, cat.reverb[(size_t)t])) return 1; }
+        std::printf("the panel: %d parameters as the catalog has them\n", checked);
+        return 0;
     }
     if (argc > 4) {   // Encode Type (choice index 0 Auto, 1 SOLO, 2 BACKING, 3 ENSEMBLE)
         const juce::String t(argv[4]);
@@ -484,6 +538,13 @@ int main(int argc, char** argv) {
         setKnobs({ { "tvaLevel", refCtl.tvaLevel }, { "tvaLevelKF", refCtl.tvaLevelKF }, { "tvaLevelLfo", refCtl.tvaLevelLfo }, { "tvaPan", refCtl.tvaPan },
                    { "tvaPanKF", refCtl.tvaPanKF }, { "tvaPanLfo", refCtl.tvaPanLfo }, { "mfxSend", refCtl.mfxSend } });
     }
+    // TEST_BUS="chorus,reverb,assign,parallel": the patch TVA's other sends, Output Assign, Output Mode
+    if (const char* e = std::getenv("TEST_BUS")) {
+        int parallel = 1;
+        std::sscanf(e, "%d,%d,%d,%d", &refCtl.chorusSend, &refCtl.reverbSend, &refCtl.outputAssign, &parallel);
+        refCtl.parallel = parallel != 0;
+        setKnobs({ { "tvaChoSend", refCtl.chorusSend }, { "tvaRevSend", refCtl.reverbSend }, { "outputAssign", refCtl.outputAssign }, { "outputMode", parallel } });
+    }
     // TEST_MATRIX="source,dest1,sens1,dest2,sens2": Matrix Control 1 (with TEST_CC to move its source)
     if (const char* e = std::getenv("TEST_MATRIX")) {
         XtMatrixControl& x = refCtl.matrix[0];
@@ -643,13 +704,53 @@ int main(int argc, char** argv) {
     XtSynth ref; ref.prepare(rate); ref.setSample(E); ref.setControls(refCtl);
     if (E2) ref.setSample(E2, 1);
     // TEST_FX=1: the Effects switch on, so all this goes through the chip: the processor's, and one here on the reference's bus, each started the same way.
+    // TEST_FX_KNOBS="fxRevOn=1,fxRevType=4": its parameters; TEST_FX_EDIT="0x80e=20,...": those by the firmware's ID.  TEST_FX_LIVE="frame:name=value,...": then, at
+    // that frame's block, a parameter by name or ID, ticking both sides each block as the control thread does.
     std::unique_ptr<XtFxUnit> refFx;
     if (std::getenv("TEST_FX")) {
+        p.fxManualTicks();
         p.apvts.getParameter("fxOn")->setValueNotifyingHost(1.0f);
+        refFx = std::make_unique<XtFxUnit>(argv[1]);
+        // Each of the plugin's effect parameters has the name, range and default the firmware gives its ID.
+        Sh4 romImage; romImage.loadRom(argv[1]);
+        for (auto* prmBase : p.getParameters())
+            if (auto* prm = dynamic_cast<juce::RangedAudioParameter*>(prmBase); prm && VSynthEmuProcessor::fxKnobId(prm->paramID) >= 0) {
+                const int id = VSynthEmuProcessor::fxKnobId(prm->paramID), def = (int)std::lround(prm->convertFrom0to1(prm->getDefaultValue()));
+                juce::String firmwareName;
+                for (uint32_t a = romImage.rd32(0x89790338 + 4 * (uint32_t)id); romImage.rd8(a); ++a) firmwareName += (char)romImage.rd8(a);
+                firmwareName = firmwareName.upToFirstOccurrenceOf(" *", false, false).trim();
+                if (prm->name != firmwareName) { std::fprintf(stderr, "%s is ID %x, which is %s\n", prm->name.toRawUTF8(), id, firmwareName.toRawUTF8()); return 1; }
+                if (prm->convertFrom0to1(0.0f) != (float)refFx->control().lowest(id) || prm->convertFrom0to1(1.0f) != (float)refFx->control().highest(id) || def != refFx->control().get(id)) {
+                    std::fprintf(stderr, "%s isn't as ID %x's descriptor: %g..%g, %d against %d..%d, %d\n", prm->paramID.toRawUTF8(), id, prm->convertFrom0to1(0.0f), prm->convertFrom0to1(1.0f), def, refFx->control().lowest(id), refFx->control().highest(id), refFx->control().get(id));
+                    return 1;
+                }
+            }
+        if (const char* e = std::getenv("TEST_FX_KNOBS"))
+            for (const auto& pair : juce::StringArray::fromTokens(e, ",", "")) {
+                const juce::String name = pair.upToFirstOccurrenceOf("=", false, false); const int v = pair.fromFirstOccurrenceOf("=", false, false).getIntValue();
+                auto* prm = p.apvts.getParameter(name);
+                if (!prm || VSynthEmuProcessor::fxKnobId(name) < 0) { std::fprintf(stderr, "no such effect parameter: %s\n", name.toRawUTF8()); return 1; }
+                prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+                refFx->control().set(VSynthEmuProcessor::fxKnobId(name), v);
+            }
+        if (const char* e = std::getenv("TEST_FX_EDIT"))
+            for (const auto& pair : juce::StringArray::fromTokens(e, ",", "")) {
+                const int id = (int)std::strtol(pair.upToFirstOccurrenceOf("=", false, false).toRawUTF8(), nullptr, 0), v = pair.fromFirstOccurrenceOf("=", false, false).getIntValue();
+                p.setFxParam(id, v);
+                refFx->control().set(id, v);
+            }
         p.fxTick();
         if (!p.effectsRunning()) { std::fprintf(stderr, "the effects didn't start\n"); return 1; }
-        refFx = std::make_unique<XtFxUnit>(argv[1]);
+        refFx->control().set(0x11d, ref.fxPatchTempo());
+        refFx->control().loadPatch();
         refFx->settle();
+        {   // What a host's saved state brings back: the edits by ID, in a new processor.
+            juce::MemoryBlock saved; p.getStateInformation(saved);
+            VSynthEmuProcessor back; back.fxManualTicks(); back.setStateInformation(saved.getData(), (int)saved.getSize());
+            if (const char* e = std::getenv("TEST_FX_EDIT"))
+                for (const auto& pair : juce::StringArray::fromTokens(e, ",", ""))
+                    if (back.fxParam((int)std::strtol(pair.upToFirstOccurrenceOf("=", false, false).toRawUTF8(), nullptr, 0), INT_MIN) != pair.fromFirstOccurrenceOf("=", false, false).getIntValue()) { std::fprintf(stderr, "a saved state lost %s\n", pair.toRawUTF8()); return 1; }
+        }
         ref.setBusSink(refFx.get()); ref.useBusSink(true);
     }
 
@@ -696,7 +797,39 @@ int main(int argc, char** argv) {
         const juce::StringArray w = juce::StringArray::fromTokens(e, ",", "");
         for (int i = 0; i + 2 < w.size(); i += 3) ccs.push_back({ w[i].getIntValue(), w[i + 1].getIntValue(), w[i + 2].getIntValue() / block * block });
     }
+    struct FxAt { int frame; juce::String name; int value; };
+    std::vector<FxAt> fxLive;
+    if (const char* e = std::getenv("TEST_FX_LIVE"))
+        for (const auto& t : juce::StringArray::fromTokens(e, ",", "")) {
+            const juce::String kv = t.fromFirstOccurrenceOf(":", false, false);
+            fxLive.push_back({ t.upToFirstOccurrenceOf(":", false, false).getIntValue() / block * block, kv.upToFirstOccurrenceOf("=", false, false), kv.fromFirstOccurrenceOf("=", false, false).getIntValue() });
+        }
+    double tail = 0.0, tailMean = 0.0;
     for (int done = 0; done < total; done += block) {
+        std::map<int, int> fxNow;    // the last of a block's, as the processor sees them at its tick
+        for (const FxAt& t : fxLive)
+            if (t.frame == done) {
+                if (VSynthEmuProcessor::fxKnobId(t.name) >= 0) {
+                    auto* prm = p.apvts.getParameter(t.name);
+                    prm->setValueNotifyingHost(prm->convertTo0to1((float)t.value));
+                    fxNow[VSynthEmuProcessor::fxKnobId(t.name)] = t.value;
+                } else {
+                    const int id = (int)std::strtol(t.name.toRawUTF8(), nullptr, 0);
+                    p.setFxParam(id, t.value);
+                    fxNow[id] = t.value;
+                }
+            }
+        if (refFx) {
+            p.fxTick();
+            XtFxControl& c = refFx->control();
+            for (const auto& [id, value] : fxNow) c.set(id, value);
+            c.set(0x11d, ref.fxPatchTempo());
+            c.set(0x41, ref.fxClockSix() ? 1 : 0);
+            c.tick();
+            c.setMatrix(ref.fxMatrix(0), ref.fxMatrix(1), ref.fxMatrix(2));
+            c.outsideClock(ref.fxClockSix());
+            c.pump();
+        }
         head.bpm = hostBpm;
         head.ppq = hostPpq + (double)done / rate * hostBpm / 60.0;
         head.moving = hostMoving != 0;
@@ -731,8 +864,10 @@ int main(int argc, char** argv) {
             maxDiff = std::max(maxDiff, (double)std::abs(buf.getSample(1, i) - rr[(size_t)i]));
             energy += (double)buf.getSample(0, i) * buf.getSample(0, i);
             side += (double)(buf.getSample(0, i) - buf.getSample(1, i)) * (buf.getSample(0, i) - buf.getSample(1, i));
+            if (done >= total - total / 8) { tail += (double)buf.getSample(0, i) * buf.getSample(0, i); tailMean += buf.getSample(0, i); }
         }
     }
+    if (refFx) std::printf("the last eighth: rms %.5f, mean %.5f; MFX-PRM %d %d %d\n", std::sqrt(tail / (total / 8)), tailMean / (total / 8), ref.fxMatrix(0), ref.fxMatrix(1), ref.fxMatrix(2));
     std::printf("rendered %d frames at %.0f Hz: rms %.4f (L-R %.4f), max |plugin - XtSynth| = %g (first at frame %ld)\n",
                 total, rate, std::sqrt(energy / total), std::sqrt(side / total), maxDiff, firstDiff);
     return maxDiff == 0 && energy > 0 ? 0 : 2;

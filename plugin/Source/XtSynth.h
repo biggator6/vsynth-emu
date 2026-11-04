@@ -446,8 +446,14 @@ private:
 public:
     void setBusSink(XtBusSink* s) { sink.store(s, std::memory_order_release); }
     void useBusSink(bool on) { sinkOn = on; }
+    // What the effects' driver is told, for the control thread: the Patch Tempo; the outside clock's ms over six clocks, 0 on the patch's own; and the Matrix's MFX-PRM1…3 as a tone's last update left them.
+    int fxPatchTempo() const { return fxTempo.load(std::memory_order_relaxed); }
+    int fxClockSix() const { return fxSix.load(std::memory_order_relaxed); }
+    int fxMatrix(int i) const { return fxPrm[i].load(std::memory_order_relaxed); }
 private:
     std::atomic<XtBusSink*> sink { nullptr };
+    std::atomic<int> fxTempo { 1200 }, fxSix { 0 };
+    mutable std::atomic<int> fxPrm[3] { {0}, {0}, {0} };
     bool sinkOn = false;
     void busOut(float* lr);
     static constexpr int kFrameWords = 8;

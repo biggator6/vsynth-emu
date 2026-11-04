@@ -1547,6 +1547,63 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The effects' parameters and panel (2026-11-04, v137)
+
+Everything the chip does can now be set from the plugin. The FX Edit button, in the file strip with the Effects switch that moved there, opens a panel in the place of the XT strip. With the switch off, nothing changes: `ab.sh` 4/4 identical, and the new parameters reach nothing but the driver's store and the bus in `XtSynth::frame`, which the plain path adds up whichever pair a tone is on. (Output Assign moved under a held note does there what v133 found: to DIR it silences the note, away from DIR it doubles it.)
+
+**The parameters.** Fourteen have host parameters, named as the firmware names them, with its ranges and defaults, all the firmware's by ID:
+
+| Plugin | ID | Plugin | ID |
+|---|---|---|---|
+| `fxMfxOn`, `fxChoOn`, `fxRevOn` | 0x120, 0x121, 0x122 | `fxChoType`, `fxChoMaster`, `fxChoRev` | 0x1fc, 0x1fd, 0x1fe |
+| `fxMfxType`, `fxMfxMaster` | 0x177, 0x178 | `fxRevType`, `fxRevMaster` | 0x230, 0x231 |
+| `fxMfxCho`, `fxMfxRev` | 0x179, 0x17a | `fxMaster`, `fxGain` | 0x3e, 0x76 |
+
+v133's `Controls` get theirs too: `tvaChoSend`, `tvaRevSend`, `outputAssign`, `outputMode`. What hangs on a type doesn't suit a host's list, as its meaning and range change with the type, so the type parameters and the system's EQ, 872 in all, go by ID (`setFxParam(id, value)`, `fxParam(id, fallback)`), aren't automatable, and are saved in the state as `fxEdits`. A state coming back is a patch change. Each type has its own IDs, so a type's settings wait while another's loaded.
+
+**The catalog** (`xtFxCatalog`). The names and ranges are read from rom.2 at run time, as the rule on tables says. A fresh `XtFxControl`'s store already holds the descriptors' ranges and defaults, so all this adds is the type tables (`0x897a8218`, `0x897a82e4`, `0x897a8310`), the parameter names and the MFX types' names, 24 bytes each from `0x89788c98`. The three types with nothing to set (Thru, and the Off types) have one entry, no range, name "_": that's left out. The Chorus's and Reverb's type names are the manual's, in the source. Until the ROM's loaded the panel lists nothing and its type boxes say "Type n". Values are the firmware's raw numbers: a Delay Time of 112 shows as 112, not as the note value it is.
+
+**A message at a time** (`XtFxControl::tick`). The control thread sets everything by ID every 10 ms, then `tick()`: `update()`, or `loadPatch()` if `wantPatch()` asked, and nothing at all unless the chip has all of the last one. The XT's task takes one message and sleeps inside it, and the flags set meanwhile go as one. Here the driver's sleep doesn't sleep, so without this a stream of edits would run ahead of the chip by what its waits add up to. A tempo moving for 10 s, tried both ways:
+
+| | Behind at the end | The words then |
+|---|---|---|
+| `update()` on each tick | 150 s | right, in 150 s |
+| `tick()` | 0.18 s | right |
+
+It also means no words pile up with the Effects switch off, when nothing's taking them: `setMatrix` and `outsideClock` aren't called then either.
+
+**The tempo.** The effects' driver reads ID 0x11d itself. So on the patch's own clock it gets the Patch Tempo as it stands, 233.0 BPM where the tones run at the clock's 233.4, and `fxPatchTempo()` passes that, not `tempo10Now()`.
+
+**An outside clock** (`XtFxControl::outsideClock`). The plugin's HOST is the firmware's Clock Source EXTERNAL (`XtSynth::hostClock`), and the driver has its own poll of the clock, `0x894acb10`, the task's event 0x20. With ID 0x41 sent, so `+0x1a` non-zero, it reads the clock's object at `0x89979bfc` as the tones' readers do: 150000 / `+0x48` when `+0x40` is set, with the same limits. Then a margin the tones don't have: it goes on only if that has moved from the last it took by more than 25 + last/100, in tenths of a BPM, 3.7 BPM at 120. It stores it, and calls `0x894ad4b0`, `0x894d34e0` and `0x894d0b50`, the MFX's, Chorus's and Reverb Delay's. That margin matters, as the reading steps with the whole ms over six clocks: at 120 BPM, 124 ms reads 120.9 and 126 ms 119.0. `outsideClock(ms)` writes those two fields and calls it. What raises the event I haven't traced (it's registered through `0x88008240(16, 0x894ad550)`), so the rate is the control thread's 10 ms, which can't matter to a comparison with the last value.
+
+**The Matrix.** `XtSynth::matrixUpdate` publishes a tone's MFX-PRM1…3 and the control thread hands them over as v131 has it. Each tone's update overwrites the last, as each note's does on the XT, and it's read once a tick.
+
+**The check.**
+
+| | |
+|---|---|
+| `xt_fx control`, new in its behaviour part | The catalog: 872 parameters, a step of each with its type loaded, 8 silent as below. The outside clock: at Clock Source 0, within the margin both ways, past it both ways, at 0 ms, back at 0. `tick()`: a stream of tempos 0.19 s behind at its end (the limit's 0.4), the last one right, and a patch and an edit sent as `loadPatch()` and `update()` send them |
+| `xt_fx control` against the reference | Outside-clock events added: 266919 samples, 0 different |
+| PluginTest `TEST_FX=1` on 20 settings, the processor against `XtSynth` and `XtFxUnit` by hand | 0 different: switches, types, levels, sends, Output Assign and Mode, edits by ID, edits in play, MFX-PRM moved by a controller, HOST at two tempos, a burst of switch changes |
+| The same in `verify.sh`, one setting with most of that, on all four inputs | 4/4 bit-identical |
+| Each effect parameter (`TEST_FX=1`) | Its name, range and default are the firmware's for its ID |
+| A saved state (`TEST_FX=1`) | The edits by ID come back in a new processor |
+| The panel (`TEST_FX_PANEL=1`, in `verify.sh`) | 985 rows over every page and type: name, range and value, a slider sets its ID, the value follows the processor |
+| `mutate_panel.py`, new | 25 planted, 0 missed |
+| `mutate_fx.py --control` | 102 planted, 0 missed |
+| `mutate_tone.py`, the whole list | 792 planted, 0 missed |
+| `mutate_fx.py`, `fxthreads.sh` | 97 planted, the same 2 missed as before (v126); no races |
+
+`mutate_panel.py` builds each error into PluginTest, so it takes about 13 minutes.
+
+**What this says about the effects.**
+- **Eight of the 602 MFX parameters do nothing on the bus for one step at their defaults.** All 258 of the Chorus's and Reverb's and all 12 of the EQ's do something. Three are v131's: Sweep Depth, and the Pitch Shifter's Low and Hi Damp Gain, which don't move at all. The other five are too coarse for one step there: AnalogDelay→Chorus's Chorus Intensity, Rotary's Low and Hi Slow Rate, and Vocal Multi's Limtr Threshld and Release each put a word on the bus when moved to an end. So on the panel, those first three look dead until something else on that page moves or a patch loads. That's the firmware as far as this can tell, and it's the first thing to try on a real XT.
+- **The MFX switched on adds a constant to the output,** even as Thru: +0.00038 of full scale, −68 dB, where everything off gives −0.00002. Chorus and Reverb with sends add more, up to +0.0019 with all three here. The chip's the same as JE-8086's on all of this, so it's what the programs do, and I'd expect the XT's analog outs to block it and its digital outs not to. The captures will say. I haven't added a DC block: nothing here says the XT has one, and the level's far below hearing.
+
+**Not checked.** Clicking through it in a real host: PluginTest moves the panel's sliders and reads its boxes, and auval passes, but no one has played it. The plugin's values against a real XT, as ever.
+
+**What's next.** Captures against all of it. On the panel: the firmware's own units for values (its tables have them), and host automation for the parameters that most want it.
+
 ### The chip in the sound, behind a switch (2026-11-04, v136)
 
 The plugin can now play through the effect chip. A new Effects switch, off by default, sends `XtSynth::frame` through `XtFxChip` on its way out, with `XtFxControl` on a thread of its own. Off, nothing changes: `ab.sh` 4/4 identical, and neither the chip nor the interpreter is even made. On, with nothing else set yet, it's the XT's defaults: MFX, Chorus and Reverb switched off and the system's EQ on. The effects' own parameters come in the next version.
@@ -1572,7 +1629,7 @@ The plugin can now play through the effect chip. A new Effects switch, off by de
 | Each word through the unit (`xt_fx control`, `numbers`) | MAIN, MULTI and DIR to their own sides at −0.02 dB, 1 sample late; the sends silent with the Reverb and Chorus off |
 | `mutate_fx.py --control` | 78 planted, 0 missed. Two more, the limits spelled out in the conversion, can't show here: an ARM host's cast saturates by itself |
 
-**What's next.** The effects' parameters and an editor panel for them.
+**What's next.** The effects' parameters and an editor panel for them: v137.
 
 ### v132 joins (2026-11-04, v135)
 

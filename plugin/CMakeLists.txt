@@ -53,6 +53,7 @@ juce_add_plugin(VSynthEmu
 target_sources(VSynthEmu PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/FxPanel.cpp
     Source/VariphraseEngine.cpp
     Source/PhaseVocoder.cpp
     Source/SourceFilterModel.cpp

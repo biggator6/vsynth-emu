@@ -294,6 +294,7 @@ bool XtSynth::matrixUpdate(Voice& v) const {
     const bool moved = std::memcmp(next, v.mx, sizeof next) != 0 || std::memcmp(beam, v.beam, sizeof beam) != 0;
     std::memcpy(v.mx, next, sizeof next);
     std::memcpy(v.beam, beam, sizeof beam);
+    for (int i = 0; i < 3; ++i) fxPrm[i].store(next[xtmx::MfxPrm + i], std::memory_order_relaxed);
     return moved;
 }
 
@@ -1418,6 +1419,8 @@ void XtSynth::tvaUpdate(Voice& v) {
 void XtSynth::mixBlock(float* lr) {
     std::fill(lr, lr + 64, 0.0f);
     std::fill(std::begin(frame), std::end(frame), 0.0f);
+    fxTempo.store(ctl.patchTempo, std::memory_order_relaxed);
+    fxSix.store(clockExt ? clockSix : 0, std::memory_order_relaxed);
     // The tempo clock, here on the blocks; ahead of the tone update, as one choice of the two
     // tasks' order on the XT.  From outside: the timer's ms in this block first, then its clocks
     if (clockExt) {

@@ -66,7 +66,7 @@ static const char* const kLimIds[4][2] = { { "LimThreshold", "Thr" }, { "LimAtta
 static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
-    : AudioProcessorEditor(&p), processor_(p)
+    : AudioProcessorEditor(&p), processor_(p), fxPanel_(std::make_unique<FxPanel>(p))
 {
     setSize(560, 1420);
     setResizable(true, true);
@@ -140,6 +140,13 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     fxOnBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     addAndMakeVisible(fxOnBtn_);
     fxOnAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor_.apvts, "fxOn", fxOnBtn_);
+    addChildComponent(*fxPanel_);
+    fxPanelBtn_.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF333355));
+    fxPanelBtn_.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF00BFA5));
+    fxPanelBtn_.setColour(juce::TextButton::textColourOnId, juce::Colours::black);
+    fxPanelBtn_.setClickingTogglesState(true);
+    fxPanelBtn_.onClick = [this] { fxPanel_->setVisible(fxPanelBtn_.getToggleState()); fxPanel_->toFront(false); };
+    addAndMakeVisible(fxPanelBtn_);
     oscTypeBox_.addItemList({ "ANALOG", "PCM" }, 1);
     anaWaveBox_.addItemList({ "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
                               "SUPER-SAW", "FEEDBACK-OSC", "X-MOD" }, 1);
@@ -913,15 +920,18 @@ void VSynthEmuEditor::resized() {
     auto fileStrip = juce::Rectangle<int>(0, titleH, getWidth(), kFileStripH).reduced(10, 8);
     loadButton_.setBounds(fileStrip.removeFromLeft(110));
     fileStrip.removeFromLeft(10);
+    fxPanelBtn_.setBounds(fileStrip.removeFromRight(64));
+    fileStrip.removeFromRight(6);
+    fxOnBtn_.setBounds(fileStrip.removeFromRight(72));
+    fileStrip.removeFromRight(6);
     fileNameLabel_.setBounds(fileStrip);
+    fxPanel_->setBounds(0, titleH + kFileStripH, getWidth(), algoTop - titleH - kFileStripH);
 
     // ── XT strip ───────────────────────────────────────────────────────────
     auto xt = juce::Rectangle<int>(0, titleH + kFileStripH, getWidth(), kXtStripH).reduced(10, 6);
     auto row1 = xt.removeFromTop(26);
     romButton_.setBounds(row1.removeFromLeft(70));
     row1.removeFromLeft(6);
-    fxOnBtn_.setBounds(row1.removeFromLeft(72));
-    row1.removeFromLeft(4);
     oscTypeBox_.setBounds(row1.removeFromRight(90).reduced(0, 1));
     oscOnBtn_.setBounds(row1.removeFromRight(46));
     oscSelBox_.setBounds(row1.removeFromRight(76).reduced(0, 1));

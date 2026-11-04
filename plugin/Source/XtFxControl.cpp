@@ -6,7 +6,7 @@
 #include <climits>
 
 namespace {
-constexpr uint32_t kThis = 0x89ced1b4, kMessage = 0x89ced200, kSp = 0x8C0E0000, kMatrix = 0x8C0F0000;
+constexpr uint32_t kThis = 0x89ced1b4, kMessage = 0x89ced200, kClock = 0x89979bfc, kSp = 0x8C0E0000, kMatrix = 0x8C0F0000;
 constexpr uint32_t kDescLow = 0x897a167c, kDescHigh = 0x897a56d8;                 // parameter descriptors: IDs below kHighIds, 12 bytes each; the rest 8 bytes each
 constexpr uint32_t kMfxIds = 0x897a8218, kChoIds = 0x897a82e4, kRevIds = 0x897a8310;  // for each type, its first and last parameter's ID
 constexpr int kHighIds = 0x55d, kIds = 0x8d0, kMfxTypes = 42, kChoTypes = 9, kRevTypes = 11;
@@ -122,6 +122,12 @@ void XtFxControl::loadPatch() {
     send(d, true);
 }
 
+void XtFxControl::tick() {
+    if (!drained()) return;
+    if (patchWanted_) { patchWanted_ = false; loadPatch(); }
+    else update();
+}
+
 // 0x894abe50, whose event then runs 0x894ad4f0: the values go to the MFX object, and those a type assigns move its parameters.
 void XtFxControl::setMatrix(int prm1, int prm2, int prm3) {
     if (!error_.empty()) return;
@@ -129,6 +135,15 @@ void XtFxControl::setMatrix(int prm1, int prm2, int prm3) {
     for (uint32_t i = 0; i < 3; i++) sh4_->wr16(kMatrix + 2 * i, (uint16_t)v[i]);
     uint32_t changed = 0;
     if (call(0x894ad4e0, { kThis, kMatrix }, &changed) && changed) call(0x894ad4f0, { kThis });
+    flush(0);
+}
+
+// The clock's object: +0x40 its source, +0x48 the ms over six clocks.  The task runs this on its event 0x20, and it does nothing unless the system's reader has seen Clock Source.
+void XtFxControl::outsideClock(int sixClocksMs) {
+    if (!error_.empty() || sixClocksMs <= 0) return;
+    sh4_->wr8(kClock + 0x40, 1);
+    sh4_->wr16(kClock + 0x48, (uint16_t)sixClocksMs);
+    call(0x894acb10, { kThis });
     flush(0);
 }
 
@@ -189,7 +204,7 @@ XtFxUnit::~XtFxUnit() = default;
 
 void XtFxUnit::settle() {
     XtFxChip& chip = *chip_;
-    while (ok() && !control_.drained()) { control_.service(chip); chip.runFrame(); }
+    while (ok() && !control_.drained()) { control_.pump(); control_.service(chip); chip.runFrame(); }
 }
 
 int32_t XtFxUnit::toChip(float x) {
@@ -213,4 +228,47 @@ void XtFxUnit::process(const float* frame, float* lr, int frames) {
         lr[2 * i] = fromChip(chip.gram(0xa1)) + fromChip(chip.gram(0xa5));
         lr[2 * i + 1] = fromChip(chip.gram(0xa3)) + fromChip(chip.gram(0xa7));
     }
+}
+
+// ------------------------------------------------------------------ the catalog
+XtFxCatalog xtFxCatalog(const char* romPath) {
+    XtFxCatalog cat;
+    const XtFxControl c(romPath);                                                       // its store holds the descriptors' ranges, and the defaults till something's set
+    if (!c.ok()) return cat;
+    Sh4& rom = *c.sh4_;
+    constexpr uint32_t kNames = 0x89790338, kMfxNames = 0x89788c98;
+    const auto text = [&](uint32_t a, int most) {
+        std::string t;
+        for (int i = 0; i < most; ++i) { const char ch = (char)rom.rd8(a + (uint32_t)i); if (!ch) break; t += ch; }
+        const size_t star = t.find(" *");                                               // a mark for the manual's footnotes
+        if (star != std::string::npos) t.erase(star);
+        const size_t from = t.find_first_not_of(' '), to = t.find_last_not_of(' ');
+        return from == std::string::npos ? std::string() : t.substr(from, to - from + 1);
+    };
+    const auto param = [&](int id) {
+        XtFxParam p;
+        p.id = id; p.low = c.lowest(id); p.high = c.highest(id); p.def = c.get(id);
+        p.name = text(rom.rd32(kNames + 4 * (uint32_t)id), 40);
+        return p;
+    };
+    const auto types = [&](uint32_t table, int count, std::vector<std::vector<XtFxParam>>& out) {
+        out.resize((size_t)count);
+        for (int t = 0; t < count; ++t) {
+            const int first = (int16_t)rom.rd16(table + 4 * (uint32_t)t), last = (int16_t)rom.rd16(table + 4 * (uint32_t)t + 2);
+            for (int id = first; id <= last; ++id) {
+                XtFxParam p = param(id);
+                if (p.high > p.low) out[(size_t)t].push_back(std::move(p));             // Thru's, and the Off types': one with no range and no name
+            }
+        }
+    };
+    types(kMfxIds, kMfxTypes, cat.mfx);
+    types(kChoIds, kChoTypes, cat.chorus);
+    types(kRevIds, kRevTypes, cat.reverb);
+    for (int t = 0; t < kMfxTypes; ++t) cat.mfxTypes.push_back(text(kMfxNames + 24 * (uint32_t)t, 20));
+    cat.chorusTypes = { "Off", "Chorus 1", "Chorus 2", "Chorus 3", "Chorus 4", "Feedback Chorus", "Flanger", "Short Delay", "Fbk Short Delay" };
+    cat.reverbTypes = { "Off", "Room 1", "Room 2", "Room 3", "Hall 1", "Hall 2", "Hall 3", "Garage", "Plate", "Non-Linear", "Delay" };
+    cat.eq.push_back(param(0x70));
+    for (int id = 0x65; id <= 0x6f; ++id) cat.eq.push_back(param(id));
+    cat.ok = c.ok();
+    return cat;
 }

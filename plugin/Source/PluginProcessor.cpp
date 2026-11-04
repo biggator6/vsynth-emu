@@ -118,6 +118,11 @@ namespace Params {
     static const juce::String kTvaPanLfo    = "tvaPanLfo";
     static const juce::String kMfxSend      = "mfxSend";
     static const juce::String kFxOn         = "fxOn";
+    // The patch TVA's other sends, and where the tone goes
+    static const juce::String kTvaChoSend   = "tvaChoSend";
+    static const juce::String kTvaRevSend   = "tvaRevSend";
+    static const juce::String kOutputAssign = "outputAssign";
+    static const juce::String kOutputMode   = "outputMode";
     static const juce::String kTvaLfoWave   = "tvaLfoWave";        // LFO 5
     static const juce::String kTvaLfoRate   = "tvaLfoRate";
     static const juce::String kTvaLfoOffset = "tvaLfoOffset";
@@ -542,6 +547,25 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kMfxSend, "MFX Send Level", 0, 127, 127));
     // The effect chip in the path.  Off by default: it hasn't been compared with a real XT yet, and it takes a share of a core
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kFxOn, "Effects", false));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaChoSend, "Chorus Send Level", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaRevSend, "Reverb Send Level", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kOutputAssign, "Output Assign", juce::StringArray{ "MULTI", "MAIN", "DIR" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kOutputMode, "Output Mode", juce::StringArray{ "Mix", "Parallel" }, 1));
+    // The chip's blocks.  Defaults as the firmware's descriptors have them.
+    params.push_back(std::make_unique<juce::AudioParameterBool>("fxMfxOn", "MFX Switch", false));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxMfxType", "MFX Type", 0, 41, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxMfxMaster", "MFX Master Level", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxMfxCho", "MFX Chorus Send Level", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxMfxRev", "MFX Reverb Send Level", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterBool>("fxChoOn", "Chorus Switch", false));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxChoType", "Chorus Type", 0, 8, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxChoMaster", "Chorus Master Level", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxChoRev", "Chorus Reverb Send Level", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterBool>("fxRevOn", "Reverb Switch", false));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxRevType", "Reverb Type", 0, 10, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxRevMaster", "Reverb Master Level", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxMaster", "Master Level", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterInt>("fxGain", "Output Gain", -12, 12, 0));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kTvaLfoWave, "LFO 5 Waveform",
         juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoRate, "LFO 5 Rate", 0, 144, 98, noteValue));
@@ -754,6 +778,7 @@ VSynthEmuProcessor::VSynthEmuProcessor()
                      .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "VSynthEmu", createParameterLayout())
 {
+    for (auto& e : fxEdits_) e.store(kFxNoEdit, std::memory_order_relaxed);
     formatManager_.registerBasicFormats();   // WAV, AIFF, OGG, FLAC
 
     for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
@@ -777,13 +802,68 @@ void VSynthEmuProcessor::fxTick() {
     if (!fxUnit_) {
         if (romFile_.isEmpty()) return;
         auto u = std::make_unique<XtFxUnit>(romFile_.toRawUTF8());
+        fxApply(u->control());
+        u->control().loadPatch();
+        fxPatchPending_ = false;
         u->settle();
         if (!u->ok()) { DBG("effects: " << u->control().error()); romFile_.clear(); return; }
         fxUnit_ = std::move(u);
         synth_.setBusSink(fxUnit_.get());
         fxRunning_ = true;
     }
-    fxUnit_->control().pump();
+    XtFxControl& c = fxUnit_->control();
+    fxApply(c);
+    if (fxPatchPending_.exchange(false)) c.wantPatch();
+    c.tick();
+    if (apvts.getRawParameterValue(Params::kFxOn)->load() >= 0.5f) {    // nothing's taking the words otherwise
+        c.setMatrix(synth_.fxMatrix(0), synth_.fxMatrix(1), synth_.fxMatrix(2));
+        c.outsideClock(synth_.fxClockSix());
+    }
+    c.pump();
+}
+
+// The plugin's effect parameters, each the firmware's ID.
+static const struct { const char* name; int id; } kFxKnobs[] = {
+    { "fxMfxOn", 0x120 }, { "fxChoOn", 0x121 }, { "fxRevOn", 0x122 },
+    { "fxMfxType", 0x177 }, { "fxMfxMaster", 0x178 }, { "fxMfxCho", 0x179 }, { "fxMfxRev", 0x17a },
+    { "fxChoType", 0x1fc }, { "fxChoMaster", 0x1fd }, { "fxChoRev", 0x1fe },
+    { "fxRevType", 0x230 }, { "fxRevMaster", 0x231 },
+    { "fxMaster", 0x3e }, { "fxGain", 0x76 }
+};
+
+void VSynthEmuProcessor::fxManualTicks() {
+    fxManual_ = true;
+    if (fxThread_) fxThread_->stopThread(2000);
+    fxThread_.reset();
+}
+
+int VSynthEmuProcessor::fxKnobId(const juce::String& parameter) {
+    for (const auto& k : kFxKnobs) if (parameter == k.name) return k.id;
+    return -1;
+}
+
+// All of it to the driver's store, which only takes what's changed.
+void VSynthEmuProcessor::fxApply(XtFxControl& c) {
+    for (const auto& k : kFxKnobs) c.set(k.id, (int)std::lround(apvts.getRawParameterValue(k.name)->load()));
+    c.set(0x11d, synth_.fxPatchTempo());
+    c.set(0x41, synth_.fxClockSix() ? 1 : 0);
+    for (int id = 0; id < kFxIds; ++id) { const int v = fxEdits_[id].load(std::memory_order_relaxed); if (v != kFxNoEdit) c.set(id, v); }
+}
+
+void VSynthEmuProcessor::setFxParam(int id, int value) { if (id >= 0 && id < kFxIds) fxEdits_[id].store(value, std::memory_order_relaxed); }
+
+int VSynthEmuProcessor::fxParam(int id, int fallback) const {
+    const int v = id >= 0 && id < kFxIds ? fxEdits_[id].load(std::memory_order_relaxed) : kFxNoEdit;
+    return v == kFxNoEdit ? fallback : v;
+}
+
+const XtFxCatalog& VSynthEmuProcessor::fxCatalog() {
+    if (!fxCatalog_.ok) {
+        juce::String rom;
+        { const std::lock_guard<std::mutex> lock(fxLock_); rom = romFile_; }
+        if (rom.isNotEmpty()) fxCatalog_ = xtFxCatalog(rom.toRawUTF8());
+    }
+    return fxCatalog_;
 }
 
 VSynthEmuProcessor::~VSynthEmuProcessor() {
@@ -836,7 +916,7 @@ void VSynthEmuProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     setLatencySamples(engine_.getLatencySamples());
     synth_.prepare(sampleRate);
     scratch_.assign((size_t)std::max(samplesPerBlock, 1) * 2, 0.0f);
-    if (!fxThread_) { fxThread_ = std::make_unique<FxThread>(*this); fxThread_->startThread(); }
+    if (!fxThread_ && !fxManual_) { fxThread_ = std::make_unique<FxThread>(*this); fxThread_->startThread(); }
     playbackPos_  = -1;
     activeVoices_ = 0;
 }
@@ -988,6 +1068,10 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.energy       = knob(Params::kEnergy);
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
     c.tvaOn        = apvts.getRawParameterValue(Params::kTvaSwitch)->load() >= 0.5f;
+    c.chorusSend   = knob(Params::kTvaChoSend);
+    c.reverbSend   = knob(Params::kTvaRevSend);
+    c.outputAssign = knob(Params::kOutputAssign);
+    c.parallel     = knob(Params::kOutputMode) != 0;
     c.tvaLevel     = knob(Params::kTvaLevel);
     c.tvaLevelKF   = kf(Params::kTvaLevelKF);
     c.tvaLevelLfo  = knob(Params::kTvaLevelLfo);
@@ -1422,6 +1506,9 @@ VSE::Algorithm VSynthEmuProcessor::getAlgorithm() const {
 
 void VSynthEmuProcessor::getStateInformation(juce::MemoryBlock& destData) {
     auto state = apvts.copyState();
+    juce::String edits;
+    for (int id = 0; id < kFxIds; ++id) { const int v = fxEdits_[id].load(std::memory_order_relaxed); if (v != kFxNoEdit) edits << id << "=" << v << ","; }
+    state.setProperty("fxEdits", edits, nullptr);
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
 }
@@ -1432,6 +1519,10 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
         return;
 
     apvts.replaceState(juce::ValueTree::fromXml(*xml));
+    for (auto& e : fxEdits_) e.store(kFxNoEdit, std::memory_order_relaxed);
+    for (const auto& pair : juce::StringArray::fromTokens(apvts.state.getProperty("fxEdits").toString(), ",", ""))
+        if (pair.contains("=")) setFxParam(pair.upToFirstOccurrenceOf("=", false, false).getIntValue(), pair.fromFirstOccurrenceOf("=", false, false).getIntValue());
+    fxPatchPending_ = true;
 
     // The firmware image and the file, if their paths were persisted
     const juce::String rom = apvts.state.getProperty("romPath").toString();

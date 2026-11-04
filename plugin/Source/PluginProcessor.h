@@ -5,6 +5,7 @@
 #include "VariphraseEngine.h"
 #include "XtSynth.h"
 #include "XtFxControl.h"
+#include <climits>
 #include <mutex>
 
 class VSynthEmuProcessor : public juce::AudioProcessor,
@@ -80,6 +81,14 @@ public:
     // what's changed.  Never on the audio thread.
     void fxTick();
     bool effectsRunning() const { return fxRunning_.load(); }
+    void fxManualTicks();                           // for PluginTest: no thread, so fxTick falls where it says
+    // The effects' parameters that aren't the host's to automate: those whose meaning hangs on a type, and the system's EQ.  By the firmware's ID, any thread.  fxParam: `fallback` if it hasn't been set.
+    void setFxParam(int id, int value);
+    int fxParam(int id, int fallback) const;
+    // Message thread: names and ranges, once rom.2 is here (ok false till then).
+    const XtFxCatalog& fxCatalog();
+    // The firmware's ID behind one of the plugin's effect parameters, or -1.
+    static int fxKnobId(const juce::String& parameter);
     // One line for the editor: ROM, encode progress, current encode type.
     juce::String getStatusText() const;
 
@@ -99,6 +108,12 @@ private:
     std::mutex fxLock_;                         // one control thread at a time: its own, or a test's
     juce::String romFile_;                      // under fxLock_
     std::atomic<bool> fxRunning_ { false };
+    bool fxManual_ = false;
+    std::atomic<bool> fxPatchPending_ { false };  // a saved state came back: all of it, as a patch change
+    static constexpr int kFxIds = 0x8d0, kFxNoEdit = INT_MIN;
+    std::atomic<int> fxEdits_[kFxIds];
+    void fxApply(XtFxControl& c);
+    XtFxCatalog fxCatalog_;
 
     juce::AudioFormatManager formatManager_;
 
