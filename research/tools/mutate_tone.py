@@ -2,8 +2,9 @@
 # mutate_tone.py [cases] [name ...]: every deliberate error in tone_muts.txt (or the
 # named ones), each planted in XtSynth.cpp by mutate.sh (PORT=tone) and run through
 # xt_tone, which stops at its first difference (XT_TONE_STOP): the verdict is the
-# whole run's, for the cases up to it.  One line each: caught, MISSED, or ERROR when
-# the old text is no longer in the source.  From the repo root.  tone_muts.txt:
+# whole run's, for the cases up to it.  One line each: caught (a run the error crashes
+# counts), MISSED, or ERROR when the old text is no longer in the source.  From the
+# repo root.  tone_muts.txt:
 # name|old|new[|port], with \n and \| escaped; port is mutate.sh's PORT for an error in
 # another file than XtSynth.cpp (toneosc, XtOsc.cpp).
 import concurrent.futures as cf, os, re, subprocess, sys
@@ -29,6 +30,8 @@ def run(m):
     out = r.stdout + r.stderr
     at = re.search(r'^tone: 1 different, (at case .*)$', out, re.M)
     if at: return m[0], at.group(1)
+    died = re.search(r'^.*: (the run died, signal \d+)$', out, re.M)
+    if died: return m[0], died.group(1)
     tot = re.findall(r'^tone[^:\n]*: (\d+) different', out, re.M)
     return m[0], f'tone: {sum(map(int, tot))} different' if tot else None
 with cf.ThreadPoolExecutor(8) as ex:

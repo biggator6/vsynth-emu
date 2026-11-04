@@ -73,6 +73,7 @@ private:
     XtSynth synth_;
     std::atomic<bool> xtActive_ { false };      // the XT voices own the output
     std::vector<float> scratch_;                // right channel for a mono output bus
+    int tripKnob_ = 0;                          // the Time Trip knob as XtSynth last had it
 
     juce::AudioFormatManager formatManager_;
 

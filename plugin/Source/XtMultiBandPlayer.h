@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include "XtBeat.h"
 #include "XtLoop.h"
 
 // The players' interpolation kernel, recombination-filter coefficients and
@@ -87,12 +88,30 @@ public:
     // walk from the next block on); a loop jump (0x8950f710) restores the
     // bands from the cached event, keeping the walk's overshoot.
     void setLoop(const XtLoop& l) { loopCfg = l; }
+    // Tempo Sync and Time Trip (XtBeat).  Set before noteOn: the note's tempo and the wave's
+    // Original Tempo (+0x4c, +0x48), byte 0 bits 1 and 2.  Then, from the voice: the bits as a
+    // block sets them, a clock, a Time Trip step.
+    void setTempo(uint32_t tempo, uint32_t orig) { tempoCfg = tempo; origCfg = orig; }
+    void setBeatFlags(bool sync, bool trip);
+    void addClock(int n);
+    void setTrip(int step);
+    bool syncOn() const;
+    bool tripOn() const;
+    const XtBeat& beat() const;
+    // To a position in 1/16 sample (0x89510bf0 with byte 0 bit 7), as a released Time Trip goes
+    // back to the beat: the records and the read positions there, the beat again from there.
+    void seek(int pos16);
+    // The output gain as it stands (+0x84), and the position (+0x38, 1/16 sample).
+    float gainNow() const;
+    int32_t position() const;
 
     struct Band;   // a band's player state (firmware struct, 0x88 bytes)
     struct State;
 private:
     State* s = nullptr;
     XtLoop loopCfg;
+    uint32_t tempoCfg = 1200000, origCfg = 1200000;
+    uint8_t flagsCfg = 0;
     static void blockImpl(State& S, float* out);
 public:
     XtMbPlayer();

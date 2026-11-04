@@ -357,6 +357,21 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
     for (Chan& c : ch) { c.start = recStart; c.age = 0; c.v = g.v; c.tap = g.C; c.tapW = g.frac; }
     ch[0].e = 0.0; ch[1].e = 0.5;
     anchorStep = anchorStepInit;
+    beat_.start(tempoCfg, origCfg, Pi);   // 0x8950f860
+}
+
+// 0x8950fed0: as a loop jump's position and record (jumpTo), but the anchor at the record's
+// start.  It loads event 0 first, whose first record is the one that can clear the Energy
+// filter's cutoff.
+void XtSoloVoice::seek(int32_t pos16) {
+    if (!p || p->size() < 2) return;
+    pos16 = pos16 < 0 ? 0 : pos16 > endPos16 ? endPos16 : pos16;
+    const double keep = f0n;
+    jumpTo(pos16);
+    f0n = p->voiced[0] ? keep : 0.0;
+    anchor = recStart;
+    beat_.reset((flags0 & 4) != 0);       // 0x8950f900
+    beat_.beatPos = (int32_t)((uint32_t)pos16 << 5);
 }
 
 void XtSoloVoice::setRates(double A_, double F_, double walk_) { A = A_; F = F_; walk = walk_; }
@@ -375,7 +390,7 @@ void XtSoloVoice::render(float* out, float* right, int count) {
             // walk·2^25 (0x8950c280), turned round inside an Alternate
             // bounce until the walk itself turns; held at 0 after a mode-3
             // loop until the walk turns away from the loop
-            const float fs = xtf::mul((float)walk, 33554432.0f);
+            const float fs = beat_.block(flags0, (float)walk, lp);
             if (!(f3 & 0x40)) {
                 int32_t step = xtf::ftrc(fs);
                 const bool neg = 0.0f > fs;

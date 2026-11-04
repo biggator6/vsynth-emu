@@ -40,6 +40,7 @@
 // (0x89510bf0), the voice flags 0x2 / 0x4 / 0x8, the event types 1..3
 // (step and event playback).
 #include "XtMultiBandPlayer.h"
+#include "XtFloat.h"
 
 #include <algorithm>
 #include <cfenv>
@@ -180,6 +181,8 @@ struct XtMbPlayer::State {
     int rate = 0, walkStep = 0;                  // +0x30, +0x34
     int pos = 0, posFrac = 0;                    // +0x38, +0x3c
     float pitch = 1, walk = 1;                   // +0x70, +0x7c
+    XtBeat beat;                                 // +0x40, +0x41, +0x48…+0x64, +0x8c, +0x90
+    float walkFloat = 0;                         // walk·factor·2^25, this block's
     float gainTarget = 1.0f / 65536, gain = 1.0f / 65536, gainCoef = 1.0f / 64;  // +0x80..+0x88
     float lpc = 0;                               // +0x94
     float rateF = 1, f9c = 1;                    // +0x98, +0x9c
@@ -422,6 +425,8 @@ void XtMbPlayer::State::startAt(int target) {
             ++ev;
         } while (target > evAt(ev));
         --ev;
+    } else {                                         // from a later event, back to it (a seek)
+        while (evAt(ev) > target && ev > 0) --ev;
     }
     pos = 0;
     initRecords();
@@ -609,7 +614,7 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
     S.w = w;
     S.mode = mode;
     S.stereo = w.channels == 2;
-    S.flags0 = S.stereo ? 0x40 : 0;
+    S.flags0 = (uint8_t)((S.stereo ? 0x40 : 0) | flagsCfg);
     S.pitch = pitch;
     S.walk = walk;
     if (const char* r = std::getenv("XT_ROUND"); r && std::string(r) == "nearest") S.rtz = false;
@@ -664,7 +669,152 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
                 }
         }
     }
+    S.beat.start(tempoCfg, origCfg, S.pos);         // 0x8950f860
     return true;
+}
+
+// ── The beat (XtBeat.h) ──────────────────────────────────────────────────────
+
+namespace {
+// float of an unsigned word: FLOAT, then 2^32 on a negative
+float beatWord(uint32_t v) {
+    const float f = xtf::flt((int32_t)v);
+    return (int32_t)v < 0 ? xtf::add(f, 4294967296.0f) : f;
+}
+int32_t wrapAdd(int32_t a, int32_t b) { return (int32_t)((uint32_t)a + (uint32_t)b); }
+int32_t wrapSub(int32_t a, int32_t b) { return (int32_t)((uint32_t)a - (uint32_t)b); }
+constexpr int32_t kBeatBlock = 0x4000;         // a block of 32 samples, in 1/512 sample
+}
+
+void XtBeat::start(uint32_t tempo_, uint32_t orig_, int32_t pos16) {
+    tempo = tempo_;
+    orig = orig_;
+    factor = integ = xtf::div(beatWord(tempo), beatWord(orig));
+    step = xtf::ftrc(xtf::div(564479918080.0f, beatWord(orig)));         // 0x53036da0
+    budget = (int32_t)((uint32_t)step << 1);
+    clk = trip = 0;
+    syncPos = tripPos = walkPos = 0;
+    beatPos = (int32_t)((uint32_t)pos16 << 5);
+}
+
+void XtBeat::reset(bool tripOn) {
+    factor = tripOn ? 0.0f : xtf::div(beatWord(tempo), beatWord(orig));
+    integ = factor;
+    budget = (int32_t)((uint32_t)step << 1);
+    syncPos = tripPos = walkPos = 0;
+}
+
+// 0x8950c470: the beat position moves on by `by`·walk, wrapping in the loop.  Going back
+// the firmware adds the region unshifted, in 1/16 sample, so a backward loop's beat
+// drifts; ported as it is.
+void XtBeat::advance(int32_t by, float walk, const int32_t* lp) {
+    const float x = xtf::mul(xtf::flt(by), walk);
+    const int32_t p = wrapAdd(beatPos, xtf::ftrc(x));
+    if (x > 0.0f) {
+        beatPos = p;
+        if ((int32_t)((uint32_t)p >> 5) > lp[1]) beatPos = wrapSub(p, (int32_t)(((uint32_t)lp[1] - (uint32_t)lp[0]) << 5));
+    } else if (0.0f > x) {
+        beatPos = p;
+        if (lp[3] > (int32_t)((uint32_t)p >> 5)) beatPos = wrapAdd(p, wrapSub(lp[2], lp[3]));
+    }
+}
+
+// 0x8950c4f0: the factor from the error, proportional and integral, within ±32.  Past one
+// clock on the far side of the target both go to 0, while what it returns, which this
+// block walks by, is not limited.
+float XtBeat::steer(int32_t err, int sign) {
+    constexpr float k0 = 0x1.999998p-18f, k1 = 0x1.ba5e34p-6f, k2 = 0x1.47ae14p-4f;   // 0x36cccccc, 0x3cdd2f1a, 0x3da3d70a
+    const float e = xtf::mul(xtf::flt(err), k0);
+    float x = xtf::add(xtf::mul(k1, e), integ);                      // fmac
+    integ = x;
+    x = xtf::add(xtf::mul(k2, e), x);
+    const bool past = sign >= 0 ? wrapSub(0, err) > step : err > step;
+    if (past) { integ = factor = 0.0f; return x; }
+    if (x > 32.0f) x = 32.0f;
+    else if (-32.0f > x) x = -32.0f;
+    factor = x;
+    return x;
+}
+
+float XtBeat::block(uint8_t flags0, float walk, const int32_t* lp) {
+    if (!(flags0 & 4)) tripPos = walkPos;
+    else if (trip & 0x7f) {
+        const int t = trip;
+        trip = (int8_t)(t & 0x80);
+        tripPos = wrapAdd(tripPos, (int32_t)((uint32_t)t * (uint32_t)step));
+        budget = (int32_t)((uint32_t)step << 1);
+        steer(wrapSub(tripPos, walkPos), trip);
+    }
+    if (!(flags0 & 2)) {
+        syncPos = walkPos;
+        advance(kBeatBlock, walk, lp);
+    } else if (clk & 0x7f) {
+        const int c = clk;
+        const int32_t m = (int32_t)((uint32_t)c * (uint32_t)step);
+        clk = (int8_t)(c & 0x80);
+        if (syncPos == 0) walkPos = m;
+        syncPos = wrapAdd(syncPos, m);
+        advance(m, walk, lp);
+        if (flags0 & 4) syncPos = walkPos;
+        else {
+            budget = (int32_t)((uint32_t)step << 1);
+            steer(wrapSub(syncPos, walkPos), clk);
+        }
+    }
+    float x;
+    if (flags0 & 4) {
+        x = factor;
+        walkPos = wrapAdd(walkPos, xtf::ftrc(xtf::mul(16384.0f, x)));
+        if (budget > 0) {
+            budget = wrapSub(budget, kBeatBlock);
+            if (0 > budget) {
+                const int32_t e = wrapSub(tripPos, walkPos);
+                if (trip >= 0 ? e > 0 : 0 > e) {
+                    budget = (int32_t)((uint32_t)step << 1);
+                    x = steer(e, trip);
+                } else integ = factor = 0.0f;
+            }
+        }
+    } else if (flags0 & 2) {
+        x = factor;
+        const int32_t w = xtf::ftrc(xtf::mul(16384.0f, x));
+        walkPos = wrapAdd(walkPos, w);
+        if (budget > 0) {
+            budget = wrapSub(budget, wrapAdd(w, 0x400));
+            if (0 > budget) {
+                budget = (int32_t)((uint32_t)step << 1);
+                x = steer(wrapSub(syncPos, walkPos), clk);
+            }
+        }
+    } else {
+        x = 1.0f;
+        factor = 1.0f;
+        walkPos = wrapAdd(walkPos, kBeatBlock);
+    }
+    return xtf::mul(xtf::mul(x, walk), 33554432.0f);
+}
+
+// 0x894f3ec0: a clock counts from when the bit comes on, and Time Trip starts with one step.
+void XtMbPlayer::setBeatFlags(bool sync, bool trip) {
+    flagsCfg = (uint8_t)((sync ? 2 : 0) | (trip ? 4 : 0));
+    if (!s) return;
+    if (sync && !(s->flags0 & 2)) s->beat.clk = 0;
+    if (trip && !(s->flags0 & 4)) s->beat.trip = 1;
+    s->flags0 = (uint8_t)((s->flags0 & ~6) | flagsCfg);
+}
+void XtMbPlayer::addClock(int n) { if (s) s->beat.clk = (int8_t)(s->beat.clk + n); }
+void XtMbPlayer::setTrip(int step) { if (s) s->beat.trip = (int8_t)step; }
+bool XtMbPlayer::syncOn() const { return s && (s->flags0 & 2); }
+bool XtMbPlayer::tripOn() const { return s && (s->flags0 & 4); }
+const XtBeat& XtMbPlayer::beat() const { static const XtBeat none; return s ? s->beat : none; }
+float XtMbPlayer::gainNow() const { return s ? s->gain : 0.0f; }
+int32_t XtMbPlayer::position() const { return s ? s->pos : 0; }
+
+void XtMbPlayer::seek(int pos16) {
+    if (!s) return;
+    s->startAt(pos16);
+    s->beat.reset((s->flags0 & 4) != 0);            // 0x8950f900
+    s->beat.beatPos = (int32_t)((uint32_t)s->pos << 5);
 }
 
 bool XtMbPlayer::ended() const { return !s || s->ended; }
@@ -920,6 +1070,7 @@ void XtMbPlayer::block(float* out) {
     if (!s) { std::fill(out, out + 64, 0.0f); return; }
     // The SH-4 runs with FPSCR RM = 1 (round to zero).  XT_ROUND=nearest
     // selects the P-code emulator's rounding (for validation).
+    s->walkFloat = s->beat.block(s->flags0, s->walk, s->lp);     // 0x8950c280: XtFloat rounds for itself
     const int saved = std::fegetround();
     if (s->rtz) std::fesetround(FE_TOWARDZERO);
     blockImpl(*s, out);
@@ -930,9 +1081,7 @@ void XtMbPlayer::blockImpl(State& S, float* out) {
     // 0x8950c280: the walk step for this block, turned round inside an
     // Alternate bounce until the walk itself turns; held at 0 after a mode-3
     // loop until the walk turns away from the loop
-    float w = 1.0f;
-    w = w * S.walk;
-    w = w * 33554432.0f;
+    const float w = S.walkFloat;
     if (!(S.flags3 & 0x40)) {
         int st = ftrc(w);
         const bool neg = 0.0f > w;

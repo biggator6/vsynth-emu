@@ -17,7 +17,10 @@
 //   the note-off (0x894dc270), a sounding tone taking a note (0x894dc1e0) and
 //     truncation (0x894d5ba0), chosen as the part's note-on and note-off do;
 //   a knob moved during a note: the updaters and the note's update (0x894dc0b0);
-//   the bender and CC 7, 11 and 10 written where the channel keeps them, and that update.
+//   the bender and CC 7, 11 and 10 written where the channel keeps them, and that update;
+//   the tempo clock's tick (0x894f4da0) on XtSynth's clock, the Patch Tempo through its
+//     object (0x89471ef0), and the Time Trip pad through its controllers (0x894d8360).
+//   Then the clock's rate alone, against the firmware's timer routine (0x89471030).
 // Only the OS is hooked: its locks and clock, the voice allocator's lists, and
 // the wave store (0x8949e5c0…): the waves lie in RAM as the loader leaves them,
 // from the same encodes XtSynth plays (their vpdt and load-time bands).
@@ -83,6 +86,7 @@ constexpr float kSoloTol = 2e-2f, kSoloFloor = 8192.0f;   // a SOLO wave's buffe
 
 constexpr uint32_t kDescTab = 0x897a167c, kRomBase = 0x89300000;
 constexpr int kCosm2 = 0x10000;      // COSM 2's IDs in the patch table: COSM 1's plus this
+constexpr uint32_t kPadCcX = 16, kPadCcY = 17;   // the controllers "Time Trip Assign X", "Y" stand on (the system's, set by hand)
 
 // A wave in the firmware's memory: its chunks (2 the header, 3 the steps, 4 the
 // loop record, 5 the vpdt, 10 the cached loop events) and the bands the players read.
@@ -189,11 +193,41 @@ public:
         c.hook(0x894796d0, [](Sh4& m) { m.ret(0); });
         if (!c.call(0x894e5f80, { 0x89d1b070u, 0, 0, 0 }, kSp)) { std::fprintf(stderr, "system: %s\n", c.error().c_str()); return false; }
         xtFwHookBandReads(c, bandReads);
+        // the tempo clock's object and the parts' Time Trip pads, as at power-on
+        if (!c.call(0x894714b0, {}, kSp) || !c.call(0x894d8740, {}, kSp)) { std::fprintf(stderr, "clock, pads: %s\n", c.error().c_str()); return false; }
+        c.wr8(0x89cf69a4, kPadCcX); c.wr8(0x89cf69a5, kPadCcY); c.wr8(0x89cf69a6, 0xff); c.wr8(0x89cf69a7, 0xff);
         return true;
     }
 
     bool updatePatch() {
         if (!c.call(0x894dfe10, { 0 }, kSp)) { std::fprintf(stderr, "updaters: %s\n", c.error().c_str()); return false; }
+        // the task's flag 0x40 (0x89471d34): the Patch Tempo to the clock object
+        if (!c.call(0x89471ef0, {}, kSp)) { std::fprintf(stderr, "patch tempo: %s\n", c.error().c_str()); return false; }
+        return true;
+    }
+    // A clock (0x894f4da0), `blocks` the blocks rendered so far, whose count it reads (0x8987c7a8)
+    bool clock(uint32_t blocks) {
+        c.wr32(0x8987c7a8, blocks);
+        if (!c.call(0x894f4da0, {}, kSp)) { std::fprintf(stderr, "clock: %s\n", c.error().c_str()); return false; }
+        return true;
+    }
+    // The pad as its two controllers reach the part (0x894d8360); the next update sees a touch
+    bool pad(int x, int y) {
+        if (!c.call(0x894d8360, { 0, kPadCcX, (uint32_t)x }, kSp) || !c.call(0x894d8360, { 0, kPadCcY, (uint32_t)y }, kSp)) { std::fprintf(stderr, "pad: %s\n", c.error().c_str()); return false; }
+        return true;
+    }
+    bool padOn() { return c.rd32(c.rd32(0x8987ae78) + 8) != 0; }
+    // The firmware's own timer routine (0x89471030, 0x894710e0) `ms` times at this Patch Tempo: the
+    // clock object's ticks (+0x28), of which 20 make a clock (0x894d4210)
+    bool msTicks(int tempo, int ms, uint32_t& ticks) {
+        constexpr uint32_t kClockObj = 0x89979bfc;
+        c.hook(0x893018b0, [](Sh4& m) { m.ret(0); });     // the signal to the clock's task
+        par[0x11d] = tempo;
+        if (!c.call(0x89471ef0, {}, kSp)) { std::fprintf(stderr, "patch tempo: %s\n", c.error().c_str()); return false; }
+        const uint32_t from = c.rd32(kClockObj + 0x28);
+        for (int i = 0; i < ms; ++i)
+            if (!c.call(0x89471030, {}, kSp)) { std::fprintf(stderr, "timer: %s\n", c.error().c_str()); return false; }
+        ticks = c.rd32(kClockObj + 0x28) - from;
         return true;
     }
     bool partMono() { return c.rd8(0x89d021d0 + 1) != 0; }
@@ -492,7 +526,7 @@ void oscParams(std::unordered_map<int, int>& p, int n, const OscC& o) {
     p[b + 0x1a] = 1 + n;                              // the Wave Number
     p[b + 0x23] = o.oscTime; p[b + 0x24] = o.oscTimeKF / 10; p[b + 0x25] = o.lfoTimeDepth; p[b + 0x26] = o.tDepth; p[b + 0x27] = o.oscTimeOffset;
     p[b + 0x28] = o.oscFormant; p[b + 0x29] = o.oscFormantKF / 10; p[b + 0x2a] = o.lfoFormantDepth; p[b + 0x2b] = o.fDepth;
-    p[b + 0x2d] = o.robot; p[b + 0x2f] = o.loop; p[b + 0x31] = o.energy;
+    p[b + 0x2c] = o.tempoSync; p[b + 0x2d] = o.robot; p[b + 0x2f] = o.loop; p[b + 0x31] = o.energy; p[b + 0x32] = o.timeTrip; p[b + 0x33] = o.beatKeep;
     p[0x30d + 3 * n] = o.ana.detune; p[0x30e + 3 * n] = o.ana.subOctave; p[0x30f + 3 * n] = o.ana.subLevel;
     const int e = 4 * n;
     envParams(p, e, o.pAttack, o.pDecay, o.pSustain, o.pRelease, 0, 32, 0, 0, 0, 0);
@@ -537,6 +571,7 @@ std::unordered_map<int, int> patchOf(const Ctl& c) {
     std::unordered_map<int, int> p;
     oscParams(p, 0, c); oscParams(p, 1, c.osc2);
     cosmParams(p, 0, c.cosm[0]); cosmParams(p, 1, c.cosm[1]);
+    p[0x11d] = c.patchTempo;
     p[0x110] = c.patchCoarse; p[0x111] = c.patchFine; p[0x112] = c.octave; p[0x113] = !c.mono; p[0x114] = c.legato;   // Mono/Poly: 0 MONO
     p[0x115] = c.portamento; p[0x116] = c.portaMode; p[0x117] = c.portaType; p[0x118] = c.portaTime; p[0x119] = c.portaVeloSens;
     p[0x11e] = c.bendUp; p[0x11f] = c.bendDown;
@@ -558,8 +593,14 @@ struct Rng {
     bool one(int n) { return next() % (uint32_t)n == 0; }
 };
 
+// An envelope's time: in one case of eight a note value; an LFO's rate, in one of four
+int drawTime(Rng& r) { return r.one(8) ? r.range(128, 144) : r.range(0, 90); }
+int drawRate(Rng& r) { return r.one(4) ? r.range(128, 144) : r.range(0, 127); }
+
 void drawOsc(Rng& r, OscC& o) {
     o.on = true;
+    o.tempoSync = r.one(3); o.timeTrip = !r.one(4); o.beatKeep = !r.one(4);
+    o.origTempo = r.one(3) ? 1200000 : r.range(40, 240) * 10000 + r.range(0, 9999);
     o.oscType = 0;
     o.oscTime = r.one(2) ? 0 : r.range(-63, 63); o.oscTimeOffset = r.range(0, 2); o.oscTimeKF = r.one(2) ? 0 : 10 * r.range(-20, 20);
     o.oscFormant = r.one(2) ? 0 : r.range(-63, 63); o.oscFormantKF = r.one(2) ? 0 : 10 * r.range(-20, 20); o.energy = r.one(2) ? 0 : r.range(0, 127);
@@ -577,14 +618,14 @@ void drawOsc(Rng& r, OscC& o) {
     o.oscPitch = r.one(2) ? 0 : r.range(-63, 63);
     o.pitchKF = r.one(2) ? 100 : 10 * r.range(-20, 20);
     o.randomPitch = r.one(3) ? r.range(0, 30) : 0;
-    o.pAttack = r.range(0, 90); o.pDecay = r.range(0, 90); o.pSustain = r.range(0, 127); o.pRelease = r.range(0, 90); o.pDepth = r.one(2) ? 0 : r.range(-63, 63);
-    o.tAttack = r.range(0, 90); o.tDecay = r.range(0, 90); o.tSustain = r.range(0, 127); o.tRelease = r.range(0, 90);
-    o.fAttack = r.range(0, 90); o.fDecay = r.range(0, 90); o.fSustain = r.range(0, 127); o.fRelease = r.range(0, 90);
-    o.lfoWave = r.range(0, 7); o.lfoRate = r.range(0, 127); o.lfoOffset = r.range(0, 4); o.lfoDelay = r.one(2) ? 0 : r.range(0, 60);
+    o.pAttack = drawTime(r); o.pDecay = drawTime(r); o.pSustain = r.range(0, 127); o.pRelease = drawTime(r); o.pDepth = r.one(2) ? 0 : r.range(-63, 63);
+    o.tAttack = drawTime(r); o.tDecay = drawTime(r); o.tSustain = r.range(0, 127); o.tRelease = drawTime(r);
+    o.fAttack = drawTime(r); o.fDecay = drawTime(r); o.fSustain = r.range(0, 127); o.fRelease = drawTime(r);
+    o.lfoWave = r.range(0, 7); o.lfoRate = drawRate(r); o.lfoOffset = r.range(0, 4); o.lfoDelay = r.one(2) ? 0 : r.range(0, 60);
     o.lfoFadeMode = r.range(0, 3); o.lfoFade = r.one(2) ? 0 : r.range(0, 60); o.lfoKeySync = !r.one(4);
     o.lfoPitchDepth = r.one(2) ? 0 : r.range(-63, 63);
     o.oscLevel = r.range(0, 127); o.oscLevelKF = 10 * r.range(-20, 20); o.oscLevelLfoDepth = r.one(2) ? 0 : r.range(-63, 63); o.waveGain = r.range(-12, 12);
-    o.oAttack = r.range(0, 90); o.oDecay = r.range(0, 90); o.oSustain = r.range(0, 127); o.oRelease = r.range(0, 90);
+    o.oAttack = drawTime(r); o.oDecay = drawTime(r); o.oSustain = r.range(0, 127); o.oRelease = drawTime(r);
     o.oASens = r.one(2) ? 0 : r.range(-63, 63); o.oDSens = r.one(2) ? 0 : r.range(-63, 63); o.oRSens = r.one(2) ? 0 : r.range(-63, 63);
     o.oTimeKF = r.one(2) ? 0 : 10 * r.range(-20, 20);
     o.oscVelSens = r.range(-63, 63); o.oscVelCurve = r.range(0, 7);
@@ -613,10 +654,10 @@ void drawCosm(Rng& r, Ctl::Cosm& c) {
     c.ampType = r.range(0, 2); c.ampBass = u(); c.ampMiddle = u(); c.ampTreble = u(); c.ampLevel = u(); c.ampGain = u(); c.ampGainLfo = d(); c.ampGainEnv = d();
     c.spkType = r.range(0, 11);
     for (Ctl::CosmEnv* e : { &c.envA, &c.envB }) {
-        e->attack = r.range(0, 90); e->decay = r.range(0, 90); e->sustain = u(); e->release = r.range(0, 90); e->velCurve = r.range(0, 7); e->velSens = r.range(-63, 63);
+        e->attack = drawTime(r); e->decay = drawTime(r); e->sustain = u(); e->release = drawTime(r); e->velCurve = r.range(0, 7); e->velSens = r.range(-63, 63);
         e->aSens = d(); e->dSens = d(); e->rSens = d(); e->timeKF = kf();
     }
-    c.lfoWave = r.range(0, 7); c.lfoRate = u(); c.lfoOffset = r.range(0, 4); c.lfoDelay = r.one(2) ? 0 : r.range(0, 60); c.lfoFadeMode = r.range(0, 3); c.lfoFade = r.one(2) ? 0 : r.range(0, 60); c.lfoKeySync = !r.one(4);
+    c.lfoWave = r.range(0, 7); c.lfoRate = drawRate(r); c.lfoOffset = r.range(0, 4); c.lfoDelay = r.one(2) ? 0 : r.range(0, 60); c.lfoFadeMode = r.range(0, 3); c.lfoFade = r.one(2) ? 0 : r.range(0, 60); c.lfoKeySync = !r.one(4);
 }
 
 Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
@@ -643,15 +684,17 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     c.patchCoarse = r.one(2) ? 0 : r.range(-24, 24);
     c.patchFine = r.one(2) ? 0 : r.range(-50, 50);
     c.bendUp = r.range(0, 48); c.bendDown = r.range(0, 48);
+    // the ends too, where the time between clocks reaches its limits (0x894f0fd0)
+    c.patchTempo = r.one(3) ? 1200 : r.one(6) ? (r.one(2) ? r.range(200, 209) : r.range(2450, 2500)) : r.range(200, 2500);
     if (r.one(3)) { c.scaleTune = true; for (int& s : c.scale) s = r.range(-64, 63); }
-    c.attack = r.range(0, 90); c.decay = r.range(0, 90); c.sustain = r.range(0, 127); c.release = r.range(0, 90);
+    c.attack = drawTime(r); c.decay = drawTime(r); c.sustain = r.range(0, 127); c.release = drawTime(r);
     c.aSens = r.one(2) ? 0 : r.range(-63, 63); c.dSens = r.one(2) ? 0 : r.range(-63, 63); c.rSens = r.one(2) ? 0 : r.range(-63, 63);
     c.timeKF = r.one(2) ? 0 : 10 * r.range(-20, 20);
     c.ampVelSens = r.range(-63, 63); c.ampVelCurve = r.range(0, 7);
     c.tvaLevel = r.one(3) ? 127 : r.range(0, 127); c.tvaLevelKF = r.one(2) ? 0 : 10 * r.range(-20, 20); c.tvaLevelLfo = r.one(2) ? 0 : r.range(-63, 63);
     c.tvaPan = r.one(3) ? 64 : r.range(0, 127); c.tvaPanKF = r.one(2) ? 0 : 10 * r.range(-20, 20); c.tvaPanLfo = r.one(2) ? 0 : r.range(-63, 63);
     c.mfxSend = r.one(2) ? 127 : r.range(0, 127);
-    c.tvaLfoWave = r.range(0, 7); c.tvaLfoRate = r.range(0, 127); c.tvaLfoOffset = r.range(0, 4); c.tvaLfoDelay = r.one(2) ? 0 : r.range(0, 60);
+    c.tvaLfoWave = r.range(0, 7); c.tvaLfoRate = drawRate(r); c.tvaLfoOffset = r.range(0, 4); c.tvaLfoDelay = r.one(2) ? 0 : r.range(0, 60);
     c.tvaLfoFadeMode = r.range(0, 3); c.tvaLfoFade = r.one(2) ? 0 : r.range(0, 60); c.tvaLfoKeySync = !r.one(4);
     c.octave = r.one(3) ? r.range(-3, 3) : 0;
     if (r.one(2)) { c.portamento = true; c.portaMode = r.range(0, 1); c.portaType = r.range(0, 1); c.portaTime = r.range(0, 127); c.portaVeloSens = r.range(-63, 63); }
@@ -683,9 +726,20 @@ std::vector<size_t> listedFields() {
     for (const int* x : { &c.mod.type, &c.mod.level, &c.mod.attack, &c.mod.release }) add(*x);
     for (const int* x : { &c.tvaLfoWave, &c.tvaLfoRate, &c.tvaLfoOffset, &c.tvaLfoDelay, &c.tvaLfoFadeMode, &c.tvaLfoFade,
                           &c.tvaLevel, &c.tvaLevelKF, &c.tvaLevelLfo, &c.tvaPan, &c.tvaPanKF, &c.tvaPanLfo, &c.mfxSend }) add(*x);
+    // the tempo's, which sweepWave gives what a move of them needs
+    add(c.patchTempo);
+    for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) }) { add(o->tempoSync); add(o->timeTrip); add(o->beatKeep); }
     for (size_t i = 0; i < 3; ++i) f.push_back(kCcOnly + i);
     f.push_back(kBenderOnly);
     return f;
+}
+
+// In the sweep: the tempo's fields, seen only on a wave with the pad held.  Which OSC has the wave, or 0.
+int sweepWave(size_t at) {
+    static const Ctl c;
+    const auto is = [&](const auto& x) { return at == (size_t)(reinterpret_cast<const char*>(&x) - reinterpret_cast<const char*>(&c)); };
+    if (is(c.patchTempo) || is(c.tempoSync) || is(c.timeTrip) || is(c.beatKeep)) return 1;
+    return is(c.osc2.tempoSync) || is(c.osc2.timeTrip) || is(c.osc2.beatKeep) ? 2 : 0;
 }
 
 struct Report {
@@ -770,16 +824,17 @@ int XtToneProbe::run(int argc, char** argv) {
     for (int g = 0; g < tickFrom + nTick; ++g) {
         rep.caseNo = g;
         const bool twoInTick = g >= tickFrom;
-        const bool osc2Case = g >= nCases + nSweep && !twoInTick;
         if (g == nCases + nSweep) summary("tone");
         if (nOsc2 && g == tickFrom) summary("tone, a wave on OSC 2");
         const bool sweep = g >= nCases && g < nCases + nSweep;
         const size_t sweepAt = sweep ? listed[(size_t)(g - nCases) / 4] : 0;
         const int sweepStage = sweep ? (g - nCases) % 4 : 0;
+        const int sweepOn = sweep && !waves.empty() ? sweepWave(sweepAt) : 0;
+        const bool osc2Case = (g >= nCases + nSweep && !twoInTick) || sweepOn == 2;
         // one case in two plays a wave on OSC 1 (with the analog OSC 2 or alone); the last
         // ones a wave on OSC 2, over OSC 1 off, analog or on another wave
         const TestWave* wv2 = osc2Case ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
-        const TestWave* wv = !sweep && !twoInTick && !waves.empty() && g % 2 == 1 ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
+        const TestWave* wv = (sweepOn == 1 || (!sweep && !twoInTick && g % 2 == 1)) && !waves.empty() ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
         if (wv && wv == wv2) wv = &waves[(size_t)((wv - waves.data() + 1) % (long)waves.size())];   // a wave's loop is its own
         Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr);
         if (sweep) {
@@ -890,6 +945,7 @@ int XtToneProbe::run(int argc, char** argv) {
             syn.setSample(wv->enc);
             fw.wave = wv->fw;
             fw.c.wr8(wv->fw.chunk[2] + 0xa, (uint8_t)ctl.rootKey);
+            fw.c.wr32(wv->fw.chunk[2] + 0x1c, (uint32_t)ctl.origTempo);
         } else {
             // an analog case: in some, a stereo wave left loaded, which it must not read or follow
             syn.setSample(g % 4 == 2 && !waves.empty() ? waves[2].enc : nullptr);
@@ -899,12 +955,21 @@ int XtToneProbe::run(int argc, char** argv) {
             syn.setSample(wv2->enc, 1);
             fw.wave2 = wv2->fw;
             fw.c.wr8(wv2->fw.chunk[2] + 0xa, (uint8_t)ctl.osc2.rootKey);
+            fw.c.wr32(wv2->fw.chunk[2] + 0x1c, (uint32_t)ctl.osc2.origTempo);
         }
         const int raw[2] = { sweep || twoInTick ? 48 : r.range(0, 127), sweep || twoInTick ? 72 : r.range(0, 127) }, vel[2] = { r.range(1, 127), r.range(1, 127) }, relVel[2] = { r.range(1, 127), r.range(1, 127) };
         const int nBlocks = sweep || twoInTick ? 90 : g % 23 == 7 ? 700 : 60 + r.range(0, 120);     // some long enough to run past a wave's end
-        const int secondAt = twoInTick ? -1 : sweep ? 1 : kind && raw[0] != raw[1] ? r.range(1, 30) : -1;
+        // Key-unsynced LFOs on a tone with no note value, the Rate moved onto one, and a second tone following
+        // them: it starts with the first's clock step, and its first update, here the bender's, gives it its own
+        const bool followCase = kind == 1 && !sweep && !twoInTick && raw[0] != raw[1] && r.one(4);
+        if (followCase) {
+            for (int* k : { &ctl.lfoRate, &ctl.osc2.lfoRate, &ctl.cosm[0].lfoRate, &ctl.cosm[1].lfoRate, &ctl.tvaLfoRate }) *k = r.range(0, 127);
+            ctl.lfoKeySync = ctl.osc2.lfoKeySync = ctl.cosm[0].lfoKeySync = ctl.cosm[1].lfoKeySync = ctl.tvaLfoKeySync = false;
+        }
+        const int secondAt = twoInTick ? -1 : sweep ? 1 : followCase ? r.range(3, 12) : kind && raw[0] != raw[1] ? r.range(1, 30) : -1;
         const int offAt[2] = { twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 3 : 1000) : 20 + r.range(0, 40), twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
-        const int liveAt = twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
+        const int liveAt = twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : followCase ? r.range(1, secondAt - 1) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
+        const int followAt = followCase ? secondAt + r.range(1, 8) : -1;
         // the free-running LFOs' phases, once a note has shown which objects they are
         for (int n = 0; n < 3; ++n) {
             if (!fwFree[n]) continue;
@@ -914,6 +979,7 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         // time with nothing sounding: the free-running LFOs run on
         for (int i = r.range(0, 30); i > 0; --i) {
+            for (int k = syn.clocksDue(); k > 0; --k) if (!fw.clock((uint32_t)(syn.hostFrames / 32))) return 1;
             if (syn.tickCount >= 441 && !fw.tickFree()) return 1;
             syn.render(L, R, 32);
         }
@@ -954,6 +1020,15 @@ int XtToneProbe::run(int argc, char** argv) {
                 wrf(M + 0x2c, pv->mod.lastLevel());
                 fw.c.wr32(M + 0x30, (uint32_t)pv->mod.writeIndex());
                 fw.c.wr32(M + 0x40, pv->mod.syncOn() ? 1 : 0);   // an OSC SYNC note leaves its flag set for the next
+                // an LFO's clock fields, which only a note value sets, and with OSC 1 off the tempo its block had
+                const XtLfo* lfos[5] = { &pv->lfo, &pv->osc2.lfo, &pv->cs[0].lfo, &pv->cs[1].lfo, &pv->tlfo };
+                for (uint32_t l = 1; l <= 5; ++l) {
+                    const XtLfo& q = *lfos[l - 1];
+                    const uint32_t O = Firmware::lfoAt(n, l);
+                    wrf(O + 0x84, q.clockStep()); wrf(O + 0x88, q.clockTarget()); wrf(O + 0x8c, q.clockTime());
+                    fw.c.wr32(O + 0x90, (uint32_t)q.clockWrap()); fw.c.wr32(O + 0x94, (uint32_t)q.clockCount());
+                }
+                if (!ctl.on) wrf(n.BL + 0x494, pv->blockTempo);
                 for (int o = 0; o < 2; ++o) {
                     if ((o ? ctl.osc2.oscType : ctl.oscType) != 0) continue;
                     const XtAnalogOsc& a = osc(*pv, o).ana;
@@ -1044,6 +1119,27 @@ int XtToneProbe::run(int argc, char** argv) {
                         const float x = fw.f32(V + f.off);
                         if (!bits(x, f.v)) rep.bad(os + f.name, "fw %.9g port %.9g", x, f.v, blk);
                     }
+                    // The beat (player at voice +0xd4)
+                    const XtBeat& bt = s.wave->type == 1 ? s.solo.beat() : s.mb.beat();
+                    const uint32_t PL = V + 0xd4;
+                    const int32_t posNow = s.wave->type == 1 ? s.solo.position() : s.mb.position();
+                    const struct { const char* name; uint32_t off; int32_t v; } ints[] = { { "position", 0x38, posNow }, { "beat budget", 0x54, bt.budget }, { "beat sync", 0x58, bt.syncPos }, { "beat trip", 0x5c, bt.tripPos },
+                        { "beat walk", 0x60, bt.walkPos }, { "beat position", 0x64, bt.beatPos }, { "beat step", 0x50, bt.step } };
+                    for (const auto& f : ints) {
+                        ++rep.checks;
+                        const int32_t x = (int32_t)fw.c.rd32(PL + f.off);
+                        if (x != f.v) rep.bad(os + f.name, "fw %.0f port %.0f", x, f.v, blk);
+                    }
+                    const VField fl[] = { { "beat factor", 0x8c, bt.factor }, { "beat integ", 0x90, bt.integ } };
+                    for (const VField& f : fl) {
+                        ++rep.checks;
+                        const float x = fw.f32(PL + f.off);
+                        if (!bits(x, f.v)) rep.bad(os + f.name, "fw %.9g port %.9g", x, f.v, blk);
+                    }
+                    rep.checks += 3;
+                    if ((int8_t)fw.c.rd8(PL + 0x40) != bt.clk) rep.bad(os + "beat clocks", "fw %.0f port %.0f", (int8_t)fw.c.rd8(PL + 0x40), bt.clk, blk);
+                    if ((int8_t)fw.c.rd8(PL + 0x41) != bt.trip) rep.bad(os + "beat steps", "fw %.0f port %.0f", (int8_t)fw.c.rd8(PL + 0x41), bt.trip, blk);
+                    if ((fw.c.rd32(V + 0x9b0) != 0) != s.chase) rep.bad(os + "chase", "fw %.0f port %.0f", fw.c.rd32(V + 0x9b0), s.chase, blk);
                 }
             }
         };
@@ -1112,6 +1208,33 @@ int XtToneProbe::run(int argc, char** argv) {
             return true;
         };
 
+        // The Time Trip pad on both sides.  A step goes straight to the voices; touching and letting go
+        // reach the tones at their next update.  A finger round a circle, or back and forth, or jumping
+        // across the pad; then perhaps held still, where a walk's budget runs out (0x8950c280); let go
+        // by both controllers or one, and perhaps touched again, within the fade the seek finds
+        // Time Trip on (0x8950f900).  A first message may have one at 0, which is no touch.
+        const auto padTo = [&](int x, int y, int blk) {
+            const bool was = syn.pad.on();
+            if (!fw.pad(x, y)) return false;
+            syn.timeTrip(x, y);
+            ++rep.checks;
+            if (fw.padOn() != syn.pad.on()) rep.bad("pad on", "fw %.0f port %.0f", fw.padOn(), syn.pad.on(), blk);
+            if (was != syn.pad.on()) {
+                fw.frames = syn.hostFrames;
+                for (FwNote& fnote : fn)
+                    if (fnote.live && !fnote.ended && !fw.liveUpdate(fnote)) return false;
+            }
+            compareAll(blk);
+            return true;
+        };
+        const bool tripCase = sweepOn || (!sweep && !twoInTick && r.one(3));
+        const int tripFrom = sweepOn ? 5 : tripCase ? r.range(0, 40) : -1, tripRadius = r.range(10, 63);
+        const int tripLen = sweepOn ? liveAt + 5 : r.one(2) ? r.range(0, 60) : r.range(60, 300), tripMoves = sweepOn ? 8 : r.one(2) ? tripLen : r.range(1, 40);
+        const float tripTurn = (r.one(2) ? 1.0f : -1.0f) * (float)r.range(1, 60) * 0.0125f;   // radians a block
+        const int tripBack = r.one(4) ? r.range(3, 20) : 0;
+        const int tripJump = !sweepOn && r.one(4) ? r.range(1, 2) : 0, tripFirst = sweepOn ? 0 : r.range(0, 2), tripLift = sweepOn ? 0 : r.range(0, 2), tripAgain = !sweepOn && r.one(2) ? r.range(1, 40) : -1;
+        float tripAngle = (float)r.range(0, 628) * 0.01f;
+
         for (FwNote& n : fn) { n.vi = -1; n.live = n.released = n.ended = false; }
         fw.cosmBuf = kRam + 0x1000000;
         bool keyDown[2] = {};
@@ -1146,7 +1269,19 @@ int XtToneProbe::run(int argc, char** argv) {
                 }
             } else if (blk == liveAt) {                  // knobs moved, and the bender
                 Ctl n = drawControls(r, g, wv != nullptr, wv2 != nullptr);
-                if (sweep && sweepAt >= kCcOnly) n = ctl;
+                if (followCase) {
+                    const Ctl d = n;
+                    n = ctl;
+                    n.lfoRate = (d.lfoRate & 15) + 128; n.osc2.lfoRate = (d.osc2.lfoRate & 15) + 128; n.tvaLfoRate = (d.tvaLfoRate & 15) + 128;
+                    for (int k = 0; k < 2; ++k) n.cosm[k].lfoRate = (d.cosm[k].lfoRate & 15) + 128;
+                }
+                else if (sweepOn) {                      // the field itself: a switch thrown, or another tempo
+                    n = ctl;
+                    char* p = reinterpret_cast<char*>(&n) + sweepAt;
+                    if (p == reinterpret_cast<char*>(&n.patchTempo)) n.patchTempo = ctl.patchTempo == 1200 ? 2400 : 1200;
+                    else *p = !*p;
+                }
+                else if (sweep && sweepAt >= kCcOnly) n = ctl;
                 else if (sweep || r.one(2)) {            // one word of the panel only: what XtSynth notices has changed
                     static_assert(std::is_trivially_copyable_v<Ctl>);
                     Ctl one = ctl;
@@ -1161,6 +1296,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 n.oscTimeOffset = ctl.oscTimeOffset; n.lfoKeySync = ctl.lfoKeySync; n.osc2.lfoKeySync = ctl.osc2.lfoKeySync; n.tvaLfoKeySync = ctl.tvaLfoKeySync;
                 n.structure = ctl.structure;             // latched at note-on, but its own check is xt_analog's
                 n.mono = ctl.mono; n.legato = ctl.legato; n.robot = ctl.robot; n.loop = ctl.loop; n.loopMode = ctl.loopMode; n.loopStart = ctl.loopStart; n.loopEnd = ctl.loopEnd;
+                n.origTempo = ctl.origTempo; n.osc2.origTempo = ctl.osc2.origTempo;
                 n.osc2.rootKey = ctl.osc2.rootKey; n.osc2.oscTimeOffset = ctl.osc2.oscTimeOffset; n.osc2.robot = ctl.osc2.robot; n.osc2.loop = ctl.osc2.loop;
                 n.osc2.loopMode = ctl.osc2.loopMode; n.osc2.loopStart = ctl.osc2.loopStart; n.osc2.loopEnd = ctl.osc2.loopEnd;
                 for (int k = 0; k < 2; ++k) { n.cosm[k].on = ctl.cosm[k].on; n.cosm[k].type = ctl.cosm[k].type; n.cosm[k].lfoKeySync = ctl.cosm[k].lfoKeySync; n.cosm[k].odType = ctl.cosm[k].odType; n.cosm[k].ampType = ctl.cosm[k].ampType; }
@@ -1171,8 +1307,31 @@ int XtToneProbe::run(int argc, char** argv) {
                 else if (!sweep && r.one(3)) { ccAt = r.range(0, 2); ccTo = r.range(0, 127); }
                 if (!moveLive(n, bentFrom, blk, ccAt, ccTo)) return 1;
             }
+            if (blk == followAt) {
+                const int from = fw.bender;
+                fw.bender = (from + 4000) % 16384;
+                if (!moveLive(ctl, from, blk)) return 1;
+            }
+            if (tripCase && blk >= tripFrom) {
+                const int at = blk - tripFrom;
+                if (at == tripLen || (at < tripLen && at < tripMoves) || (tripAgain >= 0 && at == tripLen + tripAgain)) {
+                    int x = 1, y = 64;
+                    if (tripJump == 1) x = at % 3 == 2 ? 127 : 1;
+                    else if (tripJump == 2) { x = r.range(1, 127); y = r.range(1, 127); }
+                    else {
+                        tripAngle += tripBack && at % (2 * tripBack) >= tripBack ? -tripTurn : tripTurn;
+                        x = 64 + (int)std::lround((double)tripRadius * std::cos((double)tripAngle));
+                        y = 64 + (int)std::lround((double)tripRadius * std::sin((double)tripAngle));
+                    }
+                    if (at == tripLen) { if (tripLift != 2) x = 0; if (tripLift != 1) y = 0; }
+                    else if (at == 0 && tripFirst == 1) x = 0;
+                    else if (at == 0 && tripFirst == 2) y = 0;
+                    if (!padTo(x, y, blk)) return 1;
+                }
+            }
             const bool tick = syn.tickCount >= 441;
             fw.frames = syn.hostFrames;
+            for (int k = syn.clocksDue(); k > 0; --k) if (!fw.clock((uint32_t)(syn.hostFrames / 32))) return 1;
             if (tick && !fw.tickFree()) return 1;
             // in XtSynth's voice order, so that the last rendered is the same on both sides
             FwNote* order[2] = { &fn[0], &fn[1] };
@@ -1253,6 +1412,12 @@ int XtToneProbe::run(int argc, char** argv) {
                 } else if (!bits(a * 0x1p31f, L[i] * 0x1p31f) || !bits(a2 * 0x1p31f, R[i] * 0x1p31f)) { rep.bad("output", "fw %.9g port %.9g", a, L[i], blk); break; }
             }
         }
+        if (syn.pad.on()) {                          // the pad up again for the next case
+            if (!fw.pad(0, 0)) return 1;
+            syn.pad.setX(0);
+            int unused = 0;
+            syn.pad.setY(0, unused);
+        }
         for (int i = 0; i < 2; ++i)
             if (keyDown[i]) {
                 int back = -1;
@@ -1275,6 +1440,28 @@ int XtToneProbe::run(int argc, char** argv) {
         fw.c.write(kFmLines, syn.modShared.line, sizeof(syn.modShared.line));
     }
     summary("tone, a second update in a tick");
+    // The clock's rate.  Above the firmware's clock runs on XtSynth's, which could be any speed: here
+    // two minutes (165375 blocks) against the firmware's own timer routine, within one clock.
+    {
+        XtSynth clk;
+        clk.prepare(44100.0);
+        Ctl c;
+        long all = 0;
+        for (const int tempo : { 200, 777, 1200, 2330, 2500 }) {
+            rep.caseNo = tempo;
+            c.patchTempo = tempo;
+            clk.setControls(c);
+            uint32_t ticks = 0;
+            if (!fw.msTicks(tempo, 120000, ticks)) return 1;
+            long clocks = 0;
+            for (int i = 0; i < 165375; ++i) { clocks += clk.clocksDue(); clk.render(L, R, 32); }
+            ++rep.checks;
+            all += clocks;
+            if (std::labs(clocks * 20 - (long)ticks) > 20) rep.bad("clock rate", "fw %.0f port %.0f", (float)ticks, (float)(clocks * 20), 0);
+        }
+        std::printf("tone, the clock's rate: 5 tempos, 2 minutes each, %ld clocks\n", all);
+        summary("tone, the clock's rate");
+    }
     return total ? 3 : 0;
 }
 #endif

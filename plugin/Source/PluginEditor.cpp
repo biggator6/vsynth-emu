@@ -2,7 +2,7 @@
 #include <tuple>
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 1000; // height of the XT strip below it
+static constexpr int kXtStripH   = 1030; // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -68,9 +68,9 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1300);
+    setSize(560, 1330);
     setResizable(true, true);
-    setResizeLimits(480, 990, 960, 1440);
+    setResizeLimits(480, 990, 960, 1470);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -104,6 +104,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                               &fAttackSlider_, &fDecaySlider_, &fSustainSlider_, &fReleaseSlider_, &fDepthSlider_,
                               &lfoRateSlider_, &lfoDepthSlider_, &lfoDelaySlider_, &lfoFadeSlider_, &lfoTimeSlider_, &lfoFmtSlider_,
                               &loopStartSlider_, &loopEndSlider_, &portaTimeSlider_, &portaSensSlider_, &octSlider_,
+                              &patchTempoSlider_, &tripSlider_, &origTempoSlider_,
                               &cosmCutSlider_, &cosmResoSlider_, &cosmKfSlider_, &clfoRateSlider_, &cosmCutOwnSlider_,
                               &cosmResoOwnSlider_, &modLevelSlider_, &modAttackSlider_, &modReleaseSlider_ }) {
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
@@ -191,6 +192,18 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     modLevelAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "modLevel", modLevelSlider_);
     modAttackAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "modAttack", modAttackSlider_);
     modReleaseAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "modRelease", modReleaseSlider_);
+    for (juce::ToggleButton* b : { &syncBtn_, &tripBtn_, &keepBtn_ }) {
+        b->setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+        b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(*b);
+    }
+    for (juce::Label* l : { &patchTempoLabel_, &tripLabel_, &origTempoLabel_ }) styleSmall(*l);
+    patchTempoAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "patchTempo", patchTempoSlider_);
+    tripAtt_       = std::make_unique<SliderAtt>(processor_.apvts, "timeTrip", tripSlider_);
+    origTempoAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "origTempo", origTempoSlider_);
+    syncAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, "tempoSync", syncBtn_);
+    tripBtnAtt_    = std::make_unique<ButtonAtt>(processor_.apvts, "timeTripSw", tripBtn_);
+    keepAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, "beatKeep", keepBtn_);
     portaBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
     portaBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     for (juce::Component* cpt : { (juce::Component*)&portaBtn_, (juce::Component*)&portaModeBox_, (juce::Component*)&portaTypeBox_ })
@@ -640,6 +653,11 @@ void VSynthEmuEditor::attachOsc(int k) {
     anaWaveAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("anaWave"), anaWaveBox_);
     encodeAtt_.reset(); keyAtt_.reset(); depthAtt_.reset(); energyAtt_.reset(); oscTkfAtt_.reset(); oscFkfAtt_.reset(); timeOffsetAtt_.reset();
     loopAtt_.reset(); loopModeAtt_.reset(); loopStartAtt_.reset(); loopEndAtt_.reset();
+    origTempoAtt_.reset(); syncAtt_.reset(); tripBtnAtt_.reset(); keepAtt_.reset();
+    origTempoAtt_  = std::make_unique<SliderAtt>(processor_.apvts, id("origTempo"), origTempoSlider_);
+    syncAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("tempoSync"), syncBtn_);
+    tripBtnAtt_    = std::make_unique<ButtonAtt>(processor_.apvts, id("timeTripSw"), tripBtn_);
+    keepAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("beatKeep"), keepBtn_);
     encodeAtt_     = std::make_unique<ComboAtt>(processor_.apvts, id("encodeType"), encodeBox_);
     keyAtt_        = std::make_unique<SliderAtt>(processor_.apvts, id("rootKey"), keySlider_);
     depthAtt_      = std::make_unique<SliderAtt>(processor_.apvts, id("encodeDepth"), depthSlider_);
@@ -694,7 +712,9 @@ void VSynthEmuEditor::showOscType() {
                                   (juce::Component*)&timeOffsetBox_, (juce::Component*)&oscTkfLabel_, (juce::Component*)&oscTkfSlider_,
                                   (juce::Component*)&oscFkfLabel_, (juce::Component*)&oscFkfSlider_, (juce::Component*)&loopBtn_,
                                   (juce::Component*)&loopModeBox_, (juce::Component*)&loopStartLabel_, (juce::Component*)&loopStartSlider_,
-                                  (juce::Component*)&loopEndLabel_, (juce::Component*)&loopEndSlider_ })
+                                  (juce::Component*)&loopEndLabel_, (juce::Component*)&loopEndSlider_, (juce::Component*)&syncBtn_,
+                                  (juce::Component*)&tripBtn_, (juce::Component*)&keepBtn_, (juce::Component*)&origTempoLabel_,
+                                  (juce::Component*)&origTempoSlider_ })
         cpt->setVisible(!ana);
     anaWaveLabel_.setVisible(ana);
     anaWaveBox_.setVisible(ana);
@@ -856,6 +876,14 @@ void VSynthEmuEditor::resized() {
     statusLabel_.setBounds(row1);
     xt.removeFromTop(6);
     auto row2 = xt.removeFromTop(24);
+    {   // the PCM OSC's tempo row, in the place of the analog oscillator's fourth
+        auto s4 = row2.translated(0, 90);
+        syncBtn_.setBounds(s4.removeFromLeft(62));
+        tripBtn_.setBounds(s4.removeFromLeft(58));
+        keepBtn_.setBounds(s4.removeFromLeft(64));
+        origTempoLabel_.setBounds(s4.removeFromLeft(30));
+        origTempoSlider_.setBounds(s4);
+    }
     {   // the analog rows, in rows 2, 3 and Loop's places (showOscType)
         auto a1 = row2, a2 = row2.translated(0, 30), a3 = row2.translated(0, 60), a4 = row2.translated(0, 90);
         anaWaveLabel_.setBounds(a1.removeFromLeft(36));
@@ -923,6 +951,14 @@ void VSynthEmuEditor::resized() {
     legatoBtn_.setBounds(row3k.removeFromLeft(80));
     octLabel_.setBounds(row3k.removeFromLeft(36));
     octSlider_.setBounds(row3k.removeFromLeft(200));
+    xt.removeFromTop(6);
+    auto row3t = xt.removeFromTop(24);               // the tempo: the Patch Tempo, the Time Trip knob
+    const int tw = row3t.getWidth() / 2;
+    auto tl = row3t.removeFromLeft(tw);
+    patchTempoLabel_.setBounds(tl.removeFromLeft(42));
+    patchTempoSlider_.setBounds(tl.withTrimmedRight(8));
+    tripLabel_.setBounds(row3t.removeFromLeft(30));
+    tripSlider_.setBounds(row3t);
     xt.removeFromTop(6);
     auto row4 = xt.removeFromTop(24);                // the TVA Switch, amp envelope
     tvaBtn_.setBounds(row4.removeFromLeft(56));

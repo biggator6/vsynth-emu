@@ -492,6 +492,28 @@ int main(int argc, char** argv) {
         setKnobs({ { "tvaLfoWave", refCtl.tvaLfoWave }, { "tvaLfoRate", refCtl.tvaLfoRate }, { "tvaLfoOffset", refCtl.tvaLfoOffset }, { "tvaLfoDelay", refCtl.tvaLfoDelay },
                    { "tvaLfoFadeMode", refCtl.tvaLfoFadeMode }, { "tvaLfoFade", refCtl.tvaLfoFade }, { "tvaLfoKeySync", ks } });
     }
+    // TEST_TEMPO=n: the Patch Tempo, BPM (whole); TEST_SYNC="sync,origBpm": Tempo Sync and the Original Tempo;
+    // TEST_RATE=n: the LFO Rate, 128..144 a note value; TEST_ATTACK=n: the OSC amp envelope's Attack, likewise
+    if (const char* e = std::getenv("TEST_TEMPO")) {
+        const int bpm = std::atoi(e);
+        refCtl.patchTempo = bpm * 10;
+        setKnobs({ { "patchTempo", bpm } });
+    }
+    if (const char* e = std::getenv("TEST_SYNC")) {
+        int sw = 0, bpm = 120;
+        std::sscanf(e, "%d,%d", &sw, &bpm);
+        refCtl.tempoSync = sw != 0;
+        refCtl.origTempo = bpm * 10000;
+        setKnobs({ { "tempoSync", sw }, { "origTempo", bpm } });
+    }
+    if (const char* e = std::getenv("TEST_RATE")) {
+        refCtl.lfoRate = std::atoi(e);
+        setKnobs({ { "lfoRate", refCtl.lfoRate } });
+    }
+    if (const char* e = std::getenv("TEST_ATTACK")) {
+        refCtl.oAttack = std::atoi(e);
+        setKnobs({ { "oscEnvAttack", refCtl.oAttack } });
+    }
     // TEST_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM, 3 ENV RING, 4 OSC SYNC
     if (const char* e = std::getenv("TEST_MOD")) {
         refCtl.mod.on = true;
@@ -615,7 +637,18 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("TEST_CC")) std::sscanf(e, "%d,%d,%d", &ccNum, &ccValue, &ccFrame);
     const int ccBlock = ccNum >= 0 ? ccFrame / block * block : -1, ccAt = ccFrame % block;
     if (ccNum >= 0 && (ccBlock == 0 || ccBlock == offBlock || ccBlock == n2Block || ccBlock == bBlock)) { std::fprintf(stderr, "TEST_CC must fall in another block\n"); return 1; }
+    // TEST_TRIP="value,frame[,value,frame...]": the Time Trip knob at the start of the blocks holding these frames
+    std::vector<std::pair<int, int>> trips;
+    if (const char* e = std::getenv("TEST_TRIP")) {
+        const juce::StringArray w = juce::StringArray::fromTokens(e, ",", "");
+        for (int i = 0; i + 1 < w.size(); i += 2) trips.push_back({ w[i].getIntValue(), w[i + 1].getIntValue() / block * block });
+    }
     for (int done = 0; done < total; done += block) {
+        for (const auto& t : trips)
+            if (t.second == done) {
+                setKnobs({ { "timeTrip", t.first } });
+                ref.timeTripKnob(t.first);
+            }
         juce::MidiBuffer midi;
         if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)noteVel), 100); }
         if (done == offBlock) { midi.addEvent(juce::MidiMessage::noteOff(1, note, (juce::uint8)100), offAt); }

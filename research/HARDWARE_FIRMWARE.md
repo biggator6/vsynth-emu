@@ -1547,6 +1547,129 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Tempo sync and Time Trip (2026-11-04, v118)
+
+The Patch Tempo, the note values on envelope times and LFO rates, each PCM OSC's Tempo Sync, and the Time Trip pad with its Switch and Beat Keep are ported, with parameters and rows in the editor. The tempo is the Patch Tempo, the firmware's Clock Source INTERNAL; following the host's tempo is left for the user to decide. At the defaults nothing moves: `ab.sh` 4/4 identical to v114.
+
+**The tempo.** ID 0x11d is BPM × 10, 200…2500, default 1200. `0x89471ef0` (flag 0x40 of the clock's task) takes it to the object at `0x89979bfc`, whose constructor `0x894714b0` leaves +0x10 = 20 and +0x14 = 500.
+- +0x14 = 3000·(+0x10)/(t/10), the milliseconds of a quarter, so the tenths are dropped.
+- Readers go back from it: t10 = 30000·(+0x10)/(+0x14), and t10/10 as a float is the block's +0x60 (`0x894e2d20`, analog `0x894e1880`, EXT `0x894e3790`). So 233 BPM has 257 ms and reads as 233.4.
+- The envelopes' input +0x18 takes t10 at a note's start only (`0x894df4e0`). Their update (`0x894df600`) and legato (`0x894df5e0`) do not read it.
+
+**The clock.**
+- `0x89471030` runs each millisecond: `0x894710e0` adds 24 at +0x1c, and +0x28 counts ticks, Δ·(+0x10)/(+0x14) with the remainder kept at +0x2c. So 480 ticks to the quarter. The other branch, with +0x40 set, runs from +0x46…+0x4a: the external clock, not followed here.
+- Flag 2 of task `0x89471ce0` → `0x894710b0` → the OS's timers (`0x8930eb00`, in tempo ticks) → `0x894d4210` every 20 ticks → flag 0x10 of task `0x894d4020` → `0x894f4da0`. So 24 clocks to the quarter.
+- `0x894f4da0`: dt = (blocks `0x8987c7a8` − last `0x8987c7a4`)·0.000726, and 0.000726 if that is 0. Then the free LFOs on its list (`0x894f17c0`), and each tone: slot +0x24 (`0x894f78a0` → `0x894f0fd0` on its eight LFOs), slot +0x30 (`0x894f78f0` → `0x894f2540(voice, 1)`: if voice +0xd4 & 2, the byte +0x114 + 1).
+- `XtSynth::clockPeriod`, `clocksDue`, `clockTick`. The clock falls on a block's start, ahead of the tone update. On the XT it is a task of its own, so that order is a choice; see "Not covered".
+
+**Note values.** Attack, Decay and Release run to 144 in the descriptors, and so does LFO Rate. From 128 they are note values, a count of clocks from the table at `0x897cfeb8` (3 to 192; 24 is a quarter).
+- An envelope's time: T = clocks/(24·t10)·600000 ms (`0x894df230`), as "Units" in the envelope generator's section (v45) had it. So a note keeps the tempo it started with, while the clock moves on.
+- An LFO's block has +0x14 set and the clocks as its rate. Note-on `0x894f0cf0` takes fr4, the tone block's +0x494, which is OSC 1's block +0x60: +0x74 the tempo, +0x84 = 65535/clocks, +0x88 = 0 (the target), +0x8c = 60/tempo/24, +0x94 = 0 (the count). With OSC 1 off nothing writes +0x494 (`0x894e4830` skips the converter), so it holds what the block last held. +0x90 is not set, and the constructor does not clear +0x84…+0x94.
+- A clock (`0x894f0fd0`): the count + 1; at the clocks, the count 0 and +0x90 = 1. Then +0x88 = +0x84·count, and +0x8c = dt within 0.01…0.125.
+- A tick: the rate (`0x894f1320`) is the distance to the target, across the wrap, over +0x8c·100, within 1…65535. If the phase has reached the target and +0x90 is 0, it stops there. A wrap clears +0x90. So the LFO goes at the speed that gets it to the clock's phase by the next clock, and it waits there if the next is late.
+- An update (`0x894f0f40`) keeps the flag from the note-on (object +0x60), and with it set +0x84 = 65535/rate. It runs on all of a tone's LFOs at any tone update (`0x894f5c70`), those whose OSC or COSM is off too. The port updated an LFO only when its own knobs moved, which made no difference until now: a key-unsynced note starts with the +0x84 of the tone it follows, and its first update sets its own. Seed 4242 found that. `XtSynth::lfoUpdates`.
+- The free object: +8 rate, +0x10 phase, +0x14 count of users, +0x18 flag, +0x1c step, +0x20 target (72 from the constructor), +0x24 seconds per clock (1/48), +0x28 wrap, +0x2c count, +0x30 tempo (120). `0x894f0a30` takes a note's rate, `0x894f08f0` is the rate, `0x894f09b0` the tick, `0x894f0af0` the clock. A note-on that takes it puts it on the clock's list or off, by its flag (`0x894f16d0`, `0x894f1750`). A note's end does not take it off, so it goes on following the clock.
+
+**The OSC's block.** The updater `0x894e55d0` reads the IDs to its table T; the converter's input is T − 8.
+
+| T | OSC 1, OSC 2 | | Default |
+|---|---|---|---|
+| +0x54 | 0x2d0, 0x304 | Tempo Sync Sw | 0 |
+| +0x55…+0x5a | | Robot, Playback Mode, Loop, Vari, Time Offset, Energy | |
+| +0x5b | 0x2d6, 0x30a | Time Trip Sw | 1 |
+| +0x5c | 0x2d7, 0x30b | Time Trip Beat Keep | 1 |
+
+The tail `0x894e4030` makes the block's +0xb4 bit 0x02 Tempo Sync, bit 0x04 the pad's +8 and the Switch, +0xb5 bit 0x80 Beat Keep. Voice note-on `0x894f3110` copies those to +0xd4, the player's first bytes, with the player's +0x4c = ftrc(+0x60·10000) and +0x48 = the wave header's +0x1c, its Original Tempo, BPM × 10000.
+
+**The beat.** `0x8950c280` runs first in a player's block, the same for SOLO and the band players. `XtBeat`. Positions are in 1/512 sample, 0x4000 to a block.
+
+| Player | |
+|---|---|
+| +0x40, +0x41 | clocks and Time Trip steps not yet taken, signed |
+| +0x48, +0x4c | the wave's Original Tempo, the note's tempo |
+| +0x50 | one clock at the Original Tempo: 5.6448e11/(+0x48) |
+| +0x54 | what is left before the factor is formed again |
+| +0x58, +0x5c | Tempo Sync's target, Time Trip's target |
+| +0x60 | where the walk has got to |
+| +0x64 | the beat position, which runs on regardless |
+| +0x8c, +0x90 | the factor on the walk, the steer's integral |
+
+In a block:
+1. **Time Trip.** Without +0xd4 & 4 its target follows the walk. With a step waiting, the target moves by steps·(+0x50), +0x54 = 2·(+0x50), and the factor is formed.
+2. **Tempo Sync.** Without +0xd4 & 2 its target follows the walk and the beat position moves a block (`0x8950c470`). With a clock waiting, target and beat position move by clocks·(+0x50); the first clock also sets the walk to that (target 0 means none yet). Under Time Trip the target then stands at the walk; otherwise +0x54 is set and the factor formed.
+3. **The walk.** With Time Trip the factor is taken, and +0x60 += 16384·factor. +0x54 falls by a block, and past 0 the factor is formed again if the target is still ahead, else it is 0, so the wave stands still. With Tempo Sync alike, +0x54 falling by the walk + 0x400 and the factor always formed again. With neither the factor is 1.
+4. The player's walk this block = factor·walk·2^25.
+
+- The steer `0x8950c4f0` is proportional and integral on the error: e = error·6.1e-6, integral += 0.027·e, factor = integral + 0.08·e, within ±32. Past one clock on the far side of the target both go to 0, but what it returns, which this block walks by, is not limited. Which side is far goes by the sign of the byte.
+- The beat position wraps in the loop. Going forward it takes off the region in 1/512. Going backward it adds the region unshifted, in 1/16, so a backward loop's beat drifts. Ported as it is.
+- `0x8950f860` at a note's start: factor and integral = tempo/original, +0x54 = 2·(+0x50), targets and walk 0, the beat position from the start position. `0x8950f900` after a seek: the same, but the factor 0 with Time Trip on. A player's position is otherwise its own: this only ever steers its walk.
+
+**Letting go.** Voice update `0x894f3ec0` (kind 2, VariPhrase) compares the block's bits with the player's:
+- Sync coming on: +0x114 = 0. Time Trip coming on: +0x115 = 1, a step to start it.
+- Time Trip going off with Beat Keep on: voice +0x9b0 = 1 and the gain's target +0x154 = 0.
+- Voice tick `0x894f2090`, `0x894f20d2`: while +0x9b0 is set and the gain +0x158 is above 2^−16, the whole voice update is skipped. Then `0x894f2da0` seeks to the beat position (+0x138 >> 5; SOLO `0x8950fed0`, bands `0x89510bf0`, with byte 0 bit 0x80 set meanwhile) and the update goes on, its gain target coming back. So the sound fades, jumps to where the wave would have got to, and fades in. With Beat Keep off it goes on from where it stands.
+- `XtSynth::oscBeat`, `OscVoice::chase`.
+
+The older sections call the voice's ramps +0x8c8 and +0x910 Time Trip's. They are not: Time Trip goes through +0x8c as above, and those stay at rest in every case here.
+
+**The pad.** One object per part, at `0x8987ae78`[part], set up by `0x894d8740`. `XtTripPad`.
+- Controllers reach it by `0x894d8360(part, cc, value)`, from `0x894d6f10`, the Control Change case of the message dispatcher (`0x894d43e0`), for each part on that port and channel. That answers the question in `CONTROLLERS.md` as far as the code goes: an assigned CC reaching that dispatcher moves the pad, whatever the chart says. Whether MIDI IN feeds it was not traced. `0x89cf69a4`, `0x89cf69a5` are Time Trip Assign X and Y (IDs 0x91, 0x92), `0x89cf69a6`, `0x89cf69a7` Beam 1 Assign L and R (0x87, 0x88), with 0 and 32 off (`0x894d82e0`). The descriptors give 0, where the manual says CC 82 and 83.
+- `0x894f4230` is touching and letting go: both X and Y above 0 touch it, either at 0 lets go. Note that X at 0 lets go without storing the 0, so a Y above 0 in the same breath touches it again.
+- `0x894f4080` is a move, `0x894f42b0` the angle (a table at `0x897d1c8c`, 512 to a turn), `0x894f43b0` the change in whole steps. `0x894d8740` picks index 2 of the tables at `0x897d3d8e`, `0x897d3da0`: 48 steps to a turn. A direction once taken holds against a move back of up to 64, which counts when a second one comes; a jump of more than 64 is no move. The first move goes the short way, and half a turn onto angle 0 counts as forward.
+- `0x894f4e10` → tone slot +0x3c (`0x894f7920`) → `0x894f25a0`: voice +0x115 = the steps, if +0xd4 & 4 (overwriting, not adding). The firmware's loop hands them out by ±127, but half a turn is 24, so it goes round once.
+- Touching and letting go reach a tone only at its next update, through the input's +0x63 and the object's +8 (`0x894e477a`). Here it is at once.
+- Clockwise is forward: +48 steps a turn, and the manual agrees. A turn is 48 clocks at the Original Tempo, two quarter notes.
+
+**The check.** `xt_tone` builds the clock's object and the pads as at power-on, and the Patch Tempo through `0x89471ef0`. It draws:
+- the Patch Tempo (1200 in a third of the cases, its two ends in a ninth, where the time between clocks reaches its limits) and each OSC's Tempo Sync (a third), Time Trip Sw, Beat Keep (three quarters), and the wave's Original Tempo, written in its header;
+- a note value on one envelope time in eight and one LFO rate in four, for every envelope and LFO;
+- the pad in a third of the cases: a finger round a circle or back and forth, or jumping across the pad, held still in half (so a walk's budget runs out), let go by both controllers or one, touched again in half, within the fade or after. A first message may have one controller at 0, which is no touch;
+- in a quarter of the cases with a second note on a POLY part, all five LFOs key-unsynced on a rate below 128, the rates moved onto note values, the second note following, then the bender: it starts with the first tone's clock step, and that update gives it its own.
+
+The sweep gains the Patch Tempo and each OSC's Tempo Sync, Time Trip Sw and Beat Keep, each moved alone, on a wave with the pad held and let go after the move. The firmware's `0x894f4da0` runs on XtSynth's clock, with its count of blocks from the harness. Its pad goes through `0x894d8360`, and a touch or release is followed by its update. New, at each update: the player's position and +0x50…+0x64, the factor, the integral, both bytes, +0x9b0. The pad's state after each message. An LFO's clock fields start from the port's, as nothing else sets them, and with OSC 1 off so does +0x494.
+
+The clock's rate is the one thing that comparison cannot see, so a last section runs the firmware's own `0x89471030` for two minutes at each of five tempos and counts its ticks against XtSynth's clocks over the same 165375 blocks, within one clock.
+
+**The result.** fcheck: 2000 cases and the sweep, 3381 notes, 1412 taken by a sounding tone, 412 truncated, 272,827 blocks, 10.6 million checks, 0 different; a wave on OSC 2, 1411 notes, 106,834 blocks, 3.8 million checks, 0 different. The clock's rate within one clock at all five tempos. `xt_lfo` gains 7 cases on note values, the clock's fields compared too, all identical. `fcheck.sh --update` adds those and the rate's lines, and changes only `xt_tone`'s count lines. A/B 4/4 identical to v114. PluginTest 4/4 bit-identical at the defaults; with a tempo, Tempo Sync, an LFO and an attack on note values; with Tempo Sync at another Original Tempo and the Time Trip knob moved and let go; and with the knob moved over an LFO on a note value. 3000 cases and the sweep on each of seeds 31337, 9, 2007, 90210 and 55555: 0 different. On 777, 4242 and 1234, below.
+
+**Seeds that showed something else.** Each gives one block past `kSoloTol`, on a SOLO wave.
+- 777, case 4698, block 101: a stereo SOLO wave on OSC 2 under Tempo Sync falls silent. 35,610 of that block's peak of 292,083, which is −95 dB of full scale. The block before, with a peak of 19 million, had 48,288.
+- 4242, case 1673, block 40: a SOLO wave on OSC 1 under a held pad, into a TVF whose output is small just then. 15,926 of a peak of 94,348, with OSC 1's buffer 0.01% off.
+- 1234, case 4082, block 56: a stereo SOLO wave on OSC 2, with neither Tempo Sync nor the pad. 0.01% off at OSC 2's buffer, 2.08% at the mix.
+
+For the last two, given the firmware's OSC buffer, the port's mix and COSM output are exact in every block of the case, as v114 found on its seed 777. The first is at the OSC's own buffer, so there is nothing further to give it. Unmodified v114 shows the same class on seeds 2222, 6666 and 7777. So these are `XtSoloVoice`'s known inexactness, not this version's, and `kSoloFloor` stays where it was. Another session is tracing them.
+
+A tolerance could hide a fault in the new seek, so I measured SOLO's error directly: on blocks with a peak above 2^20 at Structure Type 1, the largest error over the peak, 3000 cases and the sweep.
+
+| Seeds 2024, 31337 | Blocks | Median | 99% | Worst |
+|---|---|---|---|---|
+| Neither Tempo Sync nor Time Trip | 6833, 6416 | 7.4e-6, 6.4e-6 | 1.1e-4, 1.0e-4 | 2.4e-3, 2.8e-3 |
+| Under either | 4735, 4658 | 7.3e-6, 5.9e-6 | 1.0e-4, 1.1e-4 | 2.2e-3, 4.2e-3 |
+| Within 200 blocks of a seek (103, 137 seeks) | 330, 541 | 3.6e-6, 6.3e-6 | 9.5e-5, 1.8e-4 | 2.1e-4, 1.2e-3 |
+
+So neither the seek nor the steering adds to it.
+
+**Planted errors.** `tone_muts.txt` gains 173 and loses 8 whose lists are gone (`diff-lfo`, `diff-clfo`, `diff-tlfo-…`, `tlfo-live`): 376 in all, all caught at 2000 cases. New ports: `PORT=tonelfo`, `toneenv`, `tonesolo`; `toneband` covers `XtBeat`. The first run missed 17 of 382.
+- Six are exact, and not in the list. `pad-chunks` and `pad-chunks-up`: half a turn is 24 steps, so the firmware's loop goes round once, and the port no longer has it. `beat-clk-sign` and `mb-beat-edge-sync`: a clock is taken in the block right after it, so the byte is 0 when the bit comes on, and it could go negative only after 128 clocks untaken. The firmware's lines stay. `beat-legato`: a legato moves no knob, and the pad has already given its bits. `lfo-upd-legato`: it shows only on a note following another tone, which takes a third note.
+- Eleven were the check's weakness, and led to what it now draws. The pad was never held still (`beat-trip-sides`, `beat-trip-again`, `beat-trip-stop`), never let go by one controller or touched by one (`pad-x-touch`, `pad-y-touch`, `pad-y-lift`), never jumped (`pad-fwd-limit`, `pad-first`), and never touched in the fade (`beat-reset-trip`). The firmware's clock read the port's count of blocks (`clock-blocks`) and ran at the port's rate (`clock-rate`). That last one is now 1/4800 fast, not 1/24000, which two minutes at 250 BPM can tell from one clock.
+- Tightening the draws then lost `lfo-upd-blocks` and `lfo-limit-hi`, which had been caught by chance at cases 3155 and 2837. Hence the cases following a tone with no note value, and the tempo's two ends.
+- `chase-start` on some draws crashes the run before it reports: a stale flag on an analog voice follows a null wave. `mutate_tone.py` now counts a run that dies as caught, and says so.
+
+**What it does.** A wave of a burst every half second, played on all three types: at tempo 240 against an Original Tempo of 120 the bursts come every 0.25 s, at tempo 60 every 1 s, at 240 with Tempo Sync off every 0.5 s. A pad touched at 1.1 s and let go at 3.6 s: nothing from 1.1 s, then bursts at 4.0, 4.5, 5.0, 5.5, on the grid they had. That is the port's render, not the XT's. It shows that the behaviour the check holds to the firmware is the one the manual describes.
+
+**The plugin.** Parameters `patchTempo` (20…250 BPM), `timeTrip` (the pad as one knob, below), and for each OSC `tempoSync`, `origTempo`, `timeTripSw`, `beatKeep`, on the XT's defaults. Every envelope's Attack, Decay and Release and every LFO's Rate go on to 144, shown as 1/32…2/1 with the triplets and dotted ones. That widens those parameters' ranges, so a host's automation, which is normalized, maps differently; a saved session keeps its values. Rows: Sync, Trip, Keep and Original Tempo in the PCM OSC's place of the analog's fourth row, and Patch Tempo and Time Trip in a row of their own (`kXtStripH` 1030, window 1330). CLI `XT_TEMPO`, `XT_SYNC`, `XT_RATE`, `XT_TRIP`; PluginTest `TEST_TEMPO`, `TEST_SYNC`, `TEST_RATE`, `TEST_ATTACK`, `TEST_TRIP`.
+
+Time Trip is a plain knob for now (`XtSynth::timeTripKnob`): 0 lifted, 1…127 a finger going clockwise round the pad's rim, one turn over the range. So its whole travel is 48 steps, two quarter notes, with OFF at the bottom letting go. No MIDI CC is mapped to it, though `XtSynth::timeTrip(x, y)` takes the two controllers' values.
+
+**Not covered.**
+- A real XT.
+- The clock's phase. On the XT the clock is a timer's and the blocks the audio's, so a clock falls anywhere against a block and against the tone update's task. Here it falls on a block's start, ahead of the update, on both sides of the check. The rate is checked, the phase is not.
+- An external or MIDI clock (the other branch of `0x894710e0`), the host's tempo, and MFX tempo, with the effects.
+- Playback Mode other than the default, and Vari off.
+- The pad by anything but its two controllers: the D Beam's rotation (`0x894d8160`), and the TRIP-R matrix source (`0x894e6c60`). Hold and Pad Mode: the object's +8 is all this reads.
+- A third note: the check plays two, so a legato on a note following another tone's LFO is not reached. That is why `lfo-upd-legato` is not in the list.
+- With OSC 1 off, an LFO's tempo at note-on is whatever the tone block last held. Both sides start from the port's. The port's is the last it had in that voice, 0 before any.
+
 ### The patch TVA's level and pan (2026-11-03, v114)
 
 Level, Pan, their Keyfollows and LFO Depths, LFO 5, the MFX Send Level, and CC 7, 11 and 10 are ported, with their parameters and rows in the editor. The TVA has been at level 1, centred, with no LFO since v46. At the defaults every new factor is exactly 1, so the renders are unchanged: `ab.sh` 4/4 identical to v113.
@@ -2241,7 +2364,7 @@ same gain error from different sides; v95 has the fix.
 | +0xb8, +0xbc | start and end: samples, or event numbers with 0x80 clear |
 
 - The block's +0x60 is the tempo (`0x894e2d20`); ×10000 it goes to the player's +0x4c,
-  against the header's +0x1c at +0x48. The check sets them equal. The port has no tempo.
+  against the header's +0x1c at +0x48. The check sets them equal. The port has no tempo. (Since v118 it has, and `xt_tone` draws the header's: "Tempo sync and Time Trip".)
 - The Wave Number reaches the wave store (`0x8949e5c0`…) as 2999 + the number, in r4.
 - A PCM OSC 2's mask is 0 in every block, so under OSC SYNC it syncs nothing.
 
@@ -2330,7 +2453,7 @@ counts the notes that leave memory altogether. (Since v108 a far read gets zeros
 - An OSC Type changed between notes: the firmware's analog note then starts from what the player left
   in the same words of the voice. The port keeps them apart.
 - A wave whose header has another rate, tune or tempo (the checks set them to the values that leave the
-  pitch alone, as the port assumes).
+  pitch alone, as the port assumes). The tempo since v118.
 - Two waves that share one record of cached loop events: `xt_tone` gives each OSC its own wave, as the port
   computes a loop from each OSC's knobs.
 
@@ -2424,7 +2547,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 - The tick's timing against the audio: the firmware's update runs on XtSynth's clock. The scheduler's n is not checked.
 - The start state, as above, and everything before a note on the real panel: patch load, the editor.
 - The matrix, controllers other than the bender (CC7, CC10, CC11 at rest), Hold, the TVA's Level, Pan, LFO and sends (at defaults; CC 7, 10, 11 and all but the Chorus and Reverb sends since v114), velocity on the pitch, time and formant envelopes' depth paths beyond what the OSC converter takes.
-- PCM on OSC 2. EXT IN. Tempo sync, Time Trip, playback modes, start offset, the wave's tuning fields.
+- PCM on OSC 2. EXT IN. Tempo sync, Time Trip, playback modes, start offset, the wave's tuning fields. (Tempo sync and Time Trip since v118.)
 - The loop's cached events: the firmware's builder is not found, and the check's are built apart from the port's by the same rule.
 - Mid-note OSC Switch, Type, Waveform, Sub Octave, Time Offset, Key Sync, Robot, Structure, COSM Switch, COSM Type and loop edits: held fixed in the live cases.
 - `Controls::pitchSemis`, the plugin's own shift, has no patch parameter here.
@@ -5633,7 +5756,7 @@ on the SH-4):
   left channel; whether the XT's mixer leaves L or a mono sum there is not
   traced;
 - the matrix and controllers;
-- LFO rates above 127 (tempo sync);
+- LFO rates above 127 (tempo sync; since v118);
 - switching the COSM on or off for a sounding note.
 
 ### Mono/Poly, Legato and Octave Shift (2026-10-31, v60)
@@ -6171,7 +6294,7 @@ to the end event. The SOLO harness now starts notes through it.
     (+3 bit 0x80) restores band 0 only;
 - separate backward loop points in the plugin;
 - the PCM-style loop with Vari off;
-- Time Trip.
+- Time Trip (since v118).
 
 ### The OSC pitch (2026-10-31, v55)
 
@@ -6249,7 +6372,8 @@ the same code. They compute:
 The ramp `0x894f4c00` returns its value at +0x3c while active. When it is
 inactive, it returns 1 for a factor ramp and 0 for an additive one. The
 voice constructor (`0x894f1f50`) makes +0x880 additive (pitch: the
-portamento) and +0x8c8 and +0x910 factors (Time Trip).
+portamento) and +0x8c8 and +0x910 factors (Time Trip, I thought; v118 shows
+Time Trip goes through the player's +0x8c, and these stay at rest).
 
 **The update step** (`0x8950c1b0`): pitch (+0x144), formant, Energy, walk
 and gain each become cur + (target − cur)·0.7, by FMAC (0.7 as 0x3f333333).
@@ -6649,8 +6773,8 @@ update uses `0x894f3c90`/`0x894f3d40`.
   with Vari off) and with voice flag +0xd4 bit 1, it is also × voice +0x99c.
 - formant ratio = 2^(formant + env(+0x978)·depth + LFO(+0x988)·depth)·k,
   clamped to [0.5, 2], × voice +0x9a0.
-- k (`0x894f4c00`) is 1 unless the Time Trip object (+0x910, +0x8c8) is
-  active. Then k is that object's value at +0x3c.
+- k (`0x894f4c00`) is 1 unless the object at +0x910, +0x8c8 is active. Then
+  k is that object's value at +0x3c. (This called it Time Trip's; it is not, v118.)
 
 The update moves the player 70% of the way to these every 10 ms (v49).
 
@@ -6691,7 +6815,7 @@ from the firmware's powf at ROM load (`xtFwOscTimeKeyScales`).
   (`0x8950e8f0`, `0x8950f4b0`) are not ported — ported in v52;
 - the time and formant envelope depths' velocity factor (their curve and
   sens are not exposed);
-- controllers, the matrix, and Time Trip.
+- controllers, the matrix, and Time Trip (Time Trip since v118).
 
 ### The LFO (2026-10-29, v50)
 
@@ -6761,7 +6885,7 @@ is the ROM's 0x407fced8, one unit in the last place below the nearest float.
 - Edits take effect while notes play: new times and rates, keeping the phase
   and the fade state.
 
-Not modelled: tempo-synced rates, and the LFO's other destinations (time,
+Not modelled: tempo-synced rates (since v118), and the LFO's other destinations (time,
 formant, filter, level, pan).
 
 ### The voice update and the pitch envelope (2026-10-29, v49)

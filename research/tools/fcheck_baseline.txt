@@ -238,6 +238,13 @@ wave 0 rate  64 offset 2 delay  20 mode 2 fade  40 off  300: identical
 wave 2 rate  64 offset 2 delay   0 mode 3 fade  70 off  200: identical
 wave 1 rate  50 offset 2 delay 127 mode 0 fade 127 off   -1: identical
 wave 3 rate  64 offset 2 delay   0 mode 2 fade   0 off  100: identical
+wave 0 rate 135 offset 2 delay   0 mode 0 fade   0 off   -1: identical
+wave 1 rate 128 offset 2 delay   0 mode 0 fade   0 off   -1: identical
+wave 2 rate 144 offset 2 delay   0 mode 0 fade   0 off   -1: identical
+wave 3 rate 140 offset 3 delay  20 mode 1 fade  40 off  500: identical
+wave 5 rate 130 offset 1 delay   0 mode 0 fade   0 off   -1: identical
+wave 6 rate 142 offset 2 delay   0 mode 0 fade   0 off   -1: identical
+wave 7 rate 136 offset 2 delay   0 mode 0 fade   0 off   -1: identical
 == xt_env
 Time KF scale, std::pow: 5248 cases, 251 differ
 time converter: 1045760 cases, 0 differ
@@ -251,15 +258,19 @@ env 30 70 90 50 80 500 2: identical
 == xt_tone
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
-tone: 3353 notes, 1373 taken by a sounding tone, 416 truncated, 271325 blocks, 7959625 checks
-tone: a SOLO wave's buffers within 7.1e-03 of the block's peak; 0 notes left off, a read outside memory; 351388 band reads far from their wave
+tone: 3381 notes, 1412 taken by a sounding tone, 412 truncated, 272827 blocks, 10634505 checks
+tone: a SOLO wave's buffers within 3.2e-03 of the block's peak; 0 notes left off, a read outside memory; 223018 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1412 notes, 416 taken by a sounding tone, 212 truncated, 107310 blocks, 2842096 checks
-tone, a wave on OSC 2: a SOLO wave's buffers within 6.7e-03 of the block's peak; 0 notes left off, a read outside memory; 553296 band reads far from their wave
+tone, a wave on OSC 2: 1411 notes, 393 taken by a sounding tone, 212 truncated, 106834 blocks, 3832115 checks
+tone, a wave on OSC 2: a SOLO wave's buffers within 2.7e-02 of the block's peak; 0 notes left off, a read outside memory; 649234 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 130385 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 131086 checks
 tone, a second update in a tick: a SOLO wave's buffers within 0.0e+00 of the block's peak; 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
+tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
+tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
+tone, the clock's rate: a SOLO wave's buffers within 0.0e+00 of the block's peak; 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, the clock's rate: 0 different
 == solocmp
 solo vocal.bin 1 1.0 0 1.0 0 30000: 461 records, 30000 frames: max |firmware - port| 3.05e-06, difference -83.6 dB against the signal (rms 0.0146), first at 1
 solo vocal.bin 1 1.5 1.25 1.0 0.25 30000: 461 records, 30000 frames: max |firmware - port| 3.23e-06, difference -99.5 dB against the signal (rms 0.0593), first at 2

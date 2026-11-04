@@ -123,6 +123,15 @@ namespace Params {
     static const juce::String kTvaLfoMode   = "tvaLfoFadeMode";
     static const juce::String kTvaLfoFade   = "tvaLfoFade";
     static const juce::String kTvaLfoSync   = "tvaLfoKeySync";
+    // The tempo: the Patch Tempo (BPM, ID 0x11d) and the Time Trip pad as one knob, 0 lifted, 1..127 a
+    // finger going clockwise round it (XtSynth::timeTripKnob).  Each OSC's Tempo Sync (IDs 0x2d0, 0x304),
+    // its wave's Original Tempo (BPM), Time Trip Sw and Beat Keep (0x2d6, 0x2d7; 0x30a, 0x30b)
+    static const juce::String kPatchTempo   = "patchTempo";
+    static const juce::String kTripPad      = "timeTrip";
+    static const juce::String kTempoSync    = "tempoSync";
+    static const juce::String kOrigTempo    = "origTempo";
+    static const juce::String kTripSw       = "timeTripSw";
+    static const juce::String kBeatKeep     = "beatKeep";
     static const juce::String kAttack       = "ampAttack";
     static const juce::String kDecay        = "ampDecay";
     static const juce::String kSustain      = "ampSustain";
@@ -187,6 +196,22 @@ juce::String VSynthEmuProcessor::oscParamId(int k, const juce::String& id) { ret
 juce::AudioProcessorValueTreeState::ParameterLayout
 VSynthEmuProcessor::createParameterLayout() {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    // An envelope's time or an LFO's rate from 128 on is a note value, as the XT's knobs go on past 127: 3 to 192 clocks of 24 to the quarter
+    static const char* const kNotes[17] = { "1/32", "1/16", "1/8T", "1/16.", "1/8", "1/4T", "1/8.", "1/4", "1/2T", "1/4.", "1/2", "1/1T", "1/2.", "1/1", "2/1T", "1/1.", "2/1" };
+    const auto noteValue = juce::AudioParameterIntAttributes()
+        .withStringFromValueFunction([](int v, int) { return v >= 128 ? juce::String(kNotes[std::min(v - 128, 16)]) : juce::String(v); })
+        .withValueFromStringFunction([](const juce::String& t) {
+            for (int i = 0; i < 17; ++i) if (t.trim() == kNotes[i]) return 128 + i;
+            return t.getIntValue();
+        });
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(Params::kPatchTempo, "Patch Tempo", juce::NormalisableRange<float>(20.0f, 250.0f, 0.1f), 120.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTripPad, "Time Trip", 0, 127, 0,
+        juce::AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return v == 0 ? juce::String("OFF") : juce::String(v); })));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTempoSync, "Tempo Sync", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.01f), 120.0f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTripSw, "Time Trip Switch", true));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kBeatKeep, "Beat Keep", true));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kPitchShift, "Pitch Shift",
@@ -471,10 +496,10 @@ VSynthEmuProcessor::createParameterLayout() {
             juce::StringArray { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }, 0));
         for (const char* ab : { "A", "B" }) {
             const juce::String id = cosmId(k, "Env") + ab, name = n + "Env " + ab + " ";
-            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Attack", name + "Attack", 0, 127, 0));
-            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Decay", name + "Decay", 0, 127, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Attack", name + "Attack", 0, 144, 0, noteValue));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Decay", name + "Decay", 0, 144, 0, noteValue));
             params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Sustain", name + "Sustain", 0, 127, 127));
-            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Release", name + "Release", 0, 127, 127));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(id + "Release", name + "Release", 0, 144, 127, noteValue));
             params.push_back(std::make_unique<juce::AudioParameterInt>(id + "VelCurve", name + "Velocity Curve", 0, 7, 0));
             params.push_back(std::make_unique<juce::AudioParameterInt>(id + "VelSens", name + "Velocity Sens", -63, 63, 32));
             params.push_back(std::make_unique<juce::AudioParameterInt>(id + "AttackSens", name + "Attack Velocity Sens", -63, 63, 0));
@@ -486,7 +511,7 @@ VSynthEmuProcessor::createParameterLayout() {
         const juce::String ln = k ? "LFO 4 " : "LFO 3 ";
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "LfoWave"), ln + "Waveform",
             juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "LfoRate"), ln + "Rate", 0, 127, 98));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "LfoRate"), ln + "Rate", 0, 144, 98, noteValue));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(cosmId(k, "LfoOffset"), ln + "Offset",
             juce::StringArray { "-100", "-50", "0", "+50", "+100" }, 2));
         params.push_back(std::make_unique<juce::AudioParameterInt>(cosmId(k, "LfoDelay"), ln + "Delay", 0, 127, 0));
@@ -513,7 +538,7 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kMfxSend, "MFX Send Level", 0, 127, 127));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kTvaLfoWave, "LFO 5 Waveform",
         juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoRate, "LFO 5 Rate", 0, 127, 98));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoRate, "LFO 5 Rate", 0, 144, 98, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kTvaLfoOffset, "LFO 5 Offset",
         juce::StringArray { "-100", "-50", "0", "+50", "+100" }, 2));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoDelay, "LFO 5 Delay", 0, 127, 0));
@@ -521,33 +546,33 @@ VSynthEmuProcessor::createParameterLayout() {
         juce::StringArray { "ON <<", "ON >>", "OFF <<", "OFF >>" }, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoFade, "LFO 5 Fade", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTvaLfoSync, "LFO 5 Key Sync", false));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 144, 0, noteValue));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 144, 0, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kSustain, "Sustain", 0, 127, 127));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kRelease, "Release", 0, 127, 16));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kRelease, "Release", 0, 144, 16, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttackSens, "Attack Velocity Sens", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecaySens, "Decay Velocity Sens", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kReleaseSens, "Release Velocity Sens", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kTimeKF, "Env Time KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPAttack, "Pitch Env Attack", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPDecay, "Pitch Env Decay", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPAttack, "Pitch Env Attack", 0, 144, 0, noteValue));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPDecay, "Pitch Env Decay", 0, 144, 64, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPSustain, "Pitch Env Sustain", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPRelease, "Pitch Env Release", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPRelease, "Pitch Env Release", 0, 144, 64, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kPDepth, "Pitch Env Depth", -63, 63, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTAttack, "Time Env Attack", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTDecay, "Time Env Decay", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTAttack, "Time Env Attack", 0, 144, 0, noteValue));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTDecay, "Time Env Decay", 0, 144, 64, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTSustain, "Time Env Sustain", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTRelease, "Time Env Release", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTRelease, "Time Env Release", 0, 144, 64, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTDepth, "Time Env Depth", -63, 63, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFAttack, "Formant Env Attack", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFDecay, "Formant Env Decay", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFAttack, "Formant Env Attack", 0, 144, 0, noteValue));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFDecay, "Formant Env Decay", 0, 144, 64, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFSustain, "Formant Env Sustain", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFRelease, "Formant Env Release", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFRelease, "Formant Env Release", 0, 144, 64, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kFDepth, "Formant Env Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLfoWave, "LFO Waveform",
         juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoRate, "LFO Rate", 0, 127, 64));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoRate, "LFO Rate", 0, 144, 64, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoDepth, "LFO Pitch Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoTimeDepth, "LFO Time Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kLfoFmtDepth, "LFO Formant Depth", -63, 63, 0));
@@ -557,10 +582,10 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscLevelLfo, "OSC Level LFO Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kWaveGain, "Wave Gain", -12, 12, 0,
         juce::AudioParameterIntAttributes().withLabel("dB")));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOAttack, "OSC Env Attack", 0, 127, 0));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kODecay, "OSC Env Decay", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOAttack, "OSC Env Attack", 0, 144, 0, noteValue));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kODecay, "OSC Env Decay", 0, 144, 0, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOSustain, "OSC Env Sustain", 0, 127, 127));
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kORelease, "OSC Env Release", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kORelease, "OSC Env Release", 0, 144, 127, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOASens, "OSC Env Attack Velocity Sens", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kODSens, "OSC Env Decay Velocity Sens", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kORSens, "OSC Env Release Velocity Sens", -63, 63, 0));
@@ -589,7 +614,14 @@ VSynthEmuProcessor::createParameterLayout() {
         auto kfP = [&](const juce::String& id, const char* name, float def) {
             params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, id), n + name, juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), def));
         };
+        auto noteP = [&](const juce::String& id, const char* name, int def) {
+            params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, id), n + name, 0, 144, def, noteValue));
+        };
         params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kOscSwitch), n + "Switch", false));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kTempoSync), n + "Tempo Sync", false));
+        params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kOrigTempo), n + "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.01f), 120.0f));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kTripSw), n + "Time Trip Switch", true));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kBeatKeep), n + "Beat Keep", true));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kOscType), n + "Type", juce::StringArray { "ANALOG", "PCM" }, 0));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kAnaWave), n + "Analog Waveform",
             juce::StringArray { "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
@@ -618,24 +650,24 @@ VSynthEmuProcessor::createParameterLayout() {
             for (int i = 0; i <= 30; ++i) depths.add(juce::String(xtRandomPitchDepth(i) / 10));
             params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kRandomPitch), n + "Random Pitch Depth", depths, 0));
         }
-        intP(Params::kPAttack, "Pitch Env Attack", 0, 127, 0);
-        intP(Params::kPDecay, "Pitch Env Decay", 0, 127, 64);
+        noteP(Params::kPAttack, "Pitch Env Attack", 0);
+        noteP(Params::kPDecay, "Pitch Env Decay", 64);
         intP(Params::kPSustain, "Pitch Env Sustain", 0, 127, 0);
-        intP(Params::kPRelease, "Pitch Env Release", 0, 127, 64);
+        noteP(Params::kPRelease, "Pitch Env Release", 64);
         intP(Params::kPDepth, "Pitch Env Depth", -63, 63, 0);
-        intP(Params::kTAttack, "Time Env Attack", 0, 127, 0);
-        intP(Params::kTDecay, "Time Env Decay", 0, 127, 64);
+        noteP(Params::kTAttack, "Time Env Attack", 0);
+        noteP(Params::kTDecay, "Time Env Decay", 64);
         intP(Params::kTSustain, "Time Env Sustain", 0, 127, 0);
-        intP(Params::kTRelease, "Time Env Release", 0, 127, 64);
+        noteP(Params::kTRelease, "Time Env Release", 64);
         intP(Params::kTDepth, "Time Env Depth", -63, 63, 0);
-        intP(Params::kFAttack, "Formant Env Attack", 0, 127, 0);
-        intP(Params::kFDecay, "Formant Env Decay", 0, 127, 64);
+        noteP(Params::kFAttack, "Formant Env Attack", 0);
+        noteP(Params::kFDecay, "Formant Env Decay", 64);
         intP(Params::kFSustain, "Formant Env Sustain", 0, 127, 0);
-        intP(Params::kFRelease, "Formant Env Release", 0, 127, 64);
+        noteP(Params::kFRelease, "Formant Env Release", 64);
         intP(Params::kFDepth, "Formant Env Depth", -63, 63, 0);
         params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kLfoWave), n + "LFO Waveform",
             juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 0));
-        intP(Params::kLfoRate, "LFO Rate", 0, 127, 64);
+        noteP(Params::kLfoRate, "LFO Rate", 64);
         intP(Params::kLfoDepth, "LFO Pitch Depth", -63, 63, 0);
         intP(Params::kLfoTimeDepth, "LFO Time Depth", -63, 63, 0);
         intP(Params::kLfoFmtDepth, "LFO Formant Depth", -63, 63, 0);
@@ -651,10 +683,10 @@ VSynthEmuProcessor::createParameterLayout() {
         intP(Params::kOscLevelLfo, "Level LFO Depth", -63, 63, 0);
         params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kWaveGain), n + "Wave Gain", -12, 12, 0,
             juce::AudioParameterIntAttributes().withLabel("dB")));
-        intP(Params::kOAttack, "Env Attack", 0, 127, 0);
-        intP(Params::kODecay, "Env Decay", 0, 127, 0);
+        noteP(Params::kOAttack, "Env Attack", 0);
+        noteP(Params::kODecay, "Env Decay", 0);
         intP(Params::kOSustain, "Env Sustain", 0, 127, 127);
-        intP(Params::kORelease, "Env Release", 0, 127, 127);
+        noteP(Params::kORelease, "Env Release", 127);
         intP(Params::kOASens, "Env Attack Velocity Sens", -63, 63, 0);
         intP(Params::kODSens, "Env Decay Velocity Sens", -63, 63, 0);
         intP(Params::kORSens, "Env Release Velocity Sens", -63, 63, 0);
@@ -807,6 +839,11 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.bendDown     = knob(Params::kBendDown);
     c.scaleTune    = apvts.getRawParameterValue(Params::kScaleTune)->load() >= 0.5f;
     for (int i = 0; i < 12; ++i) c.scale[i] = knob(Params::kScaleTunes[i]);
+    c.patchTempo   = (int)std::lround(snap(apvts.getRawParameterValue(Params::kPatchTempo)->load(), 0.1f) * 10.0f);
+    c.tempoSync    = apvts.getRawParameterValue(Params::kTempoSync)->load() >= 0.5f;
+    c.origTempo    = (int)std::lround(snap(apvts.getRawParameterValue(Params::kOrigTempo)->load(), 0.01f) * 100.0f) * 100;
+    c.timeTrip     = apvts.getRawParameterValue(Params::kTripSw)->load() >= 0.5f;
+    c.beatKeep     = apvts.getRawParameterValue(Params::kBeatKeep)->load() >= 0.5f;
     c.loop         = apvts.getRawParameterValue(Params::kLoop)->load() >= 0.5f;
     c.loopMode     = knob(Params::kLoopMode);
     c.loopStart    = snap(apvts.getRawParameterValue(Params::kLoopStart)->load(), 0.01f) / 100.0f;
@@ -1040,6 +1077,10 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         o.oscTimeKF = kf2(Params::kOscTimeKF);
         o.oscFormant = knob2(Params::kOscFormant);
         o.oscFormantKF = kf2(Params::kOscFormantKF);
+        o.tempoSync = apvts.getRawParameterValue(oscId(1, Params::kTempoSync))->load() >= 0.5f;
+        o.origTempo = (int)std::lround(snap(apvts.getRawParameterValue(oscId(1, Params::kOrigTempo))->load(), 0.01f) * 100.0f) * 100;
+        o.timeTrip = apvts.getRawParameterValue(oscId(1, Params::kTripSw))->load() >= 0.5f;
+        o.beatKeep = apvts.getRawParameterValue(oscId(1, Params::kBeatKeep))->load() >= 0.5f;
         o.loop = apvts.getRawParameterValue(oscId(1, Params::kLoop))->load() >= 0.5f;
         o.loopMode = knob2(Params::kLoopMode);
         o.loopStart = snap(apvts.getRawParameterValue(oscId(1, Params::kLoopStart))->load(), 0.01f) / 100.0f;
@@ -1063,6 +1104,8 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                               || apvts.getRawParameterValue(Params::oscId(1, Params::kOscSwitch))->load() >= 0.5f);
     if ((xtActive_.load() || analog) && numOut > 0) {
         synth_.setControls(xtControls());
+        const int trip = (int)apvts.getRawParameterValue(Params::kTripPad)->load();
+        if (trip != tripKnob_) { tripKnob_ = trip; synth_.timeTripKnob(trip); }
         float* L = buffer.getWritePointer(0);
         float* R = numOut > 1 ? buffer.getWritePointer(1) : nullptr;
         if (!R) {

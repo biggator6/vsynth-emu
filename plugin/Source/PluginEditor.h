@@ -89,6 +89,15 @@ private:
     juce::ToggleButton legatoBtn_ { "Legato" };
     juce::Slider     octSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label      octLabel_ { {}, "Oct" };
+    // The tempo: the Patch Tempo and the Time Trip knob (a row); the selected OSC's Tempo Sync, Original
+    // Tempo, Time Trip Sw and Beat Keep, in the PCM OSC's place of the analog oscillator's fourth row
+    juce::Slider     patchTempoSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     tripSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     origTempoSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Label      patchTempoLabel_ { {}, "Tempo" }, tripLabel_ { {}, "Trip" }, origTempoLabel_ { {}, "Org" };
+    juce::ToggleButton syncBtn_ { "Sync" }, tripBtn_ { "Trip" }, keepBtn_ { "Keep" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> patchTempoAtt_, tripAtt_, origTempoAtt_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> syncAtt_, tripBtnAtt_, keepAtt_;
     // The COSM sections (TVF, Dynamic TVF, Dual, TB, Comb and Side Band Filters, Resonator, Frequency Shifter, Lo-Fi, Compressor, Limiter, Wave Shape, OD/Dist, Amp and Speaker Simulators), one at a time by the selector: switch,
     // Filter Type, Cutoff, Resonance, Cutoff KF; the depth and Env A rows;
     // the LFO (3 or 4)

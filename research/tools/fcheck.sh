@@ -33,7 +33,7 @@ cd "$WORK/inputs"
 part xt_osc 'echo "== xt_osc"; "$X/xt_osc" "$ROM" | grep -v "^  "'
 [ -x "$X/xt_cosm" ] && part xt_cosm 'echo "== xt_cosm"; "$X/xt_cosm" "$ROM" 3000 | grep -v "^  "'
 [ -x "$X/xt_analog" ] && part xt_analog 'echo "== xt_analog"; "$X/xt_analog" "$ROM" 3000 | grep -v "^  "'
-part xt_lfo 'echo "== xt_lfo"; "$X/xt_lfo" "$ROM" | tail -18'
+part xt_lfo 'echo "== xt_lfo"; "$X/xt_lfo" "$ROM" | tail -25'
 part xt_env 'echo "== xt_env"; "$X/xt_env" "$ROM" conv | tail -3'
 for c in "0 127 0 100 40 300 2" "10 60 64 30 50 400 2" "50 90 20 80 120 600 0" "127 127 127 127 200 900 2" "0 0 127 0 5 60 0" "30 70 90 50 80 500 2"; do
   part xt_env "echo \"env $c: \$(\"\$X/xt_env\" \"\$ROM\" $c | tail -1)\""; done
