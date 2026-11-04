@@ -2,7 +2,7 @@
 # mutate.sh <name> <old> <new> [cases] [pattern]: a deliberate error in a port, to
 # show its firmware check catches it.  Copies plugin/Source/XtCosm.cpp (with
 # PORT=analog, XtAnalog.cpp; with PORT=analogcosm, XtCosm.cpp, PORT=analogband, XtMultiBandPlayer.cpp, and PORT=analogfw, XtFirmware.cpp, under xt_analog's
-# check (XT_ANALOG_ONLY=pcm, the PCM pass alone, is passed through); with PORT=tone, XtSynth.cpp, PORT=tonecosm, XtCosm.cpp, PORT=toneanalog, XtAnalog.cpp, PORT=toneband, XtMultiBandPlayer.cpp, PORT=tonecheck, XtToneCheck.cpp, PORT=tonefw, XtFirmware.cpp, and PORT=toneosc, XtOsc.cpp, under xt_tone,
+# check (XT_ANALOG_ONLY=pcm, the PCM pass alone, is passed through); with PORT=tone, XtSynth.cpp, PORT=tonecosm, XtCosm.cpp, PORT=toneanalog, XtAnalog.cpp, PORT=toneband, XtMultiBandPlayer.cpp, PORT=tonecheck, XtToneCheck.cpp, PORT=tonefw, XtFirmware.cpp, PORT=toneosc, XtOsc.cpp, and PORT=tonesolo, XtSoloVoice.cpp, under xt_tone,
 # on seed $SEED, default 2024; with PORT=solo, XtSoloVoice.cpp under xt_fw solocmp; with PORT=enc, XtSoloEncoder.cpp under
 # xt_enc on fcheck's waves, which prints only those that differ) with the first <old> replaced by
 # <new> (exact text), builds xt_cosm (xt_analog, xt_tone, xt_fw, xt_enc) from it in $WORK/mut/<name>, runs it on
@@ -14,8 +14,8 @@ source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
-if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ] || [ "$PORT" = toneband ] || [ "$PORT" = tonecheck ] || [ "$PORT" = tonefw ] || [ "$PORT" = toneosc ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
-    F=XtSynth.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp; [ "$PORT" = toneband ] && F=XtMultiBandPlayer.cpp; [ "$PORT" = tonecheck ] && F=XtToneCheck.cpp; [ "$PORT" = tonefw ] && F=XtFirmware.cpp; [ "$PORT" = toneosc ] && F=XtOsc.cpp
+if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ] || [ "$PORT" = toneband ] || [ "$PORT" = tonecheck ] || [ "$PORT" = tonefw ] || [ "$PORT" = toneosc ] || [ "$PORT" = tonesolo ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
+    F=XtSynth.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp; [ "$PORT" = toneband ] && F=XtMultiBandPlayer.cpp; [ "$PORT" = tonecheck ] && F=XtToneCheck.cpp; [ "$PORT" = tonefw ] && F=XtFirmware.cpp; [ "$PORT" = toneosc ] && F=XtOsc.cpp; [ "$PORT" = tonesolo ] && F=XtSoloVoice.cpp
     D=XT_TONE_MAIN; ARGS=("${SEED:-2024}" "$WORK/inputs")
     OBJ="$M/tone_obj"; mkdir -p "$OBJ"; L=()
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all

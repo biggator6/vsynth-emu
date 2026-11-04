@@ -44,7 +44,7 @@ vsynth-emu/
 │       ├── PluginEditor.h/cpp         # UI (ROM, Encode Type, Key, Depth, knobs)
 │       ├── XtSynth.h/cpp              # polyphonic XT playback (no JUCE): encode + voices + resampler
 │       ├── XtSoloEncoder.h/cpp        # the XT's SOLO encoder, ported (bit-exact)
-│       ├── XtSoloVoice.h/cpp          # the XT's SOLO player as a block voice
+│       ├── XtSoloVoice.h/cpp          # the XT's SOLO player as a block voice (bit-exact)
 │       ├── XtMultiBandPlayer.h/cpp    # the XT's BACKING / ENSEMBLE players, ported (bit-exact)
 │       ├── Sh4Interp.h/cpp            # SH-4 interpreter: runs rom.2's load/encode-time code
 │       ├── XtFirmware.h/cpp           # firmware harnesses: multi-band encoder, band rebuild

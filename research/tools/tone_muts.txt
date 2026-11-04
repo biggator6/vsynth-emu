@@ -122,7 +122,6 @@ osc2-robot-osc1|v->osc2.robot = ctl.osc2.robot &&|v->osc2.robot = ctl.robot &&
 band-loop-knobs|s.mb.setLoop(waveLoop(s, o));|s.mb.setLoop(waveLoop(s, ctl));
 solo-loop-knobs|s.solo.setLoop(waveLoop(s, o));|s.solo.setLoop(waveLoop(s, ctl));
 loop-frames|const int last = (int)s.wave->frames - 1;|const int last = (int)s.wave->frames - 2;
-solo-unit|lr[2 * i + 1] = r[i] * 0x1p31f;|lr[2 * i + 1] = r[i] * 0x1p30f;
 mod-stereo2|stereo(*v), stereo(v->osc2), v->on|stereo(*v), false, v->on
 mod-stereo1|modBlk, stereo(*v), stereo(v->osc2)|modBlk, false, stereo(v->osc2)
 band-start-gain|s.mb.setGainXt(gainStart, true);|s.mb.setGainXt(s.curGain, true);
@@ -209,3 +208,131 @@ diff-tlfo-rate|c.tvaLfoRate != ctl.tvaLfoRate \|\| |
 diff-tlfo-offset|c.tvaLfoOffset != ctl.tvaLfoOffset \|\| |
 diff-tlfo-delay|c.tvaLfoDelay != ctl.tvaLfoDelay\n                          \|\| |
 diff-tlfo-fade|c.tvaLfoFadeMode != ctl.tvaLfoFadeMode \|\| c.tvaLfoFade != ctl.tvaLfoFade;|c.tvaLfoFadeMode != ctl.tvaLfoFadeMode;
+solo-round-all|if (!xtf::nearest()) std::fesetround(FE_TOWARDZERO);||tonesolo
+solo-near-window|c.e = e + slope;|c.e = [&]{ std::fesetround(FE_TONEAREST); const float n_ = e + slope; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-age|(float)c.age * c.v * 0x1p-12f +|[&]{ std::fesetround(FE_TONEAREST); const float n_ = (float)c.age * c.v; std::fesetround(FE_TOWARDZERO); return n_; }() * 0x1p-12f +|tonesolo
+solo-near-pos|const float x = (float)c.age * c.v * 0x1p-12f + 0.0625f * (float)(c.start & 15);|const float x = [&]{ std::fesetround(FE_TONEAREST); const float n_ = (float)c.age * c.v * 0x1p-12f + 0.0625f * (float)(c.start & 15); std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-lerp-mul|return (at(x, i + 1) - a) * f + a; }|return [&]{ std::fesetround(FE_TONEAREST); const float n_ = (at(x, i + 1) - a) * f; std::fesetround(FE_TOWARDZERO); return n_; }() + a; }|tonesolo
+solo-near-lerp-add|return (at(x, i + 1) - a) * f + a; }|return [&]{ std::fesetround(FE_TONEAREST); const float n_ = (at(x, i + 1) - a) * f + a; std::fesetround(FE_TOWARDZERO); return n_; }(); }|tonesolo
+solo-near-tap-pos|const float x = 0.0625f * (float)ch[g].tap + fr[g];|const float x = [&]{ std::fesetround(FE_TONEAREST); const float n_ = 0.0625f * (float)ch[g].tap + fr[g]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-tap-a|a[0] = tapA * (readAt(X, idx[0], fr[0]) - a[0]) + a[0];|a[0] = [&]{ std::fesetround(FE_TONEAREST); const float n_ = tapA * (readAt(X, idx[0], fr[0]) - a[0]) + a[0]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-tap-b|a[1] = tapB * (readAt(X, idx[1], fr[1]) - a[1]) + a[1];|a[1] = [&]{ std::fesetround(FE_TONEAREST); const float n_ = tapB * (readAt(X, idx[1], fr[1]) - a[1]) + a[1]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-tap-rb|b[1] = tapB * (readAt(Y, idx[1], fr[1]) - b[1]) + b[1];|b[1] = [&]{ std::fesetround(FE_TONEAREST); const float n_ = tapB * (readAt(Y, idx[1], fr[1]) - b[1]) + b[1]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-mix|const float y = a[0] * w[0] + a[1] * w[1];|const float y = [&]{ std::fesetround(FE_TONEAREST); const float n_ = a[0] * w[0] + a[1] * w[1]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-mix-r|const float yR = b[0] * w[0] + b[1] * w[1];|const float yR = [&]{ std::fesetround(FE_TONEAREST); const float n_ = b[0] * w[0] + b[1] * w[1]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-low|low[0] = fCoef * band[0] + low[0];|low[0] = [&]{ std::fesetround(FE_TONEAREST); const float n_ = fCoef * band[0] + low[0]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-high|const float high = y - q * band[0] - low[0];|const float high = [&]{ std::fesetround(FE_TONEAREST); const float n_ = y - q * band[0] - low[0]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-band|band[0] = fCoef * high + band[0];|band[0] = [&]{ std::fesetround(FE_TONEAREST); const float n_ = fCoef * high + band[0]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-low-r|low[1] = fCoef * band[1] + low[1];|low[1] = [&]{ std::fesetround(FE_TONEAREST); const float n_ = fCoef * band[1] + low[1]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-high-r|const float highR = yR - q * band[1] - low[1];|const float highR = [&]{ std::fesetround(FE_TONEAREST); const float n_ = yR - q * band[1] - low[1]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-band-r|band[1] = fCoef * highR + band[1];|band[1] = [&]{ std::fesetround(FE_TONEAREST); const float n_ = fCoef * highR + band[1]; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-gain|gain = 0.015625f * (gainTarget - gain) + gain;|gain = [&]{ std::fesetround(FE_TONEAREST); const float n_ = 0.015625f * (gainTarget - gain) + gain; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-out|lr[2 * k] = lr[2 * k + 1] = high * g65536;|lr[2 * k] = lr[2 * k + 1] = [&]{ std::fesetround(FE_TONEAREST); const float n_ = high * g65536; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-out-r|lr[2 * k + 1] = highR * g65536;|lr[2 * k + 1] = [&]{ std::fesetround(FE_TONEAREST); const float n_ = highR * g65536; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-trigger-e|c.e      = (float)timer * 0x1p-12f * slope;|c.e      = [&]{ std::fesetround(FE_TONEAREST); const float n_ = (float)timer * 0x1p-12f * slope; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-fcoef|fCoef = 0.125f * (ft - fCoef) + fCoef;|fCoef = [&]{ std::fesetround(FE_TONEAREST); const float n_ = 0.125f * (ft - fCoef) + fCoef; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-q|q = 0.125f * (qt - q) + q;|q = [&]{ std::fesetround(FE_TONEAREST); const float n_ = 0.125f * (qt - q) + q; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-ft|const float ft = x * (K(0x40462824) - K(0x408d7731) * x * x) * 2.0f;|const float ft = [&]{ std::fesetround(FE_TONEAREST); const float n_ = x * (K(0x40462824) - K(0x408d7731) * x * x) * 2.0f; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-qt|qt = k12 - energy + pr;|qt = [&]{ std::fesetround(FE_TONEAREST); const float n_ = k12 - energy + pr; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-frac|frac = (float)(Pi - st16) / C;|frac = [&]{ std::fesetround(FE_TONEAREST); const float n_ = (float)(Pi - st16) / C; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-ci|Ci = frac * (N - C) + C;|Ci = [&]{ std::fesetround(FE_TONEAREST); const float n_ = frac * (N - C) + C; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-pw|else { rate = Af; pw = Ci / rate; }|else { rate = Af; pw = [&]{ std::fesetround(FE_TONEAREST); const float n_ = Ci / rate; std::fesetround(FE_TOWARDZERO); return n_; }(); }|tonesolo
+solo-near-pw-robot|pw = K(0x44c8745d) / Af;|pw = [&]{ std::fesetround(FE_TONEAREST); const float n_ = K(0x44c8745d) / Af; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-pw-un|v = rate;\n        pw = Ci / rate;|v = rate;\n        pw = [&]{ std::fesetround(FE_TONEAREST); const float n_ = Ci / rate; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-wl|float wl = Ci / v;|float wl = [&]{ std::fesetround(FE_TONEAREST); const float n_ = Ci / v; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-os|os = xtf::ftrc(Ci - v * pw);|os = xtf::ftrc([&]{ std::fesetround(FE_TONEAREST); const float n_ = Ci - v * pw; std::fesetround(FE_TOWARDZERO); return n_; }());|tonesolo
+solo-near-slope|slope = 8.0f / wl;|slope = [&]{ std::fesetround(FE_TONEAREST); const float n_ = 8.0f / wl; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-near-f0|f0n = 16.0f / pw;|f0n = [&]{ std::fesetround(FE_TONEAREST); const float n_ = 16.0f / pw; std::fesetround(FE_TOWARDZERO); return n_; }();|tonesolo
+solo-fma-low|low[0] = fCoef * band[0] + low[0];|low[0] = std::fma(fCoef, band[0], low[0]);|tonesolo
+solo-fma-band|band[0] = fCoef * high + band[0];|band[0] = std::fma(fCoef, high, band[0]);|tonesolo
+solo-fma-mix|const float y = a[0] * w[0] + a[1] * w[1];|const float y = std::fma(a[0], w[0], a[1] * w[1]);|tonesolo
+solo-fma-lerp|return (at(x, i + 1) - a) * f + a; }|return std::fma(at(x, i + 1) - a, f, a); }|tonesolo
+solo-high-order|const float high = y - q * band[0] - low[0];|const float high = y - low[0] - q * band[0];|tonesolo
+solo-high-group|const float high = y - q * band[0] - low[0];|const float high = y - (q * band[0] + low[0]);|tonesolo
+solo-low-after|low[0] = fCoef * band[0] + low[0];\n        const float high = y - q * band[0] - low[0];\n        band[0] = fCoef * high + band[0];|const float high = y - q * band[0] - low[0];\n        low[0] = fCoef * band[0] + low[0];\n        band[0] = fCoef * high + band[0];|tonesolo
+solo-second-weight|tapB = tapSum - tapA;|tapB = ch[1].tapW;|tonesolo
+solo-tap-each|if (tapSum > 0.0f) {|if (tapSum > 0.0f && tapA > 0.0f) {|tonesolo
+solo-gain-mul|const float g65536 = gain * 65536.0f;\n        lr[2 * k] = lr[2 * k + 1] = high * g65536;|const float g65536 = gain * 65536.0f;\n        lr[2 * k] = lr[2 * k + 1] = high * gain * 65536.0f;|tonesolo
+solo-k-q-target|const float k12 = K(0x3f999999);|const float k12 = 1.2f;|tonesolo
+solo-k-q-start|q = 1.2f;            // 0x3f99999a|q = K(0x3f999999);            // 0x3f99999a|tonesolo
+solo-k-3|K(0x40462824) - K(0x408d7731)|K(0x40462825) - K(0x408d7731)|tonesolo
+solo-k-44|K(0x40462824) - K(0x408d7731)|K(0x40462824) - K(0x408d7732)|tonesolo
+solo-k-19|const float lim = K(0x3ff33333) - q;|const float lim = K(0x3ff33334) - q;|tonesolo
+solo-k-robot|pw = K(0x44c8745d) / Af;|pw = K(0x44c8745e) / Af;|tonesolo
+solo-no-clamp-e|if (e > 1.0f) e = 1.0f;\n||tonesolo
+solo-clamp-frac|if (!(last > idx[g])) { idx[g] = last; fr[g] = 0.0f; }      // 0x8950d420|if (!(last > idx[g])) { idx[g] = last; }|tonesolo
+solo-clamp-last|if (!(last > idx[g])) { idx[g] = last; fr[g] = 0.0f; }      // 0x8950d420|if (!(last >= idx[g])) { idx[g] = last; fr[g] = 0.0f; }|tonesolo
+solo-tap-no-clamp|                fr[g] = x - (float)whole;\n                if (!(last > idx[g])) { idx[g] = last; fr[g] = 0.0f; }\n|                fr[g] = x - (float)whole;\n|tonesolo
+solo-sub16|const float a = (float)(int32_t)std::lround(anchorStep * 16.0) * 0.0625f;|const float a = (float)(int32_t)std::lround(anchorStep * 16.0) * 0.125f;|tonesolo
+solo-frac-at-end|if (Pi > en16) { frac = 1.0f; Ci = N; }|if (Pi >= en16) { frac = 1.0f; Ci = N; }|solo
+solo-floor-c|if (160.0f > C) C = 160.0f;\n||solo
+solo-floor-n|if (160.0f > N) N = 160.0f;\n||solo
+solo-cap-pw|if (pw > 524287.0f) pw = 524287.0f;|if (pw > 524288.0f) pw = 524288.0f;|tonesolo
+solo-f0-half|if (f0n > 0.5f) f0n = 0.5f;||tonesolo
+solo-f0-note|f0n = 0.0f;\n    anchorStepInit = 1.0;|f0n = 0.5f;\n    anchorStepInit = 1.0;|tonesolo
+solo-coef-lim|if (fCoef > lim) fCoef = lim;\n||tonesolo
+solo-en-zero|if (energy == 0.0f) { x = x * 0.125f; qt = k12; }|if (energy == 0.0f) { qt = k12; }|tonesolo
+solo-en-low|if (!(0.5f > A)) {|if (!(0.25f > A)) {|tonesolo
+solo-en-mid|if (1.0f > A) pr = (2.0f * A - 1.0f) * energy;|if (1.0f > A) pr = (2.0f * A - 0.5f) * energy;|tonesolo
+solo-en-high|else if (2.0f > A) pr = (2.0f - A) * energy;|else if (2.0f > A) pr = (2.5f - A) * energy;|tonesolo
+solo-age-start|c.age    = timer;|c.age    = 0;|tonesolo
+solo-tap-next|c.tap    = g.C;|c.tap    = (int32_t)(16.0 * lenOf(seg + 1));|tonesolo
+solo-age-per-sample|c.age = (int32_t)((uint32_t)c.age + 0x1000u);|c.age = (int32_t)((uint32_t)c.age + 0xfffu);|tonesolo
+solo-frac-start|const float x = (float)c.age * c.v * 0x1p-12f + 0.0625f * (float)(c.start & 15);|const float x = (float)c.age * c.v * 0x1p-12f;|tonesolo
+solo-stereo-frac|b[1] = readAt(Y, idx[1], fr[1]); }|b[1] = readAt(Y, idx[1], fr[0]); }|tonesolo
+solo-stereo-left|if (st) { b[0] = readAt(Y, idx[0], fr[0]);|if (st) { b[0] = readAt(X, idx[0], fr[0]);|tonesolo
+solo-stereo-tap|b[0] = tapA * (readAt(Y, idx[0], fr[0]) - b[0]) + b[0];|b[0] = tapA * (readAt(X, idx[0], fr[0]) - b[0]) + b[0];|tonesolo
+solo-stereo-state|low[1] = fCoef * band[1] + low[1];|low[1] = fCoef * band[0] + low[1];|tonesolo
+solo-stereo-mono|if (st) {\n            const float yR|if (false) {\n            const float yR|tonesolo
+solo-note-window|ch[0].e = 0.0f; ch[1].e = 0.5f;|ch[0].e = 0.5f; ch[1].e = 0.5f;|tonesolo
+solo-note-toggle|next = 1;            // trigger toggle|next = 0;            // trigger toggle|tonesolo
+solo-timer-wrap|timer = (int32_t)((uint32_t)timer + 0x1000u);|timer = (int32_t)std::min<int64_t>((int64_t)timer + 0x1000, INT32_MAX);|solo
+solo-ppw-round|ppw = xtf::ftrc(pw * 256.0f);|ppw = (int32_t)std::lround(pw * 256.0f);|tonesolo
+solo-os-round|os = xtf::ftrc(Ci - v * pw);|os = (int32_t)std::lround(Ci - v * pw);|tonesolo
+solo-step-round|anchorStepInit = xtf::ftrc(s) / 16.0;|anchorStepInit = s / 16.0;|tonesolo
+solo-step-floor|if (16.0f > s) s = 16.0f;\n||tonesolo
+solo-unvoiced-1|rate = Ar == 0.0f ? 1.0f : Ar;|rate = Ar;|tonesolo
+solo-unvoiced-gate|((info & 1) ? rate : 1.0f) * ((info & 2) ? Ff : 1.0f)|((info & 1) ? rate : 1.0f) * ((info & 2) ? 1.0f : Ff)|tonesolo
+solo-repeat-half|float x = 1.0f > a ? a * -2.0f + 3.0f : a * -0.5f + 1.5f;|float x = 1.0f > a ? a * -2.0f + 3.0f : a * -0.5f + 1.0f;|tonesolo
+solo-unit|lr[2 * k] = lr[2 * k + 1] = high * g65536;|lr[2 * k] = lr[2 * k + 1] = high * g65536 * 0.5f;|tonesolo
+solo-k-min|Ff = K(0x34ffffff) > F ? K(0x34ffffff) : F;|Ff = 4.76837e-07f > F ? 4.76837e-07f : F;|solo
+solo-robot-rate|rate = Ci / pw; }|rate = Af; }|tonesolo
+solo-budget-keep|if (budget >= c) { budget -= c; wrap = true; } }\n    }\n    if (!wrap && recEnd|if (budget >= c) { wrap = true; } }\n    }\n    if (!wrap && recEnd|tonesolo
+solo-budget-keep-b|if (budget >= c) { budget -= c; wrap = true; } }\n    }\n    if (!wrap && 0.0|if (budget >= c) { wrap = true; } }\n    }\n    if (!wrap && 0.0|tonesolo
+solo-budget-field|const int b = (p->info[i] & 0x1F8) << 6;|const int b = (p->info[i] & 0x1F8) << 5;|tonesolo
+solo-anchor-end|if (anchor < recEnd) return;|if (anchor <= recEnd) return;|tonesolo
+solo-anchor-start|if (!(recStart > anchor)) return;|if (!(recStart >= anchor)) return;|tonesolo
+solo-wrap-past|if (recEnd > Pq && budget > 0.0) {|if (recEnd >= Pq && budget > 0.0) {|tonesolo
+solo-wrap-past-b|if (Pq >= recStart && budget > 0.0) {|if (Pq > recStart && budget > 0.0) {|tonesolo
+solo-wrap-end|    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;\n||tonesolo
+solo-skip|if (!(budget > 0.0) \|\| !(Pq >= recEnd)) return;|return;|tonesolo
+solo-skip-b|if (!(budget > 0.0) \|\| !(recStart > Pq)) return;|return;|tonesolo
+solo-last-len|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 8.0; }|tonesolo
+solo-walk-half|const int32_t s = walkStep >> 1, sum = Pf + s;|const int32_t s = walkStep / 2, sum = Pf + s;|tonesolo
+solo-walk-frac|int32_t np = Pi + (sum >> 20), nf = sum & 0xfffff;|int32_t np = Pi + (sum >> 20), nf = sum & 0xffffe;|tonesolo
+solo-walk-turn|if (f3 & 8) { if (neg) f3 &= 0xf7; else step = -step; }|if (f3 & 8) { if (neg) f3 &= 0xf7; }|tonesolo
+solo-walk-turn-b|if (f3 & 4) { if (neg) step = -step; else f3 &= 0xf7; }|if (f3 & 4) { if (!neg) f3 &= 0xf7; }|tonesolo
+solo-walk-sic|if (f3 & 4) { if (neg) step = -step; else f3 &= 0xf7; }|if (f3 & 4) { if (neg) step = -step; else f3 &= 0xfb; }|solo
+solo-hold-keep|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0x8f;|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0xcf;|solo
+solo-hold-side|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0x8f;|if ((f3 & 0x20) ? fs > 0.0f : 0.0f > fs) f3 &= 0x8f;|solo
+solo-hold-anchor|else if (Pq >= anchor) anchorForward();|else if (Pq > anchor) anchorForward();|tonesolo
+solo-end-gate|if (!ended_) {\n                const Grain g|if (true) {\n                const Grain g|tonesolo
+solo-jump-f0|    if (i >= nc \|\| !p->voiced[i]) f0n = 0.0f;\n||solo
+solo-jump-record|if (i + 1 == nc && L >= p->segStart[i] + p->segLen[i]) i = nc;||solo
+solo-jump-anchor|    anchor = L;\n|    anchor = recStart;\n|tonesolo
+solo-jump-frac|    Pf = 0;\n    const double L|    const double L|tonesolo
+solo-one-way|if (lmode1 == 1) { jumpTo(lp[0]); return; }|if (lmode1 == 1) { jumpTo(lp[1]); return; }|tonesolo
+solo-bounce|if (lmode1 == 2) { f3 \|= 8; walkStep = -walkStep; return; }|if (lmode1 == 2) { walkStep = -walkStep; return; }|tonesolo
+solo-bounce-now|if (lmode1 == 2) { f3 \|= 8; walkStep = -walkStep; return; }|if (lmode1 == 2) { f3 \|= 8; return; }|tonesolo
+solo-mode3|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[0]); return; }|if (lmode1 == 3) { walkStep = 0; jumpTo(lp[0]); return; }|solo
+solo-mode3-pos|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[0]); return; }|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; return; }|solo
+solo-one-way-b|if (lmode3 == 1) { jumpTo(lp[2]); return; }|if (lmode3 == 1) { jumpTo(lp[3]); return; }|tonesolo
+solo-bounce-b|if (lmode3 == 2) { f3 \|= 4; walkStep = -walkStep; return; }|if (lmode3 == 2) { walkStep = -walkStep; return; }|tonesolo
+solo-mode3-b|if (lmode3 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[3]); return; }|if (lmode3 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[2]); return; }|solo
+solo-loop-resume|        else {\n            f3 \|= 0x20;\n            ended_ = 0;|        else {\n            f3 \|= 0x20;|tonesolo
+solo-end-event|    curEv = 1;                          // the end event, the last\n||solo
+solo-cross-fwd|if (X > lp[2]) X = lp[2]; nextCross = X; return; }|nextCross = X; return; }|solo
+solo-cross-out|if (lp[2] > Pi && X > lp[2]) X = lp[2];|if (X > lp[2]) X = lp[2];|tonesolo
+solo-cross-in|if (loopOn) { if (X > lp[1]) X = lp[1]; }\n            else if (lp[1] > Pi && X > lp[1]) X = lp[1];|if (loopOn && lp[1] > Pi && X > lp[1]) X = lp[1];|tonesolo
+solo-cross-b|if (loopOn) { if (lp[3] > X) X = lp[3]; }\n            else if (Pi > lp[3] && lp[3] > X) X = lp[3];|if (loopOn && Pi > lp[3] && lp[3] > X) X = lp[3];|tonesolo
+solo-seek-first|budget = recEnd > n ? kUnlimited : budgetOf(0);|budget = kUnlimited;|tonesolo

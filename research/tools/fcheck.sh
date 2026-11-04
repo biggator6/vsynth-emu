@@ -38,12 +38,17 @@ part xt_env 'echo "== xt_env"; "$X/xt_env" "$ROM" conv | tail -3'
 for c in "0 127 0 100 40 300 2" "10 60 64 30 50 400 2" "50 90 20 80 120 600 0" "127 127 127 127 200 900 2" "0 0 127 0 5 60 0" "30 70 90 50 80 500 2"; do
   part xt_env "echo \"env $c: \$(\"\$X/xt_env\" \"\$ROM\" $c | tail -1)\""; done
 [ -x "$X/xt_tone" ] && part xt_tone 'echo "== xt_tone"; "$X/xt_tone" "$ROM" 2000 2024 "$WORK/inputs" | grep -v "^  "'
-# solocmp <file> <channels> <R pitch ratio> <F formant ratio, 0 = none> <walk> <energy gain 0..1> <frames> [frame:walk ...]
+# solocmp <file> <channels> <R pitch ratio> <F formant ratio, 0 = none> <walk> <energy gain 0..1> <frames> [frame:walk ...] [frame:gGAIN ...] [robot] [loop:on,fwdMode,bwdMode,fs,fe,bs,be]
 h='echo "== solocmp"; '
 for spec in "vocal.bin 1 1.0 0 1.0 0 30000" "vocal.bin 1 1.5 1.25 1.0 0.25 30000" "vocal.bin 1 0.7 0.8 2.0 0.6 30000" "vocal.bin 1 1.0 0 -1.0 0 30000" \
             "vocal.bin 1 1.2 1.1 0.5 0.05 30000 4000:-1.0 9000:2.0" "w358.bin 2 1.0 0 1.0 0 20000" "w358.bin 2 0.8 1.5 1.5 0.4 20000" "drum.bin 2 1.0 0 1.0 0 40000" "drum.bin 2 0.8 1.5 1.5 0.4 40000" \
             "gated.bin 1 8 0 -0.5 0 60000" "gated.bin 1 32 0 -1.0 0 31500 16000:1.0" "gated.bin 1 32 0 -1.0 0 4300000 10464:-0.001" \
-            "gated.bin 1 32 0 -1.0 0 31500 robot" "gated.bin 1 32 0 0.5 0 40000 10464:-0.25 robot"; do
+            "gated.bin 1 32 0 -1.0 0 31500 robot" "gated.bin 1 32 0 0.5 0 40000 10464:-0.25 robot" \
+            "vocal.bin 1 1.0 1.0 0.5 0 40000 loop:1,1,0,3000,9000,0,0" "vocal.bin 1 1.3 0.9 1.0 0.1 60000 loop:1,2,0,3000,9000,0,0" "w358.bin 2 1.0 1.0 -1.0 0.3 40000 loop:1,0,2,0,0,2000,8000" \
+            "vocal.bin 1 0.6 1.7 1.0 0 40000 loop:1,3,0,3000,9000,0,0 500:g0.5 8000:g0.1" "w358.bin 2 1.0 1.0 1.0 0 24000" "vocal.bin 1 4.0 1.0 1.0 1.0 30000" "vocal.bin 1 0.03 1.0 0.2 0 30000" "w358.bin 2 0.5 1.2 1.0 0.7 30000 robot" "gated.bin 1 1.5 1.3 1.0 0.4 40000" \
+            "w358.bin 2 1.0 1.0 -1.0 0 40000 12000:1.0 loop:1,0,2,0,0,2000,8000" "vocal.bin 1 0.6 1.7 1.0 0 40000 20000:-1.0 loop:1,3,0,3000,9000,0,0" "w358.bin 2 1.0 1.0 -1.0 0 40000 20000:1.0 loop:1,0,3,0,0,2000,8000" \
+            "w358.bin 2 1.0 1.0 -1.0 0 30000 loop:1,0,1,0,0,2000,13298" "w358.bin 2 1.0 1.0 1.0 0 30000 loop:1,1,0,9800,12000,0,0" "w358.bin 2 1.0 1.0 1.0 0 40000 14000:-1.0 loop:1,0,1,0,0,2000,8000" \
+            "vocal.bin 1 1.0 1.0 0.1 0 60000 1000:-0.001 40000:1.0" "gated.bin 1 1.5 1.0 1.0 0 15800 14300:0.0625"; do
   part xt_fw "${h}echo \"solo $spec: \$(\"\$X/xt_fw\" \"\$ROM\" solocmp $spec 2>/dev/null | tail -1)\""; h=""; done
 # The SOLO encoder against the firmware's, whole records: the inputs above, stereo in its own mode (:2), and make_inputs.py's enc_* and enc2_*
 h='echo "== xt_enc"; '

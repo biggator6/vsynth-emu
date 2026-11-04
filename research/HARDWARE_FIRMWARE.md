@@ -1547,6 +1547,104 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### SOLO bit for bit (2026-11-04, v122)
+
+`XtSoloVoice` now gives the firmware's output words bit for bit, mono and stereo, on every case tried. `xt_tone` has no tolerance left, and the exceptions that went with it are gone. Before this, `solocmp` read −83 to −118 dB against the signal and `xt_tone` allowed 2% of a block's peak.
+
+**The cause.** The arithmetic, and nothing else: the record logic was already right. Below it the port ran in `double` where the firmware runs single precision with FPSCR.RM = 1, round to zero. Round-to-zero errors all have one sign, so in a state summed again and again they add up instead of averaging out. Two states are like that:
+- **The windows** (`0x8950d380`): `e += slope` every sample, over a window of hundreds of samples.
+- **The filter** (`0x8950d1b0`…`0x8950d1be`): `low += f·band`, `band += f·high`, every sample for the whole note, with the rumble filter's f small.
+
+To size each part, I put one part back in `double` at a time, as v114 had it, in the exact voice. Against the firmware:
+
+| in `double` | vocal, F 0 | vocal ×1.5, F 1.25, Energy 0.25 | `w358`, F 0 | `drum`, F 0 | `gated` ×8, backward |
+|---|---|---|---|---|---|
+| all of it (v114) | −83.6 dB | −99.5 | −88.4 | −101.1 | −105.9 |
+| windows | −87.2 | −99.6 | −93.0 | −101.0 | −111.1 |
+| filter | −85.3 | −125.7 | −89.3 | −142.8 | −117.0 |
+| reads, second tap, mix | −125.2 | −138.0 | −135.5 | −141.1 | −125.7 |
+| the second weight's lost bit (below) | −168.4 | −146.1 | −165.3 | −167.9 | −138.3 |
+| read positions | 0 different | 0 | 0 | 0 | 0 |
+| the voice in single precision, rounding to nearest | −46.0 | −74.5 | −50.9 | −99.4 | −45.5 |
+
+So windows and filter carry the residual. The last row is larger for another reason, the grain parameters: a truncated period off by a 1/4096 step moves a trigger by a sample, which v37 saw. With only `grainParams` back in round to zero and the rest still nearest, that row reads −81.1, −98.7, −87.8, −99.4, −104.3, about the same as all of it in `double`. So what matters is the direction of the rounding more than the width of the float. v62's exact sums left this alone because they were not on this path.
+
+The tolerance existed for what those −90 dB do downstream. A Compressor's level decision or Lo-Fi's quantizer can flip on them, which is how seed 40000 reached 2.4e−1 of a block's peak through a Side Band Filter.
+
+**What the disassembly has that the port lacked**, besides the arithmetic:
+- The second tap is both grains or neither, on the sum of their weights (`0x8950d134`). That sum is then undone: `fadd fr10,fr11` … `fsub fr10,fr11`, so the second grain's weight is (w_B + w_A) − w_A, which can lose its last bit. That is the fourth row above.
+- The damping target each block is `0x3f999999`, where note-on's is `0x3f99999a`: q falls by a unit at the first block.
+- The floors on pitch and formant are `0x34ffffff`, a little over the decimal the port had. Only `solocmp`'s F 0 cases reach it, since XtSynth's formant is at least 0.5.
+- Start and tap are int32 in 1/16 samples, age int32 in 1/4096, as v111 found for the timer. A position is `age·v/4096 + (start & 15)/16`, single precision, added to `start >> 4`.
+- A clamped read has fraction 0, and the second tap adds to the clamped position (`0x8950d420`). So the sample past the end is only ever multiplied by 0, and what lies there cannot be heard. `at()`'s bounds protect the host's memory and nothing else.
+
+**The port.** `Chan` holds the firmware's fields. The grains, filter and gain are plain float arithmetic under `FE_TOWARDZERO`, as `XtMbPlayer`'s, with no contraction, so FMAC is a product then a sum. `noteOn` and `renderXt` set the mode. Nothing called from them may use XtFloat's sums, because TwoSum needs round to nearest; `repeatCost` moved off them. `XT_ROUND=nearest` leaves the mode alone. The record logic stays in `double`, which is exact there: every value is a multiple of 1/16 under 2^28.
+
+`renderXt` writes the firmware's words, L/R pairs, int16 × 65536 × the gain, and XtSynth and `xt_analog` call it. `render` is that × 2^-31 for the offline engine. The old ±1 × 2^31 would flush a word under about 2^-95 that the XT's units hold.
+
+**Speed.** 12 ns a sample before and after (one voice, ×1.3, formant 1.1, Energy 0.25, walk 0.01), about 0.05% of a core.
+
+**The checks.**
+- `xt_fw solocmp` compares word for word and prints a count, "461 records, 30000 frames: 0 different of 60000 (signal rms 0.0146)". Denormals are flushed in its SOLO modes, as in the other harnesses.
+- It gains seventeen cases, so 31 in all, every one 0 different, the 4.3 million frames too. New: One Way forward and backward, Alternate with the walk turning inside the bounce, mode 3 both ways with the walk turned away and with gain moves, a jump into an unvoiced record and to the wave's end, past the wave's end and back, Energy 1 at ×4, ×0.03, stereo Robot Voice, slow walks over `gated`'s shortest records.
+- With `XT_ROUND=nearest`, where both sides round to nearest, the two cases tried are 0 different as well.
+- `xt_tone`: `kSoloTol` and `kSoloFloor` are gone, and so is the line reporting them. Also gone: Lo-Fi and the Compressor replaced on a SOLO wave, X-MOD replaced over a SOLO OSC 2, `soloBeside`, and FM's lines left uncompared after a SOLO case. Only a note that left memory is still exempt from those lines.
+- On fcheck's seed, cases those rules used to change now play as drawn: Lo-Fi 36 and Compressor 46 on a SOLO wave, Side Band 154 with a SOLO wave in the case, X-MOD over a SOLO OSC 2 29.
+- `xt_analog`: the 2e−4 limit is gone, X-MOD no longer gets the firmware's OSC 2 buffer, and the MOD's state is compared on a SOLO block, with nothing written back after a note. One line of its output changed.
+
+| check | result |
+|---|---|
+| `solocmp`, 31 cases | 0 different |
+| `xt_tone`, fcheck's 2000 and sweep | 3353 notes, 271,325 blocks, 7,958,460 checks, 0 different |
+| a wave on OSC 2 | 1412 notes, 107,310 blocks, 2,840,255 checks, 0 different |
+| a second update in a tick | 48 notes, 4320 blocks, 130,385 checks, 0 different |
+| `xt_tone`, seeds 3, 4, 777, 1007, 2007, 5007, 40000, 90210 at 10,000 cases | 0 different, all three parts |
+| `xt_tone`, seeds 11, 31337, 9, 4242, 1234, 65535 at 6000 cases | 0 different, all three parts |
+| `xt_tone` with other SOLO waves in place of its two | 12 pairs, seeds 7, 2024, 99, 1500 cases: 0 different |
+| `xt_analog`, 3000 cases | 162,930 blocks, 0 different, 65,520 of them with a SOLO player |
+
+Those 12 pairs are gated tones at 300, 1000, 2000 and 5000 Hz, clicks, noise, a saw, DC, short waves, chirps, decays, and a wave of zeros. They include `f5000` and the click train v111 left untraced.
+
+`xt_tone`'s check counts fall a little (7,959,625 to 7,958,460) because what is compared for a COSM depends on its type, and those cases used to play TVF. Notes and blocks are the same. The diff of `fcheck_baseline.txt` against v114 is those lines, `xt_analog`'s and the `solocmp` section, and nothing else.
+
+**Planted errors.** `tone_muts.txt` gains 128 in `XtSoloVoice.cpp`: 113 through `xt_tone` (`PORT=tonesolo`) and 15 through `solocmp` (`mutate_tone.py` now takes port `solo`). `solo-unit` moved with them, its old text gone. `mutate_tone.py`: 338 of 338 caught at 2000 cases.
+
+Most put one step's rounding to nearest, or fuse one FMAC, because a check at 0 different only means something if one step's last bit shows. Every step of the windows, positions, reads, mix, filter and gain is caught that way. The rest are the logic: budgets, repeats, skips, the walk, crossings, jumps.
+
+I wrote 149. Twenty came out as exact or out of reach, and one was a duplicate:
+- A product by a power of two (the walk, the anchor step, the gain's 1/64, the trigger's window regrouped), or `0·x + C`, the frac test at a record's start.
+- Multiplied by 0: the sample past the end; note-on's tap, whose weight is 0 until the grain is replaced.
+- Too late to hear: an age saturated instead of wrapped, its window long closed, as v111 reasoned; the timer not reduced after the wave's end, where no trigger follows.
+- A rounding in the Robot rate or the repeat cost, which shows only when it crosses a truncation. The Robot one is now a coarser error, and `solo-repeat-half` covers the cost.
+- `ended_` set by the walk and again by the crossing: taking out either one changes nothing.
+- Not in these records: both gate bits on an unvoiced record (the low bits are 0 or 7 on the ten waves I listed), a budget field of 63, a last record ending past the wave.
+- Not reached: `loadPrev`'s floor at 0, which the first-record rule keeps out; a terminator's budget at a backward start, which a walk slow enough to stay there spends at 0.
+- `solo-wrap-first`, the first-record rule itself. It moves the anchor by a step in the first record, and 189 hunted cases did not show it. So that one rule is unproved by any case.
+
+The 15 on `solocmp` are what `xt_tone` does not reach. XtSynth clamps the Loop Mode to 2, so mode 3 is `solocmp`'s alone. The rest need records under 10 samples, 17 seconds at ×32 for the timer's wrap, F 0, or a loop's far corners that its short notes miss.
+
+Through `PORT=solo mutate.sh`, on the 31 cases:
+
+| planted | result |
+|---|---|
+| nothing (a control) | 31 same |
+| the whole voice rounding to nearest | 31 different |
+| the anchor's round 2^27, not 2^28 | the long case |
+| the landing 32 samples off, only when far | the long case |
+| the backward loop in `double` | the 5 overflow cases hang, and fail by the alarm |
+| the timer saturating | the long case |
+
+Of the 113 on `xt_tone`, `solocmp` alone (without the long case) also catches 98. The other 15 are `xt_tone`'s alone: for example the 1.9 and 4.4208 constants, the cap on the period, the walk's halving, and some loop paths.
+
+**A/B against v114.** BACKING and ENSEMBLE are identical. SOLO moves by what it was off by: `vocal` −96.8 dB from frame 127, `w358` −100.0 dB from frame 129. `verify.sh`: fcheck as the new baseline; PluginTest 4/4 bit-identical, so the plugin's own build (-O3, LTO) gives the CLI's words, rounding mode included; engine tests and auval pass. Its exit is 1 only for the two A/B lines above.
+
+**What this closes.** The SOLO cases left open by v100, v104, v106, v108 and v111: seed 5007 case 2955, seed 3 case 9455, seed 4 case 529, seed 2007 case 9186, seed 1007 case 4888, seed 40000 case 4953, and v111's waves. Those draws have moved since, so the exact cases can't be replayed, but the seeds and waves are 0 different with no tolerance, and the cause is gone.
+
+**What this leaves.**
+- All of this is against rom.2 in the interpreter, not a recording from an XT.
+- `bits()` and `solocmp` take the two zeros as equal, as `xt_tone` always has.
+- `bandcmp`'s last line says 7.01e−46, first at 3423. That is the comparison, not the player: it divides the firmware's word in float and the port's in double. With denormals flushed and both in float it is 0 different. I left it, as nothing here needs it to move.
+
 ### The patch TVA's level and pan (2026-11-03, v114)
 
 Level, Pan, their Keyfollows and LFO Depths, LFO 5, the MFX Send Level, and CC 7, 11 and 10 are ported, with their parameters and rows in the editor. The TVA has been at level 1, centred, with no LFO since v46. At the defaults every new factor is exactly 1, so the renders are unchanged: `ab.sh` 4/4 identical to v113.
@@ -1814,7 +1912,7 @@ The stack in a hung note was `XtSynth::render`, `mixBlock`, `XtSoloVoice::render
 - The rate here is 0x1000 − 0x500 a sample, so the first return should be at 10,440 + 762,601 + 524,288 = 1,297,329. The firmware's first burst is at 1,297,328, and the next is two cycles on.
 - The port's `double` timer kept triggering. That was −25.9 dB against the firmware on the long case, the only difference found after the anchor's fix. I did not look into why only every second return makes a sound.
 
-The grains' ages (+0x10, +0x14) are int32 too and stay `double` in the port. They wrap only after 524,288 samples without a trigger, and a grain's window has closed long before that (at most 32,768 samples), so it can't be heard. That is reasoning; no case plants it.
+The grains' ages (+0x10, +0x14) are int32 too and stay `double` in the port. They wrap only after 524,288 samples without a trigger, and a grain's window has closed long before that (at most 32,768 samples), so it can't be heard. That is reasoning; no case plants it. (Since v122 they are int32 in the port, and a planted saturation is still not heard.)
 
 **The fix.** `wrapAnchor` on every move of the anchor except the forward loop, and the timer's wrap. Values in range are returned untouched, so nothing changes until an overflow: A/B against the merge below it is 4/4 identical, PluginTest 4/4 bit-identical.
 
@@ -1840,14 +1938,14 @@ For that last row, one run outside the repo compared the wrapped arithmetic with
 
 **Through the whole tone.** `xt_tone` at 1500 cases with the waves that hung in place of its two SOLO waves, 7 waves, 2 seeds:
 - The old build did not finish in 280 s on 3 runs (`f1000` on both seeds, `f2000` on seed 7). The new one finishes them in about 30 s, 0 different.
-- The other runs are the same on both builds. Some have differences, on SOLO waves about 3% off in a buffer: `f5000`, a 5 kHz gated tone, 15 and 8; a click train 2. Not traced.
+- The other runs are the same on both builds. Some have differences, on SOLO waves about 3% off in a buffer: `f5000`, a 5 kHz gated tone, 15 and 8; a click train 2. Not traced. (v122: 0 different with no tolerance, "SOLO bit for bit".)
 
 Seeds 90210 and 2007 at 6000 cases: 0 different, and seed 90210's counts are as in v108. `verify.sh`: fcheck as the new baseline (five lines added), A/B and PluginTest identical, engine tests, auval.
 
 **What this leaves.**
 - `xtSoloEncode` against the firmware's encoder, above. That is its own piece of work (v112).
 - The band player's `stepBack` still relies on `int` wrapping (v108).
-- The SOLO cases past the tolerance stay open, these and seed 3 case 9455, seed 4 case 529, seed 2007 case 9186.
+- The SOLO cases past the tolerance stay open, these and seed 3 case 9455, seed 4 case 529, seed 2007 case 9186. (Closed by v122, "SOLO bit for bit".)
 
 ### `xt_analog` past the far band reads, and the Alternate loop (2026-11-03, v110)
 
@@ -1959,7 +2057,7 @@ This was found and first run on v106, then moved onto master with v105 and v107,
 - The other two are SOLO, past its tolerance, and new only because the draws moved (a note no longer cut plays out its later draws). Seed 1007 case 4888: stereo SOLO on OSC 2, COSMs off, `osc 2 buffer` in one block, 2.9e−2 of the peak. Seed 40000 case 4953: stereo SOLO on OSC 1 into a 1st Side Band, `cosm output` in 6 blocks, 2.4e−1 of the peak. Both are the family v104 and v106 describe. I did not trace them.
 - fcheck's baseline against master: only `xt_tone`'s count and SOLO lines change, in all three sections. Still 0 different.
 
-**Seed 3 case 9455, seed 4 case 529 and seed 2007 case 9186 are not this.** Counting on the old behaviour, none of them makes a far read that lands on anything but zeros. All three play SOLO waves (9186's is mono, on OSC 2, which `XT_TONE_DUMP` does not print). Those seeds now print 0 different, but only because the draws moved: those cases are no longer played. They stay open. SOLO's own reads are not among the eight, and I did not watch them.
+**Seed 3 case 9455, seed 4 case 529 and seed 2007 case 9186 are not this.** Counting on the old behaviour, none of them makes a far read that lands on anything but zeros. All three play SOLO waves (9186's is mono, on OSC 2, which `XT_TONE_DUMP` does not print). Those seeds now print 0 different, but only because the draws moved: those cases are no longer played. They stay open. SOLO's own reads are not among the eight, and I did not watch them. (Closed by v122, "SOLO bit for bit".)
 
 **Planted errors.**
 
@@ -2074,7 +2172,7 @@ The last two are in `tone_muts.txt`. `mutate_tone.py` at 2000 cases, the whole l
 - Seed 3, case 9455 (SOLO on both OSCs, `osc 1 buffer`) and seed 4, case 529 (stereo SOLO on OSC 1 into Wave Shape on COSM 2, `cosm output`): both past the SOLO tolerance. Their parts' worst are 5.5e−2 and 2.6e−2 of the peak. They look like v104's seed 5007, but I did not run its test of them.
 
 **Not covered.**
-- What a SOLO note's leftovers do in a later case. The check now starts from the port's words, so such a read compares equal by construction. It is the SOLO tolerance by another route.
+- What a SOLO note's leftovers do in a later case. The check now starts from the port's words, so such a read compares equal by construction. It is the SOLO tolerance by another route. (Since v122 the words are compared after a SOLO case as after any other.)
 - Reads below the pool, as v89 and v100 say. Seed 2024's case 1439 reads 156 words below tone 0's line, which the interpreter holds at 0 (`rd`, after C startup, and 0 different here). On a real XT it is other memory.
 
 ### A legato's order, and the COSMs' held levels (2026-11-03, v105)
@@ -2292,7 +2390,7 @@ counts the notes that leave memory altogether. (Since v108 a far read gets zeros
   mix and the MOD's state every block, and RING, FM, ENV RING and OSC SYNC over a PCM OSC 2. In fcheck, 3,000 cases: 57,154 note-ons and updates, 133,531 blocks, 0
   different. Wide, 21,000 cases: 409,838 and 959,388, 0 different. (v110, no note cut: 68,547 and 162,930; wide 480,297 and 1,141,680; 0 different.)
 - **SOLO is not 0 different and cannot be yet:** its largest difference there is 4.14e−5 of full scale, against
-  a limit of 2e−4. Its five values are exact, and so is the firmware's sum of its own buffers.
+  a limit of 2e−4. Its five values are exact, and so is the firmware's sum of its own buffers. (Since v122 it is 0 different and the limit is gone.)
 - The stereo flag at the firmware's own tone note-on (`0x894f5e60`): the six combinations of OSC 1 off, mono or
   stereo with OSC 2 mono or stereo, 0 different. The TVA's flag: 0 words different with it 0 and 1; changing
   R moved no word of the main pair's L and all 32 of its R.
@@ -2387,7 +2485,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 
 **Where it is compared.** XtSynth has taps behind `XT_TONE_CHECK`: OSC 1, OSC 2, the mix, COSM's output. Every block: the four buffers, the TVA (+0xc level, +0x68, +0x6c gain, +0x60, +0x64 target, +0x58, +0x5c step) and the output, which is the frame's third pair on the bus, Output Assign MFX (+0x10, +0x14 of each 32-byte frame). At every update: the envelopes' outputs and stages, LFOs, pitch terms and ramps, the voices' fields, the free LFOs' phases.
 
-**Tolerance: none, but for SOLO.** Everything is bit for bit in the XT's units, the last stage included, because I changed XtSynth's TVA and output sum to the firmware's arithmetic rather than widen the check (v96). The only tolerance is on a SOLO wave's buffers and what follows them: 2% of the block's peak plus −108 dB of full scale (`kSoloTol`, `kSoloFloor`), since `XtSoloVoice` is not bit-exact (`xt_fw solocmp`). The worst seen is printed; the SOLO wave's envelopes, LFOs, pitch, walk and gains are still bit for bit.
+**Tolerance: none, but for SOLO** (none at all since v122, "SOLO bit for bit", which also lifts the SOLO exceptions below). Everything is bit for bit in the XT's units, the last stage included, because I changed XtSynth's TVA and output sum to the firmware's arithmetic rather than widen the check (v96). The only tolerance is on a SOLO wave's buffers and what follows them: 2% of the block's peak plus −108 dB of full scale (`kSoloTol`, `kSoloFloor`), since `XtSoloVoice` is not bit-exact (`xt_fw solocmp`). The worst seen is printed; the SOLO wave's envelopes, LFOs, pitch, walk and gains are still bit for bit.
 
 **The result.** fcheck: 2000 cases and the sweep, 3259 notes, 1301 taken by a sounding tone, 400 truncated, 277,762 blocks, 6.2 million checks, 0 different. 3000 cases and the sweep on each of four other seeds (777, 31337, 9, 4242), 0 different.
 
