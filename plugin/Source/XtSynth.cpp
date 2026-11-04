@@ -382,20 +382,25 @@ XtEnvParams XtSynth::cosmEnvParams(const Voice& v, int cosm, const Controls::Cos
 XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtTvfParams p;
-    p.filter = c.filter; p.q = c.reso; p.qLfo = c.resoLfo; p.qEnv = c.resoEnv;
-    p.cutoff = c.cutoff; p.keyfollow = c.kf / 10; p.cutoffLfo = c.cutoffLfo; p.cutoffEnv = c.cutoffEnv;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.filter = c.filter; p.q = c.reso + m[xtmx::CosmPrm2]; p.qLfo = c.resoLfo + m[xtmx::CosmLfoPrm2]; p.qEnv = c.resoEnv;
+    p.cutoff = c.cutoff + m[xtmx::CosmPrm1]; p.keyfollow = c.kf / 10; p.cutoffLfo = c.cutoffLfo + m[xtmx::CosmLfoPrm1]; p.cutoffEnv = c.cutoffEnv;
     p.qOwn = c.resoOwn; p.cutoffOwn = c.cutoffOwn;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return v.cs[k].type == 1 ? xtDtvfBlock(p, v.note, va, vb) : xtTvfBlock(p, v.note, va, vb);
 }
+
+// The Matrix's sums on a COSM (0x894de400…): four for each section, added to the knobs each type names; ahead of the
+// clamps its converter has.  A Detune ranges ±100 and a Balance 0…100, so those take the sum ·200/127 and ·100/127.
 
 // A Dual Filter's block (0x894dd690): Filter 1's Env depth by A, Filter 2's by B.
 XtDualBlock XtSynth::dualBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtDualParams p;
     p.type = c.dualType;
-    p.freq1 = c.freq1; p.kf1 = c.kf1 / 10; p.q1 = c.q1; p.lfo1 = c.lfo1; p.env1 = c.env1;
-    p.freq2 = c.freq2; p.kf2 = c.kf2 / 10; p.q2 = c.q2; p.lfo2 = c.lfo2; p.env2 = c.env2;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.freq1 = c.freq1 + m[xtmx::CosmPrm1]; p.kf1 = c.kf1 / 10; p.q1 = c.q1; p.lfo1 = c.lfo1 + m[xtmx::CosmLfoPrm1]; p.env1 = c.env1;
+    p.freq2 = c.freq2 + m[xtmx::CosmPrm2]; p.kf2 = c.kf2 / 10; p.q2 = c.q2; p.lfo2 = c.lfo2 + m[xtmx::CosmLfoPrm2]; p.env2 = c.env2;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return xtDualBlock(p, v.note, va, vb);
 }
@@ -404,7 +409,8 @@ XtDualBlock XtSynth::dualBlock(const Voice& v, int k) const {
 XtTbBlock XtSynth::tbBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtTbParams p;
-    p.lpfCutoff = c.tbCutoff; p.lpfKf = c.tbKf / 10; p.lpfLfo = c.tbLfo; p.lpfEnv = c.tbEnv; p.q = c.tbQ; p.qFollow = c.tbQFollow;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.lpfCutoff = c.tbCutoff + m[xtmx::CosmPrm1]; p.lpfKf = c.tbKf / 10; p.lpfLfo = c.tbLfo + m[xtmx::CosmLfoPrm1]; p.lpfEnv = c.tbEnv; p.q = c.tbQ + m[xtmx::CosmPrm2]; p.qFollow = c.tbQFollow;
     p.hpfCutoff = c.tbHpf; p.hpfKf = c.tbHpfKf / 10; p.hpfLfo = c.tbHpfLfo; p.hpfEnv = c.tbHpfEnv; p.gain = c.tbGain;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return xtTbBlock(p, v.note, va, vb);
@@ -414,8 +420,9 @@ XtTbBlock XtSynth::tbBlock(const Voice& v, int k) const {
 XtCombBlock XtSynth::combBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtCombParams p;
-    p.octave = c.combOctave; p.detune = c.combDetune; p.detuneLfo = c.combDetuneLfo; p.detuneEnv = c.combDetuneEnv;
-    p.tone = c.combTone; p.toneLfo = c.combToneLfo; p.toneEnv = c.combToneEnv;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.octave = c.combOctave; p.detune = c.combDetune + 200 * m[xtmx::CosmPrm2] / 127; p.detuneLfo = c.combDetuneLfo + m[xtmx::CosmLfoPrm2]; p.detuneEnv = c.combDetuneEnv;
+    p.tone = c.combTone + m[xtmx::CosmPrm1]; p.toneLfo = c.combToneLfo + m[xtmx::CosmLfoPrm1]; p.toneEnv = c.combToneEnv;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return xtCombBlock(p, va, vb);
 }
@@ -429,8 +436,9 @@ XtSbfBlock XtSynth::sbfBlock(const Voice& v, int k) const {
     XtSbfParams p;
     p.second = second;
     p.hpf = s.hpf; p.q = s.q; p.lpf = s.lpf; p.lpfKf = s.lpfKf / 10; p.subDetune = s.subDetune; p.octave = s.octave;
-    p.detune = s.detune; p.detuneLfo = s.detuneLfo; p.detuneOwn = s.detuneOwn; p.detuneEnv = s.detuneEnv;
-    p.width = s.width; p.widthKf = s.widthKf / 10; p.widthLfo = s.widthLfo; p.widthOwn = s.widthOwn; p.widthEnv = s.widthEnv;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.detune = s.detune + 200 * m[xtmx::CosmPrm2] / 127; p.detuneLfo = s.detuneLfo + m[xtmx::CosmLfoPrm2]; p.detuneOwn = s.detuneOwn; p.detuneEnv = s.detuneEnv;
+    p.width = s.width + m[xtmx::CosmPrm1]; p.widthKf = s.widthKf / 10; p.widthLfo = s.widthLfo + m[xtmx::CosmLfoPrm1]; p.widthOwn = s.widthOwn; p.widthEnv = s.widthEnv;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return xtSbfBlock(p, v.note, va, vb);
 }
@@ -439,8 +447,9 @@ XtSbfBlock XtSynth::sbfBlock(const Voice& v, int k) const {
 XtResBlock XtSynth::resBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtResParams p;
-    p.type = c.resType; p.size = c.resSize; p.sizeKf = c.resSizeKf / 10; p.sizeLfo = c.resSizeLfo; p.sizeEnv = c.resSizeEnv;
-    p.balance = c.resBalance; p.balanceLfo = c.resBalanceLfo; p.balanceEnv = c.resBalanceEnv;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.type = c.resType; p.size = c.resSize + m[xtmx::CosmPrm1]; p.sizeKf = c.resSizeKf / 10; p.sizeLfo = c.resSizeLfo + m[xtmx::CosmLfoPrm1]; p.sizeEnv = c.resSizeEnv;
+    p.balance = c.resBalance + 100 * m[xtmx::CosmPrm2] / 127; p.balanceLfo = c.resBalanceLfo + m[xtmx::CosmLfoPrm2]; p.balanceEnv = c.resBalanceEnv;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return xtResBlock(p, v.note, va, vb);
 }
@@ -450,8 +459,9 @@ XtResBlock XtSynth::resBlock(const Voice& v, int k) const {
 XtFsBlock XtSynth::fsBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtFsParams p;
-    p.depth = c.fsDepth; p.depthKf = c.fsDepthKf / 10; p.depthLfo = c.fsDepthLfo; p.depthEnv = c.fsDepthEnv;
-    p.balance = c.fsBalance; p.balanceLfo = c.fsBalanceLfo; p.balanceEnv = c.fsBalanceEnv;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.depth = c.fsDepth + m[xtmx::CosmPrm1]; p.depthKf = c.fsDepthKf / 10; p.depthLfo = c.fsDepthLfo + m[xtmx::CosmLfoPrm1]; p.depthEnv = c.fsDepthEnv;
+    p.balance = c.fsBalance + 100 * m[xtmx::CosmPrm2] / 127; p.balanceLfo = c.fsBalanceLfo + m[xtmx::CosmLfoPrm2]; p.balanceEnv = c.fsBalanceEnv;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return xtFsBlock(p, v.note, va, vb);
 }
@@ -460,18 +470,20 @@ XtFsBlock XtSynth::fsBlock(const Voice& v, int k) const {
 XtLofiBlock XtSynth::lofiBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtLofiParams p;
-    p.bitDown = c.lofiBit; p.rateDown = c.lofiRate; p.filter = c.lofiFilter; p.filterKf = c.lofiFilterKf / 10;
-    p.filterLfo = c.lofiFilterLfo; p.filterEnv = c.lofiFilterEnv;
-    p.balance = c.lofiBalance; p.balanceLfo = c.lofiBalanceLfo; p.balanceEnv = c.lofiBalanceEnv;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.bitDown = c.lofiBit; p.rateDown = c.lofiRate; p.filter = c.lofiFilter + m[xtmx::CosmPrm1]; p.filterKf = c.lofiFilterKf / 10;
+    p.filterLfo = c.lofiFilterLfo + m[xtmx::CosmLfoPrm1]; p.filterEnv = c.lofiFilterEnv;
+    p.balance = c.lofiBalance + 100 * m[xtmx::CosmPrm2] / 127; p.balanceLfo = c.lofiBalanceLfo + m[xtmx::CosmLfoPrm2]; p.balanceEnv = c.lofiBalanceEnv;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return xtLofiBlock(p, v.note, va, vb);
 }
 
 // A Compressor's block (0x894ddc50).
-XtCompBlock XtSynth::compBlock(int k) const {
+XtCompBlock XtSynth::compBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtCompParams p;
-    p.attack = c.compAttack; p.sustain = c.compSustain; p.level = c.compLevel;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.attack = c.compAttack + m[xtmx::CosmPrm1]; p.sustain = c.compSustain + m[xtmx::CosmPrm2]; p.level = c.compLevel;
     return xtCompBlock(p);
 }
 
@@ -479,8 +491,9 @@ XtCompBlock XtSynth::compBlock(int k) const {
 XtWsBlock XtSynth::wsBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtWsParams p;
-    p.type = c.wsType; p.level = c.wsLevel; p.drive = c.wsDrive; p.driveLfo = c.wsDriveLfo; p.driveEnv = c.wsDriveEnv;
-    p.tone = c.wsTone; p.toneKf = c.wsToneKf / 10; p.toneLfo = c.wsToneLfo; p.toneEnv = c.wsToneEnv;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.type = c.wsType; p.level = c.wsLevel; p.drive = c.wsDrive + m[xtmx::CosmPrm1]; p.driveLfo = c.wsDriveLfo + m[xtmx::CosmLfoPrm1]; p.driveEnv = c.wsDriveEnv;
+    p.tone = c.wsTone + m[xtmx::CosmPrm2]; p.toneKf = c.wsToneKf / 10; p.toneLfo = c.wsToneLfo + m[xtmx::CosmLfoPrm2]; p.toneEnv = c.wsToneEnv;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return xtWsBlock(p, v.note, va, vb);
 }
@@ -489,8 +502,9 @@ XtWsBlock XtSynth::wsBlock(const Voice& v, int k) const {
 XtOdBlock XtSynth::odBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtOdParams p;
-    p.type = c.odType; p.level = c.odLevel; p.drive = c.odDrive; p.driveLfo = c.odDriveLfo; p.driveEnv = c.odDriveEnv;
-    p.tone = c.odTone; p.toneKf = c.odToneKf / 10; p.toneLfo = c.odToneLfo; p.toneEnv = c.odToneEnv;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.type = c.odType; p.level = c.odLevel; p.drive = c.odDrive + m[xtmx::CosmPrm1]; p.driveLfo = c.odDriveLfo + m[xtmx::CosmLfoPrm1]; p.driveEnv = c.odDriveEnv;
+    p.tone = c.odTone + m[xtmx::CosmPrm2]; p.toneKf = c.odToneKf / 10; p.toneLfo = c.odToneLfo + m[xtmx::CosmLfoPrm2]; p.toneEnv = c.odToneEnv;
     const float va = xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);
     return xtOdBlock(p, v.note, va, vb);
 }
@@ -499,16 +513,18 @@ XtOdBlock XtSynth::odBlock(const Voice& v, int k) const {
 XtAmpBlock XtSynth::ampBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtAmpParams p;
-    p.type = c.ampType; p.bass = c.ampBass; p.middle = c.ampMiddle; p.treble = c.ampTreble; p.level = c.ampLevel;
-    p.gain = c.ampGain; p.gainLfo = c.ampGainLfo; p.gainEnv = c.ampGainEnv;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.type = c.ampType; p.bass = c.ampBass; p.middle = c.ampMiddle; p.treble = c.ampTreble + m[xtmx::CosmPrm2]; p.level = c.ampLevel;
+    p.gain = c.ampGain + m[xtmx::CosmPrm1]; p.gainLfo = c.ampGainLfo + m[xtmx::CosmLfoPrm1]; p.gainEnv = c.ampGainEnv;
     return xtAmpBlock(p, xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve));
 }
 
 // A Limiter's block (0x894ddd20).
-XtLimBlock XtSynth::limBlock(int k) const {
+XtLimBlock XtSynth::limBlock(const Voice& v, int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     XtLimParams p;
-    p.threshold = c.limThreshold; p.ratio = c.limRatio; p.attack = c.limAttack; p.release = c.limRelease; p.level = c.limLevel;
+    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
+    p.threshold = c.limThreshold; p.ratio = c.limRatio; p.attack = c.limAttack + m[xtmx::CosmPrm1]; p.release = c.limRelease + m[xtmx::CosmPrm2]; p.level = c.limLevel;
     return xtLimBlock(p);
 }
 
@@ -524,8 +540,8 @@ void XtSynth::cosmSetBlock(Voice& v, int k) {
     if (c.type == 7) { c.res.setBlock(resBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
     if (c.type == 8) { c.fs.setBlock(fsBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
     if (c.type == 9) { c.lofi.setBlock(lofiBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
-    if (c.type == 10) { c.comp.setBlock(compBlock(k)); return; }
-    if (c.type == 11) { c.lim.setBlock(limBlock(k)); return; }
+    if (c.type == 10) { c.comp.setBlock(compBlock(v, k)); return; }
+    if (c.type == 11) { c.lim.setBlock(limBlock(v, k)); return; }
     if (c.type == 12) { c.ws.setBlock(wsBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
     if (c.type == 13) { c.od.setBlock(odBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
     if (c.type == 14) { c.amp.setBlock(ampBlock(v, k), c.heldA, c.heldLfo); return; }
@@ -798,9 +814,9 @@ void XtSynth::startVoice(int raw, int note, int vel) {
             c.lofi.noteOn(lofiBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
                           c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
         else if (c.type == 10)
-            c.comp.noteOn(compBlock(k));
+            c.comp.noteOn(compBlock(*v, k));
         else if (c.type == 11)
-            c.lim.noteOn(limBlock(k));
+            c.lim.noteOn(limBlock(*v, k));
         else if (c.type == 12)
             c.ws.noteOn(wsBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
                         c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out());
@@ -1166,9 +1182,10 @@ void XtSynth::tvaGains(const Voice& v, float levelEnv, float* lr) const {
 // (0x894f54b0), else aim at the envelope's new output with a linear ramp of
 // 10 ms, shorter when the stage itself is (0x894f5360).
 void XtSynth::tvaUpdate(Voice& v) {
-    if (v.damping) return;                                    // done when the fade is (0x894f5510)
     using namespace xtf;
+    // this test does not ask whether the tone is truncated, so a finished voice truncated just before a tick stops here
     if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }
+    if (v.damping) return;                                    // done when the fade is (0x894f5510)
     tvaGains(v, mul(v.env.level(), v.tb.level), v.target);
     const float T = v.env.stageTime();
     float frames = 441.0f;

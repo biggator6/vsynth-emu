@@ -335,6 +335,9 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The Matrix on the COSMs v120 (2026-11-04): CSM1/2-PRM1, PRM2, LFO-PRM1, LFO-PRM2 on all the types (HARDWARE_FIRMWARE.md, "The Matrix on the COSMs", its table). Knob + sum ahead of the clamps; Detune adds sum·200/127, Balance sum·100/127. The Amp Simulator's PRM2 is Treble, which the manual does not mark. Only MFX-PRM1…3 remain, for the effects, and the Chorus and Reverb sends have nowhere to go.
+  xt_tone draws all 78 Dests; the sweep has each type's four alone. mutate_tone.py 382 of 382. tvaUpdate: a voice over and truncated just before a tick ends at that tick (0x894f54b0 does not ask), seed 31337's −310 dB; a third of MONO non-Legato cases now aim at it. The whole of mutate_tone.py takes about 9 minutes now.
+
 The Matrix v119 (2026-11-04): the eight Matrix Controls (IDs 0x14d…0x174), every source, every Dest but the COSMs' PRMs (next) and MFX-PRM1…3 (HARDWARE_FIRMWARE.md, "The Matrix"). xtMatrixSums (XtOsc), XtSynth::matrixUpdate, Voice::mx by slot. A Dest is not a slot: xtFwMatrixTables runs the firmware's two maps at load, so the port holds no copy.
   0x894d96d0 on 0x89cf7634, called "the matrix" since v53, is the Multi Step Modulator (four tracks), not ported. The getters 0x894e7010… are the Matrix.
   VELO and KEYF stay at the note's start through a legato (M is not rebuilt, and an update's rebuild leaves +0…+2). Pan + sum is not clamped before its Keyfollow; Level + sum is. A pedal let go that is itself a source gives the release its new time (voiceOff).

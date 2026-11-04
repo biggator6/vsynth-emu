@@ -27,7 +27,7 @@ struct XtEnvKnobs {
     int aSens = 0, dSens = 0, rSens = 0;                        // velocity → time, −63..+63
     int timeKF = 0;                                             // −200..+200 (decay and release)
 };
-// The converter (0x894df240) for an ADSR with no matrix modulation: the
+// The converter (0x894df240) for an ADSR, its time knobs with the Matrix's sums added by XtSynth: the
 // attack time from the note-on velocity and A-Sens; decay and release from
 // D-/R-Sens and the Time KF scale for `key`; the release from the note-off
 // velocity.  The sens knobs go in as the patch's −63…+63 and are stored as

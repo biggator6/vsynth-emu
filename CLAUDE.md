@@ -76,7 +76,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
   takes about 10 s), and `mutate_tone.py 2000 <new names>` for the planted errors just added.
-- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 12 minutes) if
+- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 9 minutes) if
   `XtSynth.cpp`, `XtToneCheck.cpp` or a port changed: a planted error can stop meaning anything
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing

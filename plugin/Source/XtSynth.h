@@ -433,8 +433,8 @@ private:
     XtResBlock resBlock(const Voice& v, int k) const;
     XtFsBlock fsBlock(const Voice& v, int k) const;
     XtLofiBlock lofiBlock(const Voice& v, int k) const;
-    XtCompBlock compBlock(int k) const;
-    XtLimBlock limBlock(int k) const;
+    XtCompBlock compBlock(const Voice& v, int k) const;
+    XtLimBlock limBlock(const Voice& v, int k) const;
     XtWsBlock wsBlock(const Voice& v, int k) const;
     XtOdBlock odBlock(const Voice& v, int k) const;
     XtAmpBlock ampBlock(const Voice& v, int k) const;

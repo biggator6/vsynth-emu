@@ -658,15 +658,12 @@ void drawCosm(Rng& r, Ctl::Cosm& c) {
     c.lfoWave = r.range(0, 7); c.lfoRate = u(); c.lfoOffset = r.range(0, 4); c.lfoDelay = r.one(2) ? 0 : r.range(0, 60); c.lfoFadeMode = r.range(0, 3); c.lfoFade = r.one(2) ? 0 : r.range(0, 60); c.lfoKeySync = !r.one(4);
 }
 
-// the Dests the port takes so far: not yet the COSMs' own parameters
-constexpr bool destReady(int d) { return d != 0x2b && d != 0x2c && d != 0x36 && d != 0x37 && (d < 0x34 || d > 0x35) && (d < 0x3f || d > 0x40); }
-
 // The Matrix in half the cases, one to eight controls, on the sources whose values the case draws
 void drawMatrix(Rng& r, Ctl& c) {
     for (int i = 0; i < 10; ++i) c.assign[i] = r.one(2) ? 0 : r.one(8) ? 32 : r.range(0, 95);   // 32 means none, and it is a controller's number
     if (r.one(2)) return;
     static const int kOther[] = { 96, 96, 96, 97, 97, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 107, 108, 108 };
-    const auto dest = [&] { for (;;) { const int d = r.range(0, 78); if (destReady(d)) return d; } };
+    const auto dest = [&] { return r.range(0, 78); };
     for (int i = r.range(0, 7); i < 8; ++i) {
         XtMatrixControl& m = c.matrix[i];
         m.source = r.one(2) ? (r.one(8) ? 32 : r.range(0, 95)) : kOther[r.range(0, (int)(sizeof kOther / sizeof kOther[0]) - 1)];
@@ -712,8 +709,9 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     c.mfxSend = r.one(2) ? 127 : r.range(0, 127);
     c.tvaLfoWave = r.range(0, 7); c.tvaLfoRate = r.range(0, 127); c.tvaLfoOffset = r.range(0, 4); c.tvaLfoDelay = r.one(2) ? 0 : r.range(0, 60);
     c.tvaLfoFadeMode = r.range(0, 3); c.tvaLfoFade = r.one(2) ? 0 : r.range(0, 60); c.tvaLfoKeySync = !r.one(4);
-    // now and then the pan LFO at full depth on a slow square from the note's start: one channel's gain 0 all through, so a voice's end must look at both
-    if (r.one(16)) { c.tvaPanLfo = r.one(2) ? 63 : -63; c.tvaLfoWave = 3; c.tvaLfoFade = c.tvaLfoDelay = 0; c.tvaLfoOffset = 2; c.release = r.range(0, 30); c.tvaLevel = 127; c.tvaOn = true; c.tvaLfoRate = 30; c.tvaLfoKeySync = true; }
+    // now and then the pan LFO at full depth on a slow square from the note's start, one channel's gain 0 all through, and
+    // no release, so that the other's is still up as the envelope ends: a voice's end must look at both
+    if (r.one(16)) { c.tvaPanLfo = r.one(2) ? 63 : -63; c.tvaLfoWave = 3; c.tvaLfoFade = c.tvaLfoDelay = 0; c.tvaLfoOffset = 2; c.release = 0; c.rSens = 0; c.tvaLevel = 127; c.tvaOn = true; c.tvaLfoRate = 30; c.tvaLfoKeySync = true; c.tvaLfoFadeMode = 0; }
     c.octave = r.one(3) ? r.range(-3, 3) : 0;
     if (r.one(2)) { c.portamento = true; c.portaMode = r.range(0, 1); c.portaType = r.range(0, 1); c.portaTime = r.range(0, 127); c.portaVeloSens = r.range(-63, 63); }
     return c;
@@ -726,6 +724,7 @@ constexpr int kCcNum[4] = { 7, 11, 10, 1 };
 constexpr size_t kModeOnly = (size_t)-6;       // and an All Notes Off, which is no update
 constexpr size_t kDestOnly = (size_t)-100;     // and these 79: one Dest of the Matrix on CC 2, which moves alone
 constexpr size_t kDestKnob = (size_t)-200;     // and these 79: the same with CC 2 still, and its Sens moved
+constexpr size_t kCosmPrm = (size_t)-300;      // and these 64: each COSM type's PRM1, PRM2, LFO-PRM1, LFO-PRM2 on CC 2, by a COSM in the middle of its knobs
 constexpr int kDestCc = 2;
 // Every field XtSynth keeps in a list of what has changed (setControls): the sweep moves
 // these one at a time, where nothing else moving can hide one left out of a list.
@@ -754,7 +753,8 @@ std::vector<size_t> listedFields() {
         f.push_back(kModeOnly);
         f.push_back(kBenderOnly);
     }
-    for (int d = 1; d < 79; ++d) if (destReady(d)) { f.push_back(kDestOnly + (size_t)d); f.push_back(kDestKnob + (size_t)d); }
+    for (int d = 1; d < 79; ++d) { f.push_back(kDestOnly + (size_t)d); f.push_back(kDestKnob + (size_t)d); }
+    for (size_t i = 0; i < 64; ++i) f.push_back(kCosmPrm + i);
     return f;
 }
 
@@ -845,7 +845,8 @@ int XtToneProbe::run(int argc, char** argv) {
         if (nOsc2 && g == tickFrom) summary("tone, a wave on OSC 2");
         const bool sweep = g >= nCases && g < nCases + nSweep;
         const size_t sweepAt = sweep ? listed[(size_t)(g - nCases) / 4] : 0;
-        const bool sweepDest = sweep && sweepAt >= kDestOnly && sweepAt < kDestOnly + 79, sweepSens = sweep && sweepAt >= kDestKnob && sweepAt < kDestKnob + 79;
+        const bool sweepCosm = sweep && sweepAt >= kCosmPrm && sweepAt < kCosmPrm + 64;
+        const bool sweepDest = (sweep && sweepAt >= kDestOnly && sweepAt < kDestOnly + 79) || sweepCosm, sweepSens = sweep && sweepAt >= kDestKnob && sweepAt < kDestKnob + 79;
         const int sweepStage = sweep ? (g - nCases) % 4 : 0;
         // one case in two plays a wave on OSC 1 (with the analog OSC 2 or alone); the last
         // ones a wave on OSC 2, over OSC 1 off, analog or on another wave
@@ -908,8 +909,27 @@ int XtToneProbe::run(int argc, char** argv) {
             if (sweepDest || sweepSens) {
                 for (XtMatrixControl& m : ctl.matrix) m = {};
                 ctl.matrix[0].source = kDestCc;
-                ctl.matrix[0].dest[0] = (int)(sweepAt - (sweepDest ? kDestOnly : kDestKnob));
+                ctl.matrix[0].dest[0] = sweepCosm ? 0 : (int)(sweepAt - (sweepDest ? kDestOnly : kDestKnob));
                 ctl.matrix[0].sens[0] = sweepSens ? 10 : 40;
+            }
+            // Each type's four: on COSM 1 or 2 by the stage, the knobs in the middle, every depth on, so that no sum goes unseen
+            if (sweepCosm) {
+                const int t = (int)(sweepAt - kCosmPrm) / 4, which = (int)(sweepAt - kCosmPrm) % 4, sec = sweepStage % 2;
+                static const int kPrm[4] = { 0x2b, 0x2c, 0x34, 0x35 };
+                ctl.matrix[0].dest[0] = kPrm[which] + 11 * sec;
+                Ctl::Cosm& c = ctl.cosm[sec];
+                c.on = true;
+                c.type = t;
+                c.filter = 1; c.cutoff = c.reso = c.freq1 = c.q1 = c.freq2 = c.q2 = c.tbCutoff = c.tbQ = c.tbHpf = c.tbGain = c.combTone = c.resSize = c.fsDepth = c.lofiFilter = 64;
+                c.compAttack = c.compSustain = c.limAttack = c.limRelease = c.limThreshold = 64; c.ampTreble = 64;
+                c.wsLevel = c.wsDrive = c.wsTone = c.odLevel = c.odDrive = c.odTone = c.ampLevel = c.ampGain = 64;
+                c.resBalance = c.fsBalance = c.lofiBalance = 50;
+                c.lofiBit = 2; c.lofiRate = 1; c.kf = c.kf1 = c.kf2 = 0;
+                c.combDetune = 0;
+                for (Ctl::Cosm::SideBand& b : c.sb) { b.hpf = b.q = b.lpf = b.width = 64; b.detune = 0; }
+                c.cutoffLfo = c.resoLfo = c.lfo1 = c.lfo2 = c.tbLfo = c.combDetuneLfo = c.combToneLfo = c.resSizeLfo = c.resBalanceLfo = c.fsDepthLfo = c.fsBalanceLfo = c.lofiFilterLfo = c.lofiBalanceLfo = c.wsDriveLfo = c.wsToneLfo = c.odDriveLfo = c.odToneLfo = c.ampGainLfo = 20;
+                for (Ctl::Cosm::SideBand& b : c.sb) { b.detuneLfo = b.widthLfo = 20; }
+                c.lfoWave = 3; c.lfoRate = 90; c.lfoOffset = 2; c.lfoDelay = c.lfoFade = 0; c.lfoKeySync = true;
             }
         }
         if (twoInTick) {
@@ -988,7 +1008,22 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         const int raw[2] = { sweep || twoInTick ? 48 : r.range(0, 127), sweep || twoInTick ? 72 : r.range(0, 127) }, vel[2] = { r.range(1, 127), r.range(1, 127) }, relVel[2] = { r.range(1, 127), r.range(1, 127) };
         const int nBlocks = sweep || twoInTick ? 90 : g % 23 == 7 ? 700 : 60 + r.range(0, 120);     // some long enough to run past a wave's end
-        const int secondAt = twoInTick ? -1 : sweep ? 1 : kind && raw[0] != raw[1] ? r.range(1, 30) : -1;
+        // Hold itself as a source, on a release time, let go after the key: the release takes the new sum though its update has not run
+        const bool holdSource = !sweep && !twoInTick && r.one(8);
+        if (holdSource) {
+            static const int kRel[] = { 0x44, 0x10, 0x07, 0x0a, 0x0d, 0x25, 0x2f, 0x32, 0x3a, 0x3d };
+            ctl.matrix[0] = {};
+            ctl.matrix[0].source = 64;
+            ctl.matrix[0].dest[0] = kRel[r.range(0, 9)];
+            ctl.matrix[0].sens[0] = r.one(2) ? 63 : -63;
+            ctl.tvaOn = true;
+            ctl.release = 60;
+        }
+        // Now and then, on a MONO part, the second note waits for the first to have finished its release, and comes
+        // in the very block of the tick that will end it: truncating a voice that is already over
+        const bool chaseEnd = kind == 3 && !sweep && !twoInTick && raw[0] != raw[1] && r.one(3);
+        if (chaseEnd) { ctl.release = r.range(0, 20); ctl.attack = r.range(1, 40); ctl.tvaOn = true; }   // the new note starts from no gain, so the old one's last trace can be seen
+        const int secondAt = twoInTick || chaseEnd ? -1 : sweep ? 1 : kind && raw[0] != raw[1] ? r.range(1, 30) : -1;
         const int offAt[2] = { twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 3 : 1000) : 20 + r.range(0, 40), twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
         const int liveAt = twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
         // the free-running LFOs' phases, once a note has shown which objects they are
@@ -1337,6 +1372,11 @@ int XtToneProbe::run(int argc, char** argv) {
         };
         int holdAt[3], holdVal[3] = {}, sostAt[3], sostVal[3] = {};
         pedalBlocks(3, holdAt, holdVal);
+        if (holdSource) {
+            holdAt[0] = -2; holdVal[0] = 127;
+            holdAt[1] = -1;
+            holdAt[2] = offAt[0] + r.range(1, 10); holdVal[2] = 0;
+        }
         pedalBlocks(5, sostAt, sostVal);
         const int modeAt = !sweep && !twoInTick && r.one(8) ? r.range(0, 60) : -1, modeCc = modeAt < 0 ? 0 : r.one(3) ? 120 : r.one(2) ? 121 : 123 + r.range(0, 4);
         const int modeVal = r.one(4) ? r.range(0, 20) : 0;
@@ -1360,6 +1400,10 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         for (int blk = 0; blk < nBlocks && !over; ++blk) {
             if (blk == secondAt) { if (!startNote(1, blk)) return 1; keyDown[1] = true; }
+            if (chaseEnd && !keyDown[1] && fn[0].live && !fn[0].ended && fn[0].vi >= 0 && syn.tickCount >= 441) {
+                const XtSynth::Voice& v0 = syn.voice[fn[0].vi];
+                if (v0.env.done() && v0.cur[0] <= 0x1.0000fep-16f && v0.cur[1] <= 0x1.0000fep-16f) { if (!startNote(1, blk)) return 1; keyDown[1] = true; }
+            }
             for (int i = 0; i < 3; ++i)
                 if (blk == holdAt[i] && !pedalMove(64, holdVal[i], blk)) return 1;
             for (int i = 0; i < 3; ++i)

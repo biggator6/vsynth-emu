@@ -366,13 +366,13 @@ float xtOscSmooth(float cur, float target) {
 }
 
 int xtNoteCoarse(const XtTuning& t, int oscCoarse) {
-    // the system's key shift (byte at part base + 0xc202) and the matrix: 0
+    // the system's key shift (byte at part base + 0xc202) and the Multi Step Modulator: 0
     return (int16_t)((int8_t)t.coarse + (int8_t)oscCoarse);
 }
 
 int xtNoteFine(const XtTuning& t, int key, int oscFine, int bend, int random) {
     // the part's shorts as the updater stores them (×10); the system's
-    // Master Tune (short at part base + 0xc200) and the matrix: 0
+    // Master Tune (short at part base + 0xc200) and the Multi Step Modulator: 0
     const int scale = t.scaleOn ? (int16_t)(t.scale[(uint8_t)key % 12] * 10) : 0;
     return scale + (int16_t)(t.fine * 10) + (int16_t)(oscFine * 10) + bend + random;
 }
@@ -407,7 +407,7 @@ XtPortaSettings xtPortaSettings(bool on, int type, int time, int veloSens, int v
     constexpr int64_t M = (int32_t)0x82061029;     // the reciprocal multiply for /16129 (127²)
     int v = velocity & 0xff, sens = (int16_t)veloSens;
     if (0 > sens) { v = 127 - v; sens = -sens; }
-    int k = time & 0xff;                            // Time + the matrix's modulation (0), as a byte
+    int k = time & 0xff;                            // Time + the Multi Step Modulator's (0), as a byte
     if (k > 127) k = 127;
     int32_t t;
     if (k == 1) t = 1;

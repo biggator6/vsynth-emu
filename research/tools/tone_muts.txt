@@ -50,20 +50,20 @@ order-render|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 0.0f);| 
 mix-skip|if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);|
 cosm-order|                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
 cosm-tvf-env|else c.tvf.setBlock(cosmBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo);|else c.tvf.setBlock(cosmBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo);
-cosm-tvf-kf|p.cutoff = c.cutoff; p.keyfollow = c.kf / 10;|p.cutoff = c.cutoff; p.keyfollow = c.kf;
+cosm-tvf-kf|p.keyfollow = c.kf / 10; p.cutoffLfo|p.keyfollow = c.kf; p.cutoffLfo
 cosm-vel|xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1|xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1
 cosm-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\n// A TVF's block|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\n// A TVF's block
-cosm-dual-env|p.freq2 = c.freq2; p.kf2 = c.kf2 / 10; p.q2 = c.q2; p.lfo2 = c.lfo2; p.env2 = c.env2;|p.freq2 = c.freq2; p.kf2 = c.kf2 / 10; p.q2 = c.q2; p.lfo2 = c.env2; p.env2 = c.lfo2;
-cosm-tb|p.q = c.tbQ; p.qFollow = c.tbQFollow;|p.q = c.tbQ; p.qFollow = 0;
-cosm-comb|p.octave = c.combOctave; p.detune = c.combDetune;|p.octave = c.combOctave; p.detune = -c.combDetune;
+cosm-dual-env|p.lfo2 = c.lfo2 + m[xtmx::CosmLfoPrm2]; p.env2 = c.env2;|p.lfo2 = c.env2 + m[xtmx::CosmLfoPrm2]; p.env2 = c.lfo2;
+cosm-tb|p.q = c.tbQ + m[xtmx::CosmPrm2]; p.qFollow = c.tbQFollow;|p.q = c.tbQ + m[xtmx::CosmPrm2]; p.qFollow = 0;
+cosm-comb|p.detune = c.combDetune + 200 * m[xtmx::CosmPrm2] / 127;|p.detune = -c.combDetune + 200 * m[xtmx::CosmPrm2] / 127;
 cosm-sbf|const bool second = v.cs[k].type == 6;|const bool second = v.cs[k].type == 5;
-cosm-res|p.balance = c.resBalance; p.balanceLfo = c.resBalanceLfo; p.balanceEnv = c.resBalanceEnv;|p.balance = c.resBalance; p.balanceLfo = c.resBalanceEnv; p.balanceEnv = c.resBalanceLfo;
-cosm-fs|p.depth = c.fsDepth; p.depthKf = c.fsDepthKf / 10;|p.depth = c.fsDepth; p.depthKf = 0;
+cosm-res|p.balanceLfo = c.resBalanceLfo + m[xtmx::CosmLfoPrm2]; p.balanceEnv = c.resBalanceEnv;|p.balanceLfo = c.resBalanceEnv + m[xtmx::CosmLfoPrm2]; p.balanceEnv = c.resBalanceLfo;
+cosm-fs|p.depthKf = c.fsDepthKf / 10;|p.depthKf = 0;
 cosm-lofi|p.bitDown = c.lofiBit; p.rateDown = c.lofiRate;|p.bitDown = c.lofiRate; p.rateDown = c.lofiRate;
-cosm-comp|p.attack = c.compAttack; p.sustain = c.compSustain;|p.attack = c.compSustain; p.sustain = c.compAttack;
-cosm-lim|p.attack = c.limAttack; p.release = c.limRelease;|p.attack = c.limRelease; p.release = c.limAttack;
-cosm-ws|p.driveLfo = c.wsDriveLfo; p.driveEnv = c.wsDriveEnv;|p.driveLfo = c.wsDriveEnv; p.driveEnv = c.wsDriveLfo;
-cosm-od|p.tone = c.odTone; p.toneKf = c.odToneKf / 10;|p.tone = c.odTone; p.toneKf = 0;
+cosm-comp|p.attack = c.compAttack + m[xtmx::CosmPrm1]; p.sustain = c.compSustain + m[xtmx::CosmPrm2];|p.attack = c.compSustain + m[xtmx::CosmPrm1]; p.sustain = c.compAttack + m[xtmx::CosmPrm2];
+cosm-lim|p.attack = c.limAttack + m[xtmx::CosmPrm1]; p.release = c.limRelease + m[xtmx::CosmPrm2];|p.attack = c.limRelease + m[xtmx::CosmPrm1]; p.release = c.limAttack + m[xtmx::CosmPrm2];
+cosm-ws|p.driveLfo = c.wsDriveLfo + m[xtmx::CosmLfoPrm1]; p.driveEnv = c.wsDriveEnv;|p.driveLfo = c.wsDriveEnv + m[xtmx::CosmLfoPrm1]; p.driveEnv = c.wsDriveLfo;
+cosm-od|p.toneKf = c.odToneKf / 10;|p.toneKf = 0;
 cosm-amp|p.bass = c.ampBass; p.middle = c.ampMiddle;|p.bass = c.ampMiddle; p.middle = c.ampBass;
 cosm-spk|c.spk.noteOn({ ctl.cosm[k].spkType });|c.spk.noteOn({ 0 });
 cosm-lfo|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[3 + k]);|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[6]);
@@ -327,3 +327,56 @@ mx-pressure-update|    pressure = std::clamp(value, 0, 127);\n    for (Voice& v 
 mx-poly-update|    polyPress[key & 127] = std::clamp(value, 0, 127);\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|    polyPress[key & 127] = std::clamp(value, 0, 127);
 mx-reset-press|        pressure = 0;\n|
 mx-reset-poly|        std::fill(std::begin(polyPress), std::end(polyPress), 0);\n|
+cx-tvf-cut|p.cutoff = c.cutoff + m[xtmx::CosmPrm1];|p.cutoff = c.cutoff;
+cx-tvf-cutlfo|p.cutoffLfo = c.cutoffLfo + m[xtmx::CosmLfoPrm1];|p.cutoffLfo = c.cutoffLfo;
+cx-tvf-q|p.q = c.reso + m[xtmx::CosmPrm2];|p.q = c.reso;
+cx-tvf-qlfo|p.qLfo = c.resoLfo + m[xtmx::CosmLfoPrm2];|p.qLfo = c.resoLfo;
+cx-dual-f1|p.freq1 = c.freq1 + m[xtmx::CosmPrm1];|p.freq1 = c.freq1;
+cx-dual-l1|p.lfo1 = c.lfo1 + m[xtmx::CosmLfoPrm1];|p.lfo1 = c.lfo1;
+cx-dual-f2|p.freq2 = c.freq2 + m[xtmx::CosmPrm2];|p.freq2 = c.freq2;
+cx-dual-l2|p.lfo2 = c.lfo2 + m[xtmx::CosmLfoPrm2];|p.lfo2 = c.lfo2;
+cx-tb-cut|p.lpfCutoff = c.tbCutoff + m[xtmx::CosmPrm1];|p.lpfCutoff = c.tbCutoff;
+cx-tb-lfo|p.lpfLfo = c.tbLfo + m[xtmx::CosmLfoPrm1];|p.lpfLfo = c.tbLfo;
+cx-tb-q|p.q = c.tbQ + m[xtmx::CosmPrm2];|p.q = c.tbQ;
+cx-comb-det|p.detune = c.combDetune + 200 * m[xtmx::CosmPrm2] / 127;|p.detune = c.combDetune;
+cx-comb-det-scale|p.detune = c.combDetune + 200 * m[xtmx::CosmPrm2] / 127;|p.detune = c.combDetune + m[xtmx::CosmPrm2];
+cx-comb-detl|p.detuneLfo = c.combDetuneLfo + m[xtmx::CosmLfoPrm2];|p.detuneLfo = c.combDetuneLfo;
+cx-comb-tone|p.tone = c.combTone + m[xtmx::CosmPrm1];|p.tone = c.combTone;
+cx-comb-tonel|p.toneLfo = c.combToneLfo + m[xtmx::CosmLfoPrm1];|p.toneLfo = c.combToneLfo;
+cx-sb-det|p.detune = s.detune + 200 * m[xtmx::CosmPrm2] / 127;|p.detune = s.detune;
+cx-sb-det-scale|p.detune = s.detune + 200 * m[xtmx::CosmPrm2] / 127;|p.detune = s.detune + m[xtmx::CosmPrm2];
+cx-sb-detl|p.detuneLfo = s.detuneLfo + m[xtmx::CosmLfoPrm2];|p.detuneLfo = s.detuneLfo;
+cx-sb-wid|p.width = s.width + m[xtmx::CosmPrm1];|p.width = s.width;
+cx-sb-widl|p.widthLfo = s.widthLfo + m[xtmx::CosmLfoPrm1];|p.widthLfo = s.widthLfo;
+cx-res-size|p.size = c.resSize + m[xtmx::CosmPrm1];|p.size = c.resSize;
+cx-res-sizel|p.sizeLfo = c.resSizeLfo + m[xtmx::CosmLfoPrm1];|p.sizeLfo = c.resSizeLfo;
+cx-res-bal|p.balance = c.resBalance + 100 * m[xtmx::CosmPrm2] / 127;|p.balance = c.resBalance;
+cx-res-bal-scale|p.balance = c.resBalance + 100 * m[xtmx::CosmPrm2] / 127;|p.balance = c.resBalance + m[xtmx::CosmPrm2];
+cx-res-ball|p.balanceLfo = c.resBalanceLfo + m[xtmx::CosmLfoPrm2];|p.balanceLfo = c.resBalanceLfo;
+cx-fs-dep|p.depth = c.fsDepth + m[xtmx::CosmPrm1];|p.depth = c.fsDepth;
+cx-fs-depl|p.depthLfo = c.fsDepthLfo + m[xtmx::CosmLfoPrm1];|p.depthLfo = c.fsDepthLfo;
+cx-fs-bal|p.balance = c.fsBalance + 100 * m[xtmx::CosmPrm2] / 127;|p.balance = c.fsBalance;
+cx-fs-bal-scale|p.balance = c.fsBalance + 100 * m[xtmx::CosmPrm2] / 127;|p.balance = c.fsBalance + m[xtmx::CosmPrm2];
+cx-fs-ball|p.balanceLfo = c.fsBalanceLfo + m[xtmx::CosmLfoPrm2];|p.balanceLfo = c.fsBalanceLfo;
+cx-lofi-f|p.filter = c.lofiFilter + m[xtmx::CosmPrm1];|p.filter = c.lofiFilter;
+cx-lofi-fl|p.filterLfo = c.lofiFilterLfo + m[xtmx::CosmLfoPrm1];|p.filterLfo = c.lofiFilterLfo;
+cx-lofi-bal|p.balance = c.lofiBalance + 100 * m[xtmx::CosmPrm2] / 127;|p.balance = c.lofiBalance;
+cx-lofi-bal-scale|p.balance = c.lofiBalance + 100 * m[xtmx::CosmPrm2] / 127;|p.balance = c.lofiBalance + m[xtmx::CosmPrm2];
+cx-lofi-ball|p.balanceLfo = c.lofiBalanceLfo + m[xtmx::CosmLfoPrm2];|p.balanceLfo = c.lofiBalanceLfo;
+cx-comp-a|p.attack = c.compAttack + m[xtmx::CosmPrm1];|p.attack = c.compAttack;
+cx-comp-s|p.sustain = c.compSustain + m[xtmx::CosmPrm2];|p.sustain = c.compSustain;
+cx-lim-a|p.attack = c.limAttack + m[xtmx::CosmPrm1];|p.attack = c.limAttack;
+cx-lim-r|p.release = c.limRelease + m[xtmx::CosmPrm2];|p.release = c.limRelease;
+cx-ws-d|p.drive = c.wsDrive + m[xtmx::CosmPrm1];|p.drive = c.wsDrive;
+cx-ws-dl|p.driveLfo = c.wsDriveLfo + m[xtmx::CosmLfoPrm1];|p.driveLfo = c.wsDriveLfo;
+cx-ws-t|p.tone = c.wsTone + m[xtmx::CosmPrm2];|p.tone = c.wsTone;
+cx-ws-tl|p.toneLfo = c.wsToneLfo + m[xtmx::CosmLfoPrm2];|p.toneLfo = c.wsToneLfo;
+cx-od-d|p.drive = c.odDrive + m[xtmx::CosmPrm1];|p.drive = c.odDrive;
+cx-od-dl|p.driveLfo = c.odDriveLfo + m[xtmx::CosmLfoPrm1];|p.driveLfo = c.odDriveLfo;
+cx-od-t|p.tone = c.odTone + m[xtmx::CosmPrm2];|p.tone = c.odTone;
+cx-od-tl|p.toneLfo = c.odToneLfo + m[xtmx::CosmLfoPrm2];|p.toneLfo = c.odToneLfo;
+cx-amp-g|p.gain = c.ampGain + m[xtmx::CosmPrm1];|p.gain = c.ampGain;
+cx-amp-gl|p.gainLfo = c.ampGainLfo + m[xtmx::CosmLfoPrm1];|p.gainLfo = c.ampGainLfo;
+cx-amp-t|p.treble = c.ampTreble + m[xtmx::CosmPrm2];|p.treble = c.ampTreble;
+cx-section|    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);\n    p.filter = c.filter;|    const int16_t* m = v.mx + xtmx::Cosm;\n    p.filter = c.filter;
+tva-damp-done|    if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }\n    if (v.damping) return;|    if (v.damping) return;\n    if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }

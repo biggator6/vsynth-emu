@@ -1547,6 +1547,48 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The Matrix on the COSMs (2026-11-04, v120)
+
+CSM1/2-PRM1, PRM2, LFO-PRM1 and LFO-PRM2 now reach the sixteen types. With these, every Dest but MFX-PRM1…3 reaches its parameter, though the Chorus and Reverb sends still have nowhere to go. At the defaults the sums are 0: `ab.sh` 4/4 identical to the last version.
+
+**The inputs.** A COSM's input (`0x894de400`…) takes four sums whatever the type, plus the step modulator's term to each: +0x40 PRM1 (slot +0), +0x42 LFO-PRM1 (+9), +0x44 PRM2 (+1), +0x46 LFO-PRM2 (+0xa). Each type's converter adds them to its own knobs. The manual marks those #1…#4, and the firmware's own labels at the Matrix screen (`CSM1-P1 FILTER` and the like) agree.
+
+| Type | PRM1 | LFO-PRM1 | PRM2 | LFO-PRM2 |
+|---|---|---|---|---|
+| TVF, Dynamic TVF | Cutoff | Cutoff LFO | Q | Q LFO |
+| Dual Filter | Filter 1 Freq | its LFO | Filter 2 Freq | its LFO |
+| TB Filter | LPF Cutoff | its LFO | Q | none |
+| Comb Filter | Tone | its LFO | Detune | its LFO |
+| Side Band Filters | Width | its LFO | Detune | its LFO |
+| Resonator | Size | its LFO | Balance | its LFO |
+| Frequency Shifter | Effect Depth | its LFO | Balance | its LFO |
+| Lo-Fi | Filter | its LFO | Balance | its LFO |
+| Compressor | Attack | none | Sustain | none |
+| Limiter | Attack | none | Release | none |
+| Wave Shape, OD/Dist | Drive | its LFO | Tone | its LFO |
+| Amp Simulator | Gain | its LFO | Treble | none |
+| Speaker Simulator | none | none | none | none |
+
+The Amp Simulator's PRM2 on Treble is in the converter (`0x894dcd80`), though the manual marks only Gain and its LFO.
+
+All are integer additions ahead of the clamps the ports already have, so `xt…Block` takes knob + sum and nothing in `XtCosm` changes. `compBlock` and `limBlock` now take the voice. Two scale it first, truncating, because their knobs do not run 0…127: **Detune adds sum·200/127** (Comb and both Side Bands, ±100) and **Balance adds sum·100/127** (Resonator, Frequency Shifter, Lo-Fi, 0…100). Their LFO depths add it as it is.
+
+**The check.** `xt_tone` now draws all 78 Dests. The sweep gains each type's four alone, on CC 2, with the knobs in the middle and a square LFO on every depth: 64 × 4 cases, COSM 1 in the attack and sustain stages, COSM 2 in the decay and release. Without those a mistake in one type's PRM could wait a long time for its draw. The first run found only the scaling above: five types' PRM2, in about thirty cases, everything else exact.
+
+**The result.** fcheck: 2000 cases and the sweep, 4158 notes, 2224 taken by a sounding tone, 336 truncated, 350,411 blocks, 12.8 million checks, 0 different; a wave on OSC 2, 1351 notes, 109,490 blocks, 3.6 million checks, 0 different. 3000 cases and the sweep on seeds 777, 31337, 9: 0 different; on seed 4242 three differences in one case, below. `fcheck.sh --update` changes only `xt_tone`'s five count lines. A/B 4/4 identical to the last version and to v114, PluginTest 4/4, also with CC 1 on COSM 1's PRM1 and PRM2, auval passes.
+
+**Planted errors.** 52 new for the COSMs (each term of each type, each scale, COSM 1's sums used for COSM 2), 382 in all with the one below, all caught at 2000 cases.
+
+Two older ones lived on chance, and the draws moving lost them, so each now has cases of its own:
+- `tvag-done-r`, a voice's end looking at one channel. A pan LFO at full depth on a slow square keeps one channel at 0 throughout, but any release takes the other's gain down with the envelope, to about 1e−25 at the end, and that passes the test too. So those cases now have no release: the envelope ends with the other channel still up.
+- `mx-off-fresh`, a note-off not forming the sums first ("An ordering" in the section below). Hold is now the source on one release time in an eighth of the cases, let go after the key.
+
+**A voice truncated when already over.** With the new draws seed 31337 gave a single sample off, firmware 0 and port 1.6e-17 in the XT's units, about −310 dB of full scale. It has nothing to do with the Matrix. A MONO note had finished its release, its gain under 2^−16, and the next key came in the very block of the tick that would have ended it. The tone update's end test (`0x894f54b0`) does not ask whether the tone is truncated, so the firmware ended it there and then, where `tvaUpdate` returned early for a truncated voice and let the fade play out. `tvaUpdate` now tests first. It has been wrong since v96 and no draw had reached it, as it takes all of that in one block and a new note starting from no gain to be seen at all. The check now arranges it: in a third of the cases of a MONO part without Legato, the second key waits for exactly that moment, and the second note has an Attack. Planted: `tva-damp-done`.
+
+**A seed that showed something else.** Seed 4242, case 1017, blocks 71 to 73: SOLO on OSC 1, the Matrix empty, the key let go at block 56. `osc 1 buffer` differs by 8,900 to 9,700 where the block's peak is 13,000 to 30,000 and full scale 2^31, about −107 dB of full scale, just past `kSoloTol`'s floor of 8192. Not this change: `XtSoloVoice`'s known inexactness, left open with the others.
+
+**Not covered.** As v119. MFX-PRM1…3, for the effects' port: slots 9…0xb are formed and nothing here reads them, as `0x894e7aa0` hands them to the MFX object (with the step modulator's 0x45…0x47).
+
 ### The Matrix (2026-11-04, v119)
 
 The eight Matrix Controls are ported, with all their sources and every destination but the COSMs' own parameters (next version) and the effects'. So are channel and poly pressure, and the D-Beam's controllers that the converters read. At the defaults no sum is formed and every term is 0: `ab.sh` 4/4 identical to v117.

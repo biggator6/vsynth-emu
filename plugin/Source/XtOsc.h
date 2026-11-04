@@ -108,11 +108,11 @@ struct XtTuning {
     int scale[12] = {};
 };
 // The coarse: Patch Coarse + OSC Coarse (semitones), plus the system's Key
-// Shift and the matrix's pitch terms (both 0 here).
+// Shift and the Multi Step Modulator's pitch terms (both 0 here).
 int xtNoteCoarse(const XtTuning& t, int oscCoarse);
 // The fine, 1/10 cent: the Scale Tune at key % 12 + Patch Fine + OSC Fine
 // (cents) + the part's pitch bend + the random offset (both 1/10 cent), plus
-// the system's Master Tune and the matrix's fine terms (both 0 here).
+// the system's Master Tune and the Multi Step Modulator's fine terms (both 0 here).
 int xtNoteFine(const XtTuning& t, int key, int oscFine, int bend, int random);
 // The part's pitch bend (0x894e9fe0, its +0x174), 1/10 cent: b = the bender
 // (0…16383) − 8192; b·up·1000 >> 13 up, −(−b·down·1000 >> 13) down, with
@@ -255,9 +255,9 @@ float xtOscLevel(int level, int kf, int key, float velGain);
 float xtOscLevelLfoDepth(int d);
 
 // The patch TVA's converter (0x894ea380 at note-on and a legato, 0x894eab40 at an
-// update), its inputs at the XT's ranges (the KFs in steps of 10).  With the matrix
-// and the controller assigns at rest, and the system's output gain (0x89d2a6d0 + 0x1600,
-// 2^(x/6)) at 0.  Off is the TVA Switch.
+// update), its inputs at the XT's ranges (the KFs in steps of 10).  With the Multi Step
+// Modulator at rest, and the system's output gain (0x89d2a6d0 + 0x1600, 2^(x/6)) at 0.
+// Off is the TVA Switch.
 // The Matrix's sums go in added to the knobs.
 struct XtTvaKnobs {
     bool on = false;
