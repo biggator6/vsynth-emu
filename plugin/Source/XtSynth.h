@@ -10,6 +10,8 @@
 // analog oscillator instead (XtAnalog), with or without a sample.  A note has
 // two OSCs, as a tone on the XT does, each with its own wave; OSC 2 runs before
 // OSC 1, and the MOD section (XtMod) combines them.  No JUCE.
+#include "XtBus.h"
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -440,6 +442,14 @@ private:
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames
     // The whole output bus of the block just mixed, in the XT's units: 8 words a frame, MAIN L, R, the Reverb and Chorus sends, MULTI L, R, DIR L, R (0x894f5720).
+    // Through the effects.  A sink goes in once, from any thread, and lives as long as this; useBusSink is the audio thread's, between blocks.  A tone can be switched between the two as it sounds.
+public:
+    void setBusSink(XtBusSink* s) { sink.store(s, std::memory_order_release); }
+    void useBusSink(bool on) { sinkOn = on; }
+private:
+    std::atomic<XtBusSink*> sink { nullptr };
+    bool sinkOn = false;
+    void busOut(float* lr);
     static constexpr int kFrameWords = 8;
     enum FrameWord : int { FrameMainL, FrameMainR, FrameReverb, FrameChorus, FrameMultiL, FrameMultiR, FrameDirL, FrameDirR };
     float frame[32 * kFrameWords] = {};

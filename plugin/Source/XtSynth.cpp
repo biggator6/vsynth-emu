@@ -1441,7 +1441,7 @@ void XtSynth::mixBlock(float* lr) {
         for (XtLfoFree& f : freeClfo) f.tick(1);
         freeTlfo.tick(1);
     }
-    if (!cur && std::none_of(std::begin(voice), std::end(voice), [](const Voice& v) { return v.active; })) return;
+    if (!cur && std::none_of(std::begin(voice), std::end(voice), [](const Voice& v) { return v.active; })) { busOut(lr); return; }   // the effects' tails go on
     float tmp[64], tmp2[64];
     for (Voice& v : voice) {
         if (!v.active) continue;
@@ -1604,7 +1604,12 @@ void XtSynth::mixBlock(float* lr) {
         }
         v.elapsed += 32.0f;
     }
-    // What the plugin plays, with no effect chip in the sound yet: the pairs that reach the outs, in ±1 here.  MULTI would go through the MFX, and the sends to effects that aren't there.
+    busOut(lr);
+}
+
+// What the plugin plays: through the effects if they're in, or the pairs that reach the outs, ±1.  Without them MULTI has no MFX, and the sends no effects, to go to.
+void XtSynth::busOut(float* lr) {
+    if (XtBusSink* s = sinkOn ? sink.load(std::memory_order_acquire) : nullptr) { s->process(frame, lr, 32); return; }
     for (int i = 0; i < 32; ++i) {
         const float* f = frame + kFrameWords * i;
         lr[2 * i] = (f[FrameMultiL] + f[FrameMainL] + f[FrameDirL]) * 0x1p-31f;

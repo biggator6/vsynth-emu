@@ -49,6 +49,8 @@ private:
     // three rows the PCM OSC uses (Encode, the VariPhrase knobs, Loop)
     juce::ComboBox   oscSelBox_, oscTypeBox_, anaWaveBox_;
     juce::ToggleButton oscOnBtn_ { "On" };
+    juce::ToggleButton fxOnBtn_ { "Effects" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> fxOnAtt_;
     static constexpr int kAnaKnobs = 12;  // Impact; PW, PW KF, Fat, Fat KF; PW LFO, PW Env, Fat LFO, Fat Env; Detune, Sub Octave, Sub Level
     juce::Slider     anaSliders_[kAnaKnobs];
     juce::Label      anaLabels_[kAnaKnobs], anaWaveLabel_ { {}, "Wave" };

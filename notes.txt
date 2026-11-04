@@ -335,6 +335,8 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The chip in the sound v136 (2026-11-04), no change to the sound with the switch off, its default: an Effects switch sends XtSynth::frame through XtFxChip, with XtFxControl on its own thread (XtFxUnit, XtBus.h). The way in equals the firmware's truncation; PluginTest 4/4 bit-identical through the chip. Unit gain, by a choice that's one constant, until a capture says otherwise. The effects' parameters come next. HARDWARE_FIRMWARE.md, "The chip in the sound".
+
 v132 joins v135 (2026-11-04), no change to the sound at the defaults: Time Trip by its controllers merged with v131 and v133, on the user's word. Only the docs, baseline and plants' list conflicted. xt_tone 0 different, 792 plants, 0 missed. v134 isn't in. HARDWARE_FIRMWARE.md, "v132 joins".
 
 The whole frame in XtSynth v133 (2026-11-04), no change to the sound at the defaults: all eight words of the output bus each sample (XtSynth::frame), with Chorus and Reverb Send Level, Output Assign, Output Mode, Out Gain for TG and CC 91, 93. xt_tone compares every word, 0 different on five seeds at 3000 cases. 780 planted errors, 0 missed, about 18 minutes with other work running. A sounding tone's DIR pair doesn't update, so Output Assign moved to DIR silences it. No plugin parameters yet: nothing would be heard until the chip's in the sound, which comes next. HARDWARE_FIRMWARE.md, "The whole frame in XtSynth".

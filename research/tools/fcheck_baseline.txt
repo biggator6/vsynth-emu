@@ -707,8 +707,19 @@ Reverb Plate       tail, DC aside: at 1 s -91.0 dB, at 3 s -124.4 dB
 Reverb Non-Linear  tail, DC aside: at 1 s -168.5 dB, at 3 s -168.5 dB
 Reverb Delay       tail, DC aside: at 1 s -83.7 dB, at 3 s -168.5 dB
 under a tone, the largest step against the tone's own: an MFX type change +1.5 dB, a patch +1.5 dB; with the words all at once, +37.5 dB, +37.5 dB
+through the unit, MAIN L: left -0.02 dB, right -999.00 dB, 1 samples late
+through the unit, MAIN R: left -999.00 dB, right -0.02 dB, 1 samples late
+through the unit, Reverb send: left -999.00 dB, right -999.00 dB, -1 samples late
+through the unit, Chorus send: left -999.00 dB, right -999.00 dB, -1 samples late
+through the unit, MULTI L: left -0.02 dB, right -999.00 dB, 1 samples late
+through the unit, MULTI R: left -999.00 dB, right -0.02 dB, 1 samples late
+through the unit, DIR L: left -0.02 dB, right -999.00 dB, 1 samples late
+through the unit, DIR R: left -999.00 dB, right -0.02 dB, 1 samples late
+through the unit, MULTI L with the system's EQ on at its defaults: -0.06 dB
 control's readers against the routines one by one: 62 samples, 0 different
 control's behaviour on the bus: 229 samples, 0 different
 control's live edits against a patch: 12 samples, 0 different
 control under threads: 3200 edits, 0 different
 control against the reference: 264401 samples, 0 different
+the frame into the chip against the firmware's truncation: 51200 samples, 0 different
+the frame through the unit: 9 samples, 0 different

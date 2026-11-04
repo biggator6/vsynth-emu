@@ -20,7 +20,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - The project is GPL-3.0 (`LICENSE`, `NOTICE.md`, the user's decision), and JUCE under the AGPLv3 alongside it. JE-8086's ESP core (gearmulator, GPL-3.0) may be used with credit. Its copy in `research/third_party/gearmulator_esp/` stays unmodified: it's the effect chip's reference.
 
 ## Where things are
-- `plugin/Source/`: `XtFxChip` (the effect chip, not in the sound yet; `xt_fx`), `XtFxControl` (the firmware's effect driver in the interpreter, off the audio thread, feeding the chip through a queue; not in the sound yet; `xt_fx control`), `XtSynth` (the synth: voices, controls, tick), the ports
+- `plugin/Source/`: `XtFxChip` (the effect chip; `xt_fx`), `XtFxControl` (the firmware's effect driver in the interpreter, off the audio thread, feeding the chip through a queue; and `XtFxUnit`, the two with the frame's way through, in the sound behind the plugin's Effects switch; `xt_fx control`), `XtSynth` (the synth: voices, controls, tick), the ports
   (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`,
   `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFirmware` (firmware harness: runs
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
@@ -42,7 +42,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `ab.sh [rev]`: XtSynth CLI renders, `rev` vs working tree; `XT_*` env vars
   set controls (see the `XT_SYNTH_MAIN` comment in XtSynth.cpp).
 - `pt.sh [note]`: PluginTest (processor vs XtSynth); `TEST_*` env vars (see
-  `plugin/Tests/PluginTest.cpp`).
+  `plugin/Tests/PluginTest.cpp`); `TEST_FX=1` runs both through the chip.
 - `build.sh`: all harnesses and the XtSynth CLI. `make_inputs.py`: the raw test inputs.
 - `ghidra.sh Script.java args`: headless Ghidra on rom.2 (DecompFn, Disasm,
   MkFunc then DecompFn for undefined functions, FuncAt, CallersOf).

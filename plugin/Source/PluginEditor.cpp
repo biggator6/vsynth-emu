@@ -136,6 +136,10 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     oscOnBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     addAndMakeVisible(oscSelBox_);
     addAndMakeVisible(oscOnBtn_);
+    fxOnBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    fxOnBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    addAndMakeVisible(fxOnBtn_);
+    fxOnAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor_.apvts, "fxOn", fxOnBtn_);
     oscTypeBox_.addItemList({ "ANALOG", "PCM" }, 1);
     anaWaveBox_.addItemList({ "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
                               "SUPER-SAW", "FEEDBACK-OSC", "X-MOD" }, 1);
@@ -915,7 +919,9 @@ void VSynthEmuEditor::resized() {
     auto xt = juce::Rectangle<int>(0, titleH + kFileStripH, getWidth(), kXtStripH).reduced(10, 6);
     auto row1 = xt.removeFromTop(26);
     romButton_.setBounds(row1.removeFromLeft(70));
-    row1.removeFromLeft(10);
+    row1.removeFromLeft(6);
+    fxOnBtn_.setBounds(row1.removeFromLeft(72));
+    row1.removeFromLeft(4);
     oscTypeBox_.setBounds(row1.removeFromRight(90).reduced(0, 1));
     oscOnBtn_.setBounds(row1.removeFromRight(46));
     oscSelBox_.setBounds(row1.removeFromRight(76).reduced(0, 1));

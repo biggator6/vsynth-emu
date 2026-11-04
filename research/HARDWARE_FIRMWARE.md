@@ -1547,6 +1547,33 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The chip in the sound, behind a switch (2026-11-04, v136)
+
+The plugin can now play through the effect chip. A new Effects switch, off by default, sends `XtSynth::frame` through `XtFxChip` on its way out, with `XtFxControl` on a thread of its own. Off, nothing changes: `ab.sh` 4/4 identical, and neither the chip nor the interpreter is even made. On, with nothing else set yet, it's the XT's defaults: MFX, Chorus and Reverb switched off and the system's EQ on. The effects' own parameters come in the next version.
+
+**The way through** (`XtFxUnit`, `XtBus.h`). `XtSynth` knows only an `XtBusSink`, so its harnesses need nothing of the chip. Each sample:
+- **In.** `0x894db2b0` truncates each float of the bus to int32, toward zero and to the limits past them, and the chip has the top 24 bits. The eight words go to slots 0x20…0x2e, in the frame's order. Checked against the firmware's routine in the interpreter: 51200 values from tiny to far past full scale, 0 different.
+- **Out.** Slots 0xa0, 0xa2 are the mix (0xa8, 0xaa carry it again), and 0xa4, 0xa6 are DIR. The XT sends DIR to its own jacks. The plugin has one stereo output, so it adds them.
+- **Queue.** `service()` before each sample, so the driver's words arrive between samples as v131 has it.
+
+**The level, decided here and easy to change.** On the XT a tone reaches the frame at Out Gain for TG's −24, a sixteenth, and the chip adds +5.98 dB. So a raw wave leaves the chip 18.04 dB below where the plugin plays it without the chip. Unit gain is what I chose: ×8 after the chip gives −0.02 dB through the unit, and −0.06 dB with the EQ at its default, so switching the effects in doesn't change the level. It's one constant, `XtFxUnit::fromChip`. What a real XT's outputs do after the chip is for a capture to say: v40's +9.4 dB on the analog output is still not reconciled.
+
+**Why −24 isn't in the tones.** `xt_tone` shows Out Gain for TG exact at every value, but the plugin leaves it at 0 and applies the sixteenth where the frame enters the chip. The firmware's powf gives exactly 1/16 there, and a power of two moves no bits, so the two are the same number. Inside the tones, switching the effects under a sounding note would be a 24 dB step while the bus levels glide.
+
+**The control thread.** `VSynthEmuProcessor::fxTick`, a hundred times a second. The chip and driver come up the first time the switch is on with rom.2 present: about 2 ms for the driver, and `settle()` plays the chip through the driver's start (240 ms of the chip's time, about 50 ms here). They then live as long as the processor. The sink's pointer is published atomically, so the audio thread takes the plain path until it's ready. It costs 15–23% of a core only while the switch is on.
+
+**The check.**
+
+| | |
+|---|---|
+| PluginTest with `TEST_FX=1`: the processor against `XtSynth` with its own unit | 4/4 bit-identical |
+| PluginTest without it | 4/4 bit-identical |
+| The processor's level, chip against plain | chord 0.0296 / 0.0297 rms, vocal 0.0365 / 0.0366, drum 0.0322 / 0.0327 (the drum's the EQ, on by default) |
+| Each word through the unit (`xt_fx control`, `numbers`) | MAIN, MULTI and DIR to their own sides at −0.02 dB, 1 sample late; the sends silent with the Reverb and Chorus off |
+| `mutate_fx.py --control` | 78 planted, 0 missed. Two more, the limits spelled out in the conversion, can't show here: an ARM host's cast saturates by itself |
+
+**What's next.** The effects' parameters and an editor panel for them.
+
 ### v132 joins (2026-11-04, v135)
 
 This merges v132, Time Trip by its controllers, with v131 and v133, on the user's word, ahead of putting the chip in the sound, which touches the same files. Nothing in the two meets: one reads controllers for the pad and the other writes the output bus. So there was no new firmware to read.

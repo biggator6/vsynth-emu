@@ -3,6 +3,7 @@
 #include "Sh4Interp.h"
 #include "XtFxChip.h"
 #include <algorithm>
+#include <climits>
 
 namespace {
 constexpr uint32_t kThis = 0x89ced1b4, kMessage = 0x89ced200, kSp = 0x8C0E0000, kMatrix = 0x8C0F0000;
@@ -179,5 +180,37 @@ void XtFxControl::service(XtFxChip& chip) {
         for (const Word& x : b.words) { chip.hostWord(x.command, x.index, x.value); if (observer_) observer_(observerContext_, x.command, x.index, x.value); }
         waiting_ = b.waitAfter;
         read_.store(++r, std::memory_order_release);
+    }
+}
+
+// ------------------------------------------------------------------ the unit
+XtFxUnit::XtFxUnit(const char* romPath) : chip_(std::make_unique<XtFxChip>()), control_(romPath) {}
+XtFxUnit::~XtFxUnit() = default;
+
+void XtFxUnit::settle() {
+    XtFxChip& chip = *chip_;
+    while (ok() && !control_.drained()) { control_.service(chip); chip.runFrame(); }
+}
+
+int32_t XtFxUnit::toChip(float x) {
+    // FTRC: toward zero, and to the limits past them.  This is on the XT's numbers: the tone's Out Gain, a power of two, moves no bits.  (The limits, spelled out, as a cast past them
+    // is undefined in C++.  An ARM host's cast happens to do the same, so no check run here can show them missing; an Intel host's doesn't.)
+    const float v = x * 0.0625f;
+    const int32_t i = v >= 2147483648.0f ? INT32_MAX : v <= -2147483648.0f ? INT32_MIN : (int32_t)v;
+    return i >> 8;
+}
+
+float XtFxUnit::fromChip(int32_t word) { return (float)word * 0x1p-20f; }
+
+void XtFxUnit::process(const float* frame, float* lr, int frames) {
+    XtFxChip& chip = *chip_;
+    for (int i = 0; i < frames; ++i) {
+        control_.service(chip);
+        const float* f = frame + 8 * i;
+        for (unsigned w = 0; w < 8; ++w) chip.setGram(0x20 + 2 * w, toChip(f[w]));
+        chip.runFrame();
+        // what a program wrote at a slot reads one on, once the chip has rotated
+        lr[2 * i] = fromChip(chip.gram(0xa1)) + fromChip(chip.gram(0xa5));
+        lr[2 * i + 1] = fromChip(chip.gram(0xa3)) + fromChip(chip.gram(0xa7));
     }
 }

@@ -7,6 +7,7 @@
 // what the driver wrote next.  The words between two waits reach the chip together, between two samples: the XT's bus takes longer over them, at a speed nothing here knows.
 //
 // Two threads: one control thread, which makes every call marked so (one at a time), and the audio thread, which calls service().  service() takes no lock and allocates nothing.
+#include "XtBus.h"
 #include <atomic>
 #include <cstdint>
 #include <deque>
@@ -103,4 +104,32 @@ private:
     alignas(64) uint32_t waiting_ = 0;                                                  // the audio thread's: samples left to play before the next batch
     Observer observer_ = nullptr;
     void* observerContext_ = nullptr;
+};
+
+// The effects whole, as XtSynth uses them: the chip, its driver and the frame's way through.  One control thread and one audio thread, as above.
+class XtFxUnit : public XtBusSink {
+public:
+    explicit XtFxUnit(const char* romPath);
+    ~XtFxUnit() override;
+    bool ok() const { return control_.ok(); }
+
+    // Control thread.  The driver, by parameter ID.
+    XtFxControl& control() { return control_; }
+    // Control thread, with no audio thread on this yet: plays the chip until it has all the driver has sent, so it starts settled (the driver's start takes 240 ms of the chip's time).
+    void settle();
+
+    // Audio thread: `frames` frames of the output bus (XtSynth::frame, 8 floats a frame, the XT's units) through the chip, and ±1 stereo out.  Mix and DIR come out together, as the plugin has one stereo output.
+    // Between the two, the XT's numbers: the frame reaches the chip at Out Gain for TG's −24, a sixteenth, so a tone can be switched between this and the plain path without a jump, and the chip adds +6 dB.
+    // So a raw wave comes out of here at ×⅛ of the chip's full scale.  ×8 back makes it the level the plugin has without the chip: what a real XT's outputs do with it, only a capture can say.
+    void process(const float* frame, float* lr, int frames) override;
+
+    // A float of the bus as the chip takes it (0x894db2b0 truncates to int32; the chip has the top 24 bits), and one of its words as the plugin's ±1.
+    static int32_t toChip(float x);
+    static float fromChip(int32_t word);
+
+    const XtFxChip& chip() const { return *chip_; }             // for the check
+
+private:
+    std::unique_ptr<XtFxChip> chip_;
+    XtFxControl control_;
 };

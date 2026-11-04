@@ -3484,3 +3484,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 
 - The user's yes named v132, and by then the other session had put v134 on top of it. I merged the commit they named, not the branch's tip, and told them.
 - An easy one: the two touch different things in the same files. I still ran the whole list, as a merge is exactly when a plant can stop meaning anything.
+
+### Session 16 addendum (2026-11-04) — v136: the chip in the sound
+
+- I'd said I would bring the user the level with numbers. The numbers say a raw wave would leave the chip 18 dB below today, and nothing here says what the XT's outputs add. So there's no right answer to bring yet: I chose unit gain, in one constant, and said so.
+- I first planned the −24 inside the tones, as the XT does. But then the switch, moved under a held note, jumps 24 dB while the bus levels glide. The firmware's powf gives exactly 1/16, so it can go at the chip's door with no bit changed. Only asking the interpreter settled that: had it been a unit off, the two paths would have differed.
+- The first thing I wrote checked the level to within 0.02 dB, and it failed at −0.023. The chip's "+6.00" isn't ×2: it's 5.98. The tolerance was wrong, not the chip.

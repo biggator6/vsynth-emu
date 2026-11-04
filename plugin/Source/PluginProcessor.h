@@ -4,6 +4,8 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "VariphraseEngine.h"
 #include "XtSynth.h"
+#include "XtFxControl.h"
+#include <mutex>
 
 class VSynthEmuProcessor : public juce::AudioProcessor,
                            public juce::AudioProcessorValueTreeState::Listener,
@@ -72,6 +74,12 @@ public:
     // Message thread.  Returns false if the file is not a usable image.
     bool setRomFile(const juce::File& file);
     bool hasRom() const { return xtSynthRomReady(); }
+
+    // ── The effects ────────────────────────────────────
+    // What the control thread does each time round, also callable from a test: with the Effects switch on and rom.2 here, the chip and its driver come up (the first time) and take
+    // what's changed.  Never on the audio thread.
+    void fxTick();
+    bool effectsRunning() const { return fxRunning_.load(); }
     // One line for the editor: ROM, encode progress, current encode type.
     juce::String getStatusText() const;
 
@@ -83,6 +91,14 @@ private:
     std::atomic<bool> xtActive_ { false };      // the XT voices own the output
     std::vector<float> scratch_;                // right channel for a mono output bus
     int tripKnob_ = 0;                          // the Time Trip knob as XtSynth last had it
+
+    // The effect chip and its driver, made the first time the Effects switch is on.  They cost a core's share and some memory, so not before.
+    class FxThread;
+    std::unique_ptr<FxThread> fxThread_;
+    std::unique_ptr<XtFxUnit> fxUnit_;
+    std::mutex fxLock_;                         // one control thread at a time: its own, or a test's
+    juce::String romFile_;                      // under fxLock_
+    std::atomic<bool> fxRunning_ { false };
 
     juce::AudioFormatManager formatManager_;
 

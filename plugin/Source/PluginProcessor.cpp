@@ -117,6 +117,7 @@ namespace Params {
     static const juce::String kTvaPanKF     = "tvaPanKF";
     static const juce::String kTvaPanLfo    = "tvaPanLfo";
     static const juce::String kMfxSend      = "mfxSend";
+    static const juce::String kFxOn         = "fxOn";
     static const juce::String kTvaLfoWave   = "tvaLfoWave";        // LFO 5
     static const juce::String kTvaLfoRate   = "tvaLfoRate";
     static const juce::String kTvaLfoOffset = "tvaLfoOffset";
@@ -539,6 +540,8 @@ VSynthEmuProcessor::createParameterLayout() {
         Params::kTvaPanKF, "TVA Pan KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaPanLfo, "TVA Pan LFO Depth", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kMfxSend, "MFX Send Level", 0, 127, 127));
+    // The effect chip in the path.  Off by default: it hasn't been compared with a real XT yet, and it takes a share of a core
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kFxOn, "Effects", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kTvaLfoWave, "LFO 5 Waveform",
         juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoRate, "LFO 5 Rate", 0, 144, 98, noteValue));
@@ -759,7 +762,33 @@ VSynthEmuProcessor::VSynthEmuProcessor()
     findRom();
 }
 
+// The control thread: the driver is quick, a hundred times a second is plenty, and nothing it does holds up the audio.
+class VSynthEmuProcessor::FxThread : public juce::Thread {
+public:
+    explicit FxThread(VSynthEmuProcessor& p) : juce::Thread("XT effects"), owner(p) {}
+    void run() override { while (!threadShouldExit()) { owner.fxTick(); wait(10); } }
+private:
+    VSynthEmuProcessor& owner;
+};
+
+void VSynthEmuProcessor::fxTick() {
+    const std::lock_guard<std::mutex> lock(fxLock_);
+    if (apvts.getRawParameterValue(Params::kFxOn)->load() < 0.5f && !fxUnit_) return;
+    if (!fxUnit_) {
+        if (romFile_.isEmpty()) return;
+        auto u = std::make_unique<XtFxUnit>(romFile_.toRawUTF8());
+        u->settle();
+        if (!u->ok()) { DBG("effects: " << u->control().error()); romFile_.clear(); return; }
+        fxUnit_ = std::move(u);
+        synth_.setBusSink(fxUnit_.get());
+        fxRunning_ = true;
+    }
+    fxUnit_->control().pump();
+}
+
 VSynthEmuProcessor::~VSynthEmuProcessor() {
+    if (fxThread_) fxThread_->stopThread(2000);
+    fxThread_.reset();
     for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
                             Params::kEncodeType, Params::kEncodeDepth, Params::oscId(1, Params::kEncodeType), Params::oscId(1, Params::kEncodeDepth) })
         apvts.removeParameterListener(id, this);
@@ -778,6 +807,7 @@ void VSynthEmuProcessor::findRom() {
     for (const auto& c : cand)
         if (juce::File(c).existsAsFile() && xtSynthSetRom(c.toStdString())) {
             apvts.state.setProperty("romPath", c, nullptr);
+            { const std::lock_guard<std::mutex> lock(fxLock_); romFile_ = c; }
             setStatus("ROM ready");
             return;
         }
@@ -790,6 +820,7 @@ bool VSynthEmuProcessor::setRomFile(const juce::File& file) {
         return false;
     }
     apvts.state.setProperty("romPath", file.getFullPathName(), nullptr);
+    { const std::lock_guard<std::mutex> lock(fxLock_); romFile_ = file.getFullPathName(); }
     setStatus("ROM ready");
     reencode(0);
     reencode(1);
@@ -805,6 +836,7 @@ void VSynthEmuProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     setLatencySamples(engine_.getLatencySamples());
     synth_.prepare(sampleRate);
     scratch_.assign((size_t)std::max(samplesPerBlock, 1) * 2, 0.0f);
+    if (!fxThread_) { fxThread_ = std::make_unique<FxThread>(*this); fxThread_->startThread(); }
     playbackPos_  = -1;
     activeVoices_ = 0;
 }
@@ -1135,6 +1167,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                               || apvts.getRawParameterValue(Params::oscId(1, Params::kOscSwitch))->load() >= 0.5f);
     if ((xtActive_.load() || analog) && numOut > 0) {
         synth_.setControls(xtControls());
+        synth_.useBusSink(apvts.getRawParameterValue(Params::kFxOn)->load() >= 0.5f);
         // The host's transport, for Clock Source HOST (the Standalone has none: the Patch Tempo stands)
         double hostBpm = 0.0, hostPpq = 0.0;
         bool hostMoving = false;

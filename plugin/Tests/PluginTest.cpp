@@ -642,6 +642,16 @@ int main(int argc, char** argv) {
     }
     XtSynth ref; ref.prepare(rate); ref.setSample(E); ref.setControls(refCtl);
     if (E2) ref.setSample(E2, 1);
+    // TEST_FX=1: the Effects switch on, so all this goes through the chip: the processor's, and one here on the reference's bus, each started the same way.
+    std::unique_ptr<XtFxUnit> refFx;
+    if (std::getenv("TEST_FX")) {
+        p.apvts.getParameter("fxOn")->setValueNotifyingHost(1.0f);
+        p.fxTick();
+        if (!p.effectsRunning()) { std::fprintf(stderr, "the effects didn't start\n"); return 1; }
+        refFx = std::make_unique<XtFxUnit>(argv[1]);
+        refFx->settle();
+        ref.setBusSink(refFx.get()); ref.useBusSink(true);
+    }
 
     const int total = (int)(in.getNumSamples() * rate / rd->sampleRate);
     double maxDiff = 0, energy = 0, side = 0;
