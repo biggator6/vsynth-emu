@@ -1547,6 +1547,40 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The pad's X-Y pair on CC80 and CC81 (2026-11-04, v134)
+
+Pad Assign X and Y (IDs 0x8f, 0x90) now default to CC80 and CC81, the chart's, as v132 did for Time Trip's on CC82 and CC83. So both of the pad's pairs work from a controller with nothing to set up, side by side. At the defaults nothing moves, since every Matrix Control is off: A/B 4/4 identical to v132.
+
+**What X-Y mode is.** On the XT, Pad Mode (ID 0x42c, X-Y or Time Trip, default Time Trip) picks which pair its own pad sends. Its references all lie outside the tone generator, from `0x893094ac` to `0x8940a99a`, and the two I read sit with the panel's and V-LINK's settings. So on receiving there's no mode to set, and the plugin needs no switch: each pair is always live. Pad Hold (0x42d) is the same.
+
+The pair's path was already ported in v119. A controller goes to the channel, and the Matrix's sources read it at the next update: PAD-X and PAD-Y (100, 101) are T[CC], and +PAD-X and +PAD-Y (98, 99) go both ways from the middle, with 0 itself nothing. So **a controller of this pair does nothing until a Matrix Control has one of those as its Source**, as the manual says: "the effect" is the Matrix's. An assign of 0 or 32 is none. The only thing that changes in the port is the default.
+
+**What it does.** A 220 Hz sine played on key 69, on all three types, with Matrix 1 PAD-X to OSC1-PITCH at +40 and Matrix 2 PAD-Y to OSC1-LVL at −63. CC80 to 127 and CC81 to 30 at 1 s, both back to 0 at 2 s. That is the port's render, not the XT's.
+
+| | Before 1 s | 1 to 2 s | After 2 s |
+|---|---|---|---|
+| CC80 and CC81, at the defaults | 370 Hz | 932 Hz, level down | 370 Hz, level back |
+| The same with no Matrix | 370 Hz | no change | 370 Hz |
+| The same with both assigns OFF | 370 Hz | no change | 370 Hz |
+| CC20 and CC21, assigned | 370 Hz | as CC80 and CC81 | 370 Hz |
+| +PAD-X and +PAD-Y on the Matrix | 370 Hz | 932 Hz, level down less | 370 Hz |
+| CC82 alone, Time Trip's | 370 Hz | no change | 370 Hz |
+
+**The check.** v119's draws already moved these sources with single controller messages, on assigns drawn at random. `xt_tone` now draws the chart's pair in a third of the cases. A new case, one in eight, has a finger on the pair: three Matrix Controls on the four pad sources, a real Dest and Sens, and the pad's own gestures sent as controllers, each its own message with its update, by the route Time Trip's take. Half are on CC80 and CC81, half on other numbers.
+
+**The result.** fcheck: 2000 cases and the sweep, 4232 notes, 2307 taken by a sounding tone, 377 truncated, 369,654 blocks, 22.0 million checks, 0 different; a wave on OSC 2, 1334 notes, 117,688 blocks, 7.8 million checks, 0 different; the other sections as they were. `fcheck.sh --update` changes only `xt_tone`'s count lines. 3000 cases and the sweep on seeds 31337, 9, 2007, 90210, 55555, 777, 4242 and 1234: all 0 different in all six sections. A/B 4/4 identical to v132. PluginTest 4/4 bit-identical at the defaults, with PAD-X and +PAD-X on CC80 at the default assigns (which holds the processor's parameter defaults to `Controls`'), on CC20, with the assign off, with both pairs together, and with both on a play head.
+
+**Planted errors.** `tone_muts.txt` gains 4 on the +PAD sources and on which assigns the sources read (`xy-plus-zero`, `xy-plus-side`, `xy-plus-off`, `xy-inputs`): 749 in all, all caught at 2000 cases, none lost to the new draws.
+
+**A mistake of mine in v132.** I gave the CLI an `XT_CC` for controllers at frames. That name was taken: it means CC 7, 11, 10 before the first note, and `XT_CC_AT` already does what I wanted. It was harmless for the plugin and for `xt_tone`. It did change the level in v132's Time Trip renders, as CC 11 took the frame's next number. Levels jumping between runs here is what showed it. My option is gone, and v132's table stands on `XT_CC_AT`, with the same bursts at the same times.
+
+**The plugin.** No new parameters: `assignPadX` and `assignPadY` change their default from OFF to CC80 and CC81. A session saved with them OFF stays OFF. `TEST_ASSIGN` and `TEST_MATRIX` with `TEST_CCS` in PluginTest.
+
+**Not covered.**
+- A real XT. The chart marks these numbers as not recognised too, so the bench test in `CONTROLLERS.md` stands for both pairs. As v132, the factory value isn't confirmed from the firmware: CC80 and CC81 are Roland's chart.
+- Pad Hold, and any X-Y gesture from the plugin's own window. There is no X-Y surface there, only controllers. The knob is Time Trip's.
+- The other assigns: Beam 2 to 4 and the Knobs stay OFF, as v119 had them.
+
 ### Time Trip by its controllers (2026-11-04, v132)
 
 Time Trip Assign X and Y (IDs 0x91, 0x92) now work: a Control Change of either number moves the pad, as the firmware's Control Change case does. The knob stays. `Trip X` and `Trip Y` join the Assign box, on CC82 and CC83 by default. With no such controller nothing moves: A/B 4/4 identical to v130.
@@ -1558,7 +1592,7 @@ Time Trip Assign X and Y (IDs 0x91, 0x92) now work: a Control Change of either n
 
 `XtSynth::controller` calls `padController` after its handlers and before its update. `XtSynth::timeTrip`, the knob, keeps its one update on touching or letting go.
 
-**The default.** The descriptors give 0 for all four, and Roland's chart names CC82 and CC83 (`CONTROLLERS.md`). I took Roland's, because the descriptors' can't be what an XT ships with. `0x894d8360` and the D Beam's `0x894d8160` are all that write the pad's X and Y, `0x894d82d0` is the only reader of IDs 0x91 and 0x92, and the pad's other references are its set-up and the readers v118 and v124 traced. So with the assigns OFF an XT's own pad couldn't scrub, unless its panel has a path I haven't found. No firmware image here holds 80, 81, 82, 83 side by side, so the factory value itself isn't confirmed. v119's other assigns stay OFF, though the chart names CC80 and CC81 for Pad X and Y.
+**The default.** The descriptors give 0 for all four, and Roland's chart names CC82 and CC83 (`CONTROLLERS.md`). I took Roland's, because the descriptors' can't be what an XT ships with. `0x894d8360` and the D Beam's `0x894d8160` are all that write the pad's X and Y, `0x894d82d0` is the only reader of IDs 0x91 and 0x92, and the pad's other references are its set-up and the readers v118 and v124 traced. So with the assigns OFF an XT's own pad couldn't scrub, unless its panel has a path I haven't found. No firmware image here holds 80, 81, 82, 83 side by side, so the factory value itself isn't confirmed. v119's other assigns stay OFF, though the chart names CC80 and CC81 for Pad X and Y (since v134, those two are on them).
 
 **What it does.** A wave of a burst every half second, on all three types. That is the port's render, not the XT's.
 
@@ -1584,7 +1618,7 @@ Time Trip Assign X and Y (IDs 0x91, 0x92) now work: a Control Change of either n
 
 **Planted errors.** `tone_muts.txt` gains 12 (`cc-pad-…`, `knob-steps`, `solo-seek-ended`), and `sost-up-none` follows the line it now stands next to: 745 in all, all caught at 2000 cases, none lost to the new draws.
 
-**The plugin.** Parameters `assignTripX`, `assignTripY`, in the Assign box as `Trip X` and `Trip Y`. CLI `XT_CC="frame,number,value;…"`, and `XT_ASSIGN` takes twelve. PluginTest `TEST_TRIPCC="x,y"`, `TEST_CCS="cc,value,frame,…"`.
+**The plugin.** Parameters `assignTripX`, `assignTripY`, in the Assign box as `Trip X` and `Trip Y`. CLI `XT_CC_AT` sends the controllers, and `XT_ASSIGN` takes twelve. PluginTest `TEST_TRIPCC="x,y"`, `TEST_CCS="cc,value,frame,…"`.
 
 **Not covered.**
 - A real XT. Roland's chart says these numbers aren't recognised, so the bench test in `CONTROLLERS.md` still stands. A controller from MIDI IN wasn't traced past the dispatcher, whose case is the one every controller takes, CC 64 included.
@@ -2083,7 +2117,7 @@ Copied from the part's table at `0x89d276b4 + part·0x84`, which `0x894e9330` wr
 | 107 | VELO | `0x894e6ca0` | T[M[0]] |
 | 108 | KEYF | `0x894e6c80` | M[1]·122 − 7320, 0 at key 60 |
 
-An assign of 0 or 32 gives 0. They are system parameters (`0x894e9db0`, at `0x89d276b4 + 0x844`): IDs 0x8d, 0x8e BEAM-L, -R; 0x8f, 0x90 PAD-X, -Y; 0x93, 0x94 KNOB1, 2. Their descriptors default to OFF.
+An assign of 0 or 32 gives 0. They are system parameters (`0x894e9db0`, at `0x89d276b4 + 0x844`): IDs 0x8d, 0x8e BEAM-L, -R; 0x8f, 0x90 PAD-X, -Y; 0x93, 0x94 KNOB1, 2. Their descriptors default to OFF. (PAD-X and -Y on CC80 and CC81 since v134.)
 
 **The D-Beam's controllers.** IDs 0x89…0x8c, Beam 2 and 3 Assign L, R, stored as −1 at OFF or 32. `0x894e9fe0` copies C + 0x84 + each to M + 0x180… in every pass. The converters use them where the old notes said "the part's bytes":
 - Pitch: 2·b183 − b182, as /127 octaves.

@@ -259,13 +259,13 @@ env 30 70 90 50 80 500 2: identical
 == xt_tone
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
-tone: 4217 notes, 2274 taken by a sounding tone, 354 truncated, 371812 blocks, 20605363 checks
-tone: 0 notes left off, a read outside memory; 467796 band reads far from their wave
+tone: 4232 notes, 2307 taken by a sounding tone, 377 truncated, 369654 blocks, 21984051 checks
+tone: 0 notes left off, a read outside memory; 433596 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1342 notes, 377 taken by a sounding tone, 157 truncated, 118093 blocks, 6974752 checks
-tone, a wave on OSC 2: 0 notes left off, a read outside memory; 869356 band reads far from their wave
+tone, a wave on OSC 2: 1334 notes, 369 taken by a sounding tone, 162 truncated, 117688 blocks, 7768996 checks
+tone, a wave on OSC 2: 0 notes left off, a read outside memory; 757430 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 151115 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 144163 checks
 tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks

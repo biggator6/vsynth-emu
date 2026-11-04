@@ -729,6 +729,7 @@ void drawCosm(Rng& r, Ctl::Cosm& c) {
 // The Matrix in half the cases, one to eight controls, on the sources whose values the case draws
 void drawMatrix(Rng& r, Ctl& c) {
     for (int i = 0; i < 10; ++i) c.assign[i] = r.one(2) ? 0 : r.one(8) ? 32 : r.range(0, 95);   // 32 means none, and it is a controller's number
+    if (r.one(3)) { c.assign[6] = 80; c.assign[7] = 81; }              // Pad Assign X, Y, the chart's
     // Time Trip Assign X, Y: the chart's, none, Hold or Sostenuto as well, or another.  Not those whose values the harness keeps itself (kCcNum)
     const auto tripAssign = [&r](int chart) {
         if (r.one(3)) return chart;
@@ -1145,7 +1146,19 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         // TRIP-R as a source of three controls, on any Dest, in a case the pad moves in: a pad's move brings no update,
         // so what takes the new value is whatever next reads the sums
-        const bool padSource = !sweep && !twoInTick && !farCase && !backCase && !holdSource && r.one(6);
+        // X-Y mode's pair: a finger on Pad Assign X and Y, each a controller's message, which the Matrix reads as PAD-X, PAD-Y,
+        // +PAD-X and +PAD-Y.  Pad Mode is the XT's own pad's choice of pair, and no tone generator code reads it.
+        const bool xyCase = !sweep && !twoInTick && !farCase && !backCase && !holdSource && r.one(8);
+        if (xyCase) {
+            if (r.one(2)) { ctl.assign[6] = 80; ctl.assign[7] = 81; }
+            else { ctl.assign[6] = r.range(12, 31); ctl.assign[7] = r.range(33, 63); }
+            for (int i = 0; i < 3; ++i) {
+                ctl.matrix[i].source = r.range(98, 101);
+                ctl.matrix[i].dest[0] = r.range(1, 78);
+                ctl.matrix[i].sens[0] = r.range(-63, 63);
+            }
+        }
+        const bool padSource = !sweep && !twoInTick && !farCase && !backCase && !holdSource && !xyCase && r.one(6);
         if (padSource) {
             // half of them on one getter's group alone, with no other control in use.  Then a key-off asks the sources only if
             // that group has an envelope it converts, so the TVA Switch off or every Release on a note value leaves the sums old.
@@ -1605,14 +1618,14 @@ int XtToneProbe::run(int argc, char** argv) {
             compareAll(blk);
             return true;
         };
-        const bool tripCase = sweepOn || farCase || backCase || padSource || (!sweep && !twoInTick && r.one(3));
+        const bool tripCase = sweepOn || farCase || backCase || padSource || xyCase || (!sweep && !twoInTick && r.one(3));
         // By its controllers in half of them, on the numbers the case began with, so that moving an assign leaves them behind.
         // A controller sends what changed, so each is its own message and a block may have only one, in either order.
         const bool sweepAssign = sweep && (reinterpret_cast<const char*>(&ctl.assign[10]) - reinterpret_cast<const char*>(&ctl) == (long)sweepAt
                                            || reinterpret_cast<const char*>(&ctl.assign[11]) - reinterpret_cast<const char*>(&ctl) == (long)sweepAt);
         if (sweepAssign) { ctl.assign[10] = 82; ctl.assign[11] = 83; fw.par = patchOf(ctl); syn.setControls(ctl); if (!fw.updatePatch()) return 1; }
-        const bool tripByCc = tripCase && !farCase && !padSource && (sweepAssign || (!sweepOn && r.one(2)));
-        const int tripNumX = ctl.assign[10], tripNumY = ctl.assign[11];
+        const bool tripByCc = tripCase && !farCase && !padSource && (sweepAssign || xyCase || (!sweepOn && r.one(2)));
+        const int tripNumX = ctl.assign[xyCase ? 6 : 10], tripNumY = ctl.assign[xyCase ? 7 : 11];
         const bool tripYFirst = r.one(2);
         int tripSentX = -1, tripSentY = -1;
         const auto padByCc = [&](int x, int y, int blk) {

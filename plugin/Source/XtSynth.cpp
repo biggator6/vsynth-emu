@@ -1651,7 +1651,6 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_CC_AT="frame,number,value[;frame,number,value…]": a controller at a frame (CC 64 Hold, …).
 //   XT_MATRIX="source,dest1,sens1,dest2,sens2[;…]": the Matrix Controls, as the patch has them.
 //   XT_ASSIGN="a0,…,a11": the system's controller assigns (Beam 2 L…Knob 2, Time Trip X, Y), a CC number or 0.
-//   XT_CC="frame,number,value[;frame,number,value...]": controllers at frames.
 //   XT_PRESS="channel[,key,poly]": the pressures before the first note.
 //   XT_TEMPO=n: the Patch Tempo ×10.  XT_SYNC="sync,origTempo×10000[,sync2,origTempo2]": Tempo Sync
 //     and the wave's Original Tempo, OSC 1 and OSC 2.  XT_RATE="lfo,osc2Lfo": LFO rates, 128..144 note values.
@@ -2031,18 +2030,6 @@ int main(int argc, char** argv) {
             used = 0;
         }
     }
-    struct CcAt { long at; int number, value; };
-    std::vector<CcAt> ccs;
-    if (const char* e = std::getenv("XT_CC")) {
-        CcAt t;
-        int used = 0;
-        while (std::sscanf(e, "%ld,%d,%d;%n", &t.at, &t.number, &t.value, &used) >= 3) {
-            ccs.push_back(t);
-            if (used == 0) break;
-            e += used;
-            used = 0;
-        }
-    }
     for (int a = 9; a < argc; ++a) {
         int note = 60; long on = 0, off = -1;
         std::sscanf(argv[a], "%d@%ld:%ld", &note, &on, &off);
@@ -2061,8 +2048,6 @@ int main(int argc, char** argv) {
         for (const CcEv& e : ccEv) if (e.at == done) syn.controller(e.number, e.value);
         for (const Trip& t : trips) if (t.at >= done && t.at < next) next = t.at;
         for (const Trip& t : trips) if (t.at == done) syn.timeTrip(t.x, t.y);
-        for (const CcAt& t : ccs) if (t.at >= done && t.at < next) next = t.at;
-        for (const CcAt& t : ccs) if (t.at == done) syn.controller(t.number, t.value);
         if (bendAt == done) syn.pitchBend(bendValue);
         if (modAt == done) syn.setControls(modLater);
         for (const Ev& e : ev) if (e.at == done) { if (e.on) syn.noteOn(e.note, noteVel); else syn.noteOff(e.note); }

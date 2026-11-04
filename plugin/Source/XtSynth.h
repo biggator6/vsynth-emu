@@ -266,10 +266,12 @@ public:
         XtMatrixControl matrix[8];
         // The system's controller assigns, a CC number or 0 for OFF: Beam 2 L, R and Beam 3 L, R (IDs 0x89…0x8c,
         // the part's bytes at +0x180), then what the sources BEAM-L, BEAM-R, PAD-X and -Y, KNOB1, KNOB2 read
-        // (IDs 0x8d, 0x8e, 0x8f, 0x90, 0x93, 0x94).  OFF by default, as the XT's descriptors have them.  Last, Time Trip
-        // Assign X and Y (IDs 0x91, 0x92), the controllers that move the pad (0x894d8360): CC82 and CC83 by default, as
-        // Roland's chart has them.  The descriptors say OFF, but nothing else sets the pad, so the XT's own would not work.
-        int assign[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 82, 83 };
+        // (IDs 0x8d, 0x8e, 0x8f, 0x90, 0x93, 0x94).  Last, Time Trip Assign X and Y (IDs 0x91, 0x92), the controllers that
+        // move the pad (0x894d8360).  The pad's two pairs, one per Pad Mode, are on Roland's chart's numbers: X-Y mode's
+        // PAD-X and -Y on CC80 and CC81, Time Trip's on CC82 and CC83.  Pad Mode only picks which pair the XT's own pad sends:
+        // no tone generator code reads it, so both are always live here.  The descriptors say OFF for all of these, but nothing
+        // else sets the pad, so the XT's own would not work; the others stay OFF as they say.
+        int assign[12] = { 0, 0, 0, 0, 0, 0, 80, 81, 0, 0, 82, 83 };
         bool operator==(const Controls&) const = default;
     };
 

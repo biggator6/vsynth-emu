@@ -335,9 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The pad's X-Y pair v134 (2026-11-04): Pad Assign X, Y (IDs 0x8f, 0x90), assign[6], assign[7], now default to CC80 and CC81, the chart's (HARDWARE_FIRMWARE.md, "The pad's X-Y pair on CC80 and CC81"). The path was v119's: the Matrix's PAD-X, PAD-Y, +PAD-X, +PAD-Y read them, so they do nothing until a Matrix Control uses one. Pad Mode only picks which pair the XT's own pad sends, and no tone generator code reads it, so there's no switch here: both pairs are always live.
+  Check: xt_tone draws the chart's pair in a third of the cases, and one case in eight has a finger on the pair with the Matrix reading it, each controller its own message and update. 0 different at fcheck's 2000 and at 3000 on seeds 31337, 9, 2007, 90210, 55555, 777, 4242, 1234. mutate_tone.py 749 of 749. A/B 4/4 identical to v132, PluginTest 4/4 in seven settings.
+  Also: v132's CLI XT_CC clashed with the existing one (CC 7, 11, 10 before the first note), and is gone; XT_CC_AT does it. v132's Time Trip table holds on XT_CC_AT.
+
 Time Trip by its controllers v132 (2026-11-04): Time Trip Assign X, Y (IDs 0x91, 0x92), assign[10], assign[11], on CC82 and CC83 by default: a Control Change of either moves the pad (HARDWARE_FIRMWARE.md, "Time Trip by its controllers"). XtSynth::padController, last in XtSynth::controller before its update, as 0x894d6f10 → 0x894d8360. Still an ordinary controller too: the channel keeps it, and each message is a tone update. 0 and 32 are none (0x894d82d0).
   The default is Roland's chart, not the descriptors' 0: nothing else writes the pad, so an XT's own couldn't scrub with them off. Not confirmed from the firmware itself. A SOLO wave taken back past its start stays silent after letting go, because the seek keeps its end flag; that is the firmware's (solo-seek-ended).
-  Parameters assignTripX, assignTripY, in the Assign box. XT_CC, XT_ASSIGN takes twelve; TEST_TRIPCC, TEST_CCS.
+  Parameters assignTripX, assignTripY, in the Assign box. XT_CC_AT sends them, XT_ASSIGN takes twelve; TEST_TRIPCC, TEST_CCS.
   Check: xt_tone sets the assigns through 0x894d82d0, draws them, and in half the pad's cases sends real controller messages, each its own update; the sweep moves each assign alone. 0 different at fcheck's 2000 and at 3000 on seeds 31337, 9, 2007, 90210, 55555, 777, 4242, 1234. mutate_tone.py 745 of 745. A/B 4/4 identical to v130, PluginTest 4/4 in six settings.
   Not covered: a real XT (the chart says not recognised, so the bench test stands), Beam 1 Assign L and R, MIDI channels.
 

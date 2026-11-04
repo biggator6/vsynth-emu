@@ -743,3 +743,7 @@ cc-pad-off-32|a != 0 && a != 32 && a == number|a != 0 && a == number
 cc-pad-both|    if (assigned(ctl.assign[10])) pad.setX(value);\n    if (assigned(ctl.assign[11])) {|    if (assigned(ctl.assign[10])) pad.setX(value);\n    else if (assigned(ctl.assign[11])) {
 knob-steps|    if (moved) padSteps(step);\n|
 solo-seek-ended|    jumpTo(pos16);\n|    jumpTo(pos16);\n    ended_ = 0;\n|tonesolo
+xy-plus-zero|        if (x == 0) return 0;\n        return x >= 64 ?|        return x >= 64 ?|toneosc
+xy-plus-side|return x >= 64 ? value((x - 64) * 127 / 63) : -value((64 - x) * 127 / 63);|return x >= 64 ? value((x - 64) * 127 / 63) : value((64 - x) * 127 / 63);|toneosc
+xy-plus-off|        if (n == 0 \|\| n == 32) return 0;\n        const int x = in.cc[n];\n|        const int x = in.cc[n];\n|toneosc
+xy-inputs|in.assign[i] = std::clamp(ctl.assign[4 + i], 0, 95);|in.assign[i] = std::clamp(ctl.assign[i], 0, 95);|tone

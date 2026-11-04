@@ -99,6 +99,11 @@ descriptors' 0 can't be what an XT ships with, as nothing else writes the pad's 
 The default isn't confirmed from the firmware itself.  A part recorded from an XT's pad
 should play back by those numbers; that hasn't been tried.
 
+**X-Y mode, since v134.**  Pad Assign X and Y default to CC80 and CC81, the chart's, and the
+Matrix's PAD-X, PAD-Y, +PAD-X and +PAD-Y read them, so they do nothing until a Matrix
+Control uses one as its Source.  Pad Mode only picks which pair the XT's own pad sends: no
+tone generator code reads it, so both pairs are always live here, with no switch.
+
 ### Mode, hold and gating — SysEx only, no CC path
 
 **Patch Controller** block, `10 00 08 00` for temporary patch part 1:
