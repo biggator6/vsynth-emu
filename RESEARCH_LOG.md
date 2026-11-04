@@ -3300,6 +3300,29 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Seed 777 gave one difference, at COSM output, with a SOLO wave. It was tempting to call it the known SOLO difference and widen the tolerance. It is that difference, but I only know because I gave the port the firmware's OSC 2 buffer for that case and the error went to exactly 0 in every block, then turned each COSM off: the Compressor's level decision flips on −93 dB. So it's replaced on SOLO waves, like Lo-Fi, and the tolerance stays where it was.
 - My validation script ended with `echo done`, so it exited 0 while `verify.sh` inside it said `fcheck.sh: Permission denied` and never ran the firmware checks. I saw it reading the log. With `core.filemode` false, git writes any script it touches without +x, so this comes back on its own. The tools now call each other through `bash`.
 
+### Session 16 addendum (2026-11-03) — v115: the effects mapped
+
+- The brief asked for each type's converter and DSP routine, and I went looking for SH-4 DSP like the COSMs. The first read of the voice loop already said otherwise: the bus goes out by DMA and a block comes back. The DSP routines don't exist. Each type is a program for another chip, so most of the brief's questions needed a different kind of answer, and the section says so at the top.
+- That left "can it run in the harness?" with two answers. The SH-4 side all runs, first try, with seven routines hooked. The chip's programs can't, and nothing else in rom.2 runs them either. So the project's rule for a finished port can't be met there. I put that plainly as the user's decision instead of proposing a check that sounds as strong as `xt_tone`.
+- I built a model I wasn't asked for, because "emulate the chip" would be an empty recommendation if the instruction set can't be read. It stays a research tool and isn't wired into anything.
+- The decoding moved fastest when the program forced an answer. The clear program's address fields form an arithmetic progression of 1130 only if three words' five-bit fields join up. The odd 0x4080 in `0x894afd50` only makes sense if a coefficient's second byte is value[7:1]. An HP output must be zero at DC, which proved one op loads instead of adds. Total Gain's 0x2cfc gave the fourth shift code to five digits. I had guessed that code as ×8, and the EQ's filter band looked "close enough" until I worked the arithmetic.
+- Twice I read a good result as more than it was. Stereo Delay's echo landed at +15427 samples, exactly a read crossing the second write head, which meant the address scale was out by two. And "the model passes Thru and EQ" could read as "the model works". It doesn't: when I ran all 41 types at their defaults, most were wrong. That list is in the section, with the Reverb that doesn't decay.
+- A section I wrote from memory of the listing had two errors that a re-read against the words caught: the Chorus send has no ramp on the way in, and A 0x81…0xbe is input routing, not the system's EQ. I'd have believed both.
+- `verify.sh` failed at first in this worktree, with no plugin change: no `.venv` and no gitignored project wave here. It says that plainly enough once you read the log, but "exit 1" on a docs-only version is a poor moment to assume.
+- v114 called `g` the system's Output Gain. I only found out because this task asked where the Output Gain applies, and the chip has its own. `g` is a hidden setting, ID 0x526, and its default means the XT's tones reach the bus at 1/16, which XtSynth doesn't do. That's noted for whoever wires the sends.
+
+### Session 16 addendum (2026-11-03) — v116: the effect captures
+
+- The user answered "Yes, use captures". The obvious next step was to start the chip, but they'd only answered the question I asked. The part only they can do is the recording, so I made that easy and left starting the chip as the next question.
+- I planned on writing a list of panel settings. Then counting gave 83 takes at a minute each. The XT's IDs turned out to follow the V-Synth's published SysEx map, ID order for address order, so a MIDI file can do the panel's work. That's more tooling than I'd expected to write for "use captures", and it's the difference between an evening of button-pressing with mistakes in it and half an hour of waiting.
+- It is unverified on hardware and I can't verify it from here: no XT or interface was connected. The model ID I could check, from the firmware's own transmit routine, after several searches for a receive path that didn't pan out. Hence the 12-second test before the 8-minute run, and the by-hand fallback.
+- Searching the code for the model ID I first found `cmp/eq #0x53` in a routine that turned out to compare the letters of 'SBMP'. It is a good thing I read it before quoting it.
+- The manual's "52 — 76" for Wave Gain sits beside a 5-bit mask. I went with the XT's own descriptors, 4…28. Sent as the manual prints it, that would have been an out-of-range value in every take that touches it.
+- zsh bit me again in a small way: `=====` as an echo argument is an error there, and `set -- $spec` doesn't split. I wrote the scripts in bash after that.
+- Before committing I read my steps against the manual and the firmware's strings, and it paid: "Original Key" isn't a word the XT uses (it says Original Pitch); the channel is on a Part MIDI page I hadn't named; and with USB Audio Output Dest left on, the Mac's sounds could have reached MAIN in the middle of a take. The firmware's value lists also turned up a GENERIC driver type, which is the one hope for USB without Roland's old driver.
+- `--from` had a bug I found by reading it: the time spent resending skipped SysEx counted against what followed, so the first events after a skip would have bunched up. `--test` couldn't have shown that, because it ignores time, so there's a `--listen` now, for the path the user will really run.
+- The test's first version needed the screen to redraw on a SysEx change, which I don't know it does. It now also drops Master Level during the sweep, so it can be heard, and that's the one thing I was least sure of, a System write reaching the chip.
+
 ### Session 16 addendum (2026-11-04) — v117: Hold, Sostenuto and the mode messages
 
 - The task pointed at `0x894d96d0` on `0x89cf7634` as the matrix and at `0x894e7860` as controller terms, following the notes since v53. Read properly, it is the other way round: `0x89cf7634` has four entries of 0x1e bytes, the Multi Step Modulator's four tracks, and `0x894e7860` is one getter of the real Matrix. I went looking for Hold first anyway, and scanning for `cmp/eq #0x40` found the controller table at `0x894d7400`.
@@ -3339,6 +3362,18 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `tvag-done-r` went missing when the draws moved, and I tried a stronger draw twice before counting. Of 1520 ticks that ended a voice, 1484 had both channels at the limit and none had just one: with any release at all, both gains fall with the envelope to about 1e−25, so the test could not tell them apart however far the LFO panned. Counting first would have saved the two tries. The case that separates them has no release.
 - The list of planted errors has grown to 382, and 61 of them are first caught past the 2000 random cases, in the sweep and the groups after it. It now takes about 9 minutes, with other work running. CLAUDE.md says so.
 
+### Session 16 addendum (2026-11-04) — v121: the chip's name, the converter, the checker
+
+- The user said yes to the capture prep I'd proposed: a tool to cut a recording into takes, and the chip's part number.
+- The part number took a minute, and it was embarrassing how little: "ESP4" is in the text layer of the very page v115 called illegible, and the parts list on page 15 gives RA0A-101 (TC223C080AF-101). I had searched that text for a part number, not a name.
+- The DRAM beside it turned out the most useful thing on the page. 256 K × 16 is exactly the 18-bit offsets, so a delay line holds 16 bits a sample in a "24-bit" section. That's a reading of a parts list, nothing tested yet.
+- I scripted a loop of page fetches on the manual site and got its bot check back ("Just a moment"). I stopped scripting it, and opened pages one at a time as a person would, which it allowed. I shouldn't have tried the loop.
+- Looking for ESP in the firmware's strings also turned up the test mode's "SRC Output(44.1K)". I had told the user in v116 that a digital capture would show the chip's words, with the manual's "carries what MAIN OUT carries" as my only reason. Following the strings to rom.1's driver and the CS8420's data sheet says it doesn't: normal operation routes the transmitter from the converter's output, at every rate. Better found now than after someone buys a cable.
+- I first cited `0x893390ce` as the normal caller, then read my own write-up and saw it sat in the factory test class. The real source is the kernel's start-up, `0x8802f378`. Same answer, but it could have gone the other way: the driver's constructor defaults to the bypass.
+- Also caught before writing it down: the manual's "fixed at 44.1 kHz" that I first took for USB is about sampling. USB's case rests only on the block diagram.
+- The simulated recordings found a flaw in the run itself. If the path has v40's +9.4 dB, the EQ's +15 clipped and read as +10.34. I lowered the clicks and put the EQ takes at Wave Gain −12, while it was still free to change.
+- The first run of the test disagreed in 14 of 33 cases. About half were my test's expectations; the others were real, and the ones I'd not have thought of: a reverb's tail passing as a click because I only checked height, and a stray sound raising the floor that it was judged against.
+- Everything about `fxcut.py` is tested against my idea of a recording. Nothing has met a real one.
 
 ### Session 16 addendum (2026-11-04) — v122: SOLO bit for bit
 
@@ -3348,6 +3383,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Of 149 errors I planted, 16 and then 19 came back missed on the two runs. None was a real difference in the voice. Most were exact, like a product by a power of two. But some showed that `xt_tone` never reaches parts of the loop logic: XtSynth clamps the Loop Mode to 2, so mode 3 was only ever checked by a by-hand run. Those paths have `solocmp` cases now, and they are 0 different too.
 - One I could not settle: the first-record rule. Taking it out moves the anchor by a step, and 189 hunted cases did not show it. It stays as the firmware has it, and the doc says no case proves it.
 - My mistakes, all caught by reading output rather than trusting exit codes. I sourced `env.sh` from zsh, which pointed REPO at the wrong folder. The first seed run printed blank lines and exit 0, because BSD `xargs -I` gave up on the long paths. The first `fcheck --update` dropped the `xtrecs` lines, because `analysis/projects` wasn't linked here. And flushing denormals in all of `xt_fw` moved a `bandcmp` line, which turned out to be that comparison's own artifact, so the flush is scoped to the SOLO modes and the line is left alone.
+
+### Session 16 addendum (2026-11-04) — v123: the chip is an ESP
+
+- I'd offered this as a lead that "might" settle a few things, and expected a family resemblance at most. The header's first thirty lines had 768 clocks, 256 registers, a five-bit field at bits 27:23 and the shift table v115 had worked out from an EQ's arithmetic. Then its decode table named every one of the forms I had listed as undecoded, by name, in the order I'd listed them. Most of what v115 took a long session to infer was already there, measured on silicon, by people who'd gone in with a microscope. It's humbling, and very good news.
+- v115's reading held up everywhere it had committed itself. It was wrong where it guessed: r4 as 1, op 3 as B′, and the "output stage", which is on the input.
+- I told the user I would only read their code, not build or run it. So I wrote my own integer model, which also meant I understood it. That kept its bugs mine: the first output said +14 dB on MAIN, because the slots rotate, and my harness only wrote the pair under test, so stale words crept up into the rest of the frame.
+- Silent 0 and running away 0 of 42, on the first run with the whole instruction set. I reran it to be sure I hadn't left the old binary in place.
+- All the reverbs settled on the same −85 dB, which looked like a bug in my memory. The fact that it didn't depend on the type suggested the shared path instead, and the 1/512 in the DC cut gives about 512 LSB in truncating arithmetic, −84 dB. Then it measured as pure DC, with the signal under it past −125 dB. A nice moment, and it's a real prediction now.
+- I wrote "16 bits a sample" in v121's notes an hour before reading that the driver's memory mode is, on the older chip, the 24-bit one. The stored evidence now points both ways, so I've said that, and said what a capture would show.
+- Stereo Delay came out 10 and 8 samples short of what v115 and I had called the driver's numbers. I nearly went hunting for an off-by-ten in my controller. Printing the address register settled it: the firmware's coefficients produce 22040.008 and 28656.008, and the echoes land exactly there. So I'd been holding the model to a number nobody had measured.
+- The licence is the one thing I can't work through for the user. Their code is GPL-3.0 and this repo has none. I kept my model out of git until they've decided, because I wrote it straight after reading theirs.
 
 ### Session 16 addendum (2026-11-04) — v124: the two branches together
 
@@ -3367,6 +3413,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Re-running the whole list lost two old planted errors that had only ever been caught by chance. `solo-seek-clamp` was easy to aim at. `tvag-done-r` wasn't: my first draw, a square LFO at full Pan Depth with short releases, was caught late or not at all. I logged every tone's end and then tabulated Sustain against Release in a scratch program, and the window is mostly one value, Release 16. Guessing at draws would have taken longer than measuring.
 - Two seeds gave differences on a stereo SOLO wave on OSC 2, one of them 13 blocks long, more than the one block I'd seen in v118. Neither case leans on the clock, but saying so wasn't evidence. v122 had landed meanwhile with an exact SOLO player, so I built it under this version in a scratch copy, with one small conflict to resolve. Both seeds went to 0 different and the SOLO buffers to exactly 0. That also says v118's beat, its seeks and this clock are exact with it, which the merge will want to know.
 
+### Session 16 addendum (2026-11-04) — v126: XtFxChip
+
+- The user said yes to the chip port and to GPL-3.0. Before adding the licence I looked at JUCE's, because I'd told them it had a GPL option. It's version 8, so AGPLv3 or commercial. GPLv3 section 13 still allows the combination, so the decision holds, but I'd stated it wrongly and said so.
+- With the licence settled, the project's own method was available: a reference to equal. I vendored their interpreter unmodified, drove it and my chip with the same bytes from the firmware's driver, and compared the whole state every sample. Having read through the four headers first, and with them doing no I/O, I was content to build them.
+- Reading theirs for the port also turned up my branch bug in the model: mine landed a clock early. The reference would have found it anyway, and it did find the next one, a constant operand I dropped from the latch multiply when rewriting for speed.
+- 0 different on the first run proved nothing, which is why the planted errors come next. They were more interesting than the pass: 33 of 116 missed. Normally that's a weak check. Here each one was code no XT program reaches: no GRAM collisions, no back-to-back memory operations, nobody reading a latch mid-transfer. So I removed it all, and the chip got simpler and faster, and less exposed to differences between the two chips.
+- The speed work was all about what the compiler could see. The same semantics went from 37% of a core to 23% by putting each core's sample in one loop with its state in locals, flattening a nested switch and making the accumulators an array.
+- That memory map settled something I'd got wrong twice. v115's 0x37fff was a misreading, and with everything under 0x20000 the "16 bits a sample" of v121 looks wrong too.
+- Other sessions were running their long checks throughout, with a load average near 95, so I changed the speed test to CPU time. The real number on a quiet machine may be better.
+
 ### Session 16 addendum (2026-11-04) — v127: SOLO bit for bit, with tempo and the Matrix
 
 - A quiet merge, after the last. The one conflict in code was the line the hand-over had said it would be, and `xt_tone` was at 0 different on the first run, with no tolerance left over any of the new draws.
@@ -3385,4 +3441,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - I started by merging v125, as I had been asked, and it was going well: six hunks in `XtToneCheck.cpp`, all combined, 0 different. Then the memory index changed under me and said the tempo session had merged v125 with v124 as v128. Carrying on would have meant my resolution of the same conflicts next to its, to be reconciled later by someone. v128 contains v125, and against v127 it had no source conflict at all. Merging it was plainly what the request was for, so I threw my merge away.
 - It is worth saying how close that was. Nothing in the repository told me. I only saw it because the reminder about the memory file happened to arrive during a build.
 - With everything in one place the whole list is 733 plants, and nothing has been lost from any branch. Merging three times in a morning has been a good test of that list. The first two each lost a plant that had lived on chance, `mod-any` and `solo-cap-pw`, and each loss turned into a directed case. This one lost none.
+
+### Session 16 addendum (2026-11-04) — v130: the effects branch joins
+
+- The fourth merge in a morning and the easiest: no file on the tone's path, so no draw moved and no plant could go stale. I sorted the docs into version order instead of leaving one branch's history in a lump, because the next reader will look for a version, not for a branch.
+- `verify.sh` said 0 of 159 sections run, every one reused, which is what it is meant to do and which proves nothing about a merged tree until something has actually run on it. So `--full` once, here, where all the lines finally meet. It agreed.
 

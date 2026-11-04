@@ -365,7 +365,7 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
-- no effects: MFX, Chorus and Reverb, so also no Chorus or Reverb Send and no Output Assign;
+- no effects: MFX, Chorus and Reverb, so also no Chorus or Reverb Send and no Output Assign. On the XT they run on a separate chip, mapped in HARDWARE_FIRMWARE.md, "The effects" (v115);
 - no step/event playback;
 - no matrix or realtime controllers on the OSC knobs, and the time and
   formant envelope depths' velocity sensitivity is not exposed.

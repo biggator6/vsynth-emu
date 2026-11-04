@@ -3,6 +3,7 @@ firmware/
 Vsynth_software/
 .venv/
 analysis/projects/
+analysis/test_files/fx/
 
 # Roland manuals (copyright) — reference copies only, see research/README.md
 research/*.pdf

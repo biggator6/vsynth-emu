@@ -1,0 +1,99 @@
+# The effect chip's planted errors: name|old|new.  mutate_fx.py runs them, each against JE-8086's interpreter on every type.  Expected to be missed: acc-wrap (no program reaches 2^29
+# in these runs; the chip's width is kept anyway) and ran-off (past the end it runs empty words, which comes to the same; the guard keeps the PC in bounds).
+constants|0x10 << (6 * (d.mem - 1))|0x20 << (6 * (d.mem - 1))
+const-range|d.mem >= 1 && d.mem <= 4|d.mem >= 1 && d.mem <= 3
+shift-16|{ 7, 6, 5, 3 }|{ 7, 6, 5, 4 }
+shift-4|{ 7, 6, 5, 3 }|{ 7, 6, 4, 3 }
+shift-2|{ 7, 6, 5, 3 }|{ 7, 5, 5, 3 }
+gram-shift|d.shift = code & 1 ? 6 : 7;|d.shift = code & 1 ? 7 : 6;
+gram-acc|d.toB = code & 2 ? 1 : 0;|d.toB = code & 1 ? 1 : 0;
+op-04|case 0x04: d.kind = plain; replace = true; break;|case 0x04: d.kind = plain; break;
+op-10|case 0x10: d.kind = plain; d.toB = 1; break;|case 0x10: d.kind = plain; break;
+op-14|case 0x14: d.kind = plain; d.toB = 1; replace = true; break;|case 0x14: d.kind = plain; d.toB = 1; break;
+op-08|case 0x08: d.kind = StoreSat; replace = true; break;|case 0x08: d.kind = StoreSat; break;
+op-0c|case 0x0c: d.kind = StoreSat; replace = true; d.fromB = 1; break;|case 0x0c: d.kind = StoreSat; replace = true; break;
+op-18|case 0x18: d.kind = StoreSat; replace = true; d.toB = 1; break;|case 0x18: d.kind = StoreSat; d.toB = 1; break;
+op-1c|case 0x1c: d.kind = StoreSat; replace = true; d.toB = d.fromB = 1; break;|case 0x1c: d.kind = StoreSat; replace = true; d.toB = 1; break;
+op-58|case 0x58: d.kind = StoreSat; break;|case 0x58: d.kind = StoreSat; replace = true; break;
+op-5c|case 0x5c: d.kind = StoreSat; d.toB = d.fromB = 1; break;|case 0x5c: d.kind = StoreSat; d.toB = 1; break;
+op-3c|d.fromB = op == 0x3c;|d.fromB = 0;
+op-40|case 0x40: d.kind = StoreRaw; break;|case 0x40: d.kind = StoreRaw; replace = true; break;
+op-44|case 0x44: d.kind = StoreRaw; replace = true; break;|case 0x44: d.kind = StoreRaw; break;
+op-48|case 0x48: d.kind = StoreRect; break;|case 0x48: d.kind = StoreRect; replace = true; break;
+op-4c|case 0x4c: d.kind = StoreRect; replace = true; break;|case 0x4c: d.kind = StoreRect; break;
+op-50|d.kind = constant ? CompareConstant : Compare; replace = true; break;|d.kind = constant ? CompareConstant : Compare; break;
+op-50-const|d.kind = constant ? CompareConstant : Compare;|d.kind = Compare;
+op-6c|case 0x6c: d.kind = FoldPos; replace = true; break;|case 0x6c: d.kind = FoldPos; break;
+op-78|case 0x78: d.kind = FoldNeg; break;|case 0x78: d.kind = FoldNeg; replace = true; break;
+op-7c|case 0x7c: d.kind = FoldNeg; replace = true; break;|case 0x7c: d.kind = FoldNeg; break;
+mul-flags|d.toB = d.coef & 2 ? 1 : 0; d.fromB = d.toB; replace = !(d.coef & 1);|d.toB = d.coef & 1 ? 1 : 0; d.fromB = d.toB; replace = !(d.coef & 2);
+mul-from|d.fromB = d.toB; replace = !(d.coef & 1);|replace = !(d.coef & 1);
+control-acc|d.toB = d.mem & 0x20 ? 1 : 0; d.fromB = d.toB; replace = d.mem & 0x10;|d.toB = d.mem & 0x10 ? 1 : 0; d.fromB = d.toB; replace = d.mem & 0x20;
+control-from|d.fromB = d.toB; replace = d.mem & 0x10;|replace = d.mem & 0x10;
+coef-from|d.fromB = d.mem & 1; }|d.fromB = 0; }
+coef-index|d.coefIndex = d.mem >> 1 & 7;|d.coefIndex = d.mem & 7;
+coef-set|coef_[d.coefIndex] = sat24(stored); x = iram[at]; break;|x = iram[at]; break;
+read-dest|d.mem \|= 0xf0;|
+branch-target|(uint16_t)(w & 0x3ff)|(uint16_t)(w & 0xff)
+tail-address|hostTail_[addr >> 10 & 1] = (int32_t)(addr & 0x3ff);|hostTail_[0] = (int32_t)(addr & 0x3ff);
+coef-byte|(b2 & 15) << 6|(b2 & 7) << 6
+coef-low|b1 >> 2 \| (b2|b1 >> 3 \| (b2
+coef-shift|b0 \| (b1 & 3) << 8|b0 \| (b1 & 1) << 8
+field-3|b1 >> 5 \| (b2 & 3) << 3|b1 >> 5
+field-4|b2 >> 7 \| (b3 & 15) << 1|b2 >> 7
+field-0|{ b0 >> 3, b1 & 31,|{ 0, b1 & 31,
+read-select|if (mode_ == 3) { mailbox_ = (int32_t)wordAt(addr); return; }|if (mode_ == 3) return;
+fraction|<< 11) & 0x7fffff|<< 10) & 0x7fffff
+transform-8|if (t == 8) v = ~v;|if (t == 8) v = -v;
+transform-16|v >= 0 ? (~v & 0x7fffff) : ~(v & 0x7fffff)|v >= 0 ? (~v & 0x7fffff) : (v & 0x7fffff)
+sat-low|v < -0x800000 ? -0x800000|v < -0x7fffff ? -0x7fffff
+sat-high|v > 0x7fffff ? 0x7fffff|v > 0x7ffffe ? 0x7ffffe
+stage-start|if (f & 0x18) { e.stage = 0;|if (f & 0x10) { e.stage = 0;
+imm-step|e.imm += (uint32_t)f << ((unsigned)(e.stage - 1) * 5);|e.imm += (uint32_t)f << ((unsigned)(e.stage - 1) * 4);
+imm-start|e.mode = f; e.imm = 0; }|e.mode = f; }
+commit-3|e.toCommit = 2;|e.toCommit = 3;
+is-write|if ((e.modeCur & 0x18) == 0x10) { e.m[e.eff]|if ((e.modeCur & 0x18) == 0x08) { e.m[e.eff]
+is-var|(e.mode & 0x18) == 0x18 ? e.pos|(e.mode & 0x18) == 0x08 ? e.pos
+var-scale|((uint32_t)e.var >> 12)|((uint32_t)e.var >> 11)
+plus-one|((e.imm >> 1) & 1)|0
+write-data|e.m[e.eff] = e.writeLatch; e.readLatch|e.m[e.eff] = e.writeLatch & ~0xff; e.readLatch
+read-after-write|e.readLatch = e.writeLatch; }|}
+read-data|else e.readLatch = e.m[e.eff];|
+mem-rotate|e_.pos = (e_.pos - 1) & 0x3ffff;|e_.pos = (e_.pos + 1) & 0x3ffff;
+rotate|pos_ = (pos_ - 1) & 255;|pos_ = (pos_ + 1) & 255;
+ran-off|if (pc >= kRun) { memoryClock(0); continue; }|
+jump-land|if ((int32_t)pc == jumpAt) { pc = (uint32_t)jumpTo; jumpAt = -1; }|
+branch-delay|jumpAt = (int32_t)pc + 2;|jumpAt = (int32_t)pc + 1;
+branch-cond|if (stored >= 0) { jumpTo|if (stored > 0) { jumpTo
+dmac-x|x = lastIn >> 7;|x = lastIn >> 8;
+dmac-y|>> 9) & 0x7f;|>> 9) & 0x3f;
+dmac-mul|if (lastMul) y =|y =
+last-mul|lastMul = d.kind == MulCoef;|lastMul = true;
+last-in|lastIn = x; lastMul|lastMul
+mul-const|x = d.constant ? d.constant : iram[at];|x = iram[at];
+mul-weird|(fl & 0x1c) == 0x1c|(fl & 0x1c) == 0x18
+mul-store|x = x >= 0 ? 0x7fffff : -0x800000; iram[at] = x; }|x = x >= 0 ? 0x7fffff : -0x800000; }
+mul-y|coefValue(fl >> 5, c.lastTransform) >> 16;|coefValue(fl >> 5, c.lastTransform) >> 15;
+mul-transform|c.lastTransform = fl & 0x18;|c.lastTransform = fl & 0x10;
+write-sat|e_.writeLatch = sat24(stored);|e_.writeLatch = stored;
+address|e_.var = stored;|e_.var = sat24(stored);
+read-store|case ReadData: x = e_.readLatch; iram[at] = x; break;|case ReadData: x = e_.readLatch; break;
+raw|iram[at] = x = sext(hist[0][old], 24);|iram[at] = x = sat24(hist[0][old]);
+rect|iram[at] = x = std::max(0, sat24(hist[0][old]));|iram[at] = x = sat24(hist[0][old]);
+fold-pos|if (x >= 0) x = ~x; x &= 0x7fffff;|x &= 0x7fffff;
+fold-neg|if (x < 0) x = ~x; x &= 0x7fffff;|x &= 0x7fffff;
+acc-wrap|>> d.shift), 30);|>> d.shift), 31);
+gate|if (cond && ((c.negative ? c.skipNeg : c.skipPos) & 1)) x = 0;|
+cond-pos|c.skipPos \|= 0x18;|c.skipPos \|= 0x30;
+cond-neg|c.skipNeg \|= 0x1e0;|c.skipNeg \|= 0x1c0;
+cond-ready|c.ready \|= 4;|c.ready \|= 8;
+cond-sign|if (acc[0] < 0) c.values \|= 4;|if (acc[0] <= 0) c.values \|= 4;
+cond-gate|(c.negative ? c.skipNeg : c.skipPos) & 1|(c.negative ? c.skipPos : c.skipNeg) & 1
+pipeline|const uint32_t old = (h + 1) & 3;|const uint32_t old = (h + 2) & 3;
+pipeline-b|hist[0][h & 3] = acc[0]; hist[1][h & 3] = acc[1]; h = (h + 1) & 3;\n    }\n    if constexpr|hist[0][h & 3] = acc[0]; h = (h + 1) & 3;\n    }\n    if constexpr
+tail-raw|(t ? 0xffu : 0u)|0u
+tail-host|else if (hostTail_[1] >= 0) {|else if (false) {
+tail-step|(t - 2) / 2|(t - 2)
+tail-last|if (t < 2) lastIn = sext(iram[(pos + (t ? 0xffu : 0u)) & 255], 24);|if (t < 2) {}
+tail-shift|>> shiftOf(w >> 8 & 3)), 30);|>> 7), 30);
+tail-acc|acc[0] = sext(acc[0] + (int32_t)|acc[1] = sext(acc[0] + (int32_t)

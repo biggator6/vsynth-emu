@@ -625,3 +625,84 @@ band 5 chord.bin 1 0.8 1.5 30000: ENSEMBLE, 30000 frames: max |firmware - port| 
 band 5 chord.bin 1 1.0 0.0 20000 3000:1.0 8000:-0.5: ENSEMBLE, 20000 frames: max |firmware - port| 0, difference -327.5 dB against the signal (rms 0.1183), first at -1
 band 5 vocal.bin 1 0.03 -0.2 3000 0:0.015: ENSEMBLE, 3000 frames: max |firmware - port| 0, difference -295.4 dB against the signal (rms 0.0076), first at -1
 band 3 drum.bin 2 0.5 -0.5 8000 0:0.3: BACKING, 8000 frames: max |firmware - port| 7.01e-46, difference -257.2 dB against the signal (rms 0.0001), first at 3423
+== xt_fx
+MFX 0 Thru: 8192 samples, 0 different
+MFX 1 Parametric EQ: 8192 samples, 0 different
+MFX 2 Graphic EQ: 8192 samples, 0 different
+MFX 3 Resonant Filter: 8192 samples, 0 different
+MFX 4 Isolator and Filter: 8192 samples, 0 different
+MFX 5 Distortion / OD: 8192 samples, 0 different
+MFX 6 Amp Simulator: 8192 samples, 0 different
+MFX 7 Auto Wah: 8192 samples, 0 different
+MFX 8 Humanizer: 8192 samples, 0 different
+MFX 9 Dynamic Processor: 8192 samples, 0 different
+MFX 10 Tape Echo Simulator: 8192 samples, 0 different
+MFX 11 Stereo Delay: 8192 samples, 0 different
+MFX 12 Multi Tap Delay: 8192 samples, 0 different
+MFX 13 Reverse Delay: 8192 samples, 0 different
+MFX 14 Vocal Echo: 8192 samples, 0 different
+MFX 15 Band Pass Delay: 8192 samples, 0 different
+MFX 16 AnalogDelay->Chorus: 8192 samples, 0 different
+MFX 17 Digital Chorus: 8192 samples, 0 different
+MFX 18 Space Chorus: 8192 samples, 0 different
+MFX 19 Hexa Chorus: 8192 samples, 0 different
+MFX 20 Analog Flanger: 8192 samples, 0 different
+MFX 21 BOSS Flanger: 8192 samples, 0 different
+MFX 22 Step Flanger: 8192 samples, 0 different
+MFX 23 Analog Phaser: 8192 samples, 0 different
+MFX 24 Digital Phaser: 8192 samples, 0 different
+MFX 25 Rotary: 8192 samples, 0 different
+MFX 26 Tremolo/Auto Pan: 8192 samples, 0 different
+MFX 27 Stereo Pitch Shifter: 8192 samples, 0 different
+MFX 28 OD/DS->Cho/Flg: 8192 samples, 0 different
+MFX 29 OD/DS->Delay: 8192 samples, 0 different
+MFX 30 Cho/Flg->Delay: 8192 samples, 0 different
+MFX 31 Enh->Cho/Flg: 8192 samples, 0 different
+MFX 32 Enh->Delay: 8192 samples, 0 different
+MFX 33 Vocal Multi: 8192 samples, 0 different
+MFX 34 Guitar Multi: 8192 samples, 0 different
+MFX 35 Bass Multi: 8192 samples, 0 different
+MFX 36 EP Multi: 8192 samples, 0 different
+MFX 37 Keyboard Multi: 8192 samples, 0 different
+MFX 38 Phonograph: 8192 samples, 0 different
+MFX 39 Radio Tuning: 8192 samples, 0 different
+MFX 40 Bit Rate Converter: 8192 samples, 0 different
+MFX 41 Pseudo Stereo: 8192 samples, 0 different
+Reverb Off: 8192 samples, 0 different
+Reverb Room 1: 8192 samples, 0 different
+Reverb Room 2: 8192 samples, 0 different
+Reverb Room 3: 8192 samples, 0 different
+Reverb Hall 1: 8192 samples, 0 different
+Reverb Hall 2: 8192 samples, 0 different
+Reverb Hall 3: 8192 samples, 0 different
+Reverb Garage: 8192 samples, 0 different
+Reverb Plate: 8192 samples, 0 different
+Reverb Non-Linear: 8192 samples, 0 different
+Reverb Delay: 8192 samples, 0 different
+Chorus Off: 8192 samples, 0 different
+Chorus Chorus 1: 8192 samples, 0 different
+Chorus Chorus 2: 8192 samples, 0 different
+Chorus Chorus 3: 8192 samples, 0 different
+Chorus Chorus 4: 8192 samples, 0 different
+Chorus Feedback Chorus: 8192 samples, 0 different
+Chorus Flanger: 8192 samples, 0 different
+Chorus Short Delay: 8192 samples, 0 different
+Chorus Fbk Short Delay: 8192 samples, 0 different
+every type, changing under load: 65536 samples, 0 different
+MAIN to the mix: +6.00 dB
+MULTI through Thru: +6.00 dB
+the sends: into the Reverb, slot 72, -0.00 dB; into the Chorus, slot 70, through its filter at Off's values, -9.16 dB
+Parametric EQ at 800 Hz, against flat: Mid 1 +15 +15.00, +7 +7.00, -7 -6.99, -15 -14.97; Total +15 +15.00 dB
+Stereo Delay: L dry +5, echo +22040; R dry +5, echo +28656
+Multi Tap: L dry +5, echo +11025, echo +33075, echo +44100; R dry +5, echo +22050, echo +33075, echo +44100
+MFX types at 1 kHz: of 42, 0 silent, 0 running away
+Reverb Room 1      tail, DC aside: at 1 s -133.6 dB, at 3 s -143.2 dB
+Reverb Room 2      tail, DC aside: at 1 s -115.9 dB, at 3 s -122.7 dB
+Reverb Room 3      tail, DC aside: at 1 s -121.5 dB, at 3 s -125.0 dB
+Reverb Hall 1      tail, DC aside: at 1 s -93.5 dB, at 3 s -131.5 dB
+Reverb Hall 2      tail, DC aside: at 1 s -83.9 dB, at 3 s -122.0 dB
+Reverb Hall 3      tail, DC aside: at 1 s -94.8 dB, at 3 s -129.0 dB
+Reverb Garage      tail, DC aside: at 1 s -115.6 dB, at 3 s -139.6 dB
+Reverb Plate       tail, DC aside: at 1 s -91.0 dB, at 3 s -124.4 dB
+Reverb Non-Linear  tail, DC aside: at 1 s -168.5 dB, at 3 s -168.5 dB
+Reverb Delay       tail, DC aside: at 1 s -83.7 dB, at 3 s -168.5 dB

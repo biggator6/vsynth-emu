@@ -14,10 +14,13 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   Push only when the user asks, and only the versions named
   (`git push origin <sha>:refs/heads/master`). "Proceed" is not a push.
 - A port is done when it equals the firmware in a harness (0 different), and
-  existing behaviour is unchanged unless the change is intended.
+  existing behaviour is unchanged unless the change is intended. `XtFxChip` goes by JE-8086's interpreter the same way, on the XT's own programs loaded by the firmware's driver.
+- The effect chip's programs have no firmware to run, so their reference is captures from the user's XT (the user's decision,
+  2026-11-03; HARDWARE_FIRMWARE.md, "The effect captures"). The SH-4 side of the effects still goes by the harness. The digital outs carry the CS8420 converter's output, not the chip's words (v121): USB or Resampling for exact data.
+- The project is GPL-3.0 (`LICENSE`, `NOTICE.md`, the user's decision), and JUCE under the AGPLv3 alongside it. JE-8086's ESP core (gearmulator, GPL-3.0) may be used with credit. Its copy in `research/third_party/gearmulator_esp/` stays unmodified: it's the effect chip's reference.
 
 ## Where things are
-- `plugin/Source/`: `XtSynth` (the synth: voices, controls, tick), the ports
+- `plugin/Source/`: `XtFxChip` (the effect chip, not in the sound yet; `xt_fx`), `XtSynth` (the synth: voices, controls, tick), the ports
   (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`,
   `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFirmware` (firmware harness: runs
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
@@ -73,6 +76,15 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   an instrument.
 - `firorder.py <listing>`: the order of additions in an unrolled sum, by a
   symbolic run of its disassembly (written for the Frequency Shifter's FIR).
+- `sh4dis.py <addr> <n> ...`: a linear SH-4 listing of rom.2, no Ghidra. Ghidra's project won't open under a path holding `.claude`, so
+  `ghidra.sh` fails in a worktree; run `analyzeHeadless` on the main checkout's `firmware/ghidra` instead.
+- `fxmap.cpp` (not in build.sh; build line at its top): the firmware's effect driver in the interpreter. `table`: per type, program, active words, what
+  an update writes, memory operations. `mfx <type> [i v]`: a type's words as fields, and what wrote each. `boot`: what's loaded. Output goes in `build/`.
+- `fxchip.cpp` (the same): a throwaway model of the effect chip, to test the decoding; a sine or impulse into a frame pair, gains at its slots. Not a port.
+- `xt_fx <rom> [samples] [seed]` (in fcheck; `build/tools/fcheck/bin`): `XtFxChip` against JE-8086's interpreter, whole state each sample, every type; `XT_FX_FIRST=1` says where each case first differs. `numbers`: the firmware's own numbers on it. `speed`: its share of a core, by CPU time. `mutate_fx.py [samples] [names]`: the planted errors in `fx_muts.txt`, through `PORT=fx mutate.sh`, about a minute.
+- `fxcut.py <recording>`: checks a recording of a run and cuts it into takes, levels and all; the last line says whether to go on. `fxcut_test.py` (about 90 s, when it changes): that against a simulated XT, with faults planted.
+- `fxcapture.py`: the effect captures' test wave, MIDI runs and take list, into `analysis/test_files/fx/` (gitignored; the runs hold firmware defaults). `fxplay.cpp`: plays a run
+  through CoreMIDI; `--test` and `--listen` check it on a virtual output. Steps: RECORDING_GUIDE.md, "Effects captures".
 
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
@@ -82,7 +94,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
   a difference, not as a routine.
-- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes).
+- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes). If `XtFxChip.cpp` changed: `mutate_fx.py`.
 - Before a push: `verify.sh --full`.
 
 ## Firmware facts worth knowing
@@ -136,6 +148,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - The Matrix is the note's object M (the input table's +0x68), read through the getters `0x894e7010`…`0x894e7860`; a slot is not a Dest (`xtFwMatrixTables`).
   A getter forms its own group of sums and no other. A pad's move (TRIP-R) brings no update, so a key-off, which converts only release times, reaches only the envelopes' groups: `matrixRelease`. A note value (128 on) takes no sum (`withSum`).
   `0x894d96d0` on `0x89cf7634`, which older sections call "the matrix", is the Multi Step Modulator, not ported (HARDWARE_FIRMWARE.md, "The Matrix").
+- The effects don't run on the SH-4: MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain are microcode on a separate chip, Roland's ESP4 (RA0A-101; the JP-8000's instruction set, v123; ported in `XtFxChip`, v126; its delay memory 2^17 words on a 256 K × 16 DRAM; programs in rom.2,
+  8 channels by DMA), with no reference but a real XT. Only the SH-4's driver and converters run in `Sh4Interp`. Map, the word as far as decoded, and the proposed
+  order: HARDWARE_FIRMWARE.md, "The effects". The tones' `g` (v114) is ID 0x526, Out Gain for TG, default −24; the user's Output Gain is ID 0x76, on the chip.
 - The analog oscillator's map (waveform codes, routines, the converter's
   input, the hidden calibration IDs 0x528…0x55b) is in HARDWARE_FIRMWARE.md,
   "The analog oscillator, and SAW". A patch's waveform number is not the
