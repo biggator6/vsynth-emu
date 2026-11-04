@@ -3284,10 +3284,8 @@ int main(int argc, char** argv) {
     // 0x894f3110), the install (0x894f3660), the MOD, the updates (0x894f2090) and
     // the tone's render, with the COSM sections and the TVA stubbed.  Compared every
     // block: the five values the update moves, both buffers and the mix.  OSC 1 is
-    // off, analog (X-MOD among them, reading OSC 2's PCM) or PCM.  The band players
-    // must be exact.  The SOLO player is not (`solocmp`), so its buffers count
-    // apart, within a limit of 2e-4 of full scale, and the mix of the firmware's own
-    // buffers stands in for the sum.  Energy, which only a new block moves, changes
+    // off, analog (X-MOD among them, reading OSC 2's PCM) or PCM.  All bit for bit,
+    // the players included.  Energy, which only a new block moves, changes
     // during some notes; some loop, some SOLO notes are Robot Voice, and on some
     // the MOD is RING, FM, ENV RING or OSC SYNC.
     // the stubs this pass runs on, whatever the passes before it left
@@ -3452,17 +3450,11 @@ int main(int argc, char** argv) {
         }
     };
     static PcmVoice pv[2];
-    // OSC 2's buffer as the firmware rendered it, before X-MOD reads and clears it: a SOLO
-    // OSC 2's is only close to the port's, and X-MOD's phase would drift on the difference
-    float fwOsc2[64];
-    c.hook(0x894f6d78, [&](Sh4& m) {
-        for (uint32_t i = 0; i < 64; ++i) { const uint32_t u = m.rd32(kBuf2 + 4 * i); std::memcpy(&fwOsc2[i], &u, 4); }
-        mask2 = m.r[0]; m.r[6] = m.r[0]; m.pc += 2;
-    });
+    c.hook(0x894f6d78, [&](Sh4& m) { mask2 = m.r[0]; m.r[6] = m.r[0]; m.pc += 2; });
     // the ramps the voice's constructor (0x894f1f50) makes for Time Trip: types 2 and 1, their value 1 when idle
     for (uint32_t Vn : { V1, V2 }) { c.wr32(Vn + 0x8c8, 2); c.wr32(Vn + 0x910, 1); }
-    long pn = 0, pd = 0, pb = 0, pm = 0, pm2 = 0, pbl = 0, ps = 0, pOut2 = 0, pSoloOver = 0;
-    double pMax = 0, pSoloMax = 0;
+    long pn = 0, pd = 0, pb = 0, pm = 0, pm2 = 0, pbl = 0, pOut2 = 0;
+    double pMax = 0;
     long pByType[6] = {};
     auto pcmCase = [&](int g) {
         const int osc1 = g % 8;                      // 0 off, 1…3 analog, 4…7 PCM
@@ -3640,19 +3632,13 @@ int main(int argc, char** argv) {
             if (mask2 != 0 && pm2++ < 6) std::printf("  pcm %d.%d: OSC 2's mask %08x\n", g, blk, mask2);
             // OSC 2, then OSC 1, in the XT's units, as XtSynth's mix takes them
             float l[2][64] = {};
-            bool exact = true;
             for (int n = 1; n >= 0; --n) {
                 if (wave[n]) {
                     PcmVoice& s = pv[n];
-                    if (s.W->type == 1) {
-                        float a[32], b[32];
-                        s.solo.render(a, b, 32);
-                        for (int i = 0; i < 32; ++i) { l[n][2 * i] = a[i] * 0x1p31f; l[n][2 * i + 1] = b[i] * 0x1p31f; }
-                        exact = false;
-                    } else s.mb.block(l[n]);
+                    if (s.W->type == 1) s.solo.renderXt(l[n], 32);
+                    else s.mb.block(l[n]);
                     ++pByType[(s.W->type == 1 ? 4 : s.W->type == 3 ? 0 : 2) + (s.W->ch - 1)];
                 } else if (n == 0 && analog1) {
-                    if (wave[1]->type == 1 && k1.p.wave == 13) std::copy(fwOsc2, fwOsc2 + 64, l[1]);
                     to[0].process(l[0], 0, l[1]);                 // a PCM OSC 2's mask is 0: nothing to sync to
                     if (!fieldsSame(0) && pd++ < 12) std::printf("  pcm %d.%d analog state\n", g, blk);
                 }
@@ -3661,23 +3647,17 @@ int main(int argc, char** argv) {
             std::copy(l[0], l[0] + 64, mix);
             if (modOn) pMod.process(mix, mix, l[1]);
             else xtAnalogMix(mix, l[1]);
-            if (exact && !modSame(MODO, pMod) && pd++ < 12) std::printf("  pcm %d.%d: MOD state\n", g, blk);   // ENV RING's follower reads a SOLO OSC's small difference too
+            if (!modSame(MODO, pMod) && pd++ < 12) std::printf("  pcm %d.%d: MOD state\n", g, blk);
             ++pbl;
             int firstBad = -1;
             for (int i = 0; i < 64; ++i) {
                 const float f1 = f32(kBuf1 + 4 * (uint32_t)i), f2 = f32(kBuf2 + 4 * (uint32_t)i), fm = f32(kBufMix + 4 * (uint32_t)i);
                 pMax = std::max(pMax, (double)std::fabs(fm) / 2147483648.0);
-                const bool solo1 = wave[0] && wave[0]->type == 1, solo2 = wave[1]->type == 1;
-                if ((!solo1 && !same(f1, l[0][i])) || (!solo2 && !same(f2, l[1][i]))) { if (firstBad < 0) firstBad = i; }
-                const double d1 = solo1 ? (double)std::fabs(f1 - l[0][i]) / 2147483648.0 : 0.0, d2 = solo2 ? (double)std::fabs(f2 - l[1][i]) / 2147483648.0 : 0.0;
-                pSoloMax = std::max(pSoloMax, std::max(d1, d2));
-                if (std::max(d1, d2) > 2e-4) ++pSoloOver;
-                if (exact && !same(fm, mix[i]) && firstBad < 0) firstBad = i;
+                if ((!same(f1, l[0][i]) || !same(f2, l[1][i]) || !same(fm, mix[i])) && firstBad < 0) firstBad = i;
                 // the firmware's own sum, whatever the players
                 const float sum = add(f1, f2);
                 if (!modOn && !same(sum, fm) && pm++ < 6) std::printf("  pcm %d.%d mix %d: fw %.9g, its buffers sum %.9g\n", g, blk, i, fm, sum);
             }
-            if (!exact) ++ps;
             if (firstBad >= 0 && pb++ < 12) {
                 const uint32_t i = (uint32_t)firstBad;
                 std::printf("  pcm %d.%d osc1 %s osc2 type %d ch %d: first difference at %d: osc1 %.9g/%.9g osc2 %.9g/%.9g mix %.9g/%.9g\n", g, blk,
@@ -3689,19 +3669,16 @@ int main(int argc, char** argv) {
             if (!c.call(0x894f1fd0, { tv[n] }, sp)) { std::fprintf(stderr, "stop: %s\n", c.error().c_str()); return false; }
             if (n == 0 && analog1) to[0].release();
         }
-        // what ENV RING's follower took from a SOLO OSC's small difference: the words it
-        // leaves stay through the next notes, so the firmware's take the port's
-        wf(MODO + 0x28, pMod.env()); wf(MODO + 0x2c, pMod.lastLevel());
         return true;
     };
     for (int g = 0; g < nPcm; ++g)
         if (!pcmCase(g)) return 1;
     std::printf("pcm tone: %d cases, %ld note-ons and updates, %ld different; %ld blocks, %ld different; mix of the firmware's buffers %ld different (peak %.4g); %ld notes left off, a read outside memory; %ld band reads far from their wave\n",
                 nPcm, pn, pd, pbl, pb, pm, pMax, pOut2, bandReads.far);
-    std::printf("pcm tone blocks by OSC wave: backing mono %ld stereo %ld, ensemble mono %ld stereo %ld, solo mono %ld stereo %ld; %ld with a SOLO player, largest difference %.3g of full scale, %ld samples past the limit\n",
-                pByType[0], pByType[1], pByType[2], pByType[3], pByType[4], pByType[5], ps, pSoloMax, pSoloOver);
+    std::printf("pcm tone blocks by OSC wave: backing mono %ld stereo %ld, ensemble mono %ld stereo %ld, solo mono %ld stereo %ld\n",
+                pByType[0], pByType[1], pByType[2], pByType[3], pByType[4], pByType[5]);
     std::printf("pcm tone: OSC 2's mask not 0 in %ld blocks\n", pm2);
-    bad += pd + pb + pm + pm2 + pSoloOver;
+    bad += pd + pb + pm + pm2;
 
     // The stereo flag.  A voice's +0x960 is 1 for a stereo wave.  The tone's note-on
     // (0x894f5e60) gives both COSMs' routine pick (0x894eef70) and the TVA (0x894f50e0)

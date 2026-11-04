@@ -32,9 +32,7 @@
 // buffers, the mix, the output of the COSM stage, the TVA and the output; at every
 // update, the envelopes' and LFOs' outputs and stages, the pitch terms and ramps,
 // and each voice's fields; at each case's end, FM's lines; all bit for bit in the
-// XT's units.  Within a tolerance:
-// only a SOLO wave's buffers and what follows them (kSoloTol of the block's peak),
-// since XtSoloVoice is not bit-exact (xt_fw solocmp).  Past the wave's data a player
+// XT's units, with no tolerance.  Past the wave's data a player
 // reads whatever lies there: the waves lie among zeros, which is what the port reads;
 // a band player's read further off is given zeros too (xtFwHookBandReads), and a note
 // whose read leaves memory by another path is left off and counted.
@@ -87,7 +85,6 @@ const uint32_t kRam = 0x8C000000, kSp = kRam + 0xF0000, kN = kRam + 0x1000, kK =
                kNote = kRam + 0x1600, kCtl = kRam + 0x1800, kBuf = kRam + 0x2000, kOs = kRam + 0x3000;
 constexpr uint32_t kBuf1 = 0x89d2c810, kBuf2 = 0x89d2c910, kBufMix = 0x89d2ca10;
 constexpr uint32_t kFmLines = 0x89f91c5c;     // FM's line pool, XtModShared
-constexpr float kSoloTol = 2e-2f, kSoloFloor = 8192.0f;   // a SOLO wave's buffers: of the block's peak, plus a floor (−108 dB of full scale)
 
 constexpr uint32_t kDescTab = 0x897a167c, kRomBase = 0x89300000;
 constexpr int kCosm2 = 0x10000;      // COSM 2's IDs in the patch table: COSM 1's plus this
@@ -865,7 +862,6 @@ int XtToneProbe::run(int argc, char** argv) {
     syn.prepare(44100.0);
     Report rep;
     long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0;
-    float worstSolo = 0;
     float L[32], R[32];
     uint32_t fwFree[3] = {};                // the free-running objects of LFO 1, 2 and 5
     static constexpr uint32_t kFreeLfo[3] = { 1, 2, 5 };
@@ -879,14 +875,13 @@ int XtToneProbe::run(int argc, char** argv) {
     long total = 0;
     const auto summary = [&](const char* name) {
         std::printf("%s: %ld notes, %ld taken by a sounding tone, %ld truncated, %ld blocks, %ld checks\n", name, notes, legatos, truncates, blocks, rep.checks);
-        std::printf("%s: a SOLO wave's buffers within %.1e of the block's peak; %ld notes left off, a read outside memory; %ld band reads far from their wave\n", name, worstSolo, wild, fw.bandReads.far);
+        std::printf("%s: %ld notes left off, a read outside memory; %ld band reads far from their wave\n", name, wild, fw.bandReads.far);
         long sub = 0;
         for (const auto& k : rep.kinds) { std::printf("  %-28s %ld different\n", k.first.c_str(), k.second); sub += k.second; }
         std::printf("%s: %ld different\n", name, sub);
         total += sub;
         rep.kinds.clear();
         rep.checks = notes = legatos = truncates = blocks = wild = fw.bandReads.far = 0;
-        worstSolo = 0;
     };
     const int nOsc2 = waves.empty() ? 0 : nCases / 2;
     const int tickFrom = nCases + nSweep + nOsc2, nTick = 16 * 3;     // each COSM type, each kind of second update
@@ -1030,17 +1025,6 @@ int XtToneProbe::run(int argc, char** argv) {
             ctl.cosm[1].type = g % 4 == 0 ? 5 : 6;
             for (Ctl::Cosm::SideBand& b : ctl.cosm[1].sb) b.detuneOwn = b.widthOwn = 40;
         }
-        const bool solo1 = wv && wv->type == 1 && ctl.on, solo2 = wv2 && wv2->type == 1 && ctl.osc2.on, soloCase = solo1 || solo2;
-        // The stereo Side Band follower reads past its block, so a SOLO wave's small differences
-        // reach the buffer beside it: that one takes the SOLO tolerance too.
-        const auto sideBand = [&](int k) { return ctl.cosm[k].on && (ctl.cosm[k].type == 5 || ctl.cosm[k].type == 6); };
-        const bool soloBeside = soloCase && (sideBand(0) || sideBand(1));
-        // X-MOD's phase on OSC 2's output, which a SOLO wave's gives only closely
-        if (solo2 && ctl.ana.wave == 13) ctl.ana.wave = 0;
-        // Lo-Fi's quantizer turns the SOLO player's small differences into a step of its own, and the
-        // Compressor's level decision can flip on one: −93 dB in, 2% out through an Amp Simulator (seed 777;
-        // given the firmware's OSC 2 buffer the port is exact there).
-        if ((wv && wv->type == 1) || (wv2 && wv2->type == 1)) for (Ctl::Cosm& k : ctl.cosm) if (k.type == 9 || k.type == 10) k.type = 0;
         // what the case does besides one note: 0 none, 1 a second note on a POLY part,
         // 2 on a MONO part with Legato, 3 on a MONO part without
         const int kind = sweep || twoInTick ? 2 : g % 5 == 0 ? 1 : g % 5 == 1 ? 2 : g % 5 == 2 ? 3 : 0;
@@ -1698,28 +1682,22 @@ int XtToneProbe::run(int argc, char** argv) {
             for (FwNote* n : order) if (n->live && !n->ended) last = n;
             if (!last) { if (secondAt > blk) continue; break; }
             if (tick) compareAll(blk);
-            struct B { const char* name; uint32_t a; const float* p; bool solo; } bs[] = {
-                { "osc 2 buffer", kBuf2, syn.tapOsc2, solo2 || soloBeside }, { "osc 1 buffer", kBuf1, syn.tapOsc1, solo1 || soloBeside }, { "mix", kBufMix, syn.tapMix, soloCase }, { "cosm output", kBufMix, syn.tapCosm, soloCase } };
+            struct B { const char* name; uint32_t a; const float* p; } bs[] = {
+                { "osc 2 buffer", kBuf2, syn.tapOsc2 }, { "osc 1 buffer", kBuf1, syn.tapOsc1 }, { "mix", kBufMix, syn.tapMix }, { "cosm output", kBufMix, syn.tapCosm } };
             for (const B& b : bs) {
                 // the COSMs work in place on the mix: a mix's own buffer is theirs with one on
                 if (b.p == syn.tapMix && (ctl.cosm[0].on || ctl.cosm[1].on)) continue;
                 ++rep.checks;
-                float peak = 0;
-                if (b.solo) for (int i = 0; i < 64; ++i) peak = std::max(peak, std::fabs(fw.f32(b.a + 4 * (uint32_t)i)));
                 for (int i = 0; i < 64; ++i) {
                     const float x = fw.f32(b.a + 4 * (uint32_t)i);
-                    if (b.solo) {                        // XtSoloVoice is not bit-exact (solocmp: −83 to −100 dB)
-                        const float e = std::fabs(x - b.p[i]);
-                        if (peak > 16.0f * kSoloFloor) worstSolo = std::max(worstSolo, e / peak);
-                        if (e > kSoloTol * peak + kSoloFloor) { rep.bad(b.name, "fw %.9g port %.9g", x, b.p[i], blk); break; }
-                    } else if (!bits(x, b.p[i])) {
+                    if (!bits(x, b.p[i])) {
                         rep.bad(b.name, "fw %.9g port %.9g", x, b.p[i], blk);
                         break;
                     }
                 }
             }
             // The TVA, bit for bit; the output, Output Assign MFX's bus, the frame's third
-            // pair, likewise but for a SOLO wave.  A truncated tone's target and step, which
+            // pair, likewise.  A truncated tone's target and step, which
             // its fade does not read, are the firmware's alone.
             for (FwNote* n : order) {
                 if (!n->live || n->ended) continue;
@@ -1737,14 +1715,9 @@ int XtToneProbe::run(int argc, char** argv) {
                 }
             }
             ++rep.checks;
-            float outPeak = 0;
-            if (soloCase) for (int i = 0; i < 64; ++i) outPeak = std::max(outPeak, std::fabs(i & 1 ? R[i / 2] : L[i / 2]));
             for (int i = 0; i < 32; ++i) {
                 const float a = fw.f32(kBuf + 0x20 * (uint32_t)i + 0x10) * 0x1p-31f, a2 = fw.f32(kBuf + 0x20 * (uint32_t)i + 0x14) * 0x1p-31f;
-                if (soloCase) {
-                    const float e = std::max(std::fabs(a - L[i]), std::fabs(a2 - R[i]));
-                    if (e > kSoloTol * outPeak + kSoloFloor * 0x1p-31f) { rep.bad("output", "fw %.9g port %.9g", a, L[i], blk); break; }
-                } else if (!bits(a * 0x1p31f, L[i] * 0x1p31f) || !bits(a2 * 0x1p31f, R[i] * 0x1p31f)) { rep.bad("output", "fw %.9g port %.9g", a, L[i], blk); break; }
+                if (!bits(a * 0x1p31f, L[i] * 0x1p31f) || !bits(a2 * 0x1p31f, R[i] * 0x1p31f)) { rep.bad("output", "fw %.9g port %.9g", a, L[i], blk); break; }
             }
         }
         if (syn.pad.on()) {                          // the pad up again for the next case
@@ -1763,10 +1736,10 @@ int XtToneProbe::run(int argc, char** argv) {
         for (FwNote& n : fn) if (n.live && !fw.stop(n)) return 1;
         for (uint32_t a : { 0x894d5fc0u, 0x894d5fd0u }) if (!fw.c.call(a, { kN, 0 }, kSp)) return 1;   // the pedals up, no note left
         // FM's lines outlast a note and a modulator past full scale reads the next tone's, so
-        // they must agree after a case.  A SOLO wave's are only close, and a note that left
-        // memory stopped a block before XtSynth's: a later case reading those has no tolerance
-        // to take them in.  So each case starts from the port's.
-        if (!soloCase && !leftOff) {
+        // they must agree after a case.  A note that left memory stopped a block before
+        // XtSynth's: a later case reading those has no tolerance to take them in.  So each case
+        // starts from the port's.
+        if (!leftOff) {
             ++rep.checks;
             for (uint32_t i = 0; i < 2 * XtModShared::kTones * XtModShared::kLine; ++i) {
                 const float a = fw.f32(kFmLines + 4 * i), b = syn.modShared.line[i];

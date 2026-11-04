@@ -561,9 +561,9 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 //   : the firmware's SOLO encoder and player (xtFwSoloPlay); L/R pairs.
 //   frame:walk changes the walk, frame:gX the output gain target (1 = unity);
 //   "robot" turns Robot Voice on (R is then the pitch against A440)
-// xt_fw <rom.2.bin> solocmp <samp.bin> <channels> <R> <F> <walk> <energy> <frames> [frame:walk ...]
-//   : the same against XtSoloVoice on the same records: the largest
-//   difference and the difference's level against the signal
+// xt_fw <rom.2.bin> solocmp <samp.bin> <channels> <R> <F> <walk> <energy> <frames> [frame:walk ...] [loop:on,fwdMode,bwdMode,fs,fe,bs,be]
+//   : the same against XtSoloVoice on the same records, word for word: how many differ, and if any
+//   the largest difference and the difference's level against the signal
 // xt_fw <rom.2.bin> bandcmp <3|5> <samp.bin> <channels> <pitch> <walk> <frames> [frame:walk ...] [loop:on,fwdMode,bwdMode,fs,fe,bs,be]
 //   : the firmware's multi-band encoder, band rebuild and player
 //   (xtFwBandPlay) against XtMbPlayer on the same bands
@@ -621,6 +621,13 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "vpdt %zu bytes\n", vpdt.size());
     } else if ((mode == "soloplay" && argc >= 11) || (mode == "solocmp" && argc >= 10)) {
         alarm(120);                        // a walk that never ends fails the check instead of hanging it
+#if defined(__aarch64__)
+        {   // denormals flushed, as the SH-4 does (FPSCR.DN = 1) and the plugin's audio thread does
+            uint64_t fpcr;
+            __asm__ volatile("mrs %0, fpcr" : "=r"(fpcr));
+            __asm__ volatile("msr fpcr, %0" : : "r"(fpcr | (1ull << 24)));
+        }
+#endif
         std::vector<uint8_t> raw = slurp(argv[3]);
         const int ch = std::atoi(argv[4]);
         const long frames = (long)(raw.size() / (2 * (size_t)ch));
@@ -673,27 +680,28 @@ int main(int argc, char** argv) {
             v.setRobot(note.robot);
             v.setLoop(note.loop);
             v.noteOn(P, note.pitch, note.formant, note.walk, note.energy);
-            std::vector<float> L(32), R(32);
+            v.resetGain(1.0f / 65536.0f);                      // as the firmware's here: unity in its int16 scale
+            float lr[64];
             double maxd = 0, sig = 0, dif = 0;
-            long first = -1;
+            long first = -1, nDiff = 0;
             size_t next = 0, nextG = 0;
             for (long done = 0; done < outFrames; done += 32) {
                 while (next < note.walkAt.size() && note.walkAt[next].first <= done) {
                     v.setRates(note.pitch, note.formant, note.walkAt[next++].second);
                 }
-                while (nextG < note.gainAt.size() && note.gainAt[nextG].first <= done) v.setGain(note.gainAt[nextG++].second);
-                v.render(L.data(), R.data(), 32);
+                while (nextG < note.gainAt.size() && note.gainAt[nextG].first <= done) v.setGain(note.gainAt[nextG++].second / 65536.0f);
+                v.renderXt(lr, 32);
                 for (long i = 0; i < 32 && done + i < outFrames; ++i)
                     for (int k = 0; k < 2; ++k) {
-                        const double a = fw[(size_t)(2 * (done + i) + k)], b = k ? R[(size_t)i] : L[(size_t)i];
-                        const double d = std::fabs(a - b);
-                        if (d > 0 && first < 0) first = done + i;
-                        maxd = std::max(maxd, d); sig += a * a; dif += d * d;
+                        const float a = fw[(size_t)(2 * (done + i) + k)], b = lr[2 * i + k] / 32768.0f;
+                        const double d = std::fabs((double)a - (double)b);
+                        if (d > 0) { if (first < 0) first = done + i; ++nDiff; }
+                        maxd = std::max(maxd, d); sig += (double)a * a; dif += d * d;
                     }
             }
-            std::printf("%zu records, %ld frames: max |firmware - port| %.3g, difference %.1f dB against the signal (rms %.4f), first at %ld\n",
-                        nc, outFrames, maxd, 10.0 * std::log10(std::max(dif, 1e-30) / std::max(sig, 1e-30)),
-                        std::sqrt(sig / std::max(1L, 2 * outFrames)), first);
+            std::printf("%zu records, %ld frames: %ld different of %ld (signal rms %.4f)", nc, outFrames, nDiff, 2 * outFrames, std::sqrt(sig / std::max(1L, 2 * outFrames)));
+            if (nDiff) std::printf(", max |firmware - port| %.3g, difference %.1f dB against the signal, first at %ld", maxd, 10.0 * std::log10(dif / std::max(sig, 1e-30)), first);
+            std::printf("\n");
         }
     } else if (mode == "bandcmp" && argc >= 9) {
         std::vector<uint8_t> raw = slurp(argv[4]), vpdt;

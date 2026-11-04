@@ -61,7 +61,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=toneenv`: xt_tone, XtEnvelope.cpp; `PORT=tonesolo`: xt_tone, XtSoloVoice.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
   solocmp on the baseline's cases, XtSoloVoice.cpp; `PORT=enc`: xt_enc on the baseline's waves, XtSoloEncoder.cpp)
   and runs it, to show the check catches it (a run the error crashes counts). `mutate_tone.py [cases]`: the list in
-  `tone_muts.txt` (`name|old|new[|port]`), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
+  `tone_muts.txt` (`name|old|new[|port]`; port `solo` for what only `solocmp` reaches), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
 - `xt_tone <rom> [cases] [seed] [inputs]` (in fcheck; `build/tools/fcheck/bin`): XtSynth's wiring
   against a whole firmware tone. `XT_TONE_FIRST=1`: each case's first difference, `XT_TONE_DUMP=<case>|a`:
   its settings. A new `Controls` field needs its ID in `patchOf` and a draw in `drawControls`, and a field
@@ -77,7 +77,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
   takes about 10 s), and `mutate_tone.py 2000 <new names>` for the planted errors just added.
-- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 13 minutes) if
+- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 16 minutes) if
   `XtSynth.cpp`, `XtToneCheck.cpp` or a port changed: a planted error can stop meaning anything
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
@@ -96,16 +96,19 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - Parameter names by ID: pointers from 0x89790338. Descriptors (centre,
   default, min, max): 12 bytes per ID from 0x897a167c; IDs ≥ 0x55d use a
   second bank, 8 bytes per ID from 0x897a56d8.
-- The voice buffer is int16 × 65536 on the XT: XtSynth's SOLO buffer (±1) is
-  ×2^31 from it, the band players' (int16) ×2^16.
+- The voice buffer is int16 × 65536 on the XT: `XtSoloVoice::renderXt` writes it as it is (`render` is
+  that × 2^-31, ±1), the band players' (int16) are ×2^16 from it.
 - `xt_fw solocmp` takes R and F as ratios (F 0 = none) and Energy as a gain
   0..1; `bandcmp` type 3 BACKING / 5 ENSEMBLE.
+- `XtSoloVoice` is bit for bit: its grains, filter and gain are plain float arithmetic under FE_TOWARDZERO, as `XtMbPlayer`'s
+  (HARDWARE_FIRMWARE.md, "SOLO bit for bit"). The rounding mode is set inside `noteOn` and `renderXt`, so nothing called
+  from them may use XtFloat's sums: TwoSum needs round to nearest. `XtBeat` does, so it runs under `RoundNearest` there.
 - A band player's backward repeat (`0x8950f50a`) can overflow its position to near 2^31, in the port too.
   An Alternate loop reaches it with the walk positive, as the bounce negates the step. The reads then leave the
   wave, which on the XT gets whatever is in RAM. `xt_tone` and `xt_analog` give them zeros, as the port reads
   (`xtFwHookBandReads`; HARDWARE_FIRMWARE.md, "A band read far from its wave", "`xt_analog` past the far band reads").
-- SOLO's anchor and grain timer are int32 on the XT and can overflow, so `XtSoloVoice` wraps them: a backward
-  repeat ends only by overflowing (HARDWARE_FIRMWARE.md, "The anchor's overflow"). A loop ported to `double`
+- SOLO's anchor, grain timer and ages are int32 on the XT and can overflow. `XtSoloVoice` wraps the anchor and keeps the others
+  as int32: a backward repeat ends only by overflowing (HARDWARE_FIRMWARE.md, "The anchor's overflow"). A loop ported to `double`
   from int32 may not end; `solocmp` dies by `alarm(120)` so a hang fails the check.
 - `xtSoloEncode` gives the records of the firmware's encoder, mono (`0x8951e120(2)`) and stereo (`(3)`, which is not mono on
   `(L+R)>>1`): `xtFwSoloEncode`, `xt_enc cmp` in fcheck, HARDWARE_FIRMWARE.md, "The SOLO encoder against the firmware's" and "The

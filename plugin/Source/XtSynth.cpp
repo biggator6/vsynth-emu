@@ -1409,14 +1409,10 @@ void XtSynth::mixBlock(float* lr) {
             tvaUpdate(v);
             if (!v.active) continue;
         }
-        // A PCM OSC's player, in the XT's units (int16 × 65536): the SOLO player's ±1 × 2^31;
-        // the band players' gain is the firmware's (setGainXt)
+        // A PCM OSC's player, in the XT's units (int16 × 65536); the players' gains are the firmware's
         auto pcmBlock = [](OscVoice& s, float* lr) {
-            if (s.wave->type == 1) {
-                float l[32], r[32];
-                s.solo.render(l, r, 32);
-                for (int i = 0; i < 32; ++i) { lr[2 * i] = l[i] * 0x1p31f; lr[2 * i + 1] = r[i] * 0x1p31f; }
-            } else s.mb.block(lr);
+            if (s.wave->type == 1) s.solo.renderXt(lr, 32);
+            else s.mb.block(lr);
         };
         // The tone's render by its Structure Type (xtToneOrder), all in the XT's units
         uint32_t mask2 = 0;

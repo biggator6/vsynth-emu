@@ -6,7 +6,8 @@
 # counts), MISSED, or ERROR when the old text is no longer in the source.  From the
 # repo root.  tone_muts.txt:
 # name|old|new[|port], with \n and \| escaped; port is mutate.sh's PORT for an error in
-# another file than XtSynth.cpp (toneosc, XtOsc.cpp).
+# another file than XtSynth.cpp (toneosc, XtOsc.cpp), solo for one only `solocmp` reaches:
+# very short records, or a timer that overflows.
 import concurrent.futures as cf, os, re, subprocess, sys
 D = os.path.dirname(os.path.abspath(__file__))
 cases = sys.argv[1] if len(sys.argv) > 1 else '2000'
@@ -28,6 +29,10 @@ subprocess.run(['bash', script, 'zz-base', 'constexpr float kLand', 'constexpr f
 def run(m):
     r = subprocess.run(['bash', script, m[0], m[1], m[2], cases, 'different'], env=dict(env, PORT=m[3]), capture_output=True, text=True)
     out = r.stdout + r.stderr
+    if m[3] == 'solo':
+        if '== ' + m[0] not in out: return m[0], None
+        n = len(re.findall(r'^DIFFERENT', out, re.M))
+        return m[0], f'solocmp: {n} cases differ' if n else 'tone: 0 different'
     at = re.search(r'^tone: 1 different, (at case .*)$', out, re.M)
     if at: return m[0], at.group(1)
     died = re.search(r'^.*: (the run died, signal \d+)$', out, re.M)
