@@ -90,8 +90,14 @@ assigned number that reaches the dispatcher moves the playback pointer.  `xt_ton
 the firmware's pad through `0x894d8360`.  I did not trace whether MIDI IN feeds that
 dispatcher with these numbers, so the bench test still stands.  The parameter descriptors
 give the assigns a default of 0, off, where the manual gives CC82 and CC83.  The plugin's
-Time Trip is a plain knob for now (`XtSynth::timeTripKnob`); `XtSynth::timeTrip(x, y)`
-takes the two controllers' values if a MIDI mapping is wanted.
+The plugin's Time Trip was a plain knob at first (`XtSynth::timeTripKnob`).
+
+**The plugin since v132.**  A Control Change of either assign moves the pad, as well as being
+an ordinary controller: `XtSynth::padController`, checked in `xt_tone` against
+`0x894d8360`.  Time Trip Assign X and Y default to CC82 and CC83, the chart's.  The
+descriptors' 0 can't be what an XT ships with, as nothing else writes the pad's X and Y.
+The default isn't confirmed from the firmware itself.  A part recorded from an XT's pad
+should play back by those numbers; that hasn't been tried.
 
 ### Mode, hold and gating — SysEx only, no CC path
 

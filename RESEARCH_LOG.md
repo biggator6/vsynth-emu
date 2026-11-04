@@ -3462,6 +3462,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The threaded run can't see an ordering error, and the sanitizer can: three relaxed orderings planted, 0 different in the plain run, reports in all three. So it's a tool now, not something I ran once.
 - Nothing here has met an XT. It says the driver and the chip do on this machine what they do on JE-8086's model, by the same stream, at the same samples.
 
+### Session 16 addendum (2026-11-04) — v132: Time Trip by its controllers
+
+- `XtTripPad` was already what the firmware's handler does, so the port was a few lines. What took the time was the default. The descriptors say OFF, Roland's chart says CC82 and CC83, and v119 had gone with the descriptors for the other assigns. I searched the images for a factory table and found none. What settled it was asking what else writes the pad's X and Y, and the answer is nothing: if the assigns really shipped OFF, the XT's own pad wouldn't scrub. That's an argument, not a reading of the factory value, and the docs say so.
+- My first search for readers of IDs 0x91 and 0x92 also found three UI routines, which turned out to be drawing coordinates that happen to be 0x91 and 0x92. I read them before leaning on them.
+- A SOLO wave scrubbed back past its start stayed silent after letting go, and the band players didn't. My first thought was a bug in the port, or in v122's merge. `xt_tone` said 0 different but had hardly ever been there, as its gestures were short. So I added a case that goes there, and planted the fix I'd have made. The check caught the fix, which means the firmware keeps the flag. I'd have broken it if I'd trusted my ear.
+- The first draw for assigns could put a pad on CC 7, which the harness keeps its own copy of, so its moves would have fought each other. Those numbers are out of the draw. Hold and Sostenuto are in, on purpose, as the firmware does both.
+
 ### Session 16 addendum (2026-11-04) — v133: the whole frame in XtSynth
 
 - v115 called this an ordinary exact port, and it was. The converter's end and the render were all in v114's notes, bar the order of the words, which I read off the disassembly with the register banks written out by hand, as `fschg` turns those moves into pairs across banks.
@@ -3472,3 +3479,8 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Twelve older plants had to be rewritten, as the code they planted in had moved. Their old text was gone, so `mutate_tone.py` would have said ERROR, not missed: the kind of failure I'd want. A few of them had to become longer to mean the same thing, since a sample's words now go through one lambda.
 - The DIR behaviour is the kind of thing nobody would design. Output Assign moved to DIR under a held note silences it. It's what the code does, and a real XT can say if that's true.
 - The Time Trip session committed v132 on its own branch while this ran, in the same files. Not merged: that's the user's word to give.
+
+### Session 16 addendum (2026-11-04) — v135: v132 joins
+
+- The user's yes named v132, and by then the other session had put v134 on top of it. I merged the commit they named, not the branch's tip, and told them.
+- An easy one: the two touch different things in the same files. I still ran the whole list, as a merge is exactly when a plant can stop meaning anything.

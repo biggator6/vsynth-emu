@@ -1547,6 +1547,16 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### v132 joins (2026-11-04, v135)
+
+This merges v132, Time Trip by its controllers, with v131 and v133, on the user's word, ahead of putting the chip in the sound, which touches the same files. Nothing in the two meets: one reads controllers for the pad and the other writes the output bus. So there was no new firmware to read.
+
+**Only the docs, the baseline and the plants' list conflicted,** and each side had only added at the same place. The sources merged by themselves. These lists keep version order, so v132's sections sit between v131's and v133's.
+
+**The result.** `xt_tone` 0 different at 2000 cases, and the baseline differs from v133's only in what the draws changed: with `assign[]` two longer, the same seed draws other cases. `mutate_tone.py`: 792 planted, 0 missed. `verify.sh` passes: A/B 4/4 identical to v133, PluginTest 4/4, engine tests and auval.
+
+v134, the pad's X-Y pair, is on top of v132 on that other branch, and isn't in here: the user's word named v132.
+
 ### The whole frame in XtSynth (2026-11-04, v133)
 
 `XtSynth` now writes all eight words of the output bus at every sample, as the firmware's render does: MAIN, the Reverb and Chorus sends, MULTI and DIR (`XtSynth::frame`). Chorus and Reverb Send Level, Output Assign, Output Mode, Out Gain for TG and CC 91 and 93 are in, with the Matrix's sums on the sends, and `xt_tone` compares all of it. They have no plugin parameters yet, because nothing would be heard: the sends and MULTI's effects are waiting for the chip. At the defaults the renders are unchanged: `ab.sh` 4/4 identical.
@@ -1591,6 +1601,50 @@ Each level then moves by (block − level)·0.0009375, formed once per block, wh
 
 **What's next.** The chip in the sound: a thread for `XtFxControl`, `frame` into `XtFxChip`, the Matrix's slots 9…0xb to `setMatrix`, parameters and editor, and a decision on the level.
 
+### Time Trip by its controllers (2026-11-04, v132)
+
+Time Trip Assign X and Y (IDs 0x91, 0x92) now work: a Control Change of either number moves the pad, as the firmware's Control Change case does. The knob stays. `Trip X` and `Trip Y` join the Assign box, on CC82 and CC83 by default. With no such controller nothing moves: A/B 4/4 identical to v130.
+
+**What the firmware does.** Any controller: `0x89474bf4` stores the value on the channel for numbers below 96. Then `0x894d6f10(port, channel, number, value)` runs that number's handler, which queues the note's update (`0x894dc2c0`), and last, for each part on that port and channel, `0x894d8360(part, number, value)`.
+- `0x894d8360` compares the number with four bytes, `0x89cf69a4`…`a7`: Time Trip Assign X and Y, Beam 1 Assign L and R. `0x894d82d0` sets them from IDs 0x91, 0x92, 0x87 and 0x88. An assign of 0 or 32 becomes −1, which no number equals. Power-on (`0x894d6b40`) sets all four to −1.
+- X and Y are two separate tests, so one number can be both. What each does was already `XtTripPad`, from v118: X above 0 is stored, X at 0 on a touched pad lets go without storing, and Y makes the move.
+- So a pad's controller is still an ordinary controller. The channel keeps its value, a Matrix source can read it, an assign on CC 64 is Hold as well, and each message brings a tone update. v124's "a pad's move brings no update" is `0x894d8360` by itself: on this path the update is the controller's own.
+
+`XtSynth::controller` calls `padController` after its handlers and before its update. `XtSynth::timeTrip`, the knob, keeps its one update on touching or letting go.
+
+**The default.** The descriptors give 0 for all four, and Roland's chart names CC82 and CC83 (`CONTROLLERS.md`). I took Roland's, because the descriptors' can't be what an XT ships with. `0x894d8360` and the D Beam's `0x894d8160` are all that write the pad's X and Y, `0x894d82d0` is the only reader of IDs 0x91 and 0x92, and the pad's other references are its set-up and the readers v118 and v124 traced. So with the assigns OFF an XT's own pad couldn't scrub, unless its panel has a path I haven't found. No firmware image here holds 80, 81, 82, 83 side by side, so the factory value itself isn't confirmed. v119's other assigns stay OFF, though the chart names CC80 and CC81 for Pad X and Y.
+
+**What it does.** A wave of a burst every half second, on all three types. That is the port's render, not the XT's.
+
+| Controllers | Bursts |
+|---|---|
+| None | every 0.5 s |
+| CC82 and CC83 hold the pad still from 1.1 to 3.6 s | none from 1.1 s, then 4.0, 4.5, 5.0, 5.5, on the grid they had |
+| The same with both assigns OFF | every 0.5 s |
+| The same on CC20 and CC21, assigned | as CC82 and CC83 |
+| A finger clockwise, 1 turn a second from 1 to 4 s | every 0.5 s |
+| 2 turns a second | every 0.25 s |
+
+**A SOLO wave taken back past its start stays silent.** A finger going backward long enough reaches the wave's start. Let go, the band players fade in at the beat position, and a SOLO wave stays silent for the rest of the note: the seek (`0x8950fed0`) doesn't clear its end flag (+4). That looked like a fault, and a gesture over MIDI reaches it easily, so `xt_tone` now has a case for it, and a planted error, `solo-seek-ended`, clears the flag. That is caught, so the firmware does keep it.
+
+**The check.** `xt_tone` sets the assigns through the firmware's own `0x894d82d0`.
+- Each assign is the chart's in a third of the cases, or none, or Hold or Sostenuto as well, or another controller. One controller is both in one case in sixteen.
+- Half the pad's cases go by controllers. Each message is its own, only what changed, in either order, on the numbers the case began with, so an assign moved during the note leaves them behind. Each goes through the channel's value, Hold's or Sostenuto's handler if it's theirs, `0x894d8360`, and the update, with the pad's state compared after it. The sweep moves each assign alone.
+- Every other controller the check sends now goes through `0x894d8360` too. The numbers the harness keeps itself (CC 1, 7, 10, 11) aren't drawn as assigns.
+- The knob's cases keep the direct route, with the assign bytes on two numbers of its own around the call.
+- The long notes that `farCase` leaves now have a finger going backward past the wave's start, held 200 to 500 blocks, and let go.
+
+**The result.** fcheck: 2000 cases and the sweep, 4217 notes, 2274 taken by a sounding tone, 354 truncated, 371,812 blocks, 20.6 million checks, 0 different; a wave on OSC 2, 1342 notes, 118,093 blocks, 7.0 million checks, 0 different; the other sections as they were. `fcheck.sh --update` changes only `xt_tone`'s count lines. 3000 cases and the sweep on seeds 31337, 9, 2007, 90210, 55555, 777, 4242 and 1234: all 0 different in all six sections. A/B 4/4 identical to v130. PluginTest 4/4 bit-identical at the defaults, with CC82 and CC83 at the default assigns (which holds the processor's parameter defaults to `Controls`'), on CC20 and CC21, with the assigns off, and on a play head moving and stopped.
+
+**Planted errors.** `tone_muts.txt` gains 12 (`cc-pad-…`, `knob-steps`, `solo-seek-ended`), and `sost-up-none` follows the line it now stands next to: 745 in all, all caught at 2000 cases, none lost to the new draws.
+
+**The plugin.** Parameters `assignTripX`, `assignTripY`, in the Assign box as `Trip X` and `Trip Y`. CLI `XT_CC="frame,number,value;…"`, and `XT_ASSIGN` takes twelve. PluginTest `TEST_TRIPCC="x,y"`, `TEST_CCS="cc,value,frame,…"`.
+
+**Not covered.**
+- A real XT. Roland's chart says these numbers aren't recognised, so the bench test in `CONTROLLERS.md` still stands. A controller from MIDI IN wasn't traced past the dispatcher, whose case is the one every controller takes, CC 64 included.
+- Beam 1 Assign L and R (IDs 0x87, 0x88), the D Beam turning the pad through `0x894d8160`, in the same handler. They stay off.
+- MIDI channels and ports: the plugin has one part and takes every channel, as it does for other controllers.
+- An assign moved during a note makes a tone update here, as any control does. On the XT it is a system parameter, and I didn't check that it does.
 ### XtFxControl: the firmware's driver off the audio thread (2026-11-04, v131)
 
 `plugin/Source/XtFxControl.*` runs the XT's own effect driver from rom.2 in `Sh4Interp`, on whichever thread calls it, and what the driver writes reaches `XtFxChip` through a queue that the audio thread empties between samples. So the mutes, the ramps, the order of a type change and every converter from a parameter to a coefficient are the firmware's. There's no port of them to get wrong. It isn't in the plugin's sound yet: neither file is in `plugin/CMakeLists.txt`, and the sound doesn't change.
@@ -1703,7 +1757,7 @@ v125 comes in through v128, the tempo session's own merge of it with v124, not a
 
 **Planted errors.** 733 in all, all caught at 2000 cases, none stale and none lost: 696 from v127 and 37 from v125. 53 are first caught past the 2000 random cases, or by `solocmp`.
 
-**Not covered.** As v122, v124 and v125. The host's tempo has only run on PluginTest's play head, not in a DAW. Time Trip by MIDI is still the user's to decide.
+**Not covered.** As v122, v124 and v125. The host's tempo has only run on PluginTest's play head, not in a DAW. Time Trip by MIDI is still the user's to decide. (They said yes: v132.)
 
 ### The host's tempo with Hold and the Matrix (2026-11-04, v128)
 
@@ -2330,7 +2384,7 @@ So neither the seek nor the steering adds to it.
 
 **The plugin.** Parameters `patchTempo` (20…250 BPM), `timeTrip` (the pad as one knob, below), and for each OSC `tempoSync`, `origTempo`, `timeTripSw`, `beatKeep`, on the XT's defaults. Every envelope's Attack, Decay and Release and every LFO's Rate go on to 144, shown as 1/32…2/1 with the triplets and dotted ones. That widens those parameters' ranges, so a host's automation, which is normalized, maps differently; a saved session keeps its values. Rows: Sync, Trip, Keep and Original Tempo in the PCM OSC's place of the analog's fourth row, and Patch Tempo and Time Trip in a row of their own (`kXtStripH` 1030, window 1330). CLI `XT_TEMPO`, `XT_SYNC`, `XT_RATE`, `XT_TRIP`; PluginTest `TEST_TEMPO`, `TEST_SYNC`, `TEST_RATE`, `TEST_ATTACK`, `TEST_TRIP`.
 
-Time Trip is a plain knob for now (`XtSynth::timeTripKnob`): 0 lifted, 1…127 a finger going clockwise round the pad's rim, one turn over the range. So its whole travel is 48 steps, two quarter notes, with OFF at the bottom letting go. No MIDI CC is mapped to it, though `XtSynth::timeTrip(x, y)` takes the two controllers' values.
+Time Trip is a plain knob for now (since v132 the assigned controllers move the pad as well) (`XtSynth::timeTripKnob`): 0 lifted, 1…127 a finger going clockwise round the pad's rim, one turn over the range. So its whole travel is 48 steps, two quarter notes, with OFF at the bottom letting go. No MIDI CC is mapped to it, though `XtSynth::timeTrip(x, y)` takes the two controllers' values.
 
 **Not covered.**
 - A real XT.

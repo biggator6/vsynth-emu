@@ -213,7 +213,7 @@ sost-all-keys|if (!(sost >= 64 && (sostKeys[(v.raw & 127) >> 4] & bit))) v.keyFl
 sost-none|if (!(sost >= 64 && (sostKeys[(v.raw & 127) >> 4] & bit))) v.keyFlags &= ~4;|v.keyFlags &= ~4;
 sost-retakes|if ((sost ^ y) & 0x40) {|{
 sost-held-now|(sostKeys[(v.raw & 127) >> 4] & bit)|(keys.held[(v.raw & 127) >> 4] & bit)
-sost-up-none|                    if (!(v.keyFlags & 7)) voiceOff(v);\n                }\n    }\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|                }\n    }\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);
+sost-up-none|                    if (!(v.keyFlags & 7)) voiceOff(v);\n                }\n    }\n    padController(number, x);                      // then 0x894d6f10 gives it to the pad; the queued update is after that\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|                }\n    }\n    padController(number, x);                      // then 0x894d6f10 gives it to the pad; the queued update is after that\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);
 cc-store|if (number < 96) cc[number] = x;|if (number == 1) cc[number] = x;
 cc-any-update|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\nvoid XtSynth::newBlocks|    if (number != 1) for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\nvoid XtSynth::newBlocks
 mode-updates|            else keyRelease(v, lastRelease);           // the others (0x894d4f90)\n        }\n        return;|            else keyRelease(v, lastRelease);           // the others (0x894d4f90)\n        }\n        for (Voice& v : voice) if (v.active) newBlocks(v);\n        return;
@@ -778,3 +778,15 @@ block-gain-six|for (float& x : b.bus) x = mul(x, g);|for (int n = 0; n < 6; ++n)
 block-gain-none|for (float& x : b.bus) x = mul(x, g);||toneosc
 block-gain-sign|T.outGain[db + 48]|T.outGain[48 - db]|toneosc
 block-gain-pow|T.outGains ? T.outGain[db + 48] : (float)std::pow(2.0, (double)div(flt(db), 6.0f))|(float)std::pow(2.0, (double)div(flt(db), 6.0f))|toneosc
+cc-pad-call|    padController(number, x);                      // then 0x894d6f10 gives it to the pad; the queued update is after that\n|
+cc-pad-late|    padController(number, x);                      // then 0x894d6f10 gives it to the pad; the queued update is after that\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n    padController(number, x);\n}\n
+cc-pad-x|    if (assigned(ctl.assign[10])) pad.setX(value);\n|
+cc-pad-y|    if (assigned(ctl.assign[11])) {\n        int step = 0;\n        if (pad.setY(value, step)) padSteps(step);\n    }\n|
+cc-pad-x-as-y|if (assigned(ctl.assign[10])) pad.setX(value);|if (assigned(ctl.assign[11])) pad.setX(value);
+cc-pad-y-as-x|if (assigned(ctl.assign[11])) {|if (assigned(ctl.assign[10])) {
+cc-pad-steps|        if (pad.setY(value, step)) padSteps(step);\n    }\n}|        pad.setY(value, step);\n    }\n}
+cc-pad-off-0|a != 0 && a != 32 && a == number|a != 32 && a == number
+cc-pad-off-32|a != 0 && a != 32 && a == number|a != 0 && a == number
+cc-pad-both|    if (assigned(ctl.assign[10])) pad.setX(value);\n    if (assigned(ctl.assign[11])) {|    if (assigned(ctl.assign[10])) pad.setX(value);\n    else if (assigned(ctl.assign[11])) {
+knob-steps|    if (moved) padSteps(step);\n|
+solo-seek-ended|    jumpTo(pos16);\n|    jumpTo(pos16);\n    ended_ = 0;\n|tonesolo
