@@ -718,7 +718,7 @@ through the unit, DIR R: left -999.00 dB, right -0.02 dB, 1 samples late
 through the unit, MULTI L with the system's EQ on at its defaults: -0.06 dB
 control's readers against the routines one by one: 62 samples, 0 different
 control's behaviour on the bus: 249 samples, 0 different
-control's value text against the firmware's routine and driver: 159447 samples, 0 different
+control's value text against the firmware's routine and driver: 159835 samples, 0 different
 control's live edits against a patch: 12 samples, 0 different
 control under threads: 3200 edits, 0 different
 control against the reference: 266919 samples, 0 different

@@ -294,6 +294,19 @@ const char* noteOf(uint8_t glyph) {
     }
 }
 
+// The routine has no format for seven IDs, so it gives a bare number where the ID's own string and the manual have a scale.  The user's decision (2026-11-04): they read on that scale, so they run as an ID
+// of the same range that has it.  xt_fx control measures that the driver treats them alike.
+int formatOf(int id) {
+    switch (id) {
+        case 0x861: case 0x872: return 0x84b;                                           // Hall 2's and Hall 3's Reverb Time: Hall 1's Low Rev Time
+        case 0x884: return 0x828;                                                       // Garage's Reverb Time: Room 2's
+        case 0x864: return 0x82b;                                                       // Hall 2's Room Size: Room 2's
+        case 0x875: case 0x887: return 0x83c;                                           // Hall 3's and Garage's Room Size: Room 3's
+        case 0x898: return 0x84d;                                                       // Plate's Xover Freq: Hall 1's
+        default:    return id;
+    }
+}
+
 // The number a text starts with, with no regard to the locale.  `rest` is where it stops.
 bool leadingNumber(const std::string& t, double& number, size_t& rest) {
     size_t i = 0;
@@ -355,7 +368,7 @@ std::string XtFxValueText::unit(int id) {
 
 std::string XtFxValueText::make(int id, int value) {
     uint32_t at = 0;
-    if (!ok_ || !sh4_->call(kValueText, { (uint32_t)id, (uint32_t)value, 0 }, kSp, &at, kTextSteps)) return std::to_string(value);
+    if (!ok_ || !sh4_->call(kValueText, { (uint32_t)formatOf(id), (uint32_t)value, 0 }, kSp, &at, kTextSteps)) return std::to_string(value);
     std::string t;
     for (uint8_t ch = sh4_->rd8(at); ch; ch = sh4_->rd8(++at)) t += (char)ch;
     if (!t.empty()) if (const char* note = noteOf((uint8_t)t[0])) return std::string(note) + (t.size() > 1 && t[1] == 0x17 ? "T" : t.size() > 1 && t[1] == '.' ? "." : "");

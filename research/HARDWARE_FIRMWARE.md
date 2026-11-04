@@ -1547,6 +1547,24 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### v140 joins (2026-11-04, v142)
+
+This merges v140, the seven values on the manual's scale, with v141, on the user's word. With it, this branch has everything from every session so far. There was no new firmware to read, and no change to the sound.
+
+**Only the docs conflicted.** These lists keep version order, so v140's sections sit between v139's and v141's, though it came in after v141. It touches only the text code in `XtFxControl.cpp`, its checks and the two plant lists: the panel, the processor and the tone's sources are as v141's, so `mutate_tone.py` wasn't run again and its 796 of v139 stand.
+
+**The result.**
+
+| | |
+|---|---|
+| `verify.sh` | fcheck as the baseline, 650 checks, where v140's own line was the only one to move. A/B 4/4 identical to v141, PluginTest 4/4, through the chip 4/4, the panel's 985 rows and 5180 of its boxes' texts as the firmware's, engine tests, auval |
+| The 20 effect settings of v137 | 0 different |
+| `mutate_fx.py --control`, at 200 events | 144 planted, 0 missed |
+| `mutate_panel.py` | 67 planted, 0 missed (33 minutes) |
+| `mutate_fx.py`, `fxthreads.sh` | 97 planted, the same 2 missed as before (v126); no races |
+
+**Still open from v140:** the firmware's Reverb Time text between values 6 and 21 disagrees with what its driver does, and the panel shows the firmware's text.
+
 ### v138 joins (2026-11-04, v141)
 
 This merges v138, the effects' values as text, with v139, on the user's word. So this branch now has the pad's two pairs and FX Edit's values in the firmware's text together. Neither touches what the other does: v138 is the panel, `XtFxControl` and their checks, and v139 is the tone's harness and the pad's defaults. So there was no new firmware to read, and no change to the sound.
@@ -1562,6 +1580,47 @@ This merges v138, the effects' values as text, with v139, on the user's word. So
 | `mutate_fx.py --control` | 137 planted, 0 missed |
 | `mutate_panel.py` | 60 planted, 0 missed, each for its own reason (30 minutes) |
 | `mutate_fx.py`, `fxthreads.sh` | 97 planted, the same 2 missed as before (v126); no races |
+
+### The seven on the manual's scale, and what the Reverb Time text says (2026-11-04, v140)
+
+The seven that v138 left as bare numbers now read on the manual's scale, on the user's decision. So here the plugin differs on purpose from what the firmware's code would show: Hall 2's Reverb Time reads 0.06…64.00 sec, not 0…79.
+
+**How, with nothing from the manual in the source.** Each has a sibling of the same range that the routine does have a format for, so `XtFxValueText` runs the routine on the sibling's ID. The unit is still the parameter's own.
+
+| Parameter | ID | Reads as | Now shows |
+|---|---|---|---|
+| Hall 2's, Hall 3's Reverb Time | 0x861, 0x872 | Hall 1's Low Rev Time, 0x84b | 0.06…64.00 sec |
+| Garage's Reverb Time | 0x884 | Room 2's, 0x828 | 0.06…32.00 sec |
+| Hall 2's Room Size | 0x864 | Room 2's, 0x82b | 1…10 |
+| Hall 3's, Garage's Room Size | 0x875, 0x887 | Room 3's, 0x83c | 1…8 |
+| Plate's Xover Freq | 0x898 | Hall 1's, 0x84d | 160…15000 Hz, THRU |
+
+**Whether those scales are true of these parameters.** The ends agree with each ID's own string and with the manual, and the driver says the rest:
+- **Xover Freq.** Plate's writes the same coefficients as Hall 1's at all 22 values.
+- **Reverb Time.** A comb's feedback gain goes as 10^(−3·delay/time), so its log times the time is a constant. It's constant within 3% on Hall 2, Hall 3 and Garage against the sibling's seconds, to the top of each range, as it is on Room 2 and Room 3, which have the format themselves. Against the bare numbers it wanders by ×8 to ×13.
+- **Room Size.** Only the ends: it has no unit, and the delays it sets don't follow a scale that this can test.
+
+**The firmware's own Reverb Time text is wrong between 6 and 21.** That same measurement shows it. The format (`0x89462840`) gives `v + 25` hundredths for those values, where the driver's steps are tenths:
+
+| Value | 0…5 | 6 | 7 | 10 | 20 | 21 | 22 | 23 | 24… |
+|---|---|---|---|---|---|---|---|---|---|
+| The text | 0.06…0.30 | 0.31 | 0.32 | 0.35 | 0.45 | 0.46 | 2.00 | 2.25 | 2.50… |
+| The driver's gain | 0.06…0.30 | 0.40 | 0.50 | 0.80 | 1.80 | 1.90 | 2.00 | 2.25 | 2.50… |
+
+So the value jumps from "0.46" to "2.00" in one step. Measured on Room 2, Room 3, Hall 2, Hall 3 and Garage, all five to within 3%. The other IDs with this format (Room 1's, Hall 1's and Plate's Low and Hi Rev Time) have two bands, and I haven't measured those. The panel shows the firmware's text there, for those it has a format for and those that borrow it, as it's what the XT's code shows. A real XT would confirm it: Room 2's Reverb Time, one step at a time from 5.
+
+**The check.**
+
+| | |
+|---|---|
+| `xt_fx control` | The seven's text against the routine on the sibling's ID, each sibling's range, each scale's ends against the ID's own string; Plate's Xover Freq against Hall 1's at all 22 values; Reverb Time against the driver's gains on all five types, values 6 to 21 at the driver's steps. 159835 samples, 0 different |
+| PluginTest `TEST_FX_PANEL=1`, in `verify.sh` | The boxes of the seven against the routine on the sibling's ID, with the parameter's own unit, as all the others |
+| `mutate_panel.py` | 67 planted, 7 of them new, 0 missed. An eighth, one Room Size format for the other, showed nothing because the two formats give the same text, so it's gone |
+| `mutate_fx.py --control` | 144 planted, 7 of them new, all of those caught. The same one missed at 60 events as in v138, `matrix-unflushed` |
+| `mutate_fx.py`, `fxthreads.sh` | 97 planted, the same 2 missed as before (v126); no races |
+| `verify.sh` | Firmware checks as the baseline, where only that one line's count moved; A/B 4/4 identical to v138; PluginTest 4/4, and 4/4 through the chip; engine tests; auval |
+
+**Not checked.** A real XT's screen, on these seven or on the text between 6 and 21. Times above 32 sec on the two-band types.
 
 ### v134 joins (2026-11-04, v139)
 
@@ -1621,7 +1680,7 @@ All sixteen note values are within 0.2% at 120 and at 90 BPM (the coefficient is
 **Where the firmware's text is odd.** I compared each value's text with its ID's own string, and 15 of the 872 differ. Five of those don't matter: Delay 4 Level's string is empty but its numbers are right, Bass Multi's Amp Type has a fourth name its range doesn't reach, and three Hi Damp Gains' strings say -30 where the routine and the manual both say -36.
 
 - **Three units are a row out** in Non-Linear, the Reverb's type 9. The strings have lost a row: Feedback Time (0x8b6) has what belongs to Feedback Level, Feedback Level (0x8b7) has Post HC Freq's, and Post HC Freq (0x8b8) has an empty one. The routine's own text says "400[%]" and "12[Hz]", but the type's screen has its labels right. The plugin reads the right rows for these three, and for Feedback Time, whose row is gone, Envelope T4's. They read 400 ms, 12 % and 10000 Hz, which is also what the manual says.
-- **Seven show a bare number**, and I've left them that way, as it's what the firmware does:
+- **Seven show a bare number**, and I've left them that way, as it's what the firmware does (until v140, which puts them on the manual's scale, on the user's decision):
 
 | Type | Parameter | ID | Shows | The ID's string and the manual say |
 |---|---|---|---|---|

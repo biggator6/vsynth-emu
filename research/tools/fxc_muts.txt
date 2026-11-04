@@ -114,7 +114,14 @@ clock-no-guard| sixClocksMs <= 0) return;| false) return;
 # The values' text
 vt-with-unit|(uint32_t)value, 0 }, kSp, &at, kTextSteps|(uint32_t)value, 1 }, kSp, &at, kTextSteps
 vt-value|(uint32_t)value, 0 }, kSp, &at, kTextSteps|(uint32_t)value + 1, 0 }, kSp, &at, kTextSteps
-vt-id|{ (uint32_t)id, (uint32_t)value, 0 }, kSp, &at, kTextSteps|{ (uint32_t)id + 1, (uint32_t)value, 0 }, kSp, &at, kTextSteps
+vt-id|{ (uint32_t)formatOf(id), (uint32_t)value, 0 }, kSp, &at, kTextSteps|{ (uint32_t)formatOf(id) + 1, (uint32_t)value, 0 }, kSp, &at, kTextSteps
+vt-lent-hall2-time|case 0x861: case 0x872: return 0x84b;|case 0x872: return 0x84b;
+vt-lent-hall3-time|case 0x861: case 0x872: return 0x84b;|case 0x861: return 0x84b;
+vt-lent-garage-time|case 0x884: return 0x828;|
+vt-lent-hall2-size|case 0x864: return 0x82b;|
+vt-lent-hall3-size|case 0x875: case 0x887: return 0x83c;|case 0x887: return 0x83c;
+vt-lent-garage-size|case 0x875: case 0x887: return 0x83c;|case 0x875: return 0x83c;
+vt-lent-xover|case 0x898: return 0x84d;|
 vt-by-value|(uint32_t)id << 16 \| (uint16_t)value|(uint16_t)value
 vt-by-id|(uint32_t)id << 16 \| (uint16_t)value|(uint32_t)id << 16
 vt-spaces|t = from == std::string::npos ? std::string() : t.substr(from, to - from + 1);|;

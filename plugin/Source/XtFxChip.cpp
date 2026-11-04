@@ -238,7 +238,9 @@ void XtFxChip::runFrame() {
 #include "Sh4Interp.h"
 #include "XtFxControl.h"
 #include "esp_interpreter.h"
+#include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <ctime>
@@ -830,13 +832,16 @@ void valueText(const char* rom) {
         return digits > 0 && dots <= 1;
     };
     static const std::map<std::string, std::string> notes = { { "\x11", "1/16" }, { "\x12", "1/8" }, { "\x18", "1/4" }, { "\x13", "1/2" }, { "\x14", "1/1" }, { "\x15", "2/1" } };
+    // The seven the routine has no format for go by an ID of the same range that has one, and keep their own units.
+    static const std::map<int, int> borrowed = { { 0x861, 0x84b }, { 0x872, 0x84b }, { 0x884, 0x828 }, { 0x864, 0x82b }, { 0x875, 0x83c }, { 0x887, 0x83c }, { 0x898, 0x84d } };
     int kinds[4] = {}, values = 0, outOfRow = 0;
     const auto param = [&](const XtFxParam& p) {
+        const auto lent = borrowed.find(p.id);
         for (int v = p.low; v <= p.high; v++) {
             values++;
-            const std::string bare = routine(0x89462120, p.id, v), with = routine(0x89462130, p.id, v), shown = cat.values->text(p.id, v);
-            check(with.compare(0, bare.size(), bare) == 0 && with.size() >= bare.size(), "the routine with a unit doesn't start as it does without", p.id, v, with);
-            std::string unit = with.substr(std::min(bare.size(), with.size()));
+            const std::string own = routine(0x89462120, p.id, v), bare = lent != borrowed.end() ? routine(0x89462120, lent->second, v) : own, with = routine(0x89462130, p.id, v), shown = cat.values->text(p.id, v);
+            check(with.compare(0, own.size(), own) == 0 && with.size() >= own.size(), "the routine with a unit doesn't start as it does without", p.id, v, with);
+            std::string unit = with.substr(std::min(own.size(), with.size()));
             if (p.id >= 0x8b6 && p.id <= 0x8b8) { unit = p.id == 0x8b6 ? "[ms]" : p.id == 0x8b7 ? "[%]" : "[Hz]"; outOfRow++; }
             const auto note = notes.find(bare.substr(0, 1));
             std::string want;
@@ -888,6 +893,44 @@ void valueText(const char* rom) {
             if (first) std::printf("  note %3d %-6s at %4.1f BPM: %6.3f Hz, %6.3f by its name\n", v, n.c_str(), tempo / 10.0, got, want);
             check(n.find('/') != std::string::npos && std::abs(got / want - 1) < 0.01, "a note's name against the driver", 0x57a, v, n);
             measured++;
+        }
+    }
+    // The seven: each has its lender's range, its ends are as its own string says, and the driver treats it alike.  Plate's Xover Freq writes what Hall 1's does, value by value.
+    {
+        Coef idle; XtFxControl e(rom, &idle);
+        for (const auto& [id, from] : borrowed) {
+            check(e.lowest(id) == e.lowest(from) && e.highest(id) == e.highest(from), "a lender's range", id);
+            std::string own; for (uint32_t a = fw.rd32(0x89794114 + 4 * (uint32_t)(id - 0x55d)); fw.rd8(a) > 3; a++) own += (char)fw.rd8(a);     // up to the first mark
+            uint32_t a = fw.rd32(0x89794114 + 4 * (uint32_t)(id - 0x55d)) + (uint32_t)own.size() + 1;
+            std::string last; for (; fw.rd8(a) > 3; a++) last += (char)fw.rd8(a);
+            int top = e.highest(id); while (top > e.lowest(id) && !std::isdigit((unsigned char)cat.values->text(id, top)[0])) top--;
+            check(std::abs(std::atof(cat.values->text(id, e.lowest(id)).c_str()) - std::atof(own.c_str())) < 0.001, "a lent scale's low end against the ID's own string", id, e.lowest(id), cat.values->text(id, e.lowest(id)));
+            check(std::abs(std::atof(cat.values->text(id, top).c_str()) - std::atof(last.c_str())) < 0.001, "a lent scale's high end against the ID's own string", id, top, cat.values->text(id, top));
+        }
+        const auto words = [&](int id, int v, Coef& bus, XtFxControl& a) { bus.last.clear(); a.set(id, v); a.update(); std::vector<double> c; for (const auto& w : bus.last) c.push_back(number(w.second)); std::sort(c.begin(), c.end()); return c; };
+        Coef p8, p4; XtFxControl plate(rom, &p8), hall(rom, &p4);
+        plate.set(0x122, 1); plate.set(0x230, 8); plate.loadPatch(); hall.set(0x122, 1); hall.set(0x230, 4); hall.loadPatch();
+        for (int v = 21; v >= 0; v--) check(words(0x898, v, p8, plate) == words(0x84d, v, p4, hall), "Plate's Xover Freq against Hall 1's", 0x898, v);
+    }
+    // Reverb Time: a comb's feedback gain goes as 10^(-3 delay / time), so its log times the time is a constant.  On the five types with one Reverb Time, against what the text says, or between values 6 and 21,
+    // where the firmware's own text steps by hundredths and its driver by tenths, against what the driver's steps are.  The comb's coefficient is -gain.
+    {
+        struct Time { int type, id; uint32_t comb; };
+        for (const Time& t : { Time{ 2, 0x828, 0x53b }, Time{ 3, 0x839, 0x4e7 }, Time{ 5, 0x861, 0x53b }, Time{ 6, 0x872, 0x4e7 }, Time{ 7, 0x884, 0x4e7 } }) {
+            Coef bus; XtFxControl a(rom, &bus); a.set(0x122, 1); a.set(0x230, t.type); a.loadPatch();
+            const int high = a.highest(t.id);
+            std::vector<double> logGain((size_t)high + 1), steady;
+            for (int v = 0; v <= high; v++) { a.set(t.id, v); a.update(); logGain[(size_t)v] = -std::log10((65536.0 - number(bus.last[(int)t.comb])) / 32768.0); }
+            const auto seconds = [&](int v) { return std::atof(cat.values->text(t.id, v).c_str()); };
+            for (int v = 30; v <= high; v++) steady.push_back(logGain[(size_t)v] * seconds(v));
+            std::sort(steady.begin(), steady.end());
+            const double k = steady[steady.size() / 2];
+            for (int v = 0; v <= high; v++) {
+                if (logGain[(size_t)v] > 2) continue;                                                                               // too small a gain to tell
+                const double time = v >= 6 && v <= 21 ? 0.30 + 0.10 * (v - 5) : seconds(v);
+                if (first && v <= 24) std::printf("  type %d Reverb Time %2d: says %.2f, the driver's gain %.2f\n", t.type, v, seconds(v), k / logGain[(size_t)v]);
+                check(std::abs(logGain[(size_t)v] * time / k - 1) < 0.03, "a Reverb Time against the driver's gain", t.id, v, cat.values->text(t.id, v));
+            }
         }
     }
     // And a delay's coefficient goes as its time: Stereo Delay's Delay Time, those that fit under its 650 ms at 120 BPM.

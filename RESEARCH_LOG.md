@@ -3524,8 +3524,19 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Five plants lost to draws. I nearly reported "796, 5 missed, all caught at larger counts" and moved on. The earlier practice here is to give each a reason, and four of the five had a real one to find. `off-group-osc-note` first went into the wrong kind of case: a pedal's update forms the sums straight after its key-off, so nothing can show. I had to work out why a source needs no update of its own.
 - `solo-wrap-end` I time-boxed and left on a seed of its own, and said so in the list. 93 `solocmp` settings didn't show it. I don't know exactly what makes seed 9's case 25 show it. Comparing the anchor with the firmware's would settle it, and that's a new check, not a merge's.
 
+### Session 16 addendum (2026-11-04) — v140: the seven on the manual's scale
+
+- The user chose the manual's scale for the seven. I didn't want its numbers in the source, and each turned out to have a sibling of the same range with a format, so the firmware's text is still what shows. That only holds if the siblings' scales are true of these parameters, and the ends agreeing doesn't show that.
+- To test Reverb Time I took log gain times seconds on a comb, expecting a flat line. Room 2, which has the format itself and was there as the control, wasn't flat: it fell to a quarter around value 20 and came back at 22. Nor was anything else, in the same place. Reading off the time the gains imply gave 0.40, 0.50 … 1.90 where the text says 0.31, 0.32 … 0.46: the firmware's own text is wrong there, in the format, on the types that have it. I'd read that formula in the decompile earlier and seen nothing odd about `v + 25`.
+- So the flat line holds with those 16 values taken at the driver's steps, on all five types, and that's now in the check, so it would show if the text there ever changed. What the panel should say for them is the user's to decide.
+
 ### Session 16 addendum (2026-11-04) — v141: v138 joins
 
 - A quiet one: the two meet nowhere but the docs, and nothing here surprised me. I read v138's panel and driver changes before merging, as I hadn't yet, and its interpreter is its own, on the message thread, so it can't reach the control thread's.
 - The number's the lesson. v138 and my first v139 collided because that session committed in the same minute as mine, in a run where I'd printed the highest number and committed in the one command, so I saw it only afterwards. This time the transcript of the other session said it had v140 in hand, so I took v141 rather than rely on `git log --all`, which can't show a number that's only been claimed.
+
+### Session 16 addendum (2026-11-04) — v142: v140 joins
+
+- The quietest of the day: everything passed first time, with the two sides meeting only in the docs. The user had said yes in advance, and it had landed by the time they did.
+- All the session's branches are now in one. Nothing from v115 on has met a real DAW, and nothing from v131 on is pushed.
 
