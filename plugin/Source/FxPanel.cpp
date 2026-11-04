@@ -3,7 +3,8 @@
 
 namespace {
 const juce::Colour kBack(0xFF15152E), kLine(0xFF333355), kTick(0xFF00BFA5), kBox(0xFF0D0D1A);
-constexpr int kRowH = 26, kParamH = 24, kLabelW = 64, kNameW = 170, kScrollBarW = 12;
+constexpr int kRowH = 26, kParamH = 24, kLabelW = 64, kNameW = 170, kValueW = 92, kScrollBarW = 12;
+constexpr int kOutputGain = 0x76;
 
 void styleLabel(juce::Label& l) {
     l.setFont(juce::Font(juce::FontOptions(11.0f)));
@@ -67,7 +68,7 @@ FxPanel::FxPanel(VSynthEmuProcessor& p) : processor_(p) {
     addLevel(tone_, "Chorus Send", "tvaChoSend");
     addLevel(tone_, "Reverb Send", "tvaRevSend");
     addLevel(system_, "Master", "fxMaster");
-    addLevel(system_, "Output Gain", "fxGain");
+    styleSlider(addLevel(system_, "Output Gain", "fxGain").slider, 52);                  // the one level with a unit
     for (auto* l : { &toneLabel_, &systemLabel_, &assignLabel_, &modeLabel_, &pageLabel_ }) { styleLabel(*l); addAndMakeVisible(*l); }
     toneLabel_.setText("The tone", juce::dontSendNotification);
     systemLabel_.setText("System", juce::dontSendNotification);
@@ -184,6 +185,9 @@ void FxPanel::refresh() {
         name(mfx_.type, cat.mfxTypes);
         name(chorus_.type, cat.chorusTypes);
         name(reverb_.type, cat.reverbTypes);
+        juce::Slider& gain = system_.back()->slider;
+        gain.textFromValueFunction = [values = cat.values](double v) { return juce::String(values->text(kOutputGain, (int)std::lround(v))); };
+        gain.updateText();
         named_ = true;
         shownPage_ = -1;
     }
@@ -210,11 +214,12 @@ void FxPanel::showParams(const std::vector<XtFxParam>& params) {
     while (rows_.size() < params.size()) {
         auto row = std::make_unique<Row>();
         styleLabel(row->name);
-        styleSlider(row->value, 48);
+        styleSlider(row->value, kValueW);
         grid_.addChildComponent(row->name);
         grid_.addChildComponent(row->value);
         rows_.push_back(std::move(row));
     }
+    const std::shared_ptr<XtFxValueText> values = processor_.fxCatalog().values;
     for (size_t i = 0; i < rows_.size(); ++i) {
         Row& row = *rows_[i];
         const bool shown = i < params.size();
@@ -226,6 +231,9 @@ void FxPanel::showParams(const std::vector<XtFxParam>& params) {
         const XtFxParam& p = params[i];
         row.id = p.id; row.def = p.def;
         row.name.setText(p.name, juce::dontSendNotification);
+        // The text before the range, as setRange() shows it: the same number can read differently on the next parameter.
+        row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };
+        row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };
         row.value.setRange(p.low, p.high, 1.0);
         row.value.setDoubleClickReturnValue(true, p.def);
         row.value.onValueChange = [this, &row] { processor_.setFxParam(row.id, (int)std::lround(row.value.getValue())); };

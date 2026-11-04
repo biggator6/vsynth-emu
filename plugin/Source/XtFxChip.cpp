@@ -810,6 +810,104 @@ void behaviour(const char* rom) {
     std::printf("control's behaviour on the bus: %d samples, %d different\n", tried, different + (c.ok() ? 0 : 1));
 }
 
+// The panel's text.  Every value of every parameter against the firmware's routine itself, without the unit and with it.  What the plugin does to the text is small: the note values' names, the spaces, and a
+// space and no brackets for the unit, which goes only on a number.  What's left over is the three of Non-Linear whose strings are a row out.  Then the note names against what the driver does at a tempo,
+// and each value's text typed back in.
+void valueText(const char* rom) {
+    const XtFxCatalog cat = xtFxCatalog(rom);
+    Sh4 fw; fw.loadRom(rom); fw.mapRam(0x8C000000, 0x00100000);
+    int tried = 0, different = 0; const bool first = std::getenv("XT_FX_FIRST") != nullptr;
+    const auto check = [&](bool good, const char* what, int id = 0, int v = 0, const std::string& got = {}) { tried++; if (!good) { different++; if (first) std::printf("  value text: %s, ID %x value %d: \"%s\"\n", what, id, v, got.c_str()); } };
+    const auto routine = [&](uint32_t fn, int id, int v) {
+        uint32_t at = 0; std::string t;
+        if (!fw.call(fn, { (uint32_t)id, (uint32_t)v }, 0x8C0E0000, &at, 2000000)) return std::string("a fault");
+        for (uint8_t ch = fw.rd8(at); ch; ch = fw.rd8(++at)) t += (char)ch;
+        return t;
+    };
+    const auto isNumber = [](const std::string& t) {
+        size_t i = t[0] == '-' || t[0] == '+' ? 1 : 0, digits = 0, dots = 0;
+        for (; i < t.size(); i++) { if (t[i] == '.') dots++; else if (t[i] >= '0' && t[i] <= '9') digits++; else return false; }
+        return digits > 0 && dots <= 1;
+    };
+    static const std::map<std::string, std::string> notes = { { "\x11", "1/16" }, { "\x12", "1/8" }, { "\x18", "1/4" }, { "\x13", "1/2" }, { "\x14", "1/1" }, { "\x15", "2/1" } };
+    int kinds[4] = {}, values = 0, outOfRow = 0;
+    const auto param = [&](const XtFxParam& p) {
+        for (int v = p.low; v <= p.high; v++) {
+            values++;
+            const std::string bare = routine(0x89462120, p.id, v), with = routine(0x89462130, p.id, v), shown = cat.values->text(p.id, v);
+            check(with.compare(0, bare.size(), bare) == 0 && with.size() >= bare.size(), "the routine with a unit doesn't start as it does without", p.id, v, with);
+            std::string unit = with.substr(std::min(bare.size(), with.size()));
+            if (p.id >= 0x8b6 && p.id <= 0x8b8) { unit = p.id == 0x8b6 ? "[ms]" : p.id == 0x8b7 ? "[%]" : "[Hz]"; outOfRow++; }
+            const auto note = notes.find(bare.substr(0, 1));
+            std::string want;
+            if (note != notes.end()) { want = note->second + (bare.substr(1) == "\x17" ? "T" : bare.substr(1) == "." ? "." : ""); kinds[0]++; }
+            else {
+                const size_t a = bare.find_first_not_of(' '), b = bare.find_last_not_of(' ');
+                want = a == std::string::npos ? "" : bare.substr(a, b - a + 1);
+                if (isNumber(want) && unit.size() > 2) { want += " " + unit.substr(1, unit.size() - 2); kinds[1]++; } else kinds[isNumber(want) ? 2 : 3]++;
+            }
+            check(!want.empty() && shown == want, "the text", p.id, v, shown);
+            check(cat.values->text(p.id, cat.values->value(p.id, p.low, p.high, shown, p.low == v ? p.high : p.low)) == shown, "the text typed back", p.id, v, shown);
+        }
+    };
+    for (const auto* list : { &cat.mfx, &cat.chorus, &cat.reverb }) for (const auto& type : *list) for (const XtFxParam& q : type) param(q);
+    for (const XtFxParam& q : cat.eq) param(q);
+    if (first) std::printf("  value text: %d values: %d notes, %d numbers with units, %d without, %d names; %d out of row\n", values, kinds[0], kinds[1], kinds[2], kinds[3], outOfRow);
+    check(values == 53128, "the values");
+
+    // Typing: what the box takes besides a value's own text.
+    const auto typed = [&](int id, int low, int high, const char* text, const char* want) { const std::string got = cat.values->text(id, cat.values->value(id, low, high, text, low)); check(got == want, text, id, 0, got); };
+    typed(0x55e, 0, 19, "200", "200 Hz"); typed(0x55e, 0, 19, "200hz", "200 Hz"); typed(0x55e, 0, 19, "210", "200 Hz");         // Parametric EQ's Low Freq: a number, the nearest, in any case
+    typed(0x55f, 0, 30, "+6", "+6 dB"); typed(0x55f, 0, 30, "-6 dB", "-6 dB"); typed(0x55f, 0, 30, "6", "+6 dB"); typed(0x55f, 0, 30, "-6", "-6 dB");    // its Low Gain
+    typed(0x57a, 0, 127, "1/16.", "1/16."); typed(0x57a, 0, 127, "1/8t", "1/8T"); typed(0x57a, 0, 127, "2.03", "2.05 Hz");       // Sweep Rate
+    typed(0x5de, 0, 121, "2", "0 ms");                                                                                           // Delay Time: 2/1 isn't the number 2
+    typed(0x578, 0, 5, "mid+h", "MID+HIGH");                                                                                     // Band Mode: the start of a name
+    check(cat.values->value(0x578, 0, 5, "nothing", 3) == 3 && cat.values->value(0x578, 0, 5, " ", 3) == 3, "what it doesn't know stays where it was");
+    typed(0x5f7, 0, 126, "l20", "L20"); typed(0x5f7, 0, 126, " L 20 ", "L20"); typed(0x5f7, 0, 126, "20r", "20R");               // a Pan
+    typed(0x7c2, 0, 16, "THRU", "THRU"); typed(0x7c2, 0, 16, "2100", "2000Hz");                                                  // Chorus 1's Pre Low Freq, with the firmware's own Hz
+    typed(0x8ae, 0, 110, "95.4%", "95 %");                                                                                      // Env Time Ratio
+
+    // The note names, against the driver: at a tempo, a Rate's coefficient goes as its Hz, and a note's Hz is the beats per second over the note's beats.  Sweep Rate has all sixteen.
+    struct Coef : XtFxControl::Bus {
+        std::map<int, uint32_t> last;
+        void write(uint8_t command, uint16_t index, uint32_t word) override { if (command == 0x35) last[index] = word; }
+        uint32_t read(uint16_t) override { return 0; }
+        void wait(uint32_t) override {}
+    };
+    const auto number = [](uint32_t word) { return (double)((word & 0xff) << 8 | (word >> 16 & 1) << 7 | (word >> 9 & 0x7e)); };   // the bus's encoding of a coefficient (XtFxControl::hooks)
+    const auto beatsOf = [](const std::string& n) { const size_t s = n.find('/'); double b = 4.0 * std::atof(n.c_str()) / std::atof(n.c_str() + s + 1); if (n.back() == 'T') b *= 2.0 / 3; if (n.back() == '.') b *= 1.5; return b; };
+    int measured = 0;
+    for (const int tempo : { 1200, 900 }) {
+        Coef bus; XtFxControl a(rom, &bus); a.set(0x11d, tempo); a.set(0x120, 1); a.set(0x177, 3); a.loadPatch();
+        const auto rate = [&](int v) { a.set(0x57a, v); a.update(); return number(bus.last[0x5ca]); };
+        const double perHz = rate(19) / 1.0;                                                                                      // value 19 is 1.00 Hz
+        check(cat.values->text(0x57a, 19) == "1.00 Hz", "Sweep Rate's 1.00 Hz", 0x57a, 19, cat.values->text(0x57a, 19));
+        for (int v = 112; v <= 127; v++) {
+            const std::string n = cat.values->text(0x57a, v);
+            const double want = tempo / 600.0 / beatsOf(n), got = rate(v) / perHz;
+            if (first) std::printf("  note %3d %-6s at %4.1f BPM: %6.3f Hz, %6.3f by its name\n", v, n.c_str(), tempo / 10.0, got, want);
+            check(n.find('/') != std::string::npos && std::abs(got / want - 1) < 0.01, "a note's name against the driver", 0x57a, v, n);
+            measured++;
+        }
+    }
+    // And a delay's coefficient goes as its time: Stereo Delay's Delay Time, those that fit under its 650 ms at 120 BPM.
+    {
+        Coef bus; XtFxControl a(rom, &bus); a.set(0x11d, 1200); a.set(0x120, 1); a.set(0x177, 11); a.loadPatch();
+        const auto time = [&](int v) { a.set(0x5de, v); a.update(); return number(bus.last[0x5c8]); };
+        const double perMs = time(20) / 100.0;                                                                                    // value 20 is 100 ms
+        check(cat.values->text(0x5de, 20) == "100 ms", "Delay Time's 100 ms", 0x5de, 20, cat.values->text(0x5de, 20));
+        for (int v = 106; v <= 112; v++) {
+            const std::string n = cat.values->text(0x5de, v);
+            const double want = 500.0 * beatsOf(n), got = time(v) / perMs;
+            if (first) std::printf("  note %3d %-6s at 120 BPM: %6.1f ms, %6.1f by its name\n", v, n.c_str(), got, want);
+            check(n.find('/') != std::string::npos && std::abs(got / want - 1) < 0.01, "a note's name against the delay", 0x5de, v, n);
+            measured++;
+        }
+    }
+    check(measured == 39, "the notes measured");
+    std::printf("control's value text against the firmware's routine and driver: %d samples, %d different\n", tried, different);
+}
+
 // ------------------------------------------------------------------ the unit
 // The frame's way in, against the firmware's own: 0x894db2b0 truncates the bus to int32, and the chip has the top 24 bits.
 void unitConversion(const char* rom, uint32_t seed) {
@@ -896,7 +994,7 @@ int main(int argc, char** argv) {
     if (argc > 2 && !std::strcmp(argv[2], "threads")) { threads(rom, argc > 3 ? std::atoi(argv[3]) : 200, argc > 4 ? (uint32_t)std::atoi(argv[4]) : 2024); return 0; }
     if (argc > 2 && !std::strcmp(argv[2], "control")) {
         const int events = argc > 3 ? std::atoi(argv[3]) : 200; const uint32_t seed = argc > 4 ? (uint32_t)std::atoi(argv[4]) : 2024;
-        readers(rom, seed); behaviour(rom); liveEdits(rom, events, seed); threads(rom, events, seed); againstReference(rom, events, seed); unitConversion(rom, seed); unitLevels(rom, false);
+        readers(rom, seed); behaviour(rom); valueText(rom); liveEdits(rom, events, seed); threads(rom, events, seed); againstReference(rom, events, seed); unitConversion(rom, seed); unitLevels(rom, false);
         return 0;
     }
     if (argc > 2 && !std::strcmp(argv[2], "speed")) { speed(rom); return 0; }

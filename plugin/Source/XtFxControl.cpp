@@ -3,6 +3,7 @@
 #include "Sh4Interp.h"
 #include "XtFxChip.h"
 #include <algorithm>
+#include <cctype>
 #include <climits>
 
 namespace {
@@ -269,6 +270,118 @@ XtFxCatalog xtFxCatalog(const char* romPath) {
     cat.reverbTypes = { "Off", "Room 1", "Room 2", "Room 3", "Hall 1", "Hall 2", "Hall 3", "Garage", "Plate", "Non-Linear", "Delay" };
     cat.eq.push_back(param(0x70));
     for (int id = 0x65; id <= 0x6f; ++id) cat.eq.push_back(param(id));
-    cat.ok = c.ok();
+    cat.values = std::make_shared<XtFxValueText>(romPath);
+    cat.ok = c.ok() && cat.values->ok();
     return cat;
+}
+
+// ------------------------------------------------------------------ the values as text
+namespace {
+constexpr uint32_t kValueText = 0x89461a70;                                             // (id, value, 1 to add the unit): the GUI's text for a parameter's value goes here, through 0x89370ca0 and 0x89462120, with 0
+constexpr uint32_t kValueStrings = 0x89792ba0, kValueStringsHigh = 0x89794114;          // each ID's string, which the routine reads too: the values' names or their range, and after a 3 the unit in brackets
+constexpr uint64_t kTextSteps = 2000000;                                                // far more than the longest; the routine doesn't loop on anything but its own lists
+
+// A note value comes back in the LCD font's own codes: the note, then a triplet's 0x17, a dot or a space.  Which note each is, xt_fx control measures against what the driver does with it at a tempo.
+const char* noteOf(uint8_t glyph) {
+    switch (glyph) {
+        case 0x11: return "1/16";
+        case 0x12: return "1/8";
+        case 0x18: return "1/4";
+        case 0x13: return "1/2";
+        case 0x14: return "1/1";
+        case 0x15: return "2/1";
+        default:   return nullptr;
+    }
+}
+
+// The number a text starts with, with no regard to the locale.  `rest` is where it stops.
+bool leadingNumber(const std::string& t, double& number, size_t& rest) {
+    size_t i = 0;
+    const bool negative = i < t.size() && t[i] == '-';
+    if (i < t.size() && (t[i] == '-' || t[i] == '+')) i++;
+    double v = 0, scale = 1;
+    bool digits = false;
+    for (; i < t.size() && std::isdigit((unsigned char)t[i]); i++) { v = v * 10 + (t[i] - '0'); digits = true; }
+    if (i < t.size() && t[i] == '.') {
+        size_t j = i + 1;
+        for (; j < t.size() && std::isdigit((unsigned char)t[j]); j++) { scale /= 10; v += (t[j] - '0') * scale; digits = true; }
+        if (j > i + 1) i = j;
+    }
+    if (!digits) return false;
+    number = negative ? -v : v;
+    rest = i;
+    return true;
+}
+
+// Is it a number, alone or with a unit or a letter after it?  So "500Hz" and "63R" are, and "1/16", "1.5:1" and "2-STACK" aren't.
+bool numberIn(const std::string& t, double& number) {
+    size_t rest = 0;
+    if (!leadingNumber(t, number, rest)) return false;
+    while (rest < t.size() && t[rest] == ' ') rest++;
+    return rest == t.size() || std::isalpha((unsigned char)t[rest]) || t[rest] == '%';
+}
+
+std::string squeezed(const std::string& t) {
+    std::string out;
+    for (const char ch : t) if (ch != ' ') out += (char)std::tolower((unsigned char)ch);
+    return out;
+}
+}
+
+XtFxValueText::XtFxValueText(const char* romPath) : sh4_(std::make_unique<Sh4>()) {
+    ok_ = sh4_->loadRom(romPath);
+    if (ok_) sh4_->mapRam(0x8C000000, 0x00100000);
+}
+
+XtFxValueText::~XtFxValueText() = default;
+
+const std::string& XtFxValueText::text(int id, int value) {
+    const uint32_t key = (uint32_t)id << 16 | (uint16_t)value;
+    const auto found = shown_.find(key);
+    return found != shown_.end() ? found->second : shown_.emplace(key, make(id, value)).first->second;
+}
+
+// The unit from the ID's string.  The strings lost a row at the Reverb's Non-Linear type: Feedback Time has what belongs to Feedback Level, that has Post HC Freq's, and Post HC Freq has an empty one, all
+// the way through the routine's own unit.  The type's screen has its labels right, so these three take the right row.  Feedback Time's is gone, but Envelope T4 has the same values.
+std::string XtFxValueText::unit(int id) {
+    const int row = id == 0x8b6 ? 0x8b2 : id == 0x8b7 ? 0x8b6 : id == 0x8b8 ? 0x8b7 : id;
+    Sh4& c = *sh4_;
+    uint32_t a = row < kHighIds ? c.rd32(kValueStrings + 4 * (uint32_t)row) : c.rd32(kValueStringsHigh + 4 * (uint32_t)(row - kHighIds));
+    for (uint8_t ch = c.rd8(a); ch != 3; ch = c.rd8(++a)) if (!ch) return {};
+    std::string out;
+    for (uint8_t ch = c.rd8(++a); ch; ch = c.rd8(++a)) if (ch != '[' && ch != ']') out += (char)ch;
+    return out;
+}
+
+std::string XtFxValueText::make(int id, int value) {
+    uint32_t at = 0;
+    if (!ok_ || !sh4_->call(kValueText, { (uint32_t)id, (uint32_t)value, 0 }, kSp, &at, kTextSteps)) return std::to_string(value);
+    std::string t;
+    for (uint8_t ch = sh4_->rd8(at); ch; ch = sh4_->rd8(++at)) t += (char)ch;
+    if (!t.empty()) if (const char* note = noteOf((uint8_t)t[0])) return std::string(note) + (t.size() > 1 && t[1] == 0x17 ? "T" : t.size() > 1 && t[1] == '.' ? "." : "");
+    const size_t from = t.find_first_not_of(' '), to = t.find_last_not_of(' ');
+    t = from == std::string::npos ? std::string() : t.substr(from, to - from + 1);
+    // The XT has the unit in a label beside the box, so it isn't saying THRU or LFO is in Hz or dB, and a 500Hz has its own.
+    double number = 0; size_t rest = 0;
+    if (leadingNumber(t, number, rest) && rest == t.size()) { const std::string u = unit(id); if (!u.empty()) t += " " + u; }
+    return t;
+}
+
+int XtFxValueText::value(int id, int low, int high, const std::string& typed, int current) {
+    const std::string wanted = squeezed(typed);
+    if (wanted.empty()) return current;
+    for (int v = low; v <= high; v++) if (squeezed(text(id, v)) == wanted) return v;
+    double number = 0;
+    if (numberIn(wanted, number)) {
+        int nearest = low - 1; double best = 0;
+        for (int v = low; v <= high; v++) {
+            double there = 0;
+            if (!numberIn(text(id, v), there)) continue;
+            const double away = there > number ? there - number : number - there;
+            if (nearest < low || away < best) { best = away; nearest = v; }
+        }
+        if (nearest >= low) return nearest;
+    }
+    for (int v = low; v <= high; v++) if (squeezed(text(id, v)).compare(0, wanted.size(), wanted) == 0) return v;
+    return current;
 }

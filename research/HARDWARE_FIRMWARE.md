@@ -1547,6 +1547,22 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### v138 joins (2026-11-04, v141)
+
+This merges v138, the effects' values as text, with v139, on the user's word. So this branch now has the pad's two pairs and FX Edit's values in the firmware's text together. Neither touches what the other does: v138 is the panel, `XtFxControl` and their checks, and v139 is the tone's harness and the pad's defaults. So there was no new firmware to read, and no change to the sound.
+
+**Only the docs conflicted.** These lists keep version order, so v138's sections sit between v137's and v139's. The number is v141 because the session behind v138 had v140 under way when this was made: **v140, the seven values on the manual's scale, isn't in here.** It sits on top of v138 on `claude/serene-galileo-9e6929`, and wasn't committed when this was.
+
+**The result.** None of the tone's sources or the processor differ from v139, so `mutate_tone.py` wasn't run again: its 796 of v139 stand.
+
+| | |
+|---|---|
+| `verify.sh` | fcheck as the baseline, 650 checks, with no change to it. A/B 4/4 identical to v139, PluginTest 4/4, through the chip 4/4, the panel's 985 rows and 5180 of its boxes' texts as the firmware's, engine tests, auval |
+| The 20 effect settings of v137 | 0 different |
+| `mutate_fx.py --control` | 137 planted, 0 missed |
+| `mutate_panel.py` | 60 planted, 0 missed, each for its own reason (30 minutes) |
+| `mutate_fx.py`, `fxthreads.sh` | 97 planted, the same 2 missed as before (v126); no races |
+
 ### v134 joins (2026-11-04, v139)
 
 This merges v134, the pad's X-Y pair, on the user's word, on top of v137. So both of the pad's pairs now work by controller at the defaults: X-Y on CC80 and CC81, Time Trip on CC82 and CC83. Nothing moves until a Matrix Control uses PAD-X or PAD-Y, so the sound at the defaults doesn't change, and v134's section below still holds as written. There was no new firmware to read.
@@ -1577,6 +1593,68 @@ This merges v134, the pad's X-Y pair, on the user's word, on top of v137. So bot
 | `verify.sh` | A/B 4/4 identical to v137, PluginTest 4/4, through the chip 4/4, the panel's 985 rows, engine tests, auval |
 | The 20 effect settings of v137 | 0 different |
 
+### The effects' values as text (2026-11-04, v138)
+
+The FX Edit panel now shows each value as the XT does: "50 Hz", "-15 dB", "1/4", "L63", "MATCH DRIVE". All of it comes from the firmware's own routine, run in the interpreter when a value is first shown, so none of it is in the source. A slider still holds the raw number and sends that, so the sound can't change: `ab.sh` 4/4 identical, and PluginTest through the chip the same.
+
+**The routine** (`0x89461a70`: r4 the ID, r5 the value, r6 1 to add the unit). The descriptors hold only where a value is stored and its range, so there's no display type to read, and the routine is what decides.
+- `0x89462120` calls it with 0 and `0x89462130` with 1. The GUI's way in is `0x89370ca0(buffer, value, width, id)`, which treats the types' IDs (0x177, 0x1fc, 0x230, 1000) and the tempo's (0x11d, 0x430) itself and sends anything else to `0x89462120`. It's called by an object holding a parameter's ID at +0x4a (vtable `0x897f8f00`; `0x8937e150`) and by what looks like a parameter's pop-up list of values (`0x89342800`, `0x893434d0`). `0x89462120`'s only other caller is `0x8938ca40`. So every way I can find from an ID to its text comes here, and the formats have no other callers. I haven't traced a given knob on a given screen to those objects.
+- First, per ID: `0x89462a90` and `0x89463670` are long chains of comparisons with the IDs, each leading to one format: a Rate's 0.05…10.00 and its notes (`0x89462350`), a Reverb Time's 0.06…64.00 (`0x89462840`), the pans, the balances, the frequency lists.
+- Otherwise each ID has a string (`0x89792ba0` by ID, `0x89794114` from 0x55d). Names are separated by 1, a range by 2, and after a 3 comes the unit: `LOW\1MID\1HIGH`, `0\2650\1note\3[ms]`. A value's name is the nth of these, and a number is printed plainly, `%+ld` if the range goes below 0.
+- The routine reads nothing but tables. Past a parameter's range it runs off the end of its list and faults, so the panel only ever asks within the range.
+
+**What the XT's screens do with the unit.** The GUI's way in calls with 0, and the type's screen draws "[Hz]" as a label of its own (for instance `0x8940e350`: `0x893252d0(ctx, x, y, text)` for each). With 1, the routine joins the two, as "50[Hz]": 24 classes have that in their vtables (`0x8946ca70`, from `0x8982d93c` on), and I haven't traced where they appear. That joined text says "500Hz[Hz]" and "THRU[Hz]", which no screen would. So the plugin takes the routine's text with 0, and adds the ID's unit, in the box instead of beside it, only where the text is a plain number, without the brackets.
+
+**Note values.** They come back in the LCD font's own codes: a note, then 0x17 for a triplet, "." for a dot, or a space. There's no text for them anywhere in rom.2, so the names are in the source, in the form the plugin's LFO rates already use. The names aren't taken from the manual or a look at the font: they're measured from what the driver sends at a tempo (`xt_fx control`, with `XT_FX_FIRST=1` to see each).
+
+| Code | Note | Sweep Rate at 120 BPM | by its name |
+|---|---|---|---|
+| 0x11 | 1/16 | 8.003 Hz | 8 |
+| 0x12 | 1/8 | 4.001 Hz | 4 |
+| 0x18 | 1/4 | 2.001 Hz | 2 |
+| 0x13 | 1/2 | 1.000 Hz | 1 |
+| 0x14 | 1/1 | 0.500 Hz | 0.5 |
+| 0x15 | 2/1 | 0.250 Hz | 0.25 |
+
+All sixteen note values are within 0.2% at 120 and at 90 BPM (the coefficient is only so fine), and Stereo Delay's Delay Time gives the same seven that fit under its 650 ms (1/16 is 125.0 ms, 1/4 is 500.2 ms).
+
+**Where the firmware's text is odd.** I compared each value's text with its ID's own string, and 15 of the 872 differ. Five of those don't matter: Delay 4 Level's string is empty but its numbers are right, Bass Multi's Amp Type has a fourth name its range doesn't reach, and three Hi Damp Gains' strings say -30 where the routine and the manual both say -36.
+
+- **Three units are a row out** in Non-Linear, the Reverb's type 9. The strings have lost a row: Feedback Time (0x8b6) has what belongs to Feedback Level, Feedback Level (0x8b7) has Post HC Freq's, and Post HC Freq (0x8b8) has an empty one. The routine's own text says "400[%]" and "12[Hz]", but the type's screen has its labels right. The plugin reads the right rows for these three, and for Feedback Time, whose row is gone, Envelope T4's. They read 400 ms, 12 % and 10000 Hz, which is also what the manual says.
+- **Seven show a bare number**, and I've left them that way, as it's what the firmware does:
+
+| Type | Parameter | ID | Shows | The ID's string and the manual say |
+|---|---|---|---|---|
+| Hall 2 | Reverb Time | 0x861 | 0…79 sec | 0.06–64.00 sec |
+| Hall 2 | Room Size | 0x864 | 0…9 | 1–10 |
+| Hall 3 | Reverb Time | 0x872 | 0…79 sec | 0.06–64.0 sec |
+| Hall 3 | Room Size | 0x875 | 0…7 | 1–8 |
+| Garage | Reverb Time | 0x884 | 0…63 sec | 0.06–32.00 sec |
+| Garage | Room Size | 0x887 | 0…7 | 1–8 |
+| Plate | Xover Freq | 0x898 | 0…21 Hz | 160–15000 Hz, THRU |
+
+The routine's chains have these IDs' siblings (Room 2's Reverb Time 0x828, Hall 1's 0x84b, Room 2's Room Size 0x82b) but not these, so they fall through to a plain number. The types' screens do use these IDs (they're written at `0x89438250`, `0x89438cc0`, `0x89438ce0`, `0x89437660`), and I found no other way to the text. So as far as the code goes, a real XT's Hall 2 shows a Reverb Time of 26 with "[s]" beside it, a value Hall 1's scale would call 3.00. Only a look at a real XT's screen can settle it: Reverb, Hall 2, Rev Time.
+
+**The cost.** About 16 µs a value in the interpreter, so all 53128 would take about 0.9 s: too long for the first time the panel opens. `XtFxValueText` runs each value the first time it's shown and keeps it. It has an interpreter of its own, with no driver in it, which holds about 15 MB of ROM and memory once the panel's been opened.
+
+**Typing a value** works too (`XtFxValueText::value`): a value's text in any case and spacing, a number with or without its unit (the nearest there is), or the start of a name. Anything else leaves the value alone.
+
+**Output Gain** (ID 0x76) is the one level above the rule with a unit, so its box says "+2 dB" as well. The other levels are plain numbers on the XT too.
+
+**The check.**
+
+| | |
+|---|---|
+| `xt_fx control`, new part | Every value of the 872 parameters, 53128, against the routine run separately with 0 and with 1. Each typed back. The other forms of typing. The note names against the driver | 
+| PluginTest `TEST_FX_PANEL=1`, in `verify.sh` | What each box says, read from the box, against the routine, for all 985 rows of the 872 parameters: at its default on showing, at each end, back from the processor, and typed. A Rate and a Delay Time through all their values, so every note value goes through a box. Typing the other end's text reaches the processor as its number. 5180 boxes |
+| `mutate_panel.py` | 60 planted, 35 of them new, 0 missed: the whole list once, about 30 minutes, and the panel's 11 again after the last change. The first run missed two, and both showed code that did nothing, now gone |
+| `mutate_fx.py --control` | 137 planted, 35 of them new, all of those caught. One missed at its default of 60 events, `matrix-unflushed`, and not because of this: it's missed the same on v137's own sources, and caught at 200, the number fcheck runs |
+| `mutate_fx.py`, `fxthreads.sh` | 97 planted, the same 2 missed as before (v126); no races |
+| `verify.sh` | Firmware checks as the baseline, which gains only the one new line (`--update`, all 160 sections run); A/B 4/4 identical to v137; PluginTest 4/4, and 4/4 through the chip; engine tests; auval |
+| The snapshots (`TEST_SNAPSHOT_FX`) | Stereo Delay, Amp Simulator, Non-Linear, Stereo Pitch Shifter: everything fits, up to "-12 semitone" and "METAL STACK" |
+
+**Not checked.** Any of this against a real XT's screen, or a given screen's knob traced through to the routine. Typing in a real host.
+
 ### The effects' parameters and panel (2026-11-04, v137)
 
 Everything the chip does can now be set from the plugin. The FX Edit button, in the file strip with the Effects switch that moved there, opens a panel in the place of the XT strip. With the switch off, nothing changes: `ab.sh` 4/4 identical, and the new parameters reach nothing but the driver's store and the bus in `XtSynth::frame`, which the plain path adds up whichever pair a tone is on. (Output Assign moved under a held note does there what v133 found: to DIR it silences the note, away from DIR it doubles it.)
@@ -1591,7 +1669,7 @@ Everything the chip does can now be set from the plugin. The FX Edit button, in 
 
 v133's `Controls` get theirs too: `tvaChoSend`, `tvaRevSend`, `outputAssign`, `outputMode`. What hangs on a type doesn't suit a host's list, as its meaning and range change with the type, so the type parameters and the system's EQ, 872 in all, go by ID (`setFxParam(id, value)`, `fxParam(id, fallback)`), aren't automatable, and are saved in the state as `fxEdits`. A state coming back is a patch change. Each type has its own IDs, so a type's settings wait while another's loaded.
 
-**The catalog** (`xtFxCatalog`). The names and ranges are read from rom.2 at run time, as the rule on tables says. A fresh `XtFxControl`'s store already holds the descriptors' ranges and defaults, so all this adds is the type tables (`0x897a8218`, `0x897a82e4`, `0x897a8310`), the parameter names and the MFX types' names, 24 bytes each from `0x89788c98`. The three types with nothing to set (Thru, and the Off types) have one entry, no range, name "_": that's left out. The Chorus's and Reverb's type names are the manual's, in the source. Until the ROM's loaded the panel lists nothing and its type boxes say "Type n". Values are the firmware's raw numbers: a Delay Time of 112 shows as 112, not as the note value it is.
+**The catalog** (`xtFxCatalog`). The names and ranges are read from rom.2 at run time, as the rule on tables says. A fresh `XtFxControl`'s store already holds the descriptors' ranges and defaults, so all this adds is the type tables (`0x897a8218`, `0x897a82e4`, `0x897a8310`), the parameter names and the MFX types' names, 24 bytes each from `0x89788c98`. The three types with nothing to set (Thru, and the Off types) have one entry, no range, name "_": that's left out. The Chorus's and Reverb's type names are the manual's, in the source. Until the ROM's loaded the panel lists nothing and its type boxes say "Type n". Values are the firmware's raw numbers: a Delay Time of 112 shows as 112, not as the note value it is. (Their text is v138's.)
 
 **A message at a time** (`XtFxControl::tick`). The control thread sets everything by ID every 10 ms, then `tick()`: `update()`, or `loadPatch()` if `wantPatch()` asked, and nothing at all unless the chip has all of the last one. The XT's task takes one message and sleeps inside it, and the flags set meanwhile go as one. Here the driver's sleep doesn't sleep, so without this a stream of edits would run ahead of the chip by what its waits add up to. A tempo moving for 10 s, tried both ways:
 
@@ -1632,7 +1710,7 @@ It also means no words pile up with the Effects switch off, when nothing's takin
 
 **Not checked.** Clicking through it in a real host: PluginTest moves the panel's sliders and reads its boxes, and auval passes, but no one has played it. The plugin's values against a real XT, as ever.
 
-**What's next.** Captures against all of it. On the panel: the firmware's own units for values (its tables have them), and host automation for the parameters that most want it.
+**What's next.** Captures against all of it. On the panel: the firmware's own units for values (its tables have them; done in v138), and host automation for the parameters that most want it.
 
 ### The chip in the sound, behind a switch (2026-11-04, v136)
 

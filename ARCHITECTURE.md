@@ -364,11 +364,11 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - Time Trip by its controllers (v132): Time Trip Assign X and Y, on CC82 and CC83, move the pad, as the firmware's Control Change case (`xt_tone`).
 - The pad's X-Y pair (v134): Pad Assign X and Y default to CC80 and CC81, the Matrix's PAD sources reading them, as the firmware (`xt_tone`). Both pairs are always live: Pad Mode is only what the XT's own pad sends.
 - The host's tempo (v125): Clock Source HOST is the firmware's EXTERNAL on the host's transport, a clock on each 24th of a quarter it passes, the tempo read from the ms over six of them, as the firmware (`xt_tone`). Default INTERNAL, the Patch Tempo.
-- The effects (v136, v137): the chip (v126) and the firmware's own driver (v131) in the sound behind the Effects switch, off by default, with MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain on the editor's panel (`FxPanel`), and the tone's Chorus and Reverb Send, Output Assign and Output Mode (v133). Exact against JE-8086's interpreter and the firmware's driver in `Sh4Interp`; no reference yet beyond those.
+- The effects (v136–v138): the chip (v126) and the firmware's own driver (v131) in the sound behind the Effects switch, off by default, with MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain on the editor's panel (`FxPanel`, each value's text by the firmware's own routine, v138), and the tone's Chorus and Reverb Send, Output Assign and Output Mode (v133). Exact against JE-8086's interpreter and the firmware's driver in `Sh4Interp`; no reference yet beyond those.
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
-- the effects against a real XT (HARDWARE_FIRMWARE.md, "The effect captures"), their values in the firmware's units, and automation for those that go by ID;
+- the effects against a real XT (HARDWARE_FIRMWARE.md, "The effect captures"), and automation for those that go by ID;
 - no step/event playback;
 - no matrix or realtime controllers on the OSC knobs, and the time and
   formant envelope depths' velocity sensitivity is not exposed.

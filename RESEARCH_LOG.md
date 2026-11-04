@@ -3506,10 +3506,26 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Planting errors in the catalog's filter found three of its four conditions dead: within the type ranges only Thru's and the Off types' entries are placeholders, with no range. The others came from my guess at what the list might hold.
 - A `juce::ComboBox`'s selection only counts while its text equals the item's, so renaming the items deselected them and the type boxes came up blank. The snapshot showed it at once, and no test of values would have.
 
+### Session 16 addendum (2026-11-04) — v138: the effects' values as text
+
+- I expected a display type in a table beside the descriptors, and there isn't one: a descriptor's first four bytes say where the value is stored. The way in came from the strings instead. The list "50Hz … 20000Hz" is only reached through a pointer table, but the format strings `%d.%02d` and `%d.%01d` are loaded by code, all of it in one stretch at `0x89462xxx`. That turned out to be the per-ID chains, and their caller is the routine.
+- The units looked like the hard part: each type's screen draws "[Hz]" as a label at a position of its own, with nothing tying it to a parameter but where it falls. I'd begun reading the screens' constructors to match labels to knobs by position when the end of the routine's decompile showed what its third argument does: it appends what follows a 3 in the ID's own string. So the unit was a table all along, and the screens weren't needed for it.
+- The notes came back blank in my first listing. A printed `0x18 0x20` looks like a space. Dumping them as hex showed the LCD font's own codes.
+- I took the codes to start at 1/64, from the order in which other Roland lists run. The first measurement from the driver said 125 ms at 120 BPM, a sixteenth. They start at 1/16 and end at 2/1, and the names would have been two octaves out. They're only in the source because they're measured.
+- Reading the texts by kind, "Feedback Level 0[Hz]…99[Hz]" stood out, and the strings around it showed a lost row. Comparing every value's text with its ID's own string then gave the whole list: 15 IDs, of which ten matter, the three of that row and the seven the routine has no format for.
+- Every value at once took 0.87 s here, too long for the first opening of a panel, and that's on this machine. Each value on first showing costs nothing anyone would see.
+- A condition in the typing, that a number only counts if most of a parameter's values are numbers, was my guess at what Pans would need. Listing the texts showed no parameter where it changes anything, so it went before it could be planted.
+- Two of the panel's planted errors were missed, and both showed code that did nothing. JUCE's `setRange` shows the text itself, so my `updateText()` after it did nothing as long as the text function is set first; that order is the plant now. And I'd given Output Gain a typing function because I'd read JUCE's integer parser and seen it stop at a "+", but a `juce::String` goes through `atoi`, which doesn't. Both are gone.
+
 ### Session 16 addendum (2026-11-04) — v139: v134 joins
 
 - A merge that merged by itself, and still found two things. New draws are what a merge really adds: neither side had drawn a pad on CC 91 with v133's bus compared.
 - Seeds 2024 and 1 differed, and my first look went to the port's send levels. The dump settled it: `assign` ended in 91. The same stale copy I'd fixed in `sourceMove` for v133, on a route v132 had added at the same time. I merged those two in v135 and said 0 different on five seeds, which only meant those five hadn't reached it. Whenever the harness keeps a copy of something, every route that moves it has to be looked at when a route is added, and there's no check for that but seeds.
 - Five plants lost to draws. I nearly reported "796, 5 missed, all caught at larger counts" and moved on. The earlier practice here is to give each a reason, and four of the five had a real one to find. `off-group-osc-note` first went into the wrong kind of case: a pedal's update forms the sums straight after its key-off, so nothing can show. I had to work out why a source needs no update of its own.
 - `solo-wrap-end` I time-boxed and left on a seed of its own, and said so in the list. 93 `solocmp` settings didn't show it. I don't know exactly what makes seed 9's case 25 show it. Comparing the anchor with the firmware's would settle it, and that's a new check, not a merge's.
+
+### Session 16 addendum (2026-11-04) — v141: v138 joins
+
+- A quiet one: the two meet nowhere but the docs, and nothing here surprised me. I read v138's panel and driver changes before merging, as I hadn't yet, and its interpreter is its own, on the message thread, so it can't reach the control thread's.
+- The number's the lesson. v138 and my first v139 collided because that session committed in the same minute as mine, in a run where I'd printed the highest number and committed in the one command, so I saw it only afterwards. This time the transcript of the other session said it had v140 in hand, so I took v141 rather than rely on `git log --all`, which can't show a number that's only been claimed.
 
