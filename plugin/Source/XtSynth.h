@@ -266,8 +266,10 @@ public:
         XtMatrixControl matrix[8];
         // The system's controller assigns, a CC number or 0 for OFF: Beam 2 L, R and Beam 3 L, R (IDs 0x89…0x8c,
         // the part's bytes at +0x180), then what the sources BEAM-L, BEAM-R, PAD-X and -Y, KNOB1, KNOB2 read
-        // (IDs 0x8d, 0x8e, 0x8f, 0x90, 0x93, 0x94).  OFF by default, as the XT's descriptors have them.
-        int assign[10] = {};
+        // (IDs 0x8d, 0x8e, 0x8f, 0x90, 0x93, 0x94).  OFF by default, as the XT's descriptors have them.  Last, Time Trip
+        // Assign X and Y (IDs 0x91, 0x92), the controllers that move the pad (0x894d8360): CC82 and CC83 by default, as
+        // Roland's chart has them.  The descriptors say OFF, but nothing else sets the pad, so the XT's own would not work.
+        int assign[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 82, 83 };
         bool operator==(const Controls&) const = default;
     };
 
@@ -436,6 +438,8 @@ private:
     float tempoNow() const;        // and as the block has it (+0x60)
     int clocksDue() const;         // clocks the next block starts with
     void clockTick();              // 0x894f4da0
+    void padController(int number, int value);   // a controller to the pad, if it is one of its assigns (0x894d8360)
+    void padSteps(int step);       // the pad's whole steps to the voices (0x894f4e10)
     void clockFollow();            // Clock Source to the clock's object (0x89471e30)
     void clockIn();                // an F8 (0x894712f0)
     void clockMs();                // the timer routine's count (0x894710e0, its end)

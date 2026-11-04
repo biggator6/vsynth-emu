@@ -1156,6 +1156,7 @@ void XtSynth::controller(int number, int value) {
                     if (!(v.keyFlags & 7)) voiceOff(v);
                 }
     }
+    padController(number, x);                      // then 0x894d6f10 gives it to the pad; the queued update is after that
     for (Voice& v : voice)
         if (v.active) newBlocks(v);
 }
@@ -1219,22 +1220,37 @@ void XtSynth::polyPressure(int key, int value) {
 // 0x894f7920 → 0x894f25a0), those with Time Trip on.  Touching and letting go are seen at the
 // next tone update (input +0x63 and the object's +8, 0x894e477a), which for the sounding
 // tones here is now.
+void XtSynth::padSteps(int step) {
+    for (Voice& v : voice) {
+        if (!v.active) continue;
+        auto give = [&](OscVoice& s) {
+            if (!s.on || s.analog) return;
+            if (s.wave->type == 1) { if (s.solo.tripOn()) s.solo.setTrip(step); }
+            else if (s.mb.tripOn()) s.mb.setTrip(step);
+        };
+        give(v);
+        give(v.osc2);
+    }
+}
+
+// 0x894d8360, as every controller reaches it: X and then Y, each if the number is its assign, of which
+// 0 and 32 are none (0x894d82e0).  The two can be the same controller, and it is then both.
+void XtSynth::padController(int number, int value) {
+    const auto assigned = [number](int a) { return a != 0 && a != 32 && a == number; };
+    if (assigned(ctl.assign[10])) pad.setX(value);
+    if (assigned(ctl.assign[11])) {
+        int step = 0;
+        if (pad.setY(value, step)) padSteps(step);
+    }
+}
+
+// The plugin's knob: the pad's two controllers in one breath, on no controller's number
 void XtSynth::timeTrip(int x, int y) {
     const bool was = pad.on();
     int step = 0;
     pad.setX(x);
     const bool moved = pad.setY(y, step);
-    if (moved)
-        for (Voice& v : voice) {
-            if (!v.active) continue;
-            auto give = [&](OscVoice& s) {
-                if (!s.on || s.analog) return;
-                if (s.wave->type == 1) { if (s.solo.tripOn()) s.solo.setTrip(step); }
-                else if (s.mb.tripOn()) s.mb.setTrip(step);
-            };
-            give(v);
-            give(v.osc2);
-        }
+    if (moved) padSteps(step);
     if (pad.on() != was)
         for (Voice& v : voice)
             if (v.active) newBlocks(v);
@@ -1634,7 +1650,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_CC="cc7,cc11,cc10": the controllers before the first note.
 //   XT_CC_AT="frame,number,value[;frame,number,value…]": a controller at a frame (CC 64 Hold, …).
 //   XT_MATRIX="source,dest1,sens1,dest2,sens2[;…]": the Matrix Controls, as the patch has them.
-//   XT_ASSIGN="a0,…,a9": the system's controller assigns (Beam 2 L…Knob 2), a CC number or 0.
+//   XT_ASSIGN="a0,…,a11": the system's controller assigns (Beam 2 L…Knob 2, Time Trip X, Y), a CC number or 0.
+//   XT_CC="frame,number,value[;frame,number,value...]": controllers at frames.
 //   XT_PRESS="channel[,key,poly]": the pressures before the first note.
 //   XT_TEMPO=n: the Patch Tempo ×10.  XT_SYNC="sync,origTempo×10000[,sync2,origTempo2]": Tempo Sync
 //     and the wave's Original Tempo, OSC 1 and OSC 2.  XT_RATE="lfo,osc2Lfo": LFO rates, 128..144 note values.
@@ -1967,7 +1984,7 @@ int main(int argc, char** argv) {
     }
     if (const char* e = std::getenv("XT_ASSIGN")) {
         int* a = c.assign;
-        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", a, a + 1, a + 2, a + 3, a + 4, a + 5, a + 6, a + 7, a + 8, a + 9);
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", a, a + 1, a + 2, a + 3, a + 4, a + 5, a + 6, a + 7, a + 8, a + 9, a + 10, a + 11);
     }
     syn.setControls(c);
     if (const char* e = std::getenv("XT_PRESS")) {
@@ -2014,6 +2031,18 @@ int main(int argc, char** argv) {
             used = 0;
         }
     }
+    struct CcAt { long at; int number, value; };
+    std::vector<CcAt> ccs;
+    if (const char* e = std::getenv("XT_CC")) {
+        CcAt t;
+        int used = 0;
+        while (std::sscanf(e, "%ld,%d,%d;%n", &t.at, &t.number, &t.value, &used) >= 3) {
+            ccs.push_back(t);
+            if (used == 0) break;
+            e += used;
+            used = 0;
+        }
+    }
     for (int a = 9; a < argc; ++a) {
         int note = 60; long on = 0, off = -1;
         std::sscanf(argv[a], "%d@%ld:%ld", &note, &on, &off);
@@ -2032,6 +2061,8 @@ int main(int argc, char** argv) {
         for (const CcEv& e : ccEv) if (e.at == done) syn.controller(e.number, e.value);
         for (const Trip& t : trips) if (t.at >= done && t.at < next) next = t.at;
         for (const Trip& t : trips) if (t.at == done) syn.timeTrip(t.x, t.y);
+        for (const CcAt& t : ccs) if (t.at >= done && t.at < next) next = t.at;
+        for (const CcAt& t : ccs) if (t.at == done) syn.controller(t.number, t.value);
         if (bendAt == done) syn.pitchBend(bendValue);
         if (modAt == done) syn.setControls(modLater);
         for (const Ev& e : ev) if (e.at == done) { if (e.on) syn.noteOn(e.note, noteVel); else syn.noteOff(e.note); }

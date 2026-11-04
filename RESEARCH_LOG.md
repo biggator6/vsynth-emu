@@ -3447,3 +3447,10 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The fourth merge in a morning and the easiest: no file on the tone's path, so no draw moved and no plant could go stale. I sorted the docs into version order instead of leaving one branch's history in a lump, because the next reader will look for a version, not for a branch.
 - `verify.sh` said 0 of 159 sections run, every one reused, which is what it is meant to do and which proves nothing about a merged tree until something has actually run on it. So `--full` once, here, where all the lines finally meet. It agreed.
 
+
+### Session 16 addendum (2026-11-04) — v132: Time Trip by its controllers
+
+- `XtTripPad` was already what the firmware's handler does, so the port was a few lines. What took the time was the default. The descriptors say OFF, Roland's chart says CC82 and CC83, and v119 had gone with the descriptors for the other assigns. I searched the images for a factory table and found none. What settled it was asking what else writes the pad's X and Y, and the answer is nothing: if the assigns really shipped OFF, the XT's own pad wouldn't scrub. That's an argument, not a reading of the factory value, and the docs say so.
+- My first search for readers of IDs 0x91 and 0x92 also found three UI routines, which turned out to be drawing coordinates that happen to be 0x91 and 0x92. I read them before leaning on them.
+- A SOLO wave scrubbed back past its start stayed silent after letting go, and the band players didn't. My first thought was a bug in the port, or in v122's merge. `xt_tone` said 0 different but had hardly ever been there, as its gestures were short. So I added a case that goes there, and planted the fix I'd have made. The check caught the fix, which means the firmware keeps the flag. I'd have broken it if I'd trusted my ear.
+- The first draw for assigns could put a pad on CC 7, which the harness keeps its own copy of, so its moves would have fought each other. Those numbers are out of the draw. Hold and Sostenuto are in, on purpose, as the firmware does both.

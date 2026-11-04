@@ -285,11 +285,11 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         matrixSensLabels_[j].setText("Sens", juce::dontSendNotification);
         styleSmall(matrixSensLabels_[j]);
     }
-    for (int i = 0; i < 10; ++i) assignSelBox_.addItem(VSynthEmuProcessor::assignName(i), i + 1);
+    for (int i = 0; i < VSynthEmuProcessor::kAssigns; ++i) assignSelBox_.addItem(VSynthEmuProcessor::assignName(i), i + 1);
     assignBox_.addItemList(VSynthEmuProcessor::assignValueNames(), 1);
     for (juce::ComboBox* b : { &matrixSelBox_, &matrixSourceBox_, &assignSelBox_, &assignBox_ }) addAndMakeVisible(*b);
     matrixSelBox_.onChange = [this] { attachMatrix(juce::jlimit(0, 7, matrixSelBox_.getSelectedItemIndex())); };
-    assignSelBox_.onChange = [this] { attachAssign(juce::jlimit(0, 9, assignSelBox_.getSelectedItemIndex())); };
+    assignSelBox_.onChange = [this] { attachAssign(juce::jlimit(0, VSynthEmuProcessor::kAssigns - 1, assignSelBox_.getSelectedItemIndex())); };
     matrixSelBox_.setSelectedId(1, juce::sendNotificationSync);
     assignSelBox_.setSelectedId(7, juce::sendNotificationSync);
     lfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);

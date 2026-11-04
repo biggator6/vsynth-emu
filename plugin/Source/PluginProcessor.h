@@ -14,6 +14,8 @@ public:
     static juce::String matrixParamId(int control, const char* name) { return "matrix" + juce::String(control + 1) + name; }
     static const char* assignParamId(int which);
     static const char* assignName(int which);
+    static constexpr int kAssigns = 12;
+    static int assignDefault(int which);            // its value: Time Trip's on CC82, CC83, the others OFF
     static juce::StringArray matrixSourceNames();   // the XT's Source values, 0…108
     static juce::StringArray matrixDestNames();     // and its Dest values, 0…78
     static juce::StringArray assignValueNames();    // OFF, CC01…CC95

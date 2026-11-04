@@ -495,6 +495,11 @@ int main(int argc, char** argv) {
         refCtl.assign[6] = std::atoi(e);
         setKnobs({ { "assignPadX", refCtl.assign[6] } });
     }
+    // TEST_TRIPCC="x,y": Time Trip Assign X and Y, a CC number or 0
+    if (const char* e = std::getenv("TEST_TRIPCC")) {
+        std::sscanf(e, "%d,%d", &refCtl.assign[10], &refCtl.assign[11]);
+        setKnobs({ { "assignTripX", refCtl.assign[10] }, { "assignTripY", refCtl.assign[11] } });
+    }
     // TEST_LFO5="wave,rate,offset,delay,mode,fade,keysync": LFO 5
     if (const char* e = std::getenv("TEST_LFO5")) {
         int ks = 0;
@@ -674,6 +679,13 @@ int main(int argc, char** argv) {
         }
     } head;
     if (hostBpm > 0.0) p.setPlayHead(&head);
+    // TEST_CCS="cc,value,frame[,cc,value,frame...]": controllers at the start of the blocks holding these frames
+    struct CcAt { int number, value, frame; };
+    std::vector<CcAt> ccs;
+    if (const char* e = std::getenv("TEST_CCS")) {
+        const juce::StringArray w = juce::StringArray::fromTokens(e, ",", "");
+        for (int i = 0; i + 2 < w.size(); i += 3) ccs.push_back({ w[i].getIntValue(), w[i + 1].getIntValue(), w[i + 2].getIntValue() / block * block });
+    }
     for (int done = 0; done < total; done += block) {
         head.bpm = hostBpm;
         head.ppq = hostPpq + (double)done / rate * hostBpm / 60.0;
@@ -684,6 +696,8 @@ int main(int argc, char** argv) {
                 ref.timeTripKnob(t.first);
             }
         juce::MidiBuffer midi;
+        for (const CcAt& t : ccs)
+            if (t.frame == done) midi.addEvent(juce::MidiMessage::controllerEvent(1, t.number, t.value), 0);
         if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)noteVel), 100); }
         if (done == offBlock) { midi.addEvent(juce::MidiMessage::noteOff(1, note, (juce::uint8)100), offAt); }
         if (done == n2Block) { midi.addEvent(juce::MidiMessage::noteOn(1, note2, (juce::uint8)noteVel), n2At); }
@@ -693,6 +707,8 @@ int main(int argc, char** argv) {
         juce::ScopedNoDenormals ftz;   // processBlock runs with denormals flushed (as the SH-4 does, FPSCR.DN = 1)
         if (std::getenv("TEST_CONTROLS")) ref.setControls(refCtl);   // as processBlock does each block
         if (hostBpm > 0.0) ref.hostClock(head.bpm, head.moving, head.ppq);
+        for (const CcAt& t : ccs)
+            if (t.frame == done) ref.controller(t.number, t.value);
         if (done == 0) { ref.render(rl.data(), rr.data(), 100); ref.noteOn(note, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + 100, rr.data() + 100, block - 100); }
         else if (done == offBlock) { ref.render(rl.data(), rr.data(), offAt); ref.noteOff(note, 100 / 127.0f); ref.render(rl.data() + offAt, rr.data() + offAt, block - offAt); }
         else if (done == n2Block) { ref.render(rl.data(), rr.data(), n2At); ref.noteOn(note2, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + n2At, rr.data() + n2At, block - n2At); }

@@ -559,8 +559,8 @@ VSynthEmuProcessor::createParameterLayout() {
             params.push_back(std::make_unique<juce::AudioParameterInt>(matrixParamId(m, ("Sens" + sj).toRawUTF8()), n + "Sens " + sj, -63, 63, 0));
         }
     }
-    for (int i = 0; i < 10; ++i)
-        params.push_back(std::make_unique<juce::AudioParameterChoice>(assignParamId(i), juce::String(assignName(i)) + " Assign", assignValueNames(), 0));
+    for (int i = 0; i < kAssigns; ++i)
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(assignParamId(i), juce::String(assignName(i)) + " Assign", assignValueNames(), assignDefault(i)));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 144, 0, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 144, 0, noteValue));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kSustain, "Sustain", 0, 127, 127));
@@ -983,7 +983,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
             x.dest[0] = knob(mxIds[m][1]); x.sens[0] = knob(mxIds[m][2]);
             x.dest[1] = knob(mxIds[m][3]); x.sens[1] = knob(mxIds[m][4]);
         }
-        for (int i = 0; i < 10; ++i) c.assign[i] = knob(assignParamId(i));
+        for (int i = 0; i < kAssigns; ++i) c.assign[i] = knob(assignParamId(i));
     }
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();
     c.decay        = (int)apvts.getRawParameterValue(Params::kDecay)->load();
@@ -1456,11 +1456,13 @@ juce::StringArray VSynthEmuProcessor::assignValueNames() {
 }
 
 const char* VSynthEmuProcessor::assignParamId(int i) {
-    static const char* const k[10] = { "assignBeam2L", "assignBeam2R", "assignBeam3L", "assignBeam3R", "assignBeam4L", "assignBeam4R", "assignPadX", "assignPadY", "assignKnob1", "assignKnob2" };
+    static const char* const k[kAssigns] = { "assignBeam2L", "assignBeam2R", "assignBeam3L", "assignBeam3R", "assignBeam4L", "assignBeam4R", "assignPadX", "assignPadY", "assignKnob1", "assignKnob2", "assignTripX", "assignTripY" };
     return k[i];
 }
 
 const char* VSynthEmuProcessor::assignName(int i) {
-    static const char* const k[10] = { "Beam 2 L", "Beam 2 R", "Beam 3 L", "Beam 3 R", "Beam-L", "Beam-R", "Pad X", "Pad Y", "Knob 1", "Knob 2" };
+    static const char* const k[kAssigns] = { "Beam 2 L", "Beam 2 R", "Beam 3 L", "Beam 3 R", "Beam-L", "Beam-R", "Pad X", "Pad Y", "Knob 1", "Knob 2", "Trip X", "Trip Y" };
     return k[i];
 }
+
+int VSynthEmuProcessor::assignDefault(int i) { return i == 10 ? 82 : i == 11 ? 83 : 0; }
