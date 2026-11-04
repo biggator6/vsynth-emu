@@ -1547,6 +1547,57 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Hold, Sostenuto and the mode messages (2026-11-04, v117)
+
+CC 64 and 66 are ported, with Reset All Controllers, All Sound Off, All Notes Off and the other mode messages, and how a controller's message reaches a tone, which v99 and v114 left untraced. `XtSynth::controller` took only CC 7, 10 and 11; now it does what the handlers do. With no pedal moved nothing changes: `ab.sh` 4/4 identical to v114.
+
+**A controller's path.** `0x89474bf4` stores the value on the channel, for numbers below 96 only (`0x89475370`, C + 0x84 + number), then `0x894d6f10` runs the handler for that number. The table is built at `0x894d7400`:
+
+| Handler | CCs | |
+|---|---|---|
+| `0x894d7760` | all the others | the update below |
+| `0x894d77f0` | 64 | the update, then Hold |
+| `0x894d7880` | 66 | the update, then Sostenuto |
+| `0x894d78f0` | 84 | the update, then N + 0x130 = value |
+| `0x894d7940` | 121 | both pedals up, N + 0x130 = −1, the update; at value 0 the channel first (`0x89475200`) |
+| `0x894d7a10` | 120 | at value 0 only: key state cleared, notes truncated. No update |
+| `0x894d7b40` | 123, 124, 125 | at value 0 only: key state cleared, every key let go. No update |
+| `0x894d7a70`, `0x894d7ae0` | 126 (at ≤ 16), 127 (at 0) | the same |
+
+- **The update.** `0x894d7760` → `0x894d4fe0(C)` calls vtable slot `0x894dc2c0` on every note whose N has this C. That queues the note (`0x894d9020` on the list at `0x89cf7610`), and the queue's task runs slot 0, `0x894dc0b0`. So it is not at once, though no timer is involved, and it comes after what the handler does next.
+- So **any controller is a tone update, of any number, whether or not the value moved**, CC 1 with nothing assigned included. `controller` does this now. Bender and pressure arrive the same way (`0x894d6ff0`).
+- CC 5, 65, 68 and 71…74 have a handler class of their own (vtable `0x89833c94`) and CC 7, 10, 11, 91, 93 another (`0x89833c7c`), but both are a `bra` to the plain one. Nothing in the tone's path reads those numbers. So CC 74 is not a filter here unless the Matrix says so.
+- **N + 0x130** (CC 84, Portamento Control) is written and reset, and nothing in the tone's path reads it.
+- The defaults (`0x89475290`): CC 7, 11, 91, 93 are 127, CC 10 is 64, the others 0. Reset All Controllers sets CC 1, 2, 11, 16…19, 34, 48…51, 64, 66, 67, 69, 80…83 to those, the bender to 8192, and both pressures to 0. It leaves CC 7, 10, 91, 93 and the assigned CCs above 83 alone.
+
+**N.** So `*K`, what the harness has called the channel's key state, is the part-and-channel state at `0x89cf05d8 + (channel − 1)·0x1340 + part·0x134`: +0 C, +7 the key, +8 velocity, +9 and +0xa the key released and its velocity, +0xc the held keys' bitmap, +0x1c and +0x9c per-key counts of note-ons and note-offs, +0x11c Hold (this is the "perhaps Hold" of v60), +0x11d Sostenuto, +0x120 the keys latched by Sostenuto, +0x130 CC 84.
+
+**A note's three reasons to sound.** The note's +0x48 is 7 at its start (`0x894d5c30`) and at a legato (`0x894d5c90` ORs it). Bit 0 is the key, bit 1 Hold, bit 2 Sostenuto. The tone's note-off (`0x894dc270`) runs when all three are clear.
+- **A key let go** (`0x894d58b0`, from `0x894d4e60`, after the part's note-off `0x894dbea0`). Only if bit 0 is set. Bit 1 clears if Hold is below 64 now. Bit 2 clears unless Sostenuto is at 64 or more and this key is in the latch. Bit 0 clears, and +0x2f takes the release velocity (N + 0xa).
+- **Hold let go** (`0x894d4ec0` → `0x894d5970`, below 64): on notes with bit 1 set and bit 0 clear, bit 1 clears.
+- **Sostenuto** (`0x894d5fd0`): when the value crosses 64, the latch takes the held keys (`0x894d59d0` when let go, as Hold's, bit 2). A move that stays above 64 does not take them again.
+- **The release velocity** waits on +0x2f. The converters' inputs get it only at the note-off (`0x894eba30`), so an update while a pedal holds the note reads the old one. `Voice::relHeld`, `relVel`. It makes no audible difference, as the release time is formed again at the note-off, so no planted error stands on it.
+- **Mode messages** let the keys go through the same `0x894d58b0`, so **Hold survives All Notes Off**, as it should. Their release velocity is the last note-off's, N + 0xa.
+- **Portamento**: `0x894e4940` reads Hold in the POLY path only, as v60 found.
+
+**XtSynth.** `Voice::keyFlags`, `relHeld`; `hold`, `sost`, `sostKeys`, `lastRelease`, `cc[96]`. `keyRelease`, `voiceOff`, `keysCleared`, `ccDefaults`. `allNotesOff()` is not a message of the XT's: the plugin's panic and the check's end of case, it stops everything and clears both pedals. The processor now sends CC 120 and 123 to `controller`, as any other, so they release or truncate as on the XT rather than cutting every voice.
+
+**The check.** `xt_tone` draws Hold in a third of the cases and Sostenuto in a fifth: down, perhaps a move that stays down (64 half the time), up (63 half the time) or not at all, among the note-offs. And in one case in eight a mode message or Reset All Controllers, at a value that passes in three of four. The firmware's side is its own `0x894d58b0`, `0x894d5970`, `0x894d59d0`, `0x894d5fc0`, `0x894d5fd0`, `0x894d6040`, `0x89475200` on the note objects; the list walks (`0x894d4e60`, `0x894d4ec0`) are the harness's. The sweep gains CC 1 and an All Notes Off, each alone, the only place a stray update shows.
+
+Two faults of the check showed once notes could end earlier:
+- A note that ended was compared with the voice's state for the rest of the case, and the next note may take that voice. Now it is compared once.
+- An ended tone stayed in the firmware's list of sounding tones until its slot was reused, so a key-unsynced LFO followed it. On the XT it leaves. Now it is stopped when it ends.
+
+**The result.** fcheck: 2000 cases and the sweep, 3420 notes, 1416 taken by a sounding tone, 477 truncated, 273,771 blocks, 8.2 million checks, 0 different; a wave on OSC 2, 1410 notes, 113,803 blocks, 3.1 million checks, 0 different. 3000 cases and the sweep on each of seeds 777, 31337, 9: 0 different; seed 4242, below. `fcheck.sh --update` changes only `xt_tone`'s five count lines. A/B 4/4 identical to v114. PluginTest 4/4.
+
+**Planted errors.** 27 new, 238 in all, all caught at 2000 cases. Three of the new ones were first missed, each a weakness of the check: a Hold or Sostenuto move staying down was never drawn (`hold-up-middle`, `sost-retakes`), and a stray update from a mode message showed only in the sweep (`mode-updates`). One more, that a release velocity reaches the inputs at the key's release rather than the note-off, is exact: a release time is formed again at the note-off. It is not in the list.
+
+Changing the draws showed three old ones standing on chance: `bend-block`, `loop-frames` and `tvag-done-r` were caught on some seeds and missed on others. So the check now goes at them directly: the sweep moves the bender, each CC and an All Notes Off three times over, not once; half the loops start at the edge of their rounding, where one sample less in the wave moves the point; and one case in sixteen has the pan LFO on a square at full depth with a short release, so that one channel's gain is 0 as the envelope ends. `hold-porta-mono` needed Hold down before a first note, in a quarter of the cases with Hold.
+
+**A seed that showed something else.** Seed 4242 at 3000 cases gives one difference, on a wave on OSC 2: case 4156, block 171, a looped SOLO wave, 2.9% of the block's peak at the block's first sample, past `kSoloTol`'s 2%, in that one block. The walk and every field are bit for bit on both sides. No pedal or message is involved: it is `XtSoloVoice`'s known inexactness, and these draws happened to reach it. The tolerance stays as it is. fcheck's seed and the other three are 0 different.
+
+**Not covered.** A real XT. The queue's timing: the firmware's update runs where the harness calls it, at once. `0x894d4e60`'s per-key counts, N + 0x1c and N + 0x9c: a key pressed twice with no note-off between stops both notes at its first note-off here, and only the first on the XT. The part's Receive Hold flag (`0x89cf6988`), set at power-on.
+
 ### The patch TVA's level and pan (2026-11-03, v114)
 
 Level, Pan, their Keyfollows and LFO Depths, LFO 5, the MFX Send Level, and CC 7, 11 and 10 are ported, with their parameters and rows in the editor. The TVA has been at level 1, centred, with no LFO since v46. At the defaults every new factor is exactly 1, so the renders are unchanged: `ab.sh` 4/4 identical to v113.

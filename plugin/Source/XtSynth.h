@@ -267,8 +267,10 @@ public:
     // The bender, 0..16383 (8192 centre): the part's bend (xtPitchBend),
     // in every voice's pitch from the next update on.
     void pitchBend(int value);
-    // A MIDI controller: CC 7, 11 (level) and 10 (pan) reach the sounding voices' TVAs as
-    // any knob does.  The XT reads no other here; the others do nothing.
+    // A MIDI controller (0x89474bf4, then the handler by number, 0x894d6f10): the channel keeps
+    // numbers below 96, and all but the mode messages then update the sounding voices, as any knob
+    // does.  CC 7, 11 (level), 10 (pan), 64 Hold and 66 Sostenuto (the keys' release, 0x894d58b0),
+    // 121 Reset All Controllers; 120 All Sound Off truncates; 123…127 release every key.
     void controller(int cc, int value);
     void render(float* left, float* right, int n);
 
@@ -307,6 +309,9 @@ private:
         float velGain = 1;            // the patch TVA's velocity gain, latched at note-on (0x894ea990)
         XtTvaBlock tb;                // the TVA's block (0x894f50e0, 0x894f5310), the level in it
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
+        // The note's +0x48: bit 0 its key is down, 1 Hold may keep it, 2 Sostenuto may.  It stops
+        // when all three are clear; +0x2f is the release velocity until then.
+        int keyFlags = 7, relHeld = 64;
         XtEnvelope env;
         XtLfo tlfo;                    // LFO 5, on the TVA's level and pan
         // the COSM sections: on as at note-on; each its TVF, Dual, TB, Comb or
@@ -348,7 +353,10 @@ private:
     long hostFrames = 0;              // the system clock (ms) the key state reads
     XtPitchRandom pitchRandom;        // the XT's one random pitch generator (from its power-on seed)
     int bender = 8192;
-    int cc7 = 127, cc11 = 127, cc10 = 64;   // the channel's (C + 0x84 + cc): a patch sounds as stored at these
+    int cc[96] = {};                  // the channel's (C + 0x84 + number), as ccDefaults sets them
+    int hold = 0, sost = 0;           // the part's Hold and Sostenuto (N + 0x11c, + 0x11d)
+    uint16_t sostKeys[8] = {};        // the keys held when Sostenuto went down (N + 0x120)
+    int lastRelease = 0;              // the last note-off's velocity (N + 0xa)
     float chaosSeed = 0x1.666666p-1f; // the global logistic map the LFOs draw their seeds from (0.7 at power-on, 0x894f4c80)
     double hostRate = 44100;
 
@@ -383,6 +391,10 @@ private:
     void oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o);   // its envelopes
     void oscLfoNoteOn(OscVoice& s, const OscControls& o, XtLfoFree& free, const XtLfo* other, float seed);   // its LFO
     void truncate(Voice& v);
+    void keyRelease(Voice& v, int velocity);         // a key let go (0x894d58b0)
+    void voiceOff(Voice& v);                         // the note's release (0x894dc270)
+    void keysCleared();                              // the mode messages' reset of the key state
+    void ccDefaults();                               // the channel's controllers at power-on (0x89475290)
     void applyRates(OscVoice& s);
     void tvaUpdate(Voice& v);
     XtTvaBlock tvaBlock(const Voice& v) const;       // the converter's block, at the voice's key and latched velocity

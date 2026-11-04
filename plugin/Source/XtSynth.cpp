@@ -130,6 +130,7 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
 // ── Voices ───────────────────────────────────────────────────────────────────
 
 XtSynth::XtSynth() {
+    ccDefaults();
     xtModBlock(ctl.mod, modBlk);
     prepare(44100.0);
 }
@@ -321,7 +322,7 @@ XtTvaBlock XtSynth::tvaBlock(const Voice& v) const {
     k.level = ctl.tvaLevel; k.levelKF = ctl.tvaLevelKF; k.levelLfo = ctl.tvaLevelLfo;
     k.pan = ctl.tvaPan; k.panKF = ctl.tvaPanKF; k.panLfo = ctl.tvaPanLfo;
     k.send = ctl.mfxSend;
-    k.cc7 = cc7; k.cc11 = cc11; k.cc10 = cc10;
+    k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];
     return xtTvaBlock(k, v.note, v.velGain);
 }
 
@@ -640,8 +641,8 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     xtModBlock(ctl.mod, modBlk);                       // the tables may have loaded since the last knob moved
     // portamento's source key (0x894e4940): the previous key plus the Octave
     // Shift; with LEGATO the note's own (no glide) unless a key was held
-    // then (POLY: or Hold is down, not modelled)
-    const bool held = ctl.mono ? keys.prevMonoHeld : keys.prevPolyHeld;
+    // then (POLY: or Hold is down)
+    const bool held = ctl.mono ? keys.prevMonoHeld : keys.prevPolyHeld || hold >= 64;
     const int srcKey = ctl.portaMode == 1 && !held ? note : shiftKey(ctl.mono ? keys.prevMono : keys.prevPoly);
     Voice* v = nullptr;
     for (Voice& w : voice) if (!w.active) { v = &w; break; }
@@ -661,6 +662,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->structure = std::clamp(ctl.structure, 0, 2);
     v->vel = vel;
     v->relVel = 64;
+    v->keyFlags = 7;
     v->on = oscPlays(ctl);
     v->osc2.on = oscPlays(ctl.osc2);
     v->analog = ctl.oscType == 0;
@@ -867,6 +869,7 @@ void XtSynth::legatoNote(int key, int vel) {
         v.raw = keys.cur;
         v.srcKey = shiftKey(keys.prevMono);
         v.vel = vel;
+        v.keyFlags = 7;
         v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
         v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
         v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);
@@ -911,51 +914,74 @@ void XtSynth::truncate(Voice& v) {
     v.damp = 1.0f;
 }
 
-// The release time follows the note-off velocity (R-Sens): the times are
-// converted again before the release starts.
 // The part's note-off (0x894dbea0): the key state (0x894d63c0); a MONO part
 // whose sounding key was released while others are held takes the highest
-// of them (Legato on or off), else the note's voices release.
+// of them (Legato on or off).  Then the keys' release for the notes on that key (0x894d4e60).
 void XtSynth::noteOff(int note, float velocity) {
     keys.release(note);
     const int r = keys.noteOff(note);
     if (ctl.mono && r >= 0)
         for (const Voice& v : voice)
             if (v.active && !v.releasing && !v.damping) { legatoNote(shiftKey(r), v.vel); break; }
+    lastRelease = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
     for (Voice& v : voice)
-        if (v.active && v.raw == note && !v.releasing && !v.damping) {
-            v.releasing = true;
-            v.relVel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
-            v.env.update(envParams(v));
-            v.env.noteOff();
-            v.tlfo.noteOff();
-            auto oscRelease = [&](OscVoice& s, const OscControls& o) {
-                s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
-                s.penv.noteOff();
-                s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));
-                s.tenv.noteOff();
-                s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));
-                s.fenv.noteOff();
-                s.oenv.update(ampEnvParams(v, o));
-                s.oenv.noteOff();
-                s.lfo.noteOff();
-            };
-            if (v.on) oscRelease(v, ctl);
-            if (v.osc2.on) oscRelease(v.osc2, ctl.osc2);
-            for (int k = 0; k < 2; ++k) {
-                Voice::CosmVoice& c = v.cs[k];
-                if (!c.on) continue;
-                c.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));
-                c.envA.noteOff();
-                c.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));
-                c.envB.noteOff();
-                c.lfo.noteOff();
-            }
-        }
+        if (v.active && v.raw == note && !v.releasing && !v.damping) keyRelease(v, lastRelease);
 }
 
+// A key let go (0x894d58b0).  Hold, down now, keeps the note; so does Sostenuto if this key
+// was held when it went down.  The release velocity is latched here, for whenever the note stops.
+void XtSynth::keyRelease(Voice& v, int velocity) {
+    if (!(v.keyFlags & 1)) return;
+    if (hold < 64) v.keyFlags &= ~2;
+    const uint16_t bit = (uint16_t)(1u << (v.raw & 15));
+    if (!(sost >= 64 && (sostKeys[(v.raw & 127) >> 4] & bit))) v.keyFlags &= ~4;
+    v.keyFlags &= ~1;
+    v.relHeld = velocity;
+    if (!(v.keyFlags & 7)) voiceOff(v);
+}
+
+// The note's release (0x894dc270).  The release time follows the note-off velocity (R-Sens):
+// the times are converted again before the release starts.
+void XtSynth::voiceOff(Voice& v) {
+    v.releasing = true;
+    v.relVel = v.relHeld;
+    v.env.update(envParams(v));
+    v.env.noteOff();
+    v.tlfo.noteOff();
+    auto oscRelease = [&](OscVoice& s, const OscControls& o) {
+        s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
+        s.penv.noteOff();
+        s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));
+        s.tenv.noteOff();
+        s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));
+        s.fenv.noteOff();
+        s.oenv.update(ampEnvParams(v, o));
+        s.oenv.noteOff();
+        s.lfo.noteOff();
+    };
+    if (v.on) oscRelease(v, ctl);
+    if (v.osc2.on) oscRelease(v.osc2, ctl.osc2);
+    for (int k = 0; k < 2; ++k) {
+        Voice::CosmVoice& c = v.cs[k];
+        if (!c.on) continue;
+        c.envA.update(cosmEnvParams(v, ctl.cosm[k].envA));
+        c.envA.noteOff();
+        c.envB.update(cosmEnvParams(v, ctl.cosm[k].envB));
+        c.envB.noteOff();
+        c.lfo.noteOff();
+    }
+}
+
+// The panic of the plugin and the check, not a message of the XT's: everything stops at once.
 void XtSynth::allNotesOff() {
     for (Voice& v : voice) v.active = false;
+    keysCleared();
+    hold = sost = 0;
+    std::fill(std::begin(sostKeys), std::end(sostKeys), (uint16_t)0);
+}
+
+// What the mode messages do to the key state (0x894d6040, 0x894d6f80): no key is held.
+void XtSynth::keysCleared() {
     for (uint16_t& w : keys.held) w = 0;
     keys.lastMonoHeld = keys.prevMonoHeld = keys.lastPolyHeld = keys.prevPolyHeld = false;
 }
@@ -971,13 +997,61 @@ void XtSynth::pitchBend(int value) {
         if (v.active) newBlocks(v);
 }
 
-// The controllers the TVA's converter reads (0x894e9fe0, C + 0x84 + cc): as the bender,
-// an update for the sounding voices.
-void XtSynth::controller(int cc, int value) {
-    int* const c = cc == 7 ? &cc7 : cc == 11 ? &cc11 : cc == 10 ? &cc10 : nullptr;
+// The channel's controllers at power-on (0x89475290): a patch sounds as stored at these.
+void XtSynth::ccDefaults() {
+    std::fill(std::begin(cc), std::end(cc), 0);
+    cc[7] = cc[11] = cc[91] = cc[93] = 127;
+    cc[10] = 64;
+}
+
+// A controller.  The channel takes the value if it keeps that number (0x89475370), then its handler
+// runs (0x894d6f10; the table is built at 0x894d7400).  Nearly all of them are the plain handler,
+// 0x894d7760, an update of the part's notes (0x894d4fe0), whatever the number and whether or not the
+// value moved: the same pass as the bender's.  It is queued (0x894dc2c0), so it runs after the rest.
+void XtSynth::controller(int number, int value) {
+    if (number < 0 || number > 127) return;
     const int x = std::clamp(value, 0, 127);
-    if (!c || *c == x) return;
-    *c = x;
+    if (number == 121 && x == 0) {                 // the channel's part of Reset All Controllers (0x89475200)
+        for (int n : { 1, 2, 11, 16, 17, 18, 19, 34, 48, 49, 50, 51, 64, 66, 67, 69, 80, 81, 82, 83 })
+            cc[n] = n == 11 ? 127 : 0;
+        bender = 8192;
+    }
+    if (number < 96) cc[number] = x;
+    // the mode messages: no update, and only at these values
+    const bool cleared = number == 120 || (number >= 123 && number <= 125) || number == 127 ? x == 0 : number == 126 && x <= 16;
+    if (number == 120 || (number >= 123 && number <= 127)) {
+        if (!cleared) return;
+        keysCleared();
+        for (Voice& v : voice) {
+            if (!v.active || v.releasing || v.damping) continue;
+            if (number == 120) truncate(v);            // All Sound Off (0x894d4f40)
+            else keyRelease(v, lastRelease);           // the others (0x894d4f90)
+        }
+        return;
+    }
+    if (number == 64 || number == 121) {           // Hold (0x894d77f0); Reset All Controllers (0x894d7940) lets both go
+        hold = number == 64 ? x : 0;
+        if (hold < 64)                             // 0x894d4ec0, 0x894d5970
+            for (Voice& v : voice)
+                if (v.active && !v.releasing && !v.damping && (v.keyFlags & 2) && !(v.keyFlags & 1)) {
+                    v.keyFlags &= ~2;
+                    if (!(v.keyFlags & 7)) voiceOff(v);
+                }
+    }
+    if (number == 66 || number == 121) {           // Sostenuto (0x894d7880): the keys held as it goes down (0x894d5fd0)
+        const int y = number == 66 ? x : 0;
+        if ((sost ^ y) & 0x40) {
+            if (y >= 64) std::copy(std::begin(keys.held), std::end(keys.held), sostKeys);
+            else std::fill(std::begin(sostKeys), std::end(sostKeys), (uint16_t)0);
+        }
+        sost = y;
+        if (sost < 64)                             // 0x894d4f00, 0x894d59d0
+            for (Voice& v : voice)
+                if (v.active && !v.releasing && !v.damping && (v.keyFlags & 4) && !(v.keyFlags & 1)) {
+                    v.keyFlags &= ~4;
+                    if (!(v.keyFlags & 7)) voiceOff(v);
+                }
+    }
     for (Voice& v : voice)
         if (v.active) newBlocks(v);
 }
@@ -1242,6 +1316,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_TVA="level,levelKF,levelLfo,pan,panKF,panLfo,send": the patch TVA (KFs in %), MFX Send Level.
 //   XT_LFO5="wave,rate,offset,delay,mode,fade,keysync": LFO 5, on its level and pan.
 //   XT_CC="cc7,cc11,cc10": the controllers before the first note.
+//   XT_CC_AT="frame,number,value[;frame,number,value…]": a controller at a frame (CC 64 Hold, …).
 //   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
 //     3 ENV RING, 4 OSC SYNC, Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
 //     attack,release": new MOD knobs at a frame, on the notes then sounding.
@@ -1564,6 +1639,15 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_STRUCT_AT")) std::sscanf(e, "%ld,%d", &modAt, &modLater.structure);
     struct Ev { long at; int note; bool on; };
     std::vector<Ev> ev;
+    struct CcEv { long at; int number, value; };
+    std::vector<CcEv> ccEv;
+    if (const char* e = std::getenv("XT_CC_AT"))
+        for (std::string t = e; !t.empty(); ) {
+            CcEv c1{};
+            if (std::sscanf(t.c_str(), "%ld,%d,%d", &c1.at, &c1.number, &c1.value) == 3) ccEv.push_back(c1);
+            const size_t semi = t.find(';');
+            t = semi == std::string::npos ? std::string() : t.substr(semi + 1);
+        }
     for (int a = 9; a < argc; ++a) {
         int note = 60; long on = 0, off = -1;
         std::sscanf(argv[a], "%d@%ld:%ld", &note, &on, &off);
@@ -1577,6 +1661,8 @@ int main(int argc, char** argv) {
         for (const Ev& e : ev) if (e.at >= done && e.at < next) next = e.at;
         if (bendAt >= done && bendAt < next) next = bendAt;
         if (modAt >= done && modAt < next) next = modAt;
+        for (const CcEv& e : ccEv) if (e.at >= done && e.at < next) next = e.at;
+        for (const CcEv& e : ccEv) if (e.at == done) syn.controller(e.number, e.value);
         if (bendAt == done) syn.pitchBend(bendValue);
         if (modAt == done) syn.setControls(modLater);
         for (const Ev& e : ev) if (e.at == done) { if (e.on) syn.noteOn(e.note, noteVel); else syn.noteOff(e.note); }

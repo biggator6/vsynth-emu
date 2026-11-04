@@ -1077,8 +1077,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             if (msg.isNoteOn()) synth_.noteOn(msg.getNoteNumber(), msg.getFloatVelocity());
             else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber(), msg.getFloatVelocity());
             else if (msg.isPitchWheel()) synth_.pitchBend(msg.getPitchWheelValue());
-            else if (msg.isAllNotesOff() || msg.isAllSoundOff()) synth_.allNotesOff();
-            else if (msg.isController()) synth_.controller(msg.getControllerNumber(), msg.getControllerValue());
+            else if (msg.isController()) synth_.controller(msg.getControllerNumber(), msg.getControllerValue());   // the mode messages too
         }
         if (pos < numSamples) synth_.render(L + pos, R + pos, numSamples - pos);
         if (numOut == 1) for (int i = 0; i < numSamples; ++i) L[i] = 0.5f * (L[i] + R[i]);

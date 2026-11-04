@@ -251,13 +251,13 @@ env 30 70 90 50 80 500 2: identical
 == xt_tone
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
-tone: 3353 notes, 1373 taken by a sounding tone, 416 truncated, 271325 blocks, 7959625 checks
-tone: a SOLO wave's buffers within 7.1e-03 of the block's peak; 0 notes left off, a read outside memory; 351388 band reads far from their wave
+tone: 3420 notes, 1416 taken by a sounding tone, 477 truncated, 273771 blocks, 8240860 checks
+tone: a SOLO wave's buffers within 1.3e-02 of the block's peak; 0 notes left off, a read outside memory; 385642 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1412 notes, 416 taken by a sounding tone, 212 truncated, 107310 blocks, 2842096 checks
-tone, a wave on OSC 2: a SOLO wave's buffers within 6.7e-03 of the block's peak; 0 notes left off, a read outside memory; 553296 band reads far from their wave
+tone, a wave on OSC 2: 1410 notes, 407 taken by a sounding tone, 235 truncated, 113803 blocks, 3076246 checks
+tone, a wave on OSC 2: a SOLO wave's buffers within 8.5e-03 of the block's peak; 0 notes left off, a read outside memory; 591480 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 130385 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 130733 checks
 tone, a second update in a tick: a SOLO wave's buffers within 0.0e+00 of the block's peak; 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
 == solocmp

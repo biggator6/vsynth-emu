@@ -35,8 +35,8 @@ bend|xtPitchBend(bender, ctl.bendUp, ctl.bendDown)|xtPitchBend(bender, ctl.bendD
 scale-tune|t.scaleOn = ctl.scaleTune;|t.scaleOn = false;
 patch-fine|t.fine = ctl.patchFine + (int)(shift - semis * 100L);|t.fine = (int)(shift - semis * 100L);
 pitch-kf|xtPitchCents(key, coarse, 10 * o.pitchKF, fine,|xtPitchCents(key, coarse, 1000, fine,
-release-velocity|v.relVel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);|v.relVel = v.vel;
-lfo-off|                s.lfo.noteOff();\n|
+release-velocity|v.relVel = v.relHeld;|v.relVel = v.vel;
+lfo-off|        s.lfo.noteOff();\n|
 free-run-tick|freeLfo.tick(1);|;
 free-follow|else if (other) s.lfo.noteOnFollow(lfoParams(o), *other);|
 smooth-walk|s.curWalk = xtOscSmooth(s.curWalk, w);|s.curWalk = w;
@@ -102,7 +102,7 @@ mod-order|v.mod.process(tmp, tmp, tmp2);|v.mod.process(tmp, tmp2, tmp);
 bend-block|    bender = b;\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|    bender = b;
 mod-any|        if (anyChanged) v.mod.setBlock(modBlk);|        if (modChanged) v.mod.setBlock(modBlk);
 mod-legato|        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);|        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);
-legato-order|        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.tb = tvaBlock(v);\n        v.env.update(envParams(v));\n        v.tlfo.update(tlfoParams());\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update\n|        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmSetBlock(v, k);\n        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.tb = tvaBlock(v);\n        v.env.update(envParams(v));\n        v.tlfo.update(tlfoParams());\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n
+legato-order|        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.tb = tvaBlock(v);\n        v.env.update(envParams(v));\n        v.tlfo.update(tlfoParams());\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update\n|        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmSetBlock(v, k);\n        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.tb = tvaBlock(v);\n        v.env.update(envParams(v));\n        v.tlfo.update(tlfoParams());\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n
 sync-input|v.ana.process(tmp, sync, tmp2);|v.ana.process(tmp, 0, tmp2);
 sync-mask|            v.mod.setMask(mask2);|
 sync-la|if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;|
@@ -141,7 +141,7 @@ cosm-stereo-off|auto stereo = [](const OscVoice& s) { return s.on && !s.analog &
 cosm-past2-none|v.cs[1].process(tmp2, 1.0f, mixPast);|v.cs[1].process(tmp2, 1.0f);
 cosm-past2-kept|        std::copy(tmp, tmp + 3, mixPast);\n|
 fm-tone-0|modShared, (int)(v - voice));|modShared, 0);
-fm-lines-cleared|    for (Voice& v : voice) v.active = false;\n    for (uint16_t& w : keys.held) w = 0;|    for (Voice& v : voice) v.active = false;\n    std::fill(std::begin(modShared.line), std::end(modShared.line), 0.0f);\n    for (uint16_t& w : keys.held) w = 0;
+fm-lines-cleared|    for (Voice& v : voice) v.active = false;\n    keysCleared();|    for (Voice& v : voice) v.active = false;\n    std::fill(std::begin(modShared.line), std::end(modShared.line), 0.0f);\n    keysCleared();
 solo-old-mix|const std::vector<XtRecord> recs = xtSoloEncode(pcm.data(), (int)frames, ch);|std::vector<int16_t> x16((size_t)frames); for (long i = 0; i < frames; ++i) x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[(size_t)(2 * i)] + (int)pcm[(size_t)(2 * i + 1)]) >> 1) : pcm[(size_t)i]; const std::vector<XtRecord> recs = xtSoloEncode(x16.data(), (int)frames);
 tvab-cc7|mul(mul(mul(frac(T.level, cc(k.cc7)), frac(T.level, levelAtKey|mul(mul(mul(frac(T.level, cc(k.cc11)), frac(T.level, levelAtKey|toneosc
 tvab-cc11|levelAtKey(k.level, k.levelKF, key))), frac(T.level, cc(k.cc11))), velGain)|levelAtKey(k.level, k.levelKF, key))), frac(T.level, cc(k.cc7))), velGain)|toneosc
@@ -163,11 +163,11 @@ tvab-send|const float s = frac(T.level, cc(k.send));|const float s = 1.0f;|toneo
 tvab-send-off|const float s = frac(T.level, cc(k.send));|const float s = k.on ? frac(T.level, cc(k.send)) : 1.0f;|toneosc
 tvab-send-curve|const float s = frac(T.level, cc(k.send));|const float s = xtf::div((float)cc(k.send), 127.0f);|toneosc
 tvab-key|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.raw, v.velGain);
-tvab-c7|k.cc7 = cc7; k.cc11 = cc11; k.cc10 = cc10;|k.cc11 = cc11; k.cc10 = cc10;
-tvab-c11|k.cc7 = cc7; k.cc11 = cc11; k.cc10 = cc10;|k.cc7 = cc7; k.cc10 = cc10;
-tvab-c10|k.cc7 = cc7; k.cc11 = cc11; k.cc10 = cc10;|k.cc7 = cc7; k.cc11 = cc11;
-tvab-cc-map|int* const c = cc == 7 ? &cc7 : cc == 11 ? &cc11 : cc == 10 ? &cc10 : nullptr;|int* const c = cc == 7 ? &cc11 : cc == 11 ? &cc7 : cc == 10 ? &cc10 : nullptr;
-tvab-cc-update|    *c = x;\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|    *c = x;
+tvab-c7|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc11 = cc[11]; k.cc10 = cc[10];
+tvab-c11|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc7 = cc[7]; k.cc10 = cc[10];
+tvab-c10|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc7 = cc[7]; k.cc11 = cc[11];
+tvab-cc-map|k.cc7 = cc[7]; k.cc11 = cc[11];|k.cc7 = cc[11]; k.cc11 = cc[7];
+tvab-cc-update|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\nvoid XtSynth::newBlocks|}\n\nvoid XtSynth::newBlocks
 tvab-new|    v.mod.setBlock(modBlk);\n    v.tb = tvaBlock(v);\n|    v.mod.setBlock(modBlk);\n
 tvab-bus-start|    v->send[0] = v->tb.sendL;|    v->send[0] = 1.0f;
 tvab-bus-start-r|    v->send[1] = v->tb.sendR;|    v->send[1] = v->tb.sendL;
@@ -202,10 +202,37 @@ tlfo-follow|    else if (other) v->tlfo.noteOnFollow(tlfoParams(), other->tlfo);
 tlfo-free|v->tlfo.noteOnFree(tlfoParams(), seed[5], freeTlfo);|v->tlfo.noteOnFree(tlfoParams(), seed[5], freeLfo);
 tlfo-free-tick|        freeTlfo.tick(1);\n|
 tlfo-tick|            v.tlfo.tick(1);\n|
-tlfo-off|            v.tlfo.noteOff();\n|
+tlfo-off|    v.tlfo.noteOff();\n|
 tlfo-live|        if (tlfoChanged) v.tlfo.update(tlfoParams());\n|
 diff-tlfo-wave|const bool tlfoChanged = c.tvaLfoWave != ctl.tvaLfoWave \|\| |const bool tlfoChanged = 
 diff-tlfo-rate|c.tvaLfoRate != ctl.tvaLfoRate \|\| |
 diff-tlfo-offset|c.tvaLfoOffset != ctl.tvaLfoOffset \|\| |
 diff-tlfo-delay|c.tvaLfoDelay != ctl.tvaLfoDelay\n                          \|\| |
 diff-tlfo-fade|c.tvaLfoFadeMode != ctl.tvaLfoFadeMode \|\| c.tvaLfoFade != ctl.tvaLfoFade;|c.tvaLfoFadeMode != ctl.tvaLfoFadeMode;
+hold-keeps|if (hold < 64) v.keyFlags &= ~2;|v.keyFlags &= ~2;
+hold-middle|if (hold < 64) v.keyFlags &= ~2;|if (hold <= 64) v.keyFlags &= ~2;
+hold-up-middle|if (hold < 64)                             // 0x894d4ec0|if (hold <= 64)                             // 0x894d4ec0
+hold-up-none|                    if (!(v.keyFlags & 7)) voiceOff(v);\n                }\n    }\n    if (number == 66|                }\n    }\n    if (number == 66
+hold-up-down-too|(v.keyFlags & 2) && !(v.keyFlags & 1)) {|(v.keyFlags & 2)) {
+hold-porta|keys.prevPolyHeld \|\| hold >= 64;|keys.prevPolyHeld;
+hold-porta-mono|ctl.mono ? keys.prevMonoHeld : keys.prevPolyHeld|ctl.mono ? keys.prevMonoHeld \|\| hold >= 64 : keys.prevPolyHeld
+hold-rel-last|v.relVel = v.relHeld;|v.relVel = lastRelease;
+hold-note-flags|    v->keyFlags = 7;\n|
+sost-all-keys|if (!(sost >= 64 && (sostKeys[(v.raw & 127) >> 4] & bit))) v.keyFlags &= ~4;|if (!(sost >= 64)) v.keyFlags &= ~4;
+sost-none|if (!(sost >= 64 && (sostKeys[(v.raw & 127) >> 4] & bit))) v.keyFlags &= ~4;|v.keyFlags &= ~4;
+sost-retakes|if ((sost ^ y) & 0x40) {|{
+sost-held-now|(sostKeys[(v.raw & 127) >> 4] & bit)|(keys.held[(v.raw & 127) >> 4] & bit)
+sost-up-none|                    if (!(v.keyFlags & 7)) voiceOff(v);\n                }\n    }\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|                }\n    }\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);
+cc-store|if (number < 96) cc[number] = x;|if (number == 1) cc[number] = x;
+cc-any-update|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\nvoid XtSynth::newBlocks|    if (number != 1) for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\nvoid XtSynth::newBlocks
+mode-updates|            else keyRelease(v, lastRelease);           // the others (0x894d4f90)\n        }\n        return;|            else keyRelease(v, lastRelease);           // the others (0x894d4f90)\n        }\n        for (Voice& v : voice) if (v.active) newBlocks(v);\n        return;
+mode-sound-off|if (number == 120) truncate(v);|if (false) truncate(v);
+mode-notes-off|else keyRelease(v, lastRelease);           // the others|else truncate(v);           // the others
+mode-rel-velocity|else keyRelease(v, lastRelease);|else keyRelease(v, 64);
+mode-keys|        keysCleared();\n        for (Voice& v : voice) {\n            if (!v.active \|\| v.releasing|        for (Voice& v : voice) {\n            if (!v.active \|\| v.releasing
+mode-value|number == 127 ? x == 0 : number == 126 && x <= 16;|number == 127 ? true : number == 126;
+reset-cc|if (number == 121 && x == 0) {|if (number == 121) {
+reset-bender|        bender = 8192;\n    }\n    if (number < 96)|    }\n    if (number < 96)
+reset-expression|cc[n] = n == 11 ? 127 : 0;|cc[n] = 0;
+reset-hold|hold = number == 64 ? x : 0;|if (number == 64) hold = x;
+reset-sost|const int y = number == 66 ? x : 0;|const int y = number == 66 ? x : sost;

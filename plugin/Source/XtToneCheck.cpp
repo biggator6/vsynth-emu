@@ -17,7 +17,9 @@
 //   the note-off (0x894dc270), a sounding tone taking a note (0x894dc1e0) and
 //     truncation (0x894d5ba0), chosen as the part's note-on and note-off do;
 //   a knob moved during a note: the updaters and the note's update (0x894dc0b0);
-//   the bender and CC 7, 11 and 10 written where the channel keeps them, and that update.
+//   the bender and the controllers written where the channel keeps them, and that update;
+//   a key's release (0x894d58b0), Hold and Sostenuto (0x894d5fc0, 0x894d5fd0, 0x894d5970, 0x894d59d0)
+//   and the mode messages (0x894d6040, then the key's release or truncation) on the note objects.
 // Only the OS is hooked: its locks and clock, the voice allocator's lists, and
 // the wave store (0x8949e5c0…): the waves lie in RAM as the loader leaves them,
 // from the same encodes XtSynth plays (their vpdt and load-time bands).
@@ -59,7 +61,7 @@ using Ctl = XtSynth::Controls;
 // The peek at XtSynth's voices (a friend of the class).
 struct XtToneProbe {
     static void bend(XtSynth& s, int b) { s.bender = b; }
-    static void ccs(XtSynth& s, const int* cc) { s.cc7 = cc[0]; s.cc11 = cc[1]; s.cc10 = cc[2]; }
+    static void ccs(XtSynth& s, const int* v, const int* number, int n) { for (int i = 0; i < n; ++i) s.cc[number[i]] = v[i]; }
     static int run(int argc, char** argv);
     static XtSynth::OscVoice& osc(XtSynth::Voice& v, int n) { return n ? v.osc2 : static_cast<XtSynth::OscVoice&>(v); }
     static XtEnvelope& env(XtSynth::Voice& v, int e) {
@@ -254,20 +256,43 @@ public:
     }
 
     // The key state's note-off (0x894d63c0): the key a MONO part goes back to, or −1.
-    bool keyOff(int raw, int& back) {
+    bool keyOff(int raw, int relVel, int& back) {
         held[raw >> 4] &= (uint16_t)~(1u << (raw & 15));
         c.wr16(kN + 0xc + 2 * (uint32_t)(raw >> 4), held[raw >> 4]);
         c.wr8(kN + 9, (uint8_t)raw);
+        c.wr8(kN + 0xa, (uint8_t)relVel);
         uint32_t r0 = 0;
         if (!c.call(0x894d63c0, { kK, 0, 0x7f }, kSp, &r0)) { std::fprintf(stderr, "key off: %s\n", c.error().c_str()); return false; }
         back = (int32_t)r0;
         return true;
     }
 
-    bool noteOff(FwNote& n, int relVel) {
-        c.wr8(n.note + 0x2f, (uint8_t)relVel);
-        if (!c.call(0x894dc270, { n.note }, kSp)) { std::fprintf(stderr, "note-off: %s\n", c.error().c_str()); return false; }
-        n.released = true;
+    // Whether the note has stopped: its three reasons to sound are gone (0x894dc270 has run).
+    void released(FwNote& n) { if (!(c.rd8(n.note + 0x48) & 7)) n.released = true; }
+    // A key let go (0x894d58b0), the release velocity at N + 0xa.
+    bool keyRelease(FwNote& n) {
+        if (!c.call(0x894d58b0, { n.note, kN }, kSp)) { std::fprintf(stderr, "key release: %s\n", c.error().c_str()); return false; }
+        released(n);
+        return true;
+    }
+    // Hold or Sostenuto as the handlers (0x894d77f0, 0x894d7880) set them; a pedal let go goes over the notes
+    // (0x894d4ec0, 0x894d4f00, whose list of notes is ours here).
+    bool pedal(int number, int value, FwNote* fn, int nNotes) {
+        if (!c.call(number == 64 ? 0x894d5fc0 : 0x894d5fd0, { kN, (uint32_t)value }, kSp)) { std::fprintf(stderr, "pedal: %s\n", c.error().c_str()); return false; }
+        if (value >= 64) return true;
+        for (int i = 0; i < nNotes; ++i) {
+            FwNote& n = fn[i];
+            if (!n.live || n.released) continue;
+            if (!c.call(number == 64 ? 0x894d5970 : 0x894d59d0, { n.note }, kSp)) { std::fprintf(stderr, "pedal up: %s\n", c.error().c_str()); return false; }
+            released(n);
+        }
+        return true;
+    }
+    // A mode message's reset of the key state (0x894d6040, 0x894d6f80)
+    bool keysCleared() {
+        std::fill(std::begin(held), std::end(held), (uint16_t)0);
+        if (!c.call(0x894d6040, { kN }, kSp)) { std::fprintf(stderr, "keys cleared: %s\n", c.error().c_str()); return false; }
+        for (uint32_t o : { 0x1bu, 0x1du, 0x21u, 0x23u }) c.wr8(kK + o, 0);
         return true;
     }
 
@@ -653,6 +678,8 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     c.mfxSend = r.one(2) ? 127 : r.range(0, 127);
     c.tvaLfoWave = r.range(0, 7); c.tvaLfoRate = r.range(0, 127); c.tvaLfoOffset = r.range(0, 4); c.tvaLfoDelay = r.one(2) ? 0 : r.range(0, 60);
     c.tvaLfoFadeMode = r.range(0, 3); c.tvaLfoFade = r.one(2) ? 0 : r.range(0, 60); c.tvaLfoKeySync = !r.one(4);
+    // now and then the pan LFO at full depth on a square: one channel's gain 0, so a voice's end must look at both
+    if (r.one(16)) { c.tvaPanLfo = r.one(2) ? 63 : -63; c.tvaLfoWave = 3; c.tvaLfoFade = c.tvaLfoDelay = 0; c.tvaLfoOffset = 2; c.release = r.range(0, 30); c.tvaLevel = 127; c.tvaOn = true; }
     c.octave = r.one(3) ? r.range(-3, 3) : 0;
     if (r.one(2)) { c.portamento = true; c.portaMode = r.range(0, 1); c.portaType = r.range(0, 1); c.portaTime = r.range(0, 127); c.portaVeloSens = r.range(-63, 63); }
     return c;
@@ -660,8 +687,9 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
 
 // ── Compare ─────────────────────────────────────────────────────────────────
 constexpr size_t kBenderOnly = (size_t)-1;     // in the sweep: the bender moved, no knob
-constexpr size_t kCcOnly = (size_t)-4;         // and these three: CC 7, 11 or 10 moved, no knob
-constexpr int kCcNum[3] = { 7, 11, 10 };
+constexpr size_t kCcOnly = (size_t)-5;         // and these four: CC 7, 11, 10 or 1 moved, no knob
+constexpr int kCcNum[4] = { 7, 11, 10, 1 };
+constexpr size_t kModeOnly = (size_t)-6;       // and an All Notes Off, which is no update
 // Every field XtSynth keeps in a list of what has changed (setControls): the sweep moves
 // these one at a time, where nothing else moving can hide one left out of a list.
 std::vector<size_t> listedFields() {
@@ -683,8 +711,12 @@ std::vector<size_t> listedFields() {
     for (const int* x : { &c.mod.type, &c.mod.level, &c.mod.attack, &c.mod.release }) add(*x);
     for (const int* x : { &c.tvaLfoWave, &c.tvaLfoRate, &c.tvaLfoOffset, &c.tvaLfoDelay, &c.tvaLfoFadeMode, &c.tvaLfoFade,
                           &c.tvaLevel, &c.tvaLevelKF, &c.tvaLevelLfo, &c.tvaPan, &c.tvaPanKF, &c.tvaPanLfo, &c.mfxSend }) add(*x);
-    for (size_t i = 0; i < 3; ++i) f.push_back(kCcOnly + i);
-    f.push_back(kBenderOnly);
+    // a stray or missing update shows only when a COSM's block has moved since its last update, so several goes at those
+    for (int rep = 0; rep < 3; ++rep) {
+        for (size_t i = 0; i < 4; ++i) f.push_back(kCcOnly + i);
+        f.push_back(kModeOnly);
+        f.push_back(kBenderOnly);
+    }
     return f;
 }
 
@@ -782,6 +814,14 @@ int XtToneProbe::run(int argc, char** argv) {
         const TestWave* wv = !sweep && !twoInTick && !waves.empty() && g % 2 == 1 ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
         if (wv && wv == wv2) wv = &waves[(size_t)((wv - waves.data() + 1) % (long)waves.size())];   // a wave's loop is its own
         Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr);
+        // a loop's start at the edge of its rounding in half the cases: its region is checked to the sample
+        const auto loopEdge = [&](OscC& o, const TestWave* t) {
+            if (!t || !o.loop || !r.one(2)) return;
+            const float last = (float)(t->fw.frames - 1);
+            o.loopStart = (std::floor(o.loopStart * last) + 0.5f) / last;
+        };
+        loopEdge(ctl, wv);
+        loopEdge(ctl.osc2, wv2);
         if (sweep) {
             // analog on both OSCs, all the envelopes and LFOs bound and running, a
             // portamento gliding: whatever a field moves can be seen
@@ -923,10 +963,10 @@ int XtToneProbe::run(int argc, char** argv) {
         fw.bender = r.one(3) ? r.range(0, 16383) : 8192;
         syn.pitchBend(fw.bender);
         // the controllers the TVA reads: at rest in most cases, or a sweep's move would be hidden
-        int cc[3] = { 127, 127, 64 };
+        int cc[4] = { 127, 127, 64, 0 };
         if (!sweep && !twoInTick && r.one(3)) for (int& x : cc) x = r.range(0, 127);
-        XtToneProbe::ccs(syn, cc);
-        for (int i = 0; i < 3; ++i) fw.setCc(kCcNum[i], cc[i]);
+        XtToneProbe::ccs(syn, cc, kCcNum, 4);
+        for (int i = 0; i < 4; ++i) fw.setCc(kCcNum[i], cc[i]);
         if (wv) writeLoopEvents(fw, *wv, ctl);
         if (wv2) writeLoopEvents(fw, *wv2, ctl.osc2);
 
@@ -1078,12 +1118,12 @@ int XtToneProbe::run(int argc, char** argv) {
         auto stopNote = [&](int i, int blk) {
             fw.frames = syn.hostFrames;
             int back = -1;
-            if (!fw.keyOff(raw[i], back)) return false;
+            if (!fw.keyOff(raw[i], relVel[i], back)) return false;
             if (fw.partMono() && back >= 0)
                 for (FwNote& n : fn)
                     if (n.live && !n.released) { ++legatos; if (!fw.legato(n, keyOf(back))) return false; }
             for (FwNote& n : fn)
-                if (n.live && !n.released && n.raw == raw[i] && !fw.noteOff(n, relVel[i])) return false;
+                if (n.live && !n.released && n.raw == raw[i] && !fw.keyRelease(n)) return false;
             syn.noteOff(raw[i], (float)relVel[i] / 127.0f);
             compareAll(blk);
             return true;
@@ -1102,12 +1142,55 @@ int XtToneProbe::run(int argc, char** argv) {
                 if (moved && fnote.live && !fnote.ended && !fw.liveUpdate(fnote)) return false;
             if (panelMoved) {                        // the bender and a controller with the knobs, in the one update the firmware's gets
                 XtToneProbe::bend(syn, fw.bender);
-                XtToneProbe::ccs(syn, cc);
+                XtToneProbe::ccs(syn, cc, kCcNum, 4);
                 syn.setControls(ctl);
             } else if (ccMoved) {
                 XtToneProbe::bend(syn, fw.bender);
                 syn.controller(kCcNum[ccAt], ccTo);
             } else syn.pitchBend(fw.bender);
+            compareAll(blk);
+            return true;
+        };
+
+        // Hold or Sostenuto moved, each note's update after it, as any controller's
+        auto pedalMove = [&](int number, int value, int blk) {
+            fw.frames = syn.hostFrames;
+            if (!fw.pedal(number, value, fn, 2)) return false;
+            for (FwNote& n : fn)
+                if (n.live && !n.ended && !fw.liveUpdate(n)) return false;
+            syn.controller(number, value);
+            compareAll(blk);
+            return true;
+        };
+        // A mode message, at the values each takes (0x894d7a10, 0x894d7a70, 0x894d7ae0, 0x894d7b40): no update.
+        // All Sound Off truncates, the others are every key let go.
+        auto modeMessage = [&](int number, int value, int blk) {
+            fw.frames = syn.hostFrames;
+            if (number == 126 ? value <= 16 : value == 0) {
+                if (!fw.keysCleared()) return false;
+                for (FwNote& n : fn) {
+                    if (!n.live || n.released) continue;
+                    if (number == 120) { ++truncates; if (!fw.truncate(n)) return false; }
+                    else if (!fw.keyRelease(n)) return false;
+                }
+            }
+            syn.controller(number, value);
+            compareAll(blk);
+            return true;
+        };
+        // Reset All Controllers (0x894d7940): both pedals up, the update; at value 0 the channel's
+        // controllers first (0x89475200, its object two bytes before C).
+        auto resetAll = [&](int value, int blk) {
+            fw.frames = syn.hostFrames;
+            if (value == 0) {
+                if (!fw.c.call(0x89475200, { kCtl - 2 }, kSp)) return false;
+                fw.bender = 8192;
+                cc[1] = 127; cc[3] = 0;
+            }
+            if (!fw.pedal(64, 0, fn, 2) || !fw.pedal(66, 0, fn, 2)) return false;
+            for (FwNote& n : fn)
+                if (n.live && !n.ended && !fw.liveUpdate(n)) return false;
+            syn.controller(121, value);
             compareAll(blk);
             return true;
         };
@@ -1118,16 +1201,44 @@ int XtToneProbe::run(int argc, char** argv) {
         // The mix's first words, which follow OSC 2's buffer: between the cases XtSynth's tails
         // go on rendering and the firmware's stop, so the note starts from the port's.
         for (uint32_t i = 0; i < 3; ++i) { uint32_t u; std::memcpy(&u, &syn.mixPast[i], 4); fw.c.wr32(kBufMix + 4 * i, u); }
+        // Hold in a third of the cases and Sostenuto in a fifth, each down before the keys' release or
+        // after, and let go, or not.  The values on both sides of the middle.  A mode message in a few.
+        const auto pedalBlocks = [&](int chance, int (&at)[3], int (&val)[3]) {
+            at[0] = at[1] = at[2] = -1;
+            if (sweep || twoInTick || !r.one(chance)) return;
+            at[0] = r.one(4) ? -2 : r.range(0, 45);            // −2: down before the first note
+            at[2] = r.one(4) ? -1 : std::max(at[0], 0) + r.range(1, 70);
+            at[1] = r.one(2) ? std::max(at[0], 0) + r.range(1, 40) : -1;    // a move that stays down
+            if (at[2] >= 0 && at[1] >= at[2]) at[1] = -1;
+            val[0] = r.one(2) ? 100 : r.range(64, 127);
+            val[1] = r.one(2) ? 64 : r.range(64, 127);
+            val[2] = r.one(2) ? 63 : r.range(0, 63);
+        };
+        int holdAt[3], holdVal[3] = {}, sostAt[3], sostVal[3] = {};
+        pedalBlocks(3, holdAt, holdVal);
+        pedalBlocks(5, sostAt, sostVal);
+        const int modeAt = !sweep && !twoInTick && r.one(8) ? r.range(0, 60) : -1, modeCc = modeAt < 0 ? 0 : r.one(3) ? 120 : r.one(2) ? 121 : 123 + r.range(0, 4);
+        const int modeVal = r.one(4) ? r.range(0, 20) : 0;
+        if (holdAt[0] == -2 && !pedalMove(64, holdVal[0], -1)) return 1;
+        if (sostAt[0] == -2 && !pedalMove(66, sostVal[0], -1)) return 1;
         if (!startNote(0, -1)) return 1;
         keyDown[0] = true;
         if (dumpWhich && (dumpWhich[0] == 'a' || std::atoi(dumpWhich) == g))
             std::printf("case %d kind %d keys %d %d vel %d %d wave %d: osc1 on %d wave %d, osc2 on %d wave %d; cosm %d %d, %d %d; second at %d, off at %d %d, live at %d; mod %d type %d level %d a %d r %d, ch %d\n", g, kind, raw[0], raw[1], vel[0], vel[1], wv ? wv->type : 0, ctl.on, ctl.ana.wave,
                         ctl.osc2.on, ctl.osc2.ana.wave, ctl.cosm[0].on, ctl.cosm[0].type, ctl.cosm[1].on, ctl.cosm[1].type, secondAt, offAt[0], offAt[1], liveAt, ctl.mod.on, ctl.mod.type, ctl.mod.level, ctl.mod.attack, ctl.mod.release, wv ? wv->channels : 0);
         bool over = false, leftOff = false;
+        if (dumpWhich && (dumpWhich[0] == 'a' || std::atoi(dumpWhich) == g))
+            std::printf("  hold at %d %d %d (%d %d %d), sostenuto at %d %d %d (%d %d %d), mode message %d at %d\n", holdAt[0], holdAt[1], holdAt[2], holdVal[0], holdVal[1], holdVal[2],
+                        sostAt[0], sostAt[1], sostAt[2], sostVal[0], sostVal[1], sostVal[2], modeCc, modeAt);
         for (int blk = 0; blk < nBlocks && !over; ++blk) {
             if (blk == secondAt) { if (!startNote(1, blk)) return 1; keyDown[1] = true; }
+            for (int i = 0; i < 3; ++i)
+                if (blk == holdAt[i] && !pedalMove(64, holdVal[i], blk)) return 1;
+            for (int i = 0; i < 3; ++i)
+                if (blk == sostAt[i] && !pedalMove(66, sostVal[i], blk)) return 1;
             for (int i = 0; i < 2; ++i)
                 if (blk == offAt[i] && keyDown[i]) { if (!stopNote(i, blk)) return 1; keyDown[i] = false; }
+            if (blk == modeAt && !(modeCc == 121 ? resetAll(modeVal, blk) : modeMessage(modeCc, modeVal, blk))) return 1;
             if (blk == liveAt && twoInTick) {            // no tick between these
                 Ctl n = ctl;
                 for (Ctl::Cosm& k : n.cosm) k.envA.sustain = k.envB.sustain = 30;
@@ -1144,6 +1255,8 @@ int XtToneProbe::run(int argc, char** argv) {
                     fw.bender = (from + 4000) % 16384;
                     if (!moveLive(ctl, from, blk)) return 1;
                 }
+            } else if (blk == liveAt && sweep && sweepAt == kModeOnly) {
+                if (!modeMessage(123, 0, blk)) return 1;
             } else if (blk == liveAt) {                  // knobs moved, and the bender
                 Ctl n = drawControls(r, g, wv != nullptr, wv2 != nullptr);
                 if (sweep && sweepAt >= kCcOnly) n = ctl;
@@ -1168,7 +1281,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 if (sweep ? sweepAt == kBenderOnly : r.one(2)) fw.bender = r.range(0, 16383);
                 int ccAt = -1, ccTo = 0;
                 if (sweep && sweepAt >= kCcOnly && sweepAt != kBenderOnly) { ccAt = (int)(sweepAt - kCcOnly); ccTo = 90; }
-                else if (!sweep && r.one(3)) { ccAt = r.range(0, 2); ccTo = r.range(0, 127); }
+                else if (!sweep && r.one(3)) { ccAt = r.range(0, 3); ccTo = r.range(0, 127); }
                 if (!moveLive(n, bentFrom, blk, ccAt, ccTo)) return 1;
             }
             const bool tick = syn.tickCount >= 441;
@@ -1197,7 +1310,11 @@ int XtToneProbe::run(int argc, char** argv) {
                 // a truncated tone is over when its fade is (+0x44), ended at its next update
                 const bool fwDone = n->ended || fw.c.rd32(Firmware::tva(*n) + 0x44) != 0, synDone = n->vi < 0 || !syn.voice[n->vi].active;
                 if (fwDone != synDone) { rep.bad("voice end", "fw %.0f port %.0f", fwDone, synDone, blk); over = true; break; }
-                if (fwDone) n->ended = true;
+                if (fwDone) {                            // compared once: the next note may take its voice, and it finds no tone here to follow
+                    n->ended = true;
+                    n->vi = -1;
+                    if (!fw.stop(*n)) return 1;
+                }
             }
             if (over) break;
             FwNote* last = nullptr;
@@ -1256,11 +1373,12 @@ int XtToneProbe::run(int argc, char** argv) {
         for (int i = 0; i < 2; ++i)
             if (keyDown[i]) {
                 int back = -1;
-                if (!fw.keyOff(raw[i], back)) return 1;
+                if (!fw.keyOff(raw[i], relVel[i], back)) return 1;
                 syn.noteOff(raw[i], (float)relVel[i] / 127.0f);
             }
         syn.allNotesOff();
         for (FwNote& n : fn) if (n.live && !fw.stop(n)) return 1;
+        for (uint32_t a : { 0x894d5fc0u, 0x894d5fd0u }) if (!fw.c.call(a, { kN, 0 }, kSp)) return 1;   // the pedals up, no note left
         // FM's lines outlast a note and a modulator past full scale reads the next tone's, so
         // they must agree after a case.  A SOLO wave's are only close, and a note that left
         // memory stopped a block before XtSynth's: a later case reading those has no tolerance
