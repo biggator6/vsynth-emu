@@ -14,9 +14,9 @@ reference unit. The original-V-Synth service notes are background only.
 ### Processors
 - **V-Synth XT service notes** (block diagram, p. 32 viewer / p. 36 printed):
   main CPU **Hitachi SH7750R (SH-4), 266 MHz**; sub-CPU **H8/3061** (panel,
-  encoders, LEDs); a "DSP bus / PCM bridge" block whose part number is not
-  legible in the text layer. Main 1/5 circuit diagram lists **IC10 =
-  HD6417297BP267** (text extraction; likely the SH-4 — verify on page image).
+  encoders, LEDs); the effect chip **ESP4, IC40 = RA0A-101 (TC223C080AF-101)**,
+  with a 4 Mbit DRAM, behind the "DSP bus / PCM bridge" **PPC, IC37 = TC200E06**
+  (v121). The parts list has **IC2 = HD6417297BP267**, the 32-bit CPU.
 - **XT spec sheet**: "Sound generating section: 32 bits (floating point)";
   "Effects section: 24 bits (fixed point)".
 - **Original V-Synth service notes** (2003; background — not our unit): text layer names memories
@@ -1547,12 +1547,58 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The effect chip's name, and cutting the captures (2026-11-04, v121)
+
+Nothing here changes the plugin. The chip's name was in the service notes all along, and the run has a checker now. Reading the notes also showed that v116 was wrong about the digital outs.
+
+**The chip.** The block diagram and the Main 2/5 circuit diagram label it, and the parts list gives the parts. (v115 said the part number was illegible. I just hadn't read the text layer for this name.)
+
+| IC | Part | Labelled | |
+|---|---|---|---|
+| IC40 | RA0A-101 (TC223C080AF-101), "IC (DSP)" | ESP4, (Total_EFX) | The chip |
+| IC41 | M11L416256SA-35TG, "IC (DRAM)" | DRAM (4Mbit) | ESMT's EDO DRAM, 262,144 × 16 bits |
+| IC37 | TC200E06 (PPC), "IC (I/F)" | PPC (PCM_Bridge) | Between the SH-4 and the chip |
+| IC33 | ICS512MT, "IC (PLL)" | PLL (x6) | 11.2896 MHz, 256 fs, to 67.7376 MHz, 1536 fs |
+| IC95 | CS8420-CS, "IC" | SRC | The sample-rate converter, below |
+
+rom.2 calls it ESP too: "ESP Device Test", "ESP Verify", "PPC ESP Bus Thru". What the parts add to v115's reading:
+- **The PLL beside it makes 1536 fs,** which fits v115's 768 steps per sample at two clocks a step. v115 got 768 from the program's size alone. I read the clock's way to the chip off the diagram's lines at low resolution, so that part is less sure than the part numbers.
+- **The memory is 2^18 words of 16 bits.** That fits the 18-bit offsets exactly, and so it's the whole of what v115 called "at most 2^18 values". With one offset a sample, as Multi Tap's 1300 ms shows, a delay line can hold only 16 bits a sample, against the spec's 24-bit effects section. So either a store rounds or limits to 16 bits, or it companders, and that decides how exact a delay can be. An echo in `sdelay_stereo` on a sample-exact path will show which. Not checked on anything yet.
+
+**No data sheet.** Searching for TC223C080AF and RA0A found nothing, as expected of a part made for Roland. Its older relative has been done, though: the JP-8000's Roland/Toshiba TC170C140, also called ESP or ESP2, was reverse engineered from the silicon by The Usual Suspects (39C3 talk "From Silicon to Darude Sand-storm"), into a bit-accurate emulator, JE-8086, announced as open source. I haven't read it, and I don't know that ESP4 shares its instruction set. If it does, it could settle v115's 319 undecoded words and the widths without any capture.
+
+**The digital outs go through the converter, at every rate.** v116 said a digital capture should show all of the chip's result. It won't. rom.1 maps at 0x88000000 and holds the CS8420's driver; it writes the chip's registers bit by bit, address byte 0x20 (`0x8800f070`), all of them in `0x8800f100`. `0x8800ee30(this, n)`, reached from rom.2 by `0x89301650(obj, n)`, sets the routing, by the bits of the data sheet's Data Flow Control:
+
+| n | 03h | The transmitter's data | The SRC's input | Who uses it |
+|---|---|---|---|---|
+| 1 | 0x00 | **the SRC's output** | serial in | normal: the kernel's start-up sets it (`0x8802f378`, after the clock at 44.1 kHz), and the sampling screen goes back to it on leaving a digital input (`0x894a73d0`, `0x894a6d14`) |
+| 2 | 0x01 | the SRC's output | the receiver | nobody I found |
+| 3 | 0x09 | serial in, **no SRC** | the receiver | the sampling screen's Input Source OPTICAL or COAXIAL (`0x894a7414`, `0x894a7440`; RESAMPL and USB leave it alone), and test mode's "SRC Input" |
+| else | 0x0a | serial in, no SRC | | nobody I found |
+
+Digital Output Freq (ID 0x77) only sets the output's clock (`0x89301680` → `0x8800ef50`). So in Patch mode the digital outs carry the SRC's output, even at 44.1 kHz with both sides on one clock: no drift and no analog noise, but a filter's response, not the chip's words. Dither's off (01h = 0x0b; test mode's toggle goes to 0x03). The manual's troubleshooting page also says the digital rate is forced to 44.1 kHz during sampling, which n = 3 does.
+
+| Path | Now that we know |
+|---|---|
+| USB | The block diagram has the TUSB3200 on the same bus as the DAC and the CS8420, so it should get the chip's words with no converter. Its width isn't known, and nor is whether a current Mac takes it. Best if it works |
+| Digital | One clock, 24 bits. Sample by sample only through the converter's filter, which the wave's clicks measure, if it's fixed at a 1:1 ratio. So "0 different" isn't available here; how close it comes is to be seen |
+| Resampling | Input Source RESAMPL records what goes to MAIN OUT, from the chip, inside the XT: 16 bits, about six takes' memory, by hand. Should be exact up to the 16th bit. Not tried |
+| Analog | As before |
+
+**`fxcut.py`** checks a recording of a run and cuts it, so run 1 can be looked at before anyone spends 22 minutes on run 2. It finds the run in the recording from the take list and the wave's pattern, then each take's first click to the sample. It reports levels against the wave and against `main`, and whether the path is exact (one-sample clicks at exact spacing, the bits in use, what crosses, whether a take repeats). For run 1 it goes through the takes by name, asking whether each setting reached the sound, and giving what it measured. FAIL means do it again: the wrong rate, a wave at the wrong speed (it says how far off), writes not landing, a recording that stops early. Cut takes keep the recording's own bytes and format, with the wave's sample i at sample i + 0.25 s. A take with no clean click, such as a wet one, is placed by the run's timing, to a few ms.
+
+**`fxcut_test.py`,** a simulated XT with 40 cases, because no real capture exists: clean recordings in each format, against libsndfile and one of the user's real captures for the reader; a two-clock analog path at 16 ppm; and planted faults (System or patch writes lost, a wave a semitone, five cents or an octave off, 48 kHz, mono, stopped early, started late, too hot, too low, swapped, inverted, a filter in the path, a 16-bit path in a 24-bit file, a note lost or late, a stray sound, a level that moved). A clean case must give no FAIL and no LOOK. The first run was wrong in 14 of 33. Some of that was my test, but it found real faults: a reverb's tail passing as a click, noise taken as a first arrival, a stray sound raising the floor it was judged by. All of this tests the tool against my idea of a recording. The first real one may yet surprise it.
+
+**Two changes to the run, from that test.** If the path's gain is the +9.4 dB of v40, the Parametric EQ's +15 clipped the sweep and came out as +10.34 dB. So the clicks go from −6 to −12 dBFS, and the four `peq_` takes play at Wave Gain −12 (the manual and the descriptors allow it: −12…+12), which also measures Wave Gain. All SysEx checksums are good again, and `fxplay --test` sends 425, 4303 and 15653 bytes identical. Any `fxprobe.wav` copied to an XT before this version needs copying again.
+
+**Not done yet.** Nothing compares a capture with the model: that belongs with the chip's first version. `--take` checks a hand-made recording alone, but a set of those can't be compared with each other yet.
+
 ### The effect captures: the chip's reference (2026-11-03, v116)
 
 **The decision.** The user chose captures from their XT as the reference for the chip's programs, since nothing else runs them (v115). So for those programs, and only those, "done" stops meaning 0 different in a firmware harness. The SH-4 side of the effects still goes by the harness. No plugin code changes here, and no capture exists yet.
 
 **What done means for the chip.** It depends on the path the user can record:
-- Digital or USB, with no clock of its own to fit: sample by sample against the model. The manual gives the digital output as 24-bit and the effects section as 24-bit fixed point, so a digital capture should show all of the chip's result. The aim is 0 different. Anything left over gets stated per take, with its size and cause, as with SOLO's 2%, and no tolerance goes in unexplained. At 16 bits the comparison ends at the 16th bit.
+- Digital or USB, with no clock of its own to fit: sample by sample against the model. The manual gives the digital output as 24-bit and the effects section as 24-bit fixed point, so a digital capture should show all of the chip's result. (Wrong about digital: v121 found the converter in that path. It holds for USB, if USB works.) The aim is 0 different. Anything left over gets stated per take, with its size and cause, as with SOLO's 2%, and no tolerance goes in unexplained. At 16 bits the comparison ends at the 16th bit.
 - Analog: gains, times and responses only, after fitting the clock's drift and the trim (v40: 16 ppm, noise 56 dB down). That can't show word widths or rounding.
 
 **A run drives the XT, so the user doesn't have to.** There are 83 takes, and each would otherwise take a minute at the panel, with mistakes. `fxcapture.py` writes a Standard MIDI File of System Exclusive and notes, and `fxplay.cpp` sends it. The recording is one long file, cut by the take list and the wave's first mark. The steps are in RECORDING_GUIDE.md, "Effects captures".
@@ -1585,7 +1631,7 @@ stage time (+0x6c) and the onset level (+0x58).
 
 | At | What | For |
 |---|---|---|
-| 0.5 s | a one-sample click, both sides, −6 dBFS | aligning a take to the sample |
+| 0.5 s | a one-sample click, both sides, −12 dBFS (−6 in v116) | aligning a take to the sample |
 | 2.0, 4.0 s | the same, left only, then right only | impulse responses, and what crosses over |
 | 6.0 s | a log sweep, 20 Hz to 20 kHz, 5 s, −18 dBFS | responses, and distortion products |
 | 12.5 s | 1 kHz, −72 to 0 dBFS in 6 dB steps of 100 ms | level laws: compressors, clipping, low-level rounding |
@@ -1598,14 +1644,14 @@ stage time (+0x6c) and the onset level (+0x58).
 | `silence`, `main`, `main_again` | Noise, the real gain from a wave to the output (Out Gain for TG's −24, the ×4), and whether a take repeats to the sample |
 | `multi_off`, `multi_thru`, `multi_off_m64`, `multi_thru_m64` | That MFX Switch off still goes through Master; Thru's level; the three samples |
 | `master_100`, `gain_plus6`, `gain_minus6` | Where Master Level and Output Gain land, and whether System writes get through |
-| `peq_flat`, `peq_mid_plus15`, `peq_mid_minus15`, `peq_total_plus15` | The model's best case, on real hardware: ±15.00 dB at 800 Hz, the shift code |
+| `peq_flat`, `peq_mid_plus15`, `peq_mid_minus15`, `peq_total_plus15` | The model's best case, on real hardware: ±15.00 dB at 800 Hz, the shift code. All at Wave Gain −12 (v121) |
 | `sdelay_stereo`, `sdelay_mono`, `mtap` | Taps at the driver's offsets; memory, and both kinds of read; the wrong Chorus read, if it isn't the model's error |
 | `wet_chorus`, `wet_reverb`, `mfx_to_chorus`, `mfx_to_reverb`, `chorus_to_reverb` | Each return alone (Master 0 keeps the dry path out), and that the sends tap before Master |
 | `hot`, `hotter` | Clipping, and what the undecoded output stage does at level |
 
 **Run 2,** 59 takes, 22 minutes: every MFX type at its defaults, then each Reverb and Chorus type wet.
 
-**Not done yet.** Nothing cuts or compares the recordings: that belongs with the chip's first version, or with the first capture if it comes sooner. The LFO types start at an unknown phase, so a comparison will have to find it. DIR isn't captured: the digital outputs carry MAIN only.
+**Not done yet.** Nothing cuts or compares the recordings: that belongs with the chip's first version, or with the first capture if it comes sooner. (v121 cuts and checks them; comparing is still to do.) The LFO types start at an unknown phase, so a comparison will have to find it. DIR isn't captured: the digital outputs carry MAIN only.
 
 ### The effects: a second processor, mapped (2026-11-03, v115)
 
@@ -1816,7 +1862,7 @@ Those are the parts I trust. It is not finished:
 **How a port would be checked.** Two parts, of very different quality:
 - **The SH-4 side:** as well as anything so far, or better. It needn't be ported at all: the user's choice on 2026-10-28 was to run offline firmware in the interpreter and hand-port real-time code, and a converter runs only when a parameter changes. If it is ported, `xt_fx` compares (word, value, shift) streams against the firmware's over random parameters, 0 different, with planted errors, as ever. It only needs the hooks above and `fxmap`'s set-up.
 - **The chip:** there is no reference to run. The project's rule, a port is done when it equals the firmware in a harness, cannot be met for the chip's programs, because only a real XT executes them. (The user chose captures: v116, "The effect captures".) What can stand in, in order of strength:
-  1. A capture from the XT. Digital Out at 44.1 kHz (system, Digital Output Freq) may be close to the chip's own output, and could then be compared sample by sample if the converter passes it untouched; an analog capture gives levels, times and responses only. Test signals on a wave, FX on, one type at a time. RECORDING_GUIDE.md has the chain, with effects off so far. This needs the user and the unit.
+  1. A capture from the XT. Digital Out at 44.1 kHz (system, Digital Output Freq) may be close to the chip's own output, and could then be compared sample by sample if the converter passes it untouched (v121: it doesn't pass it untouched, and the firmware keeps it in the path); an analog capture gives levels, times and responses only. Test signals on a wave, FX on, one type at a time. RECORDING_GUIDE.md has the chain, with effects off so far. This needs the user and the unit.
   2. The firmware's own numbers, as in the table: a gain or a time that the driver computed and the manual states, reached to 0.01 dB or a sample. Exact where it applies, but it says nothing about a chorus's LFO or a reverb's density.
   3. Sanity: Thru is identity, a reverb decays, no type runs away, the same signal twice gives the same result.
 
@@ -1830,7 +1876,7 @@ Those are the parts I trust. It is not finished:
 6. Captures, and whatever they show. These can start as soon as 1 exists, and the sooner the better.
 
 **Still unknown.**
-- The chip's part number. The service notes' block diagram has it illegible in the text layer (see "Processors"), so the page image or the board would settle it, and with it maybe a data sheet. A string search of rom.0…4 for it found nothing.
+- ~~The chip's part number.~~ ESP4, RA0A-101 (TC223C080AF-101), with no public data sheet (v121).
 - Widths, saturation and rounding: the accumulators (a delay's address sum reaches 28 in units where a sample is ±1, so there is headroom), registers, memory, where a store saturates. The spec says 24 bits. These decide exactness, and only a capture will show them.
 - The 319 words, r0…r3, c[3:2] of the latch multiply beyond what's above, and the ramps' limit.
 - The output stage, A 0x230…0x2bb: whether it acts at normal levels, and which slots go to which jack.

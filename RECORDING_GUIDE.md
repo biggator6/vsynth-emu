@@ -20,9 +20,11 @@ build line at the top of `research/tools/fxplay.cpp`.
 
 | Path | What it needs | What it allows |
 |---|---|---|
-| **Digital** | XT COAXIAL or OPTICAL OUT into an interface's digital input. System: Digital Output Freq **44.1 kHz**. Interface clocked from that input, recording at 44.1 kHz, 24-bit | Sample by sample, at 24 bits. The manual says this carries what MAIN OUT carries |
-| **USB** | A USB cable and no interface, if a current Mac sees the XT (settings in step 4). Record from the XT at 44.1 kHz | Sample by sample, at whatever width USB gives. Not known to work yet |
+| **USB** | A USB cable and no interface, if a current Mac sees the XT (settings in step 4). Record from the XT at 44.1 kHz | Sample by sample, the best there is, if it works: the service notes put the USB chip on the same bus as the DAC, ahead of the converter below. Its width, and whether a Mac sees it, aren't known yet |
+| **Digital** | XT COAXIAL or OPTICAL OUT into an interface's digital input. System: Digital Output Freq **44.1 kHz**. Interface clocked from that input, recording at 44.1 kHz, 24-bit | One clock, 24 bits, no analog noise: levels, times and responses at their best. Not sample by sample as it stands: the firmware keeps the XT's sample-rate converter in the digital outs at every rate, 44.1 kHz included |
 | **Analog** | MAIN OUT into line inputs, as for the older takes, at 44.1 kHz, 24-bit. Set the trim for a full-scale XT and leave it alone between runs | Levels, times and responses only |
+
+Digital and USB together would be better still, if your interface allows it: run 1 through both shows what the converter does.
 
 **2. Load the wave.**  Copy `fxprobe.wav` into the project's `.prj` folder, the way you got `Emu_test.prj` off the XT (USB
 Storage).  Then Disk, Import Files, Wave (manual p. 133).  It needs no encoding, and no saving unless you want it past a
@@ -60,11 +62,14 @@ recording, stereo, no processing.  Then:
 ```bash
 analysis/test_files/fx/fxplay analysis/test_files/fx/fx_run_1.mid "V-Synth"
 ```
-Leave the XT alone until it says done, then stop.  Save as `analysis/test_files/fx/fx_run_1.wav`.  **This one matters most.**  It's
-worth having Claude look at it before run 2.
+Leave the XT alone until it says done, then stop.  Save as `analysis/test_files/fx/fx_run_1.wav`.  **This one matters most**, so check it before run 2, which takes a minute:
+```bash
+.venv/bin/python3 research/tools/fxcut.py analysis/test_files/fx/fx_run_1.wav
+```
+The last line says whether to go on.  FAIL lines say what to fix, and LOOK lines are worth reading but stop nothing.  It also cuts the takes into a folder beside the recording.  Or tell Claude and it'll run this and read the rest.
 
-**7. Run 2, 22 minutes.**  The same with `fx_run_2.mid`, saved as `fx_run_2.wav`.  If a run gets interrupted, `--from <seconds>`
-before the file name picks it up, with a `next_s` from `fx_takes.csv`; save that part as a separate recording and say where it starts.
+**7. Run 2, 22 minutes.**  The same with `fx_run_2.mid`, saved as `fx_run_2.wav`, and the same check.  If a run gets interrupted, `--from <seconds>`
+before the file name picks it up, with a `next_s` from `fx_takes.csv`; save that part as a separate recording and give `fxcut.py` the same `--from <seconds>`.
 
 **8. Tell Claude** which path you used, the interface and its settings.  No normalizing, fades, dither or trimming: the takes are
 found by their timing and the wave's first click.
@@ -72,7 +77,12 @@ found by their timing and the wave's first click.
 **If SysEx can't be made to work:** `fx_takes.csv` lists every take's settings in the panel's words.  By hand, the takes `main`,
 `multi_off`, `multi_thru`, `multi_off_m64`, `peq_mid_plus15`, `sdelay_stereo` and `wet_reverb` are the ones to do, one recording each,
 named after the take.  After step 3, set: Vari Sw, Tempo Sync, Robot, Loop and Time Trip OFF; OSC 2, both COSMs, MOD and TVA off;
-4 Band EQ off; MFX Send 127, CHO Send 0, REV Send 0.  Then play C4 and hold it for the wave's 17 s.
+4 Band EQ off; MFX Send 127, CHO Send 0, REV Send 0.  Then play C4 and hold it for the wave's 17 s.  `fxcut.py <file> --take <name>` checks each one.
+
+**Exact without any interface, by hand (not tried):** Resampling records what goes to MAIN OUT inside the XT, ahead of the converter, as a 16-bit wave
+you can copy off with USB Storage.  In the SAMPLING General screen: Input Source **RESAMPL**, Sampling Type **STEREO L R**, Trigger Mode **NOTE**, Pre Gain **0 dB**, Pre Trigger **0**; and Pre-Effect Type **OFF**.
+Set a take up as above, then play C4 and hold it for the wave's 17 s.  There's room for about six takes (115 s of stereo in the factory project), so do the list above.  If USB and
+digital both fail to give single-sample clicks, this is the way to get exact data, up to the 16th bit.
 
 ---
 

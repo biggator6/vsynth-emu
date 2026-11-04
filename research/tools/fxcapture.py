@@ -31,9 +31,10 @@ def probe():
     n = int(16.8 * FS)
     L, R = [0.0] * n, [0.0] * n
     at = lambda t: int(round(t * FS))
-    L[at(0.5)] = R[at(0.5)] = 0.5                      # the mark: aligns a take to the sample
-    L[at(2.0)] = 0.5                                   # left only, then right only: what crosses over
-    R[at(4.0)] = 0.5
+    CLICK = 10 ** (-12 / 20)                           # low enough to pass unclipped through a path of up to +12 dB
+    L[at(0.5)] = R[at(0.5)] = CLICK                    # the mark: aligns a take to the sample
+    L[at(2.0)] = CLICK                                 # left only, then right only: what crosses over
+    R[at(4.0)] = CLICK
     s, m = at(6.0), at(5.0)                            # a log sweep, 20 Hz to 20 kHz, -18 dBFS
     k = math.log(20000.0 / 20.0)
     for i in range(m):
@@ -125,10 +126,10 @@ def run1():
         take('master_100', 'Master Level', assign='MAIN', master=100),
         take('gain_plus6', 'Output Gain +6 dB', assign='MAIN', out_gain=6),
         take('gain_minus6', 'Output Gain -6 dB', assign='MAIN', out_gain=-6),
-        take('peq_flat', 'Parametric EQ at its defaults', mfx_sw=1, mfx=1),
-        take('peq_mid_plus15', 'Mid 1 Gain +15: the model says exactly +15.00 dB at 800 Hz', mfx_sw=1, mfx=1, mfx_over={4: 30}),
-        take('peq_mid_minus15', 'Mid 1 Gain -15', mfx_sw=1, mfx=1, mfx_over={4: 0}),
-        take('peq_total_plus15', 'Total Gain +15: the shift code', mfx_sw=1, mfx=1, mfx_over={10: 30}),
+        take('peq_flat', 'Parametric EQ at its defaults; Wave Gain -12, as in all four, so +15 stays clear of clipping', mfx_sw=1, mfx=1, wave_gain=-12),
+        take('peq_mid_plus15', 'Mid 1 Gain +15: the model says exactly +15.00 dB at 800 Hz', mfx_sw=1, mfx=1, mfx_over={4: 30}, wave_gain=-12),
+        take('peq_mid_minus15', 'Mid 1 Gain -15', mfx_sw=1, mfx=1, mfx_over={4: 0}, wave_gain=-12),
+        take('peq_total_plus15', 'Total Gain +15: the shift code', mfx_sw=1, mfx=1, mfx_over={10: 30}, wave_gain=-12),
         take('sdelay_stereo', 'Stereo Delay: taps at 22050 and 28664 samples, as the driver computes them', mfx_sw=1, mfx=11, tail=2.0),
         take('sdelay_mono', 'Mode MONO', mfx_sw=1, mfx=11, mfx_over={0: 0}, tail=2.0),
         take('mtap', 'Multi Tap: direct reads', mfx_sw=1, mfx=12, tail=2.0),

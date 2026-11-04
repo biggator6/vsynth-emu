@@ -335,6 +335,9 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The chip's name, the converter and the checker v121 (2026-11-04), no plugin change: the effect chip is ESP4, RA0A-101 (TC223C080AF-101), with a 256 K × 16 DRAM, and the firmware keeps the CS8420's converter in the digital outs at every rate, so USB or Resampling are the exact paths (HARDWARE_FIRMWARE.md, "The effect chip's name, and cutting the captures").
+  research/tools/fxcut.py checks a recording of a run and cuts it into takes; fxcut_test.py tests that on a simulated XT with faults planted, 40 cases. The run's clicks are now -12 dBFS and the Parametric EQ takes at Wave Gain -12. No capture exists yet.
+
 The effect captures v116 (2026-11-03), no plugin change: the user chose captures from their XT as the reference for the chip's programs (HARDWARE_FIRMWARE.md, "The effect captures"; CLAUDE.md's rules). Steps in RECORDING_GUIDE.md, "Effects captures". None recorded yet.
   research/tools/fxcapture.py writes the test wave, a 15 s test, run 1 (24 takes, 8 min), run 2 (59 takes, 22 min) and the take list to analysis/test_files/fx/ (gitignored); fxplay.cpp sends a run over CoreMIDI. SysEx by the V-Synth's map, which the XT's ID order and transmit routine agree with. Not tried on an XT.
 

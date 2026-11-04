@@ -3322,3 +3322,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Before committing I read my steps against the manual and the firmware's strings, and it paid: "Original Key" isn't a word the XT uses (it says Original Pitch); the channel is on a Part MIDI page I hadn't named; and with USB Audio Output Dest left on, the Mac's sounds could have reached MAIN in the middle of a take. The firmware's value lists also turned up a GENERIC driver type, which is the one hope for USB without Roland's old driver.
 - `--from` had a bug I found by reading it: the time spent resending skipped SysEx counted against what followed, so the first events after a skip would have bunched up. `--test` couldn't have shown that, because it ignores time, so there's a `--listen` now, for the path the user will really run.
 - The test's first version needed the screen to redraw on a SysEx change, which I don't know it does. It now also drops Master Level during the sweep, so it can be heard, and that's the one thing I was least sure of, a System write reaching the chip.
+
+### Session 16 addendum (2026-11-04) — v121: the chip's name, the converter, the checker
+
+- The user said yes to the capture prep I'd proposed: a tool to cut a recording into takes, and the chip's part number.
+- The part number took a minute, and it was embarrassing how little: "ESP4" is in the text layer of the very page v115 called illegible, and the parts list on page 15 gives RA0A-101 (TC223C080AF-101). I had searched that text for a part number, not a name.
+- The DRAM beside it turned out the most useful thing on the page. 256 K × 16 is exactly the 18-bit offsets, so a delay line holds 16 bits a sample in a "24-bit" section. That's a reading of a parts list, nothing tested yet.
+- I scripted a loop of page fetches on the manual site and got its bot check back ("Just a moment"). I stopped scripting it, and opened pages one at a time as a person would, which it allowed. I shouldn't have tried the loop.
+- Looking for ESP in the firmware's strings also turned up the test mode's "SRC Output(44.1K)". I had told the user in v116 that a digital capture would show the chip's words, with the manual's "carries what MAIN OUT carries" as my only reason. Following the strings to rom.1's driver and the CS8420's data sheet says it doesn't: normal operation routes the transmitter from the converter's output, at every rate. Better found now than after someone buys a cable.
+- I first cited `0x893390ce` as the normal caller, then read my own write-up and saw it sat in the factory test class. The real source is the kernel's start-up, `0x8802f378`. Same answer, but it could have gone the other way: the driver's constructor defaults to the bypass.
+- Also caught before writing it down: the manual's "fixed at 44.1 kHz" that I first took for USB is about sampling. USB's case rests only on the block diagram.
+- The simulated recordings found a flaw in the run itself. If the path has v40's +9.4 dB, the EQ's +15 clipped and read as +10.34. I lowered the clicks and put the EQ takes at Wave Gain −12, while it was still free to change.
+- The first run of the test disagreed in 14 of 33 cases. About half were my test's expectations; the others were real, and the ones I'd not have thought of: a reverb's tail passing as a click because I only checked height, and a stray sound raising the floor that it was judged against.
+- Everything about `fxcut.py` is tested against my idea of a recording. Nothing has met a real one.
+
