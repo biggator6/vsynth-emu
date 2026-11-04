@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-# mutate_panel.py [name ...]: planted errors in the effects' panel and the processor's wiring of them, each built into PluginTest and run with the settings
+# mutate_panel.py [name ...]: planted errors in the effects' panel, the values' text and the processor's wiring of them, each built into PluginTest and run with the settings
 # that should show it (VSynthEmuTest; about 30 s each, one at a time, and it edits the sources in place while it does, restoring them).  One line each: caught,
 # MISSED, or ERROR.  Needs build/plugin configured, and analysis/test_files.
 import os, subprocess, sys
 REPO = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + '/../..')
 os.chdir(REPO)
-FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'
+FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'; XV='plugin/Source/XtFxControl.cpp'
+TEXT='row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };\n        '
+TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };\n        '
+RANGE='row.value.setRange(p.low, p.high, 1.0);'
 MUTS=[
  ('panel-no-set',FP,'processor_.setFxParam(row.id, (int)std::lround(row.value.getValue()));',';','panel'),
  ('panel-range',FP,'row.value.setRange(p.low, p.high, 1.0);','row.value.setRange(p.low, p.high + 1, 1.0);','panel'),
@@ -18,6 +21,43 @@ MUTS=[
  ('panel-wrong-type',FP,'page == 1 ? chorus_.type.getSelectedItemIndex() : page == 2 ? reverb_.type.getSelectedItemIndex() : 0;','page == 1 ? reverb_.type.getSelectedItemIndex() : page == 2 ? chorus_.type.getSelectedItemIndex() : 0;','panel'),
  ('panel-extra-row',FP,'const bool shown = i < params.size();','const bool shown = true;','crash-or-panel'),
  ('panel-grid-height',FP,'grid_.setSize(view_.getWidth() - kScrollBarW, (int)params.size() * kParamH);','grid_.setSize(view_.getWidth() - kScrollBarW, 10);','panel'),
+ # The text in the box: the panel's side
+ ('box-no-text',FP,'row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };',';','panel'),
+ ('box-wrong-id',FP,'[values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };','[values, id = p.id](double v) { return juce::String(values->text(id + 1, (int)std::lround(v))); };','panel'),
+ ('box-order',FP,TEXT+TYPE+RANGE,RANGE+'\n        '+TEXT+TYPE.rstrip(),'panel'),
+ ('box-no-typing',FP,'row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };',';','panel'),
+ ('box-typing-lost',FP,'(double)values->value(id, low, high, typed.toStdString(),','(double)values->value(id, low, high, std::string(),','panel'),
+ ('box-typing-range',FP,'(double)values->value(id, low, high, typed.toStdString(),','(double)values->value(id, low, high - 1, typed.toStdString(),','panel'),
+ ('gain-no-text',FP,'gain.textFromValueFunction = [values = cat.values](double v) { return juce::String(values->text(kOutputGain, (int)std::lround(v))); };',';','panel'),
+ ('gain-wrong-id',FP,'constexpr int kOutputGain = 0x76;','constexpr int kOutputGain = 0x3e;','panel'),
+ ('gain-no-update',FP,'gain.updateText();',';','panel'),
+ # The text itself
+ ('text-no-values',XV,'cat.values = std::make_shared<XtFxValueText>(romPath);',';','crash-or-panel'),
+ ('text-with-unit',XV,'(uint32_t)value, 0 }, kSp, &at, kTextSteps','(uint32_t)value, 1 }, kSp, &at, kTextSteps','panel'),
+ ('text-value',XV,'(uint32_t)value, 0 }, kSp, &at, kTextSteps','(uint32_t)value + 1, 0 }, kSp, &at, kTextSteps','crash-or-panel'),
+ ('text-id',XV,'{ (uint32_t)id, (uint32_t)value, 0 }, kSp, &at, kTextSteps','{ (uint32_t)id + 1, (uint32_t)value, 0 }, kSp, &at, kTextSteps','panel'),
+ ('text-by-value',XV,'(uint32_t)id << 16 | (uint16_t)value','(uint16_t)value','panel'),
+ ('text-by-id',XV,'(uint32_t)id << 16 | (uint16_t)value','(uint32_t)id << 16','panel'),
+ ('text-spaces',XV,'t = from == std::string::npos ? std::string() : t.substr(from, to - from + 1);',';','panel'),
+ ('unit-none',XV,'if (!u.empty()) t += " " + u;',';','panel'),
+ ('unit-on-names',XV,'if (leadingNumber(t, number, rest) && rest == t.size()) {','{','panel'),
+ ('unit-twice',XV,'if (leadingNumber(t, number, rest) && rest == t.size()) {','if (leadingNumber(t, number, rest)) {','panel'),
+ ('unit-brackets',XV,"if (ch != '[' && ch != ']') out += (char)ch;",'out += (char)ch;','panel'),
+ ('unit-no-space',XV,'t += " " + u;','t += u;','panel'),
+ ('unit-row-time',XV,'id == 0x8b6 ? 0x8b2 : ','','panel'),
+ ('unit-row-level',XV,'id == 0x8b7 ? 0x8b6 : ','','panel'),
+ ('unit-row-hc',XV,'id == 0x8b8 ? 0x8b7 : ','','panel'),
+ ('unit-table-low',XV,'c.rd32(kValueStrings + 4 * (uint32_t)row)','c.rd32(kValueStringsHigh + 4 * (uint32_t)row)','panel'),
+ ('unit-table-high',XV,'c.rd32(kValueStringsHigh + 4 * (uint32_t)(row - kHighIds))','c.rd32(kValueStringsHigh + 4 * (uint32_t)(row - kHighIds + 1))','panel'),
+ ('note-1-16',XV,'case 0x11: return "1/16";','case 0x11: return "1/32";','panel'),
+ ('note-1-8',XV,'case 0x12: return "1/8";','case 0x12: return "1/4";','panel'),
+ ('note-1-4',XV,'case 0x18: return "1/4";','case 0x18: return "1/2";','panel'),
+ ('note-1-2',XV,'case 0x13: return "1/2";','case 0x13: return "1/4";','panel'),
+ ('note-1-1',XV,'case 0x14: return "1/1";','case 0x14: return "2/1";','panel'),
+ ('note-2-1',XV,'case 0x15: return "2/1";','case 0x15: return "1/1";','panel'),
+ ('note-unnamed',XV,'case 0x15: return "2/1";','','panel'),
+ ('note-triplet',XV,'t[1] == 0x17 ? "T"','t[1] == 0x17 ? ""','panel'),
+ ('note-dot',XV,"t[1] == '.' ? \".\"","t[1] == '.' ? \"\"",'panel'),
  ('knob-swap',PP,'{ "fxChoMaster", 0x1fd }','{ "fxChoMaster", 0x231 }','fx'),
  ('knob-id-gain',PP,'{ "fxGain", 0x76 }','{ "fxGain", 0x3e }','fx'),
  ('state-no-edits',PP,'state.setProperty("fxEdits", edits, nullptr);',';','fx-edit'),

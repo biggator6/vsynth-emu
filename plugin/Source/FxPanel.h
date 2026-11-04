@@ -1,6 +1,6 @@
 #pragma once
-// The effects' page: the chip's blocks, and each type's parameters as the firmware's descriptors give them.  The names and ranges come from rom.2 at run time, so the page is empty of them until the
-// ROM's loaded.  Values are the firmware's raw numbers: its Delay Time of 112 is a note value here too, shown as 112.
+// The effects' page: the chip's blocks, and each type's parameters as the firmware's descriptors give them.  The names, ranges and values' text come from rom.2 at run time, so the page is empty of them
+// until the ROM's loaded.  A slider still holds the firmware's raw number and sends that: its text is all that's the XT's own (XtFxValueText).
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <memory>

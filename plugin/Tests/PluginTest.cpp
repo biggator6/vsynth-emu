@@ -61,7 +61,8 @@ int main(int argc, char** argv) {
         if (!os.openedOk() || !png.writeImageToStream(img, os)) { std::fprintf(stderr, "snapshot failed\n"); return 1; }
         std::printf("snapshot: %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
     }
-    // TEST_FX_PANEL=1: every page and type of the effects' panel, then stop: it lists the catalog's parameters by name and range, shows each one's value, and a slider sets its parameter.
+    // TEST_FX_PANEL=1: every page and type of the effects' panel, then stop: it lists the catalog's parameters by name and range, shows each one's value, and a slider sets its parameter.  And what
+    // each box says, at each end of the range and the default, against the firmware's own routine, run here with its unit and without; a value's text typed into the box sets it.
     if (std::getenv("TEST_FX_PANEL")) {
         std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
         FxPanel* panel = nullptr;
@@ -72,7 +73,34 @@ int main(int argc, char** argv) {
         panel->setVisible(true);
         const XtFxCatalog& cat = p.fxCatalog();
         if (!cat.ok) { std::fprintf(stderr, "panel: no catalog\n"); return 1; }
-        int checked = 0;
+        int checked = 0, texts = 0;
+        Sh4 fw;
+        if (!fw.loadRom(argv[1])) { std::fprintf(stderr, "panel: the firmware's text: no ROM\n"); return 1; }
+        fw.mapRam(0x8C000000, 0x00100000);
+        const auto routine = [&](uint32_t fn, int id, int v) {
+            uint32_t at = 0; std::string t;
+            if (!fw.call(fn, { (uint32_t)id, (uint32_t)v }, 0x8C0E0000, &at, 2000000)) return std::string("(a fault)");
+            for (uint8_t ch = fw.rd8(at); ch; ch = fw.rd8(++at)) t += (char)ch;
+            return t;
+        };
+        const auto firmwareText = [&](int id, int v) {
+            std::string bare = routine(0x89462120, id, v), unit = routine(0x89462130, id, v);                                  // without the unit, and with it
+            unit = unit.size() > bare.size() ? unit.substr(bare.size() + 1, unit.size() - bare.size() - 2) : std::string();    // what the unit adds, its brackets off
+            if (id == 0x8b6) unit = "ms"; else if (id == 0x8b7) unit = "%"; else if (id == 0x8b8) unit = "Hz";                 // the three of Non-Linear whose strings are a row out
+            const std::map<int, const char*> notes = { { 0x11, "1/16" }, { 0x12, "1/8" }, { 0x18, "1/4" }, { 0x13, "1/2" }, { 0x14, "1/1" }, { 0x15, "2/1" } };            // measured by xt_fx control
+            const auto note = notes.find((uint8_t)bare[0]);
+            if (note != notes.end()) return note->second + std::string(bare.size() > 1 && bare[1] == 0x17 ? "T" : bare.size() > 1 && bare[1] == '.' ? "." : "");
+            juce::String t = juce::String(bare).trim();
+            return (t.containsOnly("+-.0123456789") && unit.size() ? t + " " + juce::String(unit) : t).toStdString();          // a unit only on a number: THRU isn't in Hz
+        };
+        const auto boxOf = [](juce::Slider& s) { juce::Label* box = nullptr; for (juce::Component* ch : s.getChildren()) if (auto* l = dynamic_cast<juce::Label*>(ch)) box = l; return box; };
+        const auto boxSays = [&](juce::Slider& s, int id, int v, const char* where) {
+            texts++;
+            const std::string want = firmwareText(id, v), says = boxOf(s) ? boxOf(s)->getText().toStdString() : "(no box)";
+            if (says == want) return true;
+            std::fprintf(stderr, "panel: ID %x at %d says \"%s\" against the firmware's \"%s\", %s\n", id, v, says.c_str(), want.c_str(), where);
+            return false;
+        };
         const auto page = [&](int pg, const char* typeParam, int type, const std::vector<XtFxParam>& list) {
             if (typeParam) { auto* prm = p.apvts.getParameter(typeParam); prm->setValueNotifyingHost(prm->convertTo0to1((float)type)); }
             panel->showPage(pg);
@@ -84,7 +112,13 @@ int main(int argc, char** argv) {
             for (size_t i = 0; i < list.size(); ++i) {
                 const XtFxParam& q = list[i];
                 if (labels[i]->getText().toStdString() != q.name || sliders[i]->getMinimum() != q.low || sliders[i]->getMaximum() != q.high || (int)sliders[i]->getValue() != q.def) { std::fprintf(stderr, "panel: page %d type %d row %zu shows %s %g..%g %g against %s %d..%d %d\n", pg, type, i, labels[i]->getText().toRawUTF8(), sliders[i]->getMinimum(), sliders[i]->getMaximum(), sliders[i]->getValue(), q.name.c_str(), q.low, q.high, q.def); return false; }
+                if (!boxSays(*sliders[i], q.id, q.def, "at its default on showing")) return false;
                 const int to = q.def == q.high ? q.low : q.high;
+                sliders[i]->setValue(to, juce::sendNotificationSync);
+                if (!boxSays(*sliders[i], q.id, to, "moved to an end")) return false;
+                const int other = to == q.low ? q.high : q.low;
+                sliders[i]->setValue(other, juce::sendNotificationSync);
+                if (!boxSays(*sliders[i], q.id, other, "moved to the other end")) return false;
                 sliders[i]->setValue(to, juce::sendNotificationSync);
                 if (p.fxParam(q.id, INT_MIN) != to) { std::fprintf(stderr, "panel: %s's slider didn't set ID %x\n", q.name.c_str(), q.id); return false; }
                 panel->showPage(pg);
@@ -92,6 +126,15 @@ int main(int argc, char** argv) {
                 p.setFxParam(q.id, q.def);                                  // as a host's saved state does
                 panel->showPage(pg);
                 if ((int)sliders[i]->getValue() != q.def) { std::fprintf(stderr, "panel: %s's slider doesn't follow ID %x\n", q.name.c_str(), q.id); return false; }
+                if (!boxSays(*sliders[i], q.id, q.def, "back from the processor")) return false;
+                // The other end's text, typed into the box.  What reaches the processor is its number.
+                if (juce::Label* box = boxOf(*sliders[i])) {
+                    box->setText(firmwareText(q.id, to), juce::sendNotificationSync);
+                    if (p.fxParam(q.id, INT_MIN) != to) { std::fprintf(stderr, "panel: \"%s\" typed into %s's box sets ID %x to %d, not %d\n", firmwareText(q.id, to).c_str(), q.name.c_str(), q.id, p.fxParam(q.id, INT_MIN), to); return false; }
+                    if (!boxSays(*sliders[i], q.id, to, "typed")) return false;
+                    p.setFxParam(q.id, q.def);
+                    panel->showPage(pg);
+                }
                 checked++;
             }
             return true;
@@ -102,7 +145,36 @@ int main(int argc, char** argv) {
         if (!page(3, nullptr, 0, cat.eq)) return 1;
         // A page's change alone, with each block on the same type number.
         for (int t = 1; t < 4; ++t) { if (!page(0, "fxMfxType", t, cat.mfx[(size_t)t]) || !page(1, "fxChoType", t, cat.chorus[(size_t)t]) || !page(2, "fxRevType", t, cat.reverb[(size_t)t])) return 1; }
-        std::printf("the panel: %d parameters as the catalog has them\n", checked);
+        // A Rate and a Delay Time through all their values, so that every note value goes through a box.
+        const auto sweep = [&](int type, int id) {
+            auto* prm = p.apvts.getParameter("fxMfxType"); prm->setValueNotifyingHost(prm->convertTo0to1((float)type));
+            panel->showPage(0);
+            std::vector<juce::Slider*> sliders;
+            for (juce::Component* ch : view->getViewedComponent()->getChildren()) if (ch->isVisible()) if (auto* sl = dynamic_cast<juce::Slider*>(ch)) sliders.push_back(sl);
+            const std::vector<XtFxParam>& list = cat.mfx[(size_t)type];
+            for (size_t i = 0; i < list.size() && i < sliders.size(); ++i) if (list[i].id == id) {
+                for (int v = list[i].low; v <= list[i].high; ++v) { sliders[i]->setValue(v, juce::sendNotificationSync); if (!boxSays(*sliders[i], id, v, "swept")) return false; }
+                p.setFxParam(id, list[i].def);
+                return true;
+            }
+            std::fprintf(stderr, "panel: ID %x isn't on MFX type %d\n", id, type);
+            return false;
+        };
+        if (!sweep(3, 0x57a) || !sweep(11, 0x5de)) return 1;
+        // Output Gain is a host's parameter, in the panel's own row, and the one level with a unit.
+        {
+            juce::Slider* gain = nullptr;
+            for (juce::Component* ch : panel->getChildren()) if (auto* sl = dynamic_cast<juce::Slider*>(ch)) gain = sl;   // the last of the levels
+            auto* prm = p.apvts.getParameter("fxGain");
+            if (!gain || !boxSays(*gain, 0x76, (int)prm->convertFrom0to1(prm->getValue()), "Output Gain as it opened")) return 1;
+            for (const int v : { -12, 3, 12 }) { prm->setValueNotifyingHost(prm->convertTo0to1((float)v)); if (!boxSays(*gain, 0x76, v, "Output Gain")) return 1; }
+            if (juce::Label* box = boxOf(*gain)) {
+                box->setText("+5 dB", juce::sendNotificationSync);
+                if ((int)prm->convertFrom0to1(prm->getValue()) != 5) { std::fprintf(stderr, "panel: \"+5 dB\" typed into Output Gain's box doesn't set it\n"); return 1; }
+                if (!boxSays(*gain, 0x76, 5, "Output Gain typed")) return 1;
+            }
+        }
+        std::printf("the panel: %d parameters as the catalog has them, %d of the boxes' texts as the firmware's\n", checked, texts);
         return 0;
     }
     if (argc > 4) {   // Encode Type (choice index 0 Auto, 1 SOLO, 2 BACKING, 3 ENSEMBLE)

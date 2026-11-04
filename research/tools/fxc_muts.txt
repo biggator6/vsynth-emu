@@ -108,6 +108,43 @@ cat-space-front|return from == std::string::npos ? std::string() : t.substr(from
 cat-space-back|return from == std::string::npos ? std::string() : t.substr(from, to - from + 1);|return from == std::string::npos ? std::string() : t.substr(from);
 cat-eq-first|for (int id = 0x65; id <= 0x6f; ++id)|for (int id = 0x66; id <= 0x6f; ++id)
 cat-eq-switch|cat.eq.push_back(param(0x70));|
-cat-ok|cat.ok = c.ok();|cat.ok = false;
+cat-ok|cat.ok = c.ok() && cat.values->ok();|cat.ok = false;
 cat-hide-range|if (p.high > p.low) out[(size_t)t]|out[(size_t)t]
 clock-no-guard| sixClocksMs <= 0) return;| false) return;
+# The values' text
+vt-with-unit|(uint32_t)value, 0 }, kSp, &at, kTextSteps|(uint32_t)value, 1 }, kSp, &at, kTextSteps
+vt-value|(uint32_t)value, 0 }, kSp, &at, kTextSteps|(uint32_t)value + 1, 0 }, kSp, &at, kTextSteps
+vt-id|{ (uint32_t)id, (uint32_t)value, 0 }, kSp, &at, kTextSteps|{ (uint32_t)id + 1, (uint32_t)value, 0 }, kSp, &at, kTextSteps
+vt-by-value|(uint32_t)id << 16 \| (uint16_t)value|(uint16_t)value
+vt-by-id|(uint32_t)id << 16 \| (uint16_t)value|(uint32_t)id << 16
+vt-spaces|t = from == std::string::npos ? std::string() : t.substr(from, to - from + 1);|;
+vt-unit-none|if (!u.empty()) t += " " + u;|;
+vt-unit-on-names|if (leadingNumber(t, number, rest) && rest == t.size()) {|{
+vt-unit-twice|if (leadingNumber(t, number, rest) && rest == t.size()) {|if (leadingNumber(t, number, rest)) {
+vt-unit-brackets|if (ch != '[' && ch != ']') out += (char)ch;|out += (char)ch;
+vt-row-time|id == 0x8b6 ? 0x8b2 : |
+vt-row-level|id == 0x8b7 ? 0x8b6 : |
+vt-row-hc|id == 0x8b8 ? 0x8b7 : |
+vt-table-low|c.rd32(kValueStrings + 4 * (uint32_t)row)|c.rd32(kValueStringsHigh + 4 * (uint32_t)row)
+vt-table-high|c.rd32(kValueStringsHigh + 4 * (uint32_t)(row - kHighIds))|c.rd32(kValueStringsHigh + 4 * (uint32_t)(row - kHighIds + 1))
+vt-note-1-16|case 0x11: return "1/16";|case 0x11: return "1/32";
+vt-note-1-8|case 0x12: return "1/8";|case 0x12: return "1/4";
+vt-note-1-4|case 0x18: return "1/4";|case 0x18: return "1/2";
+vt-note-1-2|case 0x13: return "1/2";|case 0x13: return "1/4";
+vt-note-1-1|case 0x14: return "1/1";|case 0x14: return "2/1";
+vt-note-2-1|case 0x15: return "2/1";|case 0x15: return "1/1";
+vt-note-triplet|t[1] == 0x17 ? "T"|t[1] == 0x17 ? ""
+vt-note-dot|t[1] == '.' ? "."|t[1] == '.' ? ""
+# Typing a value
+type-no-exact|if (squeezed(text(id, v)) == wanted) return v;|;
+type-no-number|if (numberIn(wanted, number)) {|if (false) {
+type-farthest|nearest < low \|\| away < best|nearest < low \|\| away > best
+type-no-name|if (squeezed(text(id, v)).compare(0, wanted.size(), wanted) == 0) return v;|;
+type-empty|if (wanted.empty()) return current;|
+type-lost|    return current;\n}|    return low;\n}
+type-case|out += (char)std::tolower((unsigned char)ch);|out += ch;
+type-spaces|if (ch != ' ') out +=|out +=
+type-sign|number = negative ? -v : v;|number = v;
+type-fraction|{ scale /= 10; v += (t[j] - '0') * scale; digits = true; }|{ digits = true; }
+type-any-number|return rest == t.size() \|\| std::isalpha((unsigned char)t[rest]) \|\| t[rest] == '%';|return true;
+type-no-percent| \|\| t[rest] == '%';|;

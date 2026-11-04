@@ -31,7 +31,7 @@ def one(m):
         return ('caught ', m[0], 0, 'stopped: it hung')
     lines = [l for l in out.splitlines() if re.search(r': \d+ (samples|edits), \d+ different', l)]
     if 'not in' in out or ' error' in out: return ('ERROR  ', m[0], 0, (out.strip().splitlines() or [''])[-1][:110])
-    if control and len(lines) < 7: return ('caught ', m[0], 0, 'stopped: it crashed')
+    if control and len(lines) < 8: return ('caught ', m[0], 0, 'stopped: it crashed')
     if not lines: return ('ERROR  ', m[0], 0, (out.strip().splitlines() or [''])[-1][:110])
     bad = [l for l in lines if not re.search(r', 0 different', l)]
     return ('caught ' if bad else 'MISSED ', m[0], len(bad), bad[0][:70] if bad else '')
