@@ -5,9 +5,10 @@
 # whole run's, for the cases up to it.  One line each: caught (a run the error crashes
 # counts), MISSED, or ERROR when the old text is no longer in the source.  From the
 # repo root.  tone_muts.txt:
-# name|old|new[|port], with \n and \| escaped; port is mutate.sh's PORT for an error in
+# name|old|new[|port[|seed]], with \n and \| escaped; port is mutate.sh's PORT for an error in
 # another file than XtSynth.cpp (toneosc, XtOsc.cpp), solo for one only `solocmp` reaches:
-# very short records, or a timer that overflows.
+# very short records, or a timer that overflows.  seed is for one the default seed's cases
+# don't happen to reach, so fcheck's run doesn't guard it.
 import concurrent.futures as cf, os, re, subprocess, sys
 D = os.path.dirname(os.path.abspath(__file__))
 cases = sys.argv[1] if len(sys.argv) > 1 else '2000'
@@ -19,7 +20,7 @@ for line in open(D + '/tone_muts.txt'):
     if not line: continue
     p = re.split(r'(?<!\\)\|', line)
     f = lambda x: x.replace('\\n', '\n').replace('\\|', '|')
-    muts.append((p[0], f(p[1]), f(p[2]) if len(p) > 2 else '', p[3] if len(p) > 3 else 'tone'))
+    muts.append((p[0], f(p[1]), f(p[2]) if len(p) > 2 else '', p[3] if len(p) > 3 else 'tone', p[4] if len(p) > 4 else ''))
 if names:
     unknown = set(names) - {m[0] for m in muts}
     if unknown: sys.exit('mutate_tone: not in tone_muts.txt: ' + ' '.join(sorted(unknown)))
@@ -27,7 +28,7 @@ if names:
 script = D + '/mutate.sh'
 subprocess.run(['bash', script, 'zz-base', 'constexpr float kLand', 'constexpr float kLand', '1'], env=env, capture_output=True)   # builds the shared objects
 def run(m):
-    r = subprocess.run(['bash', script, m[0], m[1], m[2], cases, 'different'], env=dict(env, PORT=m[3]), capture_output=True, text=True)
+    r = subprocess.run(['bash', script, m[0], m[1], m[2], cases, 'different'], env=dict(env, PORT=m[3], **({'SEED': m[4]} if m[4] else {})), capture_output=True, text=True)
     out = r.stdout + r.stderr
     if m[3] == 'solo':
         if '== ' + m[0] not in out: return m[0], None

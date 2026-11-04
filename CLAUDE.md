@@ -64,7 +64,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=toneenv`: xt_tone, XtEnvelope.cpp; `PORT=tonesolo`: xt_tone, XtSoloVoice.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
   solocmp on the baseline's cases, XtSoloVoice.cpp; `PORT=enc`: xt_enc on the baseline's waves, XtSoloEncoder.cpp)
   and runs it, to show the check catches it (a run the error crashes counts). `mutate_tone.py [cases]`: the list in
-  `tone_muts.txt` (`name|old|new[|port]`; port `solo` for what only `solocmp` reaches), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
+  `tone_muts.txt` (`name|old|new[|port[|seed]]`; port `solo` for what only `solocmp` reaches; seed for what the default seed's cases don't reach), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
 - `xt_tone <rom> [cases] [seed] [inputs]` (in fcheck; `build/tools/fcheck/bin`): XtSynth's wiring
   against a whole firmware tone. `XT_TONE_FIRST=1`: each case's first difference, `XT_TONE_DUMP=<case>|a`:
   its settings. A new `Controls` field needs its ID in `patchOf` and a draw in `drawControls`, and a field
@@ -136,8 +136,8 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - Clock Source EXTERNAL (ID 0x41, the clock object's +0x40): one clock to an F8 (`0x894712f0`), and the tempo read is 150000/(+0x48), the whole ms over the last six clocks, so it steps. The plugin's HOST is that, on the host's
   transport (`XtSynth::hostClock`): a clock on each 24th of a quarter it passes; stopped, they run on at its tempo (a choice, not the firmware's). `xt_tone`'s firmware is fed the port's F8s, so a section of its own holds them to the
   transport's position (HARDWARE_FIRMWARE.md, "The host's tempo, by the firmware's external clock").
-- Every controller ends at the pad's handler (`0x894d6f10` → `0x894d8360`, `XtSynth::padController`), on Time Trip Assign X and Y, then its queued update: a pad's controller is an ordinary one too. The default CC82, CC83 is Roland's chart;
-  the descriptors say 0, but nothing else writes the pad (HARDWARE_FIRMWARE.md, "Time Trip by its controllers"). A SOLO wave taken back past its start stays silent after letting go, as its seek keeps the end flag: that is the firmware's.
+- Every controller ends at the pad's handler (`0x894d6f10` → `0x894d8360`, `XtSynth::padController`), on Time Trip Assign X and Y, then its queued update: a pad's controller is an ordinary one too. X-Y mode's pair, Pad Assign X and Y, only feeds the Matrix's PAD sources.
+  The defaults, CC82, CC83 and CC80, CC81, are Roland's chart; the descriptors say 0, but nothing else writes the pad (HARDWARE_FIRMWARE.md, "Time Trip by its controllers"). Pad Mode is the XT's own pad's choice of pair, and no tone generator code reads it. A SOLO wave taken back past its start stays silent after letting go, as its seek keeps the end flag: that is the firmware's.
 - A tone's path (constructor `0x894f5860`, note start, update, the scheduler, what is hooked) is in
   HARDWARE_FIRMWARE.md, "The whole tone against XtSynth". Any change is a tone update (`0x894dc0b0`): all
   the blocks again, COSMs before the envelopes.

@@ -658,11 +658,11 @@ solo-robot-rate|rate = Ci / pw; }|rate = Af; }|tonesolo
 solo-budget-keep|if (budget >= c) { budget -= c; wrap = true; } }\n    }\n    if (!wrap && recEnd|if (budget >= c) { wrap = true; } }\n    }\n    if (!wrap && recEnd|tonesolo
 solo-budget-keep-b|if (budget >= c) { budget -= c; wrap = true; } }\n    }\n    if (!wrap && 0.0|if (budget >= c) { wrap = true; } }\n    }\n    if (!wrap && 0.0|tonesolo
 solo-budget-field|const int b = (p->info[i] & 0x1F8) << 6;|const int b = (p->info[i] & 0x1F8) << 5;|tonesolo
-solo-anchor-end|if (anchor < recEnd) return;|if (anchor <= recEnd) return;|tonesolo
+solo-anchor-end|if (anchor < recEnd) return;|if (anchor <= recEnd) return;|solo
 solo-anchor-start|if (!(recStart > anchor)) return;|if (!(recStart >= anchor)) return;|tonesolo
 solo-wrap-past|if (recEnd > Pq && budget > 0.0) {|if (recEnd >= Pq && budget > 0.0) {|tonesolo
 solo-wrap-past-b|if (Pq >= recStart && budget > 0.0) {|if (Pq > recStart && budget > 0.0) {|tonesolo
-solo-wrap-end|    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;\n||tonesolo
+solo-wrap-end|    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;\n||tonesolo|9
 solo-skip|if (!(budget > 0.0) \|\| !(Pq >= recEnd)) return;|return;|tonesolo
 solo-skip-b|if (!(budget > 0.0) \|\| !(recStart > Pq)) return;|return;|tonesolo
 solo-last-len|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 8.0; }|tonesolo
@@ -673,7 +673,7 @@ solo-walk-turn-b|if (f3 & 4) { if (neg) step = -step; else f3 &= 0xf7; }|if (f3 
 solo-walk-sic|if (f3 & 4) { if (neg) step = -step; else f3 &= 0xf7; }|if (f3 & 4) { if (neg) step = -step; else f3 &= 0xfb; }|solo
 solo-hold-keep|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0x8f;|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0xcf;|solo
 solo-hold-side|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0x8f;|if ((f3 & 0x20) ? fs > 0.0f : 0.0f > fs) f3 &= 0x8f;|solo
-solo-hold-anchor|else if (Pq >= anchor) anchorForward();|else if (Pq > anchor) anchorForward();|tonesolo
+solo-hold-anchor|else if (Pq >= anchor) anchorForward();|else if (Pq > anchor) anchorForward();|solo
 solo-end-gate|if (!ended_) {\n                const Grain g|if (true) {\n                const Grain g|tonesolo
 solo-jump-f0|    if (i >= nc \|\| !p->voiced[i]) f0n = 0.0f;\n||solo
 solo-jump-record|if (i + 1 == nc && L >= p->segStart[i] + p->segLen[i]) i = nc;||solo
@@ -790,3 +790,7 @@ cc-pad-off-32|a != 0 && a != 32 && a == number|a != 0 && a == number
 cc-pad-both|    if (assigned(ctl.assign[10])) pad.setX(value);\n    if (assigned(ctl.assign[11])) {|    if (assigned(ctl.assign[10])) pad.setX(value);\n    else if (assigned(ctl.assign[11])) {
 knob-steps|    if (moved) padSteps(step);\n|
 solo-seek-ended|    jumpTo(pos16);\n|    jumpTo(pos16);\n    ended_ = 0;\n|tonesolo
+xy-plus-zero|        if (x == 0) return 0;\n        return x >= 64 ?|        return x >= 64 ?|toneosc
+xy-plus-side|return x >= 64 ? value((x - 64) * 127 / 63) : -value((64 - x) * 127 / 63);|return x >= 64 ? value((x - 64) * 127 / 63) : value((64 - x) * 127 / 63);|toneosc
+xy-plus-off|        if (n == 0 \|\| n == 32) return 0;\n        const int x = in.cc[n];\n|        const int x = in.cc[n];\n|toneosc
+xy-inputs|in.assign[i] = std::clamp(ctl.assign[4 + i], 0, 95);|in.assign[i] = std::clamp(ctl.assign[i], 0, 95);|tone

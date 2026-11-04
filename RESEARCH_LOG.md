@@ -3480,6 +3480,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The DIR behaviour is the kind of thing nobody would design. Output Assign moved to DIR under a held note silences it. It's what the code does, and a real XT can say if that's true.
 - The Time Trip session committed v132 on its own branch while this ran, in the same files. Not merged: that's the user's word to give.
 
+### Session 16 addendum (2026-11-04) — v134: the pad's X-Y pair
+
+- The user asked for X-Y mode on CC80 and CC81. I went looking for a mode to port and there isn't one on the receiving side. Pad Mode is read only by the panel's and V-LINK's code, and it picks what the XT's own pad sends. So this came down to a default, on a path v119 had already checked. The port's change is two numbers.
+- My first search for Pad Mode found two hits by a `mov.w` scan, which turned out to be stack offsets that happen to equal 0x42c. Immediates built by `shll8` found the real ones. That's the second false lead of this kind today, so a bare scan for a small constant needs reading before I believe it.
+- The render's levels jumped between runs with no reason I could give, 0.439 against 0.174, and for CC20 0.011. Pitch was right, so I nearly let it go. It was my own `XT_CC` from v132: the CLI already had that name, for CC 7, 11, 10 before the first note, so my frame numbers were landing in CC 11. `XT_CC_AT` had been there all along, and I should have read that comment block before adding to it. The check couldn't see this, as it doesn't use the CLI.
+
 ### Session 16 addendum (2026-11-04) — v135: v132 joins
 
 - The user's yes named v132, and by then the other session had put v134 on top of it. I merged the commit they named, not the branch's tip, and told them.
@@ -3499,3 +3505,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Two more of the test's own errors: a Sens of 100 where the knob takes −63…63, which the two sides clamp differently, and two edits in a block, which a store marks as changed even when the value's back where it was, while a processor reading at its tick sees nothing. Neither was the plugin.
 - Planting errors in the catalog's filter found three of its four conditions dead: within the type ranges only Thru's and the Off types' entries are placeholders, with no range. The others came from my guess at what the list might hold.
 - A `juce::ComboBox`'s selection only counts while its text equals the item's, so renaming the items deselected them and the type boxes came up blank. The snapshot showed it at once, and no test of values would have.
+
+### Session 16 addendum (2026-11-04) — v139: v134 joins
+
+- A merge that merged by itself, and still found two things. New draws are what a merge really adds: neither side had drawn a pad on CC 91 with v133's bus compared.
+- Seeds 2024 and 1 differed, and my first look went to the port's send levels. The dump settled it: `assign` ended in 91. The same stale copy I'd fixed in `sourceMove` for v133, on a route v132 had added at the same time. I merged those two in v135 and said 0 different on five seeds, which only meant those five hadn't reached it. Whenever the harness keeps a copy of something, every route that moves it has to be looked at when a route is added, and there's no check for that but seeds.
+- Five plants lost to draws. I nearly reported "796, 5 missed, all caught at larger counts" and moved on. The earlier practice here is to give each a reason, and four of the five had a real one to find. `off-group-osc-note` first went into the wrong kind of case: a pedal's update forms the sums straight after its key-off, so nothing can show. I had to work out why a source needs no update of its own.
+- `solo-wrap-end` I time-boxed and left on a seed of its own, and said so in the list. 93 `solocmp` settings didn't show it. I don't know exactly what makes seed 9's case 25 show it. Comparing the anchor with the firmware's would settle it, and that's a new check, not a merge's.
+

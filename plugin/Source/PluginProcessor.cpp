@@ -1589,4 +1589,4 @@ const char* VSynthEmuProcessor::assignName(int i) {
     return k[i];
 }
 
-int VSynthEmuProcessor::assignDefault(int i) { return i == 10 ? 82 : i == 11 ? 83 : 0; }
+int VSynthEmuProcessor::assignDefault(int i) { return i == 6 ? 80 : i == 7 ? 81 : i == 10 ? 82 : i == 11 ? 83 : 0; }
