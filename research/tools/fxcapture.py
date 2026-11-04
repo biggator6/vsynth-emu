@@ -130,7 +130,7 @@ def run1():
         take('peq_mid_plus15', 'Mid 1 Gain +15: the model says exactly +15.00 dB at 800 Hz', mfx_sw=1, mfx=1, mfx_over={4: 30}, wave_gain=-12),
         take('peq_mid_minus15', 'Mid 1 Gain -15', mfx_sw=1, mfx=1, mfx_over={4: 0}, wave_gain=-12),
         take('peq_total_plus15', 'Total Gain +15: the shift code', mfx_sw=1, mfx=1, mfx_over={10: 30}, wave_gain=-12),
-        take('sdelay_stereo', 'Stereo Delay: taps at 22050 and 28664 samples, as the driver computes them', mfx_sw=1, mfx=11, tail=2.0),
+        take('sdelay_stereo', 'Stereo Delay: echoes 22040 and 28656 samples after the dry, where the firmware\'s coefficients put the address register', mfx_sw=1, mfx=11, tail=2.0),
         take('sdelay_mono', 'Mode MONO', mfx_sw=1, mfx=11, mfx_over={0: 0}, tail=2.0),
         take('mtap', 'Multi Tap: direct reads', mfx_sw=1, mfx=12, tail=2.0),
         take('wet_chorus', 'Chorus 1 alone, from the tone\'s send', tva_cho=127, cho_sw=1, cho=1, **w()),
@@ -139,7 +139,7 @@ def run1():
         take('mfx_to_reverb', 'the MFX\'s send to Reverb, taken before Master', mfx_rev=127, rev_sw=1, rev=1, tail=4.0, **w()),
         take('chorus_to_reverb', 'Chorus to Reverb only, Chorus Master 0', tva_cho=127, cho_sw=1, cho=1, cho_master=0, cho_rev=127, rev_sw=1, rev=1, tail=4.0, **w()),
         take('hot', 'Output Gain +12: where does it clip?', assign='MAIN', out_gain=12),
-        take('hotter', 'Output Gain +12, Wave Gain +12: the output stage', assign='MAIN', out_gain=12, wave_gain=12),
+        take('hotter', 'Output Gain +12, Wave Gain +12: clipping, on a store at 24 bits', assign='MAIN', out_gain=12, wave_gain=12),
     ]
 
 def run2():

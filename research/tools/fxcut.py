@@ -730,7 +730,7 @@ class Analysis:
             v = [x for x in v if x is not None]
             if v:
                 self.add('INFO', 'Parametric EQ at its defaults with Wave Gain -12, against Thru at 0, 100 Hz to 12.8 kHz: %+.2f to %+.2f dB.' % (min(v), max(v)))
-        self.check_taps('sdelay_stereo', {0: [22050], 1: [28664]}, 'Stereo Delay')
+        self.check_taps('sdelay_stereo', {0: [22040], 1: [28656]}, 'Stereo Delay')      # the address register's settled values; the model's prediction (HARDWARE_FIRMWARE.md, "The chip is an ESP")
         self.check_taps('sdelay_mono', None, 'Stereo Delay in MONO')
         self.check_taps('mtap', {0: [11025, 22050], 1: [11025, 22050]}, 'Multi Tap')
         a, b = by.get('sdelay_stereo'), by.get('sdelay_mono')

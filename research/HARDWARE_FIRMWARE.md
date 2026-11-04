@@ -1547,6 +1547,84 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The chip is an ESP: the JP-8000's instruction set runs the XT's programs (2026-11-04, v123)
+
+Nothing here changes the plugin. The user asked me to compare the chip with JE-8086, The Usual Suspects' emulator of the JP-8000 ([gearmulator](https://github.com/dsp56300/gearmulator), `source/ronaldo/custom_chips/esp/`, GPL-3.0). For all this project can tell it is the same machine. v115's reading of the instruction set was right as far as it went. JE-8086 has the rest, taken from the silicon of the older TC170C140, and with it the XT's own programs, loaded by the firmware's own driver, behave.
+
+**The same machine.**
+
+| | v115, from the XT's driver and programs | JE-8086's ESP |
+|---|---|---|
+| Steps | 768 a sample, two programs side by side | 768 clocks a sample, two cores, 1024 words of host window each |
+| Clock | 1536 fs, 67.7376 MHz (v121) | MAME's BOSS SX-700 driver notes the TC170C140 on the same 67.7376 MHz |
+| Word | memory 27:23, X and op 22:18, register 17:10, shift 9:8, coefficient 7:0 | the same, with the memory field on core 1 only |
+| Shift codes | ×1, ×2, ×4, ×16 | right shifts of 7, 6, 5, 3, on a product over 128 |
+| Commands at `0xb0002003` | 0x34 a word, 0x35 a coefficient, 0x36 a memory offset, 0x37 a read | 0x2003's low two bits: program, coefficient (two words), field (five words), read, with the same packing |
+| Registers | 256, all rotating | IRAM, one per core |
+| Slots | a mailbox between the programs | GRAM, shared, and it rotates too |
+| "A′ and B′, three steps before" | | a three-clock delay line on each accumulator |
+| A memory operation | five words, the next four holding the offset, low first | the same |
+| Reads to r252…r255 | | `mem \| 0xf0` |
+| Latches | | coefficient registers, each owned by a core |
+
+rom.2's own factory test prints "ESP Device Test: P0 P1 I0 I1 GR ER": the two program RAMs, the two IRAMs, GRAM, ERAM, by the same names.
+
+**What v115 couldn't decode.** All of its 319 words have a meaning, and every op the XT's programs use is one JE-8086 defines. (The one it marks as partly unknown, 0x54, the XT doesn't use.)
+
+| v115's form | Is |
+|---|---|
+| X = 1, op 0, 1 | a raw store: the low 24 bits of A′, unsaturated |
+| X = 1, op 2, 3 | R = max(0, sat A′), then a multiply accumulating or replacing, on A in both cases (v115 had op 3 as B′) |
+| X = 1, op 4 | compare: A's sign gates the multiplicand a few steps on, so a program can choose between two runs of words without a branch |
+| X = 1, op 0xb, 0xe, 0xf | store sat A′, then multiply a folded copy of it (a rectifier) |
+| op 13, [17:16] = 3, [15:10] = 0x12, 0x32 | a branch if ≥ 0: seven words, in Humanizer, Reverse Delay, Phonograph and Radio Tuning. The other values on v115's list are more of the forms it had: reads, replacing or into B |
+| r1…r4 | constants: 0x10, 0x400, 0x10000, 0x400000. So r4 is ½, not 1, which is where v115's stray ×2s came from |
+
+And the widths: a 24-bit multiplicand × an 8-bit coefficient, shifted right truncating, into a 30-bit wrapping accumulator; a store saturates to 24 bits. A 16-bit coefficient is two multiplies, the second of the last multiplicand >> 7. A latch multiply takes the register's top 8 bits, then its next 7. The address register is an accumulator's bits from 12 up, its low 12 a fraction in coefficient register 6. Core 0 waits a clock when both cores want GRAM. Ops 0x20 and 0x24 read GRAM at a shift of 7 or 6, so "an accumulator = a slot" has a gain in it after all.
+
+**The test.** A model of my own in integers, from those facts, with the firmware's driver in the interpreter as before (`build/tools/fx/esp4.cpp`, not committed: see the licence, below). I compiled nothing of JE-8086's.
+
+| Test | v115's doubles | Now | Should be |
+|---|---|---|---|
+| Frame MAIN at slot 0xa0 | +12.02 dB | +6.00 dB | |
+| MULTI through Thru | +12.03 dB | +6.01 dB | the same |
+| The sends at slots 0x70, 0x72 | −0.00 dB | −0.00 dB | 0 dB |
+| Parametric EQ, Mid 1 Gain +15, −15 at 800 Hz, against flat | +15.00, −15.00 | +14.99, −14.97 (−14.88 at −40 dBFS, where the filter's truncation shows) | those |
+| Total Gain +15 | +15.00 | +14.99 | that |
+| Multi Tap, an impulse, from the dry | | +11025, +22050, +33075, +44100 | the driver's offsets |
+| Stereo Delay, from the dry | L +22051, R +28667 | L +22040, R +28656 | what the coefficients make: the address register settles at 22040.008 and 28656.008 |
+| MFX types silent, running away, nearly silent, of 42, at 1 kHz | 10, 4, 3 | 0, 0, 0 | 0 |
+| A delay type's stray echoes at +2133, +30798 | yes | none | none |
+| Reverb | Hall 1 grows to a steady −8 dB | all ten decay. Room 1 0.8 s, Room 2 1.0, Room 3 0.8, Hall 1 2.1, Hall 2 3.0, Hall 3 2.5, Garage 1.1, Plate 2.2, Non-Linear gated in 0.1, Delay echoes | decay |
+| Stereo Pitch Shifter at its defaults (+7, −12), a 1 kHz sine | | 1499 and 499.5 Hz, between sidebands at ±5 Hz | 1498.3, 500 |
+| Tremolo, Depth 120 of 127 | | the envelope falls to 7.5% of its top | 5.5% |
+| Chorus types 1…8 | | 1…4 and Short Delay at the path's level, Feedback Chorus, Flanger and Fbk Short Delay above it | plausible |
+
+A reverb's tail ends on DC, about 580 LSB, −83 dB, with the signal under it still falling past −125 dB. That's a DC cut of 1/512 in truncating arithmetic: nothing below 512 LSB can move it. I worked that out from the program before measuring, and if a capture shows it too, little else could.
+
+59 renders of a vocal, a drum and a chord, one for each type at its defaults, are in `analysis/test_files/fx/esp4_renders/` (gitignored). These are the model. They are for checking by ear that each effect is the effect it says it is, not what an XT does.
+
+**Corrections.**
+- **There is no output stage.** A 0x230…0x2bb, which v115 read as a limiter on the way out, takes the input slots 0x18, 0x1a and ends in r63, r65, which reach slots 0x90, 0x92 the next sample. It's a compressor, limiter and gate, and I read it as the sampling screen's pre-effects, which are those three. The output is slots 0xa0, 0xa2 as written, so clipping is a store's saturation at 24 bits.
+- **The gain is ×2,** frame to output, not ×4. If a frame's int32 carries the chip's 24 bits at the top, and the tones reach the frame at 1/16, a full-scale wave comes out near −18 dBFS. v40's +9.4 dB was through an analog chain with a trim. Not reconciled until `main` is recorded.
+- **v121's 16 bits a sample isn't settled.** JE-8086 starts in a 16-bit compressed memory mode (14-bit mantissa, 2-bit exponent). The XT's driver writes 0x34 with that bit clear and the next one set, which on the TC170C140 is 24 bits in two 12-bit phases. On the XT's 16-bit DRAM that would mean two DRAM words a sample and 2^17 samples, which is all the zones use, but B also writes at 0x37fff, which would then land inside the Reverb's zone. The other way, 2^18 addresses of 16 bits. The model keeps 24.
+
+**What a capture can now do.** It no longer has to find out what the chip is. It tests predictions, and any path but analog can test most of them:
+- `main` at +6.00 dB against the frame, however the frame relates to the wave; `multi_thru` 4 samples behind it.
+- `sdelay_stereo`: echoes at 22040 and 28656 from the dry, not 22050. `mtap`: 11025 and 22050.
+- `peq_mid_plus15`: +14.99 at 800 Hz.
+- `wet_reverb`: T60s above, and the tail's DC. **The memory's width:** four seconds on, with its DC taken out, a Hall 1 tail is past −115 dB with 24 bits kept, at −87 dB with 16, and at −63 dB with 12.
+- A sample-exact path: the whole of a take, sample by sample, with the model.
+
+**Not settled.** Not one sample has been compared with an XT. All of this rests on the XT's own numbers and on the programs behaving sensibly, which is strong but isn't the chip itself. JE-8086's fixtures are from the TC170C140, and this chip is ten years newer (TC223C080AF), so it may differ where nothing here looks:
+- The memory, as above; and back-to-back writes, which on the older chip lose their low phase in this mode (it makes no difference to Hall 1 here).
+- When the PPC moves a frame, so absolute latency.
+- The tail words (756…767), and the flags at `0xb0000004`…`6`.
+- LFOs' starting phase, which v116 already expected to have to find.
+- Cost: this model runs at 2.3 × real time on one core, with nothing optimized. A plugin needs better. JE-8086 uses a JIT; pre-decoding and skipping the empty words should go a long way.
+
+**The licence.** JE-8086's core is GPL-3.0, and this repository has no licence. I copied no code. But I wrote `esp4.cpp` straight after reading theirs, so I've kept it out of the repository until the user decides: put the project under GPL-3.0, which JUCE allows and which would let the chip port build on their core and credit them; or keep it separate, and accept that a port written from these facts by someone who has read their code isn't a clean room. Not a call I can make. The facts above are about the hardware, with credit where they came from.
+
 ### The effect chip's name, and cutting the captures (2026-11-04, v121)
 
 Nothing here changes the plugin. The chip's name was in the service notes all along, and the run has a checker now. Reading the notes also showed that v116 was wrong about the digital outs.
@@ -1563,9 +1641,9 @@ Nothing here changes the plugin. The chip's name was in the service notes all al
 
 rom.2 calls it ESP too: "ESP Device Test", "ESP Verify", "PPC ESP Bus Thru". What the parts add to v115's reading:
 - **The PLL beside it makes 1536 fs,** which fits v115's 768 steps per sample at two clocks a step. v115 got 768 from the program's size alone. I read the clock's way to the chip off the diagram's lines at low resolution, so that part is less sure than the part numbers.
-- **The memory is 2^18 words of 16 bits.** That fits the 18-bit offsets exactly, and so it's the whole of what v115 called "at most 2^18 values". With one offset a sample, as Multi Tap's 1300 ms shows, a delay line can hold only 16 bits a sample, against the spec's 24-bit effects section. So either a store rounds or limits to 16 bits, or it companders, and that decides how exact a delay can be. An echo in `sdelay_stereo` on a sample-exact path will show which. Not checked on anything yet.
+- **The memory is 2^18 words of 16 bits.** That fits the 18-bit offsets exactly, and so it's the whole of what v115 called "at most 2^18 values". With one offset a sample, as Multi Tap's 1300 ms shows, a delay line can hold only 16 bits a sample, against the spec's 24-bit effects section. So either a store rounds or limits to 16 bits, or it companders, and that decides how exact a delay can be. An echo in `sdelay_stereo` on a sample-exact path will show which. Not checked on anything yet. (v123: less sure now. The driver's memory mode is 24 bits on the older chip.)
 
-**No data sheet.** Searching for TC223C080AF and RA0A found nothing, as expected of a part made for Roland. Its older relative has been done, though: the JP-8000's Roland/Toshiba TC170C140, also called ESP or ESP2, was reverse engineered from the silicon by The Usual Suspects (39C3 talk "From Silicon to Darude Sand-storm"), into a bit-accurate emulator, JE-8086, announced as open source. I haven't read it, and I don't know that ESP4 shares its instruction set. If it does, it could settle v115's 319 undecoded words and the widths without any capture.
+**No data sheet.** Searching for TC223C080AF and RA0A found nothing, as expected of a part made for Roland. Its older relative has been done, though: the JP-8000's Roland/Toshiba TC170C140, also called ESP or ESP2, was reverse engineered from the silicon by The Usual Suspects (39C3 talk "From Silicon to Darude Sand-storm"), into a bit-accurate emulator, JE-8086, announced as open source. I haven't read it, and I don't know that ESP4 shares its instruction set. If it does, it could settle v115's 319 undecoded words and the widths without any capture. (v123: it does, and it did.)
 
 **The digital outs go through the converter, at every rate.** v116 said a digital capture should show all of the chip's result. It won't. rom.1 maps at 0x88000000 and holds the CS8420's driver; it writes the chip's registers bit by bit, address byte 0x20 (`0x8800f070`), all of them in `0x8800f100`. `0x8800ee30(this, n)`, reached from rom.2 by `0x89301650(obj, n)`, sets the routing, by the bits of the data sheet's Data Flow Control:
 
@@ -1647,7 +1725,7 @@ Digital Output Freq (ID 0x77) only sets the output's clock (`0x89301680` → `0x
 | `peq_flat`, `peq_mid_plus15`, `peq_mid_minus15`, `peq_total_plus15` | The model's best case, on real hardware: ±15.00 dB at 800 Hz, the shift code. All at Wave Gain −12 (v121) |
 | `sdelay_stereo`, `sdelay_mono`, `mtap` | Taps at the driver's offsets; memory, and both kinds of read; the wrong Chorus read, if it isn't the model's error |
 | `wet_chorus`, `wet_reverb`, `mfx_to_chorus`, `mfx_to_reverb`, `chorus_to_reverb` | Each return alone (Master 0 keeps the dry path out), and that the sends tap before Master |
-| `hot`, `hotter` | Clipping, and what the undecoded output stage does at level |
+| `hot`, `hotter` | Clipping: a store's saturation at 24 bits (v123) |
 
 **Run 2,** 59 takes, 22 minutes: every MFX type at its defaults, then each Reverb and Chorus type wet.
 
@@ -1691,7 +1769,7 @@ The firmware addresses and what the driver writes are read off the code, or seen
 | B 0x464…0x5c1 (350 words) | Reverb | per type |
 | B 0x5c2…0x6f4 (307 words) | MFX | per type |
 
-**The word, as I read it.** 28 bits, a memory field and an arithmetic part side by side.
+**The word, as I read it.** 28 bits, a memory field and an arithmetic part side by side. (v123: JE-8086 confirms all of this table, and gives the rest.)
 
 | Bits | |
 |---|---|
@@ -1717,7 +1795,7 @@ A′ and B′ are the two accumulators as of three steps before.
 | 0, 12 | latch·R, or latch·A′ or B′ with c[2]: c[7:4] which latch (an odd one is 1 − the even one), c[1] B, c[0] add. The second word's shift applies |
 | 0, 13 | [17:16] = 2: a latch = A′ or B′. [17:16] = 3: by [15:10], the second word of a pair (6, 0x26), a read's data to r252…r255 (0xc…0xf), × a coefficient (0x1c, 0x3c), the address register and its fraction (7, 0x27), a write's data (0xb, 0x2b) |
 
-- **Registers.** 256 (in decimal here), and they all rotate: what r(n) holds this sample is r(n+1) next sample, so a store to r(n) read at r(n+1) is z⁻¹. r4 reads as 1. r0…r3 I take as 0.
+- **Registers.** 256 (in decimal here), and they all rotate: what r(n) holds this sample is r(n+1) next sample, so a store to r(n) read at r(n+1) is z⁻¹. r4 reads as 1. r0…r3 I take as 0. (v123: r1…r4 are constants, 0x10, 0x400, 0x10000, 0x400000, so r4 is ½.)
 - **16-bit coefficients.** A pair of words, the second carrying value[7:1] in its low byte. `0x894af610` drops bit 0, and writes byte 1 as value[6:1] and byte 2 bit 0 as value[7]. A table's default 0x7f, 0x7f is then 0x7ffe. It also explains `0x894afd50`'s odd 0x4080, which sets two single-word coefficients to 0x40 each, the left's and the right's.
 - **The fourth shift code is 16.** An MFX's Total Gain +15 dB is 0x2cfc at code 3: 0.35144 × 16 = 5.623.
 
@@ -1728,7 +1806,7 @@ A′ and B′ are the two accumulators as of three steps before.
 - **Sends.** The crossfade's L + R, × 2, before Master. Chorus's input is frame +0xc + that × word 0x115, through a filter (0x118…0x123, the Pre Low and Hi) → slot 0x70, with no ramp on the way in. Reverb's is frame +8 + that × word 0x133 + ½(Chorus L + R) × word 0x136, through its filter (0x138…0x143), × ramp 0x12c → slot 0x72.
 - **Returns.** Slots 0xf0, 0xf2 (Chorus) and 0xf4, 0xf6 (Reverb) → the same DC cut → their ramps (0x10d, 0x12c) → Chorus Master (0x164, 0x166), Reverb Master (0x168, 0x16a). Slots 0xfc, 0xfe carry the MFX's output again, into the output stage.
 - **Mix.** MAIN + MFX × word 0x162 (0x163 for R; `0x894afd50`, 1 or 0, its other callers not traced) + Chorus + Reverb → × ramp 0x34 → + an input through 0x16e, 0x172 (0 by default; not traced) → the system's EQ, 0x177…0x1ec → × Master Level → + DIR × 0x1fa, 0x1fe (0 by default; not traced) → × Output Gain (0x200, 0x202; DIR's 0x21f, 0x221). DIR otherwise stays apart, on its own slots. Mix/Parallel needs nothing here: the tone's converter chooses the pair (v114).
-- **Out.** Slots 0xa0…0xae carry the mix and DIR, with inputs added at 0x207…0x217, and I read them as the eight words back to the SH-4. Words 0x230…0x2bb look like a limiter, crossfaded at 0x2b1…0x2b8, ending on slots 0x90, 0x92, which I read as the main output. That part is not decoded.
+- **Out.** Slots 0xa0…0xae carry the mix and DIR, with inputs added at 0x207…0x217, and I read them as the eight words back to the SH-4. Words 0x230…0x2bb look like a limiter, crossfaded at 0x2b1…0x2b8, ending on slots 0x90, 0x92, which I read as the main output. That part is not decoded. (v123: wrong. Those words are the sampling pre-effects, on the input slots, and slots 0xa0, 0xa2 are the output.)
 
 Order within a sample only sets latency: in the model MAIN reaches slot 0xa0 in the sample it came in, MULTI through Thru three samples later. The double buffer's latency is on top of that, and is not measured.
 
@@ -1840,7 +1918,7 @@ As I read it, a read's data arrives ten steps later. An address-register read ta
 
 The chip's programs cannot run there. They are not SH-4 code, and nothing in rom.2 executes them.
 
-**A model, to test the reading.** `fxchip.cpp`: the driver above fills the chip's image, and a loop of doubles runs both programs. It has no word widths, no rounding and no output stage, and it reads at slots 0xa0, 0xa2. A filter's own arithmetic gave most of the table above: in Stereo Delay's feedback, the first-order shelf only makes sense with the three-step latch and the z⁻¹ registers, and in Parametric EQ a band is a state-variable filter whose coefficient is 2·sin(π·800/44100) to four digits.
+**A model, to test the reading.** (v123: superseded by an integer model with the whole instruction set, and the failures below are gone.) `fxchip.cpp`: the driver above fills the chip's image, and a loop of doubles runs both programs. It has no word widths, no rounding and no output stage, and it reads at slots 0xa0, 0xa2. A filter's own arithmetic gave most of the table above: in Stereo Delay's feedback, the first-order shelf only makes sense with the three-step latch and the z⁻¹ registers, and in Parametric EQ a band is a state-variable filter whose coefficient is 2·sin(π·800/44100) to four digits.
 
 | Test | Model | Should be |
 |---|---|---|
@@ -1866,7 +1944,7 @@ Those are the parts I trust. It is not finished:
   2. The firmware's own numbers, as in the table: a gain or a time that the driver computed and the manual states, reached to 0.01 dB or a sample. Exact where it applies, but it says nothing about a chorus's LFO or a reverb's density.
   3. Sanity: Thru is identity, a reverb decays, no type runs away, the same signal twice gives the same result.
 
-**Proposed order.** One emulated chip, not some fifty ported programs. Porting a type by hand means reading its program in this instruction set anyway, and comparing against the same absent reference. Once the chip runs, every type is data from the user's rom.2, as with the tables. The rules hold: no program is committed.
+**Proposed order.** (v123: with the instruction set known, the first three steps collapse into one chip.) One emulated chip, not some fifty ported programs. Porting a type by hand means reading its program in this instruction set anyway, and comparing against the same absent reference. Once the chip runs, every type is data from the user's rom.2, as with the tables. The rules hold: no program is committed.
 
 1. **The first version, and my recommendation: the chip as a class in plugin/Source (`XtFxChip`), with `xt_fx`: the fixed programs, Thru and the memory-free MFX types, driven by the firmware's converters in the interpreter, in a harness only, not in the plugin's sound.** It goes where the risk is. If the 319 words and the widths can't be settled, nothing later is worth doing, and this finds out cheaply. It also pins down gain staging, and its checks are the "firmware's numbers" above, in fcheck. Words, not doubles: 24-bit data as the spec says, widths chosen against the EQ and gain tables. Types: Parametric and Graphic EQ first, then Resonant Filter, Isolator, Tremolo, Auto Wah, Phasers, Distortion, Amp Simulator, Bit Rate Converter.
 2. Memory: the address register, the Chorus's zone, and the delays and modulation types: Stereo Delay, Multi Tap, Tape Echo, Reverse, Band Pass, the choruses and flangers, Pitch Shifter, Rotary, the combinations, the Multis. Chorus types 1…8 here.
@@ -1877,10 +1955,10 @@ Those are the parts I trust. It is not finished:
 
 **Still unknown.**
 - ~~The chip's part number.~~ ESP4, RA0A-101 (TC223C080AF-101), with no public data sheet (v121).
-- Widths, saturation and rounding: the accumulators (a delay's address sum reaches 28 in units where a sample is ±1, so there is headroom), registers, memory, where a store saturates. The spec says 24 bits. These decide exactness, and only a capture will show them.
-- The 319 words, r0…r3, c[3:2] of the latch multiply beyond what's above, and the ramps' limit.
-- The output stage, A 0x230…0x2bb: whether it acts at normal levels, and which slots go to which jack.
-- Gain. The frame reaches slot 0xa0 at ×4 (Master ×2, Output Gain 0 dB ×2), and the tones reach the frame at 1/16 by Out Gain for TG. v40 measured +9.4 dB on the analog output for a raw wave. Not reconciled: DAC scaling and the output stage are in between. XtSynth's level will need a decision.
+- (v123: JE-8086 has these, bar the memory's width.) Widths, saturation and rounding: the accumulators (a delay's address sum reaches 28 in units where a sample is ±1, so there is headroom), registers, memory, where a store saturates. The spec says 24 bits. These decide exactness, and only a capture will show them.
+- ~~The 319 words, r0…r3, c[3:2] of the latch multiply beyond what's above, and the ramps' limit.~~ Known (v123).
+- ~~The output stage, A 0x230…0x2bb: whether it acts at normal levels, and which slots go to which jack.~~ There is none: it's the sampling pre-effects (v123).
+- Gain. (v123: ×2, as r4 is ½.) The frame reaches slot 0xa0 at ×4 (Master ×2, Output Gain 0 dB ×2), and the tones reach the frame at 1/16 by Out Gain for TG. v40 measured +9.4 dB on the analog output for a raw wave. Not reconciled: DAC scaling and the output stage are in between. XtSynth's level will need a decision.
 - What the SH-4 does between parameter changes. I found no periodic call into a type's class besides the driver's poll (`0x894ac970`) and the tempo's (`0x894acb10`), but I did not trace every vtable entry. If some type's LFO or step is stepped from the SH-4, the design above still holds and the harness would show it.
 - The path from patch and MIDI to these setters beyond `0x894ac0a0`, `0x894ac1c0`, `0x894ac2f0`, `0x894ac3a0`, and a patch change's exact order.
 - The flags in the output routine (`0x894db3e0`), the flags at `0xb0000004`…`6`, the writes at 0xfe00, 0xff00, 0xffff and 0x37fff in B's fixed words, and `0x894aee80`'s input routing (A 0x81…0xbe, 0x91…0x95, 0x1fa, 0x1fe, 0x21b).

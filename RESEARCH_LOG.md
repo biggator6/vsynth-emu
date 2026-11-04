@@ -3336,3 +3336,14 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The first run of the test disagreed in 14 of 33 cases. About half were my test's expectations; the others were real, and the ones I'd not have thought of: a reverb's tail passing as a click because I only checked height, and a stray sound raising the floor that it was judged against.
 - Everything about `fxcut.py` is tested against my idea of a recording. Nothing has met a real one.
 
+### Session 16 addendum (2026-11-04) — v123: the chip is an ESP
+
+- I'd offered this as a lead that "might" settle a few things, and expected a family resemblance at most. The header's first thirty lines had 768 clocks, 256 registers, a five-bit field at bits 27:23 and the shift table v115 had worked out from an EQ's arithmetic. Then its decode table named every one of the forms I had listed as undecoded, by name, in the order I'd listed them. Most of what v115 took a long session to infer was already there, measured on silicon, by people who'd gone in with a microscope. It's humbling, and very good news.
+- v115's reading held up everywhere it had committed itself. It was wrong where it guessed: r4 as 1, op 3 as B′, and the "output stage", which is on the input.
+- I told the user I would only read their code, not build or run it. So I wrote my own integer model, which also meant I understood it. That kept its bugs mine: the first output said +14 dB on MAIN, because the slots rotate, and my harness only wrote the pair under test, so stale words crept up into the rest of the frame.
+- Silent 0 and running away 0 of 42, on the first run with the whole instruction set. I reran it to be sure I hadn't left the old binary in place.
+- All the reverbs settled on the same −85 dB, which looked like a bug in my memory. The fact that it didn't depend on the type suggested the shared path instead, and the 1/512 in the DC cut gives about 512 LSB in truncating arithmetic, −84 dB. Then it measured as pure DC, with the signal under it past −125 dB. A nice moment, and it's a real prediction now.
+- I wrote "16 bits a sample" in v121's notes an hour before reading that the driver's memory mode is, on the older chip, the 24-bit one. The stored evidence now points both ways, so I've said that, and said what a capture would show.
+- Stereo Delay came out 10 and 8 samples short of what v115 and I had called the driver's numbers. I nearly went hunting for an off-by-ten in my controller. Printing the address register settled it: the firmware's coefficients produce 22040.008 and 28656.008, and the echoes land exactly there. So I'd been holding the model to a number nobody had measured.
+- The licence is the one thing I can't work through for the user. Their code is GPL-3.0 and this repo has none. I kept my model out of git until they've decided, because I wrote it straight after reading theirs.
+

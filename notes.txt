@@ -335,6 +335,8 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The chip is an ESP v123 (2026-11-04), no plugin change: JE-8086's ESP core (gearmulator, GPL-3.0) has the same word, ops, widths and memory controller as the XT's chip, and has all that v115 couldn't decode. With those facts an integer model of mine (build/tools/fx/esp4.cpp, not committed: licence) runs the XT's programs through the firmware's driver: no MFX silent or running away of 42, all reverbs decay, the EQ at +14.99, delays where the coefficients put them, the pitch shifter on pitch. Not compared with an XT yet. HARDWARE_FIRMWARE.md, "The chip is an ESP".
+
 The chip's name, the converter and the checker v121 (2026-11-04), no plugin change: the effect chip is ESP4, RA0A-101 (TC223C080AF-101), with a 256 K × 16 DRAM, and the firmware keeps the CS8420's converter in the digital outs at every rate, so USB or Resampling are the exact paths (HARDWARE_FIRMWARE.md, "The effect chip's name, and cutting the captures").
   research/tools/fxcut.py checks a recording of a run and cuts it into takes; fxcut_test.py tests that on a simulated XT with faults planted, 40 cases. The run's clicks are now -12 dBFS and the Parametric EQ takes at Wave Gain -12. No capture exists yet.
 
