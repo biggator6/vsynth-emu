@@ -1547,6 +1547,37 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### XtFxChip: the effect chip, equal to JE-8086's on all the XT's programs (2026-11-04, v126)
+
+The chip port has started. `plugin/Source/XtFxChip.*` is the chip in integers, and `xt_fx` checks it. It isn't in the plugin's sound yet. The project is now GPL-3.0 (the user's decision; `LICENSE`, `NOTICE.md`), so it can build on JE-8086 with credit. An unmodified copy of their interpreter is in `research/third_party/gearmulator_esp/`, used only by the check. JUCE 8 isn't under the GPL, as I told the user it was, but under the AGPLv3 or a commercial licence. GPLv3 section 13 allows the two to be combined, so the decision stands.
+
+**The check.** The firmware's own driver, in the interpreter, loads the XT's own programs into both chips, by the same bytes on the same host bus. Then noise at every level, up to saturation, goes into every input, with parameters drawn at random and changed as it runs. Every word of both cores' registers, accumulators and pipelines, all of GRAM, the coefficient registers and the memory's latches are compared each sample, and all of the memory each 2048 samples.
+
+| Run | Cases | Different |
+|---|---|---|
+| Each MFX, Reverb and Chorus type, 8192 samples (in fcheck) | 62 | 0 |
+| Then every type changing under load, 65536 samples | 1 | 0 |
+| The same at 32768 and 262144 samples, seeds 1, 777 and 31337 | 63 × 3 | 0 |
+
+`mutate_fx.py`: 97 planted errors, all caught but two: `acc-wrap` (no program reaches 2^29 in these runs, so the accumulators never wrap, though the width stays) and `ran-off` (past the end a core runs empty words, which comes to the same; the guard keeps the PC in bounds). The check also caught a real mistake of mine in the first rewrite, a constant operand on the latch multiply, at once.
+
+So this says the port is JE-8086's chip. Only a capture can say JE-8086's chip is this one.
+
+**What the XT's programs never do.** The first list of planted errors missed 33 of 116, and the misses are the finding. Each was code that nothing in rom.2 reaches, so I took it out, and the check still says 0:
+- **The two cores never touch in a sample.** They never want GRAM on the same clock, so core 0 never stalls. They never read what the other wrote in the same sample, which is why inputs are read at odd slots: the word from last sample, rotated by one. Running either core first gives the same result, so a frame is simply each core in turn.
+- **Memory operations are always at least six words apart,** so JE-8086's back-to-back case, which loses a write's low phase, never happens. No program looks at the read latch before a transfer is done, or changes the write data during one. So the older chip's two 12-bit phases can't be seen, and here a transfer is one step. That's less to go wrong if the ESP4 differs there.
+- No branch but "if ≥ 0" (seven words, all on core 1). Core 0 does nothing in the tail, where r0 and r255 stay 0.
+- Ops 0x20, 0x28, 0x2c, 0x54, 0x60…0x68, 0x70, 0x74 and the interrupt and mailbox forms are never used, and aren't here.
+
+**The delay memory, probably 24 bits.** That corrects v121 and v123. No operation reaches past offset 0x1ffff, so 2^17 addresses are in use. (v115's 0x37fff was my misreading of word 0x407: its field is 3, which makes 0x1ffff.) That fits the driver's mode, 0x34: 24 bits in two phases of 12, on 2^18 words of DRAM. Not settled until a capture shows it, by the reverb tail test in the next section. The model keeps 24.
+
+**Speed.** 16% to 23% of a core on this Mac, by CPU time, for Thru, and for MFX and Hall 1, with the machine heavily loaded by other work. That's with each core's sample in one loop, its state in locals. Not yet what I'd want in a plugin, but usable. The two cores could go on two threads, as they don't interact in a sample.
+
+**What's next.**
+- **Control, off the audio thread:** the driver running in `Sh4Interp` when a parameter changes, its bytes reaching the chip between samples through a lock-free queue, and the plugin's parameters.
+- **The frame in XtSynth:** Chorus and Reverb Sends, Output Assign, Out Gain for TG. An ordinary exact port against `xt_tone`, but it touches the files the Matrix, tempo and SOLO branches changed, so they want merging first.
+- **Into the sound,** then captures against it.
+
 ### The chip is an ESP: the JP-8000's instruction set runs the XT's programs (2026-11-04, v123)
 
 Nothing here changes the plugin. The user asked me to compare the chip with JE-8086, The Usual Suspects' emulator of the JP-8000 ([gearmulator](https://github.com/dsp56300/gearmulator), `source/ronaldo/custom_chips/esp/`, GPL-3.0). For all this project can tell it is the same machine. v115's reading of the instruction set was right as far as it went. JE-8086 has the rest, taken from the silicon of the older TC170C140, and with it the XT's own programs, loaded by the firmware's own driver, behave.
@@ -1582,7 +1613,7 @@ rom.2's own factory test prints "ESP Device Test: P0 P1 I0 I1 GR ER": the two pr
 
 And the widths: a 24-bit multiplicand × an 8-bit coefficient, shifted right truncating, into a 30-bit wrapping accumulator; a store saturates to 24 bits. A 16-bit coefficient is two multiplies, the second of the last multiplicand >> 7. A latch multiply takes the register's top 8 bits, then its next 7. The address register is an accumulator's bits from 12 up, its low 12 a fraction in coefficient register 6. Core 0 waits a clock when both cores want GRAM. Ops 0x20 and 0x24 read GRAM at a shift of 7 or 6, so "an accumulator = a slot" has a gain in it after all.
 
-**The test.** A model of my own in integers, from those facts, with the firmware's driver in the interpreter as before (`build/tools/fx/esp4.cpp`, not committed: see the licence, below). I compiled nothing of JE-8086's.
+**The test.** A model of my own in integers, from those facts, with the firmware's driver in the interpreter as before. (That throwaway became `XtFxChip` in v126.) I compiled nothing of JE-8086's at this point.
 
 | Test | v115's doubles | Now | Should be |
 |---|---|---|---|
@@ -1607,7 +1638,7 @@ A reverb's tail ends on DC, about 580 LSB, −83 dB, with the signal under it st
 **Corrections.**
 - **There is no output stage.** A 0x230…0x2bb, which v115 read as a limiter on the way out, takes the input slots 0x18, 0x1a and ends in r63, r65, which reach slots 0x90, 0x92 the next sample. It's a compressor, limiter and gate, and I read it as the sampling screen's pre-effects, which are those three. The output is slots 0xa0, 0xa2 as written, so clipping is a store's saturation at 24 bits.
 - **The gain is ×2,** frame to output, not ×4. If a frame's int32 carries the chip's 24 bits at the top, and the tones reach the frame at 1/16, a full-scale wave comes out near −18 dBFS. v40's +9.4 dB was through an analog chain with a trim. Not reconciled until `main` is recorded.
-- **v121's 16 bits a sample isn't settled.** JE-8086 starts in a 16-bit compressed memory mode (14-bit mantissa, 2-bit exponent). The XT's driver writes 0x34 with that bit clear and the next one set, which on the TC170C140 is 24 bits in two 12-bit phases. On the XT's 16-bit DRAM that would mean two DRAM words a sample and 2^17 samples, which is all the zones use, but B also writes at 0x37fff, which would then land inside the Reverb's zone. The other way, 2^18 addresses of 16 bits. The model keeps 24.
+- **v121's 16 bits a sample isn't settled.** JE-8086 starts in a 16-bit compressed memory mode (14-bit mantissa, 2-bit exponent). The XT's driver writes 0x34 with that bit clear and the next one set, which on the TC170C140 is 24 bits in two 12-bit phases. On the XT's 16-bit DRAM that would mean two DRAM words a sample and 2^17 samples, which is all the zones use. (v126: and nothing goes past 0x1ffff, so probably this.) The model keeps 24.
 
 **What a capture can now do.** It no longer has to find out what the chip is. It tests predictions, and any path but analog can test most of them:
 - `main` at +6.00 dB against the frame, however the frame relates to the wave; `multi_thru` 4 samples behind it.
@@ -1617,13 +1648,13 @@ A reverb's tail ends on DC, about 580 LSB, −83 dB, with the signal under it st
 - A sample-exact path: the whole of a take, sample by sample, with the model.
 
 **Not settled.** Not one sample has been compared with an XT. All of this rests on the XT's own numbers and on the programs behaving sensibly, which is strong but isn't the chip itself. JE-8086's fixtures are from the TC170C140, and this chip is ten years newer (TC223C080AF), so it may differ where nothing here looks:
-- The memory, as above; and back-to-back writes, which on the older chip lose their low phase in this mode (it makes no difference to Hall 1 here).
+- The memory, as above.
 - When the PPC moves a frame, so absolute latency.
-- The tail words (756…767), and the flags at `0xb0000004`…`6`.
+- The flags at `0xb0000004`…`6`, which the driver only reads.
 - LFOs' starting phase, which v116 already expected to have to find.
-- Cost: this model runs at 2.3 × real time on one core, with nothing optimized. A plugin needs better. JE-8086 uses a JIT; pre-decoding and skipping the empty words should go a long way.
+- Cost: this model ran at 2.3 × real time on one core, with nothing optimized. (v126: 4.3 × at the worst.)
 
-**The licence.** JE-8086's core is GPL-3.0, and this repository has no licence. I copied no code. But I wrote `esp4.cpp` straight after reading theirs, so I've kept it out of the repository until the user decides: put the project under GPL-3.0, which JUCE allows and which would let the chip port build on their core and credit them; or keep it separate, and accept that a port written from these facts by someone who has read their code isn't a clean room. Not a call I can make. The facts above are about the hardware, with credit where they came from.
+**The licence.** JE-8086's core is GPL-3.0, and this repository had no licence, so I kept the model out of git until the user decided. They chose GPL-3.0 (v126).
 
 ### The effect chip's name, and cutting the captures (2026-11-04, v121)
 
@@ -1910,7 +1941,7 @@ Chorus has no programs of its own. All eight types are the 100 fixed words with 
 | 0x00000…0x0efff | MFX, 1393 ms. Each type writes zero at 0xefff, which scrubs what falls off its end, and gets its other writes by `write on` |
 | 0x0f000…0x0ffff | Chorus, 93 ms |
 | 0x10000…0x1ffff | Reverb, 1486 ms. The clear program `0x897bd1a8`: 58 write heads 1130 apart, so 25.6 ms covers 2^16, and the driver waits 30 ms |
-| to at least 0x37fff | B 0x403 writes there. I don't know why |
+| 0x1ffff | B 0x403 writes there, the top of the memory (v126; this said 0x37fff, a misreading) |
 
 As I read it, a read's data arrives ten steps later. An address-register read takes the integer as the address and the fraction as a latch, so the programs interpolate: Stereo Delay's two reads and two latches are a linear interpolation, which is how a delay time can glide. So a port's memory is at most 2^18 values, about 1 MB as int32, in one block: nothing about it is hard.
 

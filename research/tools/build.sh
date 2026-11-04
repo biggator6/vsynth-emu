@@ -6,7 +6,7 @@ source "$(dirname "$0")/env.sh"
 S="${1:-$REPO/plugin/Source}"; O="${2:-$WORK/bin}"; mkdir -p "$O"
 cc() { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 "$@" 2>&1 | grep -E " error"; return 0; }
 cd "$S" || exit 1
-rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone,engine_tests,rd}
+rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone,xt_fx,engine_tests,rd}
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp XtFirmware.cpp XtMultiBandPlayer.cpp Sh4Interp.cpp -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp Sh4Interp.cpp -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp Sh4Interp.cpp -o "$O/xt_lfo" &
@@ -18,9 +18,10 @@ cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlay
    $( [ -f XtCosm.cpp ] && echo XtCosm.cpp ) $( [ -f XtAnalog.cpp ] && echo XtAnalog.cpp ) XtFirmware.cpp Sh4Interp.cpp -o "$O/xt_synth" &
 [ -f XtToneCheck.cpp ] && cc -DXT_TONE_MAIN -DXT_TONE_CHECK XtToneCheck.cpp XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
    XtCosm.cpp XtAnalog.cpp XtFirmware.cpp Sh4Interp.cpp -o "$O/xt_tone" &
+[ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp Sh4Interp.cpp -o "$O/xt_fx" &
 cc -DENGINE_TESTS_MAIN EngineTests.cpp VariphraseEngine.cpp PhaseVocoder.cpp SourceFilterModel.cpp XtSoloEncoder.cpp XtSoloVoice.cpp \
    XtMultiBandPlayer.cpp Sh4Interp.cpp XtFirmware.cpp -o "$O/engine_tests" &
 cc -I. "$REPO/research/tools/rd.cpp" Sh4Interp.cpp -o "$O/rd" &
 wait
-for b in xt_osc xt_lfo xt_env xt_fw xt_enc xt_synth engine_tests rd $( [ -f XtCosm.cpp ] && echo xt_cosm ) $( [ -f XtAnalog.cpp ] && echo xt_analog ) $( [ -f XtToneCheck.cpp ] && echo xt_tone ); do
+for b in xt_osc xt_lfo xt_env xt_fw xt_enc xt_synth engine_tests rd $( [ -f XtCosm.cpp ] && echo xt_cosm ) $( [ -f XtAnalog.cpp ] && echo xt_analog ) $( [ -f XtFxChip.cpp ] && echo xt_fx ) $( [ -f XtToneCheck.cpp ] && echo xt_tone ); do
   [ -x "$O/$b" ] || { echo "build: $b missing"; exit 1; }; done

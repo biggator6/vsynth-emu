@@ -3347,3 +3347,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Stereo Delay came out 10 and 8 samples short of what v115 and I had called the driver's numbers. I nearly went hunting for an off-by-ten in my controller. Printing the address register settled it: the firmware's coefficients produce 22040.008 and 28656.008, and the echoes land exactly there. So I'd been holding the model to a number nobody had measured.
 - The licence is the one thing I can't work through for the user. Their code is GPL-3.0 and this repo has none. I kept my model out of git until they've decided, because I wrote it straight after reading theirs.
 
+### Session 16 addendum (2026-11-04) — v126: XtFxChip
+
+- The user said yes to the chip port and to GPL-3.0. Before adding the licence I looked at JUCE's, because I'd told them it had a GPL option. It's version 8, so AGPLv3 or commercial. GPLv3 section 13 still allows the combination, so the decision holds, but I'd stated it wrongly and said so.
+- With the licence settled, the project's own method was available: a reference to equal. I vendored their interpreter unmodified, drove it and my chip with the same bytes from the firmware's driver, and compared the whole state every sample. Having read through the four headers first, and with them doing no I/O, I was content to build them.
+- Reading theirs for the port also turned up my branch bug in the model: mine landed a clock early. The reference would have found it anyway, and it did find the next one, a constant operand I dropped from the latch multiply when rewriting for speed.
+- 0 different on the first run proved nothing, which is why the planted errors come next. They were more interesting than the pass: 33 of 116 missed. Normally that's a weak check. Here each one was code no XT program reaches: no GRAM collisions, no back-to-back memory operations, nobody reading a latch mid-transfer. So I removed it all, and the chip got simpler and faster, and less exposed to differences between the two chips.
+- The speed work was all about what the compiler could see. The same semantics went from 37% of a core to 23% by putting each core's sample in one loop with its state in locals, flattening a nested switch and making the accumulators an array.
+- That memory map settled something I'd got wrong twice. v115's 0x37fff was a misreading, and with everything under 0x20000 the "16 bits a sample" of v121 looks wrong too.
+- Other sessions were running their long checks throughout, with a load average near 95, so I changed the speed test to CPU time. The real number on a quiet machine may be better.
+

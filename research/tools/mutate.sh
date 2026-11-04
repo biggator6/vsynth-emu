@@ -4,7 +4,7 @@
 # PORT=analog, XtAnalog.cpp; with PORT=analogcosm, XtCosm.cpp, PORT=analogband, XtMultiBandPlayer.cpp, and PORT=analogfw, XtFirmware.cpp, under xt_analog's
 # check (XT_ANALOG_ONLY=pcm, the PCM pass alone, is passed through); with PORT=tone, XtSynth.cpp, PORT=tonecosm, XtCosm.cpp, PORT=toneanalog, XtAnalog.cpp, PORT=toneband, XtMultiBandPlayer.cpp, PORT=tonecheck, XtToneCheck.cpp, PORT=tonefw, XtFirmware.cpp, and PORT=toneosc, XtOsc.cpp, under xt_tone,
 # on seed $SEED, default 2024; with PORT=solo, XtSoloVoice.cpp under xt_fw solocmp; with PORT=enc, XtSoloEncoder.cpp under
-# xt_enc on fcheck's waves, which prints only those that differ) with the first <old> replaced by
+# xt_enc on fcheck's waves, which prints only those that differ; with PORT=fx, XtFxChip.cpp under xt_fx) with the first <old> replaced by
 # <new> (exact text), builds xt_cosm (xt_analog, xt_tone, xt_fw, xt_enc) from it in $WORK/mut/<name>, runs it on
 # [cases] (100) and prints the lines matching [pattern] (an extended regex;
 # default every result line).  A check that
@@ -27,6 +27,11 @@ if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalo
     EXTRA=(-DXT_TONE_CHECK)
 elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck's baseline; [cases] is not used
     F=XtSoloVoice.cpp; D=XT_FW_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
+elif [ "$PORT" = fx ]; then        # XtFxChip against the reference; [cases] is its samples per type, and XT_FX_STOP stops at the first difference
+    F=XtFxChip.cpp; D=XT_FX_MAIN; EXTRA=(-I"$REPO/research/third_party/gearmulator_esp")
+    OBJ="$M/fx_obj"; mkdir -p "$OBJ"
+    [ "$OBJ/Sh4Interp.o" -nt "$S/Sh4Interp.cpp" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -c "$S/Sh4Interp.cpp" -o "$OBJ/Sh4Interp.$$.o" && mv "$OBJ/Sh4Interp.$$.o" "$OBJ/Sh4Interp.o"; }
+    L=("$OBJ/Sh4Interp.o")
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
 elif [ "${PORT:-cosm}" = analog ]; then
