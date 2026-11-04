@@ -28,7 +28,7 @@ struct XtEnvKnobs {
     int timeKF = 0;                                             // −200..+200 (decay and release)
     int tempo10 = 1200;                                         // the tempo ×10 at the note's start (input +0x18, 0x894df4e0)
 };
-// The converter (0x894df240) for an ADSR with no matrix modulation: the
+// The converter (0x894df240) for an ADSR, its time knobs with the Matrix's sums added by XtSynth: the
 // attack time from the note-on velocity and A-Sens; decay and release from
 // D-/R-Sens and the Time KF scale for `key`; the release from the note-off
 // velocity.  The sens knobs go in as the patch's −63…+63 and are stored as

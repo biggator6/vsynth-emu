@@ -2,7 +2,7 @@
 #include <tuple>
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 1030; // height of the XT strip below it
+static constexpr int kXtStripH   = 1120; // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -68,9 +68,9 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1330);
+    setSize(560, 1420);
     setResizable(true, true);
-    setResizeLimits(480, 990, 960, 1470);
+    setResizeLimits(480, 1110, 960, 1560);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -265,6 +265,33 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     tlfoModeAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "tvaLfoFadeMode", tlfoModeBox_);
     tlfoOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "tvaLfoOffset", tlfoOffsetBox_);
     tlfoSyncAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, "tvaLfoKeySync", tlfoSyncBtn_);
+    // The Matrix, after the patch's own knobs
+    matrixLabel_.setText("Matrix", juce::dontSendNotification);
+    assignLabel_.setText("Assign", juce::dontSendNotification);
+    styleSmall(matrixLabel_);
+    styleSmall(assignLabel_);
+    for (int m = 0; m < 8; ++m) matrixSelBox_.addItem("Control " + juce::String(m + 1), m + 1);
+    matrixSourceBox_.addItemList(VSynthEmuProcessor::matrixSourceNames(), 1);
+    for (int j = 0; j < 2; ++j) {
+        matrixDestBox_[j].addItemList(VSynthEmuProcessor::matrixDestNames(), 1);
+        juce::Slider& sl = matrixSens_[j];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        addAndMakeVisible(matrixDestBox_[j]);
+        matrixSensLabels_[j].setText("Sens", juce::dontSendNotification);
+        styleSmall(matrixSensLabels_[j]);
+    }
+    for (int i = 0; i < 10; ++i) assignSelBox_.addItem(VSynthEmuProcessor::assignName(i), i + 1);
+    assignBox_.addItemList(VSynthEmuProcessor::assignValueNames(), 1);
+    for (juce::ComboBox* b : { &matrixSelBox_, &matrixSourceBox_, &assignSelBox_, &assignBox_ }) addAndMakeVisible(*b);
+    matrixSelBox_.onChange = [this] { attachMatrix(juce::jlimit(0, 7, matrixSelBox_.getSelectedItemIndex())); };
+    assignSelBox_.onChange = [this] { attachAssign(juce::jlimit(0, 9, assignSelBox_.getSelectedItemIndex())); };
+    matrixSelBox_.setSelectedId(1, juce::sendNotificationSync);
+    assignSelBox_.setSelectedId(7, juce::sendNotificationSync);
     lfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);
     lfoModeBox_.addItemList({ "ON <<", "ON >>", "OFF <<", "OFF >>" }, 1);
     lfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
@@ -646,6 +673,22 @@ void VSynthEmuEditor::attachCosm(int k) {
 // name, Encode), Key and Depth, Energy and the VariPhrase knobs, Loop, analog
 // knobs, pitch, TVA, amp envelope, velocity to level, pitch, time and formant
 // envelopes and LFO; the PITCH, TIME and FORMANT knobs and Robot too.
+// One Matrix Control's knobs on the row, as the XT's Control tabs do
+void VSynthEmuEditor::attachMatrix(int m) {
+    matrixSourceAtt_.reset();
+    for (int j = 0; j < 2; ++j) { matrixDestAtt_[j].reset(); matrixSensAtt_[j].reset(); }
+    matrixSourceAtt_ = std::make_unique<ComboAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Source"), matrixSourceBox_);
+    matrixDestAtt_[0] = std::make_unique<ComboAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Dest1"), matrixDestBox_[0]);
+    matrixDestAtt_[1] = std::make_unique<ComboAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Dest2"), matrixDestBox_[1]);
+    matrixSensAtt_[0] = std::make_unique<SliderAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Sens1"), matrixSens_[0]);
+    matrixSensAtt_[1] = std::make_unique<SliderAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Sens2"), matrixSens_[1]);
+}
+
+void VSynthEmuEditor::attachAssign(int which) {
+    assignAtt_.reset();
+    assignAtt_ = std::make_unique<ComboAtt>(processor_.apvts, VSynthEmuProcessor::assignParamId(which), assignBox_);
+}
+
 void VSynthEmuEditor::attachOsc(int k) {
     oscK_ = k;
     auto id = [k](const char* name) { return VSynthEmuProcessor::oscParamId(k, name); };
@@ -1107,6 +1150,22 @@ void VSynthEmuEditor::resized() {
     tvaSliders_[9].setBounds(rt6.removeFromLeft(130).withTrimmedRight(6));
     tlfoModeBox_.setBounds(rt6.removeFromLeft(90).withTrimmedRight(6));
     tlfoOffsetBox_.setBounds(rt6.removeFromLeft(70));
+    xt.removeFromTop(6);
+    auto rm1 = xt.removeFromTop(24);                 // the Matrix: which Control, its Source; the system's assigns
+    matrixLabel_.setBounds(rm1.removeFromLeft(46));
+    matrixSelBox_.setBounds(rm1.removeFromLeft(90).withTrimmedRight(6));
+    matrixSourceBox_.setBounds(rm1.removeFromLeft(90).withTrimmedRight(6));
+    assignLabel_.setBounds(rm1.removeFromLeft(44));
+    assignSelBox_.setBounds(rm1.removeFromLeft(90).withTrimmedRight(6));
+    assignBox_.setBounds(rm1.withTrimmedRight(2));
+    for (int j = 0; j < 2; ++j) {                    // each pair: Dest, Sens
+        xt.removeFromTop(6);
+        auto rm = xt.removeFromTop(24);
+        rm.removeFromLeft(46);
+        matrixDestBox_[j].setBounds(rm.removeFromLeft(150).withTrimmedRight(6));
+        matrixSensLabels_[j].setBounds(rm.removeFromLeft(34));
+        matrixSens_[j].setBounds(rm.withTrimmedRight(6));
+    }
 
     // ── Knobs area ─────────────────────────────────────────────────────────
     const int knobTop = titleH + kFileStripH + kXtStripH + 8;

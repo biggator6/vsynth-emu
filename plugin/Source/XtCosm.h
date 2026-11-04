@@ -40,7 +40,7 @@ struct XtTvfParams {
     int qOwn = 0, cutoffOwn = 0;      // Dynamic TVF only: Own Env Depth ±63 (IDs 0x92b, 0x930)
 };
 
-// The converter's block (0x894dd870; the matrix and controller terms 0):
+// The converter's block (0x894dd870; each knob with the Matrix's sum added by XtSynth, the Multi Step Modulator's term 0):
 //   q        Q·0.984375/127 − 1, Q within 0…127
 //   cutoff   (key − 60)·KF·10/100/127 + Cutoff/127, within 0…1
 //   …Lfo     (d/63)·|d/63|, d within ±63

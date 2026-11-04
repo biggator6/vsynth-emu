@@ -163,7 +163,9 @@ TRIP-R = 1 - r                               // "center from the circumference"
 ```
 
 `TRIP-R`'s polarity is inferred from the manual's wording and is **unverified against
-hardware**.
+hardware**.  rom.2 agrees with it (v124): T[127 − pad +0x24], where +0x24 is the distance
+from the centre at each Y of a finger (0 to 126 along an axis, 127 past that) and 127 with no
+finger.  So full at the centre, 0 at the rim and when lifted.
 
 Three behaviours the manual specifies that fall out of this:
 

@@ -1,5 +1,6 @@
 == xt_osc
-pitch ratios: std::pow differs from the firmware's powf on 59 of 127
+pitch ratios: xtOscPow2 differs from the firmware's powf on 0 of 127
+powf(2, y): 200000 cases, 0 different
 converter: 310545 cases × 6 values, 0 different
 exp2: 17143 arguments, 0 different
 velocity: 485209 cases, 0 different
@@ -258,13 +259,13 @@ env 30 70 90 50 80 500 2: identical
 == xt_tone
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
-tone: 3390 notes, 1393 taken by a sounding tone, 415 truncated, 275485 blocks, 11041897 checks
-tone: a SOLO wave's buffers within 9.8e-03 of the block's peak; 0 notes left off, a read outside memory; 291356 band reads far from their wave
+tone: 4202 notes, 2264 taken by a sounding tone, 339 truncated, 363714 blocks, 18463398 checks
+tone: a SOLO wave's buffers within 1.8e-02 of the block's peak; 0 notes left off, a read outside memory; 419404 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1402 notes, 428 taken by a sounding tone, 203 truncated, 117904 blocks, 4712501 checks
-tone, a wave on OSC 2: a SOLO wave's buffers within 7.2e-03 of the block's peak; 0 notes left off, a read outside memory; 574824 band reads far from their wave
+tone, a wave on OSC 2: 1347 notes, 397 taken by a sounding tone, 174 truncated, 111276 blocks, 6329655 checks
+tone, a wave on OSC 2: a SOLO wave's buffers within 9.6e-03 of the block's peak; 0 notes left off, a read outside memory; 725390 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 138768 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 147333 checks
 tone, a second update in a tick: a SOLO wave's buffers within 0.0e+00 of the block's peak; 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks

@@ -4,9 +4,12 @@
 #include "XtEnvelope.h"
 #include "XtFloat.h"
 
+#include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 
 namespace {
 
@@ -20,6 +23,8 @@ constexpr uint32_t kExpHiNeg = 0x897d0a28, kExpLoNeg = 0x897d0e28, kExpIntNeg = 
 // velocity (0x894ebd60): the sens table (u16 ×200, 65536·s/200) and the
 // pointers to the seven 128-byte velocity curves
 constexpr uint32_t kVelSens = 0x897cfeda, kVelCurves = 0x897cfb9c;
+constexpr uint32_t kExpPTab = 0x897eeebc, kExpQTab = 0x897eeed8;
+constexpr uint32_t kMxValue = 0x897cf11e, kMxLimit = 0x897cf080;   // u16 ×128: 8192·x/127, as stored; u16 per slot
 // the Time Trip pad: its angle by x, y from the centre (0x894f42b0), and the steps to a turn and
 // the offset into a step (0x894f41d0, 0x894d8740's index 2)
 constexpr uint32_t kPadAngle = 0x897d1c8c, kPadSteps = 0x897d3d8e, kPadOffset = 0x897d3da0;
@@ -32,9 +37,13 @@ struct Tables {
     uint8_t velCurve[7][128];
     float waveGain[25];                       // xtOscSetWaveGains, −12…+12 dB
     float pitchRatio[127];                    // xtOscSetPitchRatios, Pitch −63…+63
+    float expP[7], expQ[7];                   // expf's polynomials (0x89531a28)
+    uint16_t mxValue[128], mxLimit[kXtMatrixSlots];   // the Matrix: a controller's value, a slot's limit
+    uint8_t mxSlot[kXtMatrixSlots];           // xtOscSetMatrixTables
+    int16_t mxSens[kXtMatrixSlots * 127];
     uint8_t padAngle[65][65][2];
     uint16_t padSteps[3], padOffset[3];
-    bool keyScales = false, waveGains = false, pitchRatios = false, ok = false;
+    bool keyScales = false, waveGains = false, pitchRatios = false, mxReady = false, ok = false;
 } T;
 
 template <class V> bool readAt(FILE* f, uint32_t addr, V* v, size_t n) {
@@ -64,12 +73,22 @@ int clamp63(int d) { return d > 63 ? 63 : d < -63 ? -63 : d; }
 
 // A level with its key follow (0x894e0c90, and the patch TVA's Level and Pan): the
 // value + trunc(127·kf·(key − 60)/6000), by a reciprocal multiply, within 0…127.
-int levelAtKey(int level, int kf, int key) {
-    int x = level > 127 ? 127 : level < 0 ? 0 : level;
+int keyTerm(int kf, int key) {
     const int32_t p = 127 * (int32_t)(int16_t)kf * (int32_t)(int16_t)(key - 60);
     int32_t q = (int32_t)(((int64_t)p * 0x057619f1) >> 32) >> 7;
     q += (int32_t)((uint32_t)q >> 31);
-    x = (int16_t)(x + q);
+    return q;
+}
+
+int levelAtKey(int level, int kf, int key) {
+    int x = level > 127 ? 127 : level < 0 ? 0 : level;
+    x = (int16_t)(x + keyTerm(kf, key));
+    return x > 127 ? 127 : x < 0 ? 0 : x;
+}
+
+// The patch TVA's Pan (0x894ea5a0) the same, but the knob and the Matrix's sum are not limited first
+int panAtKey(int pan, int kf, int key) {
+    const int x = (int16_t)((int16_t)pan + keyTerm(kf, key));
     return x > 127 ? 127 : x < 0 ? 0 : x;
 }
 
@@ -84,6 +103,8 @@ bool xtOscLoadTables(const char* romPath) {
            && readAt(f, kExpHi, T.hi, 256) && readAt(f, kExpLo, T.lo, 256) && readAt(f, kExpInt, T.in, 7)
            && readAt(f, kExpHiNeg, T.hiN, 256) && readAt(f, kExpLoNeg, T.loN, 256) && readAt(f, kExpIntNeg, T.inN, 7)
            && readAt(f, kVelSens, T.velSens, 200) && readAt(f, kVelCurves, curvePtr, 7)
+           && readAt(f, kExpPTab, T.expP, 7) && readAt(f, kExpQTab, T.expQ, 7)
+           && readAt(f, kMxValue, T.mxValue, 128) && readAt(f, kMxLimit, T.mxLimit, kXtMatrixSlots)
            && readAt(f, kPadAngle, &T.padAngle[0][0][0], 65 * 65 * 2) && readAt(f, kPadSteps, T.padSteps, 3) && readAt(f, kPadOffset, T.padOffset, 3);
     for (int c = 0; ok && c < 7; ++c)
         ok = curvePtr[c] >= kRomBase && curvePtr[c] < 0x89900000u && readAt(f, curvePtr[c], T.velCurve[c], 128);
@@ -125,13 +146,12 @@ float xtOscEnergy(int k) {
     return xtf::div((float)T.level[k > 127 ? 127 : k], 32768.0f);
 }
 
-float xtOscTime(int t, int offset, int kf, int key) {
+float xtOscTime(int t, int offset, int kf, int key, int ctrl, int beam) {
     using namespace xtf;
     // Time Offset (+0x61, 0x894e31d6): BWD −1, ZERO 0, FWD and above +1
     const float base = offset == 0 ? -1.0f : offset == 1 ? 0.0f : 1.0f;
     const float s = timeKeyScale(kf, key);
-    // x = t + controller·63/12000, the controller 0
-    float x = flt((int16_t)t), y;
+    float x = add(div(mul(flt((int16_t)ctrl), 63.0f), 12000.0f), flt((int16_t)t)), y;
     bool up = false, down = false;
     if (x > 63.0f) { x = 63.0f; up = true; }
     else if (-63.0f > x) { x = -63.0f; down = true; }
@@ -146,19 +166,18 @@ float xtOscTime(int t, int offset, int kf, int key) {
     } else {
         y = add(div(x, 20.0f), base);
     }
-    // + (b1 − 3·b0)/127 from the part's bytes at +0x180 (0 with no controller)
-    y = mul(y, s);
+    y = mul(add(div(flt(beam), 127.0f), y), s);
     return y > 5.0f ? 5.0f : (-5.0f > y ? -5.0f : y);
 }
 
 float xtOscTimeEnvDepth(int d) { return timeDepth((int16_t)d); }          // × the velocity factor (sens 0: 1)
 float xtOscTimeLfoDepth(int d) { return timeDepth(clamp63((int16_t)d)); }
 
-float xtOscFormant(int f, int kf, int key) {
+float xtOscFormant(int f, int kf, int key, int ctrl) {
     using namespace xtf;
     const float k = div(flt((int16_t)(key - 60) * (int16_t)kf), 1200.0f);
-    // f·12000/63 + the controller (0), within ±12000, back to /63
-    float v = div(mul(flt((int16_t)f), 12000.0f), 63.0f);
+    // f·12000/63 + the controller, within ±12000, back to /63
+    float v = add(div(mul(flt((int16_t)f), 12000.0f), 63.0f), flt((int16_t)ctrl));
     if (v > 12000.0f) v = 12000.0f;
     else if (-12000.0f > v) v = -12000.0f;
     const float r = add(div(mul(div(v, 12000.0f), 63.0f), 63.0f), k);
@@ -215,14 +234,124 @@ void xtOscSetPitchRatios(const float* r) {
     T.pitchRatios = true;
 }
 
-float xtPitchRatio(int pitch) {
+// expf (0x89531a28)
+static float fwExpf(float x) {
     using namespace xtf;
-    // knob + modulation + controller·63/12000 (no controller), within ±63
-    const int p = clamp63((int16_t)pitch);
-    if (T.pitchRatios) return T.pitchRatio[p + 63];
-    // + (2·b183 − b182)/127 from the part's bytes at +0x180 (0 with no controller)
-    const float e = add(div(0.0f, 127.0f), div(xtPitchDepthCents(flt(p)), 1200.0f));
-    return (float)std::pow(2.0, (double)e);
+    const uint32_t u = std::bit_cast<uint32_t>(x);
+    if (x != x) return std::bit_cast<float>(0x7fc00001u);
+    if (x == 0.0f) return 1.0f;
+    if ((int)((u >> 23) & 0xff) - 127 >= 15) return (u & 0x80000000u) ? 0.0f : std::bit_cast<float>(0x7f800000u);
+    const float y = mul(x, std::bit_cast<float>(0x3fb8aa3bu));                    // log2 e
+    const uint32_t yu = std::bit_cast<uint32_t>(y);
+    float n = (yu & 0x7f800000u) < 0x4b000000u ? flt(ftrc(y)) : y;
+    n = std::bit_cast<float>(std::bit_cast<uint32_t>(n) | (yu & 0x80000000u));    // −0 for y in (−1, 0)
+    float f = sub(y, n);
+    int e = ftrc(n);
+    const uint32_t fu = std::bit_cast<uint32_t>(f);
+    if ((int)((fu >> 23) & 0xff) - 127 >= -1) {                                  // |f| ≥ ½: one step toward 0
+        if (fu & 0x80000000u) { e -= 1; f = add(f, 1.0f); }
+        else { e += 1; f = add(f, -1.0f); }
+    }
+    const float t = mul(f, std::bit_cast<float>(0x3f317218u));                    // ln 2
+    float p = T.expP[0], q = T.expQ[0];
+    for (int i = 1; i < 7; ++i) p = add(mul(p, t), T.expP[i]);
+    for (int i = 1; i < 7; ++i) q = add(mul(q, t), T.expQ[i]);
+    const float r = div(p, q);
+    const uint32_t ru = std::bit_cast<uint32_t>(r), sgn = ru & 0x80000000u;      // the exponent moved by e (0x89532ea8)
+    const int ef = (int)((ru >> 23) & 0xff), ne = ef + e;
+    if (ef == 255) return (ru & 0x7fffffu) ? std::bit_cast<float>(0x7fc00001u) : r;
+    if (ef == 0) return std::bit_cast<float>(sgn);
+    if (ne > 0 && ne < 255) return std::bit_cast<float>(sgn | (uint32_t)ne << 23 | (ru & 0x7fffffu));
+    return std::bit_cast<float>(e < 0 ? sgn : sgn | 0x7f800000u);
+}
+
+float xtOscPow2(float y) {
+    using namespace xtf;
+    if (y == 0.0f) return 1.0f;
+    return fwExpf(mul(std::bit_cast<float>(0x3f317219u), y));                     // the firmware's logf(2)
+}
+
+float xtPitchRatio(int pitch, int ctrl, int beam) {
+    using namespace xtf;
+    // knob + modulation + controller·63/12000, within ±63
+    if (ctrl == 0 && beam == 0) {
+        const int p = clamp63((int16_t)pitch);
+        if (T.pitchRatios) return T.pitchRatio[p + 63];
+        return xtOscPow2(add(div(0.0f, 127.0f), div(xtPitchDepthCents(flt(p)), 1200.0f)));
+    }
+    float x = add(div(mul(flt((int16_t)ctrl), 63.0f), 12000.0f), flt((int16_t)pitch));
+    x = x > 63.0f ? 63.0f : (-63.0f > x ? -63.0f : x);
+    return xtOscPow2(add(div(flt(beam), 127.0f), div(xtPitchDepthCents(x), 1200.0f)));
+}
+
+// ── The Matrix ──────────────────────────────────────────────────────────
+
+void xtOscSetMatrixTables(const uint8_t* slots, const int16_t* sens) {
+    std::memcpy(T.mxSlot, slots, sizeof T.mxSlot);
+    std::memcpy(T.mxSens, sens, sizeof T.mxSens);
+    T.mxReady = true;
+}
+
+// The source's routine (0x894e6940)
+int xtMatrixValue(int source, const XtMatrixInputs& in) {
+    const auto value = [](int x) { return (int)T.mxValue[x & 0xff]; };
+    // an assigned controller, through the curve (0x894e6b10 and the like); 0 or 32: none
+    const auto assigned = [&](int i) { const int n = in.assign[i]; return n == 0 || n == 32 ? 0 : value(in.cc[n]); };
+    // +PAD: both ways from the middle of the controller (0x894e6d30, 0x894e6de0), the value 0 itself nothing
+    const auto fromMiddle = [&](int i) {
+        const int n = in.assign[i];
+        if (n == 0 || n == 32) return 0;
+        const int x = in.cc[n];
+        if (x == 0) return 0;
+        return x >= 64 ? value((x - 64) * 127 / 63) : -value((64 - x) * 127 / 63);
+    };
+    switch (source) {
+    case 0: case 32: return 0;
+    case 96: return (int16_t)(in.bender - 8192);                                  // BEND (0x894e6ac0)
+    case 97: return value(std::max(in.pressure, in.poly[in.polyKey & 127]));      // AFT (0x894e6ae0)
+    case 98: return fromMiddle(2);                                                // +PAD-X
+    case 99: return fromMiddle(3);                                                // +PAD-Y
+    case 100: return assigned(2);                                                 // PAD-X
+    case 101: return assigned(3);                                                 // PAD-Y
+    case 102: return value((127 - in.pad) & 0xff);                                // TRIP-R (0x894e6c60)
+    case 103: return assigned(0);                                                 // BEAM-L
+    case 104: return assigned(1);                                                 // BEAM-R
+    case 105: return assigned(4);                                                 // KNOB1
+    case 106: return assigned(5);                                                 // KNOB2
+    case 107: return value(in.velocity);                                          // VELO (0x894e6ca0)
+    case 108: return (in.key & 0xff) * 122 - 7320;                                // KEYF (0x894e6c80): 0 at key 60
+    default: return source > 0 && source < 96 ? value(in.cc[source]) : 0;         // a controller (0x894e6aa0)
+    }
+}
+
+bool xtMatrixSums(const XtMatrixControl* m, const XtMatrixInputs& in, int16_t* slots) {
+    std::memset(slots, 0, kXtMatrixSlots * sizeof(int16_t));
+    if (!T.mxReady) return false;
+    int32_t sum[kXtMatrixSlots] = {};
+    bool any = false;
+    for (int i = 0; i < 8; ++i) {
+        const int source = m[i].source;
+        if (source <= 0 || source > 108) continue;
+        const int value = xtMatrixValue(source, in);
+        for (int j = 0; j < 2; ++j) {
+            const int dest = m[i].dest[j], sens = m[i].sens[j];
+            if (dest <= 0 || dest >= kXtMatrixSlots || sens == 0 || sens < -63 || sens > 63) continue;
+            const int slot = T.mxSlot[dest], limit = T.mxLimit[slot];
+            int32_t t = (value * (int32_t)T.mxSens[dest * 127 + sens + 63]) >> 13;
+            t = t > limit ? limit : t < -limit ? -limit : t;
+            sum[slot] += t;
+            any = true;
+        }
+    }
+    if (!any) return false;
+    any = false;
+    for (int d = 1; d < kXtMatrixSlots; ++d) {
+        const int limit = T.mxLimit[d];
+        const int32_t x = sum[d] > limit ? limit : sum[d] < -limit ? -limit : sum[d];
+        slots[d] = (int16_t)x;
+        any = any || x != 0;
+    }
+    return any;
 }
 
 float xtPitchTarget(float cents, float env, float envDepth, float lfo, float lfoDepth, float ratio,
@@ -244,13 +373,13 @@ float xtOscSmooth(float cur, float target) {
 }
 
 int xtNoteCoarse(const XtTuning& t, int oscCoarse) {
-    // the system's key shift (byte at part base + 0xc202) and the matrix: 0
+    // the system's key shift (byte at part base + 0xc202) and the Multi Step Modulator: 0
     return (int16_t)((int8_t)t.coarse + (int8_t)oscCoarse);
 }
 
 int xtNoteFine(const XtTuning& t, int key, int oscFine, int bend, int random) {
     // the part's shorts as the updater stores them (×10); the system's
-    // Master Tune (short at part base + 0xc200) and the matrix: 0
+    // Master Tune (short at part base + 0xc200) and the Multi Step Modulator: 0
     const int scale = t.scaleOn ? (int16_t)(t.scale[(uint8_t)key % 12] * 10) : 0;
     return scale + (int16_t)(t.fine * 10) + (int16_t)(oscFine * 10) + bend + random;
 }
@@ -285,7 +414,7 @@ XtPortaSettings xtPortaSettings(bool on, int type, int time, int veloSens, int v
     constexpr int64_t M = (int32_t)0x82061029;     // the reciprocal multiply for /16129 (127²)
     int v = velocity & 0xff, sens = (int16_t)veloSens;
     if (0 > sens) { v = 127 - v; sens = -sens; }
-    int k = time & 0xff;                            // Time + the matrix's modulation (0), as a byte
+    int k = time & 0xff;                            // Time + the Multi Step Modulator's (0), as a byte
     if (k > 127) k = 127;
     int32_t t;
     if (k == 1) t = 1;
@@ -368,6 +497,7 @@ void XtTripPad::touch(bool down) {
     on_ = false;
     dir = 0;
     angleWas = angleNow = -1;
+    radius_ = 127;                                  // the handler's, after it
 }
 
 // 0x894f42b0
@@ -382,6 +512,13 @@ int XtTripPad::angle(int px, int py) const {
         else v = 0x40 - (int8_t)T.padAngle[-a][-b][1];
     }
     return v * 4;
+}
+
+// 0x894f42b0, the same entry's first byte
+int XtTripPad::distance(int px, int py) const {
+    const int a = px - 64, b = py - 64;
+    if (a > 0) return (int8_t)(b > 0 ? T.padAngle[a][b][0] : T.padAngle[-b][a][0]);
+    return (int8_t)(b > 0 ? T.padAngle[b][-a][0] : T.padAngle[-a][-b][0]);
 }
 
 // 0x894f43b0
@@ -435,6 +572,7 @@ bool XtTripPad::setY(int value, int& step) {
     if (0 >= v) { touch(false); return false; }
     y = v;
     angleNow = angle(x, y);
+    radius_ = distance(x, y);
     const int d = delta();
     angleWas = angleNow;
     if (d == 0) return false;
@@ -490,7 +628,7 @@ XtTvaBlock xtTvaBlock(const XtTvaKnobs& k, int key, float velGain) {
         b.lfoDepth = xtOscLevelLfoDepth(k.levelLfo);
         b.panLfoDepth = xtOscLevelLfoDepth(k.panLfo);
         // CC 10 moves the Pan toward the end it points at, in proportion to the way left
-        const int p = levelAtKey(k.pan, k.panKF, key), c = cc(k.cc10);
+        const int p = panAtKey(k.pan, k.panKF, key), c = cc(k.cc10);
         const int at = c >= 64 ? p + (c - 64) * (127 - p) / 63 : p - ((p * (64 - c)) >> 6);
         panL = frac(T.pan, 127 - at);
         panR = frac(T.pan, at);
@@ -559,7 +697,7 @@ int main(int argc, char** argv) {
         int d = 0;
         for (int p = -63; p <= 63; ++p) d += xtPitchRatio(p) != pr[(size_t)(p + 63)];
         xtOscSetPitchRatios(pr.data());
-        std::printf("pitch ratios: std::pow differs from the firmware's powf on %d of 127\n", d);
+        std::printf("pitch ratios: xtOscPow2 differs from the firmware's powf on %d of 127\n", d);
     }
     Sh4 c;
     if (!c.loadRom(argv[1])) return 1;
@@ -570,6 +708,23 @@ int main(int argc, char** argv) {
     for (uint32_t a : { 0x894e7010u, 0x894e70b0u, 0x894e7320u, 0x894e7520u }) c.hook(a, [&](Sh4& m) { m.ret(zero); });
     auto f32 = [&](uint32_t a) { const uint32_t v = c.rd32(a); float x; std::memcpy(&x, &v, 4); return x; };
     auto bitsEq = [](float a, float b) { return std::memcmp(&a, &b, 4) == 0; };
+    {   // the firmware's powf at 2 (0x8952ff9c), over the exponents the Pitch knob gets with the Matrix
+        uint32_t x = 1;
+        long n = 0, d = 0;
+        const float two = 2.0f;
+        for (int i = 0; i < 200000; ++i) {
+            x = x * 1664525u + 1013904223u;
+            const float y = (float)(int32_t)x * 0x1p-31f * (i % 3 == 0 ? 7.0f : i % 3 == 1 ? 1.0f : 0.01f);
+            std::memcpy(&c.fb[0][4], &two, 4);
+            std::memcpy(&c.fb[0][5], &y, 4);
+            if (!c.call(0x8952ff9c, {}, sp)) { std::fprintf(stderr, "powf: %s\n", c.error().c_str()); return 1; }
+            float fw;
+            std::memcpy(&fw, &c.fb[0][0], 4);
+            ++n;
+            d += !bitsEq(fw, xtOscPow2(y));
+        }
+        std::printf("powf(2, y): %ld cases, %ld different\n", n, d);
+    }
     long cases = 0, bad = 0;
     float lo[6], hi[6];
     for (int i = 0; i < 6; ++i) lo[i] = hi[i] = 0.0f;

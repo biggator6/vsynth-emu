@@ -77,7 +77,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
   takes about 10 s), and `mutate_tone.py 2000 <new names>` for the planted errors just added.
-- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 4 minutes) if
+- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 13 minutes) if
   `XtSynth.cpp`, `XtToneCheck.cpp` or a port changed: a planted error can stop meaning anything
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
@@ -127,6 +127,12 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - The patch TVA's block (`0x894ea380`, live `0x894eab40`) holds Level, Pan, the sends and CC 7, 11, 10, read from C + 0x84 + cc at each
   conversion pass. Its pan is two things: the law on the output bus's pair, which glides 3% per block, and the LFO's on the gains. A frame
   on the bus is 32 bytes: MAIN, Reverb and Chorus, MULTI, DIR; `xt_tone` reads MULTI's (HARDWARE_FIRMWARE.md, "The patch TVA's level and pan").
+- A controller: the channel keeps numbers below 96 (C + 0x84 + number), then its handler (table built at `0x894d7400`) queues an update of the
+  part's notes (`0x894d7760`), for any number, value moved or not. `*K` is N, the part-and-channel state (+0x11c Hold, +0x11d Sostenuto). A note's
+  +0x48 is key, Hold, Sostenuto: it stops when all three are clear (HARDWARE_FIRMWARE.md, "Hold, Sostenuto and the mode messages").
+- The Matrix is the note's object M (the input table's +0x68), read through the getters `0x894e7010`…`0x894e7860`; a slot is not a Dest (`xtFwMatrixTables`).
+  A getter forms its own group of sums and no other. A pad's move (TRIP-R) brings no update, so a key-off, which converts only release times, reaches only the envelopes' groups: `matrixRelease`. A note value (128 on) takes no sum (`withSum`).
+  `0x894d96d0` on `0x89cf7634`, which older sections call "the matrix", is the Multi Step Modulator, not ported (HARDWARE_FIRMWARE.md, "The Matrix").
 - The analog oscillator's map (waveform codes, routines, the converter's
   input, the hidden calibration IDs 0x528…0x55b) is in HARDWARE_FIRMWARE.md,
   "The analog oscillator, and SAW". A patch's waveform number is not the

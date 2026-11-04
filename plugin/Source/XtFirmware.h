@@ -97,6 +97,10 @@ bool xtFwOscTimeKeyScales(std::vector<float>& out);
 // as the VariPhrase converter forms it (0x894e3568), dB = −12…+12.
 bool xtFwOscWaveGains(std::vector<float>& out);
 
+// The Matrix's maps: each Dest's slot (0x894e7d10) and each Dest's Sens −63…+63 as stored (0x894e82e0),
+// from the firmware's own routines: 79 and 79 × 127 values.
+bool xtFwMatrixTables(std::vector<uint8_t>& slots, std::vector<int16_t>& sens);
+
 // The Pitch knob's ratios 2^(c/1200) by the firmware's powf, c the depth
 // curve's cents (0x894e0ce0, run here too), the exponent formed as the
 // VariPhrase converter forms it (+0xc), Pitch = −63…+63 (XtOsc).

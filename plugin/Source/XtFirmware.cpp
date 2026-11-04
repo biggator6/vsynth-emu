@@ -452,6 +452,26 @@ bool xtFwOscWaveGains(std::vector<float>& out) {
     return true;
 }
 
+bool xtFwMatrixTables(std::vector<uint8_t>& slots, std::vector<int16_t>& sens) {
+    slots.clear(); sens.clear();
+    if (g_rom.empty()) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    slots.resize(79);
+    sens.resize(79 * 127);
+    for (uint32_t d = 0; d < 79; ++d) {
+        uint32_t r0 = 0;
+        if (!c.call(0x894e7d10, { 1, d, 1, kL }, kStack, &r0)) return false;      // its masks in scratch
+        slots[d] = (uint8_t)r0;
+        for (int s = -63; s <= 63; ++s) {
+            if (!c.call(0x894e82e0, { 1, d, (uint32_t)s }, kStack, &r0)) return false;
+            sens[d * 127 + (uint32_t)(s + 63)] = (int16_t)r0;
+        }
+    }
+    return true;
+}
+
 bool xtFwOscPitchRatios(std::vector<float>& out) {
     out.clear();
     if (g_rom.empty()) return false;

@@ -262,6 +262,12 @@ public:
         XtModParams mod;
         // Structure Type (ID 0x293): 0…2, Type1…Type3 on the panel (xtToneOrder).
         int structure = 0;
+        // The Matrix Controls (IDs 0x14d…0x174, xtMatrixSums).
+        XtMatrixControl matrix[8];
+        // The system's controller assigns, a CC number or 0 for OFF: Beam 2 L, R and Beam 3 L, R (IDs 0x89…0x8c,
+        // the part's bytes at +0x180), then what the sources BEAM-L, BEAM-R, PAD-X and -Y, KNOB1, KNOB2 read
+        // (IDs 0x8d, 0x8e, 0x8f, 0x90, 0x93, 0x94).  OFF by default, as the XT's descriptors have them.
+        int assign[10] = {};
         bool operator==(const Controls&) const = default;
     };
 
@@ -284,8 +290,13 @@ public:
     // The bender, 0..16383 (8192 centre): the part's bend (xtPitchBend),
     // in every voice's pitch from the next update on.
     void pitchBend(int value);
-    // A MIDI controller: CC 7, 11 (level) and 10 (pan) reach the sounding voices' TVAs as
-    // any knob does.  The XT reads no other here; the others do nothing.
+    // Channel and poly pressure, 0..127 (C + 2, C + 4 + key): the sources' AFT, and an update as above.
+    void channelPressure(int value);
+    void polyPressure(int key, int value);
+    // A MIDI controller (0x89474bf4, then the handler by number, 0x894d6f10): the channel keeps
+    // numbers below 96, and all but the mode messages then update the sounding voices, as any knob
+    // does.  CC 7, 11 (level), 10 (pan), 64 Hold and 66 Sostenuto (the keys' release, 0x894d58b0),
+    // 121 Reset All Controllers; 120 All Sound Off truncates; 123…127 release every key.
     void controller(int cc, int value);
     // The Time Trip pad, as its two controllers (XtTripPad): x and y 1..127 a finger on it, 0 lifted.
     void timeTrip(int x, int y);
@@ -335,6 +346,14 @@ private:
         float velGain = 1;            // the patch TVA's velocity gain, latched at note-on (0x894ea990)
         XtTvaBlock tb;                // the TVA's block (0x894f50e0, 0x894f5310), the level in it
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
+        // The note's +0x48: bit 0 its key is down, 1 Hold may keep it, 2 Sostenuto may.  It stops
+        // when all three are clear; +0x2f is the release velocity until then.
+        int keyFlags = 7, relHeld = 64;
+        // The note's object M, what matrixUpdate reads and leaves: its velocity and keys, as the note started (a
+        // legato leaves them); the Matrix's sums by slot; the D-Beam's controllers (+0x180…+0x183).
+        int mVel = 64, mKey = 60, mRaw = 60;
+        int16_t mx[kXtMatrixSlots] = {};
+        int beam[4] = {};
         int tempo10 = 1200;            // the tempo at the note's start: the note-value envelope times (input +0x18)
         float blockTempo = 0.0f;       // OSC 1's block +0x60, which the LFOs start from: left as it was with OSC 1 off
         XtEnvelope env;
@@ -378,6 +397,11 @@ private:
     long hostFrames = 0;              // the system clock (ms) the key state reads
     XtPitchRandom pitchRandom;        // the XT's one random pitch generator (from its power-on seed)
     int bender = 8192;
+    int cc[96] = {};                  // the channel's (C + 0x84 + number), as ccDefaults sets them
+    int pressure = 0, polyPress[128] = {};   // its channel and poly pressure (C + 2, C + 4)
+    int hold = 0, sost = 0;           // the part's Hold and Sostenuto (N + 0x11c, + 0x11d)
+    uint16_t sostKeys[8] = {};        // the keys held when Sostenuto went down (N + 0x120)
+    int lastRelease = 0;              // the last note-off's velocity (N + 0xa)
     XtTripPad pad;                    // the part's Time Trip pad
     // The tempo clock, 24 to the quarter (0x89471030 → 0x894d4210 → 0x894f4da0), on the audio's
     // clock here: frames × 24000 against the period × 44100.  It runs with nothing sounding.
@@ -394,7 +418,6 @@ private:
     double hostBpm = 0.0;             // the last it told; 0 before any
     double hostAt = 0.0;              // the first frame of the next block
     int64_t hostDone = 0;             // the last whole clock given
-    int cc7 = 127, cc11 = 127, cc10 = 64;   // the channel's (C + 0x84 + cc): a patch sounds as stored at these
     float chaosSeed = 0x1.666666p-1f; // the global logistic map the LFOs draw their seeds from (0.7 at power-on, 0x894f4c80)
     double hostRate = 44100;
 
@@ -423,6 +446,11 @@ private:
     bool oscPlays(const OscControls& o) const;       // switched on, with something to play
     void targets(const Voice& v, const OscVoice& s, const OscControls& o, float& A, float& F, float& walk, float& g) const;
     float gainTarget(const Voice& v, const OscVoice& s, const OscControls& o, float env) const;   // 0x894f3dc0 / 0x894f3e20
+    XtMatrixInputs matrixInputs(const Voice& v) const;
+    bool matrixUpdate(Voice& v) const;               // the sums, as a conversion pass reads them; true if any moved
+    void matrixRelease(Voice& v) const;              // what a key-off forms
+    void updateAll(Voice& v);                        // every envelope's and LFO's settings, as an update gives them
+    float pitchKnob(const Voice& v, const OscVoice& s, const OscControls& o) const;   // the voice's +0xc
     XtEnvParams ampEnvParams(const Voice& v, const OscControls& o) const;   // the OSC amp envelope
     XtLoop waveLoop(const OscVoice& s, const OscControls& o) const;   // the players' loop
     float noteCents(const Voice& v, const OscVoice& s, const OscControls& o, int key) const;  // voice +8 at a key (+0x68 at the previous one)
@@ -438,20 +466,24 @@ private:
     void legatoNote(int key, int vel);               // the sounding voice takes a note (0x894dc1e0)
     void oscStart(Voice& v, OscVoice& s, const OscControls& o);   // the voice's OSC note-on
     void oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o);   // its envelopes
-    void oscLfoNoteOn(Voice& v, OscVoice& s, const OscControls& o, XtLfoFree& free, const XtLfo* other, float seed);   // its LFO
+    void oscLfoNoteOn(const Voice& v, OscVoice& s, const OscControls& o, XtLfoFree& free, const XtLfo* other, float seed);   // its LFO
     void truncate(Voice& v);
+    void keyRelease(Voice& v, int velocity);         // a key let go (0x894d58b0)
+    void voiceOff(Voice& v);                         // the note's release (0x894dc270)
+    void keysCleared();                              // the mode messages' reset of the key state
+    void ccDefaults();                               // the channel's controllers at power-on (0x89475290)
     void applyRates(OscVoice& s);
     void tvaUpdate(Voice& v);
     XtTvaBlock tvaBlock(const Voice& v) const;       // the converter's block, at the voice's key and latched velocity
     void tvaGains(const Voice& v, float levelEnv, float* lr) const;   // a gain or target, left and right
     void newBlocks(Voice& v);                        // an update's blocks for a sounding voice (0x894dba00)
     void lfoUpdates(Voice& v);                       // and all its LFOs' (0x894f5c70)
-    XtLfoParams tlfoParams() const;                  // LFO 5
+    XtLfoParams tlfoParams(const Voice& v) const;    // LFO 5
     XtEnvParams envParams(const Voice& v) const;
-    XtEnvParams oscEnvParams(const Voice& v, int a, int d, int s, int r) const;   // pitch, time, formant
-    XtLfoParams lfoParams(const OscControls& o) const;
-    XtLfoParams clfoParams(int k) const;             // LFO 3 (COSM 1), LFO 4 (COSM 2)
-    XtEnvParams cosmEnvParams(const Voice& v, const Controls::CosmEnv& e) const;
+    XtEnvParams oscEnvParams(const Voice& v, const OscVoice& s, int which, int a, int d, int su, int r) const;   // 0 pitch, 1 time, 2 formant
+    XtLfoParams lfoParams(const Voice& v, const OscVoice& s, const OscControls& o) const;
+    XtLfoParams clfoParams(const Voice& v, int k) const;   // LFO 3 (COSM 1), LFO 4 (COSM 2)
+    XtEnvParams cosmEnvParams(const Voice& v, int k, const Controls::CosmEnv& e) const;
     XtTvfBlock cosmBlock(const Voice& v, int k) const;
     XtDualBlock dualBlock(const Voice& v, int k) const;
     XtTbBlock tbBlock(const Voice& v, int k) const;
@@ -460,8 +492,8 @@ private:
     XtResBlock resBlock(const Voice& v, int k) const;
     XtFsBlock fsBlock(const Voice& v, int k) const;
     XtLofiBlock lofiBlock(const Voice& v, int k) const;
-    XtCompBlock compBlock(int k) const;
-    XtLimBlock limBlock(int k) const;
+    XtCompBlock compBlock(const Voice& v, int k) const;
+    XtLimBlock limBlock(const Voice& v, int k) const;
     XtWsBlock wsBlock(const Voice& v, int k) const;
     XtOdBlock odBlock(const Voice& v, int k) const;
     XtAmpBlock ampBlock(const Voice& v, int k) const;
