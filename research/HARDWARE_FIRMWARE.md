@@ -1547,6 +1547,66 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The effect captures: the chip's reference (2026-11-03, v116)
+
+**The decision.** The user chose captures from their XT as the reference for the chip's programs, since nothing else runs them (v115). So for those programs, and only those, "done" stops meaning 0 different in a firmware harness. The SH-4 side of the effects still goes by the harness. No plugin code changes here, and no capture exists yet.
+
+**What done means for the chip.** It depends on the path the user can record:
+- Digital or USB, with no clock of its own to fit: sample by sample against the model. The manual gives the digital output as 24-bit and the effects section as 24-bit fixed point, so a digital capture should show all of the chip's result. The aim is 0 different. Anything left over gets stated per take, with its size and cause, as with SOLO's 2%, and no tolerance goes in unexplained. At 16 bits the comparison ends at the 16th bit.
+- Analog: gains, times and responses only, after fitting the clock's drift and the trim (v40: 16 ppm, noise 56 dB down). That can't show word widths or rounding.
+
+**A run drives the XT, so the user doesn't have to.** There are 83 takes, and each would otherwise take a minute at the panel, with mistakes. `fxcapture.py` writes a Standard MIDI File of System Exclusive and notes, and `fxplay.cpp` sends it. The recording is one long file, cut by the take list and the wave's first mark. The steps are in RECORDING_GUIDE.md, "Effects captures".
+
+**The address map.** The XT's manual leaves it out, so the map is the V-Synth manual's (MIDI Implementation), and the XT looks the same in everything I could test without one:
+- Model ID `00 53`, 4-byte address. The XT's own transmit routine `0x8946e480` passes 0x153 to its table at `0x897a0668` (model, address bytes), which writes `00 53` and takes 4. That table also has 0x42, 0x46, 0x6a, 0x110, and 0x124 with 5 bytes, whose use I did not trace. I haven't read the receive path.
+- The parameter IDs run in address order, with every checkable offset agreeing. In a block, address offset = ID − the block's first ID:
+
+| Block | Address | First ID | Checked against the manual |
+|---|---|---|---|
+| System Common | 02 00 00 00 | 0x39 | Master Level 05, Mix/Parallel 07, EQ Switch 37. Output Gain 3D isn't in the V-Synth's map, and comes from this rule alone |
+| Patch Common, temporary, Part 1 | 10 00 00 00 | 0x103 | Octave Shift 0F, the bend ranges 1B, 1C |
+| Patch MFX | 10 00 02 00 | 0x177 | Type 00, Master 01, Sends 02, 03, Parameter 1 at 04 (four nibbles, named on the last) |
+| Patch Chorus | 10 00 04 00 | 0x1fc | Type 00, Master 01, Reverb Send 02, Parameter 1 at 03 |
+| Patch Reverb | 10 00 06 00 | 0x230 | Type 00, Master 01, Parameter 1 at 02 |
+| Zone 1's oscillator block | 10 00 10 00 | 0x293 | TVA Switch 06, the Sends 0D…0F, Output Assign 10, OSC 1 Switch 11, Fine Tune 19, Vari Sw 41, OSC 2 Switch 45 |
+| Zone 1's COSM 1, COSM 2 | 10 00 50 00, 10 00 60 00 | | Switch 00 |
+
+- A type's parameter is a slot of the patch's 32: the second descriptor bank's first field is the slot's last nibble, so slot = (field − 3) / 4, and a value is sent as value + 32768. `0x89481d70` reads it back that way, and swaps anything outside the type's range for the type's default. So stale values from another type can't reach a converter, but the runs send every default anyway.
+- Wave Gain and Output Gain go as 16 ± dB, by the XT's descriptors. The V-Synth's table says 52…76 for Wave Gain beside a 5-bit mask, which can't both be right.
+- `fxcapture.py` asserts the manual's worked example, F0 41 10 00 53 12 10 00 04 00 01 6B F7. A script run over every address in run 1 named it through the XT's own table, and each was the parameter intended.
+
+**Not tried on an XT.** Three things could still fail: the receive path could want something else; a System write might not reach the chip without a page change; the first takes could show a wave that doesn't play at unity (the marks' spacing would show it). `fx_test.mid`, 15 seconds, finds out the first two before anyone waits 8 minutes: MFX Type changes on the screen, and Master Level drops during the sweep, so it can be heard. No XT or audio interface was connected to this Mac when I looked.
+
+**The sender.** `fxplay --test` sends a run to a virtual output as fast as it can, and every byte arrived identical: 425, 4277 and 15653 for the test and the two runs. `--listen` checks the path the user will run, in real time, from a second process: all of run 1 arrived identical and on time to within 5.54 ms, with the plugin building during part of it, and a `--from` near its end to within 3.52 ms. That's plenty, since a take is found from the wave's click, not the clock. SysEx goes at 20 ms, the interval the manual gives for the instrument's own packets, which costs a run a few seconds.
+
+**USB.** The firmware's value lists: USB Mode (ID 0x79, default STORAGE) STORAGE, MIDI, COMPOSITE; USB-MIDI Driver Type (ID 0x7a, default VENDOR) VENDOR, GENERIC. The screen `SYSTEM Com USB Setting` has Storage and MIDI, and I found no screen with the driver type. rom.2's service test is called "USB MIDI/Audio Test", so I expect MIDI mode carries the audio too, on one cable, but that's a guess, and so is whether a current Mac takes the XT in either driver mode. The manual's driver is for Mac OS X 10.2.3. Exclusive Protect (ID 0x74) isn't in the manual; its default is 0.
+
+**The wave.** `fxprobe.wav`: 16.8 s, stereo, 44.1 kHz, 16-bit, with Vari Sw off, so at its Original Pitch (the panel's word for the Original Key) the firmware's linear interpolator (`0x89509870`, "LITE investigation") reads it unchanged, and no encode is involved.
+
+| At | What | For |
+|---|---|---|
+| 0.5 s | a one-sample click, both sides, −6 dBFS | aligning a take to the sample |
+| 2.0, 4.0 s | the same, left only, then right only | impulse responses, and what crosses over |
+| 6.0 s | a log sweep, 20 Hz to 20 kHz, 5 s, −18 dBFS | responses, and distortion products |
+| 12.5 s | 1 kHz, −72 to 0 dBFS in 6 dB steps of 100 ms | level laws: compressors, clipping, low-level rounding |
+| 14.8 s | noise, 1 s, a different sequence each side, −12 dBFS peak | a sample-by-sample test that exercises everything; xorshift32, so it never changes |
+
+**Run 1,** 24 takes, 8 minutes, each aimed at something from v115:
+
+| Takes | Settles |
+|---|---|
+| `silence`, `main`, `main_again` | Noise, the real gain from a wave to the output (Out Gain for TG's −24, the ×4), and whether a take repeats to the sample |
+| `multi_off`, `multi_thru`, `multi_off_m64`, `multi_thru_m64` | That MFX Switch off still goes through Master; Thru's level; the three samples |
+| `master_100`, `gain_plus6`, `gain_minus6` | Where Master Level and Output Gain land, and whether System writes get through |
+| `peq_flat`, `peq_mid_plus15`, `peq_mid_minus15`, `peq_total_plus15` | The model's best case, on real hardware: ±15.00 dB at 800 Hz, the shift code |
+| `sdelay_stereo`, `sdelay_mono`, `mtap` | Taps at the driver's offsets; memory, and both kinds of read; the wrong Chorus read, if it isn't the model's error |
+| `wet_chorus`, `wet_reverb`, `mfx_to_chorus`, `mfx_to_reverb`, `chorus_to_reverb` | Each return alone (Master 0 keeps the dry path out), and that the sends tap before Master |
+| `hot`, `hotter` | Clipping, and what the undecoded output stage does at level |
+
+**Run 2,** 59 takes, 22 minutes: every MFX type at its defaults, then each Reverb and Chorus type wet.
+
+**Not done yet.** Nothing cuts or compares the recordings: that belongs with the chip's first version, or with the first capture if it comes sooner. The LFO types start at an unknown phase, so a comparison will have to find it. DIR isn't captured: the digital outputs carry MAIN only.
+
 ### The effects: a second processor, mapped (2026-11-03, v115)
 
 No effect runs on the SH-4. MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain are microcode on a separate programmable chip. rom.2 loads it over a register bus and feeds it 8 channels of audio by DMA. So an effect type has no DSP routine in the sense a COSM has: an MFX type is a class on the SH-4, which turns parameters into coefficients, plus a 307-word program for the chip. This confirms what the service notes and the spec sheet suggested at the start ("Processors": a "DSP bus / PCM bridge" block, "Effects section: 24 bits (fixed point)").
@@ -1755,7 +1815,7 @@ Those are the parts I trust. It is not finished:
 
 **How a port would be checked.** Two parts, of very different quality:
 - **The SH-4 side:** as well as anything so far, or better. It needn't be ported at all: the user's choice on 2026-10-28 was to run offline firmware in the interpreter and hand-port real-time code, and a converter runs only when a parameter changes. If it is ported, `xt_fx` compares (word, value, shift) streams against the firmware's over random parameters, 0 different, with planted errors, as ever. It only needs the hooks above and `fxmap`'s set-up.
-- **The chip:** there is no reference to run. The project's rule, a port is done when it equals the firmware in a harness, cannot be met for the chip's programs, because only a real XT executes them. What can stand in, in order of strength:
+- **The chip:** there is no reference to run. The project's rule, a port is done when it equals the firmware in a harness, cannot be met for the chip's programs, because only a real XT executes them. (The user chose captures: v116, "The effect captures".) What can stand in, in order of strength:
   1. A capture from the XT. Digital Out at 44.1 kHz (system, Digital Output Freq) may be close to the chip's own output, and could then be compared sample by sample if the converter passes it untouched; an analog capture gives levels, times and responses only. Test signals on a wave, FX on, one type at a time. RECORDING_GUIDE.md has the chain, with effects off so far. This needs the user and the unit.
   2. The firmware's own numbers, as in the table: a gain or a time that the driver computed and the manual states, reached to 0.01 dB or a sample. Exact where it applies, but it says nothing about a chorus's LFO or a reverb's density.
   3. Sanity: Thru is identity, a reverb decays, no type runs away, the same signal twice gives the same result.

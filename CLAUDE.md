@@ -15,6 +15,8 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   (`git push origin <sha>:refs/heads/master`). "Proceed" is not a push.
 - A port is done when it equals the firmware in a harness (0 different), and
   existing behaviour is unchanged unless the change is intended.
+- The effect chip's programs have no firmware to run, so their reference is captures from the user's XT (the user's decision,
+  2026-11-03; HARDWARE_FIRMWARE.md, "The effect captures"). The SH-4 side of the effects still goes by the harness.
 
 ## Where things are
 - `plugin/Source/`: `XtSynth` (the synth: voices, controls, tick), the ports
@@ -77,6 +79,8 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `fxmap.cpp` (not in build.sh; build line at its top): the firmware's effect driver in the interpreter. `table`: per type, program, active words, what
   an update writes, memory operations. `mfx <type> [i v]`: a type's words as fields, and what wrote each. `boot`: what's loaded. Output goes in `build/`.
 - `fxchip.cpp` (the same): a throwaway model of the effect chip, to test the decoding; a sine or impulse into a frame pair, gains at its slots. Not a port.
+- `fxcapture.py`: the effect captures' test wave, MIDI runs and take list, into `analysis/test_files/fx/` (gitignored; the runs hold firmware defaults). `fxplay.cpp`: plays a run
+  through CoreMIDI; `--test` and `--listen` check it on a virtual output. Steps: RECORDING_GUIDE.md, "Effects captures".
 
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
