@@ -72,6 +72,11 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   an instrument.
 - `firorder.py <listing>`: the order of additions in an unrolled sum, by a
   symbolic run of its disassembly (written for the Frequency Shifter's FIR).
+- `sh4dis.py <addr> <n> ...`: a linear SH-4 listing of rom.2, no Ghidra. Ghidra's project won't open under a path holding `.claude`, so
+  `ghidra.sh` fails in a worktree; run `analyzeHeadless` on the main checkout's `firmware/ghidra` instead.
+- `fxmap.cpp` (not in build.sh; build line at its top): the firmware's effect driver in the interpreter. `table`: per type, program, active words, what
+  an update writes, memory operations. `mfx <type> [i v]`: a type's words as fields, and what wrote each. `boot`: what's loaded. Output goes in `build/`.
+- `fxchip.cpp` (the same): a throwaway model of the effect chip, to test the decoding; a sine or impulse into a frame pair, gains at its slots. Not a port.
 
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
@@ -120,6 +125,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - The patch TVA's block (`0x894ea380`, live `0x894eab40`) holds Level, Pan, the sends and CC 7, 11, 10, read from C + 0x84 + cc at each
   conversion pass. Its pan is two things: the law on the output bus's pair, which glides 3% per block, and the LFO's on the gains. A frame
   on the bus is 32 bytes: MAIN, Reverb and Chorus, MULTI, DIR; `xt_tone` reads MULTI's (HARDWARE_FIRMWARE.md, "The patch TVA's level and pan").
+- The effects don't run on the SH-4: MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain are microcode on a separate chip (programs in rom.2,
+  8 channels by DMA), with no reference but a real XT. Only the SH-4's driver and converters run in `Sh4Interp`. Map, the word as far as decoded, and the proposed
+  order: HARDWARE_FIRMWARE.md, "The effects". The tones' `g` (v114) is ID 0x526, Out Gain for TG, default −24; the user's Output Gain is ID 0x76, on the chip.
 - The analog oscillator's map (waveform codes, routines, the converter's
   input, the hidden calibration IDs 0x528…0x55b) is in HARDWARE_FIRMWARE.md,
   "The analog oscillator, and SAW". A patch's waveform number is not the
