@@ -96,6 +96,7 @@ bool xtFwOscTimeKeyScales(std::vector<float>& out);
 // The Wave Gain factors 2^(dB/6) by the firmware's powf, the exponent formed
 // as the VariPhrase converter forms it (0x894e3568), dB = −12…+12.
 bool xtFwOscWaveGains(std::vector<float>& out);
+bool xtFwOscOutGains(std::vector<float>& out);   // the same for Out Gain for TG, 2^(g/6), g −48…+48
 
 // The Matrix's maps: each Dest's slot (0x894e7d10) and each Dest's Sens −63…+63 as stored (0x894e82e0),
 // from the firmware's own routines: 79 and 79 × 127 values.

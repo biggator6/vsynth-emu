@@ -435,15 +435,16 @@ bool xtFwOscTimeKeyScales(std::vector<float>& out) {
     return true;
 }
 
-bool xtFwOscWaveGains(std::vector<float>& out) {
+// 2^(x/6), x from −top to top, by the firmware's powf
+static bool xtFwPowSixths(int top, std::vector<float>& out) {
     out.clear();
     if (g_rom.empty()) return false;
     auto M = std::make_unique<Machine>(g_rom);
     if (!M->ok) return false;
     Sh4& c = M->cpu;
-    out.resize(25);
-    for (int i = 0; i < 25; ++i) {
-        const float two = 2.0f, e = xtf::div(xtf::flt(i - 12), 6.0f);
+    out.resize((size_t)(2 * top + 1));
+    for (int i = 0; i <= 2 * top; ++i) {
+        const float two = 2.0f, e = xtf::div(xtf::flt(i - top), 6.0f);
         std::memcpy(&c.fb[0][4], &two, 4);
         std::memcpy(&c.fb[0][5], &e, 4);
         if (!c.call(0x8952ff9c, {}, kStack)) { out.clear(); return false; }
@@ -451,6 +452,9 @@ bool xtFwOscWaveGains(std::vector<float>& out) {
     }
     return true;
 }
+
+bool xtFwOscWaveGains(std::vector<float>& out) { return xtFwPowSixths(12, out); }
+bool xtFwOscOutGains(std::vector<float>& out) { return xtFwPowSixths(48, out); }
 
 bool xtFwMatrixTables(std::vector<uint8_t>& slots, std::vector<int16_t>& sens) {
     slots.clear(); sens.clear();

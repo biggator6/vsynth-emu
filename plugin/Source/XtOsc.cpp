@@ -36,6 +36,7 @@ struct Tables {
     uint16_t velSens[200];
     uint8_t velCurve[7][128];
     float waveGain[25];                       // xtOscSetWaveGains, −12…+12 dB
+    float outGain[97];                        // xtOscSetOutGains, −48…+48 dB
     float pitchRatio[127];                    // xtOscSetPitchRatios, Pitch −63…+63
     float expP[7], expQ[7];                   // expf's polynomials (0x89531a28)
     uint16_t mxValue[128], mxLimit[kXtMatrixSlots];   // the Matrix: a controller's value, a slot's limit
@@ -43,7 +44,7 @@ struct Tables {
     int16_t mxSens[kXtMatrixSlots * 127];
     uint8_t padAngle[65][65][2];
     uint16_t padSteps[3], padOffset[3];
-    bool keyScales = false, waveGains = false, pitchRatios = false, mxReady = false, ok = false;
+    bool keyScales = false, waveGains = false, outGains = false, pitchRatios = false, mxReady = false, ok = false;
 } T;
 
 template <class V> bool readAt(FILE* f, uint32_t addr, V* v, size_t n) {
@@ -612,6 +613,11 @@ void xtOscSetWaveGains(const float* g) {
     T.waveGains = true;
 }
 
+void xtOscSetOutGains(const float* g) {
+    for (int i = 0; i < 97; ++i) T.outGain[i] = g[i];
+    T.outGains = true;
+}
+
 float xtOscLevel(int level, int kf, int key, float velGain) {
     using namespace xtf;
     return mul(div((float)T.level[levelAtKey(level, kf, key)], 32768.0f), velGain);
@@ -638,8 +644,15 @@ XtTvaBlock xtTvaBlock(const XtTvaKnobs& k, int key, float velGain) {
         panR = frac(T.pan, 64);
     }
     const float s = frac(T.level, cc(k.send));
-    b.sendL = mul(s, panL);
-    b.sendR = mul(s, panR);
+    const int pair = k.assign == 0 ? XtBusMultiL : k.assign == 2 && k.parallel ? XtBusDirL : XtBusMainL;
+    b.bus[XtBusMultiL] = b.bus[XtBusMultiR] = 0.0f;
+    b.bus[pair] = mul(s, panL);
+    b.bus[pair + 1] = mul(s, panR);
+    b.bus[XtBusReverb] = mul(frac(T.level, cc(k.cc91)), frac(T.level, cc(k.reverbSend)));
+    b.bus[XtBusChorus] = mul(frac(T.level, cc(k.cc93)), frac(T.level, cc(k.chorusSend)));
+    const int db = k.outGain > 48 ? 48 : k.outGain < -48 ? -48 : k.outGain;
+    const float g = T.outGains ? T.outGain[db + 48] : (float)std::pow(2.0, (double)div(flt(db), 6.0f));
+    for (float& x : b.bus) x = mul(x, g);
     return b;
 }
 

@@ -54,6 +54,7 @@ bool xtSynthSetRom(const std::string& path) {
     std::vector<float> ts;
     if (g_romReady && xtFwOscTimeKeyScales(ts)) xtOscSetTimeKeyScales(ts.data());
     if (g_romReady && xtFwOscWaveGains(ts)) xtOscSetWaveGains(ts.data());
+    if (g_romReady && xtFwOscOutGains(ts)) xtOscSetOutGains(ts.data());
     if (g_romReady && xtFwOscPitchRatios(ts)) xtOscSetPitchRatios(ts.data());
     if (g_romReady && xtFwCosmKeySquares(ts)) xtCosmSetKeySquares(ts.data());
     std::vector<uint8_t> mxSlots;
@@ -390,9 +391,17 @@ XtTvaBlock XtSynth::tvaBlock(const Voice& v) const {
     using namespace xtmx;
     k.level = ctl.tvaLevel + v.mx[TvaLevel]; k.levelKF = ctl.tvaLevelKF; k.levelLfo = ctl.tvaLevelLfo + v.mx[TvaLfoLevel];
     k.pan = ctl.tvaPan + v.mx[TvaPan]; k.panKF = ctl.tvaPanKF; k.panLfo = ctl.tvaPanLfo + v.mx[TvaLfoPan];
-    k.send = ctl.mfxSend + v.mx[MfxSend];
-    k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];
+    k.send = ctl.mfxSend + v.mx[MfxSend]; k.chorusSend = ctl.chorusSend + v.mx[ChorusSend]; k.reverbSend = ctl.reverbSend + v.mx[ReverbSend];
+    k.assign = ctl.outputAssign; k.parallel = ctl.parallel; k.outGain = ctl.outGainTg;
+    k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10]; k.cc91 = cc[91]; k.cc93 = cc[93];
     return xtTvaBlock(k, v.note, v.velGain);
+}
+
+void XtSynth::tvaNewBlock(Voice& v) const {
+    const float l = v.tb.bus[XtBusDirL], r = v.tb.bus[XtBusDirR];
+    v.tb = tvaBlock(v);
+    v.tb.bus[XtBusDirL] = l;
+    v.tb.bus[XtBusDirR] = r;
 }
 
 // A COSM envelope (ADSR kinds 8..11, curve 2): its times as the other
@@ -662,7 +671,7 @@ void XtSynth::setControls(const Controls& c) {
         const bool moved = anyChanged && matrixUpdate(v);   // a sum moved: each setting as a tone update gives it
         if (anyChanged && ctl.on) v.blockTempo = tempoNow();
         if (envChanged || moved) v.env.update(envParams(v));
-        if (anyChanged) v.tb = tvaBlock(v);            // the velocity as latched
+        if (anyChanged) tvaNewBlock(v);                // the velocity as latched
         auto oscLive = [&](OscVoice& s, const OscControls& o, const OscDiff& d) {
             if (d.penv || moved) s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
             if (d.tenv || moved) s.tenv.update(oscEnvParams(v, s, 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease));
@@ -800,8 +809,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     const float frames = mul(ms, kFramesPerMs);
     v->step[0] = div(sub(v->target[0], v->cur[0]), frames);
     v->step[1] = div(sub(v->target[1], v->cur[1]), frames);
-    v->send[0] = v->tb.sendL;
-    v->send[1] = v->tb.sendR;
+    std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);
     v->elapsed = 0;
     if (v->on) oscEnvNoteOn(*v, *v, ctl);
     if (v->osc2.on) oscEnvNoteOn(*v, v->osc2, ctl.osc2);
@@ -973,7 +981,7 @@ void XtSynth::legatoNote(int key, int vel) {
         v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
         v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
         v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);
-        v.tb = tvaBlock(v);
+        tvaNewBlock(v);
         if (ctl.on) v.blockTempo = tempoNow();
         v.env.update(envParams(v));
         auto oscUpdate = [&](OscVoice& s, const OscControls& o) {
@@ -1166,7 +1174,7 @@ void XtSynth::newBlocks(Voice& v) {
     oscBeat(v, ctl);
     oscBeat(v.osc2, ctl.osc2);
     v.mod.setBlock(modBlk);
-    v.tb = tvaBlock(v);
+    tvaNewBlock(v);
     for (int k = 0; k < 2; ++k)
         if (v.cs[k].on) cosmSetBlock(v, k);
     if (moved) updateAll(v);
@@ -1393,6 +1401,7 @@ void XtSynth::tvaUpdate(Voice& v) {
 
 void XtSynth::mixBlock(float* lr) {
     std::fill(lr, lr + 64, 0.0f);
+    std::fill(std::begin(frame), std::end(frame), 0.0f);
     // The tempo clock, here on the blocks; ahead of the tone update, as one choice of the two
     // tasks' order on the XT.  From outside: the timer's ms in this block first, then its clocks
     if (clockExt) {
@@ -1530,38 +1539,61 @@ void XtSynth::mixBlock(float* lr) {
         std::copy(tmp, tmp + 64, tapCosm);
 #endif
         std::copy(tmp, tmp + 3, mixPast);
+        // A tone nearly always goes on MULTI alone, and a level of 0 adds nothing to the bus.  So the other six only when one of them is in use.
+        const auto otherBuses = [&v] {
+            for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus, XtBusDirL, XtBusDirR }) if (v.bus[b] != 0.0f || v.tb.bus[b] != 0.0f) return true;
+            return false;
+        };
+        const bool others = otherBuses();
+        // One sample on the bus: the channels through the gain as a and b; the sends take their mean.
+        const auto onBus = [&v, others](float* f, float a, float b) {
+            f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(a, v.bus[XtBusMultiL]));
+            f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(b, v.bus[XtBusMultiR]));
+            if (!others) return;
+            f[FrameMainL] = xtf::add(f[FrameMainL], xtf::mul(a, v.bus[XtBusMainL]));
+            f[FrameMainR] = xtf::add(f[FrameMainR], xtf::mul(b, v.bus[XtBusMainR]));
+            f[FrameDirL] = xtf::add(f[FrameDirL], xtf::mul(a, v.bus[XtBusDirL]));
+            f[FrameDirR] = xtf::add(f[FrameDirR], xtf::mul(b, v.bus[XtBusDirR]));
+            const float mean = xtf::mul(xtf::add(a, b), 0.5f);
+            f[FrameReverb] = xtf::add(f[FrameReverb], xtf::mul(mean, v.bus[XtBusReverb]));
+            f[FrameChorus] = xtf::add(f[FrameChorus], xtf::mul(mean, v.bus[XtBusChorus]));
+        };
         if (v.damping) {
-            // truncated (0x894f5570): the gain and the bus's level held, times a fade that
+            // truncated (0x894f5570): the gain and the bus's levels held, times a fade that
             // falls by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16
             for (int i = 0; i < 32; ++i) {
                 v.damp = xtf::sub(v.damp, truncateStep());
                 if (!(v.damp > kSilent)) { v.damp = 0.0f; v.active = false; break; }
-                lr[2 * i] = xtf::add(lr[2 * i], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), v.send[0]));
-                lr[2 * i + 1] = xtf::add(lr[2 * i + 1], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.send[1]));
+                onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));
             }
             continue;
         }
         // TVA render (0x894f5720): for each channel a step that would pass the target
         // within the block is cut to (target − gain)/32.5; gain applied, then stepped.
-        // The output bus takes that at its own level, which moves by a share of the gap as
-        // the block began.
-        float s[2], e[2];
-        const float sendTo[2] = { v.tb.sendL, v.tb.sendR };
+        // The output bus takes that at its own levels, each moving by a share of the gap as
+        // the block began.  DIR's never move: they start at the block's, and that never changes.
+        float s[2], e[XtBusDirL];
         for (int c = 0; c < 2; ++c) {
             const float d = xtf::sub(v.target[c], v.cur[c]);
             s[c] = std::fabs(xtf::mul(v.step[c], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];
-            e[c] = xtf::mul(xtf::sub(sendTo[c], v.send[c]), kSendGlide);
         }
-        for (int i = 0; i < 32; ++i)
-            for (int c = 0; c < 2; ++c) {
-                lr[2 * i + c] = xtf::add(lr[2 * i + c], xtf::mul(xtf::mul(tmp[2 * i + c], v.cur[c]), v.send[c]));
-                v.cur[c] = xtf::add(v.cur[c], s[c]);
-                v.send[c] = xtf::add(v.send[c], e[c]);
-            }
+        for (int b = 0; b < XtBusDirL; ++b) e[b] = xtf::mul(xtf::sub(v.tb.bus[b], v.bus[b]), kSendGlide);
+        for (int i = 0; i < 32; ++i) {
+            onBus(frame + kFrameWords * i, xtf::mul(tmp[2 * i], v.cur[0]), xtf::mul(tmp[2 * i + 1], v.cur[1]));
+            for (int c = 0; c < 2; ++c) v.cur[c] = xtf::add(v.cur[c], s[c]);
+            v.bus[XtBusMultiL] = xtf::add(v.bus[XtBusMultiL], e[XtBusMultiL]);
+            v.bus[XtBusMultiR] = xtf::add(v.bus[XtBusMultiR], e[XtBusMultiR]);
+            if (others)
+                for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);
+        }
         v.elapsed += 32.0f;
     }
-    // the voices are summed in the XT's units, as its output bus does; ±1 here
-    for (int i = 0; i < 64; ++i) lr[i] *= 0x1p-31f;
+    // What the plugin plays, with no effect chip in the sound yet: the pairs that reach the outs, in ±1 here.  MULTI would go through the MFX, and the sends to effects that aren't there.
+    for (int i = 0; i < 32; ++i) {
+        const float* f = frame + kFrameWords * i;
+        lr[2 * i] = (f[FrameMultiL] + f[FrameMainL] + f[FrameDirL]) * 0x1p-31f;
+        lr[2 * i + 1] = (f[FrameMultiR] + f[FrameMainR] + f[FrameDirR]) * 0x1p-31f;
+    }
 }
 
 void XtSynth::render(float* left, float* right, int n) {
@@ -1630,6 +1662,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //     Switch off.
 //   XT_TVA_ON=1: the TVA Switch on (off by default: XT_ADSR then does nothing).
 //   XT_TVA="level,levelKF,levelLfo,pan,panKF,panLfo,send": the patch TVA (KFs in %), MFX Send Level.
+//   XT_BUS="chorus,reverb,assign,parallel,outGain": Chorus and Reverb Send Levels, Output Assign, Output Mode, Out Gain for TG.
 //   XT_LFO5="wave,rate,offset,delay,mode,fade,keysync": LFO 5, on its level and pan.
 //   XT_CC="cc7,cc11,cc10": the controllers before the first note.
 //   XT_CC_AT="frame,number,value[;frame,number,value…]": a controller at a frame (CC 64 Hold, …).
@@ -1776,6 +1809,11 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("XT_TVA_ON")) c.tvaOn = std::atoi(e) != 0;
     if (const char* e = std::getenv("XT_TVA"))
         std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &c.tvaLevel, &c.tvaLevelKF, &c.tvaLevelLfo, &c.tvaPan, &c.tvaPanKF, &c.tvaPanLfo, &c.mfxSend);
+    if (const char* e = std::getenv("XT_BUS")) {
+        int parallel = 1;
+        std::sscanf(e, "%d,%d,%d,%d,%d", &c.chorusSend, &c.reverbSend, &c.outputAssign, &parallel, &c.outGainTg);
+        c.parallel = parallel != 0;
+    }
     if (const char* e = std::getenv("XT_LFO5")) {
         int ks = 0;
         std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &c.tvaLfoWave, &c.tvaLfoRate, &c.tvaLfoOffset, &c.tvaLfoDelay, &c.tvaLfoFadeMode, &c.tvaLfoFade, &ks);

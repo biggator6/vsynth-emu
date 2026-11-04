@@ -274,6 +274,7 @@ bool xtMatrixSums(const XtMatrixControl* controls8, const XtMatrixInputs& in, in
 
 // The firmware's powf(2, dB/6) for Wave Gain −12…+12 dB (xtFwOscWaveGains).
 void xtOscSetWaveGains(const float* gains25);
+void xtOscSetOutGains(const float* g);    // Out Gain for TG, the same: 2^(g/6) by the firmware's powf, g −48…+48
 // One of them, dB within ±12 (std::pow before they are set).
 float xtOscWaveGainFactor(int db);
 
@@ -286,19 +287,22 @@ float xtOscLevelLfoDepth(int d);
 
 // The patch TVA's converter (0x894ea380 at note-on and a legato, 0x894eab40 at an
 // update), its inputs at the XT's ranges (the KFs in steps of 10).  With the Multi Step
-// Modulator at rest, and the system's output gain (0x89d2a6d0 + 0x1600, 2^(x/6)) at 0.
-// Off is the TVA Switch.
+// Modulator at rest.  Off is the TVA Switch.
 // The Matrix's sums go in added to the knobs.
 struct XtTvaKnobs {
     bool on = false;
-    int level = 127, levelKF = 0, levelLfo = 0, pan = 64, panKF = 0, panLfo = 0, send = 127;
-    int cc7 = 127, cc11 = 127, cc10 = 64;
+    int level = 127, levelKF = 0, levelLfo = 0, pan = 64, panKF = 0, panLfo = 0, send = 127, chorusSend = 0, reverbSend = 0;
+    int assign = 0;           // Output Assign: 0 MULTI, 1 MAIN, 2 DIR
+    bool parallel = true;     // the system's Output Mode (0x89d2a6d0 + 0x1604): under Mix, DIR goes on MAIN
+    int outGain = 0;          // Out Gain for TG, dB (0x89d2a6d0 + 0x1600): on all eight of the bus's levels
+    int cc7 = 127, cc11 = 127, cc10 = 64, cc91 = 127, cc93 = 127;
 };
+// The output bus's eight levels, in the order of the block (+0x20 + 4n) and the object (+0x70 + 4n).
+enum XtBus : int { XtBusMainL, XtBusMainR, XtBusMultiL, XtBusMultiR, XtBusReverb, XtBusChorus, XtBusDirL, XtBusDirR, XtBusCount };
 // What it writes, as the TVA object holds it: +0xc the level (with the velocity gain and
-// CC 7 and 11), +8 and +0x1c the LFO's depths on the level and the pan, +0x28 and +0x2c
-// the output bus's left and right (MFX Send Level through the pan law).  Output Assign
-// picks the pair; the Chorus and Reverb sends (+0x34, +0x30) have nowhere to go yet.
-struct XtTvaBlock { float level = 1, lfoDepth = 0, panLfoDepth = 0, sendL = 1, sendR = 1; };
+// CC 7 and 11), +8 and +0x1c the LFO's depths on the level and the pan, and the bus's levels.
+// Output Assign puts MFX Send Level through the pan law on one pair; Reverb is T[CC 91]·T[Reverb Send], Chorus T[CC 93]·T[Chorus Send].
+struct XtTvaBlock { float level = 1, lfoDepth = 0, panLfoDepth = 0; float bus[XtBusCount] = { 0, 0, 1, 1, 0, 0, 0, 0 }; };
 XtTvaBlock xtTvaBlock(const XtTvaKnobs& k, int key, float velGain);
 // The OSC gain (+0x5c): 2^(Wave Gain/6), times the level curve at two
 // further levels (+0x84 / +0x86, set with the wave) taken as full here.

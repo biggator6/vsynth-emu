@@ -142,7 +142,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   not the envelopes' output: `CosmVoice::hold` (v107). So the order of blocks and envelopes in an update has no effect.
 - The patch TVA's block (`0x894ea380`, live `0x894eab40`) holds Level, Pan, the sends and CC 7, 11, 10, read from C + 0x84 + cc at each
   conversion pass. Its pan is two things: the law on the output bus's pair, which glides 3% per block, and the LFO's on the gains. A frame
-  on the bus is 32 bytes: MAIN, Reverb and Chorus, MULTI, DIR; `xt_tone` reads MULTI's (HARDWARE_FIRMWARE.md, "The patch TVA's level and pan").
+  on the bus is 32 bytes: MAIN, Reverb and Chorus, MULTI, DIR, which `XtSynth::frame` holds and `xt_tone` compares word by word. A sounding tone's DIR pair doesn't update (HARDWARE_FIRMWARE.md, "The patch TVA's level and pan", "The whole frame in XtSynth").
 - A controller: the channel keeps numbers below 96 (C + 0x84 + number), then its handler (table built at `0x894d7400`) queues an update of the
   part's notes (`0x894d7760`), for any number, value moved or not. `*K` is N, the part-and-channel state (+0x11c Hold, +0x11d Sostenuto). A note's
   +0x48 is key, Hold, Sostenuto: it stops when all three are clear (HARDWARE_FIRMWARE.md, "Hold, Sostenuto and the mode messages").

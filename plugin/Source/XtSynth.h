@@ -153,6 +153,11 @@ public:
         // Depth; MFX Send Level 0..127, the level to the output bus.  With the Switch off only
         // the MFX Send Level counts.  The XT's defaults
         int tvaLevel = 127, tvaLevelKF = 0, tvaLevelLfo = 0, tvaPan = 64, tvaPanKF = 0, tvaPanLfo = 0, mfxSend = 127;
+        // The other sends and where the tone goes: Chorus and Reverb Send Level 0..127; Output Assign 0 MULTI (through the MFX), 1 MAIN,
+        // 2 DIR.  The system's: Output Mode, true for Parallel, and Out Gain for TG in dB.  The descriptor says −24 for that, with the effect
+        // chip's ×4 after it.  With no chip in the sound yet it stays 0 here, at the level the plugin has always had.
+        int chorusSend = 0, reverbSend = 0, outputAssign = 0, outGainTg = 0;
+        bool parallel = true;
         // LFO 5, the TVA's (IDs 0x3de…0x3e5), as the others.  The XT's defaults
         int tvaLfoWave = 1, tvaLfoRate = 98, tvaLfoOffset = 2, tvaLfoDelay = 0, tvaLfoFadeMode = 0, tvaLfoFade = 0;
         bool tvaLfoKeySync = false;
@@ -376,9 +381,10 @@ private:
         CosmVoice cs[2];
         // The TVA (0x894f5360 / 0x894f5720), left and right: its gain (the level times the
         // envelope, the LFO on the level and the pan), the gain's target and per-sample
-        // step; the output bus's level (+0x78, +0x7c), which goes 3% of the way to the
-        // block's in each block; frames since the last update.
-        float cur[2] = {}, target[2] = {}, step[2] = {}, send[2] = {}, elapsed = 0;
+        // step; frames since the last update.  The output bus's eight levels (+0x70…+0x8c),
+        // each going 3% of the way to the block's in each block.
+        float cur[2] = {}, target[2] = {}, step[2] = {}, elapsed = 0;
+        float bus[XtBusCount] = {};
     };
     std::shared_ptr<const XtEncoded> cur[2], pending[2], retired[2];   // each OSC's wave
     std::mutex swapLock;
@@ -431,6 +437,10 @@ private:
 
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames
+    // The whole output bus of the block just mixed, in the XT's units: 8 words a frame, MAIN L, R, the Reverb and Chorus sends, MULTI L, R, DIR L, R (0x894f5720).
+    static constexpr int kFrameWords = 8;
+    enum FrameWord : int { FrameMainL, FrameMainR, FrameReverb, FrameChorus, FrameMultiL, FrameMultiR, FrameDirL, FrameDirR };
+    float frame[32 * kFrameWords] = {};
     int clockPeriod() const;       // the ms of a quarter (the clock object's +0x14)
     int tempo10Now() const;        // the tempo ×10 the converters read (0x894e2d20)
     float tempoNow() const;        // and as the block has it (+0x60)
@@ -475,6 +485,7 @@ private:
     void applyRates(OscVoice& s);
     void tvaUpdate(Voice& v);
     XtTvaBlock tvaBlock(const Voice& v) const;       // the converter's block, at the voice's key and latched velocity
+    void tvaNewBlock(Voice& v) const;                // a sounding voice's new one (0x894f5310), which leaves DIR's pair as the note began
     void tvaGains(const Voice& v, float levelEnv, float* lr) const;   // a gain or target, left and right
     void newBlocks(Voice& v);                        // an update's blocks for a sounding voice (0x894dba00)
     void lfoUpdates(Voice& v);                       // and all its LFOs' (0x894f5c70)

@@ -1547,6 +1547,50 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The whole frame in XtSynth (2026-11-04, v133)
+
+`XtSynth` now writes all eight words of the output bus at every sample, as the firmware's render does: MAIN, the Reverb and Chorus sends, MULTI and DIR (`XtSynth::frame`). Chorus and Reverb Send Level, Output Assign, Output Mode, Out Gain for TG and CC 91 and 93 are in, with the Matrix's sums on the sends, and `xt_tone` compares all of it. They have no plugin parameters yet, because nothing would be heard: the sends and MULTI's effects are waiting for the chip. At the defaults the renders are unchanged: `ab.sh` 4/4 identical.
+
+**The block** (`0x894ea380` at a note's start and a legato, `0x894eab40` in the conversion pass). With T the level curve and Pn the pan law, as in v114:
+
+| Block | |
+|---|---|
+| +0x20, +0x24 MAIN; +0x28, +0x2c MULTI; +0x38, +0x3c DIR | s·Pn[127 − P], s·Pn[P] on one pair, the other two 0. s = T[MFX Send + its sums]. Output Assign 0 is MULTI, 1 or anything above 2 MAIN, 2 DIR under Parallel and MAIN under Mix |
+| +0x30 | T[CC 91]·T[Reverb Send + its sums] |
+| +0x34 | T[CC 93]·T[Chorus Send + its sums] |
+| All eight | × 2^(g/6), g = Out Gain for TG, by the firmware's powf (`0x8952ff9c`), whose results aren't all the C library's, so they're a table from rom.2 |
+
+The sums are the Multi Step Modulator's (0x42 MFX, 0x43 Chorus, 0x44 Reverb, at rest here) and the Matrix's (slots 0x4b, 0x4c, 0x4d). So the two sends ignore the pan, MFX Send Level, Output Assign and the TVA Switch. They do follow the tone's level, envelope and LFO, because they're taken after the gain.
+
+**The render** (`0x894f5720`), each sample, with FMAC's two roundings. a = L·gain and b = R·gain, then:
+
+| Frame | |
+|---|---|
+| +0, +4 | a·(+0x70), b·(+0x74): MAIN |
+| +0x10, +0x14 | a·(+0x78), b·(+0x7c): MULTI |
+| +0x18, +0x1c | a·(+0x88), b·(+0x8c): DIR |
+| +8, +0xc | ½(a + b)·(+0x80), ½(a + b)·(+0x84): Reverb, Chorus |
+
+Each level then moves by (block − level)·0.0009375, formed once per block, which comes to nothing for DIR's (below). The fade of a truncated tone (`0x894f5570`) holds the levels and takes a and b with the fade on them, the same words otherwise.
+
+**DIR's pair doesn't update.** `0x894f5310` takes every word of a new block but +0x38 and +0x3c, and a legato is the same. Their levels start at those words, so they never move. So on the XT:
+- A tone on DIR keeps the send level and pan it started with until it ends, whatever moves. Only the LFO's pan, which is on the gains, still moves it.
+- Output Assign moved to DIR under a sounding tone silences it: its old pair glides out and DIR's stays at 0.
+- Moved away from DIR, the tone doubles: the new pair rises and DIR's stays.
+
+**What the plugin plays,** with no chip in the sound: MULTI + MAIN + DIR, in ±1. `Controls::outGainTg` stays 0, though the descriptor says −24, because that's the level the plugin has always had. With the chip in, its ×4 and this −24 decide the level, which v115 left open and is still to decide.
+
+**The check.** `xt_tone` compares each of the eight words at every sample, and all eight levels and their targets at every block. It draws the new settings, moves CC 91 and 93 as it does 7, 11, 10 and 1, and sweeps each new field alone. Output Mode and Out Gain go straight into `0x89d2a6d0 + 0x1604` and `+ 0x1600`, as the Truncate Time does, because the harness doesn't run the system updater.
+
+| Run | Checks | Different |
+|---|---|---|
+| In fcheck: 2000 cases, seed 2024 | 26.9 million on the tone | 0 |
+| 3000 cases each, seeds 2024, 1, 31337, 9, 777 | about 36 million each | 0 |
+
+`mutate_tone.py`: 780 planted errors, 0 missed, about 18 minutes with other work running. The first whole run had 782 and missed 2, both code that couldn't matter: stepping DIR's levels, and a case in a test that only saves work. Both are gone.
+
+**What's next.** The chip in the sound: a thread for `XtFxControl`, `frame` into `XtFxChip`, the Matrix's slots 9…0xb to `setMatrix`, parameters and editor, and a decision on the level.
+
 ### XtFxControl: the firmware's driver off the audio thread (2026-11-04, v131)
 
 `plugin/Source/XtFxControl.*` runs the XT's own effect driver from rom.2 in `Sh4Interp`, on whichever thread calls it, and what the driver writes reaches `XtFxChip` through a queue that the audio thread empties between samples. So the mutes, the ramps, the order of a type change and every converter from a parameter to a coefficient are the firmware's. There's no port of them to get wrong. It isn't in the plugin's sound yet: neither file is in `plugin/CMakeLists.txt`, and the sound doesn't change.
@@ -1627,7 +1671,7 @@ The live-edit check leaves those seven parameters out of its edits, and takes bo
 **Not run.** The chip's device test, the input routing beyond what the start does, the sampling section's effect, the tempo from MIDI clock (Patch Tempo through `set` covers a host's), and the kernel settings at 0x2712….
 
 **What's next.**
-- **The frame in XtSynth:** Chorus and Reverb Sends, Output Assign, Out Gain for TG, an exact port against `xt_tone`. The branches it was waiting for are in (v130).
+- **The frame in XtSynth:** done, v133.
 - **Into the sound:** a thread for this class, the chip in the output path, the Matrix's slots 9…0xb to `setMatrix`, parameters and editor.
 - **Captures** against all of it.
 

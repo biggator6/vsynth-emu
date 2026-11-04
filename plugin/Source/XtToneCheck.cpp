@@ -208,6 +208,9 @@ public:
     }
 
     bool updatePatch() {
+        // Out Gain for TG and Output Mode, as the system updater (0x894eb2f0) stores them
+        c.wr8(0x89d2a6d0 + 0x1600, (uint8_t)par.at(0x526));
+        c.wr8(0x89d2a6d0 + 0x1604, (uint8_t)par.at(0x40));
         if (!c.call(0x894dfe10, { 0 }, kSp)) { std::fprintf(stderr, "updaters: %s\n", c.error().c_str()); return false; }
         if (!c.call(0x894e9db0, { 0x89d276b4u }, kSp)) { std::fprintf(stderr, "system assigns: %s\n", c.error().c_str()); return false; }
         // the task's flag 0x40 (0x89471d34): Clock Source and the Patch Tempo to the clock object
@@ -631,6 +634,7 @@ std::unordered_map<int, int> patchOf(const Ctl& c) {
     p[0x293] = c.structure; p[0x294] = c.mod.on; p[0x295] = c.mod.type; p[0x296] = c.mod.level; p[0x297] = c.mod.attack; p[0x298] = c.mod.release;
     p[0x299] = c.tvaOn;
     p[0x29a] = c.tvaLevel; p[0x29b] = c.tvaLevelKF / 10; p[0x29c] = c.tvaLevelLfo; p[0x29d] = c.tvaPan; p[0x29e] = c.tvaPanKF / 10; p[0x29f] = c.tvaPanLfo; p[0x2a0] = c.mfxSend;
+    p[0x2a1] = c.chorusSend; p[0x2a2] = c.reverbSend; p[0x2a3] = c.outputAssign; p[0x526] = c.outGainTg; p[0x40] = c.parallel;
     for (int i = 0; i < 8; ++i) {
         const int b = 0x14d + 5 * i;
         p[b] = c.matrix[i].source; p[b + 1] = c.matrix[i].dest[0]; p[b + 2] = c.matrix[i].sens[0]; p[b + 3] = c.matrix[i].dest[1]; p[b + 4] = c.matrix[i].sens[1];
@@ -769,6 +773,8 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     c.tvaLevel = r.one(3) ? 127 : r.range(0, 127); c.tvaLevelKF = r.one(2) ? 0 : 10 * r.range(-20, 20); c.tvaLevelLfo = r.one(2) ? 0 : r.range(-63, 63);
     c.tvaPan = r.one(3) ? 64 : r.range(0, 127); c.tvaPanKF = r.one(2) ? 0 : 10 * r.range(-20, 20); c.tvaPanLfo = r.one(2) ? 0 : r.range(-63, 63);
     c.mfxSend = r.one(2) ? 127 : r.range(0, 127);
+    c.chorusSend = r.one(2) ? 0 : r.range(0, 127); c.reverbSend = r.one(2) ? 0 : r.range(0, 127);
+    c.outputAssign = r.one(2) ? 0 : r.range(0, 2); c.parallel = !r.one(3); c.outGainTg = r.one(2) ? 0 : r.range(-48, 48);
     c.tvaLfoWave = r.range(0, 7); c.tvaLfoRate = drawRate(r); c.tvaLfoOffset = r.range(0, 4); c.tvaLfoDelay = r.one(2) ? 0 : r.range(0, 60);
     c.tvaLfoFadeMode = r.range(0, 3); c.tvaLfoFade = r.one(2) ? 0 : r.range(0, 60); c.tvaLfoKeySync = !r.one(4);
     // now and then the pan LFO at full depth on a slow square from the note's start, one channel's gain 0 all through, and
@@ -788,9 +794,10 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
 
 // ── Compare ─────────────────────────────────────────────────────────────────
 constexpr size_t kBenderOnly = (size_t)-1;     // in the sweep: the bender moved, no knob
-constexpr size_t kCcOnly = (size_t)-5;         // and these four: CC 7, 11, 10 or 1 moved, no knob
-constexpr int kCcNum[4] = { 7, 11, 10, 1 };
-constexpr size_t kModeOnly = (size_t)-6;       // and an All Notes Off, which is no update
+constexpr int kCcNum[] = { 7, 11, 10, 1, 91, 93 };
+constexpr int kCcCount = (int)(sizeof kCcNum / sizeof *kCcNum);
+constexpr size_t kCcOnly = (size_t)-1 - kCcCount;   // and these: CC 7, 11, 10, 1, 91 or 93 moved, no knob
+constexpr size_t kModeOnly = kCcOnly - 1;      // and an All Notes Off, which is no update
 constexpr size_t kDestOnly = (size_t)-100;     // and these 79: one Dest of the Matrix on CC 2, which moves alone
 constexpr size_t kDestKnob = (size_t)-200;     // and these 79: the same with CC 2 still, and its Sens moved
 constexpr size_t kCosmPrm = (size_t)-300;      // and these 64: each COSM type's PRM1, PRM2, LFO-PRM1, LFO-PRM2 on CC 2, by a COSM in the middle of its knobs
@@ -815,13 +822,15 @@ std::vector<size_t> listedFields() {
     add(c.mod.on);
     for (const int* x : { &c.mod.type, &c.mod.level, &c.mod.attack, &c.mod.release }) add(*x);
     for (const int* x : { &c.tvaLfoWave, &c.tvaLfoRate, &c.tvaLfoOffset, &c.tvaLfoDelay, &c.tvaLfoFadeMode, &c.tvaLfoFade,
-                          &c.tvaLevel, &c.tvaLevelKF, &c.tvaLevelLfo, &c.tvaPan, &c.tvaPanKF, &c.tvaPanLfo, &c.mfxSend }) add(*x);
+                          &c.tvaLevel, &c.tvaLevelKF, &c.tvaLevelLfo, &c.tvaPan, &c.tvaPanKF, &c.tvaPanLfo, &c.mfxSend,
+                          &c.chorusSend, &c.reverbSend, &c.outputAssign, &c.outGainTg }) add(*x);
+    add(c.parallel);
     // the tempo's, which sweepWave gives what a move of them needs
     add(c.patchTempo); add(c.clockSource);
     for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) }) { add(o->tempoSync); add(o->timeTrip); add(o->beatKeep); }
     // a stray or missing update shows only when a COSM's block has moved since its last update, so several goes at those
     for (int rep = 0; rep < 3; ++rep) {
-        for (size_t i = 0; i < 4; ++i) f.push_back(kCcOnly + i);
+        for (size_t i = 0; i < (size_t)kCcCount; ++i) f.push_back(kCcOnly + i);
         f.push_back(kModeOnly);
         f.push_back(kBenderOnly);
     }
@@ -1013,6 +1022,10 @@ int XtToneProbe::run(int argc, char** argv) {
             ctl.aSens = ctl.dSens = ctl.rSens = 20;
             // the TVA's LFO on both its depths, a level and a pan not at their limits
             ctl.tvaLevel = ctl.mfxSend = 100; ctl.tvaPan = 40; ctl.tvaLevelLfo = ctl.tvaPanLfo = 40;
+            // the sends the same, and the tone on MULTI, but for Output Mode, which only a tone going to DIR can show
+            static const Ctl probe;
+            ctl.chorusSend = ctl.reverbSend = 100; ctl.parallel = true; ctl.outGainTg = 0;
+            ctl.outputAssign = sweepAt == (size_t)(reinterpret_cast<const char*>(&probe.parallel) - reinterpret_cast<const char*>(&probe)) ? 2 : 0;
             // and fading in, or in a short delay, so that a move of each of its fields can be seen
             ctl.tvaLfoKeySync = true; ctl.tvaLfoFadeMode = 0; ctl.tvaLfoFade = 60; ctl.tvaLfoDelay = sweepStage >= 2 ? 9 : 0;
             // one Dest alone, and every knob of it away from its limits: what it moves can be seen
@@ -1206,14 +1219,14 @@ int XtToneProbe::run(int argc, char** argv) {
         fw.bender = r.one(3) ? r.range(0, 16383) : 8192;
         syn.pitchBend(fw.bender);
         // the controllers the TVA reads: at rest in most cases, or a sweep's move would be hidden
-        int cc[4] = { 127, 127, 64, 0 };
+        int cc[kCcCount] = { 127, 127, 64, 0, 127, 127 };
         if (!sweep && !twoInTick && r.one(3)) for (int& x : cc) x = r.range(0, 127);
-        XtToneProbe::ccs(syn, cc, kCcNum, 4);
-        for (int i = 0; i < 4; ++i) fw.setCc(kCcNum[i], cc[i]);
+        XtToneProbe::ccs(syn, cc, kCcNum, kCcCount);
+        for (int i = 0; i < kCcCount; ++i) fw.setCc(kCcNum[i], cc[i]);
         // what the Matrix's sources read, at rest in a few cases: the other controllers and the pressures
         const bool srcRest = sweep || twoInTick || r.one(4);
         for (int n = 0; n < 96; ++n) {
-            if (n == 1 || n == 7 || n == 10 || n == 11) continue;
+            if (std::find(std::begin(kCcNum), std::end(kCcNum), n) != std::end(kCcNum)) continue;
             const int x = srcRest ? 0 : r.one(8) ? (r.one(2) ? 127 : 0) : r.range(0, 127);
             XtToneProbe::sources(syn, n, x);
             fw.setCc(n, x);
@@ -1457,7 +1470,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 if (moved && fnote.live && !fnote.ended && !fw.liveUpdate(fnote)) return false;
             if (panelMoved) {                        // the bender and a controller with the knobs, in the one update the firmware's gets
                 XtToneProbe::bend(syn, fw.bender);
-                XtToneProbe::ccs(syn, cc, kCcNum, 4);
+                XtToneProbe::ccs(syn, cc, kCcNum, kCcCount);
                 syn.setControls(ctl);
             } else if (ccMoved) {
                 XtToneProbe::bend(syn, fw.bender);
@@ -1502,6 +1515,7 @@ int XtToneProbe::run(int argc, char** argv) {
             } else {
                 if (number < 0) number = r.range(1, 95);
                 if (number == 64 || number == 66 || number == 7 || number == 10 || number == 11 || number == 1) number = 2;   // those have their own draws
+                for (int i = 0; i < kCcCount; ++i) if (kCcNum[i] == number) cc[i] = x;                                       // CC 91 and 93, whose own a later move would restore
                 fw.setCc(number, x);
                 for (FwNote& n : fn)
                     if (n.live && !n.ended && !fw.liveUpdate(n)) return false;
@@ -1791,19 +1805,40 @@ int XtToneProbe::run(int argc, char** argv) {
                 const uint32_t A = Firmware::tva(*n);
                 const VField tv[] = { { "tva level", 0xc, v.tb.level }, { "tva lfo depth", 8, v.tb.lfoDepth }, { "tva pan lfo depth", 0x1c, v.tb.panLfoDepth },
                                       { "tva gain", 0x68, v.cur[0] }, { "tva gain r", 0x6c, v.cur[1] }, { "tva target", 0x60, v.target[0] }, { "tva target r", 0x64, v.target[1] },
-                                      { "tva step", 0x58, v.step[0] }, { "tva step r", 0x5c, v.step[1] }, { "tva fade", 0x54, v.damping ? v.damp : 1.0f },
-                                      { "tva bus level", 0x78, v.send[0] }, { "tva bus level r", 0x7c, v.send[1] }, { "tva bus target", 0x28, v.tb.sendL }, { "tva bus target r", 0x2c, v.tb.sendR } };
+                                      { "tva step", 0x58, v.step[0] }, { "tva step r", 0x5c, v.step[1] }, { "tva fade", 0x54, v.damping ? v.damp : 1.0f } };
                 for (const VField& f : tv) {
                     if (v.damping && (f.off == 0x60 || f.off == 0x64 || f.off == 0x58 || f.off == 0x5c)) continue;
                     ++rep.checks;
                     const float x = fw.f32(A + f.off);
                     if (!bits(x, f.v)) rep.bad(f.name, "fw %.9g port %.9g", x, f.v, blk);
                 }
+                // The output bus's eight levels, and the block's that they move toward
+                static const char* const kBusName[XtBusCount] = { "main l", "main r", "multi l", "multi r", "reverb", "chorus", "dir l", "dir r" };
+                for (int b = 0; b < XtBusCount; ++b) {
+                    char name[32];
+                    rep.checks += 2;
+                    const float lev = fw.f32(A + 0x70 + 4 * (uint32_t)b), to = fw.f32(A + 0x20 + 4 * (uint32_t)b);
+                    std::snprintf(name, sizeof name, "tva bus level %s", kBusName[b]);
+                    if (!bits(lev, v.bus[b])) rep.bad(name, "fw %.9g port %.9g", lev, v.bus[b], blk);
+                    std::snprintf(name, sizeof name, "tva bus target %s", kBusName[b]);
+                    if (!bits(to, v.tb.bus[b])) rep.bad(name, "fw %.9g port %.9g", to, v.tb.bus[b], blk);
+                }
             }
-            ++rep.checks;
+            // The whole frame, each word of each sample; what the plugin plays, the pairs that reach the outs
+            static const char* const kWordName[XtSynth::kFrameWords] = { "output main l", "output main r", "output reverb", "output chorus", "output multi l", "output multi r", "output dir l", "output dir r" };
+            for (int w = 0; w < XtSynth::kFrameWords; ++w) {
+                ++rep.checks;
+                for (int i = 0; i < 32; ++i) {
+                    const float a = fw.f32(kBuf + 0x20 * (uint32_t)i + 4 * (uint32_t)w), b = syn.frame[XtSynth::kFrameWords * i + w];
+                    if (!bits(a, b)) { rep.bad(kWordName[w], "fw %.9g port %.9g", a, b, blk); break; }
+                }
+            }
+            rep.checks += 2;
             for (int i = 0; i < 32; ++i) {
-                const float a = fw.f32(kBuf + 0x20 * (uint32_t)i + 0x10) * 0x1p-31f, a2 = fw.f32(kBuf + 0x20 * (uint32_t)i + 0x14) * 0x1p-31f;
-                if (!bits(a * 0x1p31f, L[i] * 0x1p31f) || !bits(a2 * 0x1p31f, R[i] * 0x1p31f)) { rep.bad("output", "fw %.9g port %.9g", a, L[i], blk); break; }
+                const auto word = [&](XtSynth::FrameWord w) { return fw.f32(kBuf + 0x20 * (uint32_t)i + 4 * (uint32_t)w); };
+                const float a = (word(XtSynth::FrameMultiL) + word(XtSynth::FrameMainL) + word(XtSynth::FrameDirL)) * 0x1p-31f;
+                const float a2 = (word(XtSynth::FrameMultiR) + word(XtSynth::FrameMainR) + word(XtSynth::FrameDirR)) * 0x1p-31f;
+                if (!bits(a, L[i]) || !bits(a2, R[i])) { rep.bad("output", "fw %.9g port %.9g", a, L[i], blk); break; }
             }
         }
         if (syn.pad.on()) {                          // the pad up again for the next case

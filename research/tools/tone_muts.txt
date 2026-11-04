@@ -100,7 +100,7 @@ mod-order|v.mod.process(tmp, tmp, tmp2);|v.mod.process(tmp, tmp2, tmp);
 bend-block|    bender = b;\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|    bender = b;
 mod-any|        if (anyChanged) v.mod.setBlock(modBlk);|        if (modChanged) v.mod.setBlock(modBlk);
 mod-legato|        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);|        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);
-legato-order|        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.tb = tvaBlock(v);\n        if (ctl.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, s, 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        oscBeat(v, ctl);\n        oscBeat(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update\n|        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmSetBlock(v, k);\n        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.tb = tvaBlock(v);\n        if (ctl.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, s, 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        oscBeat(v, ctl);\n        oscBeat(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n
+legato-order|        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        tvaNewBlock(v);\n        if (ctl.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, s, 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        oscBeat(v, ctl);\n        oscBeat(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update\n|        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmSetBlock(v, k);\n        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        tvaNewBlock(v);\n        if (ctl.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, s, 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        oscBeat(v, ctl);\n        oscBeat(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n
 sync-input|v.ana.process(tmp, sync, tmp2);|v.ana.process(tmp, 0, tmp2);
 sync-mask|            v.mod.setMask(mask2);|
 sync-la|if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;|
@@ -110,8 +110,8 @@ tva-off-times|        for (float& t : p.time) t = 0.0f;\n|
 tva-off-level|        p.level[3] = 1.0f;\n|
 tva-diff|const bool tvaChanged = c.tvaOn != ctl.tvaOn;|const bool tvaChanged = false;
 tva-off-gain|k.on = ctl.tvaOn;|k.on = true;
-tva-legato-gain|        v.tb = tvaBlock(v);\n        if (ctl.on) v.blockTempo = tempoNow();\n        v.env.update|        if (ctl.on) v.blockTempo = tempoNow();\n        v.env.update
-tva-live-gain|        if (anyChanged) v.tb = tvaBlock(v);            // the velocity as latched\n|
+tva-legato-gain|        tvaNewBlock(v);\n        if (ctl.on) v.blockTempo = tempoNow();\n        v.env.update|        if (ctl.on) v.blockTempo = tempoNow();\n        v.env.update
+tva-live-gain|        if (anyChanged) tvaNewBlock(v);                // the velocity as latched\n|
 tva-latch|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.note, xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve));
 osc2-render|else pcmBlock(v.osc2, tmp2);|else std::fill(tmp2, tmp2 + 64, 0.0f);
 osc2-plays|return waveOf(o) != nullptr;|return cur[0] != nullptr;
@@ -165,16 +165,16 @@ tvab-c11|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc7 = cc[7]; k.cc10 
 tvab-c10|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc7 = cc[7]; k.cc11 = cc[11];
 tvab-cc-map|k.cc7 = cc[7]; k.cc11 = cc[11];|k.cc7 = cc[11]; k.cc11 = cc[7];
 tvab-cc-update|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\nvoid XtSynth::newBlocks|}\n\nvoid XtSynth::newBlocks
-tvab-new|    v.mod.setBlock(modBlk);\n    v.tb = tvaBlock(v);\n|    v.mod.setBlock(modBlk);\n
-tvab-bus-start|    v->send[0] = v->tb.sendL;|    v->send[0] = 1.0f;
-tvab-bus-start-r|    v->send[1] = v->tb.sendR;|    v->send[1] = v->tb.sendL;
+tvab-new|    v.mod.setBlock(modBlk);\n    tvaNewBlock(v);\n|    v.mod.setBlock(modBlk);\n
+tvab-bus-start|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus); v->bus[XtBusMultiL] = 1.0f;
+tvab-bus-start-r|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus); v->bus[XtBusMultiR] = v->tb.bus[XtBusMultiL];
 tvab-bus-glide|constexpr float kSendGlide = 0x1.eb851ep-11f;|constexpr float kSendGlide = 0x1.eb8520p-11f;
-tvab-bus-still|e[c] = xtf::mul(xtf::sub(sendTo[c], v.send[c]), kSendGlide);|e[c] = 0.0f;
-tvab-bus-render|xtf::mul(xtf::mul(tmp[2 * i + c], v.cur[c]), v.send[c])|xtf::mul(xtf::mul(tmp[2 * i + c], v.send[c]), v.cur[c])
-tvab-bus-step|v.send[c] = xtf::add(v.send[c], e[c]);|
-tvab-trunc-bus|xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), v.send[0])|xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp)
-tvab-trunc-bus-r|xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.send[1])|xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp)
-tvab-trunc-order|xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), v.send[0])|xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.send[0]), v.damp)
+tvab-bus-still|e[b] = xtf::mul(xtf::sub(v.tb.bus[b], v.bus[b]), kSendGlide);|e[b] = 0.0f;
+tvab-bus-render|f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(a, v.bus[XtBusMultiL]));|f[FrameMultiL] = (float)((double)a * v.bus[XtBusMultiL] + f[FrameMultiL]);
+tvab-bus-step|            v.bus[XtBusMultiL] = xtf::add(v.bus[XtBusMultiL], e[XtBusMultiL]);\n|
+tvab-trunc-bus|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|{ float* f = frame + kFrameWords * i; f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp)); f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.bus[XtBusMultiR])); }
+tvab-trunc-bus-r|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|{ float* f = frame + kFrameWords * i; f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), v.bus[XtBusMultiL])); f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp)); }
+tvab-trunc-order|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|{ float* f = frame + kFrameWords * i; f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.bus[XtBusMultiL]), v.damp)); f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.bus[XtBusMultiR])); }
 tvag-lfo|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv)|const float x = levelEnv
 tvag-pan|p = mul(v.tlfo.out(), v.tb.panLfoDepth);|p = 0.0f;
 tvag-r|lr[1] = std::clamp(mul(x, add(p, 1.0f)), -1.0f, 1.0f);|lr[1] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);
@@ -412,7 +412,7 @@ chase-end|                    s.chase = false;\n                }|              
 chase-start|    s.chase = false;                                                                                  // +0x9b0 (0x894f21e6)\n|
 pad-update|    if (pad.on() != was)\n        for (Voice& v : voice)\n            if (v.active) newBlocks(v);\n|
 beat-live|        if (anyChanged) { oscBeat(v, ctl); oscBeat(v.osc2, ctl.osc2); }\n|
-beat-blocks|    oscBeat(v, ctl);\n    oscBeat(v.osc2, ctl.osc2);\n    v.mod.setBlock(modBlk);\n    v.tb = tvaBlock(v);|    v.mod.setBlock(modBlk);\n    v.tb = tvaBlock(v);
+beat-blocks|    oscBeat(v, ctl);\n    oscBeat(v.osc2, ctl.osc2);\n    v.mod.setBlock(modBlk);\n    tvaNewBlock(v);|    v.mod.setBlock(modBlk);\n    tvaNewBlock(v);
 env-latch|    v->tempo10 = tempo10Now();\n|
 env-amp|xtmx::Osc2Env) + 9;\n    k.tempo10 = v.tempo10;\n|xtmx::Osc2Env) + 9;\n
 env-cosm|xtmx::CosmEnv2);\n    k.tempo10 = v.tempo10;\n|xtmx::CosmEnv2);\n
@@ -731,3 +731,50 @@ follow-source|ctl.clockSource != 0 && hostBpm > 0.0|hostBpm > 0.0
 follow-tempo|ctl.clockSource != 0 && hostBpm > 0.0|ctl.clockSource != 0
 follow-start|    hostDone = (int64_t)std::ceil(hostAt) - 1;\n}|}
 follow-back|    if (ext == clockExt) return;\n    clockExt = ext;\n    if (!ext) return;|    if (!ext) return;\n    clockExt = ext;
+frame-mean|xtf::mul(xtf::add(a, b), 0.5f)|xtf::mul(xtf::add(a, a), 0.5f)
+frame-half|xtf::mul(xtf::add(a, b), 0.5f)|xtf::add(a, b)
+frame-reverb|f[FrameReverb] = xtf::add(f[FrameReverb], xtf::mul(mean, v.bus[XtBusReverb]));|f[FrameReverb] = xtf::add(f[FrameReverb], xtf::mul(mean, v.bus[XtBusChorus]));
+frame-chorus|f[FrameChorus] = xtf::add(f[FrameChorus], xtf::mul(mean, v.bus[XtBusChorus]));|f[FrameChorus] = xtf::add(f[FrameChorus], xtf::mul(mean, v.bus[XtBusReverb]));
+frame-main-l|xtf::mul(a, v.bus[XtBusMainL])|xtf::mul(b, v.bus[XtBusMainL])
+frame-main-r|xtf::mul(b, v.bus[XtBusMainR])|xtf::mul(a, v.bus[XtBusMainR])
+frame-dir-l|xtf::mul(a, v.bus[XtBusDirL])|xtf::mul(a, v.bus[XtBusMainL])
+frame-dir-r|xtf::mul(b, v.bus[XtBusDirR])|xtf::mul(b, v.bus[XtBusMainR])
+bus-step-main|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|for (const int b : { XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);
+bus-step-reverb|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|for (const int b : { XtBusMainL, XtBusMainR, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);
+bus-step-chorus|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb }) v.bus[b] = xtf::add(v.bus[b], e[b]);
+others-target|if (v.bus[b] != 0.0f \|\| v.tb.bus[b] != 0.0f) return true;|if (v.bus[b] != 0.0f) return true;
+others-level|if (v.bus[b] != 0.0f \|\| v.tb.bus[b] != 0.0f) return true;|if (v.tb.bus[b] != 0.0f) return true;
+others-list|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus, XtBusDirL, XtBusDirR }) if (v.bus[b]|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus, XtBusDirL }) if (v.bus[b]
+damp-fade-l|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp),|onBus(frame + kFrameWords * i, xtf::mul(tmp[2 * i], v.cur[0]),
+damp-fade-r|xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|xtf::mul(tmp[2 * i + 1], v.cur[1]));
+dir-updates-l|    v.tb.bus[XtBusDirL] = l;\n|
+dir-updates-r|    v.tb.bus[XtBusDirR] = r;\n|
+dir-live|if (anyChanged) tvaNewBlock(v); |if (anyChanged) v.tb = tvaBlock(v);
+dir-legato|        tvaNewBlock(v);\n        if (ctl.on) v.blockTempo = tempoNow();|        v.tb = tvaBlock(v);\n        if (ctl.on) v.blockTempo = tempoNow();
+dir-blocks|    v.mod.setBlock(modBlk);\n    tvaNewBlock(v);|    v.mod.setBlock(modBlk);\n    v.tb = tvaBlock(v);
+noteon-levels|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::begin(v->tb.bus) + 6, v->bus);
+knob-chorus-sum|k.chorusSend = ctl.chorusSend + v.mx[ChorusSend];|k.chorusSend = ctl.chorusSend;
+knob-reverb-sum|k.reverbSend = ctl.reverbSend + v.mx[ReverbSend];|k.reverbSend = ctl.reverbSend;
+knob-sends-crossed|k.chorusSend = ctl.chorusSend + v.mx[ChorusSend]; k.reverbSend = ctl.reverbSend + v.mx[ReverbSend];|k.chorusSend = ctl.reverbSend + v.mx[ChorusSend]; k.reverbSend = ctl.chorusSend + v.mx[ReverbSend];
+knob-sums-crossed|k.chorusSend = ctl.chorusSend + v.mx[ChorusSend]; k.reverbSend = ctl.reverbSend + v.mx[ReverbSend];|k.chorusSend = ctl.chorusSend + v.mx[ReverbSend]; k.reverbSend = ctl.reverbSend + v.mx[ChorusSend];
+knob-assign|k.assign = ctl.outputAssign;|k.assign = 0;
+knob-parallel|k.parallel = ctl.parallel;|k.parallel = true;
+knob-gain|k.outGain = ctl.outGainTg;|k.outGain = 0;
+knob-cc-crossed|k.cc91 = cc[91]; k.cc93 = cc[93];|k.cc91 = cc[93]; k.cc93 = cc[91];
+knob-cc91|k.cc91 = cc[91];|k.cc91 = 127;
+knob-cc93|k.cc93 = cc[93];|k.cc93 = 127;
+plays-no-main|(f[FrameMultiL] + f[FrameMainL] + f[FrameDirL])|(f[FrameMultiL] + f[FrameDirL])
+plays-no-dir|(f[FrameMultiR] + f[FrameMainR] + f[FrameDirR])|(f[FrameMultiR] + f[FrameMainR])
+block-pair-mix|k.assign == 2 && k.parallel ? XtBusDirL : XtBusMainL|k.assign == 2 ? XtBusDirL : XtBusMainL|toneosc
+block-pair-main|k.assign == 0 ? XtBusMultiL :|k.assign <= 1 ? XtBusMultiL :|toneosc
+block-pair-parallel|k.assign == 2 && k.parallel ?|k.assign == 2 && !k.parallel ?|toneosc
+block-multi-left|    b.bus[XtBusMultiL] = b.bus[XtBusMultiR] = 0.0f;\n||toneosc
+block-pan-crossed|b.bus[pair] = mul(s, panL);|b.bus[pair] = mul(s, panR);|toneosc
+block-reverb-cc|mul(frac(T.level, cc(k.cc91)), frac(T.level, cc(k.reverbSend)))|mul(frac(T.level, cc(k.cc93)), frac(T.level, cc(k.reverbSend)))|toneosc
+block-chorus-cc|mul(frac(T.level, cc(k.cc93)), frac(T.level, cc(k.chorusSend)))|mul(frac(T.level, cc(k.cc91)), frac(T.level, cc(k.chorusSend)))|toneosc
+block-reverb-limit|frac(T.level, cc(k.reverbSend))|frac(T.level, cc(k.reverbSend > 126 ? 126 : k.reverbSend))|toneosc
+block-chorus-limit|frac(T.level, cc(k.chorusSend))|frac(T.level, cc(k.chorusSend < 1 ? 1 : k.chorusSend))|toneosc
+block-gain-six|for (float& x : b.bus) x = mul(x, g);|for (int n = 0; n < 6; ++n) b.bus[n] = mul(b.bus[n], g);|toneosc
+block-gain-none|for (float& x : b.bus) x = mul(x, g);||toneosc
+block-gain-sign|T.outGain[db + 48]|T.outGain[48 - db]|toneosc
+block-gain-pow|T.outGains ? T.outGain[db + 48] : (float)std::pow(2.0, (double)div(flt(db), 6.0f))|(float)std::pow(2.0, (double)div(flt(db), 6.0f))|toneosc
