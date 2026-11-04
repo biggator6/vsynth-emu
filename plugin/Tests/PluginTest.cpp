@@ -484,6 +484,17 @@ int main(int argc, char** argv) {
         setKnobs({ { "tvaLevel", refCtl.tvaLevel }, { "tvaLevelKF", refCtl.tvaLevelKF }, { "tvaLevelLfo", refCtl.tvaLevelLfo }, { "tvaPan", refCtl.tvaPan },
                    { "tvaPanKF", refCtl.tvaPanKF }, { "tvaPanLfo", refCtl.tvaPanLfo }, { "mfxSend", refCtl.mfxSend } });
     }
+    // TEST_MATRIX="source,dest1,sens1,dest2,sens2": Matrix Control 1 (with TEST_CC to move its source)
+    if (const char* e = std::getenv("TEST_MATRIX")) {
+        XtMatrixControl& x = refCtl.matrix[0];
+        std::sscanf(e, "%d,%d,%d,%d,%d", &x.source, &x.dest[0], &x.sens[0], &x.dest[1], &x.sens[1]);
+        setKnobs({ { "matrix1Source", x.source }, { "matrix1Dest1", x.dest[0] }, { "matrix1Sens1", x.sens[0] }, { "matrix1Dest2", x.dest[1] }, { "matrix1Sens2", x.sens[1] } });
+    }
+    // TEST_ASSIGN="padX": PAD-X's controller, a CC number
+    if (const char* e = std::getenv("TEST_ASSIGN")) {
+        refCtl.assign[6] = std::atoi(e);
+        setKnobs({ { "assignPadX", refCtl.assign[6] } });
+    }
     // TEST_LFO5="wave,rate,offset,delay,mode,fade,keysync": LFO 5
     if (const char* e = std::getenv("TEST_LFO5")) {
         int ks = 0;

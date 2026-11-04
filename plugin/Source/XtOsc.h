@@ -6,9 +6,9 @@
 // their LFO depths).  The voice update (0x894f3c90 walk, 0x894f3d40
 // formant) adds the envelopes and the LFO to these every 10 ms.
 //
-// Each knob arrives as knob + matrix modulation (0x894d96d0).  The
-// realtime-controller terms the firmware also adds (0x894e7010/0x894e7320
-// and the part bytes at +0x180) are 0 here: no controller is assigned.
+// Each knob arrives as knob + the Multi Step Modulator's term (0x894d96d0), 0 here.
+// The Matrix's sums (0x894e7010…, xtMatrixSums below) go in where the firmware adds
+// them, and the D-Beam's controllers (the part's bytes at +0x180) likewise.
 // Tables are read from the user's rom.2 at run time.
 
 #include <cstdint>
@@ -33,7 +33,8 @@ float xtOscEnergy(int k);
 //   offset Time Offset: 0 BWD, 1 ZERO, 2 FWD (base speed −1, 0, +1)
 //   kf     Time KF, % per octave (−200…+200)
 // |t| ≤ 60 gives t/20 + base; 60…63 run on to ±5.  Times 2^(kf·(key−60)/1200).
-float xtOscTime(int t, int offset, int kf, int key);
+// ctrl: the Matrix's sum, Time + ctrl·63/12000.  beam: b1 − 3·b0, the part's bytes at +0x180.
+float xtOscTime(int t, int offset, int kf, int key, int ctrl = 0, int beam = 0);
 
 // The time envelope and LFO depths (+0x24, +0x3c): d/20, then to ±5 at ±63.
 // The envelope's depth is used as is; the LFO's is clamped to ±63 first.
@@ -42,7 +43,8 @@ float xtOscTimeLfoDepth(int d);
 
 // Formant (+0x14), in octaves, ±1: f/63 (f clamped to ±63 through its
 // 12000-unit scale) plus kf·(key − 60)/1200 (Formant KF, % per octave).
-float xtOscFormant(int f, int kf, int key);
+// ctrl: the Matrix's sum, in the 12000-unit scale.
+float xtOscFormant(int f, int kf, int key, int ctrl = 0);
 
 // The formant envelope and LFO depths (+0x2c, +0x44), octaves: d/63 (the
 // LFO's clamped to ±63 first).
@@ -73,7 +75,10 @@ float xtPitchCents(int key, int coarse, int kf, int fine, int origKey, bool robo
 // The Pitch knob (+0xc): 2^(c/1200), c the depth curve's cents (0x894e0ce0)
 // at the knob (−63…+63, + modulation, clamped).  The firmware's powf once
 // xtOscSetPitchRatios has its 127 values (xtFwOscPitchRatios), else std::pow.
-float xtPitchRatio(int pitch);
+// ctrl: the Matrix's sum, Pitch + ctrl·63/12000.  beam: 2·b183 − b182, as /127 octaves.
+float xtPitchRatio(int pitch, int ctrl = 0, int beam = 0);
+// The firmware's powf(2, y) (0x8952ff9c): expf(y·logf 2), 1 at y = 0.
+float xtOscPow2(float y);
 void xtOscSetPitchRatios(const float* ratios127);
 // The player's pitch ratio (0x894f3a00 at note-on, 0x894f3ba0 in the
 // update): the cents plus the pitch envelope's and the LFO's (their depths
@@ -190,6 +195,53 @@ int xtVelCurveValue(int velocity, int sens, int curve);
 // gain, from the patch's Velocity Sens (−63…+63) and Curve (0…7).
 float xtVelGain(int velocity, int patchSens, int patchCurve);
 
+// ── The Matrix ──────────────────────────────────────────────────────────
+// Eight Matrix Controls (IDs 0x14d…0x174), each a Source and two Dest/Sens pairs.  Source as the
+// patch has it: 0 OFF, 1…95 a controller (32 is off), 96 BEND, 97 AFT, 98 +PAD-X, 99 +PAD-Y, 100 PAD-X,
+// 101 PAD-Y, 102 TRIP-R, 103 BEAM-L, 104 BEAM-R, 105 KNOB1, 106 KNOB2, 107 VELO, 108 KEYF.  Dest 0…78
+// in the panel's order; Sens −63…+63.  The patch's table is built by 0x894e9330.
+struct XtMatrixControl {
+    int source = 0;
+    int dest[2] = { 0, 0 }, sens[2] = { 0, 0 };
+    bool operator==(const XtMatrixControl&) const = default;
+};
+// The slots a sum is kept in on the note's object, M + 0xca + 2·(slot − 1) (0x894e7010…0x894e7860).
+// A Dest's slot is the firmware's own map (0x894e7d10), not the Dest.
+constexpr int kXtMatrixSlots = 0x4f;
+namespace xtmx {
+enum Slot : int {
+    OscPitch = 1, OscTime = 2, OscFormant = 3, OscLevel = 4,          // OSC 1; OSC 2's from Osc2 on
+    Osc2 = 4,
+    MfxPrm = 9,                                                       // three, for the effects
+    OscEnv = 0xc,                                                     // OSC 1: Pitch, Time, Formant, Amp, each Attack, Decay, Release
+    OscLfoRate = 0x18, OscLfoPitch = 0x19, OscLfoTime = 0x1a, OscLfoFormant = 0x1b, OscLfoLevel = 0x1c,
+    Osc2Env = 0x1d, Osc2Lfo = 0x29,                                   // OSC 2: the same two groups
+    Cosm = 0x2e,                                                      // COSM 1: below, from here; COSM 2 from Cosm2
+    Cosm2 = 0x39,
+    CosmPrm1 = 0, CosmPrm2 = 1, CosmEnv1 = 2, CosmEnv2 = 5, CosmLfoRate = 8, CosmLfoPrm1 = 9, CosmLfoPrm2 = 10,
+    TvaEnv = 0x44, TvaLfoRate = 0x47, TvaLfoLevel = 0x48, TvaLfoPan = 0x49, TvaLevel = 0x4a, MfxSend = 0x4b, ChorusSend = 0x4c, ReverbSend = 0x4d, TvaPan = 0x4e,
+};
+}
+// What the sources read.  cc: the channel's controllers below 96.  poly: its poly pressure by key.
+// key and polyKey: the note's as it started (M + 1, M + 2), velocity likewise (M + 0).  assign: the
+// system's CC numbers for BEAM-L, BEAM-R, PAD-X, PAD-Y, KNOB1, KNOB2 (0 or 32: none); pad: the Time
+// Trip pad's +0x24, which rests at 127 and with it TRIP-R at 0.
+struct XtMatrixInputs {
+    int bender = 8192, pressure = 0;
+    const int* cc = nullptr;
+    const int* poly = nullptr;
+    int velocity = 64, key = 60, polyKey = 60;
+    int assign[6] = {};
+    int pad = 127;
+};
+// The firmware's maps for 79 Dests (0x894e7d10) and 79 × 127 Sens values (0x894e82e0): xtFwMatrixTables.
+void xtOscSetMatrixTables(const uint8_t* slots79, const int16_t* sens79x127);
+// A source's value (0x894e6940's routines), −8192…+8192.
+int xtMatrixValue(int source, const XtMatrixInputs& in);
+// Every slot's sum: each pair's term (value·sens) >> 13 within the slot's limit (0x894e6ea0), the terms
+// summed and limited again (0x894e6fc0).  True if anything is not 0.
+bool xtMatrixSums(const XtMatrixControl* controls8, const XtMatrixInputs& in, int16_t* slots79);
+
 // The firmware's powf(2, dB/6) for Wave Gain −12…+12 dB (xtFwOscWaveGains).
 void xtOscSetWaveGains(const float* gains25);
 // One of them, dB within ±12 (std::pow before they are set).
@@ -206,6 +258,7 @@ float xtOscLevelLfoDepth(int d);
 // update), its inputs at the XT's ranges (the KFs in steps of 10).  With the matrix
 // and the controller assigns at rest, and the system's output gain (0x89d2a6d0 + 0x1600,
 // 2^(x/6)) at 0.  Off is the TVA Switch.
+// The Matrix's sums go in added to the knobs.
 struct XtTvaKnobs {
     bool on = false;
     int level = 127, levelKF = 0, levelLfo = 0, pan = 64, panKF = 0, panLfo = 0, send = 127;

@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include <array>
 #include "PluginEditor.h"
 
 // ─── Parameter IDs ───────────────────────────────────────────────────────────
@@ -521,6 +522,18 @@ VSynthEmuProcessor::createParameterLayout() {
         juce::StringArray { "ON <<", "ON >>", "OFF <<", "OFF >>" }, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoFade, "LFO 5 Fade", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTvaLfoSync, "LFO 5 Key Sync", false));
+    // The Matrix Controls (IDs 0x14d…0x174), all off as on the XT, and the system's controller assigns
+    for (int m = 0; m < 8; ++m) {
+        const juce::String n = "Matrix " + juce::String(m + 1) + " ";
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(matrixParamId(m, "Source"), n + "Source", matrixSourceNames(), 0));
+        for (int j = 1; j <= 2; ++j) {
+            const juce::String sj(j);
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(matrixParamId(m, ("Dest" + sj).toRawUTF8()), n + "Dest " + sj, matrixDestNames(), 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(matrixParamId(m, ("Sens" + sj).toRawUTF8()), n + "Sens " + sj, -63, 63, 0));
+        }
+    }
+    for (int i = 0; i < 10; ++i)
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(assignParamId(i), juce::String(assignName(i)) + " Assign", assignValueNames(), 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kSustain, "Sustain", 0, 127, 127));
@@ -917,6 +930,21 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.tvaLfoFadeMode = knob(Params::kTvaLfoMode);
     c.tvaLfoFade   = knob(Params::kTvaLfoFade);
     c.tvaLfoKeySync = apvts.getRawParameterValue(Params::kTvaLfoSync)->load() >= 0.5f;
+    {
+        static const std::array<std::array<juce::String, 5>, 8> mxIds = [] {
+            std::array<std::array<juce::String, 5>, 8> a;
+            for (int m = 0; m < 8; ++m)
+                a[(size_t)m] = { matrixParamId(m, "Source"), matrixParamId(m, "Dest1"), matrixParamId(m, "Sens1"), matrixParamId(m, "Dest2"), matrixParamId(m, "Sens2") };
+            return a;
+        }();
+        for (size_t m = 0; m < 8; ++m) {
+            XtMatrixControl& x = c.matrix[m];
+            x.source = knob(mxIds[m][0]);
+            x.dest[0] = knob(mxIds[m][1]); x.sens[0] = knob(mxIds[m][2]);
+            x.dest[1] = knob(mxIds[m][3]); x.sens[1] = knob(mxIds[m][4]);
+        }
+        for (int i = 0; i < 10; ++i) c.assign[i] = knob(assignParamId(i));
+    }
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();
     c.decay        = (int)apvts.getRawParameterValue(Params::kDecay)->load();
     c.sustain      = (int)apvts.getRawParameterValue(Params::kSustain)->load();
@@ -1077,6 +1105,8 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             if (msg.isNoteOn()) synth_.noteOn(msg.getNoteNumber(), msg.getFloatVelocity());
             else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber(), msg.getFloatVelocity());
             else if (msg.isPitchWheel()) synth_.pitchBend(msg.getPitchWheelValue());
+            else if (msg.isChannelPressure()) synth_.channelPressure(msg.getChannelPressureValue());
+            else if (msg.isAftertouch()) synth_.polyPressure(msg.getNoteNumber(), msg.getAfterTouchValue());
             else if (msg.isController()) synth_.controller(msg.getControllerNumber(), msg.getControllerValue());   // the mode messages too
         }
         if (pos < numSamples) synth_.render(L + pos, R + pos, numSamples - pos);
@@ -1339,4 +1369,43 @@ juce::AudioProcessorEditor* VSynthEmuProcessor::createEditor() {
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new VSynthEmuProcessor();
+}
+
+// ── The Matrix's lists ──────────────────────────────────────────────────
+juce::StringArray VSynthEmuProcessor::matrixSourceNames() {
+    juce::StringArray a { "OFF" };
+    for (int n = 1; n < 96; ++n) a.add(n == 32 ? juce::String("(OFF)") : "CC" + juce::String(n).paddedLeft('0', 2));
+    a.addArray(juce::StringArray { "BEND", "AFT", "+PAD-X", "+PAD-Y", "PAD-X", "PAD-Y", "TRIP-R", "BEAM-L", "BEAM-R", "KNOB1", "KNOB2", "VELO", "KEYF" });
+    return a;
+}
+
+juce::StringArray VSynthEmuProcessor::matrixDestNames() {
+    juce::StringArray a { "OFF" };
+    for (const char* o : { "OSC1", "OSC2" }) {
+        for (const char* d : { "PITCH", "TIME/PW", "FORMA/FAT", "LVL", "PENV-ATK", "PENV-DCY", "PENV-REL", "TENV-ATK", "TENV-DCY", "TENV-REL",
+                               "FENV-ATK", "FENV-DCY", "FENV-REL", "AENV-ATK", "AENV-DCY", "AENV-REL", "LFO-RATE", "LFO-PCH", "LFO-TM/PW", "LFO-FR/FT", "LFO-LVL" })
+            a.add(juce::String(o) + "-" + d);
+    }
+    for (const char* o : { "CSM1", "CSM2" })
+        for (const char* d : { "PRM1", "PRM2", "ENV1-ATK", "ENV1-DCY", "ENV1-REL", "ENV2-ATK", "ENV2-DCY", "ENV2-REL", "LFO-RATE", "LFO-PRM1", "LFO-PRM2" })
+            a.add(juce::String(o) + "-" + d);
+    a.addArray(juce::StringArray { "TVA-LVL", "TVA-ENV-ATK", "TVA-ENV-DCY", "TVA-ENV-REL", "TVA-LFO-RATE", "TVA-LFO-LVL", "TVA-LFO-PAN", "MFX-SEND", "CHO-SEND", "REV-SEND",
+                                   "MFX-PRM1", "MFX-PRM2", "MFX-PRM3", "TVA-PAN" });
+    return a;
+}
+
+juce::StringArray VSynthEmuProcessor::assignValueNames() {
+    juce::StringArray a { "OFF" };
+    for (int n = 1; n < 96; ++n) a.add(n == 32 ? juce::String("(OFF)") : "CC" + juce::String(n).paddedLeft('0', 2));
+    return a;
+}
+
+const char* VSynthEmuProcessor::assignParamId(int i) {
+    static const char* const k[10] = { "assignBeam2L", "assignBeam2R", "assignBeam3L", "assignBeam3R", "assignBeam4L", "assignBeam4R", "assignPadX", "assignPadY", "assignKnob1", "assignKnob2" };
+    return k[i];
+}
+
+const char* VSynthEmuProcessor::assignName(int i) {
+    static const char* const k[10] = { "Beam 2 L", "Beam 2 R", "Beam 3 L", "Beam 3 R", "Beam-L", "Beam-R", "Pad X", "Pad Y", "Knob 1", "Knob 2" };
+    return k[i];
 }

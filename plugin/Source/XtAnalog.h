@@ -202,7 +202,12 @@ struct XtAnalogParams {
     bool operator==(const XtAnalogParams&) const = default;
 };
 
-// The converter's analog block (the matrix and controller terms 0):
+// What the Matrix and the D-Beam's controllers add to a block's curves: the sums for Time/PW and Formant/
+// Fat (the LFO depths' sums go in with the knobs), and the part's bytes at +0x180 (0x894e9fe0).
+struct XtAnalogMod {
+    int pw = 0, fat = 0, b0 = 0, b1 = 0;
+};
+// The converter's analog block:
 //   code    +0x80, as above
 //   fat     +0x84: Fat/127 + (key − 60)·KF·10/1200, within 0…1 (0x894e1010)
 //   pw      +0x98: x = PW + (key − 60)·KF·10·126/1200 + 63, PW within ±63,
@@ -249,7 +254,7 @@ struct XtAnalogBlock {
 // semitone (+0x74, xtPitch10 + the fine); velFat, velPw: the envelopes'
 // velocity factors (1 with no velocity curve).
 // osc2: the input's +2 (only X-MOD's block depends on it without a matrix).
-XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat = 1.0f, float velPw = 1.0f, bool osc2 = false);
+XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat = 1.0f, float velPw = 1.0f, bool osc2 = false, const XtAnalogMod& mod = {});
 
 // The analog voice: the fields after +0x144 that the note-on, the update and
 // the routine keep.

@@ -57,17 +57,29 @@ inline float sq63(int d) {
 }
 
 // Fat (0x894e1010): F/127 within 0…1, + (key − 60)·KF/1200 within 0…1
-float fatCurve(int f, int kf10, int dk) {
-    const float x = clamp01(div(flt((int16_t)f), 127.0f));
+// The curves' index (0x894e5060 and the like): knob + 64 if above 1, + the Matrix's sum ·127/12000 toward 0, +
+// the D-Beam's, within 0…127
+int curveIndex(int knob, int ctrl, int beam) {
+    const int i = (int16_t)(knob + 64);
+    const int32_t c = 127 * (int32_t)(int16_t)ctrl;
+    int32_t q = (int32_t)(((int64_t)c * 0x057619f1) >> 32) >> 8;
+    q += (int32_t)((uint32_t)q >> 31);
+    return clampi((i > 1 ? i : 0) + (int16_t)q + beam, 0, 127);
+}
+
+float fatCurve(int f, int kf10, int dk, int ctrl) {
+    const float x = clamp01(add(div(flt((int16_t)f), 127.0f), div(flt((int16_t)ctrl), 12000.0f)));
     return clamp01(add(div(flt((int16_t)kf10 * (int16_t)dk), 1200.0f), x));
 }
 
 // Pulse Width (0x894e0ea0): PW within ±63, + (key − 60)·KF·126/1200, + 63;
 // the integer part (toward zero) wrapped into 0…126, the fraction kept; /126
-float pwCurve(int pw, int kf10, int dk) {
-    float x = flt((int16_t)pw);
+float pwCurve(int pw, int kf10, int dk, int ctrl, int b0, int b1) {
+    float x = add(div(mul(flt((int16_t)ctrl), 63.0f), 12000.0f), flt((int16_t)pw));
     x = x > 63.0f ? 63.0f : (-63.0f > x ? -63.0f : x);
-    const float y = add(add(div(mul(flt((int16_t)dk * (int16_t)kf10), 126.0f), 1200.0f), x), 63.0f);
+    // the D-Beam's: (b1 − b0/2)·63/127
+    const float beam = div(mul(sub(flt(b1), div(flt(b0), 2.0f)), 63.0f), 127.0f);
+    const float y = add(add(beam, add(div(mul(flt((int16_t)dk * (int16_t)kf10), 126.0f), 1200.0f), x)), 63.0f);
     int i = ftrc(y);
     const float frac = sub(y, flt(i));
     if (i < 0) i = i % 126 + 126;
@@ -78,9 +90,8 @@ float pwCurve(int pw, int kf10, int dk) {
 // SUPER-SAW's knobs index 0…127 from their value + 64 (below 2: 0), then:
 // Pulse Width the saws' spread (0x894e5060): (curve/2 + 2)/32767 + (key − 60)·KF·
 // 0.019532/12000, within 6.1e−5…0.019593
-float ssDetuneCurve(int pw, int kf10, int dk) {
-    int i = (int16_t)(pw + 64);
-    i = clampi(i > 1 ? i : 0, 0, 127);
+float ssDetuneCurve(int pw, int kf10, int dk, int ctrl, int beam) {
+    int i = curveIndex(pw, ctrl, beam);
     const float x = add(div(flt((T.ssDetune[i] >> 1) + 2), K(0x46fffe00)),
                         div(mul(flt((int16_t)kf10 * (int16_t)dk), K(0x3ca00193)), 12000.0f));
     return x > K(0x3ca0817f) ? K(0x3ca0817f) : (K(0x387fda3f) > x ? K(0x387fda3f) : x);
@@ -88,9 +99,8 @@ float ssDetuneCurve(int pw, int kf10, int dk) {
 
 // Detune the side saws' level (0x894e5140), with Fat's KF: (64·i + 400)/32767
 // + (key − 60)·KF·0.248055/12000, within 0.012207…0.260262
-float ssMixCurve(int detune, int kf10, int dk) {
-    int i = (int16_t)(detune + 64);
-    i = clampi(i > 1 ? i : 0, 0, 127);
+float ssMixCurve(int detune, int kf10, int dk, int ctrl) {
+    int i = curveIndex(detune, ctrl, 0);
     const float x = add(div(flt((i << 6) + 400), K(0x46fffe00)),
                         div(mul(flt((int16_t)kf10 * (int16_t)dk), K(0x3e7e0221)), 12000.0f));
     return x > K(0x3e854110) ? K(0x3e854110) : (K(0x3c47ffde) > x ? K(0x3c47ffde) : x);
@@ -98,27 +108,24 @@ float ssMixCurve(int detune, int kf10, int dk) {
 
 // FEEDBACK-OSC's, by the same index: Pulse Width the second tap's place
 // (0x894e5210), i/254 + (key − 60)·KF·½/12000, within 0…½
-float fbTapCurve(int pw, int kf10, int dk) {
-    int i = (int16_t)(pw + 64);
-    i = clampi(i > 1 ? i : 0, 0, 127);
+float fbTapCurve(int pw, int kf10, int dk, int ctrl, int beam) {
+    int i = curveIndex(pw, ctrl, beam);
     const float x = add(div(mul(flt((int16_t)kf10 * (int16_t)dk), 0.5f), 12000.0f), div(flt(i), 254.0f));
     return x > 0.5f ? 0.5f : (0.0f > x ? 0.0f : x);
 }
 
 // Detune the second tap's level (0x894e5320), with Fat's KF: 1 − ((127 − i)/
 // 127)² + (key − 60)·KF/12000, within 0…1
-float fbLevelCurve(int detune, int kf10, int dk) {
-    int i = (int16_t)(detune + 64);
-    i = clampi(i > 1 ? i : 0, 0, 127);
+float fbLevelCurve(int detune, int kf10, int dk, int ctrl) {
+    int i = curveIndex(detune, ctrl, 0);
     const float n = div(flt(127 - i), 127.0f);
     return clamp01(add(div(flt((int16_t)kf10 * (int16_t)dk), 12000.0f), sub(1.0f, mul(n, n))));
 }
 
 // X-MOD's depth from the Pulse Width (0x894e53d0), by the same index: i/127 +
 // (key − 60)·KF/12000, within 0…1
-float xmDepthCurve(int pw, int kf10, int dk) {
-    int i = (int16_t)(pw + 64);
-    i = clampi(i > 1 ? i : 0, 0, 127);
+float xmDepthCurve(int pw, int kf10, int dk, int ctrl, int beam) {
+    int i = curveIndex(pw, ctrl, beam);
     return clamp01(add(div(flt((int16_t)kf10 * (int16_t)dk), 12000.0f), div(flt(i), 127.0f)));
 }
 
@@ -137,9 +144,9 @@ float subCents(float d) {
 
 // Detune as octaves (0x894e1090): d/63 at ±12000, within that, through the curve
 // /1200, + (key − 60)·KF/120/1200, within ±1
-float subDetuneCurve(int detune, int kf10, int dk) {
+float subDetuneCurve(int detune, int kf10, int dk, int ctrl) {
     const float kf = div(mul(flt((int16_t)kf10 * (int16_t)dk), K(0x3c088889)), 1200.0f);
-    float x = div(mul(flt((int16_t)detune), 12000.0f), 63.0f);
+    float x = add(div(mul(flt((int16_t)detune), 12000.0f), 63.0f), flt((int16_t)ctrl));
     x = x > 12000.0f ? 12000.0f : (-12000.0f > x ? -12000.0f : x);
     const float c = add(div(subCents(mul(div(x, 12000.0f), 63.0f)), 1200.0f), kf);
     return c > 1.0f ? 1.0f : (-1.0f > c ? -1.0f : c);
@@ -417,7 +424,7 @@ void XtMod::fmStereo(float* out, const float* l1, const float* l2) {
     g[2] = c;
 }
 
-XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw, bool osc2) {
+XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int waveGainDb, float velFat, float velPw, bool osc2, const XtAnalogMod& m) {
     XtAnalogBlock b;
     const int dk = key - 60;
     b.code = xtAnalogCode(p.wave);
@@ -426,40 +433,40 @@ XtAnalogBlock xtAnalogBlock(const XtAnalogParams& p, int key, int pitch10, int w
         b.slope = div(flt((uint16_t)sys(p.wave == 1 ? kSquSlope : kSawSlope)), 100.0f);
     if (p.wave == 11) {   // SUPER-SAW (0x894e2500)
         constexpr float kDet = K(0x3ca00193), kMix = K(0x3e7e0221);
-        b.pw = ssDetuneCurve(p.pw, p.pwKf * 10, dk);
+        b.pw = ssDetuneCurve(p.pw, p.pwKf * 10, dk, m.pw, m.b1 - m.b0);
         b.pwEnv = mul(mul(sq63(p.pwEnv), kDet), velPw);
         b.pwLfo = mul(sq63(clampi((int16_t)p.pwLfo, -63, 63)), kDet);
-        b.fat = ssMixCurve(p.detune, p.fatKf * 10, dk);
+        b.fat = ssMixCurve(p.detune, p.fatKf * 10, dk, m.fat);
         b.fatEnv = mul(mul(sq63(p.fatEnv), kMix), velFat);
         b.fatLfo = mul(sq63(clampi((int16_t)p.fatLfo, -63, 63)), kMix);
     } else if (p.wave == 12) {   // FEEDBACK-OSC (0x894e22c0)
-        b.pw = fbTapCurve(p.pw, p.pwKf * 10, dk);
+        b.pw = fbTapCurve(p.pw, p.pwKf * 10, dk, m.pw, m.b1 - m.b0);
         b.pwEnv = mul(mul(sq63(p.pwEnv), 0.5f), velPw);
         b.pwLfo = mul(sq63(clampi((int16_t)p.pwLfo, -63, 63)), 0.5f);
-        b.fat = fbLevelCurve(p.detune, p.fatKf * 10, dk);
+        b.fat = fbLevelCurve(p.detune, p.fatKf * 10, dk, m.fat);
         b.fatEnv = mul(sq63(p.fatEnv), velFat);
         b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
     } else if (p.wave == 13) {   // X-MOD (0x894e208a): OSC 2's has no depth
         b.pw = b.pwEnv = b.pwLfo = 0.0f;
         if (!osc2) {
-            b.pw = xmDepthCurve(p.pw, p.pwKf * 10, dk);
+            b.pw = xmDepthCurve(p.pw, p.pwKf * 10, dk, m.pw, m.b1 - m.b0);
             b.pwEnv = mul(sq63(p.pwEnv), velPw);
             b.pwLfo = sq63(clampi((int16_t)p.pwLfo, -63, 63));
         }
-        b.fat = fatCurve(p.fat, p.fatKf * 10, dk);
+        b.fat = fatCurve(p.fat, p.fatKf * 10, dk, m.fat);
         b.fatEnv = mul(sq63(p.fatEnv), velFat);
         b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
     } else {
-        b.pw = pwCurve(p.pw, p.pwKf * 10, dk);
+        b.pw = pwCurve(p.pw, p.pwKf * 10, dk, m.pw, m.b0, m.b1);
         b.pwEnv = mul(sq63(p.pwEnv), velPw);
         b.pwLfo = sq63(clampi((int16_t)p.pwLfo, -63, 63));
         if (p.subOctave != 0 && p.wave <= 10) {   // 0x894e288c
             b.subOn = 1.0f;
-            b.fat = add(subDetuneCurve(p.detune, p.fatKf * 10, dk), p.subOctave == 1 ? -2.0f : p.subOctave == 2 ? -1.0f : 0.0f);
+            b.fat = add(subDetuneCurve(p.detune, p.fatKf * 10, dk, m.fat), p.subOctave == 1 ? -2.0f : p.subOctave == 2 ? -1.0f : 0.0f);
             b.fatEnv = mul(div(subCents(flt((int16_t)p.fatEnv)), 1200.0f), velFat);
             b.fatLfo = div(subCents(flt(clampi((int16_t)p.fatLfo, -63, 63))), 1200.0f);
         } else {
-            b.fat = fatCurve(p.fat, p.fatKf * 10, dk);
+            b.fat = fatCurve(p.fat, p.fatKf * 10, dk, m.fat);
             b.fatEnv = mul(sq63(p.fatEnv), velFat);
             b.fatLfo = sq63(clampi((int16_t)p.fatLfo, -63, 63));
         }

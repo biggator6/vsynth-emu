@@ -79,6 +79,14 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> tvaAtts_[kTvaKnobs];
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> tlfoWaveAtt_, tlfoModeAtt_, tlfoOffsetAtt_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> tlfoSyncAtt_;
+    // The Matrix Controls, one at a time as the XT's tabs, and the system's controller assigns
+    juce::Label      matrixLabel_, matrixSensLabels_[2], assignLabel_;
+    juce::ComboBox   matrixSelBox_, matrixSourceBox_, matrixDestBox_[2], assignSelBox_, assignBox_;
+    juce::Slider     matrixSens_[2];
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> matrixSourceAtt_, matrixDestAtt_[2], assignAtt_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> matrixSensAtt_[2];
+    void attachMatrix(int control);
+    void attachAssign(int which);
     juce::ComboBox   modTypeBox_;
     juce::Slider     modLevelSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     modAttackSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

@@ -10,6 +10,13 @@ class VSynthEmuProcessor : public juce::AudioProcessor,
                            private juce::AsyncUpdater
 {
 public:
+    // The Matrix's parameters: matrixNSource, matrixNDest1, … for N = 1…8; the system's controller assigns
+    static juce::String matrixParamId(int control, const char* name) { return "matrix" + juce::String(control + 1) + name; }
+    static const char* assignParamId(int which);
+    static const char* assignName(int which);
+    static juce::StringArray matrixSourceNames();   // the XT's Source values, 0…108
+    static juce::StringArray matrixDestNames();     // and its Dest values, 0…78
+    static juce::StringArray assignValueNames();    // OFF, CC01…CC95
     static juce::String oscParamId(int k, const juce::String& id);   // OSC k's parameter (OSC 2: "osc2" before it)
     VSynthEmuProcessor();
     ~VSynthEmuProcessor() override;

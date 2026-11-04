@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The Matrix v119 (2026-11-04): the eight Matrix Controls (IDs 0x14d…0x174), every source, every Dest but the COSMs' PRMs (next) and MFX-PRM1…3 (HARDWARE_FIRMWARE.md, "The Matrix"). xtMatrixSums (XtOsc), XtSynth::matrixUpdate, Voice::mx by slot. A Dest is not a slot: xtFwMatrixTables runs the firmware's two maps at load, so the port holds no copy.
+  0x894d96d0 on 0x89cf7634, called "the matrix" since v53, is the Multi Step Modulator (four tracks), not ported. The getters 0x894e7010… are the Matrix.
+  VELO and KEYF stay at the note's start through a legato (M is not rebuilt, and an update's rebuild leaves +0…+2). Pan + sum is not clamped before its Keyfollow; Level + sum is. A pedal let go that is itself a source gives the release its new time (voiceOff).
+  powf(2, y) = expf(y·logf 2): xtOscPow2, 200,000 exponents 0 different, in xt_osc. channelPressure, polyPressure. The D-Beam's controllers (IDs 0x89…0x8c) reach Pitch, Time, PW and the analog indices.
+  Parameters matrixNSource, …Dest1, …Sens1, …Dest2, …Sens2, assignBeam2L…assignKnob2; rows at the end of the XT strip (kXtStripH 1090, window 1390). XT_MATRIX, XT_ASSIGN, XT_PRESS; TEST_MATRIX, TEST_ASSIGN.
+  Check: xt_tone draws them all and compares each slot's sum on M. 0 different at fcheck's 2000 and on seeds 777, 31337, 9, 4242 at 3000. mutate_tone.py 329 of 329. The sweep gains each Dest twice over: CC 2 moved, and its Sens moved.
+
 Hold, Sostenuto and the mode messages v117 (2026-11-04): CC 64, 66, 120, 121, 123…127, and how a controller reaches a tone (HARDWARE_FIRMWARE.md, "Hold, Sostenuto and the mode messages"). XtSynth::controller stores the value on the channel (below 96) and updates the voices for ANY number, as the plain handler does; keyRelease (0x894d58b0), voiceOff (0x894dc270), Voice::keyFlags (the note's +0x48: key, Hold, Sostenuto), relHeld (+0x2f).
   N (*K) is the part-and-channel state: +0x11c Hold, +0x11d Sostenuto, +0x120 its latch, +0xa the last release velocity. CC 84 is stored and nothing reads it. CC 5, 65, 68, 71…74 are the plain handler: nothing reads them unless the Matrix does.
   allNotesOff() is the plugin's panic, not a message of the XT's; the processor sends CC 120 and 123 to controller, so Hold survives All Notes Off. XT_CC_AT="frame,number,value;…" in the CLI.

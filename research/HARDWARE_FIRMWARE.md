@@ -1547,6 +1547,99 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The Matrix (2026-11-04, v119)
+
+The eight Matrix Controls are ported, with all their sources and every destination but the COSMs' own parameters (next version) and the effects'. So are channel and poly pressure, and the D-Beam's controllers that the converters read. At the defaults no sum is formed and every term is 0: `ab.sh` 4/4 identical to v117.
+
+**A correction.** Since v53 these notes have called `0x894d96d0` on `0x89cf7634` "the matrix" and the terms behind `0x894e7010`… "controller terms". It is the other way round. `0x89cf7634` has four entries of 0x1e bytes on a timer: the **Multi Step Modulator**'s four tracks (manual p. 68). That term stays at 0 here, not ported. The getters `0x894e7010`… are the Matrix. Earlier sections that say "the matrix" of `0x894d96d0` mean the step modulator.
+
+**The note's object M** (0x184 bytes, the input table's +0x68, as C and the part from the note). Its constructor is `0x894ea190`; an update rebuilds it (`0x894ea290`, from `0x894ebaa0`). A legato does not, and nothing moves +0, +1, +2 after the constructor, so **VELO and KEYF stay at the note's start through a legato**.
+
+| M | |
+|---|---|
+| +0, +1, +2 | velocity, key with the Octave Shift, key as played: the note's +0xf, +0xd, +0xe |
+| +4…+0xb | the eight sources |
+| +0xc…+0x20 | 11 words: a bit per slot in use, a group each |
+| +0x22 | 8 × 2 pairs of 4 bytes: slot (byte), Sens as stored (s16 at +2) |
+| +0x64 | 8 routines, one per source (`0x894e6940`) |
+| +0x84…+0x98 | dirty bits, copies of +0xc… when a term moved |
+| +0x9a | 8 s16: each source's last value |
+| +0xaa | 16 s16: the terms |
+| +0xca + 2·(slot − 1) | the sums, s16 |
+| +0x168, +0x16c | C, the part |
+| +0x170, +0x172 | Bend Range Up and Down |
+| +0x174 | the bend (v57); +0x178…+0x17c CC 7, 11, 10, 93, 91 (v114) |
+| +0x180…+0x183 | the D-Beam's controllers |
+
+Copied from the part's table at `0x89d276b4 + part·0x84`, which `0x894e9330` writes from IDs 0x14d…0x174.
+
+**A Source** (the ID's value; 0 or 32, or above 108: none; `0x894e6940`). T is 128 u16 at `0x897cf11e`, 8192·x/127 as stored.
+
+| Value | | Routine | |
+|---|---|---|---|
+| 1…95 | a controller | `0x894e6aa0` | T[C + 0x84 + n] |
+| 96 | BEND | `0x894e6ac0` | bender − 8192 |
+| 97 | AFT | `0x894e6ae0` | T[max(C + 2, C + 4 + M[2])]: channel or poly pressure, whichever is more |
+| 98, 99 | +PAD-X, -Y | `0x894e6d30`, `0x894e6de0` | from the middle of the assigned CC: 0 at 0, T[(x − 64)·127/63] from 64, −T[(64 − x)·127/63] below |
+| 100, 101 | PAD-X, -Y | `0x894e6be0`, `0x894e6c20` | T[assigned CC] |
+| 102 | TRIP-R | `0x894e6c60` | T[127 − pad +0x24], the part's pad object at `0x8987ae78`. It resets to 127 (`0x894d82a4`), so 0 at rest, and the plugin has no pad |
+| 103, 104 | BEAM-L, -R | `0x894e6b10`, `0x894e6b50` | T[assigned CC] |
+| 105, 106 | KNOB1, 2 | `0x894e6cb0`, `0x894e6cf0` | T[assigned CC] |
+| 107 | VELO | `0x894e6ca0` | T[M[0]] |
+| 108 | KEYF | `0x894e6c80` | M[1]·122 − 7320, 0 at key 60 |
+
+An assign of 0 or 32 gives 0. They are system parameters (`0x894e9db0`, at `0x89d276b4 + 0x844`): IDs 0x8d, 0x8e BEAM-L, -R; 0x8f, 0x90 PAD-X, -Y; 0x93, 0x94 KNOB1, 2. Their descriptors default to OFF.
+
+**The D-Beam's controllers.** IDs 0x89…0x8c, Beam 2 and 3 Assign L, R, stored as −1 at OFF or 32. `0x894e9fe0` copies C + 0x84 + each to M + 0x180… in every pass. The converters use them where the old notes said "the part's bytes":
+- Pitch: 2·b183 − b182, as /127 octaves.
+- Time: b181 − 3·b180, /127, before the KF's scale.
+- Pulse Width: (b181 − b180/2)·63/127.
+- SUPER-SAW's Detune, FEEDBACK-OSC's tap, X-MOD's depth: b181 − b180, on the index.
+
+**A term and a sum** (`0x894e6ea0`, `0x894e6fc0`). Value·Sens >> 13, arithmetic, within the slot's limit (u16 at `0x897cf080`: ±12000 for pitch, time and formant, ±32767 for MFX-PRM, ±63 for the LFO depths and pan LFO, ±127 for the others). The sum of a slot's terms, within the limit again. No Sens at 63 exceeds its limit, so the term's limit never acts and only the sum's can. Everything is formed lazily, by a getter, when a converter asks, and the dirty bits only save work: the result is a pure function of the settings and the sources as they stand. `XtSynth` forms them all at once, in `matrixUpdate`, and keeps them on the voice.
+
+**The two maps.** A Dest is not a slot: `0x894e7d10` is a jump table from Dest to slot, and `0x894e82e0` one from Dest to one of ten Sens tables (64 u16). `xtFwMatrixTables` runs both at load for all 79 × 127 values, so the port holds no copy of them, and no list of its own to get wrong. For a source of 0 the firmware's answer is 0; the port never asks.
+
+| Dest | Slot | Group's getter | |
+|---|---|---|---|
+| 1…4 | 1…4 | `0x894e7010` | OSC 1: Pitch, Time/PW, Formant/Fat, Level |
+| 0x16…0x19 | 5…8 | `0x894e70b0` | OSC 2's |
+| 0x4b…0x4d | 9…0xb | `0x894e7140` | MFX-PRM1…3, read only by `0x894e7aa0` for the effects |
+| 5…0x10 | 0xc…0x17 | `0x894e71c0` | OSC 1's envelopes: Pitch, Time, Formant, Amp, each A, D, R |
+| 0x11…0x15 | 0x18…0x1c | `0x894e7320` | OSC 1's LFO: Rate, Pitch, Time/PW, Formant/Fat, Level |
+| 0x1a…0x25 | 0x1d…0x28 | `0x894e73c0` | OSC 2's envelopes |
+| 0x26…0x2a | 0x29…0x2d | `0x894e7520` | OSC 2's LFO |
+| 0x2b…0x35 | 0x2e…0x38 | `0x894e75d0` | COSM 1: PRM1, PRM2, Env 1 A, D, R, Env 2 A, D, R, LFO Rate, LFO-PRM1, LFO-PRM2 |
+| 0x36…0x40 | 0x39…0x43 | `0x894e7710` | COSM 2's |
+| 0x42…0x47, 0x41, 0x48…0x4a, 0x4e | 0x44…0x4e | `0x894e7860` | TVA: Env A, D, R, LFO Rate, LFO Level, LFO Pan; Level; MFX, Chorus, Reverb Send; Pan |
+
+**Where each goes.** Mostly a plain addition before the clamps that were already there, so most of the port is passing a sum in.
+- Depths, Level, envelope times, LFO Rate: knob + sum as integers, then as before. An LFO Rate of 128 or more is tempo sync and takes no sum (`0x894e0290`).
+- Pitch, Time, PW: x = sum·63/12000 + knob, in floats, then within ±63. So the knob's value is no longer an integer, and the Pitch's powf is not in the table of 127 values any more. **powf(2, y) is expf(y·logf 2)** (`0x89531c80`), 1 at y = 0, and `xtOscPow2` is that, the `expf` of v69. Against `0x8952ff9c`: 200,000 exponents, 0 different. It also replaces `std::pow` in `xtPitchRatio`'s other path: "differs on 59 of 127" is now 0.
+- Formant, Sub Detune: knob·12000/63 + sum, in the 12000 scale. Fat: knob/127 + sum/12000.
+- SUPER-SAW's Detune and Mix, FEEDBACK-OSC's tap and level, X-MOD's depth: an index, knob + 64 (0 if not above 1) + trunc(sum·127/12000), within 0…127.
+- **The TVA's Pan differs from its Level**: Level + sum is clamped before the Keyfollow's term is added, Pan + sum is not (`0x894ea5a0`).
+- With the TVA Switch off, MFX Send still takes its sum.
+- The Chorus and Reverb sends take theirs in the block (+0x34, +0x30), which has nowhere to go yet.
+
+**An ordering.** A pedal's release runs before the queued update, but a getter forms its sum on what C holds at that moment, and C took the value first. So a Hold let go that is itself a source gives the release its new time, ahead of everything else the update will bring. `voiceOff` forms the sums first, and `Voice::mxMoved` carries the move to the update. Only seed 2024's case 1649 showed this, in 2000.
+
+**A sum that moves** is why `newBlocks` and `setControls` now give every envelope and LFO its settings: their change lists look only at knobs. `updateAll`. As the firmware runs all of them on every pass, and they take equal settings without effect, this is only what it does anyway.
+
+**The plugin.** Parameters `matrixNSource`, `matrixNDest1`, `matrixNSens1`, `matrixNDest2`, `matrixNSens2` for N = 1…8, all off, and `assignBeam2L`…`assignKnob2`, all OFF. Rows at the end of the XT strip: a Control selector as the XT's tabs, Source and each pair; a selector for the assigns. `kXtStripH` 1090, window 1390. The processor sends channel and poly pressure. CLI `XT_MATRIX`, `XT_ASSIGN`, `XT_PRESS`; PluginTest `TEST_MATRIX`, `TEST_ASSIGN`. Dests the port does not yet act on can be chosen and do nothing: MFX-PRM1…3 and the Chorus and Reverb sends, for want of effects; the COSMs' PRM and LFO-PRM until the next version.
+
+**The check.** `xt_tone` draws the Matrix in half the cases, one to eight controls, on every source, with Sens often at ±63; the assigns; the other 92 controllers and both pressures; and moves a source in half the cases, twice, among everything else. The firmware's side is its real table and object. New comparison, at every update: each slot's sum on M against the voice's, wherever a pass has formed it, and the four bytes. That is what keeps a term from hiding behind a clamp. The sweep gains each Dest alone twice over, in each envelope stage: on CC 2 moved alone, the path of `controller`, and with its Sens moved, the path of `setControls`.
+
+Harness faults found on the way:
+- `pedalMove` set N + 0x11c but not C + 0x84 + 64, as the handler path does, so a source or an assign on CC 64 read differently on the two sides.
+- A slot's dirty bit is clear both when its getter has formed it and when no getter has formed anything. The comparison now waits until some source's last value is not 0: until then all sums rest at 0, and the only way the port's could not is if a getter has not run.
+
+**The result.** fcheck: 2000 cases and the sweep, 3979 notes, 1957 taken by a sounding tone, 461 truncated, 324,108 blocks, 11.7 million checks, 0 different; a wave on OSC 2, 1407 notes, 110,873 blocks, 3.6 million checks, 0 different. 3000 cases and the sweep on each of seeds 777, 31337, 9, 4242: 0 different. `fcheck.sh --update` changes `xt_tone`'s five count lines and the pitch ratios' line, and adds powf's. A/B 4/4 identical to v117. PluginTest 4/4 at the defaults, with CC 1 on the Pitch moved during a note, VELO and KEYF on the TVA and an LFO, Hold and CC 74 alone, and PAD-X through an assign. Each of these does change the render: CC 1 on the Pitch from the frame it moves, a Hold keeps a note sounding at −26 dB where the base has none.
+
+**Planted errors.** 91 new, 329 in all, all caught at 2000 cases. They cover every source, the term and the sum, the slots' map, each destination's wiring, the analog curves, VELO's and KEYF's staying at the note's start, the moved sums' updates, and the pressures. The first run missed ten. Seven were the check's: a knob of the Matrix moved during a note was hardly ever seen in an envelope or an LFO, because the random moves rarely land on a Matrix word with a Dest on the thing in question. So the sweep now takes each Dest twice. Three were exact and are not in the list: CC 32 as a source was guarded twice over, one of which remains; powf's y = 0 falls through to expf(0) = 1; and a term's limit never acts, as no Sens at 63 exceeds its slot's limit, which I checked over all 78 Dests. `tvag-done-r`, an old one, slipped by chance again: its square now runs slowly from the note's start, so that its sign is known when the voice ends.
+
+**Not covered.** A real XT. The Multi Step Modulator, as above. RPN and NRPN (`0x89474a40`): Bend Range by RPN 0 and the like are not taken. TRIP-R from a real pad, and Time Trip. The upstream of `0x89475370` beyond the store. How the XT's own controllers reach CCs (a pad and a D-Beam send what the system assigns say; here a host sends them).
+
 ### Hold, Sostenuto and the mode messages (2026-11-04, v117)
 
 CC 64 and 66 are ported, with Reset All Controllers, All Sound Off, All Notes Off and the other mode messages, and how a controller's message reaches a tone, which v99 and v114 left untraced. `XtSynth::controller` took only CC 7, 10 and 11; now it does what the handlers do. With no pedal moved nothing changes: `ab.sh` 4/4 identical to v114.
@@ -1634,7 +1727,7 @@ This answers v101's open question. With the TVA Switch off CC 7, CC 11 and the M
 - Output Assign says which pair of the block takes it, the other two left 0: 0 +0x28, +0x2c; 1 +0x20, +0x24; 2 +0x38, +0x3c when the system's Output Mode (`0x89d2a6d0 + 0x1604`) is Parallel, else as 1.
 - +0x30 = T[CC 91]·T[Reverb Send], +0x34 = T[CC 93]·T[Chorus Send].
 - All eight × 2^(g/6), g the system's Output Gain (`0x89d2a6d0 + 0x1600`), 0 here. The routine also sets the truncate step (v46's).
-- Each input also adds a matrix term (`0x894d96d0` on `0x89cf7634`, destinations 0x39, 0x3a, 0x40…0x44) and a controller term from `0x894e7860`'s table. Both are 0 here.
+- Each input also adds the Multi Step Modulator's term (`0x894d96d0` on `0x89cf7634`, destinations 0x39, 0x3a, 0x40…0x44), 0 here, and the Matrix's from `0x894e7860`'s table (v119).
 
 **The controllers.** `0x894e9fe0`, in each conversion pass, copies the channel's values to the note's object: +0x178 C + 0x84 + 7, +0x179 + 11, +0x17a + 10, +0x17b + 93, +0x17c + 91. So a moved CC reaches a sounding TVA as a knob does, at the next tone update, and that update hands out all the blocks. `XtSynth::controller` does what `pitchBend` does. The check writes C and runs the update. The path from a MIDI message to C is not traced, like the bender's in v99.
 
@@ -1662,7 +1755,7 @@ A truncated tone (`0x894f5570`) holds gains and bus levels: L·gain·fade·(bus 
 **Left out, with reasons.**
 - The Chorus and Reverb sends, and +8, +0xc of the frame: there are no effects yet, so nothing to send to. The check does not compare them.
 - Output Assign: the plugin has one output. With no MFX all three buses would be the same sound. It stays at MULTI on both sides, and the check reads the MULTI pair. Other values would need two more things: COSM 1 on the mix reads the bus's first pair past its block (v104), and DIR's pair does not update.
-- The matrix, and the controller terms, at rest. CC 121 and other resets are not modelled: `controller` takes only 7, 10 and 11.
+- The Matrix (v119) and the step modulator at rest. CC 121 and other resets not modelled (v117).
 
 **The check.** `xt_tone` draws Level, Pan, their KFs and depths, the MFX Send, LFO 5's seven fields and the three CCs (at rest in two cases of three, so the sweep's moves can be seen), and moves them live. New, every block: +8, +0x1c, +0x28, +0x2c, +0x78, +0x7c. The right channel's gain, target and step were always compared, against the left's values, as nothing could part them; now they have their own. At every update: LFO 5's output. At each case's start: its free object's phase. The sweep gains LFO 5's fields, the TVA's, and each CC alone, on a note with both depths on and LFO 5 fading in or in a short delay.
 
@@ -1674,7 +1767,7 @@ A truncated tone (`0x894f5570`) holds gains and bus levels: L·gain·fade·(bus 
 
 **The plugin.** Parameters `tvaLevel`, `tvaLevelKF`, `tvaLevelLfo`, `tvaPan` (shown L64…0…63R), `tvaPanKF`, `tvaPanLfo`, `mfxSend`, `tvaLfo…`. Rows TVA, TVA Pan and LFO 5 (two) at the end of the XT strip, after the COSMs as the signal goes: `kXtStripH` 1000, window 1300. MIDI CC 7, 10, 11 go to `XtSynth::controller`. The TVA Switch is off by default, so Level, Pan and LFO 5 do nothing until it is ticked, as on the XT. A session saved before v114 comes up at the defaults, and so sounds as it did. CLI `XT_TVA`, `XT_LFO5`, `XT_CC`; PluginTest `TEST_TVA`, `TEST_LFO5`, `TEST_CC`.
 
-**Not covered.** A real XT. The matrix and controller terms. How a CC message reaches C. CC 91 and 93.
+**Not covered.** A real XT. The Matrix (v119). How a CC message reaches C (v117). CC 91 and 93.
 
 ### The SOLO encoder's stereo mode (2026-11-03, v113)
 
