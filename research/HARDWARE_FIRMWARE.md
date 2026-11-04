@@ -1547,6 +1547,42 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Reverb Time by the driver's own table (2026-11-04, v143)
+
+All 11 Reverb Times now show the time the driver really uses, on the user's decision. So between values 6 and 21 the panel differs on purpose from what the XT's code shows: Room 2's Reverb Time of 12 reads 1.00 sec, not 0.37.
+
+**Where the times are.** The driver turns a Reverb Time's value into a time with one of two functions, by the type's range: `0x894b2bf0` (80 words at `0x897ac574`) and `0x894b2ba0` (64 words at `0x897ac474`, the same where they meet). The words are samples at 44.1 kHz: 2646 is 0.06 s, 17640 is 0.40 s, 2822400 is 64 s. Two are a sample short of their round figure (30869 for 0.70 s, 61739 for 1.40 s), so the text rounds.
+
+**What changed.** `XtFxValueText` runs `0x894b2bf0` for these 11, and prints the result as the firmware's own format does, `%d.%02d`, with the ID's own unit. So the text can't part from the sound, and no time is in the source. `formatOf` keeps the other four of v140's seven.
+
+| | IDs |
+|---|---|
+| Room 1, Hall 1, Plate: Low and Hi Rev Time | 0x814, 0x815; 0x84b, 0x84c; 0x896, 0x897 |
+| Room 2, Room 3: Reverb Time | 0x828, 0x839 |
+| Hall 2, Hall 3, Garage: Reverb Time, no format in the routine | 0x861, 0x872, 0x884 |
+
+**What it takes from the routine's text.** Only values 6 to 21, and only there: everywhere else the routine's format and the table agree.
+
+| Value | 5 | 6 | 7 | 10 | 20 | 21 | 22 |
+|---|---|---|---|---|---|---|---|
+| The routine | 0.30 | 0.31 | 0.32 | 0.35 | 0.45 | 0.46 | 2.00 |
+| Now | 0.30 | 0.40 | 0.50 | 0.80 | 1.80 | 1.90 | 2.00 |
+
+**The sound against the text.** A comb's feedback gain goes as 10^(−3·delay/time), so its log times the time is a constant. On a comb's coefficient in each of the eight types it's constant within 3% against the new text, at every value the coefficient can tell. The two-band types, which v140 hadn't measured, go with Low and Hi set together, and fit within 0.2%.
+
+**The check.**
+
+| | |
+|---|---|
+| `xt_fx control` | Every Reverb Time's text against the driver's table read directly, typed back too. The two tables agree. The routine's format and the table part at exactly values 6 to 21. The gains on all eight types. 159417 samples, 0 different |
+| PluginTest `TEST_FX_PANEL=1`, in `verify.sh` | All 11 swept through a box at every value, against the table read directly: 5948 boxes |
+| `mutate_panel.py` | 80 planted, 16 of them new, 0 missed, on v140 with this change: v142 touches none of the files they plant in. Three of v140's went with the code they tested |
+| `mutate_fx.py --control` | 157 planted, 16 of them new, all of those caught. The same one missed at 60 events as in v138, `matrix-unflushed` |
+| `mutate_fx.py`, `fxthreads.sh` | 97 planted, the same 2 missed as before (v126); no races |
+| `verify.sh` | Firmware checks as the baseline, where only that one line's count moved; A/B 4/4 identical to v142; PluginTest 4/4, and 4/4 through the chip; engine tests; auval |
+
+**Not checked.** A real XT. If it does show 0.31…0.46 as its code says, this is where the plugin parts from its screen, and the sound's the same either way.
+
 ### v140 joins (2026-11-04, v142)
 
 This merges v140, the seven values on the manual's scale, with v141, on the user's word. With it, this branch has everything from every session so far. There was no new firmware to read, and no change to the sound.
@@ -1607,7 +1643,7 @@ The seven that v138 left as bare numbers now read on the manual's scale, on the 
 | The text | 0.06…0.30 | 0.31 | 0.32 | 0.35 | 0.45 | 0.46 | 2.00 | 2.25 | 2.50… |
 | The driver's gain | 0.06…0.30 | 0.40 | 0.50 | 0.80 | 1.80 | 1.90 | 2.00 | 2.25 | 2.50… |
 
-So the value jumps from "0.46" to "2.00" in one step. Measured on Room 2, Room 3, Hall 2, Hall 3 and Garage, all five to within 3%. The other IDs with this format (Room 1's, Hall 1's and Plate's Low and Hi Rev Time) have two bands, and I haven't measured those. The panel shows the firmware's text there, for those it has a format for and those that borrow it, as it's what the XT's code shows. A real XT would confirm it: Room 2's Reverb Time, one step at a time from 5.
+So the value jumps from "0.46" to "2.00" in one step. Measured on Room 2, Room 3, Hall 2, Hall 3 and Garage, all five to within 3%. The other IDs with this format (Room 1's, Hall 1's and Plate's Low and Hi Rev Time) have two bands, and I haven't measured those. The panel shows the firmware's text there, for those it has a format for and those that borrow it, as it's what the XT's code shows. (Until v143, which takes all of them from the driver's table, Hall 2's, Hall 3's and Garage's too.) A real XT would confirm it: Room 2's Reverb Time, one step at a time from 5.
 
 **The check.**
 

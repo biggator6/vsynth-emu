@@ -279,6 +279,7 @@ XtFxCatalog xtFxCatalog(const char* romPath) {
 namespace {
 constexpr uint32_t kValueText = 0x89461a70;                                             // (id, value, 1 to add the unit): the GUI's text for a parameter's value goes here, through 0x89370ca0 and 0x89462120, with 0
 constexpr uint32_t kValueStrings = 0x89792ba0, kValueStringsHigh = 0x89794114;          // each ID's string, which the routine reads too: the values' names or their range, and after a 3 the unit in brackets
+constexpr uint32_t kReverbTime = 0x894b2bf0;                                            // (value): the time the driver takes for a Reverb Time, in samples at 44.1 kHz
 constexpr uint64_t kTextSteps = 2000000;                                                // far more than the longest; the routine doesn't loop on anything but its own lists
 
 // A note value comes back in the LCD font's own codes: the note, then a triplet's 0x17, a dot or a space.  Which note each is, xt_fx control measures against what the driver does with it at a tempo.
@@ -294,16 +295,32 @@ const char* noteOf(uint8_t glyph) {
     }
 }
 
-// The routine has no format for seven IDs, so it gives a bare number where the ID's own string and the manual have a scale.  The user's decision (2026-11-04): they read on that scale, so they run as an ID
+// The routine has no format for four IDs, so it gives a bare number where the ID's own string and the manual have a scale.  The user's decision (2026-11-04): they read on that scale, so they run as an ID
 // of the same range that has it.  xt_fx control measures that the driver treats them alike.
 int formatOf(int id) {
     switch (id) {
-        case 0x861: case 0x872: return 0x84b;                                           // Hall 2's and Hall 3's Reverb Time: Hall 1's Low Rev Time
-        case 0x884: return 0x828;                                                       // Garage's Reverb Time: Room 2's
         case 0x864: return 0x82b;                                                       // Hall 2's Room Size: Room 2's
         case 0x875: case 0x887: return 0x83c;                                           // Hall 3's and Garage's Room Size: Room 3's
         case 0x898: return 0x84d;                                                       // Plate's Xover Freq: Hall 1's
         default:    return id;
+    }
+}
+
+// The Reverb Times read as the driver has them, not as the routine does.  Its format is out with the driver between values 6 and 21, 0.31...0.46 where the sound is 0.40...1.90, and it has none at all for
+// Hall 2's, Hall 3's and Garage's.  The user's decision (2026-11-04).  xt_fx control measures the driver's times against what the combs' gains do.
+bool isReverbTime(int id) {
+    switch (id) {
+        case 0x814: case 0x815:                                                         // Room 1's Low and Hi
+        case 0x828:                                                                     // Room 2's
+        case 0x839:                                                                     // Room 3's
+        case 0x84b: case 0x84c:                                                         // Hall 1's Low and Hi
+        case 0x861:                                                                     // Hall 2's
+        case 0x872:                                                                     // Hall 3's
+        case 0x884:                                                                     // Garage's
+        case 0x896: case 0x897:                                                         // Plate's Low and Hi
+            return true;
+        default:
+            return false;
     }
 }
 
@@ -368,6 +385,11 @@ std::string XtFxValueText::unit(int id) {
 
 std::string XtFxValueText::make(int id, int value) {
     uint32_t at = 0;
+    if (ok_ && isReverbTime(id)) {
+        if (!sh4_->call(kReverbTime, { (uint32_t)value }, kSp, &at, kTextSteps)) return std::to_string(value);
+        const uint32_t hundredths = (at * 100 + 22050) / 44100;
+        return std::to_string(hundredths / 100) + "." + (hundredths % 100 < 10 ? "0" : "") + std::to_string(hundredths % 100) + " " + unit(id);
+    }
     if (!ok_ || !sh4_->call(kValueText, { (uint32_t)formatOf(id), (uint32_t)value, 0 }, kSp, &at, kTextSteps)) return std::to_string(value);
     std::string t;
     for (uint8_t ch = sh4_->rd8(at); ch; ch = sh4_->rd8(++at)) t += (char)ch;

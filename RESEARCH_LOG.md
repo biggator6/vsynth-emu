@@ -3540,3 +3540,10 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The quietest of the day: everything passed first time, with the two sides meeting only in the docs. The user had said yes in advance, and it had landed by the time they did.
 - All the session's branches are now in one. Nothing from v115 on has met a real DAW, and nothing from v131 on is pushed.
 
+### Session 16 addendum (2026-11-04) — v143: Reverb Time by the driver's own table
+
+- The user chose the driver's times. All I had was what v140's check had worked out from the gains, 0.30 + 0.10(v − 5), and I was ready to put that in the source. Looking first for where the driver gets its time, to be sure of the formula, found a function and two tables. So the panel runs the function, and the formula's gone.
+- The tables are in samples at 44.1 kHz, which is why my first comparison of them with the text said all 80 differed: I'd taken them for milliseconds.
+- v140 had left the two-band types unmeasured, saying they don't separate. They do, once Low and Hi go together: one coefficient on each type fits within 0.2%, better than any of the single-band combs.
+- Two words in the table are a sample short of their round figure, so a plain division gives 0.69 for 0.70. It's a planted error now.
+- I'd taken the `analysis/projects` link out of the worktree to leave it tidy, and `fcheck.sh --update` then ran without the project's waves and wrote a baseline 28 lines shorter, saying only "updated". My own filter on the diff hid it, and I saw it by the line count. `CLAUDE.md` says so now.

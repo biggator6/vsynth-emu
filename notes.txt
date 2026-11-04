@@ -335,6 +335,11 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Reverb Time by the driver's own table v143 (2026-11-04), no change to the sound, on the user's decision: all 11 Reverb Times show the time the driver uses, by its own function (0x894b2bf0, samples at 44.1 kHz, isReverbTime in XtFxControl.cpp), so values 6 to 21 read 0.40…1.90 where the routine's text says 0.31…0.46, and Hall 2's, Hall 3's and Garage's come from there too. No time is in the source. The panel parts from the XT's code there on purpose.
+  A comb's log gain times the new text is constant within 3% on all eight types with a Reverb Time, at every value it can tell, the two-band ones with Low and Hi together.
+  Check: xt_fx control, every Reverb Time against the table read directly and the gains on all eight types; TEST_FX_PANEL=1 sweeps all 11 through a box. A/B 4/4 identical to v142. Plants: mutate_panel.py 80, none missed; mutate_fx.py --control 157, the same 1 missed at 60 events; mutate_fx.py 97, the same 2 missed. fxthreads no races.
+  Not covered: a real XT's screen.
+
 v140 joins v142 (2026-11-04), no change to the sound: the seven values on the manual's scale merged with v141, on the user's word. Only the docs conflicted. verify.sh passes, fcheck as its baseline, A/B 4/4 identical to v141; mutate_fx.py --control 144 of 144 at 200 events, mutate_panel.py 67 of 67, mutate_fx.py 97 with the same 2 missed, fxthreads no races. The tone's sources are as v139's, so its 796 stand.
 
 v138 joins v141 (2026-11-04), no change to the sound: the effects' values as text merged with v139, on the user's word. Only the docs conflicted. verify.sh passes, fcheck as its baseline, A/B 4/4 identical to v139; mutate_fx.py --control 137 of 137, mutate_panel.py 60 of 60, mutate_fx.py 97 with the same 2 missed, fxthreads no races. The tone's sources are as v139's, so its 796 stand. v140, on top of v138 on its own branch, isn't in here.

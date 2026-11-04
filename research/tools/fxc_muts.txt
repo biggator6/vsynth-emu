@@ -115,9 +115,22 @@ clock-no-guard| sixClocksMs <= 0) return;| false) return;
 vt-with-unit|(uint32_t)value, 0 }, kSp, &at, kTextSteps|(uint32_t)value, 1 }, kSp, &at, kTextSteps
 vt-value|(uint32_t)value, 0 }, kSp, &at, kTextSteps|(uint32_t)value + 1, 0 }, kSp, &at, kTextSteps
 vt-id|{ (uint32_t)formatOf(id), (uint32_t)value, 0 }, kSp, &at, kTextSteps|{ (uint32_t)formatOf(id) + 1, (uint32_t)value, 0 }, kSp, &at, kTextSteps
-vt-lent-hall2-time|case 0x861: case 0x872: return 0x84b;|case 0x872: return 0x84b;
-vt-lent-hall3-time|case 0x861: case 0x872: return 0x84b;|case 0x861: return 0x84b;
-vt-lent-garage-time|case 0x884: return 0x828;|
+vt-time-room1|case 0x814: case 0x815:|case 0x815:
+vt-time-room1-hi|case 0x814: case 0x815:|case 0x814:
+vt-time-room2|        case 0x828:                                                                     // Room 2's\n|
+vt-time-room3|        case 0x839:                                                                     // Room 3's\n|
+vt-time-hall1|case 0x84b: case 0x84c:|case 0x84c:
+vt-time-hall1-hi|case 0x84b: case 0x84c:|case 0x84b:
+vt-time-hall2|        case 0x861:                                                                     // Hall 2's\n|
+vt-time-hall3|        case 0x872:                                                                     // Hall 3's\n|
+vt-time-garage|        case 0x884:                                                                     // Garage's\n|
+vt-time-plate|case 0x896: case 0x897:|case 0x897:
+vt-time-plate-hi|case 0x896: case 0x897:|case 0x896:
+vt-time-short-table|kReverbTime = 0x894b2bf0;|kReverbTime = 0x894b2ba0;
+vt-time-truncated|(at * 100 + 22050) / 44100|(at * 100) / 44100
+vt-time-rate|(at * 100 + 22050) / 44100|(at * 100 + 24000) / 48000
+vt-time-digit|(hundredths % 100 < 10 ? "0" : "")|""
+vt-time-unit|+ std::to_string(hundredths % 100) + " " + unit(id);|+ std::to_string(hundredths % 100);
 vt-lent-hall2-size|case 0x864: return 0x82b;|
 vt-lent-hall3-size|case 0x875: case 0x887: return 0x83c;|case 0x887: return 0x83c;
 vt-lent-garage-size|case 0x875: case 0x887: return 0x83c;|case 0x875: return 0x83c;

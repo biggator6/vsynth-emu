@@ -84,8 +84,11 @@ int main(int argc, char** argv) {
             return t;
         };
         const auto firmwareText = [&](int id, int v) {
-            // The seven the routine has no format for go by an ID of the same range that has one (the user's decision), and keep their own units.
-            static const std::map<int, int> borrowed = { { 0x861, 0x84b }, { 0x872, 0x84b }, { 0x884, 0x828 }, { 0x864, 0x82b }, { 0x875, 0x83c }, { 0x887, 0x83c }, { 0x898, 0x84d } };
+            // The Reverb Times read as the driver's table has them, in samples at 44.1 kHz (the user's decision).
+            for (const int time : { 0x814, 0x815, 0x828, 0x839, 0x84b, 0x84c, 0x861, 0x872, 0x884, 0x896, 0x897 })
+                if (id == time) return (juce::String((int)(fw.rd32(0x897ac574 + 4 * (uint32_t)v) / 44100.0 * 100.0 + 0.5) / 100.0, 2) + " sec").toStdString();
+            // The four the routine has no format for go by an ID of the same range that has one (the user's decision), and keep their own units.
+            static const std::map<int, int> borrowed = { { 0x864, 0x82b }, { 0x875, 0x83c }, { 0x887, 0x83c }, { 0x898, 0x84d } };
             const auto b = borrowed.find(id);
             const std::string bare = routine(0x89462120, b != borrowed.end() ? b->second : id, v), own = routine(0x89462120, id, v);
             std::string unit = routine(0x89462130, id, v);                                                                     // with the unit
@@ -149,22 +152,24 @@ int main(int argc, char** argv) {
         if (!page(3, nullptr, 0, cat.eq)) return 1;
         // A page's change alone, with each block on the same type number.
         for (int t = 1; t < 4; ++t) { if (!page(0, "fxMfxType", t, cat.mfx[(size_t)t]) || !page(1, "fxChoType", t, cat.chorus[(size_t)t]) || !page(2, "fxRevType", t, cat.reverb[(size_t)t])) return 1; }
-        // A Rate and a Delay Time through all their values, so that every note value goes through a box.
-        const auto sweep = [&](int type, int id) {
-            auto* prm = p.apvts.getParameter("fxMfxType"); prm->setValueNotifyingHost(prm->convertTo0to1((float)type));
-            panel->showPage(0);
+        // A Rate and a Delay Time through all their values, so that every note value goes through a box, and every Reverb Time.
+        const auto sweepOn = [&](const char* typeParam, int pg, const std::vector<std::vector<XtFxParam>>& lists, int type, int id) {
+            auto* prm = p.apvts.getParameter(typeParam); prm->setValueNotifyingHost(prm->convertTo0to1((float)type));
+            panel->showPage(pg);
             std::vector<juce::Slider*> sliders;
             for (juce::Component* ch : view->getViewedComponent()->getChildren()) if (ch->isVisible()) if (auto* sl = dynamic_cast<juce::Slider*>(ch)) sliders.push_back(sl);
-            const std::vector<XtFxParam>& list = cat.mfx[(size_t)type];
+            const std::vector<XtFxParam>& list = lists[(size_t)type];
             for (size_t i = 0; i < list.size() && i < sliders.size(); ++i) if (list[i].id == id) {
                 for (int v = list[i].low; v <= list[i].high; ++v) { sliders[i]->setValue(v, juce::sendNotificationSync); if (!boxSays(*sliders[i], id, v, "swept")) return false; }
                 p.setFxParam(id, list[i].def);
                 return true;
             }
-            std::fprintf(stderr, "panel: ID %x isn't on MFX type %d\n", id, type);
+            std::fprintf(stderr, "panel: ID %x isn't on page %d type %d\n", id, pg, type);
             return false;
         };
-        if (!sweep(3, 0x57a) || !sweep(11, 0x5de)) return 1;
+        if (!sweepOn("fxMfxType", 0, cat.mfx, 3, 0x57a) || !sweepOn("fxMfxType", 0, cat.mfx, 11, 0x5de)) return 1;
+        for (const auto& [type, id] : std::initializer_list<std::pair<int, int>>{ { 1, 0x814 }, { 1, 0x815 }, { 2, 0x828 }, { 3, 0x839 }, { 4, 0x84b }, { 4, 0x84c }, { 5, 0x861 }, { 6, 0x872 }, { 7, 0x884 }, { 8, 0x896 }, { 8, 0x897 } })
+            if (!sweepOn("fxRevType", 2, cat.reverb, type, id)) return 1;
         // Output Gain is a host's parameter, in the panel's own row, and the one level with a unit.
         {
             juce::Slider* gain = nullptr;
