@@ -20,7 +20,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - The project is GPL-3.0 (`LICENSE`, `NOTICE.md`, the user's decision), and JUCE under the AGPLv3 alongside it. JE-8086's ESP core (gearmulator, GPL-3.0) may be used with credit. Its copy in `research/third_party/gearmulator_esp/` stays unmodified: it's the effect chip's reference.
 
 ## Where things are
-- `plugin/Source/`: `XtFxChip` (the effect chip, not in the sound yet; `xt_fx`), `XtSynth` (the synth: voices, controls, tick), the ports
+- `plugin/Source/`: `XtFxChip` (the effect chip, not in the sound yet; `xt_fx`), `XtFxControl` (the firmware's effect driver in the interpreter, off the audio thread, feeding the chip through a queue; not in the sound yet; `xt_fx control`), `XtSynth` (the synth: voices, controls, tick), the ports
   (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`,
   `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFirmware` (firmware harness: runs
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
@@ -82,6 +82,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   an update writes, memory operations. `mfx <type> [i v]`: a type's words as fields, and what wrote each. `boot`: what's loaded. Output goes in `build/`.
 - `fxchip.cpp` (the same): a throwaway model of the effect chip, to test the decoding; a sine or impulse into a frame pair, gains at its slots. Not a port.
 - `xt_fx <rom> [samples] [seed]` (in fcheck; `build/tools/fcheck/bin`): `XtFxChip` against JE-8086's interpreter, whole state each sample, every type; `XT_FX_FIRST=1` says where each case first differs. `numbers`: the firmware's own numbers on it. `speed`: its share of a core, by CPU time. `mutate_fx.py [samples] [names]`: the planted errors in `fx_muts.txt`, through `PORT=fx mutate.sh`, about a minute.
+- `xt_fx <rom> control [events] [seed]` (in fcheck, about 7 s): `XtFxControl`, the same driver through the queue into `XtFxChip` against on JE-8086's chip with its waits running the samples, whole state each sample; its readers against the routines one by one; live edits against a patch; what each edit costs on the bus; two threads. `XT_FX_FIRST=1` says what differs, `XT_FX_COUNTS=1` the costs. `mutate_fx.py --control [events] [names]`: the planted errors in `fxc_muts.txt`, through `PORT=fxc mutate.sh`, about 3.5 minutes. `fxthreads.sh [events] [seed]`: the threads part under the thread sanitizer, which the plain run needs for ordering errors.
 - `fxcut.py <recording>`: checks a recording of a run and cuts it into takes, levels and all; the last line says whether to go on. `fxcut_test.py` (about 90 s, when it changes): that against a simulated XT, with faults planted.
 - `fxcapture.py`: the effect captures' test wave, MIDI runs and take list, into `analysis/test_files/fx/` (gitignored; the runs hold firmware defaults). `fxplay.cpp`: plays a run
   through CoreMIDI; `--test` and `--listen` check it on a virtual output. Steps: RECORDING_GUIDE.md, "Effects captures".
@@ -94,7 +95,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
   a difference, not as a routine.
-- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes). If `XtFxChip.cpp` changed: `mutate_fx.py`.
+- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes). If `XtFxChip.cpp` changed: `mutate_fx.py`. If `XtFxControl.cpp` changed: `mutate_fx.py --control` and `fxthreads.sh`.
 - Before a push: `verify.sh --full`.
 
 ## Firmware facts worth knowing
@@ -148,6 +149,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - The Matrix is the note's object M (the input table's +0x68), read through the getters `0x894e7010`…`0x894e7860`; a slot is not a Dest (`xtFwMatrixTables`).
   A getter forms its own group of sums and no other. A pad's move (TRIP-R) brings no update, so a key-off, which converts only release times, reaches only the envelopes' groups: `matrixRelease`. A note value (128 on) takes no sum (`withSum`).
   `0x894d96d0` on `0x89cf7634`, which older sections call "the matrix", is the Multi Step Modulator, not ported (HARDWARE_FIRMWARE.md, "The Matrix").
+- The effects' driver takes messages: flags at `0x89ced200`, read by `0x894ac970` (second byte 0x20 system, 0x10 Attenuation; fourth byte 0x80 patch, 0x40 switches, 0x20 MFX, 0x10 Chorus, 0x08 Reverb), and a reader per block fetches its parameters by ID. `XtFxControl` sends those, so which readers run, and how, stays the firmware's. Its hooks are the bus, the sleep and the two parameter reads. A read is the stored value less the descriptor's centre. Some things depend on how a parameter got there, in the firmware itself: Resonant Filter's Sweep Depth does nothing when edited alone, and Reverb Delay keeps the last type's pre-EQ and the last tempo it heard: HARDWARE_FIRMWARE.md, "XtFxControl".
 - The effects don't run on the SH-4: MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain are microcode on a separate chip, Roland's ESP4 (RA0A-101; the JP-8000's instruction set, v123; ported in `XtFxChip`, v126; its delay memory 2^17 words on a 256 K × 16 DRAM; programs in rom.2,
   8 channels by DMA), with no reference but a real XT. Only the SH-4's driver and converters run in `Sh4Interp`. Map, the word as far as decoded, and the proposed
   order: HARDWARE_FIRMWARE.md, "The effects". The tones' `g` (v114) is ID 0x526, Out Gain for TG, default −24; the user's Output Gain is ID 0x76, on the chip.

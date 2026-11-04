@@ -65,6 +65,8 @@ for spec in "3 drum.bin 2 1.0 1.0 30000" "3 drum.bin 2 1.3 -1.0 30000" "5 chord.
 # The effect chip against JE-8086's interpreter, on the XT's own programs, and the firmware's own numbers on it
 [ -x "$X/xt_fx" ] && part xt_fx 'echo "== xt_fx"; "$X/xt_fx" "$ROM" 8192'
 [ -x "$X/xt_fx" ] && part xt_fx '"$X/xt_fx" "$ROM" numbers'
+# The effects' control side: the firmware's driver through the queue, against the same driver on the reference
+[ -x "$X/xt_fx" ] && part xt_fx '"$X/xt_fx" "$ROM" control'
 wait
 cat "$P"/[0-9][0-9][0-9] > "$O/results.txt"
 if [ $UPDATE = 1 ]; then cp "$O/results.txt" "$B"; keep; echo "fcheck: baseline updated ($(wc -l < "$B") lines)"; exit 0; fi

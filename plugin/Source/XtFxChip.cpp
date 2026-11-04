@@ -86,17 +86,21 @@ void XtFxChip::commit(uint32_t addr) {
     hostTail_[addr >> 10 & 1] = (int32_t)(addr & 0x3ff);
     const auto wordAt = [this](uint32_t i) { return words_[i >> 10 & 1][i & 0x3ff]; };
     if (mode_ == 3) { mailbox_ = (int32_t)wordAt(addr); return; }
-    const unsigned n = mode_ == 0 ? 1 : mode_ == 1 ? 2 : 5;
+    const unsigned n = wordsOf(mode_);
     if (addr + n > 2048) return;
     uint32_t w[5] = {}; for (unsigned i = 0; i < n; i++) w[i] = wordAt(addr + i);
-    const uint32_t b0 = staging_[0], b1 = staging_[1], b2 = staging_[2], b3 = staging_[3];
-    if (mode_ == 0) w[0] = b0 | b1 << 8 | b2 << 16 | b3 << 24;
-    else if (mode_ == 1) { w[0] = (w[0] & ~0x3ffu) | b0 | (b1 & 3) << 8; w[1] = (w[1] & ~0x3ffu) | b1 >> 2 | (b2 & 15) << 6; }
+    merge(mode_, staging_, w);
+    for (unsigned i = 0; i < n; i++) setWord(addr + i, w[i]);
+}
+
+void XtFxChip::merge(unsigned mode, const uint8_t bytes[4], uint32_t w[5]) {
+    const uint32_t b0 = bytes[0], b1 = bytes[1], b2 = bytes[2], b3 = bytes[3];
+    if (mode == 0) w[0] = b0 | b1 << 8 | b2 << 16 | b3 << 24;
+    else if (mode == 1) { w[0] = (w[0] & ~0x3ffu) | b0 | (b1 & 3) << 8; w[1] = (w[1] & ~0x3ffu) | b1 >> 2 | (b2 & 15) << 6; }
     else {
         const uint32_t f[5] = { b0 >> 3, b1 & 31, b1 >> 5 | (b2 & 3) << 3, b2 >> 2 & 31, b2 >> 7 | (b3 & 15) << 1 };
         for (unsigned i = 0; i < 5; i++) w[i] = (w[i] & ~(31u << 23)) | f[i] << 23;
     }
-    for (unsigned i = 0; i < n; i++) setWord(addr + i, w[i]);
 }
 
 int32_t XtFxChip::coefValue(unsigned i, unsigned t) const {
@@ -228,17 +232,25 @@ void XtFxChip::runFrame() {
 //   and Chorus type with its parameters drawn at random and changed as it runs, noise at every level into every input, and then all of them changing type under load.  Every word of
 //   both cores' state and all of GRAM, each sample, and the delay memory each 2048 samples.  XT_FX_FIRST=1: say where each case first differs.  XT_FX_STOP=1: stop at the first case that does.
 // xt_fx <rom> numbers: the firmware's own numbers on this class: gains, the EQ, the delays, whether every type makes sense.
-// xt_fx <rom> speed: how much of a core it takes.
+// xt_fx <rom> speed: how much of a core it takes, and what the control side costs.
+// xt_fx <rom> control [events] [seed]: XtFxControl: see "the control side" below.  xt_fx <rom> threads [events] [seed]: only its part with threads.
 // Build: see research/tools/build.sh.
 #include "Sh4Interp.h"
+#include "XtFxControl.h"
 #include "esp_interpreter.h"
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <ctime>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <initializer_list>
+#include <map>
 #include <memory>
+#include <new>
 #include <string>
+#include <thread>
 
 namespace {
 using Reference = esp::Interpreter<18>;
@@ -250,7 +262,7 @@ struct Rng { uint32_t s; explicit Rng(uint32_t seed) : s(seed * 2654435761u + 1)
 
 // The firmware's driver, with the chip's bus at its four primitives.  Each sends what the routine sends, byte for byte (read off 0x894af400, 0x894af510, 0x894af610, 0x894af6a0).
 struct Rig {
-    Sh4 c; XtFxChip chip; std::unique_ptr<Reference> ref; uint32_t obj = 0, vt = 0; int mfx = -1; uint64_t readsDiffer = 0;
+    Sh4 c; XtFxChip chip; std::unique_ptr<Reference> ref; uint32_t obj = 0, vt = 0; int mfx = -1; uint64_t readsDiffer = 0; const std::map<int, int>* forced = nullptr;
     explicit Rig(const char* rom, bool withReference = true) {
         if (withReference) ref = std::make_unique<Reference>();
         if (!c.loadRom(rom)) { std::printf("cannot load %s\n", rom); std::exit(1); }
@@ -274,6 +286,7 @@ struct Rig {
     uint32_t call(uint32_t fn, std::initializer_list<uint32_t> a = {}) { uint32_t r = 0; if (!c.call(fn, a, kSp, &r)) { std::printf("fault in %08x: %s\n", fn, c.error().c_str()); std::exit(1); } return r; }
     int s16(uint32_t a) { return (int16_t)c.rd16(a); }
     int pick(int id, Rng* r) {                                                  // a parameter: its default, or anything in range
+        if (forced) { const auto it = forced->find(id); if (it != forced->end()) return it->second; }
         const uint32_t d = kDesc + 8 * (uint32_t)(id - 0x55d); const int def = s16(d + 2), lo = s16(d + 4), hi = s16(d + 6);
         return r && r->below(2) ? lo + r->below(hi - lo + 1) : def;
     }
@@ -324,8 +337,8 @@ struct Rig {
 };
 
 // Every word of the two states, after the rotation.  Returns the first that differs.
-std::string differs(const Rig& g, bool memory) {
-    const auto& r = g.ref->runtime(); const XtFxChip& x = g.chip; char b[120];
+std::string differs(const XtFxChip& x, const Reference& ref, bool memory) {
+    const auto& r = ref.runtime(); char b[120];
     if (x.position() != r.core[0].iramPos) return "position";
     for (unsigned i = 0; i < 256; i++) if (x.gram(i) != r.readGram(i)) { std::snprintf(b, sizeof b, "GRAM %02x: %d, against %d", i, x.gram(i), r.readGram(i)); return b; }
     for (unsigned k = 0; k < 2; k++) {
@@ -362,7 +375,7 @@ void compare(const char* rom, const char* label, int mfxType, int revType, int c
             if (k == 0) g.setMfx(r.below(42), &r); else if (k == 1) { revType = r.below(11); g.setReverb(revType, &r); } else { choType = r.below(9); g.setChorus(choType, &r); } }
         for (int i = 0; i < 10; i++) { noise = (int32_t)r.next(); const double v = level[i] * (noise / 2147483648.0) * 8388608.0; g.input(inputs[i], v > 8388607.0 ? 8388607 : v < -8388608.0 ? -8388608 : (int32_t)v); }
         g.frame();
-        const std::string d = differs(g, n % 2048 == 2047 || n == frames - 1);
+        const std::string d = differs(g.chip, *g.ref, n % 2048 == 2047 || n == frames - 1);
         if (!d.empty()) { if (!different) { firstAt = n; what = d; } different++; }
     }
     if (different && first) std::printf("  %s: first at sample %d, %s\n", label, firstAt, what.c_str());
@@ -439,13 +452,325 @@ void speed(const char* rom) {
         const double sec = (double)(std::clock() - t0) / CLOCKS_PER_SEC;
         std::printf("MFX %d, Reverb %d: %.2f x real time, %.0f%% of a core\n", c.first, c.second, (n / 44100.0) / sec, 100 * sec / (n / 44100.0));
     }
+    // The control side.  The driver on its thread, and the most the audio thread ever gets between two samples: a Reverb's type, the longest program with the most read-backs.
+    using Clock = std::chrono::steady_clock;
+    const auto us = [](Clock::time_point a, Clock::time_point b) { return std::chrono::duration<double, std::micro>(b - a).count(); };
+    const Clock::time_point t0 = Clock::now(); XtFxControl c(rom); const Clock::time_point t1 = Clock::now(); XtFxChip chip;
+    while (!c.drained()) { c.service(chip); chip.runFrame(); }
+    std::printf("the driver's start: %.0f us\n", us(t0, t1));
+    const auto edit = [&](const char* what, int id, int v) {
+        c.set(id, v); const Clock::time_point a = Clock::now(); c.update(); const Clock::time_point b = Clock::now(); double most = 0; long samples = 0;
+        while (!c.drained()) { const Clock::time_point p = Clock::now(); c.service(chip); most = std::max(most, us(p, Clock::now())); chip.runFrame(); samples++; }
+        std::printf("%s: %.0f us on the control thread; at most %.1f us between two samples; %.1f ms to reach the chip\n", what, us(a, b), most, samples / 44.1);
+    };
+    edit("an MFX level", 0x178, 100); edit("the MFX's type", 0x177, 27); edit("one of its parameters", 0x57d, 3); edit("the Reverb's type", 0x230, 4); edit("the Chorus's type", 0x1fc, 3);
+}
+
+// ------------------------------------------------------------------ the control side
+// xt_fx <rom> control [events] [seed].  Each part says how many of what it tried were different.
+// - Against the reference: the firmware's driver through XtFxControl with the bus straight on JE-8086's chip, whose waits run it, against the same driver through the queue into XtFxChip, whole
+//   state each sample.  That's the queue, the copy of the words and the waits; the driver is the same code on both sides.
+// - The readers: a patch through the firmware's readers, by ID from the store, against the routines the rest of this file calls one by one, with the same values, word for word.
+// - Behaviour: what each kind of change costs on the bus, exactly; every ID a reader reads counts as a change; the Matrix reaches the types that assign it; clamping; no click under a tone.
+// - Live edits: edits one at a time through update(), then the same store loaded as a patch into a new one.  The words must end up the same, but for what the firmware itself leaves behind.
+// - Threads: the driver on one thread and the samples on another, as fast as they go, each stopping now and then: the stream arrives whole and in order, the waits are kept, and the audio thread
+//   allocates nothing.  research/tools/fxthreads.sh runs this part under the thread sanitizer.
+thread_local bool tAudioThread = false;
+std::atomic<uint64_t> gAudioAllocations{0};
+
+struct Edit { std::vector<std::pair<int, int>> sets; bool patch = false, matrix = false; int prm[3] = {}; };
+
+// Draws edits, from the firmware's own ranges.
+struct Editor {
+    Sh4 rom; XtFxControl& ranges; Rng r; int mfx = 0, cho = 0, rev = 0;
+    Editor(const char* path, XtFxControl& c, uint32_t seed) : ranges(c), r(seed) { rom.loadRom(path); }
+    int s16(uint32_t a) { return (int16_t)rom.rd16(a); }
+    int draw(int id) { const int lo = ranges.lowest(id), hi = ranges.highest(id); return lo + r.below(hi - lo + 1); }
+    void params(Edit& e, uint32_t table, int type, int n) { const int first = s16(table + 4 * (uint32_t)type), last = s16(table + 4 * (uint32_t)type + 2); for (int i = 0; i < n; i++) { const int id = first + r.below(last - first + 1); e.sets.push_back({ id, draw(id) }); } }
+    Edit mfxType(int t) { Edit e; mfx = t; e.sets.push_back({ 0x177, t }); params(e, kMfxIds, t, 3); return e; }
+    Edit choType(int t) { Edit e; cho = t; e.sets.push_back({ 0x1fc, t }); params(e, kChoIds, t, 3); return e; }
+    Edit revType(int t) { Edit e; rev = t; e.sets.push_back({ 0x230, t }); params(e, kRevIds, t, 3); return e; }
+    Edit any() {
+        Edit e; static const int levels[] = { 0x178, 0x179, 0x17a, 0x1fd, 0x1fe, 0x231, 0x3e, 0x76, 0x51e, 0x11d, 0x120, 0x121, 0x122, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70 };
+        switch (r.below(10)) {
+            case 9: e.matrix = true; for (int& v : e.prm) { const int k = r.below(4); v = k == 0 ? 0 : k == 1 ? r.below(128) - 64 : (int)(r.next() % 65535) - 32767; } break;
+            case 0: return mfxType(r.below(42));
+            case 1: return choType(r.below(9));
+            case 2: return revType(r.below(11));
+            case 3: case 4: params(e, kMfxIds, mfx, 1 + r.below(4)); break;
+            case 5: params(e, kChoIds, cho, 1 + r.below(3)); break;
+            case 6: params(e, kRevIds, rev, 1 + r.below(3)); break;
+            case 7: { const int id = levels[r.below((int)(sizeof levels / sizeof *levels))]; e.sets.push_back({ id, draw(id) }); break; }
+            default: e = mfxType(r.below(42)); e.patch = true; break;
+        }
+        return e;
+    }
+};
+void apply(XtFxControl& c, const Edit& e) { if (e.matrix) { c.setMatrix(e.prm[0], e.prm[1], e.prm[2]); return; } for (const auto& s : e.sets) c.set(s.first, s.second); if (e.patch) c.loadPatch(); else c.update(); }
+
+// The reference with the driver on its bus.  Its waits run the samples, and the samples run both chips.
+struct DirectBus : XtFxControl::Bus {
+    Reference& ref; std::function<void()> sample;
+    explicit DirectBus(Reference& r) : ref(r) {}
+    void write(uint8_t c, uint16_t i, uint32_t w) override { ref.hostWrite(0x2003, c); for (uint32_t k = 0; k < 4; k++) ref.hostWrite((uint32_t)i * 4 + k, (uint8_t)(w >> (8 * k))); }
+    uint32_t read(uint16_t i) override { write(0x37, i, 0); uint32_t v = 0; for (uint32_t k = 0; k < 4; k++) v |= (uint32_t)ref.hostRead(k) << (8 * k); return v & 0x0fffffff; }
+    void wait(uint32_t n) override { for (uint32_t i = 0; i < n; i++) sample(); }
+};
+
+void againstReference(const char* rom, int randomEvents, uint32_t seed) {
+    auto ref = std::make_unique<Reference>(); auto chip = std::make_unique<XtFxChip>();
+    Rng noise(seed); double level[10] = {}; long samples = 0, different = 0, firstAt = -1, words = 0; std::string what;
+    static const unsigned inputs[] = { 0x20, 0x22, 0x24, 0x26, 0x28, 0x2a, 0x2c, 0x2e, 0x18, 0x1a };
+    XtFxControl queued(rom);
+    const auto sample = [&] {
+        if (samples % 256 == 0) { const int w = noise.below(10), k = noise.below(4); level[w] = k == 0 ? 0.0 : k == 1 ? 0.002 : k == 2 ? 0.25 : 2.0; }
+        for (int i = 0; i < 10; i++) { const double v = level[i] * ((int32_t)noise.next() / 2147483648.0) * 8388608.0; const int32_t x = v > 8388607.0 ? 8388607 : v < -8388608.0 ? -8388608 : (int32_t)v; chip->setGram(inputs[i], x); ref->runtime().writeGram(x, (uint8_t)inputs[i]); }
+        queued.service(*chip); chip->runFrame(); ref->runProgram(768); ref->sync(); samples++;
+        const std::string d = differs(*chip, *ref, samples % 2048 == 0);
+        if (!d.empty()) { if (!different) { firstAt = samples; what = d; } different++; }
+    };
+    DirectBus bus(*ref); bus.sample = sample;
+    XtFxControl direct(rom, &bus);                                               // starts both: its start's waits run the samples
+    Editor ed(rom, queued, seed);
+    const auto run = [&](const Edit& e, int after) {
+        apply(queued, e); apply(direct, e);
+        for (int i = 0; i < after; i++) sample();
+        for (unsigned i = 0; i < 2048; i++) if (queued.drained() && (chip->word(i) & 0x0fffffff) != (queued.word(i) & 0x0fffffff)) { words++; break; }
+    };
+    for (int t = 1; t <= 42; t++) { run(ed.mfxType(t % 42), 128); Edit e; ed.params(e, kMfxIds, t % 42, 3); run(e, 128); }
+    for (int t = 1; t <= 9; t++) { run(ed.choType(t % 9), 128); Edit e; ed.params(e, kChoIds, t % 9, 3); run(e, 128); }
+    for (int t = 1; t <= 11; t++) { run(ed.revType(t % 11), 128); Edit e; ed.params(e, kRevIds, t % 11, 3); run(e, 128); }
+    for (int i = 0; i < randomEvents; i++) run(ed.any(), ed.r.below(4) ? ed.r.below(64) : ed.r.below(2048));
+    if (different && std::getenv("XT_FX_FIRST")) std::printf("  control: first at sample %ld, %s\n", firstAt, what.c_str());
+    if (!queued.ok() || !direct.ok()) std::printf("  control: a fault: %s %s\n", queued.error().c_str(), direct.error().c_str());
+    std::printf("control against the reference: %ld samples, %ld different\n", samples, different + words + (queued.ok() && direct.ok() ? 0 : 1));
+}
+
+// A patch through the firmware's readers, by ID, against Rig's routines one by one.  Where they should differ, the Rig is told what it leaves out: the tempo, and that a Chorus of type Off keeps its
+// return shut however its switch stands.  And the system's EQ, which the firmware starts with on, goes off.
+void readers(const char* rom, uint32_t seed) {
+    int cases = 0, different = 0; std::string first;
+    for (int t = 0; t < 62; t++) {
+        const int mfx = t < 42 ? t : 0, rev = t < 42 ? t % 11 : t < 53 ? t - 42 : 0, cho = t < 42 ? t % 9 : t < 53 ? 0 : t - 53;
+        XtFxControl c(rom); Editor ed(rom, c, seed + (uint32_t)t); std::map<int, int> forced;
+        const auto draw = [&](uint32_t table, int type) { const int f = ed.s16(table + 4 * (uint32_t)type), l = ed.s16(table + 4 * (uint32_t)type + 2); for (int id = f; id <= l; id++) { forced[id] = ed.draw(id); c.set(id, forced[id]); } };
+        draw(kMfxIds, mfx); draw(kRevIds, rev); draw(kChoIds, cho);
+        c.set(0x177, mfx); c.set(0x230, rev); c.set(0x1fc, cho); c.set(0x120, 1); c.set(0x121, 1); c.set(0x122, 1); c.set(0x70, 0); c.update(); c.loadPatch();
+        Rig g(rom, false); g.forced = &forced;
+        g.boot(mfx, rev, cho, nullptr);
+        g.call(0x894d34e0, { 1200 }); g.call(0x894d0b50, { 1200 }); g.call(0x894affe0, { cho ? 1u : 0u });
+        int d = 0; unsigned at = 0; uint32_t x = 0, y = 0;
+        for (unsigned i = 0; i < 2048; i++) { const uint32_t a = g.chip.word(i) & 0x0fffffff, b = c.word(i) & 0x0fffffff; if (a != b && !d++) { at = i; x = a; y = b; } }
+        if (d && first.empty()) { char s[120]; std::snprintf(s, sizeof s, "MFX %d, Reverb %d, Chorus %d: word %03x, %07x against %07x", mfx, rev, cho, at, y, x); first = s; }
+        if (!c.ok()) { first = c.error(); d++; }
+        cases++; different += d ? 1 : 0;
+    }
+    if (different && std::getenv("XT_FX_FIRST")) std::printf("  readers: first %s\n", first.c_str());
+    std::printf("control's readers against the routines one by one: %d samples, %d different\n", cases, different);
+}
+
+// Edits one at a time through update(), then the same store as a patch into a new control.  Types have their defaults and the edits their own values, so anything set() lost shows.
+void liveEdits(const char* rom, int events, uint32_t seed) {
+    int cases = 0, different = 0; std::string first;
+    for (int run = 0; run < 12; run++) {
+        XtFxControl live(rom); Editor ed(rom, live, seed + 1000 + (uint32_t)run);
+        for (int i = 0; i < events; i++) {
+            Edit e = ed.any(); e.patch = false;
+            if (e.matrix) continue;                                              // the Matrix isn't in the store, so a new patch wouldn't have it
+            // Nor do these parameters reach the words alone, in the firmware's own update: a new patch has them and a live edit doesn't (HARDWARE_FIRMWARE.md, "XtFxControl").
+            static const int alone[] = { 0x57b, 0x6bb, 0x6bd, 0x5b7, 0x5dd, 0x634, 0x71e };
+            e.sets.erase(std::remove_if(e.sets.begin(), e.sets.end(), [](const std::pair<int, int>& x) { return std::find(std::begin(alone), std::end(alone), x.first) != std::end(alone); }), e.sets.end());
+            apply(live, e);
+        }
+        XtFxControl fresh(rom);
+        for (int id = 0; id < 0x8d0; id++) fresh.set(id, live.get(id));
+        fresh.loadPatch();
+        // The firmware leaves two things behind.  Reverb types Off and Delay don't write the pre-EQ (A 0x138…0x156), so it's what the last type left, and a new patch hasn't had one.  So through Reverb 1
+        // on both, and back.  And Reverb Delay's note values use the tempo it last heard, which it only hears as the current type.  So the tempo away and back, on both.
+        const int rev = live.get(0x230), tempo = live.get(0x11d);
+        for (XtFxControl* c : { &live, &fresh }) { c->set(0x230, rev == 1 ? 2 : 1); c->update(); c->set(0x230, 1); c->update(); c->set(0x230, rev); c->update(); c->set(0x11d, tempo == 2500 ? tempo - 1 : tempo + 1); c->update(); c->set(0x11d, tempo); c->update(); }
+        int d = 0; unsigned at = 0; uint32_t x = 0, y = 0;
+        for (unsigned i = 0; i < 2048; i++) { const uint32_t a = live.word(i) & 0x0fffffff, b = fresh.word(i) & 0x0fffffff; if (a != b && !d++) { at = i; x = a; y = b; } }
+        if (d && first.empty()) { char s[100]; std::snprintf(s, sizeof s, "run %d: %d words, first %03x, live %07x, patch %07x", run, d, at, x, y); first = s; }
+        if (!live.ok() || !fresh.ok()) { first = live.error() + fresh.error(); d = 1; }
+        if (d && std::getenv("XT_FX_LIVE")) { std::printf("  run %d, MFX %d, Chorus %d, Reverb %d:", run, live.get(0x177), live.get(0x1fc), live.get(0x230)); for (unsigned i = 0; i < 2048; i++) { const uint32_t a = live.word(i) & 0x0fffffff, b = fresh.word(i) & 0x0fffffff; if (a != b) std::printf(" %c%03x %07x/%07x", "AB"[i >> 10], i & 1023, a, b); } std::printf("\n"); }
+        cases++; different += d ? 1 : 0;
+    }
+    if (different && std::getenv("XT_FX_FIRST")) std::printf("  live edits: %s\n", first.c_str());
+    std::printf("control's live edits against a patch: %d samples, %d different\n", cases, different);
+}
+
+// The stream as it should be, one thread and no queue: a checksum of what's sent, and where each wait falls in it.
+struct Recorder : XtFxControl::Bus {
+    XtFxChip chip; uint32_t crc = 0; uint64_t n = 0; std::vector<std::pair<uint64_t, uint32_t>> waits;
+    static uint32_t mix(uint32_t h, uint32_t v) { return (h ^ v) * 16777619u; }
+    void write(uint8_t c, uint16_t i, uint32_t w) override { chip.hostWord(c, i, w); crc = mix(mix(mix(crc, c), i), w); n++; }
+    uint32_t read(uint16_t i) override { write(0x37, i, 0); uint32_t v = 0; for (uint32_t k = 0; k < 4; k++) v |= (uint32_t)chip.hostRead(k) << (8 * k); return v & 0x0fffffff; }
+    void wait(uint32_t s) override { waits.push_back({ n, s }); }
+};
+// What the audio thread sees.  No allocation here: what it records has its room already.
+struct Tap {
+    std::vector<uint32_t>& at; uint32_t crc = 0; uint64_t n = 0; uint32_t sample = 0; bool overflow = false;
+    static void observe(void* context, uint8_t c, uint16_t i, uint32_t w) {
+        Tap& t = *static_cast<Tap*>(context); t.crc = Recorder::mix(Recorder::mix(Recorder::mix(t.crc, c), i), w);
+        if (t.n < t.at.size()) t.at[t.n] = t.sample; else t.overflow = true;
+        t.n++;
+    }
+};
+
+void threads(const char* rom, int events, uint32_t seed) {
+    // A burst too big for the ring while the audio thread's stopped, then the rest with both going.
+    std::vector<Edit> edits;
+    { XtFxControl c(rom); Editor ed(rom, c, seed + 7); for (int i = 0; i < events; i++) edits.push_back(ed.any()); for (int i = 0; i < 3000; i++) { Edit e; const int id = 0x178 + (i & 1); e.sets.push_back({ id, i % 128 }); edits.push_back(e); } }
+    // The order it'll go in, the burst in the middle, recorded with one thread and no queue.
+    const size_t random = (size_t)events;
+    Recorder expect; { XtFxControl e(rom, &expect);
+        for (size_t i = 0; i < edits.size(); i++) { if (i == random / 2) for (size_t k = 0; k < 3000; k++) apply(e, edits[random + k]); if (i >= random && i < random + 3000) continue; apply(e, edits[i]); } }
+    auto chip = std::make_unique<XtFxChip>(); std::vector<uint32_t> at((size_t)expect.n + 1024);
+    Tap tap{ at };
+    XtFxControl c(rom); c.observe(Tap::observe, &tap);
+    std::atomic<bool> finished{false}; std::atomic<int> hold{0};                 // hold: 1, the audio thread waits; 2, it's waiting
+    std::thread control([&] {
+        Rng r(seed + 11);
+        for (size_t i = 0; i < edits.size(); i++) {
+            if (i == random / 2) { hold = 1; while (hold.load() != 2) std::this_thread::yield(); for (size_t k = 0; k < 3000; k++) apply(c, edits[random + k]); hold = 0; }
+            if (i >= random && i < random + 3000) continue;
+            apply(c, edits[i]);
+            if (r.below(8) == 0) std::this_thread::sleep_for(std::chrono::microseconds(r.below(2000)));
+        }
+        while (!c.drained()) { c.pump(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+        finished = true;
+    });
+    tAudioThread = true;
+    Rng r(seed + 13); uint64_t samples = 0;
+    while (!finished.load()) {
+        if (hold.load() == 1) { hold = 2; while (hold.load() == 2) std::this_thread::yield(); }
+        c.service(*chip); chip->runFrame(); tap.sample++; samples++;
+        if (r.below(4096) == 0) std::this_thread::sleep_for(std::chrono::microseconds(r.below(2000)));
+    }
+    tAudioThread = false;
+    control.join();
+    long short_ = 0; for (const auto& w : expect.waits) if (w.first > 0 && w.first < tap.n && w.first < at.size() && at[(size_t)w.first] - at[(size_t)w.first - 1] < w.second) short_++;
+    long words = 0; for (unsigned i = 0; i < 2048; i++) if ((chip->word(i) & 0x0fffffff) != (c.word(i) & 0x0fffffff)) words++;
+    const long lost = (long)expect.n - (long)tap.n, wrong = tap.crc != expect.crc ? 1 : 0, allocations = (long)gAudioAllocations.load();
+    if (std::getenv("XT_FX_FIRST") && (lost || wrong || short_ || words || allocations)) std::printf("  threads: %ld lost, %ld out of order, %ld waits cut short, %ld words, %ld allocations\n", lost, wrong, short_, words, allocations);
+    if (!c.ok()) std::printf("  threads: a fault: %s\n", c.error().c_str());
+    std::printf("control under threads: %zu edits, %ld different\n", edits.size(), (lost != 0) + wrong + short_ + words + allocations + (tap.overflow ? 1 : 0) + (c.ok() ? 0 : 1));
+    (void)samples;
+}
+
+// What the waits and the mutes are for: a type change and a patch under a tone, the largest step between two samples against the tone's own, with the driver's waits and with the words all at once.
+struct Immediate : XtFxControl::Bus {
+    XtFxChip& chip; explicit Immediate(XtFxChip& x) : chip(x) {}
+    void write(uint8_t c, uint16_t i, uint32_t w) override { chip.hostWord(c, i, w); }
+    uint32_t read(uint16_t i) override { write(0x37, i, 0); uint32_t v = 0; for (uint32_t k = 0; k < 4; k++) v |= (uint32_t)chip.hostRead(k) << (8 * k); return v & 0x0fffffff; }
+    void wait(uint32_t) override {}
+};
+double stepUnderTone(const char* rom, bool honoured, bool patch) {
+    auto chip = std::make_unique<XtFxChip>(); Immediate imm(*chip);
+    XtFxControl c(rom, honoured ? nullptr : &imm);
+    c.set(0x120, 1); c.set(0x177, 11); c.loadPatch();                                                     // from a Stereo Delay, full of the tone, to an overdrive
+    double last = 0, most = 0, tone = 0;
+    for (int i = 0; i < 60000; i++) {
+        if (i == 40000) { c.set(0x177, 5); if (patch) c.loadPatch(); else c.update(); }
+        const int32_t v = (int32_t)std::lrint(0.25 * std::sin(2 * M_PI * 100 * i / 44100.0) * 8388608.0);
+        c.service(*chip);
+        for (unsigned s = 0x20; s <= 0x2e; s += 2) chip->setGram(s, s == 0x28 || s == 0x2a ? v : 0);
+        chip->runFrame();
+        const double y = (double)chip->gram(0xa1), d = std::fabs(y - last); last = y;
+        if (i > 20000 && i < 40000) tone = std::max(tone, d);
+        if (i >= 40000) most = std::max(most, d);
+    }
+    return db(most / tone);
+}
+void changeUnderTone(const char* rom) {
+    std::printf("under a tone, the largest step against the tone's own: an MFX type change %+.1f dB, a patch %+.1f dB; with the words all at once, %+.1f dB, %+.1f dB\n",
+                stepUnderTone(rom, true, false), stepUnderTone(rom, true, true), stepUnderTone(rom, false, false), stepUnderTone(rom, false, true));
+}
+
+// What each kind of change costs on the bus: a live edit stays small and doesn't wait, a value that hasn't changed costs nothing, a type change mutes before it swaps, a patch reloads.
+void behaviour(const char* rom) {
+    int tried = 0, different = 0; const bool first = std::getenv("XT_FX_FIRST"), show = std::getenv("XT_FX_COUNTS");
+    const auto check = [&](bool good, const char* what) { tried++; if (!good) { different++; if (first) std::printf("  behaviour: %s\n", what); } };
+    Recorder rec; XtFxControl c(rom, &rec);
+    c.set(0x120, 1); c.set(0x121, 1); c.set(0x122, 1); c.set(0x177, 1); c.set(0x1fc, 1); c.set(0x230, 1); c.loadPatch();
+    // A live edit: this many words on the bus, no fewer and no more (a reload or a ramp would add to them), and no wait.
+    const auto live = [&](int id, int v, uint64_t words, const char* what) {
+        const uint64_t n = rec.n; const size_t w = rec.waits.size(); c.set(id, v); c.update();
+        if (show) std::printf("  %-20s %3llu words, %zu waits\n", what, (unsigned long long)(rec.n - n), rec.waits.size() - w);
+        check(rec.n - n == words && rec.waits.size() == w, what);
+    };
+    live(0x55e + 4, 20, 16, "an MFX parameter"); live(0x7c7, 40, 1, "a Chorus parameter"); live(0x80e, 20, 3, "a Reverb parameter");
+    live(0x178, 90, 4, "MFX Master"); live(0x179, 90, 1, "MFX Chorus Send"); live(0x17a, 90, 1, "MFX Reverb Send"); live(0x1fd, 90, 2, "Chorus Master"); live(0x1fe, 90, 1, "Chorus to Reverb"); live(0x231, 90, 2, "Reverb Master");
+    live(0x3e, 90, 2, "Master Level"); live(0x51e, 1, 4, "Attenuation"); live(0x70, 0, 47, "EQ Switch"); live(0x70, 1, 7, "EQ Switch back"); live(0x66, 20, 7, "an EQ gain");
+    // The tempo's debounce: a new tempo reaches the chip after holding for two reads, 80 ms apart, and a switch's edit goes at once and then waits one.
+    const auto waits = [&](int id, int v, size_t count, const char* what) {
+        const uint64_t n = rec.n; const size_t w = rec.waits.size(); c.set(id, v); c.update();
+        if (show) std::printf("  %-20s %3llu words, %zu waits\n", what, (unsigned long long)(rec.n - n), rec.waits.size() - w);
+        bool good = rec.waits.size() - w == count && rec.n > n; for (size_t i = w; i < rec.waits.size(); i++) good = good && rec.waits[i].second == 3528; check(good, what);
+    };
+    c.set(0x1fc, 6); c.update(); waits(0x11d, 1400, 2, "a new tempo"); waits(0x120, 0, 1, "MFX Switch"); waits(0x120, 1, 1, "MFX Switch back"); waits(0x121, 0, 1, "Chorus Switch"); waits(0x121, 1, 1, "Chorus Switch back"); waits(0x122, 0, 1, "Reverb Switch"); waits(0x122, 1, 1, "Reverb Switch back");
+    { const uint64_t n = rec.n; const size_t w = rec.waits.size(); c.set(0x76, 3); c.update(); check(rec.n > n && rec.waits.size() > w, "Output Gain"); }
+    // A value that hasn't changed: nothing at all.
+    const auto same = [&](int id, const char* what) { const uint64_t n = rec.n; const size_t w = rec.waits.size(); c.set(id, c.get(id)); c.update(); check(rec.n == n && rec.waits.size() == w && !c.pending(), what); };
+    same(0x178, "a level unchanged"); same(0x120, "a switch unchanged"); same(0x177, "a type unchanged"); same(0x3e, "Master unchanged"); same(0x1fc, "the Chorus's type unchanged");
+    // A type change ramps down and waits before it loads; a patch mutes, and loads the same type again.
+    { const uint64_t n = rec.n; c.set(0x177, 2); const size_t w = rec.waits.size(); c.update(); check(rec.waits.size() > w && rec.waits[w].first - n < 64 && rec.waits[w].second > 128, "an MFX type change doesn't ramp down and wait first"); }
+    { const uint64_t n = rec.n; const size_t w = rec.waits.size(); c.loadPatch(); check(rec.waits.size() > w && rec.waits[w].first - n < 64 && rec.waits[w].second > 128, "a patch doesn't mute first"); if (show) std::printf("  a patch: %llu words\n", (unsigned long long)(rec.n - n)); check(rec.n - n > 2000, "a patch doesn't reload"); }
+    // set() keeps to the descriptor's range, and everything the readers read counts as a change.
+    c.set(0x177, 1000); check(c.get(0x177) == 41, "a type above its range"); c.set(0x177, -5); check(c.get(0x177) == 0, "a type below its range"); c.set(0x76, 99); check(c.get(0x76) == 12, "Output Gain above its range"); c.set(0x76, -99); check(c.get(0x76) == -12, "Output Gain below its range");
+    c.set(0x8000, 1); check(c.get(0x8000) == 0, "an ID that isn't there");
+    c.update();
+    static const int fixed[] = { 0x11d, 0x120, 0x121, 0x122, 0x177, 0x178, 0x179, 0x17a, 0x1fc, 0x1fd, 0x1fe, 0x230, 0x231, 0x3e, 0x76, 0x51e, 0x41, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70 };
+    int unseen = 0; const auto seen = [&](int id) { if (c.highest(id) == c.lowest(id)) return; const int v = c.get(id); c.set(id, v == c.highest(id) ? c.lowest(id) : v + 1); if (!c.pending()) unseen++; c.set(id, v); c.update(); };
+    for (const int id : fixed) seen(id);
+    for (int id = 0x55d; id <= 0x8c6; id++) seen(id);
+    if (first && unseen) std::printf("  behaviour: %d IDs set() doesn't count\n", unseen);
+    check(unseen == 0, "an ID the readers read that set() doesn't count");
+    // The Matrix: each of the three reaches the types that assign it, and moving a parameter puts words on the bus.  An unchanged value, or a type that doesn't assign it, costs nothing.
+    {
+        int responds[3] = {}, thru = 0;
+        for (int t = 0; t < 42; t++) for (int k = 0; k < 3; k++) {
+            Recorder m; XtFxControl a(rom, &m); a.set(0x177, t); a.loadPatch();
+            const uint64_t n = m.n; int v[3] = {}; v[k] = 20000; a.setMatrix(v[0], v[1], v[2]);
+            if (m.n != n) responds[k]++;
+            if (t == 0 && m.n != n) thru++;
+            const uint64_t after = m.n; a.setMatrix(v[0], v[1], v[2]); check(m.n == after, "the Matrix, unchanged");
+            v[k] = 0; a.setMatrix(v[0], v[1], v[2]); if (m.n != after) check(a.ok(), "the Matrix back to 0");
+        }
+        if (show) std::printf("  the Matrix: types that respond to PRM1 %d, PRM2 %d, PRM3 %d\n", responds[0], responds[1], responds[2]);
+        check(responds[0] == 32 && responds[1] == 22 && responds[2] == 6, "the Matrix doesn't reach the types it should"); check(thru == 0, "Thru answers the Matrix");
+    }
+    // What's the system's survives a patch, and the start reads it.
+    { XtFxControl a(rom), b(rom); a.set(0x3e, 64); a.update(); a.loadPatch(); b.set(0x3e, 64); b.loadPatch(); int d = 0; for (unsigned i = 0; i < 2048; i++) if (a.word(i) != b.word(i)) d++; check(d == 0, "a system edit lost to a patch"); }
+    { XtFxControl a(rom), b(rom); b.set(0x70, 0); b.update(); b.set(0x70, 1); b.update(); int d = 0; for (unsigned i = 0; i < 2048; i++) if (a.word(i) != b.word(i)) d++; check(d == 0, "the start doesn't read the system"); }
+    // Each thing the check counts on, a type at the end of its range: types 41, 8 and 10 load.
+    { XtFxControl a(rom); a.set(0x177, 41); a.set(0x1fc, 8); a.set(0x230, 10); a.update(); check(a.ok(), "the last types fault"); }
+    // The waits and the mutes do what they're for.  (0 dB would be no bigger than the tone's own step; without them it's over 30.)
+    check(stepUnderTone(rom, true, false) < 6.0, "a type change under a tone clicks"); check(stepUnderTone(rom, true, true) < 6.0, "a patch under a tone clicks");
+    if (!c.ok() && first) std::printf("  behaviour: a fault: %s\n", c.error().c_str());
+    std::printf("control's behaviour on the bus: %d samples, %d different\n", tried, different + (c.ok() ? 0 : 1));
 }
 } // namespace
 
+// The audio thread must not allocate.  Only this harness replaces these.
+void* operator new(std::size_t n) { if (tAudioThread) gAudioAllocations++; void* p = std::malloc(n ? n : 1); if (!p) std::abort(); return p; }
+void* operator new[](std::size_t n) { if (tAudioThread) gAudioAllocations++; void* p = std::malloc(n ? n : 1); if (!p) std::abort(); return p; }
+void operator delete(void* p) noexcept { if (tAudioThread && p) gAudioAllocations++; std::free(p); }
+void operator delete[](void* p) noexcept { if (tAudioThread && p) gAudioAllocations++; std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { if (tAudioThread && p) gAudioAllocations++; std::free(p); }
+void operator delete[](void* p, std::size_t) noexcept { if (tAudioThread && p) gAudioAllocations++; std::free(p); }
+
 int main(int argc, char** argv) {
-    if (argc < 2) { std::fprintf(stderr, "xt_fx <rom> [frames] [seed] | numbers | speed\n"); return 2; }
+    if (argc < 2) { std::fprintf(stderr, "xt_fx <rom> [frames] [seed] | numbers | speed | control [events] [seed]\n"); return 2; }
     const char* rom = argv[1];
-    if (argc > 2 && !std::strcmp(argv[2], "numbers")) { numbers(rom); return 0; }
+    if (argc > 2 && !std::strcmp(argv[2], "numbers")) { numbers(rom); changeUnderTone(rom); return 0; }
+    if (argc > 2 && !std::strcmp(argv[2], "threads")) { threads(rom, argc > 3 ? std::atoi(argv[3]) : 200, argc > 4 ? (uint32_t)std::atoi(argv[4]) : 2024); return 0; }
+    if (argc > 2 && !std::strcmp(argv[2], "control")) {
+        const int events = argc > 3 ? std::atoi(argv[3]) : 200; const uint32_t seed = argc > 4 ? (uint32_t)std::atoi(argv[4]) : 2024;
+        readers(rom, seed); behaviour(rom); liveEdits(rom, events, seed); threads(rom, events, seed); againstReference(rom, events, seed);
+        return 0;
+    }
     if (argc > 2 && !std::strcmp(argv[2], "speed")) { speed(rom); return 0; }
     const int frames = argc > 2 ? std::atoi(argv[2]) : 8192; const uint32_t seed = argc > 3 ? (uint32_t)std::atoi(argv[3]) : 2024;
     { Sh4 c; c.loadRom(rom); for (int t = 0; t < 42; t++) { char nm[24]; c.read(0x89788c98 + 24 * (uint32_t)t, nm, 20); nm[20] = 0; for (int e = 19; e > 0 && nm[e] == ' '; e--) nm[e] = 0; compare(rom, ("MFX " + std::to_string(t) + " " + nm).c_str(), t, t % 11, t % 9, frames, seed + (uint32_t)t, false); } }

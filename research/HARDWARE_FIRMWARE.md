@@ -1547,6 +1547,90 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### XtFxControl: the firmware's driver off the audio thread (2026-11-04, v131)
+
+`plugin/Source/XtFxControl.*` runs the XT's own effect driver from rom.2 in `Sh4Interp`, on whichever thread calls it, and what the driver writes reaches `XtFxChip` through a queue that the audio thread empties between samples. So the mutes, the ramps, the order of a type change and every converter from a parameter to a coefficient are the firmware's. There's no port of them to get wrong. It isn't in the plugin's sound yet: neither file is in `plugin/CMakeLists.txt`, and the sound doesn't change.
+
+**How the firmware drives the effects.** A task, `0x894ad560`, keeps its state at `0x89ced1b4` and waits on events.
+
+| Event | Routine | What |
+|---|---|---|
+| 0x02 | `0x894ac970` | a message (below) |
+| 0x04 | `0x894abcf0` | the start: the chip's device test, then `0x894ac6a0`, `0x894b0010`, `0x894ac780`, `0x894acbd0` |
+| 0x08 | `0x894abdb0` | not traced |
+| 0x10 | `0x894ad4f0` | MFX Control: `0x894abe50` stores three values through `0x894ad4e0`, and this applies them |
+| 0x20 | `0x894acb10` | the tempo from MIDI clock, when Clock Source (0x41) says so |
+| 0x40 | `0x894aee80` | the input routing and its fades |
+| 0x80 | `0x894acdb0` | everything off or back on, by a flag at `0x8987a688` |
+| 0x100 | `0x894d3bc0` | the sampling section's effect |
+| 0x200 | `0x894ace70` | kernel settings 0x2712…0x2717, into words A 0x1ed…0x215, which add inputs to the outs |
+
+Nothing is periodic: LFOs and ramps run on the chip, and the SH-4 only acts when something changes. Each block has a reader that fetches its parameters by ID and calls the setters in v115's table:
+
+| Reader | Reads | r7 |
+|---|---|---|
+| `0x894ac0a0(this, _, part, r7)` | 0x120, 0x121, 0x122, then 0x11d | 1: Patch Tempo at once, and the MFX Switch sent even if it's the same. 0: the tempo only once it has held for 80 ms, trying up to five times |
+| `0x894ac1c0` | 0x178, 0x179, 0x17a, 0x177, the type's parameters | 1: load the program even if the type's the same, with no ramp of its own |
+| `0x894ac2f0` | 0x1fc, 0x1fd, 0x1fe, the type's ten | 1: ramp the return down and up around the update |
+| `0x894ac3a0` | 0x230, 0x231, the type's 24 | 1: finish the load a patch's clear began: the program, every parameter again, the ramp back up. 0: a new type does the whole of it, ramp, clear, 30 ms |
+| `0x894ac040(this)` | 0x51e, then 0x178 | |
+| `0x894acbd0(this)` | 0x41, 0x3e, 0x76, 0x70, then 0x65…0x6f if the EQ's on | |
+
+The rest of the firmware asks for them with a message: flags at `0x89ced200`, which `0x894ac970` copies and clears. In the second byte, 0x20 runs the system's reader and 0x10 reads Attenuation (0x51e, then 0x178 again). In the fourth byte, 0x40, 0x20, 0x10 and 0x08 run the switches', MFX's, Chorus's and Reverb's readers with r7 = 0, in that order (`0x894ac630`), and 0x80 is a patch change (`0x894ac4be`): Reverb, Chorus and MFX off, a 5 ms wait, the new Reverb type's clear, then the MFX, Chorus and Reverb readers with r7 = 1, then the switches.
+
+A read goes through `0x8947d310` or `0x8947d330`, to `0x89481860`: the stored bits less the descriptor's centre, or the default if they're out of range. The first bank's descriptors are 12 bytes: +0 byte offset, +2 bits, +4 centre, +6 default, +8 minimum, +0xa maximum. The second bank, IDs from 0x55d, has 8 bytes and no centre: +0 offset, +2 default, +4 minimum, +6 maximum. Output Gain is stored as 4…28 and read as −12…+12, Patch Tempo as BPM × 10.
+
+**What's hooked.** Everything else runs as it is, these only: the bus's four primitives (`0x894af400`, `0x894af510`, `0x894af610`, `0x894af6a0`) and two spins (`0x894af3a0`, `0x894af3c0`); the sleep (`0x894b26a0`); the two parameter reads; three calls at the start on the tone generator's lists (`0x894d9230`, `0x894d90c0`, `0x894d9020`); and the system reader's last call, `0x89301680`, which passes Digital Output Frequency to the kernel. `0x894b4a60` has to be called first: it's a C++ static constructor from the table at `0x897eff10` (12 bytes an entry, function last), and it builds the object that clears the MFX's memory. Two entries beside it, `0x894ad520` and `0x894ad740`, set up the task's list entry and event, which nothing here uses.
+
+**The API** is the firmware's own terms. `set(id, value)` writes the store by ID, in what the read returns, clamped to the descriptor's range, and marks its block. `update()` sends the message for the blocks that changed, and `loadPatch()` a patch change. So which readers run, in what order and with what arguments is the firmware's; the only table here is which ID is in which block. The store starts at the firmware's defaults. The start takes 2 ms. `setMatrix(a, b, c)` is the Matrix's MFX-PRM1…3 (its slots 9…0xb, which v119 forms and leaves for this), by the way `0x894e7aa0` hands them over: `0x894abe50`, `0x894ad4e0`, then the event's `0x894ad4f0`. Of the 42 MFX types, 32 assign the first, 22 the second and 6 the third. It wants calling as often as the firmware does, since a new type starts from nothing.
+
+**Two threads, and nothing blocks.** The driver's sleep doesn't sleep. It closes a batch of words and marks how many samples must pass before the next (5 ms is 221 samples), and the driver runs on. `service(chip)`, called before each `runFrame()`, applies whatever's due. The audio thread takes no lock and allocates nothing: a ring of 1024 pointers, published with a release store, and the control thread frees a batch only once the audio thread's read index has passed it. A ring that's full (no audio running, say) leaves the driver's batches in a list on the control thread without limit, and `pump()` passes them on. The driver also reads the chip's words, for read-backs and for the memory fields' neighbouring bits. The chip is the audio thread's, so a copy of the words on the control thread answers them, and each read still goes down the queue because on the chip it touches the mailbox and the tail's word. `XtFxChip::merge` keeps the copy and the chip to the same layout. After a fault in the interpreter, `ok()` is false and nothing more goes to the chip. The driver never faulted in these runs, and there's a limit on its steps so that it can't hang the control thread.
+
+The words between two waits reach the chip together, between two samples. On the XT they take bus time, while the program runs half-replaced, at a speed nothing here knows. That's silent either way, because the driver mutes first, and all at once means the chip never runs a mix of two programs that the check hasn't seen. A parameter edit has no mute, so on the XT its coefficients change over a few samples and here between two.
+
+| On this Mac | Control thread | Most between two samples | Until the chip has it all |
+|---|---|---|---|
+| A level | 13 µs | 0.1 µs | at once |
+| An MFX parameter | 13 µs | under 0.1 µs | at once |
+| The MFX's type | 202 µs | 16 µs | 30 ms, or 35 ms with the switch on |
+| The Reverb's type | 241 µs | 28 µs | 35 ms |
+| The Chorus's type | 17 µs | 0.7 µs | at once: its program stays, only coefficients change |
+
+28 µs is about one sample's time, once, at a type change, so there's no need to spread it out. Later words wait behind a wait, as they would behind the XT's blocked task: any switch change holds them 80 ms, a new tempo 160 ms, Output Gain 50 ms.
+
+**The check.** `xt_fx <rom> control [events] [seed]`, in fcheck at 200 events, about 7 s.
+
+| Part | What | Default run | Different |
+|---|---|---|---|
+| Against the reference | The same driver on both sides: its bus straight on JE-8086's chip, where its waits run the samples, and through the queue and the copy into `XtFxChip`. All types in turn, then random edits and patches, noise on every input. Whole state each sample | 264401 samples | 0 |
+| The readers | A patch by ID through the firmware's readers, against the routines `xt_fx` calls one by one, random values, word for word | 62 patches | 0 |
+| Live edits | Edits one at a time through `update()`, then the same store loaded as a patch into a new one, word for word: except what the firmware itself leaves behind (below) | 12 runs of 200 | 0 |
+| Behaviour | Each kind of edit puts its exact number of words on the bus (a reload or a ramp would add to them) and waits only as it should; a value that hasn't changed costs nothing; a type change mutes before it swaps and a patch reloads; every ID a reader reads counts as a change; the Matrix reaches the types that assign it; clamping; a system edit survives a patch; no click | 229 | 0 |
+| Threads | Driver and samples on two threads, each stopping now and then, and a burst of 3000 edits with the audio thread stopped (the ring overflows). The stream arrives whole and in order, each wait kept, no allocation on the audio thread | 3200 edits | 0 |
+
+Also run once: 1000 events on seeds 77 and 123, 1116060 and 994297 samples each against the reference, 0 different. `fxthreads.sh` runs the threads part under the thread sanitizer: no races, and it does report each of three planted relaxed orderings (`write_`'s store and load, `read_`'s store), which the plain run can't see.
+
+Under a tone through the MFX, the largest step between two samples at a change from Stereo Delay to an overdrive is +1.5 dB against the tone's own, for a type change and for a patch. With the same words all at once it's +37.5 dB. That's what the waits and the mutes do.
+
+`mutate_fx.py --control`: 66 planted errors, 0 missed, about 3.5 minutes: the queue, the waits, the copy of the words, the bus's encodings, the store, which block each ID is in, the message's flags, the Matrix and the start. Three of them stop the check rather than fail it, by a crash or a hang, and count: `ring-overrun`, `stops-short`, `send-unflushed`. The first list had hand-written sequences of calls in place of the message, and missed 20 of 76. Some of those were exact (a bit no program has set), some showed checks too loose, and the rest were errors in my copy of the firmware's sequence that nothing here could see, since both sides of the comparison shared the copy. So the copy went: the firmware's own routine now takes a message.
+
+**What it says about the XT.** None of this has met a real one. These are the firmware's code in the interpreter, found because a live edit should end with the same words as a patch, and sometimes doesn't:
+- **Three MFX parameters do nothing when edited alone:** Resonant Filter's Sweep Depth, and Stereo Pitch Shifter's Low Damp Gain and Hi Damp Gain. Not a word goes on the bus until a related parameter changes or a patch loads: Sweep Depth lands as soon as Cutoff Freq moves. Their update compares them through two pointers that only `0x894cce60` sets, and nothing calls that, in any of the ROMs. That looks like a leftover: each class's update has its own copy of the parameters, and these few compares never moved over. On the XT they read through null at the bottom of memory, the same byte on both sides, so they always read as unchanged. (In the interpreter that page has to be mapped, or it faults.) **It's a cheap test of this whole reading on a real XT: turn Sweep Depth with the Resonant Filter sweeping and listen.** If it does change the sound, those pointers are set by something I haven't found.
+- **Four more reach the words differently live than in a patch:** Humanizer's Trigger Sens, Stereo Delay's Mode, Analog Delay → Chorus's Chorus Mode and Vocal Multi's Limiter Mode. A live edit does write, but not all that a load would. I haven't looked at why.
+- **Reverb types Off and Delay don't write the pre-EQ** (A 0x138…0x156), so a Delay keeps the pre-EQ of the Reverb type before it, audibly. 100 Hz through Delay after a Room with its Pre Low Gain right down is 6.5 dB lower than through Delay on its own.
+- **Reverb Delay's note values use the last tempo it heard,** and it only hears one while it's the current type (`0x894d0b50`). So a new tempo under another type doesn't reach it until the next tempo or patch. Its default Delay Time, 112, is a note value.
+- **The system EQ's flat isn't quite flat.** The firmware starts with it on, at defaults, and MAIN to the mix reads +5.96 dB at 1 kHz, against +6.00 with it off. RECORDING_GUIDE.md already has it off.
+- **A Chorus of type Off keeps its return shut** whatever its switch says.
+
+The live-edit check leaves those seven parameters out of its edits, and takes both sides through Reverb 1 and a tempo there and back before comparing.
+
+**Not run.** The chip's device test, the input routing beyond what the start does, the sampling section's effect, the tempo from MIDI clock (Patch Tempo through `set` covers a host's), and the kernel settings at 0x2712….
+
+**What's next.**
+- **The frame in XtSynth:** Chorus and Reverb Sends, Output Assign, Out Gain for TG, an exact port against `xt_tone`. The branches it was waiting for are in (v130).
+- **Into the sound:** a thread for this class, the chip in the output path, the Matrix's slots 9…0xb to `setMatrix`, parameters and editor.
+- **Captures** against all of it.
+
 ### The effects branch joins (2026-11-04, v130)
 
 This merges v126, and with it v115, v116, v121 and v123, with v129. So one branch now has everything from v115 to here: Hold, the Matrix, tempo sync, Time Trip, the host's tempo, SOLO bit for bit, the map of the effects, the capture tools and `XtFxChip`.
@@ -1635,7 +1719,7 @@ So this says the port is JE-8086's chip. Only a capture can say JE-8086's chip i
 **Speed.** 16% to 23% of a core on this Mac, by CPU time, for Thru, and for MFX and Hall 1, with the machine heavily loaded by other work. That's with each core's sample in one loop, its state in locals. Not yet what I'd want in a plugin, but usable. The two cores could go on two threads, as they don't interact in a sample.
 
 **What's next.**
-- **Control, off the audio thread:** the driver running in `Sh4Interp` when a parameter changes, its bytes reaching the chip between samples through a lock-free queue, and the plugin's parameters.
+- **Control, off the audio thread:** done, v131, bar the plugin's parameters.
 - **The frame in XtSynth:** Chorus and Reverb Sends, Output Assign, Out Gain for TG. An ordinary exact port against `xt_tone`, but it touches the files the Matrix, tempo and SOLO branches changed, so they want merging first.
 - **Into the sound,** then captures against it.
 

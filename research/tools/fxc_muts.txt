@@ -1,0 +1,76 @@
+# Planted errors in XtFxControl.cpp, for mutate_fx.py --control.  name|old|new
+# The queue and the waits
+wait-none|waiting_ = b.waitAfter;|waiting_ = 0;
+wait-late|waiting_ = b.waitAfter;|waiting_ = b.waitAfter + 1;
+wait-early|if (waiting_ && --waiting_) return;|if (waiting_ > 1 && (waiting_ -= 2)) return; waiting_ = 0;
+one-a-sample|while (r != w && !waiting_) {|if (r != w && !waiting_) {
+stops-short|while (r != w && !waiting_) {|while (r + 1 != w && r != w && !waiting_) {
+no-reads|open_->words.push_back({ 0, index, 0x37 });|
+read-wrong|open_->words.push_back({ 0, index, 0x37 });|open_->words.push_back({ 0, (uint16_t)(index + 1), 0x37 });
+ring-overrun|w - r < kSlots|w - r <= kSlots
+never-publish|write_.store(w, std::memory_order_release);|if (w - r < 16) write_.store(w, std::memory_order_release);
+wait-lost|if (!open_->words.empty() \|\| waitAfter) {|if (!open_->words.empty()) {
+wait-kept|open_->waitAfter = waitAfter;|open_->waitAfter = waitAfter ? waitAfter : 1;
+# The copy of the words
+copy-unmerged|XtFxChip::merge(mode, b, w);|
+copy-mask|return shadow_[index & 2047] & 0x0fffffff;|return shadow_[index & 2047] & 0x07ffffff;
+copy-reversed|(uint8_t)word, (uint8_t)(word >> 8), (uint8_t)(word >> 16), (uint8_t)(word >> 24)|(uint8_t)(word >> 24), (uint8_t)(word >> 16), (uint8_t)(word >> 8), (uint8_t)word
+copy-short|(unsigned)index + n <= 2048|(unsigned)index + n < 1024
+# The bus's encodings
+coef-bits|(v << 1 & 0xfc)|(v << 1 & 0xf8)
+coef-shift|(s & 3)|(s & 1)
+coef-top|(v >> 7 & 1)|(v >> 7 & 0)
+field-low|(a >> 20 & 0xf8)|(a >> 20 & 0x38)
+word-cmd|put(0x34, (uint16_t)m.r[4], m.r[5]);|put(0x34, (uint16_t)m.r[4], m.r[5] \| 1);
+no-kernel|c.hook(0x89301680, [](Sh4& m) { m.ret(0); });|
+# The driver's sleep
+sleep-none|sleep(m.r[4] & 0xffff);|sleep(0);
+sleep-tenth|sleep(m.r[4] & 0xffff);|sleep((m.r[4] & 0xffff) / 10);
+# The store
+centre-kept|def = (uint16_t)c.rd16(d + 6) - centre;|def = (uint16_t)c.rd16(d + 6);
+range-centre|hi = (uint16_t)c.rd16(d + 10) - centre;|hi = (uint16_t)c.rd16(d + 10);
+high-default|def = (int16_t)c.rd16(d + 2);|def = (int16_t)c.rd16(d + 4);
+high-range|hi = (int16_t)c.rd16(d + 6);|hi = (int16_t)c.rd16(d + 4);
+clamp-none|std::clamp(value, (int)low_[(size_t)id], (int)high_[(size_t)id])|value
+read-next|const int id = (int16_t)m.r[5]; m.ret(|const int id = (int16_t)m.r[5] + 1; m.ret(
+set-always|if (store_[(size_t)id] == v) return;|
+set-lost|dirty_ \|= blockOf(id);|
+# Which block a parameter is in
+block-tempo|id == 0x11d \|\| (id >= 0x120|(id >= 0x120
+block-switch|id <= 0x122)) return BlockSwitches|id <= 0x121)) return BlockSwitches
+block-attn|if (id == 0x51e) return BlockAttenuation;|
+block-master|id == 0x3e \|\| id == 0x41 \|\||id == 0x41 \|\|
+block-gain|id == 0x76 \|\||
+block-eq|id <= 0x70))|id <= 0x6f))
+block-send|(id >= 0x177 && id <= 0x17a)|(id >= 0x177 && id <= 0x179)
+block-cho|id >= 0x1fc && id <= 0x1fe|id >= 0x1fc && id <= 0x1fd
+block-rev|id == 0x230 \|\| id == 0x231|id == 0x230
+block-mfxparam|if (within(kMfxIds, kMfxTypes)) return BlockMfx;|
+block-choparam|if (within(kChoIds, kChoTypes)) return BlockChorus;|
+block-revparam|if (within(kRevIds, kRevTypes)) return BlockReverb;|
+block-lastmfx|within(kMfxIds, kMfxTypes)|within(kMfxIds, kMfxTypes - 1)
+block-lastcho|within(kChoIds, kChoTypes)|within(kChoIds, kChoTypes - 1)
+block-lastrev|within(kRevIds, kRevTypes)|within(kRevIds, kRevTypes - 1)
+# The firmware's message: which flags mean what
+flag-system|blocks & BlockSystem ? 0x20 : 0|blocks & BlockSystem ? 0x00 : 0
+flag-attn|blocks & BlockAttenuation ? 0x10 : 0|blocks & BlockAttenuation ? 0x00 : 0
+flag-patch|patch ? 0x80 : 0|patch ? 0x00 : 0
+flag-switches|blocks & BlockSwitches ? 0x40 : 0|blocks & BlockSwitches ? 0x00 : 0
+flag-mfx|blocks & BlockMfx ? 0x20 : 0|blocks & BlockMfx ? 0x00 : 0
+flag-cho|blocks & BlockChorus ? 0x10 : 0|blocks & BlockChorus ? 0x08 : 0
+flag-rev|blocks & BlockReverb ? 0x08 : 0|blocks & BlockReverb ? 0x10 : 0
+dirty-kept|const unsigned d = dirty_; dirty_ = 0;\n    if (d) send(d, false);|const unsigned d = dirty_;\n    if (d) send(d, false);
+patch-loses-system|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation); dirty_ = 0;|const unsigned d = 0; dirty_ = 0;
+patch-keeps-dirty|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation); dirty_ = 0;|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation);
+send-unflushed|    call(0x894ac970, { kThis });\n    flush(0);|    call(0x894ac970, { kThis });
+# The Matrix
+matrix-unapplied|&& changed) call(0x894ad4f0, { kThis });|&& changed) {}
+matrix-unflushed|if (call(0x894ad4e0, { kThis, kMatrix }, &changed) && changed) call(0x894ad4f0, { kThis });\n    flush(0);|if (call(0x894ad4e0, { kThis, kMatrix }, &changed) && changed) call(0x894ad4f0, { kThis });
+matrix-first-only|for (uint32_t i = 0; i < 3; i++) sh4_->wr16(kMatrix|for (uint32_t i = 0; i < 1; i++) sh4_->wr16(kMatrix
+# The start
+boot-no-ctor|    call(0x894b4a60);|
+boot-no-driver|    call(0x894ac6a0, { kThis });\n|
+boot-no-780|    call(0x894ac780, { kThis });\n|
+boot-no-system|send(BlockSystem, true);|send(0, true);
+boot-no-patch|send(BlockSystem, true);|send(BlockSystem, false);
+no-null-page|    sh4_->mapRam(0x00000000, 0x00001000);\n|

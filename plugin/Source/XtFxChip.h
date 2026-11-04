@@ -20,6 +20,11 @@ public:
     // words, 0x36 a memory offset into five words' fields, 0x37 read a word into the mailbox).  Between frames only.
     void hostWrite(uint32_t address, uint8_t value);
     uint8_t hostRead(uint32_t address) const { return (uint8_t)((uint32_t)mailbox_ >> ((address & 3) * 8)); }
+    // One transaction, as the driver makes them: 0x2003, then a word's four bytes at index × 4.
+    void hostWord(uint8_t command, uint32_t index, uint32_t word) { hostWrite(0x2003, command); for (uint32_t k = 0; k < 4; k++) hostWrite(index * 4 + k, (uint8_t)(word >> (8 * k))); }
+    // What a commit does to the words from its address on: how many it touches in a mode (0 a word, 1 a coefficient, 2 a memory offset), and their new values from the bytes.  XtFxControl's copy of the words goes through this too.
+    static unsigned wordsOf(unsigned mode) { return mode == 0 ? 1 : mode == 1 ? 2 : 5; }
+    static void merge(unsigned mode, const uint8_t bytes[4], uint32_t words[5]);
 
     // One sample: 768 clocks, then the registers, GRAM and the memory rotate by one.
     void runFrame();
@@ -42,6 +47,7 @@ public:
     uint32_t memoryPosition() const { return e_.pos; }
     int32_t memoryWord(uint32_t a) const { return e_.m[a & 0x3ffff]; }
     uint32_t position() const { return pos_; }
+    uint32_t word(unsigned i) const { return words_[i >> 10 & 1][i & 1023]; }
 
 private:
     enum Kind : uint8_t { Nop, Mac, MacConstant, Dmac, StoreSat, GramRead, GramStoreAdd, SetCoef, MulCoef, Branch, SetAddress, SetWriteData, ReadData, StoreRaw, StoreRect, Compare, CompareConstant, FoldPos, FoldNeg };
