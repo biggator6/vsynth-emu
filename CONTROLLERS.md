@@ -81,6 +81,18 @@ and reproduces the gesture.  Roland's chart and receive chapter do not support t
 patch and watch whether the playback pointer moves.  The answer decides whether the
 plugin's Time Trip input is a MIDI-reachable parameter or a UI-only gesture.
 
+**What rom.2 says (v118).**  The Control Change case of the message dispatcher (status
+0xB0, `0x894d43e0`) goes to `0x894d6f10`, which for each part on that port and channel
+calls `0x894d8360(part, number, value)`.  That compares the number with Time Trip Assign
+X and Y (IDs 0x91, 0x92; 0 and 32 are off) and Beam 1 Assign L and R (0x87, 0x88), and
+moves the pad.  So the code path exists, against the chart: a Control Change of the
+assigned number that reaches the dispatcher moves the playback pointer.  `xt_tone` drives
+the firmware's pad through `0x894d8360`.  I did not trace whether MIDI IN feeds that
+dispatcher with these numbers, so the bench test still stands.  The parameter descriptors
+give the assigns a default of 0, off, where the manual gives CC82 and CC83.  The plugin's
+Time Trip is a plain knob for now (`XtSynth::timeTripKnob`); `XtSynth::timeTrip(x, y)`
+takes the two controllers' values if a MIDI mapping is wanted.
+
 ### Mode, hold and gating — SysEx only, no CC path
 
 **Patch Controller** block, `10 00 08 00` for temporary patch part 1:
@@ -151,7 +163,9 @@ TRIP-R = 1 - r                               // "center from the circumference"
 ```
 
 `TRIP-R`'s polarity is inferred from the manual's wording and is **unverified against
-hardware**.
+hardware**.  rom.2 agrees with it (v124): T[127 − pad +0x24], where +0x24 is the distance
+from the centre at each Y of a finger (0 to 126 along an axis, 127 past that) and 127 with no
+finger.  So full at the centre, 0 at the rim and when lifted.
 
 Three behaviours the manual specifies that fall out of this:
 

@@ -14,9 +14,10 @@ constexpr uint32_t kSustainTab = 0x897cfcb8;  // u16 ×128: knob → level ×327
 constexpr uint32_t kAttackTab = 0x897d1934;   // u16 ×257: attack curve (0x894ef7d0)
 constexpr uint32_t kShapeTab = 0x897d1b36;    // u16 ×129 (+ what follows): segment shape (0x894ef960)
 constexpr uint32_t kDepthTab = 0x897cef44;    // u8 ×13: pitch depth 0..12 in cents (0x894e0ce0)
+constexpr uint32_t kClockTab = 0x897cfeb8;    // u16 ×17: a note value's clocks, 3…192 (0x894df2b8)
 
 struct Tables {
-    uint16_t time[128], sustain[128], attack[257], shape[257];
+    uint16_t time[128], sustain[128], attack[257], shape[257], clocks[17];
     uint8_t depth[13];
     uint32_t keyScale[41][128];
     bool ok = false, keyScales = false;
@@ -34,7 +35,7 @@ bool xtEnvLoadTables(const char* romPath) {
     if (!f) return false;
     const bool ok = readAt(f, kTimeTab, T.time, 128) && readAt(f, kSustainTab, T.sustain, 128)
                  && readAt(f, kAttackTab, T.attack, 257) && readAt(f, kShapeTab, T.shape, 257)
-                 && readAt(f, kDepthTab, T.depth, 13);
+                 && readAt(f, kDepthTab, T.depth, 13) && readAt(f, kClockTab, T.clocks, 17);
     std::fclose(f);
     if (!ok) return false;
     // Sanity: the three tables rise from 0 (time and sustain strictly).
@@ -48,6 +49,7 @@ bool xtEnvLoadTables(const char* romPath) {
         || T.shape[0] != 0 || T.shape[128] != 65535 || T.depth[0] != 0) return false;
     for (int i = 1; i < 13; ++i)
         if (T.depth[i] < T.depth[i - 1]) return false;
+    if (T.clocks[0] != 3 || T.clocks[16] != 192) return false;
     T.ok = true;
     return true;
 }
@@ -105,15 +107,21 @@ float xtPitchDepthCents(float d) {
 
 XtEnvParams xtEnvAdsr(const XtEnvKnobs& k, int key, int velocity, int releaseVelocity, int curve) {
     auto knob = [](int v) { return v < 0 ? 0 : v > 127 ? 127 : v; };
+    // a time: from the knob table, or a note value at the note's tempo (0x894df230, 0x894df2b6)
+    auto timeOf = [&](int v, int vel, int sens, uint32_t scale) {
+        using namespace xtf;
+        if (v >= 128) return mul(div(flt(T.clocks[v > 144 ? 16 : v - 128]), flt(24 * (int16_t)k.tempo10)), 600000.0f);
+        return (float)xtEnvTime(knob(v), vel, sens, scale);
+    };
     // the envelope table stores each time sens as trunc(knob·100/63) (0x894df8b0)
     auto sens = [](int s) { s = s < -63 ? -63 : s > 63 ? 63 : s; return s * 100 / 63; };
     const uint32_t kfScale = xtEnvKeyScale(key, k.timeKF);
     XtEnvParams p;
     p.curve = curve;
-    p.time[0] = (float)xtEnvTime(knob(k.attack), velocity, sens(k.aSens), 0x10000);
+    p.time[0] = timeOf(k.attack, velocity, sens(k.aSens), 0x10000);
     p.time[1] = 0.0f;
-    p.time[2] = (float)xtEnvTime(knob(k.decay), velocity, sens(k.dSens), kfScale);
-    p.time[3] = (float)xtEnvTime(knob(k.release), releaseVelocity, sens(k.rSens), kfScale);
+    p.time[2] = timeOf(k.decay, velocity, sens(k.dSens), kfScale);
+    p.time[3] = timeOf(k.release, releaseVelocity, sens(k.rSens), kfScale);
     p.level[0] = 0.0f;
     p.level[1] = p.level[2] = 1.0f;
     p.level[3] = xtf::div((float)T.sustain[knob(k.sustain)], 32768.0f);

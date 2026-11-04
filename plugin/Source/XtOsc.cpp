@@ -25,6 +25,9 @@ constexpr uint32_t kExpHiNeg = 0x897d0a28, kExpLoNeg = 0x897d0e28, kExpIntNeg = 
 constexpr uint32_t kVelSens = 0x897cfeda, kVelCurves = 0x897cfb9c;
 constexpr uint32_t kExpPTab = 0x897eeebc, kExpQTab = 0x897eeed8;
 constexpr uint32_t kMxValue = 0x897cf11e, kMxLimit = 0x897cf080;   // u16 ×128: 8192·x/127, as stored; u16 per slot
+// the Time Trip pad: its angle by x, y from the centre (0x894f42b0), and the steps to a turn and
+// the offset into a step (0x894f41d0, 0x894d8740's index 2)
+constexpr uint32_t kPadAngle = 0x897d1c8c, kPadSteps = 0x897d3d8e, kPadOffset = 0x897d3da0;
 
 struct Tables {
     uint16_t level[128], pan[128];
@@ -38,6 +41,8 @@ struct Tables {
     uint16_t mxValue[128], mxLimit[kXtMatrixSlots];   // the Matrix: a controller's value, a slot's limit
     uint8_t mxSlot[kXtMatrixSlots];           // xtOscSetMatrixTables
     int16_t mxSens[kXtMatrixSlots * 127];
+    uint8_t padAngle[65][65][2];
+    uint16_t padSteps[3], padOffset[3];
     bool keyScales = false, waveGains = false, pitchRatios = false, mxReady = false, ok = false;
 } T;
 
@@ -99,7 +104,8 @@ bool xtOscLoadTables(const char* romPath) {
            && readAt(f, kExpHiNeg, T.hiN, 256) && readAt(f, kExpLoNeg, T.loN, 256) && readAt(f, kExpIntNeg, T.inN, 7)
            && readAt(f, kVelSens, T.velSens, 200) && readAt(f, kVelCurves, curvePtr, 7)
            && readAt(f, kExpPTab, T.expP, 7) && readAt(f, kExpQTab, T.expQ, 7)
-           && readAt(f, kMxValue, T.mxValue, 128) && readAt(f, kMxLimit, T.mxLimit, kXtMatrixSlots);
+           && readAt(f, kMxValue, T.mxValue, 128) && readAt(f, kMxLimit, T.mxLimit, kXtMatrixSlots)
+           && readAt(f, kPadAngle, &T.padAngle[0][0][0], 65 * 65 * 2) && readAt(f, kPadSteps, T.padSteps, 3) && readAt(f, kPadOffset, T.padOffset, 3);
     for (int c = 0; ok && c < 7; ++c)
         ok = curvePtr[c] >= kRomBase && curvePtr[c] < 0x89900000u && readAt(f, curvePtr[c], T.velCurve[c], 128);
     std::fclose(f);
@@ -118,6 +124,7 @@ bool xtOscLoadTables(const char* romPath) {
     for (int i = 1; i < 128; ++i)
         if (T.pan[i] < T.pan[i - 1]) return false;
     if (T.hi[0] != 1.0f || T.lo[0] != 1.0f || T.hiN[0] != 1.0f || T.loN[0] != 1.0f) return false;
+    if (T.padSteps[2] == 0 || T.padSteps[2] > 512 || T.padOffset[2] > 64) return false;
     for (int i = 0; i < 7; ++i)
         if (T.in[i] != std::ldexp(1.0f, i) || T.inN[i] != std::ldexp(1.0f, -i)) return false;
     T.ok = true;
@@ -482,6 +489,95 @@ void XtPitchRamp::tick(int n) {
     phase = add(mul(inc, flt((int16_t)n)), phase);    // fmac
     if (!(65536.0f > phase)) { state = 3; cur = 0.0f; return; }
     cur = mul(add(div(phase, 65536.0f), -1.0f), span);
+}
+
+// 0x894f4230
+void XtTripPad::touch(bool down) {
+    if (down) { on_ = true; return; }
+    on_ = false;
+    dir = 0;
+    angleWas = angleNow = -1;
+    radius_ = 127;                                  // the handler's, after it
+}
+
+// 0x894f42b0
+int XtTripPad::angle(int px, int py) const {
+    const int a = px - 64, b = py - 64;
+    int v;
+    if (a > 0) {
+        if (b > 0) { v = (int8_t)T.padAngle[a][b][1]; v = v == 0 ? 0 : 0x80 - v; }
+        else v = 0x20 - (int8_t)T.padAngle[-b][a][1];
+    } else {
+        if (b > 0) v = 0x60 - (int8_t)T.padAngle[b][-a][1];
+        else v = 0x40 - (int8_t)T.padAngle[-a][-b][1];
+    }
+    return v * 4;
+}
+
+// 0x894f42b0, the same entry's first byte
+int XtTripPad::distance(int px, int py) const {
+    const int a = px - 64, b = py - 64;
+    if (a > 0) return (int8_t)(b > 0 ? T.padAngle[a][b][0] : T.padAngle[-b][a][0]);
+    return (int8_t)(b > 0 ? T.padAngle[b][-a][0] : T.padAngle[-a][-b][0]);
+}
+
+// 0x894f43b0
+int XtTripPad::delta() {
+    int a = angleWas;
+    const int b = angleNow;
+    if (a == -1 || a == b) return 0;
+    int d = b - a;
+    if (d > 256) d -= 512;
+    if (-256 > d) d += 512;
+    int next;
+    if (dir == 0) next = b == 0 ? (a >= 256 ? 1 : -1) : (d >= 0 ? 1 : -1);
+    else if (d < 0) {
+        if (-d > 0x40) { pending = 0; return 0; }
+        if (dir == 1 && pending >= 0) { pending = d; return 0; }
+        a -= pending;
+        next = -1;
+    } else {
+        if (d > 0x40) { pending = 0; return 0; }
+        if (dir == -1 && pending <= 0) { pending = d; return 0; }
+        a -= pending;
+        next = 1;
+    }
+    dir = next;
+    pending = 0;
+    const int st = T.padSteps[2];
+    if (dir < 0) a += T.padOffset[2] + 1;
+    a = (int32_t)((uint32_t)a * (uint32_t)st) >> 9;
+    a = (int32_t)((uint32_t)a << 9) / st;
+    int e = (a >= b ? a - b : b - a) + 512;
+    e &= 511;
+    if (e > 256) e = 512 - e;
+    const int n = (int32_t)((uint32_t)e * (uint32_t)st) >> 9;
+    return dir < 0 ? -n : n;
+}
+
+// 0x894d8360, the first controller
+void XtTripPad::setX(int value) {
+    const int v = (int8_t)value;
+    if (on_ && 0 >= v) touch(false);
+    else x = v;
+}
+
+// 0x894d8360, the second, and 0x894f4080
+bool XtTripPad::setY(int value, int& step) {
+    const int v = (int8_t)value;
+    if (!on_) {
+        if (v > 0) { y = v; if (x > 0) touch(true); }
+        return false;
+    }
+    if (0 >= v) { touch(false); return false; }
+    y = v;
+    angleNow = angle(x, y);
+    radius_ = distance(x, y);
+    const int d = delta();
+    angleWas = angleNow;
+    if (d == 0) return false;
+    step = d;
+    return true;
 }
 
 int xtVelSens(int s) {

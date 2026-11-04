@@ -23,16 +23,18 @@ struct XtEnvParams {
 };
 // An envelope's knobs as the patch stores them.
 struct XtEnvKnobs {
-    int attack = 0, decay = 0, sustain = 127, release = 16;   // 0..127
+    int attack = 0, decay = 0, sustain = 127, release = 16;   // 0..127; a time from 128 on is a note value, up to 144
     int aSens = 0, dSens = 0, rSens = 0;                        // velocity → time, −63..+63
     int timeKF = 0;                                             // −200..+200 (decay and release)
+    int tempo10 = 1200;                                         // the tempo ×10 at the note's start (input +0x18, 0x894df4e0)
 };
 // The converter (0x894df240) for an ADSR, its time knobs with the Matrix's sums added by XtSynth: the
 // attack time from the note-on velocity and A-Sens; decay and release from
 // D-/R-Sens and the Time KF scale for `key`; the release from the note-off
 // velocity.  The sens knobs go in as the patch's −63…+63 and are stored as
 // the envelope table stores them, trunc(knob·100/63) (0x894df8b0).  Levels
-// 0, 1, 1, S, 0.
+// 0, 1, 1, S, 0.  A note value's time takes no velocity or key: clocks/(24·tempo10)·600000 ms,
+// with the clocks of the table the LFOs share (0x897cfeb8).
 XtEnvParams xtEnvAdsr(const XtEnvKnobs& k, int key = 60, int velocity = 64, int releaseVelocity = 64, int curve = 2);
 inline XtEnvParams xtEnvAdsr(int attack, int decay, int sustain, int release, int curve = 2) {
     XtEnvKnobs k; k.attack = attack; k.decay = decay; k.sustain = sustain; k.release = release;

@@ -19,7 +19,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## Where things are
 - `plugin/Source/`: `XtSynth` (the synth: voices, controls, tick), the ports
   (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`,
-  `XtMultiBandPlayer`, `XtSoloEncoder`), `XtFirmware` (firmware harness: runs
+  `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFirmware` (firmware harness: runs
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
   `PluginEditor`. Each port's firmware check is its `XT_*_MAIN` block; `XtToneCheck`
   (`XT_TONE_MAIN`) is XtSynth's: a whole firmware tone against it.
@@ -57,9 +57,10 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=analogfw`: xt_analog, XtFirmware.cpp; `PORT=tone`: xt_tone, XtSynth.cpp;
   `PORT=tonecosm`: xt_tone, XtCosm.cpp; `PORT=toneanalog`: xt_tone, XtAnalog.cpp;
   `PORT=toneband`: xt_tone, XtMultiBandPlayer.cpp; `PORT=tonecheck`: xt_tone,
-  XtToneCheck.cpp; `PORT=tonefw`: xt_tone, XtFirmware.cpp; `PORT=toneosc`: xt_tone, XtOsc.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
+  XtToneCheck.cpp; `PORT=tonefw`: xt_tone, XtFirmware.cpp; `PORT=toneosc`: xt_tone, XtOsc.cpp; `PORT=tonelfo`: xt_tone, XtLfo.cpp;
+  `PORT=toneenv`: xt_tone, XtEnvelope.cpp; `PORT=tonesolo`: xt_tone, XtSoloVoice.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
   solocmp on the baseline's cases, XtSoloVoice.cpp; `PORT=enc`: xt_enc on the baseline's waves, XtSoloEncoder.cpp)
-  and runs it, to show the check catches it. `mutate_tone.py [cases]`: the list in
+  and runs it, to show the check catches it (a run the error crashes counts). `mutate_tone.py [cases]`: the list in
   `tone_muts.txt` (`name|old|new[|port]`), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
 - `xt_tone <rom> [cases] [seed] [inputs]` (in fcheck; `build/tools/fcheck/bin`): XtSynth's wiring
   against a whole firmware tone. `XT_TONE_FIRST=1`: each case's first difference, `XT_TONE_DUMP=<case>|a`:
@@ -76,7 +77,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
   takes about 10 s), and `mutate_tone.py 2000 <new names>` for the planted errors just added.
-- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 9 minutes) if
+- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 13 minutes) if
   `XtSynth.cpp`, `XtToneCheck.cpp` or a port changed: a planted error can stop meaning anything
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
@@ -112,6 +113,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   shows a difference, bar `xt_tone`'s "the SOLO records of" lines. A rounding in the filter's paths rarely reaches a record, which
   is why `xt_enc` compares memory as well. The project's stored records were written by V-Synth 1.50 or 2.01, not the XT's 2.02:
   27 of 28 waves equal (`xtrecs.py`). Wave 373 differs by one step of the tracker's period at one mark, cause not known.
+- The Patch Tempo goes to the clock's object and is read back, its tenths dropped, so 233 BPM reads as 233.4. An LFO's or envelope's value from 128 on is a
+  note value. Tempo Sync and Time Trip steer the player's walk by a factor (`XtBeat`, `0x8950c280`), not its position. In `xt_tone` the firmware's clock (`0x894f4da0`)
+  runs on XtSynth's, so that comparison can't see the rate, and a section of its own runs the firmware's timer routine against it (HARDWARE_FIRMWARE.md, "Tempo sync and Time Trip").
 - A tone's path (constructor `0x894f5860`, note start, update, the scheduler, what is hooked) is in
   HARDWARE_FIRMWARE.md, "The whole tone against XtSynth". Any change is a tone update (`0x894dc0b0`): all
   the blocks again, COSMs before the envelopes.
@@ -124,6 +128,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   part's notes (`0x894d7760`), for any number, value moved or not. `*K` is N, the part-and-channel state (+0x11c Hold, +0x11d Sostenuto). A note's
   +0x48 is key, Hold, Sostenuto: it stops when all three are clear (HARDWARE_FIRMWARE.md, "Hold, Sostenuto and the mode messages").
 - The Matrix is the note's object M (the input table's +0x68), read through the getters `0x894e7010`…`0x894e7860`; a slot is not a Dest (`xtFwMatrixTables`).
+  A getter forms its own group of sums and no other. A pad's move (TRIP-R) brings no update, so a key-off, which converts only release times, reaches only the envelopes' groups: `matrixRelease`. A note value (128 on) takes no sum (`withSum`).
   `0x894d96d0` on `0x89cf7634`, which older sections call "the matrix", is the Multi Step Modulator, not ported (HARDWARE_FIRMWARE.md, "The Matrix").
 - The analog oscillator's map (waveform codes, routines, the converter's
   input, the hidden calibration IDs 0x528…0x55b) is in HARDWARE_FIRMWARE.md,

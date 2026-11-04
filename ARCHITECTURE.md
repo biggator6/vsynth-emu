@@ -359,12 +359,13 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - The TVA Switch (v101): off, the TVA has no envelope, as the firmware (`xt_tone`). Off by default, as on the XT (v102).
 - The patch TVA's level and pan (v114): Level, Pan, their Keyfollows and LFO Depths, LFO 5, the MFX Send Level and CC 7, 10, 11, as the firmware (`xt_tone`).
 - Hold, Sostenuto and the mode messages (v117): the note's three reasons to sound, as the firmware (`xt_tone`). Any controller is a tone update.
-- The Matrix (v119): the eight controls, every source, the D-Beam's controllers and pressures, as the firmware (`xt_tone`), each slot's sum compared. MFX-PRM1…3 wait for the effects. The Multi Step Modulator is not ported. The COSMs' PRMs in v120.
+- Tempo sync and Time Trip (v118): the Patch Tempo, note values on envelope times and LFO rates, Tempo Sync, the Time Trip pad, its Switch and Beat Keep, as the firmware (`xt_tone`). On the Patch Tempo, not the host's.
+- The Matrix (v119): the eight controls, every source, the D-Beam's controllers and pressures, as the firmware (`xt_tone`), each slot's sum compared. MFX-PRM1…3 wait for the effects. The Multi Step Modulator is not ported. The COSMs' PRMs in v120. TRIP-R from the Time Trip pad, and what a source moved with no update reaches, in v124.
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
 - no effects: MFX, Chorus and Reverb, so also no Chorus or Reverb Send and no Output Assign;
-- no step/event playback or Time Trip;
+- no step/event playback;
 - no matrix or realtime controllers on the OSC knobs, and the time and
   formant envelope depths' velocity sensitivity is not exposed.
 

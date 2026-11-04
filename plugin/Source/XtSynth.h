@@ -109,6 +109,14 @@ public:
         bool loop = false;
         int loopMode = 1;
         float loopStart = 0.0f, loopEnd = 1.0f;
+        // Tempo Sync (IDs 0x2d0, 0x304): a PCM OSC's walk follows the tempo clock, at the speed of
+        // the Patch Tempo over the wave's Original Tempo (its header's +0x1c, BPM × 10000)
+        bool tempoSync = false;
+        int origTempo = 1200000;
+        // Time Trip Sw and Beat Keep (IDs 0x2d6, 0x2d7; 0x30a, 0x30b): the pad (XtSynth::timeTrip)
+        // takes this OSC's walk; when it lets go, a fade and a jump to where the wave would
+        // have got to, or with Beat Keep off on from where it stands.  On by default, as on the XT
+        bool timeTrip = true, beatKeep = true;
         bool operator==(const OscControls&) const = default;
     };
     struct Controls : OscControls {                 // OSC 1's in the base
@@ -122,8 +130,14 @@ public:
         bool scaleTune = false;
         int scale[12] = {};
         int bendUp = 2, bendDown = 2;
+        // Patch Tempo (ID 0x11d), BPM × 10, 200..2500: Clock Source INTERNAL.  It drives the clock
+        // that the note-value LFO rates and Tempo Sync follow, and the note-value envelope times.
+        // The firmware keeps whole BPM of it (XtSynth::clockPeriod).
+        int patchTempo = 1200;
         // amp envelope knobs, 0..127 as on the XT (release 16 = 30 ms);
-        // velocity → time sensitivities −63..+63; Time KF −200..+200
+        // velocity → time sensitivities −63..+63; Time KF −200..+200.  Any envelope's Attack,
+        // Decay and Release, and any LFO's Rate, take 128..144 too: a note value, 3 to 192
+        // clocks of 24 to the quarter (0x897cfeb8)
         int attack = 0, decay = 0, sustain = 127, release = 16;
         int aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
         // the TVA Switch (ID 0x299), off: no envelope, velocity, Level, Pan or LFO, only CC 7
@@ -281,6 +295,11 @@ public:
     // does.  CC 7, 11 (level), 10 (pan), 64 Hold and 66 Sostenuto (the keys' release, 0x894d58b0),
     // 121 Reset All Controllers; 120 All Sound Off truncates; 123…127 release every key.
     void controller(int cc, int value);
+    // The Time Trip pad, as its two controllers (XtTripPad): x and y 1..127 a finger on it, 0 lifted.
+    void timeTrip(int x, int y);
+    // The pad as one plain control: 0 lifted, 1..127 a finger going clockwise round its rim, one turn
+    // over the range, which is forward: a turn is 48 steps, two quarter notes of the wave's Original Tempo.
+    void timeTripKnob(int value);
     void render(float* left, float* right, int n);
 
 private:
@@ -297,6 +316,7 @@ private:
         XtEnvelope oenv;               // the OSC amp envelope (curve 2)
         XtLfo lfo;
         XtPitchRamp porta;             // the pitch ramp (+0x880)
+        bool chase = false;            // a released Time Trip fading out to go back to the beat (+0x9b0)
         // the player's pitch ratio, formant ratio, walk and Energy as the
         // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
         float curA = 1, curF = 1, curWalk = 1, curG = 0, curGain = 1;
@@ -326,7 +346,8 @@ private:
         int mVel = 64, mKey = 60, mRaw = 60;
         int16_t mx[kXtMatrixSlots] = {};
         int beam[4] = {};
-        bool mxMoved = false;          // a sum moved ahead of the update that follows (a pedal let go)
+        int tempo10 = 1200;            // the tempo at the note's start: the note-value envelope times (input +0x18)
+        float blockTempo = 0.0f;       // OSC 1's block +0x60, which the LFOs start from: left as it was with OSC 1 off
         XtEnvelope env;
         XtLfo tlfo;                    // LFO 5, on the TVA's level and pan
         // the COSM sections: on as at note-on; each its TVF, Dual, TB, Comb or
@@ -373,6 +394,11 @@ private:
     int hold = 0, sost = 0;           // the part's Hold and Sostenuto (N + 0x11c, + 0x11d)
     uint16_t sostKeys[8] = {};        // the keys held when Sostenuto went down (N + 0x120)
     int lastRelease = 0;              // the last note-off's velocity (N + 0xa)
+    XtTripPad pad;                    // the part's Time Trip pad
+    // The tempo clock, 24 to the quarter (0x89471030 → 0x894d4210 → 0x894f4da0), on the audio's
+    // clock here: frames × 24000 against the period × 44100.  It runs with nothing sounding.
+    uint64_t clockAcc = 0;
+    uint32_t clockBlocks = 0, clockLast = 0;   // blocks (0x8987c7a8), at the last clock (0x8987c7a4)
     float chaosSeed = 0x1.666666p-1f; // the global logistic map the LFOs draw their seeds from (0.7 at power-on, 0x894f4c80)
     double hostRate = 44100;
 
@@ -386,11 +412,19 @@ private:
 
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames
+    int clockPeriod() const;       // ms to the quarter ×2 (the clock object's +0x14)
+    int tempo10Now() const;        // the tempo ×10 the converters read (0x894e2d20)
+    float tempoNow() const;        // and as the block has it (+0x60)
+    int clocksDue() const;         // clocks the next block starts with
+    void clockTick();              // 0x894f4da0
+    void oscBeat(OscVoice& s, const OscControls& o);   // a block's Tempo Sync, Time Trip and Beat Keep to the player (0x894f3ec0)
     const XtEncoded* waveOf(const OscControls& o) const { return cur[&o == &ctl ? 0 : 1].get(); }
     bool oscPlays(const OscControls& o) const;       // switched on, with something to play
     void targets(const Voice& v, const OscVoice& s, const OscControls& o, float& A, float& F, float& walk, float& g) const;
     float gainTarget(const Voice& v, const OscVoice& s, const OscControls& o, float env) const;   // 0x894f3dc0 / 0x894f3e20
+    XtMatrixInputs matrixInputs(const Voice& v) const;
     bool matrixUpdate(Voice& v) const;               // the sums, as a conversion pass reads them; true if any moved
+    void matrixRelease(Voice& v) const;              // what a key-off forms
     void updateAll(Voice& v);                        // every envelope's and LFO's settings, as an update gives them
     float pitchKnob(const Voice& v, const OscVoice& s, const OscControls& o) const;   // the voice's +0xc
     XtEnvParams ampEnvParams(const Voice& v, const OscControls& o) const;   // the OSC amp envelope
@@ -419,6 +453,7 @@ private:
     XtTvaBlock tvaBlock(const Voice& v) const;       // the converter's block, at the voice's key and latched velocity
     void tvaGains(const Voice& v, float levelEnv, float* lr) const;   // a gain or target, left and right
     void newBlocks(Voice& v);                        // an update's blocks for a sounding voice (0x894dba00)
+    void lfoUpdates(Voice& v);                       // and all its LFOs' (0x894f5c70)
     XtLfoParams tlfoParams(const Voice& v) const;    // LFO 5
     XtEnvParams envParams(const Voice& v) const;
     XtEnvParams oscEnvParams(const Voice& v, const OscVoice& s, int which, int a, int d, int su, int r) const;   // 0 pitch, 1 time, 2 formant

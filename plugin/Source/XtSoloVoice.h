@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <vector>
+#include "XtBeat.h"
 #include "XtLoop.h"
 
 // A sample prepared for SOLO playback: the samples and their grain records.
@@ -52,6 +53,28 @@ public:
     // walk (0x8950c880 forward, 0x8950ca70 backward): One Way jumps to the
     // other end (0x8950d7d0), Alternate turns the walk round.
     void setLoop(const XtLoop& l) { loopCfg = l; }
+    // Tempo Sync and Time Trip (XtBeat).  Set before noteOn: the note's tempo and the wave's
+    // Original Tempo (+0x4c, +0x48), byte 0 bits 1 and 2.  Then, from the voice: the bits as a
+    // block sets them (0x894f3ec0: a clock counts from when the bit comes on, and Time Trip
+    // starts with one step), a clock, a Time Trip step.
+    void setTempo(uint32_t tempo, uint32_t orig) { tempoCfg = tempo; origCfg = orig; }
+    void setBeatFlags(bool sync, bool trip) {
+        if (sync && !(flags0 & 2)) beat_.clk = 0;
+        if (trip && !(flags0 & 4)) beat_.trip = 1;
+        flags0 = (uint8_t)((sync ? 2 : 0) | (trip ? 4 : 0));
+    }
+    void addClock(int n) { beat_.clk = (int8_t)(beat_.clk + n); }
+    void setTrip(int step) { beat_.trip = (int8_t)step; }
+    bool syncOn() const { return flags0 & 2; }
+    bool tripOn() const { return flags0 & 4; }
+    const XtBeat& beat() const { return beat_; }
+    // To a position in 1/16 sample (0x8950fed0 with byte 0 bit 7), as a released Time Trip goes
+    // back to the beat: the record there and the anchor at its start, the running grains and the
+    // trigger timer carrying on, the beat again from there.
+    void seek(int32_t pos16);
+    // The output gain as it stands (+0x84), and the position (+0x38, 1/16 sample).
+    float gainNow() const { return gain; }
+    int32_t position() const { return Pi; }
     // Renders `count` samples: mono (a stereo plan's left channel), or both
     // channels (a mono plan plays L = R, as the firmware writes it).
     void render(float* out, int count) { render(out, nullptr, count); }
@@ -90,6 +113,9 @@ private:
     // +0xc current, +0x24 its position, +0x28 the next's) and the next
     // crossing (+0x2c).
     XtLoop loopCfg;
+    XtBeat beat_;
+    uint32_t tempoCfg = 1200000, origCfg = 1200000;
+    uint8_t flags0 = 0;                 // byte 0 bits 1, 2 (Tempo Sync, Time Trip)
     int32_t lp[4] = { 0, 0x7fffffff, 0x7fffffff, 0 };
     int lmode1 = 0, lmode3 = 0;
     bool loopOn = false;

@@ -183,6 +183,36 @@ private:
 // 0…127.  KF as xtPitch10 takes it (×10).
 int xtKeyFollowKey(int key, int coarse, int kf);
 
+// ── The Time Trip pad ───────────────────────────────────────────────────────
+// The part's pad object (0x894f4020, per part from 0x8987ae78), as the controllers "Time Trip
+// Assign X" and "Y" reach it (0x894d8360): X and Y 1…127 are a finger on the pad, 0 lifts it.
+// Touching needs both above 0 (0x894f4230); after that each Y moves it (0x894f4080), and the
+// angle moved, 512 to a turn, comes out as whole steps (0x894f43b0, 48 to a turn: the tables
+// at 0x897d3d8e, 0x897d3da0, index 2 as 0x894d8740 sets it).  A direction once taken holds
+// against a move back of up to 64, which counts when a second one comes; a jump of more than
+// 64 is no move.  The angle table at 0x897d1c8c (0x894f42b0) is read from rom.2.  Its entries' other
+// byte is the distance from the centre, 126 at the middle of an edge and 127 past that, which each
+// Y of a finger leaves at +0x24 for the Matrix's TRIP-R (0x894e6c60); with no finger, 127.
+class XtTripPad {
+public:
+    bool on() const { return on_; }
+    void setX(int value);
+    // True when the pad moved: `step` the whole steps, for the voices' byte (0x894f25a0).  At most
+    // 24, half a turn, so the firmware's loop that hands them out by ±127 goes round once.
+    bool setY(int value, int& step);
+    int radius() const { return radius_; }
+private:
+    bool on_ = false;
+    int radius_ = 127;               // +0x24
+    int x = 0, y = 0;                // +0x20, +0x21 of the part's object
+    int dir = 0, pending = 0;        // +0xc, +0xe
+    int angleWas = -1, angleNow = -1;   // +0x18, +0x1e
+    void touch(bool down);
+    int angle(int px, int py) const;
+    int distance(int px, int py) const;
+    int delta();
+};
+
 // ── Level (the OSC TVA) and velocity ────────────────────────────────────────
 // Velocity Sens and Curve as the patch → table updaters store them:
 // 0x894ebe20, ±63 → ±200 (s·100/32 up to ±32, then 100 + (|s| − 32)·100/31);
