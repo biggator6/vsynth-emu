@@ -2,7 +2,7 @@
 #include <tuple>
 
 static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 880;  // height of the XT strip below it
+static constexpr int kXtStripH   = 1000; // height of the XT strip below it
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -17,6 +17,10 @@ static const char* const kLevelIds[32][2] = {
     { "cosmEnvAAttack", "A" },     { "cosmEnvADecay", "D" },        { "cosmEnvASustain", "S" },      { "cosmEnvARelease", "R" },
 };
 static const char* const kLevelRowNames[8] = { "OSC Pitch", "Tune", "OSC TVA", "O Env", "O Env", "Velocity", "TVF Mod", "COSM Env" };
+// The patch TVA's rows (Level, KF, LFO Depth, Send; Pan, KF, LFO Depth), then LFO 5's knobs
+static const char* const kTvaIds[10][2] = { { "tvaLevel", "Lvl" }, { "tvaLevelKF", "KF" }, { "tvaLevelLfo", "LFO" }, { "mfxSend", "Send" },
+                                            { "tvaPan", "Pan" }, { "tvaPanKF", "KF" }, { "tvaPanLfo", "LFO" },
+                                            { "tvaLfoRate", "Rate" }, { "tvaLfoDelay", "Delay" }, { "tvaLfoFade", "Fade" } };
 // Which of those rows' knobs are the selected OSC's own (attachOsc): the OSC's
 // pitch, TVA, amp envelope and velocity to level
 static bool kLevelOsc(int i) { return i < 4 || (i >= 8 && i < 20) || i == 22 || i == 23; }
@@ -64,9 +68,9 @@ static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(560, 1180);
+    setSize(560, 1300);
     setResizable(true, true);
-    setResizeLimits(480, 870, 960, 1320);
+    setResizeLimits(480, 990, 960, 1440);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -218,6 +222,33 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     cosmSelBox_.addItemList({ "COSM 1", "COSM 2" }, 1);
     cosmSelBox_.setSelectedId(1, juce::dontSendNotification);
     cosmSelBox_.onChange = [this] { attachCosm(cosmSelBox_.getSelectedId() == 2 ? 1 : 0); };
+    for (int i = 0; i < kTvaKnobs; ++i) {
+        juce::Slider& sl = tvaSliders_[i];
+        sl.setSliderStyle(juce::Slider::LinearHorizontal);
+        sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 20);
+        sl.setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
+        sl.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
+        sl.setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
+        addAndMakeVisible(sl);
+        tvaAtts_[i] = std::make_unique<SliderAtt>(processor_.apvts, kTvaIds[i][0], sl);
+        tvaLabels_[i].setText(kTvaIds[i][1], juce::dontSendNotification);
+        styleSmall(tvaLabels_[i]);
+    }
+    tvaRowLabels_[0].setText("TVA", juce::dontSendNotification);
+    tvaRowLabels_[1].setText("TVA Pan", juce::dontSendNotification);
+    tvaRowLabels_[2].setText("LFO 5", juce::dontSendNotification);
+    for (juce::Label& l : tvaRowLabels_) styleSmall(l);
+    tlfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);
+    tlfoModeBox_.addItemList({ "ON <<", "ON >>", "OFF <<", "OFF >>" }, 1);
+    tlfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
+    tlfoSyncBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    tlfoSyncBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    for (juce::Component* cpt : { (juce::Component*)&tlfoWaveBox_, (juce::Component*)&tlfoModeBox_,
+                                  (juce::Component*)&tlfoOffsetBox_, (juce::Component*)&tlfoSyncBtn_ }) addAndMakeVisible(*cpt);
+    tlfoWaveAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "tvaLfoWave", tlfoWaveBox_);
+    tlfoModeAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "tvaLfoFadeMode", tlfoModeBox_);
+    tlfoOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "tvaLfoOffset", tlfoOffsetBox_);
+    tlfoSyncAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, "tvaLfoKeySync", tlfoSyncBtn_);
     lfoWaveBox_.addItemList({ "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1);
     lfoModeBox_.addItemList({ "ON <<", "ON >>", "OFF <<", "OFF >>" }, 1);
     lfoOffsetBox_.addItemList({ "-100", "-50", "0", "+50", "+100" }, 1);
@@ -1009,6 +1040,32 @@ void VSynthEmuEditor::resized() {
     clfoRateLabel_.setBounds(rl.removeFromLeft(34));
     clfoRateSlider_.setBounds(rl.removeFromLeft(220).withTrimmedRight(6));
     clfoSyncBtn_.setBounds(rl);
+    for (int r = 0; r < 2; ++r) {                    // the patch TVA, after the COSMs as the signal goes
+        xt.removeFromTop(6);
+        auto rt = xt.removeFromTop(24);
+        tvaRowLabels_[r].setBounds(rt.removeFromLeft(56));
+        const int w4 = rt.getWidth() / 4;
+        for (int i = r ? 4 : 0; i < (r ? 7 : 4); ++i) {
+            auto cell = rt.removeFromLeft(w4);
+            tvaLabels_[i].setBounds(cell.removeFromLeft(34));
+            tvaSliders_[i].setBounds(cell.withTrimmedRight(6));
+        }
+    }
+    xt.removeFromTop(6);
+    auto rt5 = xt.removeFromTop(24);                 // LFO 5: waveform, rate, key sync
+    tvaRowLabels_[2].setBounds(rt5.removeFromLeft(46));
+    tlfoWaveBox_.setBounds(rt5.removeFromLeft(80).withTrimmedRight(6));
+    tvaLabels_[7].setBounds(rt5.removeFromLeft(34));
+    tvaSliders_[7].setBounds(rt5.removeFromLeft(220).withTrimmedRight(6));
+    tlfoSyncBtn_.setBounds(rt5);
+    xt.removeFromTop(6);
+    auto rt6 = xt.removeFromTop(24);                 // LFO 5: delay, fade, fade mode, offset
+    tvaLabels_[8].setBounds(rt6.removeFromLeft(40));
+    tvaSliders_[8].setBounds(rt6.removeFromLeft(130).withTrimmedRight(6));
+    tvaLabels_[9].setBounds(rt6.removeFromLeft(34));
+    tvaSliders_[9].setBounds(rt6.removeFromLeft(130).withTrimmedRight(6));
+    tlfoModeBox_.setBounds(rt6.removeFromLeft(90).withTrimmedRight(6));
+    tlfoOffsetBox_.setBounds(rt6.removeFromLeft(70));
 
     // ── Knobs area ─────────────────────────────────────────────────────────
     const int knobTop = titleH + kFileStripH + kXtStripH + 8;

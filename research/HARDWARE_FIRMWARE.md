@@ -1545,7 +1545,85 @@ stage time (+0x6c) and the onset level (+0x58).
   players' squared gain (`0x8950e1e0`);
 - velocity curves, envelope depth, A/D/R velocity sensitivity and Time KF;
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
-  no LFO; velocity stays a linear gain).
+  no LFO; velocity stays a linear gain). (Done in v114.)
+
+### The patch TVA's level and pan (2026-11-03, v114)
+
+Level, Pan, their Keyfollows and LFO Depths, LFO 5, the MFX Send Level, and CC 7, 11 and 10 are ported, with their parameters and rows in the editor. The TVA has been at level 1, centred, with no LFO since v46. At the defaults every new factor is exactly 1, so the renders are unchanged: `ab.sh` 4/4 identical to v113.
+
+This answers v101's open question. With the TVA Switch off CC 7, CC 11 and the MFX Send Level still count; Level, Pan, their Keyfollows and LFO Depths and CC 10 do not.
+
+**The inputs.** `0x894eb170` reads the IDs into the input table, 0x16 bytes per tone from `0x89d2a6d0` (0x160 per part); `0x894eb260` reads the velocity pair ahead of them.
+
+| Input | ID | |
+|---|---|---|
+| +0, +2 | 0x3b7, 0x3b8 | Env 13's Velocity Curve and Sens, through the converters (v48) |
+| +4 | 0x299 | TVA Switch |
+| +6, +8, +0xa | 0x29a, 0x29b, 0x29c | Level, Level Keyfollow ×10, Level LFO Depth |
+| +0xc, +0xe, +0x10 | 0x29d, 0x29e, 0x29f | Pan, Pan Keyfollow ×10, Pan LFO Depth |
+| +0x12, +0x13, +0x14 | 0x2a0, 0x2a1, 0x2a2 | MFX, Chorus and Reverb Send Levels |
+| +0x15 | 0x2a3 | Output Assign: 0 MULTI, 1 MAIN, 2 DIR (manual p. 97) |
+
+`0x894ea990` at the note's start copies these to its object from +6 on, with the key at +2 and velocity at +3 (the key with the Octave Shift), and latches the velocity gain at +0x1c. A legato (`0x894eaa90`) takes a new key, velocity and gain from the inputs it has. An update (`0x894eaae0`) copies the inputs again and leaves the gain as it was.
+
+**The converter.** `0x894ea380` at a note's start and a legato, `0x894eab40` in the conversion pass, the same arithmetic. It writes the block at tone block + 0x67c. T is the level curve (128 u16 at `0x897cfcb8`) and Pn the pan law (128 u16 at `0x897cfdb8`, 0 at 0, 1 at 63 and 64, 1.427 at 125…127), each /32768. So a hard pan is 3.1 dB up on its own side, and silent on the other.
+
+| Block | Switch on | Switch off |
+|---|---|---|
+| +0, +4 | 13, 5: the envelope and LFO the note-on binds | the same |
+| +0x10, +0x14 | 0, 5: +0x14 is the pan's LFO | the same |
+| +8 | Level LFO Depth, (d/63)·\|d/63\| | 0 |
+| +0xc | T[CC 7]·T[L]·T[CC 11]·velocity, in that order | T[CC 7]·T[CC 11] |
+| +0x18 | 0 | 0 |
+| +0x1c | Pan LFO Depth, (d/63)·\|d/63\| | 0 |
+
+- L = Level + trunc(127·KF·(key − 60)/6000), within 0…127, by the reciprocal multiply of `0x894e0c90` (v53). The Pan the same with its own KF.
+- CC 10 then moves the pan toward the end it points at: P + (CC − 64)·(127 − P)/63 from 64 up, P − (P·(64 − CC))>>6 below. So CC 10 at 0 or 127 is a hard pan whatever the knob.
+- The pair is s·Pn[127 − P] and s·Pn[P], with s = T[MFX Send], which the Switch does not touch. Off it is s·Pn[63] and s·Pn[64], so s on both.
+- Output Assign says which pair of the block takes it, the other two left 0: 0 +0x28, +0x2c; 1 +0x20, +0x24; 2 +0x38, +0x3c when the system's Output Mode (`0x89d2a6d0 + 0x1604`) is Parallel, else as 1.
+- +0x30 = T[CC 91]·T[Reverb Send], +0x34 = T[CC 93]·T[Chorus Send].
+- All eight × 2^(g/6), g the system's Output Gain (`0x89d2a6d0 + 0x1600`), 0 here. The routine also sets the truncate step (v46's).
+- Each input also adds a matrix term (`0x894d96d0` on `0x89cf7634`, destinations 0x39, 0x3a, 0x40…0x44) and a controller term from `0x894e7860`'s table. Both are 0 here.
+
+**The controllers.** `0x894e9fe0`, in each conversion pass, copies the channel's values to the note's object: +0x178 C + 0x84 + 7, +0x179 + 11, +0x17a + 10, +0x17b + 93, +0x17c + 91. So a moved CC reaches a sounding TVA as a knob does, at the next tone update, and that update hands out all the blocks. `XtSynth::controller` does what `pitchBend` does. The check writes C and runs the update. The path from a MIDI message to C is not traced, like the bender's in v99.
+
+**The object** (tone +0x1650). Note-on `0x894f50e0`, after the LFOs: copies the block; binds Env 13 (+0x94), LFO 5 (+0x98, +0x9c). With a0 = env·level, a8 = LFO·(+8), ac = LFO·(+0x1c):
+- targets (+0x60, +0x64) = (1 + a8)·a0·(1 ∓ ac), within ±1. The gains (+0x68, +0x6c) the same with the envelope's onset level.
+- the bus levels (+0x70…+0x8c) start at the block's, so a note's first sample is panned.
+
+`0x894f5de0` → `0x894f5310`, after the LFOs in `0x894dba00`, takes +8, +0xc, +0x18, +0x1c and +0x20…+0x34 from a new block. Not +0x38 and +0x3c, so Output Assign DIR's pair stays as at note-on. Update `0x894f5360` forms the targets as above, then the ramp as in v46, a step per channel. Done (`0x894f54b0`): both gains at or below 2^−16.
+
+**The render** (`0x894f5720`). The gains as before, one per channel. Each bus level moves by (block − level)·0.0009375 per sample, formed once per block: 3% of the gap each block, a time constant of 33 blocks, 24 ms. So a Pan or Send moved glides, while the LFO's pan moves with the gains. The frame's 32 bytes:
+
+| Frame | |
+|---|---|
+| +0, +4 | L·gain·(+0x70), R·gain·(+0x74): Output Assign MAIN |
+| +8, +0xc | ½(L·gain + R·gain)·(+0x80), ·(+0x84): the Reverb and Chorus sends |
+| +0x10, +0x14 | L·gain·(+0x78), R·gain·(+0x7c): MULTI, to the MFX |
+| +0x18, +0x1c | L·gain·(+0x88), R·gain·(+0x8c): DIR |
+
+The loop is hard to read in Ghidra's listing, as it runs under `fschg`: with FPSCR.SZ = 1, `fmov fr0,fr1` is `fmov dr0,xd0`, a pair to the other bank, and `fmov fr1,fr0` the way back. That is how the gained samples reach the bank holding the last two buses.
+
+A truncated tone (`0x894f5570`) holds gains and bus levels: L·gain·fade·(bus level), in that order.
+
+**LFO 5.** IDs 0x3de…0x3e5, the XT's defaults as LFO 3's (TRI, Rate 98, Offset 0, no delay, Key Sync off). The note-on sets its +0x80 whatever the TVA Switch, so it always ticks. Its seed is the sixth drawn (LFO 0…7). Key-unsynced it follows a sounding tone's or takes its free object, like the others (v94); `XtSynth::freeTlfo`. A live Fade Mode has no effect, as the mode is latched at the trigger (v94), so a planted error leaving it out of the change list is exact and not in the list. A legato's update of it moves nothing either, as a legato moves no knob.
+
+**Left out, with reasons.**
+- The Chorus and Reverb sends, and +8, +0xc of the frame: there are no effects yet, so nothing to send to. The check does not compare them.
+- Output Assign: the plugin has one output. With no MFX all three buses would be the same sound. It stays at MULTI on both sides, and the check reads the MULTI pair. Other values would need two more things: COSM 1 on the mix reads the bus's first pair past its block (v104), and DIR's pair does not update.
+- The matrix, and the controller terms, at rest. CC 121 and other resets are not modelled: `controller` takes only 7, 10 and 11.
+
+**The check.** `xt_tone` draws Level, Pan, their KFs and depths, the MFX Send, LFO 5's seven fields and the three CCs (at rest in two cases of three, so the sweep's moves can be seen), and moves them live. New, every block: +8, +0x1c, +0x28, +0x2c, +0x78, +0x7c. The right channel's gain, target and step were always compared, against the left's values, as nothing could part them; now they have their own. At every update: LFO 5's output. At each case's start: its free object's phase. The sweep gains LFO 5's fields, the TVA's, and each CC alone, on a note with both depths on and LFO 5 fading in or in a short delay.
+
+**The result.** fcheck: 2000 cases and the sweep, 3353 notes, 1373 taken by a sounding tone, 416 truncated, 271,325 blocks, 8.0 million checks, 0 different; a wave on OSC 2, 1412 notes, 107,310 blocks, 2.8 million checks, 0 different. 3000 cases and the sweep on each of four other seeds (777, 31337, 9, 4242), 0 different. `fcheck.sh --update` changes only `xt_tone`'s five count lines. PluginTest 4/4 bit-identical at the defaults; with the TVA's knobs and LFO 5 set, the Switch on and off; and with CC 7, 10 and 11 moved during a note. A/B 4/4 identical to v113.
+
+**A seed that showed something else.** With the new draws seed 777 gave one difference, at COSM output in a case with a SOLO wave on OSC 2, a Compressor, then an Amp Simulator: 2.19% of the block's peak, past `kSoloTol`'s 2%, with OSC 2's buffer only 0.002% off. Three runs of that case settle it. Given the firmware's OSC 2 buffer, the port's COSM output is exact in every block. With COSM 2 off the jump is still there (0.26%). With COSM 1 off it is gone. So the Compressor's level decision flips on the SOLO player's −93 dB difference, as Lo-Fi's quantizer does, and the check now replaces both on a SOLO wave. Nothing of the TVA in it: that tap is before the TVA.
+
+**Planted errors.** `tone_muts.txt` gains 66, 19 of them in the converter (PORT=toneosc, XtOsc.cpp; `mutate_tone.py` takes a fourth field for a port). All 211 are caught at 2000 cases. The first run missed five, and two of those were the check's weakness rather than exactness: moving LFO 5's Offset or Fade alone was invisible when the drawn Fade Mode left it at amplitude 0. So the sweep now fixes the mode and a Fade in progress. `cosm-past-always`, an old one, had also slipped through, by chance of the new draws: it reads OSC 2 past the block on Type1, which only a stereo Side Band shows. A quarter of the cases made for those words now stand on Type1.
+
+**The plugin.** Parameters `tvaLevel`, `tvaLevelKF`, `tvaLevelLfo`, `tvaPan` (shown L64…0…63R), `tvaPanKF`, `tvaPanLfo`, `mfxSend`, `tvaLfo…`. Rows TVA, TVA Pan and LFO 5 (two) at the end of the XT strip, after the COSMs as the signal goes: `kXtStripH` 1000, window 1300. MIDI CC 7, 10, 11 go to `XtSynth::controller`. The TVA Switch is off by default, so Level, Pan and LFO 5 do nothing until it is ticked, as on the XT. A session saved before v114 comes up at the defaults, and so sounds as it did. CLI `XT_TVA`, `XT_LFO5`, `XT_CC`; PluginTest `TEST_TVA`, `TEST_LFO5`, `TEST_CC`.
+
+**Not covered.** A real XT. The matrix and controller terms. How a CC message reaches C. CC 91 and 93.
 
 ### The SOLO encoder's stereo mode (2026-11-03, v113)
 
@@ -2280,7 +2358,7 @@ The user chose the XT's default over v101's on. So a new patch has the TVA off: 
 
 ID 0x299 is the first of the TVA's inputs (`0x894eb170` stores it at +4). `xt_tone` showed what it does, with the switch drawn in its cases and moved during notes:
 
-- **Off:** the TVA's level (+0xc) is exactly 1, so no velocity, and envelope 13's times are all 0 and its levels [0, 1, 1, 1, 0]. So the note sounds at full level from its start and the amp envelope's knobs do nothing. A note-off still ends it. The check keeps CC7, CC11 and TVA Level at rest, so whether those still count with the switch off is not known.
+- **Off:** the TVA's level (+0xc) is exactly 1, so no velocity, and envelope 13's times are all 0 and its levels [0, 1, 1, 1, 0]. So the note sounds at full level from its start and the amp envelope's knobs do nothing. A note-off still ends it. The check keeps CC7, CC11 and TVA Level at rest, so whether those still count with the switch off is not known. (v114: CC 7 and 11 count, Level does not.)
 - **Moved during a note:** it takes effect at once, on the level and the envelope.
 - **The velocity factor is latched at note-on and at a legato** (`0x894ea990`, TVA +0x1c), with the Sens and Curve of that moment. Switching back on returns to that factor and not to one from the knobs as they now are. `Voice::velGain` holds it, and `Voice::gain` is `tvaOn ? velGain : 1`.
 
@@ -2345,7 +2423,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 - The voice allocator and stealing: two notes at most, the part's note-on logic chosen in the harness as `0x894dbcb0` and `0x894dbea0` do.
 - The tick's timing against the audio: the firmware's update runs on XtSynth's clock. The scheduler's n is not checked.
 - The start state, as above, and everything before a note on the real panel: patch load, the editor.
-- The matrix, controllers other than the bender (CC7, CC10, CC11 at rest), Hold, the TVA's Level, Pan, LFO and sends (at defaults), velocity on the pitch, time and formant envelopes' depth paths beyond what the OSC converter takes.
+- The matrix, controllers other than the bender (CC7, CC10, CC11 at rest), Hold, the TVA's Level, Pan, LFO and sends (at defaults; CC 7, 10, 11 and all but the Chorus and Reverb sends since v114), velocity on the pitch, time and formant envelopes' depth paths beyond what the OSC converter takes.
 - PCM on OSC 2. EXT IN. Tempo sync, Time Trip, playback modes, start offset, the wave's tuning fields.
 - The loop's cached events: the firmware's builder is not found, and the check's are built apart from the port's by the same rule.
 - Mid-note OSC Switch, Type, Waveform, Sub Octave, Time Offset, Key Sync, Robot, Structure, COSM Switch, COSM Type and loop edits: held fixed in the live cases.
@@ -2356,7 +2434,7 @@ Each port has its own check, but XtSynth, which wires them together from the kno
 - TVA Switch (ID 0x299): done in v101.
 - With a stereo OSC 1 the firmware's COSMs take their stereo routines, and `XtCosm` had only the mono ones. The check turned COSMs off for stereo waves. Closed in v104 ("COSM: the stereo routines").
 - With both OSCs off XtSynth starts no voice, so the key state, random pitch and LFO seeds do not advance. The firmware starts a tone. The check keeps one OSC on. The user's decision (2026-11-03): leave it for now, so such a note does nothing and makes no sound.
-- Lo-Fi on a SOLO wave is replaced by TVF in the check: its quantizer turns the SOLO player's small differences into a step of its own.
+- Lo-Fi on a SOLO wave is replaced by TVF in the check: its quantizer turns the SOLO player's small differences into a step of its own. The Compressor too since v114.
 
 ### The Structure Types (2026-11-02, v92)
 

@@ -201,6 +201,22 @@ float xtOscWaveGainFactor(int db);
 float xtOscLevel(int level, int kf, int key, float velGain);
 // Level LFO depth (+0x58): (d/63)·|d/63|, d clamped to ±63.
 float xtOscLevelLfoDepth(int d);
+
+// The patch TVA's converter (0x894ea380 at note-on and a legato, 0x894eab40 at an
+// update), its inputs at the XT's ranges (the KFs in steps of 10).  With the matrix
+// and the controller assigns at rest, and the system's output gain (0x89d2a6d0 + 0x1600,
+// 2^(x/6)) at 0.  Off is the TVA Switch.
+struct XtTvaKnobs {
+    bool on = false;
+    int level = 127, levelKF = 0, levelLfo = 0, pan = 64, panKF = 0, panLfo = 0, send = 127;
+    int cc7 = 127, cc11 = 127, cc10 = 64;
+};
+// What it writes, as the TVA object holds it: +0xc the level (with the velocity gain and
+// CC 7 and 11), +8 and +0x1c the LFO's depths on the level and the pan, +0x28 and +0x2c
+// the output bus's left and right (MFX Send Level through the pan law).  Output Assign
+// picks the pair; the Chorus and Reverb sends (+0x34, +0x30) have nowhere to go yet.
+struct XtTvaBlock { float level = 1, lfoDepth = 0, panLfoDepth = 0, sendL = 1, sendR = 1; };
+XtTvaBlock xtTvaBlock(const XtTvaKnobs& k, int key, float velGain);
 // The OSC gain (+0x5c): 2^(Wave Gain/6), times the level curve at two
 // further levels (+0x84 / +0x86, set with the wave) taken as full here.
 float xtOscGain(int waveGainDb);

@@ -16,7 +16,8 @@
 //     XtSynth's control clock, the render (0x894f6d40) every block;
 //   the note-off (0x894dc270), a sounding tone taking a note (0x894dc1e0) and
 //     truncation (0x894d5ba0), chosen as the part's note-on and note-off do;
-//   a knob moved during a note: the updaters and the note's update (0x894dc0b0).
+//   a knob moved during a note: the updaters and the note's update (0x894dc0b0);
+//   the bender and CC 7, 11 and 10 written where the channel keeps them, and that update.
 // Only the OS is hooked: its locks and clock, the voice allocator's lists, and
 // the wave store (0x8949e5c0…): the waves lie in RAM as the loader leaves them,
 // from the same encodes XtSynth plays (their vpdt and load-time bands).
@@ -58,6 +59,7 @@ using Ctl = XtSynth::Controls;
 // The peek at XtSynth's voices (a friend of the class).
 struct XtToneProbe {
     static void bend(XtSynth& s, int b) { s.bender = b; }
+    static void ccs(XtSynth& s, const int* cc) { s.cc7 = cc[0]; s.cc11 = cc[1]; s.cc10 = cc[2]; }
     static int run(int argc, char** argv);
     static XtSynth::OscVoice& osc(XtSynth::Voice& v, int n) { return n ? v.osc2 : static_cast<XtSynth::OscVoice&>(v); }
     static XtEnvelope& env(XtSynth::Voice& v, int e) {
@@ -290,6 +292,8 @@ public:
         return ok;
     }
     void clearBus() { c.write(kBuf, std::vector<uint8_t>(0x400, 0).data(), 0x400); }
+    // A controller's value, which the next conversion pass reads (0x894e9fe0)
+    void setCc(int cc, int value) { c.wr8(kCtl + 0x84 + (uint32_t)cc, (uint8_t)value); }
 
     bool stop(FwNote& n) {
         if (!c.call(0x894f5a70, { n.TN, 3 }, kSp)) { std::fprintf(stderr, "stop: %s\n", c.error().c_str()); return false; }
@@ -540,6 +544,8 @@ std::unordered_map<int, int> patchOf(const Ctl& c) {
     for (int i = 0; i < 12; ++i) p[0x136 + 2 * i] = c.scale[i];
     p[0x293] = c.structure; p[0x294] = c.mod.on; p[0x295] = c.mod.type; p[0x296] = c.mod.level; p[0x297] = c.mod.attack; p[0x298] = c.mod.release;
     p[0x299] = c.tvaOn;
+    p[0x29a] = c.tvaLevel; p[0x29b] = c.tvaLevelKF / 10; p[0x29c] = c.tvaLevelLfo; p[0x29d] = c.tvaPan; p[0x29e] = c.tvaPanKF / 10; p[0x29f] = c.tvaPanLfo; p[0x2a0] = c.mfxSend;
+    p[0x3de] = c.tvaLfoWave; p[0x3e0] = c.tvaLfoRate; p[0x3e1] = c.tvaLfoOffset; p[0x3e2] = c.tvaLfoDelay; p[0x3e3] = c.tvaLfoFadeMode; p[0x3e4] = c.tvaLfoFade; p[0x3e5] = c.tvaLfoKeySync;
     envParams(p, 12, c.attack, c.decay, c.sustain, c.release, c.ampVelCurve, c.ampVelSens, c.aSens, c.dSens, c.rSens, c.timeKF / 10);
     return p;
 }
@@ -642,6 +648,11 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     c.aSens = r.one(2) ? 0 : r.range(-63, 63); c.dSens = r.one(2) ? 0 : r.range(-63, 63); c.rSens = r.one(2) ? 0 : r.range(-63, 63);
     c.timeKF = r.one(2) ? 0 : 10 * r.range(-20, 20);
     c.ampVelSens = r.range(-63, 63); c.ampVelCurve = r.range(0, 7);
+    c.tvaLevel = r.one(3) ? 127 : r.range(0, 127); c.tvaLevelKF = r.one(2) ? 0 : 10 * r.range(-20, 20); c.tvaLevelLfo = r.one(2) ? 0 : r.range(-63, 63);
+    c.tvaPan = r.one(3) ? 64 : r.range(0, 127); c.tvaPanKF = r.one(2) ? 0 : 10 * r.range(-20, 20); c.tvaPanLfo = r.one(2) ? 0 : r.range(-63, 63);
+    c.mfxSend = r.one(2) ? 127 : r.range(0, 127);
+    c.tvaLfoWave = r.range(0, 7); c.tvaLfoRate = r.range(0, 127); c.tvaLfoOffset = r.range(0, 4); c.tvaLfoDelay = r.one(2) ? 0 : r.range(0, 60);
+    c.tvaLfoFadeMode = r.range(0, 3); c.tvaLfoFade = r.one(2) ? 0 : r.range(0, 60); c.tvaLfoKeySync = !r.one(4);
     c.octave = r.one(3) ? r.range(-3, 3) : 0;
     if (r.one(2)) { c.portamento = true; c.portaMode = r.range(0, 1); c.portaType = r.range(0, 1); c.portaTime = r.range(0, 127); c.portaVeloSens = r.range(-63, 63); }
     return c;
@@ -649,6 +660,8 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
 
 // ── Compare ─────────────────────────────────────────────────────────────────
 constexpr size_t kBenderOnly = (size_t)-1;     // in the sweep: the bender moved, no knob
+constexpr size_t kCcOnly = (size_t)-4;         // and these three: CC 7, 11 or 10 moved, no knob
+constexpr int kCcNum[3] = { 7, 11, 10 };
 // Every field XtSynth keeps in a list of what has changed (setControls): the sweep moves
 // these one at a time, where nothing else moving can hide one left out of a list.
 std::vector<size_t> listedFields() {
@@ -668,6 +681,9 @@ std::vector<size_t> listedFields() {
     }
     add(c.mod.on);
     for (const int* x : { &c.mod.type, &c.mod.level, &c.mod.attack, &c.mod.release }) add(*x);
+    for (const int* x : { &c.tvaLfoWave, &c.tvaLfoRate, &c.tvaLfoOffset, &c.tvaLfoDelay, &c.tvaLfoFadeMode, &c.tvaLfoFade,
+                          &c.tvaLevel, &c.tvaLevelKF, &c.tvaLevelLfo, &c.tvaPan, &c.tvaPanKF, &c.tvaPanLfo, &c.mfxSend }) add(*x);
+    for (size_t i = 0; i < 3; ++i) f.push_back(kCcOnly + i);
     f.push_back(kBenderOnly);
     return f;
 }
@@ -728,7 +744,8 @@ int XtToneProbe::run(int argc, char** argv) {
     long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0;
     float worstSolo = 0;
     float L[32], R[32];
-    uint32_t fwFree[2] = {};
+    uint32_t fwFree[3] = {};                // the free-running objects of LFO 1, 2 and 5
+    static constexpr uint32_t kFreeLfo[3] = { 1, 2, 5 };
     FwNote fn[2];
     const char* dumpWhich = std::getenv("XT_TONE_DUMP");
     // After the random cases, the sweep: each listed field moved during a note, once in
@@ -804,6 +821,10 @@ int XtToneProbe::run(int argc, char** argv) {
                     e->timeKF = 50;
                 }
             ctl.aSens = ctl.dSens = ctl.rSens = 20;
+            // the TVA's LFO on both its depths, a level and a pan not at their limits
+            ctl.tvaLevel = ctl.mfxSend = 100; ctl.tvaPan = 40; ctl.tvaLevelLfo = ctl.tvaPanLfo = 40;
+            // and fading in, or in a short delay, so that a move of each of its fields can be seen
+            ctl.tvaLfoKeySync = true; ctl.tvaLfoFadeMode = 0; ctl.tvaLfoFade = 60; ctl.tvaLfoDelay = sweepStage >= 2 ? 9 : 0;
         }
         if (twoInTick) {
             // analog on both OSCs, sounding at once, no MOD; both COSMs at a Sustain soon, every
@@ -832,13 +853,13 @@ int XtToneProbe::run(int argc, char** argv) {
             }
         }
         // Some stereo cases where the stereo Side Band follower's words past the block matter:
-        // COSM 1 on OSC 1's buffer, OSC 2 sounding next to it, the level moving Width and Detune.
+        // COSM 1 next to OSC 2's buffer, OSC 2 sounding, the level moving Width and Detune.
         // At random this is rare enough for 2000 cases to miss it.  Only with OSC 1 on already:
         // until v108 a wave newly played could leave memory (band reads), which ended a case early
         // and changed the draws of all the cases after it.
         if (wv && wv->channels == 2 && wv->type != 1 && ctl.on && g % 10 == 3) {
             ctl.osc2.on = true;
-            ctl.structure = g % 20 == 3 ? 1 : 2;
+            ctl.structure = g % 20 == 3 ? 1 : g % 40 == 13 ? 0 : 2;   // on the mix (Type1) what follows is the bus's, not OSC 2's
             ctl.cosm[0].on = true;
             ctl.cosm[0].type = g % 40 < 20 ? 5 : 6;
             for (Ctl::Cosm::SideBand& b : ctl.cosm[0].sb) b.detuneOwn = b.widthOwn = 40;
@@ -856,8 +877,10 @@ int XtToneProbe::run(int argc, char** argv) {
         const bool soloBeside = soloCase && (sideBand(0) || sideBand(1));
         // X-MOD's phase on OSC 2's output, which a SOLO wave's gives only closely
         if (solo2 && ctl.ana.wave == 13) ctl.ana.wave = 0;
-        // Lo-Fi's quantizer turns the SOLO player's small differences into a step of its own.
-        if ((wv && wv->type == 1) || (wv2 && wv2->type == 1)) for (Ctl::Cosm& k : ctl.cosm) if (k.type == 9) k.type = 0;
+        // Lo-Fi's quantizer turns the SOLO player's small differences into a step of its own, and the
+        // Compressor's level decision can flip on one: −93 dB in, 2% out through an Amp Simulator (seed 777;
+        // given the firmware's OSC 2 buffer the port is exact there).
+        if ((wv && wv->type == 1) || (wv2 && wv2->type == 1)) for (Ctl::Cosm& k : ctl.cosm) if (k.type == 9 || k.type == 10) k.type = 0;
         // what the case does besides one note: 0 none, 1 a second note on a POLY part,
         // 2 on a MONO part with Legato, 3 on a MONO part without
         const int kind = sweep || twoInTick ? 2 : g % 5 == 0 ? 1 : g % 5 == 1 ? 2 : g % 5 == 2 ? 3 : 0;
@@ -883,11 +906,11 @@ int XtToneProbe::run(int argc, char** argv) {
         const int offAt[2] = { twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 3 : 1000) : 20 + r.range(0, 40), twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
         const int liveAt = twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
         // the free-running LFOs' phases, once a note has shown which objects they are
-        for (int n = 0; n < 2; ++n) {
+        for (int n = 0; n < 3; ++n) {
             if (!fwFree[n]) continue;
             ++rep.checks;
-            const float a = fw.f32(fwFree[n] + 0x10), b = n ? syn.freeLfo2.phase() : syn.freeLfo.phase();
-            if (!bits(a, b)) rep.bad("free lfo " + std::to_string(n + 1) + " phase", "fw %.9g port %.9g", a, b, -2);
+            const float a = fw.f32(fwFree[n] + 0x10), b = n == 2 ? syn.freeTlfo.phase() : n ? syn.freeLfo2.phase() : syn.freeLfo.phase();
+            if (!bits(a, b)) rep.bad("free lfo " + std::to_string(kFreeLfo[n]) + " phase", "fw %.9g port %.9g", a, b, -2);
         }
         // time with nothing sounding: the free-running LFOs run on
         for (int i = r.range(0, 30); i > 0; --i) {
@@ -899,6 +922,11 @@ int XtToneProbe::run(int argc, char** argv) {
         if (!fw.updatePatch()) return 1;
         fw.bender = r.one(3) ? r.range(0, 16383) : 8192;
         syn.pitchBend(fw.bender);
+        // the controllers the TVA reads: at rest in most cases, or a sweep's move would be hidden
+        int cc[3] = { 127, 127, 64 };
+        if (!sweep && !twoInTick && r.one(3)) for (int& x : cc) x = r.range(0, 127);
+        XtToneProbe::ccs(syn, cc);
+        for (int i = 0; i < 3; ++i) fw.setCc(kCcNum[i], cc[i]);
         if (wv) writeLoopEvents(fw, *wv, ctl);
         if (wv2) writeLoopEvents(fw, *wv2, ctl.osc2);
 
@@ -962,6 +990,9 @@ int XtToneProbe::run(int argc, char** argv) {
                 const int sa = (int)fw.c.rd32(Firmware::envAt(n, (uint32_t)e)), sb = pe.stage();
                 if (sa != sb) rep.bad("env " + std::to_string(e) + " stage", "fw %.0f port %.0f", sa, sb, blk);
             }
+            const float tl = fw.f32(Firmware::lfoAt(n, 5) + 0x38), tlp = v.tlfo.out();
+            ++rep.checks;
+            if (!bits(tl, tlp)) rep.bad("tva lfo output", "fw %.9g port %.9g", tl, tlp, blk);
             for (int k = 0; k < 2; ++k) {
                 if (!v.cs[k].on || !fw.c.rd32(Firmware::lfoAt(n, 3 + (uint32_t)k) + 0x80)) continue;
                 const float la = fw.f32(Firmware::lfoAt(n, 3 + (uint32_t)k) + 0x38), lb = v.cs[k].lfo.out();
@@ -1037,9 +1068,9 @@ int XtToneProbe::run(int argc, char** argv) {
             }
             syn.noteOn(raw[i], (float)vel[i] / 127.0f);
             if (fn[i].live && fn[i].vi < 0) fn[i].vi = voiceOfNewest();
-            for (int o = 0; o < 2; ++o)
+            for (int o = 0; o < 3; ++o)
                 if (fn[i].live)
-                    if (const uint32_t f = fw.c.rd32(Firmware::lfoAt(fn[i], (uint32_t)o + 1) + 0x7c)) fwFree[o] = f;
+                    if (const uint32_t f = fw.c.rd32(Firmware::lfoAt(fn[i], kFreeLfo[o]) + 0x7c)) fwFree[o] = f;
             compareAll(blk);
             return true;
         };
@@ -1059,17 +1090,23 @@ int XtToneProbe::run(int argc, char** argv) {
         };
         // Knobs moved, or the bender: the part's tables and each note's update on the firmware's
         // side, setControls or pitchBend on XtSynth's
-        auto moveLive = [&](const Ctl& n, int bentFrom, int blk) {
-            const bool panelMoved = !(n == ctl), moved = panelMoved || fw.bender != bentFrom;   // nothing moved, no update on either side
+        auto moveLive = [&](const Ctl& n, int bentFrom, int blk, int ccAt = -1, int ccTo = 0) {
+            const bool ccMoved = ccAt >= 0 && cc[ccAt] != ccTo;
+            const bool panelMoved = !(n == ctl), moved = panelMoved || fw.bender != bentFrom || ccMoved;   // nothing moved, no update on either side
             ctl = n;
+            if (ccAt >= 0) { cc[ccAt] = ccTo; fw.setCc(kCcNum[ccAt], ccTo); }
             fw.par = patchOf(ctl);
             fw.frames = syn.hostFrames;
             if (!fw.updatePatch()) return false;
             for (FwNote& fnote : fn)
                 if (moved && fnote.live && !fnote.ended && !fw.liveUpdate(fnote)) return false;
-            if (panelMoved) {                        // the bender with the knobs, in the one update the firmware's gets
+            if (panelMoved) {                        // the bender and a controller with the knobs, in the one update the firmware's gets
                 XtToneProbe::bend(syn, fw.bender);
+                XtToneProbe::ccs(syn, cc);
                 syn.setControls(ctl);
+            } else if (ccMoved) {
+                XtToneProbe::bend(syn, fw.bender);
+                syn.controller(kCcNum[ccAt], ccTo);
             } else syn.pitchBend(fw.bender);
             compareAll(blk);
             return true;
@@ -1109,7 +1146,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 }
             } else if (blk == liveAt) {                  // knobs moved, and the bender
                 Ctl n = drawControls(r, g, wv != nullptr, wv2 != nullptr);
-                if (sweep && sweepAt == kBenderOnly) n = ctl;
+                if (sweep && sweepAt >= kCcOnly) n = ctl;
                 else if (sweep || r.one(2)) {            // one word of the panel only: what XtSynth notices has changed
                     static_assert(std::is_trivially_copyable_v<Ctl>);
                     Ctl one = ctl;
@@ -1121,7 +1158,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 }
                 n.on = ctl.on; n.oscType = ctl.oscType; n.rootKey = ctl.rootKey; n.ana.wave = ctl.ana.wave; n.ana.subOctave = ctl.ana.subOctave; n.octave = ctl.octave;
                 n.osc2.on = ctl.osc2.on; n.osc2.oscType = ctl.osc2.oscType; n.osc2.ana.wave = ctl.osc2.ana.wave; n.osc2.ana.subOctave = ctl.osc2.ana.subOctave;
-                n.oscTimeOffset = ctl.oscTimeOffset; n.lfoKeySync = ctl.lfoKeySync; n.osc2.lfoKeySync = ctl.osc2.lfoKeySync;
+                n.oscTimeOffset = ctl.oscTimeOffset; n.lfoKeySync = ctl.lfoKeySync; n.osc2.lfoKeySync = ctl.osc2.lfoKeySync; n.tvaLfoKeySync = ctl.tvaLfoKeySync;
                 n.structure = ctl.structure;             // latched at note-on, but its own check is xt_analog's
                 n.mono = ctl.mono; n.legato = ctl.legato; n.robot = ctl.robot; n.loop = ctl.loop; n.loopMode = ctl.loopMode; n.loopStart = ctl.loopStart; n.loopEnd = ctl.loopEnd;
                 n.osc2.rootKey = ctl.osc2.rootKey; n.osc2.oscTimeOffset = ctl.osc2.oscTimeOffset; n.osc2.robot = ctl.osc2.robot; n.osc2.loop = ctl.osc2.loop;
@@ -1129,7 +1166,10 @@ int XtToneProbe::run(int argc, char** argv) {
                 for (int k = 0; k < 2; ++k) { n.cosm[k].on = ctl.cosm[k].on; n.cosm[k].type = ctl.cosm[k].type; n.cosm[k].lfoKeySync = ctl.cosm[k].lfoKeySync; n.cosm[k].odType = ctl.cosm[k].odType; n.cosm[k].ampType = ctl.cosm[k].ampType; }
                 const int bentFrom = fw.bender;
                 if (sweep ? sweepAt == kBenderOnly : r.one(2)) fw.bender = r.range(0, 16383);
-                if (!moveLive(n, bentFrom, blk)) return 1;
+                int ccAt = -1, ccTo = 0;
+                if (sweep && sweepAt >= kCcOnly && sweepAt != kBenderOnly) { ccAt = (int)(sweepAt - kCcOnly); ccTo = 90; }
+                else if (!sweep && r.one(3)) { ccAt = r.range(0, 2); ccTo = r.range(0, 127); }
+                if (!moveLive(n, bentFrom, blk, ccAt, ccTo)) return 1;
             }
             const bool tick = syn.tickCount >= 441;
             fw.frames = syn.hostFrames;
@@ -1191,7 +1231,10 @@ int XtToneProbe::run(int argc, char** argv) {
                 if (!n->live || n->ended) continue;
                 const XtSynth::Voice& v = syn.voice[n->vi];
                 const uint32_t A = Firmware::tva(*n);
-                const VField tv[] = { { "tva level", 0xc, v.gain }, { "tva gain", 0x68, v.cur }, { "tva gain r", 0x6c, v.cur }, { "tva target", 0x60, v.target }, { "tva target r", 0x64, v.target }, { "tva step", 0x58, v.step }, { "tva step r", 0x5c, v.step }, { "tva fade", 0x54, v.damping ? v.damp : 1.0f } };
+                const VField tv[] = { { "tva level", 0xc, v.tb.level }, { "tva lfo depth", 8, v.tb.lfoDepth }, { "tva pan lfo depth", 0x1c, v.tb.panLfoDepth },
+                                      { "tva gain", 0x68, v.cur[0] }, { "tva gain r", 0x6c, v.cur[1] }, { "tva target", 0x60, v.target[0] }, { "tva target r", 0x64, v.target[1] },
+                                      { "tva step", 0x58, v.step[0] }, { "tva step r", 0x5c, v.step[1] }, { "tva fade", 0x54, v.damping ? v.damp : 1.0f },
+                                      { "tva bus level", 0x78, v.send[0] }, { "tva bus level r", 0x7c, v.send[1] }, { "tva bus target", 0x28, v.tb.sendL }, { "tva bus target r", 0x2c, v.tb.sendR } };
                 for (const VField& f : tv) {
                     if (v.damping && (f.off == 0x60 || f.off == 0x64 || f.off == 0x58 || f.off == 0x5c)) continue;
                     ++rep.checks;

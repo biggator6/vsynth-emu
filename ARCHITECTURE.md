@@ -356,18 +356,15 @@ plugin falls back to the engine's streaming path (pre-v43 behaviour).
 - XtSynth's wiring (v93–v100): a whole firmware tone, from the parameter IDs on, equals XtSynth inside its
   block and at its output, bit for bit but for a SOLO wave's buffers, over random settings and a sweep of
   every field in its change lists (`xt_tone`). Not the voice allocator, and not a real unit.
-- The TVA Switch (v101): off, the TVA's level is 1 and it has no envelope, as the firmware (`xt_tone`). Off by default, as on the XT (v102).
+- The TVA Switch (v101): off, the TVA has no envelope, as the firmware (`xt_tone`). Off by default, as on the XT (v102).
+- The patch TVA's level and pan (v114): Level, Pan, their Keyfollows and LFO Depths, LFO 5, the MFX Send Level and CC 7, 10, 11, as the firmware (`xt_tone`).
 - `auval -v aumu VsEm Ystu` passes.
 
 **Not yet:**
-- the patch TVA's own Level, Level KF, pan and LFO terms are not
-  modelled;
-- OSC 2 plays only ANALOG, not PCM;
-- no V-Synth voice layer (filters, LFOs, effects);
+- no effects: MFX, Chorus and Reverb, so also no Chorus or Reverb Send and no Output Assign;
 - no step/event playback or Time Trip;
 - no matrix or realtime controllers on the OSC knobs, and the time and
-  formant envelope depths' velocity sensitivity is not exposed;
-- no Random Pitch Depth, scale tune or patch Coarse/Fine path.
+  formant envelope depths' velocity sensitivity is not exposed.
 
 ## Known Gaps / Next Work
 

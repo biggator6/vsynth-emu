@@ -478,6 +478,20 @@ int main(int argc, char** argv) {
         refCtl.tvaOn = std::atoi(e) != 0;
         setKnobs({ { "tvaSwitch", refCtl.tvaOn ? 1 : 0 } });
     }
+    // TEST_TVA="level,levelKF,levelLfo,pan,panKF,panLfo,send": the patch TVA (KFs in %)
+    if (const char* e = std::getenv("TEST_TVA")) {
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &refCtl.tvaLevel, &refCtl.tvaLevelKF, &refCtl.tvaLevelLfo, &refCtl.tvaPan, &refCtl.tvaPanKF, &refCtl.tvaPanLfo, &refCtl.mfxSend);
+        setKnobs({ { "tvaLevel", refCtl.tvaLevel }, { "tvaLevelKF", refCtl.tvaLevelKF }, { "tvaLevelLfo", refCtl.tvaLevelLfo }, { "tvaPan", refCtl.tvaPan },
+                   { "tvaPanKF", refCtl.tvaPanKF }, { "tvaPanLfo", refCtl.tvaPanLfo }, { "mfxSend", refCtl.mfxSend } });
+    }
+    // TEST_LFO5="wave,rate,offset,delay,mode,fade,keysync": LFO 5
+    if (const char* e = std::getenv("TEST_LFO5")) {
+        int ks = 0;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &refCtl.tvaLfoWave, &refCtl.tvaLfoRate, &refCtl.tvaLfoOffset, &refCtl.tvaLfoDelay, &refCtl.tvaLfoFadeMode, &refCtl.tvaLfoFade, &ks);
+        refCtl.tvaLfoKeySync = ks != 0;
+        setKnobs({ { "tvaLfoWave", refCtl.tvaLfoWave }, { "tvaLfoRate", refCtl.tvaLfoRate }, { "tvaLfoOffset", refCtl.tvaLfoOffset }, { "tvaLfoDelay", refCtl.tvaLfoDelay },
+                   { "tvaLfoFadeMode", refCtl.tvaLfoFadeMode }, { "tvaLfoFade", refCtl.tvaLfoFade }, { "tvaLfoKeySync", ks } });
+    }
     // TEST_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM, 3 ENV RING, 4 OSC SYNC
     if (const char* e = std::getenv("TEST_MOD")) {
         refCtl.mod.on = true;
@@ -597,12 +611,17 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("TEST_BEND")) std::sscanf(e, "%d,%d", &bendValue, &bendFrame);
     const int bBlock = bendValue >= 0 ? bendFrame / block * block : -1, bAt = bendFrame % block;
     if (bendValue >= 0 && (bBlock == 0 || bBlock == offBlock || bBlock == n2Block)) { std::fprintf(stderr, "TEST_BEND must fall in another block\n"); return 1; }
+    int ccNum = -1, ccValue = 0, ccFrame = 0;                        // TEST_CC="cc,value,frame": a controller
+    if (const char* e = std::getenv("TEST_CC")) std::sscanf(e, "%d,%d,%d", &ccNum, &ccValue, &ccFrame);
+    const int ccBlock = ccNum >= 0 ? ccFrame / block * block : -1, ccAt = ccFrame % block;
+    if (ccNum >= 0 && (ccBlock == 0 || ccBlock == offBlock || ccBlock == n2Block || ccBlock == bBlock)) { std::fprintf(stderr, "TEST_CC must fall in another block\n"); return 1; }
     for (int done = 0; done < total; done += block) {
         juce::MidiBuffer midi;
         if (done == 0) { midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8)noteVel), 100); }
         if (done == offBlock) { midi.addEvent(juce::MidiMessage::noteOff(1, note, (juce::uint8)100), offAt); }
         if (done == n2Block) { midi.addEvent(juce::MidiMessage::noteOn(1, note2, (juce::uint8)noteVel), n2At); }
         if (done == bBlock) { midi.addEvent(juce::MidiMessage::pitchWheel(1, bendValue), bAt); }
+        if (done == ccBlock) { midi.addEvent(juce::MidiMessage::controllerEvent(1, ccNum, ccValue), ccAt); }
         p.processBlock(buf, midi);
         juce::ScopedNoDenormals ftz;   // processBlock runs with denormals flushed (as the SH-4 does, FPSCR.DN = 1)
         if (std::getenv("TEST_CONTROLS")) ref.setControls(refCtl);   // as processBlock does each block
@@ -610,6 +629,7 @@ int main(int argc, char** argv) {
         else if (done == offBlock) { ref.render(rl.data(), rr.data(), offAt); ref.noteOff(note, 100 / 127.0f); ref.render(rl.data() + offAt, rr.data() + offAt, block - offAt); }
         else if (done == n2Block) { ref.render(rl.data(), rr.data(), n2At); ref.noteOn(note2, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + n2At, rr.data() + n2At, block - n2At); }
         else if (done == bBlock) { ref.render(rl.data(), rr.data(), bAt); ref.pitchBend(bendValue); ref.render(rl.data() + bAt, rr.data() + bAt, block - bAt); }
+        else if (done == ccBlock) { ref.render(rl.data(), rr.data(), ccAt); ref.controller(ccNum, ccValue); ref.render(rl.data() + ccAt, rr.data() + ccAt, block - ccAt); }
         else ref.render(rl.data(), rr.data(), block);
         for (int i = 0; i < block; ++i) {
             if (firstDiff < 0 && (buf.getSample(0, i) != rl[(size_t)i] || buf.getSample(1, i) != rr[(size_t)i])) firstDiff = done + i;

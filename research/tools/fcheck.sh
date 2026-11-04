@@ -12,7 +12,7 @@ source "$(dirname "$0")/env.sh"
 UPDATE=0; FULL=0
 while :; do case "$1" in --update) UPDATE=1; FULL=1; shift ;; --full) FULL=1; shift ;; *) break ;; esac; done
 S="${1:-$REPO/plugin/Source}"; O="$WORK/fcheck"; B="$REPO/research/tools/fcheck_baseline.txt"
-mkdir -p "$O"; "$REPO/research/tools/build.sh" "$S" "$O/bin" || exit 1
+mkdir -p "$O"; bash "$REPO/research/tools/build.sh" "$S" "$O/bin" || exit 1
 [ -f "$WORK/inputs/enc2_zeros.bin" ] || "$PY" "$REPO/research/tools/make_inputs.py" "$WORK/inputs" > /dev/null
 X="$O/bin"; P="$O/parts"; rm -rf "$P"; mkdir -p "$P"
 K="$O/kept"                                                 # the kept sections, one store for all the worktrees

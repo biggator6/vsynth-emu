@@ -126,11 +126,19 @@ public:
         // velocity → time sensitivities −63..+63; Time KF −200..+200
         int attack = 0, decay = 0, sustain = 127, release = 16;
         int aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
-        // the TVA Switch (ID 0x299), off: the TVA's level is 1, with no envelope and no
-        // velocity.  Off by default, as on the XT
+        // the TVA Switch (ID 0x299), off: no envelope, velocity, Level, Pan or LFO, only CC 7
+        // and 11 and the MFX Send Level.  Off by default, as on the XT
         bool tvaOn = false;
         // velocity to level for the patch TVA: Sens −63..+63, Curve 0 (off), 1..7
         int ampVelSens = 16, ampVelCurve = 1;
+        // the patch TVA (IDs 0x29a…0x2a0): Level 0..127, its Keyfollow −200..+200 (steps
+        // of 10) and LFO Depth −63..+63; Pan 0..127 (64 the centre), its Keyfollow and LFO
+        // Depth; MFX Send Level 0..127, the level to the output bus.  With the Switch off only
+        // the MFX Send Level counts.  The XT's defaults
+        int tvaLevel = 127, tvaLevelKF = 0, tvaLevelLfo = 0, tvaPan = 64, tvaPanKF = 0, tvaPanLfo = 0, mfxSend = 127;
+        // LFO 5, the TVA's (IDs 0x3de…0x3e5), as the others.  The XT's defaults
+        int tvaLfoWave = 1, tvaLfoRate = 98, tvaLfoOffset = 2, tvaLfoDelay = 0, tvaLfoFadeMode = 0, tvaLfoFade = 0;
+        bool tvaLfoKeySync = false;
         // Portamento: the switch, Mode (0 NORMAL, 1 LEGATO: only while a key
         // is held), Type (0 RATE: Time per octave, 1 TIME), Time 0..127
         // (k²·10000/127² ms; the XT's default 20) and Time Velo Sens −63..+63
@@ -259,6 +267,9 @@ public:
     // The bender, 0..16383 (8192 centre): the part's bend (xtPitchBend),
     // in every voice's pitch from the next update on.
     void pitchBend(int value);
+    // A MIDI controller: CC 7, 11 (level) and 10 (pan) reach the sounding voices' TVAs as
+    // any knob does.  The XT reads no other here; the others do nothing.
+    void controller(int cc, int value);
     void render(float* left, float* right, int n);
 
 private:
@@ -294,9 +305,10 @@ private:
         float damp = 0;                // the TVA's fade (+0x54)
         long age = 0;
         float velGain = 1;            // the patch TVA's velocity gain, latched at note-on (0x894ea990)
-        float gain = 1;               // the TVA's level: that gain, or 1 with the TVA Switch off
+        XtTvaBlock tb;                // the TVA's block (0x894f50e0, 0x894f5310), the level in it
         int vel = 64, relVel = 64;     // 0..127, for the envelope's times
         XtEnvelope env;
+        XtLfo tlfo;                    // LFO 5, on the TVA's level and pan
         // the COSM sections: on as at note-on; each its TVF, Dual, TB, Comb or
         // Side Band Filter, Resonator, Frequency Shifter, Lo-Fi, Compressor,
         // Limiter, Wave Shape, OD/Dist, Amp or Speaker Simulator, envelopes
@@ -313,10 +325,11 @@ private:
             void hold() { heldA = envA.level(); heldB = envB.level(); heldLfo = lfo.out(); }
         };
         CosmVoice cs[2];
-        // The TVA (0x894f5360 / 0x894f5720): its gain (the level, gain above, times
-        // the envelope), the gain's target and per-sample step, frames since the
-        // last update.
-        float cur = 0, target = 0, step = 0, elapsed = 0;
+        // The TVA (0x894f5360 / 0x894f5720), left and right: its gain (the level times the
+        // envelope, the LFO on the level and the pan), the gain's target and per-sample
+        // step; the output bus's level (+0x78, +0x7c), which goes 3% of the way to the
+        // block's in each block; frames since the last update.
+        float cur[2] = {}, target[2] = {}, step[2] = {}, send[2] = {}, elapsed = 0;
     };
     std::shared_ptr<const XtEncoded> cur[2], pending[2], retired[2];   // each OSC's wave
     std::mutex swapLock;
@@ -330,10 +343,12 @@ private:
     int tickCount = 0;                // frames since the last update
     XtLfoFree freeLfo, freeLfo2;      // the free-running phase a key-unsynced voice starts from (LFO 1, LFO 2)
     XtLfoFree freeClfo[2];            // the same for LFO 3 and 4
+    XtLfoFree freeTlfo;               // and for LFO 5
     XtKeyState keys;                  // the channel's key state (0x894d6330 / 0x894d63c0)
     long hostFrames = 0;              // the system clock (ms) the key state reads
     XtPitchRandom pitchRandom;        // the XT's one random pitch generator (from its power-on seed)
     int bender = 8192;
+    int cc7 = 127, cc11 = 127, cc10 = 64;   // the channel's (C + 0x84 + cc): a patch sounds as stored at these
     float chaosSeed = 0x1.666666p-1f; // the global logistic map the LFOs draw their seeds from (0.7 at power-on, 0x894f4c80)
     double hostRate = 44100;
 
@@ -370,6 +385,10 @@ private:
     void truncate(Voice& v);
     void applyRates(OscVoice& s);
     void tvaUpdate(Voice& v);
+    XtTvaBlock tvaBlock(const Voice& v) const;       // the converter's block, at the voice's key and latched velocity
+    void tvaGains(const Voice& v, float levelEnv, float* lr) const;   // a gain or target, left and right
+    void newBlocks(Voice& v);                        // an update's blocks for a sounding voice (0x894dba00)
+    XtLfoParams tlfoParams() const;                  // LFO 5
     XtEnvParams envParams(const Voice& v) const;
     XtEnvParams oscEnvParams(const Voice& v, int a, int d, int s, int r) const;   // pitch, time, formant
     XtLfoParams lfoParams(const OscControls& o) const;

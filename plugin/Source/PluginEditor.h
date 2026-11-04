@@ -70,6 +70,15 @@ private:
     // The MOD section: Switch, Type, Original Level, Attack and Release Times
     juce::ToggleButton modBtn_ { "MOD" };
     juce::ToggleButton tvaBtn_ { "TVA" };
+    // the patch TVA's level and pan (two rows of four, the last empty), and LFO 5 (as LFO 1's rows)
+    static constexpr int kTvaKnobs = 10;
+    juce::Slider     tvaSliders_[kTvaKnobs];
+    juce::Label      tvaLabels_[kTvaKnobs], tvaRowLabels_[3];
+    juce::ComboBox   tlfoWaveBox_, tlfoModeBox_, tlfoOffsetBox_;
+    juce::ToggleButton tlfoSyncBtn_ { "Key Sync" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> tvaAtts_[kTvaKnobs];
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> tlfoWaveAtt_, tlfoModeAtt_, tlfoOffsetAtt_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> tlfoSyncAtt_;
     juce::ComboBox   modTypeBox_;
     juce::Slider     modLevelSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     modAttackSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

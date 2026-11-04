@@ -109,6 +109,20 @@ namespace Params {
                                                    "AttackSens", "DecaySens", "ReleaseSens", "TimeKF" };
     // Amp envelope, the XT's 0..127 knobs (XtEnvelope: times from the firmware's table)
     static const juce::String kTvaSwitch    = "tvaSwitch";
+    static const juce::String kTvaLevel     = "tvaLevel";          // the patch TVA's level and pan
+    static const juce::String kTvaLevelKF   = "tvaLevelKF";
+    static const juce::String kTvaLevelLfo  = "tvaLevelLfo";
+    static const juce::String kTvaPan       = "tvaPan";
+    static const juce::String kTvaPanKF     = "tvaPanKF";
+    static const juce::String kTvaPanLfo    = "tvaPanLfo";
+    static const juce::String kMfxSend      = "mfxSend";
+    static const juce::String kTvaLfoWave   = "tvaLfoWave";        // LFO 5
+    static const juce::String kTvaLfoRate   = "tvaLfoRate";
+    static const juce::String kTvaLfoOffset = "tvaLfoOffset";
+    static const juce::String kTvaLfoDelay  = "tvaLfoDelay";
+    static const juce::String kTvaLfoMode   = "tvaLfoFadeMode";
+    static const juce::String kTvaLfoFade   = "tvaLfoFade";
+    static const juce::String kTvaLfoSync   = "tvaLfoKeySync";
     static const juce::String kAttack       = "ampAttack";
     static const juce::String kDecay        = "ampDecay";
     static const juce::String kSustain      = "ampSustain";
@@ -483,6 +497,30 @@ VSynthEmuProcessor::createParameterLayout() {
     }
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTvaSwitch, "TVA Switch", false));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLevel, "TVA Level", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kTvaLevelKF, "TVA Level KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLevelLfo, "TVA Level LFO Depth", -63, 63, 0));
+    // shown as the XT does: L64 … 0 … 63R
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaPan, "TVA Pan", 0, 127, 64, juce::AudioParameterIntAttributes()
+        .withStringFromValueFunction([](int v, int) { return v == 64 ? juce::String("0") : v < 64 ? "L" + juce::String(64 - v) : juce::String(v - 64) + "R"; })
+        .withValueFromStringFunction([](const juce::String& s) {
+            const juce::String t = s.trim();
+            return t.startsWithIgnoreCase("L") ? 64 - t.getTrailingIntValue() : t.getIntValue() + 64; })));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        Params::kTvaPanKF, "TVA Pan KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaPanLfo, "TVA Pan LFO Depth", -63, 63, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kMfxSend, "MFX Send Level", 0, 127, 127));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kTvaLfoWave, "LFO 5 Waveform",
+        juce::StringArray { "SIN", "TRI", "SAW", "SQR", "RND", "TRP", "S&H", "CHAOS" }, 1));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoRate, "LFO 5 Rate", 0, 127, 98));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kTvaLfoOffset, "LFO 5 Offset",
+        juce::StringArray { "-100", "-50", "0", "+50", "+100" }, 2));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoDelay, "LFO 5 Delay", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kTvaLfoMode, "LFO 5 Fade Mode",
+        juce::StringArray { "ON <<", "ON >>", "OFF <<", "OFF >>" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTvaLfoFade, "LFO 5 Fade", 0, 127, 0));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTvaLfoSync, "LFO 5 Key Sync", false));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kAttack, "Attack", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kDecay, "Decay", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kSustain, "Sustain", 0, 127, 127));
@@ -865,6 +903,20 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.energy       = knob(Params::kEnergy);
     c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
     c.tvaOn        = apvts.getRawParameterValue(Params::kTvaSwitch)->load() >= 0.5f;
+    c.tvaLevel     = knob(Params::kTvaLevel);
+    c.tvaLevelKF   = kf(Params::kTvaLevelKF);
+    c.tvaLevelLfo  = knob(Params::kTvaLevelLfo);
+    c.tvaPan       = knob(Params::kTvaPan);
+    c.tvaPanKF     = kf(Params::kTvaPanKF);
+    c.tvaPanLfo    = knob(Params::kTvaPanLfo);
+    c.mfxSend      = knob(Params::kMfxSend);
+    c.tvaLfoWave   = knob(Params::kTvaLfoWave);
+    c.tvaLfoRate   = knob(Params::kTvaLfoRate);
+    c.tvaLfoOffset = knob(Params::kTvaLfoOffset);
+    c.tvaLfoDelay  = knob(Params::kTvaLfoDelay);
+    c.tvaLfoFadeMode = knob(Params::kTvaLfoMode);
+    c.tvaLfoFade   = knob(Params::kTvaLfoFade);
+    c.tvaLfoKeySync = apvts.getRawParameterValue(Params::kTvaLfoSync)->load() >= 0.5f;
     c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();
     c.decay        = (int)apvts.getRawParameterValue(Params::kDecay)->load();
     c.sustain      = (int)apvts.getRawParameterValue(Params::kSustain)->load();
@@ -1026,6 +1078,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber(), msg.getFloatVelocity());
             else if (msg.isPitchWheel()) synth_.pitchBend(msg.getPitchWheelValue());
             else if (msg.isAllNotesOff() || msg.isAllSoundOff()) synth_.allNotesOff();
+            else if (msg.isController()) synth_.controller(msg.getControllerNumber(), msg.getControllerValue());
         }
         if (pos < numSamples) synth_.render(L + pos, R + pos, numSamples - pos);
         if (numOut == 1) for (int i = 0; i < numSamples; ++i) L[i] = 0.5f * (L[i] + R[i]);

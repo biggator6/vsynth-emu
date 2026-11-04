@@ -191,6 +191,7 @@ constexpr float kFramesPerMs = 0x1.60cccap+5f; // 44.1
 constexpr float kSilent = 0x1.0000fep-16f;     // 2^-16
 constexpr float kLand = 0x1.f81f8p-6f;         // 1/32.5
 constexpr float kNoAttackMs = 0x1.99999ap-4f;  // 0.1
+constexpr float kSendGlide = 0x1.eb851ep-11f;  // 0.0009375: the output bus's level, a share of the gap per sample
 // The truncate fade's step per sample (0x894ea380): 1/(T/100·44.1), T the
 // Truncate Time (system 0x51f, 1/100 ms; its default 70), in the SH-4's
 // arithmetic.
@@ -308,6 +309,20 @@ XtLfoParams XtSynth::lfoParams(const OscControls& o) const {
 XtLfoParams XtSynth::clfoParams(int k) const {
     const Controls::Cosm& c = ctl.cosm[k];
     return xtLfoConvert(c.lfoWave, c.lfoRate, c.lfoOffset, c.lfoDelay, c.lfoFadeMode, c.lfoFade, c.lfoKeySync);
+}
+
+XtLfoParams XtSynth::tlfoParams() const {
+    return xtLfoConvert(ctl.tvaLfoWave, ctl.tvaLfoRate, ctl.tvaLfoOffset, ctl.tvaLfoDelay, ctl.tvaLfoFadeMode, ctl.tvaLfoFade, ctl.tvaLfoKeySync);
+}
+
+XtTvaBlock XtSynth::tvaBlock(const Voice& v) const {
+    XtTvaKnobs k;
+    k.on = ctl.tvaOn;
+    k.level = ctl.tvaLevel; k.levelKF = ctl.tvaLevelKF; k.levelLfo = ctl.tvaLevelLfo;
+    k.pan = ctl.tvaPan; k.panKF = ctl.tvaPanKF; k.panLfo = ctl.tvaPanLfo;
+    k.send = ctl.mfxSend;
+    k.cc7 = cc7; k.cc11 = cc11; k.cc10 = cc10;
+    return xtTvaBlock(k, v.note, v.velGain);
 }
 
 // A COSM envelope (ADSR kinds 8..11, curve 2): its times as the other
@@ -549,6 +564,8 @@ void XtSynth::setControls(const Controls& c) {
         clfoChanged[k] = n.lfoWave != o.lfoWave || n.lfoRate != o.lfoRate || n.lfoOffset != o.lfoOffset || n.lfoDelay != o.lfoDelay
                       || n.lfoFadeMode != o.lfoFadeMode || n.lfoFade != o.lfoFade;
     }
+    const bool tlfoChanged = c.tvaLfoWave != ctl.tvaLfoWave || c.tvaLfoRate != ctl.tvaLfoRate || c.tvaLfoOffset != ctl.tvaLfoOffset || c.tvaLfoDelay != ctl.tvaLfoDelay
+                          || c.tvaLfoFadeMode != ctl.tvaLfoFadeMode || c.tvaLfoFade != ctl.tvaLfoFade;
     // the MOD's converter
     const bool modChanged = c.mod.on != ctl.mod.on || c.mod.type != ctl.mod.type || c.mod.level != ctl.mod.level || c.mod.attack != ctl.mod.attack
                          || c.mod.release != ctl.mod.release;
@@ -557,7 +574,8 @@ void XtSynth::setControls(const Controls& c) {
     for (Voice& v : voice) {
         if (!v.active) continue;
         if (envChanged) v.env.update(envParams(v));
-        if (tvaChanged) v.gain = ctl.tvaOn ? v.velGain : 1.0f;
+        if (tlfoChanged) v.tlfo.update(tlfoParams());
+        if (anyChanged) v.tb = tvaBlock(v);            // the velocity as latched
         auto oscLive = [&](OscVoice& s, const OscControls& o, const OscDiff& d) {
             if (d.penv) s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
             if (d.tenv) s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));
@@ -656,7 +674,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
     v->osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
     v->velGain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);
-    v->gain = ctl.tvaOn ? v->velGain : 1.0f;
+    v->tb = tvaBlock(*v);
     // the tone is constructed for each note (0x894f5860): LFOs 0…7 draw their
     // chaos seeds, and the pitch ramps (0x894f4860) start off, so the note's
     // first pitch has no glide in it
@@ -664,18 +682,9 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     for (float& x : seed) x = drawSeed();
     v->porta = XtPitchRamp{};
     v->osc2.porta = XtPitchRamp{};
-    // TVA note-on (0x894f5160): the gain starts from the level times the
-    // envelope's onset level (full with no attack, else 0) and ramps to the
-    // level times its output over the attack time, at most 10 ms (0.1 ms with
-    // no attack).  The TVA's LFO and pan terms are 0: factors of exactly 1.
     using namespace xtf;
     const XtEnvParams ep = envParams(*v);
     v->env.noteOn(ep);
-    v->cur = mul(v->env.onsetLevel(), v->gain);
-    v->target = mul(v->env.level(), v->gain);
-    const float ms = ep.time[0] == 0.0f ? (ep.time[1] == 0.0f ? kNoAttackMs : ep.time[1]) : (10.0f > ep.time[0] ? ep.time[0] : 10.0f);
-    v->step = div(sub(v->target, v->cur), mul(ms, kFramesPerMs));
-    v->elapsed = 0;
     // The note-on converters set the player directly (0x894f3a00…)
     // a key-unsynced LFO starts from the newest other tone of the part sounding, if
     // there is one (the tones' lists at 0x89f91c50/54, newest first), else from its
@@ -685,6 +694,23 @@ void XtSynth::startVoice(int raw, int note, int vel) {
         if (&w != v && w.active && (!other || w.age > other->age)) other = &w;
     oscLfoNoteOn(*v, ctl, freeLfo, other ? &other->lfo : nullptr, seed[1]);
     oscLfoNoteOn(v->osc2, ctl.osc2, freeLfo2, other ? &other->osc2.lfo : nullptr, seed[2]);
+    if (ctl.tvaLfoKeySync) v->tlfo.noteOn(tlfoParams(), seed[5]);
+    else if (other) v->tlfo.noteOnFollow(tlfoParams(), other->tlfo);
+    else v->tlfo.noteOnFree(tlfoParams(), seed[5], freeTlfo);
+    // TVA note-on (0x894f50e0), after the LFOs: the gain starts from the level times the
+    // envelope's onset level (full with no attack, else 0) and ramps to the level
+    // times its output over the attack time, at most 10 ms (0.1 ms with no attack), each
+    // with the LFO on the level and the pan.  The output bus's level starts where
+    // the block has it.
+    tvaGains(*v, mul(v->env.onsetLevel(), v->tb.level), v->cur);
+    tvaGains(*v, mul(v->env.level(), v->tb.level), v->target);
+    const float ms = ep.time[0] == 0.0f ? (ep.time[1] == 0.0f ? kNoAttackMs : ep.time[1]) : (10.0f > ep.time[0] ? ep.time[0] : 10.0f);
+    const float frames = mul(ms, kFramesPerMs);
+    v->step[0] = div(sub(v->target[0], v->cur[0]), frames);
+    v->step[1] = div(sub(v->target[1], v->cur[1]), frames);
+    v->send[0] = v->tb.sendL;
+    v->send[1] = v->tb.sendR;
+    v->elapsed = 0;
     if (v->on) oscEnvNoteOn(*v, *v, ctl);
     if (v->osc2.on) oscEnvNoteOn(*v, v->osc2, ctl.osc2);
     // the COSM sections (0x894edf70, COSM 1 then 2): their
@@ -844,8 +870,9 @@ void XtSynth::legatoNote(int key, int vel) {
         v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
         v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
         v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);
-        v.gain = ctl.tvaOn ? v.velGain : 1.0f;
+        v.tb = tvaBlock(v);
         v.env.update(envParams(v));
+        v.tlfo.update(tlfoParams());
         auto oscUpdate = [&](OscVoice& s, const OscControls& o) {
             s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
             s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));
@@ -901,6 +928,7 @@ void XtSynth::noteOff(int note, float velocity) {
             v.relVel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
             v.env.update(envParams(v));
             v.env.noteOff();
+            v.tlfo.noteOff();
             auto oscRelease = [&](OscVoice& s, const OscControls& o) {
                 s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
                 s.penv.noteOff();
@@ -939,12 +967,36 @@ void XtSynth::pitchBend(int value) {
     const int b = std::clamp(value, 0, 16383);
     if (b == bender) return;
     bender = b;
-    for (Voice& v : voice) {
-        if (!v.active) continue;
-        v.mod.setBlock(modBlk);
-        for (int k = 0; k < 2; ++k)
-            if (v.cs[k].on) cosmSetBlock(v, k);
-    }
+    for (Voice& v : voice)
+        if (v.active) newBlocks(v);
+}
+
+// The controllers the TVA's converter reads (0x894e9fe0, C + 0x84 + cc): as the bender,
+// an update for the sounding voices.
+void XtSynth::controller(int cc, int value) {
+    int* const c = cc == 7 ? &cc7 : cc == 11 ? &cc11 : cc == 10 ? &cc10 : nullptr;
+    const int x = std::clamp(value, 0, 127);
+    if (!c || *c == x) return;
+    *c = x;
+    for (Voice& v : voice)
+        if (v.active) newBlocks(v);
+}
+
+void XtSynth::newBlocks(Voice& v) {
+    v.mod.setBlock(modBlk);
+    v.tb = tvaBlock(v);
+    for (int k = 0; k < 2; ++k)
+        if (v.cs[k].on) cosmSetBlock(v, k);
+}
+
+// A gain or target (0x894f5360, and 0x894f50e0 at note-on): (1 + LFO·depth)·level·env
+// times (1 ∓ LFO·pan depth), each channel within ±1.  With both depths 0 the
+// factors are exactly 1.
+void XtSynth::tvaGains(const Voice& v, float levelEnv, float* lr) const {
+    using namespace xtf;
+    const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv), p = mul(v.tlfo.out(), v.tb.panLfoDepth);
+    lr[0] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);
+    lr[1] = std::clamp(mul(x, add(p, 1.0f)), -1.0f, 1.0f);
 }
 
 // The tone update's TVA part (0x894f75f0 tail): stop a finished voice
@@ -953,8 +1005,8 @@ void XtSynth::pitchBend(int value) {
 void XtSynth::tvaUpdate(Voice& v) {
     if (v.damping) return;                                    // done when the fade is (0x894f5510)
     using namespace xtf;
-    if (v.env.done() && v.cur <= kSilent) { v.active = false; return; }
-    v.target = mul(v.env.level(), v.gain);
+    if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }
+    tvaGains(v, mul(v.env.level(), v.tb.level), v.target);
     const float T = v.env.stageTime();
     float frames = 441.0f;
     if (!(0.0f > T)) {
@@ -962,7 +1014,8 @@ void XtSynth::tvaUpdate(Voice& v) {
         if (d > 0.0f) { if (10.0f > d) frames = mul(d, kFramesPerMs); }
         else frames = mul(kNoAttackMs, kFramesPerMs);
     }
-    v.step = div(sub(v.target, v.cur), frames);
+    v.step[0] = div(sub(v.target[0], v.cur[0]), frames);
+    v.step[1] = div(sub(v.target[1], v.cur[1]), frames);
     v.elapsed = 0;
 }
 
@@ -977,6 +1030,7 @@ void XtSynth::mixBlock(float* lr) {
         freeLfo.tick(1);
         freeLfo2.tick(1);
         for (XtLfoFree& f : freeClfo) f.tick(1);
+        freeTlfo.tick(1);
     }
     if (!cur && std::none_of(std::begin(voice), std::end(voice), [](const Voice& v) { return v.active; })) return;
     float tmp[64], tmp2[64];
@@ -986,6 +1040,7 @@ void XtSynth::mixBlock(float* lr) {
             // the tone update (0x894f75f0): envelopes step, the voice update
             // moves the player 70% toward its targets (0x8950c1b0), then the TVA
             v.env.tick();
+            v.tlfo.tick(1);
             auto oscTick = [](OscVoice& s) { s.penv.tick(); s.tenv.tick(); s.fenv.tick(); s.oenv.tick(); s.lfo.tick(1); };
             if (v.on) oscTick(v);
             if (v.osc2.on) oscTick(v.osc2);
@@ -1086,25 +1141,33 @@ void XtSynth::mixBlock(float* lr) {
 #endif
         std::copy(tmp, tmp + 3, mixPast);
         if (v.damping) {
-            // truncated (0x894f5570): the gain held, times a fade that falls
-            // by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16
+            // truncated (0x894f5570): the gain and the bus's level held, times a fade that
+            // falls by 1/(Truncate Time·44.1) each sample; silent and done at 2^-16
             for (int i = 0; i < 32; ++i) {
                 v.damp = xtf::sub(v.damp, truncateStep());
                 if (!(v.damp > kSilent)) { v.damp = 0.0f; v.active = false; break; }
-                lr[2 * i] = xtf::add(lr[2 * i], xtf::mul(xtf::mul(tmp[2 * i], v.cur), v.damp));
-                lr[2 * i + 1] = xtf::add(lr[2 * i + 1], xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur), v.damp));
+                lr[2 * i] = xtf::add(lr[2 * i], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), v.send[0]));
+                lr[2 * i + 1] = xtf::add(lr[2 * i + 1], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.send[1]));
             }
             continue;
         }
-        // TVA render (0x894f5720): a step that would pass the target within
-        // the block is cut to (target − gain)/32.5; gain applied, then stepped.
-        const float d = xtf::sub(v.target, v.cur);
-        const float s = std::fabs(xtf::mul(v.step, 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step;
-        for (int i = 0; i < 32; ++i) {
-            lr[2 * i] = xtf::add(lr[2 * i], xtf::mul(tmp[2 * i], v.cur));
-            lr[2 * i + 1] = xtf::add(lr[2 * i + 1], xtf::mul(tmp[2 * i + 1], v.cur));
-            v.cur = xtf::add(v.cur, s);
+        // TVA render (0x894f5720): for each channel a step that would pass the target
+        // within the block is cut to (target − gain)/32.5; gain applied, then stepped.
+        // The output bus takes that at its own level, which moves by a share of the gap as
+        // the block began.
+        float s[2], e[2];
+        const float sendTo[2] = { v.tb.sendL, v.tb.sendR };
+        for (int c = 0; c < 2; ++c) {
+            const float d = xtf::sub(v.target[c], v.cur[c]);
+            s[c] = std::fabs(xtf::mul(v.step[c], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];
+            e[c] = xtf::mul(xtf::sub(sendTo[c], v.send[c]), kSendGlide);
         }
+        for (int i = 0; i < 32; ++i)
+            for (int c = 0; c < 2; ++c) {
+                lr[2 * i + c] = xtf::add(lr[2 * i + c], xtf::mul(xtf::mul(tmp[2 * i + c], v.cur[c]), v.send[c]));
+                v.cur[c] = xtf::add(v.cur[c], s[c]);
+                v.send[c] = xtf::add(v.send[c], e[c]);
+            }
         v.elapsed += 32.0f;
     }
     // the voices are summed in the XT's units, as its output bus does; ±1 here
@@ -1176,6 +1239,9 @@ void XtSynth::render(float* left, float* right, int n) {
 //     and XT_KEY2 (its Original Key); XT_WAVE1=0: no wave on OSC 1.  XT_OSC1OFF=1: OSC 1's
 //     Switch off.
 //   XT_TVA_ON=1: the TVA Switch on (off by default: XT_ADSR then does nothing).
+//   XT_TVA="level,levelKF,levelLfo,pan,panKF,panLfo,send": the patch TVA (KFs in %), MFX Send Level.
+//   XT_LFO5="wave,rate,offset,delay,mode,fade,keysync": LFO 5, on its level and pan.
+//   XT_CC="cc7,cc11,cc10": the controllers before the first note.
 //   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
 //     3 ENV RING, 4 OSC SYNC, Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
 //     attack,release": new MOD knobs at a frame, on the notes then sounding.
@@ -1309,6 +1375,13 @@ int main(int argc, char** argv) {
     }
     if (std::getenv("XT_OSC1OFF") && std::atoi(std::getenv("XT_OSC1OFF")) != 0) c.on = false;
     if (const char* e = std::getenv("XT_TVA_ON")) c.tvaOn = std::atoi(e) != 0;
+    if (const char* e = std::getenv("XT_TVA"))
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &c.tvaLevel, &c.tvaLevelKF, &c.tvaLevelLfo, &c.tvaPan, &c.tvaPanKF, &c.tvaPanLfo, &c.mfxSend);
+    if (const char* e = std::getenv("XT_LFO5")) {
+        int ks = 0;
+        std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d", &c.tvaLfoWave, &c.tvaLfoRate, &c.tvaLfoOffset, &c.tvaLfoDelay, &c.tvaLfoFadeMode, &c.tvaLfoFade, &ks);
+        c.tvaLfoKeySync = ks != 0;
+    }
     if (const char* e = std::getenv("XT_MOD")) {
         c.mod.on = true;
         std::sscanf(e, "%d,%d,%d,%d", &c.mod.type, &c.mod.level, &c.mod.attack, &c.mod.release);
@@ -1474,6 +1547,13 @@ int main(int argc, char** argv) {
     long bendAt = 0;
     if (const char* e = std::getenv("XT_BEND")) std::sscanf(e, "%d@%ld", &bendValue, &bendAt);
     syn.setControls(c);
+    if (const char* e = std::getenv("XT_CC")) {
+        int c7 = 127, c11 = 127, c10 = 64;
+        std::sscanf(e, "%d,%d,%d", &c7, &c11, &c10);
+        syn.controller(7, c7);
+        syn.controller(11, c11);
+        syn.controller(10, c10);
+    }
     XtSynth::Controls modLater = c;
     long modAt = -1;
     if (const char* e = std::getenv("XT_MOD_AT")) {

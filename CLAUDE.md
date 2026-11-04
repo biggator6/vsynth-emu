@@ -2,7 +2,7 @@
 
 A JUCE plugin (AU/VST3/Standalone) that plays samples through ports of the
 Roland V-Synth XT's own firmware: its VariPhrase encoders and players, OSC
-converters, envelopes, LFOs, pitch path, key assign, COSM filters. Algorithms
+converters, envelopes, LFOs, pitch path, key assign, COSM filters, TVA. Algorithms
 are taken from the user's rom.2 (Ghidra) and every port is checked against the
 firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 
@@ -57,10 +57,10 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=analogfw`: xt_analog, XtFirmware.cpp; `PORT=tone`: xt_tone, XtSynth.cpp;
   `PORT=tonecosm`: xt_tone, XtCosm.cpp; `PORT=toneanalog`: xt_tone, XtAnalog.cpp;
   `PORT=toneband`: xt_tone, XtMultiBandPlayer.cpp; `PORT=tonecheck`: xt_tone,
-  XtToneCheck.cpp; `PORT=tonefw`: xt_tone, XtFirmware.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
+  XtToneCheck.cpp; `PORT=tonefw`: xt_tone, XtFirmware.cpp; `PORT=toneosc`: xt_tone, XtOsc.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
   solocmp on the baseline's cases, XtSoloVoice.cpp; `PORT=enc`: xt_enc on the baseline's waves, XtSoloEncoder.cpp)
   and runs it, to show the check catches it. `mutate_tone.py [cases]`: the list in
-  `tone_muts.txt`, each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
+  `tone_muts.txt` (`name|old|new[|port]`), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
 - `xt_tone <rom> [cases] [seed] [inputs]` (in fcheck; `build/tools/fcheck/bin`): XtSynth's wiring
   against a whole firmware tone. `XT_TONE_FIRST=1`: each case's first difference, `XT_TONE_DUMP=<case>|a`:
   its settings. A new `Controls` field needs its ID in `patchOf` and a draw in `drawControls`, and a field
@@ -76,7 +76,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
   takes about 10 s), and `mutate_tone.py 2000 <new names>` for the planted errors just added.
-- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 3 minutes) if
+- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 4 minutes) if
   `XtSynth.cpp`, `XtToneCheck.cpp` or a port changed: a planted error can stop meaning anything
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
@@ -117,6 +117,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   the blocks again, COSMs before the envelopes.
 - A COSM's new block reads levels it holds from its note-on or last 10 ms update (object +0x104…+0x110),
   not the envelopes' output: `CosmVoice::hold` (v107). So the order of blocks and envelopes in an update has no effect.
+- The patch TVA's block (`0x894ea380`, live `0x894eab40`) holds Level, Pan, the sends and CC 7, 11, 10, read from C + 0x84 + cc at each
+  conversion pass. Its pan is two things: the law on the output bus's pair, which glides 3% per block, and the LFO's on the gains. A frame
+  on the bus is 32 bytes: MAIN, Reverb and Chorus, MULTI, DIR; `xt_tone` reads MULTI's (HARDWARE_FIRMWARE.md, "The patch TVA's level and pan").
 - The analog oscillator's map (waveform codes, routines, the converter's
   input, the hidden calibration IDs 0x528…0x55b) is in HARDWARE_FIRMWARE.md,
   "The analog oscillator, and SAW". A patch's waveform number is not the

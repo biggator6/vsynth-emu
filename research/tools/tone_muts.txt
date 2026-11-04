@@ -1,7 +1,7 @@
 stale-porta|    v->porta = XtPitchRamp{};\n|
 seed-shift|oscLfoNoteOn(*v, ctl, freeLfo, other ? &other->lfo : nullptr, seed[1]);|oscLfoNoteOn(*v, ctl, freeLfo, other ? &other->lfo : nullptr, seed[2]);
 seed-few|    for (float& x : seed) x = drawSeed();|    for (int i = 0; i < 7; ++i) seed[i] = drawSeed();
-voice-end|if (v.env.done() && v.cur <= kSilent)|if (v.env.done() && mul(v.cur, 2.0f) <= kSilent)
+voice-end|if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent)|if (v.env.done() && mul(v.cur[0], 2.0f) <= kSilent && v.cur[1] <= kSilent)
 lfo-pitch-depth|xtPitchDepthCents((float)std::clamp(o.lfoPitchDepth, -63, 63))|xtPitchDepthCents((float)std::clamp(o.lfoTimeDepth, -63, 63))
 penv-depth|xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63))|xtPitchDepthCents((float)std::clamp(o.tDepth, -63, 63))
 root-key|s.analog ? 69 : o.rootKey|s.analog ? 60 : o.rootKey
@@ -22,7 +22,7 @@ tva-env-rsens|k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens;|k.a
 tva-time-kf|k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens; k.timeKF = ctl.timeKF;\n    XtEnvParams p = xtEnvAdsr|k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens;\n    XtEnvParams p = xtEnvAdsr
 tva-level|v->velGain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);|v->velGain = 1.0f;
 tva-frames|float frames = 441.0f;|float frames = 440.0f;
-tva-land|xtf::mul(d, kLand) : v.step|xtf::mul(d, 0.03125f) : v.step
+tva-land|xtf::mul(d, kLand) : v.step[c]|xtf::mul(d, 0.03125f) : v.step[c]
 tva-elapsed|v.elapsed += 32.0f;|v.elapsed += 33.0f;
 tva-noattack|constexpr float kNoAttackMs = 0x1.99999ap-4f;|constexpr float kNoAttackMs = 0x1.8p-4f;
 tva-truncate|v.damping = true;\n    v.damp = 1.0f;|v.damping = true;\n    v.damp = 0.5f;
@@ -99,10 +99,10 @@ mod-tone|modShared, (int)(v - voice));|modShared, 0);
 mod-plain|                if (v.mod.plain()) {\n                    if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);\n                } else v.mod.process(tmp, tmp, tmp2);|                if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);
 mod-convert|    if (modChanged) xtModBlock(ctl.mod, modBlk);|
 mod-order|v.mod.process(tmp, tmp, tmp2);|v.mod.process(tmp, tmp2, tmp);
-bend-block|    bender = b;\n    for (Voice& v : voice) {\n        if (!v.active) continue;\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmSetBlock(v, k);\n    }|    bender = b;
+bend-block|    bender = b;\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|    bender = b;
 mod-any|        if (anyChanged) v.mod.setBlock(modBlk);|        if (modChanged) v.mod.setBlock(modBlk);
 mod-legato|        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);|        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);
-legato-order|        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.gain = ctl.tvaOn ? v.velGain : 1.0f;\n        v.env.update(envParams(v));\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update\n|        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmSetBlock(v, k);\n        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.gain = ctl.tvaOn ? v.velGain : 1.0f;\n        v.env.update(envParams(v));\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n
+legato-order|        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.tb = tvaBlock(v);\n        v.env.update(envParams(v));\n        v.tlfo.update(tlfoParams());\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update\n|        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmSetBlock(v, k);\n        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);\n        v.tb = tvaBlock(v);\n        v.env.update(envParams(v));\n        v.tlfo.update(tlfoParams());\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n            s.lfo.update(lfoParams(o));\n        };\n        if (v.on) oscUpdate(v, ctl);\n        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);\n        v.mod.setBlock(modBlk);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n
 sync-input|v.ana.process(tmp, sync, tmp2);|v.ana.process(tmp, 0, tmp2);
 sync-mask|            v.mod.setMask(mask2);|
 sync-la|if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;|
@@ -111,10 +111,10 @@ struct-pitch|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA,|c.update
 tva-off-times|        for (float& t : p.time) t = 0.0f;\n|
 tva-off-level|        p.level[3] = 1.0f;\n|
 tva-diff|const bool tvaChanged = c.tvaOn != ctl.tvaOn;|const bool tvaChanged = false;
-tva-off-gain|    v->gain = ctl.tvaOn ? v->velGain : 1.0f;|    v->gain = v->velGain;
-tva-legato-gain|        v.gain = ctl.tvaOn ? v.velGain : 1.0f;\n        v.env.update|        v.gain = v.velGain;\n        v.env.update
-tva-live-gain|        if (tvaChanged) v.gain = ctl.tvaOn ? v.velGain : 1.0f;\n|
-tva-latch|        if (tvaChanged) v.gain = ctl.tvaOn ? v.velGain : 1.0f;|        if (tvaChanged) v.gain = ctl.tvaOn ? xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve) : 1.0f;
+tva-off-gain|k.on = ctl.tvaOn;|k.on = true;
+tva-legato-gain|        v.tb = tvaBlock(v);\n        v.env.update|        v.env.update
+tva-live-gain|        if (anyChanged) v.tb = tvaBlock(v);            // the velocity as latched\n|
+tva-latch|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.note, xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve));
 osc2-render|else pcmBlock(v.osc2, tmp2);|else std::fill(tmp2, tmp2 + 64, 0.0f);
 osc2-plays|return waveOf(o) != nullptr;|return cur[0] != nullptr;
 osc2-robot|v->osc2.robot = ctl.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;|v->osc2.robot = false;
@@ -143,3 +143,69 @@ cosm-past2-kept|        std::copy(tmp, tmp + 3, mixPast);\n|
 fm-tone-0|modShared, (int)(v - voice));|modShared, 0);
 fm-lines-cleared|    for (Voice& v : voice) v.active = false;\n    for (uint16_t& w : keys.held) w = 0;|    for (Voice& v : voice) v.active = false;\n    std::fill(std::begin(modShared.line), std::end(modShared.line), 0.0f);\n    for (uint16_t& w : keys.held) w = 0;
 solo-old-mix|const std::vector<XtRecord> recs = xtSoloEncode(pcm.data(), (int)frames, ch);|std::vector<int16_t> x16((size_t)frames); for (long i = 0; i < frames; ++i) x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[(size_t)(2 * i)] + (int)pcm[(size_t)(2 * i + 1)]) >> 1) : pcm[(size_t)i]; const std::vector<XtRecord> recs = xtSoloEncode(x16.data(), (int)frames);
+tvab-cc7|mul(mul(mul(frac(T.level, cc(k.cc7)), frac(T.level, levelAtKey|mul(mul(mul(frac(T.level, cc(k.cc11)), frac(T.level, levelAtKey|toneosc
+tvab-cc11|levelAtKey(k.level, k.levelKF, key))), frac(T.level, cc(k.cc11))), velGain)|levelAtKey(k.level, k.levelKF, key))), frac(T.level, cc(k.cc7))), velGain)|toneosc
+tvab-order|mul(mul(mul(frac(T.level, cc(k.cc7)), frac(T.level, levelAtKey(k.level, k.levelKF, key))), frac(T.level, cc(k.cc11))), velGain)|mul(frac(T.level, cc(k.cc7)), mul(frac(T.level, levelAtKey(k.level, k.levelKF, key)), mul(frac(T.level, cc(k.cc11)), velGain)))|toneosc
+tvab-level|levelAtKey(k.level, k.levelKF, key))), frac|levelAtKey(127, k.levelKF, key))), frac|toneosc
+tvab-level-kf|levelAtKey(k.level, k.levelKF, key))), frac|levelAtKey(k.level, 0, key))), frac|toneosc
+tvab-lfo|b.lfoDepth = xtOscLevelLfoDepth(k.levelLfo);|b.lfoDepth = xtOscLevelLfoDepth(k.panLfo);|toneosc
+tvab-panlfo|b.panLfoDepth = xtOscLevelLfoDepth(k.panLfo);|b.panLfoDepth = xtOscLevelLfoDepth(k.levelLfo);|toneosc
+tvab-pan|levelAtKey(k.pan, k.panKF, key)|levelAtKey(64, k.panKF, key)|toneosc
+tvab-pan-kf|levelAtKey(k.pan, k.panKF, key)|levelAtKey(k.pan, 0, key)|toneosc
+tvab-pan-swap|panL = frac(T.pan, 127 - at);\n        panR = frac(T.pan, at);|panL = frac(T.pan, at);\n        panR = frac(T.pan, 127 - at);|toneosc
+tvab-pan-law|panL = frac(T.pan, 127 - at);|panL = frac(T.level, 127 - at);|toneosc
+tvab-cc10|c = cc(k.cc10);|c = 64;|toneosc
+tvab-cc10-up|(c - 64) * (127 - p) / 63|(c - 64) * (127 - p) / 64|toneosc
+tvab-cc10-down|(p * (64 - c)) >> 6|(p * (64 - c)) >> 7|toneosc
+tvab-off-level|b.level = mul(frac(T.level, cc(k.cc7)), frac(T.level, cc(k.cc11)));|b.level = 1.0f;|toneosc
+tvab-off-pan|panL = frac(T.pan, 63);|panL = frac(T.pan, 127 - k.pan);|toneosc
+tvab-send|const float s = frac(T.level, cc(k.send));|const float s = 1.0f;|toneosc
+tvab-send-off|const float s = frac(T.level, cc(k.send));|const float s = k.on ? frac(T.level, cc(k.send)) : 1.0f;|toneosc
+tvab-send-curve|const float s = frac(T.level, cc(k.send));|const float s = xtf::div((float)cc(k.send), 127.0f);|toneosc
+tvab-key|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.raw, v.velGain);
+tvab-c7|k.cc7 = cc7; k.cc11 = cc11; k.cc10 = cc10;|k.cc11 = cc11; k.cc10 = cc10;
+tvab-c11|k.cc7 = cc7; k.cc11 = cc11; k.cc10 = cc10;|k.cc7 = cc7; k.cc10 = cc10;
+tvab-c10|k.cc7 = cc7; k.cc11 = cc11; k.cc10 = cc10;|k.cc7 = cc7; k.cc11 = cc11;
+tvab-cc-map|int* const c = cc == 7 ? &cc7 : cc == 11 ? &cc11 : cc == 10 ? &cc10 : nullptr;|int* const c = cc == 7 ? &cc11 : cc == 11 ? &cc7 : cc == 10 ? &cc10 : nullptr;
+tvab-cc-update|    *c = x;\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|    *c = x;
+tvab-new|    v.mod.setBlock(modBlk);\n    v.tb = tvaBlock(v);\n|    v.mod.setBlock(modBlk);\n
+tvab-bus-start|    v->send[0] = v->tb.sendL;|    v->send[0] = 1.0f;
+tvab-bus-start-r|    v->send[1] = v->tb.sendR;|    v->send[1] = v->tb.sendL;
+tvab-bus-glide|constexpr float kSendGlide = 0x1.eb851ep-11f;|constexpr float kSendGlide = 0x1.eb8520p-11f;
+tvab-bus-still|e[c] = xtf::mul(xtf::sub(sendTo[c], v.send[c]), kSendGlide);|e[c] = 0.0f;
+tvab-bus-render|xtf::mul(xtf::mul(tmp[2 * i + c], v.cur[c]), v.send[c])|xtf::mul(xtf::mul(tmp[2 * i + c], v.send[c]), v.cur[c])
+tvab-bus-step|v.send[c] = xtf::add(v.send[c], e[c]);|
+tvab-trunc-bus|xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), v.send[0])|xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp)
+tvab-trunc-bus-r|xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.send[1])|xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp)
+tvab-trunc-order|xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), v.send[0])|xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.send[0]), v.damp)
+tvag-lfo|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv)|const float x = levelEnv
+tvag-pan|p = mul(v.tlfo.out(), v.tb.panLfoDepth);|p = 0.0f;
+tvag-r|lr[1] = std::clamp(mul(x, add(p, 1.0f)), -1.0f, 1.0f);|lr[1] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);
+tvag-clamp|lr[0] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);|lr[0] = mul(x, sub(1.0f, p));
+tvag-clamp-r|lr[1] = std::clamp(mul(x, add(p, 1.0f)), -1.0f, 1.0f);|lr[1] = mul(x, add(p, 1.0f));
+tvag-order|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv), p = mul(v.tlfo.out(), v.tb.panLfoDepth);\n    lr[0] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv), p = mul(v.tlfo.out(), v.tb.panLfoDepth);\n    lr[0] = std::clamp(mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), mul(levelEnv, sub(1.0f, p))), -1.0f, 1.0f);
+tvag-start|tvaGains(*v, mul(v->env.onsetLevel(), v->tb.level), v->cur);|tvaGains(*v, mul(v->env.level(), v->tb.level), v->cur);
+tvag-done-r|v.cur[0] <= kSilent && v.cur[1] <= kSilent|v.cur[0] <= kSilent
+tvag-step-r|    v.step[1] = div(sub(v.target[1], v.cur[1]), frames);\n    v.elapsed = 0;\n}|    v.step[1] = v.step[0];\n    v.elapsed = 0;\n}
+tvag-note-step-r|    v->step[1] = div(sub(v->target[1], v->cur[1]), frames);|    v->step[1] = v->step[0];
+tvag-land-r|std::fabs(xtf::mul(v.step[c], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];|std::fabs(xtf::mul(v.step[0], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];
+tlfo-wave|xtLfoConvert(ctl.tvaLfoWave, ctl.tvaLfoRate|xtLfoConvert(ctl.lfoWave, ctl.tvaLfoRate
+tlfo-rate|xtLfoConvert(ctl.tvaLfoWave, ctl.tvaLfoRate|xtLfoConvert(ctl.tvaLfoWave, ctl.lfoRate
+tlfo-offset|ctl.tvaLfoRate, ctl.tvaLfoOffset, ctl.tvaLfoDelay|ctl.tvaLfoRate, ctl.lfoOffset, ctl.tvaLfoDelay
+tlfo-delay|ctl.tvaLfoOffset, ctl.tvaLfoDelay, ctl.tvaLfoFadeMode|ctl.tvaLfoOffset, ctl.lfoDelay, ctl.tvaLfoFadeMode
+tlfo-mode|ctl.tvaLfoDelay, ctl.tvaLfoFadeMode, ctl.tvaLfoFade|ctl.tvaLfoDelay, ctl.lfoFadeMode, ctl.tvaLfoFade
+tlfo-fade|ctl.tvaLfoFadeMode, ctl.tvaLfoFade, ctl.tvaLfoKeySync|ctl.tvaLfoFadeMode, ctl.lfoFade, ctl.tvaLfoKeySync
+tlfo-seed|v->tlfo.noteOn(tlfoParams(), seed[5]);|v->tlfo.noteOn(tlfoParams(), seed[6]);
+tlfo-seed-free|v->tlfo.noteOnFree(tlfoParams(), seed[5], freeTlfo);|v->tlfo.noteOnFree(tlfoParams(), seed[6], freeTlfo);
+tlfo-sync|if (ctl.tvaLfoKeySync) v->tlfo.noteOn(tlfoParams(), seed[5]);\n    else if (other) v->tlfo.noteOnFollow(tlfoParams(), other->tlfo);\n    else v->tlfo.noteOnFree(tlfoParams(), seed[5], freeTlfo);|v->tlfo.noteOn(tlfoParams(), seed[5]);
+tlfo-follow|    else if (other) v->tlfo.noteOnFollow(tlfoParams(), other->tlfo);\n|
+tlfo-free|v->tlfo.noteOnFree(tlfoParams(), seed[5], freeTlfo);|v->tlfo.noteOnFree(tlfoParams(), seed[5], freeLfo);
+tlfo-free-tick|        freeTlfo.tick(1);\n|
+tlfo-tick|            v.tlfo.tick(1);\n|
+tlfo-off|            v.tlfo.noteOff();\n|
+tlfo-live|        if (tlfoChanged) v.tlfo.update(tlfoParams());\n|
+diff-tlfo-wave|const bool tlfoChanged = c.tvaLfoWave != ctl.tvaLfoWave \|\| |const bool tlfoChanged = 
+diff-tlfo-rate|c.tvaLfoRate != ctl.tvaLfoRate \|\| |
+diff-tlfo-offset|c.tvaLfoOffset != ctl.tvaLfoOffset \|\| |
+diff-tlfo-delay|c.tvaLfoDelay != ctl.tvaLfoDelay\n                          \|\| |
+diff-tlfo-fade|c.tvaLfoFadeMode != ctl.tvaLfoFadeMode \|\| c.tvaLfoFade != ctl.tvaLfoFade;|c.tvaLfoFadeMode != ctl.tvaLfoFadeMode;

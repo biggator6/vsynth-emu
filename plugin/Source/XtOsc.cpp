@@ -12,6 +12,7 @@ namespace {
 
 constexpr uint32_t kRomBase = 0x89300000;
 constexpr uint32_t kLevelTab = 0x897cfcb8;   // u16 ×128: 32768·(k/127)², truncated (Energy, OSC levels)
+constexpr uint32_t kPanTab = 0x897cfdb8;     // u16 ×128: the patch TVA's pan law, 1 at 63 and 64 (0x894ea380)
 // exp2 (0x894ec090): 2^(hi/256) and 2^(lo/65536) for the bytes of a 16-bit
 // fraction, 2^n for the integer part; then the same for negative arguments.
 constexpr uint32_t kExpHi = 0x897d0228, kExpLo = 0x897d0628, kExpInt = 0x897d1228;
@@ -21,7 +22,7 @@ constexpr uint32_t kExpHiNeg = 0x897d0a28, kExpLoNeg = 0x897d0e28, kExpIntNeg = 
 constexpr uint32_t kVelSens = 0x897cfeda, kVelCurves = 0x897cfb9c;
 
 struct Tables {
-    uint16_t level[128];
+    uint16_t level[128], pan[128];
     float hi[256], lo[256], in[7], hiN[256], loN[256], inN[7];
     float keyScale[41][128];                  // xtOscSetTimeKeyScales
     uint16_t velSens[200];
@@ -56,6 +57,17 @@ float timeDepth(int d) {
 
 int clamp63(int d) { return d > 63 ? 63 : d < -63 ? -63 : d; }
 
+// A level with its key follow (0x894e0c90, and the patch TVA's Level and Pan): the
+// value + trunc(127·kf·(key − 60)/6000), by a reciprocal multiply, within 0…127.
+int levelAtKey(int level, int kf, int key) {
+    int x = level > 127 ? 127 : level < 0 ? 0 : level;
+    const int32_t p = 127 * (int32_t)(int16_t)kf * (int32_t)(int16_t)(key - 60);
+    int32_t q = (int32_t)(((int64_t)p * 0x057619f1) >> 32) >> 7;
+    q += (int32_t)((uint32_t)q >> 31);
+    x = (int16_t)(x + q);
+    return x > 127 ? 127 : x < 0 ? 0 : x;
+}
+
 } // namespace
 
 bool xtOscLoadTables(const char* romPath) {
@@ -63,7 +75,7 @@ bool xtOscLoadTables(const char* romPath) {
     FILE* f = romPath ? std::fopen(romPath, "rb") : nullptr;
     if (!f) return false;
     uint32_t curvePtr[7];
-    bool ok = readAt(f, kLevelTab, T.level, 128)
+    bool ok = readAt(f, kLevelTab, T.level, 128) && readAt(f, kPanTab, T.pan, 128)
            && readAt(f, kExpHi, T.hi, 256) && readAt(f, kExpLo, T.lo, 256) && readAt(f, kExpInt, T.in, 7)
            && readAt(f, kExpHiNeg, T.hiN, 256) && readAt(f, kExpLoNeg, T.loN, 256) && readAt(f, kExpIntNeg, T.inN, 7)
            && readAt(f, kVelSens, T.velSens, 200) && readAt(f, kVelCurves, curvePtr, 7);
@@ -80,6 +92,10 @@ bool xtOscLoadTables(const char* romPath) {
     if (T.level[0] != 0 || T.level[127] != 32768) return false;
     for (int i = 1; i < 128; ++i)
         if (!(T.level[i] > T.level[i - 1])) return false;
+    // The pan law: silent at one end, unity at the centre, and never falling
+    if (T.pan[0] != 0 || T.pan[63] != 32768 || T.pan[64] != 32768) return false;
+    for (int i = 1; i < 128; ++i)
+        if (T.pan[i] < T.pan[i - 1]) return false;
     if (T.hi[0] != 1.0f || T.lo[0] != 1.0f || T.hiN[0] != 1.0f || T.loN[0] != 1.0f) return false;
     for (int i = 0; i < 7; ++i)
         if (T.in[i] != std::ldexp(1.0f, i) || T.inN[i] != std::ldexp(1.0f, -i)) return false;
@@ -373,14 +389,33 @@ void xtOscSetWaveGains(const float* g) {
 
 float xtOscLevel(int level, int kf, int key, float velGain) {
     using namespace xtf;
-    int x = level > 127 ? 127 : level < 0 ? 0 : level;
-    // 0x894e0c90: 127·kf·(key − 60)/6000 by a reciprocal multiply, toward zero
-    const int32_t p = 127 * (int32_t)(int16_t)kf * (int32_t)(int16_t)(key - 60);
-    int32_t q = (int32_t)(((int64_t)p * 0x057619f1) >> 32) >> 7;
-    q += (int32_t)((uint32_t)q >> 31);
-    x = (int16_t)(x + q);
-    x = x > 127 ? 127 : x < 0 ? 0 : x;
-    return mul(div((float)T.level[x], 32768.0f), velGain);
+    return mul(div((float)T.level[levelAtKey(level, kf, key)], 32768.0f), velGain);
+}
+
+XtTvaBlock xtTvaBlock(const XtTvaKnobs& k, int key, float velGain) {
+    using namespace xtf;
+    const auto frac = [](const uint16_t* t, int i) { return div((float)t[i], 32768.0f); };
+    const auto cc = [](int x) { return x > 127 ? 127 : x < 0 ? 0 : x; };
+    XtTvaBlock b;
+    float panL, panR;
+    if (k.on) {
+        b.level = mul(mul(mul(frac(T.level, cc(k.cc7)), frac(T.level, levelAtKey(k.level, k.levelKF, key))), frac(T.level, cc(k.cc11))), velGain);
+        b.lfoDepth = xtOscLevelLfoDepth(k.levelLfo);
+        b.panLfoDepth = xtOscLevelLfoDepth(k.panLfo);
+        // CC 10 moves the Pan toward the end it points at, in proportion to the way left
+        const int p = levelAtKey(k.pan, k.panKF, key), c = cc(k.cc10);
+        const int at = c >= 64 ? p + (c - 64) * (127 - p) / 63 : p - ((p * (64 - c)) >> 6);
+        panL = frac(T.pan, 127 - at);
+        panR = frac(T.pan, at);
+    } else {                                           // the Switch off: the controllers' level, centred
+        b.level = mul(frac(T.level, cc(k.cc7)), frac(T.level, cc(k.cc11)));
+        panL = frac(T.pan, 63);
+        panR = frac(T.pan, 64);
+    }
+    const float s = frac(T.level, cc(k.send));
+    b.sendL = mul(s, panL);
+    b.sendR = mul(s, panR);
+    return b;
 }
 
 float xtOscLevelLfoDepth(int d) {
