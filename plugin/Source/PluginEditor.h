@@ -102,7 +102,9 @@ private:
     juce::Slider     patchTempoSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     tripSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     origTempoSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
-    juce::Label      patchTempoLabel_ { {}, "Tempo" }, tripLabel_ { {}, "Trip" }, origTempoLabel_ { {}, "Org" };
+    juce::Label      patchTempoLabel_ { {}, "Tempo" }, tripLabel_ { {}, "Trip" }, origTempoLabel_ { {}, "Org" }, clockLabel_ { {}, "Clock" };
+    juce::ComboBox   clockBox_;                      // Clock Source: INTERNAL the Patch Tempo, HOST the host's transport
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> clockAtt_;
     juce::ToggleButton syncBtn_ { "Sync" }, tripBtn_ { "Trip" }, keepBtn_ { "Keep" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> patchTempoAtt_, tripAtt_, origTempoAtt_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> syncAtt_, tripBtnAtt_, keepAtt_;

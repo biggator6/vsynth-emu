@@ -259,19 +259,27 @@ env 30 70 90 50 80 500 2: identical
 == xt_tone
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
-tone: 4185 notes, 2287 taken by a sounding tone, 317 truncated, 361123 blocks, 17525766 checks
-tone: 0 notes left off, a read outside memory; 531538 band reads far from their wave
+tone: 4202 notes, 2264 taken by a sounding tone, 339 truncated, 363714 blocks, 18456342 checks
+tone: 0 notes left off, a read outside memory; 419404 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1357 notes, 381 taken by a sounding tone, 182 truncated, 113407 blocks, 6037656 checks
-tone, a wave on OSC 2: 0 notes left off, a read outside memory; 573984 band reads far from their wave
+tone, a wave on OSC 2: 1347 notes, 397 taken by a sounding tone, 174 truncated, 111276 blocks, 6325494 checks
+tone, a wave on OSC 2: 0 notes left off, a read outside memory; 725390 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 137788 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 147333 checks
 tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
 tone, the clock's rate: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, the clock's rate: 0 different
+tone, an outside clock alone: 600 F8s
+tone, an outside clock alone: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 4212 checks
+tone, an outside clock alone: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, an outside clock alone: 0 different
+tone, the host's clock: 21041 clocks
+tone, the host's clock: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 46311 checks
+tone, the host's clock: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, the host's clock: 0 different
 == solocmp
 solo vocal.bin 1 1.0 0 1.0 0 30000: 461 records, 30000 frames: 0 different of 60000 (signal rms 0.0146)
 solo vocal.bin 1 1.5 1.25 1.0 0.25 30000: 461 records, 30000 frames: 0 different of 60000 (signal rms 0.0593)

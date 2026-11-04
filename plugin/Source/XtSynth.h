@@ -134,6 +134,9 @@ public:
         // that the note-value LFO rates and Tempo Sync follow, and the note-value envelope times.
         // The firmware keeps whole BPM of it (XtSynth::clockPeriod).
         int patchTempo = 1200;
+        // Clock Source (ID 0x41): 0 INTERNAL, the Patch Tempo; 1 EXTERNAL, whose clocks here come from
+        // the host's transport (XtSynth::hostClock), the Patch Tempo standing in until the host tells a tempo.
+        int clockSource = 0;
         // amp envelope knobs, 0..127 as on the XT (release 16 = 30 ms);
         // velocity → time sensitivities −63..+63; Time KF −200..+200.  Any envelope's Attack,
         // Decay and Release, and any LFO's Rate, take 128..144 too: a note value, 3 to 192
@@ -300,6 +303,11 @@ public:
     // The pad as one plain control: 0 lifted, 1..127 a finger going clockwise round its rim, one turn
     // over the range, which is forward: a turn is 48 steps, two quarter notes of the wave's Original Tempo.
     void timeTripKnob(int value);
+    // The host's transport, before each host block is rendered, for Clock Source EXTERNAL.  `bpm` above
+    // 0 when it tells one; `moving` when it is running and `ppq`, in quarter notes, is where this block
+    // starts.  A clock falls on each 24th of a quarter it passes.  When it isn't moving, the clocks run on
+    // at the tempo, so that a note played on a stopped transport has them too.
+    void hostClock(double bpm, bool moving, double ppq);
     void render(float* left, float* right, int n);
 
 private:
@@ -399,6 +407,17 @@ private:
     // clock here: frames × 24000 against the period × 44100.  It runs with nothing sounding.
     uint64_t clockAcc = 0;
     uint32_t clockBlocks = 0, clockLast = 0;   // blocks (0x8987c7a8), at the last clock (0x8987c7a4)
+    // Clock Source EXTERNAL (the same object, +0x40…+0x48).  Each clock comes from outside, and the tempo
+    // the converters read is the milliseconds over the last six of them.
+    bool clockExt = false;            // +0x40
+    int clockSeen = -1;               // +0x41: clocks into this count, −1 before the first
+    int clockSince = 0;               // +0x46: its ms
+    int clockSix = 125;               // +0x48: the ms over the last six
+    uint32_t clockMsAcc = 0;          // the 1 ms timer (0x89471030), on the audio's clock: frames × 1000 against 44100
+    // What stands in for the MIDI clock's F8s: the host's transport, in clocks
+    double hostBpm = 0.0;             // the last it told; 0 before any
+    double hostAt = 0.0;              // the first frame of the next block
+    int64_t hostDone = 0;             // the last whole clock given
     float chaosSeed = 0x1.666666p-1f; // the global logistic map the LFOs draw their seeds from (0.7 at power-on, 0x894f4c80)
     double hostRate = 44100;
 
@@ -412,11 +431,16 @@ private:
 
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames
-    int clockPeriod() const;       // ms to the quarter ×2 (the clock object's +0x14)
+    int clockPeriod() const;       // the ms of a quarter (the clock object's +0x14)
     int tempo10Now() const;        // the tempo ×10 the converters read (0x894e2d20)
     float tempoNow() const;        // and as the block has it (+0x60)
     int clocksDue() const;         // clocks the next block starts with
     void clockTick();              // 0x894f4da0
+    void clockFollow();            // Clock Source to the clock's object (0x89471e30)
+    void clockIn();                // an F8 (0x894712f0)
+    void clockMs();                // the timer routine's count (0x894710e0, its end)
+    int msDue() const;             // ms the next block starts with
+    double hostStep() const;       // clocks in a block, at the host's tempo
     void oscBeat(OscVoice& s, const OscControls& o);   // a block's Tempo Sync, Time Trip and Beat Keep to the player (0x894f3ec0)
     const XtEncoded* waveOf(const OscControls& o) const { return cur[&o == &ctl ? 0 : 1].get(); }
     bool oscPlays(const OscControls& o) const;       // switched on, with something to play

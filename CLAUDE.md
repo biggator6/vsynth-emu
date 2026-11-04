@@ -77,7 +77,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
   takes about 10 s), and `mutate_tone.py 2000 <new names>` for the planted errors just added.
-- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 16 minutes) if
+- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 15 minutes) if
   `XtSynth.cpp`, `XtToneCheck.cpp` or a port changed: a planted error can stop meaning anything
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
@@ -119,6 +119,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - The Patch Tempo goes to the clock's object and is read back, its tenths dropped, so 233 BPM reads as 233.4. An LFO's or envelope's value from 128 on is a
   note value. Tempo Sync and Time Trip steer the player's walk by a factor (`XtBeat`, `0x8950c280`), not its position. In `xt_tone` the firmware's clock (`0x894f4da0`)
   runs on XtSynth's, so that comparison can't see the rate, and a section of its own runs the firmware's timer routine against it (HARDWARE_FIRMWARE.md, "Tempo sync and Time Trip").
+- Clock Source EXTERNAL (ID 0x41, the clock object's +0x40): one clock to an F8 (`0x894712f0`), and the tempo read is 150000/(+0x48), the whole ms over the last six clocks, so it steps. The plugin's HOST is that, on the host's
+  transport (`XtSynth::hostClock`): a clock on each 24th of a quarter it passes; stopped, they run on at its tempo (a choice, not the firmware's). `xt_tone`'s firmware is fed the port's F8s, so a section of its own holds them to the
+  transport's position (HARDWARE_FIRMWARE.md, "The host's tempo, by the firmware's external clock").
 - A tone's path (constructor `0x894f5860`, note start, update, the scheduler, what is hooked) is in
   HARDWARE_FIRMWARE.md, "The whole tone against XtSynth". Any change is a tone update (`0x894dc0b0`): all
   the blocks again, COSMs before the envelopes.

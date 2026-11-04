@@ -369,7 +369,7 @@ cx-amp-t|p.treble = c.ampTreble + m[xtmx::CosmPrm2];|p.treble = c.ampTreble;
 cx-section|    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);\n    p.filter = c.filter;|    const int16_t* m = v.mx + xtmx::Cosm;\n    p.filter = c.filter;
 tva-damp-done|    if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }\n    if (v.damping) return;|    if (v.damping) return;\n    if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }
 tempo-tenths|return 3000 * 20 / (t / 10);|return 30000 * 20 / t;
-tempo-readback|const int t = 30000 * 20 / clockPeriod();|const int t = std::clamp(ctl.patchTempo, 200, 2500);
+tempo-readback|: 30000 * 20 / clockPeriod();|: std::clamp(ctl.patchTempo, 200, 2500);
 clock-lfo1|        oscClock(v);\n|
 clock-lfo2|        oscClock(v.osc2);\n|
 clock-cosm|        for (Voice::CosmVoice& c : v.cs) c.lfo.clock(dt);\n|
@@ -694,3 +694,40 @@ solo-cross-out|if (lp[2] > Pi && X > lp[2]) X = lp[2];|if (X > lp[2]) X = lp[2];
 solo-cross-in|if (loopOn) { if (X > lp[1]) X = lp[1]; }\n            else if (lp[1] > Pi && X > lp[1]) X = lp[1];|if (loopOn && lp[1] > Pi && X > lp[1]) X = lp[1];|tonesolo
 solo-cross-b|if (loopOn) { if (lp[3] > X) X = lp[3]; }\n            else if (Pi > lp[3] && lp[3] > X) X = lp[3];|if (loopOn && Pi > lp[3] && lp[3] > X) X = lp[3];|tonesolo
 solo-seek-first|budget = recEnd > n ? kUnlimited : budgetOf(0);|budget = kUnlimited;|tonesolo
+ext-six-none|clockSix = clockSince ? clockSince : 1;|clockSix = clockSince ? clockSince : 2;
+ext-six-by|if (++clockSeen < 6) return;|if (++clockSeen < 7) return;
+ext-six-seen|    clockSeen = 0;\n    clockSix = clockSince|    clockSeen = 1;\n    clockSix = clockSince
+ext-six-since|    clockSix = clockSince ? clockSince : 1;\n    clockSince = 0;\n|    clockSix = clockSince ? clockSince : 1;\n
+ext-start-seen|    clockSeen = -1;\n    clockSince = 0;\n    clockSix = 125;|    clockSince = 0;\n    clockSix = 125;
+ext-start-since|    clockSeen = -1;\n    clockSince = 0;\n    clockSix = 125;|    clockSeen = -1;\n    clockSix = 125;
+ext-start-six|    clockSeen = -1;\n    clockSince = 0;\n    clockSix = 125;|    clockSeen = -1;\n    clockSince = 0;
+ext-ms-seen|    if (clockSeen < 0) return;\n    if (clockSince++|    if (clockSince++
+ext-ms-wrap|clockSince++ >= 0xffff|clockSince++ >= 0xfffe
+ext-ms-wrap-hi|clockSince++ >= 0xffff|clockSince++ >= 0x10000
+ext-ms-wrap-seen|>= 0xffff) {\n        clockSeen = -1;\n|>= 0xffff) {\n
+ext-ms-wrap-since|        clockSeen = -1;\n        clockSince = 0;\n|        clockSeen = -1;\n
+ext-reader|clockExt ? 150000 / clockSix : 30000 * 20 / clockPeriod()|30000 * 20 / clockPeriod()
+ext-reader-k|150000 / clockSix|151000 / clockSix
+ext-limit-lo|return 200 > t ? 20 : t > 2500 ? 250 : t;|return 200 > t ? 200 : t > 2500 ? 250 : t;
+ext-limit-hi|return 200 > t ? 20 : t > 2500 ? 250 : t;|return 200 > t ? 20 : t > 2500 ? 2500 : t;
+ext-ms-rate|int XtSynth::msDue() const { return (int)((clockMsAcc + 32000) / 44100); }|int XtSynth::msDue() const { return (int)((clockMsAcc + 32000) / 44000); }
+ext-ms-acc|clockMsAcc = (clockMsAcc + 32000) % 44100;|clockMsAcc = (clockMsAcc + 32050) % 44100;
+ext-no-ms|        for (int n = msDue(); n > 0; --n) clockMs();\n|
+ext-no-in|{ clockIn(); clockTick(); ++hostDone; }|{ clockTick(); ++hostDone; }
+ext-no-tick|{ clockIn(); clockTick(); ++hostDone; }|{ clockIn(); ++hostDone; }
+ext-no-done|{ clockIn(); clockTick(); ++hostDone; }|{ clockIn(); clockTick(); }
+ext-order|        for (int n = msDue(); n > 0; --n) clockMs();\n        for (int n = clocksDue(); n > 0; --n) { clockIn(); clockTick(); ++hostDone; }\n|        for (int n = clocksDue(); n > 0; --n) { clockIn(); clockTick(); ++hostDone; }\n        for (int n = msDue(); n > 0; --n) clockMs();\n
+host-step|hostBpm * (32.0 * 24.0) / (60.0 * 44100.0)|hostBpm * (32.0 * 24.0) / (60.0 * 44000.0)
+host-at|    hostAt += hostStep();\n|
+host-keep|    if (bpm > 0.0) hostBpm = bpm;\n|    hostBpm = bpm;\n
+host-moving|if (!moving |if (false 
+host-pos|(ppq + ((double)srcFrames - readPos) / 44100.0 * hostBpm / 60.0) * 24.0|ppq * 24.0
+host-24|hostBpm / 60.0) * 24.0;\n    if (std::fabs|hostBpm / 60.0) * 25.0;\n    if (std::fabs
+host-jump|std::fabs(at - hostAt) > 1.0|std::fabs(at - hostAt) > 1e9
+host-jump-ceil|hostDone = (int64_t)std::ceil(at) - 1;   // a locate|hostDone = (int64_t)std::ceil(at);   // a locate
+host-follow|    if (bpm > 0.0) hostBpm = bpm;\n    clockFollow();\n|    if (bpm > 0.0) hostBpm = bpm;\n
+set-follow|    ctl = c;\n    clockFollow();\n|    ctl = c;\n
+follow-source|ctl.clockSource != 0 && hostBpm > 0.0|hostBpm > 0.0
+follow-tempo|ctl.clockSource != 0 && hostBpm > 0.0|ctl.clockSource != 0
+follow-start|    hostDone = (int64_t)std::ceil(hostAt) - 1;\n}|}
+follow-back|    if (ext == clockExt) return;\n    clockExt = ext;\n    if (!ext) return;|    if (!ext) return;\n    clockExt = ext;
