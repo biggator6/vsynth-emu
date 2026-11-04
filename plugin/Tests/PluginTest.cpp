@@ -84,8 +84,12 @@ int main(int argc, char** argv) {
             return t;
         };
         const auto firmwareText = [&](int id, int v) {
-            std::string bare = routine(0x89462120, id, v), unit = routine(0x89462130, id, v);                                  // without the unit, and with it
-            unit = unit.size() > bare.size() ? unit.substr(bare.size() + 1, unit.size() - bare.size() - 2) : std::string();    // what the unit adds, its brackets off
+            // The seven the routine has no format for go by an ID of the same range that has one (the user's decision), and keep their own units.
+            static const std::map<int, int> borrowed = { { 0x861, 0x84b }, { 0x872, 0x84b }, { 0x884, 0x828 }, { 0x864, 0x82b }, { 0x875, 0x83c }, { 0x887, 0x83c }, { 0x898, 0x84d } };
+            const auto b = borrowed.find(id);
+            const std::string bare = routine(0x89462120, b != borrowed.end() ? b->second : id, v), own = routine(0x89462120, id, v);
+            std::string unit = routine(0x89462130, id, v);                                                                     // with the unit
+            unit = unit.size() > own.size() ? unit.substr(own.size() + 1, unit.size() - own.size() - 2) : std::string();       // what the unit adds, its brackets off
             if (id == 0x8b6) unit = "ms"; else if (id == 0x8b7) unit = "%"; else if (id == 0x8b8) unit = "Hz";                 // the three of Non-Linear whose strings are a row out
             const std::map<int, const char*> notes = { { 0x11, "1/16" }, { 0x12, "1/8" }, { 0x18, "1/4" }, { 0x13, "1/2" }, { 0x14, "1/1" }, { 0x15, "2/1" } };            // measured by xt_fx control
             const auto note = notes.find((uint8_t)bare[0]);
