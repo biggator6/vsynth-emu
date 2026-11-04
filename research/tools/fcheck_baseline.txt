@@ -258,19 +258,27 @@ env 30 70 90 50 80 500 2: identical
 == xt_tone
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
-tone: 3381 notes, 1412 taken by a sounding tone, 412 truncated, 272827 blocks, 10634505 checks
-tone: a SOLO wave's buffers within 3.2e-03 of the block's peak; 0 notes left off, a read outside memory; 223018 band reads far from their wave
+tone: 3390 notes, 1393 taken by a sounding tone, 415 truncated, 275485 blocks, 11041897 checks
+tone: a SOLO wave's buffers within 9.8e-03 of the block's peak; 0 notes left off, a read outside memory; 291356 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1411 notes, 393 taken by a sounding tone, 212 truncated, 106834 blocks, 3832115 checks
-tone, a wave on OSC 2: a SOLO wave's buffers within 2.7e-02 of the block's peak; 0 notes left off, a read outside memory; 649234 band reads far from their wave
+tone, a wave on OSC 2: 1402 notes, 428 taken by a sounding tone, 203 truncated, 117904 blocks, 4712501 checks
+tone, a wave on OSC 2: a SOLO wave's buffers within 7.2e-03 of the block's peak; 0 notes left off, a read outside memory; 574824 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 131086 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 138768 checks
 tone, a second update in a tick: a SOLO wave's buffers within 0.0e+00 of the block's peak; 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
 tone, the clock's rate: a SOLO wave's buffers within 0.0e+00 of the block's peak; 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, the clock's rate: 0 different
+tone, an outside clock alone: 600 F8s
+tone, an outside clock alone: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 4212 checks
+tone, an outside clock alone: a SOLO wave's buffers within 0.0e+00 of the block's peak; 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, an outside clock alone: 0 different
+tone, the host's clock: 21041 clocks
+tone, the host's clock: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 46311 checks
+tone, the host's clock: a SOLO wave's buffers within 0.0e+00 of the block's peak; 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, the host's clock: 0 different
 == solocmp
 solo vocal.bin 1 1.0 0 1.0 0 30000: 461 records, 30000 frames: max |firmware - port| 3.05e-06, difference -83.6 dB against the signal (rms 0.0146), first at 1
 solo vocal.bin 1 1.5 1.25 1.0 0.25 30000: 461 records, 30000 frames: max |firmware - port| 3.23e-06, difference -99.5 dB against the signal (rms 0.0593), first at 2

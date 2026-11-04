@@ -127,6 +127,7 @@ namespace Params {
     // finger going clockwise round it (XtSynth::timeTripKnob).  Each OSC's Tempo Sync (IDs 0x2d0, 0x304),
     // its wave's Original Tempo (BPM), Time Trip Sw and Beat Keep (0x2d6, 0x2d7; 0x30a, 0x30b)
     static const juce::String kPatchTempo   = "patchTempo";
+    static const juce::String kClockSource  = "clockSource";
     static const juce::String kTripPad      = "timeTrip";
     static const juce::String kTempoSync    = "tempoSync";
     static const juce::String kOrigTempo    = "origTempo";
@@ -206,6 +207,7 @@ VSynthEmuProcessor::createParameterLayout() {
             return t.getIntValue();
         });
     params.push_back(std::make_unique<juce::AudioParameterFloat>(Params::kPatchTempo, "Patch Tempo", juce::NormalisableRange<float>(20.0f, 250.0f, 0.1f), 120.0f));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kClockSource, "Clock Source", juce::StringArray { "INTERNAL", "HOST" }, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTripPad, "Time Trip", 0, 127, 0,
         juce::AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return v == 0 ? juce::String("OFF") : juce::String(v); })));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTempoSync, "Tempo Sync", false));
@@ -840,6 +842,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.scaleTune    = apvts.getRawParameterValue(Params::kScaleTune)->load() >= 0.5f;
     for (int i = 0; i < 12; ++i) c.scale[i] = knob(Params::kScaleTunes[i]);
     c.patchTempo   = (int)std::lround(snap(apvts.getRawParameterValue(Params::kPatchTempo)->load(), 0.1f) * 10.0f);
+    c.clockSource  = knob(Params::kClockSource);
     c.tempoSync    = apvts.getRawParameterValue(Params::kTempoSync)->load() >= 0.5f;
     c.origTempo    = (int)std::lround(snap(apvts.getRawParameterValue(Params::kOrigTempo)->load(), 0.01f) * 100.0f) * 100;
     c.timeTrip     = apvts.getRawParameterValue(Params::kTripSw)->load() >= 0.5f;
@@ -1104,6 +1107,15 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                               || apvts.getRawParameterValue(Params::oscId(1, Params::kOscSwitch))->load() >= 0.5f);
     if ((xtActive_.load() || analog) && numOut > 0) {
         synth_.setControls(xtControls());
+        // The host's transport, for Clock Source HOST (the Standalone has none: the Patch Tempo stands)
+        double hostBpm = 0.0, hostPpq = 0.0;
+        bool hostMoving = false;
+        if (auto* head = getPlayHead())
+            if (const auto info = head->getPosition()) {
+                hostBpm = info->getBpm().orFallback(0.0);
+                if (const auto ppq = info->getPpqPosition()) { hostPpq = *ppq; hostMoving = info->getIsPlaying(); }
+            }
+        synth_.hostClock(hostBpm, hostMoving, hostPpq);
         const int trip = (int)apvts.getRawParameterValue(Params::kTripPad)->load();
         if (trip != tripKnob_) { tripKnob_ = trip; synth_.timeTripKnob(trip); }
         float* L = buffer.getWritePointer(0);

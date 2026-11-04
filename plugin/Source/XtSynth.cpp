@@ -568,6 +568,7 @@ void XtSynth::setControls(const Controls& c) {
     const bool modChanged = c.mod.on != ctl.mod.on || c.mod.type != ctl.mod.type || c.mod.level != ctl.mod.level || c.mod.attack != ctl.mod.attack
                          || c.mod.release != ctl.mod.release;
     ctl = c;
+    clockFollow();
     if (modChanged) xtModBlock(ctl.mod, modBlk);
     for (Voice& v : voice) {
         if (!v.active) continue;
@@ -1066,8 +1067,10 @@ int XtSynth::clockPeriod() const {
     return 3000 * 20 / (t / 10);
 }
 
+// The readers branch on the object's +0x40: from an outside clock, the ms over its last six clocks,
+// which are a quarter of a quarter.  The limits are as they are: a reading under 20.0 BPM is 2.0, over 250.0 is 25.0.
 int XtSynth::tempo10Now() const {
-    const int t = 30000 * 20 / clockPeriod();
+    const int t = clockExt ? 150000 / clockSix : 30000 * 20 / clockPeriod();
     return 200 > t ? 20 : t > 2500 ? 250 : t;
 }
 
@@ -1077,7 +1080,57 @@ namespace {
 constexpr uint64_t kClockPerBlock = 32 * 24000;   // a block's frames × 24 clocks a quarter × 1000 ms; a clock is clockPeriod() × 44100
 }
 
-int XtSynth::clocksDue() const { return (int)((clockAcc + kClockPerBlock) / ((uint64_t)clockPeriod() * 44100)); }
+int XtSynth::clocksDue() const {
+    if (clockExt) {
+        const double d = std::floor(hostAt + hostStep()) - (double)hostDone;
+        return d > 0.0 ? (int)d : 0;
+    }
+    return (int)((clockAcc + kClockPerBlock) / ((uint64_t)clockPeriod() * 44100));
+}
+
+int XtSynth::msDue() const { return (int)((clockMsAcc + 32000) / 44100); }
+
+double XtSynth::hostStep() const { return hostBpm * (32.0 * 24.0) / (60.0 * 44100.0); }
+
+// 0x89471e30, flag 0x40 of the clock's task.  Going to EXTERNAL the object starts over, reading 120 BPM until its first count of six is done.
+void XtSynth::clockFollow() {
+    const bool ext = ctl.clockSource != 0 && hostBpm > 0.0;
+    if (ext == clockExt) return;
+    clockExt = ext;
+    if (!ext) return;
+    clockSeen = -1;
+    clockSince = 0;
+    clockSix = 125;
+    hostDone = (int64_t)std::ceil(hostAt) - 1;
+}
+
+// An F8 (0x894712f0).  The object's ticks go on to the next 20, which is what makes it a clock (0x894d4210);
+// between F8s the ticks stop short of that (0x894710e0, +0x4a), so there is one clock to an F8.  Every sixth: the count.
+void XtSynth::clockIn() {
+    if (++clockSeen < 6) return;
+    clockSeen = 0;
+    clockSix = clockSince ? clockSince : 1;
+    clockSince = 0;
+}
+
+// Each ms (0x894710e0's end).  The count starts at the first clock, and is given up after 65536 ms short of six.
+void XtSynth::clockMs() {
+    if (clockSeen < 0) return;
+    if (clockSince++ >= 0xffff) {
+        clockSeen = -1;
+        clockSince = 0;
+    }
+}
+
+void XtSynth::hostClock(double bpm, bool moving, double ppq) {
+    if (bpm > 0.0) hostBpm = bpm;
+    clockFollow();
+    if (!moving || !(hostBpm > 0.0)) return;
+    // Where the next block will sound: the frames between the read position and it, as this host block's first frame stands at ppq
+    const double at = (ppq + ((double)srcFrames - readPos) / 44100.0 * hostBpm / 60.0) * 24.0;
+    if (std::fabs(at - hostAt) > 1.0) hostDone = (int64_t)std::ceil(at) - 1;   // a locate or a loop's end: what it passed gives no clocks
+    hostAt = at;
+}
 
 // 0x894f4da0: the time since the last clock from the blocks passed, the free-running LFOs on a
 // note value (0x894f17c0), then each tone: its eight LFOs (0x894f78a0) and its voices (0x894f78f0).
@@ -1139,9 +1192,16 @@ void XtSynth::tvaUpdate(Voice& v) {
 void XtSynth::mixBlock(float* lr) {
     std::fill(lr, lr + 64, 0.0f);
     // The tempo clock, here on the blocks; ahead of the tone update, as one choice of the two
-    // tasks' order on the XT
-    for (int n = clocksDue(); n > 0; --n) { clockTick(); clockAcc -= (uint64_t)clockPeriod() * 44100; }
-    clockAcc += kClockPerBlock;
+    // tasks' order on the XT.  From outside: the timer's ms in this block first, then its clocks
+    if (clockExt) {
+        for (int n = msDue(); n > 0; --n) clockMs();
+        for (int n = clocksDue(); n > 0; --n) { clockIn(); clockTick(); ++hostDone; }
+    } else {
+        for (int n = clocksDue(); n > 0; --n) { clockTick(); clockAcc -= (uint64_t)clockPeriod() * 44100; }
+        clockAcc += kClockPerBlock;
+    }
+    clockMsAcc = (clockMsAcc + 32000) % 44100;
+    hostAt += hostStep();
     ++clockBlocks;
     // The control clock: the tone update runs between blocks every 441 frames, and
     // the free-running LFOs step with it, a tone sounding or not.
@@ -1377,6 +1437,8 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_TEMPO=n: the Patch Tempo ×10.  XT_SYNC="sync,origTempo×10000[,sync2,origTempo2]": Tempo Sync
 //     and the wave's Original Tempo, OSC 1 and OSC 2.  XT_RATE="lfo,osc2Lfo": LFO rates, 128..144 note values.
 //   XT_TRIP="frame,x,y[;frame,x,y...]": the Time Trip pad at frames, x and y 0 lifting it.
+//   XT_HOST="bpm[,ppq[,moving]]": Clock Source EXTERNAL on a host's transport at that tempo, told every
+//     512 frames, from that position (default 0, moving; moving 0 is a stopped transport).
 //   XT_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM,
 //     3 ENV RING, 4 OSC SYNC, Original Level, Attack and Release Times.  XT_MOD_AT="frame,on,type,level,
 //     attack,release": new MOD knobs at a frame, on the notes then sounding.
@@ -1523,6 +1585,9 @@ int main(int argc, char** argv) {
     }
     if (const char* e = std::getenv("XT_STRUCT")) c.structure = std::atoi(e);
     if (const char* e = std::getenv("XT_TEMPO")) c.patchTempo = std::atoi(e);
+    double hostBpm = 0.0, hostPpq = 0.0;
+    int hostMoving = 1;
+    if (const char* e = std::getenv("XT_HOST")) { std::sscanf(e, "%lf,%lf,%d", &hostBpm, &hostPpq, &hostMoving); c.clockSource = 1; }
     if (const char* e = std::getenv("XT_SYNC")) {
         int s1 = 0, s2 = 0;
         std::sscanf(e, "%d,%d,%d,%d", &s1, &c.origTempo, &s2, &c.osc2.origTempo);
@@ -1728,7 +1793,8 @@ int main(int argc, char** argv) {
     std::vector<float> L((size_t)frames), R((size_t)frames), out((size_t)frames * 2);
     long done = 0;
     while (done < frames) {
-        long next = frames;
+        long next = hostBpm > 0.0 ? std::min(frames, done + 512) : frames;
+        if (hostBpm > 0.0) syn.hostClock(hostBpm, hostMoving != 0, hostPpq + (double)done / host * hostBpm / 60.0);
         for (const Ev& e : ev) if (e.at >= done && e.at < next) next = e.at;
         if (bendAt >= done && bendAt < next) next = bendAt;
         if (modAt >= done && modAt < next) next = modAt;

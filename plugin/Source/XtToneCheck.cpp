@@ -3,6 +3,7 @@
 // xt_tone <rom.2.bin> [cases] [seed] [inputs dir]
 //   XT_TONE_FIRST=1: only each case's first difference; XT_TONE_DUMP=<case>|a: its settings
 //   XT_TONE_STOP=1: end the run at its first difference ("tone: 1 different, at case ..."); mutate_tone.py
+//   XT_TONE_HOST=1: in the host's clock's section, the count of six and the tempo read at each tempo
 //
 // The firmware runs in the SH-4 interpreter from the parameter IDs on, nothing
 // of its path set by hand:
@@ -19,8 +20,10 @@
 //   a knob moved during a note: the updaters and the note's update (0x894dc0b0);
 //   the bender and CC 7, 11 and 10 written where the channel keeps them, and that update;
 //   the tempo clock's tick (0x894f4da0) on XtSynth's clock, the Patch Tempo through its
-//     object (0x89471ef0), and the Time Trip pad through its controllers (0x894d8360).
-//   Then the clock's rate alone, against the firmware's timer routine (0x89471030).
+//     object (0x89471ef0), Clock Source through it too (0x89471e30), an outside clock as its F8 routine
+//     (0x894712f0) and timer routine (0x89471030), and the Time Trip pad through its controllers (0x894d8360).
+//   Then the clock's rate alone, against the firmware's timer routine; the outside clock alone, on what
+//   no transport gives; and the host's transport to the clocks, against where it says it is.
 // Only the OS is hooked: its locks and clock, the voice allocator's lists, and
 // the wave store (0x8949e5c0…): the waves lie in RAM as the loader leaves them,
 // from the same encodes XtSynth plays (their vpdt and load-time bands).
@@ -87,6 +90,7 @@ constexpr float kSoloTol = 2e-2f, kSoloFloor = 8192.0f;   // a SOLO wave's buffe
 constexpr uint32_t kDescTab = 0x897a167c, kRomBase = 0x89300000;
 constexpr int kCosm2 = 0x10000;      // COSM 2's IDs in the patch table: COSM 1's plus this
 constexpr uint32_t kPadCcX = 16, kPadCcY = 17;   // the controllers "Time Trip Assign X", "Y" stand on (the system's, set by hand)
+constexpr uint32_t kClockObj = 0x89979bfc;       // the tempo clock's object
 
 // A wave in the firmware's memory: its chunks (2 the header, 3 the steps, 4 the
 // loop record, 5 the vpdt, 10 the cached loop events) and the bands the players read.
@@ -196,13 +200,15 @@ public:
         // the tempo clock's object and the parts' Time Trip pads, as at power-on
         if (!c.call(0x894714b0, {}, kSp) || !c.call(0x894d8740, {}, kSp)) { std::fprintf(stderr, "clock, pads: %s\n", c.error().c_str()); return false; }
         c.wr8(0x89cf69a4, kPadCcX); c.wr8(0x89cf69a5, kPadCcY); c.wr8(0x89cf69a6, 0xff); c.wr8(0x89cf69a7, 0xff);
+        c.hook(0x893018b0, [](Sh4& m) { m.ret(0); });     // the signal to the clock's task
+        for (uint32_t a : { 0x8946ebb0u, 0x8946ec00u }) c.hook(a, [](Sh4& m) { m.ret(0); });   // its object on the MIDI input's list, or off it
         return true;
     }
 
     bool updatePatch() {
         if (!c.call(0x894dfe10, { 0 }, kSp)) { std::fprintf(stderr, "updaters: %s\n", c.error().c_str()); return false; }
-        // the task's flag 0x40 (0x89471d34): the Patch Tempo to the clock object
-        if (!c.call(0x89471ef0, {}, kSp)) { std::fprintf(stderr, "patch tempo: %s\n", c.error().c_str()); return false; }
+        // the task's flag 0x40 (0x89471d34): Clock Source and the Patch Tempo to the clock object
+        if (!c.call(0x89471e30, {}, kSp) || !c.call(0x89471ef0, {}, kSp)) { std::fprintf(stderr, "patch tempo: %s\n", c.error().c_str()); return false; }
         return true;
     }
     // A clock (0x894f4da0), `blocks` the blocks rendered so far, whose count it reads (0x8987c7a8)
@@ -217,16 +223,31 @@ public:
         return true;
     }
     bool padOn() { return c.rd32(c.rd32(0x8987ae78) + 8) != 0; }
-    // The firmware's own timer routine (0x89471030, 0x894710e0) `ms` times at this Patch Tempo: the
-    // clock object's ticks (+0x28), of which 20 make a clock (0x894d4210)
+    // A millisecond of the timer routine (0x89471030, 0x894710e0)
+    bool timer() {
+        if (!c.call(0x89471030, {}, kSp)) { std::fprintf(stderr, "timer: %s\n", c.error().c_str()); return false; }
+        return true;
+    }
+    // An F8 reaching the clock's object (0x894712f0)
+    bool clockIn() {
+        if (!c.call(0x894712f0, { kClockObj, 0xf8 }, kSp)) { std::fprintf(stderr, "f8: %s\n", c.error().c_str()); return false; }
+        return true;
+    }
+    // Clock Source, from what it was: the object as it is after being sent there from the other
+    bool clockSource(int source) {
+        par[0x41] = source;
+        if (!c.call(0x89471e30, {}, kSp)) { std::fprintf(stderr, "clock source: %s\n", c.error().c_str()); return false; }
+        return true;
+    }
+    // The firmware's own timer routine `ms` times at this Patch Tempo: the clock object's ticks (+0x28),
+    // of which 20 make a clock (0x894d4210)
     bool msTicks(int tempo, int ms, uint32_t& ticks) {
-        constexpr uint32_t kClockObj = 0x89979bfc;
-        c.hook(0x893018b0, [](Sh4& m) { m.ret(0); });     // the signal to the clock's task
         par[0x11d] = tempo;
+        if (!clockSource(0)) return false;
         if (!c.call(0x89471ef0, {}, kSp)) { std::fprintf(stderr, "patch tempo: %s\n", c.error().c_str()); return false; }
         const uint32_t from = c.rd32(kClockObj + 0x28);
         for (int i = 0; i < ms; ++i)
-            if (!c.call(0x89471030, {}, kSp)) { std::fprintf(stderr, "timer: %s\n", c.error().c_str()); return false; }
+            if (!timer()) return false;
         ticks = c.rd32(kClockObj + 0x28) - from;
         return true;
     }
@@ -572,6 +593,7 @@ std::unordered_map<int, int> patchOf(const Ctl& c) {
     oscParams(p, 0, c); oscParams(p, 1, c.osc2);
     cosmParams(p, 0, c.cosm[0]); cosmParams(p, 1, c.cosm[1]);
     p[0x11d] = c.patchTempo;
+    p[0x41] = c.clockSource;
     p[0x110] = c.patchCoarse; p[0x111] = c.patchFine; p[0x112] = c.octave; p[0x113] = !c.mono; p[0x114] = c.legato;   // Mono/Poly: 0 MONO
     p[0x115] = c.portamento; p[0x116] = c.portaMode; p[0x117] = c.portaType; p[0x118] = c.portaTime; p[0x119] = c.portaVeloSens;
     p[0x11e] = c.bendUp; p[0x11f] = c.bendDown;
@@ -686,6 +708,7 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     c.bendUp = r.range(0, 48); c.bendDown = r.range(0, 48);
     // the ends too, where the time between clocks reaches its limits (0x894f0fd0)
     c.patchTempo = r.one(3) ? 1200 : r.one(6) ? (r.one(2) ? r.range(200, 209) : r.range(2450, 2500)) : r.range(200, 2500);
+    c.clockSource = r.one(3);
     if (r.one(3)) { c.scaleTune = true; for (int& s : c.scale) s = r.range(-64, 63); }
     c.attack = drawTime(r); c.decay = drawTime(r); c.sustain = r.range(0, 127); c.release = drawTime(r);
     c.aSens = r.one(2) ? 0 : r.range(-63, 63); c.dSens = r.one(2) ? 0 : r.range(-63, 63); c.rSens = r.one(2) ? 0 : r.range(-63, 63);
@@ -696,6 +719,13 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     c.mfxSend = r.one(2) ? 127 : r.range(0, 127);
     c.tvaLfoWave = r.range(0, 7); c.tvaLfoRate = drawRate(r); c.tvaLfoOffset = r.range(0, 4); c.tvaLfoDelay = r.one(2) ? 0 : r.range(0, 60);
     c.tvaLfoFadeMode = r.range(0, 3); c.tvaLfoFade = r.one(2) ? 0 : r.range(0, 60); c.tvaLfoKeySync = !r.one(4);
+    // LFO 5 a square held at full Pan Depth, and the release whose last step before its end is largest: as the envelope
+    // ends one channel's gain is at 0 and the other's is not, and the tone goes on until both are (0x894f54b0)
+    if (r.one(16)) {
+        c.tvaOn = true;
+        c.tvaLfoWave = 3; c.tvaPanLfo = 63; c.tvaLfoRate = r.range(0, 10); c.tvaLfoOffset = 2; c.tvaLfoDelay = c.tvaLfoFade = 0; c.tvaLfoKeySync = true;
+        c.sustain = r.range(70, 127); c.release = 16; c.rSens = 0; c.timeKF = 0;
+    }
     c.octave = r.one(3) ? r.range(-3, 3) : 0;
     if (r.one(2)) { c.portamento = true; c.portaMode = r.range(0, 1); c.portaType = r.range(0, 1); c.portaTime = r.range(0, 127); c.portaVeloSens = r.range(-63, 63); }
     return c;
@@ -727,7 +757,7 @@ std::vector<size_t> listedFields() {
     for (const int* x : { &c.tvaLfoWave, &c.tvaLfoRate, &c.tvaLfoOffset, &c.tvaLfoDelay, &c.tvaLfoFadeMode, &c.tvaLfoFade,
                           &c.tvaLevel, &c.tvaLevelKF, &c.tvaLevelLfo, &c.tvaPan, &c.tvaPanKF, &c.tvaPanLfo, &c.mfxSend }) add(*x);
     // the tempo's, which sweepWave gives what a move of them needs
-    add(c.patchTempo);
+    add(c.patchTempo); add(c.clockSource);
     for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) }) { add(o->tempoSync); add(o->timeTrip); add(o->beatKeep); }
     for (size_t i = 0; i < 3; ++i) f.push_back(kCcOnly + i);
     f.push_back(kBenderOnly);
@@ -738,7 +768,7 @@ std::vector<size_t> listedFields() {
 int sweepWave(size_t at) {
     static const Ctl c;
     const auto is = [&](const auto& x) { return at == (size_t)(reinterpret_cast<const char*>(&x) - reinterpret_cast<const char*>(&c)); };
-    if (is(c.patchTempo) || is(c.tempoSync) || is(c.timeTrip) || is(c.beatKeep)) return 1;
+    if (is(c.patchTempo) || is(c.clockSource) || is(c.tempoSync) || is(c.timeTrip) || is(c.beatKeep)) return 1;
     return is(c.osc2.tempoSync) || is(c.osc2.timeTrip) || is(c.osc2.beatKeep) ? 2 : 0;
 }
 
@@ -819,6 +849,27 @@ int XtToneProbe::run(int argc, char** argv) {
         rep.checks = notes = legatos = truncates = blocks = wild = fw.bandReads.far = 0;
         worstSolo = 0;
     };
+    // A block's clocks on the firmware's side: an outside clock has the timer's ms in it first, from the harness's
+    // own count, and each clock is an F8 before it reaches the tones
+    const auto fwClocks = [&]() {
+        const long at = syn.hostFrames;
+        if (syn.clockExt)
+            for (long n = (at + 32) * 1000 / 44100 - at * 1000 / 44100; n > 0; --n)
+                if (!fw.timer()) return false;
+        for (int k = syn.clocksDue(); k > 0; --k) {
+            if (syn.clockExt && !fw.clockIn()) return false;
+            if (!fw.clock((uint32_t)(at / 32))) return false;
+        }
+        return true;
+    };
+    // The clock's object on both sides
+    const auto clockFields = [&](XtSynth& s, int blk) {
+        rep.checks += 3;
+        const int seen = (int8_t)fw.c.rd8(kClockObj + 0x41), since = fw.c.rd16(kClockObj + 0x46), six = fw.c.rd16(kClockObj + 0x48);
+        if (seen != s.clockSeen) rep.bad("clock's count of six", "fw %.0f port %.0f", seen, s.clockSeen, blk);
+        if (since != s.clockSince) rep.bad("clock's ms", "fw %.0f port %.0f", since, s.clockSince, blk);
+        if (six != s.clockSix) rep.bad("clock's six", "fw %.0f port %.0f", six, s.clockSix, blk);
+    };
     const int nOsc2 = waves.empty() ? 0 : nCases / 2;
     const int tickFrom = nCases + nSweep + nOsc2, nTick = 16 * 3;     // each COSM type, each kind of second update
     for (int g = 0; g < tickFrom + nTick; ++g) {
@@ -837,6 +888,16 @@ int XtToneProbe::run(int argc, char** argv) {
         const TestWave* wv = (sweepOn == 1 || (!sweep && !twoInTick && g % 2 == 1)) && !waves.empty() ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
         if (wv && wv == wv2) wv = &waves[(size_t)((wv - waves.data() + 1) % (long)waves.size())];   // a wave's loop is its own
         Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr);
+        // A long note under Tempo Sync, at the tempo's top and the Original Tempo's foot, with no loop: its beat position
+        // runs past the wave's end, and a pad held and let go has the seek stop there (0x8950fed0, 0x89510bf0)
+        const bool farCase = !sweep && !twoInTick && g % 23 == 7 && wv && r.one(2);
+        if (farCase) {
+            ctl.on = ctl.tempoSync = ctl.timeTrip = ctl.beatKeep = true;
+            ctl.loop = false;
+            ctl.origTempo = 400000;
+            ctl.patchTempo = 2500;
+            ctl.clockSource = 0;
+        }
         if (sweep) {
             // analog on both OSCs, all the envelopes and LFOs bound and running, a
             // portamento gliding: whatever a field moves can be seen
@@ -967,7 +1028,7 @@ int XtToneProbe::run(int argc, char** argv) {
             ctl.lfoKeySync = ctl.osc2.lfoKeySync = ctl.cosm[0].lfoKeySync = ctl.cosm[1].lfoKeySync = ctl.tvaLfoKeySync = false;
         }
         const int secondAt = twoInTick ? -1 : sweep ? 1 : followCase ? r.range(3, 12) : kind && raw[0] != raw[1] ? r.range(1, 30) : -1;
-        const int offAt[2] = { twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 3 : 1000) : 20 + r.range(0, 40), twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
+        const int offAt[2] = { twoInTick || farCase ? 1000 : sweep ? (sweepStage == 3 ? 3 : 1000) : 20 + r.range(0, 40), twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
         const int liveAt = twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : followCase ? r.range(1, secondAt - 1) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
         const int followAt = followCase ? secondAt + r.range(1, 8) : -1;
         // the free-running LFOs' phases, once a note has shown which objects they are
@@ -977,15 +1038,35 @@ int XtToneProbe::run(int argc, char** argv) {
             const float a = fw.f32(fwFree[n] + 0x10), b = n == 2 ? syn.freeTlfo.phase() : n ? syn.freeLfo2.phase() : syn.freeLfo.phase();
             if (!bits(a, b)) rep.bad("free lfo " + std::to_string(kFreeLfo[n]) + " phase", "fw %.9g port %.9g", a, b, -2);
         }
+        // The host's transport, for Clock Source EXTERNAL.  Its tempo, past the firmware's limits in some, and perhaps
+        // changing in the note; where it stands; how often it says so, its block's length; a locate or a loop's end; a stretch
+        // where it says it is moving and stands still, in which no clock comes; and a stop, in which the clock runs on at the tempo.
+        const auto drawBpm = [&r]() { return r.one(3) ? 120.0 : r.one(6) ? (double)r.range(2400, 4000) / 10.0 : (double)r.range(2000, 25000) / 100.0; };
+        double hostBpm = drawBpm(), hostPpq = (double)r.range(-16, 3840) / 16.0;
+        const int hostEvery = r.one(2) ? 1 : r.range(2, 40), hostJump = r.one(4) ? r.range(0, 100) : -1, hostChange = r.one(4) ? r.range(0, 100) : -1;
+        const int hostStill = r.one(6) ? r.range(0, 60) : -1, hostStillLen = r.range(1, 120), hostStop = r.one(6) ? r.range(0, 60) : -1, hostStopLen = r.range(1, 120);
+        const auto hostMoves = [&](int blk) {
+            if (blk == hostJump) hostPpq = (double)r.range(0, 3840) / 16.0;
+            if (blk == hostChange) hostBpm = drawBpm();
+            if (blk % hostEvery == 0 || blk == hostJump) syn.hostClock(hostBpm, !(hostStop >= 0 && blk >= hostStop && blk < hostStop + hostStopLen), hostPpq);
+            if (!(hostStill >= 0 && blk >= hostStill && blk < hostStill + hostStillLen)) hostPpq += 32.0 / 44100.0 * hostBpm / 60.0;
+        };
+        syn.hostClock(hostBpm, true, hostPpq);
         // time with nothing sounding: the free-running LFOs run on
         for (int i = r.range(0, 30); i > 0; --i) {
-            for (int k = syn.clocksDue(); k > 0; --k) if (!fw.clock((uint32_t)(syn.hostFrames / 32))) return 1;
+            if (!fwClocks()) return 1;
             if (syn.tickCount >= 441 && !fw.tickFree()) return 1;
             syn.render(L, R, 32);
         }
         syn.setControls(ctl);
         fw.par = patchOf(ctl);
         if (!fw.updatePatch()) return 1;
+        // The last count of six clocks, which a case is mostly too short to reach: the readers' limits and their ends
+        if (ctl.clockSource && r.one(4)) {
+            static constexpr int kSixes[] = { 1, 59, 60, 61, 125, 749, 750, 751, 3000, 65535 };
+            syn.clockSix = r.one(2) ? kSixes[r.range(0, 9)] : r.range(1, 65535);
+            fw.c.wr16(kClockObj + 0x48, (uint16_t)syn.clockSix);
+        }
         fw.bender = r.one(3) ? r.range(0, 16383) : 8192;
         syn.pitchBend(fw.bender);
         // the controllers the TVA reads: at rest in most cases, or a sweep's move would be hidden
@@ -1227,12 +1308,12 @@ int XtToneProbe::run(int argc, char** argv) {
             compareAll(blk);
             return true;
         };
-        const bool tripCase = sweepOn || (!sweep && !twoInTick && r.one(3));
+        const bool tripCase = sweepOn || farCase || (!sweep && !twoInTick && r.one(3));
         const int tripFrom = sweepOn ? 5 : tripCase ? r.range(0, 40) : -1, tripRadius = r.range(10, 63);
-        const int tripLen = sweepOn ? liveAt + 5 : r.one(2) ? r.range(0, 60) : r.range(60, 300), tripMoves = sweepOn ? 8 : r.one(2) ? tripLen : r.range(1, 40);
+        const int tripLen = sweepOn ? liveAt + 5 : farCase ? r.range(200, 500) : r.one(2) ? r.range(0, 60) : r.range(60, 300), tripMoves = sweepOn ? 8 : r.one(2) ? tripLen : r.range(1, 40);
         const float tripTurn = (r.one(2) ? 1.0f : -1.0f) * (float)r.range(1, 60) * 0.0125f;   // radians a block
         const int tripBack = r.one(4) ? r.range(3, 20) : 0;
-        const int tripJump = !sweepOn && r.one(4) ? r.range(1, 2) : 0, tripFirst = sweepOn ? 0 : r.range(0, 2), tripLift = sweepOn ? 0 : r.range(0, 2), tripAgain = !sweepOn && r.one(2) ? r.range(1, 40) : -1;
+        const int tripJump = !sweepOn && r.one(4) ? r.range(1, 2) : 0, tripFirst = sweepOn ? 0 : r.range(0, 2), tripLift = sweepOn || farCase ? 0 : r.range(0, 2), tripAgain = !sweepOn && !farCase && r.one(2) ? r.range(1, 40) : -1;
         float tripAngle = (float)r.range(0, 628) * 0.01f;
 
         for (FwNote& n : fn) { n.vi = -1; n.live = n.released = n.ended = false; }
@@ -1244,8 +1325,9 @@ int XtToneProbe::run(int argc, char** argv) {
         if (!startNote(0, -1)) return 1;
         keyDown[0] = true;
         if (dumpWhich && (dumpWhich[0] == 'a' || std::atoi(dumpWhich) == g))
-            std::printf("case %d kind %d keys %d %d vel %d %d wave %d: osc1 on %d wave %d, osc2 on %d wave %d; cosm %d %d, %d %d; second at %d, off at %d %d, live at %d; mod %d type %d level %d a %d r %d, ch %d\n", g, kind, raw[0], raw[1], vel[0], vel[1], wv ? wv->type : 0, ctl.on, ctl.ana.wave,
-                        ctl.osc2.on, ctl.osc2.ana.wave, ctl.cosm[0].on, ctl.cosm[0].type, ctl.cosm[1].on, ctl.cosm[1].type, secondAt, offAt[0], offAt[1], liveAt, ctl.mod.on, ctl.mod.type, ctl.mod.level, ctl.mod.attack, ctl.mod.release, wv ? wv->channels : 0);
+            std::printf("case %d kind %d keys %d %d vel %d %d wave %d: osc1 on %d wave %d, osc2 on %d wave %d; cosm %d %d, %d %d; second at %d, off at %d %d, live at %d; mod %d type %d level %d a %d r %d, ch %d; wave 2 %d ch %d; clock %d tempo %d, host %.2f; sync %d %d, trip %s from %d len %d\n", g, kind, raw[0], raw[1], vel[0], vel[1], wv ? wv->type : 0, ctl.on, ctl.ana.wave,
+                        ctl.osc2.on, ctl.osc2.ana.wave, ctl.cosm[0].on, ctl.cosm[0].type, ctl.cosm[1].on, ctl.cosm[1].type, secondAt, offAt[0], offAt[1], liveAt, ctl.mod.on, ctl.mod.type, ctl.mod.level, ctl.mod.attack, ctl.mod.release, wv ? wv->channels : 0,
+                        wv2 ? wv2->type : 0, wv2 ? wv2->channels : 0, ctl.clockSource, ctl.patchTempo, hostBpm, ctl.tempoSync, ctl.osc2.tempoSync, tripCase ? "on" : "off", tripFrom, tripLen);
         bool over = false, leftOff = false;
         for (int blk = 0; blk < nBlocks && !over; ++blk) {
             if (blk == secondAt) { if (!startNote(1, blk)) return 1; keyDown[1] = true; }
@@ -1329,9 +1411,10 @@ int XtToneProbe::run(int argc, char** argv) {
                     if (!padTo(x, y, blk)) return 1;
                 }
             }
+            hostMoves(blk);
             const bool tick = syn.tickCount >= 441;
             fw.frames = syn.hostFrames;
-            for (int k = syn.clocksDue(); k > 0; --k) if (!fw.clock((uint32_t)(syn.hostFrames / 32))) return 1;
+            if (!fwClocks()) return 1;
             if (tick && !fw.tickFree()) return 1;
             // in XtSynth's voice order, so that the last rendered is the same on both sides
             FwNote* order[2] = { &fn[0], &fn[1] };
@@ -1346,6 +1429,9 @@ int XtToneProbe::run(int argc, char** argv) {
             }
             syn.render(L, R, 32);
             ++blocks;
+            ++rep.checks;
+            if ((fw.c.rd8(kClockObj + 0x40) != 0) != syn.clockExt) rep.bad("clock source", "fw %.0f port %.0f", fw.c.rd8(kClockObj + 0x40), syn.clockExt, blk);
+            if (syn.clockExt) clockFields(syn, blk);
             if (leftMemory) {                            // a player's read outside all memory: the note ends here
                 ++wild;
                 leftOff = true;
@@ -1461,6 +1547,163 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         std::printf("tone, the clock's rate: 5 tempos, 2 minutes each, %ld clocks\n", all);
         summary("tone, the clock's rate");
+    }
+    // The outside clock alone, on what no transport gives: clocks in no time, and long silences.  The firmware's
+    // F8 and timer routines against the port's, and one clock to an F8: its ticks on to the next 20 (0x894d4210).
+    {
+        XtSynth clk;
+        clk.prepare(44100.0);
+        Ctl c;
+        c.clockSource = 1;
+        clk.hostClock(120.0, false, 0.0);
+        clk.setControls(c);
+        if (!fw.clockSource(0) || !fw.clockSource(1)) return 1;
+        clockFields(clk, 0);
+        long f8s = 0;
+        const auto silence = [&](int ms, int at) {
+            for (int k = 0; k < ms; ++k) { if (!fw.timer()) return false; clk.clockMs(); }
+            clockFields(clk, at);
+            return true;
+        };
+        for (int i = 0; i < 600; ++i) {
+            rep.caseNo = i;
+            const int kind = r.range(0, 9);
+            // (and a stretch with no ms at all, so that a count of six takes none)
+            if (!silence(i >= 400 && i < 414 ? 0 : kind < 3 ? 0 : kind < 6 ? r.range(0, 3) : kind < 9 ? r.range(0, 900) : r.range(1000, 5000), i)) return 1;
+            // the count's end, a ms at a time: it gives up 65536 ms into a count
+            if (i == 300 && (!silence(0xffff - clk.clockSince, i) || !silence(1, i) || !silence(1, i))) return 1;
+            const uint32_t from = fw.c.rd32(kClockObj + 0x28);
+            if (!fw.clockIn()) return 1;
+            clk.clockIn();
+            ++f8s;
+            clockFields(clk, i);
+            const uint32_t to = fw.c.rd32(kClockObj + 0x28);
+            ++rep.checks;
+            if (to % 20 != 0 || to == from || to - from > 20) rep.bad("an F8's ticks", "from %.0f to %.0f", (double)from, (double)to, i);
+        }
+        std::printf("tone, an outside clock alone: %ld F8s\n", f8s);
+        summary("tone, an outside clock alone");
+    }
+    // The host's transport to the clocks.  The firmware has no say in this, so against where the transport says it is.
+    {
+        std::vector<float> hl(4096), hr(4096);
+        long all = 0;
+        const auto start = [](XtSynth& clk, double rate, double bpm, double ppq) {
+            clk.prepare(rate);
+            Ctl c;
+            c.clockSource = 1;
+            clk.hostClock(bpm, true, ppq);
+            clk.setControls(c);
+        };
+        rep.caseNo = 0;
+        for (const double rate : { 44100.0, 48000.0 })
+            for (const int hb : { 441, 4096 })
+                for (const double bpm : { 20.5, 97.3, 120.0, 120.5, 300.0 }) {
+                    ++rep.caseNo;
+                    const double perBlock = (double)hb / rate * bpm / 60.0;     // quarter notes
+                    const int nb = (int)(20.0 * rate / hb);
+                    {   // Running: the clocks it passes, and no correction to speak of at each block, whatever the frames waiting
+                        XtSynth clk;
+                        const double from = 3.3;
+                        start(clk, rate, bpm, from);
+                        const int64_t done = clk.hostDone;
+                        double ppq = from;
+                        for (int b = 0; b < nb; ++b) {
+                            const double was = clk.hostAt;
+                            clk.hostClock(bpm, true, ppq);
+                            ++rep.checks;
+                            if (b && std::fabs(clk.hostAt - was) > 1e-6) rep.bad("host: where a block is", "said %.6f had %.6f", clk.hostAt, was, b);
+                            clk.render(hl.data(), hr.data(), hb);
+                            ppq += perBlock;
+                        }
+                        const double exact = std::floor(ppq * 24.0) - std::floor(from * 24.0), got = (double)(clk.hostDone - done);
+                        all += clk.hostDone - done;
+                        ++rep.checks;
+                        if (std::fabs(exact - got) > 2.0) rep.bad("host: clocks running", "transport %.0f port %.0f", exact, got, 0);
+                    }
+                    {   // Stopped: the clocks run on at the tempo, and go on at the last it told
+                        XtSynth clk;
+                        start(clk, rate, bpm, 0.0);
+                        const int64_t done = clk.hostDone;
+                        for (int b = 0; b < nb; ++b) {
+                            clk.hostClock(b % 2 ? bpm : 0.0, false, 12345.0);
+                            clk.render(hl.data(), hr.data(), hb);
+                        }
+                        const double exact = (double)nb * perBlock * 24.0, got = (double)(clk.hostDone - done);
+                        ++rep.checks;
+                        if (std::fabs(exact - got) > 2.0) rep.bad("host: clocks stopped", "tempo %.0f port %.0f", exact, got, 0);
+                    }
+                    {   // A loop's end and a locate: what it passes gives no clocks, a block never has more than it should
+                        XtSynth clk;
+                        start(clk, rate, bpm, 8.0);
+                        double ppq = 8.0, exact = 0.0;
+                        int64_t done = clk.hostDone;
+                        for (int b = 0; b < nb; ++b) {
+                            if (b % 50 == 49) { ppq = b % 100 == 99 ? 8.0 : ppq + 1000.0; done = (int64_t)std::ceil(ppq * 24.0) - 1; }
+                            clk.hostClock(bpm, true, ppq);
+                            const int64_t was = clk.hostDone;
+                            clk.render(hl.data(), hr.data(), hb);
+                            const double should = std::floor((ppq + perBlock) * 24.0) - (double)done;
+                            ++rep.checks;
+                            if (std::fabs((double)(clk.hostDone - was) - should) > 2.0) rep.bad("host: clocks in a block", "transport %.0f port %.0f", should, (double)(clk.hostDone - was), b);
+                            ppq += perBlock;
+                            done = (int64_t)std::floor(ppq * 24.0);
+                            exact += should;
+                        }
+                    }
+                }
+        // The tempo the converters read: on average the transport's, and never more than the blocks and the ms can take it from there
+        for (const double bpm : { 25.0, 97.3, 120.0, 120.5, 174.0, 233.0, 249.0 }) {
+            ++rep.caseNo;
+            XtSynth clk;
+            start(clk, 44100.0, bpm, 0.0);
+            double ppq = 0.0, sum = 0.0, worst = 0.0;
+            long counts = 0;
+            const double exact = 15000.0 / bpm;
+            for (int b = 0; b < 82688; ++b) {            // a minute
+                if (b % 16 == 0) clk.hostClock(bpm, true, ppq);
+                const bool due = clk.clocksDue() > 0;
+                clk.render(L, R, 32);
+                ppq += 32.0 / 44100.0 * bpm / 60.0;
+                if (due && clk.clockSeen == 0 && counts++ > 0) {
+                    sum += clk.clockSix;
+                    worst = std::max(worst, std::fabs((double)clk.clockSix - exact));
+                }
+            }
+            rep.checks += 2;
+            if (worst > 3.0) rep.bad("host: a count of six", "exact %.3f off by %.3f", exact, worst, 0);
+            if (std::fabs(sum / (double)(counts - 1) - exact) > 0.002 * exact) rep.bad("host: the count's mean", "exact %.3f port %.3f", exact, sum / (double)(counts - 1), 0);
+            if (std::getenv("XT_TONE_HOST")) std::printf("  host %.1f BPM: six %.3f ms, mean %.3f, worst off %.3f, reads %d\n", bpm, exact, sum / (double)(counts - 1), worst, clk.tempo10Now());
+        }
+        {   // No tempo told: INTERNAL, as if Clock Source were; the first tempo goes EXTERNAL, as at the object's start; the source back again
+            XtSynth clk;
+            clk.prepare(44100.0);
+            Ctl c;
+            c.clockSource = 1;
+            c.patchTempo = 900;
+            clk.hostClock(0.0, true, 16.0);
+            clk.setControls(c);
+            rep.checks += 6;
+            if (clk.clockExt) rep.bad("host: no tempo", "ext %.0f want %.0f", clk.clockExt, 0, 0);
+            if (clk.tempo10Now() != 900) rep.bad("host: no tempo's reading", "port %.0f want %.0f", clk.tempo10Now(), 900, 0);
+            clk.render(L, R, 32);
+            clk.hostClock(180.0, true, 16.0);
+            if (!clk.clockExt) rep.bad("host: its first tempo", "ext %.0f want %.0f", clk.clockExt, 1, 0);
+            if (clk.tempo10Now() != 1200) rep.bad("host: its first reading", "port %.0f want %.0f", clk.tempo10Now(), 1200, 0);
+            if (clk.hostDone != 383) rep.bad("host: where it starts", "port %.0f want %.0f", (double)clk.hostDone, 383, 0);
+            c.clockSource = 0;
+            clk.setControls(c);
+            if (clk.clockExt || clk.tempo10Now() != 900) rep.bad("host: back to INTERNAL", "ext %.0f reads %.0f", clk.clockExt, clk.tempo10Now(), 0);
+            // Going EXTERNAL after the transport has run on with nothing taking its clocks: none for that time
+            clk.hostClock(120.0, false, 0.0);
+            for (int b = 0; b < 2000; ++b) clk.render(L, R, 32);
+            c.clockSource = 1;
+            clk.setControls(c);
+            ++rep.checks;
+            if (clk.clocksDue() > 1) rep.bad("host: going to it", "clocks due %.0f want %.0f", clk.clocksDue(), 1, 0);
+        }
+        std::printf("tone, the host's clock: %ld clocks\n", all);
+        summary("tone, the host's clock");
     }
     return total ? 3 : 0;
 }

@@ -514,6 +514,14 @@ int main(int argc, char** argv) {
         refCtl.oAttack = std::atoi(e);
         setKnobs({ { "oscEnvAttack", refCtl.oAttack } });
     }
+    // TEST_HOST="bpm,ppq,moving": Clock Source HOST on a host's transport at that tempo, from that position, in quarter notes
+    double hostBpm = 0.0, hostPpq = 0.0;
+    int hostMoving = 1;
+    if (const char* e = std::getenv("TEST_HOST")) {
+        std::sscanf(e, "%lf,%lf,%d", &hostBpm, &hostPpq, &hostMoving);
+        refCtl.clockSource = 1;
+        setKnobs({ { "clockSource", 1 } });
+    }
     // TEST_MOD="type,level,attack,release": the MOD on, Type 0 MIX, 1 RING, 2 FM, 3 ENV RING, 4 OSC SYNC
     if (const char* e = std::getenv("TEST_MOD")) {
         refCtl.mod.on = true;
@@ -643,7 +651,22 @@ int main(int argc, char** argv) {
         const juce::StringArray w = juce::StringArray::fromTokens(e, ",", "");
         for (int i = 0; i + 1 < w.size(); i += 2) trips.push_back({ w[i].getIntValue(), w[i + 1].getIntValue() / block * block });
     }
+    struct Head : juce::AudioPlayHead {
+        double bpm = 0.0, ppq = 0.0;
+        bool moving = false;
+        juce::Optional<PositionInfo> getPosition() const override {
+            PositionInfo i;
+            i.setBpm(bpm);
+            i.setPpqPosition(ppq);
+            i.setIsPlaying(moving);
+            return i;
+        }
+    } head;
+    if (hostBpm > 0.0) p.setPlayHead(&head);
     for (int done = 0; done < total; done += block) {
+        head.bpm = hostBpm;
+        head.ppq = hostPpq + (double)done / rate * hostBpm / 60.0;
+        head.moving = hostMoving != 0;
         for (const auto& t : trips)
             if (t.second == done) {
                 setKnobs({ { "timeTrip", t.first } });
@@ -658,6 +681,7 @@ int main(int argc, char** argv) {
         p.processBlock(buf, midi);
         juce::ScopedNoDenormals ftz;   // processBlock runs with denormals flushed (as the SH-4 does, FPSCR.DN = 1)
         if (std::getenv("TEST_CONTROLS")) ref.setControls(refCtl);   // as processBlock does each block
+        if (hostBpm > 0.0) ref.hostClock(head.bpm, head.moving, head.ppq);
         if (done == 0) { ref.render(rl.data(), rr.data(), 100); ref.noteOn(note, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + 100, rr.data() + 100, block - 100); }
         else if (done == offBlock) { ref.render(rl.data(), rr.data(), offAt); ref.noteOff(note, 100 / 127.0f); ref.render(rl.data() + offAt, rr.data() + offAt, block - offAt); }
         else if (done == n2Block) { ref.render(rl.data(), rr.data(), n2At); ref.noteOn(note2, (float)noteVel * (1.0f / 127.0f)); ref.render(rl.data() + n2At, rr.data() + n2At, block - n2At); }

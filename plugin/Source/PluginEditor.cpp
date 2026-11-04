@@ -197,7 +197,10 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         b->setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
         addAndMakeVisible(*b);
     }
-    for (juce::Label* l : { &patchTempoLabel_, &tripLabel_, &origTempoLabel_ }) styleSmall(*l);
+    for (juce::Label* l : { &patchTempoLabel_, &tripLabel_, &origTempoLabel_, &clockLabel_ }) styleSmall(*l);
+    clockBox_.addItemList({ "INTERNAL", "HOST" }, 1);
+    addAndMakeVisible(clockBox_);
+    clockAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(processor_.apvts, "clockSource", clockBox_);
     patchTempoAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "patchTempo", patchTempoSlider_);
     tripAtt_       = std::make_unique<SliderAtt>(processor_.apvts, "timeTrip", tripSlider_);
     origTempoAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "origTempo", origTempoSlider_);
@@ -952,7 +955,9 @@ void VSynthEmuEditor::resized() {
     octLabel_.setBounds(row3k.removeFromLeft(36));
     octSlider_.setBounds(row3k.removeFromLeft(200));
     xt.removeFromTop(6);
-    auto row3t = xt.removeFromTop(24);               // the tempo: the Patch Tempo, the Time Trip knob
+    auto row3t = xt.removeFromTop(24);               // the tempo: Clock Source, the Patch Tempo, the Time Trip knob
+    clockLabel_.setBounds(row3t.removeFromLeft(36));
+    clockBox_.setBounds(row3t.removeFromLeft(104).withTrimmedRight(8));
     const int tw = row3t.getWidth() / 2;
     auto tl = row3t.removeFromLeft(tw);
     patchTempoLabel_.setBounds(tl.removeFromLeft(42));

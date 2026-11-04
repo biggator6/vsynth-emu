@@ -1547,9 +1547,67 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The host's tempo, by the firmware's external clock (2026-11-04, v125)
+
+A new parameter, Clock Source, picks INTERNAL, the Patch Tempo, or HOST. HOST is the firmware's Clock Source EXTERNAL, with the host's transport standing in for the MIDI clock. Feeding the host's BPM in as the Patch Tempo would have been shorter, but the object keeps whole BPM, so at 120.5 a part drifts against the song, by a quarter note every two minutes. The default is INTERNAL, and at it nothing moves: A/B 4/4 identical to v118.
+
+**What the firmware does.** ID 0x41, 0 INTERNAL, 1 EXTERNAL, default 0. (ID 0x7d, External Clock Source, picks MIDI or USB, which means nothing here.) `0x89471e30`, flag 0x40 of the clock's task, just ahead of the Patch Tempo (`0x89471ef0`), takes it to the object at `0x89979bfc`.
+- Going EXTERNAL: +0x40 = 1, +0x41 = −1, +0x46 = 0, +0x48 = 125, +0x4a = 0, and the object goes on the list at `0x8997685c` (`0x8946ebb0`). Going back: off the list (`0x8946ec00`), +0x40 = 0. Sent where it already is, it does nothing. The Patch Tempo goes on being written to +0x14, unread.
+- An F8 (`0x894712f0`, +0x20 of the object's vtable): the ticks +0x28 go on to the next 20, +0x4a = 0, +0x41 + 1. At 6: +0x41 = 0, +0x48 = +0x46 (1 if that is 0), +0x46 = 0. All of it only with +0x40 set and +0xe clear; +0xe is the song player's (`0x89471be0`), and nothing here sets it.
+- Each ms (`0x894710e0`), with +0x40 set and +0xe clear: while +0x46 is below +0x48, +0x4a += 0x7800/(+0x48), and the ticks are the last 20 plus (+0x4a >> 8), as long as that is under 20. So between F8s the ticks run at the measured rate and stop short of the next 20. Only an F8 gets there: one clock to an F8, at the timer's next ms.
+- The same routine's end, on either side: if +0x41 ≥ 0, +0x46 + 1, and at 65535 before that, +0x41 = −1 and +0x46 = 0. So a count is given up after 65536 ms short of six clocks.
+- The readers (`0x894e2d20`, `0x894e1880`, `0x894e3790`, and the envelopes' `0x894df4e0`) branch on +0x40: t10 = 150000/(+0x48), the milliseconds over six clocks being a sixteenth. Then the limits as ever: under 200 it is 20, over 2500 it is 250.
+
+`XtSynth::clockFollow`, `clockIn`, `clockMs`, `tempo10Now`. The ticks and +0x4a aren't kept, as they can't make a clock.
+
+**The host.** `XtSynth::hostClock(bpm, moving, ppq)`, from the processor before each host block is rendered.
+- A clock falls on each 24th of a quarter the transport passes. `hostAt` is where the next block's first frame will sound, in clocks: `ppq` plus the frames between the read position and that block, so it holds at any host rate and host block length. Each block moves it on by the tempo, and each host block sets it again. A clock falls on the block it lands in, ahead of the tone update, as on the Patch Tempo.
+- A move of more than one clock is a locate or a loop's end: what it passed gives no clocks. A clock exactly where it lands is given.
+- A transport that isn't moving, or tells no position: the clocks run on at its tempo. That one is a choice, not the firmware's. Most sequencers' MIDI clock stops with the transport, and on an XT an LFO on a note value would then stand still and a Tempo Sync wave would stop. A plugin is played on a stopped transport all the time.
+- No tempo told, as in the Standalone: INTERNAL, whatever Clock Source says, until the first. A later block with none keeps the last.
+- The timer is on the audio's clock, 44.1 frames to the ms. In a block its ms come first, then the clocks.
+
+**What follows, all the firmware's own.**
+- The tempo read is whole ms over six clocks, so it steps. At 120.5 BPM six clocks are 124.48 ms, which reads 120.9 or 120.0. At 233, 234.3 or 230.7. Clocks don't depend on it. It is what a note reads when it starts: its envelopes' note values, an LFO's first step, the factor a player starts from, which the clocks then correct.
+- It reads 120 until the first count of six is done, seven clocks in. The clock runs on when the transport stops, so that is only just after going to EXTERNAL.
+- Here the F8s fall on block starts, 0.73 ms apart, which adds to the steps. Over a minute a count was at worst 1.4 ms from exact (at 233 BPM), and on average exact.
+- Past the limits the reading is far off: over 250 BPM it reads 25.0, and under 20 it reads 2.0. Tempo Sync and an LFO follow the clocks all the same, but an envelope's note value is ten times too long or more.
+
+**The check.** `xt_tone` draws Clock Source in a third of the cases, and moves it live with the other controls, in the sweep as well. The firmware runs its own `0x89471e30`, F8 routine and timer routine; the port's clocks say when, and the harness counts the ms itself from its frames. At each block it compares +0x40, and when EXTERNAL +0x41, +0x46 and +0x48. Everything a note reads goes through the firmware's own readers, and is compared as before. The draws:
+- the host's tempo, 120 in a third, 240 to 400 BPM in some, otherwise 20 to 250, and in a quarter of the cases changing in the note;
+- its block's length, a locate or loop's end in a quarter, a stretch in a sixth where it says it is moving and stands still, so no clocks come and an LFO waits, and a stop in a sixth;
+- +0x48 itself in a quarter of the EXTERNAL cases, on both sides, since a count of six at 20 BPM takes longer than most cases: 1, 59, 60, 61, 125, 749, 750, 751, 3000, 65535, or any.
+
+Two new sections after the cases.
+- *An outside clock alone* runs the firmware's F8 and timer routines against the port's, on what no transport gives: clocks in no time, silences of up to five seconds, and a count's end a ms at a time, with the fields compared after each. Each F8 has to leave the ticks on the next 20, at most 20 on from where they were.
+- *The host's clock* has no firmware to compare with, so it is against where the transport says it is, at 44.1 and 48 kHz, host blocks of 441 and 4096 frames and five tempos: the clocks over 20 seconds running and stopped, within 2; no correction above 1e-6 of a clock at any host block; a loop's end and a locate giving no burst. Over a minute at seven tempos, the count of six within 3 ms of exact at all times and within 0.2% on average; it comes out equal to three decimals. Then no tempo told, the first tempo, going back to INTERNAL, and going EXTERNAL after the clock has run on.
+
+**The result.** fcheck: 2000 cases and the sweep, 3390 notes, 1393 taken by a sounding tone, 415 truncated, 275,485 blocks, 11.0 million checks, 0 different; a wave on OSC 2, 1402 notes, 117,904 blocks, 4.7 million checks, 0 different; the outside clock alone, 600 F8s; the host's clock, 21,041 clocks; both 0 different. `fcheck.sh --update` adds those two sections' lines and changes only `xt_tone`'s count lines. A/B 4/4 identical to v118. PluginTest 4/4 bit-identical at the defaults, and on a play head in three settings, moving and stopped, with Tempo Sync, an LFO and an attack on note values. 3000 cases and the sweep on seeds 2007, 90210, 55555, 777, 4242 and 1234: 0 different.
+
+Seeds 31337 and 9 each give one case past `kSoloTol`, on a stereo SOLO wave on OSC 2. 31337, case 4717: 13 blocks under a held pad, with no Tempo Sync on it. 9, case 4556: one block, Clock Source INTERNAL as the note starts, no Tempo Sync or pad on it. To see whether they were `XtSoloVoice`'s or this version's, I put v122's SOLO player (branch `claude/practical-panini-d494b9`) under this version in a scratch copy, its one conflict resolved by giving its `walkBlock` the beat (`beat_.block(flags0, walk, lp)`). There seeds 31337, 9 and 2024 at 3000 cases are 0 different, with a SOLO wave's buffers within 0.0e+00 of the block's peak, the beat, the seeks and the outside clock included. So they are the player's known inexactness, and the two branches agree where they meet. That scratch copy isn't this commit, and the merge is still to be done.
+
+**Planted errors.** `tone_muts.txt` gains 37, and `tempo-readback` follows the text it plants in: 413 in all, all caught at 2000 cases.
+- `follow-start` got through at first, which was the test's fault: it went EXTERNAL just after moving the transport, whose new position reset the count first. It now goes EXTERNAL after the clock has run on with nothing taking it.
+- New draws lost `tvag-done-r` and `solo-seek-clamp`, which had only ever been caught by chance (cases 884 to 3155, 151 to 2538). On other seeds `tvag-done-r` was missed outright. Each now has a draw of its own, which finds it by case 283 and 513 on five seeds.
+- `tvag-done-r` needs an envelope to end with one channel's gain at 0 and the other's above 2^−16. The envelope's last step is usually far smaller than that. It is largest at Release 16 with a Sustain above about 70, so that is the draw, under LFO 5 on a square at full Pan Depth.
+- `solo-seek-clamp` needs a seek past the wave's end. A long note under Tempo Sync, at Patch Tempo 250 and Original Tempo 40, with no loop, gets its beat position there, and a pad held 200 to 500 blocks and let go does the seek.
+
+**What it does.** A wave of a burst every half second, Tempo Sync on, Original Tempo 120, on all three types, 6 seconds. The bursts come every 0.25 s at a host's 240, 0.617 s at 97.3, 0.460 s at 130.5 (at 48 kHz, starting at quarter note 3.25), 0.333 s at 180 on a stopped transport, and 1 s at 60 with the Patch Tempo at 240. The measured period is within 0.1% of that on every type, and no burst is more than 20 ms off its grid. With Tempo Sync off a host's 240 changes nothing. At host 60 and Patch 60 the bursts fall on the same times after the first. That is the port's render, not the XT's.
+
+**The plugin.** Parameter `clockSource`, INTERNAL or HOST, in a Clock box at the start of the tempo row. The processor reads the play head's tempo, position and whether it is playing. CLI `XT_HOST="bpm[,ppq[,moving]]"`, PluginTest `TEST_HOST="bpm,ppq,moving"`, which gives the processor a play head.
+
+**Not covered.**
+- A real XT, or a real MIDI clock.
+- How an F8 reaches `0x894712f0` from MIDI IN or USB, and ID 0x7d. Past the object's list this wasn't traced. The manual says EXTERNAL follows an outside sequencer's clock.
+- The clock's phase within an F8's interval. The timer that makes a clock (`0x894d4210`) comes round every 20 ticks from wherever it started, which need not be on the object's 20s, so on the XT it may fall part way between two F8s. One to an F8 all the same.
+- MIDI Start, Stop and Continue. Nothing in the clock's object looks at them. A song's start (`0x89471be0`) does reset it, which isn't followed.
+- Clock Source moved during a note makes a tone update here, as any control does. On the XT it is a system parameter, and I didn't check that it does.
+- A host's tempo for the effects, with the effects.
+- Hosts themselves. This has only run with PluginTest's play head, and not in a DAW.
+
 ### Tempo sync and Time Trip (2026-11-04, v118)
 
-The Patch Tempo, the note values on envelope times and LFO rates, each PCM OSC's Tempo Sync, and the Time Trip pad with its Switch and Beat Keep are ported, with parameters and rows in the editor. The tempo is the Patch Tempo, the firmware's Clock Source INTERNAL; following the host's tempo is left for the user to decide. At the defaults nothing moves: `ab.sh` 4/4 identical to v114.
+The Patch Tempo, the note values on envelope times and LFO rates, each PCM OSC's Tempo Sync, and the Time Trip pad with its Switch and Beat Keep are ported, with parameters and rows in the editor. The tempo is the Patch Tempo, the firmware's Clock Source INTERNAL; following the host's tempo was left for the user to decide (since v125, Clock Source HOST). At the defaults nothing moves: `ab.sh` 4/4 identical to v114.
 
 **The tempo.** ID 0x11d is BPM × 10, 200…2500, default 1200. `0x89471ef0` (flag 0x40 of the clock's task) takes it to the object at `0x89979bfc`, whose constructor `0x894714b0` leaves +0x10 = 20 and +0x14 = 500.
 - +0x14 = 3000·(+0x10)/(t/10), the milliseconds of a quarter, so the tenths are dropped.
@@ -1557,7 +1615,7 @@ The Patch Tempo, the note values on envelope times and LFO rates, each PCM OSC's
 - The envelopes' input +0x18 takes t10 at a note's start only (`0x894df4e0`). Their update (`0x894df600`) and legato (`0x894df5e0`) do not read it.
 
 **The clock.**
-- `0x89471030` runs each millisecond: `0x894710e0` adds 24 at +0x1c, and +0x28 counts ticks, Δ·(+0x10)/(+0x14) with the remainder kept at +0x2c. So 480 ticks to the quarter. The other branch, with +0x40 set, runs from +0x46…+0x4a: the external clock, not followed here.
+- `0x89471030` runs each millisecond: `0x894710e0` adds 24 at +0x1c, and +0x28 counts ticks, Δ·(+0x10)/(+0x14) with the remainder kept at +0x2c. So 480 ticks to the quarter. The other branch, with +0x40 set, runs from +0x46…+0x4a: the external clock (since v125).
 - Flag 2 of task `0x89471ce0` → `0x894710b0` → the OS's timers (`0x8930eb00`, in tempo ticks) → `0x894d4210` every 20 ticks → flag 0x10 of task `0x894d4020` → `0x894f4da0`. So 24 clocks to the quarter.
 - `0x894f4da0`: dt = (blocks `0x8987c7a8` − last `0x8987c7a4`)·0.000726, and 0.000726 if that is 0. Then the free LFOs on its list (`0x894f17c0`), and each tone: slot +0x24 (`0x894f78a0` → `0x894f0fd0` on its eight LFOs), slot +0x30 (`0x894f78f0` → `0x894f2540(voice, 1)`: if voice +0xd4 & 2, the byte +0x114 + 1).
 - `XtSynth::clockPeriod`, `clocksDue`, `clockTick`. The clock falls on a block's start, ahead of the tone update. On the XT it is a task of its own, so that order is a choice; see "Not covered".
@@ -1664,7 +1722,7 @@ Time Trip is a plain knob for now (`XtSynth::timeTripKnob`): 0 lifted, 1…127 a
 **Not covered.**
 - A real XT.
 - The clock's phase. On the XT the clock is a timer's and the blocks the audio's, so a clock falls anywhere against a block and against the tone update's task. Here it falls on a block's start, ahead of the update, on both sides of the check. The rate is checked, the phase is not.
-- An external or MIDI clock (the other branch of `0x894710e0`), the host's tempo, and MFX tempo, with the effects.
+- An external or MIDI clock (the other branch of `0x894710e0`; the host's tempo goes down it since v125), and MFX tempo, with the effects.
 - Playback Mode other than the default, and Vari off.
 - The pad by anything but its two controllers: the D Beam's rotation (`0x894d8160`), and the TRIP-R matrix source (`0x894e6c60`). Hold and Pad Mode: the object's +8 is all this reads.
 - A third note: the check plays two, so a legato on a note following another tone's LFO is not reached. That is why `lfo-upd-legato` is not in the list.
