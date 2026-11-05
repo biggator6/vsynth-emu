@@ -90,6 +90,7 @@ private:
     struct Chan { int32_t start = 0, age = 0, tap = 0; float v = 1, e = 1, tapW = 0; };
     const XtSoloPlan* p = nullptr;
     float A = 1, F = 1, walk = 1, energy = 0;
+    float f9c = 1, rate98 = 1;          // +0x9c the loop's rate factor; +0x98 what the grains and the filter take, the pitch × that, each block
     Chan ch[2];
     int next = 1;
     float slope = 0.0f;
@@ -108,7 +109,8 @@ private:
     double anchor = 0.0, anchorStep = 1.0, budget = 0.0;
     float low[2] = {}, band[2] = {}, fCoef = 0, q = 1.2f;   // SVF state per channel
     float gainTarget = 1.0f, gain = 1.0f;
-    bool robot = false;
+    bool robot = false;                 // byte 0's bit 0x10, which a block's flags reach during the note (0x894f3fa8): the rate's (0x8950cde0)
+    bool robotEv = false;               // the grains' (+0x124 = 0): taken from it only when an event loads (0x8950c7e0)
     // Loops: the cached events' positions (1/16 sample: forward start,
     // forward end, backward end, backward start) and the modes at the
     // forward end and the backward start; the walk flags (player +3: 0x04 /

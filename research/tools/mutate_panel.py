@@ -11,6 +11,11 @@ TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, h
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
 MUTS=[
  # The editor's layout (TEST_UI_LAYOUT, TEST_FX_PANEL)
+ ('editor-vari-unplaced',EP,'        wave.head = { { &variBtn_, 60 } };\n','','layout'),
+ ('editor-vari-osc',EP,'variAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("vari"), variBtn_);','variAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, "vari", variBtn_);','layout'),
+ ('patch-vari-read',PP,'    c.vari         = apvts.getRawParameterValue(Params::kVari)->load() > 0.5f;','    c.vari         = true;','patch'),
+ ('patch-vari2-read',PP,'        o.vari = apvts.getRawParameterValue(oscId(1, Params::kVari))->load() > 0.5f;','        o.vari = true;','patch'),
+ ('patch-vari-write',PP,'    set(Params::kVari, c.vari ? 1 : 0);','    ;','patch'),
  ('editor-no-build',EP,'chrome { &buildLabel_, &algoLabel_,','chrome { &algoLabel_,','layout'),
  ('editor-build-unplaced',EP,'buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);',';','layout'),
  ('editor-build-narrow',EP,'buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);','buildLabel_.setBounds(16, Ui::headerH - 17, 40, 13);','layout'),

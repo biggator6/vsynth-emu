@@ -3570,6 +3570,14 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-05) — v151: Vari off
+
+- The old notes had the right two routines from October, and the right reading of the flag, and still the wrong idea of what Vari off means. It isn't "use the linear player": that's only for SOLO waves. Band waves keep their player and change their walk, in a routine the install never mentions. The check's first run said so at once: the BACKING and ENSEMBLE cases with the switch off failed along with the SOLO ones.
+- The loop record had never been written in the check's waves, because nothing read it. So every Vari-off loop played as no loop on the firmware's side, while the port looped. The first failures looked like a port error and were the harness's.
+- Writing it, with real loop rates, then broke Vari *on*: the SOLO and band players had their loop factors pinned at 1, a choice made when the only waves seen had none. 36 of 250 real waves do.
+- Robot took three goes. The flag needs Vari on; the pitch follows the switch at once; the grains only at an event. Each was found by a case that moved the switch during a note, and each fix was half the story until the next. I'd also added handling for switching Vari during a Time Trip return. The planted errors showed the check couldn't reach it, and the firmware itself corrupts its player there, so it came out again.
+- The plants caught two of my own: one that couldn't change anything (`pitch * walk`, with pitch always positive) and a plant text with a `||` that the list's separator split.
+
 ### Session 16 addendum (2026-11-05) — v150: The build under the wordmark
 
 - Reading git at configure time would have been a few lines and wrong by the next commit, as CMake doesn't re-run for one. So it's a custom target at every build, and the care went into making that cost nothing: the header is rewritten only when the id changes.

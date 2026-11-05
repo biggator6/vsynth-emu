@@ -54,6 +54,8 @@ float xtOscFormantLfoDepth(int d);
 // The firmware's exp2 (0x894ec090): integer, high-byte and low-byte tables
 // of a 16-bit fraction, for |x| < 7.
 float xtOscExp2(float x);
+// What Vari off walks by inside a loop (0x894f34dc), from the loop record's s16 at +0x14 (forward) or +0x16 (backward): tenths of a cent.
+float xtWaveLoopRate(int tenths);
 
 // The voice's targets (0x894f3ac0/0x894f3c90 walk, 0x894f3b30/0x894f3d40
 // formant ratio) from the converter's values and the envelope and LFO

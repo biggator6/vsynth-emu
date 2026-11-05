@@ -186,6 +186,7 @@ struct XtMbPlayer::State {
     float gainTarget = 1.0f / 65536, gain = 1.0f / 65536, gainCoef = 1.0f / 64;  // +0x80..+0x88
     float lpc = 0;                               // +0x94
     float rateF = 1, f9c = 1;                    // +0x98, +0x9c
+    float loopFwdRate = 1, loopBwdRate = 1;      // +0xa0, +0xa4 (0x89510760)
     int list[16] = {};                           // +0xa8
     Band b[6];                                   // +0xe8 + 0x88·k
     // Loops: the switch (byte 0 bit 0), the cached events (+0x6c → 0xb4
@@ -535,9 +536,9 @@ void XtMbPlayer::State::crossings() {
 // bounce there; the forward loop's end loops (One Way: to the forward start,
 // keeping the overshoot; Alternate: the walk turns from the next block;
 // mode 3: to the forward start, holding); an event moves on to the next,
-// the last ending the note.  The loop regions' rate factors (+0xa0/+0xa4
-// into +0x9c) are 1.  (The event types 1..3 of step and event playback are
-// not ported.)
+// the last ending the note.  Inside a loop the pitch takes its rate factor
+// (+0xa0/+0xa4, into +0x9c).  (The event types 1..3 of step and event playback
+// are not ported.)
 void XtMbPlayer::State::crossForward() {
     const int X = limit;
     if (lp[2] == X) {
@@ -548,7 +549,7 @@ void XtMbPlayer::State::crossForward() {
         if (!loopOn) { flags3 &= 0xdf; f9c = 1.0f; }
         else {
             flags3 |= 0x20;
-            f9c = 1.0f;
+            f9c = loopFwdRate;
             ended = 0;
             if (lmode1 == 1) { pos -= X; loopJump(0); return; }
             if (lmode1 == 2) { flags3 |= 8; return; }
@@ -584,7 +585,7 @@ void XtMbPlayer::State::crossBackward() {
     if (lp[3] == X && !(flags3 & 8)) {
         if (loopOn) {
             flags3 |= 0x10;
-            f9c = 1.0f;
+            f9c = loopBwdRate;
             ended = 0;
             if (lmode3 == 1) { pos -= X; loopJump(2); return; }
             if (lmode3 == 2) { flags3 |= 4; return; }
@@ -614,7 +615,7 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
     S.w = w;
     S.mode = mode;
     S.stereo = w.channels == 2;
-    S.flags0 = (uint8_t)((S.stereo ? 0x40 : 0) | flagsCfg);
+    S.flags0 = (uint8_t)((S.stereo ? 0x40 : 0) | flagsCfg | (variCfg ? 0 : 0x20));
     S.pitch = pitch;
     S.walk = walk;
     if (const char* r = std::getenv("XT_ROUND"); r && std::string(r) == "nearest") S.rtz = false;
@@ -655,6 +656,8 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
     S.startAt((0.0f > walk) ? S.endPos : S.startPos);
     // tree state is zeroed; 0x89510760: f9c = 1; 0x8950f860: (rate ratio 1)
     S.f9c = 1.0f;
+    S.loopFwdRate = loopCfg.fwdRate;
+    S.loopBwdRate = loopCfg.bwdRate;
     if (mode == 5) {                                // 0x89510130: oscillator bands
         for (int k = 1; k <= 5; ++k) {
             Band& B = S.b[k];
@@ -1095,6 +1098,11 @@ void XtMbPlayer::blockImpl(State& S, float* out) {
     // 0x8950e760: band 0
     S.crossings();                                  // 0x8950ccc0
     S.rateF = S.pitch * S.f9c;
+    if (S.flags0 & 0x20) {                          // 0x8950f810: Vari off.  The walk goes at the pitch too, and the reads at the walk's speed.  Under the beat, at its step alone
+        const float by = (S.flags0 & 6) ? 1.0f : S.rateF;
+        S.walkStep = ftrc(by * (float)S.walkStep);
+        S.rateF = std::fabs((float)S.walkStep) * 2.98023224e-8f;   // 2^-25
+    }
     S.rate = ftrc(S.rateF * 33554432.0f);
     S.walkList();
     float* o = S.M;

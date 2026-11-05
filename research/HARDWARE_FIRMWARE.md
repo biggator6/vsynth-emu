@@ -1546,6 +1546,56 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Vari off (2026-11-05, v151)
+
+Vari Sw (IDs 0x2d4, 0x308) is now ported. 71 of 1stchoice's 358 PCM OSCs have it off: 44 on SOLO waves, 17 on BACKING, 10 on ENSEMBLE. Before this they played as VariPhrase, in tune but with their time apart from their pitch. Now a wave's time follows its pitch, by the firmware's own routes, which differ by the wave's type. The same work found the loops' rate factors, which also apply with Vari on (below).
+
+**The switch.** The converter (`0x894e46ce`) sets the block's flag 0x20 when the input's +0x60, Vari Sw, is 0. The voice copies the block's flags at note-on, so the switch is the note's from its start.
+
+**A SOLO wave** gets another player. The install (`0x894f3660`) puts `0x89509870` (mono) or `0x89509f52` (stereo) at +0x964 in place of the grain player, for modes 1 and 6. For modes 3 and 5, BACKING and ENSEMBLE, the install doesn't look at the flag. The SOLO setup still runs beneath (`0x8950bf70`), and the note-on then sets the player up from the wave's loop record (`0x894f3460`, the block's 0x80 path):
+- The forward region is from `vplp` +4 to +8, the backward from +0x10 to +0xc. Each has its Loop Mode, +0x18 and +0x19, with the Loop switch on; with it off, both are 0. The rate inside each is +0x104 and +0x11c.
+- Its ends are the last sample, and +0xb8: the Start Offset, 0 here.
+- The position starts at the start, or at the end when the walk is negative.
+
+The player, `XtLinearPlayer`, is plain resampling:
+- **Rate and reads.** Each sample it reads two int16 samples, `x + d·f` by FMAC, then × the gain × 65536. The rate is pitch × walk. Under Tempo Sync or Time Trip it is the beat's step alone, × 2^-25.
+- **Gain.** It moves 1/32 of the way to its target each sample.
+- **Ends.** Past either end it holds that sample, fading by 0.068 a sample.
+- **Backward.** It reads each sample negated and scales by −65536, which comes to the same sign.
+- **Loops.** One Way wraps both the position and the next read. Alternate runs a position on through the way back, b to b + len, and reads that half mirrored with every sample's sign flipped: the turn interpolates toward the negated next sample. That's the firmware's, not a mistake in reading it, and it puts the reflected half out of phase.
+- **Mono and stereo.** The two routines agree but for one thing: in an Alternate loop, the stereo one saves its position (+0xec) before the step, from a banked register, and the mono one after.
+- **Seek.** A Beat Keep's way back to the beat (`0x89509840`) sets the position and fraction, then resets the beat.
+
+**A band wave** keeps its player. The block's routine (`0x8950e760`) sees the flag at the player's byte 0 and calls `0x8950f810`, which makes the walk step × the pitch, and the read rate the step's size, |step| × 2^-25. Under Tempo Sync or Time Trip the step is left alone. So its time follows its pitch too, by another route: `XtMbPlayer::setVari`.
+
+**What else the switch moves.**
+- **The walk.** The voice update (`0x894f3cd0`) drops the wave's own tuning factor from the walk, unless the player's Tempo Sync bit is set. The voice's flags are copied (`0x894f3ec0`) after a knob update has already worked out the walk (`0x894f2600` calls `0x8950bcc0`, then `0x894f2788`). So a switch moved during a note reaches the walk at the next update: `OscVoice::variBit`, `syncBit`.
+- **Robot Voice.** The block's flag 0x10 needs Vari on, and the pitch's Robot (the converter's) follows both switches as they stand. Each update copies the block's flags into the player's byte 0, all but 0x20 (`0x894f3fa8`), so Robot follows during a note too, in two steps:
+  - the rate (`0x8950cde0`, +0x98) takes it at once;
+  - the grains' pitch term (+0x124, 0 with Robot) takes it only when an event loads (`0x8950c7e0`): at note-on, a loop jump, a seek or an event crossing.
+
+  `XtSoloVoice` keeps the two apart (`robot`, `robotEv`). Until now the port had only ever seen Robot set before a note.
+- **What the XT gets wrong.** The seek's routine (`0x894f2ea4`) goes by the voice's flag as it stands, but the player installed at note-on stays. Switch Vari during a Beat Keep's way back and one player's seek runs on the other's state: `0x8950fed0` writes the SOLO's record over the linear player's position and sample pointer. In the check, those notes then read outside all memory. Here each player keeps its own seek. The check doesn't switch Vari during a note with the pad in play, but does everywhere else.
+
+**The loops' rate factors, Vari on as well.** `0x89510760`, in every VariPhrase setup, sets +0xa0 and +0xa4 to exp2(s16/12000), from `vplp` +0x14 and +0x16 (tenths of a cent). Crossing into a loop sets +0x9c to the forward or the backward one; leaving it, back to 1. The SOLO grains and filter take +0x98 = pitch × +0x9c (not under Robot), and the band players `rateF`. The port had them all at 1, as v55 found them in Emu_test, where they are 0. But 36 of the 250 waves 1stchoice uses have +0x16 set. The six I printed run from −29.7 to +11.2 cents, so those waves loop that far out of tune. Now `xtWaveLoopRate`, `XtLoop::fwdRate`, `bwdRate`. Vari off takes the same two, the backward one × a float in the cached events (+0x2d0) that no code seen writes. The check and the port have 1 there.
+
+**The check.**
+- `xt_tone`: Vari off in a third of the PCM draws, the loop record written for the firmware (it never was, as nothing read it before), and real loop rates on three quarters of the waves drawn with tuning of their own. Vari moves with the panel during a note unless the pad's in play, and alone in the sweep with Robot on. fcheck's 2000 cases and the sweep, the patches, the tuned waves and the clocks: 0 different. 2000 cases on each of seeds 777, 31337, 9 and 4242: 0 different.
+- The patches' values: 541,584 against the firmware's reads, 3,116 more than before, the Vari Sw of every OSC of every zone. 0 different.
+- PluginTest with `TEST_VARI=0`, in `verify.sh`: 4/4 bit-identical, two band waves and two SOLO. The layout check, with the new switch on the Wave card's title line, and the patches through the parameters: as before.
+- `TEST_PATCH_PLAY`: the same 51 of 1stchoice's patches, none silent. `005 Gig Rhodes` now shows only its Start Offset as missing.
+- Planted errors: `mutate_tone.py` 893, 50 of them new (the player's six paths and its reads, the switch, the walk, the loops' rate factors in all three players, Robot), none missed. On the first run, 10 old plants no longer matched the text this version rewrote; they are now planted on the new text. One new plant missed: the grains' Robot through `Ar`, which only an unvoiced record with info bit 0 set reads, and the encoder writes none. It now sits on the voiced test. `mutate_files.py` 39 and `mutate_panel.py --editor` with the `patch-vari` plants 42, none missed.
+
+**What it found on the way.**
+- A sign error in my first port of the backward reads, which the check caught on its first run.
+- Robot, as above.
+- The walk's lag of an update.
+
+**Not done.**
+- Start Offset with Vari off: the linear player's start is +0xb8, which is 0 here. Start Offset is still listed as missing.
+- LITE waves (Encode Type 0) take this same player through another voice kind (1) and note-on (`0x8950b5b0`). That isn't wired: a LITE wave plays as SOLO, as before.
+- Mode 3 loops (hold at the start), which no panel setting makes, are ported but not drawn.
+
 ### The build under the wordmark (2026-11-05, v150)
 
 The user's request: to know which build is being tested. No change to the sound. The editor's header now says, for example, `v150 1a2b3c4  05 Nov 14:32`.
@@ -1652,7 +1702,7 @@ Planted errors: `mutate_tone.py` 841, none missed, 46 of them new; `mutate_files
 
 | | In 1stchoice | |
 |---|---|---|
-| Vari Sw off | 71 of 358 PCM OSCs | a plain resampling player, `0x89509870`, "LITE investigation". Here it still plays VariPhrase: in tune, but its time doesn't follow its pitch |
+| Vari Sw off | 71 of 358 PCM OSCs | done in v151, "Vari off" |
 | More than one zone | 59 of 502 patches | zone 1 only |
 | Playback Mode not RETRIGGER | 81 | LEGATO, STEP, EVENT, `vpno` |
 | Start Offset | 33 | IDs 0x2c6, 0x2fa |

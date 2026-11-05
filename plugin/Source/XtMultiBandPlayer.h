@@ -98,6 +98,8 @@ public:
     bool syncOn() const;
     bool tripOn() const;
     const XtBeat& beat() const;
+    // Vari Sw (byte 0 bit 0x20, clear with it on).  Set before noteOn.  Off, the band player stays, and its walk follows the pitch (0x8950f810).
+    void setVari(bool on) { variCfg = on; }
     // To a position in 1/16 sample (0x89510bf0 with byte 0 bit 7), as a released Time Trip goes
     // back to the beat: the records and the read positions there, the beat again from there.
     void seek(int pos16);
@@ -112,6 +114,7 @@ private:
     XtLoop loopCfg;
     uint32_t tempoCfg = 1200000, origCfg = 1200000;
     uint8_t flagsCfg = 0;
+    bool variCfg = true;
     static void blockImpl(State& S, float* out);
 public:
     XtMbPlayer();

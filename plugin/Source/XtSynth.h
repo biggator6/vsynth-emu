@@ -25,6 +25,7 @@
 #include "XtMultiBandPlayer.h"
 #include "XtOsc.h"
 #include "XtSoloVoice.h"
+#include "XtLinearPlayer.h"
 
 struct XtEncoded {
     int type = 0;                  // 1 SOLO, 3 BACKING, 5 ENSEMBLE
@@ -38,6 +39,7 @@ struct XtEncoded {
     // that isn't the forward one, its region in frames and Loop Mode (the loop record's +0x10, +0xc and +0x19).  -1: the same.
     XtWaveTune tune;
     int bwdMode = -1, bwdStart = 0, bwdEnd = 0;
+    float loopRate[2] = { 1.0f, 1.0f };   // forward and backward: what Vari off walks by inside the loop (xtWaveLoopRate)
 };
 
 // The user's rom.2: loads the encoders' and players' tables and opens the
@@ -86,6 +88,9 @@ public:
         // 0 BWD / 1 ZERO / 2 FWD, Time and Formant KF −200..+200 (% per
         // octave, steps of 10), Energy 0 (OFF)..127
         int oscTime = 0, oscTimeOffset = 2, oscTimeKF = 0, oscFormant = 0, oscFormantKF = 0, energy = 0;
+        // Vari Sw (IDs 0x2d4, 0x308): off, a SOLO wave plays on XtLinearPlayer, its time following its pitch, and Robot Voice and the wave's
+        // tuning on the walk go.  A band wave's player doesn't change (0x894f3660).
+        bool vari = true;
         // pitch envelope knobs 0..127 and its depth −63..+63 (0x894e0ce0 cents)
         int pAttack = 0, pDecay = 64, pSustain = 0, pRelease = 64, pDepth = 0;
         // time and formant envelopes, the same, with their depths −63..+63
@@ -339,6 +344,10 @@ private:
         bool on = false;               // the OSC sounds this note: its Switch, and something to play
         int kfKey = -1;                // the key-follow key (+4): a change restarts the glide
         bool robot = false;            // Robot Voice, as at note-on (the player latches it)
+        bool robotKnob = false;        // and its Switch alone: the pitch takes it with Vari Sw as that stands
+        bool linear = false;           // Vari off on a SOLO wave, as at note-on: XtLinearPlayer plays
+        bool variBit = true;           // Vari Sw as the voice has it (+0xb4 bit 0x20), what its walk reads: from note-on, then each knob update's end
+        bool syncBit = false;          // and Tempo Sync, as the player's byte 0 has it (bit 1), the same way
         bool analog = false;           // OSC Type ANALOG at note-on: the analog oscillator plays
         const XtEncoded* wave = nullptr;   // the OSC's wave at note-on (a new wave stops the voices)
         int rnd = 0;                   // the note's random pitch offset (+0x6c), 1/10 cent
@@ -352,6 +361,7 @@ private:
         float curA = 1, curF = 1, curWalk = 1, curG = 0, curGain = 1;
         XtMbPlayer mb;
         XtSoloVoice solo;
+        XtLinearPlayer lin;
         XtAnalogOsc ana;               // kept across notes: its phase runs on
     };
     struct Voice : OscVoice {                  // OSC 1's in the base

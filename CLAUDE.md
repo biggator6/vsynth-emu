@@ -21,7 +21,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 
 ## Where things are
 - `plugin/Source/`: `XtBuildId` (which build this is, from git at each build by `plugin/BuildId.cmake`; shown under the wordmark), `XtFxChip` (the effect chip; `xt_fx`), `XtFxControl` (the firmware's effect driver in the interpreter, off the audio thread, feeding the chip through a queue; and `XtFxUnit`, the two with the frame's way through, in the sound behind the plugin's Effects switch; `xt_fx control`), `FxPanel` (the editor's page for them, by `xtFxCatalog`'s names and ranges from rom.2, and `XtFxValueText`, each value's text by the firmware's own routine), `XtSynth` (the synth: voices, controls, tick), the ports
-  (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`,
+  (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`, `XtLinearPlayer` (Vari off),
   `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFiles` (V-Synth's wave and patch files), `XtPatch` (a patch's zone as `XtSynth::Controls`) and `XtVpwFormat` (a `.vpw` as a JUCE format), `XtFirmware` (firmware harness: runs
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
   `PluginEditor`. Each port's firmware check is its `XT_*_MAIN` block; `XtToneCheck`
@@ -62,7 +62,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=analogfw`: xt_analog, XtFirmware.cpp; `PORT=tone`: xt_tone, XtSynth.cpp;
   `PORT=tonecosm`: xt_tone, XtCosm.cpp; `PORT=toneanalog`: xt_tone, XtAnalog.cpp;
   `PORT=toneband`: xt_tone, XtMultiBandPlayer.cpp; `PORT=tonecheck`: xt_tone,
-  XtToneCheck.cpp; `PORT=tonefw`: xt_tone, XtFirmware.cpp; `PORT=toneosc`: xt_tone, XtOsc.cpp; `PORT=tonelfo`: xt_tone, XtLfo.cpp;
+  XtToneCheck.cpp; `PORT=tonefw`: xt_tone, XtFirmware.cpp; `PORT=toneosc`: xt_tone, XtOsc.cpp; `PORT=tonelin`: xt_tone, XtLinearPlayer.cpp; `PORT=tonelfo`: xt_tone, XtLfo.cpp;
   `PORT=toneenv`: xt_tone, XtEnvelope.cpp; `PORT=tonesolo`: xt_tone, XtSoloVoice.cpp; `PORT=tonepatch`: xt_tone, XtPatch.cpp; `PORT=tonefiles`: xt_tone, XtFiles.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
   solocmp on the baseline's cases, XtSoloVoice.cpp; `PORT=enc`: xt_enc on the baseline's waves, XtSoloEncoder.cpp)
   and runs it, to show the check catches it (a run the error crashes counts). `mutate_tone.py [cases]`: the list in
@@ -164,6 +164,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - The effects don't run on the SH-4: MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain are microcode on a separate chip, Roland's ESP4 (RA0A-101; the JP-8000's instruction set, v123; ported in `XtFxChip`, v126; its delay memory 2^17 words on a 256 K × 16 DRAM; programs in rom.2,
   8 channels by DMA), with no reference but a real XT. Only the SH-4's driver and converters run in `Sh4Interp`. Map, the word as far as decoded, and the proposed
   order: HARDWARE_FIRMWARE.md, "The effects". The tones' `g` (v114) is ID 0x526, Out Gain for TG, default −24; the user's Output Gain is ID 0x76, on the chip. The plugin plays at the XT's level by these numbers (v149, the user's decision; not measured on a real XT): a full-scale wave at ⅛, both in `XtSynth::busOut` and through `XtFxUnit::fromChip`, the chip's full scale being ±1.
+- Vari Sw off (v151): a SOLO wave plays on `XtLinearPlayer` (`0x89509870`/`0x89509f52`), a band wave keeps its player with its walk × the pitch (`0x8950f810`).
+  The player's byte 0 takes the block's flags at each update but for 0x20, so Robot follows during a note, its grains at the next event load. Each wave's loops have rate
+  factors (`vplp` +0x14, +0x16), Vari on too. HARDWARE_FIRMWARE.md, "Vari off".
 - The analog oscillator's map (waveform codes, routines, the converter's
   input, the hidden calibration IDs 0x528…0x55b) is in HARDWARE_FIRMWARE.md,
   "The analog oscillator, and SAW". A patch's waveform number is not the

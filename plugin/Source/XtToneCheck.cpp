@@ -528,9 +528,15 @@ void writeLoopEvents(Firmware& f, const TestWave& t, const OscC& c) {
     l.fwdMode = l.bwdMode = c.loopMode;
     l.fwdStart = l.bwdStart = a;
     l.fwdEnd = l.bwdEnd = b;
+    l.fwdRate = t.enc->loopRate[0]; l.bwdRate = t.enc->loopRate[1];
     if (t.enc->bwdMode >= 0) { l.bwdMode = t.enc->bwdMode; l.bwdStart = t.enc->bwdStart; l.bwdEnd = t.enc->bwdEnd; }
     const uint32_t W2 = t.fw.chunk[10];
     f.c.write(W2, std::vector<uint8_t>(0x400, 0).data(), 0x400);
+    f.c.wr32(W2 + 0x2d0, 0x3f800000);                     // a rate factor no code seen writes: what the note-on takes for the backward loop, 1 as the port has it
+    // The loop record, which only Vari off reads (0x894f3460)
+    const uint32_t R4 = t.fw.chunk[4];
+    f.c.wr32(R4 + 4, (uint32_t)l.fwdStart); f.c.wr32(R4 + 8, (uint32_t)l.fwdEnd); f.c.wr32(R4 + 0xc, (uint32_t)l.bwdEnd); f.c.wr32(R4 + 0x10, (uint32_t)l.bwdStart);
+    f.c.wr8(R4 + 0x18, (uint8_t)l.fwdMode); f.c.wr8(R4 + 0x19, (uint8_t)l.bwdMode);
     if (!l.on) { f.c.wr32(W2 + 0xb8, 0x7fffffff); f.c.wr32(W2 + 0x16c, 0x7fffffff); return; }
     if (t.type == 1) {
         const int st = t.channels == 2 ? 16 : 10;
@@ -594,6 +600,7 @@ void oscParams(std::unordered_map<int, int>& p, int n, const OscC& o) {
     p[b + 0x1a] = 1 + n;                              // the Wave Number
     p[b + 0x23] = o.oscTime; p[b + 0x24] = o.oscTimeKF / 10; p[b + 0x25] = o.lfoTimeDepth; p[b + 0x26] = o.tDepth; p[b + 0x27] = o.oscTimeOffset;
     p[b + 0x28] = o.oscFormant; p[b + 0x29] = o.oscFormantKF / 10; p[b + 0x2a] = o.lfoFormantDepth; p[b + 0x2b] = o.fDepth;
+    p[b + 0x30] = o.vari;
     p[b + 0x2c] = o.tempoSync; p[b + 0x2d] = o.robot; p[b + 0x2f] = o.loop; p[b + 0x31] = o.energy; p[b + 0x32] = o.timeTrip; p[b + 0x33] = o.beatKeep;
     p[0x30d + 3 * n] = o.ana.detune; p[0x30e + 3 * n] = o.ana.subOctave; p[0x30f + 3 * n] = o.ana.subLevel;
     const int e = 4 * n;
@@ -807,6 +814,7 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     const auto drawPcm = [&r](OscC& o) {
         o.oscType = 1; o.rootKey = r.range(36, 84);
         o.robot = r.one(4);
+        o.vari = !r.one(3);
         if (r.one(3)) { o.loop = true; o.loopMode = r.range(0, 2); o.loopStart = (float)r.range(0, 120) / 1000.0f; o.loopEnd = o.loopStart + (float)r.range(5, 40) / 1000.0f; }   // near the start: notes are short
     };
     if (pcm) drawPcm(c);
@@ -890,7 +898,7 @@ std::vector<size_t> listedFields() {
     add(c.parallel);
     // the tempo's, which sweepWave gives what a move of them needs
     add(c.patchTempo); add(c.clockSource); add(c.assign[10]); add(c.assign[11]);
-    for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) }) { add(o->tempoSync); add(o->timeTrip); add(o->beatKeep); }
+    for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) }) { add(o->tempoSync); add(o->timeTrip); add(o->beatKeep); add(o->vari); }
     // a stray or missing update shows only when a COSM's block has moved since its last update, so several goes at those
     for (int rep = 0; rep < 3; ++rep) {
         for (size_t i = 0; i < (size_t)kCcCount; ++i) f.push_back(kCcOnly + i);
@@ -902,12 +910,12 @@ std::vector<size_t> listedFields() {
     return f;
 }
 
-// In the sweep: the tempo's fields, seen only on a wave with the pad held.  Which OSC has the wave, or 0.
+// In the sweep: the tempo's fields, seen only on a wave with the pad held, and Vari Sw.  Which OSC has the wave, or 0.
 int sweepWave(size_t at) {
     static const Ctl c;
     const auto is = [&](const auto& x) { return at == (size_t)(reinterpret_cast<const char*>(&x) - reinterpret_cast<const char*>(&c)); };
-    if (is(c.patchTempo) || is(c.clockSource) || is(c.assign[10]) || is(c.assign[11]) || is(c.tempoSync) || is(c.timeTrip) || is(c.beatKeep)) return 1;
-    return is(c.osc2.tempoSync) || is(c.osc2.timeTrip) || is(c.osc2.beatKeep) ? 2 : 0;
+    if (is(c.patchTempo) || is(c.clockSource) || is(c.assign[10]) || is(c.assign[11]) || is(c.tempoSync) || is(c.timeTrip) || is(c.beatKeep) || is(c.vari)) return 1;
+    return is(c.osc2.tempoSync) || is(c.osc2.timeTrip) || is(c.osc2.beatKeep) || is(c.osc2.vari) ? 2 : 0;
 }
 
 struct Report {
@@ -1104,7 +1112,7 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         // A wave's fine tuning and backward loop, in the firmware's memory and on its encoded form; no tuning in all the other cases
         const auto waveOwn = [&](const TestWave& t) {
-            int headerCents = 0, fine = 0, tune = 0;
+            int headerCents = 0, fine = 0, tune = 0, rateF = 0, rateB = 0;
             t.enc->bwdMode = -1;
             if (extra && r.one(2)) {
                 headerCents = r.one(2) ? 0 : r.range(-60, 60);
@@ -1112,7 +1120,12 @@ int XtToneProbe::run(int argc, char** argv) {
                 tune = r.one(4) ? r.range(-1500, 1500) : r.range(-120000, 172956);   // as far as 250 real waves go
                 const int last = (int)t.fw.frames - 1, a = r.range(0, std::max(last - 32, 0));
                 if (r.one(2)) { t.enc->bwdMode = r.range(0, 2); t.enc->bwdStart = a; t.enc->bwdEnd = std::min(a + r.range(16, 4000), last); }
+                if (!r.one(4)) { rateF = r.range(-300, 300); rateB = r.range(-300, 300); }   // real waves' +0x16 run to about 300 either way
             }
+            t.enc->loopRate[0] = xtWaveLoopRate(rateF);
+            t.enc->loopRate[1] = xtWaveLoopRate(rateB);
+            fw.c.wr16(t.fw.chunk[4] + 0x14, (uint16_t)(int16_t)rateF);
+            fw.c.wr16(t.fw.chunk[4] + 0x16, (uint16_t)(int16_t)rateB);
             t.enc->tune = xtWaveTune(headerCents, fine, tune);
             fw.c.wr32(t.fw.chunk[2] + 0x18, (uint32_t)headerCents);
             fw.c.wr8(t.fw.chunk[4] + 0x1b, (uint8_t)fine);
@@ -1151,6 +1164,10 @@ int XtToneProbe::run(int argc, char** argv) {
             ctl.portamento = true;
             ctl.portaTime = 100;
             ctl.oscTimeOffset = ctl.osc2.oscTimeOffset = 2;
+            // Vari Sw moved alone, with Robot Voice on, whose flag and pitch follow it during the note (0x894f3fa8, the converter)
+            if (sweepOn) { static const Ctl c0; const size_t at = sweepAt, v1 = (size_t)(reinterpret_cast<const char*>(&c0.vari) - reinterpret_cast<const char*>(&c0)),
+                                                v2 = (size_t)(reinterpret_cast<const char*>(&c0.osc2.vari) - reinterpret_cast<const char*>(&c0));
+                           if (at == v1) ctl.robot = true; if (at == v2) ctl.osc2.robot = true; }
             // two COSMs whose block takes the envelopes' levels: a Comb, a Side Band Filter
             for (Ctl::Cosm& k : ctl.cosm) { k.on = true; k.lfoKeySync = true; }
             ctl.cosm[0].type = 4;
@@ -1569,9 +1586,16 @@ int XtToneProbe::run(int argc, char** argv) {
                         if (!bits(x, f.v)) rep.bad(os + f.name, "fw %.9g port %.9g", x, f.v, blk);
                     }
                     // The beat (player at voice +0xd4)
-                    const XtBeat& bt = s.wave->type == 1 ? s.solo.beat() : s.mb.beat();
+                    const XtBeat& bt = s.linear ? s.lin.beat() : s.wave->type == 1 ? s.solo.beat() : s.mb.beat();
                     const uint32_t PL = V + 0xd4;
-                    const int32_t posNow = s.wave->type == 1 ? s.solo.position() : s.mb.position();
+                    const int32_t posNow = s.linear ? (int32_t)fw.c.rd32(PL + 0x38) : s.wave->type == 1 ? s.solo.position() : s.mb.position();   // Vari off leaves +0x38 as the SOLO setup did
+                    if (s.linear) {                  // its own state
+                        rep.checks += 4;
+                        if ((int32_t)fw.c.rd32(PL + 0xec) != s.lin.position()) rep.bad(os + "linear position", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xec), s.lin.position(), blk);
+                        if ((int32_t)fw.c.rd32(PL + 0x128) != s.lin.turningPos()) rep.bad(os + "linear turning", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0x128), s.lin.turningPos(), blk);
+                        if (!bits(fw.f32(PL + 0xe8), s.lin.fraction())) rep.bad(os + "linear fraction", "fw %.9g port %.9g", fw.f32(PL + 0xe8), s.lin.fraction(), blk);
+                        if (!bits(fw.f32(PL + 0x124), s.lin.fade())) rep.bad(os + "linear fade", "fw %.9g port %.9g", fw.f32(PL + 0x124), s.lin.fade(), blk);
+                    }
                     const struct { const char* name; uint32_t off; int32_t v; } ints[] = { { "position", 0x38, posNow }, { "beat budget", 0x54, bt.budget }, { "beat sync", 0x58, bt.syncPos }, { "beat trip", 0x5c, bt.tripPos },
                         { "beat walk", 0x60, bt.walkPos }, { "beat position", 0x64, bt.beatPos }, { "beat step", 0x50, bt.step } };
                     for (const auto& f : ints) {
@@ -1841,6 +1865,7 @@ int XtToneProbe::run(int argc, char** argv) {
         if (dumpWhich && (dumpWhich[0] == 'a' || std::atoi(dumpWhich) == g))
         {
             for (const OscC* o : { static_cast<const OscC*>(&ctl), static_cast<const OscC*>(&ctl.osc2) })
+                std::printf("  osc: on %d vari %d wave %d/%d loop %d/%d time0 %d\n", o->on, o->vari, o == &ctl ? (wv ? wv->type : 0) : (wv2 ? wv2->type : 0), o == &ctl ? (wv ? wv->channels : 0) : (wv2 ? wv2->channels : 0), o->loop, o->loopMode, o->oscTimeOffset),
                 std::printf("  osc: type %d coarse %d fine %d pitch %d kf %d random %d key %d robot %d; patch coarse %d fine %d octave %d porta %d; time %d offset %d kf %d\n", o->oscType, o->oscCoarse, o->oscFine, o->oscPitch, o->pitchKF, o->randomPitch, o->rootKey, o->robot, ctl.patchCoarse, ctl.patchFine, ctl.octave, ctl.portamento, o->oscTime, o->oscTimeOffset, o->oscTimeKF);
             std::printf("  assign"); for (int i = 0; i < 12; ++i) std::printf(" %d", ctl.assign[i]);
             std::printf("; system"); for (uint32_t i = 0; i < 10; ++i) std::printf(" %d", (int8_t)fw.c.rd8(0x89d276b4 + 0x844 + i));
@@ -1922,6 +1947,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 n.osc2.on = ctl.osc2.on; n.osc2.oscType = ctl.osc2.oscType; n.osc2.ana.wave = ctl.osc2.ana.wave; n.osc2.ana.subOctave = ctl.osc2.ana.subOctave;
                 n.oscTimeOffset = ctl.oscTimeOffset; n.lfoKeySync = ctl.lfoKeySync; n.osc2.lfoKeySync = ctl.osc2.lfoKeySync; n.tvaLfoKeySync = ctl.tvaLfoKeySync;
                 n.structure = ctl.structure;             // latched at note-on, but its own check is xt_analog's
+                if (tripCase) { n.vari = ctl.vari; n.osc2.vari = ctl.osc2.vari; }   // switched with the pad in play, a Beat Keep's way back runs one player's seek on the other's state, on the XT too
                 n.mono = ctl.mono; n.legato = ctl.legato; n.robot = ctl.robot; n.loop = ctl.loop; n.loopMode = ctl.loopMode; n.loopStart = ctl.loopStart; n.loopEnd = ctl.loopEnd;
                 n.origTempo = ctl.origTempo; n.osc2.origTempo = ctl.osc2.origTempo;
                 n.osc2.rootKey = ctl.osc2.rootKey; n.osc2.oscTimeOffset = ctl.osc2.oscTimeOffset; n.osc2.robot = ctl.osc2.robot; n.osc2.loop = ctl.osc2.loop;

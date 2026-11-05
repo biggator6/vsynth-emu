@@ -69,7 +69,7 @@ cosm-spk|c.spk.noteOn({ ctl.cosm[k].spkType });|c.spk.noteOn({ 0 });
 cosm-lfo|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], v->blockTempo);|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[6], v->blockTempo);
 cosm-update-env|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envA.level(), c.envA.smooth(), c.envB.level(), c.envB.smooth(),|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envB.level(), c.envB.smooth(), c.envA.level(), c.envA.smooth(),
 cosm-comb-root|s.robot \|\| s.analog \|\| !s.on, tune.offset, tune.detune);|s.robot \|\| !s.on, tune.offset, tune.detune);
-robot-any|v->robot = ctl.robot && v->on && !v->analog && v->wave->type == 1;|v->robot = ctl.robot && v->on && !v->analog;
+robot-any|v->robotKnob = ctl.robot && v->on && !v->analog && v->wave->type == 1;|v->robotKnob = ctl.robot && v->on && !v->analog;
 loop-mode|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 2);|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 1);
 loop-switch|l.on = o.loop;|l.on = false;
 mod-flag|v->mod.noteOn(modBlk, stereo(*v), stereo(v->osc2), v->on && v->analog, modShared,|v->mod.noteOn(modBlk, false, false, false, modShared,
@@ -115,8 +115,8 @@ tva-live-gain|        if (anyChanged) tvaNewBlock(v);                // the velo
 tva-latch|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.note, xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve));
 osc2-render|else pcmBlock(v.osc2, tmp2);|else std::fill(tmp2, tmp2 + 64, 0.0f);
 osc2-plays|return waveOf(o) != nullptr;|return cur[0] != nullptr;
-osc2-robot|v->osc2.robot = ctl.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;|v->osc2.robot = false;
-osc2-robot-osc1|v->osc2.robot = ctl.osc2.robot &&|v->osc2.robot = ctl.robot &&
+osc2-robot|v->osc2.robotKnob = ctl.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;|v->osc2.robotKnob = false;
+osc2-robot-osc1|v->osc2.robotKnob = ctl.osc2.robot &&|v->osc2.robotKnob = ctl.robot &&
 band-loop-knobs|s.mb.setLoop(waveLoop(s, o));|s.mb.setLoop(waveLoop(s, ctl));
 solo-loop-knobs|s.solo.setLoop(waveLoop(s, o));|s.solo.setLoop(waveLoop(s, ctl));
 loop-frames|const int last = (int)s.wave->frames - 1;|const int last = (int)s.wave->frames - 2;
@@ -630,9 +630,9 @@ solo-f0-half|if (f0n > 0.5f) f0n = 0.5f;||tonesolo
 solo-f0-note|f0n = 0.0f;\n    anchorStepInit = 1.0;|f0n = 0.5f;\n    anchorStepInit = 1.0;|tonesolo
 solo-coef-lim|if (fCoef > lim) fCoef = lim;\n||tonesolo
 solo-en-zero|if (energy == 0.0f) { x = x * 0.125f; qt = k12; }|if (energy == 0.0f) { qt = k12; }|tonesolo
-solo-en-low|if (!(0.5f > A)) {|if (!(0.25f > A)) {|tonesolo
-solo-en-mid|if (1.0f > A) pr = (2.0f * A - 1.0f) * energy;|if (1.0f > A) pr = (2.0f * A - 0.5f) * energy;|tonesolo
-solo-en-high|else if (2.0f > A) pr = (2.0f - A) * energy;|else if (2.0f > A) pr = (2.5f - A) * energy;|tonesolo
+solo-en-low|if (!(0.5f > rate98)) {|if (!(0.25f > rate98)) {|tonesolo
+solo-en-mid|if (1.0f > rate98) pr = (2.0f * rate98 - 1.0f) * energy;|if (1.0f > rate98) pr = (2.0f * rate98 - 0.5f) * energy;|tonesolo
+solo-en-high|else if (2.0f > rate98) pr = (2.0f - rate98) * energy;|else if (2.0f > rate98) pr = (2.5f - rate98) * energy;|tonesolo
 solo-age-start|c.age    = timer;|c.age    = 0;|tonesolo
 solo-tap-next|c.tap    = g.C;|c.tap    = (int32_t)(16.0 * lenOf(seg + 1));|tonesolo
 solo-age-per-sample|c.age = (int32_t)((uint32_t)c.age + 0x1000u);|c.age = (int32_t)((uint32_t)c.age + 0xfffu);|tonesolo
@@ -671,8 +671,8 @@ solo-walk-frac|int32_t np = Pi + (sum >> 20), nf = sum & 0xfffff;|int32_t np = P
 solo-walk-turn|if (f3 & 8) { if (neg) f3 &= 0xf7; else step = -step; }|if (f3 & 8) { if (neg) f3 &= 0xf7; }|tonesolo
 solo-walk-turn-b|if (f3 & 4) { if (neg) step = -step; else f3 &= 0xf7; }|if (f3 & 4) { if (!neg) f3 &= 0xf7; }|tonesolo
 solo-walk-sic|if (f3 & 4) { if (neg) step = -step; else f3 &= 0xf7; }|if (f3 & 4) { if (neg) step = -step; else f3 &= 0xfb; }|solo
-solo-hold-keep|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0x8f;|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0xcf;|solo
-solo-hold-side|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0x8f;|if ((f3 & 0x20) ? fs > 0.0f : 0.0f > fs) f3 &= 0x8f;|solo
+solo-hold-keep|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) { f3 &= 0x8f;|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) { f3 &= 0xcf;|solo
+solo-hold-side|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) { f3 &= 0x8f;|if ((f3 & 0x20) ? fs > 0.0f : 0.0f > fs) { f3 &= 0x8f;|solo
 solo-hold-anchor|else if (Pq >= anchor) anchorForward();|else if (Pq > anchor) anchorForward();|solo
 solo-end-gate|if (!ended_) {\n                const Grain g|if (true) {\n                const Grain g|tonesolo
 solo-jump-f0|    if (i >= nc \|\| !p->voiced[i]) f0n = 0.0f;\n||solo
@@ -687,7 +687,7 @@ solo-mode3-pos|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[0]); retu
 solo-one-way-b|if (lmode3 == 1) { jumpTo(lp[2]); return; }|if (lmode3 == 1) { jumpTo(lp[3]); return; }|tonesolo
 solo-bounce-b|if (lmode3 == 2) { f3 \|= 4; walkStep = -walkStep; return; }|if (lmode3 == 2) { walkStep = -walkStep; return; }|tonesolo
 solo-mode3-b|if (lmode3 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[3]); return; }|if (lmode3 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[2]); return; }|solo
-solo-loop-resume|        else {\n            f3 \|= 0x20;\n            ended_ = 0;|        else {\n            f3 \|= 0x20;|tonesolo
+solo-loop-resume|        else {\n            f3 \|= 0x20;\n            f9c = loopCfg.fwdRate;\n            ended_ = 0;|        else {\n            f3 \|= 0x20;\n            f9c = loopCfg.fwdRate;|tonesolo
 solo-end-event|    curEv = 1;                          // the end event, the last\n||solo
 solo-cross-fwd|if (X > lp[2]) X = lp[2]; nextCross = X; return; }|nextCross = X; return; }|solo
 solo-cross-out|if (lp[2] > Pi && X > lp[2]) X = lp[2];|if (X > lp[2]) X = lp[2];|tonesolo
@@ -807,7 +807,7 @@ tune-robot|const bool tuned = !s.robot;|const bool tuned = true;|tone
 tune-robot-factor|xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]), tune.factor);|xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]), tuned ? tune.factor : 1.0f);|tone
 tune-pitch-offset|tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);|0.0f, 1.0f, tuned ? tune.detune : 0.0f);|tone
 tune-pitch-detune|tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);|tuned ? tune.offset : 0.0f, 1.0f, 0.0f);|tone
-tune-time|xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), tune.factor);|xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]));|tone
+tune-time|xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), s.variBit \|\| s.syncBit ? tune.factor : 1.0f);|xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), 1.0f);|tone
 tune-root|s.robot \|\| s.analog \|\| !s.on, tune.offset, tune.detune);|s.robot \|\| s.analog \|\| !s.on);|tone
 loop-bwd-mode|l.bwdMode = std::clamp(s.wave->bwdMode, 0, 2);|l.bwdMode = l.fwdMode;|tone
 loop-bwd-start|l.bwdStart = s.wave->bwdStart;|l.bwdStart = a;|tone
@@ -841,3 +841,53 @@ patch-tempo|c.patchTempo = p(0x11d);|c.patchTempo = p(0x11c);|tonepatch
 patch-fx-other|d->def });|xtPatchTyped(store, kBlocks[b].slots, id) });|tonepatch
 patch-fx-slots|{ 0x1fc, kXtChorusSlots }|{ 0x1fc, kXtMfxSlots }|tonepatch
 patch-fx-switch|{ 0x120, 0x121, 0x122, 0x177,|{ 0x120, 0x121, 0x177,|tonepatch
+lin-gain-step|constexpr float kScale = 65536.0f, kGainStep = 0.03125f;|constexpr float kScale = 65536.0f, kGainStep = 0.0625f;|tonelin
+lin-fade-step|std::bit_cast<float>(0x3d8b51d9u)|std::bit_cast<float>(0x3d8b51dau)|tonelin
+lin-fwd-end|if (pos >= w.end) { pos = w.end; hold(lr, pos, 1.0f);|if (pos > w.end) { pos = w.end; hold(lr, pos, 1.0f);|tonelin
+lin-bwd-end|if (w.end >= pos) { pos = w.end; hold(lr, pos, -1.0f);|if (w.end > pos) { pos = w.end; hold(lr, pos, -1.0f);|tonelin
+lin-hold-sign|        if (sign < 0.0f) o = -o;\n||tonelin
+lin-bwd-read|read(lr, fo, at, -1, at - 1, 1, -1);\n            frac = frac - whole;|read(lr, fo, at, -1, at - 1, 1, 1);\n            frac = frac - whole;|tonelin
+lin-fwd-read-sign|read(lr, fo, at, 1, at + 1, 1, -1);\n            frac = frac - whole;|read(lr, fo, at, 1, at + 1, -1, 1);\n            frac = frac - whole;|tonelin
+lin-oneway-next|            if (next > w.b) next = wrapAdd(next, -w.len);\n||tonelin
+lin-oneway-rate|if (!(w.a > pos) && !(pos > w.b)) rate = rate * w.rate;|if (!(w.a > pos) && !(pos > w.b)) rate = rate;|tonelin
+lin-oneway-hold|if (w.b > w.end && pos >= w.end)|if (pos >= w.end)|tonelin
+lin-alt-turn|read(lr, fo, at, 1, at - 1, -1, -1);|read(lr, fo, at, 1, at - 1, 1, -1);|tonelin
+lin-alt-mirror|read(lr, fo, m, -1, m - 1, -1, 1);|read(lr, fo, m, 1, m - 1, -1, 1);|tonelin
+lin-alt-other|read(lr, fo, m, -1, m + 1, 1, 1);|read(lr, fo, m, -1, m + 1, 1, -1);|tonelin
+lin-alt-top|const int32_t top = wrapAdd(w.b, w.len), both|const int32_t top = wrapAdd(w.b, w.len - 1), both|tonelin
+lin-alt-stereo-pos|pos = y ? at : v;                       // the stereo|pos = v;                       // the stereo|tonelin
+lin-bwd-oneway-prev|            if (w.b > prev) prev = wrapAdd(prev, w.len);\n||tonelin
+lin-bwd-oneway-wrap|while (w.b >= pos && w.len > 0)|while (w.b > pos && w.len > 0)|tonelin
+lin-bwd-alt-turn|read(lr, fo, at, -1, at + 1, -1, -1);|read(lr, fo, at, -1, at + 1, 1, -1);|tonelin
+lin-bwd-alt-mirror|read(lr, fo, m, 1, m + 1, -1, 1);|read(lr, fo, m, 1, m + 1, 1, 1);|tonelin
+lin-bwd-alt-other|read(lr, fo, w.a, 1, w.a - 1, 1, 1);|read(lr, fo, w.a, -1, w.a - 1, 1, 1);|tonelin
+lin-bwd-loop-rate|if (!(w.b > pos) && !(pos > w.a)) rate = rate * w.rate;|if (!(w.b > pos) && !(pos > w.a)) rate = rate;|tonelin
+lin-beat-bits|if (flags0 & 6) rate = (float)xtf::ftrc(fs) * 0x1p-25f;|if (flags0 & 2) rate = (float)xtf::ftrc(fs) * 0x1p-25f;|tonelin
+lin-start-dir|pos = turning = 0.0f > walk ? fwd.end : bwd.end;|pos = turning = 0.0f > walk ? bwd.end : fwd.end;|tonelin
+lin-stereo-swap|if (y) { out[0] = one(*x); out[1] = one(*y); }|if (y) { out[0] = one(*y); out[1] = one(*x); }|tonelin
+lin-seek-frac|    pos = pos16 >> 4;\n    frac = 0.0f;\n|    pos = pos16 >> 4;\n|tonelin
+lin-bwd-region|bwd.a = loopCfg.bwdEnd; bwd.b = loopCfg.bwdStart;|bwd.a = loopCfg.bwdStart; bwd.b = loopCfg.bwdEnd;|tonelin
+vari-walk-sync|s.variBit \|\| s.syncBit ? tune.factor : 1.0f|s.variBit ? tune.factor : 1.0f|tone
+vari-walk-factor|s.variBit \|\| s.syncBit ? tune.factor : 1.0f|tune.factor|tone
+vari-walk-live|    s.variBit = o.vari;                                // the voice's|    s.variBit = s.variBit;                                // the voice's|tone
+vari-robot|    v->robot = v->robotKnob && ctl.vari;|    v->robot = v->robotKnob;|tone
+vari-cents|o.rootKey, s.robotKnob && o.vari);|o.rootKey, s.robot);|tone
+vari-no-linear|    v->linear = !ctl.vari &&|    v->linear = false &&|tone
+vari-band|        s.mb.setVari(o.vari);\n||tone
+vari-robot-follow|        s.solo.setRobot(s.robotKnob && o.vari);|        s.solo.setRobot(s.robot);|tone
+loop-rate-fwd|    l.fwdRate = s.wave->loopRate[0];\n||tone
+loop-rate-bwd|    l.bwdRate = s.wave->loopRate[1];\n||tone
+band-vari|if (S.flags0 & 0x20) {|if (false) {|toneband
+band-vari-beat|const float by = (S.flags0 & 6) ? 1.0f : S.rateF;|const float by = S.rateF;|toneband
+band-vari-abs|S.rateF = std::fabs((float)S.walkStep) * 2.98023224e-8f;|S.rateF = (float)S.walkStep * 2.98023224e-8f;|toneband
+band-loop-fwd|f9c = loopFwdRate;|f9c = 1.0f;|toneband
+band-loop-bwd|f9c = loopBwdRate;|f9c = 1.0f;|toneband
+solo-loop-fwd|f9c = loopCfg.fwdRate;|f9c = 1.0f;|tonesolo
+solo-loop-bwd|f9c = loopCfg.bwdRate;|f9c = 1.0f;|tonesolo
+solo-rate98|rate98 = robot ? A : A * f9c;|rate98 = A;|tonesolo
+solo-rate98-robot|rate98 = robot ? A : A * f9c;|rate98 = A * f9c;|tonesolo
+solo-f9c-bounce|if (f3 & 0x10) { f3 &= 0xef; f9c = 1.0f; }|if (f3 & 0x10) { f3 &= 0xef; }|tonesolo
+loop-rate-scale|return xtOscExp2(xtf::div(xtf::flt(tenths), 12000.0f));|return xtOscExp2(xtf::div(xtf::flt(tenths), 1200.0f));|toneosc
+patch-vari|    o.vari = p(b + 0x30) != 0;|    o.vari = true;|tonepatch
+solo-robot-event|    robotEv = robot;                    // an event's load|    // an event's load|tonesolo
+solo-robot-grains|        if (robotEv) { pw = K(0x44c8745d) / Af;|        if (robot) { pw = K(0x44c8745d) / Af;|tonesolo

@@ -13,7 +13,7 @@ The plugin's user interface follows this design from v144 on, by the user's deci
 
 | Tab | Cards |
 |---|---|
-| Oscillator | Wave, or Analog oscillator when Type is ANALOG · Loop · Tempo sync · Pitch · Level · Velocity |
+| Oscillator | Wave (Vari on its title line), or Analog oscillator when Type is ANALOG · Loop · Tempo sync · Pitch · Level · Velocity |
 | Envelopes | Amp (TVA) · Pitch · Time · OSC n Amp · Formant · COSM n |
 | LFOs | LFO 1 or 2, by the OSC · Amp LFO (LFO 5) |
 | COSM | COSM 1/2, On, Type · the type's own rows · LFO 3 or 4 · MOD · Structure |

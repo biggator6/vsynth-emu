@@ -178,6 +178,7 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
         out.tune = (int32_t)le32(vplp);
         out.loopStart = (long)le32(vplp + 4); out.loopEnd = (long)le32(vplp + 8);
         out.bwdEnd = (long)le32(vplp + 0xc); out.bwdStart = (long)le32(vplp + 0x10);
+        out.loopRateFwd = (int16_t)(vplp[0x14] | (vplp[0x15] << 8)); out.loopRateBwd = (int16_t)(vplp[0x16] | (vplp[0x17] << 8));
         out.fwdMode = vplp[0x18]; out.bwdMode = vplp[0x19];
         out.loopSwitchDecides = vplp[0x1a] != 0;
         out.tuneFine = (int8_t)vplp[0x1b];
@@ -498,10 +499,11 @@ int main(int argc, char** argv) {
             stream[sc + 0xa] = 65; put(sc + 0x18, 15); put(sc + 0x1c, 999991);
             put(lp, (uint32_t)-1234); put(lp + 4, 11); put(lp + 8, 2222); put(lp + 0xc, 333); put(lp + 0x10, 44);
             stream[lp + 0x18] = 2; stream[lp + 0x19] = 0; stream[lp + 0x1a] = 0; stream[lp + 0x1b] = (uint8_t)(int8_t)-7;
+            stream[lp + 0x14] = 0x2c; stream[lp + 0x15] = 0x01; stream[lp + 0x16] = 0xa9; stream[lp + 0x17] = 0xfe;   // 300 and -343
             XtWaveFile back;
             const auto same = [&](const XtWaveFile& b) {
                 return b.originalKey == 65 && b.headerCents == 15 && b.tempo == 999991 && b.tune == -1234 && b.loopStart == 11 && b.loopEnd == 2222 && b.bwdEnd == 333 && b.bwdStart == 44
-                    && b.fwdMode == 2 && b.bwdMode == 0 && !b.loopSwitchDecides && b.tuneFine == -7 && b.frames == w.frames && b.channels == w.channels && b.encodeType == w.encodeType;
+                    && b.fwdMode == 2 && b.bwdMode == 0 && !b.loopSwitchDecides && b.tuneFine == -7 && b.loopRateFwd == 300 && b.loopRateBwd == -343 && b.frames == w.frames && b.channels == w.channels && b.encodeType == w.encodeType;
             };
             if (!xtWaveRead(stream.data(), stream.size(), back) || !same(back) || back.pcm != w.pcm) ++bad;
             // The RIFF: the chunks up to data, LINR for RDAC, and the samples

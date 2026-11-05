@@ -215,6 +215,8 @@ float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, flo
     return mul(r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r), waveFactor);
 }
 
+float xtWaveLoopRate(int tenths) { return xtOscExp2(xtf::div(xtf::flt(tenths), 12000.0f)); }
+
 XtWaveTune xtWaveTune(int headerCents, int fine, int tune) {
     using namespace xtf;
     XtWaveTune t;

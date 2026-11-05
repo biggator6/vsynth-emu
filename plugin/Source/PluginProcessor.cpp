@@ -13,6 +13,7 @@ namespace Params {
     static const juce::String kEncodeType   = "encodeType";    // Auto, SOLO, BACKING, ENSEMBLE
     static const juce::String kEncodeDepth  = "encodeDepth";   // multi-band attack detection
     static const juce::String kRootKey      = "rootKey";       // note that plays the sample unshifted
+    static const juce::String kVari         = "vari";          // Vari Sw: off, the wave's time follows its pitch (XtLinearPlayer, or a band player's walk)
     static const juce::String kEnergy       = "energy";        // SOLO Energy, OFF/1..127 (g = (k/127)²)
     // The VariPhrase OSC (XtOsc): Time and Formant −63..+63 (the XT path's
     // TIME and FORMANT knobs), Time Offset, Time and Formant KF
@@ -261,6 +262,7 @@ VSynthEmuProcessor::createParameterLayout() {
         Params::kRootKey, "Original Key", 0, 127, 60
     ));
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kVari, "Vari Sw", true));
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         Params::kEnergy, "Energy", 0, 127, 0,
         juce::AudioParameterIntAttributes().withStringFromValueFunction(
@@ -748,6 +750,7 @@ VSynthEmuProcessor::createParameterLayout() {
             juce::AudioParameterIntAttributes().withStringFromValueFunction(
                 [](int v, int) { return v == 0 ? juce::String("OFF") : juce::String(v); })));
         params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kRobot), n + "Robot Voice", false));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kVari), n + "Vari Sw", true));
         intP(Params::kOscTime, "Time", -63, 63, 0);
         params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kOscTimeOffset), n + "Time Offset",
             juce::StringArray { "BWD", "ZERO", "FWD" }, 2));
@@ -1198,6 +1201,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.ampVelSens   = knob(Params::kAmpVelSens);
     c.ampVelCurve  = knob(Params::kAmpVelCurve);
     c.robot        = apvts.getRawParameterValue(Params::kRobot)->load() > 0.5f;   // Robot Voice (SOLO)
+    c.vari         = apvts.getRawParameterValue(Params::kVari)->load() > 0.5f;
     c.lfoWave      = (int)apvts.getRawParameterValue(Params::kLfoWave)->load();
     c.lfoRate      = (int)apvts.getRawParameterValue(Params::kLfoRate)->load();
     c.lfoPitchDepth = (int)apvts.getRawParameterValue(Params::kLfoDepth)->load();
@@ -1274,6 +1278,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         o.energy = knob2(Params::kEnergy);
         o.rootKey = knob2(Params::kRootKey);
         o.robot = apvts.getRawParameterValue(oscId(1, Params::kRobot))->load() > 0.5f;
+        o.vari = apvts.getRawParameterValue(oscId(1, Params::kVari))->load() > 0.5f;
         o.oscTime = knob2(Params::kOscTime);
         o.oscTimeOffset = knob2(Params::kOscTimeOffset);
         o.oscTimeKF = kf2(Params::kOscTimeKF);
@@ -1539,6 +1544,7 @@ void VSynthEmuProcessor::setControls(const XtSynth::Controls& c) {
     set(Params::kAmpVelSens, c.ampVelSens);
     set(Params::kAmpVelCurve, c.ampVelCurve);
     set(Params::kRobot, c.robot ? 1 : 0);
+    set(Params::kVari, c.vari ? 1 : 0);
     set(Params::kLfoWave, c.lfoWave);
     set(Params::kLfoRate, c.lfoRate);
     set(Params::kLfoDepth, c.lfoPitchDepth);
@@ -1613,6 +1619,7 @@ void VSynthEmuProcessor::setControls(const XtSynth::Controls& c) {
         set(oscId(1, Params::kEnergy), o.energy);
         set(oscId(1, Params::kRootKey), o.rootKey);
         set(oscId(1, Params::kRobot), o.robot ? 1 : 0);
+        set(oscId(1, Params::kVari), o.vari ? 1 : 0);
         set(oscId(1, Params::kOscTime), o.oscTime);
         set(oscId(1, Params::kOscTimeOffset), o.oscTimeOffset);
         set(oscId(1, Params::kOscTimeKF), o.oscTimeKF);

@@ -14,12 +14,12 @@ source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
-if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ] || [ "$PORT" = toneband ] || [ "$PORT" = tonecheck ] || [ "$PORT" = tonefw ] || [ "$PORT" = toneosc ] || [ "$PORT" = tonelfo ] || [ "$PORT" = toneenv ] || [ "$PORT" = tonesolo ] || [ "$PORT" = tonepatch ] || [ "$PORT" = tonefiles ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
-    F=XtSynth.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp; [ "$PORT" = toneband ] && F=XtMultiBandPlayer.cpp; [ "$PORT" = tonecheck ] && F=XtToneCheck.cpp; [ "$PORT" = tonefw ] && F=XtFirmware.cpp; [ "$PORT" = toneosc ] && F=XtOsc.cpp; [ "$PORT" = tonelfo ] && F=XtLfo.cpp; [ "$PORT" = toneenv ] && F=XtEnvelope.cpp; [ "$PORT" = tonesolo ] && F=XtSoloVoice.cpp; [ "$PORT" = tonepatch ] && F=XtPatch.cpp; [ "$PORT" = tonefiles ] && F=XtFiles.cpp
+if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ] || [ "$PORT" = toneband ] || [ "$PORT" = tonecheck ] || [ "$PORT" = tonefw ] || [ "$PORT" = toneosc ] || [ "$PORT" = tonelfo ] || [ "$PORT" = toneenv ] || [ "$PORT" = tonesolo ] || [ "$PORT" = tonelin ] || [ "$PORT" = tonepatch ] || [ "$PORT" = tonefiles ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
+    F=XtSynth.cpp; [ "$PORT" = tonelin ] && F=XtLinearPlayer.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp; [ "$PORT" = toneband ] && F=XtMultiBandPlayer.cpp; [ "$PORT" = tonecheck ] && F=XtToneCheck.cpp; [ "$PORT" = tonefw ] && F=XtFirmware.cpp; [ "$PORT" = toneosc ] && F=XtOsc.cpp; [ "$PORT" = tonelfo ] && F=XtLfo.cpp; [ "$PORT" = toneenv ] && F=XtEnvelope.cpp; [ "$PORT" = tonesolo ] && F=XtSoloVoice.cpp; [ "$PORT" = tonepatch ] && F=XtPatch.cpp; [ "$PORT" = tonefiles ] && F=XtFiles.cpp
     D=XT_TONE_MAIN; ARGS=("${SEED:-2024}" "$WORK/inputs")
     OBJ="$M/tone_obj"; mkdir -p "$OBJ"; L=()
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
-    for f in XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtMultiBandPlayer XtEnvelope XtLfo XtOsc XtCosm XtAnalog XtFirmware Sh4Interp XtFiles XtPatch; do
+    for f in XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtLinearPlayer XtMultiBandPlayer XtEnvelope XtLfo XtOsc XtCosm XtAnalog XtFirmware Sh4Interp XtFiles XtPatch; do
         [ "$f.cpp" = "$F" ] && continue
         [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] || "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_TONE_MAIN -DXT_TONE_CHECK -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
         L+=("$OBJ/$f.o")

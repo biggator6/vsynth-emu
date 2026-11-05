@@ -235,7 +235,7 @@ void XtSynth::noteTuning(const Voice& v, const OscVoice& s, const OscControls& o
 float XtSynth::noteCents(const Voice& v, const OscVoice& s, const OscControls& o, int key) const {
     int coarse, fine;
     noteTuning(v, s, o, coarse, fine);
-    return xtPitchCents(key, coarse, 10 * o.pitchKF, fine, s.analog ? 69 : o.rootKey, s.robot);
+    return xtPitchCents(key, coarse, 10 * o.pitchKF, fine, s.analog ? 69 : o.rootKey, s.robotKnob && o.vari);
 }
 
 // The analog converter's block at the voice's note, formed again at every
@@ -326,7 +326,7 @@ void XtSynth::targets(const Voice& v, const OscVoice& s, const OscControls& o, f
     F = xtOscFormantRatio(xtOscFormant(o.oscFormant, o.oscFormantKF, v.note, v.mx[OscFormant + dO]), s.fenv.level(),
                           withVel(xtOscFormantEnvDepth(o.fDepth), o.fVel), s.lfo.out(), xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]), tune.factor);
     walk = xtOscWalk(xtOscTime(o.oscTime, o.oscTimeOffset, o.oscTimeKF, v.note, v.mx[OscTime + dO], v.beam[1] - 3 * v.beam[0]), s.tenv.level(),
-                     withVel(xtOscTimeEnvDepth(o.tDepth), o.tVel), s.lfo.out(), xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), tune.factor);
+                     withVel(xtOscTimeEnvDepth(o.tDepth), o.tVel), s.lfo.out(), xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), s.variBit || s.syncBit ? tune.factor : 1.0f);   // 0x894f3cd0, past Tempo Sync's test
     g = xtOscEnergy(o.energy);
 }
 
@@ -356,6 +356,8 @@ XtLoop XtSynth::waveLoop(const OscVoice& s, const OscControls& o) const {
     l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 2);
     l.fwdStart = l.bwdStart = a;
     l.fwdEnd = l.bwdEnd = b;
+    l.fwdRate = s.wave->loopRate[0];
+    l.bwdRate = s.wave->loopRate[1];
     if (s.wave->bwdMode >= 0) {
         l.bwdMode = std::clamp(s.wave->bwdMode, 0, 2);
         l.bwdStart = s.wave->bwdStart;
@@ -380,7 +382,8 @@ XtEnvParams XtSynth::ampEnvParams(const Voice& v, const OscControls& o) const {
 }
 
 void XtSynth::applyRates(OscVoice& s) {
-    if (s.wave->type == 1) { s.solo.setRates(s.curA, s.curF, s.curWalk); s.solo.setEnergy(s.curG); s.solo.setGain(s.curGain); }
+    if (s.linear) { s.lin.setRates(s.curA, s.curWalk); s.lin.setGainXt(s.curGain); }
+    else if (s.wave->type == 1) { s.solo.setRates(s.curA, s.curF, s.curWalk); s.solo.setEnergy(s.curG); s.solo.setGain(s.curGain); }
     else { s.mb.setRates(s.curA, s.curWalk); s.mb.setGainXt(s.curGain); }
 }
 
@@ -783,8 +786,16 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->osc2.analog = ctl.osc2.oscType == 0;
     v->wave = waveOf(ctl);
     v->osc2.wave = waveOf(ctl.osc2);
-    v->robot = ctl.robot && v->on && !v->analog && v->wave->type == 1;   // SOLO only (the converter's SOLO tail)
-    v->osc2.robot = ctl.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;
+    v->robotKnob = ctl.robot && v->on && !v->analog && v->wave->type == 1;   // SOLO only (the converter's SOLO tail)
+    v->osc2.robotKnob = ctl.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;
+    v->robot = v->robotKnob && ctl.vari;                                     // the block's flag 0x10 takes Vari Sw on too
+    v->osc2.robot = v->osc2.robotKnob && ctl.osc2.vari;
+    v->linear = !ctl.vari && v->on && !v->analog && v->wave->type == 1;
+    v->variBit = ctl.vari;
+    v->osc2.variBit = ctl.osc2.vari;
+    v->syncBit = ctl.tempoSync;
+    v->osc2.syncBit = ctl.osc2.tempoSync;
+    v->osc2.linear = !ctl.osc2.vari && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;
     // the OSCs' random pitch (0x894e4940, OSC 1 then 2, each whatever its
     // Switch): the shared generator steps once per note for an OSC with a depth
     v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
@@ -956,6 +967,14 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
         if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;   // the tone's note-on (0x894f6148): under OSC SYNC OSC 2 plays LA-SAW as SAW
         s.ana.noteOn(b, s.curA, s.curGain, gainStart, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared);
     }
+    else if (s.linear) {
+        s.lin.setLoop(waveLoop(s, o));
+        s.lin.setTempo(tempoWord, (uint32_t)o.origTempo);
+        s.lin.setBeatFlags(o.tempoSync, tripNow);
+        s.lin.noteOn(s.wave->solo.in, s.wave->solo.inR, s.curA, s.curWalk);
+        s.lin.setGainXt(gainStart, true);
+        s.lin.setGainXt(s.curGain);
+    }
     else if (s.wave->type == 1) {
         s.solo.setRobot(s.robot);
         s.solo.setLoop(waveLoop(s, o));
@@ -967,6 +986,7 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     }
     else {
         s.mb.setLoop(waveLoop(s, o));
+        s.mb.setVari(o.vari);
         s.mb.setTempo(tempoWord, (uint32_t)o.origTempo);
         s.mb.setBeatFlags(o.tempoSync, tripNow);
         if (s.mb.noteOn(s.wave->wave, s.wave->type, s.curA, s.curWalk)) {
@@ -1249,7 +1269,8 @@ void XtSynth::padSteps(int step) {
         if (!v.active) continue;
         auto give = [&](OscVoice& s) {
             if (!s.on || s.analog) return;
-            if (s.wave->type == 1) { if (s.solo.tripOn()) s.solo.setTrip(step); }
+            if (s.linear) { if (s.lin.tripOn()) s.lin.setTrip(step); }
+            else if (s.wave->type == 1) { if (s.solo.tripOn()) s.solo.setTrip(step); }
             else if (s.mb.tripOn()) s.mb.setTrip(step);
         };
         give(v);
@@ -1290,10 +1311,16 @@ void XtSynth::timeTripKnob(int value) {
 // fades the player out, and the voice update stands aside until it is silent (0x894f20d2).
 void XtSynth::oscBeat(OscVoice& s, const OscControls& o) {
     if (!s.on || s.analog) return;
+    s.variBit = o.vari;                                // the voice's +0xb4, after a knob's update has worked out the walk (0x894f2788)
+    s.syncBit = o.tempoSync;
     const bool sync = o.tempoSync, trip = o.timeTrip && pad.on();
-    if (s.wave->type == 1) {
+    if (s.linear) {
+        if (o.beatKeep && s.lin.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.lin.setGainXt(0.0f); }
+        s.lin.setBeatFlags(sync, trip);
+    } else if (s.wave->type == 1) {
         if (o.beatKeep && s.solo.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.solo.setGain(0.0f); }
         s.solo.setBeatFlags(sync, trip);
+        s.solo.setRobot(s.robotKnob && o.vari);        // the block's byte, all but the Vari bit, to the player's (0x894f3fa8): Robot follows
     } else {
         if (o.beatKeep && s.mb.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.mb.setGainXt(0.0f); }
         s.mb.setBeatFlags(sync, trip);
@@ -1390,7 +1417,8 @@ void XtSynth::clockTick() {
         auto oscClock = [&](OscVoice& s) {
             s.lfo.clock(dt);
             if (!s.on || s.analog) return;
-            if (s.wave->type == 1) { if (s.solo.syncOn()) s.solo.addClock(1); }
+            if (s.linear) { if (s.lin.syncOn()) s.lin.addClock(1); }
+            else if (s.wave->type == 1) { if (s.solo.syncOn()) s.solo.addClock(1); }
             else if (s.mb.syncOn()) s.mb.addClock(1);
         };
         oscClock(v);
@@ -1475,7 +1503,12 @@ void XtSynth::mixBlock(float* lr) {
                 if (c.on) { c.envA.tick(); c.envB.tick(); c.lfo.tick(1); }
             auto oscUpdate = [&](OscVoice& s, const OscControls& o) {
                 if (s.chase) {                                 // 0x894f20d2: going back to the beat, once silent
-                    if (s.wave->type == 1) {
+                    // (The XT picks a SOLO wave's seek by Vari Sw as it stands, 0x894f2ea4.  Switched during the note, that runs one player's seek
+                    // on the other's state, which leaves it reading anywhere: here each player keeps its own.)
+                    if (s.linear) {
+                        if (s.lin.gainNow() > kSilent) return;
+                        s.lin.seek(s.lin.beat().beatPos >> 5);
+                    } else if (s.wave->type == 1) {
                         if (s.solo.gainNow() > kSilent) return;
                         s.solo.seek(s.solo.beat().beatPos >> 5);
                     } else {
@@ -1514,7 +1547,8 @@ void XtSynth::mixBlock(float* lr) {
         }
         // A PCM OSC's player, in the XT's units (int16 × 65536); the players' gains are the firmware's
         auto pcmBlock = [](OscVoice& s, float* lr) {
-            if (s.wave->type == 1) s.solo.renderXt(lr, 32);
+            if (s.linear) s.lin.block(lr);
+            else if (s.wave->type == 1) s.solo.renderXt(lr, 32);
             else s.mb.block(lr);
         };
         // The tone's render by its Structure Type (xtToneOrder), all in the XT's units
@@ -1723,7 +1757,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_OENV="a,d,s,r[,aSens,dSens,rSens,timeKF]": the OSC amp envelope.
 //   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
 //   XT_VELOCITY=v: note-on velocity 1..127 (default 127).
-//   XT_ROBOT=1: Robot Voice.
+//   XT_ROBOT=1: Robot Voice.  XT_VARI=0, XT_VARI2=0: Vari Sw off on OSC 1, OSC 2.
 //   XT_LOOP="mode,start,end": Loop on, Loop Mode (0 One Shot, 1 One Way,
 //     2 Alternate) and the region as fractions of the wave.
 //   XT_PORTA="mode,type,time,veloSens": Portamento on, Mode (0 NORMAL,
@@ -1895,6 +1929,7 @@ int main(int argc, char** argv) {
             std::sscanf(e, "%d,%d,%d,%d,%d,%d,%d,%d", &o.oscTime, &o.oscTimeOffset, &o.oscTimeKF, &o.oscFormant, &o.oscFormantKF,
                         &o.energy, &o.lfoTimeDepth, &o.lfoFormantDepth);
         o.robot = std::getenv("XT_ROBOT2") && std::atoi(std::getenv("XT_ROBOT2")) != 0;
+        o.vari = !(std::getenv("XT_VARI2") && std::atoi(std::getenv("XT_VARI2")) == 0);
         if (const char* e = std::getenv("XT_LOOP2")) {
             o.loop = true;
             std::sscanf(e, "%d,%f,%f", &o.loopMode, &o.loopStart, &o.loopEnd);
@@ -1909,6 +1944,7 @@ int main(int argc, char** argv) {
         std::sscanf(e, "%d,%d,%d,%d", &c.ampVelSens, &c.ampVelCurve, &c.oscVelSens, &c.oscVelCurve);
     const float noteVel = std::getenv("XT_VELOCITY") ? std::atoi(std::getenv("XT_VELOCITY")) / 127.0f : 1.0f;
     c.robot = std::getenv("XT_ROBOT") && std::atoi(std::getenv("XT_ROBOT")) != 0;
+    c.vari = !(std::getenv("XT_VARI") && std::atoi(std::getenv("XT_VARI")) == 0);
     if (const char* e = std::getenv("XT_LOOP")) {
         c.loop = true;
         std::sscanf(e, "%d,%f,%f", &c.loopMode, &c.loopStart, &c.loopEnd);

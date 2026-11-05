@@ -945,6 +945,7 @@ int main(int argc, char** argv) {
         }
         if (const char* e = std::getenv("TEST_OSC2_KEY")) { o.rootKey = std::atoi(e); set2("rootKey", o.rootKey); }
         if (std::getenv("TEST_OSC2_ROBOT") && std::atoi(std::getenv("TEST_OSC2_ROBOT")) != 0) { o.robot = true; set2("robot", 1); }
+        if (std::getenv("TEST_OSC2_VARI") && std::atoi(std::getenv("TEST_OSC2_VARI")) == 0) { o.vari = false; set2("vari", 0); }
         if (std::getenv("TEST_OSC1_OFF") && std::atoi(std::getenv("TEST_OSC1_OFF")) != 0) {
             refCtl.on = false;
             auto* prm = p.apvts.getParameter("oscSwitch");
@@ -993,6 +994,11 @@ int main(int argc, char** argv) {
         std::sscanf(e, "%d,%d,%d,%d", &refCtl.ampVelSens, &refCtl.ampVelCurve, &refCtl.oscVelSens, &refCtl.oscVelCurve);
         setKnobs({ { "ampVelSens", refCtl.ampVelSens }, { "ampVelCurve", refCtl.ampVelCurve }, { "oscVelSens", refCtl.oscVelSens },
                    { "oscVelCurve", refCtl.oscVelCurve } });
+    }
+    // TEST_VARI=0: Vari Sw off (OSC 1), so the wave's time follows its pitch
+    if (std::getenv("TEST_VARI") && std::atoi(std::getenv("TEST_VARI")) == 0) {
+        refCtl.vari = false;
+        setKnobs({ { "vari", 0 } });
     }
     // TEST_ROBOT=1: Robot Voice
     if (std::getenv("TEST_ROBOT") && std::atoi(std::getenv("TEST_ROBOT")) != 0) {

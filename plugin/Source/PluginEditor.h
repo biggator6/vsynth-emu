@@ -65,6 +65,7 @@ private:
     juce::Label      anaLabels_[kAnaKnobs], anaWaveLabel_ { {}, "Wave" };
     // Loop: the OSC's Loop switch, the wave's Loop Mode and region
     juce::ToggleButton loopBtn_ { "Loop" };
+    juce::ToggleButton variBtn_ { "Vari" };      // the Wave card's title line
     juce::ComboBox   loopModeBox_;
     juce::Slider     loopStartSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     loopEndSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -215,6 +216,7 @@ private:
     void attachOsc(int k);              // the OSC's own rows on OSC 1 or OSC 2
     int oscK_ = 0;
     std::unique_ptr<ButtonAtt> loopAtt_;
+    std::unique_ptr<ButtonAtt> variAtt_;
     std::unique_ptr<ComboAtt>  loopModeAtt_;
     std::unique_ptr<SliderAtt> loopStartAtt_, loopEndAtt_;
     std::unique_ptr<ButtonAtt> portaAtt_;

@@ -8,4 +8,5 @@ struct XtLoop {
     bool on = false;                    // player byte 0 bit 0
     int fwdMode = 0, bwdMode = 0;
     int fwdStart = 0, fwdEnd = 0, bwdStart = 0, bwdEnd = 0;
+    float fwdRate = 1.0f, bwdRate = 1.0f;   // what the pitch is multiplied by once inside each (xtWaveLoopRate): the wave's own, 1 in anything imported
 };

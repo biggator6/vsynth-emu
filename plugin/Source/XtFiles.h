@@ -19,6 +19,7 @@ struct XtWaveFile {
     long bwdStart = 0, bwdEnd = 0;   // vplp +0x10, +0xc: the backward loop
     int fwdMode = 1, bwdMode = 1;    // vplp +0x18, +0x19: 0 One Shot, 1 One Way, 2 Alternate
     bool loopSwitchDecides = true;   // vplp +0x1a: clear, the wave loops whatever the OSC's Loop switch says (the converter's tail, 0x894e4030)
+    int loopRateFwd = 0, loopRateBwd = 0;   // vplp +0x14, +0x16: xtWaveLoopRate, in tenths of a cent
     int tuneFine = 0, tune = 0;      // vplp +0x1b and +0, in 1/100 cent: xtWaveTune.  Real: +0 of 55534 is a sample 5.55 semitones above its Original Key
     std::vector<int16_t> pcm;        // interleaved, frames * channels
     size_t size = 0;                 // bytes of the stream, its data chunk's end

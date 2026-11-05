@@ -47,6 +47,7 @@ void oscOf(const Read& p, int n, Osc& o) {
     o.ana.fat = p(b + 0x13); o.ana.fatKf = p(b + 0x14); o.ana.fatLfo = p(b + 0x15); o.ana.fatEnv = p(b + 0x16);
     o.oscTime = p(b + 0x23); o.oscTimeKF = 10 * p(b + 0x24); o.lfoTimeDepth = p(b + 0x25); o.tDepth = p(b + 0x26); o.oscTimeOffset = p(b + 0x27);
     o.oscFormant = p(b + 0x28); o.oscFormantKF = 10 * p(b + 0x29); o.lfoFormantDepth = p(b + 0x2a); o.fDepth = p(b + 0x2b);
+    o.vari = p(b + 0x30) != 0;
     o.tempoSync = p(b + 0x2c) != 0; o.robot = p(b + 0x2d) != 0; o.loop = p(b + 0x2f) != 0; o.energy = p(b + 0x31); o.timeTrip = p(b + 0x32) != 0; o.beatKeep = p(b + 0x33) != 0;
     o.ana.detune = p(0x30d + 3 * n); o.ana.subOctave = p(0x30e + 3 * n); o.ana.subLevel = p(0x30f + 3 * n);
     const int e = 4 * n;
@@ -202,6 +203,8 @@ void xtWaveOntoControls(const XtWaveFile& w, XtSynth::OscControls& o) {
 
 void xtWaveOntoEncoded(const XtWaveFile& w, XtEncoded& e) {
     e.tune = xtWaveTune(w.headerCents, w.tuneFine, w.tune);
+    e.loopRate[0] = xtWaveLoopRate(w.loopRateFwd);
+    e.loopRate[1] = xtWaveLoopRate(w.loopRateBwd);
     if (w.bwdStart < 0 || w.bwdStart > w.bwdEnd || w.bwdEnd >= w.frames) { e.bwdMode = -1; return; }   // a region that isn't in the wave: the forward loop's
     e.bwdMode = std::clamp(w.bwdMode, 0, 2);
     e.bwdStart = (int)w.bwdStart;
@@ -218,7 +221,6 @@ std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int z
         const std::string osc = "OSC " + std::to_string(n + 1) + " ";
         if (p(0x2a4 + b) != 0 && p(0x2a5 + b) == kExternal) m.push_back(osc + "external input");
         if (p(0x2a4 + b) == 0 || p(0x2a5 + b) != 1) continue;
-        if (p(0x2d4 + b) == 0) m.push_back(osc + "Vari off");
         if (p(0x2d2 + b) != 0) m.push_back(osc + "Playback Mode");
         if (p(0x2c6 + b) != 0) m.push_back(osc + "Start Offset");
     }

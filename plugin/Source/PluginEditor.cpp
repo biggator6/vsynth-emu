@@ -244,6 +244,10 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     addAndMakeVisible(loopBtn_);
     addAndMakeVisible(loopModeBox_);
     loopAtt_      = std::make_unique<ButtonAtt>(processor_.apvts, "loop", loopBtn_);
+    variBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    variBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
+    addAndMakeVisible(variBtn_);
+    variAtt_      = std::make_unique<ButtonAtt>(processor_.apvts, "vari", variBtn_);
     loopModeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "loopMode", loopModeBox_);
     loopStartAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "loopStart", loopStartSlider_);
     loopEndAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "loopEnd", loopEndSlider_);
@@ -798,6 +802,7 @@ void VSynthEmuEditor::attachOsc(int k) {
     oscFkfAtt_     = std::make_unique<SliderAtt>(processor_.apvts, id("oscFormantKF"), oscFkfSlider_);
     timeOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("oscTimeOffset"), timeOffsetBox_);
     loopAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("loop"), loopBtn_);
+    variAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("vari"), variBtn_);
     loopModeAtt_   = std::make_unique<ComboAtt>(processor_.apvts, id("loopMode"), loopModeBox_);
     loopStartAtt_  = std::make_unique<SliderAtt>(processor_.apvts, id("loopStart"), loopStartSlider_);
     loopEndAtt_    = std::make_unique<SliderAtt>(processor_.apvts, id("loopEnd"), loopEndSlider_);
@@ -842,7 +847,7 @@ void VSynthEmuEditor::showOscType() {
                                   (juce::Component*)&keySlider_, (juce::Component*)&depthLabel_, (juce::Component*)&depthSlider_,
                                   (juce::Component*)&energyLabel_, (juce::Component*)&energySlider_, (juce::Component*)&offsetLabel_,
                                   (juce::Component*)&timeOffsetBox_, (juce::Component*)&oscTkfLabel_, (juce::Component*)&oscTkfSlider_,
-                                  (juce::Component*)&oscFkfLabel_, (juce::Component*)&oscFkfSlider_, (juce::Component*)&loopBtn_,
+                                  (juce::Component*)&oscFkfLabel_, (juce::Component*)&oscFkfSlider_, (juce::Component*)&loopBtn_, (juce::Component*)&variBtn_,
                                   (juce::Component*)&loopModeBox_, (juce::Component*)&loopStartLabel_, (juce::Component*)&loopStartSlider_,
                                   (juce::Component*)&loopEndLabel_, (juce::Component*)&loopEndSlider_, (juce::Component*)&syncBtn_,
                                   (juce::Component*)&tripBtn_, (juce::Component*)&keepBtn_, (juce::Component*)&origTempoLabel_,
@@ -1287,6 +1292,7 @@ void VSynthEmuEditor::buildLayout() {
     {
         Page& p = *pages_[0];
         Card wave { "Wave" };
+        wave.head = { { &variBtn_, 60 } };
         wave.rows = { lr(encodeLabel_, encodeBox_), lr(keyLabel_, keySlider_, 150), lr(depthLabel_, depthSlider_), lr(energyLabel_, energySlider_),
                       lr(offsetLabel_, timeOffsetBox_, 110), lr(oscTkfLabel_, oscTkfSlider_), lr(oscFkfLabel_, oscFkfSlider_) };
         wave.shown = pcm;

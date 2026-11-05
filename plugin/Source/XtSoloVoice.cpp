@@ -165,6 +165,7 @@ void XtSoloVoice::jumpTo(int32_t pos16) {
     curEv = 0;
     prevEv = 0;
     nextEv = endPos16;
+    robotEv = robot;                    // an event's load (0x8950c7e0): +0x124 from byte 0's Robot bit
 }
 
 // The next crossing (0x8950ccc0, each block and after each crossing): the
@@ -196,17 +197,18 @@ void XtSoloVoice::crossings() {
 // bounce there; the forward loop's end loops (One Way: to the forward start;
 // Alternate: the walk turns round; mode 3: to the forward start, holding);
 // the next event (the wave's end) ends the note.  The loop regions' rate
-// factors (+0xa0/+0xa4 into +0x9c) are 1 on a VariPhrase voice.
+// factors (+0xa0/+0xa4 into +0x9c): the pitch takes them inside the loop, at the next block.
 void XtSoloVoice::crossForward() {
     const int32_t X = nextCross;
     if (lp[2] == X) {
         if (f3 & 4) { walkStep = -walkStep; f3 &= 0xfb; return; }
-        f3 &= 0xef;
+        if (f3 & 0x10) { f3 &= 0xef; f9c = 1.0f; }
     }
     if (lp[1] == X && !(f3 & 4)) {
-        if (!loopOn) f3 &= 0xdf;
+        if (!loopOn) { f3 &= 0xdf; f9c = 1.0f; }
         else {
             f3 |= 0x20;
+            f9c = loopCfg.fwdRate;
             ended_ = 0;
             if (lmode1 == 1) { jumpTo(lp[0]); return; }
             if (lmode1 == 2) { f3 |= 8; walkStep = -walkStep; return; }
@@ -215,6 +217,7 @@ void XtSoloVoice::crossForward() {
     }
     if (nextEv != X) return;
     curEv = 1;                          // the end event, the last
+    robotEv = robot;
     prevEv = nextEv;
     nextEv = endPos16 + 16;
     ended_ = 1;
@@ -227,20 +230,22 @@ void XtSoloVoice::crossBackward() {
     const int32_t X = nextCross;
     if (lp[0] == X) {
         if (f3 & 8) { walkStep = -walkStep; f3 &= 0xf7; return; }
-        f3 &= 0xdf;
+        if (f3 & 0x20) { f3 &= 0xdf; f9c = 1.0f; }
     }
     if (lp[3] == X && !(f3 & 8)) {
         if (loopOn) {
             f3 |= 0x10;
+            f9c = loopCfg.bwdRate;
             ended_ = 0;
             if (lmode3 == 1) { jumpTo(lp[2]); return; }
             if (lmode3 == 2) { f3 |= 4; walkStep = -walkStep; return; }
             if (lmode3 == 3) { walkStep = 0; f3 |= 0x40; jumpTo(lp[3]); return; }
         }
         f3 &= 0xef;
+        f9c = 1.0f;
     }
     if (prevEv != X) return;
-    if (curEv > 0) { --curEv; prevEv = 0; nextEv = endPos16; return; }
+    if (curEv > 0) { --curEv; robotEv = robot; prevEv = 0; nextEv = endPos16; return; }
     ended_ = -1;
 }
 
@@ -269,15 +274,15 @@ XtSoloVoice::Grain XtSoloVoice::grainParams(bool setF0) {
     if (p->forceUnvoiced) voiced = false;
     if (p->forcedInfo >= 0) voiced = (p->forcedInfo & 4) != 0;
     const int info = p->forcedInfo >= 0 ? p->forcedInfo : sg < nc ? p->info[sg] : 1;
-    const float Af = K(0x34ffffff) > A ? K(0x34ffffff) : A, Ff = K(0x34ffffff) > F ? K(0x34ffffff) : F;
+    const float Af = K(0x34ffffff) > rate98 ? K(0x34ffffff) : rate98, Ff = K(0x34ffffff) > F ? K(0x34ffffff) : F;
     float rate, v, pw;                                 // ppw divisor, read velocity, period
     // Robot voice: the pitch term (player +0x124 · A/256) is 0, so a voiced
     // record's grains come at a fixed period, A·440 Hz (1603.64 = 44100·16/440),
     // and an unvoiced one plays at rate 1.
-    const float Ar = robot ? 0.0f : Af;
+    const float Ar = robotEv ? 0.0f : Af;
     if (voiced) {
         v = Ff;
-        if (robot) { pw = K(0x44c8745d) / Af; rate = Ci / pw; }
+        if (robotEv) { pw = K(0x44c8745d) / Af; rate = Ci / pw; }
         else { rate = Af; pw = Ci / rate; }
     } else {
         // Info bit 0x1 gates the pitch factor, 0x2 the formant factor: the
@@ -307,6 +312,9 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
     const RoundToZero round;
     p = &plan;
     A = (float)A_; F = (float)F_; walk = (float)walk_; energy = (float)energy_;
+    f9c = 1.0f;
+    rate98 = A;
+    robotEv = robot;
     for (Chan& c : ch) c = Chan();
     next = 1;            // trigger toggle starts at 0 → first trigger → B
     slope = 0.0f;
@@ -394,7 +402,7 @@ void XtSoloVoice::walkBlock() {
         if (f3 & 4) { if (neg) step = -step; else f3 &= 0xf7; }   // (sic: 0x08)
         walkStep = step;
     } else {
-        if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) f3 &= 0x8f;
+        if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) { f3 &= 0x8f; f9c = 1.0f; }
         walkStep = 0;
     }
 }
@@ -406,14 +414,15 @@ void XtSoloVoice::walkBlock() {
 // the block's triggers, and reads the cutoff f0n that only voiced
 // triggers write.
 void XtSoloVoice::filterBlock() {
+    rate98 = robot ? A : A * f9c;                     // 0x8950cde0
     const float k12 = K(0x3f999999);                  // 1.2, a unit under note-on's
     float x = f0n, qt;
     if (energy == 0.0f) { x = x * 0.125f; qt = k12; }
     else {
         float pr = 0.0f;
-        if (!(0.5f > A)) {
-            if (1.0f > A) pr = (2.0f * A - 1.0f) * energy;
-            else if (2.0f > A) pr = (2.0f - A) * energy;
+        if (!(0.5f > rate98)) {
+            if (1.0f > rate98) pr = (2.0f * rate98 - 1.0f) * energy;
+            else if (2.0f > rate98) pr = (2.0f - rate98) * energy;
         }
         qt = k12 - energy + pr;
     }
