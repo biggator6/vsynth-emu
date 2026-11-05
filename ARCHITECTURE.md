@@ -286,10 +286,16 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
 3. **The 44.1 kHz mix is resampled to the host rate** with a streaming
    polyphase Kaiser sinc (16 taps each side). At 44.1 kHz it is bypassed.
 
-**The firmware image.** The plugin looks for `VSE_XT_ROM`, then
-`~/Library/Application Support/V-Synth Emu/V-SynthXT.rom.2.bin`; the
-**ROM...** button sets a path, saved with the session. Without it, the
-plugin falls back to the engine's streaming path (pre-v43 behaviour).
+**The firmware image.** A new instance looks for `VSE_XT_ROM`, then
+`V-SynthXT.rom.2.bin` beside the plugin's bundle (not in it: an added file
+breaks the signature), then in `~/Library/Application Support/V-Synth Emu/`,
+then the file last chosen with the **ROM...** button, which `settings.xml` in
+that folder keeps for every project and plugin format. A project also saves
+its path, used only if none of those is found, and not kept for other projects.
+Without any, the plugin falls back to the engine's streaming path (pre-v43
+behaviour). The tables belong to the process: an image already in memory isn't
+read again under the instances playing from it, and one that won't load leaves
+the last in place.
 
 **Checks:**
 - At a 44.1 kHz host rate, `XtSynth` output is bit-exact against the

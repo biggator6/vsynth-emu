@@ -3561,3 +3561,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Making `FxPanel` itself a `Ui::Page` rather than holding one meant its controls stayed its direct children, so `TEST_FX_PANEL` needed no change. A firmware check that didn't have to be touched is worth more than a tidier class.
 - The plan was five pages. Once drawn, EQ had nothing for its left card and Output nothing for its right, so they became one System page.
 - The plants read 111 of 111, and 35 of those were false. The ROM had been moved out of `firmware/unpacked/` partway through, and `mutate_panel.py` called any failed run caught, so `ROM rejected` looked like success. I saw it only because I ran the layout check once more before committing, and it failed. Looking at the tally alone would have missed it. The script now runs each kind of run with nothing planted first, and treats a rejected ROM as an error. `mutate_fx.py`, `mutate_enc.py` and `mutate_tone.py` have their own ways of judging a run, and I haven't checked them for the same gap.
+
+### Session 16 addendum (2026-11-04) — v146: the firmware image found by itself
+
+- The search was already half there: the plugin looked in Application Support, which nobody had told the user, and the folder didn't exist. The path chosen by hand went only into the DAW project, so each new project asked again.
+- Finding it in every instance would have made a race the normal case: each instance reloaded the process's tables under any voice playing from them. So an image in memory isn't read again. The same code showed that a wrong file chosen by hand dropped a working ROM for every instance, which is fixed too.
+- A test that chose a ROM would have written its path into the user's real settings, so PluginTest now has a temporary `VSE_APP_DIR` for every run.
+- `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
+- The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.

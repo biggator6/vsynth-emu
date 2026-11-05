@@ -125,10 +125,18 @@ MUTS=[
  ('send-swap',PP,'c.chorusSend   = knob(Params::kTvaChoSend);','c.chorusSend   = knob(Params::kTvaRevSend);','fx-bus'),
  ('assign-off',PP,'c.outputAssign = knob(Params::kOutputAssign);',';','fx-assign'),
  ('mode-off',PP,'c.parallel     = knob(Params::kOutputMode) != 0;',';','fx-mode'),
+ ('rom-not-beside',PP,'cand.add(juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile(kRomName).getFullPathName());',';','rom'),
+ ('rom-order',PP,'cand.add(appDir().getChildFile(kRomName).getFullPathName());\n    cand.add(appSettings()->getValue(kRomKey));','cand.add(appSettings()->getValue(kRomKey));\n    cand.add(appDir().getChildFile(kRomName).getFullPathName());','rom'),
+ ('rom-env-last',PP,'if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(juce::String::fromUTF8(p));\n','','rom'),
+ ('rom-not-kept',PP,'settings->setValue(kRomKey, file.getFullPathName());',';','rom'),
+ ('rom-project-kept',PP,'        openRom(juce::File(rom));','        setRomFile(juce::File(rom));','rom'),
+ ('rom-read-again',PP,'if (path == loaded && xtSynthRomReady()) return true;',';','rom'),
+ ('rom-bad-drops',PP,'if (loaded.isNotEmpty()) xtSynthSetRom(loaded.toStdString());',';','rom'),
 ]
 ROM=os.environ.get('ROM', REPO + '/firmware/unpacked/V-SynthXT.rom.2.bin'); W='analysis/test_files/raw/chord_Cmaj_original.wav'
 ENV={
  'layout':{'TEST_UI_LAYOUT':'1'},
+ 'rom':{'TEST_ROM_SEARCH':'1'},
  'panel':{'TEST_FX_PANEL':'1'},
  'crash-or-panel':{'TEST_FX_PANEL':'1'},
  'fx':{'TEST_FX':'1'},

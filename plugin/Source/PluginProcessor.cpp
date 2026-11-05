@@ -877,33 +877,68 @@ VSynthEmuProcessor::~VSynthEmuProcessor() {
 
 // ─── The firmware image ───────────────────────────────────────────────────────
 
-// VSE_XT_ROM, else ~/Library/Application Support/V-Synth Emu/V-SynthXT.rom.2.bin
-// (rom.2 as research/ghidra_scripts/unpack_firmware.py writes it).
-void VSynthEmuProcessor::findRom() {
-    juce::StringArray cand;
-    if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(p);
-    cand.add(juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                 .getChildFile("Application Support/V-Synth Emu/V-SynthXT.rom.2.bin").getFullPathName());
-    for (const auto& c : cand)
-        if (juce::File(c).existsAsFile() && xtSynthSetRom(c.toStdString())) {
-            apvts.state.setProperty("romPath", c, nullptr);
-            { const std::lock_guard<std::mutex> lock(fxLock_); romFile_ = c; }
-            setStatus("ROM ready");
-            return;
-        }
-    setStatus("No ROM: choose V-SynthXT.rom.2.bin to play through the XT's firmware");
+static const char* const kRomName = "V-SynthXT.rom.2.bin";   // rom.2 as research/ghidra_scripts/unpack_firmware.py writes it
+static const char* const kRomKey  = "romPath";
+
+// What belongs to the plugin and not to a project, whichever format is running: ~/Library/Application Support/V-Synth Emu,
+// or VSE_APP_DIR, so that PluginTest leaves the user's alone.
+static juce::File appDir() {
+    if (const char* d = std::getenv("VSE_APP_DIR")) return juce::File(juce::String::fromUTF8(d));
+    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("Application Support/V-Synth Emu");
 }
 
-bool VSynthEmuProcessor::setRomFile(const juce::File& file) {
-    if (!file.existsAsFile() || !xtSynthSetRom(file.getFullPathName().toStdString())) {
+static std::unique_ptr<juce::PropertiesFile> appSettings() {
+    juce::PropertiesFile::Options o;
+    o.millisecondsBeforeSaving = -1;   // only when told
+    return std::make_unique<juce::PropertiesFile>(appDir().getChildFile("settings.xml"), o);
+}
+
+// The tables belong to the process and every instance plays from them, so an image already in memory isn't read again
+// under a voice that's sounding, and one that won't load leaves the last in place.
+static bool loadRom(const juce::String& path) {
+    static std::mutex lock;
+    static juce::String loaded;
+    const std::lock_guard<std::mutex> hold(lock);
+    if (path == loaded && xtSynthRomReady()) return true;
+    if (xtSynthSetRom(path.toStdString())) { loaded = path; return true; }
+    if (loaded.isNotEmpty()) xtSynthSetRom(loaded.toStdString());
+    return false;
+}
+
+// A new instance's search, first to last: VSE_XT_ROM; beside the plugin, never in its bundle, where an added file breaks
+// the signature; the plugin's own folder; the image last chosen by hand, which is how an AU, a VST3 and a standalone, each
+// in a folder of its own, share one.
+void VSynthEmuProcessor::findRom() {
+    juce::StringArray cand;
+    if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(juce::String::fromUTF8(p));
+    cand.add(juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile(kRomName).getFullPathName());
+    cand.add(appDir().getChildFile(kRomName).getFullPathName());
+    cand.add(appSettings()->getValue(kRomKey));
+    for (const auto& c : cand)
+        if (c.isNotEmpty() && juce::File(c).existsAsFile() && openRom(juce::File(c))) return;
+    setStatus("No ROM: choose V-SynthXT.rom.2.bin, or put it next to the plugin");
+}
+
+bool VSynthEmuProcessor::openRom(const juce::File& file) {
+    if (!file.existsAsFile() || !loadRom(file.getFullPathName())) {
         setStatus("Not a usable rom.2 image: " + file.getFileName());
         return false;
     }
-    apvts.state.setProperty("romPath", file.getFullPathName(), nullptr);
+    apvts.state.setProperty(kRomKey, file.getFullPathName(), nullptr);
     { const std::lock_guard<std::mutex> lock(fxLock_); romFile_ = file.getFullPathName(); }
     setStatus("ROM ready");
     reencode(0);
     reencode(1);
+    return true;
+}
+
+bool VSynthEmuProcessor::setRomFile(const juce::File& file) {
+    if (!openRom(file)) return false;
+    appDir().createDirectory();
+    auto settings = appSettings();
+    settings->setValue(kRomKey, file.getFullPathName());
+    settings->save();
     return true;
 }
 
@@ -1527,7 +1562,7 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
     // The firmware image and the file, if their paths were persisted
     const juce::String rom = apvts.state.getProperty("romPath").toString();
     if (rom.isNotEmpty() && !xtSynthRomReady() && juce::File(rom).existsAsFile())
-        setRomFile(juce::File(rom));
+        openRom(juce::File(rom));
     for (int k = 0; k < 2; ++k)
     {
         juce::String path = apvts.state.getProperty(k ? "loadedFilePath2" : "loadedFilePath").toString();

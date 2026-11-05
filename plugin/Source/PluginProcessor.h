@@ -72,7 +72,8 @@ public:
     bool         hasFileLoaded(int osc = 0)    const   { return wave_[osc].loaded.load(); }
 
     // ── The XT's firmware (rom.2) ────────────────────────────────────────────
-    // Message thread.  Returns false if the file is not a usable image.
+    // Message thread.  The image the user chose: used now and kept for every project and plugin format, so a new
+    // instance finds it (findRom).  Returns false, with the last image still in use, if the file is not a usable image.
     bool setRomFile(const juce::File& file);
     bool hasRom() const { return xtSynthRomReady(); }
 
@@ -139,6 +140,7 @@ private:
     void setStatus(const juce::String& s);
     void handleAsyncUpdate() override;          // re-encode after an Encode Type / Depth change
     void findRom();
+    bool openRom(const juce::File& file);       // for this instance, and kept nowhere but its project
 
     // ── Playback state (audio thread, legacy path) ───────────────────────────
     int  playbackPos_  = -1;

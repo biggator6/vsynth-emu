@@ -15,9 +15,85 @@
 #include <thread>
 #include <vector>
 
+// VSE_APP_DIR for the whole run: no test reads or writes the user's settings, or finds their image.
+struct TestAppDir {
+    juce::File dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile("vse-plugintest", "");
+    TestAppDir() { setenv("VSE_APP_DIR", dir.getFullPathName().toRawUTF8(), 1); }
+    ~TestAppDir() { dir.deleteRecursively(); }
+};
+
+// TEST_ROM_SEARCH=1: where a new instance finds the image, first to last, and what's kept for the next (VSynthEmuTest
+// alone: it stops there).  A symbolic link stands for each copy, so the image's 8 MB isn't copied about.
+static int romSearchTest(const juce::File& rom, const juce::File& appDir) {
+    unsetenv("VSE_XT_ROM");
+    const char* const name = "V-SynthXT.rom.2.bin";
+    const auto beside = juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile(name);
+    const auto inApp = appDir.getChildFile(name), elsewhere = appDir.getChildFile("elsewhere/some other name.bin");
+    const auto settings = appDir.getChildFile("settings.xml");
+    if (beside.exists()) { std::fprintf(stderr, "rom search: there's already an image at %s\n", beside.getFullPathName().toRawUTF8()); return 1; }
+    elsewhere.getParentDirectory().createDirectory();
+    struct Tidy { juce::File f; ~Tidy() { f.deleteFile(); } } tidy { beside };
+
+    int checks = 0, failed = 0;
+    const auto check = [&](bool ok, const char* what) { ++checks; if (!ok) { ++failed; std::fprintf(stderr, "rom search: %s\n", what); } };
+    const auto found = [] { VSynthEmuProcessor p; return p.apvts.state.getProperty("romPath").toString(); };
+    const auto link = [&](const juce::File& at) { at.deleteFile(); return rom.createSymbolicLink(at, true); };
+    const auto is = [&](const juce::File& f) { return found() == f.getFullPathName(); };
+
+    { VSynthEmuProcessor p; check(!p.hasRom() && p.getStatusText().startsWith("No ROM") && p.apvts.state.getProperty("romPath").toString().isEmpty(), "with nothing to find, it should say so"); }
+
+    // A project's path is that project's: used, and not kept for the others.
+    { juce::MemoryBlock saved;
+      { VSynthEmuProcessor p; p.apvts.state.setProperty("romPath", rom.getFullPathName(), nullptr); p.getStateInformation(saved); }
+      VSynthEmuProcessor p; p.setStateInformation(saved.getData(), (int)saved.getSize());
+      check(p.hasRom() && p.getStatusText() == "ROM ready", "a project's path should be used");
+      check(!settings.exists(), "a project's path shouldn't be kept for other projects"); }
+    check(found().isEmpty(), "a project's path shouldn't reach a new instance");
+
+    check(link(inApp) && is(inApp), "the plugin's own folder");
+    check(link(beside) && is(beside), "beside the plugin, ahead of its own folder");
+    // Already in memory, so not read again: a bad file at that path shows whether it was.
+    beside.deleteFile(); beside.replaceWithText("not a ROM");
+    check(is(beside), "an image in memory shouldn't be read again");
+    beside.deleteFile();
+    check(is(inApp), "the plugin's own folder again");
+    // A bad file falls through to the next, and costs the instances playing nothing.
+    beside.replaceWithText("not a ROM");
+    { VSynthEmuProcessor p; check(p.apvts.state.getProperty("romPath").toString() == inApp.getFullPathName() && p.hasRom() && p.getStatusText() == "ROM ready", "a bad file beside the plugin should fall through"); }
+    beside.deleteFile();
+    inApp.deleteFile();
+    check(found().isEmpty(), "nothing left to find");
+
+    // Chosen by hand: kept for the next instance, behind the two places.
+    { VSynthEmuProcessor p; check(p.setRomFile(rom) && settings.existsAsFile(), "a chosen image should be kept"); }
+    check(is(rom), "the chosen image, for a new instance");
+    check(link(inApp) && is(inApp), "the plugin's own folder, ahead of the chosen image");
+    inApp.deleteFile();
+    // A wrong choice: refused, and what was in use goes on, here and for the next.
+    { VSynthEmuProcessor p; check(!p.setRomFile(settings) && p.getStatusText().startsWith("Not a usable") && p.hasRom(), "a bad file chosen should be refused, the image kept"); }
+    check(is(rom), "a refused file shouldn't be kept");
+
+    check(link(elsewhere) && link(beside), "links");
+    setenv("VSE_XT_ROM", elsewhere.getFullPathName().toRawUTF8(), 1);
+    check(is(elsewhere), "VSE_XT_ROM, ahead of everything");
+    unsetenv("VSE_XT_ROM");
+    beside.deleteFile();
+
+    // The chosen image moved away: back to asking, no harm done.
+    { VSynthEmuProcessor p; check(p.setRomFile(elsewhere), "any file name will do, chosen by hand"); }
+    elsewhere.deleteFile();
+    { VSynthEmuProcessor p; check(p.getStatusText().startsWith("No ROM"), "a chosen image that's gone should mean asking again"); }
+
+    if (failed) { std::fprintf(stderr, "rom search: %d of %d wrong\n", failed, checks); return 1; }
+    std::printf("rom search: %d checks, the order and what's kept as they should be\n", checks);
+    return 0;
+}
+
 int main(int argc, char** argv) {
     if (argc < 3) { std::fprintf(stderr, "usage: %s rom.2.bin file.wav [note] [auto|solo|backing|ensemble]\n", argv[0]); return 1; }
     juce::ScopedJuceInitialiser_GUI init;
+    TestAppDir testAppDir;
+    if (std::getenv("TEST_ROM_SEARCH")) return romSearchTest(juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]), testAppDir.dir);
     const int note = argc > 3 ? std::atoi(argv[3]) : 60;
     const double rate = 48000.0;
     const int block = 512;

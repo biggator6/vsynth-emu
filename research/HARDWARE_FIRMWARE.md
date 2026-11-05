@@ -1547,6 +1547,18 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### V-Synth's files, as far as read (2026-11-04, v146)
+
+Read for importing patches and projects, which the user has asked for; the plugin reads none of this yet. From `analysis/projects/Emu_test.prj`, the user's `Vsynth_Software/1stchoice` (502 patches, 250 waves, gitignored) and the firmware's disk image.
+
+**A project** is `Patch/NNN name.p00` and `Wave/NNN name.wav` or `.vpw`, with three `.s00` files if the XT saved it whole. rom.2's file lists name `wav`, `aif`, `vpw` and `w00`; the manual lists WAV, AIFF and VPW as imports.
+
+**A patch, `.p00`:** `SVD0` at +2, `PATaKATE` at +0x10, the data's length big-endian at +0x1c, the data from +0x20. The name is 12 7-bit characters from the data's bit 8 (notes.txt's "bit 264" counts from the file's start): 260 of Emu_test's 263 and 500 of 1stchoice's 502 equal their file names. The values are still bit-packed and undecoded. The length varies: all of Emu_test is 0x14fa, 1stchoice 0x14f2 (391), 0x14ac (25) and 0x146c (86), cause not known. Code that loads the tags: `PATa` at `0x8948b3de` and `0x8948b87a`, `SVD0` at `0x8948c52a`, not read yet. The plan is the firmware's own code in the interpreter, then each parameter by ID. A patch has up to 16 zones, and `XtSynth` plays one.
+
+**A wave, `.vpw`:** a project's `.wav` chunks with no RIFF header, in this order: `vpfl vpsc vplp vpno vpdt LIST rdmd data`. All 250 end exactly at the file's end. `vpfl` starts `0102`, and its word 10 is `RDAC` in all 250 where rom.2 also names `LINR`. So the audio is packed: `data` is only 8 to 22 bytes more than `vpsc`'s word 1, about one byte a sample if that word is the sample count. The unpacking isn't read yet. `vpsc`'s byte 1 is the encode type: 144 BACKING, 89 SOLO, 17 ENSEMBLE, none LITE, against 41 LITE of Emu_test's 79. `rdmd` starts `MThd`, a MIDI file. `LIST`'s ISFT names the encoder: Monolith, V-Synth 1.51 and, once in the image, WaveTrainer.
+
+**The disk image** (`V-SynthXTDiskImage.bin.0.bin`): a FAT16 partition from sector 32 for 47968 sectors, with `Internal.prj` (512 `.p00`, 224 `.w00` of about 32 bytes each) and `Internal.vc2` (128 `.p02`, 58 `.w02`). After it, 416 streams of the same chunks, all `RDAC`: 268 SOLO, 135 BACKING, 13 ENSEMBLE, about 24 MB. 224 of 1stchoice's 250 waves have a `data` chunk byte for byte equal to one of them, so these are plainly the preset waves (rom.2 calls the place `V:\Preset.prj\Wave\`). They carry no names; 1stchoice gives those 224 theirs. Only 2 of its patches begin as any in the image. The `vpdt` records in these waves were written by encoders other than the XT's, like Emu_test's: more for `xtrecs.py`-style comparison, none tried.
+
 ### The Effects tab in cards (2026-11-04, v145)
 
 `FxPanel` now follows the design (`research/UI_DESIGN.md`). It's itself a `Ui::Page`, so its controls stay its direct children and `TEST_FX_PANEL` runs untouched: the same 985 parameters and 5948 value texts against the firmware's routine. Nothing here is the firmware's and the sound doesn't change: A/B 4/4 identical to v144.

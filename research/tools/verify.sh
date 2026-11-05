@@ -2,7 +2,7 @@
 # verify.sh [--full] [git rev]: the standard validation of a version, one line each —
 # firmware checks against the baseline (--full: all of them run, none reused), A/B
 # renders against a revision (default HEAD; settings from XT_* env), the plugin build,
-# PluginTest (TEST_* env), the effects' panel, the editor's layout, the engine tests and auval.
+# PluginTest (TEST_* env), the effects' panel, the editor's layout, the ROM search, the engine tests and auval.
 source "$(dirname "$0")/env.sh"
 D="$(dirname "$0")"; rc=0; F=""; BUILT=1
 [ "$1" = "--full" ] && { F=--full; shift; }
@@ -18,6 +18,7 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
   TEST_BUS="60,80,0,1" TEST_MATRIX="1,75,63,0,0" TEST_CC="1,127,30000" TEST_FX_LIVE="24000:fxRevType=8,36000:0x67=20,48000:fxChoType=6,50000:fxMfxOn=0,50400:fxMfxOn=1,60000:fxMfxType=11,72000:fxGain=-6" bash "$D/pt.sh" || rc=1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_FX_PANEL=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_UI_LAYOUT=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
+[ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_ROM_SEARCH=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 echo "engine tests: $("$WORK/fcheck/bin/engine_tests" 2>&1 | tail -1)"
 [ $BUILT = 1 ] && echo "auval: $(auval -v aumu VsEm Ystu 2>&1 | grep -o "AU VALIDATION SUCCEEDED\|FAIL.*" | head -1)"
 exit $rc
