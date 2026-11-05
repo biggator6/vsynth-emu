@@ -5,7 +5,7 @@
 import os, subprocess, sys
 REPO = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + '/../..')
 os.chdir(REPO)
-FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'; XV='plugin/Source/XtFxControl.cpp'; EP='plugin/Source/PluginEditor.cpp'
+FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'; XV='plugin/Source/XtFxControl.cpp'; EP='plugin/Source/PluginEditor.cpp'; UP='plugin/Source/UiParts.h'
 TEXT='row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };\n        '
 TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };\n        '
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
@@ -19,7 +19,7 @@ MUTS=[
  ('editor-no-row',EP,'for (int i : { 8, 9, 10, 11 }) level.rows.push_back(rowOfLevel(i));','for (int i : { 8, 9, 10 }) level.rows.push_back(rowOfLevel(i));','layout'),
  ('editor-no-card',EP,'p.add(tempo);',';','layout'),
  ('editor-cosm-rows',EP,'addAll(tbLabels_, tbSliders_, kTbKnobs);',';','layout'),
- ('editor-row-gap',EP,'rowGap = 4','rowGap = -8','layout'),
+ ('editor-row-gap',UP,'rowGap = 4','rowGap = -8','layout'),
  ('editor-cosm-rows-close',EP,'return area.withTrimmedTop(30 * r).withHeight(24);','return area.withTrimmedTop(20 * r).withHeight(24);','layout'),
  ('editor-narrow-env',EP,'v->setBounds(a.removeFromLeft(104).withTrimmedBottom(2));','v->setBounds(a.removeFromLeft(204).withTrimmedBottom(2));','layout'),
  ('editor-env-border',EP,'l->setBorderSize({ 1, 0, 1, 0 });            // a narrow cell',';                                            // a narrow cell','layout'),
@@ -32,6 +32,17 @@ MUTS=[
  ('editor-seg-follow',EP,'attachCosm(cosmSelBox_.getSelectedId() == 2 ? 1 : 0); cosmSeg_->setIndex(cosmK_); };','attachCosm(cosmSelBox_.getSelectedId() == 2 ? 1 : 0); };','layout'),
  ('editor-seg-mono',EP,'monoSeg_->onChange = [this](int i) { monoBox_.setSelectedItemIndex(i, juce::sendNotificationSync); };',';','layout'),
  ('editor-mono-follow',EP,'monoBox_.onChange = [this] { monoSeg_->setIndex(monoBox_.getSelectedItemIndex()); };',';','layout'),
+ # The Effects tab's cards
+ ('editor-fx-seg',FP,'pageSeg_.onChange = [this](int i) { showPage(i); };',';','layout'),
+ ('editor-fx-seg-follow',FP,'pageSeg_.setIndex(page_);',';','layout'),
+ ('editor-fx-always',FP,'show(chorus_, page_ == 1);','show(chorus_, true);','layout'),
+ ('editor-fx-never',FP,'show(reverb_, page_ == 2);','show(reverb_, false);','layout'),
+ ('editor-fx-system-never',FP,'const bool sys = page_ == 3;','const bool sys = false;','layout'),
+ ('editor-fx-no-levels',FP,'for (auto& l : b.levels) c.rows.push_back(row(l->label, l->slider));',';','layout'),
+ ('editor-fx-names',FP,'kNameW = 130','kNameW = 30','layout'),
+ ('editor-fx-left',FP,'kLeftW = 250','kLeftW = 100','layout'),
+ ('editor-fx-fill',UP,'const int h = c.fill ? juce::jmax(0, area.getBottom() - y[juce::jmax(0, c.col)]) : heightOf(c);','const int h = heightOf(c);','layout'),
+ ('editor-fx-same-place',FP,'if (page > 0) c.sameAs = firstCard;',';','layout'),
  ('panel-no-set',FP,'processor_.setFxParam(row.id, (int)std::lround(row.value.getValue()));',';','panel'),
  ('panel-range',FP,'row.value.setRange(p.low, p.high, 1.0);','row.value.setRange(p.low, p.high + 1, 1.0);','panel'),
  ('panel-value',FP,'row->value.setValue(processor_.fxParam(row->id, row->def), juce::dontSendNotification);','row->value.setValue(row->def, juce::dontSendNotification);','panel'),
@@ -141,6 +152,10 @@ def run(kind):
 missed=0
 # ENV and MUTS are above; a build first, so the first error's time isn't the source's own.
 build()
+# Every run must fail for the plant's reason: with nothing planted, each kind of run has to pass first.
+for kind in sorted({m[4] for m in MUTS}):
+    r=run(kind)
+    if r.returncode!=0: sys.exit('the unplanted run '+kind+' fails: '+(r.stderr.strip().split('\n')[-1] if r.stderr.strip() else '')[:120])
 for name,path,old,new,kind in MUTS:
     src=open(path).read()
     if old not in src: print('NOTEXT',name); missed+=1; continue
@@ -149,7 +164,8 @@ for name,path,old,new,kind in MUTS:
         b=build()
         if 'Built target VSynthEmuTest' not in b: print('ERROR ',name,b[:200]); missed+=1; continue
         r=run(kind)
-        if r.returncode==0: print('MISSED',name); missed+=1
+        if 'ROM rejected' in r.stderr: print('ERROR ',name,'the ROM was rejected, so this proves nothing'); missed+=1
+        elif r.returncode==0: print('MISSED',name); missed+=1
         else: print('caught',name,r.returncode,(r.stderr.strip().split('\n')[-1] if r.stderr.strip() else r.stdout.strip().split('\n')[-1])[:90])
     finally:
         open(path,'w').write(src)

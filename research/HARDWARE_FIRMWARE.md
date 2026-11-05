@@ -1547,6 +1547,14 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The Effects tab in cards (2026-11-04, v145)
+
+`FxPanel` now follows the design (`research/UI_DESIGN.md`). It's itself a `Ui::Page`, so its controls stay its direct children and `TEST_FX_PANEL` runs untouched: the same 985 parameters and 5948 value texts against the firmware's routine. Nothing here is the firmware's and the sound doesn't change: A/B 4/4 identical to v144.
+
+**The pages.** Buttons for MFX, Chorus, Reverb and System. A block's page has its card on the left (On, Type, its levels) and its type's parameters in a list on the right. EQ and Output were planned as two more pages, but apart EQ has no left card and Output no list, so the System page has the Tone and System cards with the EQ's list. The list shows at least 15 rows at the smallest size, where it showed about 5. The cost is that one block shows at a time.
+
+**A false pass, found by chance.** The ROM was moved out of `firmware/unpacked/` during the plants, and `mutate_panel.py` counted any failed run as caught. So 35 plants read "caught" on `ROM rejected`, and the total said 111 of 111. A sanity run afterwards showed it. The script now runs each kind of run with nothing planted first, and calls a rejected ROM an error. The 35 were run again, all caught for their real reasons.
+
 ### The tabbed editor (2026-11-04, v144)
 
 The editor is now the tabbed design the user chose as the UI's blueprint. `research/UI_DESIGN.md` has its regions, palette, tab map and how to add a control. Nothing here is the firmware's and the sound doesn't change: A/B 4/4 identical to v143.

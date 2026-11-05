@@ -341,13 +341,11 @@ private:
     // pages, then FxPanel. Every control above is reused as it is: the constructor
     // builds them on the editor, then buildLayout() moves each into its tab's page.
     // What it doesn't place or keep, it removes: research/UI_DESIGN.md.
-    class Page;          // a tab's content: cards of rows, laid out and painted
     class TabBar;        // the row of tab names
-    class Segmented;     // joined toggle buttons (OSC 1/2, COSM 1/2, Mono/Poly)
     class EnvelopeView;  // an envelope's shape, drawn from its A, D, S, R sliders
     std::unique_ptr<TabBar>    tabBar_;
-    std::unique_ptr<Page>      pages_[kPages];
-    std::unique_ptr<Segmented> oscSeg_, cosmSeg_, monoSeg_;
+    std::unique_ptr<Ui::Page>  pages_[kPages];
+    std::unique_ptr<Ui::Segmented> oscSeg_, cosmSeg_, monoSeg_;     // OSC 1/2, COSM 1/2, Mono/Poly
     std::vector<std::unique_ptr<EnvelopeView>> envViews_;
     juce::OwnedArray<juce::Label> extraLabels_;   // row labels the old layout had no label for
     int tab_ = 0;

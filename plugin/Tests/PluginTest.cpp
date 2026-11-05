@@ -80,6 +80,11 @@ int main(int argc, char** argv) {
         auto* editor = dynamic_cast<VSynthEmuEditor*>(ed.get());
         int errors = 0, states = 0, checked = 0;
         const auto fail = [&](const juce::String& m) { if (++errors <= 40) std::fprintf(stderr, "layout: %s\n", m.toRawUTF8()); };
+        FxPanel* panel = nullptr;
+        for (juce::Component* ch : ed->getChildren()) if (auto* fp = dynamic_cast<FxPanel*>(ch)) panel = fp;
+        juce::Viewport* view = nullptr;
+        if (panel) for (juce::Component* ch : panel->getChildren()) if (auto* v = dynamic_cast<juce::Viewport*>(ch)) view = v;
+        if (!view) { std::fprintf(stderr, "layout: no effects' panel\n"); return 1; }
         const auto isControl = [](juce::Component* c) { return dynamic_cast<juce::Label*>(c) || dynamic_cast<juce::Slider*>(c) || dynamic_cast<juce::ComboBox*>(c) || dynamic_cast<juce::Button*>(c); };
         const auto nameOf = [](juce::Component* c) -> juce::String {
             if (auto* l = dynamic_cast<juce::Label*>(c)) return "label \"" + l->getText() + "\"";
@@ -104,6 +109,19 @@ int main(int argc, char** argv) {
         const auto boxOf = [&](const juce::String& first) { return dynamic_cast<juce::ComboBox*>(find(*ed, [&](juce::Component* c) { auto* x = dynamic_cast<juce::ComboBox*>(c); return x && x->getItemText(0) == first; })); };
         const auto buttonOf = [&](const juce::String& text) { return dynamic_cast<juce::Button*>(find(*ed, [&](juce::Component* c) { auto* b = dynamic_cast<juce::Button*>(c); return b && b->getButtonText() == text; })); };
         const auto setParam = [&](const juce::String& id, int v) { auto* prm = p.apvts.getParameter(id); prm->setValueNotifyingHost(prm->convertTo0to1((float)v)); };
+        const auto cutShort = [](juce::Label& l) {                                 // JUCE squeezes a text to its minimum scale, then cuts it
+            const float scale = l.getMinimumHorizontalScale() > 0 ? l.getMinimumHorizontalScale() : 0.7f;
+            return juce::GlyphArrangement::getStringWidth(l.getFont(), l.getText()) * scale > (float)(l.getWidth() - l.getBorderSize().getLeftAndRight());
+        };
+        const auto boxLabelOf = [](juce::Component& c) { juce::Label* box = nullptr; for (juce::Component* ch : c.getChildren()) if (auto* l = dynamic_cast<juce::Label*>(ch)) box = l; return box; };
+        // The effects' list: its names and values at their defaults, on each type
+        const auto checkList = [&](const juce::String& where) {
+            for (juce::Component* ch : view->getViewedComponent()->getChildren()) {
+                if (!ch->isVisible()) continue;
+                if (auto* l = dynamic_cast<juce::Label*>(ch)) { if (cutShort(*l)) fail(where + ": " + nameOf(ch) + " is cut short"); }
+                else if (juce::Label* box = boxLabelOf(*ch); box && cutShort(*box)) fail(where + ": the value " + nameOf(box) + " is cut short");
+            }
+        };
         const auto check = [&](const juce::String& where) {
             ++states;
             walk(*ed, [&](juce::Component& c) {
@@ -116,10 +134,10 @@ int main(int argc, char** argv) {
                     if (!c.getLocalBounds().contains(k->getBounds())) fail(where + ": " + nameOf(k) + " is outside its parent");
                     for (size_t j = i + 1; j < kids.size(); ++j)
                         if (k->getBounds().intersects(kids[j]->getBounds())) fail(where + ": " + nameOf(k) + " is over " + nameOf(kids[j]));
-                    if (auto* l = dynamic_cast<juce::Label*>(k)) {                 // JUCE squeezes a text to its minimum scale, then cuts it
-                        const float scale = l->getMinimumHorizontalScale() > 0 ? l->getMinimumHorizontalScale() : 0.7f;
-                        if (juce::GlyphArrangement::getStringWidth(l->getFont(), l->getText()) * scale > (float)(l->getWidth() - l->getBorderSize().getLeftAndRight()))
-                            fail(where + ": " + nameOf(k) + " is cut short");
+                    if (auto* l = dynamic_cast<juce::Label*>(k)) {
+                        if (cutShort(*l)) fail(where + ": " + nameOf(k) + " is cut short");
+                    } else if (dynamic_cast<juce::ComboBox*>(k)) {
+                        if (juce::Label* box = boxLabelOf(*k); box && cutShort(*box)) fail(where + ": " + nameOf(k) + " is cut short");
                     } else if (auto* b = dynamic_cast<juce::ToggleButton*>(k)) {   // as LookAndFeel_V4 draws it: the tick, then the text
                         const float size = juce::jmin(15.0f, (float)b->getHeight() * 0.75f);
                         if (juce::GlyphArrangement::getStringWidth(juce::Font(juce::FontOptions(size)), b->getButtonText()) * 0.7f > (float)(b->getWidth() - juce::roundToInt(size * 1.1f) - 12))
@@ -149,11 +167,12 @@ int main(int argc, char** argv) {
                 if (auto* s = dynamic_cast<juce::Slider*>(k)) move = [s] { s->setValue(s->getValue() == s->getMaximum() ? s->getMinimum() : s->getMaximum(), juce::sendNotificationSync); };
                 else if (auto* x = dynamic_cast<juce::ComboBox*>(k)) {             // what chooses what the others show, or isn't a parameter
                     const juce::String first = x->getItemText(0);
-                    if (first == "OSC 1" || first == "COSM 1" || first == "Control 1" || first == VSynthEmuProcessor::assignName(0) || first == "MFX" || first == "Passthrough (baseline)") continue;
+                    if (first == "OSC 1" || first == "COSM 1" || first == "Control 1" || first == VSynthEmuProcessor::assignName(0) || first == "Passthrough (baseline)") continue;
                     move = [x] { x->setSelectedItemIndex(x->getSelectedItemIndex() == 0 ? 1 : 0, juce::sendNotificationSync); };
                 } else if (auto* b = dynamic_cast<juce::Button*>(k)) {
                     if (dynamic_cast<juce::TextButton*>(b) && !b->getClickingTogglesState()) continue;                  // Load, ROM
-                    if (b->getButtonText().startsWith("OSC ") || b->getButtonText().startsWith("COSM ")) continue;      // as the boxes above
+                    const juce::String text = b->getButtonText();
+                    if (text.startsWith("OSC ") || text.startsWith("COSM ") || text == "MFX" || text == "Chorus" || text == "Reverb" || text == "System") continue;      // as the boxes above
                     if (b->getRadioGroupId() != 0 && b->getToggleState()) continue;                                     // one of a pair: the other moves it
                     move = [b] { b->setToggleState(!b->getToggleState(), juce::sendNotificationSync); };
                 }
@@ -176,6 +195,9 @@ int main(int argc, char** argv) {
             for (int type = 0; type < cosmTypes; ++type) { setParam(k ? "cosm2Type" : "cosmType", type); moveAll("COSM " + juce::String(k + 1) + " type " + juce::String(type)); }
         }
         boxOf("COSM 1")->setSelectedId(1, juce::sendNotificationSync);
+        editor->showTab(VSynthEmuEditor::kEffectsTab);
+        for (int page = 0; page < 4; ++page) { panel->showPage(page); moveAll("Effects page " + juce::String(page)); }
+        panel->showPage(0);
         editor->showTab(6);
         for (int m = 0; m < 8; ++m) { boxOf("Control 1")->setSelectedItemIndex(m, juce::sendNotificationSync); moveAll("Matrix Control " + juce::String(m + 1)); }
         for (int a = 0; a < VSynthEmuProcessor::kAssigns; ++a) { boxOf(VSynthEmuProcessor::assignName(0))->setSelectedItemIndex(a, juce::sendNotificationSync); moveAll(juce::String(VSynthEmuProcessor::assignName(a)) + " assign"); }
@@ -206,6 +228,22 @@ int main(int argc, char** argv) {
             editor->showTab(3);
             for (int type = 0; type < cosmTypes; ++type) { setParam("cosmType", type); check(at + " COSM type " + juce::String(type)); }
             setParam("cosmType", 0);
+            // The Effects tab: each page, and each block's types, as what's on a page follows them
+            editor->showTab(VSynthEmuEditor::kEffectsTab);
+            static const char* const typeOf[] = { "fxMfxType", "fxChoType", "fxRevType" };
+            for (int page = 0; page < 4; ++page) {
+                const int types = page < 3 ? p.apvts.getParameter(typeOf[page])->getNumSteps() : 1;
+                for (int type = 0; type < types; ++type) {
+                    if (page < 3) setParam(typeOf[page], type);
+                    panel->showPage(page);
+                    const juce::String where = at + " Effects page " + juce::String(page) + " type " + juce::String(type);
+                    check(where);
+                    checkList(where);
+                    if (view->getHeight() < 15 * 24) fail(where + ": the list shows only " + juce::String(view->getHeight() / 24) + " rows");
+                }
+                if (page < 3) setParam(typeOf[page], 0);
+            }
+            panel->showPage(0);
         }
         // Each tab by a click, in order, at the smallest width
         ed->setSize(sizes[0].x, sizes[0].y);
@@ -239,6 +277,12 @@ int main(int argc, char** argv) {
             if (!changedBy([other] { other->setToggleState(true, juce::sendNotificationSync); })) fail("MONO/POLY set no parameter");
             if (buttonOf("POLY")->getToggleState() != poly) fail("MONO/POLY doesn't follow its parameter");
         } else fail("no MONO/POLY");
+        if (juce::Button* chorus = buttonOf("Chorus"); chorus && buttonOf("System")) {
+            chorus->setToggleState(true, juce::sendNotificationSync);
+            if (panel->page() != 1) fail("the Effects tab's Chorus button doesn't open its page");
+            panel->showPage(3);
+            if (!buttonOf("System")->getToggleState()) fail("the Effects tab's System button doesn't follow its page");
+        } else fail("no page buttons on the Effects tab");
         if (errors) { std::fprintf(stderr, "layout: %d errors\n", errors); return 1; }
         std::printf("the layout: %d states at 3 sizes, %d placements, tabs by click; %d of %d parameters have a control\n", states, checked, have, (int)params.size());
         return 0;

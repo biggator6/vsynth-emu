@@ -3555,3 +3555,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Its first report, COSM 2's envelope with no control, was my walk's fault: the card is on another tab from the selector, and I'd only walked that tab on COSM 1. I'd have believed the editor was wrong if I hadn't had v143's list beside it.
 - 56 parameters have never had a control, which nobody had counted. `research/UI_DESIGN.md` lists them.
 - I can't see or click the real window here: no Screen Recording or Accessibility, and those are the user's to grant. So tab clicks are synthetic, and that's said in the notes.
+
+### Session 16 addendum (2026-11-04) — v145: the Effects tab in cards
+
+- Making `FxPanel` itself a `Ui::Page` rather than holding one meant its controls stayed its direct children, so `TEST_FX_PANEL` needed no change. A firmware check that didn't have to be touched is worth more than a tidier class.
+- The plan was five pages. Once drawn, EQ had nothing for its left card and Output nothing for its right, so they became one System page.
+- The plants read 111 of 111, and 35 of those were false. The ROM had been moved out of `firmware/unpacked/` partway through, and `mutate_panel.py` called any failed run caught, so `ROM rejected` looked like success. I saw it only because I ran the layout check once more before committing, and it failed. Looking at the tally alone would have missed it. The script now runs each kind of run with nothing planted first, and treats a rejected ROM as an error. `mutate_fx.py`, `mutate_enc.py` and `mutate_tone.py` have their own ways of judging a run, and I haven't checked them for the same gap.
