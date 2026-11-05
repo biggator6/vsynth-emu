@@ -47,6 +47,7 @@ private:
     juce::Slider     keySlider_     { juce::Slider::IncDecButtons, juce::Slider::TextBoxLeft };
     juce::Slider     depthSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     energySlider_  { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
+    juce::Slider     startSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };   // Start Offset, samples
     // the VariPhrase OSC: Time Offset, Time KF, Formant KF (Time and Formant
     // themselves are the TIME and FORMANT knobs while the XT plays)
     juce::ComboBox   timeOffsetBox_;
@@ -184,7 +185,7 @@ private:
                 pReleaseLabel_ { {}, "PR" }, pDepthLabel_ { {}, "PDep" }, lfoLabel_ { {}, "LFO" },
                 lfoRateLabel_ { {}, "Rate" }, lfoDepthLabel_ { {}, "Pitch" }, lfoDelayLabel_ { {}, "Delay" },
                 lfoFadeLabel_ { {}, "Fade" }, lfoTimeLabel_ { {}, "Time" }, lfoFmtLabel_ { {}, "Fmt" },
-                lfoDepthsLabel_ { {}, "LFO Dp" }, offsetLabel_ { {}, "Offset" }, oscTkfLabel_ { {}, "Time KF" },
+                lfoDepthsLabel_ { {}, "LFO Dp" }, offsetLabel_ { {}, "Offset" }, startLabel_ { {}, "Start Offset" }, oscTkfLabel_ { {}, "Time KF" },
                 oscFkfLabel_ { {}, "Fmt KF" },
                 tAttackLabel_ { {}, "TA" }, tDecayLabel_ { {}, "TD" }, tSustainLabel_ { {}, "TS" },
                 tReleaseLabel_ { {}, "TR" }, tDepthLabel_ { {}, "TDep" },
@@ -203,6 +204,7 @@ private:
     using ComboAtt  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
     std::unique_ptr<SliderAtt> pitchAtt_, timeAtt_, formantAtt_;
     std::unique_ptr<ButtonAtt> robotAtt_;
+    std::unique_ptr<SliderAtt> startAtt_;
     std::unique_ptr<SliderAtt> keyAtt_, depthAtt_, energyAtt_, attackAtt_, decayAtt_, sustainAtt_, releaseAtt_;
     std::unique_ptr<SliderAtt> aSensAtt_, dSensAtt_, rSensAtt_, kfAtt_;
     std::unique_ptr<SliderAtt> pAttackAtt_, pDecayAtt_, pSustainAtt_, pReleaseAtt_, pDepthAtt_;

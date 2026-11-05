@@ -126,6 +126,9 @@ public:
     uint32_t cosmBuf = 0;
     uint16_t held[8] = {};
     XtFwBandReads bandReads;
+    // FR11 as the stereo Vari off player (0x89509f52) finds it, by its player object: what its backward Alternate hold compares the fade with
+    // (XtLinearPlayer::setStaleFr11), left there by whatever ran before.  Taken each block, and given to the port's player before its block
+    std::unordered_map<uint32_t, uint32_t> fr11;
     const FwWave& waveOf(uint32_t id) const { return id == 2999 + 2 ? wave2 : wave; }
 
     float f32(uint32_t a) { const uint32_t v = c.rd32(a); float x; std::memcpy(&x, &v, 4); return x; }
@@ -174,6 +177,7 @@ public:
             auto it = par.find(cosm && cosmSection ? id + kCosm2 : id);
             m.ret((uint32_t)(it != par.end() ? it->second : defaultOf(id)));
         };
+        c.hook(0x89509f52, [this](Sh4& m) { fr11[m.r[5]] = m.fb[(m.fpscr >> 21) & 1][11]; });
         c.hook(0x8947d310, getter);
         c.hook(0x8947d330, getter);
         c.hook(0x894798a0, [this](Sh4& m) { cosmSection = (int)m.r[7]; m.ret(0); });   // which COSM's parameters are read next
@@ -598,6 +602,7 @@ void oscParams(std::unordered_map<int, int>& p, int n, const OscC& o) {
     p[b + 0xd] = o.ana.wave; p[b + 0xe] = o.ana.impact; p[b + 0xf] = o.ana.pw; p[b + 0x10] = o.ana.pwKf; p[b + 0x11] = o.ana.pwLfo; p[b + 0x12] = o.ana.pwEnv;
     p[b + 0x13] = o.ana.fat; p[b + 0x14] = o.ana.fatKf; p[b + 0x15] = o.ana.fatLfo; p[b + 0x16] = o.ana.fatEnv;
     p[b + 0x1a] = 1 + n;                              // the Wave Number
+    p[b + 0x22] = o.startOffset;
     p[b + 0x23] = o.oscTime; p[b + 0x24] = o.oscTimeKF / 10; p[b + 0x25] = o.lfoTimeDepth; p[b + 0x26] = o.tDepth; p[b + 0x27] = o.oscTimeOffset;
     p[b + 0x28] = o.oscFormant; p[b + 0x29] = o.oscFormantKF / 10; p[b + 0x2a] = o.lfoFormantDepth; p[b + 0x2b] = o.fDepth;
     p[b + 0x30] = o.vari;
@@ -815,6 +820,8 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
         o.oscType = 1; o.rootKey = r.range(36, 84);
         o.robot = r.one(4);
         o.vari = !r.one(3);
+        // the Start Offset in one case in three, now and then at or past the waves' 30000 frames, where the converter takes the last sample
+        if (r.one(3)) { o.startOffset = r.one(4) ? r.range(0, 40000) : r.range(1, 4000); if (o.startOffset > 35000) o.startOffset = 30000; }
         if (r.one(3)) { o.loop = true; o.loopMode = r.range(0, 2); o.loopStart = (float)r.range(0, 120) / 1000.0f; o.loopEnd = o.loopStart + (float)r.range(5, 40) / 1000.0f; }   // near the start: notes are short
     };
     if (pcm) drawPcm(c);
@@ -898,7 +905,7 @@ std::vector<size_t> listedFields() {
     add(c.parallel);
     // the tempo's, which sweepWave gives what a move of them needs
     add(c.patchTempo); add(c.clockSource); add(c.assign[10]); add(c.assign[11]);
-    for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) }) { add(o->tempoSync); add(o->timeTrip); add(o->beatKeep); add(o->vari); }
+    for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) }) { add(o->tempoSync); add(o->timeTrip); add(o->beatKeep); add(o->vari); add(o->startOffset); }
     // a stray or missing update shows only when a COSM's block has moved since its last update, so several goes at those
     for (int rep = 0; rep < 3; ++rep) {
         for (size_t i = 0; i < (size_t)kCcCount; ++i) f.push_back(kCcOnly + i);
@@ -910,12 +917,12 @@ std::vector<size_t> listedFields() {
     return f;
 }
 
-// In the sweep: the tempo's fields, seen only on a wave with the pad held, and Vari Sw.  Which OSC has the wave, or 0.
+// In the sweep: the tempo's fields, seen only on a wave with the pad held, Vari Sw and the Start Offset.  Which OSC has the wave, or 0.
 int sweepWave(size_t at) {
     static const Ctl c;
     const auto is = [&](const auto& x) { return at == (size_t)(reinterpret_cast<const char*>(&x) - reinterpret_cast<const char*>(&c)); };
-    if (is(c.patchTempo) || is(c.clockSource) || is(c.assign[10]) || is(c.assign[11]) || is(c.tempoSync) || is(c.timeTrip) || is(c.beatKeep) || is(c.vari)) return 1;
-    return is(c.osc2.tempoSync) || is(c.osc2.timeTrip) || is(c.osc2.beatKeep) || is(c.osc2.vari) ? 2 : 0;
+    if (is(c.patchTempo) || is(c.clockSource) || is(c.assign[10]) || is(c.assign[11]) || is(c.tempoSync) || is(c.timeTrip) || is(c.beatKeep) || is(c.vari) || is(c.startOffset)) return 1;
+    return is(c.osc2.tempoSync) || is(c.osc2.timeTrip) || is(c.osc2.beatKeep) || is(c.osc2.vari) || is(c.osc2.startOffset) ? 2 : 0;
 }
 
 struct Report {
@@ -1865,7 +1872,7 @@ int XtToneProbe::run(int argc, char** argv) {
         if (dumpWhich && (dumpWhich[0] == 'a' || std::atoi(dumpWhich) == g))
         {
             for (const OscC* o : { static_cast<const OscC*>(&ctl), static_cast<const OscC*>(&ctl.osc2) })
-                std::printf("  osc: on %d vari %d wave %d/%d loop %d/%d time0 %d\n", o->on, o->vari, o == &ctl ? (wv ? wv->type : 0) : (wv2 ? wv2->type : 0), o == &ctl ? (wv ? wv->channels : 0) : (wv2 ? wv2->channels : 0), o->loop, o->loopMode, o->oscTimeOffset),
+                std::printf("  osc: on %d vari %d start %d wave %d/%d loop %d/%d time0 %d\n", o->on, o->vari, o->startOffset, o == &ctl ? (wv ? wv->type : 0) : (wv2 ? wv2->type : 0), o == &ctl ? (wv ? wv->channels : 0) : (wv2 ? wv2->channels : 0), o->loop, o->loopMode, o->oscTimeOffset),
                 std::printf("  osc: type %d coarse %d fine %d pitch %d kf %d random %d key %d robot %d; patch coarse %d fine %d octave %d porta %d; time %d offset %d kf %d\n", o->oscType, o->oscCoarse, o->oscFine, o->oscPitch, o->pitchKF, o->randomPitch, o->rootKey, o->robot, ctl.patchCoarse, ctl.patchFine, ctl.octave, ctl.portamento, o->oscTime, o->oscTimeOffset, o->oscTimeKF);
             std::printf("  assign"); for (int i = 0; i < 12; ++i) std::printf(" %d", ctl.assign[i]);
             std::printf("; system"); for (uint32_t i = 0; i < 10; ++i) std::printf(" %d", (int8_t)fw.c.rd8(0x89d276b4 + 0x844 + i));
@@ -1931,6 +1938,8 @@ int XtToneProbe::run(int argc, char** argv) {
                     n = ctl;
                     char* p = reinterpret_cast<char*>(&n) + sweepAt;
                     if (p == reinterpret_cast<char*>(&n.patchTempo)) n.patchTempo = ctl.patchTempo == 1200 ? 2400 : 1200;
+                    else if (p == reinterpret_cast<char*>(&n.startOffset)) n.startOffset = ctl.startOffset ? 0 : 3000;
+                    else if (p == reinterpret_cast<char*>(&n.osc2.startOffset)) n.osc2.startOffset = ctl.osc2.startOffset ? 0 : 3000;
                     else *p = !*p;
                 }
                 else if (sweep && sweepAt >= kCcOnly) n = ctl;
@@ -1993,12 +2002,21 @@ int XtToneProbe::run(int argc, char** argv) {
             if (fn[0].vi >= 0 && fn[1].vi >= 0 && fn[1].vi < fn[0].vi) std::swap(order[0], order[1]);
             fw.clearBus();
             bool leftMemory = false;
+            fw.fr11.clear();
             for (FwNote* n : order) {
                 if (!n->live || n->ended) continue;
                 if (tick && !fw.tick(*n)) return 1;
                 if (fw.c.rd32(n->TN + 0xc) != 2) { n->ended = true; continue; }
                 if (!fw.render(*n)) { leftMemory = true; break; }
             }
+            for (FwNote* n : order)
+                for (int o = 0; o < 2; ++o)
+                    if (n->live && n->vi >= 0)
+                        if (const auto it = fw.fr11.find(Firmware::voice(*n, o) + 0xd4); it != fw.fr11.end()) {
+                            float v;
+                            std::memcpy(&v, &it->second, 4);
+                            osc(syn.voice[n->vi], o).lin.setStaleFr11(v);
+                        }
             syn.render(L, R, 32);
             ++blocks;
             ++rep.checks;

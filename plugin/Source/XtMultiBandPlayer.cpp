@@ -639,7 +639,7 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
     S.lastEvPos = (int)S.rd32(S.entry(S.evLast) + 4);
     if (S.evLast < S.evStart) S.evStart = S.evLast;
     if (S.evLast < S.evEnd) S.evEnd = S.evLast;
-    S.startPos = (int)S.rd32(S.entry(S.evStart) + 4);
+    S.startPos = startCfg * 16;                     // +0x18: the voice's, the Start Offset × 16 (0x894f3170)
     S.endPos = (int)S.rd32(S.entry(S.evEnd) + 4);
     S.ev = 0;
     S.pos = 0;

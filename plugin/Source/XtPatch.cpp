@@ -48,6 +48,7 @@ void oscOf(const Read& p, int n, Osc& o) {
     o.oscTime = p(b + 0x23); o.oscTimeKF = 10 * p(b + 0x24); o.lfoTimeDepth = p(b + 0x25); o.tDepth = p(b + 0x26); o.oscTimeOffset = p(b + 0x27);
     o.oscFormant = p(b + 0x28); o.oscFormantKF = 10 * p(b + 0x29); o.lfoFormantDepth = p(b + 0x2a); o.fDepth = p(b + 0x2b);
     o.vari = p(b + 0x30) != 0;
+    o.startOffset = p(b + 0x22);
     o.tempoSync = p(b + 0x2c) != 0; o.robot = p(b + 0x2d) != 0; o.loop = p(b + 0x2f) != 0; o.energy = p(b + 0x31); o.timeTrip = p(b + 0x32) != 0; o.beatKeep = p(b + 0x33) != 0;
     o.ana.detune = p(0x30d + 3 * n); o.ana.subOctave = p(0x30e + 3 * n); o.ana.subLevel = p(0x30f + 3 * n);
     const int e = 4 * n;
@@ -222,7 +223,6 @@ std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int z
         if (p(0x2a4 + b) != 0 && p(0x2a5 + b) == kExternal) m.push_back(osc + "external input");
         if (p(0x2a4 + b) == 0 || p(0x2a5 + b) != 1) continue;
         if (p(0x2d2 + b) != 0) m.push_back(osc + "Playback Mode");
-        if (p(0x2c6 + b) != 0) m.push_back(osc + "Start Offset");
     }
     if (p(0x42e)) m.push_back("arpeggio");
     if (p(0x48d)) m.push_back("Multi Step Modulator");

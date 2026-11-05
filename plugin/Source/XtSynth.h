@@ -127,6 +127,10 @@ public:
         bool loop = false;
         int loopMode = 1;
         float loopStart = 0.0f, loopEnd = 1.0f;
+        // Start Offset (IDs 0x2c6, 0x2fa): where a note walking forward starts in the wave, in samples, as a patch stores it; a walk
+        // backward stops there.  The converter takes it unsigned and makes it the last sample at most (0x894e4448); a note walking
+        // backward still starts at the end.  Samples, as Playback Mode RETRIGGER has them (the block's +0xb4 bit 0x80).
+        int startOffset = 0;
         // Tempo Sync (IDs 0x2d0, 0x304): a PCM OSC's walk follows the tempo clock, at the speed of
         // the Patch Tempo over the wave's Original Tempo (its header's +0x1c, BPM × 10000)
         bool tempoSync = false;
@@ -506,6 +510,7 @@ private:
     float pitchKnob(const Voice& v, const OscVoice& s, const OscControls& o) const;   // the voice's +0xc
     XtEnvParams ampEnvParams(const Voice& v, const OscControls& o) const;   // the OSC amp envelope
     XtLoop waveLoop(const OscVoice& s, const OscControls& o) const;   // the players' loop
+    static int32_t waveStart(const OscVoice& s, const OscControls& o);  // the block's +0xb8: the Start Offset, the last sample at most
     float noteCents(const Voice& v, const OscVoice& s, const OscControls& o, int key) const;  // voice +8 at a key (+0x68 at the previous one)
     void noteTuning(const Voice& v, const OscVoice& s, const OscControls& o, int& coarse, int& fine) const;   // the per-note setup's +0x68 and +0x70
     XtAnalogShared anaShared;                        // the analog voices' shared state

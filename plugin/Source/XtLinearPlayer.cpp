@@ -34,7 +34,7 @@ void XtLinearPlayer::noteOn(const std::vector<float>& left, const std::vector<fl
     fwd = Way {};
     bwd = Way {};
     fwd.end = frames - 1;                               // 0x894f3460: the block's +0xbc − 1
-    bwd.end = 0;                                        // and +0xb8, the Start Offset, which isn't here yet
+    bwd.end = startCfg;                                 // and +0xb8, the Start Offset
     fwd.a = loopCfg.fwdStart; fwd.b = loopCfg.fwdEnd; fwd.len = loopCfg.fwdEnd - loopCfg.fwdStart;
     bwd.a = loopCfg.bwdEnd; bwd.b = loopCfg.bwdStart; bwd.len = loopCfg.bwdEnd - loopCfg.bwdStart;
     fwd.mode = loopCfg.on ? loopCfg.fwdMode : 0;
@@ -48,7 +48,7 @@ void XtLinearPlayer::noteOn(const std::vector<float>& left, const std::vector<fl
     if (loopCfg.on) { lp[0] = loopCfg.fwdStart * 16; lp[1] = loopCfg.fwdEnd * 16; lp[2] = loopCfg.bwdEnd * 16; lp[3] = loopCfg.bwdStart * 16; }
     else { lp[0] = 0; lp[1] = lp[2] = 0x7fffffff; lp[3] = 0; }
     const RoundNearest nearest;
-    beat_.start(tempoCfg, origCfg, 0.0f > walk ? frames * 16 : 0);
+    beat_.start(tempoCfg, origCfg, 0.0f > walk ? frames * 16 : startCfg * 16);   // where the SOLO setup's seek left it (0x8950fed0)
 }
 
 void XtLinearPlayer::seek(int32_t pos16) {
@@ -62,11 +62,12 @@ int32_t XtLinearPlayer::sample(const std::vector<float>& v, int32_t i) const {
     return i >= 0 && (size_t)i < v.size() ? (int32_t)(v[(size_t)i] * 32768.0f) : 0;
 }
 
-// Past an end: that sample, fading.  Going backward the factor is −65536 and the sample's negated after it (0x89509c70).
-void XtLinearPlayer::hold(float* lr, int32_t at, float sign) {
+// Past an end: that sample, fading.  Going backward the factor is −65536 and the sample's negated after it (0x89509c70).  The fade stops at
+// `floor`: 0, but for the stereo routine's backward Alternate hold (setStaleFr11).
+void XtLinearPlayer::hold(float* lr, int32_t at, float sign, float floor) {
     const float keep = ramp;
     float next = keep - kFadeStep;
-    if (!(next > 0.0f)) next = 0.0f;
+    if (!(next > floor)) next = 0.0f;
     ramp = next;
     const auto one = [&](const std::vector<float>& v) {
         float o = (float)sample(v, at);
@@ -215,9 +216,11 @@ void XtLinearPlayer::block(float* lr) {
         const int32_t bottom = wrapAdd(w.b, -w.len), both = (int32_t)((uint32_t)w.len << 1);
         if (!(v > w.a) && !(bottom > v)) rate = rate * w.rate;
         const auto wrap = [&] { while (bottom > v && both > 0) v = wrapAdd(v, both); };
+        float cmp = y ? fr11 : 0.0f;                    // the stereo routine's hold compares with FR11 (setStaleFr11), the mono one with 0
         for (int i = 0; i < 32; ++i, lr += 2) {
             const float fo = frac;
-            if (w.end > w.b && w.end >= v) { v = w.end; pos = w.end; hold(lr, pos, -1.0f); gainStep(); continue; }
+            if (w.end > w.b && w.end >= v) { v = w.end; pos = w.end; hold(lr, pos, -1.0f, cmp); gainStep(); continue; }
+            if (y) cmp = rate;                          // 0x8950a5bc: FR10:FR11 ← FR8:FR9, the fraction and the rate
             float whole;
             if (v > w.b) {                              // on the way there
                 const int32_t at = v;

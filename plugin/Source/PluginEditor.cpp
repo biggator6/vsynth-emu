@@ -173,7 +173,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     encodeBox_.addItemList({ "Auto", "SOLO", "BACKING", "ENSEMBLE" }, 1);
     addAndMakeVisible(encodeBox_);
     encodeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "encodeType", encodeBox_);
-    for (juce::Slider* sl : { &keySlider_, &depthSlider_, &energySlider_, &attackSlider_, &decaySlider_, &sustainSlider_, &releaseSlider_,
+    for (juce::Slider* sl : { &keySlider_, &depthSlider_, &energySlider_, &startSlider_, &attackSlider_, &decaySlider_, &sustainSlider_, &releaseSlider_,
                               &aSensSlider_, &dSensSlider_, &rSensSlider_, &kfSlider_, &oscTkfSlider_, &oscFkfSlider_,
                               &pAttackSlider_, &pDecaySlider_, &pSustainSlider_, &pReleaseSlider_, &pDepthSlider_,
                               &tAttackSlider_, &tDecaySlider_, &tSustainSlider_, &tReleaseSlider_, &tDepthSlider_,
@@ -186,12 +186,13 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
         sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
         sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
-        sl->setTextBoxStyle(sl->getTextBoxPosition(), false, sl == &keySlider_ ? 56 : 44, 20);
+        sl->setTextBoxStyle(sl->getTextBoxPosition(), false, sl == &keySlider_ ? 56 : sl == &startSlider_ ? 66 : 44, 20);
         addAndMakeVisible(*sl);
     }
     keyAtt_     = std::make_unique<SliderAtt>(processor_.apvts, "rootKey",     keySlider_);
     depthAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "encodeDepth", depthSlider_);
     energyAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "energy",      energySlider_);
+    startAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "startOffset", startSlider_);
     attackAtt_  = std::make_unique<SliderAtt>(processor_.apvts, "ampAttack",   attackSlider_);
     decayAtt_   = std::make_unique<SliderAtt>(processor_.apvts, "ampDecay",    decaySlider_);
     sustainAtt_ = std::make_unique<SliderAtt>(processor_.apvts, "ampSustain",  sustainSlider_);
@@ -599,7 +600,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     spkRowLabel_.setText("Speaker", juce::dontSendNotification);
     styleSmall(spkRowLabel_);
     attachCosm(0);
-    for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &attackLabel_, &decayLabel_,
+    for (juce::Label* l : { &encodeLabel_, &keyLabel_, &depthLabel_, &energyLabel_, &startLabel_, &attackLabel_, &decayLabel_,
                             &sustainLabel_, &releaseLabel_, &aSensLabel_, &dSensLabel_, &rSensLabel_, &kfLabel_,
                             &pAttackLabel_, &pDecayLabel_, &pSustainLabel_, &pReleaseLabel_, &pDepthLabel_,
                             &tAttackLabel_, &tDecayLabel_, &tSustainLabel_, &tReleaseLabel_, &tDepthLabel_,
@@ -787,7 +788,7 @@ void VSynthEmuEditor::attachOsc(int k) {
     oscOnAtt_ = std::make_unique<ButtonAtt>(processor_.apvts, id("oscSwitch"), oscOnBtn_);
     oscTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("oscType"), oscTypeBox_);
     anaWaveAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("anaWave"), anaWaveBox_);
-    encodeAtt_.reset(); keyAtt_.reset(); depthAtt_.reset(); energyAtt_.reset(); oscTkfAtt_.reset(); oscFkfAtt_.reset(); timeOffsetAtt_.reset();
+    encodeAtt_.reset(); keyAtt_.reset(); depthAtt_.reset(); energyAtt_.reset(); startAtt_.reset(); oscTkfAtt_.reset(); oscFkfAtt_.reset(); timeOffsetAtt_.reset();
     loopAtt_.reset(); loopModeAtt_.reset(); loopStartAtt_.reset(); loopEndAtt_.reset();
     origTempoAtt_.reset(); syncAtt_.reset(); tripBtnAtt_.reset(); keepAtt_.reset();
     origTempoAtt_  = std::make_unique<SliderAtt>(processor_.apvts, id("origTempo"), origTempoSlider_);
@@ -798,6 +799,7 @@ void VSynthEmuEditor::attachOsc(int k) {
     keyAtt_        = std::make_unique<SliderAtt>(processor_.apvts, id("rootKey"), keySlider_);
     depthAtt_      = std::make_unique<SliderAtt>(processor_.apvts, id("encodeDepth"), depthSlider_);
     energyAtt_     = std::make_unique<SliderAtt>(processor_.apvts, id("energy"), energySlider_);
+    startAtt_      = std::make_unique<SliderAtt>(processor_.apvts, id("startOffset"), startSlider_);
     oscTkfAtt_     = std::make_unique<SliderAtt>(processor_.apvts, id("oscTimeKF"), oscTkfSlider_);
     oscFkfAtt_     = std::make_unique<SliderAtt>(processor_.apvts, id("oscFormantKF"), oscFkfSlider_);
     timeOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("oscTimeOffset"), timeOffsetBox_);
@@ -845,7 +847,8 @@ void VSynthEmuEditor::showOscType() {
     const bool ana = oscTypeBox_.getSelectedItemIndex() == 0;
     for (juce::Component* cpt : { (juce::Component*)&encodeLabel_, (juce::Component*)&encodeBox_, (juce::Component*)&keyLabel_,
                                   (juce::Component*)&keySlider_, (juce::Component*)&depthLabel_, (juce::Component*)&depthSlider_,
-                                  (juce::Component*)&energyLabel_, (juce::Component*)&energySlider_, (juce::Component*)&offsetLabel_,
+                                  (juce::Component*)&energyLabel_, (juce::Component*)&energySlider_, (juce::Component*)&startLabel_,
+                                  (juce::Component*)&startSlider_, (juce::Component*)&offsetLabel_,
                                   (juce::Component*)&timeOffsetBox_, (juce::Component*)&oscTkfLabel_, (juce::Component*)&oscTkfSlider_,
                                   (juce::Component*)&oscFkfLabel_, (juce::Component*)&oscFkfSlider_, (juce::Component*)&loopBtn_, (juce::Component*)&variBtn_,
                                   (juce::Component*)&loopModeBox_, (juce::Component*)&loopStartLabel_, (juce::Component*)&loopStartSlider_,
@@ -1294,7 +1297,7 @@ void VSynthEmuEditor::buildLayout() {
         Card wave { "Wave" };
         wave.head = { { &variBtn_, 60 } };
         wave.rows = { lr(encodeLabel_, encodeBox_), lr(keyLabel_, keySlider_, 150), lr(depthLabel_, depthSlider_), lr(energyLabel_, energySlider_),
-                      lr(offsetLabel_, timeOffsetBox_, 110), lr(oscTkfLabel_, oscTkfSlider_), lr(oscFkfLabel_, oscFkfSlider_) };
+                      lr(offsetLabel_, timeOffsetBox_, 110), lr(oscTkfLabel_, oscTkfSlider_), lr(oscFkfLabel_, oscFkfSlider_), lr(startLabel_, startSlider_) };
         wave.shown = pcm;
         p.add(wave);
         Card loop { "Loop" };

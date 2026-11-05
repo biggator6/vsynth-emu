@@ -125,7 +125,7 @@ void XtSoloVoice::anchorBackward() {
         if (budget >= kUnlimited) wrap = true;
         else { const double c = repeatCost(); if (budget >= c) { budget -= c; wrap = true; } }
     }
-    if (!wrap && 0.0 >= recStart) wrap = true;                      // the first record
+    if (!wrap && ((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart) wrap = true;   // the first record, or the one at the Start Offset (+0x18)
     if (wrap) {
         // 0x8950d01a.  r3 falls by the start each round, so an anchor two
         // lengths under a start above the length comes back only by overflowing.
@@ -339,10 +339,11 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
     prevEv = 0;
     nextEv = endPos16;
     nextCross = 0;
-    // The start (0x8950fa60): a seek (0x8950fed0) to the wave's start, or to
-    // its end when walk < 0: the position and the anchor there, and the
-    // record from there on, record 0 or the stream's terminator (ending 16
-    // samples past the wave's end, an unlimited budget).
+    // The start (0x8950fa60): a seek (0x8950fed0) to the Start Offset (+0x18), or to
+    // the wave's end when walk < 0 (+0x1c): the position there, the record containing
+    // it, the anchor at the record's start.  At the wave's start that's record 0; at
+    // its end the stream's terminator (ending 16 samples past it, an unlimited budget).
+    startPos16 = startCfg * 16;
     const double n = (double)p->in.size();
     if (walk < 0.0f) {
         seg = p->size();
@@ -356,6 +357,11 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
     anchor = recStart;
     Pi = (int32_t)std::lround(recStart * 16.0);
     Pq = recStart;
+    if (!(walk < 0.0f) && startPos16 > 0) {
+        jumpTo(startPos16);
+        anchor = recStart;
+        Pq = Pi / 16.0;
+    }
     anchorStep = std::max((double)A, 1.0);
     low[0] = low[1] = band[0] = band[1] = fCoef = 0.0f;
     q = 1.2f;            // 0x3f99999a, where each block's target is a unit under it
@@ -363,10 +369,11 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
     anchorStepInit = 1.0;
     t = 0;
     // Note-on (0x8950fba0): grain params at the event, timer and ages 0, both
-    // channels reading from the record start, A's window at 0 and B's at 0.5
+    // channels reading from the record's start (its +0x20 to the record block's +0x54 and +0x58, 0x8950fdca), A's window at 0 and B's at 0.5
     // (the two sum to 1), f0n zeroed after the params are computed.
     const Grain g = grainParams(false);
-    for (Chan& c : ch) { c.start = Pi; c.age = 0; c.v = g.v; c.tap = g.C; c.tapW = g.frac; }
+    const int32_t at = (int32_t)std::lround(recStart * 16.0);
+    for (Chan& c : ch) { c.start = at; c.age = 0; c.v = g.v; c.tap = g.C; c.tapW = g.frac; }
     ch[0].e = 0.0f; ch[1].e = 0.5f;
     anchorStep = anchorStepInit;
     {
@@ -471,7 +478,8 @@ void XtSoloVoice::renderXt(float* lr, int count) {
             Pi = np; Pf = nf;
             if (nextCross <= Pi) { crossForward(); crossings(); }
         } else if (s < 0) {
-            if (0 >= np) { ended_ = -1; np = 0; nf = 0; }      // +0x18: the start, 0
+            const int32_t lo = (f3 & 8) ? 0 : startPos16;     // +0x18: the Start Offset; 0 turned round in the forward loop
+            if (lo >= np) { ended_ = -1; np = lo; nf = 0; }
             Pi = np; Pf = nf;
             if (Pi <= nextCross) { crossBackward(); crossings(); }
         }

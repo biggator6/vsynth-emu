@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-05) — v152: Start Offset
+
+- The value was easy: an experiment that answered 1000 for the ID and looked for 1000 in the block found it at +0xb8 in a few minutes, faster than reading the converter for it. The converter then said what the bit 0x80 next to it means: Playback Mode picks samples or events.
+- With 0 the ports were right for the wrong reasons in two places. SOLO's grains started at the position, which at 0 is the record's start; the band players took their start from the event path and their seek from the sample path, which agree at 0. The check's first run with a Start Offset showed both.
+- Three seeds of eight then failed, all on one path: Vari off, a stereo wave, an Alternate loop, going backward. The fade dropped to 0 a sample early, or ran below 0 and grew. The routine compares with FR11 there and never sets it; the pair moves under FPSCR.SZ fill it with the rate as a side effect. The firmware's result depends on whatever ran before it, so the check now hands the port the firmware's register, and the plugin takes 0.
+- zsh doesn't split a variable into words, which cost one run of a loop over seed and case pairs: the multi-step shell work goes in bash scripts, as CLAUDE.md says.
+
 ### Session 16 addendum (2026-11-05) — v151: Vari off
 
 - The old notes had the right two routines from October, and the right reading of the flag, and still the wrong idea of what Vari off means. It isn't "use the linear player": that's only for SOLO waves. Band waves keep their player and change their walk, in a routine the install never mentions. The check's first run said so at once: the BACKING and ENSEMBLE cases with the switch off failed along with the SOLO ones.

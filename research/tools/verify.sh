@@ -18,6 +18,8 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
   TEST_BUS="60,80,0,1" TEST_MATRIX="1,75,63,0,0" TEST_CC="1,127,30000" TEST_FX_LIVE="24000:fxRevType=8,36000:0x67=20,48000:fxChoType=6,50000:fxMfxOn=0,50400:fxMfxOn=1,60000:fxMfxType=11,72000:fxGain=-6" bash "$D/pt.sh" || rc=1; }
 # And with Vari Sw off: SOLO on XtLinearPlayer, the band players' walk on the pitch
 [ $BUILT = 1 ] && { echo -n "vari off, "; TEST_VARI=0 bash "$D/pt.sh" || rc=1; }
+# And with a Start Offset: where each player starts, and where a walk back stops
+[ $BUILT = 1 ] && { echo -n "start offset, "; TEST_START=3000 bash "$D/pt.sh" || rc=1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_FX_PANEL=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_UI_LAYOUT=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_ROM_SEARCH=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }

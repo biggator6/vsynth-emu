@@ -1546,6 +1546,45 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Start Offset (2026-11-05, v152)
+
+Start Offset (IDs 0x2c6, 0x2fa) is now ported, on all three players. It is in samples, as a patch stores it: 44300 is a second. 33 of 1stchoice's patches use it on a PCM OSC that's on, `005 Gig Rhodes` among them, and the image's own patches have it in 88 zones on OSC 1 and 22 on OSC 2.
+
+**The value.** A 32-bit field whose descriptor has min and max both 0, so the read takes the bits as they are. The part's OSC table keeps it at +0x3c (`0x894e5afc`). The encode-type tail of the converter (`0x894e4030`) then goes by Playback Mode (input +0x5e):
+- RETRIGGER and LEGATO (`0x894e4400`): positions in samples, the block's flag 0x80 at +0xb4. +0xb8 is the Start Offset, or the wave's last sample if it isn't below the length, compared unsigned (`0x894e4448`); +0xbc is the length; +0xc0 a copy of +0xb8.
+- STEP (`0x894e42e0`) and EVENT (`0x894e4070`): event numbers, the flag clear. Not ported, with Playback Mode.
+
+In the interpreter, with 1000 answered for 0x2c6: +0xb8 1000, +0xbc 30000. With 40000 on the check's 30000-frame waves: 29999.
+
+**Where it goes.** The voice's note-on (`0x894f3110`) copies +0xb8 and +0xbc, × 16, to the player's +0x18 and +0x1c (`0x894f3170`). Then:
+- **SOLO and the band players** start through `0x8950fa60`. With the flag it seeks, by the table at `0x8987c8a0` (SOLO `0x8950fed0`, the bands `0x89510bf0`), to +0x18, or to +0x1c when the walk is negative. A walk going backward now stops at +0x18, not at 0: SOLO's walk (`0x8950cf9c`) and anchor (`0x8950d048`), the bands' walk list and stepper. Inside the forward loop's bounce (byte 3 bit 8) it is still 0.
+- **SOLO's grains.** After the seek, the note-on (`0x8950fd40`) starts both grains at the record's start (the record's +0x20, to +0x54 and +0x58), not at the position. At 0 the two are the same, and the port had them at the position. The check's first run with a Start Offset caught it.
+- **The band players** had a start half from each path: the positions from the events, the seek from the sample path. Their +0x18 is now the Start Offset × 16. Their end (+0x1c) is still the last event's, which the check finds equal to the length × 16.
+- **Vari off** (`0x894f3460`): the first sample, +0x10c, is +0xb8. A note walking forward starts there, and going backward holds there. Its beat starts there too, where the SOLO setup's seek left it.
+
+Only the note-on reads it (`0x8950bf70` has one caller). Moved during a note, it acts from the next note.
+
+**A register the XT never sets.** Vari off's stereo routine (`0x89509f52`) holds at the first sample going backward in an Alternate loop only when that sample lies above the loop's start (`end > b`), and that takes a Start Offset. The hold there (`0x8950a746`) compares the fade with FR11, but it has no `fldi0 fr11` before it, as the routine's other holds do (`0x8950a3d0`, `0x8950a4d8`). The routine runs with FPSCR.SZ set, so each sample it plays moves the fraction and the rate into FR10 and FR11 as a pair (`0x8950a5bc`). So:
+- after a sample played in the same block, the fade stops at the rate, which is negative going backward. It runs on below 0, and the held sample comes out with its sign flipped and growing, to about −1.1 by the block's end;
+- at a block's start, FR11 is whatever ran before. In the check, an analog OSC 2's render leaves 2^31, which cuts the fade to 0 at once. In another case it was negative: the fade fell by 2.18 a block, −1.18 then −3.35, and the held sample grows until the envelope ends the note.
+
+The mono routine clamps against a zero of its own (`0x89509de2`). The port does what the routine does inside a block, and starts each block from 0, the floor the other holds set (`XtLinearPlayer::setStaleFr11`). That's a choice: on the XT it depends on what ran before. `xt_tone` hands the port the firmware's own FR11 at each block's start, so everything else is checked bit for bit. Two of fcheck's 2000 cases reach that hold, three on seed 777 and seven on seed 9.
+
+**In the plugin.** `OscControls::startOffset`, and the parameters `startOffset` and `osc2StartOffset`: 0 … 2^24 − 1 samples, exact in a float. A patch word with its top bit set comes in as the largest, which the converter treats the same. A Start Offset row on the Wave card, typed or dragged; a skewed slider would be easier to drag, but the attachment takes the parameter's range. `XtPatch` reads it, and it's off the missing list. `TEST_START`, `TEST_OSC2_START`; `XT_START`, `XT_START2`.
+
+**The check.**
+- `xt_tone`: a Start Offset on a third of the PCM draws, a quarter of those past the waves' 30000 frames, where the converter takes the last sample. In the sweep it moves during a note, on a wave. fcheck's 2000 cases and the sweep, the patches, the tuned waves and the clocks: 0 different, and 2000 cases on each of seeds 777, 31337, 9, 4242, 5, 123 and 2025: 0 different. The patches' values: 544,700 against the firmware's reads, 3,116 more than before, both OSCs' Start Offset in every zone. 0 different.
+- `verify.sh`: `TEST_START=3000`, 4/4 bit-identical. The layout check, with the new row: as before, and both new parameters have a control.
+- `TEST_PATCH_PLAY` on ten of 1stchoice's patches that use it: none silent, and `005 Gig Rhodes` now reports nothing missing.
+- Planted errors: `mutate_tone.py` 914, none missed, 21 of them new: the clamp and its edge, each player's start, SOLO's stop, anchor, grains and seek, the beat's start, the FR11 hold, and `patchOf`'s and `XtPatch`'s reads. The first run missed eight and lost one to text this version rewrote (`solo-budget-keep-b`, now on the new line). The FR11 hold changes a result only on seed 9, which reaches it in seven cases to fcheck's two, so its four plants run there. Three older plants (`vari-robot-follow`, `solo-f9c-bounce`, `solo-robot-event`) lost their cases on the default seed to the new draws, since a note starting past its loop never reaches it; they run on seeds 4242, 777 and 11. The clamp's edge missed until the draw gave the waves' exact length now and then, which changes no result: any start at or past the end plays the last sample. `mutate_panel.py --editor` with the `patch-` plants: 71, none missed, six of them new (the row's place and its OSC, and the two OSCs' reads and writes).
+
+**What it found on the way.**
+- The grains' start at a seek, above.
+- The band players' start, above: right only at 0.
+- The stale FR11, above. Without a Start Offset the hold can't be reached, which is why v151's check never saw it.
+
+**Not done.** STEP's and EVENT's starts, in event numbers, which come with Playback Mode. LEGATO's converter path is RETRIGGER's, but LEGATO itself isn't ported.
+
 ### Vari off (2026-11-05, v151)
 
 Vari Sw (IDs 0x2d4, 0x308) is now ported. 71 of 1stchoice's 358 PCM OSCs have it off: 44 on SOLO waves, 17 on BACKING, 10 on ENSEMBLE. Before this they played as VariPhrase, in tune but with their time apart from their pitch. Now a wave's time follows its pitch, by the firmware's own routes, which differ by the wave's type. The same work found the loops' rate factors, which also apply with Vari on (below).
@@ -1592,7 +1631,7 @@ The player, `XtLinearPlayer`, is plain resampling:
 - The walk's lag of an update.
 
 **Not done.**
-- Start Offset with Vari off: the linear player's start is +0xb8, which is 0 here. Start Offset is still listed as missing.
+- Start Offset with Vari off: the linear player's start is +0xb8, which is 0 here. Start Offset is still listed as missing. (Done in v152, "Start Offset".)
 - LITE waves (Encode Type 0) take this same player through another voice kind (1) and note-on (`0x8950b5b0`). That isn't wired: a LITE wave plays as SOLO, as before.
 - Mode 3 loops (hold at the start), which no panel setting makes, are ported but not drawn.
 
@@ -1705,7 +1744,7 @@ Planted errors: `mutate_tone.py` 841, none missed, 46 of them new; `mutate_files
 | Vari Sw off | 71 of 358 PCM OSCs | done in v151, "Vari off" |
 | More than one zone | 59 of 502 patches | zone 1 only |
 | Playback Mode not RETRIGGER | 81 | LEGATO, STEP, EVENT, `vpno` |
-| Start Offset | 33 | IDs 0x2c6, 0x2fa |
+| Start Offset | 33 | done in v152, "Start Offset" |
 | Arpeggio | 107 of 502 | IDs 0x42e… |
 | Multi Step Modulator | | 0x48d… |
 | External input | | no input here |

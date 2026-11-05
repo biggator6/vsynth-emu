@@ -52,6 +52,10 @@ public:
     // walk (0x8950c880 forward, 0x8950ca70 backward): One Way jumps to the
     // other end (0x8950d7d0), Alternate turns the walk round.
     void setLoop(const XtLoop& l) { loopCfg = l; }
+    // The Start Offset in samples, as the converter leaves it in the block (+0xb8, at most the last sample).  Set before noteOn.  The voice
+    // keeps it × 16 at +0x18 (0x894f3170): a note walking forward starts there (0x8950fa60, then 0x8950fed0), and a walk backward stops
+    // there, unless the forward loop has turned it round (0x8950cf9c, 0x8950d048).
+    void setStart(int32_t samples) { startCfg = samples; }
     // Tempo Sync and Time Trip (XtBeat).  Set before noteOn: the note's tempo and the wave's
     // Original Tempo (+0x4c, +0x48), byte 0 bits 1 and 2.  Then, from the voice: the bits as a
     // block sets them (0x894f3ec0: a clock counts from when the bit comes on, and Time Trip
@@ -128,6 +132,7 @@ private:
     uint8_t f3 = 0x80;
     int curEv = 0;
     int32_t prevEv = 0, nextEv = 0, nextCross = 0, endPos16 = 0;
+    int32_t startCfg = 0, startPos16 = 0;   // +0x18: the Start Offset × 16
     float f0n = 0.0f;
     double anchorStepInit = 1.0;
     long t = 0;

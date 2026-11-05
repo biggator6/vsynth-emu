@@ -5,6 +5,11 @@
 #include "XtVpwFormat.h"
 
 // ─── Parameter IDs ───────────────────────────────────────────────────────────
+// Start Offset's parameter holds 0 … 2^24 − 1 samples, exact in a float.  The converter compares it unsigned (0x894e4448), so a word with its top bit set
+// is past any wave, as the largest is.
+constexpr int kStartOffsetMax = (1 << 24) - 1;
+static int startOffsetParam(int v) { return v < 0 ? kStartOffsetMax : std::min(v, kStartOffsetMax); }
+
 namespace Params {
     static const juce::String kPitchShift   = "pitchShift";
     static const juce::String kTimeStretch  = "timeStretch";
@@ -67,6 +72,7 @@ namespace Params {
     static const juce::String kLoopMode      = "loopMode";
     static const juce::String kLoopStart     = "loopStart";
     static const juce::String kLoopEnd       = "loopEnd";
+    static const juce::String kStartOffset   = "startOffset";   // Start Offset in samples, the XT's unit: where a note starts in the wave
     // Portamento: switch, Mode (NORMAL, LEGATO), Type (RATE, TIME), Time
     // 0..127, Time Velo Sens −63..+63
     static const juce::String kPorta         = "portamento";
@@ -324,6 +330,9 @@ VSynthEmuProcessor::createParameterLayout() {
         Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f, twoPlaces));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kLoopEnd, "Loop End", juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f, twoPlaces));
+    // Samples, as a patch stores it; the firmware takes the wave's last sample for anything past it.  2^24 − 1 holds the longest
+    // wave the XT's memory takes and stays exact in a float
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kStartOffset, "Start Offset", 0, kStartOffsetMax, 0));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kPorta, "Portamento", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kPortaMode, "Portamento Mode",
         juce::StringArray { "NORMAL", "LEGATO" }, 0));
@@ -764,6 +773,7 @@ VSynthEmuProcessor::createParameterLayout() {
             juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f, twoPlaces));
         params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kLoopEnd), n + "Loop End",
             juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f, twoPlaces));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kStartOffset), n + "Start Offset", 0, kStartOffsetMax, 0));
     }
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kModSwitch, "MOD Switch", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kModType, "MOD Type",
@@ -1034,6 +1044,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.loopMode     = knob(Params::kLoopMode);
     c.loopStart    = apvts.getRawParameterValue(Params::kLoopStart)->load() / 100.0f;   // not to a step: a wave's own loop is to the sample
     c.loopEnd      = apvts.getRawParameterValue(Params::kLoopEnd)->load() / 100.0f;
+    c.startOffset  = knob(Params::kStartOffset);
     c.portamento   = apvts.getRawParameterValue(Params::kPorta)->load() >= 0.5f;
     c.portaMode    = knob(Params::kPortaMode);
     c.portaType    = knob(Params::kPortaType);
@@ -1292,6 +1303,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         o.loopMode = knob2(Params::kLoopMode);
         o.loopStart = apvts.getRawParameterValue(oscId(1, Params::kLoopStart))->load() / 100.0f;
         o.loopEnd = apvts.getRawParameterValue(oscId(1, Params::kLoopEnd))->load() / 100.0f;
+        o.startOffset = knob2(Params::kStartOffset);
     }
     for (int k = 0; k < 2; ++k) {   // each OSC's pitch, time and formant envelopes' velocity and key
         XtSynth::OscControls& o = k ? c.osc2 : c;
@@ -1322,6 +1334,7 @@ void VSynthEmuProcessor::setControls(const XtSynth::Controls& c) {
     set(Params::kOrigTempo, (float)c.origTempo / 10000.0f);
     set(Params::kLoopStart, c.loopStart * 100.0f);
     set(Params::kLoopEnd, c.loopEnd * 100.0f);
+    set(Params::kStartOffset, (float)startOffsetParam(c.startOffset));
     set(Params::kMonoPoly, c.mono ? 0 : 1);
     set(Params::kOutputMode, c.parallel ? 1 : 0);
     set(Params::kTimeKF, c.timeKF);
@@ -1330,6 +1343,7 @@ void VSynthEmuProcessor::setControls(const XtSynth::Controls& c) {
         set(oscId(1, Params::kOrigTempo), (float)c.osc2.origTempo / 10000.0f);
         set(oscId(1, Params::kLoopStart), c.osc2.loopStart * 100.0f);
         set(oscId(1, Params::kLoopEnd), c.osc2.loopEnd * 100.0f);
+        set(oscId(1, Params::kStartOffset), (float)startOffsetParam(c.osc2.startOffset));
         for (int k = 0; k < 2; ++k) {
             const XtSynth::OscControls& o = k ? c.osc2 : c;
             const XtSynth::OscControls::EnvVelocity* v[3] = { &o.pVel, &o.tVel, &o.fVel };

@@ -18,6 +18,15 @@ class XtLinearPlayer {
 public:
     // Set before noteOn.  The backward rate on the XT is also × a word in the wave's cached events (+0x2d0), which no code seen writes, so 1 here.
     void setLoop(const XtLoop& l) { loopCfg = l; }
+    // The Start Offset in samples, as the converter leaves it in the block (+0xb8, at most the last sample): the first sample (+0x10c),
+    // where a note walking forward starts and a walk backward holds (0x894f3460).  Set before noteOn.
+    void setStart(int32_t samples) { startCfg = samples; }
+    // What the stereo routine's hold in an Alternate loop going backward clamps its fade against (0x8950a746): FR11, which that path never
+    // sets.  Each sample it plays moves the frac and rate pair into FR10 and FR11 (0x8950a5bc, a pair move under FPSCR.SZ), so after one the
+    // fade stops at the rate, which is negative going backward, and runs on below 0, the held sample growing with its sign flipped.  At a
+    // block's start FR11 is whatever ran before on the XT left there (an analog OSC 2's render leaves 2^31, cutting the fade at once).  The
+    // plugin takes 0, the floor the routine's other holds set for themselves; the check gives the firmware's own.  Set before each block.
+    void setStaleFr11(float v) { fr11 = v; }
     // Tempo Sync and Time Trip (XtBeat), as XtSoloVoice's: the player keeps them apart from what it reads, and under either bit walks at the beat's step alone.
     void setTempo(uint32_t tempo, uint32_t orig) { tempoCfg = tempo; origCfg = orig; }
     void setBeatFlags(bool sync, bool trip) {
@@ -51,13 +60,15 @@ private:
     const std::vector<float>* x = nullptr;
     const std::vector<float>* y = nullptr;
     int32_t sample(const std::vector<float>& v, int32_t i) const;
-    void hold(float* lr, int32_t at, float sign);
+    void hold(float* lr, int32_t at, float sign, float floor = 0.0f);
     float pitch = 1.0f, walk = 1.0f;
     float frac = 0.0f, ramp = 1.0f, gainTarget = 0.0f, gain = 0.0f;
     int32_t pos = 0, turning = 0;                       // +0xec, +0x128
     struct Way { int32_t end = 0, a = 0, b = 0, len = 0; float rate = 1.0f; int mode = 0; };
     Way fwd, bwd;
     XtLoop loopCfg;
+    int32_t startCfg = 0;
+    float fr11 = 0.0f;
     XtBeat beat_;
     uint32_t tempoCfg = 1200000, origCfg = 1200000;
     uint8_t flags0 = 0;

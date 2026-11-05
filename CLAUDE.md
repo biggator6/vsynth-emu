@@ -104,7 +104,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - Before a push: `verify.sh --full`.
 
 ## Firmware facts worth knowing
-- Applying a patch (HARDWARE_FIRMWARE.md, "Applying a patch"; `XtPatch`, `VSynthEmuProcessor::loadPatch`): a new `Controls` field read from a patch needs its line there as well as in `patchOf`, and `setControls` beside `xtControls`. A wave's own fine tuning (`vplp` +0, up to 14 semitones in real waves) is on `XtEncoded`, not a control: it reaches the pitch, the root, the formant ratio and the walk. A patch holds only its type's parameters, read by slot (`xtPatchTyped`). Not done: Vari off, zones past the first, Playback Mode, Start Offset, arpeggio, Multi Step Modulator; `xtPatchMissing` says which a patch asks for.
+- Applying a patch (HARDWARE_FIRMWARE.md, "Applying a patch"; `XtPatch`, `VSynthEmuProcessor::loadPatch`): a new `Controls` field read from a patch needs its line there as well as in `patchOf`, and `setControls` beside `xtControls`. A wave's own fine tuning (`vplp` +0, up to 14 semitones in real waves) is on `XtEncoded`, not a control: it reaches the pitch, the root, the formant ratio and the walk. A patch holds only its type's parameters, read by slot (`xtPatchTyped`). Not done: zones past the first, Playback Mode, arpeggio, Multi Step Modulator; `xtPatchMissing` says which a patch asks for.
 - V-Synth's files (HARDWARE_FIRMWARE.md, "V-Synth's files"; `XtFiles`): a `.vpw`'s audio is RDAC-packed, unpacked by the firmware's block routine, and the plugin plays one. A `.p00` is in a file layout: the firmware's defaults under it, then `0x8947dae0`, give the store the descriptors (12 bytes an ID: offset, width, bit, centre, default, min, max) read. Applying a patch to the plugin isn't done. The disk image's files are fragmented, so go through its FAT; 416 preset waves follow its partition, in no file.
 - rom.2 maps at 0x89300000; .data/.bss up to 0x8a020000 (the interpreter sets
   them up). Calls take r4–r7, then the stack; `Sh4::call(addr, {args}, sp)`.
@@ -167,6 +167,10 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - Vari Sw off (v151): a SOLO wave plays on `XtLinearPlayer` (`0x89509870`/`0x89509f52`), a band wave keeps its player with its walk × the pitch (`0x8950f810`).
   The player's byte 0 takes the block's flags at each update but for 0x20, so Robot follows during a note, its grains at the next event load. Each wave's loops have rate
   factors (`vplp` +0x14, +0x16), Vari on too. HARDWARE_FIRMWARE.md, "Vari off".
+- Start Offset (v152, IDs 0x2c6, 0x2fa): samples under RETRIGGER and LEGATO (the block's +0xb4 bit 0x80; STEP and EVENT give event numbers). The converter puts it at +0xb8, the last
+  sample at most, compared unsigned; the voice gives each player it × 16 at +0x18: where a note walking forward starts (`0x8950fa60`) and where a walk back stops, Vari off's first
+  sample. Read at note-on only. Vari off's stereo hold going backward in an Alternate loop compares its fade with FR11, which the XT never sets there (`XtLinearPlayer::setStaleFr11`:
+  the plugin 0, `xt_tone` the firmware's own). HARDWARE_FIRMWARE.md, "Start Offset".
 - The analog oscillator's map (waveform codes, routines, the converter's
   input, the hidden calibration IDs 0x528…0x55b) is in HARDWARE_FIRMWARE.md,
   "The analog oscillator, and SAW". A patch's waveform number is not the

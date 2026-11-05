@@ -946,6 +946,7 @@ int main(int argc, char** argv) {
         if (const char* e = std::getenv("TEST_OSC2_KEY")) { o.rootKey = std::atoi(e); set2("rootKey", o.rootKey); }
         if (std::getenv("TEST_OSC2_ROBOT") && std::atoi(std::getenv("TEST_OSC2_ROBOT")) != 0) { o.robot = true; set2("robot", 1); }
         if (std::getenv("TEST_OSC2_VARI") && std::atoi(std::getenv("TEST_OSC2_VARI")) == 0) { o.vari = false; set2("vari", 0); }
+        if (const char* e = std::getenv("TEST_OSC2_START")) { o.startOffset = std::atoi(e); set2("startOffset", o.startOffset); }
         if (std::getenv("TEST_OSC1_OFF") && std::atoi(std::getenv("TEST_OSC1_OFF")) != 0) {
             refCtl.on = false;
             auto* prm = p.apvts.getParameter("oscSwitch");
@@ -999,6 +1000,11 @@ int main(int argc, char** argv) {
     if (std::getenv("TEST_VARI") && std::atoi(std::getenv("TEST_VARI")) == 0) {
         refCtl.vari = false;
         setKnobs({ { "vari", 0 } });
+    }
+    // TEST_START=n: OSC 1's Start Offset, n samples into the wave
+    if (const char* e = std::getenv("TEST_START")) {
+        refCtl.startOffset = std::atoi(e);
+        setKnobs({ { "startOffset", refCtl.startOffset } });
     }
     // TEST_ROBOT=1: Robot Voice
     if (std::getenv("TEST_ROBOT") && std::atoi(std::getenv("TEST_ROBOT")) != 0) {

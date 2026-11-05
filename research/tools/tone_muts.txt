@@ -656,7 +656,7 @@ solo-unit|lr[2 * k] = lr[2 * k + 1] = high * g65536;|lr[2 * k] = lr[2 * k + 1] =
 solo-k-min|Ff = K(0x34ffffff) > F ? K(0x34ffffff) : F;|Ff = 4.76837e-07f > F ? 4.76837e-07f : F;|solo
 solo-robot-rate|rate = Ci / pw; }|rate = Af; }|tonesolo
 solo-budget-keep|if (budget >= c) { budget -= c; wrap = true; } }\n    }\n    if (!wrap && recEnd|if (budget >= c) { wrap = true; } }\n    }\n    if (!wrap && recEnd|tonesolo
-solo-budget-keep-b|if (budget >= c) { budget -= c; wrap = true; } }\n    }\n    if (!wrap && 0.0|if (budget >= c) { wrap = true; } }\n    }\n    if (!wrap && 0.0|tonesolo
+solo-budget-keep-b|if (budget >= c) { budget -= c; wrap = true; } }\n    }\n    if (!wrap && ((f3 & 8)|if (budget >= c) { wrap = true; } }\n    }\n    if (!wrap && ((f3 & 8)|tonesolo
 solo-budget-field|const int b = (p->info[i] & 0x1F8) << 6;|const int b = (p->info[i] & 0x1F8) << 5;|tonesolo
 solo-anchor-end|if (anchor < recEnd) return;|if (anchor <= recEnd) return;|solo
 solo-anchor-start|if (!(recStart > anchor)) return;|if (!(recStart >= anchor)) return;|tonesolo
@@ -874,7 +874,7 @@ vari-robot|    v->robot = v->robotKnob && ctl.vari;|    v->robot = v->robotKnob;
 vari-cents|o.rootKey, s.robotKnob && o.vari);|o.rootKey, s.robot);|tone
 vari-no-linear|    v->linear = !ctl.vari &&|    v->linear = false &&|tone
 vari-band|        s.mb.setVari(o.vari);\n||tone
-vari-robot-follow|        s.solo.setRobot(s.robotKnob && o.vari);|        s.solo.setRobot(s.robot);|tone
+vari-robot-follow|        s.solo.setRobot(s.robotKnob && o.vari);|        s.solo.setRobot(s.robot);|tone|4242
 loop-rate-fwd|    l.fwdRate = s.wave->loopRate[0];\n||tone
 loop-rate-bwd|    l.bwdRate = s.wave->loopRate[1];\n||tone
 band-vari|if (S.flags0 & 0x20) {|if (false) {|toneband
@@ -886,8 +886,29 @@ solo-loop-fwd|f9c = loopCfg.fwdRate;|f9c = 1.0f;|tonesolo
 solo-loop-bwd|f9c = loopCfg.bwdRate;|f9c = 1.0f;|tonesolo
 solo-rate98|rate98 = robot ? A : A * f9c;|rate98 = A;|tonesolo
 solo-rate98-robot|rate98 = robot ? A : A * f9c;|rate98 = A * f9c;|tonesolo
-solo-f9c-bounce|if (f3 & 0x10) { f3 &= 0xef; f9c = 1.0f; }|if (f3 & 0x10) { f3 &= 0xef; }|tonesolo
+solo-f9c-bounce|if (f3 & 0x10) { f3 &= 0xef; f9c = 1.0f; }|if (f3 & 0x10) { f3 &= 0xef; }|tonesolo|777
 loop-rate-scale|return xtOscExp2(xtf::div(xtf::flt(tenths), 12000.0f));|return xtOscExp2(xtf::div(xtf::flt(tenths), 1200.0f));|toneosc
 patch-vari|    o.vari = p(b + 0x30) != 0;|    o.vari = true;|tonepatch
-solo-robot-event|    robotEv = robot;                    // an event's load|    // an event's load|tonesolo
+solo-robot-event|    robotEv = robot;                    // an event's load|    // an event's load|tonesolo|11
 solo-robot-grains|        if (robotEv) { pw = K(0x44c8745d) / Af;|        if (robot) { pw = K(0x44c8745d) / Af;|tonesolo
+start-clamp|return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);|return frames == 0 ? 0 : (int32_t)(at > frames ? frames - 1 : at);
+start-clamp-none|return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);|return (int32_t)at;
+start-solo|        s.solo.setStart(waveStart(s, o));|        s.solo.setStart(0);
+start-band|        s.mb.setStart(waveStart(s, o));|        s.mb.setStart(0);
+start-lin|        s.lin.setStart(waveStart(s, o));|        s.lin.setStart(0);
+solo-start-stop|const int32_t lo = (f3 & 8) ? 0 : startPos16;|const int32_t lo = 0;|tonesolo
+solo-start-stop-turned|const int32_t lo = (f3 & 8) ? 0 : startPos16;|const int32_t lo = startPos16;|tonesolo
+solo-start-anchor|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|0.0 >= recStart|tonesolo
+solo-start-anchor-turned|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|startPos16 / 16.0 >= recStart|tonesolo
+solo-start-grains|    const int32_t at = (int32_t)std::lround(recStart * 16.0);|    const int32_t at = Pi;|tonesolo
+solo-start-seek-anchor|        jumpTo(startPos16);\n        anchor = recStart;|        jumpTo(startPos16);|tonesolo
+solo-start-backward|    if (!(walk < 0.0f) && startPos16 > 0) {|    if (startPos16 > 0) {|tonesolo
+band-start|    S.startPos = startCfg * 16;|    S.startPos = 0;|toneband
+lin-start|    bwd.end = startCfg;|    bwd.end = 0;|tonelin
+lin-start-beat|0.0f > walk ? frames * 16 : startCfg * 16);|0.0f > walk ? frames * 16 : 0);|tonelin
+lin-fr11-rate|            if (y) cmp = rate;|            ;|tonelin|9
+lin-fr11-mono|            if (y) cmp = rate;|            cmp = rate;|tonelin|9
+lin-fr11-entry|        float cmp = y ? fr11 : 0.0f;|        float cmp = 0.0f;|tonelin|9
+lin-hold-floor|    if (!(next > floor)) next = 0.0f;|    if (!(next > 0.0f)) next = 0.0f;|tonelin|9
+check-start|    p[b + 0x22] = o.startOffset;|;|tonecheck
+patch-start|    o.startOffset = p(b + 0x22);|    o.startOffset = 0;|tonepatch

@@ -259,21 +259,21 @@ env 30 70 90 50 80 500 2: identical
 == xt_tone
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
-patches: 512, 1558 zones, 541584 values, 0 different; 448512 of their effects' values, 0 different
-tone: 4384 notes, 2469 taken by a sounding tone, 344 truncated, 383184 blocks, 31465418 checks
-tone: 0 notes left off, a read outside memory; 413128 band reads far from their wave
+patches: 512, 1558 zones, 544700 values, 0 different; 448512 of their effects' values, 0 different
+tone: 4389 notes, 2472 taken by a sounding tone, 334 truncated, 382387 blocks, 31399256 checks
+tone: 0 notes left off, a read outside memory; 299520 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1358 notes, 378 taken by a sounding tone, 183 truncated, 120293 blocks, 10701776 checks
-tone, a wave on OSC 2: 0 notes left off, a read outside memory; 576958 band reads far from their wave
+tone, a wave on OSC 2: 1348 notes, 383 taken by a sounding tone, 172 truncated, 120060 blocks, 11780105 checks
+tone, a wave on OSC 2: 0 notes left off, a read outside memory; 663076 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 240784 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 241012 checks
 tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
-tone, the firmware's patches: 719 notes, 168 taken by a sounding tone, 25 truncated, 62215 blocks, 6243393 checks
-tone, the firmware's patches: 0 notes left off, a read outside memory; 37642 band reads far from their wave
+tone, the firmware's patches: 721 notes, 175 taken by a sounding tone, 22 truncated, 58847 blocks, 5937445 checks
+tone, the firmware's patches: 0 notes left off, a read outside memory; 41600 band reads far from their wave
 tone, the firmware's patches: 0 different
-tone, a wave's own tuning: 670 notes, 196 taken by a sounding tone, 80 truncated, 57095 blocks, 5400001 checks
-tone, a wave's own tuning: 0 notes left off, a read outside memory; 186564 band reads far from their wave
+tone, a wave's own tuning: 669 notes, 187 taken by a sounding tone, 87 truncated, 57998 blocks, 5096471 checks
+tone, a wave's own tuning: 0 notes left off, a read outside memory; 165590 band reads far from their wave
 tone, a wave's own tuning: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks

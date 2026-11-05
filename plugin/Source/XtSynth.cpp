@@ -341,6 +341,12 @@ float XtSynth::gainTarget(const Voice& v, const OscVoice& s, const OscControls& 
     return xtOscGainTarget(gain, level, env, s.lfo.out(), xtOscLevelLfoDepth(o.oscLevelLfoDepth + v.mx[(&s == &v ? OscLfoRate : Osc2Lfo) + 4]));
 }
 
+// The converter's (0x894e4448): the Start Offset, or the last sample if it's not below the wave's length, both unsigned.
+int32_t XtSynth::waveStart(const OscVoice& s, const OscControls& o) {
+    const uint32_t frames = (uint32_t)s.wave->frames, at = (uint32_t)o.startOffset;
+    return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);
+}
+
 // The loop the players get (their cached loop events, player +0x6c, and
 // byte 0 bit 0): the region in samples, at least 16 long as on the XT; One
 // Shot leaves the Loop switch without effect (loop modes 0).
@@ -969,6 +975,7 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     }
     else if (s.linear) {
         s.lin.setLoop(waveLoop(s, o));
+        s.lin.setStart(waveStart(s, o));
         s.lin.setTempo(tempoWord, (uint32_t)o.origTempo);
         s.lin.setBeatFlags(o.tempoSync, tripNow);
         s.lin.noteOn(s.wave->solo.in, s.wave->solo.inR, s.curA, s.curWalk);
@@ -978,6 +985,7 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     else if (s.wave->type == 1) {
         s.solo.setRobot(s.robot);
         s.solo.setLoop(waveLoop(s, o));
+        s.solo.setStart(waveStart(s, o));
         s.solo.setTempo(tempoWord, (uint32_t)o.origTempo);
         s.solo.setBeatFlags(o.tempoSync, tripNow);
         s.solo.noteOn(s.wave->solo, s.curA, s.curF, s.curWalk, s.curG);
@@ -986,6 +994,7 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     }
     else {
         s.mb.setLoop(waveLoop(s, o));
+        s.mb.setStart(waveStart(s, o));
         s.mb.setVari(o.vari);
         s.mb.setTempo(tempoWord, (uint32_t)o.origTempo);
         s.mb.setBeatFlags(o.tempoSync, tripNow);
@@ -1758,6 +1767,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_VEL="ampSens,ampCurve,oscSens,oscCurve": velocity to level.
 //   XT_VELOCITY=v: note-on velocity 1..127 (default 127).
 //   XT_ROBOT=1: Robot Voice.  XT_VARI=0, XT_VARI2=0: Vari Sw off on OSC 1, OSC 2.
+//   XT_START=n, XT_START2=n: OSC 1's, OSC 2's Start Offset, n samples into the wave.
 //   XT_LOOP="mode,start,end": Loop on, Loop Mode (0 One Shot, 1 One Way,
 //     2 Alternate) and the region as fractions of the wave.
 //   XT_PORTA="mode,type,time,veloSens": Portamento on, Mode (0 NORMAL,
@@ -1930,6 +1940,7 @@ int main(int argc, char** argv) {
                         &o.energy, &o.lfoTimeDepth, &o.lfoFormantDepth);
         o.robot = std::getenv("XT_ROBOT2") && std::atoi(std::getenv("XT_ROBOT2")) != 0;
         o.vari = !(std::getenv("XT_VARI2") && std::atoi(std::getenv("XT_VARI2")) == 0);
+        if (const char* e = std::getenv("XT_START2")) o.startOffset = std::atoi(e);
         if (const char* e = std::getenv("XT_LOOP2")) {
             o.loop = true;
             std::sscanf(e, "%d,%f,%f", &o.loopMode, &o.loopStart, &o.loopEnd);
@@ -1945,6 +1956,7 @@ int main(int argc, char** argv) {
     const float noteVel = std::getenv("XT_VELOCITY") ? std::atoi(std::getenv("XT_VELOCITY")) / 127.0f : 1.0f;
     c.robot = std::getenv("XT_ROBOT") && std::atoi(std::getenv("XT_ROBOT")) != 0;
     c.vari = !(std::getenv("XT_VARI") && std::atoi(std::getenv("XT_VARI")) == 0);
+    if (const char* e = std::getenv("XT_START")) c.startOffset = std::atoi(e);
     if (const char* e = std::getenv("XT_LOOP")) {
         c.loop = true;
         std::sscanf(e, "%d,%f,%f", &c.loopMode, &c.loopStart, &c.loopEnd);

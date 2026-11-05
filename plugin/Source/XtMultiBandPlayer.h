@@ -100,6 +100,10 @@ public:
     const XtBeat& beat() const;
     // Vari Sw (byte 0 bit 0x20, clear with it on).  Set before noteOn.  Off, the band player stays, and its walk follows the pitch (0x8950f810).
     void setVari(bool on) { variCfg = on; }
+    // The Start Offset in samples, as the converter leaves it in the block (+0xb8, at most the last sample).  Set before noteOn.  The
+    // voice keeps it × 16 at +0x18 (0x894f3170, the block's positions in samples, +0xb4 bit 0x80): a note walking forward starts there
+    // (0x8950fa60, then 0x89510bf0), and a walk backward stops there, unless the forward loop has turned it round.
+    void setStart(int32_t samples) { startCfg = samples; }
     // To a position in 1/16 sample (0x89510bf0 with byte 0 bit 7), as a released Time Trip goes
     // back to the beat: the records and the read positions there, the beat again from there.
     void seek(int pos16);
@@ -115,6 +119,7 @@ private:
     uint32_t tempoCfg = 1200000, origCfg = 1200000;
     uint8_t flagsCfg = 0;
     bool variCfg = true;
+    int32_t startCfg = 0;
     static void blockImpl(State& S, float* out);
 public:
     XtMbPlayer();
