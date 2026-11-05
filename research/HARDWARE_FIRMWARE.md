@@ -1547,6 +1547,24 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The planted-error runners (2026-11-05, v146)
+
+v145 found `mutate_panel.py` passing plants on a missing ROM. So the others were run with no ROM as well:
+
+| Runner | With no ROM, a plant read | |
+|---|---|---|
+| `mutate_fx.py` | ERROR | right |
+| `mutate_fx.py --control` | caught, "stopped: it crashed" | a false pass, as it counted too few result lines as a crash |
+| `mutate_enc.py` | MISSED | wrong: it blames the check |
+| `mutate_tone.py` | ERROR | right |
+| `mutate_tone.py`, solo cases | MISSED | wrong: it blames the check |
+
+Past results aren't in doubt: those runs had the ROM, and the verdicts came out the same when run again.
+
+**The fix.** `mutate.sh` refuses to run with no ROM, both before the build and before the run, as a build takes long enough for it to go. Each runner first runs with nothing planted and stops unless that's clean. A wave or `solocmp` case that dies now counts as different, as the runners' headers already said; it had read as no difference, since a run that dies prints nothing for the pattern to match.
+
+**The check.** No ROM and a junk ROM stop all five runs, saying why. A ROM removed during a plant's build gives ERROR on all five plants tried. A plant that aborts counts on all 275 waves and all 32 solo cases. With the real ROM no verdict changed: `mutate_fx.py` 97, the 2 missed that v126 explains; `--control` 157, the 1 missed at 60 events since v138, caught at 200; `mutate_enc.py` 34 and `mutate_tone.py` 796, none missed.
+
 ### The Effects tab in cards (2026-11-04, v145)
 
 `FxPanel` now follows the design (`research/UI_DESIGN.md`). It's itself a `Ui::Page`, so its controls stay its direct children and `TEST_FX_PANEL` runs untouched: the same 985 parameters and 5948 value texts against the firmware's routine. Nothing here is the firmware's and the sound doesn't change: A/B 4/4 identical to v144.

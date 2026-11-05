@@ -3,8 +3,9 @@
 # named ones), each planted in XtSynth.cpp by mutate.sh (PORT=tone) and run through
 # xt_tone, which stops at its first difference (XT_TONE_STOP): the verdict is the
 # whole run's, for the cases up to it.  One line each: caught (a run the error crashes
-# counts), MISSED, or ERROR when the old text is no longer in the source.  From the
-# repo root.  tone_muts.txt:
+# counts), MISSED, or ERROR when the old text is no longer in the source or the run never
+# started.  It stops first if a run with nothing planted doesn't say 0 different, on each
+# seed and for solocmp, whichever the list uses.  From the repo root.  tone_muts.txt:
 # name|old|new[|port[|seed]], with \n and \| escaped; port is mutate.sh's PORT for an error in
 # another file than XtSynth.cpp (toneosc, XtOsc.cpp), solo for one only `solocmp` reaches:
 # very short records, or a timer that overflows.  seed is for one the default seed's cases
@@ -27,9 +28,11 @@ if names:
     muts = [m for m in muts if m[0] in names]
 script = D + '/mutate.sh'
 subprocess.run(['bash', script, 'zz-base', 'constexpr float kLand', 'constexpr float kLand', '1'], env=env, capture_output=True)   # builds the shared objects
-def run(m):
-    r = subprocess.run(['bash', script, m[0], m[1], m[2], cases, 'different'], env=dict(env, PORT=m[3], **({'SEED': m[4]} if m[4] else {})), capture_output=True, text=True)
+def run(m, pattern=None):
+    # solocmp: its verdict is DIFFERENT, as a run that dies says nothing with "different" in it, and that counts
+    r = subprocess.run(['bash', script, m[0], m[1], m[2], cases, pattern or ('DIFFERENT' if m[3] == 'solo' else 'different')], env=dict(env, PORT=m[3], **({'SEED': m[4]} if m[4] else {})), capture_output=True, text=True)
     out = r.stdout + r.stderr
+    if pattern and m[3] == 'solo' and not re.search(r'^same:', out, re.M): return m[0], None    # nothing planted: the cases must have run, and equalled the baseline
     if m[3] == 'solo':
         if '== ' + m[0] not in out: return m[0], None
         n = len(re.findall(r'^DIFFERENT', out, re.M))
@@ -40,7 +43,12 @@ def run(m):
     if died: return m[0], died.group(1)
     tot = re.findall(r'^tone[^:\n]*: (\d+) different', out, re.M)
     return m[0], f'tone: {sum(map(int, tot))} different' if tot else None
+# With nothing planted, an old text put back as it was.  If this run fails, every plant's would, and would read as caught or missed for no reason of its own.
+controls = [('zz-control-' + (s or 'default'), 'constexpr float kLand', 'constexpr float kLand', 'tone', s) for s in sorted({x[4] for x in muts if x[3] != 'solo'})]
+controls += [('zz-control-solo', x[1], x[1], 'solo', '') for x in muts if x[3] == 'solo'][:1]
 with cf.ThreadPoolExecutor(8) as ex:
+    for (n, t), c in zip(ex.map(lambda c: run(c, 'same|DIFFERENT' if c[3] == 'solo' else 'different'), controls), controls):
+        if t != 'tone: 0 different': sys.exit(f'mutate_tone: the run with nothing planted ({c[3]}, seed {c[4] or "default"}) says {t or "nothing"}, so no plant would mean anything')
     res = list(ex.map(run, muts))
 missed = errors = 0
 for n, t in res:

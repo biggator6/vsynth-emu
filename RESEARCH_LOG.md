@@ -3561,3 +3561,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Making `FxPanel` itself a `Ui::Page` rather than holding one meant its controls stayed its direct children, so `TEST_FX_PANEL` needed no change. A firmware check that didn't have to be touched is worth more than a tidier class.
 - The plan was five pages. Once drawn, EQ had nothing for its left card and Output nothing for its right, so they became one System page.
 - The plants read 111 of 111, and 35 of those were false. The ROM had been moved out of `firmware/unpacked/` partway through, and `mutate_panel.py` called any failed run caught, so `ROM rejected` looked like success. I saw it only because I ran the layout check once more before committing, and it failed. Looking at the tally alone would have missed it. The script now runs each kind of run with nothing planted first, and treats a rejected ROM as an error. `mutate_fx.py`, `mutate_enc.py` and `mutate_tone.py` have their own ways of judging a run, and I haven't checked them for the same gap.
+
+### Session 17 (2026-11-05) — v146: the planted-error runners
+
+- v145 left the other runners unchecked for its false pass. Running them with no ROM found it in `mutate_fx.py --control`: it treats too few result lines as a crash, and a run that never started has none.
+- My first guard was too early. It checked the ROM before the build, and the mid-run test still read "caught" on its first plant. I can't be sure which side of the guard the ROM went on in that test, but a build takes seconds, so the gap was real. It now checks again just before the run, and the test removes the ROM during the build, so it isn't a race any more.
+- A plant that kills the run has been reading as no difference on the encoder's waves and the solo cases, the opposite of what the headers said. No plant in the lists happens to do that, so no verdict changed. It's a check that nothing had tested.
