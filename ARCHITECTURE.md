@@ -297,6 +297,11 @@ behaviour). The tables belong to the process: an image already in memory isn't
 read again under the instances playing from it, and one that won't load leaves
 the last in place.
 
+**V-Synth's own files.** A `.vpw` loads wherever a WAV does (`XtVpwFormat`), its
+RDAC audio unpacked by the firmware's own routine; on Auto it encodes as the type
+the wave says it is. `XtFiles` also reads a `.p00` into the firmware's store, not yet
+applied to the plugin. research/HARDWARE_FIRMWARE.md, "V-Synth's files".
+
 **Checks:**
 - At a 44.1 kHz host rate, `XtSynth` output is bit-exact against the
   firmware chain: `xt_fw play`, and the engine's SOLO render.

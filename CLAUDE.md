@@ -22,7 +22,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## Where things are
 - `plugin/Source/`: `XtFxChip` (the effect chip; `xt_fx`), `XtFxControl` (the firmware's effect driver in the interpreter, off the audio thread, feeding the chip through a queue; and `XtFxUnit`, the two with the frame's way through, in the sound behind the plugin's Effects switch; `xt_fx control`), `FxPanel` (the editor's page for them, by `xtFxCatalog`'s names and ranges from rom.2, and `XtFxValueText`, each value's text by the firmware's own routine), `XtSynth` (the synth: voices, controls, tick), the ports
   (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`,
-  `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFirmware` (firmware harness: runs
+  `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFiles` (V-Synth's wave and patch files) and `XtVpwFormat` (a `.vpw` as a JUCE format), `XtFirmware` (firmware harness: runs
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
   `PluginEditor`. Each port's firmware check is its `XT_*_MAIN` block; `XtToneCheck`
   (`XT_TONE_MAIN`) is XtSynth's: a whole firmware tone against it.
@@ -79,6 +79,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   symbolic run of its disassembly (written for the Frequency Shifter's FIR).
 - `sh4dis.py <addr> <n> ...`: a linear SH-4 listing of rom.2, no Ghidra. Ghidra's project won't open under a path holding `.claude`, so
   `ghidra.sh` fails in a worktree; run `analyzeHeadless` on the main checkout's `firmware/ghidra` instead.
+- `xt_files <rom>` (in fcheck, about 8 s; `build/tools/fcheck/bin`): the disk image's preset waves against the firmware's whole-wave routines and its patches' values against its reads; `XT_FILES_FIRST=1` says what differs. `wave <file.vpw> [out.raw]`, `patch <file.p00> [lo hi]`, `extract <n> <out.vpw>`. `mutate_files.py [names]`: the planted errors in `files_muts.txt`, through `PORT=files` or `PORT=filesfw mutate.sh`, about 10 minutes.
 - `fxmap.cpp` (not in build.sh; build line at its top): the firmware's effect driver in the interpreter. `table`: per type, program, active words, what
   an update writes, memory operations. `mfx <type> [i v]`: a type's words as fields, and what wrote each. `boot`: what's loaded. Output goes in `build/`.
 - `fxchip.cpp` (the same): a throwaway model of the effect chip, to test the decoding; a sine or impulse into a frame pair, gains at its slots. Not a port.
@@ -97,11 +98,11 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
   a difference, not as a routine.
-- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes). If `XtFxChip.cpp` changed: `mutate_fx.py`. If `XtFxControl.cpp` changed: `mutate_fx.py --control` and `fxthreads.sh`. If `FxPanel.cpp`, `XtFxValueText` or the effects' wiring in `PluginProcessor.cpp` changed: `mutate_panel.py`. If `PluginEditor.cpp` or `UiParts.h` changed: `mutate_panel.py --editor`. If the ROM search changed: `mutate_panel.py` with the seven `rom-` names, about 4 minutes.
+- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes). If `XtFxChip.cpp` changed: `mutate_fx.py`. If `XtFxControl.cpp` changed: `mutate_fx.py --control` and `fxthreads.sh`. If `FxPanel.cpp`, `XtFxValueText` or the effects' wiring in `PluginProcessor.cpp` changed: `mutate_panel.py`. If `PluginEditor.cpp` or `UiParts.h` changed: `mutate_panel.py --editor`. If `XtFiles.cpp` or the file routines in `XtFirmware.cpp` changed: `mutate_files.py`. If the ROM search changed: `mutate_panel.py` with the seven `rom-` names, about 4 minutes.
 - Before a push: `verify.sh --full`.
 
 ## Firmware facts worth knowing
-- V-Synth's files (HARDWARE_FIRMWARE.md, "V-Synth's files, as far as read"; the plugin reads none of them yet): a `.p00`'s name reads, its values don't. A `.vpw` is a project's `.wav` without the RIFF header, its audio RDAC-packed, undecoded. The disk image holds 416 such streams after its FAT partition, plainly the preset waves.
+- V-Synth's files (HARDWARE_FIRMWARE.md, "V-Synth's files"; `XtFiles`): a `.vpw`'s audio is RDAC-packed, unpacked by the firmware's block routine, and the plugin plays one. A `.p00` is in a file layout: the firmware's defaults under it, then `0x8947dae0`, give the store the descriptors (12 bytes an ID: offset, width, bit, centre, default, min, max) read. Applying a patch to the plugin isn't done. The disk image's files are fragmented, so go through its FAT; 416 preset waves follow its partition, in no file.
 - rom.2 maps at 0x89300000; .data/.bss up to 0x8a020000 (the interpreter sets
   them up). Calls take r4–r7, then the stack; `Sh4::call(addr, {args}, sp)`.
 - The SH-4 runs round-to-zero (FPSCR.RM), FMAC = product then sum (two

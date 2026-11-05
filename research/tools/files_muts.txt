@@ -1,0 +1,24 @@
+tone-stride|{ 0x293, 0x312, 0xe6, 82 },|{ 0x293, 0x312, 0xe6, 78 },
+tone-base|{ 0x293, 0x312, 0xe6, 82 },|{ 0x293, 0x312, 0xe5, 82 },
+env-base|{ 0x313, 0x3bd, 0x606, 112 },|{ 0x313, 0x3bd, 0x5c6, 112 },
+lfo-base|{ 0x3be, 0x3e6, 0xd06, 20 },|{ 0x3be, 0x3e6, 0xcc6, 20 },
+cosm-stride|kCosmStride = 0x220;|kCosmStride = 0x200;
+mfx-base|{ 0x176, 0x1fb, 84, 0 },|{ 0x176, 0x1fb, 83, 0 },
+msm-base|{ 0x48d, 0x4ef, 0x14ac, 0 },|{ 0x48d, 0x4ef, 0x146c, 0 },
+ctl-base|{ 0x42b, 0x438, 0x1286, 0 },|{ 0x42b, 0x438, 0x1246, 0 },
+width-32|width >= 32 ? v : v & ((1u << width) - 1)|v & ((1u << width) - 1)
+width-sign|const int width = std::abs(d->width), total|const int width = d->width, total
+range-default|if (d->min != d->max && (v < d->min \|\| v > d->max)) v = d->def;|
+range-equal|if (d->min != d->max && (v < d->min|if ((v < d->min
+centre|return v - d->centre;|return v;
+stereo-flag|out.channels = vpsc[2] ? 2 : 1;|out.channels = 1;
+frames-word|out.frames = (long)le32(vpsc + 4);|out.frames = (long)le32(vpsc + 8);
+header-kept|xtFwRdacDecode(data + 8, nData - 8,|xtFwRdacDecode(data, nData,
+fat-chain|c = (uint32_t)(d[fat + 2 * (size_t)c] \| d[fat + 2 * (size_t)c + 1] << 8);|c = c + 1;
+name-shift|name += (char)((((data[at] << 8 \| data[at + 1]) >> (9 - shift)) & 0x7f));|name += (char)((((data[at] << 8 \| data[at + 1]) >> (8 - shift)) & 0x7f));
+prev-reset|prev[k] = (uint32_t)(int32_t)(int16_t)r0;|prev[k] = 0;|filesfw
+prev-shared|prev[k] = (uint32_t)(int32_t)(int16_t)r0;|prev[0] = (uint32_t)(int32_t)(int16_t)r0;|filesfw
+past-end|at + i < n && at + i < bytes ? src[at + i] : 0|at + i < bytes ? src[at + i] : 0|filesfw
+no-defaults|c.write(kFile, data, bytes);\n    if (!c.call(0x8947dae0|std::memset(c.ptr(kFile, 0x14fa), 0, 0x14fa); c.write(kFile, data, bytes);\n    if (!c.call(0x8947dae0|filesfw
+no-upgrade|c.read(kStore, store.data(), store.size());|c.read(kFile, store.data(), store.size());|filesfw
+short-length|bytes = std::min<size_t>({ (size_t)be32(file + 0x1c), size - at, (size_t)kXtPatchBytes });|bytes = std::min<size_t>({ size - at, (size_t)kXtPatchBytes });

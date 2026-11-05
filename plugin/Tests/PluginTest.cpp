@@ -6,6 +6,7 @@
 #include "../Source/PluginEditor.h"
 #include "../Source/FxPanel.h"
 #include "../Source/Sh4Interp.h"
+#include "../Source/XtVpwFormat.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <cstdio>
 #include <functional>
@@ -1045,7 +1046,7 @@ int main(int argc, char** argv) {
         refCtl.osc2.on = true;
         refCtl.osc2.oscType = 1;
         p.loadFile(juce::File(path2), 1);
-        juce::AudioFormatManager fm2; fm2.registerBasicFormats();
+        juce::AudioFormatManager fm2; fm2.registerBasicFormats(); fm2.registerFormat(new XtVpwFormat(), false);
         std::unique_ptr<juce::AudioFormatReader> rd2(fm2.createReaderFor(juce::File(path2)));
         if (!rd2) { std::fprintf(stderr, "TEST_OSC2_WAVE: cannot read %s\n", path2.toRawUTF8()); return 1; }
         juce::AudioBuffer<float> in2((int)rd2->numChannels, (int)rd2->lengthInSamples);
@@ -1061,13 +1062,14 @@ int main(int argc, char** argv) {
         if (p.getStatusText().startsWith("Encode failed")) break;
     }
     std::printf("status: %s\n", p.getStatusText().toRawUTF8());
+    if (juce::File(argv[2]).hasFileExtension("vpw") && !p.getFormatManager().getWildcardForAllFormats().contains("*.vpw")) { std::fprintf(stderr, ".vpw isn't in the file chooser's list\n"); return 1; }
     for (const char* id : { "pitchShift", "patchCoarse", "patchFine", "randomPitch", "oscCoarse", "oscFine", "oscPitch", "pitchKF", "oscTime", "oscTimeOffset", "oscFormant", "energy",
                             "rootKey", "ampAttack", "ampDecay", "ampSustain", "ampRelease", "encodeDepth" })
         std::printf("  %s = %.9g\n", id, (double)p.apvts.getRawParameterValue(id)->load());
     if (!p.getStatusText().startsWith("Encoded")) return 1;
 
     // the same input straight through XtSynth
-    juce::AudioFormatManager fm; fm.registerBasicFormats();
+    juce::AudioFormatManager fm; fm.registerBasicFormats(); fm.registerFormat(new XtVpwFormat(), false);
     std::unique_ptr<juce::AudioFormatReader> rd(fm.createReaderFor(juce::File(argv[2])));
     juce::AudioBuffer<float> in((int)rd->numChannels, (int)rd->lengthInSamples);
     rd->read(&in, 0, in.getNumSamples(), 0, true, true);

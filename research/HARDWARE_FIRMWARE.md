@@ -872,8 +872,7 @@ default OFF, as on the XT). `render_suite.py` renders at 0.05. Result: suite
 **Open:**
 - ~~The knob → g mapping~~: g = (k/127)², from the VariPhrase converter's
   tail `0x894e4030` (v51). The references' g ≈ 0.05 is Energy ≈ 28.
-- The EMU-TEST patch's actual Energy value. The patch file is bit-packed; the
-  value is easiest to read on the XT (OSC → Formant (PCM) page).
+- ~~The EMU-TEST patch's actual Energy value~~: 1, its default, in the file as it now stands (v147, "V-Synth's files").
 
 ## BACKING / ENSEMBLE: first findings (2026-10-28, in progress)
 
@@ -1547,17 +1546,40 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
-### V-Synth's files, as far as read (2026-11-04, v146)
+### V-Synth's files (2026-11-05, v147)
 
-Read for importing patches and projects, which the user has asked for; the plugin reads none of this yet. From `analysis/projects/Emu_test.prj`, the user's `Vsynth_Software/1stchoice` (502 patches, 250 waves, gitignored) and the firmware's disk image.
+`plugin/Source/XtFiles.*` reads them, through the firmware's own routines in the interpreter and its descriptors from rom.2 at run time, and `xt_files` checks that against the firmware. The plugin plays a `.vpw` (`XtVpwFormat`, a JUCE format, so the file chooser offers it with no change to the editor). A patch is read but not yet applied to the plugin. From `analysis/projects/Emu_test.prj`, the user's `Vsynth_Software/1stchoice` (502 patches, 250 waves, gitignored) and the firmware's disk image.
 
 **A project** is `Patch/NNN name.p00` and `Wave/NNN name.wav` or `.vpw`, with three `.s00` files if the XT saved it whole. rom.2's file lists name `wav`, `aif`, `vpw` and `w00`; the manual lists WAV, AIFF and VPW as imports.
 
-**A patch, `.p00`:** `SVD0` at +2, `PATaKATE` at +0x10, the data's length big-endian at +0x1c, the data from +0x20. The name is 12 7-bit characters from the data's bit 8 (notes.txt's "bit 264" counts from the file's start): 260 of Emu_test's 263 and 500 of 1stchoice's 502 equal their file names. The values are still bit-packed and undecoded. The length varies: all of Emu_test is 0x14fa, 1stchoice 0x14f2 (391), 0x14ac (25) and 0x146c (86), cause not known. Code that loads the tags: `PATa` at `0x8948b3de` and `0x8948b87a`, `SVD0` at `0x8948c52a`, not read yet. The plan is the firmware's own code in the interpreter, then each parameter by ID. A patch has up to 16 zones, and `XtSynth` plays one.
+**A wave, `.vpw`:** a project's `.wav` chunks with no RIFF header, in this order: `vpfl vpsc vplp vpno vpdt LIST rdmd data`. `vpfl` starts `0102`, its word 8 is the `data` chunk's size and word 10 `RDAC` (rom.2 also names `LINR`, which no file in hand uses). `vpsc`: byte 0 is 0x0b or 0x0a, not read yet, byte 1 the encode type, byte 2 set if stereo, word 1 the frames. `vplp`: words 1 and 2 the loop's start and end. `rdmd` starts `MThd`, a MIDI file. `LIST`'s ISFT names the encoder: Monolith, V-Synth 1.51 and, once in the image, WaveTrainer. 1stchoice has 144 BACKING, 89 SOLO, 17 ENSEMBLE and no LITE, against 41 LITE of Emu_test's 79.
 
-**A wave, `.vpw`:** a project's `.wav` chunks with no RIFF header, in this order: `vpfl vpsc vplp vpno vpdt LIST rdmd data`. All 250 end exactly at the file's end. `vpfl` starts `0102`, and its word 10 is `RDAC` in all 250 where rom.2 also names `LINR`. So the audio is packed: `data` is only 8 to 22 bytes more than `vpsc`'s word 1, about one byte a sample if that word is the sample count. The unpacking isn't read yet. `vpsc`'s byte 1 is the encode type: 144 BACKING, 89 SOLO, 17 ENSEMBLE, none LITE, against 41 LITE of Emu_test's 79. `rdmd` starts `MThd`, a MIDI file. `LIST`'s ISFT names the encoder: Monolith, V-Synth 1.51 and, once in the image, WaveTrainer.
+**RDAC** packs 16 bits into 8, losing some. `data` is an 8-byte header, `00 08` (`0x8952ee80` checks those two; nothing reads the other six), then 16-byte blocks of 16 samples each, in turn left and right if stereo. A block routine, `0x89529570(block, out, prev, 1)`, returns its last sample, which is the next block's `prev`; each channel starts at 0 (`0x8952ee70`). Inside a block the eight big-endian words go alternately into two 8-sample groups. Each group's top bits choose field widths (jump tables `0x895298e0`, `0x89529910`) and a shift (`0x89529a10`, `0x89529a1c`), and its samples are rebuilt from the last inward, each the mean of its neighbours plus a stored difference. `0x8952eeb0` runs the whole-wave routines `0x89529c20` (mono) and `0x89529ce0` (stereo) at load, so the XT unpacks a wave once, not as it plays. Bytes past frames x channels read as 0. In the interpreter a million frames take about 100 ms, so there is no port: `xtFwRdacDecode` runs the block routine.
 
-**The disk image** (`V-SynthXTDiskImage.bin.0.bin`): a FAT16 partition from sector 32 for 47968 sectors, with `Internal.prj` (512 `.p00`, 224 `.w00` of about 32 bytes each) and `Internal.vc2` (128 `.p02`, 58 `.w02`). After it, 416 streams of the same chunks, all `RDAC`: 268 SOLO, 135 BACKING, 13 ENSEMBLE, about 24 MB. 224 of 1stchoice's 250 waves have a `data` chunk byte for byte equal to one of them, so these are plainly the preset waves (rom.2 calls the place `V:\Preset.prj\Wave\`). They carry no names; 1stchoice gives those 224 theirs. Only 2 of its patches begin as any in the image. The `vpdt` records in these waves were written by encoders other than the XT's, like Emu_test's: more for `xtrecs.py`-style comparison, none tried.
+**A patch, `.p00`:** `0x1e` then `SVD0`, `PATaKATE` at +0x10, and big-endian at +0x18 the data's offset and at +0x1c its length. `0x89490430` reads at most 0x14fa bytes over the firmware's default patch (`0x8947e230`, `0x8947dad0`), so a short file is an old one and what it lacks stays default. The length tells the age: 0x146c, then 0x14ac with 4 more bytes a zone at 0x146c, 0x14f2 with the Multi Step Modulator at 0x14ac, 0x14fa with 8 more. All are one **file layout**, and `0x8947dae0(store, file)` turns it into the **store layout** the descriptors go by, moving those 4 bytes into each zone's tone block, at +0x4e. The file layout has tone blocks of 78 bytes, not 82, and the rest of the blocks 0x40 earlier, so the descriptors misread a file directly. That is what made the sequential decode of 2026-10-22 drift.
+
+A **descriptor** is 12 bytes an ID from `0x897a167c`: u16 byte offset, s8 width (only its size counts), u8 bit, u16 centre, default, min, max. The bits read most significant first from that byte and bit (`0x894817b0`), and `0x89481860` makes the value: the default if they're out of range, unless min equals max, less the centre. OSC 1 and 2's Start Offset (0x2c6, 0x2fa) are 32 bits. An offset counts from its section's start in the store:
+
+| IDs | What | At | Each zone |
+|---|---|---|---|
+| 0x103…0x175 | Common: name, tempo, zone ranges, Matrix | 0 | |
+| 0x176…0x1fb | MFX (0x176 lies over MFX Type, and isn't a patch's) | 84 | |
+| 0x1fc…0x22f | Chorus | 152 | |
+| 0x230…0x292 | Reverb | 180 | |
+| 0x293…0x312 | Tone: Structure, MOD, TVA, both OSCs | 0xe6 | +82 |
+| 0x313…0x3bd | 13 envelopes | 0x606 | +112 |
+| 0x3be…0x3e6 | 5 LFOs | 0xd06 | +20 |
+| 0x3e7…0x42a | COSM 1; COSM 2 is +0x220 | 0xe46 | +34 |
+| 0x42b…0x438 | Beam Type, Pad, arpeggio | 0x1286 | |
+| 0x48d…0x4ef | Multi Step Modulator | 0x14ac | |
+
+**What shows it's right.** After the upgrade, every value of all 16 zones in the 765 patches of Emu_test and 1stchoice is in range, over 3.5 million, bar 0x176. Before it, 11 to 34% of the zone blocks' weren't. `xt_files` on the image's 512: 12 of 4.16 million out of range, four Multi Step Modulator IDs in three patches, and 520,256 values equal to the firmware's reads. Patches' wave numbers are what the project holds: 98% in Emu_test and all in 1stchoice, bar 0, which no file has. A wave number is the file's number: 1stchoice's Gig Rhodes plays 2, `002 KEY-Rhodes`. EMU-TEST's OSC 1 is wave 3, its sine, with Formant at -63 and Energy at its default, 1, which settles the old question of that patch's Energy. 446 of 1stchoice's 502 patches and 257 of Emu_test's 263 use one zone. `XtSynth` plays one, so the others would lose their splits.
+
+A patch cut short, as the image has none: one using the Multi Step Modulator in 77 fields, cut before it, gives a patch of no length's values, and cut after it, its own. 3 of the firmware's 98 defaults there aren't the descriptors'.
+
+**The disk image** (`V-SynthXTDiskImage.bin.0.bin`): a FAT16 partition from sector 32 for 47968 sectors, with `Internal.prj` (512 `.p00`, 224 `.w00` of about 32 bytes each) and `Internal.vc2` (128 `.p02`, 58 `.w02`). Its files are fragmented: scanning for `SVD0` gave 19,474 values out of range where reading through the FAT gives 12. After the partition, 416 streams of a wave's chunks, 268 SOLO, 135 BACKING, 13 ENSEMBLE, 19.8 million frames, 49 stereo. 224 of 1stchoice's 250 waves have a `data` chunk byte for byte equal to one of them, so these are plainly the preset waves (rom.2 calls the place `V:\Preset.prj\Wave\`). They carry no names; 1stchoice gives those 224 theirs. All 416 equal the firmware's whole-wave routines, mono and stereo, with a block's edge 0.999 of the mean step. Over them and 1stchoice's, 84% of the 340 loops tested meet within 3 steps. Their stored SOLO records don't equal `xtSoloEncode`'s on the unpacked audio, none of 18: other encoders, and that audio is what the packing left. So that isn't a check of RDAC either way.
+
+**Not done:** applying a patch to the plugin's parameters, which needs each ID's way back to a `Controls` field (`patchOf` in `XtToneCheck.cpp` is the way there); zones; what links a `.w00` to a stream; playing a wave on its stored records and not a new encode; LITE.
 
 ### The Effects tab in cards (2026-11-04, v145)
 

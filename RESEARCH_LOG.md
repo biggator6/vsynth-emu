@@ -3569,3 +3569,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - A test that chose a ROM would have written its path into the user's real settings, so PluginTest now has a temporary `VSE_APP_DIR` for every run.
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
+
+### Session 16 addendum (2026-11-05) — v147: V-Synth's files
+
+- RDAC was found by a crude scan: windows of code with many dynamic shifts, a step of 16 and a loop. The top hit was the block routine. The code that names `RDAC` only writes it.
+- A patch's name led to the rest: `0x894832d0` reads it by ID through `0x89484310`, and that routine's table holds every parameter's byte, bit, width and range. The sequential decode I'd tried in October was never going to work, as the fields aren't in ID order across sections.
+- Reading by those descriptors went badly at first: 11 to 34% of the zones' values out of range, though Common, Chorus and Reverb were clean. A search over every byte offset for where each section fits gave 1478 for the envelopes, where the code's copy loop says 0x5c6. So files are in a layout of their own, and the file's length has nothing to do with it. With the firmware's upgrade run first, 3.5 million values were in range.
+- The image's patches then read 19,474 out of range. I'd found them by scanning for `SVD0`, and the files are fragmented. Through the FAT, 12.
+- `OSC n Start Offset` is 32 bits, and `1u << 32` gave a mask of 0. The firmware's reads caught it, in 5 of 520,256, which is why they're compared and not just the ranges.
+- The stored SOLO records were the check I'd hoped for on RDAC: encode the unpacked audio and compare. None of 18 equal, as other encoders wrote them, from audio before the packing. It says nothing either way. Running the firmware's own routine is what the exactness rests on, with the two routes through it compared.
+- The plants found a hole: with the fill of defaults removed, nothing changed, as every patch in the image is full length. `xt_files` now cuts one. My first version of that used the first patch, which leaves the Multi Step Modulator at its defaults, so it couldn't tell a cut from no cut, and the next plant showed that too. It now picks the patch that uses it most.

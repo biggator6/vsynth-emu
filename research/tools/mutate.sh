@@ -40,6 +40,13 @@ elif [ "$PORT" = fxc ]; then       # XtFxControl against its checks in xt_fx; [c
     L=("$OBJ/Sh4Interp.o" "$OBJ/XtFxChip_main.o")
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
+elif [ "$PORT" = files ]; then     # XtFiles against fcheck's baseline of xt_files; [cases] is not used
+    F=XtFiles.cpp; D=XT_FILES_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
+elif [ "$PORT" = filesfw ]; then   # the same, with the error in XtFirmware's routines for them
+    F=XtFirmware.cpp; D=XT_FILES_MAIN
+    OBJ="$M/files_obj"; mkdir -p "$OBJ"
+    [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.cpp" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.h" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFirmware.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_FILES_MAIN -I"$S" -c "$S/XtFiles.cpp" -o "$OBJ/XtFiles_main.$$.o" && mv "$OBJ/XtFiles_main.$$.o" "$OBJ/XtFiles_main.o"; }
+    L=("$OBJ/XtFiles_main.o" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
 elif [ "${PORT:-cosm}" = analog ]; then
     F=XtAnalog.cpp; D=XT_ANALOG_MAIN
     L=("$S/XtOsc.cpp" "$S/XtCosm.cpp" "$S/XtEnvelope.cpp" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp")
@@ -73,6 +80,14 @@ if [ "$PORT" = solo ]; then
     done < <(sed -n 's/^solo \(.*\): [0-9]* records.*/\1/p' "$B")
     wait
     cat "$T"/* | grep -E "$P"
+    exit
+fi
+if [ "$PORT" = files ] || [ "$PORT" = filesfw ]; then
+    B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.base"; grep -E '^(rdac|patches|short): ' "$B" > "$T"
+    "$M/$N" "$ROM" 2>/dev/null | grep -vxF -f "$T" > "$M/$N.out"
+    st=${PIPESTATUS[0]}; [ "$st" -ge 128 ] && echo "x: the run died, signal $((st - 128))" >> "$M/$N.out"
+    grep -E "$P" "$M/$N.out"
+    echo "files: $(grep -c . "$M/$N.out") lines differ from the baseline"
     exit
 fi
 if [ "$PORT" = enc ]; then

@@ -5,6 +5,8 @@
 // does not exist (ENSEMBLE's load-time analysis) and to validate the ports.
 #include <cstdint>
 #include <map>
+#include <memory>
+#include <string>
 #include <vector>
 #include "XtMultiBandPlayer.h"
 #include "XtSoloEncoder.h"
@@ -14,6 +16,27 @@
 // the image cannot be read.
 bool xtFwOpen(const char* romPath);
 bool xtFwOpened();
+const std::string& xtFwRomPath();
+
+// A wave's RDAC audio (a data chunk's bytes after its 8-byte header) into interleaved int16: the block routine 0x89529570,
+// which 0x8952eeb0 runs at load, each channel's prediction starting from 0 (0x8952ee70).  xtFwRdacWhole does it by the
+// whole-wave routines 0x89529c20 and 0x89529ce0, for the check.
+bool xtFwRdacDecode(const uint8_t* src, size_t bytes, long frames, int channels, std::vector<int16_t>& out);
+bool xtFwRdacWhole(const uint8_t* src, size_t bytes, long frames, int channels, std::vector<int16_t>& out);
+// A .p00's data into the patch as the firmware holds it: its default patch (0x8947e230) as it stands in a file (0x8947dad0)
+// under the file's bytes, then its layout upgrade (0x8947dae0).
+bool xtFwPatchStore(const uint8_t* data, size_t bytes, std::vector<uint8_t>& store);
+// The firmware's reads of a store, for the check: 0x894817b0 (the bits) and 0x89484310 (the value).
+class XtFwPatchReader {
+public:
+    XtFwPatchReader();
+    ~XtFwPatchReader();
+    void load(const std::vector<uint8_t>& store);
+    bool read(int at, int id, int& raw, int& value);
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl;
+};
 
 // The SOLO encoder (0x8951dc40 + 0x8951e120), as XtSoloEncoder.cpp ports it: n frames
 // of mono, or of interleaved stereo in the mode the XT's driver gives a stereo wave

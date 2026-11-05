@@ -625,6 +625,10 @@ band 5 chord.bin 1 0.8 1.5 30000: ENSEMBLE, 30000 frames: max |firmware - port| 
 band 5 chord.bin 1 1.0 0.0 20000 3000:1.0 8000:-0.5: ENSEMBLE, 20000 frames: max |firmware - port| 0, difference -327.5 dB against the signal (rms 0.1183), first at -1
 band 5 vocal.bin 1 0.03 -0.2 3000 0:0.015: ENSEMBLE, 3000 frames: max |firmware - port| 0, difference -295.4 dB against the signal (rms 0.0076), first at -1
 band 3 drum.bin 2 0.5 -0.5 8000 0:0.3: BACKING, 8000 frames: max |firmware - port| 7.01e-46, difference -257.2 dB against the signal (rms 0.0001), first at 3423
+== xt_files
+rdac: 416 waves (367 mono, 49 stereo; 268 SOLO, 135 BACKING, 13 ENSEMBLE), 19764803 frames, 0 unread, 0 different from the firmware's whole-wave routines, a block's edge 0.999 of the mean step, hash 9d163e39a6de617a
+patches: 512 in the image (lengths 0x146c 0, 0x14ac 0, 0x14f2 0, other 512), 512 names read alike, 4162048 values, 12 out of range, 520256 against the firmware's reads, 0 different, hash 82034c2071b9a07a
+short: a patch using the Multi Step Modulator in 77 fields, cut before it 98 values the firmware's defaults, after it 98 its own, 0 not; 3 of those defaults aren't the descriptors'
 == xt_fx
 MFX 0 Thru: 8192 samples, 0 different
 MFX 1 Parametric EQ: 8192 samples, 0 different

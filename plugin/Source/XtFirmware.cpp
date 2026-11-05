@@ -69,6 +69,82 @@ bool xtFwOpen(const char* romPath) {
     return true;
 }
 bool xtFwOpened() { return !g_rom.empty(); }
+const std::string& xtFwRomPath() { return g_rom; }
+
+// ── V-Synth's files ──────────────────────────────────────────────────────────
+
+bool xtFwRdacDecode(const uint8_t* src, size_t bytes, long frames, int channels, std::vector<int16_t>& out) {
+    out.clear();
+    if (g_rom.empty() || frames < 0 || (channels != 1 && channels != 2)) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    const size_t n = (size_t)frames * (size_t)channels;     // a count of samples, and of the bytes that count: past it they read as 0
+    out.assign(n, 0);
+    constexpr uint32_t kBlock = kRam, kOut = kRam + 0x100;
+    uint32_t prev[2] = { 0, 0 };
+    size_t at = 0;
+    for (size_t f = 0; f < (size_t)frames; f += 16)
+        for (int k = 0; k < channels; ++k, at += 16) {
+            for (uint32_t i = 0; i < 16; ++i) c.wr8(kBlock + i, at + i < n && at + i < bytes ? src[at + i] : 0);
+            uint32_t r0 = 0;
+            if (!c.call(0x89529570, { kBlock, kOut, prev[k], 1 }, kStack, &r0)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+            prev[k] = (uint32_t)(int32_t)(int16_t)r0;
+            for (uint32_t i = 0; i < 16 && f + i < (size_t)frames; ++i) out[(f + i) * (size_t)channels + (size_t)k] = (int16_t)c.rd16(kOut + 2 * i);
+        }
+    return true;
+}
+
+bool xtFwRdacWhole(const uint8_t* src, size_t bytes, long frames, int channels, std::vector<int16_t>& out) {
+    out.clear();
+    if (g_rom.empty() || frames < 0 || (channels != 1 && channels != 2)) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    const size_t n = (size_t)frames * (size_t)channels;
+    const uint32_t dst = kSamp + (uint32_t)((bytes + 0x1000) & ~0xfffu);
+    if (dst + n * 2 + 0x1000 > kRam + kRamSize) return false;
+    c.write(kSamp, src, bytes);
+    if (channels == 1) {
+        if (!c.call(0x89529c20, { kSamp, (uint32_t)n, dst, 0 }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    } else {   // on the stack as 0x8952eeb0 leaves it: where to put the last samples, then the first predictions
+        const uint32_t sp = kStack - 8, prevs = kRam + 0x200;
+        c.wr32(sp, prevs); c.wr32(sp + 4, 0);
+        if (!c.call(0x89529ce0, { kSamp, (uint32_t)n, dst, 0 }, sp)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    }
+    out.resize(n);
+    c.read(dst, out.data(), n * 2);
+    return true;
+}
+
+bool xtFwPatchStore(const uint8_t* data, size_t bytes, std::vector<uint8_t>& store) {
+    store.clear();
+    if (g_rom.empty() || bytes > 0x14fa) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    constexpr uint32_t kFile = kSamp, kStore = kSamp + 0x2000;
+    if (!c.call(0x8947e230, { 1 }, kStack) || !c.call(0x8947dad0, { kFile }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    c.write(kFile, data, bytes);
+    if (!c.call(0x8947dae0, { kStore, kFile }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    store.resize(0x14fa);
+    c.read(kStore, store.data(), store.size());
+    return true;
+}
+
+struct XtFwPatchReader::Impl { Machine m { g_rom }; };
+XtFwPatchReader::XtFwPatchReader() : impl(std::make_unique<Impl>()) {}
+XtFwPatchReader::~XtFwPatchReader() = default;
+void XtFwPatchReader::load(const std::vector<uint8_t>& store) { impl->m.cpu.write(kSamp, store.data(), store.size()); }
+bool XtFwPatchReader::read(int at, int id, int& raw, int& value) {
+    Sh4& c = impl->m.cpu;
+    uint32_t r0 = 0;
+    if (!c.call(0x894817b0, { kSamp + (uint32_t)at, 0x897a167cu + 12u * (uint32_t)id }, kStack, &r0)) return false;
+    raw = (int)r0;
+    if (!c.call(0x89484310, { kSamp + (uint32_t)at, (uint32_t)id }, kStack, &r0)) return false;
+    value = (int)r0;
+    return true;
+}
 // The reads are 0x8950e980's and 0x8950eb60's (mono, stereo; each twice): the bytes at r7,
 // from the band at r5 (for the kernel's, a few bytes before it), r7 loaded again before each.
 void xtFwHookBandReads(Sh4& c, XtFwBandReads& reads) {

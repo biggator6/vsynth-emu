@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include <array>
 #include "PluginEditor.h"
+#include "XtVpwFormat.h"
 
 // ─── Parameter IDs ───────────────────────────────────────────────────────────
 namespace Params {
@@ -780,6 +781,7 @@ VSynthEmuProcessor::VSynthEmuProcessor()
 {
     for (auto& e : fxEdits_) e.store(kFxNoEdit, std::memory_order_relaxed);
     formatManager_.registerBasicFormats();   // WAV, AIFF, OGG, FLAC
+    formatManager_.registerFormat(new XtVpwFormat(), false);
 
     for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
                             Params::kEncodeType, Params::kEncodeDepth, Params::oscId(1, Params::kEncodeType), Params::oscId(1, Params::kEncodeDepth) })
@@ -1417,7 +1419,7 @@ void VSynthEmuProcessor::loadFile(const juce::File& file, int osc)
         juce::AlertWindow::showMessageBoxAsync(
             juce::AlertWindow::WarningIcon,
             "Load Error",
-            "Could not read: " + file.getFileName());
+            (file.hasFileExtension("vpw") && !xtSynthRomReady() ? "A .vpw needs the firmware image: " : "Could not read: ") + file.getFileName());
         return;
     }
 
@@ -1433,6 +1435,7 @@ void VSynthEmuProcessor::loadFile(const juce::File& file, int osc)
         w.buffer = std::move(newBuffer);
         w.rate = reader->sampleRate;
         w.bits = reader->usesFloatingPointData ? 16 : (int)reader->bitsPerSample;   // float WAVs: rounded
+        w.ownType = reader->metadataValues.getValue(XtVpwFormat::kEncodeType, "0").getIntValue();
         w.loaded.store(true);
     }
 
@@ -1467,9 +1470,10 @@ void VSynthEmuProcessor::reencode(int osc) {
     if (!xtSynthRomReady()) { xtActive_.store(false); return; }
     std::vector<std::vector<float>> chans;
     double rate;
-    int bits;
+    int bits, own;
     {
         juce::CriticalSection::ScopedLockType lock(bufferLock_);
+        own = w.ownType == 1 || w.ownType == 3 || w.ownType == 5 ? w.ownType : 0;
         for (int c = 0; c < std::min(2, w.buffer.getNumChannels()); ++c)
             chans.emplace_back(w.buffer.getReadPointer(c), w.buffer.getReadPointer(c) + w.buffer.getNumSamples());
         rate = w.rate;
@@ -1480,8 +1484,8 @@ void VSynthEmuProcessor::reencode(int osc) {
     const int gen = ++w.gen;
     const juce::String who = osc ? "OSC 2: " : "";
     setStatus(who + "Encoding...");
-    encodePool_.addJob([this, chans = std::move(chans), rate, bits, choice, depth, gen, osc, who] {
-        int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : 0;
+    encodePool_.addJob([this, chans = std::move(chans), rate, bits, choice, depth, gen, osc, who, own] {
+        int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : own;   // Auto: what the wave says it is, or
         if (type == 0) {   // Auto: the engine's content classifier
             std::vector<float> mono(chans[0].size());
             for (size_t i = 0; i < mono.size(); ++i) {
@@ -1499,7 +1503,7 @@ void VSynthEmuProcessor::reencode(int osc) {
         synth_.setSample(e, osc);
         xtActive_.store(true);
         static const char* names[] = { "", "SOLO", "", "BACKING", "", "ENSEMBLE" };
-        setStatus(who + "Encoded as " + names[type] + (choice == 0 ? " (auto)" : ""));
+        setStatus(who + "Encoded as " + names[type] + (choice != 0 ? "" : own ? " (the wave's own)" : " (auto)"));
     });
 }
 

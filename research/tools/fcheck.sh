@@ -62,6 +62,8 @@ h='echo "== bandcmp"; '
 for spec in "3 drum.bin 2 1.0 1.0 30000" "3 drum.bin 2 1.3 -1.0 30000" "5 chord.bin 1 0.8 1.5 30000" "5 chord.bin 1 1.0 0.0 20000 3000:1.0 8000:-0.5" \
             "5 vocal.bin 1 0.03 -0.2 3000 0:0.015" "3 drum.bin 2 0.5 -0.5 8000 0:0.3"; do
   part xt_fw "${h}echo \"band $spec: \$(\"\$X/xt_fw\" \"\$ROM\" bandcmp $spec 2>&1 | tail -1)\""; h=""; done
+# V-Synth's files: the disk image's preset waves and patches against the firmware's own routines
+[ -x "$X/xt_files" ] && part xt_files 'echo "== xt_files"; "$X/xt_files" "$ROM"'
 # The effect chip against JE-8086's interpreter, on the XT's own programs, and the firmware's own numbers on it
 [ -x "$X/xt_fx" ] && part xt_fx 'echo "== xt_fx"; "$X/xt_fx" "$ROM" 8192'
 [ -x "$X/xt_fx" ] && part xt_fx '"$X/xt_fx" "$ROM" numbers'

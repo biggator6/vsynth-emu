@@ -126,6 +126,7 @@ private:
         juce::String             name;
         double                   rate = 44100.0;
         int                      bits = 16;
+        int                      ownType = 0;        // a V-Synth wave's own encode type (XtVpwFormat)
         std::atomic<int>         gen { 0 };          // a newer encode request discards an older result
         std::atomic<bool>        reencode { false }; // its Encode Type or Depth changed
     };

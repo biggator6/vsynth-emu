@@ -68,6 +68,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtMultiBandPlayer.cpp
     Source/Sh4Interp.cpp
     Source/XtFirmware.cpp
+    Source/XtFiles.cpp
     Source/XtFxChip.cpp
     Source/XtFxControl.cpp
     Source/OfflineRenderer.cpp
