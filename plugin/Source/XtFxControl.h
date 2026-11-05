@@ -171,10 +171,10 @@ public:
 
     // Audio thread: `frames` frames of the output bus (XtSynth::frame, 8 floats a frame, the XT's units) through the chip, and ±1 stereo out.  Mix and DIR come out together, as the plugin has one stereo output.
     // Between the two, the XT's numbers: the frame reaches the chip at Out Gain for TG's −24, a sixteenth, so a tone can be switched between this and the plain path without a jump, and the chip adds +6 dB.
-    // So a raw wave comes out of here at ×⅛ of the chip's full scale.  ×8 back makes it the level the plugin has without the chip: what a real XT's outputs do with it, only a capture can say.
+    // So a raw wave comes out of here at ⅛ of the chip's full scale, and XtSynth::busOut plays it at the same level without the chip.  Whether a real XT's outputs do just that, only a capture can say.
     void process(const float* frame, float* lr, int frames) override;
 
-    // A float of the bus as the chip takes it (0x894db2b0 truncates to int32; the chip has the top 24 bits), and one of its words as the plugin's ±1.
+    // A float of the bus as the chip takes it (0x894db2b0 truncates to int32; the chip has the top 24 bits), and one of its words as the plugin's ±1, the chip's full scale.
     static int32_t toChip(float x);
     static float fromChip(int32_t word);
 

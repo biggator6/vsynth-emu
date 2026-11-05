@@ -167,8 +167,8 @@ public:
         // the MFX Send Level counts.  The XT's defaults
         int tvaLevel = 127, tvaLevelKF = 0, tvaLevelLfo = 0, tvaPan = 64, tvaPanKF = 0, tvaPanLfo = 0, mfxSend = 127;
         // The other sends and where the tone goes: Chorus and Reverb Send Level 0..127; Output Assign 0 MULTI (through the MFX), 1 MAIN,
-        // 2 DIR.  The system's: Output Mode, true for Parallel, and Out Gain for TG in dB.  The descriptor says −24 for that, with the effect
-        // chip's ×4 after it.  With no chip in the sound yet it stays 0 here, at the level the plugin has always had.
+        // 2 DIR.  The system's: Output Mode, true for Parallel, and Out Gain for TG in dB.  The descriptor says −24 for that.  It stays 0 here, and the
+        // sixteenth is applied after the tones instead, in the frame's way into the chip and in busOut: inside them, switching the effects under a note would be a step.
         int chorusSend = 0, reverbSend = 0, outputAssign = 0, outGainTg = 0;
         bool parallel = true;
         // LFO 5, the TVA's (IDs 0x3de…0x3e5), as the others.  The XT's defaults

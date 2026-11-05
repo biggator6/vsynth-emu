@@ -28,7 +28,7 @@ struct TestAppDir {
 
 // TEST_ROM_SEARCH=1: where a new instance finds the image, first to last, and what's kept for the next (VSynthEmuTest
 // alone: it stops there).  A symbolic link stands for each copy, so the image's 8 MB isn't copied about.
-static int romSearchTest(const juce::File& rom, const juce::File& appDir) {
+static int romSearchTest(const juce::File& rom, const juce::File& appDir, const juce::File& wave) {
     unsetenv("VSE_XT_ROM");
     const char* const name = "V-SynthXT.rom.2.bin";
     const auto beside = juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile(name);
@@ -45,6 +45,22 @@ static int romSearchTest(const juce::File& rom, const juce::File& appDir) {
     const auto is = [&](const juce::File& f) { return found() == f.getFullPathName(); };
 
     { VSynthEmuProcessor p; check(!p.hasRom() && p.getStatusText().startsWith("No ROM") && p.apvts.state.getProperty("romPath").toString().isEmpty(), "with nothing to find, it should say so"); }
+
+    // With no image the engine plays the file, at the level of the XT's voices: ⅛ of it, near enough, as the engine isn't exactly unity.
+    { juce::AudioFormatManager formats; formats.registerBasicFormats();
+      float lo = 0, hi = 0, lo2 = 0, hi2 = 0;
+      if (std::unique_ptr<juce::AudioFormatReader> r { formats.createReaderFor(wave) }) r->readMaxLevels(0, r->lengthInSamples, lo, hi, lo2, hi2);
+      const double top = std::max({ std::fabs((double)lo), std::fabs((double)hi), std::fabs((double)lo2), std::fabs((double)hi2) });
+      VSynthEmuProcessor p;
+      p.prepareToPlay(44100.0, 512);
+      p.loadFile(wave);
+      juce::AudioBuffer<float> buf(2, 512);
+      juce::MidiBuffer midi;
+      midi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)100), 0);
+      double peak = 0;
+      for (int b = 0; b < 400; ++b) { p.processBlock(buf, midi); midi.clear(); peak = std::max(peak, (double)buf.getMagnitude(0, 512)); }
+      std::printf("the engine with no image: the file's peak %.4f, out %.4f\n", top, peak);
+      check(top > 0.0 && peak > top * 0.0625 && peak < top * 0.25, "with no image, the engine should play at the XT's level"); }
 
     // A project's path is that project's: used, and not kept for the others.
     { juce::MemoryBlock saved;
@@ -340,7 +356,7 @@ int main(int argc, char** argv) {
     if (argc < 3) { std::fprintf(stderr, "usage: %s rom.2.bin file.wav [note] [auto|solo|backing|ensemble]\n", argv[0]); return 1; }
     juce::ScopedJuceInitialiser_GUI init;
     TestAppDir testAppDir;
-    if (std::getenv("TEST_ROM_SEARCH")) return romSearchTest(juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]), testAppDir.dir);
+    if (std::getenv("TEST_ROM_SEARCH")) return romSearchTest(juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]), testAppDir.dir, juce::File::getCurrentWorkingDirectory().getChildFile(argv[2]));
     if (std::getenv("TEST_PATCH_APPLY")) return patchApplyTest(juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]));
     if (const char* folder = std::getenv("TEST_PATCH_PLAY")) {
         const char* every = std::getenv("TEST_PATCH_EVERY");

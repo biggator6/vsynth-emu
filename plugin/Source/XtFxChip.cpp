@@ -995,7 +995,7 @@ void unitConversion(const char* rom, uint32_t seed) {
     std::printf("the frame into the chip against the firmware's truncation: %ld samples, %ld different\n", tried, different);
 }
 
-// Through the unit: each word of the frame to its place, at the level the plugin has without the chip, and how long it takes.
+// Through the unit: each word of the frame to its place, at the level the plugin has without the chip (⅛, −18.06 dB), and how long it takes.
 struct UnitLine { double left = 0, right = 0; int delay = -1; };
 UnitLine unitLine(const char* rom, int word, bool eq) {
     auto u = std::make_unique<XtFxUnit>(rom);
@@ -1009,7 +1009,7 @@ UnitLine unitLine(const char* rom, int word, bool eq) {
     }
     // the delay: a click, in a chip that's settled.  The DC cut's tail is much smaller.
     frame[word] = 0; for (int i = 0; i < 2000; i++) u->process(frame, lr, 1);
-    for (int i = 0; i < 64; i++) { frame[word] = i == 0 ? 0x1p30f : 0.0f; u->process(frame, lr, 1); if (out.delay < 0 && (std::fabs(lr[0]) > 0.1f || std::fabs(lr[1]) > 0.1f)) out.delay = i; }
+    for (int i = 0; i < 64; i++) { frame[word] = i == 0 ? 0x1p30f : 0.0f; u->process(frame, lr, 1); if (out.delay < 0 && (std::fabs(lr[0]) > 0.0125f || std::fabs(lr[1]) > 0.0125f)) out.delay = i; }
     out.left /= in; out.right /= in;
     return out;
 }
@@ -1021,7 +1021,7 @@ void unitLevels(const char* rom, bool print) {
         const UnitLine a = unitLine(rom, w, false);
         const bool isLeft = w == 0 || w == 4 || w == 6, isSend = w == 2 || w == 3;
         tried++;
-        const bool good = isSend ? a.left < 1e-4 && a.right < 1e-4 : near(db(isLeft ? a.left : a.right), 0.0, 0.05) && (isLeft ? a.right : a.left) < 1e-4 && a.delay == 1;
+        const bool good = isSend ? a.left < 1.25e-5 && a.right < 1.25e-5 : near(db(isLeft ? a.left : a.right), 20 * std::log10(0.125), 0.05) && (isLeft ? a.right : a.left) < 1.25e-5 && a.delay == 1;
         if (!good) { different++; if (std::getenv("XT_FX_FIRST")) std::printf("  unit: %s: left %.3f dB, right %.3f dB\n", kName[w], db(a.left), db(a.right)); }
         if (print) std::printf("through the unit, %s: left %+.2f dB, right %+.2f dB, %d samples late\n", kName[w], db(a.left), db(a.right), a.delay);
     }

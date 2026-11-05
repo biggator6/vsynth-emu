@@ -1546,6 +1546,32 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The plugin at the XT's level (2026-11-05, v149)
+
+The user's decision, on what v148's patches showed: 22 of 51 played over full scale, one at about +19 dB. The plugin now plays 18.06 dB lower, with or without the effects. A full-scale wave comes out at ⅛.
+
+**What moved.** Two scales at the very end, and nothing before them:
+- `XtSynth::busOut`, the plain path: the frame ×2^-34, was ×2^-31.
+- `XtFxUnit::fromChip`, through the chip: a word ×2^-23, was ×2^-20, so the chip's 24-bit full scale is now the plugin's ±1.
+- The engine that plays a file with no image: ×⅛, so losing the image isn't 18 dB louder. It isn't the XT's sound, and this only keeps it from jumping.
+
+Out Gain for TG stays 0 in the tones, for the reason in "Why −24 isn't in the tones". The two paths still agree, to 0.02 dB (0.03 on MULTI) with the EQ off and 0.06 dB with it on.
+
+**What "the XT's level" means here.** It's the firmware's numbers: Out Gain for TG's −24 and the chip's +5.98 dB, with the chip's full scale as 0 dBFS. It hasn't been measured on the outputs of a real XT. v40's +9.4 dB went through an analog chain with a trim and is still not reconciled. A USB or Resampling capture of `main` would settle it, and if it disagrees this is still two constants.
+
+**What it does to the sound.** Only the level, with one exception: through the chip the ceiling drops with it. A store saturates at 24 bits, so each of the chip's output pairs can reach ±1 where it could reach ±8, and that's by arithmetic, not measured on a patch. Mix and DIR are added after the chip, so the two together can reach ±2. The plain path has no such limit: floats go to the host as they are. Sessions saved before this play 18 dB quieter.
+
+**The check.**
+- `ab.sh` against v148: all four renders are old × ⅛ exactly, bar 613 of the 480,000 samples, all in one render, each off by 1.4e-45: the smallest step a float has, at the bottom of its range, where ⅛ can't be exact.
+- `xt_tone`'s "output" check holds L and R to the firmware's frame at the new scale. `xt_fx numbers`: each pair through the unit at −18.08 or −18.09 dB. Those and the EQ's are the only 7 of `fcheck_baseline.txt`'s 739 lines to change. Its limits for crosstalk and the click that finds the delay scale by ⅛ with the level, so they test the same thing as before.
+- `TEST_ROM_SEARCH`: with no image, the engine's output is ⅛ of the file's peak (0.0547 against 0.4375).
+- PluginTest, plain and through the chip, 4/4 bit-identical. The `.vpw`s 2/2, patch apply 0 failed, layout, panel and auval as before.
+- `TEST_PATCH_PLAY`, the same 51 of 1stchoice's patches with the chip out: median peak 0.109, one over full scale, at 1.113, about +0.9 dB. Lowest 0.014, about −37 dB.
+
+Planted errors, 3 new: `mutate_tone.py` 843, none missed, with `plays-level-l` and `plays-level-r`. `mutate_panel.py engine-level` caught; the rest of that list wasn't run, as the panel, the values' text and the wiring didn't change. `mutate_fx.py` 97, the same 2 missed as before (v126), and `--control` 157, with `unit-scale` caught on its new text and the same one missed at 60 events as before, `matrix-unflushed`, caught at 200. `fxthreads.sh`: no races.
+
+**Not checked.** A real XT's outputs, and playing it in a DAW.
+
 ### Applying a patch (2026-11-05, v148)
 
 `XtPatch` is `patchOf` (`XtToneCheck.cpp`) the other way round, for one zone: a store to `XtSynth::Controls`. The whole-tone check already holds `patchOf`'s IDs to XtSynth's fields, so what's left is to hold a real patch to `patchOf`.
@@ -1601,7 +1627,7 @@ Planted errors: `mutate_tone.py` 841, none missed, 46 of them new; `mutate_files
 
 **As a user loads them.** `TEST_PATCH_PLAY=<folder>`, with `TEST_PATCH_EVERY=10`: 51 of 1stchoice's patches, each with its waves and a note: none refused and none silent. That says they load and sound, not that they sound like the XT's.
 
-**The level, left as it is.** They run hot. With the chip out, at key 60 and velocity 100, those 51 peak at a median of 0.87; 22 are over full scale, 4 over 4, and one reaches 8.9, about +19 dB. The plugin plays 18 dB above the XT by a choice made for single waves ("The level, decided here and easy to change"), and at the XT's level 8.9 is 1.1. So real patches say where the XT's headroom went, without a capture. Changing it moves everything already set up in a session, so it's the user's call.
+**The level, left as it is (v149 changed it, on this).** They run hot. With the chip out, at key 60 and velocity 100, those 51 peak at a median of 0.87; 22 are over full scale, 4 over 4, and one reaches 8.9, about +19 dB. The plugin plays 18 dB above the XT by a choice made for single waves ("The level, decided here and easy to change"), and at the XT's level 8.9 is 1.1. So real patches say where the XT's headroom went, without a capture. Changing it moves everything already set up in a session, so it's the user's call.
 
 **Not here yet,** and the status line says which a patch asks for:
 
@@ -1941,7 +1967,7 @@ The plugin can now play through the effect chip. A new Effects switch, off by de
 - **Out.** Slots 0xa0, 0xa2 are the mix (0xa8, 0xaa carry it again), and 0xa4, 0xa6 are DIR. The XT sends DIR to its own jacks. The plugin has one stereo output, so it adds them.
 - **Queue.** `service()` before each sample, so the driver's words arrive between samples as v131 has it.
 
-**The level, decided here and easy to change.** On the XT a tone reaches the frame at Out Gain for TG's −24, a sixteenth, and the chip adds +5.98 dB. So a raw wave leaves the chip 18.04 dB below where the plugin plays it without the chip. Unit gain is what I chose: ×8 after the chip gives −0.02 dB through the unit, and −0.06 dB with the EQ at its default, so switching the effects in doesn't change the level. It's one constant, `XtFxUnit::fromChip`. What a real XT's outputs do after the chip is for a capture to say: v40's +9.4 dB on the analog output is still not reconciled.
+**The level, decided here and easy to change (v149 changed it: "The plugin at the XT's level").** On the XT a tone reaches the frame at Out Gain for TG's −24, a sixteenth, and the chip adds +5.98 dB. So a raw wave leaves the chip 18.04 dB below where the plugin plays it without the chip. Unit gain is what I chose: ×8 after the chip gives −0.02 dB through the unit, and −0.06 dB with the EQ at its default, so switching the effects in doesn't change the level. It's one constant, `XtFxUnit::fromChip`. What a real XT's outputs do after the chip is for a capture to say: v40's +9.4 dB on the analog output is still not reconciled.
 
 **Why −24 isn't in the tones.** `xt_tone` shows Out Gain for TG exact at every value, but the plugin leaves it at 0 and applies the sixteenth where the frame enters the chip. The firmware's powf gives exactly 1/16 there, and a power of two moves no bits, so the two are the same number. Inside the tones, switching the effects under a sounding note would be a 24 dB step while the bus levels glide.
 

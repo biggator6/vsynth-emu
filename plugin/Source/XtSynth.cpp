@@ -1625,13 +1625,14 @@ void XtSynth::mixBlock(float* lr) {
     busOut(lr);
 }
 
-// What the plugin plays: through the effects if they're in, or the pairs that reach the outs, ±1.  Without them MULTI has no MFX, and the sends no effects, to go to.
+// What the plugin plays: through the effects if they're in, or the pairs that reach the outs.  Without them MULTI has no MFX, and the sends no effects, to go to.
+// At the XT's level both ways: a full-scale wave, 2^31 in the frame, comes out at ⅛, as it leaves the chip (XtFxUnit), by Out Gain for TG's −24 and the chip's +6 dB.  A power of two moves no bits.
 void XtSynth::busOut(float* lr) {
     if (XtBusSink* s = sinkOn ? sink.load(std::memory_order_acquire) : nullptr) { s->process(frame, lr, 32); return; }
     for (int i = 0; i < 32; ++i) {
         const float* f = frame + kFrameWords * i;
-        lr[2 * i] = (f[FrameMultiL] + f[FrameMainL] + f[FrameDirL]) * 0x1p-31f;
-        lr[2 * i + 1] = (f[FrameMultiR] + f[FrameMainR] + f[FrameDirR]) * 0x1p-31f;
+        lr[2 * i] = (f[FrameMultiL] + f[FrameMainL] + f[FrameDirL]) * 0x1p-34f;
+        lr[2 * i + 1] = (f[FrameMultiR] + f[FrameMainR] + f[FrameDirR]) * 0x1p-34f;
     }
 }
 

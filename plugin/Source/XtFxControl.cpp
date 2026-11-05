@@ -216,7 +216,7 @@ int32_t XtFxUnit::toChip(float x) {
     return i >> 8;
 }
 
-float XtFxUnit::fromChip(int32_t word) { return (float)word * 0x1p-20f; }
+float XtFxUnit::fromChip(int32_t word) { return (float)word * 0x1p-23f; }
 
 void XtFxUnit::process(const float* frame, float* lr, int frames) {
     XtFxChip& chip = *chip_;

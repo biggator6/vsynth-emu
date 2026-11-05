@@ -3570,6 +3570,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-05) — v149: The XT's level
+
+- The firmware's numbers had been in the notes since v123. The plugin stayed 18 dB over them by a choice made for single waves, at v136. One note of a real patch can run far hotter than a raw wave: 8.9 at the old level is 1.11 at this one, and 1.11 is about what a design with a chip's full scale at the top would leave. That points the same way as the firmware's numbers, but it isn't a measurement.
+- The check that would have stopped working was the unit's delay: it looked for a click over 0.1, and a half-scale click now comes out at 0.0625. It would have failed loudly. The crosstalk limit next to it wouldn't have: left at 1e-4 it would have passed while testing eight times less. It scales now too.
+- The first A/B line, "diff −1.2 dB", looks like a fault until you do the sum: a difference of ⅞ of the signal. The comparison that says something is the old render × ⅛ against the new.
+
 ### Session 16 addendum (2026-11-05) — v148: Applying a patch
 
 - The first run held every real patch to `patchOf` and found one gap, in one place: `patchOf` had written the OSCs' pitch, time and formant envelopes' velocity as constants, so the check had never seen them. 2,038 of about 970,000 values. The whole tone then equalled the firmware with them in, at the first try, because the routines all took those arguments already.

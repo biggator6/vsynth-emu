@@ -2054,8 +2054,8 @@ int XtToneProbe::run(int argc, char** argv) {
             rep.checks += 2;
             for (int i = 0; i < 32; ++i) {
                 const auto word = [&](XtSynth::FrameWord w) { return fw.f32(kBuf + 0x20 * (uint32_t)i + 4 * (uint32_t)w); };
-                const float a = (word(XtSynth::FrameMultiL) + word(XtSynth::FrameMainL) + word(XtSynth::FrameDirL)) * 0x1p-31f;
-                const float a2 = (word(XtSynth::FrameMultiR) + word(XtSynth::FrameMainR) + word(XtSynth::FrameDirR)) * 0x1p-31f;
+                const float a = (word(XtSynth::FrameMultiL) + word(XtSynth::FrameMainL) + word(XtSynth::FrameDirL)) * 0x1p-34f;
+                const float a2 = (word(XtSynth::FrameMultiR) + word(XtSynth::FrameMainR) + word(XtSynth::FrameDirR)) * 0x1p-34f;
                 if (!bits(a, L[i]) || !bits(a2, R[i])) { rep.bad("output", "fw %.9g port %.9g", a, L[i], blk); break; }
             }
         }

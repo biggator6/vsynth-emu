@@ -78,7 +78,7 @@ no-null-page|    sh4_->mapRam(0x00000000, 0x00001000);\n|
 unit-gain|const float v = x * 0.0625f;|const float v = x * 0.125f;
 unit-round|: (int32_t)v;|: (int32_t)std::lrint(v);
 unit-word|return i >> 8;|return i >> 7;
-unit-scale|(float)word * 0x1p-20f|(float)word * 0x1p-19f
+unit-scale|(float)word * 0x1p-23f|(float)word * 0x1p-22f
 unit-in-order|chip.setGram(0x20 + 2 * w, toChip(f[w]));|chip.setGram(0x20 + 2 * (w ^ 1), toChip(f[w]));
 unit-in-slot|chip.setGram(0x20 + 2 * w, toChip(f[w]));|chip.setGram(0x21 + 2 * w, toChip(f[w]));
 unit-left-right|lr[2 * i] = fromChip(chip.gram(0xa1))|lr[2 * i] = fromChip(chip.gram(0xa3))

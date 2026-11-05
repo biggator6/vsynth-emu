@@ -765,6 +765,8 @@ knob-cc91|k.cc91 = cc[91];|k.cc91 = 127;
 knob-cc93|k.cc93 = cc[93];|k.cc93 = 127;
 plays-no-main|(f[FrameMultiL] + f[FrameMainL] + f[FrameDirL])|(f[FrameMultiL] + f[FrameDirL])
 plays-no-dir|(f[FrameMultiR] + f[FrameMainR] + f[FrameDirR])|(f[FrameMultiR] + f[FrameMainR])
+plays-level-l|f[FrameDirL]) * 0x1p-34f|f[FrameDirL]) * 0x1p-31f
+plays-level-r|f[FrameDirR]) * 0x1p-34f|f[FrameDirR]) * 0x1p-31f
 block-pair-mix|k.assign == 2 && k.parallel ? XtBusDirL : XtBusMainL|k.assign == 2 ? XtBusDirL : XtBusMainL|toneosc
 block-pair-main|k.assign == 0 ? XtBusMultiL :|k.assign <= 1 ? XtBusMultiL :|toneosc
 block-pair-parallel|k.assign == 2 && k.parallel ?|k.assign == 2 && !k.parallel ?|toneosc

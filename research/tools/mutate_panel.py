@@ -127,6 +127,7 @@ MUTS=[
  ('send-swap',PP,'c.chorusSend   = knob(Params::kTvaChoSend);','c.chorusSend   = knob(Params::kTvaRevSend);','fx-bus'),
  ('assign-off',PP,'c.outputAssign = knob(Params::kOutputAssign);',';','fx-assign'),
  ('mode-off',PP,'c.parallel     = knob(Params::kOutputMode) != 0;',';','fx-mode'),
+ ('engine-level',PP,'buffer.applyGain(0.125f);',';','rom'),
  ('rom-not-beside',PP,'cand.add(juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile(kRomName).getFullPathName());',';','rom'),
  ('rom-order',PP,'cand.add(appDir().getChildFile(kRomName).getFullPathName());\n    cand.add(appSettings()->getValue(kRomKey));','cand.add(appSettings()->getValue(kRomKey));\n    cand.add(appDir().getChildFile(kRomName).getFullPathName());','rom'),
  ('rom-env-last',PP,'if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(juce::String::fromUTF8(p));\n','','rom'),

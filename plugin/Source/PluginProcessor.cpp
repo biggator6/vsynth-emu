@@ -1759,6 +1759,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // ── Fan mono output to all output channels ───────────────────────────────
     for (int ch = 0; ch < numOut; ++ch)
         buffer.copyFrom(ch, 0, monoOut, 0, 0, numSamples);
+    buffer.applyGain(0.125f);   // at the level the XT's voices play (XtSynth::busOut), so losing the image isn't 18 dB louder
 }
 
 // ─── File Loading ─────────────────────────────────────────────────────────────
