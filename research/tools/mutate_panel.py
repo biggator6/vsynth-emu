@@ -11,6 +11,10 @@ TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, h
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
 MUTS=[
  # The editor's layout (TEST_UI_LAYOUT, TEST_FX_PANEL)
+ ('editor-no-build',EP,'chrome { &buildLabel_, &algoLabel_,','chrome { &algoLabel_,','layout'),
+ ('editor-build-unplaced',EP,'buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);',';','layout'),
+ ('editor-build-narrow',EP,'buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);','buildLabel_.setBounds(16, Ui::headerH - 17, 40, 13);','layout'),
+ ('editor-build-text',EP,'buildLabel_.setText(juce::String(xtBuildId()) + "  " + xtBuildTime(), juce::dontSendNotification);','buildLabel_.setText("v150", juce::dontSendNotification);','layout'),
  ('editor-no-patch-button',EP,'&romButton_, &loadButton_, &patchButton_, &fileNameLabel_,','&romButton_, &loadButton_, &fileNameLabel_,','layout'),
  ('editor-patch-unplaced',EP,'patchButton_.setBounds(src.removeFromLeft(100));',';','layout'),
  ('editor-no-panel',EP,'&fxOnBtn_, fxPanel_.get() };','&fxOnBtn_ };','panel'),

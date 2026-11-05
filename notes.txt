@@ -335,6 +335,11 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The build under the wordmark v150 (2026-11-05), no change to the sound: the header says e.g. v150 1a2b3c4  05 Nov 14:32, and +5f3a after the hash means plugin source not committed, the four characters standing for those changes.
+  plugin/BuildId.cmake at every build, rewriting its header only when the id changes, so nothing new relinks nothing.  XtBuildId.  The line V-Synth Emu build <id> stays in the binary: buildid.sh --installed reads every copy.  A host's version field stays 0.1.0.
+  Check: buildid_test.sh, 18 cases, and buildid.sh against git, both in verify.sh.  TEST_UI_LAYOUT.
+  Planted: mutate_panel.py --editor 37, none missed.  The rest of that list and the ports' lists not run: nothing they cover changed.
+
 The XT's level v149 (2026-11-05), the plugin 18.06 dB lower, its only change to the sound: the user's decision, as v148's patches ran up to +19 dB.  XtSynth::busOut x2^-34, XtFxUnit::fromChip x2^-23, the engine with no image x1/8.  A full-scale wave comes out at 1/8, by the firmware's numbers; not yet measured on a real XT.
   Through the chip the ceiling falls too: each output pair reaches +-1, was +-8.  Saved sessions play 18 dB quieter.
   Check: ab.sh, all four renders the old x 1/8, bar 613 samples off by 1.4e-45.  xt_tone's output check and xt_fx numbers at the new scale.  TEST_PATCH_PLAY, the same 51 patches, median peak 0.109, one over full scale, at 1.113.

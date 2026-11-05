@@ -73,7 +73,18 @@ target_sources(VSynthEmu PRIVATE
     Source/XtFxChip.cpp
     Source/XtFxControl.cpp
     Source/OfflineRenderer.cpp
+    Source/XtBuildId.cpp
 )
+
+# ─── Which build this is ─────────────────────────────────────────────────────
+# Worked out at every build, not at configure, so it can't go stale.  It rewrites the file only when the id changes.
+set(XT_BUILD_ID_H "${CMAKE_CURRENT_BINARY_DIR}/generated/XtBuildIdGenerated.h")
+add_custom_target(VSynthEmuBuildId
+    COMMAND "${CMAKE_COMMAND}" "-DREPO=${CMAKE_CURRENT_SOURCE_DIR}/.." "-DOUT=${XT_BUILD_ID_H}" -P "${CMAKE_CURRENT_SOURCE_DIR}/BuildId.cmake"
+    BYPRODUCTS "${XT_BUILD_ID_H}"
+    VERBATIM)
+add_dependencies(VSynthEmu VSynthEmuBuildId)
+set_source_files_properties(Source/XtBuildId.cpp PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 # ─── JUCE Modules ────────────────────────────────────────────────────────────
 target_link_libraries(VSynthEmu PRIVATE

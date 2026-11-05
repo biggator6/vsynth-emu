@@ -7,6 +7,7 @@
 #include "../Source/FxPanel.h"
 #include "../Source/Sh4Interp.h"
 #include "../Source/XtPatch.h"
+#include "../Source/XtBuildId.h"
 #include "../Source/XtVpwFormat.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <climits>
@@ -571,6 +572,15 @@ int main(int argc, char** argv) {
                 if (auto* b = dynamic_cast<juce::TextButton*>(child))
                     if (b->getButtonText() == text && b->isVisible() && !b->getBounds().isEmpty()) there = true;
             if (!there) fail(juce::String(text) + " isn't on the editor");
+        }
+        // Which build this is, on the header, whole
+        {
+            const juce::String want = juce::String(xtBuildId()) + "  " + xtBuildTime();
+            bool there = false;
+            for (auto* child : ed->getChildren())
+                if (auto* l = dynamic_cast<juce::Label*>(child))
+                    if (l->getText() == want && l->isVisible() && !l->getBounds().isEmpty()) there = true;
+            if (!there) fail("the build, " + want + ", isn't on the editor");
         }
         // The layout, at each size
         const juce::ComponentBoundsConstrainer* limits = ed->getConstrainer();

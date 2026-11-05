@@ -2,7 +2,7 @@
 # verify.sh [--full] [git rev]: the standard validation of a version, one line each —
 # firmware checks against the baseline (--full: all of them run, none reused), A/B
 # renders against a revision (default HEAD; settings from XT_* env), the plugin build,
-# PluginTest (TEST_* env), the effects' panel, the editor's layout, the ROM search, a patch through the parameters, a .vpw, the engine tests and auval.
+# PluginTest (TEST_* env), the effects' panel, the editor's layout, the ROM search, a patch through the parameters, a .vpw, the engine tests, the build id and auval.
 source "$(dirname "$0")/env.sh"
 D="$(dirname "$0")"; rc=0; F=""; BUILT=1
 [ "$1" = "--full" ] && { F=--full; shift; }
@@ -24,5 +24,8 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
 # A .vpw through the processor, against XtSynth on the same audio: a preset wave, mono and stereo, on its own encode type
 [ $BUILT = 1 ] && { n=0; for w in 0 300; do "$WORK/fcheck/bin/xt_files" "$ROM" extract $w "$WORK/verify_$w.vpw" > /dev/null; o=$(cd "$REPO" && build/plugin/VSynthEmuTest "$ROM" "$WORK/verify_$w.vpw" 60 auto 2>&1); echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "the wave's own" && n=$((n+1)); done; echo ".vpw, plugintest: $n/2 bit-identical"; [ $n = 2 ] || rc=1; }
 echo "engine tests: $("$WORK/fcheck/bin/engine_tests" 2>&1 | tail -1)"
+# Which build: the script on a repository of its own, then the copies this build made against git
+bash "$D/buildid_test.sh" || rc=1
+[ $BUILT = 1 ] && { bash "$D/buildid.sh" || rc=1; }
 [ $BUILT = 1 ] && echo "auval: $(auval -v aumu VsEm Ystu 2>&1 | grep -o "AU VALIDATION SUCCEEDED\|FAIL.*" | head -1)"
 exit $rc

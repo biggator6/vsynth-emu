@@ -42,6 +42,7 @@ private:
     // ── The XT strip: firmware image, encode type and depth, key, the OSC ───
     juce::TextButton romButton_ { "ROM..." };
     juce::Label      statusLabel_;
+    juce::Label      buildLabel_;       // which build this is, under the wordmark
     juce::ComboBox   encodeBox_;
     juce::Slider     keySlider_     { juce::Slider::IncDecButtons, juce::Slider::TextBoxLeft };
     juce::Slider     depthSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

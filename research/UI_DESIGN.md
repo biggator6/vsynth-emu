@@ -6,7 +6,7 @@ The plugin's user interface follows this design from v144 on, by the user's deci
 
 960 × 600, resizable from 900 × 600 to 1400 × 900. The two card columns share any extra width. Top to bottom:
 
-- **Header:** wordmark, Effects switch, Algorithm, ROM status, ROM button.
+- **Header:** wordmark with the build under it, Effects switch, Algorithm, ROM status, ROM button.
 - **Source bar:** Load WAV, Load Patch, the patch's name, the file's and what the patch asks for that isn't here, OSC 1/2, the OSC's On and Type. It stays in view on every tab, and the Load button and most tabs follow its OSC.
 - **Perform column** (left, every tab): Pitch, Time, Formant, Robot. With a ROM these are the selected OSC's, and the title says which.
 - **Tabs:**

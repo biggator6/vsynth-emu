@@ -1546,6 +1546,25 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The build under the wordmark (2026-11-05, v150)
+
+The user's request: to know which build is being tested. No change to the sound. The editor's header now says, for example, `v150 1a2b3c4  05 Nov 14:32`.
+
+**How to read it.** The last commit named `vNN:`, then this commit's short hash. With plugin source not yet committed, `+5f3a` follows: four characters that stand for those changes, so two different sets of edits read differently and the same set reads the same. The time is when the id last changed, so a rebuild of the same source keeps it.
+
+**How it's made.** `plugin/BuildId.cmake` runs at every build, not at configure, so it can't go stale. It rewrites the header only when the id changes. A build with nothing new, or with only docs or tests edited, doesn't relink the plugin. Only `plugin/Source`, `plugin/CMakeLists.txt` and the script itself count as a change. With no git it says `unknown` and the build goes on.
+
+**In the binary.** `V-Synth Emu build <id>` stays in it as a plain string, so `buildid.sh --installed` can say what every copy is without loading it. Copies from before v150 have no such string. It's marked `used`: without that, link-time optimisation kept only the part after the mark in the AU and VST3 of some ids, though the label still read right. `buildid.sh` caught it, on the commit's own build, and looks at those two binaries in every `verify.sh`.
+
+**What it doesn't do.** The version a host may show is CMake's `project(VERSION)`, which stays 0.1.0. Moving it with each commit would change a compile definition on every source and JUCE module, so every commit would rebuild the whole plugin. The header is where to look.
+
+**The check.**
+- `buildid_test.sh`, in `verify.sh`: the script on a repository of its own, 18 cases: a version, a commit that isn't one, docs edited, a source edited, edited further, undone, a new file, its contents, one deleted, one staged, the file left alone when the id is the same, no git.
+- `buildid.sh`, in `verify.sh`: the test, the AU and the VST3 carry this checkout's id, and that id's number and hash are what `git log` says by another road.
+- `TEST_UI_LAYOUT`: the text is on the editor, whole, at the three sizes.
+- By hand: a comment added to `XtLfo.cpp` changed the id (`+5be8` to `+a72d`) and recompiled that file and `XtBuildId.cpp` alone; undoing it brought `+5be8` back. A rebuild with nothing new took 0.64 s with the binary untouched, and the same with a doc edited.
+- `mutate_panel.py --editor`: 37 planted, 4 of them new, none missed. The rest of that list wasn't run, as the panel, the values' text and the wiring didn't change. Nor were the ports' lists, as no port or harness changed: `ab.sh` against v149 is 4/4 identical.
+
 ### The plugin at the XT's level (2026-11-05, v149)
 
 The user's decision, on what v148's patches showed: 22 of 51 played over full scale, one at about +19 dB. The plugin now plays 18.06 dB lower, with or without the effects. A full-scale wave comes out at ⅛.

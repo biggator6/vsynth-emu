@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-05) — v150: The build under the wordmark
+
+- Reading git at configure time would have been a few lines and wrong by the next commit, as CMake doesn't re-run for one. So it's a custom target at every build, and the care went into making that cost nothing: the header is rewritten only when the id changes.
+- A timestamp in the id would have been the obvious way to tell two builds apart, and would have relinked and re-signed the plugin on every build. A hash of the uncommitted changes tells them apart better: it says whether two builds are the same source, which a time can't.
+- `buildid.sh` passed on the uncommitted build and failed on the commit's: the same code, with `v150 ef66b38` for `v149 d3aba00+ee29`. Link-time optimisation had kept only the id, as a string of its own, and dropped the line round it. The label read right throughout, so nothing else would have shown it. The test binary kept both, so a check on it alone would have passed. `[[gnu::used]]` fixes it, and I checked both kinds of id, since one had passed by luck.
+- The test's "no git" case passed through the real checkout at first: its temporary folder was inside `build/`, and git walked up to find this repository.
+
 ### Session 16 addendum (2026-11-05) — v149: The XT's level
 
 - The firmware's numbers had been in the notes since v123. The plugin stayed 18 dB over them by a choice made for single waves, at v136. One note of a real patch can run far hotter than a raw wave: 8.9 at the old level is 1.11 at this one, and 1.11 is about what a design with a chip's full scale at the top would leave. That points the same way as the firmware's numbers, but it isn't a measurement.

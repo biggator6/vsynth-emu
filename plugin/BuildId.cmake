@@ -1,0 +1,46 @@
+# cmake -DREPO=<checkout> -DOUT=<file> -P BuildId.cmake: which source this is, from git, as #defines for XtBuildId.cpp.
+# Run at every build.  The file changes only when the id does, so a build with nothing new relinks nothing, and the time is when the id last changed.
+#   v150 1a2b3c4        commit 1a2b3c4, and the last commit named vNN: at or before it is v150
+#   v150 1a2b3c4+5f3a   the same with changes not committed; 5f3a stands for those changes, so two different sets read differently
+# Only what goes into the plugin counts as a change: a build of the same plugin source with the docs edited is the same build.
+function(git out)
+    execute_process(COMMAND git -C "${REPO}" ${ARGN} OUTPUT_VARIABLE text ERROR_QUIET RESULT_VARIABLE failed)
+    if(failed)
+        set(text "")
+    endif()
+    set(${out} "${text}" PARENT_SCOPE)
+endfunction()
+
+set(paths plugin/Source plugin/CMakeLists.txt plugin/BuildId.cmake)
+git(sha rev-parse --short=7 HEAD)
+string(STRIP "${sha}" sha)
+if(sha STREQUAL "")
+    set(id "unknown")           # no git here, or it won't run: still a build
+else()
+    git(subject log -1 -E "--grep=^v[0-9]+: " --format=%s)
+    string(REGEX MATCH "^v[0-9]+" number "${subject}")
+    string(STRIP "${number} ${sha}" id)
+    git(changes diff HEAD --binary -- ${paths})
+    git(new ls-files --others --exclude-standard -- ${paths})
+    string(REPLACE "\n" ";" new "${new}")
+    foreach(f IN LISTS new)
+        file(SHA1 "${REPO}/${f}" h)
+        string(APPEND changes "${f} ${h}\n")
+    endforeach()
+    if(NOT changes STREQUAL "")
+        string(SHA1 h "${changes}")
+        string(SUBSTRING "${h}" 0 4 h)
+        string(APPEND id "+${h}")
+    endif()
+endif()
+
+set(line "#define XT_BUILD_ID \"${id}\"\n")
+if(EXISTS "${OUT}")
+    file(READ "${OUT}" old)
+    string(FIND "${old}" "${line}" at)
+    if(at EQUAL 0)
+        return()
+    endif()
+endif()
+string(TIMESTAMP now "%d %b %H:%M")
+file(WRITE "${OUT}" "${line}#define XT_BUILD_TIME \"${now}\"\n")

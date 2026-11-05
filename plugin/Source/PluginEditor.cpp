@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "XtBuildId.h"
 #include <tuple>
 
 using Ui::Page;
@@ -164,6 +165,11 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     statusLabel_.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
     statusLabel_.setMinimumHorizontalScale(0.5f);
     addAndMakeVisible(statusLabel_);
+    buildLabel_.setText(juce::String(xtBuildId()) + "  " + xtBuildTime(), juce::dontSendNotification);
+    buildLabel_.setFont(juce::Font(10.0f));
+    buildLabel_.setColour(juce::Label::textColourId, Ui::label);
+    buildLabel_.setBorderSize({ 0, 0, 0, 0 });
+    addAndMakeVisible(buildLabel_);
     encodeBox_.addItemList({ "Auto", "SOLO", "BACKING", "ENSEMBLE" }, 1);
     addAndMakeVisible(encodeBox_);
     encodeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "encodeType", encodeBox_);
@@ -957,7 +963,7 @@ void VSynthEmuEditor::paint(juce::Graphics& g) {
     g.fillRect(0, 0, getWidth(), Ui::headerH);
     g.setColour(Ui::title);
     g.setFont(juce::Font(18.0f, juce::Font::bold));
-    g.drawText("V-SYNTH EMU", 16, 0, 200, Ui::headerH, juce::Justification::centredLeft);
+    g.drawText("V-SYNTH EMU", 16, 2, 200, Ui::headerH - 16, juce::Justification::centredLeft);
 
     // Source bar
     g.setColour(Ui::surfaceStrip);
@@ -995,6 +1001,7 @@ void VSynthEmuEditor::resized() {
     algoLabel_.setBounds(hdr.removeFromRight(72));
     hdr.removeFromRight(6);
     fxOnBtn_.setBounds(hdr.removeFromRight(76));
+    buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);     // under the wordmark
 
     // Source bar: Load, the file, the OSC selector, its switch and type
     auto src = juce::Rectangle<int>(0, Ui::headerH, getWidth(), Ui::sourceH).reduced(16, 13);
@@ -1505,7 +1512,7 @@ void VSynthEmuEditor::buildLayout() {
     // What stays on the editor; everything the pages don't take is dropped, so a
     // new control must go in a card or here (TEST_UI_LAYOUT says if one didn't),
     // bar the two selector boxes, kept hidden
-    const juce::Array<juce::Component*> chrome { &algoLabel_, &algoBox_, &statusLabel_, &romButton_, &loadButton_, &patchButton_, &fileNameLabel_,
+    const juce::Array<juce::Component*> chrome { &buildLabel_, &algoLabel_, &algoBox_, &statusLabel_, &romButton_, &loadButton_, &patchButton_, &fileNameLabel_,
                                                  &oscOnBtn_, &oscTypeBox_, &pitchSlider_, &pitchLabel_, &timeSlider_, &timeLabel_,
                                                  &formantSlider_, &formantLabel_, &robotBtn_, &oscSelBox_, &cosmSelBox_, &fxOnBtn_, fxPanel_.get() };
     for (auto& p : pages_) p->adopt();
