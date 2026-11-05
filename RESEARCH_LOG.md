@@ -3547,3 +3547,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - v140 had left the two-band types unmeasured, saying they don't separate. They do, once Low and Hi go together: one coefficient on each type fits within 0.2%, better than any of the single-band combs.
 - Two words in the table are a sample short of their round figure, so a plain division gives 0.69 for 0.70. It's a planted error now.
 - I'd taken the `analysis/projects` link out of the worktree to leave it tidy, and `fcheck.sh --update` then ran without the project's waves and wrote a baseline 28 lines shorter, saying only "updated". My own filter on the diff hid it, and I saw it by the line count. `CLAUDE.md` says so now.
+
+### Session 16 addendum (2026-11-04) — v144: the tabbed editor
+
+- The user chose the design in `tabdesign/` as the UI's blueprint. Its notes say its files replace the editor's. They'd have removed everything from v131 on, so this was a merge, and the merge compiled while losing the effects: `buildLayout()` removes what it doesn't place. Only `TEST_FX_PANEL` said so.
+- That trap stays in the design, so there's a check for it now. `TEST_UI_LAYOUT` moves every control and sees which parameter changes, which also lets it compare the editors: v143's and this one reach the same 539 parameters.
+- Its first report, COSM 2's envelope with no control, was my walk's fault: the card is on another tab from the selector, and I'd only walked that tab on COSM 1. I'd have believed the editor was wrong if I hadn't had v143's list beside it.
+- 56 parameters have never had a control, which nobody had counted. `research/UI_DESIGN.md` lists them.
+- I can't see or click the real window here: no Screen Recording or Accessibility, and those are the user's to grant. So tab clicks are synthetic, and that's said in the notes.

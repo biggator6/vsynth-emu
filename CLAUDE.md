@@ -26,6 +26,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
   `PluginEditor`. Each port's firmware check is its `XT_*_MAIN` block; `XtToneCheck`
   (`XT_TONE_MAIN`) is XtSynth's: a whole firmware tone against it.
+- `research/UI_DESIGN.md`: the editor's design, which new UI work follows.
 - `research/HARDWARE_FIRMWARE.md`: the findings, newest version first (addresses,
   layouts, formulas, checks). `notes.txt`, `ARCHITECTURE.md`, `RESEARCH_LOG.md`.
 - `research/tools/`: the scripts below. `research/ghidra_scripts/`: Ghidra scripts.
@@ -33,7 +34,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## Tools (`research/tools/`, paths in `env.sh`; work files in `build/tools/`)
 - `verify.sh [--full] [rev]`: the standard validation, one line each — firmware checks
   vs baseline, A/B renders vs `rev` (default HEAD), plugin build, PluginTest, the same through the chip,
-  the effects' panel, engine tests, auval. Run it for every version; `--full` before a push.
+  the effects' panel, the editor's layout, engine tests, auval. Run it for every version; `--full` before a push.
 - `fcheck.sh [--update] [--full]`: every firmware harness on fixed cases against
   `fcheck_baseline.txt`, side by side. A section is reused when its binary, command,
   ROM and inputs are those of a run that matched the baseline (`build/tools/fcheck/kept`
@@ -42,7 +43,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `ab.sh [rev]`: XtSynth CLI renders, `rev` vs working tree; `XT_*` env vars
   set controls (see the `XT_SYNTH_MAIN` comment in XtSynth.cpp).
 - `pt.sh [note]`: PluginTest (processor vs XtSynth); `TEST_*` env vars (see
-  `plugin/Tests/PluginTest.cpp`); `TEST_FX=1` runs both through the chip, with `TEST_FX_KNOBS`, `TEST_FX_EDIT`, `TEST_FX_LIVE`, `TEST_BUS`, and each effect parameter's name, range and default against its ID. `TEST_FX_PANEL=1` walks the panel's pages, with what each box says against the firmware's routine (VSynthEmuTest alone: it stops there); `TEST_SNAPSHOT_FX=page` draws one.
+  `plugin/Tests/PluginTest.cpp`); `TEST_FX=1` runs both through the chip, with `TEST_FX_KNOBS`, `TEST_FX_EDIT`, `TEST_FX_LIVE`, `TEST_BUS`, and each effect parameter's name, range and default against its ID. `TEST_FX_PANEL=1` walks the panel's pages, with what each box says against the firmware's routine (VSynthEmuTest alone: it stops there); `TEST_SNAPSHOT_FX=page` draws one. `TEST_UI_LAYOUT=1` checks the editor's layout at three sizes, that every control sets a parameter and every parameter has a control (the same: `=list` lists them); `TEST_SNAPSHOT=file.png` draws the open tab, `TEST_SNAPSHOT_TAB=n` another, `TEST_SNAPSHOT_SIZE=WxH` at that size.
 - `build.sh`: all harnesses and the XtSynth CLI. `make_inputs.py`: the raw test inputs.
 - `ghidra.sh Script.java args`: headless Ghidra on rom.2 (DecompFn, Disasm,
   MkFunc then DecompFn for undefined functions, FuncAt, CallersOf).
@@ -83,7 +84,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `fxchip.cpp` (the same): a throwaway model of the effect chip, to test the decoding; a sine or impulse into a frame pair, gains at its slots. Not a port.
 - `xt_fx <rom> [samples] [seed]` (in fcheck; `build/tools/fcheck/bin`): `XtFxChip` against JE-8086's interpreter, whole state each sample, every type; `XT_FX_FIRST=1` says where each case first differs. `numbers`: the firmware's own numbers on it. `speed`: its share of a core, by CPU time. `mutate_fx.py [samples] [names]`: the planted errors in `fx_muts.txt`, through `PORT=fx mutate.sh`, about a minute.
 - `xt_fx <rom> control [events] [seed]` (in fcheck, about 7 s): `XtFxControl`, the same driver through the queue into `XtFxChip` against on JE-8086's chip with its waits running the samples, whole state each sample; its readers against the routines one by one; live edits against a patch; what each edit costs on the bus; two threads. `XT_FX_FIRST=1` says what differs, `XT_FX_COUNTS=1` the costs. `mutate_fx.py --control [events] [names]`: the planted errors in `fxc_muts.txt`, through `PORT=fxc mutate.sh`, about 3.5 minutes. `fxthreads.sh [events] [seed]`: the threads part under the thread sanitizer, which the plain run needs for ordering errors.
-- `mutate_panel.py [names]`: planted errors in `FxPanel.cpp`, the values' text in `XtFxControl.cpp` and the effects' wiring in `PluginProcessor.cpp`, each built into PluginTest and run with the settings that should show it, about 40 minutes. It edits the sources in place while it runs, so nothing else that reads them can run alongside it.
+- `mutate_panel.py [--editor] [names]`: planted errors in `FxPanel.cpp`, the values' text in `XtFxControl.cpp`, the effects' wiring in `PluginProcessor.cpp` and the layout in `PluginEditor.cpp` (`--editor`: those alone, about 10 minutes), each built into PluginTest and run with the settings that should show it, about 50 minutes. It edits the sources in place while it runs, so nothing else that reads them can run alongside it.
 - `fxcut.py <recording>`: checks a recording of a run and cuts it into takes, levels and all; the last line says whether to go on. `fxcut_test.py` (about 90 s, when it changes): that against a simulated XT, with faults planted.
 - `fxcapture.py`: the effect captures' test wave, MIDI runs and take list, into `analysis/test_files/fx/` (gitignored; the runs hold firmware defaults). `fxplay.cpp`: plays a run
   through CoreMIDI; `--test` and `--listen` check it on a virtual output. Steps: RECORDING_GUIDE.md, "Effects captures".
@@ -96,7 +97,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
   a difference, not as a routine.
-- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes). If `XtFxChip.cpp` changed: `mutate_fx.py`. If `XtFxControl.cpp` changed: `mutate_fx.py --control` and `fxthreads.sh`. If `FxPanel.cpp`, `XtFxValueText` or the effects' wiring in `PluginProcessor.cpp` changed: `mutate_panel.py`.
+- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes). If `XtFxChip.cpp` changed: `mutate_fx.py`. If `XtFxControl.cpp` changed: `mutate_fx.py --control` and `fxthreads.sh`. If `FxPanel.cpp`, `XtFxValueText` or the effects' wiring in `PluginProcessor.cpp` changed: `mutate_panel.py`. If `PluginEditor.cpp` changed: `mutate_panel.py --editor`.
 - Before a push: `verify.sh --full`.
 
 ## Firmware facts worth knowing
@@ -189,8 +190,8 @@ checked in `XT_COSM_MAIN`'s last section.
 5. Wire it: XtSynth (`Controls::Cosm` fields, a type number, the block
    function, `cosmSetBlock`, note-on, update, process), PluginProcessor
    parameters (`cosm…`/`cosm2…`, the XT's defaults), the editor's type area
-   (`showCosmType`, `layoutCosm`), `TEST_*` in PluginTest, `XT_*` in the CLI.
-   Check `pt.sh` with the type, and a `TEST_SNAPSHOT_TYPE` snapshot.
+   (`showCosmType`, `layoutCosmType`, the type card's `extra` in `buildLayout`), `TEST_*` in PluginTest, `XT_*` in the CLI.
+   Check `pt.sh` with the type, `TEST_UI_LAYOUT=1`, and a `TEST_SNAPSHOT_TYPE` snapshot.
 6. `fcheck.sh --update` (the diff must only add the new lines), `verify.sh`,
    then the docs: a HARDWARE_FIRMWARE.md section (newest first) and its
    type-map row, notes.txt, RESEARCH_LOG.md. Commit `vNN: …`.
@@ -201,7 +202,5 @@ checked in `XT_COSM_MAIN`'s last section.
   `cmake -S plugin -B build/plugin -DCMAKE_BUILD_TYPE=Release` (see notes.txt).
 - Use `.venv/bin/python3` (system python lacks numpy). Write multi-step shell
   work as bash scripts (zsh word-splits differently).
-- The editor is fixed-layout: new rows need `kXtStripH`, `setSize` and the
-  resize limits raised together. A COSM type's own rows go in the shared
-  three-row type area instead (`layoutCosm`, shown by `showCosmType`), which
-  needs no size change. The effects' panel lies over the XT strip and scrolls, so nor do its rows.
+- The editor follows `research/UI_DESIGN.md` (the user's decision, 2026-11-04): tabs of titled cards, with the regions, palette and how to add a control there. `buildLayout()` removes what it doesn't place, so a new control
+  must go in a card or its `chrome` list; `TEST_UI_LAYOUT` says if one didn't. Pages don't scroll, so cards must fit. A COSM type's own rows go in the shared three-row area (`layoutCosmType`, shown by `showCosmType`). The Effects tab is `FxPanel`, which scrolls.

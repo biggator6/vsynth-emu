@@ -14,6 +14,11 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
+    // The tabs: seven pages of cards, then the effects' panel
+    static constexpr int kPages = 7, kEffectsTab = kPages;
+    void showTab(int t);
+    int currentTab() const { return tab_; }
+
 private:
     VSynthEmuProcessor& processor_;
 
@@ -52,8 +57,7 @@ private:
     juce::ToggleButton oscOnBtn_ { "On" };
     juce::ToggleButton fxOnBtn_ { "Effects" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> fxOnAtt_;
-    juce::TextButton fxPanelBtn_ { "FX Edit" };     // in the file strip; the panel takes the place of the strip below it
-    std::unique_ptr<FxPanel> fxPanel_;
+    std::unique_ptr<FxPanel> fxPanel_;              // the Effects tab's content
     static constexpr int kAnaKnobs = 12;  // Impact; PW, PW KF, Fat, Fat KF; PW LFO, PW Env, Fat LFO, Fat Env; Detune, Sub Octave, Sub Level
     juce::Slider     anaSliders_[kAnaKnobs];
     juce::Label      anaLabels_[kAnaKnobs], anaWaveLabel_ { {}, "Wave" };
@@ -229,7 +233,7 @@ private:
     void attachCosm(int k);             // COSM 1 (0) or 2 (1) on the COSM rows
     void attachSideBand();              // the 1st or 2nd Side Band Filter's set, by the type
     void showCosmType();                // only the selected type's rows
-    void layoutCosm(juce::Rectangle<int>& xt);
+    void layoutCosmType(juce::Rectangle<int> area);   // the selected type's three rows, in the COSM tab's type card
     // the Dual Filter: its type (on the Own row) and a row per filter of
     // Frequency, Q, KF, LFO and Env depths
     static constexpr int kDualKnobs = 10;
@@ -330,6 +334,26 @@ private:
     // engine's stretch and semitones without
     bool mainKnobsXt_ = false;
     void attachMainKnobs(bool xt);
+
+    // ── The tabbed layout ────────────────────────────────────────────────────
+    // A header (title, Effects, Algorithm, ROM), a source bar (Load, file, OSC 1/2,
+    // On, Type), the Pitch/Time/Formant column on the left, and eight tabs: seven
+    // pages, then FxPanel. Every control above is reused as it is: the constructor
+    // builds them on the editor, then buildLayout() moves each into its tab's page.
+    // What it doesn't place or keep, it removes: research/UI_DESIGN.md.
+    class Page;          // a tab's content: cards of rows, laid out and painted
+    class TabBar;        // the row of tab names
+    class Segmented;     // joined toggle buttons (OSC 1/2, COSM 1/2, Mono/Poly)
+    class EnvelopeView;  // an envelope's shape, drawn from its A, D, S, R sliders
+    std::unique_ptr<TabBar>    tabBar_;
+    std::unique_ptr<Page>      pages_[kPages];
+    std::unique_ptr<Segmented> oscSeg_, cosmSeg_, monoSeg_;
+    std::vector<std::unique_ptr<EnvelopeView>> envViews_;
+    juce::OwnedArray<juce::Label> extraLabels_;   // row labels the old layout had no label for
+    int tab_ = 0;
+    void buildLayout();
+    void repaintPages();
+    juce::Label* newLabel(const juce::String& text);
 
     void comboBoxChanged(juce::ComboBox* box) override;
     void styleSlider(juce::Slider& s, juce::Label& l);

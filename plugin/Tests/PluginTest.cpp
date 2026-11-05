@@ -3,13 +3,17 @@
 // directly on the same input.  Build: cmake --build <dir> --target VSynthEmuTest
 // Run:   VSynthEmuTest <rom.2.bin> <file.wav> [note]
 #include "../Source/PluginProcessor.h"
+#include "../Source/PluginEditor.h"
 #include "../Source/FxPanel.h"
 #include "../Source/Sh4Interp.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <cstdio>
+#include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <thread>
+#include <vector>
 
 int main(int argc, char** argv) {
     if (argc < 3) { std::fprintf(stderr, "usage: %s rom.2.bin file.wav [note] [auto|solo|backing|ensemble]\n", argv[0]); return 1; }
@@ -22,11 +26,13 @@ int main(int argc, char** argv) {
     if (!p.setRomFile(juce::File(argv[1]))) { std::fprintf(stderr, "ROM rejected: %s\n", p.getStatusText().toRawUTF8()); return 1; }
     p.prepareToPlay(rate, block);
     // TEST_SNAPSHOT=file.png: the editor drawn offscreen, for checking the
-    // layout (TEST_SNAPSHOT_COSM2=1: with the COSM rows on COSM 2;
-    // TEST_SNAPSHOT_TYPE=n: COSM 1's type, e.g. 6 for the 2nd Side Band rows;
+    // layout, on the open tab only (TEST_SNAPSHOT_TAB=n: that tab, 0 Oscillator … 7 Effects;
+    // TEST_SNAPSHOT_SIZE=WxH: at that size;
+    // TEST_SNAPSHOT_COSM2=1: the COSM tab, on COSM 2;
+    // TEST_SNAPSHOT_TYPE=n: the COSM tab, COSM 1's type, e.g. 6 for the 2nd Side Band rows;
     // TEST_SNAPSHOT_ANALOG=1: OSC Type ANALOG, its rows shown;
     // TEST_SNAPSHOT_OSC2=1: with the OSC rows on OSC 2; =pcm: with OSC 2 on PCM too;
-    // TEST_SNAPSHOT_FX=page: the effects' panel, 0 MFX, 1 Chorus, 2 Reverb, 3 EQ, with TEST_SNAPSHOT_FXTYPE=n the page's block's type)
+    // TEST_SNAPSHOT_FX=page: the Effects tab, 0 MFX, 1 Chorus, 2 Reverb, 3 EQ, with TEST_SNAPSHOT_FXTYPE=n the page's block's type)
     if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
         if (std::getenv("TEST_SNAPSHOT_ANALOG")) {
             auto* prm = p.apvts.getParameter("oscType");
@@ -41,6 +47,9 @@ int main(int argc, char** argv) {
             prm->setValueNotifyingHost(prm->convertTo0to1(1.0f));
         }
         std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
+        auto* editor = dynamic_cast<VSynthEmuEditor*>(ed.get());
+        if (std::getenv("TEST_SNAPSHOT_TYPE") || std::getenv("TEST_SNAPSHOT_COSM2")) editor->showTab(3);
+        if (const char* size = std::getenv("TEST_SNAPSHOT_SIZE")) ed->setSize(std::atoi(size), juce::String(size).fromFirstOccurrenceOf("x", false, false).getIntValue());
         if (std::getenv("TEST_SNAPSHOT_COSM2"))      // the COSM rows switched to COSM 2 (the selector re-attaches them)
             for (juce::Component* ch : ed->getChildren())
                 if (auto* cb = dynamic_cast<juce::ComboBox*>(ch); cb && cb->getItemText(0) == "COSM 1") cb->setSelectedId(2, juce::sendNotificationSync);
@@ -50,9 +59,11 @@ int main(int argc, char** argv) {
         if (const char* page = std::getenv("TEST_SNAPSHOT_FX")) {
             static const char* const typeOf[] = { "fxMfxType", "fxChoType", "fxRevType", "fxMfxType" };
             if (const char* t = std::getenv("TEST_SNAPSHOT_FXTYPE")) { auto* prm = p.apvts.getParameter(typeOf[std::atoi(page) & 3]); prm->setValueNotifyingHost(prm->convertTo0to1((float)std::atoi(t))); }
+            editor->showTab(VSynthEmuEditor::kEffectsTab);
             for (juce::Component* ch : ed->getChildren())
-                if (auto* panel = dynamic_cast<FxPanel*>(ch)) { panel->setVisible(true); panel->toFront(false); panel->showPage(std::atoi(page)); }
+                if (auto* panel = dynamic_cast<FxPanel*>(ch)) panel->showPage(std::atoi(page));
         }
+        if (const char* tab = std::getenv("TEST_SNAPSHOT_TAB")) editor->showTab(std::atoi(tab));
         const juce::Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 2.0f);
         juce::File f(juce::File::getCurrentWorkingDirectory().getChildFile(snap));
         f.deleteFile();
@@ -60,6 +71,177 @@ int main(int argc, char** argv) {
         juce::PNGImageFormat png;
         if (!os.openedOk() || !png.writeImageToStream(img, os)) { std::fprintf(stderr, "snapshot failed\n"); return 1; }
         std::printf("snapshot: %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
+    }
+    // TEST_UI_LAYOUT=1: the editor's layout, then stop.  At its smallest, default and largest sizes, on every tab, for both OSC types and every COSM type: no control outside its parent, over another or
+    // without a size, and no text cut short.  Every control is moved, to see which parameter it sets: none may move nothing, and no parameter may be left without a control, bar the engine's three, shown
+    // only without a ROM.  (buildLayout drops what it doesn't place, so a control left out of it goes quietly.)  And each tab by a click, and the joined buttons both ways.  =list: the parameters with no control, and those with.
+    if (const char* ui = std::getenv("TEST_UI_LAYOUT")) {
+        std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
+        auto* editor = dynamic_cast<VSynthEmuEditor*>(ed.get());
+        int errors = 0, states = 0, checked = 0;
+        const auto fail = [&](const juce::String& m) { if (++errors <= 40) std::fprintf(stderr, "layout: %s\n", m.toRawUTF8()); };
+        const auto isControl = [](juce::Component* c) { return dynamic_cast<juce::Label*>(c) || dynamic_cast<juce::Slider*>(c) || dynamic_cast<juce::ComboBox*>(c) || dynamic_cast<juce::Button*>(c); };
+        const auto nameOf = [](juce::Component* c) -> juce::String {
+            if (auto* l = dynamic_cast<juce::Label*>(c)) return "label \"" + l->getText() + "\"";
+            if (auto* b = dynamic_cast<juce::Button*>(c)) return "button \"" + b->getButtonText() + "\"";
+            if (auto* x = dynamic_cast<juce::ComboBox*>(c)) return "box \"" + x->getText() + "\"";
+            if (dynamic_cast<juce::Slider*>(c)) return "slider at " + c->getBounds().toString();
+            return "component at " + c->getBounds().toString();
+        };
+        // Each visible parent under c: not into a control's own parts, nor the effects' rows, which TEST_FX_PANEL goes through
+        std::function<void(juce::Component&, const std::function<void(juce::Component&)>&)> walk = [&](juce::Component& c, const std::function<void(juce::Component&)>& visit) {
+            visit(c);
+            for (juce::Component* ch : c.getChildren())
+                if (ch->isVisible() && !isControl(ch) && !dynamic_cast<juce::Viewport*>(ch)) walk(*ch, visit);
+        };
+        std::function<juce::Component*(juce::Component&, const std::function<bool(juce::Component*)>&)> find = [&](juce::Component& c, const std::function<bool(juce::Component*)>& is) -> juce::Component* {
+            for (juce::Component* ch : c.getChildren()) {
+                if (is(ch)) return ch;
+                if (juce::Component* in = find(*ch, is)) return in;
+            }
+            return nullptr;
+        };
+        const auto boxOf = [&](const juce::String& first) { return dynamic_cast<juce::ComboBox*>(find(*ed, [&](juce::Component* c) { auto* x = dynamic_cast<juce::ComboBox*>(c); return x && x->getItemText(0) == first; })); };
+        const auto buttonOf = [&](const juce::String& text) { return dynamic_cast<juce::Button*>(find(*ed, [&](juce::Component* c) { auto* b = dynamic_cast<juce::Button*>(c); return b && b->getButtonText() == text; })); };
+        const auto setParam = [&](const juce::String& id, int v) { auto* prm = p.apvts.getParameter(id); prm->setValueNotifyingHost(prm->convertTo0to1((float)v)); };
+        const auto check = [&](const juce::String& where) {
+            ++states;
+            walk(*ed, [&](juce::Component& c) {
+                std::vector<juce::Component*> kids;
+                for (juce::Component* ch : c.getChildren()) if (ch->isVisible() && !dynamic_cast<juce::ResizableCornerComponent*>(ch)) kids.push_back(ch);
+                for (size_t i = 0; i < kids.size(); ++i) {
+                    juce::Component* k = kids[i];
+                    ++checked;
+                    if (isControl(k) && k->getBounds().isEmpty()) fail(where + ": " + nameOf(k) + " has no size");
+                    if (!c.getLocalBounds().contains(k->getBounds())) fail(where + ": " + nameOf(k) + " is outside its parent");
+                    for (size_t j = i + 1; j < kids.size(); ++j)
+                        if (k->getBounds().intersects(kids[j]->getBounds())) fail(where + ": " + nameOf(k) + " is over " + nameOf(kids[j]));
+                    if (auto* l = dynamic_cast<juce::Label*>(k)) {                 // JUCE squeezes a text to its minimum scale, then cuts it
+                        const float scale = l->getMinimumHorizontalScale() > 0 ? l->getMinimumHorizontalScale() : 0.7f;
+                        if (juce::GlyphArrangement::getStringWidth(l->getFont(), l->getText()) * scale > (float)(l->getWidth() - l->getBorderSize().getLeftAndRight()))
+                            fail(where + ": " + nameOf(k) + " is cut short");
+                    } else if (auto* b = dynamic_cast<juce::ToggleButton*>(k)) {   // as LookAndFeel_V4 draws it: the tick, then the text
+                        const float size = juce::jmin(15.0f, (float)b->getHeight() * 0.75f);
+                        if (juce::GlyphArrangement::getStringWidth(juce::Font(juce::FontOptions(size)), b->getButtonText()) * 0.7f > (float)(b->getWidth() - juce::roundToInt(size * 1.1f) - 12))
+                            fail(where + ": " + nameOf(k) + " is cut short");
+                    }
+                }
+            });
+        };
+        // Every control moved, and the parameters it changes put back
+        std::vector<juce::RangedAudioParameter*> params;
+        for (auto* prm : p.getParameters()) if (auto* r = dynamic_cast<juce::RangedAudioParameter*>(prm)) params.push_back(r);
+        std::set<juce::String> reached;
+        const auto changedBy = [&](const std::function<void()>& move) {
+            std::vector<float> before;
+            for (auto* r : params) before.push_back(r->getValue());
+            move();
+            juce::RangedAudioParameter* changed = nullptr;
+            for (size_t i = 0; i < params.size(); ++i)
+                if (params[i]->getValue() != before[i]) { changed = params[i]; reached.insert(params[i]->paramID); params[i]->setValueNotifyingHost(before[i]); }
+            return changed;
+        };
+        const auto moveAll = [&](const juce::String& where) {
+            std::vector<juce::Component*> controls;
+            walk(*ed, [&](juce::Component& c) { for (juce::Component* ch : c.getChildren()) if (ch->isVisible() && isControl(ch) && !dynamic_cast<juce::Label*>(ch)) controls.push_back(ch); });
+            for (juce::Component* k : controls) {
+                std::function<void()> move;
+                if (auto* s = dynamic_cast<juce::Slider*>(k)) move = [s] { s->setValue(s->getValue() == s->getMaximum() ? s->getMinimum() : s->getMaximum(), juce::sendNotificationSync); };
+                else if (auto* x = dynamic_cast<juce::ComboBox*>(k)) {             // what chooses what the others show, or isn't a parameter
+                    const juce::String first = x->getItemText(0);
+                    if (first == "OSC 1" || first == "COSM 1" || first == "Control 1" || first == VSynthEmuProcessor::assignName(0) || first == "MFX" || first == "Passthrough (baseline)") continue;
+                    move = [x] { x->setSelectedItemIndex(x->getSelectedItemIndex() == 0 ? 1 : 0, juce::sendNotificationSync); };
+                } else if (auto* b = dynamic_cast<juce::Button*>(k)) {
+                    if (dynamic_cast<juce::TextButton*>(b) && !b->getClickingTogglesState()) continue;                  // Load, ROM
+                    if (b->getButtonText().startsWith("OSC ") || b->getButtonText().startsWith("COSM ")) continue;      // as the boxes above
+                    if (b->getRadioGroupId() != 0 && b->getToggleState()) continue;                                     // one of a pair: the other moves it
+                    move = [b] { b->setToggleState(!b->getToggleState(), juce::sendNotificationSync); };
+                }
+                if (!changedBy(move)) fail(where + ": " + nameOf(k) + " moves no parameter");
+            }
+        };
+        const int cosmTypes = p.apvts.getParameter("cosmType")->getNumSteps();
+        for (int k = 0; k < 2; ++k) {
+            boxOf("OSC 1")->setSelectedId(k + 1, juce::sendNotificationSync);
+            for (int type = 0; type < 2; ++type) {
+                setParam(VSynthEmuProcessor::oscParamId(k, "oscType"), type);
+                for (int tab = 0; tab <= VSynthEmuEditor::kEffectsTab; ++tab) { editor->showTab(tab); moveAll("OSC " + juce::String(k + 1) + " type " + juce::String(type) + " tab " + juce::String(tab)); }
+            }
+        }
+        boxOf("OSC 1")->setSelectedId(1, juce::sendNotificationSync);
+        for (int k = 0; k < 2; ++k) {
+            boxOf("COSM 1")->setSelectedId(k + 1, juce::sendNotificationSync);
+            for (int tab = 0; tab <= VSynthEmuEditor::kEffectsTab; ++tab) { editor->showTab(tab); moveAll("COSM " + juce::String(k + 1) + " tab " + juce::String(tab)); }   // the COSM's envelope is on another tab
+            editor->showTab(3);
+            for (int type = 0; type < cosmTypes; ++type) { setParam(k ? "cosm2Type" : "cosmType", type); moveAll("COSM " + juce::String(k + 1) + " type " + juce::String(type)); }
+        }
+        boxOf("COSM 1")->setSelectedId(1, juce::sendNotificationSync);
+        editor->showTab(6);
+        for (int m = 0; m < 8; ++m) { boxOf("Control 1")->setSelectedItemIndex(m, juce::sendNotificationSync); moveAll("Matrix Control " + juce::String(m + 1)); }
+        for (int a = 0; a < VSynthEmuProcessor::kAssigns; ++a) { boxOf(VSynthEmuProcessor::assignName(0))->setSelectedItemIndex(a, juce::sendNotificationSync); moveAll(juce::String(VSynthEmuProcessor::assignName(a)) + " assign"); }
+        // No editor has shown these (v143's didn't either): the engine's three, shown only without a ROM; Scale Tune; the COSMs' second envelope, the first's velocity and key follow, their LFOs' fade and offset
+        const auto hostOnly = [](const juce::String& id) {
+            if (id == "pitchShift" || id == "timeStretch" || id == "formantShift" || id.startsWith("scaleTune")) return true;
+            const juce::String c = id.startsWith("cosm2") ? id.substring(5) : id.startsWith("cosm") ? id.substring(4) : juce::String();
+            return c.startsWith("EnvB") || c == "EnvAVelCurve" || c == "EnvAVelSens" || c == "EnvAAttackSens" || c == "EnvADecaySens" || c == "EnvAReleaseSens" || c == "EnvATimeKF"
+                || c == "LfoOffset" || c == "LfoDelay" || c == "LfoFadeMode" || c == "LfoFade";
+        };
+        int have = 0;
+        for (auto* r : params) {
+            if (reached.count(r->paramID)) ++have;
+            else if (juce::String(ui) == "list") std::printf("no control: %s\n", r->paramID.toRawUTF8());
+            else if (!hostOnly(r->paramID)) fail("no control sets " + r->paramID);
+        }
+        if (juce::String(ui) == "list") { for (const auto& id : reached) std::printf("control: %s\n", id.toRawUTF8()); return 0; }
+        // The layout, at each size
+        const juce::ComponentBoundsConstrainer* limits = ed->getConstrainer();
+        const juce::Point<int> sizes[] = { { limits->getMinimumWidth(), limits->getMinimumHeight() }, { ed->getWidth(), ed->getHeight() }, { limits->getMaximumWidth(), limits->getMaximumHeight() } };
+        for (const auto& size : sizes) {
+            ed->setSize(size.x, size.y);
+            const juce::String at = juce::String(size.x) + "x" + juce::String(size.y);
+            for (int type = 0; type < 2; ++type) {
+                setParam("oscType", type);
+                for (int tab = 0; tab <= VSynthEmuEditor::kEffectsTab; ++tab) { editor->showTab(tab); check(at + " tab " + juce::String(tab) + " OSC type " + juce::String(type)); }
+            }
+            editor->showTab(3);
+            for (int type = 0; type < cosmTypes; ++type) { setParam("cosmType", type); check(at + " COSM type " + juce::String(type)); }
+            setParam("cosmType", 0);
+        }
+        // Each tab by a click, in order, at the smallest width
+        ed->setSize(sizes[0].x, sizes[0].y);
+        editor->showTab(0);
+        if (juce::Component* bar = ed->findChildWithID("tabs")) {
+            int seen = 0;
+            for (int x = 0; x < bar->getWidth(); x += 4) {
+                const juce::Point<float> at((float)x, (float)bar->getHeight() / 2.0f);
+                const juce::Time now = juce::Time::getCurrentTime();
+                bar->mouseDown(juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), at, {}, juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation, juce::MouseInputSource::defaultRotation,
+                                                juce::MouseInputSource::defaultTiltX, juce::MouseInputSource::defaultTiltY, bar, bar, now, at, now, 1, false));
+                if (editor->currentTab() == seen + 1) ++seen;
+                else if (editor->currentTab() != seen) fail("the click at x " + juce::String(x) + " opens tab " + juce::String(editor->currentTab()) + " after tab " + juce::String(seen));
+            }
+            if (seen != VSynthEmuEditor::kEffectsTab) fail("clicks reach only as far as tab " + juce::String(seen));
+        } else fail("no tab bar");
+        // The joined buttons drive their boxes, and follow them
+        for (const char* first : { "OSC 1", "COSM 1" }) {
+            juce::Button* one = buttonOf(first);
+            juce::Button* two = buttonOf(juce::String(first).upToFirstOccurrenceOf(" ", false, false) + " 2");
+            juce::ComboBox* box = boxOf(first);
+            if (!one || !two || !box) { fail(juce::String("no selector for ") + first); continue; }
+            two->setToggleState(true, juce::sendNotificationSync);
+            if (box->getSelectedId() != 2) fail(juce::String("the second button of ") + first + " doesn't set its box");
+            box->setSelectedId(1, juce::sendNotificationSync);
+            if (!one->getToggleState()) fail(juce::String("the first button of ") + first + " doesn't follow its box");
+        }
+        if (juce::Button* mono = buttonOf("MONO"); mono && buttonOf("POLY")) {
+            const bool poly = buttonOf("POLY")->getToggleState();
+            juce::Button* other = poly ? mono : buttonOf("POLY");
+            if (!changedBy([other] { other->setToggleState(true, juce::sendNotificationSync); })) fail("MONO/POLY set no parameter");
+            if (buttonOf("POLY")->getToggleState() != poly) fail("MONO/POLY doesn't follow its parameter");
+        } else fail("no MONO/POLY");
+        if (errors) { std::fprintf(stderr, "layout: %d errors\n", errors); return 1; }
+        std::printf("the layout: %d states at 3 sizes, %d placements, tabs by click; %d of %d parameters have a control\n", states, checked, have, (int)params.size());
+        return 0;
     }
     // TEST_FX_PANEL=1: every page and type of the effects' panel, then stop: it lists the catalog's parameters by name and range, shows each one's value, and a slider sets its parameter.  And what
     // each box says, at each end of the range and the default, against the firmware's own routine, run here with its unit and without; a value's text typed into the box sets it.

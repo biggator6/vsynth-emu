@@ -1,15 +1,37 @@
 #!/usr/bin/env python3
-# mutate_panel.py [name ...]: planted errors in the effects' panel, the values' text and the processor's wiring of them, each built into PluginTest and run with the settings
+# mutate_panel.py [--editor] [name ...]: planted errors in the effects' panel, the values' text, the processor's wiring of them and the editor's layout (--editor: those alone), each built into PluginTest and run with the settings
 # that should show it (VSynthEmuTest; about 30 s each, one at a time, and it edits the sources in place while it does, restoring them).  One line each: caught,
 # MISSED, or ERROR.  Needs build/plugin configured, and analysis/test_files.
 import os, subprocess, sys
 REPO = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + '/../..')
 os.chdir(REPO)
-FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'; XV='plugin/Source/XtFxControl.cpp'
+FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'; XV='plugin/Source/XtFxControl.cpp'; EP='plugin/Source/PluginEditor.cpp'
 TEXT='row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };\n        '
 TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };\n        '
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
 MUTS=[
+ # The editor's layout (TEST_UI_LAYOUT, TEST_FX_PANEL)
+ ('editor-no-panel',EP,'&fxOnBtn_, fxPanel_.get() };','&fxOnBtn_ };','panel'),
+ ('editor-no-switch',EP,'&fxOnBtn_, fxPanel_.get() };','fxPanel_.get() };','layout'),
+ ('editor-panel-always',EP,'fxPanel_->setVisible(tab_ == kEffectsTab);','fxPanel_->setVisible(true);','layout'),
+ ('editor-panel-never',EP,'fxPanel_->setVisible(tab_ == kEffectsTab);','fxPanel_->setVisible(false);','layout'),
+ ('editor-page-stuck',EP,'pages_[i]->setVisible(i == tab_);','pages_[i]->setVisible(i == 0);','layout'),
+ ('editor-no-row',EP,'for (int i : { 8, 9, 10, 11 }) level.rows.push_back(rowOfLevel(i));','for (int i : { 8, 9, 10 }) level.rows.push_back(rowOfLevel(i));','layout'),
+ ('editor-no-card',EP,'p.add(tempo);',';','layout'),
+ ('editor-cosm-rows',EP,'addAll(tbLabels_, tbSliders_, kTbKnobs);',';','layout'),
+ ('editor-row-gap',EP,'rowGap = 4','rowGap = -8','layout'),
+ ('editor-cosm-rows-close',EP,'return area.withTrimmedTop(30 * r).withHeight(24);','return area.withTrimmedTop(20 * r).withHeight(24);','layout'),
+ ('editor-narrow-env',EP,'v->setBounds(a.removeFromLeft(104).withTrimmedBottom(2));','v->setBounds(a.removeFromLeft(204).withTrimmedBottom(2));','layout'),
+ ('editor-env-border',EP,'l->setBorderSize({ 1, 0, 1, 0 });            // a narrow cell',';                                            // a narrow cell','layout'),
+ ('editor-toggle-narrow',EP,'osc.head = { { &lfoSyncBtn_, 84 } };','osc.head = { { &lfoSyncBtn_, 40 } };','layout'),
+ ('editor-min-width',EP,'setResizeLimits(900, 600, 1400, 900);','setResizeLimits(700, 600, 1400, 900);','layout'),
+ ('editor-min-height',EP,'setResizeLimits(900, 600, 1400, 900);','setResizeLimits(900, 400, 1400, 900);','layout'),
+ ('editor-no-tab-name',EP,'"Matrix", "Effects" }','"Matrix" }','layout'),
+ ('editor-tab-click',EP,'if (tabBounds(i).contains(e.getPosition())) { if (onChange) onChange(i); return; }','if (tabBounds(i).contains(e.getPosition())) { if (onChange) onChange(0); return; }','layout'),
+ ('editor-seg-osc',EP,'oscSeg_->onChange = [this](int i) { oscSelBox_.setSelectedId(i + 1, juce::sendNotificationSync); };',';','layout'),
+ ('editor-seg-follow',EP,'attachCosm(cosmSelBox_.getSelectedId() == 2 ? 1 : 0); cosmSeg_->setIndex(cosmK_); };','attachCosm(cosmSelBox_.getSelectedId() == 2 ? 1 : 0); };','layout'),
+ ('editor-seg-mono',EP,'monoSeg_->onChange = [this](int i) { monoBox_.setSelectedItemIndex(i, juce::sendNotificationSync); };',';','layout'),
+ ('editor-mono-follow',EP,'monoBox_.onChange = [this] { monoSeg_->setIndex(monoBox_.getSelectedItemIndex()); };',';','layout'),
  ('panel-no-set',FP,'processor_.setFxParam(row.id, (int)std::lround(row.value.getValue()));',';','panel'),
  ('panel-range',FP,'row.value.setRange(p.low, p.high, 1.0);','row.value.setRange(p.low, p.high + 1, 1.0);','panel'),
  ('panel-value',FP,'row->value.setValue(processor_.fxParam(row->id, row->def), juce::dontSendNotification);','row->value.setValue(row->def, juce::dontSendNotification);','panel'),
@@ -95,6 +117,7 @@ MUTS=[
 ]
 ROM=os.environ.get('ROM', REPO + '/firmware/unpacked/V-SynthXT.rom.2.bin'); W='analysis/test_files/raw/chord_Cmaj_original.wav'
 ENV={
+ 'layout':{'TEST_UI_LAYOUT':'1'},
  'panel':{'TEST_FX_PANEL':'1'},
  'crash-or-panel':{'TEST_FX_PANEL':'1'},
  'fx':{'TEST_FX':'1'},
@@ -111,7 +134,7 @@ SDK=os.environ.get('SDK','/Applications/Xcode.app/Contents/Developer/Platforms/M
 def build():
     r=subprocess.run(['cmake','--build','build/plugin','--target','VSynthEmuTest','-j','10'],capture_output=True,text=True,env=dict(os.environ,SDKROOT=SDK))
     return r.stdout if r.returncode==0 else 'failed: '+r.stderr[-300:]
-if sys.argv[1:]: MUTS=[m for m in MUTS if m[0] in sys.argv[1:]]
+if sys.argv[1:]: MUTS=[m for m in MUTS if m[0] in sys.argv[1:] or ('--editor' in sys.argv and m[0].startswith('editor-'))]
 def run(kind):
     env=dict(os.environ); env.update(ENV[kind])
     return subprocess.run(['build/plugin/VSynthEmuTest',ROM,W,'60','ensemble'],capture_output=True,text=True,env=env,timeout=300)

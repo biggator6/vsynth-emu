@@ -1547,6 +1547,18 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The tabbed editor (2026-11-04, v144)
+
+The editor is now the tabbed design the user chose as the UI's blueprint. `research/UI_DESIGN.md` has its regions, palette, tab map and how to add a control. Nothing here is the firmware's and the sound doesn't change: A/B 4/4 identical to v143.
+
+**The merge.** The design was cut from v130, and the patch no longer applied. A three-way merge had one conflict, the old `resized()`. Its `buildLayout()` removes every child of the editor it doesn't place, so a plain merge compiled and quietly lost the Effects switch and the panel; `TEST_FX_PANEL` said `panel: not found`. The panel is now the Effects tab, a direct child of the editor as before, so that test runs unchanged, and the switch went to the header.
+
+**What the old editor reached.** `TEST_UI_LAYOUT` moves every control in every state and notes which parameter changes. On v143's editor and this one the list is the same, 539 of 595. The other 56 have no control in either: Scale Tune (13), each COSM's Envelope B (10), Envelope A's velocity and key follow (6) and LFO offset, delay and fade (4), and the engine's three knobs, which show only without a ROM.
+
+**The check's own first report** was that COSM 2's envelope had no control. That was the walk's fault, not the editor's: the card is on the Envelopes tab, and the walk went there only on COSM 1. It does show that COSM 1/2 is chosen on one tab and followed on another.
+
+**Not checked.** Real clicks in a real window. Tabs are clicked with synthetic mouse events, and the standalone opens and stays up, but this environment can't see or drive it.
+
 ### Reverb Time by the driver's own table (2026-11-04, v143)
 
 All 11 Reverb Times now show the time the driver really uses, on the user's decision. So between values 6 and 21 the panel differs on purpose from what the XT's code shows: Room 2's Reverb Time of 12 reads 1.00 sec, not 0.37.

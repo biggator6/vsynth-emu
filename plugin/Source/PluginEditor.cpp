@@ -1,8 +1,235 @@
 #include "PluginEditor.h"
 #include <tuple>
 
-static constexpr int kFileStripH = 44;   // height of the load-file strip at the top
-static constexpr int kXtStripH   = 1120; // height of the XT strip below it
+// ─── The palette (the design system's tokens) ────────────────────────────────
+namespace Ui {
+    const juce::Colour surfaceApp      { 0xFF1A1A2E };   // window
+    const juce::Colour surfaceTitlebar { 0xFF0D0D20 };   // header
+    const juce::Colour surfaceStrip    { 0xFF111128 };   // source bar, tab bar
+    const juce::Colour surfaceXt       { 0xFF15152E };   // cards, the perform column
+    const juce::Colour surfaceField    { 0xFF0D0D1A };   // value boxes, envelope views
+    const juce::Colour line            { 0xFF333355 };   // dividers, card borders, knob outline
+    const juce::Colour accent          { 0xFF00BFA5 };   // the one interactive colour
+    const juce::Colour title           { 0xFF00FF88 };   // the wordmark
+    const juce::Colour text            = juce::Colours::lightgrey;
+    const juce::Colour label           = juce::Colours::lightblue;
+
+    constexpr int headerH = 40, sourceH = 56, performW = 248, tabH = 38;
+    constexpr int pad = 12, gap = 12, cardHeadH = 28, rowH = 26, rowGap = 4, cardFoot = 10, labelW = 84;
+}
+
+// ─── A tab's page: cards of rows ──────────────────────────────────────────────
+// Each card is a titled box in column 0 or 1 (or across both, col -1), its
+// rows a list of items: a component with a fixed width, or 0 for a share of
+// what the fixed ones leave. A card may take another's place (sameAs) and
+// show only while shown() holds (the analog oscillator's in the PCM ones').
+class VSynthEmuEditor::Page : public juce::Component {
+public:
+    struct Item { juce::Component* c; int w; };
+    struct Row  { std::vector<Item> items; };
+    struct Card {
+        Card() = default;
+        explicit Card(juce::String t) : title(std::move(t)) {}
+        juce::String title;
+        std::function<juce::String()> titleFn;          // a title that follows the selectors
+        std::vector<Item> head;                         // controls on the title line, right-aligned
+        std::vector<Row> rows;
+        int col = 0;                                    // 0, 1, or -1 across both
+        int sameAs = -1;                                // the index of the card whose place this takes
+        bool bare = false;                              // rows only: no box, no title
+        int customH = 0;                                // a body laid out by custom() instead of rows
+        std::function<void(juce::Rectangle<int>)> custom;
+        std::vector<juce::Component*> extra;            // what custom() places
+        std::function<bool()> shown;
+        juce::Rectangle<int> bounds;
+    };
+    std::vector<Card> cards;
+
+    Card& add(Card c) { cards.push_back(std::move(c)); return cards.back(); }
+
+    // Take each card's components from wherever they are, visibility kept
+    void adopt() {
+        for (auto& c : cards) {
+            for (auto& i : c.head) if (i.c) addChildComponent(i.c);
+            for (auto& r : c.rows) for (auto& i : r.items) if (i.c) addChildComponent(i.c);
+            for (auto* e : c.extra) addChildComponent(e);
+        }
+    }
+
+    static int heightOf(const Card& c) {
+        const int body = c.custom ? c.customH : (int)c.rows.size() * (Ui::rowH + Ui::rowGap) - Ui::rowGap;
+        return c.bare ? body : Ui::cardHeadH + body + Ui::cardFoot;
+    }
+
+    static void layoutRow(juce::Rectangle<int> r, const std::vector<Item>& items) {
+        int fixed = 0, shares = 0;
+        for (auto& i : items) { if (i.w > 0) fixed += i.w; else ++shares; }
+        const int gaps = 8 * juce::jmax(0, (int)items.size() - 1);
+        const int share = shares ? juce::jmax(0, (r.getWidth() - fixed - gaps) / shares) : 0;
+        for (auto& i : items) {
+            auto cell = r.removeFromLeft(i.w > 0 ? i.w : share);
+            r.removeFromLeft(8);
+            if (i.c) i.c->setBounds(cell);
+        }
+    }
+
+    void resized() override {
+        auto area = getLocalBounds().reduced(Ui::pad);
+        const int colW = (area.getWidth() - Ui::gap) / 2;
+        int y[2] = { area.getY(), area.getY() };
+        for (auto& c : cards) {
+            const int h = heightOf(c);
+            juce::Rectangle<int> b;
+            if (c.sameAs >= 0) {
+                const auto& o = cards[(size_t)c.sameAs].bounds;
+                b = { o.getX(), o.getY(), o.getWidth(), h };
+                if (c.col >= 0) y[c.col] = juce::jmax(y[c.col], b.getBottom() + Ui::gap);
+            } else if (c.col < 0) {
+                const int top = juce::jmax(y[0], y[1]);
+                b = { area.getX(), top, area.getWidth(), h };
+                y[0] = y[1] = b.getBottom() + Ui::gap;
+            } else {
+                b = { area.getX() + c.col * (colW + Ui::gap), y[c.col], c.col ? area.getRight() - (area.getX() + colW + Ui::gap) : colW, h };
+                y[c.col] = b.getBottom() + Ui::gap;
+            }
+            c.bounds = b;
+            auto inner = c.bare ? b : b.reduced(Ui::pad, 0);
+            if (!c.bare) {
+                auto head = inner.removeFromTop(Ui::cardHeadH).withTrimmedTop(3).withTrimmedBottom(1);
+                for (auto it = c.head.rbegin(); it != c.head.rend(); ++it) {
+                    if (it->c) it->c->setBounds(head.removeFromRight(it->w));
+                    head.removeFromRight(8);
+                }
+            }
+            if (c.custom) { c.custom(inner.removeFromTop(c.customH)); continue; }
+            for (auto& r : c.rows) {
+                layoutRow(inner.removeFromTop(Ui::rowH), r.items);
+                inner.removeFromTop(Ui::rowGap);
+            }
+        }
+    }
+
+    void paint(juce::Graphics& g) override {
+        for (auto& c : cards) {
+            if (c.bare || (c.shown && !c.shown())) continue;
+            g.setColour(Ui::surfaceXt);
+            g.fillRect(c.bounds);
+            g.setColour(Ui::line);
+            g.drawRect(c.bounds, 1);
+            juce::Font f(11.0f, juce::Font::bold);
+            f.setExtraKerningFactor(0.08f);
+            g.setFont(f);
+            g.setColour(Ui::label);
+            g.drawText((c.titleFn ? c.titleFn() : c.title).toUpperCase(),
+                       c.bounds.reduced(Ui::pad, 0).withHeight(Ui::cardHeadH), juce::Justification::centredLeft, true);
+        }
+    }
+};
+
+// ─── The tab bar ─────────────────────────────────────────────────────────────
+class VSynthEmuEditor::TabBar : public juce::Component {
+public:
+    juce::StringArray names;
+    int current = 0;
+    std::function<void(int)> onChange;
+
+    juce::Rectangle<int> tabBounds(int i) const {
+        int x = Ui::pad;
+        for (int k = 0; k < names.size(); ++k) {
+            const int w = juce::Font(13.0f, juce::Font::bold).getStringWidth(names[k]) + 28;
+            if (k == i) return { x, 0, w, getHeight() };
+            x += w;
+        }
+        return {};
+    }
+    void paint(juce::Graphics& g) override {
+        g.fillAll(Ui::surfaceStrip);
+        g.setColour(Ui::line);
+        g.fillRect(0, getHeight() - 1, getWidth(), 1);
+        for (int i = 0; i < names.size(); ++i) {
+            const auto b = tabBounds(i);
+            const bool on = i == current;
+            g.setFont(juce::Font(13.0f, on ? juce::Font::bold : juce::Font::plain));
+            g.setColour(on ? Ui::text : Ui::label);
+            g.drawText(names[i], b, juce::Justification::centred, false);
+            if (on) { g.setColour(Ui::accent); g.fillRect(b.getX(), getHeight() - 2, b.getWidth(), 2); }
+        }
+    }
+    void mouseDown(const juce::MouseEvent& e) override {
+        for (int i = 0; i < names.size(); ++i)
+            if (tabBounds(i).contains(e.getPosition())) { if (onChange) onChange(i); return; }
+    }
+};
+
+// ─── Joined toggle buttons ───────────────────────────────────────────────────
+class VSynthEmuEditor::Segmented : public juce::Component {
+public:
+    std::function<void(int)> onChange;
+
+    Segmented(const juce::StringArray& names, int group) {
+        for (int i = 0; i < names.size(); ++i) {
+            auto* b = buttons_.add(new juce::TextButton(names[i]));
+            b->setClickingTogglesState(true);
+            b->setRadioGroupId(group);
+            b->setConnectedEdges((i > 0 ? juce::Button::ConnectedOnLeft : 0) | (i < names.size() - 1 ? juce::Button::ConnectedOnRight : 0));
+            b->setColour(juce::TextButton::buttonOnColourId, Ui::accent);
+            b->setColour(juce::TextButton::textColourOnId, juce::Colours::black);
+            b->setColour(juce::TextButton::textColourOffId, Ui::text);
+            b->onClick = [this, i] { if (buttons_[i]->getToggleState() && onChange) onChange(i); };
+            addAndMakeVisible(b);
+        }
+        setIndex(0);
+    }
+    void setIndex(int i) {
+        if (juce::isPositiveAndBelow(i, buttons_.size()))
+            buttons_[i]->setToggleState(true, juce::dontSendNotification);
+    }
+    void resized() override {
+        auto r = getLocalBounds();
+        const int w = r.getWidth() / juce::jmax(1, buttons_.size());
+        for (int i = 0; i < buttons_.size(); ++i)
+            buttons_[i]->setBounds(i == buttons_.size() - 1 ? r : r.removeFromLeft(w));
+    }
+private:
+    juce::OwnedArray<juce::TextButton> buttons_;
+};
+
+// ─── An envelope's shape ─────────────────────────────────────────────────────
+// Attack, decay and release as thirds of the width each scaled by their knob,
+// sustain as the level they meet: a picture of the settings, not the
+// envelope's real timing.
+class VSynthEmuEditor::EnvelopeView : public juce::Component, private juce::Slider::Listener {
+public:
+    EnvelopeView(juce::Slider& a, juce::Slider& d, juce::Slider& s, juce::Slider& r) : sl_{ &a, &d, &s, &r } {
+        for (auto* x : sl_) x->addListener(this);
+    }
+    ~EnvelopeView() override { for (auto* x : sl_) x->removeListener(this); }
+
+    void paint(juce::Graphics& g) override {
+        auto b = getLocalBounds().toFloat();
+        g.setColour(Ui::surfaceField);
+        g.fillRect(b);
+        g.setColour(Ui::line);
+        g.drawRect(b, 1.0f);
+        const auto p = [this](int i) { return (float)sl_[i]->valueToProportionOfLength(sl_[i]->getValue()); };
+        b = b.reduced(6.0f);
+        const float third = b.getWidth() / 4.0f;
+        const float x1 = b.getX() + p(0) * third, x2 = x1 + p(1) * third, x3 = b.getRight() - p(3) * third;
+        const float ys = b.getBottom() - p(2) * b.getHeight();
+        juce::Path path;
+        path.startNewSubPath(b.getX(), b.getBottom());
+        path.lineTo(x1, b.getY());
+        path.lineTo(x2, ys);
+        path.lineTo(juce::jmax(x2, x3), ys);
+        path.lineTo(b.getRight(), b.getBottom());
+        g.setColour(Ui::accent);
+        g.strokePath(path, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+private:
+    void sliderValueChanged(juce::Slider*) override { repaint(); }
+    juce::Slider* sl_[4];
+};
+
 
 // The OSC pitch, patch tuning, level, velocity and COSM rows: parameter and
 // label, four per row, and the rows' names
@@ -63,14 +290,10 @@ static const char* const kAmpIds[7][2] = { { "AmpGain", "Gain" }, { "AmpGainLfo"
                                            { "AmpBass", "Bass" }, { "AmpMiddle", "Mid" }, { "AmpTreble", "Treb" } };
 // The Limiter's row after its Ratio
 static const char* const kLimIds[4][2] = { { "LimThreshold", "Thr" }, { "LimAttack", "Atk" }, { "LimRelease", "Rel" }, { "LimLevel", "Lvl" } };
-static constexpr int kAlgoStripH = 52;   // height of the algorithm strip at the bottom
 
 VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     : AudioProcessorEditor(&p), processor_(p), fxPanel_(std::make_unique<FxPanel>(p))
 {
-    setSize(560, 1420);
-    setResizable(true, true);
-    setResizeLimits(480, 1110, 960, 1560);
 
     // ── File strip ────────────────────────────────────────────────────────────
     loadButton_.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xFF00BFA5));
@@ -141,12 +364,6 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     addAndMakeVisible(fxOnBtn_);
     fxOnAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(processor_.apvts, "fxOn", fxOnBtn_);
     addChildComponent(*fxPanel_);
-    fxPanelBtn_.setColour(juce::TextButton::buttonColourId, juce::Colour(0xFF333355));
-    fxPanelBtn_.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xFF00BFA5));
-    fxPanelBtn_.setColour(juce::TextButton::textColourOnId, juce::Colours::black);
-    fxPanelBtn_.setClickingTogglesState(true);
-    fxPanelBtn_.onClick = [this] { fxPanel_->setVisible(fxPanelBtn_.getToggleState()); fxPanel_->toFront(false); };
-    addAndMakeVisible(fxPanelBtn_);
     oscTypeBox_.addItemList({ "ANALOG", "PCM" }, 1);
     anaWaveBox_.addItemList({ "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
                               "SUPER-SAW", "FEEDBACK-OSC", "X-MOD" }, 1);
@@ -567,6 +784,11 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
 
     addAndMakeVisible(algoBox_);
     addAndMakeVisible(algoLabel_);
+
+    buildLayout();
+    setSize(960, 600);
+    setResizable(true, true);
+    setResizeLimits(900, 600, 1400, 900);
 }
 
 VSynthEmuEditor::~VSynthEmuEditor() {
@@ -776,6 +998,7 @@ void VSynthEmuEditor::showOscType() {
     anaWaveLabel_.setVisible(ana);
     anaWaveBox_.setVisible(ana);
     for (int i = 0; i < kAnaKnobs; ++i) { anaLabels_[i].setVisible(ana); anaSliders_[i].setVisible(ana); }
+    repaintPages();
 }
 
 // The type's own rows share one area: only the selected type's are shown
@@ -832,6 +1055,7 @@ void VSynthEmuEditor::showCosmType() {
     for (juce::Label& l : ampRowLabels_) l.setVisible(amp);
     spkTypeBox_.setVisible(spk);
     spkRowLabel_.setVisible(spk);
+    repaintPages();
 }
 
 // The Side Band rows show the 1st's parameters, or the 2nd's when the type
@@ -878,376 +1102,107 @@ void VSynthEmuEditor::openRomChooser() {
 // ─── Painting ─────────────────────────────────────────────────────────────────
 
 void VSynthEmuEditor::paint(juce::Graphics& g) {
-    g.fillAll(juce::Colour(0xFF1A1A2E));
+    g.fillAll(Ui::surfaceApp);
 
-    // Title bar
-    g.setColour(juce::Colour(0xFF0D0D20));
-    g.fillRect(0, 0, getWidth(), 36);
-
-    g.setColour(juce::Colour(0xFF00FF88));
+    // Header: the wordmark
+    g.setColour(Ui::surfaceTitlebar);
+    g.fillRect(0, 0, getWidth(), Ui::headerH);
+    g.setColour(Ui::title);
     g.setFont(juce::Font(18.0f, juce::Font::bold));
-    g.drawText("V-SYNTH EMU", 0, 0, getWidth(), 36, juce::Justification::centred);
+    g.drawText("V-SYNTH EMU", 16, 0, 200, Ui::headerH, juce::Justification::centredLeft);
 
-    // File strip background
-    g.setColour(juce::Colour(0xFF111128));
-    g.fillRect(0, 36, getWidth(), kFileStripH);
+    // Source bar
+    g.setColour(Ui::surfaceStrip);
+    g.fillRect(0, Ui::headerH, getWidth(), Ui::sourceH);
+    g.setColour(Ui::line);
+    g.fillRect(0, Ui::headerH, getWidth(), 1);
+    g.fillRect(0, Ui::headerH + Ui::sourceH - 1, getWidth(), 1);
+    g.fillRect(fileNameLabel_.getRight() + 8, Ui::headerH + 14, 1, Ui::sourceH - 28);   // between the file and the OSC
 
-    g.setColour(juce::Colour(0xFF333355));
-    g.drawLine(0.0f, 36.0f, float(getWidth()), 36.0f, 1.0f);
-    g.drawLine(0.0f, float(36 + kFileStripH), float(getWidth()), float(36 + kFileStripH), 1.0f);
-
-    // XT strip background
-    g.setColour(juce::Colour(0xFF15152E));
-    g.fillRect(0, 36 + kFileStripH, getWidth(), kXtStripH);
-    g.setColour(juce::Colour(0xFF333355));
-    g.drawLine(0.0f, float(36 + kFileStripH + kXtStripH), float(getWidth()), float(36 + kFileStripH + kXtStripH), 1.0f);
-
-    // Algorithm strip background
-    int algoTop = getHeight() - kAlgoStripH;
-    g.setColour(juce::Colour(0xFF111128));
-    g.fillRect(0, algoTop, getWidth(), kAlgoStripH);
-    g.setColour(juce::Colour(0xFF333355));
-    g.drawLine(0.0f, float(algoTop), float(getWidth()), float(algoTop), 1.0f);
+    // The perform column
+    const int top = Ui::headerH + Ui::sourceH;
+    g.setColour(Ui::surfaceXt);
+    g.fillRect(0, top, Ui::performW, getHeight() - top);
+    g.setColour(Ui::line);
+    g.fillRect(Ui::performW - 1, top, 1, getHeight() - top);
+    juce::Font f(11.0f, juce::Font::bold);
+    f.setExtraKerningFactor(0.08f);
+    g.setFont(f);
+    g.setColour(Ui::label);
+    g.drawText(mainKnobsXt_ ? "PERFORM  OSC " + juce::String(oscK_ + 1) : juce::String("PERFORM"), 18, top + 10, Ui::performW - 36, 16, juce::Justification::centredLeft);
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 void VSynthEmuEditor::resized() {
-    const int titleH  = 36;
-    const int algoTop = getHeight() - kAlgoStripH;
+    if (tabBar_ == nullptr) return;                  // setSize() runs before buildLayout()
+    // Header: Algorithm and the ROM at the right
+    auto hdr = juce::Rectangle<int>(0, 0, getWidth(), Ui::headerH).reduced(16, 6);
+    romButton_.setBounds(hdr.removeFromRight(70));
+    hdr.removeFromRight(10);
+    statusLabel_.setBounds(hdr.removeFromRight(170));
+    hdr.removeFromRight(16);
+    algoBox_.setBounds(hdr.removeFromRight(230));
+    hdr.removeFromRight(6);
+    algoLabel_.setBounds(hdr.removeFromRight(72));
+    hdr.removeFromRight(6);
+    fxOnBtn_.setBounds(hdr.removeFromRight(76));
 
-    // ── File strip ─────────────────────────────────────────────────────────
-    auto fileStrip = juce::Rectangle<int>(0, titleH, getWidth(), kFileStripH).reduced(10, 8);
-    loadButton_.setBounds(fileStrip.removeFromLeft(110));
-    fileStrip.removeFromLeft(10);
-    fxPanelBtn_.setBounds(fileStrip.removeFromRight(64));
-    fileStrip.removeFromRight(6);
-    fxOnBtn_.setBounds(fileStrip.removeFromRight(72));
-    fileStrip.removeFromRight(6);
-    fileNameLabel_.setBounds(fileStrip);
-    fxPanel_->setBounds(0, titleH + kFileStripH, getWidth(), algoTop - titleH - kFileStripH);
+    // Source bar: Load, the file, the OSC selector, its switch and type
+    auto src = juce::Rectangle<int>(0, Ui::headerH, getWidth(), Ui::sourceH).reduced(16, 13);
+    loadButton_.setBounds(src.removeFromLeft(110));
+    src.removeFromLeft(12);
+    oscTypeBox_.setBounds(src.removeFromRight(110).reduced(0, 2));
+    src.removeFromRight(10);
+    oscOnBtn_.setBounds(src.removeFromRight(54));
+    src.removeFromRight(6);
+    oscSeg_->setBounds(src.removeFromRight(140).reduced(0, 2));
+    src.removeFromRight(24);
+    fileNameLabel_.setBounds(src);
 
-    // ── XT strip ───────────────────────────────────────────────────────────
-    auto xt = juce::Rectangle<int>(0, titleH + kFileStripH, getWidth(), kXtStripH).reduced(10, 6);
-    auto row1 = xt.removeFromTop(26);
-    romButton_.setBounds(row1.removeFromLeft(70));
-    row1.removeFromLeft(6);
-    oscTypeBox_.setBounds(row1.removeFromRight(90).reduced(0, 1));
-    oscOnBtn_.setBounds(row1.removeFromRight(46));
-    oscSelBox_.setBounds(row1.removeFromRight(76).reduced(0, 1));
-    statusLabel_.setBounds(row1);
-    xt.removeFromTop(6);
-    auto row2 = xt.removeFromTop(24);
-    {   // the PCM OSC's tempo row, in the place of the analog oscillator's fourth
-        auto s4 = row2.translated(0, 90);
-        syncBtn_.setBounds(s4.removeFromLeft(62));
-        tripBtn_.setBounds(s4.removeFromLeft(58));
-        keepBtn_.setBounds(s4.removeFromLeft(64));
-        origTempoLabel_.setBounds(s4.removeFromLeft(30));
-        origTempoSlider_.setBounds(s4);
+    // The perform column: Pitch, Time, Formant, Robot
+    const int top = Ui::headerH + Ui::sourceH;
+    auto col = juce::Rectangle<int>(0, top + 32, Ui::performW, getHeight() - top - 32);
+    for (auto [s, l] : { std::pair<juce::Slider*, juce::Label*>{ &pitchSlider_, &pitchLabel_ },
+                         { &timeSlider_, &timeLabel_ }, { &formantSlider_, &formantLabel_ } }) {
+        l->setBounds(col.removeFromTop(16));
+        s->setBounds(col.removeFromTop(112).withSizeKeepingCentre(160, 112));
+        col.removeFromTop(10);
     }
-    {   // the analog rows, in rows 2, 3 and Loop's places (showOscType)
-        auto a1 = row2, a2 = row2.translated(0, 30), a3 = row2.translated(0, 60), a4 = row2.translated(0, 90);
-        anaWaveLabel_.setBounds(a1.removeFromLeft(36));
-        anaWaveBox_.setBounds(a1.removeFromLeft(130).withTrimmedRight(10));
-        anaLabels_[0].setBounds(a1.removeFromLeft(44));
-        anaSliders_[0].setBounds(a1);
-        for (int r = 0; r < 2; ++r) {
-            auto& a = r ? a3 : a2;
-            const int cw = a.getWidth() / 4;
-            for (int i = 1 + 4 * r; i < 5 + 4 * r; ++i) {
-                auto cell = a.removeFromLeft(cw);
-                anaLabels_[i].setBounds(cell.removeFromLeft(46));
-                anaSliders_[i].setBounds(cell.withTrimmedRight(6));
-            }
-        }
-        const int sw4 = a4.getWidth() / 3;           // Detune and the sub oscillator: a row only the analog oscillator uses
-        for (int i : { 9, 10, 11 }) {
-            auto cell = a4.removeFromLeft(sw4);
-            anaLabels_[i].setBounds(cell.removeFromLeft(46));
-            anaSliders_[i].setBounds(cell.withTrimmedRight(6));
-        }
-    }
-    encodeLabel_.setBounds(row2.removeFromLeft(52));
-    encodeBox_.setBounds(row2.removeFromLeft(120));
-    row2.removeFromLeft(12);
-    keyLabel_.setBounds(row2.removeFromLeft(30));
-    keySlider_.setBounds(row2.removeFromLeft(110));
-    row2.removeFromLeft(12);
-    depthLabel_.setBounds(row2.removeFromLeft(44));
-    depthSlider_.setBounds(row2);
-    xt.removeFromTop(6);
-    auto row3 = xt.removeFromTop(24);                // the OSC: Energy, Time Offset, Time KF, Formant KF
-    const int sw = (row3.getWidth() - 46 - 38 - 80 - 50 - 46) / 3;   // the three sliders share what the labels leave
-    energyLabel_.setBounds(row3.removeFromLeft(46));
-    energySlider_.setBounds(row3.removeFromLeft(sw).withTrimmedRight(6));
-    offsetLabel_.setBounds(row3.removeFromLeft(38));
-    timeOffsetBox_.setBounds(row3.removeFromLeft(80).withTrimmedRight(6));
-    oscTkfLabel_.setBounds(row3.removeFromLeft(50));
-    oscTkfSlider_.setBounds(row3.removeFromLeft(sw).withTrimmedRight(6));
-    oscFkfLabel_.setBounds(row3.removeFromLeft(46));
-    oscFkfSlider_.setBounds(row3);
-    xt.removeFromTop(6);
-    auto row3l = xt.removeFromTop(24);               // Loop: switch, mode, region
-    loopBtn_.setBounds(row3l.removeFromLeft(64));
-    loopModeBox_.setBounds(row3l.removeFromLeft(110).withTrimmedRight(10));
-    const int lh = row3l.getWidth() / 2;
-    auto ls = row3l.removeFromLeft(lh);
-    loopStartLabel_.setBounds(ls.removeFromLeft(38));
-    loopStartSlider_.setBounds(ls.withTrimmedRight(8));
-    loopEndLabel_.setBounds(row3l.removeFromLeft(32));
-    loopEndSlider_.setBounds(row3l);
-    xt.removeFromTop(36);                            // the analog oscillator's fourth row (above)
-    auto row3p = xt.removeFromTop(24);               // Portamento: switch, mode, type, time, velocity sens
-    portaBtn_.setBounds(row3p.removeFromLeft(64));
-    portaModeBox_.setBounds(row3p.removeFromLeft(96).withTrimmedRight(8));
-    portaTypeBox_.setBounds(row3p.removeFromLeft(80).withTrimmedRight(10));
-    const int ph = row3p.getWidth() / 2;
-    auto pt = row3p.removeFromLeft(ph);
-    portaTimeLabel_.setBounds(pt.removeFromLeft(36));
-    portaTimeSlider_.setBounds(pt.withTrimmedRight(8));
-    portaSensLabel_.setBounds(row3p.removeFromLeft(40));
-    portaSensSlider_.setBounds(row3p);
-    auto row3k = xt.removeFromTop(24);               // Key assign: Mono/Poly, Legato, Octave Shift
-    monoBox_.setBounds(row3k.removeFromLeft(96).withTrimmedRight(8));
-    legatoBtn_.setBounds(row3k.removeFromLeft(80));
-    octLabel_.setBounds(row3k.removeFromLeft(36));
-    octSlider_.setBounds(row3k.removeFromLeft(200));
-    xt.removeFromTop(6);
-    auto row3t = xt.removeFromTop(24);               // the tempo: Clock Source, the Patch Tempo, the Time Trip knob
-    clockLabel_.setBounds(row3t.removeFromLeft(36));
-    clockBox_.setBounds(row3t.removeFromLeft(104).withTrimmedRight(8));
-    const int tw = row3t.getWidth() / 2;
-    auto tl = row3t.removeFromLeft(tw);
-    patchTempoLabel_.setBounds(tl.removeFromLeft(42));
-    patchTempoSlider_.setBounds(tl.withTrimmedRight(8));
-    tripLabel_.setBounds(row3t.removeFromLeft(30));
-    tripSlider_.setBounds(row3t);
-    xt.removeFromTop(6);
-    auto row4 = xt.removeFromTop(24);                // the TVA Switch, amp envelope
-    tvaBtn_.setBounds(row4.removeFromLeft(56));
-    const int q = row4.getWidth() / 4;
-    std::pair<juce::Label*, juce::Slider*> adsr[] = { { &attackLabel_, &attackSlider_ }, { &decayLabel_, &decaySlider_ },
-                                                      { &sustainLabel_, &sustainSlider_ }, { &releaseLabel_, &releaseSlider_ } };
-    for (auto& [l, sl] : adsr) {
-        auto cell = row4.removeFromLeft(q);
-        l->setBounds(cell.removeFromLeft(18));
-        sl->setBounds(cell.withTrimmedRight(8));
-    }
-    xt.removeFromTop(6);
-    auto row5 = xt.removeFromTop(24);                // velocity → time, Time KF
-    row5.removeFromLeft(56);
-    std::pair<juce::Label*, juce::Slider*> sens[] = { { &aSensLabel_, &aSensSlider_ }, { &dSensLabel_, &dSensSlider_ },
-                                                      { &rSensLabel_, &rSensSlider_ }, { &kfLabel_, &kfSlider_ } };
-    for (auto& [l, sl] : sens) {
-        auto cell = row5.removeFromLeft(q);
-        l->setBounds(cell.removeFromLeft(38));
-        sl->setBounds(cell.withTrimmedRight(8));
-    }
-    xt.removeFromTop(6);
-    auto row6 = xt.removeFromTop(24);                // pitch envelope
-    const int fifth = row6.getWidth() / 5;
-    std::pair<juce::Label*, juce::Slider*> penv[] = { { &pAttackLabel_, &pAttackSlider_ }, { &pDecayLabel_, &pDecaySlider_ },
-                                                      { &pSustainLabel_, &pSustainSlider_ }, { &pReleaseLabel_, &pReleaseSlider_ },
-                                                      { &pDepthLabel_, &pDepthSlider_ } };
-    for (auto& [l, sl] : penv) {
-        auto cell = row6.removeFromLeft(fifth);
-        l->setBounds(cell.removeFromLeft(30));
-        sl->setBounds(cell.withTrimmedRight(6));
-    }
-    xt.removeFromTop(6);
-    auto row6t = xt.removeFromTop(24);               // time envelope
-    std::pair<juce::Label*, juce::Slider*> tenv[] = { { &tAttackLabel_, &tAttackSlider_ }, { &tDecayLabel_, &tDecaySlider_ },
-                                                      { &tSustainLabel_, &tSustainSlider_ }, { &tReleaseLabel_, &tReleaseSlider_ },
-                                                      { &tDepthLabel_, &tDepthSlider_ } };
-    for (auto& [l, sl] : tenv) {
-        auto cell = row6t.removeFromLeft(fifth);
-        l->setBounds(cell.removeFromLeft(30));
-        sl->setBounds(cell.withTrimmedRight(6));
-    }
-    xt.removeFromTop(6);
-    auto row6f = xt.removeFromTop(24);               // formant envelope
-    std::pair<juce::Label*, juce::Slider*> fenv[] = { { &fAttackLabel_, &fAttackSlider_ }, { &fDecayLabel_, &fDecaySlider_ },
-                                                      { &fSustainLabel_, &fSustainSlider_ }, { &fReleaseLabel_, &fReleaseSlider_ },
-                                                      { &fDepthLabel_, &fDepthSlider_ } };
-    for (auto& [l, sl] : fenv) {
-        auto cell = row6f.removeFromLeft(fifth);
-        l->setBounds(cell.removeFromLeft(30));
-        sl->setBounds(cell.withTrimmedRight(6));
-    }
-    xt.removeFromTop(6);
-    auto row7 = xt.removeFromTop(24);                // LFO: waveform, rate, key sync
-    lfoLabel_.setBounds(row7.removeFromLeft(30));
-    lfoWaveBox_.setBounds(row7.removeFromLeft(80).withTrimmedRight(6));
-    lfoRateLabel_.setBounds(row7.removeFromLeft(34));
-    lfoRateSlider_.setBounds(row7.removeFromLeft(220).withTrimmedRight(6));
-    lfoSyncBtn_.setBounds(row7);
-    xt.removeFromTop(6);
-    auto row8 = xt.removeFromTop(24);                // LFO: delay, fade, fade mode, offset
-    lfoDelayLabel_.setBounds(row8.removeFromLeft(40));
-    lfoDelaySlider_.setBounds(row8.removeFromLeft(130).withTrimmedRight(6));
-    lfoFadeLabel_.setBounds(row8.removeFromLeft(34));
-    lfoFadeSlider_.setBounds(row8.removeFromLeft(130).withTrimmedRight(6));
-    lfoModeBox_.setBounds(row8.removeFromLeft(90).withTrimmedRight(6));
-    lfoOffsetBox_.setBounds(row8.removeFromLeft(70));
-    xt.removeFromTop(6);
-    auto row9 = xt.removeFromTop(24);                // LFO depths: pitch, time, formant
-    lfoDepthsLabel_.setBounds(row9.removeFromLeft(46));
-    const int third = row9.getWidth() / 3;
-    std::pair<juce::Label*, juce::Slider*> lfoDepths[] = { { &lfoDepthLabel_, &lfoDepthSlider_ }, { &lfoTimeLabel_, &lfoTimeSlider_ },
-                                                           { &lfoFmtLabel_, &lfoFmtSlider_ } };
-    for (auto& [l, sl] : lfoDepths) {
-        auto cell = row9.removeFromLeft(third);
-        l->setBounds(cell.removeFromLeft(34));
-        sl->setBounds(cell.withTrimmedRight(6));
-    }
-    for (int r = 0; r < kLevelRows; ++r) {          // the OSC pitch, tuning, TVA and velocity rows; COSM Env
-        if (r == 6) continue;                        // TVF Mod: in the type's area
-        xt.removeFromTop(6);
-        auto row = xt.removeFromTop(24);
-        levelRowLabels_[r].setBounds(row.removeFromLeft(56));
-        const int quarter = row.getWidth() / 4;
-        for (int i = 4 * r; i < 4 * r + 4; ++i) {
-            auto cell = row.removeFromLeft(quarter);
-            levelLabels_[i].setBounds(cell.removeFromLeft(r <= 1 || r == 4 || i >= 22 ? 46 : 34));
-            levelSliders_[i].setBounds(cell.withTrimmedRight(6));
-        }
-        if (r == 5) {
-            xt.removeFromTop(6);
-            auto rs = xt.removeFromTop(24);          // the Structure Type, the order of what follows
-            structLabel_.setBounds(rs.removeFromLeft(56));
-            structBox_.setBounds(rs.removeFromLeft(100).withTrimmedRight(8));
-            structOrderLabel_.setBounds(rs);
-            xt.removeFromTop(6);
-            auto rm = xt.removeFromTop(24);          // the MOD, between the OSCs and the COSMs
-            modBtn_.setBounds(rm.removeFromLeft(56));
-            modTypeBox_.setBounds(rm.removeFromLeft(100).withTrimmedRight(8));
-            const int w3 = rm.getWidth() / 3;
-            std::pair<juce::Label*, juce::Slider*> cells[] = { { &modLevelLabel_, &modLevelSlider_ }, { &modAttackLabel_, &modAttackSlider_ },
-                                                               { &modReleaseLabel_, &modReleaseSlider_ } };
-            for (auto& [l, sl] : cells) {
-                auto cell = rm.removeFromLeft(w3);
-                l->setBounds(cell.removeFromLeft(34));
-                sl->setBounds(cell.withTrimmedRight(6));
-            }
-            layoutCosm(xt);
-        }
-    }
-    xt.removeFromTop(6);
-    auto rl = xt.removeFromTop(24);                  // LFO 3: waveform, rate, key sync
-    clfoLabel_.setBounds(rl.removeFromLeft(46));
-    clfoWaveBox_.setBounds(rl.removeFromLeft(80).withTrimmedRight(6));
-    clfoRateLabel_.setBounds(rl.removeFromLeft(34));
-    clfoRateSlider_.setBounds(rl.removeFromLeft(220).withTrimmedRight(6));
-    clfoSyncBtn_.setBounds(rl);
-    for (int r = 0; r < 2; ++r) {                    // the patch TVA, after the COSMs as the signal goes
-        xt.removeFromTop(6);
-        auto rt = xt.removeFromTop(24);
-        tvaRowLabels_[r].setBounds(rt.removeFromLeft(56));
-        const int w4 = rt.getWidth() / 4;
-        for (int i = r ? 4 : 0; i < (r ? 7 : 4); ++i) {
-            auto cell = rt.removeFromLeft(w4);
-            tvaLabels_[i].setBounds(cell.removeFromLeft(34));
-            tvaSliders_[i].setBounds(cell.withTrimmedRight(6));
-        }
-    }
-    xt.removeFromTop(6);
-    auto rt5 = xt.removeFromTop(24);                 // LFO 5: waveform, rate, key sync
-    tvaRowLabels_[2].setBounds(rt5.removeFromLeft(46));
-    tlfoWaveBox_.setBounds(rt5.removeFromLeft(80).withTrimmedRight(6));
-    tvaLabels_[7].setBounds(rt5.removeFromLeft(34));
-    tvaSliders_[7].setBounds(rt5.removeFromLeft(220).withTrimmedRight(6));
-    tlfoSyncBtn_.setBounds(rt5);
-    xt.removeFromTop(6);
-    auto rt6 = xt.removeFromTop(24);                 // LFO 5: delay, fade, fade mode, offset
-    tvaLabels_[8].setBounds(rt6.removeFromLeft(40));
-    tvaSliders_[8].setBounds(rt6.removeFromLeft(130).withTrimmedRight(6));
-    tvaLabels_[9].setBounds(rt6.removeFromLeft(34));
-    tvaSliders_[9].setBounds(rt6.removeFromLeft(130).withTrimmedRight(6));
-    tlfoModeBox_.setBounds(rt6.removeFromLeft(90).withTrimmedRight(6));
-    tlfoOffsetBox_.setBounds(rt6.removeFromLeft(70));
-    xt.removeFromTop(6);
-    auto rm1 = xt.removeFromTop(24);                 // the Matrix: which Control, its Source; the system's assigns
-    matrixLabel_.setBounds(rm1.removeFromLeft(46));
-    matrixSelBox_.setBounds(rm1.removeFromLeft(90).withTrimmedRight(6));
-    matrixSourceBox_.setBounds(rm1.removeFromLeft(90).withTrimmedRight(6));
-    assignLabel_.setBounds(rm1.removeFromLeft(44));
-    assignSelBox_.setBounds(rm1.removeFromLeft(90).withTrimmedRight(6));
-    assignBox_.setBounds(rm1.withTrimmedRight(2));
-    for (int j = 0; j < 2; ++j) {                    // each pair: Dest, Sens
-        xt.removeFromTop(6);
-        auto rm = xt.removeFromTop(24);
-        rm.removeFromLeft(46);
-        matrixDestBox_[j].setBounds(rm.removeFromLeft(150).withTrimmedRight(6));
-        matrixSensLabels_[j].setBounds(rm.removeFromLeft(34));
-        matrixSens_[j].setBounds(rm.withTrimmedRight(6));
-    }
+    robotBtn_.setBounds(col.removeFromTop(22).withSizeKeepingCentre(88, 22));
 
-    // ── Knobs area ─────────────────────────────────────────────────────────
-    const int knobTop = titleH + kFileStripH + kXtStripH + 8;
-    auto knobArea = juce::Rectangle<int>(20, knobTop,
-                                         getWidth() - 40,
-                                         algoTop - knobTop - 36);
-    const int knobW = knobArea.getWidth() / 3;
-
-    auto layoutKnob = [](juce::Rectangle<int> a, juce::Slider& s, juce::Label& l) {
-        l.setBounds(a.removeFromTop(20));
-        a.reduce(8, 0);
-        s.setBounds(a.removeFromTop(std::min(a.getHeight(), 130)));
-    };
-
-    layoutKnob(knobArea.removeFromLeft(knobW), pitchSlider_,   pitchLabel_);
-    layoutKnob(knobArea.removeFromLeft(knobW), timeSlider_,    timeLabel_);
-    layoutKnob(knobArea,                       formantSlider_, formantLabel_);
-
-    // Robot button — centred below the knobs
-    robotBtn_.setBounds(getWidth() / 2 - 44, algoTop - 30, 88, 22);
-
-    // ── Algorithm strip ────────────────────────────────────────────────────
-    auto algoStrip = juce::Rectangle<int>(0, algoTop, getWidth(), kAlgoStripH).reduced(12, 12);
-    algoLabel_.setBounds(algoStrip.removeFromLeft(80));
-    algoStrip.removeFromLeft(6);
-    algoBox_.setBounds(algoStrip);
+    // The tabs
+    tabBar_->setBounds(Ui::performW, top, getWidth() - Ui::performW, Ui::tabH);
+    for (auto& p : pages_)
+        p->setBounds(Ui::performW, top + Ui::tabH, getWidth() - Ui::performW, getHeight() - top - Ui::tabH);
+    fxPanel_->setBounds(Ui::performW, top + Ui::tabH, getWidth() - Ui::performW, getHeight() - top - Ui::tabH);
 }
 
-// ─── File chooser ────────────────────────────────────────────────────────────
-
-void VSynthEmuEditor::openFileChooser() {
-    fileChooser_ = std::make_unique<juce::FileChooser>(
-        "Load audio file",
-        juce::File::getSpecialLocation(juce::File::userHomeDirectory),
-        processor_.getFormatManager().getWildcardForAllFormats());
-
-    fileChooser_->launchAsync(
-        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [this](const juce::FileChooser& fc)
-        {
-            auto result = fc.getResult();
-            if (result.existsAsFile())
-            {
-                processor_.loadFile(result, oscK_);
-                showFileName();
-            }
-        });
+void VSynthEmuEditor::showTab(int t) {
+    tab_ = juce::jlimit(0, kEffectsTab, t);
+    for (int i = 0; i < kPages; ++i) pages_[i]->setVisible(i == tab_);
+    fxPanel_->setVisible(tab_ == kEffectsTab);
+    tabBar_->current = tab_;
+    tabBar_->repaint();
 }
 
-// The selected OSC's wave: Load loads into that OSC.
-void VSynthEmuEditor::showFileName() {
-    const juce::String name = processor_.hasFileLoaded(oscK_) ? processor_.getLoadedFileName(oscK_) : juce::String("No file loaded");
-    fileNameLabel_.setText(oscK_ ? "OSC 2: " + name : name, juce::dontSendNotification);
+void VSynthEmuEditor::repaintPages() {
+    if (tabBar_ == nullptr) return;                  // before buildLayout
+    for (auto& p : pages_) p->repaint();
+    repaint();                                       // the Perform column's title
 }
 
-// The COSM rows: the selector, switch and type, then the type's own area
-// (three rows; only the selected type's rows are visible, see showCosmType).
-void VSynthEmuEditor::layoutCosm(juce::Rectangle<int>& xt) {
-    xt.removeFromTop(6);
-    auto rc = xt.removeFromTop(24);
-    cosmSelBox_.setBounds(rc.removeFromLeft(90).withTrimmedRight(6));
-    cosmBtn_.setBounds(rc.removeFromLeft(48));
-    cosmTypeLabel_.setBounds(rc.removeFromLeft(40));
-    cosmTypeBox_.setBounds(rc.removeFromLeft(160).withTrimmedRight(8));
-    const juce::Rectangle<int> area = xt.removeFromTop(3 * 30);
-    auto rowOf = [&](int r) { return area.withTrimmedTop(30 * r + 6).withHeight(24); };
+juce::Label* VSynthEmuEditor::newLabel(const juce::String& text) {
+    auto* l = extraLabels_.add(new juce::Label({}, text));
+    styleSmall(*l);
+    return l;
+}
+
+// The selected COSM type's rows (three at most), in the COSM tab's type card.
+// The rows are the old layout's, wider: every type's sit in the same area
+// and showCosmType shows one type's.
+void VSynthEmuEditor::layoutCosmType(juce::Rectangle<int> area) {
+    auto rowOf = [&](int r) { return area.withTrimmedTop(30 * r).withHeight(24); };
     {                                                // the TVF: Filter Type, Cutoff, Resonance, KF; the depths; the Own depths
         auto row = rowOf(0);
         tvfLabel_.setBounds(row.removeFromLeft(56));
@@ -1410,6 +1365,342 @@ void VSynthEmuEditor::layoutCosm(juce::Rectangle<int>& xt) {
             }
         }
     }
+}
+
+// ─── Building the tabs ───────────────────────────────────────────────────────
+// Every control the constructor made is moved into a page here (or stays in
+// the header, source bar or perform column); the rest of the old layout's
+// row labels are dropped. The OSC and COSM selector combo boxes stay on the
+// editor, hidden, as the segmented buttons' models (PluginTest finds them).
+void VSynthEmuEditor::buildLayout() {
+    // The segmented selectors drive the existing combo boxes, which keep
+    // their own onChange work (attachOsc, attachCosm) and the parameters
+    oscSeg_ = std::make_unique<Segmented>(juce::StringArray { "OSC 1", "OSC 2" }, 1001);
+    oscSeg_->onChange = [this](int i) { oscSelBox_.setSelectedId(i + 1, juce::sendNotificationSync); };
+    oscSelBox_.onChange = [this] { attachOsc(oscSelBox_.getSelectedId() == 2 ? 1 : 0); oscSeg_->setIndex(oscK_); };
+    cosmSeg_ = std::make_unique<Segmented>(juce::StringArray { "COSM 1", "COSM 2" }, 1002);
+    cosmSeg_->onChange = [this](int i) { cosmSelBox_.setSelectedId(i + 1, juce::sendNotificationSync); };
+    cosmSelBox_.onChange = [this] { attachCosm(cosmSelBox_.getSelectedId() == 2 ? 1 : 0); cosmSeg_->setIndex(cosmK_); };
+    monoSeg_ = std::make_unique<Segmented>(juce::StringArray { "MONO", "POLY" }, 1003);
+    monoSeg_->onChange = [this](int i) { monoBox_.setSelectedItemIndex(i, juce::sendNotificationSync); };
+    monoBox_.onChange = [this] { monoSeg_->setIndex(monoBox_.getSelectedItemIndex()); };
+    monoSeg_->setIndex(monoBox_.getSelectedItemIndex());
+    for (auto* seg : { oscSeg_.get(), cosmSeg_.get(), monoSeg_.get() }) seg->setVisible(true);   // pages adopt with visibility kept
+    algoLabel_.setJustificationType(juce::Justification::centredRight);
+    statusLabel_.setJustificationType(juce::Justification::centredRight);
+
+    using Item = Page::Item;
+    using Row = Page::Row;
+    using Card = Page::Card;
+    const auto lr = [](juce::Component& l, juce::Component& c, int w = 0) { return Row{ { Item{ &l, Ui::labelW }, Item{ &c, w } } }; };
+    const auto rowOfLevel = [this, lr](int i) { return lr(levelLabels_[i], levelSliders_[i]); };
+    const auto pcm = [this] { return oscTypeBox_.getSelectedItemIndex() != 0; };
+
+    // Friendlier names where the old rows were too narrow for them
+    static const std::pair<int, const char*> levelNames[] = {
+        { 0, "Coarse" }, { 1, "Fine" }, { 2, "Random" }, { 3, "Pitch KF" }, { 4, "Coarse" }, { 5, "Fine" }, { 6, "Bend up" }, { 7, "Bend down" },
+        { 8, "Level" }, { 9, "Level KF" }, { 10, "LFO depth" }, { 11, "Wave gain" }, { 20, "Sensitivity" }, { 21, "Curve" },
+        { 22, "Sensitivity" }, { 23, "Curve" } };
+    for (auto [i, n] : levelNames) levelLabels_[i].setText(n, juce::dontSendNotification);
+    static const char* const tvaNames[kTvaKnobs] = { "Level", "Level KF", "LFO depth", "MFX send", "Pan", "Pan KF", "LFO depth", "Rate", "Delay", "Fade" };
+    for (int i = 0; i < kTvaKnobs; ++i) tvaLabels_[i].setText(tvaNames[i], juce::dontSendNotification);
+    for (auto [l, n] : { std::pair<juce::Label*, const char*>{ &offsetLabel_, "Time offset" }, { &oscFkfLabel_, "Formant KF" },
+                         { &origTempoLabel_, "Original BPM" }, { &portaTimeLabel_, "Time" }, { &portaSensLabel_, "Velocity sens" },
+                         { &octLabel_, "Octave" }, { &tripLabel_, "Time Trip" }, { &lfoDepthLabel_, "Pitch depth" },
+                         { &lfoTimeLabel_, "Time depth" }, { &lfoFmtLabel_, "Formant depth" }, { &modAttackLabel_, "Attack" },
+                         { &modReleaseLabel_, "Release" }, { &structLabel_, "Type" }, { &matrixLabel_, "Control" },
+                         { &assignLabel_, "Controller" }, { &cosmTypeLabel_, "Type" }, { &pitchLabel_, "Pitch" },
+                         { &timeLabel_, "Time" }, { &formantLabel_, "Formant" }, { &pDepthLabel_, "Depth" },
+                         { &tDepthLabel_, "Depth" }, { &fDepthLabel_, "Depth" } })
+        l->setText(n, juce::dontSendNotification);
+    for (int j = 0; j < 2; ++j) matrixSensLabels_[j].setText("Sensitivity " + juce::String(j + 1), juce::dontSendNotification);
+    for (auto [l, n] : { std::pair<juce::Label*, const char*>{ &pAttackLabel_, "A" }, { &pDecayLabel_, "D" }, { &pSustainLabel_, "S" }, { &pReleaseLabel_, "R" },
+                         { &tAttackLabel_, "A" }, { &tDecayLabel_, "D" }, { &tSustainLabel_, "S" }, { &tReleaseLabel_, "R" },
+                         { &fAttackLabel_, "A" }, { &fDecayLabel_, "D" }, { &fSustainLabel_, "S" }, { &fReleaseLabel_, "R" } })
+        l->setText(n, juce::dontSendNotification);
+    for (juce::ToggleButton* b : { &loopBtn_, &portaBtn_, &modBtn_, &tvaBtn_ }) b->setButtonText("On");
+    structOrderLabel_.setFont(juce::Font(12.0f));
+    structOrderLabel_.setColour(juce::Label::textColourId, Ui::text);
+    structOrderLabel_.setMinimumHorizontalScale(0.6f);
+    for (juce::Slider* s : { &keySlider_ }) s->setTextBoxStyle(juce::Slider::TextBoxLeft, false, 56, 22);
+
+    for (auto& p : pages_) p = std::make_unique<Page>();
+
+    // ── Oscillator ──
+    {
+        Page& p = *pages_[0];
+        Card wave { "Wave" };
+        wave.rows = { lr(encodeLabel_, encodeBox_), lr(keyLabel_, keySlider_, 150), lr(depthLabel_, depthSlider_), lr(energyLabel_, energySlider_),
+                      lr(offsetLabel_, timeOffsetBox_, 110), lr(oscTkfLabel_, oscTkfSlider_), lr(oscFkfLabel_, oscFkfSlider_) };
+        wave.shown = pcm;
+        p.add(wave);
+        Card loop { "Loop" };
+        loop.head = { { &loopBtn_, 54 }, { &loopModeBox_, 110 } };
+        loop.rows = { lr(loopStartLabel_, loopStartSlider_), lr(loopEndLabel_, loopEndSlider_) };
+        loop.shown = pcm;
+        p.add(loop);
+        Card sync { "Tempo sync" };
+        sync.head = { { &syncBtn_, 62 }, { &tripBtn_, 58 }, { &keepBtn_, 64 } };
+        sync.rows = { lr(origTempoLabel_, origTempoSlider_) };
+        sync.shown = pcm;
+        p.add(sync);
+        Card ana { "Analog oscillator" };
+        ana.sameAs = 0;
+        ana.rows = { lr(anaWaveLabel_, anaWaveBox_) };
+        for (int i = 0; i < kAnaKnobs; i += 2)
+            ana.rows.push_back(Row{ { { &anaLabels_[i], 50 }, { &anaSliders_[i], 0 }, { nullptr, 2 }, { &anaLabels_[i + 1], 50 }, { &anaSliders_[i + 1], 0 } } });
+        ana.shown = [pcm] { return !pcm(); };
+        p.add(ana);
+        Card pitch { "Pitch" };
+        pitch.col = 1;
+        for (int i : { 0, 1, 2, 3 }) pitch.rows.push_back(rowOfLevel(i));
+        p.add(pitch);
+        Card level { "Level" };
+        level.col = 1;
+        for (int i : { 8, 9, 10, 11 }) level.rows.push_back(rowOfLevel(i));
+        p.add(level);
+        Card velo { "Velocity" };
+        velo.col = 1;
+        velo.rows = { rowOfLevel(22), rowOfLevel(23) };
+        p.add(velo);
+    }
+
+    // ── Envelopes: each a shape and its knobs as bars ──
+    {
+        Page& p = *pages_[1];
+        auto envCard = [this](const juce::String& title, std::function<juce::String()> titleFn, int col, juce::Component* headBtn,
+                              std::vector<std::pair<juce::Label*, juce::Slider*>> knobs) {
+            for (auto [l, s] : knobs) {
+                s->setSliderStyle(juce::Slider::LinearBar);
+                s->setColour(juce::Slider::trackColourId, Ui::accent.withAlpha(0.45f));
+                s->setColour(juce::Slider::textBoxOutlineColourId, Ui::line);
+                s->setColour(juce::Slider::textBoxTextColourId, Ui::text);
+                l->setJustificationType(juce::Justification::centred);
+                l->setBorderSize({ 1, 0, 1, 0 });            // a narrow cell: the default's 5 on each side cut "A-Sns" short
+            }
+            auto view = std::make_unique<EnvelopeView>(*knobs[0].second, *knobs[1].second, *knobs[2].second, *knobs[3].second);
+            Card c { title };
+            c.titleFn = std::move(titleFn);
+            c.col = col;
+            if (headBtn) c.head = { { headBtn, 54 } };
+            c.customH = 72;
+            EnvelopeView* v = view.get();
+            v->setVisible(true);
+            c.extra.push_back(v);
+            for (auto [l, s] : knobs) { c.extra.push_back(l); c.extra.push_back(s); }
+            c.custom = [v, knobs](juce::Rectangle<int> a) {
+                v->setBounds(a.removeFromLeft(104).withTrimmedBottom(2));
+                a.removeFromLeft(12);
+                const int cw = (a.getWidth() - 4 * 4) / 5;
+                for (size_t i = 0; i < knobs.size(); ++i) {
+                    const int row = i < 4 || (knobs.size() == 5) ? 0 : 1, colIx = row == 0 ? (int)i : (int)i - 4;
+                    juce::Rectangle<int> cell(a.getX() + colIx * (cw + 4), a.getY() + row * 38, cw, 34);
+                    knobs[i].first->setBounds(cell.removeFromTop(14));
+                    knobs[i].second->setBounds(cell);
+                }
+            };
+            envViews_.push_back(std::move(view));
+            return c;
+        };
+        p.add(envCard("Amp (TVA)", nullptr, 0, &tvaBtn_,
+                      { { &attackLabel_, &attackSlider_ }, { &decayLabel_, &decaySlider_ }, { &sustainLabel_, &sustainSlider_ }, { &releaseLabel_, &releaseSlider_ },
+                        { &aSensLabel_, &aSensSlider_ }, { &dSensLabel_, &dSensSlider_ }, { &rSensLabel_, &rSensSlider_ }, { &kfLabel_, &kfSlider_ } }));
+        const auto ofOsc = [this](const juce::String& name) { return [this, name] { return name + " (OSC " + juce::String(oscK_ + 1) + ")"; }; };
+        p.add(envCard("Pitch", ofOsc("Pitch"), 0, nullptr,
+                      { { &pAttackLabel_, &pAttackSlider_ }, { &pDecayLabel_, &pDecaySlider_ }, { &pSustainLabel_, &pSustainSlider_ },
+                        { &pReleaseLabel_, &pReleaseSlider_ }, { &pDepthLabel_, &pDepthSlider_ } }));
+        p.add(envCard("Time", ofOsc("Time"), 0, nullptr,
+                      { { &tAttackLabel_, &tAttackSlider_ }, { &tDecayLabel_, &tDecaySlider_ }, { &tSustainLabel_, &tSustainSlider_ },
+                        { &tReleaseLabel_, &tReleaseSlider_ }, { &tDepthLabel_, &tDepthSlider_ } }));
+        std::vector<std::pair<juce::Label*, juce::Slider*>> oscEnv, cosmEnv;
+        for (int i = 12; i < 20; ++i) oscEnv.push_back({ &levelLabels_[i], &levelSliders_[i] });
+        for (int i = 28; i < 32; ++i) cosmEnv.push_back({ &levelLabels_[i], &levelSliders_[i] });
+        p.add(envCard("Oscillator", [this] { return "OSC " + juce::String(oscK_ + 1) + " Amp"; }, 1, nullptr, oscEnv));
+        p.add(envCard("Formant", ofOsc("Formant"), 1, nullptr,
+                      { { &fAttackLabel_, &fAttackSlider_ }, { &fDecayLabel_, &fDecaySlider_ }, { &fSustainLabel_, &fSustainSlider_ },
+                        { &fReleaseLabel_, &fReleaseSlider_ }, { &fDepthLabel_, &fDepthSlider_ } }));
+        p.add(envCard("COSM", [this] { return "COSM " + juce::String(cosmK_ + 1); }, 1, nullptr, cosmEnv));
+    }
+
+    // ── LFOs: the OSC's (LFO 1 or 2) and the patch TVA's (LFO 5) ──
+    {
+        Page& p = *pages_[2];
+        Card osc { "LFO" };
+        osc.titleFn = [this] { return oscK_ ? juce::String("LFO 2 (OSC 2)") : juce::String("LFO 1 (OSC 1)"); };
+        osc.head = { { &lfoSyncBtn_, 84 } };
+        osc.rows = { lr(*newLabel("Wave"), lfoWaveBox_), lr(lfoRateLabel_, lfoRateSlider_), lr(lfoDelayLabel_, lfoDelaySlider_),
+                     lr(lfoFadeLabel_, lfoFadeSlider_),
+                     Row{ { { newLabel("Fade mode"), Ui::labelW }, { &lfoModeBox_, 0 }, { &lfoOffsetBox_, 0 } } },
+                     lr(lfoDepthLabel_, lfoDepthSlider_), lr(lfoTimeLabel_, lfoTimeSlider_), lr(lfoFmtLabel_, lfoFmtSlider_) };
+        p.add(osc);
+        Card amp { "Amp LFO (LFO 5)" };
+        amp.col = 1;
+        amp.head = { { &tlfoSyncBtn_, 84 } };
+        amp.rows = { lr(*newLabel("Wave"), tlfoWaveBox_), lr(tvaLabels_[7], tvaSliders_[7]), lr(tvaLabels_[8], tvaSliders_[8]),
+                     lr(tvaLabels_[9], tvaSliders_[9]),
+                     Row{ { { newLabel("Fade mode"), Ui::labelW }, { &tlfoModeBox_, 0 }, { &tlfoOffsetBox_, 0 } } } };
+        p.add(amp);
+    }
+
+    // ── COSM: which section, its type's rows, its LFO, MOD and the Structure ──
+    {
+        Page& p = *pages_[3];
+        Card sel;
+        sel.bare = true;
+        sel.col = -1;
+        sel.rows = { Row{ { { cosmSeg_.get(), 150 }, { &cosmBtn_, 50 }, { nullptr, 4 }, { &cosmTypeLabel_, 36 }, { &cosmTypeBox_, 220 }, { nullptr, 0 } } } };
+        p.add(sel);
+        Card type;
+        type.titleFn = [this] { return "COSM " + juce::String(cosmK_ + 1) + "  " + cosmTypeBox_.getText(); };
+        type.col = -1;
+        type.customH = 3 * 30 - 6;
+        type.custom = [this](juce::Rectangle<int> a) { layoutCosmType(a); };
+        type.extra = { &tvfLabel_, &cosmFilterBox_, &cosmCutLabel_, &cosmCutSlider_, &cosmResoLabel_, &cosmResoSlider_, &cosmKfLabel_, &cosmKfSlider_,
+                       &levelRowLabels_[6], &cosmCutOwnLabel_, &cosmCutOwnSlider_, &cosmResoOwnLabel_, &cosmResoOwnSlider_,
+                       &dualLabel_, &dualTypeBox_, &combOctBox_, &sbOctBox_, &resTypeBox_, &compRowLabel_, &limRowLabel_, &limRatioBox_,
+                       &wsTypeBox_, &odTypeBox_, &ampTypeBox_, &spkRowLabel_, &spkTypeBox_ };
+        for (int i = 24; i < 28; ++i) { type.extra.push_back(&levelLabels_[i]); type.extra.push_back(&levelSliders_[i]); }
+        auto addAll = [&type](juce::Label* labels, juce::Slider* sliders, int n) {
+            for (int i = 0; i < n; ++i) {
+                labels[i].setBorderSize({ 1, 3, 1, 0 });     // narrow cells, as the envelopes': the default's 10 squeezes "Reso", none touches the box before
+                type.extra.push_back(&labels[i]);
+                type.extra.push_back(&sliders[i]);
+            }
+        };
+        for (juce::Label* l : { &cosmCutLabel_, &cosmResoLabel_, &cosmKfLabel_, &cosmCutOwnLabel_, &cosmResoOwnLabel_,
+                                &levelLabels_[24], &levelLabels_[25], &levelLabels_[26], &levelLabels_[27] })
+            l->setBorderSize({ 1, 3, 1, 0 });
+        addAll(dualLabels_, dualSliders_, kDualKnobs);
+        addAll(tbLabels_, tbSliders_, kTbKnobs);
+        addAll(combLabels_, combSliders_, kCombKnobs);
+        addAll(sbLabels_, sbSliders_, kSbKnobs);
+        addAll(resLabels_, resSliders_, kResKnobs);
+        addAll(fsLabels_, fsSliders_, kFsKnobs);
+        addAll(lofiLabels_, lofiSliders_, kLofiKnobs);
+        addAll(compLabels_, compSliders_, kCompKnobs);
+        addAll(limLabels_, limSliders_, kLimKnobs);
+        addAll(wsLabels_, wsSliders_, kWsKnobs);
+        addAll(odLabels_, odSliders_, kWsKnobs);
+        addAll(ampLabels_, ampSliders_, kAmpKnobs);
+        for (juce::Label* rows : { dualRowLabels_, tbRowLabels_, combRowLabels_, resRowLabels_, fsRowLabels_, lofiRowLabels_, wsRowLabels_, odRowLabels_, ampRowLabels_ })
+            for (int r = 0; r < 2; ++r) type.extra.push_back(&rows[r]);
+        for (auto& l : sbRowLabels_) type.extra.push_back(&l);
+        p.add(type);
+        Card lfo { "LFO" };
+        lfo.titleFn = [this] { return cosmK_ ? juce::String("LFO 4 (COSM 2)") : juce::String("LFO 3 (COSM 1)"); };
+        lfo.head = { { &clfoSyncBtn_, 84 } };
+        lfo.rows = { lr(*newLabel("Wave"), clfoWaveBox_), lr(clfoRateLabel_, clfoRateSlider_) };
+        p.add(lfo);
+        Card mod { "MOD" };
+        mod.head = { { &modBtn_, 54 }, { &modTypeBox_, 110 } };
+        mod.rows = { lr(modLevelLabel_, modLevelSlider_), lr(modAttackLabel_, modAttackSlider_), lr(modReleaseLabel_, modReleaseSlider_) };
+        p.add(mod);
+        Card st { "Structure" };
+        st.col = 1;
+        st.rows = { lr(structLabel_, structBox_, 110), Row{ { { &structOrderLabel_, 0 } } } };
+        p.add(st);
+    }
+
+    // ── Amp & Pan: the patch TVA and velocity to level ──
+    {
+        Page& p = *pages_[4];
+        Card lvl { "Patch level" };
+        for (int i = 0; i < 4; ++i) lvl.rows.push_back(lr(tvaLabels_[i], tvaSliders_[i]));
+        p.add(lvl);
+        Card velo { "Velocity" };
+        velo.rows = { rowOfLevel(20), rowOfLevel(21) };
+        p.add(velo);
+        Card pan { "Pan" };
+        pan.col = 1;
+        for (int i = 4; i < 7; ++i) pan.rows.push_back(lr(tvaLabels_[i], tvaSliders_[i]));
+        p.add(pan);
+    }
+
+    // ── Play: portamento, key assign, tuning and tempo ──
+    {
+        Page& p = *pages_[5];
+        Card porta { "Portamento" };
+        porta.head = { { &portaBtn_, 54 } };
+        porta.rows = { lr(*newLabel("Mode"), portaModeBox_), lr(*newLabel("Type"), portaTypeBox_),
+                       lr(portaTimeLabel_, portaTimeSlider_), lr(portaSensLabel_, portaSensSlider_) };
+        p.add(porta);
+        Card keys { "Keys" };
+        keys.head = { { &legatoBtn_, 74 } };
+        keys.rows = { lr(*newLabel("Voices"), *monoSeg_, 140), lr(octLabel_, octSlider_) };
+        p.add(keys);
+        Card tune { "Tune" };
+        tune.col = 1;
+        for (int i : { 4, 5, 6, 7 }) tune.rows.push_back(rowOfLevel(i));
+        p.add(tune);
+        Card tempo { "Tempo" };
+        tempo.col = 1;
+        tempo.rows = { lr(clockLabel_, clockBox_), lr(patchTempoLabel_, patchTempoSlider_), lr(tripLabel_, tripSlider_) };
+        p.add(tempo);
+    }
+
+    // ── Matrix: one Control at a time, and the controller assigns ──
+    {
+        Page& p = *pages_[6];
+        Card m { "Matrix" };
+        m.rows = { lr(matrixLabel_, matrixSelBox_), lr(*newLabel("Source"), matrixSourceBox_),
+                   lr(*newLabel("Destination 1"), matrixDestBox_[0]), lr(matrixSensLabels_[0], matrixSens_[0]),
+                   lr(*newLabel("Destination 2"), matrixDestBox_[1]), lr(matrixSensLabels_[1], matrixSens_[1]) };
+        p.add(m);
+        Card a { "Controller assign" };
+        a.col = 1;
+        a.rows = { lr(assignLabel_, assignSelBox_), lr(*newLabel("Function"), assignBox_) };
+        p.add(a);
+    }
+
+    // What stays on the editor; everything the pages don't take is dropped, so a
+    // new control must go in a card or here (TEST_UI_LAYOUT says if one didn't),
+    // bar the two selector boxes, kept hidden
+    const juce::Array<juce::Component*> chrome { &algoLabel_, &algoBox_, &statusLabel_, &romButton_, &loadButton_, &fileNameLabel_,
+                                                 &oscOnBtn_, &oscTypeBox_, &pitchSlider_, &pitchLabel_, &timeSlider_, &timeLabel_,
+                                                 &formantSlider_, &formantLabel_, &robotBtn_, &oscSelBox_, &cosmSelBox_, &fxOnBtn_, fxPanel_.get() };
+    for (auto& p : pages_) p->adopt();
+    const juce::Array<juce::Component*> kids(getChildren());
+    for (auto* c : kids)
+        if (!chrome.contains(c)) removeChildComponent(c);
+    oscSelBox_.setVisible(false);
+    cosmSelBox_.setVisible(false);
+    for (juce::Label* l : { &pitchLabel_, &timeLabel_, &formantLabel_ }) l->setJustificationType(juce::Justification::centred);
+
+    tabBar_ = std::make_unique<TabBar>();
+    tabBar_->names = { "Oscillator", "Envelopes", "LFOs", "COSM", "Amp & Pan", "Play", "Matrix", "Effects" };
+    tabBar_->onChange = [this](int t) { showTab(t); };
+    tabBar_->setComponentID("tabs");                 // for PluginTest
+    addAndMakeVisible(*tabBar_);
+    addAndMakeVisible(*oscSeg_);
+    for (auto& p : pages_) addChildComponent(*p);
+    showTab(0);
+}
+
+// ─── File chooser ────────────────────────────────────────────────────────────
+
+void VSynthEmuEditor::openFileChooser() {
+    fileChooser_ = std::make_unique<juce::FileChooser>(
+        "Load audio file",
+        juce::File::getSpecialLocation(juce::File::userHomeDirectory),
+        processor_.getFormatManager().getWildcardForAllFormats());
+
+    fileChooser_->launchAsync(
+        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [this](const juce::FileChooser& fc)
+        {
+            auto result = fc.getResult();
+            if (result.existsAsFile())
+            {
+                processor_.loadFile(result, oscK_);
+                showFileName();
+            }
+        });
+}
+
+// The selected OSC's wave: Load loads into that OSC.
+void VSynthEmuEditor::showFileName() {
+    const juce::String name = processor_.hasFileLoaded(oscK_) ? processor_.getLoadedFileName(oscK_) : juce::String("No file loaded");
+    fileNameLabel_.setText(oscK_ ? "OSC 2: " + name : name, juce::dontSendNotification);
 }
 
 // ─── Combo box ───────────────────────────────────────────────────────────────
