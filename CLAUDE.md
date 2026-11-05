@@ -22,7 +22,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## Where things are
 - `plugin/Source/`: `XtFxChip` (the effect chip; `xt_fx`), `XtFxControl` (the firmware's effect driver in the interpreter, off the audio thread, feeding the chip through a queue; and `XtFxUnit`, the two with the frame's way through, in the sound behind the plugin's Effects switch; `xt_fx control`), `FxPanel` (the editor's page for them, by `xtFxCatalog`'s names and ranges from rom.2, and `XtFxValueText`, each value's text by the firmware's own routine), `XtSynth` (the synth: voices, controls, tick), the ports
   (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`,
-  `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFiles` (V-Synth's wave and patch files) and `XtVpwFormat` (a `.vpw` as a JUCE format), `XtFirmware` (firmware harness: runs
+  `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFiles` (V-Synth's wave and patch files), `XtPatch` (a patch's zone as `XtSynth::Controls`) and `XtVpwFormat` (a `.vpw` as a JUCE format), `XtFirmware` (firmware harness: runs
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
   `PluginEditor`. Each port's firmware check is its `XT_*_MAIN` block; `XtToneCheck`
   (`XT_TONE_MAIN`) is XtSynth's: a whole firmware tone against it.
@@ -36,7 +36,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   vs baseline, A/B renders vs `rev` (default HEAD), plugin build, PluginTest, the same through the chip,
   the effects' panel, the editor's layout, engine tests, auval. Run it for every version; `--full` before a push.
 - `fcheck.sh [--update] [--full]`: every firmware harness on fixed cases against
-  `fcheck_baseline.txt`, side by side. A section is reused when its binary, command,
+  `fcheck_baseline.txt`, side by side. In a worktree set `PY` to the main checkout's `.venv/bin/python3`. A section is reused when its binary, command,
   ROM and inputs are those of a run that matched the baseline (`build/tools/fcheck/kept`
   in the main checkout, shared by the worktrees); `--full` runs them all. `--update`
   only when adding checks/cases on purpose, and read its diff: in a worktree with no `analysis/projects` link it runs without the project's waves and quietly loses their 28 lines.
@@ -62,7 +62,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=tonecosm`: xt_tone, XtCosm.cpp; `PORT=toneanalog`: xt_tone, XtAnalog.cpp;
   `PORT=toneband`: xt_tone, XtMultiBandPlayer.cpp; `PORT=tonecheck`: xt_tone,
   XtToneCheck.cpp; `PORT=tonefw`: xt_tone, XtFirmware.cpp; `PORT=toneosc`: xt_tone, XtOsc.cpp; `PORT=tonelfo`: xt_tone, XtLfo.cpp;
-  `PORT=toneenv`: xt_tone, XtEnvelope.cpp; `PORT=tonesolo`: xt_tone, XtSoloVoice.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
+  `PORT=toneenv`: xt_tone, XtEnvelope.cpp; `PORT=tonesolo`: xt_tone, XtSoloVoice.cpp; `PORT=tonepatch`: xt_tone, XtPatch.cpp; `PORT=tonefiles`: xt_tone, XtFiles.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
   solocmp on the baseline's cases, XtSoloVoice.cpp; `PORT=enc`: xt_enc on the baseline's waves, XtSoloEncoder.cpp)
   and runs it, to show the check catches it (a run the error crashes counts). `mutate_tone.py [cases]`: the list in
   `tone_muts.txt` (`name|old|new[|port[|seed]]`; port `solo` for what only `solocmp` reaches; seed for what the default seed's cases don't reach), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
@@ -79,6 +79,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   symbolic run of its disassembly (written for the Frequency Shifter's FIR).
 - `sh4dis.py <addr> <n> ...`: a linear SH-4 listing of rom.2, no Ghidra. Ghidra's project won't open under a path holding `.claude`, so
   `ghidra.sh` fails in a worktree; run `analyzeHeadless` on the main checkout's `firmware/ghidra` instead.
+- `xt_tone` opens with every zone of the image's patches against `patchOf`, then runs 512 of them and random cases on tuned waves through the whole tone; `XT_TONE_PATCHES=<folder>` for a project's. `TEST_PATCH_APPLY=1` (`pt.sh`'s binary; `TEST_PATCH_DIR=<folder>` besides): the same through the plugin's parameters, and a project on disk. `TEST_SNAPSHOT_PATCH=file.p00` draws the editor with one loaded. `TEST_PATCH_PLAY=<folder>` (`TEST_PATCH_EVERY=n`) loads and plays a project's patches, with each one's peak and what isn't here.
 - `xt_files <rom>` (in fcheck, about 8 s; `build/tools/fcheck/bin`): the disk image's preset waves against the firmware's whole-wave routines and its patches' values against its reads; `XT_FILES_FIRST=1` says what differs. `wave <file.vpw> [out.raw]`, `patch <file.p00> [lo hi]`, `extract <n> <out.vpw>`. `mutate_files.py [names]`: the planted errors in `files_muts.txt`, through `PORT=files` or `PORT=filesfw mutate.sh`, about 10 minutes.
 - `fxmap.cpp` (not in build.sh; build line at its top): the firmware's effect driver in the interpreter. `table`: per type, program, active words, what
   an update writes, memory operations. `mfx <type> [i v]`: a type's words as fields, and what wrote each. `boot`: what's loaded. Output goes in `build/`.
@@ -102,6 +103,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - Before a push: `verify.sh --full`.
 
 ## Firmware facts worth knowing
+- Applying a patch (HARDWARE_FIRMWARE.md, "Applying a patch"; `XtPatch`, `VSynthEmuProcessor::loadPatch`): a new `Controls` field read from a patch needs its line there as well as in `patchOf`, and `setControls` beside `xtControls`. A wave's own fine tuning (`vplp` +0, up to 14 semitones in real waves) is on `XtEncoded`, not a control: it reaches the pitch, the root, the formant ratio and the walk. A patch holds only its type's parameters, read by slot (`xtPatchTyped`). Not done: Vari off, zones past the first, Playback Mode, Start Offset, arpeggio, Multi Step Modulator; `xtPatchMissing` says which a patch asks for.
 - V-Synth's files (HARDWARE_FIRMWARE.md, "V-Synth's files"; `XtFiles`): a `.vpw`'s audio is RDAC-packed, unpacked by the firmware's block routine, and the plugin plays one. A `.p00` is in a file layout: the firmware's defaults under it, then `0x8947dae0`, give the store the descriptors (12 bytes an ID: offset, width, bit, centre, default, min, max) read. Applying a patch to the plugin isn't done. The disk image's files are fragmented, so go through its FAT; 416 preset waves follow its partition, in no file.
 - rom.2 maps at 0x89300000; .data/.bss up to 0x8a020000 (the interpreter sets
   them up). Calls take r4–r7, then the stack; `Sh4::call(addr, {args}, sp)`.

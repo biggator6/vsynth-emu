@@ -55,6 +55,65 @@ const XtParamDesc* xtParamDesc(int id) {
     return id >= 0 && id < (int)t.size() ? &t[(size_t)id] : nullptr;
 }
 
+// The second bank: 8 bytes an ID from 0x897a56d8, s16 slot, default, min, max.
+const XtTypedDesc* xtTypedDesc(int id) {
+    static constexpr int kTypedIds = 0x8d0 + 0x85 - kDescIds;   // to the COSMs' last, 0x954
+    static std::mutex lock;
+    static std::vector<XtTypedDesc> table;
+    const std::lock_guard<std::mutex> hold(lock);
+    if (table.empty() && !xtFwRomPath().empty()) {
+        if (FILE* f = std::fopen(xtFwRomPath().c_str(), "rb")) {
+            std::vector<uint8_t> raw(8 * (size_t)kTypedIds);
+            if (std::fseek(f, 0x897a56d8 - 0x89300000, SEEK_SET) == 0 && std::fread(raw.data(), 1, raw.size(), f) == raw.size()) {
+                table.resize(kTypedIds);
+                for (int i = 0; i < kTypedIds; ++i) {
+                    const uint8_t* p = &raw[8 * (size_t)i];
+                    const auto s16 = [p](int at) { return (int)(int16_t)(p[at] | p[at + 1] << 8); };
+                    table[(size_t)i] = { p[0], s16(2), s16(4), s16(6) };   // the slot is a byte to 0x89481d70
+                }
+            }
+            std::fclose(f);
+        }
+    }
+    const int at = id - kDescIds;
+    return at >= 0 && at < (int)table.size() ? &table[(size_t)at] : nullptr;
+}
+
+int xtPatchTyped(const std::vector<uint8_t>& store, int base, int id, int zone, int cosm) {
+    const XtTypedDesc* d = xtTypedDesc(id);
+    if (!d) return 0;
+    const int v = xtPatchValue(store, base + d->slot, zone, cosm);
+    return v < d->min || v > d->max ? d->def : v;
+}
+
+int xtEffectTypes(int block) { return block == 0 ? 42 : block == 1 ? 9 : block == 2 ? 11 : block == 3 ? 17 : 0; }
+
+bool xtEffectTypeIds(int block, int type, int& first, int& last) {
+    if (type < 0 || type >= xtEffectTypes(block)) return false;
+    static constexpr long kTables[4] = { 0x897a8218 - 0x89300000, 0x897a82e4 - 0x89300000, 0x897a8310 - 0x89300000, 0x897cebd8 - 0x89300000 };
+    static std::mutex lock;
+    static std::vector<int16_t> tables[4];
+    const std::lock_guard<std::mutex> hold(lock);
+    if (tables[block].empty()) {
+        FILE* f = xtFwRomPath().empty() ? nullptr : std::fopen(xtFwRomPath().c_str(), "rb");
+        if (!f) return false;
+        std::vector<uint8_t> raw(4 * (size_t)xtEffectTypes(block));
+        const bool ok = std::fseek(f, kTables[block], SEEK_SET) == 0 && std::fread(raw.data(), 1, raw.size(), f) == raw.size();
+        std::fclose(f);
+        if (!ok) return false;
+        for (size_t i = 0; i + 1 < raw.size(); i += 2) tables[block].push_back((int16_t)(raw[i] | raw[i + 1] << 8));
+    }
+    first = tables[block][2 * (size_t)type];
+    last = tables[block][2 * (size_t)type + 1];
+    return true;
+}
+
+int xtPatchZones(const std::vector<uint8_t>& store) {
+    for (int z = 0; z < 16; ++z)
+        if (xtPatchValue(store, 0x124 + z) >= 127) return z + 1;
+    return 16;
+}
+
 int xtPatchSection(int id, int zone, int cosm) {
     for (const Section& s : kSections)
         if (id >= s.first && id <= s.last)
@@ -88,7 +147,8 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
     out = {};
     const uint8_t* vpfl = nullptr; const uint8_t* vpsc = nullptr; const uint8_t* vplp = nullptr; const uint8_t* data = nullptr;
     uint32_t nFl = 0, nSc = 0, nLp = 0, nData = 0;
-    size_t i = 0;
+    // A project's .wav is a RIFF round the same chunks
+    size_t i = size >= 12 && !std::memcmp(file, "RIFF", 4) && !std::memcmp(file + 8, "WAVE", 4) ? 12 : 0;
     while (i + 8 <= size && !data) {
         const uint32_t n = le32(file + i + 4);
         if (n > size - i - 8) return fail(why, "a chunk runs past the end");
@@ -101,13 +161,34 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
     }
     out.size = i < size ? i : size;
     if (!vpfl || nFl < 44 || !vpsc || nSc < 8 || !data) return fail(why, "not a V-Synth wave");
-    if (std::memcmp(vpfl + 40, "RDAC", 4)) return fail(why, "not an RDAC wave");
+    const bool linear = !std::memcmp(vpfl + 40, "LINR", 4);
+    if (!linear && std::memcmp(vpfl + 40, "RDAC", 4)) return fail(why, "neither RDAC nor plain samples");
     // 0x8952ee80 checks the data's first two bytes; the next six are nothing the firmware reads.
-    if (nData < 8 || data[0] != 0 || data[1] != 8) return fail(why, "an RDAC wave without its header");
+    if (!linear && (nData < 8 || data[0] != 0 || data[1] != 8)) return fail(why, "an RDAC wave without its header");
     out.encodeType = vpsc[1];
     out.channels = vpsc[2] ? 2 : 1;
     out.frames = (long)le32(vpsc + 4);
-    if (vplp && nLp >= 12) { out.loopStart = (long)le32(vplp + 4); out.loopEnd = (long)le32(vplp + 8); }
+    if (nSc >= 32) {
+        out.originalKey = (int8_t)vpsc[0xa];
+        out.headerCents = (int32_t)le32(vpsc + 0x18);
+        out.tempo = (int32_t)le32(vpsc + 0x1c);
+    }
+    out.loopEnd = out.bwdEnd = out.frames - 1;   // a wave with no loop record: all of it
+    if (vplp && nLp >= 28) {
+        out.tune = (int32_t)le32(vplp);
+        out.loopStart = (long)le32(vplp + 4); out.loopEnd = (long)le32(vplp + 8);
+        out.bwdEnd = (long)le32(vplp + 0xc); out.bwdStart = (long)le32(vplp + 0x10);
+        out.fwdMode = vplp[0x18]; out.bwdMode = vplp[0x19];
+        out.loopSwitchDecides = vplp[0x1a] != 0;
+        out.tuneFine = (int8_t)vplp[0x1b];
+    }
+    if (linear) {
+        const size_t want = (size_t)out.frames * (size_t)out.channels;
+        if (nData / 2 < want) return fail(why, "fewer samples than the header says");
+        out.pcm.resize(want);
+        for (size_t k = 0; k < want; ++k) out.pcm[k] = (int16_t)(data[2 * k] | data[2 * k + 1] << 8);
+        return true;
+    }
     if (!xtFwRdacDecode(data + 8, nData - 8, out.frames, out.channels, out.pcm)) return fail(why, "the firmware's decoder failed (no ROM?)");
     return true;
 }
@@ -368,6 +449,84 @@ int main(int argc, char** argv) {
             }
     }
     if (first) for (int id = 0; id < kDescIds; ++id) if (outBy[(size_t)id]) std::printf("out of range: %03x %ld times\n", id, outBy[(size_t)id]);
+    // A type's parameters, the slots' meaning under the COSMs' and the effects' types, against the firmware's read of them: every type's IDs on one patch in eight, in range or not
+    {
+        long typed = 0, typedDifferent = 0;
+        int nth = 0;
+        for (const auto& entry : patches) {
+            if (nth++ % 8) continue;
+            const auto file = diskImage.read(entry);
+            XtPatchFile p;
+            if (!xtPatchRead(file.data(), file.size(), p)) continue;
+            fw.load(p.store);
+            const auto one = [&](int base, int id, int section, int z, int c) {
+                int fwValue = 0;
+                ++typed;
+                if (!fw.readTyped(section, base, id, fwValue) || fwValue != xtPatchTyped(p.store, base, id, z, c)) {
+                    ++typedDifferent;
+                    if (first && typedDifferent < 20) std::printf("patch %s base %03x id %03x zone %d cosm %d: firmware %d, here %d\n", p.name.c_str(), base, id, z, c, fwValue, xtPatchTyped(p.store, base, id, z, c));
+                }
+            };
+            for (int z = 0; z < 16; z += 5)
+                for (int c = 0; c < 2; ++c)
+                    for (int t = 0; t < xtEffectTypes(3); ++t) {
+                        int lo = 0, hi = -1;
+                        if (!xtEffectTypeIds(3, t, lo, hi)) { ++typedDifferent; continue; }
+                        for (int id = lo; id <= hi; ++id) one(kXtCosmSlots, id, xtPatchSection(kXtCosmSlots, z, c), z, c);
+                    }
+            static constexpr int kBases[3] = { kXtMfxSlots, kXtChorusSlots, kXtReverbSlots };
+            for (int b = 0; b < 3; ++b)
+                for (int t = 0; t < xtEffectTypes(b); ++t) {
+                    int lo = 0, hi = -1;
+                    if (!xtEffectTypeIds(b, t, lo, hi)) { ++typedDifferent; continue; }
+                    for (int id = lo; id <= hi; ++id) one(kBases[b], id, xtPatchSection(kBases[b]), 0, 0);
+                }
+        }
+        std::printf("typed: %ld values against the firmware's read, %ld different\n", typed, typedDifferent);
+        different += typedDifferent;
+    }
+    // A project's wave: a RIFF round the chunks, its audio plain samples.  And what a wave says of itself, put in its chunks and read back
+    {
+        int bad = 0;
+        XtWaveFile w;
+        const size_t at = waves[0];
+        if (xtWaveRead(&disk[at], disk.size() - at, w)) {
+            std::vector<uint8_t> stream(disk.begin() + (long)at, disk.begin() + (long)(at + w.size));
+            const auto chunkAt = [&](const char* tag) { for (size_t i = 0; i + 8 < stream.size(); ++i) if (!std::memcmp(&stream[i], tag, 4)) return i; return (size_t)0; };
+            const auto put = [&](size_t a, uint32_t v) { for (int k = 0; k < 4; ++k) stream[a + (size_t)k] = (uint8_t)(v >> (8 * k)); };
+            const size_t sc = chunkAt("vpsc") + 8, lp = chunkAt("vplp") + 8, fl = chunkAt("vpfl") + 8, da = chunkAt("data");
+            stream[sc + 0xa] = 65; put(sc + 0x18, 15); put(sc + 0x1c, 999991);
+            put(lp, (uint32_t)-1234); put(lp + 4, 11); put(lp + 8, 2222); put(lp + 0xc, 333); put(lp + 0x10, 44);
+            stream[lp + 0x18] = 2; stream[lp + 0x19] = 0; stream[lp + 0x1a] = 0; stream[lp + 0x1b] = (uint8_t)(int8_t)-7;
+            XtWaveFile back;
+            const auto same = [&](const XtWaveFile& b) {
+                return b.originalKey == 65 && b.headerCents == 15 && b.tempo == 999991 && b.tune == -1234 && b.loopStart == 11 && b.loopEnd == 2222 && b.bwdEnd == 333 && b.bwdStart == 44
+                    && b.fwdMode == 2 && b.bwdMode == 0 && !b.loopSwitchDecides && b.tuneFine == -7 && b.frames == w.frames && b.channels == w.channels && b.encodeType == w.encodeType;
+            };
+            if (!xtWaveRead(stream.data(), stream.size(), back) || !same(back) || back.pcm != w.pcm) ++bad;
+            // The RIFF: the chunks up to data, LINR for RDAC, and the samples
+            std::vector<uint8_t> riff = { 'R','I','F','F',0,0,0,0,'W','A','V','E','f','m','t',' ',16,0,0,0, 1,0,(uint8_t)w.channels,0, 0x44,0xac,0,0, 0,0,0,0, 4,0,16,0 };
+            std::vector<uint8_t> head(stream.begin(), stream.begin() + (long)da);
+            std::memcpy(&head[fl + 40], "LINR", 4);
+            riff.insert(riff.end(), head.begin(), head.end());
+            const uint32_t bytes = (uint32_t)w.pcm.size() * 2;
+            const uint8_t tag[8] = { 'd','a','t','a',(uint8_t)bytes,(uint8_t)(bytes >> 8),(uint8_t)(bytes >> 16),(uint8_t)(bytes >> 24) };
+            riff.insert(riff.end(), tag, tag + 8);
+            for (int16_t x : w.pcm) { riff.push_back((uint8_t)x); riff.push_back((uint8_t)((uint16_t)x >> 8)); }
+            if (!xtWaveRead(riff.data(), riff.size(), back) || !same(back) || back.pcm != w.pcm) ++bad;
+            // Plain WAVs aren't this, nor is a wave cut short
+            XtWaveFile none;
+            const std::vector<uint8_t> plain = { 'R','I','F','F',36,0,0,0,'W','A','V','E','f','m','t',' ',16,0,0,0, 1,0,1,0, 0x44,0xac,0,0, 0,0,0,0, 2,0,16,0, 'd','a','t','a',0,0,0,0 };
+            if (xtWaveRead(plain.data(), plain.size(), none)) ++bad;
+            std::vector<uint8_t> shortRiff(riff.begin(), riff.end() - 4);
+            std::memcpy(&shortRiff[shortRiff.size() - bytes + 4 - 8], tag, 8);   // the same header
+            const uint32_t less = bytes - 4;
+            for (int k = 0; k < 4; ++k) shortRiff[shortRiff.size() - less - 4 + (size_t)k] = (uint8_t)(less >> (8 * k));
+            if (xtWaveRead(shortRiff.data(), shortRiff.size(), none)) ++bad;
+        } else ++bad;
+        std::printf("a wave's own: %d wrong\n", bad);
+        different += bad;
+    }
     std::printf("patches: %d in the image (lengths 0x146c %d, 0x14ac %d, 0x14f2 %d, other %d), %d names read alike, %ld values, %ld out of range, %ld against the firmware's reads, %ld different, hash %016llx\n",
                 nPatches, sizes[0], sizes[1], sizes[2], sizes[3], named, values, outOfRange, compared, different, (unsigned long long)storeHash);
     // An older patch, shorter: a real one that uses the Multi Step Modulator, cut before and after it.  Before, it must come out as a

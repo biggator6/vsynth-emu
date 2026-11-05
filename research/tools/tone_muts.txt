@@ -5,13 +5,13 @@ voice-end|if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent)|if (v.
 lfo-pitch-depth|std::clamp(o.lfoPitchDepth + v.mx[dL + 1], -63, 63)|std::clamp(o.lfoTimeDepth + v.mx[dL + 1], -63, 63)
 penv-depth|xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63))|xtPitchDepthCents((float)std::clamp(o.tDepth, -63, 63))
 root-key|s.analog ? 69 : o.rootKey|s.analog ? 60 : o.rootKey
-formant-env|s.fenv.level(),\n                          xtOscFormantEnvDepth|s.tenv.level(),\n                          xtOscFormantEnvDepth
+formant-env|s.fenv.level(),\n                          withVel(xtOscFormantEnvDepth|s.tenv.level(),\n                          withVel(xtOscFormantEnvDepth
 time-kf|xtOscTime(o.oscTime, o.oscTimeOffset, o.oscTimeKF, v.note,|xtOscTime(o.oscTime, o.oscTimeOffset, o.oscFormantKF, v.note,
 energy|g = xtOscEnergy(o.energy);|g = xtOscEnergy(o.energy / 2);
 level-kf|Osc2)], o.oscLevelKF, v.note,|Osc2)], 0, v.note,
 level-vel|xtVelGain(v.vel, o.oscVelSens, o.oscVelCurve)|xtVelGain(v.vel, ctl.ampVelSens, o.oscVelCurve)
 level-lfo|xtOscLevelLfoDepth(o.oscLevelLfoDepth + v.mx[|xtOscLevelLfoDepth(o.lfoPitchDepth + v.mx[
-osc2-flag|o.waveGain, 1.0f, 1.0f, &s == &v.osc2, m)|o.waveGain, 1.0f, 1.0f, false, m)
+osc2-flag|xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve), &s == &v.osc2, m)|xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve), false, m)
 gain-start|s.curGain = gainTarget(v, s, o, s.oenv.level());                                                  // +0x154 (0x894f3dc0)|s.curGain = gainStart;
 ana-env-swap|s.curGain, gainStart, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared)|s.curGain, gainStart, s.tenv.level(), s.fenv.level(), s.lfo.out(), anaShared)
 ana-update-swap|s.ana.update(analogBlock(v, s, o), A, gt, s.fenv.level(), s.tenv.level(), s.lfo.out());|s.ana.update(analogBlock(v, s, o), A, gt, s.tenv.level(), s.fenv.level(), s.lfo.out());
@@ -68,7 +68,7 @@ cosm-amp|p.bass = c.ampBass; p.middle = c.ampMiddle;|p.bass = c.ampMiddle; p.mid
 cosm-spk|c.spk.noteOn({ ctl.cosm[k].spkType });|c.spk.noteOn({ 0 });
 cosm-lfo|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], v->blockTempo);|if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[6], v->blockTempo);
 cosm-update-env|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envA.level(), c.envA.smooth(), c.envB.level(), c.envB.smooth(),|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envB.level(), c.envB.smooth(), c.envA.level(), c.envA.smooth(),
-cosm-comb-root|s.robot \|\| s.analog \|\| !s.on);|s.robot \|\| !s.on);
+cosm-comb-root|s.robot \|\| s.analog \|\| !s.on, tune.offset, tune.detune);|s.robot \|\| !s.on, tune.offset, tune.detune);
 robot-any|v->robot = ctl.robot && v->on && !v->analog && v->wave->type == 1;|v->robot = ctl.robot && v->on && !v->analog;
 loop-mode|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 2);|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 1);
 loop-switch|l.on = o.loop;|l.on = false;
@@ -662,7 +662,7 @@ solo-anchor-end|if (anchor < recEnd) return;|if (anchor <= recEnd) return;|solo
 solo-anchor-start|if (!(recStart > anchor)) return;|if (!(recStart >= anchor)) return;|tonesolo
 solo-wrap-past|if (recEnd > Pq && budget > 0.0) {|if (recEnd >= Pq && budget > 0.0) {|tonesolo
 solo-wrap-past-b|if (Pq >= recStart && budget > 0.0) {|if (Pq > recStart && budget > 0.0) {|tonesolo
-solo-wrap-end|    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;\n||tonesolo|9
+solo-wrap-end|    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;\n||tonesolo|6
 solo-skip|if (!(budget > 0.0) \|\| !(Pq >= recEnd)) return;|return;|tonesolo
 solo-skip-b|if (!(budget > 0.0) \|\| !(recStart > Pq)) return;|return;|tonesolo
 solo-last-len|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 8.0; }|tonesolo
@@ -794,3 +794,48 @@ xy-plus-zero|        if (x == 0) return 0;\n        return x >= 64 ?|        ret
 xy-plus-side|return x >= 64 ? value((x - 64) * 127 / 63) : -value((64 - x) * 127 / 63);|return x >= 64 ? value((x - 64) * 127 / 63) : value((64 - x) * 127 / 63);|toneosc
 xy-plus-off|        if (n == 0 \|\| n == 32) return 0;\n        const int x = in.cc[n];\n|        const int x = in.cc[n];\n|toneosc
 xy-inputs|in.assign[i] = std::clamp(ctl.assign[4 + i], 0, 95);|in.assign[i] = std::clamp(ctl.assign[i], 0, 95);|tone
+tune-offset|t.offset = add(flt(headerCents), mul(flt(fine), hundredth));|t.offset = add(flt(headerCents), mul(flt(-fine), hundredth));|toneosc
+tune-header|t.offset = add(flt(headerCents), mul(flt(fine), hundredth));|t.offset = mul(flt(fine), hundredth);|toneosc
+tune-detune|t.detune = mul(flt(tune), hundredth);|t.detune = mul(flt(-tune), hundredth);|toneosc
+tune-factor|t.factor = f > 0.0f ? f : 1.0f;|t.factor = 1.0f;|toneosc
+tune-walk|return mul(w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w), waveFactor);|return w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w);|toneosc
+tune-walk-clamp|return mul(w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w), waveFactor);|const float y = mul(w, waveFactor); return y > 5.0f ? 5.0f : (-5.0f > y ? -5.0f : y);|toneosc
+tune-formant|return mul(r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r), waveFactor);|return r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r);|toneosc
+tune-robot|const bool tuned = !s.robot;|const bool tuned = true;|tone
+tune-robot-factor|xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]), tune.factor);|xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]), tuned ? tune.factor : 1.0f);|tone
+tune-pitch-offset|tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);|0.0f, 1.0f, tuned ? tune.detune : 0.0f);|tone
+tune-pitch-detune|tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);|tuned ? tune.offset : 0.0f, 1.0f, 0.0f);|tone
+tune-time|xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), tune.factor);|xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]));|tone
+tune-root|s.robot \|\| s.analog \|\| !s.on, tune.offset, tune.detune);|s.robot \|\| s.analog \|\| !s.on);|tone
+loop-bwd-mode|l.bwdMode = std::clamp(s.wave->bwdMode, 0, 2);|l.bwdMode = l.fwdMode;|tone
+loop-bwd-start|l.bwdStart = s.wave->bwdStart;|l.bwdStart = a;|tone
+loop-bwd-end|l.bwdEnd = s.wave->bwdEnd;|l.bwdEnd = b;|tone
+envvel-pitch|withVel(xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63)), o.pVel)|xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63))|tone
+envvel-pitch-which|withVel(xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63)), o.pVel)|withVel(xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63)), o.tVel)|tone
+envvel-time|withVel(xtOscTimeEnvDepth(o.tDepth), o.tVel)|xtOscTimeEnvDepth(o.tDepth)|tone
+envvel-formant|withVel(xtOscFormantEnvDepth(o.fDepth), o.fVel)|xtOscFormantEnvDepth(o.fDepth)|tone
+envvel-analog|xtCosmVelocity(v.vel, o.fVel.sens, o.fVel.curve), xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve)|xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve), xtCosmVelocity(v.vel, o.fVel.sens, o.fVel.curve)|tone
+envvel-times|k.aSens = e.aSens; k.dSens = e.dSens; k.rSens = e.rSens; k.timeKF = e.timeKF;|k.aSens = e.aSens; k.dSens = e.dSens; k.rSens = e.rSens;|tone
+envvel-which|const OscControls::EnvVelocity& e = which == 0 ? o.pVel : which == 1 ? o.tVel : o.fVel;|const OscControls::EnvVelocity& e = which == 0 ? o.pVel : which == 1 ? o.fVel : o.tVel;|tone
+envvel-live|n.pRelease != o.pRelease \|\| n.pVel != o.pVel;|n.pRelease != o.pRelease;|tone
+patch-kf|o.pitchKF = 10 * p(b + 4);|o.pitchKF = p(b + 4);|tonepatch
+patch-coarse|o.oscCoarse = p(b + 7); o.oscFine = p(b + 8);|o.oscCoarse = p(b + 8); o.oscFine = p(b + 7);|tonepatch
+patch-osc2|const int b = 0x2a4 + 0x34 * n;|const int b = 0x2a4;|tonepatch
+patch-envs|const EnvIds pe = envIds(e), te = envIds(e + 1), fe = envIds(e + 2), oe = envIds(e + 3);|const EnvIds pe = envIds(e), te = envIds(e + 2), fe = envIds(e + 1), oe = envIds(e + 3);|tonepatch
+patch-sens|int aSens() const { return base + 8; }|int aSens() const { return base + 9; }|tonepatch
+patch-lfo|lfoOf(p, 0x3be + 8 * n, o.lfoWave|lfoOf(p, 0x3be + 8 * (n + 1), o.lfoWave|tonepatch
+patch-mono|c.mono = p(0x113) == 0;|c.mono = p(0x113) != 0;|tonepatch
+patch-external|o.on = p(b) != 0 && type != kExternal;|o.on = p(b) != 0;|tonepatch
+patch-cosm-map|{ 0, 13, 12, 14, 15, 7, 5, 6, 4, 2, 0, 1, 10, 11, 8, 9, 3 }|{ 0, 12, 13, 14, 15, 7, 5, 6, 4, 2, 0, 1, 10, 11, 8, 9, 3 }|tonepatch
+patch-cosm-kf|kf(c.tbHpfKf);|;|tonepatch
+patch-cosm-order|&c.wsDrive, &c.wsDriveEnv, &c.wsDriveLfo,|&c.wsDrive, &c.wsDriveLfo, &c.wsDriveEnv,|tonepatch
+patch-cosm-second|c.on = xtPatchValue(store, 0x3e7, zone, k) != 0|c.on = xtPatchValue(store, 0x3e7, zone, 0) != 0|tonepatch
+patch-cosm-envb|cosmEnvOf(p, 9 + 2 * k, c.envB);|cosmEnvOf(p, 8 + 2 * k, c.envB);|tonepatch
+patch-cosm-lfo|lfoOf(p, 0x3be + 8 * (2 + k), c.lfoWave|lfoOf(p, 0x3be + 8 * (2 + 0), c.lfoWave|tonepatch
+patch-tva-lfo|lfoOf(p, 0x3de, c.tvaLfoWave|lfoOf(p, 0x3d6, c.tvaLfoWave|tonepatch
+patch-matrix|c.matrix[i].dest[1] = p(b + 3); c.matrix[i].sens[1] = p(b + 4);|c.matrix[i].dest[1] = p(b + 4); c.matrix[i].sens[1] = p(b + 3);|tonepatch
+patch-amp-env|const EnvIds a = envIds(12);|const EnvIds a = envIds(11);|tonepatch
+patch-tempo|c.patchTempo = p(0x11d);|c.patchTempo = p(0x11c);|tonepatch
+patch-fx-other|d->def });|xtPatchTyped(store, kBlocks[b].slots, id) });|tonepatch
+patch-fx-slots|{ 0x1fc, kXtChorusSlots }|{ 0x1fc, kXtMfxSlots }|tonepatch
+patch-fx-switch|{ 0x120, 0x121, 0x122, 0x177,|{ 0x120, 0x121, 0x177,|tonepatch

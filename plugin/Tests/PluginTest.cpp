@@ -6,9 +6,12 @@
 #include "../Source/PluginEditor.h"
 #include "../Source/FxPanel.h"
 #include "../Source/Sh4Interp.h"
+#include "../Source/XtPatch.h"
 #include "../Source/XtVpwFormat.h"
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <climits>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <map>
 #include <set>
@@ -90,11 +93,259 @@ static int romSearchTest(const juce::File& rom, const juce::File& appDir) {
     return 0;
 }
 
+// TEST_PATCH_APPLY=1: every zone of every patch in the firmware's image through the parameters and the effects, and back through what the processor plays from; then a
+// project on disk, a patch and its wave made from the image's, with a tuning and a loop of its own, against XtSynth driven directly (VSynthEmuTest alone: it stops there).
+// TEST_PATCH_DIR: a folder of .p00 besides, not in verify.sh.
+static int patchApplyTest(const juce::File& rom) {
+    VSynthEmuProcessor p;
+    if (!p.setRomFile(rom)) { std::fprintf(stderr, "ROM rejected\n"); return 1; }
+    int checks = 0, failed = 0;
+    const auto check = [&](bool ok, const juce::String& what) { ++checks; if (!ok && ++failed <= 20) std::fprintf(stderr, "patch apply: %s\n", what.toRawUTF8()); };
+    XtDiskImage disk;
+    if (!disk.open(rom.getSiblingFile("V-SynthXTDiskImage.bin.0.bin").getFullPathName().toStdString())) { std::fprintf(stderr, "patch apply: no disk image beside the ROM\n"); return 1; }
+    std::vector<std::vector<uint8_t>> files;
+    for (const auto& e : disk.list("Internal.prj/Patch")) files.push_back(disk.read(e));
+    if (const char* dir = std::getenv("TEST_PATCH_DIR"))
+        for (const auto& f : juce::File(juce::String::fromUTF8(dir)).findChildFiles(juce::File::findFiles, false, "*.p00")) {
+            juce::MemoryBlock m;
+            f.loadFileAsData(m);
+            files.emplace_back(static_cast<const uint8_t*>(m.getData()), static_cast<const uint8_t*>(m.getData()) + m.getSize());
+        }
+    int zonesDone = 0;
+    long fxValues = 0;
+    for (const auto& f : files) {
+        XtPatchFile patch;
+        if (!xtPatchRead(f.data(), f.size(), patch)) { check(false, "a patch that won't read"); continue; }
+        for (int z = 0; z < xtPatchZones(patch.store); ++z) {
+            const XtSynth::Controls want = xtPatchControls(patch.store, z, p.currentControls());
+            p.applyPatch(patch.name, patch.store, z, juce::File());
+            const XtSynth::Controls got = p.currentControls();
+            check(got == want, juce::String(patch.name) + " zone " + juce::String(z) + ": the controls differ");
+            ++zonesDone;
+        }
+        check(p.getPatchName() == juce::String(patch.name), "its name");
+        for (const auto& fx : xtPatchEffects(patch.store)) {
+            int knob = INT_MIN;
+            for (const char* id : { "fxMfxOn", "fxChoOn", "fxRevOn", "fxMfxType", "fxMfxMaster", "fxMfxCho", "fxMfxRev", "fxChoType", "fxChoMaster", "fxChoRev", "fxRevType", "fxRevMaster" })
+                if (VSynthEmuProcessor::fxKnobId(id) == fx.id) knob = (int)std::lround(p.apvts.getRawParameterValue(id)->load());
+            const int got = knob != INT_MIN ? knob : p.fxParam(fx.id, INT_MIN);
+            ++fxValues;
+            check(got == fx.value, juce::String(patch.name) + ": effect ID " + juce::String::toHexString(fx.id) + " is " + juce::String(got) + ", the patch says " + juce::String(fx.value));
+        }
+    }
+
+    // A project.  The wave: a preset wave of the image's, its own settings put in its chunks
+    const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile("vse-patchtest", "");
+    struct Tidy { juce::File f; ~Tidy() { f.deleteRecursively(); } } tidy { dir };
+    const auto patchDir = dir.getChildFile("Patch"), waveDir = dir.getChildFile("Wave");
+    patchDir.createDirectory(); waveDir.createDirectory();
+    std::vector<uint8_t> chosen;
+    XtPatchFile patch;
+    int number = 0;
+    for (const auto& f : files) {
+        XtPatchFile t;
+        if (!xtPatchRead(f.data(), f.size(), t)) continue;
+        if (xtPatchValue(t.store, 0x2a4) && xtPatchValue(t.store, 0x2a5) == 1 && xtPatchWaveNumber(t.store, 0, 0) > 0 && xtPatchValue(t.store, 0x2d9) != 1) { chosen = f; patch = t; number = xtPatchWaveNumber(t.store, 0, 0); break; }
+    }
+    if (chosen.empty()) { std::fprintf(stderr, "patch apply: no patch with a wave on OSC 1\n"); return 1; }
+    const auto presets = disk.presetWaves();
+    XtWaveFile stream;
+    if (presets.empty() || !xtWaveRead(&disk.bytes()[presets[0]], disk.bytes().size() - presets[0], stream)) { std::fprintf(stderr, "patch apply: no preset wave\n"); return 1; }
+    std::vector<uint8_t> waveBytes(disk.bytes().begin() + (long)presets[0], disk.bytes().begin() + (long)(presets[0] + stream.size));
+    const auto chunk = [&](const char* tag) { for (size_t i = 0; i + 8 < waveBytes.size(); ++i) if (!std::memcmp(&waveBytes[i], tag, 4)) return i + 8; return (size_t)0; };
+    const auto put32 = [&](size_t at, int32_t v) { for (int i = 0; i < 4; ++i) waveBytes[at + (size_t)i] = (uint8_t)((uint32_t)v >> (8 * i)); };
+    const size_t sc = chunk("vpsc"), lp = chunk("vplp");
+    const long last = stream.frames - 1;
+    const int loopA = (int)(last / 3), loopB = (int)(last * 3 / 4), bwdA = (int)(last / 5), bwdB = (int)(last / 2);
+    waveBytes[sc + 0xa] = 65;                 // the Original Key
+    put32(sc + 0x18, 15);                     // cents
+    put32(sc + 0x1c, 999991);                 // the Original Tempo
+    put32(lp, 55534);                         // 5.55 semitones
+    put32(lp + 4, loopA); put32(lp + 8, loopB); put32(lp + 0xc, bwdB); put32(lp + 0x10, bwdA);
+    waveBytes[lp + 0x18] = 2; waveBytes[lp + 0x19] = 1;
+    waveBytes[lp + 0x1a] = 0;                 // it loops, whatever the switch says
+    waveBytes[lp + 0x1b] = (uint8_t)(int8_t)-30;
+    const juce::String waveName = juce::String(number).paddedLeft('0', 3) + " Test.vpw";
+    waveDir.getChildFile(waveName).replaceWithData(waveBytes.data(), waveBytes.size());
+    waveDir.getChildFile(juce::String(number).paddedLeft('0', 3) + " Test 2.vpw").replaceWithData(waveBytes.data(), 16);   // a sync's copy, longer in name: not this one
+    const auto patchFile = patchDir.getChildFile("x.p00");
+    patchFile.replaceWithData(chosen.data(), chosen.size());
+
+    const double rate = 48000.0;
+    const int block = 512;
+    p.prepareToPlay(rate, block);
+    check(!p.loadPatch(patchDir.getChildFile("nothing.p00")) && !p.getStatusText().isEmpty(), "a missing file should be refused");
+    for (const char* id : { "encodeType", "osc2EncodeType" }) {   // left on something else, for the patch to put back
+        auto* type = p.apvts.getParameter(id);
+        type->setValueNotifyingHost(type->convertTo0to1(2.0f));
+    }
+    check(p.loadPatch(patchFile), "the patch should load");
+    check(p.getPatchName() == juce::String(patch.name), "its name");
+    check(p.hasFileLoaded(0) && p.getLoadedFileName(0) == waveName, "its wave on OSC 1, by its number: " + p.getLoadedFileName(0));
+    check(p.lastPatchFolder() == patchDir, "the folder kept for next time");
+    const auto wait = [&] {
+        for (int i = 0; i < 600 && !p.getStatusText().contains("Encoded"); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        return p.getStatusText().contains("Encoded");
+    };
+    check(wait(), "its wave should encode: " + p.getStatusText());
+    XtSynth::Controls c = p.currentControls();
+    check(c.rootKey == 65, "the wave's Original Key");
+    check(c.origTempo == 999991, "the wave's Original Tempo: " + juce::String(c.origTempo));
+    check(c.loopMode == 2 && c.loop, "the wave's Loop Mode, and its loop on whatever the patch's switch says");
+    check(std::lround((double)c.loopStart * (double)last) == loopA && std::lround((double)c.loopEnd * (double)last) == loopB, "the wave's loop, to the sample");
+    check(p.apvts.getRawParameterValue("encodeType")->load() == 0.0f && p.apvts.getRawParameterValue("osc2EncodeType")->load() == 0.0f, "Encode Type on Auto, the wave's own");
+
+    // The sound against XtSynth, as this wave and these controls: the wave's tuning and backward loop are nothing but what's on its encoded form
+    {
+        XtWaveFile wave;
+        const auto bytes = waveBytes;
+        check(xtWaveRead(bytes.data(), bytes.size(), wave), "the wave reads");
+        std::vector<std::vector<float>> chans((size_t)wave.channels);
+        for (long i = 0; i < wave.frames; ++i)
+            for (int k = 0; k < wave.channels; ++k) chans[(size_t)k].push_back((float)wave.pcm[(size_t)(i * wave.channels + k)] / 32768.0f);
+        const int type = wave.encodeType == 1 || wave.encodeType == 3 || wave.encodeType == 5 ? wave.encodeType : 1;
+        auto own = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16), plain = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16);
+        xtWaveOntoEncoded(wave, *own);
+        c = p.currentControls();
+        c.pitchSemis = 0;
+        XtSynth ref, untuned;
+        ref.prepare(rate); ref.setSample(own); ref.setControls(c);
+        untuned.prepare(rate); untuned.setSample(plain); untuned.setControls(c);
+        juce::AudioBuffer<float> buf(2, block);
+        juce::MidiBuffer midi;
+        std::vector<float> rl((size_t)block), rr((size_t)block);
+        long different = 0, frames = 0, away = 0;
+        double energy = 0;
+        for (int b = 0; b < 200; ++b) {
+            midi.clear();
+            if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, 72, (juce::uint8)100), 0);
+            buf.clear();
+            p.processBlock(buf, midi);
+            juce::ScopedNoDenormals ftz;
+            if (b == 0) { ref.noteOn(72, 100 / 127.0f); untuned.noteOn(72, 100 / 127.0f); }
+            ref.render(rl.data(), rr.data(), block);
+            for (int i = 0; i < block; ++i) {
+                ++frames;
+                if (buf.getSample(0, i) != rl[(size_t)i] || buf.getSample(1, i) != rr[(size_t)i]) ++different;
+                energy += (double)rl[(size_t)i] * rl[(size_t)i];
+            }
+            untuned.render(rl.data(), rr.data(), block);
+            for (int i = 0; i < block; ++i) if (buf.getSample(0, i) != rl[(size_t)i]) ++away;
+        }
+        midi.clear();
+        midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
+        buf.clear();
+        p.processBlock(buf, midi);
+        check(different == 0, juce::String(different) + " of " + juce::String(frames) + " frames differ from XtSynth with the wave's tuning");
+        check(energy > 0.0, "it should sound");
+        check(away > frames / 2, "the tuning should change the sound: " + juce::String(away) + " of " + juce::String(frames));
+    }
+
+    // Its effects, through the chip: the driver takes what the patch says, and something still comes out
+    {
+        p.fxManualTicks();
+        auto* fxOn = p.apvts.getParameter("fxOn");
+        fxOn->setValueNotifyingHost(1.0f);
+        juce::AudioBuffer<float> buf(2, block);
+        juce::MidiBuffer midi;
+        double energy = 0;
+        for (int b = 0; b < 300; ++b) {
+            p.fxTick();
+            midi.clear();
+            if (b == 100) midi.addEvent(juce::MidiMessage::noteOn(1, 72, (juce::uint8)100), 0);
+            buf.clear();
+            p.processBlock(buf, midi);
+            energy += (double)buf.getRMSLevel(0, 0, block);
+        }
+        check(p.effectsRunning(), "the effects should come up on a patch");
+        check(energy > 0.0, "it should sound through the effects");
+        fxOn->setValueNotifyingHost(0.0f);
+        midi.clear();
+        midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
+        p.processBlock(buf, midi);
+    }
+
+    // A saved session: the parameters as they stood, the wave's settings not put over them
+    {
+        auto* key = p.apvts.getParameter("rootKey");
+        key->setValueNotifyingHost(key->convertTo0to1(70.0f));
+        juce::MemoryBlock state;
+        p.getStateInformation(state);
+        VSynthEmuProcessor q;
+        check(q.setRomFile(rom), "the ROM again");
+        q.setStateInformation(state.getData(), (int)state.getSize());
+        check(q.getPatchName() == p.getPatchName(), "the patch's name comes back");
+        check(q.hasFileLoaded(0) && q.getLoadedFileName(0) == waveName, "the wave comes back");
+        check(q.currentControls().rootKey == 70, "a saved session's Original Key isn't the wave's");
+        check(q.currentControls() == p.currentControls(), "a saved session's controls come back");
+    }
+
+    // A wave it can't find: said so, nothing left on the OSC
+    waveDir.getChildFile(waveName).deleteFile();
+    waveDir.getChildFile(juce::String(number).paddedLeft('0', 3) + " Test 2.vpw").deleteFile();
+    check(p.loadPatch(patchFile), "the patch without its wave");
+    check(!p.hasFileLoaded(0), "no wave left on OSC 1");
+    check(p.getPatchNote().contains("no wave " + juce::String(number)), "the wave not found, in its note: " + p.getPatchNote());
+    // And a file that's no patch
+    const auto notPatch = patchDir.getChildFile("no.p00");
+    notPatch.replaceWithText("not a patch at all, though long enough to look at");
+    check(!p.loadPatch(notPatch) && p.getStatusText().contains("not a V-Synth patch"), "something else should be refused: " + p.getStatusText());
+    p.releaseResources();
+    std::printf("patch apply: %d patches, %d zones, %ld effect values, %d checks, %d failed\n", (int)files.size(), zonesDone, fxValues, checks, failed);
+    return failed ? 1 : 0;
+}
+
+// TEST_PATCH_PLAY=folder [TEST_PATCH_EVERY=n]: a project's patches as a user loads them, one in n, with their waves, a note on each: its level and what isn't here.
+// Not in verify.sh: it needs a project, and takes a while.  A patch that's silent is worth a look, not always a fault: a patch can want a controller or the external input.
+static int patchPlayTest(const juce::File& rom, const juce::File& folder, int every) {
+    VSynthEmuProcessor p;
+    if (!p.setRomFile(rom)) { std::fprintf(stderr, "ROM rejected\n"); return 1; }
+    const double rate = 44100.0;
+    const int block = 512;
+    p.prepareToPlay(rate, block);
+    auto files = folder.findChildFiles(juce::File::findFiles, false, "*.p00");
+    files.sort();
+    int played = 0, silent = 0, refused = 0, n = 0;
+    for (const auto& f : files) {
+        if (n++ % every) continue;
+        if (!p.loadPatch(f)) { ++refused; std::printf("%-28s refused: %s\n", f.getFileName().toRawUTF8(), p.getStatusText().toRawUTF8()); continue; }
+        const char* want = p.hasFileLoaded(1) ? "OSC 2: Encoded" : p.hasFileLoaded(0) ? "Encoded" : nullptr;
+        for (int i = 0; want && i < 1200 && !p.getStatusText().startsWith(want); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        juce::AudioBuffer<float> buf(2, block);
+        juce::MidiBuffer midi;
+        double energy = 0, peak = 0;
+        for (int b = 0; b < 150; ++b) {
+            midi.clear();
+            if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)100), 0);
+            if (b == 120) midi.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
+            buf.clear();
+            p.processBlock(buf, midi);
+            energy += (double)buf.getRMSLevel(0, 0, block) + (double)buf.getRMSLevel(1, 0, block);
+            peak = std::max(peak, (double)buf.getMagnitude(0, block));
+        }
+        midi.clear();
+        midi.addEvent(juce::MidiMessage::allSoundOff(1), 0);
+        buf.clear();
+        p.processBlock(buf, midi);
+        ++played;
+        if (energy <= 0.0) ++silent;
+        std::printf("%-28s peak %.3f  %s  %s%s%s\n", f.getFileName().toRawUTF8(), peak, energy > 0.0 ? "" : "SILENT", p.getLoadedFileName(0).toRawUTF8(), p.getPatchNote().isNotEmpty() ? " | " : "", p.getPatchNote().toRawUTF8());
+    }
+    p.releaseResources();
+    std::printf("patch play: %d played, %d silent, %d refused\n", played, silent, refused);
+    return refused ? 1 : 0;
+}
+
 int main(int argc, char** argv) {
     if (argc < 3) { std::fprintf(stderr, "usage: %s rom.2.bin file.wav [note] [auto|solo|backing|ensemble]\n", argv[0]); return 1; }
     juce::ScopedJuceInitialiser_GUI init;
     TestAppDir testAppDir;
     if (std::getenv("TEST_ROM_SEARCH")) return romSearchTest(juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]), testAppDir.dir);
+    if (std::getenv("TEST_PATCH_APPLY")) return patchApplyTest(juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]));
+    if (const char* folder = std::getenv("TEST_PATCH_PLAY")) {
+        const char* every = std::getenv("TEST_PATCH_EVERY");
+        return patchPlayTest(juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]), juce::File(juce::String::fromUTF8(folder)), every ? std::max(1, std::atoi(every)) : 1);
+    }
     const int note = argc > 3 ? std::atoi(argv[3]) : 60;
     const double rate = 48000.0;
     const int block = 512;
@@ -110,6 +361,8 @@ int main(int argc, char** argv) {
     // TEST_SNAPSHOT_ANALOG=1: OSC Type ANALOG, its rows shown;
     // TEST_SNAPSHOT_OSC2=1: with the OSC rows on OSC 2; =pcm: with OSC 2 on PCM too;
     // TEST_SNAPSHOT_FX=page: the Effects tab, 0 MFX, 1 Chorus, 2 Reverb, 3 EQ, with TEST_SNAPSHOT_FXTYPE=n the page's block's type)
+    // TEST_SNAPSHOT_PATCH=file.p00: with that patch loaded
+    if (const char* f = std::getenv("TEST_SNAPSHOT_PATCH")) p.loadPatch(juce::File::getCurrentWorkingDirectory().getChildFile(f));
     if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
         if (std::getenv("TEST_SNAPSHOT_ANALOG")) {
             auto* prm = p.apvts.getParameter("oscType");
@@ -281,6 +534,9 @@ int main(int argc, char** argv) {
         // No editor has shown these (v143's didn't either): the engine's three, shown only without a ROM; Scale Tune; the COSMs' second envelope, the first's velocity and key follow, their LFOs' fade and offset
         const auto hostOnly = [](const juce::String& id) {
             if (id == "pitchShift" || id == "timeStretch" || id == "formantShift" || id.startsWith("scaleTune")) return true;
+            for (const char* env : { "itchEnv", "imeEnv", "ormantEnv" })
+                for (const char* knob : { "VelCurve", "VelSens", "AttackSens", "DecaySens", "ReleaseSens", "TimeKF" })
+                    if (id.endsWith(juce::String(env) + knob)) return true;
             const juce::String c = id.startsWith("cosm2") ? id.substring(5) : id.startsWith("cosm") ? id.substring(4) : juce::String();
             return c.startsWith("EnvB") || c == "EnvAVelCurve" || c == "EnvAVelSens" || c == "EnvAAttackSens" || c == "EnvADecaySens" || c == "EnvAReleaseSens" || c == "EnvATimeKF"
                 || c == "LfoOffset" || c == "LfoDelay" || c == "LfoFadeMode" || c == "LfoFade";
@@ -292,6 +548,14 @@ int main(int argc, char** argv) {
             else if (!hostOnly(r->paramID)) fail("no control sets " + r->paramID);
         }
         if (juce::String(ui) == "list") { for (const auto& id : reached) std::printf("control: %s\n", id.toRawUTF8()); return 0; }
+        // The source bar's two buttons, which no parameter would miss
+        for (const char* text : { "Load WAV...", "Load Patch..." }) {
+            bool there = false;
+            for (auto* child : ed->getChildren())
+                if (auto* b = dynamic_cast<juce::TextButton*>(child))
+                    if (b->getButtonText() == text && b->isVisible() && !b->getBounds().isEmpty()) there = true;
+            if (!there) fail(juce::String(text) + " isn't on the editor");
+        }
         // The layout, at each size
         const juce::ComponentBoundsConstrainer* limits = ed->getConstrainer();
         const juce::Point<int> sizes[] = { { limits->getMinimumWidth(), limits->getMinimumHeight() }, { ed->getWidth(), ed->getHeight() }, { limits->getMaximumWidth(), limits->getMaximumHeight() } };
@@ -721,8 +985,8 @@ int main(int argc, char** argv) {
         pe->setValueNotifyingHost(pe->convertTo0to1(en));
         setKnobs({ { "loop", 1 }, { "loopMode", refCtl.loopMode } });
         // as the processor reads them back: snapped to the 0.01% steps
-        refCtl.loopStart = std::round(p.apvts.getRawParameterValue("loopStart")->load() / 0.01f) * 0.01f / 100.0f;
-        refCtl.loopEnd = std::round(p.apvts.getRawParameterValue("loopEnd")->load() / 0.01f) * 0.01f / 100.0f;
+        refCtl.loopStart = p.apvts.getRawParameterValue("loopStart")->load() / 100.0f;
+        refCtl.loopEnd = p.apvts.getRawParameterValue("loopEnd")->load() / 100.0f;
     }
     // TEST_PORTA="mode,type,time,sens": Portamento on, Mode (0 NORMAL,
     // 1 LEGATO), Type (0 RATE, 1 TIME), Time, Time Velo Sens; with
@@ -1085,6 +1349,15 @@ int main(int argc, char** argv) {
                  && E->solo.inR == E2->solo.inR;
         for (int k = 0; k < 6; ++k) same = same && E->bands.buf[k] == E2->bands.buf[k];
         std::printf("encode repeatable: %s\n", same ? "yes" : "NO");
+    }
+    // A V-Synth wave brings its Original Key, Tempo, loop and fine tuning with it
+    if (juce::File(argv[2]).hasFileExtension("vpw")) {
+        juce::MemoryBlock bytes;
+        XtWaveFile own;
+        if (juce::File(argv[2]).loadFileAsData(bytes) && xtWaveRead(static_cast<const uint8_t*>(bytes.getData()), bytes.getSize(), own)) {
+            xtWaveOntoControls(own, refCtl);
+            xtWaveOntoEncoded(own, *E);
+        }
     }
     XtSynth ref; ref.prepare(rate); ref.setSample(E); ref.setControls(refCtl);
     if (E2) ref.setSample(E2, 1);

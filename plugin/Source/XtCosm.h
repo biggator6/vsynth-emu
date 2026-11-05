@@ -248,8 +248,8 @@ XtCombBlock xtCombBlock(const XtCombParams& p, float velA, float velB);
 
 // The wave's root frequency, the voice's +0x9a4 (the voice setup
 // 0x894f21c0): 440·2^((Original Pitch − 69)/12) Hz through exp2, for a wave
-// without fine tuning; 440 with Robot Voice.
-float xtCosmRootHz(int originalPitch, bool robot);
+// plus the wave's fine tuning, its +0x994 and +0x998 (xtWaveTune); 440 with Robot Voice.
+float xtCosmRootHz(int originalPitch, bool robot, float offset = 0.0f, float detune = 0.0f);
 
 // The object for block code 9.  The delay in samples is 44100 · factor ·
 // (1 − Detune/2400 + Env·depth + LFO·depth) / (pitch × root), within 0…3267:

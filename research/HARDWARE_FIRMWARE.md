@@ -1546,13 +1546,84 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Applying a patch (2026-11-05, v148)
+
+`XtPatch` is `patchOf` (`XtToneCheck.cpp`) the other way round, for one zone: a store to `XtSynth::Controls`. The whole-tone check already holds `patchOf`'s IDs to XtSynth's fields, so what's left is to hold a real patch to `patchOf`.
+
+**What it found the Controls didn't have.**
+
+- **Each OSC's pitch, time and formant envelopes' velocity and key.** `patchOf` had written them as constants: Curve 0, Sens 32, no A/D/R-Sens or Time KF. Of about 970,000 values in 1,014 real patches, 2,038 differed, all there. They're `OscControls::EnvVelocity` now: the factor scales the envelope's depth (`xtCosmVelocity`, as the COSMs'), the analog block's Fat and PW take theirs, and the sens and KF go to the envelope's times. 36 parameters, host-only for now (`UI_DESIGN.md`).
+- **OSC Type 2, the external input.** Two patches in 200 read outside memory with it, and left the LFOs' seeds out of step for every case after. With no input here it reads as an OSC switched off, and the status line says so.
+- **Scale Tune's range is ±100,** raw 28…228, not the −64…+63 the plugin had. "Minor Cuts" uses 100.
+
+**A wave's own settings.** All of these are in its chunks and none reach a voice from an imported wave, which has 0 or the defaults:
+
+| Chunk | Field | What it is |
+|---|---|---|
+| `vpsc` +0xa | s8 | Original Key |
+| `vpsc` +0x18 | s32 | cents, the voice's +0x994 |
+| `vpsc` +0x1c | s32 | Original Tempo, BPM × 10000 |
+| `vplp` +0 | s32 | fine tuning, 1/100 cent, the voice's +0x998 |
+| `vplp` +4, +8 | | the forward loop, in frames |
+| `vplp` +0xc, +0x10 | | the backward loop's end and start |
+| `vplp` +0x18, +0x19 | | forward and backward Loop Mode |
+| `vplp` +0x1a | | 0: the wave loops whatever the OSC's Loop switch says |
+| `vplp` +0x1b | s8 | fine tuning, 1/100 cent, added to +0x994 |
+
+**The fine tuning is large and real.** v55 noted these fields as 0 in every wave, which is true of what the XT imports. In `1stchoice`, `vplp` +0 runs to 172956, over 14 semitones. It's the sample's pitch against its Original Key: autocorrelation on the decoded waves gives 482.0 Hz for `002 KEY-Rhodes`, Original Key 65 (349.2 Hz), +0 = 55534, within 2.3 cents of 349.2 × 2^(555.34/1200). Most of the first 40 waves land within 12 cents, and the misses are an octave out, the measure's error on an inharmonic sample, or a deliberate octave (`023 ETH-Digeridu`, 120000). So until v148 a `.vpw` played sharp by as much as this says.
+
+The voice setup `0x894f21c0`: +0x994 = header +0x18 + 0.01 × record +0x1b (FMAC); +0x998 = 0.01 × record +0; the root (+0x9a4) as before, with those; and f = exp2(−record +0 / 120000), 1 if not above 0, at +0x99c, +0x9a0 and +0x9a8. With Robot Voice the first two are 0 and the root 440, and f stays. Then:
+
+- the pitch target has +0x994 and +0x998 as v55 ported them;
+- the formant ratio is × +0x9a0 after its clamp (the update's `0x894f3d40`, and at note-on `0x894f32f0`);
+- the walk is × +0x99c after its clamp (`0x894f3c90`, which is the note-on's too), with Vari on or under Tempo Sync. So a wave tuned down also walks slower.
+
+`xtWaveTune`, on `XtEncoded::tune`, as it belongs to the wave and not to a control. A wave's backward loop is there too (`bwdMode`, `bwdStart`, `bwdEnd`); the forward loop, Key, Tempo and Loop Mode go to the OSC's parameters, which the plugin already had.
+
+**A type's parameters.** From ID 0x55d an ID is a meaning, not a place: the second bank's first byte is a slot, counted from the block's base at `0x897a100c`: MFX 0x17b, Chorus 0x1ff, Reverb 0x232, COSM 0x3e9. `0x89481d70(store, desc(base), bank2(id))` reads the slot through the first bank's range, then swaps anything outside the ID's own range for its default. So a patch holds only its current type's parameters, and the plugin's other types go back to their defaults on a patch. A COSM's Type 0 is Through, off here. `xtPatchTyped`.
+
+**Zones.** `0x124`… are upper keys and a note takes the first ≥ it, so the first at 127 ends them. 443 of 1stchoice's 502 have one, and 257 of Emu_test's 263; 49 and 6 are 16-zone kits, whose top is often 126, so no zone says 127 at all. The plugin loads zone 1 and says so.
+
+**In the plugin.** `loadPatch`: the store, one zone to the parameters (`setControls`, the writer to `xtControls`' reader, only those that moved), the effects' parameters, Encode Type to Auto, and each PCM OSC's wave by number from `Wave` beside `Patch`: `NNN name.vpw` or `.wav`, the shortest name if a sync left a copy. A wave it can't find leaves that OSC empty, and the status line says which. The system's assigns, Output Mode, Out Gain and Clock Source stay as they are, and so does the Effects switch: a patch's effects sound only with it on.
+
+`.wav` files in a project are a RIFF round the same chunks, with `LINR` for the tag and plain samples: that corrects the line above that said no file in hand uses it. Emu_test's are. `loadFile` reads either by its own reader when the first chunks say `vpfl`, on any route in, so a wave loaded alone brings its tuning and loop as well. A saved session's parameters aren't overwritten by its wave's settings as it comes back.
+
+Loop Start and End no longer step in 0.01%, and Original Tempo steps in 0.0001 BPM, so that a wave's own loop lands on its sample and 99.9991 BPM stays that. The boxes show two places.
+
+**The checks.**
+
+- `xt_tone`: every zone of every patch in the image against `patchOf`, 538,212 values, 0 different, and 448,512 of their effects' against the firmware's table of bases, 0 different. It's first, so a planted error stops at once. Outside fcheck, with `XT_TONE_PATCHES`: 1stchoice's 434,775 and Emu_test's 122,591 values, 0 different.
+- `xt_tone`: 512 real patches through the whole tone, on a wave for each PCM OSC, half with a tuning of their own, and 500 random cases on tuned waves with a backward loop of their own: about 12 million checks, 0 different.
+- `xt_files`: 123,840 type parameters against `0x89481d70`, every type on one patch in eight, 0 different. A wave's fields put in its chunks and read back; a RIFF of plain samples equal to the RDAC one.
+- `TEST_PATCH_APPLY=1`, in `verify.sh`: every zone of the image's patches through the real parameters and back, and each effect value. Then a project on disk: the patch, its wave by number, a sync's copy passed over, the tuning, the loop to the sample, and the sound bit-identical to XtSynth given the same wave and controls, against an untuned one that differs; through the chip; a saved session; a missing wave; something that isn't a patch.
+
+Planted errors: `mutate_tone.py` 841, none missed, 46 of them new; `mutate_files.py` 39, none missed, 15 new; `mutate_panel.py --editor` with the 23 `patch-` plants, 56, none missed. The rest of `mutate_panel.py`'s list wasn't run, as the panel, the values' text and the effects' driver didn't change. Three old plants' text moved with the code. The new draws lost two: `cx-ws-tl`, as a key's follow could hold the sweep's Wave Shape Tone at its limit, so the sweep's type cases now clear every Keyfollow; and `solo-wrap-end`, still on a seed of its own, now 6, which fcheck doesn't run. `patch-external` showed that the firmware's tone gets the same controls and so can't see an External OSC left on; the patches' check looks for it itself.
+
+**As a user loads them.** `TEST_PATCH_PLAY=<folder>`, with `TEST_PATCH_EVERY=10`: 51 of 1stchoice's patches, each with its waves and a note: none refused and none silent. That says they load and sound, not that they sound like the XT's.
+
+**The level, left as it is.** They run hot. With the chip out, at key 60 and velocity 100, those 51 peak at a median of 0.87; 22 are over full scale, 4 over 4, and one reaches 8.9, about +19 dB. The plugin plays 18 dB above the XT by a choice made for single waves ("The level, decided here and easy to change"), and at the XT's level 8.9 is 1.1. So real patches say where the XT's headroom went, without a capture. Changing it moves everything already set up in a session, so it's the user's call.
+
+**Not here yet,** and the status line says which a patch asks for:
+
+| | In 1stchoice | |
+|---|---|---|
+| Vari Sw off | 71 of 358 PCM OSCs | a plain resampling player, `0x89509870`, "LITE investigation". Here it still plays VariPhrase: in tune, but its time doesn't follow its pitch |
+| More than one zone | 59 of 502 patches | zone 1 only |
+| Playback Mode not RETRIGGER | 81 | LEGATO, STEP, EVENT, `vpno` |
+| Start Offset | 33 | IDs 0x2c6, 0x2fa |
+| Arpeggio | 107 of 502 | IDs 0x42e… |
+| Multi Step Modulator | | 0x48d… |
+| External input | | no input here |
+
+The plugin also encodes a wave again from its audio, rather than playing the analysis the wave stores, which other encoders wrote. Pad Mode and Pad Hold, and a patch's own zones' wave links in `Internal.prj` (`.w00` stubs), aren't read.
+
 ### V-Synth's files (2026-11-05, v147)
 
 `plugin/Source/XtFiles.*` reads them, through the firmware's own routines in the interpreter and its descriptors from rom.2 at run time, and `xt_files` checks that against the firmware. The plugin plays a `.vpw` (`XtVpwFormat`, a JUCE format, so the file chooser offers it with no change to the editor). A patch is read but not yet applied to the plugin. From `analysis/projects/Emu_test.prj`, the user's `Vsynth_Software/1stchoice` (502 patches, 250 waves, gitignored) and the firmware's disk image.
 
 **A project** is `Patch/NNN name.p00` and `Wave/NNN name.wav` or `.vpw`, with three `.s00` files if the XT saved it whole. rom.2's file lists name `wav`, `aif`, `vpw` and `w00`; the manual lists WAV, AIFF and VPW as imports.
 
-**A wave, `.vpw`:** a project's `.wav` chunks with no RIFF header, in this order: `vpfl vpsc vplp vpno vpdt LIST rdmd data`. `vpfl` starts `0102`, its word 8 is the `data` chunk's size and word 10 `RDAC` (rom.2 also names `LINR`, which no file in hand uses). `vpsc`: byte 0 is 0x0b or 0x0a, not read yet, byte 1 the encode type, byte 2 set if stereo, word 1 the frames. `vplp`: words 1 and 2 the loop's start and end. `rdmd` starts `MThd`, a MIDI file. `LIST`'s ISFT names the encoder: Monolith, V-Synth 1.51 and, once in the image, WaveTrainer. 1stchoice has 144 BACKING, 89 SOLO, 17 ENSEMBLE and no LITE, against 41 LITE of Emu_test's 79.
+**A wave, `.vpw`:** a project's `.wav` chunks with no RIFF header, in this order: `vpfl vpsc vplp vpno vpdt LIST rdmd data`. `vpfl` starts `0102`, its word 8 is the `data` chunk's size and word 10 `RDAC` (`LINR` in a project's `.wav`, a RIFF round the same chunks with plain samples, v148). `vpsc`: byte 0 is 0x0b or 0x0a, not read yet, byte 1 the encode type, byte 2 set if stereo, word 1 the frames. `vplp`: words 1 and 2 the loop's start and end. `rdmd` starts `MThd`, a MIDI file. `LIST`'s ISFT names the encoder: Monolith, V-Synth 1.51 and, once in the image, WaveTrainer. 1stchoice has 144 BACKING, 89 SOLO, 17 ENSEMBLE and no LITE, against 41 LITE of Emu_test's 79.
 
 **RDAC** packs 16 bits into 8, losing some. `data` is an 8-byte header, `00 08` (`0x8952ee80` checks those two; nothing reads the other six), then 16-byte blocks of 16 samples each, in turn left and right if stereo. A block routine, `0x89529570(block, out, prev, 1)`, returns its last sample, which is the next block's `prev`; each channel starts at 0 (`0x8952ee70`). Inside a block the eight big-endian words go alternately into two 8-sample groups. Each group's top bits choose field widths (jump tables `0x895298e0`, `0x89529910`) and a shift (`0x89529a10`, `0x89529a1c`), and its samples are rebuilt from the last inward, each the mean of its neighbours plus a stored difference. `0x8952eeb0` runs the whole-wave routines `0x89529c20` (mono) and `0x89529ce0` (stereo) at load, so the XT unpacks a wave once, not as it plays. Bytes past frames x channels read as 0. In the interpreter a million frames take about 100 ms, so there is no port: `xtFwRdacDecode` runs the block routine.
 

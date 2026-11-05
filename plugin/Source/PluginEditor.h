@@ -24,6 +24,7 @@ private:
 
     // ── File loading ─────────────────────────────────────────────────────────
     juce::TextButton loadButton_     { "Load WAV..." };
+    juce::TextButton patchButton_    { "Load Patch..." };
     juce::Label      fileNameLabel_;
 
     std::unique_ptr<juce::FileChooser> fileChooser_;
@@ -356,6 +357,7 @@ private:
     void comboBoxChanged(juce::ComboBox* box) override;
     void styleSlider(juce::Slider& s, juce::Label& l);
     void openFileChooser();
+    void openPatchChooser();
     void showFileName();
     void openRomChooser();
     void timerCallback() override;

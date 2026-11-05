@@ -17,7 +17,7 @@ cc -ffp-contract=off -DXT_ENCODER_MAIN XtSoloEncoder.cpp XtFirmware.cpp XtMultiB
 cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
    $( [ -f XtCosm.cpp ] && echo XtCosm.cpp ) $( [ -f XtAnalog.cpp ] && echo XtAnalog.cpp ) XtFirmware.cpp Sh4Interp.cpp -o "$O/xt_synth" &
 [ -f XtToneCheck.cpp ] && cc -DXT_TONE_MAIN -DXT_TONE_CHECK XtToneCheck.cpp XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
-   XtCosm.cpp XtAnalog.cpp XtFirmware.cpp Sh4Interp.cpp -o "$O/xt_tone" &
+   XtCosm.cpp XtAnalog.cpp XtFirmware.cpp Sh4Interp.cpp XtFiles.cpp XtPatch.cpp -o "$O/xt_tone" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN XtFiles.cpp XtFirmware.cpp XtMultiBandPlayer.cpp XtSoloVoice.cpp XtSoloEncoder.cpp Sh4Interp.cpp -o "$O/xt_files" &
 [ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp XtFxControl.cpp Sh4Interp.cpp -o "$O/xt_fx" &
 cc -DENGINE_TESTS_MAIN EngineTests.cpp VariphraseEngine.cpp PhaseVocoder.cpp SourceFilterModel.cpp XtSoloEncoder.cpp XtSoloVoice.cpp \

@@ -3570,6 +3570,14 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-05) — v148: Applying a patch
+
+- The first run held every real patch to `patchOf` and found one gap, in one place: `patchOf` had written the OSCs' pitch, time and formant envelopes' velocity as constants, so the check had never seen them. 2,038 of about 970,000 values. The whole tone then equalled the firmware with them in, at the first try, because the routines all took those arguments already.
+- A wave's header I'd noted in v55 as "0 in every wave seen". That was true of Emu_test. 1stchoice's run to 14 semitones. I nearly wrote it off as a field used for something else, since 55534 cents/100 looked wild, and measured the decoded audio instead: it is the sample's pitch against its Original Key, within a few cents. So the `.vpw` playback I'd told the user to try in v147 was out of tune, by up to a seventh in the waves I looked at, and I said so.
+- The tuning went on in three places I hadn't expected. The pitch and root were known. Then `xt_tone`'s walk differed, 1.476 against 1, and then the formant: the same factor reaches both, after their clamps. The note's walk is the same routine as the update's, which an old note here had as two.
+- Two factory patches read outside memory, and every LFO after them differed. It looked like a bug in the tuned cases, since that's where the LFOs showed it. The cause was the note before, on OSC Type 2, the external input, which the plugin's parameter can't hold. An error early in a run can read as an error far from it, as v108 found.
+- `fcheck.sh --update` in this worktree dropped Emu_test's 28 lines, as CLAUDE.md warns, though here for a different reason: no `.venv` in the worktree, so `PY` failed quietly. The diff showed it. It wants `PY` set.
+
 ### Session 16 addendum (2026-11-05) — v147: V-Synth's files
 
 - RDAC was found by a crude scan: windows of code with many dynamic shifts, a step of 16 and a loop. The top hit was the block routine. The code that names `RDAC` only writes it.

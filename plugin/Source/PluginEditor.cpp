@@ -145,6 +145,8 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     loadButton_.setColour(juce::TextButton::textColourOffId,  juce::Colours::black);
     loadButton_.onClick = [this] { openFileChooser(); };
     addAndMakeVisible(loadButton_);
+    patchButton_.onClick = [this] { openPatchChooser(); };
+    addAndMakeVisible(patchButton_);
 
     fileNameLabel_.setText(
         processor_.hasFileLoaded() ? processor_.getLoadedFileName() : "No file loaded",
@@ -920,6 +922,7 @@ void VSynthEmuEditor::attachSideBand() {
 
 void VSynthEmuEditor::timerCallback() {
     if (timeAtt_ && processor_.hasRom() != mainKnobsXt_) attachMainKnobs(processor_.hasRom());
+    showFileName();
     statusLabel_.setText(processor_.getStatusText(), juce::dontSendNotification);
     statusLabel_.setColour(juce::Label::textColourId, processor_.hasRom() ? juce::Colours::lightgrey : juce::Colours::orange);
 }
@@ -995,8 +998,10 @@ void VSynthEmuEditor::resized() {
 
     // Source bar: Load, the file, the OSC selector, its switch and type
     auto src = juce::Rectangle<int>(0, Ui::headerH, getWidth(), Ui::sourceH).reduced(16, 13);
-    loadButton_.setBounds(src.removeFromLeft(110));
-    src.removeFromLeft(12);
+    loadButton_.setBounds(src.removeFromLeft(100));
+    src.removeFromLeft(6);
+    patchButton_.setBounds(src.removeFromLeft(100));
+    src.removeFromLeft(10);
     oscTypeBox_.setBounds(src.removeFromRight(110).reduced(0, 2));
     src.removeFromRight(10);
     oscOnBtn_.setBounds(src.removeFromRight(54));
@@ -1500,7 +1505,7 @@ void VSynthEmuEditor::buildLayout() {
     // What stays on the editor; everything the pages don't take is dropped, so a
     // new control must go in a card or here (TEST_UI_LAYOUT says if one didn't),
     // bar the two selector boxes, kept hidden
-    const juce::Array<juce::Component*> chrome { &algoLabel_, &algoBox_, &statusLabel_, &romButton_, &loadButton_, &fileNameLabel_,
+    const juce::Array<juce::Component*> chrome { &algoLabel_, &algoBox_, &statusLabel_, &romButton_, &loadButton_, &patchButton_, &fileNameLabel_,
                                                  &oscOnBtn_, &oscTypeBox_, &pitchSlider_, &pitchLabel_, &timeSlider_, &timeLabel_,
                                                  &formantSlider_, &formantLabel_, &robotBtn_, &oscSelBox_, &cosmSelBox_, &fxOnBtn_, fxPanel_.get() };
     for (auto& p : pages_) p->adopt();
@@ -1545,7 +1550,23 @@ void VSynthEmuEditor::openFileChooser() {
 // The selected OSC's wave: Load loads into that OSC.
 void VSynthEmuEditor::showFileName() {
     const juce::String name = processor_.hasFileLoaded(oscK_) ? processor_.getLoadedFileName(oscK_) : juce::String("No file loaded");
-    fileNameLabel_.setText(oscK_ ? "OSC 2: " + name : name, juce::dontSendNotification);
+    juce::String text = oscK_ ? "OSC 2: " + name : name;
+    // A patch's name first, and at the end what it asks for that isn't here
+    if (processor_.getPatchName().isNotEmpty()) text = processor_.getPatchName() + " | " + text;
+    if (processor_.getPatchNote().isNotEmpty()) text << " | not here: " << processor_.getPatchNote();
+    fileNameLabel_.setText(text, juce::dontSendNotification);
+}
+
+void VSynthEmuEditor::openPatchChooser() {
+    fileChooser_ = std::make_unique<juce::FileChooser>("Load a V-Synth patch", processor_.lastPatchFolder(), "*.p00");
+    fileChooser_->launchAsync(
+        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [this](const juce::FileChooser& fc) {
+            const auto file = fc.getResult();
+            if (!file.existsAsFile()) return;
+            processor_.loadPatch(file);
+            showFileName();
+        });
 }
 
 // ─── Combo box ───────────────────────────────────────────────────────────────

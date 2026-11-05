@@ -50,6 +50,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <map>
 #include <string>
 #include <type_traits>
@@ -59,6 +62,8 @@
 #include "XtFirmware.h"
 #include "XtSoloEncoder.h"
 #include "XtSynth.h"
+#include "XtFiles.h"
+#include "XtPatch.h"
 
 using OscC = XtSynth::OscControls;
 using Ctl = XtSynth::Controls;
@@ -523,6 +528,7 @@ void writeLoopEvents(Firmware& f, const TestWave& t, const OscC& c) {
     l.fwdMode = l.bwdMode = c.loopMode;
     l.fwdStart = l.bwdStart = a;
     l.fwdEnd = l.bwdEnd = b;
+    if (t.enc->bwdMode >= 0) { l.bwdMode = t.enc->bwdMode; l.bwdStart = t.enc->bwdStart; l.bwdEnd = t.enc->bwdEnd; }
     const uint32_t W2 = t.fw.chunk[10];
     f.c.write(W2, std::vector<uint8_t>(0x400, 0).data(), 0x400);
     if (!l.on) { f.c.wr32(W2 + 0xb8, 0x7fffffff); f.c.wr32(W2 + 0x16c, 0x7fffffff); return; }
@@ -591,9 +597,9 @@ void oscParams(std::unordered_map<int, int>& p, int n, const OscC& o) {
     p[b + 0x2c] = o.tempoSync; p[b + 0x2d] = o.robot; p[b + 0x2f] = o.loop; p[b + 0x31] = o.energy; p[b + 0x32] = o.timeTrip; p[b + 0x33] = o.beatKeep;
     p[0x30d + 3 * n] = o.ana.detune; p[0x30e + 3 * n] = o.ana.subOctave; p[0x30f + 3 * n] = o.ana.subLevel;
     const int e = 4 * n;
-    envParams(p, e, o.pAttack, o.pDecay, o.pSustain, o.pRelease, 0, 32, 0, 0, 0, 0);
-    envParams(p, e + 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease, 0, 32, 0, 0, 0, 0);
-    envParams(p, e + 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease, 0, 32, 0, 0, 0, 0);
+    envParams(p, e, o.pAttack, o.pDecay, o.pSustain, o.pRelease, o.pVel.curve, o.pVel.sens, o.pVel.aSens, o.pVel.dSens, o.pVel.rSens, o.pVel.timeKF / 10);
+    envParams(p, e + 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease, o.tVel.curve, o.tVel.sens, o.tVel.aSens, o.tVel.dSens, o.tVel.rSens, o.tVel.timeKF / 10);
+    envParams(p, e + 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease, o.fVel.curve, o.fVel.sens, o.fVel.aSens, o.fVel.dSens, o.fVel.rSens, o.fVel.timeKF / 10);
     envParams(p, e + 3, o.oAttack, o.oDecay, o.oSustain, o.oRelease, o.oscVelCurve, o.oscVelSens, o.oASens, o.oDSens, o.oRSens, o.oTimeKF / 10);
     const int l = 0x3be + 8 * n;
     p[l] = o.lfoWave; p[l + 2] = o.lfoRate; p[l + 3] = o.lfoOffset; p[l + 4] = o.lfoDelay; p[l + 5] = o.lfoFadeMode; p[l + 6] = o.lfoFade; p[l + 7] = o.lfoKeySync;
@@ -655,6 +661,40 @@ std::unordered_map<int, int> patchOf(const Ctl& c) {
     return p;
 }
 
+// ── A real patch ────────────────────────────────────────────────────────────
+// xtPatchControls against patchOf: every ID the firmware's converters read from a patch, what it would have read from the store (xt_files holds xtPatchValue to the
+// firmware's own read) against what it reads in the whole-tone check for those controls.  The system's IDs and the Wave Number aren't a patch's to give here.
+struct PatchTally { long values = 0, different = 0; std::map<int, long> byId; };
+void patchRoundTrip(const std::vector<uint8_t>& store, int zone, const Ctl& c, PatchTally& t) {
+    const std::unordered_map<int, int> p = patchOf(c);
+    const auto own = [&](int id) { return id == 0x40 || id == 0x41 || id == 0x526 || (id >= 0x89 && id <= 0x94) || id == 0x2be || id == 0x2f2; };
+    for (const auto& kv : p) {
+        const int id = kv.first & 0xffff, k = kv.first >> 16;
+        if (own(id)) continue;
+        // OSC Type 2, the external input: here an OSC off and on analog.  The firmware's tone gets the same, so only this can see it
+        const int typeId = id == 0x2a4 || id == 0x2a5 ? 0x2a5 : id == 0x2d8 || id == 0x2d9 ? 0x2d9 : 0;
+        if (typeId && xtPatchValue(store, typeId, zone) == 2) {
+            ++t.values;
+            if (kv.second != 0) { ++t.different; ++t.byId[kv.first]; }
+            continue;
+        }
+        int fw;
+        if (id >= 0x55d) {
+            // A type's parameter: a patch holds only its own type's, and a COSM on Through none
+            const int type = xtPatchValue(store, 0x3e8, zone, k);
+            int first = 0, last = -1;
+            xtEffectTypeIds(3, type, first, last);
+            if (type == 0 || id < first || id > last) continue;
+            fw = xtPatchTyped(store, kXtCosmSlots, id, zone, k);
+        } else if (id == 0x3e7 || id == 0x3e8) {
+            if (xtPatchValue(store, 0x3e8, zone, k) == 0) continue;   // Through: off here
+            fw = xtPatchValue(store, id, zone, k);
+        } else fw = xtPatchValue(store, id, zone);
+        ++t.values;
+        if (fw != kv.second) { ++t.different; ++t.byId[kv.first]; }
+    }
+}
+
 // ── Random settings ─────────────────────────────────────────────────────────
 struct Rng {
     uint32_t s;
@@ -691,6 +731,8 @@ void drawOsc(Rng& r, OscC& o) {
     o.pAttack = drawTime(r); o.pDecay = drawTime(r); o.pSustain = r.range(0, 127); o.pRelease = drawTime(r); o.pDepth = r.one(2) ? 0 : r.range(-63, 63);
     o.tAttack = drawTime(r); o.tDecay = drawTime(r); o.tSustain = r.range(0, 127); o.tRelease = drawTime(r);
     o.fAttack = drawTime(r); o.fDecay = drawTime(r); o.fSustain = r.range(0, 127); o.fRelease = drawTime(r);
+    for (OscC::EnvVelocity* v : { &o.pVel, &o.tVel, &o.fVel })
+        if (r.one(3)) { v->curve = r.range(0, 7); v->sens = r.range(-63, 63); v->aSens = r.one(2) ? 0 : r.range(-63, 63); v->dSens = r.one(2) ? 0 : r.range(-63, 63); v->rSens = r.one(2) ? 0 : r.range(-63, 63); v->timeKF = r.one(2) ? 0 : 10 * r.range(-20, 20); }
     o.lfoWave = r.range(0, 7); o.lfoRate = drawRate(r); o.lfoOffset = r.range(0, 4); o.lfoDelay = r.one(2) ? 0 : r.range(0, 60);
     o.lfoFadeMode = r.range(0, 3); o.lfoFade = r.one(2) ? 0 : r.range(0, 60); o.lfoKeySync = !r.one(4);
     o.lfoPitchDepth = r.one(2) ? 0 : r.range(-63, 63);
@@ -785,7 +827,7 @@ Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     // the ends too, where the time between clocks reaches its limits (0x894f0fd0)
     c.patchTempo = r.one(3) ? 1200 : r.one(6) ? (r.one(2) ? r.range(200, 209) : r.range(2450, 2500)) : r.range(200, 2500);
     c.clockSource = r.one(3);
-    if (r.one(3)) { c.scaleTune = true; for (int& s : c.scale) s = r.range(-64, 63); }
+    if (r.one(3)) { c.scaleTune = true; for (int& s : c.scale) s = r.range(-100, 100); }
     c.attack = drawTime(r); c.decay = drawTime(r); c.sustain = r.range(0, 127); c.release = drawTime(r);
     c.aSens = r.one(2) ? 0 : r.range(-63, 63); c.dSens = r.one(2) ? 0 : r.range(-63, 63); c.rSens = r.one(2) ? 0 : r.range(-63, 63);
     c.timeKF = r.one(2) ? 0 : 10 * r.range(-20, 20);
@@ -831,7 +873,8 @@ std::vector<size_t> listedFields() {
     for (const auto* x : { &c.attack, &c.decay, &c.sustain, &c.release, &c.aSens, &c.dSens, &c.rSens, &c.timeKF, &c.patchCoarse, &c.portaTime, &c.portaVeloSens, &c.portaType }) add(*x);
     add(c.portamento); add(c.tvaOn);
     for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) })
-        for (const int* x : { &o->pAttack, &o->pDecay, &o->pSustain, &o->pRelease, &o->tAttack, &o->tDecay, &o->tSustain, &o->tRelease, &o->fAttack, &o->fDecay, &o->fSustain, &o->fRelease,
+        for (const int* x : { &o->pVel.aSens, &o->pVel.dSens, &o->pVel.rSens, &o->pVel.timeKF, &o->pVel.sens, &o->tVel.aSens, &o->tVel.dSens, &o->tVel.rSens, &o->tVel.timeKF, &o->tVel.sens, &o->fVel.aSens, &o->fVel.dSens, &o->fVel.rSens, &o->fVel.timeKF, &o->fVel.sens,
+                              &o->pAttack, &o->pDecay, &o->pSustain, &o->pRelease, &o->tAttack, &o->tDecay, &o->tSustain, &o->tRelease, &o->fAttack, &o->fDecay, &o->fSustain, &o->fRelease,
                               &o->oAttack, &o->oDecay, &o->oSustain, &o->oRelease, &o->oASens, &o->oDSens, &o->oRSens, &o->oTimeKF,
                               &o->lfoWave, &o->lfoRate, &o->lfoOffset, &o->lfoDelay, &o->lfoFadeMode, &o->lfoFade, &o->oscCoarse, &o->pitchKF }) add(*x);
     for (const Ctl::Cosm& k : c.cosm) {
@@ -965,30 +1008,124 @@ int XtToneProbe::run(int argc, char** argv) {
     };
     const int nOsc2 = waves.empty() ? 0 : nCases / 2;
     const int tickFrom = nCases + nSweep + nOsc2, nTick = 16 * 3;     // each COSM type, each kind of second update
-    for (int g = 0; g < tickFrom + nTick; ++g) {
+    // Then the firmware's own patches, each a zone of it at random, with the case's waves on its PCM OSCs and a tuning of their own in half of them; and
+    // random settings on waves with their own tuning and a backward loop of their own, which is what a V-Synth wave brings.  XT_TONE_PATCHES: a folder of .p00 instead of the image's.
+    std::vector<std::vector<uint8_t>> patchFiles;
+    {
+        std::string image = argv[1];
+        const auto slash = image.find_last_of('/');
+        image = (slash == std::string::npos ? std::string() : image.substr(0, slash + 1)) + "V-SynthXTDiskImage.bin.0.bin";
+        XtDiskImage disk;
+        if (disk.open(image))
+            for (const auto& e : disk.list("Internal.prj/Patch")) patchFiles.push_back(disk.read(e));
+        if (const char* dir = std::getenv("XT_TONE_PATCHES"))
+            for (const auto& e : std::filesystem::directory_iterator(dir)) {
+                if (e.path().extension() != ".p00") continue;
+                std::ifstream f(e.path(), std::ios::binary);
+                patchFiles.emplace_back(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+            }
+    }
+    const int patchFrom = tickFrom + nTick, nPatch = waves.empty() ? 0 : std::min((int)patchFiles.size(), nCases / 2);
+    const int tuneFrom = patchFrom + nPatch, nTune = waves.empty() ? 0 : nCases / 4;
+    // The firmware's own patches, every zone of each that has one, as xtPatchControls reads them.  What's patchOf's for these controls must be what's in the store:
+    // the whole-tone cases above hold patchOf's IDs to XtSynth's fields, so this holds a real patch to them.  XT_TONE_PATCHES: a folder of .p00 besides, not in fcheck.
+    {
+        // The effects' too: each block's slots count from the firmware's own table (0x897a100c), and a type the patch isn't on goes back to its defaults
+        const auto slotsOf = [&](int b) { int16_t v; std::memcpy(&v, fw.rom.data() + (0x897a100c - kRomBase) + 2 * b, 2); return (int)v; };
+        PatchTally t;
+        long fxChecks = 0, fxDifferent = 0;
+        int nPatches = 0, nZones = 0;
+        for (const auto& file : patchFiles) {
+            XtPatchFile p;
+            if (!xtPatchRead(file.data(), file.size(), p)) continue;
+            ++nPatches;
+            for (int z = 0; z < xtPatchZones(p.store); ++z) {
+                ++nZones;
+                patchRoundTrip(p.store, z, xtPatchControls(p.store, z, Ctl{}), t);
+            }
+            std::unordered_map<int, int> fx;
+            for (const int id : { 0x120, 0x121, 0x122, 0x177, 0x178, 0x179, 0x17a, 0x1fc, 0x1fd, 0x1fe, 0x230, 0x231 }) fx[id] = xtPatchValue(p.store, id);
+            for (int b = 0; b < 3; ++b) {
+                static constexpr int kTypeIds[3] = { 0x177, 0x1fc, 0x230 };
+                for (int ty = 0; ty < xtEffectTypes(b); ++ty) {
+                    int lo = 0, hi = -1;
+                    xtEffectTypeIds(b, ty, lo, hi);
+                    for (int id = lo; id <= hi; ++id) fx[id] = ty == xtPatchValue(p.store, kTypeIds[b]) ? xtPatchTyped(p.store, slotsOf(b), id) : xtTypedDesc(id)->def;
+                }
+            }
+            const auto list = xtPatchEffects(p.store);
+            ++fxChecks;
+            if (list.size() != fx.size()) ++fxDifferent;
+            for (const XtPatchFx& e : list) {
+                ++fxChecks;
+                const auto it = fx.find(e.id);
+                if (it == fx.end() || it->second != e.value) ++fxDifferent;
+            }
+        }
+        std::printf("patches: %d, %d zones, %ld values, %ld different; %ld of their effects' values, %ld different\n", nPatches, nZones, t.values, t.different, fxChecks, fxDifferent);
+        for (const auto& kv : t.byId) std::printf("  id %03x%s %ld different\n", kv.first & 0xffff, kv.first >> 16 ? " (COSM 2)" : "", kv.second);
+        total += t.different + fxDifferent;
+        if (rep.stop && t.different + fxDifferent) { std::printf("tone: 1 different, in the patches\n"); return 0; }
+    }
+    for (int g = 0; g < tuneFrom + nTune; ++g) {
         rep.caseNo = g;
-        const bool twoInTick = g >= tickFrom;
+        const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom, extra = patchCase || tuneCase;
+        const bool twoInTick = g >= tickFrom && !extra;
         if (g == nCases + nSweep) summary("tone");
         if (nOsc2 && g == tickFrom) summary("tone, a wave on OSC 2");
+        if (nPatch + nTune && g == patchFrom) summary("tone, a second update in a tick");
+        if (nPatch && g == tuneFrom) summary("tone, the firmware's patches");
         const bool sweep = g >= nCases && g < nCases + nSweep;
         const size_t sweepAt = sweep ? listed[(size_t)(g - nCases) / 4] : 0;
         const bool sweepCosm = sweep && sweepAt >= kCosmPrm && sweepAt < kCosmPrm + 64;
         const bool sweepDest = (sweep && sweepAt >= kDestOnly && sweepAt < kDestOnly + 79) || sweepCosm, sweepSens = sweep && sweepAt >= kDestKnob && sweepAt < kDestKnob + 79;
         const int sweepStage = sweep ? (g - nCases) % 4 : 0;
         const int sweepOn = sweep && !waves.empty() ? sweepWave(sweepAt) : 0;
-        const bool osc2Case = (g >= nCases + nSweep && !twoInTick) || sweepOn == 2;
+        Ctl patchCtl;
+        if (patchCase) {
+            XtPatchFile pf;
+            const auto& file = patchFiles[(size_t)((long)(g - patchFrom) * (long)patchFiles.size() / nPatch)];
+            if (!xtPatchRead(file.data(), file.size(), pf)) { std::fprintf(stderr, "patch\n"); return 1; }
+            patchCtl = xtPatchControls(pf.store, r.range(0, xtPatchZones(pf.store) - 1), Ctl{});
+            if (!patchCtl.on && !patchCtl.osc2.on) patchCtl.on = true;   // both off: XtSynth starts no voice at all (see the report)
+        }
+        const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase) || sweepOn == 2 || (tuneCase && g % 2 == 0);
         // one case in two plays a wave on OSC 1 (with the analog OSC 2 or alone); the last
         // ones a wave on OSC 2, over OSC 1 off, analog or on another wave
         const TestWave* wv2 = osc2Case ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
-        const TestWave* wv = (sweepOn == 1 || (!sweep && !twoInTick && g % 2 == 1)) && !waves.empty() ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
+        const TestWave* wv = (patchCase ? patchCtl.oscType == 1 : sweepOn == 1 || (!sweep && !twoInTick && g % 2 == 1)) && !waves.empty() ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
         if (wv && wv == wv2) wv = &waves[(size_t)((wv - waves.data() + 1) % (long)waves.size())];   // a wave's loop is its own
         Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr);
+        if (patchCase) {   // what a patch has, on what the wave has of its own
+            const Ctl d = ctl;
+            ctl = patchCtl;
+            ctl.rootKey = d.rootKey; ctl.loopMode = d.loopMode; ctl.loopStart = d.loopStart; ctl.loopEnd = d.loopEnd; ctl.origTempo = d.origTempo;
+            ctl.osc2.rootKey = d.osc2.rootKey; ctl.osc2.loopMode = d.osc2.loopMode; ctl.osc2.loopStart = d.osc2.loopStart; ctl.osc2.loopEnd = d.osc2.loopEnd; ctl.osc2.origTempo = d.osc2.origTempo;
+        }
+        // A wave's fine tuning and backward loop, in the firmware's memory and on its encoded form; no tuning in all the other cases
+        const auto waveOwn = [&](const TestWave& t) {
+            int headerCents = 0, fine = 0, tune = 0;
+            t.enc->bwdMode = -1;
+            if (extra && r.one(2)) {
+                headerCents = r.one(2) ? 0 : r.range(-60, 60);
+                fine = r.one(2) ? 0 : r.range(-100, 100);
+                tune = r.one(4) ? r.range(-1500, 1500) : r.range(-120000, 172956);   // as far as 250 real waves go
+                const int last = (int)t.fw.frames - 1, a = r.range(0, std::max(last - 32, 0));
+                if (r.one(2)) { t.enc->bwdMode = r.range(0, 2); t.enc->bwdStart = a; t.enc->bwdEnd = std::min(a + r.range(16, 4000), last); }
+            }
+            t.enc->tune = xtWaveTune(headerCents, fine, tune);
+            fw.c.wr32(t.fw.chunk[2] + 0x18, (uint32_t)headerCents);
+            fw.c.wr8(t.fw.chunk[4] + 0x1b, (uint8_t)fine);
+            fw.c.wr32(t.fw.chunk[4], (uint32_t)tune);
+        };
+        if (wv) waveOwn(*wv);
+        if (wv2) waveOwn(*wv2);
         // A long note under Tempo Sync, at the tempo's top and the Original Tempo's foot, with no loop: its beat position
         // runs past the wave's end, and a pad held and let go has the seek stop there (0x8950fed0, 0x89510bf0)
-        const bool farCase = !sweep && !twoInTick && g % 23 == 7 && wv && r.one(2);
+        const bool farCase = !sweep && !twoInTick && !patchCase && g % 23 == 7 && wv && r.one(2);
         // And the others of those long notes: a finger going backward past the wave's start, held there a while and let go,
         // which a gesture over MIDI reaches easily and the short random ones don't
-        const bool backCase = !sweep && !twoInTick && g % 23 == 7 && wv && !farCase;
+        const bool backCase = !sweep && !twoInTick && !patchCase && g % 23 == 7 && wv && !farCase;
         if (backCase) { ctl.on = ctl.timeTrip = ctl.beatKeep = true; ctl.loop = false; }
         if (farCase) {
             ctl.on = ctl.tempoSync = ctl.timeTrip = ctl.beatKeep = true;
@@ -1073,6 +1210,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 c.wsLevel = c.wsDrive = c.wsTone = c.odLevel = c.odDrive = c.odTone = c.ampLevel = c.ampGain = 64;
                 c.resBalance = c.fsBalance = c.lofiBalance = 50;
                 c.lofiBit = 2; c.lofiRate = 1; c.kf = c.kf1 = c.kf2 = 0;
+                c.tbKf = c.tbHpfKf = c.resSizeKf = c.fsDepthKf = c.lofiFilterKf = c.wsToneKf = c.odToneKf = 0;   // or a key's follow can hold a target at its limit
                 c.combDetune = 0;
                 for (Ctl::Cosm::SideBand& b : c.sb) { b.hpf = b.q = b.lpf = b.width = 64; b.detune = 0; }
                 c.cutoffLfo = c.resoLfo = c.lfo1 = c.lfo2 = c.tbLfo = c.combDetuneLfo = c.combToneLfo = c.resSizeLfo = c.resBalanceLfo = c.fsDepthLfo = c.fsBalanceLfo = c.lofiFilterLfo = c.lofiBalanceLfo = c.wsDriveLfo = c.wsToneLfo = c.odDriveLfo = c.odToneLfo = c.ampGainLfo = 20;
@@ -1111,7 +1249,7 @@ int XtToneProbe::run(int argc, char** argv) {
         // At random this is rare enough for 2000 cases to miss it.  Only with OSC 1 on already:
         // until v108 a wave newly played could leave memory (band reads), which ended a case early
         // and changed the draws of all the cases after it.
-        if (wv && wv->channels == 2 && wv->type != 1 && ctl.on && g % 10 == 3) {
+        if (!patchCase && wv && wv->channels == 2 && wv->type != 1 && ctl.on && g % 10 == 3) {
             ctl.osc2.on = true;
             ctl.structure = g % 20 == 3 ? 1 : g % 40 == 13 ? 0 : 2;   // on the mix (Type1) what follows is the bus's, not OSC 2's
             ctl.cosm[0].on = true;
@@ -1119,16 +1257,15 @@ int XtToneProbe::run(int argc, char** argv) {
             for (Ctl::Cosm::SideBand& b : ctl.cosm[0].sb) b.detuneOwn = b.widthOwn = 40;
         }
         // And COSM 2 on a stereo OSC 2's buffer in the third Structure, next to the last tone's mix
-        if (wv2 && wv2->channels == 2 && wv2->type != 1 && ctl.osc2.on && ctl.structure == 2) {
+        if (!patchCase && wv2 && wv2->channels == 2 && wv2->type != 1 && ctl.osc2.on && ctl.structure == 2) {
             ctl.cosm[1].on = true;
             ctl.cosm[1].type = g % 4 == 0 ? 5 : 6;
             for (Ctl::Cosm::SideBand& b : ctl.cosm[1].sb) b.detuneOwn = b.widthOwn = 40;
         }
         // what the case does besides one note: 0 none, 1 a second note on a POLY part,
         // 2 on a MONO part with Legato, 3 on a MONO part without
-        const int kind = sweep || twoInTick ? 2 : g % 5 == 0 ? 1 : g % 5 == 1 ? 2 : g % 5 == 2 ? 3 : 0;
-        ctl.mono = kind >= 2;
-        ctl.legato = kind == 2;
+        const int kind = patchCase ? (ctl.mono ? (ctl.legato ? 2 : 3) : g % 2) : sweep || twoInTick ? 2 : g % 5 == 0 ? 1 : g % 5 == 1 ? 2 : g % 5 == 2 ? 3 : 0;
+        if (!patchCase) { ctl.mono = kind >= 2; ctl.legato = kind == 2; }
         if (wv) {
             syn.setSample(wv->enc);
             fw.wave = wv->fw;
@@ -1148,7 +1285,7 @@ int XtToneProbe::run(int argc, char** argv) {
         const int raw[2] = { sweep || twoInTick ? 48 : r.range(0, 127), sweep || twoInTick ? 72 : r.range(0, 127) }, vel[2] = { r.range(1, 127), r.range(1, 127) }, relVel[2] = { r.range(1, 127), r.range(1, 127) };
         const int nBlocks = sweep || twoInTick ? 90 : g % 23 == 7 ? 700 : 60 + r.range(0, 120);     // some long enough to run past a wave's end
         // Hold itself as a source, on a release time, let go after the key: the release takes the new sum though its update has not run
-        const bool holdSource = !sweep && !twoInTick && !farCase && !backCase && r.one(8);
+        const bool holdSource = !sweep && !twoInTick && !patchCase && !farCase && !backCase && r.one(8);
         if (holdSource) {
             static const int kRel[] = { 0x44, 0x10, 0x07, 0x0a, 0x0d, 0x25, 0x2f, 0x32, 0x3a, 0x3d };
             ctl.matrix[0] = {};
@@ -1162,7 +1299,7 @@ int XtToneProbe::run(int argc, char** argv) {
         // so what takes the new value is whatever next reads the sums
         // X-Y mode's pair: a finger on Pad Assign X and Y, each a controller's message, which the Matrix reads as PAD-X, PAD-Y,
         // +PAD-X and +PAD-Y.  Pad Mode is the XT's own pad's choice of pair, and no tone generator code reads it.
-        const bool xyCase = !sweep && !twoInTick && !farCase && !backCase && !holdSource && r.one(8);
+        const bool xyCase = !sweep && !twoInTick && !patchCase && !farCase && !backCase && !holdSource && r.one(8);
         if (xyCase) {
             if (r.one(2)) { ctl.assign[6] = 80; ctl.assign[7] = 81; }
             else { ctl.assign[6] = r.range(12, 31); ctl.assign[7] = r.range(33, 63); }
@@ -1172,7 +1309,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 ctl.matrix[i].sens[0] = r.range(-63, 63);
             }
         }
-        const bool padSource = !sweep && !twoInTick && !farCase && !backCase && !holdSource && !xyCase && r.one(6);
+        const bool padSource = !sweep && !twoInTick && !patchCase && !farCase && !backCase && !holdSource && !xyCase && r.one(6);
         if (padSource) {
             // All of an OSC's Releases on note values, in some: a key-off then forms none of that OSC's envelope sums, which only a source with no update of its own can show.
             // Without a case for it this rests on four draws lining up.
@@ -1203,22 +1340,22 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         // A voice keeps an OSC SYNC note's flag for its next note, and any update clears it (0x894f1c60).  So that next note, on
         // another MOD Type, with analog OSCs to hear it on, and an early update that moves one knob, ahead of the other draws' updates.
-        const bool syncAfter = !sweep && !twoInTick && !wv && !wv2 && syn.voice[0].mod.syncOn() && r.one(2);
+        const bool syncAfter = !sweep && !twoInTick && !patchCase && !wv && !wv2 && syn.voice[0].mod.syncOn() && r.one(2);
         if (syncAfter) { ctl.mod.on = true; ctl.mod.type = r.range(0, 3); ctl.on = ctl.osc2.on = true; }
         // Now and then, on a MONO part, the second note waits for the first to have finished its release, and comes
         // in the very block of the tick that will end it: truncating a voice that is already over
-        const bool chaseEnd = kind == 3 && !sweep && !twoInTick && !farCase && !backCase && raw[0] != raw[1] && r.one(3);
+        const bool chaseEnd = kind == 3 && !sweep && !twoInTick && !patchCase && !farCase && !backCase && raw[0] != raw[1] && r.one(3);
         if (chaseEnd) { ctl.release = r.range(0, 20); ctl.attack = r.range(1, 40); ctl.tvaOn = true; }   // the new note starts from no gain, so the old one's last trace can be seen
         // Key-unsynced LFOs on a tone with no note value, the Rate moved onto one, and a second tone following
         // them: it starts with the first's clock step, and its first update, here the bender's, gives it its own
-        const bool followCase = kind == 1 && !sweep && !twoInTick && raw[0] != raw[1] && r.one(4);
+        const bool followCase = kind == 1 && !sweep && !twoInTick && !patchCase && raw[0] != raw[1] && r.one(4);
         if (followCase) {
             for (int* k : { &ctl.lfoRate, &ctl.osc2.lfoRate, &ctl.cosm[0].lfoRate, &ctl.cosm[1].lfoRate, &ctl.tvaLfoRate }) *k = r.range(0, 127);
             ctl.lfoKeySync = ctl.osc2.lfoKeySync = ctl.cosm[0].lfoKeySync = ctl.cosm[1].lfoKeySync = ctl.tvaLfoKeySync = false;
         }
         const int secondAt = twoInTick || chaseEnd ? -1 : sweep ? 1 : followCase ? r.range(3, 12) : kind && raw[0] != raw[1] ? r.range(1, 30) : -1;
         const int offAt[2] = { twoInTick || farCase || backCase ? 1000 : sweep ? (sweepStage == 3 ? 3 : 1000) : padSource ? r.range(35, 60) : 20 + r.range(0, 40), twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
-        const int liveAt = twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : followCase ? r.range(1, secondAt - 1) : syncAfter ? r.range(1, 3) : padSource ? r.range(12, 30) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
+        const int liveAt = patchCase ? -1 : twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : followCase ? r.range(1, secondAt - 1) : syncAfter ? r.range(1, 3) : padSource ? r.range(12, 30) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
         const int followAt = followCase ? secondAt + r.range(1, 8) : -1;
         // the free-running LFOs' phases, once a note has shown which objects they are
         for (int n = 0; n < 3; ++n) {
@@ -1703,6 +1840,8 @@ int XtToneProbe::run(int argc, char** argv) {
         bool over = false, leftOff = false;
         if (dumpWhich && (dumpWhich[0] == 'a' || std::atoi(dumpWhich) == g))
         {
+            for (const OscC* o : { static_cast<const OscC*>(&ctl), static_cast<const OscC*>(&ctl.osc2) })
+                std::printf("  osc: type %d coarse %d fine %d pitch %d kf %d random %d key %d robot %d; patch coarse %d fine %d octave %d porta %d; time %d offset %d kf %d\n", o->oscType, o->oscCoarse, o->oscFine, o->oscPitch, o->pitchKF, o->randomPitch, o->rootKey, o->robot, ctl.patchCoarse, ctl.patchFine, ctl.octave, ctl.portamento, o->oscTime, o->oscTimeOffset, o->oscTimeKF);
             std::printf("  assign"); for (int i = 0; i < 12; ++i) std::printf(" %d", ctl.assign[i]);
             std::printf("; system"); for (uint32_t i = 0; i < 10; ++i) std::printf(" %d", (int8_t)fw.c.rd8(0x89d276b4 + 0x844 + i));
             std::printf("; matrix"); for (int i = 0; i < 8; ++i) std::printf(" [%d: %d %d, %d %d]", ctl.matrix[i].source, ctl.matrix[i].dest[0], ctl.matrix[i].sens[0], ctl.matrix[i].dest[1], ctl.matrix[i].sens[1]);
@@ -1841,6 +1980,7 @@ int XtToneProbe::run(int argc, char** argv) {
             if (syn.clockExt) clockFields(syn, blk);
             if (leftMemory) {                            // a player's read outside all memory: the note ends here
                 ++wild;
+                if (rep.first) std::printf("  case %d block %d: left memory: %s\n", g, blk, fw.c.error().c_str());
                 leftOff = true;
                 break;
             }
@@ -1947,7 +2087,7 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         fw.c.write(kFmLines, syn.modShared.line, sizeof(syn.modShared.line));
     }
-    summary("tone, a second update in a tick");
+    summary(nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
     // The clock's rate.  Above the firmware's clock runs on XtSynth's, which could be any speed: here
     // two minutes (165375 blocks) against the firmware's own timer routine, within one clock.
     {

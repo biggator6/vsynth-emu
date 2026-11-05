@@ -34,6 +34,10 @@ struct XtEncoded {
     XtMbBands bands;
     XtMbWave wave;
     XtSoloPlan solo;               // SOLO
+    // What a V-Synth wave brings of its own (0 in anything imported): its fine tuning (xtWaveTune), and a backward loop
+    // that isn't the forward one, its region in frames and Loop Mode (the loop record's +0x10, +0xc and +0x19).  -1: the same.
+    XtWaveTune tune;
+    int bwdMode = -1, bwdStart = 0, bwdEnd = 0;
 };
 
 // The user's rom.2: loads the encoders' and players' tables and opens the
@@ -88,6 +92,13 @@ public:
         // (time: ±3 at ±60, ±5 at ±63; formant: d/63 octaves)
         int tAttack = 0, tDecay = 64, tSustain = 0, tRelease = 64, tDepth = 0;
         int fAttack = 0, fDecay = 64, fSustain = 0, fRelease = 64, fDepth = 0;
+        // Each of those three's velocity and key: Curve 0 (off), 1..7 and Sens −63..+63, whose factor scales its depth, and
+        // the velocity → time sensitivities and Time KF −200..+200, as the OSC amp envelope has them.  The XT's defaults.
+        struct EnvVelocity {
+            int curve = 0, sens = 32, aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
+            bool operator==(const EnvVelocity&) const = default;
+        };
+        EnvVelocity pVel, tVel, fVel;
         // LFO: waveform 0..7 in the XT's order (SIN, TRI, SAW, SQR, RND, TRP,
         // S&H, CHAOS), rate/delay/fade 0..127, offset 0..4 (−100…+100), fade
         // mode 0..3 (ON <<, ON >>, OFF <<, OFF >>); its pitch depth −63..+63
@@ -125,7 +136,7 @@ public:
         OscControls osc2 = [] { OscControls o; o.on = false; o.oscType = 0; return o; }();   // off until switched on, as the plugin has always played
         // the patch's tuning (XtOsc XtTuning): Coarse Tune −48..+48 and Fine
         // Tune −50..+50 (cents), with Pitch Shift (semitones, to the cent)
-        // added to them; Scale Tune (the switch, and C…B −64..+63 cents);
+        // added to them; Scale Tune (the switch, and C…B −100..+100 cents);
         // Bend Range Up and Down 0..48 semitones
         float pitchSemis = 0;
         int patchCoarse = 0, patchFine = 0;

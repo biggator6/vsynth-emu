@@ -299,8 +299,9 @@ the last in place.
 
 **V-Synth's own files.** A `.vpw` loads wherever a WAV does (`XtVpwFormat`), its
 RDAC audio unpacked by the firmware's own routine; on Auto it encodes as the type
-the wave says it is. `XtFiles` also reads a `.p00` into the firmware's store, not yet
-applied to the plugin. research/HARDWARE_FIRMWARE.md, "V-Synth's files".
+the wave says it is. `XtFiles` also reads a `.p00` into the firmware's store, and
+`XtPatch` turns one zone of that into `XtSynth::Controls`: `loadPatch` sets the parameters
+and effects from it and loads its waves from the project's `Wave` folder.
 
 **Checks:**
 - At a 44.1 kHz host rate, `XtSynth` output is bit-exact against the

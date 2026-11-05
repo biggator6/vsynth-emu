@@ -57,10 +57,19 @@ float xtOscExp2(float x);
 
 // The voice's targets (0x894f3ac0/0x894f3c90 walk, 0x894f3b30/0x894f3d40
 // formant ratio) from the converter's values and the envelope and LFO
-// outputs: walk = (time + env·envDepth + lfo·lfoDepth), clamped to ±5;
+// outputs: walk = (time + env·envDepth + lfo·lfoDepth), clamped to ±5, × the wave's factor;
 // formant = 2^(formant + env·envDepth + lfo·lfoDepth), clamped to [0.5, 2].
-float xtOscWalk(float time, float env, float envDepth, float lfo, float lfoDepth);
-float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, float lfoDepth);
+float xtOscWalk(float time, float env, float envDepth, float lfo, float lfoDepth, float waveFactor = 1.0f);
+float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, float lfoDepth, float waveFactor = 1.0f);
+
+// A wave's own tuning, as the voice setup (0x894f21c0) forms it from the header's s32 at +0x18 and the loop record's s8 at
+// +0x1b and s32 at +0, the last two in 1/100 cent: the voice's +0x994 and +0x998 (xtPitchTarget's offset and detune; 0 with
+// Robot Voice), and the factor on the formant ratio and the walk (+0x9a0, +0x99c), which stays with Robot Voice too.
+struct XtWaveTune {
+    float offset = 0.0f, detune = 0.0f, factor = 1.0f;
+    bool operator==(const XtWaveTune&) const = default;
+};
+XtWaveTune xtWaveTune(int headerCents, int fine, int tune);
 
 // ── Pitch ───────────────────────────────────────────────────────────────────
 // The note's pitch in 1/1000 semitone (0x894e1250): (60 + Coarse)·1000 +

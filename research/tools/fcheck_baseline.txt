@@ -259,15 +259,22 @@ env 30 70 90 50 80 500 2: identical
 == xt_tone
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
-tone: 4251 notes, 2312 taken by a sounding tone, 338 truncated, 369582 blocks, 30750564 checks
-tone: 0 notes left off, a read outside memory; 417858 band reads far from their wave
+patches: 512, 1558 zones, 538468 values, 0 different; 448512 of their effects' values, 0 different
+tone: 4370 notes, 2429 taken by a sounding tone, 335 truncated, 378801 blocks, 31238231 checks
+tone: 0 notes left off, a read outside memory; 400426 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1354 notes, 397 taken by a sounding tone, 176 truncated, 118501 blocks, 10552082 checks
-tone, a wave on OSC 2: 0 notes left off, a read outside memory; 670068 band reads far from their wave
+tone, a wave on OSC 2: 1355 notes, 362 taken by a sounding tone, 173 truncated, 116066 blocks, 10604007 checks
+tone, a wave on OSC 2: 0 notes left off, a read outside memory; 578528 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 241107 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 244204 checks
 tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
+tone, the firmware's patches: 718 notes, 171 taken by a sounding tone, 29 truncated, 61529 blocks, 6413006 checks
+tone, the firmware's patches: 0 notes left off, a read outside memory; 43364 band reads far from their wave
+tone, the firmware's patches: 0 different
+tone, a wave's own tuning: 668 notes, 181 taken by a sounding tone, 84 truncated, 54888 blocks, 5376755 checks
+tone, a wave's own tuning: 0 notes left off, a read outside memory; 274274 band reads far from their wave
+tone, a wave's own tuning: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
 tone, the clock's rate: 0 notes left off, a read outside memory; 0 band reads far from their wave
@@ -627,6 +634,8 @@ band 5 vocal.bin 1 0.03 -0.2 3000 0:0.015: ENSEMBLE, 3000 frames: max |firmware 
 band 3 drum.bin 2 0.5 -0.5 8000 0:0.3: BACKING, 8000 frames: max |firmware - port| 7.01e-46, difference -257.2 dB against the signal (rms 0.0001), first at 3423
 == xt_files
 rdac: 416 waves (367 mono, 49 stereo; 268 SOLO, 135 BACKING, 13 ENSEMBLE), 19764803 frames, 0 unread, 0 different from the firmware's whole-wave routines, a block's edge 0.999 of the mean step, hash 9d163e39a6de617a
+typed: 123840 values against the firmware's read, 0 different
+a wave's own: 0 wrong
 patches: 512 in the image (lengths 0x146c 0, 0x14ac 0, 0x14f2 0, other 512), 512 names read alike, 4162048 values, 12 out of range, 520256 against the firmware's reads, 0 different, hash 82034c2071b9a07a
 short: a patch using the Multi Step Modulator in 77 fields, cut before it 98 values the firmware's defaults, after it 98 its own, 0 not; 3 of those defaults aren't the descriptors'
 == xt_fx

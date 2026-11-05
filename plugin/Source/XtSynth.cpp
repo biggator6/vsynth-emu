@@ -251,7 +251,7 @@ XtAnalogBlock XtSynth::analogBlock(const Voice& v, const OscVoice& s, const OscC
     a.pwLfo += v.mx[dL + 2];
     a.fatLfo += v.mx[dL + 3];
     const XtAnalogMod m{ v.mx[OscTime + dO], v.mx[OscFormant + dO], v.beam[0], v.beam[1] };
-    return xtAnalogBlock(a, v.note, xtPitch10(v.note, coarse, 10 * o.pitchKF, fine), o.waveGain, 1.0f, 1.0f, &s == &v.osc2, m);
+    return xtAnalogBlock(a, v.note, xtPitch10(v.note, coarse, 10 * o.pitchKF, fine), o.waveGain, xtCosmVelocity(v.vel, o.fVel.sens, o.fVel.curve), xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve), &s == &v.osc2, m);
 }
 
 // The note's object as a conversion pass reads it (the getters 0x894e7010…, 0x894e9fe0): the Matrix's sums, and
@@ -315,12 +315,18 @@ float XtSynth::pitchKnob(const Voice& v, const OscVoice& s, const OscControls& o
 void XtSynth::targets(const Voice& v, const OscVoice& s, const OscControls& o, float& A, float& F, float& walk, float& g) const {
     using namespace xtmx;
     const int dO = &s == &v ? 0 : Osc2, dL = &s == &v ? OscLfoRate : Osc2Lfo;
-    A = xtPitchTarget(noteCents(v, s, o, v.note), s.penv.level(), xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63)), s.lfo.out(),
-                      xtPitchDepthCents((float)std::clamp(o.lfoPitchDepth + v.mx[dL + 1], -63, 63)), pitchKnob(v, s, o), s.porta.value());
+    // The wave's own tuning: none on an analog voice, and with Robot Voice none on the pitch (0x894f21c0)
+    const XtWaveTune tune = !s.analog && s.wave ? s.wave->tune : XtWaveTune{};
+    const bool tuned = !s.robot;
+    // Each envelope's depth takes its velocity factor (1 with no curve)
+    const auto withVel = [&v](float depth, const OscControls::EnvVelocity& e) { return xtf::mul(depth, xtCosmVelocity(v.vel, e.sens, e.curve)); };
+    A = xtPitchTarget(noteCents(v, s, o, v.note), s.penv.level(), withVel(xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63)), o.pVel), s.lfo.out(),
+                      xtPitchDepthCents((float)std::clamp(o.lfoPitchDepth + v.mx[dL + 1], -63, 63)), pitchKnob(v, s, o), s.porta.value(),
+                      tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);
     F = xtOscFormantRatio(xtOscFormant(o.oscFormant, o.oscFormantKF, v.note, v.mx[OscFormant + dO]), s.fenv.level(),
-                          xtOscFormantEnvDepth(o.fDepth), s.lfo.out(), xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]));
+                          withVel(xtOscFormantEnvDepth(o.fDepth), o.fVel), s.lfo.out(), xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]), tune.factor);
     walk = xtOscWalk(xtOscTime(o.oscTime, o.oscTimeOffset, o.oscTimeKF, v.note, v.mx[OscTime + dO], v.beam[1] - 3 * v.beam[0]), s.tenv.level(),
-                     xtOscTimeEnvDepth(o.tDepth), s.lfo.out(), xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]));
+                     withVel(xtOscTimeEnvDepth(o.tDepth), o.tVel), s.lfo.out(), xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), tune.factor);
     g = xtOscEnergy(o.energy);
 }
 
@@ -350,6 +356,11 @@ XtLoop XtSynth::waveLoop(const OscVoice& s, const OscControls& o) const {
     l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 2);
     l.fwdStart = l.bwdStart = a;
     l.fwdEnd = l.bwdEnd = b;
+    if (s.wave->bwdMode >= 0) {
+        l.bwdMode = std::clamp(s.wave->bwdMode, 0, 2);
+        l.bwdStart = s.wave->bwdStart;
+        l.bwdEnd = s.wave->bwdEnd;
+    }
     return l;
 }
 
@@ -605,6 +616,9 @@ XtEnvParams XtSynth::oscEnvParams(const Voice& v, const OscVoice& s, int which, 
     const int16_t* m = v.mx + (&s == &v ? xtmx::OscEnv : xtmx::Osc2Env) + 3 * which;
     k.tempo10 = v.tempo10;
     k.attack = withSum(a, m[0]); k.decay = withSum(d, m[1]); k.sustain = su; k.release = withSum(r, m[2]);
+    const OscControls& o = &s == &v ? static_cast<const OscControls&>(ctl) : ctl.osc2;
+    const OscControls::EnvVelocity& e = which == 0 ? o.pVel : which == 1 ? o.tVel : o.fVel;
+    k.aSens = e.aSens; k.dSens = e.dSens; k.rSens = e.rSens; k.timeKF = e.timeKF;
     return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);
 }
 
@@ -634,9 +648,9 @@ void XtSynth::setControls(const Controls& c) {
     struct OscDiff { bool penv, tenv, fenv, oenv, key; };
     auto oscDiff = [&](const OscControls& n, const OscControls& o) {
         OscDiff d;
-        d.penv = n.pAttack != o.pAttack || n.pDecay != o.pDecay || n.pSustain != o.pSustain || n.pRelease != o.pRelease;
-        d.tenv = n.tAttack != o.tAttack || n.tDecay != o.tDecay || n.tSustain != o.tSustain || n.tRelease != o.tRelease;
-        d.fenv = n.fAttack != o.fAttack || n.fDecay != o.fDecay || n.fSustain != o.fSustain || n.fRelease != o.fRelease;
+        d.penv = n.pAttack != o.pAttack || n.pDecay != o.pDecay || n.pSustain != o.pSustain || n.pRelease != o.pRelease || n.pVel != o.pVel;
+        d.tenv = n.tAttack != o.tAttack || n.tDecay != o.tDecay || n.tSustain != o.tSustain || n.tRelease != o.tRelease || n.tVel != o.tVel;
+        d.fenv = n.fAttack != o.fAttack || n.fDecay != o.fDecay || n.fSustain != o.fSustain || n.fRelease != o.fRelease || n.fVel != o.fVel;
         d.oenv = n.oAttack != o.oAttack || n.oDecay != o.oDecay || n.oSustain != o.oSustain || n.oRelease != o.oRelease
               || n.oASens != o.oASens || n.oDSens != o.oDSens || n.oRSens != o.oRSens || n.oTimeKF != o.oTimeKF;
         d.key = n.oscCoarse != o.oscCoarse || c.patchCoarse != ctl.patchCoarse || n.pitchKF != o.pitchKF || c.pitchSemis != ctl.pitchSemis;
@@ -883,7 +897,8 @@ void XtSynth::startVoice(int raw, int note, int vel) {
         if (!c.on || c.type < 4 || c.type > 6) continue;
         const bool second = xtCosmOsc(v->structure, k) != 0;
         const OscVoice& s = second ? v->osc2 : *v;
-        const float root = xtCosmRootHz(second ? ctl.osc2.rootKey : ctl.rootKey, s.robot || s.analog || !s.on);   // the analog voice's root is 440 too (0x894f21c0)
+        const XtWaveTune tune = s.on && !s.analog && s.wave ? s.wave->tune : XtWaveTune{};
+        const float root = xtCosmRootHz(second ? ctl.osc2.rootKey : ctl.rootKey, s.robot || s.analog || !s.on, tune.offset, tune.detune);   // the analog voice's root is 440 too (0x894f21c0)
         if (c.type == 4)
             c.comb.noteOn(combBlock(*v, k), s.curA, root, c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
                           c.lfo.out(), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());

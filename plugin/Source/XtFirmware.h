@@ -33,6 +33,7 @@ public:
     ~XtFwPatchReader();
     void load(const std::vector<uint8_t>& store);
     bool read(int at, int id, int& raw, int& value);
+    bool readTyped(int at, int base, int id, int& value);   // 0x89481d70: a type's parameter, in the block's slots counted from `base`
 private:
     struct Impl;
     std::unique_ptr<Impl> impl;

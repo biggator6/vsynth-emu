@@ -4,6 +4,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "VariphraseEngine.h"
 #include "XtSynth.h"
+#include "XtFiles.h"
 #include "XtFxControl.h"
 #include <climits>
 #include <mutex>
@@ -66,7 +67,17 @@ public:
     // as the selected Encode Type (the XT path needs the firmware image).  Each
     // OSC has its own wave (osc: 0 OSC 1, 1 OSC 2), as on the XT; the engine path
     // without the firmware plays OSC 1's.
-    void loadFile(const juce::File& file, int osc = 0);
+    // A V-Synth wave (.vpw, or a project's .wav) brings its own Original Key, Tempo, loop and fine tuning to OSC's parameters unless waveSettings is false, as for a saved
+    // session whose parameters came back with it.
+    void loadFile(const juce::File& file, int osc = 0, bool waveSettings = true);
+    // Message thread.  A V-Synth patch (.p00): one zone of it to the parameters and the effects, and the waves it names, from the Wave folder beside its own.  False, and the status
+    // says why, if it's no patch.  The effects sound only with the Effects switch on, which a patch leaves as it is.  The name, and what it asks for that isn't here (XtPatch.h), for the editor.
+    bool loadPatch(const juce::File& file, int zone = 0);
+    void applyPatch(const std::string& name, const std::vector<uint8_t>& store, int zone, const juce::File& waveFolder);
+    juce::String getPatchName() const { return patchName_; }
+    juce::String getPatchNote() const { return patchNote_; }
+    juce::File lastPatchFolder() const;
+    XtSynth::Controls currentControls() const { return xtControls(); }
 
     juce::String getLoadedFileName(int osc = 0) const  { return wave_[osc].name; }
     bool         hasFileLoaded(int osc = 0)    const   { return wave_[osc].loaded.load(); }
@@ -127,6 +138,8 @@ private:
         double                   rate = 44100.0;
         int                      bits = 16;
         int                      ownType = 0;        // a V-Synth wave's own encode type (XtVpwFormat)
+        bool                     isOwn = false;      // a V-Synth wave, and what it says of itself (its audio left out)
+        XtWaveFile               own;
         std::atomic<int>         gen { 0 };          // a newer encode request discards an older result
         std::atomic<bool>        reencode { false }; // its Encode Type or Depth changed
     };
@@ -149,6 +162,11 @@ private:
 
     void syncParamsToEngine();
     XtSynth::Controls xtControls() const;
+    void setControls(const XtSynth::Controls& c);
+    void waveToParameters(const XtWaveFile& wave, int osc);
+    void takeWave(const XtWaveFile& wave, const juce::File& file, int osc);
+    void unloadWave(int osc);
+    juce::String patchName_, patchNote_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VSynthEmuProcessor)
 };

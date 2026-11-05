@@ -145,6 +145,12 @@ bool XtFwPatchReader::read(int at, int id, int& raw, int& value) {
     value = (int)r0;
     return true;
 }
+bool XtFwPatchReader::readTyped(int at, int base, int id, int& value) {
+    uint32_t r0 = 0;
+    if (!impl->m.cpu.call(0x89481d70, { kSamp + (uint32_t)at, 0x897a167cu + 12u * (uint32_t)base, 0x897a56d8u + 8u * (uint32_t)(id - 0x55d) }, kStack, &r0)) return false;
+    value = (int)r0;
+    return true;
+}
 // The reads are 0x8950e980's and 0x8950eb60's (mono, stereo; each twice): the bytes at r7,
 // from the band at r5 (for the kernel's, a few bytes before it), r7 loaded again before each.
 void xtFwHookBandReads(Sh4& c, XtFwBandReads& reads) {

@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include <array>
 #include "PluginEditor.h"
+#include "XtPatch.h"
 #include "XtVpwFormat.h"
 
 // ─── Parameter IDs ───────────────────────────────────────────────────────────
@@ -214,12 +215,14 @@ VSynthEmuProcessor::createParameterLayout() {
             for (int i = 0; i < 17; ++i) if (t.trim() == kNotes[i]) return 128 + i;
             return t.getIntValue();
         });
+    // A wave's own loop and tempo hold more than a box can show
+    const auto twoPlaces = juce::AudioParameterFloatAttributes().withStringFromValueFunction([](float v, int) { return juce::String(v, 2); });
     params.push_back(std::make_unique<juce::AudioParameterFloat>(Params::kPatchTempo, "Patch Tempo", juce::NormalisableRange<float>(20.0f, 250.0f, 0.1f), 120.0f));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kClockSource, "Clock Source", juce::StringArray { "INTERNAL", "HOST" }, 0));
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kTripPad, "Time Trip", 0, 127, 0,
         juce::AudioParameterIntAttributes().withStringFromValueFunction([](int v, int) { return v == 0 ? juce::String("OFF") : juce::String(v); })));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTempoSync, "Tempo Sync", false));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.01f), 120.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.0001f), 120.0f, twoPlaces));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kTripSw, "Time Trip Switch", true));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kBeatKeep, "Beat Keep", true));
 
@@ -310,15 +313,15 @@ VSynthEmuProcessor::createParameterLayout() {
     {
         static const char* const names[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
         for (int i = 0; i < 12; ++i)
-            params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kScaleTunes[i], juce::String("Scale Tune ") + names[i], -64, 63, 0));
+            params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kScaleTunes[i], juce::String("Scale Tune ") + names[i], -100, 100, 0));
     }
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kLoop, "Loop", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kLoopMode, "Loop Mode",
         juce::StringArray { "One Shot", "One Way", "Alternate" }, 1));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 0.0f, "%"));
+        Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f, twoPlaces));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        Params::kLoopEnd, "Loop End", juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 100.0f, "%"));
+        Params::kLoopEnd, "Loop End", juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f, twoPlaces));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kPorta, "Portamento", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kPortaMode, "Portamento Mode",
         juce::StringArray { "NORMAL", "LEGATO" }, 0));
@@ -662,7 +665,7 @@ VSynthEmuProcessor::createParameterLayout() {
         };
         params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kOscSwitch), n + "Switch", false));
         params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kTempoSync), n + "Tempo Sync", false));
-        params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kOrigTempo), n + "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.01f), 120.0f));
+        params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kOrigTempo), n + "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.0001f), 120.0f, twoPlaces));
         params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kTripSw), n + "Time Trip Switch", true));
         params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kBeatKeep), n + "Beat Keep", true));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kOscType), n + "Type", juce::StringArray { "ANALOG", "PCM" }, 0));
@@ -755,9 +758,9 @@ VSynthEmuProcessor::createParameterLayout() {
         params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kLoopMode), n + "Loop Mode",
             juce::StringArray { "One Shot", "One Way", "Alternate" }, 1));
         params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kLoopStart), n + "Loop Start",
-            juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 0.0f, "%"));
+            juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f, twoPlaces));
         params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kLoopEnd), n + "Loop End",
-            juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f), 100.0f, "%"));
+            juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f, twoPlaces));
     }
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kModSwitch, "MOD Switch", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kModType, "MOD Type",
@@ -767,6 +770,20 @@ VSynthEmuProcessor::createParameterLayout() {
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kModRelease, "MOD Release Time", 0, 127, 0));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kStructure, "Structure Type",
         juce::StringArray { "Type1", "Type2", "Type3" }, 0));
+    // Each OSC's pitch, time and formant envelopes' velocity and key.  A host's and a patch's: no control on the editor yet (UI_DESIGN.md)
+    for (int k = 0; k < 2; ++k)
+        for (int e = 0; e < 3; ++e) {
+            static const char* const kEnvs[3] = { "pitchEnv", "timeEnv", "formantEnv" };
+            static const char* const kNames[3] = { "Pitch Env ", "Time Env ", "Formant Env " };
+            const juce::String id = kEnvs[e], name = juce::String(k ? "OSC 2 " : "") + kNames[e];
+            const auto intP = [&](const char* sfx, const char* label, int lo, int hi, int def) { params.push_back(std::make_unique<juce::AudioParameterInt>(Params::oscId(k, id + sfx), name + label, lo, hi, def)); };
+            intP("VelCurve", "Velocity Curve", 0, 7, 0);
+            intP("VelSens", "Velocity Sens", -63, 63, 32);
+            intP("AttackSens", "Attack Velocity Sens", -63, 63, 0);
+            intP("DecaySens", "Decay Velocity Sens", -63, 63, 0);
+            intP("ReleaseSens", "Release Velocity Sens", -63, 63, 0);
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(Params::oscId(k, id + "TimeKF"), name + "Time KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
+        }
 
     return { params.begin(), params.end() };
 }
@@ -881,6 +898,7 @@ VSynthEmuProcessor::~VSynthEmuProcessor() {
 
 static const char* const kRomName = "V-SynthXT.rom.2.bin";   // rom.2 as research/ghidra_scripts/unpack_firmware.py writes it
 static const char* const kRomKey  = "romPath";
+static const char* const kPatchFolderKey = "patchFolder";
 
 // What belongs to the plugin and not to a project, whichever format is running: ~/Library/Application Support/V-Synth Emu,
 // or VSE_APP_DIR, so that PluginTest leaves the user's alone.
@@ -1006,13 +1024,13 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.patchTempo   = (int)std::lround(snap(apvts.getRawParameterValue(Params::kPatchTempo)->load(), 0.1f) * 10.0f);
     c.clockSource  = knob(Params::kClockSource);
     c.tempoSync    = apvts.getRawParameterValue(Params::kTempoSync)->load() >= 0.5f;
-    c.origTempo    = (int)std::lround(snap(apvts.getRawParameterValue(Params::kOrigTempo)->load(), 0.01f) * 100.0f) * 100;
+    c.origTempo    = (int)std::lround(apvts.getRawParameterValue(Params::kOrigTempo)->load() * 10000.0f);
     c.timeTrip     = apvts.getRawParameterValue(Params::kTripSw)->load() >= 0.5f;
     c.beatKeep     = apvts.getRawParameterValue(Params::kBeatKeep)->load() >= 0.5f;
     c.loop         = apvts.getRawParameterValue(Params::kLoop)->load() >= 0.5f;
     c.loopMode     = knob(Params::kLoopMode);
-    c.loopStart    = snap(apvts.getRawParameterValue(Params::kLoopStart)->load(), 0.01f) / 100.0f;
-    c.loopEnd      = snap(apvts.getRawParameterValue(Params::kLoopEnd)->load(), 0.01f) / 100.0f;
+    c.loopStart    = apvts.getRawParameterValue(Params::kLoopStart)->load() / 100.0f;   // not to a step: a wave's own loop is to the sample
+    c.loopEnd      = apvts.getRawParameterValue(Params::kLoopEnd)->load() / 100.0f;
     c.portamento   = apvts.getRawParameterValue(Params::kPorta)->load() >= 0.5f;
     c.portaMode    = knob(Params::kPortaMode);
     c.portaType    = knob(Params::kPortaType);
@@ -1262,15 +1280,351 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         o.oscFormant = knob2(Params::kOscFormant);
         o.oscFormantKF = kf2(Params::kOscFormantKF);
         o.tempoSync = apvts.getRawParameterValue(oscId(1, Params::kTempoSync))->load() >= 0.5f;
-        o.origTempo = (int)std::lround(snap(apvts.getRawParameterValue(oscId(1, Params::kOrigTempo))->load(), 0.01f) * 100.0f) * 100;
+        o.origTempo = (int)std::lround(apvts.getRawParameterValue(oscId(1, Params::kOrigTempo))->load() * 10000.0f);
         o.timeTrip = apvts.getRawParameterValue(oscId(1, Params::kTripSw))->load() >= 0.5f;
         o.beatKeep = apvts.getRawParameterValue(oscId(1, Params::kBeatKeep))->load() >= 0.5f;
         o.loop = apvts.getRawParameterValue(oscId(1, Params::kLoop))->load() >= 0.5f;
         o.loopMode = knob2(Params::kLoopMode);
-        o.loopStart = snap(apvts.getRawParameterValue(oscId(1, Params::kLoopStart))->load(), 0.01f) / 100.0f;
-        o.loopEnd = snap(apvts.getRawParameterValue(oscId(1, Params::kLoopEnd))->load(), 0.01f) / 100.0f;
+        o.loopStart = apvts.getRawParameterValue(oscId(1, Params::kLoopStart))->load() / 100.0f;
+        o.loopEnd = apvts.getRawParameterValue(oscId(1, Params::kLoopEnd))->load() / 100.0f;
+    }
+    for (int k = 0; k < 2; ++k) {   // each OSC's pitch, time and formant envelopes' velocity and key
+        XtSynth::OscControls& o = k ? c.osc2 : c;
+        XtSynth::OscControls::EnvVelocity* v[3] = { &o.pVel, &o.tVel, &o.fVel };
+        static const juce::String kEnvs[3] = { "pitchEnv", "timeEnv", "formantEnv" };
+        for (int e = 0; e < 3; ++e) {
+            v[e]->curve = knob(Params::oscId(k, kEnvs[e] + "VelCurve"));
+            v[e]->sens = knob(Params::oscId(k, kEnvs[e] + "VelSens"));
+            v[e]->aSens = knob(Params::oscId(k, kEnvs[e] + "AttackSens"));
+            v[e]->dSens = knob(Params::oscId(k, kEnvs[e] + "DecaySens"));
+            v[e]->rSens = knob(Params::oscId(k, kEnvs[e] + "ReleaseSens"));
+            v[e]->timeKF = kf(Params::oscId(k, kEnvs[e] + "TimeKF"));
+        }
     }
     return c;
+}
+
+// The other way round from xtControls: each parameter to what these controls hold, as a host's automation would, and only those that have moved.
+void VSynthEmuProcessor::setControls(const XtSynth::Controls& c) {
+    const auto set = [this](const juce::String& id, float v) {
+        auto* p = apvts.getParameter(id);
+        if (!p) { jassertfalse; return; }
+        const float n = p->convertTo0to1(v);
+        if (p->getValue() != n) p->setValueNotifyingHost(n);
+    };
+    set(Params::kPitchShift, c.pitchSemis);
+    set(Params::kPatchTempo, (float)c.patchTempo / 10.0f);
+    set(Params::kOrigTempo, (float)c.origTempo / 10000.0f);
+    set(Params::kLoopStart, c.loopStart * 100.0f);
+    set(Params::kLoopEnd, c.loopEnd * 100.0f);
+    set(Params::kMonoPoly, c.mono ? 0 : 1);
+    set(Params::kOutputMode, c.parallel ? 1 : 0);
+    set(Params::kTimeKF, c.timeKF);
+    {
+        using Params::oscId;
+        set(oscId(1, Params::kOrigTempo), (float)c.osc2.origTempo / 10000.0f);
+        set(oscId(1, Params::kLoopStart), c.osc2.loopStart * 100.0f);
+        set(oscId(1, Params::kLoopEnd), c.osc2.loopEnd * 100.0f);
+        for (int k = 0; k < 2; ++k) {
+            const XtSynth::OscControls& o = k ? c.osc2 : c;
+            const XtSynth::OscControls::EnvVelocity* v[3] = { &o.pVel, &o.tVel, &o.fVel };
+            static const juce::String kEnvs[3] = { "pitchEnv", "timeEnv", "formantEnv" };
+            for (int e = 0; e < 3; ++e) {
+                set(oscId(k, kEnvs[e] + "VelCurve"), v[e]->curve);
+                set(oscId(k, kEnvs[e] + "VelSens"), v[e]->sens);
+                set(oscId(k, kEnvs[e] + "AttackSens"), v[e]->aSens);
+                set(oscId(k, kEnvs[e] + "DecaySens"), v[e]->dSens);
+                set(oscId(k, kEnvs[e] + "ReleaseSens"), v[e]->rSens);
+                set(oscId(k, kEnvs[e] + "TimeKF"), v[e]->timeKF);
+            }
+        }
+    }
+    
+    set(Params::kOscTime, c.oscTime);
+    set(Params::kOscTimeOffset, c.oscTimeOffset);
+    set(Params::kOscTimeKF, c.oscTimeKF);
+    set(Params::kOscFormant, c.oscFormant);
+    set(Params::kOscFormantKF, c.oscFormantKF);
+    set(Params::kOscType, c.oscType);
+    set(Params::kAnaWave, c.ana.wave);
+    set(Params::kAnaImpact, c.ana.impact);
+    set(Params::kAnaPw, c.ana.pw);
+    set(Params::kAnaPwKF, c.ana.pwKf * 10);
+    set(Params::kAnaPwLfo, c.ana.pwLfo);
+    set(Params::kAnaPwEnv, c.ana.pwEnv);
+    set(Params::kAnaFat, c.ana.fat);
+    set(Params::kAnaFatKF, c.ana.fatKf * 10);
+    set(Params::kAnaFatLfo, c.ana.fatLfo);
+    set(Params::kAnaFatEnv, c.ana.fatEnv);
+    set(Params::kAnaDetune, c.ana.detune);
+    set(Params::kAnaSubOct, c.ana.subOctave);
+    set(Params::kAnaSubLevel, c.ana.subLevel);
+    set(Params::kOscCoarse, c.oscCoarse);
+    set(Params::kOscFine, c.oscFine);
+    set(Params::kOscPitch, c.oscPitch);
+    set(Params::kPitchKF, c.pitchKF);
+    set(Params::kRandomPitch, c.randomPitch);
+    set(Params::kPatchCoarse, c.patchCoarse);
+    set(Params::kPatchFine, c.patchFine);
+    set(Params::kBendUp, c.bendUp);
+    set(Params::kBendDown, c.bendDown);
+    set(Params::kScaleTune, c.scaleTune ? 1 : 0);
+    for (int i = 0; i < 12; ++i) set(Params::kScaleTunes[i], c.scale[i]);
+    set(Params::kClockSource, c.clockSource);
+    set(Params::kTempoSync, c.tempoSync ? 1 : 0);
+    
+    set(Params::kTripSw, c.timeTrip ? 1 : 0);
+    set(Params::kBeatKeep, c.beatKeep ? 1 : 0);
+    set(Params::kLoop, c.loop ? 1 : 0);
+    set(Params::kLoopMode, c.loopMode);
+    
+    
+    set(Params::kPorta, c.portamento ? 1 : 0);
+    set(Params::kPortaMode, c.portaMode);
+    set(Params::kPortaType, c.portaType);
+    set(Params::kPortaTime, c.portaTime);
+    set(Params::kPortaVeloSens, c.portaVeloSens);
+    
+    set(Params::kLegato, c.legato ? 1 : 0);
+    set(Params::kOctave, c.octave);
+    set(Params::kModSwitch, c.mod.on ? 1 : 0);
+    set(Params::kModType, c.mod.type);
+    set(Params::kModLevel, c.mod.level);
+    set(Params::kModAttack, c.mod.attack);
+    set(Params::kModRelease, c.mod.release);
+    set(Params::kStructure, c.structure);
+    for (int k = 0; k < 2; ++k) {
+        using Params::cosmId;
+        const XtSynth::Controls::Cosm& m = c.cosm[k];
+        set(cosmId(k, "Switch"), m.on ? 1 : 0);
+        set(cosmId(k, "Type"), m.type);
+        set(cosmId(k, "ResoOwn"), m.resoOwn);
+        set(cosmId(k, "CutoffOwn"), m.cutoffOwn);
+        set(cosmId(k, "Filter"), m.filter);
+        set(cosmId(k, "Cutoff"), m.cutoff);
+        set(cosmId(k, "Reso"), m.reso);
+        set(cosmId(k, "CutoffKF"), m.kf);
+        set(cosmId(k, "CutoffEnv"), m.cutoffEnv);
+        set(cosmId(k, "CutoffLfo"), m.cutoffLfo);
+        set(cosmId(k, "ResoEnv"), m.resoEnv);
+        set(cosmId(k, "ResoLfo"), m.resoLfo);
+        set(cosmId(k, "DualType"), m.dualType);
+        set(cosmId(k, "Dual1Freq"), m.freq1); set(cosmId(k, "Dual1KF"), m.kf1); set(cosmId(k, "Dual1Q"), m.q1);
+        set(cosmId(k, "Dual1Lfo"), m.lfo1); set(cosmId(k, "Dual1Env"), m.env1);
+        set(cosmId(k, "Dual2Freq"), m.freq2); set(cosmId(k, "Dual2KF"), m.kf2); set(cosmId(k, "Dual2Q"), m.q2);
+        set(cosmId(k, "Dual2Lfo"), m.lfo2); set(cosmId(k, "Dual2Env"), m.env2);
+        set(cosmId(k, "TbCutoff"), m.tbCutoff); set(cosmId(k, "TbKF"), m.tbKf); set(cosmId(k, "TbLfo"), m.tbLfo);
+        set(cosmId(k, "TbEnv"), m.tbEnv); set(cosmId(k, "TbQ"), m.tbQ); set(cosmId(k, "TbQFollow"), m.tbQFollow);
+        set(cosmId(k, "TbHpf"), m.tbHpf); set(cosmId(k, "TbHpfKF"), m.tbHpfKf); set(cosmId(k, "TbHpfLfo"), m.tbHpfLfo);
+        set(cosmId(k, "TbHpfEnv"), m.tbHpfEnv); set(cosmId(k, "TbGain"), m.tbGain);
+        set(cosmId(k, "CombOctave"), m.combOctave); set(cosmId(k, "CombDetune"), m.combDetune);
+        set(cosmId(k, "CombDetuneLfo"), m.combDetuneLfo); set(cosmId(k, "CombDetuneEnv"), m.combDetuneEnv);
+        set(cosmId(k, "CombTone"), m.combTone); set(cosmId(k, "CombToneLfo"), m.combToneLfo); set(cosmId(k, "CombToneEnv"), m.combToneEnv);
+        set(cosmId(k, "ResType"), m.resType); set(cosmId(k, "ResSize"), m.resSize); set(cosmId(k, "ResSizeKF"), m.resSizeKf);
+        set(cosmId(k, "ResSizeLfo"), m.resSizeLfo); set(cosmId(k, "ResSizeEnv"), m.resSizeEnv); set(cosmId(k, "ResBalance"), m.resBalance);
+        set(cosmId(k, "ResBalanceLfo"), m.resBalanceLfo); set(cosmId(k, "ResBalanceEnv"), m.resBalanceEnv);
+        set(cosmId(k, "FsDepth"), m.fsDepth); set(cosmId(k, "FsDepthKF"), m.fsDepthKf); set(cosmId(k, "FsDepthLfo"), m.fsDepthLfo);
+        set(cosmId(k, "FsDepthEnv"), m.fsDepthEnv); set(cosmId(k, "FsBalance"), m.fsBalance);
+        set(cosmId(k, "FsBalanceLfo"), m.fsBalanceLfo); set(cosmId(k, "FsBalanceEnv"), m.fsBalanceEnv);
+        set(cosmId(k, "LofiBit"), m.lofiBit); set(cosmId(k, "LofiRate"), m.lofiRate); set(cosmId(k, "LofiFilter"), m.lofiFilter);
+        set(cosmId(k, "LofiFilterKF"), m.lofiFilterKf); set(cosmId(k, "LofiFilterLfo"), m.lofiFilterLfo);
+        set(cosmId(k, "LofiFilterEnv"), m.lofiFilterEnv); set(cosmId(k, "LofiBalance"), m.lofiBalance);
+        set(cosmId(k, "LofiBalanceLfo"), m.lofiBalanceLfo); set(cosmId(k, "LofiBalanceEnv"), m.lofiBalanceEnv);
+        set(cosmId(k, "CompAttack"), m.compAttack); set(cosmId(k, "CompSustain"), m.compSustain); set(cosmId(k, "CompLevel"), m.compLevel);
+        set(cosmId(k, "LimThreshold"), m.limThreshold); set(cosmId(k, "LimRatio"), m.limRatio); set(cosmId(k, "LimAttack"), m.limAttack);
+        set(cosmId(k, "LimRelease"), m.limRelease); set(cosmId(k, "LimLevel"), m.limLevel);
+        set(cosmId(k, "WsType"), m.wsType); set(cosmId(k, "WsLevel"), m.wsLevel); set(cosmId(k, "WsDrive"), m.wsDrive);
+        set(cosmId(k, "WsDriveLfo"), m.wsDriveLfo); set(cosmId(k, "WsDriveEnv"), m.wsDriveEnv); set(cosmId(k, "WsTone"), m.wsTone);
+        set(cosmId(k, "WsToneKF"), m.wsToneKf); set(cosmId(k, "WsToneLfo"), m.wsToneLfo); set(cosmId(k, "WsToneEnv"), m.wsToneEnv);
+        set(cosmId(k, "OdType"), m.odType); set(cosmId(k, "OdLevel"), m.odLevel); set(cosmId(k, "OdDrive"), m.odDrive);
+        set(cosmId(k, "OdDriveLfo"), m.odDriveLfo); set(cosmId(k, "OdDriveEnv"), m.odDriveEnv); set(cosmId(k, "OdTone"), m.odTone);
+        set(cosmId(k, "OdToneKF"), m.odToneKf); set(cosmId(k, "OdToneLfo"), m.odToneLfo); set(cosmId(k, "OdToneEnv"), m.odToneEnv);
+        set(cosmId(k, "AmpType"), m.ampType); set(cosmId(k, "AmpBass"), m.ampBass); set(cosmId(k, "AmpMiddle"), m.ampMiddle);
+        set(cosmId(k, "AmpTreble"), m.ampTreble); set(cosmId(k, "AmpLevel"), m.ampLevel); set(cosmId(k, "AmpGain"), m.ampGain);
+        set(cosmId(k, "AmpGainLfo"), m.ampGainLfo); set(cosmId(k, "AmpGainEnv"), m.ampGainEnv);
+        set(cosmId(k, "SpkType"), m.spkType);
+        for (int t = 0; t < 2; ++t) {
+            const XtSynth::Controls::Cosm::SideBand& b = m.sb[t];
+            const juce::String id = cosmId(k, "Sb") + juce::String(t + 1);
+            set(id + "SubDetune", b.subDetune);
+            if (t == 0) { set(id + "Hpf", b.hpf); set(id + "SubDetune", b.subDetune); }
+            else set(id + "Q", b.q);
+            set(id + "Lpf", b.lpf); set(id + "LpfKF", b.lpfKf); set(id + "Octave", b.octave);
+            set(id + "Detune", b.detune); set(id + "DetuneLfo", b.detuneLfo); set(id + "DetuneOwn", b.detuneOwn); set(id + "DetuneEnv", b.detuneEnv);
+            set(id + "Width", b.width); set(id + "WidthKF", b.widthKf); set(id + "WidthLfo", b.widthLfo);
+            set(id + "WidthOwn", b.widthOwn); set(id + "WidthEnv", b.widthEnv);
+        }
+        for (int ab = 0; ab < 2; ++ab) {
+            const XtSynth::Controls::CosmEnv& e = ab == 0 ? m.envA : m.envB;
+            const juce::String id = cosmId(k, ab == 0 ? "EnvA" : "EnvB");
+            const int* const f[9] = { &e.attack, &e.decay, &e.sustain, &e.release, &e.velCurve, &e.velSens, &e.aSens, &e.dSens, &e.rSens };
+            for (int i = 0; i < 9; ++i) set(id + Params::kCosmEnvKnobs[i], *f[i]);
+            set(id + "TimeKF", e.timeKF);
+        }
+        set(cosmId(k, "LfoWave"), m.lfoWave);
+        set(cosmId(k, "LfoRate"), m.lfoRate);
+        set(cosmId(k, "LfoOffset"), m.lfoOffset);
+        set(cosmId(k, "LfoDelay"), m.lfoDelay);
+        set(cosmId(k, "LfoFadeMode"), m.lfoFadeMode);
+        set(cosmId(k, "LfoFade"), m.lfoFade);
+        set(cosmId(k, "LfoKeySync"), m.lfoKeySync ? 1 : 0);
+    }
+    set(Params::kEnergy, c.energy);
+    set(Params::kRootKey, c.rootKey);
+    set(Params::kTvaSwitch, c.tvaOn ? 1 : 0);
+    set(Params::kTvaChoSend, c.chorusSend);
+    set(Params::kTvaRevSend, c.reverbSend);
+    set(Params::kOutputAssign, c.outputAssign);
+    
+    set(Params::kTvaLevel, c.tvaLevel);
+    set(Params::kTvaLevelKF, c.tvaLevelKF);
+    set(Params::kTvaLevelLfo, c.tvaLevelLfo);
+    set(Params::kTvaPan, c.tvaPan);
+    set(Params::kTvaPanKF, c.tvaPanKF);
+    set(Params::kTvaPanLfo, c.tvaPanLfo);
+    set(Params::kMfxSend, c.mfxSend);
+    set(Params::kTvaLfoWave, c.tvaLfoWave);
+    set(Params::kTvaLfoRate, c.tvaLfoRate);
+    set(Params::kTvaLfoOffset, c.tvaLfoOffset);
+    set(Params::kTvaLfoDelay, c.tvaLfoDelay);
+    set(Params::kTvaLfoMode, c.tvaLfoFadeMode);
+    set(Params::kTvaLfoFade, c.tvaLfoFade);
+    set(Params::kTvaLfoSync, c.tvaLfoKeySync ? 1 : 0);
+    for (int m = 0; m < 8; ++m) {
+        const XtMatrixControl& x = c.matrix[m];
+        set(matrixParamId(m, "Source"), x.source);
+        set(matrixParamId(m, "Dest1"), x.dest[0]); set(matrixParamId(m, "Sens1"), x.sens[0]);
+        set(matrixParamId(m, "Dest2"), x.dest[1]); set(matrixParamId(m, "Sens2"), x.sens[1]);
+    }
+    for (int i = 0; i < kAssigns; ++i) set(assignParamId(i), c.assign[i]);
+    set(Params::kAttack, c.attack);
+    set(Params::kDecay, c.decay);
+    set(Params::kSustain, c.sustain);
+    set(Params::kRelease, c.release);
+    set(Params::kAttackSens, c.aSens);
+    set(Params::kDecaySens, c.dSens);
+    set(Params::kReleaseSens, c.rSens);
+    
+    set(Params::kPAttack, c.pAttack);
+    set(Params::kPDecay, c.pDecay);
+    set(Params::kPSustain, c.pSustain);
+    set(Params::kPRelease, c.pRelease);
+    set(Params::kPDepth, c.pDepth);
+    set(Params::kTAttack, c.tAttack);
+    set(Params::kTDecay, c.tDecay);
+    set(Params::kTSustain, c.tSustain);
+    set(Params::kTRelease, c.tRelease);
+    set(Params::kTDepth, c.tDepth);
+    set(Params::kFAttack, c.fAttack);
+    set(Params::kFDecay, c.fDecay);
+    set(Params::kFSustain, c.fSustain);
+    set(Params::kFRelease, c.fRelease);
+    set(Params::kFDepth, c.fDepth);
+    set(Params::kLfoTimeDepth, c.lfoTimeDepth);
+    set(Params::kLfoFmtDepth, c.lfoFormantDepth);
+    set(Params::kOscLevel, c.oscLevel);
+    set(Params::kOscLevelKF, c.oscLevelKF);
+    set(Params::kOscLevelLfo, c.oscLevelLfoDepth);
+    set(Params::kWaveGain, c.waveGain);
+    set(Params::kOAttack, c.oAttack);
+    set(Params::kODecay, c.oDecay);
+    set(Params::kOSustain, c.oSustain);
+    set(Params::kORelease, c.oRelease);
+    set(Params::kOASens, c.oASens);
+    set(Params::kODSens, c.oDSens);
+    set(Params::kORSens, c.oRSens);
+    set(Params::kOTimeKF, c.oTimeKF);
+    set(Params::kOscVelSens, c.oscVelSens);
+    set(Params::kOscVelCurve, c.oscVelCurve);
+    set(Params::kAmpVelSens, c.ampVelSens);
+    set(Params::kAmpVelCurve, c.ampVelCurve);
+    set(Params::kRobot, c.robot ? 1 : 0);
+    set(Params::kLfoWave, c.lfoWave);
+    set(Params::kLfoRate, c.lfoRate);
+    set(Params::kLfoDepth, c.lfoPitchDepth);
+    set(Params::kLfoDelay, c.lfoDelay);
+    set(Params::kLfoFadeMode, c.lfoFadeMode);
+    set(Params::kLfoFade, c.lfoFade);
+    set(Params::kLfoOffset, c.lfoOffset);
+    set(Params::kLfoKeySync, c.lfoKeySync ? 1 : 0);
+    set(Params::kOscSwitch, c.on ? 1 : 0);
+    {   // OSC 2's own knobs
+        const XtSynth::OscControls& o = c.osc2;
+        using Params::oscId;
+        set(oscId(1, Params::kOscSwitch), o.on ? 1 : 0);
+        set(oscId(1, Params::kOscType), o.oscType);
+        set(oscId(1, Params::kAnaWave), o.ana.wave);
+        set(oscId(1, Params::kAnaImpact), o.ana.impact);
+        set(oscId(1, Params::kAnaPw), o.ana.pw);
+        set(oscId(1, Params::kAnaPwKF), o.ana.pwKf * 10);
+        set(oscId(1, Params::kAnaPwLfo), o.ana.pwLfo);
+        set(oscId(1, Params::kAnaPwEnv), o.ana.pwEnv);
+        set(oscId(1, Params::kAnaFat), o.ana.fat);
+        set(oscId(1, Params::kAnaFatKF), o.ana.fatKf * 10);
+        set(oscId(1, Params::kAnaFatLfo), o.ana.fatLfo);
+        set(oscId(1, Params::kAnaFatEnv), o.ana.fatEnv);
+        set(oscId(1, Params::kAnaDetune), o.ana.detune);
+        set(oscId(1, Params::kAnaSubOct), o.ana.subOctave);
+        set(oscId(1, Params::kAnaSubLevel), o.ana.subLevel);
+        set(oscId(1, Params::kOscCoarse), o.oscCoarse);
+        set(oscId(1, Params::kOscFine), o.oscFine);
+        set(oscId(1, Params::kOscPitch), o.oscPitch);
+        set(oscId(1, Params::kPitchKF), o.pitchKF);
+        set(oscId(1, Params::kRandomPitch), o.randomPitch);
+        set(oscId(1, Params::kPAttack), o.pAttack);
+        set(oscId(1, Params::kPDecay), o.pDecay);
+        set(oscId(1, Params::kPSustain), o.pSustain);
+        set(oscId(1, Params::kPRelease), o.pRelease);
+        set(oscId(1, Params::kPDepth), o.pDepth);
+        set(oscId(1, Params::kTAttack), o.tAttack);
+        set(oscId(1, Params::kTDecay), o.tDecay);
+        set(oscId(1, Params::kTSustain), o.tSustain);
+        set(oscId(1, Params::kTRelease), o.tRelease);
+        set(oscId(1, Params::kTDepth), o.tDepth);
+        set(oscId(1, Params::kFAttack), o.fAttack);
+        set(oscId(1, Params::kFDecay), o.fDecay);
+        set(oscId(1, Params::kFSustain), o.fSustain);
+        set(oscId(1, Params::kFRelease), o.fRelease);
+        set(oscId(1, Params::kFDepth), o.fDepth);
+        set(oscId(1, Params::kLfoWave), o.lfoWave);
+        set(oscId(1, Params::kLfoRate), o.lfoRate);
+        set(oscId(1, Params::kLfoDepth), o.lfoPitchDepth);
+        set(oscId(1, Params::kLfoTimeDepth), o.lfoTimeDepth);
+        set(oscId(1, Params::kLfoFmtDepth), o.lfoFormantDepth);
+        set(oscId(1, Params::kLfoDelay), o.lfoDelay);
+        set(oscId(1, Params::kLfoFadeMode), o.lfoFadeMode);
+        set(oscId(1, Params::kLfoFade), o.lfoFade);
+        set(oscId(1, Params::kLfoOffset), o.lfoOffset);
+        set(oscId(1, Params::kLfoKeySync), o.lfoKeySync ? 1 : 0);
+        set(oscId(1, Params::kOscLevel), o.oscLevel);
+        set(oscId(1, Params::kOscLevelKF), o.oscLevelKF);
+        set(oscId(1, Params::kOscLevelLfo), o.oscLevelLfoDepth);
+        set(oscId(1, Params::kWaveGain), o.waveGain);
+        set(oscId(1, Params::kOAttack), o.oAttack);
+        set(oscId(1, Params::kODecay), o.oDecay);
+        set(oscId(1, Params::kOSustain), o.oSustain);
+        set(oscId(1, Params::kORelease), o.oRelease);
+        set(oscId(1, Params::kOASens), o.oASens);
+        set(oscId(1, Params::kODSens), o.oDSens);
+        set(oscId(1, Params::kORSens), o.oRSens);
+        set(oscId(1, Params::kOTimeKF), o.oTimeKF);
+        set(oscId(1, Params::kOscVelSens), o.oscVelSens);
+        set(oscId(1, Params::kOscVelCurve), o.oscVelCurve);
+        set(oscId(1, Params::kEnergy), o.energy);
+        set(oscId(1, Params::kRootKey), o.rootKey);
+        set(oscId(1, Params::kRobot), o.robot ? 1 : 0);
+        set(oscId(1, Params::kOscTime), o.oscTime);
+        set(oscId(1, Params::kOscTimeOffset), o.oscTimeOffset);
+        set(oscId(1, Params::kOscTimeKF), o.oscTimeKF);
+        set(oscId(1, Params::kOscFormant), o.oscFormant);
+        set(oscId(1, Params::kOscFormantKF), o.oscFormantKF);
+        set(oscId(1, Params::kTempoSync), o.tempoSync ? 1 : 0);
+        
+        set(oscId(1, Params::kTripSw), o.timeTrip ? 1 : 0);
+        set(oscId(1, Params::kBeatKeep), o.beatKeep ? 1 : 0);
+        set(oscId(1, Params::kLoop), o.loop ? 1 : 0);
+        set(oscId(1, Params::kLoopMode), o.loopMode);
+    }
 }
 
 void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
@@ -1409,8 +1763,93 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
 // ─── File Loading ─────────────────────────────────────────────────────────────
 
-void VSynthEmuProcessor::loadFile(const juce::File& file, int osc)
+// A V-Synth wave by its first chunks: a .vpw, or a project's .wav, the same chunks in a RIFF.
+static bool isVSynthWave(const juce::File& file) {
+    juce::FileInputStream in(file);
+    char head[64] = {};
+    const int n = in.openedOk() ? in.read(head, (int)sizeof head) : 0;
+    if (n >= 4 && !std::memcmp(head, "vpfl", 4)) return true;
+    if (n < 12 || std::memcmp(head, "RIFF", 4) || std::memcmp(head + 8, "WAVE", 4)) return false;
+    for (int i = 12; i + 4 <= n; ++i) if (!std::memcmp(head + i, "vpfl", 4)) return true;
+    return false;
+}
+
+static bool readVSynthWave(const juce::File& file, XtWaveFile& wave, std::string* why = nullptr) {
+    juce::MemoryBlock bytes;
+    return file.loadFileAsData(bytes) && xtWaveRead(static_cast<const uint8_t*>(bytes.getData()), bytes.getSize(), wave, why);
+}
+
+// The wave's own settings to OSC `osc`'s parameters.
+void VSynthEmuProcessor::waveToParameters(const XtWaveFile& wave, int osc) {
+    XtSynth::Controls c = xtControls();
+    xtWaveOntoControls(wave, osc ? c.osc2 : static_cast<XtSynth::OscControls&>(c));
+    const XtSynth::OscControls& o = osc ? c.osc2 : c;
+    const auto set = [this, osc](const juce::String& id, float v) {
+        auto* p = apvts.getParameter(Params::oscId(osc, id));
+        if (p) p->setValueNotifyingHost(p->convertTo0to1(v));
+    };
+    set(Params::kRootKey, (float)o.rootKey);
+    set(Params::kOrigTempo, (float)o.origTempo / 10000.0f);
+    set(Params::kLoopStart, o.loopStart * 100.0f);
+    set(Params::kLoopEnd, o.loopEnd * 100.0f);
+    set(Params::kLoopMode, (float)o.loopMode);
+    set(Params::kLoop, o.loop ? 1.0f : 0.0f);
+}
+
+// A V-Synth wave's audio into OSC `osc`.  What the wave says of itself goes with it to each encode.
+void VSynthEmuProcessor::takeWave(const XtWaveFile& wave, const juce::File& file, int osc) {
+    juce::AudioBuffer<float> audio(wave.channels, (int)wave.frames);
+    for (int c = 0; c < wave.channels; ++c) {
+        float* d = audio.getWritePointer(c);
+        for (long i = 0; i < wave.frames; ++i) d[i] = (float)wave.pcm[(size_t)(i * wave.channels + c)] / 32768.0f;
+    }
+    {
+        juce::CriticalSection::ScopedLockType lock(bufferLock_);
+        LoadedWave& w = wave_[osc];
+        w.buffer = std::move(audio);
+        w.rate = 44100.0;
+        w.bits = 16;
+        w.ownType = wave.encodeType;
+        w.own = wave;
+        w.own.pcm.clear();
+        w.isOwn = true;
+        w.loaded.store(true);
+    }
+    if (osc == 0) { playbackPos_ = -1; activeVoices_ = 0; }
+    wave_[osc].name = file.getFileName();
+    apvts.state.setProperty(osc ? "loadedFilePath2" : "loadedFilePath", file.getFullPathName(), nullptr);
+    reencode(osc);
+}
+
+void VSynthEmuProcessor::unloadWave(int osc) {
+    LoadedWave& w = wave_[osc];
+    {
+        juce::CriticalSection::ScopedLockType lock(bufferLock_);
+        w.loaded.store(false);
+        w.buffer.setSize(0, 0);
+        w.isOwn = false;
+        w.ownType = 0;
+    }
+    ++w.gen;                       // an encode under way comes to nothing
+    if (osc == 0) { playbackPos_ = -1; activeVoices_ = 0; }
+    w.name.clear();
+    apvts.state.setProperty(osc ? "loadedFilePath2" : "loadedFilePath", juce::String(), nullptr);
+    synth_.setSample(nullptr, osc);
+}
+
+void VSynthEmuProcessor::loadFile(const juce::File& file, int osc, bool waveSettings)
 {
+    if (xtSynthRomReady() && isVSynthWave(file)) {
+        XtWaveFile wave;
+        std::string why;
+        if (readVSynthWave(file, wave, &why)) {
+            if (waveSettings) waveToParameters(wave, osc);
+            takeWave(wave, file, osc);
+            return;
+        }
+        setStatus(file.getFileName() + ": " + juce::String(why));
+    }
+
     std::unique_ptr<juce::AudioFormatReader> reader(
         formatManager_.createReaderFor(file));
 
@@ -1436,6 +1875,7 @@ void VSynthEmuProcessor::loadFile(const juce::File& file, int osc)
         w.rate = reader->sampleRate;
         w.bits = reader->usesFloatingPointData ? 16 : (int)reader->bitsPerSample;   // float WAVs: rounded
         w.ownType = reader->metadataValues.getValue(XtVpwFormat::kEncodeType, "0").getIntValue();
+        w.isOwn = false;
         w.loaded.store(true);
     }
 
@@ -1448,6 +1888,80 @@ void VSynthEmuProcessor::loadFile(const juce::File& file, int osc)
     // Persist the file path so it survives DAW project reload
     apvts.state.setProperty(osc ? "loadedFilePath2" : "loadedFilePath", file.getFullPathName(), nullptr);
     reencode(osc);
+}
+
+// ─── A V-Synth patch ─────────────────────────────────────────────────────────
+
+// A project keeps its waves in Wave beside Patch, each named by its number.  A copy named "… 2.wav" sorts after its original.
+static juce::File findWave(const juce::File& folder, int number) {
+    if (number <= 0 || !folder.isDirectory()) return {};
+    juce::Array<juce::File> found;
+    folder.findChildFiles(found, juce::File::findFiles, false, juce::String(number).paddedLeft('0', 3) + " *");
+    juce::File best;
+    for (const auto& f : found)
+        if ((f.hasFileExtension("vpw") || f.hasFileExtension("wav")) && (best == juce::File() || f.getFileName().length() < best.getFileName().length()))
+            best = f;
+    return best;
+}
+
+bool VSynthEmuProcessor::loadPatch(const juce::File& file, int zone) {
+    if (!xtSynthRomReady()) { setStatus("A patch needs the firmware image"); return false; }
+    juce::MemoryBlock bytes;
+    XtPatchFile patch;
+    std::string why;
+    if (!file.loadFileAsData(bytes) || !xtPatchRead(static_cast<const uint8_t*>(bytes.getData()), bytes.getSize(), patch, &why)) {
+        setStatus(file.getFileName() + ": " + (why.empty() ? juce::String("can't be read") : juce::String(why)));
+        return false;
+    }
+    appDir().createDirectory();
+    auto settings = appSettings();
+    settings->setValue(kPatchFolderKey, file.getParentDirectory().getFullPathName());
+    settings->save();
+    applyPatch(patch.name, patch.store, zone, file.getParentDirectory().getSiblingFile("Wave"));
+    return true;
+}
+
+juce::File VSynthEmuProcessor::lastPatchFolder() const {
+    const juce::File f(appSettings()->getValue(kPatchFolderKey));
+    return f.isDirectory() ? f : juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+}
+
+void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<uint8_t>& store, int zone, const juce::File& waveFolder) {
+    XtSynth::Controls c = xtPatchControls(store, zone, xtControls());
+    // Its waves first, for what they say of themselves
+    juce::File files[2];
+    XtWaveFile waves[2];
+    bool found[2] = {};
+    juce::StringArray notes;
+    for (int k = 0; k < 2; ++k) {
+        XtSynth::OscControls& o = k ? c.osc2 : static_cast<XtSynth::OscControls&>(c);
+        const int number = xtPatchWaveNumber(store, zone, k);
+        if (o.oscType != 1 || number <= 0) continue;
+        files[k] = findWave(waveFolder, number);
+        std::string why;
+        if (files[k].existsAsFile() && readVSynthWave(files[k], waves[k], &why)) { found[k] = true; xtWaveOntoControls(waves[k], o); }
+        else notes.add("no wave " + juce::String(number));
+    }
+    setControls(c);
+    for (int k = 0; k < 2; ++k)
+        if (auto* p = apvts.getParameter(Params::oscId(k, Params::kEncodeType))) p->setValueNotifyingHost(p->convertTo0to1(0.0f));   // Auto: each wave's own
+    for (const auto& fx : xtPatchEffects(store)) {
+        const char* knob = nullptr;
+        for (const auto& k : kFxKnobs) if (k.id == fx.id) knob = k.name;
+        if (!knob) { setFxParam(fx.id, fx.value); continue; }
+        if (auto* p = apvts.getParameter(knob)) p->setValueNotifyingHost(p->convertTo0to1((float)fx.value));
+    }
+    fxPatchPending_ = true;
+    for (int k = 0; k < 2; ++k) {
+        if (found[k]) takeWave(waves[k], files[k], k);
+        else unloadWave(k);
+    }
+    for (const auto& m : xtPatchMissing(store, zone)) notes.add(m);
+    patchName_ = juce::String(name);
+    patchNote_ = notes.joinIntoString(", ");
+    apvts.state.setProperty("patchName", patchName_, nullptr);
+    apvts.state.setProperty("patchNote", patchNote_, nullptr);
+    if (!found[0] && !found[1]) setStatus("Patch: " + patchName_);
 }
 
 // ─── Encoding ─────────────────────────────────────────────────────────────────
@@ -1471,9 +1985,12 @@ void VSynthEmuProcessor::reencode(int osc) {
     std::vector<std::vector<float>> chans;
     double rate;
     int bits, own;
+    XtWaveFile ownWave;
+    bool isOwn = false;
     {
         juce::CriticalSection::ScopedLockType lock(bufferLock_);
         own = w.ownType == 1 || w.ownType == 3 || w.ownType == 5 ? w.ownType : 0;
+        if (w.isOwn) { ownWave = w.own; isOwn = true; }
         for (int c = 0; c < std::min(2, w.buffer.getNumChannels()); ++c)
             chans.emplace_back(w.buffer.getReadPointer(c), w.buffer.getReadPointer(c) + w.buffer.getNumSamples());
         rate = w.rate;
@@ -1484,7 +2001,7 @@ void VSynthEmuProcessor::reencode(int osc) {
     const int gen = ++w.gen;
     const juce::String who = osc ? "OSC 2: " : "";
     setStatus(who + "Encoding...");
-    encodePool_.addJob([this, chans = std::move(chans), rate, bits, choice, depth, gen, osc, who, own] {
+    encodePool_.addJob([this, chans = std::move(chans), rate, bits, choice, depth, gen, osc, who, own, ownWave = std::move(ownWave), isOwn] {
         int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : own;   // Auto: what the wave says it is, or
         if (type == 0) {   // Auto: the engine's content classifier
             std::vector<float> mono(chans[0].size());
@@ -1500,6 +2017,7 @@ void VSynthEmuProcessor::reencode(int osc) {
         auto e = xtSynthEncode(chans, rate, type, depth, &err, bits);
         if (gen != wave_[osc].gen.load()) return;
         if (!e) { setStatus(who + "Encode failed: " + juce::String(err)); return; }
+        if (isOwn) xtWaveOntoEncoded(ownWave, *e);
         synth_.setSample(e, osc);
         xtActive_.store(true);
         static const char* names[] = { "", "SOLO", "", "BACKING", "", "ENSEMBLE" };
@@ -1574,9 +2092,11 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
         {
             juce::File f(path);
             if (f.existsAsFile())
-                loadFile(f, k);
+                loadFile(f, k, false);
         }
     }
+    patchName_ = apvts.state.getProperty("patchName").toString();
+    patchNote_ = apvts.state.getProperty("patchNote").toString();
 }
 
 // ─── Editor / Entry Point ─────────────────────────────────────────────────────

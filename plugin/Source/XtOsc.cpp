@@ -201,18 +201,29 @@ float xtOscExp2(float x) {
     return mul(mul(hi[(q >> 8) & 0xff], in[n]), lo[q & 0xff]);
 }
 
-float xtOscWalk(float time, float env, float envDepth, float lfo, float lfoDepth) {
+float xtOscWalk(float time, float env, float envDepth, float lfo, float lfoDepth, float waveFactor) {
     using namespace xtf;
     // (time + (env·depth + lfo·depth)) × the Time Trip factor (0x894f4c00: 1
     // without Time Trip), clamped
     const float w = add(time, add(mul(env, envDepth), mul(lfo, lfoDepth)));
-    return w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w);
+    return mul(w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w), waveFactor);       // 0x894f3c90: with Vari on, as it always is here
 }
 
-float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, float lfoDepth) {
+float xtOscFormantRatio(float formant, float env, float envDepth, float lfo, float lfoDepth, float waveFactor) {
     using namespace xtf;
     const float r = xtOscExp2(add(formant, add(mul(env, envDepth), mul(lfo, lfoDepth))));
-    return r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r);
+    return mul(r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r), waveFactor);
+}
+
+XtWaveTune xtWaveTune(int headerCents, int fine, int tune) {
+    using namespace xtf;
+    XtWaveTune t;
+    const float hundredth = std::bit_cast<float>(0x3c23d709u);
+    t.offset = add(flt(headerCents), mul(flt(fine), hundredth));              // FMAC
+    t.detune = mul(flt(tune), hundredth);
+    const float f = xtOscExp2(mul(-flt(tune), std::bit_cast<float>(0x370bcf65u)));
+    t.factor = f > 0.0f ? f : 1.0f;
+    return t;
 }
 
 int xtPitch10(int key, int coarse, int kf, int fine) {

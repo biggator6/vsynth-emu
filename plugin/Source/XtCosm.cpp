@@ -629,11 +629,11 @@ void XtCosmSection::process(float* lr, float scale, const float* past) {
     else tvf.process(lr, scale, stereo);
 }
 
-float xtCosmRootHz(int originalPitch, bool robot) {
+float xtCosmRootHz(int originalPitch, bool robot, float offset, float detune) {
     if (robot) return 440.0f;
-    // 0x894f21c0: (P·100 − 0 + 0)/1200 − 5.75 (as stored), exp2, × 44000 × 0.01
-    float x = sub(mul(flt(originalPitch), 100.0f), 0.0f);
-    x = add(x, 0.0f);
+    // 0x894f21c0: (P·100 − offset + detune)/1200 − 5.75 (as stored), exp2, × 44000 × 0.01
+    float x = sub(mul(flt(originalPitch), 100.0f), offset);
+    x = add(x, detune);
     x = fmac(x, K(0x3a5a740d), K(0xc0b7ffff));
     return mul(mul(exp2t(x), 44000.0f), K(0x3c23d709));
 }
