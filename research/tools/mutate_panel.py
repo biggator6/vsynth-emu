@@ -11,7 +11,8 @@ TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, h
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
 MUTS=[
  # The editor's layout (TEST_UI_LAYOUT, TEST_FX_PANEL)
- ('editor-vari-unplaced',EP,'        wave.head = { { &variBtn_, 60 } };\n','','layout'),
+ ('editor-vari-unplaced',EP,'        wave.head = { { &variBtn_, 60 }, { &playbackBox_, 110 } };\n','        wave.head = { { &playbackBox_, 110 } };\n','layout'),
+ ('editor-vari-hide',EP,'(juce::Component*)&loopBtn_, (juce::Component*)&variBtn_,','(juce::Component*)&loopBtn_,','layout'),
  ('editor-vari-osc',EP,'variAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("vari"), variBtn_);','variAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, "vari", variBtn_);','layout'),
  ('patch-vari-read',PP,'    c.vari         = apvts.getRawParameterValue(Params::kVari)->load() > 0.5f;','    c.vari         = true;','patch'),
  ('patch-vari2-read',PP,'        o.vari = apvts.getRawParameterValue(oscId(1, Params::kVari))->load() > 0.5f;','        o.vari = true;','patch'),
@@ -185,6 +186,16 @@ MUTS=[
  ('zones-wave-number',PP,'            const int number = xtPatchWaveNumber(store, z, k);','            const int number = xtPatchWaveNumber(store, z, 0);','patch'),
  ('zones-wave-zone',PP,'            const int number = xtPatchWaveNumber(store, z, k);','            const int number = xtPatchWaveNumber(store, 0, k);','patch'),
  ('rom-bad-drops',PP,'if (loaded.isNotEmpty()) xtSynthSetRom(loaded.toStdString());',';','rom'),
+ ('patch-playback-read',PP,'    c.playbackMode = knob(Params::kPlaybackMode);','    c.playbackMode = 0;','patch'),
+ ('patch-playback2-read',PP,'        o.playbackMode = knob2(Params::kPlaybackMode);','        o.playbackMode = 0;','patch'),
+ ('patch-playback-write',PP,'    set(Params::kPlaybackMode, c.playbackMode);','    ;','patch'),
+ ('patch-playback2-write',PP,'        set(oscId(1, Params::kPlaybackMode), o.playbackMode);','        ;','patch'),
+ ('patch-playback-types',PP,'        if (found[k]) typeOf[xtPatchWaveNumber(store, zone, k)] = waves[k].encodeType;','        if (found[k]) typeOf[xtPatchWaveNumber(store, zone, k)] = 1;','patch'),
+ ('patch-playback-vpno','plugin/Source/XtPatch.cpp',"    if (w.vpnoCount >= 0) { e.vpno = w.vpno; e.vpnoCount = w.vpnoCount; }   // its own list in place of the encode's\n",'','patch'),
+ ('patch-playback-missing','plugin/Source/XtPatch.cpp','        if (mode >= 2 && (!waveType || waveType[n] == 1))','        if (mode >= 2 && (!waveType || waveType[n] != 0))','patch'),
+ ('editor-playback-osc',EP,'    playbackAtt_   = std::make_unique<ComboAtt>(processor_.apvts, id("playbackMode"), playbackBox_);','    playbackAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "playbackMode", playbackBox_);','layout'),
+ ('editor-playback-card',EP,'        wave.head = { { &variBtn_, 60 }, { &playbackBox_, 110 } };','        wave.head = { { &variBtn_, 60 } };','layout'),
+ ('editor-playback-hide',EP,'(juce::Component*)&startSlider_, (juce::Component*)&playbackBox_, (juce::Component*)&offsetLabel_,','(juce::Component*)&startSlider_, (juce::Component*)&offsetLabel_,','layout'),
 ]
 ROM=os.environ.get('ROM', REPO + '/firmware/unpacked/V-SynthXT.rom.2.bin'); W='analysis/test_files/raw/chord_Cmaj_original.wav'
 ENV={

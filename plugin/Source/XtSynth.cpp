@@ -130,6 +130,11 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         E->wave.vpdtBytes = E->vpdt.size();
         xtMbAttach(E->bands, E->wave);
         E->channels = ch;
+        // its events in order (the XT's import writes the same `vpno`): the vpdt's count is u32[2]'s high half
+        uint32_t w2 = 0;
+        if (E->vpdt.size() >= 12) std::memcpy(&w2, E->vpdt.data() + 8, 4);
+        E->vpnoCount = (int)(w2 >> 16);
+        for (int k = 0; k < E->vpnoCount; ++k) E->vpno.push_back((uint16_t)k);
     }
     return E;
 }
@@ -203,10 +208,11 @@ void XtSynth::prepare(double rate) {
     for (Voice& v : voice) v.active = false;
 }
 
-void XtSynth::setSample(std::shared_ptr<const XtEncoded> e, int osc) {
+void XtSynth::setSample(std::shared_ptr<const XtEncoded> e, int osc, int number) {
     std::lock_guard<std::mutex> g(swapLock);
     retired[osc].reset();                           // freed here, not on the audio thread
     pending[osc] = std::move(e);
+    pendingNumber[osc] = number;
     swapPending[osc] = true;
 }
 
@@ -225,12 +231,20 @@ void XtSynth::pickUpSample() {
             retired[k] = std::move(cur[k]);
             cur[k] = std::move(pending[k]);
             swapPending[k] = false;
+            if (pendingNumber[k] < 0 || pendingNumber[k] != curNumber[k]) stepCount[0][k] = 0;   // another wave (0x894e5ad4)
+            curNumber[k] = pendingNumber[k];
         }
     if (zonesPending) {
         retiredZones = std::move(zones);
         zones = std::move(pendingZones);
         zonesPending = false;
         for (int z = 0; z < kZones; ++z) zoneUpper[z] = zones ? zones->upper[z] : 127;
+        for (int z = 1; z < kZones; ++z)
+            for (int k = 0; k < 2; ++k) {
+                const int n = zones ? zones->number[z][k] : 0;
+                if (n <= 0 || n != zoneNumber[z][k]) stepCount[z][k] = 0;
+                zoneNumber[z][k] = n;
+            }
         zonesFollow();
         for (int z = 1; z < kZones; ++z) xtModBlock(zoneCtl[z].mod, modBlk[z]);
     }
@@ -401,6 +415,34 @@ float XtSynth::gainTarget(const Voice& v, const OscVoice& s, const OscControls& 
 int32_t XtSynth::waveStart(const OscVoice& s, const OscControls& o) {
     const uint32_t frames = (uint32_t)s.wave->frames, at = (uint32_t)o.startOffset;
     return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);
+}
+
+// Playback Mode STEP (0x894e42e0) and EVENT (0x894e4070), on a band wave with a `vpno`: the event its list gives at an index, and the one
+// after it, by the vpdt's numbers.  STEP's index is the zone's count of notes modulo the list's count less one, and with fewer than two it
+// plays as RETRIGGER.  EVENT's is the key from 60 up, wrapping each list rounded up to octaves (0x894e1200).
+// The tails clear the block's Loop bit (+0xb4 bit 0x01) and its 0x80 then, at every conversion: so a band wave's loop is off under them.
+bool XtSynth::eventPlay(const OscVoice& s, const OscControls& o) {
+    return o.playbackMode >= 2 && !s.analog && !s.lite && s.wave && (s.wave->type == 3 || s.wave->type == 5) && (o.playbackMode == 3 || s.wave->vpnoCount >= 2);
+}
+
+bool XtSynth::waveEvents(const Voice& v, const OscVoice& s, const OscControls& o, int& first, int& last) const {
+    if (!eventPlay(s, o)) return false;
+    const int n = s.wave->vpnoCount;
+    const auto at = [&](int i) { return i >= 0 && i < (int)s.wave->vpno.size() ? (int)s.wave->vpno[(size_t)i] : 0; };
+    int idx = 0;
+    if (o.playbackMode == 2) idx = (int)s.steps % (n - 1);
+    else {
+        const int m = (uint16_t)(n - 1);
+        if (m != 0) {
+            const int r = (m + 11) / 12 * 12, k = v.note - 60;
+            int x = v.note >= 60 ? k : k % r + r;
+            x %= r;
+            idx = (uint16_t)(x % m);
+        }
+    }
+    first = at(idx);
+    last = at(idx + 1);
+    return true;
 }
 
 // The loop the players get (their cached loop events, player +0x6c, and
@@ -826,6 +868,24 @@ int XtSynth::keyFollowKey(const Voice& v, const OscControls& o) const {
     return xtKeyFollowKey(v.note, xtNoteCoarse(t, o.oscCoarse), 10 * o.pitchKF);
 }
 
+// Playback Mode LEGATO (0x894f2d00): the voice takes the earlier note's whole player (its +0xd4…+0x87c), its own pitch, formant,
+// walk, Energy and gain target (+0x144…+0x154) put back, and the gain from 0 (+0x158).  Not if that player is done (its +4).
+void XtSynth::legatoTake(OscVoice& s, const OscVoice& from) {
+    s.staleEnd = from.staleEnd;                     // the copy's +4
+    if (s.analog) s.ana = from.ana;
+    else if (s.linear) s.lin = from.lin;
+    else if (s.lite) s.xfg = from.xfg;
+    else if (s.wave->type == 1) s.solo = from.solo;
+    else s.mb.takeState(from.mb);
+    if (s.analog) return;
+    if (s.linear) s.lin.setGainXt(0.0f, true);
+    else if (s.lite) s.xfg.setGainXt(0.0f, true);
+    else if (s.wave->type == 1) s.solo.resetGain(0.0f);
+    else s.mb.setGainXt(0.0f, true);
+    if (s.lite && !s.linear) { s.xfg.takeRates(s.curA, s.curF, s.curWalk); s.xfg.setGainXt(s.curGain); }   // its filter's rate is the player's, kept
+    else applyRates(s);
+}
+
 // The part's note-on (0x894dbcb0): the key state moves on (0x894d6330),
 // the key takes the Octave Shift (and the system's Transpose, 0 here).
 // POLY: a new voice.  MONO with a key already held and Legato on: the
@@ -862,6 +922,21 @@ void XtSynth::startVoice(int raw, int note, int vel, int zone) {
     for (Voice& w : voice) if (!w.active) { w.ana.release(); w.osc2.ana.release(); }
     v->ana.release();
     v->osc2.ana.release();
+    // The allocator's earlier note of the part and zone (0x894d4c04), among those not released, oldest first: the first whose key is
+    // down, else the last.  The new note takes its chain key (+0x6c4), and with Playback Mode LEGATO and its key down, its player.
+    const Voice* prev = nullptr;
+    bool prevHeld = false;
+    {
+        const Voice* order[kVoices];
+        int n = 0;
+        for (const Voice& w : voice)
+            if (&w != v && w.active && !w.releasing && w.zone == zone) order[n++] = &w;
+        std::sort(order, order + n, [](const Voice* a, const Voice* b) { return a->age < b->age; });
+        for (int i = 0; i < n && !prevHeld; ++i) { prev = order[i]; prevHeld = (order[i]->keyFlags & 1) != 0; }
+    }
+    v->chainKey = prev ? prev->chainKey : note;
+    v->steps = stepCount[zone][0]++;                 // the per-note OSC setup (0x894e4940): the count, then one more
+    v->osc2.steps = stepCount[zone][1]++;
     v->active = true;
     v->zone = zone;
     v->releasing = false;
@@ -882,6 +957,9 @@ void XtSynth::startVoice(int raw, int note, int vel, int zone) {
     v->osc2.on = oscPlays(zone, 1);
     v->analog = Z.oscType == 0;
     v->osc2.analog = Z.osc2.oscType == 0;
+    // LEGATO taken up: the PCM converter's tail (0x894e2dac) sets the block's +0x64 with the earlier note's key down.  It also picks a
+    // wave set's wave at the chain's key (0x894e1570), which a single wave doesn't have
+    const bool legato1 = prevHeld && Z.playbackMode == 1 && v->on && !v->analog, legato2 = prevHeld && Z.osc2.playbackMode == 1 && v->osc2.on && !v->osc2.analog;
     v->wave = waveOf(zone, 0);
     v->osc2.wave = waveOf(zone, 1);
     v->robotKnob = Z.robot && v->on && !v->analog && v->wave->type == 1;   // SOLO only (the converter's SOLO tail)
@@ -1022,8 +1100,22 @@ void XtSynth::startVoice(int raw, int note, int vel, int zone) {
     }
     // the voices' note-ons, OSC 1 then OSC 2 (0x894f21c0): SUPER-SAW's counter
     // and FEEDBACK-OSC's lines go in that order
+    // LEGATO (0x894f6176…): each OSC whose earlier voice is of the same kind and mode takes its player, once its own note-on has run
+    // (0x894f2d00) and not one at its wave's end, its +4 at 1 (0x894f2d24): a SOLO or band player's own flag, LITE's what it holds, and
+    // Vari off's SOLO setup clears it, as the band and SOLO note-ons do, and nothing sets it there.  Vari Sw is the block's flag 0x20, not
+    // the voice's mode, so across a Vari switch the XT finds a SOLO wave's two players alike and copies one into the other, which then reads
+    // anywhere: here a player is taken only by its own kind (`linear`), as each player keeps its own seek (v151)
+    const auto sameKind = [](const OscVoice& a, const OscVoice& b) {
+        return a.on == b.on && a.analog == b.analog && a.lite == b.lite && a.linear == b.linear && (a.analog || !a.on || a.wave->type == b.wave->type);
+    };
+    const auto atEnd = [](const OscVoice& s) {
+        const int f = s.lite ? s.staleEnd : s.linear ? 0 : s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();
+        return (int8_t)f == 1;
+    };
     if (v->on) oscStart(*v, *v, Z);
+    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);
     if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);
+    if (legato2 && sameKind(v->osc2, prev->osc2) && !atEnd(prev->osc2)) legatoTake(v->osc2, prev->osc2);
     // portamento (0x894f2440, after the voice setup): the pitch ramp from the
     // source key's cents to the note's; it moves from the next update on
     auto portaStart = [&](OscVoice& s, const OscControls& o) {
@@ -1100,8 +1192,12 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
         s.solo.setGain(s.curGain);
     }
     else {
+        // STEP and EVENT play between two events with no loop: their tails clear the block's flags 0x01 (the Loop), 0x80 and 0x08,
+        // which the player keeps apart from the loop's cached events (setEvents)
+        int first = 0, last = 0;
         s.mb.setLoop(waveLoop(s, o));
-        s.mb.setStart(waveStart(s, o));
+        if (waveEvents(v, s, o, first, last)) s.mb.setEvents(first, last);
+        else s.mb.setStart(waveStart(s, o));
         s.mb.setVari(o.vari);
         s.mb.setTempo(tempoWord, (uint32_t)o.origTempo);
         s.mb.setBeatFlags(o.tempoSync, tripNow);
@@ -1449,6 +1545,7 @@ void XtSynth::oscBeat(OscVoice& s, const OscControls& o) {
     } else {
         if (o.beatKeep && s.mb.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.mb.setGainXt(0.0f); }
         s.mb.setBeatFlags(sync, trip);
+        s.mb.setLoopBit(o.loop && !eventPlay(s, o));   // the block's byte to the player's (0x894f3fb6): the Loop bit, which Playback Mode's tails clear
     }
 }
 
@@ -1896,6 +1993,7 @@ void XtSynth::render(float* left, float* right, int n) {
 //   XT_VELOCITY=v: note-on velocity 1..127 (default 127).
 //   XT_ROBOT=1: Robot Voice.  XT_VARI=0, XT_VARI2=0: Vari Sw off on OSC 1, OSC 2.
 //   XT_START=n, XT_START2=n: OSC 1's, OSC 2's Start Offset, n samples into the wave.
+//   XT_PLAYBACK=n, XT_PLAYBACK2=n: OSC 1's, OSC 2's Playback Mode, 0 RETRIGGER, 1 LEGATO, 2 STEP, 3 EVENT.
 //   XT_LOOP="mode,start,end": Loop on, Loop Mode (0 One Shot, 1 One Way,
 //     2 Alternate) and the region as fractions of the wave.
 //   XT_PORTA="mode,type,time,veloSens": Portamento on, Mode (0 NORMAL,
@@ -2069,6 +2167,7 @@ int main(int argc, char** argv) {
         o.robot = std::getenv("XT_ROBOT2") && std::atoi(std::getenv("XT_ROBOT2")) != 0;
         o.vari = !(std::getenv("XT_VARI2") && std::atoi(std::getenv("XT_VARI2")) == 0);
         if (const char* e = std::getenv("XT_START2")) o.startOffset = std::atoi(e);
+        if (const char* e = std::getenv("XT_PLAYBACK2")) o.playbackMode = std::clamp(std::atoi(e), 0, 3);
         if (const char* e = std::getenv("XT_LOOP2")) {
             o.loop = true;
             std::sscanf(e, "%d,%f,%f", &o.loopMode, &o.loopStart, &o.loopEnd);
@@ -2085,6 +2184,7 @@ int main(int argc, char** argv) {
     c.robot = std::getenv("XT_ROBOT") && std::atoi(std::getenv("XT_ROBOT")) != 0;
     c.vari = !(std::getenv("XT_VARI") && std::atoi(std::getenv("XT_VARI")) == 0);
     if (const char* e = std::getenv("XT_START")) c.startOffset = std::atoi(e);
+    if (const char* e = std::getenv("XT_PLAYBACK")) c.playbackMode = std::clamp(std::atoi(e), 0, 3);
     if (const char* e = std::getenv("XT_LOOP")) {
         c.loop = true;
         std::sscanf(e, "%d,%f,%f", &c.loopMode, &c.loopStart, &c.loopEnd);

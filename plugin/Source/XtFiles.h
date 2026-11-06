@@ -21,6 +21,10 @@ struct XtWaveFile {
     bool loopSwitchDecides = true;   // vplp +0x1a: clear, the wave loops whatever the OSC's Loop switch says (the converter's tail, 0x894e4030)
     int loopRateFwd = 0, loopRateBwd = 0;   // vplp +0x14, +0x16: xtWaveLoopRate, in tenths of a cent
     int tuneFine = 0, tune = 0;      // vplp +0x1b and +0, in 1/100 cent: xtWaveTune.  Real: +0 of 55534 is a sample 5.55 semitones above its Original Key
+    // vpno: the events Playback Mode STEP and EVENT go between, by the wave's own event numbers (u16 from +0xc), and its count (+4).
+    // −1 with no chunk, as on LITE waves.  An XT's own encode lists every event in order; a list edited on the instrument leaves some out.
+    std::vector<uint16_t> vpno;
+    int vpnoCount = -1;
     std::vector<int16_t> pcm;        // interleaved, frames * channels
     size_t size = 0;                 // bytes of the stream, its data chunk's end
 };

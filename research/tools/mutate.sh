@@ -99,5 +99,6 @@ if [ "$PORT" = enc ]; then
     exit
 fi
 [ "$PORT" = fxc ] && ARGS=("$C") && C=control
-"$M/$N" "$ROM" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"
-st=${PIPESTATUS[0]}; [ "$st" -ge 128 ] && echo "$N: the run died, signal $((st - 128))"
+# a run the error hangs is stopped as solocmp's alarm stops one (MUT_TIMEOUT seconds, default 1500): it counts as one that died
+timeout "${MUT_TIMEOUT:-1500}" "$M/$N" "$ROM" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"
+st=${PIPESTATUS[0]}; [ "$st" = 124 ] && st=$((128 + 14)); [ "$st" -ge 128 ] && echo "$N: the run died, signal $((st - 128))"

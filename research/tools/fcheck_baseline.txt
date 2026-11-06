@@ -259,29 +259,33 @@ env 30 70 90 50 80 500 2: identical
 == xt_tone
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
-patches: 512, 1558 zones, 544700 values, 0 different; 448512 of their effects' values, 0 different
-tone: 4389 notes, 2472 taken by a sounding tone, 334 truncated, 382387 blocks, 31403645 checks
-tone: 0 notes left off, a read outside memory; 299520 band reads far from their wave
+patches: 512, 1558 zones, 547816 values, 0 different; 448512 of their effects' values, 0 different
+tone: 4390 notes, 2461 taken by a sounding tone, 332 truncated, 384907 blocks, 30787324 checks
+tone: 0 notes left off, a read outside memory; 289042 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1348 notes, 383 taken by a sounding tone, 172 truncated, 120060 blocks, 11781453 checks
-tone, a wave on OSC 2: 0 notes left off, a read outside memory; 663076 band reads far from their wave
+tone, a wave on OSC 2: 1344 notes, 377 taken by a sounding tone, 167 truncated, 115551 blocks, 10500437 checks
+tone, a wave on OSC 2: 0 notes left off, a read outside memory; 462388 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 241060 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 242643 checks
 tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
-tone, the firmware's patches: 721 notes, 175 taken by a sounding tone, 22 truncated, 58847 blocks, 5938166 checks
-tone, the firmware's patches: 0 notes left off, a read outside memory; 41600 band reads far from their wave
+tone, the firmware's patches: 722 notes, 161 taken by a sounding tone, 29 truncated, 60917 blocks, 6483816 checks
+tone, the firmware's patches: 0 notes left off, a read outside memory; 43094 band reads far from their wave
 tone, the firmware's patches: 0 different
-tone, a wave's own tuning: 669 notes, 187 taken by a sounding tone, 87 truncated, 57998 blocks, 5097140 checks
-tone, a wave's own tuning: 0 notes left off, a read outside memory; 165590 band reads far from their wave
+tone, a wave's own tuning: 674 notes, 209 taken by a sounding tone, 90 truncated, 58918 blocks, 5413951 checks
+tone, a wave's own tuning: 0 notes left off, a read outside memory; 187760 band reads far from their wave
 tone, a wave's own tuning: 0 different
-tone, LITE waves: 674 notes, 192 taken by a sounding tone, 78 truncated, 60560 blocks, 5793728 checks
+tone, LITE waves: 663 notes, 190 taken by a sounding tone, 71 truncated, 57924 blocks, 5762531 checks
 tone, LITE waves: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, LITE waves: 0 different
-tone, zones: 556 notes on zones 2 to 16, 15 of those zones
-tone, zones: 673 notes, 195 taken by a sounding tone, 86 truncated, 58588 blocks, 5684128 checks
-tone, zones: 0 notes left off, a read outside memory; 151804 band reads far from their wave
+tone, zones: 559 notes on zones 2 to 16, 15 of those zones
+tone, zones: 676 notes, 197 taken by a sounding tone, 88 truncated, 54061 blocks, 5091611 checks
+tone, zones: 0 notes left off, a read outside memory; 101850 band reads far from their wave
 tone, zones: 0 different
+tone, playback modes: 140 OSCs took an earlier note's player (LEGATO), 8 didn't as it had reached its wave's end; 417 started from an event (STEP, EVENT)
+tone, playback modes: 961 notes, 45 taken by a sounding tone, 101 truncated, 58634 blocks, 7592347 checks
+tone, playback modes: 0 notes left off, a read outside memory; 396714 band reads far from their wave
+tone, playback modes: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
 tone, the clock's rate: 0 notes left off, a read outside memory; 0 band reads far from their wave
@@ -641,6 +645,7 @@ band 5 vocal.bin 1 0.03 -0.2 3000 0:0.015: ENSEMBLE, 3000 frames: max |firmware 
 band 3 drum.bin 2 0.5 -0.5 8000 0:0.3: BACKING, 8000 frames: max |firmware - port| 7.01e-46, difference -257.2 dB against the signal (rms 0.0001), first at 3423
 == xt_files
 rdac: 416 waves (367 mono, 49 stereo; 268 SOLO, 135 BACKING, 13 ENSEMBLE), 19764803 frames, 0 unread, 0 different from the firmware's whole-wave routines, a block's edge 0.999 of the mean step, hash 9d163e39a6de617a
+vpno: 416 waves with a list, 366 of them each event in order, the others 34 SOLO, 12 BACKING, 4 ENSEMBLE; 0 shorter than their count
 typed: 123840 values against the firmware's read, 0 different
 a wave's own: 0 wrong
 patches: 512 in the image (lengths 0x146c 0, 0x14ac 0, 0x14f2 0, other 512), 512 names read alike, 4162048 values, 12 out of range, 520256 against the firmware's reads, 0 different, hash 82034c2071b9a07a

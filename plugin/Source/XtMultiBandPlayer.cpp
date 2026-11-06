@@ -192,7 +192,8 @@ struct XtMbPlayer::State {
     // Loops: the switch (byte 0 bit 0), the cached events (+0x6c → 0xb4
     // bytes each), their positions and the modes at the forward end and the
     // backward start (records 1 and 3)
-    bool loopOn = false;
+    bool cached = false;                         // the note-on found the loop's events
+    bool pastVpdt = false;                       // records past the vpdt that leave nothing to step (startAt, the repeats): the XT reads RAM there
     uint8_t lrec[4][kXtMbLoopEventBytes] = {};
     int lp[4] = { 0, 0x7fffffff, 0x7fffffff, 0 };
     int lmode1 = 0, lmode3 = 0;
@@ -330,12 +331,12 @@ void XtMbPlayer::State::step(Band& B, int fshift, int walkPos) {
         }
     }
     if (!repeat && r2 >= endPos) repeat = true;
-    if (repeat) {                                   // 0x8950f44a
-        int r3 = B.recStart;
-        r1 -= r2;
+    if (repeat) {                                   // 0x8950f44a, in 32 bits that wrap (as 0x8950f50a below)
+        uint32_t a = (uint32_t)r1 - (uint32_t)r2, c = (uint32_t)B.recStart;
+        if (c == 0 && r2 == 0 && (int32_t)a >= 0) { pastVpdt = true; return; }   // an empty record at 0, from records past the vpdt: it would never end
         bool more;
-        do { r1 += r3; more = r1 >= r2; r3 -= r2; } while (more);
-        B.readPos = r1;
+        do { a += c; more = (int32_t)a >= r2; c -= (uint32_t)r2; } while (more);
+        B.readPos = (int32_t)a;
     } else {                                        // 0x8950f466
         for (;;) {
             if (record(B) <= 0) break;
@@ -376,12 +377,12 @@ void XtMbPlayer::State::stepBack(Band& B, int fshift, int walkPos) {
         }
     }
     if (!repeat && ((flags3 & 8) ? 0 : startPos) >= r2) repeat = true;
-    if (repeat) {                                   // 0x8950f50a
-        int r3 = B.recEnd;
-        r1 -= r2;
+    if (repeat) {                                   // 0x8950f50a: in 32 bits that wrap, as the SH-4's (the sums can pass 2^31; signed ints
+        uint32_t a = (uint32_t)r1 - (uint32_t)r2, c = (uint32_t)B.recEnd;   // there would let the compiler take the loop as endless)
+        if (c == 0 && r2 == 0 && 0 >= (int32_t)a) { pastVpdt = true; return; }   // as in step: it would never end
         bool more;
-        do { r1 += r3; more = r2 >= r1; r3 -= r2; } while (more);
-        B.readPos = r1;
+        do { a += c; more = r2 >= (int32_t)a; c -= (uint32_t)r2; } while (more);
+        B.readPos = (int32_t)a;
     } else {                                        // 0x8950f52e
         for (;;) {
             if (recordPrev(B) <= 0) break;
@@ -432,16 +433,21 @@ void XtMbPlayer::State::startAt(int target) {
     pos = 0;
     initRecords();
     pos = target;
+    // A seek to the wave's end on the last event (a Beat Keep's way back after the walk reached it) reads the last event's entry, whose
+    // segments and records run past the vpdt.  The XT reads RAM there and gets out of these loops; the port reads zeros there, so it
+    // stops at a step past the vpdt that moves nothing, from which it could never get out.  (Inside the vpdt a record may be empty.)
     for (int k = 0; k < 6; ++k) {
         Band& B = b[k];
         while (target >= B.nextSeg && lastEvPos > B.nextSeg) {
+            const int was = B.nextSeg;
             B.grainStart = B.nextSeg;
             B.recEnd = B.nextSeg;
             B.recPtr = B.nextRecs;
             segment(B);
             record(B);
+            if (B.nextSeg == was && (B.segList < 0 || B.segList >= (long)w.vpdtBytes)) { pastVpdt = true; break; }
         }
-        while (target >= B.recEnd) record(B);
+        while (target >= B.recEnd) { const int was = B.recEnd; record(B); if (B.recEnd == was && (B.recPtr < 0 || B.recPtr >= (long)w.vpdtBytes)) { pastVpdt = true; break; } }
         B.readPos = B.startOff + target;
         B.readFrac = 0;
         if (flags3 & 0x80) break;
@@ -517,7 +523,7 @@ void XtMbPlayer::State::crossings() {
         if (flags3 & 4) { if (X > lp[2]) X = lp[2]; limit = X; return; }
         if (lp[2] > pos && X > lp[2]) X = lp[2];
         if (lmode1 > 0) {
-            if (loopOn) { if (X > lp[1]) X = lp[1]; }
+            if (flags0 & 1) { if (X > lp[1]) X = lp[1]; }
             else if (lp[1] > pos && X > lp[1]) X = lp[1];
         }
     } else {
@@ -525,7 +531,7 @@ void XtMbPlayer::State::crossings() {
         if (flags3 & 8) { if (lp[0] > X) X = lp[0]; limit = X; return; }
         if (pos > lp[0] && lp[0] > X) X = lp[0];
         if (lmode3 > 0) {
-            if (loopOn) { if (lp[3] > X) X = lp[3]; }
+            if (flags0 & 1) { if (lp[3] > X) X = lp[3]; }
             else if (pos > lp[3] && lp[3] > X) X = lp[3];
         }
     }
@@ -546,7 +552,7 @@ void XtMbPlayer::State::crossForward() {
         if (flags3 & 0x10) { flags3 &= 0xef; f9c = 1.0f; }
     }
     if (lp[1] == X && !(flags3 & 4)) {
-        if (!loopOn) { flags3 &= 0xdf; f9c = 1.0f; }
+        if (!(flags0 & 1)) { flags3 &= 0xdf; f9c = 1.0f; }
         else {
             flags3 |= 0x20;
             f9c = loopFwdRate;
@@ -583,7 +589,7 @@ void XtMbPlayer::State::crossBackward() {
         if (flags3 & 0x20) { flags3 &= 0xdf; f9c = 1.0f; }
     }
     if (lp[3] == X && !(flags3 & 8)) {
-        if (loopOn) {
+        if (flags0 & 1) {
             flags3 |= 0x10;
             f9c = loopBwdRate;
             ended = 0;
@@ -637,23 +643,31 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
     // 0x8950fa60
     S.evLast = (uint16_t)((S.rd32(8) >> 16) - 1);
     S.lastEvPos = (int)S.rd32(S.entry(S.evLast) + 4);
+    if (eventCfg) { S.evStart = evFirstCfg; S.evEnd = evLastCfg; }   // event numbers (0x894f3150)
     if (S.evLast < S.evStart) S.evStart = S.evLast;
     if (S.evLast < S.evEnd) S.evEnd = S.evLast;
-    S.startPos = startCfg * 16;                     // +0x18: the voice's, the Start Offset × 16 (0x894f3170)
+    S.startPos = eventCfg ? (int)S.rd32(S.entry(S.evStart) + 4) : startCfg * 16;   // +0x18: the first event's, or the voice's Start Offset × 16 (0x894f3170)
     S.endPos = (int)S.rd32(S.entry(S.evEnd) + 4);
     S.ev = 0;
     S.pos = 0;
     // the cached loop events and the switch (none: the forward and backward
     // ends out of reach)
-    S.loopOn = loopCfg.on && xtMbLoopEvents(w, loopCfg, S.lrec);
-    if (S.loopOn) {
+    // The voice's cached loop events (+0x6c) whatever the mode; byte 0 bit 0, the loop itself, the block's, which STEP and EVENT clear.
+    // Without it the walk still crosses the loop's points, and the beat goes round the loop (XtBeat::block)
+    const bool cached = loopCfg.on && xtMbLoopEvents(w, loopCfg, S.lrec);
+    S.cached = cached;
+    if (cached) {
         for (int r = 0; r < 4; ++r) std::memcpy(&S.lp[r], S.lrec[r] + 4, 4);
         S.lmode1 = loopCfg.fwdMode;
         S.lmode3 = loopCfg.bwdMode;
-        S.flags0 |= 1;
+        if (!eventCfg) S.flags0 |= 1;
     }
     if (mode == 5) S.flags3 = 0x80;                 // 0x89510130: band 0's records only
-    S.startAt((0.0f > walk) ? S.endPos : S.startPos);
+    if (eventCfg) {                                 // from an event: the walk from 0 and the event's records (+0x38 = 0, then 0x8950f6c0)
+        S.ev = (0.0f > walk) ? S.evEnd : S.evStart;
+        S.pos = 0;
+        S.initRecords();
+    } else S.startAt((0.0f > walk) ? S.endPos : S.startPos);
     // tree state is zeroed; 0x89510760: f9c = 1; 0x8950f860: (rate ratio 1)
     S.f9c = 1.0f;
     S.loopFwdRate = loopCfg.fwdRate;
@@ -821,6 +835,16 @@ void XtMbPlayer::seek(int pos16) {
 }
 
 bool XtMbPlayer::ended() const { return !s || s->ended; }
+int XtMbPlayer::endFlag() const { return s ? s->ended : 0; }
+bool XtMbPlayer::readPastWave() const { return s && s->pastVpdt; }
+// An update's block byte to the player's (0x894f3ec0, at 0x894f3fb6), whose Loop bit the crossings read (0x8950c8ce): the loop
+// comes and goes with it, as where Playback Mode moves between EVENT and RETRIGGER during a note.  Only where the note-on found
+// the loop's events.
+void XtMbPlayer::setLoopBit(bool on) {
+    if (!s) return;
+    if (on && s->cached) s->flags0 |= 1;
+    else s->flags0 &= (uint8_t)~1;
+}
 
 void XtMbPlayer::setGain(float target, bool now) {
     if (!s) return;
@@ -1070,7 +1094,9 @@ void XtMbPlayer::State::output(float* out) {
 }
 
 void XtMbPlayer::block(float* out) {
-    if (!s) { std::fill(out, out + 64, 0.0f); return; }
+    // After a seek that read records past the vpdt (startAt) the bands' state is no longer any wave's: the XT reads RAM there.  The
+    // player goes silent rather than run its steppers on it, which can loop for good (xt_tone ends such a case there)
+    if (!s || s->pastVpdt) { std::fill(out, out + 64, 0.0f); return; }
     // The SH-4 runs with FPSCR RM = 1 (round to zero).  XT_ROUND=nearest
     // selects the P-code emulator's rounding (for validation).
     s->walkFloat = s->beat.block(s->flags0, s->walk, s->lp);     // 0x8950c280: XtFloat rounds for itself
@@ -1368,6 +1394,7 @@ bool xtMbLoopEvents(const XtMbWave& w, const XtLoop& l, uint8_t out[4][kXtMbLoop
 
 XtMbPlayer::XtMbPlayer() : s(new State) {}
 XtMbPlayer::~XtMbPlayer() { delete s; }
+void XtMbPlayer::takeState(const XtMbPlayer& o) { *s = *o.s; }
 
 #ifdef XT_MBPLAYER_MAIN
 // xt_mbplay <rom.2.bin> <vpdt.bin> <mem.samp> <band1..5 hex,> <channels> <out.f32> <pitch> <walk> [frames]

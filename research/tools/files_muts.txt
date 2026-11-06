@@ -39,3 +39,7 @@ typed-range|return v < d->min \|\| v > d->max ? d->def : v;|return v;
 typed-default|{ p[0], s16(2), s16(4), s16(6) }|{ p[0], s16(4), s16(4), s16(6) }
 lite-riff|    const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|    const bool linear = vpfl && !std::memcmp(vpfl + 40, "LINR", 4);
 lite-novpsc|if (!vpsc \|\| nSc < 8 \|\| !data \|\| (!vpfl && !riff)|if (!data \|\| (!vpfl && !riff)
+vpno-chunk|        else if (!std::memcmp(file + i, "vpno", 4)) { vpno = body; nNo = n; }\n|
+vpno-count|        out.vpnoCount = (int)le32(vpno + 4);|        out.vpnoCount = (int)le32(vpno + 8);
+vpno-list-from|        for (uint32_t k = 12; k + 2 <= nNo; k += 2)|        for (uint32_t k = 10; k + 2 <= nNo; k += 2)
+vpno-list-end|        for (uint32_t k = 12; k + 2 <= nNo; k += 2)|        for (uint32_t k = 12; k + 4 <= nNo; k += 2)

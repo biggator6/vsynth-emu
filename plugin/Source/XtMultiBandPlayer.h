@@ -73,6 +73,9 @@ public:
     // in round-to-zero like the SH-4 (XT_ROUND=nearest: the emulator's mode).
     void block(float* out);
     bool ended() const;
+    int endFlag() const;            // +4 as it stands: 1 at the end, −1 at the start, else 0
+    void setLoopBit(bool on);       // an update's Loop bit, the block's (0x894f3fb6)
+    bool readPastWave() const;      // since note-on, records past the vpdt that left nothing to step (a seek's, an event's), where the XT reads RAM: silent from then
     // Pitch and walk may change while the note plays (read every block).
     void setRates(float pitch, float walk);
     // The output gain target (+0x80; 1 = unity), followed per sample pair
@@ -103,7 +106,12 @@ public:
     // The Start Offset in samples, as the converter leaves it in the block (+0xb8, at most the last sample).  Set before noteOn.  The
     // voice keeps it × 16 at +0x18 (0x894f3170, the block's positions in samples, +0xb4 bit 0x80): a note walking forward starts there
     // (0x8950fa60, then 0x89510bf0), and a walk backward stops there, unless the forward loop has turned it round.
-    void setStart(int32_t samples) { startCfg = samples; }
+    void setStart(int32_t samples) { startCfg = samples; eventCfg = false; }
+    // Playback Mode STEP or EVENT: the block's positions are event numbers (+0xb4 bit 0x80 clear), from one to the other (0x894f3150,
+    // +0x14 and +0x16): each at most the last event (0x8950fac0), the walk starting at the first's position, or the second's going
+    // backward, by the event's own seek (0x8950f6c0 by the table at 0x8987c8b4).  No loop (the tails clear byte 0 bit 0), though the
+    // loop's cached events stay for the walk's crossings and the beat.  Set before noteOn.
+    void setEvents(int first, int last) { evFirstCfg = (uint16_t)first; evLastCfg = (uint16_t)last; eventCfg = true; }
     // To a position in 1/16 sample (0x89510bf0 with byte 0 bit 7), as a released Time Trip goes
     // back to the beat: the records and the read positions there, the beat again from there.
     void seek(int pos16);
@@ -120,10 +128,14 @@ private:
     uint8_t flagsCfg = 0;
     bool variCfg = true;
     int32_t startCfg = 0;
+    bool eventCfg = false;
+    uint16_t evFirstCfg = 0, evLastCfg = 0;
     static void blockImpl(State& S, float* out);
 public:
     XtMbPlayer();
     ~XtMbPlayer();
     XtMbPlayer(const XtMbPlayer&) = delete;
     XtMbPlayer& operator=(const XtMbPlayer&) = delete;
+    // Another player's whole state, as Playback Mode LEGATO copies a voice's player (0x894f2d00); the settings set before noteOn stay this one's
+    void takeState(const XtMbPlayer& o);
 };

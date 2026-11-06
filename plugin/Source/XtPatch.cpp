@@ -49,6 +49,7 @@ void oscOf(const Read& p, int n, Osc& o) {
     o.oscFormant = p(b + 0x28); o.oscFormantKF = 10 * p(b + 0x29); o.lfoFormantDepth = p(b + 0x2a); o.fDepth = p(b + 0x2b);
     o.vari = p(b + 0x30) != 0;
     o.startOffset = p(b + 0x22);
+    o.playbackMode = p(b + 0x2e);
     o.tempoSync = p(b + 0x2c) != 0; o.robot = p(b + 0x2d) != 0; o.loop = p(b + 0x2f) != 0; o.energy = p(b + 0x31); o.timeTrip = p(b + 0x32) != 0; o.beatKeep = p(b + 0x33) != 0;
     o.ana.detune = p(0x30d + 3 * n); o.ana.subOctave = p(0x30e + 3 * n); o.ana.subLevel = p(0x30f + 3 * n);
     const int e = 4 * n;
@@ -192,6 +193,8 @@ void xtPatchZoneSet(const std::vector<uint8_t>& store, const XtSynth::Controls& 
     for (int i = 0; i < XtSynth::kZones; ++i) {
         z.upper[i] = xtPatchValue(store, 0x124 + i);
         if (i) z.ctl[i] = xtPatchControls(store, i, base);
+        if (i) for (int k = 0; k < 2; ++k) z.number[i][k] = xtPatchWaveNumber(store, i, k);   // STEP's count starts again on another
+
     }
 }
 
@@ -213,13 +216,14 @@ void xtWaveOntoEncoded(const XtWaveFile& w, XtEncoded& e) {
     e.tune = xtWaveTune(w.headerCents, w.tuneFine, w.tune);
     e.loopRate[0] = xtWaveLoopRate(w.loopRateFwd);
     e.loopRate[1] = xtWaveLoopRate(w.loopRateBwd);
+    if (w.vpnoCount >= 0) { e.vpno = w.vpno; e.vpnoCount = w.vpnoCount; }   // its own list in place of the encode's
     if (w.bwdStart < 0 || w.bwdStart > w.bwdEnd || w.bwdEnd >= w.frames) { e.bwdMode = -1; return; }   // a region that isn't in the wave: the forward loop's
     e.bwdMode = std::clamp(w.bwdMode, 0, 2);
     e.bwdStart = (int)w.bwdStart;
     e.bwdEnd = (int)w.bwdEnd;
 }
 
-std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone) {
+std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone, const int* waveType) {
     std::vector<std::string> m;
     const Read p { store, zone };
     for (int n = 0; n < 2; ++n) {
@@ -227,7 +231,10 @@ std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int z
         const std::string osc = "OSC " + std::to_string(n + 1) + " ";
         if (p(0x2a4 + b) != 0 && p(0x2a5 + b) == kExternal) m.push_back(osc + "external input");
         if (p(0x2a4 + b) == 0 || p(0x2a5 + b) != 1) continue;
-        if (p(0x2d2 + b) != 0) m.push_back(osc + "Playback Mode");
+        // LEGATO is done, and STEP and EVENT on band waves; a LITE wave's converter doesn't read the mode, on the XT either.  A SOLO
+        // wave's segments at its attack events aren't done (v156)
+        const int mode = p(0x2d2 + b);
+        if (mode >= 2 && (!waveType || waveType[n] == 1)) m.push_back(osc + "Playback Mode " + (mode == 2 ? "STEP" : "EVENT") + " on a SOLO wave");
     }
     if (p(0x42e)) m.push_back("arpeggio");
     if (p(0x48d)) m.push_back("Multi Step Modulator");

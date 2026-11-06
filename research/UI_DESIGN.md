@@ -13,7 +13,7 @@ The plugin's user interface follows this design from v144 on, by the user's deci
 
 | Tab | Cards |
 |---|---|
-| Oscillator | Wave (Vari on its title line, Start Offset its last row), or Analog oscillator when Type is ANALOG · Loop · Tempo sync · Pitch · Level · Velocity |
+| Oscillator | Wave (Vari and Playback Mode on its title line, Start Offset its last row), or Analog oscillator when Type is ANALOG · Loop · Tempo sync · Pitch · Level · Velocity |
 | Envelopes | Amp (TVA) · Pitch · Time · OSC n Amp · Formant · COSM n |
 | LFOs | LFO 1 or 2, by the OSC · Amp LFO (LFO 5) |
 | COSM | COSM 1/2, On, Type · the type's own rows · LFO 3 or 4 · MOD · Structure |
@@ -53,7 +53,7 @@ A page doesn't scroll, so cards must fit: at the smallest size a page is 466 hig
 
 ## Checks
 
-- `TEST_UI_LAYOUT=1` (in `verify.sh`): at the smallest, default and largest sizes, on every tab, both OSC types, every COSM type, every Effects page and every effect type, no control is outside its parent, over another or without a size, and no text is cut short, the effects' list included, which must show at least 15 rows. Every control is moved, to see that it sets a parameter, and every parameter must have a control. Each tab is opened by a click, and the joined buttons are driven both ways. `=list` prints the parameters with and without a control.
+- `TEST_UI_LAYOUT=1` (in `verify.sh`): at the smallest, default and largest sizes, on every tab, both OSC types, every COSM type, every Effects page and every effect type, no control is outside its parent, over another or without a size, none shows on a card that isn't shown (v155), and no text is cut short, the effects' list included, which must show at least 15 rows. Every control is moved, to see that it sets a parameter, and every parameter must have a control. Each tab is opened by a click, and the joined buttons are driven both ways. `=list` prints the parameters with and without a control.
 - `mutate_panel.py --editor`: planted errors in the layout, to show that check catches them.
 - `TEST_SNAPSHOT=file.png`, with `TEST_SNAPSHOT_TAB=n` and `TEST_SNAPSHOT_SIZE=WxH`: the editor drawn offscreen. It draws only the open tab. `TEST_SNAPSHOT_TYPE` and `TEST_SNAPSHOT_COSM2` open the COSM tab, and `TEST_SNAPSHOT_FX` the Effects tab.
 

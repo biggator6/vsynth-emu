@@ -74,6 +74,7 @@ namespace Params {
     static const juce::String kLoopStart     = "loopStart";
     static const juce::String kLoopEnd       = "loopEnd";
     static const juce::String kStartOffset   = "startOffset";   // Start Offset in samples, the XT's unit: where a note starts in the wave
+    static const juce::String kPlaybackMode  = "playbackMode";  // Playback Mode: RETRIGGER, LEGATO, STEP, EVENT (IDs 0x2d2, 0x306)
     // Portamento: switch, Mode (NORMAL, LEGATO), Type (RATE, TIME), Time
     // 0..127, Time Velo Sens −63..+63
     static const juce::String kPorta         = "portamento";
@@ -334,6 +335,8 @@ VSynthEmuProcessor::createParameterLayout() {
     // Samples, as a patch stores it; the firmware takes the wave's last sample for anything past it.  2^24 − 1 holds the longest
     // wave the XT's memory takes and stays exact in a float
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kStartOffset, "Start Offset", 0, kStartOffsetMax, 0));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kPlaybackMode, "Playback Mode",
+        juce::StringArray { "RETRIGGER", "LEGATO", "STEP", "EVENT" }, 0));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kPorta, "Portamento", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kPortaMode, "Portamento Mode",
         juce::StringArray { "NORMAL", "LEGATO" }, 0));
@@ -775,6 +778,8 @@ VSynthEmuProcessor::createParameterLayout() {
         params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kLoopEnd), n + "Loop End",
             juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f, twoPlaces));
         params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kStartOffset), n + "Start Offset", 0, kStartOffsetMax, 0));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kPlaybackMode), n + "Playback Mode",
+            juce::StringArray { "RETRIGGER", "LEGATO", "STEP", "EVENT" }, 0));
     }
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kModSwitch, "MOD Switch", false));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kModType, "MOD Type",
@@ -1046,6 +1051,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     c.loopStart    = apvts.getRawParameterValue(Params::kLoopStart)->load() / 100.0f;   // not to a step: a wave's own loop is to the sample
     c.loopEnd      = apvts.getRawParameterValue(Params::kLoopEnd)->load() / 100.0f;
     c.startOffset  = knob(Params::kStartOffset);
+    c.playbackMode = knob(Params::kPlaybackMode);
     c.portamento   = apvts.getRawParameterValue(Params::kPorta)->load() >= 0.5f;
     c.portaMode    = knob(Params::kPortaMode);
     c.portaType    = knob(Params::kPortaType);
@@ -1305,6 +1311,7 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
         o.loopStart = apvts.getRawParameterValue(oscId(1, Params::kLoopStart))->load() / 100.0f;
         o.loopEnd = apvts.getRawParameterValue(oscId(1, Params::kLoopEnd))->load() / 100.0f;
         o.startOffset = knob2(Params::kStartOffset);
+        o.playbackMode = knob2(Params::kPlaybackMode);
     }
     for (int k = 0; k < 2; ++k) {   // each OSC's pitch, time and formant envelopes' velocity and key
         XtSynth::OscControls& o = k ? c.osc2 : c;
@@ -1397,6 +1404,7 @@ void VSynthEmuProcessor::setControls(const XtSynth::Controls& c) {
     set(Params::kBeatKeep, c.beatKeep ? 1 : 0);
     set(Params::kLoop, c.loop ? 1 : 0);
     set(Params::kLoopMode, c.loopMode);
+    set(Params::kPlaybackMode, c.playbackMode);
     
     
     set(Params::kPorta, c.portamento ? 1 : 0);
@@ -1646,6 +1654,7 @@ void VSynthEmuProcessor::setControls(const XtSynth::Controls& c) {
         set(oscId(1, Params::kBeatKeep), o.beatKeep ? 1 : 0);
         set(oscId(1, Params::kLoop), o.loop ? 1 : 0);
         set(oscId(1, Params::kLoopMode), o.loopMode);
+        set(oscId(1, Params::kPlaybackMode), o.playbackMode);
     }
 }
 
@@ -1980,9 +1989,15 @@ void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<u
         if (found[k]) takeWave(waves[k], files[k], k);
         else unloadWave(k);
     }
-    loadZones(store, waveFolder, notes);
-    for (int z = 0; z < xtPatchZones(store); ++z)
-        for (const auto& m : xtPatchMissing(store, z)) notes.addIfNotAlreadyThere(m);
+    std::map<int, int> typeOf;                      // each wave number's encode type, for what isn't done on that type
+    for (int k = 0; k < 2; ++k)
+        if (found[k]) typeOf[xtPatchWaveNumber(store, zone, k)] = waves[k].encodeType;
+    loadZones(store, waveFolder, notes, &typeOf);
+    for (int z = 0; z < xtPatchZones(store); ++z) {
+        int types[2];
+        for (int k = 0; k < 2; ++k) { const auto it = typeOf.find(xtPatchWaveNumber(store, z, k)); types[k] = it == typeOf.end() ? -1 : it->second; }
+        for (const auto& m : xtPatchMissing(store, z, types)) notes.addIfNotAlreadyThere(m);
+    }
     patchName_ = juce::String(name);
     patchNote_ = notes.joinIntoString(", ");
     apvts.state.setProperty("patchName", patchName_, nullptr);
@@ -1992,7 +2007,7 @@ void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<u
 
 // Zones 2…16 (the user's decision, 2026-11-05): the patch's data, not the parameters.  Their settings go to the synth at once, analog OSCs
 // and all, then again with their waves once the pool has encoded them: each wave once, as its own type, its own tuning and loop on it.
-void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes) {
+void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes, std::map<int, int>* typeOf) {
     const int gen = ++zonesGen_;
     const int zones = xtPatchZones(store);
     patchZones_.store(zones);
@@ -2014,6 +2029,7 @@ void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce
                 XtWaveFile w;
                 const juce::File f = findWave(waveFolder, number);
                 if (!(f.existsAsFile() && readVSynthWave(f, w))) { w = XtWaveFile{}; notes.addIfNotAlreadyThere("no wave " + juce::String(number)); }
+                else if (typeOf) (*typeOf)[number] = w.encodeType;
                 files[number] = std::move(w);
             }
             const XtWaveFile& w = files[number];

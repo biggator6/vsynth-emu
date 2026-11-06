@@ -10,6 +10,7 @@
 #include "../Source/XtBuildId.h"
 #include "../Source/XtVpwFormat.h"
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <algorithm>
 #include <climits>
 #include <cstdio>
 #include <cstring>
@@ -128,7 +129,7 @@ static int patchApplyTest(const juce::File& rom) {
             f.loadFileAsData(m);
             files.emplace_back(static_cast<const uint8_t*>(m.getData()), static_cast<const uint8_t*>(m.getData()) + m.getSize());
         }
-    int zonesDone = 0;
+    int zonesDone = 0, stepEvent = 0;
     long fxValues = 0;
     for (const auto& f : files) {
         XtPatchFile patch;
@@ -139,6 +140,19 @@ static int patchApplyTest(const juce::File& rom) {
             const XtSynth::Controls got = p.currentControls();
             check(got == want, juce::String(patch.name) + " zone " + juce::String(z) + ": the controls differ");
             ++zonesDone;
+            // Playback Mode STEP and EVENT, missing on a SOLO wave alone
+            for (int k = 0; k < 2; ++k) {
+                const int b = 0x34 * k, mode = xtPatchValue(patch.store, 0x2d2 + b, z);
+                const bool pcm = xtPatchValue(patch.store, 0x2a4 + b, z) != 0 && xtPatchValue(patch.store, 0x2a5 + b, z) == 1;
+                stepEvent += pcm && mode >= 2;
+                for (int type : { 1, 3, 5, 0 }) {
+                    const int types[2] = { k == 0 ? type : -1, k == 1 ? type : -1 };
+                    const auto m = xtPatchMissing(patch.store, z, types);
+                    const std::string note = "OSC " + std::to_string(k + 1) + " Playback Mode " + (mode == 2 ? "STEP" : "EVENT") + " on a SOLO wave";
+                    check((std::find(m.begin(), m.end(), note) != m.end()) == (pcm && mode >= 2 && type == 1),
+                          juce::String(patch.name) + " zone " + juce::String(z) + ": Playback Mode " + juce::String(mode) + " on encode type " + juce::String(type) + ", said wrongly");
+                }
+            }
         }
         check(p.getPatchName() == juce::String(patch.name), "its name");
         for (const auto& fx : xtPatchEffects(patch.store)) {
@@ -159,12 +173,14 @@ static int patchApplyTest(const juce::File& rom) {
     std::vector<uint8_t> chosen;
     XtPatchFile patch;
     int number = 0;
-    for (const auto& f : files) {
-        XtPatchFile t;
-        if (!xtPatchRead(f.data(), f.size(), t)) continue;
-        // one zone: the sound below is held to XtSynth on zone 1's settings alone
-        if (xtPatchZones(t.store) == 1 && xtPatchValue(t.store, 0x2a4) && xtPatchValue(t.store, 0x2a5) == 1 && xtPatchWaveNumber(t.store, 0, 0) > 0 && xtPatchValue(t.store, 0x2d9) != 1) { chosen = f; patch = t; number = xtPatchWaveNumber(t.store, 0, 0); break; }
-    }
+    for (int pass = 0; pass < 2 && chosen.empty(); ++pass)   // one with Playback Mode STEP or EVENT on OSC 1 if there is one, for the note of what's missing
+        for (const auto& f : files) {
+            XtPatchFile t;
+            if (!xtPatchRead(f.data(), f.size(), t)) continue;
+            // one zone: the sound below is held to XtSynth on zone 1's settings alone
+            if (xtPatchZones(t.store) == 1 && xtPatchValue(t.store, 0x2a4) && xtPatchValue(t.store, 0x2a5) == 1 && xtPatchWaveNumber(t.store, 0, 0) > 0 && xtPatchValue(t.store, 0x2d9) != 1
+                && (pass == 1 || xtPatchValue(t.store, 0x2d2) >= 2)) { chosen = f; patch = t; number = xtPatchWaveNumber(t.store, 0, 0); break; }
+        }
     if (chosen.empty()) { std::fprintf(stderr, "patch apply: no patch with a wave on OSC 1\n"); return 1; }
     const auto presets = disk.presetWaves();
     XtWaveFile stream;
@@ -183,6 +199,9 @@ static int patchApplyTest(const juce::File& rom) {
     waveBytes[lp + 0x18] = 2; waveBytes[lp + 0x19] = 1;
     waveBytes[lp + 0x1a] = 0;                 // it loops, whatever the switch says
     waveBytes[lp + 0x1b] = (uint8_t)(int8_t)-30;
+    const size_t no = chunk("vpno");          // its list of events for STEP and EVENT: three, out of order
+    check(no != 0, "the preset wave's list of events (vpno)");
+    if (no) { put32(no + 4, 3); for (int i = 0; i < 3; ++i) { waveBytes[no + 12 + 2 * (size_t)i] = (uint8_t)(i == 0 ? 2 : i - 1); waveBytes[no + 13 + 2 * (size_t)i] = 0; } }
     const juce::String waveName = juce::String(number).paddedLeft('0', 3) + " Test.vpw";
     waveDir.getChildFile(waveName).replaceWithData(waveBytes.data(), waveBytes.size());
     waveDir.getChildFile(juce::String(number).paddedLeft('0', 3) + " Test 2.vpw").replaceWithData(waveBytes.data(), 16);   // a sync's copy, longer in name: not this one
@@ -199,6 +218,12 @@ static int patchApplyTest(const juce::File& rom) {
     }
     check(p.loadPatch(patchFile), "the patch should load");
     check(p.getPatchName() == juce::String(patch.name), "its name");
+    {   // STEP or EVENT on OSC 1, said to be missing only as its wave is SOLO
+        const int mode = xtPatchValue(patch.store, 0x2d2);
+        const bool said = p.getPatchNote().contains("OSC 1 Playback Mode");
+        check(said == (mode >= 2 && stream.encodeType == 1), "Playback Mode " + juce::String(mode) + " on encode type " + juce::String(stream.encodeType) + ": the note says \"" + p.getPatchNote() + "\"");
+        std::printf("patch apply: the project's patch %s, OSC 1 Playback Mode %d on encode type %d\n", patch.name.c_str(), mode, stream.encodeType);
+    }
     check(p.hasFileLoaded(0) && p.getLoadedFileName(0) == waveName, "its wave on OSC 1, by its number: " + p.getLoadedFileName(0));
     check(p.lastPatchFolder() == patchDir, "the folder kept for next time");
     const auto wait = [&] {
@@ -224,6 +249,7 @@ static int patchApplyTest(const juce::File& rom) {
         const int type = wave.encodeType == 0 || wave.encodeType == 1 || wave.encodeType == 3 || wave.encodeType == 5 ? wave.encodeType : 1;
         auto own = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16), plain = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16);
         xtWaveOntoEncoded(wave, *own);
+        check(own->vpnoCount == 3 && own->vpno.size() >= 3 && own->vpno[0] == 2 && own->vpno[1] == 0 && own->vpno[2] == 1, "the wave's own list of events, not the encode's");
         c = p.currentControls();
         c.pitchSemis = 0;
         XtSynth ref, untuned;
@@ -489,7 +515,7 @@ static int patchApplyTest(const juce::File& rom) {
     notPatch.replaceWithText("not a patch at all, though long enough to look at");
     check(!p.loadPatch(notPatch) && p.getStatusText().contains("not a V-Synth patch"), "something else should be refused: " + p.getStatusText());
     p.releaseResources();
-    std::printf("patch apply: %d patches, %d zones, %ld effect values, %s, %d checks, %d failed\n", (int)files.size(), zonesDone, fxValues, zoneWhat.c_str(), checks, failed);
+    std::printf("patch apply: %d patches, %d zones (%d PCM OSCs on STEP or EVENT), %ld effect values, %s, %d checks, %d failed\n", (int)files.size(), zonesDone, stepEvent, fxValues, zoneWhat.c_str(), checks, failed);
     return failed ? 1 : 0;
 }
 
@@ -654,6 +680,18 @@ int main(int argc, char** argv) {
         const auto check = [&](const juce::String& where) {
             ++states;
             walk(*ed, [&](juce::Component& c) {
+                // a card that isn't shown takes its controls with it, the title line's too, unless a card that is holds them
+                if (auto* pg = dynamic_cast<Ui::Page*>(&c)) {
+                    std::set<juce::Component*> held, hidden;
+                    for (const auto& card : pg->cards) {
+                        auto& into = card.shown && !card.shown() ? hidden : held;
+                        for (const auto& h : card.head) if (h.c) into.insert(h.c);
+                        for (const auto& r : card.rows) for (const auto& it : r.items) if (it.c) into.insert(it.c);
+                        for (juce::Component* x : card.extra) if (x) into.insert(x);
+                    }
+                    for (juce::Component* k : hidden)
+                        if (!held.count(k) && k->isVisible()) fail(where + ": " + nameOf(k) + " shows on a card that isn't shown");
+                }
                 std::vector<juce::Component*> kids;
                 for (juce::Component* ch : c.getChildren()) if (ch->isVisible() && !dynamic_cast<juce::ResizableCornerComponent*>(ch)) kids.push_back(ch);
                 for (size_t i = 0; i < kids.size(); ++i) {
@@ -1129,6 +1167,7 @@ int main(int argc, char** argv) {
         if (std::getenv("TEST_OSC2_ROBOT") && std::atoi(std::getenv("TEST_OSC2_ROBOT")) != 0) { o.robot = true; set2("robot", 1); }
         if (std::getenv("TEST_OSC2_VARI") && std::atoi(std::getenv("TEST_OSC2_VARI")) == 0) { o.vari = false; set2("vari", 0); }
         if (const char* e = std::getenv("TEST_OSC2_START")) { o.startOffset = std::atoi(e); set2("startOffset", o.startOffset); }
+        if (const char* e = std::getenv("TEST_OSC2_PLAYBACK")) { o.playbackMode = std::clamp(std::atoi(e), 0, 3); set2("playbackMode", o.playbackMode); }
         if (std::getenv("TEST_OSC1_OFF") && std::atoi(std::getenv("TEST_OSC1_OFF")) != 0) {
             refCtl.on = false;
             auto* prm = p.apvts.getParameter("oscSwitch");
@@ -1187,6 +1226,11 @@ int main(int argc, char** argv) {
     if (const char* e = std::getenv("TEST_START")) {
         refCtl.startOffset = std::atoi(e);
         setKnobs({ { "startOffset", refCtl.startOffset } });
+    }
+    // TEST_PLAYBACK=n: OSC 1's Playback Mode, 0 RETRIGGER, 1 LEGATO, 2 STEP, 3 EVENT (with TEST_NOTE2 for a second note)
+    if (const char* e = std::getenv("TEST_PLAYBACK")) {
+        refCtl.playbackMode = std::clamp(std::atoi(e), 0, 3);
+        setKnobs({ { "playbackMode", refCtl.playbackMode } });
     }
     // TEST_ROBOT=1: Robot Voice
     if (std::getenv("TEST_ROBOT") && std::atoi(std::getenv("TEST_ROBOT")) != 0) {

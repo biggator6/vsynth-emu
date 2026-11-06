@@ -41,6 +41,11 @@ struct XtEncoded {
     XtWaveTune tune;
     int bwdMode = -1, bwdStart = 0, bwdEnd = 0;
     float loopRate[2] = { 1.0f, 1.0f };   // forward and backward: what Vari off walks by inside the loop (xtWaveLoopRate)
+    // The wave's `vpno`: the events Playback Mode STEP and EVENT play between, by the vpdt's numbers, and its count (+4).  A band wave
+    // encoded here has them all in order, as the XT's own encodes do; a V-Synth wave brings its own (xtWaveOntoEncoded), SOLO's too.
+    // STEP and EVENT play a SOLO wave as RETRIGGER here (not done), and a LITE wave on the XT too, whose converter doesn't read the mode.
+    std::vector<uint16_t> vpno;
+    int vpnoCount = 0;
 };
 
 // The user's rom.2: loads the encoders' and players' tables and opens the
@@ -132,6 +137,10 @@ public:
         // backward stops there.  The converter takes it unsigned and makes it the last sample at most (0x894e4448); a note walking
         // backward still starts at the end.  Samples, as Playback Mode RETRIGGER has them (the block's +0xb4 bit 0x80).
         int startOffset = 0;
+        // Playback Mode (IDs 0x2d2, 0x306): 0 RETRIGGER, 1 LEGATO, 2 STEP, 3 EVENT.  LEGATO: a note played while an earlier note of its
+        // part and zone is held takes that note's player, so the wave goes on from where the other was (0x894f2d00).  STEP and EVENT
+        // pick the wave's events.
+        int playbackMode = 0;
         // Tempo Sync (IDs 0x2d0, 0x304): a PCM OSC's walk follows the tempo clock, at the speed of
         // the Patch Tempo over the wave's Original Tempo (its header's +0x1c, BPM × 10000)
         bool tempoSync = false;
@@ -313,6 +322,7 @@ public:
         int upper[kZones] = { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 };
         Controls ctl[kZones];                                // [0] unused: zone 1 is setControls'
         std::shared_ptr<const XtEncoded> wave[kZones][2];    // the same
+        int number[kZones][2] = {};                          // their Wave Numbers, as setSample's; 0 a new wave
     };
     // The zone a key plays, with the Octave Shift (the part's note-on, 0x894dbcb0): the first whose upper key it doesn't pass, on
     // the table 0x894794f0 makes of the upper keys, each at least the one before and the last 127.  0 for zone 1.
@@ -322,8 +332,9 @@ public:
     ~XtSynth();
     void prepare(double hostRate);
     // Any thread: the next render() starts using this sample on OSC `osc` (0
-    // OSC 1, 1 OSC 2; voices stop).  The XT binds a wave per OSC (IDs 0x2be, 0x2f2).
-    void setSample(std::shared_ptr<const XtEncoded> e, int osc = 0);
+    // OSC 1, 1 OSC 2; voices stop).  The XT binds a wave per OSC (IDs 0x2be, 0x2f2).  `number`: its Wave Number, which Playback
+    // Mode STEP's count starts again from 0 on a change of (0x894e5ad4); −1, a new wave.
+    void setSample(std::shared_ptr<const XtEncoded> e, int osc = 0, int number = -1);
     bool hasSample(int osc = 0) const { return cur[osc] != nullptr; }
     // Any thread, the same way: a patch's zones 2…16 (voices stop).  nullptr: zone 1 alone, every key on it.
     void setZones(std::shared_ptr<const Zones> z);
@@ -382,6 +393,12 @@ private:
         XtLfo lfo;
         XtPitchRamp porta;             // the pitch ramp (+0x880)
         bool chase = false;            // a released Time Trip fading out to go back to the beat (+0x9b0)
+        int steps = 0;                 // the zone's and OSC's count of notes at this one's start (the input's +0xe0): STEP's
+        // A LITE player's byte +4, the end flag the SOLO and band players keep (1 at the wave's end, −1 at its start): LITE's note-ons
+        // (0x8950b8d0, 0x8950b712) neither clear nor set it, so on the XT it is what the tone slot's last SOLO or band player, or a LEGATO
+        // copy, left there, and LEGATO takes no earlier player whose flag is 1 (0x894f2d24).  XtSynth's voices are not the XT's tone slots,
+        // so the plugin takes 0; the check sets the firmware's own.
+        int8_t staleEnd = 0;
         // the player's pitch ratio, formant ratio, walk and Energy as the
         // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
         float curA = 1, curF = 1, curWalk = 1, curG = 0, curGain = 1;
@@ -399,6 +416,7 @@ private:
         bool active = false, releasing = false;
         int note = -1;                 // the key, with the Octave Shift
         int raw = -1;                  // the key as played (the tone's +0x42), for note-off
+        int chainKey = -1;             // the block's +0x6c4: the key the notes it follows began on, its own if none (the allocator's, 0x894d4c04)
         int srcKey = -1;               // the key portamento glides from (the OSC's +0x7c)
         bool damping = false;          // truncated (0x894f5500): fading out over the Truncate Time
         float damp = 0;                // the TVA's fade (+0x54)
@@ -442,6 +460,11 @@ private:
         float bus[XtBusCount] = {};
     };
     std::shared_ptr<const XtEncoded> cur[2], pending[2], retired[2];   // each OSC's wave
+    int curNumber[2] = { -1, -1 }, pendingNumber[2] = { -1, -1 };     // and its Wave Number
+    // Each zone's and OSC's count of notes started (0x89cf7210: part × 64 + zone × 4 + OSC × 2), every note-on of the zone, both
+    // OSCs, whatever their mode (0x894e4940); from 0 when the OSC's Wave Number changes (0x894e5ad4).  STEP's event is it modulo the count
+    uint16_t stepCount[kZones][2] = {};
+    int zoneNumber[kZones][2] = {};
     std::shared_ptr<const Zones> zones, pendingZones, retiredZones;     // zones 2…16
     std::mutex swapLock;
     bool swapPending[2] = {}, zonesPending = false;
@@ -547,6 +570,9 @@ private:
     XtEnvParams ampEnvParams(const Voice& v, const OscControls& o) const;   // the OSC amp envelope
     XtLoop waveLoop(const OscVoice& s, const OscControls& o) const;   // the players' loop
     static int32_t waveStart(const OscVoice& s, const OscControls& o);  // the block's +0xb8: the Start Offset, the last sample at most
+    // Playback Mode STEP and EVENT on a band wave (0x894e42e0, 0x894e4070): the two event numbers it plays between, false for samples
+    static bool eventPlay(const OscVoice& s, const OscControls& o);   // Playback Mode STEP or EVENT taking effect: a band wave, with a list for STEP
+    bool waveEvents(const Voice& v, const OscVoice& s, const OscControls& o, int& first, int& last) const;
     float noteCents(const Voice& v, const OscVoice& s, const OscControls& o, int key) const;  // voice +8 at a key (+0x68 at the previous one)
     void noteTuning(const Voice& v, const OscVoice& s, const OscControls& o, int& coarse, int& fine) const;   // the per-note setup's +0x68 and +0x70
     XtAnalogShared anaShared;                        // the analog voices' shared state
@@ -555,6 +581,7 @@ private:
     float mixPast[3] = {};                           // the last tone's mix, its first words: they follow OSC 2's buffer on the XT
     XtAnalogBlock analogBlock(const Voice& v, const OscVoice& s, const OscControls& o) const; // the analog converter's block
     int keyFollowKey(const Voice& v, const OscControls& o) const;   // the OSC's +4
+    void legatoTake(OscVoice& s, const OscVoice& from);  // Playback Mode LEGATO: the earlier note's player (0x894f2d00)
     int shiftKey(int key) const;                     // + the Octave Shift, within 0..127
     void startVoice(int raw, int key, int vel, int zone);
     void liveUpdate(Voice& v, const Controls& c, const Controls& was, bool anyChanged);   // a knob's update of a sounding voice, its zone's controls now and before

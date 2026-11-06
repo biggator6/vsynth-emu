@@ -240,6 +240,9 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
         }
     }
     loopModeBox_.addItemList({ "One Shot", "One Way", "Alternate" }, 1);
+    playbackBox_.addItemList({ "RETRIGGER", "LEGATO", "STEP", "EVENT" }, 1);
+    addAndMakeVisible(playbackBox_);
+    playbackAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "playbackMode", playbackBox_);
     loopBtn_.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
     loopBtn_.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xFF00BFA5));
     addAndMakeVisible(loopBtn_);
@@ -789,7 +792,7 @@ void VSynthEmuEditor::attachOsc(int k) {
     oscTypeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("oscType"), oscTypeBox_);
     anaWaveAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("anaWave"), anaWaveBox_);
     encodeAtt_.reset(); keyAtt_.reset(); depthAtt_.reset(); energyAtt_.reset(); startAtt_.reset(); oscTkfAtt_.reset(); oscFkfAtt_.reset(); timeOffsetAtt_.reset();
-    loopAtt_.reset(); loopModeAtt_.reset(); loopStartAtt_.reset(); loopEndAtt_.reset();
+    loopAtt_.reset(); loopModeAtt_.reset(); loopStartAtt_.reset(); loopEndAtt_.reset(); playbackAtt_.reset();
     origTempoAtt_.reset(); syncAtt_.reset(); tripBtnAtt_.reset(); keepAtt_.reset();
     origTempoAtt_  = std::make_unique<SliderAtt>(processor_.apvts, id("origTempo"), origTempoSlider_);
     syncAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("tempoSync"), syncBtn_);
@@ -806,6 +809,7 @@ void VSynthEmuEditor::attachOsc(int k) {
     loopAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("loop"), loopBtn_);
     variAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("vari"), variBtn_);
     loopModeAtt_   = std::make_unique<ComboAtt>(processor_.apvts, id("loopMode"), loopModeBox_);
+    playbackAtt_   = std::make_unique<ComboAtt>(processor_.apvts, id("playbackMode"), playbackBox_);
     loopStartAtt_  = std::make_unique<SliderAtt>(processor_.apvts, id("loopStart"), loopStartSlider_);
     loopEndAtt_    = std::make_unique<SliderAtt>(processor_.apvts, id("loopEnd"), loopEndSlider_);
     static const char* const anaIds[kAnaKnobs] = { "anaImpact", "anaPw", "anaPwKF", "anaFat", "anaFatKF", "anaPwLfo", "anaPwEnv", "anaFatLfo", "anaFatEnv", "anaDetune", "anaSubOct", "anaSubLevel" };
@@ -848,7 +852,7 @@ void VSynthEmuEditor::showOscType() {
     for (juce::Component* cpt : { (juce::Component*)&encodeLabel_, (juce::Component*)&encodeBox_, (juce::Component*)&keyLabel_,
                                   (juce::Component*)&keySlider_, (juce::Component*)&depthLabel_, (juce::Component*)&depthSlider_,
                                   (juce::Component*)&energyLabel_, (juce::Component*)&energySlider_, (juce::Component*)&startLabel_,
-                                  (juce::Component*)&startSlider_, (juce::Component*)&offsetLabel_,
+                                  (juce::Component*)&startSlider_, (juce::Component*)&playbackBox_, (juce::Component*)&offsetLabel_,
                                   (juce::Component*)&timeOffsetBox_, (juce::Component*)&oscTkfLabel_, (juce::Component*)&oscTkfSlider_,
                                   (juce::Component*)&oscFkfLabel_, (juce::Component*)&oscFkfSlider_, (juce::Component*)&loopBtn_, (juce::Component*)&variBtn_,
                                   (juce::Component*)&loopModeBox_, (juce::Component*)&loopStartLabel_, (juce::Component*)&loopStartSlider_,
@@ -1295,7 +1299,7 @@ void VSynthEmuEditor::buildLayout() {
     {
         Page& p = *pages_[0];
         Card wave { "Wave" };
-        wave.head = { { &variBtn_, 60 } };
+        wave.head = { { &variBtn_, 60 }, { &playbackBox_, 110 } };
         wave.rows = { lr(encodeLabel_, encodeBox_), lr(keyLabel_, keySlider_, 150), lr(depthLabel_, depthSlider_), lr(energyLabel_, energySlider_),
                       lr(offsetLabel_, timeOffsetBox_, 110), lr(oscTkfLabel_, oscTkfSlider_), lr(oscFkfLabel_, oscFkfSlider_), lr(startLabel_, startSlider_) };
         wave.shown = pcm;

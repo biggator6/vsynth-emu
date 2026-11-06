@@ -85,6 +85,7 @@ public:
     // The same as the firmware's output words, L/R pairs: int16 × 65536 × the gain.  Bit for bit.
     void renderXt(float* lr, int count);
     bool ended() const { return ended_ != 0; }
+    int endFlag() const { return ended_; }  // +4 as it stands: 1 at the end, −1 at the start, else 0
     FILE* trace = nullptr;              // VSE_TRACE: per-sample state, as EmuSolo.java writes it
 
 private:

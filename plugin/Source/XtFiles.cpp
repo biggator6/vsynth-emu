@@ -145,8 +145,8 @@ int xtPatchValue(const std::vector<uint8_t>& store, int id, int zone, int cosm) 
 
 bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* why) {
     out = {};
-    const uint8_t* vpfl = nullptr; const uint8_t* vpsc = nullptr; const uint8_t* vplp = nullptr; const uint8_t* data = nullptr;
-    uint32_t nFl = 0, nSc = 0, nLp = 0, nData = 0;
+    const uint8_t* vpfl = nullptr; const uint8_t* vpsc = nullptr; const uint8_t* vplp = nullptr; const uint8_t* vpno = nullptr; const uint8_t* data = nullptr;
+    uint32_t nFl = 0, nSc = 0, nLp = 0, nNo = 0, nData = 0;
     // A project's .wav is a RIFF round the same chunks
     size_t i = size >= 12 && !std::memcmp(file, "RIFF", 4) && !std::memcmp(file + 8, "WAVE", 4) ? 12 : 0;
     while (i + 8 <= size && !data) {
@@ -156,6 +156,7 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
         if (!std::memcmp(file + i, "vpfl", 4)) { vpfl = body; nFl = n; }
         else if (!std::memcmp(file + i, "vpsc", 4)) { vpsc = body; nSc = n; }
         else if (!std::memcmp(file + i, "vplp", 4)) { vplp = body; nLp = n; }
+        else if (!std::memcmp(file + i, "vpno", 4)) { vpno = body; nNo = n; }
         else if (!std::memcmp(file + i, "data", 4)) { data = body; nData = n; }
         i += 8 + (size_t)n + (n & 1);
     }
@@ -184,6 +185,10 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
         out.fwdMode = vplp[0x18]; out.bwdMode = vplp[0x19];
         out.loopSwitchDecides = vplp[0x1a] != 0;
         out.tuneFine = (int8_t)vplp[0x1b];
+    }
+    if (vpno && nNo >= 12) {
+        out.vpnoCount = (int)le32(vpno + 4);
+        for (uint32_t k = 12; k + 2 <= nNo; k += 2) out.vpno.push_back((uint16_t)(vpno[k] | vpno[k + 1] << 8));
     }
     if (linear) {
         const size_t want = (size_t)out.frames * (size_t)out.channels;
@@ -389,12 +394,21 @@ int main(int argc, char** argv) {
     int mono = 0, stereo = 0, unread = 0, waveDifferent = 0; long total = 0; uint64_t hash = 0xcbf29ce484222325ull;
     double edge = 0, inner = 0;
     int types[8] = {};
+    int listed = 0, inOrder = 0, listShort = 0, edited[8] = {};     // the waves' vpno
     for (size_t at : waves) {
         XtWaveFile w; std::string why;
         if (!xtWaveRead(&disk[at], disk.size() - at, w, &why)) { ++unread; if (first) std::printf("wave at %zu: %s\n", at, why.c_str()); continue; }
         (w.channels == 2 ? stereo : mono)++;
         total += w.frames;
         if (w.encodeType >= 0 && w.encodeType < 8) ++types[w.encodeType];
+        if (w.vpnoCount >= 0) {
+            ++listed;
+            bool order = (int)w.vpno.size() >= w.vpnoCount;
+            for (int k = 0; order && k < w.vpnoCount; ++k) order = w.vpno[(size_t)k] == k;
+            inOrder += order;
+            if (!order && w.encodeType >= 0 && w.encodeType < 8) ++edited[w.encodeType];
+            listShort += (int)w.vpno.size() < w.vpnoCount;
+        }
         hash = fnv(w.pcm.data(), w.pcm.size() * 2, hash);
         // Against the whole-wave routine, from the raw chunk
         size_t i = at; const uint8_t* data = nullptr; uint32_t nData = 0;
@@ -413,6 +427,8 @@ int main(int argc, char** argv) {
     std::printf("rdac: %zu waves (%d mono, %d stereo; %d SOLO, %d BACKING, %d ENSEMBLE), %ld frames, %d unread, %d different from the firmware's whole-wave routines, a block's edge %.3f of the mean step, hash %016llx\n",
                 waves.size(), mono, stereo, types[1], types[3], types[5], total, unread, waveDifferent,
                 edge * 15.0 / (inner > 0 ? inner : 1.0), (unsigned long long)hash);
+    std::printf("vpno: %d waves with a list, %d of them each event in order, the others %d SOLO, %d BACKING, %d ENSEMBLE; %d shorter than their count\n",
+                listed, inOrder, edited[1], edited[3], edited[5], listShort);
 
     // The patches
     const auto patches = diskImage.list("Internal.prj/Patch");
@@ -497,7 +513,11 @@ int main(int argc, char** argv) {
             std::vector<uint8_t> stream(disk.begin() + (long)at, disk.begin() + (long)(at + w.size));
             const auto chunkAt = [&](const char* tag) { for (size_t i = 0; i + 8 < stream.size(); ++i) if (!std::memcmp(&stream[i], tag, 4)) return i; return (size_t)0; };
             const auto put = [&](size_t a, uint32_t v) { for (int k = 0; k < 4; ++k) stream[a + (size_t)k] = (uint8_t)(v >> (8 * k)); };
-            const size_t sc = chunkAt("vpsc") + 8, lp = chunkAt("vplp") + 8, fl = chunkAt("vpfl") + 8, da = chunkAt("data");
+            const size_t sc = chunkAt("vpsc") + 8, lp = chunkAt("vplp") + 8, fl = chunkAt("vpfl") + 8, da = chunkAt("data"), no = chunkAt("vpno");
+            // the list, edited: three events out of order
+            const bool hasList = no && (stream[no + 4] | stream[no + 5] << 8) >= 18;
+            if (hasList) { put(no + 8 + 4, 3); stream[no + 8 + 12] = 2; stream[no + 8 + 13] = 0; stream[no + 8 + 14] = 0; stream[no + 8 + 15] = 0; stream[no + 8 + 16] = 1; stream[no + 8 + 17] = 0; }
+            if (!hasList) ++bad;
             stream[sc + 0xa] = 65; put(sc + 0x18, 15); put(sc + 0x1c, 999991);
             put(lp, (uint32_t)-1234); put(lp + 4, 11); put(lp + 8, 2222); put(lp + 0xc, 333); put(lp + 0x10, 44);
             stream[lp + 0x18] = 2; stream[lp + 0x19] = 0; stream[lp + 0x1a] = 0; stream[lp + 0x1b] = (uint8_t)(int8_t)-7;
@@ -505,7 +525,8 @@ int main(int argc, char** argv) {
             XtWaveFile back;
             const auto same = [&](const XtWaveFile& b) {
                 return b.originalKey == 65 && b.headerCents == 15 && b.tempo == 999991 && b.tune == -1234 && b.loopStart == 11 && b.loopEnd == 2222 && b.bwdEnd == 333 && b.bwdStart == 44
-                    && b.fwdMode == 2 && b.bwdMode == 0 && !b.loopSwitchDecides && b.tuneFine == -7 && b.loopRateFwd == 300 && b.loopRateBwd == -343 && b.frames == w.frames && b.channels == w.channels && b.encodeType == w.encodeType;
+                    && b.fwdMode == 2 && b.bwdMode == 0 && !b.loopSwitchDecides && b.tuneFine == -7 && b.loopRateFwd == 300 && b.loopRateBwd == -343 && b.frames == w.frames && b.channels == w.channels && b.encodeType == w.encodeType
+                    && b.vpnoCount == 3 && b.vpno.size() >= 3 && b.vpno[0] == 2 && b.vpno[1] == 0 && b.vpno[2] == 1;
             };
             if (!xtWaveRead(stream.data(), stream.size(), back) || !same(back) || back.pcm != w.pcm) ++bad;
             // The RIFF: the chunks up to data, LINR for RDAC, and the samples
@@ -530,7 +551,7 @@ int main(int argc, char** argv) {
                 lite.insert(lite.end(), tag, tag + 8);
                 for (int16_t x : w.pcm) { lite.push_back((uint8_t)x); lite.push_back((uint8_t)((uint16_t)x >> 8)); }
                 XtWaveFile l;
-                if (!xtWaveRead(lite.data(), lite.size(), l) || l.encodeType != 0 || l.pcm != w.pcm || l.loopEnd != 2222 || l.tune != -1234 || l.frames != w.frames) ++bad;
+                if (!xtWaveRead(lite.data(), lite.size(), l) || l.encodeType != 0 || l.pcm != w.pcm || l.loopEnd != 2222 || l.tune != -1234 || l.frames != w.frames || l.vpnoCount != -1 || !l.vpno.empty()) ++bad;
                 // the same with no vpsc is a plain WAV
                 std::vector<uint8_t> noSc(lite);
                 std::memcpy(&noSc[36], "junk", 4);

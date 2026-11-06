@@ -45,7 +45,7 @@ legato-env|            s.oenv.update(ampEnvParams(v, o));\n        };\n        i
 legato-source|v.srcKey = shiftKey(keys.prevMono);|v.srcKey = shiftKey(keys.prevPoly);
 legato-level|        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);\n|
 live-key|            if (k != s.kfKey) {\n                s.kfKey = k;\n                s.porta.restart|            if (k == s.kfKey) {\n                s.kfKey = k;\n                s.porta.restart
-order-osc|if (v->on) oscStart(*v, *v, Z);\n    if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);|if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);\n    if (v->on) oscStart(*v, *v, Z);
+order-osc|if (v->on) oscStart(*v, *v, Z);\n    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);\n    if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);|if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);\n    if (v->on) oscStart(*v, *v, Z);\n    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);
 order-render|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 0.0f);|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 1.0f);
 mix-skip|if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);|
 cosm-order|                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
@@ -662,7 +662,7 @@ solo-anchor-end|if (anchor < recEnd) return;|if (anchor <= recEnd) return;|solo
 solo-anchor-start|if (!(recStart > anchor)) return;|if (!(recStart >= anchor)) return;|tonesolo
 solo-wrap-past|if (recEnd > Pq && budget > 0.0) {|if (recEnd >= Pq && budget > 0.0) {|tonesolo
 solo-wrap-past-b|if (Pq >= recStart && budget > 0.0) {|if (Pq > recStart && budget > 0.0) {|tonesolo
-solo-wrap-end|    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;\n||tonesolo|6
+solo-wrap-end|    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;\n||tonesolo|10
 solo-skip|if (!(budget > 0.0) \|\| !(Pq >= recEnd)) return;|return;|tonesolo
 solo-skip-b|if (!(budget > 0.0) \|\| !(recStart > Pq)) return;|return;|tonesolo
 solo-last-len|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 8.0; }|tonesolo
@@ -874,7 +874,7 @@ vari-robot|    v->robot = v->robotKnob && Z.vari;|    v->robot = v->robotKnob;|t
 vari-cents|o.rootKey, s.robotKnob && o.vari);|o.rootKey, s.robot);|tone
 vari-no-linear|    v->linear = !Z.vari &&|    v->linear = false &&|tone
 vari-band|        s.mb.setVari(o.vari);\n||tone
-vari-robot-follow|        s.solo.setRobot(s.robotKnob && o.vari);|        s.solo.setRobot(s.robot);|tone|4242
+vari-robot-follow|        s.solo.setRobot(s.robotKnob && o.vari);|        s.solo.setRobot(s.robot);|tone|12
 loop-rate-fwd|    l.fwdRate = s.wave->loopRate[0];\n||tone
 loop-rate-bwd|    l.bwdRate = s.wave->loopRate[1];\n||tone
 band-vari|if (S.flags0 & 0x20) {|if (false) {|toneband
@@ -886,24 +886,24 @@ solo-loop-fwd|f9c = loopCfg.fwdRate;|f9c = 1.0f;|tonesolo
 solo-loop-bwd|f9c = loopCfg.bwdRate;|f9c = 1.0f;|tonesolo
 solo-rate98|rate98 = robot ? A : A * f9c;|rate98 = A;|tonesolo
 solo-rate98-robot|rate98 = robot ? A : A * f9c;|rate98 = A * f9c;|tonesolo
-solo-f9c-bounce|if (f3 & 0x10) { f3 &= 0xef; f9c = 1.0f; }|if (f3 & 0x10) { f3 &= 0xef; }|tonesolo|777
+solo-f9c-bounce|if (f3 & 0x10) { f3 &= 0xef; f9c = 1.0f; }|if (f3 & 0x10) { f3 &= 0xef; }|tonesolo
 loop-rate-scale|return xtOscExp2(xtf::div(xtf::flt(tenths), 12000.0f));|return xtOscExp2(xtf::div(xtf::flt(tenths), 1200.0f));|toneosc
 patch-vari|    o.vari = p(b + 0x30) != 0;|    o.vari = true;|tonepatch
-solo-robot-event|    robotEv = robot;                    // an event's load|    // an event's load|tonesolo|11
-solo-robot-grains|        if (robotEv) { pw = K(0x44c8745d) / Af;|        if (robot) { pw = K(0x44c8745d) / Af;|tonesolo
+solo-robot-event|    robotEv = robot;                    // an event's load|    // an event's load|tonesolo|16
+solo-robot-grains|        if (robotEv) { pw = K(0x44c8745d) / Af;|        if (robot) { pw = K(0x44c8745d) / Af;|tonesolo|31337
 start-clamp|return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);|return frames == 0 ? 0 : (int32_t)(at > frames ? frames - 1 : at);
 start-clamp-none|return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);|return (int32_t)at;
 start-solo|        s.solo.setStart(waveStart(s, o));|        s.solo.setStart(0);
-start-band|        s.mb.setStart(waveStart(s, o));|        s.mb.setStart(0);
+start-band|        else s.mb.setStart(waveStart(s, o));|        else s.mb.setStart(0);
 start-lin|        s.lin.setStart(waveStart(s, o));|        s.lin.setStart(0);
 solo-start-stop|const int32_t lo = (f3 & 8) ? 0 : startPos16;|const int32_t lo = 0;|tonesolo
 solo-start-stop-turned|const int32_t lo = (f3 & 8) ? 0 : startPos16;|const int32_t lo = startPos16;|tonesolo
-solo-start-anchor|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|0.0 >= recStart|tonesolo
+solo-start-anchor|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|0.0 >= recStart|tonesolo|31337
 solo-start-anchor-turned|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|startPos16 / 16.0 >= recStart|tonesolo
 solo-start-grains|    const int32_t at = (int32_t)std::lround(recStart * 16.0);|    const int32_t at = Pi;|tonesolo
 solo-start-seek-anchor|        jumpTo(startPos16);\n        anchor = recStart;|        jumpTo(startPos16);|tonesolo
 solo-start-backward|    if (!(walk < 0.0f) && startPos16 > 0) {|    if (startPos16 > 0) {|tonesolo
-band-start|    S.startPos = startCfg * 16;|    S.startPos = 0;|toneband
+band-start|(int)S.rd32(S.entry(S.evStart) + 4) : startCfg * 16;|(int)S.rd32(S.entry(S.evStart) + 4) : 0;|toneband
 lin-start|    bwd.end = startCfg;|    bwd.end = 0;|tonelin
 lin-start-beat|0.0f > walk ? frames * 16 : startCfg * 16);|0.0f > walk ? frames * 16 : 0);|tonelin
 lin-fr11-rate|            if (y) cmp = rate;|            ;|tonelin|9
@@ -1004,3 +1004,43 @@ check-zone-tag-env|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x89479
 check-zone-tag-lfo|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479860u, 0x89479920u })|tonecheck
 check-zone-uppers|            if (id >= 0x124 && id <= 0x133) { m.ret((uint32_t)upper[id - 0x124]); return; }\n||tonecheck
 check-zone-carry|                const Ctl& ctl = syn.zc(fw.c.rd8(n.BL + 0x6c6) & 15);   // the note's zone's|                const Ctl& ctl = syn.ctl;|tonecheck
+play-legato-any|    const bool legato1 = prevHeld && Z.playbackMode == 1 && v->on|    const bool legato1 = prev && Z.playbackMode == 1 && v->on
+play-legato-mode|    const bool legato1 = prevHeld && Z.playbackMode == 1 && v->on|    const bool legato1 = prevHeld && Z.playbackMode >= 1 && v->on
+play-legato2-mode|legato2 = prevHeld && Z.osc2.playbackMode == 1 && v->osc2.on|legato2 = prevHeld && Z.playbackMode == 1 && v->osc2.on
+play-legato-end|    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);|    if (legato1 && sameKind(*v, *prev)) legatoTake(*v, *prev);|tone|777
+play-legato2-end|    if (legato2 && sameKind(v->osc2, prev->osc2) && !atEnd(prev->osc2)) legatoTake(v->osc2, prev->osc2);|    if (legato2 && sameKind(v->osc2, prev->osc2)) legatoTake(v->osc2, prev->osc2);
+play-end-start|        return (int8_t)f == 1;|        return f != 0;
+play-end-solo|s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();|s.wave->type == 1 ? 0 : s.mb.endFlag();
+play-end-band|s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();|s.wave->type == 1 ? s.solo.endFlag() : 0;
+play-end-lite|        const int f = s.lite ? s.staleEnd : s.linear|        const int f = s.lite ? 0 : s.linear
+play-prev-zone|            if (&w != v && w.active && !w.releasing && w.zone == zone) order[n++] = &w;|            if (&w != v && w.active && !w.releasing) order[n++] = &w;
+play-prev-held|prevHeld = (order[i]->keyFlags & 1) != 0; }|prevHeld = (order[i]->keyFlags & 2) != 0; }
+play-take-gain|    else s.mb.setGainXt(0.0f, true);\n    if (s.lite|    if (s.lite
+play-take-rates|    if (s.lite && !s.linear) { s.xfg.takeRates(s.curA, s.curF, s.curWalk); s.xfg.setGainXt(s.curGain); }|    if (s.lite && !s.linear) { s.xfg.takeRates(s.curA, s.curA, s.curWalk); s.xfg.setGainXt(s.curGain); }
+play-take-lite-linear|    if (s.lite && !s.linear) { s.xfg.takeRates|    if (s.lite) { s.xfg.takeRates
+play-steps-pre|    v->steps = stepCount[zone][0]++;|    v->steps = ++stepCount[zone][0];
+play-steps2|    v->osc2.steps = stepCount[zone][1]++;|    v->osc2.steps = stepCount[zone][0]++;
+play-step-mod|    if (o.playbackMode == 2) idx = (int)s.steps % (n - 1);|    if (o.playbackMode == 2) idx = (int)s.steps % n;
+play-event-octaves|            const int r = (m + 11) / 12 * 12, k = v.note - 60;|            const int r = (m + 12) / 12 * 12, k = v.note - 60;|tone|777
+play-event-below|            int x = v.note >= 60 ? k : k % r + r;|            int x = v.note >= 60 ? k : k % r;
+play-event-last|    last = at(idx + 1);|    last = at(idx);
+play-step-few|(o.playbackMode == 3 \|\| s.wave->vpnoCount >= 2);|(o.playbackMode == 3 \|\| s.wave->vpnoCount >= 1);
+play-event-ensemble|(s.wave->type == 3 \|\| s.wave->type == 5) && (o.playbackMode == 3|s.wave->type == 3 && (o.playbackMode == 3
+play-loop-bit|        s.mb.setLoopBit(o.loop && !eventPlay(s, o));|        s.mb.setLoopBit(o.loop);
+play-loop-bit-none|        s.mb.setLoopBit(o.loop && !eventPlay(s, o));|
+play-band-events-swap|    if (eventCfg) { S.evStart = evFirstCfg; S.evEnd = evLastCfg; }|    if (eventCfg) { S.evStart = evLastCfg; S.evEnd = evFirstCfg; }|toneband
+play-band-startpos|    S.startPos = eventCfg ? (int)S.rd32(S.entry(S.evStart) + 4) : startCfg * 16;|    S.startPos = eventCfg ? 0 : startCfg * 16;|toneband
+play-band-loop-on|        if (!eventCfg) S.flags0 \|= 1;|        S.flags0 \|= 1;|toneband
+play-band-from-end|        S.ev = (0.0f > walk) ? S.evEnd : S.evStart;|        S.ev = S.evStart;|toneband
+play-band-cross-fwd|        if (!(flags0 & 1)) { flags3 &= 0xdf; f9c = 1.0f; }|        if (!cached) { flags3 &= 0xdf; f9c = 1.0f; }|toneband
+play-band-endflag|int XtMbPlayer::endFlag() const { return s ? s->ended : 0; }|int XtMbPlayer::endFlag() const { return s ? -s->ended : 0; }|toneband
+check-play-held|prev && (c.rd32(prev->note + 0x20) & 0x20000000) ? 1 : 0);|prev && (c.rd32(prev->note + 0x20) & 0x40000000) ? 1 : 0);|tonecheck
+check-play-prev-block|        if (!c.call(0x894db830, { n.BL, prev ? prev->BL : 0, (uint32_t)(int8_t)chain }, kSp))|        if (!c.call(0x894db830, { n.BL, 0, (uint32_t)(int8_t)chain }, kSp))|tonecheck
+check-play-prev-zone|                    if (o->live && !o->off && !o->ended && fw.c.rd8(o->BL + 0x6c6) == zone) prev = o;|                    if (o->live && !o->off && !o->ended) prev = o;|tonecheck
+check-play-stale|                    for (int o = 0; o < 2; ++o) osc(syn.voice[prev->vi], o).staleEnd = (int8_t)fw.c.rd8(Firmware::voice(*prev, o) + 0xd4 + 4);|                    for (int o = 0; o < 2; ++o) osc(syn.voice[prev->vi], o).staleEnd = 0;|tonecheck
+check-play-vpno-count|    le(4, (uint32_t)e.vpnoCount, 4);|    le(4, (uint32_t)e.vpnoCount + 1, 4);|tonecheck
+check-play-vpno-list|    for (size_t k = 0; k < e.vpno.size(); ++k) le(12 + 2 * k, e.vpno[k], 2);|    for (size_t k = 0; k < e.vpno.size(); ++k) le(10 + 2 * k, e.vpno[k], 2);|tonecheck
+check-play-patch|    p[b + 0x2e] = o.playbackMode;|    p[b + 0x2e] = 0;|tonecheck
+patch-playback|    o.playbackMode = p(b + 0x2e);|    o.playbackMode = p(b + 0x2f);|tonepatch
+check-pad-cc|            if (ccMoved && !panelMoved && !fw.padCc(kCcNum[ccAt], ccTo)) return false;\n||tonecheck|4242
+check-play-patch-solo|        if (patchCase && patchCtl.osc2.playbackMode >= 2) wv2 = band(wv2);\n||tonecheck|777

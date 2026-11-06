@@ -41,6 +41,8 @@ public:
     void noteOn(const std::vector<float>& left, const std::vector<float>& right, float pitch, float formant, float walk, float root);
     // Each update (0x8950bc60): the pitch, the formant and the walk, and the filter's rate from the pitch.
     void setRates(float pitch, float formant, float walk, float root);
+    // The three alone, the filter's rate left as it was: Playback Mode LEGATO puts a note's own back on an earlier note's player (0x894f2d00)
+    void takeRates(float pitch_, float formant_, float walk_) { pitch = pitch_; formant = formant_; walk = walk_; }
     void setGainXt(float target, bool now = false) { gainTarget = target; if (now) gain = target; }
     float gainNow() const { return gain; }
     // 0x8950a780: the walk and both heads to a position in 1/16 sample, the windows back to their start, the beat again.

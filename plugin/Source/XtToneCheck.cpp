@@ -112,6 +112,7 @@ struct FwNote {
     uint32_t note = 0, BL = 0, IN = 0, TN = 0;
     int raw = -1, vi = -1;              // the key as played; XtSynth's voice
     bool live = false, released = false, ended = false;
+    bool off = false;                   // released (0x894dc270): off the allocator's list of notes, which a truncated note isn't
 };
 
 class Firmware {
@@ -322,22 +323,28 @@ public:
     }
 
     // The note's start and the tone's note-on.
-    template <class Carry> bool start(FwNote& n, int idx, int key, int zone, Carry carry) {
+    // `prev`: the allocator's earlier note of the part and zone (0x894d4c04), or none
+    template <class Carry> bool start(FwNote& n, int idx, int key, int zone, Carry carry, const FwNote* prev = nullptr) {
         n.note = kNote + 0x100 * (uint32_t)idx;
         c.wr8(kMsg, 0);                                // the part
         c.write(n.note, std::vector<uint8_t>(0x100, 0).data(), 0x100);
         c.wr32(n.note + 0x10, 0x89833e44);
         c.wr8(n.note + 0x40, (uint8_t)idx);
         c.wr8(n.note + 0x52, 0xff);
-        c.wr8(kA1, 0); c.wr8(kA1 + 1, 0); c.wr8(kA1 + 2, 0);
+        // as the allocation leaves a note (0x894d5b00): its state word all set, +0x1c at it.  The key's release clears bit 29 (0x894d5932)
+        c.wr32(n.note + 0x20, 0xffffffff);
+        c.wr32(n.note + 0x1c, n.note + 0x20);
+        // the allocator's three bytes: an earlier note found, its key down (its state word's bit 29), and its chain key (+0x6c4), or this key
+        const uint8_t chain = prev ? c.rd8(prev->BL + 0x6c4) : (uint8_t)key;
+        c.wr8(kA1, prev ? 1 : 0); c.wr8(kA1 + 1, prev && (c.rd32(prev->note + 0x20) & 0x20000000) ? 1 : 0); c.wr8(kA1 + 2, chain);
         c.wr32(kSp, kA1); c.wr32(kSp + 4, (uint32_t)zone);
         if (!c.call(0x894dc130, { n.note, kK, kMsg, (uint32_t)key }, kSp)) { std::fprintf(stderr, "note: %s\n", c.error().c_str()); return false; }
         n.BL = c.rd32(n.note + 0x4c); n.IN = c.rd32(n.note + 0x5c);
         n.TN = c.rd32(n.BL + 0x6bc);
         n.raw = c.rd8(kK + 0xc);
-        n.live = true; n.released = n.ended = false;
+        n.live = true; n.released = n.ended = n.off = false;
         carry(n);
-        if (!c.call(0x894db830, { n.BL, 0, (uint32_t)(int8_t)key }, kSp)) { std::fprintf(stderr, "tone note-on: %s\n", c.error().c_str()); return false; }
+        if (!c.call(0x894db830, { n.BL, prev ? prev->BL : 0, (uint32_t)(int8_t)chain }, kSp)) { std::fprintf(stderr, "tone note-on: %s\n", c.error().c_str()); return false; }
         if (!c.call(0x894f4f70, { n.BL }, kSp)) { std::fprintf(stderr, "tone start: %s\n", c.error().c_str()); return false; }
         return true;
     }
@@ -377,7 +384,7 @@ public:
     }
 
     // Whether the note has stopped: its three reasons to sound are gone (0x894dc270 has run).
-    void released(FwNote& n) { if (!(c.rd8(n.note + 0x48) & 7)) n.released = true; }
+    void released(FwNote& n) { if (!(c.rd8(n.note + 0x48) & 7)) n.released = n.off = true; }
     // A key let go (0x894d58b0), the release velocity at N + 0xa.
     bool keyRelease(FwNote& n) {
         if (!c.call(0x894d58b0, { n.note, kN }, kSp)) { std::fprintf(stderr, "key release: %s\n", c.error().c_str()); return false; }
@@ -435,6 +442,7 @@ public:
         if (!c.call(0x894f5a70, { n.TN, 3 }, kSp)) { std::fprintf(stderr, "stop: %s\n", c.error().c_str()); return false; }
         if (!c.call(0x894eb810, { n.IN, 3 }, kSp)) { std::fprintf(stderr, "stop input: %s\n", c.error().c_str()); return false; }
         n.live = false;
+        n.off = true;
         return true;
     }
 };
@@ -474,6 +482,19 @@ struct TestWave {
     std::vector<XtRecord> recs;         // SOLO
 };
 
+// A band wave's `vpno` (chunk 3), as XtEncoded has it: +0 8, +4 the count, +8 0 and the count less one, then the vpdt's event numbers.
+// The chunk is 0x40 bytes: room for 26.
+void writeVpno(Firmware& f, const FwWave& w, const XtEncoded& e) {
+    std::vector<uint8_t> v(std::max<size_t>(0x40, 12 + 2 * e.vpno.size()), 0);   // the chunk has a page to itself
+    const auto le = [&](size_t at, uint32_t x, int n) { for (int k = 0; k < n; ++k) v[at + (size_t)k] = (uint8_t)(x >> (8 * k)); };
+    le(0, 8, 4);
+    le(4, (uint32_t)e.vpnoCount, 4);
+    le(10, (uint32_t)(e.vpnoCount - 1), 2);
+    for (size_t k = 0; k < e.vpno.size(); ++k) le(12 + 2 * k, e.vpno[k], 2);
+    f.c.write(w.chunk[3], v.data(), v.size());
+}
+
+bool makeWave(Firmware& f, uint32_t& next, const std::vector<int16_t>& raw, int channels, int type, TestWave& out);
 bool loadWave(Firmware& f, uint32_t& next, const std::string& path, int channels, int type, long maxFrames, TestWave& out) {
     FILE* fp = std::fopen(path.c_str(), "rb");
     if (!fp) return false;
@@ -481,6 +502,25 @@ bool loadWave(Firmware& f, uint32_t& next, const std::string& path, int channels
     int16_t x;
     while (raw.size() < (size_t)(maxFrames * channels) && std::fread(&x, 2, 1, fp) == 1) raw.push_back(x);
     std::fclose(fp);
+    return makeWave(f, next, raw, channels, type, out);
+}
+
+// A wave of separate hits, decaying noise and tone, which the encoder gives an attack event each: hits + 1 events
+std::vector<int16_t> hitsWave(int hits, int channels, long frames, uint32_t seed) {
+    std::vector<int16_t> raw((size_t)(frames * channels), 0);
+    for (int h = 0; h < hits; ++h) {
+        const long at = h * frames / hits;
+        for (long i = 0; i < frames / hits - 200; ++i)
+            for (int c = 0; c < channels; ++c) {
+                seed = seed * 1664525u + 1013904223u;
+                const double noise = (double)(seed >> 9) / 8388608.0 - 1.0, tone = std::sin(2.0 * 3.141592653589793 * (220.0 + 110.0 * h + 3.0 * c) * (double)i / 44100.0);
+                raw[(size_t)((at + i) * channels + c)] = (int16_t)std::lround(26000.0 * std::exp(-(double)i / 1500.0) * (0.5 * noise + 0.5 * tone));
+            }
+    }
+    return raw;
+}
+
+bool makeWave(Firmware& f, uint32_t& next, const std::vector<int16_t>& raw, int channels, int type, TestWave& out) {
     const long frames = (long)raw.size() / channels;
     std::vector<std::vector<float>> chans((size_t)channels);
     for (long i = 0; i < frames; ++i)
@@ -517,6 +557,7 @@ bool loadWave(Firmware& f, uint32_t& next, const std::string& path, int channels
         w.band[0] = put(raw.data(), raw.size() * 2);
     } else {
         w.chunk[5] = put(out.enc->vpdt.data(), out.enc->vpdt.size());
+        writeVpno(f, w, *out.enc);
         static const int slot[6] = { 0, 2, 3, 4, 5, 6 };
         for (int k = 0; k < 6; ++k) {
             const size_t bytes = out.enc->bands.buf[k].size() * 2;
@@ -642,6 +683,7 @@ void oscParams(std::unordered_map<int, int>& p, int n, const OscC& o) {
     p[b + 0x13] = o.ana.fat; p[b + 0x14] = o.ana.fatKf; p[b + 0x15] = o.ana.fatLfo; p[b + 0x16] = o.ana.fatEnv;
     p[b + 0x1a] = 1 + n;                              // the Wave Number
     p[b + 0x22] = o.startOffset;
+    p[b + 0x2e] = o.playbackMode;
     p[b + 0x23] = o.oscTime; p[b + 0x24] = o.oscTimeKF / 10; p[b + 0x25] = o.lfoTimeDepth; p[b + 0x26] = o.tDepth; p[b + 0x27] = o.oscTimeOffset;
     p[b + 0x28] = o.oscFormant; p[b + 0x29] = o.oscFormantKF / 10; p[b + 0x2a] = o.lfoFormantDepth; p[b + 0x2b] = o.fDepth;
     p[b + 0x30] = o.vari;
@@ -944,7 +986,7 @@ std::vector<size_t> listedFields() {
     add(c.parallel);
     // the tempo's, which sweepWave gives what a move of them needs
     add(c.patchTempo); add(c.clockSource); add(c.assign[10]); add(c.assign[11]);
-    for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) }) { add(o->tempoSync); add(o->timeTrip); add(o->beatKeep); add(o->vari); add(o->startOffset); }
+    for (const OscC* o : { static_cast<const OscC*>(&c), static_cast<const OscC*>(&c.osc2) }) { add(o->tempoSync); add(o->timeTrip); add(o->beatKeep); add(o->vari); add(o->startOffset); add(o->playbackMode); }
     // a stray or missing update shows only when a COSM's block has moved since its last update, so several goes at those
     for (int rep = 0; rep < 3; ++rep) {
         for (size_t i = 0; i < (size_t)kCcCount; ++i) f.push_back(kCcOnly + i);
@@ -956,12 +998,12 @@ std::vector<size_t> listedFields() {
     return f;
 }
 
-// In the sweep: the tempo's fields, seen only on a wave with the pad held, Vari Sw and the Start Offset.  Which OSC has the wave, or 0.
+// In the sweep: the tempo's fields, seen only on a wave with the pad held, Vari Sw, the Start Offset and Playback Mode.  Which OSC has the wave, or 0.
 int sweepWave(size_t at) {
     static const Ctl c;
     const auto is = [&](const auto& x) { return at == (size_t)(reinterpret_cast<const char*>(&x) - reinterpret_cast<const char*>(&c)); };
-    if (is(c.patchTempo) || is(c.clockSource) || is(c.assign[10]) || is(c.assign[11]) || is(c.tempoSync) || is(c.timeTrip) || is(c.beatKeep) || is(c.vari) || is(c.startOffset)) return 1;
-    return is(c.osc2.tempoSync) || is(c.osc2.timeTrip) || is(c.osc2.beatKeep) || is(c.osc2.vari) || is(c.osc2.startOffset) ? 2 : 0;
+    if (is(c.patchTempo) || is(c.clockSource) || is(c.assign[10]) || is(c.assign[11]) || is(c.tempoSync) || is(c.timeTrip) || is(c.beatKeep) || is(c.vari) || is(c.startOffset) || is(c.playbackMode)) return 1;
+    return is(c.osc2.tempoSync) || is(c.osc2.timeTrip) || is(c.osc2.beatKeep) || is(c.osc2.vari) || is(c.osc2.startOffset) || is(c.osc2.playbackMode) ? 2 : 0;
 }
 
 struct Report {
@@ -1001,7 +1043,9 @@ int XtToneProbe::run(int argc, char** argv) {
     Firmware fw;
     if (!fw.open(argv[1])) { std::fprintf(stderr, "firmware\n"); return 2; }
     // The PCM cases' waves: SOLO mono and stereo, BACKING, ENSEMBLE
-    std::vector<TestWave> waves, liteWaves;
+    std::vector<TestWave> waves, liteWaves, eventWaves;
+    // The COSMs' buffers each case (the pool's slot finder, hooked): past the waves, which they'd write over, and below the zones' chunks
+    uint32_t cosmBase = kRam + 0x1000000;
     if (argc > 4) {
         const std::string dir = std::string(argv[4]) + "/";
         struct W { const char* file; int ch, type; } list[] = { { "vocal.bin", 1, 1 }, { "w358.bin", 2, 1 }, { "drum.bin", 2, 3 }, { "chord.bin", 1, 5 } };
@@ -1011,6 +1055,15 @@ int XtToneProbe::run(int argc, char** argv) {
             if (!loadWave(fw, next, dir + w.file, w.ch, w.type, 30000, t)) { std::fprintf(stderr, "wave %s\n", w.file); return 2; }
             waves.push_back(std::move(t));
         }
+        // Band waves of several events, for Playback Mode STEP and EVENT: 4, 6, 8 and 12 hits, BACKING and ENSEMBLE, mono and stereo.  12 hits
+        // make 13 events, a list whose last index is a multiple of 12, where EVENT's rounding up to octaves (0x894e1200) has nothing to add.  The
+        // encoder merges hits closer than about 3000 frames, so those are 48000 frames long
+        struct H { int hits, ch, type; long frames; };
+        for (const H& w : { H{ 4, 1, 3, 30000 }, H{ 6, 2, 5, 30000 }, H{ 8, 1, 5, 30000 }, H{ 4, 2, 3, 30000 }, H{ 12, 1, 3, 48000 }, H{ 12, 2, 5, 48000 } }) {
+            TestWave t;
+            if (!makeWave(fw, next, hitsWave(w.hits, w.ch, w.frames, 777u + (uint32_t)w.hits), w.ch, w.type, t)) { std::fprintf(stderr, "hits wave\n"); return 2; }
+            eventWaves.push_back(std::move(t));
+        }
         checkSoloRecords(dir, "vocal.bin", 1);
         checkSoloRecords(dir, "drum.bin", 2);
         // LITE waves (type 0), mono and stereo: the samples alone, for the last cases
@@ -1019,11 +1072,18 @@ int XtToneProbe::run(int argc, char** argv) {
             if (!loadWave(fw, next, dir + w.file, w.ch, w.type, 30000, t)) { std::fprintf(stderr, "LITE wave %s\n", w.file); return 2; }
             liteWaves.push_back(std::move(t));
         }
+        cosmBase = std::max(cosmBase, (next + 0xfffffu) & ~0xfffffu);
     }
+    // Playback Mode's waves: the hits, the others, and LITE
+    std::vector<TestWave> playWaves = eventWaves;
+    playWaves.insert(playWaves.end(), waves.begin(), waves.end());
+    playWaves.insert(playWaves.end(), liteWaves.begin(), liteWaves.end());
     XtSynth syn;
     syn.prepare(44100.0);
+    syn.setSample(nullptr, 0, 1);                       // the Wave Numbers patchOf gives, from the first patch on, as the firmware's
+    syn.setSample(nullptr, 1, 2);
     Report rep;
-    long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0, zoneNotes = 0, zonesSeen = 0;
+    long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0, zoneNotes = 0, zonesSeen = 0, playerTakes = 0, endSkips = 0, eventNotes = 0;
     float L[32], R[32];
     uint32_t fwFree[16][3] = {};            // the free-running objects of LFO 1, 2 and 5, by zone
     static constexpr uint32_t kFreeLfo[3] = { 1, 2, 5 };
@@ -1131,12 +1191,19 @@ int XtToneProbe::run(int argc, char** argv) {
     }
     // Then a patch's zones, last of all: zones 2…16 each its own settings and waves, the upper keys over the keyboard (XtSynth::Zones)
     const int zoneFrom = liteFrom + nLite, nZone = waves.empty() ? 0 : nCases / 4;
+    // Then Playback Mode, last: two notes of a part, each OSC on a mode of its own, the second while the first is held or after it
+    const int playFrom = zoneFrom + nZone, nPlay = waves.empty() ? 0 : nCases / 4;
+    const auto zoneLine = [&] {
+        int n = 0;
+        for (int z = 1; z < 16; ++z) n += (zonesSeen >> z) & 1;
+        std::printf("tone, zones: %ld notes on zones 2 to 16, %d of those zones\n", zoneNotes, n);
+    };
     // Each zone's OSC's own copy of its wave's header and loop chunks, as a zone's settings of the wave's own are its own here
     constexpr uint32_t kZoneChunks = kRam + 0x2800000;
-    for (int g = 0; g < zoneFrom + nZone; ++g) {
+    for (int g = 0; g < playFrom + nPlay; ++g) {
         rep.caseNo = g;
-        const bool zoneCase = g >= zoneFrom;
-        const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom && g < liteFrom, liteCase = g >= liteFrom && !zoneCase, extra = patchCase || tuneCase || liteCase || zoneCase;
+        const bool playCase = g >= playFrom, zoneCase = g >= zoneFrom && !playCase;
+        const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom && g < liteFrom, liteCase = g >= liteFrom && !zoneCase && !playCase, extra = patchCase || tuneCase || liteCase || zoneCase || playCase;
         const bool twoInTick = g >= tickFrom && !extra;
         if (g == nCases + nSweep) summary("tone");
         if (nOsc2 && g == tickFrom) summary("tone, a wave on OSC 2");
@@ -1144,6 +1211,7 @@ int XtToneProbe::run(int argc, char** argv) {
         if (nPatch && g == tuneFrom) summary("tone, the firmware's patches");
         if (nLite && g == liteFrom) summary("tone, a wave's own tuning");
         if (nZone && g == zoneFrom) summary("tone, LITE waves");
+        if (nPlay && g == playFrom) { zoneLine(); summary("tone, zones"); syn.setZones(nullptr); }
         const bool sweep = g >= nCases && g < nCases + nSweep;
         const size_t sweepAt = sweep ? listed[(size_t)(g - nCases) / 4] : 0;
         const bool sweepCosm = sweep && sweepAt >= kCosmPrm && sweepAt < kCosmPrm + 64;
@@ -1158,13 +1226,27 @@ int XtToneProbe::run(int argc, char** argv) {
             patchCtl = xtPatchControls(pf.store, r.range(0, xtPatchZones(pf.store) - 1), Ctl{});
             if (!patchCtl.on && !patchCtl.osc2.on) patchCtl.on = true;   // both off: XtSynth starts no voice at all (see the report)
         }
-        const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase && !liteCase && !zoneCase) || sweepOn == 2 || ((tuneCase || liteCase || zoneCase) && g % 2 == 0);
+        const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase && !liteCase && !zoneCase && !playCase) || sweepOn == 2 || ((tuneCase || liteCase || zoneCase || playCase) && g % 2 == 0);
         // one case in two plays a wave on OSC 1 (with the analog OSC 2 or alone); the last
         // ones a wave on OSC 2, over OSC 1 off, analog or on another wave
-        std::vector<TestWave>& pool = liteCase ? liteWaves : waves;
+        std::vector<TestWave>& pool = liteCase ? liteWaves : playCase ? playWaves : waves;
         const TestWave* wv2 = osc2Case ? &pool[(size_t)r.range(0, (int)pool.size() - 1)] : nullptr;
         const TestWave* wv = (patchCase ? patchCtl.oscType == 1 : sweepOn == 1 || (!sweep && !twoInTick && g % 2 == 1)) && !pool.empty() ? &pool[(size_t)r.range(0, (int)pool.size() - 1)] : nullptr;
+        // A patch's STEP or EVENT on a SOLO wave needs the XT's segments by events (not done): that OSC plays the next band wave instead
+        const auto band = [&](const TestWave* w) {
+            for (size_t i = 0; w && w->type == 1 && i < pool.size(); ++i) {
+                const TestWave* x = &pool[((size_t)(w - pool.data()) + i) % pool.size()];
+                if (x->type == 3 || x->type == 5) return x;
+            }
+            return w;
+        };
+        if (patchCase && patchCtl.osc2.playbackMode >= 2) wv2 = band(wv2);
+        if (patchCase && patchCtl.playbackMode >= 2) wv = band(wv);
         if (wv && wv == wv2) wv = &pool[(size_t)((wv - pool.data() + 1) % (long)pool.size())];   // a wave's loop is its own
+        if (patchCase && patchCtl.playbackMode >= 2 && wv && wv->type == 1) {
+            wv = band(wv);
+            for (size_t i = 0; wv == wv2 && i < pool.size(); ++i) wv = band(&pool[((size_t)(wv - pool.data()) + 1) % pool.size()]);
+        }
         Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr);
         if (patchCase) {   // what a patch has, on what the wave has of its own
             const Ctl d = ctl;
@@ -1229,7 +1311,14 @@ int XtToneProbe::run(int argc, char** argv) {
             // Vari Sw moved alone, with Robot Voice on, whose flag and pitch follow it during the note (0x894f3fa8, the converter)
             if (sweepOn) { static const Ctl c0; const size_t at = sweepAt, v1 = (size_t)(reinterpret_cast<const char*>(&c0.vari) - reinterpret_cast<const char*>(&c0)),
                                                 v2 = (size_t)(reinterpret_cast<const char*>(&c0.osc2.vari) - reinterpret_cast<const char*>(&c0));
-                           if (at == v1) ctl.robot = true; if (at == v2) ctl.osc2.robot = true; }
+                           if (at == v1) { ctl.robot = true; ctl.beatKeep = false; }   // and no Beat Keep: its way back would run one player's seek on the other's state
+                           if (at == v2) { ctl.osc2.robot = true; ctl.osc2.beatKeep = false; }
+                           // Playback Mode on a band wave from EVENT, with the Loop on: the move takes the update's Loop bit to the player (0x894f3fb6)
+                           const size_t p1 = (size_t)(reinterpret_cast<const char*>(&c0.playbackMode) - reinterpret_cast<const char*>(&c0)),
+                                        p2 = (size_t)(reinterpret_cast<const char*>(&c0.osc2.playbackMode) - reinterpret_cast<const char*>(&c0));
+                           const auto band = [](const TestWave* w) { return w && (w->type == 3 || w->type == 5); };
+                           if (at == p1 && band(wv)) { ctl.loop = true; ctl.playbackMode = 3; }
+                           if (at == p2 && band(wv2)) { ctl.osc2.loop = true; ctl.osc2.playbackMode = 3; } }
             // two COSMs whose block takes the envelopes' levels: a Comb, a Side Band Filter
             for (Ctl::Cosm& k : ctl.cosm) { k.on = true; k.lfoKeySync = true; }
             ctl.cosm[0].type = 4;
@@ -1343,20 +1432,40 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         // what the case does besides one note: 0 none, 1 a second note on a POLY part,
         // 2 on a MONO part with Legato, 3 on a MONO part without
-        const int kind = patchCase ? (ctl.mono ? (ctl.legato ? 2 : 3) : g % 2) : sweep || twoInTick ? 2 : g % 5 == 0 ? 1 : g % 5 == 1 ? 2 : g % 5 == 2 ? 3 : 0;
+        const int kind = patchCase ? (ctl.mono ? (ctl.legato ? 2 : 3) : g % 2) : playCase ? (g % 4 == 3 ? 3 : 1) : sweep || twoInTick ? 2 : g % 5 == 0 ? 1 : g % 5 == 1 ? 2 : g % 5 == 2 ? 3 : 0;
+        // Playback Mode by what the OSC plays: any of the four on a band wave, LITE (whose converter doesn't read it) and the analog OSC; RETRIGGER
+        // or LEGATO on SOLO, whose STEP and EVENT need the XT's segments by events (not done).  A band wave's list now and then its own: some of
+        // its events, out of order or the same twice, or one past its last (the player takes the last)
+        if (zoneCase)                                // the zones' first, by the earlier note of its own zone alone
+            for (int k = 0; k < 2; ++k) { const TestWave* t = k ? wv2 : wv; (k ? ctl.osc2.playbackMode : ctl.playbackMode) = t && t->type == 1 ? r.range(0, 1) : r.range(0, 3); }
+        if (playCase) {
+            for (int k = 0; k < 2; ++k) {
+                const TestWave* t = k ? wv2 : wv;
+                (k ? ctl.osc2.playbackMode : ctl.playbackMode) = t && t->type == 1 ? r.range(0, 1) : r.range(0, 3);
+                if (!t || (t->type != 3 && t->type != 5)) continue;
+                uint32_t w2 = 0;
+                std::memcpy(&w2, t->enc->vpdt.data() + 8, 4);
+                const int n = (int)(w2 >> 16);
+                t->enc->vpno.clear();
+                if (r.one(2)) for (int e = 0; e < n; ++e) t->enc->vpno.push_back((uint16_t)e);
+                else for (int e = r.range(1, n >= 12 ? 2 * n : n + 2); e > 0; --e) t->enc->vpno.push_back((uint16_t)(r.one(8) ? n : r.range(0, n - 1)));   // past 24 on the long ones
+                t->enc->vpnoCount = (int)t->enc->vpno.size();
+                writeVpno(fw, t->fw, *t->enc);
+            }
+        }
         if (!patchCase) { ctl.mono = kind >= 2; ctl.legato = kind == 2; }
         if (wv) {
-            syn.setSample(wv->enc);
+            syn.setSample(wv->enc, 0, 1);              // the Wave Numbers patchOf gives, which never change here
             fw.wave = wv->fw;
             fw.c.wr8(wv->fw.chunk[2] + 0xa, (uint8_t)ctl.rootKey);
             fw.c.wr32(wv->fw.chunk[2] + 0x1c, (uint32_t)ctl.origTempo);
         } else {
             // an analog case: in some, a stereo wave left loaded, which it must not read or follow
-            syn.setSample(g % 4 == 2 && !waves.empty() ? waves[2].enc : nullptr);
+            syn.setSample(g % 4 == 2 && !waves.empty() ? waves[2].enc : nullptr, 0, 1);
             fw.wave = FwWave{};
         }
         if (osc2Case) {
-            syn.setSample(wv2->enc, 1);
+            syn.setSample(wv2->enc, 1, 2);
             fw.wave2 = wv2->fw;
             fw.c.wr8(wv2->fw.chunk[2] + 0xa, (uint8_t)ctl.osc2.rootKey);
             fw.c.wr32(wv2->fw.chunk[2] + 0x1c, (uint32_t)ctl.osc2.origTempo);
@@ -1433,7 +1542,9 @@ int XtToneProbe::run(int argc, char** argv) {
             ctl.lfoKeySync = ctl.osc2.lfoKeySync = ctl.cosm[0].lfoKeySync = ctl.cosm[1].lfoKeySync = ctl.tvaLfoKeySync = false;
         }
         const int secondAt = twoInTick || chaseEnd ? -1 : sweep ? 1 : followCase ? r.range(3, 12) : kind && raw[0] != raw[1] ? r.range(1, 30) : -1;
-        const int offAt[2] = { twoInTick || farCase || backCase ? 1000 : sweep ? (sweepStage == 3 ? 3 : 1000) : padSource ? r.range(35, 60) : 20 + r.range(0, 40), twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
+        // one playback case in eight: the earlier key up before the second note, Hold keeping it sounding, which LEGATO doesn't take (+0x20 bit 29)
+        const bool playHeld = playCase && g % 8 == 5 && secondAt >= 3;
+        const int offAt[2] = { twoInTick || farCase || backCase ? 1000 : sweep ? (sweepStage == 3 ? 3 : 1000) : playHeld ? r.range(1, secondAt - 1) : padSource ? r.range(35, 60) : 20 + r.range(0, 40), twoInTick ? 1000 : sweep ? (sweepStage == 3 ? 4 : 1000) : secondAt >= 0 ? secondAt + r.range(1, 40) : -1 };
         const int liveAt = patchCase ? -1 : twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : followCase ? r.range(1, secondAt - 1) : syncAfter ? r.range(1, 3) : padSource ? r.range(12, 30) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
         const int followAt = followCase ? secondAt + r.range(1, 8) : -1;
         // the free-running LFOs' phases, once a note has shown which objects they are
@@ -1491,6 +1602,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 Ctl zc = drawControls(r, g, zw[0] != nullptr, zw[1] != nullptr);
                 for (int k = 0; k < 2; ++k) {
                     const TestWave* t = zw[k];
+                    (k ? zc.osc2.playbackMode : zc.playbackMode) = t && t->type == 1 ? r.range(0, 1) : r.range(0, 3);   // as the playback cases draw it
                     if (!t) continue;
                     if (std::find(owned.begin(), owned.end(), t) == owned.end()) { waveOwn(*t); owned.push_back(t); }
                     OscC& o = k ? zc.osc2 : static_cast<OscC&>(zc);
@@ -1508,6 +1620,8 @@ int XtToneProbe::run(int argc, char** argv) {
                     zs->wave[z][k] = t->enc;
                 }
                 zs->ctl[z] = zc;
+                zs->number[z][0] = 1 + 2 * z;              // as zpar's, on every zone's OSCs
+                zs->number[z][1] = 2 + 2 * z;
                 fw.zpar[(size_t)z] = patchOf(zc);
                 fw.zpar[(size_t)z][0x2be] = 1 + 2 * z;
                 fw.zpar[(size_t)z][0x2f2] = 2 + 2 * z;
@@ -1760,8 +1874,24 @@ int XtToneProbe::run(int argc, char** argv) {
                     for (FwNote& n : fn)
                         if (n.live && !n.ended) { ++truncates; if (!fw.truncate(n)) return false; }   // released ones too (0x894d4a80)
                 if (fn[i].live && !fw.stop(fn[i])) return false;
-                if (!fw.start(fn[i], i, keyOf(raw[i]), fw.zoneOf(keyOf(raw[i])), carryFrom(nextVoice()))) return false;
+                // the allocator's earlier note (0x894d4c04): of the part and zone, still on its list; the first whose key is down, else the last
+                const int zone = fw.zoneOf(keyOf(raw[i]));
+                const FwNote* prev = nullptr;
+                for (const FwNote* o : { &fn[1 - i] })
+                    if (o->live && !o->off && !o->ended && fw.c.rd8(o->BL + 0x6c6) == zone) prev = o;
+                if (!fw.start(fn[i], i, keyOf(raw[i]), zone, carryFrom(nextVoice()), prev)) return false;
                 ++notes;
+                // a LITE player's +4, which LEGATO's copy reads, is what its tone slot last held, which XtSynth's voices don't keep
+                if (prev && prev->vi >= 0)
+                    for (int o = 0; o < 2; ++o) osc(syn.voice[prev->vi], o).staleEnd = (int8_t)fw.c.rd8(Firmware::voice(*prev, o) + 0xd4 + 4);
+                for (int o = 0; o < 2; ++o) {
+                    const uint32_t V = Firmware::voice(fn[i], o);
+                    // LEGATO: 0x894f21c0's flag, and the copy unless the earlier player had reached its wave's end (0x894f2d24)
+                    if (prev && fw.c.rd32(V + 0x87c)) ++((int8_t)fw.c.rd8(Firmware::voice(*prev, o) + 0xd4 + 4) == 1 ? endSkips : playerTakes);
+                    // STEP and EVENT: a band player whose block's 0x80 is clear starts from an event (0x894f3150)
+                    const uint32_t mode = fw.c.rd32(V + 0x80);
+                    if (fw.c.rd32(V) == 2 && (mode == 3 || mode == 5) && !(fw.c.rd8(V + 0xb4) & 0x80)) ++eventNotes;
+                }
             }
             syn.noteOn(raw[i], (float)vel[i] / 127.0f);
             if (fn[i].live && fn[i].vi < 0) fn[i].vi = voiceOfNewest();
@@ -1770,6 +1900,11 @@ int XtToneProbe::run(int argc, char** argv) {
                 const int a = fw.c.rd8(fn[i].BL + 0x6c6), b = syn.voice[fn[i].vi].zone;
                 if (a != b) rep.bad("zone", "fw %.0f port %.0f", a, b, blk);
                 if (a) { ++zoneNotes; zonesSeen |= 1L << a; }
+                for (int o = 0; o < 2; ++o) {                 // STEP's counts, the zone's and OSC's (0x89cf7210)
+                    ++rep.checks;
+                    const int x = fw.c.rd16(0x89cf7210 + 4 * (uint32_t)a + 2 * (uint32_t)o), y = syn.stepCount[a][o];
+                    if (x != y) rep.bad("step count", "fw %.0f port %.0f", x, y, blk);
+                }   // Playback Mode LEGATO took an earlier player (0x894f21c0's flag)
             }
             for (int o = 0; o < 3; ++o)
                 if (fn[i].live)
@@ -1801,6 +1936,9 @@ int XtToneProbe::run(int argc, char** argv) {
             fw.par = patchOf(ctl);
             fw.frames = syn.hostFrames;
             if (!fw.updatePatch()) return false;
+            // a controller alone ends at the pad's handler before its update, as XtSynth::controller does: CC 91 or 93 can be a
+            // Time Trip Assign too (the knobs' branch below moves neither side's pad)
+            if (ccMoved && !panelMoved && !fw.padCc(kCcNum[ccAt], ccTo)) return false;
             for (FwNote& fnote : fn)
                 if (moved && fnote.live && !fnote.ended && !fw.liveUpdate(fnote)) return false;
             if (panelMoved) {                        // the bender and a controller with the knobs, in the one update the firmware's gets
@@ -1958,7 +2096,7 @@ int XtToneProbe::run(int argc, char** argv) {
         float tripAngle = (float)r.range(0, 628) * 0.01f;
 
         for (FwNote& n : fn) { n.vi = -1; n.live = n.released = n.ended = false; }
-        fw.cosmBuf = kRam + 0x1000000;
+        fw.cosmBuf = cosmBase;
         bool keyDown[2] = {};
         // The mix's first words, which follow OSC 2's buffer: between the cases XtSynth's tails
         // go on rendering and the firmware's stop, so the note starts from the port's.
@@ -1978,10 +2116,10 @@ int XtToneProbe::run(int argc, char** argv) {
         };
         int holdAt[3], holdVal[3] = {}, sostAt[3], sostVal[3] = {};
         pedalBlocks(3, holdAt, holdVal);
-        if (holdSource) {
+        if (holdSource || playHeld) {
             holdAt[0] = -2; holdVal[0] = 127;
             holdAt[1] = -1;
-            holdAt[2] = offAt[0] + r.range(1, 10); holdVal[2] = 0;
+            holdAt[2] = (playHeld ? secondAt : offAt[0]) + r.range(1, 10); holdVal[2] = 0;
         }
         pedalBlocks(5, sostAt, sostVal);
         const int modeAt = !sweep && !twoInTick && r.one(8) ? r.range(0, 60) : -1, modeCc = modeAt < 0 ? 0 : r.one(3) ? 120 : r.one(2) ? 121 : 123 + r.range(0, 4);
@@ -1999,7 +2137,9 @@ int XtToneProbe::run(int argc, char** argv) {
         if (dumpWhich && (dumpWhich[0] == 'a' || std::atoi(dumpWhich) == g))
         {
             for (const OscC* o : { static_cast<const OscC*>(&ctl), static_cast<const OscC*>(&ctl.osc2) })
-                std::printf("  osc: on %d vari %d start %d wave %d/%d loop %d/%d time0 %d\n", o->on, o->vari, o->startOffset, o == &ctl ? (wv ? wv->type : 0) : (wv2 ? wv2->type : 0), o == &ctl ? (wv ? wv->channels : 0) : (wv2 ? wv2->channels : 0), o->loop, o->loopMode, o->oscTimeOffset),
+                std::printf("  osc: on %d vari %d start %d wave %d/%d loop %d/%d time0 %d playback %d events", o->on, o->vari, o->startOffset, o == &ctl ? (wv ? wv->type : 0) : (wv2 ? wv2->type : 0), o == &ctl ? (wv ? wv->channels : 0) : (wv2 ? wv2->channels : 0), o->loop, o->loopMode, o->oscTimeOffset, o->playbackMode),
+                [&] { const TestWave* t = o == &ctl ? wv : wv2; if (t) { uint32_t w2 = 0; if (t->enc->vpdt.size() >= 12) std::memcpy(&w2, t->enc->vpdt.data() + 8, 4); std::printf(" %u, list", w2 >> 16); for (uint16_t e : t->enc->vpno) std::printf(" %u", e);
+                    if (t->type == 3 || t->type == 5) { const size_t st = t->channels == 2 ? 0x58 : 0x2e; std::printf(", at"); for (uint32_t e = 0; e < (w2 >> 16); ++e) { uint32_t p = 0; const size_t at = 2 * (e * st + 0xe) + 4; if (at + 4 <= t->enc->vpdt.size()) std::memcpy(&p, t->enc->vpdt.data() + at, 4); std::printf(" %u", p); } std::printf(", loop %.4f..%.4f mode %d", o->loopStart, o->loopEnd, o->loopMode); } } std::printf("\n"); }(),
                 std::printf("  osc: type %d coarse %d fine %d pitch %d kf %d random %d key %d robot %d; patch coarse %d fine %d octave %d porta %d; time %d offset %d kf %d\n", o->oscType, o->oscCoarse, o->oscFine, o->oscPitch, o->pitchKF, o->randomPitch, o->rootKey, o->robot, ctl.patchCoarse, ctl.patchFine, ctl.octave, ctl.portamento, o->oscTime, o->oscTimeOffset, o->oscTimeKF);
             std::printf("  assign"); for (int i = 0; i < 12; ++i) std::printf(" %d", ctl.assign[i]);
             std::printf("; system"); for (uint32_t i = 0; i < 10; ++i) std::printf(" %d", (int8_t)fw.c.rd8(0x89d276b4 + 0x844 + i));
@@ -2067,6 +2207,8 @@ int XtToneProbe::run(int argc, char** argv) {
                     if (p == reinterpret_cast<char*>(&n.patchTempo)) n.patchTempo = ctl.patchTempo == 1200 ? 2400 : 1200;
                     else if (p == reinterpret_cast<char*>(&n.startOffset)) n.startOffset = ctl.startOffset ? 0 : 3000;
                     else if (p == reinterpret_cast<char*>(&n.osc2.startOffset)) n.osc2.startOffset = ctl.osc2.startOffset ? 0 : 3000;
+                    else if (p == reinterpret_cast<char*>(&n.playbackMode)) n.playbackMode = ctl.playbackMode == 3 ? 0 : ctl.playbackMode == 0 ? 1 : 0;
+                    else if (p == reinterpret_cast<char*>(&n.osc2.playbackMode)) n.osc2.playbackMode = ctl.osc2.playbackMode == 3 ? 0 : ctl.osc2.playbackMode == 0 ? 1 : 0;
                     else *p = !*p;
                 }
                 else if (sweep && sweepAt >= kCcOnly) n = ctl;
@@ -2079,14 +2221,42 @@ int XtToneProbe::run(int argc, char** argv) {
                     std::memcpy(reinterpret_cast<char*>(&one) + w, reinterpret_cast<const char*>(&n) + w, 4);
                     n = one;
                 }
+                else if (playCase)                       // the whole panel: Playback Mode drawn again as at the case's start, not left at RETRIGGER
+                    for (int k = 0; k < 2; ++k) { const TestWave* t = k ? wv2 : wv; (k ? n.osc2.playbackMode : n.playbackMode) = t && t->type == 1 ? r.range(0, 1) : r.range(0, 3); }
                 n.on = ctl.on; n.oscType = ctl.oscType; n.rootKey = ctl.rootKey; n.ana.wave = ctl.ana.wave; n.ana.subOctave = ctl.ana.subOctave; n.octave = ctl.octave;
                 n.osc2.on = ctl.osc2.on; n.osc2.oscType = ctl.osc2.oscType; n.osc2.ana.wave = ctl.osc2.ana.wave; n.osc2.ana.subOctave = ctl.osc2.ana.subOctave;
                 // Switched during a LITE note, the XT's next update installs the other player on this one's state (0x894f6bf0 → 0x894f2010 by the
-                // block's mode as it stands, 0x894f3590): the check holds Vari as the note started
+                // block's mode as it stands, 0x894f3590; its loop's update, 0x8950bcc0, writes over the linear player's position): the check holds
+                // Vari as the note started, there and on the playback modes' LITE waves
                 if (liteCase) { n.vari = ctl.vari; n.osc2.vari = ctl.osc2.vari; }
+                if (playCase && wv && wv->type == 0) n.vari = ctl.vari;
+                if (playCase && wv2 && wv2->type == 0) n.osc2.vari = ctl.osc2.vari;
                 n.oscTimeOffset = ctl.oscTimeOffset; n.lfoKeySync = ctl.lfoKeySync; n.osc2.lfoKeySync = ctl.osc2.lfoKeySync; n.tvaLfoKeySync = ctl.tvaLfoKeySync;
                 n.structure = ctl.structure;             // latched at note-on, but its own check is xt_analog's
-                if (tripCase) { n.vari = ctl.vari; n.osc2.vari = ctl.osc2.vari; }   // switched with the pad in play, a Beat Keep's way back runs one player's seek on the other's state, on the XT too
+                // switched with the pad in play, a Beat Keep's way back runs one player's seek on the other's state, on the XT too; the sweep's own
+                // throw of Vari goes through, with Beat Keep off
+                static const Ctl c0;
+                const bool sweepVari = sweepOn && (sweepAt == (size_t)(reinterpret_cast<const char*>(&c0.vari) - reinterpret_cast<const char*>(&c0))
+                                                   || sweepAt == (size_t)(reinterpret_cast<const char*>(&c0.osc2.vari) - reinterpret_cast<const char*>(&c0)));
+                if (tripCase && !sweepVari) { n.vari = ctl.vari; n.osc2.vari = ctl.osc2.vari; }
+                // and so wherever else that way back can come: the pad also moves by a controller the case moves for itself as a Time Trip Assign,
+                // Hold, Sostenuto, CC 91 or 93, or a source of the Matrix (0x894f213e's seek then ran the SOLO's records on the linear player's
+                // state, and the note left memory)
+                const auto padByCc = [](const Ctl& c) {
+                    for (int a : { c.assign[10], c.assign[11] }) {
+                        if (a == 64 || a == 66 || a == 91 || a == 93) return true;
+                        for (const auto& m : c.matrix) if (a != 0 && a != 32 && m.source == a) return true;
+                    }
+                    return false;
+                };
+                // and on a SOLO wave with LEGATO: thrown before the next note, the XT takes the earlier player into the other kind (Vari is the
+                // block's 0x20, not the voice's mode) and reads anywhere; XtSynth takes a player only into its own kind
+                if (wv && wv->type == 1 && (ctl.playbackMode == 1 || n.playbackMode == 1)) n.vari = ctl.vari;
+                if (wv2 && wv2->type == 1 && (ctl.osc2.playbackMode == 1 || n.osc2.playbackMode == 1)) n.osc2.vari = ctl.osc2.vari;
+                if (padByCc(ctl) || padByCc(n)) {
+                    if ((ctl.timeTrip || n.timeTrip) && (ctl.beatKeep || n.beatKeep)) n.vari = ctl.vari;
+                    if ((ctl.osc2.timeTrip || n.osc2.timeTrip) && (ctl.osc2.beatKeep || n.osc2.beatKeep)) n.osc2.vari = ctl.osc2.vari;
+                }
                 n.mono = ctl.mono; n.legato = ctl.legato; n.robot = ctl.robot; n.loop = ctl.loop; n.loopMode = ctl.loopMode; n.loopStart = ctl.loopStart; n.loopEnd = ctl.loopEnd;
                 n.origTempo = ctl.origTempo; n.osc2.origTempo = ctl.osc2.origTempo;
                 n.osc2.rootKey = ctl.osc2.rootKey; n.osc2.oscTimeOffset = ctl.osc2.oscTimeOffset; n.osc2.robot = ctl.osc2.robot; n.osc2.loop = ctl.osc2.loop;
@@ -2157,6 +2327,20 @@ int XtToneProbe::run(int argc, char** argv) {
                 if (rep.first) std::printf("  case %d block %d: left memory: %s\n", g, blk, fw.c.error().c_str());
                 leftOff = true;
                 break;
+            }
+            // A band player's seek that read its records past the vpdt (XtMbPlayer::startAt): the XT reads RAM there, and the port
+            // stops where it would spin on its zeros, so from here neither is the XT's own.  As a read outside memory, the case ends here
+            {
+                bool past = false;
+                for (FwNote* n : order)
+                    if (n->live && n->vi >= 0)
+                        for (int o = 0; o < 2; ++o) { const XtSynth::OscVoice& sv = osc(syn.voice[n->vi], o); past |= sv.on && !sv.analog && !sv.lite && !sv.linear && sv.wave && sv.wave->type != 1 && sv.mb.readPastWave(); }
+                if (past) {
+                    ++wild;
+                    if (rep.first) std::printf("  case %d block %d: a band seek read past its vpdt\n", g, blk);
+                    leftOff = true;
+                    break;
+                }
             }
             for (FwNote* n : order) {
                 if (!n->live) continue;
@@ -2261,12 +2445,10 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         fw.c.write(kFmLines, syn.modShared.line, sizeof(syn.modShared.line));
     }
-    if (nZone) {
-        int n = 0;
-        for (int z = 1; z < 16; ++z) n += (zonesSeen >> z) & 1;
-        std::printf("tone, zones: %ld notes on zones 2 to 16, %d of those zones\n", zoneNotes, n);
-    }
-    summary(nZone ? "tone, zones" : nLite ? "tone, LITE waves" : nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
+    if (nZone && !nPlay) zoneLine();
+    if (nPlay) std::printf("tone, playback modes: %ld OSCs took an earlier note's player (LEGATO), %ld didn't as it had reached its wave's end; %ld started from an event (STEP, EVENT)\n",
+                           playerTakes, endSkips, eventNotes);
+    summary(nPlay ? "tone, playback modes" : nZone ? "tone, zones" : nLite ? "tone, LITE waves" : nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
     syn.setZones(nullptr);
     fw.zpar.clear();
     fw.zoneWave.clear();

@@ -335,6 +335,23 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Playback Mode v155 (2026-11-06), RETRIGGER as before but for a band wave's Loop switch moved during a note (not checked): LEGATO on every player, STEP and EVENT on band waves (IDs 0x2d2, 0x306); a LITE wave's converter doesn't read the mode.
+  LEGATO: the allocator's earlier note of the part and zone (0x894d4c04: not released, the first with its key down, else the last); the PCM tail sets the block's +0x64 (0x894e2dac).
+  The tone's note-on (0x894f5e60): per OSC of the same kind and mode, 0x894f21c0 then 0x894f2d00 copies the earlier player whole, its own rates back, the gain from 0; not if that player's +4 is 1 (at its wave's end).
+  A LITE player never writes +4, so it's what its tone slot last held: OscVoice::staleEnd, 0 in the plugin, the firmware's own in the check.
+  STEP (0x894e42e0) and EVENT (0x894e4070) on the wave's vpno: STEP's count by part, zone and OSC (0x89cf7210), up at every note-on, 0 on a new Wave Number; EVENT by key from C4, octave by octave.
+  The band player starts at the event (0x894f3150 → +0x14/+0x16, 0x8950fa60), and its Loop bit follows the block's at each update (0x894f3fb6; the crossings read it, 0x8950c8ce).
+  Plugin: Playback Mode per OSC on the Wave card's title line; patches set it; a V-Synth wave's own vpno; the note names STEP and EVENT on a SOLO wave, by the wave's type.
+  Check: xt_tone's playback section (fcheck's 961 notes: 140 LEGATO copies, 8 refused at a wave's end, 417 from an event), the sweep, the patches, seeds 777, 31337, 9, 4242: 0 different;
+  xt_files' vpno line; TEST_PATCH_APPLY (37 PCM OSCs on STEP or EVENT; Arp Drops: STEP on a BACKING wave with an edited list), PluginTest per mode.
+  Also: the check holds Vari on LITE waves and with Time Trip and Beat Keep on (two XT faults it reached in new ways), and gives CC 91 and 93 moved alone to the firmware's pad too;
+  XtMbPlayer::startAt stops a loop that reads past the vpdt and can't move (a seek to the end on the last event); xt_tone ends such a case as a read outside memory.
+  LEGATO across a Vari switch on a SOLO wave: the XT copies one player into the other (Vari isn't the mode) and reads anywhere; XtSynth takes only its own kind.
+  The sweep's Vari throw now goes through (every sweep case is a Time Trip case, which put it back).
+  Planted: mutate_tone.py 1046 (40 new, 9 dropped as equivalent, 9 old moved or re-seeded), files 45 (4 new), panel 91 (11 new; the layout check now finds a hidden card's control left showing), none missed.
+  Open: seeds 6 and 8 differ in a LITE player under Time Trip in the playback cases (v153's path, not this version's).
+  Not done: STEP and EVENT on SOLO waves (v156: the SOLO player from an event, its records by events, bit for bit); the band seek with 0x80 clear (0x89510cc0).
+
 Zones v154 (2026-11-05), no change to the sound of a patch of one zone: a loaded patch plays all its zones, 2-16 as the patch's data (the user's decision), the parameters and editor on zone 1.
   The zone: the part's note-on (0x894dbcb0), the key with the Octave Shift on the part's table (+6, made by 0x894794f0: each the larger of its upper key, 0x124 on, and the one before; the 16th 127).
   It goes to the note's start (0x894dc130, the second stack word): the block's +0x6c6, the tone's +0x1c (part and zone).  A legato note keeps its zone.

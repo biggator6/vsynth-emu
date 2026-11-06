@@ -68,6 +68,7 @@ private:
     juce::ToggleButton loopBtn_ { "Loop" };
     juce::ToggleButton variBtn_ { "Vari" };      // the Wave card's title line
     juce::ComboBox   loopModeBox_;
+    juce::ComboBox   playbackBox_;   // Playback Mode, on the Wave card's title line
     juce::Slider     loopStartSlider_ { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider     loopEndSlider_   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Label      loopStartLabel_ { {}, "Start" }, loopEndLabel_ { {}, "End" };
@@ -219,7 +220,7 @@ private:
     int oscK_ = 0;
     std::unique_ptr<ButtonAtt> loopAtt_;
     std::unique_ptr<ButtonAtt> variAtt_;
-    std::unique_ptr<ComboAtt>  loopModeAtt_;
+    std::unique_ptr<ComboAtt>  loopModeAtt_, playbackAtt_;
     std::unique_ptr<SliderAtt> loopStartAtt_, loopEndAtt_;
     std::unique_ptr<ButtonAtt> portaAtt_;
     std::unique_ptr<ComboAtt>  portaModeAtt_, portaTypeAtt_;
