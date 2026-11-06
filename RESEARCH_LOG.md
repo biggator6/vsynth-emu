@@ -3570,6 +3570,14 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-06) — v157: a LITE player's update
+
+- v155 had read seeds 6 and 8 as "no LEGATO there". A trace of the player's state each update, with fields the check didn't compare, showed the firmware's first sample (+0x138) at 1332 on one side and 0 on the other, both from the same note. Within one block it went from the copied 0 to the note's own 1332: something after the LEGATO copy wrote it again.
+- That was `0x8950bcc0`, kind 1's counterpart of `0x894f3ec0`, which v155 had seen only as the routine that spoils a Vari switch. Past the bits it rewrites the first and last samples, the loop's points and its modes from the voice's block and the wave's record. So the port's LEGATO copy was right and its update was short.
+- The check never compared those fields, which is why a wrong first sample took a long Time Trip to show. It compares them now on both LITE players. The cases draw as before, so only fcheck's counts of checks moved.
+- The same routine's mode 0 does the same for the Vari-off player, so it went in with the fix. No seed of eight reached that path with the update removed; seed 24 was the one in 22.
+- Hunting seeds turned up seed 23, which differs at v155 too: a Vari-off LITE player reading far before its wave, where the check's firmware memory isn't zero. It's left open, as it belongs with how the check treats reads outside a wave.
+
 ### Session 16 addendum (2026-11-06) — v155: Playback Mode
 
 - The scope came in two steps. With the session that started this one, LEGATO plus STEP and EVENT on band and LITE waves became v155, and SOLO's segments at events v156, so the SOLO encoder and player stay bit for bit through one change at a time. LITE turned out to need nothing: its converter never reads the mode.

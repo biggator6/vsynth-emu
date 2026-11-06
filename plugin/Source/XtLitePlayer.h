@@ -1,6 +1,6 @@
 #pragma once
 // What plays a LITE wave (type 0, the voice's kind 1) with Vari Sw on: the firmware's mode 2 (rom.2 0x8950a7f0 mono, 0x8950a7fc
-// stereo; note-on 0x8950b8d0, update 0x8950bc60, seek 0x8950a780).  A LITE wave has no analysis, so its time and pitch come apart
+// stereo; note-on 0x8950b8d0, update 0x8950bc60, seek 0x8950a780; the knob update's 0x8950bcc0, blockUpdate).  A LITE wave has no analysis, so its time and pitch come apart
 // by two read heads: the walk (the time) moves a position through the wave; each head reads from a point at or below it at the
 // formant's rate under a triangular window whose phase runs at the pitch's, and when its clock passes the period (88200 over the
 // root frequency, two of its cycles) it splices back to the last half period below the walk.  The two windows are half a period
@@ -47,6 +47,11 @@ public:
     float gainNow() const { return gain; }
     // 0x8950a780: the walk and both heads to a position in 1/16 sample, the windows back to their start, the beat again.
     void seek(int32_t pos16);
+    // Each knob update, after the bits (0x8950bcc0, mode 2, at 0x8950bdda): the first and last samples again from the voice's own block
+    // (+0xc4 the Start Offset and +0xc8 the frames, as its note started), the loops' points from the wave's loop record (`l`), and their
+    // modes by the Loop bit as it stands (`l.on`).  Not the loops' rates.  A LEGATO copy brings the earlier note's player whole, so from
+    // its next update it runs to this note's own start.
+    void blockUpdate(const XtLoop& l, int32_t start, int32_t frames);
     // 32 frames, L/R pairs, in the XT's units (int16 × 65536 × the gain).
     void block(float* lr);
 
@@ -58,6 +63,11 @@ public:
     float fractionA() const { return fracA; }
     float fractionB() const { return fracB; }
     float filterL() const { return dcL; }
+    // +0x138, +0x124, +0xe8, +0xec: what each knob update sets again (blockUpdate)
+    float firstSample() const { return firstF; }
+    float lastSample() const { return lastF; }
+    int fwdLoopMode() const { return fwdMode; }
+    int bwdLoopMode() const { return bwdMode; }
 
 private:
     const std::vector<float>* x = nullptr;

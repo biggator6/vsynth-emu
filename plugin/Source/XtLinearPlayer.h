@@ -30,6 +30,11 @@ public:
     // A LITE wave's note-on (0x8950b712) instead of the SOLO setup's: the beat starts at the first sample read, × 16, so walking backward
     // at the last sample's and not at the length's.  Set before noteOn.
     void setLite(bool on) { liteCfg = on; }
+    // A LITE wave's at each knob update (0x8950bcc0, mode 0, at 0x8950bea0): the last and first samples (+0xf4, +0x10c) again from the
+    // voice's own block (+0xc8 the frames, +0xc4 the Start Offset, as its note started), and the loop of the way the voice's walk (+0x150)
+    // goes now from the wave's loop record (`l`), its mode by the Loop bit as it stands (`l.on`); not its rate.  A LEGATO copy brings the
+    // earlier note's player whole, so from its next update a walk backward holds at this note's own start.
+    void liteUpdate(const XtLoop& l, int32_t start, int32_t frames, float walkNow);
     // Tempo Sync and Time Trip (XtBeat), as XtSoloVoice's: the player keeps them apart from what it reads, and under either bit walks at the beat's step alone.
     void setTempo(uint32_t tempo, uint32_t orig) { tempoCfg = tempo; origCfg = orig; }
     void setBeatFlags(bool sync, bool trip) {
@@ -54,6 +59,11 @@ public:
     int32_t turningPos() const { return turning; }
     float fraction() const { return frac; }
     float fade() const { return ramp; }
+    // +0x10c, +0xf4, +0x108, +0x120: what a LITE wave's knob updates set again (liteUpdate)
+    int32_t firstSample() const { return bwd.end; }
+    int32_t lastSample() const { return fwd.end; }
+    int fwdLoopMode() const { return fwd.mode; }
+    int bwdLoopMode() const { return bwd.mode; }
     // 0x89509840: to a position in 1/16 sample, as a released Time Trip goes back to the beat.
     void seek(int32_t pos16);
     // 32 frames, L/R pairs, in the XT's units (int16 × 65536 × the gain).

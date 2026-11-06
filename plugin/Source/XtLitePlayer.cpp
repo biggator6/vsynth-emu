@@ -94,6 +94,21 @@ void XtLitePlayer::setRates(float pitch_, float formant_, float walk_, float roo
     dcRate = dcRate * kRate;
 }
 
+// 0x8950bdda: as the note-on has them (0x8950b8d0), from the voice and the record as they stand
+void XtLitePlayer::blockUpdate(const XtLoop& l, int32_t start, int32_t frames) {
+    const RoundToZero round;
+    firstF = floatU(start);
+    lastF = floatU(frames - 1);
+    fwdStartF = (float)l.fwdStart;
+    fwdEndF = (float)l.fwdEnd;
+    fwdLenF = (float)(l.fwdEnd - l.fwdStart);
+    bwdEndF = (float)l.bwdEnd;
+    bwdStartF = (float)l.bwdStart;
+    bwdLenF = (float)(l.bwdEnd - l.bwdStart);
+    fwdMode = l.on ? l.fwdMode : 0;                       // 0x8950be5c: the byte 0's Loop bit, just set from the block's +0xb4
+    bwdMode = l.on ? l.bwdMode : 0;
+}
+
 void XtLitePlayer::seek(int32_t p16) {
     const RoundToZero round;
     const int32_t s = p16 >> 4;

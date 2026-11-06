@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A LITE player's update v157 (2026-11-06), a change only after a LEGATO take on a LITE wave (or a Loop switch moved during a LITE note): v155's open seeds 6 and 8.
+  Each knob update ends, for kind 1, in 0x8950bcc0(voice, block + 0x80): the bits as 0x894f3ec0's, then by the block's mode: 2 (0x8950bdda) the player's first and last
+  samples (+0x138, +0x124) from the voice's +0xc4 and +0xc8, the loops' points from the wave's record, the Loop Modes by the Loop bit; 0 (0x8950bea0) the linear player's
+  +0x10c and +0xf4, and the loop of the way the walk (+0x150) goes. Not the rates. The voice's +0xc4 is the note's own Start Offset; a LEGATO copy (0x894f2d00) brings
+  the earlier player whole, so from its next update it runs to this note's start. Seeds 6 and 8 were LEGATO takes with a new Start Offset (a live move between the notes).
+  XtSynth: OscVoice::liteStart; oscBeat ends with XtLitePlayer::blockUpdate or XtLinearPlayer::liteUpdate (LITE only). xt_tone compares both players' first and last
+  samples and Loop Modes at each update (fcheck's baseline: counts of checks only).
+  Check: seeds 6, 8, 2024, 777, 31337, 9, 4242, 24 at 2000: 0 different. Planted: mutate_tone.py 1060 (14 new; Vari on on seeds 6 and 8, Vari off on 24), none missed.
+  Open: seed 23's LITE section, case 6125: a Vari-off LITE player reads 136,794 samples before its wave, where the check's firmware has other data and the port zeros (at v155 too).
+
 Playback Mode v155 (2026-11-06), RETRIGGER as before but for a band wave's Loop switch moved during a note (not checked): LEGATO on every player, STEP and EVENT on band waves (IDs 0x2d2, 0x306); a LITE wave's converter doesn't read the mode.
   LEGATO: the allocator's earlier note of the part and zone (0x894d4c04: not released, the first with its key down, else the last); the PCM tail sets the block's +0x64 (0x894e2dac).
   The tone's note-on (0x894f5e60): per OSC of the same kind and mode, 0x894f21c0 then 0x894f2d00 copies the earlier player whole, its own rates back, the gain from 0; not if that player's +4 is 1 (at its wave's end).

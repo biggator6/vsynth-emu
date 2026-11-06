@@ -1165,6 +1165,7 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     else if (s.linear) {
         s.lin.setLoop(waveLoop(s, o));
         s.lin.setStart(waveStart(s, o));
+        s.liteStart = waveStart(s, o);
         s.lin.setLite(s.lite);
         s.lin.setTempo(tempoWord, (uint32_t)o.origTempo);
         s.lin.setBeatFlags(o.tempoSync, tripNow);
@@ -1175,6 +1176,7 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     else if (s.lite) {                                // Vari on (0x8950b8d0)
         s.xfg.setLoop(waveLoop(s, o));
         s.xfg.setStart(waveStart(s, o));
+        s.liteStart = waveStart(s, o);
         s.xfg.setTempo(tempoWord, (uint32_t)o.origTempo);
         s.xfg.setBeatFlags(o.tempoSync, tripNow);
         s.xfg.noteOn(s.wave->solo.in, s.wave->solo.inR, s.curA, s.curF, s.curWalk, s.root);
@@ -1532,12 +1534,17 @@ void XtSynth::oscBeat(OscVoice& s, const OscControls& o) {
     s.variBit = o.vari;                                // the voice's +0xb4, after a knob's update has worked out the walk (0x894f2788)
     s.syncBit = o.tempoSync;
     const bool sync = o.tempoSync, trip = o.timeTrip && pad.on();
+    // A LITE wave's (0x8950bcc0, kind 1's) then gives its player the first and last samples from the voice's own block, and the loop from the
+    // wave's record with its modes by the Loop bit, both as they stand: which after a LEGATO copy are this note's, not the earlier one's
+    const XtLoop rec = s.lite ? waveLoop(s, o) : XtLoop {};
     if (s.linear) {
         if (o.beatKeep && s.lin.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.lin.setGainXt(0.0f); }
         s.lin.setBeatFlags(sync, trip);
+        if (s.lite) s.lin.liteUpdate(rec, s.liteStart, (int32_t)s.wave->frames, s.curWalk);
     } else if (s.lite) {
         if (o.beatKeep && s.xfg.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.xfg.setGainXt(0.0f); }
         s.xfg.setBeatFlags(sync, trip);
+        s.xfg.blockUpdate(rec, s.liteStart, (int32_t)s.wave->frames);
     } else if (s.wave->type == 1) {
         if (o.beatKeep && s.solo.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.solo.setGain(0.0f); }
         s.solo.setBeatFlags(sync, trip);

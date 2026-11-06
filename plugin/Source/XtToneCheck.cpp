@@ -1830,6 +1830,12 @@ int XtToneProbe::run(int argc, char** argv) {
                         rep.checks += 2;
                         if ((int32_t)fw.c.rd32(PL + 0xf4) != s.xfg.headA()) rep.bad(os + "lite head a", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xf4), s.xfg.headA(), blk);
                         if ((int32_t)fw.c.rd32(PL + 0xf8) != s.xfg.headB()) rep.bad(os + "lite head b", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xf8), s.xfg.headB(), blk);
+                        // and what each knob update sets again (0x8950bdda): the first and last samples, the loops' modes
+                        rep.checks += 4;
+                        if (!bits(fw.f32(PL + 0x138), s.xfg.firstSample())) rep.bad(os + "lite first sample", "fw %.9g port %.9g", fw.f32(PL + 0x138), s.xfg.firstSample(), blk);
+                        if (!bits(fw.f32(PL + 0x124), s.xfg.lastSample())) rep.bad(os + "lite last sample", "fw %.9g port %.9g", fw.f32(PL + 0x124), s.xfg.lastSample(), blk);
+                        if ((int32_t)fw.c.rd32(PL + 0xe8) != s.xfg.fwdLoopMode()) rep.bad(os + "lite loop mode", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xe8), s.xfg.fwdLoopMode(), blk);
+                        if ((int32_t)fw.c.rd32(PL + 0xec) != s.xfg.bwdLoopMode()) rep.bad(os + "lite loop mode back", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xec), s.xfg.bwdLoopMode(), blk);
                     }
                     if (s.linear) {                  // its own state
                         rep.checks += 4;
@@ -1837,6 +1843,9 @@ int XtToneProbe::run(int argc, char** argv) {
                         if ((int32_t)fw.c.rd32(PL + 0x128) != s.lin.turningPos()) rep.bad(os + "linear turning", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0x128), s.lin.turningPos(), blk);
                         if (!bits(fw.f32(PL + 0xe8), s.lin.fraction())) rep.bad(os + "linear fraction", "fw %.9g port %.9g", fw.f32(PL + 0xe8), s.lin.fraction(), blk);
                         if (!bits(fw.f32(PL + 0x124), s.lin.fade())) rep.bad(os + "linear fade", "fw %.9g port %.9g", fw.f32(PL + 0x124), s.lin.fade(), blk);
+                        const struct { const char* name; uint32_t off; int32_t v; } le[] = { { "linear first sample", 0x10c, s.lin.firstSample() },
+                            { "linear last sample", 0xf4, s.lin.lastSample() }, { "linear loop mode", 0x108, s.lin.fwdLoopMode() }, { "linear loop mode back", 0x120, s.lin.bwdLoopMode() } };
+                        for (const auto& f : le) { ++rep.checks; if ((int32_t)fw.c.rd32(PL + f.off) != f.v) rep.bad(os + f.name, "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + f.off), f.v, blk); }
                     }
                     const struct { const char* name; uint32_t off; int32_t v; } ints[] = { { "position", 0x38, posNow }, { "beat budget", 0x54, bt.budget }, { "beat sync", 0x58, bt.syncPos }, { "beat trip", 0x5c, bt.tripPos },
                         { "beat walk", 0x60, bt.walkPos }, { "beat position", 0x64, bt.beatPos }, { "beat step", 0x50, bt.step } };
