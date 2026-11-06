@@ -119,8 +119,13 @@ public:
     Sh4 c;
     std::vector<uint8_t> rom;
     std::unordered_map<int, int> par;   // the patch, by parameter ID
+    // Zones 2…16's own (zpar[z], empty for none: zone 1's then), what the getter answers for an ID of a zone's blocks when the read
+    // object it is given was pointed at that zone (the routines at 0x894796d0…0x89479920, hooked to leave kZoneTag | zone there)
+    std::vector<std::unordered_map<int, int>> zpar;
     long frames = 0;                    // the system clock
     FwWave wave, wave2;                 // the waves the Wave Numbers find: 1 OSC 1's, 2 OSC 2's
+    std::unordered_map<uint32_t, FwWave> zoneWave;   // and zones 2…16's, by 2999 + the number
+    int upper[16] = { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 };   // the zones' upper keys (IDs 0x124…0x133)
     int bender = 8192;
     int cosmSection = 0;
     uint32_t cosmBuf = 0;
@@ -129,7 +134,22 @@ public:
     // FR11 as the stereo Vari off player (0x89509f52) finds it, by its player object: what its backward Alternate hold compares the fade with
     // (XtLinearPlayer::setStaleFr11), left there by whatever ran before.  Taken each block, and given to the port's player before its block
     std::unordered_map<uint32_t, uint32_t> fr11;
-    const FwWave& waveOf(uint32_t id) const { return id == 2999 + 2 ? wave2 : wave; }
+    const FwWave& waveOf(uint32_t id) const {
+        if (id == 2999 + 1) return wave;
+        if (id == 2999 + 2) return wave2;
+        static const FwWave none;
+        const auto it = zoneWave.find(id);
+        return it != zoneWave.end() ? it->second : id > 2999 + 2 ? none : wave;
+    }
+    // The IDs of a zone's blocks: the tone block, the envelopes, the LFOs and the COSMs (XtFiles' sections with a stride)
+    static bool zoned(int id) { return (id >= 0x293 && id <= 0x3e8) || (id >= 0x8d0 && id <= 0x954); }
+    static constexpr uint32_t kZoneTag = 0x7a5a0000;
+    // The zone a key plays (the part's note-on, 0x894dbcb0): the first of the part's table (+6, from 0x894794f0) it doesn't pass
+    int zoneOf(int key) {
+        for (uint32_t z = 0; z < 16; ++z)
+            if (!(key > (int)c.rd8(0x89d021d0 + 6 + z))) return (int)z;
+        return 0;
+    }
 
     float f32(uint32_t a) { const uint32_t v = c.rd32(a); float x; std::memcpy(&x, &v, 4); return x; }
     static uint32_t envAt(const FwNote& n, uint32_t e) { return n.TN + 0x1780 + 0x70 * e; }
@@ -169,18 +189,29 @@ public:
         // its tables.  The hardware reads whatever is there, into a ramp that is off.
         c.mapRam(0x877d0000, 0x10000);
         c.mapRam(0x8b7d0000, 0x10000);
+        // A key-unsynced LFO's search for the newest tone of its part and zone (0x894f5f70) walks back from the sounding list's
+        // last node, and with none of its zone off the first into the list's head (0x89fa9078), whose tone pointer (+0x14) is 0:
+        // it then reads +0x1c of address 0, on the XT the boot ROM in area 0.  Equal to the key or not, the search ends there with
+        // no tone (0x894f5f8a), on the free-running object.  Zeros stand in for it.
+        c.mapRam(0x00000000, 0x1000);
         for (uint32_t a : { 0x89301920u, 0x89301930u, 0x89301950u, 0x89301960u, 0x89301860u }) c.hook(a, [](Sh4& m) { m.ret(0); });
         c.hook(0x89301940, [this](Sh4& m) { m.ret((uint32_t)(int32_t)std::floor((double)frames * 1000.0 / 44100.0)); });
         auto getter = [this](Sh4& m) {
             const int id = (int16_t)m.r[5];
             const bool cosm = id == 0x3e7 || id == 0x3e8 || (id >= 0x8d0 && id <= 0x954);
-            auto it = par.find(cosm && cosmSection ? id + kCosm2 : id);
-            m.ret((uint32_t)(it != par.end() ? it->second : defaultOf(id)));
+            if (id >= 0x124 && id <= 0x133) { m.ret((uint32_t)upper[id - 0x124]); return; }
+            const uint32_t zone = (m.r[4] & 0xffffff00u) == kZoneTag ? m.r[4] & 0xffu : 0;
+            const auto& P = zone && zoned(id) && zone < zpar.size() && !zpar[zone].empty() ? zpar[zone] : par;
+            auto it = P.find(cosm && cosmSection ? id + kCosm2 : id);
+            m.ret((uint32_t)(it != P.end() ? it->second : defaultOf(id)));
         };
         c.hook(0x89509f52, [this](Sh4& m) { fr11[m.r[5]] = m.fb[(m.fpscr >> 21) & 1][11]; });
         c.hook(0x8947d310, getter);
         c.hook(0x8947d330, getter);
-        c.hook(0x894798a0, [this](Sh4& m) { cosmSection = (int)m.r[7]; m.ret(0); });   // which COSM's parameters are read next
+        c.hook(0x894798a0, [this](Sh4& m) { cosmSection = (int)m.r[7]; m.wr32(m.r[4] + 4, kZoneTag | (m.r[6] & 0xff)); m.ret(0); });   // which COSM's parameters are read next, and the zone's
+        // the read objects of a zone's blocks (obj, part, zone): its tone block, envelopes, LFOs, COSMs, each from one of the part's two stores
+        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })
+            c.hook(a, [](Sh4& m) { m.wr32(m.r[4] + 4, kZoneTag | (m.r[6] & 0xff)); m.ret(0); });
         // the COSMs' buffers (the pool's slot finder), which the allocator clears
         c.hook(0x894ec2b0, [this](Sh4& m) { for (uint32_t i = 0; i < 4; ++i) { m.wr32(m.r[5] + 4 * i, cosmBuf); cosmBuf += 0x10000; } m.ret(0); });
         c.wr32(0x898585dc, kOs);                       // the OS's lock owner
@@ -205,7 +236,7 @@ public:
         c.wr16(0x89d2a6d0 + 0x1602, (uint16_t)defaultOf(0x51f));   // the Truncate Time, as the system updater stores it
         // the TB Filter's constants (run at start-up)
         if (!c.call(0x894fc4c0, {}, kSp)) { std::fprintf(stderr, "tb constants: %s\n", c.error().c_str()); return false; }
-        c.hook(0x894796d0, [](Sh4& m) { m.ret(0); });
+        c.hook(0x894796d0, [](Sh4& m) { m.wr32(m.r[4] + 4, kZoneTag | (m.r[6] & 0xff)); m.ret(0); });
         if (!c.call(0x894e5f80, { 0x89d1b070u, 0, 0, 0 }, kSp)) { std::fprintf(stderr, "system: %s\n", c.error().c_str()); return false; }
         xtFwHookBandReads(c, bandReads);
         // the tempo clock's object and the parts' Time Trip pads, as at power-on
@@ -291,7 +322,7 @@ public:
     }
 
     // The note's start and the tone's note-on.
-    template <class Carry> bool start(FwNote& n, int idx, int key, Carry carry) {
+    template <class Carry> bool start(FwNote& n, int idx, int key, int zone, Carry carry) {
         n.note = kNote + 0x100 * (uint32_t)idx;
         c.wr8(kMsg, 0);                                // the part
         c.write(n.note, std::vector<uint8_t>(0x100, 0).data(), 0x100);
@@ -299,7 +330,7 @@ public:
         c.wr8(n.note + 0x40, (uint8_t)idx);
         c.wr8(n.note + 0x52, 0xff);
         c.wr8(kA1, 0); c.wr8(kA1 + 1, 0); c.wr8(kA1 + 2, 0);
-        c.wr32(kSp, kA1); c.wr32(kSp + 4, 0);
+        c.wr32(kSp, kA1); c.wr32(kSp + 4, (uint32_t)zone);
         if (!c.call(0x894dc130, { n.note, kK, kMsg, (uint32_t)key }, kSp)) { std::fprintf(stderr, "note: %s\n", c.error().c_str()); return false; }
         n.BL = c.rd32(n.note + 0x4c); n.IN = c.rd32(n.note + 0x5c);
         n.TN = c.rd32(n.BL + 0x6bc);
@@ -524,7 +555,8 @@ void checkSoloRecords(const std::string& dir, const char* file, int channels) {
 
 // The cached loop events a wave's player reads, for the loop XtSynth computes: the
 // firmware's own builder of them is not found.  As xtFwSoloPlay and xtFwBandPlay lay them.
-void writeLoopEvents(Firmware& f, const TestWave& t, const OscC& c) {
+void writeLoopEvents(Firmware& f, const TestWave& t, const OscC& c, const FwWave* copy = nullptr) {
+    const FwWave& W = copy ? *copy : t.fw;          // a zone's own copy of its header and loop chunks, or the wave's
     // the region from the fractions, at least 16 long; One Shot's modes are 0
     XtLoop l;
     const int last = (int)t.fw.frames - 1;
@@ -536,11 +568,11 @@ void writeLoopEvents(Firmware& f, const TestWave& t, const OscC& c) {
     l.fwdEnd = l.bwdEnd = b;
     l.fwdRate = t.enc->loopRate[0]; l.bwdRate = t.enc->loopRate[1];
     if (t.enc->bwdMode >= 0) { l.bwdMode = t.enc->bwdMode; l.bwdStart = t.enc->bwdStart; l.bwdEnd = t.enc->bwdEnd; }
-    const uint32_t W2 = t.fw.chunk[10];
+    const uint32_t W2 = W.chunk[10];
     f.c.write(W2, std::vector<uint8_t>(0x400, 0).data(), 0x400);
     f.c.wr32(W2 + 0x2d0, 0x3f800000);                     // a rate factor no code seen writes: what the note-on takes for the backward loop, 1 as the port has it
     // The loop record, which only Vari off reads (0x894f3460)
-    const uint32_t R4 = t.fw.chunk[4];
+    const uint32_t R4 = W.chunk[4];
     f.c.wr32(R4 + 4, (uint32_t)l.fwdStart); f.c.wr32(R4 + 8, (uint32_t)l.fwdEnd); f.c.wr32(R4 + 0xc, (uint32_t)l.bwdEnd); f.c.wr32(R4 + 0x10, (uint32_t)l.bwdStart);
     f.c.wr8(R4 + 0x18, (uint8_t)l.fwdMode); f.c.wr8(R4 + 0x19, (uint8_t)l.bwdMode);
     if (!l.on) { f.c.wr32(W2 + 0xb8, 0x7fffffff); f.c.wr32(W2 + 0x16c, 0x7fffffff); return; }
@@ -991,9 +1023,9 @@ int XtToneProbe::run(int argc, char** argv) {
     XtSynth syn;
     syn.prepare(44100.0);
     Report rep;
-    long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0;
+    long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0, zoneNotes = 0, zonesSeen = 0;
     float L[32], R[32];
-    uint32_t fwFree[3] = {};                // the free-running objects of LFO 1, 2 and 5
+    uint32_t fwFree[16][3] = {};            // the free-running objects of LFO 1, 2 and 5, by zone
     static constexpr uint32_t kFreeLfo[3] = { 1, 2, 5 };
     FwNote fn[2];
     const char* dumpWhich = std::getenv("XT_TONE_DUMP");
@@ -1097,15 +1129,21 @@ int XtToneProbe::run(int argc, char** argv) {
         total += t.different + fxDifferent;
         if (rep.stop && t.different + fxDifferent) { std::printf("tone: 1 different, in the patches\n"); return 0; }
     }
-    for (int g = 0; g < liteFrom + nLite; ++g) {
+    // Then a patch's zones, last of all: zones 2…16 each its own settings and waves, the upper keys over the keyboard (XtSynth::Zones)
+    const int zoneFrom = liteFrom + nLite, nZone = waves.empty() ? 0 : nCases / 4;
+    // Each zone's OSC's own copy of its wave's header and loop chunks, as a zone's settings of the wave's own are its own here
+    constexpr uint32_t kZoneChunks = kRam + 0x2800000;
+    for (int g = 0; g < zoneFrom + nZone; ++g) {
         rep.caseNo = g;
-        const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom && g < liteFrom, liteCase = g >= liteFrom, extra = patchCase || tuneCase || liteCase;
+        const bool zoneCase = g >= zoneFrom;
+        const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom && g < liteFrom, liteCase = g >= liteFrom && !zoneCase, extra = patchCase || tuneCase || liteCase || zoneCase;
         const bool twoInTick = g >= tickFrom && !extra;
         if (g == nCases + nSweep) summary("tone");
         if (nOsc2 && g == tickFrom) summary("tone, a wave on OSC 2");
         if (nPatch + nTune && g == patchFrom) summary("tone, a second update in a tick");
         if (nPatch && g == tuneFrom) summary("tone, the firmware's patches");
         if (nLite && g == liteFrom) summary("tone, a wave's own tuning");
+        if (nZone && g == zoneFrom) summary("tone, LITE waves");
         const bool sweep = g >= nCases && g < nCases + nSweep;
         const size_t sweepAt = sweep ? listed[(size_t)(g - nCases) / 4] : 0;
         const bool sweepCosm = sweep && sweepAt >= kCosmPrm && sweepAt < kCosmPrm + 64;
@@ -1120,7 +1158,7 @@ int XtToneProbe::run(int argc, char** argv) {
             patchCtl = xtPatchControls(pf.store, r.range(0, xtPatchZones(pf.store) - 1), Ctl{});
             if (!patchCtl.on && !patchCtl.osc2.on) patchCtl.on = true;   // both off: XtSynth starts no voice at all (see the report)
         }
-        const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase && !liteCase) || sweepOn == 2 || ((tuneCase || liteCase) && g % 2 == 0);
+        const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase && !liteCase && !zoneCase) || sweepOn == 2 || ((tuneCase || liteCase || zoneCase) && g % 2 == 0);
         // one case in two plays a wave on OSC 1 (with the analog OSC 2 or alone); the last
         // ones a wave on OSC 2, over OSC 1 off, analog or on another wave
         std::vector<TestWave>& pool = liteCase ? liteWaves : waves;
@@ -1399,12 +1437,13 @@ int XtToneProbe::run(int argc, char** argv) {
         const int liveAt = patchCase ? -1 : twoInTick ? 60 : sweep ? (sweepStage >= 2 ? 50 : 20) : followCase ? r.range(1, secondAt - 1) : syncAfter ? r.range(1, 3) : padSource ? r.range(12, 30) : g % 3 == 2 ? r.range(1, 50) : -1;     // a stage of 0 still takes a tick
         const int followAt = followCase ? secondAt + r.range(1, 8) : -1;
         // the free-running LFOs' phases, once a note has shown which objects they are
-        for (int n = 0; n < 3; ++n) {
-            if (!fwFree[n]) continue;
-            ++rep.checks;
-            const float a = fw.f32(fwFree[n] + 0x10), b = n == 2 ? syn.freeTlfo.phase() : n ? syn.freeLfo2.phase() : syn.freeLfo.phase();
-            if (!bits(a, b)) rep.bad("free lfo " + std::to_string(kFreeLfo[n]) + " phase", "fw %.9g port %.9g", a, b, -2);
-        }
+        for (int z = 0; z < 16; ++z)
+            for (int n = 0; n < 3; ++n) {
+                if (!fwFree[z][n]) continue;
+                ++rep.checks;
+                const float a = fw.f32(fwFree[z][n] + 0x10), b = n == 2 ? syn.freeTlfo[z].phase() : n ? syn.freeLfo2[z].phase() : syn.freeLfo[z].phase();
+                if (!bits(a, b)) rep.bad("free lfo " + std::to_string(kFreeLfo[n]) + " phase" + (z ? " of zone " + std::to_string(z + 1) : std::string()), "fw %.9g port %.9g", a, b, -2);
+            }
         // The host's transport, for Clock Source EXTERNAL.  Its tempo, past the firmware's limits in some, and perhaps
         // changing in the note; where it stands; how often it says so, its block's length; a locate or a loop's end; a stretch
         // where it says it is moving and stands still, in which no clock comes; and a stop, in which the clock runs on at the tempo.
@@ -1425,7 +1464,59 @@ int XtToneProbe::run(int argc, char** argv) {
             if (syn.tickCount >= 441 && !fw.tickFree()) return 1;
             syn.render(L, R, 32);
         }
+        // A patch's zones: zones 2…16 each drawn as a case of its own, its waves from either pool, and over the keyboard by the upper
+        // keys, some out of order (the table takes the larger) and in some, as in a kit, none at 127.  Their common settings, drawn too,
+        // are none of theirs: the getter gives a zone only its blocks' IDs, and XtSynth takes zone 1's for the rest.
+        fw.zpar.clear();
+        fw.zoneWave.clear();
+        for (int& u : fw.upper) u = 127;
+        if (zoneCase) {
+            auto zs = std::make_shared<XtSynth::Zones>();
+            const int nz = r.range(2, 16);
+            std::vector<int> cut;
+            for (int z = 0; z + 1 < nz; ++z) cut.push_back(r.range(0, 126));
+            std::sort(cut.begin(), cut.end());
+            for (int z = 0; z < 16; ++z)
+                zs->upper[z] = z + 1 < nz ? cut[(size_t)z] : z + 1 == nz ? (r.one(4) ? r.range(90, 126) : 127) : r.range(0, 127);
+            if (nz > 2 && r.one(4)) zs->upper[r.range(0, nz - 2)] = r.range(0, 127);
+            std::copy(std::begin(zs->upper), std::end(zs->upper), fw.upper);
+            fw.zpar.assign(16, {});
+            std::vector<const TestWave*> owned { wv, wv2 };
+            const auto anyWave = [&]() -> const TestWave* {
+                const int i = r.range(0, (int)(waves.size() + liteWaves.size()) - 1);
+                return i < (int)waves.size() ? &waves[(size_t)i] : &liteWaves[(size_t)i - waves.size()];
+            };
+            for (int z = 1; z < 16; ++z) {
+                const TestWave* zw[2] = { r.one(2) ? anyWave() : nullptr, r.one(3) ? anyWave() : nullptr };
+                Ctl zc = drawControls(r, g, zw[0] != nullptr, zw[1] != nullptr);
+                for (int k = 0; k < 2; ++k) {
+                    const TestWave* t = zw[k];
+                    if (!t) continue;
+                    if (std::find(owned.begin(), owned.end(), t) == owned.end()) { waveOwn(*t); owned.push_back(t); }
+                    OscC& o = k ? zc.osc2 : static_cast<OscC&>(zc);
+                    loopEdge(o, t);
+                    FwWave w = t->fw;
+                    const uint32_t slot = kZoneChunks + 0x2000u * (uint32_t)(2 * z + k);
+                    w.chunk[2] = slot; w.chunk[4] = slot + 0x100; w.chunk[10] = slot + 0x800;
+                    uint8_t b[0x40];
+                    fw.c.read(t->fw.chunk[2], b, sizeof b); fw.c.write(w.chunk[2], b, sizeof b);
+                    fw.c.read(t->fw.chunk[4], b, sizeof b); fw.c.write(w.chunk[4], b, sizeof b);
+                    fw.c.wr8(w.chunk[2] + 0xa, (uint8_t)o.rootKey);
+                    fw.c.wr32(w.chunk[2] + 0x1c, (uint32_t)o.origTempo);
+                    writeLoopEvents(fw, *t, o, &w);
+                    fw.zoneWave[2999 + 1 + 2 * (uint32_t)z + (uint32_t)k] = w;
+                    zs->wave[z][k] = t->enc;
+                }
+                zs->ctl[z] = zc;
+                fw.zpar[(size_t)z] = patchOf(zc);
+                fw.zpar[(size_t)z][0x2be] = 1 + 2 * z;
+                fw.zpar[(size_t)z][0x2f2] = 2 + 2 * z;
+            }
+            syn.setZones(zs);
+        }
         syn.setControls(ctl);
+        if (zoneCase) syn.pickUpSample();     // after the knobs, as a patch's zones come after its zone 1; and now, not at the first note,
+                                              // as what's carried into the firmware's voice reads the zone's
         fw.par = patchOf(ctl);
         if (!fw.updatePatch()) return 1;
         // The last count of six clocks, which a case is mostly too short to reach: the readers' limits and their ends
@@ -1467,6 +1558,7 @@ int XtToneProbe::run(int argc, char** argv) {
         // use): the firmware's tone comes from a pool, so it starts from the port's.
         auto carryFrom = [&](XtSynth::Voice& pv) {
             return [&, pv = &pv](FwNote& n) {
+                const Ctl& ctl = syn.zc(fw.c.rd8(n.BL + 0x6c6) & 15);   // the note's zone's
                 // the Dynamic TVF's follower, which its note-on does not clear
                 for (int k = 0; k < 2; ++k) { const float lev = pv->cs[k].tvf.level(); uint32_t u; std::memcpy(&u, &lev, 4); fw.c.wr32(n.TN + (k ? 0x14ec : 0x1388) + 0x58 + 0x98, u); }
                 // the two words the stereo TB Filter reads uncleared
@@ -1584,7 +1676,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 XtSynth::OscVoice& s = osc(v, o);
                 if (!s.on) continue;
                 const uint32_t V = Firmware::voice(n, o);
-                const OscC& oc = o ? static_cast<const OscC&>(syn.ctl.osc2) : static_cast<const OscC&>(syn.ctl);
+                const OscC& oc = o ? static_cast<const OscC&>(syn.zc(v).osc2) : static_cast<const OscC&>(syn.zc(v));
                 const std::string os = "osc " + std::to_string(o + 1) + " ";
                 const float la = fw.f32(Firmware::lfoAt(n, (uint32_t)o + 1) + 0x38), lb = s.lfo.out();
                 ++rep.checks;
@@ -1668,14 +1760,20 @@ int XtToneProbe::run(int argc, char** argv) {
                     for (FwNote& n : fn)
                         if (n.live && !n.ended) { ++truncates; if (!fw.truncate(n)) return false; }   // released ones too (0x894d4a80)
                 if (fn[i].live && !fw.stop(fn[i])) return false;
-                if (!fw.start(fn[i], i, keyOf(raw[i]), carryFrom(nextVoice()))) return false;
+                if (!fw.start(fn[i], i, keyOf(raw[i]), fw.zoneOf(keyOf(raw[i])), carryFrom(nextVoice()))) return false;
                 ++notes;
             }
             syn.noteOn(raw[i], (float)vel[i] / 127.0f);
             if (fn[i].live && fn[i].vi < 0) fn[i].vi = voiceOfNewest();
+            if (fn[i].live && fn[i].vi >= 0) {                   // the zone it plays, the block's +0x6c6
+                ++rep.checks;
+                const int a = fw.c.rd8(fn[i].BL + 0x6c6), b = syn.voice[fn[i].vi].zone;
+                if (a != b) rep.bad("zone", "fw %.0f port %.0f", a, b, blk);
+                if (a) { ++zoneNotes; zonesSeen |= 1L << a; }
+            }
             for (int o = 0; o < 3; ++o)
                 if (fn[i].live)
-                    if (const uint32_t f = fw.c.rd32(Firmware::lfoAt(fn[i], kFreeLfo[o]) + 0x7c)) fwFree[o] = f;
+                    if (const uint32_t f = fw.c.rd32(Firmware::lfoAt(fn[i], kFreeLfo[o]) + 0x7c)) fwFree[fw.c.rd8(fn[i].BL + 0x6c6) & 15][o] = f;
             compareAll(blk);
             return true;
         };
@@ -2163,7 +2261,16 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         fw.c.write(kFmLines, syn.modShared.line, sizeof(syn.modShared.line));
     }
-    summary(nLite ? "tone, LITE waves" : nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
+    if (nZone) {
+        int n = 0;
+        for (int z = 1; z < 16; ++z) n += (zonesSeen >> z) & 1;
+        std::printf("tone, zones: %ld notes on zones 2 to 16, %d of those zones\n", zoneNotes, n);
+    }
+    summary(nZone ? "tone, zones" : nLite ? "tone, LITE waves" : nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
+    syn.setZones(nullptr);
+    fw.zpar.clear();
+    fw.zoneWave.clear();
+    for (int& u : fw.upper) u = 127;
     // The clock's rate.  Above the firmware's clock runs on XtSynth's, which could be any speed: here
     // two minutes (165375 blocks) against the firmware's own timer routine, within one clock.
     {

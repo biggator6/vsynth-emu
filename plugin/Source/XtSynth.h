@@ -303,6 +303,21 @@ public:
         bool operator==(const Controls&) const = default;
     };
 
+    // A patch's zones (v154, the user's decision of 2026-11-05: a loaded patch plays all of them, kits too, while the plugin's
+    // parameters and editor stay on zone 1).  Zone 1 is setControls' and setSample's; zones 2…16 are a patch's data, each its
+    // controls and its two waves.  Only a zone's own blocks are read from it (the tone block, envelopes, LFOs and COSMs:
+    // zoneControls); the patch's common and the system's are zone 1's, as on the XT, where they aren't in a zone.  The upper keys
+    // (IDs 0x124…0x133) pick a note's zone.
+    static constexpr int kZones = 16;
+    struct Zones {
+        int upper[kZones] = { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 };
+        Controls ctl[kZones];                                // [0] unused: zone 1 is setControls'
+        std::shared_ptr<const XtEncoded> wave[kZones][2];    // the same
+    };
+    // The zone a key plays, with the Octave Shift (the part's note-on, 0x894dbcb0): the first whose upper key it doesn't pass, on
+    // the table 0x894794f0 makes of the upper keys, each at least the one before and the last 127.  0 for zone 1.
+    static int xtZoneOf(const int (&upper)[kZones], int key);
+
     XtSynth();
     ~XtSynth();
     void prepare(double hostRate);
@@ -310,9 +325,11 @@ public:
     // OSC 1, 1 OSC 2; voices stop).  The XT binds a wave per OSC (IDs 0x2be, 0x2f2).
     void setSample(std::shared_ptr<const XtEncoded> e, int osc = 0);
     bool hasSample(int osc = 0) const { return cur[osc] != nullptr; }
-    // Audio thread: whether a note would sound (a sample, or an analog
+    // Any thread, the same way: a patch's zones 2…16 (voices stop).  nullptr: zone 1 alone, every key on it.
+    void setZones(std::shared_ptr<const Zones> z);
+    // Audio thread: whether a note on zone 1 would sound (a sample, or an analog
     // waveform the port plays).
-    bool canPlay() const;
+    bool canPlay() const { return canPlay(0); }
 
     // Audio thread
     void setControls(const Controls& c);
@@ -376,6 +393,7 @@ private:
     };
     struct Voice : OscVoice {                  // OSC 1's in the base
         OscVoice osc2;
+        int zone = 0;                  // the patch's zone the note plays, 0 for zone 1 (the block's +0x6c6; the tone's +0x1c, part and zone)
         XtMod mod;                     // kept across notes, as the tone's
         int structure = 0;             // the Structure Type as at note-on (the tone's +0x1770)
         bool active = false, releasing = false;
@@ -424,18 +442,29 @@ private:
         float bus[XtBusCount] = {};
     };
     std::shared_ptr<const XtEncoded> cur[2], pending[2], retired[2];   // each OSC's wave
+    std::shared_ptr<const Zones> zones, pendingZones, retiredZones;     // zones 2…16
     std::mutex swapLock;
-    bool swapPending[2] = {};
+    bool swapPending[2] = {}, zonesPending = false;
     Controls ctl;
+    // Each zone's controls as its notes read them: its own blocks, and the rest zone 1's (zoneCtl[0] unused: zone 1 is ctl)
+    Controls zoneCtl[kZones];
+    Controls zoneWas[kZones];                        // setControls': each sounding zone's before the change
+    int zoneUpper[kZones] = { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 };
+    const Controls& zc(int z) const { return z ? zoneCtl[z] : ctl; }
+    const Controls& zc(const Voice& v) const { return zc(v.zone); }
+    Controls zoneControls(int z) const;              // zone z's own blocks on ctl's
+    void zonesFollow();                              // each zone's controls again, after ctl or the zones moved
     Voice voice[kVoices];
     long clock = 0;
     // The XT's control clock: the tone update (envelope step, TVA targets)
     // runs between blocks once per 441 frames (10 ms).
     static constexpr int kTickFrames = 441;
     int tickCount = 0;                // frames since the last update
-    XtLfoFree freeLfo, freeLfo2;      // the free-running phase a key-unsynced voice starts from (LFO 1, LFO 2)
-    XtLfoFree freeClfo[2];            // the same for LFO 3 and 4
-    XtLfoFree freeTlfo;               // and for LFO 5
+    // The free-running phase a key-unsynced voice starts from, by zone (the pool's objects are by the tone's +0x1c, part and zone,
+    // 0x894f1590): LFO 1, LFO 2, LFO 3 and 4, LFO 5.  A zone's first takes an object no note has used, which runs at 1 Hz from power-on.
+    XtLfoFree freeLfo[kZones], freeLfo2[kZones];
+    XtLfoFree freeClfo[kZones][2];
+    XtLfoFree freeTlfo[kZones];
     XtKeyState keys;                  // the channel's key state (0x894d6330 / 0x894d63c0)
     long hostFrames = 0;              // the system clock (ms) the key state reads
     XtPitchRandom pitchRandom;        // the XT's one random pitch generator (from its power-on seed)
@@ -505,8 +534,9 @@ private:
     int msDue() const;             // ms the next block starts with
     double hostStep() const;       // clocks in a block, at the host's tempo
     void oscBeat(OscVoice& s, const OscControls& o);   // a block's Tempo Sync, Time Trip and Beat Keep to the player (0x894f3ec0)
-    const XtEncoded* waveOf(const OscControls& o) const { return cur[&o == &ctl ? 0 : 1].get(); }
-    bool oscPlays(const OscControls& o) const;       // switched on, with something to play
+    const XtEncoded* waveOf(int zone, int osc) const { return zone ? (zones ? zones->wave[zone][osc].get() : nullptr) : cur[osc].get(); }
+    bool oscPlays(int zone, int osc) const;          // switched on, with something to play
+    bool canPlay(int zone) const;
     void targets(const Voice& v, const OscVoice& s, const OscControls& o, float& A, float& F, float& walk, float& g, bool noteOn = false) const;
     float gainTarget(const Voice& v, const OscVoice& s, const OscControls& o, float env) const;   // 0x894f3dc0 / 0x894f3e20
     XtMatrixInputs matrixInputs(const Voice& v) const;
@@ -520,13 +550,14 @@ private:
     float noteCents(const Voice& v, const OscVoice& s, const OscControls& o, int key) const;  // voice +8 at a key (+0x68 at the previous one)
     void noteTuning(const Voice& v, const OscVoice& s, const OscControls& o, int& coarse, int& fine) const;   // the per-note setup's +0x68 and +0x70
     XtAnalogShared anaShared;                        // the analog voices' shared state
-    XtModBlock modBlk;                               // the MOD's block (the tone block's +0x5dc)
+    XtModBlock modBlk[kZones];                       // the MOD's block (the tone block's +0x5dc), by zone: what a type leaves stays for the next
     XtModShared modShared;                           // FM's delay lines; a voice's index is its tone's number
     float mixPast[3] = {};                           // the last tone's mix, its first words: they follow OSC 2's buffer on the XT
     XtAnalogBlock analogBlock(const Voice& v, const OscVoice& s, const OscControls& o) const; // the analog converter's block
     int keyFollowKey(const Voice& v, const OscControls& o) const;   // the OSC's +4
     int shiftKey(int key) const;                     // + the Octave Shift, within 0..127
-    void startVoice(int raw, int key, int vel);
+    void startVoice(int raw, int key, int vel, int zone);
+    void liveUpdate(Voice& v, const Controls& c, const Controls& was, bool anyChanged);   // a knob's update of a sounding voice, its zone's controls now and before
     void legatoNote(int key, int vel);               // the sounding voice takes a note (0x894dc1e0)
     void oscStart(Voice& v, OscVoice& s, const OscControls& o);   // the voice's OSC note-on
     void oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o);   // its envelopes

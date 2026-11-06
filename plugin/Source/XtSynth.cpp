@@ -138,8 +138,38 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
 
 XtSynth::XtSynth() {
     ccDefaults();
-    xtModBlock(ctl.mod, modBlk);
+    for (int z = 0; z < kZones; ++z) xtModBlock(zc(z).mod, modBlk[z]);
     prepare(44100.0);
+}
+
+int XtSynth::xtZoneOf(const int (&upper)[kZones], int key) {
+    int top = 0;
+    for (int z = 0; z < kZones; ++z) {
+        top = z == kZones - 1 ? 127 : std::max(top, upper[z]);
+        if (!(key > top)) return z;
+    }
+    return 0;
+}
+
+// A zone's own blocks (IDs 0x293…0x3e6 and the COSMs': the tone block, the envelopes, the LFOs), the rest zone 1's: the patch's
+// common (tuning, tempo, key assign, portamento, bend, the Matrix) and the system's, which aren't a zone's.
+XtSynth::Controls XtSynth::zoneControls(int z) const {
+    if (!z || !zones) return ctl;
+    Controls c = zones->ctl[z];
+    c.pitchSemis = ctl.pitchSemis; c.patchCoarse = ctl.patchCoarse; c.patchFine = ctl.patchFine;
+    c.scaleTune = ctl.scaleTune; std::copy(std::begin(ctl.scale), std::end(ctl.scale), c.scale);
+    c.bendUp = ctl.bendUp; c.bendDown = ctl.bendDown;
+    c.patchTempo = ctl.patchTempo; c.clockSource = ctl.clockSource;
+    c.portamento = ctl.portamento; c.portaMode = ctl.portaMode; c.portaType = ctl.portaType; c.portaTime = ctl.portaTime; c.portaVeloSens = ctl.portaVeloSens;
+    c.mono = ctl.mono; c.legato = ctl.legato; c.octave = ctl.octave;
+    std::copy(std::begin(ctl.matrix), std::end(ctl.matrix), c.matrix);
+    std::copy(std::begin(ctl.assign), std::end(ctl.assign), c.assign);
+    c.outGainTg = ctl.outGainTg; c.parallel = ctl.parallel;
+    return c;
+}
+
+void XtSynth::zonesFollow() {
+    for (int z = 1; z < kZones; ++z) zoneCtl[z] = zoneControls(z);
 }
 XtSynth::~XtSynth() = default;
 
@@ -180,15 +210,30 @@ void XtSynth::setSample(std::shared_ptr<const XtEncoded> e, int osc) {
     swapPending[osc] = true;
 }
 
+void XtSynth::setZones(std::shared_ptr<const Zones> z) {
+    std::lock_guard<std::mutex> g(swapLock);
+    retiredZones.reset();
+    pendingZones = std::move(z);
+    zonesPending = true;
+}
+
 void XtSynth::pickUpSample() {
     std::unique_lock<std::mutex> g(swapLock, std::try_to_lock);
-    if (!g.owns_lock() || !(swapPending[0] || swapPending[1])) return;
+    if (!g.owns_lock() || !(swapPending[0] || swapPending[1] || zonesPending)) return;
     for (int k = 0; k < 2; ++k)
         if (swapPending[k]) {
             retired[k] = std::move(cur[k]);
             cur[k] = std::move(pending[k]);
             swapPending[k] = false;
         }
+    if (zonesPending) {
+        retiredZones = std::move(zones);
+        zones = std::move(pendingZones);
+        zonesPending = false;
+        for (int z = 0; z < kZones; ++z) zoneUpper[z] = zones ? zones->upper[z] : 127;
+        zonesFollow();
+        for (int z = 1; z < kZones; ++z) xtModBlock(zoneCtl[z].mod, modBlk[z]);
+    }
     for (Voice& v : voice) v.active = false;
 }
 
@@ -224,15 +269,16 @@ float truncateStep() {
 // Robot Voice takes the pitch against A4 (0x894e4030), not against the
 // wave's Original Key, and so does the analog oscillator (0x894e1920).
 void XtSynth::noteTuning(const Voice& v, const OscVoice& s, const OscControls& o, int& coarse, int& fine) const {
-    const long shift = std::lround((double)ctl.pitchSemis * 100.0);
+    const Controls& Z = zc(v);
+    const long shift = std::lround((double)Z.pitchSemis * 100.0);
     const int semis = (int)std::lround((double)shift / 100.0);
     XtTuning t;
-    t.coarse = ctl.patchCoarse + semis;
-    t.fine = ctl.patchFine + (int)(shift - semis * 100L);
-    t.scaleOn = ctl.scaleTune;
-    std::copy(std::begin(ctl.scale), std::end(ctl.scale), t.scale);
+    t.coarse = Z.patchCoarse + semis;
+    t.fine = Z.patchFine + (int)(shift - semis * 100L);
+    t.scaleOn = Z.scaleTune;
+    std::copy(std::begin(Z.scale), std::end(Z.scale), t.scale);
     coarse = xtNoteCoarse(t, o.oscCoarse);
-    fine = xtNoteFine(t, v.note, o.oscFine, xtPitchBend(bender, ctl.bendUp, ctl.bendDown), s.rnd);
+    fine = xtNoteFine(t, v.note, o.oscFine, xtPitchBend(bender, Z.bendUp, Z.bendDown), s.rnd);
 }
 
 float XtSynth::noteCents(const Voice& v, const OscVoice& s, const OscControls& o, int key) const {
@@ -261,10 +307,11 @@ XtAnalogBlock XtSynth::analogBlock(const Voice& v, const OscVoice& s, const OscC
 // the D-Beam's controllers, each a CC number or −1 (0x894e9db0: OFF and 32).  A value only moves with an
 // update, so the sums are kept on the voice between them.
 XtMatrixInputs XtSynth::matrixInputs(const Voice& v) const {
+    const Controls& Z = zc(v);
     XtMatrixInputs in;
     in.bender = bender; in.pressure = pressure; in.cc = cc; in.poly = polyPress;
     in.velocity = v.mVel; in.key = v.mKey; in.polyKey = v.mRaw; in.pad = pad.radius();
-    for (int i = 0; i < 6; ++i) in.assign[i] = std::clamp(ctl.assign[4 + i], 0, 95);
+    for (int i = 0; i < 6; ++i) in.assign[i] = std::clamp(Z.assign[4 + i], 0, 95);
     return in;
 }
 
@@ -273,25 +320,27 @@ XtMatrixInputs XtSynth::matrixInputs(const Voice& v) const {
 // no other, on what the sources hold now.  So a source that has moved with no update yet, a pedal let go or the pad, reaches
 // these ahead of the rest, which what reads the sums at every tick must not see.  The next update forms them all.
 void XtSynth::matrixRelease(Voice& v) const {
+    const Controls& Z = zc(v);
     const XtMatrixInputs in = matrixInputs(v);
     int16_t next[kXtMatrixSlots];
-    xtMatrixSums(ctl.matrix, in, next);
+    xtMatrixSums(Z.matrix, in, next);
     const auto form = [&](int first, int n) { std::memcpy(v.mx + first, next + first, (size_t)n * sizeof next[0]); };
     const auto oscAny = [](const OscControls& o) { return o.pRelease < 128 || o.tRelease < 128 || o.fRelease < 128 || o.oRelease < 128; };
-    if (oscAny(ctl)) form(xtmx::OscEnv, 12);
-    if (oscAny(ctl.osc2)) form(xtmx::Osc2Env, 12);
+    if (oscAny(Z)) form(xtmx::OscEnv, 12);
+    if (oscAny(Z.osc2)) form(xtmx::Osc2Env, 12);
     for (int k = 0; k < 2; ++k)
-        if (ctl.cosm[k].envA.release < 128 || ctl.cosm[k].envB.release < 128) form(k ? xtmx::Cosm2 : xtmx::Cosm, 11);
-    if (ctl.tvaOn && ctl.release < 128) form(xtmx::TvaEnv, 11);
+        if (Z.cosm[k].envA.release < 128 || Z.cosm[k].envB.release < 128) form(k ? xtmx::Cosm2 : xtmx::Cosm, 11);
+    if (Z.tvaOn && Z.release < 128) form(xtmx::TvaEnv, 11);
 }
 
 bool XtSynth::matrixUpdate(Voice& v) const {
+    const Controls& Z = zc(v);
     const XtMatrixInputs in = matrixInputs(v);
     int16_t next[kXtMatrixSlots];
-    xtMatrixSums(ctl.matrix, in, next);
+    xtMatrixSums(Z.matrix, in, next);
     int beam[4];
     for (int i = 0; i < 4; ++i) {
-        const int n = ctl.assign[i];
+        const int n = Z.assign[i];
         beam[i] = n <= 0 || n == 32 || n >= 96 ? 0 : cc[n];
     }
     const bool moved = std::memcmp(next, v.mx, sizeof next) != 0 || std::memcmp(beam, v.beam, sizeof beam) != 0;
@@ -302,13 +351,14 @@ bool XtSynth::matrixUpdate(Voice& v) const {
 }
 
 // Audio thread (it reads the samples the last render picked up).
-bool XtSynth::oscPlays(const OscControls& o) const {
+bool XtSynth::oscPlays(int zone, int osc) const {
+    const OscControls& o = osc ? zc(zone).osc2 : zc(zone);
     if (!o.on) return false;
     if (o.oscType == 0) return xtAnalogTablesLoaded() && xtAnalogPlays(o.ana.wave);
-    return waveOf(o) != nullptr;
+    return waveOf(zone, osc) != nullptr;
 }
 
-bool XtSynth::canPlay() const { return oscPlays(ctl) || oscPlays(ctl.osc2); }
+bool XtSynth::canPlay(int zone) const { return oscPlays(zone, 0) || oscPlays(zone, 1); }
 
 // The Pitch knob's ratio (+0xc): the Matrix's sum, and 2·b183 − b182 from the D-Beam's
 float XtSynth::pitchKnob(const Voice& v, const OscVoice& s, const OscControls& o) const {
@@ -385,8 +435,9 @@ int withSum(int knob, int sum) { return knob >= 128 ? knob : std::clamp(knob + s
 }
 
 XtEnvParams XtSynth::ampEnvParams(const Voice& v, const OscControls& o) const {
+    const Controls& Z = zc(v);
     XtEnvKnobs k;
-    const int16_t* m = v.mx + (&o == &ctl ? xtmx::OscEnv : xtmx::Osc2Env) + 9;
+    const int16_t* m = v.mx + (&o == &Z ? xtmx::OscEnv : xtmx::Osc2Env) + 9;
     k.tempo10 = v.tempo10;
     k.attack = withSum(o.oAttack, m[0]); k.decay = withSum(o.oDecay, m[1]); k.sustain = o.oSustain; k.release = withSum(o.oRelease, m[2]);
     k.aSens = o.oASens; k.dSens = o.oDSens; k.rSens = o.oRSens; k.timeKF = o.oTimeKF;
@@ -405,22 +456,25 @@ XtLfoParams XtSynth::lfoParams(const Voice& v, const OscVoice& s, const OscContr
 }
 
 XtLfoParams XtSynth::clfoParams(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     return xtLfoConvert(c.lfoWave, withSum(c.lfoRate, v.mx[(k ? xtmx::Cosm2 : xtmx::Cosm) + xtmx::CosmLfoRate]), c.lfoOffset, c.lfoDelay, c.lfoFadeMode, c.lfoFade, c.lfoKeySync);
 }
 
 XtLfoParams XtSynth::tlfoParams(const Voice& v) const {
-    return xtLfoConvert(ctl.tvaLfoWave, withSum(ctl.tvaLfoRate, v.mx[xtmx::TvaLfoRate]), ctl.tvaLfoOffset, ctl.tvaLfoDelay, ctl.tvaLfoFadeMode, ctl.tvaLfoFade, ctl.tvaLfoKeySync);
+    const Controls& Z = zc(v);
+    return xtLfoConvert(Z.tvaLfoWave, withSum(Z.tvaLfoRate, v.mx[xtmx::TvaLfoRate]), Z.tvaLfoOffset, Z.tvaLfoDelay, Z.tvaLfoFadeMode, Z.tvaLfoFade, Z.tvaLfoKeySync);
 }
 
 XtTvaBlock XtSynth::tvaBlock(const Voice& v) const {
+    const Controls& Z = zc(v);
     XtTvaKnobs k;
-    k.on = ctl.tvaOn;
+    k.on = Z.tvaOn;
     using namespace xtmx;
-    k.level = ctl.tvaLevel + v.mx[TvaLevel]; k.levelKF = ctl.tvaLevelKF; k.levelLfo = ctl.tvaLevelLfo + v.mx[TvaLfoLevel];
-    k.pan = ctl.tvaPan + v.mx[TvaPan]; k.panKF = ctl.tvaPanKF; k.panLfo = ctl.tvaPanLfo + v.mx[TvaLfoPan];
-    k.send = ctl.mfxSend + v.mx[MfxSend]; k.chorusSend = ctl.chorusSend + v.mx[ChorusSend]; k.reverbSend = ctl.reverbSend + v.mx[ReverbSend];
-    k.assign = ctl.outputAssign; k.parallel = ctl.parallel; k.outGain = ctl.outGainTg;
+    k.level = Z.tvaLevel + v.mx[TvaLevel]; k.levelKF = Z.tvaLevelKF; k.levelLfo = Z.tvaLevelLfo + v.mx[TvaLfoLevel];
+    k.pan = Z.tvaPan + v.mx[TvaPan]; k.panKF = Z.tvaPanKF; k.panLfo = Z.tvaPanLfo + v.mx[TvaLfoPan];
+    k.send = Z.mfxSend + v.mx[MfxSend]; k.chorusSend = Z.chorusSend + v.mx[ChorusSend]; k.reverbSend = Z.reverbSend + v.mx[ReverbSend];
+    k.assign = Z.outputAssign; k.parallel = Z.parallel; k.outGain = Z.outGainTg;
     k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10]; k.cc91 = cc[91]; k.cc93 = cc[93];
     return xtTvaBlock(k, v.note, v.velGain);
 }
@@ -435,8 +489,9 @@ void XtSynth::tvaNewBlock(Voice& v) const {
 // A COSM envelope (ADSR kinds 8..11, curve 2): its times as the other
 // envelopes'; its Velocity Curve and Sens scale the COSM's depth instead.
 XtEnvParams XtSynth::cosmEnvParams(const Voice& v, int cosm, const Controls::CosmEnv& e) const {
+    const Controls& Z = zc(v);
     XtEnvKnobs k;
-    const int16_t* m = v.mx + (cosm ? xtmx::Cosm2 : xtmx::Cosm) + (&e == &ctl.cosm[cosm].envA ? xtmx::CosmEnv1 : xtmx::CosmEnv2);
+    const int16_t* m = v.mx + (cosm ? xtmx::Cosm2 : xtmx::Cosm) + (&e == &Z.cosm[cosm].envA ? xtmx::CosmEnv1 : xtmx::CosmEnv2);
     k.tempo10 = v.tempo10;
     k.attack = withSum(e.attack, m[0]); k.decay = withSum(e.decay, m[1]); k.sustain = e.sustain; k.release = withSum(e.release, m[2]);
     k.aSens = e.aSens; k.dSens = e.dSens; k.rSens = e.rSens; k.timeKF = e.timeKF;
@@ -447,7 +502,8 @@ XtEnvParams XtSynth::cosmEnvParams(const Voice& v, int cosm, const Controls::Cos
 // of its envelopes (A: the Cutoff's depth, Env 9 or 11; B: the Q's, Env 10
 // or 12).
 XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtTvfParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.filter = c.filter; p.q = c.reso + m[xtmx::CosmPrm2]; p.qLfo = c.resoLfo + m[xtmx::CosmLfoPrm2]; p.qEnv = c.resoEnv;
@@ -462,7 +518,8 @@ XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {
 
 // A Dual Filter's block (0x894dd690): Filter 1's Env depth by A, Filter 2's by B.
 XtDualBlock XtSynth::dualBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtDualParams p;
     p.type = c.dualType;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
@@ -474,7 +531,8 @@ XtDualBlock XtSynth::dualBlock(const Voice& v, int k) const {
 
 // A TB Filter's block (0x894de110): the LPF's Env depth by A, the HPF's by B.
 XtTbBlock XtSynth::tbBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtTbParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.lpfCutoff = c.tbCutoff + m[xtmx::CosmPrm1]; p.lpfKf = c.tbKf / 10; p.lpfLfo = c.tbLfo + m[xtmx::CosmLfoPrm1]; p.lpfEnv = c.tbEnv; p.q = c.tbQ + m[xtmx::CosmPrm2]; p.qFollow = c.tbQFollow;
@@ -485,7 +543,8 @@ XtTbBlock XtSynth::tbBlock(const Voice& v, int k) const {
 
 // A Comb Filter's block (0x894dd4f0): Tone's Env depth by A, Detune's by B.
 XtCombBlock XtSynth::combBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtCombParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.octave = c.combOctave; p.detune = c.combDetune + 200 * m[xtmx::CosmPrm2] / 127; p.detuneLfo = c.combDetuneLfo + m[xtmx::CosmLfoPrm2]; p.detuneEnv = c.combDetuneEnv;
@@ -497,7 +556,8 @@ XtCombBlock XtSynth::combBlock(const Voice& v, int k) const {
 // A Side Band Filter's block (0x894dd0a0, 0x894dd2c0): Width's Env depth by
 // A, Detune's by B.
 XtSbfBlock XtSynth::sbfBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     const bool second = v.cs[k].type == 6;
     const Controls::Cosm::SideBand& s = c.sb[second ? 1 : 0];
     XtSbfParams p;
@@ -512,7 +572,8 @@ XtSbfBlock XtSynth::sbfBlock(const Voice& v, int k) const {
 
 // A Resonator's block (0x894dcf00): Size's Env depth by A, Balance's by B.
 XtResBlock XtSynth::resBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtResParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.type = c.resType; p.size = c.resSize + m[xtmx::CosmPrm1]; p.sizeKf = c.resSizeKf / 10; p.sizeLfo = c.resSizeLfo + m[xtmx::CosmLfoPrm1]; p.sizeEnv = c.resSizeEnv;
@@ -524,7 +585,8 @@ XtResBlock XtSynth::resBlock(const Voice& v, int k) const {
 // A Frequency Shifter's block (0x894ddde0): Depth's Env depth by A,
 // Balance's by B.
 XtFsBlock XtSynth::fsBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtFsParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.depth = c.fsDepth + m[xtmx::CosmPrm1]; p.depthKf = c.fsDepthKf / 10; p.depthLfo = c.fsDepthLfo + m[xtmx::CosmLfoPrm1]; p.depthEnv = c.fsDepthEnv;
@@ -535,7 +597,8 @@ XtFsBlock XtSynth::fsBlock(const Voice& v, int k) const {
 
 // A Lo-Fi block (0x894ddf80): the Filter's Env depth by A, Balance's by B.
 XtLofiBlock XtSynth::lofiBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtLofiParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.bitDown = c.lofiBit; p.rateDown = c.lofiRate; p.filter = c.lofiFilter + m[xtmx::CosmPrm1]; p.filterKf = c.lofiFilterKf / 10;
@@ -547,7 +610,8 @@ XtLofiBlock XtSynth::lofiBlock(const Voice& v, int k) const {
 
 // A Compressor's block (0x894ddc50).
 XtCompBlock XtSynth::compBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtCompParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.attack = c.compAttack + m[xtmx::CosmPrm1]; p.sustain = c.compSustain + m[xtmx::CosmPrm2]; p.level = c.compLevel;
@@ -556,7 +620,8 @@ XtCompBlock XtSynth::compBlock(const Voice& v, int k) const {
 
 // A Wave Shape block (0x894dcbf0): Drive's Env depth by A, Tone's by B.
 XtWsBlock XtSynth::wsBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtWsParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.type = c.wsType; p.level = c.wsLevel; p.drive = c.wsDrive + m[xtmx::CosmPrm1]; p.driveLfo = c.wsDriveLfo + m[xtmx::CosmLfoPrm1]; p.driveEnv = c.wsDriveEnv;
@@ -567,7 +632,8 @@ XtWsBlock XtSynth::wsBlock(const Voice& v, int k) const {
 
 // An OD/Dist block (0x894dc8b0): Drive's Env depth by A, Tone's by B.
 XtOdBlock XtSynth::odBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtOdParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.type = c.odType; p.level = c.odLevel; p.drive = c.odDrive + m[xtmx::CosmPrm1]; p.driveLfo = c.odDriveLfo + m[xtmx::CosmLfoPrm1]; p.driveEnv = c.odDriveEnv;
@@ -578,7 +644,8 @@ XtOdBlock XtSynth::odBlock(const Voice& v, int k) const {
 
 // An Amp Simulator block (0x894dcd80): Gain's Env depth by A.
 XtAmpBlock XtSynth::ampBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtAmpParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.type = c.ampType; p.bass = c.ampBass; p.middle = c.ampMiddle; p.treble = c.ampTreble + m[xtmx::CosmPrm2]; p.level = c.ampLevel;
@@ -588,7 +655,8 @@ XtAmpBlock XtSynth::ampBlock(const Voice& v, int k) const {
 
 // A Limiter's block (0x894ddd20).
 XtLimBlock XtSynth::limBlock(const Voice& v, int k) const {
-    const Controls::Cosm& c = ctl.cosm[k];
+    const Controls& Z = zc(v);
+    const Controls::Cosm& c = Z.cosm[k];
     XtLimParams p;
     const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);
     p.threshold = c.limThreshold; p.ratio = c.limRatio; p.attack = c.limAttack + m[xtmx::CosmPrm1]; p.release = c.limRelease + m[xtmx::CosmPrm2]; p.level = c.limLevel;
@@ -601,6 +669,7 @@ XtLimBlock XtSynth::limBlock(const Voice& v, int k) const {
 // the Comb and Side Band
 // Filters' Detune (envB).
 void XtSynth::cosmSetBlock(Voice& v, int k) {
+    const Controls& Z = zc(v);
     Voice::CosmVoice& c = v.cs[k];
     if (c.type == 4) { c.comb.setBlock(combBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo); return; }
     if (c.type == 5 || c.type == 6) { c.sbf.setBlock(sbfBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo); return; }
@@ -612,7 +681,7 @@ void XtSynth::cosmSetBlock(Voice& v, int k) {
     if (c.type == 12) { c.ws.setBlock(wsBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
     if (c.type == 13) { c.od.setBlock(odBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo); return; }
     if (c.type == 14) { c.amp.setBlock(ampBlock(v, k), c.heldA, c.heldLfo); return; }
-    if (c.type == 15) { c.spk.setBlock({ ctl.cosm[k].spkType }); return; }
+    if (c.type == 15) { c.spk.setBlock({ Z.cosm[k].spkType }); return; }
     if (c.type == 2) c.dual.setBlock(dualBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo);
     else if (c.type == 3) c.tb.setBlock(tbBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo);
     else c.tvf.setBlock(cosmBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo);
@@ -628,23 +697,25 @@ float XtSynth::drawSeed() {
 }
 
 XtEnvParams XtSynth::oscEnvParams(const Voice& v, const OscVoice& s, int which, int a, int d, int su, int r) const {
+    const Controls& Z = zc(v);
     XtEnvKnobs k;
     const int16_t* m = v.mx + (&s == &v ? xtmx::OscEnv : xtmx::Osc2Env) + 3 * which;
     k.tempo10 = v.tempo10;
     k.attack = withSum(a, m[0]); k.decay = withSum(d, m[1]); k.sustain = su; k.release = withSum(r, m[2]);
-    const OscControls& o = &s == &v ? static_cast<const OscControls&>(ctl) : ctl.osc2;
+    const OscControls& o = &s == &v ? static_cast<const OscControls&>(Z) : Z.osc2;
     const OscControls::EnvVelocity& e = which == 0 ? o.pVel : which == 1 ? o.tVel : o.fVel;
     k.aSens = e.aSens; k.dSens = e.dSens; k.rSens = e.rSens; k.timeKF = e.timeKF;
     return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);
 }
 
 XtEnvParams XtSynth::envParams(const Voice& v) const {
+    const Controls& Z = zc(v);
     XtEnvKnobs k;
     k.tempo10 = v.tempo10;
-    k.attack = withSum(ctl.attack, v.mx[xtmx::TvaEnv]); k.decay = withSum(ctl.decay, v.mx[xtmx::TvaEnv + 1]); k.sustain = ctl.sustain; k.release = withSum(ctl.release, v.mx[xtmx::TvaEnv + 2]);
-    k.aSens = ctl.aSens; k.dSens = ctl.dSens; k.rSens = ctl.rSens; k.timeKF = ctl.timeKF;
+    k.attack = withSum(Z.attack, v.mx[xtmx::TvaEnv]); k.decay = withSum(Z.decay, v.mx[xtmx::TvaEnv + 1]); k.sustain = Z.sustain; k.release = withSum(Z.release, v.mx[xtmx::TvaEnv + 2]);
+    k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens; k.timeKF = Z.timeKF;
     XtEnvParams p = xtEnvAdsr(k, v.note, v.vel, v.relVel);
-    if (!ctl.tvaOn) {                                  // the TVA Switch off: no times, level 1
+    if (!Z.tvaOn) {                                  // the TVA Switch off: no times, level 1
         for (float& t : p.time) t = 0.0f;
         p.level[3] = 1.0f;
     }
@@ -652,11 +723,30 @@ XtEnvParams XtSynth::envParams(const Voice& v) const {
 }
 
 // New knob values reach a playing voice at the next update (mixBlock),
-// through the voice update's smoothing, as on the XT.
+// through the voice update's smoothing, as on the XT.  Any change is an update of every note of the part (0x894d7760), whatever its zone,
+// and each reads its own zone's settings again: a voice on another zone sees only what of zone 1's it reads, the patch's common.
 void XtSynth::setControls(const Controls& c) {
-    const bool tvaChanged = c.tvaOn != ctl.tvaOn;
-    const bool envChanged = tvaChanged || c.attack != ctl.attack || c.decay != ctl.decay || c.sustain != ctl.sustain || c.release != ctl.release
-                         || c.aSens != ctl.aSens || c.dSens != ctl.dSens || c.rSens != ctl.rSens || c.timeKF != ctl.timeKF;
+    const bool anyChanged = !(c == ctl);
+    // what each sounding zone had: a voice's update compares its own zone's settings
+    bool sounding[kZones] = {};
+    if (anyChanged)
+        for (const Voice& v : voice)
+            if (v.active && !sounding[v.zone]) { sounding[v.zone] = true; zoneWas[v.zone] = zc(v.zone); }
+    ctl = c;
+    clockFollow();
+    if (!anyChanged) return;
+    zonesFollow();
+    // the MOD's converter, zone 1's: the other zones' are the patch's, formed when they came (pickUpSample).  What one type
+    // leaves the next keeps, and the same settings give the same block
+    xtModBlock(ctl.mod, modBlk[0]);
+    for (Voice& v : voice)
+        if (v.active) liveUpdate(v, zc(v), zoneWas[v.zone], anyChanged);
+}
+
+void XtSynth::liveUpdate(Voice& v, const Controls& c, const Controls& was, bool anyChanged) {
+    const bool tvaChanged = c.tvaOn != was.tvaOn;
+    const bool envChanged = tvaChanged || c.attack != was.attack || c.decay != was.decay || c.sustain != was.sustain || c.release != was.release
+                         || c.aSens != was.aSens || c.dSens != was.dSens || c.rSens != was.rSens || c.timeKF != was.timeKF;
     // what changed for each OSC.  The tone update also gives the voices' pitch
     // ramps the new portamento settings (0x894ebd34 → 0x894f48b0) and, when the
     // key-follow key moved (Coarse, Pitch KF), glides again from the voice's
@@ -669,12 +759,12 @@ void XtSynth::setControls(const Controls& c) {
         d.fenv = n.fAttack != o.fAttack || n.fDecay != o.fDecay || n.fSustain != o.fSustain || n.fRelease != o.fRelease || n.fVel != o.fVel;
         d.oenv = n.oAttack != o.oAttack || n.oDecay != o.oDecay || n.oSustain != o.oSustain || n.oRelease != o.oRelease
               || n.oASens != o.oASens || n.oDSens != o.oDSens || n.oRSens != o.oRSens || n.oTimeKF != o.oTimeKF;
-        d.key = n.oscCoarse != o.oscCoarse || c.patchCoarse != ctl.patchCoarse || n.pitchKF != o.pitchKF || c.pitchSemis != ctl.pitchSemis;
+        d.key = n.oscCoarse != o.oscCoarse || c.patchCoarse != was.patchCoarse || n.pitchKF != o.pitchKF || c.pitchSemis != was.pitchSemis;
         return d;
     };
-    const OscDiff d1 = oscDiff(c, ctl), d2 = oscDiff(c.osc2, ctl.osc2);
-    const bool portaChanged = c.portamento != ctl.portamento || c.portaTime != ctl.portaTime || c.portaVeloSens != ctl.portaVeloSens
-                           || c.portaType != ctl.portaType;
+    const OscDiff d1 = oscDiff(c, was), d2 = oscDiff(c.osc2, was.osc2);
+    const bool portaChanged = c.portamento != was.portamento || c.portaTime != was.portaTime || c.portaVeloSens != was.portaVeloSens
+                           || c.portaType != was.portaType;
     // Any change is a tone update (0x894dc0b0), and it gives the sounding voices' COSM
     // sections (0x894ed8f0) and MOD (0x894f1c60) a new block, whatever moved: a block's
     // targets take the envelopes' levels without their rates, and the MOD's clears an
@@ -684,54 +774,44 @@ void XtSynth::setControls(const Controls& c) {
         return a.attack != b.attack || a.decay != b.decay || a.sustain != b.sustain || a.release != b.release || a.aSens != b.aSens
             || a.dSens != b.dSens || a.rSens != b.rSens || a.timeKF != b.timeKF;
     };
-    const bool anyChanged = !(c == ctl);
     bool cenvAChanged[2], cenvBChanged[2];
     for (int k = 0; k < 2; ++k) {
-        const Controls::Cosm &n = c.cosm[k], &o = ctl.cosm[k];
+        const Controls::Cosm &n = c.cosm[k], &o = was.cosm[k];
         cenvAChanged[k] = envDiff(n.envA, o.envA);
         cenvBChanged[k] = envDiff(n.envB, o.envB);
     }
-    // the MOD's converter
-    const bool modChanged = c.mod.on != ctl.mod.on || c.mod.type != ctl.mod.type || c.mod.level != ctl.mod.level || c.mod.attack != ctl.mod.attack
-                         || c.mod.release != ctl.mod.release;
-    ctl = c;
-    clockFollow();
-    if (modChanged) xtModBlock(ctl.mod, modBlk);
-    for (Voice& v : voice) {
-        if (!v.active) continue;
-        const bool moved = anyChanged && matrixUpdate(v);   // a sum moved: each setting as a tone update gives it
-        if (anyChanged && ctl.on) v.blockTempo = tempoNow();
-        if (envChanged || moved) v.env.update(envParams(v));
-        if (anyChanged) tvaNewBlock(v);                // the velocity as latched
-        auto oscLive = [&](OscVoice& s, const OscControls& o, const OscDiff& d) {
-            if (d.penv || moved) s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
-            if (d.tenv || moved) s.tenv.update(oscEnvParams(v, s, 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease));
-            if (d.fenv || moved) s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));
-            if (d.oenv || moved) s.oenv.update(ampEnvParams(v, o));
-            if (portaChanged) s.porta.update(xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v.vel));
-            if (d.key) {
-                const int k = keyFollowKey(v, o);
-                if (k != s.kfKey) {
-                    s.kfKey = k;
-                    s.porta.restart(noteCents(v, s, o, v.srcKey), noteCents(v, s, o, v.note));
-                }
+    const bool moved = anyChanged && matrixUpdate(v);   // a sum moved: each setting as a tone update gives it
+    if (anyChanged && c.on) v.blockTempo = tempoNow();
+    if (envChanged || moved) v.env.update(envParams(v));
+    if (anyChanged) tvaNewBlock(v);                // the velocity as latched
+    auto oscLive = [&](OscVoice& s, const OscControls& o, const OscDiff& d) {
+        if (d.penv || moved) s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
+        if (d.tenv || moved) s.tenv.update(oscEnvParams(v, s, 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease));
+        if (d.fenv || moved) s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));
+        if (d.oenv || moved) s.oenv.update(ampEnvParams(v, o));
+        if (portaChanged) s.porta.update(xtPortaSettings(c.portamento, c.portaType, c.portaTime, c.portaVeloSens, v.vel));
+        if (d.key) {
+            const int k = keyFollowKey(v, o);
+            if (k != s.kfKey) {
+                s.kfKey = k;
+                s.porta.restart(noteCents(v, s, o, v.srcKey), noteCents(v, s, o, v.note));
             }
-        };
-        if (v.on) oscLive(v, ctl, d1);
-        if (v.osc2.on) oscLive(v.osc2, ctl.osc2, d2);
-        if (anyChanged) { oscBeat(v, ctl); oscBeat(v.osc2, ctl.osc2); }
-        if (anyChanged) v.mod.setBlock(modBlk);
-        for (int k = 0; k < 2; ++k) {
-            Voice::CosmVoice& cv = v.cs[k];
-            if (!cv.on) continue;
-            // the block first (0x894dba00: 0x894f5d10, then 0x894f5cc0), on the held levels:
-            // a Sustain moved reaches it at the next tick, however many updates come first
-            if (anyChanged) cosmSetBlock(v, k);
-            if (cenvAChanged[k] || moved) cv.envA.update(cosmEnvParams(v, k, ctl.cosm[k].envA));
-            if (cenvBChanged[k] || moved) cv.envB.update(cosmEnvParams(v, k, ctl.cosm[k].envB));
         }
-        if (anyChanged) lfoUpdates(v);
+    };
+    if (v.on) oscLive(v, c, d1);
+    if (v.osc2.on) oscLive(v.osc2, c.osc2, d2);
+    if (anyChanged) { oscBeat(v, c); oscBeat(v.osc2, c.osc2); }
+    if (anyChanged) v.mod.setBlock(modBlk[v.zone]);
+    for (int k = 0; k < 2; ++k) {
+        Voice::CosmVoice& cv = v.cs[k];
+        if (!cv.on) continue;
+        // the block first (0x894dba00: 0x894f5d10, then 0x894f5cc0), on the held levels:
+        // a Sustain moved reaches it at the next tick, however many updates come first
+        if (anyChanged) cosmSetBlock(v, k);
+        if (cenvAChanged[k] || moved) cv.envA.update(cosmEnvParams(v, k, c.cosm[k].envA));
+        if (cenvBChanged[k] || moved) cv.envB.update(cosmEnvParams(v, k, c.cosm[k].envB));
     }
+    if (anyChanged) lfoUpdates(v);
 }
 
 int XtSynth::shiftKey(int key) const {
@@ -739,9 +819,10 @@ int XtSynth::shiftKey(int key) const {
 }
 
 int XtSynth::keyFollowKey(const Voice& v, const OscControls& o) const {
-    const long shift = std::lround((double)ctl.pitchSemis * 100.0);
+    const Controls& Z = zc(v);
+    const long shift = std::lround((double)Z.pitchSemis * 100.0);
     XtTuning t;
-    t.coarse = ctl.patchCoarse + (int)std::lround((double)shift / 100.0);
+    t.coarse = Z.patchCoarse + (int)std::lround((double)shift / 100.0);
     return xtKeyFollowKey(v.note, xtNoteCoarse(t, o.oscCoarse), 10 * o.pitchKF);
 }
 
@@ -749,27 +830,30 @@ int XtSynth::keyFollowKey(const Voice& v, const OscControls& o) const {
 // the key takes the Octave Shift (and the system's Transpose, 0 here).
 // POLY: a new voice.  MONO with a key already held and Legato on: the
 // sounding voice takes the note (0x894d4e00).  MONO otherwise: the part's
-// voices are truncated (0x894d4a80) and a new one starts.
+// voices are truncated (0x894d4a80) and a new one starts, on the key's zone.  A legato note keeps the
+// sounding voices' zones (0x894d4e00 takes no zone).
 void XtSynth::noteOn(int note, float velocity) {
     pickUpSample();
-    if (!canPlay()) return;
+    const int key = shiftKey(note), zone = xtZoneOf(zoneUpper, key);
+    if (!canPlay(zone)) return;
     keys.press(note);
     keys.noteOn(note, (int32_t)std::floor((double)hostFrames * 1000.0 / hostRate));
-    const int key = shiftKey(note), vel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
+    const int vel = (int)std::lround(std::clamp(velocity, 0.0f, 1.0f) * 127.0f);
     if (ctl.mono) {
         if (keys.prevMonoHeld && ctl.legato) { legatoNote(key, vel); return; }
         for (Voice& v : voice) if (v.active) truncate(v);
     }
-    startVoice(note, key, vel);
+    startVoice(note, key, vel, zone);
 }
 
-void XtSynth::startVoice(int raw, int note, int vel) {
-    xtModBlock(ctl.mod, modBlk);                       // the tables may have loaded since the last knob moved
+void XtSynth::startVoice(int raw, int note, int vel, int zone) {
+    const Controls& Z = zc(zone);                      // the zone's, all through the note's start
+    xtModBlock(Z.mod, modBlk[zone]);                 // the tables may have loaded since the last knob moved
     // portamento's source key (0x894e4940): the previous key plus the Octave
     // Shift; with LEGATO the note's own (no glide) unless a key was held
     // then (POLY: or Hold is down)
-    const bool held = ctl.mono ? keys.prevMonoHeld : keys.prevPolyHeld || hold >= 64;
-    const int srcKey = ctl.portaMode == 1 && !held ? note : shiftKey(ctl.mono ? keys.prevMono : keys.prevPoly);
+    const bool held = Z.mono ? keys.prevMonoHeld : keys.prevPolyHeld || hold >= 64;
+    const int srcKey = Z.portaMode == 1 && !held ? note : shiftKey(Z.mono ? keys.prevMono : keys.prevPoly);
     Voice* v = nullptr;
     for (Voice& w : voice) if (!w.active) { v = &w; break; }
     if (!v) { v = &voice[0]; for (Voice& w : voice) if (w.age < v->age) v = &w; }   // steal the oldest
@@ -779,46 +863,47 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->ana.release();
     v->osc2.ana.release();
     v->active = true;
+    v->zone = zone;
     v->releasing = false;
     v->damping = false;
     v->note = note;
     v->raw = raw;
     v->srcKey = srcKey;
     v->age = clock++;
-    v->structure = std::clamp(ctl.structure, 0, 2);
+    v->structure = std::clamp(Z.structure, 0, 2);
     v->vel = vel;
     v->relVel = 64;
     v->keyFlags = 7;
     v->mVel = vel; v->mKey = note; v->mRaw = raw;
     matrixUpdate(*v);
     v->tempo10 = tempo10Now();
-    if (ctl.on) v->blockTempo = tempoNow();
-    v->on = oscPlays(ctl);
-    v->osc2.on = oscPlays(ctl.osc2);
-    v->analog = ctl.oscType == 0;
-    v->osc2.analog = ctl.osc2.oscType == 0;
-    v->wave = waveOf(ctl);
-    v->osc2.wave = waveOf(ctl.osc2);
-    v->robotKnob = ctl.robot && v->on && !v->analog && v->wave->type == 1;   // SOLO only (the converter's SOLO tail)
-    v->osc2.robotKnob = ctl.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;
-    v->robot = v->robotKnob && ctl.vari;                                     // the block's flag 0x10 takes Vari Sw on too
-    v->osc2.robot = v->osc2.robotKnob && ctl.osc2.vari;
+    if (Z.on) v->blockTempo = tempoNow();
+    v->on = oscPlays(zone, 0);
+    v->osc2.on = oscPlays(zone, 1);
+    v->analog = Z.oscType == 0;
+    v->osc2.analog = Z.osc2.oscType == 0;
+    v->wave = waveOf(zone, 0);
+    v->osc2.wave = waveOf(zone, 1);
+    v->robotKnob = Z.robot && v->on && !v->analog && v->wave->type == 1;   // SOLO only (the converter's SOLO tail)
+    v->osc2.robotKnob = Z.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;
+    v->robot = v->robotKnob && Z.vari;                                     // the block's flag 0x10 takes Vari Sw on too
+    v->osc2.robot = v->osc2.robotKnob && Z.osc2.vari;
     v->lite = v->on && !v->analog && v->wave->type == 0;
-    v->linear = !ctl.vari && v->on && !v->analog && (v->wave->type == 1 || v->lite);
-    v->variBit = ctl.vari;
-    v->osc2.variBit = ctl.osc2.vari;
-    v->syncBit = ctl.tempoSync;
-    v->osc2.syncBit = ctl.osc2.tempoSync;
+    v->linear = !Z.vari && v->on && !v->analog && (v->wave->type == 1 || v->lite);
+    v->variBit = Z.vari;
+    v->osc2.variBit = Z.osc2.vari;
+    v->syncBit = Z.tempoSync;
+    v->osc2.syncBit = Z.osc2.tempoSync;
     v->osc2.lite = v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 0;
     // A LITE voice's root frequency (+0x9a4), which its Vari-on player's period and filter go by
-    if (v->lite) v->root = xtCosmRootHz(ctl.rootKey, false, v->wave->tune.offset, v->wave->tune.detune);
-    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(ctl.osc2.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);
-    v->osc2.linear = !ctl.osc2.vari && v->osc2.on && !v->osc2.analog && (v->osc2.wave->type == 1 || v->osc2.lite);
+    if (v->lite) v->root = xtCosmRootHz(Z.rootKey, false, v->wave->tune.offset, v->wave->tune.detune);
+    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(Z.osc2.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);
+    v->osc2.linear = !Z.osc2.vari && v->osc2.on && !v->osc2.analog && (v->osc2.wave->type == 1 || v->osc2.lite);
     // the OSCs' random pitch (0x894e4940, OSC 1 then 2, each whatever its
     // Switch): the shared generator steps once per note for an OSC with a depth
-    v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
-    v->osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
-    v->velGain = xtVelGain(v->vel, ctl.ampVelSens, ctl.ampVelCurve);
+    v->rnd = pitchRandom.next(xtRandomPitchDepth(Z.randomPitch));
+    v->osc2.rnd = pitchRandom.next(xtRandomPitchDepth(Z.osc2.randomPitch));
+    v->velGain = xtVelGain(v->vel, Z.ampVelSens, Z.ampVelCurve);
     v->tb = tvaBlock(*v);
     // the tone is constructed for each note (0x894f5860): LFOs 0…7 draw their
     // chaos seeds, and the pitch ramps (0x894f4860) start off, so the note's
@@ -831,17 +916,17 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     const XtEnvParams ep = envParams(*v);
     v->env.noteOn(ep);
     // The note-on converters set the player directly (0x894f3a00…)
-    // a key-unsynced LFO starts from the newest other tone of the part sounding, if
-    // there is one (the tones' lists at 0x89f91c50/54, newest first), else from its
-    // free-running phase
+    // a key-unsynced LFO starts from the newest other tone of the part and zone sounding, if
+    // there is one (the tones' lists at 0x89f91c50/54, newest first, by the tone's +0x1c), else
+    // from its zone's free-running phase
     const Voice* other = nullptr;
     for (const Voice& w : voice)
-        if (&w != v && w.active && (!other || w.age > other->age)) other = &w;
-    oscLfoNoteOn(*v, *v, ctl, freeLfo, other ? &other->lfo : nullptr, seed[1]);
-    oscLfoNoteOn(*v, v->osc2, ctl.osc2, freeLfo2, other ? &other->osc2.lfo : nullptr, seed[2]);
-    if (ctl.tvaLfoKeySync) v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);
+        if (&w != v && w.active && w.zone == zone && (!other || w.age > other->age)) other = &w;
+    oscLfoNoteOn(*v, *v, Z, freeLfo[zone], other ? &other->lfo : nullptr, seed[1]);
+    oscLfoNoteOn(*v, v->osc2, Z.osc2, freeLfo2[zone], other ? &other->osc2.lfo : nullptr, seed[2]);
+    if (Z.tvaLfoKeySync) v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);
     else if (other) v->tlfo.noteOnFollow(tlfoParams(*v), other->tlfo);
-    else v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo, v->blockTempo);
+    else v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo[zone], v->blockTempo);
     // TVA note-on (0x894f50e0), after the LFOs: the gain starts from the level times the
     // envelope's onset level (full with no attack, else 0) and ramps to the level
     // times its output over the attack time, at most 10 ms (0.1 ms with no attack), each
@@ -855,8 +940,8 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->step[1] = div(sub(v->target[1], v->cur[1]), frames);
     std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);
     v->elapsed = 0;
-    if (v->on) oscEnvNoteOn(*v, *v, ctl);
-    if (v->osc2.on) oscEnvNoteOn(*v, v->osc2, ctl.osc2);
+    if (v->on) oscEnvNoteOn(*v, *v, Z);
+    if (v->osc2.on) oscEnvNoteOn(*v, v->osc2, Z.osc2);
     // the COSM sections (0x894edf70, COSM 1 then 2): their
     // envelopes and LFOs start with the others; the filters' states clear and
     // their coefficients start from the envelopes' start levels
@@ -866,15 +951,15 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     for (int k = 0; k < 2; ++k) {
         Voice::CosmVoice& c = v->cs[k];
         c.holdWords();
-        c.on = ctl.cosm[k].on;
+        c.on = Z.cosm[k].on;
         c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);   // the routines' flag (0x894eef70)
-        if (ctl.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], v->blockTempo);
+        if (Z.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], v->blockTempo);
         else if (other) c.lfo.noteOnFollow(clfoParams(*v, k), other->cs[k].lfo);
-        else c.lfo.noteOnFree(clfoParams(*v, k), seed[3 + k], freeClfo[k], v->blockTempo);
+        else c.lfo.noteOnFree(clfoParams(*v, k), seed[3 + k], freeClfo[zone][k], v->blockTempo);
         if (!c.on) continue;
-        c.type = ctl.cosm[k].type;
-        c.envA.noteOn(cosmEnvParams(*v, k, ctl.cosm[k].envA));
-        c.envB.noteOn(cosmEnvParams(*v, k, ctl.cosm[k].envB));
+        c.type = Z.cosm[k].type;
+        c.envA.noteOn(cosmEnvParams(*v, k, Z.cosm[k].envA));
+        c.envB.noteOn(cosmEnvParams(*v, k, Z.cosm[k].envB));
         c.hold();
         if (c.type == 2)
             c.dual.noteOn(dualBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out(),
@@ -905,16 +990,16 @@ void XtSynth::startVoice(int raw, int note, int vel) {
         else if (c.type == 14)
             c.amp.noteOn(ampBlock(*v, k), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
         else if (c.type == 15)
-            c.spk.noteOn({ ctl.cosm[k].spkType });
+            c.spk.noteOn({ Z.cosm[k].spkType });
         else if (c.type >= 4)
             ;                                          // below, once the voice's pitch is set
         else
             c.tvf.noteOn(cosmBlock(*v, k), c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out(),
                          c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
     }
-    if (v->on) targets(*v, *v, ctl, v->curA, v->curF, v->curWalk, v->curG, true);
+    if (v->on) targets(*v, *v, Z, v->curA, v->curF, v->curWalk, v->curG, true);
     else v->curA = 1.0f;                               // the note-on of an OSC that is off (0x894f2f80, kind 0)
-    if (v->osc2.on) targets(*v, v->osc2, ctl.osc2, v->osc2.curA, v->osc2.curF, v->osc2.curWalk, v->osc2.curG, true);
+    if (v->osc2.on) targets(*v, v->osc2, Z.osc2, v->osc2.curA, v->osc2.curF, v->osc2.curWalk, v->osc2.curG, true);
     else v->osc2.curA = 1.0f;
     // the Comb and Side Band Filters' note-ons read the voice's pitch ratio
     // (+0x144) and root frequency (+0x9a4) as the voice's own note-on leaves
@@ -927,7 +1012,7 @@ void XtSynth::startVoice(int raw, int note, int vel) {
         const bool second = xtCosmOsc(v->structure, k) != 0;
         const OscVoice& s = second ? v->osc2 : *v;
         const XtWaveTune tune = s.on && !s.analog && s.wave ? s.wave->tune : XtWaveTune{};
-        const float root = xtCosmRootHz(second ? ctl.osc2.rootKey : ctl.rootKey, s.robot || s.analog || !s.on, tune.offset, tune.detune);   // the analog voice's root is 440 too (0x894f21c0)
+        const float root = xtCosmRootHz(second ? Z.osc2.rootKey : Z.rootKey, s.robot || s.analog || !s.on, tune.offset, tune.detune);   // the analog voice's root is 440 too (0x894f21c0)
         if (c.type == 4)
             c.comb.noteOn(combBlock(*v, k), s.curA, root, c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(),
                           c.lfo.out(), c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
@@ -937,19 +1022,19 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     }
     // the voices' note-ons, OSC 1 then OSC 2 (0x894f21c0): SUPER-SAW's counter
     // and FEEDBACK-OSC's lines go in that order
-    if (v->on) oscStart(*v, *v, ctl);
-    if (v->osc2.on) oscStart(*v, v->osc2, ctl.osc2);
+    if (v->on) oscStart(*v, *v, Z);
+    if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);
     // portamento (0x894f2440, after the voice setup): the pitch ramp from the
     // source key's cents to the note's; it moves from the next update on
     auto portaStart = [&](OscVoice& s, const OscControls& o) {
         s.kfKey = keyFollowKey(*v, o);
         s.porta.start(noteCents(*v, s, o, srcKey), noteCents(*v, s, o, note),
-                      xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v->vel));
+                      xtPortaSettings(Z.portamento, Z.portaType, Z.portaTime, Z.portaVeloSens, v->vel));
     };
-    if (v->on) portaStart(*v, ctl);
-    if (v->osc2.on) portaStart(v->osc2, ctl.osc2);
+    if (v->on) portaStart(*v, Z);
+    if (v->osc2.on) portaStart(v->osc2, Z.osc2);
     // the MOD (0x894f1b00, 0x894f1d90)
-    v->mod.noteOn(modBlk, stereo(*v), stereo(v->osc2), v->on && v->analog, modShared, (int)(v - voice));
+    v->mod.noteOn(modBlk[zone], stereo(*v), stereo(v->osc2), v->on && v->analog, modShared, (int)(v - voice));
 }
 
 // An OSC's LFO at note-on, whatever its Switch: every LFO of the tone starts
@@ -982,7 +1067,7 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     const bool tripNow = o.timeTrip && pad.on();
     if (s.analog) {   // the analog note-on (0x89504af0): Fat on the formant envelope, the Pulse Width on the time envelope
         XtAnalogBlock b = analogBlock(v, s, o);
-        if (&s == &v.osc2 && modBlk.type == 4 && b.code == 10) b.code = 2;   // the tone's note-on (0x894f6148): under OSC SYNC OSC 2 plays LA-SAW as SAW
+        if (&s == &v.osc2 && modBlk[v.zone].type == 4 && b.code == 10) b.code = 2;   // the tone's note-on (0x894f6148): under OSC SYNC OSC 2 plays LA-SAW as SAW
         s.ana.noteOn(b, s.curA, s.curGain, gainStart, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared);
     }
     else if (s.linear) {
@@ -1039,17 +1124,18 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
 void XtSynth::legatoNote(int key, int vel) {
     for (Voice& v : voice) {
         if (!v.active || v.releasing || v.damping) continue;
+        const Controls& Z = zc(v);                     // its own zone's
         v.note = key;
         v.raw = keys.cur;
         v.srcKey = shiftKey(keys.prevMono);
         v.vel = vel;
         v.keyFlags = 7;
         matrixUpdate(v);                               // for the pad, which moves its source with no update of its own
-        v.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
-        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(ctl.osc2.randomPitch));
-        v.velGain = xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve);
+        v.rnd = pitchRandom.next(xtRandomPitchDepth(Z.randomPitch));
+        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(Z.osc2.randomPitch));
+        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);
         tvaNewBlock(v);
-        if (ctl.on) v.blockTempo = tempoNow();
+        if (Z.on) v.blockTempo = tempoNow();
         v.env.update(envParams(v));
         auto oscUpdate = [&](OscVoice& s, const OscControls& o) {
             s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
@@ -1057,28 +1143,28 @@ void XtSynth::legatoNote(int key, int vel) {
             s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));
             s.oenv.update(ampEnvParams(v, o));
         };
-        if (v.on) oscUpdate(v, ctl);
-        if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);
-        oscBeat(v, ctl);
-        oscBeat(v.osc2, ctl.osc2);
-        v.mod.setBlock(modBlk);
+        if (v.on) oscUpdate(v, Z);
+        if (v.osc2.on) oscUpdate(v.osc2, Z.osc2);
+        oscBeat(v, Z);
+        oscBeat(v.osc2, Z.osc2);
+        v.mod.setBlock(modBlk[v.zone]);
         for (int k = 0; k < 2; ++k) {
             if (!v.cs[k].on) continue;
             cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update
-            v.cs[k].envA.update(cosmEnvParams(v, k, ctl.cosm[k].envA));
-            v.cs[k].envB.update(cosmEnvParams(v, k, ctl.cosm[k].envB));
+            v.cs[k].envA.update(cosmEnvParams(v, k, Z.cosm[k].envA));
+            v.cs[k].envB.update(cosmEnvParams(v, k, Z.cosm[k].envB));
         }
         lfoUpdates(v);
         auto oscGlide = [&](OscVoice& s, const OscControls& o) {
-            s.porta.update(xtPortaSettings(ctl.portamento, ctl.portaType, ctl.portaTime, ctl.portaVeloSens, v.vel));
+            s.porta.update(xtPortaSettings(Z.portamento, Z.portaType, Z.portaTime, Z.portaVeloSens, v.vel));
             const int k = keyFollowKey(v, o);
             if (k != s.kfKey) {
                 s.kfKey = k;
                 s.porta.restart(noteCents(v, s, o, v.srcKey), noteCents(v, s, o, v.note));
             }
         };
-        if (v.on) oscGlide(v, ctl);
-        if (v.osc2.on) oscGlide(v.osc2, ctl.osc2);
+        if (v.on) oscGlide(v, Z);
+        if (v.osc2.on) oscGlide(v.osc2, Z.osc2);
     }
 }
 
@@ -1119,6 +1205,7 @@ void XtSynth::keyRelease(Voice& v, int velocity) {
 // The note's release (0x894dc270).  The release time follows the note-off velocity (R-Sens):
 // the times are converted again before the release starts.
 void XtSynth::voiceOff(Voice& v) {
+    const Controls& Z = zc(v);
     v.releasing = true;
     v.relVel = v.relHeld;
     matrixRelease(v);
@@ -1136,14 +1223,14 @@ void XtSynth::voiceOff(Voice& v) {
         s.oenv.noteOff();
         s.lfo.noteOff();
     };
-    if (v.on) oscRelease(v, ctl);
-    if (v.osc2.on) oscRelease(v.osc2, ctl.osc2);
+    if (v.on) oscRelease(v, Z);
+    if (v.osc2.on) oscRelease(v.osc2, Z.osc2);
     for (int k = 0; k < 2; ++k) {
         Voice::CosmVoice& c = v.cs[k];
         if (!c.on) continue;
-        c.envA.update(cosmEnvParams(v, k, ctl.cosm[k].envA));
+        c.envA.update(cosmEnvParams(v, k, Z.cosm[k].envA));
         c.envA.noteOff();
-        c.envB.update(cosmEnvParams(v, k, ctl.cosm[k].envB));
+        c.envB.update(cosmEnvParams(v, k, Z.cosm[k].envB));
         c.envB.noteOff();
         c.lfo.noteOff();
     }
@@ -1237,11 +1324,12 @@ void XtSynth::controller(int number, int value) {
 }
 
 void XtSynth::newBlocks(Voice& v) {
+    const Controls& Z = zc(v);
     const bool moved = matrixUpdate(v);
-    if (ctl.on) v.blockTempo = tempoNow();
-    oscBeat(v, ctl);
-    oscBeat(v.osc2, ctl.osc2);
-    v.mod.setBlock(modBlk);
+    if (Z.on) v.blockTempo = tempoNow();
+    oscBeat(v, Z);
+    oscBeat(v.osc2, Z.osc2);
+    v.mod.setBlock(modBlk[v.zone]);
     tvaNewBlock(v);
     for (int k = 0; k < 2; ++k)
         if (v.cs[k].on) cosmSetBlock(v, k);
@@ -1253,14 +1341,16 @@ void XtSynth::newBlocks(Voice& v) {
 // on a note value that is more than its own knobs: a key-unsynced note starts with the clock step
 // of the tone it follows, and this sets its own.
 void XtSynth::lfoUpdates(Voice& v) {
-    v.lfo.update(lfoParams(v, v, ctl));
-    v.osc2.lfo.update(lfoParams(v, v.osc2, ctl.osc2));
+    const Controls& Z = zc(v);
+    v.lfo.update(lfoParams(v, v, Z));
+    v.osc2.lfo.update(lfoParams(v, v.osc2, Z.osc2));
     for (int k = 0; k < 2; ++k) v.cs[k].lfo.update(clfoParams(v, k));
     v.tlfo.update(tlfoParams(v));
 }
 
 // Every envelope's settings again, as any tone update gives them (0x894dba00), when a sum has moved them.
 void XtSynth::updateAll(Voice& v) {
+    const Controls& Z = zc(v);
     v.env.update(envParams(v));
     auto osc = [&](OscVoice& s, const OscControls& o) {
         s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));
@@ -1268,13 +1358,13 @@ void XtSynth::updateAll(Voice& v) {
         s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));
         s.oenv.update(ampEnvParams(v, o));
     };
-    if (v.on) osc(v, ctl);
-    if (v.osc2.on) osc(v.osc2, ctl.osc2);
+    if (v.on) osc(v, Z);
+    if (v.osc2.on) osc(v.osc2, Z.osc2);
     for (int k = 0; k < 2; ++k) {
         Voice::CosmVoice& c = v.cs[k];
         if (!c.on) continue;
-        c.envA.update(cosmEnvParams(v, k, ctl.cosm[k].envA));
-        c.envB.update(cosmEnvParams(v, k, ctl.cosm[k].envB));
+        c.envA.update(cosmEnvParams(v, k, Z.cosm[k].envA));
+        c.envB.update(cosmEnvParams(v, k, Z.cosm[k].envB));
     }
 }
 
@@ -1443,10 +1533,12 @@ void XtSynth::clockTick() {
     float dt = mul(flt((int32_t)(clockBlocks - clockLast)), kBlockSeconds);
     if (dt == 0.0f) dt = kBlockSeconds;
     clockLast = clockBlocks;
-    freeLfo.clock(dt);
-    freeLfo2.clock(dt);
-    for (XtLfoFree& f : freeClfo) f.clock(dt);
-    freeTlfo.clock(dt);
+    for (int z = 0; z < kZones; ++z) {
+        freeLfo[z].clock(dt);
+        freeLfo2[z].clock(dt);
+        for (XtLfoFree& f : freeClfo[z]) f.clock(dt);
+        freeTlfo[z].clock(dt);
+    }
     for (Voice& v : voice) {
         if (!v.active) continue;
         auto oscClock = [&](OscVoice& s) {
@@ -1518,10 +1610,12 @@ void XtSynth::mixBlock(float* lr) {
     if (tick) tickCount -= kTickFrames;
     tickCount += 32;
     if (tick) {
-        freeLfo.tick(1);
-        freeLfo2.tick(1);
-        for (XtLfoFree& f : freeClfo) f.tick(1);
-        freeTlfo.tick(1);
+        for (int z = 0; z < kZones; ++z) {
+            freeLfo[z].tick(1);
+            freeLfo2[z].tick(1);
+            for (XtLfoFree& f : freeClfo[z]) f.tick(1);
+            freeTlfo[z].tick(1);
+        }
     }
     if (!cur && std::none_of(std::begin(voice), std::end(voice), [](const Voice& v) { return v.active; })) { busOut(lr); return; }   // the effects' tails go on
     float tmp[64], tmp2[64];
@@ -1575,8 +1669,8 @@ void XtSynth::mixBlock(float* lr) {
                     applyRates(s);
                 }
             };
-            if (v.on) oscUpdate(v, ctl);
-            if (v.osc2.on) oscUpdate(v.osc2, ctl.osc2);
+            if (v.on) oscUpdate(v, zc(v));
+            if (v.osc2.on) oscUpdate(v.osc2, zc(v).osc2);
             // the COSM updates (0x894ee6a0, COSM 1 then 2), after the voices', before the TVA
             for (int k = 0; k < 2; ++k) {
                 Voice::CosmVoice& c = v.cs[k];

@@ -70,10 +70,15 @@ public:
     // A V-Synth wave (.vpw, or a project's .wav) brings its own Original Key, Tempo, loop and fine tuning to OSC's parameters unless waveSettings is false, as for a saved
     // session whose parameters came back with it.
     void loadFile(const juce::File& file, int osc = 0, bool waveSettings = true);
-    // Message thread.  A V-Synth patch (.p00): one zone of it to the parameters and the effects, and the waves it names, from the Wave folder beside its own.  False, and the status
-    // says why, if it's no patch.  The effects sound only with the Effects switch on, which a patch leaves as it is.  The name, and what it asks for that isn't here (XtPatch.h), for the editor.
+    // Message thread.  A V-Synth patch (.p00): zone 1 to the parameters and the effects, and the waves it names, from the Wave folder beside its own; zones 2…16 as the
+    // patch's data, each its own settings and waves, which notes play by the upper keys (the user's decision, 2026-11-05: the parameters and editor stay on zone 1).  False,
+    // and the status says why, if it's no patch.  The effects sound only with the Effects switch on, which a patch leaves as it is.  The name, and what it asks for that isn't
+    // here (XtPatch.h), for the editor.  applyPatch's `zone` is the one put on the parameters, 0 but in PluginTest (each zone's values through them).
     bool loadPatch(const juce::File& file, int zone = 0);
     void applyPatch(const std::string& name, const std::vector<uint8_t>& store, int zone, const juce::File& waveFolder);
+    // How many zones the patch loaded last plays (1 for none), and whether its zones' waves are all encoded and in the synth.
+    int patchZones() const { return patchZones_.load(); }
+    bool zonesReady() const { return zonesReady_.load(); }
     juce::String getPatchName() const { return patchName_; }
     juce::String getPatchNote() const { return patchNote_; }
     juce::File lastPatchFolder() const;
@@ -145,6 +150,11 @@ private:
     };
     LoadedWave               wave_[2];
     juce::CriticalSection    bufferLock_;
+    // A patch's zones 2…16: their settings at once, and again with their waves once the pool has encoded them (each wave once, as its own
+    // type).  A newer patch discards an older one's.  The store and the wave folder go in the session, for its zones to come back.
+    void loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes);
+    std::atomic<int>         zonesGen_ { 0 }, patchZones_ { 1 };
+    std::atomic<bool>        zonesReady_ { true };
 
     // ── Encoding (background) ────────────────────────────────────────────────
     juce::ThreadPool encodePool_ { 1 };

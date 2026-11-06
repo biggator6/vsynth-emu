@@ -260,24 +260,28 @@ env 30 70 90 50 80 500 2: identical
 tone, the SOLO records of vocal.bin: 0 different of 461
 tone, the SOLO records of drum.bin: 0 different of 609
 patches: 512, 1558 zones, 544700 values, 0 different; 448512 of their effects' values, 0 different
-tone: 4389 notes, 2472 taken by a sounding tone, 334 truncated, 382387 blocks, 31399256 checks
+tone: 4389 notes, 2472 taken by a sounding tone, 334 truncated, 382387 blocks, 31403645 checks
 tone: 0 notes left off, a read outside memory; 299520 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1348 notes, 383 taken by a sounding tone, 172 truncated, 120060 blocks, 11780105 checks
+tone, a wave on OSC 2: 1348 notes, 383 taken by a sounding tone, 172 truncated, 120060 blocks, 11781453 checks
 tone, a wave on OSC 2: 0 notes left off, a read outside memory; 663076 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 241012 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 241060 checks
 tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
-tone, the firmware's patches: 721 notes, 175 taken by a sounding tone, 22 truncated, 58847 blocks, 5937445 checks
+tone, the firmware's patches: 721 notes, 175 taken by a sounding tone, 22 truncated, 58847 blocks, 5938166 checks
 tone, the firmware's patches: 0 notes left off, a read outside memory; 41600 band reads far from their wave
 tone, the firmware's patches: 0 different
-tone, a wave's own tuning: 669 notes, 187 taken by a sounding tone, 87 truncated, 57998 blocks, 5096471 checks
+tone, a wave's own tuning: 669 notes, 187 taken by a sounding tone, 87 truncated, 57998 blocks, 5097140 checks
 tone, a wave's own tuning: 0 notes left off, a read outside memory; 165590 band reads far from their wave
 tone, a wave's own tuning: 0 different
-tone, LITE waves: 674 notes, 192 taken by a sounding tone, 78 truncated, 60560 blocks, 5793054 checks
+tone, LITE waves: 674 notes, 192 taken by a sounding tone, 78 truncated, 60560 blocks, 5793728 checks
 tone, LITE waves: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, LITE waves: 0 different
+tone, zones: 556 notes on zones 2 to 16, 15 of those zones
+tone, zones: 673 notes, 195 taken by a sounding tone, 86 truncated, 58588 blocks, 5684128 checks
+tone, zones: 0 notes left off, a read outside memory; 151804 band reads far from their wave
+tone, zones: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
 tone, the clock's rate: 0 notes left off, a read outside memory; 0 band reads far from their wave

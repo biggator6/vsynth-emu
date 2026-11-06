@@ -175,6 +175,15 @@ MUTS=[
  ('patch-loop-step',PP,'Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f)','Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f, 0.5f)','patch'),
  ('patch-tempo-step',PP,'Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.0001f)','Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.01f)','patch'),
  ('patch-folder-kept',PP,'settings->setValue(kPatchFolderKey, file.getParentDirectory().getFullPathName());',';','patch'),
+ ('zones-store',PP,'apvts.state.setProperty("patchStore", zones > 1 ? juce::Base64::toBase64(store.data(), store.size()) : juce::String(), nullptr);',';','patch'),
+ ('zones-restore',PP,'        loadZones(store, juce::File(apvts.state.getProperty("patchWaves").toString()), unused);','        ;','patch'),
+ ('zones-set',PP,'        synth_.setZones(withWaves);','        ;','patch'),
+ ('zones-wave-settings',PP,'            xtWaveOntoControls(w, o);\n            want.push_back({ z, k, number });','            want.push_back({ z, k, number });','patch'),
+ ('zones-wave-tuning',PP,'            xtWaveOntoEncoded(w, *e);\n            enc[number] = std::move(e);','            enc[number] = std::move(e);','patch'),
+ ('zones-one',PP,'if (zones < 2) { synth_.setZones(nullptr); zonesReady_.store(true); return; }','if (zones < 2) { zonesReady_.store(true); return; }','patch'),
+ ('zones-note',PP,'    notes.add(juce::String(zones) + " zones, zone 1 on the panel");','    ;','patch'),
+ ('zones-wave-number',PP,'            const int number = xtPatchWaveNumber(store, z, k);','            const int number = xtPatchWaveNumber(store, z, 0);','patch'),
+ ('zones-wave-zone',PP,'            const int number = xtPatchWaveNumber(store, z, k);','            const int number = xtPatchWaveNumber(store, 0, k);','patch'),
  ('rom-bad-drops',PP,'if (loaded.isNotEmpty()) xtSynthSetRom(loaded.toStdString());',';','rom'),
 ]
 ROM=os.environ.get('ROM', REPO + '/firmware/unpacked/V-SynthXT.rom.2.bin'); W='analysis/test_files/raw/chord_Cmaj_original.wav'

@@ -188,6 +188,13 @@ XtSynth::Controls xtPatchControls(const std::vector<uint8_t>& store, int zone, c
     return c;
 }
 
+void xtPatchZoneSet(const std::vector<uint8_t>& store, const XtSynth::Controls& base, XtSynth::Zones& z) {
+    for (int i = 0; i < XtSynth::kZones; ++i) {
+        z.upper[i] = xtPatchValue(store, 0x124 + i);
+        if (i) z.ctl[i] = xtPatchControls(store, i, base);
+    }
+}
+
 int xtPatchWaveNumber(const std::vector<uint8_t>& store, int zone, int osc) {
     return xtPatchValue(store, osc ? 0x2f2 : 0x2be, zone);
 }
@@ -215,8 +222,6 @@ void xtWaveOntoEncoded(const XtWaveFile& w, XtEncoded& e) {
 std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone) {
     std::vector<std::string> m;
     const Read p { store, zone };
-    const int zones = xtPatchZones(store);
-    if (zones > 1) m.push_back("zone " + std::to_string(zone + 1) + " of " + std::to_string(zones) + " only");
     for (int n = 0; n < 2; ++n) {
         const int b = 0x34 * n;
         const std::string osc = "OSC " + std::to_string(n + 1) + " ";

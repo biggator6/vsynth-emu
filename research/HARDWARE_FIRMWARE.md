@@ -1546,6 +1546,36 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Zones (2026-11-05, v154)
+
+**The user's decision (2026-11-05):** a patch's zones 2–16 are kept as patch data, so a loaded patch, kits included, plays every zone. The plugin's parameters and editor stay on zone 1. About one in nine of 1stchoice's 502 patches has more than one zone, 49 of them 16-zone kits ("Applying a patch").
+
+**How a note picks its zone.** The part's note-on (`0x894dbcb0`) takes the key with the system's Transpose and the Octave Shift, within 0…127, and walks the part's table (`0x89d021d0` + 22 × part, +6): the first zone whose entry the key isn't above. `0x894794f0` makes the table from the upper keys (IDs 0x124…0x133): each entry the larger of its upper key and the one before, and the sixteenth 127 whatever the patch says. So every key has a zone, an upper key below the one before is passed over (the larger changes no key's zone: the first entry a key isn't above is the same either way), and on a kit whose top is 126, key 127 plays zone 16. The descriptors' default for every upper key is 127: zone 1 for all.
+
+**Where the zone goes.** POLY, and MONO without Legato after truncating the part's tones, hand it to the allocator (`0x894d4af0`, r7), which gives it to the note's start (`0x894dc130`, the second word on the stack). The block keeps it at +0x6c6, and the tone's +0x1c is the part and zone (zone × 0x10000 for part 0). A legato note (`0x894d4e00` → `0x894dc1e0` on each sounding tone) takes no zone: it stays on the zone its note began on.
+
+**How a zone's settings are read.** A converter points a read object at its zone's block, then reads through it with the getter (`0x8947d310(obj + 4, id)`, which with a null pointer gives the descriptor's default). The routines, each in a pair for the part's two stores (by `0x897a0fc8`), take (object, part, zone): the tone block `0x894796d0`/`0x89479720` (+0xe6 + 82 × zone), the envelopes `0x89479760`/`0x894797c0` (+0x606 + 112 × zone), the LFOs `0x89479810`/`0x89479860` (+0xd06 + 20 × zone) and the COSMs `0x894798a0`/`0x89479920` (+0xe46 or +0x1066 + 34 × zone). Their neighbours point at blocks with no zone: the MFX, Chorus and Reverb (+84, +0x98, +0xb4), the controllers (+0x1286) and the Multi Step Modulator (+0x14ac). So a zone has the IDs 0x293…0x3e8 and the COSMs' 0x8d0…0x954, and the rest is the patch's common: tuning, tempo, key assign, portamento, bend, the Matrix, the zones' ranges.
+
+**What the tone's +0x1c keys.** Two things are by part and zone, not part:
+- A key-unsynced LFO follows the newest sounding tone with the same +0x1c (`0x894f5f68`: from the sounding list's last node back). A new tone is on that list from its start (`0x894f4f70` → `0x894f19c0` moves the starting list onto it), so it is the newest other one of its zone.
+- Otherwise it takes the free-running object of its key (`0x894f1590(pool, +0x1c, LFO)`): 384 objects in use order, each found again by its key, a new key taking the least used, which no note has touched and which has run at 1 Hz since power-on. So each zone has its own free-running LFOs.
+- With no tone of its zone, the search walks off the list's first node into its head (`0x89fa9078`), whose tone pointer is 0, and reads +0x1c of address 0: on the XT the boot ROM in area 0. Equal to the key or not, it then ends with no tone (`0x894f5f8a`), on the free-running object. The check maps a page of zeros there.
+
+**The MOD's block** keeps what one type leaves for the next (v114), and here it is one per zone, each formed from its zone's settings: zone 1's when its knobs move, the others' when the patch's zones come, as nothing else moves them.
+
+**In XtSynth.** `XtSynth::Zones`: the upper keys, and for zones 2…16 their controls and waves. `setZones` (any thread, picked up with the samples; voices stop). Zone 1 is `setControls`' and `setSample`'s, as before. A zone's controls as its notes read them are its own blocks with zone 1's common and the system's on them (`zoneControls`). Each voice keeps its zone, and everything a note reads comes from its zone's controls: its start, legato, updates, release, the COSMs' and TVA's blocks. The free-running LFOs and the MOD's block are by zone. Any change of a control is an update of every note, as on the XT, and each compares its own zone's settings before and after.
+
+**In the plugin.** `loadPatch`: zone 1 to the parameters as before; zones 2…16 at once with their settings, then again with their waves once the pool has encoded them, each wave once, as its own type, with its tuning and loop. The note says how many zones, zone 1 on the panel, and what the zones ask for that isn't here, all of them. A saved session keeps the patch's store and the wave folder, and its zones come back from them. A patch of one zone leaves none of the last's.
+
+**The check.**
+- `xt_tone`: a section of zone cases after all the others, a quarter of the case count. Each draws 2 to 16 zones over the keyboard, some upper keys out of order and, in a quarter, a top short of 127 as in a kit; zones 2…16 each drawn as a case of its own, with waves from both pools, LITE included, and each zone's OSC a copy of its wave's header and loop chunks of its own. The getter answers a zone's IDs from that zone's when the read object was pointed at it (the eight routines are hooked to leave a tag there), the rest from zone 1's; the zone's own common settings, drawn too, go unread on both sides. Each note's zone (+0x6c6) is compared with the voice's, and the free-running LFOs' phases by zone. fcheck's: 673 notes, 556 of them on zones 2 to 16, every one of those zones reached, 0 different. Seeds 777, 31337, 9, 4242, 5, 123 and 2025 at 2000: 0 different, 540 to 563 notes on zones 2 to 16 each. The sections before play exactly as they did: the same notes and blocks, one check more a note.
+- Given the previous sounding note of its part and zone, as the allocator gives it (`0x894db830`'s second argument, kept at the block's +0x6c0; +4 takes its +8, +0x6c4 its byte), 346 note starts changed nothing compared. The check starts notes with none, as it always has.
+- `TEST_PATCH_APPLY`: the image's first patch of three zones or more with waves on two and a zone past the first whose OSC 2 plays a wave of its own (Turntablez, 4 zones), every wave it names written, each number its own (the same audio, its own Original Key, tuning and loop). Four zones played through the processor against XtSynth given the same zones: bit-identical, and again from a saved session. Then a patch of one zone after it, on a new processor: a key that was on another zone plays zone 1, bit-identical. The sound check of one patch now picks one of one zone, as its reference is zone 1's alone.
+- `TEST_PATCH_PLAY` on one in four of Emu_test's patches, waiting for the zones' waves: 66 played, one silent, which has no wave, as in v153; among them a 16-zone kit, three of whose waves the project doesn't have.
+- Planted errors: `mutate_tone.py` 1006, none missed. 43 are new: the zone's pick, each of the common fields zone 1 gives, the following and free-running LFOs, the MOD's block, every reader of a voice's controls, the updates, the pick-up, and the check's own (the getter, the tags, the uppers, the zone given, the carry). 95 old ones had to move with the code, 69 for the rename alone and 26 by hand, each checked to land in the function it did. Six of mine changed nothing and were dropped: the running maximum (the first entry a key isn't above is the same without it), the MOD's block formed again at a note's start or for every zone at a knob (a zone's settings move only when the zones come), the tuning's reads (common fields only), an update's comparison with zone 1's settings (an update given unchanged settings changes nothing) and Can Play on zone 1 (a note with nothing to play has no voice to compare, by the check's design). A seventh showed the check set the zones before the knobs, so the pick-up's own refresh went unseen; it now sets them after. `mutate_panel.py` with every `patch` plant: 39, none missed, 9 new for the zones' loading and the session. Two of those first missed because every zone wave was the same file, which is why each number now has its own.
+
+**Not done.** Playback Mode, arpeggio and the Multi Step Modulator, on any zone. The panel shows zone 1 only.
+
 ### LITE waves (2026-11-05, v153)
 
 A LITE wave (type 0) is the samples alone: no analysis. 41 of the 79 waves in Emu_test are LITE. In a project they are RIFF files with `fmt `, `vpsc` (its byte 1 is 0), `vplp` and `data`, and no `vpfl`, `vpno` or `vpdt`; the reader now takes them, as plain samples. Until now a LITE wave played as SOLO, its records made by the encoder. Now it plays as the XT plays it, Vari on and off.
@@ -1768,7 +1798,7 @@ The voice setup `0x894f21c0`: +0x994 = header +0x18 + 0.01 × record +0x1b (FMAC
 
 **A type's parameters.** From ID 0x55d an ID is a meaning, not a place: the second bank's first byte is a slot, counted from the block's base at `0x897a100c`: MFX 0x17b, Chorus 0x1ff, Reverb 0x232, COSM 0x3e9. `0x89481d70(store, desc(base), bank2(id))` reads the slot through the first bank's range, then swaps anything outside the ID's own range for its default. So a patch holds only its current type's parameters, and the plugin's other types go back to their defaults on a patch. A COSM's Type 0 is Through, off here. `xtPatchTyped`.
 
-**Zones.** `0x124`… are upper keys and a note takes the first ≥ it, so the first at 127 ends them. 443 of 1stchoice's 502 have one, and 257 of Emu_test's 263; 49 and 6 are 16-zone kits, whose top is often 126, so no zone says 127 at all. The plugin loads zone 1 and says so.
+**Zones.** `0x124`… are upper keys and a note takes the first ≥ it, so the first at 127 ends them. 443 of 1stchoice's 502 have one, and 257 of Emu_test's 263; 49 and 6 are 16-zone kits, whose top is often 126, so no zone says 127 at all. The plugin loads zone 1 and says so. (v154: all of them, zones 2–16 as the patch's data: "Zones".)
 
 **In the plugin.** `loadPatch`: the store, one zone to the parameters (`setControls`, the writer to `xtControls`' reader, only those that moved), the effects' parameters, Encode Type to Auto, and each PCM OSC's wave by number from `Wave` beside `Patch`: `NNN name.vpw` or `.wav`, the shortest name if a sync left a copy. A wave it can't find leaves that OSC empty, and the status line says which. The system's assigns, Output Mode, Out Gain and Clock Source stay as they are, and so does the Effects switch: a patch's effects sound only with it on.
 
@@ -1794,7 +1824,7 @@ Planted errors: `mutate_tone.py` 841, none missed, 46 of them new; `mutate_files
 | | In 1stchoice | |
 |---|---|---|
 | Vari Sw off | 71 of 358 PCM OSCs | done in v151, "Vari off" |
-| More than one zone | 59 of 502 patches | zone 1 only |
+| More than one zone | 59 of 502 patches | zone 1 only (v154: all) |
 | Playback Mode not RETRIGGER | 81 | LEGATO, STEP, EVENT, `vpno` |
 | Start Offset | 33 | done in v152, "Start Offset" |
 | Arpeggio | 107 of 502 | IDs 0x42e… |
@@ -1830,13 +1860,13 @@ A **descriptor** is 12 bytes an ID from `0x897a167c`: u16 byte offset, s8 width 
 | 0x42b…0x438 | Beam Type, Pad, arpeggio | 0x1286 | |
 | 0x48d…0x4ef | Multi Step Modulator | 0x14ac | |
 
-**What shows it's right.** After the upgrade, every value of all 16 zones in the 765 patches of Emu_test and 1stchoice is in range, over 3.5 million, bar 0x176. Before it, 11 to 34% of the zone blocks' weren't. `xt_files` on the image's 512: 12 of 4.16 million out of range, four Multi Step Modulator IDs in three patches, and 520,256 values equal to the firmware's reads. Patches' wave numbers are what the project holds: 98% in Emu_test and all in 1stchoice, bar 0, which no file has. A wave number is the file's number: 1stchoice's Gig Rhodes plays 2, `002 KEY-Rhodes`. EMU-TEST's OSC 1 is wave 3, its sine, with Formant at -63 and Energy at its default, 1, which settles the old question of that patch's Energy. 446 of 1stchoice's 502 patches and 257 of Emu_test's 263 use one zone. `XtSynth` plays one, so the others would lose their splits.
+**What shows it's right.** After the upgrade, every value of all 16 zones in the 765 patches of Emu_test and 1stchoice is in range, over 3.5 million, bar 0x176. Before it, 11 to 34% of the zone blocks' weren't. `xt_files` on the image's 512: 12 of 4.16 million out of range, four Multi Step Modulator IDs in three patches, and 520,256 values equal to the firmware's reads. Patches' wave numbers are what the project holds: 98% in Emu_test and all in 1stchoice, bar 0, which no file has. A wave number is the file's number: 1stchoice's Gig Rhodes plays 2, `002 KEY-Rhodes`. EMU-TEST's OSC 1 is wave 3, its sine, with Formant at -63 and Energy at its default, 1, which settles the old question of that patch's Energy. 446 of 1stchoice's 502 patches and 257 of Emu_test's 263 use one zone. `XtSynth` plays one, so the others would lose their splits. (v154: it plays them all.)
 
 A patch cut short, as the image has none: one using the Multi Step Modulator in 77 fields, cut before it, gives a patch of no length's values, and cut after it, its own. 3 of the firmware's 98 defaults there aren't the descriptors'.
 
 **The disk image** (`V-SynthXTDiskImage.bin.0.bin`): a FAT16 partition from sector 32 for 47968 sectors, with `Internal.prj` (512 `.p00`, 224 `.w00` of about 32 bytes each) and `Internal.vc2` (128 `.p02`, 58 `.w02`). Its files are fragmented: scanning for `SVD0` gave 19,474 values out of range where reading through the FAT gives 12. After the partition, 416 streams of a wave's chunks, 268 SOLO, 135 BACKING, 13 ENSEMBLE, 19.8 million frames, 49 stereo. 224 of 1stchoice's 250 waves have a `data` chunk byte for byte equal to one of them, so these are plainly the preset waves (rom.2 calls the place `V:\Preset.prj\Wave\`). They carry no names; 1stchoice gives those 224 theirs. All 416 equal the firmware's whole-wave routines, mono and stereo, with a block's edge 0.999 of the mean step. Over them and 1stchoice's, 84% of the 340 loops tested meet within 3 steps. Their stored SOLO records don't equal `xtSoloEncode`'s on the unpacked audio, none of 18: other encoders, and that audio is what the packing left. So that isn't a check of RDAC either way.
 
-**Not done:** applying a patch to the plugin's parameters, which needs each ID's way back to a `Controls` field (`patchOf` in `XtToneCheck.cpp` is the way there); zones; what links a `.w00` to a stream; playing a wave on its stored records and not a new encode; LITE.
+**Not done:** applying a patch to the plugin's parameters, which needs each ID's way back to a `Controls` field (`patchOf` in `XtToneCheck.cpp` is the way there); zones (v154); what links a `.w00` to a stream; playing a wave on its stored records and not a new encode; LITE (v153).
 
 ### The Effects tab in cards (2026-11-04, v145)
 
@@ -7610,7 +7640,7 @@ TVA's +0x48 = 1 and +0x54 = 1.0. Then:
 - Not modelled:
   - Hold (the plugin ignores the pedal);
   - the system's Transpose;
-  - zones;
+  - zones (v154);
   - the voice allocator's CPU budget and its stealing (the plugin steals
     the oldest voice outright).
 

@@ -162,7 +162,8 @@ static int patchApplyTest(const juce::File& rom) {
     for (const auto& f : files) {
         XtPatchFile t;
         if (!xtPatchRead(f.data(), f.size(), t)) continue;
-        if (xtPatchValue(t.store, 0x2a4) && xtPatchValue(t.store, 0x2a5) == 1 && xtPatchWaveNumber(t.store, 0, 0) > 0 && xtPatchValue(t.store, 0x2d9) != 1) { chosen = f; patch = t; number = xtPatchWaveNumber(t.store, 0, 0); break; }
+        // one zone: the sound below is held to XtSynth on zone 1's settings alone
+        if (xtPatchZones(t.store) == 1 && xtPatchValue(t.store, 0x2a4) && xtPatchValue(t.store, 0x2a5) == 1 && xtPatchWaveNumber(t.store, 0, 0) > 0 && xtPatchValue(t.store, 0x2d9) != 1) { chosen = f; patch = t; number = xtPatchWaveNumber(t.store, 0, 0); break; }
     }
     if (chosen.empty()) { std::fprintf(stderr, "patch apply: no patch with a wave on OSC 1\n"); return 1; }
     const auto presets = disk.presetWaves();
@@ -297,6 +298,186 @@ static int patchApplyTest(const juce::File& rom) {
         check(q.currentControls() == p.currentControls(), "a saved session's controls come back");
     }
 
+    std::string zoneWhat = "no patch of zones";
+    // A patch of several zones (v154): zones 2…16 play as the patch has them, each its own settings and waves, while the parameters are zone 1's.
+    // The image's first with three zones or more and waves on two of them, every wave it names this one; the sound against XtSynth given the
+    // same zones, a note on each of four zones, then the same from a saved session.  On a processor of its own, as XtSynth's is new: what a
+    // synth keeps from note to note (the free-running LFOs, the random pitch's generator, the LFOs' seeds) has moved on in this one.
+    {
+        VSynthEmuProcessor p;
+        check(p.setRomFile(rom), "the ROM for the zones");
+        p.prepareToPlay(rate, block);
+        std::vector<uint8_t> zoneFile;
+        XtPatchFile zp;
+        // first one with a zone past the first whose OSC 2 plays a wave of its own, then any
+        for (int pass = 0; pass < 2 && zoneFile.empty(); ++pass)
+            for (const auto& f : files) {
+                XtPatchFile t;
+                if (!xtPatchRead(f.data(), f.size(), t) || xtPatchZones(t.store) < 3) continue;
+                int pcm = 0;
+                bool osc2 = false;
+                for (int z = 0; z < xtPatchZones(t.store); ++z) {
+                    if (xtPatchValue(t.store, 0x2a4, z) && xtPatchValue(t.store, 0x2a5, z) == 1 && xtPatchWaveNumber(t.store, z, 0) > 0) ++pcm;
+                    const int n2 = xtPatchWaveNumber(t.store, z, 1);
+                    if (z && xtPatchValue(t.store, 0x2d8, z) && xtPatchValue(t.store, 0x2d9, z) == 1 && n2 > 0 && n2 != xtPatchWaveNumber(t.store, z, 0)) osc2 = true;
+                }
+                if (pcm >= 2 && (pass || osc2)) { zoneFile = f; zp = t; break; }
+            }
+        check(!zoneFile.empty(), "a patch of several zones in the image");
+        if (!zoneFile.empty()) {
+            const int zones = xtPatchZones(zp.store);
+            std::set<int> numbers;
+            for (int z = 0; z < zones; ++z)
+                for (int k = 0; k < 2; ++k) if (const int n = xtPatchWaveNumber(zp.store, z, k); n > 0 && n != number) numbers.insert(n);
+            // each number its own wave: the same audio, its own Original Key, tuning and loop, so a zone given another's shows
+            const auto bytesOf = [&](int n) {
+                std::vector<uint8_t> b = waveBytes;
+                if (n == number) return b;
+                b[sc + 0xa] = (uint8_t)(40 + n % 40);
+                const auto put = [&](size_t at, int32_t v) { for (int i = 0; i < 4; ++i) b[at + (size_t)i] = (uint8_t)((uint32_t)v >> (8 * i)); };
+                put(lp, 1000 * (n % 13) - 6000);
+                put(lp + 4, loopA / (1 + n % 3));
+                return b;
+            };
+            for (int n : numbers) { const auto b = bytesOf(n); waveDir.getChildFile(juce::String(n).paddedLeft('0', 3) + " Zone.vpw").replaceWithData(b.data(), b.size()); }
+            const auto zoneFileOnDisk = patchDir.getChildFile("zones.p00");
+            zoneFileOnDisk.replaceWithData(zoneFile.data(), zoneFile.size());
+            const auto ready = [&](VSynthEmuProcessor& q) {
+                for (int i = 0; i < 1200 && !(q.zonesReady() && (!q.hasFileLoaded(0) || q.getStatusText().contains("Encoded"))); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                return q.zonesReady();
+            };
+            check(p.loadPatch(zoneFileOnDisk), "the patch of zones should load");
+            check(ready(p), "its zones' waves should encode");
+            check(p.patchZones() == zones, "its zones: " + juce::String(p.patchZones()) + " of " + juce::String(zones));
+            check(p.getPatchNote().contains(juce::String(zones) + " zones"), "its zones in its note: " + p.getPatchNote());
+            // XtSynth on the same: zone 1 as the parameters stand, zones 2… from the store, each wave the one written for its number
+            std::map<int, std::pair<XtWaveFile, std::shared_ptr<XtEncoded>>> waveOf;
+            const auto encOf = [&](int n) -> std::pair<XtWaveFile, std::shared_ptr<XtEncoded>>& {
+                auto& e = waveOf[n];
+                if (e.second) return e;
+                const auto b = bytesOf(n);
+                check(xtWaveRead(b.data(), b.size(), e.first), "wave " + juce::String(n) + " reads");
+                std::vector<std::vector<float>> chans((size_t)e.first.channels);
+                for (long i = 0; i < e.first.frames; ++i)
+                    for (int k = 0; k < e.first.channels; ++k) chans[(size_t)k].push_back((float)e.first.pcm[(size_t)(i * e.first.channels + k)] / 32768.0f);
+                const int type = e.first.encodeType == 0 || e.first.encodeType == 1 || e.first.encodeType == 3 || e.first.encodeType == 5 ? e.first.encodeType : 1;
+                e.second = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16);
+                xtWaveOntoEncoded(e.first, *e.second);
+                return e;
+            };
+            const std::shared_ptr<XtEncoded> enc = encOf(number).second;   // the patch of one zone's
+            XtSynth::Controls c1 = p.currentControls();
+            c1.pitchSemis = 0;
+            auto zs = std::make_shared<XtSynth::Zones>();
+            xtPatchZoneSet(zp.store, c1, *zs);
+            for (int z = 1; z < zones; ++z)
+                for (int k = 0; k < 2; ++k) {
+                    XtSynth::OscControls& o = k ? zs->ctl[z].osc2 : static_cast<XtSynth::OscControls&>(zs->ctl[z]);
+                    const int n = xtPatchWaveNumber(zp.store, z, k);
+                    if (o.oscType != 1 || n <= 0) continue;
+                    xtWaveOntoControls(encOf(n).first, o);
+                    zs->wave[z][k] = encOf(n).second;
+                }
+            // a key on each of four zones, the first of zone 1's and three others'
+            std::vector<int> keys;
+            std::set<int> seen;
+            for (int note = 0; note < 128 && keys.size() < 4; ++note) {
+                const int z = XtSynth::xtZoneOf(zs->upper, std::clamp(note + 12 * c1.octave, 0, 127));
+                if (seen.insert(z).second && (z || keys.empty())) keys.push_back(note);
+            }
+            check(keys.size() >= 3, "keys on three zones at least");
+            zoneWhat = std::string(zp.name) + "'s " + std::to_string(zones) + " zones, " + std::to_string(keys.size()) + " of them played";
+            const auto play = [&](VSynthEmuProcessor& q, bool withZones, long& away) {
+                XtSynth ref, alone;
+                ref.prepare(rate); alone.prepare(rate);
+                for (XtSynth* s : { &ref, &alone }) {
+                    for (int k = 0; k < 2; ++k) if (q.hasFileLoaded(k)) s->setSample(encOf(xtPatchWaveNumber(zp.store, 0, k)).second, k);
+                    s->setControls(c1);
+                }
+                if (withZones) ref.setZones(zs);
+                juce::AudioBuffer<float> buf(2, block);
+                juce::MidiBuffer midi;
+                std::vector<float> rl((size_t)block), rr((size_t)block), al((size_t)block), ar((size_t)block);
+                long different = 0;
+                double energy = 0;
+                for (size_t n = 0; n < keys.size(); ++n)
+                    for (int b = 0; b < 40; ++b) {
+                        midi.clear();
+                        if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, keys[n], (juce::uint8)100), 0);
+                        if (b == 30) midi.addEvent(juce::MidiMessage::noteOff(1, keys[n]), 0);
+                        buf.clear();
+                        q.processBlock(buf, midi);
+                        juce::ScopedNoDenormals ftz;
+                        if (b == 0) { ref.noteOn(keys[n], 100 / 127.0f); alone.noteOn(keys[n], 100 / 127.0f); }
+                        if (b == 30) { ref.noteOff(keys[n]); alone.noteOff(keys[n]); }
+                        ref.render(rl.data(), rr.data(), block);
+                        alone.render(al.data(), ar.data(), block);
+                        for (int i = 0; i < block; ++i) {
+                            if (buf.getSample(0, i) != rl[(size_t)i] || buf.getSample(1, i) != rr[(size_t)i]) ++different;
+                            if (buf.getSample(0, i) != al[(size_t)i]) ++away;
+                            energy += (double)rl[(size_t)i] * rl[(size_t)i];
+                        }
+                    }
+                midi.clear();
+                midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
+                buf.clear();
+                q.processBlock(buf, midi);
+                check(energy > 0.0, "the zones should sound");
+                return different;
+            };
+            long away = 0;
+            const long different = play(p, true, away);
+            check(different == 0, juce::String(different) + " frames differ from XtSynth given the patch's zones");
+            check(away > 0, "zones 2… should sound as their own, not as zone 1");
+            // a saved session brings its zones back
+            juce::MemoryBlock state;
+            p.getStateInformation(state);
+            VSynthEmuProcessor q;
+            check(q.setRomFile(rom), "the ROM again");
+            q.prepareToPlay(rate, block);
+            q.setStateInformation(state.getData(), (int)state.getSize());
+            check(ready(q), "a saved session's zones should encode");
+            check(q.patchZones() == zones, "a saved session's zones: " + juce::String(q.patchZones()));
+            long unused = 0;
+            const long again = play(q, true, unused);
+            check(again == 0, juce::String(again) + " frames of a saved session's zones differ");
+            q.releaseResources();
+            p.releaseResources();
+            // And a patch of one zone after it leaves none of the last's: on a new processor, the zones' patch then that one, and a key
+            // that was on another zone plays zone 1
+            {
+                VSynthEmuProcessor r;
+                check(r.setRomFile(rom), "the ROM once more");
+                r.prepareToPlay(rate, block);
+                check(r.loadPatch(zoneFileOnDisk) && ready(r) && r.loadPatch(patchFile) && ready(r), "a patch of one zone after one of zones");
+                check(r.patchZones() == 1, "a patch of one zone leaves no zones of the last");
+                XtSynth alone;
+                alone.prepare(rate);
+                for (int k = 0; k < 2; ++k) if (r.hasFileLoaded(k)) alone.setSample(enc, k);
+                XtSynth::Controls c = r.currentControls();
+                c.pitchSemis = 0;
+                alone.setControls(c);
+                juce::AudioBuffer<float> buf(2, block);
+                juce::MidiBuffer midi;
+                std::vector<float> al((size_t)block), ar((size_t)block);
+                long off = 0;
+                for (int b = 0; b < 40; ++b) {
+                    midi.clear();
+                    if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, keys[1], (juce::uint8)100), 0);
+                    buf.clear();
+                    r.processBlock(buf, midi);
+                    juce::ScopedNoDenormals ftz;
+                    if (b == 0) alone.noteOn(keys[1], 100 / 127.0f);
+                    alone.render(al.data(), ar.data(), block);
+                    for (int i = 0; i < block; ++i) if (buf.getSample(0, i) != al[(size_t)i] || buf.getSample(1, i) != ar[(size_t)i]) ++off;
+                }
+                check(off == 0, juce::String(off) + " frames of zone 1 differ after a patch of zones");
+                r.releaseResources();
+            }
+            for (int n : numbers) waveDir.getChildFile(juce::String(n).paddedLeft('0', 3) + " Zone.vpw").deleteFile();
+        }
+    }
+
     // A wave it can't find: said so, nothing left on the OSC
     waveDir.getChildFile(waveName).deleteFile();
     waveDir.getChildFile(juce::String(number).paddedLeft('0', 3) + " Test 2.vpw").deleteFile();
@@ -308,7 +489,7 @@ static int patchApplyTest(const juce::File& rom) {
     notPatch.replaceWithText("not a patch at all, though long enough to look at");
     check(!p.loadPatch(notPatch) && p.getStatusText().contains("not a V-Synth patch"), "something else should be refused: " + p.getStatusText());
     p.releaseResources();
-    std::printf("patch apply: %d patches, %d zones, %ld effect values, %d checks, %d failed\n", (int)files.size(), zonesDone, fxValues, checks, failed);
+    std::printf("patch apply: %d patches, %d zones, %ld effect values, %s, %d checks, %d failed\n", (int)files.size(), zonesDone, fxValues, zoneWhat.c_str(), checks, failed);
     return failed ? 1 : 0;
 }
 
@@ -328,6 +509,7 @@ static int patchPlayTest(const juce::File& rom, const juce::File& folder, int ev
         if (!p.loadPatch(f)) { ++refused; std::printf("%-28s refused: %s\n", f.getFileName().toRawUTF8(), p.getStatusText().toRawUTF8()); continue; }
         const char* want = p.hasFileLoaded(1) ? "OSC 2: Encoded" : p.hasFileLoaded(0) ? "Encoded" : nullptr;
         for (int i = 0; want && i < 1200 && !p.getStatusText().startsWith(want); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        for (int i = 0; i < 1200 && !p.zonesReady(); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(50));   // and its zones' waves
         juce::AudioBuffer<float> buf(2, block);
         juce::MidiBuffer midi;
         double energy = 0, peak = 0;

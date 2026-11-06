@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Zones v154 (2026-11-05), no change to the sound of a patch of one zone: a loaded patch plays all its zones, 2-16 as the patch's data (the user's decision), the parameters and editor on zone 1.
+  The zone: the part's note-on (0x894dbcb0), the key with the Octave Shift on the part's table (+6, made by 0x894794f0: each the larger of its upper key, 0x124 on, and the one before; the 16th 127).
+  It goes to the note's start (0x894dc130, the second stack word): the block's +0x6c6, the tone's +0x1c (part and zone).  A legato note keeps its zone.
+  A zone's IDs (0x293-0x3e8 and the COSMs') are read through an object pointed at the zone's block (0x894796d0, 0x89479760, 0x89479810, 0x894798a0 and their pairs); the rest is the patch's common, zone 1's.
+  By part and zone: a key-unsynced LFO follows the newest sounding tone of its zone (0x894f5f68), else its zone's free-running object (0x894f1590).  The MOD's block is one per zone.
+  XtSynth::Zones and setZones, zoneControls, a voice's zone.  loadPatch: zones 2-16 at once, then their waves, encoded on the pool, each once as its own type; a session keeps the store and the wave folder.
+  Check: xt_tone's zone section, fcheck's 673 notes (556 on zones 2-16, all 15 reached) and seven other seeds at 2000, 0 different; TEST_PATCH_APPLY: Turntablez's zones bit-identical to XtSynth, and from a saved session.
+  Planted: mutate_tone.py 1006 (43 new, 95 moved with the code, six equivalent ones dropped), none missed; mutate_panel.py's patch plants 39 (9 new), none missed.
+
 LITE waves v153 (2026-11-05), no change to the sound of anything else: a LITE wave (type 0) plays as the XT plays it, the voice's kind 1, where it played as SOLO; LITE in the Encode box (last).
   Kind 1 (0x894e2ec0 by the wave's type): its own converter tail (0x894e3ee0), note-on (0x8950b5b0), update (0x8950bbb0: the values as they are, no Energy) and block (+0x80 mode Vari ? 2 : 0, +0xc4 Start Offset, +0xc8 length).
   Vari off: XtLinearPlayer, the beat from the first sample read.  Vari on: XtLitePlayer (0x8950a7f0 mono, 0x8950a7fc stereo), two heads at the formant's rate under windows on the pitch, splicing to the walk each period (88200/root), a one-pole filter; backward inverted.

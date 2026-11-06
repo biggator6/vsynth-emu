@@ -3570,6 +3570,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-05) — v154: zones
+
+- Finding where a zone enters the reads took longer than using it. The getter has no zone: each converter first points a read object at its zone's block. A probe that gave a note zone 5 and logged the getter's callers showed only junk registers; reading the routines beside `0x894796d0`, eight of them in pairs, showed the pattern.
+- The first zone case stopped the interpreter at address 0x1c. With no sounding tone of its zone, the LFO's search walks off its list into the head, which no earlier case did: the newest tone always matched. The XT reads its boot ROM there, and the outcome doesn't depend on what it reads.
+- Then 11 of 75 zone cases differed, all at a note's start. It was the check: it read XtSynth's zones for the carry into the firmware's voice before XtSynth had picked them up.
+- PluginTest's first zones run differed on every frame. That processor had played the checks before it, so its free-running LFOs and random pitch had moved on; a fresh one matched bit for bit, and so did the session restored from it.
+- The allocator also hands a note the previous sounding note of its part and zone. The check has always passed none; given it, 346 note starts changed nothing compared, so I left it as it was.
+- Renaming `ctl` to the voice's zone controls broke the text of 95 old plants. Rather than rewrite them by eye, a script moved them and then checked each landed in the function it had before.
+- Seven of my zone plants missed. Six were equivalent, which says something about the code: the table's running maximum, and the MOD block formed for every zone at a knob, are both redundant, and I simplified the second. The seventh found the check setting zones before knobs, hiding the pick-up's refresh. Two panel plants missed for a similar reason: every zone wave was one file.
+
 ### Session 16 addendum (2026-11-05) — v153: LITE waves
 
 - The brief said Vari on would go through the kind-2 install. It doesn't: a LITE wave is a kind of its own, picked by the wave's type in the converter, and both its modes install from kind 1's switch. The October notes had kind 1 as "Vari off"; the converter showed what it is.
