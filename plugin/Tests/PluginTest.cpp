@@ -140,18 +140,13 @@ static int patchApplyTest(const juce::File& rom) {
             const XtSynth::Controls got = p.currentControls();
             check(got == want, juce::String(patch.name) + " zone " + juce::String(z) + ": the controls differ");
             ++zonesDone;
-            // Playback Mode STEP and EVENT, missing on a SOLO wave alone
+            // Playback Mode STEP and EVENT: done on every kind of wave (v156), so never said to be missing
             for (int k = 0; k < 2; ++k) {
                 const int b = 0x34 * k, mode = xtPatchValue(patch.store, 0x2d2 + b, z);
                 const bool pcm = xtPatchValue(patch.store, 0x2a4 + b, z) != 0 && xtPatchValue(patch.store, 0x2a5 + b, z) == 1;
                 stepEvent += pcm && mode >= 2;
-                for (int type : { 1, 3, 5, 0 }) {
-                    const int types[2] = { k == 0 ? type : -1, k == 1 ? type : -1 };
-                    const auto m = xtPatchMissing(patch.store, z, types);
-                    const std::string note = "OSC " + std::to_string(k + 1) + " Playback Mode " + (mode == 2 ? "STEP" : "EVENT") + " on a SOLO wave";
-                    check((std::find(m.begin(), m.end(), note) != m.end()) == (pcm && mode >= 2 && type == 1),
-                          juce::String(patch.name) + " zone " + juce::String(z) + ": Playback Mode " + juce::String(mode) + " on encode type " + juce::String(type) + ", said wrongly");
-                }
+                for (const auto& m : xtPatchMissing(patch.store, z))
+                    check(m.find("Playback Mode") == std::string::npos, juce::String(patch.name) + " zone " + juce::String(z) + ": " + m + ", said wrongly");
             }
         }
         check(p.getPatchName() == juce::String(patch.name), "its name");
@@ -218,10 +213,10 @@ static int patchApplyTest(const juce::File& rom) {
     }
     check(p.loadPatch(patchFile), "the patch should load");
     check(p.getPatchName() == juce::String(patch.name), "its name");
-    {   // STEP or EVENT on OSC 1, said to be missing only as its wave is SOLO
+    {   // STEP or EVENT on OSC 1, never said to be missing (v156)
         const int mode = xtPatchValue(patch.store, 0x2d2);
-        const bool said = p.getPatchNote().contains("OSC 1 Playback Mode");
-        check(said == (mode >= 2 && stream.encodeType == 1), "Playback Mode " + juce::String(mode) + " on encode type " + juce::String(stream.encodeType) + ": the note says \"" + p.getPatchNote() + "\"");
+        const bool said = p.getPatchNote().contains("Playback Mode");
+        check(!said, "Playback Mode " + juce::String(mode) + " on encode type " + juce::String(stream.encodeType) + ": the note says \"" + p.getPatchNote() + "\"");
         std::printf("patch apply: the project's patch %s, OSC 1 Playback Mode %d on encode type %d\n", patch.name.c_str(), mode, stream.encodeType);
     }
     check(p.hasFileLoaded(0) && p.getLoadedFileName(0) == waveName, "its wave on OSC 1, by its number: " + p.getLoadedFileName(0));
@@ -247,7 +242,7 @@ static int patchApplyTest(const juce::File& rom) {
         for (long i = 0; i < wave.frames; ++i)
             for (int k = 0; k < wave.channels; ++k) chans[(size_t)k].push_back((float)wave.pcm[(size_t)(i * wave.channels + k)] / 32768.0f);
         const int type = wave.encodeType == 0 || wave.encodeType == 1 || wave.encodeType == 3 || wave.encodeType == 5 ? wave.encodeType : 1;
-        auto own = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16), plain = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16);
+        auto own = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &wave.events), plain = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &wave.events);
         xtWaveOntoEncoded(wave, *own);
         check(own->vpnoCount == 3 && own->vpno.size() >= 3 && own->vpno[0] == 2 && own->vpno[1] == 0 && own->vpno[2] == 1, "the wave's own list of events, not the encode's");
         c = p.currentControls();
@@ -355,14 +350,36 @@ static int patchApplyTest(const juce::File& rom) {
             std::set<int> numbers;
             for (int z = 0; z < zones; ++z)
                 for (int k = 0; k < 2; ++k) if (const int n = xtPatchWaveNumber(zp.store, z, k); n > 0 && n != number) numbers.insert(n);
+            // The odd numbers' waves a SOLO preset wave with attacks, one of its events moved as V-Producer can: the zone keeps the wave's own
+            // events, which the detection wouldn't find (a band wave keeps the detection, so preset 0's can't show it)
+            std::vector<uint8_t> soloBytes;
+            long soloLast = 0;
+            for (size_t i = 1; i < presets.size() && soloBytes.empty(); ++i) {
+                XtWaveFile w;
+                if (!xtWaveRead(&disk.bytes()[presets[i]], disk.bytes().size() - presets[i], w) || w.encodeType != 1 || w.channels != 1 || w.events.size() < 3
+                    || w.frames > 150000 || w.events[1] + 16 * 800 >= w.events[2]) continue;
+                std::vector<uint8_t> b(disk.bytes().begin() + (long)presets[i], disk.bytes().begin() + (long)(presets[i] + w.size));
+                size_t vd = 0;
+                for (size_t j = 0; j + 8 < b.size() && !vd; ++j) if (!std::memcmp(&b[j], "vpdt", 4)) vd = j + 8;
+                const int32_t moved = w.events[1] + 16 * 400;
+                for (int k = 0; k < 4; ++k) b[vd + (10 + 8) * 2 + 4 + (size_t)k] = (uint8_t)((uint32_t)moved >> (8 * k));   // event 1's position
+                XtWaveFile back;
+                if (!vd || !xtWaveRead(b.data(), b.size(), back) || back.events.size() != w.events.size() || back.events[1] != moved) continue;
+                soloBytes = std::move(b);
+                soloLast = w.frames - 1;
+            }
+            check(!soloBytes.empty(), "a SOLO preset wave with attacks for the zones");
             // each number its own wave: the same audio, its own Original Key, tuning and loop, so a zone given another's shows
             const auto bytesOf = [&](int n) {
-                std::vector<uint8_t> b = waveBytes;
-                if (n == number) return b;
-                b[sc + 0xa] = (uint8_t)(40 + n % 40);
+                const bool solo = n % 2 && !soloBytes.empty();
+                std::vector<uint8_t> b = solo ? soloBytes : waveBytes;
+                if (n == number) return waveBytes;
+                const auto at = [&](const char* tag) { for (size_t i = 0; i + 8 < b.size(); ++i) if (!std::memcmp(&b[i], tag, 4)) return i + 8; return (size_t)0; };
+                const size_t s2 = at("vpsc"), l2 = at("vplp");
+                b[s2 + 0xa] = (uint8_t)(40 + n % 40);
                 const auto put = [&](size_t at, int32_t v) { for (int i = 0; i < 4; ++i) b[at + (size_t)i] = (uint8_t)((uint32_t)v >> (8 * i)); };
-                put(lp, 1000 * (n % 13) - 6000);
-                put(lp + 4, loopA / (1 + n % 3));
+                put(l2, 1000 * (n % 13) - 6000);
+                put(l2 + 4, (solo ? (int)(soloLast / 3) : loopA) / (1 + n % 3));
                 return b;
             };
             for (int n : numbers) { const auto b = bytesOf(n); waveDir.getChildFile(juce::String(n).paddedLeft('0', 3) + " Zone.vpw").replaceWithData(b.data(), b.size()); }
@@ -387,7 +404,7 @@ static int patchApplyTest(const juce::File& rom) {
                 for (long i = 0; i < e.first.frames; ++i)
                     for (int k = 0; k < e.first.channels; ++k) chans[(size_t)k].push_back((float)e.first.pcm[(size_t)(i * e.first.channels + k)] / 32768.0f);
                 const int type = e.first.encodeType == 0 || e.first.encodeType == 1 || e.first.encodeType == 3 || e.first.encodeType == 5 ? e.first.encodeType : 1;
-                e.second = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16);
+                e.second = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &e.first.events);
                 xtWaveOntoEncoded(e.first, *e.second);
                 return e;
             };
@@ -412,6 +429,16 @@ static int patchApplyTest(const juce::File& rom) {
                 if (seen.insert(z).second && (z || keys.empty())) keys.push_back(note);
             }
             check(keys.size() >= 3, "keys on three zones at least");
+            bool soloPlayed = false;
+            for (int note : keys) {
+                const int z = XtSynth::xtZoneOf(zs->upper, std::clamp(note + 12 * c1.octave, 0, 127));
+                for (int k = 0; k < 2; ++k) {
+                    const XtSynth::OscControls& o = k ? zs->ctl[z].osc2 : static_cast<const XtSynth::OscControls&>(zs->ctl[z]);
+                    const int n = xtPatchWaveNumber(zp.store, z, k);
+                    soloPlayed |= z > 0 && o.on && o.oscType == 1 && n > 0 && n != number && n % 2;
+                }
+            }
+            check(soloPlayed, "a zone played on the SOLO wave of its own events");
             zoneWhat = std::string(zp.name) + "'s " + std::to_string(zones) + " zones, " + std::to_string(keys.size()) + " of them played";
             const auto play = [&](VSynthEmuProcessor& q, bool withZones, long& away) {
                 XtSynth ref, alone;
@@ -1581,7 +1608,10 @@ int main(int argc, char** argv) {
         rd2->read(&in2, 0, in2.getNumSamples(), 0, true, true);
         std::vector<std::vector<float>> ch2;
         for (int c = 0; c < std::min(2, in2.getNumChannels()); ++c) ch2.emplace_back(in2.getReadPointer(c), in2.getReadPointer(c) + in2.getNumSamples());
-        E2 = xtSynthEncode(ch2, rd2->sampleRate, type2, 64, nullptr, rd2->usesFloatingPointData ? 16 : (int)rd2->bitsPerSample);
+        XtWaveFile own2;
+        juce::MemoryBlock b2;
+        const bool isOwn2 = juce::File(path2).loadFileAsData(b2) && xtWaveRead(static_cast<const uint8_t*>(b2.getData()), b2.getSize(), own2) && own2.encodeType == type2;
+        E2 = xtSynthEncode(ch2, rd2->sampleRate, type2, 64, nullptr, rd2->usesFloatingPointData ? 16 : (int)rd2->bitsPerSample, isOwn2 ? &own2.events : nullptr);
         if (!E2) { std::fprintf(stderr, "TEST_OSC2_WAVE: encode failed\n"); return 1; }
     }
     p.loadFile(juce::File(argv[2]));
@@ -1611,9 +1641,17 @@ int main(int argc, char** argv) {
     }
     const int type = st.contains("ENSEMBLE") ? 5 : st.contains("BACKING") ? 3 : st.contains("LITE") ? 0 : 1;
     const int bits = rd->usesFloatingPointData ? 16 : (int)rd->bitsPerSample;
-    auto E = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits);
+    // A V-Synth wave (.vpw, or a project's .wav) encoded as its own type keeps its own events, as the processor does
+    XtWaveFile ownFile;
+    bool isOwnFile = false;
+    {
+        juce::MemoryBlock bytes;
+        isOwnFile = juce::File(argv[2]).loadFileAsData(bytes) && xtWaveRead(static_cast<const uint8_t*>(bytes.getData()), bytes.getSize(), ownFile);
+    }
+    const std::vector<int32_t>* ownEvents = isOwnFile && ownFile.encodeType == type ? &ownFile.events : nullptr;
+    auto E = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits, ownEvents);
     {   // the encode must be repeatable
-        auto E2 = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits);
+        auto E2 = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits, ownEvents);
         bool same = E->vpdt == E2->vpdt && E->solo.segStart == E2->solo.segStart && E->solo.in == E2->solo.in
                  && E->solo.inR == E2->solo.inR;
         for (int k = 0; k < 6; ++k) same = same && E->bands.buf[k] == E2->bands.buf[k];

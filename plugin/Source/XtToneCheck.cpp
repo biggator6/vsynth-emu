@@ -53,8 +53,11 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <atomic>
+#include <chrono>
 #include <map>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
@@ -447,39 +450,11 @@ public:
     }
 };
 
-// The vpdt of a SOLO wave as the XT lays out a one-segment one (as xtFwSoloPlay does).
-std::vector<uint8_t> soloVpdt(const std::vector<XtRecord>& recs, long frames, int channels) {
-    const uint32_t endPos = (uint32_t)frames * 16;
-    const int st = channels == 2 ? 16 : 10;
-    const uint32_t ev0 = 16, ev1 = (uint32_t)(st + 8) * 2, seg0 = (uint32_t)(2 * st + 8) * 2, seg1 = seg0 + 12;
-    const uint32_t cnt = seg1 + 12, rec0 = cnt + 4;
-    std::vector<uint16_t> stream;
-    for (const XtRecord& r : recs) {
-        int len = r.len16;
-        while (len >= 0xffff) { stream.push_back(0xffff); stream.push_back((uint16_t)r.info); len -= 0xffff; }
-        stream.push_back((uint16_t)len); stream.push_back((uint16_t)r.info);
-    }
-    const uint32_t term = rec0 + (uint32_t)stream.size() * 2;
-    stream.push_back(256); stream.push_back(1);
-    std::vector<uint8_t> v(term + 4, 0);
-    auto w32 = [&](uint32_t o, uint32_t x) { std::memcpy(&v[o], &x, 4); };
-    auto w16 = [&](uint32_t o, uint16_t x) { std::memcpy(&v[o], &x, 2); };
-    w32(8, 2u << 16);
-    w32(ev0, 0x0d); w32(ev0 + 4, 0); w32(ev0 + 8, seg0); w32(ev0 + 12, rec0); w16(ev0 + 16, stream[0]);
-    w32(ev1, 0x0e); w32(ev1 + 4, endPos); w32(ev1 + 8, seg1); w32(ev1 + 12, term); w16(ev1 + 16, 256);
-    w32(seg0, rec0); w32(seg0 + 4, 1); w32(seg0 + 8, 0);
-    w32(seg1, term); w32(seg1 + 4, 1); w32(seg1 + 8, endPos);
-    w32(cnt, (uint32_t)(stream.size() / 2));
-    std::memcpy(&v[rec0], stream.data(), stream.size() * 2);
-    return v;
-}
-
 // One of the test waves, encoded for XtSynth and laid out for the firmware.
 struct TestWave {
     std::shared_ptr<XtEncoded> enc;
     FwWave fw;
     int type = 0, channels = 1;
-    std::vector<XtRecord> recs;         // SOLO
 };
 
 // A band wave's `vpno` (chunk 3), as XtEncoded has it: +0 8, +4 the count, +8 0 and the count less one, then the vpdt's event numbers.
@@ -550,10 +525,9 @@ bool makeWave(Firmware& f, uint32_t& next, const std::vector<int16_t>& raw, int 
     f.c.wr8(w.chunk[4] + 0x1a, 1);                        // the Loop switch decides
     if (type == 0)                                         // LITE: the samples alone, no vpdt (a project's LITE waves have none)
         w.band[0] = put(raw.data(), raw.size() * 2);
-    else if (type == 1) {
-        out.recs = xtSoloEncode(raw.data(), (int)frames, channels);
-        const std::vector<uint8_t> v = soloVpdt(out.recs, frames, channels);
-        w.chunk[5] = put(v.data(), v.size());
+    else if (type == 1) {                                  // XtSynth's vpdt: the XT's own encode with attacks, the port's records without
+        w.chunk[5] = put(out.enc->vpdt.data(), out.enc->vpdt.size());
+        writeVpno(f, w, *out.enc);
         w.band[0] = put(raw.data(), raw.size() * 2);
     } else {
         w.chunk[5] = put(out.enc->vpdt.data(), out.enc->vpdt.size());
@@ -569,8 +543,9 @@ bool makeWave(Firmware& f, uint32_t& next, const std::vector<int16_t>& raw, int 
     return true;
 }
 
-// XtSynth's own SOLO records against the firmware's encoder.  The cases give both sides the port's
-// records, loadWave's, so nothing in them sees which mode XtSynth encodes in, on a wave where the modes differ.
+// XtSynth's own SOLO records against the firmware's encoder, given the events the XT's driver gives it (none between the start and
+// the end on a wave without attacks, where XtSynth's are the port's).  The cases give both sides XtSynth's vpdt, so nothing in them
+// sees which mode XtSynth encodes in, on a wave where the modes differ, or how it read the XT's vpdt.
 void checkSoloRecords(const std::string& dir, const char* file, int channels) {
     std::vector<int16_t> raw;
     if (FILE* fp = std::fopen((dir + file).c_str(), "rb")) {
@@ -585,13 +560,18 @@ void checkSoloRecords(const std::string& dir, const char* file, int channels) {
     std::string err;
     const std::shared_ptr<XtEncoded> e = xtSynthEncode(chans, 44100.0, 1, 64, &err);
     std::vector<XtRecord> fw;
-    if (!e || !xtFwSoloEncode(raw.data(), (int)frames, fw, channels)) { std::printf("tone, the SOLO records of %s: cannot encode\n", file); return; }
+    std::vector<uint32_t> ev;
+    std::vector<uint8_t> vp;
+    if (!e || !xtFwEncodeSolo(raw.data(), frames, channels, 64, vp, &ev) || !xtFwSoloEncode(raw.data(), (int)frames, fw, channels, nullptr, &ev)) {
+        std::printf("tone, the SOLO records of %s: cannot encode\n", file);
+        return;
+    }
     const XtSoloPlan& P = e->solo;
     const size_t both = std::min(P.segStart.size(), fw.size());
     size_t diff = std::max(P.segStart.size(), fw.size()) - both;
     for (size_t i = 0; i < both; ++i)
         if (P.segStart[i] != fw[i].start16 / 16.0 || P.info[i] != fw[i].info) ++diff;
-    std::printf("tone, the SOLO records of %s: %zu different of %zu\n", file, diff, fw.size());
+    std::printf("tone, the SOLO records of %s: %zu different of %zu, %zu events\n", file, diff, fw.size(), P.evPos.size());
 }
 
 // The cached loop events a wave's player reads, for the loop XtSynth computes: the
@@ -622,28 +602,35 @@ void writeLoopEvents(Firmware& f, const TestWave& t, const OscC& c, const FwWave
         for (uint32_t k = 0; k < 4; ++k) f.c.wr32(W2 + 0xb4 * k + 4, (uint32_t)(pts[k] * 16));
         return;
     }
-    if (t.type == 1) {
-        const int st = t.channels == 2 ? 16 : 10;
-        const uint32_t seg0 = (uint32_t)(2 * st + 8) * 2, rec0 = seg0 + 12 + 12 + 4, endPos = (uint32_t)t.fw.frames * 16;
-        uint32_t term = rec0;
-        for (const XtRecord& r : t.recs) { int len = r.len16; while (len >= 0xffff) { term += 4; len -= 0xffff; } term += 4; }
+    if (t.type == 1) {                                     // from the vpdt: the event before the point, the segment and the record containing it
+        const std::vector<uint8_t>& v = t.enc->vpdt;
+        const auto r32 = [&](uint32_t o) { uint32_t x = 0; if ((size_t)o + 4 <= v.size()) std::memcpy(&x, &v[o], 4); return x; };
+        const auto r16 = [&](uint32_t o) { uint16_t x = 0; if ((size_t)o + 2 <= v.size()) std::memcpy(&x, &v[o], 2); return x; };
+        const uint32_t st = t.channels == 2 ? 16 : 10, nev = r32(8) >> 16, seg0 = r32(16 + 8), rec0 = r32(16 + 12), segEnd = rec0 - 4;
+        const auto evPos = [&](uint32_t e) { return (int)r32((st * e + 8) * 2 + 4); };
         const int pts[4] = { l.fwdStart, l.fwdEnd, l.bwdEnd, l.bwdStart };
         const int modes[4] = { 0, l.fwdMode, 0, l.bwdMode };
         for (uint32_t k = 0; k < 4; ++k) {
             const int pos = pts[k] * 16;
-            uint32_t off = term, walk = rec0;
-            int start = (int)endPos, first = 256;
-            size_t s0 = 0;
-            for (const XtRecord& r : t.recs) {
-                if ((int)s0 + r.len16 > pos) { off = walk; start = (int)s0; first = std::min(r.len16, 0xffff); break; }
-                int len = r.len16;
-                while (len >= 0xffff) { walk += 4; len -= 0xffff; }
-                walk += 4;
-                s0 += (size_t)r.len16;
+            uint32_t ev = 0;
+            while (ev + 1 < nev && evPos(ev + 1) < pos) ++ev;
+            uint32_t seg = seg0;
+            while (seg + 12 < segEnd && !(pos < (int)r32(seg + 12 + 8))) seg += 12;
+            uint32_t rec = r32(seg) & ~1u;
+            int start = (int)r32(seg + 8);
+            unsigned first;
+            for (;;) {                                     // the records from the segment's, to the one containing the point
+                first = r16(rec);
+                int total = (int)first;
+                uint32_t q = rec + 4;
+                while (r16(q - 4) == 0xffff && (size_t)q + 4 <= v.size()) { total += (int)r16(q); q += 4; }
+                if (start + total > pos || (size_t)q >= v.size()) break;
+                start += total;
+                rec = q;
             }
             const uint32_t R = W2 + 0xb4 * k;
-            f.c.wr16(R, 0); f.c.wr16(R + 2, (uint16_t)modes[k]); f.c.wr32(R + 4, (uint32_t)pos);
-            f.c.wr32(R + 8, seg0); f.c.wr32(R + 12, off); f.c.wr16(R + 16, (uint16_t)(start + first - pos));
+            f.c.wr16(R, (uint16_t)ev); f.c.wr16(R + 2, (uint16_t)modes[k]); f.c.wr32(R + 4, (uint32_t)pos);
+            f.c.wr32(R + 8, seg); f.c.wr32(R + 12, rec); f.c.wr16(R + 16, (uint16_t)(start + (int)first - pos));
         }
     } else {
         uint8_t ev[4][kXtMbLoopEventBytes];
@@ -892,6 +879,9 @@ void drawMatrix(Rng& r, Ctl& c) {
     }
 }
 
+// Playback Mode for an OSC: any of the four, but RETRIGGER or LEGATO on a SOLO wave with Vari off (its STEP and EVENT: not done)
+int drawMode(Rng& r, const TestWave* t, bool vari) { return t && t->type == 1 && !vari ? r.range(0, 1) : r.range(0, 3); }
+
 Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false) {
     Ctl c;
     drawMatrix(r, c);
@@ -1025,12 +1015,181 @@ struct Report {
 // Equal, the two zeros included: a sign on a zero has no effect on anything after it.
 bool bits(float a, float b) { return a == b || std::memcmp(&a, &b, 4) == 0; }
 
+
+// ── A wave's own events, and the SOLO encode's two paths ────────────────────
+// A wave's events after XtSynth's encode, 1/16 sample: a SOLO wave's from its plan, a band wave's from its vpdt (as XtWaveFile reads them)
+std::vector<int32_t> encodedEvents(const XtEncoded& E) {
+    if (E.type == 1) return E.solo.evPos;
+    std::vector<int32_t> out;
+    if (E.vpdt.size() < 12) return out;
+    uint32_t w2 = 0;
+    std::memcpy(&w2, E.vpdt.data() + 8, 4);
+    const uint32_t stride = E.channels == 2 ? 0x58 : 0x2e;
+    for (uint32_t e = 0; e < (w2 >> 16) && e < 4096; ++e) {
+        const size_t at = (stride * e + 14) * 2 + 4;
+        if (at + 4 > E.vpdt.size()) break;
+        int32_t x;
+        std::memcpy(&x, E.vpdt.data() + at, 4);
+        out.push_back(x);
+    }
+    return out;
+}
+
+std::vector<std::vector<float>> chansOf(const std::vector<int16_t>& raw, int channels) {
+    std::vector<std::vector<float>> c((size_t)channels);
+    for (size_t i = 0; i + (size_t)channels <= raw.size(); i += (size_t)channels)
+        for (int k = 0; k < channels; ++k) c[(size_t)k].push_back((float)raw[i + (size_t)k] / 32768.0f);
+    return c;
+}
+
+size_t recordsDiff(const std::vector<XtRecord>& a, const std::vector<XtRecord>& b) {
+    size_t d = std::max(a.size(), b.size()) - std::min(a.size(), b.size());
+    for (size_t i = 0; i < std::min(a.size(), b.size()); ++i) d += !(a[i].start16 == b[i].start16 && a[i].len16 == b[i].len16 && a[i].info == b[i].info);
+    return d;
+}
+
+// A SOLO wave as the XT's driver encodes it given the events {0, end}, its records read from the vpdt: what the port's encoder stands for
+bool driverRecords(const std::vector<int16_t>& raw, int channels, std::vector<XtRecord>& recs) {
+    const long frames = (long)raw.size() / channels;
+    const std::vector<uint32_t> ends{ 0, (uint32_t)frames };
+    std::vector<uint8_t> v;
+    XtSoloPlan P;
+    return xtFwEncodeSolo(raw.data(), frames, channels, 64, v, nullptr, false, &ends) && xtSoloReadVpdt(v, channels, recs, P);
+}
+
+// xt_tone <rom> paths [file ...]: the SOLO encode's two paths and a wave's own events, on every wave there is.  The disk image's preset
+// waves (beside the ROM), and the files: a V-Synth wave (.wav, .vpw), or raw int16 samples (name.bin, name.bin:2 for stereo) taken as
+// SOLO.  Each SOLO wave and raw input: XtSynth's path (its events) against the XT's detection's, and without attacks the port's records
+// against the XT's driver's with {0, end}.  Each wave with a vpdt: its events after the encode given its own against its own.
+int encodePaths(int n, char** files) {
+    struct Wv { std::string name; std::vector<int16_t> pcm; int ch = 1, type = 1; bool raw = false; std::vector<int32_t> events; };
+    std::vector<Wv> list;
+    std::string image = xtFwRomPath();
+    const size_t slash = image.find_last_of('/');
+    image = (slash == std::string::npos ? std::string() : image.substr(0, slash + 1)) + "V-SynthXTDiskImage.bin.0.bin";
+    XtDiskImage disk;
+    int presets = 0;
+    if (disk.open(image)) {
+        for (size_t at : disk.presetWaves()) {
+            XtWaveFile w;
+            if (!xtWaveRead(&disk.bytes()[at], disk.bytes().size() - at, w)) continue;
+            list.push_back({ "preset " + std::to_string(presets++), std::move(w.pcm), w.channels, w.encodeType, false, std::move(w.events) });
+        }
+    }
+    for (int i = 0; i < n; ++i) {
+        std::string f = files[i];
+        int ch = 1;
+        if (f.size() > 2 && f.compare(f.size() - 2, 2, ":2") == 0) { ch = 2; f.resize(f.size() - 2); }
+        std::ifstream in(f, std::ios::binary);
+        const std::vector<uint8_t> b((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        const std::string base = f.substr(f.find_last_of('/') + 1);
+        if (f.size() > 4 && f.compare(f.size() - 4, 4, ".bin") == 0) {
+            Wv w{ base, std::vector<int16_t>(b.size() / 2), ch, 1, true, {} };
+            if (!b.empty()) std::memcpy(w.pcm.data(), b.data(), w.pcm.size() * 2);
+            w.pcm.resize(w.pcm.size() / (size_t)ch * (size_t)ch);
+            list.push_back(std::move(w));
+            continue;
+        }
+        XtWaveFile w;
+        if (b.empty() || !xtWaveRead(b.data(), b.size(), w)) continue;
+        list.push_back({ base, std::move(w.pcm), w.channels, w.encodeType, false, std::move(w.events) });
+    }
+    struct Out { bool solo = false, attacks = false, pathSame = true, noResult = false, refused = false, own = false, ownSame = true, between = false, band = false, bandSame = true; size_t recDiff = 0, records = 0, plans = 0, events = 0, entryOff = 0; long ms = 0; std::string note; };
+    // A plan's events whose segment entry isn't the segment containing them (the last whose start is at or before the event)
+    const auto entries = [](const XtSoloPlan& P, Out& o) {
+        if (P.evPos.size() <= 2) return;
+        ++o.plans;
+        for (size_t e = 0; e < P.evPos.size(); ++e) {
+            int k = 0;
+            while (k + 1 < (int)P.segPos.size() && P.segPos[(size_t)k + 1] <= P.evPos[e]) ++k;
+            ++o.events;
+            o.entryOff += P.evSeg[e] != k;
+        }
+    };
+    std::vector<Out> out(list.size());
+    std::atomic<size_t> next{ 0 };
+    const auto work = [&] {
+        for (size_t i; (i = next++) < list.size(); ) {
+            const Wv& w = list[i];
+            Out& o = out[i];
+            const long frames = (long)w.pcm.size() / w.ch;
+            if (frames < 64) continue;
+            const auto chans = chansOf(w.pcm, w.ch);
+            const auto t0 = std::chrono::steady_clock::now();
+            if (w.raw || w.type == 1) {
+                o.solo = true;
+                std::vector<uint32_t> ev;
+                std::vector<uint8_t> v;
+                const bool ok = xtFwEncodeSolo(w.pcm.data(), frames, w.ch, 64, v, &ev, true);   // the detection, and the list the encoder would get
+                o.attacks = ev.size() > 2;
+                // With attacks the run goes on to the vpdt, so a false is the firmware's own: its encoder reads outside memory after a
+                // NaN drift on a run of exact zeros (HARDWARE_FIRMWARE.md, "Where the firmware has no result"), and XtSynth takes the port's
+                o.noResult = o.attacks && !ok;
+                const auto E = xtSynthEncode(chans, 44100.0, 1, 64);
+                if (E) entries(E->solo, o);
+                const std::vector<XtRecord> port = xtSoloEncode(w.pcm.data(), (int)frames, w.ch);
+                o.refused = !E && port.size() < 2;              // XtSynth refuses a wave the encoder finds no records in
+                const std::vector<int32_t> evp(ev.begin(), ev.end());
+                if (!o.refused) o.pathSame = E && (o.noResult ? E->solo.evPos.size() == 2 : (E->solo.evPos.size() > 2) == o.attacks && (!o.attacks || E->solo.evPos == evp));
+                if (!o.pathSame) o.note += " path: detection " + std::to_string(ev.size()) + " events, XtSynth's " + std::to_string(E ? E->solo.evPos.size() : 0) + ";";
+                if (!o.attacks) {
+                    std::vector<XtRecord> fwr;
+                    o.records = port.size();
+                    if (!driverRecords(w.pcm, w.ch, fwr)) o.noResult = true;
+                    else o.recDiff = recordsDiff(port, fwr);
+                    if (o.recDiff) o.note += " records: " + std::to_string(o.recDiff) + " of " + std::to_string(port.size()) + " different;";
+                }
+                if (o.noResult) o.note += " no firmware result;";
+            }
+            if (!w.raw && w.events.size() >= 2 && (w.type == 3 || w.type == 5)) {   // a band wave keeps the detection: how often it finds the stored events
+                o.band = true;
+                const auto E = xtSynthEncode(chans, 44100.0, w.type, 64);
+                o.bandSame = E && encodedEvents(*E) == w.events;
+            }
+            if (!w.raw && w.events.size() >= 2 && w.type == 1) {
+                o.own = true;
+                for (int32_t e : w.events) o.between |= e % 16 != 0;
+                const auto E = xtSynthEncode(chans, 44100.0, w.type, 64, nullptr, 16, &w.events);
+                if (E) entries(E->solo, o);
+                o.ownSame = E && encodedEvents(*E) == w.events;
+                if (!o.ownSame) o.note += " own events: " + std::to_string(w.events.size()) + (o.between ? " (some between samples)" : "") + ", after the encode " + std::to_string(E ? encodedEvents(*E).size() : 0) + " different;";
+            }
+            o.ms = (long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+        }
+    };
+    std::vector<std::thread> pool;
+    for (unsigned k = 0; k < std::max(1u, std::min(8u, std::thread::hardware_concurrency())); ++k) pool.emplace_back(work);
+    for (auto& t : pool) t.join();
+    long solo = 0, attacks = 0, pathDiff = 0, without = 0, recWaves = 0, recDiff = 0, own = 0, ownMulti = 0, ownDiff = 0, between = 0, band = 0, bandMulti = 0, bandSame = 0, noResult = 0, refused = 0, plans = 0, events = 0, entryOff = 0;
+    size_t slowest = 0;
+    for (size_t i = 0; i < list.size(); ++i) {
+        const Out& o = out[i];
+        if (!o.note.empty()) std::printf("  %s:%s\n", list[i].name.c_str(), o.note.c_str());
+        if (o.ms > out[slowest].ms) slowest = i;
+        if (o.solo) { ++solo; attacks += o.attacks; pathDiff += !o.pathSame; noResult += o.noResult; refused += o.refused; if (!o.attacks && !o.noResult) { ++without; recWaves += o.recDiff != 0; recDiff += (long)o.recDiff; } }
+        if (o.own) { ++own; ownMulti += list[i].events.size() > 2; ownDiff += !o.ownSame && !o.between; between += o.between; }
+        if (o.band) { ++band; bandMulti += list[i].events.size() > 2; bandSame += o.bandSame; }
+        plans += (long)o.plans; events += (long)o.events; entryOff += (long)o.entryOff;
+    }
+    std::fprintf(stderr, "paths: slowest %s, %ld ms, %ld frames\n", list.empty() ? "-" : list[slowest].name.c_str(), list.empty() ? 0L : out[slowest].ms, list.empty() ? 0L : (long)(list[slowest].pcm.size() / (size_t)list[slowest].ch));
+    std::printf("paths: %zu waves (%d preset waves of the disk image)\n", list.size(), presets);
+    std::printf("paths: %ld SOLO waves and raw inputs, %ld with attacks, %ld with no firmware result, %ld with no records (XtSynth refuses them); XtSynth's path not the detection's on %ld\n",
+                solo, attacks, noResult, refused, pathDiff);
+    std::printf("paths: of the %ld without attacks and with a result, the port's records against the XT's driver's with {0, end}: %ld waves different, %ld records\n", without, recWaves, recDiff);
+    std::printf("paths: %ld SOLO waves with their own events (%ld with attacks; %ld with events between samples, which the markers can't hold): %ld others whose events the encode doesn't keep\n",
+                own, ownMulti, between, ownDiff);
+    std::printf("paths: %ld band waves with their own events (%ld with attacks), which keep the detection: its events the stored ones on %ld\n", band, bandMulti, bandSame);
+    std::printf("paths: %ld SOLO plans of the XT's encode, %ld events: %ld whose segment entry isn't the segment containing them\n", plans, events, entryOff);
+    return pathDiff || recWaves || ownDiff ? 3 : 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) { return XtToneProbe::run(argc, argv); }
 
 int XtToneProbe::run(int argc, char** argv) {
-    if (argc < 2 || !xtSynthSetRom(argv[1])) { std::fprintf(stderr, "usage: xt_tone rom.2.bin [cases] [seed] [inputs dir]\n"); return 2; }
+    if (argc < 2 || !xtSynthSetRom(argv[1])) { std::fprintf(stderr, "usage: xt_tone rom.2.bin [cases] [seed] [inputs dir] | paths [file ...]\n"); return 2; }
+    if (argc > 2 && std::string(argv[2]) == "paths") return encodePaths(argc - 3, argv + 3);
 #if defined(__aarch64__)
     {   // denormals flushed, as the SH-4 does (FPSCR.DN = 1) and the plugin's audio thread does
         uint64_t fpcr;
@@ -1055,17 +1214,20 @@ int XtToneProbe::run(int argc, char** argv) {
             if (!loadWave(fw, next, dir + w.file, w.ch, w.type, 30000, t)) { std::fprintf(stderr, "wave %s\n", w.file); return 2; }
             waves.push_back(std::move(t));
         }
-        // Band waves of several events, for Playback Mode STEP and EVENT: 4, 6, 8 and 12 hits, BACKING and ENSEMBLE, mono and stereo.  12 hits
-        // make 13 events, a list whose last index is a multiple of 12, where EVENT's rounding up to octaves (0x894e1200) has nothing to add.  The
-        // encoder merges hits closer than about 3000 frames, so those are 48000 frames long
+        // Band and SOLO waves of several events, for Playback Mode STEP and EVENT: 4, 6, 8 and 12 hits, BACKING and ENSEMBLE, mono and stereo,
+        // and SOLO of 6 and 4 (the XT's own encode, segmented at the attacks).  12 hits make 13 events, a list whose last index is a multiple of
+        // 12, where EVENT's rounding up to octaves (0x894e1200) has nothing to add.  The encoder merges hits closer than about 3000 frames, so
+        // those are 48000 frames long
         struct H { int hits, ch, type; long frames; };
-        for (const H& w : { H{ 4, 1, 3, 30000 }, H{ 6, 2, 5, 30000 }, H{ 8, 1, 5, 30000 }, H{ 4, 2, 3, 30000 }, H{ 12, 1, 3, 48000 }, H{ 12, 2, 5, 48000 } }) {
+        for (const H& w : { H{ 4, 1, 3, 30000 }, H{ 6, 2, 5, 30000 }, H{ 8, 1, 5, 30000 }, H{ 4, 2, 3, 30000 }, H{ 12, 1, 3, 48000 }, H{ 12, 2, 5, 48000 },
+                            H{ 6, 1, 1, 30000 }, H{ 4, 2, 1, 30000 } }) {
             TestWave t;
             if (!makeWave(fw, next, hitsWave(w.hits, w.ch, w.frames, 777u + (uint32_t)w.hits), w.ch, w.type, t)) { std::fprintf(stderr, "hits wave\n"); return 2; }
             eventWaves.push_back(std::move(t));
         }
         checkSoloRecords(dir, "vocal.bin", 1);
-        checkSoloRecords(dir, "drum.bin", 2);
+        checkSoloRecords(dir, "w358.bin", 2);                // stereo with no attacks: the port's own encode
+        checkSoloRecords(dir, "drum.bin", 2);                // with attacks: the XT's, read from its vpdt
         // LITE waves (type 0), mono and stereo: the samples alone, for the last cases
         for (const W& w : { W{ "vocal.bin", 1, 0 }, W{ "w358.bin", 2, 0 } }) {
             TestWave t;
@@ -1076,6 +1238,9 @@ int XtToneProbe::run(int argc, char** argv) {
     }
     // Playback Mode's waves: the hits, the others, and LITE
     std::vector<TestWave> playWaves = eventWaves;
+    // A SOLO wave's segments: the SOLO waves of hits alone
+    std::vector<TestWave> soloWaves;
+    for (const TestWave& t : eventWaves) if (t.type == 1) soloWaves.push_back(t);
     playWaves.insert(playWaves.end(), waves.begin(), waves.end());
     playWaves.insert(playWaves.end(), liteWaves.begin(), liteWaves.end());
     XtSynth syn;
@@ -1083,7 +1248,8 @@ int XtToneProbe::run(int argc, char** argv) {
     syn.setSample(nullptr, 0, 1);                       // the Wave Numbers patchOf gives, from the first patch on, as the firmware's
     syn.setSample(nullptr, 1, 2);
     Report rep;
-    long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0, zoneNotes = 0, zonesSeen = 0, playerTakes = 0, endSkips = 0, eventNotes = 0;
+    long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0, zoneNotes = 0, zonesSeen = 0, playerTakes = 0, endSkips = 0, eventNotes = 0, soloEventNotes = 0, segMoves = 0;
+    std::map<const XtSoloVoice*, int> segSeen;                    // each SOLO player's moves between segments, as last counted
     float L[32], R[32];
     uint32_t fwFree[16][3] = {};            // the free-running objects of LFO 1, 2 and 5, by zone
     static constexpr uint32_t kFreeLfo[3] = { 1, 2, 5 };
@@ -1193,6 +1359,9 @@ int XtToneProbe::run(int argc, char** argv) {
     const int zoneFrom = liteFrom + nLite, nZone = waves.empty() ? 0 : nCases / 4;
     // Then Playback Mode, last: two notes of a part, each OSC on a mode of its own, the second while the first is held or after it
     const int playFrom = zoneFrom + nZone, nPlay = waves.empty() ? 0 : nCases / 4;
+    // Then a SOLO wave's segments, last of all: Playback Mode's cases on the SOLO waves of hits, their loops at a segment's start, across
+    // one, ending at an event or anywhere (the random cases' loops stay near the start, inside the first segment of either)
+    const int segFrom = playFrom + nPlay, nSegs = waves.empty() ? 0 : nCases / 10;
     const auto zoneLine = [&] {
         int n = 0;
         for (int z = 1; z < 16; ++z) n += (zonesSeen >> z) & 1;
@@ -1200,9 +1369,9 @@ int XtToneProbe::run(int argc, char** argv) {
     };
     // Each zone's OSC's own copy of its wave's header and loop chunks, as a zone's settings of the wave's own are its own here
     constexpr uint32_t kZoneChunks = kRam + 0x2800000;
-    for (int g = 0; g < playFrom + nPlay; ++g) {
+    for (int g = 0; g < segFrom + nSegs; ++g) {
         rep.caseNo = g;
-        const bool playCase = g >= playFrom, zoneCase = g >= zoneFrom && !playCase;
+        const bool playCase = g >= playFrom, segCase = g >= segFrom, zoneCase = g >= zoneFrom && !playCase;
         const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom && g < liteFrom, liteCase = g >= liteFrom && !zoneCase && !playCase, extra = patchCase || tuneCase || liteCase || zoneCase || playCase;
         const bool twoInTick = g >= tickFrom && !extra;
         if (g == nCases + nSweep) summary("tone");
@@ -1212,6 +1381,13 @@ int XtToneProbe::run(int argc, char** argv) {
         if (nLite && g == liteFrom) summary("tone, a wave's own tuning");
         if (nZone && g == zoneFrom) summary("tone, LITE waves");
         if (nPlay && g == playFrom) { zoneLine(); summary("tone, zones"); syn.setZones(nullptr); }
+        if (nSegs && g == segFrom) {
+            std::printf("tone, playback modes: %ld OSCs took an earlier note's player (LEGATO), %ld didn't as it had reached its wave's end; %ld started from an event (STEP, EVENT)\n",
+                        playerTakes, endSkips, eventNotes);
+            std::printf("tone, playback modes: %ld SOLO notes started from an event; %ld moves between a SOLO wave's segments\n", soloEventNotes, segMoves);
+            summary("tone, playback modes");
+            playerTakes = endSkips = eventNotes = soloEventNotes = segMoves = 0;
+        }
         const bool sweep = g >= nCases && g < nCases + nSweep;
         const size_t sweepAt = sweep ? listed[(size_t)(g - nCases) / 4] : 0;
         const bool sweepCosm = sweep && sweepAt >= kCosmPrm && sweepAt < kCosmPrm + 64;
@@ -1229,10 +1405,10 @@ int XtToneProbe::run(int argc, char** argv) {
         const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase && !liteCase && !zoneCase && !playCase) || sweepOn == 2 || ((tuneCase || liteCase || zoneCase || playCase) && g % 2 == 0);
         // one case in two plays a wave on OSC 1 (with the analog OSC 2 or alone); the last
         // ones a wave on OSC 2, over OSC 1 off, analog or on another wave
-        std::vector<TestWave>& pool = liteCase ? liteWaves : playCase ? playWaves : waves;
+        std::vector<TestWave>& pool = liteCase ? liteWaves : segCase ? soloWaves : playCase ? playWaves : waves;
         const TestWave* wv2 = osc2Case ? &pool[(size_t)r.range(0, (int)pool.size() - 1)] : nullptr;
         const TestWave* wv = (patchCase ? patchCtl.oscType == 1 : sweepOn == 1 || (!sweep && !twoInTick && g % 2 == 1)) && !pool.empty() ? &pool[(size_t)r.range(0, (int)pool.size() - 1)] : nullptr;
-        // A patch's STEP or EVENT on a SOLO wave needs the XT's segments by events (not done): that OSC plays the next band wave instead
+        // A patch's STEP or EVENT on a SOLO wave with Vari off needs the linear player's events (not done): that OSC plays the next band wave instead
         const auto band = [&](const TestWave* w) {
             for (size_t i = 0; w && w->type == 1 && i < pool.size(); ++i) {
                 const TestWave* x = &pool[((size_t)(w - pool.data()) + i) % pool.size()];
@@ -1240,10 +1416,10 @@ int XtToneProbe::run(int argc, char** argv) {
             }
             return w;
         };
-        if (patchCase && patchCtl.osc2.playbackMode >= 2) wv2 = band(wv2);
-        if (patchCase && patchCtl.playbackMode >= 2) wv = band(wv);
+        if (patchCase && patchCtl.osc2.playbackMode >= 2 && !patchCtl.osc2.vari) wv2 = band(wv2);
+        if (patchCase && patchCtl.playbackMode >= 2 && !patchCtl.vari) wv = band(wv);
         if (wv && wv == wv2) wv = &pool[(size_t)((wv - pool.data() + 1) % (long)pool.size())];   // a wave's loop is its own
-        if (patchCase && patchCtl.playbackMode >= 2 && wv && wv->type == 1) {
+        if (patchCase && patchCtl.playbackMode >= 2 && !patchCtl.vari && wv && wv->type == 1) {
             wv = band(wv);
             for (size_t i = 0; wv == wv2 && i < pool.size(); ++i) wv = band(&pool[((size_t)(wv - pool.data()) + 1) % pool.size()]);
         }
@@ -1299,6 +1475,31 @@ int XtToneProbe::run(int argc, char** argv) {
         };
         loopEdge(ctl, wv);
         loopEdge(ctl.osc2, wv2);
+        // A SOLO wave's segments: the loop on in most cases, starting at a segment's start (the sample under it or over it), across one,
+        // ending at an event, inside one or anywhere, and in half a Start Offset before it
+        const auto segLoop = [&](OscC& o, const TestWave* t) {
+            if (!segCase || !t || t->type != 1) return;
+            const XtSoloPlan& P = t->enc->solo;
+            const int last = (int)t->fw.frames - 1, nseg = (int)P.segPos.size(), nev = (int)P.evPos.size();
+            if (nseg < 3 || nev < 3) return;
+            o.loop = !r.one(4);
+            o.loopMode = r.range(0, 2);
+            const int len = r.one(2) ? r.range(16, 400) : r.range(400, 3000);
+            int a = 0;
+            switch (r.range(0, 4)) {
+            case 0: { const int32_t s = P.segPos[(size_t)r.range(1, nseg - 2)]; a = r.one(2) ? s / 16 : (s + 15) / 16; break; }
+            case 1: a = P.segPos[(size_t)r.range(1, nseg - 2)] / 16 - r.range(1, len - 1); break;
+            case 2: a = P.evPos[(size_t)r.range(1, nev - 2)] / 16 - len; break;
+            case 3: a = P.segPos[(size_t)r.range(1, nseg - 2)] / 16 + r.range(1, 1500); break;
+            default: a = r.range(0, last - len);
+            }
+            a = std::clamp(a, 0, last - 16);
+            o.loopStart = (float)a / (float)last;
+            o.loopEnd = (float)std::min(a + len, last) / (float)last;
+            if (r.one(2)) o.startOffset = std::max(0, a - r.range(0, 3000));
+        };
+        segLoop(ctl, wv);
+        segLoop(ctl.osc2, wv2);
         if (sweep) {
             // analog on both OSCs, all the envelopes and LFOs bound and running, a
             // portamento gliding: whatever a field moves can be seen
@@ -1316,9 +1517,9 @@ int XtToneProbe::run(int argc, char** argv) {
                            // Playback Mode on a band wave from EVENT, with the Loop on: the move takes the update's Loop bit to the player (0x894f3fb6)
                            const size_t p1 = (size_t)(reinterpret_cast<const char*>(&c0.playbackMode) - reinterpret_cast<const char*>(&c0)),
                                         p2 = (size_t)(reinterpret_cast<const char*>(&c0.osc2.playbackMode) - reinterpret_cast<const char*>(&c0));
-                           const auto band = [](const TestWave* w) { return w && (w->type == 3 || w->type == 5); };
-                           if (at == p1 && band(wv)) { ctl.loop = true; ctl.playbackMode = 3; }
-                           if (at == p2 && band(wv2)) { ctl.osc2.loop = true; ctl.osc2.playbackMode = 3; } }
+                           const auto band = [](const TestWave* w, bool vari) { return w && (w->type == 3 || w->type == 5 || (w->type == 1 && vari)); };
+                           if (at == p1 && band(wv, ctl.vari)) { ctl.loop = true; ctl.playbackMode = 3; }
+                           if (at == p2 && band(wv2, ctl.osc2.vari)) { ctl.osc2.loop = true; ctl.osc2.playbackMode = 3; } }
             // two COSMs whose block takes the envelopes' levels: a Comb, a Side Band Filter
             for (Ctl::Cosm& k : ctl.cosm) { k.on = true; k.lfoKeySync = true; }
             ctl.cosm[0].type = 4;
@@ -1433,16 +1634,16 @@ int XtToneProbe::run(int argc, char** argv) {
         // what the case does besides one note: 0 none, 1 a second note on a POLY part,
         // 2 on a MONO part with Legato, 3 on a MONO part without
         const int kind = patchCase ? (ctl.mono ? (ctl.legato ? 2 : 3) : g % 2) : playCase ? (g % 4 == 3 ? 3 : 1) : sweep || twoInTick ? 2 : g % 5 == 0 ? 1 : g % 5 == 1 ? 2 : g % 5 == 2 ? 3 : 0;
-        // Playback Mode by what the OSC plays: any of the four on a band wave, LITE (whose converter doesn't read it) and the analog OSC; RETRIGGER
-        // or LEGATO on SOLO, whose STEP and EVENT need the XT's segments by events (not done).  A band wave's list now and then its own: some of
-        // its events, out of order or the same twice, or one past its last (the player takes the last)
+        // Playback Mode by what the OSC plays: any of the four on a band or SOLO wave, LITE (whose converter doesn't read it) and the analog OSC;
+        // RETRIGGER or LEGATO on SOLO with Vari off, whose STEP and EVENT need the linear player's events (not done).  A band or SOLO wave's list
+        // now and then its own: some of its events, out of order or the same twice, or one past its last (the player takes the last)
         if (zoneCase)                                // the zones' first, by the earlier note of its own zone alone
-            for (int k = 0; k < 2; ++k) { const TestWave* t = k ? wv2 : wv; (k ? ctl.osc2.playbackMode : ctl.playbackMode) = t && t->type == 1 ? r.range(0, 1) : r.range(0, 3); }
+            for (int k = 0; k < 2; ++k) (k ? ctl.osc2.playbackMode : ctl.playbackMode) = drawMode(r, k ? wv2 : wv, k ? ctl.osc2.vari : ctl.vari);
         if (playCase) {
             for (int k = 0; k < 2; ++k) {
                 const TestWave* t = k ? wv2 : wv;
-                (k ? ctl.osc2.playbackMode : ctl.playbackMode) = t && t->type == 1 ? r.range(0, 1) : r.range(0, 3);
-                if (!t || (t->type != 3 && t->type != 5)) continue;
+                (k ? ctl.osc2.playbackMode : ctl.playbackMode) = drawMode(r, t, k ? ctl.osc2.vari : ctl.vari);
+                if (!t || (t->type != 1 && t->type != 3 && t->type != 5)) continue;
                 uint32_t w2 = 0;
                 std::memcpy(&w2, t->enc->vpdt.data() + 8, 4);
                 const int n = (int)(w2 >> 16);
@@ -1602,7 +1803,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 Ctl zc = drawControls(r, g, zw[0] != nullptr, zw[1] != nullptr);
                 for (int k = 0; k < 2; ++k) {
                     const TestWave* t = zw[k];
-                    (k ? zc.osc2.playbackMode : zc.playbackMode) = t && t->type == 1 ? r.range(0, 1) : r.range(0, 3);   // as the playback cases draw it
+                    (k ? zc.osc2.playbackMode : zc.playbackMode) = drawMode(r, t, k ? zc.osc2.vari : zc.vari);   // as the playback cases draw it
                     if (!t) continue;
                     if (std::find(owned.begin(), owned.end(), t) == owned.end()) { waveOwn(*t); owned.push_back(t); }
                     OscC& o = k ? zc.osc2 : static_cast<OscC&>(zc);
@@ -1831,6 +2032,12 @@ int XtToneProbe::run(int argc, char** argv) {
                         if ((int32_t)fw.c.rd32(PL + 0xf4) != s.xfg.headA()) rep.bad(os + "lite head a", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xf4), s.xfg.headA(), blk);
                         if ((int32_t)fw.c.rd32(PL + 0xf8) != s.xfg.headB()) rep.bad(os + "lite head b", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xf8), s.xfg.headB(), blk);
                     }
+                    if (!s.linear && !s.lite && s.wave->type == 1) {
+                        int& seen = segSeen[&s.solo];
+                        const int m = s.solo.segmentMoves();
+                        segMoves += m >= seen ? m - seen : m;
+                        seen = m;
+                    }
                     if (s.linear) {                  // its own state
                         rep.checks += 4;
                         if ((int32_t)fw.c.rd32(PL + 0xec) != s.lin.position()) rep.bad(os + "linear position", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xec), s.lin.position(), blk);
@@ -1888,9 +2095,10 @@ int XtToneProbe::run(int argc, char** argv) {
                     const uint32_t V = Firmware::voice(fn[i], o);
                     // LEGATO: 0x894f21c0's flag, and the copy unless the earlier player had reached its wave's end (0x894f2d24)
                     if (prev && fw.c.rd32(V + 0x87c)) ++((int8_t)fw.c.rd8(Firmware::voice(*prev, o) + 0xd4 + 4) == 1 ? endSkips : playerTakes);
-                    // STEP and EVENT: a band player whose block's 0x80 is clear starts from an event (0x894f3150)
+                    // STEP and EVENT: a band or SOLO player whose block's 0x80 is clear starts from an event (0x894f3150)
                     const uint32_t mode = fw.c.rd32(V + 0x80);
                     if (fw.c.rd32(V) == 2 && (mode == 3 || mode == 5) && !(fw.c.rd8(V + 0xb4) & 0x80)) ++eventNotes;
+                    if (fw.c.rd32(V) == 2 && (mode == 1 || mode == 6) && !(fw.c.rd8(V + 0xb4) & 0x80)) ++soloEventNotes;   // SOLO: modes 1 and 6
                 }
             }
             syn.noteOn(raw[i], (float)vel[i] / 127.0f);
@@ -2222,7 +2430,7 @@ int XtToneProbe::run(int argc, char** argv) {
                     n = one;
                 }
                 else if (playCase)                       // the whole panel: Playback Mode drawn again as at the case's start, not left at RETRIGGER
-                    for (int k = 0; k < 2; ++k) { const TestWave* t = k ? wv2 : wv; (k ? n.osc2.playbackMode : n.playbackMode) = t && t->type == 1 ? r.range(0, 1) : r.range(0, 3); }
+                    for (int k = 0; k < 2; ++k) (k ? n.osc2.playbackMode : n.playbackMode) = drawMode(r, k ? wv2 : wv, k ? ctl.osc2.vari : ctl.vari);   // Vari held, below
                 n.on = ctl.on; n.oscType = ctl.oscType; n.rootKey = ctl.rootKey; n.ana.wave = ctl.ana.wave; n.ana.subOctave = ctl.ana.subOctave; n.octave = ctl.octave;
                 n.osc2.on = ctl.osc2.on; n.osc2.oscType = ctl.osc2.oscType; n.osc2.ana.wave = ctl.osc2.ana.wave; n.osc2.ana.subOctave = ctl.osc2.ana.subOctave;
                 // Switched during a LITE note, the XT's next update installs the other player on this one's state (0x894f6bf0 → 0x894f2010 by the
@@ -2231,6 +2439,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 if (liteCase) { n.vari = ctl.vari; n.osc2.vari = ctl.osc2.vari; }
                 if (playCase && wv && wv->type == 0) n.vari = ctl.vari;
                 if (playCase && wv2 && wv2->type == 0) n.osc2.vari = ctl.osc2.vari;
+                if (segCase && r.one(3)) { n.vari = !ctl.vari; n.osc2.vari = !ctl.osc2.vari; }   // Vari thrown, so that what holds it below is seen
                 n.oscTimeOffset = ctl.oscTimeOffset; n.lfoKeySync = ctl.lfoKeySync; n.osc2.lfoKeySync = ctl.osc2.lfoKeySync; n.tvaLfoKeySync = ctl.tvaLfoKeySync;
                 n.structure = ctl.structure;             // latched at note-on, but its own check is xt_analog's
                 // switched with the pad in play, a Beat Keep's way back runs one player's seek on the other's state, on the XT too; the sweep's own
@@ -2250,9 +2459,10 @@ int XtToneProbe::run(int argc, char** argv) {
                     return false;
                 };
                 // and on a SOLO wave with LEGATO: thrown before the next note, the XT takes the earlier player into the other kind (Vari is the
-                // block's 0x20, not the voice's mode) and reads anywhere; XtSynth takes a player only into its own kind
-                if (wv && wv->type == 1 && (ctl.playbackMode == 1 || n.playbackMode == 1)) n.vari = ctl.vari;
-                if (wv2 && wv2->type == 1 && (ctl.osc2.playbackMode == 1 || n.osc2.playbackMode == 1)) n.osc2.vari = ctl.osc2.vari;
+                // block's 0x20, not the voice's mode) and reads anywhere; XtSynth takes a player only into its own kind.  With STEP or EVENT,
+                // Vari off's converter takes the event numbers as samples, which isn't done
+                if (wv && wv->type == 1 && (ctl.playbackMode >= 1 || n.playbackMode >= 1)) n.vari = ctl.vari;
+                if (wv2 && wv2->type == 1 && (ctl.osc2.playbackMode >= 1 || n.osc2.playbackMode >= 1)) n.osc2.vari = ctl.osc2.vari;
                 if (padByCc(ctl) || padByCc(n)) {
                     if ((ctl.timeTrip || n.timeTrip) && (ctl.beatKeep || n.beatKeep)) n.vari = ctl.vari;
                     if ((ctl.osc2.timeTrip || n.osc2.timeTrip) && (ctl.osc2.beatKeep || n.osc2.beatKeep)) n.osc2.vari = ctl.osc2.vari;
@@ -2328,16 +2538,17 @@ int XtToneProbe::run(int argc, char** argv) {
                 leftOff = true;
                 break;
             }
-            // A band player's seek that read its records past the vpdt (XtMbPlayer::startAt): the XT reads RAM there, and the port
-            // stops where it would spin on its zeros, so from here neither is the XT's own.  As a read outside memory, the case ends here
+            // A band player's seek that read its records past the vpdt (XtMbPlayer::startAt), or a SOLO player's walk into the segment after
+            // its list (XtSoloVoice::segForward): the XT reads RAM there, and the port stops (the band player where it would spin on its
+            // zeros), so from here neither is the XT's own.  As a read outside memory, the case ends here
             {
                 bool past = false;
                 for (FwNote* n : order)
                     if (n->live && n->vi >= 0)
-                        for (int o = 0; o < 2; ++o) { const XtSynth::OscVoice& sv = osc(syn.voice[n->vi], o); past |= sv.on && !sv.analog && !sv.lite && !sv.linear && sv.wave && sv.wave->type != 1 && sv.mb.readPastWave(); }
+                        for (int o = 0; o < 2; ++o) { const XtSynth::OscVoice& sv = osc(syn.voice[n->vi], o); past |= sv.on && !sv.analog && !sv.lite && !sv.linear && sv.wave && (sv.wave->type == 1 ? sv.solo.readPastWave() : sv.mb.readPastWave()); }
                 if (past) {
                     ++wild;
-                    if (rep.first) std::printf("  case %d block %d: a band seek read past its vpdt\n", g, blk);
+                    if (rep.first) std::printf("  case %d block %d: a seek or an event read past its vpdt\n", g, blk);
                     leftOff = true;
                     break;
                 }
@@ -2446,9 +2657,11 @@ int XtToneProbe::run(int argc, char** argv) {
         fw.c.write(kFmLines, syn.modShared.line, sizeof(syn.modShared.line));
     }
     if (nZone && !nPlay) zoneLine();
-    if (nPlay) std::printf("tone, playback modes: %ld OSCs took an earlier note's player (LEGATO), %ld didn't as it had reached its wave's end; %ld started from an event (STEP, EVENT)\n",
-                           playerTakes, endSkips, eventNotes);
-    summary(nPlay ? "tone, playback modes" : nZone ? "tone, zones" : nLite ? "tone, LITE waves" : nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
+    if (nPlay && !nSegs) std::printf("tone, playback modes: %ld OSCs took an earlier note's player (LEGATO), %ld didn't as it had reached its wave's end; %ld started from an event (STEP, EVENT)\n",
+                                     playerTakes, endSkips, eventNotes);
+    if (nPlay && !nSegs) std::printf("tone, playback modes: %ld SOLO notes started from an event; %ld moves between a SOLO wave's segments\n", soloEventNotes, segMoves);
+    if (nSegs) std::printf("tone, SOLO segments: %ld notes started from an event; %ld moves between segments; %ld took an earlier note's player\n", soloEventNotes, segMoves, playerTakes);
+    summary(nSegs ? "tone, SOLO segments" : nPlay ? "tone, playback modes" : nZone ? "tone, zones" : nLite ? "tone, LITE waves" : nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
     syn.setZones(nullptr);
     fw.zpar.clear();
     fw.zoneWave.clear();
@@ -2631,6 +2844,83 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         std::printf("tone, the host's clock: %ld clocks\n", all);
         summary("tone, the host's clock");
+    }
+    if (argc > 4) {   // A wave's own events (XtWaveFile::events) in place of the detection, and a SOLO wave without attacks on the port
+        rep.caseNo = -1;
+        long waves = 0;
+        struct H { int hits, ch, type; long frames; };
+        for (const H& w : { H{ 4, 1, 3, 30000 }, H{ 6, 2, 5, 30000 }, H{ 6, 1, 1, 30000 }, H{ 4, 2, 1, 30000 } }) {   // band waves: their own events not taken
+            const std::vector<int16_t> raw = hitsWave(w.hits, w.ch, w.frames, 777u + (uint32_t)w.hits);
+            const auto chans = chansOf(raw, w.ch);
+            const auto E0 = xtSynthEncode(chans, 44100.0, w.type, 64);
+            ++waves;
+            rep.checks += 3;
+            if (!E0) { rep.bad("own events: the encode", "type %.0f, %.0f channels", w.type, w.ch, 0); continue; }
+            // the detection's own events given back: the same encode, byte for byte (a band wave's: the detection again)
+            const std::vector<int32_t> ev0 = encodedEvents(*E0);
+            // the events as its vpdt has them: from the start to the end, rising
+            rep.checks += 5;
+            bool rising = ev0.size() >= 2 && ev0.front() == 0 && ev0.back() == (int32_t)(w.frames * 16);
+            for (size_t i = 1; i < ev0.size(); ++i) rising = rising && ev0[i] > ev0[i - 1];
+            if (!rising) rep.bad("own events: the vpdt's", "%.0f events, the last %.0f", (double)ev0.size(), ev0.empty() ? 0.0 : (double)ev0.back(), 0);
+            const auto E1 = xtSynthEncode(chans, 44100.0, w.type, 64, nullptr, 16, &ev0);
+            if (!E1 || E1->vpdt != E0->vpdt || encodedEvents(*E1) != ev0) rep.bad("own events: the detection's given back", "events %.0f, vpdt %.0f bytes", (double)ev0.size(), E1 ? (double)E1->vpdt.size() : 0.0, 0);
+            // an edit: the second attack gone, the first 37 samples later
+            std::vector<int32_t> ev = ev0;
+            if (ev.size() >= 4) { ev.erase(ev.begin() + 2); if (ev[1] + 37 * 16 < ev[2]) ev[1] += 37 * 16; }
+            const auto E2 = xtSynthEncode(chans, 44100.0, w.type, 64, nullptr, 16, &ev);
+            if (!E2 || encodedEvents(*E2) != (w.type == 1 ? ev : ev0)) rep.bad("own events: an edited list", "events %.0f, after the encode %.0f", (double)ev.size(), E2 ? (double)encodedEvents(*E2).size() : 0.0, 0);
+            // a list that doesn't end at the wave's end isn't this audio's: the detection's
+            std::vector<int32_t> cut(ev0.begin(), ev0.end() - 1);
+            const auto E4 = xtSynthEncode(chans, 44100.0, w.type, 64, nullptr, 16, &cut);
+            if (!E4 || encodedEvents(*E4) != ev0) rep.bad("own events: a list short of the end", "events %.0f, after the encode %.0f", (double)cut.size(), E4 ? (double)encodedEvents(*E4).size() : 0.0, 0);
+            // an event between samples, as V-Trainer's can be: the sample under it
+            std::vector<int32_t> mid = ev0;
+            if (mid.size() >= 3) mid[1] += 9;
+            const auto E5 = xtSynthEncode(chans, 44100.0, w.type, 64, nullptr, 16, &mid);
+            if (!E5 || encodedEvents(*E5) != ev0) rep.bad("own events: one between samples", "events %.0f, the second after the encode %.0f", (double)mid.size(), E5 && encodedEvents(*E5).size() > 1 ? (double)encodedEvents(*E5)[1] : 0.0, 0);
+            // markers not from the start to the end: the firmware's encodes refuse them
+            if (ev0.size() >= 3)
+                for (const auto& bad : { std::vector<uint32_t>{ 0, (uint32_t)(ev0[1] / 16), (uint32_t)w.frames - 100 }, std::vector<uint32_t>{ 100, (uint32_t)(ev0[1] / 16), (uint32_t)w.frames } }) {
+                    std::vector<uint8_t> v;
+                    const bool took = w.type == 1 ? xtFwEncodeSolo(raw.data(), w.frames, w.ch, 64, v, nullptr, false, &bad)
+                                                  : xtFwEncodeMulti(w.type, raw.data(), w.frames, w.ch, v, 64, nullptr, &bad);
+                    if (took) rep.bad("own events: markers not from the start to the end", "type %.0f, from %.0f", w.type, (double)bad.front(), 0);
+                }
+            // on a SOLO wave, edited down to the start and the end: the port's records
+            if (w.type == 1) {
+                const std::vector<int32_t> ends{ 0, (int32_t)(w.frames * 16) };
+                const auto E3 = xtSynthEncode(chans, 44100.0, 1, 64, nullptr, 16, &ends);
+                std::vector<XtRecord> port = xtSoloEncode(raw.data(), (int)w.frames, w.ch);
+                if (!E3 || E3->solo.evPos != ends || E3->solo.segStart.size() != port.size()) rep.bad("own events: none between", "records %.0f, the port's %.0f", E3 ? (double)E3->solo.segStart.size() : 0.0, (double)port.size(), 0);
+            }
+        }
+        // SOLO waves without attacks: XtSynth on the port, whose records are the XT's driver's given {0, end}
+        const std::string dir = std::string(argv[4]) + "/";
+        for (const auto& [file, ch] : { std::pair<const char*, int>{ "vocal.bin", 1 }, { "w358.bin", 2 } }) {
+            std::ifstream in(dir + file, std::ios::binary);
+            const std::vector<uint8_t> b((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            std::vector<int16_t> raw(b.size() / 2 / (size_t)ch * (size_t)ch);
+            if (!raw.empty()) std::memcpy(raw.data(), b.data(), raw.size() * 2);
+            const long frames = (long)raw.size() / ch;
+            ++waves;
+            rep.checks += 2;
+            std::vector<uint32_t> ev;
+            std::vector<uint8_t> v;
+            xtFwEncodeSolo(raw.data(), frames, ch, 64, v, &ev, true);
+            const auto E = xtSynthEncode(chansOf(raw, ch), 44100.0, 1, 64);
+            if (!E || ev.size() > 2 || E->solo.evPos.size() != 2) rep.bad(std::string("own events: ") + file + "'s path", "detection %.0f events, XtSynth's %.0f", (double)ev.size(), E ? (double)E->solo.evPos.size() : 0.0, 0);
+            std::vector<XtRecord> fwr;
+            const std::vector<XtRecord> port = xtSoloEncode(raw.data(), (int)frames, ch);
+            const size_t d = driverRecords(raw, ch, fwr) ? recordsDiff(port, fwr) : port.size() + 1;
+            if (d) rep.bad(std::string("own events: ") + file + "'s records", "%.0f of %.0f different from the driver's", (double)d, (double)port.size(), 0);
+        }
+        std::printf("tone, own events: %ld waves, %ld checks\n", waves, rep.checks);
+        long sub = 0;
+        for (const auto& k : rep.kinds) { std::printf("  %-28s %ld different\n", k.first.c_str(), k.second); sub += k.second; }
+        std::printf("tone, own events: %ld different\n", sub);
+        total += sub;
+        rep.kinds.clear();
     }
     return total ? 3 : 0;
 }

@@ -42,7 +42,8 @@ private:
 // The SOLO encoder (0x8951dc40 + 0x8951e120), as XtSoloEncoder.cpp ports it: n frames
 // of mono, or of interleaved stereo in the mode the XT's driver gives a stereo wave
 // (0x89515ed6: 0x8951e120(3), and (2) for mono).
-bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int channels = 1, std::vector<uint64_t>* trace = nullptr);
+bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int channels = 1, std::vector<uint64_t>* trace = nullptr,
+                    const std::vector<uint32_t>* events = nullptr);   // the event list (1/16 sample), else {n·16}
 
 // The firmware's own SOLO player, for validation: the records written as the
 // XT lays out a one-segment SOLO vpdt (a start and an end event, their
@@ -97,8 +98,18 @@ bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMb
 // depth 0..127 runs the XT's attack detection at that Encode Depth (module
 // init 0x89516400, then 0x895164c0(depth)), as the encode page does.
 // `events`, if given, receives the number of events in the vpdt.
+// `markers`: the events' positions in samples, the first 0 and the last the end, in place of the detection: the markers as
+// the detection leaves them (`0x895164c0`: {position, position, 0}, linked), so 0x895126d0 and all after it go on as from it.
 bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, std::vector<uint8_t>& vpdt,
-                     int depth = -1, int* events = nullptr);
+                     int depth = -1, int* events = nullptr, const std::vector<uint32_t>* markers = nullptr);
+
+// The XT's SOLO encode: attack detection at this Encode Depth (as xtFwEncodeMulti), then the SOLO encode driver
+// 0x89515e28: 0x895126d0 makes the event list from the markers, the encoder (0x8951dc40, 0x8951e120 in mode 2 or 3)
+// splits the records at them, and the vpdt (chunk 5) is taken when it is written.  `events`: the list the encoder got.
+// onlyWithAttacks: stop at the encoder (false, no vpdt) when the list has nothing between the start and the end.  `markers`: the
+// events in place of the detection, as xtFwEncodeMulti's.
+bool xtFwEncodeSolo(const int16_t* pcm, long frames, int channels, int depth, std::vector<uint8_t>& vpdt,
+                    std::vector<uint32_t>* events = nullptr, bool onlyWithAttacks = false, const std::vector<uint32_t>* markers = nullptr);
 
 // The XT's WAV import converter to 44.1 kHz: setup 0x8952dec0 (step =
 // rate·2^24/44100), the 16-bit driver 0x8952e4d0 over the whole sample, then

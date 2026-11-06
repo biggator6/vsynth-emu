@@ -8,6 +8,7 @@
 #include <cfenv>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 
 // The grains, the filter and the gain are the SH-4's single precision, as XtMbPlayer's: plain
 // float arithmetic under FE_TOWARDZERO (noteOn and the render set it), FMAC a product then a sum.
@@ -41,6 +42,66 @@ double wrapAnchor(double a) {
 }
 }
 
+bool xtSoloReadVpdt(const std::vector<uint8_t>& v, int channels, std::vector<XtRecord>& recs, XtSoloPlan& P) {
+    recs.clear();
+    P.evPos.clear(); P.evSeg.clear(); P.segPos.clear(); P.segRec.clear(); P.segFirst.clear();
+    P.pastStart = 0x7fffffff; P.pastLen = 0;
+    const size_t n = v.size();
+    const auto r32 = [&](size_t o) -> uint32_t { uint32_t x = 0; if (o + 4 <= n) std::memcpy(&x, &v[o], 4); return x; };
+    const auto r16 = [&](size_t o) -> uint16_t { uint16_t x = 0; if (o + 2 <= n) std::memcpy(&x, &v[o], 2); return x; };
+    if (n < 64 || (channels != 1 && channels != 2)) return false;
+    const size_t st = channels == 2 ? 16 : 10;
+    const uint32_t nev = r32(8) >> 16;
+    if (nev < 2 || nev > 4096) return false;
+    const size_t seg0 = r32(16 + 8), rec0 = r32(16 + 12);
+    if (rec0 < 16 || rec0 > n || seg0 < 16 || seg0 + 12 > n) return false;
+    const uint32_t words = r32(rec0 - 4);
+    if (words < 2 || rec0 + (size_t)words * 4 > n) return false;
+    // the records, one stream from event 0's: a length, 0xffff continuing it, and the info word of its last
+    std::vector<size_t> off;
+    int32_t at = 0;
+    size_t k = 0;
+    while (k + 1 < words) {
+        off.push_back(rec0 + 4 * k);
+        int32_t len = 0;
+        uint32_t w = 0, info = 0;
+        do { w = r16(rec0 + 4 * k); info = r16(rec0 + 4 * k + 2); len += (int32_t)w; ++k; } while (w == 0xffff && k + 1 < words);
+        recs.push_back({ at, len, (int)info });
+        at += len;
+    }
+    const size_t term = rec0 + 4 * k;
+    // the segments, from event 0's to the one at the last event, the wave's end (a stereo wave's second list and stream follow, which
+    // the player doesn't read): each a record's start, and its first record by offset (the terminator's, the stream's end)
+    const int32_t endAt = (int32_t)r32((st * (nev - 1) + 8) * 2 + 4);
+    size_t nseg = 0;
+    while (seg0 + 12 * (nseg + 1) <= n && nseg < 4096 && (int32_t)r32(seg0 + 12 * nseg + 8) != endAt) ++nseg;
+    if (seg0 + 12 * (nseg + 1) > n || nseg >= 4096) return false;
+    ++nseg;
+    for (size_t j = 0; j < nseg; ++j) {
+        const size_t e = seg0 + 12 * j, ro = r32(e) & ~1u;
+        int idx = -1;
+        if (ro == term) idx = (int)recs.size();
+        else for (size_t i = 0; i < off.size(); ++i) if (off[i] == ro) { idx = (int)i; break; }
+        if (idx < 0) return false;
+        P.segPos.push_back((int32_t)r32(e + 8));
+        P.segRec.push_back(idx);
+        P.segFirst.push_back((int16_t)r16(ro));
+    }
+    // the events: their positions and segments
+    for (uint32_t e = 0; e < nev; ++e) {
+        const size_t o = (st * e + 8) * 2, so = r32(o + 8);
+        if (so < seg0 || (so - seg0) % 12 != 0 || (so - seg0) / 12 >= nseg) return false;
+        P.evPos.push_back((int32_t)r32(o + 4));
+        P.evSeg.push_back((int)((so - seg0) / 12));
+    }
+    // the entry after the last segment's, as 0x8950d770 reads it: its start the third word, its record at the first word taken as an
+    // offset, bit 0 cleared.  A mono wave's is the record count, then the records; a stereo wave's the second list's count and entries
+    const size_t past = seg0 + 12 * nseg;
+    P.pastStart = (int32_t)r32(past + 8);
+    P.pastLen = (int16_t)r16(r32(past) & ~1u);
+    return recs.size() >= 1 && P.evPos.back() == at && P.evPos.front() == 0;
+}
+
 // A record's length in samples; past the last record, the terminator's 16.
 double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }
 
@@ -58,12 +119,21 @@ void XtSoloVoice::loadNext() {
     if (seg < p->size()) ++seg;
     recStart = recEnd;
     recEnd = recStart + lenOf(seg);
-    budget = recEnd > (double)p->in.size() ? kUnlimited : budgetOf(seg);
+    loaded();
+}
+
+// What 0x8950d4c0 takes with a record: its repeat budget and the next record's length (+0x30, the grains' next period), or, for a
+// record past the end event (+0x1c), no limit and its own length.
+void XtSoloVoice::loaded() {
+    const bool past = recEnd * 16.0 > (double)endStop16;
+    budget = past ? kUnlimited : budgetOf(seg);
+    nextLen16 = (int32_t)std::lround(16.0 * lenOf(past ? seg : seg + 1));
 }
 
 // 0x8950d530: the previous record ends where this one starts (at 0 at the
 // earliest).
 void XtSoloVoice::loadPrev() {
+    nextLen16 = (int32_t)std::lround(16.0 * lenOf(seg));   // 0x8950d560: the next period, the length of the record it leaves (+0x2c)
     if (seg > 0) --seg;
     recEnd = recStart;
     recStart = recEnd - lenOf(seg);
@@ -98,7 +168,7 @@ void XtSoloVoice::anchorForward() {
         if (budget >= kUnlimited) wrap = true;
         else { const double c = repeatCost(); if (budget >= c) { budget -= c; wrap = true; } }
     }
-    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;
+    if (!wrap && recEnd * 16.0 >= (double)endStop16) wrap = true;   // the record reaching the end event (+0x1c)
     if (wrap) {
         // 0x8950cf4a: one wrap is anchor − length; more (a step longer than
         // the record) follow the firmware's loop
@@ -142,12 +212,9 @@ void XtSoloVoice::anchorBackward() {
     }
 }
 
-// The loop jump (0x8950d7d0, then 0x8950d4c0): position and anchor at the
-// cached event, the record containing it loaded (the stream's terminator at
-// the wave's end), event 0 current (a SOLO wave's events are its start and
-// its end).  The running grains and the trigger timer carry on; landing in
-// an unvoiced record clears the Energy filter's cutoff (+0x148), as an event
-// jump does.
+// A jump's position and record (0x8950d7e2, then 0x8950d4c0): the position and anchor there, the record containing it loaded
+// (the stream's terminator at the wave's end).  The callers load the event and the segment (eventJump, loopJump, seekTo).  The
+// running grains and the trigger timer carry on; landing in an unvoiced record clears the Energy filter's cutoff (+0x148).
 void XtSoloVoice::jumpTo(int32_t pos16) {
     Pi = pos16;
     Pf = 0;
@@ -159,13 +226,108 @@ void XtSoloVoice::jumpTo(int32_t pos16) {
     seg = i;
     recStart = i < nc ? p->segStart[i] : p->segStart[nc - 1] + p->segLen[nc - 1];
     recEnd = recStart + lenOf(i);
-    budget = recEnd > (double)p->in.size() ? kUnlimited : budgetOf(i);
+    loaded();
     anchor = L;
     if (i >= nc || !p->voiced[i]) f0n = 0.0f;
-    curEv = 0;
-    prevEv = 0;
-    nextEv = endPos16;
-    robotEv = robot;                    // an event's load (0x8950c7e0): +0x124 from byte 0's Robot bit
+}
+
+// The plan's events and segments; a plan without them (built elsewhere) has the start and the end alone, one segment.
+int XtSoloVoice::evLast() const { return p->evPos.size() >= 2 ? (int)p->evPos.size() - 1 : 1; }
+int32_t XtSoloVoice::evAt(int e) const {
+    if (p->evPos.size() >= 2) return p->evPos[(size_t)std::clamp(e, 0, evLast())];
+    return e <= 0 ? 0 : endPos16;
+}
+int XtSoloVoice::evSegAt(int e) const { return p->evSeg.size() >= 2 ? p->evSeg[(size_t)std::clamp(e, 0, evLast())] : (e <= 0 ? 0 : 1); }
+int XtSoloVoice::segLast() const { return p->segPos.size() >= 2 ? (int)p->segPos.size() - 1 : 1; }
+int32_t XtSoloVoice::segAt(int k) const {
+    if (p->segPos.size() >= 2) return p->segPos[(size_t)std::clamp(k, 0, segLast())];
+    return k <= 0 ? 0 : endPos16;
+}
+size_t XtSoloVoice::segRecAt(int k) const { return p->segRec.size() >= 2 ? (size_t)p->segRec[(size_t)std::clamp(k, 0, segLast())] : (k <= 0 ? 0 : p->size()); }
+int16_t XtSoloVoice::segFirstAt(int k) const {
+    if (p->segFirst.size() >= 2) return p->segFirst[(size_t)std::clamp(k, 0, segLast())];
+    if (k > 0) return 256;
+    const long l = std::lround(lenOf(0) * 16.0);
+    return (int16_t)(uint16_t)(l >= 0xffff ? 0xffff : l);
+}
+
+int XtSoloVoice::eventBefore(int32_t pos16) const {
+    int e = 0;
+    while (e < evLast() && evAt(e + 1) < pos16) ++e;
+    return e;
+}
+
+int XtSoloVoice::segContaining(int32_t pos16) const {
+    int k = 0;
+    while (k < segLast() && !(pos16 < segAt(k + 1))) ++k;
+    return k;
+}
+
+// 0x8950d790: the event's load, then its entry's position as the walk's and the anchor's, its segment entry and the next (0x8950d770
+// twice), and its record (position + mark − the record's first length is the record's start, 0x8950d832), which clears the Energy
+// filter's cutoff if it is unvoiced.
+void XtSoloVoice::eventJump(int e) {
+    eventAt(e);
+    jumpTo(evAt(e));
+    segCur = evSegAt(e);
+}
+
+// 0x8950d7d0: the same from a cached loop event, which names its event (the last before its point), its segment entry (the one
+// containing it) and its record.
+void XtSoloVoice::loopJump(int32_t pos16) {
+    eventAt(eventBefore(pos16));
+    jumpTo(pos16);
+    segCur = segContaining(pos16);
+}
+
+// 0x8950fed0 with byte 0 bit 7: event 0, then the last event before the position (0x8950f9c0) and its jump; the position; the segments
+// up to it but the last (0x8950ff26), then the records (0x8950ff50); the anchor at the record's start.  Only the event's record can
+// clear the Energy filter's cutoff.
+void XtSoloVoice::seekTo(int32_t pos16) {
+    const int32_t last = evAt(evLast());
+    pos16 = pos16 < 0 ? 0 : pos16 > last ? last : pos16;
+    eventJump(eventBefore(pos16));
+    const float f = f0n;
+    while (segCur < segLast() && !(segAt(segCur + 1) > pos16) && segAt(segCur + 1) < last) ++segCur;
+    jumpTo(pos16);
+    f0n = f;
+    anchor = recStart;
+}
+
+// The walk reaching the next segment's start (0x8950cef0, walking forward): the anchor and the record to the segment's first, unless
+// that record reaches the end event (+0x1c).  On the last segment the next entry is the record count's (pastStart, pastLen); taken,
+// the XT reads its records from RAM.
+void XtSoloVoice::segForward() {
+    const int k = segCur + 1;
+    const bool past = k > segLast();
+    const int32_t X = past ? p->pastStart : segAt(k);
+    if (!(Pi >= X)) return;
+    const int32_t first = past ? p->pastLen : segFirstAt(k);
+    if (!(endStop16 > (int32_t)((uint32_t)X + (uint32_t)first))) return;
+    if (past) { pastWave = true; return; }
+    segCur = k;
+    ++segMoves;
+    seg = segRecAt(k);
+    recStart = X / 16.0;
+    recEnd = recStart + lenOf(seg);
+    loaded();
+    anchor = recStart;
+}
+
+// The walk back past its segment's start (0x8950cfde): the segment before it, the anchor and record left as they are.  The position
+// it compares is r1, which a crossing in the same sample leaves as the next crossing (0x8950ccc0's), not the position: the forward
+// walk reads the position again (0x8950ceee), this one doesn't.
+void XtSoloVoice::segBackward(int32_t r1) {
+    if (segCur > 0 && segAt(segCur) > r1) { --segCur; ++segMoves; }
+}
+
+// An event's load (0x8950c7e0): it is current, its position at +0x24, and +0x124 from byte 0's Robot bit; the next crossing
+// at the event after it, or 16 past the last (as the band player's 0x8950f6f0 leaves them).
+void XtSoloVoice::eventAt(int e) {
+    curEv = e;
+    robotEv = robot;
+    prevEv = evAt(e);
+    nextEv = e < evLast() ? evAt(e + 1) : evAt(evLast()) + 16;
 }
 
 // The next crossing (0x8950ccc0, each block and after each crossing): the
@@ -210,16 +372,19 @@ void XtSoloVoice::crossForward() {
             f3 |= 0x20;
             f9c = loopCfg.fwdRate;
             ended_ = 0;
-            if (lmode1 == 1) { jumpTo(lp[0]); return; }
+            if (lmode1 == 1) { loopJump(lp[0]); return; }
             if (lmode1 == 2) { f3 |= 8; walkStep = -walkStep; return; }
-            if (lmode1 == 3) { walkStep = 0; f3 |= 0x40; jumpTo(lp[0]); return; }
+            if (lmode1 == 3) { walkStep = 0; f3 |= 0x40; loopJump(lp[0]); return; }
         }
     }
     if (nextEv != X) return;
-    curEv = 1;                          // the end event, the last
-    robotEv = robot;
-    prevEv = nextEv;
-    nextEv = endPos16 + 16;
+    if (evLast() > curEv) {             // the next event; past the last, the note's end
+        eventAt(curEv + 1);
+        if (evLast() > curEv) return;
+    } else {
+        prevEv = nextEv;
+        nextEv = evAt(evLast()) + 16;
+    }
     ended_ = 1;
 }
 
@@ -237,15 +402,15 @@ void XtSoloVoice::crossBackward() {
             f3 |= 0x10;
             f9c = loopCfg.bwdRate;
             ended_ = 0;
-            if (lmode3 == 1) { jumpTo(lp[2]); return; }
+            if (lmode3 == 1) { loopJump(lp[2]); return; }
             if (lmode3 == 2) { f3 |= 4; walkStep = -walkStep; return; }
-            if (lmode3 == 3) { walkStep = 0; f3 |= 0x40; jumpTo(lp[3]); return; }
+            if (lmode3 == 3) { walkStep = 0; f3 |= 0x40; loopJump(lp[3]); return; }
         }
         f3 &= 0xef;
         f9c = 1.0f;
     }
     if (prevEv != X) return;
-    if (curEv > 0) { --curEv; robotEv = robot; prevEv = 0; nextEv = endPos16; return; }
+    if (curEv > 0) { eventAt(curEv - 1); return; }
     ended_ = -1;
 }
 
@@ -262,7 +427,7 @@ XtSoloVoice::Grain XtSoloVoice::grainParams(bool setF0) {
     // After the last record the XT's stream holds a (256, 1) terminator: the
     // last record's next period is 16 samples, and the terminator's own is
     // its length (0x8950d4c0).
-    float N = (float)(int32_t)std::lround(16.0 * lenOf(sg < nc ? sg + 1 : sg));
+    float N = (float)nextLen16;                        // +0x30, as the record's load left it
     if (160.0f > N) N = 160.0f;
     float frac = 0.0f, Ci = C;
     if (Pi > en16) { frac = 1.0f; Ci = N; }
@@ -322,11 +487,12 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
     timer = ppw = 0;
     ended_ = 0;
     // Loops: the cached events (none: the forward end and the backward end
-    // out of reach) and the walk flags as note-on leaves them (0x8950fba0),
-    // event 0 current.
+    // out of reach) and the walk flags as note-on leaves them (0x8950fba0).
+    // STEP and EVENT keep the cached events but clear the Loop bit.
     endPos16 = (int32_t)p->in.size() * 16;
-    loopOn = loopCfg.on;
-    if (loopOn) {
+    cachedLoop = loopCfg.on;
+    loopOn = cachedLoop && !eventCfg;
+    if (cachedLoop) {
         lp[0] = loopCfg.fwdStart * 16; lp[1] = loopCfg.fwdEnd * 16;
         lp[2] = loopCfg.bwdEnd * 16;   lp[3] = loopCfg.bwdStart * 16;
         lmode1 = loopCfg.fwdMode; lmode3 = loopCfg.bwdMode;
@@ -335,46 +501,42 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
         lmode1 = lmode3 = 0;
     }
     f3 = 0x80;
-    curEv = 0;
-    prevEv = 0;
-    nextEv = endPos16;
     nextCross = 0;
-    // The start (0x8950fa60): a seek (0x8950fed0) to the Start Offset (+0x18), or to
-    // the wave's end when walk < 0 (+0x1c): the position there, the record containing
-    // it, the anchor at the record's start.  At the wave's start that's record 0; at
-    // its end the stream's terminator (ending 16 samples past it, an unlimited budget).
-    startPos16 = startCfg * 16;
-    const double n = (double)p->in.size();
-    if (walk < 0.0f) {
-        seg = p->size();
-        recStart = n; recEnd = n + lenOf(seg);
-        budget = kUnlimited;
-    } else {
-        seg = 0;
-        recStart = 0.0; recEnd = lenOf(0);
-        budget = recEnd > n ? kUnlimited : budgetOf(0);
-    }
-    anchor = recStart;
-    Pi = (int32_t)std::lround(recStart * 16.0);
-    Pq = recStart;
-    if (!(walk < 0.0f) && startPos16 > 0) {
-        jumpTo(startPos16);
-        anchor = recStart;
-        Pq = Pi / 16.0;
-    }
+    segCur = 0;
+    pastWave = false;
+    segMoves = 0;
+    // The start (0x8950fa60).  The end event (+0x1c): the last, or STEP's and EVENT's second, held to the last; the start (+0x18): the
+    // Start Offset, or their first's position, held the same way.  Then a seek (0x8950fed0) to the start, or to the end when walk < 0:
+    // the position there, the record containing it, the anchor at the record's start (at the wave's end the stream's terminator, ending
+    // 16 samples past it, an unlimited budget).  STEP and EVENT jump to the event instead (0x8950d790), the anchor at its position.
+    const int evE = eventCfg ? std::min(evLastCfg, evLast()) : evLast();
+    const int evS = eventCfg ? std::min(evFirstCfg, evLast()) : 0;
+    endStop16 = evAt(evE);
+    startPos16 = eventCfg ? evAt(evS) : startCfg * 16;
+    if (eventCfg) eventJump(walk < 0.0f ? evE : evS);
+    else seekTo(walk < 0.0f ? endStop16 : startPos16);
+    Pq = Pi / 16.0;
     anchorStep = std::max((double)A, 1.0);
     low[0] = low[1] = band[0] = band[1] = fCoef = 0.0f;
     q = 1.2f;            // 0x3f99999a, where each block's target is a unit under it
     f0n = 0.0f;
     anchorStepInit = 1.0;
     t = 0;
-    // Note-on (0x8950fba0): grain params at the event, timer and ages 0, both
+    // Note-on (0x8950fba0): grain params at the event, the timer and both ages at (anchor − record start)·256 (0 after a seek, which
+    // leaves the anchor at the record's start; an event's jump leaves it at the event), both
     // channels reading from the record's start (its +0x20 to the record block's +0x54 and +0x58, 0x8950fdca), A's window at 0 and B's at 0.5
     // (the two sum to 1), f0n zeroed after the params are computed.
     const Grain g = grainParams(false);
     const int32_t at = (int32_t)std::lround(recStart * 16.0);
-    for (Chan& c : ch) { c.start = at; c.age = 0; c.v = g.v; c.tap = g.C; c.tapW = g.frac; }
-    ch[0].e = 0.0f; ch[1].e = 0.5f;
+    const int32_t age0 = (int32_t)((uint32_t)((int32_t)std::lround(anchor * 16.0) - at) * 256u);
+    timer = age0;
+    for (Chan& c : ch) { c.start = at; c.age = age0; c.v = g.v; c.tap = g.C; c.tapW = g.frac; }
+    // The windows from the ages, as a trigger's but by 1/256 where it has 1/4096 (0x8950fe0a): at the record's start 0 and 0.5, and
+    // anywhere else in it far past 1, so the note is silent until its first trigger
+    ch[0].e = (float)age0 * slope * 0x1p-8f;
+    ch[1].e = (float)age0 * slope * 0x1p-8f + 0.5f;
+    // The last sample the reads take (+0x5c, 0x8950fdd4): the end event's, or the wave's where the forward loop ends at the end event
+    lastRead = ((lp[1] == endStop16 ? evAt(evLast()) : endStop16) >> 4) - 1;
     anchorStep = anchorStepInit;
     {
         const RoundNearest nearest;
@@ -387,11 +549,9 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
 // filter's cutoff.
 void XtSoloVoice::seek(int32_t pos16) {
     if (!p || p->size() < 2) return;
-    pos16 = pos16 < 0 ? 0 : pos16 > endPos16 ? endPos16 : pos16;
-    const float keep = f0n;
-    jumpTo(pos16);
-    f0n = p->voiced[0] ? keep : 0.0f;
-    anchor = recStart;
+    const int32_t last = evAt(evLast());
+    pos16 = pos16 < 0 ? 0 : pos16 > last ? last : pos16;   // the beat goes from the position held to the wave (0x8950fefe)
+    seekTo(pos16);
     beat_.reset((flags0 & 4) != 0);       // 0x8950f900
     beat_.beatPos = (int32_t)((uint32_t)pos16 << 5);
 }
@@ -458,7 +618,8 @@ void XtSoloVoice::renderXt(float* lr, int count) {
     const RoundToZero round;
     const bool st = p->stereo();
     const size_t nc = p->size();
-    const int32_t endPos = (int32_t)p->in.size() * 16, last = (int32_t)p->in.size() - 1;
+    if (pastWave) { std::fill(lr, lr + 2 * count, 0.0f); return; }
+    const int32_t last = lastRead;
     const std::vector<float>& X = p->in, & Y = p->inR;
     for (int k = 0; k < count; ++k, ++t) {
         if ((t & 31) == 0) {   // per-block walk step [c280] and coefficient update [cde0]
@@ -474,14 +635,17 @@ void XtSoloVoice::renderXt(float* lr, int count) {
         const int32_t s = walkStep >> 1, sum = Pf + s;
         int32_t np = Pi + (sum >> 20), nf = sum & 0xfffff;
         if (s > 0) {
-            if (np >= endPos) { ended_ = 1; np = endPos; nf = 0; }
+            if (np >= endStop16) { ended_ = 1; np = endStop16; nf = 0; }
             Pi = np; Pf = nf;
             if (nextCross <= Pi) { crossForward(); crossings(); }
+            segForward();
+            if (pastWave) { std::fill(lr + 2 * k, lr + 2 * count, 0.0f); return; }
         } else if (s < 0) {
             const int32_t lo = (f3 & 8) ? 0 : startPos16;     // +0x18: the Start Offset; 0 turned round in the forward loop
             if (lo >= np) { ended_ = -1; np = lo; nf = 0; }
             Pi = np; Pf = nf;
-            if (Pi <= nextCross) { crossBackward(); crossings(); }
+            if (Pi <= nextCross) { crossBackward(); crossings(); segBackward(nextCross); }
+            else segBackward(Pi);
         }
         Pq = Pi / 16.0;
         if (!p->anchorMode) {           // diagnostic: the record containing P

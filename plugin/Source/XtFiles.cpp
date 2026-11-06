@@ -146,7 +146,8 @@ int xtPatchValue(const std::vector<uint8_t>& store, int id, int zone, int cosm) 
 bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* why) {
     out = {};
     const uint8_t* vpfl = nullptr; const uint8_t* vpsc = nullptr; const uint8_t* vplp = nullptr; const uint8_t* vpno = nullptr; const uint8_t* data = nullptr;
-    uint32_t nFl = 0, nSc = 0, nLp = 0, nNo = 0, nData = 0;
+    const uint8_t* vpdt = nullptr;
+    uint32_t nFl = 0, nSc = 0, nLp = 0, nNo = 0, nData = 0, nDt = 0;
     // A project's .wav is a RIFF round the same chunks
     size_t i = size >= 12 && !std::memcmp(file, "RIFF", 4) && !std::memcmp(file + 8, "WAVE", 4) ? 12 : 0;
     while (i + 8 <= size && !data) {
@@ -157,6 +158,7 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
         else if (!std::memcmp(file + i, "vpsc", 4)) { vpsc = body; nSc = n; }
         else if (!std::memcmp(file + i, "vplp", 4)) { vplp = body; nLp = n; }
         else if (!std::memcmp(file + i, "vpno", 4)) { vpno = body; nNo = n; }
+        else if (!std::memcmp(file + i, "vpdt", 4)) { vpdt = body; nDt = n; }
         else if (!std::memcmp(file + i, "data", 4)) { data = body; nData = n; }
         i += 8 + (size_t)n + (n & 1);
     }
@@ -189,6 +191,15 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
     if (vpno && nNo >= 12) {
         out.vpnoCount = (int)le32(vpno + 4);
         for (uint32_t k = 12; k + 2 <= nNo; k += 2) out.vpno.push_back((uint16_t)(vpno[k] | vpno[k + 1] << 8));
+    }
+    if (vpdt && nDt >= 12 && (out.encodeType == 1 || out.encodeType == 3 || out.encodeType == 5)) {
+        const uint32_t nev = le32(vpdt + 8) >> 16;
+        const uint32_t stride = out.encodeType == 1 ? (out.channels == 2 ? 16 : 10) : (out.channels == 2 ? 0x58 : 0x2e), first = out.encodeType == 1 ? 8 : 14;
+        for (uint32_t e = 0; e < nev && e < 4096; ++e) {
+            const uint32_t at = (stride * e + first) * 2 + 4;
+            if (at + 4 > nDt) { out.events.clear(); break; }
+            out.events.push_back((int32_t)le32(vpdt + at));
+        }
     }
     if (linear) {
         const size_t want = (size_t)out.frames * (size_t)out.channels;
@@ -395,6 +406,8 @@ int main(int argc, char** argv) {
     double edge = 0, inner = 0;
     int types[8] = {};
     int listed = 0, inOrder = 0, listShort = 0, edited[8] = {};     // the waves' vpno
+    int withEvents[8] = {}, withAttacks[8] = {};                    // the waves' vpdt events
+    uint64_t eventsHash = 1469598103934665603ull;
     for (size_t at : waves) {
         XtWaveFile w; std::string why;
         if (!xtWaveRead(&disk[at], disk.size() - at, w, &why)) { ++unread; if (first) std::printf("wave at %zu: %s\n", at, why.c_str()); continue; }
@@ -408,6 +421,11 @@ int main(int argc, char** argv) {
             inOrder += order;
             if (!order && w.encodeType >= 0 && w.encodeType < 8) ++edited[w.encodeType];
             listShort += (int)w.vpno.size() < w.vpnoCount;
+        }
+        if (!w.events.empty() && w.encodeType >= 0 && w.encodeType < 8) {
+            ++withEvents[w.encodeType];
+            withAttacks[w.encodeType] += w.events.size() > 2;
+            eventsHash = fnv(w.events.data(), w.events.size() * 4, eventsHash);
         }
         hash = fnv(w.pcm.data(), w.pcm.size() * 2, hash);
         // Against the whole-wave routine, from the raw chunk
@@ -429,6 +447,8 @@ int main(int argc, char** argv) {
                 edge * 15.0 / (inner > 0 ? inner : 1.0), (unsigned long long)hash);
     std::printf("vpno: %d waves with a list, %d of them each event in order, the others %d SOLO, %d BACKING, %d ENSEMBLE; %d shorter than their count\n",
                 listed, inOrder, edited[1], edited[3], edited[5], listShort);
+    std::printf("vpdt: events on %d SOLO, %d BACKING, %d ENSEMBLE waves, of them with attacks %d, %d, %d; hash %016llx\n",
+                withEvents[1], withEvents[3], withEvents[5], withAttacks[1], withAttacks[3], withAttacks[5], (unsigned long long)eventsHash);
 
     // The patches
     const auto patches = diskImage.list("Internal.prj/Patch");

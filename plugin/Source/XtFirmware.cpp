@@ -18,6 +18,7 @@ constexpr uint32_t kMalloc = 0x89527910, kCalloc = 0x89527930, kFree = 0x8952795
 constexpr uint32_t kSoloNew = 0x8951dc40, kSoloEncode = 0x8951e120;
 constexpr uint32_t kLoadInit = 0x89529e90, kLoad = 0x894a9940;
 constexpr uint32_t kEncMulti = 0x89516000;                       // BACKING/ENSEMBLE encode driver
+constexpr uint32_t kEncSolo = 0x89515e28;                        // SOLO encode driver
 constexpr uint32_t kOsAlloc = 0x895113a0, kOsFree = 0x895113e0;  // sample-memory chunks (OS pointers 0x8987c8f0/8f8)
 constexpr uint32_t kAfterVpdt = 0x89515b40;                       // the note chunk, after the vpdt is written
 constexpr uint32_t kEncInit = 0x89516400, kDetect = 0x895164c0;   // encode module init; attack detection (depth)
@@ -171,7 +172,7 @@ void xtFwHookBandReads(Sh4& c, XtFwBandReads& reads) {
 
 void xtFwForceNearest(bool on) { g_nearest = on; }
 
-bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int channels, std::vector<uint64_t>* trace) {
+bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int channels, std::vector<uint64_t>* trace, const std::vector<uint32_t>* events) {
     out.clear();
     if (g_rom.empty() || !x || n <= 0 || (channels != 1 && channels != 2)) return false;
     auto M = std::make_unique<Machine>(g_rom);
@@ -179,8 +180,12 @@ bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int cha
     Sh4& c = M->cpu;
     if (kSamp + (size_t)n * (size_t)channels * 2 > kHeap) return false;
     c.write(kSamp, x, (size_t)n * (size_t)channels * 2);
-    c.wr32(kEv, (uint32_t)n * 16);          // event list {n·16}: one sustained note
-    if (!c.call(kSoloNew, { (uint32_t)n, kSamp, 1, kEv }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
+    // the event list: {n·16}, one sustained note, or the attack events' (0x895126d0's, as the SOLO driver gives them)
+    const std::vector<uint32_t> one { (uint32_t)n * 16 };
+    const std::vector<uint32_t>& ev = events && !events->empty() ? *events : one;
+    if (ev.size() > 60) return false;
+    for (size_t k = 0; k < ev.size(); ++k) c.wr32(kEv + 4 * (uint32_t)k, ev[k]);
+    if (!c.call(kSoloNew, { (uint32_t)n, kSamp, (uint32_t)ev.size(), kEv }, kStack)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
     if (trace) {   // at the common exit of 0x8951f790, 0x8951f880, 0x8951fab0, 0x89520d30: as xtSoloEncode's
         trace->clear();
         auto add = [trace](Sh4& m, int kind, uint32_t at, uint32_t bytes) { trace->push_back(xtEncHash(kind, m.ptr(at, bytes), bytes)); };
@@ -201,8 +206,28 @@ bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int cha
     return true;
 }
 
+namespace {
+// The markers as the attack detection leaves them (0x895164c0, read back after it): a list head and one marker an event, each
+// {position, a later position, a level} in samples with +0xd set, doubly linked (next at +0xbc, previous at +0xc0).  The driver's
+// 0x895126d0 takes the events' positions from the first word alone; the later position here is the event's own, as at the end.
+void putMarkers(Sh4& c, uint32_t& heap, const std::vector<uint32_t>& at) {
+    const uint32_t head = heap; heap += 0x100;
+    for (uint32_t a = head; a < heap; a += 4) c.wr32(a, 0);
+    uint32_t prev = head;
+    for (uint32_t pos : at) {
+        const uint32_t m = heap; heap += 0x100;
+        for (uint32_t a = m; a < heap; a += 4) c.wr32(a, 0);
+        c.wr32(m, pos); c.wr32(m + 4, pos); c.wr8(m + 0xd, 1);
+        c.wr32(prev + 0xbc, m); c.wr32(m + 0xc0, prev);
+        prev = m;
+    }
+    c.wr32(kMarkHead, head);
+    c.wr32(kMarkCount, (uint32_t)at.size());
+}
+}
+
 bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, std::vector<uint8_t>& vpdt,
-                     int depth, int* events) {
+                     int depth, int* events, const std::vector<uint32_t>* markers) {
     vpdt.clear();
     if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5)) return false;
     auto M = std::make_unique<Machine>(g_rom);
@@ -211,9 +236,10 @@ bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, st
     const size_t bytes = (size_t)frames * channels * 2;
     if (kSamp + bytes + 0x800000 > kHeap) return false;
     c.write(kSamp, pcm, bytes);
-    if (depth >= 0 && !c.call(kEncInit, {}, kStack)) { std::fprintf(stderr, "sh4 init: %s\n", c.error().c_str()); return false; }
+    if (markers && (markers->size() < 2 || markers->front() != 0 || markers->back() != (uint32_t)frames)) return false;
+    if ((depth >= 0 || markers) && !c.call(kEncInit, {}, kStack)) { std::fprintf(stderr, "sh4 init: %s\n", c.error().c_str()); return false; }
     // the sample being encoded
-    c.wr8(kSmp, (uint8_t)(depth >= 0 ? 0 : type));
+    c.wr8(kSmp, (uint8_t)(depth >= 0 && !markers ? 0 : type));
     c.wr8(kSmp + 2, (uint8_t)channels);
     c.wr32(kSmp + 8, (uint32_t)frames);
     c.wr32(kSmp + 0x20, 0);
@@ -228,7 +254,8 @@ bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, st
         cpu.ret(p);
     });
     c.hook(kOsFree, [](Sh4& cpu) { cpu.ret(0); });
-    if (depth >= 0) {   // the XT's attack detection at this Encode Depth builds the markers
+    if (markers) putMarkers(c, M->heap, *markers);   // the events given, in place of the detection
+    else if (depth >= 0) {   // the XT's attack detection at this Encode Depth builds the markers
         uint32_t rc = 0;
         if (!c.call(kDetect, { (uint32_t)std::min(depth, 127) }, kStack, &rc)) { std::fprintf(stderr, "sh4 detect: %s\n", c.error().c_str()); return false; }
         c.wr8(kSmp, (uint8_t)type);
@@ -266,6 +293,63 @@ bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, st
     uint32_t rc = 0;
     if (!c.call(kEncMulti, { 0 }, kStack, &rc)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
     if (std::getenv("XT_FW_TRACE")) std::fprintf(stderr, "encode driver returned %u; [89ff0dd0]=%d; vpdt %zu bytes\n", rc, (int)c.rd32(0x89ff0dd0), vpdt.size());
+    return done;
+}
+
+bool xtFwEncodeSolo(const int16_t* pcm, long frames, int channels, int depth, std::vector<uint8_t>& vpdt, std::vector<uint32_t>* events, bool onlyWithAttacks,
+                    const std::vector<uint32_t>* markers) {
+    vpdt.clear();
+    if (events) events->clear();
+    if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2)) return false;
+    auto M = std::make_unique<Machine>(g_rom);
+    if (!M->ok) return false;
+    Sh4& c = M->cpu;
+    const size_t bytes = (size_t)frames * channels * 2;
+    if (kSamp + bytes + 0x800000 > kHeap) return false;
+    c.write(kSamp, pcm, bytes);
+    if (!c.call(kEncInit, {}, kStack)) { std::fprintf(stderr, "sh4 init: %s\n", c.error().c_str()); return false; }
+    c.wr8(kSmp, 0);
+    c.wr8(kSmp + 2, (uint8_t)channels);
+    c.wr32(kSmp + 8, (uint32_t)frames);
+    c.wr32(kSmp + 0x20, 0);
+    c.wr32(kSmp + 0x24, (uint32_t)frames);
+    c.wr32(kSmp + 0x7c, kSamp);
+    c.hook(kOsAlloc, [&M](Sh4& cpu) {
+        const uint32_t sz = 0x400000, p = M->heap;
+        if (p + sz > kRam + kRamSize) { cpu.ret(0); return; }
+        if (uint8_t* m = cpu.ptr(p, sz)) std::memset(m, 0, sz);
+        M->heap += sz;
+        cpu.ret(p);
+    });
+    c.hook(kOsFree, [](Sh4& cpu) { cpu.ret(0); });
+    uint32_t rc = 0;
+    if (markers) {                      // the events given, in place of the detection
+        if (markers->size() < 2 || markers->front() != 0 || markers->back() != (uint32_t)frames) return false;
+        putMarkers(c, M->heap, *markers);
+    } else if (!c.call(kDetect, { (uint32_t)std::clamp(depth, 0, 127) }, kStack, &rc)) { std::fprintf(stderr, "sh4 detect: %s\n", c.error().c_str()); return false; }
+    c.wr8(kSmp, 1);
+    // The event list the encoder gets: the start, the attacks, the end.  With none between, the port's encoder gives the same
+    // records ({n·16}: the driver's {0, n·16} changes none), so the caller may stop here
+    bool attacks = true;
+    c.hook(kSoloNew, [&](Sh4& cpu) {
+        if (events) for (uint32_t k = 0; k < cpu.r[6] && k < 4096; ++k) events->push_back(cpu.rd32(cpu.r[7] + 4 * k));
+        if (cpu.r[6] <= 2) attacks = false;
+        if (!attacks && onlyWithAttacks) cpu.pc = 0x10;   // stop the whole run there (an unmapped address: the call ends as a fault)
+    });
+    bool done = false;
+    c.hook(kAfterVpdt, [&](Sh4& cpu) {
+        const uint32_t p = cpu.rd32(kChunks + 8 * 5), n = cpu.rd32(kChunks + 8 * 5 + 4);
+        if ((int32_t)cpu.rd32(0x89ff0dd0) == 0 && p && n && n <= 0x400000) {
+            vpdt.resize(n);
+            cpu.read(p, vpdt.data(), n);
+            done = true;
+        }
+        cpu.ret(0);
+    });
+    if (!c.call(kEncSolo, {}, kStack, &rc)) {
+        if (!attacks && onlyWithAttacks) return false;
+        std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false;
+    }
     return done;
 }
 

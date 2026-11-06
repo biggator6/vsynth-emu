@@ -257,8 +257,9 @@ env 127 127 127 127 200 900 2: identical
 env 0 0 127 0 5 60 0: identical
 env 30 70 90 50 80 500 2: identical
 == xt_tone
-tone, the SOLO records of vocal.bin: 0 different of 461
-tone, the SOLO records of drum.bin: 0 different of 609
+tone, the SOLO records of vocal.bin: 0 different of 461, 2 events
+tone, the SOLO records of w358.bin: 0 different of 111, 2 events
+tone, the SOLO records of drum.bin: 0 different of 607, 3 events
 patches: 512, 1558 zones, 547816 values, 0 different; 448512 of their effects' values, 0 different
 tone: 4390 notes, 2461 taken by a sounding tone, 332 truncated, 384907 blocks, 30787324 checks
 tone: 0 notes left off, a read outside memory; 289042 band reads far from their wave
@@ -282,10 +283,15 @@ tone, zones: 559 notes on zones 2 to 16, 15 of those zones
 tone, zones: 676 notes, 197 taken by a sounding tone, 88 truncated, 54061 blocks, 5091611 checks
 tone, zones: 0 notes left off, a read outside memory; 101850 band reads far from their wave
 tone, zones: 0 different
-tone, playback modes: 140 OSCs took an earlier note's player (LEGATO), 8 didn't as it had reached its wave's end; 417 started from an event (STEP, EVENT)
-tone, playback modes: 961 notes, 45 taken by a sounding tone, 101 truncated, 58634 blocks, 7592347 checks
-tone, playback modes: 0 notes left off, a read outside memory; 396714 band reads far from their wave
+tone, playback modes: 160 OSCs took an earlier note's player (LEGATO), 12 didn't as it had reached its wave's end; 326 started from an event (STEP, EVENT)
+tone, playback modes: 178 SOLO notes started from an event; 112 moves between a SOLO wave's segments
+tone, playback modes: 963 notes, 54 taken by a sounding tone, 98 truncated, 57875 blocks, 6838043 checks
+tone, playback modes: 1 notes left off, a read outside memory; 380464 band reads far from their wave
 tone, playback modes: 0 different
+tone, SOLO segments: 121 notes started from an event; 289 moves between segments; 59 took an earlier note's player
+tone, SOLO segments: 381 notes, 20 taken by a sounding tone, 37 truncated, 23641 blocks, 3099847 checks
+tone, SOLO segments: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, SOLO segments: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
 tone, the clock's rate: 0 notes left off, a read outside memory; 0 band reads far from their wave
@@ -298,6 +304,15 @@ tone, the host's clock: 21041 clocks
 tone, the host's clock: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 46311 checks
 tone, the host's clock: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, the host's clock: 0 different
+tone, own events: 6 waves, 36 checks
+tone, own events: 0 different
+== xt_tone paths
+paths: 770 waves (416 preset waves of the disk image)
+paths: 566 SOLO waves and raw inputs, 79 with attacks, 8 with no firmware result, 6 with no records (XtSynth refuses them); XtSynth's path not the detection's on 0
+paths: of the 480 without attacks and with a result, the port's records against the XT's driver's with {0, end}: 0 waves different, 0 records
+paths: 300 SOLO waves with their own events (265 with attacks; 2 with events between samples, which the markers can't hold): 0 others whose events the encode doesn't keep
+paths: 154 band waves with their own events (72 with attacks), which keep the detection: its events the stored ones on 90
+paths: 343 SOLO plans of the XT's encode, 1845 events: 0 whose segment entry isn't the segment containing them
 == solocmp
 solo vocal.bin 1 1.0 0 1.0 0 30000: 461 records, 30000 frames: 0 different of 60000 (signal rms 0.0146)
 solo vocal.bin 1 1.5 1.25 1.0 0.25 30000: 461 records, 30000 frames: 0 different of 60000 (signal rms 0.0593)
@@ -646,6 +661,7 @@ band 3 drum.bin 2 0.5 -0.5 8000 0:0.3: BACKING, 8000 frames: max |firmware - por
 == xt_files
 rdac: 416 waves (367 mono, 49 stereo; 268 SOLO, 135 BACKING, 13 ENSEMBLE), 19764803 frames, 0 unread, 0 different from the firmware's whole-wave routines, a block's edge 0.999 of the mean step, hash 9d163e39a6de617a
 vpno: 416 waves with a list, 366 of them each event in order, the others 34 SOLO, 12 BACKING, 4 ENSEMBLE; 0 shorter than their count
+vpdt: events on 268 SOLO, 135 BACKING, 13 ENSEMBLE waves, of them with attacks 261, 61, 11; hash 98fb3bec6f2fd5e1
 typed: 123840 values against the firmware's read, 0 different
 a wave's own: 0 wrong
 patches: 512 in the image (lengths 0x146c 0, 0x14ac 0, 0x14f2 0, other 512), 512 names read alike, 4162048 values, 12 out of range, 520256 against the firmware's reads, 0 different, hash 82034c2071b9a07a

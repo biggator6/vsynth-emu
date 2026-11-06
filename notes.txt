@@ -335,6 +335,29 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+STEP and EVENT on SOLO waves v156 (2026-11-06), no change on a SOLO wave without attacks: with attacks, the XT's own SOLO encode splits its records, and STEP and EVENT play between its events.
+  The encode: the band waves' detection (0x895164c0), then the SOLO driver (0x89515e28) in the interpreter, xtFwEncodeSolo; the plan from its vpdt, xtSoloReadVpdt (events, segments, records;
+  a stereo wave's second list and stream unread). Without attacks the port's records as before, laid out by xtFwSoloImage. The port's encoder given events isn't the firmware's, so isn't used.
+  The player (XtSoloVoice): the event's jump (0x8950d790), +0x18/+0x1c the start and end events'; the note-on's ages (anchor − record start)·256 and windows ·slope/256 (silent from an event
+  mid-record until the first trigger, the XT's); the last sample read from +0x1c; a record past +0x1c unlimited with its own length as the next period (+0x30; walking back, the one it leaves);
+  the walk into the next segment (0x8950cef0) and back out (0x8950cfde, r1 after a crossing the next crossing, not the position); the seek by event and segments (0x8950fed0, 0x8950ff26);
+  a loop jump's cached event, segment and record; the segment after the list (stereo: taken from the last event) marks readPastWave. The Loop bit follows each update, as the band player's.
+  A wave's own events (XtWaveFile::events from its vpdt; V-Producer can edit them): a SOLO wave's go to the XT's encode as the detection's markers (xtFwEncodeSolo's markers),
+  so its vpno names them; 298 of 300 SOLO waves with a vpdt keep theirs (2 with events between samples, VTrainer's VP9SAMnoise1 and preset 270), ITS-3AM's 10 not the detection's 11.
+  A band wave keeps the detection: the band encode reads each marker's second word too, which the detection takes from the audio; it finds the stored events on 90 of 154 (user's call).
+  The port's encoder takes no event list (ev_ is {n·16} alone): its several-event code is vpenc's, not reached. Costs: the detection ~30 ms on a wave without attacks, ITS-3AM 1.3 s.
+  Plugin: no "Playback Mode ... on a SOLO wave" note. Not done: Vari off (its converter, 0x894f3460, takes the event numbers as samples; the linear player is v157's); the SOLO seek with 0x80 clear.
+  Check: xt_tone gives the firmware XtSynth's SOLO vpdt and vpno, SOLO waves of 6 and 4 hits in the playback pool, STEP and EVENT on SOLO with Vari on; seeds 2024, 777, 31337, 9, 4242 at 2000:
+  0 different, 159-189 SOLO notes from an event and 101-134 segment moves each. A last section, SOLO segments (a tenth of the cases): the two SOLO hit waves, loops at a
+  segment's start, across one, ending at an event, inside one or anywhere, Vari thrown at a third of the updates (the random loops stay inside the first segment).
+  checkSoloRecords with the driver's events, and on w358. xt_tone's own-events section (a list short of the end, one between samples, markers the encodes refuse);
+  xt_tone paths (fcheck, 770 waves: XtSynth's path the detection's on 566 SOLO waves and inputs, the port's records the driver's {0, end} on 480, own events as above,
+  every event's segment entry the segment containing it in 343 plans); xt_files' vpdt line.
+  Planted: mutate_tone.py 1085 (40 new), none missed; the first run missed 28, as the random loops never leave a hit wave's first segment (hence SOLO segments);
+  10 of mine equivalent within reach and dropped, check-play-patch-solo unreachable (no image patch has STEP/EVENT on OSC 2 with Vari off), four on seed 777.
+  mutate_files.py 49 (4 new), none missed. mutate_panel.py's patch- plants 37 (2 new for own events; patch-playback-types went with its map), none missed, after the zone one
+  missed while every zone wave was band (PluginTest's zones now have a SOLO preset wave, an event moved); the zones- plants and two patch- ones on it, 11, none missed.
+
 Playback Mode v155 (2026-11-06), RETRIGGER as before but for a band wave's Loop switch moved during a note (not checked): LEGATO on every player, STEP and EVENT on band waves (IDs 0x2d2, 0x306); a LITE wave's converter doesn't read the mode.
   LEGATO: the allocator's earlier note of the part and zone (0x894d4c04: not released, the first with its key down, else the last); the PCM tail sets the block's +0x64 (0x894e2dac).
   The tone's note-on (0x894f5e60): per OSC of the same kind and mode, 0x894f21c0 then 0x894f2d00 copies the earlier player whole, its own rates back, the gain from 0; not if that player's +4 is 1 (at its wave's end).
@@ -350,7 +373,7 @@ Playback Mode v155 (2026-11-06), RETRIGGER as before but for a band wave's Loop 
   The sweep's Vari throw now goes through (every sweep case is a Time Trip case, which put it back).
   Planted: mutate_tone.py 1046 (40 new, 9 dropped as equivalent, 9 old moved or re-seeded), files 45 (4 new), panel 91 (11 new; the layout check now finds a hidden card's control left showing), none missed.
   Open: seeds 6 and 8 differ in a LITE player under Time Trip in the playback cases (v153's path, not this version's).
-  Not done: STEP and EVENT on SOLO waves (v156: the SOLO player from an event, its records by events, bit for bit); the band seek with 0x80 clear (0x89510cc0).
+  Not done: STEP and EVENT on SOLO waves (v156, but for Vari off); the band seek with 0x80 clear (0x89510cc0).
 
 Zones v154 (2026-11-05), no change to the sound of a patch of one zone: a loaded patch plays all its zones, 2-16 as the patch's data (the user's decision), the parameters and editor on zone 1.
   The zone: the part's note-on (0x894dbcb0), the key with the Octave Shift on the part's table (+6, made by 0x894794f0: each the larger of its upper key, 0x124 on, and the one before; the 16th 127).

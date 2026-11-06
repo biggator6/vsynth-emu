@@ -1989,15 +1989,9 @@ void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<u
         if (found[k]) takeWave(waves[k], files[k], k);
         else unloadWave(k);
     }
-    std::map<int, int> typeOf;                      // each wave number's encode type, for what isn't done on that type
-    for (int k = 0; k < 2; ++k)
-        if (found[k]) typeOf[xtPatchWaveNumber(store, zone, k)] = waves[k].encodeType;
-    loadZones(store, waveFolder, notes, &typeOf);
-    for (int z = 0; z < xtPatchZones(store); ++z) {
-        int types[2];
-        for (int k = 0; k < 2; ++k) { const auto it = typeOf.find(xtPatchWaveNumber(store, z, k)); types[k] = it == typeOf.end() ? -1 : it->second; }
-        for (const auto& m : xtPatchMissing(store, z, types)) notes.addIfNotAlreadyThere(m);
-    }
+    loadZones(store, waveFolder, notes);
+    for (int z = 0; z < xtPatchZones(store); ++z)
+        for (const auto& m : xtPatchMissing(store, z)) notes.addIfNotAlreadyThere(m);
     patchName_ = juce::String(name);
     patchNote_ = notes.joinIntoString(", ");
     apvts.state.setProperty("patchName", patchName_, nullptr);
@@ -2007,7 +2001,7 @@ void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<u
 
 // Zones 2…16 (the user's decision, 2026-11-05): the patch's data, not the parameters.  Their settings go to the synth at once, analog OSCs
 // and all, then again with their waves once the pool has encoded them: each wave once, as its own type, its own tuning and loop on it.
-void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes, std::map<int, int>* typeOf) {
+void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes) {
     const int gen = ++zonesGen_;
     const int zones = xtPatchZones(store);
     patchZones_.store(zones);
@@ -2029,7 +2023,6 @@ void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce
                 XtWaveFile w;
                 const juce::File f = findWave(waveFolder, number);
                 if (!(f.existsAsFile() && readVSynthWave(f, w))) { w = XtWaveFile{}; notes.addIfNotAlreadyThere("no wave " + juce::String(number)); }
-                else if (typeOf) (*typeOf)[number] = w.encodeType;
                 files[number] = std::move(w);
             }
             const XtWaveFile& w = files[number];
@@ -2050,7 +2043,7 @@ void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce
             for (long i = 0; i < w.frames; ++i)
                 for (int c = 0; c < w.channels; ++c) chans[(size_t)c].push_back((float)w.pcm[(size_t)(i * w.channels + c)] / 32768.0f);
             const int type = w.encodeType == 0 || w.encodeType == 1 || w.encodeType == 3 || w.encodeType == 5 ? w.encodeType : 1;
-            auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16);
+            auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events);   // on its own events, as the file has them
             if (!e) continue;
             xtWaveOntoEncoded(w, *e);
             enc[number] = std::move(e);
@@ -2114,7 +2107,9 @@ void VSynthEmuProcessor::reencode(int osc) {
             type = a.contentType == CT::BACKING ? 3 : a.contentType == CT::ENSEMBLE ? 5 : 1;   // the classifier's LITE as SOLO: Auto doesn't choose LITE
         }
         std::string err;
-        auto e = xtSynthEncode(chans, rate, type, depth, &err, bits);
+        // A V-Synth SOLO wave as its own type keeps its own events (as encoded, or edited in V-Producer), which its vpno names;
+        // otherwise the detection at the Encode Depth finds them (xtSynthEncode)
+        auto e = xtSynthEncode(chans, rate, type, depth, &err, bits, isOwn && type == own ? &ownWave.events : nullptr);
         if (gen != wave_[osc].gen.load()) return;
         if (!e) { setStatus(who + "Encode failed: " + juce::String(err)); return; }
         if (isOwn) xtWaveOntoEncoded(ownWave, *e);

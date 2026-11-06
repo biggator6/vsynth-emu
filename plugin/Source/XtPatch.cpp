@@ -223,19 +223,14 @@ void xtWaveOntoEncoded(const XtWaveFile& w, XtEncoded& e) {
     e.bwdEnd = (int)w.bwdEnd;
 }
 
-std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone, const int* waveType) {
+std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone) {
     std::vector<std::string> m;
     const Read p { store, zone };
     for (int n = 0; n < 2; ++n) {
         const int b = 0x34 * n;
         const std::string osc = "OSC " + std::to_string(n + 1) + " ";
         if (p(0x2a4 + b) != 0 && p(0x2a5 + b) == kExternal) m.push_back(osc + "external input");
-        if (p(0x2a4 + b) == 0 || p(0x2a5 + b) != 1) continue;
-        // LEGATO is done, and STEP and EVENT on band waves; a LITE wave's converter doesn't read the mode, on the XT either.  A SOLO
-        // wave's segments at its attack events aren't done (v156)
-        const int mode = p(0x2d2 + b);
-        if (mode >= 2 && (!waveType || waveType[n] == 1)) m.push_back(osc + "Playback Mode " + (mode == 2 ? "STEP" : "EVENT") + " on a SOLO wave");
-    }
+    }   // Playback Mode is done on every kind of wave (v156); a LITE wave's converter doesn't read it, on the XT either
     if (p(0x42e)) m.push_back("arpeggio");
     if (p(0x48d)) m.push_back("Multi Step Modulator");
     return m;

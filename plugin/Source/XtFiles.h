@@ -25,6 +25,10 @@ struct XtWaveFile {
     // −1 with no chunk, as on LITE waves.  An XT's own encode lists every event in order; a list edited on the instrument leaves some out.
     std::vector<uint16_t> vpno;
     int vpnoCount = -1;
+    // vpdt: its events' positions (1/16 sample: the start, the attacks, the end), as the wave was encoded or its event points
+    // edited (V-Producer can).  A SOLO wave's at (stride·e + 8)·2 + 4 (stride 10, 16 stereo), a band wave's at (stride·e + 14)·2 + 4
+    // (0x2e, 0x58 stereo).  Empty with no chunk, as on LITE waves.
+    std::vector<int32_t> events;
     std::vector<int16_t> pcm;        // interleaved, frames * channels
     size_t size = 0;                 // bytes of the stream, its data chunk's end
 };

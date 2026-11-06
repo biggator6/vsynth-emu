@@ -26,9 +26,7 @@ void xtWaveOntoControls(const XtWaveFile& wave, XtSynth::OscControls& o);
 void xtWaveOntoEncoded(const XtWaveFile& wave, XtEncoded& e);
 
 // What this zone of the patch asks for that the plugin doesn't do yet, one short phrase each, for the status line.
-// `waveType`: the encode types of the zone's two waves (vpsc +1; −1 for none read), for Playback Mode STEP and EVENT, which a SOLO wave
-// plays as RETRIGGER here; nullptr when not known.
-std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone, const int* waveType = nullptr);
+std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone);
 
 // The firmware's IDs an effect holds in this patch, with their values: the blocks' own and their types' parameters, as XtFxControl::set takes them.
 struct XtPatchFx { int id, value; };

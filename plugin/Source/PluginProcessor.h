@@ -153,7 +153,7 @@ private:
     juce::CriticalSection    bufferLock_;
     // A patch's zones 2…16: their settings at once, and again with their waves once the pool has encoded them (each wave once, as its own
     // type).  A newer patch discards an older one's.  The store and the wave folder go in the session, for its zones to come back.
-    void loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes, std::map<int, int>* typeOf = nullptr);
+    void loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes);
     std::atomic<int>         zonesGen_ { 0 }, patchZones_ { 1 };
     std::atomic<bool>        zonesReady_ { true };
 

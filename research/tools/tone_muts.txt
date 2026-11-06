@@ -139,7 +139,7 @@ cosm-past2-none|v.cs[1].process(tmp2, 1.0f, mixPast);|v.cs[1].process(tmp2, 1.0f
 cosm-past2-kept|        std::copy(tmp, tmp + 3, mixPast);\n|
 fm-tone-0|modShared, (int)(v - voice));|modShared, 0);
 fm-lines-cleared|    for (Voice& v : voice) v.active = false;\n    keysCleared();|    for (Voice& v : voice) v.active = false;\n    std::fill(std::begin(modShared.line), std::end(modShared.line), 0.0f);\n    keysCleared();
-solo-old-mix|const std::vector<XtRecord> recs = xtSoloEncode(pcm.data(), (int)frames, ch);|std::vector<int16_t> x16((size_t)frames); for (long i = 0; i < frames; ++i) x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[(size_t)(2 * i)] + (int)pcm[(size_t)(2 * i + 1)]) >> 1) : pcm[(size_t)i]; const std::vector<XtRecord> recs = xtSoloEncode(x16.data(), (int)frames);
+solo-old-mix|recs = xtSoloEncode(pcm.data(), (int)frames, ch);|std::vector<int16_t> x16((size_t)frames); for (long i = 0; i < frames; ++i) x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[(size_t)(2 * i)] + (int)pcm[(size_t)(2 * i + 1)]) >> 1) : pcm[(size_t)i]; recs = xtSoloEncode(x16.data(), (int)frames);
 tvab-cc7|mul(mul(mul(frac(T.level, cc(k.cc7)), frac(T.level, levelAtKey|mul(mul(mul(frac(T.level, cc(k.cc11)), frac(T.level, levelAtKey|toneosc
 tvab-cc11|levelAtKey(k.level, k.levelKF, key))), frac(T.level, cc(k.cc11))), velGain)|levelAtKey(k.level, k.levelKF, key))), frac(T.level, cc(k.cc7))), velGain)|toneosc
 tvab-order|mul(mul(mul(frac(T.level, cc(k.cc7)), frac(T.level, levelAtKey(k.level, k.levelKF, key))), frac(T.level, cc(k.cc11))), velGain)|mul(frac(T.level, cc(k.cc7)), mul(frac(T.level, levelAtKey(k.level, k.levelKF, key)), mul(frac(T.level, cc(k.cc11)), velGain)))|toneosc
@@ -539,8 +539,8 @@ mb-start-beat|    S.beat.start(tempoCfg, origCfg, S.pos);         // 0x8950f860\
 solo-start-beat|    beat_.start(tempoCfg, origCfg, Pi);   // 0x8950f860\n|    beat_.start(tempoCfg, origCfg, 0);   // 0x8950f860\n|tonesolo
 solo-seek-reset|    beat_.reset((flags0 & 4) != 0);       // 0x8950f900\n||tonesolo
 solo-seek-pos|    beat_.beatPos = (int32_t)((uint32_t)pos16 << 5);\n||tonesolo
-solo-seek-clamp|    pos16 = pos16 < 0 ? 0 : pos16 > endPos16 ? endPos16 : pos16;\n||tonesolo
-solo-seek-where|    jumpTo(pos16);\n    f0n = p->voiced[0] ? keep : 0.0f;|    f0n = p->voiced[0] ? keep : 0.0f;|tonesolo
+solo-seek-clamp|    pos16 = pos16 < 0 ? 0 : pos16 > last ? last : pos16;   // the beat goes from the position held to the wave (0x8950fefe)\n||tonesolo
+solo-seek-where|    f0n = f;\n    anchor = recStart;|    anchor = recStart;|tonesolo
 sum-note-takes|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|knob >= 128 ? knob + sum : std::clamp(knob + sum, 0, 127)
 sum-crosses|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|knob >= 128 ? knob : std::max(knob + sum, 0)
 sum-note-clamped|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|std::clamp(knob + sum, 0, 127)
@@ -642,7 +642,7 @@ solo-stereo-left|if (st) { b[0] = readAt(Y, idx[0], fr[0]);|if (st) { b[0] = rea
 solo-stereo-tap|b[0] = tapA * (readAt(Y, idx[0], fr[0]) - b[0]) + b[0];|b[0] = tapA * (readAt(X, idx[0], fr[0]) - b[0]) + b[0];|tonesolo
 solo-stereo-state|low[1] = fCoef * band[1] + low[1];|low[1] = fCoef * band[0] + low[1];|tonesolo
 solo-stereo-mono|if (st) {\n            const float yR|if (false) {\n            const float yR|tonesolo
-solo-note-window|ch[0].e = 0.0f; ch[1].e = 0.5f;|ch[0].e = 0.5f; ch[1].e = 0.5f;|tonesolo
+solo-note-window|ch[0].e = (float)age0 * slope * 0x1p-8f;|ch[0].e = (float)age0 * slope * 0x1p-8f + 0.5f;|tonesolo
 solo-note-toggle|next = 1;            // trigger toggle|next = 0;            // trigger toggle|tonesolo
 solo-timer-wrap|timer = (int32_t)((uint32_t)timer + 0x1000u);|timer = (int32_t)std::min<int64_t>((int64_t)timer + 0x1000, INT32_MAX);|solo
 solo-ppw-round|ppw = xtf::ftrc(pw * 256.0f);|ppw = (int32_t)std::lround(pw * 256.0f);|tonesolo
@@ -662,7 +662,7 @@ solo-anchor-end|if (anchor < recEnd) return;|if (anchor <= recEnd) return;|solo
 solo-anchor-start|if (!(recStart > anchor)) return;|if (!(recStart >= anchor)) return;|tonesolo
 solo-wrap-past|if (recEnd > Pq && budget > 0.0) {|if (recEnd >= Pq && budget > 0.0) {|tonesolo
 solo-wrap-past-b|if (Pq >= recStart && budget > 0.0) {|if (Pq > recStart && budget > 0.0) {|tonesolo
-solo-wrap-end|    if (!wrap && recEnd >= (double)p->in.size()) wrap = true;\n||tonesolo|10
+solo-wrap-end|    if (!wrap && recEnd * 16.0 >= (double)endStop16) wrap = true;   // the record reaching the end event (+0x1c)\n||tonesolo|10
 solo-skip|if (!(budget > 0.0) \|\| !(Pq >= recEnd)) return;|return;|tonesolo
 solo-skip-b|if (!(budget > 0.0) \|\| !(recStart > Pq)) return;|return;|tonesolo
 solo-last-len|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 8.0; }|tonesolo
@@ -679,21 +679,21 @@ solo-jump-f0|    if (i >= nc \|\| !p->voiced[i]) f0n = 0.0f;\n||solo
 solo-jump-record|if (i + 1 == nc && L >= p->segStart[i] + p->segLen[i]) i = nc;||solo
 solo-jump-anchor|    anchor = L;\n|    anchor = recStart;\n|tonesolo
 solo-jump-frac|    Pf = 0;\n    const double L|    const double L|tonesolo
-solo-one-way|if (lmode1 == 1) { jumpTo(lp[0]); return; }|if (lmode1 == 1) { jumpTo(lp[1]); return; }|tonesolo
+solo-one-way|if (lmode1 == 1) { loopJump(lp[0]); return; }|if (lmode1 == 1) { loopJump(lp[1]); return; }|tonesolo
 solo-bounce|if (lmode1 == 2) { f3 \|= 8; walkStep = -walkStep; return; }|if (lmode1 == 2) { walkStep = -walkStep; return; }|tonesolo
 solo-bounce-now|if (lmode1 == 2) { f3 \|= 8; walkStep = -walkStep; return; }|if (lmode1 == 2) { f3 \|= 8; return; }|tonesolo
-solo-mode3|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[0]); return; }|if (lmode1 == 3) { walkStep = 0; jumpTo(lp[0]); return; }|solo
-solo-mode3-pos|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[0]); return; }|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; return; }|solo
-solo-one-way-b|if (lmode3 == 1) { jumpTo(lp[2]); return; }|if (lmode3 == 1) { jumpTo(lp[3]); return; }|tonesolo
+solo-mode3|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; loopJump(lp[0]); return; }|if (lmode1 == 3) { walkStep = 0; loopJump(lp[0]); return; }|solo
+solo-mode3-pos|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; loopJump(lp[0]); return; }|if (lmode1 == 3) { walkStep = 0; f3 \|= 0x40; return; }|solo
+solo-one-way-b|if (lmode3 == 1) { loopJump(lp[2]); return; }|if (lmode3 == 1) { loopJump(lp[3]); return; }|tonesolo
 solo-bounce-b|if (lmode3 == 2) { f3 \|= 4; walkStep = -walkStep; return; }|if (lmode3 == 2) { walkStep = -walkStep; return; }|tonesolo
-solo-mode3-b|if (lmode3 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[3]); return; }|if (lmode3 == 3) { walkStep = 0; f3 \|= 0x40; jumpTo(lp[2]); return; }|solo
+solo-mode3-b|if (lmode3 == 3) { walkStep = 0; f3 \|= 0x40; loopJump(lp[3]); return; }|if (lmode3 == 3) { walkStep = 0; f3 \|= 0x40; loopJump(lp[2]); return; }|solo
 solo-loop-resume|        else {\n            f3 \|= 0x20;\n            f9c = loopCfg.fwdRate;\n            ended_ = 0;|        else {\n            f3 \|= 0x20;\n            f9c = loopCfg.fwdRate;|tonesolo
-solo-end-event|    curEv = 1;                          // the end event, the last\n||solo
+solo-end-event|        eventAt(curEv + 1);\n||tonesolo
 solo-cross-fwd|if (X > lp[2]) X = lp[2]; nextCross = X; return; }|nextCross = X; return; }|solo
 solo-cross-out|if (lp[2] > Pi && X > lp[2]) X = lp[2];|if (X > lp[2]) X = lp[2];|tonesolo
 solo-cross-in|if (loopOn) { if (X > lp[1]) X = lp[1]; }\n            else if (lp[1] > Pi && X > lp[1]) X = lp[1];|if (loopOn && lp[1] > Pi && X > lp[1]) X = lp[1];|tonesolo
 solo-cross-b|if (loopOn) { if (lp[3] > X) X = lp[3]; }\n            else if (Pi > lp[3] && lp[3] > X) X = lp[3];|if (loopOn && Pi > lp[3] && lp[3] > X) X = lp[3];|tonesolo
-solo-seek-first|budget = recEnd > n ? kUnlimited : budgetOf(0);|budget = kUnlimited;|tonesolo
+solo-seek-first|    budget = past ? kUnlimited : budgetOf(seg);|    budget = kUnlimited;|tonesolo
 ext-six-none|clockSix = clockSince ? clockSince : 1;|clockSix = clockSince ? clockSince : 2;
 ext-six-by|if (++clockSeen < 6) return;|if (++clockSeen < 7) return;
 ext-six-seen|    clockSeen = 0;\n    clockSix = clockSince|    clockSeen = 1;\n    clockSix = clockSince
@@ -791,7 +791,7 @@ cc-pad-off-0|a != 0 && a != 32 && a == number|a != 32 && a == number
 cc-pad-off-32|a != 0 && a != 32 && a == number|a != 0 && a == number
 cc-pad-both|    if (assigned(ctl.assign[10])) pad.setX(value);\n    if (assigned(ctl.assign[11])) {|    if (assigned(ctl.assign[10])) pad.setX(value);\n    else if (assigned(ctl.assign[11])) {
 knob-steps|    if (moved) padSteps(step);\n|
-solo-seek-ended|    jumpTo(pos16);\n|    jumpTo(pos16);\n    ended_ = 0;\n|tonesolo
+solo-seek-ended|    jumpTo(pos16);\n    f0n = f;|    jumpTo(pos16);\n    ended_ = 0;\n    f0n = f;|tonesolo
 xy-plus-zero|        if (x == 0) return 0;\n        return x >= 64 ?|        return x >= 64 ?|toneosc
 xy-plus-side|return x >= 64 ? value((x - 64) * 127 / 63) : -value((64 - x) * 127 / 63);|return x >= 64 ? value((x - 64) * 127 / 63) : value((64 - x) * 127 / 63);|toneosc
 xy-plus-off|        if (n == 0 \|\| n == 32) return 0;\n        const int x = in.cc[n];\n|        const int x = in.cc[n];\n|toneosc
@@ -889,11 +889,11 @@ solo-rate98-robot|rate98 = robot ? A : A * f9c;|rate98 = A * f9c;|tonesolo
 solo-f9c-bounce|if (f3 & 0x10) { f3 &= 0xef; f9c = 1.0f; }|if (f3 & 0x10) { f3 &= 0xef; }|tonesolo
 loop-rate-scale|return xtOscExp2(xtf::div(xtf::flt(tenths), 12000.0f));|return xtOscExp2(xtf::div(xtf::flt(tenths), 1200.0f));|toneosc
 patch-vari|    o.vari = p(b + 0x30) != 0;|    o.vari = true;|tonepatch
-solo-robot-event|    robotEv = robot;                    // an event's load|    // an event's load|tonesolo|16
+solo-robot-event|    curEv = e;\n    robotEv = robot;|    curEv = e;|tonesolo|16
 solo-robot-grains|        if (robotEv) { pw = K(0x44c8745d) / Af;|        if (robot) { pw = K(0x44c8745d) / Af;|tonesolo|31337
 start-clamp|return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);|return frames == 0 ? 0 : (int32_t)(at > frames ? frames - 1 : at);
 start-clamp-none|return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);|return (int32_t)at;
-start-solo|        s.solo.setStart(waveStart(s, o));|        s.solo.setStart(0);
+start-solo|else s.solo.setStart(waveStart(s, o));|else s.solo.setStart(0);
 start-band|        else s.mb.setStart(waveStart(s, o));|        else s.mb.setStart(0);
 start-lin|        s.lin.setStart(waveStart(s, o));|        s.lin.setStart(0);
 solo-start-stop|const int32_t lo = (f3 & 8) ? 0 : startPos16;|const int32_t lo = 0;|tonesolo
@@ -901,13 +901,13 @@ solo-start-stop-turned|const int32_t lo = (f3 & 8) ? 0 : startPos16;|const int32
 solo-start-anchor|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|0.0 >= recStart|tonesolo|31337
 solo-start-anchor-turned|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|startPos16 / 16.0 >= recStart|tonesolo
 solo-start-grains|    const int32_t at = (int32_t)std::lround(recStart * 16.0);|    const int32_t at = Pi;|tonesolo
-solo-start-seek-anchor|        jumpTo(startPos16);\n        anchor = recStart;|        jumpTo(startPos16);|tonesolo
-solo-start-backward|    if (!(walk < 0.0f) && startPos16 > 0) {|    if (startPos16 > 0) {|tonesolo
+solo-start-seek-anchor|    f0n = f;\n    anchor = recStart;|    f0n = f;|tonesolo
+solo-start-backward|else seekTo(walk < 0.0f ? endStop16 : startPos16);|else seekTo(startPos16);|tonesolo
 band-start|(int)S.rd32(S.entry(S.evStart) + 4) : startCfg * 16;|(int)S.rd32(S.entry(S.evStart) + 4) : 0;|toneband
 lin-start|    bwd.end = startCfg;|    bwd.end = 0;|tonelin
 lin-start-beat|0.0f > walk ? frames * 16 : startCfg * 16);|0.0f > walk ? frames * 16 : 0);|tonelin
 lin-fr11-rate|            if (y) cmp = rate;|            ;|tonelin|9
-lin-fr11-mono|            if (y) cmp = rate;|            cmp = rate;|tonelin|9
+lin-fr11-mono|            if (y) cmp = rate;|            cmp = rate;|tonelin|777
 lin-fr11-entry|        float cmp = y ? fr11 : 0.0f;|        float cmp = 0.0f;|tonelin|9
 lin-hold-floor|    if (!(next > floor)) next = 0.0f;|    if (!(next > 0.0f)) next = 0.0f;|tonelin|9
 check-start|    p[b + 0x22] = o.startOffset;|;|tonecheck
@@ -1010,7 +1010,7 @@ play-legato2-mode|legato2 = prevHeld && Z.osc2.playbackMode == 1 && v->osc2.on|l
 play-legato-end|    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);|    if (legato1 && sameKind(*v, *prev)) legatoTake(*v, *prev);|tone|777
 play-legato2-end|    if (legato2 && sameKind(v->osc2, prev->osc2) && !atEnd(prev->osc2)) legatoTake(v->osc2, prev->osc2);|    if (legato2 && sameKind(v->osc2, prev->osc2)) legatoTake(v->osc2, prev->osc2);
 play-end-start|        return (int8_t)f == 1;|        return f != 0;
-play-end-solo|s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();|s.wave->type == 1 ? 0 : s.mb.endFlag();
+play-end-solo|s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();|s.wave->type == 1 ? 0 : s.mb.endFlag();|tone|777
 play-end-band|s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();|s.wave->type == 1 ? s.solo.endFlag() : 0;
 play-end-lite|        const int f = s.lite ? s.staleEnd : s.linear|        const int f = s.lite ? 0 : s.linear
 play-prev-zone|            if (&w != v && w.active && !w.releasing && w.zone == zone) order[n++] = &w;|            if (&w != v && w.active && !w.releasing) order[n++] = &w;
@@ -1021,11 +1021,11 @@ play-take-lite-linear|    if (s.lite && !s.linear) { s.xfg.takeRates|    if (s.l
 play-steps-pre|    v->steps = stepCount[zone][0]++;|    v->steps = ++stepCount[zone][0];
 play-steps2|    v->osc2.steps = stepCount[zone][1]++;|    v->osc2.steps = stepCount[zone][0]++;
 play-step-mod|    if (o.playbackMode == 2) idx = (int)s.steps % (n - 1);|    if (o.playbackMode == 2) idx = (int)s.steps % n;
-play-event-octaves|            const int r = (m + 11) / 12 * 12, k = v.note - 60;|            const int r = (m + 12) / 12 * 12, k = v.note - 60;|tone|777
+play-event-octaves|            const int r = (m + 11) / 12 * 12, k = v.note - 60;|            const int r = (m + 12) / 12 * 12, k = v.note - 60;|tone
 play-event-below|            int x = v.note >= 60 ? k : k % r + r;|            int x = v.note >= 60 ? k : k % r;
 play-event-last|    last = at(idx + 1);|    last = at(idx);
 play-step-few|(o.playbackMode == 3 \|\| s.wave->vpnoCount >= 2);|(o.playbackMode == 3 \|\| s.wave->vpnoCount >= 1);
-play-event-ensemble|(s.wave->type == 3 \|\| s.wave->type == 5) && (o.playbackMode == 3|s.wave->type == 3 && (o.playbackMode == 3
+play-event-ensemble|s.wave->type == 1 \|\| s.wave->type == 3 \|\| s.wave->type == 5)|s.wave->type == 1 \|\| s.wave->type == 3)
 play-loop-bit|        s.mb.setLoopBit(o.loop && !eventPlay(s, o));|        s.mb.setLoopBit(o.loop);
 play-loop-bit-none|        s.mb.setLoopBit(o.loop && !eventPlay(s, o));|
 play-band-events-swap|    if (eventCfg) { S.evStart = evFirstCfg; S.evEnd = evLastCfg; }|    if (eventCfg) { S.evStart = evLastCfg; S.evEnd = evFirstCfg; }|toneband
@@ -1043,4 +1043,43 @@ check-play-vpno-list|    for (size_t k = 0; k < e.vpno.size(); ++k) le(12 + 2 * 
 check-play-patch|    p[b + 0x2e] = o.playbackMode;|    p[b + 0x2e] = 0;|tonecheck
 patch-playback|    o.playbackMode = p(b + 0x2e);|    o.playbackMode = p(b + 0x2f);|tonepatch
 check-pad-cc|            if (ccMoved && !panelMoved && !fw.padCc(kCcNum[ccAt], ccTo)) return false;\n||tonecheck|4242
-check-play-patch-solo|        if (patchCase && patchCtl.osc2.playbackMode >= 2) wv2 = band(wv2);\n||tonecheck|777
+seg-forward-off|            segForward();\n||tonesolo
+seg-forward-len|    if (!(endStop16 > (int32_t)((uint32_t)X + (uint32_t)first))) return;|    if (!(endStop16 > X)) return;|tonesolo
+seg-forward-anchor|    loaded();\n    anchor = recStart;\n}\n\n// The walk back|    loaded();\n}\n\n// The walk back|tonesolo
+seg-backward-off|crossings(); segBackward(nextCross); }\n            else segBackward(Pi);|crossings(); }|tonesolo
+seg-backward-r1|segBackward(nextCross); }|segBackward(Pi); }|tonesolo
+seg-loop-entry|    segCur = segContaining(pos16);|    segCur = evSegAt(eventBefore(pos16));|tonesolo|777
+seg-seek-walk|    while (segCur < segLast() && !(segAt(segCur + 1) > pos16) && segAt(segCur + 1) < last) ++segCur;\n||tonesolo
+ev-before-edge|while (e < evLast() && evAt(e + 1) < pos16) ++e;|while (e < evLast() && evAt(e + 1) <= pos16) ++e;|tonesolo
+ev-seek-event|    eventJump(eventBefore(pos16));|    eventJump(0);|tonesolo
+ev-start-backward|if (eventCfg) eventJump(walk < 0.0f ? evE : evS);|if (eventCfg) eventJump(evS);|tonesolo
+ev-loop-bit|    loopOn = cachedLoop && !eventCfg;|    loopOn = cachedLoop;|tonesolo
+ev-end-stop|if (np >= endStop16) { ended_ = 1; np = endStop16; nf = 0; }|if (np >= endPos16) { ended_ = 1; np = endPos16; nf = 0; }|tonesolo
+ev-note-age|const int32_t age0 = (int32_t)((uint32_t)((int32_t)std::lround(anchor * 16.0) - at) * 256u);|const int32_t age0 = 0;|tonesolo
+ev-note-window|ch[0].e = (float)age0 * slope * 0x1p-8f;|ch[0].e = (float)age0 * slope * 0x1p-12f;|tonesolo
+ev-last-read|    lastRead = ((lp[1] == endStop16 ? evAt(evLast()) : endStop16) >> 4) - 1;|    lastRead = (int32_t)p->in.size() - 1;|tonesolo
+ev-last-read-loop|(lp[1] == endStop16 ? evAt(evLast()) : endStop16)|endStop16|tonesolo
+rec-past-end|    const bool past = recEnd * 16.0 > (double)endStop16;|    const bool past = recEnd > (double)p->in.size();|tonesolo
+rec-next-len|lenOf(past ? seg : seg + 1)|lenOf(seg + 1)|tonesolo
+rec-prev-len|    nextLen16 = (int32_t)std::lround(16.0 * lenOf(seg));   // 0x8950d560|    // 0x8950d560|tonesolo
+read-ev-seg|P.evSeg.push_back((int)((so - seg0) / 12));|P.evSeg.push_back((int)((so - seg0) / 12) + 1);|tonesolo
+read-seg-first|P.segFirst.push_back((int16_t)r16(ro));|P.segFirst.push_back((int16_t)256);|tonesolo
+solo-events-order|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(first, last);|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(last, first);
+solo-loop-bit|        s.solo.setLoopBit(o.loop && !eventPlay(s, o)); // and the Loop bit, which Playback Mode's tails clear\n|
+solo-encode-xt|const bool xt = (own ? marks.size() > 2 : depth >= 0)|const bool xt = (own ? marks.size() > 2 : depth < -1)
+check-solo-loop-ev|            while (ev + 1 < nev && evPos(ev + 1) < pos) ++ev;\n||tonecheck|777
+check-solo-loop-seg|            while (seg + 12 < segEnd && !(pos < (int)r32(seg + 12 + 8))) seg += 12;\n||tonecheck
+check-solo-vpno|        w.chunk[5] = put(out.enc->vpdt.data(), out.enc->vpdt.size());\n        writeVpno(f, w, *out.enc);\n|        w.chunk[5] = put(out.enc->vpdt.data(), out.enc->vpdt.size());\n|tonecheck
+check-solo-hold-vari|if (wv && wv->type == 1 && (ctl.playbackMode >= 1 \|\| n.playbackMode >= 1)) n.vari = ctl.vari;|if (wv && wv->type == 1 && (ctl.playbackMode == 1 \|\| n.playbackMode == 1)) n.vari = ctl.vari;|tonecheck
+own-ignored|    const bool own = !marks.empty();|    const bool own = false;
+own-band|        if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth)) return fail("multi-band encoder failed");|        if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth, nullptr, own ? &marks : nullptr)) return fail("multi-band encoder failed");
+own-detect-too|&& xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, own ? &marks : nullptr)|&& xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, nullptr)
+own-end-check|events->front() == 0 && (long)events->back() == frames * 16|events->front() == 0
+own-marks-floor|(uint32_t)(e / 16) > marks.back() ? (uint32_t)(e / 16) : marks.back()|(uint32_t)((e + 15) / 16) > marks.back() ? (uint32_t)((e + 15) / 16) : marks.back()
+fw-marker-pos|        c.wr32(m, pos); c.wr32(m + 4, pos); c.wr8(m + 0xd, 1);|        c.wr32(m, pos + 1); c.wr32(m + 4, pos); c.wr8(m + 0xd, 1);|tonefw
+fw-marker-count|    c.wr32(kMarkCount, (uint32_t)at.size());|    c.wr32(kMarkCount, (uint32_t)at.size() - 1);|tonefw
+fw-marker-solo|    if (markers) {                      // the events given, in place of the detection|    if (false) {                      // the events given, in place of the detection|tonefw
+fw-marker-ends|        if (markers->size() < 2 \|\| markers->front() != 0 \|\| markers->back() != (uint32_t)frames) return false;\n        putMarkers|        putMarkers|tonefw
+check-own-edit|if (ev[1] + 37 * 16 < ev[2]) ev[1] += 37 * 16;|if (ev[1] + 37 * 16 < ev[2]) ev[1] += 37 * 16 + 1;|tonecheck
+check-own-band|encodedEvents(*E2) != (w.type == 1 ? ev : ev0)|encodedEvents(*E2) != ev|tonecheck
+check-own-stride|    const uint32_t stride = E.channels == 2 ? 0x58 : 0x2e;\n    for (uint32_t e = 0; e < (w2 >> 16)|    const uint32_t stride = E.channels == 2 ? 0x2e : 0x58;\n    for (uint32_t e = 0; e < (w2 >> 16)|tonecheck

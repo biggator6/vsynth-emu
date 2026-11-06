@@ -9,6 +9,7 @@
 #include <vector>
 #include "XtBeat.h"
 #include "XtLoop.h"
+#include "XtSoloEncoder.h"
 
 // A sample prepared for SOLO playback: the samples and their grain records.
 // A stereo wave has one record stream (encoded from (L+R) >> 1); the player
@@ -19,6 +20,18 @@ struct XtSoloPlan {
     std::vector<double> segStart, segLen;
     std::vector<char> voiced;
     std::vector<int> info;              // record info word, −1 if unknown
+    // The events and segments, as the wave's vpdt has them (xtSoloReadVpdt).  Event e: its position (1/16 sample: 0 the start, the
+    // last the wave's end, between them the attacks the encoder found) and the segment containing it.  Segment k: its start (a record's,
+    // the one nearest its attack), its first record (an index; size() is the terminator) and that record's first length word, as the
+    // player reads it (int16).  pastStart, pastLen: what the player reads as the segment after the last (0x8950d770): the record count's
+    // entry, the records' second word and the word at the count's offset.  Empty: one segment, the start and the end alone.
+    std::vector<int32_t> evPos;
+    std::vector<int> evSeg;
+    std::vector<int32_t> segPos;
+    std::vector<int> segRec;
+    std::vector<int16_t> segFirst;
+    int32_t pastStart = 0x7fffffff;
+    int16_t pastLen = 0;
     // Diagnostics (read from the environment where the plan is built)
     bool anchorMode = true;             // VSE_SCHED=pos: record containing P
     bool forceUnvoiced = false;         // VSE_LITE=solo-np
@@ -26,6 +39,12 @@ struct XtSoloPlan {
     size_t size() const { return segStart.size(); }
     bool stereo() const { return !inR.empty(); }
 };
+
+// A SOLO wave's vpdt as the XT lays it out: events at (stride·e + 8)·2 (stride 10, 16 stereo), each {u32 flags, u32 position, u32 segment
+// entry, u32 record, u16 mark}; segment entries {u32 record, u32 flags, u32 start}; the count of record words; then the records {u16 length,
+// u16 info}, 0xffff continuing a length, ending with (256, 1).  Read into its records and the plan's events and segments.  False if it isn't
+// one, or its records don't reach its last event.
+bool xtSoloReadVpdt(const std::vector<uint8_t>& vpdt, int channels, std::vector<XtRecord>& recs, XtSoloPlan& P);
 
 class XtSoloVoice {
 public:
@@ -55,7 +74,13 @@ public:
     // The Start Offset in samples, as the converter leaves it in the block (+0xb8, at most the last sample).  Set before noteOn.  The voice
     // keeps it × 16 at +0x18 (0x894f3170): a note walking forward starts there (0x8950fa60, then 0x8950fed0), and a walk backward stops
     // there, unless the forward loop has turned it round (0x8950cf9c, 0x8950d048).
-    void setStart(int32_t samples) { startCfg = samples; }
+    void setStart(int32_t samples) { startCfg = samples; eventCfg = false; }
+    // Playback Mode STEP or EVENT instead (0x894f3150 with the block's 0x80 clear): the start and end events, held to the last.  The note
+    // starts at the first (the last walking backward) by the event's jump (0x8950d790), and its walk stops at both (+0x18, +0x1c).
+    // No loop: the converter's tails clear the Loop bit, though the cached loop events stay.  Set before noteOn.
+    void setEvents(int first, int last) { evFirstCfg = first; evLastCfg = last; eventCfg = true; }
+    // An update's Loop bit, the block's (0x894f3fb6), as the band player's: only where the note-on cached the loop.
+    void setLoopBit(bool on) { loopOn = on && cachedLoop; }
     // Tempo Sync and Time Trip (XtBeat).  Set before noteOn: the note's tempo and the wave's
     // Original Tempo (+0x4c, +0x48), byte 0 bits 1 and 2.  Then, from the voice: the bits as a
     // block sets them (0x894f3ec0: a clock counts from when the bit comes on, and Time Trip
@@ -85,6 +110,10 @@ public:
     // The same as the firmware's output words, L/R pairs: int16 × 65536 × the gain.  Bit for bit.
     void renderXt(float* lr, int count);
     bool ended() const { return ended_ != 0; }
+    // Since note-on, a segment past the vpdt's list taken (0x8950cef0 on the last segment, only after starting at the last event): the
+    // XT then reads its records from RAM.  Silent from then here.
+    bool readPastWave() const { return pastWave; }
+    int segmentMoves() const { return segMoves; }   // since note-on, the walk's moves between segments (for the check's counts)
     int endFlag() const { return ended_; }  // +4 as it stands: 1 at the end, −1 at the start, else 0
     FILE* trace = nullptr;              // VSE_TRACE: per-sample state, as EmuSolo.java writes it
 
@@ -129,11 +158,20 @@ private:
     uint8_t flags0 = 0;                 // byte 0 bits 1, 2 (Tempo Sync, Time Trip)
     int32_t lp[4] = { 0, 0x7fffffff, 0x7fffffff, 0 };
     int lmode1 = 0, lmode3 = 0;
-    bool loopOn = false;
+    bool loopOn = false;                // byte 0 bit 0, as the crossings read it
+    bool cachedLoop = false;            // the note-on cached the loop's events
     uint8_t f3 = 0x80;
     int curEv = 0;
     int32_t prevEv = 0, nextEv = 0, nextCross = 0, endPos16 = 0;
-    int32_t startCfg = 0, startPos16 = 0;   // +0x18: the Start Offset × 16
+    int32_t startCfg = 0, startPos16 = 0;   // +0x18: the Start Offset × 16, or the start event's position
+    int32_t endStop16 = 0;              // +0x1c: the end event's position (the wave's end but under STEP and EVENT)
+    int32_t lastRead = 0;               // +0x5c of the record block: the last sample a read takes
+    int32_t nextLen16 = 0;              // +0x30: the next record's length, 1/16 sample, as a load leaves it
+    int segCur = 0;                     // the segment the walk is in (+0xe8 block: +0xc its start, +0x10 the next's, +0x14 the one after it)
+    bool pastWave = false;
+    int segMoves = 0;
+    bool eventCfg = false;
+    int evFirstCfg = 0, evLastCfg = 0;
     float f0n = 0.0f;
     double anchorStepInit = 1.0;
     long t = 0;
@@ -142,6 +180,7 @@ private:
     double budgetOf(size_t i) const;
     void loadNext();
     void loadPrev();
+    void loaded();
     double repeatCost() const;
     void anchorForward();
     void anchorBackward();
@@ -149,6 +188,21 @@ private:
     void crossForward();
     void crossBackward();
     void jumpTo(int32_t pos16);
+    int evLast() const;                 // the wave's last event (its end)
+    int32_t evAt(int e) const;          // an event's position, 1/16 sample
+    int evSegAt(int e) const;           // the segment containing it
+    int segLast() const;
+    int32_t segAt(int k) const;         // a segment's start, 1/16 sample
+    size_t segRecAt(int k) const;       // its first record
+    int16_t segFirstAt(int k) const;    // that record's first length word
+    int eventBefore(int32_t pos16) const;   // the last event before the position, or 0 (0x8950f9c0 from event 0)
+    int segContaining(int32_t pos16) const;
+    void eventAt(int e);                // the event current (0x8950c7e0), and the next crossing at the event after it
+    void eventJump(int e);              // to an event (0x8950d790): it current, the position and anchor there, its segment and record
+    void loopJump(int32_t pos16);       // to a cached loop event (0x8950d7d0)
+    void seekTo(int32_t pos16);         // 0x8950fed0 with byte 0 bit 7: the event before, then segments and records to the position
+    void segForward();                  // the walk into the next segment (0x8950cef0)
+    void segBackward(int32_t r1);       // and back out of one (0x8950cfde)
     Grain grainParams(bool setF0);
     void walkBlock();
     void filterBlock();

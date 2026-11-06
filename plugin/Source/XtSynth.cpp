@@ -65,7 +65,7 @@ bool xtSynthSetRom(const std::string& path) {
 bool xtSynthRomReady() { return g_romReady; }
 
 std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& channels, double sampleRate,
-                                         int type, int depth, std::string* err, int bits) {
+                                         int type, int depth, std::string* err, int bits, const std::vector<int32_t>* events) {
     auto fail = [&](const char* m) -> std::shared_ptr<XtEncoded> { if (err) *err = m; return nullptr; };
     if (!g_romReady) return fail("no firmware image (rom.2) loaded");
     if (channels.empty() || channels[0].size() < 64) return fail("sample too short");
@@ -98,6 +98,12 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
     auto E = std::make_shared<XtEncoded>();
     E->type = type;
     E->frames = frames;
+    // A SOLO wave's own events as the markers the detection would leave (in samples, the first 0, the last the end), when they fit
+    // this audio: a V-Trainer wave's can fall between samples, which the markers can't hold (they're taken down to one)
+    std::vector<uint32_t> marks;
+    if (events && events->size() >= 2 && irate == 44100 && events->front() == 0 && (long)events->back() == frames * 16)
+        for (int32_t e : *events) marks.push_back(marks.empty() || (uint32_t)(e / 16) > marks.back() ? (uint32_t)(e / 16) : marks.back());
+    const bool own = !marks.empty();
     if (type == 0 || type == 1) {
         // LITE (0) is the samples alone, as the XT keeps them: no analysis, so nothing to encode.
         // A stereo SOLO wave has the encoder's stereo mode, one list of records from both
@@ -111,8 +117,25 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         }
         E->channels = ch;
         if (type == 0) return E;
-        const std::vector<XtRecord> recs = xtSoloEncode(pcm.data(), (int)frames, ch);
+        // The attacks first: the XT's detection at the Encode Depth (as a band wave's), or the wave's own events.  With any, the XT's
+        // own SOLO encode (0x89515e28) in the interpreter splits the records at them, and its vpdt gives the records, the events and
+        // the segments.  With none, the port: the same records as the firmware's, laid out with no event between the start and the end.
+        std::vector<XtRecord> recs;
+        std::vector<uint8_t> vp;
+        const bool xt = (own ? marks.size() > 2 : depth >= 0)
+            && xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, own ? &marks : nullptr) && xtSoloReadVpdt(vp, ch, recs, P) && P.evPos.size() > 2;
+        if (!xt) {
+            recs = xtSoloEncode(pcm.data(), (int)frames, ch);
+            if (recs.size() < 2) return fail("SOLO encoder found no records");
+            uint8_t ev[4][kXtFwSoloEventBytes];
+            xtFwSoloImage(recs, frames, ch, XtLoop{}, vp, ev);
+            std::vector<XtRecord> back;
+            if (!xtSoloReadVpdt(vp, ch, back, P)) return fail("SOLO layout unreadable");
+        }
         if (recs.size() < 2) return fail("SOLO encoder found no records");
+        E->vpdt = std::move(vp);
+        E->vpnoCount = (int)P.evPos.size();            // its events in order, as the XT's import writes them
+        for (int k = 0; k < E->vpnoCount; ++k) E->vpno.push_back((uint16_t)k);
         const size_t nc = recs.size();
         P.segStart.resize(nc); P.segLen.resize(nc); P.voiced.resize(nc); P.info.resize(nc);
         for (size_t i = 0; i < nc; ++i) {
@@ -124,6 +147,8 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         }
         E->channels = ch;
     } else {
+        // A band wave keeps the detection, its own events or not: the band encode also reads each marker's second word, which the
+        // detection takes from the audio and the file doesn't keep (HARDWARE_FIRMWARE.md, "A wave's own events")
         if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth)) return fail("multi-band encoder failed");
         if (!xtFwLoadBands(type, pcm.data(), frames, ch, E->bands)) return fail("band rebuild failed");
         E->wave.vpdt = E->vpdt.data();
@@ -417,12 +442,14 @@ int32_t XtSynth::waveStart(const OscVoice& s, const OscControls& o) {
     return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);
 }
 
-// Playback Mode STEP (0x894e42e0) and EVENT (0x894e4070), on a band wave with a `vpno`: the event its list gives at an index, and the one
+// Playback Mode STEP (0x894e42e0) and EVENT (0x894e4070), on a band or SOLO wave with a `vpno`: the event its list gives at an index, and the one
 // after it, by the vpdt's numbers.  STEP's index is the zone's count of notes modulo the list's count less one, and with fewer than two it
 // plays as RETRIGGER.  EVENT's is the key from 60 up, wrapping each list rounded up to octaves (0x894e1200).
-// The tails clear the block's Loop bit (+0xb4 bit 0x01) and its 0x80 then, at every conversion: so a band wave's loop is off under them.
+// The tails clear the block's Loop bit (+0xb4 bit 0x01) and its 0x80 then, at every conversion: so a wave's loop is off under them.
+// Vari off plays a SOLO wave on the linear player, whose converter (0x894f3460) takes samples, not events.
 bool XtSynth::eventPlay(const OscVoice& s, const OscControls& o) {
-    return o.playbackMode >= 2 && !s.analog && !s.lite && s.wave && (s.wave->type == 3 || s.wave->type == 5) && (o.playbackMode == 3 || s.wave->vpnoCount >= 2);
+    return o.playbackMode >= 2 && !s.analog && !s.lite && !s.linear && s.wave && (s.wave->type == 1 || s.wave->type == 3 || s.wave->type == 5)
+        && (o.playbackMode == 3 || s.wave->vpnoCount >= 2);
 }
 
 bool XtSynth::waveEvents(const Voice& v, const OscVoice& s, const OscControls& o, int& first, int& last) const {
@@ -1182,9 +1209,11 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
         s.xfg.setGainXt(s.curGain);
     }
     else if (s.wave->type == 1) {
+        int first = 0, last = 0;
         s.solo.setRobot(s.robot);
         s.solo.setLoop(waveLoop(s, o));
-        s.solo.setStart(waveStart(s, o));
+        if (waveEvents(v, s, o, first, last)) s.solo.setEvents(first, last);
+        else s.solo.setStart(waveStart(s, o));
         s.solo.setTempo(tempoWord, (uint32_t)o.origTempo);
         s.solo.setBeatFlags(o.tempoSync, tripNow);
         s.solo.noteOn(s.wave->solo, s.curA, s.curF, s.curWalk, s.curG);
@@ -1542,6 +1571,7 @@ void XtSynth::oscBeat(OscVoice& s, const OscControls& o) {
         if (o.beatKeep && s.solo.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.solo.setGain(0.0f); }
         s.solo.setBeatFlags(sync, trip);
         s.solo.setRobot(s.robotKnob && o.vari);        // the block's byte, all but the Vari bit, to the player's (0x894f3fa8): Robot follows
+        s.solo.setLoopBit(o.loop && !eventPlay(s, o)); // and the Loop bit, which Playback Mode's tails clear
     } else {
         if (o.beatKeep && s.mb.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.mb.setGainXt(0.0f); }
         s.mb.setBeatFlags(sync, trip);

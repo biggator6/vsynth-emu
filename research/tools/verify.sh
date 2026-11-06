@@ -24,6 +24,9 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
 # The project's LITE waves, mono and stereo, as their own type, with Vari on (XtLitePlayer) and off (XtLinearPlayer)
 [ $BUILT = 1 ] && { n=0; for w in "005 sine_400hz_r.wav" "348 Handclap.wav"; do for v in 1 0; do o=$(cd "$REPO" && TEST_VARI=$v build/plugin/VSynthEmuTest "$ROM" "analysis/projects/Emu_test.prj/Wave/$w" 60 auto 2>&1)
   echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "Encoded as LITE" && n=$((n+1)); done; done; echo "LITE waves, plugintest: $n/4 bit-identical"; [ $n = 4 ] || rc=1; }
+# A project's SOLO wave with attacks on its own events (Tribal1, 7), with STEP and EVENT
+[ $BUILT = 1 ] && { n=0; for m in 2 3; do o=$(cd "$REPO" && TEST_PLAYBACK=$m TEST_NOTE2="64,30000" build/plugin/VSynthEmuTest "$ROM" "analysis/projects/Emu_test.prj/Wave/346 Tribal1.wav" 60 auto 2>&1)
+  echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "Encoded as SOLO (the wave's own)" && n=$((n+1)); done; echo "SOLO events, plugintest: $n/2 bit-identical"; [ $n = 2 ] || rc=1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_FX_PANEL=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_UI_LAYOUT=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_ROM_SEARCH=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
