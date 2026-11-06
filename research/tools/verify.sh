@@ -20,6 +20,9 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
 [ $BUILT = 1 ] && { echo -n "vari off, "; TEST_VARI=0 bash "$D/pt.sh" || rc=1; }
 # And with a Start Offset: where each player starts, and where a walk back stops
 [ $BUILT = 1 ] && { echo -n "start offset, "; TEST_START=3000 bash "$D/pt.sh" || rc=1; }
+# The project's LITE waves, mono and stereo, as their own type, with Vari on (XtLitePlayer) and off (XtLinearPlayer)
+[ $BUILT = 1 ] && { n=0; for w in "005 sine_400hz_r.wav" "348 Handclap.wav"; do for v in 1 0; do o=$(cd "$REPO" && TEST_VARI=$v build/plugin/VSynthEmuTest "$ROM" "analysis/projects/Emu_test.prj/Wave/$w" 60 auto 2>&1)
+  echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "Encoded as LITE" && n=$((n+1)); done; done; echo "LITE waves, plugintest: $n/4 bit-identical"; [ $n = 4 ] || rc=1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_FX_PANEL=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_UI_LAYOUT=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_ROM_SEARCH=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }

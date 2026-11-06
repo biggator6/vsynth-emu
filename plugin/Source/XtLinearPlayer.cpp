@@ -48,7 +48,8 @@ void XtLinearPlayer::noteOn(const std::vector<float>& left, const std::vector<fl
     if (loopCfg.on) { lp[0] = loopCfg.fwdStart * 16; lp[1] = loopCfg.fwdEnd * 16; lp[2] = loopCfg.bwdEnd * 16; lp[3] = loopCfg.bwdStart * 16; }
     else { lp[0] = 0; lp[1] = lp[2] = 0x7fffffff; lp[3] = 0; }
     const RoundNearest nearest;
-    beat_.start(tempoCfg, origCfg, 0.0f > walk ? frames * 16 : startCfg * 16);   // where the SOLO setup's seek left it (0x8950fed0)
+    // where the SOLO setup's seek left it (0x8950fed0); a LITE wave's, its first read, the voice's +0x10c (0x8950b7ec)
+    beat_.start(tempoCfg, origCfg, liteCfg ? pos * 16 : 0.0f > walk ? frames * 16 : startCfg * 16);
 }
 
 void XtLinearPlayer::seek(int32_t pos16) {

@@ -26,9 +26,10 @@
 #include "XtOsc.h"
 #include "XtSoloVoice.h"
 #include "XtLinearPlayer.h"
+#include "XtLitePlayer.h"
 
 struct XtEncoded {
-    int type = 0;                  // 1 SOLO, 3 BACKING, 5 ENSEMBLE
+    int type = 0;                  // 0 LITE (the samples alone), 1 SOLO, 3 BACKING, 5 ENSEMBLE
     int channels = 1;              // the wave's channels (1 or 2)
     long frames = 0;               // at 44.1 kHz
     std::vector<uint8_t> vpdt;     // multi-band
@@ -349,7 +350,11 @@ private:
         int kfKey = -1;                // the key-follow key (+4): a change restarts the glide
         bool robot = false;            // Robot Voice, as at note-on (the player latches it)
         bool robotKnob = false;        // and its Switch alone: the pitch takes it with Vari Sw as that stands
-        bool linear = false;           // Vari off on a SOLO wave, as at note-on: XtLinearPlayer plays
+        bool linear = false;           // Vari off on a SOLO or LITE wave, as at note-on: XtLinearPlayer plays
+        // A LITE wave (type 0) is the voice's kind 1 (the converter at 0x894e2ec0): its own note-on (0x8950b5b0) and update (0x8950bbb0),
+        // which take the converters' values as they are, no 70% steps.  Vari off, the linear player; on, XtLitePlayer (mode 2)
+        bool lite = false;
+        float root = 440.0f;           // the voice's root frequency (+0x9a4), as its setup leaves it at note-on (0x894f21c0)
         bool variBit = true;           // Vari Sw as the voice has it (+0xb4 bit 0x20), what its walk reads: from note-on, then each knob update's end
         bool syncBit = false;          // and Tempo Sync, as the player's byte 0 has it (bit 1), the same way
         bool analog = false;           // OSC Type ANALOG at note-on: the analog oscillator plays
@@ -366,6 +371,7 @@ private:
         XtMbPlayer mb;
         XtSoloVoice solo;
         XtLinearPlayer lin;
+        XtLitePlayer xfg;              // a LITE wave with Vari on (mode 2)
         XtAnalogOsc ana;               // kept across notes: its phase runs on
     };
     struct Voice : OscVoice {                  // OSC 1's in the base
@@ -501,7 +507,7 @@ private:
     void oscBeat(OscVoice& s, const OscControls& o);   // a block's Tempo Sync, Time Trip and Beat Keep to the player (0x894f3ec0)
     const XtEncoded* waveOf(const OscControls& o) const { return cur[&o == &ctl ? 0 : 1].get(); }
     bool oscPlays(const OscControls& o) const;       // switched on, with something to play
-    void targets(const Voice& v, const OscVoice& s, const OscControls& o, float& A, float& F, float& walk, float& g) const;
+    void targets(const Voice& v, const OscVoice& s, const OscControls& o, float& A, float& F, float& walk, float& g, bool noteOn = false) const;
     float gainTarget(const Voice& v, const OscVoice& s, const OscControls& o, float env) const;   // 0x894f3dc0 / 0x894f3e20
     XtMatrixInputs matrixInputs(const Voice& v) const;
     bool matrixUpdate(Voice& v) const;               // the sums, as a conversion pass reads them; true if any moved

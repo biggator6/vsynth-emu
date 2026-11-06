@@ -545,7 +545,7 @@ shown "ENSEMBLE"), 5 = ENSEMBLE, 6 = FOR4, 7 = FORO, 8 = UWA. Codes 1–5 =
 V-Trainer's algorithm numbers. So PCM player modes 6 and 8 are **FOR4** and
 **UWA** (internal types, presumably preset waves), not LITE.
 
-**Oscillator kinds** (`0x894f2010`, 1–4) — corrected: **1 = PCM, Vari
+**Oscillator kinds** (`0x894f2010`, 1–4) — corrected (and again in v153, "LITE waves": 1 is a LITE wave, Vari picking its mode): **1 = PCM, Vari
 OFF** → `0x894f3590` (modes 0/1/2; mode 0 → `0x89509870`/`89509f52`: plain
 linear-interpolation resampler, int16 reads, position += pitch × time,
 gain smoothing 1/32 per sample, loop/end variants via a jump table at
@@ -1546,6 +1546,58 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### LITE waves (2026-11-05, v153)
+
+A LITE wave (type 0) is the samples alone: no analysis. 41 of the 79 waves in Emu_test are LITE. In a project they are RIFF files with `fmt `, `vpsc` (its byte 1 is 0), `vplp` and `data`, and no `vpfl`, `vpno` or `vpdt`; the reader now takes them, as plain samples. Until now a LITE wave played as SOLO, its records made by the encoder. Now it plays as the XT plays it, Vari on and off.
+
+**The kind.** The PCM converter picks the voice's kind from the wave's type (`0x894e2ec0`, input +0x87): type 0 is kind 1, types 1, 3 and 5 kind 2. The block's +0 is the kind, and the voice setup copies the block's first 0xd4 bytes into the voice. Kind 1 has a converter tail of its own (`0x894e3ee0`) and a block of its own:
+
+| Block | Kind 1 |
+|---|---|
+| +0x80 | the mode: Vari Sw on 2, off 0 |
+| +0xb4 | Loop (the switch, or the wave's own) |
+| +0xb8 | Tempo Sync |
+| +0xbc | Time Trip, with the pad |
+| +0xc0 | Beat Keep |
+| +0xc4 | the Start Offset, the last sample at most (as v152's +0xb8) |
+| +0xc8 | the length |
+| +0xcc | a copy of +0xc4 |
+
+Its note-on is `0x8950b5b0` (by kind, `0x894f2f80`), its install `0x894f3590` (by mode: 0 the Vari-off player `0x89509870`/`0x89509f52`; 1 `0x8950d880` with `0x8950ffd0`; 2 `0x8950a7f0`/`0x8950a7fc`) and its update `0x8950bbb0`. The converter makes modes 0 and 2 only. This corrects the October note that called kind 1 "PCM, Vari off": kind 1 is LITE, and Vari picks the mode within it.
+
+**The note-on and update.** Kind 1 takes the converters' values as they are, with no 70% steps, and has no Energy.
+- At note-on: the pitch (`0x894f3a00`), the time (`0x894f3ac0`) and the formant (`0x894f3b30`), none with the wave's tuning factor, and the gain. The player's byte 0 takes its bits from the block's words. Then the mode's own part, the beat started from +0x38 (`0x8950f860`), and a seek only if +0xcc differs from +0xc4, which it doesn't.
+- At each update, mode 0: the same three. Mode 2: the walk and formant with the factor (`0x894f3c90`, `0x894f3d40`; the walk's Vari test reads +0xb4, here the Loop word, so it keeps the factor), and the filter's rate below.
+
+**Vari off (mode 0)** is the Vari-off player, `XtLinearPlayer`, set up from the loop record as v151's (`0x8950b712`). Two things differ: the beat starts at the first sample read, × 16, so walking backward at the last sample's and not the length's (`setLite`); and the backward loop's rate has no cached factor, which the port had at 1 anyway.
+
+**Vari on (mode 2)** is `XtLitePlayer`, a pitch shifter with two read heads, written by hand with both float banks (`frchg`) and pairs of registers (`fschg`).
+- The walk (the time, the beat's step from `0x8950c270`) moves a position through the wave.
+- Each head reads at the formant's rate, interpolated, under a triangular window: its phase × 1/period, doubled, folded at 1, clipped at 0. The period is 88200 over the root frequency (+0x9a4), two of its cycles.
+- While its clock is under the period, the clock and the phase step by the pitch, the phase by at least 1 (back by the pitch, then on by 1). Past it, the head splices to the last half period at or below the walk's position, and the phase starts again from the clock. The second head is half a period behind.
+- The sum takes the gain (1/32 of the way each sample) and × 65536, then a one-pole filter takes out what follows the signal slowly: o − s, s += o × root × pitch × π/2 / 44100, one per channel.
+- Forward the heads stop at the last sample, and past it the walk splices them beyond, to silence. Backward they stop at the first sample, read the other way with each sample negated, and the scale stays +65536: a LITE wave played backward comes out inverted.
+- Loops: One Way wraps the walk by the loop's length; Alternate runs it on to end + length and reads it mirrored. Inside a loop, at the block's start, the pitch takes the loop's rate.
+- The note-on (`0x8950b8d0`) starts the heads' fractions at the fractional part of the formant, and with the walk not above 0 starts at the last half period below the end. The seek (`0x8950a780`), for a Beat Keep's way back, puts the walk and both heads at the position and clears the fractions.
+
+**What the XT does that it shouldn't.**
+- **It runs through a constant.** The kernels keep 0.5 (0x3f000000) in the code and fall through it, and branch to it: H'0000, then H'3f00, a `cmp/eq` whose T is set again before it's read. The XT plays LITE waves, so H'0000 must do nothing there. `Sh4Interp` now takes it so; it stopped there before.
+- **Vari moved during a LITE note.** Every update re-installs both OSCs' players by the block's mode as it stands (`0x894f6bf0` calls `0x894f2010`). So switching Vari during a note puts the other player on this one's state; in the check, the walk went to 0. As v151 does for a Beat Keep's way back, the check holds Vari as the note started, and the port keeps its note-on's player.
+- **What a LITE note leaves behind.** Its player's first sample and backward loop start (+0x138, +0x140) are the voice's +0x20c and +0x214, the two limits the analog note-ons read, which nothing else writes (`XtAnalog` has them 0). An analog note on that voice then takes them, and its LA phase came out at −3.52. The plugin's voices aren't allocated as the XT's tones are, so it keeps 0, as after an analog note, and the check carries that 0 into the firmware's voice.
+- Not modelled: the player's byte 3 (the turn and hold bits) is whatever the voice's last note left, which the beat's step reads; here it is clear, and the check found no case where it mattered.
+- The cached loop events' builder isn't found. For LITE waves the check writes the loop points × 16, as for the others; the beat reads them.
+
+**In the plugin.** Encode Type has LITE, last, so saved sessions keep their choice. Auto plays a V-Synth wave as its own type, LITE now included, and a plain WAV as the classifier says; the classifier never says LITE. A LITE wave is the samples, with nothing to encode. `XtEncoded` type 0.
+
+**The check.**
+- `xt_tone`: a section of LITE cases after the others (so the cases before them draw as they did), a quarter of the case count: `vocal.bin` mono and `w358.bin` stereo as LITE, on OSC 1 or OSC 2, half with a tuning of their own. fcheck's: 674 notes, 5,793,054 checks, 0 different; 2000 cases on each of seeds 777, 9, 31337 and 4242: 0 different. The LITE player's own state is compared at each update: the walk's position, both heads and their fractions, the filter.
+- `verify.sh`: Emu_test's `005` (mono) and `348` (stereo) LITE waves through the processor, Vari on and off: 4/4 bit-identical, each encoded as its own type.
+- `xt_files`: a LITE RIFF built from a preset wave reads back with its type, loop and samples; without its `vpsc` it isn't a V-Synth wave.
+- `TEST_PATCH_PLAY` on one in four of Emu_test's 263 patches: 66 played, one silent, which has no wave.
+- Planted errors: `mutate_tone.py` 963, none missed, 49 of them new: the LITE player's windows, splices, reads, loops, gain and filter, its note-on and seek, the LITE wiring in XtSynth and the Vari-off start, and the check's own pieces. Three of mine changed nothing on first writing (a grouping C++ already makes, and two float equalities that never happen) and were written again; two old plants moved with the text of `targets()`. `mutate_files.py` 42, two new on the LITE RIFF, none missed, after one old plant moved with the reader's line. `mutate_panel.py --editor` with the `patch-` and new `lite-` plants: 74, none missed, three new: a LITE wave loaded and LITE chosen, each run failing unless it comes out encoded as LITE (`TEST_EXPECT_ENCODE`).
+
+**Not done.** Mode 1 (`0x8950d880`), which the converter doesn't make. Auto doesn't pick LITE for a plain WAV.
+
 ### Start Offset (2026-11-05, v152)
 
 Start Offset (IDs 0x2c6, 0x2fa) is now ported, on all three players. It is in samples, as a patch stores it: 44300 is a second. 33 of 1stchoice's patches use it on a PCM OSC that's on, `005 Gig Rhodes` among them, and the image's own patches have it in 88 zones on OSC 1 and 22 on OSC 2.
@@ -1568,7 +1620,7 @@ Only the note-on reads it (`0x8950bf70` has one caller). Moved during a note, it
 - after a sample played in the same block, the fade stops at the rate, which is negative going backward. It runs on below 0, and the held sample comes out with its sign flipped and growing, to about −1.1 by the block's end;
 - at a block's start, FR11 is whatever ran before. In the check, an analog OSC 2's render leaves 2^31, which cuts the fade to 0 at once. In another case it was negative: the fade fell by 2.18 a block, −1.18 then −3.35, and the held sample grows until the envelope ends the note.
 
-The mono routine clamps against a zero of its own (`0x89509de2`). The port does what the routine does inside a block, and starts each block from 0, the floor the other holds set (`XtLinearPlayer::setStaleFr11`). That's a choice: on the XT it depends on what ran before. `xt_tone` hands the port the firmware's own FR11 at each block's start, so everything else is checked bit for bit. Two of fcheck's 2000 cases reach that hold, three on seed 777 and seven on seed 9.
+The mono routine clamps against a zero of its own (`0x89509de2`). The port does what the routine does inside a block, and starts each block from 0, the floor the other holds set (`XtLinearPlayer::setStaleFr11`): a normal fade. That parts from the XT's code by the user's decision (2026-11-05, "keep the fade"): on the XT it depends on what ran before. `xt_tone` hands the port the firmware's own FR11 at each block's start, so everything else is checked bit for bit. Two of fcheck's 2000 cases reach that hold, three on seed 777 and seven on seed 9.
 
 **In the plugin.** `OscControls::startOffset`, and the parameters `startOffset` and `osc2StartOffset`: 0 … 2^24 − 1 samples, exact in a float. A patch word with its top bit set comes in as the largest, which the converter treats the same. A Start Offset row on the Wave card, typed or dragged; a skewed slider would be easier to drag, but the attachment takes the parameter's range. `XtPatch` reads it, and it's off the missing list. `TEST_START`, `TEST_OSC2_START`; `XT_START`, `XT_START2`.
 
@@ -1632,7 +1684,7 @@ The player, `XtLinearPlayer`, is plain resampling:
 
 **Not done.**
 - Start Offset with Vari off: the linear player's start is +0xb8, which is 0 here. Start Offset is still listed as missing. (Done in v152, "Start Offset".)
-- LITE waves (Encode Type 0) take this same player through another voice kind (1) and note-on (`0x8950b5b0`). That isn't wired: a LITE wave plays as SOLO, as before.
+- LITE waves (Encode Type 0) take this same player through another voice kind (1) and note-on (`0x8950b5b0`). That isn't wired: a LITE wave plays as SOLO, as before. (Done in v153, "LITE waves": with Vari on they have a player of their own.)
 - Mode 3 loops (hold at the start), which no panel setting makes, are ported but not drawn.
 
 ### The build under the wordmark (2026-11-05, v150)

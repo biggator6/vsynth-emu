@@ -335,10 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+LITE waves v153 (2026-11-05), no change to the sound of anything else: a LITE wave (type 0) plays as the XT plays it, the voice's kind 1, where it played as SOLO; LITE in the Encode box (last).
+  Kind 1 (0x894e2ec0 by the wave's type): its own converter tail (0x894e3ee0), note-on (0x8950b5b0), update (0x8950bbb0: the values as they are, no Energy) and block (+0x80 mode Vari ? 2 : 0, +0xc4 Start Offset, +0xc8 length).
+  Vari off: XtLinearPlayer, the beat from the first sample read.  Vari on: XtLitePlayer (0x8950a7f0 mono, 0x8950a7fc stereo), two heads at the formant's rate under windows on the pitch, splicing to the walk each period (88200/root), a one-pole filter; backward inverted.
+  Sh4Interp: H'0000 does nothing (the kernels run through the constant 0.5).  Vari moved during a LITE note re-installs the other player on its state (0x894f6bf0): xt_tone holds Vari.  A LITE note leaves +0x20c, +0x214 for an analog note's limits: the check carries 0.
+  A project's LITE wave (RIFF, vpsc, vplp, no vpfl) reads as plain samples; Auto takes a wave's own type, LITE too.
+  Check: xt_tone's LITE section (vocal mono, w358 stereo), fcheck's 674 notes and four other seeds at 2000, 0 different; verify.sh: Emu_test's 005 and 348, Vari on and off, 4/4; xt_files: a LITE RIFF.
+  Planted: mutate_tone.py 963 (49 new), mutate_files.py 42 (2 new), none missed; mutate_panel.py --editor with the patch- and lite- plants: 74 (3 new), none missed.
+
 Start Offset v152 (2026-11-05), no change to the sound at 0 (its default): Start Offset on each OSC (IDs 0x2c6, 0x2fa), in samples, a row on the Wave card.
   The converter (0x894e4400, RETRIGGER and LEGATO) puts it at the block's +0xb8, the last sample at most; the voice gives each player it x 16 at +0x18 (0x894f3170).
   SOLO and the bands seek there at note-on (0x8950fa60: 0x8950fed0, 0x89510bf0) unless walking back, and a walk back stops there; SOLO's grains start at the record's start.
-  Vari off: the first sample (+0x10c).  Its stereo backward Alternate hold compares the fade with FR11, never set there (0x8950a746): XtLinearPlayer::setStaleFr11, 0 in the plugin, the firmware's in xt_tone.
+  Vari off: the first sample (+0x10c).  Its stereo backward Alternate hold compares the fade with FR11, never set there (0x8950a746): XtLinearPlayer::setStaleFr11, 0 in the plugin (the user's decision, 2026-11-05: keep the fade), the firmware's in xt_tone.
   Check: xt_tone, fcheck's 2000 cases and seven other seeds at 2000, 0 different; 544,700 patch values; TEST_START=3000 in verify.sh, 4/4.  Not done: STEP and EVENT (event numbers), with Playback Mode.
   Planted: mutate_tone.py 914 (21 new), none missed; nine run on seeds of their own (9, 4242, 777, 11), as the new draws took their cases from the default seed.  mutate_panel.py --editor with the patch- plants: 71 (6 new), none missed.
 

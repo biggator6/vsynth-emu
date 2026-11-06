@@ -31,9 +31,11 @@ wave-modes|out.fwdMode = vplp[0x18]; out.bwdMode = vplp[0x19];|out.fwdMode = vpl
 wave-switch|out.loopSwitchDecides = vplp[0x1a] != 0;|out.loopSwitchDecides = vplp[0x1a] == 0;
 wave-fine|out.tuneFine = (int8_t)vplp[0x1b];|out.tuneFine = (uint8_t)vplp[0x1b];
 riff-start|file + 8, "WAVE", 4) ? 12 : 0;|file + 8, "WAVE", 4) ? 0 : 0;
-linr-tag|const bool linear = !std::memcmp(vpfl + 40, "LINR", 4);|const bool linear = false;
+linr-tag|const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|const bool linear = !vpfl;
 linr-short|if (nData / 2 < want) return fail(why, "fewer samples than the header says");|;
 typed-slot|const int v = xtPatchValue(store, base + d->slot, zone, cosm);|const int v = xtPatchValue(store, base + d->slot + 4, zone, cosm);
 typed-base|table[(size_t)i] = { p[0], s16(2), s16(4), s16(6) };|table[(size_t)i] = { p[0] + 1, s16(2), s16(4), s16(6) };
 typed-range|return v < d->min \|\| v > d->max ? d->def : v;|return v;
 typed-default|{ p[0], s16(2), s16(4), s16(6) }|{ p[0], s16(4), s16(4), s16(6) }
+lite-riff|    const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|    const bool linear = vpfl && !std::memcmp(vpfl + 40, "LINR", 4);
+lite-novpsc|if (!vpsc \|\| nSc < 8 \|\| !data \|\| (!vpfl && !riff)|if (!data \|\| (!vpfl && !riff)

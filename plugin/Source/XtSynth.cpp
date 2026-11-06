@@ -69,7 +69,7 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
     auto fail = [&](const char* m) -> std::shared_ptr<XtEncoded> { if (err) *err = m; return nullptr; };
     if (!g_romReady) return fail("no firmware image (rom.2) loaded");
     if (channels.empty() || channels[0].size() < 64) return fail("sample too short");
-    if (type != 1 && type != 3 && type != 5) return fail("unknown encode type");
+    if (type != 0 && type != 1 && type != 3 && type != 5) return fail("unknown encode type");
     const int ch = channels.size() >= 2 ? 2 : 1;
     // to int16 as the XT's WAV readers do (0x8952e4d0 16-bit, 0x8952e740
     // 24-bit, 0x8952eab0 32-bit: the top two bytes), then its converter to
@@ -98,11 +98,10 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
     auto E = std::make_shared<XtEncoded>();
     E->type = type;
     E->frames = frames;
-    if (type == 1) {
-        // A stereo wave has the encoder's stereo mode, one list of records from both
+    if (type == 0 || type == 1) {
+        // LITE (0) is the samples alone, as the XT keeps them: no analysis, so nothing to encode.
+        // A stereo SOLO wave has the encoder's stereo mode, one list of records from both
         // channels (0x8951e120(3)); the player reads both through it (0x8950d1f0).
-        const std::vector<XtRecord> recs = xtSoloEncode(pcm.data(), (int)frames, ch);
-        if (recs.size() < 2) return fail("SOLO encoder found no records");
         XtSoloPlan& P = E->solo;
         P.in.resize((size_t)frames);
         if (ch == 2) P.inR.resize((size_t)frames);
@@ -110,6 +109,10 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
             P.in[(size_t)i] = (float)pcm[(size_t)(i * ch)] / 32768.0f;
             if (ch == 2) P.inR[(size_t)i] = (float)pcm[(size_t)(2 * i + 1)] / 32768.0f;
         }
+        E->channels = ch;
+        if (type == 0) return E;
+        const std::vector<XtRecord> recs = xtSoloEncode(pcm.data(), (int)frames, ch);
+        if (recs.size() < 2) return fail("SOLO encoder found no records");
         const size_t nc = recs.size();
         P.segStart.resize(nc); P.segLen.resize(nc); P.voiced.resize(nc); P.info.resize(nc);
         for (size_t i = 0; i < nc; ++i) {
@@ -312,7 +315,7 @@ float XtSynth::pitchKnob(const Voice& v, const OscVoice& s, const OscControls& o
     return xtPitchRatio(o.oscPitch, v.mx[xtmx::OscPitch + (&s == &v ? 0 : xtmx::Osc2)], 2 * v.beam[3] - v.beam[2]);
 }
 
-void XtSynth::targets(const Voice& v, const OscVoice& s, const OscControls& o, float& A, float& F, float& walk, float& g) const {
+void XtSynth::targets(const Voice& v, const OscVoice& s, const OscControls& o, float& A, float& F, float& walk, float& g, bool noteOn) const {
     using namespace xtmx;
     const int dO = &s == &v ? 0 : Osc2, dL = &s == &v ? OscLfoRate : Osc2Lfo;
     // The wave's own tuning: none on an analog voice, and with Robot Voice none on the pitch (0x894f21c0)
@@ -324,9 +327,12 @@ void XtSynth::targets(const Voice& v, const OscVoice& s, const OscControls& o, f
                       xtPitchDepthCents((float)std::clamp(o.lfoPitchDepth + v.mx[dL + 1], -63, 63)), pitchKnob(v, s, o), s.porta.value(),
                       tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);
     F = xtOscFormantRatio(xtOscFormant(o.oscFormant, o.oscFormantKF, v.note, v.mx[OscFormant + dO]), s.fenv.level(),
-                          withVel(xtOscFormantEnvDepth(o.fDepth), o.fVel), s.lfo.out(), xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]), tune.factor);
+                          withVel(xtOscFormantEnvDepth(o.fDepth), o.fVel), s.lfo.out(), xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]),
+                          s.lite && (s.linear || noteOn) ? 1.0f : tune.factor);   // kind 1's note-on and Vari off: 0x894f3b30, no factor
     walk = xtOscWalk(xtOscTime(o.oscTime, o.oscTimeOffset, o.oscTimeKF, v.note, v.mx[OscTime + dO], v.beam[1] - 3 * v.beam[0]), s.tenv.level(),
-                     withVel(xtOscTimeEnvDepth(o.tDepth), o.tVel), s.lfo.out(), xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), s.variBit || s.syncBit ? tune.factor : 1.0f);   // 0x894f3cd0, past Tempo Sync's test
+                     withVel(xtOscTimeEnvDepth(o.tDepth), o.tVel), s.lfo.out(), xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]),
+                     s.lite ? (s.linear || noteOn ? 1.0f : tune.factor)      // kind 1: note-on and Vari off 0x894f3ac0, no factor; on 0x894f3c90, whose test reads +0xb4, the Loop word here
+                            : s.variBit || s.syncBit ? tune.factor : 1.0f);   // 0x894f3cd0, past Tempo Sync's test
     g = xtOscEnergy(o.energy);
 }
 
@@ -389,6 +395,7 @@ XtEnvParams XtSynth::ampEnvParams(const Voice& v, const OscControls& o) const {
 
 void XtSynth::applyRates(OscVoice& s) {
     if (s.linear) { s.lin.setRates(s.curA, s.curWalk); s.lin.setGainXt(s.curGain); }
+    else if (s.lite) { s.xfg.setRates(s.curA, s.curF, s.curWalk, s.root); s.xfg.setGainXt(s.curGain); }
     else if (s.wave->type == 1) { s.solo.setRates(s.curA, s.curF, s.curWalk); s.solo.setEnergy(s.curG); s.solo.setGain(s.curGain); }
     else { s.mb.setRates(s.curA, s.curWalk); s.mb.setGainXt(s.curGain); }
 }
@@ -796,12 +803,17 @@ void XtSynth::startVoice(int raw, int note, int vel) {
     v->osc2.robotKnob = ctl.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;
     v->robot = v->robotKnob && ctl.vari;                                     // the block's flag 0x10 takes Vari Sw on too
     v->osc2.robot = v->osc2.robotKnob && ctl.osc2.vari;
-    v->linear = !ctl.vari && v->on && !v->analog && v->wave->type == 1;
+    v->lite = v->on && !v->analog && v->wave->type == 0;
+    v->linear = !ctl.vari && v->on && !v->analog && (v->wave->type == 1 || v->lite);
     v->variBit = ctl.vari;
     v->osc2.variBit = ctl.osc2.vari;
     v->syncBit = ctl.tempoSync;
     v->osc2.syncBit = ctl.osc2.tempoSync;
-    v->osc2.linear = !ctl.osc2.vari && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;
+    v->osc2.lite = v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 0;
+    // A LITE voice's root frequency (+0x9a4), which its Vari-on player's period and filter go by
+    if (v->lite) v->root = xtCosmRootHz(ctl.rootKey, false, v->wave->tune.offset, v->wave->tune.detune);
+    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(ctl.osc2.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);
+    v->osc2.linear = !ctl.osc2.vari && v->osc2.on && !v->osc2.analog && (v->osc2.wave->type == 1 || v->osc2.lite);
     // the OSCs' random pitch (0x894e4940, OSC 1 then 2, each whatever its
     // Switch): the shared generator steps once per note for an OSC with a depth
     v->rnd = pitchRandom.next(xtRandomPitchDepth(ctl.randomPitch));
@@ -900,9 +912,9 @@ void XtSynth::startVoice(int raw, int note, int vel) {
             c.tvf.noteOn(cosmBlock(*v, k), c.envB.onsetLevel(), c.envB.level(), c.envB.smooth(), c.lfo.out(),
                          c.envA.onsetLevel(), c.envA.level(), c.envA.smooth(), c.lfo.out());
     }
-    if (v->on) targets(*v, *v, ctl, v->curA, v->curF, v->curWalk, v->curG);
+    if (v->on) targets(*v, *v, ctl, v->curA, v->curF, v->curWalk, v->curG, true);
     else v->curA = 1.0f;                               // the note-on of an OSC that is off (0x894f2f80, kind 0)
-    if (v->osc2.on) targets(*v, v->osc2, ctl.osc2, v->osc2.curA, v->osc2.curF, v->osc2.curWalk, v->osc2.curG);
+    if (v->osc2.on) targets(*v, v->osc2, ctl.osc2, v->osc2.curA, v->osc2.curF, v->osc2.curWalk, v->osc2.curG, true);
     else v->osc2.curA = 1.0f;
     // the Comb and Side Band Filters' note-ons read the voice's pitch ratio
     // (+0x144) and root frequency (+0x9a4) as the voice's own note-on leaves
@@ -976,11 +988,21 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     else if (s.linear) {
         s.lin.setLoop(waveLoop(s, o));
         s.lin.setStart(waveStart(s, o));
+        s.lin.setLite(s.lite);
         s.lin.setTempo(tempoWord, (uint32_t)o.origTempo);
         s.lin.setBeatFlags(o.tempoSync, tripNow);
         s.lin.noteOn(s.wave->solo.in, s.wave->solo.inR, s.curA, s.curWalk);
         s.lin.setGainXt(gainStart, true);
         s.lin.setGainXt(s.curGain);
+    }
+    else if (s.lite) {                                // Vari on (0x8950b8d0)
+        s.xfg.setLoop(waveLoop(s, o));
+        s.xfg.setStart(waveStart(s, o));
+        s.xfg.setTempo(tempoWord, (uint32_t)o.origTempo);
+        s.xfg.setBeatFlags(o.tempoSync, tripNow);
+        s.xfg.noteOn(s.wave->solo.in, s.wave->solo.inR, s.curA, s.curF, s.curWalk, s.root);
+        s.xfg.setGainXt(gainStart, true);
+        s.xfg.setGainXt(s.curGain);
     }
     else if (s.wave->type == 1) {
         s.solo.setRobot(s.robot);
@@ -1279,6 +1301,7 @@ void XtSynth::padSteps(int step) {
         auto give = [&](OscVoice& s) {
             if (!s.on || s.analog) return;
             if (s.linear) { if (s.lin.tripOn()) s.lin.setTrip(step); }
+            else if (s.lite) { if (s.xfg.tripOn()) s.xfg.setTrip(step); }
             else if (s.wave->type == 1) { if (s.solo.tripOn()) s.solo.setTrip(step); }
             else if (s.mb.tripOn()) s.mb.setTrip(step);
         };
@@ -1326,6 +1349,9 @@ void XtSynth::oscBeat(OscVoice& s, const OscControls& o) {
     if (s.linear) {
         if (o.beatKeep && s.lin.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.lin.setGainXt(0.0f); }
         s.lin.setBeatFlags(sync, trip);
+    } else if (s.lite) {
+        if (o.beatKeep && s.xfg.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.xfg.setGainXt(0.0f); }
+        s.xfg.setBeatFlags(sync, trip);
     } else if (s.wave->type == 1) {
         if (o.beatKeep && s.solo.tripOn() && !trip) { s.chase = true; s.curGain = 0.0f; s.solo.setGain(0.0f); }
         s.solo.setBeatFlags(sync, trip);
@@ -1427,6 +1453,7 @@ void XtSynth::clockTick() {
             s.lfo.clock(dt);
             if (!s.on || s.analog) return;
             if (s.linear) { if (s.lin.syncOn()) s.lin.addClock(1); }
+            else if (s.lite) { if (s.xfg.syncOn()) s.xfg.addClock(1); }
             else if (s.wave->type == 1) { if (s.solo.syncOn()) s.solo.addClock(1); }
             else if (s.mb.syncOn()) s.mb.addClock(1);
         };
@@ -1517,6 +1544,9 @@ void XtSynth::mixBlock(float* lr) {
                     if (s.linear) {
                         if (s.lin.gainNow() > kSilent) return;
                         s.lin.seek(s.lin.beat().beatPos >> 5);
+                    } else if (s.lite) {
+                        if (s.xfg.gainNow() > kSilent) return;
+                        s.xfg.seek(s.xfg.beat().beatPos >> 5);
                     } else if (s.wave->type == 1) {
                         if (s.solo.gainNow() > kSilent) return;
                         s.solo.seek(s.solo.beat().beatPos >> 5);
@@ -1533,6 +1563,9 @@ void XtSynth::mixBlock(float* lr) {
                 if (s.analog) {   // the analog update (0x89505400): the pitch at its target, no glide
                     s.curA = A;
                     s.ana.update(analogBlock(v, s, o), A, gt, s.fenv.level(), s.tenv.level(), s.lfo.out());
+                } else if (s.lite) {   // kind 1's update (0x8950bbb0): the values as they are, and no Energy
+                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;
+                    applyRates(s);
                 } else {
                     s.curA = xtOscSmooth(s.curA, A);
                     s.curF = xtOscSmooth(s.curF, F);
@@ -1557,6 +1590,7 @@ void XtSynth::mixBlock(float* lr) {
         // A PCM OSC's player, in the XT's units (int16 × 65536); the players' gains are the firmware's
         auto pcmBlock = [](OscVoice& s, float* lr) {
             if (s.linear) s.lin.block(lr);
+            else if (s.lite) s.xfg.block(lr);
             else if (s.wave->type == 1) s.solo.renderXt(lr, 32);
             else s.mb.block(lr);
         };

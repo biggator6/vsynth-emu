@@ -187,6 +187,12 @@ bool Sh4::exec(uint16_t op, bool slot, uint32_t& next) {
     switch (op >> 12) {
     case 0x0:
         switch (op & 0xf) {
+        case 0x0:
+            // H'0000 does nothing.  The LITE player's kernels (0x8950b0b8 and on) keep the constant 0.5, 0x3f000000, inline and run on through
+            // it, and branch to it: H'0000, then H'3f00, a cmp/eq whose T is set again before anything reads it.  The XT plays LITE waves, so
+            // on it the word does nothing (HARDWARE_FIRMWARE.md, "LITE waves").
+            if (op == 0x0000) return true;
+            break;
         case 0x2:
             switch (m) {
             case 0: Rn = sr; return true;

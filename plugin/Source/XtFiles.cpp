@@ -160,8 +160,10 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
         i += 8 + (size_t)n + (n & 1);
     }
     out.size = i < size ? i : size;
-    if (!vpfl || nFl < 44 || !vpsc || nSc < 8 || !data) return fail(why, "not a V-Synth wave");
-    const bool linear = !std::memcmp(vpfl + 40, "LINR", 4);
+    // A project's LITE wave is a RIFF with vpsc and vplp but no vpfl, and its samples as they are (Emu_test's 005, 348)
+    const bool riff = size >= 12 && !std::memcmp(file, "RIFF", 4);
+    if (!vpsc || nSc < 8 || !data || (!vpfl && !riff) || (vpfl && nFl < 44)) return fail(why, "not a V-Synth wave");
+    const bool linear = !vpfl || !std::memcmp(vpfl + 40, "LINR", 4);
     if (!linear && std::memcmp(vpfl + 40, "RDAC", 4)) return fail(why, "neither RDAC nor plain samples");
     // 0x8952ee80 checks the data's first two bytes; the next six are nothing the firmware reads.
     if (!linear && (nData < 8 || data[0] != 0 || data[1] != 8)) return fail(why, "an RDAC wave without its header");
@@ -516,6 +518,24 @@ int main(int argc, char** argv) {
             riff.insert(riff.end(), tag, tag + 8);
             for (int16_t x : w.pcm) { riff.push_back((uint8_t)x); riff.push_back((uint8_t)((uint16_t)x >> 8)); }
             if (!xtWaveRead(riff.data(), riff.size(), back) || !same(back) || back.pcm != w.pcm) ++bad;
+            // A project's LITE wave: the fmt chunk, vpsc with type 0 and vplp, the samples; no vpfl
+            {
+                std::vector<uint8_t> lite(riff.begin(), riff.begin() + 36);
+                for (const char* t : { "vpsc", "vplp" }) {
+                    const size_t c = chunkAt(t);
+                    const uint32_t n = (uint32_t)stream[c + 4] | (uint32_t)stream[c + 5] << 8 | (uint32_t)stream[c + 6] << 16 | (uint32_t)stream[c + 7] << 24;
+                    lite.insert(lite.end(), stream.begin() + (long)c, stream.begin() + (long)(c + 8 + n + (n & 1)));
+                }
+                lite[36 + 8 + 1] = 0;                              // vpsc +1: LITE
+                lite.insert(lite.end(), tag, tag + 8);
+                for (int16_t x : w.pcm) { lite.push_back((uint8_t)x); lite.push_back((uint8_t)((uint16_t)x >> 8)); }
+                XtWaveFile l;
+                if (!xtWaveRead(lite.data(), lite.size(), l) || l.encodeType != 0 || l.pcm != w.pcm || l.loopEnd != 2222 || l.tune != -1234 || l.frames != w.frames) ++bad;
+                // the same with no vpsc is a plain WAV
+                std::vector<uint8_t> noSc(lite);
+                std::memcpy(&noSc[36], "junk", 4);
+                if (xtWaveRead(noSc.data(), noSc.size(), l)) ++bad;
+            }
             // Plain WAVs aren't this, nor is a wave cut short
             XtWaveFile none;
             const std::vector<uint8_t> plain = { 'R','I','F','F',36,0,0,0,'W','A','V','E','f','m','t',' ',16,0,0,0, 1,0,1,0, 0x44,0xac,0,0, 0,0,0,0, 2,0,16,0, 'd','a','t','a',0,0,0,0 };

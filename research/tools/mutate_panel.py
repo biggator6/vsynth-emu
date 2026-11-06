@@ -18,6 +18,9 @@ MUTS=[
  ('patch-vari-write',PP,'    set(Params::kVari, c.vari ? 1 : 0);','    ;','patch'),
  ('editor-start-unplaced',EP,', lr(startLabel_, startSlider_) };',' };','layout'),
  ('editor-start-osc',EP,'startAtt_      = std::make_unique<SliderAtt>(processor_.apvts, id("startOffset"), startSlider_);','startAtt_      = std::make_unique<SliderAtt>(processor_.apvts, "startOffset", startSlider_);','layout'),
+ ('lite-own',PP,'own = w.ownType == 0 || w.ownType == 1','own = w.ownType == 1','lite'),
+ ('lite-choice',PP,'choice == 3 ? 5 : choice == 4 ? 0 : own','choice == 3 ? 5 : own','lite-pick'),
+ ('lite-riff',PP,' || !std::memcmp(head + i, "vpsc", 4)) return true;',') return true;','lite'),
  ('patch-start-read',PP,'    c.startOffset  = knob(Params::kStartOffset);','    c.startOffset  = 0;','patch'),
  ('patch-start2-read',PP,'        o.startOffset = knob2(Params::kStartOffset);','        o.startOffset = 0;','patch'),
  ('patch-start-write',PP,'    set(Params::kStartOffset, (float)startOffsetParam(c.startOffset));','    ;','patch'),
@@ -179,6 +182,8 @@ ENV={
  'layout':{'TEST_UI_LAYOUT':'1'},
  'rom':{'TEST_ROM_SEARCH':'1'},
  'patch':{'TEST_PATCH_APPLY':'1'},
+ 'lite':{'TEST_EXPECT_ENCODE':'LITE','_file':'analysis/projects/Emu_test.prj/Wave/005 sine_400hz_r.wav','_mode':'auto'},
+ 'lite-pick':{'TEST_EXPECT_ENCODE':'LITE','_mode':'lite'},
  'panel':{'TEST_FX_PANEL':'1'},
  'crash-or-panel':{'TEST_FX_PANEL':'1'},
  'fx':{'TEST_FX':'1'},
@@ -197,8 +202,9 @@ def build():
     return r.stdout if r.returncode==0 else 'failed: '+r.stderr[-300:]
 if sys.argv[1:]: MUTS=[m for m in MUTS if m[0] in sys.argv[1:] or ('--editor' in sys.argv and m[0].startswith('editor-'))]
 def run(kind):
-    env=dict(os.environ); env.update(ENV[kind])
-    return subprocess.run(['build/plugin/VSynthEmuTest',ROM,W,'60','ensemble'],capture_output=True,text=True,env=env,timeout=300)
+    e=dict(ENV[kind]); f=e.pop('_file',W); m=e.pop('_mode','ensemble')   # a kind's own wave and Encode Type, or the chord as ENSEMBLE
+    env=dict(os.environ); env.update(e)
+    return subprocess.run(['build/plugin/VSynthEmuTest',ROM,f,'60',m],capture_output=True,text=True,env=env,timeout=300)
 missed=0
 # ENV and MUTS are above; a build first, so the first error's time isn't the source's own.
 build()

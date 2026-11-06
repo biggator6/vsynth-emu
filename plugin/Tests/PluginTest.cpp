@@ -220,7 +220,7 @@ static int patchApplyTest(const juce::File& rom) {
         std::vector<std::vector<float>> chans((size_t)wave.channels);
         for (long i = 0; i < wave.frames; ++i)
             for (int k = 0; k < wave.channels; ++k) chans[(size_t)k].push_back((float)wave.pcm[(size_t)(i * wave.channels + k)] / 32768.0f);
-        const int type = wave.encodeType == 1 || wave.encodeType == 3 || wave.encodeType == 5 ? wave.encodeType : 1;
+        const int type = wave.encodeType == 0 || wave.encodeType == 1 || wave.encodeType == 3 || wave.encodeType == 5 ? wave.encodeType : 1;
         auto own = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16), plain = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16);
         xtWaveOntoEncoded(wave, *own);
         c = p.currentControls();
@@ -779,9 +779,9 @@ int main(int argc, char** argv) {
         std::printf("the panel: %d parameters as the catalog has them, %d of the boxes' texts as the firmware's\n", checked, texts);
         return 0;
     }
-    if (argc > 4) {   // Encode Type (choice index 0 Auto, 1 SOLO, 2 BACKING, 3 ENSEMBLE)
+    if (argc > 4) {   // Encode Type (choice index 0 Auto, 1 SOLO, 2 BACKING, 3 ENSEMBLE, 4 LITE)
         const juce::String t(argv[4]);
-        const int idx = t == "solo" ? 1 : t == "backing" ? 2 : t == "ensemble" ? 3 : 0;
+        const int idx = t == "solo" ? 1 : t == "backing" ? 2 : t == "ensemble" ? 3 : t == "lite" ? 4 : 0;
         auto* prm = p.apvts.getParameter("encodeType");
         prm->setValueNotifyingHost(prm->convertTo0to1((float)idx));
     }
@@ -1378,7 +1378,12 @@ int main(int argc, char** argv) {
     std::vector<std::vector<float>> chans;
     for (int c = 0; c < std::min(2, in.getNumChannels()); ++c) chans.emplace_back(in.getReadPointer(c), in.getReadPointer(c) + in.getNumSamples());
     const juce::String st = p.getStatusText();
-    const int type = st.contains("ENSEMBLE") ? 5 : st.contains("BACKING") ? 3 : 1;
+    // TEST_EXPECT_ENCODE=LITE (or SOLO, BACKING, ENSEMBLE): the run fails unless the wave was encoded as that
+    if (const char* want = std::getenv("TEST_EXPECT_ENCODE"); want && !st.contains(juce::String("Encoded as ") + want)) {
+        std::fprintf(stderr, "expected the wave encoded as %s; the status says: %s\n", want, st.toRawUTF8());
+        return 1;
+    }
+    const int type = st.contains("ENSEMBLE") ? 5 : st.contains("BACKING") ? 3 : st.contains("LITE") ? 0 : 1;
     const int bits = rd->usesFloatingPointData ? 16 : (int)rd->bitsPerSample;
     auto E = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits);
     {   // the encode must be repeatable

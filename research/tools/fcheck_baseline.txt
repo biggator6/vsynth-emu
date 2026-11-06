@@ -275,6 +275,9 @@ tone, the firmware's patches: 0 different
 tone, a wave's own tuning: 669 notes, 187 taken by a sounding tone, 87 truncated, 57998 blocks, 5096471 checks
 tone, a wave's own tuning: 0 notes left off, a read outside memory; 165590 band reads far from their wave
 tone, a wave's own tuning: 0 different
+tone, LITE waves: 674 notes, 192 taken by a sounding tone, 78 truncated, 60560 blocks, 5793054 checks
+tone, LITE waves: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, LITE waves: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
 tone, the clock's rate: 0 notes left off, a read outside memory; 0 band reads far from their wave

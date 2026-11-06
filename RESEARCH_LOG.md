@@ -3570,6 +3570,14 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-05) — v153: LITE waves
+
+- The brief said Vari on would go through the kind-2 install. It doesn't: a LITE wave is a kind of its own, picked by the wave's type in the converter, and both its modes install from kind 1's switch. The October notes had kind 1 as "Vari off"; the converter showed what it is.
+- I read the install's jump table wrongly at first, swapping modes 1 and 2, and spent a while on the wrong player. A trace of which entry points actually ran settled it in one run.
+- The fake LITE wave crashed the interpreter on what looked like data. It was data: the kernels fall through an inline 0.5. Since the XT plays these waves, the word has to do nothing, and the interpreter now agrees.
+- The player itself matched in its first run but for two things, neither the player's: Vari switched mid-note, where the XT swaps players on stale state, and an analog note reading what the LITE player left in the voice. Both are the XT reading memory the other code owns, and both took a trace to see.
+- Hand-porting rather than translating the asm was deliberate: a machine translation of 1,100 instructions would be the firmware's code in another syntax.
+
 ### Session 16 addendum (2026-11-05) — v152: Start Offset
 
 - The value was easy: an experiment that answered 1000 for the ID and looked for 1000 in the block found it at +0xb8 in a few minutes, faster than reading the converter for it. The converter then said what the bit 0x80 next to it means: Playback Mode picks samples or events.

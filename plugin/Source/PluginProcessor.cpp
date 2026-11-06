@@ -15,7 +15,7 @@ namespace Params {
     static const juce::String kTimeStretch  = "timeStretch";
     static const juce::String kFormantShift = "formantShift";
     static const juce::String kRobot        = "robot";         // the engine's robot mode; with the XT, Robot Voice
-    static const juce::String kEncodeType   = "encodeType";    // Auto, SOLO, BACKING, ENSEMBLE
+    static const juce::String kEncodeType   = "encodeType";    // Auto, SOLO, BACKING, ENSEMBLE, LITE (last, so that saved sessions keep their choice)
     static const juce::String kEncodeDepth  = "encodeDepth";   // multi-band attack detection
     static const juce::String kRootKey      = "rootKey";       // note that plays the sample unshifted
     static const juce::String kVari         = "vari";          // Vari Sw: off, the wave's time follows its pitch (XtLinearPlayer, or a band player's walk)
@@ -257,7 +257,7 @@ VSynthEmuProcessor::createParameterLayout() {
 
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         Params::kEncodeType, "Encode Type",
-        juce::StringArray { "Auto", "SOLO", "BACKING", "ENSEMBLE" }, 0
+        juce::StringArray { "Auto", "SOLO", "BACKING", "ENSEMBLE", "LITE" }, 0
     ));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(
@@ -752,7 +752,7 @@ VSynthEmuProcessor::createParameterLayout() {
         params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kOscVelCurve), n + "Velocity Curve", 0, 7, 1, curveName));
         // its wave and the VariPhrase knobs
         params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kEncodeType), n + "Encode Type",
-            juce::StringArray { "Auto", "SOLO", "BACKING", "ENSEMBLE" }, 0));
+            juce::StringArray { "Auto", "SOLO", "BACKING", "ENSEMBLE", "LITE" }, 0));
         intP(Params::kEncodeDepth, "Encode Depth", 0, 127, 64);
         intP(Params::kRootKey, "Original Key", 0, 127, 60);
         params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kEnergy), n + "Energy", 0, 127, 0,
@@ -1785,14 +1785,15 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
 // ─── File Loading ─────────────────────────────────────────────────────────────
 
-// A V-Synth wave by its first chunks: a .vpw, or a project's .wav, the same chunks in a RIFF.
+// A V-Synth wave by its first chunks: a .vpw, or a project's .wav, the same chunks in a RIFF.  A LITE wave in a project is a RIFF with no
+// vpfl, its vpsc after the fmt chunk.
 static bool isVSynthWave(const juce::File& file) {
     juce::FileInputStream in(file);
     char head[64] = {};
     const int n = in.openedOk() ? in.read(head, (int)sizeof head) : 0;
     if (n >= 4 && !std::memcmp(head, "vpfl", 4)) return true;
     if (n < 12 || std::memcmp(head, "RIFF", 4) || std::memcmp(head + 8, "WAVE", 4)) return false;
-    for (int i = 12; i + 4 <= n; ++i) if (!std::memcmp(head + i, "vpfl", 4)) return true;
+    for (int i = 12; i + 4 <= n; ++i) if (!std::memcmp(head + i, "vpfl", 4) || !std::memcmp(head + i, "vpsc", 4)) return true;
     return false;
 }
 
@@ -1850,7 +1851,7 @@ void VSynthEmuProcessor::unloadWave(int osc) {
         w.loaded.store(false);
         w.buffer.setSize(0, 0);
         w.isOwn = false;
-        w.ownType = 0;
+        w.ownType = -1;
     }
     ++w.gen;                       // an encode under way comes to nothing
     if (osc == 0) { playbackPos_ = -1; activeVoices_ = 0; }
@@ -1896,7 +1897,7 @@ void VSynthEmuProcessor::loadFile(const juce::File& file, int osc, bool waveSett
         w.buffer = std::move(newBuffer);
         w.rate = reader->sampleRate;
         w.bits = reader->usesFloatingPointData ? 16 : (int)reader->bitsPerSample;   // float WAVs: rounded
-        w.ownType = reader->metadataValues.getValue(XtVpwFormat::kEncodeType, "0").getIntValue();
+        w.ownType = reader->metadataValues.getValue(XtVpwFormat::kEncodeType, "-1").getIntValue();
         w.isOwn = false;
         w.loaded.store(true);
     }
@@ -2011,7 +2012,7 @@ void VSynthEmuProcessor::reencode(int osc) {
     bool isOwn = false;
     {
         juce::CriticalSection::ScopedLockType lock(bufferLock_);
-        own = w.ownType == 1 || w.ownType == 3 || w.ownType == 5 ? w.ownType : 0;
+        own = w.ownType == 0 || w.ownType == 1 || w.ownType == 3 || w.ownType == 5 ? w.ownType : -1;
         if (w.isOwn) { ownWave = w.own; isOwn = true; }
         for (int c = 0; c < std::min(2, w.buffer.getNumChannels()); ++c)
             chans.emplace_back(w.buffer.getReadPointer(c), w.buffer.getReadPointer(c) + w.buffer.getNumSamples());
@@ -2024,8 +2025,8 @@ void VSynthEmuProcessor::reencode(int osc) {
     const juce::String who = osc ? "OSC 2: " : "";
     setStatus(who + "Encoding...");
     encodePool_.addJob([this, chans = std::move(chans), rate, bits, choice, depth, gen, osc, who, own, ownWave = std::move(ownWave), isOwn] {
-        int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : own;   // Auto: what the wave says it is, or
-        if (type == 0) {   // Auto: the engine's content classifier
+        int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : choice == 4 ? 0 : own;   // Auto: what the wave says it is, or
+        if (0 > type) {   // Auto: the engine's content classifier
             std::vector<float> mono(chans[0].size());
             for (size_t i = 0; i < mono.size(); ++i) {
                 float s = 0; for (const auto& c : chans) s += c[i];
@@ -2033,7 +2034,7 @@ void VSynthEmuProcessor::reencode(int osc) {
             }
             using CT = VSE::VariphraseAnalysis::ContentType;
             const auto a = VSE::VariphraseEngine::analyzeContent(mono.data(), (int)mono.size(), rate);
-            type = a.contentType == CT::BACKING ? 3 : a.contentType == CT::ENSEMBLE ? 5 : 1;   // LITE plays on the SOLO player
+            type = a.contentType == CT::BACKING ? 3 : a.contentType == CT::ENSEMBLE ? 5 : 1;   // the classifier's LITE as SOLO: Auto doesn't choose LITE
         }
         std::string err;
         auto e = xtSynthEncode(chans, rate, type, depth, &err, bits);
@@ -2042,8 +2043,8 @@ void VSynthEmuProcessor::reencode(int osc) {
         if (isOwn) xtWaveOntoEncoded(ownWave, *e);
         synth_.setSample(e, osc);
         xtActive_.store(true);
-        static const char* names[] = { "", "SOLO", "", "BACKING", "", "ENSEMBLE" };
-        setStatus(who + "Encoded as " + names[type] + (choice != 0 ? "" : own ? " (the wave's own)" : " (auto)"));
+        static const char* names[] = { "LITE", "SOLO", "", "BACKING", "", "ENSEMBLE" };
+        setStatus(who + "Encoded as " + names[type] + (choice != 0 ? "" : own >= 0 ? " (the wave's own)" : " (auto)"));
     });
 }
 

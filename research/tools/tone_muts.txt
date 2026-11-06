@@ -804,10 +804,10 @@ tune-walk|return mul(w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w), waveFactor);|ret
 tune-walk-clamp|return mul(w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w), waveFactor);|const float y = mul(w, waveFactor); return y > 5.0f ? 5.0f : (-5.0f > y ? -5.0f : y);|toneosc
 tune-formant|return mul(r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r), waveFactor);|return r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r);|toneosc
 tune-robot|const bool tuned = !s.robot;|const bool tuned = true;|tone
-tune-robot-factor|xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]), tune.factor);|xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3]), tuned ? tune.factor : 1.0f);|tone
+tune-robot-factor|s.lite && (s.linear \|\| noteOn) ? 1.0f : tune.factor);|s.lite && (s.linear \|\| noteOn) ? 1.0f : tuned ? tune.factor : 1.0f);|tone
 tune-pitch-offset|tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);|0.0f, 1.0f, tuned ? tune.detune : 0.0f);|tone
 tune-pitch-detune|tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);|tuned ? tune.offset : 0.0f, 1.0f, 0.0f);|tone
-tune-time|xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), s.variBit \|\| s.syncBit ? tune.factor : 1.0f);|xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2]), 1.0f);|tone
+tune-time|: s.variBit \|\| s.syncBit ? tune.factor : 1.0f);|: 1.0f);|tone
 tune-root|s.robot \|\| s.analog \|\| !s.on, tune.offset, tune.detune);|s.robot \|\| s.analog \|\| !s.on);|tone
 loop-bwd-mode|l.bwdMode = std::clamp(s.wave->bwdMode, 0, 2);|l.bwdMode = l.fwdMode;|tone
 loop-bwd-start|l.bwdStart = s.wave->bwdStart;|l.bwdStart = a;|tone
@@ -912,3 +912,52 @@ lin-fr11-entry|        float cmp = y ? fr11 : 0.0f;|        float cmp = 0.0f;|to
 lin-hold-floor|    if (!(next > floor)) next = 0.0f;|    if (!(next > 0.0f)) next = 0.0f;|tonelin|9
 check-start|    p[b + 0x22] = o.startOffset;|;|tonecheck
 patch-start|    o.startOffset = p(b + 0x22);|    o.startOffset = 0;|tonepatch
+lite-kind|    v->lite = v->on && !v->analog && v->wave->type == 0;|    v->lite = false;
+lite-update-smooth|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;|                    s.curA = xtOscSmooth(s.curA, A); s.curF = F; s.curWalk = w; s.curGain = gt;
+lite-update-gain|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = xtOscSmooth(s.curGain, gt);
+lite-walk-factor|                     s.lite ? (s.linear \|\| noteOn ? 1.0f : tune.factor)|                     s.lite ? (s.linear ? 1.0f : tune.factor)
+lite-walk-off|                     s.lite ? (s.linear \|\| noteOn ? 1.0f : tune.factor)|                     s.lite ? (noteOn ? 1.0f : tune.factor)
+lite-formant-factor|                          s.lite && (s.linear \|\| noteOn) ? 1.0f : tune.factor);|                          s.lite && s.linear ? 1.0f : tune.factor);
+lite-root|    if (v->lite) v->root = xtCosmRootHz(ctl.rootKey, false, v->wave->tune.offset, v->wave->tune.detune);|    if (v->lite) v->root = xtCosmRootHz(ctl.rootKey, false);
+lite-root2|    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(ctl.osc2.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);|    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(ctl.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);
+lite-start|        s.xfg.setStart(waveStart(s, o));|        s.xfg.setStart(0);
+lite-chase|                        s.xfg.seek(s.xfg.beat().beatPos >> 5);|                        s.xfg.seek(0);
+lite-lin-beat|    beat_.start(tempoCfg, origCfg, liteCfg ? pos * 16 : 0.0f > walk ? frames * 16 : startCfg * 16);|    beat_.start(tempoCfg, origCfg, 0.0f > walk ? frames * 16 : startCfg * 16);|tonelin
+xfg-period|    period = 88200.0f / root;|    period = 44100.0f / root;|tonelite
+xfg-frac|    fracA = formant - (float)xtf::ftrc(formant);|    fracA = 0.0f;|tonelite
+xfg-fracb|    fracB = formant - (float)xtf::ftrc(formant);|    fracB = 0.0f;|tonelite
+xfg-winb|    winB = period * 0.5f;\n    clkB = period * 0.5f;\n    dcL|    winB = 0.0f;\n    clkB = period * 0.5f;\n    dcL|tonelite
+xfg-dcrate|    dcRate = dcRate * kRate;\n    // The loop|    // The loop|tonelite
+xfg-dcrate-update|    pitch = pitch_; formant = formant_; walk = walk_;\n    dcRate = root * pitch;\n    dcRate = dcRate * kRate;\n}|    pitch = pitch_; formant = formant_; walk = walk_;\n}|tonelite
+xfg-back-start|        e = e / half;|        e = e / period;|tonelite
+xfg-back-zero|    if (walk > 0.0f) {|    if (walk >= 0.0f) {|tonelite
+xfg-pos16|    pos16 = (int32_t)((uint32_t)xtf::ftrc(walkPos) << 4);|    pos16 = (int32_t)((uint32_t)xtf::ftrc(walkPos) << 5);|tonelite
+xfg-tri|    if (w > 1.0f) w = -w + 2.0f;|    if (w > 1.0f) w = 1.0f;|tonelite
+xfg-clamp|    if (0.0f > w) w = 0.0f;|    ;|tonelite
+xfg-phase-quirk|        win = win + rate;\n        if (!(rate > 1.0f)) { win = win - rate; win = win + 1.0f; }|        if (rate > 1.0f) win = win + rate; else win = win + 1.0f;|tonelite
+xfg-phase-min|        if (!(rate > 1.0f)) { win = win - rate; win = win + 1.0f; }|        ;|tonelite
+xfg-splice|        t = (float)xtf::ftrc(t);\n        float h|        float h|tonelite
+xfg-splice-half|        float h = 0.5f * period;|        float h = period;|tonelite
+xfg-read-back|            a = -a;\n            float d = (float)sample(v, head - 1);|            float d = (float)sample(v, head - 1);|tonelite
+xfg-read-dir|            float d = (float)sample(v, head + 1);|            float d = (float)sample(v, head - 1);|tonelite
+xfg-step-dir|        frac = Forward ? frac + formant : frac - formant;|        frac = frac + formant;|tonelite
+xfg-end-fwd|    if (Forward ? end > hA : hA > end) {|    if (Forward ? end >= hA : hA > end) {|tonelite
+xfg-end-bwd|    if (Forward ? end > hB : hB > end) {|    if (Forward ? end > hB : hB >= end) {|tonelite
+xfg-dc-mono|        o = o - dcL;\n|        |tonelite
+xfg-dc-stereo|        l = l - dcL; r = r - dcR;|        l = l - dcL; r = r - dcL;|tonelite
+xfg-gain-stereo|        l = l * gain; r = r * gain;|        l = l * gain; r = r * gainTarget;|tonelite
+xfg-rate-fwd|        if (fwdMode == 1) { if (!(fwdStartF > walkPos) && !(walkPos > fwdEndF)) pr = pr * fwdRate; }|        if (fwdMode == 1) { }|tonelite
+xfg-rate-alt|        else if (fwdMode == 2) { const float e = fwdEndF + fwdLenF; if (!(fwdStartF > walkPos) && !(walkPos > e)) pr = pr * fwdRate; }|        else if (fwdMode == 2) { if (!(fwdStartF > walkPos) && !(walkPos > fwdEndF)) pr = pr * fwdRate; }|tonelite
+xfg-rate-bwd|        if (bwdMode == 1) { if (!(bwdStartF > walkPos) && !(walkPos > bwdEndF)) pr = pr * bwdRate; }|        if (bwdMode == 1) { }|tonelite
+xfg-end0|                else at = lastF + period;\n            } else if (fwdMode == 1)|                else at = lastF;\n            } else if (fwdMode == 1)|tonelite
+xfg-start0|                else at = firstF;\n            } else if (bwdMode == 1)|                else at = walkPos;\n            } else if (bwdMode == 1)|tonelite
+xfg-oneway|                    while (walkPos > fwdEndF && fwdLenF > 0.0f) walkPos = walkPos - fwdLenF;|                    while (walkPos > fwdEndF && fwdLenF > 0.0f) walkPos = fwdStartF;|tonelite
+xfg-mirror|                    if (!(fwdEndF > walkPos)) { at = -at; at = at + fwdEndF; at = at + fwdEndF; }|                    if (!(fwdEndF > walkPos)) { at = fwdEndF; }|tonelite
+xfg-oneway-bwd|                    while (bwdStartF > walkPos && bwdLenF > 0.0f) walkPos = walkPos + bwdLenF;|                    while (bwdStartF > walkPos && bwdLenF > 0.0f) walkPos = bwdEndF;|tonelite
+xfg-mirror-bwd|                    if (!(walkPos > bwdStartF)) { at = -at; at = at + bwdStartF; at = at + bwdStartF; }|                    ;|tonelite
+xfg-step|    const float step = (float)xtf::ftrc(fs) * 0x1p-25f;|    const float step = fs * 0x1p-25f;|tonelite
+xfg-seek-win|    winB = period * 0.5f;\n    clkB = period * 0.5f;\n    beat_|    winB = 0.0f;\n    clkB = period * 0.5f;\n    beat_|tonelite
+xfg-seek-frac|    fracA = fracB = 0.0f;\n    hA = hB = s;|    hA = hB = s;|tonelite
+check-lite-events|        for (uint32_t k = 0; k < 4; ++k) f.c.wr32(W2 + 0xb4 * k + 4, (uint32_t)(pts[k] * 16));|        ;|tonecheck
+check-lite-fr11|                            osc(syn.voice[n->vi], o).lin.setStaleFr11(v);|                            ;|tonecheck|9
+check-lite-limits|                    fw.c.wr32(V + 0x20c, 0); fw.c.wr32(V + 0x214, 0);|                    ;|tonecheck

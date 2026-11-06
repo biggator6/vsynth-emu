@@ -170,7 +170,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     buildLabel_.setColour(juce::Label::textColourId, Ui::label);
     buildLabel_.setBorderSize({ 0, 0, 0, 0 });
     addAndMakeVisible(buildLabel_);
-    encodeBox_.addItemList({ "Auto", "SOLO", "BACKING", "ENSEMBLE" }, 1);
+    encodeBox_.addItemList({ "Auto", "SOLO", "BACKING", "ENSEMBLE", "LITE" }, 1);
     addAndMakeVisible(encodeBox_);
     encodeAtt_  = std::make_unique<ComboAtt>(processor_.apvts, "encodeType", encodeBox_);
     for (juce::Slider* sl : { &keySlider_, &depthSlider_, &energySlider_, &startSlider_, &attackSlider_, &decaySlider_, &sustainSlider_, &releaseSlider_,

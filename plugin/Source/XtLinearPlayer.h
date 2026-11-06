@@ -27,6 +27,9 @@ public:
     // block's start FR11 is whatever ran before on the XT left there (an analog OSC 2's render leaves 2^31, cutting the fade at once).  The
     // plugin takes 0, the floor the routine's other holds set for themselves; the check gives the firmware's own.  Set before each block.
     void setStaleFr11(float v) { fr11 = v; }
+    // A LITE wave's note-on (0x8950b712) instead of the SOLO setup's: the beat starts at the first sample read, × 16, so walking backward
+    // at the last sample's and not at the length's.  Set before noteOn.
+    void setLite(bool on) { liteCfg = on; }
     // Tempo Sync and Time Trip (XtBeat), as XtSoloVoice's: the player keeps them apart from what it reads, and under either bit walks at the beat's step alone.
     void setTempo(uint32_t tempo, uint32_t orig) { tempoCfg = tempo; origCfg = orig; }
     void setBeatFlags(bool sync, bool trip) {
@@ -69,6 +72,7 @@ private:
     XtLoop loopCfg;
     int32_t startCfg = 0;
     float fr11 = 0.0f;
+    bool liteCfg = false;
     XtBeat beat_;
     uint32_t tempoCfg = 1200000, origCfg = 1200000;
     uint8_t flags0 = 0;

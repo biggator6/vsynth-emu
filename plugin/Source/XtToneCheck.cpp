@@ -477,7 +477,9 @@ bool loadWave(Firmware& f, uint32_t& next, const std::string& path, int channels
     f.c.wr8(w.chunk[2] + 2, channels == 2 ? 1 : 0);
     f.c.wr16(w.chunk[2] + 8, 44000);
     f.c.wr8(w.chunk[4] + 0x1a, 1);                        // the Loop switch decides
-    if (type == 1) {
+    if (type == 0)                                         // LITE: the samples alone, no vpdt (a project's LITE waves have none)
+        w.band[0] = put(raw.data(), raw.size() * 2);
+    else if (type == 1) {
         out.recs = xtSoloEncode(raw.data(), (int)frames, channels);
         const std::vector<uint8_t> v = soloVpdt(out.recs, frames, channels);
         w.chunk[5] = put(v.data(), v.size());
@@ -542,6 +544,11 @@ void writeLoopEvents(Firmware& f, const TestWave& t, const OscC& c) {
     f.c.wr32(R4 + 4, (uint32_t)l.fwdStart); f.c.wr32(R4 + 8, (uint32_t)l.fwdEnd); f.c.wr32(R4 + 0xc, (uint32_t)l.bwdEnd); f.c.wr32(R4 + 0x10, (uint32_t)l.bwdStart);
     f.c.wr8(R4 + 0x18, (uint8_t)l.fwdMode); f.c.wr8(R4 + 0x19, (uint8_t)l.bwdMode);
     if (!l.on) { f.c.wr32(W2 + 0xb8, 0x7fffffff); f.c.wr32(W2 + 0x16c, 0x7fffffff); return; }
+    if (t.type == 0) {                                     // a LITE wave's player reads the record (0x8950b712); the beat, the events' positions
+        const int pts[4] = { l.fwdStart, l.fwdEnd, l.bwdEnd, l.bwdStart };
+        for (uint32_t k = 0; k < 4; ++k) f.c.wr32(W2 + 0xb4 * k + 4, (uint32_t)(pts[k] * 16));
+        return;
+    }
     if (t.type == 1) {
         const int st = t.channels == 2 ? 16 : 10;
         const uint32_t seg0 = (uint32_t)(2 * st + 8) * 2, rec0 = seg0 + 12 + 12 + 4, endPos = (uint32_t)t.fw.frames * 16;
@@ -962,7 +969,7 @@ int XtToneProbe::run(int argc, char** argv) {
     Firmware fw;
     if (!fw.open(argv[1])) { std::fprintf(stderr, "firmware\n"); return 2; }
     // The PCM cases' waves: SOLO mono and stereo, BACKING, ENSEMBLE
-    std::vector<TestWave> waves;
+    std::vector<TestWave> waves, liteWaves;
     if (argc > 4) {
         const std::string dir = std::string(argv[4]) + "/";
         struct W { const char* file; int ch, type; } list[] = { { "vocal.bin", 1, 1 }, { "w358.bin", 2, 1 }, { "drum.bin", 2, 3 }, { "chord.bin", 1, 5 } };
@@ -974,6 +981,12 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         checkSoloRecords(dir, "vocal.bin", 1);
         checkSoloRecords(dir, "drum.bin", 2);
+        // LITE waves (type 0), mono and stereo: the samples alone, for the last cases
+        for (const W& w : { W{ "vocal.bin", 1, 0 }, W{ "w358.bin", 2, 0 } }) {
+            TestWave t;
+            if (!loadWave(fw, next, dir + w.file, w.ch, w.type, 30000, t)) { std::fprintf(stderr, "LITE wave %s\n", w.file); return 2; }
+            liteWaves.push_back(std::move(t));
+        }
     }
     XtSynth syn;
     syn.prepare(44100.0);
@@ -1042,6 +1055,8 @@ int XtToneProbe::run(int argc, char** argv) {
     }
     const int patchFrom = tickFrom + nTick, nPatch = waves.empty() ? 0 : std::min((int)patchFiles.size(), nCases / 2);
     const int tuneFrom = patchFrom + nPatch, nTune = waves.empty() ? 0 : nCases / 4;
+    // Then LITE waves (kind 1), on OSC 1 or OSC 2, with a tuning of their own in half of them: last, so that the cases before them draw as they did
+    const int liteFrom = tuneFrom + nTune, nLite = waves.empty() ? 0 : nCases / 4;
     // The firmware's own patches, every zone of each that has one, as xtPatchControls reads them.  What's patchOf's for these controls must be what's in the store:
     // the whole-tone cases above hold patchOf's IDs to XtSynth's fields, so this holds a real patch to them.  XT_TONE_PATCHES: a folder of .p00 besides, not in fcheck.
     {
@@ -1082,14 +1097,15 @@ int XtToneProbe::run(int argc, char** argv) {
         total += t.different + fxDifferent;
         if (rep.stop && t.different + fxDifferent) { std::printf("tone: 1 different, in the patches\n"); return 0; }
     }
-    for (int g = 0; g < tuneFrom + nTune; ++g) {
+    for (int g = 0; g < liteFrom + nLite; ++g) {
         rep.caseNo = g;
-        const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom, extra = patchCase || tuneCase;
+        const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom && g < liteFrom, liteCase = g >= liteFrom, extra = patchCase || tuneCase || liteCase;
         const bool twoInTick = g >= tickFrom && !extra;
         if (g == nCases + nSweep) summary("tone");
         if (nOsc2 && g == tickFrom) summary("tone, a wave on OSC 2");
         if (nPatch + nTune && g == patchFrom) summary("tone, a second update in a tick");
         if (nPatch && g == tuneFrom) summary("tone, the firmware's patches");
+        if (nLite && g == liteFrom) summary("tone, a wave's own tuning");
         const bool sweep = g >= nCases && g < nCases + nSweep;
         const size_t sweepAt = sweep ? listed[(size_t)(g - nCases) / 4] : 0;
         const bool sweepCosm = sweep && sweepAt >= kCosmPrm && sweepAt < kCosmPrm + 64;
@@ -1104,12 +1120,13 @@ int XtToneProbe::run(int argc, char** argv) {
             patchCtl = xtPatchControls(pf.store, r.range(0, xtPatchZones(pf.store) - 1), Ctl{});
             if (!patchCtl.on && !patchCtl.osc2.on) patchCtl.on = true;   // both off: XtSynth starts no voice at all (see the report)
         }
-        const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase) || sweepOn == 2 || (tuneCase && g % 2 == 0);
+        const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase && !liteCase) || sweepOn == 2 || ((tuneCase || liteCase) && g % 2 == 0);
         // one case in two plays a wave on OSC 1 (with the analog OSC 2 or alone); the last
         // ones a wave on OSC 2, over OSC 1 off, analog or on another wave
-        const TestWave* wv2 = osc2Case ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
-        const TestWave* wv = (patchCase ? patchCtl.oscType == 1 : sweepOn == 1 || (!sweep && !twoInTick && g % 2 == 1)) && !waves.empty() ? &waves[(size_t)r.range(0, (int)waves.size() - 1)] : nullptr;
-        if (wv && wv == wv2) wv = &waves[(size_t)((wv - waves.data() + 1) % (long)waves.size())];   // a wave's loop is its own
+        std::vector<TestWave>& pool = liteCase ? liteWaves : waves;
+        const TestWave* wv2 = osc2Case ? &pool[(size_t)r.range(0, (int)pool.size() - 1)] : nullptr;
+        const TestWave* wv = (patchCase ? patchCtl.oscType == 1 : sweepOn == 1 || (!sweep && !twoInTick && g % 2 == 1)) && !pool.empty() ? &pool[(size_t)r.range(0, (int)pool.size() - 1)] : nullptr;
+        if (wv && wv == wv2) wv = &pool[(size_t)((wv - pool.data() + 1) % (long)pool.size())];   // a wave's loop is its own
         Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr);
         if (patchCase) {   // what a patch has, on what the wave has of its own
             const Ctl d = ctl;
@@ -1487,6 +1504,9 @@ int XtToneProbe::run(int argc, char** argv) {
                     fw.c.wr8(V + 0x248, (uint8_t)a.noiseHold());
                     fw.c.wr32(V + 0x1dc, a.flags()); fw.c.wr32(V + 0x244, a.noiseState());
                     fw.c.wr32(V + 0x1e8, (uint32_t)a.hqFalling()); fw.c.wr32(V + 0x278, (uint32_t)a.fbWrite());
+                    // the two limits the analog note-ons read, 0 after an analog note.  A LITE note with Vari on leaves its first sample and its
+                    // backward loop's start there (its player's +0x138, +0x140), which an analog note on that voice then takes on the XT
+                    fw.c.wr32(V + 0x20c, 0); fw.c.wr32(V + 0x214, 0);
                 }
             };
         };
@@ -1588,14 +1608,23 @@ int XtToneProbe::run(int argc, char** argv) {
                 } else {
                     const VField fs[] = { { "pitch", 0x144, s.curA }, { "formant", 0x148, s.curF }, { "energy", 0x14c, s.curG }, { "walk", 0x150, s.curWalk }, { "pcm gain", 0x154, s.curGain } };
                     for (const VField& f : fs) {
+                        if (s.lite && f.off == 0x14c) continue;   // kind 1 has no Energy (0x8950bbb0 leaves +0x14c alone)
                         ++rep.checks;
                         const float x = fw.f32(V + f.off);
                         if (!bits(x, f.v)) rep.bad(os + f.name, "fw %.9g port %.9g", x, f.v, blk);
                     }
                     // The beat (player at voice +0xd4)
-                    const XtBeat& bt = s.linear ? s.lin.beat() : s.wave->type == 1 ? s.solo.beat() : s.mb.beat();
+                    const XtBeat& bt = s.linear ? s.lin.beat() : s.lite ? s.xfg.beat() : s.wave->type == 1 ? s.solo.beat() : s.mb.beat();
                     const uint32_t PL = V + 0xd4;
-                    const int32_t posNow = s.linear ? (int32_t)fw.c.rd32(PL + 0x38) : s.wave->type == 1 ? s.solo.position() : s.mb.position();   // Vari off leaves +0x38 as the SOLO setup did
+                    const int32_t posNow = s.linear ? (int32_t)fw.c.rd32(PL + 0x38) : s.lite ? s.xfg.position() : s.wave->type == 1 ? s.solo.position() : s.mb.position();   // Vari off leaves +0x38 as the SOLO setup did
+                    if (s.lite && !s.linear) {       // the LITE player's own state
+                        const struct { const char* name; uint32_t off; float v; } lf[] = { { "lite walk", 0x110, s.xfg.walkPosition() }, { "lite fraction a", 0x108, s.xfg.fractionA() },
+                            { "lite fraction b", 0x10c, s.xfg.fractionB() }, { "lite filter", 0x100, s.xfg.filterL() } };
+                        for (const auto& f : lf) { ++rep.checks; if (!bits(fw.f32(PL + f.off), f.v)) rep.bad(os + f.name, "fw %.9g port %.9g", fw.f32(PL + f.off), f.v, blk); }
+                        rep.checks += 2;
+                        if ((int32_t)fw.c.rd32(PL + 0xf4) != s.xfg.headA()) rep.bad(os + "lite head a", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xf4), s.xfg.headA(), blk);
+                        if ((int32_t)fw.c.rd32(PL + 0xf8) != s.xfg.headB()) rep.bad(os + "lite head b", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xf8), s.xfg.headB(), blk);
+                    }
                     if (s.linear) {                  // its own state
                         rep.checks += 4;
                         if ((int32_t)fw.c.rd32(PL + 0xec) != s.lin.position()) rep.bad(os + "linear position", "fw %.0f port %.0f", (int32_t)fw.c.rd32(PL + 0xec), s.lin.position(), blk);
@@ -1954,6 +1983,9 @@ int XtToneProbe::run(int argc, char** argv) {
                 }
                 n.on = ctl.on; n.oscType = ctl.oscType; n.rootKey = ctl.rootKey; n.ana.wave = ctl.ana.wave; n.ana.subOctave = ctl.ana.subOctave; n.octave = ctl.octave;
                 n.osc2.on = ctl.osc2.on; n.osc2.oscType = ctl.osc2.oscType; n.osc2.ana.wave = ctl.osc2.ana.wave; n.osc2.ana.subOctave = ctl.osc2.ana.subOctave;
+                // Switched during a LITE note, the XT's next update installs the other player on this one's state (0x894f6bf0 → 0x894f2010 by the
+                // block's mode as it stands, 0x894f3590): the check holds Vari as the note started
+                if (liteCase) { n.vari = ctl.vari; n.osc2.vari = ctl.osc2.vari; }
                 n.oscTimeOffset = ctl.oscTimeOffset; n.lfoKeySync = ctl.lfoKeySync; n.osc2.lfoKeySync = ctl.osc2.lfoKeySync; n.tvaLfoKeySync = ctl.tvaLfoKeySync;
                 n.structure = ctl.structure;             // latched at note-on, but its own check is xt_analog's
                 if (tripCase) { n.vari = ctl.vari; n.osc2.vari = ctl.osc2.vari; }   // switched with the pad in play, a Beat Keep's way back runs one player's seek on the other's state, on the XT too
@@ -2131,7 +2163,7 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         fw.c.write(kFmLines, syn.modShared.line, sizeof(syn.modShared.line));
     }
-    summary(nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
+    summary(nLite ? "tone, LITE waves" : nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
     // The clock's rate.  Above the firmware's clock runs on XtSynth's, which could be any speed: here
     // two minutes (165375 blocks) against the firmware's own timer routine, within one clock.
     {

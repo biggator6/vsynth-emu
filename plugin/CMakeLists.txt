@@ -65,6 +65,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtAnalog.cpp
     Source/XtSoloVoice.cpp
     Source/XtLinearPlayer.cpp
+    Source/XtLitePlayer.cpp
     Source/XtSynth.cpp
     Source/XtMultiBandPlayer.cpp
     Source/Sh4Interp.cpp
