@@ -2043,7 +2043,7 @@ void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce
             for (long i = 0; i < w.frames; ++i)
                 for (int c = 0; c < w.channels; ++c) chans[(size_t)c].push_back((float)w.pcm[(size_t)(i * w.channels + c)] / 32768.0f);
             const int type = w.encodeType == 0 || w.encodeType == 1 || w.encodeType == 3 || w.encodeType == 5 ? w.encodeType : 1;
-            auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events);   // on its own events, as the file has them
+            auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events, &w.vpdt);   // on its own vpdt, as the file has it
             if (!e) continue;
             xtWaveOntoEncoded(w, *e);
             enc[number] = std::move(e);
@@ -2109,7 +2109,7 @@ void VSynthEmuProcessor::reencode(int osc) {
         std::string err;
         // A V-Synth SOLO wave as its own type keeps its own events (as encoded, or edited in V-Producer), which its vpno names;
         // otherwise the detection at the Encode Depth finds them (xtSynthEncode)
-        auto e = xtSynthEncode(chans, rate, type, depth, &err, bits, isOwn && type == own ? &ownWave.events : nullptr);
+        auto e = xtSynthEncode(chans, rate, type, depth, &err, bits, isOwn && type == own ? &ownWave.events : nullptr, isOwn && type == own ? &ownWave.vpdt : nullptr);
         if (gen != wave_[osc].gen.load()) return;
         if (!e) { setStatus(who + "Encode failed: " + juce::String(err)); return; }
         if (isOwn) xtWaveOntoEncoded(ownWave, *e);

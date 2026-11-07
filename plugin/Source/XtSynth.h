@@ -46,6 +46,7 @@ struct XtEncoded {
     // A LITE wave has none, and the XT plays STEP and EVENT on it as RETRIGGER: its converter doesn't read the mode.
     std::vector<uint16_t> vpno;
     int vpnoCount = 0;
+    bool stored = false;           // played on the wave's own vpdt as the file has it, not an encode (xtSynthEncode's `stored`)
 };
 
 // The user's rom.2: loads the encoders' and players' tables and opens the
@@ -61,10 +62,13 @@ bool xtSynthRomReady();
 // `bits`: the source's bits per sample.  `events`: a V-Synth wave's own events (XtWaveFile::events, 1/16 sample), which the XT's
 // SOLO encode takes in place of its detection, so a SOLO wave keeps the events it was encoded with or edited to (V-Producer can
 // edit them) and its `vpno` names them; whole samples, on the file's own audio at 44.1 kHz, else the detection's.  A band wave
-// keeps the detection: its encode reads more of a marker than the file keeps.
+// keeps the detection: its encode reads more of a marker than the file keeps.  `stored`: a V-Synth wave's own vpdt (XtWaveFile::vpdt),
+// which is played as it is, no encode, as the XT plays a wave it loads: a SOLO wave's plan read from it (xtSoloReadVpdt), a band wave's
+// players reading it with the bands rebuilt from the audio (xtFwLoadBands).  Taken when its events run from 0 to the end, never back,
+// on the file's own audio at 44.1 kHz, and a SOLO plan reads; else the encode above (`events`, then the detection).
 std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& channels, double sampleRate,
                                          int type, int depth, std::string* err = nullptr, int bits = 16,
-                                         const std::vector<int32_t>* events = nullptr);
+                                         const std::vector<int32_t>* events = nullptr, const std::vector<uint8_t>* stored = nullptr);
 
 class XtSynth {
 public:

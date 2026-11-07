@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A wave's stored vpdt v158 (2026-11-07), a change on band waves and on SOLO waves whose stored records aren't the XT 2.02's: a V-Synth wave plays the vpdt its file holds.
+  XtWaveFile::vpdt; xtSynthEncode's `stored`, taken when the events run from 0 to frames·16, never back, each on a whole sample (and a SOLO plan reads); XtEncoded::stored.
+  Else encoded again as v156 (SOLO on its own events, band on the detection): only VP9SAMnoise1 and preset 270, V-Trainer 1.00's events between samples. Preset 270's
+  records stop 18/16 short of its last event; VP9SAMnoise1 played as stored parts from the firmware in ~3% of notes from their first block (cause not found).
+  Event kinds (flags & 0xb): stored 13/4/14 (9/0/10), the fresh encode 4; 1-3 only VP9SAMnoise1's events 3, 4. Forward (0x8950c970) all gated by byte 2 bits 0..2, never
+  set (0 or 0x80 over 233,418 reads); backward (0x8950cb60) a 1 with +3 bit 3 turns the walk forward and keeps the event: ported in both players.
+  The load: vpdt read in place (relative offsets); the chunk loader not found (0x89493d00, 0x89496740, 0x89497f80 write; 0x89499000 reads vpsc only).
+  Load: Emu_test SOLO 5.0 s -> 1.5 s (ITS-3AM 1235 -> 0 ms), BACKING 1283 -> 367 ms, ENSEMBLE 671 -> 225 ms. Sound, root note RETRIGGER vs v157: 30 of 37 waves the same;
+  373 -60 dB; BACKING -2.3 to -8.9 dB, ENSEMBLE -21, -33 dB (difference against the signal); WAVs in build/v158_ab.
+  Check: xt_tone's stored section, 452 of 454 V-Synth waves on their stored vpdt (416 presets, Emu_test), each taken exactly when it should be, byte for byte; 0 different at
+  2000 on 12 seeds (2024 777 31337 9 4242 6 8 24 12 18 36 41). Found in the check: stale pads in the reused memory (zeroed), an update leaving memory (now left off),
+  PluginTest's reference taking a wave's own fields from .vpw only. Own-events: its own vpdt back, four that don't fit. Kind-1 marks on two hit waves. verify.sh: 4 waves.
+  Planted: mutate_tone.py 1121 (22 new; 2 of mine equivalent, dropped; SOLO kind-1 on 777 and 31337, band kind-1 on 24), mutate_files.py 49,
+  mutate_panel.py's patch- and zones- 47 (patch-stored-osc, patch-stored-zone new; patch-own-events-osc on VP9SAMnoise1), none missed.
+
 A LITE player's update v157 (2026-11-06), a change only after a LEGATO take on a LITE wave (or a Loop switch moved during a LITE note): v155's open seeds 6 and 8.
   Each knob update ends, for kind 1, in 0x8950bcc0(voice, block + 0x80): the bits as 0x894f3ec0's, then by the block's mode: 2 (0x8950bdda) the player's first and last
   samples (+0x138, +0x124) from the voice's +0xc4 and +0xc8, the loops' points from the wave's record, the Loop Modes by the Loop bit; 0 (0x8950bea0) the linear player's

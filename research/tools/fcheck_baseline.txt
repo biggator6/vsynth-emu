@@ -288,10 +288,14 @@ tone, playback modes: 178 SOLO notes started from an event; 112 moves between a 
 tone, playback modes: 963 notes, 54 taken by a sounding tone, 98 truncated, 57875 blocks, 6868407 checks
 tone, playback modes: 1 notes left off, a read outside memory; 380464 band reads far from their wave
 tone, playback modes: 0 different
-tone, SOLO segments: 121 notes started from an event; 289 moves between segments; 59 took an earlier note's player
+tone, SOLO segments: 121 notes started from an event; 289 moves between segments; 0 turns at a kind-1 event; 59 took an earlier note's player
 tone, SOLO segments: 381 notes, 20 taken by a sounding tone, 37 truncated, 23641 blocks, 3123311 checks
 tone, SOLO segments: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, SOLO segments: 0 different
+tone, stored waves: 454 of 504 played on their own vpdt (SOLO 298, BACKING 139, ENSEMBLE 15), 2 encoded again as theirs can't be played as it is, 50 skipped
+tone, stored waves: 868 notes, 48 taken by a sounding tone, 93 truncated, 51919 blocks, 6171893 checks
+tone, stored waves: 1 notes left off, a read outside memory; 12000 band reads far from their wave
+tone, stored waves: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
 tone, the clock's rate: 0 notes left off, a read outside memory; 0 band reads far from their wave
@@ -304,7 +308,7 @@ tone, the host's clock: 21041 clocks
 tone, the host's clock: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 46311 checks
 tone, the host's clock: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, the host's clock: 0 different
-tone, own events: 6 waves, 36 checks
+tone, own events: 6 waves, 56 checks
 tone, own events: 0 different
 == xt_tone paths
 paths: 770 waves (416 preset waves of the disk image)

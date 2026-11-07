@@ -543,8 +543,8 @@ void XtMbPlayer::State::crossings() {
 // keeping the overshoot; Alternate: the walk turns from the next block;
 // mode 3: to the forward start, holding); an event moves on to the next,
 // the last ending the note.  Inside a loop the pitch takes its rate factor
-// (+0xa0/+0xa4, into +0x9c).  (The event types 1..3 of step and event playback
-// are not ported.)
+// (+0xa0/+0xa4, into +0x9c).  An event's kinds 1..3 do nothing here: their
+// branches wait on the player's byte 2 bits 0..2, which no code sets.
 void XtMbPlayer::State::crossForward() {
     const int X = limit;
     if (lp[2] == X) {
@@ -601,6 +601,9 @@ void XtMbPlayer::State::crossBackward() {
         f9c = 1.0f;
     }
     if (evPos != X) return;
+    // 0x8950cb60, shared with SOLO: an event of kind 1 (+5) met with the forward loop turned (+3 bit 3) turns the walk forward there, as the
+    // loop's start would, and keeps the event; 2 and 3, and 1's other branch, wait on byte 2 bits 0..2, which no code sets
+    if (flags5 == 1 && (flags3 & 8)) { flags3 &= 0xf7; return; }
     if ((int16_t)ev > 0) {
         --ev;
         eventSetup();

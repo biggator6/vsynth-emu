@@ -29,6 +29,8 @@ struct XtWaveFile {
     // edited (V-Producer can).  A SOLO wave's at (stride·e + 8)·2 + 4 (stride 10, 16 stereo), a band wave's at (stride·e + 14)·2 + 4
     // (0x2e, 0x58 stereo).  Empty with no chunk, as on LITE waves.
     std::vector<int32_t> events;
+    // and the vpdt chunk itself, which the plugin plays as it is (xtSynthEncode's `stored`), as the XT plays a wave it loads
+    std::vector<uint8_t> vpdt;
     std::vector<int16_t> pcm;        // interleaved, frames * channels
     size_t size = 0;                 // bytes of the stream, its data chunk's end
 };

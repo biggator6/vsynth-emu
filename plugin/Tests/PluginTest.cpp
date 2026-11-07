@@ -242,7 +242,7 @@ static int patchApplyTest(const juce::File& rom) {
         for (long i = 0; i < wave.frames; ++i)
             for (int k = 0; k < wave.channels; ++k) chans[(size_t)k].push_back((float)wave.pcm[(size_t)(i * wave.channels + k)] / 32768.0f);
         const int type = wave.encodeType == 0 || wave.encodeType == 1 || wave.encodeType == 3 || wave.encodeType == 5 ? wave.encodeType : 1;
-        auto own = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &wave.events), plain = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &wave.events);
+        auto own = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &wave.events, &wave.vpdt), plain = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &wave.events, &wave.vpdt);
         xtWaveOntoEncoded(wave, *own);
         check(own->vpnoCount == 3 && own->vpno.size() >= 3 && own->vpno[0] == 2 && own->vpno[1] == 0 && own->vpno[2] == 1, "the wave's own list of events, not the encode's");
         c = p.currentControls();
@@ -350,22 +350,15 @@ static int patchApplyTest(const juce::File& rom) {
             std::set<int> numbers;
             for (int z = 0; z < zones; ++z)
                 for (int k = 0; k < 2; ++k) if (const int n = xtPatchWaveNumber(zp.store, z, k); n > 0 && n != number) numbers.insert(n);
-            // The odd numbers' waves a SOLO preset wave with attacks, one of its events moved as V-Producer can: the zone keeps the wave's own
-            // events, which the detection wouldn't find (a band wave keeps the detection, so preset 0's can't show it)
+            // The odd numbers' waves a SOLO preset wave with attacks: a zone plays its stored vpdt, whose records an older encoder wrote, where a
+            // new encode would give others (preset 0 is a band wave, played on its own vpdt too)
             std::vector<uint8_t> soloBytes;
             long soloLast = 0;
             for (size_t i = 1; i < presets.size() && soloBytes.empty(); ++i) {
                 XtWaveFile w;
                 if (!xtWaveRead(&disk.bytes()[presets[i]], disk.bytes().size() - presets[i], w) || w.encodeType != 1 || w.channels != 1 || w.events.size() < 3
-                    || w.frames > 150000 || w.events[1] + 16 * 800 >= w.events[2]) continue;
-                std::vector<uint8_t> b(disk.bytes().begin() + (long)presets[i], disk.bytes().begin() + (long)(presets[i] + w.size));
-                size_t vd = 0;
-                for (size_t j = 0; j + 8 < b.size() && !vd; ++j) if (!std::memcmp(&b[j], "vpdt", 4)) vd = j + 8;
-                const int32_t moved = w.events[1] + 16 * 400;
-                for (int k = 0; k < 4; ++k) b[vd + (10 + 8) * 2 + 4 + (size_t)k] = (uint8_t)((uint32_t)moved >> (8 * k));   // event 1's position
-                XtWaveFile back;
-                if (!vd || !xtWaveRead(b.data(), b.size(), back) || back.events.size() != w.events.size() || back.events[1] != moved) continue;
-                soloBytes = std::move(b);
+                    || w.frames > 150000) continue;
+                soloBytes.assign(disk.bytes().begin() + (long)presets[i], disk.bytes().begin() + (long)(presets[i] + w.size));
                 soloLast = w.frames - 1;
             }
             check(!soloBytes.empty(), "a SOLO preset wave with attacks for the zones");
@@ -404,7 +397,7 @@ static int patchApplyTest(const juce::File& rom) {
                 for (long i = 0; i < e.first.frames; ++i)
                     for (int k = 0; k < e.first.channels; ++k) chans[(size_t)k].push_back((float)e.first.pcm[(size_t)(i * e.first.channels + k)] / 32768.0f);
                 const int type = e.first.encodeType == 0 || e.first.encodeType == 1 || e.first.encodeType == 3 || e.first.encodeType == 5 ? e.first.encodeType : 1;
-                e.second = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &e.first.events);
+                e.second = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &e.first.events, &e.first.vpdt);
                 xtWaveOntoEncoded(e.first, *e.second);
                 return e;
             };
@@ -1611,7 +1604,7 @@ int main(int argc, char** argv) {
         XtWaveFile own2;
         juce::MemoryBlock b2;
         const bool isOwn2 = juce::File(path2).loadFileAsData(b2) && xtWaveRead(static_cast<const uint8_t*>(b2.getData()), b2.getSize(), own2) && own2.encodeType == type2;
-        E2 = xtSynthEncode(ch2, rd2->sampleRate, type2, 64, nullptr, rd2->usesFloatingPointData ? 16 : (int)rd2->bitsPerSample, isOwn2 ? &own2.events : nullptr);
+        E2 = xtSynthEncode(ch2, rd2->sampleRate, type2, 64, nullptr, rd2->usesFloatingPointData ? 16 : (int)rd2->bitsPerSample, isOwn2 ? &own2.events : nullptr, isOwn2 ? &own2.vpdt : nullptr);
         if (!E2) { std::fprintf(stderr, "TEST_OSC2_WAVE: encode failed\n"); return 1; }
     }
     p.loadFile(juce::File(argv[2]));
@@ -1641,7 +1634,7 @@ int main(int argc, char** argv) {
     }
     const int type = st.contains("ENSEMBLE") ? 5 : st.contains("BACKING") ? 3 : st.contains("LITE") ? 0 : 1;
     const int bits = rd->usesFloatingPointData ? 16 : (int)rd->bitsPerSample;
-    // A V-Synth wave (.vpw, or a project's .wav) encoded as its own type keeps its own events, as the processor does
+    // A V-Synth wave (.vpw, or a project's .wav) taken as its own type plays its own vpdt, or keeps its own events, as the processor does
     XtWaveFile ownFile;
     bool isOwnFile = false;
     {
@@ -1649,22 +1642,20 @@ int main(int argc, char** argv) {
         isOwnFile = juce::File(argv[2]).loadFileAsData(bytes) && xtWaveRead(static_cast<const uint8_t*>(bytes.getData()), bytes.getSize(), ownFile);
     }
     const std::vector<int32_t>* ownEvents = isOwnFile && ownFile.encodeType == type ? &ownFile.events : nullptr;
-    auto E = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits, ownEvents);
+    const std::vector<uint8_t>* ownVpdt = isOwnFile && ownFile.encodeType == type ? &ownFile.vpdt : nullptr;
+    auto E = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits, ownEvents, ownVpdt);
     {   // the encode must be repeatable
-        auto E2 = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits, ownEvents);
+        auto E2 = xtSynthEncode(chans, rd->sampleRate, type, 64, nullptr, bits, ownEvents, ownVpdt);
         bool same = E->vpdt == E2->vpdt && E->solo.segStart == E2->solo.segStart && E->solo.in == E2->solo.in
                  && E->solo.inR == E2->solo.inR;
         for (int k = 0; k < 6; ++k) same = same && E->bands.buf[k] == E2->bands.buf[k];
         std::printf("encode repeatable: %s\n", same ? "yes" : "NO");
     }
-    // A V-Synth wave brings its Original Key, Tempo, loop and fine tuning with it
-    if (juce::File(argv[2]).hasFileExtension("vpw")) {
-        juce::MemoryBlock bytes;
-        XtWaveFile own;
-        if (juce::File(argv[2]).loadFileAsData(bytes) && xtWaveRead(static_cast<const uint8_t*>(bytes.getData()), bytes.getSize(), own)) {
-            xtWaveOntoControls(own, refCtl);
-            xtWaveOntoEncoded(own, *E);
-        }
+    // A V-Synth wave, a .vpw or a project's .wav, brings its Original Key, Tempo, loop, fine tuning and own list of events with it, as the
+    // processor takes them (loadFile, reencode)
+    if (isOwnFile) {
+        xtWaveOntoControls(ownFile, refCtl);
+        xtWaveOntoEncoded(ownFile, *E);
     }
     XtSynth ref; ref.prepare(rate); ref.setSample(E); ref.setControls(refCtl);
     if (E2) ref.setSample(E2, 1);

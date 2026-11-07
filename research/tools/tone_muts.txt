@@ -1066,13 +1066,13 @@ read-ev-seg|P.evSeg.push_back((int)((so - seg0) / 12));|P.evSeg.push_back((int)(
 read-seg-first|P.segFirst.push_back((int16_t)r16(ro));|P.segFirst.push_back((int16_t)256);|tonesolo
 solo-events-order|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(first, last);|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(last, first);
 solo-loop-bit|        s.solo.setLoopBit(o.loop && !eventPlay(s, o)); // and the Loop bit, which Playback Mode's tails clear\n|
-solo-encode-xt|const bool xt = (own ? marks.size() > 2 : depth >= 0)|const bool xt = (own ? marks.size() > 2 : depth < -1)
+solo-encode-xt|E->stored \|\| ((own ? marks.size() > 2 : depth >= 0)|E->stored \|\| ((own ? marks.size() > 2 : depth < -1)
 check-solo-loop-ev|            while (ev + 1 < nev && evPos(ev + 1) < pos) ++ev;\n||tonecheck|777
 check-solo-loop-seg|            while (seg + 12 < segEnd && !(pos < (int)r32(seg + 12 + 8))) seg += 12;\n||tonecheck
 check-solo-vpno|        w.chunk[5] = put(out.enc->vpdt.data(), out.enc->vpdt.size());\n        writeVpno(f, w, *out.enc);\n|        w.chunk[5] = put(out.enc->vpdt.data(), out.enc->vpdt.size());\n|tonecheck
 check-solo-hold-vari|if (wv && wv->type == 1 && (ctl.playbackMode >= 1 \|\| n.playbackMode >= 1)) n.vari = ctl.vari;|if (wv && wv->type == 1 && (ctl.playbackMode == 1 \|\| n.playbackMode == 1)) n.vari = ctl.vari;|tonecheck
 own-ignored|    const bool own = !marks.empty();|    const bool own = false;
-own-band|        if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth)) return fail("multi-band encoder failed");|        if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth, nullptr, own ? &marks : nullptr)) return fail("multi-band encoder failed");
+own-band|        else if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth)) return fail("multi-band encoder failed");|        else if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth, nullptr, own ? &marks : nullptr)) return fail("multi-band encoder failed");
 own-detect-too|&& xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, own ? &marks : nullptr)|&& xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, nullptr)
 own-end-check|events->front() == 0 && (long)events->back() == frames * 16|events->front() == 0
 own-marks-floor|(uint32_t)(e / 16) > marks.back() ? (uint32_t)(e / 16) : marks.back()|(uint32_t)((e + 15) / 16) > marks.back() ? (uint32_t)((e + 15) / 16) : marks.back()
@@ -1097,3 +1097,25 @@ lin-upd-first|    bwd.end = start;\n    fwd.end = frames - 1;|    fwd.end = fram
 lin-upd-last|    bwd.end = start;\n    fwd.end = frames - 1;|    bwd.end = start;\n    fwd.end = frames;|tonelin
 lin-upd-mode|        fwd.mode = l.on ? l.fwdMode : 0;|        fwd.mode = 0;|tonelin
 lin-upd-mode-bwd|        bwd.mode = l.on ? l.bwdMode : 0;|        bwd.mode = 0;|tonelin
+stored-solo-off|if (fits && xtSoloReadVpdt(*stored, ch, recs, P)|if (false && xtSoloReadVpdt(*stored, ch, recs, P)|tone
+stored-band-off|        if (fits) { E->vpdt = *stored; E->stored = true; }|        if (false) { E->vpdt = *stored; E->stored = true; }|tone
+stored-flag|{ vp = *stored; E->stored = true; }|{ vp = *stored; }|tone
+stored-whole|        for (uint32_t e = 0; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) % 16 == 0;\n||tone
+stored-order|        for (uint32_t e = 1; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) >= r32((st * (e - 1) + first) * 2 + 4);\n||tone
+stored-front| && r32(first * 2 + 4) == 0\n|\n|tone
+stored-back|            && (long)r32((st * (nev - 1) + first) * 2 + 4) == frames * 16;|            ;|tone
+stored-stride|st = type == 1 ? (ch == 2 ? 16 : 10) : (ch == 2 ? 0x58 : 0x2e), first = type == 1 ? 8 : 14;|st = type == 1 ? (ch == 2 ? 10 : 16) : (ch == 2 ? 0x58 : 0x2e), first = type == 1 ? 8 : 14;|tone
+solo-kind1-off|    if (evKindAt(curEv) == 1 && (f3 & 8)) { f3 &= 0xf7; walkStep = -walkStep; ++kindTurn; return; }\n||tonesolo|777
+solo-kind1-walk|f3 &= 0xf7; walkStep = -walkStep; ++kindTurn; return; }|f3 &= 0xf7; ++kindTurn; return; }|tonesolo|777
+solo-kind1-flag|(f3 & 8)) { f3 &= 0xf7; walkStep = -walkStep; ++kindTurn|(f3 & 8)) { walkStep = -walkStep; ++kindTurn|tonesolo|31337
+solo-kind1-test|if (evKindAt(curEv) == 1 && (f3 & 8))|if (evKindAt(curEv) == 1 && (f3 & 4))|tonesolo|777
+solo-kind-mask|P.evKind.push_back((uint8_t)(r32(o) & 0xb));|P.evKind.push_back((uint8_t)(r32(o) & 0x8));|tonesolo|777
+solo-kind-event|int XtSoloVoice::evKindAt(int e) const { return e >= 0 && (size_t)e < p->evKind.size() ? p->evKind[(size_t)e] : 0; }|int XtSoloVoice::evKindAt(int e) const { return e > 0 && (size_t)e - 1 < p->evKind.size() ? p->evKind[(size_t)e - 1] : 0; }|tonesolo|777
+band-kind1-off|    if (flags5 == 1 && (flags3 & 8)) { flags3 &= 0xf7; return; }\n||toneband|24
+band-kind1-flag|if (flags5 == 1 && (flags3 & 8)) { flags3 &= 0xf7; return; }|if (flags5 == 1 && (flags3 & 8)) { return; }|toneband|24
+check-stored-zero|                fw.c.write(kStoredAt, zero.data(), zero.size());\n||tonecheck
+check-kind-fw|                    fw.c.wr16(t.fw.chunk[5] + at, 1);\n||tonecheck|777
+check-kind-plan|                if (w.type == 1 && xtSoloReadVpdt(t.enc->vpdt, w.ch, rr, back)) t.enc->solo.evKind = back.evKind;\n||tonecheck|777
+check-stored-whole|whole = w.events[i] % 16 == 0 && (i == 0|whole = (i == 0|tonecheck
+check-stored-file|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events, &w.vpdt);|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events);|tonecheck
+files-vpdt-copy|        out.vpdt.assign(vpdt, vpdt + nDt);\n||tonefiles

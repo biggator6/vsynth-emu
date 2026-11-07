@@ -495,6 +495,10 @@ std::vector<int16_t> hitsWave(int hits, int channels, long frames, uint32_t seed
     return raw;
 }
 
+// A wave's encoded form (out.enc) in the firmware's memory, as XtSynth has it: its chunks and bands from `next`.  `bands`, if given, gets
+// the bands' places, as they go in the registry of band reads.
+bool layoutWave(Firmware& f, uint32_t& next, const std::vector<int16_t>& raw, int channels, int type, TestWave& out, std::vector<uint32_t>* bands = nullptr);
+
 bool makeWave(Firmware& f, uint32_t& next, const std::vector<int16_t>& raw, int channels, int type, TestWave& out) {
     const long frames = (long)raw.size() / channels;
     std::vector<std::vector<float>> chans((size_t)channels);
@@ -505,6 +509,25 @@ bool makeWave(Firmware& f, uint32_t& next, const std::vector<int16_t>& raw, int 
     out.type = type;
     out.channels = channels;
     if (!out.enc) { std::fprintf(stderr, "encode: %s\n", err.c_str()); return false; }
+    return layoutWave(f, next, raw, channels, type, out);
+}
+
+// A V-Synth wave as XtSynth takes it, on its own vpdt (or encoded again where that can't be played), with its own `vpno` and what else it
+// brings (xtWaveOntoEncoded), laid out for the firmware: both sides play the file's vpdt as it is
+bool storedWave(Firmware& f, uint32_t& next, const XtWaveFile& w, TestWave& out, std::vector<uint32_t>* bands) {
+    if (w.encodeType != 1 && w.encodeType != 3 && w.encodeType != 5) return false;
+    std::vector<std::vector<float>> chans((size_t)w.channels);
+    for (long i = 0; i < w.frames; ++i)
+        for (int k = 0; k < w.channels; ++k) chans[(size_t)k].push_back((float)w.pcm[(size_t)(i * w.channels + k)] / 32768.0f);
+    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events, &w.vpdt);
+    if (!out.enc) return false;
+    xtWaveOntoEncoded(w, *out.enc);
+    out.type = w.encodeType;
+    out.channels = w.channels;
+    return layoutWave(f, next, w.pcm, w.channels, w.encodeType, out, bands);
+}
+
+bool layoutWave(Firmware& f, uint32_t& next, const std::vector<int16_t>& raw, int channels, int type, TestWave& out, std::vector<uint32_t>* bands) {
     FwWave& w = out.fw;
     w.frames = out.enc->frames;
     auto put = [&](const void* data, size_t bytes) {
@@ -537,6 +560,7 @@ bool makeWave(Firmware& f, uint32_t& next, const std::vector<int16_t>& raw, int 
             const size_t bytes = out.enc->bands.buf[k].size() * 2;
             w.band[slot[k]] = put(out.enc->bands.buf[k].data(), bytes);
             f.bandReads.add(w.band[slot[k]], bytes);
+            if (bands) bands->push_back(w.band[slot[k]]);
         }
     }
     w.loaded = true;
@@ -1223,6 +1247,19 @@ int XtToneProbe::run(int argc, char** argv) {
                             H{ 6, 1, 1, 30000 }, H{ 4, 2, 1, 30000 } }) {
             TestWave t;
             if (!makeWave(fw, next, hitsWave(w.hits, w.ch, w.frames, 777u + (uint32_t)w.hits), w.ch, w.type, t)) { std::fprintf(stderr, "hits wave\n"); return 2; }
+            // Events of the 6-hit SOLO wave (2, 4) and of the 12-hit BACKING wave (1, 5, 9) marked kind 1, as V-Trainer marks a loop (VP9SAMnoise1's
+            // event 3), on both sides: an Alternate loop's way back turns there (0x8950cb60), which the XT's own encodes never write
+            if ((w.type == 1 && w.hits == 6) || (w.type == 3 && w.hits == 12 && w.ch == 1)) {
+                for (uint32_t e : w.type == 1 ? std::vector<uint32_t>{ 2, 4 } : std::vector<uint32_t>{ 1, 5, 9 }) {
+                    const uint32_t at = (w.type == 1 ? (w.ch == 2 ? 16 : 10) * e + 8 : (w.ch == 2 ? 0x58 : 0x2e) * e + 14) * 2;
+                    t.enc->vpdt[at] = 1;
+                    t.enc->vpdt[at + 1] = 0;
+                    fw.c.wr16(t.fw.chunk[5] + at, 1);
+                }
+                std::vector<XtRecord> rr;                  // the SOLO plan's kinds read back from it, as a wave's are
+                XtSoloPlan back;
+                if (w.type == 1 && xtSoloReadVpdt(t.enc->vpdt, w.ch, rr, back)) t.enc->solo.evKind = back.evKind;
+            }
             eventWaves.push_back(std::move(t));
         }
         checkSoloRecords(dir, "vocal.bin", 1);
@@ -1236,6 +1273,29 @@ int XtToneProbe::run(int argc, char** argv) {
         }
         cosmBase = std::max(cosmBase, (next + 0xfffffu) & ~0xfffffu);
     }
+    // The stored waves: every V-Synth wave there is, the disk image's preset waves and a project's beside the ROM's folder
+    // (analysis/projects/*/Wave), each read when its case comes
+    struct StoredSrc { std::string name; size_t preset = 0; std::filesystem::path path; };
+    std::vector<StoredSrc> stored;
+    XtDiskImage storedDisk;
+    {
+        const std::string image = argv[1];
+        const auto slash = image.find_last_of('/');
+        const std::string romDir = slash == std::string::npos ? std::string() : image.substr(0, slash + 1);
+        if (storedDisk.open(romDir + "V-SynthXTDiskImage.bin.0.bin")) {
+            const auto p = storedDisk.presetWaves();
+            for (size_t i = 0; i < p.size(); ++i) stored.push_back({ "preset " + std::to_string(i), p[i], {} });
+        }
+        std::vector<std::filesystem::path> files;
+        std::error_code ec;
+        for (const auto& prj : std::filesystem::directory_iterator(romDir + "../../analysis/projects", ec)) {
+            std::error_code ec2;
+            for (const auto& e : std::filesystem::directory_iterator(prj.path() / "Wave", ec2))
+                if (e.path().extension() == ".wav" || e.path().extension() == ".vpw") files.push_back(e.path());
+        }
+        std::sort(files.begin(), files.end());
+        for (const auto& f : files) stored.push_back({ f.filename().string(), 0, f });
+    }
     // Playback Mode's waves: the hits, the others, and LITE
     std::vector<TestWave> playWaves = eventWaves;
     // A SOLO wave's segments: the SOLO waves of hits alone
@@ -1248,8 +1308,8 @@ int XtToneProbe::run(int argc, char** argv) {
     syn.setSample(nullptr, 0, 1);                       // the Wave Numbers patchOf gives, from the first patch on, as the firmware's
     syn.setSample(nullptr, 1, 2);
     Report rep;
-    long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0, zoneNotes = 0, zonesSeen = 0, playerTakes = 0, endSkips = 0, eventNotes = 0, soloEventNotes = 0, segMoves = 0;
-    std::map<const XtSoloVoice*, int> segSeen;                    // each SOLO player's moves between segments, as last counted
+    long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0, zoneNotes = 0, zonesSeen = 0, playerTakes = 0, endSkips = 0, eventNotes = 0, soloEventNotes = 0, segMoves = 0, kindTurns = 0;
+    std::map<const XtSoloVoice*, int> segSeen, kindSeen;          // each SOLO player's moves between segments and turns at a kind-1 event, as last counted
     float L[32], R[32];
     uint32_t fwFree[16][3] = {};            // the free-running objects of LFO 1, 2 and 5, by zone
     static constexpr uint32_t kFreeLfo[3] = { 1, 2, 5 };
@@ -1362,6 +1422,14 @@ int XtToneProbe::run(int argc, char** argv) {
     // Then a SOLO wave's segments, last of all: Playback Mode's cases on the SOLO waves of hits, their loops at a segment's start, across
     // one, ending at an event or anywhere (the random cases' loops stay near the start, inside the first segment of either)
     const int segFrom = playFrom + nPlay, nSegs = waves.empty() ? 0 : nCases / 10;
+    // And the stored waves, last: one a case, on its own vpdt as the file has it, both sides (xtSynthEncode's `stored`); every one of them at
+    // 2000 cases and over, else a quarter of the cases' count spread over the list.  Laid out afresh at kStoredAt each, below the zones'
+    // chunks, so a read far past its vpdt lands in memory as the other waves' do
+    const int storedFrom = segFrom + nSegs, nStored = waves.empty() || stored.empty() ? 0 : std::min((int)stored.size(), nCases >= 2000 ? (int)stored.size() : nCases / 4);
+    constexpr uint32_t kStoredAt = kRam + 0x2000000, kStoredEnd = kRam + 0x2800000;
+    std::vector<uint32_t> storedBands;                // the bands of the last stored wave, in the registry of band reads
+    uint32_t storedUsed = kStoredAt;                  // and where its layout ended: zeroed before the next, as the pads around a band are zeros
+    long storedOwn[6] = {}, storedAgain[6] = {}, storedSkipped = 0;
     const auto zoneLine = [&] {
         int n = 0;
         for (int z = 1; z < 16; ++z) n += (zonesSeen >> z) & 1;
@@ -1369,9 +1437,9 @@ int XtToneProbe::run(int argc, char** argv) {
     };
     // Each zone's OSC's own copy of its wave's header and loop chunks, as a zone's settings of the wave's own are its own here
     constexpr uint32_t kZoneChunks = kRam + 0x2800000;
-    for (int g = 0; g < segFrom + nSegs; ++g) {
+    for (int g = 0; g < storedFrom + nStored; ++g) {
         rep.caseNo = g;
-        const bool playCase = g >= playFrom, segCase = g >= segFrom, zoneCase = g >= zoneFrom && !playCase;
+        const bool playCase = g >= playFrom, segCase = g >= segFrom && g < storedFrom, storedCase = g >= storedFrom, zoneCase = g >= zoneFrom && !playCase;
         const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom && g < liteFrom, liteCase = g >= liteFrom && !zoneCase && !playCase, extra = patchCase || tuneCase || liteCase || zoneCase || playCase;
         const bool twoInTick = g >= tickFrom && !extra;
         if (g == nCases + nSweep) summary("tone");
@@ -1386,7 +1454,55 @@ int XtToneProbe::run(int argc, char** argv) {
                         playerTakes, endSkips, eventNotes);
             std::printf("tone, playback modes: %ld SOLO notes started from an event; %ld moves between a SOLO wave's segments\n", soloEventNotes, segMoves);
             summary("tone, playback modes");
-            playerTakes = endSkips = eventNotes = soloEventNotes = segMoves = 0;
+            playerTakes = endSkips = eventNotes = soloEventNotes = segMoves = kindTurns = 0;
+        }
+        if (nStored && g == storedFrom) {
+            std::printf("tone, SOLO segments: %ld notes started from an event; %ld moves between segments; %ld turns at a kind-1 event; %ld took an earlier note's player\n", soloEventNotes, segMoves, kindTurns, playerTakes);
+            summary("tone, SOLO segments");
+            playerTakes = endSkips = eventNotes = soloEventNotes = segMoves = kindTurns = 0;
+        }
+        // A stored wave's case: the wave read and laid out; one that doesn't fit the memory left, or doesn't read, is skipped
+        std::vector<TestWave> storedPool;
+        if (storedCase) {
+            const StoredSrc& src = stored[(size_t)((long)(g - storedFrom) * (long)stored.size() / nStored)];
+            XtWaveFile w;
+            bool read = false;
+            if (src.path.empty()) read = xtWaveRead(&storedDisk.bytes()[src.preset], storedDisk.bytes().size() - src.preset, w);
+            else {
+                std::ifstream in(src.path, std::ios::binary);
+                const std::vector<uint8_t> b((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                read = xtWaveRead(b.data(), b.size(), w);
+            }
+            for (uint32_t a : storedBands) fw.bandReads.bandEnd.erase(a);
+            storedBands.clear();
+            if (storedUsed > kStoredAt) {
+                const std::vector<uint8_t> zero(storedUsed - kStoredAt, 0);
+                fw.c.write(kStoredAt, zero.data(), zero.size());
+                storedUsed = kStoredAt;
+            }
+            const size_t need = 16 * (size_t)(kXtFwWavePad + 0x2000) + w.pcm.size() * 4 + w.vpdt.size();   // the bands are at most the audio again
+            TestWave t;
+            uint32_t next = kStoredAt;
+            const bool laid = read && (w.encodeType == 1 || w.encodeType == 3 || w.encodeType == 5) && kStoredAt + need <= kStoredEnd && storedWave(fw, next, w, t, &storedBands);
+            storedUsed = std::max(storedUsed, std::min(next, kStoredEnd));
+            if (!laid || next > kStoredEnd) {
+                ++storedSkipped;
+                if (rep.first) std::printf("  case %d: %s skipped\n", g, src.name.c_str());
+                continue;
+            }
+            ++(t.enc->stored ? storedOwn : storedAgain)[w.encodeType];
+            // taken as it is exactly where it should be: its events from 0 to the end, never back, each on a whole sample (a SOLO wave's plan
+            // reading too, which only preset 270's doesn't); and then the file's own bytes
+            {
+                bool whole = w.events.size() >= 2 && w.events.front() == 0 && (long)w.events.back() == w.frames * 16;
+                for (size_t i = 0; whole && i < w.events.size(); ++i) whole = w.events[i] % 16 == 0 && (i == 0 || w.events[i] >= w.events[i - 1]);
+                rep.checks += 2;
+                if (t.enc->stored != whole) rep.bad(std::string("stored: ") + src.name + (whole ? " not played on its vpdt" : " played on a vpdt it can't be"), "events %.0f, type %.0f", (double)w.events.size(), w.encodeType, 0);
+                if (t.enc->stored && t.enc->vpdt != w.vpdt) rep.bad(std::string("stored: ") + src.name + "'s vpdt not the file's", "%.0f bytes, the file's %.0f", (double)t.enc->vpdt.size(), (double)w.vpdt.size(), 0);
+            }
+            if (std::getenv("XT_TONE_STORED")) std::printf("  case %d: %s, type %d, %d ch, %ld frames%s\n", g, src.name.c_str(), w.encodeType, w.channels, w.frames, t.enc->stored ? "" : ", encoded again");
+            if (!t.enc->stored && rep.first) std::printf("  case %d: %s encoded again, its vpdt can't be played as it is\n", g, src.name.c_str());
+            storedPool.push_back(std::move(t));
         }
         const bool sweep = g >= nCases && g < nCases + nSweep;
         const size_t sweepAt = sweep ? listed[(size_t)(g - nCases) / 4] : 0;
@@ -1405,7 +1521,7 @@ int XtToneProbe::run(int argc, char** argv) {
         const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase && !liteCase && !zoneCase && !playCase) || sweepOn == 2 || ((tuneCase || liteCase || zoneCase || playCase) && g % 2 == 0);
         // one case in two plays a wave on OSC 1 (with the analog OSC 2 or alone); the last
         // ones a wave on OSC 2, over OSC 1 off, analog or on another wave
-        std::vector<TestWave>& pool = liteCase ? liteWaves : segCase ? soloWaves : playCase ? playWaves : waves;
+        std::vector<TestWave>& pool = liteCase ? liteWaves : storedCase ? storedPool : segCase ? soloWaves : playCase ? playWaves : waves;
         const TestWave* wv2 = osc2Case ? &pool[(size_t)r.range(0, (int)pool.size() - 1)] : nullptr;
         const TestWave* wv = (patchCase ? patchCtl.oscType == 1 : sweepOn == 1 || (!sweep && !twoInTick && g % 2 == 1)) && !pool.empty() ? &pool[(size_t)r.range(0, (int)pool.size() - 1)] : nullptr;
         // A patch's STEP or EVENT on a SOLO wave with Vari off needs the linear player's events (not done): that OSC plays the next band wave instead
@@ -1643,7 +1759,7 @@ int XtToneProbe::run(int argc, char** argv) {
             for (int k = 0; k < 2; ++k) {
                 const TestWave* t = k ? wv2 : wv;
                 (k ? ctl.osc2.playbackMode : ctl.playbackMode) = drawMode(r, t, k ? ctl.osc2.vari : ctl.vari);
-                if (!t || (t->type != 1 && t->type != 3 && t->type != 5)) continue;
+                if (!t || (t->type != 1 && t->type != 3 && t->type != 5) || storedCase) continue;   // a stored wave keeps its own list
                 uint32_t w2 = 0;
                 std::memcpy(&w2, t->enc->vpdt.data() + 8, 4);
                 const int n = (int)(w2 >> 16);
@@ -2043,6 +2159,10 @@ int XtToneProbe::run(int argc, char** argv) {
                         const int m = s.solo.segmentMoves();
                         segMoves += m >= seen ? m - seen : m;
                         seen = m;
+                        int& seenK = kindSeen[&s.solo];
+                        const int kt = s.solo.kindTurns();
+                        kindTurns += kt >= seenK ? kt - seenK : kt;
+                        seenK = kt;
                     }
                     if (s.linear) {                  // its own state
                         rep.checks += 4;
@@ -2524,7 +2644,7 @@ int XtToneProbe::run(int argc, char** argv) {
             fw.fr11.clear();
             for (FwNote* n : order) {
                 if (!n->live || n->ended) continue;
-                if (tick && !fw.tick(*n)) return 1;
+                if (tick && !fw.tick(*n)) { leftMemory = true; break; }   // an update's read outside all memory (a band record walk past a stored vpdt, into zeros)
                 if (fw.c.rd32(n->TN + 0xc) != 2) { n->ended = true; continue; }
                 if (!fw.render(*n)) { leftMemory = true; break; }
             }
@@ -2669,8 +2789,11 @@ int XtToneProbe::run(int argc, char** argv) {
     if (nPlay && !nSegs) std::printf("tone, playback modes: %ld OSCs took an earlier note's player (LEGATO), %ld didn't as it had reached its wave's end; %ld started from an event (STEP, EVENT)\n",
                                      playerTakes, endSkips, eventNotes);
     if (nPlay && !nSegs) std::printf("tone, playback modes: %ld SOLO notes started from an event; %ld moves between a SOLO wave's segments\n", soloEventNotes, segMoves);
-    if (nSegs) std::printf("tone, SOLO segments: %ld notes started from an event; %ld moves between segments; %ld took an earlier note's player\n", soloEventNotes, segMoves, playerTakes);
-    summary(nSegs ? "tone, SOLO segments" : nPlay ? "tone, playback modes" : nZone ? "tone, zones" : nLite ? "tone, LITE waves" : nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
+    if (nSegs && !nStored) std::printf("tone, SOLO segments: %ld notes started from an event; %ld moves between segments; %ld took an earlier note's player\n", soloEventNotes, segMoves, playerTakes);
+    if (nStored) std::printf("tone, stored waves: %ld of %zu played on their own vpdt (SOLO %ld, BACKING %ld, ENSEMBLE %ld), %ld encoded again as theirs can't be played as it is, %ld skipped\n",
+                             storedOwn[1] + storedOwn[3] + storedOwn[5] + storedAgain[1] + storedAgain[3] + storedAgain[5], stored.size(), storedOwn[1], storedOwn[3], storedOwn[5],
+                             storedAgain[1] + storedAgain[3] + storedAgain[5], storedSkipped);
+    summary(nStored ? "tone, stored waves" : nSegs ? "tone, SOLO segments" : nPlay ? "tone, playback modes" : nZone ? "tone, zones" : nLite ? "tone, LITE waves" : nPatch + nTune ? "tone, a wave's own tuning" : "tone, a second update in a tick");
     syn.setZones(nullptr);
     fw.zpar.clear();
     fw.zoneWave.clear();
@@ -2896,6 +3019,29 @@ int XtToneProbe::run(int argc, char** argv) {
                                                   : xtFwEncodeMulti(w.type, raw.data(), w.frames, w.ch, v, 64, nullptr, &bad);
                     if (took) rep.bad("own events: markers not from the start to the end", "type %.0f, from %.0f", w.type, (double)bad.front(), 0);
                 }
+            // its own vpdt given back as a file's: played as it is; changed so it doesn't fit (the last event off the end, the first off 0, two
+            // out of order, one between samples): encoded again
+            {
+                const std::vector<uint8_t> v0 = E0->vpdt;
+                const uint32_t st = w.type == 1 ? (w.ch == 2 ? 16 : 10) : (w.ch == 2 ? 0x58 : 0x2e), first = w.type == 1 ? 8 : 14, nev = (uint32_t)(v0[10] | v0[11] << 8);
+                const auto at = [&](uint32_t e) { return (size_t)((st * e + first) * 2 + 4); };
+                const auto put = [](std::vector<uint8_t>& v, size_t o, int32_t x) { for (int i = 0; i < 4; ++i) v[o + (size_t)i] = (uint8_t)((uint32_t)x >> (8 * i)); };
+                const auto get = [](const std::vector<uint8_t>& v, size_t o) { int32_t x; std::memcpy(&x, &v[o], 4); return x; };
+                rep.checks += 5;
+                const auto S0 = xtSynthEncode(chans, 44100.0, w.type, 64, nullptr, 16, &ev0, &v0);
+                if (!S0 || !S0->stored || S0->vpdt != v0) rep.bad("own events: its own vpdt given back", "type %.0f, %.0f events", w.type, (double)nev, 0);
+                std::vector<uint8_t> bad[4] = { v0, v0, v0, v0 };
+                put(bad[0], at(nev - 1), get(v0, at(nev - 1)) - 16);
+                put(bad[1], at(0), 16);
+                if (nev >= 4) { const int32_t a = get(v0, at(1)), b = get(v0, at(2)); put(bad[2], at(1), b); put(bad[2], at(2), a); }
+                put(bad[3], at(1), get(v0, at(1)) + 9);
+                static const char* why[4] = { "the last event off the end", "the first off 0", "two out of order", "one between samples" };
+                for (int k = 0; k < 4; ++k) {
+                    if (k == 2 && nev < 4) continue;
+                    const auto Sk = xtSynthEncode(chans, 44100.0, w.type, 64, nullptr, 16, &ev0, &bad[k]);
+                    if (!Sk || Sk->stored) rep.bad(std::string("own events: a vpdt with ") + why[k] + " played as it is", "type %.0f", w.type, 0, 0);
+                }
+            }
             // on a SOLO wave, edited down to the start and the end: the port's records
             if (w.type == 1) {
                 const std::vector<int32_t> ends{ 0, (int32_t)(w.frames * 16) };

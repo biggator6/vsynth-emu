@@ -193,6 +193,7 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
         for (uint32_t k = 12; k + 2 <= nNo; k += 2) out.vpno.push_back((uint16_t)(vpno[k] | vpno[k + 1] << 8));
     }
     if (vpdt && nDt >= 12 && (out.encodeType == 1 || out.encodeType == 3 || out.encodeType == 5)) {
+        out.vpdt.assign(vpdt, vpdt + nDt);
         const uint32_t nev = le32(vpdt + 8) >> 16;
         const uint32_t stride = out.encodeType == 1 ? (out.channels == 2 ? 16 : 10) : (out.channels == 2 ? 0x58 : 0x2e), first = out.encodeType == 1 ? 8 : 14;
         for (uint32_t e = 0; e < nev && e < 4096; ++e) {

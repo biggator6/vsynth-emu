@@ -27,6 +27,10 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
 # A project's SOLO wave with attacks on its own events (Tribal1, 7), with STEP and EVENT
 [ $BUILT = 1 ] && { n=0; for m in 2 3; do o=$(cd "$REPO" && TEST_PLAYBACK=$m TEST_NOTE2="64,30000" build/plugin/VSynthEmuTest "$ROM" "analysis/projects/Emu_test.prj/Wave/346 Tribal1.wav" 60 auto 2>&1)
   echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "Encoded as SOLO (the wave's own)" && n=$((n+1)); done; echo "SOLO events, plugintest: $n/2 bit-identical"; [ $n = 2 ] || rc=1; }
+# Project waves on their stored vpdt: BACKING, ENSEMBLE and SOLO (373, whose stored records aren't the XT's encode), and VP9SAMnoise1, encoded again
+# on its own events as they fall between samples, under EVENT
+[ $BUILT = 1 ] && { n=0; for wm in "376 Synth014.wav:0" "362 Synth006.wav:3" "373 SynthFX002.wav:0" "002 VP9SAMnoise1.wav:3"; do o=$(cd "$REPO" && TEST_PLAYBACK=${wm##*:} TEST_NOTE2="64,30000" build/plugin/VSynthEmuTest "$ROM" "analysis/projects/Emu_test.prj/Wave/${wm%:*}" 60 auto 2>&1)
+  echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "(the wave's own)" && n=$((n+1)); done; echo "stored waves, plugintest: $n/4 bit-identical"; [ $n = 4 ] || rc=1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_FX_PANEL=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_UI_LAYOUT=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_ROM_SEARCH=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }

@@ -44,7 +44,7 @@ double wrapAnchor(double a) {
 
 bool xtSoloReadVpdt(const std::vector<uint8_t>& v, int channels, std::vector<XtRecord>& recs, XtSoloPlan& P) {
     recs.clear();
-    P.evPos.clear(); P.evSeg.clear(); P.segPos.clear(); P.segRec.clear(); P.segFirst.clear();
+    P.evPos.clear(); P.evKind.clear(); P.evSeg.clear(); P.segPos.clear(); P.segRec.clear(); P.segFirst.clear();
     P.pastStart = 0x7fffffff; P.pastLen = 0;
     const size_t n = v.size();
     const auto r32 = [&](size_t o) -> uint32_t { uint32_t x = 0; if (o + 4 <= n) std::memcpy(&x, &v[o], 4); return x; };
@@ -92,6 +92,7 @@ bool xtSoloReadVpdt(const std::vector<uint8_t>& v, int channels, std::vector<XtR
         const size_t o = (st * e + 8) * 2, so = r32(o + 8);
         if (so < seg0 || (so - seg0) % 12 != 0 || (so - seg0) / 12 >= nseg) return false;
         P.evPos.push_back((int32_t)r32(o + 4));
+        P.evKind.push_back((uint8_t)(r32(o) & 0xb));
         P.evSeg.push_back((int)((so - seg0) / 12));
     }
     // the entry after the last segment's, as 0x8950d770 reads it: its start the third word, its record at the first word taken as an
@@ -237,6 +238,7 @@ int32_t XtSoloVoice::evAt(int e) const {
     if (p->evPos.size() >= 2) return p->evPos[(size_t)std::clamp(e, 0, evLast())];
     return e <= 0 ? 0 : endPos16;
 }
+int XtSoloVoice::evKindAt(int e) const { return e >= 0 && (size_t)e < p->evKind.size() ? p->evKind[(size_t)e] : 0; }
 int XtSoloVoice::evSegAt(int e) const { return p->evSeg.size() >= 2 ? p->evSeg[(size_t)std::clamp(e, 0, evLast())] : (e <= 0 ? 0 : 1); }
 int XtSoloVoice::segLast() const { return p->segPos.size() >= 2 ? (int)p->segPos.size() - 1 : 1; }
 int32_t XtSoloVoice::segAt(int k) const {
@@ -410,6 +412,10 @@ void XtSoloVoice::crossBackward() {
         f9c = 1.0f;
     }
     if (prevEv != X) return;
+    // 0x8950cb60: the event being left, by its kind (+5).  A 1 met with the forward loop turned (+3 bit 3, Alternate) turns the walk forward
+    // there and keeps the event, so the bounce is at the event, not the loop's start (V-Trainer's loop markers; VP9SAMnoise1's event 3).
+    // Its other branch, and 2's and 3's both ways, wait on the player's byte 2 bits 0..2, which no code sets
+    if (evKindAt(curEv) == 1 && (f3 & 8)) { f3 &= 0xf7; walkStep = -walkStep; ++kindTurn; return; }
     if (curEv > 0) { eventAt(curEv - 1); return; }
     ended_ = -1;
 }
@@ -505,6 +511,7 @@ void XtSoloVoice::noteOn(const XtSoloPlan& plan, double A_, double F_, double wa
     segCur = 0;
     pastWave = false;
     segMoves = 0;
+    kindTurn = 0;
     // The start (0x8950fa60).  The end event (+0x1c): the last, or STEP's and EVENT's second, held to the last; the start (+0x18): the
     // Start Offset, or their first's position, held the same way.  Then a seek (0x8950fed0) to the start, or to the end when walk < 0:
     // the position there, the record containing it, the anchor at the record's start (at the wave's end the stream's terminator, ending

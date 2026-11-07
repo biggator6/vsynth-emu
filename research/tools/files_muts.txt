@@ -46,4 +46,4 @@ vpno-list-end|        for (uint32_t k = 12; k + 2 <= nNo; k += 2)|        for (u
 vpdt-solo-stride|out.encodeType == 1 ? (out.channels == 2 ? 16 : 10)|out.encodeType == 1 ? (out.channels == 2 ? 10 : 16)
 vpdt-band-first|first = out.encodeType == 1 ? 8 : 14;|first = out.encodeType == 1 ? 8 : 16;
 vpdt-count|const uint32_t nev = le32(vpdt + 8) >> 16;|const uint32_t nev = (le32(vpdt + 8) >> 16) - 1;
-vpdt-lite|(out.encodeType == 1 \|\| out.encodeType == 3 \|\| out.encodeType == 5)) {\n        const uint32_t nev|(out.encodeType == 3 \|\| out.encodeType == 5)) {\n        const uint32_t nev
+vpdt-lite|(out.encodeType == 1 \|\| out.encodeType == 3 \|\| out.encodeType == 5)) {\n        out.vpdt.assign|(out.encodeType == 3 \|\| out.encodeType == 5)) {\n        out.vpdt.assign

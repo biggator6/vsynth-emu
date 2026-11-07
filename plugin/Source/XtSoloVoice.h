@@ -26,6 +26,7 @@ struct XtSoloPlan {
     // player reads it (int16).  pastStart, pastLen: what the player reads as the segment after the last (0x8950d770): the record count's
     // entry, the records' second word and the word at the count's offset.  Empty: one segment, the start and the end alone.
     std::vector<int32_t> evPos;
+    std::vector<uint8_t> evKind;        // and its kind, its flags & 0xb (0x8950c7e0's +5): 9 the start, 10 the end, 0 an attack; V-Trainer's 1 and 2
     std::vector<int> evSeg;
     std::vector<int32_t> segPos;
     std::vector<int> segRec;
@@ -114,6 +115,7 @@ public:
     // XT then reads its records from RAM.  Silent from then here.
     bool readPastWave() const { return pastWave; }
     int segmentMoves() const { return segMoves; }   // since note-on, the walk's moves between segments (for the check's counts)
+    int kindTurns() const { return kindTurn; }      // and its turns at a kind-1 event (0x8950cb60)
     int endFlag() const { return ended_; }  // +4 as it stands: 1 at the end, −1 at the start, else 0
     FILE* trace = nullptr;              // VSE_TRACE: per-sample state, as EmuSolo.java writes it
 
@@ -170,6 +172,7 @@ private:
     int segCur = 0;                     // the segment the walk is in (+0xe8 block: +0xc its start, +0x10 the next's, +0x14 the one after it)
     bool pastWave = false;
     int segMoves = 0;
+    int kindTurn = 0;
     bool eventCfg = false;
     int evFirstCfg = 0, evLastCfg = 0;
     float f0n = 0.0f;
@@ -191,6 +194,7 @@ private:
     int evLast() const;                 // the wave's last event (its end)
     int32_t evAt(int e) const;          // an event's position, 1/16 sample
     int evSegAt(int e) const;           // the segment containing it
+    int evKindAt(int e) const;          // its kind (flags & 0xb), 0 on a plan without them
     int segLast() const;
     int32_t segAt(int k) const;         // a segment's start, 1/16 sample
     size_t segRecAt(int k) const;       // its first record

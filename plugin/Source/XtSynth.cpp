@@ -65,7 +65,8 @@ bool xtSynthSetRom(const std::string& path) {
 bool xtSynthRomReady() { return g_romReady; }
 
 std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& channels, double sampleRate,
-                                         int type, int depth, std::string* err, int bits, const std::vector<int32_t>* events) {
+                                         int type, int depth, std::string* err, int bits, const std::vector<int32_t>* events,
+                                         const std::vector<uint8_t>* stored) {
     auto fail = [&](const char* m) -> std::shared_ptr<XtEncoded> { if (err) *err = m; return nullptr; };
     if (!g_romReady) return fail("no firmware image (rom.2) loaded");
     if (channels.empty() || channels[0].size() < 64) return fail("sample too short");
@@ -104,6 +105,20 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
     if (events && events->size() >= 2 && irate == 44100 && events->front() == 0 && (long)events->back() == frames * 16)
         for (int32_t e : *events) marks.push_back(marks.empty() || (uint32_t)(e / 16) > marks.back() ? (uint32_t)(e / 16) : marks.back());
     const bool own = !marks.empty();
+    // A wave's own vpdt, played as it is when its events fit this audio: from 0 to the end (frames·16), never back (two at the end are the
+    // XT's own, on 18 of the image's waves), each on a whole sample, in the type's layout (a SOLO event every 10 or 16 halfwords from 8, a
+    // band one every 0x2e or 0x58 from 14; its position a word on).  Events between samples are V-Trainer 1.00's (VP9SAMnoise1, preset 270):
+    // there the port's SOLO player isn't the XT's (VP9SAMnoise1 parts in a few notes from their first block, cause not found; preset 270's
+    // records stop short of its last event), so those are encoded again on their own events, as before (HARDWARE_FIRMWARE.md, v158)
+    bool fits = false;
+    if (stored && irate == 44100 && type != 0 && stored->size() >= 64) {
+        const auto r32 = [&](size_t o) { uint32_t x = 0; if (o + 4 <= stored->size()) std::memcpy(&x, stored->data() + o, 4); return x; };
+        const uint32_t nev = r32(8) >> 16, st = type == 1 ? (ch == 2 ? 16 : 10) : (ch == 2 ? 0x58 : 0x2e), first = type == 1 ? 8 : 14;
+        fits = nev >= 2 && nev < 4096 && (st * (nev - 1) + first) * 2 + 8 <= stored->size() && r32(first * 2 + 4) == 0
+            && (long)r32((st * (nev - 1) + first) * 2 + 4) == frames * 16;
+        for (uint32_t e = 1; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) >= r32((st * (e - 1) + first) * 2 + 4);
+        for (uint32_t e = 0; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) % 16 == 0;
+    }
     if (type == 0 || type == 1) {
         // LITE (0) is the samples alone, as the XT keeps them: no analysis, so nothing to encode.
         // A stereo SOLO wave has the encoder's stereo mode, one list of records from both
@@ -122,8 +137,10 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         // the segments.  With none, the port: the same records as the firmware's, laid out with no event between the start and the end.
         std::vector<XtRecord> recs;
         std::vector<uint8_t> vp;
-        const bool xt = (own ? marks.size() > 2 : depth >= 0)
-            && xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, own ? &marks : nullptr) && xtSoloReadVpdt(vp, ch, recs, P) && P.evPos.size() > 2;
+        if (fits && xtSoloReadVpdt(*stored, ch, recs, P) && P.evPos.size() >= 2 && (long)P.evPos.back() == frames * 16) { vp = *stored; E->stored = true; }
+        else { recs.clear(); P.evPos.clear(); P.evKind.clear(); P.evSeg.clear(); P.segPos.clear(); P.segRec.clear(); P.segFirst.clear(); }
+        const bool xt = E->stored || ((own ? marks.size() > 2 : depth >= 0)
+            && xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, own ? &marks : nullptr) && xtSoloReadVpdt(vp, ch, recs, P) && P.evPos.size() > 2);
         if (!xt) {
             recs = xtSoloEncode(pcm.data(), (int)frames, ch);
             if (recs.size() < 2) return fail("SOLO encoder found no records");
@@ -147,9 +164,10 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         }
         E->channels = ch;
     } else {
-        // A band wave keeps the detection, its own events or not: the band encode also reads each marker's second word, which the
-        // detection takes from the audio and the file doesn't keep (HARDWARE_FIRMWARE.md, "A wave's own events")
-        if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth)) return fail("multi-band encoder failed");
+        // A band wave on its own vpdt, or the detection's encode: its own events alone can't be given, as the band encode also reads
+        // each marker's second word, which the detection takes from the audio and the file doesn't keep (HARDWARE_FIRMWARE.md, "A wave's own events")
+        if (fits) { E->vpdt = *stored; E->stored = true; }
+        else if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt, depth)) return fail("multi-band encoder failed");
         if (!xtFwLoadBands(type, pcm.data(), frames, ch, E->bands)) return fail("band rebuild failed");
         E->wave.vpdt = E->vpdt.data();
         E->wave.vpdtBytes = E->vpdt.size();
