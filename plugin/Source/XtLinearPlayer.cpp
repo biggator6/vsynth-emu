@@ -52,6 +52,18 @@ void XtLinearPlayer::noteOn(const std::vector<float>& left, const std::vector<fl
     beat_.start(tempoCfg, origCfg, liteCfg ? pos * 16 : 0.0f > walk ? frames * 16 : startCfg * 16);
 }
 
+void XtLinearPlayer::liteUpdate(const XtLoop& l, int32_t start, int32_t frames, float walkNow) {
+    bwd.end = start;
+    fwd.end = frames - 1;
+    if (0.0f > walkNow) {                               // 0x8950bec4
+        bwd.b = l.bwdStart; bwd.a = l.bwdEnd; bwd.len = l.bwdEnd - l.bwdStart;
+        bwd.mode = l.on ? l.bwdMode : 0;
+    } else {                                            // 0x8950bf10
+        fwd.a = l.fwdStart; fwd.b = l.fwdEnd; fwd.len = l.fwdEnd - l.fwdStart;
+        fwd.mode = l.on ? l.fwdMode : 0;
+    }
+}
+
 void XtLinearPlayer::seek(int32_t pos16) {
     pos = pos16 >> 4;
     frac = 0.0f;

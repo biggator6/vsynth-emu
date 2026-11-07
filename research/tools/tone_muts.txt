@@ -1083,3 +1083,17 @@ fw-marker-ends|        if (markers->size() < 2 \|\| markers->front() != 0 \|\| m
 check-own-edit|if (ev[1] + 37 * 16 < ev[2]) ev[1] += 37 * 16;|if (ev[1] + 37 * 16 < ev[2]) ev[1] += 37 * 16 + 1;|tonecheck
 check-own-band|encodedEvents(*E2) != (w.type == 1 ? ev : ev0)|encodedEvents(*E2) != ev|tonecheck
 check-own-stride|    const uint32_t stride = E.channels == 2 ? 0x58 : 0x2e;\n    for (uint32_t e = 0; e < (w2 >> 16)|    const uint32_t stride = E.channels == 2 ? 0x2e : 0x58;\n    for (uint32_t e = 0; e < (w2 >> 16)|tonecheck
+xfg-upd-first|    firstF = floatU(start);|    ;|tonelite|12
+xfg-upd-last|    firstF = floatU(start);\n    lastF = floatU(frames - 1);|    firstF = floatU(start);\n    lastF = floatU(frames);|tonelite
+xfg-upd-fwdlen|    fwdLenF = (float)(l.fwdEnd - l.fwdStart);|    fwdLenF = (float)l.fwdEnd;|tonelite
+xfg-upd-mode|    fwdMode = l.on ? l.fwdMode : 0;|    fwdMode = 0;|tonelite
+xfg-upd-mode-bwd|    bwdMode = l.on ? l.bwdMode : 0;|    bwdMode = 0;|tonelite
+lite-update-off|        s.xfg.blockUpdate(rec, s.liteStart, (int32_t)s.wave->frames);\n||tone|12
+lite-update-start|        s.xfg.blockUpdate(rec, s.liteStart, (int32_t)s.wave->frames);|        s.xfg.blockUpdate(rec, waveStart(s, o), (int32_t)s.wave->frames);
+lite-start-lin|        s.liteStart = waveStart(s, o);\n        s.lin.setLite(s.lite);|        s.lin.setLite(s.lite);
+lite-start-xfg|        s.xfg.setStart(waveStart(s, o));\n        s.liteStart = waveStart(s, o);|        s.xfg.setStart(waveStart(s, o));
+lin-update-off|        if (s.lite) s.lin.liteUpdate(rec, s.liteStart, (int32_t)s.wave->frames, s.curWalk);\n||tone|24
+lin-upd-first|    bwd.end = start;\n    fwd.end = frames - 1;|    fwd.end = frames - 1;|tonelin|24
+lin-upd-last|    bwd.end = start;\n    fwd.end = frames - 1;|    bwd.end = start;\n    fwd.end = frames;|tonelin
+lin-upd-mode|        fwd.mode = l.on ? l.fwdMode : 0;|        fwd.mode = 0;|tonelin
+lin-upd-mode-bwd|        bwd.mode = l.on ? l.bwdMode : 0;|        bwd.mode = 0;|tonelin

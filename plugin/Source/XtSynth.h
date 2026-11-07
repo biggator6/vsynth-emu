@@ -386,6 +386,7 @@ private:
         // A LITE wave (type 0) is the voice's kind 1 (the converter at 0x894e2ec0): its own note-on (0x8950b5b0) and update (0x8950bbb0),
         // which take the converters' values as they are, no 70% steps.  Vari off, the linear player; on, XtLitePlayer (mode 2)
         bool lite = false;
+        int32_t liteStart = 0;         // kind 1's +0xc4, the Start Offset as the note's block had it: each knob update gives it to the player again (0x8950bcc0)
         float root = 440.0f;           // the voice's root frequency (+0x9a4), as its setup leaves it at note-on (0x894f21c0)
         bool variBit = true;           // Vari Sw as the voice has it (+0xb4 bit 0x20), what its walk reads: from note-on, then each knob update's end
         bool syncBit = false;          // and Tempo Sync, as the player's byte 0 has it (bit 1), the same way

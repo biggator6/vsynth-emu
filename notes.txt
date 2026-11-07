@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A LITE player's update v157 (2026-11-06), a change only after a LEGATO take on a LITE wave (or a Loop switch moved during a LITE note): v155's open seeds 6 and 8.
+  Each knob update ends, for kind 1, in 0x8950bcc0(voice, block + 0x80): the bits as 0x894f3ec0's, then by the block's mode: 2 (0x8950bdda) the player's first and last
+  samples (+0x138, +0x124) from the voice's +0xc4 and +0xc8, the loops' points from the wave's record, the Loop Modes by the Loop bit; 0 (0x8950bea0) the linear player's
+  +0x10c and +0xf4, and the loop of the way the walk (+0x150) goes. Not the rates. The voice's +0xc4 is the note's own Start Offset; a LEGATO copy (0x894f2d00) brings
+  the earlier player whole, so from its next update it runs to this note's start. Seeds 6 and 8 were LEGATO takes with a new Start Offset (a live move between the notes).
+  XtSynth: OscVoice::liteStart; oscBeat ends with XtLitePlayer::blockUpdate or XtLinearPlayer::liteUpdate (LITE only). xt_tone compares both players' first and last
+  samples and Loop Modes at each update (fcheck's baseline: counts of checks only).
+  Check: seeds 6, 8, 2024, 777, 31337, 9, 4242, 24 at 2000: 0 different. Planted: mutate_tone.py 1060 (14 new; Vari on on seeds 6 and 8, Vari off on 24), none missed. Merged with v156, whose draws moved the cases: the two on 6 and 8 run on 12 (of 37 more seeds, 12, 18, 36, 41 reach the path, clean unplanted).
+  Open: seed 23's LITE section, case 6125: a Vari-off LITE player reads 136,794 samples before its wave, where the check's firmware has other data and the port zeros (at v155 too).
+
 STEP and EVENT on SOLO waves v156 (2026-11-06), no change on a SOLO wave without attacks: with attacks, the XT's own SOLO encode splits its records, and STEP and EVENT play between its events.
   The encode: the band waves' detection (0x895164c0), then the SOLO driver (0x89515e28) in the interpreter, xtFwEncodeSolo; the plan from its vpdt, xtSoloReadVpdt (events, segments, records;
   a stereo wave's second list and stream unread). Without attacks the port's records as before, laid out by xtFwSoloImage. The port's encoder given events isn't the firmware's, so isn't used.
