@@ -73,7 +73,7 @@ PY
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # again: a build takes long enough for it to go
 echo "== $N"
 if [ "$PORT" = solo ]; then
-    B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.out"; rm -rf "$T"; mkdir -p "$T"; i=0
+    B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.out"; rm -rf "${T:?}"; mkdir -p "$T"; i=0
     cd "$WORK/inputs"
     while IFS= read -r spec; do
         i=$((i+1))

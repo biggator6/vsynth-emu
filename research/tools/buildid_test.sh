@@ -1,7 +1,7 @@
 #!/bin/bash
 # buildid_test.sh: plugin/BuildId.cmake on a small git repository of its own, through what a working day does to one.  A second or so.  In verify.sh.
 source "$(dirname "$0")/env.sh"
-T="$WORK/buildid_test"; rm -rf "$T"; mkdir -p "$T/plugin/Source" "$T/research"
+T="$WORK/buildid_test"; rm -rf "${T:?}"; mkdir -p "$T/plugin/Source" "$T/research"
 SCRIPT="$REPO/plugin/BuildId.cmake"
 git -C "$T" init -q; git -C "$T" config user.email t@t; git -C "$T" config user.name t
 n=0; fail=0
@@ -61,6 +61,6 @@ n=$((n+1)); grep -Eq '^#define XT_BUILD_TIME "[0-9]{2} [A-Z][a-z]{2} [0-9]{2}:[0
 
 none=$(mktemp -d)        # outside this checkout, or git finds it
 say "no git: still a build" "$(run "$none")" "unknown"
-rm -rf "$none" "$T.out"
+rm -rf "${none:?}" "${T:?}.out"
 
 [ $fail = 0 ] && echo "build id's script: $n cases as they should be" || { echo "buildid_test: $fail of $n wrong"; exit 1; }
