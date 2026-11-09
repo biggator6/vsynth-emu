@@ -17,3 +17,8 @@ build/
 *.reapeaks
 .claude/settings.local.json
 .claude/worktrees/
+.claude/.claude-packs-backup/
+.claude/state/
+.claude/usage.log
+.claude/hooks.log
+.claude/logs/
