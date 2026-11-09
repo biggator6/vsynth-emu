@@ -3570,6 +3570,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-09) — v161: v146 joins
+
+- The user asked whether everything was ready to push, and it wasn't: master's v146 had never reached this branch, which has a v146 of its own. Each took the next number from its own branch, 26 minutes apart. v141's lesson was about numbers only claimed; this one was committed, and `git log --all` would have shown it.
+- The merge itself was quiet: docs only. The rule it brought did more. Applied to `mutate_files.py`, the one runner written after it, the run with nothing planted failed straight away: four lines `xt_files` had gained since v148 were never in what `mutate.sh` compared. So every files plant from v148 on read caught whatever it did. That's v145's false pass again, in a runner nobody had held to the rule. On the whole section all 49 are still caught, so the files port was never wrong, only unproven.
+- `mutate_tone.py`'s one ERROR came from v160 itself: its full run came before the seek's last change, and only the seek's plants ran after it. A plant elsewhere in the list on the same lines went unseen. Only a whole list run after the last change shows that.
+
 ### Session 16 addendum (2026-11-09) — v160: preset 270's records
 
 - The user asked for preset 270 too. The listing was short and plain: the event's jump starts its record by the mark, the seek resets the record at each segment it steps into, and the port had taken all of it from the records' running sum, which no other wave could tell apart. Ported that way, the forced run went from 64 differing cases to none on the first try.
@@ -3693,3 +3699,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `OSC n Start Offset` is 32 bits, and `1u << 32` gave a mask of 0. The firmware's reads caught it, in 5 of 520,256, which is why they're compared and not just the ranges.
 - The stored SOLO records were the check I'd hoped for on RDAC: encode the unpacked audio and compare. None of 18 equal, as other encoders wrote them, from audio before the packing. It says nothing either way. Running the firmware's own routine is what the exactness rests on, with the two routes through it compared.
 - The plants found a hole: with the fill of defaults removed, nothing changed, as every patch in the image is full length. `xt_files` now cuts one. My first version of that used the first patch, which leaves the Multi Step Modulator at its defaults, so it couldn't tell a cut from no cut, and the next plant showed that too. It now picks the patch that uses it most.
+
+### Session 17 (2026-11-05) — v146: the planted-error runners
+
+- v145 left the other runners unchecked for its false pass. Running them with no ROM found it in `mutate_fx.py --control`: it treats too few result lines as a crash, and a run that never started has none.
+- My first guard was too early. It checked the ROM before the build, and the mid-run test still read "caught" on its first plant. I can't be sure which side of the guard the ROM went on in that test, but a build takes seconds, so the gap was real. It now checks again just before the run, and the test removes the ROM during the build, so it isn't a race any more.
+- A plant that kills the run has been reading as no difference on the encoder's waves and the solo cases, the opposite of what the headers said. No plant in the lists happens to do that, so no verdict changed. It's a check that nothing had tested.

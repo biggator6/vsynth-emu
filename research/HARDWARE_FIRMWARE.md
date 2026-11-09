@@ -1546,6 +1546,30 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### v146 joins (2026-11-09, v161)
+
+This merges master's v146, the planted-error runners, with v160, on the user's word. There was no new firmware to read, and no change to the sound.
+
+**Two commits carry v146.** This branch's is the firmware image found by itself (2026-11-04 23:34); master's, the planted-error runners, was made from v145 on master 26 minutes later. Both keep their number, as renumbering would rewrite fifteen commits. These lists keep version order, so master's v146 sits after v147, and the branch's v146 has no section of its own here. **Only the docs conflicted.** The runners' changes to `mutate.sh` merged cleanly with this branch's ports for `XtFiles`, `XtLinearPlayer`, `XtLitePlayer` and `XtPatch`, and its timeout.
+
+**The rule, applied to `mutate_files.py`, found a false pass.** That runner came after master's v146, so it had no run with nothing planted. Given one, it failed: 4 lines differed with nothing planted. `xt_files` gained `typed:` and `a wave's own` in v148 and `vpno:` and `vpdt:` in v155, but `mutate.sh`'s files ports took only the `rdac`, `patches` and `short` lines from the baseline. So every plant since v148 read caught on those lines alone, and the 49 of v156 and v158 said nothing. `mutate.sh` now takes the baseline's whole `xt_files` section, and a line of it the run doesn't print counts as different, as a wave with no result does for the encoder.
+
+**A plant v160 left behind.** `solo-start-seek-anchor` (v152) planted on `f0n = f;` then `anchor = recStart;`, which v160's seek no longer has: it read ERROR. v160 ran the whole list before the seek's last change and only the seek's plants after it, so this one wasn't seen. It now drops the seek's closing `anchor = recStart;`, as it always did, and is caught at case 13.
+
+**The result.**
+
+| | |
+|---|---|
+| `verify.sh --full` | fcheck as the baseline, 664 checks, all 162 sections run. A/B 4/4 identical to v160, PluginTest 4/4, through the chip 4/4, and its other lines as v160's: the panel, the layout, the ROM search, patches applied, stored waves, engine tests, auval |
+| `mutate_files.py` | 49 planted, 0 missed, on the whole section; a plant that changes one line reads 2, the line it printed and the baseline's it didn't (20 minutes) |
+| `mutate_tone.py` | 1138 planted, 0 missed, after `solo-start-seek-anchor` was moved |
+| `mutate_enc.py` | 34 planted, 0 missed |
+| `mutate_fx.py` | 97 planted, the same 2 missed (v126) |
+| `mutate_fx.py --control`, at 60 events | 157 planted, the same 1 missed (v138) |
+| No ROM, a junk ROM | `mutate_files.py` stops, saying why |
+
+`mutate_panel.py` wasn't run: nothing it plants in or runs changed.
+
 ### A SOLO record's start by its segment and by its mark: preset 270 on its stored vpdt (2026-11-09, v160)
 
 v159 left preset 270 encoded again (the user asked for it to be ported). Every V-Synth wave there is now plays its stored `vpdt`: 454 of 504 in `xt_tone`'s list, the 50 others LITE waves and plain WAVs.
@@ -2046,6 +2070,24 @@ A patch cut short, as the image has none: one using the Multi Step Modulator in 
 **The disk image** (`V-SynthXTDiskImage.bin.0.bin`): a FAT16 partition from sector 32 for 47968 sectors, with `Internal.prj` (512 `.p00`, 224 `.w00` of about 32 bytes each) and `Internal.vc2` (128 `.p02`, 58 `.w02`). Its files are fragmented: scanning for `SVD0` gave 19,474 values out of range where reading through the FAT gives 12. After the partition, 416 streams of a wave's chunks, 268 SOLO, 135 BACKING, 13 ENSEMBLE, 19.8 million frames, 49 stereo. 224 of 1stchoice's 250 waves have a `data` chunk byte for byte equal to one of them, so these are plainly the preset waves (rom.2 calls the place `V:\Preset.prj\Wave\`). They carry no names; 1stchoice gives those 224 theirs. All 416 equal the firmware's whole-wave routines, mono and stereo, with a block's edge 0.999 of the mean step. Over them and 1stchoice's, 84% of the 340 loops tested meet within 3 steps. Their stored SOLO records don't equal `xtSoloEncode`'s on the unpacked audio, none of 18: other encoders, and that audio is what the packing left. So that isn't a check of RDAC either way.
 
 **Not done:** applying a patch to the plugin's parameters, which needs each ID's way back to a `Controls` field (`patchOf` in `XtToneCheck.cpp` is the way there); zones (v154); what links a `.w00` to a stream; playing a wave on its stored records and not a new encode; LITE (v153).
+
+### The planted-error runners (2026-11-05, v146)
+
+v145 found `mutate_panel.py` passing plants on a missing ROM. So the others were run with no ROM as well:
+
+| Runner | With no ROM, a plant read | |
+|---|---|---|
+| `mutate_fx.py` | ERROR | right |
+| `mutate_fx.py --control` | caught, "stopped: it crashed" | a false pass, as it counted too few result lines as a crash |
+| `mutate_enc.py` | MISSED | wrong: it blames the check |
+| `mutate_tone.py` | ERROR | right |
+| `mutate_tone.py`, solo cases | MISSED | wrong: it blames the check |
+
+Past results aren't in doubt: those runs had the ROM, and the verdicts came out the same when run again.
+
+**The fix.** `mutate.sh` refuses to run with no ROM, both before the build and before the run, as a build takes long enough for it to go. Each runner first runs with nothing planted and stops unless that's clean. A wave or `solocmp` case that dies now counts as different, as the runners' headers already said; it had read as no difference, since a run that dies prints nothing for the pattern to match.
+
+**The check.** No ROM and a junk ROM stop all five runs, saying why. A ROM removed during a plant's build gives ERROR on all five plants tried. A plant that aborts counts on all 275 waves and all 32 solo cases. With the real ROM no verdict changed: `mutate_fx.py` 97, the 2 missed that v126 explains; `--control` 157, the 1 missed at 60 events since v138, caught at 200; `mutate_enc.py` 34 and `mutate_tone.py` 796, none missed.
 
 ### The Effects tab in cards (2026-11-04, v145)
 

@@ -2,7 +2,8 @@
 # mutate_enc.py [name ...]: every deliberate error in enc_muts.txt (or the named ones),
 # each planted in XtSoloEncoder.cpp by mutate.sh (PORT=enc) and run through xt_enc on
 # fcheck's waves.  One line each: caught and on how many waves, MISSED, or ERROR when the
-# old text is no longer in the source.  enc_muts.txt: name|old|new, with \n and \| escaped.
+# old text is no longer in the source or the run never started.  It stops first if a run with
+# nothing planted doesn't equal the baseline.  enc_muts.txt: name|old|new, with \n and \| escaped.
 import os, re, subprocess, sys
 D = os.path.dirname(os.path.abspath(__file__))
 names = sys.argv[1:]
@@ -18,9 +19,15 @@ if names:
     unknown = set(names) - {m[0] for m in muts}
     if unknown: sys.exit('mutate_enc: not in enc_muts.txt: ' + ' '.join(sorted(unknown)))
     muts = [m for m in muts if m[0] in names]
+PATTERN = 'different|DIFFERENT|no result|TILE'
+if muts:   # with nothing planted: the old text put back as it was.  If this run fails, no plant would mean anything.
+    r = subprocess.run(['bash', D + '/mutate.sh', '_control', muts[0][1], muts[0][1], '0', PATTERN], env=env, capture_output=True, text=True)
+    n = re.search(r'^enc: (\d+) waves', r.stdout, re.M)
+    if not n or int(n.group(1)) != 0:
+        sys.exit('mutate_enc: the run with nothing planted fails, so no plant would mean anything: ' + ((r.stdout + r.stderr).strip().splitlines() or ['no output'])[-1][:120])
 missed = errors = 0
 for m in muts:
-    r = subprocess.run(['bash', D + '/mutate.sh', m[0], m[1], m[2], '0', 'different|DIFFERENT|no result|TILE'], env=env, capture_output=True, text=True)
+    r = subprocess.run(['bash', D + '/mutate.sh', m[0], m[1], m[2], '0', PATTERN], env=env, capture_output=True, text=True)
     out = r.stdout + r.stderr
     n = re.search(r'^enc: (\d+) waves', out, re.M)
     if not n: errors += 1; print('ERROR  ', m[0].ljust(16), (out.strip().splitlines() or [''])[-1][:100]); continue

@@ -12,6 +12,7 @@
 # the change is exact (e.g. a product of powers of two regrouped).
 source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
+[ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # a run that can't start must never read as a result; no "== name" follows
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
 if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ] || [ "$PORT" = toneband ] || [ "$PORT" = tonecheck ] || [ "$PORT" = tonefw ] || [ "$PORT" = toneosc ] || [ "$PORT" = tonelfo ] || [ "$PORT" = toneenv ] || [ "$PORT" = tonesolo ] || [ "$PORT" = tonelin ] || [ "$PORT" = tonelite ] || [ "$PORT" = tonepatch ] || [ "$PORT" = tonefiles ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
@@ -69,6 +70,7 @@ if s.count(sys.argv[3]) == 0: sys.exit('mutate: the old text is not in ' + sys.a
 open(sys.argv[2], 'w').write(s.replace(sys.argv[3], sys.argv[4], 1))
 PY
 "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -D$D "${EXTRA[@]}" -I"$S" "$M/$N.cpp" "${L[@]}" -o "$M/$N" 2>&1 | grep -E " error" && exit 1
+[ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # again: a build takes long enough for it to go
 echo "== $N"
 if [ "$PORT" = solo ]; then
     B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.out"; rm -rf "$T"; mkdir -p "$T"; i=0
@@ -83,9 +85,12 @@ if [ "$PORT" = solo ]; then
     exit
 fi
 if [ "$PORT" = files ] || [ "$PORT" = filesfw ]; then
-    B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.base"; grep -E '^(rdac|patches|short): ' "$B" > "$T"
-    "$M/$N" "$ROM" 2>/dev/null | grep -vxF -f "$T" > "$M/$N.out"
-    st=${PIPESTATUS[0]}; [ "$st" -ge 128 ] && echo "x: the run died, signal $((st - 128))" >> "$M/$N.out"
+    # the baseline's whole xt_files section, as xt_files gains lines (v148, v155): a line the run prints that isn't in it differs, and one of it the run doesn't print
+    B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.base"; awk '/^== /{s = ($0 == "== xt_files"); next} s' "$B" > "$T"
+    "$M/$N" "$ROM" 2>/dev/null > "$M/$N.all"; st=$?
+    grep -vxF -f "$T" "$M/$N.all" > "$M/$N.out"
+    grep -vxF -f "$M/$N.all" "$T" | sed 's/^/missing: /' >> "$M/$N.out"
+    [ "$st" -ge 128 ] && echo "x: the run died, signal $((st - 128))" >> "$M/$N.out"
     grep -E "$P" "$M/$N.out"
     echo "files: $(grep -c . "$M/$N.out") lines differ from the baseline"
     exit
@@ -93,7 +98,9 @@ fi
 if [ "$PORT" = enc ]; then
     B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.base"; grep '^enc ' "$B" > "$T"
     cd "$WORK/inputs"
-    sed -n 's/^enc \([^:]*\(:2\)\{0,1\}\): .*/\1/p' "$T" | xargs -n 1 -P "${JOBS:-8}" "$M/$N" "$ROM" cmp 2>/dev/null | grep -vxF -f "$T" > "$M/$N.out"
+    sed -n 's/^enc \([^:]*\(:2\)\{0,1\}\): .*/\1/p' "$T" | xargs -n 1 -P "${JOBS:-8}" "$M/$N" "$ROM" cmp 2>/dev/null > "$M/$N.all"
+    grep -vxF -f "$T" "$M/$N.all" > "$M/$N.out"
+    while IFS= read -r w; do grep -qF "enc $w: " "$M/$N.all" || echo "enc $w: no result" >> "$M/$N.out"; done < <(sed -n 's/^enc \([^:]*\(:2\)\{0,1\}\): .*/\1/p' "$T")   # a wave the run died on differs too
     grep -E "$P" "$M/$N.out"
     echo "enc: $(grep -c . "$M/$N.out") waves differ from the baseline"
     exit

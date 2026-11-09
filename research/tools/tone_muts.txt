@@ -916,7 +916,7 @@ solo-start-stop-turned|const int32_t lo = (f3 & 8) ? 0 : startPos16;|const int32
 solo-start-anchor|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|0.0 >= recStart|tonesolo|31337
 solo-start-anchor-turned|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|startPos16 / 16.0 >= recStart|tonesolo
 solo-start-grains|    const int32_t at = (int32_t)std::lround(recStart * 16.0);|    const int32_t at = Pi;|tonesolo
-solo-start-seek-anchor|    f0n = f;\n    anchor = recStart;|    f0n = f;|tonesolo
+solo-start-seek-anchor|        f0n = f;\n    }\n    anchor = recStart;\n}|        f0n = f;\n    }\n}|tonesolo
 solo-start-backward|else seekTo(walk < 0.0f ? endStop16 : startPos16);|else seekTo(startPos16);|tonesolo
 band-start|(int)S.rd32(S.entry(S.evStart) + 4) : startCfg * 16;|(int)S.rd32(S.entry(S.evStart) + 4) : 0;|toneband
 lin-start|    bwd.end = startCfg;|    bwd.end = 0;|tonelin
