@@ -23,7 +23,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## Where things are
 - `plugin/Source/`: `XtBuildId` (which build this is, from git at each build by `plugin/BuildId.cmake`; shown under the wordmark), `XtFxChip` (the effect chip; `xt_fx`), `XtFxControl` (the firmware's effect driver in the interpreter, off the audio thread, feeding the chip through a queue; and `XtFxUnit`, the two with the frame's way through, in the sound behind the plugin's Effects switch; `xt_fx control`), `FxPanel` (the editor's page for them, by `xtFxCatalog`'s names and ranges from rom.2, and `XtFxValueText`, each value's text by the firmware's own routine), `XtSynth` (the synth: voices, controls, tick), the ports
   (`XtOsc`, `XtAnalog`, `XtEnvelope`, `XtLfo`, `XtCosm`, `XtKeys.h`, `XtSoloVoice`, `XtLinearPlayer` (Vari off, and LITE with it off), `XtLitePlayer` (LITE, Vari on),
-  `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFiles` (V-Synth's wave and patch files), `XtPatch` (a patch's zone as `XtSynth::Controls`) and `XtVpwFormat` (a `.vpw` as a JUCE format), `XtFirmware` (firmware harness: runs
+  `XtMultiBandPlayer`, `XtBeat.h`, `XtSoloEncoder`), `XtFiles` (V-Synth's wave and patch files; a wave's chunks in `XtWaveFile.cpp`), `XtPatch` (a patch's zone as `XtSynth::Controls`) and `XtVpwFormat` (a `.vpw` as a JUCE format), `XtFirmware` (firmware harness: runs
   rom.2 routines), `XtFloat.h` (SH-4 single precision), `PluginProcessor`/
   `PluginEditor`. Each port's firmware check is its `XT_*_MAIN` block; `XtToneCheck`
   (`XT_TONE_MAIN`) is XtSynth's: a whole firmware tone against it.
@@ -65,7 +65,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=tonecosm`: xt_tone, XtCosm.cpp; `PORT=toneanalog`: xt_tone, XtAnalog.cpp;
   `PORT=toneband`: xt_tone, XtMultiBandPlayer.cpp; `PORT=tonelite`: xt_tone, XtLitePlayer.cpp; `PORT=tonecheck`: xt_tone,
   XtToneCheck.cpp; `PORT=tonefw`: xt_tone, XtFirmware.cpp; `PORT=toneosc`: xt_tone, XtOsc.cpp; `PORT=tonelin`: xt_tone, XtLinearPlayer.cpp; `PORT=tonelfo`: xt_tone, XtLfo.cpp;
-  `PORT=toneenv`: xt_tone, XtEnvelope.cpp; `PORT=tonesolo`: xt_tone, XtSoloVoice.cpp; `PORT=tonepatch`: xt_tone, XtPatch.cpp; `PORT=tonefiles`: xt_tone, XtFiles.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
+  `PORT=toneenv`: xt_tone, XtEnvelope.cpp; `PORT=tonesolo`: xt_tone, XtSoloVoice.cpp; `PORT=tonepatch`: xt_tone, XtPatch.cpp; `PORT=tonefiles`: xt_tone, XtFiles.cpp; `PORT=tonewave`: xt_tone, XtWaveFile.cpp; `SEED=<n>`: xt_tone's seed, default 2024; `PORT=solo`: xt_fw
   solocmp on the baseline's cases, XtSoloVoice.cpp; `PORT=enc`: xt_enc on the baseline's waves, XtSoloEncoder.cpp)
   and runs it, to show the check catches it (a run the error crashes counts, and one it hangs, stopped after MUT_TIMEOUT seconds, default 1500). `mutate_tone.py [cases]`: the list in
   `tone_muts.txt` (`name|old|new[|port[|seed]]`; port `solo` for what only `solocmp` reaches; seed for what the default seed's cases don't reach), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
@@ -83,7 +83,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - `sh4dis.py <addr> <n> ...`: a linear SH-4 listing of rom.2, no Ghidra. Ghidra's project won't open under a path holding `.claude`, so
   `ghidra.sh` fails in a worktree; run `analyzeHeadless` on the main checkout's `firmware/ghidra` instead.
 - `xt_tone` opens with every zone of the image's patches against `patchOf`, then runs 512 of them and random cases on tuned waves through the whole tone; `XT_TONE_PATCHES=<folder>` for a project's. `TEST_PATCH_APPLY=1` (`pt.sh`'s binary; `TEST_PATCH_DIR=<folder>` besides): the same through the plugin's parameters, and a project on disk. `TEST_SNAPSHOT_PATCH=file.p00` draws the editor with one loaded. `TEST_PATCH_PLAY=<folder>` (`TEST_PATCH_EVERY=n`) loads and plays a project's patches, with each one's peak and what isn't here.
-- `xt_files <rom>` (in fcheck, about 8 s; `build/tools/fcheck/bin`): the disk image's preset waves against the firmware's whole-wave routines and its patches' values against its reads; `XT_FILES_FIRST=1` says what differs. `wave <file.vpw> [out.raw]`, `patch <file.p00> [lo hi]`, `extract <n> <out.vpw>`. `mutate_files.py [names]`: the planted errors in `files_muts.txt`, through `PORT=files` or `PORT=filesfw mutate.sh`, against the baseline's whole `xt_files` section, about 20 minutes.
+- `xt_files <rom>` (in fcheck, about 8 s; `build/tools/fcheck/bin`): the disk image's preset waves against the firmware's whole-wave routines and its patches' values against its reads; `XT_FILES_FIRST=1` says what differs. `wave <file.vpw> [out.raw]`, `patch <file.p00> [lo hi]`, `extract <n> <out.vpw>`. `mutate_files.py [names]`: the planted errors in `files_muts.txt`, through `PORT=files`, `PORT=wavefile` (XtWaveFile.cpp) or `PORT=filesfw mutate.sh`, against the baseline's whole `xt_files` section, about 20 minutes.
 - `fxmap.cpp` (not in build.sh; build line at its top): the firmware's effect driver in the interpreter. `table`: per type, program, active words, what
   an update writes, memory operations. `mfx <type> [i v]`: a type's words as fields, and what wrote each. `boot`: what's loaded. Output goes in `build/`.
 - `fxchip.cpp` (the same): a throwaway model of the effect chip, to test the decoding; a sine or impulse into a frame pair, gains at its slots. Not a port.
@@ -103,7 +103,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing
   a difference, not as a routine.
-- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes). If `XtFxChip.cpp` changed: `mutate_fx.py`. If `XtFxControl.cpp` changed: `mutate_fx.py --control` and `fxthreads.sh`. If `FxPanel.cpp`, `XtFxValueText` or the effects' wiring in `PluginProcessor.cpp` changed: `mutate_panel.py`. If `PluginEditor.cpp` or `UiParts.h` changed: `mutate_panel.py --editor`. If `XtFiles.cpp` or the file routines in `XtFirmware.cpp` changed: `mutate_files.py`. If the ROM search changed: `mutate_panel.py` with the seven `rom-` names, about 4 minutes.
+- If `XtSoloEncoder.cpp` changed: `mutate_enc.py` as well (about 8 minutes). If `XtFxChip.cpp` changed: `mutate_fx.py`. If `XtFxControl.cpp` changed: `mutate_fx.py --control` and `fxthreads.sh`. If `FxPanel.cpp`, `XtFxValueText` or the effects' wiring in `PluginProcessor.cpp` changed: `mutate_panel.py`. If `PluginEditor.cpp` or `UiParts.h` changed: `mutate_panel.py --editor`. If `XtFiles.cpp`, `XtWaveFile.cpp` or the file routines in `XtFirmware.cpp` changed: `mutate_files.py`. If the ROM search changed: `mutate_panel.py` with the seven `rom-` names, about 4 minutes.
 - Before a push: `verify.sh --full`.
 
 ## Firmware facts worth knowing

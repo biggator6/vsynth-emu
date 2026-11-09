@@ -6,9 +6,9 @@
 #include <mutex>
 
 namespace {
-uint32_t le32(const uint8_t* p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
+using xtfile::le32;
 uint32_t be32(const uint8_t* p) { return (uint32_t)p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3]; }
-bool fail(std::string* why, const char* what) { if (why) *why = what; return false; }
+using xtfile::fail;
 
 // The descriptors: 12 bytes an ID from 0x897a167c, u16 byte offset, s8 width (its size is what counts), u8 bit, u16 centre, default, min, max.
 constexpr int kDescIds = 0x55d;
@@ -141,77 +141,7 @@ int xtPatchValue(const std::vector<uint8_t>& store, int id, int zone, int cosm) 
     return v - d->centre;
 }
 
-// ── A wave ───────────────────────────────────────────────────────────────────
-
-bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* why) {
-    out = {};
-    const uint8_t* vpfl = nullptr; const uint8_t* vpsc = nullptr; const uint8_t* vplp = nullptr; const uint8_t* vpno = nullptr; const uint8_t* data = nullptr;
-    const uint8_t* vpdt = nullptr;
-    uint32_t nFl = 0, nSc = 0, nLp = 0, nNo = 0, nData = 0, nDt = 0;
-    // A project's .wav is a RIFF round the same chunks
-    size_t i = size >= 12 && !std::memcmp(file, "RIFF", 4) && !std::memcmp(file + 8, "WAVE", 4) ? 12 : 0;
-    while (i + 8 <= size && !data) {
-        const uint32_t n = le32(file + i + 4);
-        if (n > size - i - 8) return fail(why, "a chunk runs past the end");
-        const uint8_t* body = file + i + 8;
-        if (!std::memcmp(file + i, "vpfl", 4)) { vpfl = body; nFl = n; }
-        else if (!std::memcmp(file + i, "vpsc", 4)) { vpsc = body; nSc = n; }
-        else if (!std::memcmp(file + i, "vplp", 4)) { vplp = body; nLp = n; }
-        else if (!std::memcmp(file + i, "vpno", 4)) { vpno = body; nNo = n; }
-        else if (!std::memcmp(file + i, "vpdt", 4)) { vpdt = body; nDt = n; }
-        else if (!std::memcmp(file + i, "data", 4)) { data = body; nData = n; }
-        i += 8 + (size_t)n + (n & 1);
-    }
-    out.size = i < size ? i : size;
-    // A project's LITE wave is a RIFF with vpsc and vplp but no vpfl, and its samples as they are (Emu_test's 005, 348)
-    const bool riff = size >= 12 && !std::memcmp(file, "RIFF", 4);
-    if (!vpsc || nSc < 8 || !data || (!vpfl && !riff) || (vpfl && nFl < 44)) return fail(why, "not a V-Synth wave");
-    const bool linear = !vpfl || !std::memcmp(vpfl + 40, "LINR", 4);
-    if (!linear && std::memcmp(vpfl + 40, "RDAC", 4)) return fail(why, "neither RDAC nor plain samples");
-    // 0x8952ee80 checks the data's first two bytes; the next six are nothing the firmware reads.
-    if (!linear && (nData < 8 || data[0] != 0 || data[1] != 8)) return fail(why, "an RDAC wave without its header");
-    out.encodeType = vpsc[1];
-    out.channels = vpsc[2] ? 2 : 1;
-    out.frames = (long)le32(vpsc + 4);
-    if (nSc >= 32) {
-        out.originalKey = (int8_t)vpsc[0xa];
-        out.headerCents = (int32_t)le32(vpsc + 0x18);
-        out.tempo = (int32_t)le32(vpsc + 0x1c);
-    }
-    out.loopEnd = out.bwdEnd = out.frames - 1;   // a wave with no loop record: all of it
-    if (vplp && nLp >= 28) {
-        out.tune = (int32_t)le32(vplp);
-        out.loopStart = (long)le32(vplp + 4); out.loopEnd = (long)le32(vplp + 8);
-        out.bwdEnd = (long)le32(vplp + 0xc); out.bwdStart = (long)le32(vplp + 0x10);
-        out.loopRateFwd = (int16_t)(vplp[0x14] | (vplp[0x15] << 8)); out.loopRateBwd = (int16_t)(vplp[0x16] | (vplp[0x17] << 8));
-        out.fwdMode = vplp[0x18]; out.bwdMode = vplp[0x19];
-        out.loopSwitchDecides = vplp[0x1a] != 0;
-        out.tuneFine = (int8_t)vplp[0x1b];
-    }
-    if (vpno && nNo >= 12) {
-        out.vpnoCount = (int)le32(vpno + 4);
-        for (uint32_t k = 12; k + 2 <= nNo; k += 2) out.vpno.push_back((uint16_t)(vpno[k] | vpno[k + 1] << 8));
-    }
-    if (vpdt && nDt >= 12 && (out.encodeType == 1 || out.encodeType == 3 || out.encodeType == 5)) {
-        out.vpdt.assign(vpdt, vpdt + nDt);
-        const uint32_t nev = le32(vpdt + 8) >> 16;
-        const uint32_t stride = out.encodeType == 1 ? (out.channels == 2 ? 16 : 10) : (out.channels == 2 ? 0x58 : 0x2e), first = out.encodeType == 1 ? 8 : 14;
-        for (uint32_t e = 0; e < nev && e < 4096; ++e) {
-            const uint32_t at = (stride * e + first) * 2 + 4;
-            if (at + 4 > nDt) { out.events.clear(); break; }
-            out.events.push_back((int32_t)le32(vpdt + at));
-        }
-    }
-    if (linear) {
-        const size_t want = (size_t)out.frames * (size_t)out.channels;
-        if (nData / 2 < want) return fail(why, "fewer samples than the header says");
-        out.pcm.resize(want);
-        for (size_t k = 0; k < want; ++k) out.pcm[k] = (int16_t)(data[2 * k] | data[2 * k + 1] << 8);
-        return true;
-    }
-    if (!xtFwRdacDecode(data + 8, nData - 8, out.frames, out.channels, out.pcm)) return fail(why, "the firmware's decoder failed (no ROM?)");
-    return true;
-}
+// A wave: xtWaveRead is in XtWaveFile.cpp (v169).
 
 // ── A patch ──────────────────────────────────────────────────────────────────
 

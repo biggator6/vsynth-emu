@@ -11,9 +11,9 @@ width-sign|const int width = std::abs(d->width), total|const int width = d->widt
 range-default|if (d->min != d->max && (v < d->min \|\| v > d->max)) v = d->def;|
 range-equal|if (d->min != d->max && (v < d->min|if ((v < d->min
 centre|return v - d->centre;|return v;
-stereo-flag|out.channels = vpsc[2] ? 2 : 1;|out.channels = 1;
-frames-word|out.frames = (long)le32(vpsc + 4);|out.frames = (long)le32(vpsc + 8);
-header-kept|xtFwRdacDecode(data + 8, nData - 8,|xtFwRdacDecode(data, nData,
+stereo-flag|out.channels = vpsc[2] ? 2 : 1;|out.channels = 1;|wavefile
+frames-word|out.frames = (long)le32(vpsc + 4);|out.frames = (long)le32(vpsc + 8);|wavefile
+header-kept|xtFwRdacDecode(data + 8, nData - 8,|xtFwRdacDecode(data, nData,|wavefile
 fat-chain|c = (uint32_t)(d[fat + 2 * (size_t)c] \| d[fat + 2 * (size_t)c + 1] << 8);|c = c + 1;
 name-shift|name += (char)((((data[at] << 8 \| data[at + 1]) >> (9 - shift)) & 0x7f));|name += (char)((((data[at] << 8 \| data[at + 1]) >> (8 - shift)) & 0x7f));
 prev-reset|prev[k] = (uint32_t)(int32_t)(int16_t)r0;|prev[k] = 0;|filesfw
@@ -22,28 +22,28 @@ past-end|at + i < n && at + i < bytes ? src[at + i] : 0|at + i < bytes ? src[at 
 no-defaults|c.write(kFile, data, bytes);\n    if (!c.call(0x8947dae0|std::memset(c.ptr(kFile, 0x14fa), 0, 0x14fa); c.write(kFile, data, bytes);\n    if (!c.call(0x8947dae0|filesfw
 no-upgrade|c.read(kStore, store.data(), store.size());|c.read(kFile, store.data(), store.size());|filesfw
 short-length|bytes = std::min<size_t>({ (size_t)be32(file + 0x1c), size - at, (size_t)kXtPatchBytes });|bytes = std::min<size_t>({ size - at, (size_t)kXtPatchBytes });
-wave-key|out.originalKey = (int8_t)vpsc[0xa];|out.originalKey = (int8_t)vpsc[0xb];
-wave-cents|out.headerCents = (int32_t)le32(vpsc + 0x18);|out.headerCents = (int32_t)le32(vpsc + 0x14);
-wave-tempo|out.tempo = (int32_t)le32(vpsc + 0x1c);|out.tempo = 1200000;
-wave-tune|out.tune = (int32_t)le32(vplp);|out.tune = 0;
-wave-bwd|out.bwdEnd = (long)le32(vplp + 0xc); out.bwdStart = (long)le32(vplp + 0x10);|out.bwdStart = (long)le32(vplp + 0xc); out.bwdEnd = (long)le32(vplp + 0x10);
-wave-modes|out.fwdMode = vplp[0x18]; out.bwdMode = vplp[0x19];|out.fwdMode = vplp[0x19]; out.bwdMode = vplp[0x18];
-wave-switch|out.loopSwitchDecides = vplp[0x1a] != 0;|out.loopSwitchDecides = vplp[0x1a] == 0;
-wave-fine|out.tuneFine = (int8_t)vplp[0x1b];|out.tuneFine = (uint8_t)vplp[0x1b];
-riff-start|file + 8, "WAVE", 4) ? 12 : 0;|file + 8, "WAVE", 4) ? 0 : 0;
-linr-tag|const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|const bool linear = !vpfl;
-linr-short|if (nData / 2 < want) return fail(why, "fewer samples than the header says");|;
+wave-key|out.originalKey = (int8_t)vpsc[0xa];|out.originalKey = (int8_t)vpsc[0xb];|wavefile
+wave-cents|out.headerCents = (int32_t)le32(vpsc + 0x18);|out.headerCents = (int32_t)le32(vpsc + 0x14);|wavefile
+wave-tempo|out.tempo = (int32_t)le32(vpsc + 0x1c);|out.tempo = 1200000;|wavefile
+wave-tune|out.tune = (int32_t)le32(vplp);|out.tune = 0;|wavefile
+wave-bwd|out.bwdEnd = (long)le32(vplp + 0xc);\n    out.bwdStart = (long)le32(vplp + 0x10);|out.bwdStart = (long)le32(vplp + 0xc);\n    out.bwdEnd = (long)le32(vplp + 0x10);|wavefile
+wave-modes|out.fwdMode = vplp[0x18];\n    out.bwdMode = vplp[0x19];|out.fwdMode = vplp[0x19];\n    out.bwdMode = vplp[0x18];|wavefile
+wave-switch|out.loopSwitchDecides = vplp[0x1a] != 0;|out.loopSwitchDecides = vplp[0x1a] == 0;|wavefile
+wave-fine|out.tuneFine = (int8_t)vplp[0x1b];|out.tuneFine = (uint8_t)vplp[0x1b];|wavefile
+riff-start|file + 8, "WAVE", 4) ? 12 : 0;|file + 8, "WAVE", 4) ? 0 : 0;|wavefile
+linr-tag|const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|const bool linear = !vpfl;|wavefile
+linr-short|if ((linear ? nData / 2 : nData - 8) < want) return fail(why, "fewer samples than the header says");|;|wavefile
 typed-slot|const int v = xtPatchValue(store, base + d->slot, zone, cosm);|const int v = xtPatchValue(store, base + d->slot + 4, zone, cosm);
 typed-base|table[(size_t)i] = { p[0], s16(2), s16(4), s16(6) };|table[(size_t)i] = { p[0] + 1, s16(2), s16(4), s16(6) };
 typed-range|return v < d->min \|\| v > d->max ? d->def : v;|return v;
 typed-default|{ p[0], s16(2), s16(4), s16(6) }|{ p[0], s16(4), s16(4), s16(6) }
-lite-riff|    const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|    const bool linear = vpfl && !std::memcmp(vpfl + 40, "LINR", 4);
-lite-novpsc|if (!vpsc \|\| nSc < 8 \|\| !data \|\| (!vpfl && !riff)|if (!data \|\| (!vpfl && !riff)
-vpno-chunk|        else if (!std::memcmp(file + i, "vpno", 4)) { vpno = body; nNo = n; }\n|
-vpno-count|        out.vpnoCount = (int)le32(vpno + 4);|        out.vpnoCount = (int)le32(vpno + 8);
-vpno-list-from|        for (uint32_t k = 12; k + 2 <= nNo; k += 2)|        for (uint32_t k = 10; k + 2 <= nNo; k += 2)
-vpno-list-end|        for (uint32_t k = 12; k + 2 <= nNo; k += 2)|        for (uint32_t k = 12; k + 4 <= nNo; k += 2)
-vpdt-solo-stride|out.encodeType == 1 ? (out.channels == 2 ? 16 : 10)|out.encodeType == 1 ? (out.channels == 2 ? 10 : 16)
-vpdt-band-first|first = out.encodeType == 1 ? 8 : 14;|first = out.encodeType == 1 ? 8 : 16;
-vpdt-count|const uint32_t nev = le32(vpdt + 8) >> 16;|const uint32_t nev = (le32(vpdt + 8) >> 16) - 1;
-vpdt-lite|(out.encodeType == 1 \|\| out.encodeType == 3 \|\| out.encodeType == 5)) {\n        out.vpdt.assign|(out.encodeType == 3 \|\| out.encodeType == 5)) {\n        out.vpdt.assign
+lite-riff|    const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|    const bool linear = vpfl && !std::memcmp(vpfl + 40, "LINR", 4);|wavefile
+lite-novpsc|if (!vpsc \|\| nSc < 8 \|\| !data \|\| (!vpfl && !riff)|if (!data \|\| (!vpfl && !riff)|wavefile
+vpno-chunk|"vplp", "vpno", "vpdt"|"vplp", "vpnX", "vpdt"|wavefile
+vpno-count|        out.vpnoCount = (int)le32(vpno + 4);|        out.vpnoCount = (int)le32(vpno + 8);|wavefile
+vpno-list-from|        for (uint32_t k = 12; k + 2 <= nNo; k += 2)|        for (uint32_t k = 10; k + 2 <= nNo; k += 2)|wavefile
+vpno-list-end|        for (uint32_t k = 12; k + 2 <= nNo; k += 2)|        for (uint32_t k = 12; k + 4 <= nNo; k += 2)|wavefile
+vpdt-solo-stride|kSolo { 10, 16, 8 }|kSolo { 16, 10, 8 }|wavefile
+vpdt-band-first|kBand { 0x2e, 0x58, 14 }|kBand { 0x2e, 0x58, 16 }|wavefile
+vpdt-count|const uint32_t nev = le32(vpdt + 8) >> 16;|const uint32_t nev = (le32(vpdt + 8) >> 16) - 1;|wavefile
+vpdt-lite|{ nullptr, &kSolo, nullptr, &kBand, nullptr, &kBand }|{ nullptr, nullptr, nullptr, &kBand, nullptr, &kBand }|wavefile

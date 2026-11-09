@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-09) — v169: a wave held to its data
+
+- The review had said a truncated wave loads with a silent tail. That's only half right: a file cut off at its end was always refused, as a chunk running past the end. What got through was a data chunk whole in itself but shorter than the header, which only a damaged writer or a made-up file gives.
+- Before refusing anything I measured every wave there is here: 745 of them, the disk image's presets and two projects' waves. None is short, and the spare never passes one block's padding. So the bound refuses nothing real.
+- XtFiles.cpp is over the kit's line limit, so by the rule the user set today the work started with a split. Moving the reader was the easy part. The kit's shape law then wanted it in parts of under 50 statements, one statement a line, and its chains as tables. The reshaping is checked the way the reader always was, by xt_files against the firmware's own routines, and it came out as its baseline before the bound went in. Seven planted errors had their text reworded for the new shape, and one reads differently now: vpno-chunk plants an id that never matches, where it used to delete the line.
+- The test for a count past 2^31 needs 2 GB of data. A sparse file, mapped, gives that without the disk space. On the old reader it would have decoded for minutes, so the test gives it 3 seconds and exits hard. Its first run left the 2 GB file behind, since `_Exit` skips the clean-up. It was sparse, so it took no space.
+
 ### Session 18 (2026-11-09) — v168: an encode that stops
 
 - The kit's review of the project (`.claude/claude-packs-review.md`) put this first: close the plugin during a long encode and the host hangs, then writes into freed memory. The 10 s the destructor waited looked generous until a 30 s BACKING wave took 10.9 s to encode. The test closes one at 1 s, and on the old code took 10,765 ms.

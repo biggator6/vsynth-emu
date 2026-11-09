@@ -7,6 +7,15 @@
 #include <string>
 #include <vector>
 
+// What the readers (XtFiles.cpp, XtWaveFile.cpp) share: a little-endian word, and a refusal with its reason.
+namespace xtfile {
+inline uint32_t le32(const uint8_t* p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
+inline bool fail(std::string* why, const char* what) {
+    if (why) *why = what;
+    return false;
+}
+} // namespace xtfile
+
 // ── A wave ───────────────────────────────────────────────────────────────────
 struct XtWaveFile {
     int channels = 1;

@@ -10,17 +10,41 @@
 # default every result line).  A check that
 # still says 0 different missed the error: either the check is too weak, or
 # the change is exact (e.g. a product of powers of two regrouped).
+# PORT=wavefile: XtWaveFile.cpp (a wave's chunks) under xt_files, as PORT=files; PORT=tonewave: XtWaveFile.cpp under xt_tone.
 source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # a run that can't start must never read as a result; no "== name" follows
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
-if [ "${PORT:-cosm}" = tone ] || [ "$PORT" = tonecosm ] || [ "$PORT" = toneanalog ] || [ "$PORT" = toneband ] || [ "$PORT" = tonecheck ] || [ "$PORT" = tonefw ] || [ "$PORT" = toneosc ] || [ "$PORT" = tonelfo ] || [ "$PORT" = toneenv ] || [ "$PORT" = tonesolo ] || [ "$PORT" = tonelin ] || [ "$PORT" = tonelite ] || [ "$PORT" = tonepatch ] || [ "$PORT" = tonefiles ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
-    F=XtSynth.cpp; [ "$PORT" = tonelin ] && F=XtLinearPlayer.cpp; [ "$PORT" = tonelite ] && F=XtLitePlayer.cpp; [ "$PORT" = tonecosm ] && F=XtCosm.cpp; [ "$PORT" = toneanalog ] && F=XtAnalog.cpp; [ "$PORT" = toneband ] && F=XtMultiBandPlayer.cpp; [ "$PORT" = tonecheck ] && F=XtToneCheck.cpp; [ "$PORT" = tonefw ] && F=XtFirmware.cpp; [ "$PORT" = toneosc ] && F=XtOsc.cpp; [ "$PORT" = tonelfo ] && F=XtLfo.cpp; [ "$PORT" = toneenv ] && F=XtEnvelope.cpp; [ "$PORT" = tonesolo ] && F=XtSoloVoice.cpp; [ "$PORT" = tonepatch ] && F=XtPatch.cpp; [ "$PORT" = tonefiles ] && F=XtFiles.cpp
+# A tone port's file, planted under xt_tone; nothing for any other port
+tonefile() {
+    case "$1" in
+        tone) echo XtSynth.cpp ;;
+        tonecosm) echo XtCosm.cpp ;;
+        toneanalog) echo XtAnalog.cpp ;;
+        toneband) echo XtMultiBandPlayer.cpp ;;
+        tonecheck) echo XtToneCheck.cpp ;;
+        tonefw) echo XtFirmware.cpp ;;
+        toneosc) echo XtOsc.cpp ;;
+        tonelfo) echo XtLfo.cpp ;;
+        toneenv) echo XtEnvelope.cpp ;;
+        tonesolo) echo XtSoloVoice.cpp ;;
+        tonelin) echo XtLinearPlayer.cpp ;;
+        tonelite) echo XtLitePlayer.cpp ;;
+        tonepatch) echo XtPatch.cpp ;;
+        tonefiles) echo XtFiles.cpp ;;
+        tonewave) echo XtWaveFile.cpp ;;
+    esac
+}
+TF=$(tonefile "${PORT:-cosm}")
+if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
+    F=$TF
     D=XT_TONE_MAIN; ARGS=("${SEED:-2024}" "$WORK/inputs")
     OBJ="$M/tone_obj"; mkdir -p "$OBJ"; L=()
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
-    for f in XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtLinearPlayer XtLitePlayer XtMultiBandPlayer XtEnvelope XtLfo XtOsc XtCosm XtAnalog XtFirmware Sh4Interp XtFiles XtPatch; do
+    PARTS=(XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtLinearPlayer XtLitePlayer XtMultiBandPlayer XtEnvelope XtLfo
+           XtOsc XtCosm XtAnalog XtFirmware Sh4Interp XtFiles XtWaveFile XtPatch)
+    for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue
         [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] || "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_TONE_MAIN -DXT_TONE_CHECK -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
         L+=("$OBJ/$f.o")
@@ -41,13 +65,23 @@ elif [ "$PORT" = fxc ]; then       # XtFxControl against its checks in xt_fx; [c
     L=("$OBJ/Sh4Interp.o" "$OBJ/XtFxChip_main.o")
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
-elif [ "$PORT" = files ]; then     # XtFiles against fcheck's baseline of xt_files; [cases] is not used
-    F=XtFiles.cpp; D=XT_FILES_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
+elif [ "$PORT" = files ] || [ "$PORT" = wavefile ]; then
+    # XtFiles, or with PORT=wavefile XtWaveFile (a wave's chunks), against fcheck's baseline of xt_files; [cases] is not used
+    F=XtFiles.cpp
+    G=XtWaveFile.cpp
+    if [ "$PORT" = wavefile ]; then
+        F=XtWaveFile.cpp
+        G=XtFiles.cpp
+    fi
+    D=XT_FILES_MAIN
+    L=("$S/$G" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp"
+       "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
 elif [ "$PORT" = filesfw ]; then   # the same, with the error in XtFirmware's routines for them
     F=XtFirmware.cpp; D=XT_FILES_MAIN
     OBJ="$M/files_obj"; mkdir -p "$OBJ"
     [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.cpp" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.h" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFirmware.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_FILES_MAIN -I"$S" -c "$S/XtFiles.cpp" -o "$OBJ/XtFiles_main.$$.o" && mv "$OBJ/XtFiles_main.$$.o" "$OBJ/XtFiles_main.o"; }
-    L=("$OBJ/XtFiles_main.o" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
+    L=("$OBJ/XtFiles_main.o" "$S/XtWaveFile.cpp" "$S/XtMultiBandPlayer.cpp"
+       "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
 elif [ "${PORT:-cosm}" = analog ]; then
     F=XtAnalog.cpp; D=XT_ANALOG_MAIN
     L=("$S/XtOsc.cpp" "$S/XtCosm.cpp" "$S/XtEnvelope.cpp" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp")
@@ -84,7 +118,7 @@ if [ "$PORT" = solo ]; then
     cat "$T"/* | grep -E "$P"
     exit
 fi
-if [ "$PORT" = files ] || [ "$PORT" = filesfw ]; then
+if [[ "$PORT" =~ ^(files|filesfw|wavefile)$ ]]; then
     # the baseline's whole xt_files section, as xt_files gains lines (v148, v155): a line the run prints that isn't in it differs, and one of it the run doesn't print
     B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.base"; awk '/^== /{s = ($0 == "== xt_files"); next} s' "$B" > "$T"
     "$M/$N" "$ROM" 2>/dev/null > "$M/$N.all"; st=$?

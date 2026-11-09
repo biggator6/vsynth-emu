@@ -1135,4 +1135,4 @@ check-kind-plan|                if (w.type == 1 && xtSoloReadVpdt(t.enc->vpdt, w
 check-stored-whole|whole = (w.encodeType == 1 \|\| w.events[i] % 16 == 0) && (i == 0|whole = w.events[i] % 16 == 0 && (i == 0|tonecheck
 check-stored-sum|                    whole = reach >= 0 && reach <= w.frames * 16 && reach + (long)rd(term, 2) >= w.frames * 16;|                    whole = reach == w.frames * 16;|tonecheck
 check-stored-file|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events, &w.vpdt);|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events);|tonecheck
-files-vpdt-copy|        out.vpdt.assign(vpdt, vpdt + nDt);\n||tonefiles
+files-vpdt-copy|    out.vpdt.assign(vpdt, vpdt + nDt);\n||tonewave

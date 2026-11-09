@@ -335,6 +335,23 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A wave's frames bounded by its data v169 (2026-11-09), no change on any real wave: R2 of .claude/claude-packs-review.md.
+  An RDAC wave's vpsc frame count was never held to its data chunk: a 100-byte .vpw claiming 64M stereo frames read "ok" after 10 s
+  and 268 MB, silence past its 16 bytes, and past 2^31 samples the plugin's int buffers went negative. xtWaveRead now refuses fewer
+  data bytes than frames x channels (one a sample after RDAC's 8-byte header; plain samples two, as before) and more than 2^31 - 1
+  samples. Every real wave holds at least that: 745 measured (HARDWARE_FIRMWARE.md, "A wave's data against its header").
+  The split first, as the user's rule for long files says: xtWaveRead moved from XtFiles.cpp (632 lines) to XtWaveFile.cpp, by
+  what each part reads (findChunks, readHeader, readLoops, readEvents, readSamples; the chunk ids and the vpdt layouts as tables),
+  the kit's code-shape law wanting one statement a line and 50 a function. le32 and fail are shared in XtFiles.h. The plants
+  follow it: PORT=wavefile (xt_files, XtWaveFile.cpp) and PORT=tonewave (xt_tone), 24 of files_muts.txt's and 1 of tone_muts.txt's,
+  7 of them reworded where the text was reshaped (wave-bwd, wave-modes, vpno-chunk, vpdt-solo-stride, vpdt-band-first, vpdt-lite,
+  files-vpdt-copy); mutate.sh's tone ports are one case table. xt_files has a plain wave cut short, not an RDAC one, and XtFiles.cpp
+  can't grow to take one, so the RDAC bound's gate is VSynthEmuWaveFileTest (plugin/Tests/WaveFileTest.cpp, in verify.sh).
+  Check: before the bound, fcheck as its baseline with the split (3 of 162 sections run: xt_files, xt_tone's two). The test, red on
+  the old reader (the over-edge waves read, 64M frames 9.7 s, 2^31 still decoding at 3 s), 6/6 after in 0.2 s. Plants with the bound:
+  mutate_files.py 49, none missed, no errors, each port (files, wavefile, filesfw) clean with nothing planted first;
+  mutate_tone.py's files-vpdt-copy caught on tonewave.
+
 Encodes that stop when their processor closes v168 (2026-11-09), no change to the sound: R1 of .claude/claude-packs-review.md.
   An encode runs the firmware in the interpreter on the processor's pool thread (a 30 s BACKING wave: 10.9 s), and a lambda job never
   heard removeAllJobs(true, ...) ask it to stop. So the destructor gave up after its 10 s, the members after encodePool_ (status_,

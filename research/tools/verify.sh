@@ -41,6 +41,8 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_ROM_SEARCH=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 # A processor closed while its wave is encoding: closed in ms, and the next one encodes as before
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && build/plugin/VSynthEmuTeardownTest "$ROM" 2>&1) || rc=1; echo "$o" | tail -1; }
+# A wave whose header claims more than its data holds, or more samples than an int counts: refused at once
+[ $BUILT = 1 ] && { o=$(cd "$REPO" && build/plugin/VSynthEmuWaveFileTest "$ROM" 2>&1) || rc=1; echo "$o" | tail -1; }
 # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_PATCH_APPLY=1 build/plugin/VSynthEmuTest "$ROM" x 2>&1) || rc=1; echo "$o" | tail -1; }
 # A .vpw through the processor, against XtSynth on the same audio: a preset wave, mono and stereo, on its own encode type

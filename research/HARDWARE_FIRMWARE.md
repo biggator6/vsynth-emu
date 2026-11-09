@@ -1546,6 +1546,18 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A wave's data against its header (2026-11-09, v169)
+
+Every V-Synth wave there is here has at least as much data as its header's frames and channels ask for: the disk image's 416 preset
+waves and 250 RDAC waves of two projects (Emu_test, 1stchoice) have at least frames × channels bytes after the data's 8-byte RDAC
+header, and their 79 plain-sample waves exactly two bytes a sample. The most over it is 30 bytes, stereo: the last block of 16
+frames, each channel's 16 bytes, written whole. So the RDAC block routine (`0x89529570`, run 16 frames at a time by
+`xtFwRdacDecode`) never needs a byte past the chunk on a real wave. `xtWaveRead` (now `XtWaveFile.cpp`) refuses one with fewer, "fewer
+samples than the header says", as it already did plain samples, and one of more than 2^31 − 1 samples, which the plugin's
+int-counted buffers can't hold. A file cut off at its end was already refused (a chunk running past the end): what got through was a
+data chunk complete in itself but shorter than the header, which read as silence past its data. VSynthEmuWaveFileTest has the
+edges, mono and stereo, and a sparse 2 GB file past the int.
+
 ### v146 joins (2026-11-09, v161)
 
 This merges master's v146, the planted-error runners, with v160, on the user's word. There was no new firmware to read, and no change to the sound.
