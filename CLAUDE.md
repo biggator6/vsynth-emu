@@ -39,8 +39,8 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   fails the run when its program fails. `verify_test.sh` (when verify.sh changes; it runs it whole): a stub auval that fails must fail the run.
 - `fcheck.sh [--update] [--full]`: every firmware harness on fixed cases against
   `fcheck_baseline.txt`, side by side. In a worktree set `PY` to the main checkout's `.venv/bin/python3`. A section is reused when its binary, command,
-  ROM and inputs are those of a run that matched the baseline (`build/tools/fcheck/kept`
-  in the main checkout, shared by the worktrees); `--full` runs them all. `--update`
+  ROM, disk image, inputs and the files it reads besides (`FILES=` before its `part` line: xtrecs.py, a project's waves) are those of a run that matched the baseline (`build/tools/fcheck/kept`
+  in the main checkout, shared by the worktrees); `--full` runs them all. A new section that reads a script or data names it in `FILES`. `fcheck_keys_test.sh` (when fcheck.sh changes, a few minutes): a changed xtrecs.py and a changed wave must run again. `--update`
   only when adding checks/cases on purpose, and read its diff: in a worktree with no `analysis/projects` link it runs without the project's waves and quietly loses their 28 lines.
 - `ab.sh [rev]`: XtSynth CLI renders, `rev` vs working tree; `XT_*` env vars
   set controls (see the `XT_SYNTH_MAIN` comment in XtSynth.cpp).

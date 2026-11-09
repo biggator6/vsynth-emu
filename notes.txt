@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+fcheck's kept sections keyed by what they read v171 (2026-11-09), tools only: R5 of .claude/claude-packs-review.md. A kept
+  section's key was its binary, its command, the ROM and the inputs; xtrecs.py, the project's waves and the disk image were left
+  out, so after a change to any of them fcheck said "as baseline" from a kept result without running it. Now the disk image is in
+  DATA with the ROM and the inputs, and a section names what else it reads in FILES before its part line (sectionKey): the paths
+  section the projects' waves, xtrecs xtrecs.py and Emu_test's waves. A file that isn't there (a worktree with no projects)
+  counts as empty, so the section runs there. Every key changed, so the first fcheck after v171 runs every section once.
+  Check: fcheck_keys_test.sh (research/tools), in a scratch tree with a copy of the tools, the baseline, the waves, the inputs and
+  this checkout's kept sections, on this checkout's plugin/Source: before, a comment added to xtrecs.py and a byte of a wave
+  changed both left "as baseline, 0 of 162 sections run"; after, both ran again. Not in verify.sh.
+
 verify.sh fails as its last lines do v170 (2026-11-09), tools only: R4 of .claude/claude-packs-review.md. The engine tests' and
   auval's lines were echoed and never set rc, so a version could pass verify.sh with either failing. Now the engine tests fail the
   run as their program does (it returns 1 on a failure), and auval unless it exits 0 and says AU VALIDATION SUCCEEDED.

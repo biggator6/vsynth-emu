@@ -3,8 +3,9 @@
 # against rom.2's own routines run in the SH-4 interpreter — on fixed cases, the
 # sections side by side.  Prints one line: "as baseline"
 # (research/tools/fcheck_baseline.txt), or the lines that differ.  Full output:
-# $WORK/fcheck/results.txt.  A section is not run again when its binary, command, ROM
-# and inputs are those of a run that matched the baseline: the builds are repeatable
+# $WORK/fcheck/results.txt.  A section is not run again when its binary, command, ROM,
+# disk image, inputs and the files it reads besides (FILES: a script it runs, a project's
+# waves) are those of a run that matched the baseline: the builds are repeatable
 # byte for byte, so the output would be the same.  --full runs them all (before a
 # push).  --update rewrites the baseline from a full run: only when a change in the
 # results is intended (new checks, new cases).
@@ -18,13 +19,30 @@ X="$O/bin"; P="$O/parts"; rm -rf "${P:?}"; mkdir -p "$P"
 K="$O/kept"                                                 # the kept sections, one store for all the worktrees
 G=$(cd "$REPO" && git rev-parse --git-common-dir 2>/dev/null) && K="$(cd "$REPO" && cd "$G/.." && pwd)/build/tools/fcheck/kept"
 mkdir -p "$K"
-DATA=$(cat "$ROM" "$WORK/inputs"/*.bin | shasum)
+DISK="$(dirname "$ROM")/V-SynthXTDiskImage.bin.0.bin"   # beside the ROM: xt_files and xt_tone read it
+[ -f "$DISK" ] || DISK=/dev/null
+DATA=$(cat "$ROM" "$DISK" "$WORK/inputs"/*.bin | shasum)
+FILES=()   # what the next section reads besides those, its binary and its command, set before its part line
 trap 'pkill -f "$X/" 2>/dev/null; kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
 n=0; ran=0
+# A section's key: its binary, the ROM, the disk image and the inputs, its command, and the FILES it reads besides (v171)
+sectionKey() {
+  shasum < "$X/$1"
+  echo "$DATA"
+  echo "$2"
+  cat "${FILES[@]}" < /dev/null 2> /dev/null | shasum   # one that isn't there (no waves in a worktree) counts as empty
+}
 part() {   # part <binary> <command>: the next section, from the store or run in the background
-  local f k; f="$P/$(printf %03d $n)"; n=$((n+1))
-  k=$( { shasum < "$X/$1"; echo "$DATA"; echo "$2"; } | shasum | cut -c1-24 ); echo "$k" > "$f.key"
-  if [ $FULL = 0 ] && [ -f "$K/$k" ]; then cp "$K/$k" "$f"; return; fi
+  local f k
+  f="$P/$(printf %03d $n)"
+  n=$((n+1))
+  k=$(sectionKey "$1" "$2" | shasum | cut -c1-24)
+  FILES=()
+  echo "$k" > "$f.key"
+  if [ $FULL = 0 ] && [ -f "$K/$k" ]; then
+    cp "$K/$k" "$f"
+    return
+  fi
   ran=$((ran+1))
   eval "$2" > "$f" 2>&1 &
 }
@@ -39,6 +57,7 @@ for c in "0 127 0 100 40 300 2" "10 60 64 30 50 400 2" "50 90 20 80 120 600 0" "
   part xt_env "echo \"env $c: \$(\"\$X/xt_env\" \"\$ROM\" $c | tail -1)\""; done
 [ -x "$X/xt_tone" ] && part xt_tone 'echo "== xt_tone"; "$X/xt_tone" "$ROM" 2000 2024 "$WORK/inputs" | grep -v "^  "'
 # The SOLO encode's two paths and a SOLO wave's own events, on every wave there is: the disk image's preset waves, the project's, the inputs (about a minute, 8 threads)
+FILES=("$REPO"/analysis/projects/*/Wave/*.wav)
 [ -x "$X/xt_tone" ] && part xt_tone 'echo "== xt_tone paths"; "$X/xt_tone" "$ROM" paths "$REPO"/analysis/projects/*/Wave/*.wav vocal.bin chord.bin sine.bin gated.bin drum.bin:2 w358.bin:2 enc_*.bin $(ls enc2_*.bin | sed "s/\$/:2/") 2>/dev/null | grep -v "^  "'
 # solocmp <file> <channels> <R pitch ratio> <F formant ratio, 0 = none> <walk> <energy gain 0..1> <frames> [frame:walk ...] [frame:gGAIN ...] [robot] [loop:on,fwdMode,bwdMode,fs,fe,bs,be]
 h='echo "== solocmp"; '
@@ -58,6 +77,7 @@ for f in vocal.bin chord.bin sine.bin gated.bin drum.bin:2 w358.bin:2 enc_*.bin;
   part xt_enc "${h}\"\$X/xt_enc\" \"\$ROM\" cmp $f 2>/dev/null"; h=""; done
 part xt_enc 'ls enc2_*.bin | sed "s/\$/:2/" | xargs -n 1 -P 8 "$X/xt_enc" "$ROM" cmp 2>/dev/null | LC_ALL=C sort'
 # ... and against the records stored in the project's own waves
+FILES=("$REPO/research/tools/xtrecs.py" "$REPO"/analysis/projects/Emu_test.prj/Wave/*.wav)
 part xt_enc 'echo "== xtrecs"; "$PY" "$REPO/research/tools/xtrecs.py" "$X/xt_enc" "$ROM"'
 # bandcmp <3 BACKING|5 ENSEMBLE> <file> <channels> <pitch> <walk> <frames> [frame:walk ...]
 h='echo "== bandcmp"; '
