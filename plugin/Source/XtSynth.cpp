@@ -106,10 +106,11 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         for (int32_t e : *events) marks.push_back(marks.empty() || (uint32_t)(e / 16) > marks.back() ? (uint32_t)(e / 16) : marks.back());
     const bool own = !marks.empty();
     // A wave's own vpdt, played as it is when its events fit this audio: from 0 to the end (frames·16), never back (two at the end are the
-    // XT's own, on 18 of the image's waves), each on a whole sample, in the type's layout (a SOLO event every 10 or 16 halfwords from 8, a
-    // band one every 0x2e or 0x58 from 14; its position a word on).  Events between samples are V-Trainer 1.00's (VP9SAMnoise1, preset 270):
-    // there the port's SOLO player isn't the XT's (VP9SAMnoise1 parts in a few notes from their first block, cause not found; preset 270's
-    // records stop short of its last event), so those are encoded again on their own events, as before (HARDWARE_FIRMWARE.md, v158)
+    // XT's own, on 18 of the image's waves), in the type's layout (a SOLO event every 10 or 16 halfwords from 8, a band one every 0x2e or
+    // 0x58 from 14; its position a word on).  A SOLO wave's may fall between samples (V-Trainer 1.00's, VP9SAMnoise1's) and its records must
+    // reach its last event exactly (below; preset 270's stop short, so it is encoded again on its own events, as before).  A band wave's
+    // must be on whole samples: no band wave there is has one between them, so the band player's way with one isn't checked
+    // (HARDWARE_FIRMWARE.md, v158, v159)
     bool fits = false;
     if (stored && irate == 44100 && type != 0 && stored->size() >= 64) {
         const auto r32 = [&](size_t o) { uint32_t x = 0; if (o + 4 <= stored->size()) std::memcpy(&x, stored->data() + o, 4); return x; };
@@ -117,7 +118,7 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         fits = nev >= 2 && nev < 4096 && (st * (nev - 1) + first) * 2 + 8 <= stored->size() && r32(first * 2 + 4) == 0
             && (long)r32((st * (nev - 1) + first) * 2 + 4) == frames * 16;
         for (uint32_t e = 1; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) >= r32((st * (e - 1) + first) * 2 + 4);
-        for (uint32_t e = 0; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) % 16 == 0;
+        for (uint32_t e = 0; fits && type != 1 && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) % 16 == 0;
     }
     if (type == 0 || type == 1) {
         // LITE (0) is the samples alone, as the XT keeps them: no analysis, so nothing to encode.

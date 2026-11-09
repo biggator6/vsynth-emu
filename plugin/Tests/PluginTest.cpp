@@ -1651,6 +1651,7 @@ int main(int argc, char** argv) {
         for (int k = 0; k < 6; ++k) same = same && E->bands.buf[k] == E2->bands.buf[k];
         std::printf("encode repeatable: %s\n", same ? "yes" : "NO");
     }
+    if (ownVpdt) std::printf("the wave's own vpdt: %s\n", E->stored ? "played as it is" : "encoded again");
     // A V-Synth wave, a .vpw or a project's .wav, brings its Original Key, Tempo, loop, fine tuning and own list of events with it, as the
     // processor takes them (loadFile, reencode)
     if (isOwnFile) {

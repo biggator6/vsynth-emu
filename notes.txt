@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A SOLO stream's own terminator v159 (2026-11-08), a change on VP9SAMnoise1 alone: it plays its stored vpdt (HARDWARE_FIRMWARE.md, "A SOLO stream's own terminator").
+  v158's VP9SAMnoise1 residual was the record after the last: (256, 0) where the XT's encodes and 298 of 300 SOLO waves have (256, 1) (preset 270 (256, 128)). The player
+  reads it as a record (0x8950d4c0); info bit 0 gates the pitch in the grains (0x8950d5a0), so a note from the wave's end (walking backward, Vari on, Robot off) took rate 1
+  on the XT, the pitch in the port. XtSoloPlan::termLen, termInfo from xtSoloReadVpdt; lenOf, grainParams, jumpTo. Found by the grains' state each block (player at
+  voice +0xd4, records +0xe8, grains +0x124) in a debug copy of xt_tone. 504 VP9SAMnoise1 cases forced stored: 67 different before, 0 after.
+  A SOLO wave's events may fall between samples (fits); a band wave's not (none has one). Preset 270 stays encoded again: records 18/16 short, segment 3 at +1/16 of its
+  records' sum (the firmware's seek counts from the segment, its event jump from the mark, 0x8950d832; the port from the sum); not ported.
+  Load 1.5 s -> ~1 ms. Sound: VP9SAMnoise1's stored records (a noise wave: another waveform, the same level); WAVs in build/v159_ab.
+  Check: xt_tone's stored line counts those played as they are (v158's 454 was 452); 453 now, 1 encoded again; 12 cases from the end on each wave whose terminator
+  (from the file) isn't (256, 1), 21-25 grains on it by seed; own-events: SOLO between samples stored, records a sample short encoded again. PluginTest says played as it is
+  or encoded again; verify.sh's stored line 5 waves. 0 different at 2000 on 12 seeds. Planted: mutate_tone.py 1126 (5 new), mutate_panel.py's own-events and stored 3
+  (patch-own-events-osc on an extracted preset 270), none missed.
+
 A wave's stored vpdt v158 (2026-11-07), a change on band waves and on SOLO waves whose stored records aren't the XT 2.02's: a V-Synth wave plays the vpdt its file holds.
   XtWaveFile::vpdt; xtSynthEncode's `stored`, taken when the events run from 0 to frames·16, never back, each on a whole sample (and a SOLO plan reads); XtEncoded::stored.
   Else encoded again as v156 (SOLO on its own events, band on the detection): only VP9SAMnoise1 and preset 270, V-Trainer 1.00's events between samples. Preset 270's

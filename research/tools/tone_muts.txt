@@ -665,7 +665,10 @@ solo-wrap-past-b|if (Pq >= recStart && budget > 0.0) {|if (Pq > recStart && budg
 solo-wrap-end|    if (!wrap && recEnd * 16.0 >= (double)endStop16) wrap = true;   // the record reaching the end event (+0x1c)\n||tonesolo|10
 solo-skip|if (!(budget > 0.0) \|\| !(Pq >= recEnd)) return;|return;|tonesolo
 solo-skip-b|if (!(budget > 0.0) \|\| !(recStart > Pq)) return;|return;|tonesolo
-solo-last-len|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 8.0; }|tonesolo
+solo-last-len|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : p->termLen; }|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 8.0; }|tonesolo
+solo-term-info|    P.termInfo = (int)r16(term + 2);|    P.termInfo = 1;|tonesolo
+solo-term-grain|sg < nc ? p->info[sg] : p->termInfo;|sg < nc ? p->info[sg] : 1;|tonesolo
+solo-read-short|P.evPos.back() == at && P.evPos.front() == 0;|P.evPos.back() >= at && P.evPos.front() == 0;|tonesolo
 solo-walk-half|const int32_t s = walkStep >> 1, sum = Pf + s;|const int32_t s = walkStep / 2, sum = Pf + s;|tonesolo
 solo-walk-frac|int32_t np = Pi + (sum >> 20), nf = sum & 0xfffff;|int32_t np = Pi + (sum >> 20), nf = sum & 0xffffe;|tonesolo
 solo-walk-turn|if (f3 & 8) { if (neg) f3 &= 0xf7; else step = -step; }|if (f3 & 8) { if (neg) f3 &= 0xf7; }|tonesolo
@@ -675,7 +678,7 @@ solo-hold-keep|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) { f3 &= 0x8f;|if ((f3 & 
 solo-hold-side|if ((f3 & 0x20) ? 0.0f > fs : fs > 0.0f) { f3 &= 0x8f;|if ((f3 & 0x20) ? fs > 0.0f : 0.0f > fs) { f3 &= 0x8f;|solo
 solo-hold-anchor|else if (Pq >= anchor) anchorForward();|else if (Pq > anchor) anchorForward();|solo
 solo-end-gate|if (!ended_) {\n                const Grain g|if (true) {\n                const Grain g|tonesolo
-solo-jump-f0|    if (i >= nc \|\| !p->voiced[i]) f0n = 0.0f;\n||solo
+solo-jump-f0|    if (i >= nc ? !(p->termInfo & 4) : !p->voiced[i]) f0n = 0.0f;\n||solo
 solo-jump-record|if (i + 1 == nc && L >= p->segStart[i] + p->segLen[i]) i = nc;||solo
 solo-jump-anchor|    anchor = L;\n|    anchor = recStart;\n|tonesolo
 solo-jump-frac|    Pf = 0;\n    const double L|    const double L|tonesolo
@@ -1100,7 +1103,8 @@ lin-upd-mode-bwd|        bwd.mode = l.on ? l.bwdMode : 0;|        bwd.mode = 0;|
 stored-solo-off|if (fits && xtSoloReadVpdt(*stored, ch, recs, P)|if (false && xtSoloReadVpdt(*stored, ch, recs, P)|tone
 stored-band-off|        if (fits) { E->vpdt = *stored; E->stored = true; }|        if (false) { E->vpdt = *stored; E->stored = true; }|tone
 stored-flag|{ vp = *stored; E->stored = true; }|{ vp = *stored; }|tone
-stored-whole|        for (uint32_t e = 0; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) % 16 == 0;\n||tone
+stored-whole|        for (uint32_t e = 0; fits && type != 1 && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) % 16 == 0;\n||tone
+stored-whole-solo|fits && type != 1 && e < nev|fits && e < nev|tone
 stored-order|        for (uint32_t e = 1; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) >= r32((st * (e - 1) + first) * 2 + 4);\n||tone
 stored-front| && r32(first * 2 + 4) == 0\n|\n|tone
 stored-back|            && (long)r32((st * (nev - 1) + first) * 2 + 4) == frames * 16;|            ;|tone
@@ -1116,6 +1120,7 @@ band-kind1-flag|if (flags5 == 1 && (flags3 & 8)) { flags3 &= 0xf7; return; }|if 
 check-stored-zero|                fw.c.write(kStoredAt, zero.data(), zero.size());\n||tonecheck
 check-kind-fw|                    fw.c.wr16(t.fw.chunk[5] + at, 1);\n||tonecheck|777
 check-kind-plan|                if (w.type == 1 && xtSoloReadVpdt(t.enc->vpdt, w.ch, rr, back)) t.enc->solo.evKind = back.evKind;\n||tonecheck|777
-check-stored-whole|whole = w.events[i] % 16 == 0 && (i == 0|whole = (i == 0|tonecheck
+check-stored-whole|whole = (w.encodeType == 1 \|\| w.events[i] % 16 == 0) && (i == 0|whole = w.events[i] % 16 == 0 && (i == 0|tonecheck
+check-stored-sum|                    whole = sum == w.frames * 16;|                    whole = true;|tonecheck
 check-stored-file|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events, &w.vpdt);|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events);|tonecheck
 files-vpdt-copy|        out.vpdt.assign(vpdt, vpdt + nDt);\n||tonefiles

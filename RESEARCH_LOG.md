@@ -3570,6 +3570,14 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-08) — v159: VP9SAMnoise1's terminator
+
+- The user said keep hunting. v158's hunt had taken things away from the wave's settings one at a time and never compared the player's own state, only what it wrote. This time a debug copy of the check compared the SOLO grains' fields with the firmware's each block, and the first differing case showed it at its note-on: the firmware's grain period and velocity were a record of 16 samples at rate 1, the port's were at the pitch.
+- That note started at the wave's end, walking backward, on the stream's terminator. VP9SAMnoise1's is (256, 0); the port had the XT's (256, 1) written in, and bit 0 of the info word is what lets a grain follow the pitch. A table of the 504 cases by their settings had pointed the same way before the state did: every difference had Vari on and Robot off.
+- So v158's suspects, the events between samples and V-Trainer's event kinds, were never it. Asking which records a note actually reads would have found it sooner than asking which settings it had.
+- Preset 270 turned out to have its own terminator too, (256, 128), but fixing that wasn't enough: its layout disagrees with itself by 1/16 at one segment, and the firmware counts record starts from the segment where the port counts from the sum. That's more porting than this question asked, so it stays encoded again and goes to the user.
+- The check's new cases from the wave's end first took their list from the port's reading of the terminator, so a planted error in that reading removed the very cases that would show it. A check that chooses what to test from the code under test can be blinded by it; the list now comes from the file's bytes. The same cases then showed no grain on the terminator on two seeds: an OSC drawn off, a walk turned by its other terms, and a counter the check undercounted. Each looked like coverage until counted.
+
 ### Session 16 addendum (2026-11-07) — v158: a wave's stored vpdt
 
 - The user chose to play V-Synth waves on their stored data (option (c)), after v157 was merged in. The path itself was small: keep the chunk, check that it fits, and hand it to the reader or the band players.

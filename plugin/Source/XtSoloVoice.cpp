@@ -46,6 +46,7 @@ bool xtSoloReadVpdt(const std::vector<uint8_t>& v, int channels, std::vector<XtR
     recs.clear();
     P.evPos.clear(); P.evKind.clear(); P.evSeg.clear(); P.segPos.clear(); P.segRec.clear(); P.segFirst.clear();
     P.pastStart = 0x7fffffff; P.pastLen = 0;
+    P.termLen = 16.0; P.termInfo = 1;
     const size_t n = v.size();
     const auto r32 = [&](size_t o) -> uint32_t { uint32_t x = 0; if (o + 4 <= n) std::memcpy(&x, &v[o], 4); return x; };
     const auto r16 = [&](size_t o) -> uint16_t { uint16_t x = 0; if (o + 2 <= n) std::memcpy(&x, &v[o], 2); return x; };
@@ -70,6 +71,8 @@ bool xtSoloReadVpdt(const std::vector<uint8_t>& v, int channels, std::vector<XtR
         at += len;
     }
     const size_t term = rec0 + 4 * k;
+    P.termLen = r16(term) / 16.0;
+    P.termInfo = (int)r16(term + 2);
     // the segments, from event 0's to the one at the last event, the wave's end (a stereo wave's second list and stream follow, which
     // the player doesn't read): each a record's start, and its first record by offset (the terminator's, the stream's end)
     const int32_t endAt = (int32_t)r32((st * (nev - 1) + 8) * 2 + 4);
@@ -103,8 +106,8 @@ bool xtSoloReadVpdt(const std::vector<uint8_t>& v, int channels, std::vector<XtR
     return recs.size() >= 1 && P.evPos.back() == at && P.evPos.front() == 0;
 }
 
-// A record's length in samples; past the last record, the terminator's 16.
-double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 16.0; }
+// A record's length in samples; past the last record, the terminator's (16 in every wave there is).
+double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : p->termLen; }
 
 // The repeat budget, (info & 0x1F8) << 6; 0x7E00 (all bits) means
 // unlimited, as do the terminator and unknown info.
@@ -229,7 +232,7 @@ void XtSoloVoice::jumpTo(int32_t pos16) {
     recEnd = recStart + lenOf(i);
     loaded();
     anchor = L;
-    if (i >= nc || !p->voiced[i]) f0n = 0.0f;
+    if (i >= nc ? !(p->termInfo & 4) : !p->voiced[i]) f0n = 0.0f;
 }
 
 // The plan's events and segments; a plan without them (built elsewhere) has the start and the end alone, one segment.
@@ -430,9 +433,8 @@ XtSoloVoice::Grain XtSoloVoice::grainParams(bool setF0) {
     // anchor wrap and the second-tap offset use the raw length.
     float C = (float)len16;
     if (160.0f > C) C = 160.0f;
-    // After the last record the XT's stream holds a (256, 1) terminator: the
-    // last record's next period is 16 samples, and the terminator's own is
-    // its length (0x8950d4c0).
+    // After the last record the stream holds a terminator, (256, 1) in the XT's encodes, read as a record: the
+    // last record's next period is its length, 16 samples, and the terminator's own is its length (0x8950d4c0).
     float N = (float)nextLen16;                        // +0x30, as the record's load left it
     if (160.0f > N) N = 160.0f;
     float frac = 0.0f, Ci = C;
@@ -441,10 +443,11 @@ XtSoloVoice::Grain XtSoloVoice::grainParams(bool setF0) {
         frac = (float)(Pi - st16) / C;
         Ci = frac * (N - C) + C;
     }
-    bool voiced = sg < nc && p->voiced[sg] != 0;                   // the terminator: info 1
+    bool voiced = sg < nc ? p->voiced[sg] != 0 : (p->termInfo & 4) != 0;   // the terminator: its own info, 1 in the XT's encodes
     if (p->forceUnvoiced) voiced = false;
     if (p->forcedInfo >= 0) voiced = (p->forcedInfo & 4) != 0;
-    const int info = p->forcedInfo >= 0 ? p->forcedInfo : sg < nc ? p->info[sg] : 1;
+    const int info = p->forcedInfo >= 0 ? p->forcedInfo : sg < nc ? p->info[sg] : p->termInfo;
+    if (sg >= nc) ++termGrain;
     const float Af = K(0x34ffffff) > rate98 ? K(0x34ffffff) : rate98, Ff = K(0x34ffffff) > F ? K(0x34ffffff) : F;
     float rate, v, pw;                                 // ppw divisor, read velocity, period
     // Robot voice: the pitch term (player +0x124 · A/256) is 0, so a voiced

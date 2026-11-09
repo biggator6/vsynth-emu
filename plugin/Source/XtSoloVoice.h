@@ -33,6 +33,11 @@ struct XtSoloPlan {
     std::vector<int16_t> segFirst;
     int32_t pastStart = 0x7fffffff;
     int16_t pastLen = 0;
+    // The record after the last, the stream's terminator, which the player reads as any record (0x8950d4c0): its length and info words.
+    // The XT's encodes write (256, 1), as do 298 of the 300 SOLO waves there are; V-Trainer 1.00's VP9SAMnoise1 (256, 0) and preset 270
+    // (256, 128), whose unvoiced grains at the wave's end then play at rate 1, not the pitch (info bit 0).  Without a vpdt, the XT's.
+    double termLen = 16.0;
+    int termInfo = 1;
     // Diagnostics (read from the environment where the plan is built)
     bool anchorMode = true;             // VSE_SCHED=pos: record containing P
     bool forceUnvoiced = false;         // VSE_LITE=solo-np
@@ -116,6 +121,7 @@ public:
     bool readPastWave() const { return pastWave; }
     int segmentMoves() const { return segMoves; }   // since note-on, the walk's moves between segments (for the check's counts)
     int kindTurns() const { return kindTurn; }      // and its turns at a kind-1 event (0x8950cb60)
+    int terminatorGrains() const { return termGrain; }   // its grains on the stream's terminator (at the wave's end), all its notes'
     int endFlag() const { return ended_; }  // +4 as it stands: 1 at the end, −1 at the start, else 0
     FILE* trace = nullptr;              // VSE_TRACE: per-sample state, as EmuSolo.java writes it
 
@@ -173,6 +179,7 @@ private:
     bool pastWave = false;
     int segMoves = 0;
     int kindTurn = 0;
+    int termGrain = 0;
     bool eventCfg = false;
     int evFirstCfg = 0, evLastCfg = 0;
     float f0n = 0.0f;
