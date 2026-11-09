@@ -1,0 +1,2 @@
+# batch_test.py's HTML reports (report_<time>.html, up to 19 MB each, their plots inlined as PNG): generated output, kept on disk, not in git
+report_*.html
