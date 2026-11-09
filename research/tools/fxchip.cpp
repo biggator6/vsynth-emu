@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <numbers>
 #include <string>
 #include <vector>
 
@@ -138,7 +139,7 @@ int main(int argc, char** argv) {
     const double amp = env("FX_AMP") ? std::atof(env("FX_AMP")) : 0.01; int events = 0; double peakIn = 0; std::map<int, double> peak;
     double e = 0; int k = 0;
     for (int n = 0; n < N; n++) {
-        const double x = imp ? (n == t0 ? 0.5 : 0.0) : amp * std::sin(2 * M_PI * freq * n / 44100.0);
+        const double x = imp ? (n == t0 ? 0.5 : 0.0) : amp * std::sin(2 * std::numbers::pi * freq * n / 44100.0);
         S[slot] = x; S[slot + 2] = x;
         for (int t = 0; t < 0x300; t++) { A.step(W[t], W[t + 1]); B.pc = 0x400 + t; B.memory(W[0x400 + t]); B.step(W[0x400 + t], W[0x400 + t + 1]); }
         A.base = (A.base - 1) & 255; B.base = (B.base - 1) & 255; memBase = (memBase - 1) & kMask;
