@@ -19,8 +19,11 @@ encoder; Session 16 on the user's XT project Emu_test.prj):
   LITE waves (vpsc byte 1 = 0) carry no vpdt at all.
 """
 import struct, os
+from pathlib import Path
 def chunks(p):
-    d=open(os.path.expanduser(p),'rb').read(); i=12; c={}
+    d = Path(os.path.expanduser(p)).read_bytes()
+    i = 12
+    c = {}
     while i+8<=len(d):
         cid=d[i:i+4]; sz=struct.unpack('<I',d[i+4:i+8])[0]; c[cid.decode('latin1')]=d[i+8:i+8+sz]; i+=8+sz+(sz&1)
     return c

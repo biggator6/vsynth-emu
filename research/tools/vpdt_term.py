@@ -4,9 +4,10 @@
 # play the wave's vpdt as it is and encodes it again on its own events (v160), which no wave there is does otherwise: verify.sh and
 # mutate_panel.py's solo-own run use it for that path.
 import struct, sys
+from pathlib import Path
 
 src, dst, length = sys.argv[1], sys.argv[2], int(sys.argv[3])
-b = bytearray(open(src, 'rb').read())
+b = bytearray(Path(src).read_bytes())
 i = b.find(b'vpdt')
 if i < 0: sys.exit('vpdt_term: no vpdt chunk in ' + src)
 v = i + 8                                              # the chunk's data
@@ -16,4 +17,4 @@ words = r32(rec0 - 4)
 term = v + rec0 + 4 * (words - 1)
 if not (0 < words and term + 4 <= len(b)): sys.exit('vpdt_term: no record stream in ' + src)
 struct.pack_into('<H', b, term, length)
-open(dst, 'wb').write(b)
+Path(dst).write_bytes(b)

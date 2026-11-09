@@ -5,6 +5,7 @@ A/B renders read (vocal, drum, chord, sine, w358 .bin), from the project's WAVs.
 SOLO encoder check's enc_*.bin (mono) and enc2_*.bin (stereo) are generated, and
 enc2_prj_*.bin are the project's own stereo waves."""
 import glob, math, random, struct, sys, os
+from pathlib import Path
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SOURCES = {
@@ -16,7 +17,7 @@ SOURCES = {
 }
 
 def pcm16(path):
-    d = open(path, 'rb').read()
+    d = Path(path).read_bytes()
     i, bits, data = 12, 16, None
     while i + 8 <= len(d):
         cid, size = d[i:i + 4], struct.unpack_from('<I', d, i + 4)[0]
@@ -32,7 +33,7 @@ os.makedirs(out, exist_ok=True)
 for name, rel in SOURCES.items():
     src = os.path.join(REPO, rel)
     if not os.path.exists(src): print(f'skip {name}: {rel} missing'); continue
-    open(os.path.join(out, name + '.bin'), 'wb').write(pcm16(src))
+    Path(os.path.join(out, name + '.bin')).write_bytes(pcm16(src))
 
 # A gated tone with vibrato.  The firmware's SOLO encoder ends its bursts with records of a few
 # samples, which a backward note's repeat leaves only by overflowing (HARDWARE_FIRMWARE.md,
@@ -42,18 +43,18 @@ for t in range(30000):
     ph += 2335.7 * (1 + 0.1 * math.sin(2 * math.pi * 18.44 * t / 44100)) / 44100
     x = math.sin(2 * math.pi * ph) if math.sin(2 * math.pi * 33.85 * t / 44100) > 0 else 0.0
     tone += struct.pack('<h', int(22936 * x))
-open(os.path.join(out, 'gated.bin'), 'wb').write(bytes(tone))
+Path(os.path.join(out, 'gated.bin')).write_bytes(bytes(tone))
 
 # The SOLO encoder's check (fcheck's xt_enc, HARDWARE_FIRMWARE.md "The SOLO encoder against the
 # firmware's"): generated waves, plain Python so that they come out the same every time.
 def enc(name, xs):
     b = bytearray()
     for x in xs: b += struct.pack('<h', max(-32768, min(32767, int(x))))
-    open(os.path.join(out, 'enc_' + name + '.bin'), 'wb').write(bytes(b))
+    Path(os.path.join(out, 'enc_' + name + '.bin')).write_bytes(bytes(b))
 def wave(name):
     p = os.path.join(out, name + '.bin')
     if not os.path.exists(p): return []
-    d = open(p, 'rb').read()
+    d = Path(p).read_bytes()
     return list(struct.unpack('<%dh' % (len(d) // 2), d[:len(d) // 2 * 2]))
 def mixed(name):                                  # stereo as the XT's reader takes it
     x = wave(name)
@@ -124,7 +125,7 @@ for i in range(12):
 # The encoder's stereo mode (fcheck's xt_enc, each with :2; HARDWARE_FIRMWARE.md "The SOLO encoder's
 # stereo mode").  The project's stereo waves as they are, the wave's number for a name.
 def channels(path):
-    d = open(path, 'rb').read()
+    d = Path(path).read_bytes()
     i = 12
     while i + 8 <= len(d):
         if d[i:i + 4] == b'fmt ': return struct.unpack_from('<H', d, i + 10)[0]
@@ -132,11 +133,11 @@ def channels(path):
     return 0
 for p in sorted(glob.glob(os.path.join(REPO, 'analysis/projects/Emu_test.prj/Wave/*.wav'))):
     if os.path.getsize(p) and channels(p) == 2:
-        open(os.path.join(out, 'enc2_prj_' + os.path.basename(p)[:3] + '.bin'), 'wb').write(pcm16(p))
+        Path(os.path.join(out, 'enc2_prj_' + os.path.basename(p)[:3] + '.bin')).write_bytes(pcm16(p))
 def enc2(name, l, r):
     b = bytearray()
     for u, v in zip(l, r): b += struct.pack('<hh', max(-32768, min(32767, int(u))), max(-32768, min(32767, int(v))))
-    open(os.path.join(out, 'enc2_' + name + '.bin'), 'wb').write(bytes(b))
+    Path(os.path.join(out, 'enc2_' + name + '.bin')).write_bytes(bytes(b))
 def chans(name):
     x = wave(name)
     return x[0::2], x[1::2]

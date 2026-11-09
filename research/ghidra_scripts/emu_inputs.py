@@ -9,6 +9,7 @@ dropped).  The XT wave's audio is sample-identical to the raw source for
 the waves in analysis/projects/Emu_test.prj (003 sine, 004 vocal).
 """
 import os, struct, sys
+from pathlib import Path
 import numpy as np, soundfile as sf
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import vpdt_parse as vp
@@ -16,7 +17,7 @@ import vpdt_parse as vp
 wave, raw, pre = sys.argv[1:4]
 v = vp.chunks(wave)['vpdt']
 cnt = struct.unpack('<I', v[84:88])[0]
-open(pre + '_recs.bin', 'wb').write(v[88:88 + 4 * cnt])
+Path(pre + '_recs.bin').write_bytes(v[88:88 + 4 * cnt])
 x, sr = sf.read(raw, dtype='int16')
 assert sr == 44100 and x.ndim == 1, (sr, x.shape)
 x.astype('<i2').tofile(pre + '_samp.bin')

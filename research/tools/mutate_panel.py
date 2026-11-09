@@ -3,6 +3,7 @@
 # that should show it (VSynthEmuTest; about 30 s each, one at a time, and it edits the sources in place while it does, restoring them).  One line each: caught,
 # MISSED, or ERROR.  Needs build/plugin configured, and analysis/test_files.
 import os, subprocess, sys
+from pathlib import Path
 REPO = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + '/../..')
 os.chdir(REPO)
 FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'; XV='plugin/Source/XtFxControl.cpp'; EP='plugin/Source/PluginEditor.cpp'; UP='plugin/Source/UiParts.h'
@@ -242,9 +243,9 @@ for kind in sorted({m[4] for m in MUTS}):
     r=run(kind)
     if r.returncode!=0: sys.exit('the unplanted run '+kind+' fails: '+(r.stderr.strip().split('\n')[-1] if r.stderr.strip() else '')[:120])
 for name,path,old,new,kind in MUTS:
-    src=open(path).read()
+    src=Path(path).read_text()
     if old not in src: print('NOTEXT',name); missed+=1; continue
-    open(path,'w').write(src.replace(old,new,1))
+    Path(path).write_text(src.replace(old,new,1))
     try:
         b=build()
         if 'Built target VSynthEmuTest' not in b: print('ERROR ',name,b[:200]); missed+=1; continue
@@ -253,6 +254,6 @@ for name,path,old,new,kind in MUTS:
         elif r.returncode==0: print('MISSED',name); missed+=1
         else: print('caught',name,r.returncode,(r.stderr.strip().split('\n')[-1] if r.stderr.strip() else r.stdout.strip().split('\n')[-1])[:90])
     finally:
-        open(path,'w').write(src)
+        Path(path).write_text(src)
 print('planted',len(MUTS),'missed',missed)
 build()

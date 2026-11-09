@@ -15,7 +15,7 @@ transmit routine (0x8946e480) uses the same model ID.  Not yet tried on an XT.  
 rom.2 at run time, so the runs are derived from firmware tables: they stay in the gitignored folder.
 
 fxcapture.py --check FILE.mid  parses a run back and checks every checksum."""
-import argparse, csv, math, os, struct, sys, wave
+import argparse, csv, math, os, pathlib, struct, sys, wave
 
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..')
 ROM_BASE = 0x89300000
@@ -62,7 +62,7 @@ def probe():
 # ---------------------------------------------------------------- the firmware's tables, read at run time
 class Rom:
     def __init__(self, path):
-        self.b = open(path, 'rb').read()
+        self.b = pathlib.Path(path).read_bytes()
     def s16(self, a): return struct.unpack_from('<h', self.b, a - ROM_BASE)[0]
     def params(self, table, t):
         """A type's parameters: {slot: default}, from its first and last ID and the second descriptor bank."""
@@ -260,7 +260,7 @@ def build(takes, rom, dev, ch, note, wave_s):
 
 def check(path):
     """Reads a run back: format, every SysEx's checksum, the length; prints a summary.  Exits non-zero on any fault."""
-    b = open(path, 'rb').read()
+    b = pathlib.Path(path).read_bytes()
     assert b[:4] == b'MThd' and b[14:18] == b'MTrk', 'not a type 0 file'
     fmt, ntrk, div = struct.unpack('>HHH', b[8:14]); assert (fmt, ntrk, div) == (0, 1, 500), 'header'
     n = struct.unpack('>I', b[18:22])[0]; i = 22; end = 22 + n; assert end == len(b), 'track length'
@@ -311,12 +311,12 @@ def main():
     w.wait(1000); w.setup(); w.wait(500); w.sx(addr_add(COMMON, 0x1d), [1]); w.sx(P_MFX, [1]); w.wait(1500)
     w.note(True, a.note); w.wait(8000); w.sx(addr_add(SYSTEM, 0x05), [40]); w.wait(2000); w.note(False, a.note)
     w.wait(500); w.sx(addr_add(SYSTEM, 0x05), [127]); w.sx(P_MFX, [0]); w.wait(100)
-    open(os.path.join(a.out, 'fx_test.mid'), 'wb').write(w.smf())
+    pathlib.Path(os.path.join(a.out, 'fx_test.mid')).write_bytes(w.smf())
     rows = []
     for name, takes in (('fx_run_1', run1()), ('fx_run_2', run2())):
         smf, r, total = build(takes, rom, a.dev - 1, a.ch - 1, a.note, wave_s)
         p = os.path.join(a.out, name + '.mid')
-        open(p, 'wb').write(smf)
+        pathlib.Path(p).write_bytes(smf)
         for x in r: x['run'] = name
         rows += r
         print('%s.mid: %d takes, %.1f minutes' % (name, len(takes), total / 60))

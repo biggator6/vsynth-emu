@@ -3,14 +3,8 @@
 values and branch targets, without Ghidra (whose project will not open under a path holding .claude,
 as a worktree's does).  Decodes whatever is there, pools included; FP register names are as if
 SZ=0, PR=0.  Listings go in build/, never in the repo.  As a module: dis(pc) -> (text, info)."""
-import struct, sys, os
-ROMP = os.environ.get('ROM', os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../firmware/unpacked/V-SynthXT.rom.2.bin'))
-rom = open(ROMP, 'rb').read()
-B = 0x89300000
-def u16(a): return struct.unpack_from('<H', rom, a - B)[0]
-def u32(a): return struct.unpack_from('<I', rom, a - B)[0]
-def s16(a): return struct.unpack_from('<h', rom, a - B)[0]
-def f32(a): return struct.unpack_from('<f', rom, a - B)[0]
+import struct, sys
+from romfile import rom, B, u16, u32, s16, f32
 def sx8(v): return v - 256 if v & 0x80 else v
 def sx12(v): return v - 4096 if v & 0x800 else v
 def cstr(a, n=60):

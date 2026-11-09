@@ -4,11 +4,8 @@
 min and max (8 bytes per ID from 0x897a56d8).  A COSM type's patch values sit at
 +0x12, +0x14, … in the converter's input, in ID order (the IDs per type: the
 table at 0x897cebd8, or HARDWARE_FIRMWARE.md's type map)."""
-import struct, sys, os
-rom = open(os.environ.get('ROM', os.path.join(os.path.dirname(__file__), '../../firmware/unpacked/V-SynthXT.rom.2.bin')), 'rb').read()
-B = 0x89300000
-def u32(a): return struct.unpack_from('<I', rom, a - B)[0]
-def s16(a): return struct.unpack_from('<h', rom, a - B)[0]
+import sys
+from romfile import rom, B, u32, s16
 def cstr(a):
     o = a - B; return rom[o:rom.index(b'\0', o)].decode('latin1')
 lo, hi = int(sys.argv[1], 16), int(sys.argv[2], 16)

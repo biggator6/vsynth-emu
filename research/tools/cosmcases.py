@@ -11,12 +11,8 @@ image at 0x89858278, the stereo table's at 0x898582cc; .data 0x8987c7ec and
   alloc     0x894ecb00 (delay buffers: codes 7…18 that reach 0x894ecb78 get four)
 A case at the switch's shared exit has none of its own.  Block copies that jump
 on (mov.l/jmp or bra) are followed one step."""
-import struct, sys, os, re
-rom = open(os.environ.get('ROM', os.path.join(os.path.dirname(__file__), '../../firmware/unpacked/V-SynthXT.rom.2.bin')), 'rb').read()
-B = 0x89300000
-def u16(a): return struct.unpack_from('<H', rom, a - B)[0]
-def s16(a): return struct.unpack_from('<h', rom, a - B)[0]
-def u32(a): return struct.unpack_from('<I', rom, a - B)[0]
+import sys, re
+from romfile import u16, s16, u32
 def case(braf, tab, i): return braf + 4 + s16(tab + 2 * i)
 def follow(a):                                   # mov.l @(d,PC),r3; jmp @r3, or bra
     w = u16(a)

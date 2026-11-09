@@ -3,9 +3,8 @@
 literal pool (mov.l @(disp,PC),Rn; with --16, mov.w for 16-bit values in the
 voice code, 0x894d0000..0x89540000), and any raw words equal to it (tables,
 vtables).  Values built from immediates (mov #k; shll8; add) are not found."""
-import struct, sys, os
-rom = open(os.environ.get('ROM', os.path.join(os.path.dirname(__file__), '../../firmware/unpacked/V-SynthXT.rom.2.bin')), 'rb').read()
-B = 0x89300000
+import struct, sys
+from romfile import rom, B
 args = sys.argv[1:]
 w16 = '--16' in args
 for t in (int(a, 16) for a in args if a != '--16'):

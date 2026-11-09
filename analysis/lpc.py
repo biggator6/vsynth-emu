@@ -126,8 +126,9 @@ def extract_formants(audio: np.ndarray, sr: int,
             coeffs = lpc_coefficients(frame, lpc_order)
             f = formants_from_lpc(coeffs, sr, max_formants)
             formants[i] = f
-        except Exception:
-            pass  # leave as NaN
+        except np.linalg.LinAlgError:
+            # np.roots on coefficients that are not finite (a frame's recursion blew up): nothing detected
+            formants[i] = np.nan
 
     return formants
 

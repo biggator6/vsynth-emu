@@ -5,6 +5,7 @@ one event (start to end), its encoder from the file's ISFT tag.  The vpdt: at wo
 count, then the records, u16 length (0xffff: go on) and u16 info, the (256, x) terminator counted.  In a
 stereo wave the same list follows again.  HARDWARE_FIRMWARE.md, "The SOLO encoder's stereo mode"."""
 import glob, os, struct, subprocess, sys, tempfile
+from pathlib import Path
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 xt_enc, rom = sys.argv[1], sys.argv[2]
@@ -37,7 +38,7 @@ def isft(c):
 
 for path in sorted(glob.glob(os.path.join(REPO, 'analysis/projects/Emu_test.prj/Wave/*.wav'))):
     if not os.path.getsize(path): continue
-    c = chunks(open(path, 'rb').read())
+    c = chunks(Path(path).read_bytes())
     if b'vpsc' not in c or c[b'vpsc'][1] != 1 or b'vpdt' not in c: continue    # SOLO
     if struct.unpack_from('<I', c[b'vpdt'], 8)[0] >> 16 != 2: continue           # a start and an end
     if struct.unpack_from('<H', c[b'fmt '], 14)[0] != 16: continue
@@ -45,7 +46,8 @@ for path in sorted(glob.glob(os.path.join(REPO, 'analysis/projects/Emu_test.prj/
     with tempfile.NamedTemporaryFile(suffix='.bin') as f:
         f.write(c[b'data']); f.flush()
         args = [xt_enc, rom, f.name] + (['stereo'] if channels == 2 else [])
-        port = [tuple(map(int, l.split()))[1:] for l in subprocess.run(args, capture_output=True, text=True).stdout.splitlines()]
+        enc = subprocess.run(args, capture_output=True, text=True, check=True)   # a failed encode is never "no records"
+        port = [tuple(map(int, l.split()))[1:] for l in enc.stdout.splitlines()]
     file = stored(c[b'vpdt'])
     diffs = [k for k, (a, b) in enumerate(zip(port, file)) if a != b]
     name = '%s, %d ch, %s' % (os.path.basename(path)[:3], channels, isft(c))
