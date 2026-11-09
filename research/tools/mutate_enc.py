@@ -5,20 +5,10 @@
 # old text is no longer in the source or the run never started.  It stops first if a run with
 # nothing planted doesn't equal the baseline.  enc_muts.txt: name|old|new, with \n and \| escaped.
 import os, re, subprocess, sys
+import mutlist
 D = os.path.dirname(os.path.abspath(__file__))
-names = sys.argv[1:]
 env = dict(os.environ, PORT='enc')
-muts = []
-for line in open(D + '/enc_muts.txt'):
-    line = line.rstrip('\n')
-    if not line: continue
-    p = re.split(r'(?<!\\)\|', line)
-    f = lambda x: x.replace('\\n', '\n').replace('\\|', '|')
-    muts.append((p[0], f(p[1]), f(p[2]) if len(p) > 2 else ''))
-if names:
-    unknown = set(names) - {m[0] for m in muts}
-    if unknown: sys.exit('mutate_enc: not in enc_muts.txt: ' + ' '.join(sorted(unknown)))
-    muts = [m for m in muts if m[0] in names]
+muts = mutlist.plants(D + '/enc_muts.txt', sys.argv[1:], 'mutate_enc')
 PATTERN = 'different|DIFFERENT|no result|TILE'
 if muts:   # with nothing planted: the old text put back as it was.  If this run fails, no plant would mean anything.
     r = subprocess.run(['bash', D + '/mutate.sh', '_control', muts[0][1], muts[0][1], '0', PATTERN], env=env, capture_output=True, text=True)

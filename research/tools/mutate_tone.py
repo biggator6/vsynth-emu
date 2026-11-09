@@ -11,21 +11,11 @@
 # very short records, or a timer that overflows.  seed is for one the default seed's cases
 # don't happen to reach, so fcheck's run doesn't guard it.
 import concurrent.futures as cf, os, re, subprocess, sys
+import mutlist
 D = os.path.dirname(os.path.abspath(__file__))
 cases = sys.argv[1] if len(sys.argv) > 1 else '2000'
-names = sys.argv[2:]
 env = dict(os.environ, PORT='tone', XT_TONE_STOP='1')
-muts = []
-for line in open(D + '/tone_muts.txt'):
-    line = line.rstrip('\n')
-    if not line: continue
-    p = re.split(r'(?<!\\)\|', line)
-    f = lambda x: x.replace('\\n', '\n').replace('\\|', '|')
-    muts.append((p[0], f(p[1]), f(p[2]) if len(p) > 2 else '', p[3] if len(p) > 3 else 'tone', p[4] if len(p) > 4 else ''))
-if names:
-    unknown = set(names) - {m[0] for m in muts}
-    if unknown: sys.exit('mutate_tone: not in tone_muts.txt: ' + ' '.join(sorted(unknown)))
-    muts = [m for m in muts if m[0] in names]
+muts = mutlist.plants(D + '/tone_muts.txt', sys.argv[2:], 'mutate_tone', ('tone', ''))
 script = D + '/mutate.sh'
 subprocess.run(['bash', script, 'zz-base', 'constexpr float kLand', 'constexpr float kLand', '1'], env=env, capture_output=True)   # builds the shared objects
 def run(m, pattern=None):

@@ -4,19 +4,9 @@
 # MISSED, or ERROR when the old text is no longer in the source or the run never started.  It stops first if a run with
 # nothing planted doesn't equal the baseline, for each port the list uses.  files_muts.txt: name|old|new[|port], with \n and \| escaped.
 import os, re, subprocess, sys
+import mutlist
 D = os.path.dirname(os.path.abspath(__file__))
-names = sys.argv[1:]
-muts = []
-for line in open(D + '/files_muts.txt'):
-    line = line.rstrip('\n')
-    if not line: continue
-    p = re.split(r'(?<!\\)\|', line)
-    f = lambda x: x.replace('\\n', '\n').replace('\\|', '|')
-    muts.append((p[0], f(p[1]), f(p[2]) if len(p) > 2 else '', p[3] if len(p) > 3 else 'files'))
-if names:
-    unknown = set(names) - {m[0] for m in muts}
-    if unknown: sys.exit('mutate_files: not in files_muts.txt: ' + ' '.join(sorted(unknown)))
-    muts = [m for m in muts if m[0] in names]
+muts = mutlist.plants(D + '/files_muts.txt', sys.argv[1:], 'mutate_files', ('files',))
 def run(m):
     r = subprocess.run(['bash', D + '/mutate.sh', m[0], m[1], m[2], '0', '^$'], env=dict(os.environ, PORT=m[3]), capture_output=True, text=True)
     out = r.stdout + r.stderr

@@ -4,6 +4,7 @@
 # when it crashes or hangs), MISSED, or ERROR when the old text is no longer in the source or the run never started.  It stops first if the run with nothing planted doesn't say 0 different.
 # The lists: name|old|new, with \\n and \\| escaped.
 import concurrent.futures as cf, os, re, signal, subprocess, sys
+import mutlist
 D = os.path.dirname(os.path.abspath(__file__))
 args = sys.argv[1:]
 control = '--control' in args
@@ -11,17 +12,7 @@ if control: args.remove('--control')
 samples = args.pop(0) if args and args[0].isdigit() else ('60' if control else '4096')
 port, listing, source, tag = ('fxc', 'fxc_muts.txt', 'XtFxControl::boot', 'fxc_') if control else ('fx', 'fx_muts.txt', 'XtFxChip::reset', 'fx_')
 env = dict(os.environ, PORT=port, XT_FX_STOP='1')
-muts = []
-for line in open(D + '/' + listing):
-    line = line.rstrip('\n')
-    if not line or line.startswith('#'): continue
-    p = re.split(r'(?<!\\)\|', line)
-    f = lambda x: x.replace('\\n', '\n').replace('\\|', '|')
-    muts.append((p[0], f(p[1]), f(p[2]) if len(p) > 2 else ''))
-if args:
-    unknown = set(args) - {m[0] for m in muts}
-    if unknown: sys.exit('mutate_fx: not in ' + listing + ': ' + ' '.join(sorted(unknown)))
-    muts = [m for m in muts if m[0] in args]
+muts = mutlist.plants(D + '/' + listing, args, 'mutate_fx')
 def results(out): return [l for l in out.splitlines() if re.search(r': \d+ (samples|edits), \d+ different', l)]
 # With nothing planted, which also builds the shared objects.  If this run fails, every plant's would, and would read as caught.
 base = subprocess.run(['bash', D + '/mutate.sh', tag + '_control', source, source, samples, 'different'], env=env, capture_output=True, text=True, timeout=600)
