@@ -35,7 +35,8 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## Tools (`research/tools/`, paths in `env.sh`; work files in `build/tools/`)
 - `verify.sh [--full] [rev]`: the standard validation, one line each — firmware checks
   vs baseline, A/B renders vs `rev` (default HEAD), plugin build, PluginTest, the same through the chip,
-  the effects' panel, the editor's layout, engine tests, auval. Run it for every version; `--full` before a push.
+  the effects' panel, the editor's layout, engine tests, auval. Run it for every version; `--full` before a push. Every line
+  fails the run when its program fails. `verify_test.sh` (when verify.sh changes; it runs it whole): a stub auval that fails must fail the run.
 - `fcheck.sh [--update] [--full]`: every firmware harness on fixed cases against
   `fcheck_baseline.txt`, side by side. In a worktree set `PY` to the main checkout's `.venv/bin/python3`. A section is reused when its binary, command,
   ROM and inputs are those of a run that matched the baseline (`build/tools/fcheck/kept`

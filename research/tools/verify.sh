@@ -47,9 +47,16 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_PATCH_APPLY=1 build/plugin/VSynthEmuTest "$ROM" x 2>&1) || rc=1; echo "$o" | tail -1; }
 # A .vpw through the processor, against XtSynth on the same audio: a preset wave, mono and stereo, on its own encode type
 [ $BUILT = 1 ] && { n=0; for w in 0 300; do "$WORK/fcheck/bin/xt_files" "$ROM" extract $w "$WORK/verify_$w.vpw" > /dev/null; o=$(cd "$REPO" && build/plugin/VSynthEmuTest "$ROM" "$WORK/verify_$w.vpw" 60 auto 2>&1); echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "the wave's own" && n=$((n+1)); done; echo ".vpw, plugintest: $n/2 bit-identical"; [ $n = 2 ] || rc=1; }
-echo "engine tests: $("$WORK/fcheck/bin/engine_tests" 2>&1 | tail -1)"
+# The engine's invariants: the run fails as the program does, not only its text
+o=$("$WORK/fcheck/bin/engine_tests" 2>&1) || rc=1
+echo "engine tests: $(echo "$o" | tail -1)"
 # Which build: the script on a repository of its own, then the copies this build made against git
 bash "$D/buildid_test.sh" || rc=1
 [ $BUILT = 1 ] && { bash "$D/buildid.sh" || rc=1; }
-[ $BUILT = 1 ] && echo "auval: $(auval -v aumu VsEm Ystu 2>&1 | grep -o "AU VALIDATION SUCCEEDED\|FAIL.*" | head -1)"
+# The AU as a host sees it: the run fails unless auval succeeds and says so
+if [ $BUILT = 1 ]; then
+    o=$(auval -v aumu VsEm Ystu 2>&1) || rc=1
+    echo "auval: $(echo "$o" | grep -o "AU VALIDATION SUCCEEDED\|FAIL.*" | head -1)"
+    echo "$o" | grep -q "AU VALIDATION SUCCEEDED" || rc=1
+fi
 exit $rc

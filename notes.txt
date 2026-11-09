@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+verify.sh fails as its last lines do v170 (2026-11-09), tools only: R4 of .claude/claude-packs-review.md. The engine tests' and
+  auval's lines were echoed and never set rc, so a version could pass verify.sh with either failing. Now the engine tests fail the
+  run as their program does (it returns 1 on a failure), and auval unless it exits 0 and says AU VALIDATION SUCCEEDED.
+  Check: verify_test.sh (research/tools; tests of the tools sit beside them, the user's choice, so layout.json's tests concept has
+  research/tools/*_test.*) runs verify.sh with a stub auval first on PATH that fails: before, verify.sh exited 0 with "auval: FAIL:
+  a stub auval"; after, non-zero. Not in verify.sh, which it runs whole.
+
 A wave's frames bounded by its data v169 (2026-11-09), no change on any real wave: R2 of .claude/claude-packs-review.md.
   An RDAC wave's vpsc frame count was never held to its data chunk: a 100-byte .vpw claiming 64M stereo frames read "ok" after 10 s
   and 268 MB, silence past its 16 bytes, and past 2^31 samples the plugin's int buffers went negative. xtWaveRead now refuses fewer

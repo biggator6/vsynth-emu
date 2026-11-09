@@ -3570,6 +3570,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-09) — v170: verify.sh's last two lines
+
+- Two of verify.sh's lines printed a verdict nobody counted: the engine tests' and auval's. Both programs say how they did in their exit status, and the script threw it away. The test runs verify.sh whole with an auval that fails on purpose. Before the fix it printed "auval: FAIL" and exited 0.
+- The test is slow, as it runs everything verify.sh runs, so it isn't in verify.sh. It's for when verify.sh changes. It counts on the rest passing, so it comes after a verify.sh that did.
+
 ### Session 18 (2026-11-09) — v169: a wave held to its data
 
 - The review had said a truncated wave loads with a silent tail. That's only half right: a file cut off at its end was always refused, as a chunk running past the end. What got through was a data chunk whole in itself but shorter than the header, which only a damaged writer or a made-up file gives.
