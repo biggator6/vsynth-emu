@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-09) — v168: an encode that stops
+
+- The kit's review of the project (`.claude/claude-packs-review.md`) put this first: close the plugin during a long encode and the host hangs, then writes into freed memory. The 10 s the destructor waited looked generous until a 30 s BACKING wave took 10.9 s to encode. The test closes one at 1 s, and on the old code took 10,765 ms.
+- The fix I wanted first was in the destructor: raise a flag, bump the gens and wait with no deadline. The kit's guards wouldn't have it. template-law judges the whole function an edit lands in, and the destructor's listener list repeats the constructor's. Making that list one function adds lines to PluginProcessor.cpp, which file-size-guard refuses, and the whole change came out one line over. The destructor already calls `removeAllJobs(true, ...)`, which signals the running job to exit. Our lambdas never heard it. A job class that turns the signal into the interpreter's stop flag needed nothing in the destructor.
+- The stop is looked at once in 65536 steps, on the step counter's low bits. My first mask, `== 0`, would have missed for ever in some loops: the counter rises by 2 on a delayed branch, so a loop of even length entered on an odd count never lands on a multiple. The look is now at 0 or 1, which every crossing lands on.
+- The kit's red gate, `test-verdict.mjs --red`, reads CTest output, and this project's tests aren't CTest. The red was shown by running the test itself.
+
 ### Session 16 addendum (2026-11-09) — v161: v146 joins
 
 - The user asked whether everything was ready to push, and it wasn't: master's v146 had never reached this branch, which has a v146 of its own. Each took the next number from its own branch, 26 minutes apart. v141's lesson was about numbers only claimed; this one was committed, and `git log --all` would have shown it.

@@ -159,6 +159,7 @@ private:
 
     // ── Encoding (background) ────────────────────────────────────────────────
     juce::ThreadPool encodePool_ { 1 };
+    void addEncode(std::function<void()> job);   // a job on the pool whose firmware stops when the pool asks it to (v168)
     mutable juce::CriticalSection statusLock_;
     juce::String status_;
     void reencode(int osc);

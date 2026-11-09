@@ -135,7 +135,7 @@ bool Sh4::call(uint32_t addr, std::initializer_list<uint32_t> args, uint32_t sp,
     err.clear();
     const uint64_t limit = nsteps + maxSteps;
     bool ok = true;
-    while (pc != kSentinel) {
+    while (pc != kSentinel && !Sh4StopScope::stopped(nsteps, err)) {
         if (hookFilter[(pc >> 1) & 0xffff]) {
             auto h = hooks.find(pc);
             if (h != hooks.end()) {

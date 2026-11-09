@@ -2034,7 +2034,7 @@ void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce
     xtActive_.store(true);
     zonesReady_.store(want.empty());
     if (want.empty()) return;
-    encodePool_.addJob([this, gen, set, want = std::move(want), files = std::move(files)] {
+    addEncode([this, gen, set, want = std::move(want), files = std::move(files)] {
         std::map<int, std::shared_ptr<XtEncoded>> enc;
         for (const auto& [number, w] : files) {
             if (gen != zonesGen_.load()) return;
@@ -2094,7 +2094,7 @@ void VSynthEmuProcessor::reencode(int osc) {
     const int gen = ++w.gen;
     const juce::String who = osc ? "OSC 2: " : "";
     setStatus(who + "Encoding...");
-    encodePool_.addJob([this, chans = std::move(chans), rate, bits, choice, depth, gen, osc, who, own, ownWave = std::move(ownWave), isOwn] {
+    addEncode([=, this, chans = std::move(chans), ownWave = std::move(ownWave)] {
         int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : choice == 4 ? 0 : own;   // Auto: what the wave says it is, or
         if (0 > type) {   // Auto: the engine's content classifier
             std::vector<float> mono(chans[0].size());

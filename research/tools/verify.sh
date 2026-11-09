@@ -2,7 +2,7 @@
 # verify.sh [--full] [git rev]: the standard validation of a version, one line each —
 # firmware checks against the baseline (--full: all of them run, none reused), A/B
 # renders against a revision (default HEAD; settings from XT_* env), the plugin build,
-# PluginTest (TEST_* env), the effects' panel, the editor's layout, the ROM search, a patch through the parameters, a .vpw, the engine tests, the build id and auval.
+# PluginTest (TEST_* env), the effects' panel, the editor's layout, the ROM search, a processor closed mid-encode, a patch through the parameters, a .vpw, the engine tests, the build id and auval.
 source "$(dirname "$0")/env.sh"
 D="$(dirname "$0")"; rc=0; F=""; BUILT=1
 [ "$1" = "--full" ] && { F=--full; shift; }
@@ -39,6 +39,8 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_FX_PANEL=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_UI_LAYOUT=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_ROM_SEARCH=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
+# A processor closed while its wave is encoding: closed in ms, and the next one encodes as before
+[ $BUILT = 1 ] && { o=$(cd "$REPO" && build/plugin/VSynthEmuTeardownTest "$ROM" 2>&1) || rc=1; echo "$o" | tail -1; }
 # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_PATCH_APPLY=1 build/plugin/VSynthEmuTest "$ROM" x 2>&1) || rc=1; echo "$o" | tail -1; }
 # A .vpw through the processor, against XtSynth on the same audio: a preset wave, mono and stereo, on its own encode type

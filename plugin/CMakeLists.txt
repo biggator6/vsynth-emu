@@ -52,6 +52,7 @@ juce_add_plugin(VSynthEmu
 # ─── Sources ─────────────────────────────────────────────────────────────────
 target_sources(VSynthEmu PRIVATE
     Source/PluginProcessor.cpp
+    Source/PluginEncodes.cpp
     Source/PluginEditor.cpp
     Source/FxPanel.cpp
     Source/VariphraseEngine.cpp
@@ -107,15 +108,19 @@ target_compile_definitions(VSynthEmu PUBLIC
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
-# ─── End-to-end test of the processor's XT path (not built by default) ──────
-add_executable(VSynthEmuTest EXCLUDE_FROM_ALL Tests/PluginTest.cpp)
-target_link_libraries(VSynthEmuTest PRIVATE VSynthEmu)
-# JUCE's headers and settings as the plugin's shared code sees them
-target_include_directories(VSynthEmuTest PRIVATE $<TARGET_PROPERTY:VSynthEmu,INCLUDE_DIRECTORIES>)
-target_compile_definitions(VSynthEmuTest PRIVATE $<TARGET_PROPERTY:VSynthEmu,COMPILE_DEFINITIONS>)
-# What verify.sh builds, in one make: the plugin's links and the test's run side by side
+# ─── Tests of the processor (not built by default) ───────────────────────────
+# A test linked to the plugin's shared code, with JUCE's headers and settings as that code sees them
+function(vse_add_test name)
+    add_executable(${name} EXCLUDE_FROM_ALL ${ARGN})
+    target_link_libraries(${name} PRIVATE VSynthEmu)
+    target_include_directories(${name} PRIVATE $<TARGET_PROPERTY:VSynthEmu,INCLUDE_DIRECTORIES>)
+    target_compile_definitions(${name} PRIVATE $<TARGET_PROPERTY:VSynthEmu,COMPILE_DEFINITIONS>)
+endfunction()
+vse_add_test(VSynthEmuTest Tests/PluginTest.cpp)               # the XT path end to end
+vse_add_test(VSynthEmuTeardownTest Tests/TeardownTest.cpp)     # a processor closed while its wave is encoding
+# What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
-add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest)
+add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.

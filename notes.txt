@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Encodes that stop when their processor closes v168 (2026-11-09), no change to the sound: R1 of .claude/claude-packs-review.md.
+  An encode runs the firmware in the interpreter on the processor's pool thread (a 30 s BACKING wave: 10.9 s), and a lambda job never
+  heard removeAllJobs(true, ...) ask it to stop. So the destructor gave up after its 10 s, the members after encodePool_ (status_,
+  statusLock_) were destroyed under the running job, which still called setStatus, and the pool killed its thread. Each encode is now
+  an EncodeJob (PluginEncodes.cpp, addEncode) that turns the pool's exit signal into a flag the interpreter looks at once in 65536
+  steps (Sh4StopScope in Sh4Interp.h; Sh4::call returns false, error "stopped"). Steps rise by 1 or 2 an instruction, a delay slot
+  counting, so the look is at the low bits 0 or 1: a plain multiple can be stepped over for ever. With no scope held a call runs as
+  before. The destructor is as it was, and its wait now ends in ms.
+  Not done: the destructor still gives up after 10 s, so work after a stopped call that isn't the firmware's (Auto's classifier, the
+  port's SOLO encoder, the resampler for a rate the converter won't take) would still reach the old fault past that: for the SOLO
+  encoder, at 0.33 s per 30 s, about 15 minutes of audio (an estimate). R2, a wave's frames bounded by its data, is the rest. The wait
+  wants no deadline: template-law refuses any edit of the destructor while its parameter list repeats the constructor's, and
+  file-size-guard any growth of PluginProcessor.cpp, where the one list would go.
+  Check: VSynthEmuTeardownTest (plugin/Tests/TeardownTest.cpp; TestAppDir.h, shared with PluginTest), in verify.sh: a 30 s BACKING
+  encode, the processor closed at 1 s: 10765 ms before, 6 ms after; the next processor encodes as before.
+
 v146 joins v161 (2026-11-09), tools only, no change to the plugin: master's v146, the planted-error runners, merged with v160 on the user's word. Two commits carry v146: this branch's, the firmware image found by itself, and master's, made 26 minutes later from v145 on master. Only the docs conflicted; master's entries sit after v147's. Its rule, a run with nothing planted first, is now in mutate_files.py too, which came after it here, and that run failed at once: xt_files gained lines in v148 and v155 that mutate.sh's files ports didn't take from the baseline, so every plant since v148 read caught on those lines alone. mutate.sh now takes the baseline's whole xt_files section, and a line of it that the run doesn't print differs too. solo-start-seek-anchor, left on v159's text when v160 rewrote the seek's close, is moved onto it.
   Check: verify.sh --full passes: fcheck as its baseline (664 checks, all 162 sections run), A/B 4/4 identical to v160, PluginTest 4/4 plain and through the chip with the rest of its lines, auval. No ROM and a junk ROM stop mutate_files.py. Plants: mutate_files.py 49, none missed, on the whole section (a plant that changes one line reads 2: the line it printed and the baseline's it didn't); mutate_tone.py 1138, none missed, solo-start-seek-anchor caught at case 13 once moved; mutate_enc.py 34, none missed; mutate_fx.py 97, the 2 missed that v126 explains; --control 157, the 1 missed at 60 events since v138. mutate_panel.py wasn't run: nothing it plants in or runs changed.
 

@@ -5,11 +5,33 @@
 // both banks, SZ = 1 pair moves, FIPR / FTRV) with the rounding mode taken
 // from FPSCR.RM; no MMU, caches, exceptions or peripherals.  Firmware calls
 // that need the OS (malloc, UI) are served by C++ hooks.
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+// A thread's stop flag (v168).  While a scope holds one on a thread, a call there returns false, error() "stopped",
+// within 65536 instructions of the flag going up: for a firmware routine its owner may abandon, an encode whose
+// processor is closing.  With none held a call runs as it always has, to its return or its step limit.
+class Sh4StopScope {
+public:
+    explicit Sh4StopScope(const std::atomic<bool>& stop) : outer(current) { current = &stop; }
+    ~Sh4StopScope() { current = outer; }
+    Sh4StopScope(const Sh4StopScope&) = delete;
+    Sh4StopScope& operator=(const Sh4StopScope&) = delete;
+    // True, with `err` "stopped", when this thread's flag is up.  Looked at once in 65536 steps: they rise by 1 or 2
+    // an instruction (a delay slot counts), so each 65536th crossed lands on 0 or 1 of the low bits.
+    static bool stopped(uint64_t steps, std::string& err) {
+        if ((steps & 0xfffe) != 0 || !current || !current->load(std::memory_order_relaxed)) return false;
+        err = "stopped";
+        return true;
+    }
+private:
+    inline static thread_local const std::atomic<bool>* current = nullptr;
+    const std::atomic<bool>* outer;
+};
 
 class Sh4 {
 public:
@@ -47,8 +69,8 @@ public:
     void ret(uint32_t v) { r[0] = v; pc = pr; }
 
     // Call a firmware routine: r4..r7 = args, stack at sp, returns r0.  Runs
-    // until it returns to an internal sentinel; false on a fault or after
-    // maxSteps instructions (error() says why).
+    // until it returns to an internal sentinel; false on a fault, after
+    // maxSteps instructions, or once its thread's stop flag is up (error() says why).
     bool call(uint32_t addr, std::initializer_list<uint32_t> args, uint32_t sp, uint32_t* r0 = nullptr,
               uint64_t maxSteps = 20000000000ull);
     const std::string& error() const { return err; }
