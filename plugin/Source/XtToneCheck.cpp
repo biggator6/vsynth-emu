@@ -1227,6 +1227,7 @@ int XtToneProbe::run(int argc, char** argv) {
     if (!fw.open(argv[1])) { std::fprintf(stderr, "firmware\n"); return 2; }
     // The PCM cases' waves: SOLO mono and stereo, BACKING, ENSEMBLE
     std::vector<TestWave> waves, liteWaves, eventWaves;
+    bool segShiftFailed = false;                        // the 6-hit wave's segments couldn't be moved (below): reported once the report is up
     // The COSMs' buffers each case (the pool's slot finder, hooked): past the waves, which they'd write over, and below the zones' chunks
     uint32_t cosmBase = kRam + 0x1000000;
     if (argc > 4) {
@@ -1259,6 +1260,26 @@ int XtToneProbe::run(int argc, char** argv) {
                 std::vector<XtRecord> rr;                  // the SOLO plan's kinds read back from it, as a wave's are
                 XtSoloPlan back;
                 if (w.type == 1 && xtSoloReadVpdt(t.enc->vpdt, w.ch, rr, back)) t.enc->solo.evKind = back.evKind;
+            }
+            // The 6-hit SOLO wave's middle segments (all but the first and the last two) starting 1/16 past its records' sum, on both sides, as
+            // preset 270's segment 3 does: a seek's segments and a loop event's records count from a segment's start (v160), which no wave whose
+            // layout agrees with itself tells apart
+            if (w.type == 1 && w.hits == 6) {
+                uint32_t seg0 = 0;
+                std::memcpy(&seg0, &t.enc->vpdt[24], 4);
+                const size_t nseg = t.enc->solo.segPos.size();
+                for (size_t k = 1; nseg >= 4 && k + 2 < nseg; ++k) {
+                    const size_t at = seg0 + 12 * k + 8;
+                    uint32_t x = 0;
+                    std::memcpy(&x, &t.enc->vpdt[at], 4);
+                    ++x;
+                    std::memcpy(&t.enc->vpdt[at], &x, 4);
+                    fw.c.wr32(t.fw.chunk[5] + (uint32_t)at, x);
+                }
+                std::vector<XtRecord> rr;
+                XtSoloPlan back;
+                if (nseg < 4 || !xtSoloReadVpdt(t.enc->vpdt, w.ch, rr, back) || back.segPos.size() != nseg) segShiftFailed = true;
+                else t.enc->solo.segPos = back.segPos;
             }
             eventWaves.push_back(std::move(t));
         }
@@ -1308,6 +1329,7 @@ int XtToneProbe::run(int argc, char** argv) {
     syn.setSample(nullptr, 0, 1);                       // the Wave Numbers patchOf gives, from the first patch on, as the firmware's
     syn.setSample(nullptr, 1, 2);
     Report rep;
+    if (segShiftFailed) rep.bad("the 6-hit SOLO wave's segments not moved: too few, or its vpdt then unreadable", "%.0f", 0, 0, -1);
     long blocks = 0, notes = 0, wild = 0, legatos = 0, truncates = 0, zoneNotes = 0, zonesSeen = 0, playerTakes = 0, endSkips = 0, eventNotes = 0, soloEventNotes = 0, segMoves = 0, kindTurns = 0, termGrains = 0;
     std::map<const XtSoloVoice*, int> segSeen, kindSeen, termSeen;   // each SOLO player's moves between segments, turns at a kind-1 event and grains on the terminator, as last counted
     float L[32], R[32];
@@ -1499,9 +1521,9 @@ int XtToneProbe::run(int argc, char** argv) {
             }
             if (!oddCase) ++(t.enc->stored ? storedOwn : storedAgain)[w.encodeType];
             bool oddT = false;                      // its terminator, from the file's bytes: not the XT's (256, 1)
-            // taken as it is exactly where it should be: its events from 0 to the end, never back; a band wave's each on a whole sample, a
-            // SOLO wave's records (their length words, the terminator's left out) reaching its last event, which only preset 270's don't; and
-            // then the file's own bytes
+            // taken as it is exactly where it should be: its events from 0 to the end, never back; a band wave's each on a whole sample; a
+            // SOLO wave's records reaching its last event, from the start of the segment before the end's by their length words, at most to it
+            // and the terminator past it (preset 270's stop 18/16 short); and then the file's own bytes
             {
                 bool whole = w.events.size() >= 2 && w.events.front() == 0 && (long)w.events.back() == w.frames * 16;
                 for (size_t i = 0; whole && i < w.events.size(); ++i) whole = (w.encodeType == 1 || w.events[i] % 16 == 0) && (i == 0 || w.events[i] >= w.events[i - 1]);
@@ -1509,10 +1531,16 @@ int XtToneProbe::run(int argc, char** argv) {
                     const auto rd = [&](size_t o, int n) { uint32_t x = 0; if (o + (size_t)n <= w.vpdt.size()) std::memcpy(&x, &w.vpdt[o], (size_t)n); return x; };
                     const size_t rec0 = rd(28, 4);
                     const uint32_t words = rec0 >= 4 ? rd(rec0 - 4, 4) : 0;
-                    long sum = 0;
-                    for (uint32_t k = 0; k + 1 < words; ++k) sum += (long)rd(rec0 + 4 * k, 2);
-                    whole = sum == w.frames * 16;
-                    oddT = words >= 1 && rd(rec0 + 4 * (words - 1), 4) != (256u | 1u << 16);
+                    const size_t seg0 = rd(24, 4), term = rec0 + 4 * (words >= 1 ? words - 1 : 0);
+                    size_t end = seg0;                 // the end's segment entry, at the last event
+                    while (end + 12 <= rec0 && (long)rd(end + 8, 4) != w.frames * 16) end += 12;
+                    long reach = -1;
+                    if (end > seg0 && end + 12 <= rec0) {
+                        reach = (long)rd(end - 12 + 8, 4);
+                        for (size_t o = rd(end - 12, 4) & ~1u; o < term; o += 4) reach += (long)rd(o, 2);
+                    }
+                    whole = reach >= 0 && reach <= w.frames * 16 && reach + (long)rd(term, 2) >= w.frames * 16;
+                    oddT = words >= 1 && rd(term, 4) != (256u | 1u << 16);
                 }
                 rep.checks += 2;
                 if (t.enc->stored != whole) rep.bad(std::string("stored: ") + src.name + (whole ? " not played on its vpdt" : " played on a vpdt it can't be"), "events %.0f, type %.0f", (double)w.events.size(), w.encodeType, 0);
@@ -1796,6 +1824,19 @@ int XtToneProbe::run(int argc, char** argv) {
             o->tDepth = 0; o->lfoTimeDepth = 0; o->oscTimeKF = 0; o->tempoSync = false; o->timeTrip = false;
         }
         if (oddCase) { if (wv) ctl.on = true; if (wv2) ctl.osc2.on = true; }   // and the OSC playing it on
+        // One SOLO segments case in four: a note from a middle segment's start, RETRIGGER and walking forward, so its seek steps from the event
+        // before into that segment (0x8950ff26); by the case's number, no draw, so the cases after it draw as they did
+        if (segCase && g % 4 == 0)
+            for (int k = 0; k < 2; ++k) {
+                const TestWave* t = k ? wv2 : wv;
+                OscC& o = k ? static_cast<OscC&>(ctl.osc2) : static_cast<OscC&>(ctl);
+                if (!t || t->type != 1 || t->enc->solo.segPos.size() < 4) continue;
+                const std::vector<int32_t>& sp = t->enc->solo.segPos;
+                o.startOffset = std::min((sp[1 + (size_t)(g / 4) % (sp.size() - 3)] + 15) / 16, (int32_t)t->fw.frames - 1);
+                o.playbackMode = 0;
+                o.oscTimeOffset = 2;
+                o.oscTime = std::abs(o.oscTime);
+            }
         if (!patchCase) { ctl.mono = kind >= 2; ctl.legato = kind == 2; }
         if (wv) {
             syn.setSample(wv->enc, 0, 1);              // the Wave Numbers patchOf gives, which never change here
@@ -3052,18 +3093,19 @@ int XtToneProbe::run(int argc, char** argv) {
                     if (took) rep.bad("own events: markers not from the start to the end", "type %.0f, from %.0f", w.type, (double)bad.front(), 0);
                 }
             // its own vpdt given back as a file's: played as it is; changed so it doesn't fit (the last event off the end, the first off 0, two
-            // out of order, one between samples on a band wave, a SOLO wave's records a sample short of its last event): encoded again.  A SOLO
-            // wave's event between samples is played as it is, as V-Trainer 1.00 writes them
+            // out of order, one between samples on a band wave, a SOLO wave's records a sample long, or a sample short of its last event with a
+            // terminator too short to reach it): encoded again.  A SOLO wave's event between samples is played as it is, as V-Trainer 1.00 writes them, and its
+            // records a sample short, which the terminator reaches, as preset 270's
             {
                 const std::vector<uint8_t> v0 = E0->vpdt;
                 const uint32_t st = w.type == 1 ? (w.ch == 2 ? 16 : 10) : (w.ch == 2 ? 0x58 : 0x2e), first = w.type == 1 ? 8 : 14, nev = (uint32_t)(v0[10] | v0[11] << 8);
                 const auto at = [&](uint32_t e) { return (size_t)((st * e + first) * 2 + 4); };
                 const auto put = [](std::vector<uint8_t>& v, size_t o, int32_t x) { for (int i = 0; i < 4; ++i) v[o + (size_t)i] = (uint8_t)((uint32_t)x >> (8 * i)); };
                 const auto get = [](const std::vector<uint8_t>& v, size_t o) { int32_t x; std::memcpy(&x, &v[o], 4); return x; };
-                rep.checks += 6;
+                rep.checks += 8;
                 const auto S0 = xtSynthEncode(chans, 44100.0, w.type, 64, nullptr, 16, &ev0, &v0);
                 if (!S0 || !S0->stored || S0->vpdt != v0) rep.bad("own events: its own vpdt given back", "type %.0f, %.0f events", w.type, (double)nev, 0);
-                std::vector<uint8_t> bad[5] = { v0, v0, v0, v0, v0 };
+                std::vector<uint8_t> bad[7] = { v0, v0, v0, v0, v0, v0, v0 };
                 put(bad[0], at(nev - 1), get(v0, at(nev - 1)) - 16);
                 put(bad[1], at(0), 16);
                 if (nev >= 4) { const int32_t a = get(v0, at(1)), b = get(v0, at(2)); put(bad[2], at(1), b); put(bad[2], at(2), a); }
@@ -3071,14 +3113,20 @@ int XtToneProbe::run(int argc, char** argv) {
                 if (w.type == 1) {                  // the last record's last length word a sample shorter
                     const size_t rec0 = (size_t)get(v0, 28), words = (size_t)get(v0, rec0 - 4), o = rec0 + 4 * (words - 2);
                     const uint16_t len = (uint16_t)(v0[o] | v0[o + 1] << 8);
-                    if (len > 16 && len != 0xffff) { bad[4][o] = (uint8_t)(len - 16); bad[4][o + 1] = (uint8_t)((len - 16) >> 8); }
+                    if (len > 16 && len != 0xffff) {
+                        bad[4][o] = (uint8_t)(len - 16); bad[4][o + 1] = (uint8_t)((len - 16) >> 8);
+                        bad[5] = bad[4];                // and the terminator 8 long
+                        bad[5][rec0 + 4 * (words - 1)] = 8; bad[5][rec0 + 4 * (words - 1) + 1] = 0;
+                    }
+                    if (len + 16 < 0xffff) { bad[6][o] = (uint8_t)(len + 16); bad[6][o + 1] = (uint8_t)((len + 16) >> 8); }   // a sample longer
                 }
-                static const char* why[5] = { "the last event off the end", "the first off 0", "two out of order", "one between samples", "its records a sample short" };
-                for (int k = 0; k < 5; ++k) {
-                    if ((k == 2 && nev < 4) || (k == 4 && (w.type != 1 || bad[4] == v0))) continue;
+                static const char* why[7] = { "the last event off the end", "the first off 0", "two out of order", "one between samples", "its records a sample short",
+                                              "its records a sample short and the terminator 8", "its records a sample long" };
+                for (int k = 0; k < 7; ++k) {
+                    if ((k == 2 && nev < 4) || (k >= 4 && (w.type != 1 || bad[k] == v0))) continue;
                     const auto Sk = xtSynthEncode(chans, 44100.0, w.type, 64, nullptr, 16, &ev0, &bad[k]);
-                    if (k == 3 && w.type == 1) {
-                        if (!Sk || !Sk->stored || Sk->vpdt != bad[3]) rep.bad("own events: a SOLO vpdt with one between samples not played as it is", "%.0f events", (double)nev, 0, 0);
+                    if ((k == 3 || k == 4) && w.type == 1) {
+                        if (!Sk || !Sk->stored || Sk->vpdt != bad[k]) rep.bad(std::string("own events: a SOLO vpdt with ") + why[k] + " not played as it is", "%.0f events", (double)nev, 0, 0);
                     } else if (!Sk || Sk->stored) rep.bad(std::string("own events: a vpdt with ") + why[k] + " played as it is", "type %.0f", w.type, 0, 0);
                 }
             }

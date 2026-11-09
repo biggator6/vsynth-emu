@@ -44,7 +44,7 @@ double wrapAnchor(double a) {
 
 bool xtSoloReadVpdt(const std::vector<uint8_t>& v, int channels, std::vector<XtRecord>& recs, XtSoloPlan& P) {
     recs.clear();
-    P.evPos.clear(); P.evKind.clear(); P.evSeg.clear(); P.segPos.clear(); P.segRec.clear(); P.segFirst.clear();
+    P.evPos.clear(); P.evKind.clear(); P.evSeg.clear(); P.evRec.clear(); P.evRecStart.clear(); P.segPos.clear(); P.segRec.clear(); P.segFirst.clear();
     P.pastStart = 0x7fffffff; P.pastLen = 0;
     P.termLen = 16.0; P.termInfo = 1;
     const size_t n = v.size();
@@ -90,20 +90,34 @@ bool xtSoloReadVpdt(const std::vector<uint8_t>& v, int channels, std::vector<XtR
         P.segRec.push_back(idx);
         P.segFirst.push_back((int16_t)r16(ro));
     }
-    // the events: their positions and segments
+    // the events: their positions, segments and records (one a record starts at, or the terminator), and each record's start by the mark
     for (uint32_t e = 0; e < nev; ++e) {
-        const size_t o = (st * e + 8) * 2, so = r32(o + 8);
+        const size_t o = (st * e + 8) * 2, so = r32(o + 8), ro = r32(o + 12);
         if (so < seg0 || (so - seg0) % 12 != 0 || (so - seg0) / 12 >= nseg) return false;
+        int idx = -1;
+        if (ro == term) idx = (int)recs.size();
+        else if (const auto it = std::lower_bound(off.begin(), off.end(), ro); it != off.end() && *it == ro) idx = (int)(it - off.begin());
+        if (idx < 0) return false;
         P.evPos.push_back((int32_t)r32(o + 4));
         P.evKind.push_back((uint8_t)(r32(o) & 0xb));
         P.evSeg.push_back((int)((so - seg0) / 12));
+        P.evRec.push_back(idx);
+        P.evRecStart.push_back((int32_t)(r32(o + 4) + ((uint32_t)r16(o + 16) - (uint32_t)r16(ro))));
     }
     // the entry after the last segment's, as 0x8950d770 reads it: its start the third word, its record at the first word taken as an
     // offset, bit 0 cleared.  A mono wave's is the record count, then the records; a stereo wave's the second list's count and entries
     const size_t past = seg0 + 12 * nseg;
     P.pastStart = (int32_t)r32(past + 8);
     P.pastLen = (int16_t)r16(r32(past) & ~1u);
-    return recs.size() >= 1 && P.evPos.back() == at && P.evPos.front() == 0;
+    // The records reach the last event: from the last segment before the end's, at its start, by their own lengths as the walk takes them,
+    // to the last event at most, and the terminator from there past it (preset 270's stop 18/16 short of it; the records' running sum,
+    // `at`, is not what the player reads, as a segment can start off it: preset 270's segment 3 by 1/16)
+    (void)at;
+    if (recs.empty() || P.segPos.size() < 2 || P.evPos.front() != 0) return false;
+    const size_t ks = P.segPos.size() - 2;
+    int64_t reach = P.segPos[ks];
+    for (size_t i = (size_t)P.segRec[ks]; i < recs.size(); ++i) reach += recs[i].len16;
+    return reach <= P.evPos.back() && reach + (int64_t)r16(term) >= P.evPos.back();
 }
 
 // A record's length in samples; past the last record, the terminator's (16 in every wave there is).
@@ -273,16 +287,49 @@ int XtSoloVoice::segContaining(int32_t pos16) const {
 // filter's cutoff if it is unvoiced.
 void XtSoloVoice::eventJump(int e) {
     eventAt(e);
-    jumpTo(evAt(e));
+    if (laidOut()) {
+        const size_t k = (size_t)std::clamp(e, 0, evLast());
+        jumpRecord(evAt(e), (size_t)p->evRec[k], p->evRecStart[k] / 16.0);
+    } else jumpTo(evAt(e));
     segCur = evSegAt(e);
+}
+
+bool XtSoloVoice::laidOut() const { return p->evPos.size() >= 2 && p->segPos.size() >= 2 && p->evRec.size() == p->evPos.size() && p->evRecStart.size() == p->evPos.size(); }
+
+// 0x8950d7e2…0x8950d836: the position and the anchor there, the record loaded from the start given (0x8950d4c0), and the Energy filter's
+// cutoff cleared if it is unvoiced
+void XtSoloVoice::jumpRecord(int32_t pos16, size_t i, double start) {
+    Pi = pos16;
+    Pf = 0;
+    seg = std::min(i, p->size());
+    recStart = start;
+    recEnd = recStart + lenOf(seg);
+    loaded();
+    anchor = pos16 / 16.0;
+    if (seg >= p->size() ? !(p->termInfo & 4) : !p->voiced[seg]) f0n = 0.0f;
+}
+
+// The record containing a position, walked from segment k's first record at the segment's start by the records' own lengths, as the
+// seek walks them (0x8950ff50) and the check builds a loop event's (the XT's builder isn't found); the terminator past them
+void XtSoloVoice::recordFrom(int k, int32_t pos16, size_t& i, double& start) const {
+    i = segRecAt(k);
+    start = segAt(k) / 16.0;
+    const double L = pos16 / 16.0;
+    while (i < p->size() && !(start + lenOf(i) > L)) { start += lenOf(i); ++i; }
 }
 
 // 0x8950d7d0: the same from a cached loop event, which names its event (the last before its point), its segment entry (the one
 // containing it) and its record.
 void XtSoloVoice::loopJump(int32_t pos16) {
     eventAt(eventBefore(pos16));
-    jumpTo(pos16);
-    segCur = segContaining(pos16);
+    const int k = segContaining(pos16);
+    if (laidOut()) {
+        size_t i;
+        double start;
+        recordFrom(k, pos16, i, start);
+        jumpRecord(pos16, i, start);
+    } else jumpTo(pos16);
+    segCur = k;
 }
 
 // 0x8950fed0 with byte 0 bit 7: event 0, then the last event before the position (0x8950f9c0) and its jump; the position; the segments
@@ -292,10 +339,24 @@ void XtSoloVoice::seekTo(int32_t pos16) {
     const int32_t last = evAt(evLast());
     pos16 = pos16 < 0 ? 0 : pos16 > last ? last : pos16;
     eventJump(eventBefore(pos16));
-    const float f = f0n;
-    while (segCur < segLast() && !(segAt(segCur + 1) > pos16) && segAt(segCur + 1) < last) ++segCur;
-    jumpTo(pos16);
-    f0n = f;
+    if (laidOut()) {
+        // each segment's first record from its start (+0x24 the segment's, then 0x8950d4a0), then the records by their own lengths; the
+        // loads leave the Energy filter's cutoff as the event's record left it
+        while (segCur < segLast() && !(segAt(segCur + 1) > pos16) && segAt(segCur + 1) < last) {
+            ++segCur;
+            seg = segRecAt(segCur);
+            recStart = segAt(segCur) / 16.0;
+            recEnd = recStart + lenOf(seg);
+            loaded();
+        }
+        while (!(recEnd * 16.0 > (double)pos16) && seg < p->size()) loadNext();
+        Pi = pos16;
+    } else {                            // a plan without the vpdt's events and segments: the record by the records' running sum
+        const float f = f0n;
+        while (segCur < segLast() && !(segAt(segCur + 1) > pos16) && segAt(segCur + 1) < last) ++segCur;
+        jumpTo(pos16);
+        f0n = f;
+    }
     anchor = recStart;
 }
 

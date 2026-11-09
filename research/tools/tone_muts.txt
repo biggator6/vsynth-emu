@@ -540,7 +540,7 @@ solo-start-beat|    beat_.start(tempoCfg, origCfg, Pi);   // 0x8950f860\n|    be
 solo-seek-reset|    beat_.reset((flags0 & 4) != 0);       // 0x8950f900\n||tonesolo
 solo-seek-pos|    beat_.beatPos = (int32_t)((uint32_t)pos16 << 5);\n||tonesolo
 solo-seek-clamp|    pos16 = pos16 < 0 ? 0 : pos16 > last ? last : pos16;   // the beat goes from the position held to the wave (0x8950fefe)\n||tonesolo
-solo-seek-where|    f0n = f;\n    anchor = recStart;|    anchor = recStart;|tonesolo
+solo-seek-where|        while (!(recEnd * 16.0 > (double)pos16) && seg < p->size()) loadNext();\n        Pi = pos16;|        while (!(recEnd * 16.0 > (double)pos16) && seg < p->size()) loadNext();\n        if (seg >= p->size() \|\| !p->voiced[seg]) f0n = 0.0f;\n        Pi = pos16;|tonesolo
 sum-note-takes|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|knob >= 128 ? knob + sum : std::clamp(knob + sum, 0, 127)
 sum-crosses|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|knob >= 128 ? knob : std::max(knob + sum, 0)
 sum-note-clamped|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|std::clamp(knob + sum, 0, 127)
@@ -668,7 +668,18 @@ solo-skip-b|if (!(budget > 0.0) \|\| !(recStart > Pq)) return;|return;|tonesolo
 solo-last-len|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : p->termLen; }|double XtSoloVoice::lenOf(size_t i) const { return i < p->size() ? p->segLen[i] : 8.0; }|tonesolo
 solo-term-info|    P.termInfo = (int)r16(term + 2);|    P.termInfo = 1;|tonesolo
 solo-term-grain|sg < nc ? p->info[sg] : p->termInfo;|sg < nc ? p->info[sg] : 1;|tonesolo
-solo-read-short|P.evPos.back() == at && P.evPos.front() == 0;|P.evPos.back() >= at && P.evPos.front() == 0;|tonesolo
+solo-read-short|    return reach <= P.evPos.back() && reach + (int64_t)r16(term) >= P.evPos.back();|    return reach <= P.evPos.back() + 16 && reach + (int64_t)r16(term) >= P.evPos.back();|tonesolo
+solo-reach-term|reach + (int64_t)r16(term) >= P.evPos.back();|reach == P.evPos.back();|tonesolo
+solo-mark-read|P.evRecStart.push_back((int32_t)(r32(o + 4) + ((uint32_t)r16(o + 16) - (uint32_t)r16(ro))));|P.evRecStart.push_back((int32_t)r32(o + 4));|tonesolo
+solo-ev-rec|idx = (int)(it - off.begin());|idx = (int)(it - off.begin()) + 1;|tonesolo
+solo-jump-mark|    if (laidOut()) {\n        const size_t k = (size_t)std::clamp(e, 0, evLast());|    if (false) {\n        const size_t k = (size_t)std::clamp(e, 0, evLast());|tonesolo
+solo-jump-rec-f0|    if (seg >= p->size() ? !(p->termInfo & 4) : !p->voiced[seg]) f0n = 0.0f;\n||tonesolo
+solo-seek-laid|    if (laidOut()) {\n        // each segment|    if (false) {\n        // each segment|tonesolo
+solo-seek-segstart|            recStart = segAt(segCur) / 16.0;|            recStart = recEnd;|tonesolo
+solo-seek-walk|while (!(recEnd * 16.0 > (double)pos16) && seg < p->size()) loadNext();|while (!(recEnd * 16.0 >= (double)pos16) && seg < p->size()) loadNext();|tonesolo
+solo-loop-laid|    if (laidOut()) {\n        size_t i;|    if (false) {\n        size_t i;|tonesolo
+solo-from-start|    start = segAt(k) / 16.0;|    start = p->segStart[i];|tonesolo
+stored-last-len|xt ? (recs[i].start16 + recs[i].len16) / 16.0 : (double)frames;|(double)frames;|tone
 solo-walk-half|const int32_t s = walkStep >> 1, sum = Pf + s;|const int32_t s = walkStep / 2, sum = Pf + s;|tonesolo
 solo-walk-frac|int32_t np = Pi + (sum >> 20), nf = sum & 0xfffff;|int32_t np = Pi + (sum >> 20), nf = sum & 0xffffe;|tonesolo
 solo-walk-turn|if (f3 & 8) { if (neg) f3 &= 0xf7; else step = -step; }|if (f3 & 8) { if (neg) f3 &= 0xf7; }|tonesolo
@@ -680,8 +691,9 @@ solo-hold-anchor|else if (Pq >= anchor) anchorForward();|else if (Pq > anchor) a
 solo-end-gate|if (!ended_) {\n                const Grain g|if (true) {\n                const Grain g|tonesolo
 solo-jump-f0|    if (i >= nc ? !(p->termInfo & 4) : !p->voiced[i]) f0n = 0.0f;\n||solo
 solo-jump-record|if (i + 1 == nc && L >= p->segStart[i] + p->segLen[i]) i = nc;||solo
-solo-jump-anchor|    anchor = L;\n|    anchor = recStart;\n|tonesolo
-solo-jump-frac|    Pf = 0;\n    const double L|    const double L|tonesolo
+solo-jump-anchor|    anchor = pos16 / 16.0;\n|    anchor = recStart;\n|tonesolo
+solo-jump-anchor-sum|    anchor = L;\n|    anchor = recStart;\n|solo
+solo-jump-frac|    Pi = pos16;\n    Pf = 0;\n    seg = std::min(i, p->size());|    Pi = pos16;\n    seg = std::min(i, p->size());|tonesolo
 solo-one-way|if (lmode1 == 1) { loopJump(lp[0]); return; }|if (lmode1 == 1) { loopJump(lp[1]); return; }|tonesolo
 solo-bounce|if (lmode1 == 2) { f3 \|= 8; walkStep = -walkStep; return; }|if (lmode1 == 2) { walkStep = -walkStep; return; }|tonesolo
 solo-bounce-now|if (lmode1 == 2) { f3 \|= 8; walkStep = -walkStep; return; }|if (lmode1 == 2) { f3 \|= 8; return; }|tonesolo
@@ -794,7 +806,7 @@ cc-pad-off-0|a != 0 && a != 32 && a == number|a != 32 && a == number
 cc-pad-off-32|a != 0 && a != 32 && a == number|a != 0 && a == number
 cc-pad-both|    if (assigned(ctl.assign[10])) pad.setX(value);\n    if (assigned(ctl.assign[11])) {|    if (assigned(ctl.assign[10])) pad.setX(value);\n    else if (assigned(ctl.assign[11])) {
 knob-steps|    if (moved) padSteps(step);\n|
-solo-seek-ended|    jumpTo(pos16);\n    f0n = f;|    jumpTo(pos16);\n    ended_ = 0;\n    f0n = f;|tonesolo
+solo-seek-ended|        f0n = f;\n    }\n    anchor = recStart;\n}|        f0n = f;\n    }\n    ended_ = 0;\n    anchor = recStart;\n}|tonesolo
 xy-plus-zero|        if (x == 0) return 0;\n        return x >= 64 ?|        return x >= 64 ?|toneosc
 xy-plus-side|return x >= 64 ? value((x - 64) * 127 / 63) : -value((64 - x) * 127 / 63);|return x >= 64 ? value((x - 64) * 127 / 63) : value((64 - x) * 127 / 63);|toneosc
 xy-plus-off|        if (n == 0 \|\| n == 32) return 0;\n        const int x = in.cc[n];\n|        const int x = in.cc[n];\n|toneosc
@@ -1047,12 +1059,12 @@ check-play-patch|    p[b + 0x2e] = o.playbackMode;|    p[b + 0x2e] = 0;|tonechec
 patch-playback|    o.playbackMode = p(b + 0x2e);|    o.playbackMode = p(b + 0x2f);|tonepatch
 check-pad-cc|            if (ccMoved && !panelMoved && !fw.padCc(kCcNum[ccAt], ccTo)) return false;\n||tonecheck|4242
 seg-forward-off|            segForward();\n||tonesolo
-seg-forward-len|    if (!(endStop16 > (int32_t)((uint32_t)X + (uint32_t)first))) return;|    if (!(endStop16 > X)) return;|tonesolo
+seg-forward-len|    if (!(endStop16 > (int32_t)((uint32_t)X + (uint32_t)first))) return;|    if (!(endStop16 > X)) return;|tonesolo|31337
 seg-forward-anchor|    loaded();\n    anchor = recStart;\n}\n\n// The walk back|    loaded();\n}\n\n// The walk back|tonesolo
 seg-backward-off|crossings(); segBackward(nextCross); }\n            else segBackward(Pi);|crossings(); }|tonesolo
 seg-backward-r1|segBackward(nextCross); }|segBackward(Pi); }|tonesolo
-seg-loop-entry|    segCur = segContaining(pos16);|    segCur = evSegAt(eventBefore(pos16));|tonesolo|777
-seg-seek-walk|    while (segCur < segLast() && !(segAt(segCur + 1) > pos16) && segAt(segCur + 1) < last) ++segCur;\n||tonesolo
+seg-loop-entry|    segCur = k;\n}|    segCur = evSegAt(eventBefore(pos16));\n}|tonesolo|777
+seg-seek-walk|        while (segCur < segLast() && !(segAt(segCur + 1) > pos16) && segAt(segCur + 1) < last) {|        while (false) {|tonesolo
 ev-before-edge|while (e < evLast() && evAt(e + 1) < pos16) ++e;|while (e < evLast() && evAt(e + 1) <= pos16) ++e;|tonesolo
 ev-seek-event|    eventJump(eventBefore(pos16));|    eventJump(0);|tonesolo
 ev-start-backward|if (eventCfg) eventJump(walk < 0.0f ? evE : evS);|if (eventCfg) eventJump(evS);|tonesolo
@@ -1066,7 +1078,7 @@ rec-past-end|    const bool past = recEnd * 16.0 > (double)endStop16;|    const 
 rec-next-len|lenOf(past ? seg : seg + 1)|lenOf(seg + 1)|tonesolo
 rec-prev-len|    nextLen16 = (int32_t)std::lround(16.0 * lenOf(seg));   // 0x8950d560|    // 0x8950d560|tonesolo
 read-ev-seg|P.evSeg.push_back((int)((so - seg0) / 12));|P.evSeg.push_back((int)((so - seg0) / 12) + 1);|tonesolo
-read-seg-first|P.segFirst.push_back((int16_t)r16(ro));|P.segFirst.push_back((int16_t)256);|tonesolo
+read-seg-first|P.segFirst.push_back((int16_t)r16(ro));|P.segFirst.push_back((int16_t)256);|tonesolo|31337
 solo-events-order|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(first, last);|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(last, first);
 solo-loop-bit|        s.solo.setLoopBit(o.loop && !eventPlay(s, o)); // and the Loop bit, which Playback Mode's tails clear\n|
 solo-encode-xt|E->stored \|\| ((own ? marks.size() > 2 : depth >= 0)|E->stored \|\| ((own ? marks.size() > 2 : depth < -1)
@@ -1121,6 +1133,6 @@ check-stored-zero|                fw.c.write(kStoredAt, zero.data(), zero.size()
 check-kind-fw|                    fw.c.wr16(t.fw.chunk[5] + at, 1);\n||tonecheck|777
 check-kind-plan|                if (w.type == 1 && xtSoloReadVpdt(t.enc->vpdt, w.ch, rr, back)) t.enc->solo.evKind = back.evKind;\n||tonecheck|777
 check-stored-whole|whole = (w.encodeType == 1 \|\| w.events[i] % 16 == 0) && (i == 0|whole = w.events[i] % 16 == 0 && (i == 0|tonecheck
-check-stored-sum|                    whole = sum == w.frames * 16;|                    whole = true;|tonecheck
+check-stored-sum|                    whole = reach >= 0 && reach <= w.frames * 16 && reach + (long)rd(term, 2) >= w.frames * 16;|                    whole = reach == w.frames * 16;|tonecheck
 check-stored-file|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events, &w.vpdt);|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events);|tonecheck
 files-vpdt-copy|        out.vpdt.assign(vpdt, vpdt + nDt);\n||tonefiles

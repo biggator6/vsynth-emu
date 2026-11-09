@@ -3570,6 +3570,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 16 addendum (2026-11-09) — v160: preset 270's records
+
+- The user asked for preset 270 too. The listing was short and plain: the event's jump starts its record by the mark, the seek resets the record at each segment it steps into, and the port had taken all of it from the records' running sum, which no other wave could tell apart. Ported that way, the forced run went from 64 differing cases to none on the first try.
+- What took the time was making the check able to see it. Preset 270's own cases reach the mark path, but no case seeks across one of its segments or loops into one, so three planted errors in that code went unnoticed. Shifting one segment of a hit wave wasn't enough either; shifting all its middle segments caught the loop jump, and the seek's segment step needed notes started at a segment's start. Those come from the case number rather than the random draw, so every later case draws as before.
+- With every wave there is now on its stored data, the plugin's path back to its own events has no wave to run on. A copy of preset 270 with a too-short terminator gives it one, for verify.sh and the panel plants; without it that plant would have gone quiet and looked like a pass.
+
 ### Session 16 addendum (2026-11-08) — v159: VP9SAMnoise1's terminator
 
 - The user said keep hunting. v158's hunt had taken things away from the wave's settings one at a time and never compared the player's own state, only what it wrote. This time a debug copy of the check compared the SOLO grains' fields with the firmware's each block, and the first differing case showed it at its note-on: the firmware's grain period and velocity were a record of 16 samples at rate 1, the port's were at the pitch.

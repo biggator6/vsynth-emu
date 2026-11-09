@@ -203,7 +203,7 @@ ENV={
  'layout':{'TEST_UI_LAYOUT':'1'},
  'rom':{'TEST_ROM_SEARCH':'1'},
  'patch':{'TEST_PATCH_APPLY':'1'},
- 'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_mode':'auto'},   # encoded again on its own events: its records stop short of its last event
+ 'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_term':'8','_mode':'auto'},   # encoded again on its own events: a terminator too short to reach its last event
  'stored':{'TEST_NOTE2':'64,30000','_file':'analysis/projects/Emu_test.prj/Wave/376 Synth014.wav','_mode':'auto'},
  'lite':{'TEST_EXPECT_ENCODE':'LITE','_file':'analysis/projects/Emu_test.prj/Wave/005 sine_400hz_r.wav','_mode':'auto'},
  'lite-pick':{'TEST_EXPECT_ENCODE':'LITE','_mode':'lite'},
@@ -229,6 +229,9 @@ def run(kind):
     if '_preset' in e:                   # or a preset wave of the disk image, extracted
         n=e.pop('_preset'); f=REPO+'/build/tools/panel_preset_'+n+'.vpw'
         if not os.path.exists(f): subprocess.run([REPO+'/build/tools/fcheck/bin/xt_files',ROM,'extract',n,f],capture_output=True)
+        if '_term' in e:                 # its stream's terminator that long (vpdt_term.py)
+            t=e.pop('_term'); g=f[:-4]+'_term'+t+'.vpw'
+            subprocess.run([sys.executable,REPO+'/research/tools/vpdt_term.py',f,g,t],capture_output=True); f=g
     env=dict(os.environ); env.update(e)
     return subprocess.run(['build/plugin/VSynthEmuTest',ROM,f,'60',m],capture_output=True,text=True,env=env,timeout=300)
 missed=0

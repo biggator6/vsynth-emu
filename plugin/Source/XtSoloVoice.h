@@ -28,6 +28,10 @@ struct XtSoloPlan {
     std::vector<int32_t> evPos;
     std::vector<uint8_t> evKind;        // and its kind, its flags & 0xb (0x8950c7e0's +5): 9 the start, 10 the end, 0 an attack; V-Trainer's 1 and 2
     std::vector<int> evSeg;
+    // and the record it names (its +12, an index; size() the terminator), and that record's start by its mark: the position + the mark − the
+    // record's first length word (0x8950d832), where an event's jump puts it
+    std::vector<int> evRec;
+    std::vector<int32_t> evRecStart;
     std::vector<int32_t> segPos;
     std::vector<int> segRec;
     std::vector<int16_t> segFirst;
@@ -198,6 +202,9 @@ private:
     void crossForward();
     void crossBackward();
     void jumpTo(int32_t pos16);
+    void jumpRecord(int32_t pos16, size_t i, double start);   // a jump's position and anchor, and record i loaded from its start
+    void recordFrom(int k, int32_t pos16, size_t& i, double& start) const;   // the record containing the position, from segment k's
+    bool laidOut() const;               // the plan has the vpdt's events, segments and their records
     int evLast() const;                 // the wave's last event (its end)
     int32_t evAt(int e) const;          // an event's position, 1/16 sample
     int evSegAt(int e) const;           // the segment containing it

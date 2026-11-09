@@ -27,15 +27,15 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
 # A project's SOLO wave with attacks on its own events (Tribal1, 7), with STEP and EVENT
 [ $BUILT = 1 ] && { n=0; for m in 2 3; do o=$(cd "$REPO" && TEST_PLAYBACK=$m TEST_NOTE2="64,30000" build/plugin/VSynthEmuTest "$ROM" "analysis/projects/Emu_test.prj/Wave/346 Tribal1.wav" 60 auto 2>&1)
   echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "Encoded as SOLO (the wave's own)" && n=$((n+1)); done; echo "SOLO events, plugintest: $n/2 bit-identical"; [ $n = 2 ] || rc=1; }
-# Project waves on their stored vpdt: BACKING, ENSEMBLE and SOLO (373, whose stored records aren't the XT's encode; VP9SAMnoise1, its events
-# between samples and its stream's own terminator, under EVENT), and preset 270, encoded again on its own events as its records stop short of
-# its last event, under EVENT
-[ $BUILT = 1 ] && { n=0; "$WORK/fcheck/bin/xt_files" "$ROM" extract 270 "$WORK/verify_270.vpw" > /dev/null
-  for wm in "376 Synth014.wav:0:played" "362 Synth006.wav:3:played" "373 SynthFX002.wav:0:played" "002 VP9SAMnoise1.wav:3:played" "$WORK/verify_270.vpw:3:encoded"; do
+# Waves on their stored vpdt: BACKING, ENSEMBLE and SOLO (373, whose stored records aren't the XT's encode; VP9SAMnoise1, its events between
+# samples and its stream's own terminator, under EVENT; preset 270, its records short of its last event and a segment off their sum, under
+# EVENT), and preset 270 with a terminator too short to reach its last event, encoded again on its own events, under EVENT
+[ $BUILT = 1 ] && { n=0; "$WORK/fcheck/bin/xt_files" "$ROM" extract 270 "$WORK/verify_270.vpw" > /dev/null; "$PY" "$REPO/research/tools/vpdt_term.py" "$WORK/verify_270.vpw" "$WORK/verify_270t.vpw" 8
+  for wm in "376 Synth014.wav:0:played" "362 Synth006.wav:3:played" "373 SynthFX002.wav:0:played" "002 VP9SAMnoise1.wav:3:played" "$WORK/verify_270.vpw:3:played" "$WORK/verify_270t.vpw:3:encoded"; do
   f=${wm%%:*}; m=${wm#*:}; m=${m%%:*}; [ "${f#/}" = "$f" ] && f="analysis/projects/Emu_test.prj/Wave/$f"
   o=$(cd "$REPO" && TEST_PLAYBACK=$m TEST_NOTE2="64,30000" build/plugin/VSynthEmuTest "$ROM" "$f" 60 auto 2>&1)
   echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "(the wave's own)" && echo "$o" | grep -q "the wave's own vpdt: ${wm##*:}" && n=$((n+1)); done
-  echo "stored waves, plugintest: $n/5 bit-identical"; [ $n = 5 ] || rc=1; }
+  echo "stored waves, plugintest: $n/6 bit-identical"; [ $n = 6 ] || rc=1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_FX_PANEL=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_UI_LAYOUT=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
 [ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_ROM_SEARCH=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }

@@ -108,9 +108,9 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
     // A wave's own vpdt, played as it is when its events fit this audio: from 0 to the end (frames·16), never back (two at the end are the
     // XT's own, on 18 of the image's waves), in the type's layout (a SOLO event every 10 or 16 halfwords from 8, a band one every 0x2e or
     // 0x58 from 14; its position a word on).  A SOLO wave's may fall between samples (V-Trainer 1.00's, VP9SAMnoise1's) and its records must
-    // reach its last event exactly (below; preset 270's stop short, so it is encoded again on its own events, as before).  A band wave's
-    // must be on whole samples: no band wave there is has one between them, so the band player's way with one isn't checked
-    // (HARDWARE_FIRMWARE.md, v158, v159)
+    // reach its last event, or stop short of it with the terminator past it, as the player walks them (xtSoloReadVpdt; preset 270's stop
+    // 18/16 short).  A band wave's must be on whole samples: no band wave there is has one between them, so the band player's way with one
+    // isn't checked.  Every V-Synth wave there is plays as it is (HARDWARE_FIRMWARE.md, v158–v160)
     bool fits = false;
     if (stored && irate == 44100 && type != 0 && stored->size() >= 64) {
         const auto r32 = [&](size_t o) { uint32_t x = 0; if (o + 4 <= stored->size()) std::memcpy(&x, stored->data() + o, 4); return x; };
@@ -139,7 +139,7 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         std::vector<XtRecord> recs;
         std::vector<uint8_t> vp;
         if (fits && xtSoloReadVpdt(*stored, ch, recs, P) && P.evPos.size() >= 2 && (long)P.evPos.back() == frames * 16) { vp = *stored; E->stored = true; }
-        else { recs.clear(); P.evPos.clear(); P.evKind.clear(); P.evSeg.clear(); P.segPos.clear(); P.segRec.clear(); P.segFirst.clear(); }
+        else { recs.clear(); P.evPos.clear(); P.evKind.clear(); P.evSeg.clear(); P.evRec.clear(); P.evRecStart.clear(); P.segPos.clear(); P.segRec.clear(); P.segFirst.clear(); }
         const bool xt = E->stored || ((own ? marks.size() > 2 : depth >= 0)
             && xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, own ? &marks : nullptr) && xtSoloReadVpdt(vp, ch, recs, P) && P.evPos.size() > 2);
         if (!xt) {
@@ -158,7 +158,8 @@ std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& 
         P.segStart.resize(nc); P.segLen.resize(nc); P.voiced.resize(nc); P.info.resize(nc);
         for (size_t i = 0; i < nc; ++i) {
             P.segStart[i] = recs[i].start16 / 16.0;
-            const double end = (i + 1 < nc) ? recs[i + 1].start16 / 16.0 : (double)frames;
+            // the last a vpdt's own length (preset 270's stops short of the wave's end), the port's encoder's to the end
+            const double end = (i + 1 < nc) ? recs[i + 1].start16 / 16.0 : xt ? (recs[i].start16 + recs[i].len16) / 16.0 : (double)frames;
             P.segLen[i] = std::max(1.0 / 16.0, end - P.segStart[i]);
             P.voiced[i] = (recs[i].info & 4) != 0;
             P.info[i] = recs[i].info;
