@@ -1,6 +1,6 @@
 # Ghidra helper scripts (V-Synth XT firmware)
 
-Our own analysis scripts — no Roland code or data. Firmware itself lives in
+Our own analysis scripts, with no Roland code or data. Firmware itself lives in
 gitignored `firmware/`. Run headless (Ghidra 12.1.4 via Homebrew):
 
 ```bash
@@ -16,10 +16,10 @@ Rebuild the project from scratch (order matters):
    `$H firmware/ghidra vsynthxt -import firmware/unpacked/V-SynthXT.rom.2.bin -loader BinaryLoader -loader-baseAddr 0x89300000 -processor SuperH4:LE:32:default -scriptPath $S -preScript SetupSH4.java`
 3. Fill in the DSP region's functions, then FPU modes, then mark code read-only:
    `$H firmware/ghidra vsynthxt -process V-SynthXT.rom.2.bin -noanalysis -scriptPath $S -postScript SweepRegion.java 894d0000 89540000 -postScript FpscrFix.java /tmp/fpscr.txt -postScript ReadOnlyCode.java 89560000`
-3b. `-postScript AssumeR0.java` — players that take the FPU mode from the
+3b. `-postScript AssumeR0.java`: players that take the FPU mode from the
     caller in r0 (`lds r0,fpscr`): assume r0 = 0x00040001 at entry.
 4. Dump/decompile a range: `-postScript DumpRange.java <lo> <hi> <outprefix>` (writes `.idx` + `.c`).
-   `Disasm.java <out> <addr> <count> ...` — raw listing with pool values.
+   `Disasm.java <out> <addr> <count> ...`: raw listing with pool values.
 5. Execute firmware code in the P-code emulator:
    `-postScript EmuD5A0.java <out.tsv> [f0n preset]` runs the SOLO grain-
    parameter routine `0x8950d5a0` over an input grid. It prints one TSV row
@@ -48,7 +48,7 @@ Rebuild the project from scratch (order matters):
    processor.
 9. Tracing the emulated encoder: `EmuEnc.java samp.bin out.tsv trace.txt
    <hexaddr>... [r4=<value>]`.
-   - At each listed address it logs r0, r4–r7, PR, the position globals and
+   - At each listed address it logs r0, r4-r7, PR, the position globals and
      [r5].
    - With `r4=`, it dumps the decimated and full-rate buffers when r4 equals
      that value.
