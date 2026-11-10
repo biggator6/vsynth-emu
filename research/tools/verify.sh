@@ -49,8 +49,9 @@ if [ $BUILT = 1 ]; then
         checkTest "$mode=1" build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav
     done
     # A processor closed while its wave is encoding (closed in ms, the next one encodes as before); a project that
-    # reopens without its parts (each said); a wave whose header claims more than its data holds (refused at once)
-    for t in Teardown Restore WaveFile; do
+    # reopens without its parts (each said); a wave whose header claims more than its data holds (refused at once);
+    # another image given while one is in use (refused, the tables as they were)
+    for t in Teardown Restore WaveFile Rom; do
         checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
     done
     # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth

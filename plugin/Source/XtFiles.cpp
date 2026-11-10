@@ -282,11 +282,7 @@ static std::vector<uint8_t> slurp(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
     return std::vector<uint8_t>((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 }
-static uint64_t fnv(const void* p, size_t n, uint64_t h = 0xcbf29ce484222325ull) {
-    const auto* b = static_cast<const uint8_t*>(p);
-    for (size_t i = 0; i < n; ++i) { h ^= b[i]; h *= 0x100000001b3ull; }
-    return h;
-}
+using xtfile::fnv;
 
 int main(int argc, char** argv) {
     if (argc < 2 || !xtFwOpen(argv[1])) { std::fprintf(stderr, "usage: xt_files rom.2.bin [wave file | patch file [lo hi] | extract n out]\n"); return 2; }

@@ -9,6 +9,7 @@ os.chdir(REPO)
 FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'; XV='plugin/Source/XtFxControl.cpp'; EP='plugin/Source/PluginEditor.cpp'; UP='plugin/Source/UiParts.h'
 PE = 'plugin/Source/PluginEffects.cpp'   # the effects' tick, from PluginProcessor.cpp (v172)
 PS = 'plugin/Source/PluginState.cpp'     # the session's state, from PluginProcessor.cpp (v172)
+XR = 'plugin/Source/XtSynthRom.cpp'      # the image the process plays from, its last path from PluginProcessor.cpp (v173)
 TEXT='row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };\n        '
 TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };\n        '
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
@@ -155,7 +156,7 @@ MUTS=[
  ('rom-env-last',PP,'if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(juce::String::fromUTF8(p));\n','','rom'),
  ('rom-not-kept',PP,'settings->setValue(kRomKey, file.getFullPathName());',';','rom'),
  ('rom-project-kept',PS,'        openRom(juce::File(rom));','        setRomFile(juce::File(rom));','rom'),
- ('rom-read-again',PP,'if (path == loaded && xtSynthRomReady()) return true;',';','rom'),
+ ('rom-read-again',XR,'if (ready() && path == lastTaken_) return true;',';','rom'),
  ('patch-writer',PP,'set(Params::kOscCoarse, c.oscCoarse);','set(Params::kOscCoarse, c.oscFine);','patch'),
  ('patch-writer-osc2',PP,'set(oscId(1, Params::kOscPitch), o.oscPitch);','set(oscId(1, Params::kOscPitch), c.oscPitch);','patch'),
  ('patch-writer-kf',PP,'set(Params::kAnaPwKF, c.ana.pwKf * 10);','set(Params::kAnaPwKF, c.ana.pwKf);','patch'),
@@ -189,7 +190,8 @@ MUTS=[
  ('zones-note',PP,'    notes.add(juce::String(zones) + " zones, zone 1 on the panel");','    ;','patch'),
  ('zones-wave-number',PP,'            const int number = xtPatchWaveNumber(store, z, k);','            const int number = xtPatchWaveNumber(store, z, 0);','patch'),
  ('zones-wave-zone',PP,'            const int number = xtPatchWaveNumber(store, z, k);','            const int number = xtPatchWaveNumber(store, 0, k);','patch'),
- ('rom-bad-drops',PP,'if (loaded.isNotEmpty()) xtSynthSetRom(loaded.toStdString());',';','rom'),
+ ('rom-other-taken',XR,'    if (ready() && *digest != digest_) {','    if (false) {','rom-image'),
+ ('rom-tables-again',XR,'if (!ready() && !loadTables(path.c_str()))','if (!loadTables(path.c_str()))','rom-image'),
  ('patch-playback-read',PP,'    c.playbackMode = knob(Params::kPlaybackMode);','    c.playbackMode = 0;','patch'),
  ('patch-playback2-read',PP,'        o.playbackMode = knob2(Params::kPlaybackMode);','        o.playbackMode = 0;','patch'),
  ('patch-playback-write',PP,'    set(Params::kPlaybackMode, c.playbackMode);','    ;','patch'),
@@ -206,6 +208,7 @@ ROM=os.environ.get('ROM', REPO + '/firmware/unpacked/V-SynthXT.rom.2.bin'); W='a
 ENV={
  'layout':{'TEST_UI_LAYOUT':'1'},
  'rom':{'TEST_ROM_SEARCH':'1'},
+ 'rom-image':{'_bin':'VSynthEmuRomTest'},   # a test of its own, given only the ROM
  'patch':{'TEST_PATCH_APPLY':'1'},
  'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_term':'8','_mode':'auto'},   # encoded again on its own events: a terminator too short to reach its last event
  'stored':{'TEST_NOTE2':'64,30000','_file':'analysis/projects/Emu_test.prj/Wave/376 Synth014.wav','_mode':'auto'},
@@ -225,7 +228,9 @@ ENV={
 }
 SDK=os.environ.get('SDK','/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk')
 def build():
-    r=subprocess.run(['cmake','--build','build/plugin','--target','VSynthEmuTest','-j','10'],capture_output=True,text=True,env=dict(os.environ,SDKROOT=SDK))
+    targets=['VSynthEmuTest','VSynthEmuRomTest']   # every binary a kind runs
+    r=subprocess.run(['cmake','--build','build/plugin','--target',*targets,'-j','10'],
+                     capture_output=True,text=True,env=dict(os.environ,SDKROOT=SDK))
     return r.stdout if r.returncode==0 else 'failed: '+r.stderr[-300:]
 if sys.argv[1:]: MUTS=[m for m in MUTS if m[0] in sys.argv[1:] or ('--editor' in sys.argv and m[0].startswith('editor-'))]
 def run(kind):
@@ -236,8 +241,11 @@ def run(kind):
         if '_term' in e:                 # its stream's terminator that long (vpdt_term.py)
             t=e.pop('_term'); g=f[:-4]+'_term'+t+'.vpw'
             subprocess.run([sys.executable,REPO+'/research/tools/vpdt_term.py',f,g,t],capture_output=True); f=g
-    env=dict(os.environ); env.update(e)
-    return subprocess.run(['build/plugin/VSynthEmuTest',ROM,f,'60',m],capture_output=True,text=True,env=env,timeout=300)
+    test=e.pop('_bin',None)   # a test binary of its own, given only the ROM
+    env=dict(os.environ)
+    env.update(e)
+    cmd=['build/plugin/'+test,ROM] if test else ['build/plugin/VSynthEmuTest',ROM,f,'60',m]
+    return subprocess.run(cmd,capture_output=True,text=True,env=env,timeout=300)
 missed=0
 # ENV and MUTS are above; a build first, so the first error's time isn't the source's own.
 build()

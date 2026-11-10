@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-09) — v173: the ROM's tables, written once
+
+- The review had R7 as read, with the glitch or crash as a claim. The test made it measured. An instance plays a note with its attack on a knob whose time comes from the envelopes' table. Another instance is given the ROM with that one entry a millisecond longer. On the old code the second image was taken, and the note sounded different. A plain copy of the ROM at another path rewrote the tables too, and moved every firmware call onto the copy.
+- I'd thought of a lock first. The audio thread can't take one, and the tables have only one source anyway. So they're written once, and a second file has to prove it's the same bytes. Nothing is written after an instance can see them.
+- The processor's loadRom kept "the last path isn't read again" in two function statics. The kit refuses a new one of those, and that rule belongs with the tables. So the path, the digest and the lock are now one object in XtSynthRom.cpp, and loadRom is gone. PluginProcessor.cpp is 12 lines shorter.
+- The kit's placement law took a test helper named TestParams.h for parameter code, by its name alone. It's TestControls.h now, marked wrong. Its verdict tool called a plain test binary's run "RUNNER_BROKEN", so the red is the test's own 4/8.
+
 ### Session 18 (2026-11-09) — v172: what a reopened project lacks
 
 - The review had the effects' part as a quiet one: the switch on, the driver not started, only a debug line. The test made a copy of the ROM, opened it, took it away and turned the effects on, and the test died. The driver's constructor returns early when the ROM won't load, before it sizes its store, and the tick went on to write into it. It was a crash all along, waiting for a ROM that moves after an instance opens it.

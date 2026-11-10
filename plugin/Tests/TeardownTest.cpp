@@ -5,6 +5,7 @@
 // Run: VSynthEmuTeardownTest <rom.2.bin>.  Exit 0 if every check holds.
 #include "TestAppDir.h"
 #include "TestChecks.h"
+#include "TestControls.h"
 #include "TestWave.h"
 #include "../Source/PluginProcessor.h"
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -22,8 +23,7 @@ constexpr float kBacking = 2.0f;   // the Encode Type's choice index: 0 Auto, 1 
 std::unique_ptr<VSynthEmuProcessor> backingOn(const juce::File& rom, const juce::File& wave) {
     auto p = std::make_unique<VSynthEmuProcessor>();
     if (!p->setRomFile(rom)) return nullptr;
-    auto* type = p->apvts.getParameter("encodeType");
-    type->setValueNotifyingHost(type->convertTo0to1(kBacking));
+    setParam(*p, "encodeType", kBacking);
     p->loadFile(wave);
     return p;
 }

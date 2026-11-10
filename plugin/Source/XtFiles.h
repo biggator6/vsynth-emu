@@ -7,12 +7,21 @@
 #include <string>
 #include <vector>
 
-// What the readers (XtFiles.cpp, XtWaveFile.cpp) share: a little-endian word, and a refusal with its reason.
+// What the readers (XtFiles.cpp, XtWaveFile.cpp) share: a little-endian word, and a refusal with its reason.  And a
+// file's digest, FNV-1a over its bytes, which xt_files hashes waves and patches by and XtSynthRom.cpp knows an image by.
 namespace xtfile {
 inline uint32_t le32(const uint8_t* p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
 inline bool fail(std::string* why, const char* what) {
     if (why) *why = what;
     return false;
+}
+inline uint64_t fnv(const void* p, size_t n, uint64_t h = 0xcbf29ce484222325ull) {
+    const auto* b = static_cast<const uint8_t*>(p);
+    for (size_t i = 0; i < n; ++i) {
+        h ^= b[i];
+        h *= 0x100000001b3ull;
+    }
+    return h;
 }
 } // namespace xtfile
 

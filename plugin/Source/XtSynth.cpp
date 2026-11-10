@@ -10,8 +10,6 @@
 
 namespace {
 
-bool g_romReady = false;
-
 // Offline rational-rate conversion with a Kaiser-windowed sinc (β = 8, 32
 // zero crossings each side at the lower rate), as the engine uses.
 std::vector<double> resample(const std::vector<float>& x, double from, double to) {
@@ -45,30 +43,13 @@ inline int16_t to16(double v) { return (int16_t)std::clamp(std::lround(v * 32768
 
 } // namespace
 
-bool xtSynthSetRom(const std::string& path) {
-    g_romReady = xtLoadTables(path.c_str()) && xtMbLoadTables(path.c_str()) && xtEnvLoadTables(path.c_str())
-              && xtLfoLoadTables(path.c_str()) && xtOscLoadTables(path.c_str()) && xtCosmLoadTables(path.c_str())
-              && xtAnalogLoadTables(path.c_str()) && xtFwOpen(path.c_str());
-    std::vector<uint32_t> ks;
-    if (g_romReady && xtFwEnvKeyScales(ks)) xtEnvSetKeyScales(ks.data());
-    std::vector<float> ts;
-    if (g_romReady && xtFwOscTimeKeyScales(ts)) xtOscSetTimeKeyScales(ts.data());
-    if (g_romReady && xtFwOscWaveGains(ts)) xtOscSetWaveGains(ts.data());
-    if (g_romReady && xtFwOscOutGains(ts)) xtOscSetOutGains(ts.data());
-    if (g_romReady && xtFwOscPitchRatios(ts)) xtOscSetPitchRatios(ts.data());
-    if (g_romReady && xtFwCosmKeySquares(ts)) xtCosmSetKeySquares(ts.data());
-    std::vector<uint8_t> mxSlots;
-    std::vector<int16_t> mxSens;
-    if (g_romReady && xtFwMatrixTables(mxSlots, mxSens)) xtOscSetMatrixTables(mxSlots.data(), mxSens.data());
-    return g_romReady;
-}
-bool xtSynthRomReady() { return g_romReady; }
+// xtSynthSetRom and xtSynthRomReady are in XtSynthRom.cpp (v173)
 
 std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& channels, double sampleRate,
                                          int type, int depth, std::string* err, int bits, const std::vector<int32_t>* events,
                                          const std::vector<uint8_t>* stored) {
     auto fail = [&](const char* m) -> std::shared_ptr<XtEncoded> { if (err) *err = m; return nullptr; };
-    if (!g_romReady) return fail("no firmware image (rom.2) loaded");
+    if (!xtSynthRomReady()) return fail("no firmware image (rom.2) loaded");
     if (channels.empty() || channels[0].size() < 64) return fail("sample too short");
     if (type != 0 && type != 1 && type != 3 && type != 5) return fail("unknown encode type");
     const int ch = channels.size() >= 2 ? 2 : 1;

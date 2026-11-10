@@ -910,18 +910,6 @@ static std::unique_ptr<juce::PropertiesFile> appSettings() {
     return std::make_unique<juce::PropertiesFile>(appDir().getChildFile("settings.xml"), o);
 }
 
-// The tables belong to the process and every instance plays from them, so an image already in memory isn't read again
-// under a voice that's sounding, and one that won't load leaves the last in place.
-static bool loadRom(const juce::String& path) {
-    static std::mutex lock;
-    static juce::String loaded;
-    const std::lock_guard<std::mutex> hold(lock);
-    if (path == loaded && xtSynthRomReady()) return true;
-    if (xtSynthSetRom(path.toStdString())) { loaded = path; return true; }
-    if (loaded.isNotEmpty()) xtSynthSetRom(loaded.toStdString());
-    return false;
-}
-
 // A new instance's search, first to last: VSE_XT_ROM; beside the plugin, never in its bundle, where an added file breaks
 // the signature; the plugin's own folder; the image last chosen by hand, which is how an AU, a VST3 and a standalone, each
 // in a folder of its own, share one.
@@ -937,8 +925,8 @@ void VSynthEmuProcessor::findRom() {
 }
 
 bool VSynthEmuProcessor::openRom(const juce::File& file) {
-    if (!file.existsAsFile() || !loadRom(file.getFullPathName())) {
-        setStatus("Not a usable rom.2 image: " + file.getFileName());
+    if (std::string why; !file.existsAsFile() || !xtSynthSetRom(file.getFullPathName().toStdString(), &why)) {
+        setStatus("Not a usable rom.2 image: " + file.getFileName() + (why.empty() ? "" : ": ") + juce::String(why));
         return false;
     }
     apvts.state.setProperty(kRomKey, file.getFullPathName(), nullptr);

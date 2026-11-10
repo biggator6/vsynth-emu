@@ -5,6 +5,7 @@
 // Run: VSynthEmuRestoreTest <rom.2.bin>.  Exit 0 if every check holds.
 #include "TestAppDir.h"
 #include "TestChecks.h"
+#include "TestControls.h"
 #include "TestWave.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/XtFiles.h"
@@ -93,8 +94,7 @@ void effectsWithoutRom(TestChecks& check, const juce::File& rom, const juce::Fil
     p.fxManualTicks();
     const bool opened = p.setRomFile(copy);
     copy.deleteFile();
-    auto* on = p.apvts.getParameter("fxOn");
-    on->setValueNotifyingHost(on->convertTo0to1(1.0f));
+    setParam(p, "fxOn", 1.0f);
     p.fxTick();
     check(opened && p.getStatusText().startsWith("Effects"),
           "effects whose driver won't start should say so: \"" + p.getStatusText().toStdString() + "\"");

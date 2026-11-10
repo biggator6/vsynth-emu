@@ -70,6 +70,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtLinearPlayer.cpp
     Source/XtLitePlayer.cpp
     Source/XtSynth.cpp
+    Source/XtSynthRom.cpp
     Source/XtMultiBandPlayer.cpp
     Source/Sh4Interp.cpp
     Source/XtFirmware.cpp
@@ -123,10 +124,11 @@ vse_add_test(VSynthEmuTest Tests/PluginTest.cpp)               # the XT path end
 vse_add_test(VSynthEmuTeardownTest Tests/TeardownTest.cpp Tests/TestWave.cpp)   # a processor closed while its wave encodes
 vse_add_test(VSynthEmuWaveFileTest Tests/WaveFileTest.cpp)     # a wave whose header claims more than its data holds
 vse_add_test(VSynthEmuRestoreTest Tests/RestoreTest.cpp Tests/TestWave.cpp)     # a project that reopens without its parts
+vse_add_test(VSynthEmuRomTest Tests/RomTest.cpp)               # another image given while one is in use
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
-                 VSynthEmuRestoreTest)
+                 VSynthEmuRestoreTest VSynthEmuRomTest)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.

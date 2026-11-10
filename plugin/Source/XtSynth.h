@@ -49,9 +49,9 @@ struct XtEncoded {
     bool stored = false;           // played on the wave's own vpdt as the file has it, not an encode (xtSynthEncode's `stored`)
 };
 
-// The user's rom.2: loads the encoders' and players' tables and opens the
-// firmware for the interpreter.  False if the file is not a usable image.
-bool xtSynthSetRom(const std::string& path);
+// The user's rom.2 (XtSynthRom.cpp): the tables, once a process, and the firmware for the interpreter.  False if it isn't
+// usable, or (`why` says) isn't the image the process already plays from, and then nothing is written.
+bool xtSynthSetRom(const std::string& path, std::string* why = nullptr);
 bool xtSynthRomReady();
 
 // Encodes planar float channels at `sampleRate`.  type: 1 SOLO, 3 BACKING,

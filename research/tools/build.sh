@@ -15,9 +15,11 @@ cc -ffp-contract=off -DXT_FW_MAIN XtFirmware.cpp Sh4Interp.cpp XtMultiBandPlayer
 cc -ffp-contract=off -DXT_ENCODER_MAIN XtSoloEncoder.cpp XtFirmware.cpp XtMultiBandPlayer.cpp XtSoloVoice.cpp Sh4Interp.cpp -o "$O/xt_enc" &
 [ -f XtAnalog.cpp ] && cc -DXT_ANALOG_MAIN XtAnalog.cpp XtOsc.cpp XtCosm.cpp XtEnvelope.cpp XtFirmware.cpp XtMultiBandPlayer.cpp XtSoloVoice.cpp Sh4Interp.cpp -o "$O/xt_analog" &
 cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.cpp XtLitePlayer.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
-   $( [ -f XtCosm.cpp ] && echo XtCosm.cpp ) $( [ -f XtAnalog.cpp ] && echo XtAnalog.cpp ) XtFirmware.cpp Sh4Interp.cpp -o "$O/xt_synth" &
+   $( [ -f XtCosm.cpp ] && echo XtCosm.cpp ) $( [ -f XtAnalog.cpp ] && echo XtAnalog.cpp ) XtFirmware.cpp \
+   Sh4Interp.cpp $( [ -f XtSynthRom.cpp ] && echo XtSynthRom.cpp ) -o "$O/xt_synth" &
 [ -f XtToneCheck.cpp ] && cc -DXT_TONE_MAIN -DXT_TONE_CHECK XtToneCheck.cpp XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.cpp XtLitePlayer.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
-   XtCosm.cpp XtAnalog.cpp XtFirmware.cpp Sh4Interp.cpp XtFiles.cpp XtWaveFile.cpp XtPatch.cpp -o "$O/xt_tone" &
+   XtCosm.cpp XtAnalog.cpp XtFirmware.cpp Sh4Interp.cpp XtFiles.cpp XtWaveFile.cpp XtPatch.cpp \
+   $( [ -f XtSynthRom.cpp ] && echo XtSynthRom.cpp ) -o "$O/xt_tone" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN XtFiles.cpp XtWaveFile.cpp XtFirmware.cpp XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp Sh4Interp.cpp -o "$O/xt_files" &
 [ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp XtFxControl.cpp Sh4Interp.cpp -o "$O/xt_fx" &

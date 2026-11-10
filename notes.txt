@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The ROM's tables written once v173 (2026-11-09): R7 of .claude/claude-packs-review.md. The ports' tables are the process's and
+  every instance reads them without a lock, but xtSynthSetRom rewrote them, and XtFirmware's g_rom (a std::string), whenever an
+  instance was given a file at a path the processor's loadRom hadn't loaded last: another image, or a copy of the same one.
+  Measured by VSynthEmuRomTest on the old code: a copy at another path made every firmware call read the copy; an image with one
+  entry of the envelopes' time table 1 ms longer was taken ("ROM ready"), and a new instance's note on it sounded different.
+  Now XtSynthRom.cpp (xtSynthSetRom and xtSynthRomReady, out of XtSynth.cpp) holds the image in use in one object, RomInUse: its
+  lock, an atomic ready flag stored only once every table is in (the key scales and gains were set after it before), the
+  bytes' FNV-1a (xtfile::fnv, moved from xt_files to XtFiles.h) and the last path taken, which isn't read again (the rule the
+  processor's loadRom kept, with its two statics; loadRom is gone). A file with the same bytes is taken and nothing written; a
+  different one is refused, openRom saying "...: it isn't the image this host plays from, <name>; restart the host to change
+  images". A junk file before any image is in use reads as before. Choosing between images in one process is no longer
+  possible: the tables can't change under voices sounding, and the XT has one image.
+  mutate_panel.py: rom-read-again follows the rule to XtSynthRom.cpp; rom-bad-drops (the restore loadRom made) is gone with
+  its line, and rom-other-taken and rom-tables-again run VSynthEmuRomTest (the kind rom-image). Not run: a thread sanitizer
+  pass over the processor, as fxthreads.sh does for the effects; the fix takes the writes away rather than ordering them.
+
 What a reopened project lacks, said v172 (2026-11-09): R6 of .claude/claude-packs-review.md, and a crash under it.
   setStateInformation skipped a wave whose file had gone without a word, and threw away loadZones' notes of a patch's zone waves
   not in its folder. Now both go with what isn't here of the patch (patchNote_, the editor's "not here") and in the status line,
