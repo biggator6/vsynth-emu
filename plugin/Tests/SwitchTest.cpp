@@ -5,17 +5,14 @@
 // --play), as a switch can be read once, when a process first needs it.
 // Run: VSynthEmuSwitchTest <rom.2.bin>.  Exit 0 if every check holds.
 #include "TestChecks.h"
-#include "TestControls.h"
 #include "TestMain.h"
 #include "TestNote.h"
 #include "TestWave.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/XtFiles.h"
-#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <thread>
 #include <vector>
 
 namespace {
@@ -39,11 +36,8 @@ constexpr Switch kSwitches[] = {
 std::string note(const juce::File& rom, const juce::File& wave, float type) {
     VSynthEmuProcessor p;
     if (!p.setRomFile(rom)) return "the ROM wasn't taken";
-    setParam(p, "encodeType", type);
-    p.loadFile(wave);
-    for (int i = 0; i < 600 && !p.getStatusText().startsWith("Encoded"); ++i)
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    if (!p.getStatusText().startsWith("Encoded")) return "not encoded: " + p.getStatusText().toStdString();
+    const juce::String status = encodeWave(p, wave, type);
+    if (!status.startsWith("Encoded")) return "not encoded: " + status.toStdString();
     const std::vector<float> out = playNote(p, kBlock, kBlocks, 2);
     float peak = 0.0f;
     for (const float s : out) peak = std::max(peak, std::fabs(s));

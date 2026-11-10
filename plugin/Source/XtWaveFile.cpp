@@ -113,7 +113,7 @@ bool readSamples(const Chunks& c, bool linear, XtWaveFile& out, std::string* why
         return true;
     }
     if (!xtFwRdacDecode(data + 8, nData - 8, out.frames, out.channels, out.pcm))
-        return fail(why, "the firmware's decoder failed (no ROM?)");
+        return fail(why, "the firmware's decoder failed");
     return true;
 }
 

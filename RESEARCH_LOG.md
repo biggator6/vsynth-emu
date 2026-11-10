@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-10) — v175: the firmware's calls stop by what they were given
+
+- The test first: a copy of the image with three routines made to loop (`bra .`, a nop in its slot), on the ways the plugin runs firmware. On the old code a patch's load still held the message thread at the watchdog's 30 s.
+- A fixed number can't serve: a patch's store takes 0.51 M steps, a SOLO encode up to 846 M. So the limit is the machine's, sized by the wave each routine is given. The interpreter's default became a member, `stepLimit`, through an overload, so Sh4Interp.cpp didn't change and every other caller keeps 20e9.
+- XtFirmware.cpp is over the line limit, so the machine left it first, in the edit that also brought its include in (the guard judges each edit alone). Two pairs of routines opened with the same statements, the SOLO encoders and the band ones; template-law refused the second of each, and they became `waveMachine`. The nine fixed-cost openings are copies too, so their lines were left as they were: the machine takes the rounding switch itself (an atomic, `roundNearest`), not as an argument.
+- The measuring program went to research/tools (`fwsteps.sh`) after folder-law refused it in the scratchpad: its numbers set the product's constants, so it has to be there to run again. Every 8th preset wave said a SOLO encode takes up to 7,000 steps a sample; every wave said 12,091, so the first 20,000 a sample became 40,000.
+
 ### Session 18 (2026-11-09) — v174: the plugin reads no research switches
 
 - The review counted 30 getenv calls in the shipped code. The test runs the plugin twice, each in a process of its own, the second with the switches set. On the old code that second run printed the firmware's trace lines and wrote five trace and dump files. XT_ROUND=nearest alone changed both a SOLO note and a BACKING note.

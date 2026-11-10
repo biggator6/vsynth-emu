@@ -70,9 +70,14 @@ public:
 
     // Call a firmware routine: r4..r7 = args, stack at sp, returns r0.  Runs
     // until it returns to an internal sentinel; false on a fault, after
-    // maxSteps instructions, or once its thread's stop flag is up (error() says why).
-    bool call(uint32_t addr, std::initializer_list<uint32_t> args, uint32_t sp, uint32_t* r0 = nullptr,
-              uint64_t maxSteps = 20000000000ull);
+    // maxSteps instructions (stepLimit when not given), or once its thread's stop flag is up (error() says why).
+    bool call(uint32_t addr, std::initializer_list<uint32_t> args, uint32_t sp, uint32_t* r0, uint64_t maxSteps);
+    bool call(uint32_t addr, std::initializer_list<uint32_t> args, uint32_t sp, uint32_t* r0 = nullptr) {
+        return call(addr, args, sp, r0, stepLimit);
+    }
+    // The steps a call may run when its caller names none (v175): 20e9, 73 s at the interpreter's 275 M steps/s,
+    // unless its owner sets less.  XtFwMachine sets each machine's by what its routines are given.
+    uint64_t stepLimit = 20000000000ull;
     const std::string& error() const { return err; }
     uint64_t steps() const { return nsteps; }
 

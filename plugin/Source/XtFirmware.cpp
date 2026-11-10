@@ -3,6 +3,7 @@
 #include "XtFirmware.h"
 #include "Sh4Interp.h"
 #include "XtFloat.h"
+#include "XtFwMachine.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -11,10 +12,11 @@
 #include <memory>
 #include <string>
 
+using namespace xtfw;   // the machine the routines run on, and its memory (XtFwMachine.h)
+
 namespace {
 
-// rom.2 entry points and OS calls (see research/HARDWARE_FIRMWARE.md)
-constexpr uint32_t kMalloc = 0x89527910, kCalloc = 0x89527930, kFree = 0x89527950, kOsInit = 0x895278f0, kUi = 0x89511360;
+// rom.2 entry points (see research/HARDWARE_FIRMWARE.md)
 constexpr uint32_t kSoloNew = 0x8951dc40, kSoloEncode = 0x8951e120;
 constexpr uint32_t kLoadInit = 0x89529e90, kLoad = 0x894a9940;
 constexpr uint32_t kEncMulti = 0x89516000;                       // BACKING/ENSEMBLE encode driver
@@ -26,38 +28,11 @@ constexpr uint32_t kSmp = 0x8987c940;    // sample block: +0 type, +2 channels, 
 constexpr uint32_t kChunks = 0x8987c97c; // (ptr, size) per chunk kind 0..8, set by 0x89517320
 constexpr uint32_t kMarkCount = 0x89ff0cfc, kMarkHead = 0x89ff0d04;
 constexpr uint32_t kSrcSetup = 0x8952dec0, kSrcFeed16 = 0x8952e4d0;  // WAV import converter (16-bit input)
-// harness memory (as the emulator scripts use it)
-constexpr uint32_t kRam = 0x8C000000, kRamSize = 0x02000000;
-constexpr uint32_t kStack = 0x8C0E0000, kEv = 0x8C0F0000, kL = 0x8C0F0000, kInfo = 0x8C0F0100;
-constexpr uint32_t kSamp = 0x8C100000, kHeap = 0x8D000000;
 
 std::string g_rom;
-bool g_nearest = false;
 
-struct Machine {
-    Sh4 cpu;
-    uint32_t heap = kHeap;
-    bool ok = false;
-    explicit Machine(const std::string& rom) {
-        if (!cpu.loadRom(rom.c_str())) return;
-        cpu.mapRam(kRam, kRamSize);
-        cpu.forceNearest = g_nearest;
-        auto alloc = [this](uint32_t sz) -> uint32_t {
-            sz = (std::max(sz, 1u) + 15) & ~15u;       // malloc(0) (the SOLO encoder's pool under 160 samples) still gives a block
-            const uint32_t p = heap;
-            if (heap + sz > kRam + kRamSize) return 0;
-            if (uint8_t* m = cpu.ptr(p, sz)) std::memset(m, 0, sz);
-            heap += sz;
-            return p;
-        };
-        cpu.hook(kMalloc, [alloc](Sh4& c) { c.ret(alloc(c.r[4])); });
-        cpu.hook(kCalloc, [alloc](Sh4& c) { c.ret(alloc(c.r[4] * std::max(1u, c.r[5]))); });
-        cpu.hook(kFree, [](Sh4& c) { c.ret(0); });
-        cpu.hook(kOsInit, [](Sh4& c) { c.ret(0); });
-        cpu.hook(kUi, [](Sh4& c) { c.ret(0); });
-        ok = true;
-    }
-};
+// A machine on the image, each call it makes allowed its steps for `samples` of a wave (XtFwMachine.h)
+std::unique_ptr<Machine> machine(size_t samples) { return std::make_unique<Machine>(g_rom, samples); }
 
 } // namespace
 
@@ -99,7 +74,7 @@ bool xtFwRdacDecode(const uint8_t* src, size_t bytes, long frames, int channels,
 bool xtFwRdacWhole(const uint8_t* src, size_t bytes, long frames, int channels, std::vector<int16_t>& out) {
     out.clear();
     if (g_rom.empty() || frames < 0 || (channels != 1 && channels != 2)) return false;
-    auto M = std::make_unique<Machine>(g_rom);
+    auto M = machine((size_t)frames * (size_t)channels);
     if (!M->ok) return false;
     Sh4& c = M->cpu;
     const size_t n = (size_t)frames * (size_t)channels;
@@ -170,16 +145,13 @@ void xtFwHookBandReads(Sh4& c, XtFwBandReads& reads) {
         });
 }
 
-void xtFwForceNearest(bool on) { g_nearest = on; }
+void xtFwForceNearest(bool on) { roundNearest(on); }
 
 bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int channels, std::vector<uint64_t>* trace, const std::vector<uint32_t>* events) {
     out.clear();
-    if (g_rom.empty() || !x || n <= 0 || (channels != 1 && channels != 2)) return false;
-    auto M = std::make_unique<Machine>(g_rom);
-    if (!M->ok) return false;
+    auto M = waveMachine(g_rom, x, n, channels, 0);
+    if (!M) return false;
     Sh4& c = M->cpu;
-    if (kSamp + (size_t)n * (size_t)channels * 2 > kHeap) return false;
-    c.write(kSamp, x, (size_t)n * (size_t)channels * 2);
     // the event list: {n·16}, one sustained note, or the attack events' (0x895126d0's, as the SOLO driver gives them)
     const std::vector<uint32_t> one { (uint32_t)n * 16 };
     const std::vector<uint32_t>& ev = events && !events->empty() ? *events : one;
@@ -229,13 +201,9 @@ void putMarkers(Sh4& c, uint32_t& heap, const std::vector<uint32_t>& at) {
 bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, std::vector<uint8_t>& vpdt,
                      int depth, int* events, const std::vector<uint32_t>* markers) {
     vpdt.clear();
-    if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5)) return false;
-    auto M = std::make_unique<Machine>(g_rom);
-    if (!M->ok) return false;
+    auto M = waveMachine(g_rom, pcm, frames, channels, 0x800000);
+    if (!M || (type != 3 && type != 5)) return false;
     Sh4& c = M->cpu;
-    const size_t bytes = (size_t)frames * channels * 2;
-    if (kSamp + bytes + 0x800000 > kHeap) return false;
-    c.write(kSamp, pcm, bytes);
     if (markers && (markers->size() < 2 || markers->front() != 0 || markers->back() != (uint32_t)frames)) return false;
     if ((depth >= 0 || markers) && !c.call(kEncInit, {}, kStack)) { std::fprintf(stderr, "sh4 init: %s\n", c.error().c_str()); return false; }
     // the sample being encoded
@@ -298,13 +266,9 @@ bool xtFwEncodeSolo(const int16_t* pcm, long frames, int channels, int depth, st
                     const std::vector<uint32_t>* markers) {
     vpdt.clear();
     if (events) events->clear();
-    if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2)) return false;
-    auto M = std::make_unique<Machine>(g_rom);
-    if (!M->ok) return false;
+    auto M = waveMachine(g_rom, pcm, frames, channels, 0x800000);
+    if (!M) return false;
     Sh4& c = M->cpu;
-    const size_t bytes = (size_t)frames * channels * 2;
-    if (kSamp + bytes + 0x800000 > kHeap) return false;
-    c.write(kSamp, pcm, bytes);
     if (!c.call(kEncInit, {}, kStack)) { std::fprintf(stderr, "sh4 init: %s\n", c.error().c_str()); return false; }
     c.wr8(kSmp, 0);
     c.wr8(kSmp + 2, (uint8_t)channels);
@@ -358,7 +322,7 @@ bool xtFwImport(const int16_t* pcm, long frames, int channels, int rate, std::ve
     // input below the heap; the output, at most rate/44100 shorter or longer, above it
     const double outMax = ((double)frames * 44100.0 / rate + 64.0) * channels * 2;
     if (kSamp + bytes > kHeap || (double)kHeap + outMax > (double)kRam + kRamSize) return false;
-    auto M = std::make_unique<Machine>(g_rom);
+    auto M = machine(bytes / 2 + ((size_t)frames * 44100 / (size_t)rate + 64) * (size_t)channels);
     if (!M->ok) return false;
     Sh4& c = M->cpu;
     c.write(kSamp, pcm, bytes);
@@ -446,7 +410,7 @@ bool xtFwSoloPlay(const std::vector<XtRecord>& recs, const int16_t* pcm, long fr
                   const XtFwSoloNote& note, long outFrames, std::vector<float>& out) {
     out.clear();
     if (g_rom.empty() || recs.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2)) return false;
-    auto M = std::make_unique<Machine>(g_rom);
+    auto M = machine((size_t)frames * (size_t)channels);
     if (!M->ok) return false;
     Sh4& c = M->cpu;
     constexpr uint32_t R8 = kRam, R9 = R8 + 0xe8, R10 = R9 + 0x3c, W2 = kRam + 0x1000, VP = kRam + 0x10000, OUT = 0x8D800000;
@@ -510,7 +474,7 @@ bool xtFwBandPlay(int type, const int16_t* pcm, long frames, int channels, const
                   const XtFwSoloNote& note, long outFrames, std::vector<float>& out) {
     out.clear();
     if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5) || vpdt.size() < 64) return false;
-    auto M = std::make_unique<Machine>(g_rom);
+    auto M = machine((size_t)frames * (size_t)channels);
     if (!M->ok) return false;
     Sh4& c = M->cpu;
     constexpr uint32_t P = kRam, W = kRam + 0x2000, TUNE = kRam + 0x2100, W2 = kRam + 0x3000, VP = kRam + 0x10000;
@@ -683,13 +647,9 @@ bool xtFwCosmKeySquares(std::vector<float>& out) {
 }
 
 bool xtFwLoadBands(int type, const int16_t* pcm, long frames, int channels, XtMbBands& out) {
-    if (g_rom.empty() || !pcm || frames <= 0 || (channels != 1 && channels != 2) || (type != 3 && type != 5)) return false;
-    auto M = std::make_unique<Machine>(g_rom);
-    if (!M->ok) return false;
+    auto M = waveMachine(g_rom, pcm, frames, channels, 0x400000);   // sample memory must stay below the heap
+    if (!M || (type != 3 && type != 5)) return false;
     Sh4& c = M->cpu;
-    const size_t bytes = (size_t)frames * channels * 2;
-    if (kSamp + bytes + 0x400000 > kHeap) return false;   // sample memory must stay below the heap
-    c.write(kSamp, pcm, bytes);
     c.wr32(kL + 4, (uint32_t)frames);
     const uint32_t info[7] = { (uint32_t)type, kSamp, (uint32_t)frames, (uint32_t)channels, 0, 0, 0 };
     for (int i = 0; i < 7; ++i) c.wr32(kInfo + 4 * i, info[i]);

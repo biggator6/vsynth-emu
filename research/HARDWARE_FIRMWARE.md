@@ -1546,6 +1546,34 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### How long the firmware's routines run (2026-11-10, v175)
+
+Every call the plugin made into rom.2 was allowed 20e9 interpreter steps (`Sh4::call`'s default), 73 s at the interpreter's
+275–285 M steps a second, so a routine that looped held its thread that long: the message thread, for a patch or a `.vpw`. What
+each kind of call takes, by `research/tools/fwsteps.sh 1` (each call's steps through a counting copy of the interpreter) over the
+disk image's 512 patches and 416 preset waves, a project's 263 patches and 91 waves, the tables, and every preset wave encoded (SOLO
+and BACKING at Encode Depth 0, 64 and 127, ENSEMBLE at 64), rebuilt (both band types) and imported from 8, 22.05, 32, 48 and 96 kHz:
+
+| kind | the most one call took | a sample, past 50 M |
+|---|---|---|
+| a patch's store (`0x8947dae0`, after `0x8947e230`, `0x8947dad0`) | 513,646 | — |
+| a table | 500 | — |
+| an RDAC block (`0x89529570`) | 330 | — |
+| SOLO encode (`0x89515e28`, with the detection `0x895164c0`) | 846 M | 12,091 |
+| BACKING or ENSEMBLE encode (`0x89516000`) | 798 M | 1,604 |
+| band rebuild (`0x894a9940`) | 329 M | 576 |
+| import (`0x8952e4d0`), by its input and output samples | 638 M | 186 |
+
+A SOLO encode's cost a sample goes with the wave's content, not its length: the most is on short and middle-length waves, and the
+long ones take under 1,750. So the machine each routine runs on (`XtFwMachine`) now allows a call 50 M steps, 97 times the most a
+fixed call took, and 40,000 more a sample of the wave it was given, 3.3 times SOLO's most. A fixed call that loops gives up in
+0.13–0.18 s; an encode in proportion to its wave (a 1 s mono wave's 1.8e9 steps, 5 s on a `bra .` loop). No call here came near its
+allowance. 12 of the 1,664 band encodes fail as they do without the limits, none at one: the firmware leaves no vpdt (in the
+first, every 8th wave's, run, a wave of 368 samples, after 1.5 M steps). By the same numbers the
+old 20e9 was less than a dense SOLO wave near that memory's end (3.86 M samples) could need, 47e9, which would have left the
+firmware's encode for the port's; no wave here comes near it. `VSynthEmuStepTest` patches the three routines to loop and holds each
+way to its bound.
+
 ### A wave's data against its header (2026-11-09, v169)
 
 Every V-Synth wave there is here has at least as much data as its header's frames and channels ask for: the disk image's 416 preset

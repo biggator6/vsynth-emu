@@ -11,6 +11,7 @@ PE = 'plugin/Source/PluginEffects.cpp'   # the effects' tick, from PluginProcess
 PS = 'plugin/Source/PluginState.cpp'     # the session's state, from PluginProcessor.cpp (v172)
 XR = 'plugin/Source/XtSynthRom.cpp'      # the image the process plays from, its last path from PluginProcessor.cpp (v173)
 SW = 'plugin/Source/XtSwitches.h'        # the harnesses' research switches, none read by the plugin's builds (v174)
+FM = 'plugin/Source/XtFwMachine.cpp'     # the machine XtFirmware's routines run on, and how long a call may (v175)
 TEXT='row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };\n        '
 TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };\n        '
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
@@ -194,6 +195,10 @@ MUTS=[
  ('rom-other-taken',XR,'    if (ready() && *digest != digest_) {','    if (false) {','rom-image'),
  ('rom-tables-again',XR,'if (!ready() && !loadTables(path.c_str()))','if (!loadTables(path.c_str()))','rom-image'),
  ('switch-read',SW,'    return nullptr;\n#endif','    return std::getenv(name);\n#endif','switches'),
+ ('step-unlimited',FM,'cpu.stepLimit = kCallSteps + kStepsPerSample * samples;',
+  'cpu.stepLimit = 20000000000ull;','steps'),
+ ('step-no-wave',FM,'auto M = std::make_unique<Machine>(rom, samples);',
+  'auto M = std::make_unique<Machine>(rom);','switches'),
  ('patch-playback-read',PP,'    c.playbackMode = knob(Params::kPlaybackMode);','    c.playbackMode = 0;','patch'),
  ('patch-playback2-read',PP,'        o.playbackMode = knob2(Params::kPlaybackMode);','        o.playbackMode = 0;','patch'),
  ('patch-playback-write',PP,'    set(Params::kPlaybackMode, c.playbackMode);','    ;','patch'),
@@ -212,6 +217,7 @@ ENV={
  'rom':{'TEST_ROM_SEARCH':'1'},
  'rom-image':{'_bin':'VSynthEmuRomTest'},   # a test of its own, given only the ROM
  'switches':{'_bin':'VSynthEmuSwitchTest'},   # the switches set, in runs of the plugin of their own
+ 'steps':{'_bin':'VSynthEmuStepTest'},   # firmware routines that loop, on the ways the plugin runs them
  'patch':{'TEST_PATCH_APPLY':'1'},
  'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_term':'8','_mode':'auto'},   # encoded again on its own events: a terminator too short to reach its last event
  'stored':{'TEST_NOTE2':'64,30000','_file':'analysis/projects/Emu_test.prj/Wave/376 Synth014.wav','_mode':'auto'},
@@ -231,7 +237,7 @@ ENV={
 }
 SDK=os.environ.get('SDK','/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk')
 def build():
-    targets=['VSynthEmuTest','VSynthEmuRomTest','VSynthEmuSwitchTest']   # every binary a kind runs
+    targets=['VSynthEmuTest','VSynthEmuRomTest','VSynthEmuSwitchTest','VSynthEmuStepTest']   # every binary a kind runs
     r=subprocess.run(['cmake','--build','build/plugin','--target',*targets,'-j','10'],
                      capture_output=True,text=True,env=dict(os.environ,SDKROOT=SDK))
     return r.stdout if r.returncode==0 else 'failed: '+r.stderr[-300:]

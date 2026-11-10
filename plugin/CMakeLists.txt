@@ -74,6 +74,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtMultiBandPlayer.cpp
     Source/Sh4Interp.cpp
     Source/XtFirmware.cpp
+    Source/XtFwMachine.cpp
     Source/XtFiles.cpp
     Source/XtWaveFile.cpp
     Source/XtPatch.cpp
@@ -127,10 +128,12 @@ vse_add_test(VSynthEmuRestoreTest Tests/RestoreTest.cpp Tests/TestMain.cpp Tests
 vse_add_test(VSynthEmuRomTest Tests/RomTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp)   # another image while one plays
 # The harnesses' switches set in the plugin's environment, which it doesn't read
 vse_add_test(VSynthEmuSwitchTest Tests/SwitchTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp Tests/TestWave.cpp)
+# A firmware routine that loops, on each way the plugin runs one: it gives up within its step limit
+vse_add_test(VSynthEmuStepTest Tests/StepTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp Tests/TestWave.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
-                 VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest)
+                 VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.

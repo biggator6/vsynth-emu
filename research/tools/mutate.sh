@@ -43,7 +43,7 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
     OBJ="$M/tone_obj"; mkdir -p "$OBJ"; L=()
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
     PARTS=(XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtLinearPlayer XtLitePlayer XtMultiBandPlayer XtEnvelope XtLfo
-           XtOsc XtCosm XtAnalog XtFirmware Sh4Interp XtFiles XtWaveFile XtPatch XtSynthRom)
+           XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp XtFiles XtWaveFile XtPatch XtSynthRom)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue
         [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] || "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_TONE_MAIN -DXT_TONE_CHECK -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
@@ -96,6 +96,10 @@ elif [ "$PORT" = analogfw ]; then
     L=("$S/XtOsc.cpp" "$S/XtCosm.cpp" "$S/XtAnalog.cpp" "$S/XtEnvelope.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp")
 else
     F=XtCosm.cpp; D=XT_COSM_MAIN; L=("$S/XtOsc.cpp" "$S/XtEnvelope.cpp" "$S/Sh4Interp.cpp")
+fi
+# The machine XtFirmware's routines run on (v175) is built wherever they are; the tone port has it among its PARTS
+if [ -z "$TF" ] && { [ "$F" = XtFirmware.cpp ] || [[ " ${L[*]} " == *"/XtFirmware.cpp "* ]]; }; then
+    L+=("$S/XtFwMachine.cpp")
 fi
 "$PY" - "$S/$F" "$M/$N.cpp" "$O" "$W" <<'PY' || exit 1
 import sys

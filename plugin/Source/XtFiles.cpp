@@ -161,7 +161,7 @@ bool xtPatchRead(const uint8_t* file, size_t size, XtPatchFile& out, std::string
     out = {};
     const uint8_t* data = nullptr; size_t bytes = 0;
     if (!patchData(file, size, data, bytes)) return fail(why, "not a V-Synth patch");
-    if (!xtFwPatchStore(data, bytes, out.store)) return fail(why, "the firmware's patch routines failed (no ROM?)");
+    if (!xtFwPatchStore(data, bytes, out.store)) return fail(why, "the firmware's patch routines failed");
     for (int k = 0; k < 12; ++k) out.name += (char)xtPatchRaw(out.store, 0x103 + k);
     while (!out.name.empty() && out.name.back() == ' ') out.name.pop_back();
     return true;

@@ -12,8 +12,8 @@ struct TestChecks {
         ++failed;
         std::fprintf(stderr, "%s: %s\n", name, what.c_str());
     }
-    int summary() const {
-        std::printf("%s: %d/%d checks hold\n", name, count - failed, count);
+    int summary(const std::string& also = {}) const {   // `also`, said after the count
+        std::printf("%s: %d/%d checks hold%s%s\n", name, count - failed, count, also.empty() ? "" : "; ", also.c_str());
         return failed ? 1 : 0;
     }
 };
