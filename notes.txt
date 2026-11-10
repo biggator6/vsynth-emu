@@ -335,6 +335,12 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+ARCHITECTURE.md's goal v181 (2026-11-10): .claude/fix-plan.md, section 9. Its Project Goal and method still said
+  black-box testing against a real V-Synth. Now the goal is the firmware's ports, checked against the firmware in the
+  interpreter (the effect chip against JE-8086's and captures from the XT), and the black-box method is kept beneath as
+  Sessions 1-15's, with the legacy engine named as what plays without an image. Its tree and "Not yet" list are stale too:
+  a box of their own.
+
 CLAUDE.md's out-of-date lines v180 (2026-11-10): .claude/fix-plan.md, section 9. "Where things are" listed notes.txt,
   ARCHITECTURE.md and RESEARCH_LOG.md under research/, where none is; they have a bullet of their own, at the root. "V-Synth's
   files" said applying a patch to the plugin isn't done; VSynthEmuProcessor::loadPatch does it, and the line points at

@@ -1,8 +1,28 @@
 # V-Synth VariPhrase Emulator — Architecture
 
 ## Project Goal
-Reverse-engineer Roland's VariPhrase DSP algorithm by black-box testing against a real V-Synth,
-then implement a faithful emulation as a JUCE VST3/AU plugin.
+A JUCE plugin (AU, VST3, Standalone) that plays samples through ports of the Roland V-Synth XT's
+own firmware: its VariPhrase encoders and players, the OSC converters, envelopes, LFOs, pitch path,
+key assign, COSM filters, TVA and effects. The algorithms are taken from the owner's `rom.2`, read
+at run time and never shipped. `CLAUDE.md` is the working reference, and
+`research/HARDWARE_FIRMWARE.md` holds the findings.
+
+Until Session 15 the goal was to reverse-engineer VariPhrase by black-box testing against a real
+V-Synth, then write an emulation from what the differences showed. Session 16 (October 2026)
+turned to the firmware itself. The engine from that earlier work is still in the plugin, as the
+legacy engine (`VariphraseEngine`), which plays a loaded file when there is no firmware image.
+
+## Methodology: Ports Checked Against the Firmware
+1. Read the routine in `rom.2` (Ghidra, and the disassembly for DSP code).
+2. Port it to C++ in `plugin/Source/`.
+3. Run the firmware's own routine in the SH-4 interpreter (`plugin/Source/Sh4Interp.*`) beside the
+   port, on fixed and random cases, in the port's harness (its `XT_*_MAIN` block).
+4. A port is done when the two are equal (0 different), and planted errors show the harness
+   catches a mistake (the `mutate_*` scripts in `research/tools/`).
+
+The effect chip runs microcode the SH-4 can't run. `XtFxChip` is checked the same way against
+JE-8086's interpreter, on the XT's own programs, and the effects' sound against captures from the
+owner's XT.
 
 ## What VariPhrase Does
 VariPhrase decouples three axes that are normally entangled in audio processing:
@@ -13,7 +33,8 @@ VariPhrase decouples three axes that are normally entangled in audio processing:
 | Time/Duration | Locked to pitch       | Fully independent  |
 | Formants    | Shift with pitch        | Fully independent  |
 
-## Methodology: Black-Box Reverse Engineering
+## Earlier Methodology: Black-Box Reverse Engineering (Sessions 1–15)
+The method before Session 16, kept as it was; the analysis in `analysis/` and the scores below come from it.
 1. Feed controlled inputs to the real V-Synth, capture outputs (WAV)
 2. Run the same inputs through our plugin
 3. Null test + spectrogram compare to measure the difference
