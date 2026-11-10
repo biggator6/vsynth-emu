@@ -3570,6 +3570,10 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-10) — v183: ARCHITECTURE.md's "Checks"
+
+- The list is a history: each line says what its version measured. So nothing was rewritten. A line that changed keeps its words and gains what holds now, with the version that changed it, taken from fcheck's baseline (the numbers) and HARDWARE_FIRMWARE.md (the version). Lines that still hold were checked too, and left alone.
+
 ### Session 18 (2026-11-10) — v182: ARCHITECTURE.md's tree and "Not yet"
 
 - The tree is by folder, because a file list goes stale with every split, and CLAUDE.md already keeps one. Each folder was taken from git's own list and .gitignore, not memory.

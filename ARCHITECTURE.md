@@ -278,7 +278,8 @@ The plugin plays a loaded sample the way the XT plays an encoded wave:
      the twelve filter types, Cutoff, Resonance and Keyfollow, each with its
      own envelopes (Env 9/10, 11/12) and LFO (3, 4), through the XT's
      converter, control and filter kernels, between the player and the
-     TVA.
+     TVA. Since v78 all sixteen COSM types, each with its stereo routine
+     since v104.
    - the analog oscillator (v79–v87, XtAnalog): OSC Type ANALOG plays the
      XT's SAW, SQUARE, TRIANGLE, SINE, RAMP, JUNO, NOISE, HQ-SAW and
      HQ-SQUARE (band-limited, from rom.2's tables), LA-SAW, LA-SQUARE,
@@ -325,10 +326,12 @@ and effects from it and loads its waves from the project's `Wave` folder.
 - At a 44.1 kHz host rate, `XtSynth` output is bit-exact against the
   firmware chain: `xt_fw play`, and the engine's SOLO render.
 - `XtEnvelope` is tick-for-tick identical to the firmware's envelope
-  routines run in the SH-4 interpreter (`xt_env`, 18 cases).
+  routines run in the SH-4 interpreter (`xt_env`, 18 cases). fcheck now runs
+  six of them, and the time converter on 1,045,760 cases, 0 different.
 - The SOLO player (`XtSoloVoice`, mono and stereo) is within −101…−118 dB
   of the firmware player in the P-code emulator, on 13 mono cases and 4
-  stereo ones (v44).
+  stereo ones (v44). Since v122 it is bit for bit: `xt_fw solocmp`, 32 cases,
+  every one 0 different (HARDWARE_FIRMWARE.md, "SOLO bit for bit").
 - `Tests/PluginTest.cpp` drives the real processor (ROM, file load,
   background encode, sample-accurate MIDI) at 48 kHz. Its output is
   **bit-identical** to `XtSynth` on the chord (ENSEMBLE), drum (BACKING),
@@ -341,12 +344,14 @@ and effects from it and loads its waves from the project's `Wave` folder.
 - The level path (v53): the velocity curve, the OSC level slots and the
   gain target equal the firmware (`xt_osc`); the players' gain stages
   match the firmware players with gain changes.
-- Robot Voice (v54) matches the firmware's SOLO player at −94.5…−110 dB.
+- Robot Voice (v54) matches the firmware's SOLO player at −94.5…−110 dB. Since
+  v122, 0 different (`solocmp`'s three Robot cases).
 - The pitch path (v55): the note's pitch, the cents, the Pitch ratio, the
   target and the voice update's step equal the firmware (`xt_osc`, 385,240
   cases).
 - SOLO loops (v56) match the firmware's SOLO player, given the same cached
-  loop events, at −92…−107 dB (`xt_fw solocmp … loop:…`). BACKING and
+  loop events, at −92…−107 dB (`xt_fw solocmp … loop:…`); since v122,
+  0 different, One Way and Alternate among the cases. BACKING and
   ENSEMBLE loops (v57) are bit-exact against the firmware players
   (`xt_fw bandcmp … loop:…`).
 - Portamento (v58): the settings converter and the pitch ramp equal the
@@ -371,31 +376,37 @@ and effects from it and loads its waves from the project's `Wave` folder.
 - PCM on OSC 2 (v103): `xt_tone`, a whole firmware tone against XtSynth with a wave on OSC 2; and in `xt_analog`
   real encoded waves through the firmware's converter, note-on, updates and render: BACKING and ENSEMBLE equal
   the firmware, SOLO within 2e−4 of full scale. Notes whose firmware reads leave the wave are not compared.
+  Now (fcheck's baseline) SOLO equals the firmware too: `xt_analog`'s PCM tone is 0 different on every kind of
+  wave, SOLO mono and stereo among them.
 - OSC 2 (v86): the converter with the input's OSC set, and both voices in a tone
   object through the firmware's binding, setup, install, updates and render
   (both buffers, the mix, the masks, the fields and the shared delay lines),
   equal the firmware (`xt_analog`).
 - COSM TVF (v61) and Dynamic TVF (v64): the converters, start values,
   targets and updates, the follower and the twelve filter kernels equal the
-  firmware (`xt_cosm`).
+  firmware (`xt_cosm`). All sixteen COSM types since v78, and their stereo
+  routines since v104, the same way (CLAUDE.md, "Porting a COSM type").
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.
   SOLO agrees at −94…−109 dB in every direction, the port's usual
-  output-stage residual.
+  output-stage residual; since v122, 0 different in every direction too.
 - XtSynth's wiring (v93–v100): a whole firmware tone, from the parameter IDs on, equals XtSynth inside its
   block and at its output, bit for bit but for a SOLO wave's buffers, over random settings and a sweep of
-  every field in its change lists (`xt_tone`). Not the voice allocator, and not a real unit.
+  every field in its change lists (`xt_tone`). Not the voice allocator, and not a real unit. Since v122 a
+  SOLO wave's buffers too: `xt_tone` has no tolerance left.
 - The TVA Switch (v101): off, the TVA has no envelope, as the firmware (`xt_tone`). Off by default, as on the XT (v102).
 - The patch TVA's level and pan (v114): Level, Pan, their Keyfollows and LFO Depths, LFO 5, the MFX Send Level and CC 7, 10, 11, as the firmware (`xt_tone`).
 - Hold, Sostenuto and the mode messages (v117): the note's three reasons to sound, as the firmware (`xt_tone`). Any controller is a tone update.
 - Tempo sync and Time Trip (v118): the Patch Tempo, note values on envelope times and LFO rates, Tempo Sync, the Time Trip pad, its Switch and Beat Keep, as the firmware (`xt_tone`).
-- The Matrix (v119): the eight controls, every source, the D-Beam's controllers and pressures, as the firmware (`xt_tone`), each slot's sum compared. MFX-PRM1…3 wait for the effects. The Multi Step Modulator is not ported. The COSMs' PRMs in v120. TRIP-R from the Time Trip pad, and what a source moved with no update reaches, in v124.
+- The Matrix (v119): the eight controls, every source, the D-Beam's controllers and pressures, as the firmware (`xt_tone`), each slot's sum compared. MFX-PRM1…3 wait for the effects (they reach the effects' driver since v137). The Multi Step Modulator is not ported. The COSMs' PRMs in v120. TRIP-R from the Time Trip pad, and what a source moved with no update reaches, in v124.
 - Time Trip by its controllers (v132): Time Trip Assign X and Y, on CC82 and CC83, move the pad, as the firmware's Control Change case (`xt_tone`).
 - The pad's X-Y pair (v134): Pad Assign X and Y default to CC80 and CC81, the Matrix's PAD sources reading them, as the firmware (`xt_tone`). Both pairs are always live: Pad Mode is only what the XT's own pad sends.
 - The host's tempo (v125): Clock Source HOST is the firmware's EXTERNAL on the host's transport, a clock on each 24th of a quarter it passes, the tempo read from the ms over six of them, as the firmware (`xt_tone`). Default INTERNAL, the Patch Tempo.
 - The effects (v136–v138): the chip (v126) and the firmware's own driver (v131) in the sound behind the Effects switch, off by default, with MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain on the editor's panel (`FxPanel`, each value's text by the firmware's own routine, v138), and the tone's Chorus and Reverb Send, Output Assign and Output Mode (v133). Exact against JE-8086's interpreter and the firmware's driver in `Sh4Interp`; no reference yet beyond those.
 - `auval -v aumu VsEm Ystu` passes.
+- Each line above is as its version wrote it, with what holds now after it where that changed (v183).
+  The checks of v139 on are in each version's note in `notes.txt`; fcheck and `verify.sh` run them all.
 
 **Not yet** (checked at v182):
 - the effects against a real XT: no capture is recorded yet (HARDWARE_FIRMWARE.md, "The effect

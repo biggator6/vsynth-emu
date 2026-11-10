@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+ARCHITECTURE.md's "Checks" v183 (2026-11-10): .claude/fix-plan.md, section 9. Its lines were each version's as it left
+  them. Each was read against fcheck's baseline, HARDWARE_FIRMWARE.md and the code; those that changed keep their words and
+  say what holds now: the SOLO player, Robot, loops and reverse 0 different since v122 (solocmp's 32 cases), xt_analog's
+  SOLO PCM and xt_tone's SOLO buffers exact, the Matrix's MFX-PRMs at the effects' driver since v137, all sixteen COSM types
+  since v78 (and in the description list), xt_env's cases in fcheck now. A last line says the list is read that way and
+  that v139 on is in notes.txt.
+
 ARCHITECTURE.md's tree and "Not yet" v182 (2026-11-10): .claude/fix-plan.md, section 9. The tree named a dozen files of
   v43's plugin; it's by folder now, against git's own list, with the files left to CLAUDE.md's "Where things are". "Not
   yet" said no step/event playback and no matrix, both done (v155, v156; v119 on), and the envelopes' velocity settings
