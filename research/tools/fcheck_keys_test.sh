@@ -10,9 +10,11 @@ G=$(cd "$REPO" && git rev-parse --git-common-dir)
 KEPT="$(cd "$REPO" && cd "$G/.." && pwd)/build/tools/fcheck/kept"
 T=$(mktemp -d)
 trap 'rm -rf "${T:?}"' EXIT
-mkdir -p "$T/research" "$T/analysis/projects" "$T/build/tools/fcheck"
+mkdir -p "$T/research" "$T/plugin" "$T/analysis/projects" "$T/build/tools/fcheck"
 cp -R "$REPO/research/tools" "$T/research/tools"
 ln -s "$REPO/research/third_party" "$T/research/third_party"
+# The tools reach plugin/Source by relative paths too (harness_switches.cpp's include, v174): the run stopped there
+ln -s "$REPO/plugin/Source" "$T/plugin/Source"
 cp -R "$REPO/analysis/projects/Emu_test.prj" "$T/analysis/projects/"
 cp -R "$WORK/inputs" "$T/build/tools/inputs"
 cp -R "$KEPT" "$T/build/tools/fcheck/kept"

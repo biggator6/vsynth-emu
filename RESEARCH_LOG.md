@@ -3570,6 +3570,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-10) — v179: fcheck_keys_test.sh runs again
+
+- The red was v178's run of it: the first fcheck in its scratch tree built nothing, for want of plugin/ beside the copied tools. A link to the checkout's plugin/Source, like the one to research/third_party, and it passes in 120 s.
+- It went five versions unrun because it was asked for only when fcheck.sh changed, and what broke it was a file build.sh compiles. CLAUDE.md now names those too.
+
 ### Session 18 (2026-11-10) — v178: env.sh from zsh
 
 - Every script runs under bash, so BASH_SOURCE was always there for them. It was missing only when env.sh was sourced by hand, from the Mac's own shell, which is how this session first met it: REPO two folders up. An empty ~/build/tools from 2026-10-31 says it had happened before.
