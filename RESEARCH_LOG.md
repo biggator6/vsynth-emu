@@ -3570,6 +3570,10 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-10) — v180: CLAUDE.md's out-of-date lines
+
+- Of the three boxes, one was already done: 79b16c5 had fitted "Project layout" to this repo after the review measured it, the same day. Checked again: every folder it names is there. The other two were still wrong, and are corrected; build.md's own pointer to research/notes.txt was the same mistake.
+
 ### Session 18 (2026-11-10) — v179: fcheck_keys_test.sh runs again
 
 - The red was v178's run of it: the first fcheck in its scratch tree built nothing, for want of plugin/ beside the copied tools. A link to the checkout's plugin/Source, like the one to research/third_party, and it passes in 120 s.

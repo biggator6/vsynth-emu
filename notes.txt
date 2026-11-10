@@ -335,6 +335,12 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+CLAUDE.md's out-of-date lines v180 (2026-11-10): .claude/fix-plan.md, section 9. "Where things are" listed notes.txt,
+  ARCHITECTURE.md and RESEARCH_LOG.md under research/, where none is; they have a bullet of their own, at the root. "V-Synth's
+  files" said applying a patch to the plugin isn't done; VSynthEmuProcessor::loadPatch does it, and the line points at
+  "Applying a patch". The third box, the src/ tree in "Project layout", had been done by 79b16c5. ARCHITECTURE.md's goal is
+  still the old one (a box of its own).
+
 fcheck_keys_test.sh runs again v179 (2026-11-10): .claude/fix-plan.md, section 9, found at v178. Its scratch tree had no
   plugin/, and harness_switches.cpp (v174) includes XtSwitches.h through ../../plugin/Source, so the first fcheck run built
   nothing ("build: xt_osc missing") and the test stopped before checking a key; it had last run at v171. The tree now links

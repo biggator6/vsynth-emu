@@ -29,7 +29,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   (`XT_TONE_MAIN`) is XtSynth's: a whole firmware tone against it.
 - `research/UI_DESIGN.md`: the editor's design, which new UI work follows.
 - `research/HARDWARE_FIRMWARE.md`: the findings, newest version first (addresses,
-  layouts, formulas, checks). `notes.txt`, `ARCHITECTURE.md`, `RESEARCH_LOG.md`.
+  layouts, formulas, checks).
+- At the root: `notes.txt` (the versions' notes, and how to build), `RESEARCH_LOG.md` (the sessions),
+  `ARCHITECTURE.md`.
 - `research/tools/`: the scripts below. `research/ghidra_scripts/`: Ghidra scripts.
 
 ## Tools (`research/tools/`, paths in `env.sh`; work files in `build/tools/`)
@@ -112,7 +114,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 ## Firmware facts worth knowing
 - Applying a patch (HARDWARE_FIRMWARE.md, "Applying a patch"; `XtPatch`, `VSynthEmuProcessor::loadPatch`): a new `Controls` field read from a patch needs its line there as well as in `patchOf`, and `setControls` beside `xtControls`. A wave's own fine tuning (`vplp` +0, up to 14 semitones in real waves) is on `XtEncoded`, not a control: it reaches the pitch, the root, the formant ratio and the walk. A patch holds only its type's parameters, read by slot (`xtPatchTyped`). Not done: STEP and EVENT on SOLO waves, arpeggio, Multi Step Modulator; `xtPatchMissing` says which a patch asks for.
 - Zones (v154; HARDWARE_FIRMWARE.md, "Zones"; the user's decision, 2026-11-05): zones 2–16 are a patch's data (`XtSynth::Zones`, `setZones`; `loadPatch` encodes their waves on the pool), zone 1 the parameters and editor. A note's zone is the first of the part's table of upper keys (IDs 0x124…, `0x894794f0`) its key isn't above; a legato note keeps its zone. A zone's IDs (0x293…0x3e8, the COSMs') are read through objects its routines point at its block; the rest is the patch's common, zone 1's (`zoneControls`). The free-running LFOs, a key-unsynced LFO's following and the MOD's block are by zone. Everything a voice reads goes through `zc(v)`: a voice reading `ctl` is a zone bug. `xt_tone`'s getter answers by the tag the eight routines leave in the object; its zone cases are the last section.
-- V-Synth's files (HARDWARE_FIRMWARE.md, "V-Synth's files"; `XtFiles`): a `.vpw`'s audio is RDAC-packed, unpacked by the firmware's block routine, and the plugin plays one. A `.p00` is in a file layout: the firmware's defaults under it, then `0x8947dae0`, give the store the descriptors (12 bytes an ID: offset, width, bit, centre, default, min, max) read. Applying a patch to the plugin isn't done. The disk image's files are fragmented, so go through its FAT; 416 preset waves follow its partition, in no file.
+- V-Synth's files (HARDWARE_FIRMWARE.md, "V-Synth's files"; `XtFiles`): a `.vpw`'s audio is RDAC-packed, unpacked by the firmware's block routine, and the plugin plays one. A `.p00` is in a file layout: the firmware's defaults under it, then `0x8947dae0`, give the store the descriptors (12 bytes an ID: offset, width, bit, centre, default, min, max) read. A patch is applied by `VSynthEmuProcessor::loadPatch` ("Applying a patch", above). The disk image's files are fragmented, so go through its FAT; 416 preset waves follow its partition, in no file.
 - The ports' tables are the process's, read by every instance without a lock (`XtSynthRom.cpp`, v173): written once, by the first image to load,
   and published by an atomic flag only when all of them are in. Another file is taken only if it holds the same bytes, with nothing written;
   a different image is refused, saying why, until the host starts again. A new table goes in `loadTables` there, never written after.
