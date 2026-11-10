@@ -4,6 +4,8 @@
 // past the 10 s the destructor used to wait, after which the job wrote into members already destroyed.
 // Run: VSynthEmuTeardownTest <rom.2.bin>.  Exit 0 if every check holds.
 #include "TestAppDir.h"
+#include "TestChecks.h"
+#include "TestWave.h"
 #include "../Source/PluginProcessor.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <chrono>
@@ -15,31 +17,7 @@
 
 namespace {
 
-constexpr int kRate = 44100;
 constexpr float kBacking = 2.0f;   // the Encode Type's choice index: 0 Auto, 1 SOLO, 2 BACKING, 3 ENSEMBLE, 4 LITE
-
-// `seconds` of a line of notes, a semitone up every half second, with a little noise: something the encoders work at.
-juce::File writeWave(const juce::File& folder, int seconds) {
-    const int frames = seconds * kRate;
-    juce::AudioBuffer<float> audio(1, frames);
-    uint32_t noise = 1;
-    for (int i = 0; i < frames; ++i) {
-        const double t = (double)i / kRate, f = 110.0 * std::pow(2.0, (double)((i / (kRate / 2)) % 12) / 12.0);
-        const double env = 0.6 + 0.4 * std::exp(-8.0 * std::fmod(t, 0.5));
-        noise = noise * 1664525u + 1013904223u;
-        const double n = (double)(noise >> 8) / 16777216.0 - 0.5;
-        audio.setSample(0, i, (float)(0.4 * std::sin(2.0 * std::numbers::pi * f * t) * env + 0.01 * n));
-    }
-    const juce::File file = folder.getChildFile("teardown_" + juce::String(seconds) + "s.wav");
-    file.deleteFile();
-    juce::WavAudioFormat wav;
-    auto stream = std::make_unique<juce::FileOutputStream>(file);
-    if (!stream->openedOk()) return {};
-    std::unique_ptr<juce::AudioFormatWriter> writer(wav.createWriterFor(stream.get(), kRate, 1, 16, {}, 0));
-    if (!writer) return {};
-    stream.release();   // the writer owns it now
-    return writer->writeFromAudioSampleBuffer(audio, 0, frames) ? file : juce::File();
-}
 
 std::unique_ptr<VSynthEmuProcessor> backingOn(const juce::File& rom, const juce::File& wave) {
     auto p = std::make_unique<VSynthEmuProcessor>();
@@ -51,13 +29,10 @@ std::unique_ptr<VSynthEmuProcessor> backingOn(const juce::File& rom, const juce:
 }
 
 int teardownTest(const juce::File& rom, const juce::File& work) {
-    int checks = 0, failed = 0;
-    const auto check = [&](bool ok, const juce::String& what) {
-        ++checks;
-        if (!ok) { ++failed; std::fprintf(stderr, "teardown: %s\n", what.toRawUTF8()); }
-    };
+    TestChecks checks { "teardown" };
+    const auto check = [&checks](bool ok, const juce::String& what) { checks(ok, what.toStdString()); };
     work.createDirectory();
-    const juce::File longWave = writeWave(work, 30), shortWave = writeWave(work, 2);
+    const juce::File longWave = writeTestWave(work, 30), shortWave = writeTestWave(work, 2);
     if (longWave == juce::File() || shortWave == juce::File()) {
         std::fprintf(stderr, "teardown: no test waves\n");
         return 1;
@@ -79,8 +54,9 @@ int teardownTest(const juce::File& rom, const juce::File& work) {
     const juce::String status = q ? q->getStatusText() : juce::String("no processor");
     check(status == "Encoded as BACKING", "the next processor should encode: " + status);
     q.reset();
-    std::printf("teardown: %d/%d checks hold; closed mid-encode in %.0f ms\n", checks - failed, checks, ms);
-    return failed ? 1 : 0;
+    const int held = checks.count - checks.failed;
+    std::printf("teardown: %d/%d checks hold; closed mid-encode in %.0f ms\n", held, checks.count, ms);
+    return checks.failed ? 1 : 0;
 }
 
 } // namespace

@@ -3570,6 +3570,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-09) — v172: what a reopened project lacks
+
+- The review had the effects' part as a quiet one: the switch on, the driver not started, only a debug line. The test made a copy of the ROM, opened it, took it away and turned the effects on, and the test died. The driver's constructor returns early when the ROM won't load, before it sizes its store, and the tick went on to write into it. It was a crash all along, waiting for a ROM that moves after an instance opens it.
+- The other two were as the review said. A wave whose file had gone was skipped without a word, and the zones' notes went into a list named `unused`. For the zones the test saves a session as if the waves had been there, with nothing in its note, then reopens it without them. That's how a project moved between machines would meet it.
+- The split this time was small on purpose. Only the tick and the two state functions left PluginProcessor.cpp. The tick reads the Effects switch through a one-line accessor, so the parameter IDs could stay where they are.
+
 ### Session 18 (2026-11-09) — v171: fcheck's kept sections, keyed by what they read
 
 - fcheck reuses a section's last result when the section's key matches. The key held the binary, the command text, the ROM and the inputs. Two sections also read a script (xtrecs.py) or the project's waves, and two read the disk image, so a change there left "as baseline" standing on a result from before the change. The test showed it both ways: a comment added to xtrecs.py and one byte of a wave changed, and fcheck said 0 of 162 sections run each time.

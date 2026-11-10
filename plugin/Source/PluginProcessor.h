@@ -131,6 +131,7 @@ private:
     static constexpr int kFxIds = 0x8d0, kFxNoEdit = INT_MIN;
     std::atomic<int> fxEdits_[kFxIds];
     void fxApply(XtFxControl& c);
+    bool effectsWanted() const;                 // the Effects switch
     XtFxCatalog fxCatalog_;
 
     juce::AudioFormatManager formatManager_;
@@ -154,6 +155,7 @@ private:
     // A patch's zones 2…16: their settings at once, and again with their waves once the pool has encoded them (each wave once, as its own
     // type).  A newer patch discards an older one's.  The store and the wave folder go in the session, for its zones to come back.
     void loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes);
+    void restoreZones(juce::StringArray& notes);   // a session's zones back (PluginState.cpp), what isn't there in notes
     std::atomic<int>         zonesGen_ { 0 }, patchZones_ { 1 };
     std::atomic<bool>        zonesReady_ { true };
 

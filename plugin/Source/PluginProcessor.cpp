@@ -834,31 +834,8 @@ private:
     VSynthEmuProcessor& owner;
 };
 
-void VSynthEmuProcessor::fxTick() {
-    const std::lock_guard<std::mutex> lock(fxLock_);
-    if (apvts.getRawParameterValue(Params::kFxOn)->load() < 0.5f && !fxUnit_) return;
-    if (!fxUnit_) {
-        if (romFile_.isEmpty()) return;
-        auto u = std::make_unique<XtFxUnit>(romFile_.toRawUTF8());
-        fxApply(u->control());
-        u->control().loadPatch();
-        fxPatchPending_ = false;
-        u->settle();
-        if (!u->ok()) { DBG("effects: " << u->control().error()); romFile_.clear(); return; }
-        fxUnit_ = std::move(u);
-        synth_.setBusSink(fxUnit_.get());
-        fxRunning_ = true;
-    }
-    XtFxControl& c = fxUnit_->control();
-    fxApply(c);
-    if (fxPatchPending_.exchange(false)) c.wantPatch();
-    c.tick();
-    if (apvts.getRawParameterValue(Params::kFxOn)->load() >= 0.5f) {    // nothing's taking the words otherwise
-        c.setMatrix(synth_.fxMatrix(0), synth_.fxMatrix(1), synth_.fxMatrix(2));
-        c.outsideClock(synth_.fxClockSix());
-    }
-    c.pump();
-}
+// fxTick is in PluginEffects.cpp (v172)
+bool VSynthEmuProcessor::effectsWanted() const { return apvts.getRawParameterValue(Params::kFxOn)->load() >= 0.5f; }
 
 // The plugin's effect parameters, each the firmware's ID.
 static const struct { const char* name; int id; } kFxKnobs[] = {
@@ -2154,59 +2131,7 @@ VSE::Algorithm VSynthEmuProcessor::getAlgorithm() const {
     return engine_.getAlgorithm();
 }
 
-// ─── State ────────────────────────────────────────────────────────────────────
-
-void VSynthEmuProcessor::getStateInformation(juce::MemoryBlock& destData) {
-    auto state = apvts.copyState();
-    juce::String edits;
-    for (int id = 0; id < kFxIds; ++id) { const int v = fxEdits_[id].load(std::memory_order_relaxed); if (v != kFxNoEdit) edits << id << "=" << v << ","; }
-    state.setProperty("fxEdits", edits, nullptr);
-    std::unique_ptr<juce::XmlElement> xml(state.createXml());
-    copyXmlToBinary(*xml, destData);
-}
-
-void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) {
-    std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
-    if (!xml || !xml->hasTagName(apvts.state.getType()))
-        return;
-
-    apvts.replaceState(juce::ValueTree::fromXml(*xml));
-    for (auto& e : fxEdits_) e.store(kFxNoEdit, std::memory_order_relaxed);
-    for (const auto& pair : juce::StringArray::fromTokens(apvts.state.getProperty("fxEdits").toString(), ",", ""))
-        if (pair.contains("=")) setFxParam(pair.upToFirstOccurrenceOf("=", false, false).getIntValue(), pair.fromFirstOccurrenceOf("=", false, false).getIntValue());
-    fxPatchPending_ = true;
-
-    // The firmware image and the file, if their paths were persisted
-    const juce::String rom = apvts.state.getProperty("romPath").toString();
-    if (rom.isNotEmpty() && !xtSynthRomReady() && juce::File(rom).existsAsFile())
-        openRom(juce::File(rom));
-    for (int k = 0; k < 2; ++k)
-    {
-        juce::String path = apvts.state.getProperty(k ? "loadedFilePath2" : "loadedFilePath").toString();
-        if (path.isNotEmpty())
-        {
-            juce::File f(path);
-            if (f.existsAsFile())
-                loadFile(f, k, false);
-        }
-    }
-    patchName_ = apvts.state.getProperty("patchName").toString();
-    patchNote_ = apvts.state.getProperty("patchNote").toString();
-    // A patch's zones 2…16, from the store it kept
-    juce::MemoryOutputStream zoneStore;
-    const juce::String kept = apvts.state.getProperty("patchStore").toString();
-    if (kept.isNotEmpty() && xtSynthRomReady() && juce::Base64::convertFromBase64(zoneStore, kept)) {
-        const auto* b = static_cast<const uint8_t*>(zoneStore.getData());
-        const std::vector<uint8_t> store(b, b + zoneStore.getDataSize());
-        juce::StringArray unused;
-        loadZones(store, juce::File(apvts.state.getProperty("patchWaves").toString()), unused);
-    } else {
-        ++zonesGen_;
-        patchZones_.store(1);
-        zonesReady_.store(true);
-        synth_.setZones(nullptr);
-    }
-}
+// The state, getStateInformation and setStateInformation, is in PluginState.cpp (v172).
 
 // ─── Editor / Entry Point ─────────────────────────────────────────────────────
 

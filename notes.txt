@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+What a reopened project lacks, said v172 (2026-11-09): R6 of .claude/claude-packs-review.md, and a crash under it.
+  setStateInformation skipped a wave whose file had gone without a word, and threw away loadZones' notes of a patch's zone waves
+  not in its folder. Now both go with what isn't here of the patch (patchNote_, the editor's "not here") and in the status line,
+  only what the session didn't say already, and not written back into the session, so it clears when the files return.
+  fxTick with a driver that didn't start: the review read it as a DBG line and a silent switch; the test found a crash. A ROM that
+  won't load (the file gone since the instance opened it) leaves XtFxControl's store empty, and fxTick's fxApply then wrote past
+  it: a segmentation fault when the Effects switch went on. Now fxTick asks ok() first and says "Effects didn't start: <why>".
+  The split first (the user's rule for long files): fxTick to PluginEffects.cpp, reading the switch through effectsWanted();
+  getStateInformation and setStateInformation to PluginState.cpp, the zones' part as restoreZones. mutate_panel.py's plants
+  follow them (PE, PS); zones-restore's text names notes, not unused. verify.sh's test lines are one checkTest, as template-law
+  asked; TestChecks.h and TestWave.cpp are what the tests share. FxPanel still says "they need the ROM" for any driver that
+  isn't running; the status line has the reason.
+  Check: VSynthEmuRestoreTest (plugin/Tests/RestoreTest.cpp, in verify.sh), red on the old code (the gone wave and the zone
+  waves unsaid, then the segmentation fault), then green.
+
 fcheck's kept sections keyed by what they read v171 (2026-11-09), tools only: R5 of .claude/claude-packs-review.md. A kept
   section's key was its binary, its command, the ROM and the inputs; xtrecs.py, the project's waves and the disk image were left
   out, so after a change to any of them fcheck said "as baseline" from a kept result without running it. Now the disk image is in

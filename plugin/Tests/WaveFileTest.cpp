@@ -4,6 +4,7 @@
 // made up.  Read as it was, a 100-byte RDAC wave claiming 64M stereo frames took 10.3 s and 268 MB and read "ok", with
 // silence where its data wasn't, and a count past INT_MAX went negative in the plugin's int-sized buffers.
 // Run: VSynthEmuWaveFileTest <rom.2.bin>.  Exit 0 if every check holds.
+#include "TestChecks.h"
 #include "../Source/XtFiles.h"
 #include "../Source/XtFirmware.h"
 #include <juce_core/juce_core.h>
@@ -45,19 +46,8 @@ std::vector<uint8_t> rdacWave(uint32_t frames, bool stereo, uint32_t samples) {
     return file;
 }
 
-struct Checks {
-    int count = 0, failed = 0;
-    void operator()(bool ok, const std::string& what) {
-        ++count;
-        if (!ok) {
-            ++failed;
-            std::fprintf(stderr, "wave file: %s\n", what.c_str());
-        }
-    }
-};
-
 // At the edge, on both sides of it, mono and stereo; then the review's file.
-void edges(Checks& check) {
+void edges(TestChecks& check) {
     XtWaveFile w;
     std::string why;
     const auto mono = rdacWave(32, false, 32), monoOver = rdacWave(33, false, 32);
@@ -78,7 +68,7 @@ void edges(Checks& check) {
 
 // 2^31 mono frames with the data to match, past what an int counts: a sparse file of 2 GB, mapped.  Refused before any
 // decoding; read as it was, it would decode for minutes, so a run that hasn't come back in 3 s fails and exits.
-void pastInt(Checks& check, const juce::File& folder) {
+void pastInt(TestChecks& check, const juce::File& folder) {
     const uint32_t frames = 0x80000000u;
     auto head = rdacWave(frames, false, 0);
     const size_t dataSize = head.size() - 12;                                       // where the data chunk's size is
@@ -113,10 +103,9 @@ int main(int argc, char** argv) {
     const auto temp = juce::File::getSpecialLocation(juce::File::tempDirectory);
     const juce::File folder = temp.getNonexistentChildFile("vse-wavetest", "");
     folder.createDirectory();
-    Checks check;
+    TestChecks check { "wave file" };
     edges(check);
     pastInt(check, folder);
     folder.deleteRecursively();
-    std::printf("wave file: %d/%d checks hold\n", check.count - check.failed, check.count);
-    return check.failed ? 1 : 0;
+    return check.summary();
 }

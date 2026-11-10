@@ -36,15 +36,26 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
   o=$(cd "$REPO" && TEST_PLAYBACK=$m TEST_NOTE2="64,30000" build/plugin/VSynthEmuTest "$ROM" "$f" 60 auto 2>&1)
   echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "(the wave's own)" && echo "$o" | grep -q "the wave's own vpdt: ${wm##*:}" && n=$((n+1)); done
   echo "stored waves, plugintest: $n/6 bit-identical"; [ $n = 6 ] || rc=1; }
-[ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_FX_PANEL=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
-[ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_UI_LAYOUT=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
-[ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_ROM_SEARCH=1 build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav 2>&1) || rc=1; echo "$o" | tail -1; }
-# A processor closed while its wave is encoding: closed in ms, and the next one encodes as before
-[ $BUILT = 1 ] && { o=$(cd "$REPO" && build/plugin/VSynthEmuTeardownTest "$ROM" 2>&1) || rc=1; echo "$o" | tail -1; }
-# A wave whose header claims more than its data holds, or more samples than an int counts: refused at once
-[ $BUILT = 1 ] && { o=$(cd "$REPO" && build/plugin/VSynthEmuWaveFileTest "$ROM" 2>&1) || rc=1; echo "$o" | tail -1; }
-# Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth
-[ $BUILT = 1 ] && { o=$(cd "$REPO" && TEST_PATCH_APPLY=1 build/plugin/VSynthEmuTest "$ROM" x 2>&1) || rc=1; echo "$o" | tail -1; }
+# A test of this build, run in the checkout: its last line, and the run fails as it does.  VAR=value first goes to its
+# environment.
+checkTest() {
+    local o
+    o=$(cd "$REPO" && env "$@" 2>&1) || rc=1
+    echo "$o" | tail -1
+}
+if [ $BUILT = 1 ]; then
+    # PluginTest's own modes: the effects' panel, the editor's layout, the ROM search
+    for mode in TEST_FX_PANEL TEST_UI_LAYOUT TEST_ROM_SEARCH; do
+        checkTest "$mode=1" build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav
+    done
+    # A processor closed while its wave is encoding (closed in ms, the next one encodes as before); a project that
+    # reopens without its parts (each said); a wave whose header claims more than its data holds (refused at once)
+    for t in Teardown Restore WaveFile; do
+        checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
+    done
+    # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth
+    checkTest TEST_PATCH_APPLY=1 build/plugin/VSynthEmuTest "$ROM" x
+fi
 # A .vpw through the processor, against XtSynth on the same audio: a preset wave, mono and stereo, on its own encode type
 [ $BUILT = 1 ] && { n=0; for w in 0 300; do "$WORK/fcheck/bin/xt_files" "$ROM" extract $w "$WORK/verify_$w.vpw" > /dev/null; o=$(cd "$REPO" && build/plugin/VSynthEmuTest "$ROM" "$WORK/verify_$w.vpw" 60 auto 2>&1); echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "the wave's own" && n=$((n+1)); done; echo ".vpw, plugintest: $n/2 bit-identical"; [ $n = 2 ] || rc=1; }
 # The engine's invariants: the run fails as the program does, not only its text

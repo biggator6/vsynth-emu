@@ -7,6 +7,8 @@ from pathlib import Path
 REPO = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + '/../..')
 os.chdir(REPO)
 FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'; XV='plugin/Source/XtFxControl.cpp'; EP='plugin/Source/PluginEditor.cpp'; UP='plugin/Source/UiParts.h'
+PE = 'plugin/Source/PluginEffects.cpp'   # the effects' tick, from PluginProcessor.cpp (v172)
+PS = 'plugin/Source/PluginState.cpp'     # the session's state, from PluginProcessor.cpp (v172)
 TEXT='row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };\n        '
 TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };\n        '
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
@@ -135,13 +137,13 @@ MUTS=[
  ('note-dot',XV,"t[1] == '.' ? \".\"","t[1] == '.' ? \"\"",'panel'),
  ('knob-swap',PP,'{ "fxChoMaster", 0x1fd }','{ "fxChoMaster", 0x231 }','fx'),
  ('knob-id-gain',PP,'{ "fxGain", 0x76 }','{ "fxGain", 0x3e }','fx'),
- ('state-no-edits',PP,'state.setProperty("fxEdits", edits, nullptr);',';','fx-edit'),
- ('state-no-back',PP,'if (pair.contains("=")) setFxParam(','if (false) setFxParam(','fx-edit'),
+ ('state-no-edits',PS,'state.setProperty("fxEdits", edits, nullptr);',';','fx-edit'),
+ ('state-no-back',PS,'if (pair.contains("=")) setFxParam(','if (false) setFxParam(','fx-edit'),
  ('no-apply-knobs',PP,'for (const auto& k : kFxKnobs) c.set(k.id, (int)std::lround(apvts.getRawParameterValue(k.name)->load()));',';','fx-live'),
  ('no-apply-edits',PP,'if (v != kFxNoEdit) c.set(id, v); }\n}','}\n}','fx-live'),
- ('no-tick',PP,'    c.tick();\n',';\n','fx-live'),
- ('no-matrix',PP,'c.setMatrix(synth_.fxMatrix(0), synth_.fxMatrix(1), synth_.fxMatrix(2));',';','fx-matrix'),
- ('no-clock',PP,'c.outsideClock(synth_.fxClockSix());',';','fx-host'),
+ ('no-tick',PE,'    c.tick();\n',';\n','fx-live'),
+ ('no-matrix',PE,'c.setMatrix(synth_.fxMatrix(0), synth_.fxMatrix(1), synth_.fxMatrix(2));',';','fx-matrix'),
+ ('no-clock',PE,'c.outsideClock(synth_.fxClockSix());',';','fx-host'),
  ('no-clock-source',PP,'c.set(0x41, synth_.fxClockSix() ? 1 : 0);',';','fx-host'),
  ('no-tempo',PP,'c.set(0x11d, synth_.fxPatchTempo());',';','fx-tempo'),
  ('send-swap',PP,'c.chorusSend   = knob(Params::kTvaChoSend);','c.chorusSend   = knob(Params::kTvaRevSend);','fx-bus'),
@@ -152,7 +154,7 @@ MUTS=[
  ('rom-order',PP,'cand.add(appDir().getChildFile(kRomName).getFullPathName());\n    cand.add(appSettings()->getValue(kRomKey));','cand.add(appSettings()->getValue(kRomKey));\n    cand.add(appDir().getChildFile(kRomName).getFullPathName());','rom'),
  ('rom-env-last',PP,'if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(juce::String::fromUTF8(p));\n','','rom'),
  ('rom-not-kept',PP,'settings->setValue(kRomKey, file.getFullPathName());',';','rom'),
- ('rom-project-kept',PP,'        openRom(juce::File(rom));','        setRomFile(juce::File(rom));','rom'),
+ ('rom-project-kept',PS,'        openRom(juce::File(rom));','        setRomFile(juce::File(rom));','rom'),
  ('rom-read-again',PP,'if (path == loaded && xtSynthRomReady()) return true;',';','rom'),
  ('patch-writer',PP,'set(Params::kOscCoarse, c.oscCoarse);','set(Params::kOscCoarse, c.oscFine);','patch'),
  ('patch-writer-osc2',PP,'set(oscId(1, Params::kOscPitch), o.oscPitch);','set(oscId(1, Params::kOscPitch), c.oscPitch);','patch'),
@@ -172,13 +174,14 @@ MUTS=[
  ('patch-wave-left',PP,'else unloadWave(k);',';','patch'),
  ('patch-wave-note',PP,'else notes.add("no wave " + juce::String(number));',';','patch'),
  ('patch-encode-auto',PP,'p->setValueNotifyingHost(p->convertTo0to1(0.0f));   // Auto',';   // Auto','patch'),
- ('patch-restore-settings',PP,'loadFile(f, k, false);','loadFile(f, k);','patch'),
- ('patch-restore-name',PP,'patchName_ = apvts.state.getProperty("patchName").toString();',';','patch'),
+ ('patch-restore-settings',PS,'loadFile(f, k, false);','loadFile(f, k);','patch'),
+ ('patch-restore-name',PS,'patchName_ = apvts.state.getProperty("patchName").toString();',';','patch'),
  ('patch-loop-step',PP,'Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f)','Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f, 0.5f)','patch'),
  ('patch-tempo-step',PP,'Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.0001f)','Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.01f)','patch'),
  ('patch-folder-kept',PP,'settings->setValue(kPatchFolderKey, file.getParentDirectory().getFullPathName());',';','patch'),
  ('zones-store',PP,'apvts.state.setProperty("patchStore", zones > 1 ? juce::Base64::toBase64(store.data(), store.size()) : juce::String(), nullptr);',';','patch'),
- ('zones-restore',PP,'        loadZones(store, juce::File(apvts.state.getProperty("patchWaves").toString()), unused);','        ;','patch'),
+ ('zones-restore',PS,'        loadZones(store, juce::File(apvts.state.getProperty("patchWaves").toString()), '
+  'notes);','        ;','patch'),
  ('zones-set',PP,'        synth_.setZones(withWaves);','        ;','patch'),
  ('zones-wave-settings',PP,'            xtWaveOntoControls(w, o);\n            want.push_back({ z, k, number });','            want.push_back({ z, k, number });','patch'),
  ('zones-wave-tuning',PP,'            xtWaveOntoEncoded(w, *e);\n            enc[number] = std::move(e);','            enc[number] = std::move(e);','patch'),
