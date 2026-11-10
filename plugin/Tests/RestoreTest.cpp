@@ -3,9 +3,9 @@
 // missing; and effects whose driver won't start (here, the copy of the ROM they were given, taken away before the Effects
 // switch goes on).
 // Run: VSynthEmuRestoreTest <rom.2.bin>.  Exit 0 if every check holds.
-#include "TestAppDir.h"
 #include "TestChecks.h"
 #include "TestControls.h"
+#include "TestMain.h"
 #include "TestWave.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/XtFiles.h"
@@ -100,21 +100,14 @@ void effectsWithoutRom(TestChecks& check, const juce::File& rom, const juce::Fil
           "effects whose driver won't start should say so: \"" + p.getStatusText().toStdString() + "\"");
 }
 
-} // namespace
-
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::fprintf(stderr, "usage: %s rom.2.bin\n", argc > 0 ? argv[0] : "");
-        return 1;
-    }
-    juce::ScopedJuceInitialiser_GUI init;
-    TestAppDir appDir;
-    const juce::File rom = juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]);
-    const juce::File work = appDir.dir.getChildFile("restore");
-    work.createDirectory();
+int restoreTest(const juce::File& rom, const juce::File& work) {
     TestChecks check { "restore" };
     waveGone(check, rom, work);
     zonesWithoutWaves(check, rom, work);
     effectsWithoutRom(check, rom, work);   // last: it leaves the process's tables read from a file that's gone
     return check.summary();
 }
+
+} // namespace
+
+int main(int argc, char** argv) { return testMain(argc, argv, "restore", restoreTest); }

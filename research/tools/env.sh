@@ -5,5 +5,7 @@ WORK="${WORK:-$REPO/build/tools}"                           # binaries, inputs, 
 SDK="${SDK:-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk}"
 TC="${TC:-/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin}"
 PY="${PY:-$REPO/.venv/bin/python3}"                         # the system python lacks numpy
+# What a harness is built with to read the research switches (plugin/Source/XtSwitches.h); the plugin's targets never are
+HARNESS_SWITCHES=(-DXT_HARNESS_SWITCHES "$REPO/research/tools/harness_switches.cpp")
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}"
 mkdir -p "$WORK"

@@ -627,7 +627,7 @@ bool XtMbPlayer::noteOn(const XtMbWave& w, int mode, float pitch, float walk) {
     S.flags0 = (uint8_t)((S.stereo ? 0x40 : 0) | flagsCfg | (variCfg ? 0 : 0x20));
     S.pitch = pitch;
     S.walk = walk;
-    if (const char* r = std::getenv("XT_ROUND"); r && std::string(r) == "nearest") S.rtz = false;
+    if (xtf::nearest()) S.rtz = false;
     // 0x89510980
     for (int k = 0; k < 6; ++k) {
         Band& B = S.b[k];
@@ -973,7 +973,7 @@ void XtMbPlayer::State::readBand(int k, float*& o) {
 
 // 0x8950c720: one ×2 stage of the recombination tree: n input samples at
 // M[r4] are upsampled and added into M[r5] (2n samples), state at M[r6].
-// Indices are float slots from +0x418; transliterated register by register.
+// Indices are float slots from +0x418; transliterated register by register (one-off: the routine kept whole).
 void XtMbPlayer::State::stage(int r4, int r5, int r6, int n, const float* C) {
     float f[4];                          // fr0..fr3 (fv0); fv4 = C[0..3]
     const float fr8 = C[4], fr9 = C[5], fr10 = C[6];
@@ -1301,8 +1301,7 @@ bool xtMbBuildBacking(const int16_t* pcm, long frames, int channels, XtMbBands& 
     if (!T.ok || !pcm || frames <= 0 || (channels != 1 && channels != 2)) return false;
     // The SH-4's rounding (round to zero); XT_ROUND=nearest: the emulator's.
     const int saved = std::fegetround();
-    const char* rm = std::getenv("XT_ROUND");
-    if (!(rm && std::string(rm) == "nearest")) std::fesetround(FE_TOWARDZERO);
+    if (!xtf::nearest()) std::fesetround(FE_TOWARDZERO);
     out.channels = channels;
     const long n64 = (frames + 63) / 64 * 64;                 // chunks are rounded up to 64 frames
     const int shift[6] = { 0, 2, 3, 4, 5, 6 };

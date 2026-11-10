@@ -1,22 +1,19 @@
 #pragma once
 // Single-precision arithmetic as the SH-4 runs it: FPSCR.RM = round to zero,
-// or the P-code emulator's round to nearest with XT_ROUND=nearest.  A
+// or the P-code emulator's round to nearest with XT_ROUND=nearest (a harness's
+// switch, XtSwitches.h; the plugin always rounds as the SH-4).  A
 // product of two floats is exact in double, and a quotient is never within
 // double rounding of a float boundary, so rounding the double once gives the
 // SH-4's.  A sum is not always exact in double (operands more than about 29
 // bits apart in exponent): it is rounded from the double sum and its exact
 // error (TwoSum), so a tiny addend still moves a large value one unit toward
 // zero, as the SH-4 does.
+#include "XtSwitches.h"
 #include <cmath>
-#include <cstdlib>
-#include <cstring>
 
 namespace xtf {
 
-inline bool nearest() {
-    static const bool n = [] { const char* r = std::getenv("XT_ROUND"); return r && std::strcmp(r, "nearest") == 0; }();
-    return n;
-}
+inline bool nearest() { return xtSwitchNearest(); }
 inline float rnd(double x) {
     float f = (float)x;
     if (!nearest() && std::fabs((double)f) > std::fabs(x)) f = std::nextafter(f, 0.0f);

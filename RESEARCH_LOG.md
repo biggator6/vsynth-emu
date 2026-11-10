@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-09) — v174: the plugin reads no research switches
+
+- The review counted 30 getenv calls in the shipped code. The test runs the plugin twice, each in a process of its own, the second with the switches set. On the old code that second run printed the firmware's trace lines and wrote five trace and dump files. XT_ROUND=nearest alone changed both a SOLO note and a BACKING note.
+- The kit refuses a new getenv anywhere in plugin/Source, and any added line in a file over 300 lines. So the reads couldn't move to one place, and no getenv line could be wrapped. Each site was rewritten on its own line to read a switch from XtSwitches.h. Only the harnesses' builds read the environment, through a file in research/tools that ships in nothing. Two over-limit files needed an include: each swapped in for one the change left unneeded (`<string>` in the encoder, which moved to its main block, and an unused `<cassert>`).
+- XtFirmware's two XT_FW_TRACE prints were deleted, not moved. Nothing named them, and as single lines they'd have been over the width limit.
+- code-shape refused the band player for a function the edits never touched. It keeps the old functions by name, so `XtMbPlayer::State::stage` (64 statements) was compared with the free `stage` further down (short) and read as grown. I marked it wrong, and put the hook's own `one-off:` on the routine's existing comment line, so the file didn't grow.
+
 ### Session 18 (2026-11-09) — v173: the ROM's tables, written once
 
 - The review had R7 as read, with the glitch or crash as a claim. The test made it measured. An instance plays a note with its attack on a knob whose time comes from the envelopes' table. Another instance is given the ROM with that one entry a millisecond longer. On the old code the second image was taken, and the note sounded different. A plain copy of the ROM at another path rewrote the tables too, and moved every firmware call onto the copy.

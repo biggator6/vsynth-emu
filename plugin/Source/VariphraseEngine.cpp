@@ -5,11 +5,11 @@
 #include "XtFirmware.h"
 #include "XtMultiBandPlayer.h"
 #include "XtSoloVoice.h"
+#include "XtSwitches.h"
 
 #include <cmath>
 #include <algorithm>
 #include <numeric>
-#include <cassert>
 #include <atomic>
 #include <mutex>
 #include <string>
@@ -448,8 +448,7 @@ std::vector<GrainCut> encodeGrainCuts(const std::vector<float>& x, double sr,
     const int hop = grainUnvoicedHop(sr);
     double pos = 0.0;
     float prev = 0.0f;
-    const char* epSel = std::getenv("VSE_EPOCH");
-    const bool peakSnap = epSel && std::string(epSel) == "peak";
+    const bool peakSnap = xtSwitchIs("VSE_EPOCH", "peak");
     std::vector<double> cumE;   // prefix sums of x² for the energy epoch
     if (epochAlign && !peakSnap) {
         cumE.assign(n + 1, 0.0);
@@ -1007,8 +1006,7 @@ std::vector<float> VariphraseEngine::multiBandFirmwareOffline(const std::vector<
     // floors too), then the XT's own converter (xtFwImport).  VSE_SRC=sinc:
     // the windowed sinc of v41–v46.
     std::vector<int16_t> pcm;
-    const char* srcSel = std::getenv("VSE_SRC");
-    const bool useSinc = srcSel && std::string(srcSel) == "sinc";
+    const bool useSinc = xtSwitchIs("VSE_SRC", "sinc");
     if (!useSinc) {
         std::vector<int16_t> p48(in.size());
         for (size_t i = 0; i < in.size(); ++i) p48[i] = (int16_t)std::clamp(std::floor((double)in[i] * 32768.0), -32768.0, 32767.0);
@@ -1025,8 +1023,7 @@ std::vector<float> VariphraseEngine::multiBandFirmwareOffline(const std::vector<
     // the Encode Depth (VSE_DEPTH, default 64; −1 = start and end only).
     // Neither suite input changes with depth (the drum has one attack, the
     // chord none).
-    int depth = 64;
-    if (const char* d = std::getenv("VSE_DEPTH")) depth = std::atoi(d);
+    const int depth = xtSwitchInt("VSE_DEPTH", 64);
     std::vector<uint8_t> vpdt;
     XtMbBands bands;
     if (!xtFwEncodeMulti(type, pcm.data(), (long)pcm.size(), 1, vpdt, depth) || !xtFwLoadBands(type, pcm.data(), (long)pcm.size(), 1, bands)) return {};
@@ -1094,7 +1091,7 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     // other rates are resampled for the analysis and the record positions
     // scaled back.  VSE_ENC=epoch: the v34–v38 epoch encoder (+ budgets);
     // VSE_ENC=vt: the earlier V-Trainer approximation.
-    const char* encSel = std::getenv("VSE_ENC");
+    const char* encSel = xtSwitch("VSE_ENC");
     const std::string enc = encSel ? encSel : "xt";
     std::vector<GrainCut> cuts;
     // The XT encoder reads one table from the user's firmware image
@@ -1106,7 +1103,7 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
         cuts = encodeGrainCuts(in, sr, /*epochAlign=*/true);
         // Per-record repeat budgets as the XT's encoder writes them (v38).
         // VSE_BUDGET=off: unlimited (pre-v38).
-        if (const char* bs = std::getenv("VSE_BUDGET"); !(bs && std::string(bs) == "off"))
+        if (!xtSwitchIs("VSE_BUDGET", "off"))
             assignRecordBudgets(cuts, in);
     } else {
         const double k = sr / 44100.0;
@@ -1125,7 +1122,7 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     }
     // Diagnostic: VSE_CUTSFILE = "start len voiced" lines (e.g. the real
     // V-Trainer records parsed from a VP-9000 sample's vpdt chunk).
-    if (const char* cf = std::getenv("VSE_CUTSFILE")) {
+    if (const char* cf = xtSwitch("VSE_CUTSFILE")) {
         if (FILE* f = std::fopen(cf, "r")) {
             std::vector<GrainCut> ext;
             char line[256];
@@ -1140,7 +1137,7 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     }
     if (cuts.size() < 2) return {};
     const size_t nc = cuts.size();
-    if (const char* dump = std::getenv("VSE_DUMPCUTS")) {   // diagnostic: start len voiced info
+    if (const char* dump = xtSwitch("VSE_DUMPCUTS")) {   // diagnostic: start len voiced info
         if (FILE* f = std::fopen(dump, "w")) {
             for (size_t i = 0; i < nc; ++i) {
                 const double end = (i + 1 < nc) ? cuts[i + 1].start : (double)in.size();
@@ -1149,7 +1146,7 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
             std::fclose(f);
         }
     }
-    if (std::getenv("VSE_DEBUG")) {
+    if (xtSwitch("VSE_DEBUG")) {
         size_t nv = 0; double sumL = 0, voicedSpan = 0;
         for (size_t i = 0; i < nc; ++i) if (cuts[i].voiced) { ++nv; sumL += cuts[i].cwp; }
         for (size_t i = 0; i + 1 < nc; ++i) if (cuts[i].voiced) voicedSpan += cuts[i+1].start - cuts[i].start;
@@ -1170,22 +1167,21 @@ std::vector<float> VariphraseEngine::soloFirmwareResynthOffline(
     }
     // Record selection: the firmware scheduler (0x8950ce80 / d6f0) is the
     // default; VSE_SCHED=pos: the record containing P (pre-v37, diagnostic).
-    if (const char* schedSel = std::getenv("VSE_SCHED"); schedSel && std::string(schedSel) == "pos") plan.anchorMode = false;
-    if (const char* lm = std::getenv("VSE_LITE"); lm && std::string(lm) == "solo-np") plan.forceUnvoiced = true;
+    if (xtSwitchIs("VSE_SCHED", "pos")) plan.anchorMode = false;
+    if (xtSwitchIs("VSE_LITE", "solo-np")) plan.forceUnvoiced = true;
     // EXPERIMENT: VSE_LITEINFO=b forces the record info low bits: bit 0x4 →
     // patent path; else non-patent with S = A'·F', A' = (b & 1 ? A : 1),
     // F' = (b & 2 ? F : 1)   (0x8950d5a0).
-    if (const char* fi = std::getenv("VSE_LITEINFO")) plan.forcedInfo = std::atoi(fi);
+    plan.forcedInfo = xtSwitchInt("VSE_LITEINFO", plan.forcedInfo);
     // SOLO "Energy" (manual p. 92): g = player +0x78, smoothed ×0.7 per
     // update toward a voice target (0x8950c1b0).  The knob (OFF, 1–127)
     // gives g = (k/127)² (0x894e4030, XtOsc).  VSE_ENERGY overrides.
-    double energy = pImpl->params.soloEnergy;
-    if (const char* e = std::getenv("VSE_ENERGY")) energy = std::atof(e);
+    const double energy = xtSwitchReal("VSE_ENERGY", pImpl->params.soloEnergy);
 
     const int outLen = std::max(1, (int)std::lround((double)n * stretch));
     std::vector<float> out(outLen, 0.0f);
     XtSoloVoice voice;
-    if (const char* tf = std::getenv("VSE_TRACE")) voice.trace = std::fopen(tf, "w");
+    if (const char* tf = xtSwitch("VSE_TRACE")) voice.trace = std::fopen(tf, "w");
     voice.noteOn(plan, A, F, 1.0 / stretch, energy);
     voice.render(out.data(), outLen);
     if (voice.trace) std::fclose(voice.trace);
@@ -1209,8 +1205,7 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
         // pitch +7 63.8 → 61.2.  The time-only gains (no knob-mapping
         // assumptions involved) validate the transcribed structure.
         // VSE_SOLO=patent selects the older engine for comparison.
-        const char* m = std::getenv("VSE_SOLO");
-        if (!(m && std::string(m) == "patent")) {
+        if (!xtSwitchIs("VSE_SOLO", "patent")) {
             std::vector<float> fw = soloFirmwareResynthOffline(inputMono);
             if (!fw.empty()) return fw;
         }
@@ -1223,7 +1218,7 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
     // EXPERIMENT (LITE player search): VSE_LITE = solo-p | solo-np | pj
     // routes LITE content to the firmware SOLO player (patent / non-patent
     // record path) or the period-jump player.
-    if (const char* lm = std::getenv("VSE_LITE");
+    if (const char* lm = xtSwitch("VSE_LITE");
         lm && pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid &&
         pImpl->analysis.contentType == VariphraseAnalysis::ContentType::LITE) {
         const std::string m(lm);
@@ -1242,7 +1237,7 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
     // algorithm.  VSE_MB=off: the older paths for both; VSE_MB=ensemble:
     // BACKING on the older paths.
     if (pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid) {
-        const char* mb = std::getenv("VSE_MB");
+        const char* mb = xtSwitch("VSE_MB");
         const std::string mbs = mb ? mb : "";
         const auto ct = pImpl->analysis.contentType;
         int type = 0;
@@ -1278,7 +1273,7 @@ std::vector<float> VariphraseEngine::processOffline(const std::vector<float>& in
     // time-only, T = ENSEMBLE time-only.  Session 16 (metric v6): B +2.3,
     // D +1.0 / −3.6 / −0.5, T −20.7.  Not adopted for BACKING until the drum
     // references are verified (they look mis-recorded — see notes.txt).
-    if (const char* pj = std::getenv("VSE_PERIODJUMP");
+    if (const char* pj = xtSwitch("VSE_PERIODJUMP");
         pj && pImpl->algorithm.load(std::memory_order_relaxed) == Algorithm::Hybrid) {
         const std::string mode(pj);
         const auto ct = pImpl->analysis.contentType;

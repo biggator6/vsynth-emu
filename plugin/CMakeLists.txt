@@ -121,14 +121,16 @@ function(vse_add_test name)
     target_compile_definitions(${name} PRIVATE $<TARGET_PROPERTY:VSynthEmu,COMPILE_DEFINITIONS>)
 endfunction()
 vse_add_test(VSynthEmuTest Tests/PluginTest.cpp)               # the XT path end to end
-vse_add_test(VSynthEmuTeardownTest Tests/TeardownTest.cpp Tests/TestWave.cpp)   # a processor closed while its wave encodes
+vse_add_test(VSynthEmuTeardownTest Tests/TeardownTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)   # closed mid-encode
 vse_add_test(VSynthEmuWaveFileTest Tests/WaveFileTest.cpp)     # a wave whose header claims more than its data holds
-vse_add_test(VSynthEmuRestoreTest Tests/RestoreTest.cpp Tests/TestWave.cpp)     # a project that reopens without its parts
-vse_add_test(VSynthEmuRomTest Tests/RomTest.cpp)               # another image given while one is in use
+vse_add_test(VSynthEmuRestoreTest Tests/RestoreTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)   # reopened, parts gone
+vse_add_test(VSynthEmuRomTest Tests/RomTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp)   # another image while one plays
+# The harnesses' switches set in the plugin's environment, which it doesn't read
+vse_add_test(VSynthEmuSwitchTest Tests/SwitchTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp Tests/TestWave.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
-                 VSynthEmuRestoreTest VSynthEmuRomTest)
+                 VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.

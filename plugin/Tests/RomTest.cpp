@@ -4,9 +4,10 @@
 // as the image it is, with nothing read into the tables again.  The other image here is the ROM with one entry of the
 // envelopes' time table a millisecond longer: a different image that loads, whose difference a note can hear.
 // Run: VSynthEmuRomTest <rom.2.bin>.  Exit 0 if every check holds.
-#include "TestAppDir.h"
 #include "TestChecks.h"
 #include "TestControls.h"
+#include "TestMain.h"
+#include "TestNote.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/XtFirmware.h"
 #include <cstdint>
@@ -24,18 +25,7 @@ std::vector<float> attackNote() {
     VSynthEmuProcessor p;
     setParam(p, "oscType", 0.0f);   // ANALOG: no wave to encode
     setParam(p, "oscEnvAttack", (float)kAttack);
-    p.prepareToPlay(48000.0, kBlock);
-    juce::AudioBuffer<float> buf(2, kBlock);
-    juce::MidiBuffer midi;
-    midi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)100), 0);
-    std::vector<float> out;
-    for (int b = 0; b < kBlocks; ++b) {
-        buf.clear();
-        p.processBlock(buf, midi);
-        midi.clear();
-        out.insert(out.end(), buf.getReadPointer(0), buf.getReadPointer(0) + kBlock);
-    }
-    return out;
+    return playNote(p, kBlock, kBlocks, 1);
 }
 
 // The ROM with the time at kAttack one longer; an empty File if that wouldn't still rise as the table must
@@ -81,14 +71,4 @@ int romTest(const juce::File& rom, const juce::File& work) {
 
 } // namespace
 
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::fprintf(stderr, "usage: %s rom.2.bin\n", argc > 0 ? argv[0] : "");
-        return 1;
-    }
-    juce::ScopedJuceInitialiser_GUI init;
-    TestAppDir appDir;
-    const juce::File work = appDir.dir.getChildFile("rom");
-    work.createDirectory();
-    return romTest(juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]), work);
-}
+int main(int argc, char** argv) { return testMain(argc, argv, "rom", romTest); }

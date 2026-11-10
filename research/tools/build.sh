@@ -4,7 +4,7 @@
 # side.  What does not build is left missing, not as the last build's binary.
 source "$(dirname "$0")/env.sh"
 S="${1:-$REPO/plugin/Source}"; O="${2:-$WORK/bin}"; mkdir -p "$O"
-cc() { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 "$@" 2>&1 | grep -E " error"; return 0; }
+cc() { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 "${HARNESS_SWITCHES[@]}" "$@" 2>&1 | grep -E " error"; return 0; }
 cd "$S" || exit 1
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone,xt_fx,xt_files,engine_tests,rd}
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp XtFirmware.cpp XtMultiBandPlayer.cpp Sh4Interp.cpp -o "$O/xt_osc" &

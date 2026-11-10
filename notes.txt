@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The plugin reads no research switches v174 (2026-11-09): R8 of .claude/claude-packs-review.md. The shipped code read 30 of the
+  harnesses' switches from its environment: XT_ROUND=nearest (XtFloat, the band player's note-on on the audio thread, the BACKING
+  bands and the SOLO encoder), the encoder's XT_TRACE, XT_DUMPDEC and XT_DUMPFIR, XtFirmware's XT_FW_TRACE prints and the earlier
+  engine's VSE_*. Measured by VSynthEmuSwitchTest on the old code, the plugin run twice in processes of its own, the second with
+  the switches set: two stderr lines, five files written (the trace, three DEC dumps, the FIR), and under XT_ROUND=nearest alone
+  both a SOLO and a BACKING note sounded different. Now a switch is read through XtSwitches.h (xtSwitch, xtSwitchIs,
+  xtSwitchInt, xtSwitchReal, xtSwitchDump, xtSwitchNearest, which XtFloat's nearest() calls). Only a build that defines
+  XT_HARNESS_SWITCHES reads the environment, through research/tools/harness_switches.cpp: build.sh's and ab.sh's programs
+  (HARNESS_SWITCHES in env.sh), where XT_ROUND=nearest still changes xt_synth's render. The plugin's targets and its tests don't,
+  so every switch is unset there and its branch compiled away. XT_FW_TRACE's two prints are gone rather than moved: nothing
+  named them, and as single lines they couldn't take the 120 columns. VSE_APP_DIR and VSE_XT_ROM stay, the plugin's own (its
+  tests point it with them). The tests' main and note loop are one each now (plugin/Tests/TestMain.cpp, TestNote.cpp), which
+  RomTest, RestoreTest and TeardownTest share. mutate_panel.py: switch-read (the plugin's build reading the environment again)
+  runs VSynthEmuSwitchTest.
+
 The ROM's tables written once v173 (2026-11-09): R7 of .claude/claude-packs-review.md. The ports' tables are the process's and
   every instance reads them without a lock, but xtSynthSetRom rewrote them, and XtFirmware's g_rom (a std::string), whenever an
   instance was given a file at a path the processor's loadRom hadn't loaded last: another image, or a copy of the same one.

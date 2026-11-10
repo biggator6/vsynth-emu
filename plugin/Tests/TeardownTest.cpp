@@ -3,9 +3,9 @@
 // the processor's pool thread, mostly in the interpreter; a 30 s BACKING encode takes about 11 s (measured 2026-11-09),
 // past the 10 s the destructor used to wait, after which the job wrote into members already destroyed.
 // Run: VSynthEmuTeardownTest <rom.2.bin>.  Exit 0 if every check holds.
-#include "TestAppDir.h"
 #include "TestChecks.h"
 #include "TestControls.h"
+#include "TestMain.h"
 #include "TestWave.h"
 #include "../Source/PluginProcessor.h"
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -61,10 +61,4 @@ int teardownTest(const juce::File& rom, const juce::File& work) {
 
 } // namespace
 
-int main(int argc, char** argv) {
-    if (argc < 2) { std::fprintf(stderr, "usage: %s rom.2.bin\n", argv[0]); return 1; }
-    juce::ScopedJuceInitialiser_GUI init;
-    TestAppDir appDir;
-    const juce::File rom = juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]);
-    return teardownTest(rom, appDir.dir.getChildFile("teardown"));
-}
+int main(int argc, char** argv) { return testMain(argc, argv, "teardown", teardownTest); }

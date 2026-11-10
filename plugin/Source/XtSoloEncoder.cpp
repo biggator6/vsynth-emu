@@ -22,6 +22,7 @@
 // XT_ENCODER_MAIN below (xt_enc in fcheck).
 
 #include "XtSoloEncoder.h"
+#include "XtSwitches.h"
 
 // Bit-exactness against the XT needs plain IEEE single-precision steps: no
 // fused multiply-adds, and the dynamic rounding mode honoured (the SH-4 runs
@@ -34,7 +35,6 @@
 #pragma STDC FENV_ACCESS ON
 #endif
 #include <algorithm>
-#include <string>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -318,7 +318,7 @@ private:
     bool started_ = false;               // rom.2's pointer 0x8987caa8 is set
     std::deque<Node> pool_;
     int shifts_ = 0;
-    FILE* trace_ = std::getenv("XT_TRACE") ? std::fopen(std::getenv("XT_TRACE"), "w") : nullptr;
+    FILE* trace_ = xtSwitch("XT_TRACE") ? std::fopen(xtSwitch("XT_TRACE"), "w") : nullptr;
     Node* head_ = nullptr; Node* tail_ = nullptr;
 };
 
@@ -379,7 +379,7 @@ int Enc::nextEvent() {                                     // 0x10008210
 }
 
 int Enc::shift(int pos, int p3) {                          // 0x1000a5b0
-    if (const char* dd = std::getenv("XT_DUMPDEC"); dd && shifts_ < 3) {   // diagnostic
+    if (const char* dd = xtSwitch("XT_DUMPDEC"); dd && shifts_ < 3) {   // diagnostic
         char fn[512]; std::snprintf(fn, sizeof fn, "%s.dec%d", dd, shifts_);
         if (FILE* f = std::fopen(fn, "wb")) { std::fwrite(mem_.data() + kDec, 4, 3072, f); std::fclose(f); }
     }
@@ -1004,7 +1004,7 @@ std::vector<XtRecord> Enc::run() {
     unvLow_ = 0;
     lagTable();
     designFir();
-    if (const char* fd = std::getenv("XT_DUMPFIR")) if (FILE* f = std::fopen(fd, "wb")) { std::fwrite(c_, 4, 64, f); std::fclose(f); }
+    xtSwitchDump("XT_DUMPFIR", c_, sizeof c_);
 
     // main loop (0x10007c70)
     const int chan = 2;
@@ -1134,9 +1134,8 @@ bool xtTablesLoaded() { return g_lpLoaded; }
 std::vector<XtRecord> xtSoloEncode(const int16_t* x, int n, int channels, std::vector<uint64_t>* trace) {
     if (!x || n <= 0 || !g_lpLoaded || (channels != 1 && channels != 2)) return {};
     // The SH-4 runs with FPSCR RM = 1 (round to zero).  XT_ROUND=nearest
-    // gives the P-code emulator's rounding instead (diagnostic).
-    const char* rm = std::getenv("XT_ROUND");
-    const bool rtz = !(rm && std::string(rm) == "nearest");
+    // gives the P-code emulator's rounding instead (a harness's switch).
+    const bool rtz = !xtSwitchNearest();
     const int saved = std::fegetround();
     if (rtz) std::fesetround(FE_TOWARDZERO);
     Enc e(x, n, channels, trace);
@@ -1148,6 +1147,7 @@ std::vector<XtRecord> xtSoloEncode(const int16_t* x, int n, int channels, std::v
 #ifdef XT_ENCODER_MAIN
 #include "XtFirmware.h"
 #include <cstdio>
+#include <string>
 // xt_enc <rom.2.bin> <samp.bin (int16 LE)> [stereo] : prints "start len info"
 // (1/16 sample).  "stereo": interleaved L/R, in the XT's stereo mode.
 // xt_enc <rom.2.bin> cmp <samp.bin[:2]> ... : against the firmware's encoder (rom.2

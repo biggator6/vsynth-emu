@@ -55,7 +55,8 @@ Rebuild the project from scratch (order matters):
    - At the first shift (`89521fc0`) it dumps the FIR table.
    The native port has matching hooks: `XT_TRACE=file` (inserts, tracker
    calls, first marks), `XT_DUMPDEC`, `XT_DUMPFIR`, and `XT_ROUND=nearest` to
-   match the emulator.
+   match the emulator. They work in build.sh's and ab.sh's programs
+   (`plugin/Source/XtSwitches.h`); the plugin reads none of them (v174).
 
 10. BACKING / ENSEMBLE:
     - `EmuBand.java samp.bin <ch> out.heap` runs the multi-band encoder to

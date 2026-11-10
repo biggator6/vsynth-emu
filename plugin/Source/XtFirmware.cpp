@@ -259,7 +259,6 @@ bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, st
         uint32_t rc = 0;
         if (!c.call(kDetect, { (uint32_t)std::min(depth, 127) }, kStack, &rc)) { std::fprintf(stderr, "sh4 detect: %s\n", c.error().c_str()); return false; }
         c.wr8(kSmp, (uint8_t)type);
-        if (std::getenv("XT_FW_TRACE")) std::fprintf(stderr, "detect(depth %d) -> %08x, markers %u\n", depth, rc, c.rd32(kMarkCount));
     } else {
     // markers: a list head and {start (type 1), end (type 2)}, doubly linked
     auto marker = [&](uint32_t at, uint32_t pos, uint8_t kind) {
@@ -292,7 +291,6 @@ bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, st
     });
     uint32_t rc = 0;
     if (!c.call(kEncMulti, { 0 }, kStack, &rc)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
-    if (std::getenv("XT_FW_TRACE")) std::fprintf(stderr, "encode driver returned %u; [89ff0dd0]=%d; vpdt %zu bytes\n", rc, (int)c.rd32(0x89ff0dd0), vpdt.size());
     return done;
 }
 
