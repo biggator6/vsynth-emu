@@ -3570,6 +3570,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-10) — v182: ARCHITECTURE.md's tree and "Not yet"
+
+- The tree is by folder, because a file list goes stale with every split, and CLAUDE.md already keeps one. Each folder was taken from git's own list and .gitignore, not memory.
+- Each "Not yet" line was checked in the code or the notes before it was kept or dropped. What was done since is named, not just removed, so the list's history reads. Checking SOLO STEP/EVENT turned up CLAUDE.md saying twice it wasn't done, which v156 had done; those lines are corrected in this version too, as the same fact.
+
 ### Session 18 (2026-11-10) — v181: ARCHITECTURE.md's goal
 
 - The goal's words are CLAUDE.md's, and Session 16's first addenda date the turn to the firmware. The old method isn't deleted: the analysis and the scores further down came from it, so it stays as Sessions 1-15's method, under the new one. The one claim not in CLAUDE.md, that the legacy engine plays when there's no image, was read in processBlock.

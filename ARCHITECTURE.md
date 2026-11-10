@@ -42,39 +42,36 @@ The method before Session 16, kept as it was; the analysis in `analysis/` and th
 5. Repeat until perceptually indistinguishable on most material
 
 ## Repository Structure
+By folder; what each file in `plugin/Source/` does is in `CLAUDE.md`, "Where things are".
 ```
 vsynth-emu/
-├── ARCHITECTURE.md        # this file — living design document
-├── RESEARCH_LOG.md        # session-by-session findings and hypotheses
-├── RECORDING_GUIDE.md     # V-Synth recording setup, file naming, completed checklist
-├── CONTROLLERS.md         # controller MIDI surface + emulation requirements
-├── analysis/              # Python analysis pipeline (independent of plugin)
-│   ├── compare.py         # null test + spectrogram + LPC comparison
-│   ├── lpc.py             # formant extraction utilities
-│   ├── batch_test.py      # automated regression runner across all test files
-│   ├── variphrase_render  # compiled C++ offline renderer (no JUCE required)
-│   ├── test_files/        # V-Synth reference WAV recordings
-│   │   ├── passthrough/   # unprocessed input signals (raw recordings)
-│   │   └── sustained/     # V-Synth processed outputs (PCM, 48 kHz stereo)
-│   ├── plugin_outputs/    # engine render outputs for batch comparison
-│   └── results/           # batch_test.py JSON + HTML reports
-├── plugin/                # JUCE project
-│   ├── CMakeLists.txt
-│   └── Source/
-│       ├── PluginProcessor.h/cpp      # JUCE processor: XT voices, encode thread, MIDI
-│       ├── PluginEditor.h/cpp         # UI (ROM, Encode Type, Key, Depth, knobs)
-│       ├── XtSynth.h/cpp              # polyphonic XT playback (no JUCE): encode + voices + resampler
-│       ├── XtSoloEncoder.h/cpp        # the XT's SOLO encoder, ported (bit-exact)
-│       ├── XtSoloVoice.h/cpp          # the XT's SOLO player as a block voice (bit-exact)
-│       ├── XtMultiBandPlayer.h/cpp    # the XT's BACKING / ENSEMBLE players, ported (bit-exact)
-│       ├── Sh4Interp.h/cpp            # SH-4 interpreter: runs rom.2's load/encode-time code
-│       ├── XtFirmware.h/cpp           # firmware harnesses: multi-band encoder, band rebuild
-│       ├── VariphraseEngine.h/cpp     # offline router for the test suite — isolated + testable
-│       ├── PhaseVocoder.h/cpp         # phase vocoder + WSOLA time-stretch
-│       ├── SourceFilterModel.h/cpp    # LPC source-filter (formant shift)
-│       └── OfflineRenderer.h/cpp      # WAV file renderer for batch testing
-│   └── Tests/PluginTest.cpp           # processor end-to-end test (target VSynthEmuTest)
-└── research/              # papers, notes, spectrogram images, session exports
+├── CLAUDE.md              # the working reference: where things are, the tools, what to run when
+├── ARCHITECTURE.md        # this file
+├── notes.txt              # each version's note, and how to build
+├── RESEARCH_LOG.md        # the sessions
+├── RECORDING_GUIDE.md     # recording the V-Synth: the black-box takes, and the effect captures
+├── CONTROLLERS.md         # the controllers' MIDI surface, and what the plugin needs for them
+├── PROJECT_REVIEW.md      # Session 15's step back, before the turn to the firmware
+├── LICENSE, NOTICE.md     # GPL-3.0, and the credits
+├── plugin/                # the JUCE plugin: CMakeLists.txt, BuildId.cmake
+│   ├── Source/            # the processor, editor and XtSynth; the firmware's ports (Xt*), each
+│   │                      #   checked in its own XT_*_MAIN block; Sh4Interp, the SH-4 interpreter;
+│   │                      #   the legacy engine (VariphraseEngine, PhaseVocoder, SourceFilterModel)
+│   └── Tests/             # PluginTest and the processor's other tests (VSynthEmu*Test)
+├── research/
+│   ├── HARDWARE_FIRMWARE.md  # the findings, newest version first
+│   ├── UI_DESIGN.md       # the editor's design
+│   ├── tools/             # build.sh, fcheck.sh, verify.sh, the mutate runners and the other scripts
+│   ├── ghidra_scripts/    # Ghidra's scripts, run headless on rom.2
+│   ├── third_party/       # JE-8086's ESP core (gearmulator, GPL-3.0): the effect chip's reference
+│   └── README.md, PATENTS.md, VPENC_ABI.md   # the sources, Roland's patents, V-Trainer's encoder
+├── analysis/              # the black-box pipeline (Sessions 1-15): compare.py, lpc.py,
+│                          #   batch_test.py, variphrase_render; test_files/, plugin_outputs/,
+│                          #   results/; projects/, the owner's V-Synth projects (gitignored)
+├── IOS_companion/         # the iOS controller, built elsewhere
+├── JUCE/                  # JUCE 8.0.7, a gitlink
+├── firmware/              # the owner's rom.2 and disk image (gitignored, never committed)
+└── build/                 # the plugin's build and the tools' work (gitignored)
 ```
 
 ## Key Architectural Decision: Isolated Engine
@@ -400,17 +397,23 @@ and effects from it and loads its waves from the project's `Wave` folder.
 - The effects (v136–v138): the chip (v126) and the firmware's own driver (v131) in the sound behind the Effects switch, off by default, with MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain on the editor's panel (`FxPanel`, each value's text by the firmware's own routine, v138), and the tone's Chorus and Reverb Send, Output Assign and Output Mode (v133). Exact against JE-8086's interpreter and the firmware's driver in `Sh4Interp`; no reference yet beyond those.
 - `auval -v aumu VsEm Ystu` passes.
 
-**Not yet:**
-- the effects against a real XT (HARDWARE_FIRMWARE.md, "The effect captures"), and automation for those that go by ID;
-- no step/event playback;
-- no matrix or realtime controllers on the OSC knobs, and the time and
-  formant envelope depths' velocity sensitivity is not exposed.
+**Not yet** (checked at v182):
+- the effects against a real XT: no capture is recorded yet (HARDWARE_FIRMWARE.md, "The effect
+  captures"; the steps in `RECORDING_GUIDE.md`, "Effects captures");
+- host automation of the effects that go by ID: each type's parameters and the system's EQ are
+  saved as the project's `fxEdits`, not host parameters (v137);
+- the arpeggio, the Multi Step Modulator and an OSC's external input: `xtPatchMissing` names them
+  when a patch asks for one;
+- the output level against a real XT: it is set by the firmware's numbers (v149), not measured.
+
+Done since this list was first written: STEP and EVENT playback (v155 band waves, v156 SOLO), the
+Matrix on every source, the OSC knobs among its destinations (v119, v120, v124), and the time and
+formant envelopes' velocity settings, each OSC's, as host parameters.
 
 ## Known Gaps / Next Work
 
-See `notes.txt` (always current) and `RESEARCH_LOG.md` Session 15 final
-next-steps.  Headlines: listening pass (A/B players ready), Round-2
-recordings (`RECORDING_GUIDE.md`), real-time parity above.
+"Not yet" above, and each version's own in `notes.txt`. The listening pass, Round-2 recordings and
+real-time parity named here at Session 15 belonged to the black-box engine.
 
 ## Known Constraints
 - Cannot license Roland's PCM ROM content — custom samples required for oscillators
