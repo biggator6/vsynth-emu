@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A close waits for its encodes, and Auto's classifier hears it v185 (2026-11-10): .claude/fix-plan.md, section 9, R1's 10 s.
+  The destructor waited 10 s for the pool, and only the firmware heard its stop (v168). Auto's content classifier runs
+  before any firmware, an autocorrelation per 512 samples, over 0.04 s a second of audio. Measured by VSynthEmuTeardownTest
+  on the old code: a processor on Auto with a 360 s wave, closed 1 s in, took 15,538 ms, and JUCE printed "killing thread
+  by force": the destructor gave up at 10 s, its status members were destroyed, and the pool killed the job's thread after
+  its own 5 s. Now EncodeJob gives its work the stop, analyzeContent (an optional stop) reads no further frame once it's
+  up, and the job starts no encode after it; the destructor waits with no deadline. The close in the classifier: 5-6 ms.
+  Without the job's own check it was about 2 s, the port's SOLO encode of the wave, so the test's bound there is 0.5 s.
+  The job's body moved whole to PluginEncodes.cpp as encodeWave (PluginProcessor.cpp is over the line limit; reencode
+  keeps the parameter reads), its four-deep ternary on the Encode Type now a table. analyzeContent stayed in
+  VariphraseEngine.cpp, its stop in the frame loop's own condition: moved, its typed pi would have had to change, and
+  std::numbers::pi is 7 ulps off it. Not stopped still: the port's SOLO encoder after a stopped firmware SOLO encode (0.44 s
+  for 140 s of audio, measured), and the deadline itself has no plant that can catch it now that nothing outlasts it.
+  Plants (mutate_panel.py, panel_muts.txt): the classifier given no stop, 14,282 ms, and deaf to it, 14,169 ms, each a
+  wait to the classifier's end with no thread killed; the encode started after the stop, 2,086 ms. 3 caught.
+
 JUCE as a submodule v184 (2026-11-10): .claude/fix-plan.md, section 9. JUCE was a gitlink (10a5896) with no .gitmodules,
   so a fresh clone got an empty JUCE/ and `git submodule update --init JUCE` said "No url found for submodule path 'JUCE' in
   .gitmodules". .gitmodules now names https://github.com/juce-framework/JUCE.git, whose tag 8.0.7 is that commit

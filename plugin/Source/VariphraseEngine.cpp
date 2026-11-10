@@ -1522,7 +1522,7 @@ void VariphraseEngine::setDebugCallback(DebugCallback cb) {
 
 VariphraseAnalysis VariphraseEngine::analyzeContent(const float* mono,
                                                      int           numSamples,
-                                                     double        sampleRate) {
+                                                     double        sampleRate, const std::atomic<bool>* stop) {
     VariphraseAnalysis result;
     if (numSamples < 2048 || sampleRate <= 0.0) return result;
 
@@ -1535,8 +1535,8 @@ VariphraseAnalysis VariphraseEngine::analyzeContent(const float* mono,
     std::vector<float> confValues;
     std::vector<float> rmsValues;
 
-    // ── Per-frame unbiased ACF confidence ─────────────────────────────────────
-    for (int start = 0; start + kFrameSize <= numSamples; start += kStep) {
+    // ── Per-frame unbiased ACF confidence (no further frame once a stop given goes up, v185) ──
+    for (int start = 0; start + kFrameSize <= numSamples && !(stop && *stop); start += kStep) {
         const float* frame = mono + start;
 
         // RMS energy — skip silent frames (below −80 dBFS equivalent)

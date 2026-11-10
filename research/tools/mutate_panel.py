@@ -224,6 +224,7 @@ ENV={
  'steps':{'_bin':'VSynthEmuStepTest'},   # firmware routines that loop, on the ways the plugin runs them
  'formants':{'_bin':'VSynthEmuFormantTest'},   # two legacy engines on one thread, and one reset (v176)
  'disk':{'_bin':'VSynthEmuDiskImageTest'},   # the firmware's disk image reader on damaged images (v177)
+ 'teardown':{'_bin':'VSynthEmuTeardownTest'},   # processors closed mid-encode, in the firmware and in Auto's classifier (v185)
  'patch':{'TEST_PATCH_APPLY':'1'},
  'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_term':'8','_mode':'auto'},   # encoded again on its own events: a terminator too short to reach its last event
  'stored':{'TEST_NOTE2':'64,30000','_file':'analysis/projects/Emu_test.prj/Wave/376 Synth014.wav','_mode':'auto'},
@@ -244,7 +245,7 @@ ENV={
 SDK=os.environ.get('SDK','/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk')
 def build():
     targets=['VSynthEmuTest','VSynthEmuRomTest','VSynthEmuSwitchTest','VSynthEmuStepTest',
-             'VSynthEmuFormantTest','VSynthEmuDiskImageTest']   # every binary a kind runs
+             'VSynthEmuFormantTest','VSynthEmuDiskImageTest','VSynthEmuTeardownTest']   # every binary a kind runs
     r=subprocess.run(['cmake','--build','build/plugin','--target',*targets,'-j','10'],
                      capture_output=True,text=True,env=dict(os.environ,SDKROOT=SDK))
     return r.stdout if r.returncode==0 else 'failed: '+r.stderr[-300:]

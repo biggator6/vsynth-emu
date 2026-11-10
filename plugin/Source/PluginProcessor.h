@@ -161,10 +161,12 @@ private:
 
     // ── Encoding (background) ────────────────────────────────────────────────
     juce::ThreadPool encodePool_ { 1 };
-    void addEncode(std::function<void()> job);   // a job on the pool whose firmware stops when the pool asks it to (v168)
+    // A job on the pool whose firmware stops when the pool asks it to (v168), given the stop for what isn't firmware (v185)
+    void addEncode(std::function<void(const std::atomic<bool>& stop)> job);
     mutable juce::CriticalSection statusLock_;
     juce::String status_;
     void reencode(int osc);
+    void encodeWave(int osc, int choice, int depth);   // the wave's encode on the pool, as Encode Type `choice` (PluginEncodes.cpp)
     void setStatus(const juce::String& s);
     void handleAsyncUpdate() override;          // re-encode after an Encode Type / Depth change
     void findRom();

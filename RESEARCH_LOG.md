@@ -3570,6 +3570,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-10) — v185: a close waits for its encodes, and Auto's classifier hears it
+
+- The box said to drop the deadline. Dropping it alone would have traded a crash for a wait: Auto's classifier, the one long part no stop reached, would have held a host's close for as long as it ran, over 16 s on a 6 minute wave. So the classifier hears the stop too, and the deadline goes.
+- The test found the case first. The port's SOLO encoder, the box's other suspect, runs 140 s of audio in 0.44 s, too fast to matter. The classifier on 360 s was still running at 16.5 s, so the old close ran into the deadline and the pool's kill, and JUCE said so.
+- After the classifier stopped, the close still took 2 s. The job went on to encode a wave nobody would keep, and the firmware's stop left the port's encoder to do it. One line after the classifier ends that. PluginProcessor.cpp couldn't take the line, so the job's body moved to PluginEncodes.cpp, where the encodes already were. The classifier itself didn't move: its pi is typed out, and a new file would have had to change it.
+
 ### Session 18 (2026-11-10) — v184: JUCE as a submodule
 
 - The red was the command a fresh clone runs, and its own words: "No url found for submodule path 'JUCE' in .gitmodules". A --shared clone with no files checked out reaches it in a fraction of a second, where a full checkout is a gigabyte.

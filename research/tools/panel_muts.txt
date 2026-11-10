@@ -8,3 +8,7 @@ disk-root-past|if (cluster == 0 \|\| data > d.size()) {|if (cluster == 0) {|plug
 disk-loop|c < clusterEnd && !seen[c] && out.size() < limit|c < clusterEnd && out.size() < limit|plugin/Source/XtDiskImage.cpp|disk
 disk-fat-bound|std::min(fatBytes, d.size() - fat) / 2|(d.size() - fat) / 2|plugin/Source/XtDiskImage.cpp|disk
 disk-image-bound|(d.size() - data) / cluster + 2|size_t { 0xfff8 }|plugin/Source/XtDiskImage.cpp|disk
+# A processor closed in Auto's classifier, by VSynthEmuTeardownTest: the classifier given no stop, deaf to it, and the encode started anyway (v185).
+teardown-classifier-unstopped|rate, &stop);|rate);|plugin/Source/PluginEncodes.cpp|teardown
+teardown-classifier-deaf| && !(stop && *stop); start += kStep|; start += kStep|plugin/Source/VariphraseEngine.cpp|teardown
+teardown-encode-after-stop|        if (stop) return;   // closing|        // closing|plugin/Source/PluginEncodes.cpp|teardown

@@ -887,7 +887,7 @@ VSynthEmuProcessor::~VSynthEmuProcessor() {
     for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
                             Params::kEncodeType, Params::kEncodeDepth, Params::oscId(1, Params::kEncodeType), Params::oscId(1, Params::kEncodeDepth) })
         apvts.removeParameterListener(id, this);
-    encodePool_.removeAllJobs(true, 10000);
+    encodePool_.removeAllJobs(true, -1);   // no deadline: each job hears the stop and ends (PluginEncodes.cpp, v185)
 }
 
 // ─── The firmware image ───────────────────────────────────────────────────────
@@ -1997,7 +1997,7 @@ void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce
     xtActive_.store(true);
     zonesReady_.store(want.empty());
     if (want.empty()) return;
-    addEncode([this, gen, set, want = std::move(want), files = std::move(files)] {
+    addEncode([this, gen, set, want = std::move(want), files = std::move(files)](const std::atomic<bool>&) {
         std::map<int, std::shared_ptr<XtEncoded>> enc;
         for (const auto& [number, w] : files) {
             if (gen != zonesGen_.load()) return;
@@ -2034,53 +2034,10 @@ juce::String VSynthEmuProcessor::getStatusText() const {
 
 // Encodes the loaded file as the XT would (XtSynth.h) on the pool thread;
 // a newer request discards an older result.
-void VSynthEmuProcessor::reencode(int osc) {
-    LoadedWave& w = wave_[osc];
-    if (!w.loaded.load()) return;
-    if (!xtSynthRomReady()) { xtActive_.store(false); return; }
-    std::vector<std::vector<float>> chans;
-    double rate;
-    int bits, own;
-    XtWaveFile ownWave;
-    bool isOwn = false;
-    {
-        juce::CriticalSection::ScopedLockType lock(bufferLock_);
-        own = w.ownType == 0 || w.ownType == 1 || w.ownType == 3 || w.ownType == 5 ? w.ownType : -1;
-        if (w.isOwn) { ownWave = w.own; isOwn = true; }
-        for (int c = 0; c < std::min(2, w.buffer.getNumChannels()); ++c)
-            chans.emplace_back(w.buffer.getReadPointer(c), w.buffer.getReadPointer(c) + w.buffer.getNumSamples());
-        rate = w.rate;
-        bits = w.bits;
-    }
+void VSynthEmuProcessor::reencode(int osc) {   // the encode itself is in PluginEncodes.cpp (v185)
     const int choice = (int)apvts.getRawParameterValue(Params::oscId(osc, Params::kEncodeType))->load();
     const int depth  = (int)apvts.getRawParameterValue(Params::oscId(osc, Params::kEncodeDepth))->load();
-    const int gen = ++w.gen;
-    const juce::String who = osc ? "OSC 2: " : "";
-    setStatus(who + "Encoding...");
-    addEncode([=, this, chans = std::move(chans), ownWave = std::move(ownWave)] {
-        int type = choice == 1 ? 1 : choice == 2 ? 3 : choice == 3 ? 5 : choice == 4 ? 0 : own;   // Auto: what the wave says it is, or
-        if (0 > type) {   // Auto: the engine's content classifier
-            std::vector<float> mono(chans[0].size());
-            for (size_t i = 0; i < mono.size(); ++i) {
-                float s = 0; for (const auto& c : chans) s += c[i];
-                mono[i] = s / (float)chans.size();
-            }
-            using CT = VSE::VariphraseAnalysis::ContentType;
-            const auto a = VSE::VariphraseEngine::analyzeContent(mono.data(), (int)mono.size(), rate);
-            type = a.contentType == CT::BACKING ? 3 : a.contentType == CT::ENSEMBLE ? 5 : 1;   // the classifier's LITE as SOLO: Auto doesn't choose LITE
-        }
-        std::string err;
-        // A V-Synth SOLO wave as its own type keeps its own events (as encoded, or edited in V-Producer), which its vpno names;
-        // otherwise the detection at the Encode Depth finds them (xtSynthEncode)
-        auto e = xtSynthEncode(chans, rate, type, depth, &err, bits, isOwn && type == own ? &ownWave.events : nullptr, isOwn && type == own ? &ownWave.vpdt : nullptr);
-        if (gen != wave_[osc].gen.load()) return;
-        if (!e) { setStatus(who + "Encode failed: " + juce::String(err)); return; }
-        if (isOwn) xtWaveOntoEncoded(ownWave, *e);
-        synth_.setSample(e, osc);
-        xtActive_.store(true);
-        static const char* names[] = { "LITE", "SOLO", "", "BACKING", "", "ENSEMBLE" };
-        setStatus(who + "Encoded as " + names[type] + (choice != 0 ? "" : own >= 0 ? " (the wave's own)" : " (auto)"));
-    });
+    encodeWave(osc, choice, depth);
 }
 
 void VSynthEmuProcessor::handleAsyncUpdate() {

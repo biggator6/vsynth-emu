@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <vector>
 #include <array>
 #include <complex>
@@ -157,9 +158,12 @@ public:
     //   onset events for BACKING content.
     //   sampleRate: Hz (used for band-energy voiced-speech detector)
     //   Call this ONCE on the full input before block-by-block processing.
+    //   stop: when given and it goes up, no further frame is analysed (its per-frame autocorrelation takes
+    //   over 0.04 s a second of audio, measured v185): an encode whose processor is closing.
     static VariphraseAnalysis analyzeContent(const float* mono,
                                               int numSamples,
-                                              double sampleRate);
+                                              double sampleRate,
+                                              const std::atomic<bool>* stop = nullptr);
 
     // setAnalysis: store the result of analyzeContent so that processBlock
     //   can use it for stable content-adaptive routing.
