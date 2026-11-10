@@ -83,6 +83,13 @@ public:
     // Call once before processing starts
     void prepare(double sampleRate, int maxBlockSize);
 
+    // An engine set up to play: prepared, then given the algorithm and parameters it plays with (v176)
+    void prepare(double sampleRate, int maxBlockSize, Algorithm algo, const VariphraseParams& params) {
+        prepare(sampleRate, maxBlockSize);
+        setAlgorithm(algo);
+        setParams(params);
+    }
+
     // Reset all internal state (call on transport stop/start)
     void reset();
 

@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-10) — v176: the legacy engine's formant smoothing, each model's own
+
+- The test first, through VariphraseEngine as the processor drives it: two engines on the LPC algorithm, each a vowel with its formants shifted, block by block on one thread, and one reset. Red on the old code from the first frame on.
+- SourceFilterModel.cpp is 1,394 lines, so the analysis moved out whole, by one change that also put its reset in reset() (the size guard judges each edit alone, and the file shrank by 164). Moving it showed what one file had hidden: its root finder was shiftFormants' own, copied. template-law refused the copy, and then the search and polish loops as copies of each other; code-shape refused the 102-statement function. Each refusal was right.
+- The move wasn't bit for bit: -147 dBFS apart. Bisected on throwaway copies of both trees: the downsampled path off, equal; the smoothing off, still apart; the exact pi in the old copy, still apart; both built with -ffp-contract=off, equal. So the arithmetic is the same and only the fusing of multiply-adds moved, which the split into functions decides. Taken under the -120 dBFS bar, not chased into inlining attributes.
+- `test-verdict.mjs --red` with a command of my own says RUNNER_BROKEN: it reads CTest names, not a program's checks. The red is the program's own exit and lines.
+
 ### Session 18 (2026-11-10) — v175: the firmware's calls stop by what they were given
 
 - The test first: a copy of the image with three routines made to loop (`bra .`, a nop in its slot), on the ways the plugin runs firmware. On the old code a patch's load still held the message thread at the watchdog's 30 s.

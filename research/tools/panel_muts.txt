@@ -1,0 +1,4 @@
+# mutate_panel.py's planted errors from v176 on (the earlier ones are its MUTS): name|old|new|file|kind, kind as its ENV.
+# The legacy engine's formant smoothing, by VSynthEmuFormantTest: kept through a reset, and shared by a thread (v176).
+formants-no-reset|void reset() { smoothed_ = {}; }|void reset() {}|plugin/Source/DownsampledFormants.h|formants
+formants-shared|    Lags smoothed_ {};|    static inline thread_local Lags smoothed_ {};|plugin/Source/DownsampledFormants.h|formants

@@ -60,6 +60,8 @@ target_sources(VSynthEmu PRIVATE
     Source/VariphraseEngine.cpp
     Source/PhaseVocoder.cpp
     Source/SourceFilterModel.cpp
+    Source/DownsampledFormants.cpp
+    Source/PolynomialRoots.cpp
     Source/XtSoloEncoder.cpp
     Source/XtEnvelope.cpp
     Source/XtLfo.cpp
@@ -130,10 +132,12 @@ vse_add_test(VSynthEmuRomTest Tests/RomTest.cpp Tests/TestMain.cpp Tests/TestNot
 vse_add_test(VSynthEmuSwitchTest Tests/SwitchTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp Tests/TestWave.cpp)
 # A firmware routine that loops, on each way the plugin runs one: it gives up within its step limit
 vse_add_test(VSynthEmuStepTest Tests/StepTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp Tests/TestWave.cpp)
+# Two legacy engines on one thread, and one reset: each plays as it does alone and the first time
+vse_add_test(VSynthEmuFormantTest Tests/FormantTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
-                 VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest)
+                 VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest VSynthEmuFormantTest)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.

@@ -174,7 +174,7 @@ private:
     int  playbackPos_  = -1;
     int  activeVoices_ = 0;
 
-    void syncParamsToEngine();
+    VSE::VariphraseParams engineParams() const;   // the legacy engine's, from the parameters
     XtSynth::Controls xtControls() const;
     void setControls(const XtSynth::Controls& c);
     void waveToParameters(const XtWaveFile& wave, int osc);

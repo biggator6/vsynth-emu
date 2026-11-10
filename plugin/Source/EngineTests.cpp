@@ -5,14 +5,8 @@
 // because the only test was the slow 20-case batch.  These tests assert the
 // hard-won engine invariants on SYNTHETIC inputs in seconds.
 //
-// Build & run:
-//   clang++ -std=c++20 -O2 -DENGINE_TESTS_MAIN \
-//       plugin/Source/EngineTests.cpp plugin/Source/VariphraseEngine.cpp \
-//       plugin/Source/PhaseVocoder.cpp plugin/Source/SourceFilterModel.cpp \
-//       plugin/Source/XtSoloEncoder.cpp plugin/Source/XtSoloVoice.cpp \
-//       plugin/Source/XtMultiBandPlayer.cpp \
-//       plugin/Source/Sh4Interp.cpp plugin/Source/XtFirmware.cpp \
-//       -o /tmp/engine_tests && /tmp/engine_tests
+// Build & run: research/tools/build.sh builds it as engine_tests, with the files it needs (its line
+// names them); verify.sh runs fcheck's copy, build/tools/fcheck/bin/engine_tests.
 //
 // Exit code 0 = all pass.  Each failure prints a line and sets the code.
 
@@ -95,13 +89,8 @@ double acfF0(const std::vector<float>& x, double fLo, double fHi) {
 std::vector<float> render(const std::vector<float>& in, float time,
                           float pitchSt, float formantSt) {
     VariphraseEngine eng;
-    eng.prepare(kSR, 512);
-    eng.setAlgorithm(Algorithm::Hybrid);
-    VariphraseParams p;
-    p.timeStretchRatio      = time;
-    p.pitchShiftSemitones   = pitchSt;
-    p.formantShiftSemitones = formantSt;
-    eng.setParams(p);
+    eng.prepare(kSR, 512, Algorithm::Hybrid,
+                { .pitchShiftSemitones = pitchSt, .timeStretchRatio = time, .formantShiftSemitones = formantSt });
     eng.setAnalysis(VariphraseEngine::analyzeContent(in.data(), (int)in.size(), kSR));
     return eng.processOffline(in);
 }

@@ -949,9 +949,7 @@ bool VSynthEmuProcessor::setRomFile(const juce::File& file) {
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
 void VSynthEmuProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
-    engine_.prepare(sampleRate, samplesPerBlock);
-    engine_.setAlgorithm(VSE::Algorithm::Passthrough);
-    syncParamsToEngine();
+    engine_.prepare(sampleRate, samplesPerBlock, VSE::Algorithm::Passthrough, engineParams());
     setLatencySamples(engine_.getLatencySamples());
     synth_.prepare(sampleRate);
     scratch_.assign((size_t)std::max(samplesPerBlock, 1) * 2, 0.0f);
@@ -2099,16 +2097,16 @@ void VSynthEmuProcessor::parameterChanged(const juce::String& paramID, float /*n
             triggerAsyncUpdate();
             return;
         }
-    syncParamsToEngine();
+    engine_.setParams(engineParams());
 }
 
-void VSynthEmuProcessor::syncParamsToEngine() {
+VSE::VariphraseParams VSynthEmuProcessor::engineParams() const {
     VSE::VariphraseParams p;
     p.pitchShiftSemitones   = apvts.getRawParameterValue(Params::kPitchShift)->load();
     p.timeStretchRatio      = apvts.getRawParameterValue(Params::kTimeStretch)->load();
     p.formantShiftSemitones = apvts.getRawParameterValue(Params::kFormantShift)->load();
     p.robotMode             = apvts.getRawParameterValue(Params::kRobot)->load() > 0.5f;
-    engine_.setParams(p);
+    return p;
 }
 
 void VSynthEmuProcessor::setAlgorithm(VSE::Algorithm algo) {

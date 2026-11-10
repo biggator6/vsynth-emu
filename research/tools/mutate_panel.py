@@ -4,6 +4,7 @@
 # MISSED, or ERROR.  Needs build/plugin configured, and analysis/test_files.
 import os, subprocess, sys
 from pathlib import Path
+import mutlist
 REPO = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + '/../..')
 os.chdir(REPO)
 FP='plugin/Source/FxPanel.cpp'; PP='plugin/Source/PluginProcessor.cpp'; XV='plugin/Source/XtFxControl.cpp'; EP='plugin/Source/PluginEditor.cpp'; UP='plugin/Source/UiParts.h'
@@ -211,6 +212,9 @@ MUTS=[
  ('editor-playback-card',EP,'        wave.head = { { &variBtn_, 60 }, { &playbackBox_, 110 } };','        wave.head = { { &variBtn_, 60 } };','layout'),
  ('editor-playback-hide',EP,'(juce::Component*)&startSlider_, (juce::Component*)&playbackBox_, (juce::Component*)&offsetLabel_,','(juce::Component*)&startSlider_, (juce::Component*)&offsetLabel_,','layout'),
 ]
+# The plants from v176 on are in panel_muts.txt (name|old|new|file|kind), in MUTS's order of fields
+MUTS += [(n, p, o, w, k)
+         for n, o, w, p, k in mutlist.plants('research/tools/panel_muts.txt', None, 'mutate_panel', ('', ''))]
 ROM=os.environ.get('ROM', REPO + '/firmware/unpacked/V-SynthXT.rom.2.bin'); W='analysis/test_files/raw/chord_Cmaj_original.wav'
 ENV={
  'layout':{'TEST_UI_LAYOUT':'1'},
@@ -218,6 +222,7 @@ ENV={
  'rom-image':{'_bin':'VSynthEmuRomTest'},   # a test of its own, given only the ROM
  'switches':{'_bin':'VSynthEmuSwitchTest'},   # the switches set, in runs of the plugin of their own
  'steps':{'_bin':'VSynthEmuStepTest'},   # firmware routines that loop, on the ways the plugin runs them
+ 'formants':{'_bin':'VSynthEmuFormantTest'},   # two legacy engines on one thread, and one reset (v176)
  'patch':{'TEST_PATCH_APPLY':'1'},
  'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_term':'8','_mode':'auto'},   # encoded again on its own events: a terminator too short to reach its last event
  'stored':{'TEST_NOTE2':'64,30000','_file':'analysis/projects/Emu_test.prj/Wave/376 Synth014.wav','_mode':'auto'},
@@ -237,7 +242,8 @@ ENV={
 }
 SDK=os.environ.get('SDK','/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk')
 def build():
-    targets=['VSynthEmuTest','VSynthEmuRomTest','VSynthEmuSwitchTest','VSynthEmuStepTest']   # every binary a kind runs
+    targets=['VSynthEmuTest','VSynthEmuRomTest','VSynthEmuSwitchTest','VSynthEmuStepTest',
+             'VSynthEmuFormantTest']   # every binary a kind runs
     r=subprocess.run(['cmake','--build','build/plugin','--target',*targets,'-j','10'],
                      capture_output=True,text=True,env=dict(os.environ,SDKROOT=SDK))
     return r.stdout if r.returncode==0 else 'failed: '+r.stderr[-300:]

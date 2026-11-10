@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The legacy engine's formant smoothing is each model's own v176 (2026-11-10): .claude/fix-plan.md, section 9. SourceFilterModel's
+  downsampled formant analysis (Session 15) smoothed its autocorrelation from frame to frame in a function-local thread_local,
+  so every model processed on one thread (each processor's legacy engine, which plays the loaded file on the LPC algorithm when
+  there's no firmware image) smoothed into the same numbers, and a reset, the processor's on each note-on, kept them. Measured
+  by VSynthEmuFormantTest on the old code: two engines, a vowel each with its formants shifted, block by block on one thread,
+  differed from one alone in 47,359 of 48,128 samples, and one reset and played again from its first play in 29,134, both from
+  the first frame on. Now the analysis is a class of its own, DownsampledFormants, holding the smoothing, restarted by
+  SourceFilterModel::reset(); the test holds 3/3. Its Laguerre root finder was the one shiftFormants had, a copy since Session 15:
+  one PolynomialRoots serves both, its search and polish one converge(). The analysis is split by its steps (code-shape's 50
+  statements); the engine's set-up, by hand in the processor, EngineTests and the test, is one prepare(rate, block, algorithm,
+  params). Null test (HEAD's OfflineRenderer against the new, two vowels, formant -12, -5, +7, +12, lpc and hybrid): hybrid
+  bit for bit; lpc up to 9,943 of 48,128 samples apart, at most -147.0 dBFS. That is where the compiler fuses multiply-adds,
+  nothing in the arithmetic: built with -ffp-contract=off the two are bit for bit (the default here is on; turning the
+  downsampled path off, or the FIR's typed pi for std::numbers::pi, changed nothing). Under the house's -120 dBFS for a
+  refactor, so taken. mutate_panel.py's new plants are in panel_muts.txt: formants-no-reset and formants-shared.
+
 The firmware's calls stop by what they were given v175 (2026-11-10): .claude/fix-plan.md, section 9. Every call into rom.2 was
   allowed 20e9 steps, 73 s at the interpreter's 275-285 M a second, so a routine that looped held its thread that long. Measured by
   VSynthEmuStepTest on the old code (a copy of the image with the patch store 0x8947dae0, the RDAC block 0x89529570 and the

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DownsampledFormants.h"
 #include "VariphraseEngine.h"
 #include <array>
 #include <vector>
@@ -95,10 +96,13 @@ private:
     // are bounded: |b1| ≤ 2·|pole|, b0 = |pole|² ≤ 1.  Float32 precision is
     // therefore identical to float64 for each section, and the cascade remains
     // analytically stable even after the float32 cast.
-    struct BiquadSection { float b1, b0; };   // 1/(1 + b1·z⁻¹ + b0·z⁻²)
-    std::vector<BiquadSection>            biquads_;      // populated by shiftFormants
+    using BiquadSection = DownsampledFormants::Section;   // 1/(1 + b1·z⁻¹ + b0·z⁻²)
+    std::vector<BiquadSection>            biquads_;      // populated by shiftFormants or formants_
     std::vector<std::array<float, 2>>     biquadState_;  // per-section [y[n-1], y[n-2]]
     bool                                   useBiquad_ = false;
+
+    // The downsampled formant analysis of speech frames, and its smoothing from frame to frame (v176: per instance)
+    DownsampledFormants formants_;
 
     // ── Onset detection state ─────────────────────────────────────────────────
     // Tracks previous-frame RMS energy for onset detection.
@@ -167,17 +171,6 @@ private:
 
     // Shift formant frequencies by semitones via LPC pole angle scaling
     void shiftFormants(std::vector<float>& coeffs, float semitones);
-
-    // Downsampled formant analysis (Session 15).  At 48 kHz a direct order-8/16
-    // LPC wastes pole pairs on the 12–24 kHz noise floor (measured: poles at
-    // ~620 Hz, ~4.5 kHz, 12–20 kHz) and misses F2/F3 entirely.  This method
-    // decimates the frame ×4 (≈12 kHz rate), runs order-12 LPC there — forcing
-    // every pole into the speech band — then maps poles back to the full rate
-    // (θ/4, r^¼), applies the formant shift to the angles, and populates
-    // biquads_ with the shifted sections.  Returns false on degenerate frames
-    // (caller falls back to the full-rate path).
-    bool computeDownsampledFormantBiquads(const std::vector<float>& frame,
-                                          float shiftRatio);
 
     // Autocorrelation-based F0 detection with parabolic interpolation
     // Returns 0 if unvoiced or F0 undetectable
