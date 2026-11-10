@@ -3570,7 +3570,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
-### Session 18 (2026-11-10) — v176: the legacy engine's formant smoothing, each model's own
+### Session 18 (2026-11-10) — v177: the disk image reader on a damaged image
+
+- The test first, on FAT16 images it builds field by field, so it needs no firmware and can damage any field. On the old reader a root directory past the image's end was taken (and read past it), a file whose FAT loops came back at its entry's 16 MB, and an image with clusters of no sectors was taken and a folder on it with a looping FAT never came back; the test exits after 3 s for that.
+- XtFiles.cpp is 558 lines, so the reader left it whole for XtDiskImage.cpp before the fix, its long lines broken for code-shape and nothing else changed; the test said the same four things on the moved copy. The planted error `fat-chain` and mutate.sh's ports followed it (`PORT=diskimage`).
+- Only one check against the image's size is needed: the FATs come before the root, so a root that ends in the image puts them in it too. A chain is bounded by the clusters whose data and FAT entry are both in the image, and it ends at a cluster it has been through. The FAT bound and the image bound each got a case of their own, added with the fix, so each is seen red only by its plant.
+- WaveFileTest's deadline (a call that must come back, or the program exits) would have been copied for the hanging folder. It's `TestChecks::within` now, used by both.
 
 - The test first, through VariphraseEngine as the processor drives it: two engines on the LPC algorithm, each a vowel with its formants shifted, block by block on one thread, and one reset. Red on the old code from the first frame on.
 - SourceFilterModel.cpp is 1,394 lines, so the analysis moved out whole, by one change that also put its reset in reset() (the size guard judges each edit alone, and the file shrank by 164). Moving it showed what one file had hidden: its root finder was shiftFormants' own, copied. template-law refused the copy, and then the search and polish loops as copies of each other; code-shape refused the 102-statement function. Each refusal was right.

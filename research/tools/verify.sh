@@ -51,8 +51,9 @@ if [ $BUILT = 1 ]; then
     # A processor closed while its wave is encoding (closed in ms, the next one encodes as before); a project that
     # reopens without its parts (each said); a wave whose header claims more than its data holds (refused at once);
     # another image given while one is in use (refused, the tables as they were); the harnesses' switches set (unread);
-    # firmware routines that loop (each way gives up within its step limit); two legacy engines on one thread (each as alone)
-    for t in Teardown Restore WaveFile Rom Switch Step Formant; do
+    # firmware routines that loop (each way gives up within its step limit); two legacy engines on one thread (each as alone);
+    # damaged disk images (refused, or each cluster once)
+    for t in Teardown Restore WaveFile Rom Switch Step Formant DiskImage; do
         checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
     done
     # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth

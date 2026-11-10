@@ -2,3 +2,9 @@
 # The legacy engine's formant smoothing, by VSynthEmuFormantTest: kept through a reset, and shared by a thread (v176).
 formants-no-reset|void reset() { smoothed_ = {}; }|void reset() {}|plugin/Source/DownsampledFormants.h|formants
 formants-shared|    Lags smoothed_ {};|    static inline thread_local Lags smoothed_ {};|plugin/Source/DownsampledFormants.h|formants
+# The firmware's disk image reader on damaged images, by VSynthEmuDiskImageTest: each refusal and each end of a chain (v177).
+disk-no-sectors|if (cluster == 0 \|\| data > d.size()) {|if (data > d.size()) {|plugin/Source/XtDiskImage.cpp|disk
+disk-root-past|if (cluster == 0 \|\| data > d.size()) {|if (cluster == 0) {|plugin/Source/XtDiskImage.cpp|disk
+disk-loop|c < clusterEnd && !seen[c] && out.size() < limit|c < clusterEnd && out.size() < limit|plugin/Source/XtDiskImage.cpp|disk
+disk-fat-bound|std::min(fatBytes, d.size() - fat) / 2|(d.size() - fat) / 2|plugin/Source/XtDiskImage.cpp|disk
+disk-image-bound|(d.size() - data) / cluster + 2|size_t { 0xfff8 }|plugin/Source/XtDiskImage.cpp|disk

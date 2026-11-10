@@ -10,10 +10,8 @@
 #include <juce_core/juce_core.h>
 #include <chrono>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <future>
 #include <string>
 #include <vector>
 
@@ -83,13 +81,10 @@ void pastInt(TestChecks& check, const juce::File& folder) {
     XtWaveFile w;
     std::string why;
     const auto* bytes = static_cast<const uint8_t*>(mapped.getData());
-    auto run = std::async(std::launch::async, [&] { return xtWaveRead(bytes, mapped.getSize(), w, &why); });
-    if (run.wait_for(std::chrono::seconds(3)) != std::future_status::ready) {
-        std::fprintf(stderr, "wave file: 2^31 frames on their data should be refused at once, not decoded\n");
-        std::fflush(stderr);
-        std::_Exit(1);   // the decode can't be stopped, and the future would wait for it
-    }
-    check(!run.get() && why == kLong, "2^31 frames on their data: " + why);
+    const bool read = check.within(std::chrono::seconds(3),
+                                   "2^31 frames on their data should be refused at once, not decoded",
+                                   [&] { return xtWaveRead(bytes, mapped.getSize(), w, &why); });
+    check(!read && why == kLong, "2^31 frames on their data: " + why);
     file.deleteFile();
 }
 

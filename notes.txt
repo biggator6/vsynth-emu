@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The disk image reader on a damaged image v177 (2026-11-10): .claude/fix-plan.md, section 9. XtDiskImage (harness and test
+  code: xt_files, xt_tone, PluginTest and the tests read the firmware's disk image through it; the plugin doesn't) took a FAT16
+  layout as its boot sector said, so a root directory past the image's end was read past it, clusters of no sectors made a
+  looping FAT's chain never end, and a looping chain gave a file whatever size its entry claimed. Measured by
+  VSynthEmuDiskImageTest on the old reader, on images it builds: the root past the end and the clusters of no sectors both
+  taken, a looping 16 MB file read as 16,777,216 bytes, and the folder on no sectors not back in 3 s. Now open() refuses
+  clusters of no sectors and a root past the end (the FATs are before it, so they are in the image too), and a chain takes
+  only clusters whose data and FAT entry are in the image (clusterEnd), each once; the test holds 14/14 (a cluster with no
+  FAT entry and one past the image added with the fix). The reader moved whole from XtFiles.cpp (558 lines) to
+  XtDiskImage.cpp first, as the split rule says; the plant fat-chain followed (PORT=diskimage). fcheck as baseline, 664
+  checks: xt_files and both xt_tone sections ran, the rest kept. WaveFileTest's deadline is TestChecks::within, shared.
+  mutate_panel.py's five disk- plants (each refusal, each bound of a chain, the loop) caught; mutate_files.py 49/49.
+
 The legacy engine's formant smoothing is each model's own v176 (2026-11-10): .claude/fix-plan.md, section 9. SourceFilterModel's
   downsampled formant analysis (Session 15) smoothed its autocorrelation from frame to frame in a function-local thread_local,
   so every model processed on one thread (each processor's legacy engine, which plays the loaded file on the LPC algorithm when

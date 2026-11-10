@@ -11,6 +11,7 @@
 # still says 0 different missed the error: either the check is too weak, or
 # the change is exact (e.g. a product of powers of two regrouped).
 # PORT=wavefile: XtWaveFile.cpp (a wave's chunks) under xt_files, as PORT=files; PORT=tonewave: XtWaveFile.cpp under xt_tone.
+# PORT=diskimage: XtDiskImage.cpp (the firmware's disk image, v177) under xt_files, as PORT=files.
 source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # a run that can't start must never read as a result; no "== name" follows
@@ -43,7 +44,7 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
     OBJ="$M/tone_obj"; mkdir -p "$OBJ"; L=()
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
     PARTS=(XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtLinearPlayer XtLitePlayer XtMultiBandPlayer XtEnvelope XtLfo
-           XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp XtFiles XtWaveFile XtPatch XtSynthRom)
+           XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp XtFiles XtWaveFile XtDiskImage XtPatch XtSynthRom)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue
         [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] || "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_TONE_MAIN -DXT_TONE_CHECK -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
@@ -65,22 +66,25 @@ elif [ "$PORT" = fxc ]; then       # XtFxControl against its checks in xt_fx; [c
     L=("$OBJ/Sh4Interp.o" "$OBJ/XtFxChip_main.o")
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
-elif [ "$PORT" = files ] || [ "$PORT" = wavefile ]; then
-    # XtFiles, or with PORT=wavefile XtWaveFile (a wave's chunks), against fcheck's baseline of xt_files; [cases] is not used
-    F=XtFiles.cpp
-    G=XtWaveFile.cpp
-    if [ "$PORT" = wavefile ]; then
-        F=XtWaveFile.cpp
-        G=XtFiles.cpp
-    fi
+elif [[ "$PORT" =~ ^(files|wavefile|diskimage)$ ]]; then
+    # XtFiles, or with PORT=wavefile XtWaveFile (a wave's chunks), with PORT=diskimage XtDiskImage (the firmware's disk
+    # image), against fcheck's baseline of xt_files; [cases] is not used.  The other two are built as they are.
+    case "$PORT" in
+        wavefile) F=XtWaveFile.cpp ;;
+        diskimage) F=XtDiskImage.cpp ;;
+        *) F=XtFiles.cpp ;;
+    esac
     D=XT_FILES_MAIN
-    L=("$S/$G" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp"
-       "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
+    L=()
+    for f in XtFiles.cpp XtWaveFile.cpp XtDiskImage.cpp; do
+        [ "$f" = "$F" ] || L+=("$S/$f")
+    done
+    L+=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
 elif [ "$PORT" = filesfw ]; then   # the same, with the error in XtFirmware's routines for them
     F=XtFirmware.cpp; D=XT_FILES_MAIN
     OBJ="$M/files_obj"; mkdir -p "$OBJ"
     [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.cpp" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.h" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFirmware.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_FILES_MAIN -I"$S" -c "$S/XtFiles.cpp" -o "$OBJ/XtFiles_main.$$.o" && mv "$OBJ/XtFiles_main.$$.o" "$OBJ/XtFiles_main.o"; }
-    L=("$OBJ/XtFiles_main.o" "$S/XtWaveFile.cpp" "$S/XtMultiBandPlayer.cpp"
+    L=("$OBJ/XtFiles_main.o" "$S/XtWaveFile.cpp" "$S/XtDiskImage.cpp" "$S/XtMultiBandPlayer.cpp"
        "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
 elif [ "${PORT:-cosm}" = analog ]; then
     F=XtAnalog.cpp; D=XT_ANALOG_MAIN
@@ -122,7 +126,7 @@ if [ "$PORT" = solo ]; then
     cat "$T"/* | grep -E "$P"
     exit
 fi
-if [[ "$PORT" =~ ^(files|filesfw|wavefile)$ ]]; then
+if [[ "$PORT" =~ ^(files|filesfw|wavefile|diskimage)$ ]]; then
     # the baseline's whole xt_files section, as xt_files gains lines (v148, v155): a line the run prints that isn't in it differs, and one of it the run doesn't print
     B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.base"; awk '/^== /{s = ($0 == "== xt_files"); next} s' "$B" > "$T"
     "$M/$N" "$ROM" 2>/dev/null > "$M/$N.all"; st=$?

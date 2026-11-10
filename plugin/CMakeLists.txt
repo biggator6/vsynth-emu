@@ -79,6 +79,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtFwMachine.cpp
     Source/XtFiles.cpp
     Source/XtWaveFile.cpp
+    Source/XtDiskImage.cpp
     Source/XtPatch.cpp
     Source/XtFxChip.cpp
     Source/XtFxControl.cpp
@@ -134,10 +135,13 @@ vse_add_test(VSynthEmuSwitchTest Tests/SwitchTest.cpp Tests/TestMain.cpp Tests/T
 vse_add_test(VSynthEmuStepTest Tests/StepTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp Tests/TestWave.cpp)
 # Two legacy engines on one thread, and one reset: each plays as it does alone and the first time
 vse_add_test(VSynthEmuFormantTest Tests/FormantTest.cpp Tests/TestMain.cpp)
+# The firmware's disk image reader on damaged images: refused, or each cluster once
+vse_add_test(VSynthEmuDiskImageTest Tests/DiskImageTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
-                 VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest VSynthEmuFormantTest)
+                 VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest VSynthEmuFormantTest
+                 VSynthEmuDiskImageTest)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.

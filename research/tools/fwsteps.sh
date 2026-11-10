@@ -12,5 +12,5 @@ mkdir -p "$O"
 "$PY" "$T/fwsteps_count.py" "$S/Sh4Interp.cpp" "$O/Sh4Interp_counted.cpp"
 "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -I"$S" "$T/fwsteps.cpp" "$O/Sh4Interp_counted.cpp" \
     "$S/XtFirmware.cpp" "$S/XtFwMachine.cpp" "$S/XtFiles.cpp" "$S/XtWaveFile.cpp" "$S/XtMultiBandPlayer.cpp" \
-    "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" -o "$O/fwsteps"
+    "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/XtDiskImage.cpp" -o "$O/fwsteps"
 "$O/fwsteps" "$ROM" "$(dirname "$ROM")/V-SynthXTDiskImage.bin.0.bin" "$REPO/analysis/projects" "${1:-8}"

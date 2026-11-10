@@ -14,7 +14,7 @@ centre|return v - d->centre;|return v;
 stereo-flag|out.channels = vpsc[2] ? 2 : 1;|out.channels = 1;|wavefile
 frames-word|out.frames = (long)le32(vpsc + 4);|out.frames = (long)le32(vpsc + 8);|wavefile
 header-kept|xtFwRdacDecode(data + 8, nData - 8,|xtFwRdacDecode(data, nData,|wavefile
-fat-chain|c = (uint32_t)(d[fat + 2 * (size_t)c] \| d[fat + 2 * (size_t)c + 1] << 8);|c = c + 1;
+fat-chain|c = (uint32_t)(d[fat + 2 * (size_t)c] \| d[fat + 2 * (size_t)c + 1] << 8);|c = c + 1;|diskimage
 name-shift|name += (char)((((data[at] << 8 \| data[at + 1]) >> (9 - shift)) & 0x7f));|name += (char)((((data[at] << 8 \| data[at + 1]) >> (8 - shift)) & 0x7f));
 prev-reset|prev[k] = (uint32_t)(int32_t)(int16_t)r0;|prev[k] = 0;|filesfw
 prev-shared|prev[k] = (uint32_t)(int32_t)(int16_t)r0;|prev[0] = (uint32_t)(int32_t)(int16_t)r0;|filesfw

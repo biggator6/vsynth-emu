@@ -90,9 +90,11 @@ int xtPatchZones(const std::vector<uint8_t>& store);
 
 // ── The firmware's disk image ────────────────────────────────────────────────
 // V-SynthXTDiskImage.bin: a FAT16 partition from sector 32 (Internal.prj, Internal.vc2), then the preset waves, not in any file.
+// XtDiskImage.cpp.
 class XtDiskImage {
 public:
     struct Entry { std::string name; bool isDir = false; uint32_t cluster = 0, size = 0; };
+    // False for a file that isn't a FAT16 image, or a damaged one: clusters of no sectors, a root past its end.
     bool open(const std::string& path);
     const std::vector<uint8_t>& bytes() const { return d; }
     // The entries of a folder by its path ("Internal.prj/Patch"; "" the root), and a file's bytes through the FAT.
@@ -104,6 +106,7 @@ private:
     std::vector<uint8_t> d;
     size_t fat = 0, root = 0, data = 0, partitionEnd = 0;
     uint32_t cluster = 0, rootBytes = 0;
+    uint32_t clusterEnd = 0;   // the cluster numbers a chain can take: their FAT entries and data are in the image
     std::vector<uint8_t> chain(uint32_t first, uint32_t limit) const;
     std::vector<Entry> entries(const std::vector<uint8_t>& raw) const;
 };
