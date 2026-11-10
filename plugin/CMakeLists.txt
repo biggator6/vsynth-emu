@@ -5,17 +5,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ─── JUCE ────────────────────────────────────────────────────────────────────
-# Assumes JUCE is either a sibling directory or installed via FetchContent.
-# Option 1 (recommended for dev): clone JUCE alongside this project
-#   git clone https://github.com/juce-framework/JUCE.git ../JUCE
-# Option 2: FetchContent (uncomment below)
-
-# include(FetchContent)
-# FetchContent_Declare(JUCE
-#     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-#     GIT_TAG        7.0.9
-# )
-# FetchContent_MakeAvailable(JUCE)
+# JUCE 8.0.7 (10a5896) is the submodule at ./JUCE (.gitmodules). In a fresh clone:
+#   git submodule update --init JUCE
+# Or point JUCE_PATH at another checkout of it.
 
 # Local JUCE path (adjust if needed)
 set(JUCE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../JUCE"

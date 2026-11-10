@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+JUCE as a submodule v184 (2026-11-10): .claude/fix-plan.md, section 9. JUCE was a gitlink (10a5896) with no .gitmodules,
+  so a fresh clone got an empty JUCE/ and `git submodule update --init JUCE` said "No url found for submodule path 'JUCE' in
+  .gitmodules". .gitmodules now names https://github.com/juce-framework/JUCE.git, whose tag 8.0.7 is that commit
+  (ls-remote); a fresh clone filled JUCE/ from it at 10a5896 in 4 s (shallow, 84 MB), CMakeLists.txt there. The checkout's
+  own JUCE/ is untouched. research/tools/gitlinks_test.sh (in verify.sh): on a --shared clone, `git submodule init` must
+  register a URL for every gitlink, fetching nothing; red on HEAD without .gitmodules, then 1 of 1; --plants, an empty
+  .gitmodules, caught. plugin/CMakeLists.txt's comment, CLAUDE.md and this file's build line name 8.0.7 (the comment had
+  FetchContent at 7.0.9).
+
 ARCHITECTURE.md's "Checks" v183 (2026-11-10): .claude/fix-plan.md, section 9. Its lines were each version's as it left
   them. Each was read against fcheck's baseline, HARDWARE_FIRMWARE.md and the code; those that changed keep their words and
   say what holds now: the SOLO player, Robot, loops and reverse 0 different since v122 (solocmp's 32 cases), xt_analog's
@@ -1249,7 +1258,7 @@ AMP ENVELOPE v45 (2026-10-29): plugin/Source/XtEnvelope.cpp is the XT's
 PLUGIN (v43, 2026-10-28): plays through the XT's own encoders and players
   (ARCHITECTURE.md, "The plugin"). Firmware image: VSE_XT_ROM, or
   ~/Library/Application Support/V-Synth Emu/V-SynthXT.rom.2.bin, or the
-  ROM... button. Build (JUCE checked out at ./JUCE):
+  ROM... button. Build (JUCE 8.0.7 at ./JUCE, a submodule since v184: git submodule update --init JUCE):
     SDK=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
     TC=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
     SDKROOT=$SDK cmake -S plugin -B build/plugin -DCMAKE_BUILD_TYPE=Release \

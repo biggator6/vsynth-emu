@@ -231,7 +231,7 @@ checked in `XT_COSM_MAIN`'s last section.
    type-map row, notes.txt, RESEARCH_LOG.md. Commit `vNN: …`.
 
 ## Building
-- Plugin (JUCE in ./JUCE): `SDKROOT=$SDK cmake --build build/plugin -j 10`
+- Plugin (JUCE 8.0.7 in ./JUCE, a submodule: in a fresh clone `git submodule update --init JUCE`; `gitlinks_test.sh`, in `verify.sh`, checks every gitlink has its URL): `SDKROOT=$SDK cmake --build build/plugin -j 10`
   (installs AU/VST3), test: `--target VSynthEmuTest`, both (verify.sh): `--target VSynthEmuVerify`. Configure once with
   `cmake -S plugin -B build/plugin -DCMAKE_BUILD_TYPE=Release` (see notes.txt).
 - Use `.venv/bin/python3` (system python lacks numpy). Write multi-step shell
