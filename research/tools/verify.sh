@@ -64,6 +64,8 @@ fi
 # The engine's invariants: the run fails as the program does, not only its text
 o=$("$WORK/fcheck/bin/engine_tests" 2>&1) || rc=1
 echo "engine tests: $(echo "$o" | tail -1)"
+# The tools' paths: env.sh sourced from bash and zsh, wherever from, on a copy in a tree of its own
+bash "$D/env_test.sh" || rc=1
 # Which build: the script on a repository of its own, then the copies this build made against git
 bash "$D/buildid_test.sh" || rc=1
 [ $BUILT = 1 ] && { bash "$D/buildid.sh" || rc=1; }

@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+env.sh from zsh v178 (2026-11-10): .claude/fix-plan.md, section 9. env.sh found its checkout by BASH_SOURCE, which zsh
+  doesn't have, so sourced from zsh (the Mac's shell, and the tool shell's) REPO was two folders above the current one and
+  `mkdir -p "$WORK"` made build/tools there (~/build/tools, empty, from 2026-10-31, is one; left for the owner). Measured by
+  env_test.sh on a copy in a scratch tree, against HEAD's env.sh: 5 of 8 wrong (both zsh cases two folders out, a REPO
+  given that isn't a checkout taken, build folders made outside it; the bash cases and a checkout given right). Now zsh's
+  $0 while sourcing (FUNCTION_ARGZERO, its default) stands in, and a REPO that doesn't hold research/tools/env.sh, found
+  (zsh under POSIX_ARGZERO, a case) or given, is refused with a line on stderr before anything is made. The test holds
+  8/8; its plants, the old line and the refusal gone, both caught (`env_test.sh --plants`). fcheck_keys_test.sh, the one
+  tool that gives REPO, fails at its first run since v174 (its scratch tree has no plugin/, which harness_switches.cpp
+  includes from by a relative path), not by this; the REPO-given cases stand in for it here.
+
 The disk image reader on a damaged image v177 (2026-11-10): .claude/fix-plan.md, section 9. XtDiskImage (harness and test
   code: xt_files, xt_tone, PluginTest and the tests read the firmware's disk image through it; the plugin doesn't) took a FAT16
   layout as its boot sector said, so a root directory past the image's end was read past it, clusters of no sectors made a

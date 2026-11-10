@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-10) — v178: env.sh from zsh
+
+- Every script runs under bash, so BASH_SOURCE was always there for them. It was missing only when env.sh was sourced by hand, from the Mac's own shell, which is how this session first met it: REPO two folders up. An empty ~/build/tools from 2026-10-31 says it had happened before.
+- The test works on a copy of env.sh three folders down a scratch tree, so even the old line, run red, makes its stray build/tools inside the tree, where the test finds it. Nothing outside was touched by the red run.
+- zsh names a sourced file in `$0` by default. Under POSIX_ARGZERO it doesn't, and no line of plain shell can tell, so env.sh checks what it found instead: a REPO without research/tools/env.sh in it is refused before `mkdir`. The shell tests here each have a shape of their own, so this one is a table of cases and one loop, with its plants in the same file, run on the copy.
+- fcheck_keys_test.sh, the one tool that gives env.sh a REPO, was to check that path. It stops at its first run: its scratch tree has no plugin/, and harness_switches.cpp (v174) includes XtSwitches.h through ../../plugin/Source. It was last run at v171. So env_test.sh took two cases of its own for a REPO given, a checkout and not one, and the break is a box in the fix plan.
+
 ### Session 18 (2026-11-10) — v177: the disk image reader on a damaged image
 
 - The test first, on FAT16 images it builds field by field, so it needs no firmware and can damage any field. On the old reader a root directory past the image's end was taken (and read past it), a file whose FAT loops came back at its entry's 16 MB, and an image with clusters of no sectors was taken and a folder on it with a looping FAT never came back; the test exits after 3 s for that.
