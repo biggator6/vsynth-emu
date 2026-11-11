@@ -14,6 +14,8 @@
 # PORT=diskimage: XtDiskImage.cpp (the firmware's disk image, v177) under xt_files, as PORT=files.
 # PORT=patchstore: XtPatchStore.cpp (the patch store's layout and the descriptors' reads, v187) under xt_files, as
 # PORT=files; PORT=tonestore: XtPatchStore.cpp under xt_tone.
+# PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
+# PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
 source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # a run that can't start must never read as a result; no "== name" follows
@@ -68,6 +70,29 @@ elif [ "$PORT" = fxc ]; then       # XtFxControl against its checks in xt_fx; [c
     [ "$OBJ/Sh4Interp.o" -nt "$S/Sh4Interp.cpp" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -c "$S/Sh4Interp.cpp" -o "$OBJ/Sh4Interp.$$.o" && mv "$OBJ/Sh4Interp.$$.o" "$OBJ/Sh4Interp.o"; }
     [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxChip.cpp" ] && [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxControl.h" ] && [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxChip.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_FX_MAIN "${EXTRA[@]}" -I"$S" -c "$S/XtFxChip.cpp" -o "$OBJ/XtFxChip_main.$$.o" && mv "$OBJ/XtFxChip_main.$$.o" "$OBJ/XtFxChip_main.o"; }
     L=("$OBJ/Sh4Interp.o" "$OBJ/XtFxChip_main.o")
+elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
+    # The Multi Step Modulator against xt_msm: XtMsm.cpp, with PORT=msmtrack XtMsmTrack.cpp, with PORT=msmpatch
+    # XtMsmPatch.cpp; [cases] its random cases, SEED its seed (default 2024), XT_MSM_STOP its first case that differs
+    case "$PORT" in
+        msmtrack) F=XtMsmTrack.cpp ;;
+        msmpatch) F=XtMsmPatch.cpp ;;
+        *) F=XtMsm.cpp ;;
+    esac
+    D=XT_MSM_MAIN
+    ARGS=("${SEED:-2024}")
+    EXTRA=("${HARNESS_SWITCHES[@]}")
+    OBJ="$M/msm_obj"
+    mkdir -p "$OBJ"
+    L=()
+    H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
+    for f in XtMsm XtMsmTrack XtMsmPatch XtMsmCheck XtMsmCases XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware \
+             XtFwMachine XtMultiBandPlayer XtSoloVoice XtSoloEncoder Sh4Interp; do
+        [ "$f.cpp" = "$F" ] && continue
+        L+=("$OBJ/$f.o")
+        [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] && continue
+        "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -D$D -DXT_HARNESS_SWITCHES -c "$S/$f.cpp" -o "$OBJ/$f.$$.o" \
+            && mv "$OBJ/$f.$$.o" "$OBJ/$f.o"
+    done
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
 elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore)$ ]]; then

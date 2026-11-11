@@ -1,0 +1,83 @@
+# mutate_msm.py's planted errors (v192): name|old|new[|port[|seed]], port msm (XtMsm.cpp, the default), msmtrack
+# (XtMsmTrack.cpp) or msmpatch (XtMsmPatch.cpp); each must make xt_msm differ.  \n and \| escaped.
+# The track: the curve and its destinations
+coarse-17|constexpr int kDestCoarse[] = { 0, 3, 17 };|constexpr int kDestCoarse[] = { 0, 3, 18 };|msmtrack
+coarse-none|if (t.dest == d) return (int8_t)xtMsmCoarse(v);|if (t.dest == d) return (int8_t)v;|msmtrack
+coarse-reach|const int c = i < kCoarseReach ? T.coarse[i] : 0;|const int c = i < 64 ? T.coarse[i] : 24;|msmtrack
+coarse-sign|return v >= 0 ? c : -c;|return c;|msmtrack
+grid-index|return T.grid[t.grid & 7];|return T.grid[t.grid & 3];|msmtrack
+# SMOOTH's line
+smooth-clocks|(clocks - c) + t.stepAt|(clocks - c + 1) + t.stepAt|msmtrack
+smooth-swap|t.stepAt(t.next) * (clocks - c)|t.stepAt(t.cur) * (clocks - c)|msmtrack
+smooth-round|* c) / clocks;|* c + clocks / 2) / clocks;|msmtrack
+# The six Directions
+finish-state|if (t.state != 1) t.state = 1;|if (t.state != 1) t.state = 2;|msmtrack
+end-past|    if (c > e) {\n        t.cur = (int8_t)e;\n        finish(t);|    if (c >= e) {\n        t.cur = (int8_t)e;\n        finish(t);|msmtrack
+end-hold|hold(t, e, e);|hold(t, e, 0);|msmtrack
+fwd1-wrap|else if (c > e) hold(t, 0, 1);|else if (c > e) hold(t, 0, 0);|msmtrack
+fwd1-last|else if (c >= e) t.next = 0;|else if (c >= e) t.next = (int8_t)e;|msmtrack
+fwd1-end0|    else if (e == 0) hold(t, 0, 0);\n    else if (c > e)|    else if (e == 99) hold(t, 0, 0);\n    else if (c > e)|msmtrack
+turn-twice|} else if (twice ? c > e : c >= e) {|} else if (c >= e) {|msmtrack
+turn-next|        t.delta = -1;\n        t.next = (int8_t)(t.cur - 1);|        t.delta = -1;\n        t.next = (int8_t)(t.cur);|msmtrack
+forward-end0|    } else if (e == 0) {\n        hold(t, 0, 0);\n    } else if (twice|    } else if (e == 99) {\n        hold(t, 0, 0);\n    } else if (twice|msmtrack
+turn-hold|        hold(t, e, e);\n    } else {\n        t.next = (int8_t)(c + 1);\n    }\n}\n\n// Down|        hold(t, e, e - 1);\n    } else {\n        t.next = (int8_t)(c + 1);\n    }\n}\n\n// Down|msmtrack
+back-end0|if (loops && t.end == 0) {|if (t.end == 0) {|msmtrack
+back-twice|} else if (c >= 0 && (twice \|\| !loops)) {|} else if (c >= 0 && twice) {|msmtrack
+back-turn|        t.delta = 1;\n        t.next = (int8_t)(t.cur + 1);|        t.delta = 1;\n        t.next = 0;|msmtrack
+back-delta|        t.cur = 0;\n        t.delta = 1;|        t.cur = 0;\n        t.delta = 0;|msmtrack
+ping-fwdloop|forward(t, c, fwd \|\| t.loop, twice)|forward(t, c, t.loop, twice)|msmtrack
+ping-bwdloop|backward(t, c, !fwd \|\| t.loop, twice)|backward(t, c, t.loop, twice)|msmtrack
+bwd1-noloop|if (!t.loop) backward(t, c, false, false);|if (!t.loop) backward(t, c, true, false);|msmtrack
+bwd1-nextend|else if (c >= 0) t.next = (int8_t)t.end;|else if (c >= 0) t.next = 0;|msmtrack
+bwd1-wrap|else hold(t, t.end, t.end - 1);|else hold(t, t.end, t.end);|msmtrack
+dir-fwd2|case 1: pingPong(t, true, false);|case 1: pingPong(t, true, true);|msmtrack
+dir-bwd1|case 3: bwd1(t);|case 3: fwd1(t);|msmtrack
+dir-bwd2|case 4: pingPong(t, false, false);|case 4: pingPong(t, false, true);|msmtrack
+# A track's start, stop and clock
+start-dir|if ((uint8_t)(dir - 3) > 2) {|if ((uint8_t)(dir - 3) > 1) {|msmtrack
+start-end0|if (end < 1) next = (int8_t)end;|if (end < 0) next = (int8_t)end;|msmtrack
+start-next|next = (int8_t)(n < 0 ? 0 : n);|next = (int8_t)n;|msmtrack
+# (Not planted: start's "already running" guard, as a track starts only when the object does, every track stopped then)
+start-state|    if (state == 2) return;\n    state = 2;|    if (state == 2) return;\n    state = 1;|msmtrack
+start-count|    count = (int8_t)gridClocks(*this);\n    out = termOf(*this, stepAt(cur));|    count = (int8_t)(gridClocks(*this) - 1);\n    out = termOf(*this, stepAt(cur));|msmtrack
+halt-out|    state = 0;\n    out = 0;|    state = 0;|msmtrack
+clock-step|if (count > 0) {|if (count > 1) {|msmtrack
+clock-update|if (!type) return false;|if (!type) return true;|msmtrack
+clock-state|if ((uint8_t)(state - 1) > 1) {|if ((uint8_t)(state - 1) > 0) {|msmtrack
+# The object: its settings
+field-order|&t.on, &t.loop, &t.type, &t.grid|&t.on, &t.loop, &t.grid, &t.type
+field-keysync|if (id == kXtMsmFirstId + 1) return &s.keySync;|if (id == kXtMsmFirstId + 1) return &s.master;
+read-loop|t.loop = keySync ? loops[n] : 1;|t.loop = loops[n];
+read-master|        if (!m) stop();|        if (!m) {}
+read-zone|t.zone = (uint8_t)a.zone;|t.zone = (uint8_t)(a.zone & 7);
+load-stop|    if (part != 0) return;\n    stop();\n    read(s);|    if (part != 0) return;\n    read(s);
+edit-part|void XtMsm::edit(const XtMsmSettings& s, int part) {\n    if (part != 0) return;|void XtMsm::edit(const XtMsmSettings& s, int part) {\n    if (part > 1) return;
+reset|    *this = XtMsm();|    updates = 0;
+# Its start, stop, notes and timer
+start-pos|pos = (int32_t)((uint32_t)now + kTicksPerClock);|pos = (int32_t)((uint32_t)now + kTicksPerClock - 1);
+start-running|if (running == 1) return;|if (running == 2) return;
+stop-timer|due = kNever;|due = due;
+stop-update|    for (XtMsmTrack& t : track) t.halt();\n    ++updates;|    for (XtMsmTrack& t : track) t.halt();
+note-arp|        if (arp) {\n            start();|        if (!arp) {\n            start();
+note-held|} else if (!keyHeld) {|} else if (keyHeld) {
+note-voice|every note\n        stop();|every note\n
+note-part|if (!master \|\| part != 0) return;|if (!master) return;
+tick-at|if (due > now) return;|if (due >= now) return;
+tick-pos|pos = (int32_t)((uint32_t)pos + kTicksPerClock);|pos = (int32_t)((uint32_t)now + kTicksPerClock);
+tick-fired|fired = due;|fired = now;
+clocks-sync|if (!sounding && keySync && !arp) {|if (!sounding && !arp) {
+clocks-pending|pending = 0;|pending = n > 1 ? 1 : 0;
+clocks-one|const int32_t n = pending;|const int32_t n = pending > 0 ? 1 : 0;
+clocks-update|if (moved) ++updates;|++updates;
+# The terms
+term-zone|if (t.dest == dest && t.zone == zone && t.on) sum|if (t.dest == dest && t.on) sum
+term-on|if (t.dest == dest && t.zone == zone && t.on)|if (t.dest == dest && t.zone == zone)
+# (Not planted: the terms' "running" guards, as a stopped object's tracks are all stopped, their terms 0)
+term-part|if (!running \|\| part != 0) return 0;|if (!running \|\| part > 1) return 0;
+termall-on|if (t.dest == dest && t.on) sum += t.out;|if (t.dest == dest) sum += t.out;
+termall-stopped|    if (!running) return 0;\n    int sum = 0;\n    for (const XtMsmTrack& t : track)\n        if (t.dest == dest && t.on)|    if (!running) return 1;\n    int sum = 0;\n    for (const XtMsmTrack& t : track)\n        if (t.dest == dest && t.on)
+termany-part|return part != 0 ? 0 : (int16_t)termAll(dest);|return (int16_t)termAll(dest);
+shown|return t.stopped() ? -1 : t.cur;|return t.cur;
+# The patch's reads
+patch-raw|xtPatchValue(store, id)|xtPatchRaw(store, id)|msmpatch
+patch-last|id <= kXtMsmLastId|id < kXtMsmLastId|msmpatch

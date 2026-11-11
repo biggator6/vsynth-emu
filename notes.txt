@@ -335,6 +335,29 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The Multi Step Modulator v192 (2026-11-11): the firmware's own, which 55 of the 512 preset patches use (HARDWARE_FIRMWARE.md,
+  "The Multi Step Modulator"), ported and checked; not wired into the sound yet (v193). Numbered from v192 on its own branch
+  (claude/msm-ad515c): v188 to v191 are the arpeggio's and the Algorithm menu's removal, on master.
+  It is the object at 0x89cf7634, the one called "the matrix" before v119: four tracks of 16 steps on an OS tempo timer that
+  fires every 20 of the 480 ticks a quarter, counted from its start. A track counts its Grid's clocks (24, 12, 8, 6, 4, 3: the
+  8TH-T and 16TH-T are triplets, as the arpeggio's), steps by its Direction and makes its term: STEP its step, SMOOTH a line to
+  the next step each clock. The converters add the terms of the tracks on their destination and zone to their knobs; the coarse
+  tunes' through a curve, ±63 to ±24 semitones. Key Sync OFF starts it at the first note and never stops it, and every track
+  then loops whatever its Loop Switch; PART restarts it at a note with no other key down; VOICE at every note; both stop it
+  when no note of part 0 sounds. Part 0's only.
+  Code: XtMsm.h, XtMsm.cpp (the object: settings, start, stop, notes, timer, clocks, terms), XtMsmTrack.cpp (a track's start,
+  stop and clock, the six Directions, SMOOTH, the two tables from rom.2), XtMsmPatch.cpp (the settings from a patch's store,
+  xtMsmSettingsOf). Split by job: XtMsm.cpp alone was 311 lines.
+  Check: xt_msm (XtMsmCheck.cpp, XtMsmCases.cpp; build.sh, fcheck): the firmware's object in the interpreter against the port,
+  the object's bytes, its timer, the tempo ticks, the tone updates and the timer's messages after every event, the terms at each
+  clock run and every destination and zone at each load. The presets read their store by the firmware's own routines. 55
+  presets, 356,944 events, 489,446 terms; 300 random cases, 811,357 events, 1,340,938 terms; 0 different. Seeds 7, 31337,
+  90210 at 3000 cases, 0 different. XT_MSM_FIRST=1 says what differs, with both objects' bytes; XT_MSM_STOP=1 stops at the
+  first case that does. The first run found one: a Grid edited to fewer clocks mid-step makes SMOOTH run past ±63, and the
+  coarse curve's lookup then reads on past its 64 entries, so the port reads 129 bytes there.
+  Plants: msm_muts.txt through mutate_msm.py (PORT=msm, msmtrack, msmpatch in mutate.sh), 71, all caught; three first planted
+  were equivalent within what can happen and were replaced (HARDWARE_FIRMWARE.md says which).
+
 The arpeggio pattern and the knob sets in a patch v187 (2026-11-11): the first step to the arpeggio, which 117 of the 512 preset
   patches use (HARDWARE_FIRMWARE.md, "The arpeggio pattern and the knob sets in a patch"). IDs 0x439…0x48c were in no section of
   the store, so xtPatchValue gave 0 for them. kSections gains the zones' Knob Sets (0x439…0x448 at 0x14f2, a nibble each) and the

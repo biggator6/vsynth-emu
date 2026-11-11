@@ -1546,6 +1546,120 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The Multi Step Modulator (2026-11-11, v192)
+
+The manual (p. 68, "Using steps to vary the sound"): up to four tracks of a sixteen-step sequence, each modulating a
+parameter. 55 of the disk image's 512 patches use it. It is the object at `0x89cf7634`, which the notes since v53 called "the
+matrix" (v119's correction). Ported as `XtMsm` and checked against the firmware's own object; not wired into the sound yet.
+
+**Its names** (rom.2's names, descriptors and value strings, IDs 0x48d…0x4ef; stored less the centre):
+
+| ID | Name | Range (default) | Values |
+|---|---|---|---|
+| 0x48d | Master Switch | 0…1 (0) | OFF, ON |
+| 0x48e | Key Sync | 0…2 (1) | OFF, PART, VOICE |
+| 0x48f + 24n | Track n Switch | 0…1 (1) | OFF, ON |
+| 0x490 + 24n | Track Loop Switch | 0…1 (1) | OFF, ON |
+| 0x491 + 24n | Track n Type | 0…1 (0) | STEP, SMOOTH |
+| 0x492 + 24n | Track n Grid | 0…5 (3) | QUARTER, 8TH, 8TH-T, 16TH, 16TH-T, 32TH |
+| 0x493 + 24n | Track n End Point | 0…15 (15) | 1…16 |
+| 0x494 + 24n | Track n Direction | 0…5 (0) | FWD1, FWD2, FWD3, BWD1, BWD2, BWD3 |
+| 0x495 + 24n | Track n Zone | 0…15 (0) | 1…16 |
+| 0x496 + 24n | Track n Destination | 0…71 (0) | OSC1+2-PIT-CRS, OSC1+2-PIT-FINE, PORTA-TIME, OSC1-PIT-CRS … MFX-PRM3 |
+| 0x497…0x4a6 + 24n | Track n Step 01…16 Value | 1…127, centre 64 (64) | −63…+63 |
+
+n is 0…3 (the manual's tracks A–D). 0x4ef is a dummy. The 72 destinations, by number: 0 OSC1+2-PIT-CRS, 1 -FINE, 2
+PORTA-TIME, 3…16 OSC 1's (PIT-CRS, PIT-FINE, PITCH, PENV-DPT, TIME/PW, TENV-DPT, FORMA/FAT, FENV-DPT, LFO-RATE, LFO-PCH,
+LFO-TM/PW, LFO-FR/FT, LFO-LVL, LVL), 17…30 OSC 2's the same, 31…43 COSM 1's (PRM1, PRM2, ENV1 ATK/DCY/SUS/REL, ENV2 the same,
+LFO-RATE, LFO-PRM1, LFO-PRM2), 44…56 COSM 2's, 57…65 TVA (LVL, PAN, ENV ATK/DCY/SUS/REL, LFO-RATE, LFO-LVL, LFO-PAN), 66
+MFX-SEND, 67 CHO-SEND, 68 REV-SEND, 69…71 MFX-PRM1…3. The manual's Grid has "dotted" eighth and sixteenth; the step's clocks
+(below) make them triplets, as the arpeggio's Grid.
+
+**The object** (constructor `0x894d9820`): an OS tempo timer (`0x8930e9c0`: +8 its time, +0xc when it fired, +0x10/+0x14
+links, +0x18 its vtable `0x89833db4`, whose +0x14 is the callback `0x894d9510`), set up at boot by `0x894d9580(obj,
+0x8987cda8, 0x20)`: the tone task's queue (task `0x894d4020`) and its flag.
+
+| +0x1c | the time the timer was last set for |
+|---|---|
+| +0x20 | clocks counted and not yet run |
+| +0x24 | running |
+| +0x25 | the arpeggio's flag: set as its steps play (`0x894d9920`, from `0x893027e6`), cleared when it halts (`0x894d9930`, from `0x89302558`) |
+| +0x26, +0x27 | Master Switch, Key Sync |
+| +0x28…+0x2b | each track's Loop Switch as read |
+| +0x2c + 30·n | the tracks (constructor `0x894da2e0`) |
+| +0xa4, +0xa8 | the queue and the flag the timer posts |
+
+A track: +0 state (0 stopped, 1 past its end without a loop, 2 running), +1 the step, +2 the next step, +3 End Point, +4 the
+way it goes (±1), +5 Switch, +6 Loop, +7 Grid, +8 Direction, +9 Type, +0xa Zone, +0xb Destination, +0xc…+0x1b the 16 steps,
++0x1c its term (s8), +0x1d the clocks left in the step.
+
+**Its settings.** A patch (`0x894d9950`, from the message whose first byte is 0) stops it, then reads every ID through its read
+object (`0x89479b70`, the block at +0x14ac) and the getter `0x8947d310`; an edit of its section (`0x894d9b20`, from the edit
+message of type 0x12) reads them without stopping it. Both stop it if the Master Switch went from on to OFF. Both take part 0
+only (their r5): the Multi Step Modulator is one, part 0's. **A track's Loop is its Loop Switch under Key Sync PART or VOICE,
+and always on under OFF**: the loaders put 1 at +6 then.
+
+**Start and stop.** Start (`0x894d95a0`), if not running: the timer set for the tempo ticks now + 20, running, each track to its
+first step (`0x894da320`: forward, step 1 and +1; BWD1…3, the End Point and −1), its clocks the Grid's and its term its first
+step's, then a tone update. Stop (`0x894d9600`), if running: the timer off (`0x8930ea90`), each track stopped with its term 0,
+then a tone update. A tone update is `0x894d96b0`: `0x894d72f0` on part 0's notes (`*0x89cf5e84`), when there are any.
+
+**Notes.** At a note-on, before the allocator takes a note (`0x894d4af0`, its head `0x894d4b08`…`0x894d4bd2`), for part 0 with
+the Master Switch on, by Key Sync:
+- OFF: start. So the first note after a patch starts it, and nothing after stops it but a patch or the Master Switch.
+- PART: with the arpeggio's flag set, start; otherwise, with no other key of part 0 down (`0x894d5550(0)`: a note of the part
+  not ended, +0x2c clear, whose state word has bit 29, its key down), stop and start: from the top, unless it's a legato.
+- VOICE: stop and start, at every note.
+
+**The clock.** The timer fires every 20 of the OS's tempo ticks (480 a quarter: 24 clocks a quarter), counted from its start,
+not from the beat: `0x894d9510` counts a clock (+0x20), posts flag 0x20, and sets itself 20 ticks on from its own last time
+(`0x8930ea10`, which only sets a timer sooner). `0x8930eb00` fires a timer at most once a call. The tone task's flag 0x20 runs
+`0x894d4240`: under Key Sync PART or VOICE, with no note of part 0 sounding (`0x894d55a0(0)`: one on the active list with +0x2c
+clear) and the arpeggio's flag clear, it stops; otherwise every clock counted runs each track (`0x894d9660` → `0x894da400`),
+then a tone update if a track's term was made again.
+
+**A track's clock** (`0x894da400`): the clocks left − 1. Within a step, SMOOTH's term is made again each clock, (next ·
+(clocks − left) + step · left) / clocks, truncated (`0x8952eff8`), so the line arrives at the next step's value as it begins;
+STEP's isn't. At 0, the Grid's clocks again (`0x897c4a30`: 24, 12, 8, 6, 4, 3), the next step by the Direction, and the term
+the new step's (SMOOTH's line at its start, the same).
+
+**The Directions** (`0x894d9db0` FWD1, `0x894d9e30` FWD2, `0x894d9f10` FWD3, `0x894da010` BWD1, `0x894da090` BWD2, `0x894da170`
+BWD3; a Direction past 5 plays FWD1). With a loop: FWD1 1…E 1…E; FWD2 1…E…2 1…E (each end once); FWD3 1…E E…1 1…E (each end
+twice); the BWDs the same from E downward. With an End Point of 1 a loop holds step 1. Without a loop a track ends (state 1)
+holding a step: FWD1 at E, BWD1 at 1; FWD2 and FWD3 go up, turn at E, and end at 1; BWD2 and BWD3 go down, turn at 1, and end
+at E. An ended track goes on making its term from the step it holds.
+
+**The terms.** The converters add a term to their knob:
+- `0x894d96d0(obj, dest, part, zone)`: the sum of the tracks on `dest` and `zone` that are switched on, while it runs, for
+  part 0. A converter passes its tone's part and zone, so a track serves the zone its Zone names.
+- `0x894d9750(obj, dest, part)`: the same in any zone, as 16 bits (its callers `0x894e654e`, `0x894e671e`).
+- `0x894d97b0(obj, dest)`: the same, any zone and any part (the sends and MFX-PRM1…3, `0x894e7aa0`, `0x894e7bf2`).
+A coarse tune's track (destinations 0, 3, 17) makes its term through `0x894d98a0`: the table at `0x897c49bc`, ±63 to ±24
+semitones (|v|·24/63 rounded down). **Past ±63 it reads on** into the bytes after the 64: an edit of a Grid to fewer clocks
+during a step leaves more clocks in it than the Grid has, and SMOOTH's line then runs past both steps' values (seen: −108).
+`0x894d9870(n)` is the step the screen shows, −1 for a stopped track; `0x894d98c0` and `0x894d98e0` (tables `0x897c49fc`,
+`0x897c4a15`) are the screens', not read.
+
+**Not it:** `0x894da9f0`, which the arpeggio calls at its 4th and 16th steps (v188), works on another object, `0x89cf7eac`.
+
+**What shows it's right.** `xt_msm` (`XtMsmCheck.cpp`, `XtMsmCases.cpp`): the firmware's object in the interpreter, driven as
+the tone task, the allocator's head and the arpeggio drive it, and `XtMsm` beside it. After every event the object's bytes from
++0x1c to the last track's end, the timer's time and last, the tempo ticks, the tone updates and the timer's messages; at each
+clock run every track's own term (`0x894d96d0`, `0x894d97b0`), the step shown and a drawn term (`0x894d9750`) of parts 0 and 1;
+and every destination and zone at each load and case end. Hooked: the getter and the read object (answering the case's
+settings), the message post, the tone update, and the two note-list questions. The presets don't hook the getter: the
+firmware reads the patch's store by its own routines, where the port gets `xtMsmSettingsOf` it. The 55 presets at their Patch
+Tempo for 6 s each, with notes of parts 0 and 1: 356,944 events, 489,446 terms; 300 random cases over every ID's range, with
+the arpeggio's flag, edits, loads, ticks in bursts and the tone task up to 8 ms late: 811,357 events, 1,340,938 terms; 0
+different. Seeds 7, 31337 and 90210 at 3000 cases: 8.09 M events and 12.7 M terms each, 0 different. Plants (`msm_muts.txt`,
+`mutate_msm.py`, `PORT=msm`, `msmtrack`, `msmpatch`): 71, all caught. Three first planted were equivalent within what can
+happen and were replaced: a track's start's "already running" guard (a track starts only when the object does, every track
+stopped then) and the terms' "running" guards (a stopped object's tracks are all stopped, their terms 0).
+
+**Not yet:** the wiring. Which converter asks for which destination and with what zone; the tone updates it asks for;
+XtSynth's clock in tempo ticks (it counts 24 clocks a quarter); the note list's two answers; the arpeggio's flag. Until then
+`xtPatchMissing` still names it, and every term is 0 as before.
+
 ### The arpeggio pattern and the knob sets in a patch (2026-11-11, v187)
 
 IDs 0x439…0x48c were in no section of the store's layout (`XtPatchStore.cpp`'s `kSections`, "V-Synth's files"), so the patch
