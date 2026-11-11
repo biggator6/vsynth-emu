@@ -14,6 +14,8 @@
 # PORT=diskimage: XtDiskImage.cpp (the firmware's disk image, v177) under xt_files, as PORT=files.
 # PORT=patchstore: XtPatchStore.cpp (the patch store's layout and the descriptors' reads, v187) under xt_files, as
 # PORT=files; PORT=tonestore: XtPatchStore.cpp under xt_tone.
+# PORT=arp: XtArpeggio.cpp (the arpeggiator's keys and settings, v188), PORT=arpstep: XtArpeggioStep.cpp (its timer and
+# step), PORT=arpmotif: XtArpeggioMotifs.cpp (its motifs), under xt_arp; [cases] its random cases, after the presets.
 source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # a run that can't start must never read as a result; no "== name" follows
@@ -68,6 +70,25 @@ elif [ "$PORT" = fxc ]; then       # XtFxControl against its checks in xt_fx; [c
     [ "$OBJ/Sh4Interp.o" -nt "$S/Sh4Interp.cpp" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -c "$S/Sh4Interp.cpp" -o "$OBJ/Sh4Interp.$$.o" && mv "$OBJ/Sh4Interp.$$.o" "$OBJ/Sh4Interp.o"; }
     [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxChip.cpp" ] && [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxControl.h" ] && [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxChip.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_FX_MAIN "${EXTRA[@]}" -I"$S" -c "$S/XtFxChip.cpp" -o "$OBJ/XtFxChip_main.$$.o" && mv "$OBJ/XtFxChip_main.$$.o" "$OBJ/XtFxChip_main.o"; }
     L=("$OBJ/Sh4Interp.o" "$OBJ/XtFxChip_main.o")
+elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
+    case "$PORT" in
+        arpstep) F=XtArpeggioStep.cpp ;;
+        arpmotif) F=XtArpeggioMotifs.cpp ;;
+        *) F=XtArpeggio.cpp ;;
+    esac
+    D=XT_ARP_MAIN
+    EXTRA=("${HARNESS_SWITCHES[@]}")
+    OBJ="$M/arp_obj"
+    mkdir -p "$OBJ"
+    L=()
+    H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
+    for f in XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases XtFiles XtWaveFile XtDiskImage \
+             XtPatchStore XtFirmware XtFwMachine XtMultiBandPlayer XtSoloVoice XtSoloEncoder Sh4Interp; do
+        [ "$f.cpp" = "$F" ] && continue
+        [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 \
+            -DXT_ARP_MAIN -DXT_HARNESS_SWITCHES -c "$S/$f.cpp" -o "$OBJ/$f.$$.o" && mv "$OBJ/$f.$$.o" "$OBJ/$f.o"; }
+        L+=("$OBJ/$f.o")
+    done
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
 elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore)$ ]]; then

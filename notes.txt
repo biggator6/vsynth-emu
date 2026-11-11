@@ -335,6 +335,35 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The arpeggiator v188 (2026-11-11): the second step to the arpeggio, its engine (HARDWARE_FIRMWARE.md, "The arpeggiator").
+  Found from its settings: 0x8930c190 reads IDs 0x42e…0x437 for the object 0x8987cef8 (class 0x893036b0), which takes a part's
+  keys, steps on the OS's tempo timer (0x8930eb00, 480 ticks a quarter) and posts MIDI messages to the tone generator's input
+  with a source byte of 3. XtArpeggio ports that object as real-time code (no allocation, no locks): XtArpeggio.cpp its keys,
+  Hold, the pedal and the settings; XtArpeggioStep.cpp its timer, step, notes and controllers; XtArpeggioMotifs.cpp the eight
+  motifs and their octaves. Not in the plugin yet: v189 wires it. A pattern cell is 0 REST, 1 TIE, 2…128 velocity 1…127, the
+  step code's reading; v187's "128 TIE" is withdrawn in place. research/tools/arptext.cpp prints the firmware's text for the
+  arpeggio's values (plain numbers for a cell and End Point, so the screens draw their own).
+  Check: xt_arp (XtArpeggioCheck.cpp, XtArpeggioCases.cpp, XT_ARP_MAIN; build.sh, fcheck): the firmware's own object in the
+  interpreter and the port, given the same channel, settings, pattern, keys, pedal and ticks, every message compared and the
+  object's fields after each key, setting and fired step. fcheck's run: the 117 disk-image patches with the arpeggio on, 10,790
+  messages and 10,717 states; 1000 random cases, 224,687 messages and 110,830 states; 0 different. Seeds 7, 31337, 90210 at
+  3000 cases: 675,634 to 695,048 messages each, 0 different. XT_ARP_FIRST=1 says what differs, XT_ARP_STOP=1 stops at it.
+  Plants: arp_muts.txt through mutate_arp.py (PORT=arp, arpstep, arpmotif in mutate.sh), each run to its first difference
+  on the presets and fcheck's 1000 cases: 78 planted, 78 caught (retrigger by hanging the port: its list of note ends loops),
+  0 missed, 0 errors, about 7 minutes. The first runs missed five. Two were equivalent and were replaced: shuffle-res
+  (Resolution is only 0 or 1) and fold-low (a note under -12 folds alike by 12 or 24). Three were draws the cases didn't
+  make, and the cases now draw them: pedal-at-64 (the pedal at exactly 64), cc-pedal-up (a CTRL line moved off a pedal),
+  auto-few (more notes sounding than keys held: legato lines). nth-from-one, a key 0 held, was caught only by chance until
+  the keys reached the keyboard's ends. mutate_arp.py gives mutate.sh a MUT_TIMEOUT a minute under its own, as `timeout`
+  puts the binary in a process group the runner's kill missed (workflow-bugs.md; mutate_fx.py has the same shape, open).
+  fcheck --update added xt_arp's four lines and nothing else, once solocmp's gated.bin line, emptied by its 120 s alarm under
+  load as at v187, was put back by hand: run alone it takes 25 s and gives the same line (its kept, empty result removed).
+  ASan and UBSan: 117 presets and 100 cases, clean. fcheck_keys_test.sh green. verify.sh: every line as it should be. Its
+  step test (an encode must give up within 30 s of wall clock) ran out under the machine's load the first time; alone,
+  10/10, encodes giving up in 4.9 s.
+  The split stays as planned: the engine is one object, and what feeds it (the router) and what it feeds (a key state of its
+  own in the tone generator) are the wiring's, v189.
+
 The arpeggio pattern and the knob sets in a patch v187 (2026-11-11): the first step to the arpeggio, which 117 of the 512 preset
   patches use (HARDWARE_FIRMWARE.md, "The arpeggio pattern and the knob sets in a patch"). IDs 0x439…0x48c were in no section of
   the store, so xtPatchValue gave 0 for them. kSections gains the zones' Knob Sets (0x439…0x448 at 0x14f2, a nibble each) and the

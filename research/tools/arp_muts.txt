@@ -1,0 +1,80 @@
+# The arpeggiator's planted errors: name|old|new|port (arp XtArpeggio.cpp, arpstep XtArpeggioStep.cpp, arpmotif
+# XtArpeggioMotifs.cpp).  mutate_arp.py runs them, each through xt_arp against the firmware's own object.
+key-numbers|keys[k].key = (uint8_t)k;|keys[k].key = (uint8_t)(k + 1);|arp
+shuffle-8th-span|const int span = 120 * r / 100;|const int span = 121 * r / 100;|arp
+shuffle-8th-tail|(2 * span + 2 * k - k * span / 60 - 120)|(2 * span + 2 * k - k * span / 60 - 119)|arp
+shuffle-16th-head|shuffle[k] = (uint8_t)(k * span / 30);|shuffle[k] = (uint8_t)(k * span / 31);|arp
+shuffle-16th-second|shuffle[60 + k] = (uint8_t)(k * span / 30 + 60);|shuffle[60 + k] = (uint8_t)(k * span / 30 + 59);|arp
+shuffle-16th-last|(2 * span + 2 * k - k * span / 30);|(2 * span + 2 * k - k * span / 30 + 1);|arp
+shuffle-clamp|std::clamp(r, 1, 99)|std::clamp(r, 0, 99)|arp
+shuffle-res|if ((s & 0xff) == 1) {|if ((s & 0xff) == 0) {|arp
+shuffle-cached|if (shuffleRate == r && shuffleRes == s) return;|if (shuffleRate == r) return;|arp
+switch-stops|        on = s.on;\n        stop();|        on = s.on;|arp
+settings-pedal|    makeShuffle(rate, res);\n    pedalCheck();|    makeShuffle(rate, res);|arp
+hold-new-chord|        dropKeys();   // held by Hold|        ;   // held by Hold|arp
+pedal-at-64|else if ((hold != 0 \|\| pedalValue >= kPedalDown) && !anyHeld())|else if ((hold != 0 \|\| pedalValue > kPedalDown) && !anyHeld())|arp
+unlink-head|        keyHead = prev;|        keyHead = keys[k].next;|arp
+link-tail|    n.prev = tail;|    n.prev = keyHead;|arp
+repress-current|        if (curNode == key) curNode = n.prev;\n        n.vel = 0;\n        unlinkKey(key);\n        if (keyHead < 0) {|        if (curNode == key) curNode = n.next;\n        n.vel = 0;\n        unlinkKey(key);\n        if (keyHead < 0) {|arp
+velocity-zero|    if (velocity <= 0) return;|    if (velocity < 0) return;|arp
+last-velocity|    lastVelocity = (uint8_t)velocity;|    lastVelocity = 100;|arp
+off-under-hold|    if (hold != 0 \|\| pedalValue >= kPedalDown \|\| n.vel == 0) return;|    if (pedalValue >= kPedalDown \|\| n.vel == 0) return;|arp
+off-current|    if (curNode == key) curNode = n.prev;\n    n.vel = 0;\n    unlinkKey(key);\n    if (keyHead >= 0) return;|    n.vel = 0;\n    unlinkKey(key);\n    if (keyHead >= 0) return;|arp
+off-reset-ccs|    halt();\n    resetControllers();\n}\n\n// 0x89303a80|    halt();\n}\n\n// 0x89303a80|arp
+pedal-keeps-held|        if (keys[k].vel == 0 \|\| xtArpBit(held, keys[k].key)) continue;|        if (keys[k].vel == 0) continue;|arp
+stop-pedal|    pedalValue = 0;|    ;|arp
+first-delay|kFirstDelay = 15;|kFirstDelay = 16;|arpstep
+grid-triplet|{ 480, 240, 160, 120, 80, 60 }|{ 480, 240, 160, 120, 90, 60 }|arpstep
+step-wrap|            if (step >= endPoint + 1) {|            if (step > endPoint + 1) {|arpstep
+octave-pending|                if (octavePending == 1) {|                if (octavePending == 2) {|arpstep
+tie-plays|            else if (c != kTie)|            else if (c != 0)|arpstep
+ctrl-bit|kCtrlLine = 0x80;|kCtrlLine = 0x40;|arpstep
+pair-ticks|kPairTicks = 480;|kPairTicks = 240;|arpstep
+shuffle-place|shuffle[(frac >> 2) % kShuffle]|shuffle[(frac >> 3) % kShuffle]|arpstep
+timer-at-now|    if (due > now) return;|    if (due >= now) return;|arpstep
+fired-now|    fired = due;|    fired = now;|arpstep
+ends-at-fire|    while (offHead >= 0 && offs[offHead].time <= fired) endNote(offHead);|    while (offHead >= 0 && offs[offHead].time < fired) endNote(offHead);|arpstep
+reschedule|    schedule(offHead >= 0 ? offs[offHead].time : kNever);|    schedule(kNever);|arpstep
+start-octave|    octave = 0;\n    direction = 1;|    octave = 1;\n    direction = 1;|arpstep
+start-direction|    direction = 1;\n    step = 0;|    direction = -1;\n    step = 0;|arpstep
+halt-held|    while (offHead >= 0) endNote(offHead);\n    std::memset(held, 0, sizeof held);|    while (offHead >= 0) endNote(offHead);|arpstep
+fold-low|    if (note < 0) note += 12;|    if (note < 0) note += 24;|arpstep
+fold-high|    if (note > 127) note -= 12;|    if (note > 128) note -= 12;|arpstep
+fold-mid|    while (note > 139) note -= 24;|    while (note > 127) note -= 24;|arpstep
+vel-scale|    int out = scale * (vel & 0xff) / 127;|    int out = scale * (vel & 0xff) / 128;|arpstep
+vel-least|    if ((out & 0xff) == 0) out = 1;|    if ((out & 0xff) == 0) out = 2;|arpstep
+key-velocity|keyVelocity > 0 ? keyVelocity : velocity|keyVelocity > 1 ? keyVelocity : velocity|arpstep
+retrigger|    if (o.time != kNever) endNote(note);|    ;|arpstep
+tie-wrap|pattern.cell[s % (endPoint + 1) % XtArpPattern::kSteps]|pattern.cell[s % XtArpPattern::kSteps]|arpstep
+duration|std::max(1, g * duration * 99 / 10000)|std::max(1, g * duration / 100)|arpstep
+length-least|std::max(1, g * duration * 99 / 10000)|std::max(0, g * duration * 99 / 10000)|arpstep
+ends-in-order|while (offs[at].next >= 0 && o.time >= offs[offs[at].next].time)|while (offs[at].next >= 0 && o.time > offs[offs[at].next].time)|arpstep
+sounding-count|    xtArpClearBit(sounding, n);\n    --soundingCount;|    xtArpClearBit(sounding, n);|arpstep
+cc-value|    const int value = pattern.cell[step % XtArpPattern::kSteps][line] - 1;|    const int value = pattern.cell[step % XtArpPattern::kSteps][line];|arpstep
+cc64-flag|    if (cc == 64 && value > 0) cc64 = 1;|    if (cc == 64 && value >= 0) cc64 = 1;|arpstep
+cc-rest-pan|{ 10, 64 }|{ 10, 63 }|arpstep
+cc-skip-32|        if (cc == 0 \|\| cc == 32) continue;|        if (cc == 0) continue;|arpstep
+cc-pedal-up|    if (cc64 && channel >= 0) send(kControl \| channel, 64, 0);|    ;|arpstep
+too-few|    return keysListed(a) <= a.soundingCount;|    return keysListed(a) < a.soundingCount;|arpmotif
+walk-skips-sounding|        if (!xtArpBit(a.sounding, take(a, k))) return k;|        if (take(a, k) >= 0) return k;|arpmotif
+nth-from-one|    int k = 0;\n    do {|    int k = kLast;\n    do {|arpmotif
+seed-step|kSeedMul = 0x497d;|kSeedMul = 0x497b;|arpmotif
+random-bits|    const int draw = (nextSeed(a.keySeed) >> 8) & 0xff;|    const int draw = (nextSeed(a.keySeed) >> 7) & 0xff;|arpmotif
+order-start|a.curNode >= 0 ? a.keys[a.curNode].next : a.keyHead|a.curNode >= 0 ? a.keys[a.curNode].next : a.keys[a.keyHead].prev|arpmotif
+order-skips-sounding|n > 0 && xtArpBit(a.sounding, a.keys[k].key)|n > 0 && false|arpmotif
+auto-line|    return nthHeld(a, line % n);|    return nthHeld(a, (line + 1) % n);|arpmotif
+auto-few|    if (n <= a.soundingCount && line >= n) return -1;|    if (n <= a.soundingCount) return -1;|arpmotif
+octave-ends|    a.octave = (int8_t)(fromTop ? hi : lo);|    a.octave = (int8_t)(fromTop ? lo : hi);|arpmotif
+octave-first|    if (a.lastNote >= 0 && a.octave >= lo && a.octave <= hi) return a.octave;|    if (a.octave >= lo && a.octave <= hi) return a.octave;|arpmotif
+octave-random|    a.octave = (int8_t)(lo + draw % (hi - lo + 1));|    a.octave = (int8_t)(lo + draw % (hi - lo + 2));|arpmotif
+up-octave-on|    if (!heldBeyond(a, k, by)) a.octave = (int8_t)(a.octave + by);|    if (!heldBeyond(a, k, by)) a.octave = (int8_t)(a.octave + 1);|arpmotif
+down-octave-rule|    play(a, octaveFrom(a, by < 0), k);|    play(a, octaveFrom(a, false), k);|arpmotif
+updown-octave-rule|    play(a, octaveFrom(a, true), k);|    play(a, octaveFrom(a, false), k);|arpmotif
+updown-turn|        a.direction = (int8_t)-by;|        a.direction = (int8_t)by;|arpmotif
+updown-end|    if (by > 0 ? a.octave < end : a.octave > end)|    if (by > 0 ? a.octave <= end : a.octave > end)|arpmotif
+order-octave|k == a.keys[a.keyHead].prev) a.octave|k == a.keys[a.keyHead].next) a.octave|arpmotif
+phrase-from-line-1|- (a.pattern.line[0] & kNoteBits)|- (a.pattern.line[1] & kNoteBits)|arpmotif
+line-velocity|    a.playNote(octave * 12 + note, a.lastVelocity);|    a.playNote(octave * 12 + note, a.keys[k].vel);|arpmotif
+line-pending|    a.playNote(octave * 12 + note, a.lastVelocity);\n    a.octavePending = 1;|    a.playNote(octave * 12 + note, a.lastVelocity);\n    a.octavePending = 0;|arpmotif
+auto-pending|    play(a, octaveFrom(a, false), k);\n    a.octavePending = 1;|    play(a, octaveFrom(a, false), k);\n    a.octavePending = 0;|arpmotif
+motif-order|{ up, down, upAndDown, randomOrder, noteOrder, rhythm, phrase, autoLines }|{ up, down, upAndDown, randomOrder, noteOrder, phrase, rhythm, autoLines }|arpmotif
