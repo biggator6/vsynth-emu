@@ -668,8 +668,9 @@ rdac: 416 waves (367 mono, 49 stereo; 268 SOLO, 135 BACKING, 13 ENSEMBLE), 19764
 vpno: 416 waves with a list, 366 of them each event in order, the others 34 SOLO, 12 BACKING, 4 ENSEMBLE; 0 shorter than their count
 vpdt: events on 268 SOLO, 135 BACKING, 13 ENSEMBLE waves, of them with attacks 261, 61, 11; hash 98fb3bec6f2fd5e1
 typed: 123840 values against the firmware's read, 0 different
+pointed: 623104 values through the firmware's own pointing routines and getters, and 1217 of a made-up store, 0 different
 a wave's own: 0 wrong
-patches: 512 in the image (lengths 0x146c 0, 0x14ac 0, 0x14f2 0, other 512), 512 names read alike, 4162048 values, 12 out of range, 520256 against the firmware's reads, 0 different, hash 82034c2071b9a07a
+patches: 512 in the image (lengths 0x146c 0, 0x14ac 0, 0x14f2 0, other 512), 512 names read alike, 4727296 values, 12 out of range, 590912 against the firmware's reads, 0 different, hash 82034c2071b9a07a
 short: a patch using the Multi Step Modulator in 77 fields, cut before it 98 values the firmware's defaults, after it 98 its own, 0 not; 3 of those defaults aren't the descriptors'
 == xt_fx
 MFX 0 Thru: 8192 samples, 0 different

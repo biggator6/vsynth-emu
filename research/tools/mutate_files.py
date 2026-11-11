@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # mutate_files.py [name ...]: every deliberate error in files_muts.txt (or the named ones), each planted in XtFiles.cpp, or by
-# its port in XtWaveFile.cpp (wavefile), XtDiskImage.cpp (diskimage) or XtFirmware.cpp (filesfw), by mutate.sh and run
+# its port in XtWaveFile.cpp (wavefile), XtDiskImage.cpp (diskimage), XtPatchStore.cpp (patchstore, the store's layout and
+# the descriptors' reads, v187) or XtFirmware.cpp (filesfw), by mutate.sh and run
 # through xt_files against fcheck's baseline.  One line each: caught, MISSED, or ERROR when the old text is no longer in
 # the source or the run never started.  It stops first if a run with
 # nothing planted doesn't equal the baseline, for each port the list uses.  files_muts.txt: name|old|new[|port], with \n and \| escaped.

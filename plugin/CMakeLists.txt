@@ -74,6 +74,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtFirmware.cpp
     Source/XtFwMachine.cpp
     Source/XtFiles.cpp
+    Source/XtPatchStore.cpp
     Source/XtWaveFile.cpp
     Source/XtDiskImage.cpp
     Source/XtPatch.cpp

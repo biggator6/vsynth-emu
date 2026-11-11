@@ -1,16 +1,21 @@
-tone-stride|{ 0x293, 0x312, 0xe6, 82 },|{ 0x293, 0x312, 0xe6, 78 },
-tone-base|{ 0x293, 0x312, 0xe6, 82 },|{ 0x293, 0x312, 0xe5, 82 },
-env-base|{ 0x313, 0x3bd, 0x606, 112 },|{ 0x313, 0x3bd, 0x5c6, 112 },
-lfo-base|{ 0x3be, 0x3e6, 0xd06, 20 },|{ 0x3be, 0x3e6, 0xcc6, 20 },
-cosm-stride|kCosmStride = 0x220;|kCosmStride = 0x200;
-mfx-base|{ 0x176, 0x1fb, 84, 0 },|{ 0x176, 0x1fb, 83, 0 },
-msm-base|{ 0x48d, 0x4ef, 0x14ac, 0 },|{ 0x48d, 0x4ef, 0x146c, 0 },
-ctl-base|{ 0x42b, 0x438, 0x1286, 0 },|{ 0x42b, 0x438, 0x1246, 0 },
-width-32|width >= 32 ? v : v & ((1u << width) - 1)|v & ((1u << width) - 1)
-width-sign|const int width = std::abs(d->width), total|const int width = d->width, total
-range-default|if (d->min != d->max && (v < d->min \|\| v > d->max)) v = d->def;|
-range-equal|if (d->min != d->max && (v < d->min|if ((v < d->min
-centre|return v - d->centre;|return v;
+tone-stride|{ 0x293, 0x312, 0xe6, 82 },|{ 0x293, 0x312, 0xe6, 78 },|patchstore
+tone-base|{ 0x293, 0x312, 0xe6, 82 },|{ 0x293, 0x312, 0xe5, 82 },|patchstore
+env-base|{ 0x313, 0x3bd, 0x606, 112 },|{ 0x313, 0x3bd, 0x5c6, 112 },|patchstore
+lfo-base|{ 0x3be, 0x3e6, 0xd06, 20 },|{ 0x3be, 0x3e6, 0xcc6, 20 },|patchstore
+cosm-stride|kCosmStride = 0x220;|kCosmStride = 0x200;|patchstore
+mfx-base|{ 0x176, 0x1fb, 84, 0 },|{ 0x176, 0x1fb, 83, 0 },|patchstore
+msm-base|{ 0x48d, 0x4ef, 0x14ac, 0 },|{ 0x48d, 0x4ef, 0x146c, 0 },|patchstore
+ctl-base|{ 0x42b, 0x438, 0x1286, 0 },|{ 0x42b, 0x438, 0x1246, 0 },|patchstore
+pattern-stride|{ 0x449, 0x48c, 0x128c, 34 },|{ 0x449, 0x48c, 0x128c, 0 },|patchstore
+pattern-base|{ 0x449, 0x48c, 0x128c, 34 },|{ 0x449, 0x48c, 0x1286, 34 },|patchstore
+pattern-gone|{ 0x449, 0x48c, 0x128c, 34 },||patchstore
+knob-base|{ 0x439, 0x448, 0x14f2, 0 },|{ 0x439, 0x448, 0x14f1, 0 },|patchstore
+knob-gone|{ 0x439, 0x448, 0x14f2, 0 },||patchstore
+width-32|width >= 32 ? v : v & ((1u << width) - 1)|v & ((1u << width) - 1)|patchstore
+width-sign|const int width = std::abs(d->width), total|const int width = d->width, total|patchstore
+range-default|if (d->min != d->max && (v < d->min \|\| v > d->max)) v = d->def;||patchstore
+range-equal|if (d->min != d->max && (v < d->min|if ((v < d->min|patchstore
+centre|return v - d->centre;|return v;|patchstore
 stereo-flag|out.channels = vpsc[2] ? 2 : 1;|out.channels = 1;|wavefile
 frames-word|out.frames = (long)le32(vpsc + 4);|out.frames = (long)le32(vpsc + 8);|wavefile
 header-kept|xtFwRdacDecode(data + 8, nData - 8,|xtFwRdacDecode(data, nData,|wavefile
@@ -33,10 +38,10 @@ wave-fine|out.tuneFine = (int8_t)vplp[0x1b];|out.tuneFine = (uint8_t)vplp[0x1b];
 riff-start|file + 8, "WAVE", 4) ? 12 : 0;|file + 8, "WAVE", 4) ? 0 : 0;|wavefile
 linr-tag|const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|const bool linear = !vpfl;|wavefile
 linr-short|if ((linear ? nData / 2 : nData - 8) < want) return fail(why, "fewer samples than the header says");|;|wavefile
-typed-slot|const int v = xtPatchValue(store, base + d->slot, zone, cosm);|const int v = xtPatchValue(store, base + d->slot + 4, zone, cosm);
-typed-base|table[(size_t)i] = { p[0], s16(2), s16(4), s16(6) };|table[(size_t)i] = { p[0] + 1, s16(2), s16(4), s16(6) };
-typed-range|return v < d->min \|\| v > d->max ? d->def : v;|return v;
-typed-default|{ p[0], s16(2), s16(4), s16(6) }|{ p[0], s16(4), s16(4), s16(6) }
+typed-slot|const int v = xtPatchValue(store, base + d->slot, zone, cosm);|const int v = xtPatchValue(store, base + d->slot + 4, zone, cosm);|patchstore
+typed-base|{ p[0], s16(p + 2), s16(p + 4), s16(p + 6) }|{ p[0] + 1, s16(p + 2), s16(p + 4), s16(p + 6) }|patchstore
+typed-range|return v < d->min \|\| v > d->max ? d->def : v;|return v;|patchstore
+typed-default|{ p[0], s16(p + 2), s16(p + 4), s16(p + 6) }|{ p[0], s16(p + 4), s16(p + 4), s16(p + 6) }|patchstore
 lite-riff|    const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|    const bool linear = vpfl && !std::memcmp(vpfl + 40, "LINR", 4);|wavefile
 lite-novpsc|if (!vpsc \|\| nSc < 8 \|\| !data \|\| (!vpfl && !riff)|if (!data \|\| (!vpfl && !riff)|wavefile
 vpno-chunk|"vplp", "vpno", "vpdt"|"vplp", "vpnX", "vpdt"|wavefile

@@ -4,13 +4,16 @@
 // time.  HARDWARE_FIRMWARE.md, "V-Synth's files".  Needs xtFwOpen.  Not for the audio thread.
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
-// What the readers (XtFiles.cpp, XtWaveFile.cpp) share: a little-endian word, and a refusal with its reason.  And a
-// file's digest, FNV-1a over its bytes, which xt_files hashes waves and patches by and XtSynthRom.cpp knows an image by.
+// What the readers (XtFiles.cpp, XtWaveFile.cpp) share: a little-endian word, a big-endian one (a patch file's header), and
+// a refusal with its reason.  And a file's digest, FNV-1a over its bytes, which xt_files hashes waves and patches by and
+// XtSynthRom.cpp knows an image by.
 namespace xtfile {
 inline uint32_t le32(const uint8_t* p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
+inline uint32_t be32(const uint8_t* p) { return (uint32_t)p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3]; }
 inline bool fail(std::string* why, const char* what) {
     if (why) *why = what;
     return false;
@@ -68,10 +71,18 @@ bool xtPatchRead(const uint8_t* file, size_t size, XtPatchFile& out, std::string
 // The name alone, without the firmware: for a list of hundreds.  Empty if it isn't a patch.
 std::string xtPatchName(const uint8_t* file, size_t size);
 
+// The store's layout and the descriptors' reads below are XtPatchStore.cpp's (v187).
 // One parameter's place and range, by the firmware's ID, from rom.2.  nullptr past the table or without a ROM.
 struct XtParamDesc { int offset, width, bit, centre, def, min, max; };
 const XtParamDesc* xtParamDesc(int id);
-// Where an ID's section starts in the store: `zone` 0..15 for what a zone has, `cosm` 0..1 for the COSMs.  -1 for an ID outside a patch.
+constexpr int kXtDescIds = 0x55d;   // the first bank's IDs; the second (xtTypedDesc) goes on from there
+// The store's sections, as 0x8947dae0 writes them: the IDs first..last from `at`, and where a section repeats 16 times
+// (a zone's, or the arpeggio pattern's lines), `zoneStride` bytes apart.  The COSMs (xtPatchIsCosm) repeat twice over that.
+struct XtPatchSectionDef { int first, last, at, zoneStride; };
+std::span<const XtPatchSectionDef> xtPatchSections();
+bool xtPatchIsCosm(int id);
+// Where an ID's section starts in the store: `zone` 0..15 for what a zone has (or the arpeggio pattern's line), `cosm` 0..1
+// for the COSMs.  -1 for an ID outside a patch.
 int xtPatchSection(int id, int zone = 0, int cosm = 0);
 // The bits as stored, and the firmware's read of them (0x89481860): the default if they're out of range, less the centre.
 int xtPatchRaw(const std::vector<uint8_t>& store, int id, int zone = 0, int cosm = 0);
@@ -110,3 +121,21 @@ private:
     std::vector<uint8_t> chain(uint32_t first, uint32_t limit) const;
     std::vector<Entry> entries(const std::vector<uint8_t>& raw) const;
 };
+
+#ifdef XT_FILES_MAIN
+// xt_files' patches (XtPatchStoreCheck.cpp; its main is XtFiles.cpp's).  The values of the disk image's patches against the
+// firmware's reads, which prints the lines of a type's parameters and of the blocks the firmware points at by its own
+// routines; the counts, which xtPatchCheckPrint prints; and an older, shorter patch, which prints its line and gives how
+// many came out wrong.
+struct XtPatchCheck {
+    int patches = 0, sizes[4] = {}, named = 0;
+    long values = 0, outOfRange = 0, compared = 0, different = 0;
+    uint64_t hash = 0xcbf29ce484222325ull;
+};
+XtPatchCheck xtPatchCheckValues(const XtDiskImage& disk, bool first);
+void xtPatchCheckPrint(const XtPatchCheck& c);
+int xtPatchCheckShort(const XtDiskImage& disk);
+// The preset wave at `at`, edited in its chunks, as a project's RIFF and LITE wave, and plain and short WAVs that aren't
+// waves (XtWaveFileCheck.cpp): prints its line, and gives how many came out wrong
+int xtWaveCheckOwn(const std::vector<uint8_t>& disk, size_t at);
+#endif

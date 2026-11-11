@@ -335,6 +335,25 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The arpeggio pattern and the knob sets in a patch v187 (2026-11-11): the first step to the arpeggio, which 117 of the 512 preset
+  patches use (HARDWARE_FIRMWARE.md, "The arpeggio pattern and the knob sets in a patch"). IDs 0x439…0x48c were in no section of
+  the store, so xtPatchValue gave 0 for them. kSections gains the zones' Knob Sets (0x439…0x448 at 0x14f2, a nibble each) and the
+  arpeggio pattern (0x449…0x48c at 0x128c): 16 lines of 34 bytes, read by line as a zone is, xtPatchValue(store, id, line); a line
+  is State (the top bit, NOTE or CTRL) and Note/CC, then Step 1-32 (0 REST, 1-127, 128 TIE). The firmware's routines that point a
+  read object at the pattern (0x89479ad0, 0x89479b20) add 34 x the line, and the manual has 32 steps x 16 lines.
+  First XtFiles.cpp (469 lines) split by job, xt_files' output byte for byte the same in every mode: XtPatchStore.cpp (the
+  store's layout and the descriptors' reads; their tables now published once by an atomic pointer), XtFiles.cpp (a patch file into
+  the store; xt_files' main and preset waves), XtPatchStoreCheck.cpp and XtWaveFileCheck.cpp (xt_files' patches and a wave's own
+  chunks, XT_FILES_MAIN only). build.sh, CMakeLists.txt, fwsteps.sh and mutate.sh list the new files; mutate.sh has PORT=patchstore
+  (xt_files) and PORT=tonestore (xt_tone) for XtPatchStore.cpp, and files_muts.txt's store plants moved to patchstore.
+  Check: xt_files compares 4,727,296 values (565,248 more) and 590,912 against the firmware's reads (70,656 more), 0 different; its
+  new pointed line: the four blocks with no zone found by the firmware's own routines and read by its getters (0x8947d310,
+  0x8947d330), 623,104 values over the 512 and 1,217 of a made-up store (the presets' knob sets are all 0), 0 different.
+  Plants: 54 caught, 0 missed, 0 errors, the five new among them (pattern-stride, pattern-base, pattern-gone, knob-base,
+  knob-gone); 91 minutes, 83 s a plant, as each builds the whole of xt_files. fcheck --update changed only xt_files' lines.
+  verify.sh: every line as it should be (fcheck as baseline, A/B and PluginTest bit-identical, patch apply 452159
+  checks 0 failed, auval).
+
 The plugin's maker, Gato Gordo Labs v186 (2026-11-10): .claude/fix-plan.md, section 9, the names the user chose.
   COMPANY_NAME was "YourStudio" and the manufacturer code Ystu, placeholders; now "Gato Gordo Labs" and Gato. BUNDLE_ID
   is set as com.GatoGordoLabs.VSynthEmu: JUCE's default, com.<company>.<target>, would hold the name's spaces. Read from

@@ -1546,6 +1546,54 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The arpeggio pattern and the knob sets in a patch (2026-11-11, v187)
+
+IDs 0x439…0x48c were in no section of the store's layout (`XtPatchStore.cpp`'s `kSections`, "V-Synth's files"), so the patch
+reader gave 0 for every one of them. They are two blocks, each one the firmware points a read object at by a routine of its own,
+beside the zones' at `0x894796d0`…`0x89479920` ("How a zone's settings are read"). Each routine is one of a pair for a part's two
+stores: it takes (object, part, index), finds the part's object in the table at `0x897a0fc8` (after C startup, part 0's at
+`0x89c32528`, 0x14 apart), and if its byte +0 is 1 writes the store (+8 for the first of the pair, +4 for the second) plus the
+block's offset at the object's +4, else 0, which the getter `0x8947d310` answers with the descriptor's default. The offsets are
+built in the code (`mov #hi; shll8; add #lo`), so no scan of the pools finds them.
+
+| IDs | What | At | Routines (+8, +4) |
+|---|---|---|---|
+| 0x42b…0x438 | Beam Type, Pad Mode, Pad Hold, the arpeggio's settings | 0x1286 (19·256 − 122) | `0x894799a0`, `0x894799e0` |
+| 0x439…0x448 | Zone 1–16 Knob Set, a nibble each: 0…15, PRESET01…08, USER01…08 | 0x14f2 (21·256 − 14) | `0x89479a40`, `0x89479a80` |
+| 0x449…0x48c | the arpeggio pattern's line: byte 0 State (0x44a, the top bit: NOTE, CTRL) and Note/CC (0x44b, the low 7 bits, default 60); Step 1…32 Velocity (0x44d, 0x44f … 0x48b, a dummy between each) bytes 1…32, 0 REST, 1…127, 128 TIE; byte 33 unused | 0x128c (19·256 − 116) + 34 × line | `0x89479ad0`, `0x89479b20` |
+| 0x48d…0x4ef | the Multi Step Modulator | 0x14ac (21·256 − 84) | `0x89479b70`, `0x89479bb0` |
+
+**The pattern is 16 lines.** The two routines for 0x128c add 34 × their third argument (`0x89479b08`…`0x89479b14`: r1 × 16, + r1,
+× 2), where the other three blocks' add nothing; and 16 × 34 = 0x220 fills the store from 0x128c to the Multi Step Modulator at 0x14ac.
+The manual (Pattern Edit) says what the index is: a pattern is "up to 32 steps (horizontally) x 16 lines (vertically)", each line
+with a State, NOTE or CTRL, and a note or controller number. The presets agree, read by line: the drum kits on
+RHYTHM (Motif 5) use 5 to 16 lines, each a note with its own steps (D&B Vibe KIT's line 3 is note 72 on every other step); 116 of the
+117 patches with the arpeggio on have a line with a step set; 36 lines in all are CTRL. The descriptors give one line's places only,
+so a section of one block (as first proposed, `{0x449, 0x48c, 0x128c, 0}`) read line 0 sixteen times. Two of the 16 callers of
+`0x89479b20`, read only this far: `0x893f8e54`, its line `0x8937ce90`'s result, then the getter on 0x44a; and `0x8947cbd8`
+(`0x8947cbfa`), which takes a line and passes ID 0x44a + its second argument to `0x894792c0`. What plays the pattern is not read yet.
+
+**The knob sets** are a file's last 8 bytes: 0x14f2 + 8 = 0x14fa, the most `0x89490430` reads, so a file of 0x14f2 bytes or fewer
+leaves them at the default patch's. Every zone of the 512 presets has 0, PRESET01. The manual has the E1–E8 knob sets saved with
+the patch.
+
+**What shows it's right.** `xt_files` walks both new sections, the pattern by line: 4,727,296 values, 565,248 more than before, and
+590,912 against the firmware's reads (`0x894817b0`, `0x89484310`), 70,656 more, 0 different, 12 out of range as before. Those reads
+are given the port's own address, so a new line, `pointed`, takes it from the firmware: on a machine whose part 0 has both stores
+at the patch, each of the four blocks with no zone is found by both of its routines (which must agree), line by line, and every ID
+read through `0x8947d310` and `0x8947d330` (which must agree) against `xtPatchValue`: 623,104 values over the 512 patches, and 1,217
+of a made-up store whose bytes each differ from the next, as the presets' knob sets are all 0 and a misplaced block would read 0 too;
+0 different. Plants (`mutate_files.py`, `PORT=patchstore`): the pattern's stride at 0, its base at the arpeggio's 0x1286, its row
+gone, the knob sets' base a byte early and their row gone, each caught; the whole list 54 caught, 0 missed, 0 errors.
+
+**Split.** `XtFiles.cpp` (469 lines) became four by job, `xt_files`' output byte for byte the same in every mode: `XtPatchStore.cpp`
+(the store's layout, the descriptors' reads; their tables published once by an atomic pointer, where they were mutable statics
+under a lock), `XtFiles.cpp` (a patch file into the store, and `xt_files`' preset waves), `XtPatchStoreCheck.cpp` and
+`XtWaveFileCheck.cpp` (its patches and a wave's own chunks; XT_FILES_MAIN only).
+
+**Not yet:** the arpeggio itself (which motifs read the pattern, what a step sends, the clock); what the knob sets choose.
+`xtPatchMissing` still names the arpeggio.
+
 ### How long the firmware's routines run (2026-11-10, v175)
 
 Every call the plugin made into rom.2 was allowed 20e9 interpreter steps (`Sh4::call`'s default), 73 s at the interpreter's
@@ -2101,6 +2149,8 @@ A **descriptor** is 12 bytes an ID from `0x897a167c`: u16 byte offset, s8 width 
 | 0x3be…0x3e6 | 5 LFOs | 0xd06 | +20 |
 | 0x3e7…0x42a | COSM 1; COSM 2 is +0x220 | 0xe46 | +34 |
 | 0x42b…0x438 | Beam Type, Pad, arpeggio | 0x1286 | |
+| 0x439…0x448 | Zone 1–16 Knob Set (v187) | 0x14f2 | |
+| 0x449…0x48c | the arpeggio pattern, by line (v187) | 0x128c | +34 a line, 16 lines |
 | 0x48d…0x4ef | Multi Step Modulator | 0x14ac | |
 
 **What shows it's right.** After the upgrade, every value of all 16 zones in the 765 patches of Emu_test and 1stchoice is in range, over 3.5 million, bar 0x176. Before it, 11 to 34% of the zone blocks' weren't. `xt_files` on the image's 512: 12 of 4.16 million out of range, four Multi Step Modulator IDs in three patches, and 520,256 values equal to the firmware's reads. Patches' wave numbers are what the project holds: 98% in Emu_test and all in 1stchoice, bar 0, which no file has. A wave number is the file's number: 1stchoice's Gig Rhodes plays 2, `002 KEY-Rhodes`. EMU-TEST's OSC 1 is wave 3, its sine, with Formant at -63 and Energy at its default, 1, which settles the old question of that patch's Energy. 446 of 1stchoice's 502 patches and 257 of Emu_test's 263 use one zone. `XtSynth` plays one, so the others would lose their splits. (v154: it plays them all.)
