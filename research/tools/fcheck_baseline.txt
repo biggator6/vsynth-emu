@@ -672,6 +672,10 @@ pointed: 623104 values through the firmware's own pointing routines and getters,
 a wave's own: 0 wrong
 patches: 512 in the image (lengths 0x146c 0, 0x14ac 0, 0x14f2 0, other 512), 512 names read alike, 4727296 values, 12 out of range, 590912 against the firmware's reads, 0 different, hash 82034c2071b9a07a
 short: a patch using the Multi Step Modulator in 77 fields, cut before it 98 values the firmware's defaults, after it 98 its own, 0 not; 3 of those defaults aren't the descriptors'
+== xt_arp
+presets: 117 cases, 646719 operations, 10790 messages, 10717 states, 0 different
+random: 1000 cases, 4537707 operations, 224687 messages, 110830 states, 0 different
+messages alike by motif: UP 25626 DOWN 28839 UP&DOWN 26690 RANDOM 23502 NOTE-ORDER 34656 RHYTHM 35626 PHRASE 29704 AUTO 30834
 == xt_msm
 presets: 55 cases, 356944 events, 356999 states, 489446 terms: 0 different
 random: 300 cases, 811357 events, 811657 states, 1340938 terms: 0 different

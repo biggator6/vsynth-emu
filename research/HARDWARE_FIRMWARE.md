@@ -1660,6 +1660,141 @@ stopped then) and the terms' "running" guards (a stopped object's tracks are all
 XtSynth's clock in tempo ticks (it counts 24 clocks a quarter); the note list's two answers; the arpeggio's flag. Until then
 `xtPatchMissing` still names it, and every term is 0 as before.
 
+### The arpeggiator (2026-11-11, v188)
+
+The arpeggiator is a C++ object in the realtime layer above the tone generator, not part of a tone. It takes a part's keys and
+steps through the patch's pattern on the OS's tempo timer. It sends MIDI messages, which the firmware posts to the tone
+generator's own input. `XtArpeggio` ports it (`XtArpeggio.cpp` keys and settings, `XtArpeggioStep.cpp` timer and step,
+`XtArpeggioMotifs.cpp` motifs). `xt_arp` checks it against the firmware's object, message by message and field by field:
+0 different.
+
+**Where it is.**
+- Objects:
+  - `0x8987cef8`: the one that plays, constructor `0x89304960`, 0xd48 bytes, vtable `0x897f0488`.
+  - `0x8987dc40` and `0x8987e9f8`: Pattern Edit's players, 0xdb8 bytes, constructor `0x89304bb0`; `0x8987dc40` always runs as RHYTHM.
+  - `0x8987f7b4` points at whichever plays now; `0x8930d990` switches between them.
+- The class chain:
+  - `0x8930e9c0`: an OS timer. +8 its time, +0xc when it fired, +0x10/+0x14 links, +0x18 vtable.
+  - `0x893043e0`: the tempo group (`0x898586cc`). +0x1c position, +0x20 phase, +0x30…+0xa9 the shuffle.
+  - `0x89304200`: the settings, +0xac…+0xb4.
+  - `0x893036b0`: the engine.
+- Its task is `0x8987cd40` (run `0x8930d460`). Flag 2 takes the MIDI router's messages (`0x8930d8b0`). Flag 0x200 is a fired
+  timer, and runs a step (`0x89302570`) when +0xfc < 0x7fffffff. Flag 0x40 is a patch: `0x8930c190` reads the settings and
+  `0x8930ca30` the pattern.
+- The router, which decides what reaches the object with the Switch on, is a state machine (`0x89307c80`, `0x89307e10`,
+  `0x8930a690`, `0x8930a37e`). It isn't read here; v189 traces it.
+
+**The settings** (`0x8930c190`). It reads ID 0x42e…0x437 through the part's pointing routine (`0x894799a0`) and getter
+(`0x89479a30`), as stored less the centre.
+- A Switch that changed is stored at +0xd2c, and the object stops (`0x89303ab0`).
+- Then the nine go to +0xac: Hold, Motif, Shuffle Rate, Shuffle Resolution, Duration, Grid, End Point, Octave Range (−3…+3),
+  Keyboard Velocity.
+- Then the shuffle's table (`0x89304430`), the pedal check (`0x89303380`), and `0x893033d0`, which does nothing once it has
+  started.
+- The channel it sends on is +0xbc, from +0xd2d when the router enables it (`0x89304920`).
+
+**The pattern** (`0x8930ca30`). 16 line bytes at `0x89880f83`, State (bit 7, CTRL) over Note/CC (a controller at most 95),
+then 32 × 16 cells at `0x89880f93` by step then line. Each object's +0xb8 points at it, and a start takes it to +0xf8.
+- A cell is 0 REST, 1 TIE, and 2…128 a velocity of 1…127: the step plays a cell other than 0 and 1 (`0x89302700`), and scales
+  the velocity by the cell less 1 (`0x893028ae`). The initial pattern's 32 × 101 is velocity 100.
+- So v187's table, which reads 1…127 and 128 TIE from the value string "REST|1..127|TIE", has the ends the wrong way round
+  (withdrawn there).
+- The firmware's text routine (`0x89461a70`, `research/tools/arptext.cpp`) gives a cell as its plain number, 0…128, and End
+  Point as 0…31. So the Pattern Edit screen draws its own symbols.
+
+**Keys** (note-on `0x89303830`, note-off `0x893039c0`, the Hold pedal `0x89303a80`, stop `0x89303ab0`).
+- The keys held are a bitmap (+0xd0). The keys it plays are 128 nodes by key (+0x108 + key·12: key, velocity, prev, next),
+  linked in the order played (head +0x104, circular).
+- A note-on with none in the list starts it (`0x89302400`): its phase is the tempo timer's count now, the first step 15
+  ticks on.
+- With Hold (+0xac) or the pedal at 64 or more (+0xce), a key let go stays. The first key of a new chord, with no key down,
+  drops the old ones.
+- A key pressed again leaves and rejoins at the end.
+- Taking out the list's first node makes the one before it, the last played, the first (`0x893040c0`). NOTE-ORDER and PHRASE
+  see that.
+- Letting go of the last key stops it: every note off, the keys forgotten, no step to come (`0x893024e0`). Then every CTRL
+  line's controller goes back (`0x89303b40`): 7, 91, 93, 11 to 127, 10 to 64, the rest to 0, 0 and 32 left alone, and CC 64
+  or 66 up if a line sent them above 0. A stop (`0x89303ab0`, the Switch) does both too.
+- Hold or the pedal let go with no key down stops it (`0x89303380`), but leaves the controllers where the lines put them.
+
+**The step** (`0x89302570`). The OS's tempo timer (`0x8930eb00`) counts 480 ticks a quarter: the count the 24 clocks are
+every 20th of (v118). A timer fires at the first count at or past its time, with that time as when it fired, and is set again
+only sooner (`0x8930ea10`). Each step due by then runs; then the notes that end by then end, and the timer is set to the
+sooner of the next step and the next end.
+- A step plays every line whose cell isn't 0: a NOTE line through the motif if it isn't a tie, a CTRL line as its controller
+  at the cell less 1 (`0x89302ba0`).
+- The step moves on by the Grid: 480, 240, 160, 120, 80, 60 ticks for QUARTER, 8TH, 8TH-T, 16TH, 16TH-T, 32TH (`0x89301e90`).
+  The ROM's names and these counts agree: 160 and 80 are triplets. The manual's "dotted" is wrong.
+- After the End Point it starts at step 1 again, and the octave moves on if a line-based motif asked for it (+0xf6).
+- **Shuffle.** A step's time is its 480-tick pair's start plus the shuffle table's place for where in the pair it falls. The
+  table (`0x89304430`, rate 1…99) maps each 4-tick place linearly, so that the pair's first 8th, or each 240's first 16th,
+  ends at Rate % of the pair, or of the 240. At 50 every step is where it is. Rate 0 and 100 act as 1 and 99.
+- **A note** (`0x89302840`).
+  - It folds into 0…127 by octaves.
+  - Its velocity is the key's, or Keyboard Velocity's when that is 1…127, times the cell less 1, over 127, at least 1.
+  - A note still sounding is ended first.
+  - It sounds for the ties that follow it on its line (wrapping at the End Point) times the Grid, plus Grid × Duration × 99
+    / 10000, at least 1 tick, counted from the step's own time. So the first step's notes, 15 ticks late, are 15 ticks
+    shorter.
+  - Ends are kept in a list by time (+0x724), later of two at the same tick after the other.
+- **What it sends.** Note-on `[0x90|ch, note, velocity]`, note-off `[0x80|ch, note, 64]`, controller `[0xB0|ch, cc, value]`,
+  posted with a fourth byte of 3 to `0x89c1d518` (`0x89472e70`). The tone generator's receive (`0x894d42e0`) takes byte 3 as
+  the key state's first index: K = `0x89cf05d8` + (3 − 1)·0x1340 + part·0x134, apart from the keys played. What CLAUDE.md calls
+  K's channel is that source.
+- Two calls are for the Multi Step Modulator (`0x89cf7634`), not ported: `0x894da9f0` each 4th and 16th step, `0x894d9920`
+  each note's end.
+
+**The motifs** (`0x89534a9c`, by Motif; past 7, AUTO).
+- UP and DOWN walk the 128 nodes by key from the last key played (+0x718), skipping keys whose note is sounding.
+  - Past the last key held the octave moves on, by 1 up or down.
+  - The octave starts again at the bottom of 0…Octave Range for UP (`0x893034e0`), at the top for DOWN (`0x89303530`).
+- UP&DOWN walks by its direction (+0xc1) under DOWN's octave rule. At the last key it moves the octave on, or at the range's
+  end turns.
+- RANDOM: the n-th key held, counting from key 1 round to key 0. n is ((seed >> 8) & 0xff) mod the keys held. The octave is
+  drawn the same way, its own seed (+0xc6), across the range. Both seeds step as seed · 0x497d + 1 from 0x7ab7.
+- NOTE-ORDER: the key played after the last, skipping sounding ones. After the last key played the octave moves on.
+- RHYTHM: each line's own note, at the last key's velocity.
+- PHRASE: each line's note moved so that line 1's falls on the last key played.
+- AUTO: line i plays the (i mod count)-th key held.
+- RHYTHM, PHRASE and AUTO move the octave on at the pattern's end.
+- A walk gives nothing while as many notes sound as keys are held, so a held chord is never played over itself. AUTO gives
+  its lines below the count even then.
+
+**The check** (`xt_arp`, `XtArpeggioCheck.cpp`, `XtArpeggioCases.cpp`).
+- The firmware's own object `0x8987cef8` runs in the interpreter: its constructor, its routines as 0x8930c190 and the router
+  call them, the OS's timer routine, and the step on its task's flag.
+- Hooked: the message post (recorded), the task's flag, and the MSM's two calls, the OS's ms clock and `new`, which answer
+  nothing.
+- The port gets the same channel, settings, pattern, keys, pedal and ticks.
+- After every key, setting and tick that fired, their messages are compared one by one, with every field of the object: the
+  keys' and notes' nodes and links, the seeds, the shuffle table, the timer.
+- Cases:
+  - The 117 disk-image patches with the Switch on, each with its own settings, pattern and Patch Tempo, a chord from the
+    start and keys over 4 s.
+  - 1000 random cases over every setting:
+    - dense, sparse, empty and legato lines (mostly ties, so more notes sound than keys are held);
+    - CTRL lines on the controllers that reset;
+    - Hold, the pedal (often at 63 or 64), chords, keys at the keyboard's ends, keys pressed again, note-ons at 0;
+    - live edits of settings, cells and lines' State and Note/CC (a CTRL line moved off a pedal, so the reset's last two
+      sends are reached), and the Switch off and on;
+    - tempos 20…250, and ticks in bursts and jumps.
+- **The result.** fcheck's run: 117 patches, 646,719 operations, 10,790 messages, 10,717 states; 1000 random cases,
+  4,537,707 operations, 224,687 messages, 110,830 states; 0 different. Seeds 7, 31337 and 90210 at 3000 cases: 675,634 to
+  695,048 messages each, 0 different.
+- **Planted errors** (`arp_muts.txt`, `mutate_arp.py`; PORT=arp, arpstep, arpmotif): 78 planted, 78 caught, 0 missed. One,
+  `retrigger`, is caught by hanging the port. Five first missed: two were equivalent and were replaced, and three showed
+  draws the cases now make (notes.txt, v188).
+
+**Not covered.**
+- The router: what the realtime layer sends the object with the Switch on and off, its channel (+0xd2d), the pedal's way in,
+  and whether played keys still reach the tone generator. v189 reads it, as the wiring needs it.
+- The tempo timer's own ticks per ms (`0x894710e0`), and under Clock Source EXTERNAL. The check feeds both sides the same
+  ticks.
+- The task's timing: here the step runs before the next tick, as soon as the timer fires.
+- Pattern Edit's players, Real Rec and Step Rec, the tempo group with more than one object, and pitch bend through the
+  object (`0x89303a90`, `0x89302c70`, which nothing found calls).
+- A real XT.
+
 ### The arpeggio pattern and the knob sets in a patch (2026-11-11, v187)
 
 IDs 0x439…0x48c were in no section of the store's layout (`XtPatchStore.cpp`'s `kSections`, "V-Synth's files"), so the patch
@@ -1674,7 +1809,7 @@ built in the code (`mov #hi; shll8; add #lo`), so no scan of the pools finds the
 |---|---|---|---|
 | 0x42b…0x438 | Beam Type, Pad Mode, Pad Hold, the arpeggio's settings | 0x1286 (19·256 − 122) | `0x894799a0`, `0x894799e0` |
 | 0x439…0x448 | Zone 1–16 Knob Set, a nibble each: 0…15, PRESET01…08, USER01…08 | 0x14f2 (21·256 − 14) | `0x89479a40`, `0x89479a80` |
-| 0x449…0x48c | the arpeggio pattern's line: byte 0 State (0x44a, the top bit: NOTE, CTRL) and Note/CC (0x44b, the low 7 bits, default 60); Step 1…32 Velocity (0x44d, 0x44f … 0x48b, a dummy between each) bytes 1…32, 0 REST, 1…127, 128 TIE; byte 33 unused | 0x128c (19·256 − 116) + 34 × line | `0x89479ad0`, `0x89479b20` |
+| 0x449…0x48c | the arpeggio pattern's line: byte 0 State (0x44a, the top bit: NOTE, CTRL) and Note/CC (0x44b, the low 7 bits, default 60); Step 1…32 Velocity (0x44d, 0x44f … 0x48b, a dummy between each) bytes 1…32, ~~0 REST, 1…127, 128 TIE~~ (withdrawn in v188: the step code plays 0 as REST, 1 as TIE and 2…128 as velocity 1…127, "The arpeggiator"); byte 33 unused | 0x128c (19·256 − 116) + 34 × line | `0x89479ad0`, `0x89479b20` |
 | 0x48d…0x4ef | the Multi Step Modulator | 0x14ac (21·256 − 84) | `0x89479b70`, `0x89479bb0` |
 
 **The pattern is 16 lines.** The two routines for 0x128c add 34 × their third argument (`0x89479b08`…`0x89479b14`: r1 × 16, + r1,

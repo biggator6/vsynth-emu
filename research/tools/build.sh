@@ -13,7 +13,7 @@ SFM=(SourceFilterModel.cpp $( [ -f DownsampledFormants.cpp ] && echo Downsampled
 # layout and xt_files' checks of patches and of a wave's own chunks (their own files from v187 on)
 VF=(XtFiles.cpp XtWaveFile.cpp $( [ -f XtDiskImage.cpp ] && echo XtDiskImage.cpp )
     $( [ -f XtPatchStore.cpp ] && echo XtPatchStore.cpp XtPatchStoreCheck.cpp XtWaveFileCheck.cpp ))
-rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone,xt_fx,xt_files,xt_msm,engine_tests,rd}
+rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone,xt_fx,xt_files,xt_arp,xt_msm,engine_tests,rd}
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp Sh4Interp.cpp -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp Sh4Interp.cpp -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp Sh4Interp.cpp -o "$O/xt_lfo" &
@@ -32,6 +32,10 @@ cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp Sh4Interp.cpp -o "$O/xt_files" &
 [ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp XtFxControl.cpp Sh4Interp.cpp -o "$O/xt_fx" &
+# The arpeggiator against the firmware's own object (v188), on the disk image's patches
+ARP=(XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp XtArpeggioCheck.cpp XtArpeggioCases.cpp)
+[ -f XtArpeggio.cpp ] && cc -DXT_ARP_MAIN "${ARP[@]}" "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
+   XtSoloVoice.cpp XtSoloEncoder.cpp Sh4Interp.cpp -o "$O/xt_arp" &
 # the Multi Step Modulator (v192 on), with the patches' reads for the presets
 [ -f XtMsm.cpp ] && cc -DXT_MSM_MAIN XtMsm.cpp XtMsmTrack.cpp XtMsmPatch.cpp XtMsmCheck.cpp XtMsmCases.cpp "${VF[@]}" \
    "${FW[@]}" XtMultiBandPlayer.cpp XtSoloVoice.cpp XtSoloEncoder.cpp Sh4Interp.cpp -o "$O/xt_msm" &
@@ -39,8 +43,9 @@ cc -DENGINE_TESTS_MAIN EngineTests.cpp VariphraseEngine.cpp PhaseVocoder.cpp "${
    XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlayer.cpp Sh4Interp.cpp "${FW[@]}" -o "$O/engine_tests" &
 cc -I. "$REPO/research/tools/rd.cpp" Sh4Interp.cpp -o "$O/rd" &
 wait
-for b in xt_osc xt_lfo xt_env xt_fw xt_enc xt_synth engine_tests rd $( [ -f XtCosm.cpp ] && echo xt_cosm ) \
-         $( [ -f XtAnalog.cpp ] && echo xt_analog ) $( [ -f XtFxChip.cpp ] && echo xt_fx ) \
-         $( [ -f XtFiles.cpp ] && echo xt_files ) $( [ -f XtToneCheck.cpp ] && echo xt_tone ) \
+for b in xt_osc xt_lfo xt_env xt_fw xt_enc xt_synth engine_tests rd \
+         $( [ -f XtCosm.cpp ] && echo xt_cosm ) $( [ -f XtAnalog.cpp ] && echo xt_analog ) \
+         $( [ -f XtFxChip.cpp ] && echo xt_fx ) $( [ -f XtFiles.cpp ] && echo xt_files ) \
+         $( [ -f XtToneCheck.cpp ] && echo xt_tone ) $( [ -f XtArpeggio.cpp ] && echo xt_arp ) \
          $( [ -f XtMsm.cpp ] && echo xt_msm ); do
   [ -x "$O/$b" ] || { echo "build: $b missing"; exit 1; }; done
