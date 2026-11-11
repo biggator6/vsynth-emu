@@ -73,7 +73,7 @@ bash "$D/buildid_test.sh" || rc=1
 [ $BUILT = 1 ] && { bash "$D/buildid.sh" || rc=1; }
 # The AU as a host sees it: the run fails unless auval succeeds and says so
 if [ $BUILT = 1 ]; then
-    o=$(auval -v aumu VsEm Ystu 2>&1) || rc=1
+    o=$(auval -v aumu VsEm Gato 2>&1) || rc=1
     echo "auval: $(echo "$o" | grep -o "AU VALIDATION SUCCEEDED\|FAIL.*" | head -1)"
     echo "$o" | grep -q "AU VALIDATION SUCCEEDED" || rc=1
 fi

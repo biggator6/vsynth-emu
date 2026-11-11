@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The plugin's maker, Gato Gordo Labs v186 (2026-11-10): .claude/fix-plan.md, section 9, the names the user chose.
+  COMPANY_NAME was "YourStudio" and the manufacturer code Ystu, placeholders; now "Gato Gordo Labs" and Gato. BUNDLE_ID
+  is set as com.GatoGordoLabs.VSynthEmu: JUCE's default, com.<company>.<target>, would hold the name's spaces. Read from
+  the installed bundles: the AU "Gato Gordo Labs: V-Synth Emu", aumu VsEm Gato; both bundles com.GatoGordoLabs.VSynthEmu;
+  the VST3's binary names Gato Gordo Labs and no YourStudio. The AU's identity and the VST3's class id (JUCE builds it
+  from both codes) are new, so a host sees a new plugin and a session saved with the old one doesn't find it (auval on
+  aumu VsEm Ystu: "didn't find the component"); the settings, ~/Library/Application Support/V-Synth Emu by the product,
+  stay. The plugin code VsEm is kept: JUCE's docs ask for exactly one capital there and GarageBand 10.3 for the Vsem form,
+  and auval passes it as it is. verify.sh's auval line, ARCHITECTURE.md's and the build notes' read aumu VsEm Gato.
+  Check: verify.sh green, every line (auval on aumu VsEm Gato: AU VALIDATION SUCCEEDED); verify_test.sh green.
+
 A close waits for its encodes, and Auto's classifier hears it v185 (2026-11-10): .claude/fix-plan.md, section 9, R1's 10 s.
   The destructor waited 10 s for the pool, and only the firmware heard its stop (v168). Auto's content classifier runs
   before any firmware, an autocorrelation per 512 samples, over 0.04 s a second of audio. Measured by VSynthEmuTeardownTest
@@ -1283,7 +1294,7 @@ PLUGIN (v43, 2026-10-28): plays through the XT's own encoders and players
     SDKROOT=$SDK cmake --build build/plugin --target VSynthEmuTest
     [TEST_ADSR=a,d,s,r] build/plugin/VSynthEmuTest firmware/unpacked/V-SynthXT.rom.2.bin <file.wav> [note] [auto|solo|backing|ensemble]
       (processor end to end vs XtSynth at 48 kHz; exit 0 = bit-identical)
-    auval -v aumu VsEm Ystu
+    auval -v aumu VsEm Gato
   VST3_AUTO_MANIFEST is off: JUCE's manifest helper cannot load the build-tree
   bundle on macOS 27 ("library load disallowed by system policy"); the
   installed copy loads. XtSynth CLI: -DXT_SYNTH_MAIN XtSynth.cpp + the Xt*/Sh4

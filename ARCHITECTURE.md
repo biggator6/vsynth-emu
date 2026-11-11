@@ -404,7 +404,7 @@ and effects from it and loads its waves from the project's `Wave` folder.
 - The pad's X-Y pair (v134): Pad Assign X and Y default to CC80 and CC81, the Matrix's PAD sources reading them, as the firmware (`xt_tone`). Both pairs are always live: Pad Mode is only what the XT's own pad sends.
 - The host's tempo (v125): Clock Source HOST is the firmware's EXTERNAL on the host's transport, a clock on each 24th of a quarter it passes, the tempo read from the ms over six of them, as the firmware (`xt_tone`). Default INTERNAL, the Patch Tempo.
 - The effects (v136–v138): the chip (v126) and the firmware's own driver (v131) in the sound behind the Effects switch, off by default, with MFX, Chorus, Reverb, the system's EQ, Master Level and Output Gain on the editor's panel (`FxPanel`, each value's text by the firmware's own routine, v138), and the tone's Chorus and Reverb Send, Output Assign and Output Mode (v133). Exact against JE-8086's interpreter and the firmware's driver in `Sh4Interp`; no reference yet beyond those.
-- `auval -v aumu VsEm Ystu` passes.
+- `auval -v aumu VsEm Gato` passes (the codes Ystu until v186).
 - Each line above is as its version wrote it, with what holds now after it where that changed (v183).
   The checks of v139 on are in each version's note in `notes.txt`; fcheck and `verify.sh` run them all.
 

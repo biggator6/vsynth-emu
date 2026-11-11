@@ -23,8 +23,12 @@ add_subdirectory(${JUCE_PATH} JUCE)
 
 # ─── Plugin Target ───────────────────────────────────────────────────────────
 juce_add_plugin(VSynthEmu
-    COMPANY_NAME            "YourStudio"
-    PLUGIN_MANUFACTURER_CODE Ystu
+    COMPANY_NAME            "Gato Gordo Labs"
+    # JUCE's default id is com.<company>.<target>, which would hold the name's spaces
+    BUNDLE_ID               com.GatoGordoLabs.VSynthEmu
+    # The AU's identity (aumu VsEm Gato) and the VST3's class id, which JUCE builds from these two codes: a new code is a
+    # new plugin to every host, so sessions saved with the old one don't find it (Ystu until v186, the user's choice).
+    PLUGIN_MANUFACTURER_CODE Gato
     PLUGIN_CODE             VsEm
     FORMATS                 VST3 AU Standalone
     PRODUCT_NAME            "V-Synth Emu"

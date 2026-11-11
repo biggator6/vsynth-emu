@@ -3570,6 +3570,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 18 (2026-11-10) — v186: the plugin's maker, Gato Gordo Labs
+
+- The name and the code are two things. The name is what a host shows; the code, with VsEm, is what a host finds the plugin by, in both formats, since JUCE builds the VST3's class id from the same two codes. So the name could change alone and lose nothing, and the code only as the user's choice. The user chose both: Gato Gordo Labs, and Gato.
+- JUCE's default bundle id is com.<company>.<target>, which with this name holds spaces: JUCE warns of it and macOS doesn't take one. So the id is set, com.GatoGordoLabs.VSynthEmu, in the form it had.
+- Measured on what was installed, not on the CMake file: the AU's name and codes from its Info.plist, the VST3's vendor in its binary, auval on the new codes, and the old codes no longer found.
+
 ### Session 18 (2026-11-10) — v185: a close waits for its encodes, and Auto's classifier hears it
 
 - The box said to drop the deadline. Dropping it alone would have traded a crash for a wait: Auto's classifier, the one long part no stop reached, would have held a host's close for as long as it ran, over 16 s on a 6 minute wave. So the classifier hears the stop too, and the deadline goes.
