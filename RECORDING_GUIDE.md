@@ -397,6 +397,10 @@ grabbing only if time permits after the Round-2 priorities:
 
 ## Rendering Plugin Outputs
 
+(v191 removed the legacy engine this renderer is built from. `analysis/variphrase_render` still runs
+as last built; to rebuild it, run the command below in a checkout of v190, 164ac15. The firmware's
+own path renders with the XtSynth CLI, `research/tools/ab.sh`.)
+
 After recording, rebuild the renderer (from the project root):
 
 ```bash

@@ -1,7 +1,4 @@
 # mutate_panel.py's planted errors from v176 on (the earlier ones are its MUTS): name|old|new|file|kind, kind as its ENV.
-# The legacy engine's formant smoothing, by VSynthEmuFormantTest: kept through a reset, and shared by a thread (v176).
-formants-no-reset|void reset() { smoothed_ = {}; }|void reset() {}|plugin/Source/DownsampledFormants.h|formants
-formants-shared|    Lags smoothed_ {};|    static inline thread_local Lags smoothed_ {};|plugin/Source/DownsampledFormants.h|formants
 # The firmware's disk image reader on damaged images, by VSynthEmuDiskImageTest: each refusal and each end of a chain (v177).
 disk-no-sectors|if (cluster == 0 \|\| data > d.size()) {|if (data > d.size()) {|plugin/Source/XtDiskImage.cpp|disk
 disk-root-past|if (cluster == 0 \|\| data > d.size()) {|if (cluster == 0) {|plugin/Source/XtDiskImage.cpp|disk
@@ -10,7 +7,7 @@ disk-fat-bound|std::min(fatBytes, d.size() - fat) / 2|(d.size() - fat) / 2|plugi
 disk-image-bound|(d.size() - data) / cluster + 2|size_t { 0xfff8 }|plugin/Source/XtDiskImage.cpp|disk
 # A processor closed in Auto's classifier, by VSynthEmuTeardownTest: the classifier given no stop, deaf to it, and the encode started anyway (v185).
 teardown-classifier-unstopped|rate, &stop);|rate);|plugin/Source/PluginEncodes.cpp|teardown
-teardown-classifier-deaf| && !(stop && *stop); start += kStep|; start += kStep|plugin/Source/VariphraseEngine.cpp|teardown
+teardown-classifier-deaf| && !(stop && *stop); start += kStep|; start += kStep|plugin/Source/ContentClassifier.cpp|teardown
 teardown-encode-after-stop|        if (stop) return;   // closing|        // closing|plugin/Source/PluginEncodes.cpp|teardown
 # XtSynth's arpeggiator, by VSynthEmuArpTest: the router, the ticks each ms, what it sends, and the Hold pedal (v189).
 arp-router-bypass|    if (known) arp.noteOn(note, vel);\n    arp.noteOn(note, vel);|    tgNoteOn(note, velocity);|plugin/Source/XtSynthArp.cpp|arp

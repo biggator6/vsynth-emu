@@ -3570,6 +3570,15 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 20, continued (2026-11-12) — v191: the Algorithm menu and the legacy engine removed
+
+- The engine's file held one thing the plugin still uses: Auto's classifier, which picks an encode type for a wave on Auto. It moved to a file of its own as it stood. The house's checks then caught two old habits in it: a float cast to int before its clamp, and pi typed by hand. Fixing both changed nothing measurable: old and new classify the 34 test waves identically, down to the float bits.
+- The engine's tests had one check on the classifier. It became a test of its own, with a second case so it can fail both ways: the same pitch with and without energy in the 1–4 kHz band, read SOLO and LITE. Each side of the decision, planted, fails it.
+- Taking the engine out showed the plugin had been reporting the phase vocoder's 2048 samples of latency to hosts, though nothing played through it. It now reports none.
+- The Perform knobs had followed the engine without an image. With the engine gone they set the selected OSC's knobs either way; Time Stretch and Formant Shift stay as host parameters, unread, so old sessions load.
+- once-only refused the edit that took the menu out of PluginEditor.cpp: the stale, untracked tabdesign/ copy of the editor matched the code around it, and once-only judged every line an edit touched. The user chose the kit fix (KWB-158): once-only now refuses only a copy a write adds, and reads no untracked file older than HEAD. Installing it, code-shape refused twice. Once rightly: my new selftest cases had grown an already-too-long function. Once wrongly: it read a function head's three defaults as three statements. Both were fixed before the install.
+- The plants: 11 that v191's changes reach, all caught. One editor plant had to follow the chrome list's new wrap.
+
 ### Session 20, continued (2026-11-12) — v190: the arpeggio's plugin side
 
 - The split came first and took most of the session. The kit refused every way of moving PluginProcessor.cpp's parts as they stood: code-shape for the old long lines and functions, template-law for the parameter rows as copies of each other. I measured that with a dry run of each hook on a scratch copy before writing anything, asked, and the user chose a kit fix (KWB-156) over rewriting the code as tables or moving it by script.

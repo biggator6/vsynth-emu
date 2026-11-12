@@ -642,8 +642,8 @@ int main(int argc, char** argv) {
         std::printf("snapshot: %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
     }
     // TEST_UI_LAYOUT=1: the editor's layout, then stop.  At its smallest, default and largest sizes, on every tab, for both OSC types and every COSM type: no control outside its parent, over another or
-    // without a size, and no text cut short.  Every control is moved, to see which parameter it sets: none may move nothing, and no parameter may be left without a control, bar the engine's three, shown
-    // only without a ROM.  (buildLayout drops what it doesn't place, so a control left out of it goes quietly.)  And each tab by a click, and the joined buttons both ways.  =list: the parameters with no control, and those with.
+    // without a size, and no text cut short.  Every control is moved, to see which parameter it sets: none may move nothing, and no parameter may be left without a control, bar the engine's three, kept
+    // unread for old sessions (v191).  (buildLayout drops what it doesn't place, so a control left out of it goes quietly.)  And each tab by a click, and the joined buttons both ways.  =list: the parameters with no control, and those with.
     if (const char* ui = std::getenv("TEST_UI_LAYOUT")) {
         std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
         auto* editor = dynamic_cast<VSynthEmuEditor*>(ed.get());
@@ -782,7 +782,7 @@ int main(int argc, char** argv) {
         editor->showTab(6);
         for (int m = 0; m < 8; ++m) { boxOf("Control 1")->setSelectedItemIndex(m, juce::sendNotificationSync); moveAll("Matrix Control " + juce::String(m + 1)); }
         for (int a = 0; a < VSynthEmuProcessor::kAssigns; ++a) { boxOf(VSynthEmuProcessor::assignName(0))->setSelectedItemIndex(a, juce::sendNotificationSync); moveAll(juce::String(VSynthEmuProcessor::assignName(a)) + " assign"); }
-        // No editor has shown these (v143's didn't either): the engine's three, shown only without a ROM; Scale Tune; the COSMs' second envelope, the first's velocity and key follow, their LFOs' fade and offset
+        // No editor has shown these (v143's didn't either): the engine's three (v191: unread, kept for old sessions); Scale Tune; the COSMs' second envelope, the first's velocity and key follow, their LFOs' fade and offset
         const auto hostOnly = [](const juce::String& id) {
             if (id == "pitchShift" || id == "timeStretch" || id == "formantShift" || id.startsWith("scaleTune")) return true;
             for (const char* env : { "itchEnv", "imeEnv", "ormantEnv" })

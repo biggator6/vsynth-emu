@@ -51,10 +51,10 @@ if [ $BUILT = 1 ]; then
     # A processor closed while its wave is encoding (closed in ms, the next one encodes as before); a project that
     # reopens without its parts (each said); a wave whose header claims more than its data holds (refused at once);
     # another image given while one is in use (refused, the tables as they were); the harnesses' switches set (unread);
-    # firmware routines that loop (each way gives up within its step limit); two legacy engines on one thread (each as alone);
+    # firmware routines that loop (each way gives up within its step limit);
     # damaged disk images (refused, or each cluster once); the arpeggiator in XtSynth, heard (a note a quarter, two tempos);
     # and its plugin side: its parameters against the firmware, a patch's, a session's, a chord through processBlock (v190)
-    for t in Teardown Restore WaveFile Rom Switch Step Formant DiskImage Arp ArpPlugin; do
+    for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin; do
         checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
     done
     # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth
@@ -62,9 +62,9 @@ if [ $BUILT = 1 ]; then
 fi
 # A .vpw through the processor, against XtSynth on the same audio: a preset wave, mono and stereo, on its own encode type
 [ $BUILT = 1 ] && { n=0; for w in 0 300; do "$WORK/fcheck/bin/xt_files" "$ROM" extract $w "$WORK/verify_$w.vpw" > /dev/null; o=$(cd "$REPO" && build/plugin/VSynthEmuTest "$ROM" "$WORK/verify_$w.vpw" 60 auto 2>&1); echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "the wave's own" && n=$((n+1)); done; echo ".vpw, plugintest: $n/2 bit-identical"; [ $n = 2 ] || rc=1; }
-# The engine's invariants: the run fails as the program does, not only its text
-o=$("$WORK/fcheck/bin/engine_tests" 2>&1) || rc=1
-echo "engine tests: $(echo "$o" | tail -1)"
+# Auto's classifier on a voiced and a pure tone: the run fails as the program does, not only its text
+o=$("$WORK/fcheck/bin/classifier_test" 2>&1) || rc=1
+echo "classifier: $(echo "$o" | tail -1)"
 # The tools' paths: env.sh sourced from bash and zsh, wherever from, on a copy in a tree of its own
 bash "$D/env_test.sh" || rc=1
 # A fresh clone can fill its gitlinks (JUCE): each has its URL in .gitmodules

@@ -37,11 +37,11 @@ MUTS=[
  ('patch-start2-read',O2,'        o.startOffset = knob2(Params::kStartOffset);','        o.startOffset = 0;','patch'),
  ('patch-start-write',CW,'    set(Params::kStartOffset, (float)startOffsetParam(c.startOffset));','    ;','patch'),
  ('patch-start2-write',CW,'        set(oscId(1, Params::kStartOffset), (float)startOffsetParam(c.osc2.startOffset));','        ;','patch'),
- ('editor-no-build',EP,'chrome { &buildLabel_, &algoLabel_,','chrome { &algoLabel_,','layout'),
+ ('editor-no-build',EP,'chrome { &buildLabel_, &statusLabel_,','chrome { &statusLabel_,','layout'),
  ('editor-build-unplaced',EP,'buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);',';','layout'),
  ('editor-build-narrow',EP,'buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);','buildLabel_.setBounds(16, Ui::headerH - 17, 40, 13);','layout'),
  ('editor-build-text',EP,'buildLabel_.setText(juce::String(xtBuildId()) + "  " + xtBuildTime(), juce::dontSendNotification);','buildLabel_.setText("v150", juce::dontSendNotification);','layout'),
- ('editor-no-patch-button',EP,'&romButton_, &loadButton_, &patchButton_, &fileNameLabel_,','&romButton_, &loadButton_, &fileNameLabel_,','layout'),
+ ('editor-no-patch-button',EP,'&romButton_, &loadButton_, &patchButton_,','&romButton_, &loadButton_,','layout'),
  ('editor-patch-unplaced',EP,'patchButton_.setBounds(src.removeFromLeft(100));',';','layout'),
  ('editor-no-panel',EP,'&fxOnBtn_, fxPanel_.get() };','&fxOnBtn_ };','panel'),
  ('editor-no-switch',EP,'&fxOnBtn_, fxPanel_.get() };','fxPanel_.get() };','layout'),
@@ -226,7 +226,6 @@ ENV={
  'rom-image':{'_bin':'VSynthEmuRomTest'},   # a test of its own, given only the ROM
  'switches':{'_bin':'VSynthEmuSwitchTest'},   # the switches set, in runs of the plugin of their own
  'steps':{'_bin':'VSynthEmuStepTest'},   # firmware routines that loop, on the ways the plugin runs them
- 'formants':{'_bin':'VSynthEmuFormantTest'},   # two legacy engines on one thread, and one reset (v176)
  'disk':{'_bin':'VSynthEmuDiskImageTest'},   # the firmware's disk image reader on damaged images (v177)
  'teardown':{'_bin':'VSynthEmuTeardownTest'},   # processors closed mid-encode, in the firmware and in Auto's classifier (v185)
  'arp':{'_bin':'VSynthEmuArpTest'},   # XtSynth's arpeggiator heard: its router, ticks and what it sends (v189)
@@ -251,7 +250,7 @@ ENV={
 SDK=os.environ.get('SDK','/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk')
 def build():
     targets=['VSynthEmuTest','VSynthEmuRomTest','VSynthEmuSwitchTest','VSynthEmuStepTest',
-             'VSynthEmuFormantTest','VSynthEmuDiskImageTest','VSynthEmuTeardownTest',
+             'VSynthEmuDiskImageTest','VSynthEmuTeardownTest',
              'VSynthEmuArpTest','VSynthEmuArpPluginTest']   # every binary a kind runs
     r=subprocess.run(['cmake','--build','build/plugin','--target',*targets,'-j','10'],
                      capture_output=True,text=True,env=dict(os.environ,SDKROOT=SDK))

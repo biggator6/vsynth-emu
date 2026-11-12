@@ -1,7 +1,7 @@
 #pragma once
 // The V-Synth XT's SOLO grain player as a block-rendering voice, for the
-// offline engine (VariphraseEngine::soloFirmwareResynthOffline) and the
-// plugin's voices alike.  Behaviour as described in VariphraseEngine.cpp
+// plugin's voices (and, until v191, the legacy engine's offline renders).
+// Behaviour: research/HARDWARE_FIRMWARE.md, pass 8 and "SOLO bit for bit"
 // (firmware 0x8950cd90 chain).  Bit for bit against the firmware run in the
 // SH-4 interpreter: xt_fw solocmp, and in a whole tone, xt_tone.
 #include <cstdint>

@@ -6,6 +6,7 @@
 // destructor still waits.  What it then does is what a failed encode does.  The work is given the stop too, for the
 // part that isn't firmware: Auto's classifier ran 360 s of audio on for over 15 s after a close, past the destructor's
 // 10 s, until the pool killed the thread (v185).  The destructor now waits with no deadline.
+#include "ContentClassifier.h"
 #include "PluginProcessor.h"
 #include "Sh4Interp.h"
 #include "XtPatch.h"
@@ -74,7 +75,7 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
     setStatus(who + "Encoding...");
     addEncode([=, this, chans = std::move(chans), ownWave = std::move(ownWave)](const std::atomic<bool>& stop) {
         int type = choice >= 1 && choice <= 4 ? kTypeOfChoice[choice - 1] : own;   // Auto: what the wave says it is, or
-        if (0 > type) {   // Auto: the engine's content classifier
+        if (0 > type) {   // Auto: the plugin's content classifier (ContentClassifier.cpp)
             std::vector<float> mono(chans[0].size());
             for (size_t i = 0; i < mono.size(); ++i) {
                 float s = 0;
@@ -82,7 +83,7 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
                 mono[i] = s / (float)chans.size();
             }
             using CT = VSE::VariphraseAnalysis::ContentType;
-            const auto a = VSE::VariphraseEngine::analyzeContent(mono.data(), (int)mono.size(), rate, &stop);
+            const auto a = VSE::analyzeContent(mono.data(), (int)mono.size(), rate, &stop);
             // the classifier's LITE as SOLO: Auto doesn't choose LITE
             type = a.contentType == CT::BACKING ? 3 : a.contentType == CT::ENSEMBLE ? 5 : 1;
         }

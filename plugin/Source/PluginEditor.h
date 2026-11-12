@@ -6,7 +6,6 @@
 #include "PluginEditorArp.h"
 
 class VSynthEmuEditor : public juce::AudioProcessorEditor,
-                        private juce::ComboBox::Listener,
                         private juce::Timer,
                         private CosmTypeControls   // the COSM tab's type rows (v190)
 {
@@ -197,10 +196,6 @@ private:
                 fReleaseLabel_ { {}, "FR" }, fDepthLabel_ { {}, "FDep" };
     std::unique_ptr<juce::FileChooser> romChooser_;
 
-    // ── Algorithm selector ───────────────────────────────────────────────────
-    juce::ComboBox algoBox_;
-    juce::Label    algoLabel_ { {}, "Algorithm" };
-
     // ── APVTS attachments ────────────────────────────────────────────────────
     using SliderAtt = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAtt = juce::AudioProcessorValueTreeState::ButtonAttachment;
@@ -250,13 +245,11 @@ private:
     std::unique_ptr<ButtonAtt> lfoSyncAtt_;
     std::unique_ptr<ComboAtt>  encodeAtt_;
 
-    // TIME and FORMANT: the XT's Time and Formant (−63..+63) with a ROM, the
-    // engine's stretch and semitones without
-    bool mainKnobsXt_ = false;
-    void attachMainKnobs(bool xt);
+    // PITCH, TIME and FORMANT and Robot Voice: the selected OSC's (Time and Formant −63..+63)
+    void attachMainKnobs();
 
     // ── The tabbed layout ────────────────────────────────────────────────────
-    // A header (title, Effects, Algorithm, ROM), a source bar (Load, file, OSC 1/2,
+    // A header (title, Effects, ROM), a source bar (Load, file, OSC 1/2,
     // On, Type), the Pitch/Time/Formant column on the left, and eight tabs: seven
     // pages, then FxPanel. Every control above is reused as it is: the constructor
     // builds them on the editor, then buildLayout() moves each into its tab's page.
@@ -280,7 +273,6 @@ private:
     void repaintPages();
     juce::Label* newLabel(const juce::String& text);
 
-    void comboBoxChanged(juce::ComboBox* box) override;
     void styleSlider(juce::Slider& s, juce::Label& l);
     void openFileChooser();
     void openPatchChooser();

@@ -3,6 +3,7 @@
 // as they stood from PluginProcessor.cpp (v190).
 #include <juce_core/juce_core.h>
 #include <algorithm>
+#include <array>
 
 // ─── Parameter IDs ───────────────────────────────────────────────────────────
 // Start Offset's parameter holds 0 … 2^24 − 1 samples, exact in a float.  The converter compares it unsigned (0x894e4448), so a word with its top bit set
@@ -11,10 +12,12 @@ constexpr int kStartOffsetMax = (1 << 24) - 1;
 inline int startOffsetParam(int v) { return v < 0 ? kStartOffsetMax : std::min(v, kStartOffsetMax); }
 
 namespace Params {
-    static const juce::String kPitchShift   = "pitchShift";
+    static const juce::String kPitchShift   = "pitchShift";    // added to the patch's Coarse/Fine Tune
+    // Time Stretch and Formant Shift were the legacy engine's, removed in v191: kept, unread, so a saved session or
+    // automation that names them still loads
     static const juce::String kTimeStretch  = "timeStretch";
     static const juce::String kFormantShift = "formantShift";
-    static const juce::String kRobot        = "robot";         // the engine's robot mode; with the XT, Robot Voice
+    static const juce::String kRobot        = "robot";         // Robot Voice (SOLO)
     static const juce::String kEncodeType   = "encodeType";    // Auto, SOLO, BACKING, ENSEMBLE, LITE (last, so that saved sessions keep their choice)
     static const juce::String kEncodeDepth  = "encodeDepth";   // multi-band attack detection
     static const juce::String kRootKey      = "rootKey";       // note that plays the sample unshifted
@@ -38,6 +41,10 @@ namespace Params {
     static const juce::String kOscSwitch     = "oscSwitch";
     inline juce::String oscId(int k, const juce::String& id) {
         return k ? "osc2" + id.substring(0, 1).toUpperCase() + id.substring(1) : id;
+    }
+    // Both OSCs' encode settings: a change re-encodes that OSC's wave (the processor listens to these)
+    inline std::array<juce::String, 4> encodeParamIds() {
+        return { kEncodeType, kEncodeDepth, oscId(1, kEncodeType), oscId(1, kEncodeDepth) };
     }
     static const juce::String kAnaWave       = "anaWave";
     static const juce::String kAnaImpact     = "anaImpact";

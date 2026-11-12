@@ -335,6 +335,33 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The Algorithm menu and the legacy engine removed v191 (2026-11-12): the user's "Both, after arpeggio" to "Remove the
+  Algorithm menu and the old engine behind it?". Gone: the editor's Algorithm menu (algoBox_, algoLabel_, comboBoxChanged)
+  and the legacy black-box engine whole, VariphraseEngine, PhaseVocoder, SourceFilterModel, DownsampledFormants,
+  PolynomialRoots, its offline renderer (OfflineRenderer; analysis/variphrase_render still runs as last built, its sources
+  in v190, 164ac15) and its EngineTests, with FormantTest (VSynthEmuFormantTest), build.sh's engine_tests, verify.sh's
+  engine and formant lines and mutate_panel's two formants- plants. Kept: Auto's classifier (analyzeContent and
+  VariphraseAnalysis, which encodeWave calls for a wave on Auto), moved as it stood to ContentClassifier.cpp/.h, with two
+  of the house's checks met on the way (a float cast to int before its clamp, three times, now clamped first; pi typed by
+  hand, now std::numbers::pi): old and new give the same type, median confidence, energy ratio and onsets, bit for bit,
+  on the 34 test waves of analysis/test_files. Its check, a SOLO tone reads SOLO (the engine tests' test 5) and the same
+  pitch alone reads LITE, is plugin/Tests/ClassifierTest.cpp, classifier_test, built by build.sh, run by verify.sh;
+  planting either side of the SOLO/LITE line fails it. teardown-classifier-deaf follows the code to ContentClassifier.cpp.
+  What changes for a user: the latency the processor reports goes from 2048 samples to 0 (it was the phase vocoder's,
+  reported though the plugin plays the XT path and, without the image, the file as it is); the Perform knobs set the
+  selected OSC's Pitch, Time, Formant and Robot Voice with or without the image (without it they set the engine's, which
+  is gone); without the image a loaded file plays as it is, as it did (the engine was on Passthrough). Time Stretch and
+  Formant Shift stay host parameters, unread, so a session or automation that names them still loads (IDs never change);
+  the processor no longer listens to them. Pitch Shift stays: the XT path adds it to Coarse/Fine Tune.
+  once-only refused the edit that took the menu out (the stale, untracked tabdesign/ copy of the editor matched the lines
+  around it); the user chose the kit fix, KWB-158 (workflow-bugs.md), installed with its patch for the user to send.
+  Checks: verify.sh every line green (A/B 4/4 identical; PluginTest bit-identical in every mode; the layout 285 states at 3
+  sizes, 555 of 647 parameters with a control; patch apply 0 failed; classifier 2/2; auval); verify_test.sh and
+  fcheck_keys_test.sh pass. Plants (mutate_panel.py): the 11 v191's changes reach, all caught: editor-no-build and
+  editor-no-patch-button (re-texted to the chrome list's new wrap), editor-build-unplaced, editor-build-narrow,
+  editor-no-panel, editor-no-switch, editor-mono-follow, engine-level and the three teardown-. Not run, code unchanged:
+  the rest of the list; mutate_tone.py (XtSoloVoice.cpp's comments only).
+
 The arpeggio's plugin side v190 (2026-11-12): the fourth step to the arpeggio (HARDWARE_FIRMWARE.md, "The arpeggio's
   plugin side"). The split first, moves only, by the kit's KWB-156 (the old copy out first, then the new file from HEAD's
   text, copied in so that no line was retyped; the user's choice of a kit fix over a rewrite as tables or a move by script):
