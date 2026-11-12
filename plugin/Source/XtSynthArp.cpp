@@ -106,16 +106,28 @@ void XtSynth::arpBlock() {
     clockMsAcc = (clockMsAcc + kBlockMsByRate) % kRate;
 }
 
+// The same ticks step the Multi Step Modulator (XtSynthMsm.cpp, v193), whose clocks the tone task takes ahead of the
+// arpeggio's notes; the arpeggio's step runs first, on its own task, leaving the Modulator's flag set
 void XtSynth::arpMs() {
     if (clockExt) arpTicks.msExternal(clockSix, clockSince);
     else arpTicks.msInternal(clockPeriod());
     const int32_t d = arpTicks.take();
     if (d != 0) arp.tick(d);
+    arpFlag();
+    msmMs(d);
     arpApply();
+}
+
+// The Multi Step Modulator's arpeggio flag, as the arpeggio's last call left it
+void XtSynth::arpFlag() {
+    if (arp.msmFlag < 0) return;
+    msm.arpeggio(arp.msmFlag != 0);
+    arp.msmFlag = -1;
 }
 
 // What it sent, to the part as the tone generator's input takes it (0x894d42e0): notes and controllers
 void XtSynth::arpApply() {
+    arpFlag();
     for (int i = 0; i < arp.eventCount(); ++i) {
         const XtArpEvent& e = arp.events()[i];
         switch (e.status & kKind) {

@@ -20,8 +20,10 @@ constexpr uint32_t kCtor = 0x89304960, kEnable = 0x89304920, kShuffle = 0x893044
 constexpr uint32_t kSettled = 0x893033d0, kStop = 0x89303ab0, kNoteOn = 0x89303830, kNoteOff = 0x893039c0;
 constexpr uint32_t kPedal = 0x89303a80, kTick = 0x8930eb00, kStep = 0x89302570;
 constexpr uint32_t kPost = 0x89472e70, kEventSet = 0x893018a0, kEventClear = 0x893018b0;
-// Answered with nothing: the Multi Step Modulator's beat and flag, the OS's ms clock (+0xd28), new (never reached)
-constexpr uint32_t kQuiet[] = { 0x894da9f0, 0x894d9920, 0x894d9930, 0x89301940, 0x8952ff3c };
+// Answered with nothing: the Multi Step Modulator's beat, the OS's ms clock (+0xd28), new (never reached)
+constexpr uint32_t kQuiet[] = { 0x894da9f0, 0x89301940, 0x8952ff3c };
+// The Multi Step Modulator's arpeggio flag, set and cleared (v193): recorded, and compared with the port's
+constexpr uint32_t kMsmSet = 0x894d9920, kMsmClear = 0x894d9930;
 constexpr uint32_t kKeyNodes = 0x108, kOffNodes = 0x728, kNodeBytes = 12;
 constexpr uint32_t kSettings = 0xac, kSettingBytes = 9;
 constexpr int kSaid = 20;                      // differences said with XT_ARP_FIRST
@@ -41,6 +43,11 @@ XtArpFw::XtArpFw(const std::string& rom) : m(rom) {
     });
     m.cpu.hook(kEventClear, [](Sh4& c) { c.ret(0); });
     for (const uint32_t a : kQuiet) m.cpu.hook(a, [](Sh4& c) { c.ret(0); });
+    for (const uint32_t a : { kMsmSet, kMsmClear })
+        m.cpu.hook(a, [this, a](Sh4& c) {
+            msmFlag = a == kMsmSet ? 1 : 0;
+            c.ret(0);
+        });
     built = true;
 }
 
@@ -62,6 +69,7 @@ void XtArpFw::begin() {
     sent.clear();
     failed.clear();
     stepFlag = false;
+    msmFlag = -1;
     call(kCtor, { kObj });
 }
 
@@ -188,6 +196,9 @@ void XtArpCheck::compare(bool fields) {
     }
     fw.sent.clear();
     port.clearEvents();
+    if (fw.msmFlag != port.msmFlag) differs("the Multi Step Modulator's flag", fw.msmFlag, port.msmFlag);
+    fw.msmFlag = -1;
+    port.msmFlag = -1;
     if (!fw.failed.empty()) {
         differs(("the firmware's call: " + fw.failed).c_str(), 0, 0);
         fw.failed.clear();

@@ -18,6 +18,7 @@
 #include "XtLinearPlayer.h"
 #include "XtLitePlayer.h"
 #include "XtArpeggio.h"
+#include "XtMsm.h"
 
 // What each of the two OSCs has of its own (the tone's OSC blocks at +0x434
 // and +0x508, and their envelopes and LFO: OSC 1 Env 1..4 and LFO 1, OSC 2
@@ -267,5 +268,7 @@ struct XtControls : XtOscControls {                 // OSC 1's in the base
     // XtArpeggio when they change: not a tone's, so no list of setControls' has them (v189)
     XtArpSettings arp;
     XtArpPattern arpPattern;
+    // The Multi Step Modulator (IDs 0x48d…0x4ee), part 0's, which XtSynthMsm.cpp gives XtMsm when it changes (v193)
+    XtMsmSettings msm;
     bool operator==(const XtControls&) const = default;
 };

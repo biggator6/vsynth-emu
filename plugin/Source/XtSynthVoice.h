@@ -17,6 +17,7 @@
 #include "XtSoloVoice.h"
 #include "XtLinearPlayer.h"
 #include "XtLitePlayer.h"
+#include "XtMsm.h"
 
 // What each OSC keeps on the voice (the firmware's objects at tone +0x20
 // and +0x9d4, with their envelopes and LFO)
@@ -80,6 +81,11 @@ struct XtVoice : XtOscVoice {                  // OSC 1's in the base
     int mVel = 64, mKey = 60, mRaw = 60;
     int16_t mx[kXtMatrixSlots] = {};
     int beam[4] = {};
+    // The Multi Step Modulator's terms by destination, as the conversion pass last read them (0x894d96d0, by the note's zone;
+    // PORTA-TIME any zone, 0x894d9750); a key-off reads the envelopes' releases again (XtSynthUpdate.cpp)
+    int16_t msm[kXtMsmDests] = {};
+    int16_t cosmSums[2][4] = {};   // the COSMs' four sums while their input words are held (xtCosmWordsHold)
+    bool cosmHeld = false;
     int tempo10 = 1200;            // the tempo at the note's start: the note-value envelope times (input +0x18)
     float blockTempo = 0.0f;       // OSC 1's block +0x60, which the LFOs start from: left as it was with OSC 1 off
     XtEnvelope env;
@@ -107,3 +113,9 @@ struct XtVoice : XtOscVoice {                  // OSC 1's in the base
     float cur[2] = {}, target[2] = {}, step[2] = {}, elapsed = 0;
     float bus[XtBusCount] = {};
 };
+
+// The COSMs' input words as a conversion pass forms them (0x894de3b0): PRM1 (+0x40), LFO-PRM1 (+0x42), PRM2 (+0x44) and
+// LFO-PRM2 (+0x46), each the Matrix's sum with the Multi Step Modulator's term on it.  Held, the voice's sums are those
+// words, where each COSM type's converter reads them; released, the sums again (XtSynthEnvKnobs.cpp)
+void xtCosmWordsHold(XtVoice& v);
+void xtCosmWordsRelease(XtVoice& v);

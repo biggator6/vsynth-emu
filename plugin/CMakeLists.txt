@@ -57,11 +57,15 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginCosmControls.cpp
     Source/PluginOsc2Controls.cpp
     Source/PluginArp.cpp
+    Source/PluginSetting.cpp
+    Source/PluginMsm.cpp
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
     Source/PluginState.cpp
     Source/PluginEditor.cpp
     Source/PluginEditorPlay.cpp
+    Source/PluginEditorMsm.cpp
+    Source/PluginEditorMatrix.cpp
     Source/FxPanel.cpp
     Source/VariphraseEngine.cpp
     Source/PhaseVocoder.cpp
@@ -79,6 +83,15 @@ target_sources(VSynthEmu PRIVATE
     Source/XtLitePlayer.cpp
     Source/XtSynth.cpp
     Source/XtSynthArp.cpp
+    Source/XtSynthZones.cpp
+    Source/XtSynthNotes.cpp
+    Source/XtSynthUpdate.cpp
+    Source/XtSynthKnobs.cpp
+    Source/XtSynthEnvKnobs.cpp
+    Source/XtSynthMsm.cpp
+    Source/XtMsm.cpp
+    Source/XtMsmTrack.cpp
+    Source/XtMsmPatch.cpp
     Source/XtTempoTicks.cpp
     Source/XtArpeggio.cpp
     Source/XtArpeggioStep.cpp
@@ -137,7 +150,7 @@ function(vse_add_test name)
     target_include_directories(${name} PRIVATE $<TARGET_PROPERTY:VSynthEmu,INCLUDE_DIRECTORIES>)
     target_compile_definitions(${name} PRIVATE $<TARGET_PROPERTY:VSynthEmu,COMPILE_DEFINITIONS>)
 endfunction()
-vse_add_test(VSynthEmuTest Tests/PluginTest.cpp)               # the XT path end to end
+vse_add_test(VSynthEmuTest Tests/PluginTest.cpp Tests/LayoutTest.cpp)   # the XT path end to end; the layout (v193)
 vse_add_test(VSynthEmuTeardownTest Tests/TeardownTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)   # closed mid-encode
 vse_add_test(VSynthEmuWaveFileTest Tests/WaveFileTest.cpp)     # a wave whose header claims more than its data holds
 vse_add_test(VSynthEmuRestoreTest Tests/RestoreTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)   # reopened, parts gone
@@ -152,8 +165,9 @@ vse_add_test(VSynthEmuFormantTest Tests/FormantTest.cpp Tests/TestMain.cpp)
 vse_add_test(VSynthEmuDiskImageTest Tests/DiskImageTest.cpp Tests/TestMain.cpp)
 # XtSynth's arpeggiator heard: a note a quarter at two tempos, the Switch off, the Hold pedal (v189)
 vse_add_test(VSynthEmuArpTest Tests/ArpTest.cpp Tests/TestMain.cpp)
-# The arpeggio's plugin side: its parameters, a patch's arpeggio, a session's, and a chord through the processor (v190)
-vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/TestMain.cpp)
+# The arpeggio's plugin side: its parameters, a patch's arpeggio, a session's, and a chord through the processor (v190);
+# then the Multi Step Modulator's: its parameters, the image's patches with it on, a note, a patch's load stopping it (v193)
+vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest

@@ -57,7 +57,7 @@ reset|    *this = XtMsm();|    updates = 0;
 start-pos|pos = (int32_t)((uint32_t)now + kTicksPerClock);|pos = (int32_t)((uint32_t)now + kTicksPerClock - 1);
 start-running|if (running == 1) return;|if (running == 2) return;
 stop-timer|due = kNever;|due = due;
-stop-update|    for (XtMsmTrack& t : track) t.halt();\n    ++updates;|    for (XtMsmTrack& t : track) t.halt();
+stop-update|    for (XtMsmTrack& t : track) t.halt();\n    toneUpdate();|    for (XtMsmTrack& t : track) t.halt();
 note-arp|        if (arp) {\n            start();|        if (!arp) {\n            start();
 note-held|} else if (!keyHeld) {|} else if (keyHeld) {
 note-voice|every note\n        stop();|every note\n
@@ -68,7 +68,7 @@ tick-fired|fired = due;|fired = now;
 clocks-sync|if (!sounding && keySync && !arp) {|if (!sounding && !arp) {
 clocks-pending|pending = 0;|pending = n > 1 ? 1 : 0;
 clocks-one|const int32_t n = pending;|const int32_t n = pending > 0 ? 1 : 0;
-clocks-update|if (moved) ++updates;|++updates;
+clocks-update|if (moved) toneUpdate();|toneUpdate();
 # The terms
 term-zone|if (t.dest == dest && t.zone == zone && t.on) sum|if (t.dest == dest && t.on) sum
 term-on|if (t.dest == dest && t.zone == zone && t.on)|if (t.dest == dest && t.zone == zone)

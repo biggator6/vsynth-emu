@@ -9,7 +9,8 @@
 # name|old|new[|port[|seed]], with \n and \| escaped; port is mutate.sh's PORT for an error in
 # another file than XtSynth.cpp (toneosc, XtOsc.cpp), solo for one only `solocmp` reaches:
 # very short records, or a timer that overflows.  seed is for one the default seed's cases
-# don't happen to reach, so fcheck's run doesn't guard it.
+# don't happen to reach, so fcheck's run doesn't guard it.  A port wire… (v193) is the Multi Step Modulator's wiring,
+# run through xt_tone's MSM mode (`xt_tone rom msm`), [cases] its cases.
 import concurrent.futures as cf, os, re, subprocess, sys
 import mutlist
 D = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +37,10 @@ def run(m, pattern=None):
 # With nothing planted, an old text put back as it was.  If this run fails, every plant's would, and would read as caught or missed for no reason of its own.
 controls = [('zz-control-' + (s or 'default'), 'constexpr float kLand', 'constexpr float kLand', 'tone', s) for s in sorted({x[4] for x in muts if x[3] != 'solo'})]
 controls += [('zz-control-solo', x[1], x[1], 'solo', '') for x in muts if x[3] == 'solo'][:1]
+# the Multi Step Modulator's wiring (port wire…, v193) runs xt_tone's MSM mode: its own run with nothing planted, by seed
+wire = sorted({x[4] for x in muts if x[3].startswith('wire')})
+controls += [('zz-control-msm-' + (s or 'default'), '#include "XtSynth.h"', '#include "XtSynth.h"', 'wiremsm', s)
+             for s in wire]
 with cf.ThreadPoolExecutor(8) as ex:
     for (n, t), c in zip(ex.map(lambda c: run(c, 'same|DIFFERENT' if c[3] == 'solo' else 'different'), controls), controls):
         if t != 'tone: 0 different': sys.exit(f'mutate_tone: the run with nothing planted ({c[3]}, seed {c[4] or "default"}) says {t or "nothing"}, so no plant would mean anything')

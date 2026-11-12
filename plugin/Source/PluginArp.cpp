@@ -3,6 +3,7 @@
 // kept in the session's state ("arpPattern", which a session saved before v190 lacks: the XT's default then).
 #include "PluginArp.h"
 #include "PluginProcessor.h"
+#include "PluginSetting.h"
 #include "XtArpeggioPatch.h"
 #include <algorithm>
 #include <cstring>
@@ -10,22 +11,14 @@
 
 namespace {
 
-enum class ArpKind { Toggle, Choice, Number };
+using namespace Setting;   // a setting's kinds, texts and parameter, which the MSM's share (PluginSetting.h, v193)
+using ArpKind = Kind;
 
 // A Number's text and its reading back.  The firmware's text routine's (0x89461a70, research/tools/arptext.cpp), but End
 // Point, which the routine gives as 0…31 and the manual as the steps of the pattern, 1…32 [MAN p. 66], shown as the step
-struct ArpText {
-    juce::String (*show)(int);
-    int (*read)(const juce::String&);
-};
-juce::String plainText(int v) { return juce::String(v); }
-int plainValue(const juce::String& t) { return t.getIntValue(); }
+using ArpText = Text;
 juce::String realText(int v) { return v == 0 ? juce::String("REAL") : juce::String(v); }
 int realValue(const juce::String& t) { return t.trim().equalsIgnoreCase("REAL") ? 0 : t.getIntValue(); }
-juce::String signedText(int v) { return v >= 0 ? "+" + juce::String(v) : juce::String(v); }   // "+0", as the XT
-juce::String stepText(int v) { return juce::String(v + 1); }
-int stepValue(const juce::String& t) { return t.getIntValue() - 1; }
-constexpr ArpText kPlain { plainText, plainValue };
 
 // The ten, by the XT's IDs: names [FW 0x89790338], range and default [FW 0x897a167c, its centre taken off], a Choice's
 // values [FW 0x89461a70]
@@ -65,20 +58,10 @@ const juce::String& idOf(int fwId) {
     return kArpIds[(size_t)(at - std::begin(kArpParams))];
 }
 
-std::unique_ptr<juce::RangedAudioParameter> paramOf(const ArpParam& r) {
-    switch (r.kind) {
-        case ArpKind::Toggle: return std::make_unique<juce::AudioParameterBool>(r.id, r.name, r.def != 0);
-        case ArpKind::Choice: {
-            const auto values = juce::StringArray::fromTokens(r.values, "|", "");
-            return std::make_unique<juce::AudioParameterChoice>(r.id, r.name, values, r.def);
-        }
-        case ArpKind::Number: break;
-    }
-    const ArpText t = r.text;
-    const auto text = juce::AudioParameterIntAttributes()
-                          .withStringFromValueFunction([t](int v, int) { return t.show(v); })
-                          .withValueFromStringFunction([t](const juce::String& s) { return t.read(s); });
-    return std::make_unique<juce::AudioParameterInt>(r.id, r.name, r.lo, r.hi, r.def, text);
+// What Setting::paramOf makes its parameter from
+Spec specOf(const ArpParam& r) {
+    const auto values = r.values ? juce::StringArray::fromTokens(r.values, "|", "") : juce::StringArray();
+    return { r.id, r.name, r.kind, r.lo, r.hi, r.def, values, r.text };
 }
 
 } // namespace
@@ -112,7 +95,7 @@ void ArpPatternWords::store(const XtArpPattern& p) {
 }
 
 void VSynthEmuProcessor::addArpParams(ParamList& params) {
-    for (const ArpParam& r : kArpParams) params.push_back(paramOf(r));
+    for (const ArpParam& r : kArpParams) params.push_back(Setting::paramOf(specOf(r)));
 }
 
 void VSynthEmuProcessor::readArpControls(XtSynth::Controls& c) const {

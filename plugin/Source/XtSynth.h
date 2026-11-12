@@ -30,6 +30,7 @@
 #include "XtEncoded.h"
 #include "XtSynthControls.h"
 #include "XtSynthVoice.h"
+#include "XtSynthZones.h"
 #include "XtArpeggio.h"
 #include "XtTempoTicks.h"
 
@@ -39,18 +40,8 @@ public:
     using OscControls = XtOscControls;     // XtSynthControls.h
     using Controls = XtControls;
 
-    // A patch's zones (v154, the user's decision of 2026-11-05: a loaded patch plays all of them, kits too, while the plugin's
-    // parameters and editor stay on zone 1).  Zone 1 is setControls' and setSample's; zones 2…16 are a patch's data, each its
-    // controls and its two waves.  Only a zone's own blocks are read from it (the tone block, envelopes, LFOs and COSMs:
-    // zoneControls); the patch's common and the system's are zone 1's, as on the XT, where they aren't in a zone.  The upper keys
-    // (IDs 0x124…0x133) pick a note's zone.
-    static constexpr int kZones = 16;
-    struct Zones {
-        int upper[kZones] = { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 };
-        Controls ctl[kZones];                                // [0] unused: zone 1 is setControls'
-        std::shared_ptr<const XtEncoded> wave[kZones][2];    // the same
-        int number[kZones][2] = {};                          // their Wave Numbers, as setSample's; 0 a new wave
-    };
+    static constexpr int kZones = kXtZones;
+    using Zones = XtZones;                 // XtSynthZones.h: a patch's zones
     // The zone a key plays, with the Octave Shift (the part's note-on, 0x894dbcb0): the first whose upper key it doesn't pass, on
     // the table 0x894794f0 makes of the upper keys, each at least the one before and the last 127.  0 for zone 1.
     static int xtZoneOf(const int (&upper)[kZones], int key);
@@ -95,6 +86,9 @@ public:
     // starts.  A clock falls on each 24th of a quarter it passes.  When it isn't moving, the clocks run on
     // at the tempo, so that a note played on a stopped transport has them too.
     void hostClock(double bpm, bool moving, double ppq);
+    // Any thread: a patch came (VSynthEmuProcessor::loadPatch), so the Multi Step Modulator stops and reads it at the next
+    // setControls (0x894d9950), where an edit of its section reads it without stopping it (0x894d9b20)
+    void msmPatch() { msmPatchDue.store(true, std::memory_order_relaxed); }
     void render(float* left, float* right, int n);
 
 private:
@@ -146,6 +140,20 @@ private:
     XtArpSettings arpGiven;
     XtArpPattern patternGiven;
     XtTempoTicks arpTicks;
+    // The Multi Step Modulator (XtSynthMsm.cpp, v193): part 0's, on the same tempo ticks; what it was last given
+    XtMsm msm;
+    XtMsmSettings msmGiven;
+    std::atomic<bool> msmPatchDue { false };
+    bool msmHooked = msmHook();                      // its tone update, every note of the part (0x894d96b0 → 0x894d50d0)
+    bool msmHook();
+    void msmSync();                                  // its settings when they changed, or a patch's
+    void msmMs(int32_t ticks);                       // a ms of tempo ticks, then the tone task's flag 0x20 (0x894d4240)
+    void msmNoteOn();                                // the allocator's head (0x894d4b08), before a new voice
+    bool msmTerms(Voice& v, bool release) const;     // the terms a conversion pass reads; a key-off's, the releases'
+    XtPortaSettings portaSettings(const Voice& v) const;    // the portamento (0x894e6510): its Time with PORTA-TIME's term
+    void oscFollows(Voice& v, OscVoice& s, const OscControls& o, bool porta, bool key);   // the glide's again (0x894f2600)
+    void cosmNewBlock(Voice& v, int k);              // cosmSetBlock on the COSMs' input words (XtCosmWords)
+    bool matrixNoteOn(Voice& v);                     // matrixUpdate, the words held until the note has started
     // The tempo clock, 24 to the quarter (0x89471030 → 0x894d4210 → 0x894f4da0), on the audio's
     // clock here: frames × 24000 against the period × 44100.  It runs with nothing sounding.
     uint64_t clockAcc = 0;
@@ -236,7 +244,7 @@ private:
     void liveUpdate(Voice& v, const Controls& c, const Controls& was, bool anyChanged);   // a knob's update of a sounding voice, its zone's controls now and before
     void legatoNote(int key, int vel);               // the sounding voice takes a note (0x894dc1e0)
     void oscStart(Voice& v, OscVoice& s, const OscControls& o);   // the voice's OSC note-on
-    void oscEnvNoteOn(Voice& v, OscVoice& s, const OscControls& o);   // its envelopes
+    void oscEnvs(Voice& v, OscVoice& s, const OscControls& o, bool noteOn);   // its envelopes, at note-on or an update
     void oscLfoNoteOn(const Voice& v, OscVoice& s, const OscControls& o, XtLfoFree& free, const XtLfo* other, float seed);   // its LFO
     void truncate(Voice& v);
     void keyRelease(Voice& v, int velocity);         // a key let go (0x894d58b0)
@@ -251,6 +259,7 @@ private:
     void arpBlock();                                 // a block's ms, then the ms timer on
     void arpMs();                                    // one ms of ticks
     void arpApply();                                 // what it sent, to the part
+    void arpFlag();                                  // the Multi Step Modulator's arpeggio flag
     void ccDefaults();                               // the channel's controllers at power-on (0x89475290)
     void applyRates(OscVoice& s);
     void tvaUpdate(Voice& v);
@@ -284,6 +293,7 @@ private:
     // The whole-tone check (XtToneCheck.cpp): it reads a voice between blocks,
     // and the last voice's stages in the XT's units (int16 × 65536) here.
     friend struct XtToneProbe;
+    friend struct XtToneMsmProbe;                    // its MSM mode (XtToneMsm.cpp)
     float tapOsc1[64] = {}, tapOsc2[64] = {}, tapMix[64] = {}, tapCosm[64] = {};
 #endif
 };

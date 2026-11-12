@@ -40,6 +40,9 @@ namespace Ui {
         struct Card {
             Card() = default;
             explicit Card(juce::String t) : title(std::move(t)) {}
+            // A card whole: its title, the title line's controls and the rows, in column `column` (v193)
+            Card(juce::String t, std::vector<Item> h, std::vector<Row> r, int column = 0)
+                : title(std::move(t)), head(std::move(h)), rows(std::move(r)), col(column) {}
             juce::String title;
             std::function<juce::String()> titleFn;          // a title that follows the selectors
             std::vector<Item> head;                         // controls on the title line, right-aligned

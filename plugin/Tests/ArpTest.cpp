@@ -7,6 +7,7 @@
 #include "TestChecks.h"
 #include "TestMain.h"
 #include "TestOnsets.h"
+#include "TestSynth.h"
 #include "../Source/XtSynth.h"
 #include <algorithm>
 #include <cmath>
@@ -49,9 +50,8 @@ XtSynth::Controls controlsOf(const Case& c) {
 
 // Each 5 ms frame's RMS, the case played from its first frame
 std::vector<float> levels(const Case& c) {
-    XtSynth s;
-    s.prepare(kRate);
-    s.setControls(controlsOf(c));
+    const auto synth = synthOn(kRate, controlsOf(c));
+    XtSynth& s = *synth;
     if (c.letGoAt >= 0.0) s.controller(kHoldPedal, 127);
     for (const int k : kChord) s.noteOn(k, kVelocity);
     const int frames = (int)(c.seconds * kRate / kFrame);

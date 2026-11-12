@@ -481,7 +481,7 @@ void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<u
         if (files[k].existsAsFile() && readVSynthWave(files[k], waves[k], &why)) { found[k] = true; xtWaveOntoControls(waves[k], o); }
         else notes.add("no wave " + juce::String(number));
     }
-    setControls(c);
+    setPatchControls(c);   // and the Multi Step Modulator stopped, as the XT's patch load does (PluginMsm.cpp, v193)
     for (int k = 0; k < 2; ++k)
         if (auto* p = apvts.getParameter(Params::oscId(k, Params::kEncodeType))) p->setValueNotifyingHost(p->convertTo0to1(0.0f));   // Auto: each wave's own
     for (const auto& fx : xtPatchEffects(store)) {

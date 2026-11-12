@@ -123,6 +123,9 @@ public:
     int32_t now = 0;                          // the tempo timer's count (0x898586f0)
     bool on = false;                          // +0xd2c
     XtArpPattern pattern;                     // what +0xf8 points at
+    // The Multi Step Modulator's arpeggio flag (its +0x25) as the last call left it, for its owner to give it: 1 set after
+    // a step's note ends (0x893027e6 → 0x894d9920), 0 cleared at a halt (0x89302558 → 0x894d9930), −1 untouched
+    int8_t msmFlag = -1;
 
     // XtArpeggioMotifs.cpp: the line a step is on, played by the motif (0x893041e0), and a note sent (0x89302840)
     void playLine();

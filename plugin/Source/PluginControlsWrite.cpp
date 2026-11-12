@@ -190,4 +190,5 @@ void VSynthEmuProcessor::setControls(const XtSynth::Controls& c) {
     writeToneControls(c);
     writeOsc2Controls(c);
     writeArpControls(c);    // PluginArp.cpp, v190
+    writeMsmControls(c);    // PluginMsm.cpp, v193
 }

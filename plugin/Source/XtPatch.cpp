@@ -152,9 +152,10 @@ void cosmOf(const Read& p, int k, Ctl::Cosm& c) {
     lfoOf(p, 0x3be + 8 * (2 + k), c.lfoWave, c.lfoRate, c.lfoOffset, c.lfoDelay, c.lfoFadeMode, c.lfoFade, c.lfoKeySync);
 }
 
-// The patch's common: its tempo, tuning, keys, portamento, bend and scale, the same whatever the zone.  Its arpeggio is
-// read beside these controls (xtWithPatchArp, XtArpeggioPatch.cpp, v189)
+// The patch's common: its tempo, tuning, keys, portamento, bend and scale, the same whatever the zone, and its Multi Step
+// Modulator (v193), part 0's.  Its arpeggio is read beside these controls (xtWithPatchArp, XtArpeggioPatch.cpp, v189)
 void commonOf(const Read& p, Ctl& c) {
+    c.msm = xtMsmSettingsOf(p.store);
     c.patchTempo = p(0x11d);
     c.patchCoarse = p(0x110);
     c.patchFine = p(0x111);
@@ -246,8 +247,8 @@ std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int z
         const std::string osc = "OSC " + std::to_string(n + 1) + " ";
         if (p(0x2a4 + b) != 0 && p(0x2a5 + b) == kExternal) m.push_back(osc + "external input");
     }   // Playback Mode is done on every kind of wave (v156); a LITE wave's converter doesn't read it, on the XT either
-    // The arpeggio is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190)
-    if (p(0x48d)) m.push_back("Multi Step Modulator");
+    // The arpeggio is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190); and the
+    // Multi Step Modulator (v193)
     return m;
 }
 

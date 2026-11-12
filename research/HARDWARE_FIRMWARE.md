@@ -1546,11 +1546,112 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The Multi Step Modulator in XtSynth (2026-11-12, v193)
+
+v192's `XtMsm` in the sound: XtSynth runs part 0's where the firmware does, each converter adds its terms where the firmware's
+does, and xt_tone holds the whole against the firmware's own object beside the firmware's tone.
+
+**Where it runs** (`XtSynthMsm.cpp`):
+- *Its settings.* `setControls` reads the section before the knobs' update of the notes: after `msmPatch()` (the plugin's
+  loadPatch) as a patch (`0x894d9950`: stopped, then read), otherwise as an edit when it changed (`0x894d9b20`: read, not
+  stopped). A patch's settings come from its store by `xtMsmSettingsOf` (`XtPatch`'s common), so `xtPatchMissing` no longer
+  names it.
+- *Its clock.* Each ms of the tempo clock's ticks (`arpMs`, the one `XtTempoTicks` take a ms that the arpeggio steps on) goes
+  to its timer (`0x8930eb00`); when the timer fired, the tone task's flag 0x20 runs its clocks (`0x894d4240`), which the
+  task takes ahead of the arpeggio's notes (`0x894d4048`). Only a firing runs them: a clock counted when no note sounded, and
+  so left by the stop, waits for the next. (The first wiring ran them on any count left over, which the MSM mode below
+  showed as tracks a clock ahead after a stop.)
+- *Notes.* The allocator's head (`0x894d4b08`) is `msmNoteOn` in `tgNoteOn`, after MONO's truncation and before the voice is
+  taken; a legato doesn't reach it. "A key of part 0 down" (`0x894d5550(0)`) is a voice not let go, not truncated, whose key
+  is down (its key flag); "a note sounding" (`0x894d55a0(0)`) the same without the key.
+- *Its tone updates* (`0x894d96b0` → `0x894d72f0` → `0x894d50d0`, at a start, a stop and a clock that made a term again) are a
+  controller's update of every sounding voice (`newBlocks`), through the hook `XtMsm::onUpdate`.
+- *The arpeggio's flag* (+0x25): `XtArpeggio::msmFlag`, set when a step's note ends (`0x893027e6` → `0x894d9920`) and cleared
+  at a halt (`0x89302558` → `0x894d9930`), given to it after each ms (`XtSynth::arpFlag`). xt_arp now records the firmware's
+  two calls and holds the port's flag to them after every event, where it had answered them with nothing.
+
+**The terms.** A conversion pass (`matrixUpdate`, the Matrix's sums' place) reads each voice's 72 terms into `Voice::msm`:
+`0x894d96d0(obj, dest, 0, zone)` by the voice's zone, PORTA-TIME's by `0x894d9750` of any zone; a key-off's pass reads only the
+five Releases (`0x894def60`); MFX-PRM1…3 go to the effects as the sum and `0x894d97b0`'s term of any zone and part. Each
+converter adds its term as the firmware's does (`XtSynthKnobs.cpp`, `XtSynthEnvKnobs.cpp`):
+- an OSC's Pitch, envelope depths, TIME/PW, FORMA/FAT, LFO depths and Level: on the knob, ahead of the Matrix's sum and the
+  limit the sum already had. An analog OSC's FORMA/FAT goes to both Fat and Detune (`0x894e1f78`…`0x894e2050`);
+- the coarse tunes: the word is (int16)(the note's coarse + OSC1+2-PIT-CRS's term + the OSC's), each term through the coarse
+  curve; the fine takes ten times OSC1+2-PIT-FINE's and the OSC's;
+- an LFO's rate and an envelope's times: with the sum, within 0…127, and a note value (128 on) takes neither; a Sustain: the
+  knob and its term within 0…127 (`0x894df170`);
+- PORTA-TIME: (time + term) as a byte, at most 127 (`0x894e6510`), so a time taken below 0 is 127;
+- the TVA's Level, Pan, LFO depths and the sends: on the knob, with the sum;
+- a COSM's PRM1, PRM2, LFO-PRM1 and LFO-PRM2: in its input words, sum and term stored as one word (`0x894de452`…`0x894de534`),
+  which the type's block reads as it read the sum (`xtCosmWordsHold` for the pass, the sums put back after).
+A key-unsynced LFO, a COSM's held levels and the rest a tone update gives are as before: an update the Multi Step Modulator
+asks for is any controller's.
+
+**The plugin's side** (`PluginMsm.cpp`, `PluginEditorMsm.cpp`): its 98 settings as host parameters, appended after the
+arpeggio's so that a host's list keeps every place it had (745 parameters, the first 647 as before byte for byte), in the XT's
+ID order, `msmSwitch`, `msmKeySync`, then each track's `msmNSwitch` … `msmNDest`, `msmNStep1` … `msmNStep16`. Names are the
+firmware's after "MSM "; the firmware names every track's Loop "Track Loop Switch", which a host's list can't tell apart, so
+here it has its track's number. Ranges and defaults are the descriptors' (Master OFF, Key Sync PART, a track's Switch and
+Loop ON, STEP, 16TH, End Point 16, FWD1, Zone 1, OSC1+2-PIT-CRS, steps +0), and the values' texts the firmware's routine's,
+End Point and Zone as 1…16, the manual's, as the arpeggio's End Point (v190). Each block reads them into `Controls::msm`
+through `xtMsmField`, the loaders' own map of IDs. A patch's settings go onto the parameters and then `msmPatch()` tells
+XtSynth a patch came, so the next `setControls` stops it as the firmware's patch message does; a host's automation is an
+edit. The editor's MSM tab, before the Matrix, shows one track at a time, as the Matrix shows one Control.
+`VSynthEmuArpPluginTest` holds them to the firmware's tables, each parameter to its own field, the 55 presets through
+applyPatch, loadPatch and a session, a note with it on to XtSynth bit for bit, and a patch's load stopping it (against an
+XtSynth told of the load, and one not told, which must differ). `TEST_UI_LAYOUT` selects each track and fails if its controls
+reach another's parameters.
+
+**What shows it's right.** xt_tone's MSM mode (`xt_tone <rom> msm [cases] [seed]`; `XtToneMsm.cpp`, `XtToneFwMsm.h`,
+`XtToneMsmCheck.h`): the firmware's own object (`0x89cf7634`) runs in the interpreter beside the firmware's tone, built as at
+boot (`0x894d9820`, `0x894d9580`), its settings read by the getter from the case's patch, its timer on the OS's tempo ticks
+from XtSynth's own count, the allocator's head at each note, the tone task's flag when it posted. The two note-list questions
+are answered from the firmware's notes; the tone updates it asks for are taken with the object as it stood and given to the
+notes when the call that asked returns (the interpreter's calls don't nest). XtSynth runs its `XtMsm` on the same settings,
+notes and ticks. Analog tones, POLY, Clock Source INTERNAL, two notes on two keys, an edit of the section in one case in
+three, the Hold pedal in one in four (down before the first key lets go, then up or not; in half of them the second note
+comes while the first is held by the pedal alone, its key up, which Key Sync PART's head reads). Each block: the whole bus word by word, bit for bit; each note's TVA (level, LFO depths, gains, targets, steps, the
+eight bus levels and their targets), its envelopes' outputs and stages, its LFOs, its COSMs' held levels (a Comb Filter's
+delays, Tone and crossfade too), its OSCs (cents, the Pitch knob, the glide, an analog oscillator's own); the last voice's
+buffers; and the two objects' running flag, tracks (state, step, term, clocks left, Grid), clocks pending, tempo ticks and
+timer. Every destination alone at 30 cases (every track on it), keys let go and held: 144 runs, 0 different. Random
+destinations at 400 cases on seeds 2024, 7 and 99: 440,283, 439,208 and 438,934 blocks, 11,109, 11,309 and 10,709 of its
+tone updates, about 2.7 × 10⁸ checks each, 0 different. fcheck runs 200 cases.
+
+Besides the clock above, the mode first found faults of its own, each now as xt_tone's main check has it: a firmware note that
+had ended stayed on the tones' list, so the next note's key-unsynced LFO followed it where XtSynth's started from the
+free-running phase (`Firmware::stop`, as xt_tone does); two notes on one key, where a key-off ends both on the XT and the
+firmware's side ended one; and an edit that moved no value, which ran a tone update on the firmware's notes where XtSynth,
+as the plugin, takes none (a Comb Filter's new block moves its delay: the firmware's quirk of v73).
+
+xt_tone's main check plays a patch's tone with the Multi Step Modulator off (`withoutMsm`), as it plays it without the
+arpeggio: it doesn't run the firmware's object, so the 55 patches that use it would differ by their terms alone.
+
+**Plants.** In `tone_muts.txt`, 28 on ports `wire…` through the MSM mode (`mutate.sh`, `mutate_tone.py`): the hook, an
+edit, the clocks, the ticks, the note lists, the head, the terms' passes, each kind of term's site, the arpeggio's ms, and
+the check's own replay and stop; all caught. The whole list, 1166, all caught but `check-pad-cc`, missed as since v189 (its
+case needs a draw of its own). The 171 earlier plants on the parts split out of `XtSynth.cpp` and `XtToneCheck.cpp` moved
+with their code. The first whole run missed two of mine. `msm-held-sounding`, Key Sync PART's head asking for any note on
+the list rather than a key down, needs a note held by the Hold pedal alone, and the mode had no pedal: it has Hold now, and
+catches it. `msm-release-unread`, a key-off's read of the Releases left out, was equivalent within what can happen and was
+dropped. Every term that moves asks an update of every voice at once (a start, a stop, a clock that made a term again; an
+edit is the knobs' update), so a voice already holds the Releases' terms when its key lets go. A track past its end without
+a loop holds its last step and still asks (its state 1): the branch of `0x894da400` that zeroes a term asking nothing is
+never reached. The read stays, as the firmware's step. xt_arp's two of the flag in `arp_muts.txt`: `mutate_arp.py` 92, none
+missed. `mutate_msm.py` 71, none missed. `mutate_panel.py` with v193's twenty (the eighteen `msm-`, `arp-text-step`,
+`arp-text-sign`), none missed.
+
+**Not covered.** The arpeggio and the Multi Step Modulator together in xt_tone (the flag is xt_arp's, its effect xt_msm's);
+zones in the MSM mode (each note on zone 1; xt_msm checks the terms by zone); MONO, legato, an outside clock and PCM waves in
+the MSM mode; the MFX-PRM terms' sound (the effects chip's, compared as numbers in xt_msm only); parts other than part 0,
+which the plugin hasn't.
+
 ### The Multi Step Modulator (2026-11-11, v192)
 
 The manual (p. 68, "Using steps to vary the sound"): up to four tracks of a sixteen-step sequence, each modulating a
 parameter. 55 of the disk image's 512 patches use it. It is the object at `0x89cf7634`, which the notes since v53 called "the
-matrix" (v119's correction). Ported as `XtMsm` and checked against the firmware's own object; not wired into the sound yet.
+matrix" (v119's correction). Ported as `XtMsm` and checked against the firmware's own object; not wired into the sound yet
+(v193 does: "The Multi Step Modulator in XtSynth").
 
 **Its names** (rom.2's names, descriptors and value strings, IDs 0x48d…0x4ef; stored less the centre):
 
@@ -1658,7 +1759,7 @@ stopped then) and the terms' "running" guards (a stopped object's tracks are all
 
 **Not yet:** the wiring. Which converter asks for which destination and with what zone; the tone updates it asks for;
 XtSynth's clock in tempo ticks (it counts 24 clocks a quarter); the note list's two answers; the arpeggio's flag. Until then
-`xtPatchMissing` still names it, and every term is 0 as before.
+`xtPatchMissing` still names it, and every term is 0 as before. (Done in v193: "The Multi Step Modulator in XtSynth".)
 
 ### The arpeggio's plugin side (2026-11-12, v190)
 
@@ -1854,7 +1955,8 @@ sooner of the next step and the next end.
   the key state's first index: K = `0x89cf05d8` + (3 − 1)·0x1340 + part·0x134, apart from the keys played. What CLAUDE.md calls
   K's channel is that source.
 - Two calls are for the Multi Step Modulator (`0x89cf7634`), not ported: `0x894da9f0` each 4th and 16th step, `0x894d9920`
-  each note's end.
+  each note's end. (v192: `0x894da9f0` is another object's, `0x89cf7eac`; v193 ports `0x894d9920` and the halt's `0x894d9930`
+  as `XtArpeggio::msmFlag`.)
 
 **The motifs** (`0x89534a9c`, by Motif; past 7, AUTO).
 - UP and DOWN walk the 128 nodes by key from the last key played (+0x718), skipping keys whose note is sounding.
@@ -2196,7 +2298,7 @@ Playback Mode (IDs 0x2d2, 0x306; the converter's input +0x5e) is RETRIGGER 0, LE
 
 **Open.** Seeds 6 and 8 at 2000 differ in a LITE player in the playback cases (6: case 7229, the heads 420 blocks into a long Time Trip; 8: case 7066, the heads and fractions under Time Trip with the Start Offset at the last sample). Neither touches this version's code (no LEGATO there, and EVENT doesn't reach LITE): it is v153's player on a path the earlier seeds didn't reach, for a version of its own. Eleven other seeds are clean. (v157: both were LEGATO after all, and the first sample a LITE player's update sets; "A LITE player's update".)
 
-**Not done.** STEP and EVENT on SOLO waves (done in v156, "STEP and EVENT on SOLO waves", but for Vari off). A wave set's wave by the chain key (no wave sets here). The band seek with 0x80 clear (`0x89510cc0`). Arpeggio and the Multi Step Modulator.
+**Not done.** STEP and EVENT on SOLO waves (done in v156, "STEP and EVENT on SOLO waves", but for Vari off). A wave set's wave by the chain key (no wave sets here). The band seek with 0x80 clear (`0x89510cc0`). Arpeggio and the Multi Step Modulator. (The arpeggio v190, the Multi Step Modulator v193.)
 
 ### Zones (2026-11-05, v154)
 
@@ -2226,7 +2328,7 @@ Playback Mode (IDs 0x2d2, 0x306; the converter's input +0x5e) is RETRIGGER 0, LE
 - `TEST_PATCH_PLAY` on one in four of Emu_test's patches, waiting for the zones' waves: 66 played, one silent, which has no wave, as in v153; among them a 16-zone kit, three of whose waves the project doesn't have.
 - Planted errors: `mutate_tone.py` 1006, none missed. 43 are new: the zone's pick, each of the common fields zone 1 gives, the following and free-running LFOs, the MOD's block, every reader of a voice's controls, the updates, the pick-up, and the check's own (the getter, the tags, the uppers, the zone given, the carry). 95 old ones had to move with the code, 69 for the rename alone and 26 by hand, each checked to land in the function it did. Six of mine changed nothing and were dropped: the running maximum (the first entry a key isn't above is the same without it), the MOD's block formed again at a note's start or for every zone at a knob (a zone's settings move only when the zones come), the tuning's reads (common fields only), an update's comparison with zone 1's settings (an update given unchanged settings changes nothing) and Can Play on zone 1 (a note with nothing to play has no voice to compare, by the check's design). A seventh showed the check set the zones before the knobs, so the pick-up's own refresh went unseen; it now sets them after. `mutate_panel.py` with every `patch` plant: 39, none missed, 9 new for the zones' loading and the session. Two of those first missed because every zone wave was the same file, which is why each number now has its own.
 
-**Not done.** Playback Mode, arpeggio and the Multi Step Modulator, on any zone. The panel shows zone 1 only. (v155: Playback Mode, bar STEP and EVENT on SOLO waves.)
+**Not done.** Playback Mode, arpeggio and the Multi Step Modulator, on any zone. The panel shows zone 1 only. (v155: Playback Mode, bar STEP and EVENT on SOLO waves. v193: the Multi Step Modulator, part 0's, a track serving the zone its Zone names.)
 
 ### LITE waves (2026-11-05, v153)
 
@@ -3604,7 +3706,7 @@ Harness faults found on the way:
 
 **Planted errors.** 91 new, 329 in all, all caught at 2000 cases. They cover every source, the term and the sum, the slots' map, each destination's wiring, the analog curves, VELO's and KEYF's staying at the note's start, the moved sums' updates, and the pressures. The first run missed ten. Seven were the check's: a knob of the Matrix moved during a note was hardly ever seen in an envelope or an LFO, because the random moves rarely land on a Matrix word with a Dest on the thing in question. So the sweep now takes each Dest twice. Three were exact and are not in the list: CC 32 as a source was guarded twice over, one of which remains; powf's y = 0 falls through to expf(0) = 1; and a term's limit never acts, as no Sens at 63 exceeds its slot's limit, which I checked over all 78 Dests. `tvag-done-r`, an old one, slipped by chance again: its square now runs slowly from the note's start, so that its sign is known when the voice ends.
 
-**Not covered.** A real XT. The Multi Step Modulator, as above. RPN and NRPN (`0x89474a40`): Bend Range by RPN 0 and the like are not taken. TRIP-R from a real pad, and Time Trip. The upstream of `0x89475370` beyond the store. How the XT's own controllers reach CCs (a pad and a D-Beam send what the system assigns say; here a host sends them).
+**Not covered.** A real XT. The Multi Step Modulator, as above (ported in v192, in the sound in v193). RPN and NRPN (`0x89474a40`): Bend Range by RPN 0 and the like are not taken. TRIP-R from a real pad, and Time Trip. The upstream of `0x89475370` beyond the store. How the XT's own controllers reach CCs (a pad and a D-Beam send what the system assigns say; here a host sends them).
 
 ### Tempo sync and Time Trip (2026-11-04, v118)
 

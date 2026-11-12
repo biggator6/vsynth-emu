@@ -4,6 +4,7 @@
 #include "FxPanel.h"
 #include "PluginEditorCosmTypes.h"
 #include "PluginEditorArp.h"
+#include "PluginEditorMsm.h"
 
 class VSynthEmuEditor : public juce::AudioProcessorEditor,
                         private juce::ComboBox::Listener,
@@ -17,8 +18,8 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // The tabs: seven pages of cards, then the effects' panel
-    static constexpr int kPages = 7, kEffectsTab = kPages;
+    // The tabs: eight pages of cards (the MSM's, v193, before the Matrix), then the effects' panel
+    static constexpr int kPages = 8, kEffectsTab = kPages;
     void showTab(int t);
     int currentTab() const { return tab_; }
 
@@ -275,6 +276,9 @@ private:
     void buildPlayPage();
     ArpControls arp_;                                // the Arpeggio card's
     void addArpCards(Ui::Page& p);                   // its controls on their parameters, and its two cards
+    MsmControls msm_;                                // the MSM tab's, a track at a time (PluginEditorMsm.cpp, v193)
+    void buildMsmPage();
+    void buildMatrixPage();                          // PluginEditorMatrix.cpp (v193)
     static Ui::Page::Row lr(juce::Component& l, juce::Component& c, int w = 0);
     Ui::Page::Row rowOfLevel(int i);
     void repaintPages();

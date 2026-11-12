@@ -33,7 +33,7 @@ pair-ticks|kPairTicks = 480;|kPairTicks = 240;|arpstep
 shuffle-place|shuffle[(frac >> 2) % kShuffle]|shuffle[(frac >> 3) % kShuffle]|arpstep
 timer-at-now|    if (due > now) return;|    if (due >= now) return;|arpstep
 fired-now|    fired = due;|    fired = now;|arpstep
-ends-at-fire|    while (offHead >= 0 && offs[offHead].time <= fired) endNote(offHead);|    while (offHead >= 0 && offs[offHead].time < fired) endNote(offHead);|arpstep
+ends-at-fire|    while (offHead >= 0 && offs[offHead].time <= fired) {|    while (offHead >= 0 && offs[offHead].time < fired) {|arpstep
 reschedule|    schedule(offHead >= 0 ? offs[offHead].time : kNever);|    schedule(kNever);|arpstep
 start-octave|    octave = 0;\n    direction = 1;|    octave = 1;\n    direction = 1;|arpstep
 start-direction|    direction = 1;\n    step = 0;|    direction = -1;\n    step = 0;|arpstep
@@ -90,3 +90,6 @@ ticks-ramp-floor|ticks = ticks - ticks % kPerClock + (uint32_t)past;|ticks = tic
 ticks-f8-next|ticks = ticks - ticks % kPerClock + kPerClock;|ticks = ticks + kPerClock;|ticks
 ticks-f8-ramp|    ramp = 0;|    ramp = 1;|ticks
 ticks-take|    fed = ticks;|    fed = ticks & ~1u;|ticks
+# The Multi Step Modulator's arpeggio flag (v193)
+msm-flag-unset|        msmFlag = 1;||arpstep
+msm-flag-uncleared|    msmFlag = 0;||arpstep

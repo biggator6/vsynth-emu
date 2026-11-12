@@ -335,6 +335,38 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The Multi Step Modulator in the sound v193 (2026-11-12): v192's XtMsm wired into XtSynth and the plugin (HARDWARE_FIRMWARE.md,
+  "The Multi Step Modulator in XtSynth"), on claude/msm-ad515c after master's v189 and v190 were merged in (a76c8b5).
+  XtSynth: part 0's XtMsm (XtSynthMsm.cpp). setControls reads the section before the knobs' update, a patch's (msmPatch) as
+  the firmware's patch message, stopped then read, an edit as its edit message; its timer takes arpMs's tempo ticks each ms
+  and runs its clocks only when it fired; the allocator's head in tgNoteOn before the voice; its tone updates are a
+  controller's (newBlocks). A conversion pass reads each voice's 72 terms (Voice::msm; a key-off only the Releases), and each
+  knob takes its term where its converter does: OSC knobs on the knob before the Matrix's sum, the coarse and fine words, LFO
+  rates and envelope times with the sum, Sustain within 0…127, PORTA-TIME as a byte at most 127, the TVA and sends, and a
+  COSM's input words (sum and term as one word). The arpeggio's flag to it: XtArpeggio::msmFlag. XtPatch reads a patch's
+  (xtMsmSettingsOf); xtPatchMissing no longer names it. Split by job first, as the kit's limits require: XtSynth.cpp's
+  parts to XtSynthZones, XtSynthNotes.cpp, XtSynthUpdate.cpp, XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp; XtToneCheck.cpp's to
+  XtToneFirmware, XtToneCases, XtToneCarry.
+  Check: xt_tone's MSM mode (xt_tone <rom> msm [cases] [seed]; XtToneMsm.cpp, XtToneFwMsm.h, XtToneMsmCheck.h; fcheck, 200
+  cases): the firmware's own object beside the firmware's tone, against XtSynth: the bus bit for bit, each note's TVA,
+  envelopes, LFOs, COSMs, OSCs, the last voice's buffers, both objects; Hold in a case in four. Every destination alone,
+  keys let go and held, 144 runs at 30 cases; seeds 2024, 7, 99 at 400 cases; 0 different. It found one fault in XtSynth (clocks run on a count a stop
+  had left) and three of its own (an ended firmware note left on the tones' list, two notes on one key, an edit that moved
+  no value). xt_tone's main check plays a patch's tone with it off (withoutMsm). xt_arp now compares the arpeggio's flag
+  (0x894d9920, 0x894d9930), which it had answered with nothing.
+  Research switches: XT_TONE_MSM_DEST=n, XT_TONE_MSM_HOLD=1, XT_TONE_MSM_ONE=1, XT_TONE_MSM_OFF=1, XT_TONE_MSM_CC7=1.
+  Plugin: 98 host parameters appended after the arpeggio's (PluginMsm.cpp; 745 in all, the first 647 unchanged), the
+  firmware's names (each track's Loop numbered), descriptors and value texts, End Point and Zone 1…16; a patch's settings
+  onto them, then msmPatch (setPatchControls); the editor's MSM tab before the Matrix (PluginEditorMsm.cpp), one track at a
+  time; PluginSetting.cpp, the parameter builder and texts the arpeggio's and the MSM's share; the Matrix tab's parts in
+  PluginEditorMatrix.cpp. Tests: MsmPluginTest.cpp in VSynthEmuArpPluginTest; TEST_UI_LAYOUT moved to LayoutTest.cpp and
+  LayoutCheck.h, with a step for each track.
+  Planted: mutate_tone.py 1166 (28 new wire… plants through the MSM mode; 171 moved with the split), all caught but
+  check-pad-cc [gap, v189's]. The first run missed two of mine: msm-held-sounding, caught once the mode had the Hold pedal;
+  msm-release-unread dropped as equivalent (every term that moves updates every voice at once, so a key-off's read of the
+  Releases finds them already there; the read stays, as the firmware's). mutate_arp.py 92 (2 new: the flag), mutate_msm.py
+  71, mutate_panel.py v193's 20 (18 msm-, arp-text-step, arp-text-sign): none missed.
+
 The Multi Step Modulator v192 (2026-11-11): the firmware's own, which 55 of the 512 preset patches use (HARDWARE_FIRMWARE.md,
   "The Multi Step Modulator"), ported and checked; not wired into the sound yet (v193). Numbered from v192 on its own branch
   (claude/msm-ad515c): v188 to v191 are the arpeggio's and the Algorithm menu's removal, on master.

@@ -31,7 +31,8 @@ std::optional<uint64_t> digestOf(const std::string& path) {
 // Every port's tables from the image, then what the firmware's own start-up works out; false if a port's won't read
 bool loadTables(const char* path) {
     if (!(xtLoadTables(path) && xtMbLoadTables(path) && xtEnvLoadTables(path) && xtLfoLoadTables(path)
-          && xtOscLoadTables(path) && xtCosmLoadTables(path) && xtAnalogLoadTables(path) && xtFwOpen(path)))
+          && xtOscLoadTables(path) && xtCosmLoadTables(path) && xtAnalogLoadTables(path) && xtMsmLoadTables(path)
+          && xtFwOpen(path)))
         return false;
     std::vector<uint32_t> ks;
     if (xtFwEnvKeyScales(ks)) xtEnvSetKeyScales(ks.data());

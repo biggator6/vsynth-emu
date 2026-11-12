@@ -213,6 +213,12 @@ private:
     void writeArpControls(const XtSynth::Controls& c);
     void restoreArpPattern();                        // a session's, or the XT's default (setStateInformation)
     ArpPatternWords arpWords_;
+    // The Multi Step Modulator's 98 settings, after the arpeggio's (PluginMsm.cpp, v193); and a patch's controls, which
+    // stop it as the XT's patch load does
+    static void addMsmParams(ParamList& params);
+    void readMsmControls(XtSynth::Controls& c) const;
+    void writeMsmControls(const XtSynth::Controls& c);
+    void setPatchControls(const XtSynth::Controls& c);
     void waveToParameters(const XtWaveFile& wave, int osc);
     void takeWave(const XtWaveFile& wave, const juce::File& file, int osc);
     void unloadWave(int osc);

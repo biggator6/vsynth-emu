@@ -19,6 +19,7 @@ struct XtMsmTrackSettings {
     int zone = 0;          // 0…15
     int dest = 0;          // 0…71, the value string's list (OSC1+2-PIT-CRS … MFX-PRM3)
     int steps[16] = {};    // −63…+63
+    bool operator==(const XtMsmTrackSettings&) const = default;
 };
 
 struct XtMsmSettings {
@@ -26,13 +27,33 @@ struct XtMsmSettings {
     int master = 0;        // 0x48d Master Switch
     int keySync = 1;       // 0x48e OFF, PART, VOICE
     XtMsmTrackSettings track[kTracks];
+    bool operator==(const XtMsmSettings&) const = default;
 };
 
 // The IDs the loaders read: 0x48d Master Switch, 0x48e Key Sync, then 24 a track from 0x48f: Switch, Loop, Type, Grid,
 // End Point, Direction, Zone, Destination, Step 1…16 (0x4ef, after them, is a dummy).  The setting an ID is, nullptr for
-// none.
-constexpr int kXtMsmFirstId = 0x48d, kXtMsmLastId = 0x4ee, kXtMsmTrackIds = 24;
+// none; xtMsmValue its value, 0 for none.  The destinations are 72.
+constexpr int kXtMsmFirstId = 0x48d, kXtMsmLastId = 0x4ee, kXtMsmTrackIds = 24, kXtMsmDests = 72;
 int* xtMsmField(XtMsmSettings& s, int id);
+int xtMsmValue(XtMsmSettings s, int id);
+
+// The destinations by number: the patch's three, OSC 1's from 3 and OSC 2's from 17 (an OscDest on), COSM 1's from 31 and
+// COSM 2's from 44 (a CosmDest on), the TVA's from 57 (a TvaDest on), the sends and MFX-PRM1…3
+namespace xtmsm {
+enum Dest : int {
+    PitCrs = 0, PitFine = 1, PortaTime = 2, Osc1 = 3, Osc2 = 17, Cosm1 = 31, Cosm2 = 44, Tva = 57,
+    MfxSend = 66, ChoSend = 67, RevSend = 68, MfxPrm = 69,
+};
+enum OscDest : int {
+    OscCrs, OscFine, OscPitch, OscPenv, OscTime, OscTenv, OscFormant, OscFenv,
+    OscLfoRate, OscLfoPitch, OscLfoTime, OscLfoFormant, OscLfoLevel, OscLevel,
+};
+enum CosmDest : int {
+    CosmPrm1, CosmPrm2, CosmEnv1, CosmEnv2 = CosmEnv1 + 4, CosmLfoRate = CosmEnv2 + 4, CosmLfoPrm1, CosmLfoPrm2,
+};
+enum TvaDest : int { TvaLevel, TvaPan, TvaEnv, TvaLfoRate = TvaEnv + 4, TvaLfoLevel, TvaLfoPan };
+enum EnvStage : int { Attack, Decay, Sustain, Release };
+}
 // The settings a patch's store holds (XtMsmPatch.cpp; its reads need xtFwOpen, and aren't for the audio thread)
 XtMsmSettings xtMsmSettingsOf(const std::vector<uint8_t>& store);
 
@@ -108,7 +129,11 @@ public:
     uint8_t loops[kTracks] = {};   // +0x28: each track's Loop Switch as read
     XtMsmTrack track[kTracks];     // +0x2c
     int32_t now = 0;           // the OS's tempo ticks (0x898586f0)
-    int updates = 0;           // the tone updates asked for (0x894d96b0 → 0x894d72f0); the caller takes them
+    int updates = 0;           // the tone updates asked for (0x894d96b0 → 0x894d72f0)
+    // Each tone update at once, where the firmware's runs: inside start, stop and clocks, so that one stopped and started
+    // again gives its notes an update with no terms, then one with the first steps'.  reset keeps it.
+    void (*onUpdate)(void*) = nullptr;
+    void* updateTo = nullptr;
 
     void start();              // 0x894d95a0
     void stop();               // 0x894d9600
@@ -116,6 +141,7 @@ public:
 private:
     void read(const XtMsmSettings& s);                  // the loaders' common part, 0x894d9988… and 0x894d9b4c…
     bool clockAll();                                    // 0x894d9660
+    void toneUpdate();                                  // 0x894d96b0
 };
 
 // 0x894d98a0: a step's value as semitones, for the coarse tunes (destinations 0, 3, 17): ±63 to ±24, ⌊|v|·24/63⌋; past

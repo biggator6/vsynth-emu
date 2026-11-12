@@ -28,6 +28,7 @@ public:
     uint32_t global(uint32_t addr) { return m.cpu.rd32(addr); }
     std::vector<XtArpEvent> sent;                  // the messages it posted (0x89472e70)
     std::string failed;                            // a call that faulted or ran out of steps
+    int msmFlag = -1;                              // the Multi Step Modulator's flag: 1 set (0x894d9920), 0 cleared (0x894d9930)
 private:
     xtfw::Machine m;
     bool built = false, stepFlag = false;

@@ -23,8 +23,8 @@ arp-pedal-to-part|    arp.pedal(std::clamp(value, 0, 127));|    tgController(num
 arp-param-swap|{ "arpDuration", 0x431,|{ "arpDuration", 0x432,|plugin/Source/PluginArp.cpp|arpplugin
 arp-param-default|ArpKind::Choice, 0, 5, 3,|ArpKind::Choice, 0, 5, 0,|plugin/Source/PluginArp.cpp|arpplugin
 arp-text-real|{ realText, realValue } },|kPlain },|plugin/Source/PluginArp.cpp|arpplugin
-arp-text-step|juce::String stepText(int v) { return juce::String(v + 1); }|juce::String stepText(int v) { return juce::String(v); }|plugin/Source/PluginArp.cpp|arpplugin
-arp-text-sign|return v >= 0 ? "+" + juce::String(v)|return v > 0 ? "+" + juce::String(v)|plugin/Source/PluginArp.cpp|arpplugin
+arp-text-step|juce::String stepText(int v) { return juce::String(v + 1); }|juce::String stepText(int v) { return juce::String(v); }|plugin/Source/PluginSetting.cpp|arpplugin
+arp-text-sign|return v >= 0 ? "+" + juce::String(v)|return v > 0 ? "+" + juce::String(v)|plugin/Source/PluginSetting.cpp|arpplugin
 arp-not-added|    addArpParams(params);|    ;|plugin/Source/PluginParams.cpp|arpplugin
 arp-switch-unread|    c.arp.on = knob(idOf(kXtArpSwitchId)) != 0;|    c.arp.on = false;|plugin/Source/PluginArp.cpp|arpplugin
 arp-pattern-unread|    c.arpPattern = arpWords_.load();|    ;|plugin/Source/PluginArp.cpp|arpplugin
@@ -44,3 +44,23 @@ editor-arp-narrow|{ &arp_.resolution, 84 }|{ &arp_.resolution, 40 }|plugin/Sourc
 editor-arp-one-column|    pattern.col = 1;|    ;|plugin/Source/PluginEditorPlay.cpp|layout
 editor-arp-hidden|        addAndMakeVisible(*s);|        ;|plugin/Source/PluginEditorPlay.cpp|layout
 editor-style-shared|        Ui::styleValueSlider(*sl, sl == &keySlider_ ? 56 : sl == &startSlider_ ? 66 : 44);|        Ui::styleValueSlider(*sl, 20);|plugin/Source/PluginEditor.cpp|layout
+# The Multi Step Modulator's plugin side (v193): its parameters, by VSynthEmuArpPluginTest's MSM checks (MsmPluginTest.cpp);
+# their read and write, by PluginTest's patch apply; a patch's load not stopping it; the MSM tab, by the layout check.
+msm-param-id|first + 7 + s));|first + 8 + s));|plugin/Source/PluginMsm.cpp|arpplugin
+msm-param-id-swap|kTrack[i].name, first + i));|kTrack[i].name, first + (i ^ 1)));|plugin/Source/PluginMsm.cpp|arpplugin
+msm-param-default|Kind::Choice, 0, 5, 3, "QUARTER|Kind::Choice, 0, 5, 0, "QUARTER|plugin/Source/PluginMsm.cpp|arpplugin
+msm-keysync-default|"KeySync", "Key Sync", Kind::Choice, 0, 2, 1,|"KeySync", "Key Sync", Kind::Choice, 0, 2, 0,|plugin/Source/PluginMsm.cpp|arpplugin
+msm-text-endpoint|Kind::Number, 0, 15, 15, nullptr, { stepText, stepValue } },|Kind::Number, 0, 15, 15, nullptr, kPlain },|plugin/Source/PluginMsm.cpp|arpplugin
+msm-dest-names|{ "CSM1-", &cosm }|{ "COSM1-", &cosm }|plugin/Source/PluginMsm.cpp|arpplugin
+msm-not-added|    addMsmParams(params);   // PluginMsm.cpp, v193: the same|    ;|plugin/Source/PluginParams.cpp|arpplugin
+msm-read-dropped|    readMsmControls(c);     // PluginMsm.cpp, v193|    ;|plugin/Source/PluginControlsRead.cpp|patch
+msm-write-dropped|    writeMsmControls(c);    // PluginMsm.cpp, v193|    ;|plugin/Source/PluginControlsWrite.cpp|patch
+msm-read-swapped|*xtMsmField(c.msm, p.fwId) = knob(p.spec.id);|*xtMsmField(c.msm, p.fwId) = knob(kMsmParams[(size_t)((p.fwId - kXtMsmFirstId) ^ 1)].spec.id);|plugin/Source/PluginMsm.cpp|patch
+msm-write-swapped|set(p.spec.id, (float)xtMsmValue(c.msm, p.fwId));|set(kMsmParams[(size_t)((p.fwId - kXtMsmFirstId) ^ 1)].spec.id, (float)xtMsmValue(c.msm, p.fwId));|plugin/Source/PluginMsm.cpp|patch
+msm-patch-unstopped|    synth_.msmPatch();|    ;|plugin/Source/PluginMsm.cpp|arpplugin
+msm-patch-not-told|    setPatchControls(c);   // and the|    setControls(c);   // and the|plugin/Source/PluginProcessor.cpp|arpplugin
+msm-editor-wrong-track|juce::jlimit(0, MsmControls::kTracks - 1, msm_.track.getSelectedItemIndex());|(msm_.track.getSelectedItemIndex() + 1) % MsmControls::kTracks;|plugin/Source/PluginEditorMsm.cpp|layout
+msm-editor-one-track|kXtMsmTrackIds * t + i; }|kXtMsmTrackIds * 0 * t + i; }|plugin/Source/PluginEditorMsm.cpp|layout
+msm-editor-unplaced|    p.add(stepsCard(msm_, 1));|    ;|plugin/Source/PluginEditorMsm.cpp|layout
+msm-editor-no-items|        box.addItemList(choice->choices, 1);|        ;|plugin/Source/PluginEditorMsm.cpp|layout
+msm-tab-unnamed|"Play", "MSM", "Matrix"|"Play", "Matrix"|plugin/Source/PluginEditor.cpp|layout

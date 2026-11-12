@@ -8,12 +8,16 @@
 // - a session: settings and pattern back in another processor; one saved before v190 brings the XT's default pattern;
 // - a chord through processBlock with the arpeggio on: XtSynth's render on the processor's own controls, sample for
 //   sample, a note each quarter; the Switch off, the chord once.
+// Then the Multi Step Modulator's plugin side (MsmPluginTest.cpp, v193), whose checks this program runs too.
 // `params` lists every parameter instead: its place, ID, name, range, default and its text at five points, what a host
 // sees of it, so a change to how the list is made can be shown to leave it as it was (v190's split of PluginProcessor.cpp).
 // Run: VSynthEmuArpPluginTest <rom.2.bin> [params].  Exit 0 if every check holds.
+#include "MsmPluginTest.h"
 #include "TestChecks.h"
 #include "TestControls.h"
+#include "TestFirmware.h"
 #include "TestMain.h"
+#include "TestAgainstSynth.h"
 #include "TestOnsets.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/Sh4Interp.h"
@@ -41,38 +45,14 @@ constexpr int kBlock = 480;                   // 10 ms
 constexpr int kChord[] = { 60, 64, 67 };
 using Setting = std::pair<const char*, float>;
 
-juce::String firmwareName(Sh4& image, int id) {
-    juce::String name;
-    for (uint32_t a = image.rd32(0x89790338 + 4 * (uint32_t)id); image.rd8(a); ++a) name += (char)image.rd8(a);
-    return name.upToFirstOccurrenceOf(" *", false, false).trim();
-}
-
 // Each one's name, range, default and texts against the firmware's
 void againstFirmware(TestChecks& check, VSynthEmuProcessor& p, const juce::File& rom) {
-    const std::string path = rom.getFullPathName().toStdString();
-    Sh4 image;
-    image.loadRom(path.c_str());
-    XtFxValueText text(path.c_str());
-    check(text.ok(), "the firmware's text routine should run");
+    Firmware fw(rom);
+    check(fw.text.ok(), "the firmware's text routine should run");
     for (const ArpId& a : kArpIds) {
         auto* prm = dynamic_cast<juce::RangedAudioParameter*>(p.apvts.getParameter(a.id));
-        const XtParamDesc* d = xtParamDesc(a.fw);
-        if (!prm || !d) {
-            check(false, std::string(a.id) + " and its descriptor should be there");
-            continue;
-        }
-        const std::string what = std::string(a.id) + ": ";
-        check(prm->name == firmwareName(image, a.fw), what + "named " + prm->name.toStdString());
-        const auto& r = prm->getNormalisableRange();
-        const int def = (int)std::lround(prm->convertFrom0to1(prm->getDefaultValue()));
-        check((int)r.start == d->min - d->centre && (int)r.end == d->max - d->centre, what + "the descriptor's range");
-        check(def == d->def - d->centre, what + "the descriptor's default, not " + std::to_string(def));
-        for (int v = (int)r.start; v <= (int)r.end && prm->getNumSteps() > 2; ++v) {
-            const juce::String want = a.fw == kEndPointId ? juce::String(v + 1) : juce::String(text.text(a.fw, v));
-            const juce::String got = prm->getText(prm->convertTo0to1((float)v), 64);
-            const std::string reads = std::to_string(v) + " reads " + got.toStdString();
-            check(got == want, what + reads + ", not " + want.toStdString());
-        }
+        const bool texts = prm && prm->getNumSteps() > 2;
+        paramAgainstFirmware(check, prm, { a.fw, firmwareName(fw.image, a.fw), texts, a.fw == kEndPointId }, fw.text);
     }
 }
 
@@ -183,31 +163,20 @@ struct Heard {
     float most = 0.0f;
 };
 Heard play(VSynthEmuProcessor& p, double seconds) {
-    p.prepareToPlay(kRate, kBlock);
-    XtSynth ref;
-    ref.prepare(kRate);
-    ref.setControls(p.currentControls());
-    juce::AudioBuffer<float> buf(2, kBlock);
+    AgainstSynth both(p, kRate, kBlock);
     juce::MidiBuffer midi;
-    std::vector<float> rl(kBlock), rr(kBlock);
     Heard h;
     for (int b = 0; b < (int)(seconds * kRate / kBlock); ++b) {
         midi.clear();
         for (const int k : kChord)
             if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, k, (juce::uint8)100), 0);
-        buf.clear();
-        p.processBlock(buf, midi);
-        juce::ScopedNoDenormals ftz;
-        for (const int k : kChord)
-            if (b == 0) ref.noteOn(k, 100 / 127.0f);
-        ref.render(rl.data(), rr.data(), kBlock);
-        for (int i = 0; i < kBlock; ++i) {
-            const float l = std::fabs(buf.getSample(0, i) - rl[(size_t)i]);
-            const float r = std::fabs(buf.getSample(1, i) - rr[(size_t)i]);
-            h.most = std::max({ h.most, l, r });
-        }
-        h.rms.push_back(frameRms(buf.getReadPointer(0), buf.getReadPointer(1), kBlock));
+        both.block(midi, [b](XtSynth& ref) {
+            for (const int k : kChord)
+                if (b == 0) ref.noteOn(k, 100 / 127.0f);
+        });
+        h.rms.push_back(frameRms(both.buf.getReadPointer(0), both.buf.getReadPointer(1), kBlock));
     }
+    h.most = both.most;
     return h;
 }
 
@@ -235,7 +204,8 @@ int arpPluginTest(const juce::File& rom, const juce::File& work) {
     patchAndSession(check, rom, work);
     throughProcessor(check, rom, true);
     throughProcessor(check, rom, false);
-    return check.summary();
+    const int arp = check.summary();
+    return msmPluginTest(rom, work) | arp;   // the MSM's (v193)
 }
 
 // Every parameter as a host sees it, one a line

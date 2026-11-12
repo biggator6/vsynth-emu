@@ -764,22 +764,6 @@ void VSynthEmuEditor::attachCosm(int k) {
 // name, Encode), Key and Depth, Energy and the VariPhrase knobs, Loop, analog
 // knobs, pitch, TVA, amp envelope, velocity to level, pitch, time and formant
 // envelopes and LFO; the PITCH, TIME and FORMANT knobs and Robot too.
-// One Matrix Control's knobs on the row, as the XT's Control tabs do
-void VSynthEmuEditor::attachMatrix(int m) {
-    matrixSourceAtt_.reset();
-    for (int j = 0; j < 2; ++j) { matrixDestAtt_[j].reset(); matrixSensAtt_[j].reset(); }
-    matrixSourceAtt_ = std::make_unique<ComboAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Source"), matrixSourceBox_);
-    matrixDestAtt_[0] = std::make_unique<ComboAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Dest1"), matrixDestBox_[0]);
-    matrixDestAtt_[1] = std::make_unique<ComboAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Dest2"), matrixDestBox_[1]);
-    matrixSensAtt_[0] = std::make_unique<SliderAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Sens1"), matrixSens_[0]);
-    matrixSensAtt_[1] = std::make_unique<SliderAtt>(processor_.apvts, VSynthEmuProcessor::matrixParamId(m, "Sens2"), matrixSens_[1]);
-}
-
-void VSynthEmuEditor::attachAssign(int which) {
-    assignAtt_.reset();
-    assignAtt_ = std::make_unique<ComboAtt>(processor_.apvts, VSynthEmuProcessor::assignParamId(which), assignBox_);
-}
-
 void VSynthEmuEditor::attachOsc(int k) {
     oscK_ = k;
     auto id = [k](const char* name) { return VSynthEmuProcessor::oscParamId(k, name); };
@@ -1482,20 +1466,8 @@ void VSynthEmuEditor::buildLayout() {
     }
 
     buildPlayPage();   // PluginEditorPlay.cpp (v190)
-
-    // ── Matrix: one Control at a time, and the controller assigns ──
-    {
-        Page& p = *pages_[6];
-        Card m { "Matrix" };
-        m.rows = { lr(matrixLabel_, matrixSelBox_), lr(*newLabel("Source"), matrixSourceBox_),
-                   lr(*newLabel("Destination 1"), matrixDestBox_[0]), lr(matrixSensLabels_[0], matrixSens_[0]),
-                   lr(*newLabel("Destination 2"), matrixDestBox_[1]), lr(matrixSensLabels_[1], matrixSens_[1]) };
-        p.add(m);
-        Card a { "Controller assign" };
-        a.col = 1;
-        a.rows = { lr(assignLabel_, assignSelBox_), lr(*newLabel("Function"), assignBox_) };
-        p.add(a);
-    }
+    buildMsmPage();    // PluginEditorMsm.cpp (v193)
+    buildMatrixPage(); // PluginEditorMatrix.cpp (v193)
 
     // What stays on the editor; everything the pages don't take is dropped, so a
     // new control must go in a card or here (TEST_UI_LAYOUT says if one didn't),
@@ -1512,7 +1484,7 @@ void VSynthEmuEditor::buildLayout() {
     for (juce::Label* l : { &pitchLabel_, &timeLabel_, &formantLabel_ }) l->setJustificationType(juce::Justification::centred);
 
     tabBar_ = std::make_unique<TabBar>();
-    tabBar_->names = { "Oscillator", "Envelopes", "LFOs", "COSM", "Amp & Pan", "Play", "Matrix", "Effects" };
+    tabBar_->names = { "Oscillator", "Envelopes", "LFOs", "COSM", "Amp & Pan", "Play", "MSM", "Matrix", "Effects" };
     tabBar_->onChange = [this](int t) { showTab(t); };
     tabBar_->setComponentID("tabs");                 // for PluginTest
     addAndMakeVisible(*tabBar_);

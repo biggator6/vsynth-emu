@@ -60,6 +60,7 @@ void XtArpeggio::halt() {
     next = kNever;
     step = 0;
     due = kNever;
+    msmFlag = 0;                              // 0x89302558
 }
 
 // 0x89303480: from the pattern's start, `delay` ticks late
@@ -115,7 +116,10 @@ void XtArpeggio::runStep() {
         started = 1;
     }
     schedule(next);
-    while (offHead >= 0 && offs[offHead].time <= fired) endNote(offHead);
+    while (offHead >= 0 && offs[offHead].time <= fired) {
+        endNote(offHead);
+        msmFlag = 1;                          // 0x893027e6
+    }
     schedule(offHead >= 0 ? offs[offHead].time : kNever);
 }
 

@@ -14,8 +14,22 @@ int* xtMsmField(XtMsmSettings& s, int id) {
     return f < kFields ? fields[f] : &t.steps[f - kFields];
 }
 
+int xtMsmValue(XtMsmSettings s, int id) {
+    const int* f = xtMsmField(s, id);
+    return f ? *f : 0;
+}
+
 void XtMsm::reset() {
+    const auto fn = onUpdate;
+    void* const to = updateTo;
     *this = XtMsm();
+    onUpdate = fn;
+    updateTo = to;
+}
+
+void XtMsm::toneUpdate() {
+    ++updates;
+    if (onUpdate) onUpdate(updateTo);
 }
 
 // 0x894d9988… and 0x894d9b4c…: the Master Switch (a change to OFF stops it), Key Sync, then each track's by its IDs.  A
@@ -60,7 +74,7 @@ void XtMsm::start() {
     if (due > pos) due = pos;                   // 0x8930ea10: a timer is set only sooner
     running = 1;
     for (XtMsmTrack& t : track) t.start();
-    ++updates;
+    toneUpdate();
 }
 
 void XtMsm::stop() {
@@ -68,7 +82,7 @@ void XtMsm::stop() {
     due = kNever;                               // 0x8930ea90
     running = 0;
     for (XtMsmTrack& t : track) t.halt();
-    ++updates;
+    toneUpdate();
 }
 
 void XtMsm::noteOn(int part, bool keyHeld) {
@@ -121,7 +135,7 @@ void XtMsm::clocks(bool sounding) {
     bool moved = false;
     for (int32_t i = n; i > 0; --i)
         if (clockAll()) moved = true;
-    if (moved) ++updates;
+    if (moved) toneUpdate();
 }
 
 int XtMsm::term(int dest, int part, int zone) const {

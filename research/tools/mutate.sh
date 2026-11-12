@@ -19,6 +19,12 @@
 # v189), under xt_arp; [cases] its random cases, after the presets.
 # PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
+# PORT=toneknobs, toneenvknobs, toneupdate, tonezones, tonenotes: XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp, XtSynthUpdate.cpp,
+# XtSynthZones.cpp, XtSynthNotes.cpp under xt_tone (v193: XtSynth's parts by job); tonefwcpp, tonefwh, tonecases,
+# tonecarry: xt_tone's own XtToneFirmware.cpp, XtToneFirmware.h, XtToneCases.cpp, XtToneCarry.cpp.  PORT=wire…: under
+# xt_tone's MSM mode (`xt_tone rom msm [cases] [seed]`), [cases] its cases: wiremsm XtSynthMsm.cpp; wireknobs,
+# wireenvknobs, wireupdate, wirezones, wirenotes, wirearp the files of the tone ports of those names; wirecheck
+# XtToneMsm.cpp, wirefwmsm XtToneFwMsm.h.  A header's plant builds every part again, from a copy of the sources.
 source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # a run that can't start must never read as a result; no "== name" follows
@@ -44,6 +50,19 @@ tonefile() {
         tonewave) echo XtWaveFile.cpp ;;
         tonestore) echo XtPatchStore.cpp ;;
         tonearp) echo XtSynthArp.cpp ;;
+        toneknobs | wireknobs) echo XtSynthKnobs.cpp ;;
+        toneenvknobs | wireenvknobs) echo XtSynthEnvKnobs.cpp ;;
+        toneupdate | wireupdate) echo XtSynthUpdate.cpp ;;
+        tonezones | wirezones) echo XtSynthZones.cpp ;;
+        tonenotes | wirenotes) echo XtSynthNotes.cpp ;;
+        wiremsm) echo XtSynthMsm.cpp ;;
+        wirearp) echo XtSynthArp.cpp ;;
+        wirecheck) echo XtToneMsm.cpp ;;
+        wirefwmsm) echo XtToneFwMsm.h ;;
+        tonefwcpp) echo XtToneFirmware.cpp ;;
+        tonefwh) echo XtToneFirmware.h ;;
+        tonecases) echo XtToneCases.cpp ;;
+        tonecarry) echo XtToneCarry.cpp ;;
     esac
 }
 # A port whose check is a harness of its own with the patches' reads (xt_arp, xt_msm): its files and those reads, all but
@@ -70,17 +89,25 @@ TF=$(tonefile "${PORT:-cosm}")
 if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
     F=$TF
     D=XT_TONE_MAIN; ARGS=("${SEED:-2024}" "$WORK/inputs")
-    OBJ="$M/tone_obj"; mkdir -p "$OBJ"; L=()
+    OBJ="$M/tone_sw_obj"   # with the research switches, as build.sh's xt_tone (v193)
+    mkdir -p "$OBJ"
+    L=()
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
     PARTS=(XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtLinearPlayer XtLitePlayer XtMultiBandPlayer XtEnvelope XtLfo
            XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp XtFiles XtWaveFile XtDiskImage XtPatchStore
-           XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch)
+           XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch
+           XtSynthZones XtSynthNotes XtSynthUpdate XtSynthKnobs XtSynthEnvKnobs XtSynthMsm XtMsm XtMsmTrack XtMsmPatch
+           XtToneFirmware XtToneCases XtToneCarry XtToneMsm)
+    TONE=(-DXT_TONE_MAIN -DXT_TONE_CHECK -DXT_HARNESS_SWITCHES)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue
-        [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] || "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_TONE_MAIN -DXT_TONE_CHECK -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
         L+=("$OBJ/$f.o")
+        [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] && continue
+        "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 "${TONE[@]}" -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
     done
-    EXTRA=(-DXT_TONE_CHECK)
+    EXTRA=(-DXT_TONE_CHECK "${HARNESS_SWITCHES[@]}")
+    # PORT=wire…: the Multi Step Modulator's wiring, against xt_tone's MSM mode, [cases] its cases (v193)
+    [[ "$PORT" == wire* ]] && ARGS=("$C" "${SEED:-2024}") && C=msm
 elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck's baseline; [cases] is not used
     F=XtSoloVoice.cpp; D=XT_FW_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
 elif [ "$PORT" = fx ]; then        # XtFxChip against the reference; [cases] is its samples per type, and XT_FX_STOP stops at the first difference
@@ -157,12 +184,28 @@ fi
 if [ -z "$TF" ] && { [ "$F" = XtFirmware.cpp ] || [[ " ${L[*]} " == *"/XtFirmware.cpp "* ]]; }; then
     L+=("$S/XtFwMachine.cpp")
 fi
-"$PY" - "$S/$F" "$M/$N.cpp" "$O" "$W" <<'PY' || exit 1
+# A header's plant (PORT=tonefwh, wirefwmsm; v193) goes into a copy of the sources
+OUT="$M/$N.cpp"
+if [[ "$F" == *.h ]]; then
+    rm -rf "${M:?}/${N:?}.src"
+    cp -R "$S" "$M/$N.src"
+    OUT="$M/$N.src/$F"
+fi
+"$PY" - "$S/$F" "$OUT" "$O" "$W" <<'PY' || exit 1
 import sys
 s = open(sys.argv[1]).read()
 if s.count(sys.argv[3]) == 0: sys.exit('mutate: the old text is not in ' + sys.argv[1])
 open(sys.argv[2], 'w').write(s.replace(sys.argv[3], sys.argv[4], 1))
 PY
+# and every part is built from the copy, which the line below links, its own file left empty
+if [[ "$F" == *.h ]]; then
+    : > "$M/$N.cpp"
+    mkdir -p "$M/$N.obj"
+    L=()
+    for f in "${PARTS[@]}"; do L+=("$M/$N.obj/$f.o"); done
+    printf '%s\n' "${PARTS[@]}" | xargs -P "${JOBS:-8}" -I{} "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 \
+        "${TONE[@]}" -c "$M/$N.src/{}.cpp" -o "$M/$N.obj/{}.o" 2>&1 | grep -E " error" && exit 1
+fi
 "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -D$D "${EXTRA[@]}" -I"$S" "$M/$N.cpp" "${L[@]}" -o "$M/$N" 2>&1 | grep -E " error" && exit 1
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # again: a build takes long enough for it to go
 echo "== $N"

@@ -2,24 +2,24 @@ stale-porta|    v->porta = XtPitchRamp{};\n|
 seed-shift|oscLfoNoteOn(*v, *v, Z, freeLfo[zone], other ? &other->lfo : nullptr, seed[1]);|oscLfoNoteOn(*v, *v, Z, freeLfo[zone], other ? &other->lfo : nullptr, seed[2]);
 seed-few|    for (float& x : seed) x = drawSeed();|    for (int i = 0; i < 7; ++i) seed[i] = drawSeed();
 voice-end|if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent)|if (v.env.done() && mul(v.cur[0], 2.0f) <= kSilent && v.cur[1] <= kSilent)
-lfo-pitch-depth|std::clamp(o.lfoPitchDepth + v.mx[dL + 1], -63, 63)|std::clamp(o.lfoTimeDepth + v.mx[dL + 1], -63, 63)
-penv-depth|xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63))|xtPitchDepthCents((float)std::clamp(o.tDepth, -63, 63))
-root-key|s.analog ? 69 : o.rootKey|s.analog ? 60 : o.rootKey
-formant-env|s.fenv.level(),\n                          withVel(xtOscFormantEnvDepth|s.tenv.level(),\n                          withVel(xtOscFormantEnvDepth
-time-kf|xtOscTime(o.oscTime, o.oscTimeOffset, o.oscTimeKF, v.note,|xtOscTime(o.oscTime, o.oscTimeOffset, o.oscFormantKF, v.note,
-energy|g = xtOscEnergy(o.energy);|g = xtOscEnergy(o.energy / 2);
-level-kf|Osc2)], o.oscLevelKF, v.note,|Osc2)], 0, v.note,
-level-vel|xtVelGain(v.vel, o.oscVelSens, o.oscVelCurve)|xtVelGain(v.vel, ctl.ampVelSens, o.oscVelCurve)
-level-lfo|xtOscLevelLfoDepth(o.oscLevelLfoDepth + v.mx[|xtOscLevelLfoDepth(o.lfoPitchDepth + v.mx[
-osc2-flag|xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve), &s == &v.osc2, m)|xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve), false, m)
+lfo-pitch-depth|std::clamp(o.lfoPitchDepth + oscTerm(v, s, xtmsm::OscLfoPitch) + v.mx[dL + 1], -63, 63)|std::clamp(o.lfoTimeDepth + oscTerm(v, s, xtmsm::OscLfoPitch) + v.mx[dL + 1], -63, 63)|toneknobs
+penv-depth|std::clamp(o.pDepth + oscTerm(v, s, xtmsm::OscPenv), -63, 63)|std::clamp(o.tDepth + oscTerm(v, s, xtmsm::OscPenv), -63, 63)|toneknobs
+root-key|s.analog ? 69 : o.rootKey|s.analog ? 60 : o.rootKey|toneknobs
+formant-env|v.mx[OscFormant + dO]), s.fenv.level(), fEnv,|v.mx[OscFormant + dO]), s.tenv.level(), fEnv,|toneknobs
+time-kf|xtOscTime(time, o.oscTimeOffset, o.oscTimeKF, v.note,|xtOscTime(time, o.oscTimeOffset, o.oscFormantKF, v.note,|toneknobs
+energy|g = xtOscEnergy(o.energy);|g = xtOscEnergy(o.energy / 2);|toneknobs
+level-kf|xtOscLevel(knob, o.oscLevelKF, v.note,|xtOscLevel(knob, 0, v.note,|toneknobs
+level-vel|xtVelGain(v.vel, o.oscVelSens, o.oscVelCurve)|xtVelGain(v.vel, ctl.ampVelSens, o.oscVelCurve)|toneknobs
+level-lfo|const int lfo = o.oscLevelLfoDepth + oscTerm(|const int lfo = o.lfoPitchDepth + oscTerm(|toneknobs
+osc2-flag|fatVel, pwVel, &s == &v.osc2, m)|fatVel, pwVel, false, m)|toneknobs
 gain-start|s.curGain = gainTarget(v, s, o, s.oenv.level());                                                  // +0x154 (0x894f3dc0)|s.curGain = gainStart;
 ana-env-swap|s.curGain, gainStart, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared)|s.curGain, gainStart, s.tenv.level(), s.fenv.level(), s.lfo.out(), anaShared)
 ana-update-swap|s.ana.update(analogBlock(v, s, o), A, gt, s.fenv.level(), s.tenv.level(), s.lfo.out());|s.ana.update(analogBlock(v, s, o), A, gt, s.tenv.level(), s.fenv.level(), s.lfo.out());
-amp-env-sens|k.aSens = o.oASens; k.dSens = o.oDSens; k.rSens = o.oRSens;|k.aSens = o.oASens; k.dSens = o.oRSens; k.rSens = o.oDSens;
-amp-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nvoid XtSynth::applyRates|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nvoid XtSynth::applyRates
-osc-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nXtEnvParams XtSynth::envParams|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nXtEnvParams XtSynth::envParams
-tva-env-rsens|k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens;|k.aSens = Z.aSens; k.dSens = Z.rSens; k.rSens = Z.dSens;
-tva-time-kf|k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens; k.timeKF = Z.timeKF;\n    XtEnvParams p = xtEnvAdsr|k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens;\n    XtEnvParams p = xtEnvAdsr
+amp-env-sens|k.aSens = o.oASens; k.dSens = o.oDSens; k.rSens = o.oRSens;|k.aSens = o.oASens; k.dSens = o.oRSens; k.rSens = o.oDSens;|toneenvknobs
+amp-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nXtLfoParams XtSynth::lfoParams|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nXtLfoParams XtSynth::lfoParams|toneenvknobs
+osc-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nXtEnvParams XtSynth::envParams|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nXtEnvParams XtSynth::envParams|toneenvknobs
+tva-env-rsens|k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens;|k.aSens = Z.aSens; k.dSens = Z.rSens; k.rSens = Z.dSens;|toneenvknobs
+tva-time-kf|k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens; k.timeKF = Z.timeKF;\n    XtEnvParams p = xtEnvAdsr|k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens;\n    XtEnvParams p = xtEnvAdsr|toneenvknobs
 tva-level|v->velGain = xtVelGain(v->vel, Z.ampVelSens, Z.ampVelCurve);|v->velGain = 1.0f;
 tva-frames|float frames = 441.0f;|float frames = 440.0f;
 tva-land|xtf::mul(d, kLand) : v.step[c]|xtf::mul(d, 0.03125f) : v.step[c]
@@ -29,22 +29,22 @@ tva-truncate|v.damping = true;\n    v.damp = 1.0f;|v.damping = true;\n    v.damp
 key-octave|return std::clamp(key + 12 * ctl.octave, 0, 127);|return std::clamp(key + 11 * ctl.octave, 0, 127);
 source-key|shiftKey(Z.mono ? keys.prevMono : keys.prevPoly)|shiftKey(Z.mono ? keys.prevPoly : keys.prevMono)
 porta-legato|Z.portaMode == 1 && !held ? note|Z.portaMode == 1 && held ? note
-porta-velo|xtPortaSettings(Z.portamento, Z.portaType, Z.portaTime, Z.portaVeloSens, v->vel)|xtPortaSettings(Z.portamento, Z.portaType, Z.portaTime, 0, v->vel)
+porta-velo|xtPortaSettings(Z.portamento, Z.portaType, time, Z.portaVeloSens, v.vel)|xtPortaSettings(Z.portamento, Z.portaType, time, 0, v.vel)|toneknobs
 porta-tick|s.porta.tick(1);                               // 0x894f4b00, before the voice update|;
-bend|xtPitchBend(bender, Z.bendUp, Z.bendDown)|xtPitchBend(bender, Z.bendDown, Z.bendUp)
-scale-tune|t.scaleOn = Z.scaleTune;|t.scaleOn = false;
-patch-fine|t.fine = Z.patchFine + (int)(shift - semis * 100L);|t.fine = (int)(shift - semis * 100L);
-pitch-kf|xtPitchCents(key, coarse, 10 * o.pitchKF, fine,|xtPitchCents(key, coarse, 1000, fine,
+bend|xtPitchBend(bender, Z.bendUp, Z.bendDown)|xtPitchBend(bender, Z.bendDown, Z.bendUp)|toneknobs
+scale-tune|t.scaleOn = Z.scaleTune;|t.scaleOn = false;|toneknobs
+patch-fine|t.fine = Z.patchFine + (int)(shift - semis * 100L);|t.fine = (int)(shift - semis * 100L);|toneknobs
+pitch-kf|xtPitchCents(key, coarse, 10 * o.pitchKF, fine,|xtPitchCents(key, coarse, 1000, fine,|toneknobs
 release-velocity|v.relVel = v.relHeld;|v.relVel = v.vel;
 lfo-off|        s.lfo.noteOff();\n|
 free-run-tick|            freeLfo[z].tick(1);|            ;
 free-follow|else if (other) s.lfo.noteOnFollow(lfoParams(v, s, o), *other);|
 smooth-walk|s.curWalk = xtOscSmooth(s.curWalk, w);|s.curWalk = w;
 smooth-gain|s.curGain = xtOscSmooth(s.curGain, gt);|s.curGain = gt;
-legato-env|            s.oenv.update(ampEnvParams(v, o));\n        };\n        if (v.on) oscUpdate(v, Z);|        };\n        if (v.on) oscUpdate(v, Z);
+legato-env|        v.env.update(envParams(v));\n        if (v.on) oscEnvs(v, v, Z, false);\n|        v.env.update(envParams(v));\n
 legato-source|v.srcKey = shiftKey(keys.prevMono);|v.srcKey = shiftKey(keys.prevPoly);
 legato-level|        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);\n|
-live-key|            if (k != s.kfKey) {\n                s.kfKey = k;\n                s.porta.restart|            if (k == s.kfKey) {\n                s.kfKey = k;\n                s.porta.restart
+live-key|    if (k == s.kfKey) return;|    if (k != s.kfKey) return;|toneknobs
 order-osc|if (v->on) oscStart(*v, *v, Z);\n    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);\n    if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);|if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);\n    if (v->on) oscStart(*v, *v, Z);\n    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);
 order-render|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 0.0f);|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 1.0f);
 mix-skip|if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);|
@@ -52,7 +52,7 @@ cosm-order|                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f, v.structur
 cosm-tvf-env|else c.tvf.setBlock(cosmBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo);|else c.tvf.setBlock(cosmBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo);
 cosm-tvf-kf|p.keyfollow = c.kf / 10; p.cutoffLfo|p.keyfollow = c.kf; p.cutoffLfo
 cosm-vel|xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1|xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1
-cosm-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\n// A TVF's block|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\n// A TVF's block
+cosm-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nXtEnvParams XtSynth::oscEnvParams|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nXtEnvParams XtSynth::oscEnvParams|toneenvknobs
 cosm-dual-env|p.lfo2 = c.lfo2 + m[xtmx::CosmLfoPrm2]; p.env2 = c.env2;|p.lfo2 = c.env2 + m[xtmx::CosmLfoPrm2]; p.env2 = c.lfo2;
 cosm-tb|p.q = c.tbQ + m[xtmx::CosmPrm2]; p.qFollow = c.tbQFollow;|p.q = c.tbQ + m[xtmx::CosmPrm2]; p.qFollow = 0;
 cosm-comb|p.detune = c.combDetune + 200 * m[xtmx::CosmPrm2] / 127;|p.detune = -c.combDetune + 200 * m[xtmx::CosmPrm2] / 127;
@@ -87,7 +87,7 @@ held-dual|c.dual.setBlock(dualBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLf
 held-tb|c.tb.setBlock(tbBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo)|c.tb.setBlock(tbBlock(v, k), c.envA.level(), c.heldLfo, c.envB.level(), c.heldLfo)
 held-tvf|c.tvf.setBlock(cosmBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo)|c.tvf.setBlock(cosmBlock(v, k), c.envB.level(), c.heldLfo, c.envA.level(), c.heldLfo)
 held-amp|c.amp.setBlock(ampBlock(v, k), c.heldA, c.heldLfo)|c.amp.setBlock(ampBlock(v, k), c.envA.level(), c.heldLfo)
-any-changed|const bool anyChanged = !(c == ctl);|const bool anyChanged = !(c.cosm[0] == ctl.cosm[0]) \|\| !(c.cosm[1] == ctl.cosm[1]);
+any-changed|const bool anyChanged = !(c == ctl);|const bool anyChanged = !(c.cosm[0] == ctl.cosm[0]) \|\| !(c.cosm[1] == ctl.cosm[1]);|tonezones
 diff-tva|\|\| c.aSens != was.aSens \|\| c.dSens != was.dSens \|\| c.rSens != was.rSens \|\| c.timeKF != was.timeKF;|\|\| c.aSens != was.aSens \|\| c.dSens != was.dSens \|\| c.rSens != was.rSens;
 diff-oenv|\|\| n.oASens != o.oASens \|\| n.oDSens != o.oDSens \|\| n.oRSens != o.oRSens \|\| n.oTimeKF != o.oTimeKF;|\|\| n.oASens != o.oASens \|\| n.oDSens != o.oDSens \|\| n.oRSens != o.oRSens;
 diff-key|\|\| n.pitchKF != o.pitchKF \|\| c.pitchSemis != was.pitchSemis;|\|\| c.pitchSemis != was.pitchSemis;
@@ -95,24 +95,24 @@ diff-porta|\|\| c.portaVeloSens != was.portaVeloSens|
 diff-cenv|return a.attack != b.attack \|\| a.decay != b.decay|return a.attack != b.attack
 mod-tone|modShared, (int)(v - voice));|modShared, 0);
 mod-plain|                if (v.mod.plain()) {\n                    if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);\n                } else v.mod.process(tmp, tmp, tmp2);|                if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);
-mod-convert|    xtModBlock(ctl.mod, modBlk[0]);\n    for (Voice& v : voice)|    for (Voice& v : voice)
+mod-convert|    xtModBlock(ctl.mod, modBlk[0]);\n||tonezones
 mod-order|v.mod.process(tmp, tmp, tmp2);|v.mod.process(tmp, tmp2, tmp);
 bend-block|    bender = b;\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|    bender = b;
 mod-any|    if (anyChanged) v.mod.setBlock(modBlk[v.zone]);|    if (c.mod.on != was.mod.on \|\| c.mod.type != was.mod.type \|\| c.mod.level != was.mod.level \|\| c.mod.attack != was.mod.attack \|\| c.mod.release != was.mod.release) v.mod.setBlock(modBlk[v.zone]);
-mod-legato|        v.mod.setBlock(modBlk[v.zone]);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);|        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);
-legato-order|        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(Z.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(Z.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);\n        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, s, 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n        };\n        if (v.on) oscUpdate(v, Z);\n        if (v.osc2.on) oscUpdate(v.osc2, Z.osc2);\n        oscBeat(v, Z);\n        oscBeat(v.osc2, Z.osc2);\n        v.mod.setBlock(modBlk[v.zone]);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmSetBlock(v, k);                        // as in setControls, before the envelopes' update\n|        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmSetBlock(v, k);\n        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(Z.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(Z.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);\n        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        auto oscUpdate = [&](OscVoice& s, const OscControls& o) {\n            s.penv.update(oscEnvParams(v, s, 0, o.pAttack, o.pDecay, o.pSustain, o.pRelease));\n            s.tenv.update(oscEnvParams(v, s, 1, o.tAttack, o.tDecay, o.tSustain, o.tRelease));\n            s.fenv.update(oscEnvParams(v, s, 2, o.fAttack, o.fDecay, o.fSustain, o.fRelease));\n            s.oenv.update(ampEnvParams(v, o));\n        };\n        if (v.on) oscUpdate(v, Z);\n        if (v.osc2.on) oscUpdate(v.osc2, Z.osc2);\n        oscBeat(v, Z);\n        oscBeat(v.osc2, Z.osc2);\n        v.mod.setBlock(modBlk[v.zone]);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n
+mod-legato|        v.mod.setBlock(modBlk[v.zone]);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmNewBlock(v, k);|        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmNewBlock(v, k);
+legato-order|        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(Z.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(Z.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);\n        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        if (v.on) oscEnvs(v, v, Z, false);\n        if (v.osc2.on) oscEnvs(v, v.osc2, Z.osc2, false);\n        oscBeat(v, Z);\n        oscBeat(v.osc2, Z.osc2);\n        v.mod.setBlock(modBlk[v.zone]);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmNewBlock(v, k);                        // as in setControls, before the envelopes' update\n|        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmNewBlock(v, k);\n        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(Z.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(Z.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);\n        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        if (v.on) oscEnvs(v, v, Z, false);\n        if (v.osc2.on) oscEnvs(v, v.osc2, Z.osc2, false);\n        oscBeat(v, Z);\n        oscBeat(v.osc2, Z.osc2);\n        v.mod.setBlock(modBlk[v.zone]);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n
 sync-input|v.ana.process(tmp, sync, tmp2);|v.ana.process(tmp, 0, tmp2);
 sync-mask|            v.mod.setMask(mask2);|
 sync-la|if (&s == &v.osc2 && modBlk[v.zone].type == 4 && b.code == 10) b.code = 2;|
 struct-latch|v->structure = std::clamp(Z.structure, 0, 2);|v->structure = 0;
 struct-pitch|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA,|c.update(v.curA,
-tva-off-times|        for (float& t : p.time) t = 0.0f;\n|
-tva-off-level|        p.level[3] = 1.0f;\n|
+tva-off-times|        for (float& t : p.time) t = 0.0f;\n||toneenvknobs
+tva-off-level|        p.level[3] = 1.0f;\n||toneenvknobs
 tva-diff|const bool tvaChanged = c.tvaOn != was.tvaOn;|const bool tvaChanged = false;
-tva-off-gain|k.on = Z.tvaOn;|k.on = true;
+tva-off-gain|k.on = Z.tvaOn;|k.on = true;|toneenvknobs
 tva-legato-gain|        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update|        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update
 tva-live-gain|    if (anyChanged) tvaNewBlock(v);                // the velocity as latched\n|
-tva-latch|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.note, xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve));
+tva-latch|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.note, xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve));|toneenvknobs
 osc2-render|else pcmBlock(v.osc2, tmp2);|else std::fill(tmp2, tmp2 + 64, 0.0f);
 osc2-plays|return waveOf(zone, osc) != nullptr;|return waveOf(zone, 0) != nullptr;
 osc2-robot|v->osc2.robotKnob = Z.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;|v->osc2.robotKnob = false;
@@ -159,13 +159,13 @@ tvab-off-pan|panL = frac(T.pan, 63);|panL = frac(T.pan, 127 - k.pan);|toneosc
 tvab-send|const float s = frac(T.level, cc(k.send));|const float s = 1.0f;|toneosc
 tvab-send-off|const float s = frac(T.level, cc(k.send));|const float s = k.on ? frac(T.level, cc(k.send)) : 1.0f;|toneosc
 tvab-send-curve|const float s = frac(T.level, cc(k.send));|const float s = xtf::div((float)cc(k.send), 127.0f);|toneosc
-tvab-key|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.raw, v.velGain);
-tvab-c7|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc11 = cc[11]; k.cc10 = cc[10];
-tvab-c11|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc7 = cc[7]; k.cc10 = cc[10];
-tvab-c10|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc7 = cc[7]; k.cc11 = cc[11];
-tvab-cc-map|k.cc7 = cc[7]; k.cc11 = cc[11];|k.cc7 = cc[11]; k.cc11 = cc[7];
-tvab-cc-update|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\nvoid XtSynth::newBlocks|}\n\nvoid XtSynth::newBlocks
-tvab-new|    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);\n|    v.mod.setBlock(modBlk[v.zone]);\n
+tvab-key|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.raw, v.velGain);|toneenvknobs
+tvab-c7|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc11 = cc[11]; k.cc10 = cc[10];|toneenvknobs
+tvab-c11|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc7 = cc[7]; k.cc10 = cc[10];|toneenvknobs
+tvab-c10|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc7 = cc[7]; k.cc11 = cc[11];|toneenvknobs
+tvab-cc-map|k.cc7 = cc[7]; k.cc11 = cc[11];|k.cc7 = cc[11]; k.cc11 = cc[7];|toneenvknobs
+tvab-cc-update|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\n// The pressures|}\n\n// The pressures
+tvab-new|    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);\n|    v.mod.setBlock(modBlk[v.zone]);\n|toneupdate
 tvab-bus-start|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus); v->bus[XtBusMultiL] = 1.0f;
 tvab-bus-start-r|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus); v->bus[XtBusMultiR] = v->tb.bus[XtBusMultiL];
 tvab-bus-glide|constexpr float kSendGlide = 0x1.eb851ep-11f;|constexpr float kSendGlide = 0x1.eb8520p-11f;
@@ -186,12 +186,12 @@ tvag-done-r|v.cur[0] <= kSilent && v.cur[1] <= kSilent|v.cur[0] <= kSilent
 tvag-step-r|    v.step[1] = div(sub(v.target[1], v.cur[1]), frames);\n    v.elapsed = 0;\n}|    v.step[1] = v.step[0];\n    v.elapsed = 0;\n}
 tvag-note-step-r|    v->step[1] = div(sub(v->target[1], v->cur[1]), frames);|    v->step[1] = v->step[0];
 tvag-land-r|std::fabs(xtf::mul(v.step[c], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];|std::fabs(xtf::mul(v.step[0], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];
-tlfo-wave|xtLfoConvert(Z.tvaLfoWave, withSum(Z.tvaLfoRate|xtLfoConvert(Z.lfoWave, withSum(Z.tvaLfoRate
-tlfo-rate|xtLfoConvert(Z.tvaLfoWave, withSum(Z.tvaLfoRate|xtLfoConvert(Z.tvaLfoWave, withSum(Z.lfoRate
-tlfo-offset|v.mx[xtmx::TvaLfoRate]), Z.tvaLfoOffset, Z.tvaLfoDelay|v.mx[xtmx::TvaLfoRate]), Z.lfoOffset, Z.tvaLfoDelay
-tlfo-delay|Z.tvaLfoOffset, Z.tvaLfoDelay, Z.tvaLfoFadeMode|Z.tvaLfoOffset, Z.lfoDelay, Z.tvaLfoFadeMode
-tlfo-mode|Z.tvaLfoDelay, Z.tvaLfoFadeMode, Z.tvaLfoFade|Z.tvaLfoDelay, Z.lfoFadeMode, Z.tvaLfoFade
-tlfo-fade|Z.tvaLfoFadeMode, Z.tvaLfoFade, Z.tvaLfoKeySync|Z.tvaLfoFadeMode, Z.lfoFade, Z.tvaLfoKeySync
+tlfo-wave|return xtLfoConvert(Z.tvaLfoWave, rate|return xtLfoConvert(Z.lfoWave, rate|toneenvknobs
+tlfo-rate|withSum(Z.tvaLfoRate, v.mx[xtmx::TvaLfoRate]|withSum(Z.lfoRate, v.mx[xtmx::TvaLfoRate]|toneenvknobs
+tlfo-offset|rate, Z.tvaLfoOffset, Z.tvaLfoDelay|rate, Z.lfoOffset, Z.tvaLfoDelay|toneenvknobs
+tlfo-delay|Z.tvaLfoOffset, Z.tvaLfoDelay, Z.tvaLfoFadeMode|Z.tvaLfoOffset, Z.lfoDelay, Z.tvaLfoFadeMode|toneenvknobs
+tlfo-mode|Z.tvaLfoDelay, Z.tvaLfoFadeMode, Z.tvaLfoFade|Z.tvaLfoDelay, Z.lfoFadeMode, Z.tvaLfoFade|toneenvknobs
+tlfo-fade|Z.tvaLfoFadeMode, Z.tvaLfoFade,|Z.tvaLfoFadeMode, Z.lfoFade,|toneenvknobs
 tlfo-seed|v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);|v->tlfo.noteOn(tlfoParams(*v), seed[6], v->blockTempo);
 tlfo-seed-free|v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo[zone], v->blockTempo);|v->tlfo.noteOnFree(tlfoParams(*v), seed[6], freeTlfo[zone], v->blockTempo);
 tlfo-sync|if (Z.tvaLfoKeySync) v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);\n    else if (other) v->tlfo.noteOnFollow(tlfoParams(*v), other->tlfo);\n    else v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo[zone], v->blockTempo);|v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);
@@ -215,7 +215,7 @@ sost-retakes|if ((sost ^ y) & 0x40) {|{
 sost-held-now|(sostKeys[(v.raw & 127) >> 4] & bit)|(keys.held[(v.raw & 127) >> 4] & bit)
 sost-up-none|                    if (!(v.keyFlags & 7)) voiceOff(v);\n                }\n    }\n    padController(number, x);                      // then 0x894d6f10 gives it to the pad; the queued update is after that\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|                }\n    }\n    padController(number, x);                      // then 0x894d6f10 gives it to the pad; the queued update is after that\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);
 cc-store|if (number < 96) cc[number] = x;|if (number == 1) cc[number] = x;
-cc-any-update|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\nvoid XtSynth::newBlocks|    if (number != 1) for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\nvoid XtSynth::newBlocks
+cc-any-update|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\n// The pressures|    if (number != 1) for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\n// The pressures
 mode-updates|            else keyRelease(v, lastRelease);           // the others (0x894d4f90)\n        }\n        return;|            else keyRelease(v, lastRelease);           // the others (0x894d4f90)\n        }\n        for (Voice& v : voice) if (v.active) newBlocks(v);\n        return;
 mode-sound-off|if (number == 120) truncate(v);|if (false) truncate(v);
 mode-notes-off|else keyRelease(v, lastRelease);           // the others|else truncate(v);           // the others
@@ -252,20 +252,20 @@ mx-sum-limit|const int32_t x = sum[d] > limit ? limit : sum[d] < -limit ? -limit
 mx-slot|const int slot = T.mxSlot[dest], limit|const int slot = dest, limit|toneosc
 mx-pair|for (int j = 0; j < 2; ++j) {\n            const int dest = m[i].dest[j]|for (int j = 0; j < 1; ++j) {\n            const int dest = m[i].dest[j]|toneosc
 mx-eight|for (int i = 0; i < 8; ++i) {\n        const int source = m[i].source;|for (int i = 0; i < 7; ++i) {\n        const int source = m[i].source;|toneosc
-mx-pitch-osc|v.mx[xtmx::OscPitch + (&s == &v ? 0 : xtmx::Osc2)]|v.mx[xtmx::OscPitch]
-mx-pitch-beam|2 * v.beam[3] - v.beam[2]|v.beam[3]
-mx-pitch-lfo|o.lfoPitchDepth + v.mx[dL + 1]|o.lfoPitchDepth
-mx-formant|o.oscFormantKF, v.note, v.mx[OscFormant + dO])|o.oscFormantKF, v.note)
-mx-formant-lfo|xtOscFormantLfoDepth(o.lfoFormantDepth + v.mx[dL + 3])|xtOscFormantLfoDepth(o.lfoFormantDepth)
-mx-time|v.note, v.mx[OscTime + dO], v.beam[1] - 3 * v.beam[0])|v.note, 0, v.beam[1] - 3 * v.beam[0])
-mx-time-beam|v.mx[OscTime + dO], v.beam[1] - 3 * v.beam[0])|v.mx[OscTime + dO], v.beam[1] - v.beam[0])
-mx-time-lfo|xtOscTimeLfoDepth(o.lfoTimeDepth + v.mx[dL + 2])|xtOscTimeLfoDepth(o.lfoTimeDepth)
-mx-level|xtOscLevel(o.oscLevel + v.mx[OscLevel + (&s == &v ? 0 : Osc2)],|xtOscLevel(o.oscLevel,
-mx-level-lfo|o.oscLevelLfoDepth + v.mx[(&s == &v ? OscLfoRate : Osc2Lfo) + 4]|o.oscLevelLfoDepth
-mx-ana-pwlfo|    a.pwLfo += v.mx[dL + 2];\n|
-mx-ana-fatlfo|    a.fatLfo += v.mx[dL + 3];\n|
-mx-ana-terms|XtAnalogMod m{ v.mx[OscTime + dO], v.mx[OscFormant + dO],|XtAnalogMod m{ v.mx[OscFormant + dO], v.mx[OscTime + dO],
-mx-ana-beam|v.beam[0], v.beam[1] };|v.beam[1], v.beam[0] };
+mx-pitch-osc|v.mx[xtmx::OscPitch + (&s == &v ? 0 : xtmx::Osc2)]|v.mx[xtmx::OscPitch]|toneknobs
+mx-pitch-beam|2 * v.beam[3] - v.beam[2]|v.beam[3]|toneknobs
+mx-pitch-lfo|o.lfoPitchDepth + oscTerm(v, s, xtmsm::OscLfoPitch) + v.mx[dL + 1]|o.lfoPitchDepth + oscTerm(v, s, xtmsm::OscLfoPitch)|toneknobs
+mx-formant|o.oscFormantKF, v.note, v.mx[OscFormant + dO])|o.oscFormantKF, v.note)|toneknobs
+mx-formant-lfo|const int fLfo = o.lfoFormantDepth + oscTerm(v, s, xtmsm::OscLfoFormant) + v.mx[dL + 3];|const int fLfo = o.lfoFormantDepth + oscTerm(v, s, xtmsm::OscLfoFormant);|toneknobs
+mx-time|v.note, v.mx[OscTime + dO], beams)|v.note, 0, beams)|toneknobs
+mx-time-beam|const int beams = v.beam[1] - 3 * v.beam[0];|const int beams = v.beam[1] - v.beam[0];|toneknobs
+mx-time-lfo|const int tLfo = o.lfoTimeDepth + oscTerm(v, s, xtmsm::OscLfoTime) + v.mx[dL + 2];|const int tLfo = o.lfoTimeDepth + oscTerm(v, s, xtmsm::OscLfoTime);|toneknobs
+mx-level|const int knob = o.oscLevel + oscTerm(v, s, xtmsm::OscLevel) + v.mx[OscLevel + dO];|const int knob = o.oscLevel + oscTerm(v, s, xtmsm::OscLevel);|toneknobs
+mx-level-lfo|const int lfo = o.oscLevelLfoDepth + oscTerm(v, s, xtmsm::OscLfoLevel) + v.mx[dL + 4];|const int lfo = o.oscLevelLfoDepth + oscTerm(v, s, xtmsm::OscLfoLevel);|toneknobs
+mx-ana-pwlfo|    a.pwLfo += oscTerm(v, s, xtmsm::OscLfoTime) + v.mx[dL + 2];\n|    a.pwLfo += oscTerm(v, s, xtmsm::OscLfoTime);\n|toneknobs
+mx-ana-fatlfo|    a.fatLfo += oscTerm(v, s, xtmsm::OscLfoFormant) + v.mx[dL + 3];\n|    a.fatLfo += oscTerm(v, s, xtmsm::OscLfoFormant);\n|toneknobs
+mx-ana-terms|XtAnalogMod m{ v.mx[OscTime + dO], v.mx[OscFormant + dO],|XtAnalogMod m{ v.mx[OscFormant + dO], v.mx[OscTime + dO],|toneknobs
+mx-ana-beam|v.beam[0], v.beam[1] };|v.beam[1], v.beam[0] };|toneknobs
 mx-ana-index|int32_t q = (int32_t)(((int64_t)c * 0x057619f1) >> 32) >> 8;|int32_t q = (int32_t)(((int64_t)c * 0x057619f1) >> 32) >> 7;|toneanalog
 mx-ana-index-beam|(i > 1 ? i : 0) + (int16_t)q + beam|(i > 1 ? i : 0) + (int16_t)q|toneanalog
 mx-ana-ss-beam|b.pw = ssDetuneCurve(p.pw, p.pwKf * 10, dk, m.pw, m.b1 - m.b0);|b.pw = ssDetuneCurve(p.pw, p.pwKf * 10, dk, m.pw, 0);|toneanalog
@@ -275,34 +275,34 @@ mx-ana-pw-beam|sub(flt(b1), div(flt(b0), 2.0f))|sub(flt(b1), flt(b0))|toneanalog
 mx-ana-pw-ctrl|float x = add(div(mul(flt((int16_t)ctrl), 63.0f), 12000.0f), flt((int16_t)pw));|float x = flt((int16_t)pw);|toneanalog
 mx-ana-fat-ctrl|add(div(flt((int16_t)f), 127.0f), div(flt((int16_t)ctrl), 12000.0f))|div(flt((int16_t)f), 127.0f)|toneanalog
 mx-ana-sub-ctrl|float x = add(div(mul(flt((int16_t)detune), 12000.0f), 63.0f), flt((int16_t)ctrl));|float x = div(mul(flt((int16_t)detune), 12000.0f), 63.0f);|toneanalog
-mx-env-a|k.attack = withSum(a, m[0]); k.decay = withSum(d, m[1]);|k.attack = withSum(a, m[1]); k.decay = withSum(d, m[0]);
-mx-env-r|k.sustain = su; k.release = withSum(r, m[2]);|k.sustain = su; k.release = r;
-mx-env-which|(&s == &v ? xtmx::OscEnv : xtmx::Osc2Env) + 3 * which;|(&s == &v ? xtmx::OscEnv : xtmx::Osc2Env) + which;
-mx-env-osc|(&s == &v ? xtmx::OscEnv : xtmx::Osc2Env) + 3 * which;|xtmx::OscEnv + 3 * which;
-mx-amp|(&o == &Z ? xtmx::OscEnv : xtmx::Osc2Env) + 9;|(&o == &Z ? xtmx::OscEnv : xtmx::Osc2Env) + 6;
-mx-amp-osc|(&o == &Z ? xtmx::OscEnv : xtmx::Osc2Env) + 9;|xtmx::OscEnv + 9;
-mx-tva-a|k.attack = withSum(Z.attack, v.mx[xtmx::TvaEnv]);|k.attack = Z.attack;
-mx-tva-d|k.decay = withSum(Z.decay, v.mx[xtmx::TvaEnv + 1]);|k.decay = Z.decay;
-mx-tva-r|k.release = withSum(Z.release, v.mx[xtmx::TvaEnv + 2]);|k.release = Z.release;
-mx-cosm-env|(&e == &Z.cosm[cosm].envA ? xtmx::CosmEnv1 : xtmx::CosmEnv2)|(&e == &Z.cosm[cosm].envA ? xtmx::CosmEnv2 : xtmx::CosmEnv1)
-mx-cosm-env2|v.mx + (cosm ? xtmx::Cosm2 : xtmx::Cosm) + (&e|v.mx + xtmx::Cosm + (&e
-mx-lfo-rate|withSum(o.lfoRate, v.mx[&s == &v ? xtmx::OscLfoRate : xtmx::Osc2Lfo])|o.lfoRate
-mx-lfo-rate-osc|withSum(o.lfoRate, v.mx[&s == &v ? xtmx::OscLfoRate : xtmx::Osc2Lfo])|withSum(o.lfoRate, v.mx[xtmx::OscLfoRate])
-mx-clfo-rate|withSum(c.lfoRate, v.mx[(k ? xtmx::Cosm2 : xtmx::Cosm) + xtmx::CosmLfoRate])|c.lfoRate
-mx-clfo-rate2|withSum(c.lfoRate, v.mx[(k ? xtmx::Cosm2 : xtmx::Cosm) + xtmx::CosmLfoRate])|withSum(c.lfoRate, v.mx[xtmx::Cosm + xtmx::CosmLfoRate])
-mx-tlfo-rate|withSum(Z.tvaLfoRate, v.mx[xtmx::TvaLfoRate])|Z.tvaLfoRate
-mx-tva-level|k.level = Z.tvaLevel + v.mx[TvaLevel];|k.level = Z.tvaLevel;
-mx-tva-levellfo|k.levelLfo = Z.tvaLevelLfo + v.mx[TvaLfoLevel];|k.levelLfo = Z.tvaLevelLfo;
-mx-tva-pan|k.pan = Z.tvaPan + v.mx[TvaPan];|k.pan = Z.tvaPan;
-mx-tva-panlfo|k.panLfo = Z.tvaPanLfo + v.mx[TvaLfoPan];|k.panLfo = Z.tvaPanLfo;
-mx-tva-send|k.send = Z.mfxSend + v.mx[MfxSend];|k.send = Z.mfxSend;
+mx-env-a|k.attack = withSum(knob.attack, sums[0] + t[xtmsm::Attack]);\n    k.decay = withSum(knob.decay, sums[1] + t[xtmsm::Decay]);|k.attack = withSum(knob.attack, sums[1] + t[xtmsm::Attack]);\n    k.decay = withSum(knob.decay, sums[0] + t[xtmsm::Decay]);|toneenvknobs
+mx-env-r|k.release = withSum(knob.release, sums[2] + t[xtmsm::Release]);|k.release = withSum(knob.release, t[xtmsm::Release]);|toneenvknobs
+mx-env-which|(&s == &v ? xtmx::OscEnv : xtmx::Osc2Env) + 3 * which;|(&s == &v ? xtmx::OscEnv : xtmx::Osc2Env) + which;|toneenvknobs
+mx-env-osc|(&s == &v ? xtmx::OscEnv : xtmx::Osc2Env) + 3 * which;|xtmx::OscEnv + 3 * which;|toneenvknobs
+mx-amp|(&o == &Z ? xtmx::OscEnv : xtmx::Osc2Env) + 9;|(&o == &Z ? xtmx::OscEnv : xtmx::Osc2Env) + 6;|toneenvknobs
+mx-amp-osc|(&o == &Z ? xtmx::OscEnv : xtmx::Osc2Env) + 9;|xtmx::OscEnv + 9;|toneenvknobs
+mx-tva-a|k.attack = withSum(knob.attack, sums[0] + t[xtmsm::Attack]);|k.attack = withSum(knob.attack, t[xtmsm::Attack]);|toneenvknobs
+mx-tva-d|k.decay = withSum(knob.decay, sums[1] + t[xtmsm::Decay]);|k.decay = withSum(knob.decay, t[xtmsm::Decay]);|toneenvknobs
+mx-tva-r|Z.sustain, Z.release }, v.mx + xtmx::TvaEnv, v.msm|Z.sustain, Z.release }, v.mx + xtmx::TvaEnv + 1, v.msm|toneenvknobs
+mx-cosm-env|(first ? xtmx::CosmEnv1 : xtmx::CosmEnv2)|(first ? xtmx::CosmEnv2 : xtmx::CosmEnv1)|toneenvknobs
+mx-cosm-env2|const int16_t* m = v.mx + (cosm ? xtmx::Cosm2 : xtmx::Cosm) + (first|const int16_t* m = v.mx + xtmx::Cosm + (first|toneenvknobs
+mx-lfo-rate|withSum(o.lfoRate, sum + term)|o.lfoRate|toneenvknobs
+mx-lfo-rate-osc|const int sum = v.mx[&s == &v ? xtmx::OscLfoRate : xtmx::Osc2Lfo];|const int sum = v.mx[xtmx::OscLfoRate];|toneenvknobs
+mx-clfo-rate|withSum(c.lfoRate, sum + term)|c.lfoRate|toneenvknobs
+mx-clfo-rate2|const int sum = v.mx[(k ? xtmx::Cosm2 : xtmx::Cosm) + xtmx::CosmLfoRate];|const int sum = v.mx[xtmx::Cosm + xtmx::CosmLfoRate];|toneenvknobs
+mx-tlfo-rate|withSum(Z.tvaLfoRate, v.mx[xtmx::TvaLfoRate] + v.msm[xtmsm::Tva + xtmsm::TvaLfoRate])|Z.tvaLfoRate|toneenvknobs
+mx-tva-level|k.level = Z.tvaLevel + t[xtmsm::TvaLevel] + v.mx[TvaLevel];|k.level = Z.tvaLevel + t[xtmsm::TvaLevel];|toneenvknobs
+mx-tva-levellfo|k.levelLfo = Z.tvaLevelLfo + t[xtmsm::TvaLfoLevel] + v.mx[TvaLfoLevel];|k.levelLfo = Z.tvaLevelLfo + t[xtmsm::TvaLfoLevel];|toneenvknobs
+mx-tva-pan|k.pan = Z.tvaPan + t[xtmsm::TvaPan] + v.mx[TvaPan];|k.pan = Z.tvaPan + t[xtmsm::TvaPan];|toneenvknobs
+mx-tva-panlfo|k.panLfo = Z.tvaPanLfo + t[xtmsm::TvaLfoPan] + v.mx[TvaLfoPan];|k.panLfo = Z.tvaPanLfo + t[xtmsm::TvaLfoPan];|toneenvknobs
+mx-tva-send|k.send = Z.mfxSend + v.msm[xtmsm::MfxSend] + v.mx[MfxSend];|k.send = Z.mfxSend + v.msm[xtmsm::MfxSend];|toneenvknobs
 mx-tva-pan-clamp|const int p = panAtKey(k.pan, k.panKF, key), c|const int p = levelAtKey(k.pan, k.panKF, key), c|toneosc
-mx-beam-assign|beam[i] = n <= 0 \|\| n == 32 \|\| n >= 96 ? 0 : cc[n];|beam[i] = n <= 0 \|\| n >= 96 ? 0 : cc[n];
+mx-beam-assign|beam[i] = n <= 0 \|\| n == 32 \|\| n >= 96 ? 0 : cc[n];|beam[i] = n <= 0 \|\| n >= 96 ? 0 : cc[n];|toneupdate
 mx-note-vel|        v.keyFlags = 7;\n        matrixUpdate(v);|        v.keyFlags = 7;\n        v.mVel = vel;\n        matrixUpdate(v);
 mx-note-key|        v.keyFlags = 7;\n        matrixUpdate(v);|        v.keyFlags = 7;\n        v.mKey = key;\n        matrixUpdate(v);
 mx-note-raw|v->mVel = vel; v->mKey = note; v->mRaw = raw;|v->mVel = vel; v->mKey = note; v->mRaw = note;
 mx-note-oct|v->mVel = vel; v->mKey = note; v->mRaw = raw;|v->mVel = vel; v->mKey = raw; v->mRaw = raw;
-mx-update-all|    if (moved) updateAll(v);\n|
+mx-update-all|    if (moved) updateAll(v);\n||toneupdate
 mx-live-env|if (envChanged \|\| moved) v.env.update|if (envChanged) v.env.update
 mx-live-penv|if (d.penv \|\| moved) s.penv.update|if (d.penv) s.penv.update
 mx-live-tenv|if (d.tenv \|\| moved) s.tenv.update|if (d.tenv) s.tenv.update
@@ -412,23 +412,23 @@ chase-end|                    s.chase = false;\n                }|              
 chase-start|    s.chase = false;                                                                                  // +0x9b0 (0x894f21e6)\n|
 pad-update|    if (pad.on() != was)\n        for (Voice& v : voice)\n            if (v.active) newBlocks(v);\n|
 beat-live|    if (anyChanged) { oscBeat(v, c); oscBeat(v.osc2, c.osc2); }\n|
-beat-blocks|    oscBeat(v, Z);\n    oscBeat(v.osc2, Z.osc2);\n    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);|    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);
+beat-blocks|    oscBeat(v, Z);\n    oscBeat(v.osc2, Z.osc2);\n    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);|    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);|toneupdate
 env-latch|    v->tempo10 = tempo10Now();\n|
-env-amp|xtmx::Osc2Env) + 9;\n    k.tempo10 = v.tempo10;\n|xtmx::Osc2Env) + 9;\n
-env-cosm|xtmx::CosmEnv2);\n    k.tempo10 = v.tempo10;\n|xtmx::CosmEnv2);\n
-env-osc|xtmx::Osc2Env) + 3 * which;\n    k.tempo10 = v.tempo10;\n|xtmx::Osc2Env) + 3 * which;\n
-env-tva|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = zc(v);\n    XtEnvKnobs k;\n    k.tempo10 = v.tempo10;\n|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = zc(v);\n    XtEnvKnobs k;\n
+env-amp|xtmx::Osc2Env) + 9;\n    k.tempo10 = v.tempo10;\n|xtmx::Osc2Env) + 9;\n|toneenvknobs
+env-cosm|xtmsm::CosmEnv2);\n    k.tempo10 = v.tempo10;\n|xtmsm::CosmEnv2);\n|toneenvknobs
+env-osc|xtmx::Osc2Env) + 3 * which;\n    k.tempo10 = v.tempo10;\n|xtmx::Osc2Env) + 3 * which;\n|toneenvknobs
+env-tva|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = zc(v);\n    XtEnvKnobs k;\n    k.tempo10 = v.tempo10;\n|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = zc(v);\n    XtEnvKnobs k;\n|toneenvknobs
 block-tempo-off|    if (Z.on) v->blockTempo = tempoNow();\n|    v->blockTempo = tempoNow();\n
 lfo-tempo-osc|if (o.lfoKeySync) s.lfo.noteOn(lfoParams(v, s, o), seed, v.blockTempo);|if (o.lfoKeySync) s.lfo.noteOn(lfoParams(v, s, o), seed, 120.0f);
 lfo-tempo-free|else s.lfo.noteOnFree(lfoParams(v, s, o), seed, free, v.blockTempo);|else s.lfo.noteOnFree(lfoParams(v, s, o), seed, free, 120.0f);
 lfo-tempo-tva|v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);|v->tlfo.noteOn(tlfoParams(*v), seed[5], 120.0f);
 lfo-tempo-cosm|c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], v->blockTempo);|c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], 120.0f);
 lfo-upd-live|    if (anyChanged) lfoUpdates(v);\n|
-lfo-upd-blocks|    if (moved) updateAll(v);\n    lfoUpdates(v);\n|    if (moved) updateAll(v);\n
-lfo-upd-1|    v.lfo.update(lfoParams(v, v, Z));\n|
-lfo-upd-2|    v.osc2.lfo.update(lfoParams(v, v.osc2, Z.osc2));\n|
-lfo-upd-cosm|    for (int k = 0; k < 2; ++k) v.cs[k].lfo.update(clfoParams(v, k));\n|
-lfo-upd-tva|    v.tlfo.update(tlfoParams(v));\n|
+lfo-upd-blocks|    if (moved) updateAll(v);\n    lfoUpdates(v);\n|    if (moved) updateAll(v);\n|toneupdate
+lfo-upd-1|    v.lfo.update(lfoParams(v, v, Z));\n||toneupdate
+lfo-upd-2|    v.osc2.lfo.update(lfoParams(v, v.osc2, Z.osc2));\n||toneupdate
+lfo-upd-cosm|    for (int k = 0; k < 2; ++k) v.cs[k].lfo.update(clfoParams(v, k));\n||toneupdate
+lfo-upd-tva|    v.tlfo.update(tlfoParams(v));\n||toneupdate
 pad-angle|    return v * 4;\n|    return v * 2;\n|toneosc
 pad-back-limit|if (-d > 0x40) { pending = 0; return 0; }|if (-d > 0x80) { pending = 0; return 0; }|toneosc
 pad-fwd-limit|if (d > 0x40) { pending = 0; return 0; }|if (d > 0x80) { pending = 0; return 0; }|toneosc
@@ -541,24 +541,24 @@ solo-seek-reset|    beat_.reset((flags0 & 4) != 0);       // 0x8950f900\n||tones
 solo-seek-pos|    beat_.beatPos = (int32_t)((uint32_t)pos16 << 5);\n||tonesolo
 solo-seek-clamp|    pos16 = pos16 < 0 ? 0 : pos16 > last ? last : pos16;   // the beat goes from the position held to the wave (0x8950fefe)\n||tonesolo
 solo-seek-where|        while (!(recEnd * 16.0 > (double)pos16) && seg < p->size()) loadNext();\n        Pi = pos16;|        while (!(recEnd * 16.0 > (double)pos16) && seg < p->size()) loadNext();\n        if (seg >= p->size() \|\| !p->voiced[seg]) f0n = 0.0f;\n        Pi = pos16;|tonesolo
-sum-note-takes|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|knob >= 128 ? knob + sum : std::clamp(knob + sum, 0, 127)
-sum-crosses|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|knob >= 128 ? knob : std::max(knob + sum, 0)
-sum-note-clamped|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|std::clamp(knob + sum, 0, 127)
-trip-source|in.pad = pad.radius();|in.pad = 127;
+sum-note-takes|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|knob >= 128 ? knob + sum : std::clamp(knob + sum, 0, 127)|toneenvknobs
+sum-crosses|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|knob >= 128 ? knob : std::max(knob + sum, 0)|toneenvknobs
+sum-note-clamped|knob >= 128 ? knob : std::clamp(knob + sum, 0, 127)|std::clamp(knob + sum, 0, 127)|toneenvknobs
+trip-source|in.pad = pad.radius();|in.pad = 127;|toneupdate
 legato-sums|        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n|
 off-all-groups|    matrixRelease(v);\n    v.env.update|    matrixUpdate(v);\n    v.env.update
-off-group-osc|    if (oscAny(Z)) form(xtmx::OscEnv, 12);\n|
-off-group-osc2|    if (oscAny(Z.osc2)) form(xtmx::Osc2Env, 12);\n|
-off-group-osc-on|if (oscAny(Z)) form(xtmx::OscEnv, 12);|if (v.on && oscAny(Z)) form(xtmx::OscEnv, 12);
-off-group-osc2-on|if (oscAny(Z.osc2)) form(xtmx::Osc2Env, 12);|if (v.osc2.on && oscAny(Z.osc2)) form(xtmx::Osc2Env, 12);
-off-group-cosm|if (Z.cosm[k].envA.release < 128 \|\| Z.cosm[k].envB.release < 128) form(k ? xtmx::Cosm2 : xtmx::Cosm, 11);|if (false) form(k ? xtmx::Cosm2 : xtmx::Cosm, 11);
-off-group-cosm-on|if (Z.cosm[k].envA.release < 128 \|\| Z.cosm[k].envB.release < 128)|if (v.cs[k].on && (Z.cosm[k].envA.release < 128 \|\| Z.cosm[k].envB.release < 128))
-off-group-cosm2|form(k ? xtmx::Cosm2 : xtmx::Cosm, 11);|form(xtmx::Cosm, 11);
-off-group-tva|    if (Z.tvaOn && Z.release < 128) form(xtmx::TvaEnv, 11);\n|
-off-group-tva-on|if (Z.tvaOn && Z.release < 128) form(xtmx::TvaEnv, 11);|if (Z.release < 128) form(xtmx::TvaEnv, 11);
-off-group-tva-note|if (Z.tvaOn && Z.release < 128) form(xtmx::TvaEnv, 11);|if (Z.tvaOn) form(xtmx::TvaEnv, 11);
-off-group-osc-note|return o.pRelease < 128 \|\| o.tRelease < 128 \|\| o.fRelease < 128 \|\| o.oRelease < 128;|return true;
-off-group-cosm-note|if (Z.cosm[k].envA.release < 128 \|\| Z.cosm[k].envB.release < 128) form|form
+off-group-osc|    if (oscAny(Z)) form(xtmx::OscEnv, 12);\n||toneupdate
+off-group-osc2|    if (oscAny(Z.osc2)) form(xtmx::Osc2Env, 12);\n||toneupdate
+off-group-osc-on|if (oscAny(Z)) form(xtmx::OscEnv, 12);|if (v.on && oscAny(Z)) form(xtmx::OscEnv, 12);|toneupdate
+off-group-osc2-on|if (oscAny(Z.osc2)) form(xtmx::Osc2Env, 12);|if (v.osc2.on && oscAny(Z.osc2)) form(xtmx::Osc2Env, 12);|toneupdate
+off-group-cosm|if (Z.cosm[k].envA.release < 128 \|\| Z.cosm[k].envB.release < 128) form(k ? xtmx::Cosm2 : xtmx::Cosm, 11);|if (false) form(k ? xtmx::Cosm2 : xtmx::Cosm, 11);|toneupdate
+off-group-cosm-on|if (Z.cosm[k].envA.release < 128 \|\| Z.cosm[k].envB.release < 128)|if (v.cs[k].on && (Z.cosm[k].envA.release < 128 \|\| Z.cosm[k].envB.release < 128))|toneupdate
+off-group-cosm2|form(k ? xtmx::Cosm2 : xtmx::Cosm, 11);|form(xtmx::Cosm, 11);|toneupdate
+off-group-tva|    if (Z.tvaOn && Z.release < 128) form(xtmx::TvaEnv, 11);\n||toneupdate
+off-group-tva-on|if (Z.tvaOn && Z.release < 128) form(xtmx::TvaEnv, 11);|if (Z.release < 128) form(xtmx::TvaEnv, 11);|toneupdate
+off-group-tva-note|if (Z.tvaOn && Z.release < 128) form(xtmx::TvaEnv, 11);|if (Z.tvaOn) form(xtmx::TvaEnv, 11);|toneupdate
+off-group-osc-note|return o.pRelease < 128 \|\| o.tRelease < 128 \|\| o.fRelease < 128 \|\| o.oRelease < 128;|return true;|toneupdate
+off-group-cosm-note|if (Z.cosm[k].envA.release < 128 \|\| Z.cosm[k].envB.release < 128) form|form|toneupdate
 pad-radius-move|    radius_ = distance(x, y);\n||toneosc
 pad-radius-lift|    radius_ = 127;                                  // the handler's, after it\n||toneosc
 pad-radius-q1|T.padAngle[a][b][0]|T.padAngle[a][0][0]|toneosc
@@ -741,7 +741,7 @@ host-24|hostBpm / 60.0) * 24.0;\n    if (std::fabs|hostBpm / 60.0) * 25.0;\n    
 host-jump|std::fabs(at - hostAt) > 1.0|std::fabs(at - hostAt) > 1e9
 host-jump-ceil|hostDone = (int64_t)std::ceil(at) - 1;   // a locate|hostDone = (int64_t)std::ceil(at);   // a locate
 host-follow|    if (bpm > 0.0) hostBpm = bpm;\n    clockFollow();\n|    if (bpm > 0.0) hostBpm = bpm;\n
-set-follow|    ctl = c;\n    clockFollow();\n|    ctl = c;\n
+set-follow|    ctl = c;\n    clockFollow();\n|    ctl = c;\n|tonezones
 follow-source|ctl.clockSource != 0 && hostBpm > 0.0|hostBpm > 0.0
 follow-tempo|ctl.clockSource != 0 && hostBpm > 0.0|ctl.clockSource != 0
 follow-start|    hostDone = (int64_t)std::ceil(hostAt) - 1;\n}|}
@@ -766,18 +766,18 @@ dir-updates-l|    v.tb.bus[XtBusDirL] = l;\n|
 dir-updates-r|    v.tb.bus[XtBusDirR] = r;\n|
 dir-live|if (anyChanged) tvaNewBlock(v); |if (anyChanged) v.tb = tvaBlock(v);
 dir-legato|        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();|        v.tb = tvaBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();
-dir-blocks|    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);|    v.mod.setBlock(modBlk[v.zone]);\n    v.tb = tvaBlock(v);
+dir-blocks|    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);|    v.mod.setBlock(modBlk[v.zone]);\n    v.tb = tvaBlock(v);|toneupdate
 noteon-levels|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::begin(v->tb.bus) + 6, v->bus);
-knob-chorus-sum|k.chorusSend = Z.chorusSend + v.mx[ChorusSend];|k.chorusSend = Z.chorusSend;
-knob-reverb-sum|k.reverbSend = Z.reverbSend + v.mx[ReverbSend];|k.reverbSend = Z.reverbSend;
-knob-sends-crossed|k.chorusSend = Z.chorusSend + v.mx[ChorusSend]; k.reverbSend = Z.reverbSend + v.mx[ReverbSend];|k.chorusSend = Z.reverbSend + v.mx[ChorusSend]; k.reverbSend = Z.chorusSend + v.mx[ReverbSend];
-knob-sums-crossed|k.chorusSend = Z.chorusSend + v.mx[ChorusSend]; k.reverbSend = Z.reverbSend + v.mx[ReverbSend];|k.chorusSend = Z.chorusSend + v.mx[ReverbSend]; k.reverbSend = Z.reverbSend + v.mx[ChorusSend];
-knob-assign|k.assign = Z.outputAssign;|k.assign = 0;
-knob-parallel|k.parallel = Z.parallel;|k.parallel = true;
-knob-gain|k.outGain = Z.outGainTg;|k.outGain = 0;
-knob-cc-crossed|k.cc91 = cc[91]; k.cc93 = cc[93];|k.cc91 = cc[93]; k.cc93 = cc[91];
-knob-cc91|k.cc91 = cc[91];|k.cc91 = 127;
-knob-cc93|k.cc93 = cc[93];|k.cc93 = 127;
+knob-chorus-sum|k.chorusSend = Z.chorusSend + v.msm[xtmsm::ChoSend] + v.mx[ChorusSend];|k.chorusSend = Z.chorusSend + v.msm[xtmsm::ChoSend];|toneenvknobs
+knob-reverb-sum|k.reverbSend = Z.reverbSend + v.msm[xtmsm::RevSend] + v.mx[ReverbSend];|k.reverbSend = Z.reverbSend + v.msm[xtmsm::RevSend];|toneenvknobs
+knob-sends-crossed|k.chorusSend = Z.chorusSend + v.msm[xtmsm::ChoSend] + v.mx[ChorusSend];\n    k.reverbSend = Z.reverbSend +|k.chorusSend = Z.reverbSend + v.msm[xtmsm::ChoSend] + v.mx[ChorusSend];\n    k.reverbSend = Z.chorusSend +|toneenvknobs
+knob-sums-crossed|v.mx[ChorusSend];\n    k.reverbSend = Z.reverbSend + v.msm[xtmsm::RevSend] + v.mx[ReverbSend];|v.mx[ReverbSend];\n    k.reverbSend = Z.reverbSend + v.msm[xtmsm::RevSend] + v.mx[ChorusSend];|toneenvknobs
+knob-assign|k.assign = Z.outputAssign;|k.assign = 0;|toneenvknobs
+knob-parallel|k.parallel = Z.parallel;|k.parallel = true;|toneenvknobs
+knob-gain|k.outGain = Z.outGainTg;|k.outGain = 0;|toneenvknobs
+knob-cc-crossed|k.cc91 = cc[91]; k.cc93 = cc[93];|k.cc91 = cc[93]; k.cc93 = cc[91];|toneenvknobs
+knob-cc91|k.cc91 = cc[91];|k.cc91 = 127;|toneenvknobs
+knob-cc93|k.cc93 = cc[93];|k.cc93 = 127;|toneenvknobs
 plays-no-main|(f[FrameMultiL] + f[FrameMainL] + f[FrameDirL])|(f[FrameMultiL] + f[FrameDirL])
 plays-no-dir|(f[FrameMultiR] + f[FrameMainR] + f[FrameDirR])|(f[FrameMultiR] + f[FrameMainR])
 plays-level-l|f[FrameDirL]) * 0x1p-34f|f[FrameDirL]) * 0x1p-31f
@@ -810,7 +810,7 @@ solo-seek-ended|        f0n = f;\n    }\n    anchor = recStart;\n}|        f0n =
 xy-plus-zero|        if (x == 0) return 0;\n        return x >= 64 ?|        return x >= 64 ?|toneosc
 xy-plus-side|return x >= 64 ? value((x - 64) * 127 / 63) : -value((64 - x) * 127 / 63);|return x >= 64 ? value((x - 64) * 127 / 63) : value((64 - x) * 127 / 63);|toneosc
 xy-plus-off|        if (n == 0 \|\| n == 32) return 0;\n        const int x = in.cc[n];\n|        const int x = in.cc[n];\n|toneosc
-xy-inputs|in.assign[i] = std::clamp(Z.assign[4 + i], 0, 95);|in.assign[i] = std::clamp(Z.assign[i], 0, 95);|tone
+xy-inputs|in.assign[i] = std::clamp(Z.assign[4 + i], 0, 95);|in.assign[i] = std::clamp(Z.assign[i], 0, 95);|toneupdate
 tune-offset|t.offset = add(flt(headerCents), mul(flt(fine), hundredth));|t.offset = add(flt(headerCents), mul(flt(-fine), hundredth));|toneosc
 tune-header|t.offset = add(flt(headerCents), mul(flt(fine), hundredth));|t.offset = mul(flt(fine), hundredth);|toneosc
 tune-detune|t.detune = mul(flt(tune), hundredth);|t.detune = mul(flt(-tune), hundredth);|toneosc
@@ -818,23 +818,23 @@ tune-factor|t.factor = f > 0.0f ? f : 1.0f;|t.factor = 1.0f;|toneosc
 tune-walk|return mul(w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w), waveFactor);|return w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w);|toneosc
 tune-walk-clamp|return mul(w > 5.0f ? 5.0f : (-5.0f > w ? -5.0f : w), waveFactor);|const float y = mul(w, waveFactor); return y > 5.0f ? 5.0f : (-5.0f > y ? -5.0f : y);|toneosc
 tune-formant|return mul(r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r), waveFactor);|return r > 2.0f ? 2.0f : (0.5f > r ? 0.5f : r);|toneosc
-tune-robot|const bool tuned = !s.robot;|const bool tuned = true;|tone
-tune-robot-factor|s.lite && (s.linear \|\| noteOn) ? 1.0f : tune.factor);|s.lite && (s.linear \|\| noteOn) ? 1.0f : tuned ? tune.factor : 1.0f);|tone
-tune-pitch-offset|tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);|0.0f, 1.0f, tuned ? tune.detune : 0.0f);|tone
-tune-pitch-detune|tuned ? tune.offset : 0.0f, 1.0f, tuned ? tune.detune : 0.0f);|tuned ? tune.offset : 0.0f, 1.0f, 0.0f);|tone
-tune-time|: s.variBit \|\| s.syncBit ? tune.factor : 1.0f);|: 1.0f);|tone
-tune-root|s.robot \|\| s.analog \|\| !s.on, tune.offset, tune.detune);|s.robot \|\| s.analog \|\| !s.on);|tone
-loop-bwd-mode|l.bwdMode = std::clamp(s.wave->bwdMode, 0, 2);|l.bwdMode = l.fwdMode;|tone
-loop-bwd-start|l.bwdStart = s.wave->bwdStart;|l.bwdStart = a;|tone
-loop-bwd-end|l.bwdEnd = s.wave->bwdEnd;|l.bwdEnd = b;|tone
-envvel-pitch|withVel(xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63)), o.pVel)|xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63))|tone
-envvel-pitch-which|withVel(xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63)), o.pVel)|withVel(xtPitchDepthCents((float)std::clamp(o.pDepth, -63, 63)), o.tVel)|tone
-envvel-time|withVel(xtOscTimeEnvDepth(o.tDepth), o.tVel)|xtOscTimeEnvDepth(o.tDepth)|tone
-envvel-formant|withVel(xtOscFormantEnvDepth(o.fDepth), o.fVel)|xtOscFormantEnvDepth(o.fDepth)|tone
-envvel-analog|xtCosmVelocity(v.vel, o.fVel.sens, o.fVel.curve), xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve)|xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve), xtCosmVelocity(v.vel, o.fVel.sens, o.fVel.curve)|tone
-envvel-times|k.aSens = e.aSens; k.dSens = e.dSens; k.rSens = e.rSens; k.timeKF = e.timeKF;|k.aSens = e.aSens; k.dSens = e.dSens; k.rSens = e.rSens;|tone
-envvel-which|const OscControls::EnvVelocity& e = which == 0 ? o.pVel : which == 1 ? o.tVel : o.fVel;|const OscControls::EnvVelocity& e = which == 0 ? o.pVel : which == 1 ? o.fVel : o.tVel;|tone
-envvel-live|n.pRelease != o.pRelease \|\| n.pVel != o.pVel;|n.pRelease != o.pRelease;|tone
+tune-robot|const bool tuned = !s.robot;|const bool tuned = true;|toneknobs
+tune-robot-factor|s.lite && (s.linear \|\| noteOn) ? 1.0f : tune.factor;|s.lite && (s.linear \|\| noteOn) ? 1.0f : tuned ? tune.factor : 1.0f;|toneknobs
+tune-pitch-offset|const float offset = tuned ? tune.offset : 0.0f, detune|const float offset = 0.0f, detune|toneknobs
+tune-pitch-detune|detune = tuned ? tune.detune : 0.0f;|detune = 0.0f;|toneknobs
+tune-time|const float wFactor = s.lite ? liteFactor : s.variBit \|\| s.syncBit ? tune.factor : 1.0f;|const float wFactor = s.lite ? liteFactor : 1.0f;|toneknobs
+tune-root|s.robot \|\| s.analog \|\| !s.on, tune.offset, tune.detune);|s.robot \|\| s.analog \|\| !s.on);
+loop-bwd-mode|l.bwdMode = std::clamp(s.wave->bwdMode, 0, 2);|l.bwdMode = l.fwdMode;
+loop-bwd-start|l.bwdStart = s.wave->bwdStart;|l.bwdStart = a;
+loop-bwd-end|l.bwdEnd = s.wave->bwdEnd;|l.bwdEnd = b;
+envvel-pitch|const float pEnv = withVel(xtPitchDepthCents((float)pDepth), o.pVel);|const float pEnv = xtPitchDepthCents((float)pDepth);|toneknobs
+envvel-pitch-which|const float pEnv = withVel(xtPitchDepthCents((float)pDepth), o.pVel);|const float pEnv = withVel(xtPitchDepthCents((float)pDepth), o.tVel);|toneknobs
+envvel-time|const float tEnv = withVel(xtOscTimeEnvDepth(o.tDepth + oscTerm(v, s, xtmsm::OscTenv)), o.tVel);|const float tEnv = xtOscTimeEnvDepth(o.tDepth + oscTerm(v, s, xtmsm::OscTenv));|toneknobs
+envvel-formant|const float fEnv = withVel(xtOscFormantEnvDepth(o.fDepth + oscTerm(v, s, xtmsm::OscFenv)), o.fVel);|const float fEnv = xtOscFormantEnvDepth(o.fDepth + oscTerm(v, s, xtmsm::OscFenv));|toneknobs
+envvel-analog|const float fatVel = xtCosmVelocity(v.vel, o.fVel.sens, o.fVel.curve);\n    const float pwVel = xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve);|const float fatVel = xtCosmVelocity(v.vel, o.tVel.sens, o.tVel.curve);\n    const float pwVel = xtCosmVelocity(v.vel, o.fVel.sens, o.fVel.curve);|toneknobs
+envvel-times|k.aSens = e.aSens; k.dSens = e.dSens; k.rSens = e.rSens; k.timeKF = e.timeKF;|k.aSens = e.aSens; k.dSens = e.dSens; k.rSens = e.rSens;|toneenvknobs
+envvel-which|const OscControls::EnvVelocity& e = which == 0 ? o.pVel : which == 1 ? o.tVel : o.fVel;|const OscControls::EnvVelocity& e = which == 0 ? o.pVel : which == 1 ? o.fVel : o.tVel;|toneenvknobs
+envvel-live|n.pRelease != o.pRelease \|\| n.pVel != o.pVel;|n.pRelease != o.pRelease;
 patch-kf|o.pitchKF = 10 * p(b + 4);|o.pitchKF = p(b + 4);|tonepatch
 patch-coarse|o.oscCoarse = p(b + 7); o.oscFine = p(b + 8);|o.oscCoarse = p(b + 8); o.oscFine = p(b + 7);|tonepatch
 patch-osc2|const int b = 0x2a4 + 0x34 * n;|const int b = 0x2a4;|tonepatch
@@ -882,16 +882,16 @@ lin-start-dir|pos = turning = 0.0f > walk ? fwd.end : bwd.end;|pos = turning = 0
 lin-stereo-swap|if (y) { out[0] = one(*x); out[1] = one(*y); }|if (y) { out[0] = one(*y); out[1] = one(*x); }|tonelin
 lin-seek-frac|    pos = pos16 >> 4;\n    frac = 0.0f;\n|    pos = pos16 >> 4;\n|tonelin
 lin-bwd-region|bwd.a = loopCfg.bwdEnd; bwd.b = loopCfg.bwdStart;|bwd.a = loopCfg.bwdStart; bwd.b = loopCfg.bwdEnd;|tonelin
-vari-walk-sync|s.variBit \|\| s.syncBit ? tune.factor : 1.0f|s.variBit ? tune.factor : 1.0f|tone
-vari-walk-factor|s.variBit \|\| s.syncBit ? tune.factor : 1.0f|tune.factor|tone
-vari-walk-live|    s.variBit = o.vari;                                // the voice's|    s.variBit = s.variBit;                                // the voice's|tone
-vari-robot|    v->robot = v->robotKnob && Z.vari;|    v->robot = v->robotKnob;|tone
-vari-cents|o.rootKey, s.robotKnob && o.vari);|o.rootKey, s.robot);|tone
-vari-no-linear|    v->linear = !Z.vari &&|    v->linear = false &&|tone
-vari-band|        s.mb.setVari(o.vari);\n||tone
+vari-walk-sync|s.variBit \|\| s.syncBit ? tune.factor : 1.0f|s.variBit ? tune.factor : 1.0f|toneknobs
+vari-walk-factor|s.variBit \|\| s.syncBit ? tune.factor : 1.0f|tune.factor|toneknobs
+vari-walk-live|    s.variBit = o.vari;                                // the voice's|    s.variBit = s.variBit;                                // the voice's
+vari-robot|    v->robot = v->robotKnob && Z.vari;|    v->robot = v->robotKnob;
+vari-cents|o.rootKey, s.robotKnob && o.vari);|o.rootKey, s.robot);|toneknobs
+vari-no-linear|    v->linear = !Z.vari &&|    v->linear = false &&
+vari-band|        s.mb.setVari(o.vari);\n|
 vari-robot-follow|        s.solo.setRobot(s.robotKnob && o.vari);|        s.solo.setRobot(s.robot);|tone|777
-loop-rate-fwd|    l.fwdRate = s.wave->loopRate[0];\n||tone
-loop-rate-bwd|    l.bwdRate = s.wave->loopRate[1];\n||tone
+loop-rate-fwd|    l.fwdRate = s.wave->loopRate[0];\n|
+loop-rate-bwd|    l.bwdRate = s.wave->loopRate[1];\n|
 band-vari|if (S.flags0 & 0x20) {|if (false) {|toneband
 band-vari-beat|const float by = (S.flags0 & 6) ? 1.0f : S.rateF;|const float by = S.rateF;|toneband
 band-vari-abs|S.rateF = std::fabs((float)S.walkStep) * 2.98023224e-8f;|S.rateF = (float)S.walkStep * 2.98023224e-8f;|toneband
@@ -925,14 +925,14 @@ lin-fr11-rate|            if (y) cmp = rate;|            ;|tonelin|9
 lin-fr11-mono|            if (y) cmp = rate;|            cmp = rate;|tonelin|777
 lin-fr11-entry|        float cmp = y ? fr11 : 0.0f;|        float cmp = 0.0f;|tonelin|9
 lin-hold-floor|    if (!(next > floor)) next = 0.0f;|    if (!(next > 0.0f)) next = 0.0f;|tonelin|9
-check-start|    p[b + 0x22] = o.startOffset;|;|tonecheck
+check-start|    p[b + 0x22] = o.startOffset;|;|tonecases
 patch-start|    o.startOffset = p(b + 0x22);|    o.startOffset = 0;|tonepatch
 lite-kind|    v->lite = v->on && !v->analog && v->wave->type == 0;|    v->lite = false;
 lite-update-smooth|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;|                    s.curA = xtOscSmooth(s.curA, A); s.curF = F; s.curWalk = w; s.curGain = gt;
 lite-update-gain|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = xtOscSmooth(s.curGain, gt);
-lite-walk-factor|                     s.lite ? (s.linear \|\| noteOn ? 1.0f : tune.factor)|                     s.lite ? (s.linear ? 1.0f : tune.factor)
-lite-walk-off|                     s.lite ? (s.linear \|\| noteOn ? 1.0f : tune.factor)|                     s.lite ? (noteOn ? 1.0f : tune.factor)
-lite-formant-factor|                          s.lite && (s.linear \|\| noteOn) ? 1.0f : tune.factor);|                          s.lite && s.linear ? 1.0f : tune.factor);
+lite-walk-factor|const float liteFactor = s.linear \|\| noteOn ? 1.0f : tune.factor;|const float liteFactor = s.linear ? 1.0f : tune.factor;|toneknobs
+lite-walk-off|const float liteFactor = s.linear \|\| noteOn ? 1.0f : tune.factor;|const float liteFactor = noteOn ? 1.0f : tune.factor;|toneknobs
+lite-formant-factor|const float fFactor = s.lite && (s.linear \|\| noteOn) ? 1.0f : tune.factor;|const float fFactor = s.lite && s.linear ? 1.0f : tune.factor;|toneknobs
 lite-root|    if (v->lite) v->root = xtCosmRootHz(Z.rootKey, false, v->wave->tune.offset, v->wave->tune.detune);|    if (v->lite) v->root = xtCosmRootHz(Z.rootKey, false);
 lite-root2|    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(Z.osc2.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);|    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(Z.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);
 lite-start|        s.xfg.setStart(waveStart(s, o));|        s.xfg.setStart(0);
@@ -975,20 +975,20 @@ xfg-seek-win|    winB = period * 0.5f;\n    clkB = period * 0.5f;\n    beat_|   
 xfg-seek-frac|    fracA = fracB = 0.0f;\n    hA = hB = s;|    hA = hB = s;|tonelite
 check-lite-events|        for (uint32_t k = 0; k < 4; ++k) f.c.wr32(W2 + 0xb4 * k + 4, (uint32_t)(pts[k] * 16));|        ;|tonecheck
 check-lite-fr11|                            osc(syn.voice[n->vi], o).lin.setStaleFr11(v);|                            ;|tonecheck|9
-check-lite-limits|                    fw.c.wr32(V + 0x20c, 0); fw.c.wr32(V + 0x214, 0);|                    ;|tonecheck
-zone-last|top = z == kZones - 1 ? 127 : std::max(top, upper[z]);|top = std::max(top, upper[z]);
-zone-pass|        if (!(key > top)) return z;|        if (key < top) return z;
-zone-common-coarse|c.pitchSemis = ctl.pitchSemis; c.patchCoarse = ctl.patchCoarse; c.patchFine = ctl.patchFine;|c.pitchSemis = ctl.pitchSemis; c.patchFine = ctl.patchFine;
-zone-common-fine|c.pitchSemis = ctl.pitchSemis; c.patchCoarse = ctl.patchCoarse; c.patchFine = ctl.patchFine;|c.pitchSemis = ctl.pitchSemis; c.patchCoarse = ctl.patchCoarse;
-zone-common-scale|    c.scaleTune = ctl.scaleTune; std::copy(std::begin(ctl.scale), std::end(ctl.scale), c.scale);\n|    c.scaleTune = ctl.scaleTune;\n
-zone-common-bend|    c.bendUp = ctl.bendUp; c.bendDown = ctl.bendDown;\n|    c.bendUp = ctl.bendUp;\n
-zone-common-porta|c.portamento = ctl.portamento; c.portaMode = ctl.portaMode;|c.portaMode = ctl.portaMode;
-zone-common-portatime|c.portaTime = ctl.portaTime; c.portaVeloSens|c.portaVeloSens
-zone-common-mono|    c.mono = ctl.mono; c.legato = ctl.legato;|    c.legato = ctl.legato;
-zone-common-matrix|    std::copy(std::begin(ctl.matrix), std::end(ctl.matrix), c.matrix);\n|
-zone-common-assign|    std::copy(std::begin(ctl.assign), std::end(ctl.assign), c.assign);\n|
-zone-common-outgain|    c.outGainTg = ctl.outGainTg; c.parallel = ctl.parallel;\n|    c.parallel = ctl.parallel;\n
-zone-common-parallel|    c.outGainTg = ctl.outGainTg; c.parallel = ctl.parallel;\n|    c.outGainTg = ctl.outGainTg;\n
+check-lite-limits|                    fw.c.wr32(V + 0x20c, 0); fw.c.wr32(V + 0x214, 0);|                    ;|tonecarry
+zone-last|top = z == kZones - 1 ? 127 : std::max(top, upper[z]);|top = std::max(top, upper[z]);|tonezones
+zone-pass|        if (!(key > top)) return z;|        if (key < top) return z;|tonezones
+zone-common-coarse|c.pitchSemis = ctl.pitchSemis; c.patchCoarse = ctl.patchCoarse; c.patchFine = ctl.patchFine;|c.pitchSemis = ctl.pitchSemis; c.patchFine = ctl.patchFine;|tonezones
+zone-common-fine|c.pitchSemis = ctl.pitchSemis; c.patchCoarse = ctl.patchCoarse; c.patchFine = ctl.patchFine;|c.pitchSemis = ctl.pitchSemis; c.patchCoarse = ctl.patchCoarse;|tonezones
+zone-common-scale|    c.scaleTune = ctl.scaleTune; std::copy(std::begin(ctl.scale), std::end(ctl.scale), c.scale);\n|    c.scaleTune = ctl.scaleTune;\n|tonezones
+zone-common-bend|    c.bendUp = ctl.bendUp; c.bendDown = ctl.bendDown;\n|    c.bendUp = ctl.bendUp;\n|tonezones
+zone-common-porta|c.portamento = ctl.portamento; c.portaMode = ctl.portaMode;|c.portaMode = ctl.portaMode;|tonezones
+zone-common-portatime|c.portaTime = ctl.portaTime; c.portaVeloSens|c.portaVeloSens|tonezones
+zone-common-mono|    c.mono = ctl.mono; c.legato = ctl.legato;|    c.legato = ctl.legato;|tonezones
+zone-common-matrix|    std::copy(std::begin(ctl.matrix), std::end(ctl.matrix), c.matrix);\n||tonezones
+zone-common-assign|    std::copy(std::begin(ctl.assign), std::end(ctl.assign), c.assign);\n||tonezones
+zone-common-outgain|    c.outGainTg = ctl.outGainTg; c.parallel = ctl.parallel;\n|    c.parallel = ctl.parallel;\n|tonezones
+zone-common-parallel|    c.outGainTg = ctl.outGainTg; c.parallel = ctl.parallel;\n|    c.outGainTg = ctl.outGainTg;\n|tonezones
 zone-follow-lfo|if (&w != v && w.active && w.zone == zone && (!other \|\| w.age > other->age)) other = &w;|if (&w != v && w.active && (!other \|\| w.age > other->age)) other = &w;
 zone-free-lfo|freeLfo[zone], other ? &other->lfo|freeLfo[0], other ? &other->lfo
 zone-free-lfo2|freeLfo2[zone], other ? &other->osc2.lfo|freeLfo2[0], other ? &other->osc2.lfo
@@ -998,27 +998,27 @@ zone-free-tick|            freeLfo[z].tick(1);|            if (!z) freeLfo[z].ti
 zone-modblk-note|    v->mod.noteOn(modBlk[zone], |    v->mod.noteOn(modBlk[0], 
 zone-legato|        const Controls& Z = zc(v);                     // its own zone's|        const Controls& Z = ctl;
 zone-release|void XtSynth::voiceOff(Voice& v) {\n    const Controls& Z = zc(v);|void XtSynth::voiceOff(Voice& v) {\n    const Controls& Z = ctl;
-zone-newblocks|void XtSynth::newBlocks(Voice& v) {\n    const Controls& Z = zc(v);|void XtSynth::newBlocks(Voice& v) {\n    const Controls& Z = ctl;
-zone-tva|XtTvaBlock XtSynth::tvaBlock(const Voice& v) const {\n    const Controls& Z = zc(v);|XtTvaBlock XtSynth::tvaBlock(const Voice& v) const {\n    const Controls& Z = ctl;
+zone-newblocks|void XtSynth::newBlocks(Voice& v) {\n    const Controls& Z = zc(v);|void XtSynth::newBlocks(Voice& v) {\n    const Controls& Z = ctl;|toneupdate
+zone-tva|XtTvaBlock XtSynth::tvaBlock(const Voice& v) const {\n    const Controls& Z = zc(v);|XtTvaBlock XtSynth::tvaBlock(const Voice& v) const {\n    const Controls& Z = ctl;|toneenvknobs
 zone-cosm|XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {\n    const Controls& Z = zc(v);|XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {\n    const Controls& Z = ctl;
-zone-env|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = zc(v);|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = ctl;
-zone-oscenv|XtEnvParams XtSynth::oscEnvParams(const Voice& v, const OscVoice& s, int which, int a, int d, int su, int r) const {\n    const Controls& Z = zc(v);|XtEnvParams XtSynth::oscEnvParams(const Voice& v, const OscVoice& s, int which, int a, int d, int su, int r) const {\n    const Controls& Z = ctl;
+zone-env|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = zc(v);|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = ctl;|toneenvknobs
+zone-oscenv|XtEnvParams XtSynth::oscEnvParams(const Voice& v, const OscVoice& s, int which, int a, int d, int su, int r) const {\n    const Controls& Z = zc(v);|XtEnvParams XtSynth::oscEnvParams(const Voice& v, const OscVoice& s, int which, int a, int d, int su, int r) const {\n    const Controls& Z = ctl;|toneenvknobs
 zone-start|    const Controls& Z = zc(zone);                      // the zone's, all through the note's start|    const Controls& Z = ctl;
 zone-voice-zone|    v->active = true;\n    v->zone = zone;\n|    v->active = true;\n
 zone-wave|    v->wave = waveOf(zone, 0);|    v->wave = waveOf(zone > 1 ? zone - 1 : zone, 0);
-zone-update-new|        if (v.active) liveUpdate(v, zc(v), zoneWas[v.zone], anyChanged);|        if (v.active) liveUpdate(v, ctl, zoneWas[v.zone], anyChanged);
-zone-follow|    if (!anyChanged) return;\n    zonesFollow();|    if (!anyChanged) return;
+zone-update-new|        if (v.active) liveUpdate(v, zc(v), zoneWas[v.zone], anyChanged);|        if (v.active) liveUpdate(v, ctl, zoneWas[v.zone], anyChanged);|tonezones
+zone-follow|        return;\n    }\n    zonesFollow();\n|        return;\n    }\n|tonezones
 zone-pickup-upper|for (int z = 0; z < kZones; ++z) zoneUpper[z] = zones ? zones->upper[z] : 127;|for (int z = 0; z < kZones; ++z) zoneUpper[z] = 127;
 zone-pickup-follow|        zonesFollow();\n        for (int z = 1; z < kZones; ++z) xtModBlock(zoneCtl[z].mod, modBlk[z]);|        for (int z = 1; z < kZones; ++z) xtModBlock(zoneCtl[z].mod, modBlk[z]);
 zone-mix-update|            if (v.on) oscUpdate(v, zc(v));|            if (v.on) oscUpdate(v, ctl);
-zone-key-unshifted|    const int key = shiftKey(note), zone = xtZoneOf(zoneUpper, key);|    const int key = shiftKey(note), zone = xtZoneOf(zoneUpper, note);
-check-zone-getter|            const auto& P = zone && zoned(id) && zone < zpar.size() && !zpar[zone].empty() ? zpar[zone] : par;|            const auto& P = par;|tonecheck
-check-zone-zoned|    static bool zoned(int id) { return (id >= 0x293 && id <= 0x3e8) \|\| (id >= 0x8d0 && id <= 0x954); }|    static bool zoned(int id) { return id >= 0x293 && id <= 0x3e8; }|tonecheck
-check-zone-start|        c.wr32(kSp, kA1); c.wr32(kSp + 4, (uint32_t)zone);|        c.wr32(kSp, kA1); c.wr32(kSp + 4, 0);|tonecheck
-check-zone-tag-env|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|        for (uint32_t a : { 0x89479720u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|tonecheck
-check-zone-tag-lfo|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479860u, 0x89479920u })|tonecheck
-check-zone-uppers|            if (id >= 0x124 && id <= 0x133) { m.ret((uint32_t)upper[id - 0x124]); return; }\n||tonecheck
-check-zone-carry|                const Ctl& ctl = syn.zc(fw.c.rd8(n.BL + 0x6c6) & 15);   // the note's zone's|                const Ctl& ctl = syn.ctl;|tonecheck
+zone-key-unshifted|    const int key = shiftKey(note), zone = xtZoneOf(zoneUpper, key);|    const int key = shiftKey(note), zone = xtZoneOf(zoneUpper, note);|tonenotes
+check-zone-getter|            const auto& P = zone && zoned(id) && zone < zpar.size() && !zpar[zone].empty() ? zpar[zone] : par;|            const auto& P = par;|tonefwcpp
+check-zone-zoned|    static bool zoned(int id) { return (id >= 0x293 && id <= 0x3e8) \|\| (id >= 0x8d0 && id <= 0x954); }|    static bool zoned(int id) { return id >= 0x293 && id <= 0x3e8; }|tonefwh
+check-zone-start|        c.wr32(kSp, kA1); c.wr32(kSp + 4, (uint32_t)zone);|        c.wr32(kSp, kA1); c.wr32(kSp + 4, 0);|tonefwh
+check-zone-tag-env|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|        for (uint32_t a : { 0x89479720u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|tonefwcpp
+check-zone-tag-lfo|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479860u, 0x89479920u })|tonefwcpp
+check-zone-uppers|            if (id >= 0x124 && id <= 0x133) { m.ret((uint32_t)upper[id - 0x124]); return; }\n||tonefwcpp
+check-zone-carry|(int)(pv - syn.voice), syn.zc(fw.c.rd8(n.BL + 0x6c6) & 15));|(int)(pv - syn.voice), syn.ctl);|tonecheck
 play-legato-any|    const bool legato1 = prevHeld && Z.playbackMode == 1 && v->on|    const bool legato1 = prev && Z.playbackMode == 1 && v->on
 play-legato-mode|    const bool legato1 = prevHeld && Z.playbackMode == 1 && v->on|    const bool legato1 = prevHeld && Z.playbackMode >= 1 && v->on
 play-legato2-mode|legato2 = prevHeld && Z.osc2.playbackMode == 1 && v->osc2.on|legato2 = prevHeld && Z.playbackMode == 1 && v->osc2.on
@@ -1049,13 +1049,13 @@ play-band-loop-on|        if (!eventCfg) S.flags0 \|= 1;|        S.flags0 \|= 1;
 play-band-from-end|        S.ev = (0.0f > walk) ? S.evEnd : S.evStart;|        S.ev = S.evStart;|toneband
 play-band-cross-fwd|        if (!(flags0 & 1)) { flags3 &= 0xdf; f9c = 1.0f; }|        if (!cached) { flags3 &= 0xdf; f9c = 1.0f; }|toneband
 play-band-endflag|int XtMbPlayer::endFlag() const { return s ? s->ended : 0; }|int XtMbPlayer::endFlag() const { return s ? -s->ended : 0; }|toneband
-check-play-held|prev && (c.rd32(prev->note + 0x20) & 0x20000000) ? 1 : 0);|prev && (c.rd32(prev->note + 0x20) & 0x40000000) ? 1 : 0);|tonecheck
-check-play-prev-block|        if (!c.call(0x894db830, { n.BL, prev ? prev->BL : 0, (uint32_t)(int8_t)chain }, kSp))|        if (!c.call(0x894db830, { n.BL, 0, (uint32_t)(int8_t)chain }, kSp))|tonecheck
+check-play-held|prev && (c.rd32(prev->note + 0x20) & 0x20000000) ? 1 : 0);|prev && (c.rd32(prev->note + 0x20) & 0x40000000) ? 1 : 0);|tonefwh
+check-play-prev-block|        if (!c.call(0x894db830, { n.BL, prev ? prev->BL : 0, (uint32_t)(int8_t)chain }, kSp))|        if (!c.call(0x894db830, { n.BL, 0, (uint32_t)(int8_t)chain }, kSp))|tonefwh
 check-play-prev-zone|                    if (o->live && !o->off && !o->ended && fw.c.rd8(o->BL + 0x6c6) == zone) prev = o;|                    if (o->live && !o->off && !o->ended) prev = o;|tonecheck
 check-play-stale|                    for (int o = 0; o < 2; ++o) osc(syn.voice[prev->vi], o).staleEnd = (int8_t)fw.c.rd8(Firmware::voice(*prev, o) + 0xd4 + 4);|                    for (int o = 0; o < 2; ++o) osc(syn.voice[prev->vi], o).staleEnd = 0;|tonecheck
 check-play-vpno-count|    le(4, (uint32_t)e.vpnoCount, 4);|    le(4, (uint32_t)e.vpnoCount + 1, 4);|tonecheck
 check-play-vpno-list|    for (size_t k = 0; k < e.vpno.size(); ++k) le(12 + 2 * k, e.vpno[k], 2);|    for (size_t k = 0; k < e.vpno.size(); ++k) le(10 + 2 * k, e.vpno[k], 2);|tonecheck
-check-play-patch|    p[b + 0x2e] = o.playbackMode;|    p[b + 0x2e] = 0;|tonecheck
+check-play-patch|    p[b + 0x2e] = o.playbackMode;|    p[b + 0x2e] = 0;|tonecases
 patch-playback|    o.playbackMode = p(b + 0x2e);|    o.playbackMode = p(b + 0x2f);|tonepatch
 check-pad-cc|            if (ccMoved && !panelMoved && !fw.padCc(kCcNum[ccAt], ccTo)) return false;\n||tonecheck|4242
 seg-forward-off|            segForward();\n||tonesolo
@@ -1112,15 +1112,15 @@ lin-upd-first|    bwd.end = start;\n    fwd.end = frames - 1;|    fwd.end = fram
 lin-upd-last|    bwd.end = start;\n    fwd.end = frames - 1;|    bwd.end = start;\n    fwd.end = frames;|tonelin
 lin-upd-mode|        fwd.mode = l.on ? l.fwdMode : 0;|        fwd.mode = 0;|tonelin
 lin-upd-mode-bwd|        bwd.mode = l.on ? l.bwdMode : 0;|        bwd.mode = 0;|tonelin
-stored-solo-off|if (fits && xtSoloReadVpdt(*stored, ch, recs, P)|if (false && xtSoloReadVpdt(*stored, ch, recs, P)|tone
-stored-band-off|        if (fits) { E->vpdt = *stored; E->stored = true; }|        if (false) { E->vpdt = *stored; E->stored = true; }|tone
-stored-flag|{ vp = *stored; E->stored = true; }|{ vp = *stored; }|tone
-stored-whole|        for (uint32_t e = 0; fits && type != 1 && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) % 16 == 0;\n||tone
-stored-whole-solo|fits && type != 1 && e < nev|fits && e < nev|tone
-stored-order|        for (uint32_t e = 1; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) >= r32((st * (e - 1) + first) * 2 + 4);\n||tone
-stored-front| && r32(first * 2 + 4) == 0\n|\n|tone
-stored-back|            && (long)r32((st * (nev - 1) + first) * 2 + 4) == frames * 16;|            ;|tone
-stored-stride|st = type == 1 ? (ch == 2 ? 16 : 10) : (ch == 2 ? 0x58 : 0x2e), first = type == 1 ? 8 : 14;|st = type == 1 ? (ch == 2 ? 10 : 16) : (ch == 2 ? 0x58 : 0x2e), first = type == 1 ? 8 : 14;|tone
+stored-solo-off|if (fits && xtSoloReadVpdt(*stored, ch, recs, P)|if (false && xtSoloReadVpdt(*stored, ch, recs, P)
+stored-band-off|        if (fits) { E->vpdt = *stored; E->stored = true; }|        if (false) { E->vpdt = *stored; E->stored = true; }
+stored-flag|{ vp = *stored; E->stored = true; }|{ vp = *stored; }
+stored-whole|        for (uint32_t e = 0; fits && type != 1 && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) % 16 == 0;\n|
+stored-whole-solo|fits && type != 1 && e < nev|fits && e < nev
+stored-order|        for (uint32_t e = 1; fits && e < nev; ++e) fits = r32((st * e + first) * 2 + 4) >= r32((st * (e - 1) + first) * 2 + 4);\n|
+stored-front| && r32(first * 2 + 4) == 0\n|\n
+stored-back|            && (long)r32((st * (nev - 1) + first) * 2 + 4) == frames * 16;|            ;
+stored-stride|st = type == 1 ? (ch == 2 ? 16 : 10) : (ch == 2 ? 0x58 : 0x2e), first = type == 1 ? 8 : 14;|st = type == 1 ? (ch == 2 ? 10 : 16) : (ch == 2 ? 0x58 : 0x2e), first = type == 1 ? 8 : 14;
 solo-kind1-off|    if (evKindAt(curEv) == 1 && (f3 & 8)) { f3 &= 0xf7; walkStep = -walkStep; ++kindTurn; return; }\n||tonesolo|31337
 solo-kind1-walk|f3 &= 0xf7; walkStep = -walkStep; ++kindTurn; return; }|f3 &= 0xf7; ++kindTurn; return; }|tonesolo|31337
 solo-kind1-flag|(f3 & 8)) { f3 &= 0xf7; walkStep = -walkStep; ++kindTurn|(f3 & 8)) { walkStep = -walkStep; ++kindTurn|tonesolo|31337
@@ -1136,3 +1136,32 @@ check-stored-whole|whole = (w.encodeType == 1 \|\| w.events[i] % 16 == 0) && (i 
 check-stored-sum|                    whole = reach >= 0 && reach <= w.frames * 16 && reach + (long)rd(term, 2) >= w.frames * 16;|                    whole = reach == w.frames * 16;|tonecheck
 check-stored-file|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events, &w.vpdt);|    out.enc = xtSynthEncode(chans, 44100.0, w.encodeType, 64, nullptr, 16, &w.events);|tonecheck
 files-vpdt-copy|    out.vpdt.assign(vpdt, vpdt + nDt);\n||tonewave
+# The Multi Step Modulator in XtSynth (v193): its wiring, through xt_tone's MSM mode
+msm-hook-releasing|            if (v.active) s.newBlocks(v);|            if (v.active && v.releasing) s.newBlocks(v);|wiremsm
+msm-edit-ignored|    if (ctl.msm == msmGiven) return;|    return;|wiremsm
+msm-clocks-always|    if (msm.pending != counted) msm.clocks(sounding(voice, kVoices));|    msm.clocks(sounding(voice, kVoices));|wiremsm
+msm-ticks-few|    if (ticks != 0) msm.tick(ticks);|    if (ticks > 1) msm.tick(ticks);|wiremsm
+msm-held-sounding|        if (listed(voices[i]) && (voices[i].keyFlags & 1)) return true;|        if (listed(voices[i])) return true;|wiremsm
+msm-listed-releasing|    return v.active && !v.releasing && !v.damping;|    return v.active && !v.damping;|wiremsm
+msm-terms-unmoved|    return moved;\n}|    return false;\n}|wiremsm
+msm-head-unheld|    msm.noteOn(0, keyHeld(voice, kVoices));|    msm.noteOn(0, false);|wiremsm
+msm-head-none|    msmNoteOn();\n||wirenotes
+msm-update-unread|    const bool termsMoved = msmTerms(v, false);|    const bool termsMoved = false;|wireupdate
+msm-coarse-part|xtNoteCoarse(t, oscCoarse) + v.msm[xtmsm::PitCrs] + v.msm[osc + xtmsm::OscCrs]|xtNoteCoarse(t, oscCoarse) + v.msm[osc + xtmsm::OscCrs]|wireknobs
+msm-fine-unscaled|fine = xtNoteFine(t, v.note, o.oscFine, bend, s.rnd) + 10 * fineTerms;|fine = xtNoteFine(t, v.note, o.oscFine, bend, s.rnd) + fineTerms;|wireknobs
+msm-porta-clamped|std::min((Z.portaTime + v.msm[xtmsm::PortaTime]) & 0xff, 127)|std::clamp(Z.portaTime + v.msm[xtmsm::PortaTime], 0, 127)|wireknobs
+msm-osc-level|o.oscLevel + oscTerm(v, s, xtmsm::OscLevel)|o.oscLevel + oscTerm(v, s, xtmsm::OscLfoLevel)|wireknobs
+msm-osc2-first|    return &s == &v ? xtmsm::Osc1 : xtmsm::Osc2;|    return xtmsm::Osc1;|wireknobs
+msm-detune-none|    a.detune += oscTerm(v, s, xtmsm::OscFormant);\n||wireknobs
+msm-pitch-knob|const int knob = o.oscPitch + oscTerm(v, s, xtmsm::OscPitch);|const int knob = o.oscPitch;|wireknobs
+msm-sustain-none|k.sustain = std::clamp(knob.sustain + t[xtmsm::Sustain], 0, 127);|k.sustain = knob.sustain;|wireenvknobs
+msm-tva-pan|k.pan = Z.tvaPan + t[xtmsm::TvaPan] + v.mx[TvaPan];|k.pan = Z.tvaPan + t[xtmsm::TvaLevel] + v.mx[TvaPan];|wireenvknobs
+msm-cosm-env-one|(first ? xtmsm::CosmEnv1 : xtmsm::CosmEnv2)|xtmsm::CosmEnv1|wireenvknobs
+msm-cosm-word|{ xtmx::CosmPrm1, xtmsm::CosmPrm1 }|{ xtmx::CosmPrm1, xtmsm::CosmPrm2 }|wireenvknobs
+msm-lfo-rate-osc1|const int term = v.msm[(&s == &v ? xtmsm::Osc1 : xtmsm::Osc2) + xtmsm::OscLfoRate];|const int term = v.msm[xtmsm::Osc1 + xtmsm::OscLfoRate];|wireenvknobs
+msm-tlfo-rate|v.mx[xtmx::TvaLfoRate] + v.msm[xtmsm::Tva + xtmsm::TvaLfoRate]|v.mx[xtmx::TvaLfoRate]|wireenvknobs
+msm-chorus-send|k.chorusSend = Z.chorusSend + v.msm[xtmsm::ChoSend]|k.chorusSend = Z.chorusSend + v.msm[xtmsm::RevSend]|wireenvknobs
+msm-ms-none|    msmMs(d);\n||wirearp
+msm-edit-unsynced|    msmSync();\n    for (Voice& v : voice)|    for (Voice& v : voice)|wirezones
+check-msm-unreplayed|        if (asked.empty()) return true;|        asked.clear();\n        if (asked.empty()) return true;|wirefwmsm
+check-msm-unstopped|            if (!fw.stop(n)) return false;\n||wirecheck
