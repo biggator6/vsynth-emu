@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Plant runs build one binary v194 (2026-11-12): the user's "speed up the plant runs". mutate_panel.py built all eight
+  test binaries for every plant, though a plant's run starts one (its kind's _bin, else VSynthEmuTest), and each link of
+  the whole plugin takes about 20 s, one after another: 173 s a plant, measured after a touch of one source, where one
+  binary takes 30 s. Now build(targets) builds only binary(kind), and the run's own binaries at its start and, from the
+  clean sources, at its end. Checked on nine plants, one or more for each of the eight binaries (editor-no-build,
+  patch-playback-vpno, arp-param-default, arp-no-ticks, disk-loop, rom-other-taken, step-unlimited, switch-read,
+  teardown-classifier-deaf): all caught, 305 s with the clean runs, then 161 s for the closing rebuild; the sources as
+  they were after. CLAUDE.md's times measured again: about half a minute a plant, the whole list about two hours.
+  (v192 and v193 are the Multi Step Modulator's, on claude/msm-ad515c.)
+
 The Algorithm menu and the legacy engine removed v191 (2026-11-12): the user's "Both, after arpeggio" to "Remove the
   Algorithm menu and the old engine behind it?". Gone: the editor's Algorithm menu (algoBox_, algoLabel_, comboBoxChanged)
   and the legacy black-box engine whole, VariphraseEngine, PhaseVocoder, SourceFilterModel, DownsampledFormants,

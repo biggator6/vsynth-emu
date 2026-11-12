@@ -3570,6 +3570,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 20, continued (2026-11-12) — v194: plant runs build one binary
+
+- The plant runs had grown to 2.8 minutes a plant, and v190's whole list to over 8 hours. A measurement showed where it went: linking. Every test binary links the whole plugin, about 20 s each, one after another, and every plant built all eight, though its run starts one. One binary takes 30 s from a touched source, eight take 173 s.
+- mutate_panel.py now builds only the binary a plant's kind runs, and the run's own binaries at its start and end. Nine plants, at least one for each binary, were all caught in 305 s with the clean runs, then 161 s for the closing rebuild. The whole list of 227 should take about two hours.
+- v192 and v193 are the Multi Step Modulator's, on its own branch, so this one is v194.
+
 ### Session 20, continued (2026-11-12) — v191: the Algorithm menu and the legacy engine removed
 
 - The engine's file held one thing the plugin still uses: Auto's classifier, which picks an encode type for a wave on Auto. It moved to a file of its own as it stood. The house's checks then caught two old habits in it: a float cast to int before its clamp, and pi typed by hand. Fixing both changed nothing measurable: old and new classify the 34 test waves identically, down to the float bits.

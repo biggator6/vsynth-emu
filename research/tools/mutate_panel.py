@@ -248,10 +248,9 @@ ENV={
  'fx-mode':{'TEST_FX':'1','TEST_BUS':'0,0,2,0'},
 }
 SDK=os.environ.get('SDK','/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk')
-def build():
-    targets=['VSynthEmuTest','VSynthEmuRomTest','VSynthEmuSwitchTest','VSynthEmuStepTest',
-             'VSynthEmuDiskImageTest','VSynthEmuTeardownTest',
-             'VSynthEmuArpTest','VSynthEmuArpPluginTest']   # every binary a kind runs
+def binary(kind):   # the one test binary a kind's run starts (run)
+    return ENV[kind].get('_bin','VSynthEmuTest')
+def build(targets):   # only those: each links the whole plugin, about 20 s, one after another (all eight: 173 s)
     r=subprocess.run(['cmake','--build','build/plugin','--target',*targets,'-j','10'],
                      capture_output=True,text=True,env=dict(os.environ,SDKROOT=SDK))
     return r.stdout if r.returncode==0 else 'failed: '+r.stderr[-300:]
@@ -271,7 +270,8 @@ def run(kind):
     return subprocess.run(cmd,capture_output=True,text=True,env=env,timeout=300)
 missed=0
 # ENV and MUTS are above; a build first, so the first error's time isn't the source's own.
-build()
+used=sorted({binary(m[4]) for m in MUTS})   # the binaries this run's kinds start
+build(used)
 # Every run must fail for the plant's reason: with nothing planted, each kind of run has to pass first.
 for kind in sorted({m[4] for m in MUTS}):
     r=run(kind)
@@ -281,8 +281,8 @@ for name,path,old,new,kind in MUTS:
     if old not in src: print('NOTEXT',name); missed+=1; continue
     Path(path).write_text(src.replace(old,new,1))
     try:
-        b=build()
-        if 'Built target VSynthEmuTest' not in b: print('ERROR ',name,b[:200]); missed+=1; continue
+        b=build([binary(kind)])
+        if 'Built target '+binary(kind) not in b: print('ERROR ',name,b[:200]); missed+=1; continue
         r=run(kind)
         if 'ROM rejected' in r.stderr: print('ERROR ',name,'the ROM was rejected, so this proves nothing'); missed+=1
         elif r.returncode==0: print('MISSED',name); missed+=1
@@ -290,4 +290,4 @@ for name,path,old,new,kind in MUTS:
     finally:
         Path(path).write_text(src)
 print('planted',len(MUTS),'missed',missed)
-build()
+build(used)   # each from the sources as they are again
