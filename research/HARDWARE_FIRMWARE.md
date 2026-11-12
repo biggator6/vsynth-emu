@@ -1639,7 +1639,10 @@ edit is the knobs' update), so a voice already holds the Releases' terms when it
 a loop holds its last step and still asks (its state 1): the branch of `0x894da400` that zeroes a term asking nothing is
 never reached. The read stays, as the firmware's step. xt_arp's two of the flag in `arp_muts.txt`: `mutate_arp.py` 92, none
 missed. `mutate_msm.py` 71, none missed. `mutate_panel.py` with v193's twenty (the eighteen `msm-`, `arp-text-step`,
-`arp-text-sign`), none missed.
+`arp-text-sign`), none missed. On the merge with master's v191 and v194, `mutate_panel.py --editor` with every `rom-`,
+`arp-` and `msm-` name: 101, 100 caught. `arp-said-missing` read ERROR: v193 lengthened the comment it replaces in
+`xtPatchMissing`, so its old text matched only the first line, and the plant left the rest behind, which didn't build. It
+now replaces the whole comment, and is caught.
 
 **Not covered.** The arpeggio and the Multi Step Modulator together in xt_tone (the flag is xt_arp's, its effect xt_msm's);
 zones in the MSM mode (each note on zone 1; xt_msm checks the terms by zone); MONO, legato, an outside clock and PCM waves in

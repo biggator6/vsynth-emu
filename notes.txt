@@ -375,7 +375,9 @@ The Multi Step Modulator in the sound v193 (2026-11-12): v192's XtMsm wired into
   check-pad-cc [gap, v189's]. The first run missed two of mine: msm-held-sounding, caught once the mode had the Hold pedal;
   msm-release-unread dropped as equivalent (every term that moves updates every voice at once, so a key-off's read of the
   Releases finds them already there; the read stays, as the firmware's). mutate_arp.py 92 (2 new: the flag), mutate_msm.py
-  71, mutate_panel.py v193's 20 (18 msm-, arp-text-step, arp-text-sign): none missed.
+  71, mutate_panel.py v193's 20 (18 msm-, arp-text-step, arp-text-sign): none missed. On the merge with v191 and v194
+  (d84aae0), mutate_panel.py --editor with every rom-, arp- and msm- name: 101, 100 caught; arp-said-missing read ERROR,
+  its old text matching only the first line of the comment v193 lengthened, and now replaces the whole comment: caught.
 
 The Multi Step Modulator v192 (2026-11-11): the firmware's own, which 55 of the 512 preset patches use (HARDWARE_FIRMWARE.md,
   "The Multi Step Modulator"), ported and checked; not wired into the sound yet (v193). Numbered from v192 on its own branch

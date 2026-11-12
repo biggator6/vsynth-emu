@@ -33,7 +33,7 @@ arp-old-session-kept|    XtArpPattern p = xtArpDefaultPattern();|    XtArpPatter
 arp-default-line|uint8_t { 60 }|uint8_t { 0 }|plugin/Source/PluginArp.cpp|arpplugin
 arp-words-half|for (size_t i = 0; i < kWords; ++i)|for (size_t i = 0; i < kWords / 2; ++i)|plugin/Source/PluginArp.cpp|arpplugin
 arp-patch-tone-only|xtWithPatchArp(store, xtPatchControls(store, zone, xtControls()))|xtPatchControls(store, zone, xtControls())|plugin/Source/PluginProcessor.cpp|patch
-arp-said-missing|    // The arpeggio is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190)|    if (p(0x42e)) m.push_back("arpeggio");|plugin/Source/XtPatch.cpp|arpplugin
+arp-said-missing|    // The arpeggio is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190); and the\n    // Multi Step Modulator (v193)|    if (p(0x42e)) m.push_back("arpeggio");|plugin/Source/XtPatch.cpp|arpplugin
 editor-arp-unplaced|        addArpCards(p);|        ;|plugin/Source/PluginEditorPlay.cpp|layout
 editor-arp-wrong-param|{ &arp_.duration, "arpDuration" }|{ &arp_.duration, "arpShuffleRate" }|plugin/Source/PluginEditorPlay.cpp|layout
 editor-arp-no-items|            box->addItemList(choice->choices, 1);|            ;|plugin/Source/PluginEditorPlay.cpp|layout
