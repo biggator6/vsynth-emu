@@ -21,6 +21,7 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
         return;
 
     apvts.replaceState(juce::ValueTree::fromXml(*xml));
+    restoreArpPattern();   // v190: a session before it has none
     for (auto& e : fxEdits_) e.store(kFxNoEdit, std::memory_order_relaxed);
     for (const auto& pair : juce::StringArray::fromTokens(apvts.state.getProperty("fxEdits").toString(), ",", ""))
         if (pair.contains("=")) setFxParam(pair.upToFirstOccurrenceOf("=", false, false).getIntValue(),

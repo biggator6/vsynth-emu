@@ -52,8 +52,9 @@ if [ $BUILT = 1 ]; then
     # reopens without its parts (each said); a wave whose header claims more than its data holds (refused at once);
     # another image given while one is in use (refused, the tables as they were); the harnesses' switches set (unread);
     # firmware routines that loop (each way gives up within its step limit); two legacy engines on one thread (each as alone);
-    # damaged disk images (refused, or each cluster once); the arpeggiator in XtSynth, heard (a note a quarter, two tempos)
-    for t in Teardown Restore WaveFile Rom Switch Step Formant DiskImage Arp; do
+    # damaged disk images (refused, or each cluster once); the arpeggiator in XtSynth, heard (a note a quarter, two tempos);
+    # and its plugin side: its parameters against the firmware, a patch's, a session's, a chord through processBlock (v190)
+    for t in Teardown Restore WaveFile Rom Switch Step Formant DiskImage Arp ArpPlugin; do
         checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
     done
     # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth

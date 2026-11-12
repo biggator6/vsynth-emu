@@ -19,6 +19,15 @@ namespace Ui {
     inline constexpr int headerH = 40, sourceH = 56, performW = 248, tabH = 38;
     inline constexpr int pad = 12, gap = 12, cardHeadH = 28, rowH = 26, rowGap = 4, cardFoot = 10, labelW = 84;
 
+    // A value slider on a card: its value box `boxW` wide, in the palette (v190: the editor's constructor's, and the
+    // Arpeggio card's)
+    inline void styleValueSlider(juce::Slider& s, int boxW) {
+        s.setColour(juce::Slider::textBoxTextColourId, text);
+        s.setColour(juce::Slider::textBoxBackgroundColourId, surfaceField);
+        s.setColour(juce::Slider::trackColourId, accent);
+        s.setTextBoxStyle(s.getTextBoxPosition(), false, boxW, 20);
+    }
+
     // ─── A tab's page: cards of rows ──────────────────────────────────────────────
     // Each card is a titled box in column 0 or 1 (or across both, col -1), its
     // rows a list of items: a component with a fixed width, or 0 for a share of

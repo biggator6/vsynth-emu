@@ -129,7 +129,7 @@ static int patchApplyTest(const juce::File& rom) {
         XtPatchFile patch;
         if (!xtPatchRead(f.data(), f.size(), patch)) { check(false, "a patch that won't read"); continue; }
         for (int z = 0; z < xtPatchZones(patch.store); ++z) {
-            const XtSynth::Controls want = xtPatchControls(patch.store, z, p.currentControls());
+            const auto want = xtWithPatchArp(patch.store, xtPatchControls(patch.store, z, p.currentControls()));   // and its arpeggio (v190)
             p.applyPatch(patch.name, patch.store, z, juce::File());
             const XtSynth::Controls got = p.currentControls();
             check(got == want, juce::String(patch.name) + " zone " + juce::String(z) + ": the controls differ");
@@ -717,7 +717,7 @@ int main(int argc, char** argv) {
                         if (k->getBounds().intersects(kids[j]->getBounds())) fail(where + ": " + nameOf(k) + " is over " + nameOf(kids[j]));
                     if (auto* l = dynamic_cast<juce::Label*>(k)) {
                         if (cutShort(*l)) fail(where + ": " + nameOf(k) + " is cut short");
-                    } else if (dynamic_cast<juce::ComboBox*>(k)) {
+                    } else if (dynamic_cast<juce::ComboBox*>(k) || dynamic_cast<juce::Slider*>(k)) {   // its value box (v190)
                         if (juce::Label* box = boxLabelOf(*k); box && cutShort(*box)) fail(where + ": " + nameOf(k) + " is cut short");
                     } else if (auto* b = dynamic_cast<juce::ToggleButton*>(k)) {   // as LookAndFeel_V4 draws it: the tick, then the text
                         const float size = juce::jmin(15.0f, (float)b->getHeight() * 0.75f);

@@ -6,6 +6,7 @@
 // Run: VSynthEmuArpTest <rom.2.bin>.  Exit 0 if every check holds.
 #include "TestChecks.h"
 #include "TestMain.h"
+#include "TestOnsets.h"
 #include "../Source/XtSynth.h"
 #include <algorithm>
 #include <cmath>
@@ -61,30 +62,9 @@ std::vector<float> levels(const Case& c) {
             for (const int k : kChord) s.noteOff(k);
         if (c.pedalUpAt >= 0.0 && std::fabs(t - c.pedalUpAt) < 0.5 * kFrame / kRate) s.controller(kHoldPedal, 0);
         s.render(l.data(), r.data(), kFrame);
-        double sum = 0.0;
-        for (int i = 0; i < kFrame; ++i) sum += (double)l[i] * l[i] + (double)r[i] * r[i];
-        rms.push_back((float)std::sqrt(sum / (2.0 * kFrame)));
+        rms.push_back(frameRms(l.data(), r.data(), kFrame));
     }
     return rms;
-}
-
-// Where the level first rises past a third of the render's loudest frame from below a tenth of it, in ms
-std::vector<double> onsetsMs(const std::vector<float>& rms) {
-    const float top = *std::max_element(rms.begin(), rms.end());
-    std::vector<double> at;
-    bool quiet = true;
-    for (size_t f = 0; f < rms.size(); ++f) {
-        if (quiet && rms[f] > top / 3.0f) at.push_back((double)f * kFrameMs);
-        if (rms[f] > top / 3.0f) quiet = false;
-        if (rms[f] < top / 10.0f) quiet = true;
-    }
-    return at;
-}
-
-std::string said(const std::vector<double>& at) {
-    std::string s;
-    for (const double t : at) s += " " + std::to_string((int)std::lround(t));
-    return s;
 }
 
 // A note each quarter at this tempo, from 15 ticks after the keys
@@ -92,7 +72,7 @@ void steps(TestChecks& check, int tempo10) {
     const Case c{ tempo10 };
     const std::vector<float> rms = levels(c);
     check(rms == levels(c), "the same render twice should be the same");
-    const std::vector<double> at = onsetsMs(rms);
+    const std::vector<double> at = onsetsMs(rms, kFrameMs);
     const double quarterMs = 600000.0 / tempo10, firstMs = quarterMs * kFirstTicks / kTicksPerQuarter;
     const int want = (int)std::floor(c.seconds * 1000.0 / quarterMs) + 1;
     const std::string bpm = std::to_string(tempo10 / 10) + " BPM";
@@ -114,11 +94,11 @@ int arpTest(const juce::File& rom, const juce::File&) {
     steps(check, 1400);
     Case off;
     off.arpOn = false;
-    check(onsetsMs(levels(off)).size() == 1, "the Switch off: the chord should start once and hold");
+    check(onsetsMs(levels(off), kFrameMs).size() == 1, "the Switch off: the chord should start once and hold");
     Case held;
     held.letGoAt = 1.0;
     held.pedalUpAt = 2.6;
-    const std::vector<double> at = onsetsMs(levels(held));
+    const std::vector<double> at = onsetsMs(levels(held), kFrameMs);
     const auto between = [&](double lo, double hi) {
         return std::count_if(at.begin(), at.end(), [&](double t) { return t >= lo && t < hi; });
     };

@@ -246,7 +246,7 @@ std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int z
         const std::string osc = "OSC " + std::to_string(n + 1) + " ";
         if (p(0x2a4 + b) != 0 && p(0x2a5 + b) == kExternal) m.push_back(osc + "external input");
     }   // Playback Mode is done on every kind of wave (v156); a LITE wave's converter doesn't read it, on the XT either
-    if (p(0x42e)) m.push_back("arpeggio");           // XtSynth plays it (v189); the plugin's parameters for it are v190's
+    // The arpeggio is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190)
     if (p(0x48d)) m.push_back("Multi Step Modulator");
     return m;
 }

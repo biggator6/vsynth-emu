@@ -19,3 +19,28 @@ arp-ticks-fast|    else arpTicks.msInternal(clockPeriod());|    else arpTicks.ms
 arp-notes-lost|                tgNoteOn(e.d1, (float)e.d2 / kVelocityFull);|                tgNoteOn(e.d1 - 128, (float)e.d2 / kVelocityFull);|plugin/Source/XtSynthArp.cpp|arp
 arp-offs-lost|                tgNoteOff(e.d1, (float)e.d2 / kVelocityFull);|                tgNoteOff(e.d1 + 1, (float)e.d2 / kVelocityFull);|plugin/Source/XtSynthArp.cpp|arp
 arp-pedal-to-part|    arp.pedal(std::clamp(value, 0, 127));|    tgController(number, value);|plugin/Source/XtSynthArp.cpp|arp
+# The arpeggio's plugin side, by VSynthEmuArpPluginTest, PluginTest's patch apply and its layout check (v190).
+arp-param-swap|{ "arpDuration", 0x431,|{ "arpDuration", 0x432,|plugin/Source/PluginArp.cpp|arpplugin
+arp-param-default|ArpKind::Choice, 0, 5, 3,|ArpKind::Choice, 0, 5, 0,|plugin/Source/PluginArp.cpp|arpplugin
+arp-text-real|{ realText, realValue } },|kPlain },|plugin/Source/PluginArp.cpp|arpplugin
+arp-text-step|juce::String stepText(int v) { return juce::String(v + 1); }|juce::String stepText(int v) { return juce::String(v); }|plugin/Source/PluginArp.cpp|arpplugin
+arp-text-sign|return v >= 0 ? "+" + juce::String(v)|return v > 0 ? "+" + juce::String(v)|plugin/Source/PluginArp.cpp|arpplugin
+arp-not-added|    addArpParams(params);|    ;|plugin/Source/PluginParams.cpp|arpplugin
+arp-switch-unread|    c.arp.on = knob(idOf(kXtArpSwitchId)) != 0;|    c.arp.on = false;|plugin/Source/PluginArp.cpp|arpplugin
+arp-pattern-unread|    c.arpPattern = arpWords_.load();|    ;|plugin/Source/PluginArp.cpp|arpplugin
+arp-switch-unwritten|    set(idOf(kXtArpSwitchId), c.arp.on ? 1.0f : 0.0f);|    ;|plugin/Source/PluginArp.cpp|arpplugin
+arp-pattern-unwritten|    setArpPattern(c.arpPattern);|    ;|plugin/Source/PluginArp.cpp|arpplugin
+arp-pattern-unsaved|    apvts.state.setProperty("arpPattern", juce::Base64::toBase64(&p, sizeof p), nullptr);|    ;|plugin/Source/PluginArp.cpp|arpplugin
+arp-pattern-unrestored|    restoreArpPattern();   // v190: a session before it has none|    ;|plugin/Source/PluginState.cpp|arpplugin
+arp-old-session-kept|    XtArpPattern p = xtArpDefaultPattern();|    XtArpPattern p = arpWords_.load();|plugin/Source/PluginArp.cpp|arpplugin
+arp-default-line|uint8_t { 60 }|uint8_t { 0 }|plugin/Source/PluginArp.cpp|arpplugin
+arp-words-half|for (size_t i = 0; i < kWords; ++i)|for (size_t i = 0; i < kWords / 2; ++i)|plugin/Source/PluginArp.cpp|arpplugin
+arp-patch-tone-only|xtWithPatchArp(store, xtPatchControls(store, zone, xtControls()))|xtPatchControls(store, zone, xtControls())|plugin/Source/PluginProcessor.cpp|patch
+arp-said-missing|    // The arpeggio is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190)|    if (p(0x42e)) m.push_back("arpeggio");|plugin/Source/XtPatch.cpp|arpplugin
+editor-arp-unplaced|        addArpCards(p);|        ;|plugin/Source/PluginEditorPlay.cpp|layout
+editor-arp-wrong-param|{ &arp_.duration, "arpDuration" }|{ &arp_.duration, "arpShuffleRate" }|plugin/Source/PluginEditorPlay.cpp|layout
+editor-arp-no-items|            box->addItemList(choice->choices, 1);|            ;|plugin/Source/PluginEditorPlay.cpp|layout
+editor-arp-narrow|{ &arp_.resolution, 84 }|{ &arp_.resolution, 40 }|plugin/Source/PluginEditorPlay.cpp|layout
+editor-arp-one-column|    pattern.col = 1;|    ;|plugin/Source/PluginEditorPlay.cpp|layout
+editor-arp-hidden|        addAndMakeVisible(*s);|        ;|plugin/Source/PluginEditorPlay.cpp|layout
+editor-style-shared|        Ui::styleValueSlider(*sl, sl == &keySlider_ ? 56 : sl == &startSlider_ ? 66 : 44);|        Ui::styleValueSlider(*sl, 20);|plugin/Source/PluginEditor.cpp|layout

@@ -3570,6 +3570,18 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 20, continued (2026-11-12) — v190: the arpeggio's plugin side
+
+- The split came first and took most of the session. The kit refused every way of moving PluginProcessor.cpp's parts as they stood: code-shape for the old long lines and functions, template-law for the parameter rows as copies of each other. I measured that with a dry run of each hook on a scratch copy before writing anything, asked, and the user chose a kit fix (KWB-156) over rewriting the code as tables or moving it by script.
+- The fix needed two more rounds, each found by a read-only probe of its pool. The first: a moved part's lone braces were taken by other new files' braces. The second: the stale, untracked tabdesign/PluginEditor.cpp holds the same lines as the editor, so a moved line it also held read as new. Then every move went through. once-only still reads tabdesign once (a refusal marked wrong), and making-check sends back every turn that writes source by cp or sed -i, since the hooks can't find jscpd under npx: both are logged in workflow-bugs.md.
+- I moved each part by cutting HEAD's lines into a scratch file and copying it in, so no line was retyped; every hook reads a cp's text, so each move was judged whole. One cut went wrong when I misread sed's numbering and took oscParamId with it; it went into the layout's own file, where it belongs anyway.
+- The proof the split changed nothing came from a dump of every parameter's place, ID, name, range, default and text, written into the new test before the split and run on HEAD's build: 637 lines, identical after. Snapshots of every tab and COSM type differed only in the build label.
+- The editor's header was the class itself, so a part could leave it only as a class of its own. The COSM type rows became a base struct, which kept every name in the editor's code as it was.
+- The arpeggio's ten parameters took their names, ranges and defaults from the firmware's tables, and the test holds them to it. The test caught one thing I'd written from habit: the firmware writes Octave Range 0 as "+0".
+- My first card put two settings to a row, and at 900 wide the layout check refused it, rightly: Grid read "1…" and Velocity "R…". Two cards of one setting a row fit both columns with 16 pixels to spare.
+- The pattern is a patch's data, so it went into the session's state and an atomic copy for the audio thread rather than 528 parameters. The card's title says when the pattern is empty, as the default is, since a Switch that does nothing would otherwise look broken.
+- Five of mutate_panel.py's plants had pointed at code that v185 moved, and would have printed NOTEXT. They follow it now, with the moved plants.
+
 ### Session 20, continued (2026-11-11) — v189: the arpeggiator in XtSynth
 
 - The router came first, as the leads said, and its mode objects only made sense once the vtables were read at the right base: the controller's pointer is at this+4, and four mode classes of eleven methods sit 0x84 apart. Read as one table they had looked like overlapping copies.

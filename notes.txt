@@ -335,6 +335,36 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The arpeggio's plugin side v190 (2026-11-12): the fourth step to the arpeggio (HARDWARE_FIRMWARE.md, "The arpeggio's
+  plugin side"). The split first, moves only, by the kit's KWB-156 (the old copy out first, then the new file from HEAD's
+  text, copied in so that no line was retyped; the user's choice of a kit fix over a rewrite as tables or a move by script):
+  PluginProcessor.cpp 2128 → 671 lines (the IDs to PluginParamIds.h; the layout to PluginParams.cpp and its parts to
+  PluginParamsOsc.cpp, PluginParamsCosm.cpp, PluginParamsTone.cpp; xtControls and setControls to PluginControlsRead.cpp and
+  PluginControlsWrite.cpp, their COSM and OSC 2 parts to PluginCosmControls.cpp and PluginOsc2Controls.cpp, their lambdas
+  knob, kf and set made members), PluginEditor.h 373 → 293 (the COSM type rows a base, PluginEditorCosmTypes.h),
+  PluginEditor.cpp 1620 → 1595 (the Play page to PluginEditorPlay.cpp, lr and rowOfLevel members; the constructor's
+  slider styling one function, Ui::styleValueSlider, as template-law asked when the cards needed it too). The Algorithm
+  menu and the legacy engine left where they were, for v191. The map of every part: the shared notes' v190-file-map.md.
+  The split changed nothing: every parameter's place, ID, name, range, default, steps, label and text at five points
+  (VSynthEmuArpPluginTest's `params`, run on HEAD's build first) identical for all 637; the 7 tabs and 16 COSM types drawn
+  the same bar the build label; TEST_UI_LAYOUT's list the same; PluginTest bit-identical; TEST_PATCH_APPLY 0 failed.
+  Then the arpeggio (PluginArp.cpp): ten host parameters by IDs 0x42e…0x437, appended, names, ranges and defaults the
+  firmware's, texts its routine's but End Point's (the step, 1…32, the manual's); the pattern in the session's state and in
+  atomic words for the audio thread; applyPatch takes xtWithPatchArp and xtPatchMissing no longer names it; the Play tab's
+  Arpeggio and Arpeggio pattern cards (two settings a row failed the layout check at 900 × 600 and was dropped).
+  Checks: VSynthEmuArpPluginTest (verify.sh) 430/430; TEST_UI_LAYOUT 555 of 647 parameters with a control, every new one;
+  TEST_PATCH_APPLY with every zone of the 512 patches held to xtWithPatchArp; VSynthEmuArpTest 24/24 on the onset finder now
+  shared in TestOnsets.h. TEST_UI_LAYOUT's editor walk now checks sliders' value boxes cut short, as it does a ComboBox's:
+  no check had looked at them, and editor-style-shared found the gap; none is cut short at the three sizes.
+  Plants (mutate_panel.py, 227): the whole list ran until the user stopped it after 8 h (about 2.8 minutes a plant, each
+  building nine test binaries: CLAUDE.md's "about an hour" no longer holds), at 179, all caught: every plant the split
+  moved to its new file, and lite-own, lite-choice and patch-wave-tuning, stale since v185, re-pointed. The 30 v190's files
+  reach: 29 caught (arp-not-added and arp-param-swap by a crash), editor-style-shared MISSED, then caught (157 errors)
+  with sliders' boxes checked. patch-own-events-osc and patch-stored-osc, re-texted at v190 to v185's code (NOTEXT from
+  v185 until now): caught. Not run at v190, code unchanged (16): formants-no-reset, formants-shared, the five disk-, the
+  three teardown-, and v189's six arp- router plants (arp-router-bypass, arp-no-ticks, arp-ticks-fast, arp-notes-lost,
+  arp-offs-lost, arp-pedal-to-part).
+
 The arpeggiator in XtSynth v189 (2026-11-11): the third step to the arpeggio (HARDWARE_FIRMWARE.md, "The arpeggiator in
   XtSynth"). The split, by the way the code reads: v189 is the engine's wiring and the patch's reads, v190 the plugin's face
   (host parameters, loadPatch's line, an editor card, PluginTest). Each of PluginProcessor.cpp (2128 lines) and

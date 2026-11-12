@@ -48,10 +48,20 @@ juce_add_plugin(VSynthEmu
 # ─── Sources ─────────────────────────────────────────────────────────────────
 target_sources(VSynthEmu PRIVATE
     Source/PluginProcessor.cpp
+    Source/PluginParams.cpp
+    Source/PluginParamsOsc.cpp
+    Source/PluginParamsCosm.cpp
+    Source/PluginParamsTone.cpp
+    Source/PluginControlsRead.cpp
+    Source/PluginControlsWrite.cpp
+    Source/PluginCosmControls.cpp
+    Source/PluginOsc2Controls.cpp
+    Source/PluginArp.cpp
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
     Source/PluginState.cpp
     Source/PluginEditor.cpp
+    Source/PluginEditorPlay.cpp
     Source/FxPanel.cpp
     Source/VariphraseEngine.cpp
     Source/PhaseVocoder.cpp
@@ -142,11 +152,13 @@ vse_add_test(VSynthEmuFormantTest Tests/FormantTest.cpp Tests/TestMain.cpp)
 vse_add_test(VSynthEmuDiskImageTest Tests/DiskImageTest.cpp Tests/TestMain.cpp)
 # XtSynth's arpeggiator heard: a note a quarter at two tempos, the Switch off, the Hold pedal (v189)
 vse_add_test(VSynthEmuArpTest Tests/ArpTest.cpp Tests/TestMain.cpp)
+# The arpeggio's plugin side: its parameters, a patch's arpeggio, a session's, and a chord through the processor (v190)
+vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest VSynthEmuFormantTest
-                 VSynthEmuDiskImageTest VSynthEmuArpTest)
+                 VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.

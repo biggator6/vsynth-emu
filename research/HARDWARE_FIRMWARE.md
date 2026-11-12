@@ -1546,6 +1546,49 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The arpeggio's plugin side (2026-11-12, v190)
+
+What a host and the editor see of v189's arpeggiator. `PluginArp.cpp`, `PluginEditorPlay.cpp`; the processor split first.
+
+**The settings.** Ten host parameters, appended after every other so the list's places stay a host's: `arpSwitch`,
+`arpHold`, `arpMotif`, `arpDuration`, `arpShuffleRate`, `arpShuffleRes`, `arpKeyVelocity`, `arpOctave`, `arpGrid`,
+`arpEndPoint`, for IDs 0x42e…0x437.
+- Names: the firmware's (`0x89790338`, "Arpeggio Switch" … "Arpeggio End Point").
+- Range and default: the descriptors' (`0x897a167c`, little-endian, the centre taken off): Switch and Hold 0…1, 0; Motif 0…7,
+  0; Duration 0…100, 100; Shuffle Rate 0…100, 50; Shuffle Resolution 0…1, 0; Keyboard Velocity 0…127, 0; Octave Range
+  −3…+3, 0 (stored 1…7, centre 4); Grid 0…5, 3; End Point 0…31, 31. The arpeggio object's own defaults (XtArpSettings) are
+  the same, a second source.
+- Text: the firmware's routine (`0x89461a70`, through XtFxValueText): Motif UP … AUTO, Grid QUARTER … 32TH, Shuffle
+  Resolution 16TH and 8TH, Keyboard Velocity REAL at 0, Octave Range signed with "+0", Duration and Shuffle Rate plain numbers.
+  End Point is the one exception: the routine gives 0…31, and the manual's Pattern Edit says "the pattern length as a
+  number of steps (1–32)" (p. 66), so it shows the step, value + 1.
+- Read into `Controls::arp` each block (`readArpControls`, by `kXtArpSettingIds`) and written back from a patch's
+  (`writeArpControls`).
+
+**The pattern.** A patch's data, not knobs: no parameter. The processor keeps it in `ArpPatternWords`, 132 atomic words
+(the audio thread reads it each block into `Controls::arpPattern` without a lock; a reader between two stores can see words
+of both, as it can a patch's parameters, which its load moves one by one), and in the session's state as `arpPattern`
+(base64 of the 528 bytes). A session saved before v190 has none, and gets the XT's default.
+- The default before any patch: every line NOTE C4 and every cell REST, the descriptors' defaults of IDs 0x44a (0), 0x44b
+  (60) and the steps (0x44d…, 0). With it the arpeggio plays nothing; the Arpeggio pattern card's title says "empty".
+
+**A patch.** applyPatch takes `xtWithPatchArp(store, xtPatchControls(…))`, so its settings go onto the parameters and its
+pattern into the state; `xtPatchMissing` no longer names the arpeggio. PluginTest's patch apply holds every zone of the
+image's 512 patches to `xtWithPatchArp` now.
+
+**The cards** (UI_DESIGN.md): the Play tab, Arpeggio under Keys (On and Hold on the title line; Motif, Octaves, Velocity,
+Duration) and Arpeggio pattern under Tempo (Grid, End point, Shuffle with its Resolution beside it). Two settings to a row
+in one card was tried first and failed TEST_UI_LAYOUT at 900 × 600: the boxes cut "16TH" and "REAL".
+
+**Checks.** `VSynthEmuArpPluginTest` (verify.sh): the ten against the firmware's names, descriptors and every value's
+text; the parameters each moved and read back; the default pattern against the descriptors; a disk-image patch with the
+arpeggio on through loadPatch; a session's settings and pattern in another processor, and one from before v190; a chord
+through processBlock, UP on quarters on the analog saw, sample for sample XtSynth's render on the processor's own controls,
+a note each quarter, and the Switch off holding the chord.
+
+**Not yet:** a pattern edited in the plugin (it comes only from a patch or a session), Pattern Edit's players, Real and
+Step Rec, `*0x898808d0`'s mode, the clocks sent out.
+
 ### The arpeggiator in XtSynth (2026-11-11, v189)
 
 What feeds the arpeggio object (v188's, below) and what it feeds, and the ticks it steps on.
@@ -1612,8 +1655,8 @@ hear a word's field bytes, never its padding (`xtToneWordMoved`): compared as ra
 what the stack held, and every case followed it (notes.txt, v189). With that pick v188's own source gives v189's xt_tone
 line for line. The arpeggio's check is xt_arp; the wiring's is VSynthEmuArpTest.
 
-**Not yet:** the plugin's parameters for it, loadPatch's line, an editor card and PluginTest (v190); Pattern Edit's two
-players; `*0x898808d0`'s mode; the clocks the XT sends out.
+**Not yet:** the plugin's parameters for it, loadPatch's line, an editor card and PluginTest (v190; done there, above);
+Pattern Edit's two players; `*0x898808d0`'s mode; the clocks the XT sends out.
 
 ### The arpeggiator (2026-11-11, v188)
 
