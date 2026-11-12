@@ -12,3 +12,10 @@ disk-image-bound|(d.size() - data) / cluster + 2|size_t { 0xfff8 }|plugin/Source
 teardown-classifier-unstopped|rate, &stop);|rate);|plugin/Source/PluginEncodes.cpp|teardown
 teardown-classifier-deaf| && !(stop && *stop); start += kStep|; start += kStep|plugin/Source/VariphraseEngine.cpp|teardown
 teardown-encode-after-stop|        if (stop) return;   // closing|        // closing|plugin/Source/PluginEncodes.cpp|teardown
+# XtSynth's arpeggiator, by VSynthEmuArpTest: the router, the ticks each ms, what it sends, and the Hold pedal (v189).
+arp-router-bypass|    if (known) arp.noteOn(note, vel);\n    arp.noteOn(note, vel);|    tgNoteOn(note, velocity);|plugin/Source/XtSynthArp.cpp|arp
+arp-no-ticks|    if (d != 0) arp.tick(d);|    if (d < 0) arp.tick(d);|plugin/Source/XtSynthArp.cpp|arp
+arp-ticks-fast|    else arpTicks.msInternal(clockPeriod());|    else arpTicks.msInternal(clockPeriod() * 2 / 3);|plugin/Source/XtSynthArp.cpp|arp
+arp-notes-lost|                tgNoteOn(e.d1, (float)e.d2 / kVelocityFull);|                tgNoteOn(e.d1 - 128, (float)e.d2 / kVelocityFull);|plugin/Source/XtSynthArp.cpp|arp
+arp-offs-lost|                tgNoteOff(e.d1, (float)e.d2 / kVelocityFull);|                tgNoteOff(e.d1 + 1, (float)e.d2 / kVelocityFull);|plugin/Source/XtSynthArp.cpp|arp
+arp-pedal-to-part|    arp.pedal(std::clamp(value, 0, 127));|    tgController(number, value);|plugin/Source/XtSynthArp.cpp|arp

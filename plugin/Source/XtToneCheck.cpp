@@ -770,7 +770,7 @@ std::unordered_map<int, int> patchOf(const Ctl& c) {
 // firmware's own read) against what it reads in the whole-tone check for those controls.  The system's IDs and the Wave Number aren't a patch's to give here.
 struct PatchTally { long values = 0, different = 0; std::map<int, long> byId; };
 void patchRoundTrip(const std::vector<uint8_t>& store, int zone, const Ctl& c, PatchTally& t) {
-    const std::unordered_map<int, int> p = patchOf(c);
+    const std::unordered_map<int, int> p = xtArpPatchIds(patchOf(c), c.arp, c.arpPattern);   // and the arpeggio's (v189)
     const auto own = [&](int id) { return id == 0x40 || id == 0x41 || id == 0x526 || (id >= 0x89 && id <= 0x94) || id == 0x2be || id == 0x2f2; };
     for (const auto& kv : p) {
         const int id = kv.first & 0xffff, k = kv.first >> 16;
@@ -793,7 +793,7 @@ void patchRoundTrip(const std::vector<uint8_t>& store, int zone, const Ctl& c, P
         } else if (id == 0x3e7 || id == 0x3e8) {
             if (xtPatchValue(store, 0x3e8, zone, k) == 0) continue;   // Through: off here
             fw = xtPatchValue(store, id, zone, k);
-        } else fw = xtPatchValue(store, id, zone);
+        } else fw = xtPatchValue(store, id, xtArpByLine(id) ? k : zone);
         ++t.values;
         if (fw != kv.second) { ++t.different; ++t.byId[kv.first]; }
     }
@@ -1411,7 +1411,7 @@ int XtToneProbe::run(int argc, char** argv) {
             ++nPatches;
             for (int z = 0; z < xtPatchZones(p.store); ++z) {
                 ++nZones;
-                patchRoundTrip(p.store, z, xtPatchControls(p.store, z, Ctl{}), t);
+                patchRoundTrip(p.store, z, xtWithPatchArp(p.store, xtPatchControls(p.store, z, Ctl{})), t);
             }
             std::unordered_map<int, int> fx;
             for (const int id : { 0x120, 0x121, 0x122, 0x177, 0x178, 0x179, 0x17a, 0x1fc, 0x1fd, 0x1fe, 0x230, 0x231 }) fx[id] = xtPatchValue(p.store, id);
@@ -2623,8 +2623,8 @@ int XtToneProbe::run(int argc, char** argv) {
                 else if (sweep || syncAfter || r.one(2)) {   // one word of the panel only: what XtSynth notices has changed
                     static_assert(std::is_trivially_copyable_v<Ctl>);
                     Ctl one = ctl;
-                    const size_t w = sweep ? sweepAt & ~(size_t)3 : (size_t)r.range(0, (int)(sizeof(Ctl) / 4) - 1) * 4;
-                    for (int tries = 0; tries < 16 && !std::memcmp(reinterpret_cast<const char*>(&ctl) + w, reinterpret_cast<const char*>(&n) + w, 4); ++tries)
+                    const size_t w = sweep ? sweepAt & ~(size_t)3 : (size_t)r.range(0, xtToneWords(ctl) - 1) * 4;
+                    for (int tries = 0; tries < 16 && !xtToneWordMoved(ctl, n, w); ++tries)
                         n = drawControls(r, g, wv != nullptr, wv2 != nullptr);
                     std::memcpy(reinterpret_cast<char*>(&one) + w, reinterpret_cast<const char*>(&n) + w, 4);
                     n = one;

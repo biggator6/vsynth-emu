@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # mutate_arp.py [cases] [name ...]: every deliberate error in arp_muts.txt (or the named ones), each planted by mutate.sh in
-# its port's file (the list's fourth field: arp XtArpeggio.cpp, arpstep XtArpeggioStep.cpp, arpmotif XtArpeggioMotifs.cpp)
-# and run through xt_arp on the presets and [cases] random cases (1000, fcheck's), stopping at the first that differs
-# (XT_ARP_STOP).
+# its port's file (the list's fourth field: arp XtArpeggio.cpp, arpstep XtArpeggioStep.cpp, arpmotif XtArpeggioMotifs.cpp,
+# ticks XtTempoTicks.cpp, v189) and run through xt_arp on the presets and [cases] random cases (1000, fcheck's), stopping at
+# the first that differs (XT_ARP_STOP), then its tempo ticks.
 # One line each: caught and where, MISSED, or ERROR when the old text is no longer in the source or the run never started.
 # It stops first unless the run with nothing planted says 0 different on every port.  The list: name|old|new|port.
 import concurrent.futures as cf
@@ -15,8 +15,9 @@ import sys
 import mutlist
 
 D = os.path.dirname(os.path.abspath(__file__))
-PORTS = ('arp', 'arpstep', 'arpmotif')
-SOURCE = {'arp': 'XtArpeggio::reset', 'arpstep': 'XtArpeggio::tick', 'arpmotif': 'XtArpeggio::playLine'}
+PORTS = ('arp', 'arpstep', 'arpmotif', 'ticks')
+SOURCE = {'arp': 'XtArpeggio::reset', 'arpstep': 'XtArpeggio::tick', 'arpmotif': 'XtArpeggio::playLine',
+          'ticks': 'XtTempoTicks::take'}
 args = sys.argv[1:]
 cases = args.pop(0) if args and args[0].isdigit() else '1000'   # fcheck's
 muts = mutlist.plants(D + '/arp_muts.txt', args, 'mutate_arp', defaults=('arp',))
@@ -26,7 +27,7 @@ LIMIT = int(os.environ.get('MUT_TIMEOUT', '300'))
 
 
 def results(out):
-    return [l for l in out.splitlines() if re.match(r'(presets|random): \d+ cases, .*, \d+ different$', l)]
+    return [l for l in out.splitlines() if re.match(r'(presets|random|ticks): \d+ cases, .*, \d+ different$', l)]
 
 
 def start(name, old, new, port):
@@ -40,7 +41,7 @@ def start(name, old, new, port):
 for port in PORTS:
     out, _ = start('arp_control_' + port, SOURCE[port], SOURCE[port], port).communicate(timeout=1200)
     lines = results(out)
-    if len(lines) != 2 or any(not l.endswith(' 0 different') for l in lines):
+    if len(lines) != 3 or any(not l.endswith(' 0 different') for l in lines):
         sys.exit('mutate_arp: the run with nothing planted fails on ' + port + ', so no plant would mean anything: '
                  + (out.strip().splitlines() or ['no output'])[-1][:120])
 

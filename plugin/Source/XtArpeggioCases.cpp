@@ -3,6 +3,7 @@
 // the pedal and live edits, then let go; XtArpeggioCheck.cpp compares the two sides.  XT_ARP_FIRST=1 says what differs.
 #ifdef XT_ARP_MAIN
 #include "XtArpeggioCheck.h"
+#include "XtArpeggioPatch.h"
 #include "XtFiles.h"
 #include "XtFirmware.h"
 #include "XtSwitches.h"
@@ -14,50 +15,30 @@
 #include <vector>
 
 namespace {
-constexpr int kSwitch = 0x42e, kState = 0x44a, kNote = 0x44b, kStep1 = 0x44d, kTempo = 0x11d;
-constexpr int kCtrlMost = 95;                  // a CTRL line's controller [FW 0x8930ca30]
+constexpr int kTempo = 0x11d;
 constexpr int kTicksPerQuarter = 480;          // the tempo timer's [FW 0x894710e0]
 constexpr int kPresetMs = 4000, kRandomMs = 3000, kTailMs = 1500;
+constexpr long kTickCases = 100;               // XtTempoTicksCheck.cpp's, 3 s each, half of them EXTERNAL
 
-// The settings 0x8930c190 reads, by ID, and the range a case draws each from: kept at `kept` that often
+// The range a case draws each setting from (their IDs: XtArpeggioPatch.h), kept at `kept` that often
 struct SettingId {
-    int id;
     int XtArpSettings::*field;
     int lo, hi;
     double keep;
     int kept;
 };
 constexpr SettingId kSettingIds[] = {
-    { 0x42f, &XtArpSettings::hold, 0, 1, 0.75, 0 },
-    { 0x430, &XtArpSettings::motif, 0, 7, 0, 0 },
-    { 0x431, &XtArpSettings::duration, 0, 100, 0.3, 100 },
-    { 0x432, &XtArpSettings::shuffleRate, 0, 100, 0.4, 50 },
-    { 0x433, &XtArpSettings::shuffleRes, 0, 1, 0, 0 },
-    { 0x434, &XtArpSettings::keyVelocity, 1, 127, 0.5, 0 },
-    { 0x435, &XtArpSettings::octave, -3, 3, 0, 0 },
-    { 0x436, &XtArpSettings::grid, 0, 5, 0, 0 },
-    { 0x437, &XtArpSettings::endPoint, 0, 31, 0.3, 31 },
+    { &XtArpSettings::hold, 0, 1, 0.75, 0 },
+    { &XtArpSettings::motif, 0, 7, 0, 0 },
+    { &XtArpSettings::duration, 0, 100, 0.3, 100 },
+    { &XtArpSettings::shuffleRate, 0, 100, 0.4, 50 },
+    { &XtArpSettings::shuffleRes, 0, 1, 0, 0 },
+    { &XtArpSettings::keyVelocity, 1, 127, 0.5, 0 },
+    { &XtArpSettings::octave, -3, 3, 0, 0 },
+    { &XtArpSettings::grid, 0, 5, 0, 0 },
+    { &XtArpSettings::endPoint, 0, 31, 0.3, 31 },
 };
 const char* const kMotifNames[8] = { "UP", "DOWN", "UP&DOWN", "RANDOM", "NOTE-ORDER", "RHYTHM", "PHRASE", "AUTO" };
-
-XtArpSettings settingsOf(const std::vector<uint8_t>& store) {
-    XtArpSettings s;
-    s.on = xtPatchValue(store, kSwitch) != 0;
-    for (const SettingId& f : kSettingIds) s.*f.field = xtPatchValue(store, f.id);
-    return s;
-}
-
-// The pattern as 0x8930ca30 lays it out: a line's State and Note/CC, then its 32 steps
-XtArpPattern patternOf(const std::vector<uint8_t>& store) {
-    XtArpPattern p;
-    for (int l = 0; l < XtArpPattern::kLines; ++l) {
-        const bool ctrl = (xtPatchValue(store, kState, l) & 1) != 0;
-        const int n = xtPatchValue(store, kNote, l) & 0x7f;
-        p.line[l] = (uint8_t)(ctrl ? 0x80 | std::min(n, kCtrlMost) : n);
-        for (int s = 0; s < XtArpPattern::kSteps; ++s) p.cell[s][l] = (uint8_t)xtPatchValue(store, kStep1 + 2 * s, l);
-    }
-    return p;
-}
 
 // The tempo timer's ticks each ms, 480 to the quarter of whole ms (the clock object's +0x14 = 60000 / BPM)
 struct TempoTicks {
@@ -112,7 +93,7 @@ struct Player {
     uint8_t ctrlByte() {
         static constexpr int kCcs[] = { 0, 1, 7, 10, 11, 32, 64, 66, 74, 91, 93 };
         if (chance(0.3)) return (uint8_t)(0x80 | (chance(0.5) ? 64 : 66));
-        return (uint8_t)(0x80 | (chance(0.6) ? kCcs[pickOf((int)std::size(kCcs))] : pick(0, kCtrlMost)));
+        return (uint8_t)(0x80 | (chance(0.6) ? kCcs[pickOf((int)std::size(kCcs))] : pick(0, kXtArpCtrlMost)));
     }
     // The Hold pedal, often either side of 64
     int pedalValue() { return chance(0.3) ? 64 : chance(0.3) ? 63 : pick(0, 127); }
@@ -201,8 +182,8 @@ int main(int argc, char** argv) {
         const auto file = disk.read(entry);
         XtPatchFile pf;
         if (stop && presets.different) break;
-        if (!xtPatchRead(file.data(), file.size(), pf) || xtPatchValue(pf.store, kSwitch) == 0) continue;
-        Player h{ presets, r, settingsOf(pf.store), patternOf(pf.store), false, false, {}, 0.0006, true };
+        if (!xtPatchRead(file.data(), file.size(), pf) || xtPatchValue(pf.store, kXtArpSwitchId) == 0) continue;
+        Player h{ presets, r, xtArpSettingsOf(pf.store), xtArpPatternOf(pf.store), false, false, {}, 0.0006, true };
         presets.where = pf.name;
         presets.begin((int)(nPresets++ % 16), h.s, h.p);
         h.play(kPresetMs, xtPatchValue(pf.store, kTempo));
@@ -219,6 +200,9 @@ int main(int argc, char** argv) {
     std::printf("messages alike by motif:");
     for (int m = 0; m < 8; ++m) std::printf(" %s %ld", kMotifNames[m], presets.byMotif[m] + random.byMotif[m]);
     std::printf("\n");
-    return presets.different + random.different == 0 ? 0 : 1;
+    const XtTicksTally ticks = xtTempoTicksCheck(rom, kTickCases, seed, presets.first);
+    std::printf("ticks: %ld cases, %ld ms, %ld values, %ld different%s\n", ticks.cases, ticks.ms, ticks.values,
+                ticks.different, ticks.failed ? ", a routine failed" : "");
+    return presets.different + random.different + ticks.different == 0 && !ticks.failed ? 0 : 1;
 }
 #endif

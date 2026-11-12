@@ -1,5 +1,5 @@
 # The arpeggiator's planted errors: name|old|new|port (arp XtArpeggio.cpp, arpstep XtArpeggioStep.cpp, arpmotif
-# XtArpeggioMotifs.cpp).  mutate_arp.py runs them, each through xt_arp against the firmware's own object.
+# XtArpeggioMotifs.cpp, ticks XtTempoTicks.cpp: the tempo ticks it steps on, v189).  mutate_arp.py runs them, each through xt_arp against the firmware's own object.
 key-numbers|keys[k].key = (uint8_t)k;|keys[k].key = (uint8_t)(k + 1);|arp
 shuffle-8th-span|const int span = 120 * r / 100;|const int span = 121 * r / 100;|arp
 shuffle-8th-tail|(2 * span + 2 * k - k * span / 60 - 120)|(2 * span + 2 * k - k * span / 60 - 119)|arp
@@ -78,3 +78,15 @@ line-velocity|    a.playNote(octave * 12 + note, a.lastVelocity);|    a.playNote
 line-pending|    a.playNote(octave * 12 + note, a.lastVelocity);\n    a.octavePending = 1;|    a.playNote(octave * 12 + note, a.lastVelocity);\n    a.octavePending = 0;|arpmotif
 auto-pending|    play(a, octaveFrom(a, false), k);\n    a.octavePending = 1;|    play(a, octaveFrom(a, false), k);\n    a.octavePending = 0;|arpmotif
 motif-order|{ up, down, upAndDown, randomOrder, noteOrder, rhythm, phrase, autoLines }|{ up, down, upAndDown, randomOrder, noteOrder, phrase, rhythm, autoLines }|arpmotif
+ticks-units-shift|units += step >> kFracBits;|units += step >> (kFracBits + 1);|ticks
+ticks-frac-carry|        ++units;|        units += 2;|ticks
+ticks-per-clock|const int32_t p = d * kPerClock;|const int32_t p = d * (kPerClock + 1);|ticks
+ticks-rem-ge|if ((int32_t)remainder >= quarterMs) {|if ((int32_t)remainder > quarterMs) {|ticks
+ticks-rem-carry|        ++q;|        q += 0;|ticks
+ticks-rem-sign|const int32_t r = (int16_t)remainder + p % quarterMs;|const int32_t r = p % quarterMs;|ticks
+ticks-ramp-rate|kRampAMs / six;|kRampAMs / (six + 1);|ticks
+ticks-ramp-cap|if (past >= kPerClock) return;|if (past > kPerClock) return;|ticks
+ticks-ramp-floor|ticks = ticks - ticks % kPerClock + (uint32_t)past;|ticks = ticks + (uint32_t)past;|ticks
+ticks-f8-next|ticks = ticks - ticks % kPerClock + kPerClock;|ticks = ticks + kPerClock;|ticks
+ticks-f8-ramp|    ramp = 0;|    ramp = 1;|ticks
+ticks-take|    fed = ticks;|    fed = ticks & ~1u;|ticks

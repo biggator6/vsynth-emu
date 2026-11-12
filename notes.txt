@@ -335,6 +335,78 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The arpeggiator in XtSynth v189 (2026-11-11): the third step to the arpeggio (HARDWARE_FIRMWARE.md, "The arpeggiator in
+  XtSynth"). The split, by the way the code reads: v189 is the engine's wiring and the patch's reads, v190 the plugin's face
+  (host parameters, loadPatch's line, an editor card, PluginTest). Each of PluginProcessor.cpp (2128 lines) and
+  PluginEditor.cpp (1620) has to be split by job before a line goes in, a version's work of its own; the wiring is checked
+  without them, by xt_arp and a test that hears XtSynth.
+  XtSynth.h (640 lines) split first, moved as it stood: XtEncoded.h (the wave and the calls that make one), XtSynthControls.h
+  (XtOscControls, XtControls), XtSynthVoice.h (XtOscVoice, XtVoice), XtSynth::Controls and the rest naming them; 289 lines
+  now. The moves went by a script, since the kit's code-shape hook judges a moved block in a new file as new lines (logged in
+  workflow-bugs.md); every file using them compiled unchanged, and xt_tone, run after the wiring, gives 0 different.
+  The router (XtSynthArp.cpp): with the Switch on, played keys go to the arpeggio (0x89307c80: its key tracker, a key it had
+  given twice), the Hold pedal to its pedal, every other controller to the part; what the arpeggio sends reaches the part as
+  played notes do. The part's own note-on, note-off, controller and panic are renamed in place (tgNoteOn and so on), so
+  XtSynth.cpp took no line. The host's notes are the XT's keys, as with Remote Keyboard Switch (ID 0x9b) on: on the XT, MIDI
+  IN reaches the arpeggio only so. The arpeggio's notes have a key state of their own on the XT (source 3's N; the
+  controllers C are shared by sources 1 to 3, 0x894d6120); the part keeps one here, as nothing else reaches it with the
+  Switch on: they differ only by a Hold or Sostenuto across the Switch. A key down at the part when it goes on keeps its
+  note-off there (a choice).
+  The ticks (XtTempoTicks.cpp): the clock object's count each ms (0x894710e0), INTERNAL and EXTERNAL, and an F8 (0x894712f0),
+  fed to XtArpeggio::tick as 0x894710b0 gives them, each ms of a block after the clock's own and before the tone update.
+  The patch (XtArpeggioPatch.cpp, xt_arp's reads moved): xtWithPatchArp puts a patch's arpeggio, settings and pattern, on
+  its controls beside xtPatchControls, which stays a patch's tone. PluginTest's patch apply holds the plugin's parameters to
+  xtPatchControls, and they carry no arpeggio until v190: read inside it, verify.sh failed all 1,558 zones. xtPatchControls'
+  patch common is a function of its own (commonOf), as code-shape held xtPatchControls over 50 statements when the
+  arpeggio's reads first went in. xtPatchMissing still names the arpeggio until v190 gives the plugin its parameters.
+  Checks: xt_arp's ticks section, the routines against XtTempoTicks: 100 cases, 300,000 ms, 2,455,125 values, 0 different;
+  12 plants (PORT=ticks), 12 caught. xt_arp's presets and cases as at v188. xt_tone's patch round trip: 1,410,948 values,
+  863,132 more (the arpeggio's 554 in each zone), 0 different; patchOf itself is the firmware tone's, which never reads them,
+  so xtArpPatchIds adds them where the round trip takes it; xt_tone can't reach the arpeggio (it plays the tone generator
+  below the router), so its draws leave the Switch off and its cases on the image's patches play their tone alone
+  (xtPatchControls). The first fcheck --update, with the arpeggio read into xtPatchControls, showed why: XtSynth arpeggiated
+  those patches against a firmware tone playing the keys, and the arpeggio, left running in the one XtSynth, reached every
+  section after (248,434 different in the patches' section, every later section too); that run's baseline was not kept. The second showed every count moved with
+  0 different: xt_tone's one-word live edits pick a word over sizeof(Ctl), which the arpeggio's fields grew from 2464 to
+  3032 bytes, so its draws went another way, and a fifth of those edits fell on words it can't hear. They now pick from the
+  words before the arpeggio's (xtToneWords, 2464 bytes, the size before), and the cases are v188's again, line for line on
+  40 cases' settings (XT_TONE_DUMP=a) against v188's own build. VSynthEmuArpTest (verify.sh) hears it: a chord on the analog saw, UP
+  on quarters at 90 and 140 BPM, the first note 15 ticks after the keys and the rest a quarter apart from the keys; the
+  Switch off; the Hold pedal: 24/24. Its plants (panel_muts.txt, kind arp): 6 planted, 6 caught: arp-router-bypass, arp-no-
+  ticks, arp-ticks-fast, arp-notes-lost, arp-offs-lost, arp-pedal-to-part. A first arp-silent-notes (a velocity of 0) was
+  equivalent, as Velocity Sens at its default 0 plays any velocity alike, and was replaced. fcheck --update: the round
+  trip's count and the tick line (its first two runs, which moved more, are above); then xt_tone's counts (below).
+  mutate_arp.py: 90 planted, 90 caught (v188's 78 and the 12 ticks).
+  Found and fixed: xt_tone's cases followed bytes nobody wrote. Its one-word live edit ("one word of the panel only") drew
+  again while the word it picked compared equal between two Controls by memcmp, and 22 of the tone's 616 words hold padding
+  (2 or 3 bytes after a bool), which hold whatever the stack held. So v188's own build, made with
+  -ftrivial-auto-var-init=pattern, parted from the plain build at seed 24's case 353, and v189's bigger XtSynth moved the
+  streams of seeds 24, 777 and 4242, each still 0 different: 13 of mutate_tone.py's seeded plants lost their cases, 9 MISSED
+  and the 4 on seed 24 unjudged, as seed 24's run with nothing planted failed (below). "Line for line" above held for that
+  build's stack only. xtToneWordMoved (XtArpeggioPatch.cpp) compares a word's field bytes, found once by making the controls
+  over 0x00s and over 0xffs: 63 bytes of padding in 23 runs. tone_stack_test.sh, build.sh plain and with
+  XT_STACK_INIT=pattern, whose two xt_tones must say the same: red before the fix, green after (2000 cases at seed 24). Zero
+  against pattern was the first try and passed on the fault, as either init writes every local alike. v188's source with
+  the fixed pick gives v189's xt_tone line for line, bar the round trip's count: v189 changes no draw. fcheck --update moved
+  47 xt_tone lines, every one 0 different, one of them new (a band read past a wave, "update: read16 at 8f000000", before
+  the SOLO records). The streams moved for every seed, so mutate_tone.py's first run: 1138 planted, 1120 caught, 18 missed,
+  each the plant of a case the old streams happened to reach. Their built mutants went on the seeds tone_muts.txt uses,
+  then on new ones, a new seed taken only once its run with nothing planted was clean: 15 caught on seeds in use (31337
+  seven, 777, 16 and 2024 two each, 12, 10), play-event-octaves on 11, solo-f9c-bounce on 5; mutate_tone.py on the 17 by
+  name: 17 caught, 0 missed. check-pad-cc MISSED [gap], on 32 clean seeds: its case is a controller moved alone at a live
+  edit that is also a Time Trip Assign (CC 91 or 93 in the sweep), the pads parting, and a later Time Trip hearing it (v155,
+  seed 4242); the old pick's padding-only edits, which moved no field, made such moves less rare. The fix is a case made for
+  it (Time Trip on, its Assign the controller moved alone), which changes xt_tone's draws again, so it waits. mutate_tone.py:
+  1138 planted, 1137 caught (the whole run's 1120 and the 17), check-pad-cc missed. verify.sh green.
+  Found and not fixed [gap]: seed 24's case 7608 (xt_tone 2000 24, the stored waves' section): kind 1, Clock Source EXTERNAL
+  at the host's 124.36 BPM, Tempo Sync on OSC 2, OSC 2 a stored wave on STEP with two of its three events at 281648,
+  Sostenuto down. It differs from the firmware's tone first at block 19, OSC 2's buffer (the firmware 303534.406, the port
+  303535.312), then the COSM's output, 108 checks; v188's source with the fixed pick gives the same, so it is the tone's,
+  from before v189; not yet read. Seed 24's four plants moved off it. Four more seeds differ with nothing planted at 2000
+  cases, of 36 tried for check-pad-cc: 4 and 21 at case 7608 too (OSC 2's buffer, OSC 1's), 25 at 7137 and 99 at 7395
+  (OSC 1's buffer each); v188's source with the fixed pick gives each the same, so they are the tone's too, not yet read.
+  A seed is taken for a plant only after its run with nothing planted (mutate_tone.py's control) is clean.
+
 The arpeggiator v188 (2026-11-11): the second step to the arpeggio, its engine (HARDWARE_FIRMWARE.md, "The arpeggiator").
   Found from its settings: 0x8930c190 reads IDs 0x42e…0x437 for the object 0x8987cef8 (class 0x893036b0), which takes a part's
   keys, steps on the OS's tempo timer (0x8930eb00, 480 ticks a quarter) and posts MIDI messages to the tone generator's input

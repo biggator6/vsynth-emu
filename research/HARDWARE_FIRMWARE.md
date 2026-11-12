@@ -1546,6 +1546,75 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The arpeggiator in XtSynth (2026-11-11, v189)
+
+What feeds the arpeggio object (v188's, below) and what it feeds, and the ticks it steps on.
+
+**The router.** The realtime task's controller object (`*0x8988094c`) takes the keyboard's internal events, types 1…21
+(`0x8930bb80`, through its vtable at this+4: type 5 a key at +0x90, 4 at +0x9c, 6 at +0xa8, 7 at +0xb4). A key reaches the
+mode object at this+0x190, whose class is the mode: vtables `0x897f0d58` (the base, whose key methods return at once,
+`0x89307390`), `0x897f0ddc`, `0x897f0e60` (the arpeggio's, put there by `0x89307b70`) and `0x897f0ee4`. The arpeggio's +0x30,
+`0x89307c80`: unless `*0x898808d0` is set (another mode, `0x89307460`, not read), a velocity above 0 goes to the key tracker
+at +0x80 (`0x8930ad00` sets the key's bit and gives 1 if it was clear), then to the playing object's note-on
+(`*0x8987f7b4`, `0x89303830`) once for a new key and twice for one the tracker had; a velocity of 0 builds [0x80, key, 64]
+for `0x8930ad40` (clears the bit, 1 if it was set) and then the object's note-off (`0x893039c0`). The Hold pedal
+(`0x8930a360`, `0x8930a3a0`) reaches the object's pedal (`0x89303a80`) only when `(this[0x179] >> 6) == 1`; that byte isn't read.
+
+**MIDI IN.** It reaches that path only with Remote Keyboard Switch on (ID 0x9b, default OFF, its descriptor; the manual's
+"Using an External MIDI Keyboard to Play Arpeggios"); otherwise it goes straight to the tone generator. The plugin's host
+notes are the XT's own keys here, as with that switch on: the plugin has no other way to play the arpeggio.
+
+**Sources.** A key state N for each source and channel, 0x134 bytes at `0x89cf05d8` + source·0x1340 + channel·0x134, four
+sources (`0x894d7c00` builds them with `0x894d60a0`). Each N's +0 points at its channel's controllers C, which `0x894d6120`
+takes from one of two tables by `0x897a0d91`[source] = 0, 0, 0, 1: sources 1 to 3 share C, the fourth has its own. So the
+arpeggio's notes (source byte 3) have their own keys, Hold and Sostenuto, and every controller is the part's. A part has a
+receiver for each source, at `0x89cf5e84` + source·256 + part·16, and `0x894d70a0` binds them to the part's channel, all
+three at once (its callers in `0x894d7c00`; −1 off, −2 all sixteen).
+
+**The ticks.** The clock object `0x89979bfc` (built by `0x89471040`: +0x10 = 20, +0x14 = 500, +0x38 = 0x4000, +0x41 = −1,
++0x42 = 20, +0x48 = 125). Each ms `0x894710e0` runs, and its task (flag 2) then `0x894710b0`, which gives the tempo timer
+(`0x8930eb00`) +0x28 − +0x34 when that isn't 0 and sets +0x34 to +0x28.
+- INTERNAL (+0x40 clear, or +0xe set): +0x1c += +0x38·24 >> 14, its 16384ths carried at +0x20 (u16); Δ = +0x1c − +0x24, +0x24 =
+  +0x1c; q = Δ·20 / +0x14 (the quarter's ms), the remainder added to +0x2c (u16, read signed) and a whole +0x14 of it one more
+  tick; +0x28 += q. At +0x38 = 0x4000 that is 24 a ms and 480 ticks a quarter.
+- EXTERNAL (+0x40 set, +0xe clear): while the ms since the last count (+0x46) are under the last six clocks' (+0x48):
+  +0x4a += 30720 / +0x48 (u16, 256ths of a tick: 120 ticks over six clocks), and +0x28 = +0x28 − +0x28 % 20 + (+0x4a >> 8)
+  while that is under 20.  An F8 (`0x894712f0`): +0x28 on to the next 20 and +0x4a = 0, then the count of six.
+- Between: +0x42 counts the ticks down to the clocks the XT sends out (`0x8946f150(0xF8)`, +0x44 pending), not ported.
+
+**The port.** `XtTempoTicks` (XtTempoTicks.cpp) is the tick count. `XtSynthArp.cpp` is the router in front of the part:
+`XtSynth::noteOn`, `noteOff`, `controller` and `allNotesOff`, the part's own renamed in place to `tgNoteOn`, `tgNoteOff`,
+`tgController` and `tgAllNotesOff`. Each block's ms run after the clock's own ms and clocks and before the tone update
+(`arpBlock`), each giving `XtArpeggio::tick` its ticks; an F8 moves the ticks before the count (`clockIn`). What the arpeggio
+sends goes to the part as played notes do. The patch's settings and pattern are given to it when they change (`arpSync`).
+Choices, not read in the firmware: a key held at the part when the Switch goes on has its note-off there; the part keeps one
+key state, since with the Switch on nothing but the arpeggio's notes reach it, so the XT's two differ here only by a Hold or
+Sostenuto of one source while the other's notes sound across the Switch; the Hold pedal goes to the arpeggio whenever its
+Switch is on (the manual's word; the router's condition on it isn't read).
+
+**The patch.** `XtArpeggioPatch.cpp` reads the settings and pattern (xt_arp's reads of v188, moved), and `xtWithPatchArp` puts
+them in `Controls::arp` and `arpPattern` beside `xtPatchControls`, which stays the patch's tone, as the plugin's parameters
+(PluginTest's patch apply holds the two alike) carry no arpeggio until v190. xt_tone's patch round trip takes both and adds their IDs (`xtArpPatchIds`; `patchOf` itself is the
+firmware tone's, which never reads them): 1,410,948 values, 863,132 more than before (554 in each of 1,558 zones), 0 different.
+
+**Checks.** xt_arp's ticks section (XtTempoTicksCheck.cpp): the routines in the interpreter against XtTempoTicks, 100 cases of
+3 s, half EXTERNAL with F8s jittered and stopped for 400 ms, tempo changes and the speed drawn: 300,000 ms, 2,455,125 values,
+0 different; 12 plants (`PORT=ticks`), all caught. `VSynthEmuArpTest` (verify.sh) hears it: a chord on the analog saw, UP on
+quarters, the first note 15 ticks after the keys and the rest each quarter from the keys (`runStep`'s next = start + the
+grid), at 90 and 140 BPM, within two 5 ms frames; the same render twice; the Switch off; the Hold pedal: 24 checks.
+
+**xt_tone can't reach it.** It drives the tone generator's note-on (`0x894dc130`) itself, below the router, so its draws
+leave the Switch off and its cases on the image's patches play their tone alone (`xtPatchControls`). With the arpeggio read
+into that, the first fcheck run had XtSynth arpeggiate the patches whose Switch is on, against a firmware tone playing the keys, and the arpeggio
+left running in the one XtSynth carried into every section after: 248,434 different in the patches' section alone. Its
+one-word live edits pick from the words before the arpeggio's (`xtToneWords`), the size the controls had before, and
+hear a word's field bytes, never its padding (`xtToneWordMoved`): compared as raw bytes, the padding beside a bool held
+what the stack held, and every case followed it (notes.txt, v189). With that pick v188's own source gives v189's xt_tone
+line for line. The arpeggio's check is xt_arp; the wiring's is VSynthEmuArpTest.
+
+**Not yet:** the plugin's parameters for it, loadPatch's line, an editor card and PluginTest (v190); Pattern Edit's two
+players; `*0x898808d0`'s mode; the clocks the XT sends out.
+
 ### The arpeggiator (2026-11-11, v188)
 
 The arpeggiator is a C++ object in the realtime layer above the tone generator, not part of a tone. It takes a part's keys and

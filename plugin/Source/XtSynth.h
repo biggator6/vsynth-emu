@@ -27,298 +27,17 @@
 #include "XtSoloVoice.h"
 #include "XtLinearPlayer.h"
 #include "XtLitePlayer.h"
-
-struct XtEncoded {
-    int type = 0;                  // 0 LITE (the samples alone), 1 SOLO, 3 BACKING, 5 ENSEMBLE
-    int channels = 1;              // the wave's channels (1 or 2)
-    long frames = 0;               // at 44.1 kHz
-    std::vector<uint8_t> vpdt;     // multi-band, or SOLO in the XT's layout (xtSoloReadVpdt): the firmware's, or the port's records with no event between
-    XtMbBands bands;
-    XtMbWave wave;
-    XtSoloPlan solo;               // SOLO
-    // What a V-Synth wave brings of its own (0 in anything imported): its fine tuning (xtWaveTune), and a backward loop
-    // that isn't the forward one, its region in frames and Loop Mode (the loop record's +0x10, +0xc and +0x19).  -1: the same.
-    XtWaveTune tune;
-    int bwdMode = -1, bwdStart = 0, bwdEnd = 0;
-    float loopRate[2] = { 1.0f, 1.0f };   // forward and backward: what Vari off walks by inside the loop (xtWaveLoopRate)
-    // The wave's `vpno`: the events Playback Mode STEP and EVENT play between, by the vpdt's numbers, and its count (+4).  A band wave
-    // or SOLO wave encoded here has them all in order, as the XT's own encodes do; a V-Synth wave brings its own (xtWaveOntoEncoded).
-    // A LITE wave has none, and the XT plays STEP and EVENT on it as RETRIGGER: its converter doesn't read the mode.
-    std::vector<uint16_t> vpno;
-    int vpnoCount = 0;
-    bool stored = false;           // played on the wave's own vpdt as the file has it, not an encode (xtSynthEncode's `stored`)
-};
-
-// The user's rom.2 (XtSynthRom.cpp): the tables, once a process, and the firmware for the interpreter.  False if it isn't
-// usable, or (`why` says) isn't the image the process already plays from, and then nothing is written.
-bool xtSynthSetRom(const std::string& path, std::string* why = nullptr);
-bool xtSynthRomReady();
-
-// Encodes planar float channels at `sampleRate`.  type: 1 SOLO, 3 BACKING,
-// 5 ENSEMBLE; depth: Encode Depth 0..127 (multi-band attack detection).
-// The sample is imported as the XT imports a WAV: to int16 (sources wider
-// than 16 bits keep their top 16, as the XT's 24/32-bit readers do), then
-// the XT's own converter to 44.1 kHz (xtFwImport) when the rate differs.
-// `bits`: the source's bits per sample.  `events`: a V-Synth wave's own events (XtWaveFile::events, 1/16 sample), which the XT's
-// SOLO encode takes in place of its detection, so a SOLO wave keeps the events it was encoded with or edited to (V-Producer can
-// edit them) and its `vpno` names them; whole samples, on the file's own audio at 44.1 kHz, else the detection's.  A band wave
-// keeps the detection: its encode reads more of a marker than the file keeps.  `stored`: a V-Synth wave's own vpdt (XtWaveFile::vpdt),
-// which is played as it is, no encode, as the XT plays a wave it loads: a SOLO wave's plan read from it (xtSoloReadVpdt), a band wave's
-// players reading it with the bands rebuilt from the audio (xtFwLoadBands).  Taken when its events run from 0 to the end, never back,
-// on the file's own audio at 44.1 kHz, and a SOLO plan reads; else the encode above (`events`, then the detection).
-std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& channels, double sampleRate,
-                                         int type, int depth, std::string* err = nullptr, int bits = 16,
-                                         const std::vector<int32_t>* events = nullptr, const std::vector<uint8_t>* stored = nullptr);
+#include "XtEncoded.h"
+#include "XtSynthControls.h"
+#include "XtSynthVoice.h"
+#include "XtArpeggio.h"
+#include "XtTempoTicks.h"
 
 class XtSynth {
 public:
     static constexpr int kVoices = 16;
-    // What each of the two OSCs has of its own (the tone's OSC blocks at +0x434
-    // and +0x508, and their envelopes and LFO: OSC 1 Env 1..4 and LFO 1, OSC 2
-    // Env 5..8 and LFO 2).
-    struct OscControls {
-        // the OSC Switch (IDs 0x2a4, 0x2d8): off, the OSC's kind is 0 and its
-        // buffer silence
-        bool on = true;
-        // the OSC's pitch (XtOsc): the XT's Coarse −48..+48 and Fine −50..+50
-        // (cents); the wave's Original Key 0..127; the Pitch knob −63..+63
-        // (the depth curve: ±1200 cents at ±36, ±6000 at ±63), Pitch KF
-        // −200..+200 (% per octave, steps of 10; 100 plays the keyboard in
-        // semitones) and Random Pitch Depth 0..30 (0…1200 cents,
-        // xtRandomPitchDepth)
-        int rootKey = 60;
-        int oscCoarse = 0, oscFine = 0, oscPitch = 0, pitchKF = 100, randomPitch = 0;
-        // OSC Type: 0 ANALOG, the analog oscillator (XtAnalog; it needs no
-        // sample, and its pitch is against A4), 1 PCM, the OSC's loaded sample
-        // (OSC 1's default in the plugin).  The analog knobs as the patch
-        // stores them: Waveform 0..13 in the XT's order, Impact 0..40, Pulse
-        // Width −63..+63 on the time envelope, Fat 0..127 on the formant
-        // envelope, their Keyfollows ±20 (×10 = the displayed ±200) and LFO
-        // and Env depths −63..+63.  X-MOD on OSC 1 uses OSC 2 up: OSC 2's
-        // output moves its phase and is not heard.
-        int oscType = 1;
-        XtAnalogParams ana;
-        // the VariPhrase OSC (XtOsc): Time and Formant −63..+63, Time Offset
-        // 0 BWD / 1 ZERO / 2 FWD, Time and Formant KF −200..+200 (% per
-        // octave, steps of 10), Energy 0 (OFF)..127
-        int oscTime = 0, oscTimeOffset = 2, oscTimeKF = 0, oscFormant = 0, oscFormantKF = 0, energy = 0;
-        // Vari Sw (IDs 0x2d4, 0x308): off, a SOLO wave plays on XtLinearPlayer, its time following its pitch, and Robot Voice and the wave's
-        // tuning on the walk go.  A band wave's player doesn't change (0x894f3660).
-        bool vari = true;
-        // pitch envelope knobs 0..127 and its depth −63..+63 (0x894e0ce0 cents)
-        int pAttack = 0, pDecay = 64, pSustain = 0, pRelease = 64, pDepth = 0;
-        // time and formant envelopes, the same, with their depths −63..+63
-        // (time: ±3 at ±60, ±5 at ±63; formant: d/63 octaves)
-        int tAttack = 0, tDecay = 64, tSustain = 0, tRelease = 64, tDepth = 0;
-        int fAttack = 0, fDecay = 64, fSustain = 0, fRelease = 64, fDepth = 0;
-        // Each of those three's velocity and key: Curve 0 (off), 1..7 and Sens −63..+63, whose factor scales its depth, and
-        // the velocity → time sensitivities and Time KF −200..+200, as the OSC amp envelope has them.  The XT's defaults.
-        struct EnvVelocity {
-            int curve = 0, sens = 32, aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
-            bool operator==(const EnvVelocity&) const = default;
-        };
-        EnvVelocity pVel, tVel, fVel;
-        // LFO: waveform 0..7 in the XT's order (SIN, TRI, SAW, SQR, RND, TRP,
-        // S&H, CHAOS), rate/delay/fade 0..127, offset 0..4 (−100…+100), fade
-        // mode 0..3 (ON <<, ON >>, OFF <<, OFF >>); its pitch depth −63..+63
-        int lfoWave = 0, lfoRate = 64, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
-        bool lfoKeySync = true;
-        int lfoPitchDepth = 0, lfoTimeDepth = 0, lfoFormantDepth = 0;
-        // the OSC TVA (XtOsc): Level 0..127, Level KF −200..+200, Level LFO
-        // depth −63..+63, Wave Gain −12..+12 dB; its amp envelope (curve 2,
-        // in series with the patch TVA) with A/D/R-Sens and Time KF; velocity
-        // to level: Sens −63..+63, Curve 0 (off), 1..7
-        int oscLevel = 127, oscLevelKF = 0, oscLevelLfoDepth = 0, waveGain = 0;
-        int oAttack = 0, oDecay = 0, oSustain = 127, oRelease = 127, oASens = 0, oDSens = 0, oRSens = 0, oTimeKF = 0;
-        int oscVelSens = 0, oscVelCurve = 1;
-        // Robot Voice (SOLO): voiced grains at a fixed pitch, the note's
-        // pitch against A440 instead of the Original Key
-        bool robot = false;
-        // Loop (all three players): the OSC's Loop switch and the wave's
-        // Loop Mode (0 One Shot: no loop, 1 One Way, 2 Alternate) and loop
-        // region, as fractions of the wave (end 1 = the last sample, the
-        // XT's default), for forward and backward play alike
-        bool loop = false;
-        int loopMode = 1;
-        float loopStart = 0.0f, loopEnd = 1.0f;
-        // Start Offset (IDs 0x2c6, 0x2fa): where a note walking forward starts in the wave, in samples, as a patch stores it; a walk
-        // backward stops there.  The converter takes it unsigned and makes it the last sample at most (0x894e4448); a note walking
-        // backward still starts at the end.  Samples, as Playback Mode RETRIGGER has them (the block's +0xb4 bit 0x80).
-        int startOffset = 0;
-        // Playback Mode (IDs 0x2d2, 0x306): 0 RETRIGGER, 1 LEGATO, 2 STEP, 3 EVENT.  LEGATO: a note played while an earlier note of its
-        // part and zone is held takes that note's player, so the wave goes on from where the other was (0x894f2d00).  STEP and EVENT
-        // pick the wave's events.
-        int playbackMode = 0;
-        // Tempo Sync (IDs 0x2d0, 0x304): a PCM OSC's walk follows the tempo clock, at the speed of
-        // the Patch Tempo over the wave's Original Tempo (its header's +0x1c, BPM × 10000)
-        bool tempoSync = false;
-        int origTempo = 1200000;
-        // Time Trip Sw and Beat Keep (IDs 0x2d6, 0x2d7; 0x30a, 0x30b): the pad (XtSynth::timeTrip)
-        // takes this OSC's walk; when it lets go, a fade and a jump to where the wave would
-        // have got to, or with Beat Keep off on from where it stands.  On by default, as on the XT
-        bool timeTrip = true, beatKeep = true;
-        bool operator==(const OscControls&) const = default;
-    };
-    struct Controls : OscControls {                 // OSC 1's in the base
-        OscControls osc2 = [] { OscControls o; o.on = false; o.oscType = 0; return o; }();   // off until switched on, as the plugin has always played
-        // the patch's tuning (XtOsc XtTuning): Coarse Tune −48..+48 and Fine
-        // Tune −50..+50 (cents), with Pitch Shift (semitones, to the cent)
-        // added to them; Scale Tune (the switch, and C…B −100..+100 cents);
-        // Bend Range Up and Down 0..48 semitones
-        float pitchSemis = 0;
-        int patchCoarse = 0, patchFine = 0;
-        bool scaleTune = false;
-        int scale[12] = {};
-        int bendUp = 2, bendDown = 2;
-        // Patch Tempo (ID 0x11d), BPM × 10, 200..2500: Clock Source INTERNAL.  It drives the clock
-        // that the note-value LFO rates and Tempo Sync follow, and the note-value envelope times.
-        // The firmware keeps whole BPM of it (XtSynth::clockPeriod).
-        int patchTempo = 1200;
-        // Clock Source (ID 0x41): 0 INTERNAL, the Patch Tempo; 1 EXTERNAL, whose clocks here come from
-        // the host's transport (XtSynth::hostClock), the Patch Tempo standing in until the host tells a tempo.
-        int clockSource = 0;
-        // amp envelope knobs, 0..127 as on the XT (release 16 = 30 ms);
-        // velocity → time sensitivities −63..+63; Time KF −200..+200.  Any envelope's Attack,
-        // Decay and Release, and any LFO's Rate, take 128..144 too: a note value, 3 to 192
-        // clocks of 24 to the quarter (0x897cfeb8)
-        int attack = 0, decay = 0, sustain = 127, release = 16;
-        int aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
-        // the TVA Switch (ID 0x299), off: no envelope, velocity, Level, Pan or LFO, only CC 7
-        // and 11 and the MFX Send Level.  Off by default, as on the XT
-        bool tvaOn = false;
-        // velocity to level for the patch TVA: Sens −63..+63, Curve 0 (off), 1..7
-        int ampVelSens = 16, ampVelCurve = 1;
-        // the patch TVA (IDs 0x29a…0x2a0): Level 0..127, its Keyfollow −200..+200 (steps
-        // of 10) and LFO Depth −63..+63; Pan 0..127 (64 the centre), its Keyfollow and LFO
-        // Depth; MFX Send Level 0..127, the level to the output bus.  With the Switch off only
-        // the MFX Send Level counts.  The XT's defaults
-        int tvaLevel = 127, tvaLevelKF = 0, tvaLevelLfo = 0, tvaPan = 64, tvaPanKF = 0, tvaPanLfo = 0, mfxSend = 127;
-        // The other sends and where the tone goes: Chorus and Reverb Send Level 0..127; Output Assign 0 MULTI (through the MFX), 1 MAIN,
-        // 2 DIR.  The system's: Output Mode, true for Parallel, and Out Gain for TG in dB.  The descriptor says −24 for that.  It stays 0 here, and the
-        // sixteenth is applied after the tones instead, in the frame's way into the chip and in busOut: inside them, switching the effects under a note would be a step.
-        int chorusSend = 0, reverbSend = 0, outputAssign = 0, outGainTg = 0;
-        bool parallel = true;
-        // LFO 5, the TVA's (IDs 0x3de…0x3e5), as the others.  The XT's defaults
-        int tvaLfoWave = 1, tvaLfoRate = 98, tvaLfoOffset = 2, tvaLfoDelay = 0, tvaLfoFadeMode = 0, tvaLfoFade = 0;
-        bool tvaLfoKeySync = false;
-        // Portamento: the switch, Mode (0 NORMAL, 1 LEGATO: only while a key
-        // is held), Type (0 RATE: Time per octave, 1 TIME), Time 0..127
-        // (k²·10000/127² ms; the XT's default 20) and Time Velo Sens −63..+63
-        bool portamento = false;
-        int portaMode = 0, portaType = 0, portaTime = 20, portaVeloSens = 0;
-        // the patch's key assign: Mono/Poly, Legato Switch (MONO: a note
-        // played while a key is held takes over the sounding voice) and
-        // Octave Shift −3..+3 (the XT's defaults: POLY, ON, 0)
-        bool mono = false, legato = true;
-        int octave = 0;
-        // The COSM sections (XtCosm), COSM 1 then COSM 2 in series: the
-        // switch; the type, 0 TVF, 1 Dynamic TVF (its Q and Cutoff also
-        // follow the input's level by their Own Env depths −63..+63), 2
-        // Dual Filter, 3 TB Filter, 4 Comb Filter, 5 or 6 the 1st or 2nd Side
-        // Band Filter, 7 Resonator, 8 Frequency Shifter, 9 Lo-Fi, 10
-        // Compressor, 11 Limiter, 12 Wave Shape, 13 OD/Dist, 14 Amp Simulator,
-        // 15 Speaker Simulator (their own parameters below); Filter
-        // Type 0..11 (LP24, BP24, HP24, NOTCH24, PEAK24,
-        // LP12, BP12, HP12, NOTCH12, PEAK12, LP6, HP6); Cutoff and Resonance
-        // (Q) 0..127; Cutoff Keyfollow −200..+200 (steps of 10); the Cutoff's
-        // and Q's Env and LFO depths −63..+63.  Their envelopes (curve 2):
-        // envA drives the Cutoff (Env 9, COSM 2 Env 11), envB the Q (Env 10,
-        // 12), each with the Velocity Curve 0 (off), 1..7 and Sens −63..+63
-        // that scale its depth; the LFO is LFO 3 (COSM 2 LFO 4).  The XT's
-        // defaults.
-        struct CosmEnv {
-            int attack = 0, decay = 0, sustain = 127, release = 127;
-            int velCurve = 0, velSens = 32, aSens = 0, dSens = 0, rSens = 0, timeKF = 0;
-            bool operator==(const CosmEnv&) const = default;
-        };
-        struct Cosm {
-            bool on = false;
-            int type = 0, resoOwn = 0, cutoffOwn = 0;
-            int filter = 5, cutoff = 127, reso = 0, kf = 0;
-            int cutoffEnv = 0, cutoffLfo = 0, resoEnv = 0, resoLfo = 0;
-            // the Dual Filter: Filter Type 0..2 (LPF/HPF, LPF->HPF, BPF/BPF);
-            // per filter Frequency and Q 0..127, Keyfollow −200..+200 (steps
-            // of 10), LFO and Env depths −63..+63; Filter 1 on envA, 2 on envB
-            int dualType = 0, freq1 = 90, kf1 = 100, q1 = 108, lfo1 = 0, env1 = 0;
-            int freq2 = 80, kf2 = 100, q2 = 120, lfo2 = 0, env2 = 0;
-            // the TB Filter: LPF Cutoff 0..127, Keyfollow −200..+200 (steps
-            // of 10), LFO and Env depths −63..+63, Q 0..127, Q Follow
-            // −63..+63; HPF Cutoff, Keyfollow, LFO and Env depths; Gain
-            // 0..127; the LPF on envA, the HPF on envB
-            int tbCutoff = 90, tbKf = 0, tbLfo = 0, tbEnv = 0, tbQ = 100, tbQFollow = 25;
-            int tbHpf = 45, tbHpfKf = 0, tbHpfLfo = 0, tbHpfEnv = 0, tbGain = 127;
-            // the Comb Filter: Octave 0..4 (−2..+2), Detune −100..+100 with
-            // its LFO and Env depths (envB), Tone 0..127 with its depths (envA)
-            int combOctave = 3, combDetune = 0, combDetuneLfo = 0, combDetuneEnv = 0, combTone = 0, combToneLfo = 0, combToneEnv = 0;
-            // the Side Band Filters, each its own set (sb[0] the 1st, sb[1]
-            // the 2nd): the 1st's HPF Cutoff, the 2nd's Q, 0..127; LPF Cutoff
-            // 0..127, Keyfollow −200..+200 (steps of 10); the 1st's Sub Delay
-            // Detune −100..+100; Octave 0..2 (−2..0); Detune −100..+100 with
-            // its LFO, Own Env and Env depths −63..+63 (envB); Width 0..127,
-            // its Keyfollow and the same depths (envA)
-            struct SideBand {
-                int hpf = 48, q = 64, lpf = 64, lpfKf = 100, subDetune = 0, octave = 1;
-                int detune = 0, detuneLfo = 0, detuneOwn = 0, detuneEnv = 0;
-                int width = 16, widthKf = 0, widthLfo = 0, widthOwn = 0, widthEnv = 0;
-                bool operator==(const SideBand&) const = default;
-            };
-            SideBand sb[2] = { {}, { .width = 32 } };
-            // the Resonator: Filter Type 0..2, Size 0..127 with Keyfollow
-            // −200..+200 (steps of 10), LFO and Env depths −63..+63 (envA);
-            // Balance 0..100 with its depths (envB)
-            int resType = 0, resSize = 64, resSizeKf = 0, resSizeLfo = 0, resSizeEnv = 0, resBalance = 50, resBalanceLfo = 0, resBalanceEnv = 0;
-            // the Frequency Shifter: Effect Depth 0..127 with Keyfollow
-            // −200..+200 (steps of 10), LFO and Env depths −63..+63 (envA);
-            // Dry/Effect Balance 0..100 with its depths (envB)
-            int fsDepth = 80, fsDepthKf = 0, fsDepthLfo = 0, fsDepthEnv = 0, fsBalance = 50, fsBalanceLfo = 0, fsBalanceEnv = 0;
-            // Lo-Fi: Sample Bit Down 0..15, Sample Rate Down 0..5; Filter
-            // 0..127 with Keyfollow −200..+200 (steps of 10), LFO and Env depths
-            // −63..+63 (envA); Dry/Effect Balance 0..100 with its depths (envB)
-            int lofiBit = 10, lofiRate = 4, lofiFilter = 64, lofiFilterKf = 0, lofiFilterLfo = 0, lofiFilterEnv = 0;
-            int lofiBalance = 50, lofiBalanceLfo = 0, lofiBalanceEnv = 0;
-            // the Compressor: Attack, Sustain and Output Level 0..127 (no
-            // envelopes or LFO)
-            int compAttack = 64, compSustain = 64, compLevel = 115;
-            // the Limiter: Threshold Level, Attack, Release and Output Level
-            // 0..127, Ratio 0..3 (1.5:1, 2:1, 4:1, 100:1; no envelopes or LFO)
-            int limThreshold = 64, limRatio = 1, limAttack = 64, limRelease = 64, limLevel = 115;
-            // Wave Shape: Type 0..5 (1..6), Output Level 0..127; Drive 0..127
-            // with its LFO and Env depths −63..+63 (envA); Tone 0..127 with
-            // Keyfollow −200..+200 (steps of 10) and its depths (envB)
-            int wsType = 0, wsLevel = 127, wsDrive = 127, wsDriveLfo = 0, wsDriveEnv = 0, wsTone = 127, wsToneKf = 0, wsToneLfo = 0, wsToneEnv = 0;
-            // OD/Dist: Type 0 OD, 1 DS (latched at note-on), and the rest as
-            // Wave Shape's
-            int odType = 0, odLevel = 127, odDrive = 127, odDriveLfo = 0, odDriveEnv = 0, odTone = 127, odToneKf = 0, odToneLfo = 0, odToneEnv = 0;
-            // the Amp Simulator: Amp Type 0..2 (1..3); Bass, Middle, Treble
-            // and Output Level 0..127; Gain 0..127 with its LFO and Env
-            // depths −63..+63 (envA)
-            int ampType = 0, ampBass = 64, ampMiddle = 64, ampTreble = 64, ampLevel = 127, ampGain = 0, ampGainLfo = 0, ampGainEnv = 0;
-            // the Speaker Simulator: Speaker Type 0..11 (1..12)
-            int spkType = 0;
-            CosmEnv envA, envB;
-            int lfoWave = 1, lfoRate = 98, lfoOffset = 2, lfoDelay = 0, lfoFadeMode = 0, lfoFade = 0;
-            bool lfoKeySync = false;
-            bool operator==(const Cosm&) const = default;
-        };
-        Cosm cosm[2];
-        // The MOD section (XtMod): Switch, Type 0 MIX, 1 RING, 2 FM, 3 ENV RING, 4
-        // OSC SYNC, Original Level, Attack and Release Times, between the OSCs and
-        // COSM 1.  Off, or MIX, is the sum.
-        XtModParams mod;
-        // Structure Type (ID 0x293): 0…2, Type1…Type3 on the panel (xtToneOrder).
-        int structure = 0;
-        // The Matrix Controls (IDs 0x14d…0x174, xtMatrixSums).
-        XtMatrixControl matrix[8];
-        // The system's controller assigns, a CC number or 0 for OFF: Beam 2 L, R and Beam 3 L, R (IDs 0x89…0x8c,
-        // the part's bytes at +0x180), then what the sources BEAM-L, BEAM-R, PAD-X and -Y, KNOB1, KNOB2 read
-        // (IDs 0x8d, 0x8e, 0x8f, 0x90, 0x93, 0x94).  Last, Time Trip Assign X and Y (IDs 0x91, 0x92), the controllers that
-        // move the pad (0x894d8360).  The pad's two pairs, one per Pad Mode, are on Roland's chart's numbers: X-Y mode's
-        // PAD-X and -Y on CC80 and CC81, Time Trip's on CC82 and CC83.  Pad Mode only picks which pair the XT's own pad sends:
-        // no tone generator code reads it, so both are always live here.  The descriptors say OFF for all of these, but nothing
-        // else sets the pad, so the XT's own would not work; the others stay OFF as they say.
-        int assign[12] = { 0, 0, 0, 0, 0, 0, 80, 81, 0, 0, 82, 83 };
-        bool operator==(const Controls&) const = default;
-    };
+    using OscControls = XtOscControls;     // XtSynthControls.h
+    using Controls = XtControls;
 
     // A patch's zones (v154, the user's decision of 2026-11-05: a loaded patch plays all of them, kits too, while the plugin's
     // parameters and editor stay on zone 1).  Zone 1 is setControls' and setSample's; zones 2…16 are a patch's data, each its
@@ -379,95 +98,8 @@ public:
     void render(float* left, float* right, int n);
 
 private:
-    // What each OSC keeps on the voice (the firmware's objects at tone +0x20
-    // and +0x9d4, with their envelopes and LFO)
-    struct OscVoice {
-        bool on = false;               // the OSC sounds this note: its Switch, and something to play
-        int kfKey = -1;                // the key-follow key (+4): a change restarts the glide
-        bool robot = false;            // Robot Voice, as at note-on (the player latches it)
-        bool robotKnob = false;        // and its Switch alone: the pitch takes it with Vari Sw as that stands
-        bool linear = false;           // Vari off on a SOLO or LITE wave, as at note-on: XtLinearPlayer plays
-        // A LITE wave (type 0) is the voice's kind 1 (the converter at 0x894e2ec0): its own note-on (0x8950b5b0) and update (0x8950bbb0),
-        // which take the converters' values as they are, no 70% steps.  Vari off, the linear player; on, XtLitePlayer (mode 2)
-        bool lite = false;
-        int32_t liteStart = 0;         // kind 1's +0xc4, the Start Offset as the note's block had it: each knob update gives it to the player again (0x8950bcc0)
-        float root = 440.0f;           // the voice's root frequency (+0x9a4), as its setup leaves it at note-on (0x894f21c0)
-        bool variBit = true;           // Vari Sw as the voice has it (+0xb4 bit 0x20), what its walk reads: from note-on, then each knob update's end
-        bool syncBit = false;          // and Tempo Sync, as the player's byte 0 has it (bit 1), the same way
-        bool analog = false;           // OSC Type ANALOG at note-on: the analog oscillator plays
-        const XtEncoded* wave = nullptr;   // the OSC's wave at note-on (a new wave stops the voices)
-        int rnd = 0;                   // the note's random pitch offset (+0x6c), 1/10 cent
-        XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)
-        XtEnvelope oenv;               // the OSC amp envelope (curve 2)
-        XtLfo lfo;
-        XtPitchRamp porta;             // the pitch ramp (+0x880)
-        bool chase = false;            // a released Time Trip fading out to go back to the beat (+0x9b0)
-        int steps = 0;                 // the zone's and OSC's count of notes at this one's start (the input's +0xe0): STEP's
-        // A LITE player's byte +4, the end flag the SOLO and band players keep (1 at the wave's end, −1 at its start): LITE's note-ons
-        // (0x8950b8d0, 0x8950b712) neither clear nor set it, so on the XT it is what the tone slot's last SOLO or band player, or a LEGATO
-        // copy, left there, and LEGATO takes no earlier player whose flag is 1 (0x894f2d24).  XtSynth's voices are not the XT's tone slots,
-        // so the plugin takes 0; the check sets the firmware's own.
-        int8_t staleEnd = 0;
-        // the player's pitch ratio, formant ratio, walk and Energy as the
-        // voice update leaves them (0x8950c1b0: 70% toward the targets per update)
-        float curA = 1, curF = 1, curWalk = 1, curG = 0, curGain = 1;
-        XtMbPlayer mb;
-        XtSoloVoice solo;
-        XtLinearPlayer lin;
-        XtLitePlayer xfg;              // a LITE wave with Vari on (mode 2)
-        XtAnalogOsc ana;               // kept across notes: its phase runs on
-    };
-    struct Voice : OscVoice {                  // OSC 1's in the base
-        OscVoice osc2;
-        int zone = 0;                  // the patch's zone the note plays, 0 for zone 1 (the block's +0x6c6; the tone's +0x1c, part and zone)
-        XtMod mod;                     // kept across notes, as the tone's
-        int structure = 0;             // the Structure Type as at note-on (the tone's +0x1770)
-        bool active = false, releasing = false;
-        int note = -1;                 // the key, with the Octave Shift
-        int raw = -1;                  // the key as played (the tone's +0x42), for note-off
-        int chainKey = -1;             // the block's +0x6c4: the key the notes it follows began on, its own if none (the allocator's, 0x894d4c04)
-        int srcKey = -1;               // the key portamento glides from (the OSC's +0x7c)
-        bool damping = false;          // truncated (0x894f5500): fading out over the Truncate Time
-        float damp = 0;                // the TVA's fade (+0x54)
-        long age = 0;
-        float velGain = 1;            // the patch TVA's velocity gain, latched at note-on (0x894ea990)
-        XtTvaBlock tb;                // the TVA's block (0x894f50e0, 0x894f5310), the level in it
-        int vel = 64, relVel = 64;     // 0..127, for the envelope's times
-        // The note's +0x48: bit 0 its key is down, 1 Hold may keep it, 2 Sostenuto may.  It stops
-        // when all three are clear; +0x2f is the release velocity until then.
-        int keyFlags = 7, relHeld = 64;
-        // The note's object M, what matrixUpdate reads and leaves: its velocity and keys, as the note started (a
-        // legato leaves them); the Matrix's sums by slot; the D-Beam's controllers (+0x180…+0x183).
-        int mVel = 64, mKey = 60, mRaw = 60;
-        int16_t mx[kXtMatrixSlots] = {};
-        int beam[4] = {};
-        int tempo10 = 1200;            // the tempo at the note's start: the note-value envelope times (input +0x18)
-        float blockTempo = 0.0f;       // OSC 1's block +0x60, which the LFOs start from: left as it was with OSC 1 off
-        XtEnvelope env;
-        XtLfo tlfo;                    // LFO 5, on the TVA's level and pan
-        // the COSM sections: on as at note-on; each its TVF, Dual, TB, Comb or
-        // Side Band Filter, Resonator, Frequency Shifter, Lo-Fi, Compressor,
-        // Limiter, Wave Shape, OD/Dist, Amp or Speaker Simulator, envelopes
-        // (A: the Cutoff's, Filter 1's, the LPF's, Tone's, Width's, Size's,
-        // Depth's, the Lo-Fi Filter's or Drive's; B: the Q's, Filter 2's, the
-        // HPF's, Detune's, Balance's or Wave Shape's Tone) and LFO
-        struct CosmVoice : XtCosmSection {
-            bool on = false;
-            XtEnvelope envA, envB;
-            XtLfo lfo;
-            // What a new block reads (object +0x104…+0x110): the outputs as the note-on or
-            // the last update took them, not the envelope's own, which a moved Sustain moves at once
-            float heldA = 0, heldB = 0, heldLfo = 0;
-            void hold() { heldA = envA.level(); heldB = envB.level(); heldLfo = lfo.out(); }
-        };
-        CosmVoice cs[2];
-        // The TVA (0x894f5360 / 0x894f5720), left and right: its gain (the level times the
-        // envelope, the LFO on the level and the pan), the gain's target and per-sample
-        // step; frames since the last update.  The output bus's eight levels (+0x70…+0x8c),
-        // each going 3% of the way to the block's in each block.
-        float cur[2] = {}, target[2] = {}, step[2] = {}, elapsed = 0;
-        float bus[XtBusCount] = {};
-    };
+    using OscVoice = XtOscVoice;           // XtSynthVoice.h
+    using Voice = XtVoice;
     std::shared_ptr<const XtEncoded> cur[2], pending[2], retired[2];   // each OSC's wave
     int curNumber[2] = { -1, -1 }, pendingNumber[2] = { -1, -1 };     // and its Wave Number
     // Each zone's and OSC's count of notes started (0x89cf7210: part × 64 + zone × 4 + OSC × 2), every note-on of the zone, both
@@ -507,6 +139,13 @@ private:
     uint16_t sostKeys[8] = {};        // the keys held when Sostenuto went down (N + 0x120)
     int lastRelease = 0;              // the last note-off's velocity (N + 0xa)
     XtTripPad pad;                    // the part's Time Trip pad
+    // The arpeggiator (XtSynthArp.cpp): the router's key tracker (+0x80), the part's keys down as its Switch went
+    // on, what it was last given of the patch, and the tempo clock's ticks it steps on
+    XtArpeggio arp;
+    uint16_t arpKeys[8] = {}, tgKeysAtSwitch[8] = {};
+    XtArpSettings arpGiven;
+    XtArpPattern patternGiven;
+    XtTempoTicks arpTicks;
     // The tempo clock, 24 to the quarter (0x89471030 → 0x894d4210 → 0x894f4da0), on the audio's
     // clock here: frames × 24000 against the period × 44100.  It runs with nothing sounding.
     uint64_t clockAcc = 0;
@@ -561,7 +200,8 @@ private:
     void padController(int number, int value);   // a controller to the pad, if it is one of its assigns (0x894d8360)
     void padSteps(int step);       // the pad's whole steps to the voices (0x894f4e10)
     void clockFollow();            // Clock Source to the clock's object (0x89471e30)
-    void clockIn();                // an F8 (0x894712f0)
+    void clockIn();                // an F8 (0x894712f0): the arpeggio's ticks, then clockCount
+    void clockCount();             // its count of six
     void clockMs();                // the timer routine's count (0x894710e0, its end)
     int msDue() const;             // ms the next block starts with
     double hostStep() const;       // clocks in a block, at the host's tempo
@@ -602,6 +242,15 @@ private:
     void keyRelease(Voice& v, int velocity);         // a key let go (0x894d58b0)
     void voiceOff(Voice& v);                         // the note's release (0x894dc270)
     void keysCleared();                              // the mode messages' reset of the key state
+    // The part's own note, controller and panic, which the router (XtSynthArp.cpp) stands in front of
+    void tgNoteOn(int note, float velocity);
+    void tgNoteOff(int note, float velocity);
+    void tgController(int number, int value);
+    void tgAllNotesOff();
+    void arpSync();                                  // the patch's settings and pattern, when changed
+    void arpBlock();                                 // a block's ms, then the ms timer on
+    void arpMs();                                    // one ms of ticks
+    void arpApply();                                 // what it sent, to the part
     void ccDefaults();                               // the channel's controllers at power-on (0x89475290)
     void applyRates(OscVoice& s);
     void tvaUpdate(Voice& v);

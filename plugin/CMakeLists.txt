@@ -68,6 +68,12 @@ target_sources(VSynthEmu PRIVATE
     Source/XtLinearPlayer.cpp
     Source/XtLitePlayer.cpp
     Source/XtSynth.cpp
+    Source/XtSynthArp.cpp
+    Source/XtTempoTicks.cpp
+    Source/XtArpeggio.cpp
+    Source/XtArpeggioStep.cpp
+    Source/XtArpeggioMotifs.cpp
+    Source/XtArpeggioPatch.cpp
     Source/XtSynthRom.cpp
     Source/XtMultiBandPlayer.cpp
     Source/Sh4Interp.cpp
@@ -134,11 +140,13 @@ vse_add_test(VSynthEmuStepTest Tests/StepTest.cpp Tests/TestMain.cpp Tests/TestN
 vse_add_test(VSynthEmuFormantTest Tests/FormantTest.cpp Tests/TestMain.cpp)
 # The firmware's disk image reader on damaged images: refused, or each cluster once
 vse_add_test(VSynthEmuDiskImageTest Tests/DiskImageTest.cpp Tests/TestMain.cpp)
+# XtSynth's arpeggiator heard: a note a quarter at two tempos, the Switch off, the Hold pedal (v189)
+vse_add_test(VSynthEmuArpTest Tests/ArpTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest VSynthEmuFormantTest
-                 VSynthEmuDiskImageTest)
+                 VSynthEmuDiskImageTest VSynthEmuArpTest)
 
 # ─── Optional: Python bindings for testing (pybind11) ────────────────────────
 # Uncomment when you want to call VariphraseEngine from Python for batch tests.

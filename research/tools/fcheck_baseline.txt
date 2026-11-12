@@ -257,45 +257,46 @@ env 127 127 127 127 200 900 2: identical
 env 0 0 127 0 5 60 0: identical
 env 30 70 90 50 80 500 2: identical
 == xt_tone
+update: read16 at 8f000000 (pc 8950f5a6)
 tone, the SOLO records of vocal.bin: 0 different of 461, 2 events
 tone, the SOLO records of w358.bin: 0 different of 111, 2 events
 tone, the SOLO records of drum.bin: 0 different of 607, 3 events
-patches: 512, 1558 zones, 547816 values, 0 different; 448512 of their effects' values, 0 different
-tone: 4390 notes, 2461 taken by a sounding tone, 332 truncated, 384907 blocks, 30822720 checks
-tone: 0 notes left off, a read outside memory; 289042 band reads far from their wave
+patches: 512, 1558 zones, 1410948 values, 0 different; 448512 of their effects' values, 0 different
+tone: 4386 notes, 2459 taken by a sounding tone, 334 truncated, 384001 blocks, 31902812 checks
+tone: 0 notes left off, a read outside memory; 460586 band reads far from their wave
 tone: 0 different
-tone, a wave on OSC 2: 1344 notes, 377 taken by a sounding tone, 167 truncated, 115551 blocks, 10542237 checks
-tone, a wave on OSC 2: 0 notes left off, a read outside memory; 462388 band reads far from their wave
+tone, a wave on OSC 2: 1357 notes, 389 taken by a sounding tone, 181 truncated, 116132 blocks, 10612925 checks
+tone, a wave on OSC 2: 0 notes left off, a read outside memory; 654006 band reads far from their wave
 tone, a wave on OSC 2: 0 different
-tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 242643 checks
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 242866 checks
 tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
-tone, the firmware's patches: 722 notes, 161 taken by a sounding tone, 29 truncated, 60917 blocks, 6490416 checks
-tone, the firmware's patches: 0 notes left off, a read outside memory; 43094 band reads far from their wave
+tone, the firmware's patches: 718 notes, 165 taken by a sounding tone, 22 truncated, 61605 blocks, 6192466 checks
+tone, the firmware's patches: 0 notes left off, a read outside memory; 62228 band reads far from their wave
 tone, the firmware's patches: 0 different
-tone, a wave's own tuning: 674 notes, 209 taken by a sounding tone, 90 truncated, 58918 blocks, 5430727 checks
-tone, a wave's own tuning: 0 notes left off, a read outside memory; 187760 band reads far from their wave
+tone, a wave's own tuning: 676 notes, 188 taken by a sounding tone, 85 truncated, 59544 blocks, 5483537 checks
+tone, a wave's own tuning: 0 notes left off, a read outside memory; 207852 band reads far from their wave
 tone, a wave's own tuning: 0 different
-tone, LITE waves: 663 notes, 190 taken by a sounding tone, 71 truncated, 57924 blocks, 5859275 checks
+tone, LITE waves: 668 notes, 184 taken by a sounding tone, 72 truncated, 58232 blocks, 5802561 checks
 tone, LITE waves: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, LITE waves: 0 different
-tone, zones: 559 notes on zones 2 to 16, 15 of those zones
-tone, zones: 676 notes, 197 taken by a sounding tone, 88 truncated, 54061 blocks, 5112895 checks
-tone, zones: 0 notes left off, a read outside memory; 101850 band reads far from their wave
+tone, zones: 545 notes on zones 2 to 16, 15 of those zones
+tone, zones: 673 notes, 189 taken by a sounding tone, 90 truncated, 57543 blocks, 5571821 checks
+tone, zones: 0 notes left off, a read outside memory; 67934 band reads far from their wave
 tone, zones: 0 different
-tone, playback modes: 160 OSCs took an earlier note's player (LEGATO), 12 didn't as it had reached its wave's end; 326 started from an event (STEP, EVENT)
-tone, playback modes: 178 SOLO notes started from an event; 112 moves between a SOLO wave's segments
-tone, playback modes: 963 notes, 54 taken by a sounding tone, 98 truncated, 57875 blocks, 6868407 checks
-tone, playback modes: 1 notes left off, a read outside memory; 380464 band reads far from their wave
+tone, playback modes: 132 OSCs took an earlier note's player (LEGATO), 8 didn't as it had reached its wave's end; 398 started from an event (STEP, EVENT)
+tone, playback modes: 136 SOLO notes started from an event; 95 moves between a SOLO wave's segments
+tone, playback modes: 956 notes, 45 taken by a sounding tone, 105 truncated, 60595 blocks, 7763735 checks
+tone, playback modes: 1 notes left off, a read outside memory; 283322 band reads far from their wave
 tone, playback modes: 0 different
-tone, SOLO segments: 83 notes started from an event; 370 moves between segments; 0 turns at a kind-1 event; 38 took an earlier note's player
-tone, SOLO segments: 381 notes, 20 taken by a sounding tone, 37 truncated, 23641 blocks, 3123215 checks
-tone, SOLO segments: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, SOLO segments: 75 notes started from an event; 389 moves between segments; 0 turns at a kind-1 event; 38 took an earlier note's player
+tone, SOLO segments: 381 notes, 18 taken by a sounding tone, 37 truncated, 25474 blocks, 2934158 checks
+tone, SOLO segments: 2 notes left off, a read outside memory; 0 band reads far from their wave
 tone, SOLO segments: 0 different
 tone, stored waves: 454 of 504 played on their own vpdt (SOLO 300, BACKING 139, ENSEMBLE 15), 0 encoded again as theirs can't be played as it is, 50 skipped
-tone, stored waves: 2 SOLO with a terminator other than (256, 1), 24 cases from their end, 49 grains on it
-tone, stored waves: 913 notes, 50 taken by a sounding tone, 96 truncated, 55073 blocks, 6541827 checks
-tone, stored waves: 1 notes left off, a read outside memory; 12000 band reads far from their wave
+tone, stored waves: 2 SOLO with a terminator other than (256, 1), 24 cases from their end, 53 grains on it
+tone, stored waves: 918 notes, 52 taken by a sounding tone, 103 truncated, 57352 blocks, 6923849 checks
+tone, stored waves: 1 notes left off, a read outside memory; 5576 band reads far from their wave
 tone, stored waves: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
@@ -676,6 +677,7 @@ short: a patch using the Multi Step Modulator in 77 fields, cut before it 98 val
 presets: 117 cases, 646719 operations, 10790 messages, 10717 states, 0 different
 random: 1000 cases, 4537707 operations, 224687 messages, 110830 states, 0 different
 messages alike by motif: UP 25626 DOWN 28839 UP&DOWN 26690 RANDOM 23502 NOTE-ORDER 34656 RHYTHM 35626 PHRASE 29704 AUTO 30834
+ticks: 100 cases, 300000 ms, 2455125 values, 0 different
 == xt_fx
 MFX 0 Thru: 8192 samples, 0 different
 MFX 1 Parametric EQ: 8192 samples, 0 different
