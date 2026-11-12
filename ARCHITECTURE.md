@@ -9,8 +9,10 @@ at run time and never shipped. `CLAUDE.md` is the working reference, and
 
 Until Session 15 the goal was to reverse-engineer VariPhrase by black-box testing against a real
 V-Synth, then write an emulation from what the differences showed. Session 16 (October 2026)
-turned to the firmware itself. The engine from that earlier work is still in the plugin, as the
-legacy engine (`VariphraseEngine`), which plays a loaded file when there is no firmware image.
+turned to the firmware itself. The engine from that earlier work stayed in the plugin as the
+legacy engine (`VariphraseEngine`) until v191 removed it, with its Algorithm menu: without a
+firmware image the plugin now plays a loaded file as it is. Only its classifier is left, as Auto's
+(`ContentClassifier`).
 
 ## Methodology: Ports Checked Against the Firmware
 1. Read the routine in `rom.2` (Ghidra, and the disassembly for DSP code).
@@ -56,7 +58,7 @@ vsynth-emu/
 ├── plugin/                # the JUCE plugin: CMakeLists.txt, BuildId.cmake
 │   ├── Source/            # the processor, editor and XtSynth; the firmware's ports (Xt*), each
 │   │                      #   checked in its own XT_*_MAIN block; Sh4Interp, the SH-4 interpreter;
-│   │                      #   the legacy engine (VariphraseEngine, PhaseVocoder, SourceFilterModel)
+│   │                      #   Auto's classifier (ContentClassifier), all v191 kept of the legacy engine
 │   └── Tests/             # PluginTest and the processor's other tests (VSynthEmu*Test)
 ├── research/
 │   ├── HARDWARE_FIRMWARE.md  # the findings, newest version first
@@ -75,6 +77,10 @@ vsynth-emu/
 ```
 
 ## Key Architectural Decision: Isolated Engine
+(Withdrawn in v191: the engine and its offline renderer were removed. This section and the
+renderer's below describe the Sessions 1-15 pipeline as it was; their sources are in v190, 164ac15,
+and `analysis/variphrase_render` is the last binary built from them.)
+
 `VariphraseEngine` is a completely standalone C++ class with no JUCE dependencies.
 It takes a buffer of floats in, returns a buffer of floats out.
 This allows:
@@ -187,7 +193,8 @@ tonal .50/.30/0/.10/.10.
 
 The HTML batch report embeds **A/B audio players** per case.
 Fast engine invariants: `plugin/Source/EngineTests.cpp`
-(`-DENGINE_TESTS_MAIN`, 15 checks, runs in seconds).
+(`-DENGINE_TESTS_MAIN`, 15 checks, runs in seconds), until v191; its classifier check is now
+`plugin/Tests/ClassifierTest.cpp` (`classifier_test`).
 
 ## Current Scores (v47, metric v6)
 

@@ -19,8 +19,7 @@ VSynthEmuProcessor::VSynthEmuProcessor()
     formatManager_.registerBasicFormats();   // WAV, AIFF, OGG, FLAC
     formatManager_.registerFormat(new XtVpwFormat(), false);
 
-    for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
-                            Params::kEncodeType, Params::kEncodeDepth, Params::oscId(1, Params::kEncodeType), Params::oscId(1, Params::kEncodeDepth) })
+    for (const auto& id : Params::encodeParamIds())
         apvts.addParameterListener(id, this);
     findRom();
 }
@@ -84,8 +83,7 @@ const XtFxCatalog& VSynthEmuProcessor::fxCatalog() {
 VSynthEmuProcessor::~VSynthEmuProcessor() {
     if (fxThread_) fxThread_->stopThread(2000);
     fxThread_.reset();
-    for (const auto& id : { Params::kPitchShift, Params::kTimeStretch, Params::kFormantShift, Params::kRobot,
-                            Params::kEncodeType, Params::kEncodeDepth, Params::oscId(1, Params::kEncodeType), Params::oscId(1, Params::kEncodeDepth) })
+    for (const auto& id : Params::encodeParamIds())
         apvts.removeParameterListener(id, this);
     encodePool_.removeAllJobs(true, -1);   // no deadline: each job hears the stop and ends (PluginEncodes.cpp, v185)
 }
@@ -149,8 +147,6 @@ bool VSynthEmuProcessor::setRomFile(const juce::File& file) {
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
 void VSynthEmuProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
-    engine_.prepare(sampleRate, samplesPerBlock, VSE::Algorithm::Passthrough, engineParams());
-    setLatencySamples(engine_.getLatencySamples());
     synth_.prepare(sampleRate);
     scratch_.assign((size_t)std::max(samplesPerBlock, 1) * 2, 0.0f);
     if (!fxThread_ && !fxManual_) { fxThread_ = std::make_unique<FxThread>(*this); fxThread_->startThread(); }
@@ -158,9 +154,7 @@ void VSynthEmuProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     activeVoices_ = 0;
 }
 
-void VSynthEmuProcessor::releaseResources() {
-    engine_.reset();
-}
+void VSynthEmuProcessor::releaseResources() {}
 
 // ─── Process ──────────────────────────────────────────────────────────────────
 
@@ -214,7 +208,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         return;
     }
 
-    // ── Without the firmware: the loaded file through the engine ─────────────
+    // ── Without the firmware: the loaded file as it is ──────────────────────────
     // MIDI: note-on starts playback, note-off decrements voice count
     for (const auto meta : midi)
     {
@@ -223,7 +217,6 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         {
             ++activeVoices_;
             playbackPos_ = 0;   // restart from top on any note-on
-            engine_.reset();
         }
         else if (msg.isNoteOff())
         {
@@ -253,7 +246,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         return;
 
     // ── Fill a mono source block from the file buffer ─────────────────────────
-    // Mix file channels down to mono for the engine, then fan back out to stereo.
+    // Mix file channels down to mono, then fan back out to every output.
     juce::AudioBuffer<float> monoIn(1, numSamples);
     monoIn.clear();
 
@@ -283,19 +276,9 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         }
     }
 
-    // ── Process mono through the engine ──────────────────────────────────────
-    juce::AudioBuffer<float> monoOut(1, numSamples);
-    monoOut.clear();
-
-    const float* inPtr  = monoIn.getReadPointer(0);
-    float*       outPtr = monoOut.getWritePointer(0);
-    const float* inArr[1]  = { inPtr };
-    float*       outArr[1] = { outPtr };
-    engine_.process(inArr, outArr, 1, numSamples);
-
     // ── Fan mono output to all output channels ───────────────────────────────
     for (int ch = 0; ch < numOut; ++ch)
-        buffer.copyFrom(ch, 0, monoOut, 0, 0, numSamples);
+        buffer.copyFrom(ch, 0, monoIn, 0, 0, numSamples);
     buffer.applyGain(0.125f);   // at the level the XT's voices play (XtSynth::busOut), so losing the image isn't 18 dB louder
 }
 
@@ -597,24 +580,6 @@ void VSynthEmuProcessor::parameterChanged(const juce::String& paramID, float /*n
             triggerAsyncUpdate();
             return;
         }
-    engine_.setParams(engineParams());
-}
-
-VSE::VariphraseParams VSynthEmuProcessor::engineParams() const {
-    VSE::VariphraseParams p;
-    p.pitchShiftSemitones   = apvts.getRawParameterValue(Params::kPitchShift)->load();
-    p.timeStretchRatio      = apvts.getRawParameterValue(Params::kTimeStretch)->load();
-    p.formantShiftSemitones = apvts.getRawParameterValue(Params::kFormantShift)->load();
-    p.robotMode             = apvts.getRawParameterValue(Params::kRobot)->load() > 0.5f;
-    return p;
-}
-
-void VSynthEmuProcessor::setAlgorithm(VSE::Algorithm algo) {
-    engine_.setAlgorithm(algo);
-}
-
-VSE::Algorithm VSynthEmuProcessor::getAlgorithm() const {
-    return engine_.getAlgorithm();
 }
 
 // The state, getStateInformation and setStateInformation, is in PluginState.cpp (v172).

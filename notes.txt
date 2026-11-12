@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Plant runs build one binary v194 (2026-11-12): the user's "speed up the plant runs". mutate_panel.py built all eight
+  test binaries for every plant, though a plant's run starts one (its kind's _bin, else VSynthEmuTest), and each link of
+  the whole plugin takes about 20 s, one after another: 173 s a plant, measured after a touch of one source, where one
+  binary takes 30 s. Now build(targets) builds only binary(kind), and the run's own binaries at its start and, from the
+  clean sources, at its end. Checked on nine plants, one or more for each of the eight binaries (editor-no-build,
+  patch-playback-vpno, arp-param-default, arp-no-ticks, disk-loop, rom-other-taken, step-unlimited, switch-read,
+  teardown-classifier-deaf): all caught, 305 s with the clean runs, then 161 s for the closing rebuild; the sources as
+  they were after. CLAUDE.md's times measured again: about half a minute a plant, the whole list about two hours.
+  (v192 and v193 are the Multi Step Modulator's, on claude/msm-ad515c.)
+
 The Multi Step Modulator in the sound v193 (2026-11-12): v192's XtMsm wired into XtSynth and the plugin (HARDWARE_FIRMWARE.md,
   "The Multi Step Modulator in XtSynth"), on claude/msm-ad515c after master's v189 and v190 were merged in (a76c8b5).
   XtSynth: part 0's XtMsm (XtSynthMsm.cpp). setControls reads the section before the knobs' update, a patch's (msmPatch) as
@@ -350,9 +360,9 @@ The Multi Step Modulator in the sound v193 (2026-11-12): v192's XtMsm wired into
   Check: xt_tone's MSM mode (xt_tone <rom> msm [cases] [seed]; XtToneMsm.cpp, XtToneFwMsm.h, XtToneMsmCheck.h; fcheck, 200
   cases): the firmware's own object beside the firmware's tone, against XtSynth: the bus bit for bit, each note's TVA,
   envelopes, LFOs, COSMs, OSCs, the last voice's buffers, both objects; Hold in a case in four. Every destination alone,
-  keys let go and held, 144 runs at 30 cases; seeds 2024, 7, 99 at 400 cases; 0 different. It found one fault in XtSynth (clocks run on a count a stop
-  had left) and three of its own (an ended firmware note left on the tones' list, two notes on one key, an edit that moved
-  no value). xt_tone's main check plays a patch's tone with it off (withoutMsm). xt_arp now compares the arpeggio's flag
+  keys let go and held, 144 runs at 30 cases; seeds 2024, 7, 99 at 400 cases; 0 different. It found one fault in XtSynth
+  (clocks run on a count a stop had left) and three of its own (an ended firmware note left on the tones' list, two notes
+  on one key, an edit that moved no value). xt_tone's main check plays a patch's tone with it off (withoutMsm). xt_arp now compares the arpeggio's flag
   (0x894d9920, 0x894d9930), which it had answered with nothing.
   Research switches: XT_TONE_MSM_DEST=n, XT_TONE_MSM_HOLD=1, XT_TONE_MSM_ONE=1, XT_TONE_MSM_OFF=1, XT_TONE_MSM_CC7=1.
   Plugin: 98 host parameters appended after the arpeggio's (PluginMsm.cpp; 745 in all, the first 647 unchanged), the
@@ -389,6 +399,33 @@ The Multi Step Modulator v192 (2026-11-11): the firmware's own, which 55 of the 
   coarse curve's lookup then reads on past its 64 entries, so the port reads 129 bytes there.
   Plants: msm_muts.txt through mutate_msm.py (PORT=msm, msmtrack, msmpatch in mutate.sh), 71, all caught; three first planted
   were equivalent within what can happen and were replaced (HARDWARE_FIRMWARE.md says which).
+
+The Algorithm menu and the legacy engine removed v191 (2026-11-12): the user's "Both, after arpeggio" to "Remove the
+  Algorithm menu and the old engine behind it?". Gone: the editor's Algorithm menu (algoBox_, algoLabel_, comboBoxChanged)
+  and the legacy black-box engine whole, VariphraseEngine, PhaseVocoder, SourceFilterModel, DownsampledFormants,
+  PolynomialRoots, its offline renderer (OfflineRenderer; analysis/variphrase_render still runs as last built, its sources
+  in v190, 164ac15) and its EngineTests, with FormantTest (VSynthEmuFormantTest), build.sh's engine_tests, verify.sh's
+  engine and formant lines and mutate_panel's two formants- plants. Kept: Auto's classifier (analyzeContent and
+  VariphraseAnalysis, which encodeWave calls for a wave on Auto), moved as it stood to ContentClassifier.cpp/.h, with two
+  of the house's checks met on the way (a float cast to int before its clamp, three times, now clamped first; pi typed by
+  hand, now std::numbers::pi): old and new give the same type, median confidence, energy ratio and onsets, bit for bit,
+  on the 34 test waves of analysis/test_files. Its check, a SOLO tone reads SOLO (the engine tests' test 5) and the same
+  pitch alone reads LITE, is plugin/Tests/ClassifierTest.cpp, classifier_test, built by build.sh, run by verify.sh;
+  planting either side of the SOLO/LITE line fails it. teardown-classifier-deaf follows the code to ContentClassifier.cpp.
+  What changes for a user: the latency the processor reports goes from 2048 samples to 0 (it was the phase vocoder's,
+  reported though the plugin plays the XT path and, without the image, the file as it is); the Perform knobs set the
+  selected OSC's Pitch, Time, Formant and Robot Voice with or without the image (without it they set the engine's, which
+  is gone); without the image a loaded file plays as it is, as it did (the engine was on Passthrough). Time Stretch and
+  Formant Shift stay host parameters, unread, so a session or automation that names them still loads (IDs never change);
+  the processor no longer listens to them. Pitch Shift stays: the XT path adds it to Coarse/Fine Tune.
+  once-only refused the edit that took the menu out (the stale, untracked tabdesign/ copy of the editor matched the lines
+  around it); the user chose the kit fix, KWB-158 (workflow-bugs.md), installed with its patch for the user to send.
+  Checks: verify.sh every line green (A/B 4/4 identical; PluginTest bit-identical in every mode; the layout 285 states at 3
+  sizes, 555 of 647 parameters with a control; patch apply 0 failed; classifier 2/2; auval); verify_test.sh and
+  fcheck_keys_test.sh pass. Plants (mutate_panel.py): the 11 v191's changes reach, all caught: editor-no-build and
+  editor-no-patch-button (re-texted to the chrome list's new wrap), editor-build-unplaced, editor-build-narrow,
+  editor-no-panel, editor-no-switch, editor-mono-follow, engine-level and the three teardown-. Not run, code unchanged:
+  the rest of the list; mutate_tone.py (XtSoloVoice.cpp's comments only).
 
 The arpeggio's plugin side v190 (2026-11-12): the fourth step to the arpeggio (HARDWARE_FIRMWARE.md, "The arpeggio's
   plugin side"). The split first, moves only, by the kit's KWB-156 (the old copy out first, then the new file from HEAD's

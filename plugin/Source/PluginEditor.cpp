@@ -622,26 +622,11 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
     styleSlider(formantSlider_, formantLabel_);
 
     attachOsc(0);
-    attachMainKnobs(processor_.hasRom());
+    attachMainKnobs();
 
     robotBtn_.setColour(juce::ToggleButton::textColourId,     juce::Colours::lightblue);
     robotBtn_.setColour(juce::ToggleButton::tickColourId,     juce::Colour(0xFF00BFA5));
     addAndMakeVisible(robotBtn_);
-
-    // ── Algorithm selector ────────────────────────────────────────────────────
-    algoBox_.addItem("Passthrough (baseline)",         1);
-    algoBox_.addItem("Phase Vocoder",                  2);
-    algoBox_.addItem("Sinusoidal + Residual (TODO)",   3);
-    algoBox_.addItem("LPC Source-Filter (TODO)",       4);
-    algoBox_.addItem("Hybrid (TODO)",                  5);
-    algoBox_.setSelectedId(1, juce::dontSendNotification);
-    algoBox_.addListener(this);
-
-    algoLabel_.setColour(juce::Label::textColourId, juce::Colours::lightblue);
-    algoLabel_.setFont(juce::Font(13.0f));
-
-    addAndMakeVisible(algoBox_);
-    addAndMakeVisible(algoLabel_);
 
     buildLayout();
     setSize(960, 600);
@@ -651,22 +636,20 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
 
 VSynthEmuEditor::~VSynthEmuEditor() {
     stopTimer();
-    algoBox_.removeListener(this);
 }
 
-void VSynthEmuEditor::attachMainKnobs(bool xt) {
+void VSynthEmuEditor::attachMainKnobs() {
     pitchAtt_.reset();
     timeAtt_.reset();
     formantAtt_.reset();
     robotAtt_.reset();
-    // with the XT, the selected OSC's Pitch, Time and Formant knobs and Robot
-    // Voice (Pitch Shift stays a host parameter, added to the patch's Coarse/Fine Tune)
+    // the selected OSC's Pitch, Time and Formant knobs and Robot Voice, with or without the firmware image
+    // (Pitch Shift stays a host parameter, added to the patch's Coarse/Fine Tune)
     auto id = [this](const char* name) { return VSynthEmuProcessor::oscParamId(oscK_, name); };
-    pitchAtt_   = std::make_unique<SliderAtt>(processor_.apvts, xt ? id("oscPitch") : juce::String("pitchShift"), pitchSlider_);
-    timeAtt_    = std::make_unique<SliderAtt>(processor_.apvts, xt ? id("oscTime") : juce::String("timeStretch"), timeSlider_);
-    formantAtt_ = std::make_unique<SliderAtt>(processor_.apvts, xt ? id("oscFormant") : juce::String("formantShift"), formantSlider_);
-    robotAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, xt ? id("robot") : juce::String("robot"), robotBtn_);
-    mainKnobsXt_ = xt;
+    pitchAtt_   = std::make_unique<SliderAtt>(processor_.apvts, id("oscPitch"), pitchSlider_);
+    timeAtt_    = std::make_unique<SliderAtt>(processor_.apvts, id("oscTime"), timeSlider_);
+    formantAtt_ = std::make_unique<SliderAtt>(processor_.apvts, id("oscFormant"), formantSlider_);
+    robotAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, id("robot"), robotBtn_);
 }
 
 // The COSM rows show one section: its switch, type, Cutoff, Resonance, KF,
@@ -822,7 +805,7 @@ void VSynthEmuEditor::attachOsc(int k) {
     lfoOffsetAtt_ = std::make_unique<ComboAtt>(processor_.apvts, id("lfoOffset"), lfoOffsetBox_);
     lfoSyncAtt_   = std::make_unique<ButtonAtt>(processor_.apvts, id("lfoKeySync"), lfoSyncBtn_);
     lfoLabel_.setText(k ? "LFO 2" : "LFO", juce::dontSendNotification);
-    if (timeAtt_) attachMainKnobs(mainKnobsXt_);
+    if (timeAtt_) attachMainKnobs();
     showOscType();
 }
 
@@ -920,7 +903,6 @@ void VSynthEmuEditor::attachSideBand() {
 }
 
 void VSynthEmuEditor::timerCallback() {
-    if (timeAtt_ && processor_.hasRom() != mainKnobsXt_) attachMainKnobs(processor_.hasRom());
     showFileName();
     statusLabel_.setText(processor_.getStatusText(), juce::dontSendNotification);
     statusLabel_.setColour(juce::Label::textColourId, processor_.hasRom() ? juce::Colours::lightgrey : juce::Colours::orange);
@@ -976,23 +958,20 @@ void VSynthEmuEditor::paint(juce::Graphics& g) {
     f.setExtraKerningFactor(0.08f);
     g.setFont(f);
     g.setColour(Ui::label);
-    g.drawText(mainKnobsXt_ ? "PERFORM  OSC " + juce::String(oscK_ + 1) : juce::String("PERFORM"), 18, top + 10, Ui::performW - 36, 16, juce::Justification::centredLeft);
+    g.drawText("PERFORM  OSC " + juce::String(oscK_ + 1), 18, top + 10, Ui::performW - 36, 16,
+               juce::Justification::centredLeft);
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 void VSynthEmuEditor::resized() {
     if (tabBar_ == nullptr) return;                  // setSize() runs before buildLayout()
-    // Header: Algorithm and the ROM at the right
+    // Header: the ROM at the right
     auto hdr = juce::Rectangle<int>(0, 0, getWidth(), Ui::headerH).reduced(16, 6);
     romButton_.setBounds(hdr.removeFromRight(70));
     hdr.removeFromRight(10);
     statusLabel_.setBounds(hdr.removeFromRight(170));
     hdr.removeFromRight(16);
-    algoBox_.setBounds(hdr.removeFromRight(230));
-    hdr.removeFromRight(6);
-    algoLabel_.setBounds(hdr.removeFromRight(72));
-    hdr.removeFromRight(6);
     fxOnBtn_.setBounds(hdr.removeFromRight(76));
     buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);     // under the wordmark
 
@@ -1236,7 +1215,6 @@ void VSynthEmuEditor::buildLayout() {
     monoBox_.onChange = [this] { monoSeg_->setIndex(monoBox_.getSelectedItemIndex()); };
     monoSeg_->setIndex(monoBox_.getSelectedItemIndex());
     for (auto* seg : { oscSeg_.get(), cosmSeg_.get(), monoSeg_.get() }) seg->setVisible(true);   // pages adopt with visibility kept
-    algoLabel_.setJustificationType(juce::Justification::centredRight);
     statusLabel_.setJustificationType(juce::Justification::centredRight);
 
     using Item = Page::Item;
@@ -1472,9 +1450,9 @@ void VSynthEmuEditor::buildLayout() {
     // What stays on the editor; everything the pages don't take is dropped, so a
     // new control must go in a card or here (TEST_UI_LAYOUT says if one didn't),
     // bar the two selector boxes, kept hidden
-    const juce::Array<juce::Component*> chrome { &buildLabel_, &algoLabel_, &algoBox_, &statusLabel_, &romButton_, &loadButton_, &patchButton_, &fileNameLabel_,
-                                                 &oscOnBtn_, &oscTypeBox_, &pitchSlider_, &pitchLabel_, &timeSlider_, &timeLabel_,
-                                                 &formantSlider_, &formantLabel_, &robotBtn_, &oscSelBox_, &cosmSelBox_, &fxOnBtn_, fxPanel_.get() };
+    const juce::Array<juce::Component*> chrome { &buildLabel_, &statusLabel_, &romButton_, &loadButton_, &patchButton_,
+        &fileNameLabel_, &oscOnBtn_, &oscTypeBox_, &pitchSlider_, &pitchLabel_, &timeSlider_, &timeLabel_,
+        &formantSlider_, &formantLabel_, &robotBtn_, &oscSelBox_, &cosmSelBox_, &fxOnBtn_, fxPanel_.get() };
     for (auto& p : pages_) p->adopt();
     const juce::Array<juce::Component*> kids(getChildren());
     for (auto* c : kids)
@@ -1534,20 +1512,6 @@ void VSynthEmuEditor::openPatchChooser() {
             processor_.loadPatch(file);
             showFileName();
         });
-}
-
-// ─── Combo box ───────────────────────────────────────────────────────────────
-
-void VSynthEmuEditor::comboBoxChanged(juce::ComboBox* box) {
-    if (box == &algoBox_) {
-        using A = VSE::Algorithm;
-        static const A map[] = { A::Passthrough, A::PhaseVocoder,
-                                  A::SinusoidalPlusResidual, A::LPCSourceFilter,
-                                  A::Hybrid };
-        int idx = box->getSelectedId() - 1;
-        if (idx >= 0 && idx < 5)
-            processor_.setAlgorithm(map[idx]);
-    }
 }
 
 // ─── Slider styling ──────────────────────────────────────────────────────────

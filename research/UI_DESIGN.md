@@ -6,7 +6,7 @@ The plugin's user interface follows this design from v144 on, by the user's deci
 
 960 × 600, resizable from 900 × 600 to 1400 × 900. The two card columns share any extra width. Top to bottom:
 
-- **Header:** wordmark with the build under it, Effects switch, Algorithm, ROM status, ROM button.
+- **Header:** wordmark with the build under it, Effects switch, ROM status, ROM button (the Algorithm menu went with the legacy engine, v191).
 - **Source bar:** Load WAV, Load Patch, the patch's name, the file's and what the patch asks for that isn't here, OSC 1/2, the OSC's On and Type. It stays in view on every tab, and the Load button and most tabs follow its OSC.
 - **Perform column** (left, every tab): Pitch, Time, Formant, Robot. With a ROM these are the selected OSC's, and the title says which.
 - **Tabs:**
@@ -66,7 +66,8 @@ A page doesn't scroll, so cards must fit: at the smallest size a page is 466 hig
 - The COSMs' Envelope B, and Envelope A's velocity and key follow (each COSM: 10 and 6).
 - The COSMs' LFO offset, delay and fade (each COSM: 4).
 - Each OSC's pitch, time and formant envelopes' velocity and key (each OSC: 18, v148). A patch sets them.
-- The engine's Pitch, Time and Formant (3). These show on the Perform knobs without a ROM.
+- The engine's Pitch, Time and Formant (3). Until v191 these showed on the Perform knobs without a ROM; with the engine
+  gone they are kept, unread, for old sessions, and the Perform knobs set the selected OSC's with or without one.
 
 ## Still to do
 

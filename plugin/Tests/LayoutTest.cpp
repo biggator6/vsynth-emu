@@ -1,6 +1,6 @@
 // TEST_UI_LAYOUT=1: the editor's layout, then stop.  At its smallest, default and largest sizes, on every tab, for both OSC types and every COSM type: no control outside its parent, over another or
-// without a size, and no text cut short.  Every control is moved, to see which parameter it sets: none may move nothing, and no parameter may be left without a control, bar the engine's three, shown
-// only without a ROM.  (buildLayout drops what it doesn't place, so a control left out of it goes quietly.)  And each tab by a click, and the joined buttons both ways.  =list: the parameters with no control, and those with.
+// without a size, and no text cut short.  Every control is moved, to see which parameter it sets: none may move nothing, and no parameter may be left without a control, bar the engine's three, kept
+// unread for old sessions (v191).  (buildLayout drops what it doesn't place, so a control left out of it goes quietly.)  And each tab by a click, and the joined buttons both ways.  =list: the parameters with no control, and those with.
 // Moved from PluginTest.cpp's main and split by what each part does (v193): the checks are LayoutCheck.h's, the sweeps
 // here.  And the MSM tab's tracks, one at a time as the Matrix's Controls, each track's controls on its own parameters.
 #include "LayoutTest.h"
@@ -10,7 +10,7 @@
 
 namespace {
 
-// No editor has shown these (v143's didn't either): the engine's three, shown only without a ROM; Scale Tune; the COSMs' second envelope, the first's velocity and key follow, their LFOs' fade and offset
+// No editor has shown these (v143's didn't either): the engine's three (v191: unread, kept for old sessions); Scale Tune; the COSMs' second envelope, the first's velocity and key follow, their LFOs' fade and offset
 bool hostOnly(const juce::String& id) {
     if (id == "pitchShift" || id == "timeStretch" || id == "formantShift" || id.startsWith("scaleTune")) return true;
     for (const char* env : { "itchEnv", "imeEnv", "ormantEnv" })

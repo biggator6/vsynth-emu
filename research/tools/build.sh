@@ -9,8 +9,6 @@ cc() { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 ${XT_STACK_INIT:+-ftrivial-
        "${HARNESS_SWITCHES[@]}" "$@" 2>&1 | grep -E " error"; return 0; }
 cd "$S" || exit 1
 FW=(XtFirmware.cpp $( [ -f XtFwMachine.cpp ] && echo XtFwMachine.cpp ))   # the routines and their machine (v175 on)
-# the legacy engine's source-filter model, and its formant analysis and root finder (v176 on)
-SFM=(SourceFilterModel.cpp $( [ -f DownsampledFormants.cpp ] && echo DownsampledFormants.cpp PolynomialRoots.cpp ))
 # V-Synth's files: patches, a wave's chunks, and the firmware's disk image (its own file from v177 on); the patch store's
 # layout and xt_files' checks of patches and of a wave's own chunks (their own files from v187 on)
 VF=(XtFiles.cpp XtWaveFile.cpp $( [ -f XtDiskImage.cpp ] && echo XtDiskImage.cpp )
@@ -21,7 +19,8 @@ SARP=($( [ -f XtSynthArp.cpp ] && echo XtSynthArp.cpp XtArpeggio.cpp XtArpeggioS
 # XtSynth's parts split out by job and the Multi Step Modulator in it (v193)
 SARP+=($( [ -f XtSynthMsm.cpp ] && echo XtSynthZones.cpp XtSynthNotes.cpp XtSynthUpdate.cpp XtSynthKnobs.cpp \
        XtSynthEnvKnobs.cpp XtSynthMsm.cpp XtMsm.cpp XtMsmTrack.cpp ))
-rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone,xt_fx,xt_files,xt_arp,xt_msm,engine_tests,rd}
+rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
+rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,classifier_test,rd}
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp Sh4Interp.cpp -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp Sh4Interp.cpp -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp Sh4Interp.cpp -o "$O/xt_lfo" &
@@ -50,11 +49,12 @@ ARP=(XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp XtArpeggioCheck.cpp 
 # the Multi Step Modulator (v192 on), with the patches' reads for the presets
 [ -f XtMsm.cpp ] && cc -DXT_MSM_MAIN XtMsm.cpp XtMsmTrack.cpp XtMsmPatch.cpp XtMsmCheck.cpp XtMsmCases.cpp "${VF[@]}" \
    "${FW[@]}" XtMultiBandPlayer.cpp XtSoloVoice.cpp XtSoloEncoder.cpp Sh4Interp.cpp -o "$O/xt_msm" &
-cc -DENGINE_TESTS_MAIN EngineTests.cpp VariphraseEngine.cpp PhaseVocoder.cpp "${SFM[@]}" \
-   XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlayer.cpp Sh4Interp.cpp "${FW[@]}" -o "$O/engine_tests" &
+# Auto's classifier on a voiced and a pure tone (v191: what the legacy engine's tests kept of it)
+CLS=$( [ -f ContentClassifier.cpp ] && [ -f ../Tests/ClassifierTest.cpp ] && echo classifier_test )
+[ -n "$CLS" ] && cc ../Tests/ClassifierTest.cpp ContentClassifier.cpp -o "$O/classifier_test" &
 cc -I. "$REPO/research/tools/rd.cpp" Sh4Interp.cpp -o "$O/rd" &
 wait
-for b in xt_osc xt_lfo xt_env xt_fw xt_enc xt_synth engine_tests rd \
+for b in xt_osc xt_lfo xt_env xt_fw xt_enc xt_synth $CLS rd \
          $( [ -f XtCosm.cpp ] && echo xt_cosm ) $( [ -f XtAnalog.cpp ] && echo xt_analog ) \
          $( [ -f XtFxChip.cpp ] && echo xt_fx ) $( [ -f XtFiles.cpp ] && echo xt_files ) \
          $( [ -f XtToneCheck.cpp ] && echo xt_tone ) $( [ -f XtArpeggio.cpp ] && echo xt_arp ) \

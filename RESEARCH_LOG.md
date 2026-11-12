@@ -3570,6 +3570,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 20, continued (2026-11-12) — v194: plant runs build one binary
+
+- The plant runs had grown to 2.8 minutes a plant, and v190's whole list to over 8 hours. A measurement showed where it went: linking. Every test binary links the whole plugin, about 20 s each, one after another, and every plant built all eight, though its run starts one. One binary takes 30 s from a touched source, eight take 173 s.
+- mutate_panel.py now builds only the binary a plant's kind runs, and the run's own binaries at its start and end. Nine plants, at least one for each binary, were all caught in 305 s with the clean runs, then 161 s for the closing rebuild. The whole list of 227 should take about two hours.
+- v192 and v193 are the Multi Step Modulator's, on its own branch, so this one is v194.
+
 ### Session 21, continued (2026-11-12) — v193: the Multi Step Modulator in the sound
 
 - v189 and v190 changed the same files, so v193 waited for them on master, merged them in and built on their splits. The kit's limits then shaped the rest: XtSynth.cpp and XtToneCheck.cpp could take no new line, so the parts the wiring touched moved out by job first, and a term was added only where a converter could take it without a function growing past the statement limit. `startVoice` and `mixBlock` couldn't change at all, so the note-on's pass became a function of its own in place, and `targets` keeps its eight parameters as a marked one-off.
@@ -3591,6 +3597,15 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Handing both sides the same settings meant an error in reading a patch couldn't show. So the presets give the firmware the patch's store and let its own pointing routine and getter read it, and give the port `xtMsmSettingsOf` it. The `patch-` plants are caught that way, and only that way.
 - Three plants missed, and each was an error the firmware's code can't reach: a guard against starting a running track, which only runs when every track is stopped, and the terms' running checks, whose sums are 0 anyway once every track's term is. They're kept as the firmware's, and the plants went to errors on the same lines that can show.
 - The kit's hooks refused the check's first shape: the same seven event methods on both sides (template-law), then the event kind switched on twice (dispatch-once). Each kind is now one table row with both sides' handling, which is what the check is about.
+
+### Session 20, continued (2026-11-12) — v191: the Algorithm menu and the legacy engine removed
+
+- The engine's file held one thing the plugin still uses: Auto's classifier, which picks an encode type for a wave on Auto. It moved to a file of its own as it stood. The house's checks then caught two old habits in it: a float cast to int before its clamp, and pi typed by hand. Fixing both changed nothing measurable: old and new classify the 34 test waves identically, down to the float bits.
+- The engine's tests had one check on the classifier. It became a test of its own, with a second case so it can fail both ways: the same pitch with and without energy in the 1–4 kHz band, read SOLO and LITE. Each side of the decision, planted, fails it.
+- Taking the engine out showed the plugin had been reporting the phase vocoder's 2048 samples of latency to hosts, though nothing played through it. It now reports none.
+- The Perform knobs had followed the engine without an image. With the engine gone they set the selected OSC's knobs either way; Time Stretch and Formant Shift stay as host parameters, unread, so old sessions load.
+- once-only refused the edit that took the menu out of PluginEditor.cpp: the stale, untracked tabdesign/ copy of the editor matched the code around it, and once-only judged every line an edit touched. The user chose the kit fix (KWB-158): once-only now refuses only a copy a write adds, and reads no untracked file older than HEAD. Installing it, code-shape refused twice. Once rightly: my new selftest cases had grown an already-too-long function. Once wrongly: it read a function head's three defaults as three statements. Both were fixed before the install.
+- The plants: 11 that v191's changes reach, all caught. One editor plant had to follow the chrome list's new wrap.
 
 ### Session 20, continued (2026-11-12) — v190: the arpeggio's plugin side
 

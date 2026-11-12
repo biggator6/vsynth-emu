@@ -1,5 +1,5 @@
-// SOLO grain player as a voice — see XtSoloVoice.h and the description in
-// VariphraseEngine.cpp (soloFirmwareResynthOffline).
+// SOLO grain player as a voice — see XtSoloVoice.h and research/HARDWARE_FIRMWARE.md
+// (pass 8, "SOLO bit for bit").
 #include "XtSoloVoice.h"
 #include "XtFloat.h"
 
