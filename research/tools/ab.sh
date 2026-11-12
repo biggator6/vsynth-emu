@@ -20,6 +20,7 @@ have() {
 synth() { (cd "$1" && cc XtSynth.cpp $(have XtSynthRom.cpp) \
            XtSoloEncoder.cpp XtSoloVoice.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
            $(have XtLinearPlayer.cpp XtLitePlayer.cpp XtCosm.cpp XtAnalog.cpp) XtFirmware.cpp $(have XtFwMachine.cpp) \
+           $(have XtSynthArp.cpp XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp XtTempoTicks.cpp) \
            Sh4Interp.cpp -o "$2"); }
 rm -f "$A/old" "$A/new"; synth "$A/src/plugin/Source" "$A/old"; synth "$REPO/plugin/Source" "$A/new"
 [ -x "$A/old" ] && [ -x "$A/new" ] || { echo "ab: build failed"; exit 1; }

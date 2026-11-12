@@ -13,6 +13,10 @@ PS = 'plugin/Source/PluginState.cpp'     # the session's state, from PluginProce
 XR = 'plugin/Source/XtSynthRom.cpp'      # the image the process plays from, its last path from PluginProcessor.cpp (v173)
 SW = 'plugin/Source/XtSwitches.h'        # the harnesses' research switches, none read by the plugin's builds (v174)
 FM = 'plugin/Source/XtFwMachine.cpp'     # the machine XtFirmware's routines run on, and how long a call may (v175)
+EN = 'plugin/Source/PluginEncodes.cpp'   # a wave's encode, from PluginProcessor.cpp (v185)
+CR, CW = 'plugin/Source/PluginControlsRead.cpp', 'plugin/Source/PluginControlsWrite.cpp'   # xtControls, setControls (v190)
+CC, O2 = 'plugin/Source/PluginCosmControls.cpp', 'plugin/Source/PluginOsc2Controls.cpp'   # their COSM and OSC 2 parts (v190)
+PO, PL = 'plugin/Source/PluginParamsOsc.cpp', 'plugin/Source/PluginEditorPlay.cpp'   # OSC parameters, the Play tab (v190)
 TEXT='row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };\n        '
 TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };\n        '
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
@@ -21,18 +25,18 @@ MUTS=[
  ('editor-vari-unplaced',EP,'        wave.head = { { &variBtn_, 60 }, { &playbackBox_, 110 } };\n','        wave.head = { { &playbackBox_, 110 } };\n','layout'),
  ('editor-vari-hide',EP,'(juce::Component*)&loopBtn_, (juce::Component*)&variBtn_,','(juce::Component*)&loopBtn_,','layout'),
  ('editor-vari-osc',EP,'variAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, id("vari"), variBtn_);','variAtt_       = std::make_unique<ButtonAtt>(processor_.apvts, "vari", variBtn_);','layout'),
- ('patch-vari-read',PP,'    c.vari         = apvts.getRawParameterValue(Params::kVari)->load() > 0.5f;','    c.vari         = true;','patch'),
- ('patch-vari2-read',PP,'        o.vari = apvts.getRawParameterValue(oscId(1, Params::kVari))->load() > 0.5f;','        o.vari = true;','patch'),
- ('patch-vari-write',PP,'    set(Params::kVari, c.vari ? 1 : 0);','    ;','patch'),
+ ('patch-vari-read',CR,'    c.vari         = apvts.getRawParameterValue(Params::kVari)->load() > 0.5f;','    c.vari         = true;','patch'),
+ ('patch-vari2-read',O2,'        o.vari = apvts.getRawParameterValue(oscId(1, Params::kVari))->load() > 0.5f;','        o.vari = true;','patch'),
+ ('patch-vari-write',CW,'    set(Params::kVari, c.vari ? 1 : 0);','    ;','patch'),
  ('editor-start-unplaced',EP,', lr(startLabel_, startSlider_) };',' };','layout'),
  ('editor-start-osc',EP,'startAtt_      = std::make_unique<SliderAtt>(processor_.apvts, id("startOffset"), startSlider_);','startAtt_      = std::make_unique<SliderAtt>(processor_.apvts, "startOffset", startSlider_);','layout'),
- ('lite-own',PP,'own = w.ownType == 0 || w.ownType == 1','own = w.ownType == 1','lite'),
- ('lite-choice',PP,'choice == 3 ? 5 : choice == 4 ? 0 : own','choice == 3 ? 5 : own','lite-pick'),
+ ('lite-own',EN,'own = w.ownType == 0 || w.ownType == 1','own = w.ownType == 1','lite'),
+ ('lite-choice',EN,'kTypeOfChoice[] = { 1, 3, 5, 0 };','kTypeOfChoice[] = { 1, 3, 5, 5 };','lite-pick'),
  ('lite-riff',PP,' || !std::memcmp(head + i, "vpsc", 4)) return true;',') return true;','lite'),
- ('patch-start-read',PP,'    c.startOffset  = knob(Params::kStartOffset);','    c.startOffset  = 0;','patch'),
- ('patch-start2-read',PP,'        o.startOffset = knob2(Params::kStartOffset);','        o.startOffset = 0;','patch'),
- ('patch-start-write',PP,'    set(Params::kStartOffset, (float)startOffsetParam(c.startOffset));','    ;','patch'),
- ('patch-start2-write',PP,'        set(oscId(1, Params::kStartOffset), (float)startOffsetParam(c.osc2.startOffset));','        ;','patch'),
+ ('patch-start-read',CR,'    c.startOffset  = knob(Params::kStartOffset);','    c.startOffset  = 0;','patch'),
+ ('patch-start2-read',O2,'        o.startOffset = knob2(Params::kStartOffset);','        o.startOffset = 0;','patch'),
+ ('patch-start-write',CW,'    set(Params::kStartOffset, (float)startOffsetParam(c.startOffset));','    ;','patch'),
+ ('patch-start2-write',CW,'        set(oscId(1, Params::kStartOffset), (float)startOffsetParam(c.osc2.startOffset));','        ;','patch'),
  ('editor-no-build',EP,'chrome { &buildLabel_, &algoLabel_,','chrome { &algoLabel_,','layout'),
  ('editor-build-unplaced',EP,'buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);',';','layout'),
  ('editor-build-narrow',EP,'buildLabel_.setBounds(16, Ui::headerH - 17, hdr.getRight() - 16, 13);','buildLabel_.setBounds(16, Ui::headerH - 17, 40, 13);','layout'),
@@ -45,7 +49,7 @@ MUTS=[
  ('editor-panel-never',EP,'fxPanel_->setVisible(tab_ == kEffectsTab);','fxPanel_->setVisible(false);','layout'),
  ('editor-page-stuck',EP,'pages_[i]->setVisible(i == tab_);','pages_[i]->setVisible(i == 0);','layout'),
  ('editor-no-row',EP,'for (int i : { 8, 9, 10, 11 }) level.rows.push_back(rowOfLevel(i));','for (int i : { 8, 9, 10 }) level.rows.push_back(rowOfLevel(i));','layout'),
- ('editor-no-card',EP,'p.add(tempo);',';','layout'),
+ ('editor-no-card',PL,'p.add(tempo);',';','layout'),
  ('editor-cosm-rows',EP,'addAll(tbLabels_, tbSliders_, kTbKnobs);',';','layout'),
  ('editor-row-gap',UP,'rowGap = 4','rowGap = -8','layout'),
  ('editor-cosm-rows-close',EP,'return area.withTrimmedTop(30 * r).withHeight(24);','return area.withTrimmedTop(20 * r).withHeight(24);','layout'),
@@ -150,9 +154,9 @@ MUTS=[
  ('no-clock',PE,'c.outsideClock(synth_.fxClockSix());',';','fx-host'),
  ('no-clock-source',PP,'c.set(0x41, synth_.fxClockSix() ? 1 : 0);',';','fx-host'),
  ('no-tempo',PP,'c.set(0x11d, synth_.fxPatchTempo());',';','fx-tempo'),
- ('send-swap',PP,'c.chorusSend   = knob(Params::kTvaChoSend);','c.chorusSend   = knob(Params::kTvaRevSend);','fx-bus'),
- ('assign-off',PP,'c.outputAssign = knob(Params::kOutputAssign);',';','fx-assign'),
- ('mode-off',PP,'c.parallel     = knob(Params::kOutputMode) != 0;',';','fx-mode'),
+ ('send-swap',CR,'c.chorusSend   = knob(Params::kTvaChoSend);','c.chorusSend   = knob(Params::kTvaRevSend);','fx-bus'),
+ ('assign-off',CR,'c.outputAssign = knob(Params::kOutputAssign);',';','fx-assign'),
+ ('mode-off',CR,'c.parallel     = knob(Params::kOutputMode) != 0;',';','fx-mode'),
  ('engine-level',PP,'buffer.applyGain(0.125f);',';','rom'),
  ('rom-not-beside',PP,'cand.add(juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile(kRomName).getFullPathName());',';','rom'),
  ('rom-order',PP,'cand.add(appDir().getChildFile(kRomName).getFullPathName());\n    cand.add(appSettings()->getValue(kRomKey));','cand.add(appSettings()->getValue(kRomKey));\n    cand.add(appDir().getChildFile(kRomName).getFullPathName());','rom'),
@@ -160,28 +164,28 @@ MUTS=[
  ('rom-not-kept',PP,'settings->setValue(kRomKey, file.getFullPathName());',';','rom'),
  ('rom-project-kept',PS,'        openRom(juce::File(rom));','        setRomFile(juce::File(rom));','rom'),
  ('rom-read-again',XR,'if (ready() && path == lastTaken_) return true;',';','rom'),
- ('patch-writer',PP,'set(Params::kOscCoarse, c.oscCoarse);','set(Params::kOscCoarse, c.oscFine);','patch'),
- ('patch-writer-osc2',PP,'set(oscId(1, Params::kOscPitch), o.oscPitch);','set(oscId(1, Params::kOscPitch), c.oscPitch);','patch'),
- ('patch-writer-kf',PP,'set(Params::kAnaPwKF, c.ana.pwKf * 10);','set(Params::kAnaPwKF, c.ana.pwKf);','patch'),
- ('patch-writer-mono',PP,'set(Params::kMonoPoly, c.mono ? 0 : 1);','set(Params::kMonoPoly, c.mono ? 1 : 0);','patch'),
- ('patch-writer-cosm2',PP,'set(cosmId(k, "Cutoff"), m.cutoff);','set(cosmId(0, "Cutoff"), m.cutoff);','patch'),
- ('patch-writer-velocity',PP,'set(oscId(k, kEnvs[e] + "VelSens"), v[e]->sens);',';','patch'),
- ('patch-reader-velocity',PP,'v[e]->timeKF = kf(Params::oscId(k, kEnvs[e] + "TimeKF"));',';','patch'),
- ('patch-scale-range',PP,'juce::String("Scale Tune ") + names[i], -100, 100, 0)','juce::String("Scale Tune ") + names[i], -64, 63, 0)','patch'),
+ ('patch-writer',CW,'set(Params::kOscCoarse, c.oscCoarse);','set(Params::kOscCoarse, c.oscFine);','patch'),
+ ('patch-writer-osc2',O2,'set(oscId(1, Params::kOscPitch), o.oscPitch);','set(oscId(1, Params::kOscPitch), c.oscPitch);','patch'),
+ ('patch-writer-kf',CW,'set(Params::kAnaPwKF, c.ana.pwKf * 10);','set(Params::kAnaPwKF, c.ana.pwKf);','patch'),
+ ('patch-writer-mono',CW,'set(Params::kMonoPoly, c.mono ? 0 : 1);','set(Params::kMonoPoly, c.mono ? 1 : 0);','patch'),
+ ('patch-writer-cosm2',CC,'set(cosmId(k, "Cutoff"), m.cutoff);','set(cosmId(0, "Cutoff"), m.cutoff);','patch'),
+ ('patch-writer-velocity',CW,'set(oscId(k, kEnvs[e] + "VelSens"), v[e]->sens);',';','patch'),
+ ('patch-reader-velocity',CR,'v[e]->timeKF = kf(Params::oscId(k, kEnvs[e] + "TimeKF"));',';','patch'),
+ ('patch-scale-range',PO,'juce::String("Scale Tune ") + names[i], -100, 100, 0)','juce::String("Scale Tune ") + names[i], -64, 63, 0)','patch'),
  ('patch-fx-params',PP,'if (!knob) { setFxParam(fx.id, fx.value); continue; }','if (!knob) continue;','patch'),
  ('patch-fx-knobs',PP,'if (auto* p = apvts.getParameter(knob)) p->setValueNotifyingHost(p->convertTo0to1((float)fx.value));',';','patch'),
  ('patch-wave-folder',PP,'file.getParentDirectory().getSiblingFile("Wave")','file.getParentDirectory().getChildFile("Wave")','patch'),
  ('patch-wave-number',PP,'xtPatchWaveNumber(store, zone, k);','xtPatchWaveNumber(store, zone, 0) + 1;','patch'),
  ('patch-wave-copy',PP,'f.getFileName().length() < best.getFileName().length()','f.getFileName().length() > best.getFileName().length()','patch'),
  ('patch-wave-settings',PP,'if (files[k].existsAsFile() && readVSynthWave(files[k], waves[k], &why)) { found[k] = true; xtWaveOntoControls(waves[k], o); }','if (files[k].existsAsFile() && readVSynthWave(files[k], waves[k], &why)) { found[k] = true; }','patch'),
- ('patch-wave-tuning',PP,'if (isOwn) xtWaveOntoEncoded(ownWave, *e);',';','patch'),
+ ('patch-wave-tuning',EN,'if (isOwn) xtWaveOntoEncoded(ownWave, *e);',';','patch'),
  ('patch-wave-left',PP,'else unloadWave(k);',';','patch'),
  ('patch-wave-note',PP,'else notes.add("no wave " + juce::String(number));',';','patch'),
  ('patch-encode-auto',PP,'p->setValueNotifyingHost(p->convertTo0to1(0.0f));   // Auto',';   // Auto','patch'),
  ('patch-restore-settings',PS,'loadFile(f, k, false);','loadFile(f, k);','patch'),
  ('patch-restore-name',PS,'patchName_ = apvts.state.getProperty("patchName").toString();',';','patch'),
- ('patch-loop-step',PP,'Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f)','Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f, 0.5f)','patch'),
- ('patch-tempo-step',PP,'Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.0001f)','Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.01f)','patch'),
+ ('patch-loop-step',PO,'Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f)','Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f, 0.5f)','patch'),
+ ('patch-tempo-step',PO,'Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.0001f)','Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.01f)','patch'),
  ('patch-folder-kept',PP,'settings->setValue(kPatchFolderKey, file.getParentDirectory().getFullPathName());',';','patch'),
  ('zones-store',PP,'apvts.state.setProperty("patchStore", zones > 1 ? juce::Base64::toBase64(store.data(), store.size()) : juce::String(), nullptr);',';','patch'),
  ('zones-restore',PS,'        loadZones(store, juce::File(apvts.state.getProperty("patchWaves").toString()), '
@@ -200,13 +204,13 @@ MUTS=[
   'cpu.stepLimit = 20000000000ull;','steps'),
  ('step-no-wave',FM,'auto M = std::make_unique<Machine>(rom, samples);',
   'auto M = std::make_unique<Machine>(rom);','switches'),
- ('patch-playback-read',PP,'    c.playbackMode = knob(Params::kPlaybackMode);','    c.playbackMode = 0;','patch'),
- ('patch-playback2-read',PP,'        o.playbackMode = knob2(Params::kPlaybackMode);','        o.playbackMode = 0;','patch'),
- ('patch-playback-write',PP,'    set(Params::kPlaybackMode, c.playbackMode);','    ;','patch'),
- ('patch-playback2-write',PP,'        set(oscId(1, Params::kPlaybackMode), o.playbackMode);','        ;','patch'),
- ('patch-own-events-osc',PP,'isOwn && type == own ? &ownWave.events : nullptr','nullptr','solo-own'),
+ ('patch-playback-read',CR,'    c.playbackMode = knob(Params::kPlaybackMode);','    c.playbackMode = 0;','patch'),
+ ('patch-playback2-read',O2,'        o.playbackMode = knob2(Params::kPlaybackMode);','        o.playbackMode = 0;','patch'),
+ ('patch-playback-write',CW,'    set(Params::kPlaybackMode, c.playbackMode);','    ;','patch'),
+ ('patch-playback2-write',O2,'        set(oscId(1, Params::kPlaybackMode), o.playbackMode);','        ;','patch'),
+ ('patch-own-events-osc',EN,'ownEvents ? &ownWave.events : nullptr,','nullptr,','solo-own'),
  ('patch-stored-zone',PP,'auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events, &w.vpdt);','auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events);','patch'),
- ('patch-stored-osc',PP,', isOwn && type == own ? &ownWave.vpdt : nullptr);',', nullptr);','stored'),
+ ('patch-stored-osc',EN,'ownEvents ? &ownWave.vpdt : nullptr);','nullptr);','stored'),
  ('patch-playback-vpno','plugin/Source/XtPatch.cpp',"    if (w.vpnoCount >= 0) { e.vpno = w.vpno; e.vpnoCount = w.vpnoCount; }   // its own list in place of the encode's\n",'','patch'),
  ('editor-playback-osc',EP,'    playbackAtt_   = std::make_unique<ComboAtt>(processor_.apvts, id("playbackMode"), playbackBox_);','    playbackAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "playbackMode", playbackBox_);','layout'),
  ('editor-playback-card',EP,'        wave.head = { { &variBtn_, 60 }, { &playbackBox_, 110 } };','        wave.head = { { &variBtn_, 60 } };','layout'),
@@ -225,6 +229,8 @@ ENV={
  'formants':{'_bin':'VSynthEmuFormantTest'},   # two legacy engines on one thread, and one reset (v176)
  'disk':{'_bin':'VSynthEmuDiskImageTest'},   # the firmware's disk image reader on damaged images (v177)
  'teardown':{'_bin':'VSynthEmuTeardownTest'},   # processors closed mid-encode, in the firmware and in Auto's classifier (v185)
+ 'arp':{'_bin':'VSynthEmuArpTest'},   # XtSynth's arpeggiator heard: its router, ticks and what it sends (v189)
+ 'arpplugin':{'_bin':'VSynthEmuArpPluginTest'},   # its parameters, a patch's, a session's, through the processor (v190)
  'patch':{'TEST_PATCH_APPLY':'1'},
  'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_term':'8','_mode':'auto'},   # encoded again on its own events: a terminator too short to reach its last event
  'stored':{'TEST_NOTE2':'64,30000','_file':'analysis/projects/Emu_test.prj/Wave/376 Synth014.wav','_mode':'auto'},
@@ -245,7 +251,8 @@ ENV={
 SDK=os.environ.get('SDK','/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk')
 def build():
     targets=['VSynthEmuTest','VSynthEmuRomTest','VSynthEmuSwitchTest','VSynthEmuStepTest',
-             'VSynthEmuFormantTest','VSynthEmuDiskImageTest','VSynthEmuTeardownTest']   # every binary a kind runs
+             'VSynthEmuFormantTest','VSynthEmuDiskImageTest','VSynthEmuTeardownTest',
+             'VSynthEmuArpTest','VSynthEmuArpPluginTest']   # every binary a kind runs
     r=subprocess.run(['cmake','--build','build/plugin','--target',*targets,'-j','10'],
                      capture_output=True,text=True,env=dict(os.environ,SDKROOT=SDK))
     return r.stdout if r.returncode==0 else 'failed: '+r.stderr[-300:]

@@ -920,7 +920,7 @@ void XtSynth::legatoTake(OscVoice& s, const OscVoice& from) {
 // sounding voice takes the note (0x894d4e00).  MONO otherwise: the part's
 // voices are truncated (0x894d4a80) and a new one starts, on the key's zone.  A legato note keeps the
 // sounding voices' zones (0x894d4e00 takes no zone).
-void XtSynth::noteOn(int note, float velocity) {
+void XtSynth::tgNoteOn(int note, float velocity) {
     pickUpSample();
     const int key = shiftKey(note), zone = xtZoneOf(zoneUpper, key);
     if (!canPlay(zone)) return;
@@ -1307,7 +1307,7 @@ void XtSynth::truncate(Voice& v) {
 // The part's note-off (0x894dbea0): the key state (0x894d63c0); a MONO part
 // whose sounding key was released while others are held takes the highest
 // of them (Legato on or off).  Then the keys' release for the notes on that key (0x894d4e60).
-void XtSynth::noteOff(int note, float velocity) {
+void XtSynth::tgNoteOff(int note, float velocity) {
     keys.release(note);
     const int r = keys.noteOff(note);
     if (ctl.mono && r >= 0)
@@ -1365,7 +1365,7 @@ void XtSynth::voiceOff(Voice& v) {
 }
 
 // The panic of the plugin and the check, not a message of the XT's: everything stops at once.
-void XtSynth::allNotesOff() {
+void XtSynth::tgAllNotesOff() {
     for (Voice& v : voice) v.active = false;
     keysCleared();
     hold = sost = 0;
@@ -1400,7 +1400,7 @@ void XtSynth::ccDefaults() {
 // runs (0x894d6f10; the table is built at 0x894d7400).  Nearly all of them are the plain handler,
 // 0x894d7760, an update of the part's notes (0x894d4fe0), whatever the number and whether or not the
 // value moved: the same pass as the bender's.  It is queued (0x894dc2c0), so it runs after the rest.
-void XtSynth::controller(int number, int value) {
+void XtSynth::tgController(int number, int value) {
     if (number < 0 || number > 127) return;
     const int x = std::clamp(value, 0, 127);
     if (number == 121 && x == 0) {                 // the channel's part of Reset All Controllers (0x89475200)
@@ -1634,7 +1634,7 @@ void XtSynth::clockFollow() {
 
 // An F8 (0x894712f0).  The object's ticks go on to the next 20, which is what makes it a clock (0x894d4210);
 // between F8s the ticks stop short of that (0x894710e0, +0x4a), so there is one clock to an F8.  Every sixth: the count.
-void XtSynth::clockIn() {
+void XtSynth::clockCount() {
     if (++clockSeen < 6) return;
     clockSeen = 0;
     clockSix = clockSince ? clockSince : 1;
@@ -1736,7 +1736,7 @@ void XtSynth::mixBlock(float* lr) {
         for (int n = clocksDue(); n > 0; --n) { clockTick(); clockAcc -= (uint64_t)clockPeriod() * 44100; }
         clockAcc += kClockPerBlock;
     }
-    clockMsAcc = (clockMsAcc + 32000) % 44100;
+    arpBlock();                                   // the arpeggio's ms, then the ms timer on (XtSynthArp.cpp)
     hostAt += hostStep();
     ++clockBlocks;
     // The control clock: the tone update runs between blocks every 441 frames, and

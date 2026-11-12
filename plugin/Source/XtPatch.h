@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "XtSynth.h"
+#include "XtArpeggioPatch.h"
 
 // `base` keeps what isn't a patch's: the system's assigns, Output Mode, Out Gain and Clock Source, the plugin's Pitch Shift, and the wave's own:
 // each OSC's Original Key, Original Tempo and loop.  A COSM's type's parameters are read; the other types' go back to the XT's defaults, as a

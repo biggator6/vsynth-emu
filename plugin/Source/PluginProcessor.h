@@ -7,6 +7,7 @@
 #include "XtSynth.h"
 #include "XtFiles.h"
 #include "XtFxControl.h"
+#include "PluginArp.h"
 #include <climits>
 #include <mutex>
 
@@ -84,6 +85,9 @@ public:
     juce::String getPatchNote() const { return patchNote_; }
     juce::File lastPatchFolder() const;
     XtSynth::Controls currentControls() const { return xtControls(); }
+    // The arpeggio's pattern (PluginArp.cpp, v190): a patch's, or a session's; any thread reads it, the message thread sets it
+    XtArpPattern arpPattern() const { return arpWords_.load(); }
+    void setArpPattern(const XtArpPattern& p);
 
     juce::String getLoadedFileName(int osc = 0) const  { return wave_[osc].name; }
     bool         hasFileLoaded(int osc = 0)    const   { return wave_[osc].loaded.load(); }
@@ -179,6 +183,36 @@ private:
     VSE::VariphraseParams engineParams() const;   // the legacy engine's, from the parameters
     XtSynth::Controls xtControls() const;
     void setControls(const XtSynth::Controls& c);
+    // The parameters' layout by part, in the order a host has always seen them (PluginParams*.cpp, v190)
+    using ParamList = std::vector<std::unique_ptr<juce::RangedAudioParameter>>;
+    using IntText = juce::AudioParameterIntAttributes;
+    using FloatText = juce::AudioParameterFloatAttributes;
+    static void addOscParams(ParamList& params, const FloatText& twoPlaces);
+    static void addCosmParams(ParamList& params, const IntText& noteValue);
+    static void addToneParams(ParamList& params, const IntText& noteValue, const IntText& curveName);
+    static void addOsc2Params(ParamList& params, const IntText& noteValue, const FloatText& twoPlaces,
+                              const IntText& curveName);
+    static void addModParams(ParamList& params);
+    // xtControls and setControls by part (PluginControlsRead.cpp, PluginControlsWrite.cpp, PluginCosmControls.cpp,
+    // PluginOsc2Controls.cpp, v190)
+    int knob(const juce::String& id) const;          // a parameter's value, rounded
+    int kf(const juce::String& id) const;            // a keyfollow's, to its step of 10
+    void readOscControls(XtSynth::Controls& c) const;
+    void readCosmControls(XtSynth::Controls& c) const;
+    void readToneControls(XtSynth::Controls& c) const;
+    void readOsc2Controls(XtSynth::Controls& c) const;
+    void readEnvVelocity(XtSynth::Controls& c) const;
+    void set(const juce::String& id, float v);       // as a host's automation would, and only if it has moved
+    void writeOscControls(const XtSynth::Controls& c);
+    void writeCosmControls(const XtSynth::Controls& c);
+    void writeToneControls(const XtSynth::Controls& c);
+    void writeOsc2Controls(const XtSynth::Controls& c);
+    // The arpeggio's ten settings, after every other parameter, and its pattern (PluginArp.cpp, v190)
+    static void addArpParams(ParamList& params);
+    void readArpControls(XtSynth::Controls& c) const;
+    void writeArpControls(const XtSynth::Controls& c);
+    void restoreArpPattern();                        // a session's, or the XT's default (setStateInformation)
+    ArpPatternWords arpWords_;
     void waveToParameters(const XtWaveFile& wave, int osc);
     void takeWave(const XtWaveFile& wave, const juce::File& file, int osc);
     void unloadWave(int osc);

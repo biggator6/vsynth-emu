@@ -151,6 +151,26 @@ void cosmOf(const Read& p, int k, Ctl::Cosm& c) {
     cosmEnvOf(p, 9 + 2 * k, c.envB);
     lfoOf(p, 0x3be + 8 * (2 + k), c.lfoWave, c.lfoRate, c.lfoOffset, c.lfoDelay, c.lfoFadeMode, c.lfoFade, c.lfoKeySync);
 }
+
+// The patch's common: its tempo, tuning, keys, portamento, bend and scale, the same whatever the zone.  Its arpeggio is
+// read beside these controls (xtWithPatchArp, XtArpeggioPatch.cpp, v189)
+void commonOf(const Read& p, Ctl& c) {
+    c.patchTempo = p(0x11d);
+    c.patchCoarse = p(0x110);
+    c.patchFine = p(0x111);
+    c.octave = p(0x112);
+    c.mono = p(0x113) == 0;
+    c.legato = p(0x114) != 0;
+    c.portamento = p(0x115) != 0;
+    c.portaMode = p(0x116);
+    c.portaType = p(0x117);
+    c.portaTime = p(0x118);
+    c.portaVeloSens = p(0x119);
+    c.bendUp = p(0x11e);
+    c.bendDown = p(0x11f);
+    c.scaleTune = p(0x134) != 0;
+    for (int i = 0; i < 12; ++i) c.scale[i] = p(0x136 + 2 * i);
+}
 } // namespace
 
 XtSynth::Controls xtPatchControls(const std::vector<uint8_t>& store, int zone, const XtSynth::Controls& base) {
@@ -167,12 +187,7 @@ XtSynth::Controls xtPatchControls(const std::vector<uint8_t>& store, int zone, c
     oscKeeping(1, c.osc2);
     cosmOf(p, 0, c.cosm[0]);
     cosmOf(p, 1, c.cosm[1]);
-    c.patchTempo = p(0x11d);
-    c.patchCoarse = p(0x110); c.patchFine = p(0x111); c.octave = p(0x112); c.mono = p(0x113) == 0; c.legato = p(0x114) != 0;
-    c.portamento = p(0x115) != 0; c.portaMode = p(0x116); c.portaType = p(0x117); c.portaTime = p(0x118); c.portaVeloSens = p(0x119);
-    c.bendUp = p(0x11e); c.bendDown = p(0x11f);
-    c.scaleTune = p(0x134) != 0;
-    for (int i = 0; i < 12; ++i) c.scale[i] = p(0x136 + 2 * i);
+    commonOf(p, c);
     c.structure = p(0x293);
     c.mod.on = p(0x294) != 0; c.mod.type = p(0x295); c.mod.level = p(0x296); c.mod.attack = p(0x297); c.mod.release = p(0x298);
     c.tvaOn = p(0x299) != 0;
@@ -231,7 +246,7 @@ std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int z
         const std::string osc = "OSC " + std::to_string(n + 1) + " ";
         if (p(0x2a4 + b) != 0 && p(0x2a5 + b) == kExternal) m.push_back(osc + "external input");
     }   // Playback Mode is done on every kind of wave (v156); a LITE wave's converter doesn't read it, on the XT either
-    if (p(0x42e)) m.push_back("arpeggio");
+    // The arpeggio is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190)
     if (p(0x48d)) m.push_back("Multi Step Modulator");
     return m;
 }

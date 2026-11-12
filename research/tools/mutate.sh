@@ -13,9 +13,10 @@
 # PORT=wavefile: XtWaveFile.cpp (a wave's chunks) under xt_files, as PORT=files; PORT=tonewave: XtWaveFile.cpp under xt_tone.
 # PORT=diskimage: XtDiskImage.cpp (the firmware's disk image, v177) under xt_files, as PORT=files.
 # PORT=patchstore: XtPatchStore.cpp (the patch store's layout and the descriptors' reads, v187) under xt_files, as
-# PORT=files; PORT=tonestore: XtPatchStore.cpp under xt_tone.
+# PORT=files; PORT=tonestore: XtPatchStore.cpp under xt_tone; PORT=tonearp: XtSynthArp.cpp under xt_tone (v189).
 # PORT=arp: XtArpeggio.cpp (the arpeggiator's keys and settings, v188), PORT=arpstep: XtArpeggioStep.cpp (its timer and
-# step), PORT=arpmotif: XtArpeggioMotifs.cpp (its motifs), under xt_arp; [cases] its random cases, after the presets.
+# step), PORT=arpmotif: XtArpeggioMotifs.cpp (its motifs), PORT=ticks: XtTempoTicks.cpp (the tempo ticks it steps on,
+# v189), under xt_arp; [cases] its random cases, after the presets.
 # PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
 source "$(dirname "$0")/env.sh"
@@ -42,6 +43,7 @@ tonefile() {
         tonefiles) echo XtFiles.cpp ;;
         tonewave) echo XtWaveFile.cpp ;;
         tonestore) echo XtPatchStore.cpp ;;
+        tonearp) echo XtSynthArp.cpp ;;
     esac
 }
 # A port whose check is a harness of its own with the patches' reads (xt_arp, xt_msm): its files and those reads, all but
@@ -72,7 +74,7 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
     PARTS=(XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtLinearPlayer XtLitePlayer XtMultiBandPlayer XtEnvelope XtLfo
            XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp XtFiles XtWaveFile XtDiskImage XtPatchStore
-           XtPatch XtSynthRom)
+           XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue
         [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] || "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_TONE_MAIN -DXT_TONE_CHECK -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
@@ -92,13 +94,15 @@ elif [ "$PORT" = fxc ]; then       # XtFxControl against its checks in xt_fx; [c
     [ "$OBJ/Sh4Interp.o" -nt "$S/Sh4Interp.cpp" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -c "$S/Sh4Interp.cpp" -o "$OBJ/Sh4Interp.$$.o" && mv "$OBJ/Sh4Interp.$$.o" "$OBJ/Sh4Interp.o"; }
     [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxChip.cpp" ] && [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxControl.h" ] && [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxChip.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_FX_MAIN "${EXTRA[@]}" -I"$S" -c "$S/XtFxChip.cpp" -o "$OBJ/XtFxChip_main.$$.o" && mv "$OBJ/XtFxChip_main.$$.o" "$OBJ/XtFxChip_main.o"; }
     L=("$OBJ/Sh4Interp.o" "$OBJ/XtFxChip_main.o")
-elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
+elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
     case "$PORT" in
+        ticks) F=XtTempoTicks.cpp ;;
         arpstep) F=XtArpeggioStep.cpp ;;
         arpmotif) F=XtArpeggioMotifs.cpp ;;
         *) F=XtArpeggio.cpp ;;
     esac
-    harnessParts XT_ARP_MAIN arp_obj XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases
+    harnessParts XT_ARP_MAIN arp_obj XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases \
+                 XtTempoTicks XtTempoTicksCheck XtArpeggioPatch
 elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     # The Multi Step Modulator against xt_msm: XtMsm.cpp, with PORT=msmtrack XtMsmTrack.cpp, with PORT=msmpatch
     # XtMsmPatch.cpp; [cases] its random cases, SEED its seed (default 2024), XT_MSM_STOP its first case that differs

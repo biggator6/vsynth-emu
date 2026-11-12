@@ -18,7 +18,7 @@ The plugin's user interface follows this design from v144 on, by the user's deci
 | LFOs | LFO 1 or 2, by the OSC · Amp LFO (LFO 5) |
 | COSM | COSM 1/2, On, Type · the type's own rows · LFO 3 or 4 · MOD · Structure |
 | Amp & Pan | Patch level · Velocity · Pan |
-| Play | Portamento · Keys · Tune · Tempo |
+| Play | Portamento · Keys · Arpeggio (On and Hold on its title line; Motif, Octaves, Velocity, Duration) · Tune · Tempo · Arpeggio pattern (Grid, End point, Shuffle and its Resolution; its title says when the pattern has no step to play) |
 | Matrix | Matrix, one Control at a time · Controller assign |
 | Effects | MFX, Chorus, Reverb, System buttons · the block's card, or Tone and System on the System page · a scrolling list of the type's parameters, or the system's EQ |
 
@@ -59,7 +59,7 @@ A page doesn't scroll, so cards must fit: at the smallest size a page is 466 hig
 
 ## Not shown anywhere yet
 
-92 of the 631 parameters have no control. Only a host can reach them (`hostOnly` in `PluginTest.cpp`):
+92 of the 647 parameters have no control (v190's ten for the arpeggio all have one). Only a host can reach them (`hostOnly` in `PluginTest.cpp`):
 
 - Scale Tune (13).
 - The COSMs' Envelope B, and Envelope A's velocity and key follow (each COSM: 10 and 6).

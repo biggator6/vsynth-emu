@@ -183,10 +183,7 @@ VSynthEmuEditor::VSynthEmuEditor(VSynthEmuProcessor& p)
                               &patchTempoSlider_, &tripSlider_, &origTempoSlider_,
                               &cosmCutSlider_, &cosmResoSlider_, &cosmKfSlider_, &clfoRateSlider_, &cosmCutOwnSlider_,
                               &cosmResoOwnSlider_, &modLevelSlider_, &modAttackSlider_, &modReleaseSlider_ }) {
-        sl->setColour(juce::Slider::textBoxTextColourId, juce::Colours::lightgrey);
-        sl->setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(0xFF0D0D1A));
-        sl->setColour(juce::Slider::trackColourId, juce::Colour(0xFF00BFA5));
-        sl->setTextBoxStyle(sl->getTextBoxPosition(), false, sl == &keySlider_ ? 56 : sl == &startSlider_ ? 66 : 44, 20);
+        Ui::styleValueSlider(*sl, sl == &keySlider_ ? 56 : sl == &startSlider_ ? 66 : 44);
         addAndMakeVisible(*sl);
     }
     keyAtt_     = std::make_unique<SliderAtt>(processor_.apvts, "rootKey",     keySlider_);
@@ -1261,8 +1258,6 @@ void VSynthEmuEditor::buildLayout() {
     using Item = Page::Item;
     using Row = Page::Row;
     using Card = Page::Card;
-    const auto lr = [](juce::Component& l, juce::Component& c, int w = 0) { return Row{ { Item{ &l, Ui::labelW }, Item{ &c, w } } }; };
-    const auto rowOfLevel = [this, lr](int i) { return lr(levelLabels_[i], levelSliders_[i]); };
     const auto pcm = [this] { return oscTypeBox_.getSelectedItemIndex() != 0; };
 
     // Friendlier names where the old rows were too narrow for them
@@ -1486,27 +1481,7 @@ void VSynthEmuEditor::buildLayout() {
         p.add(pan);
     }
 
-    // ── Play: portamento, key assign, tuning and tempo ──
-    {
-        Page& p = *pages_[5];
-        Card porta { "Portamento" };
-        porta.head = { { &portaBtn_, 54 } };
-        porta.rows = { lr(*newLabel("Mode"), portaModeBox_), lr(*newLabel("Type"), portaTypeBox_),
-                       lr(portaTimeLabel_, portaTimeSlider_), lr(portaSensLabel_, portaSensSlider_) };
-        p.add(porta);
-        Card keys { "Keys" };
-        keys.head = { { &legatoBtn_, 74 } };
-        keys.rows = { lr(*newLabel("Voices"), *monoSeg_, 140), lr(octLabel_, octSlider_) };
-        p.add(keys);
-        Card tune { "Tune" };
-        tune.col = 1;
-        for (int i : { 4, 5, 6, 7 }) tune.rows.push_back(rowOfLevel(i));
-        p.add(tune);
-        Card tempo { "Tempo" };
-        tempo.col = 1;
-        tempo.rows = { lr(clockLabel_, clockBox_), lr(patchTempoLabel_, patchTempoSlider_), lr(tripLabel_, tripSlider_) };
-        p.add(tempo);
-    }
+    buildPlayPage();   // PluginEditorPlay.cpp (v190)
 
     // ── Matrix: one Control at a time, and the controller assigns ──
     {

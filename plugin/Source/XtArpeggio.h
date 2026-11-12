@@ -19,6 +19,7 @@ struct XtArpSettings {
     int endPoint = 31;        // 0x437, +0xb2: 0…31, the pattern's last step
     int octave = 0;           // 0x435, +0xb3: −3…+3
     int keyVelocity = 0;      // 0x434, +0xb4: 0 REAL, 1…127
+    bool operator==(const XtArpSettings&) const = default;
 };
 
 // The pattern as 0x8930ca30 lays it out from the patch (0x89880f83): a line's State and Note/CC, and each step's cell
@@ -26,6 +27,7 @@ struct XtArpPattern {
     static constexpr int kLines = 16, kSteps = 32;
     uint8_t line[kLines] = {};          // bit 7 CTRL, else NOTE; the low 7 bits the note or controller (a controller at most 95)
     uint8_t cell[kSteps][kLines] = {};  // 0 REST, 1 TIE, 2…128 velocity (or a controller's value + 1)
+    bool operator==(const XtArpPattern&) const = default;
 };
 
 // What it sends: a MIDI message on its channel (0x90 note-on, 0x80 note-off at velocity 64, 0xb0 controller)

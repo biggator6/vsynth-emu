@@ -63,4 +63,11 @@ private:
     void link(const char* name, uint32_t off, uint32_t nodes, long want);         // a pointer, as the node it points at
     void differs(const char* what, long fwValue, long portValue);
 };
+
+// The tempo ticks the arpeggio steps on: XtTempoTicks against the clock object's routines (XtTempoTicksCheck.cpp)
+struct XtTicksTally {
+    long cases = 0, ms = 0, values = 0, different = 0;
+    bool failed = false;                           // a routine faulted or ran out of steps
+};
+XtTicksTally xtTempoTicksCheck(const std::string& rom, long cases, unsigned seed, bool first);
 #endif
