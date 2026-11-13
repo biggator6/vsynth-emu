@@ -47,8 +47,6 @@ constexpr uint32_t kLfoQ = kScratch + 0x600, kLfoC = kScratch + 0x700;
 constexpr uint32_t kBuf = kScratch + 0x800, kBufSamples = 64, kPast = 3;   // 32 frames L/R, and what lies after them
 constexpr uint32_t kBuffers = kScratch + 0x20000, kBufferStride = 0x4000, kBufferCount = 4;
 constexpr int kNoteCases = 100, kBlocks = 40;
-// [FW] the levels xt_cosm plays a block at (its stereo section): the XT's units, int16 × 65536 up to near full scale
-constexpr float kLevels[] = {30000.0f, 1.0e7f, 1.0e8f, 6.0e8f, 2.1e9f, 1.0f};
 
 // An input block as the dispatcher fills it: COSM flag, key, the type's parameters (each in its descriptor's range, as a
 // patch can hold it: past it a DSP reads its tables past their end) and two velocities
@@ -144,7 +142,7 @@ bool makeBlock(Twin& t, Rng& r, size_t k) {
 // A block's signal in both: 32 frames, L and R each at one of the levels, and what lies after them (the Side Band
 // Filters' follower reads on)
 void writeSignal(Twin& t, Rng& r) {
-    const float left = kLevels[r.next() % std::size(kLevels)], right = kLevels[r.next() % std::size(kLevels)];
+    const float left = pickLevel(r), right = pickLevel(r);
     std::array<float, kBufSamples + kPast> x{};
     for (size_t i = 0; i < x.size(); ++i) {
         const float level = i % 2 == 0 && i < kBufSamples ? left : right;

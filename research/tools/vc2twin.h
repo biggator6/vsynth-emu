@@ -95,6 +95,10 @@ struct Rng {
     float in(float lo, float hi) { return lo + (hi - lo) * (float)next() / 65535.0f; }
 };
 
+// [FW] one of the levels xt_cosm plays a block at (its stereo section): the XT's units, int16 × 65536 up to near full
+// scale, and 1
+float pickLevel(Rng& r);
+
 // A block's side-by-side run as vc2run calls it (`vc2run <rom.4> <name> <rom.2>`): the usage checked, the port's tables
 // read from rom.2, the twin made, then `body`, which says how many of its cases differed (−1 on a fault)
 int twinRun(Machine& m, int argc, char** argv, bool (*loadTables)(const char*), int (*body)(Twin&));

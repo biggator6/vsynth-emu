@@ -22,8 +22,8 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   2026-11-13** (VC2_VOCAL_DESIGNER.md, "The V-Synth's tables and code in rom.4").
 - 1b. Each block's firmware routine in rom.2 run beside its rom.4 counterpart on the same inputs, by its port's harness
   pointed at rom.4: envelopes, LFOs, pitch, the TVA, the OSC converters, COSM, the analog OSC, the band and SOLO players, key
-  assign. Done when each block is "equal" or "differs, here". **In progress** (VC2_VOCAL_DESIGNER.md, "The V-Synth's routines
-  in rom.4, run"): the pairs by code shape for every routine the ports name (`codepairs.py`); the LFO and the envelope with
+  assign. Done when each block is "equal" or "differs, here". **Done 2026-11-13** (VC2_VOCAL_DESIGNER.md, "The V-Synth's
+  routines in rom.4, run"): the pairs by code shape for every routine the ports name (`codepairs.py`); the LFO and the envelope with
   its converters run and equal, the ports equal to rom.4 (`vc2run … lfo`, `env`); COSM's note-on, update, new block and
   DSP routines, mono and stereo, equal for 15 of 16 types (`vc2run … cosm`, each image's routines from its own tables by
   block code), the Comb differs (its note-on case moved out and reads the block otherwise),
@@ -38,8 +38,10 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   LITE's player equal walking forward (`vc2run … lite`), and walking backward once rom.2's six backward reads are made
   rom.4's (the VC-2 reads backward the right way up, the V-Synth inverted); Vari off rewritten (no walk, no beat factor, its
   mode meaning otherwise: ported from rom.4, not run). Not run: kind 1's mode 1, the period-jump player, the Comb's DSP (rom.4
-  has one Comb routine for mono and stereo), COSM codes 10, 11 and 17 (no converter writes them). Left in 1b: the TVA
-  (the patch TVA's block and the frame on the bus). The wiring (what reads parameters by ID, COSM's
+  has one Comb routine for mono and stereo), COSM codes 10, 11 and 17 (no converter writes them); the TVA's render the
+  V-Synth's gains onto one stereo pair (`vc2run … tva`: equal once rom.2's 1/32.5 is rom.4's, a unit up, and rom.4's
+  shortened step, which it keeps, is set aside), with no eight buses, sends or glide, its note-on, update, new block,
+  truncated path and converter rewritten; the end test equal. The wiring (what reads parameters by ID, COSM's
   converters) differs by construction: it is ported from rom.4, not shared, and the Comb and the portamento with it.
 - 1c. Still to map: the pitch tracker (the routines that write `0x899d9bd0`); the VOCODER OSC's IDs (0x354…0x383) into the
   voice's fields; kind 6's mode and where its pitch comes from (Auto Note, Modulator Key Mode, Split Point); the part mixer's

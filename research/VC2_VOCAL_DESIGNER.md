@@ -60,14 +60,14 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   each first is: an object's field map read from the code ("The VariPhrase players and key assign in rom.4").
   `romfile.option` runs a tool's `--option`s and `romfile.images` reads a two-image tool's arguments (codepairs.py's and
   codealign.py's).
-- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`, `osc`, `analog`, `band`, `solo`, `lite`): a block's rom.2 routines
-  and their rom.4 pairs on two interpreters, its object compared after every call, and the port held beside rom.4's where
+- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`, `osc`, `analog`, `band`, `solo`, `lite`, `tva`): a block's rom.2
+  routines and their rom.4 pairs on two interpreters, its object compared after every call, and the port held beside rom.4's where
   one is linked (`vc2twin.*`, a run per block, `vc2twin<block>.cpp`; `lfo` and `env` link their ports from plugin/Source,
   the rest none; `band`, `solo` and `lite` share `vc2twinplay.*`, and `band` and `solo` link XtFirmware for rom.2's
   encoders and band load). An object rom.4 lays out otherwise is copied and compared by segments (`Twin::copyMapped`,
   `differsMapped`); every call starts both machines' FPU registers at 0. Fails on any difference: `cosm` does, at the Comb
-  ("COSM in rom.4"), `osc` at the pitch ramp ("The OSC block in rom.4"), `solo` under Robot Voice, and `lite` walking
-  backward.
+  ("COSM in rom.4"), `osc` at the pitch ramp ("The OSC block in rom.4"), `solo` under Robot Voice, `lite` walking
+  backward, and `tva` at its ramp ("The TVA in rom.4").
 
 ## The V-Synth's tables and code in rom.4 (2026-11-13, the VC-2 mode's step 1a)
 
@@ -146,7 +146,8 @@ COSM's voice side is too for 15 of its 16 types (below: note-on, update, new blo
 and key state are, its wiring and portamento are not; the analog OSC's waveforms are, for the 11 the VC-2 has (no SUPER-SAW,
 no FEEDBACK-OSC), its note-on, install, update and converter are not; BACKING's, ENSEMBLE's and SOLO's players are, given
 rom.4's object layout, but for SOLO under Robot Voice; LITE's is walking forward, and walking backward but for its read the
-right way up; key assign is; Vari off is not.** Not run: Vari off (rewritten; read from the code), kind 1's mode 1, the
+right way up; key assign is; Vari off is not; the TVA's render is the V-Synth's gains on one stereo pair, with two changes
+in its ramp, and no buses, sends or glide.** Not run: Vari off (rewritten; read from the code), kind 1's mode 1, the
 period-jump player (type 8).
 
 ### COSM in rom.4 (2026-11-13)
@@ -446,6 +447,61 @@ rom.4 calls it from two more places (`0x89390c9c`, `0x89391de8`) rom.2 has not.
 as they stand, given rom.4's object layout; SOLO under Robot Voice is not; LITE's is, with its backward read the right way
 up (six instructions; for the port, a switch in `XtLitePlayer`); key assign is the V-Synth's; Vari off is the VC-2's
 own.**
+
+### The TVA in rom.4 (2026-11-13)
+
+**Pairs.** Of the patch TVA's routines (HARDWARE_FIRMWARE.md, "The patch TVA's level and pan") only the render pairs by
+shape: `0x894f5720` → `0x893b2870`, at 0x142eb0. The converter (`0x894ea380`, `0x894eab40`) and its helpers (`0x894ea990`,
+`0x894eaa90`, `0x894eb170`, `0x894eb260`, the controllers' copy `0x894e9fe0`) have no pair by shape: wiring, as the other
+converters. The object's routines don't line up by size (rom.2's 0x600, 0x500 and 0x170 bytes from `0x894f4f70`, rom.4's
+0xe0, 0x2b0, 0xc10 and 0x150 from `0x893b2020`), so each was scored by field shape (`codealign.py --fields`' masking, as
+difflib's ratio) at every place in rom.4's 0x893b2000…0x893b3300: the end test `0x894f54b0` → `0x893b2560` and the new
+block's caller `0x894f5de0` → `0x893b32d0` at 1.000; the update `0x894f5360` at 0.72 at best, the new block `0x894f5310`
+0.45, the truncated-tone dispatcher `0x894f5570` 0.50 and the note-on `0x894f50e0` 0.35: rewritten. The end test's offsets
+are 0x10 further in rom.4 (+0x40, +0x68, +0x6c, +0x94 at +0x50, +0x78, +0x7c, +0xa4): **rom.4's TVA object holds rom.2's
+words 0x10 further on.**
+
+**rom.2's render is in rom.4, and nothing calls it.** No `bsr` reaches `0x893b2870` and no word in rom.4 holds its address;
+its pool (32, 1/32.5, 0.0009375) is the only place rom.4 holds the bus levels' glide step. rom.4's voice routines
+(`0x893b3f80`, `0x893b4060`, `0x893b4140`, `0x893b4220`) call `0x893b2640` instead, rom.4's own render:
+
+- With +0x50 and +0x58 clear (rom.2's +0x40, +0x48: no truncation), it ramps the two gains (+0x78, +0x7c) toward their
+  targets (+0x70, +0x74) by their steps (+0x68, +0x6c), a step that would pass the target in the block shortened to
+  (target − gain)·1/32.5 as rom.2's is, and adds the signal × the gain into **one stereo pair, 8 bytes a frame**. rom.2's
+  adds it into eight buses (MAIN, the Reverb and Chorus sends, MULTI, DIR) through levels that glide 3% a block. **So the
+  VC-2's TVA has no Output Assign pairs, no sends and no bus glide: one pair a voice.** Where its pan goes is not read
+  (rom.2's is the bus levels' pan law; rom.4's would have to be in the gains, which its own update forms).
+- Truncated, it fades by a global step (`0x8993eb08`) and at the end sets +0x54 and calls the OS (`0x89301830` with
+  `0x8994fec8` and 0x1000). Not run.
+
+**Run (`vc2run <rom.4> tva <rom.2>`, `vc2twintva.cpp`; no port linked: xt_tone holds XtSynth's TVA to rom.2;
+`build/tools/vc2/tva_run.txt`).** rom.2's render with its MAIN pair's levels at 1 (the block's +0x20, +0x24 and the gliding
++0x70, +0x74), where it is the gains alone, beside rom.4's live render, each object holding the same state (rom.4's 0x10
+further on): targets and gains within ±1, a quarter of them at rest near 0, steps toward the targets, the envelope released
+or not. 2000 cases of 40 blocks, the signal at one of xt_cosm's levels added into a pair the other voices have filled,
+the targets and steps moved every tenth block as an update moves them, then each image's end test; the pair, the targets and
+gains and the end test's answer compared after each:
+
+| Pass | Render | End test |
+|---|---|---|
+| As the images are | 46,395 of 80,000 blocks different, the gains at most 1.3e−5 apart | 0 of 80,000 |
+| rom.2's 1/32.5 made rom.4's (`0x894f5844`: 0x3cfc0fc0, a unit low; rom.4's `0x893b2844` 0x3cfc0fc1, to nearest) | 6,874 different | 0 |
+| That, and rom.4's steps set to rom.2's before each block | **0 different** | 0 |
+
+The second difference: rom.4's render writes a shortened step back into the object, where rom.2's keeps it in a register
+and shortens afresh from the stored step each block. Near a target a stale step can then point the wrong way, and under
+the SH-4's rounding to zero a step under half a unit of the gain still moves it a whole unit toward zero: rom.4's gain
+creeps away from its target by a unit a sample (2.4e−7 a block at a gain of 0.097) until the next update sets the step.
+The end test's answers are the same throughout (13,938 "ended" in each pass).
+
+Seen red (200 cases a pass, the third pass clean without them): the object 0x14 further on (9,317 of 16,000 calls), a bit
+of rom.4's gain flipped at the 21st block (2,730), rom.4's dead copy of the render in place of its live one (9,703), the
+envelope's state changed in rom.4 alone (2,744).
+
+**So the VC-2's TVA renders the V-Synth's gains onto one stereo pair, with its last-step constant rounded to nearest and
+its shortened step kept; its eight buses, sends and glide are not there, and its note-on, update, new block, truncated
+path and converter are its own.** For the port: `XtSynth`'s TVA gains serve it given those two changes; its frame does
+not.
 
 ## rom.4 run in the interpreter (2026-11-12, fourth pass)
 

@@ -119,6 +119,11 @@ void Twin::sayDiffers(uint32_t a, long at) {
     std::printf("the images' objects differ at +%#lx (rom.2 %08x, rom.4 %08x); ", at, vsynth.rd32(w), vc2.cpu.rd32(w));
 }
 
+float pickLevel(Rng& r) {
+    constexpr float kLevels[] = {30000.0f, 1.0e7f, 1.0e8f, 6.0e8f, 2.1e9f, 1.0f};
+    return kLevels[r.next() % std::size(kLevels)];
+}
+
 void addCount(const char* label, const char* unit, const Twin::Returns& part, Twin::Returns& whole) {
     std::printf("%s: %ld %s, %ld different\n", label, part.cases, unit, part.differ);
     whole.cases += part.cases;
