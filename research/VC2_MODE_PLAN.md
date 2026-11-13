@@ -51,6 +51,10 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   arpeggio sections placed, the vocoder block over the corpus (the Modulator Key Mode and Auto Note disagreements settled:
   0–1 both), and no factory patch on the VOCODER OSC (PCM and EXT IN carriers in the first two tone blocks). Left of it: the
   second descriptor bank (MFX, Chorus, Reverb, COSMs) and what the eight tone blocks are against sixteen envelope blocks.
+  **The pitch tracker, 2026-11-13:** its routines found (the module `0x893edca0…0x893ef400`) and run on known signals
+  (`vc2run … track`; VC2_VOCAL_DESIGNER.md, "The pitch tracker, run"): mode 0 is the only one selected, reaching 65.4 Hz to
+  1480 Hz from its start, holding the last pitch through silence and noise, following an octave in 20–24 ms. Left of it:
+  its analysis routines, read, for the port (step 3.6).
 - Second sources: the V-Card owner's manual (names and meanings) and the 64 factory patches (the corpus).
 
 ### 2. Shared plumbing (plugin/Source)

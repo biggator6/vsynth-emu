@@ -31,5 +31,6 @@ int solo(Machine& m, int argc, char** argv);
 int lite(Machine& m, int argc, char** argv);
 int tva(Machine& m, int argc, char** argv);
 int patches(Machine& m, int argc, char** argv);
+int track(Machine& m, int argc, char** argv);
 
 } // namespace vc2

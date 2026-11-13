@@ -38,10 +38,11 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
 - `diskls.py [filter]`, `diskls.py get <path> <out>`: the disk image's FAT16 files (`$DISK` for another image).
 - `likeat.py <A> <addr> <n> <B>`: code in B shaped like A's at addr, with what moves when code moves masked out.
 - `vc2run <rom.4> <run>` (C++, build line at the top of `vc2run.cpp`; run through `.claude/tools/buildq.mjs`): rom.4's
-  routines in `Sh4Interp`, on `vc2rom.*`'s map; runs `boot`, `warp`, `ratio`, `hold`, `growl`, `kind6`, one file each
-  ("rom.4 run in the interpreter"). `warp check` and `growl` hold a model of a routine (`vc2warplaw.cpp`, `vc2growllaw.cpp`)
-  to the firmware bit for bit, and fail when any word differs; `ratio` fails past 2 ulp from powf; `kind6` fails when an
-  output's period is more than a sample from the reading's.
+  routines in `Sh4Interp`, on `vc2rom.*`'s map; runs `boot`, `warp`, `ratio`, `hold`, `growl`, `kind6`, `track`, one file
+  each ("rom.4 run in the interpreter"). `warp check` and `growl` hold a model of a routine (`vc2warplaw.cpp`,
+  `vc2growllaw.cpp`) to the firmware bit for bit, and fail when any word differs; `ratio` fails past 2 ulp from powf; `kind6`
+  fails when an output's period is more than a sample from the reading's; `track` (`vc2track.cpp`) measures the pitch tracker
+  against no model and fails only on a fault ("The pitch tracker, run").
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -599,8 +600,10 @@ Kind 6 (written in the EXT IN path; render `0x893ec730(voice + 0xafc, out)`) is 
 the mic:
 
 - the block mixer writes each block of the mic into a 4096-sample ring (`0x893ec820(input, 32)`: `0x8a0f31d0`, write index
-  `0x8a0f31cc`) and the pitch tracker's period for that block (`0x893ee010`, `0x899d9bd0`, in samples; 551.25, 80 Hz, at the
-  tracker's init) into a 128-block history (`0x8a0f71d4`, which `0x893ec7d0` resets to 44100/440);
+  `0x8a0f31cc`) and the pitch tracker's period for that block (`0x893ee010`, `0x899d9bd0`, in samples; ~~551.25, 80 Hz, at the
+  tracker's init~~, withdrawn 2026-11-13: run, it is 0 after the init table's setters and 220.5, 200 Hz, after the tracker's
+  reset, which selects mode 0 and nothing else; 551.25 is mode 1's start, which nothing selects: "The pitch tracker, run")
+  into a 128-block history (`0x8a0f71d4`, which `0x893ec7d0` resets to 44100/440);
 - a voice starts 512 samples behind the write point (`0x893ec8d0`, which sets the flag `0x8a0f73d4` the render needs; a mode
   change, `0x893ec890`, clears it). An epoch marker steps through the ring by the period recorded for the block it is in. Every
   T_out samples a grain starts at the latest epoch, two heads in turn, each read with linear interpolation at a rate (+0x64, from
@@ -628,6 +631,48 @@ parameter selects the mode (`0x893ec890` and the voice's start have no pool refe
 yet found, and the mode word's .data value, 2, is one `0x893ec890` never writes), and where the voice's P comes from (the
 keyboard's note, Auto Note). A pulse train in can leave grains empty: the epochs are period-spaced from where the voice started,
 not placed on pulses (the run first used one and got silence at 300 samples).
+
+### The pitch tracker, run (`track`) (2026-11-13, the VC-2 mode's step 1c)
+
+Found by what loads its period, `0x899d9bd0`: a module from `0x893edca0` to `0x893ef400`. Its two setters are in the init
+table (`0x898c60a8`): `0x893edf90` (44100/440 at `0x899d9b70`, and the two objects at `0x899d9ae8` and `0x899d9b2c` built by
+`0x893efc30`) and `0x893ef240` (the tables at `0x899d9b78…0x899d9b9c`, and 881 at `0x899d9ba0`, the length the block entry
+counts its input to). The reset, `0x893ee040` (called by the glue at `0x893b1682`, beside the mic ring's `0x893ec7d0`), clears
+the state and calls the mode setter `0x893ee100(mode)`. Its four modes each set two frequencies as 2πf/44100 (`0x899d9bc8` and
+`0x899d9cb8`, `0x899d9bcc` and `0x899d9cb4`; mode 0 60 and 400 Hz, 1 20 and 100, 2 100 and 300, 3 200 and 800), a start period
+(`0x899d9bd0`, `0x899d9bd4`: 220.5, 551.25, 441 and 88.2 samples, 200, 80, 100 and 500 Hz) and two tables (`0x899d9cd8`,
+`0x899d9cdc`). **Only mode 0 is used:** the reset passes 0 (`0x893ee04a`), the setter's one call is the reset's `bsr` (every
+`bsr` and `bra` in the image searched), and no word in the image is its address.
+
+A block goes in through `0x893ee280(samples, n)`, called by the input stage `0x893ebb00` with 32 samples the glue makes
+(`0x893b1880`): each frame's int32 word at +0x14 × 2^-31 (`0x30000000` at `0x893b1a88`), so 1 is full scale. The word at +4,
+scaled the same, is what goes into kind 6's mic ring (`0x893ec820`); which inputs the two words are is not traced. The block
+entry returns the period in fr0 and leaves it at `0x899d9bd0`, where `0x893ee010` reads it. When the word at `0x8993fe48` is
+set, the input stage gives the block to `0x893ef400` first; not run.
+
+`vc2run <rom.4> track` (`vc2track.cpp`, 4 s): the two setters, then for each case the reset, the mode, and a second (1400
+blocks of 32) of a tone of four harmonics (each 0.6 of the one below; its peak about the level given), white noise or
+silence, the period read after each block. A run that fails only on a fault: it measures, against no model. In mode 0:
+
+- **Reach**, from the reset's 200 Hz at 0.5: every note from 65.4 Hz (C2) to 1480 Hz (F♯6) settles on the tone's pitch,
+  within 0.02%. At 61.7 Hz and at 1568 Hz the period stays 220.5 exactly.
+- **How soon**, to stay within 2%: 6–15 ms from 196 Hz to 1 kHz, 16–69 ms below 196 Hz (the longest at 65–78 Hz), and
+  14–42 ms from 1.1 kHz up to 1480 Hz.
+- **Level** (110, 220, 440 and 880 Hz, from −66 dB of full scale by 6 dB): the lowest level that settles is −36 dB at 110 Hz,
+  −54 at 220 (where it ends 0.5% high), −48 at 440 and −18 at 880; a step below, the period doesn't move. The threshold depends on the pitch, so it is
+  not a plain gate on the input's level; what sets it is not read.
+- **Noise and silence** leave the period where it is: noise at 0.5 gives no pitch.
+- **Holding**: after a second of 220 Hz, a second of silence, of noise, or of the same tone 54 dB lower (0.001) leaves it at
+  220.00 Hz. The last pitch is held; it never goes back to the start.
+- **Following**: 110 → 330 Hz in 48 ms, 330 → 110 in 73 ms, 220 → 440 in 20 ms, 440 → 220 in 24 ms. 110 → 880 Hz is not
+  followed in a second (it ends at 110.91 Hz), where 880 Hz from the reset's 200 Hz settles in 7 ms: how far it reaches
+  depends on where it is.
+
+Modes 1 to 3, which nothing selects, on the grid of nine pitches (55…880 Hz) at 0.05 and 0.5: mode 1 reaches 55–165 Hz and
+not 220 up, mode 2 110–440 and neither 82.5 down nor 660 up, mode 3 330–880 and not 220 down; each holds its start on noise,
+on silence and at 0.001. So the two frequencies a mode sets are not its limits: mode 0's are 60 and 400 Hz, and it reaches
+65.4 to 1480. The analysis under the block entry (`0x893ee570`, `0x893ee7d0`, `0x893eeb90`) is not read; the tracker's port
+(the plan's step 3.6) will be held to these routines in a harness, and this table is what its first run should give.
 
 ## The vocoder's code (2026-11-12, second pass)
 
@@ -1074,5 +1119,9 @@ among rom.2's.
 - ~~The 64 factory patches' values, read with rom.4's descriptors.~~ Read by rom.4's own routines ("The factory patches, read by
   rom.4"); left: the second descriptor bank (MFX, Chorus, Reverb, COSMs) and what the store's eight tone and sixteen envelope
   blocks are.
+- The pitch tracker ("The pitch tracker, run"): run in mode 0, the only one selected, on known signals. Left: its analysis
+  (`0x893ee570`, `0x893ee7d0`, `0x893eeb90`), and with it why its reach depends on where it is and why its level threshold
+  depends on the pitch; `0x893ef400`, which takes the block first when `0x8993fe48` is set; which inputs the frame's words at
+  +4 (kind 6's ring) and +0x14 (the tracker) are.
 - The `WLF08` library's format, and whether it is the V-Synth's preset area's format too.
 - rom.4's sections (code, .data, .bss), and how much of its code is rom.2's.
