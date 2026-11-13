@@ -53,8 +53,11 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   second descriptor bank (MFX, Chorus, Reverb, COSMs) and what the eight tone blocks are against sixteen envelope blocks.
   **The pitch tracker, 2026-11-13:** its routines found (the module `0x893edca0…0x893ef400`) and run on known signals
   (`vc2run … track`; VC2_VOCAL_DESIGNER.md, "The pitch tracker, run"): mode 0 is the only one selected, reaching 65.4 Hz to
-  1480 Hz from its start, holding the last pitch through silence and noise, following an octave in 20–24 ms. Left of it:
-  its analysis routines, read, for the port (step 3.6).
+  1480 Hz from its start, holding the last pitch through silence and noise, following an octave in 20–24 ms. Its analysis
+  read the same day ("The pitch tracker's analysis"): zero crossings of a band-pass that follows the pitch (f0/2 to
+  f0 + 25 Hz), validated by their peaks, two half-periods a period, limits 29.4–678.46 samples; the band-pass, noise count,
+  gates, limits and fallback held to the firmware by the run. Left of it, for the port's harness (step 3.6): the
+  estimator's rules by level, period and peak balance (read in outline) and the direction state (read, not run).
 - Second sources: the V-Card owner's manual (names and meanings) and the 64 factory patches (the corpus).
 
 ### 2. Shared plumbing (plugin/Source)

@@ -41,8 +41,9 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   routines in `Sh4Interp`, on `vc2rom.*`'s map; runs `boot`, `warp`, `ratio`, `hold`, `growl`, `kind6`, `track`, one file
   each ("rom.4 run in the interpreter"). `warp check` and `growl` hold a model of a routine (`vc2warplaw.cpp`,
   `vc2growllaw.cpp`) to the firmware bit for bit, and fail when any word differs; `ratio` fails past 2 ulp from powf; `kind6`
-  fails when an output's period is more than a sample from the reading's; `track` (`vc2track.cpp`) measures the pitch tracker
-  against no model and fails only on a fault ("The pitch tracker, run").
+  fails when an output's period is more than a sample from the reading's; `track` (`vc2track.cpp`, its settings and state
+  section `vc2trackstate.cpp`, sharing `vc2track.h`) measures the pitch tracker against no model and fails only on a fault
+  ("The pitch tracker, run", "The pitch tracker's analysis").
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -671,8 +672,84 @@ silence, the period read after each block. A run that fails only on a fault: it 
 Modes 1 to 3, which nothing selects, on the grid of nine pitches (55…880 Hz) at 0.05 and 0.5: mode 1 reaches 55–165 Hz and
 not 220 up, mode 2 110–440 and neither 82.5 down nor 660 up, mode 3 330–880 and not 220 down; each holds its start on noise,
 on silence and at 0.001. So the two frequencies a mode sets are not its limits: mode 0's are 60 and 400 Hz, and it reaches
-65.4 to 1480. The analysis under the block entry (`0x893ee570`, `0x893ee7d0`, `0x893eeb90`) is not read; the tracker's port
-(the plan's step 3.6) will be held to these routines in a harness, and this table is what its first run should give.
+65.4 to 1480. ~~The analysis under the block entry (`0x893ee570`, `0x893ee7d0`, `0x893eeb90`) is not read~~: read, "The pitch
+tracker's analysis", which says why. The tracker's port (the plan's step 3.6) will be held to these routines in a harness,
+and this table is what its first run should give.
+
+### The pitch tracker's analysis (2026-11-13, the VC-2 mode's step 1c)
+
+Read from the listing (`sh4dis.py` on rom.4, `0x893ee280…0x893ef200`), and each part marked **run** held to the firmware by
+`track`'s last section (`vc2trackstate.cpp`: the settings after the reset, and the state after nine feeds). Levels are the
+input's units (1 full scale); the settings are 16-bit sample values over 32768. It is a time-domain tracker: zero crossings of
+a band-passed signal, timed to a fraction of a sample, validated by their peaks, two half-periods making a period.
+
+**The band-pass** (the block entry's first loop): two state-variable filters in series, each low += f·band, then band +=
+f·(in − low − band), damping 1. The first's high-pass (in − low − band) feeds the second, whose low-pass is the signal the rest
+reads. f is 2πF/44100 itself, not 2 sin(πF/fs). Each f glides toward a target once a block, by (target − f)·n·0.0005 (1.6% a
+block of 32, a time constant of about 45 ms). **Run:** the reset starts them at 20 Hz and 170 Hz and sets the targets to the
+mode's (mode 0: 60 Hz high-pass, 400 Hz low-pass). When a period P is taken and lies between 73.5 and 441 samples (600 to
+100 Hz; `0x899d9b84`, `0x899d9b80`), both targets move to it: the high-pass to f0/2 (2π/P × 0.5) and the low-pass to f0 + 25 Hz
+(2π/P + 0.0035619, which is 2π·25/44100). **Run:** after 110 Hz the targets are 55 and 135 Hz, after 440 Hz 220 and 465 Hz,
+and after 1480 Hz (P 29.8, outside the band's range) still 60 and 400 Hz. The last filtered sample is kept (`0x899d9be0`) so a
+crossing between blocks is seen.
+
+**Per sample** (the block entry's second loop): the largest |x| since the last crossing (`0x899d9c78`) and in the current
+frame of 881 samples (`0x899d9c80`, moved to `0x899d9c84` at each frame's end), counters of samples since the last valid
+crossing of either direction (`0x899d9cc0`) and of each (`0x899d9cc8` up, `0x899d9ccc` down); an upward crossing calls
+`0x893ee570(previous, this)`, a downward one `0x893ee7d0`. When the period has gone longer than the longest candidate without
+a valid crossing (`0x899d9cc0` ≥ `0x899d9cdc`), `0x899d9bd4` takes the period.
+
+**Noise** (after the loop): the raw input's zero crossings in the block whose sample passes 50/32768 are counted, and
+`0x899d9d14` = ⌊count + ½·itself + ½⌋. Above 25, no crossing is analysed in the next block; the estimator also refuses some
+candidates above 7 and 10. **Run:** noise at 0.5 leaves it at 30; tones at 1 to 3.
+
+**A crossing** (each direction its own copy of the same state, `0x893ee570` and `0x893ee7d0`):
+- its peak, the largest |x| since the last crossing, must pass 0.68 of a peak that decays by 0.68 at each crossing it
+  doesn't pass (and at each crossing more than the longest candidate after the last), or the crossing is not valid;
+- `0x893eea50`, only when locked (more than 3 agreeing estimates, below): a peak over 0.005 and over 2.3 times the recent
+  peaks unlocks and clears the failures, as an onset; otherwise a crossing sooner than 0.7 P after the last of its direction
+  and sooner than 0.8 of the last candidate is ignored, so a harmonic's extra crossings don't count (sooner than 0.7 P alone
+  halves the lock); and a crossing whose peak failed counts after all if it comes at least 0.85 P after the last of its
+  direction when the recent peaks are over twice its own, 0.9 P otherwise;
+- a valid crossing is timed to a fraction of a sample, |previous| / (this − previous) after the sample before it;
+- crossings alternate: a flag (`0x899d9c64`, 1 after an up, 0 after a down) sends a crossing after one of the other
+  direction to the estimator (`0x893eeb90(0)` up, `(1)` down) and one after its own direction to a history of the half
+  intervals instead (`0x899d9cfc…0x899d9d08`).
+
+**The estimator** (`0x893eeb90`): the half interval since the last valid crossing (whole samples plus this crossing's fraction
+less the last's) goes into the four-deep history, and the candidate is it plus the half before it. It returns 0 (no estimate)
+when the recent peak (`0x899d9c7c`, the largest of the last peaks) is under 50/32768 (**run:** 220 Hz at −60 dB peaks at
+0.00085 and never passes; at −54 dB it passes early and then holds), when the candidate is outside 29.4–678.46 samples
+(1500–65 Hz; `0x899d9cd8`, `0x899d9cdc`, set by the mode: **run**, and the reach measured above, 65.4 to 1480 Hz, is exactly
+it), or when this half and the one two back, of the same direction, differ by more than a factor of 0.75 to 0.9 (the factor
+by level, noise count and lock). Past those, rules by level (200, 400, 600, 1000 and 3000 over 32768,
+`0x899d9bb0…0x899d9bc0`), by period (63 and 245 samples, `0x899d9ba4`, `0x899d9ba8`) and by the up and down peaks' balance
+refuse a jump the signal is too quiet for; they are read in outline only. One of them, read in full: unlocked, a candidate
+longer than both the current period and 245 samples (below 180 Hz) is refused while the recent peak is under 400/32768
+(−38 dB), which fits 110 Hz needing −36 dB from the reset's 200 Hz where 220 Hz needs −54 (not run in isolation). When the
+two halves before this one disagree: locked for more than 30 estimates, the candidate stands if it and the last candidate
+are within a factor 0.85 of each other and the last within 0.85 of P; unlocked, with the up and down peaks unbalanced and
+the recent peak over 200/32768, the candidate if it lies in 0.85–1.3 P, or else whichever of it and twice either half is
+nearest P; otherwise there is no estimate.
+
+**Taking it** (`0x893ef110`, then the crossing routine): an estimate within ±10% of the last one counts toward the lock
+(`0x899d9c68`, up to 256) and, locked, sets the smoothing (`0x899d9cd4`) to 1, a jump, and clears the failures. One that
+isn't: unlocked, smoothing 1; locked, outside 0.25–1.5 P, smoothing ½ and the lock cleared; otherwise the smoothing stays.
+Then P += (estimate − P) × smoothing, and the band's targets follow P (above). No estimate counts a failure (`0x899d9c6c`, up
+to 256; locked, it sets the smoothing to ½); at 256 failures and each one after, the lock halves, the high-pass's target goes
+back to the mode's own and the low-pass's does not. **Run:** after 110 Hz then 880 Hz, 256 failures, the high-pass target
+60 Hz and the low-pass's 136 Hz. Which direction's estimates move P is a state at `0x899d9c70`: both (2: the reset, and set
+again by the estimator whenever it finds no lock), up only (0) or down only (1), taken from the first estimate after a 2; a
+flag the estimator sets (`0x899d9c74`) hands it to the other direction. That last is read, not run.
+
+So, measured against read:
+- the reach, 65.4 to 1480 Hz, is the candidate's limits, 678.46 to 29.4 samples;
+- the last pitch is held because nothing changes P but an estimate, and silence, noise (its count) and a quiet tone (the
+  level) give none;
+- 110 → 880 Hz is never followed because the low-pass stays at the old f0 + 25 Hz (136 Hz), where 880 Hz arrives at a peak of
+  0.0065 and no estimate passes, and the fallback after 256 failures resets only the high-pass; from the reset the low-pass is
+  at 400 Hz, and 880 Hz at 0.5 passes;
+- the level a tone needs depends on its pitch through the band-pass and the quiet-jump rules.
 
 ## The vocoder's code (2026-11-12, second pass)
 
@@ -1119,9 +1196,11 @@ among rom.2's.
 - ~~The 64 factory patches' values, read with rom.4's descriptors.~~ Read by rom.4's own routines ("The factory patches, read by
   rom.4"); left: the second descriptor bank (MFX, Chorus, Reverb, COSMs) and what the store's eight tone and sixteen envelope
   blocks are.
-- The pitch tracker ("The pitch tracker, run"): run in mode 0, the only one selected, on known signals. Left: its analysis
-  (`0x893ee570`, `0x893ee7d0`, `0x893eeb90`), and with it why its reach depends on where it is and why its level threshold
-  depends on the pitch; `0x893ef400`, which takes the block first when `0x8993fe48` is set; which inputs the frame's words at
-  +4 (kind 6's ring) and +0x14 (the tracker) are.
+- The pitch tracker ("The pitch tracker, run"): run in mode 0, the only one selected, on known signals; its analysis read
+  ("The pitch tracker's analysis"), the band-pass, the noise count, the gates, the limits and the fallback held to the
+  firmware by the run. Left: the estimator's rules by level, period and peak balance, read in outline only, and the
+  direction state (`0x899d9c70`, `0x899d9c74`), read and not run: the port's harness will settle both; `0x893ef400`, which
+  takes the block first when `0x8993fe48` is set; which inputs the frame's words at +4 (kind 6's ring) and +0x14 (the
+  tracker) are.
 - The `WLF08` library's format, and whether it is the V-Synth's preset area's format too.
 - rom.4's sections (code, .data, .bss), and how much of its code is rom.2's.
