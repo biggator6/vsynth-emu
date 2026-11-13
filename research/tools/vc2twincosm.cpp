@@ -48,15 +48,6 @@ constexpr uint32_t kBuf = kScratch + 0x800, kBufSamples = 64;
 constexpr uint32_t kBuffers = kScratch + 0x20000, kBufferStride = 0x4000, kBufferCount = 4;
 constexpr int kNoteCases = 200, kUpdates = 6, kFilterBlocks = 40;
 
-struct Rng {
-    uint32_t s = 12345;
-    uint32_t next() {
-        s = s * 1103515245u + 12345u;
-        return (s >> 8) & 0xffff;
-    }
-    float in(float lo, float hi) { return lo + (hi - lo) * (float)next() / 65535.0f; }
-};
-
 // An input block as the dispatcher fills it: COSM flag, key, the type's words (any of −64…127) and two velocities
 void writeInput(Twin& t, Rng& r) {
     std::array<uint8_t, 0x100> in{};
@@ -168,14 +159,10 @@ int cosmCases(Twin& t) {
     return (int)voiceDiffer;
 }
 
-bool noTables(const char*) {
-    return true;   // the run has no port to load: rom.2 against rom.4 alone
-}
-
 } // namespace
 
 int cosm(Machine& m, int argc, char** argv) {
-    return twinRun(m, argc, argv, noTables, cosmCases);
+    return twinRun(m, argc, argv, noPortTables, cosmCases);
 }
 
 } // namespace vc2

@@ -16,14 +16,24 @@ public:
     Machine& vc2;    // rom.4
     Twin(const char* rom2, Machine& rom4);
     [[nodiscard]] bool ok() const { return ready; }
-    // One call on each: rom.2's routine at a2, rom.4's at a4, the same r4…r7 and fr4; false, said, on a fault in either
-    [[nodiscard]] bool call(uint32_t a2, uint32_t a4, std::initializer_list<uint32_t> args, float fr4 = 0);
+    // One call on each: rom.2's routine at a2, rom.4's at a4, the same r4…r7, fr4 and fr5; false, said, on a fault in
+    // either
+    [[nodiscard]] bool call(uint32_t a2, uint32_t a4, std::initializer_list<uint32_t> args, float fr4 = 0,
+                            float fr5 = 0);
     struct Pair {
         uint32_t vsynth, vc2;   // a routine in rom.2 and its counterpart in rom.4
     };
-    [[nodiscard]] bool call(Pair p, std::initializer_list<uint32_t> args, float fr4 = 0) {
-        return call(p.vsynth, p.vc2, args, fr4);
+    [[nodiscard]] bool call(Pair p, std::initializer_list<uint32_t> args, float fr4 = 0, float fr5 = 0) {
+        return call(p.vsynth, p.vc2, args, fr4, fr5);
     }
+    // A routine's return compared over many calls: r0, or fr0 for one that returns a float
+    enum class Reg { r0, fr0 };
+    struct Returns {
+        long cases = 0, differ = 0;
+    };
+    // One call on each image and its return compared, counted in `tally`: false on a fault
+    [[nodiscard]] bool returns(Pair p, std::initializer_list<uint32_t> args, Reg reg, Returns& tally, float fr4 = 0,
+                               float fr5 = 0);
     // The same hook at a routine's address in each image
     void hook(Pair p, const std::function<void(Sh4&)>& fn);
     void write(uint32_t a, const void* src, size_t n);   // into both
@@ -44,8 +54,22 @@ private:
     bool ready = false;
 };
 
+// The runs' random inputs: a fixed linear congruential sequence (xt_cosm's), so a run repeats
+struct Rng {
+    uint32_t s = 12345;
+    uint32_t next() {
+        s = s * 1103515245u + 12345u;
+        return (s >> 8) & 0xffff;
+    }
+    float in(float lo, float hi) { return lo + (hi - lo) * (float)next() / 65535.0f; }
+};
+
 // A block's side-by-side run as vc2run calls it (`vc2run <rom.4> <name> <rom.2>`): the usage checked, the port's tables
 // read from rom.2, the twin made, then `body`, which says how many of its cases differed (−1 on a fault)
 int twinRun(Machine& m, int argc, char** argv, bool (*loadTables)(const char*), int (*body)(Twin&));
+// twinRun's loadTables for a run with no port linked: rom.2 against rom.4 alone
+inline bool noPortTables(const char*) {
+    return true;
+}
 
 } // namespace vc2

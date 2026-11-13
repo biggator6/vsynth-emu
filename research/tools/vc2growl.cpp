@@ -23,10 +23,11 @@ constexpr uint32_t kUpdate = 0x893ec4d0;    // [FW] (carrier, P): gain and pitch
 constexpr uint32_t kRender = 0x893ebfa0;    // [FW] (carrier, out): 32 samples, a float pair each
 constexpr uint32_t kSawIn = 0x893ec310;     // [FW] growl branch: fr7 is the saw before × 0.5 and the filter
 constexpr uint32_t kDivider = 0x893ec29a;   // [FW] growl branch: r6 is the divider just chosen
-// [FW] the init's random start phase (0x893f31a0) asks the OS (0x893018d0 jumps to its RAM, 0x880080d0, not mapped
-// here) for a number; it is answered with a fixed one, as the model reads the carrier's state after the init
-constexpr uint32_t kOsRandom = 0x893018d0;
-constexpr uint32_t kFixedRandom = 12345;
+// [FW] the init's start phase (0x893f31a0) is seeded from the system clock in ms (0x893018d0, rom.2's 0x89301940, which
+// jumps to the OS's RAM, 0x880080d0, not mapped here); it is answered with a fixed time, as the model reads the carrier's
+// state after the init
+constexpr uint32_t kOsClock = 0x893018d0;
+constexpr uint32_t kFixedMs = 12345;
 constexpr float kA4 = 440.0f;               // P+4 is the pitch as a ratio to 440 Hz (by kSetRate's 880/44100)
 constexpr int kBlock = 32;
 
@@ -77,7 +78,7 @@ int growl(Machine& m, int argc, char** argv) {
             return 2;
         }
     }
-    m.cpu.hook(kOsRandom, [](Sh4& c) { c.ret(kFixedRandom); });
+    m.cpu.hook(kOsClock, [](Sh4& c) { c.ret(kFixedMs); });
     if (!m.run(kSetRate, {})) return 1;
     long samples = 0, differ = 0;
     for (const float hz : {55.0f, 110.0f, 220.0f, 440.0f, 880.0f, 1760.0f, 2600.0f, 4000.0f, 8000.0f, 10000.0f}) {

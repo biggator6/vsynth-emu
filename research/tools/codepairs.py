@@ -18,7 +18,7 @@ from pathlib import Path
 
 from likeat import shape, shapes
 from poolrefs import loads
-from romfile import B, image
+from romfile import B, image, option
 
 SOURCE = Path(__file__).resolve().parents[2] / 'plugin/Source'
 LITERAL = re.compile(r'\b(?:(k\w+)\s*=\s*)?(0x89[0-9a-fA-F]{6})u?\b')
@@ -129,11 +129,7 @@ def callers(argv):
 
 
 def main(argv):
-    if argv[:1] == ['--pools']:
-        pools(argv[1:])
-        return
-    if argv[:1] == ['--callers']:
-        callers(argv[1:])
+    if option(argv, {'--pools': pools, '--callers': callers}):
         return
     if len(argv) < 2:
         sys.exit(__doc__)

@@ -26,9 +26,12 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   in rom.4, run"): the pairs by code shape for every routine the ports name (`codepairs.py`); the LFO and the envelope with
   its converters run and equal, the ports equal to rom.4 (`vc2run … lfo`, `env`); COSM's note-on, update and TVF filters
   equal for 14 of 15 types (`vc2run … cosm`), the Comb differs (its note-on case moved out and reads the block otherwise),
-  and COSM's 15 converters take another input block in rom.4 (no MSM term, the Matrix read inside). Next: the OSC block
-  (pitch, TVA, Matrix), the analog OSC, the players, key assign; COSM's other DSP routines. The converters (those that read
-  parameters by ID, and COSM's) differ by construction: they are ported from rom.4, not shared, and the Comb with them.
+  and COSM's 15 converters take another input block in rom.4 (no MSM term, the Matrix read inside); the OSC block's
+  arithmetic (exp2, powf, velocity, pitch10, key-follow key) and key state equal (`vc2run … osc`), its wiring (the
+  VariPhrase converter, pitch and gain targets, voice update, portamento settings, note setup, bend) rewritten, and its
+  portamento differing (rom.4's constructor, restart and tick: an eased ending, fast glides held to ±500 cents). Next: the
+  analog OSC, the players, key assign; COSM's other DSP routines. The wiring (what reads parameters by ID, COSM's
+  converters) differs by construction: it is ported from rom.4, not shared, and the Comb and the portamento with it.
 - 1c. Still to map: the pitch tracker (the routines that write `0x899d9bd0`); the VOCODER OSC's IDs (0x354…0x383) into the
   voice's fields; kind 6's mode and where its pitch comes from (Auto Note, Modulator Key Mode, Split Point); the part mixer's
   levels; the 64 factory `.p02` read with rom.4's descriptors; the `WLF08` wave library (58 waves); whether the VC-2 runs

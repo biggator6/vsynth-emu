@@ -35,6 +35,15 @@ def offsets(img, addr):
     return None
 
 
+def option(argv, handlers):
+    """A tool's option run: handlers['--name'](the rest of argv) when argv starts with one of them; True when it ran."""
+    run = handlers.get(argv[0]) if argv else None
+    if run is None:
+        return False
+    run(argv[1:])
+    return True
+
+
 rom = image(ROMP)
 BSS, BSS_END, DATA, DATA_FROM = sections(rom)
 

@@ -88,36 +88,22 @@ bool envCase(Twin& t, const EnvCase& k, long& calls) {
     return true;
 }
 
-struct Returns {
-    long cases = 0, differ = 0;
-};
-
-// One converter call on both images, its return compared (r0, or fr0 for a float routine): false on a fault
-bool converter(Twin& t, Twin::Pair p, std::initializer_list<uint32_t> args, float fr4, Returns& r) {
-    if (!t.call(p, args, fr4)) return false;
-    const bool isFloat = p.vsynth == kPitchDepth.vsynth;
-    const uint32_t x = isFloat ? t.vsynth.fb[0][0] : t.vsynth.r[0];
-    const uint32_t y = isFloat ? t.vc2.cpu.fb[0][0] : t.vc2.cpu.r[0];
-    ++r.cases;
-    r.differ += x != y ? 1 : 0;
-    return true;
-}
-
-// The converters over xt_env conv's ranges: false on a fault
-bool converters(Twin& t, Returns& r) {
+// The converters over xt_env conv's ranges, each return compared: false on a fault
+bool converters(Twin& t, Twin::Returns& r) {
+    using Reg = Twin::Reg;
     for (int key = 0; key < 128; ++key)
         for (int kf = -200; kf <= 200; kf += 10)
-            if (!converter(t, kKeyScale, {(uint32_t)key, (uint32_t)kf}, 0, r)) return false;
+            if (!t.returns(kKeyScale, {(uint32_t)key, (uint32_t)kf}, Reg::r0, r)) return false;
     constexpr uint32_t kScales[] = {0x10000, 0x8000, 0x4a3d, 0xffff, 0x10001, 0x1a000, 0x28000, 0x40000, 0x1, 0x0};
     for (int knob = 0; knob < 128; ++knob)
         for (int vel = 0; vel < 128; vel += 3)
             for (int sens = -63; sens <= 63; sens += 7)
                 for (const uint32_t scale : kScales) {
                     const std::initializer_list<uint32_t> args{(uint32_t)knob, (uint32_t)vel, (uint32_t)sens, scale};
-                    if (!converter(t, kTime, args, 0, r)) return false;
+                    if (!t.returns(kTime, args, Reg::r0, r)) return false;
                 }
     for (int d = -63; d <= 63; ++d)
-        if (!converter(t, kPitchDepth, {}, (float)d, r)) return false;
+        if (!t.returns(kPitchDepth, {}, Reg::fr0, r, (float)d)) return false;
     return true;
 }
 
@@ -125,7 +111,7 @@ int envCases(Twin& t) {
     long calls = 0;
     int bad = 0;
     for (const EnvCase& k : kCases) bad += envCase(t, k, calls) ? 0 : 1;
-    Returns r;
+    Twin::Returns r;
     if (!converters(t, r)) return -1;
     std::printf("env: %zu cases, %ld states compared, %d cases different; converters: %ld cases, %ld different\n",
                 std::size(kCases), calls, bad, r.cases, r.differ);

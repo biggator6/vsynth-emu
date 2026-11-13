@@ -16,10 +16,20 @@ Twin::Twin(const char* rom2, Machine& rom4) : vc2(rom4) {
     ready = true;
 }
 
-bool Twin::call(uint32_t a2, uint32_t a4, std::initializer_list<uint32_t> args, float fr4) {
-    std::memcpy(&vsynth.fb[0][4], &fr4, 4);
-    std::memcpy(&vc2.cpu.fb[0][4], &fr4, 4);
+bool Twin::call(uint32_t a2, uint32_t a4, std::initializer_list<uint32_t> args, float fr4, float fr5) {
+    for (uint32_t* bank : {vsynth.fb[0], vc2.cpu.fb[0]}) {
+        std::memcpy(&bank[4], &fr4, 4);
+        std::memcpy(&bank[5], &fr5, 4);
+    }
     return callVSynth(a2, args) && vc2.run(a4, args);
+}
+
+bool Twin::returns(Pair p, std::initializer_list<uint32_t> args, Reg reg, Returns& tally, float fr4, float fr5) {
+    if (!call(p, args, fr4, fr5)) return false;
+    const bool same = reg == Reg::r0 ? vsynth.r[0] == vc2.cpu.r[0] : vsynth.fb[0][0] == vc2.cpu.fb[0][0];
+    ++tally.cases;
+    tally.differ += same ? 0 : 1;
+    return true;
 }
 
 void Twin::copyToVc2(uint32_t a, uint32_t n) {

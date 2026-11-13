@@ -50,10 +50,13 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   each moved; with no addresses, every rom.2 code address in plugin/Source. `--pools <rom.2> <rom.4> <a2> <a4>`: for one pair,
   the literals that differ. `--callers <rom.2> <rom.4> <a2> …`: a routine rom.4 compiled anew, through the literals its
   callers load. `likeat.py`'s `shape`, `shapes` and `find` are importable for it (its output checked unchanged).
-- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`): a block's rom.2 routines and their rom.4 pairs on two
+- `codealign.py <rom.2> <rom.4> <lo2> <hi2> <lo4> <hi4>`: a region's routines lined up by order and size, for code rom.4
+  compiled anew; `--near <rom.2> <rom.4> <distance> <a2> …`: the longest alike run near where a routine should be.
+  `romfile.option` runs a tool's `--option`s (codepairs.py's and codealign.py's).
+- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`, `osc`): a block's rom.2 routines and their rom.4 pairs on two
   interpreters, its object compared after every call, and the port held beside rom.4's where one is linked (`vc2twin.*`, a
-  run per block, `vc2twin<block>.cpp`; `lfo` and `env` link their ports from plugin/Source, `cosm` none). Fails on any
-  difference: `cosm` does, at the Comb ("COSM in rom.4").
+  run per block, `vc2twin<block>.cpp`; `lfo` and `env` link their ports from plugin/Source, `cosm` and `osc` none). Fails on
+  any difference: `cosm` does, at the Comb ("COSM in rom.4"), and `osc` at the pitch ramp ("The OSC block in rom.4").
 
 ## The V-Synth's tables and code in rom.4 (2026-11-13, the VC-2 mode's step 1a)
 
@@ -128,8 +131,9 @@ time table (`0x8953fb90`, rom.2's `0x897cec24`), and `0x8939aa40`, which reads a
 it is not the V-Synth's envelope time.
 
 **So far: the LFO and the envelope (and its converters) of the VC-2 are the V-Synth's, and the ports serve it as they stand;
-COSM's voice side is too for 14 of its 15 types (below), its converters and the Comb are not.** Still to run: the OSC block
-(pitch, TVA, the Matrix), the analog OSC, the band and SOLO players, Vari off and LITE, key assign.
+COSM's voice side is too for 14 of its 15 types (below), its converters and the Comb are not; the OSC block's arithmetic
+and key state are, its wiring and portamento are not.** Still to run: the analog OSC, the band and SOLO players, Vari off and
+LITE, key assign.
 
 ### COSM in rom.4 (2026-11-13)
 
@@ -187,6 +191,52 @@ every note (the first Side Band Filter doesn't read that word).
 
 Not yet run: the types' own DSP routines but the TVFs' (copies by shape, at the common distance), the stereo copies, the
 new-block routine (`0x894ed390` → `0x893a9500`) and the Dynamic TVF's targets apart from note-on.
+
+### The OSC block in rom.4 (2026-11-13)
+
+xt_osc's routines (`build/tools/vc2/osc_pairs.txt`): 13 pair by shape, 2 several times, 17 not. `codealign.py` (new) lines a
+region's routines up by order and size, and `--near` finds the longest alike run near where a routine should be; they place
+the rest, and show which were rewritten:
+
+| Part | rom.2 → rom.4 | How |
+|---|---|---|
+| exp2, powf | `0x894ec090` → `0x893a8340`, `0x8952ff9c` → `0x89506e54` (the converter's powf, "HIRESO's formant warp, run") | shape; run |
+| Velocity curve, sensitivity | `0x894ebd60` → `0x893a7fb0`, `0x894ebe20` → `0x893a8070` | shape |
+| pitch10, key-follow key | `0x894e1250` → `0x8939c8a0`, `0x894e12c0` → `0x8939c910` | shape |
+| Key state | reset `0x894d6420` → `0x893923c0`, note-on `0x894d6330` → `0x893922d0` (144 alike), note-off `0x894d63c0` → `0x89392360` | shape |
+| The Matrix's getters | `0x894e7010` → `0x893a23b0`, `0x894e70b0` → `0x893a2440`, `0x894e7320` → `0x893a26b0`, `0x894e7520` → `0x893a28b0` | shape |
+| Pitch ramp | start `0x894f4890` → `0x893b0e10` (41 alike), legato update `0x894f48b0` → `0x893b0e30`, value `0x894f4c00` → `0x893b1160` | shape, `--near` |
+| Pitch ramp, rewritten | constructor `0x894f4860` → `0x893b0dc0` (37 instructions against 22), restart `0x894f4920` → `0x893b0b10` (rom.4's update branches to it), tick `0x894f4b00` → `0x893b0f30` (0x230 bytes against 0x100) | order, run |
+| Rewritten, not run | the VariPhrase converter `0x894e2f20`, the pitch target `0x894f3a00`/`0x894f3ba0`, the gain target `0x894f3dc0`/`0x894f3e20` (rom.2's seven routines 0x894f3a00…0x894f3ec0, 0x5c0 bytes, are three of 0x470 in rom.4 at 0x893afff0…), the voice update's 70% step `0x8950c1b0`, the portamento settings `0x894e66e0`, the note's setup `0x894e4c30` and random seed `0x894e5010`, the bend `0x894e9fe0`, the velocity curve's patch converter `0x894ebed0` | no alike run of more than 12 instructions within 0x400 of their place |
+
+The rewritten ones are the wiring: what reads parameters, the Matrix and (in rom.2) the Multi Step Modulator's terms. They
+are ported from rom.4, as COSM's converters are.
+
+**Run (`vc2run <rom.4> osc <rom.2>`, `vc2twinosc.cpp`, no port linked: xt_osc holds `XtOsc` to rom.2;
+`build/tools/vc2/osc_run.txt`):**
+
+- exp2 over xt_osc's grid, powf at 2 over its 200,000 exponents, the velocity curve over every velocity, sensitivity −210…+210
+  and curve 0…8, the sensitivity converter, pitch10 over keys, Coarse, Pitch KF and Fine, and the key-follow key: **988,032
+  returns, 0 different.**
+- The mono/poly key state over 400 sequences of 300 key events, the system clock hooked in each (rom.2's `0x89301940` is
+  rom.4's `0x893018d0`, by the note-on pair's literals): **120,000 events, 0 different.**
+- The pitch ramp over 4000 sequences of starts, legato updates with and without a restart, and ticks: **1,759,632 values,
+  18,485 different**; while rom.2's glide is under way (its value not 0), 955,339 values, 12,917 different. Traced glide by
+  glide, they agree for most of a glide (0 → 1000 cents over 500 ms steps 24 cents a tick in both; the type 1 glide traced
+  agrees throughout) and part in two places. Near the target, where rom.2 steps linearly to exactly 0, rom.4 eases in by a
+  ratio of about 0.6 to 0.7 a tick (0 → 100 cents over 500 ms: rom.2 −100, −76, −52, −28, −4, 0; rom.4 −100, −60.0, −33.4,
+  −16.8, −7.3, −2.6, …). And a fast, wide glide starts at ±500 cents in rom.4 where rom.2 starts at the whole offset (276.2 →
+  −770 cents over 114 ms: rom.2 1046, 941, 835, …; rom.4 500, 448, 397, … in about as many ticks; −3584 → 4632 over 7 ms:
+  rom.2 −8216, rom.4 −500). **So the VC-2's portamento is its own** (the constructor, restart and tick rewritten): ported
+  from rom.4, its law read from those three; the start, update and value are the V-Synth's.
+
+Seen red: the sensitivity paired with rom.4's velocity curve instead (201 returns part); rom.4's clock a millisecond late
+(every sequence parts, at the key state's time, +0x10).
+
+One correction this brought: `0x893018d0`, which the carrier's init seeds its start phase from, is the system clock in ms
+("The growl, run", corrected in place), not a random number.
+
+Not yet run: the Matrix's getters (paired by shape; xt_osc hooks them), and anything of the rewritten wiring.
 
 **What rom.4 lacks.** Not in it: the Multi Step Modulator (its coarse and grid tables, its object's routines, its terms), the
 arpeggio's note-on, pedal, step, enable and constructor, the MIDI out of the clock, the effect driver's MFX, Chorus and Reverb
@@ -256,8 +306,10 @@ it as CC 64, and whether a receive-channel test comes before the dispatcher.
 ### The growl, run (`growl`)
 
 The carrier (kind 5, `0x893ebfa0`), with +0x3c above 0. Run on a carrier made by its own init (`0x893ebed0(carrier, P)`, which
-zeroes +0x3c and its phase, and starts the saw at 2·(3.997·x(1 − x)) − 1 for x = |rand|/32767: the OS's rand, `0x893018d0`, is
-answered with a fixed number), set by its own update (`0x893ec4d0(carrier, P)`: P+0 gain, P+4 pitch, P+0x20 to +0x3c, P+0x2c the
+zeroes +0x3c and its phase, and starts the saw at 2·(3.997·x(1 − x)) − 1 for x = |t|/32767 with t the call `0x893018d0`
+returns, ~~the OS's rand~~ the system clock in ms, as short (2026-11-13: it pairs with rom.2's `0x89301940`, which the key
+state calls for the time and xt_osc hooks as the clock; so a note's saw starts where the clock and a logistic step put it),
+answered here with a fixed number), set by its own update (`0x893ec4d0(carrier, P)`: P+0 gain, P+4 pitch, P+0x20 to +0x3c, P+0x2c the
 balance), after the carriers' rate setter (`0x893ec6a0`, from the init table at `0x898c60a8`: 880/44100 at `0x899d9964`, 44100/440
 at `0x899d9960`, so P+4 is the pitch as a ratio to 440 Hz). The law, held bit for bit to the saw the branch hands its filter (a
 hook at `0x893ec310`; `vc2growllaw.cpp`; 256,000 samples at 55 Hz…10 kHz and growl 0.05…1, 0 different; planted errors in the
