@@ -22,6 +22,18 @@ void setTextLook(juce::Label& l, const juce::Font& font, juce::Colour colour, ju
     l.setInterceptsMouseClicks(false, false);
 }
 
+void paintPanel(juce::Graphics& g, juce::Rectangle<int> bounds, bool selected) {
+    const auto r = bounds.toFloat().reduced(0.5f);
+    Ui::fillRounded(g, r, panel, (float)radius);
+    g.setColour(selected ? accent : edge);
+    g.drawRoundedRectangle(r, (float)radius, 1.0f);
+}
+
+void panelName(juce::Label& l, const juce::String& name) {
+    setTextLook(l, sans(12.0f, "Bold", 0.06f), text, juce::Justification::centredLeft);
+    l.setText(name, juce::dontSendNotification);
+}
+
 void showText(juce::Label& l, const juce::String& words, juce::Colour colour) {
     l.setText(words, juce::dontSendNotification);
     l.setColour(juce::Label::textColourId, colour);
@@ -40,8 +52,8 @@ void arc(juce::Graphics& g, const Circle& k, float a0, float a1, juce::Colour co
     if (a1 - a0 < 0.005f) return;
     juce::Path p;
     p.addCentredArc(k.c.x, k.c.y, k.r, k.r, 0.0f, a0, a1, true);
-    g.setColour(colour);
-    g.strokePath(p, juce::PathStrokeType(k.stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    const juce::PathStrokeType round(k.stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+    Ui::stroke(g, p, colour, round);
 }
 
 // Where the value arc starts: 0 on a range that holds both signs, else the range's start
@@ -137,8 +149,7 @@ void Feel::drawComboBox(juce::Graphics& g, int w, int h, bool, int, int, int, in
     chevron.startNewSubPath(c.x - 3.0f, c.y - 1.5f);
     chevron.lineTo(c.x, c.y + 1.5f);
     chevron.lineTo(c.x + 3.0f, c.y - 1.5f);
-    g.setColour(label);
-    g.strokePath(chevron, juce::PathStrokeType(1.5f));
+    Ui::stroke(g, chevron, label, juce::PathStrokeType(1.5f));
 }
 
 void Feel::positionComboBoxText(juce::ComboBox& box, juce::Label& l) {

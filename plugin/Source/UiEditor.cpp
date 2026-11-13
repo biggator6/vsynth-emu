@@ -1,4 +1,4 @@
-// D, the redesigned editor (UiEditor.h; UI step 1)
+// D, the redesigned editor (UiEditor.h; UI steps 1 and 2)
 #include "UiEditor.h"
 #include "UiBlocks.h"
 #include "UiParts.h"
@@ -13,18 +13,19 @@ struct NotYet {
 }
 
 SynthEditor::SynthEditor(VSynthEmuProcessor& p)
-    : juce::AudioProcessorEditor(&p), header_(p), path_(p.apvts), footer_(p) {
+    : juce::AudioProcessorEditor(&p), header_(p), path_(p.apvts), rack_(p), footer_(p) {
     setLookAndFeel(&feel_);
     pageBar_.onPage = [this](int page) { showPage(page); };
     path_.onSelect = [this](int block) { select(block); };
     path_.onEffect = [this](int) { showPage(Blocks::kFxPage); };
-    for (juce::Component* c : std::initializer_list<juce::Component*> { &header_, &pageBar_, &path_, &footer_ })
-        drawing_.addAndMakeVisible(c);
+    rack_.onSelect = [this](int block) { select(block); };
+    const std::initializer_list<juce::Component*> parts = { &header_, &pageBar_, &path_, &rack_, &footer_ };
+    for (juce::Component* c : parts) drawing_.addAndMakeVisible(c);
     drawing_.setInterceptsMouseClicks(false, true);
     addAndMakeVisible(drawing_);
     int y = 0;
     for (auto [part, h] : { std::pair<juce::Component*, int> { &header_, Look::headerH }, { &pageBar_, Look::pageBarH },
-                            { &path_, Look::pathH } }) {
+                            { &path_, Look::pathH }, { &rack_, Look::rackH } }) {
         part->setBounds(0, y, Look::width, h);
         y += h;
     }
@@ -45,27 +46,29 @@ SynthEditor::~SynthEditor() {
 
 void SynthEditor::showPage(int page) {
     pageBar_.setPage(page);
-    path_.setVisible(pageBar_.page() == Blocks::kSynthPage);
+    const bool synth = pageBar_.page() == Blocks::kSynthPage;
+    path_.setVisible(synth);
+    rack_.setVisible(synth);
     repaint();
 }
 
 void SynthEditor::select(int block) {
     path_.setSelected(block);
+    rack_.setSelected(block);
 }
 
 void SynthEditor::resized() {
     drawing_.setTransform(juce::AffineTransform::scale(scale()));
 }
 
-// The ground, and what each region not built yet says (the rack, step 2; the lower panel, step 3; the pages, step 4)
+// The ground, and what each region not built yet says (the lower panel, step 3; the pages, step 4)
 void SynthEditor::paint(juce::Graphics& g) {
     g.fillAll(Look::ground);
     g.addTransform(juce::AffineTransform::scale(scale()));
-    const int top = Look::headerH + Look::pageBarH, synthTop = top + Look::pathH;
-    const int lowerTop = synthTop + Look::rackH, below = Look::height - Look::footerH;
+    const int top = Look::headerH + Look::pageBarH;
+    const int lowerTop = top + Look::pathH + Look::rackH, below = Look::height - Look::footerH;
     const bool synth = pageBar_.page() == Blocks::kSynthPage;
     const NotYet parts[] = {
-        { { 0, synthTop, Look::width, Look::rackH }, synth ? "The rack: UI step 2" : "" },
         { { 0, lowerTop, Look::width, below - lowerTop }, synth ? "The lower panel: UI step 3" : "" },
         { { 0, top, Look::width, below - top }, synth ? "" : "This page: UI step 4" },
     };
@@ -74,9 +77,10 @@ void SynthEditor::paint(juce::Graphics& g) {
     Ui::fill(g, { 0, lowerTop, Look::width, 1 }, synth ? Look::divider : Look::ground);
 }
 
-// What the header, the path and the footer show, each repainting only what moved
+// What the header, the path, the rack and the footer show, each repainting only what moved
 void SynthEditor::timerCallback() {
     header_.refresh();
     path_.refresh();
+    rack_.refresh();
     footer_.refresh();
 }

@@ -4,6 +4,7 @@
 // another, without a size or cut short (LayoutCheck), and every control moved sets a parameter.  A press on each page's
 // name opens it, on each block selects it, on an effect opens FX.  With a folder: each page, and SYNTH with each block
 // selected, drawn into it.  Exit 0 if every check holds.
+#include "EditorTest.h"
 #include "LayoutCheck.h"
 #include "TestChecks.h"
 #include "TestMain.h"
@@ -70,6 +71,7 @@ void presses(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
 
 // Each page, and SYNTH with each block selected, into a folder
 void snapshots(SynthEditor& ed, const juce::File& dir, TestChecks& check) {
+    check(dir.createDirectory().wasOk(), "can't make " + dir.getFullPathName().toStdString());
     const auto shoot = [&](const juce::String& name) {
         check(writeSnapshot(ed, dir.getChildFile(name + ".png")), "can't write " + name.toStdString());
     };
@@ -96,6 +98,7 @@ int editorTest(const juce::File& rom, const juce::File&, const juce::StringArray
     sizes(l, ed, check);
     pagesAndBlocks(l, ed);
     presses(l, ed, check);
+    rackChecks(l, ed, p, check);
     if (!rest.isEmpty()) snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);
     check(l.errors == 0, std::to_string(l.errors) + " layout errors (said above)");
     return check.summary(std::to_string(l.states) + " states, " + std::to_string(l.checked) + " placements, " +

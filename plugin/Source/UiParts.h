@@ -52,6 +52,11 @@ namespace Ui {
         g.setColour(c);
         g.fillRoundedRectangle(r, radius);
     }
+    // A path stroked in a colour: D's knobs' arcs, a box's chevron, a waveform (UI step 2)
+    inline void stroke(juce::Graphics& g, const juce::Path& p, juce::Colour c, const juce::PathStrokeType& type) {
+        g.setColour(c);
+        g.strokePath(p, type);
+    }
     // The cards' and the Perform column's titles: 11 pt bold, spaced out
     inline juce::Font titleFont() {
         juce::Font f(11.0f, juce::Font::bold);

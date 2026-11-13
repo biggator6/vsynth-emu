@@ -88,6 +88,16 @@ struct LayoutCheck {
         };
         return dynamic_cast<T*>(find(*ed, match));
     }
+    // Every T under c, in the order the components hold them (D's panels, made one per instance, UI step 2)
+    template <class T>
+    static std::vector<T*> allOf(juce::Component& c) {
+        std::vector<T*> found;
+        for (juce::Component* ch : c.getChildren()) {
+            if (auto* t = dynamic_cast<T*>(ch)) found.push_back(t);
+            for (T* t : allOf<T>(*ch)) found.push_back(t);
+        }
+        return found;
+    }
     juce::ComboBox* boxOf(const juce::String& item) {
         return firstOf<juce::ComboBox>([&](juce::ComboBox& x) { return x.getItemText(0) == item; });
     }
@@ -132,7 +142,7 @@ struct LayoutCheck {
             return box && cutShort(*box);
         }
         auto* b = dynamic_cast<juce::ToggleButton*>(k);
-        if (!b) return false;
+        if (!b || b->getButtonText().isEmpty()) return false;   // a switch of no text (D's power dots) has none to cut
         const float size = juce::jmin(15.0f, (float)b->getHeight() * 0.75f);
         const juce::Font font { juce::FontOptions(size) };
         const float text = juce::GlyphArrangement::getStringWidth(font, b->getButtonText());

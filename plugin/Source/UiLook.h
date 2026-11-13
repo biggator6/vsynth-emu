@@ -40,6 +40,11 @@ void setTextLook(juce::Label& l, const juce::Font& font, juce::Colour colour,
 // A label's text now, in the colour that says what it means (a state: ready or not, a name or none)
 void showText(juce::Label& l, const juce::String& words, juce::Colour colour);
 
+// A rack panel's frame: its face and its border, the accent when its block is selected
+void paintPanel(juce::Graphics& g, juce::Rectangle<int> bounds, bool selected);
+// A rack panel's name, a label (so the layout's check sees it whole)
+void panelName(juce::Label& l, const juce::String& name);
+
 // Where a knob's sweep starts and ends: 135° to 405° in the mock-up's angles, from 12 o'clock as JUCE counts them
 inline constexpr float sweepStart = 1.25f * juce::MathConstants<float>::pi;
 inline constexpr float sweepEnd = 2.75f * juce::MathConstants<float>::pi;

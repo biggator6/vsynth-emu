@@ -28,8 +28,15 @@ constexpr std::array<Block, kCount> makePath() {
 }
 inline constexpr std::array<Block, kCount> kPath = makePath();
 
+// Where a block is on the path, -1 if it isn't
+constexpr int indexOf(Kind kind, int index) {
+    for (size_t i = 0; i < kPath.size(); ++i)
+        if (kPath[i].kind == kind && kPath[i].index == index) return (int)i;
+    return -1;
+}
+
 // The block a new editor shows selected: the first COSM, as the mock-up does
-inline constexpr int kFirstSelected = kOscs + 1;
+inline constexpr int kFirstSelected = indexOf(Kind::cosm, 0);
 
 // The page bar's pages, in order; SYNTH is the path, the rack and the lower panel
 inline constexpr std::array<const char*, 5> kPages = { "SYNTH", "MODULATION", "FX", "PLAY", "ZONES" };

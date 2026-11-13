@@ -9,6 +9,7 @@
 #include "UiLook.h"
 #include "UiPageBar.h"
 #include "UiPath.h"
+#include "UiRack.h"
 
 class SynthEditor : public juce::AudioProcessorEditor, private juce::Timer {
 public:
@@ -31,6 +32,7 @@ private:
     Header header_;
     PageBar pageBar_;
     PathBar path_;
+    Rack rack_;
     Footer footer_;
     void timerCallback() override;
 };
