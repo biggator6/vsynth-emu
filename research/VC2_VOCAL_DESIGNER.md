@@ -42,6 +42,49 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   ("rom.4 run in the interpreter"). `warp check` and `growl` hold a model of a routine (`vc2warplaw.cpp`, `vc2growllaw.cpp`)
   to the firmware bit for bit, and fail when any word differs; `ratio` fails past 2 ulp from powf; `kind6` fails when an
   output's period is more than a sample from the reading's.
+- `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
+  image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
+  `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
+  checked unchanged).
+
+## The V-Synth's tables and code in rom.4 (2026-11-13, the VC-2 mode's step 1a)
+
+The first step of bringing the VC-2 in as its own mode (`research/VC2_MODE_PLAN.md`): which of the V-Synth's firmware the VC-2
+shares. `romtables.py` over the 156 address constants of the ports (output in `build/tools/vc2/romtables.txt`): 82 have a
+copy in rom.4, 45 none, 7 too plain to search (zeros, a ramp) and 22 are .bss. Where a table is copied, the code loading it in
+each image is listed, so each block below has its counterpart routine in rom.4 by the table it reads, not by its code.
+
+**The tone's tables are all there, byte for byte, with their neighbours** (the equal run goes on past each table, often for
+kilobytes), each loaded from as many places in rom.4 as in rom.2 or close:
+
+| Block | Tables (port) | A loader in rom.2 → rom.4 |
+|---|---|---|
+| Envelopes | time, sustain, attack, shape, clocks, depth (`XtEnvelope`) | `0x894df7b8` → `0x8939a978` (time), `0x894ef808` → `0x893ab898` (attack) |
+| LFOs | rate, sine (.data), clocks (`XtLfo`) | `0x894e02dc` → `0x8939b5d2`, `0x894f1152` → `0x893ad202` |
+| OSC, pitch, TVA | exp tables, velocity sensitivity, level, pan, the pad's angles, Matrix values (`XtOsc`) | `0x894ec09c` → `0x893a834c`, `0x894ebd90` → `0x893a7fe0`, `0x894e6aa2` → `0x893a1df2` |
+| COSM | cutoff, cap, octaves, resonance, sine, Hilbert, waveshaper, speaker, Lo-Fi, limiter (`XtCosm`) | `0x894ec164` → `0x893a8414`, `0x894ffa2e` → `0x893bd36e`, `0x8950131c` → `0x893bec5c` |
+| Analog OSC | tone key follow, super saw detune, the HQ tables (`XtAnalog`) | `0x89505a56` → `0x893c24f8`, `0x894e50b6` → `0x893a3c12` |
+| Band players | tree, final, oscillator constants, shifts, masks, offsets, cosine, kernel (`XtMultiBandPlayer`) | `0x8950c668` → `0x893c8d88`, `0x8951018e` → `0x893cc94e` |
+| Rate converters | the 2× and 4× decimators and interpolators | `0x89522b52` → `0x893df3d2` |
+
+The descriptors' first bank is at `0x8950f0b0` (found before by its first 48 entries), and rom.2's parameter getter
+`0x8947d310` is `0x89324350` in rom.4, its first 42 bytes equal: the getter already named in "How rom.4 reads a parameter".
+
+**Some code is a copy.** Where a constant is a routine's address, its bytes were looked for too, and these are in rom.4 from
+their first byte for the run given: the SOLO encoder and its setup (`0x8951e120` → `0x893da9a0`, 368 bytes; `0x8951dc40` →
+`0x893da4c0`; the import's `0x89516400`, `0x895164c0`, `0x8952dec0` and on), the clock object's routines (`0x894710e0` →
+`0x89313000`, 484 bytes; `0x894710b0`, `0x894712f0`, `0x89471040`), the OS's allocator and UI calls (`0x89527910` →
+`0x893e4190`, `0x895113a0` → `0x893cdc20`), the reverb time routine (`0x894b2bf0` → `0x893663a0`, 592 bytes), and parts of the
+arpeggio (its event set and clear, note-off, stop, shuffle, tick and pedal check). The tone's routines are not
+("The vocoder's code"): the same tables, compiled anew. Whether they compute the same is step 1b, by running them.
+
+**What rom.4 lacks.** Not in it: the Multi Step Modulator (its coarse and grid tables, its object's routines, its terms), the
+arpeggio's note-on, pedal, step, enable and constructor, the MIDI out of the clock, the effect driver's MFX, Chorus and Reverb
+ID tables and its value-text routine, the parameter names at rom.2's address (rom.4's are its own, "The parameter tables"),
+and the velocity curves' pointer table (its pointers would differ even with the curves equal). A miss alone means the bytes
+differ, not that the VC-2 has no such thing: a table changed within itself, or code compiled anew, reads as a miss too. For
+the Multi Step Modulator a second source agrees: rom.2 holds the string "Multi Step Modulator" (and "Step Modulator" twice),
+rom.4 none of them. So the VC-2 has no Multi Step Modulator; its arpeggio's and its effects' IDs are its own.
 
 ## rom.4 run in the interpreter (2026-11-12, fourth pass)
 
@@ -548,6 +591,9 @@ among rom.2's.
 - ~~**Nothing here has been run.**~~ Four things have ("rom.4 run in the interpreter"), two of them held to a model bit for bit;
   the rest is still a reading of the code, checked against it by eye and by computed filter responses. rom.4's memory map is in
   the interpreter for research (`vc2rom.*`), so the project's way, the firmware's routines against a port, is open to the rest.
+- The VC-2 as its own mode (the user's decision, 2026-11-13): its steps and their state are in `research/VC2_MODE_PLAN.md`.
+  Next there, step 1b: each tone block's rom.2 routine run beside its rom.4 counterpart ("The V-Synth's tables and code in
+  rom.4" gives the pairs by the tables they read).
 - The 64 factory patches' values, read with rom.4's descriptors (the `.p02` store's layout, as `XtPatchStore` reads a `.p00`'s).
 - The `WLF08` library's format, and whether it is the V-Synth's preset area's format too.
 - rom.4's sections (code, .data, .bss), and how much of its code is rom.2's.
