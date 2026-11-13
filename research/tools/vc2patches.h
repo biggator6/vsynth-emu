@@ -17,6 +17,13 @@ struct Descriptor {
 };
 
 Descriptor descriptorOf(Machine& m, uint32_t id);
+// [FW] the second bank (research/VC2_VOCAL_DESIGNER.md, "The second descriptor bank, read"): 8 bytes an ID from 0x56a, u8
+// slot, s16 default, min, max, the values themselves (no centre)
+inline constexpr uint32_t kBank = 0x895131a8, kFirstTyped = 0x56a;
+struct TypedDescriptor {
+    int slot, def, min, max;
+};
+TypedDescriptor typedDescriptorOf(Machine& m, uint32_t id);
 // An ID's name from rom.4's table (pointers to strings with a leading space)
 std::string paramName(Machine& m, uint32_t id);
 // A .p02's PATa data (its header checked: 0x1e, VC20 at +2, PATaVC_2 at +0x10, the data's offset and length big-endian at

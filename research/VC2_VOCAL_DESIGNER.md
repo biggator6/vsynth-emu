@@ -57,7 +57,10 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   `mixer` share. `typed <file.p02>…` (`vc2typed.cpp`) reads the MFX, Chorus, Reverb and COSM blocks through the second bank
   by rom.4's own readers, with `vc2patches.h`'s `p02Data` and `spreadOf` shared with `patches` ("The second descriptor bank,
   read"). `fxprog <rom.2>` (`vc2fxprog.cpp`) runs rom.4's reverb types and holds each program they load to rom.2's ("The
-  effect chip's programs"); `vc2runs.h`'s `fileContents` is the file reader it and `p02Data` share.
+  effect chip's programs"); `vc2runs.h`'s `fileContents` is the file reader it and `p02Data` share, and its `answerKernel`
+  the kernel's stubs answered. `fxroute <rom.2> [scan|flags]` (`vc2fxroute.cpp`) maps where program A takes each input on
+  both images, on `XtFxChip` ("Program A's routing"); `vc2fxdriver.h` is rom.4's effect driver on an `XtFxChip`, and
+  `vc2patches.h` has the second bank's `typedDescriptorOf`.
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -1518,9 +1521,73 @@ The display's list (`0x89577ee0`, "00:Off" … "14:Garage") and the Reverb Type 
 reverbs with no Off: the seven stereo ones, Room 1 … Garage, Plate, Non-Linear and Delay, the table's order with Delay after.
 
 So **the VC-2 runs the V-Synth's effect chip programs** for its 42 MFX, its Chorus and the seven V-Synth reverbs it offers,
-renumbered to the slots of a new program A, and adds seven stereo reverbs of its own; the V-Synth's Plate, Non-Linear and
-Delay are there but unreachable from a patch. Not run: rom.4's MFX types loading their programs (the bytes and the names
-are the two sources), its program A and new reverbs on `XtFxChip`, and what the new program A routes where.
+their registers renumbered one down, beside a new program A, and adds seven stereo reverbs of its own; the V-Synth's
+Plate, Non-Linear and Delay are there but unreachable from a patch. Not run: rom.4's MFX types loading their programs (the
+bytes and the names are the two sources), and its new reverbs on `XtFxChip`. Program A on `XtFxChip`: the next section.
+
+### Program A's routing (2026-11-13, the VC-2 mode's step 1c)
+
+**How it was measured.** `vc2run <rom.4> fxroute <rom.2>` (`vc2fxroute.cpp`, with `vc2fxdriver.cpp`;
+`build/tools/vc2/fxroute.txt`, `fxroute_scan.txt`). rom.4's effect driver runs as XtFxControl runs rom.2's: its static
+constructor `0x89368280`, its starts `0x8935f9a0` and `0x8935fa80`, then the system's and a patch's message (the object
+`0x89980f24`, the flags at `0x89980f84`, the reader `0x8935fc40`). Its bus primitives (`0x89362490` a word, `0x89362610`
+a read, `0x893626d0` a coefficient, `0x893627f0` a memory offset) are hooked into an `XtFxChip`, each word at once, and its
+parameter reads (`0x89324350`, `0x89324370`; rom.2's `0x8947d310`, `0x8947d330`) answered with rom.4's defaults or a
+setting's values. The coefficient write doesn't pair by shape, as it was compiled anew, but its listing sends the same
+three bytes from the same arguments. rom.2's side is `XtFxUnit` as the plugin runs it. Then, on copies of each settled
+chip, an impulse into one GRAM word against a copy given silence: every word that differs, its first sample and its peak,
+whether rom.4's word is rom.2's sample for sample, and the mix out (0xa0, 0xa2) of the two against each other, over 8192
+samples. 17 settings, and a scan with each of the 256 words as the input.
+
+**The routes**, rom.4's EQ Hi Gain set to rom.2's default so the two EQs are alike (below):
+
+| From | rom.2 | rom.4 |
+|---|---|---|
+| MAIN L, R (0x20, 0x22) | the mix L, R (0xa0, 0xa2, again at 0xa8, 0xaa), through the system EQ | the same: 12 of 8192 samples differ, by −73 dB of the impulse at most |
+| MULTI L, R (0x28, 0x2a), the MFX off | the mix | the same within −67 dB, and through the patch's EQ 1 and EQ 2 (below) |
+| MULTI to the MFX | its input at 0x74, 0x76 | at 0x76, 0x78 |
+| The MFX's out (0xf8, 0xfa) | the mix; to the Chorus at +6 dB (0x70); to the Reverb at +6 dB (0x72) | the mix, the same; to the Chorus the same, sample for sample; to the Reverb at −6 dB, its left to 0x72 and its right to 0x74 (and with a V-Synth reverb into 0x72 too) |
+| The Chorus send (0x26) | the Chorus's input, 0x70 | the same, sample for sample |
+| The Reverb send (0x24) | the Reverb's input, 0x72, at 0 dB | a stereo input, 0x72 and 0x74, at −12 dB each; with a V-Synth reverb the right is added into the left, so 0x72 at −6 dB |
+| The Chorus's and Reverb's outs (0xf0…0xf6) | the mix | the same |
+| DIR L, R (0x2c, 0x2e) | DIR out (0xa4, 0xa6) | nowhere: none of the 256 words reaches 0xa4…0xa7 |
+| The outside input, read at 0x11 and 0x13 | left to 0x90, 0x94, 0x98, right to 0x92, 0x96, 0x9a, each a copy (and to 0x78, 0x7a) | left to 0x90, 0x94, 0x98; right to 0x9a alone, and nothing reaches 0x92 or 0x96 |
+| The USB input, 0x18 and 0x1a, with USB External In Type STEREO | not tried | added into the same: left to 0x90, 0x94, 0x98, right to 0x9a |
+
+Room 1's program is the same too: from its input word on, its outs are rom.2's sample for sample, so its output in the mix
+is 6 dB down only by its input. Nothing in the chip reads 0x90…0x9a back (the scan), so they leave it; rom.2's sampling
+pre-effects write 0x90, 0x92 (HARDWARE_FIRMWARE.md, "There is no output stage").
+
+**What the driver reads.** At its start rom.4's driver reads Master Level, Clock Source, Output Gain (0x40, 0x43, 0x78),
+the system EQ's Low Freq and Gain, Hi Freq and Gain, Total Gain and Switch (0x67, 0x68, 0x6f…0x72), USB External In Type
+(0x7f), Sampling Template (0x34), Part 1's bank and program (0…2), the patch's Category and Tempo (0x12c, 0x13a), the three
+switches, Direct Sound Level (0x195), EQ 1 and EQ 2's Freq, Q and Gain (0x1af…0x1b4), the MFX's, Chorus's and Reverb's own
+IDs, the tone block's MFX Send Level, Reverb Send Level and OSC 1 Type (0x2e0, 0x2e2, 0x2e5), and 35 typed IDs. It doesn't
+read the system EQ's Mid 1 and Mid 2 (0x69…0x6e), where rom.2's reads all of its EQ (0x65…0x70). The patch's EQ 1 and EQ 2
+have their ranges and defaults (Freq 50…20000 Hz, 12 and 16; Q 1; Gain 0 dB).
+
+**What the settings do.**
+- The system EQ: switched off, rom.2's MAIN peaks at +6.0 dB of the impulse as rom.4's does, and rom.4's answers its Low
+  Gain. Of their defaults only EQ Hi Gain differs: rom.2's 13 (−2 dB), rom.4's 15 (0 dB). So at the defaults rom.4's mix
+  is 2 dB brighter (MAIN's peak +6.0 dB against +4.7).
+- The patch's EQ 1 Gain at +15 dB moves MULTI's path (its peak +4.7 → +7.3 dB) and not MAIN's. So the VC-2 took the two
+  mid bands off the whole mix and put them on MULTI, by patch.
+- Direct Sound Level 127, OSC 1 Type EXTIN or VOCODER, External In Type STEREO or MONO-R, and the tone's MFX Send 0 with
+  its Reverb Send 127: each is read, and none moves a route measured here, from the frame or the outside input. What they
+  set is elsewhere: the SH-4's side, or words none of these inputs reach.
+- The message's 32 bits one at a time (`fxroute <rom.2> flags`), the chip's words cleared before each: only rom.2's
+  (system and Attenuation, a patch and the switches) write a word; the others write none. A weak check, as the driver
+  skips a block it holds as loaded.
+
+So **the new program A keeps the V-Synth's mix**: MAIN, MULTI, the MFX and the returns reach the outputs as on the V-Synth,
+at its gains. What it changes: the Reverb's input is a stereo pair, for the seven stereo reverbs, fed 6 dB lower (12 dB
+from the MFX); the MFX's input moved up a pair to make room; the system EQ's two mid bands are the patch's EQ 1 and EQ 2,
+on MULTI alone; DIR goes nowhere; and the outside input's right side reaches one outgoing word of three. For the port, the
+VC-2 mode's effects can go XtFxControl's way on rom.4's driver, as here, with the frame's eight words where they are.
+Not settled: the Chorus, whose output in the mix differs by up to +3.8 dB, its taps at 17 and 35 samples against rom.2's
+36 and 16, with their LFOs' phases not lined up between the runs, so whether its sides are swapped isn't known (program B
+differs in 13 words besides its registers); what outside the chip reads 0x90…0x9a; what DIR out carries on the VC-2; what
+the IDs read that moved nothing do.
 
 
 ## The names sweep

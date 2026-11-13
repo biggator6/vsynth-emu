@@ -36,6 +36,11 @@ Descriptor descriptorOf(Machine& m, uint32_t id) {
             (int16_t)m.cpu.rd16(d + 6), (int16_t)m.cpu.rd16(d + 8), (int16_t)m.cpu.rd16(d + 10)};
 }
 
+TypedDescriptor typedDescriptorOf(Machine& m, uint32_t id) {
+    const uint32_t d = kBank + 8 * (id - kFirstTyped);
+    return {m.cpu.rd8(d), (int16_t)m.cpu.rd16(d + 2), (int16_t)m.cpu.rd16(d + 4), (int16_t)m.cpu.rd16(d + 6)};
+}
+
 std::string paramName(Machine& m, uint32_t id) {
     std::string s;
     for (uint32_t p = m.cpu.rd32(kNames + 4 * id); s.size() < kLongestName; ++p) {

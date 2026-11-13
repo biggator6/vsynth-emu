@@ -6,7 +6,7 @@
 // per type, its name (rom.4's list, 15 of them) and what it loads; and each 350-word program held to rom.2's eight reverb
 // programs (fxmap's table) word by word: the closest, its words equal and those that differ in the register field alone.
 // Fails on a fault.
-#include "vc2runs.h"
+#include "vc2patches.h"
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -19,10 +19,8 @@ namespace {
 // [FW] rom.4's; rom.2's 0x894d09b0, 0x894d0a70, 0x894d0a80, 0x894d0b00 (codepairs.py)
 constexpr uint32_t kReverbInit = 0x893873d0, kSetType = 0x89387490, kSetParam = 0x893874a0, kApply = 0x89387520;
 constexpr uint32_t kLoadProgram = 0x89362b60;                     // [FW] (word, n, table)
-// [FW] the stubs into the kernel (0x88000000…, not mapped here): mov.l @(disp, pc), rn; jmp @rn, in this stretch
-constexpr uint32_t kStubsFrom = 0x89301000, kStubsTo = 0x89302000, kKernel = 0x88000000, kKernelEnd = 0x89000000;
 constexpr uint32_t kChip = 0xb0000000, kChipBytes = 0x4000;
-constexpr uint32_t kTypeIds = 0x895165e4, kBank = 0x895131a8, kFirstTyped = 0x56a;   // [FW] ("The second bank, read")
+constexpr uint32_t kTypeIds = 0x895165e4;                         // [FW] ("The second bank, read")
 constexpr uint32_t kTypeNames = 0x89577ee0, kNameBytes = 20, kNamedTypes = 15;      // [FW] "00:Off", …
 constexpr int kTypes = 17, kParams = 24;   // the table's entries; the parameters the setter takes
 constexpr uint32_t kReverbWords = 350, kRom2Base = 0x89300000;
@@ -80,25 +78,6 @@ std::string typeName(Machine& m, int type) {
     return s;
 }
 
-// Every stub into the kernel answered with 0, as XtFxControl answers rom.2's sleep: the driver's waits and its OS calls;
-// how many
-int answerKernel(Machine& m) {
-    int n = 0;
-    for (uint32_t pc = kStubsFrom; pc < kStubsTo; pc += 2) {
-        const uint32_t op = m.cpu.rd16(pc), reg = op >> 8 & 15;
-        if (op >> 12 != 0xd || m.cpu.rd16(pc + 2) != (0x402bu | reg << 8)) continue;
-        const uint32_t literal = m.cpu.rd32(((pc + 4) & ~3u) + 4 * (op & 0xff));
-        if (literal < kKernel || literal >= kKernelEnd) continue;
-        m.cpu.hook(pc, [](Sh4& c) { c.ret(0); });
-        ++n;
-    }
-    return n;
-}
-
-int typedDefault(Machine& m, int id) {
-    return (int16_t)m.cpu.rd16(kBank + 8 * (uint32_t)(id - (int)kFirstTyped) + 2);
-}
-
 // One type set with its typed defaults and applied; what it loaded, said; false on a fault
 bool runType(Machine& m, const std::vector<uint8_t>& rom2, int type, std::vector<Load>& loads) {
     const int first = (int16_t)m.cpu.rd16(kTypeIds + 4 * (uint32_t)type);
@@ -106,7 +85,7 @@ bool runType(Machine& m, const std::vector<uint8_t>& rom2, int type, std::vector
     loads.clear();
     if (!m.run(kSetType, {(uint32_t)type})) return false;
     for (int i = 0; i < kParams; ++i) {
-        const int def = i <= last - first ? typedDefault(m, first + i) : 0;
+        const int def = i <= last - first ? typedDescriptorOf(m, (uint32_t)(first + i)).def : 0;
         if (!m.run(kSetParam, {(uint32_t)i, (uint32_t)def})) return false;
     }
     if (!m.run(kApply, {0})) return false;

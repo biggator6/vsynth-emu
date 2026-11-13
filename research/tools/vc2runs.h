@@ -18,6 +18,9 @@ uint32_t slotOf(Machine& m, uint32_t engine, int slot);
 bool runF(Machine& m, uint32_t addr, std::initializer_list<uint32_t> args, float fr4, float fr5 = 0);
 // A file's bytes, or empty when it can't be read
 std::vector<uint8_t> fileContents(const char* path);
+// Every stub into the kernel (rom.4's 0x89301000…0x89302000, each a literal into 0x88000000…, which isn't mapped) answered
+// with 0: the effect driver's waits and its OS calls; how many
+int answerKernel(Machine& m);
 // The vocoder module's static initializers, the init table's entries 0x898c609c…0x898c6108 (the carriers' rates, the
 // mic's globals, the pitch tracker's setters, C4's period, …); false on a fault
 bool initVocoderModule(Machine& m);
@@ -44,5 +47,6 @@ int autonote(Machine& m, int argc, char** argv);
 int mixer(Machine& m, int argc, char** argv);
 int typed(Machine& m, int argc, char** argv);
 int fxprog(Machine& m, int argc, char** argv);
+int fxroute(Machine& m, int argc, char** argv);
 
 } // namespace vc2

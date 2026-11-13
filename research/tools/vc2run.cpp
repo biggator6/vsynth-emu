@@ -22,10 +22,12 @@
 //   vc2run <rom.4> mixer           the part's levels and block mixer on known input frames (vc2mixer.cpp)
 //   vc2run <rom.4> typed <file.p02> …   MFX, Chorus, Reverb and COSMs read through the second bank (vc2typed.cpp)
 //   vc2run <rom.4> fxprog <rom.2>  the reverb types' chip programs, against rom.2's (vc2fxprog.cpp)
+//   vc2run <rom.4> fxroute <rom.2> where program A takes each input, both images on XtFxChip (vc2fxroute.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
-//        plugin/Source/XtFwMachine.cpp plugin/Source/XtMultiBandPlayer.cpp -o build/tools/vc2/vc2run
+//        plugin/Source/XtFwMachine.cpp plugin/Source/XtMultiBandPlayer.cpp plugin/Source/XtFxChip.cpp
+//        plugin/Source/XtFxControl.cpp -o build/tools/vc2/vc2run
 #include "vc2runs.h"
 #include <algorithm>
 #include <array>
@@ -53,6 +55,21 @@ std::vector<uint8_t> fileContents(const char* path) {
         std::fclose(fp);
     }
     return f;
+}
+
+int answerKernel(Machine& m) {
+    // [FW] the stubs into the kernel (0x88000000…, not mapped here): mov.l @(disp, pc), rn; jmp @rn, in this stretch
+    constexpr uint32_t kStubsFrom = 0x89301000, kStubsTo = 0x89302000, kKernel = 0x88000000, kKernelEnd = 0x89000000;
+    int n = 0;
+    for (uint32_t pc = kStubsFrom; pc < kStubsTo; pc += 2) {
+        const uint32_t op = m.cpu.rd16(pc), reg = op >> 8 & 15;
+        if (op >> 12 != 0xd || m.cpu.rd16(pc + 2) != (0x402bu | reg << 8)) continue;
+        const uint32_t literal = m.cpu.rd32(((pc + 4) & ~3u) + 4 * (op & 0xff));
+        if (literal < kKernel || literal >= kKernelEnd) continue;
+        m.cpu.hook(pc, [](Sh4& c) { c.ret(0); });
+        ++n;
+    }
+    return n;
 }
 
 bool initVocoderModule(Machine& m) {
@@ -91,7 +108,7 @@ constexpr std::array kRuns{Run{"boot", vc2::boot}, Run{"warp", vc2::warp}, Run{"
                            Run{"solo", vc2::solo}, Run{"lite", vc2::lite}, Run{"tva", vc2::tva},
                            Run{"patches", vc2::patches}, Run{"track", vc2::track}, Run{"vocosc", vc2::vocosc},
                            Run{"autonote", vc2::autonote}, Run{"mixer", vc2::mixer}, Run{"typed", vc2::typed},
-                           Run{"fxprog", vc2::fxprog}};
+                           Run{"fxprog", vc2::fxprog}, Run{"fxroute", vc2::fxroute}};
 
 } // namespace
 
@@ -100,7 +117,7 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "usage: vc2run <rom.4> <run> [args]: boot, warp, ratio, hold, growl, kind6, patches,\n"
                              "       track, vocosc, autonote, mixer, typed;\n"
                              "       vc2run <rom.4> <block> <rom.2>: lfo, env, cosm, osc, analog, band, solo, lite,\n"
-                             "       tva, fxprog\n");
+                             "       tva, fxprog, fxroute\n");
         return 2;
     }
     vc2::Machine m(argv[1]);

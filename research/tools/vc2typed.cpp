@@ -16,7 +16,6 @@ namespace vc2 {
 namespace {
 
 constexpr uint32_t kTypedRead = 0x8932b460;                    // [FW] (section, slot base, id) → the value
-constexpr uint32_t kBank = 0x895131a8, kFirstTyped = 0x56a;    // [FW] the second bank, 8 bytes an ID
 constexpr uint32_t kCosmSwitchId = 0x462;                      // [FW]
 constexpr uint32_t kNames = 2476;                              // [FW] the names table's IDs, both banks
 
@@ -35,15 +34,6 @@ constexpr Block kBlocks[] = {
 };
 constexpr bool isCosm(const Block& b) {
     return b.zones > 1;
-}
-
-struct TypedDescriptor {
-    int slot, def, min, max;
-};
-
-TypedDescriptor typedDescriptorOf(Machine& m, uint32_t id) {
-    const uint32_t d = kBank + 8 * (id - kFirstTyped);
-    return {m.cpu.rd8(d), (int16_t)m.cpu.rd16(d + 2), (int16_t)m.cpu.rd16(d + 4), (int16_t)m.cpu.rd16(d + 6)};
 }
 
 // A type's first and last typed IDs, from its block's table
