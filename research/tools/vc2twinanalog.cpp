@@ -37,10 +37,9 @@ constexpr int kWaveCodes = 11;   // [FW] rom.4's OSC Analog Waveform, 0…10 (SA
 
 constexpr uint32_t kIn = kScratch, kPart = kScratch + 0x200, kZero = kScratch + 0x400, kVoice = kScratch + 0x1000;
 constexpr uint32_t kEnvs = kScratch + 0x3000, kLfo = kScratch + 0x3400, kBuf = kScratch + 0x4000, kBufBytes = 64 * 4;
-// [FW] rom.4's sub-object: the waveform routines read +0x80 and +0x84 where rom.2's do and +0xec on 4 bytes further
-// (0x89509360 against 0x893c5dc0), so a 4-byte field is inserted in (0x84, 0xec]; none of them reads between, and the run
-// is equal with it at 0x88, 0xc0 or 0xe8, so it is put at the bound
-constexpr uint32_t kSub = kVoice + 0xd4, kSubSize = 0x200, kInsertAt = 0x88, kInserted = 4;
+// [FW] the OSC object, laid out in rom.4 with vc2twin.h's kOscInsert: the waveform routines read +0x80 and +0x84 where
+// rom.2's do and +0xec on 4 bytes further (0x89509360 against 0x893c5dc0); the band run places the insert at +0x94
+constexpr uint32_t kSub = kVoice + 0xd4, kSubSize = 0x200;
 constexpr int kNotes = 100, kBlocks = 40;
 
 void hookRom2(Twin& t) {
@@ -125,14 +124,6 @@ void writeEnvelopeOutputs(Twin& t, Rng& r, bool attack) {
     t.vsynth.write(kEnvs + 0x300 + 0x1c, &atk, 4);
 }
 
-// rom.2's sub-object into rom.4's, the bytes from kInsertAt moved past the field rom.4 inserts there
-void copySub(Twin& t) {
-    std::vector<uint8_t> sub(kSubSize + kInserted, 0);
-    t.vsynth.read(kSub, sub.data(), kInsertAt);
-    t.vsynth.read(kSub + kInsertAt, sub.data() + kInsertAt + kInserted, kSubSize - kInsertAt);
-    t.vc2.cpu.write(kSub, sub.data(), sub.size());
-}
-
 // The voice made in rom.2 for one waveform: rom.2's routine for it, 0 on a fault
 uint32_t makeVoice(Twin& t, Rng& r, int code, bool sub) {
     writeAnalogInput(t, r, code, sub);
@@ -151,9 +142,8 @@ uint32_t makeVoice(Twin& t, Rng& r, int code, bool sub) {
 // Where one block's output or sub-object parts, or nullptr; `at` the byte offset
 const char* blockDiffers(Twin& t, long& at) {
     if ((at = t.differs(kBuf, kBufBytes)) >= 0) return "samples";
-    if ((at = t.differsAt(kSub, kSub, kInsertAt)) >= 0) return "sub-object";
-    at = t.differsAt(kSub + kInsertAt, kSub + kInsertAt + kInserted, kSubSize - kInsertAt);
-    return at >= 0 ? "sub-object past the insert" : nullptr;
+    at = t.differsInserted(kSub, kSubSize, kOscInsert);
+    return at >= 0 ? "sub-object" : nullptr;
 }
 
 // One note: false on a fault; `counts` its blocks and those that differ, the first said
@@ -164,13 +154,13 @@ bool note(Twin& t, Rng& r, int code, bool sub, Twin::Returns& counts) {
         std::printf("waveform %d%s: rom.2's routine %08x has no pair\n", code, sub ? " with sub" : "", fn2);
         return false;
     }
-    copySub(t);
+    t.copyInserted(kSub, kSubSize, kOscInsert);
     const std::vector<uint8_t> zero(kBufBytes, 0);
     for (int b = 0; b < kBlocks; ++b) {
         if (b % 5 == 4) {
             writeEnvelopeOutputs(t, r, false);
             if (!t.callVSynth(kUpdate, {kVoice})) return false;
-            copySub(t);
+            t.copyInserted(kSub, kSubSize, kOscInsert);
         }
         const uint32_t sync = r.next() % 8 == 0 ? (r.next() << 16 | r.next()) & (r.next() << 16 | r.next()) : 0u;
         t.write(kBuf, zero.data(), kBufBytes);
@@ -191,19 +181,17 @@ int analogCases(Twin& t) {
     hookRom2(t);
     if (!t.callVSynth(kSystem, {kSystemObject, 0, 0, 0})) return -1;
     Rng r;
-    long differ = 0, blocks = 0;
+    Twin::Returns all;
     for (int code = 0; code < kWaveCodes; ++code)
         for (const bool sub : {false, true}) {
             Twin::Returns counts;
             for (int n = 0; n < kNotes; ++n)
                 if (!note(t, r, code, sub, counts)) return -1;
-            std::printf("waveform %2d%s: %ld blocks, %ld different\n", code, sub ? " with sub" : "         ",
-                        counts.cases, counts.differ);
-            blocks += counts.cases;
-            differ += counts.differ;
+            char label[32];
+            std::snprintf(label, sizeof label, "waveform %2d%s", code, sub ? " with sub" : "         ");
+            addCount(label, "blocks", counts, all);
         }
-    std::printf("analog: %ld blocks, %ld different\n", blocks, differ);
-    return (int)differ;
+    return sayCount("analog", "blocks", all);
 }
 
 } // namespace

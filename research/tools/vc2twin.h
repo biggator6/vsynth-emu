@@ -53,10 +53,37 @@ public:
     // As differs, for an object rom.4 holds at another address than rom.2 (a field inserted before it): the first word in
     // n bytes from a2 in rom.2 and a4 in rom.4 that differs, as a byte offset, or −1
     [[nodiscard]] long differsAt(uint32_t a2, uint32_t a4, uint32_t n);
+    // A run of an object's bytes at one offset in rom.2's layout and another in rom.4's
+    struct Segment {
+        uint32_t vsynth, vc2, bytes;
+    };
+    // rom.2's object at a into rom.4's at a, segment by segment (what no segment covers in rom.4's left zero, `n` bytes
+    // of it cleared first)
+    void copyMapped(uint32_t a, uint32_t n, std::span<const Segment> map);
+    // The first word where the two objects differ, segment by segment, by rom.2's offset, or −1
+    [[nodiscard]] long differsMapped(uint32_t a, std::span<const Segment> map);
+    // An object rom.4 lays out with `bytes` more at `at` (its fields from there on that much further)
+    struct Insert {
+        uint32_t at, bytes;
+    };
+    // rom.2's object of n bytes at a into rom.4's at a, the bytes from ins.at moved past the insert (left zero)
+    void copyInserted(uint32_t a, uint32_t n, Insert ins);
+    // The first word where rom.2's object of n bytes at a and rom.4's differ, by rom.2's offset, or −1
+    [[nodiscard]] long differsInserted(uint32_t a, uint32_t n, Insert ins);
 private:
     bool ready = false;
     long differsMoved(uint32_t a2, uint32_t a4, uint32_t n, std::span<const Moved> moved);
 };
+
+// [FW] rom.4's OSC object (voice + 0xd4: the analog OSC's and the VariPhrase players') has 4 bytes at +0x94 that rom.2's
+// has not, its fields from there on 4 further: the code's offsets +0x98, +0xa8, +0xe8, +0xec on are 4 more in rom.4 and
+// +0x84 is not (codealign.py --fields), and the band run is equal with the insert here and nowhere else in (+0x84, +0x98]
+inline constexpr Twin::Insert kOscInsert{0x94, 4};
+
+// A part of a run's count added to the whole, said as "<label>: <cases> <unit>, <differ> different"
+void addCount(const char* label, const char* unit, const Twin::Returns& part, Twin::Returns& whole);
+// The whole said the same way; its differences, the run's result
+int sayCount(const char* label, const char* unit, const Twin::Returns& whole);
 
 // The runs' random inputs: a fixed linear congruential sequence (xt_cosm's), so a run repeats
 struct Rng {

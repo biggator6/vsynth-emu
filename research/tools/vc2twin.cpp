@@ -69,6 +69,35 @@ long Twin::differsAt(uint32_t a2, uint32_t a4, uint32_t n) {
     return differsMoved(a2, a4, n, {});
 }
 
+void Twin::copyMapped(uint32_t a, uint32_t n, std::span<const Segment> map) {
+    const std::vector<uint8_t> zero(n, 0);
+    vc2.cpu.write(a, zero.data(), n);
+    std::vector<uint8_t> x;
+    for (const Segment& s : map) {
+        x.resize(s.bytes);
+        vsynth.read(a + s.vsynth, x.data(), s.bytes);
+        vc2.cpu.write(a + s.vc2, x.data(), s.bytes);
+    }
+}
+
+long Twin::differsMapped(uint32_t a, std::span<const Segment> map) {
+    for (const Segment& s : map) {
+        const long at = differsAt(a + s.vsynth, a + s.vc2, s.bytes);
+        if (at >= 0) return (long)s.vsynth + at;
+    }
+    return -1;
+}
+
+void Twin::copyInserted(uint32_t a, uint32_t n, Insert ins) {
+    const Segment map[] = {{0, 0, ins.at}, {ins.at, ins.at + ins.bytes, n - ins.at}};
+    copyMapped(a, n + ins.bytes, map);
+}
+
+long Twin::differsInserted(uint32_t a, uint32_t n, Insert ins) {
+    const Segment map[] = {{0, 0, ins.at}, {ins.at, ins.at + ins.bytes, n - ins.at}};
+    return differsMapped(a, map);
+}
+
 long Twin::differsMoved(uint32_t a2, uint32_t a4, uint32_t n, std::span<const Moved> moved) {
     std::vector<uint32_t> x(n / 4), y(n / 4);
     vsynth.read(a2, x.data(), n);
@@ -84,6 +113,17 @@ long Twin::differsMoved(uint32_t a2, uint32_t a4, uint32_t n, std::span<const Mo
 void Twin::sayDiffers(uint32_t a, long at) {
     const uint32_t w = a + (uint32_t)at;
     std::printf("the images' objects differ at +%#lx (rom.2 %08x, rom.4 %08x); ", at, vsynth.rd32(w), vc2.cpu.rd32(w));
+}
+
+void addCount(const char* label, const char* unit, const Twin::Returns& part, Twin::Returns& whole) {
+    std::printf("%s: %ld %s, %ld different\n", label, part.cases, unit, part.differ);
+    whole.cases += part.cases;
+    whole.differ += part.differ;
+}
+
+int sayCount(const char* label, const char* unit, const Twin::Returns& whole) {
+    std::printf("%s: %ld %s, %ld different\n", label, whole.cases, unit, whole.differ);
+    return (int)whole.differ;
 }
 
 int twinRun(Machine& m, int argc, char** argv, bool (*loadTables)(const char*), int (*body)(Twin&)) {

@@ -26,5 +26,7 @@ int env(Machine& m, int argc, char** argv);
 int cosm(Machine& m, int argc, char** argv);
 int osc(Machine& m, int argc, char** argv);
 int analog(Machine& m, int argc, char** argv);
+int band(Machine& m, int argc, char** argv);
+int solo(Machine& m, int argc, char** argv);
 
 } // namespace vc2
