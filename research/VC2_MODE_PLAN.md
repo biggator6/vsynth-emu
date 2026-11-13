@@ -69,6 +69,12 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   detector that would snap it is unreachable, and the Legato Switch's setter only keeps it off); a key's note takes the
   singer's pitch movement by a depth. Left of it: what sets that depth, Auto Note's 1 against 2 in the tone generator (read,
   not run), the mailbox's note + 12.
+  **The part mixer, 2026-11-13** (`vc2run … mixer`; VC2_VOCAL_DESIGNER.md, "The part mixer, run"): one block mixer
+  (`0x893b1820`) writes the bus frame: the direct signal (the raw mic when an EXTIN OSC is in zone 0 or 1, else the voices'
+  second buffer) to MAIN at Direct Sound × 0.025 and to the Reverb send at that × zone 0's Reverb Send, the vocoder's output
+  to MULTI at zone 0's MFX Send × 0.025, the Chorus send 0, DIR untouched; each level eases 3% a block; suspend and resume
+  bypass the vocoder. Left of it: what drives the levels' offsets, which voices render into which buffer, the vocoder's
+  output scale.
 - Second sources: the V-Card owner's manual (names and meanings) and the 64 factory patches (the corpus).
 
 ### 2. Shared plumbing (plugin/Source)

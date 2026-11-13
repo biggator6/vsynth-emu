@@ -52,6 +52,25 @@ bool loadStore(Machine& m, const std::vector<uint8_t>& data) {
     return m.run(kToStore, {kPatchStore, kFile});
 }
 
+bool setStoreValue(Machine& m, uint32_t section, uint32_t id, int value) {
+    const Descriptor d = descriptorOf(m, id);
+    const int width = d.width < 0 ? -d.width : d.width, total = width + d.bit, bytes = (total + 7) / 8;
+    const uint32_t at = section + (uint32_t)d.offset, shift = (uint32_t)(bytes * 8 - total);
+    uint32_t v = 0;
+    for (int k = 0; k < bytes; ++k) v = v << 8 | m.cpu.rd8(at + (uint32_t)k);
+    const uint32_t mask = ((1u << width) - 1) << shift;
+    v = (v & ~mask) | (((uint32_t)(value + d.centre) << shift) & mask);
+    for (int k = bytes - 1; k >= 0; --k) {
+        m.cpu.wr8(at + (uint32_t)k, (uint8_t)v);
+        v >>= 8;
+    }
+    uint32_t back = 0;
+    if (!m.run(kReadValue, {section, id}, &back)) return false;
+    if ((int32_t)back == value) return true;
+    std::printf("store: %03x set to %d reads %d\n", id, value, (int32_t)back);
+    return false;
+}
+
 namespace {
 
 uint32_t be32(const std::vector<uint8_t>& f, size_t at) {

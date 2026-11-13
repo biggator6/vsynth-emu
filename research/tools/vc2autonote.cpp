@@ -17,7 +17,6 @@ namespace vc2 {
 
 namespace {
 
-constexpr uint32_t kInitFirst = 0x898c609c, kInitLast = 0x898c6108, kInitStride = 12;   // [FW] the vocoder module's
 constexpr uint32_t kTrackerReset = 0x893ee040, kRingReset = 0x893ec7d0;   // [FW] what the glue calls
 constexpr uint32_t kInputStage = 0x893ebb00;   // [FW] (samples, n): the detector if 0x8993fe48, the tracker, Auto Note
 constexpr uint32_t kSetAutoNote = 0x893ebc20;  // [FW] Auto Note On Switch's setter, 0…2
@@ -179,8 +178,7 @@ bool noNoteGetter(Machine& m, Run& run, float depth) {
 }
 
 bool init(Machine& m) {
-    for (uint32_t e = kInitFirst; e <= kInitLast; e += kInitStride)
-        if (!m.run(m.cpu.rd32(e), {})) return false;
+    if (!initVocoderModule(m)) return false;
     std::printf("after the init: kind 6's mode word %d, pitch flag %d; C4's period %.4f (%.3f Hz); detector word %d\n",
                 (int32_t)m.cpu.rd32(kKind6Mode), (int32_t)m.cpu.rd32(kPitchFlag), m.f32(kC4Period),
                 kTrackRate / m.f32(kC4Period), (int32_t)m.cpu.rd32(kDetectorOn));

@@ -22,5 +22,8 @@ std::string paramName(Machine& m, uint32_t id);
 // A .p02's data (empty for rom.4's defaults) into rom.4's store at kPatchStore, as its own routines take one; false on a
 // fault
 bool loadStore(Machine& m, const std::vector<uint8_t>& data);
+// An ID's value into the store by its descriptor (big-endian bits from its offset in the section at `section`, the value
+// plus its centre), then read back by rom.4's reader (kReadValue); false on a fault or when the reader disagrees, said
+bool setStoreValue(Machine& m, uint32_t section, uint32_t id, int value);
 
 } // namespace vc2

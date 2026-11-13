@@ -47,7 +47,11 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   through the builder, the converter and the carrier and fails on a fault or a store write its reader doesn't read back
   ("The VOCODER OSC's IDs, run"). `patches` shares its store helpers through `vc2patches.h`. `autonote`
   (`vc2autonote.cpp`, sharing `track`'s tones through `vc2track.h`) runs kind 6's mode and Auto Note on sung tones, with the
-  tone generator's calls answered and logged, and fails only on a fault ("Kind 6's pitch source, run").
+  tone generator's calls answered and logged, and fails only on a fault ("Kind 6's pitch source, run"). `mixer`
+  (`vc2mixer.cpp`) runs the part's level routine and its live block mixer on known input frames, the vocoder's block call
+  answered, and fails on a fault or a store write its reader doesn't read back ("The part mixer, run"); `vc2patches.h`'s
+  `setStoreValue` is the store writer `vocosc` and `mixer` share, `vc2runs.h`'s `initVocoderModule` the init `autonote` and
+  `mixer` share.
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -818,7 +822,67 @@ So, measured against read:
   at 400 Hz, and 880 Hz at 0.5 passes;
 - the level a tone needs depends on its pitch through the band-pass and the quiet-jump rules.
 
-## The vocoder's code (2026-11-12, second pass)
+### The part mixer, run (`mixer`) (2026-11-13, the VC-2 mode's step 1c)
+
+**The mixer**, `0x893b1820(out)` (called once a block from `0x89395b0e`; the two call sites "The block driver" names,
+`0x893b19b0` and `0x893b1b46`, are its two paths). Per block of 32 it:
+
+1. reads the 32 input frames (`*0x8993eadc`): the word at +4 × 2^-31 into the mic buffer `0x8999f3d0`, +0x14 into
+   `0x8999f450`;
+2. clears two stereo buffers, `0x8999f2d0` (the vocoder's) and `0x8999f1d0`;
+3. runs the pitch tracker's input stage (on +0x14), the mic ring (on +4) and, with a vocoder engine, the unvoiced detector;
+4. walks the part's voices (`*0x899996d0`), each rendering into one buffer or the other by what its methods answer (read, not
+   run). This is where rom.4's TVA, which renders one stereo pair ("The TVA in rom.4"), lands;
+5. runs the vocoder (`0x893f0580`) on a modulator into the `0x8999f2d0` buffer, unless the bypass flag `0x89934550` is set;
+6. writes each output frame, the bus's eight words (MAIN L, R, the Reverb and Chorus sends, MULTI L, R, DIR L, R, as
+   XtSynth's frame), from three levels:
+
+| Frame | Source | Level |
+|---|---|---|
+| MAIN L and R (the same) | the direct signal | MAIN's |
+| Reverb send | the direct signal | Reverb's |
+| Chorus send | 0 | |
+| MULTI L and R (the MFX's input) | the vocoder's buffer | MULTI's |
+| DIR L and R | not written | |
+
+The direct signal and the vocoder's modulator depend on a flag `0x8993eacc`, set when zone 0's or zone 1's OSC 1 Type is
+EXTIN. With the flag set, both are the raw mic, the input frame's +4 word. Without it, both come from the other buffer's
+right channel (the modulator × 2^-31).
+
+**The levels.** Three targets: MULTI's `0x8999f4d0`, MAIN's `0x8999f4dc` and Reverb's `0x8999f4e8`. Each has the level the
+mixer has reached, at `0x8999f4d8`, `4e4` and `4f0`; each sample it adds (target − reached) × 0.0009375, the step worked out
+once a block, so a level eases 3% of the way each block (a time constant of about 24 ms). The targets (`0x893b1ee0`, and the
+tail of `0x893b1480`):
+- MULTI = clamp₀¹(MFX Send + offset₂) × 0.025;
+- MAIN = clamp₀¹(Direct Sound + offset₁) × 0.025, × 2^31 (2147483392) with the EXTIN flag;
+- Reverb = Reverb Send × MAIN's target.
+
+The settings are each ÷127: Direct Sound Level (0x195, the patch common) and **zone 0's MFX and Reverb Send Levels** (0x2e0,
+0x2e2, the V-Synth's tone TVA sends, read here for the part). The vocoder converter (`0x893a72f0`) sets them through the setters
+`0x893b1eb0`, `0x893b1ed0`, `0x893b1ec0` at each conversion, then recomputes the targets. Chorus Send (0x2e1) is not read. The
+level routine `0x893b1480` (from `0x89360880`, which two routines call) reads the same three and also sets the EXTIN flag. It
+is the flag's only writer: its setter and getter `0x893b1370` and `0x893b1380` have no caller. The offsets
+`0x89997290` (Direct Sound's) and `0x89997294` (MFX Send's), with a third at `0x89997298` that no level reads, are three
+16-bit sums × 1/127 (`0x893a2e50`, from `0x893a24d0`, beside the Matrix's getters; `0x893a2ee0` is in a handler table at
+`0x898cd45c`). Which controls drive them is not traced.
+
+**Suspend and resume.** `0x893b1390` (nested by a count, interrupts masked) sets the bypass flag, saves the three targets
+(`0x8999f4f4…fc`) and zeroes them; `0x893b1410` puts them back and clears the flag.
+
+**Run** (`vc2run <rom.4> mixer`, `vc2mixer.cpp`): the store set, the level routine, then the live mixer with an empty voice
+list on input frames whose +4 word is 1/8 of full scale and +0x14 1/16, the vocoder's block call answered with L 1000, R −1000.
+- **No EXTIN OSC; Direct 127, MFX Send 127, Reverb Send 64:** targets MULTI 0.025, MAIN 0.025, Reverb 0.0126. MULTI eases from
+  0 (0.73 at the end of the first block, 7.1 by block 10, 24.996 by block 299, of 25); MAIN and Reverb carry the voices'
+  buffer, empty here, so 0.
+- **Zone 1's OSC 1 EXTIN; Direct 64, MFX Send 100, Reverb Send 127:** MAIN's target 0.50394 × 0.025 × 2^31 = 2.7055e7. MAIN L
+  and R are 3.38186e6, the mic's 0.125 × that (the +4 word's, not +0x14's), and the Reverb send the same (Reverb Send 1).
+  Chorus 0; DIR left as it was; MULTI eases to 19.685 (1000 × 0.7874 × 0.025).
+- **Suspended:** the vocoder isn't called and MULTI is 0 at once (its buffer cleared); MAIN and Reverb ease out, 0.97 a block
+  (×0.049 after 99). **Resumed:** the targets come back and the levels ease in from where they had got to.
+
+So a full-scale direct sound at Direct Sound 127 sits at 0.025, −32 dB, in the frame's units (2^31 full scale); the vocoder's
+output goes to the MFX's input at MFX Send × 0.025 of its own scale, which this run doesn't fix (the vocoder was answered here).
+
 
 Found from what loads the vocoder block's IDs, then followed by hand in `sh4dis.py` listings (`ROM=` rom.4). ~~rom.4 is compiled
 differently from rom.2: matching rom.2's routines instruction by instruction (pool displacements and branch offsets masked) finds
@@ -839,7 +903,8 @@ add #-97` is 0x19f), so a search for literal IDs misses them; `idbuild.py` ("The
   an octave each way. ~~Not confirmed which library routine that is.~~ Run: powf ("HIRESO's formant warp, run").
 - Vocoder Sound Level, Vocoder Depth, Unvoice Level and Unvoice Detect (+24), Unvoice Spread, Env Attack, Env Release, Formant
   Template, Hold Dump Time (÷127), Direct Sound Level (÷127). Unvoice Level ÷127 goes to `0x899d9968`, Direct Sound Level ÷127 to
-  `0x8999f4e0` (setter `0x893b1eb0`). Where the others go has not been traced.
+  `0x8999f4e0` (setter `0x893b1eb0`). Where the others go has not been traced. (Since: it also reads zone 0's Reverb and MFX
+  Send Levels into `0x893b1ec0` and `0x893b1ed0` and recomputes the part mixer's targets, "The part mixer, run".)
 - Then, if either OSC's Type (0x2e5) reads 2, Auto Note On Switch, Legato Switch and robot human depth (÷127, to the setters
   `0x893ebc20`, `0x893ebc60`, and the Formant Template's table at `0x89540904`, 16 entries of 140 bytes, offsets the formant).
   Otherwise those are set to 0. So Auto Note and robot human depth belong to a mic played through an EXT IN-type OSC, not to the
@@ -886,7 +951,8 @@ on `0x89561700`.
 the calls. Each runs `0x893ed040(input)`, the hook, slot 1 (input), slot 2 or 3 (output), slot 7, then `0x893ed510` or `0x893ed690`
 (output, the object's +0x14 level × a constant). Both are called from the part's block mixers at `0x893b19b0` and `0x893b1b46`
 (in `0x893b1300…0x893b1bd0`): each copies the mic input, skips the vocoder when `0x89934550` is set, and mixes onto a 32-byte frame
-per sample with levels ramped across the block from `0x8999f4d0…0x8999f4fc`.
+per sample with levels ramped across the block from `0x8999f4d0…0x8999f4fc`. (Run since, "The part mixer, run": the two are
+one mixer's paths, `0x893b1820`, chosen by whether an EXTIN OSC is in zone 0 or 1; the frame is the bus's.)
 
 **The settings path (third pass).** The converter builds a settings struct on its stack (its sp + 16) and passes it to
 `0x893b1be0`, which calls `0x893f06a0(vocoder, settings)`: +0x00 and +0x04 the formant ratio; +0x08, +0x0c 0, or in the EXT IN
@@ -1326,8 +1392,9 @@ among rom.2's.
   (slot 4's three branches)~~, ~~which controller drives the hold~~ (CC 64), ~~the carrier's growl branch~~, ~~kind 6~~.
   Still open: whether HIRESO's Depth routine `0x893f22d0` has a computed caller; the float argument `0x893f07a0` multiplies the
   consonant gain by, and the glue that calls it; `0x899d9d90`, which the EXT IN path's formant offsets divide by the tracked
-  period; the analysis and synthesis groups' delays against HIRESO's 128-sample input latency; the levels the part mixer ramps
-  (`0x8999f4d0…`) beyond Direct Sound; ~~the pass the VOCODER OSC's own IDs (0x354…0x361) take into the voice's fields (P+0x30's
+  period; the analysis and synthesis groups' delays against HIRESO's 128-sample input latency; ~~the levels the part mixer ramps
+  (`0x8999f4d0…`) beyond Direct Sound~~ (run, "The part mixer, run"; left of it: what drives the offsets `0x89997290…98`,
+  which voices render into which buffer, the vocoder's output scale); ~~the pass the VOCODER OSC's own IDs (0x354…0x361) take into the voice's fields (P+0x30's
   ID among them: run the OSC converter `0x8939ced0` on a patch's block)~~ (run, "The VOCODER OSC's IDs, run"; left of it: where
   the Harm Formant's LFO and Envelope Depths and the Wave start offset are read, and the Dynamics' law); ~~kind 6's mode
   parameter and where its P comes from~~ (run, "Kind 6's pitch source, run": mode 0 always, P+0 the note's pitch bent by the
