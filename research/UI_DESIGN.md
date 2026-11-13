@@ -1,8 +1,134 @@
 # The editor's design
 
+## The redesign, D (from 2026-11-13) {#redesign-d}
+
+The user's decision (2026-11-13): a new UI and workflow with Arturia Pigments and Xfer Serum as ideas, a fresh palette, room
+for a V-Synth / VC-2 mode switch, on the branch `ui-redesign` cut from master. Of the four mock-ups on the canvas
+https://claude.ai/artifact/RQFA4HhEHdfSYsMYUdYQvP, the user chose D ("Yes, build D"), the mix of A (the module rack) and C
+(the signal path, a block's own envelopes and LFO beside it). The mock-up's source, `Mix.dc.html` on that canvas, is the
+reference: the numbers below are read from it. The ideas come from Pigments and Serum, their look does not. Nothing here
+changes a parameter or the sound: every control sets a parameter, as today, and `TEST_UI_LAYOUT` holds D to that.
+
+Until step 7 lands, the sections after this one describe the editor as it stands.
+
+### The window
+
+Drawn at 1200 × 750 and scaled whole, from 0.8 (960 × 600, today's smallest) to 1.2 (1440 × 900), the aspect kept. Top to
+bottom, in the drawing's own units:
+
+| Region | y | Height | Holds |
+|---|---|---|---|
+| Header | 0 | 48 | the wordmark and the build under it; the mode switch, V-SYNTH and VC-2 (VC-2 greyed until the VC-2 mode is in); the patch box (previous, the patch's name, next, Browse… which is today's Load Patch); the tempo; the Effects switch; the ROM's state and the ROM… button |
+| Page bar | 48 | 34 | SYNTH, MODULATION, FX, PLAY, ZONES; a line saying what a click on a block does |
+| Signal path | 82 | 52 | OSC 1, OSC 2, MOD, COSM 1, COSM 2, AMP as blocks to click, the selected one filled with the accent; MFX, CHORUS, REVERB with ON or OFF (a click opens its FX page); the Structure box |
+| Rack | 134 | 304 | 12 in from each side, 8 between: the Time Trip column (184 wide), OSC 1 and OSC 2 (310 each), and a column of COSM 1 (116 high), COSM 2 (116) and AMP (the rest) |
+| Lower panel | 438 | 272 | the list (148 wide): SELECTED, DETAILS, ENVELOPES, LFOs; then the chosen view |
+| Footer | 710 | 40 | Keys MONO or POLY and the number of zones (184 wide), the keyboard: 42 white keys with each zone's range in its colour above them |
+
+The SYNTH page is the path, the rack and the lower panel. The other pages take everything under the page bar.
+
+### The blocks and the lower panel
+
+A click on a block on the path, or on a rack panel's name, selects it: the path fills it, its rack panel's border turns the
+accent, and the lower panel follows it. SELECTED is the block's shape, three columns:
+
+- **Envelope** (392 wide): a tab for each envelope the block has (OSC: Pitch, Time, Formant, Amp; COSM: Env A, Env B; AMP:
+  TVA; MOD: none), the curve (392 × 128) with points to drag, and its knobs (Attack, Decay, Sustain, Release, Depth or
+  Velocity, Key).
+- **LFO** (214 wide): the block's own LFO (OSC n: LFO n; COSM n: LFO 2+n; AMP: LFO 5), its Key Sync, its shape (214 × 76),
+  its waveform box and knobs.
+- **What reaches the block**: a row for each fixed depth (amber dot) and each Matrix route (cyan dot) that lands on it, its
+  amount editable in place, and the place to drop a source to make a Matrix route.
+
+DETAILS holds the selected block's other settings as today's cards: for an OSC its wave (Encode, Key, Time Offset, the KFs,
+Start Offset), Loop, Tempo sync, the analog oscillator's other knobs, Random pitch, Level KF, LFO depth, Wave gain,
+Velocity curve; for a COSM its type's own rows (today's three-row area); for MOD its switch, type, level and times; for AMP
+the patch TVA's velocity, KF and LFO depths. ENVELOPES and LFOs show every envelope and LFO at once.
+
+### The rack
+
+- **Time Trip column:** the pad (162 × 196), whose OSC it follows (1 or 2), Robot and Hold under it.
+- **An OSC panel** (one panel, made for each OSC): On, its name, Type (PCM or ANALOG), the encoding (SOLO, BACKING, ENSEMBLE,
+  LITE) or the analog waveform, the wave's name, Load…; a display (286 × 72): the wave with its loop and the Time Trip
+  position, or the analog waveform; four big knobs (44): Pitch, Time, Formant, Level for PCM, Pitch, Pulse Width, Impact,
+  Level for ANALOG; six small (30): Coarse, Fine, Depth, Energy, Velocity Sens, Pitch KF for PCM, Coarse, Fine, PW KF, PW
+  LFO, PW Env, Velocity Sens for ANALOG; a line of Vari, Playback Mode and Tempo Sync.
+- **A COSM panel** (one panel, made for each COSM): On, its name, Type, its filter type where it has one; a display (96 × 62)
+  of the response or the curve; up to five knobs (30), the type's first ones, the rest in DETAILS.
+- **AMP:** Level, Pan, Chorus and Reverb sends (24, the name and value beside each knob).
+
+### The look
+
+| Token | Colour | Used for |
+|---|---|---|
+| `ground` | `141518` | window, page bar |
+| `header` | `0F1012` | header, footer |
+| `panel` | `1C1E22` | rack panels, path blocks, boxes in the header |
+| `raised` | `24272D` | buttons and boxes on a panel |
+| `lower` | `1A1C20` | the lower panel |
+| `field` | `0F1012` | displays: the wave, curves, the pad, routes |
+| `edge` | `2C2F36` | a panel's border |
+| `divider` | `2A2D33` | lines between regions; the selected list entry |
+| `track` | `33363D` | a knob's track, an outlined button |
+| `text` | `ECEDEF` | values, names on panels |
+| `label` | `A3A8B2` | a control's name |
+| `muted` | `8E949F` | hints, secondary text (5.2:1 on `panel`) |
+| `dim` | `6B717C` | arrows and marks only, never text (3.3:1) |
+| `accent` | `F5A524` | value arcs, the selected block, what is on |
+| `mod` | `46C2E0` | modulation: rings on knobs, LFO curves, Matrix routes, the Time Trip |
+| `ready` | `5FD28B` | the ROM's state when it is loaded |
+
+Zones take the accent, `mod` and `B9A3FF`, then lighter and darker steps of them for zones 4–16.
+
+Type: a sans for names (Inter in the mock-up), a monospaced face for values (JetBrains Mono). Until they are built in,
+the system's sans and its monospaced face stand in. Sizes: the wordmark 15 bold, spaced 0.12; page names 12 bold, spaced
+0.1; a panel's name 12 bold, spaced 0.1; a knob's name 10 or 11 semibold in `label`; its value 10 or 11 in the monospaced
+face; a path block's name 11 bold over its setting 10.
+
+A knob sweeps 270°, from 135° (lower left) to 405° (lower right). Its track is the whole sweep in `track`, 3 to 4 wide with
+round ends; its value arc is `accent` from the bottom of the sweep, or from the top for a bipolar knob; a modulated knob
+has a `mod` ring 3.2 outside the track over the modulation's reach; a big knob has a cap (`2A2D33`); a pointer in `text`
+runs from the centre to 6 inside the track. Its name is under it, its value under that.
+
+### Where today's controls go
+
+| Today | In D |
+|---|---|
+| Header, source bar | the header (Load Patch is the patch box's Browse…, the patch's name and what it misses are the patch box's); Load WAV is each OSC panel's Load…; OSC 1/2 goes, both OSCs show; On and Type are the OSC panel's |
+| Perform column | each OSC panel's big knobs and its line (Robot under the pad, for the OSC the pad follows) |
+| Oscillator tab | the OSC panels and their DETAILS |
+| Envelopes, LFOs tabs | SELECTED for each block, and ENVELOPES and LFOs |
+| COSM tab | the COSM panels and their DETAILS; LFO 3 and 4 in SELECTED; MOD is a block of its own; Structure is on the path |
+| Amp & Pan tab | AMP and its DETAILS |
+| Play tab | the PLAY page as it is |
+| MSM, Matrix tabs | the MODULATION page; a block's Matrix routes in SELECTED too |
+| Zones tab | the ZONES page as it is; the zones' ranges on the footer's keyboard |
+| Effects tab | the FX page; ON or OFF of each block on the path |
+
+### The steps
+
+Each step is a commit `UI step n: …` on `ui-redesign`, with `TEST_UI_LAYOUT` green and snapshots of what it changed. The
+plugin is whole after every step: no control is left without a place.
+
+0. This design and the plan.
+1. `PluginEditor.cpp` (1,483 lines) split by job: what it draws byte for byte the same, the panel plants following the code.
+2. D's look on today's layout: the palette, a LookAndFeel for knobs, sliders, switches, boxes and buttons.
+3. D's frame: the scaled window, the header, the page bar, the signal path with its selection; today's pages hosted in it.
+4. The rack: the Time Trip column, the OSC panels, the COSM panels, AMP.
+5. The lower panel: SELECTED (the envelope editor, the LFO, what reaches the block), DETAILS, ENVELOPES, LFOs.
+6. The MODULATION, PLAY, ZONES and FX pages in D's look; the footer's keyboard with the zones.
+7. Landing: `TEST_UI_LAYOUT` and the plants for D, these sections made the only description, a version number.
+
+After that, each with the user's yes where it needs one: Inter and JetBrains Mono built in (a folder for font files); the
+wave drawn from the loaded wave; the pad sending its controllers; the keyboard playing; dragging a source onto a knob to
+make a Matrix route; the controls only a host reaches today (the OSC envelopes' velocity and key, the COSMs' Env B); the
+VC-2 mode's pages.
+
+## The editor as it stands (v144–v195)
+
 The plugin's user interface follows this design from v144 on, by the user's decision (2026-11-04). It came as a tabbed editor cut from v130, and v144 merged it with the effects' UI that came after. New controls go where this says.
 
-## The window
+### The window (today)
 
 960 × 600, resizable from 900 × 600 to 1400 × 900. The two card columns share any extra width. Top to bottom:
 
@@ -24,7 +150,7 @@ The plugin's user interface follows this design from v144 on, by the user's deci
 | Zones | Zones and their keys (across both columns: the keyboard's keys under the zones that play them, and a line a zone of its keys and what it plays, or why it is silent) · Zones 1-8 · Zones 9-16 (a slider a zone, its Range Upper key; v195) |
 | Effects | MFX, Chorus, Reverb, System buttons · the block's card, or Tone and System on the System page · a scrolling list of the type's parameters, or the system's EQ |
 
-## The look
+### The look (today)
 
 The palette is `namespace Ui` in `plugin/Source/UiParts.h`, with the sizes, the cards (`Ui::Page`) and the joined buttons (`Ui::Segmented`), which `PluginEditor` and `FxPanel` share:
 
@@ -44,7 +170,7 @@ Card titles are 11 pt bold capitals in `label`. Row names are 11 pt bold, in ful
 
 Drawn text goes through `Ui::drawText` with a `Ui::TextStyle` (font, colour, where it sits, whether it is cut with dots), and a filled rectangle through `Ui::fill`: the cards' and the Perform column's titles (`Ui::titleFont`), the tabs and the Zones map share them (v195). The tab bar gives each tab its name's width and an equal share of what's left, 28 at most, so all ten fit at the smallest size.
 
-## Adding a control
+### Adding a control
 
 1. Build it in the constructor and attach its parameter, as now.
 2. Put it in a card in `buildLayout()`: `Ui::Page::Card` holds a title, controls on the title line (`head`) and rows, and `lr(label, control)` makes the usual row. A card goes in column 0, column 1 or across both (`col = -1`). `sameAs` puts a card in another's place, and `fill` runs one to the page's bottom, for a list that scrolls. A page's `leftW` sets column 0's width. On the Effects tab, `FxPanel` is itself a `Ui::Page` and its cards are in `buildCards()`: its controls stay its direct children, which `TEST_FX_PANEL` relies on.
@@ -55,13 +181,13 @@ Drawn text goes through `Ui::drawText` with a `Ui::TextStyle` (font, colour, whe
 
 A page doesn't scroll, so cards must fit: at the smallest size a page is 466 high, and a card is 38 plus 30 a row, less 4. Only the Effects tab's list scrolls. A COSM type's rows go in the shared three-row area instead (`layoutCosmType`, `showCosmType`, and the card's `extra` list).
 
-## Checks
+### Checks
 
 - `TEST_UI_LAYOUT=1` (in `verify.sh`): at the smallest, default and largest sizes, on every tab, both OSC types, every COSM type, every Effects page and every effect type, no control is outside its parent, over another or without a size, none shows on a card that isn't shown (v155), and no text is cut short, the effects' list included, which must show at least 15 rows. Every control is moved, to see that it sets a parameter, and every parameter must have a control. Each tab is opened by a click, and a click at the tab bar's right end, at the smallest width, must open none (v195: the last tab ends inside the bar). The joined buttons are driven both ways. `=list` prints the parameters with and without a control.
 - `mutate_panel.py --editor`: planted errors in the layout, to show that check catches them.
 - `TEST_SNAPSHOT=file.png`, with `TEST_SNAPSHOT_TAB=n` and `TEST_SNAPSHOT_SIZE=WxH`: the editor drawn offscreen. It draws only the open tab. `TEST_SNAPSHOT_TYPE` and `TEST_SNAPSHOT_COSM2` open the COSM tab, and `TEST_SNAPSHOT_FX` the Effects tab.
 
-## Not shown anywhere yet
+### Not shown anywhere yet
 
 92 of the 761 parameters have no control (v190's ten for the arpeggio, v193's 98 for the Multi Step Modulator and v195's sixteen splits all have one). Only a host can reach them (`hostOnly` in `PluginTest.cpp`):
 
@@ -72,7 +198,7 @@ A page doesn't scroll, so cards must fit: at the smallest size a page is 466 hig
 - The engine's Pitch, Time and Formant (3). Until v191 these showed on the Perform knobs without a ROM; with the engine
   gone they are kept, unread, for old sessions, and the Perform knobs set the selected OSC's with or without one.
 
-## Still to do
+### Still to do
 
 - The Effects tab shows one block at a time, so you can't see at a glance which of MFX, Chorus and Reverb are on.
 - Keep the open tab when the plugin's window closes. It goes back to Oscillator now.
