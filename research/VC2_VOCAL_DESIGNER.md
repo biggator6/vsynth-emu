@@ -18,9 +18,23 @@ in the repo (see "Open").
   and zeroes .bss [0x8994fc20, 0x8a1f11c4): the rule `Sh4Interp` uses for rom.2 (the source ends where the copy begins), which
   for rom.4 lands on its header's own word 0x8990c758. So a table at a CPU address in 0x8992e1bc…0x8994fc20 is read at that
   address − 0x21a64 in the file; read in place it is something else. `Sh4Interp::loadRom` and `build/tools/bin/rd` hold rom.2's
-  map, so they can't run or read rom.4 as they stand.
+  map, so they can't run or read rom.4 as they stand; `ramrd.py` reads it ("The tools").
 - The disk image's `Internal.vc2` folder (FAT16 partition), and a preset wave library after the V-Synth's preset waves (below).
 - `research/V-SYNTH_XT_OM.txt`: the VC-2's file names (fig. 07-06) and its one-line description. Nothing on its parameters.
+
+## The tools
+
+In `research/tools/`, run as the others are (`.venv/bin/python3 research/tools/<tool>`, not `-I`, which hides `romfile.py`
+from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at rom.4.
+
+- `romfile.py`'s `ram32`, `ramf32`: a word as the CPU sees it after C startup, by the image's own header (.data through its
+  copy, .bss 0). `ramrd.py <addr>[:n] …` prints them. Checked on rom.2 against `build/tools/bin/rd`, which runs the startup in
+  the interpreter: three nonzero .data words, at its start, middle and end, the same.
+- `idbuild.py <lo> <hi> [from] [to]`: where a register comes to hold a value in [lo, hi], following the constant building the
+  firmware uses for parameter IDs. How the converter and the OSC dispatch were found.
+- `vc2params.py <lo> <hi>` (rom.4 only): an ID's name, descriptor and value text from rom.4's own tables.
+- `diskls.py [filter]`, `diskls.py get <path> <out>`: the disk image's FAT16 files (`$DISK` for another image).
+- `likeat.py <A> <addr> <n> <B>`: code in B shaped like A's at addr, with what moves when code moves masked out.
 
 ## The vocoder's code (2026-11-12, second pass)
 
@@ -32,7 +46,7 @@ none of the tone code, so nothing here can be taken from a rom.2 address. A Ghid
 **How rom.4 reads a parameter.** As rom.2 does, with its own routines: a pointing routine aims a read object at the part's block
 (`0x893207b0(obj, part)`) or at one OSC's (`0x89320a50(obj, part, osc)`), then the getter `0x89324350(obj, id)` returns the value.
 An OSC's IDs are OSC 1's, read once per OSC with the object pointed at it. The IDs are built in registers (`mov #2; shll8;
-add #-97` is 0x19f), so a search for literal IDs misses them; `idbuild.py` (scratch) tracks those constructions.
+add #-97` is 0x19f), so a search for literal IDs misses them; `idbuild.py` ("The tools") tracks those constructions.
 
 **The converter, `0x893a72f0(?, part)`.** It reads the vocoder block in this order and hands the results on:
 
