@@ -53,8 +53,9 @@ if [ $BUILT = 1 ]; then
     # another image given while one is in use (refused, the tables as they were); the harnesses' switches set (unread);
     # firmware routines that loop (each way gives up within its step limit);
     # damaged disk images (refused, or each cluster once); the arpeggiator in XtSynth, heard (a note a quarter, two tempos);
-    # and its plugin side: its parameters against the firmware, a patch's, a session's, a chord through processBlock (v190)
-    for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin; do
+    # and its plugin side: its parameters against the firmware, a patch's, a session's, a chord through processBlock (v190);
+    # D, the redesigned editor, as it grows (UI step 1: its sizes, its layout on each page and block, each press's route)
+    for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin Editor; do
         checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
     done
     # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth
