@@ -43,7 +43,9 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   `vc2growllaw.cpp`) to the firmware bit for bit, and fail when any word differs; `ratio` fails past 2 ulp from powf; `kind6`
   fails when an output's period is more than a sample from the reading's; `track` (`vc2track.cpp`, its settings and state
   section `vc2trackstate.cpp`, sharing `vc2track.h`) measures the pitch tracker against no model and fails only on a fault
-  ("The pitch tracker, run", "The pitch tracker's analysis").
+  ("The pitch tracker, run", "The pitch tracker's analysis"); `vocosc` (`vc2vocosc.cpp`) follows the VOCODER OSC's IDs
+  through the builder, the converter and the carrier and fails on a fault or a store write its reader doesn't read back
+  ("The VOCODER OSC's IDs, run"). `patches` shares its store helpers through `vc2patches.h`.
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -312,8 +314,9 @@ between its scale's ends:
 | Pitch ramp's tick `0x894f4b00` / `0x893b0f30` (differs, "The OSC block in rom.4") | 0x80 / 0x118 | 0.368 |
 | Unrelated: COSM note-on / analog note-on, analog update / COSM note-on | | 0.096, 0.080 |
 
-So the note-on, install, update and the converter (rom.4's `0x8939ced0`, "The carrier: the VOCODER OSC"; rom.2's `0x894e1920`
-has no pair by shape) are the wiring, ported from rom.4 as COSM's converters are; only the waveform routines are run.
+So the note-on, install, update and the converter (rom.4's ~~`0x8939ced0`~~, which only starts kind 3's block: the conversion
+is `0x8939fbd0`, "The VOCODER OSC's IDs, run"; rom.2's `0x894e1920` has no pair by shape) are the wiring, ported from rom.4
+as COSM's converters are; only the waveform routines are run.
 
 **Run (`vc2run <rom.4> analog <rom.2>`, `vc2twinanalog.cpp`, no port linked: xt_analog holds `XtAnalog` to rom.2;
 `build/tools/vc2/analog.txt`).** A voice is made in rom.2 alone, as xt_analog makes one: the calibration from the
@@ -592,8 +595,9 @@ divider's noise test, its rounding and the cosine give 242,948, 127,960 and 256,
 
 Where g comes from (read, not run): the kind 5 update `0x893afff2(voice)` builds P at voice + 0x104 and gives P+0x20 =
 clamp₀¹(P+0x30 + m₁·P+0x34 + m₂·P+0x38) and P+0x2c = clamp₀²(P+0x44 + m₁·P+0x48 + m₂·P+0x4c), m₁ and m₂ two modulators the voice
-points at (+0xa50, +0xa60): the shape of Growl Level and Saw-Noise Mix Balance with their LFO and Envelope Depths. Which ID lands
-at P+0x30 (and where Growl Keyfollow goes) is not traced: the converter hasn't been run.
+points at (+0xa50, +0xa60): the shape of Growl Level and Saw-Noise Mix Balance with their LFO and Envelope Depths. ~~Which ID
+lands at P+0x30 (and where Growl Keyfollow goes) is not traced: the converter hasn't been run.~~ Run: Growl Level, with its
+Keyfollow added by octave from key 60, and m₁ the envelope, m₂ the LFO ("The VOCODER OSC's IDs, run").
 
 ### Voice kind 6, run (`kind6`)
 
@@ -986,7 +990,10 @@ value, gain and coefficients to +0x2d6c.
 ### The carrier: the VOCODER OSC
 
 rom.4's OSC dispatch is `0x8939fb40(input, block)`: input +8 the OSC Switch, +9 the Type.
-ANALOG and VOCODER both go through the analog converter `0x8939ced0`, which writes kind 3; VOCODER then writes **kind 5**. PCM is
+ANALOG and VOCODER both go through ~~the analog converter~~ `0x8939ced0`, which writes kind 3; VOCODER then writes **kind 5**.
+(Withdrawn 2026-11-13, "The VOCODER OSC's IDs, run": `0x8939ced0` reads nothing of its input; it starts kind 3's block, the
+kind, five gains of 1 and a time from a global at +0x60. The conversion is `0x8939fbd0(input, block)`, which the note-on
+calls after the dispatch: the vibrato's fields, then a converter by kind, `0x8939db00` VOCODER's.) PCM is
 `0x8939e120`, EXTIN `0x8939e940` (kind 4). The voice switches on its kind at +84 (0–6): setup `0x893ae0f0`, render
 `0x893ae9f0`, update `0x893aeb20`. Kind 5's setup only stores a constant at voice + 0xa88; its update is the analog kind's
 (`0x893aec40`, shared by 3, 5 and 6); its render is **`0x893ebfa0(voice + 0xa90, out)`**: 32 samples, the same value to left and
@@ -1000,8 +1007,8 @@ right,
 - out = (noise + saw × the field at +0x1c) × a gain that glides to its target at 0.00756 a sample, × 2^31, the voice buffer's
   integer scale.
 
-That is the Saw Wave LPF, Noise LPF and HPF and Saw-Noise balance of the OSC's own parameters, by shape. Which field each
-parameter lands in is not traced~~, nor the branch taken when the field at +0x3c is positive (`0x893ec240`, which calls
+That is the Saw Wave LPF, Noise LPF and HPF and Saw-Noise balance of the OSC's own parameters, by shape. ~~Which field each
+parameter lands in is not traced~~ (run: "The VOCODER OSC's IDs, run", each ID to its carrier field)~~, nor the branch taken when the field at +0x3c is positive (`0x893ec240`, which calls
 `0x893f3280` and `0x893f3210`, likely the growl)~~. That branch, run: the growl, a subharmonic near 50 Hz ("The growl, run").
 Kind 6 is written inside the EXT IN path (`0x8939ee5e`); its render is `0x893ec730(voice + 0xafc, out)`. ~~Not read.~~ Run: a
 pitch shifter of the mic ("Voice kind 6, run").
@@ -1082,7 +1089,77 @@ The parameters only rom.4 has, per OSC (OSC 1's IDs; OSC 2's follow each run):
 - 0x37c–0x37f: Vibrato Type (0–3), Vibrato Rate, Vibrato Depth, Wave start offset (0–15). OSC 2's 0x380–0x383.
 
 A saw and a noise, each filtered, mixed by a balance, with growl, dynamics and vibrato: by the names, a carrier made inside the
-OSC rather than one played from a wave. That is a reading of names, not of code.
+OSC rather than one played from a wave. That is a reading of names, not of code. (Run since: "The VOCODER OSC's IDs, run".)
+
+### The VOCODER OSC's IDs, run (`vocosc`) (2026-11-13, the VC-2 mode's step 1c)
+
+`vc2run <rom.4> vocosc` (`vc2vocosc.cpp`, a few seconds; `build/tools/vc2/vocosc.txt`). rom.4's default patch made a store
+(the `patches` run's helpers, shared through `vc2patches.h`), part 0's entry in the part table (`0x8950d8e0`: +0 a flag, 1
+when the part has a store, +8 the store) pointed at it, both OSCs switched on. Each of IDs 0x354…0x383 is written into zone
+0's tone block by its descriptor (big-endian bits, the value plus the centre), and read back by rom.4's own reader, which
+agreed every time. It goes over its range in four steps, and rom.4's routines run as a note's do:
+
+- **the OSC input builder** `0x893a04e0(out, part, zone, osc)` (called at `0x893a154e`, by part, zone and OSC): it aims a
+  read object at the store's tone block (`0x89320a50(obj, part, zone)`: the part's store + 0xfe + zone·0x80) and reads the
+  OSC's IDs through the getter (`0x89324350`) into a 128-byte record at out + 0x20 + zone·0x100 + osc·0x80 (the firmware's
+  out is `0x89e371e0`, 0x1020 bytes a part). Each OSC's IDs reach its own record, at the same offsets for both;
+- **the note-on** (`0x8939fe08`) copies the record to the converter's input +8, behind an 8-byte header (+3 key, +4
+  velocity), then calls the dispatch `0x8939fb40(input, block)` and **the converter** `0x8939fbd0(input, block)`. The block is
+  the voice + 0x54: the "+84" where the voice keeps its kind ("The carrier: the VOCODER OSC") is decimal, 0x54, and the
+  dispatch writes 5 there for VOCODER;
+- **the carrier's** init and update (`0x893ebed0`, `0x893ec4d0`, after the rate setter, the clock fixed as `growl` fixes it)
+  on P = the voice + 0x104 = the block + 0xb0, with P+0x20 and P+0x2c as the kind 5 routine (`0x893afff0`) leaves them with
+  no modulation (Growl Level's and the balance's own; read, not run) and gain and pitch 1.
+
+What each reaches (OSC 1's IDs; OSC 2's are 14 on, 0x362…0x36f, and land at the same offsets in its own record, block and
+carrier). v is the ID's value; the laws hold at all five values tried:
+
+| ID | Name | Record | P | Law | Carrier |
+|---|---|---|---|---|---|
+| 0x354 | Saw Wave LPF cutoff | +0x64 | +0x0c | v/127 | +0x18 (v/127); +0x14, the saw filters' coefficient g (0 at 0, 0.970 at 127 with the default Dynamics) |
+| 0x355 | Saw Wave Level | +0x65 | +0x10 | v/127 | +0x1c, the saw's gain in the sum: Level × min(1, balance) |
+| 0x356 | Noise LPF cutoff | +0x66 | +0x14 | v/127 | +0x24 (v/127); +0x20, the noise one-pole's coefficient (0.266 at 31, 1 at 127) |
+| 0x357 | Noise HPF cutoff | +0x67 | +0x18 | v/127 | +0x2c (v/127); +0x28, the high-pass stage's coefficient (0.0068 at 0, 1 at 127) |
+| 0x358 | Noise Level | +0x68 | +0x1c | v/127 | +0x30: min(1, Level × (2 − balance)) |
+| 0x359 | Dynamics Threshold | +0x74 | +0x24 | v/127 | +0x34; and +0x20 (0.086 at 0, 0.103 from 31 up) |
+| 0x35a | Dynamics Sensitivity | +0x75 | +0x28 | v/127 | +0x38; and +0x14 down (0.709 → 0.638) and +0x20 up (0.094 → 0.123) over its range |
+| 0x35b | Growl Level | +0x6a | +0x30 | v/127, 1 exactly at 127 | +0x3c, the growl's amount ("The growl, run") |
+| 0x35c | Growl Keyfollow | +0x6c, ×10, 16 bits | into +0x30 | + Keyfollow% × octaves from key 60 | |
+| 0x35d | Growl LFO Depth | +0x6e | +0x38 | sign·(v/63)² | |
+| 0x35e | Growl Envelope Depth | +0x6f | +0x34 | sign·(v/63)² | |
+| 0x35f | Saw-Noise Mix Balance | +0x76 | +0x44 | v/64, 0…1.98 | through P+0x2c, +0x1c and +0x30 |
+| 0x360 | Mix Balance LFO Depth | +0x7a | +0x4c | sign·(v/63)² | |
+| 0x361 | Mix Balance Envelope Depth | +0x7b | +0x48 | sign·(v/63)² | |
+| 0x37c | Vibrato Type | +0x1c | block +0x80…+0x98 | a 0x50-byte row of `0x8953ffd0` by type; 0 leaves them 0 | |
+| 0x37d | Vibrato Rate | +0x1d | block +0x84 | 2 + 6·v/127 | |
+| 0x37e | Vibrato Depth | +0x1e | block +0xa8, +0xac | sign·(v/63)² × 300, and × 0.6 | |
+
+- **Two sources agree on P.** The converter's writes, and the kind 5 routine's reads ("The growl, run"): it takes P+0x30 +
+  m₁·P+0x34 + m₂·P+0x38 into P+0x20 and P+0x44 + m₁·P+0x48 + m₂·P+0x4c into P+0x2c, m₁ at its envelope's +0x4c and m₂ at its
+  LFO's +0x38, where rom.2's envelopes and LFO keep their outputs (`vc2twinanalog.cpp`). So P+0x34 and P+0x48 are the
+  Envelope Depths and P+0x38 and P+0x4c the LFO Depths, as the converter put them. P+0x30 is Growl Level, the open question
+  "The growl, run" left.
+- **Growl Keyfollow** (run at key 72, Growl Level 64): −50, −20, −10, +10, +20, +50% give 0.004, 0.304, 0.404, 0.604, 0.704
+  and 1 (clamped) from 0.504; at key 60 it moves nothing. So the growl is clamp₀¹(Level/127 + Keyfollow/100 × (key − 60)/12)
+  before its modulation.
+- **The balance** (Noise and Saw Levels at their defaults, 95 and 101): the saw's gain is Saw Level × b up to b = 1 and Saw
+  Level from there, the noise's min(1, Noise Level × (2 − b)) (b = 0, 0.48, 0.98, 1.48, 1.98 give 1, 1, 0.760, 0.386,
+  0.0117). So a balance of 64 has both at their levels, and each end fades the other source; the noise's clamp at 1 is on
+  the product, the saw's on the factor (five points each, the form fits them).
+- **The Dynamics** move the two lowpass coefficients from their settings (at velocity 100, gain 1); what level they follow
+  is not read.
+- **The vibrato** is read for every Type: the builder puts its three IDs in the record under ANALOG, PCM, EXTIN and VOCODER
+  alike (+0x1c…+0x1e), and the converter's part that reads them comes before its switch by kind (`0x8939fbd0`; read). The
+  block's fields were run under VOCODER only. Its depth through the Matrix's getters (`0x893a26b0`, `0x893a28b0`), clamped to
+  ±63, is read, not run.
+- **Harm Formant is the EXT IN's.** 0x371, 0x372 (×10) and 0x375 reach the record only under EXTIN (+0x4e, +0x50, +0x5e; OSC
+  2's 0x376, 0x377, 0x37a the same), beside kind 6's pitch shifter of the mic ("Voice kind 6, run"). Its LFO and Envelope
+  Depths (0x373, 0x374) and the Wave start offset (0x37f) reach no record under any Type; `idbuild.py` finds 0x373 built
+  outside the builder (`0x8932de12`, `0x893304c2`, …) and 0x37f only in the store's code (`0x8932b1e6`, `0x8932b386`). Where
+  they are read is not followed.
+- **The builder lays the record out the same under every Type**: the VOCODER OSC's IDs and the vibrato land at the same
+  offsets under ANALOG, PCM and EXTIN as under VOCODER (the record holds them all); only the Harm Formant IDs are taken by
+  Type.
 
 ### System
 
@@ -1184,8 +1261,10 @@ among rom.2's.
   Still open: whether HIRESO's Depth routine `0x893f22d0` has a computed caller; the float argument `0x893f07a0` multiplies the
   consonant gain by, and the glue that calls it; `0x899d9d90`, which the EXT IN path's formant offsets divide by the tracked
   period; the analysis and synthesis groups' delays against HIRESO's 128-sample input latency; the levels the part mixer ramps
-  (`0x8999f4d0…`) beyond Direct Sound; the pass the VOCODER OSC's own IDs (0x354…0x361) take into the voice's fields (P+0x30's
-  ID among them: run the OSC converter `0x8939ced0` on a patch's block); kind 6's mode parameter and where its P comes from;
+  (`0x8999f4d0…`) beyond Direct Sound; ~~the pass the VOCODER OSC's own IDs (0x354…0x361) take into the voice's fields (P+0x30's
+  ID among them: run the OSC converter `0x8939ced0` on a patch's block)~~ (run, "The VOCODER OSC's IDs, run"; left of it: where
+  the Harm Formant's LFO and Envelope Depths and the Wave start offset are read, and the Dynamics' law); kind 6's mode
+  parameter and where its P comes from;
   whether the pedal jack reaches the hold as CC 64.
 - ~~**Nothing here has been run.**~~ Four things have ("rom.4 run in the interpreter"), two of them held to a model bit for bit;
   the rest is still a reading of the code, checked against it by eye and by computed filter responses. rom.4's memory map is in

@@ -8,31 +8,27 @@
 // when a file's header is wrong or a routine faults.
 // vc2run <rom.4> patches --stores <dir> <file.p02> …: the stores themselves into dir, rom.4's defaults (no file's data
 // over them) as default.store and each file's as <its name>.store, for finding where each section of IDs starts.
-#include "vc2runs.h"
+#include "vc2patches.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <string>
 #include <string_view>
-#include <vector>
 
 namespace vc2 {
 
 namespace {
 
-// [FW] rom.4's (rom.2's 0x8947e230, 0x8947dad0, 0x8947dae0, 0x894817b0, 0x89484310)
+// [FW] rom.4's (rom.2's 0x8947e230, 0x8947dad0, 0x8947dae0, 0x894817b0; kReadValue's is 0x89484310)
 constexpr uint32_t kDefaultPatch = 0x89325300, kAsFile = 0x89324b10, kToStore = 0x89324b20;
-constexpr uint32_t kReadBits = 0x89328580, kReadValue = 0x8932b050;
-// [FW] rom.4's descriptors (12 bytes an ID: u16 offset, s8 width, u8 bit, u16 centre, default, min, max) and names
+constexpr uint32_t kReadBits = 0x89328580;
+// [FW] rom.4's descriptors (Descriptor's layout) and names
 constexpr uint32_t kDescriptors = 0x8950f0b0, kNames = 0x898b5798, kIds = 2476;
-constexpr uint32_t kFile = kScratch, kStore = kScratch + 0x4000;
+constexpr uint32_t kFile = kScratch;
 constexpr uint32_t kVocoderFirst = 0x193, kVocoderLast = 0x1a5;
 constexpr size_t kHeaderBytes = 0x20, kLongestName = 40;
 constexpr uint32_t kStoreBytes = 0x2000;   // what --stores writes: past the file's 0x13a4, as the store's size isn't known
 
-struct Descriptor {
-    int offset, width, bit, centre, def, min, max;
-};
+} // namespace
 
 Descriptor descriptorOf(Machine& m, uint32_t id) {
     const uint32_t d = kDescriptors + 12 * id;
@@ -40,7 +36,6 @@ Descriptor descriptorOf(Machine& m, uint32_t id) {
             (int16_t)m.cpu.rd16(d + 6), (int16_t)m.cpu.rd16(d + 8), (int16_t)m.cpu.rd16(d + 10)};
 }
 
-// An ID's name from rom.4's table (pointers to strings with a leading space)
 std::string paramName(Machine& m, uint32_t id) {
     std::string s;
     for (uint32_t p = m.cpu.rd32(kNames + 4 * id); s.size() < kLongestName; ++p) {
@@ -50,6 +45,14 @@ std::string paramName(Machine& m, uint32_t id) {
     }
     return s;
 }
+
+bool loadStore(Machine& m, const std::vector<uint8_t>& data) {
+    if (!m.run(kDefaultPatch, {1}) || !m.run(kAsFile, {kFile})) return false;
+    m.cpu.write(kFile, data.data(), data.size());
+    return m.run(kToStore, {kPatchStore, kFile});
+}
+
+namespace {
 
 uint32_t be32(const std::vector<uint8_t>& f, size_t at) {
     return (uint32_t)f[at] << 24 | (uint32_t)f[at + 1] << 16 | (uint32_t)f[at + 2] << 8 | f[at + 3];
@@ -70,13 +73,6 @@ std::vector<uint8_t> p02Data(const char* path) {
     return {f.begin() + at, f.begin() + at + bytes};
 }
 
-// The file into rom.4's store, as its own routines take one; false on a fault
-bool loadStore(Machine& m, const std::vector<uint8_t>& data) {
-    if (!m.run(kDefaultPatch, {1}) || !m.run(kAsFile, {kFile})) return false;
-    m.cpu.write(kFile, data.data(), data.size());
-    return m.run(kToStore, {kStore, kFile});
-}
-
 // [FW] the store's sections placed so far, each its IDs and its base (where every one of its IDs reads its default in
 // rom.4's default store; research/VC2_VOCAL_DESIGNER.md, "The factory patches"); a read of an ID is at the store + its
 // section's base, as rom.2's are (XtPatchStore.cpp's kSections)
@@ -95,8 +91,8 @@ bool readStore(Machine& m, std::vector<int>& raw) {
     for (const Section& s : kSections)
         for (uint32_t id = s.first; id <= s.last; ++id) {
             uint32_t bits = 0, value = 0;
-            if (!m.run(kReadBits, {kStore + s.base, kDescriptors + 12 * id}, &bits)) return false;
-            if (!m.run(kReadValue, {kStore + s.base, id}, &value)) return false;
+            if (!m.run(kReadBits, {kPatchStore + s.base, kDescriptors + 12 * id}, &bits)) return false;
+            if (!m.run(kReadValue, {kPatchStore + s.base, id}, &value)) return false;
             raw[id] = (int)bits;
         }
     return true;
@@ -144,7 +140,7 @@ void sayVocoder(Machine& m, const std::vector<std::string>& names, const std::ve
 // The store as rom.4 left it into dir/name.store; false when it can't be written
 bool writeStore(Machine& m, const std::string& dir, const std::string& name) {
     std::vector<uint8_t> store(kStoreBytes);
-    m.cpu.read(kStore, store.data(), store.size());
+    m.cpu.read(kPatchStore, store.data(), store.size());
     const std::string path = dir + "/" + name + ".store";
     FILE* fp = std::fopen(path.c_str(), "wb");
     if (!fp) return false;

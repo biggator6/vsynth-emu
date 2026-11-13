@@ -58,6 +58,11 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   f0 + 25 Hz), validated by their peaks, two half-periods a period, limits 29.4–678.46 samples; the band-pass, noise count,
   gates, limits and fallback held to the firmware by the run. Left of it, for the port's harness (step 3.6): the
   estimator's rules by level, period and peak balance (read in outline) and the direction state (read, not run).
+  **The VOCODER OSC's IDs, 2026-11-13** (`vc2run … vocosc`; VC2_VOCAL_DESIGNER.md, "The VOCODER OSC's IDs, run"): each of
+  0x354…0x361 and the vibrato's followed from the store through the OSC input builder (`0x893a04e0`), the converter
+  (`0x8939fbd0`, not `0x8939ced0`, withdrawn) and the carrier's update to its field, with its law; Growl Keyfollow by octave
+  from key 60; Harm Formant the EXT IN's. Left of it: where the Harm Formant's depths and the Wave start offset are read,
+  and the Dynamics' law.
 - Second sources: the V-Card owner's manual (names and meanings) and the 64 factory patches (the corpus).
 
 ### 2. Shared plumbing (plugin/Source)

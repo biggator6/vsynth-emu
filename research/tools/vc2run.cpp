@@ -17,6 +17,7 @@
 //                                  (vc2twintva.cpp)
 //   vc2run <rom.4> patches <file.p02> …   the VC-2's patches read by rom.4's own routines (vc2patches.cpp)
 //   vc2run <rom.4> track           the pitch tracker on tones of known pitch, noise and silence (vc2track.cpp)
+//   vc2run <rom.4> vocosc          the VOCODER OSC's IDs from the store through the builder and converter (vc2vocosc.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
@@ -67,14 +68,14 @@ constexpr std::array kRuns{Run{"boot", vc2::boot}, Run{"warp", vc2::warp}, Run{"
                            Run{"lfo", vc2::lfo}, Run{"env", vc2::env}, Run{"cosm", vc2::cosm},
                            Run{"osc", vc2::osc}, Run{"analog", vc2::analog}, Run{"band", vc2::band},
                            Run{"solo", vc2::solo}, Run{"lite", vc2::lite}, Run{"tva", vc2::tva},
-                           Run{"patches", vc2::patches}, Run{"track", vc2::track}};
+                           Run{"patches", vc2::patches}, Run{"track", vc2::track}, Run{"vocosc", vc2::vocosc}};
 
 } // namespace
 
 int main(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: vc2run <rom.4> <run> [args]: boot, warp, ratio, hold, growl, kind6, patches,\n"
-                             "       track;\n"
+                             "       track, vocosc;\n"
                              "       vc2run <rom.4> <block> <rom.2>: lfo, env, cosm, osc, analog, band, solo, lite,\n"
                              "       tva\n");
         return 2;
