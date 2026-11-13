@@ -59,26 +59,8 @@ const Variant kVariants[] = {
      true},
 };
 
-// [FW] GRAM's words the SH-4's frame (0x20…0x2e) and the converters (0x18, 0x1a) write, and two between them; and the
-// two the scan finds read from outside, which reach 0x90…0x9a (0x11, 0x13)
-constexpr unsigned kInputs[] = {0x11, 0x13, 0x18, 0x1a, 0x1c, 0x1e, 0x20, 0x22, 0x24, 0x26, 0x28, 0x2a, 0x2c, 0x2e};
 constexpr unsigned kGramWords = 256;
-constexpr int32_t kImpulse = 1 << 20;
-constexpr int kFrames = 8192, kScanFrames = 2048, kSettle = 22050;
-
-void silence(XtFxChip& chip) {
-    for (const unsigned w : kInputs) chip.setGram(w, 0);
-}
-
-// A copy of `chip` after kSettle samples of silence
-std::unique_ptr<XtFxChip> settled(const XtFxChip& chip) {
-    auto c = std::make_unique<XtFxChip>(chip);
-    for (int t = 0; t < kSettle; ++t) {
-        silence(*c);
-        c->runFrame();
-    }
-    return c;
-}
+constexpr int kFrames = 8192, kScanFrames = 2048;
 
 // What an impulse does to one GRAM word: the first sample it differs, its largest difference, and a hash of every
 // difference and its sample, to tell two images' words alike
@@ -113,34 +95,21 @@ Reaches reachOf(const XtFxChip& chip, unsigned in, int frames) {
 }
 
 // [FW] the mix out, left and right (HARDWARE_FIRMWARE.md, "The chip in the sound")
-constexpr unsigned kMix[] = {0xa0, 0xa2};
-
-// One output word after an impulse into `in`, on a copy of `chip`, sample by sample
-std::vector<int32_t> traceOf(const XtFxChip& chip, unsigned in, unsigned word, int frames) {
-    auto c = std::make_unique<XtFxChip>(chip);
-    std::vector<int32_t> out;
-    for (int t = 0; t < frames; ++t) {
-        silence(*c);
-        c->setGram(in, t == 0 ? kImpulse : 0);
-        c->runFrame();
-        out.push_back(c->gram(word + 1));
-    }
-    return out;
-}
+constexpr unsigned kMixL = 0xa0, kMixR = 0xa2;
 
 // The two images' mix out against each other: how many samples differ, and the largest difference against the impulse
 void sayMixAgainst(const XtFxChip& rom2, const XtFxChip& rom4, unsigned in, int frames) {
     std::printf("    the mix, rom.4 against rom.2:");
-    for (const unsigned w : kMix) {
-        const auto a = traceOf(rom2, in, w, frames), b = traceOf(rom4, in, w, frames);
+    const auto a = tracesOf(rom2, in, {kMixL, kMixR}, frames), b = tracesOf(rom4, in, {kMixL, kMixR}, frames);
+    for (size_t side = 0; side < a.size(); ++side) {
         long differ = 0;
         int32_t most = 0;
-        for (size_t t = 0; t < a.size(); ++t) {
-            differ += a[t] != b[t] ? 1 : 0;
-            most = std::max(most, std::abs(a[t] - b[t]));
+        for (size_t t = 0; t < a[side].size(); ++t) {
+            differ += a[side][t] != b[side][t] ? 1 : 0;
+            most = std::max(most, std::abs(a[side][t] - b[side][t]));
         }
         const double db = most ? 20 * std::log10((double)most / kImpulse) : 0;
-        std::printf(" %02x: %ld samples differ, the most %+.1f dB;", w, differ, db);
+        std::printf(" %02x: %ld samples differ, the most %+.1f dB;", side ? kMixR : kMixL, differ, db);
     }
     std::printf("\n");
 }
@@ -219,7 +188,7 @@ int fxroute(Machine& m, int argc, char** argv) {
         return 2;
     }
     const bool scan = argc > 2 && std::string_view(argv[2]) == "scan";
-    std::vector<unsigned> inputs(std::begin(kInputs), std::end(kInputs));
+    std::vector<unsigned> inputs(std::begin(kOutsideWords), std::end(kOutsideWords));
     if (scan) inputs.resize(kGramWords);
     if (scan) std::iota(inputs.begin(), inputs.end(), 0u);
     FxSettings answers;

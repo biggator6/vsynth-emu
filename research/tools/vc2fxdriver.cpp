@@ -74,8 +74,48 @@ bool startFxDriver(Machine& m) {
     return m.run(kStartTask, {kThis}) && reloadFx(m);
 }
 
+std::string reverbTypeName(Machine& m, int type) {
+    constexpr uint32_t kTypeNames = 0x89577ee0, kNameBytes = 20, kNamedTypes = 15;   // [FW] "00:Off", …
+    if (type < 0 || type >= (int)kNamedTypes) return "(past the list)";
+    std::string s;
+    for (uint32_t k = 0; k < kNameBytes; ++k) {
+        const char c = (char)m.cpu.rd8(kTypeNames + kNameBytes * (uint32_t)type + k);
+        if (!c) break;
+        s += c;
+    }
+    return s;
+}
+
 bool reloadFx(Machine& m) {
     return fxMessage(m, (uint32_t)kSystem << 16 | kPatch);
+}
+
+void silence(XtFxChip& chip) {
+    for (const unsigned w : kOutsideWords) chip.setGram(w, 0);
+}
+
+std::unique_ptr<XtFxChip> settled(const XtFxChip& chip) {
+    constexpr int kSettle = 22050;
+    auto c = std::make_unique<XtFxChip>(chip);
+    for (int t = 0; t < kSettle; ++t) {
+        silence(*c);
+        c->runFrame();
+    }
+    return c;
+}
+
+std::vector<std::vector<int32_t>> tracesOf(const XtFxChip& chip, unsigned in, std::initializer_list<unsigned> words,
+                                           int frames, int32_t height) {
+    auto c = std::make_unique<XtFxChip>(chip);
+    std::vector<std::vector<int32_t>> out(words.size());
+    for (int t = 0; t < frames; ++t) {
+        silence(*c);
+        c->setGram(in, t == 0 ? height : 0);
+        c->runFrame();
+        size_t k = 0;
+        for (const unsigned w : words) out[k++].push_back(c->gram(w + 1));
+    }
+    return out;
 }
 
 } // namespace vc2

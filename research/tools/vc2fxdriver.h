@@ -1,11 +1,16 @@
 #pragma once
 // rom.4's effect driver in the interpreter, on an XtFxChip (research/VC2_VOCAL_DESIGNER.md, "Program A's routing"), as
 // XtFxControl runs rom.2's: its bus primitives hooked into the chip with the bytes rom.2's send, each word at once (its
-// waits answered at once), and its parameter reads answered from a map over rom.4's defaults.  vc2fxdriver.cpp.
+// waits answered at once), and its parameter reads answered from a map over rom.4's defaults.  And the chip's side of a
+// measurement, on either image's chip: silence in, a settled copy, words traced after an impulse.  vc2fxdriver.cpp.
 #include "XtFxChip.h"
 #include "vc2runs.h"
+#include <initializer_list>
 #include <map>
+#include <memory>
 #include <set>
+#include <string>
+#include <vector>
 
 namespace vc2 {
 
@@ -24,5 +29,21 @@ bool reloadFx(Machine& m);
 // Attenuation; fourth 0x80 patch, 0x40 switches, 0x20 MFX, 0x10 Chorus, 0x08 Reverb), taken by its reader.  False on a
 // fault
 bool fxMessage(Machine& m, uint32_t bytes);
+// A Reverb Type's name from rom.4's list ("00:Off" … "14:Garage"), or "(past the list)"
+std::string reverbTypeName(Machine& m, int type);
+
+// [FW] GRAM's words written from outside the chip: the SH-4's frame (0x20…0x2e), the converters (0x18, 0x1a) and two
+// between them, and the two "Program A's routing" finds read from outside (0x11, 0x13)
+inline constexpr unsigned kOutsideWords[] = {0x11, 0x13, 0x18, 0x1a, 0x1c, 0x1e, 0x20,
+                                             0x22, 0x24, 0x26, 0x28, 0x2a, 0x2c, 0x2e};
+inline constexpr int32_t kImpulse = 1 << 20;
+// Each of kOutsideWords set to 0, as before a sample with nothing coming in
+void silence(XtFxChip& chip);
+// A copy of `chip` after half a second of silence
+std::unique_ptr<XtFxChip> settled(const XtFxChip& chip);
+// GRAM words as written each sample (each read one on, after the sample), for `frames` samples after an impulse of
+// `height` (0: none, the baseline) into `in`, on a copy of `chip`; one vector a word
+std::vector<std::vector<int32_t>> tracesOf(const XtFxChip& chip, unsigned in, std::initializer_list<unsigned> words,
+                                           int frames, int32_t height = kImpulse);
 
 } // namespace vc2

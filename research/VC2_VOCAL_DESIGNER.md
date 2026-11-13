@@ -59,8 +59,11 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   read"). `fxprog <rom.2>` (`vc2fxprog.cpp`) runs rom.4's reverb types and holds each program they load to rom.2's ("The
   effect chip's programs"); `vc2runs.h`'s `fileContents` is the file reader it and `p02Data` share, and its `answerKernel`
   the kernel's stubs answered. `fxroute <rom.2> [scan|flags]` (`vc2fxroute.cpp`) maps where program A takes each input on
-  both images, on `XtFxChip` ("Program A's routing"); `vc2fxdriver.h` is rom.4's effect driver on an `XtFxChip`, and
-  `vc2patches.h` has the second bank's `typedDescriptorOf`.
+  both images, on `XtFxChip` ("Program A's routing"); `vc2fxdriver.h` is rom.4's effect driver on an `XtFxChip`, with
+  the chip's side of a measurement (`silence`, `settled`, `tracesOf`) and the Reverb Types' names (`reverbTypeName`), and
+  `vc2patches.h` has the second bank's `typedDescriptorOf`. `fxreverb [envelope <type> [time] | damping]`
+  (`vc2fxreverb.cpp`) measures the Reverb Types on `XtFxChip` ("The new reverbs on XtFxChip"), its decay by `vc2decay.h`;
+  `vc2runs.h`'s `intArg` reads a run's number arguments.
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -1523,7 +1526,8 @@ reverbs with no Off: the seven stereo ones, Room 1 … Garage, Plate, Non-Linear
 So **the VC-2 runs the V-Synth's effect chip programs** for its 42 MFX, its Chorus and the seven V-Synth reverbs it offers,
 their registers renumbered one down, beside a new program A, and adds seven stereo reverbs of its own; the V-Synth's
 Plate, Non-Linear and Delay are there but unreachable from a patch. Not run: rom.4's MFX types loading their programs (the
-bytes and the names are the two sources), and its new reverbs on `XtFxChip`. Program A on `XtFxChip`: the next section.
+bytes and the names are the two sources). Program A on `XtFxChip`: the next section; the new reverbs on it: "The new
+reverbs on XtFxChip".
 
 ### Program A's routing (2026-11-13, the VC-2 mode's step 1c)
 
@@ -1588,6 +1592,67 @@ Not settled: the Chorus, whose output in the mix differs by up to +3.8 dB, its t
 36 and 16, with their LFOs' phases not lined up between the runs, so whether its sides are swapped isn't known (program B
 differs in 13 words besides its registers); what outside the chip reads 0x90…0x9a; what DIR out carries on the VC-2; what
 the IDs read that moved nothing do.
+
+### The new reverbs on XtFxChip (2026-11-13, the VC-2 mode's step 1c)
+
+**How it was measured.** `vc2run <rom.4> fxreverb` (`vc2fxreverb.cpp`, `vc2decay.cpp`; `build/tools/vc2/fxreverb.txt`):
+rom.4's driver on an `XtFxChip` (`vc2fxdriver.h`, as in "Program A's routing") set to each Reverb Type with its typed
+defaults and its Pre Delay at 0; an impulse at half the chip's full scale into the reverb's left input word (0x73, what
+program A wrote to 0x72 the sample before), then its right (0x75); the wet outs alone (0xf4, 0xf6, before the mix), 12 s.
+The decay is the measure-reverb skill's: each out less its DC, Schroeder's backward integral, a least-squares line from
+−5 to −35 dB. Then each type's time parameter over its range against the panel's text for it (rom.4's text routine,
+`0x894fa730(id, value)`), once at the type's damping and once with Hf Damp and Lf Damp at 0 dB.
+
+**The floor first.** The first run read T30s of 45 to 58 s. The tails don't fall to nothing: the impulse leaves a DC on
+both outs (−236 LSB on Stereo Cathedral, about −640 on Stereo Plate), and on some types a residue around it as well, near
+30 LSB RMS, that holds for the whole 12 s (`fxreverb envelope <type>`). The same chip with no impulse is exactly 0, so the
+residue is the impulse's, through the programs' truncating arithmetic, as v126 found the V-Synth's tails end on DC. So the
+integral is cut where the decay meets the floor, the floor taken off (Lundeby's way), and a reading is marked where the
+tail is still falling at the end. On the V-Synth's Room 2 the T30 then reads its driver's table: 0.80, 1.00, 1.90, 4.25 and
+11.00 s as 0.80, 1.00, 1.90, 4.19 and 10.75. Above about 10 s the 12 s isn't long enough to read.
+
+**At the defaults** (Pre Delay 0; out levels are energy against the impulse's):
+
+| Reverb Type | T30 | Onset (samples) | Left in: left out, right out | Left in against right in |
+|---|---|---|---|---|
+| 1 Stereo Plate | 1.64 s | 2 | −13.1, −25.3 dB | 0.43 |
+| 2 Stereo OperaHouse | 1.99 s | 3 | −15.6, −21.7 dB | 0.64 |
+| 3 Stereo StudioSpring | 2.59 s | 2 | −14.5, −25.7 dB | 0.46 |
+| 4 Stereo Echoes | 4.51 s | 585 | −10.3, −17.2 dB | 0.64 |
+| 5 Stereo Room | 1.08 s | 2 | −10.9, −22.2 dB | 0.47 |
+| 6 Stereo Cathedral | 1.84 s | 3 | −14.1, −20.4 dB | 0.65 |
+| 7 Stereo Church | 3.27 s | 3 | −13.8 dB, none | 0.00 |
+| 8–14, the V-Synth's | Room 1 0.90, Room 2 1.00, Room 3 1.08, Hall 1 2.88, Hall 2 2.90, Hall 3 3.16, Garage 1.37 s | 310…1765 | equal on both outs | the right input reaches nothing |
+
+The seven are **stereo in and out**. Each input comes out mostly on its own side, the other side 6 to 12 dB under it, and
+the right input's response is the left's mirrored (each out's level the other's, within 0.3 dB). The two inputs' responses
+are partly the same (0.43 to 0.65) but not mirror images of each other (−0.30 to 0.01). Stereo Church is two reverbs, one
+a side: nothing crosses. With Pre Delay 0, six of the seven answer within 3 samples; Echoes at 585 (13.3 ms). The V-Synth's read only the left input word (program A adds the right into it for
+them), give it to both outs alike, and start late, 310 to 1765 samples, as on the V-Synth.
+
+**Rev Time is the undamped decay.** Its text is the driver's 80-entry time table's ("1.00[S]" at 12, "10.00[S]" at 41;
+Echoes, Stereo Room and Stereo Cathedral from 0 or 6, "0.06[S]", "0.40[S]"), though no new type's code calls it. At the
+types' damping (Hf Damp −5 to −20 dB, Lf Damp 0 to −6 dB, their defaults) the T30 is short of it, more so as it grows:
+Stereo Plate 0.87 s at "1.00" to 7.53 s at "10.00". With Hf Damp and Lf Damp at 0 dB (36, "0[dB]", on every new type):
+
+| Rev Time's text | 1.00 | 1.40 | 1.90 | 3.00 | 4.25 | 6.00 | 10.00 |
+|---|---|---|---|---|---|---|---|
+| Stereo Plate | 1.08 | 1.43 | 1.91 | 3.00 | 4.25 | 6.01 | 10.01 |
+| Stereo OperaHouse | 1.07 | 1.41 | 1.90 | 3.00 | 4.24 | 5.99 | 10.00 |
+| Stereo StudioSpring | 1.00 | 1.37 | 1.83 | 2.76 | 3.71 | 5.01 | 7.75 |
+| Stereo Church | 1.41 | 1.59 | 1.96 | 2.96 | 4.18 | 6.04 | 9.95 |
+
+(OperaHouse's 4.24 is one the run marks as still falling at the end.) Stereo Cathedral (from "0.40"): 0.61, 0.93 at "0.90", 1.52 at "1.50", 2.01 at "2.00", 3.78 at "3.75", 5.53 at "5.50",
+9.97 at "10.00". Stereo Room: 0.40, 0.89, 1.30, 1.49 to "1.50", then short: 2.16 at "2.25", 3.34 at "3.75", 7.16 at
+"10.00". Stereo Echoes doesn't follow it, as its decay is a train of repeats (Repeat Time): 0.91 s from "0.06" to "0.40",
+then 1.52, 2.52, 4.43, 14.00 at "10.00". So on Plate, OperaHouse and Cathedral, and on Church from 1.9 s, Rev Time is
+the decay's T60 within 1 to 2%, the damping taking the highs and lows off it; the shortest settings bottom out (Church
+1.41 s at "1.00"); StudioSpring and Room run short at long settings.
+
+So **the seven new reverbs run on `XtFxChip` as reverbs**, rom.4's driver loading and setting them, each decaying as its
+panel says, given its damping. As with every program here, the chip is JE-8086's and the programs the firmware's; that
+the VC-2 sounds so is not checked against a real one. Not measured: Room Size (four of the seven), Repeat Time, the
+pre-EQ, the Pre Delay's own law, and the seven at sample rates other than 44.1 kHz.
 
 
 ## The names sweep

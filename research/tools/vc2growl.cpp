@@ -72,11 +72,12 @@ void growlCase(Machine& m, float hz, float growl, int blocks, Tally& t) {
 int growl(Machine& m, int argc, char** argv) {
     int blocks = 200;
     if (argc >= 2) {
-        const char* end = argv[1] + std::strlen(argv[1]);
-        if (std::from_chars(argv[1], end, blocks).ptr != end || blocks <= 0) {
+        const std::optional<int> n = intArg(argv[1]);
+        if (!n || *n <= 0) {
             std::fprintf(stderr, "growl [blocks]: blocks is a count\n");
             return 2;
         }
+        blocks = *n;
     }
     m.cpu.hook(kOsClock, [](Sh4& c) { c.ret(kFixedMs); });
     if (!m.run(kSetRate, {})) return 1;

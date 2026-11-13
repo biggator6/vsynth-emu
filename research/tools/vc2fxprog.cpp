@@ -6,6 +6,7 @@
 // per type, its name (rom.4's list, 15 of them) and what it loads; and each 350-word program held to rom.2's eight reverb
 // programs (fxmap's table) word by word: the closest, its words equal and those that differ in the register field alone.
 // Fails on a fault.
+#include "vc2fxdriver.h"
 #include "vc2patches.h"
 #include <cstdio>
 #include <cstring>
@@ -21,7 +22,6 @@ constexpr uint32_t kReverbInit = 0x893873d0, kSetType = 0x89387490, kSetParam = 
 constexpr uint32_t kLoadProgram = 0x89362b60;                     // [FW] (word, n, table)
 constexpr uint32_t kChip = 0xb0000000, kChipBytes = 0x4000;
 constexpr uint32_t kTypeIds = 0x895165e4;                         // [FW] ("The second bank, read")
-constexpr uint32_t kTypeNames = 0x89577ee0, kNameBytes = 20, kNamedTypes = 15;      // [FW] "00:Off", …
 constexpr int kTypes = 17, kParams = 24;   // the table's entries; the parameters the setter takes
 constexpr uint32_t kReverbWords = 350, kRom2Base = 0x89300000;
 constexpr uint32_t kRegister = 0x3fc00;   // a program word's register field, bits 17:10
@@ -67,17 +67,6 @@ void sayMatch(Machine& m, const std::vector<uint8_t>& rom2, uint32_t table) {
                 best->name, bestEqual, kReverbWords, bestRegister);
 }
 
-std::string typeName(Machine& m, int type) {
-    if (type >= (int)kNamedTypes) return "(past the list)";
-    std::string s;
-    for (uint32_t k = 0; k < kNameBytes; ++k) {
-        const char c = (char)m.cpu.rd8(kTypeNames + kNameBytes * (uint32_t)type + k);
-        if (!c) break;
-        s += c;
-    }
-    return s;
-}
-
 // One type set with its typed defaults and applied; what it loaded, said; false on a fault
 bool runType(Machine& m, const std::vector<uint8_t>& rom2, int type, std::vector<Load>& loads) {
     const int first = (int16_t)m.cpu.rd16(kTypeIds + 4 * (uint32_t)type);
@@ -89,7 +78,7 @@ bool runType(Machine& m, const std::vector<uint8_t>& rom2, int type, std::vector
         if (!m.run(kSetParam, {(uint32_t)i, (uint32_t)def})) return false;
     }
     if (!m.run(kApply, {0})) return false;
-    std::printf("  type %2d %-20s typed IDs %03x…%03x:", type, typeName(m, type).c_str(), first, last);
+    std::printf("  type %2d %-20s typed IDs %03x…%03x:", type, reverbTypeName(m, type).c_str(), first, last);
     if (loads.empty()) std::printf(" no program loaded");
     for (const Load& l : loads) std::printf(" %u words at %03x from %#x;", l.n, l.word, l.table);
     std::printf("\n");

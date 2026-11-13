@@ -92,13 +92,19 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   down, the Chorus's but for 13 words, the reverbs' transition program equal; program A (routing, mix, EQ, levels)
   rewritten (110 of 768 words equal). Reverb Types: Off, seven new stereo reverbs, then Room 1–3, Hall 1–3 and Garage;
   Plate and Non-Linear only past the range, Delay in no type. So the effects go by XtFxChip and XtFxControl as the
-  V-Synth's do, with rom.4's programs. Left of it: ~~program A's routing and~~ the seven new reverbs run on `XtFxChip`.
+  V-Synth's do, with rom.4's programs. Left of it: ~~program A's routing and the seven new reverbs run on `XtFxChip`~~
+  (both done below).
   **Program A's routing, 2026-11-13** (`vc2run … fxroute`; VC2_VOCAL_DESIGNER.md, "Program A's routing"): rom.4's
   effect driver run on an `XtFxChip` (`vc2fxdriver.h`) beside rom.2's `XtFxUnit`, impulses into each GRAM word: MAIN,
   MULTI, the MFX and the returns reach the outputs as on the V-Synth, at its gains; the Reverb's input is a stereo pair
   (0x72, 0x74) fed 6 dB lower, the MFX's input moved to 0x76, 0x78, the system EQ's mid bands are the patch's EQ 1 and
   EQ 2 on MULTI alone, DIR goes nowhere, and the outside input's right reaches 0x9a alone. Left of it: whether the
   Chorus's sides are swapped, and what reads 0x90…0x9a outside the chip.
+  **The new reverbs on XtFxChip, 2026-11-13** (`vc2run … fxreverb`; VC2_VOCAL_DESIGNER.md, "The new reverbs on
+  XtFxChip"): the seven, set by rom.4's driver, decay as reverbs, stereo in and out (Church as two, one a side), and
+  with their damping at 0 dB their T30 is the panel's Rev Time within 1 to 2% on Plate, OperaHouse, Cathedral and
+  Church (Room and StudioSpring short at long settings; Echoes is repeats). Left of it: Room Size, Repeat Time, the
+  pre-EQ and Pre Delay's laws; any check against a real VC-2.
 - Second sources: the V-Card owner's manual (names and meanings) and the 64 factory patches (the corpus).
 
 ### 2. Shared plumbing (plugin/Source)

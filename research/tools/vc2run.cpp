@@ -23,6 +23,7 @@
 //   vc2run <rom.4> typed <file.p02> …   MFX, Chorus, Reverb and COSMs read through the second bank (vc2typed.cpp)
 //   vc2run <rom.4> fxprog <rom.2>  the reverb types' chip programs, against rom.2's (vc2fxprog.cpp)
 //   vc2run <rom.4> fxroute <rom.2> where program A takes each input, both images on XtFxChip (vc2fxroute.cpp)
+//   vc2run <rom.4> fxreverb        the Reverb Types on XtFxChip, measured as reverbs (vc2fxreverb.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
@@ -31,6 +32,7 @@
 #include "vc2runs.h"
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstdio>
 #include <cstring>
 #include <string_view>
@@ -55,6 +57,14 @@ std::vector<uint8_t> fileContents(const char* path) {
         std::fclose(fp);
     }
     return f;
+}
+
+std::optional<int> intArg(const char* s) {
+    int v = 0;
+    const char* end = s + std::strlen(s);
+    const auto [at, why] = std::from_chars(s, end, v);
+    if (why != std::errc() || at != end) return std::nullopt;
+    return v;
 }
 
 int answerKernel(Machine& m) {
@@ -108,14 +118,14 @@ constexpr std::array kRuns{Run{"boot", vc2::boot}, Run{"warp", vc2::warp}, Run{"
                            Run{"solo", vc2::solo}, Run{"lite", vc2::lite}, Run{"tva", vc2::tva},
                            Run{"patches", vc2::patches}, Run{"track", vc2::track}, Run{"vocosc", vc2::vocosc},
                            Run{"autonote", vc2::autonote}, Run{"mixer", vc2::mixer}, Run{"typed", vc2::typed},
-                           Run{"fxprog", vc2::fxprog}, Run{"fxroute", vc2::fxroute}};
+                           Run{"fxprog", vc2::fxprog}, Run{"fxroute", vc2::fxroute}, Run{"fxreverb", vc2::fxreverb}};
 
 } // namespace
 
 int main(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: vc2run <rom.4> <run> [args]: boot, warp, ratio, hold, growl, kind6, patches,\n"
-                             "       track, vocosc, autonote, mixer, typed;\n"
+                             "       track, vocosc, autonote, mixer, typed, fxreverb;\n"
                              "       vc2run <rom.4> <block> <rom.2>: lfo, env, cosm, osc, analog, band, solo, lite,\n"
                              "       tva, fxprog, fxroute\n");
         return 2;
