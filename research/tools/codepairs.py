@@ -18,7 +18,7 @@ from pathlib import Path
 
 from likeat import shape, shapes
 from poolrefs import loads
-from romfile import B, image, option
+from romfile import B, image, images, option
 
 SOURCE = Path(__file__).resolve().parents[2] / 'plugin/Source'
 LITERAL = re.compile(r'\b(?:(k\w+)\s*=\s*)?(0x89[0-9a-fA-F]{6})u?\b')
@@ -95,8 +95,9 @@ def pool_pairs(rom2, a2, rom4, a4, n):
 
 def pools(argv):
     """--pools <rom.2> <rom.4> <a2> <a4> [cap]: the literals that differ between two routines shaped alike."""
-    rom2, rom4, a2, a4 = image(argv[0]), image(argv[1]), int(argv[2], 16), int(argv[3], 16)
-    n = same_run(rom2, a2, rom4, a4, int(argv[4]) if len(argv) > 4 else 2000)
+    rom2, rom4, rest = images(argv)
+    a2, a4 = int(rest[0], 16), int(rest[1], 16)
+    n = same_run(rom2, a2, rom4, a4, int(rest[2]) if len(rest) > 2 else 2000)
     print(f'{a2:#x} / {a4:#x}: {n} instructions alike')
     for v2, v4 in sorted(pool_pairs(rom2, a2, rom4, a4, n).items()):
         print(f'    {v2:#010x} -> {v4:#010x}')
@@ -110,10 +111,10 @@ def callers(argv):
     compiled anew (its own shape not found): each place rom.2 loads a2 as a literal is found in rom.4 by the shape of the
     code around it, and the literal rom.4's same instruction loads is read. One line a routine: the rom.4 addresses its call
     sites give, with how many gave each; the sites not found in rom.4 once are counted apart."""
-    rom2, rom4 = image(argv[0]), image(argv[1])
+    rom2, rom4, rest = images(argv)
     shaped4, keyed = index(rom4)
     n = SITE_BEFORE + SITE_AFTER
-    for a2 in (int(a, 16) for a in argv[2:]):
+    for a2 in (int(a, 16) for a in rest):
         votes, lost = collections.Counter(), 0
         sites, _ = loads(rom2, a2)
         for site in sites:
@@ -139,6 +140,10 @@ def main(argv):
     distances = collections.Counter()
     tally = collections.Counter()
     for name, addr in targets:
+        if not CODE_LO <= addr < CODE_HI:
+            tally['not code'] += 1
+            print(f'{name} {addr:#x}: not in rom.2\'s code')
+            continue
         n = length(rom2, addr)
         if n < KEY:
             tally['too short to key'] += 1

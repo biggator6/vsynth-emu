@@ -29,8 +29,10 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   and COSM's 15 converters take another input block in rom.4 (no MSM term, the Matrix read inside); the OSC block's
   arithmetic (exp2, powf, velocity, pitch10, key-follow key) and key state equal (`vc2run … osc`), its wiring (the
   VariPhrase converter, pitch and gain targets, voice update, portamento settings, note setup, bend) rewritten, and its
-  portamento differing (rom.4's constructor, restart and tick: an eased ending, fast glides held to ±500 cents). Next: the
-  analog OSC, the players, key assign; COSM's other DSP routines. The wiring (what reads parameters by ID, COSM's
+  portamento differing (rom.4's constructor, restart and tick: an eased ending, fast glides held to ±500 cents); the analog
+  OSC's 11 waveform routines equal, with and without the sub oscillator (`vc2run … analog`; rom.4's sub-object has 4 bytes
+  more above +0x84), its note-on, install, update and converter rewritten, and no SUPER-SAW, FEEDBACK-OSC or X-MOD in rom.4.
+  Next: the players, key assign; COSM's other DSP routines. The wiring (what reads parameters by ID, COSM's
   converters) differs by construction: it is ported from rom.4, not shared, and the Comb and the portamento with it.
 - 1c. Still to map: the pitch tracker (the routines that write `0x899d9bd0`); the VOCODER OSC's IDs (0x354…0x383) into the
   voice's fields; kind 6's mode and where its pitch comes from (Auto Note, Modulator Key Mode, Split Point); the part mixer's

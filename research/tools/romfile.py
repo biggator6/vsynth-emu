@@ -35,6 +35,11 @@ def offsets(img, addr):
     return None
 
 
+def images(argv):
+    """A two-image tool's arguments: (rom.2's bytes, rom.4's bytes, the rest of argv)."""
+    return image(argv[0]), image(argv[1]), argv[2:]
+
+
 def option(argv, handlers):
     """A tool's option run: handlers['--name'](the rest of argv) when argv starts with one of them; True when it ran."""
     run = handlers.get(argv[0]) if argv else None

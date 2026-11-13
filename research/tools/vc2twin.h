@@ -50,8 +50,12 @@ public:
     [[nodiscard]] long differs(uint32_t a, uint32_t n, std::span<const Moved> moved = {});
     // Says where differs() found the objects at `a` part, with each image's word there
     void sayDiffers(uint32_t a, long at);
+    // As differs, for an object rom.4 holds at another address than rom.2 (a field inserted before it): the first word in
+    // n bytes from a2 in rom.2 and a4 in rom.4 that differs, as a byte offset, or −1
+    [[nodiscard]] long differsAt(uint32_t a2, uint32_t a4, uint32_t n);
 private:
     bool ready = false;
+    long differsMoved(uint32_t a2, uint32_t a4, uint32_t n, std::span<const Moved> moved);
 };
 
 // The runs' random inputs: a fixed linear congruential sequence (xt_cosm's), so a run repeats

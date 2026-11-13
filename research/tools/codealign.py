@@ -9,13 +9,16 @@ A line a pair: rom.2's start and size, rom.4's start and size, '=' when the size
 of the same length whose sizes don't, and '-' with a routine one image alone has. Read only; both images are the
 user's.
 
-codealign.py --near <rom.2> <rom.4> <distance> <a2> ...: the longest alike run near where each routine should be."""
+codealign.py --near <rom.2> <rom.4> <distance> <a2> ...: the longest alike run near where each routine should be.
+codealign.py --similar <rom.2> <rom.4> <a2> <a4> <n2> <n4>: the share of n2 instructions from a2 and n4 from a4 alike in
+order (likeat.py's shape, difflib's ratio), for a pair compiled anew: 1.0 the same, near 0 unrelated code."""
 import difflib
 import struct
 import sys
 
 from codepairs import same_run
-from romfile import B, image, option
+from likeat import shapes
+from romfile import B, images, option
 
 NOP = 0x0009
 ALIGN = 16
@@ -48,20 +51,29 @@ def near(argv):
     """--near <rom.2> <rom.4> <distance> <a2> ...: for each rom.2 routine, the rom.4 address within NEAR_SPAN of
     a2 − distance where the longest run of alike instructions starts (codepairs.py's same_run), and the run's length: how a
     routine moved with its neighbours is found when its first instructions alone don't match."""
-    rom2, rom4, distance = image(argv[0]), image(argv[1]), int(argv[2], 16)
-    for a2 in (int(a, 16) for a in argv[3:]):
+    rom2, rom4, rest = images(argv)
+    distance = int(rest[0], 16)
+    for a2 in (int(a, 16) for a in rest[1:]):
         at = a2 - distance
         n, a4 = max((same_run(rom2, a2, rom4, x, 4000), x) for x in range(at - NEAR_SPAN, at + NEAR_SPAN, 2))
         print(f'{a2:#x}: rom.4 {a4:#x} (distance {a2 - a4:#x}), {n} instructions alike')
 
 
+def similar(argv):
+    """--similar <rom.2> <rom.4> <a2> <a4> <n2> <n4>: the share of two routines' instructions matching in order."""
+    rom2, rom4, rest = images(argv)
+    a2, a4, n2, n4 = (int(a, 16) for a in rest[:4])
+    alike = difflib.SequenceMatcher(a=shapes(rom2, a2, n2), b=shapes(rom4, a4, n4), autojunk=False).ratio()
+    print(f'{a2:#x} ({n2:#x} instructions) / {a4:#x} ({n4:#x}): {alike:.3f} alike')
+
+
 def main(argv):
-    if option(argv, {'--near': near}):
+    if option(argv, {'--near': near, '--similar': similar}):
         return
     if len(argv) < 6:
         sys.exit(__doc__)
-    rom2, rom4 = image(argv[0]), image(argv[1])
-    lo2, hi2, lo4, hi4 = (int(a, 16) for a in argv[2:6])
+    rom2, rom4, rest = images(argv)
+    lo2, hi2, lo4, hi4 = (int(a, 16) for a in rest[:4])
     s2, s4 = starts(rom2, lo2, hi2), starts(rom4, lo4, hi4)
     m = difflib.SequenceMatcher(a=[n for _, n in s2], b=[n for _, n in s4], autojunk=False)
     for op, i1, i2, j1, j2 in m.get_opcodes():

@@ -62,9 +62,17 @@ void Twin::writeF32(uint32_t a2, uint32_t a4, float f) {
 }
 
 long Twin::differs(uint32_t a, uint32_t n, std::span<const Moved> moved) {
+    return differsMoved(a, a, n, moved);
+}
+
+long Twin::differsAt(uint32_t a2, uint32_t a4, uint32_t n) {
+    return differsMoved(a2, a4, n, {});
+}
+
+long Twin::differsMoved(uint32_t a2, uint32_t a4, uint32_t n, std::span<const Moved> moved) {
     std::vector<uint32_t> x(n / 4), y(n / 4);
-    vsynth.read(a, x.data(), n);
-    vc2.cpu.read(a, y.data(), n);
+    vsynth.read(a2, x.data(), n);
+    vc2.cpu.read(a4, y.data(), n);
     const auto same = [moved](uint32_t v, uint32_t w) {
         return v == w || std::ranges::find_if(moved, [&](const Moved& p) { return p.vsynth == v && p.vc2 == w; })
                              != moved.end();

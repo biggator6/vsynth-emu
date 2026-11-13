@@ -47,16 +47,21 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
   checked unchanged).
 - `codepairs.py <rom.2> <rom.4> [addr …]`: rom.2's routines found in rom.4 by the shape of their code, with the distance
-  each moved; with no addresses, every rom.2 code address in plugin/Source. `--pools <rom.2> <rom.4> <a2> <a4>`: for one pair,
-  the literals that differ. `--callers <rom.2> <rom.4> <a2> …`: a routine rom.4 compiled anew, through the literals its
-  callers load. `likeat.py`'s `shape`, `shapes` and `find` are importable for it (its output checked unchanged).
+  each moved; with no addresses, every rom.2 code address in plugin/Source (an address given outside rom.2's code,
+  0x89300000…0x89540000, is said and skipped). `--pools <rom.2> <rom.4> <a2> <a4>`: for one pair, the literals that differ,
+  paired by their place in the pools (so a pool word used twice reads as the first use; "The analog OSC in rom.4").
+  `--callers <rom.2> <rom.4> <a2> …`: a routine rom.4 compiled anew, through the literals its callers load. `likeat.py`'s
+  `shape`, `shapes` and `find` are importable for it (its output checked unchanged).
 - `codealign.py <rom.2> <rom.4> <lo2> <hi2> <lo4> <hi4>`: a region's routines lined up by order and size, for code rom.4
-  compiled anew; `--near <rom.2> <rom.4> <distance> <a2> …`: the longest alike run near where a routine should be.
-  `romfile.option` runs a tool's `--option`s (codepairs.py's and codealign.py's).
-- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`, `osc`): a block's rom.2 routines and their rom.4 pairs on two
-  interpreters, its object compared after every call, and the port held beside rom.4's where one is linked (`vc2twin.*`, a
-  run per block, `vc2twin<block>.cpp`; `lfo` and `env` link their ports from plugin/Source, `cosm` and `osc` none). Fails on
-  any difference: `cosm` does, at the Comb ("COSM in rom.4"), and `osc` at the pitch ramp ("The OSC block in rom.4").
+  compiled anew; `--near <rom.2> <rom.4> <distance> <a2> …`: the longest alike run near where a routine should be;
+  `--similar <rom.2> <rom.4> <a2> <a4> <n2> <n4>`: the share of two routines' instructions alike in order (difflib's ratio
+  over their shapes), its scale in "The analog OSC in rom.4". `romfile.option` runs a tool's `--option`s and
+  `romfile.images` reads a two-image tool's arguments (codepairs.py's and codealign.py's).
+- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`, `osc`, `analog`): a block's rom.2 routines and their rom.4 pairs on
+  two interpreters, its object compared after every call, and the port held beside rom.4's where one is linked (`vc2twin.*`,
+  a run per block, `vc2twin<block>.cpp`; `lfo` and `env` link their ports from plugin/Source, `cosm`, `osc` and `analog`
+  none). Fails on any difference: `cosm` does, at the Comb ("COSM in rom.4"), and `osc` at the pitch ramp ("The OSC block in
+  rom.4").
 
 ## The V-Synth's tables and code in rom.4 (2026-11-13, the VC-2 mode's step 1a)
 
@@ -132,7 +137,8 @@ it is not the V-Synth's envelope time.
 
 **So far: the LFO and the envelope (and its converters) of the VC-2 are the V-Synth's, and the ports serve it as they stand;
 COSM's voice side is too for 14 of its 15 types (below), its converters and the Comb are not; the OSC block's arithmetic
-and key state are, its wiring and portamento are not.** Still to run: the analog OSC, the band and SOLO players, Vari off and
+and key state are, its wiring and portamento are not; the analog OSC's waveforms are, for the 11 the VC-2 has (no SUPER-SAW,
+no FEEDBACK-OSC), its note-on, install, update and converter are not.** Still to run: the band and SOLO players, Vari off and
 LITE, key assign.
 
 ### COSM in rom.4 (2026-11-13)
@@ -245,6 +251,63 @@ and the velocity curves' pointer table (its pointers would differ even with the 
 differ, not that the VC-2 has no such thing: a table changed within itself, or code compiled anew, reads as a miss too. For
 the Multi Step Modulator a second source agrees: rom.2 holds the string "Multi Step Modulator" (and "Step Modulator" twice),
 rom.4 none of them. So the VC-2 has no Multi Step Modulator; its arpeggio's and its effects' IDs are its own.
+
+### The analog OSC in rom.4 (2026-11-13)
+
+**Its waveforms: the V-Synth's first 11.** rom.4's install (`0x893c2ad0`, rom.2's `0x89505170`) loads 12 routine literals
+where rom.2's loads 15: the sub oscillator's install (`0x895069d0` → `0x893c3e60`) and the 11 waveform routines, in rom.2's
+order, each 0x1435a0 from rom.2's. rom.2's other three are not there: SUPER-SAW (`0x89507520`), FEEDBACK-OSC (`0x89507900`)
+and X-MOD (`0x89507b60`, HARDWARE_FIRMWARE.md, "X-MOD"). A second source agrees: rom.4's waveform names are SAW, SQUARE,
+TRIANGLE, SINE, RAMP, JUNO, HQ-SAW, HQ-SQUARE, NOISE, LA-SAW, LA-SQUARE (11, xt_analog's codes 0…10 in order), and it holds
+no "SUPER-SAW" (rom.2 twice), "FEEDBACK-OSC" (once) or "X-MOD" (13 times). A third: the super saw's shared counter
+(`0x8987c894`) is not in rom.4's .data ("The V-Synth's tables and code in rom.4"). So the VC-2's analog OSC has 11
+waveforms and no X-MOD.
+
+**Pairs.** The 11 waveform routines and the sub oscillator's 8 pair by shape at the block's distance 0x1435a0 (19 pairs,
+`kWaveforms` in `vc2twinanalog.cpp`); their literals differ only in the analog sub-object's offsets from +0xec on (4 more in
+rom.4, below) and their own pools' addresses. The note-on, install and update were compiled anew, and the voice is laid out
+otherwise: rom.4's install clears at +0xa40 what rom.2's clears at +0x960 (0xe0 further). `codealign.py --similar` puts them
+between its scale's ends:
+
+| Pair | Instructions | Alike |
+|---|---|---|
+| COSM note-on `0x894edf70` / `0x893aa0e0` (runs equal) | 0x398 / 0x378 | 0.918 |
+| COSM update `0x894ee6a0` / `0x893aa7d0` (runs equal) | 0x468 / 0x408 | 0.761 |
+| Analog install `0x89505170` / `0x893c2ad0` | 0x128 / 0x128 | 0.605 |
+| Analog update `0x89505400` / `0x893c2ce0` | 0x1f8 / 0x1f0 | 0.450 |
+| Analog note-on `0x89504af0` / `0x893c22e0` | 0x488 / 0x500 | 0.425 |
+| Pitch ramp's tick `0x894f4b00` / `0x893b0f30` (differs, "The OSC block in rom.4") | 0x80 / 0x118 | 0.368 |
+| Unrelated: COSM note-on / analog note-on, analog update / COSM note-on | | 0.096, 0.080 |
+
+So the note-on, install, update and the converter (rom.4's `0x8939ced0`, "The carrier: the VOCODER OSC"; rom.2's `0x894e1920`
+has no pair by shape) are the wiring, ported from rom.4 as COSM's converters are; only the waveform routines are run.
+
+**Run (`vc2run <rom.4> analog <rom.2>`, `vc2twinanalog.cpp`, no port linked: xt_analog holds `XtAnalog` to rom.2;
+`build/tools/vc2/analog.txt`).** A voice is made in rom.2 alone, as xt_analog makes one: the calibration from the
+descriptors' defaults, the converter on a random input (key, velocity, gain, pitch, level and its key follow, Pulse Width's and
+Fat's groups, the sub oscillator on or off), the note-on and the install. Its analog sub-object (voice + 0xd4, what a waveform
+routine is given) is copied into rom.4 in rom.4's layout, and each image's routine renders 40 blocks of 64 samples, rom.2's
+update moving the targets every fifth block (the sub-object copied again) and a random sync mask one block in eight; the
+samples, the returned mask and the sub-object compared each block. 100 notes for each waveform, with and without the sub
+oscillator: **88,000 blocks, 0 different**, all 19 pairs reached. 544 of the 2,200 notes are silent in both images, every one
+with its level key follow taking the level down at its key; the rest sound.
+
+The sub-object's layout, by the run: rom.4's waveform routines read +0x80 and +0x84 where rom.2's do, and every field from
++0xec on 4 bytes further (+0xec, +0xf0, +0xf4, +0xf8, +0x104, +0x10c in rom.2). So rom.4 has 4 bytes more somewhere in
+(+0x84, +0xec]; no waveform routine reads between, and the run is equal with them placed at +0x88, +0xc0 or +0xe8 (the run
+places them at +0x88). What rom.4 keeps there is not read yet. First written as inserted at +0x80, from the `--pools` line
+0x80 → 0x84 of `0x89509360` (SQUARE with the sub oscillator): that routine loads its pool word 0x80 twice, as the base of
++0x80 and +0x84 and later to step from +0x84 to +0x104, and rom.4's steps by a word of its own, 0x84, to +0x108; `--pools`
+pairs pool words by place, so the second use read as the first. The run with the insert at +0x80 gave 68,320 of 88,000
+blocks different.
+
+Seen red: the insert at +0x84 (68,320 different); no insert (rom.4's NOISE routine `0x893c2230` runs to the step limit on the
+misplaced fields, and the run fails); SAW paired with rom.4's SQUARE routine (3,890 different); one bit of rom.4's sub-object
+flipped at the eighth block (4,077 different).
+
+**So the VC-2's 11 analog waveforms are the V-Synth's, and `XtAnalog`'s routines serve them as they stand, given rom.4's
+sub-object; its note-on, install, update and converter are its own.** Not run: how rom.4's converter maps OSC 1 Analog
+Waveform (ID 0x2f1, 0…10) to the input's code (the names' order says one for one).
 
 ## rom.4 run in the interpreter (2026-11-12, fourth pass)
 
