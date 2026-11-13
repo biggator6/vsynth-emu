@@ -52,5 +52,6 @@ int typed(Machine& m, int argc, char** argv);
 int fxprog(Machine& m, int argc, char** argv);
 int fxroute(Machine& m, int argc, char** argv);
 int fxreverb(Machine& m, int argc, char** argv);
+int splits(Machine& m, int argc, char** argv);
 
 } // namespace vc2

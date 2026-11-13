@@ -63,7 +63,9 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   the chip's side of a measurement (`silence`, `settled`, `tracesOf`) and the Reverb Types' names (`reverbTypeName`), and
   `vc2patches.h` has the second bank's `typedDescriptorOf`. `fxreverb [envelope <type> [time] | damping]`
   (`vc2fxreverb.cpp`) measures the Reverb Types on `XtFxChip` ("The new reverbs on XtFxChip"), its decay by `vc2decay.h`;
-  `vc2runs.h`'s `intArg` reads a run's number arguments.
+  `vc2runs.h`'s `intArg` reads a run's number arguments. `splits <index>` (`vc2split.cpp`) runs rom.4's wave index parser
+  and its split readers at every velocity and key ("A VC-2 wave's split, chosen"); `wlflib.py get VC2 <out>` writes the
+  index it reads, and `wlflib.py choices VC2` what the rule gives, to diff with it.
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -1352,11 +1354,14 @@ The preset area after the partition holds both instruments' waves, each as an in
 **The index** (`WLF08`): a section count at +8, two version strings at +0x10 and +0x20, and a 16-byte entry a section from
 +0x40 (u16 number, u16 1, u32 offset from the index, u32 size). A section is a u32 count, a u32 index offset (0xc) and a u32
 entry size: 8 means an index of (u32 offset from the section, u32 size), anything else inline entries of that size. Section 1,
-the waves: a 16-character name, then a 4-byte split each (the upper key, a byte, 127 in 67 of the VC-2's 70 and 82, 88 and
+the waves: a 16-character name, then a 4-byte split each (~~the upper key~~ the upper velocity, a byte, 127 in 67 of the
+VC-2's 70 and 82, 88 and
 100 once each, and a u16 map number). Section 2, the maps: a name, then a 6-byte split each (the upper key, a byte of 100 to
-127, a level by its values, a u16, 0 in 402 of the 430 and 12 in 28, which by its value may be an octave but isn't read, and
+127, a level by its values, a u16, 0 in 402 of the 430 and 12 in 28, which by its value may be an octave ~~but isn't read~~, and
 a u16 sample number). Section 3, the samples: 36-byte paths `VPW\<file>.vpw`. Numbers count from 1. So a VC-2 wave is a
-multisample: `LargeChoVS S` splits at keys 90, 120 and 127 into maps 3, 1 and 2, and the map `LondonChoSt` spreads samples
+multisample: `LargeChoVS S` splits at ~~keys~~ velocities 90, 120 and 127 into maps 3, 1 and 2 (the three strikes withdrawn
+2026-11-13, "A VC-2 wave's split, chosen": rom.4 compares a wave's split with the note's velocity, and passes the 0 or 12
+on), and the map `LondonChoSt` spreads samples
 52…65 over 14 splits from key 43. **The sample bank** ("VC-2 Preset.bin"): `"TABLE"`, the count in ASCII (`0192`), 60-byte
 entries (a 52-byte file name, u32 size, u32 offset from the end of `"DATA"`), then `"DATA"` and the streams. The index finds
 a sample in it by name: the bank's order is not the index's. **A link file** (`.w00`, `.w02`, 36 bytes): a `link` chunk
@@ -1375,9 +1380,52 @@ maps' use of it (the V-Synth's own index has one split everywhere) and its own b
 
 So **the 416 "preset waves" the project's tools read (xt_files, xt_tone) are 224 V-Synth waves and the VC-2's 192 samples**.
 A VC-2 wave plays one of a map's samples by key, which the V-Synth's own waves never needed. How rom.2 finds its 224 streams
-(they have no `"TABLE"`), and how rom.4's player picks a split, are not traced.
+(they have no `"TABLE"`), ~~and how rom.4's player picks a split,~~ are not traced (the split since: "A VC-2 wave's split,
+chosen").
 
-### The factory patches, read by rom.4 (2026-11-13, the VC-2 mode's step 1c)
+### A VC-2 wave's split, chosen (2026-11-13, the VC-2 mode's step 1c)
+
+**Where.** rom.4's PCM converter (`0x8939e120`, rom.2's `0x894e2d20` by shape) takes the OSC's Wave Number to the wave
+store as rom.2's does (`0x89351840`, rom.2's `0x8949e5c0`, as 2999 + the number). A V-Synth wave the store holds goes on as
+before (`0x8939cd30`). One it doesn't hold goes to the wave library (`0x893520a0`), and from there to a routine rom.2
+hasn't (`0x8939cba0`), with the converter's input +4, which the per-note OSC setup fills with the note's velocity (rom.2's
+`0x894e4c30`: the note's +0xf; HARDWARE_FIRMWARE.md, "The note's object M"), and the key-follow key the converter already
+forms (`0x8939c910`, rom.2's `0x894e12c0`: the key with the Octave Shift, moved by the OSC's Coarse Tune and Pitch
+Keyfollow; HARDWARE_FIRMWARE.md, "The key-follow key"). It calls three readers of the index:
+- `0x89394b30(wave, velocity, out)`: the wave's record (by a table of each record's place, `0x89973084`, that the parser
+  fills), its splits walked, the first whose first byte is at or above the velocity taken: out+6 its map, out+4 its second
+  byte. out+0 is set when the first split covers 127 (one split), out+8 when the name has " M" at its 11th and 12th
+  characters (`LargeChoVS M`, a mono wave beside each `… S`).
+- `0x89394c20(map, key, out)`: the same over the map's splits by the key-follow key: out+6 the sample, out+4 the split's
+  second byte, out+5 the low byte of its "0 or 12" word.
+- `0x89394d10(sample, out)`: out+2 the id the store then takes, as rom.2's wave fetch takes 2999 + a wave's number.
+The routine copies these into the converter's block (its +0xa0 on: +4 the wave split's byte, +5 and +6 the map split's,
++7 the sample reader's out+0, +0 set when both the wave and the map have one split, +0x5c the " M") and fetches the
+sample's chunks from the store as rom.2's `0x894e16f0` fetches a wave's.
+
+**Run** (`vc2run <rom.4> splits <index>`, `vc2split.cpp`; the index written by `wlflib.py get VC2`;
+`build/tools/vc2/splits.txt`). rom.4's own parser (`0x8934d12a`) reads the index, its file calls (open `0x89336c60`, read
+`0x89336cf0`, seek `0x89336db0`, close `0x89336ca0`) answered from the index's bytes: it returns 1 and finds 58 waves and 43
+maps. Then the wave reader at every velocity 0…127 for every wave, and the map reader at every key for every map, printed
+as `wlflib.py choices VC2` prints the rule "the first split whose first byte is at or above the value" on the same bytes:
+
+| | |
+|---|---|
+| The firmware's choices against the rule's, 58 waves × 128 velocities and 43 maps × 128 keys | the same, line for line |
+| The rule with "above" for "at or above", planted | all 101 lines differ |
+| The key-follow key (`0x8939c910`) against the port's `xtKeyFollowKey`, keys 0…127, Coarse −48…+48, Keyfollow −2000…+2000 | 139,392 cases, 0 different |
+| The sample reader | sample n is the store's id n, for all 192 |
+
+So **a VC-2 wave plays by velocity, then by key**: its splits choose a map by the note's velocity (the six `…VS` waves, the
+Large, Gospel and Small Choirs in stereo and mono: velocity 0…90, 91…120, 121…127; the other 52 have one split), and the
+map's splits choose a sample by the key-follow key: the key the V-Synth's PCM OSC already forms for its key follow, which
+XtOsc ports. Each split list ends at 127, so every velocity and key finds one. A VC-2 sample is the store's id 1…192, its own
+number in the index, where a V-Synth wave is 3000 on. The bytes the readers pass on are 127 on every wave split but the FM
+waves' (`FMSynWave 1`…`3`: 88, 82, 100), 100…127 on the map splits, and 12 on some splits of the four bass maps
+(`LindaJohnBs`, `PennyRobyBs`, `JohnAndBs`, `RobyAndBass`), each into the converter's block: what the block does with them
+(a level, an octave, by their values) is not followed here, nor how the store comes to hold the bank's samples under
+those ids.
+
 
 **How.** `vc2run <rom.4> patches <file.p02> …` (`vc2patches.cpp`) reads a `.p02` the project's way, by rom.4's own routines in
 the interpreter, as `XtFiles` and `XtFwPatchReader` read a `.p00` by rom.2's: rom.4's default patch (`0x89325300`, rom.2's

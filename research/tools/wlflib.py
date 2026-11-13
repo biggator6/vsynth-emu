@@ -5,7 +5,7 @@ what it points at (research/VC2_VOCAL_DESIGNER.md, "The wave libraries, read").
 A library: "WLF08", a section count at +8, two version strings at +0x10 and +0x20, and a 16-byte entry a section from +0x40
 (u16 number, u16 1, u32 offset from the library, u32 size). A section: u32 count, u32 the index's offset (0xc), u32 an
 entry's size: 8 is an index of (u32 offset from the section, u32 size), anything else inline entries of that size.
-Section 1, the waves: a 16-character name, then 4 bytes a split (upper key, a byte, u16 map number). Section 2, the maps:
+Section 1, the waves: a 16-character name, then 4 bytes a split (upper velocity, a byte, u16 map number). Section 2, the maps:
 a name, then 6 bytes a split (upper key, level, a u16 0 or 12, u16 sample number). Section 3, the samples: 36-byte paths
 "VPW\\<file>.vpw". Numbers count from 1.
 
@@ -13,7 +13,12 @@ Checks: the sections follow each other; every number in range and every entry us
 each library's waves against the link files that name them (a "link" chunk, the wave's number, and a "name" chunk); the
 VC-2's samples against its sample bank ('"TABLE"', an ASCII count, 60-byte entries of a 52-byte name, u32 size and u32
 offset from the end of '"DATA"', which follows them, then the streams); the V-Synth's against the streams that start on a
-sector. Prints what it found and every difference; exits 1 when there is one. $DISK picks the image (diskls.py)."""
+sector. Prints what it found and every difference; exits 1 when there is one. $DISK picks the image (diskls.py).
+
+wlflib.py get <VSYN2|VC2> <out>: the library's bytes, as the firmware's "D:\\... Wave.bin".
+wlflib.py choices <VSYN2|VC2>: each wave's split at every velocity and each map's at every key by the rule the
+firmware's readers are read to keep (the first split whose upper byte is at or above the value), in the form
+`vc2run <rom.4> splits` prints the firmware's own."""
 import re
 import struct
 import sys
@@ -31,7 +36,7 @@ class Library:
     tag: str
     versions: tuple
     sections: list
-    waves: list   # (name, [(upper key, byte, map number)])
+    waves: list   # (name, [(upper velocity, byte, map number)])
     maps: list    # (name, [(upper key, level, a word 0 or 12, sample number)])
     paths: list
 
@@ -165,9 +170,54 @@ def check(lib):
     return out
 
 
+def libraries():
+    return [library(m.start()) for m in re.finditer(b'WLF08', img) if m.start() >= partition_end()]
+
+
+def library_bytes(lib):
+    """The library's own bytes, from its header to the end of its last section, as the firmware reads the file."""
+    return img[lib.at:lib.at + max(s[2] + s[3] for s in lib.sections)]
+
+
+def chosen(split_list, value):
+    """The first split whose upper byte is at or above the value, or None: the rule rom.4's readers are read to keep."""
+    return next((s for s in split_list if value <= s[0]), None)
+
+
+def say_ranges(what, number, name, split_list, carried):
+    """One wave's or map's choice at each value 0..127, consecutive values with one result as a range."""
+    runs = []
+    for value in range(128):
+        s = chosen(split_list, value)
+        result = carried(s) if s else 'none'
+        if runs and runs[-1][2] == result:
+            runs[-1][1] = value
+        else:
+            runs.append([value, value, result])
+    print(f'{what} {number:3d} {name:<16} ' + ', '.join(f'{lo}-{hi} {r}' for lo, hi, r in runs))
+
+
+def say_choices(lib):
+    """What the rule gives for each wave at every velocity and each map at every key, in vc2run splits' form."""
+    for k, (name, s) in enumerate(lib.waves, 1):
+        say_ranges('wave', k, name, s, lambda x: f'map {x[2]} (byte {x[1]})')
+    for k, (name, s) in enumerate(lib.maps, 1):
+        say_ranges('map', k, name, s, lambda x: f'sample {x[3]} (byte {x[1]}, {x[2] & 0xff})')
+
+
 def main():
-    starts = [m.start() for m in re.finditer(b'WLF08', img) if m.start() >= partition_end()]
-    problems = [p for at in starts for p in check(library(at))]
+    if len(sys.argv) > 2 and sys.argv[1] in ('get', 'choices'):
+        lib = next((x for x in libraries() if x.tag == sys.argv[2]), None)
+        if lib is None:
+            sys.exit(f'wlflib.py: no library {sys.argv[2]} (VSYN2 or VC2)')
+        if sys.argv[1] == 'choices':
+            say_choices(lib)
+            return
+        with open(sys.argv[3], 'wb') as f:
+            f.write(library_bytes(lib))
+        return
+    starts = libraries()
+    problems = [p for lib in starts for p in check(lib)]
     sys.exit(1 if problems or not starts else 0)
 
 

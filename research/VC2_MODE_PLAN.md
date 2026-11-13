@@ -86,7 +86,13 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   an index, "VC-2 Wave.bin" (58 waves → 43 key maps → 192 samples), in the V-Synth's own format (its "V-Synth Wave.bin",
   224 one to one); the samples are the last 192 of the 416 preset-area streams, in "VC-2 Preset.bin"'s `"TABLE"`/`"DATA"`
   bank; all held to the link files and the bank with 0 differences, and to rom.4's parsers. Left of it: how a VC-2 wave's
-  split is chosen when it plays (the port needs it: a VC-2 wave is a multisample).
+  split is chosen when it plays (the port needs it: a VC-2 wave is a multisample). (Since, below.)
+  **A VC-2 wave's split, 2026-11-13** (`vc2run … splits`; VC2_VOCAL_DESIGNER.md, "A VC-2 wave's split, chosen"): rom.4's
+  PCM converter sends a wave the store doesn't hold through new readers: the wave's splits by the note's velocity to a
+  map, the map's by the key-follow key (xtKeyFollowKey) to a sample, the first split at or above each, run on the real
+  index at every velocity and key and equal to that rule, 0 different; a sample is the store's id 1…192. The wave
+  splits' "upper key" withdrawn: it is velocity. Left of it: what the bytes passed on do (a level, the bass maps' 12),
+  and how the store takes the bank's samples.
   **The effect chip's programs, 2026-11-13** (`vc2run … fxprog`; VC2_VOCAL_DESIGNER.md, "The effect chip's programs"):
   rom.2's driver, paired in rom.4; the 42 MFX programs and the V-Synth's reverbs equal but for registers renumbered one
   down, the Chorus's but for 13 words, the reverbs' transition program equal; program A (routing, mix, EQ, levels)
