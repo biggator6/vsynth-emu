@@ -925,7 +925,7 @@ lin-fr11-rate|            if (y) cmp = rate;|            ;|tonelin|9
 lin-fr11-mono|            if (y) cmp = rate;|            cmp = rate;|tonelin|777
 lin-fr11-entry|        float cmp = y ? fr11 : 0.0f;|        float cmp = 0.0f;|tonelin|9
 lin-hold-floor|    if (!(next > floor)) next = 0.0f;|    if (!(next > 0.0f)) next = 0.0f;|tonelin|9
-check-start|    p[b + 0x22] = o.startOffset;|;|tonecases
+check-start|    p[b + 0x22] = o.startOffset;|;|tonepatchids
 patch-start|    o.startOffset = p(b + 0x22);|    o.startOffset = 0;|tonepatch
 lite-kind|    v->lite = v->on && !v->analog && v->wave->type == 0;|    v->lite = false;
 lite-update-smooth|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;|                    s.curA = xtOscSmooth(s.curA, A); s.curF = F; s.curWalk = w; s.curGain = gt;
@@ -1008,16 +1008,18 @@ zone-voice-zone|    v->active = true;\n    v->zone = zone;\n|    v->active = tru
 zone-wave|    v->wave = waveOf(zone, 0);|    v->wave = waveOf(zone > 1 ? zone - 1 : zone, 0);
 zone-update-new|        if (v.active) liveUpdate(v, zc(v), zoneWas[v.zone], anyChanged);|        if (v.active) liveUpdate(v, ctl, zoneWas[v.zone], anyChanged);|tonezones
 zone-follow|        return;\n    }\n    zonesFollow();\n|        return;\n    }\n|tonezones
-zone-pickup-upper|for (int z = 0; z < kZones; ++z) zoneUpper[z] = zones ? zones->upper[z] : 127;|for (int z = 0; z < kZones; ++z) zoneUpper[z] = 127;
+zone-patch-upper|c.zoneUpper[i] = p(0x124 + i);|c.zoneUpper[i] = 127;|tonepatch
+zone-pick-unused|xtZoneOf(ctl.zoneUpper, key)|xtZoneOf(zoneCtl[0].zoneUpper, key)|tonenotes
 zone-pickup-follow|        zonesFollow();\n        for (int z = 1; z < kZones; ++z) xtModBlock(zoneCtl[z].mod, modBlk[z]);|        for (int z = 1; z < kZones; ++z) xtModBlock(zoneCtl[z].mod, modBlk[z]);
 zone-mix-update|            if (v.on) oscUpdate(v, zc(v));|            if (v.on) oscUpdate(v, ctl);
-zone-key-unshifted|    const int key = shiftKey(note), zone = xtZoneOf(zoneUpper, key);|    const int key = shiftKey(note), zone = xtZoneOf(zoneUpper, note);|tonenotes
+zone-key-unshifted|    const int key = shiftKey(note), zone = xtZoneOf(ctl.zoneUpper, key);|    const int key = shiftKey(note), zone = xtZoneOf(ctl.zoneUpper, note);|tonenotes
 check-zone-getter|            const auto& P = zone && zoned(id) && zone < zpar.size() && !zpar[zone].empty() ? zpar[zone] : par;|            const auto& P = par;|tonefwcpp
 check-zone-zoned|    static bool zoned(int id) { return (id >= 0x293 && id <= 0x3e8) \|\| (id >= 0x8d0 && id <= 0x954); }|    static bool zoned(int id) { return id >= 0x293 && id <= 0x3e8; }|tonefwh
 check-zone-start|        c.wr32(kSp, kA1); c.wr32(kSp + 4, (uint32_t)zone);|        c.wr32(kSp, kA1); c.wr32(kSp + 4, 0);|tonefwh
 check-zone-tag-env|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|        for (uint32_t a : { 0x89479720u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|tonefwcpp
 check-zone-tag-lfo|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479810u, 0x89479860u, 0x89479920u })|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x894797c0u, 0x89479860u, 0x89479920u })|tonefwcpp
-check-zone-uppers|            if (id >= 0x124 && id <= 0x133) { m.ret((uint32_t)upper[id - 0x124]); return; }\n||tonefwcpp
+check-zone-uppers|    for (int i = 0; i < kXtZones; ++i) p[0x124 + i] = c.zoneUpper[i];\n||tonepatchids
+check-tone-alone|    std::ranges::fill(c.zoneUpper, 127);\n||tonecases
 check-zone-carry|(int)(pv - syn.voice), syn.zc(fw.c.rd8(n.BL + 0x6c6) & 15));|(int)(pv - syn.voice), syn.ctl);|tonecheck
 play-legato-any|    const bool legato1 = prevHeld && Z.playbackMode == 1 && v->on|    const bool legato1 = prev && Z.playbackMode == 1 && v->on
 play-legato-mode|    const bool legato1 = prevHeld && Z.playbackMode == 1 && v->on|    const bool legato1 = prevHeld && Z.playbackMode >= 1 && v->on
@@ -1055,7 +1057,7 @@ check-play-prev-zone|                    if (o->live && !o->off && !o->ended && 
 check-play-stale|                    for (int o = 0; o < 2; ++o) osc(syn.voice[prev->vi], o).staleEnd = (int8_t)fw.c.rd8(Firmware::voice(*prev, o) + 0xd4 + 4);|                    for (int o = 0; o < 2; ++o) osc(syn.voice[prev->vi], o).staleEnd = 0;|tonecheck
 check-play-vpno-count|    le(4, (uint32_t)e.vpnoCount, 4);|    le(4, (uint32_t)e.vpnoCount + 1, 4);|tonecheck
 check-play-vpno-list|    for (size_t k = 0; k < e.vpno.size(); ++k) le(12 + 2 * k, e.vpno[k], 2);|    for (size_t k = 0; k < e.vpno.size(); ++k) le(10 + 2 * k, e.vpno[k], 2);|tonecheck
-check-play-patch|    p[b + 0x2e] = o.playbackMode;|    p[b + 0x2e] = 0;|tonecases
+check-play-patch|    p[b + 0x2e] = o.playbackMode;|    p[b + 0x2e] = 0;|tonepatchids
 patch-playback|    o.playbackMode = p(b + 0x2e);|    o.playbackMode = p(b + 0x2f);|tonepatch
 check-pad-cc|            if (ccMoved && !panelMoved && !fw.padCc(kCcNum[ccAt], ccTo)) return false;\n||tonecheck|4242
 seg-forward-off|            segForward();\n||tonesolo

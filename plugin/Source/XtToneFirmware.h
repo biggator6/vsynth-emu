@@ -48,7 +48,6 @@ public:
     long frames = 0;                    // the system clock
     FwWave wave, wave2;                 // the waves the Wave Numbers find: 1 OSC 1's, 2 OSC 2's
     std::unordered_map<uint32_t, FwWave> zoneWave;   // and zones 2…16's, by 2999 + the number
-    int upper[16] = { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 };   // the zones' upper keys (IDs 0x124…0x133)
     int bender = 8192;
     int cosmSection = 0;
     uint32_t cosmBuf = 0;

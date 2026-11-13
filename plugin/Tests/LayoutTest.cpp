@@ -138,20 +138,33 @@ void LayoutCheck::atSizes() {
     ed->setSize(sizes[0].x, sizes[0].y);
 }
 
-// Each tab by a click, in order, at the smallest width
+// Each tab by a click, in order, at the smallest width; and the last one ending inside the bar, so a click at its right end
+// opens none (v195: ten tabs ran Effects past the end at the smallest width, where a click still reached it)
 void LayoutCheck::tabClicks() {
     editor->showTab(0);
     if (juce::Component* bar = ed->findChildWithID("tabs")) {
-        int seen = 0;
-        for (int x = 0; x < bar->getWidth(); x += 4) {
+        const auto click = [bar](int x) {
+            using Src = juce::MouseInputSource;
             const juce::Point<float> at((float)x, (float)bar->getHeight() / 2.0f);
             const juce::Time now = juce::Time::getCurrentTime();
-            bar->mouseDown(juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), at, {}, juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation, juce::MouseInputSource::defaultRotation,
-                                            juce::MouseInputSource::defaultTiltX, juce::MouseInputSource::defaultTiltY, bar, bar, now, at, now, 1, false));
+            const Src mouse = juce::Desktop::getInstance().getMainMouseSource();
+            bar->mouseDown(juce::MouseEvent(mouse, at, {}, Src::defaultPressure, Src::defaultOrientation,
+                                            Src::defaultRotation, Src::defaultTiltX, Src::defaultTiltY, bar, bar, now,
+                                            at, now, 1, false));
+        };
+        int seen = 0;
+        for (int x = 0; x < bar->getWidth(); x += 4) {
+            click(x);
             if (editor->currentTab() == seen + 1) ++seen;
-            else if (editor->currentTab() != seen) fail("the click at x " + juce::String(x) + " opens tab " + juce::String(editor->currentTab()) + " after tab " + juce::String(seen));
+            else if (editor->currentTab() != seen)
+                fail("the click at x " + juce::String(x) + " opens tab " + juce::String(editor->currentTab()) +
+                     " after tab " + juce::String(seen));
         }
         if (seen != VSynthEmuEditor::kEffectsTab) fail("clicks reach only as far as tab " + juce::String(seen));
+        editor->showTab(0);
+        click(bar->getWidth() - 4);
+        if (editor->currentTab() != 0)
+            fail("the last tab runs past the tab bar's end, at " + juce::String(ed->getWidth()) + " wide");
     } else fail("no tab bar");
 }
 

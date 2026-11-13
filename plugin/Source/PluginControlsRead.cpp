@@ -194,5 +194,6 @@ XtSynth::Controls VSynthEmuProcessor::xtControls() const {
     readEnvVelocity(c);
     readArpControls(c);     // PluginArp.cpp, v190
     readMsmControls(c);     // PluginMsm.cpp, v193
+    readZoneControls(c);    // PluginZones.cpp, v195
     return c;
 }

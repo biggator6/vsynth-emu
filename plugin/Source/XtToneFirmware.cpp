@@ -27,7 +27,6 @@ bool Firmware::open(const char* path) {
         auto getter = [this](Sh4& m) {
             const int id = (int16_t)m.r[5];
             const bool cosm = id == 0x3e7 || id == 0x3e8 || (id >= 0x8d0 && id <= 0x954);
-            if (id >= 0x124 && id <= 0x133) { m.ret((uint32_t)upper[id - 0x124]); return; }
             const uint32_t zone = (m.r[4] & 0xffffff00u) == kZoneTag ? m.r[4] & 0xffu : 0;
             const auto& P = zone && zoned(id) && zone < zpar.size() && !zpar[zone].empty() ? zpar[zone] : par;
             auto it = P.find(cosm && cosmSection ? id + kCosm2 : id);

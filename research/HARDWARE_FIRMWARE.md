@@ -1546,6 +1546,72 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The zones' splits on the panel (2026-11-12, v195) {#zone-splits}
+
+**The user's request:** "add a zones card to the editor allowing it to show and edit splits". Until now the splits came only
+from a loaded patch, into `XtSynth::Zones`, and the panel showed zone 1 alone ("Zones", below).
+
+**What a split is.** Each zone's Range Upper key, IDs 0x124…0x133: "Zone n Range Upper" [FW 0x89790338], 0…127, default
+127, centre 0 [FW 0x897a167c], in the patch's common, one copy for the patch. The firmware's value text routine
+(`0x89461a70`, through `XtFxValueText`) gives the plain number for all 128 values, and the manual has each split as "the
+top note number" of its zone [MAN p. 100]: the parameters' text is the number, and the editor names the keys only as a
+reading aid (C4 = 60, Roland's).
+
+**When the part's table is made.** `0x894794f0` makes it (`0x89d021d0` + 22 × part + 6) for two callers in the tone
+generator's reach: `0x894dbfa0`, the part's settings (Octave Shift 0x112, Mono/Poly 0x113, Legato 0x114, the Patch Tempo
+0x11d, then the table), under `0x894dc050`; and the panel's parameter set, `0x8937a7c0` (at `0x8937adc2`), with three
+screens (`0x89377630`, `0x893d1980`, `0x894086c0`). `xt_tone`'s `updatePatch` (`0x894dfe10`, the updaters) builds it at every
+update: the zone cases have always relied on that. So a split edited during play gives the next note-on a new table, and a
+sounding note keeps the zone it began on (the tone's +0x1c).
+
+**In XtSynth.** `Controls::zoneUpper[16]`, zone 1's common, placed after the Multi Step Modulator's settings: past
+`xtToneWords` with the arpeggio's, as no tone reads it, so the check's random word picks are the ones they were.
+`tgNoteOn` picks by `ctl.zoneUpper`; `XtZones` lost its upper keys and `pickUpSample` its copy of them. A zone with no
+patch's data is the XT's init zone, both OSC Switches off [FW 0x897a167c: IDs 0x2a4, 0x2d8 default 0], so a key above a
+moved split with no patch loaded plays nothing (`zoneControls`); before v195 no key could reach such a zone. `xtZoneKeys`
+(XtSynthZones.cpp) gives a zone's keys on the same table, for the editor's map.
+
+**A patch's zones past its splits.** `loadZones` now loads every zone of every patch, one of a single zone too, and keeps
+the store in the session for all, as moving a split reaches them on the XT. In the project's 263 patches the zones past a
+patch's own count never hold a PCM wave; 55 hold an analog OSC switched on (a probe of the stores, not kept). What isn't
+here is noted only for a zone the patch's own splits reach.
+
+**The plugin.** Sixteen host parameters, `zoneUpper1`…`zoneUpper16`, appended after the MSM's at 745…760 (the 745 before
+them as they were: VSynthEmuArpPluginTest's `params` list against v193's build, 16 lines added, none changed); read into
+the controls each block and written from a patch's. A session saved before v195 has none: they come from the store it
+kept, or stay 127 without one. `PluginZones.cpp` holds them, with `loadZones` and `restoreZones` moved there as they stood
+from PluginProcessor.cpp and PluginState.cpp (and `PluginPatchFiles.cpp` the wave reads they share with `applyPatch`).
+The editor's Zones tab, index 8 before Effects (which stays `kEffectsTab`): across both columns a map of the keys each zone
+plays, numbered, with a line a zone of its keys and what it plays or why it is silent ("OSCs off, silent", "no patch,
+silent", "wave n not here", "no keys"); under it two cards of eight sliders, one a split. Zone 16's is greyed and the map's
+title says why: the table's last entry is 127 whatever the patch says. The map draws only when a split or the patch's zones
+change, with no timer. The tab bar gives each tab an equal share of the spare width, 28 at most: ten tabs at 28 each ran
+Effects past the bar's end at the smallest width, where a click still reached it, so the layout check missed it.
+
+**The check.**
+- `xt_tone`: `patchOf` gives 0x124…0x133 from the controls (`commonParams`, in `XtTonePatchIds.cpp`, where the patch by ID
+  moved as it stood from XtToneCases.cpp); the getter's own answer for them went. The zone section draws its splits onto zone
+  1's controls (`drawSplits`, the draw moved as it stood, the same random calls in the same order); a live move holds them
+  (`holdKeys`); a patch case plays its tone alone on zone 1 (`toneAlone`, which was `withoutMsm`). fcheck: every line as the
+  baseline but the patches' value count, 1,563,632 → 1,588,560, the sixteen splits of each of the 1,558 zones, 0 different;
+  so the cases are the ones they were. 300 cases with the test waves: 0 different, 85 notes on zones 2 to 16.
+- VSynthEmuArpPluginTest's zone checks (`ZonePluginTest.cpp`), 2144: the sixteen in the list's last places against the
+  firmware's names, descriptors and text; each into its own field; a kit of the image's through `loadPatch`, its sessions,
+  one from before v195 with its store and one without; a patch of one zone with its other zones; and the analog saw with no
+  patch through `processBlock` against XtSynth on the processor's own controls: a split moved under a sounding note leaves
+  it sounding, a key above it plays nothing, one below plays zone 1.
+- `TEST_UI_LAYOUT`: 297 states at three sizes, 669 of 761 parameters with a control, and a click at the tab bar's right end
+  at the smallest width opens no tab.
+
+**Planted errors.** `mutate_tone.py`, the ten v195 moved or added first (the splits read from a patch and given by
+`patchOf`, a zone picked by an unused split, the key unshifted, `toneAlone`, the patch cases' start and play): all caught.
+The whole list, 1168: all caught but `check-pad-cc`, missed as since v189. `tone_stack_test.sh`: the same, 2000 cases at
+seed 24. `mutate_panel.py --editor` with v195's names, the zones' plants moved from the script to `panel_muts.txt` and every
+`arp-` and `msm-`, 116: all caught. v195's own: a parameter's name and default, the read and write swapped or dropped, a
+session from before taking none from its store or never seen as one, the plays past the patch's count, an init zone that
+sounds, a patch's zone picked by the splits; on the editor a slider on one parameter, a card unplaced, a card unnamed and
+the tab bar past its end.
+
 ### The Multi Step Modulator in XtSynth (2026-11-12, v193)
 
 v192's `XtMsm` in the sound: XtSynth runs part 0's where the firmware does, each converter adds its terms where the firmware's
@@ -2320,7 +2386,7 @@ Playback Mode (IDs 0x2d2, 0x306; the converter's input +0x5e) is RETRIGGER 0, LE
 
 **The MOD's block** keeps what one type leaves for the next (v114), and here it is one per zone, each formed from its zone's settings: zone 1's when its knobs move, the others' when the patch's zones come, as nothing else moves them.
 
-**In XtSynth.** `XtSynth::Zones`: the upper keys, and for zones 2…16 their controls and waves. `setZones` (any thread, picked up with the samples; voices stop). Zone 1 is `setControls`' and `setSample`'s, as before. A zone's controls as its notes read them are its own blocks with zone 1's common and the system's on them (`zoneControls`). Each voice keeps its zone, and everything a note reads comes from its zone's controls: its start, legato, updates, release, the COSMs' and TVA's blocks. The free-running LFOs and the MOD's block are by zone. Any change of a control is an update of every note, as on the XT, and each compares its own zone's settings before and after.
+**In XtSynth.** `XtSynth::Zones`: the upper keys, and for zones 2…16 their controls and waves (v195: the upper keys moved to `Controls::zoneUpper`, zone 1's common, {#zone-splits}). `setZones` (any thread, picked up with the samples; voices stop). Zone 1 is `setControls`' and `setSample`'s, as before. A zone's controls as its notes read them are its own blocks with zone 1's common and the system's on them (`zoneControls`). Each voice keeps its zone, and everything a note reads comes from its zone's controls: its start, legato, updates, release, the COSMs' and TVA's blocks. The free-running LFOs and the MOD's block are by zone. Any change of a control is an update of every note, as on the XT, and each compares its own zone's settings before and after.
 
 **In the plugin.** `loadPatch`: zone 1 to the parameters as before; zones 2…16 at once with their settings, then again with their waves once the pool has encoded them, each wave once, as its own type, with its tuning and loop. The note says how many zones, zone 1 on the panel, and what the zones ask for that isn't here, all of them. A saved session keeps the patch's store and the wave folder, and its zones come back from them. A patch of one zone leaves none of the last's.
 
@@ -2331,7 +2397,7 @@ Playback Mode (IDs 0x2d2, 0x306; the converter's input +0x5e) is RETRIGGER 0, LE
 - `TEST_PATCH_PLAY` on one in four of Emu_test's patches, waiting for the zones' waves: 66 played, one silent, which has no wave, as in v153; among them a 16-zone kit, three of whose waves the project doesn't have.
 - Planted errors: `mutate_tone.py` 1006, none missed. 43 are new: the zone's pick, each of the common fields zone 1 gives, the following and free-running LFOs, the MOD's block, every reader of a voice's controls, the updates, the pick-up, and the check's own (the getter, the tags, the uppers, the zone given, the carry). 95 old ones had to move with the code, 69 for the rename alone and 26 by hand, each checked to land in the function it did. Six of mine changed nothing and were dropped: the running maximum (the first entry a key isn't above is the same without it), the MOD's block formed again at a note's start or for every zone at a knob (a zone's settings move only when the zones come), the tuning's reads (common fields only), an update's comparison with zone 1's settings (an update given unchanged settings changes nothing) and Can Play on zone 1 (a note with nothing to play has no voice to compare, by the check's design). A seventh showed the check set the zones before the knobs, so the pick-up's own refresh went unseen; it now sets them after. `mutate_panel.py` with every `patch` plant: 39, none missed, 9 new for the zones' loading and the session. Two of those first missed because every zone wave was the same file, which is why each number now has its own.
 
-**Not done.** Playback Mode, arpeggio and the Multi Step Modulator, on any zone. The panel shows zone 1 only. (v155: Playback Mode, bar STEP and EVENT on SOLO waves. v193: the Multi Step Modulator, part 0's, a track serving the zone its Zone names.)
+**Not done.** Playback Mode, arpeggio and the Multi Step Modulator, on any zone. The panel shows zone 1 only (v195: and the splits, on the Zones tab, {#zone-splits}; a zone's own settings still only from a patch). (v155: Playback Mode, bar STEP and EVENT on SOLO waves. v193: the Multi Step Modulator, part 0's, a track serving the zone its Zone names.)
 
 ### LITE waves (2026-11-05, v153)
 

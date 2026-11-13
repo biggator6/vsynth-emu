@@ -15,6 +15,7 @@
 #include "TestChecks.h"
 #include "TestControls.h"
 #include "TestFirmware.h"
+#include "TestPatches.h"
 #include "../Source/PluginMsm.h"
 #include "../Source/XtPatch.h"
 
@@ -42,13 +43,15 @@ bool countsFromOne(int fw) {   // End Point and Zone
     return fw >= 0x48f && ((fw - 0x48f) % 24 == 4 || (fw - 0x48f) % 24 == 6);
 }
 
-// The last 98 of the list, in the XT's order, each against the firmware: every value's text but the toggles' (Off, On)
+// The 98 after every parameter before them, in the XT's order, and before the zones' sixteen splits (appended after them,
+// v195), each against the firmware: every value's text but the toggles' (Off, On)
 void msmAgainstFirmware(TestChecks& check, VSynthEmuProcessor& p, const juce::File& rom) {
     Firmware fw(rom);
     check(fw.text.ok(), "the firmware's text routine should run");
     const auto& list = p.getParameters();
+    const int first = list.size() - kXtZones - kMsmParams;
     for (int id = kXtMsmFirstId; id <= kXtMsmLastId; ++id) {
-        auto* prm = dynamic_cast<juce::RangedAudioParameter*>(list[list.size() - kMsmParams + id - kXtMsmFirstId]);
+        auto* prm = dynamic_cast<juce::RangedAudioParameter*>(list[first + id - kXtMsmFirstId]);
         const juce::String want = expectedId(id);
         check(prm && prm->paramID == want && msmParamId(id) == want, want.toStdString() + " should be in its place");
         const bool texts = !dynamic_cast<juce::AudioParameterBool*>(prm);
@@ -85,20 +88,10 @@ void msmIntoControls(TestChecks& check, const juce::File& rom) {
 }
 
 // The disk image's patches with the MSM on
-struct MsmPatch {
-    std::string name;
-    std::vector<uint8_t> store, file;
-};
+using MsmPatch = ImagePatch;
 std::vector<MsmPatch> msmPatches(const juce::File& rom) {
-    std::vector<MsmPatch> out;
-    XtDiskImage disk;
-    if (!disk.open(rom.getSiblingFile("V-SynthXTDiskImage.bin.0.bin").getFullPathName().toStdString())) return out;
-    for (const auto& e : disk.list("Internal.prj/Patch")) {
-        XtPatchFile patch;
-        const std::vector<uint8_t> bytes = disk.read(e);
-        if (xtPatchRead(bytes.data(), bytes.size(), patch) && xtPatchValue(patch.store, kXtMsmFirstId) != 0)
-            out.push_back({ patch.name, patch.store, bytes });
-    }
+    std::vector<MsmPatch> out = imagePatches(rom);   // TestPatches.h (v195)
+    std::erase_if(out, [](const MsmPatch& m) { return xtPatchValue(m.store, kXtMsmFirstId) == 0; });
     return out;
 }
 

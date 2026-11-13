@@ -29,6 +29,7 @@ VSynthEmuProcessor::createParameterLayout() {
     addModParams(params);
     addArpParams(params);   // PluginArp.cpp, v190: appended, so every other keeps its place
     addMsmParams(params);   // PluginMsm.cpp, v193: the same
+    addZoneParams(params);  // PluginZones.cpp, v195: the same
 
     return { params.begin(), params.end() };
 }

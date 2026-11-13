@@ -12,7 +12,7 @@
 // again by its Key Sync, after MONO's truncation and before the voice is taken; a legato doesn't reach it.
 void XtSynth::tgNoteOn(int note, float velocity) {
     pickUpSample();
-    const int key = shiftKey(note), zone = xtZoneOf(zoneUpper, key);
+    const int key = shiftKey(note), zone = xtZoneOf(ctl.zoneUpper, key);
     if (!canPlay(zone)) return;
     keys.press(note);
     keys.noteOn(note, (int32_t)std::floor((double)hostFrames * 1000.0 / hostRate));

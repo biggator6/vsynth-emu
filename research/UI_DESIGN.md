@@ -21,6 +21,7 @@ The plugin's user interface follows this design from v144 on, by the user's deci
 | Play | Portamento · Keys · Arpeggio (On and Hold on its title line; Motif, Octaves, Velocity, Duration) · Tune · Tempo · Arpeggio pattern (Grid, End point, Shuffle and its Resolution; its title says when the pattern has no step to play) |
 | MSM | Multi Step Modulator (On on its title line; Key sync, the Track shown) · Track n (On and Loop on its title line; Type, Grid, End point, Direction, Zone, Destination) · Track n steps 1–8 · steps 9–16 (v193; one track at a time, as the Matrix's Controls) |
 | Matrix | Matrix, one Control at a time · Controller assign |
+| Zones | Zones and their keys (across both columns: the keyboard's keys under the zones that play them, and a line a zone of its keys and what it plays, or why it is silent) · Zones 1-8 · Zones 9-16 (a slider a zone, its Range Upper key; v195) |
 | Effects | MFX, Chorus, Reverb, System buttons · the block's card, or Tone and System on the System page · a scrolling list of the type's parameters, or the system's EQ |
 
 ## The look
@@ -41,6 +42,8 @@ The palette is `namespace Ui` in `plugin/Source/UiParts.h`, with the sizes, the 
 
 Card titles are 11 pt bold capitals in `label`. Row names are 11 pt bold, in full words: "Coarse", not "Crs".
 
+Drawn text goes through `Ui::drawText` with a `Ui::TextStyle` (font, colour, where it sits, whether it is cut with dots), and a filled rectangle through `Ui::fill`: the cards' and the Perform column's titles (`Ui::titleFont`), the tabs and the Zones map share them (v195). The tab bar gives each tab its name's width and an equal share of what's left, 28 at most, so all ten fit at the smallest size.
+
 ## Adding a control
 
 1. Build it in the constructor and attach its parameter, as now.
@@ -54,13 +57,13 @@ A page doesn't scroll, so cards must fit: at the smallest size a page is 466 hig
 
 ## Checks
 
-- `TEST_UI_LAYOUT=1` (in `verify.sh`): at the smallest, default and largest sizes, on every tab, both OSC types, every COSM type, every Effects page and every effect type, no control is outside its parent, over another or without a size, none shows on a card that isn't shown (v155), and no text is cut short, the effects' list included, which must show at least 15 rows. Every control is moved, to see that it sets a parameter, and every parameter must have a control. Each tab is opened by a click, and the joined buttons are driven both ways. `=list` prints the parameters with and without a control.
+- `TEST_UI_LAYOUT=1` (in `verify.sh`): at the smallest, default and largest sizes, on every tab, both OSC types, every COSM type, every Effects page and every effect type, no control is outside its parent, over another or without a size, none shows on a card that isn't shown (v155), and no text is cut short, the effects' list included, which must show at least 15 rows. Every control is moved, to see that it sets a parameter, and every parameter must have a control. Each tab is opened by a click, and a click at the tab bar's right end, at the smallest width, must open none (v195: the last tab ends inside the bar). The joined buttons are driven both ways. `=list` prints the parameters with and without a control.
 - `mutate_panel.py --editor`: planted errors in the layout, to show that check catches them.
 - `TEST_SNAPSHOT=file.png`, with `TEST_SNAPSHOT_TAB=n` and `TEST_SNAPSHOT_SIZE=WxH`: the editor drawn offscreen. It draws only the open tab. `TEST_SNAPSHOT_TYPE` and `TEST_SNAPSHOT_COSM2` open the COSM tab, and `TEST_SNAPSHOT_FX` the Effects tab.
 
 ## Not shown anywhere yet
 
-92 of the 745 parameters have no control (v190's ten for the arpeggio and v193's 98 for the Multi Step Modulator all have one). Only a host can reach them (`hostOnly` in `PluginTest.cpp`):
+92 of the 761 parameters have no control (v190's ten for the arpeggio, v193's 98 for the Multi Step Modulator and v195's sixteen splits all have one). Only a host can reach them (`hostOnly` in `PluginTest.cpp`):
 
 - Scale Tune (13).
 - The COSMs' Envelope B, and Envelope A's velocity and key follow (each COSM: 10 and 6).

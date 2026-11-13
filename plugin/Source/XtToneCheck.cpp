@@ -941,7 +941,7 @@ int XtToneProbe::run(int argc, char** argv) {
             XtPatchFile pf;
             const auto& file = patchFiles[(size_t)((long)(g - patchFrom) * (long)patchFiles.size() / nPatch)];
             if (!xtPatchRead(file.data(), file.size(), pf)) { std::fprintf(stderr, "patch\n"); return 1; }
-            patchCtl = withoutMsm(xtPatchControls(pf.store, r.range(0, xtPatchZones(pf.store) - 1), Ctl{}));
+            patchCtl = toneAlone(xtPatchControls(pf.store, r.range(0, xtPatchZones(pf.store) - 1), Ctl{}));
             if (!patchCtl.on && !patchCtl.osc2.on) patchCtl.on = true;   // both off: XtSynth starts no voice at all (see the report)
         }
         const bool osc2Case = patchCase ? patchCtl.osc2.oscType == 1 : (g >= nCases + nSweep && !twoInTick && !tuneCase && !liteCase && !zoneCase && !playCase) || sweepOn == 2 || ((tuneCase || liteCase || zoneCase || playCase) && g % 2 == 0);
@@ -1343,17 +1343,9 @@ int XtToneProbe::run(int argc, char** argv) {
         // are none of theirs: the getter gives a zone only its blocks' IDs, and XtSynth takes zone 1's for the rest.
         fw.zpar.clear();
         fw.zoneWave.clear();
-        for (int& u : fw.upper) u = 127;
         if (zoneCase) {
             auto zs = std::make_shared<XtSynth::Zones>();
-            const int nz = r.range(2, 16);
-            std::vector<int> cut;
-            for (int z = 0; z + 1 < nz; ++z) cut.push_back(r.range(0, 126));
-            std::sort(cut.begin(), cut.end());
-            for (int z = 0; z < 16; ++z)
-                zs->upper[z] = z + 1 < nz ? cut[(size_t)z] : z + 1 == nz ? (r.one(4) ? r.range(90, 126) : 127) : r.range(0, 127);
-            if (nz > 2 && r.one(4)) zs->upper[r.range(0, nz - 2)] = r.range(0, 127);
-            std::copy(std::begin(zs->upper), std::end(zs->upper), fw.upper);
+            drawSplits(r, r.range(2, 16), ctl.zoneUpper);   // zone 1's common, the getter's by patchOf (v195; XtToneCases.cpp)
             fw.zpar.assign(16, {});
             std::vector<const TestWave*> owned { wv, wv2 };
             const auto anyWave = [&]() -> const TestWave* {
@@ -1968,8 +1960,7 @@ int XtToneProbe::run(int argc, char** argv) {
                 }
                 else if (playCase)                       // the whole panel: Playback Mode drawn again as at the case's start, not left at RETRIGGER
                     for (int k = 0; k < 2; ++k) (k ? n.osc2.playbackMode : n.playbackMode) = drawMode(r, k ? wv2 : wv, k ? ctl.osc2.vari : ctl.vari);   // Vari held, below
-                n.on = ctl.on; n.oscType = ctl.oscType; n.rootKey = ctl.rootKey; n.ana.wave = ctl.ana.wave; n.ana.subOctave = ctl.ana.subOctave; n.octave = ctl.octave;
-                n.osc2.on = ctl.osc2.on; n.osc2.oscType = ctl.osc2.oscType; n.osc2.ana.wave = ctl.osc2.ana.wave; n.osc2.ana.subOctave = ctl.osc2.ana.subOctave;
+                holdKeys(n, ctl);                        // the OSCs' kinds and waves, the Octave Shift, the zones' splits (XtToneCases.cpp)
                 // Switched during a LITE note, the XT's next update installs the other player on this one's state (0x894f6bf0 → 0x894f2010 by the
                 // block's mode as it stands, 0x894f3590; its loop's update, 0x8950bcc0, writes over the linear player's position): the check holds
                 // Vari as the note started, there and on the playback modes' LITE waves
@@ -2207,7 +2198,6 @@ int XtToneProbe::run(int argc, char** argv) {
     syn.setZones(nullptr);
     fw.zpar.clear();
     fw.zoneWave.clear();
-    for (int& u : fw.upper) u = 127;
     // The clock's rate.  Above the firmware's clock runs on XtSynth's, which could be any speed: here
     // two minutes (165375 blocks) against the firmware's own timer routine, within one clock.
     {

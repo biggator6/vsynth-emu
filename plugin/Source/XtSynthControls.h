@@ -20,6 +20,8 @@
 #include "XtArpeggio.h"
 #include "XtMsm.h"
 
+constexpr int kXtZones = 16;   // a patch's zones (XtSynthZones.h)
+
 // What each of the two OSCs has of its own (the tone's OSC blocks at +0x434
 // and +0x508, and their envelopes and LFO: OSC 1 Env 1..4 and LFO 1, OSC 2
 // Env 5..8 and LFO 2).
@@ -270,5 +272,9 @@ struct XtControls : XtOscControls {                 // OSC 1's in the base
     XtArpPattern arpPattern;
     // The Multi Step Modulator (IDs 0x48d…0x4ee), part 0's, which XtSynthMsm.cpp gives XtMsm when it changes (v193)
     XtMsmSettings msm;
+    // The zones' Range Upper keys (IDs 0x124…0x133, 0…127, default 127 [FW 0x897a167c]), the patch's common: the part's table
+    // is made from them at each update (0x894dbfa0 → 0x894794f0), and a note takes its zone from it at its start (v195).  Not
+    // a tone's: past xtToneWords, as the arpeggio's and the MSM's
+    int zoneUpper[kXtZones] = { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 };
     bool operator==(const XtControls&) const = default;
 };

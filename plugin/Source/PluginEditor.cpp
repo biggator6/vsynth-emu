@@ -5,40 +5,7 @@
 using Ui::Page;
 using Ui::Segmented;
 
-// ─── The tab bar ─────────────────────────────────────────────────────────────
-class VSynthEmuEditor::TabBar : public juce::Component {
-public:
-    juce::StringArray names;
-    int current = 0;
-    std::function<void(int)> onChange;
-
-    juce::Rectangle<int> tabBounds(int i) const {
-        int x = Ui::pad;
-        for (int k = 0; k < names.size(); ++k) {
-            const int w = juce::Font(13.0f, juce::Font::bold).getStringWidth(names[k]) + 28;
-            if (k == i) return { x, 0, w, getHeight() };
-            x += w;
-        }
-        return {};
-    }
-    void paint(juce::Graphics& g) override {
-        g.fillAll(Ui::surfaceStrip);
-        g.setColour(Ui::line);
-        g.fillRect(0, getHeight() - 1, getWidth(), 1);
-        for (int i = 0; i < names.size(); ++i) {
-            const auto b = tabBounds(i);
-            const bool on = i == current;
-            g.setFont(juce::Font(13.0f, on ? juce::Font::bold : juce::Font::plain));
-            g.setColour(on ? Ui::text : Ui::label);
-            g.drawText(names[i], b, juce::Justification::centred, false);
-            if (on) { g.setColour(Ui::accent); g.fillRect(b.getX(), getHeight() - 2, b.getWidth(), 2); }
-        }
-    }
-    void mouseDown(const juce::MouseEvent& e) override {
-        for (int i = 0; i < names.size(); ++i)
-            if (tabBounds(i).contains(e.getPosition())) { if (onChange) onChange(i); return; }
-    }
-};
+#include "PluginEditorTabs.h"   // the tab bar, its own file from v195
 
 // ─── An envelope's shape ─────────────────────────────────────────────────────
 // Attack, decay and release as thirds of the width each scaled by their knob,
@@ -954,12 +921,8 @@ void VSynthEmuEditor::paint(juce::Graphics& g) {
     g.fillRect(0, top, Ui::performW, getHeight() - top);
     g.setColour(Ui::line);
     g.fillRect(Ui::performW - 1, top, 1, getHeight() - top);
-    juce::Font f(11.0f, juce::Font::bold);
-    f.setExtraKerningFactor(0.08f);
-    g.setFont(f);
-    g.setColour(Ui::label);
-    g.drawText("PERFORM  OSC " + juce::String(oscK_ + 1), 18, top + 10, Ui::performW - 36, 16,
-               juce::Justification::centredLeft);
+    Ui::drawText(g, "PERFORM  OSC " + juce::String(oscK_ + 1), { 18, top + 10, Ui::performW - 36, 16 },
+                 { Ui::titleFont(), Ui::label });
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -1005,14 +968,6 @@ void VSynthEmuEditor::resized() {
     for (auto& p : pages_)
         p->setBounds(Ui::performW, top + Ui::tabH, getWidth() - Ui::performW, getHeight() - top - Ui::tabH);
     fxPanel_->setBounds(Ui::performW, top + Ui::tabH, getWidth() - Ui::performW, getHeight() - top - Ui::tabH);
-}
-
-void VSynthEmuEditor::showTab(int t) {
-    tab_ = juce::jlimit(0, kEffectsTab, t);
-    for (int i = 0; i < kPages; ++i) pages_[i]->setVisible(i == tab_);
-    fxPanel_->setVisible(tab_ == kEffectsTab);
-    tabBar_->current = tab_;
-    tabBar_->repaint();
 }
 
 void VSynthEmuEditor::repaintPages() {
@@ -1446,6 +1401,7 @@ void VSynthEmuEditor::buildLayout() {
     buildPlayPage();   // PluginEditorPlay.cpp (v190)
     buildMsmPage();    // PluginEditorMsm.cpp (v193)
     buildMatrixPage(); // PluginEditorMatrix.cpp (v193)
+    buildZonesPage();  // PluginEditorZones.cpp (v195)
 
     // What stays on the editor; everything the pages don't take is dropped, so a
     // new control must go in a card or here (TEST_UI_LAYOUT says if one didn't),
@@ -1461,11 +1417,7 @@ void VSynthEmuEditor::buildLayout() {
     cosmSelBox_.setVisible(false);
     for (juce::Label* l : { &pitchLabel_, &timeLabel_, &formantLabel_ }) l->setJustificationType(juce::Justification::centred);
 
-    tabBar_ = std::make_unique<TabBar>();
-    tabBar_->names = { "Oscillator", "Envelopes", "LFOs", "COSM", "Amp & Pan", "Play", "MSM", "Matrix", "Effects" };
-    tabBar_->onChange = [this](int t) { showTab(t); };
-    tabBar_->setComponentID("tabs");                 // for PluginTest
-    addAndMakeVisible(*tabBar_);
+    makeTabBar();      // PluginEditorTabs.cpp (v195): the tabs' names, Zones before Effects
     addAndMakeVisible(*oscSeg_);
     for (auto& p : pages_) addChildComponent(*p);
     showTab(0);

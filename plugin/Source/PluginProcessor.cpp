@@ -1,7 +1,6 @@
 #include "PluginProcessor.h"
-#include <array>
-#include <map>
 #include "PluginEditor.h"
+#include "PluginPatchFiles.h"
 #include "PluginParamIds.h"
 #include "XtPatch.h"
 #include "XtVpwFormat.h"
@@ -296,11 +295,6 @@ static bool isVSynthWave(const juce::File& file) {
     return false;
 }
 
-static bool readVSynthWave(const juce::File& file, XtWaveFile& wave, std::string* why = nullptr) {
-    juce::MemoryBlock bytes;
-    return file.loadFileAsData(bytes) && xtWaveRead(static_cast<const uint8_t*>(bytes.getData()), bytes.getSize(), wave, why);
-}
-
 // The wave's own settings to OSC `osc`'s parameters.
 void VSynthEmuProcessor::waveToParameters(const XtWaveFile& wave, int osc) {
     XtSynth::Controls c = xtControls();
@@ -414,18 +408,6 @@ void VSynthEmuProcessor::loadFile(const juce::File& file, int osc, bool waveSett
 
 // ─── A V-Synth patch ─────────────────────────────────────────────────────────
 
-// A project keeps its waves in Wave beside Patch, each named by its number.  A copy named "… 2.wav" sorts after its original.
-static juce::File findWave(const juce::File& folder, int number) {
-    if (number <= 0 || !folder.isDirectory()) return {};
-    juce::Array<juce::File> found;
-    folder.findChildFiles(found, juce::File::findFiles, false, juce::String(number).paddedLeft('0', 3) + " *");
-    juce::File best;
-    for (const auto& f : found)
-        if ((f.hasFileExtension("vpw") || f.hasFileExtension("wav")) && (best == juce::File() || f.getFileName().length() < best.getFileName().length()))
-            best = f;
-    return best;
-}
-
 bool VSynthEmuProcessor::loadPatch(const juce::File& file, int zone) {
     if (!xtSynthRomReady()) { setStatus("A patch needs the firmware image"); return false; }
     juce::MemoryBlock bytes;
@@ -486,64 +468,6 @@ void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<u
     apvts.state.setProperty("patchName", patchName_, nullptr);
     apvts.state.setProperty("patchNote", patchNote_, nullptr);
     if (!found[0] && !found[1]) setStatus("Patch: " + patchName_);
-}
-
-// Zones 2…16 (the user's decision, 2026-11-05): the patch's data, not the parameters.  Their settings go to the synth at once, analog OSCs
-// and all, then again with their waves once the pool has encoded them: each wave once, as its own type, its own tuning and loop on it.
-void VSynthEmuProcessor::loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes) {
-    const int gen = ++zonesGen_;
-    const int zones = xtPatchZones(store);
-    patchZones_.store(zones);
-    apvts.state.setProperty("patchStore", zones > 1 ? juce::Base64::toBase64(store.data(), store.size()) : juce::String(), nullptr);
-    apvts.state.setProperty("patchWaves", zones > 1 ? waveFolder.getFullPathName() : juce::String(), nullptr);
-    if (zones < 2) { synth_.setZones(nullptr); zonesReady_.store(true); return; }
-    notes.add(juce::String(zones) + " zones, zone 1 on the panel");
-    auto set = std::make_shared<XtSynth::Zones>();
-    xtPatchZoneSet(store, xtControls(), *set);
-    struct Want { int zone, osc, number; };
-    std::vector<Want> want;
-    std::map<int, XtWaveFile> files;
-    for (int z = 1; z < zones; ++z)
-        for (int k = 0; k < 2; ++k) {
-            XtSynth::OscControls& o = k ? set->ctl[z].osc2 : static_cast<XtSynth::OscControls&>(set->ctl[z]);
-            const int number = xtPatchWaveNumber(store, z, k);
-            if (o.oscType != 1 || number <= 0) continue;
-            if (!files.count(number)) {
-                XtWaveFile w;
-                const juce::File f = findWave(waveFolder, number);
-                if (!(f.existsAsFile() && readVSynthWave(f, w))) { w = XtWaveFile{}; notes.addIfNotAlreadyThere("no wave " + juce::String(number)); }
-                files[number] = std::move(w);
-            }
-            const XtWaveFile& w = files[number];
-            if (w.frames <= 0) continue;
-            xtWaveOntoControls(w, o);
-            want.push_back({ z, k, number });
-        }
-    synth_.setZones(set);
-    xtActive_.store(true);
-    zonesReady_.store(want.empty());
-    if (want.empty()) return;
-    addEncode([this, gen, set, want = std::move(want), files = std::move(files)](const std::atomic<bool>&) {
-        std::map<int, std::shared_ptr<XtEncoded>> enc;
-        for (const auto& [number, w] : files) {
-            if (gen != zonesGen_.load()) return;
-            if (w.frames <= 0) continue;
-            std::vector<std::vector<float>> chans((size_t)w.channels);
-            for (long i = 0; i < w.frames; ++i)
-                for (int c = 0; c < w.channels; ++c) chans[(size_t)c].push_back((float)w.pcm[(size_t)(i * w.channels + c)] / 32768.0f);
-            const int type = w.encodeType == 0 || w.encodeType == 1 || w.encodeType == 3 || w.encodeType == 5 ? w.encodeType : 1;
-            auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events, &w.vpdt);   // on its own vpdt, as the file has it
-            if (!e) continue;
-            xtWaveOntoEncoded(w, *e);
-            enc[number] = std::move(e);
-        }
-        auto withWaves = std::make_shared<XtSynth::Zones>(*set);
-        for (const Want& x : want)
-            if (const auto it = enc.find(x.number); it != enc.end()) withWaves->wave[x.zone][x.osc] = it->second;
-        if (gen != zonesGen_.load()) return;
-        synth_.setZones(withWaves);
-        zonesReady_.store(true);
-    });
 }
 
 // ─── Encoding ─────────────────────────────────────────────────────────────────

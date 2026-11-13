@@ -59,11 +59,15 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginArp.cpp
     Source/PluginSetting.cpp
     Source/PluginMsm.cpp
+    Source/PluginZones.cpp
+    Source/PluginPatchFiles.cpp
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
     Source/PluginState.cpp
     Source/PluginEditor.cpp
     Source/PluginEditorPlay.cpp
+    Source/PluginEditorTabs.cpp
+    Source/PluginEditorZones.cpp
     Source/PluginEditorMsm.cpp
     Source/PluginEditorMatrix.cpp
     Source/FxPanel.cpp
@@ -160,7 +164,8 @@ vse_add_test(VSynthEmuDiskImageTest Tests/DiskImageTest.cpp Tests/TestMain.cpp)
 vse_add_test(VSynthEmuArpTest Tests/ArpTest.cpp Tests/TestMain.cpp)
 # The arpeggio's plugin side: its parameters, a patch's arpeggio, a session's, and a chord through the processor (v190);
 # then the Multi Step Modulator's: its parameters, the image's patches with it on, a note, a patch's load stopping it (v193)
-vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.cpp Tests/TestMain.cpp)
+vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.cpp Tests/ZonePluginTest.cpp
+             Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest

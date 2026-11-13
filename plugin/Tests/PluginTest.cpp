@@ -412,13 +412,13 @@ static int patchApplyTest(const juce::File& rom) {
             std::vector<int> keys;
             std::set<int> seen;
             for (int note = 0; note < 128 && keys.size() < 4; ++note) {
-                const int z = XtSynth::xtZoneOf(zs->upper, std::clamp(note + 12 * c1.octave, 0, 127));
+                const int z = XtSynth::xtZoneOf(c1.zoneUpper, std::clamp(note + 12 * c1.octave, 0, 127));
                 if (seen.insert(z).second && (z || keys.empty())) keys.push_back(note);
             }
             check(keys.size() >= 3, "keys on three zones at least");
             bool soloPlayed = false;
             for (int note : keys) {
-                const int z = XtSynth::xtZoneOf(zs->upper, std::clamp(note + 12 * c1.octave, 0, 127));
+                const int z = XtSynth::xtZoneOf(c1.zoneUpper, std::clamp(note + 12 * c1.octave, 0, 127));
                 for (int k = 0; k < 2; ++k) {
                     const XtSynth::OscControls& o = k ? zs->ctl[z].osc2 : static_cast<const XtSynth::OscControls&>(zs->ctl[z]);
                     const int n = xtPatchWaveNumber(zp.store, z, k);

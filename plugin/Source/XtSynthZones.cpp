@@ -13,11 +13,22 @@ int XtSynth::xtZoneOf(const int (&upper)[kZones], int key) {
     return 0;
 }
 
+XtZoneKeys xtZoneKeys(const int (&upper)[kXtZones], int zone) {
+    int top = -1, lo = 0;
+    for (int z = 0; z <= zone && z < kXtZones; ++z) {
+        lo = top + 1;
+        top = z == kXtZones - 1 ? 127 : std::max(top, upper[z]);
+    }
+    return { lo, top };
+}
+
 // A zone's own blocks (IDs 0x293…0x3e6 and the COSMs': the tone block, the envelopes, the LFOs), the rest zone 1's: the patch's
-// common (tuning, tempo, key assign, portamento, bend, the Matrix) and the system's, which aren't a zone's.
+// common (tuning, tempo, key assign, portamento, bend, the Matrix) and the system's, which aren't a zone's.  A zone with no
+// patch's data is the XT's init zone, both OSC Switches off [FW 0x897a167c: IDs 0x2a4, 0x2d8 default 0], so silent (v195).
 XtSynth::Controls XtSynth::zoneControls(int z) const {
-    if (!z || !zones) return ctl;
-    Controls c = zones->ctl[z];
+    if (!z) return ctl;
+    Controls c = zones ? zones->ctl[z] : ctl;
+    if (!zones) c.on = c.osc2.on = false;
     c.pitchSemis = ctl.pitchSemis; c.patchCoarse = ctl.patchCoarse; c.patchFine = ctl.patchFine;
     c.scaleTune = ctl.scaleTune; std::copy(std::begin(ctl.scale), std::end(ctl.scale), c.scale);
     c.bendUp = ctl.bendUp; c.bendDown = ctl.bendDown;

@@ -28,6 +28,32 @@ namespace Ui {
         s.setTextBoxStyle(s.getTextBoxPosition(), false, boxW, 20);
     }
 
+    // How a piece of drawn text looks: its font and colour, where it sits, and whether it is cut with dots if it doesn't fit
+    struct TextStyle {
+        juce::Font font;
+        juce::Colour colour;
+        juce::Justification just = juce::Justification::centredLeft;
+        bool dots = true;
+    };
+    // Text drawn in a style: the set-up the cards' and the Perform column's titles, the tabs and the Zones tab's map share
+    // (v195, one place for it)
+    inline void drawText(juce::Graphics& g, const juce::String& t, juce::Rectangle<int> r, const TextStyle& s) {
+        g.setFont(s.font);
+        g.setColour(s.colour);
+        g.drawText(t, r, s.just, s.dots);
+    }
+    // A rectangle filled in a colour: the tab bar's mark, the Zones map's keys (v195)
+    inline void fill(juce::Graphics& g, juce::Rectangle<int> r, juce::Colour c) {
+        g.setColour(c);
+        g.fillRect(r);
+    }
+    // The cards' and the Perform column's titles: 11 pt bold, spaced out
+    inline juce::Font titleFont() {
+        juce::Font f(11.0f, juce::Font::bold);
+        f.setExtraKerningFactor(0.08f);
+        return f;
+    }
+
     // ─── A tab's page: cards of rows ──────────────────────────────────────────────
     // Each card is a titled box in column 0 or 1 (or across both, col -1), its
     // rows a list of items: a component with a fixed width, or 0 for a share of
@@ -131,12 +157,8 @@ namespace Ui {
                 g.fillRect(c.bounds);
                 g.setColour(Ui::line);
                 g.drawRect(c.bounds, 1);
-                juce::Font f(11.0f, juce::Font::bold);
-                f.setExtraKerningFactor(0.08f);
-                g.setFont(f);
-                g.setColour(Ui::label);
-                g.drawText((c.titleFn ? c.titleFn() : c.title).toUpperCase(),
-                           c.bounds.reduced(Ui::pad, 0).withHeight(Ui::cardHeadH), juce::Justification::centredLeft, true);
+                const auto head = c.bounds.reduced(Ui::pad, 0).withHeight(Ui::cardHeadH);
+                drawText(g, (c.titleFn ? c.titleFn() : c.title).toUpperCase(), head, { titleFont(), Ui::label });
             }
         }
     };

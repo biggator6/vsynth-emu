@@ -17,6 +17,8 @@ EN = 'plugin/Source/PluginEncodes.cpp'   # a wave's encode, from PluginProcessor
 CR, CW = 'plugin/Source/PluginControlsRead.cpp', 'plugin/Source/PluginControlsWrite.cpp'   # xtControls, setControls (v190)
 CC, O2 = 'plugin/Source/PluginCosmControls.cpp', 'plugin/Source/PluginOsc2Controls.cpp'   # their COSM and OSC 2 parts (v190)
 PO, PL = 'plugin/Source/PluginParamsOsc.cpp', 'plugin/Source/PluginEditorPlay.cpp'   # OSC parameters, the Play tab (v190)
+PZ, PF = 'plugin/Source/PluginZones.cpp', 'plugin/Source/PluginPatchFiles.cpp'   # a patch's zones, its waves' files (v195)
+ET, EH = 'plugin/Source/PluginEditorTabs.cpp', 'plugin/Source/PluginEditorTabs.h'   # the editor's tabs (v195)
 TEXT='row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };\n        '
 TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };\n        '
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
@@ -45,9 +47,9 @@ MUTS=[
  ('editor-patch-unplaced',EP,'patchButton_.setBounds(src.removeFromLeft(100));',';','layout'),
  ('editor-no-panel',EP,'&fxOnBtn_, fxPanel_.get() };','&fxOnBtn_ };','panel'),
  ('editor-no-switch',EP,'&fxOnBtn_, fxPanel_.get() };','fxPanel_.get() };','layout'),
- ('editor-panel-always',EP,'fxPanel_->setVisible(tab_ == kEffectsTab);','fxPanel_->setVisible(true);','layout'),
- ('editor-panel-never',EP,'fxPanel_->setVisible(tab_ == kEffectsTab);','fxPanel_->setVisible(false);','layout'),
- ('editor-page-stuck',EP,'pages_[i]->setVisible(i == tab_);','pages_[i]->setVisible(i == 0);','layout'),
+ ('editor-panel-always',ET,'fxPanel_->setVisible(tab_ == kEffectsTab);','fxPanel_->setVisible(true);','layout'),
+ ('editor-panel-never',ET,'fxPanel_->setVisible(tab_ == kEffectsTab);','fxPanel_->setVisible(false);','layout'),
+ ('editor-page-stuck',ET,'pages_[i]->setVisible(i == tab_);','pages_[i]->setVisible(i == 0);','layout'),
  ('editor-no-row',EP,'for (int i : { 8, 9, 10, 11 }) level.rows.push_back(rowOfLevel(i));','for (int i : { 8, 9, 10 }) level.rows.push_back(rowOfLevel(i));','layout'),
  ('editor-no-card',PL,'p.add(tempo);',';','layout'),
  ('editor-cosm-rows',EP,'addAll(tbLabels_, tbSliders_, kTbKnobs);',';','layout'),
@@ -58,8 +60,9 @@ MUTS=[
  ('editor-toggle-narrow',EP,'osc.head = { { &lfoSyncBtn_, 84 } };','osc.head = { { &lfoSyncBtn_, 40 } };','layout'),
  ('editor-min-width',EP,'setResizeLimits(900, 600, 1400, 900);','setResizeLimits(700, 600, 1400, 900);','layout'),
  ('editor-min-height',EP,'setResizeLimits(900, 600, 1400, 900);','setResizeLimits(900, 400, 1400, 900);','layout'),
- ('editor-no-tab-name',EP,'"Matrix", "Effects" }','"Matrix" }','layout'),
- ('editor-tab-click',EP,'if (tabBounds(i).contains(e.getPosition())) { if (onChange) onChange(i); return; }','if (tabBounds(i).contains(e.getPosition())) { if (onChange) onChange(0); return; }','layout'),
+ ('editor-no-tab-name',ET,'"Zones",\n                       "Effects" }','"Zones" }','layout'),
+ ('editor-tab-click',EH,'if (tabBounds(i).contains(e.getPosition())) { if (onChange) onChange(i); return; }',
+  'if (tabBounds(i).contains(e.getPosition())) { if (onChange) onChange(0); return; }','layout'),
  ('editor-seg-osc',EP,'oscSeg_->onChange = [this](int i) { oscSelBox_.setSelectedId(i + 1, juce::sendNotificationSync); };',';','layout'),
  ('editor-seg-follow',EP,'attachCosm(cosmSelBox_.getSelectedId() == 2 ? 1 : 0); cosmSeg_->setIndex(cosmK_); };','attachCosm(cosmSelBox_.getSelectedId() == 2 ? 1 : 0); };','layout'),
  ('editor-seg-mono',EP,'monoSeg_->onChange = [this](int i) { monoBox_.setSelectedItemIndex(i, juce::sendNotificationSync); };',';','layout'),
@@ -176,7 +179,8 @@ MUTS=[
  ('patch-fx-knobs',PP,'if (auto* p = apvts.getParameter(knob)) p->setValueNotifyingHost(p->convertTo0to1((float)fx.value));',';','patch'),
  ('patch-wave-folder',PP,'file.getParentDirectory().getSiblingFile("Wave")','file.getParentDirectory().getChildFile("Wave")','patch'),
  ('patch-wave-number',PP,'xtPatchWaveNumber(store, zone, k);','xtPatchWaveNumber(store, zone, 0) + 1;','patch'),
- ('patch-wave-copy',PP,'f.getFileName().length() < best.getFileName().length()','f.getFileName().length() > best.getFileName().length()','patch'),
+ ('patch-wave-copy',PF,'f.getFileName().length() < best.getFileName().length()',
+  'f.getFileName().length() > best.getFileName().length()','patch'),
  ('patch-wave-settings',PP,'if (files[k].existsAsFile() && readVSynthWave(files[k], waves[k], &why)) { found[k] = true; xtWaveOntoControls(waves[k], o); }','if (files[k].existsAsFile() && readVSynthWave(files[k], waves[k], &why)) { found[k] = true; }','patch'),
  ('patch-wave-tuning',EN,'if (isOwn) xtWaveOntoEncoded(ownWave, *e);',';','patch'),
  ('patch-wave-left',PP,'else unloadWave(k);',';','patch'),
@@ -187,16 +191,6 @@ MUTS=[
  ('patch-loop-step',PO,'Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f)','Params::kLoopStart, "Loop Start", juce::NormalisableRange<float>(0.0f, 100.0f, 0.5f)','patch'),
  ('patch-tempo-step',PO,'Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.0001f)','Params::kOrigTempo, "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.01f)','patch'),
  ('patch-folder-kept',PP,'settings->setValue(kPatchFolderKey, file.getParentDirectory().getFullPathName());',';','patch'),
- ('zones-store',PP,'apvts.state.setProperty("patchStore", zones > 1 ? juce::Base64::toBase64(store.data(), store.size()) : juce::String(), nullptr);',';','patch'),
- ('zones-restore',PS,'        loadZones(store, juce::File(apvts.state.getProperty("patchWaves").toString()), '
-  'notes);','        ;','patch'),
- ('zones-set',PP,'        synth_.setZones(withWaves);','        ;','patch'),
- ('zones-wave-settings',PP,'            xtWaveOntoControls(w, o);\n            want.push_back({ z, k, number });','            want.push_back({ z, k, number });','patch'),
- ('zones-wave-tuning',PP,'            xtWaveOntoEncoded(w, *e);\n            enc[number] = std::move(e);','            enc[number] = std::move(e);','patch'),
- ('zones-one',PP,'if (zones < 2) { synth_.setZones(nullptr); zonesReady_.store(true); return; }','if (zones < 2) { zonesReady_.store(true); return; }','patch'),
- ('zones-note',PP,'    notes.add(juce::String(zones) + " zones, zone 1 on the panel");','    ;','patch'),
- ('zones-wave-number',PP,'            const int number = xtPatchWaveNumber(store, z, k);','            const int number = xtPatchWaveNumber(store, z, 0);','patch'),
- ('zones-wave-zone',PP,'            const int number = xtPatchWaveNumber(store, z, k);','            const int number = xtPatchWaveNumber(store, 0, k);','patch'),
  ('rom-other-taken',XR,'    if (ready() && *digest != digest_) {','    if (false) {','rom-image'),
  ('rom-tables-again',XR,'if (!ready() && !loadTables(path.c_str()))','if (!loadTables(path.c_str()))','rom-image'),
  ('switch-read',SW,'    return nullptr;\n#endif','    return std::getenv(name);\n#endif','switches'),
@@ -209,7 +203,6 @@ MUTS=[
  ('patch-playback-write',CW,'    set(Params::kPlaybackMode, c.playbackMode);','    ;','patch'),
  ('patch-playback2-write',O2,'        set(oscId(1, Params::kPlaybackMode), o.playbackMode);','        ;','patch'),
  ('patch-own-events-osc',EN,'ownEvents ? &ownWave.events : nullptr,','nullptr,','solo-own'),
- ('patch-stored-zone',PP,'auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events, &w.vpdt);','auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events);','patch'),
  ('patch-stored-osc',EN,'ownEvents ? &ownWave.vpdt : nullptr);','nullptr);','stored'),
  ('patch-playback-vpno','plugin/Source/XtPatch.cpp',"    if (w.vpnoCount >= 0) { e.vpno = w.vpno; e.vpnoCount = w.vpnoCount; }   // its own list in place of the encode's\n",'','patch'),
  ('editor-playback-osc',EP,'    playbackAtt_   = std::make_unique<ComboAtt>(processor_.apvts, id("playbackMode"), playbackBox_);','    playbackAtt_   = std::make_unique<ComboAtt>(processor_.apvts, "playbackMode", playbackBox_);','layout'),

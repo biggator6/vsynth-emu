@@ -261,7 +261,7 @@ update: read16 at 8f000000 (pc 8950f5a6)
 tone, the SOLO records of vocal.bin: 0 different of 461, 2 events
 tone, the SOLO records of w358.bin: 0 different of 111, 2 events
 tone, the SOLO records of drum.bin: 0 different of 607, 3 events
-patches: 512, 1558 zones, 1563632 values, 0 different; 448512 of their effects' values, 0 different
+patches: 512, 1558 zones, 1588560 values, 0 different; 448512 of their effects' values, 0 different
 tone: 4386 notes, 2459 taken by a sounding tone, 334 truncated, 384001 blocks, 31902812 checks
 tone: 0 notes left off, a read outside memory; 460586 band reads far from their wave
 tone: 0 different

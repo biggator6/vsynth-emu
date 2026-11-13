@@ -235,7 +235,6 @@ void XtSynth::pickUpSample() {
         retiredZones = std::move(zones);
         zones = std::move(pendingZones);
         zonesPending = false;
-        for (int z = 0; z < kZones; ++z) zoneUpper[z] = zones ? zones->upper[z] : 127;
         for (int z = 1; z < kZones; ++z)
             for (int k = 0; k < 2; ++k) {
                 const int n = zones ? zones->number[z][k] : 0;

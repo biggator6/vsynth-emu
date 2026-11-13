@@ -80,6 +80,9 @@ public:
     juce::String getPatchNote() const { return patchNote_; }
     juce::File lastPatchFolder() const;
     XtSynth::Controls currentControls() const { return xtControls(); }
+    // What zones 2…16 of the patch loaded last play, a line each, the first zone 1's and empty; none without a patch
+    // (PluginZones.cpp, v195).  Message thread
+    juce::StringArray zonePlays() const;
     // The arpeggio's pattern (PluginArp.cpp, v190): a patch's, or a session's; any thread reads it, the message thread sets it
     XtArpPattern arpPattern() const { return arpWords_.load(); }
     void setArpPattern(const XtArpPattern& p);
@@ -152,8 +155,12 @@ private:
     juce::CriticalSection    bufferLock_;
     // A patch's zones 2…16: their settings at once, and again with their waves once the pool has encoded them (each wave once, as its own
     // type).  A newer patch discards an older one's.  The store and the wave folder go in the session, for its zones to come back.
+    // PluginZones.cpp (v195), with the splits' parameters
     void loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes);
-    void restoreZones(juce::StringArray& notes);   // a session's zones back (PluginState.cpp), what isn't there in notes
+    // a session's zones back, what isn't there in notes; and its splits from its store if it has none (before v195)
+    void restoreZones(juce::StringArray& notes, bool hadSplits);
+    std::vector<uint8_t> keptStore() const;
+    void setZonePlays(const juce::StringArray& plays);
     std::atomic<int>         zonesGen_ { 0 }, patchZones_ { 1 };
     std::atomic<bool>        zonesReady_ { true };
 
@@ -211,6 +218,10 @@ private:
     static void addMsmParams(ParamList& params);
     void readMsmControls(XtSynth::Controls& c) const;
     void writeMsmControls(const XtSynth::Controls& c);
+    // The zones' sixteen Range Upper keys, after the MSM's (PluginZones.cpp, v195)
+    static void addZoneParams(ParamList& params);
+    void readZoneControls(XtSynth::Controls& c) const;
+    void writeZoneControls(const XtSynth::Controls& c);
     void setPatchControls(const XtSynth::Controls& c);
     void waveToParameters(const XtWaveFile& wave, int osc);
     void takeWave(const XtWaveFile& wave, const juce::File& file, int osc);

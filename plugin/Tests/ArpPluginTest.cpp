@@ -13,12 +13,14 @@
 // sees of it, so a change to how the list is made can be shown to leave it as it was (v190's split of PluginProcessor.cpp).
 // Run: VSynthEmuArpPluginTest <rom.2.bin> [params].  Exit 0 if every check holds.
 #include "MsmPluginTest.h"
+#include "ZonePluginTest.h"
 #include "TestChecks.h"
 #include "TestControls.h"
 #include "TestFirmware.h"
 #include "TestMain.h"
 #include "TestAgainstSynth.h"
 #include "TestOnsets.h"
+#include "TestPatches.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/Sh4Interp.h"
 #include "../Source/XtFiles.h"
@@ -26,6 +28,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <optional>
 #include <span>
 
 namespace {
@@ -97,50 +100,26 @@ void intoControls(TestChecks& check, const juce::File& rom) {
 }
 
 // A patch of the image's with the arpeggio on, a pattern that plays and settings away from the defaults
-bool arpPatch(const juce::File& rom, XtPatchFile& patch, std::vector<uint8_t>& bytes) {
-    XtDiskImage disk;
-    if (!disk.open(rom.getSiblingFile("V-SynthXTDiskImage.bin.0.bin").getFullPathName().toStdString())) return false;
-    for (const auto& e : disk.list("Internal.prj/Patch")) {
-        bytes = disk.read(e);
-        if (!xtPatchRead(bytes.data(), bytes.size(), patch)) continue;
-        const XtArpSettings s = xtArpSettingsOf(patch.store);
-        if (s.on && !xtArpPatternSilent(xtArpPatternOf(patch.store)) && s.motif != 0 && s.grid != 3) return true;
+std::optional<ImagePatch> arpPatch(const juce::File& rom) {
+    for (ImagePatch& m : imagePatches(rom)) {   // TestPatches.h (v195)
+        const XtArpSettings s = xtArpSettingsOf(m.store);
+        if (s.on && !xtArpPatternSilent(xtArpPatternOf(m.store)) && s.motif != 0 && s.grid != 3) return m;
     }
-    return false;
-}
-
-// A session's state as one saved before v190: no pattern in it, and none of the arpeggio's parameters
-juce::MemoryBlock beforeArp(const juce::MemoryBlock& state) {
-    std::unique_ptr<juce::XmlElement> old(VSynthEmuProcessor::getXmlFromBinary(state.getData(), (int)state.getSize()));
-    juce::MemoryBlock out;
-    if (!old) return out;
-    old->removeAttribute("arpPattern");
-    for (auto* e = old->getFirstChildElement(); e != nullptr;) {
-        auto* next = e->getNextElement();
-        if (e->getStringAttribute("id").startsWith("arp")) old->removeChildElement(e, true);
-        e = next;
-    }
-    VSynthEmuProcessor::copyXmlToBinary(*old, out);
-    return out;
+    return std::nullopt;
 }
 
 // Through loadPatch, then a session of it, and one from before v190
 void patchAndSession(TestChecks& check, const juce::File& rom, const juce::File& work) {
-    XtPatchFile patch;
-    std::vector<uint8_t> bytes;
-    if (!arpPatch(rom, patch, bytes)) {
+    const std::optional<ImagePatch> patch = arpPatch(rom);
+    if (!patch) {
         check(false, "a patch of the image's with the arpeggio on, beside the ROM");
         return;
     }
-    const juce::File file = work.getChildFile("Patch/arp.p00");
-    file.getParentDirectory().createDirectory();
-    file.replaceWithData(bytes.data(), bytes.size());
-    VSynthEmuProcessor p;
-    p.setRomFile(rom);
-    check(p.loadPatch(file), "the patch should load");
-    const std::string name = patch.name + ": ";
-    check(p.currentControls().arp == xtArpSettingsOf(patch.store), name + "its arpeggio's settings on the parameters");
-    check(p.arpPattern() == xtArpPatternOf(patch.store), name + "its pattern");
+    const auto loaded = loadedWith(check, rom, *patch, work.getChildFile("Patch/arp.p00"));   // TestPatches.h (v195)
+    VSynthEmuProcessor& p = *loaded;
+    const std::string name = patch->name + ": ";
+    check(p.currentControls().arp == xtArpSettingsOf(patch->store), name + "its arpeggio's settings on the parameters");
+    check(p.arpPattern() == xtArpPatternOf(patch->store), name + "its pattern");
     check(!p.getPatchNote().contains("arpeggio"), name + "not said to be missing: " + p.getPatchNote().toStdString());
 
     juce::MemoryBlock state;
@@ -149,7 +128,7 @@ void patchAndSession(TestChecks& check, const juce::File& rom, const juce::File&
     q.setStateInformation(state.getData(), (int)state.getSize());
     check(q.currentControls().arp == p.currentControls().arp, "a session's arpeggio settings should come back");
     check(q.arpPattern() == p.arpPattern(), "and its pattern");
-    const juce::MemoryBlock before = beforeArp(state);
+    const juce::MemoryBlock before = sessionBefore(state, "arp", "arpPattern");   // no pattern, no arpeggio's parameters
     q.setStateInformation(before.getData(), (int)before.getSize());
     check(q.arpPattern() == xtArpDefaultPattern(), "a session from before v190 should bring the XT's default pattern");
     VSynthEmuProcessor r;
@@ -205,7 +184,7 @@ int arpPluginTest(const juce::File& rom, const juce::File& work) {
     throughProcessor(check, rom, true);
     throughProcessor(check, rom, false);
     const int arp = check.summary();
-    return msmPluginTest(rom, work) | arp;   // the MSM's (v193)
+    return msmPluginTest(rom, work) | zonePluginTest(rom, work) | arp;   // the MSM's (v193) and the zones' (v195)
 }
 
 // Every parameter as a host sees it, one a line

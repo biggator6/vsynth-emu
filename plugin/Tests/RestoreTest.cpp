@@ -6,6 +6,7 @@
 #include "TestChecks.h"
 #include "TestControls.h"
 #include "TestMain.h"
+#include "TestPatches.h"
 #include "TestWave.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/XtFiles.h"
@@ -70,8 +71,7 @@ void zonesWithoutWaves(TestChecks& check, const juce::File& rom, const juce::Fil
     }
     const auto bytes = disk.read(*chosen);
     const juce::File patch = work.getChildFile("Project/Patch/zones.p00");   // and no Wave folder beside it
-    patch.getParentDirectory().createDirectory();
-    patch.replaceWithData(bytes.data(), bytes.size());
+    writeTestFile(patch, bytes);   // TestPatches.h (v195)
     // Saved as if its waves had been there: nothing said in the session
     const auto state = saved(rom, [&](VSynthEmuProcessor& p) {
         p.loadPatch(patch);

@@ -3570,6 +3570,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 20, continued (2026-11-12) — v195: the zones' splits on the panel
+
+- The user didn't see the zones in the plugin. Two reasons, both true: the panel never showed them (v154 kept zones 2–16 as a patch's data, by the user's decision), and Reaper was loading a Nov 4 copy of the VST3 from /Library, from before zones existed, its list entry keyed to that copy's class ID. Removing that copy takes the user's sudo.
+- The splits are the patch's common (IDs 0x124…0x133), not a zone's, and the firmware makes the part's table from them at every update (0x894dbfa0), as well as from the panel's parameter set. So they became controls, and a split moved in play behaves as on the XT: the next note takes the new table, a sounding one keeps its zone.
+- Before moving a split could reach zones past a patch's own, I wanted to know what those hold. A throwaway probe of the project's 263 stores: no PCM wave in any, an analog OSC switched on in 55. So every patch now loads all sixteen zones, at no encode cost.
+- Placing the new field mattered: xt_tone picks a random word of the controls up to the arpeggio's, so a field before it would have changed every case's draws. After the MSM's settings, the check ran the same cases, and fcheck's only new line was sixteen more values a zone in the patch check.
+- The kit's size and shape laws made this a version of moves: four files over 300 lines, each split first, by what its parts do. template-law refused the tab bar's move as a copy, because it counts one object's set-ups once a file and the editor held the same drawing set-up twice. That was KWB-159, fixed in the kit with a selftest and installed on the user's word. The same law then had a point about new code: three hand-written font-colour-text set-ups became Ui::drawText, and the tests' patch walk, file write and old-session builder became TestPatches.h.
+- The first snapshot at 900 wide cut the Effects tab to "Ef", and the layout check had passed it, because a click on the visible part still opened it. Tabs now share the spare width, and the check clicks the bar's right end.
+- The plant runs took 2 hours 40 minutes, one after another, as mutate_panel.py edits the sources in place. Every plant was caught but check-pad-cc, the tone list's gap since v189, which v193's run missed too.
+
 ### Session 20, continued (2026-11-12) — v194: plant runs build one binary
 
 - The plant runs had grown to 2.8 minutes a plant, and v190's whole list to over 8 hours. A measurement showed where it went: linking. Every test binary links the whole plugin, about 20 s each, one after another, and every plant built all eight, though its run starts one. One binary takes 30 s from a touched source, eight take 173 s.

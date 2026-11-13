@@ -335,6 +335,27 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The splits on the panel v195 (2026-11-12): the user's "add a zones card to the editor allowing it to show and edit
+  splits" (HARDWARE_FIRMWARE.md, "The zones' splits on the panel"). Each zone's Range Upper key (IDs 0x124…0x133, the
+  patch's common) is Controls::zoneUpper, read with zone 1's common from a patch, and the part's table is made again at each
+  update (0x894dbfa0 → 0x894794f0), so a split moved in play reaches the next note and a sounding one keeps its zone.
+  XtZones lost its upper keys. A zone with no patch's data is the XT's init zone, silent. Every patch loads all sixteen
+  zones (past its own splits: no PCM wave in 263 patches, an analog OSC on in 55). Sixteen host parameters, zoneUpper1…16,
+  appended after the MSM's (the 745 before them unchanged, by the params list); a session from before takes them from its
+  kept store. The Zones tab before Effects: a map of each zone's keys and what it plays or why it is silent, and two cards
+  of eight sliders, zone 16's greyed (the table ends it at 127). The tab bar shares its spare width: ten tabs at 28 each
+  cut Effects at 900 wide, and the layout check now clicks the bar's right end.
+  Splits by the size limit, each moved as it stood: loadZones and restoreZones to PluginZones.cpp, the wave reads to
+  PluginPatchFiles.cpp, the tab bar and showTab to PluginEditorTabs, patchOf to XtTonePatchIds.cpp, xt_tone's split draw to
+  drawSplits and what a live move holds to holdKeys (XtToneCases.cpp); the drawing set-ups to Ui::drawText and Ui::fill,
+  the tests' patch walk, file write, load and old session to TestPatches.h. template-law refused the tab bar's move as a
+  copy (it counted a set-up once a file): KWB-159, installed on the user's "Yes, install it", the patch in .claude/.
+  Check: xt_tone 300 with the test waves 0 different (85 notes on zones 2 to 16); fcheck as the baseline but the patches'
+  value count, +24,928 (sixteen splits a zone, 0 different); VSynthEmuArpPluginTest arpplugin 430, msmplugin 9217,
+  zoneplugin 2144, all hold; TEST_UI_LAYOUT 297 states, 669 of 761 parameters with a control. Plants: mutate_tone.py
+  1168, all caught but check-pad-cc [gap, v189's] (the ten v195 moved or added, all caught); tone_stack_test.sh the same
+  at 2000 cases; mutate_panel.py --editor with v195's names, the zones' and every arp- and msm-, 116, all caught.
+
 Plant runs build one binary v194 (2026-11-12): the user's "speed up the plant runs". mutate_panel.py built all eight
   test binaries for every plant, though a plant's run starts one (its kind's _bin, else VSynthEmuTest), and each link of
   the whole plugin takes about 20 s, one after another: 173 s a plant, measured after a touch of one source, where one

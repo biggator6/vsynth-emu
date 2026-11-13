@@ -171,6 +171,7 @@ void commonOf(const Read& p, Ctl& c) {
     c.bendDown = p(0x11f);
     c.scaleTune = p(0x134) != 0;
     for (int i = 0; i < 12; ++i) c.scale[i] = p(0x136 + 2 * i);
+    for (int i = 0; i < kXtZones; ++i) c.zoneUpper[i] = p(0x124 + i);   // the zones' Range Upper keys (v195)
 }
 } // namespace
 
@@ -207,7 +208,6 @@ XtSynth::Controls xtPatchControls(const std::vector<uint8_t>& store, int zone, c
 
 void xtPatchZoneSet(const std::vector<uint8_t>& store, const XtSynth::Controls& base, XtSynth::Zones& z) {
     for (int i = 0; i < XtSynth::kZones; ++i) {
-        z.upper[i] = xtPatchValue(store, 0x124 + i);
         if (i) z.ctl[i] = xtPatchControls(store, i, base);
         if (i) for (int k = 0; k < 2; ++k) z.number[i][k] = xtPatchWaveNumber(store, i, k);   // STEP's count starts again on another
 

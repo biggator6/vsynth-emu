@@ -37,6 +37,7 @@ cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.
    XtCosm.cpp XtAnalog.cpp "${FW[@]}" Sh4Interp.cpp "${VF[@]}" XtPatch.cpp "${SARP[@]}" \
    $( [ -f XtArpeggioPatch.cpp ] && echo XtArpeggioPatch.cpp ) $( [ -f XtSynthMsm.cpp ] && echo XtMsmPatch.cpp ) \
    $( [ -f XtToneMsm.cpp ] && echo XtToneFirmware.cpp XtToneCases.cpp XtToneCarry.cpp XtToneMsm.cpp ) \
+   $( [ -f XtTonePatchIds.cpp ] && echo XtTonePatchIds.cpp ) \
    $( [ -f XtSynthRom.cpp ] && echo XtSynthRom.cpp ) -o "$O/xt_tone" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp Sh4Interp.cpp -o "$O/xt_files" &

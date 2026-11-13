@@ -2,6 +2,7 @@
 // back.  Moved here from PluginProcessor.cpp in v172, when what doesn't come back began to say so: a wave whose file has
 // gone, and a patch's zone waves that aren't in its folder, go with what isn't here of the patch and in the status line.
 #include "PluginProcessor.h"
+#include "PluginParamIds.h"
 
 void VSynthEmuProcessor::getStateInformation(juce::MemoryBlock& destData) {
     auto state = apvts.copyState();
@@ -20,7 +21,9 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
     if (!xml || !xml->hasTagName(apvts.state.getType()))
         return;
 
-    apvts.replaceState(juce::ValueTree::fromXml(*xml));
+    const juce::ValueTree saved = juce::ValueTree::fromXml(*xml);
+    const bool hadSplits = saved.getChildWithProperty("id", Params::zoneUpperId(0)).isValid();   // v195 on
+    apvts.replaceState(saved);
     restoreArpPattern();   // v190: a session before it has none
     for (auto& e : fxEdits_) e.store(kFxNoEdit, std::memory_order_relaxed);
     for (const auto& pair : juce::StringArray::fromTokens(apvts.state.getProperty("fxEdits").toString(), ",", ""))
@@ -45,7 +48,7 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
     }
     patchName_ = apvts.state.getProperty("patchName").toString();
     patchNote_ = apvts.state.getProperty("patchNote").toString();
-    restoreZones(gone);
+    restoreZones(gone, hadSplits);   // PluginZones.cpp
     // What the session said already is left as it was; anything new goes with it, and in the status line
     juce::StringArray fresh;
     for (const auto& n : gone)
@@ -53,20 +56,4 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
     if (fresh.isEmpty()) return;
     patchNote_ << (patchNote_.isEmpty() ? "" : ", ") << fresh.joinIntoString(", ");
     setStatus("Not here: " + fresh.joinIntoString(", "));
-}
-
-// A patch's zones 2…16, from the store it kept, their waves from its folder; what isn't there goes in `notes`
-void VSynthEmuProcessor::restoreZones(juce::StringArray& notes) {
-    juce::MemoryOutputStream zoneStore;
-    const juce::String kept = apvts.state.getProperty("patchStore").toString();
-    if (kept.isNotEmpty() && xtSynthRomReady() && juce::Base64::convertFromBase64(zoneStore, kept)) {
-        const auto* b = static_cast<const uint8_t*>(zoneStore.getData());
-        const std::vector<uint8_t> store(b, b + zoneStore.getDataSize());
-        loadZones(store, juce::File(apvts.state.getProperty("patchWaves").toString()), notes);
-        return;
-    }
-    ++zonesGen_;
-    patchZones_.store(1);
-    zonesReady_.store(true);
-    synth_.setZones(nullptr);
 }

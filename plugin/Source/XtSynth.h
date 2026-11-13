@@ -107,7 +107,6 @@ private:
     // Each zone's controls as its notes read them: its own blocks, and the rest zone 1's (zoneCtl[0] unused: zone 1 is ctl)
     Controls zoneCtl[kZones];
     Controls zoneWas[kZones];                        // setControls': each sounding zone's before the change
-    int zoneUpper[kZones] = { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 };
     const Controls& zc(int z) const { return z ? zoneCtl[z] : ctl; }
     const Controls& zc(const Voice& v) const { return zc(v.zone); }
     Controls zoneControls(int z) const;              // zone z's own blocks on ctl's

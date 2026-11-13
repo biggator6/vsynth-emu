@@ -60,4 +60,31 @@ msm-editor-wrong-track|juce::jlimit(0, MsmControls::kTracks - 1, msm_.track.getS
 msm-editor-one-track|kXtMsmTrackIds * t + i; }|kXtMsmTrackIds * 0 * t + i; }|plugin/Source/PluginEditorMsm.cpp|layout
 msm-editor-unplaced|    p.add(stepsCard(msm_, 1));|    ;|plugin/Source/PluginEditorMsm.cpp|layout
 msm-editor-no-items|        box.addItemList(choice->choices, 1);|        ;|plugin/Source/PluginEditorMsm.cpp|layout
-msm-tab-unnamed|"Play", "MSM", "Matrix"|"Play", "Matrix"|plugin/Source/PluginEditor.cpp|layout
+msm-tab-unnamed|"Play", "MSM", "Matrix"|"Play", "Matrix"|plugin/Source/PluginEditorTabs.cpp|layout
+# A patch's zones (v154), moved from mutate_panel.py's MUTS with loadZones and restoreZones to PluginZones.cpp (v195), by
+# PluginTest's patch apply. zones-one is withdrawn: loadZones has no branch for a patch of one zone, which loads its own zones.
+zones-store|apvts.state.setProperty("patchStore", juce::Base64::toBase64(store.data(), store.size()), nullptr);|;|plugin/Source/PluginZones.cpp|patch
+zones-restore|        loadZones(store, juce::File(apvts.state.getProperty("patchWaves").toString()), notes);|        ;|plugin/Source/PluginZones.cpp|patch
+zones-set|        synth_.setZones(withWaves);|        ;|plugin/Source/PluginZones.cpp|patch
+zones-wave-settings|            xtWaveOntoControls(w, o);\n            want.push_back({ z, k, number });|            want.push_back({ z, k, number });|plugin/Source/PluginZones.cpp|patch
+zones-wave-tuning|            xtWaveOntoEncoded(w, *e);\n            enc[number] = std::move(e);|            enc[number] = std::move(e);|plugin/Source/PluginZones.cpp|patch
+zones-note|notes.add(juce::String(zones) + " zones, zone 1 on the panel");|(void)notes;|plugin/Source/PluginZones.cpp|patch
+zones-wave-number|            const int number = xtPatchWaveNumber(store, z, k);|            const int number = xtPatchWaveNumber(store, z, 0);|plugin/Source/PluginZones.cpp|patch
+zones-wave-zone|            const int number = xtPatchWaveNumber(store, z, k);|            const int number = xtPatchWaveNumber(store, 0, k);|plugin/Source/PluginZones.cpp|patch
+patch-stored-zone|auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events, &w.vpdt);|auto e = xtSynthEncode(chans, 44100.0, type, 64, nullptr, 16, &w.events);|plugin/Source/PluginZones.cpp|patch
+# The splits' plugin side (v195): their parameters, read and write, a session's and one from before, every zone of a patch of
+# one zone, and an init zone silent, by VSynthEmuArpPluginTest's zone checks (ZonePluginTest.cpp); the Zones tab and the tab
+# bar, by the layout check.
+zone-param-name|"Zone " + juce::String(z + 1) + " Range Upper"|"Zone " + juce::String(z) + " Range Upper"|plugin/Source/PluginZones.cpp|arpplugin
+zone-param-default|kUpperHi = 127, kUpperDefault = 127;|kUpperHi = 127, kUpperDefault = 126;|plugin/Source/PluginZones.cpp|arpplugin
+zone-read-swapped|c.zoneUpper[z] = knob(kZoneIds[(size_t)z]);|c.zoneUpper[z] = knob(kZoneIds[(size_t)(kXtZones - 1 - z)]);|plugin/Source/PluginZones.cpp|arpplugin
+zone-write-none|    for (int z = 0; z < kXtZones; ++z) set(kZoneIds[(size_t)z], (float)c.zoneUpper[z]);|    (void)c;|plugin/Source/PluginZones.cpp|arpplugin
+zone-old-session|for (int z = 0; z < kXtZones && !hadSplits; ++z)|for (int z = 0; z < kXtZones && hadSplits; ++z)|plugin/Source/PluginZones.cpp|arpplugin
+zone-old-session-seen|saved.getChildWithProperty("id", Params::zoneUpperId(0)).isValid();|true;|plugin/Source/PluginState.cpp|arpplugin
+zone-plays-past-count|plays.add(z ? playsOf(set->ctl[z], store, z, files) : juce::String());|plays.add(z < zones ? playsOf(set->ctl[z], store, z, files) : juce::String());|plugin/Source/PluginZones.cpp|arpplugin
+zone-init-sounds|    if (!zones) c.on = c.osc2.on = false;\n||plugin/Source/XtSynthZones.cpp|arpplugin
+zone-pick-patch|    for (int i = 0; i < kXtZones; ++i) c.zoneUpper[i] = p(0x124 + i);   // the zones' Range Upper keys (v195)\n||plugin/Source/XtPatch.cpp|arpplugin
+editor-zone-one-param|Params::zoneUpperId(z), s));|Params::zoneUpperId(0), s));|plugin/Source/PluginEditorZones.cpp|layout
+editor-zones-unplaced|        p.add(Card { half ? "Zones 9-16" : "Zones 1-8", {}, rows, half });|        ;|plugin/Source/PluginEditorZones.cpp|layout
+editor-zones-unnamed|"Matrix", "Zones",|"Matrix",|plugin/Source/PluginEditorTabs.cpp|layout
+editor-tabs-past-end|const int padding = juce::jlimit(kMinPadding, kMaxPadding, share);|const int padding = kMaxPadding;|plugin/Source/PluginEditorTabs.h|layout

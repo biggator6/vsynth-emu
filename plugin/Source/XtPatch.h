@@ -12,8 +12,9 @@
 // patch holds only its own type's.  A COSM of type 0 (Through) is off, which is the same sound.
 XtSynth::Controls xtPatchControls(const std::vector<uint8_t>& store, int zone, const XtSynth::Controls& base);
 
-// The upper keys and zones 2…16's controls, as XtSynth::Zones keeps a patch's zones (the user's decision, 2026-11-05); their waves are
-// the caller's to find.  `base` as xtPatchControls'.  The zones past xtPatchZones' are read too: no key reaches them.
+// Zones 2…16's controls, as XtSynth::Zones keeps a patch's zones (the user's decision, 2026-11-05); their waves are the caller's to
+// find.  `base` as xtPatchControls'.  The zones past xtPatchZones' are read too: a key reaches them when a split moves (v195).  The
+// upper keys are the common's, xtPatchControls' (Controls::zoneUpper).
 void xtPatchZoneSet(const std::vector<uint8_t>& store, const XtSynth::Controls& base, XtSynth::Zones& z);
 
 // The Wave Number an OSC plays (IDs 0x2be, 0x2f2), 0 for none.

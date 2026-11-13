@@ -21,7 +21,8 @@
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
 # PORT=toneknobs, toneenvknobs, toneupdate, tonezones, tonenotes: XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp, XtSynthUpdate.cpp,
 # XtSynthZones.cpp, XtSynthNotes.cpp under xt_tone (v193: XtSynth's parts by job); tonefwcpp, tonefwh, tonecases,
-# tonecarry: xt_tone's own XtToneFirmware.cpp, XtToneFirmware.h, XtToneCases.cpp, XtToneCarry.cpp.  PORT=wire…: under
+# tonecarry: xt_tone's own XtToneFirmware.cpp, XtToneFirmware.h, XtToneCases.cpp, XtToneCarry.cpp; tonepatchids its
+# XtTonePatchIds.cpp (v195).  PORT=wire…: under
 # xt_tone's MSM mode (`xt_tone rom msm [cases] [seed]`), [cases] its cases: wiremsm XtSynthMsm.cpp; wireknobs,
 # wireenvknobs, wireupdate, wirezones, wirenotes, wirearp the files of the tone ports of those names; wirecheck
 # XtToneMsm.cpp, wirefwmsm XtToneFwMsm.h.  A header's plant builds every part again, from a copy of the sources.
@@ -62,6 +63,7 @@ tonefile() {
         tonefwcpp) echo XtToneFirmware.cpp ;;
         tonefwh) echo XtToneFirmware.h ;;
         tonecases) echo XtToneCases.cpp ;;
+        tonepatchids) echo XtTonePatchIds.cpp ;;
         tonecarry) echo XtToneCarry.cpp ;;
     esac
 }
@@ -97,7 +99,7 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
            XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp XtFiles XtWaveFile XtDiskImage XtPatchStore
            XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch
            XtSynthZones XtSynthNotes XtSynthUpdate XtSynthKnobs XtSynthEnvKnobs XtSynthMsm XtMsm XtMsmTrack XtMsmPatch
-           XtToneFirmware XtToneCases XtToneCarry XtToneMsm)
+           XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds)
     TONE=(-DXT_TONE_MAIN -DXT_TONE_CHECK -DXT_HARNESS_SWITCHES)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue

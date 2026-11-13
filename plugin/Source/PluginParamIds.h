@@ -46,6 +46,8 @@ namespace Params {
     inline std::array<juce::String, 4> encodeParamIds() {
         return { kEncodeType, kEncodeDepth, oscId(1, kEncodeType), oscId(1, kEncodeDepth) };
     }
+    // A zone's Range Upper key (v195), zone 0…15: "zoneUpper1"…"zoneUpper16", as the XT counts its zones
+    inline juce::String zoneUpperId(int zone) { return "zoneUpper" + juce::String(zone + 1); }
     static const juce::String kAnaWave       = "anaWave";
     static const juce::String kAnaImpact     = "anaImpact";
     static const juce::String kAnaPw         = "anaPw";

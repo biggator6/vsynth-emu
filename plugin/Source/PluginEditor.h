@@ -5,6 +5,7 @@
 #include "PluginEditorCosmTypes.h"
 #include "PluginEditorArp.h"
 #include "PluginEditorMsm.h"
+#include "PluginEditorZones.h"
 
 class VSynthEmuEditor : public juce::AudioProcessorEditor,
                         private juce::Timer,
@@ -17,8 +18,8 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // The tabs: eight pages of cards (the MSM's, v193, before the Matrix), then the effects' panel
-    static constexpr int kPages = 8, kEffectsTab = kPages;
+    // The tabs: nine pages of cards (the MSM's, v193, before the Matrix; the Zones', v195, after it), then the effects' panel
+    static constexpr int kPages = 9, kZonesTab = 8, kEffectsTab = kPages;
     void showTab(int t);
     int currentTab() const { return tab_; }
 
@@ -272,6 +273,9 @@ private:
     MsmControls msm_;                                // the MSM tab's, a track at a time (PluginEditorMsm.cpp, v193)
     void buildMsmPage();
     void buildMatrixPage();                          // PluginEditorMatrix.cpp (v193)
+    ZonesControls zones_;                            // the Zones tab's (PluginEditorZones.cpp, v195)
+    void buildZonesPage();
+    void makeTabBar();                               // the tab bar with the tabs' names (PluginEditorTabs.cpp, v195)
     static Ui::Page::Row lr(juce::Component& l, juce::Component& c, int w = 0);
     Ui::Page::Row rowOfLevel(int i);
     void repaintPages();
