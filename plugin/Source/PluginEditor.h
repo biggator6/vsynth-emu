@@ -265,7 +265,6 @@ private:
     juce::OwnedArray<juce::Label> extraLabels_;   // row labels the old layout had no label for
     int tab_ = 0;
     void buildLayout();
-    void makeSourceControls(), makeToneControls(), makeCosmTypeRows();   // the constructor's parts, each its own file (UI step 1)
     // The Play tab's page (PluginEditorPlay.cpp, v190), and the usual rows: a label and its control, a level knob's
     using Card = Ui::Page::Card;
     void buildPlayPage();
