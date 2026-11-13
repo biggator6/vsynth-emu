@@ -17,13 +17,10 @@ namespace vc2 {
 
 namespace {
 
-struct Pair {
-    uint32_t vsynth, vc2;   // a routine in rom.2 and its counterpart in rom.4
-};
-constexpr Pair kCtor{0x894efdb0, 0x893abe40}, kNoteOn{0x894f0130, 0x893ac1c0};          // [FW]
-constexpr Pair kTick{0x894efdf0, 0x893abe80}, kNoteOff{0x894f03e0, 0x893ac470};         // [FW]
-constexpr Pair kKeyScale{0x894df760, 0x8939a920}, kTime{0x894df7b0, 0x8939a970};        // [FW]
-constexpr Pair kPitchDepth{0x894e0ce0, 0x8939c1a0};                                     // [FW]
+constexpr Twin::Pair kCtor{0x894efdb0, 0x893abe40}, kNoteOn{0x894f0130, 0x893ac1c0};          // [FW]
+constexpr Twin::Pair kTick{0x894efdf0, 0x893abe80}, kNoteOff{0x894f03e0, 0x893ac470};         // [FW]
+constexpr Twin::Pair kKeyScale{0x894df760, 0x8939a920}, kTime{0x894df7b0, 0x8939a970};        // [FW]
+constexpr Twin::Pair kPitchDepth{0x894e0ce0, 0x8939c1a0};                                     // [FW]
 // [FW] the output routine note-on installs at +0x64 by the curve type, curve 2's and curve 0's: each pair codepairs.py
 // finds alike, at the envelope block's distance (0x143f70)
 constexpr Twin::Moved kMoved[] = {{0x894efca0, 0x893abd30}, {0x894ef7d0, 0x893ab860}};
@@ -56,10 +53,6 @@ const char* envAgainstPort(Machine& m, const XtEnvelope& e) {
     return same ? nullptr : "stage, phase, output, coefficient, onset or stage time";
 }
 
-bool call(Twin& t, Pair p, std::initializer_list<uint32_t> args, float fr4 = 0) {
-    return t.call(p.vsynth, p.vc2, args, fr4);
-}
-
 bool envCase(Twin& t, const EnvCase& k, long& calls) {
     const XtEnvParams p = xtEnvAdsr(k.attack, k.decay, k.sustain, k.release, k.curve);
     uint32_t words[14] = {};
@@ -71,16 +64,16 @@ bool envCase(Twin& t, const EnvCase& k, long& calls) {
     const std::vector<uint8_t> zero(kObject, 0);
     t.write(kEnv, zero.data(), zero.size());
     t.write(kSource, words, sizeof words);
-    if (!call(t, kCtor, {kEnv}) || !call(t, kNoteOn, {kEnv, kSource})) return false;
+    if (!t.call(kCtor, {kEnv}) || !t.call(kNoteOn, {kEnv, kSource})) return false;
     XtEnvelope port;
     port.noteOn(p);
     for (int tick = 0; tick <= k.ticks; ++tick) {
         if (tick == k.off) {
-            if (!call(t, kNoteOff, {kEnv})) return false;
+            if (!t.call(kNoteOff, {kEnv})) return false;
             port.noteOff();
         }
         if (tick > 0) {
-            if (!call(t, kTick, {kEnv, 1})) return false;
+            if (!t.call(kTick, {kEnv, 1})) return false;
             port.tick(1);
         }
         ++calls;
@@ -100,8 +93,8 @@ struct Returns {
 };
 
 // One converter call on both images, its return compared (r0, or fr0 for a float routine): false on a fault
-bool converter(Twin& t, Pair p, std::initializer_list<uint32_t> args, float fr4, Returns& r) {
-    if (!call(t, p, args, fr4)) return false;
+bool converter(Twin& t, Twin::Pair p, std::initializer_list<uint32_t> args, float fr4, Returns& r) {
+    if (!t.call(p, args, fr4)) return false;
     const bool isFloat = p.vsynth == kPitchDepth.vsynth;
     const uint32_t x = isFloat ? t.vsynth.fb[0][0] : t.vsynth.r[0];
     const uint32_t y = isFloat ? t.vc2.cpu.fb[0][0] : t.vc2.cpu.r[0];

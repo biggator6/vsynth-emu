@@ -7,6 +7,7 @@
 //   vc2run <rom.4> kind6           voice kind 6 on a wave of known period, its output's period (vc2kind6.cpp)
 //   vc2run <rom.4> lfo <rom.2>     the LFO on both images' routines and the port, side by side (vc2twinlfo.cpp)
 //   vc2run <rom.4> env <rom.2>     the envelope and its converters the same way (vc2twinenv.cpp)
+//   vc2run <rom.4> cosm <rom.2>    COSM's converters, note-on, update and TVFs, both images (vc2twincosm.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp -o build/tools/vc2/vc2run
@@ -53,13 +54,14 @@ struct Run {
 };
 constexpr std::array kRuns{Run{"boot", vc2::boot}, Run{"warp", vc2::warp}, Run{"hold", vc2::hold},
                            Run{"growl", vc2::growl}, Run{"kind6", vc2::kind6}, Run{"ratio", vc2::ratio},
-                           Run{"lfo", vc2::lfo}, Run{"env", vc2::env}};
+                           Run{"lfo", vc2::lfo}, Run{"env", vc2::env}, Run{"cosm", vc2::cosm}};
 
 } // namespace
 
 int main(int argc, char** argv) {
     if (argc < 3) {
-        std::fprintf(stderr, "usage: vc2run <rom.4> <run> [args]: boot, warp, ratio, hold, growl, kind6, lfo, env\n");
+        std::fprintf(stderr, "usage: vc2run <rom.4> <run> [args]: boot, warp, ratio, hold, growl, kind6;\n"
+                             "       vc2run <rom.4> <block> <rom.2>: lfo, env, cosm\n");
         return 2;
     }
     vc2::Machine m(argv[1]);

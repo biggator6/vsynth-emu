@@ -48,10 +48,12 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   checked unchanged).
 - `codepairs.py <rom.2> <rom.4> [addr …]`: rom.2's routines found in rom.4 by the shape of their code, with the distance
   each moved; with no addresses, every rom.2 code address in plugin/Source. `--pools <rom.2> <rom.4> <a2> <a4>`: for one pair,
-  the literals that differ. `likeat.py`'s `shape`, `shapes` and `find` are importable for it (its output checked unchanged).
-- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`): a block's rom.2 routines and their rom.4 pairs on two interpreters, its
-  object compared after every call and the port held beside rom.4's (`vc2twin.*`, a run per block, `vc2twin<block>.cpp`); it
-  links the block's port from plugin/Source. Fails on any difference.
+  the literals that differ. `--callers <rom.2> <rom.4> <a2> …`: a routine rom.4 compiled anew, through the literals its
+  callers load. `likeat.py`'s `shape`, `shapes` and `find` are importable for it (its output checked unchanged).
+- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`): a block's rom.2 routines and their rom.4 pairs on two
+  interpreters, its object compared after every call, and the port held beside rom.4's where one is linked (`vc2twin.*`, a
+  run per block, `vc2twin<block>.cpp`; `lfo` and `env` link their ports from plugin/Source, `cosm` none). Fails on any
+  difference: `cosm` does, at the Comb ("COSM in rom.4").
 
 ## The V-Synth's tables and code in rom.4 (2026-11-13, the VC-2 mode's step 1a)
 
@@ -125,9 +127,66 @@ time table (`0x8953fb90`, rom.2's `0x897cec24`), and `0x8939aa40`, which reads a
 (`0x8953fc90`, in 0x120 bytes rom.2 doesn't have before its LFO rate table). What reads through `0x8939aa40` is not traced;
 it is not the V-Synth's envelope time.
 
-**So far: the LFO and the envelope (and its converters) of the VC-2 are the V-Synth's, and the ports serve it as they stand.**
-Still to run: COSM, the OSC block (pitch, TVA, the Matrix), the analog OSC, the band and SOLO players, Vari off and LITE, key
-assign.
+**So far: the LFO and the envelope (and its converters) of the VC-2 are the V-Synth's, and the ports serve it as they stand;
+COSM's voice side is too for 14 of its 15 types (below), its converters and the Comb are not.** Still to run: the OSC block
+(pitch, TVA, the Matrix), the analog OSC, the band and SOLO players, Vari off and LITE, key assign.
+
+### COSM in rom.4 (2026-11-13)
+
+xt_cosm's 77 addresses (`build/tools/vc2/cosm_pairs.txt`) part three ways.
+
+- **The DSP is copied.** The filter and the types' routines are found by their shape, most twice in each image (rom.2 holds
+  two copies too, 0xf80 apart: the TVF's `0x89502890` and `0x89503810`), at the common distance 0x1426c0: the TVF
+  `0x89502890` → `0x893c01d0`, the Dynamic TVF `0x89502920` → `0x893c0260`, and on.
+- **The voice side is recompiled, mostly to the byte.** Listing the routines' starts in each image (16-aligned, a prologue
+  after nop padding) and lining them up by order and size, rom.2's 0x894ecce0…0x894edf70 and rom.4's 0x893a8e50…0x893aa0e0
+  run one for one with equal sizes (the block targets `0x894ed8f0` → `0x893a9a60`, 266 instructions alike; the Dynamic
+  TVF's `0x894eda10` → `0x893a9b80`; new blocks `0x894ed390` → `0x893a9500`; the slot finder `0x894ec2b0` → `0x893a8560`;
+  the start values `0x894ec340` → `0x893a85f0`, by `codepairs.py --callers`). Two differ in size: **the note-on**
+  (`0x894edf70` → `0x893aa0e0`, 0x730 against 0x6f0 bytes) **and the 10 ms update** (`0x894ee6a0` → `0x893aa7d0`, 0x8d0
+  against 0x810). Their code is the same instructions scheduled otherwise (a `mov #-84` moved up, a `shll8` down), so a shape
+  match can't find them; their order and size can.
+- **The converters are rewired.** rom.4's dispatcher `0x89399920` has rom.2's (`0x894de3b0`) switch, the same 15 cases in the
+  same order, 7 by literal and 8 by `bsr`: rom.2's `0x894dc8b0`, `0x894dcbf0`, `0x894dcd80`, `0x894dcf00`, `0x894dd0a0`,
+  `0x894dd2c0`, `0x894dd4f0`, `0x894dd690`, `0x894dd870`, `0x894dda40`, `0x894ddc50`, `0x894ddd20`, `0x894ddde0`,
+  `0x894ddf80`, `0x894de110` are rom.4's `0x89397980`, `0x89397cf0`, `0x89397eb0`, `0x89398080`, `0x89398260`, `0x893984e0`,
+  `0x89398780`, `0x893988a0`, `0x89398ae0`, `0x89398d40`, `0x89398fd0`, `0x893990d0`, `0x893991d0`, `0x893993f0`,
+  `0x89399620`. Before its switch rom.2's dispatcher calls `0x894ddf40`, rom.4's nothing. And the converters' input block is
+  laid out otherwise: rom.2's first converter reads its words from +0x12, +0x14, … and adds the word at +0x40 (the Multi Step
+  Modulator's term, v193) to its field; rom.4's reads the same words from +0x10, +0x12, …, adds no such term, and where rom.2
+  has a velocity float at +0x38 it takes a pointer and calls `0x893a2960` with it (which reads the object's +0x1c and +0x94:
+  by its shape the Matrix read in the converter, where rom.2 is given it). So the VC-2's COSM converters take another input:
+  they are to be ported from rom.4 with the converters that read by ID, and compared once their input path is read.
+
+**Run (`vc2run <rom.4> cosm <rom.2>`, `vc2twincosm.cpp`).** No port is linked: xt_cosm holds `XtCosm` to rom.2, so rom.2
+equal to rom.4 is the port equal to rom.4. For each of the 15 types, 200 notes: a block made by rom.2's converter on a random
+input (each word that indexes a table held in its range, as xt_cosm holds it) and given to both images, then the note-on
+with the slot finder hooked in each to hand out four buffers of junk, six updates with new envelope, LFO and pitch values,
+and for the TVF and Dynamic TVF 40 filter blocks of signal; the object, the four buffers and the signal compared after every
+call (`build/tools/vc2/cosm_run.txt`):
+
+| Codes | Types (by xt_cosm) | Result |
+|---|---|---|
+| 2, 3, 4, 6, 7, 8, 12, 15, 16, 18, 19, 20 | among them the Side Band Filters (7, 8), the Compressor (16), Lo-Fi (19) | 200 notes each, 0 different |
+| 13, 14 | TVF, Dynamic TVF | 200 notes each with 40 filter blocks, 0 different |
+| 9 | Comb Filter | 200 of 200 different at note-on |
+
+So **14 of the 15 types' note-on, update and (for the TVFs) filter are the V-Synth's**, the note-on and update included,
+though rom.4 compiled them anew and 0x40 and 0xc0 bytes smaller. The Comb is not: rom.2's note-on sets it up in place
+(the case at `0x894ee300`: the octave byte at +0x14 through the octave table to +0xf4, then the delay's whole and fraction),
+rom.4's sends code 9 to a call of `0x893b9d30(object)`; given rom.2's block, rom.4's Comb leaves another word above the
+octave byte at +0x14 and, at +0x2c, a whole number where rom.2 has a ratio near 1 (−40.0 against 1.017). So the VC-2's Comb
+reads its block otherwise, and is settled with rom.4's own Comb converter. (The other types' cases have the same sizes in
+both note-ons' jump tables, `0x894ee118` and `0x893aa288`; only code 9's case moved.)
+
+Two wrong first runs, kept here so they're not made again: random input words past a table's index range (the TVF's filter
+type, an octave) make both images read past the table, into neighbours each image holds its own (the octave table is
+copied for 198 bytes, the filter's kernel table is followed by code), which gave 612 notes "different" and a fault in rom.2's
+own filter. Held in range, they all agree. Seen red: one word of rom.4's copy of the block nudged sets 13 types apart on
+every note (the first Side Band Filter doesn't read that word).
+
+Not yet run: the types' own DSP routines but the TVFs' (copies by shape, at the common distance), the stereo copies, the
+new-block routine (`0x894ed390` → `0x893a9500`) and the Dynamic TVF's targets apart from note-on.
 
 **What rom.4 lacks.** Not in it: the Multi Step Modulator (its coarse and grid tables, its object's routines, its terms), the
 arpeggio's note-on, pedal, step, enable and constructor, the MIDI out of the clock, the effect driver's MFX, Chorus and Reverb

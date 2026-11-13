@@ -19,11 +19,24 @@ Twin::Twin(const char* rom2, Machine& rom4) : vc2(rom4) {
 bool Twin::call(uint32_t a2, uint32_t a4, std::initializer_list<uint32_t> args, float fr4) {
     std::memcpy(&vsynth.fb[0][4], &fr4, 4);
     std::memcpy(&vc2.cpu.fb[0][4], &fr4, 4);
-    if (!vsynth.call(a2, args, kStack)) {
-        std::fprintf(stderr, "twin: rom.2 %08x: %s\n", a2, vsynth.error().c_str());
-        return false;
-    }
-    return vc2.run(a4, args);
+    return callVSynth(a2, args) && vc2.run(a4, args);
+}
+
+void Twin::copyToVc2(uint32_t a, uint32_t n) {
+    std::vector<uint8_t> x(n);
+    vsynth.read(a, x.data(), n);
+    vc2.cpu.write(a, x.data(), n);
+}
+
+bool Twin::callVSynth(uint32_t a2, std::initializer_list<uint32_t> args) {
+    if (vsynth.call(a2, args, kStack)) return true;
+    std::fprintf(stderr, "twin: rom.2 %08x: %s\n", a2, vsynth.error().c_str());
+    return false;
+}
+
+void Twin::hook(Pair p, const std::function<void(Sh4&)>& fn) {
+    vsynth.hook(p.vsynth, fn);
+    vc2.cpu.hook(p.vc2, fn);
 }
 
 void Twin::write(uint32_t a, const void* src, size_t n) {

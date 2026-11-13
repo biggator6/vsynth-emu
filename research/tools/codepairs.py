@@ -2,6 +2,7 @@
 """codepairs.py <rom.2> <rom.4> [hex addr ...]: rom.2's routines in rom.4 by the shape of their code (likeat.py's shape:
 what moves when code moves masked out), the pairs the VC-2 mode's step 1b runs side by side (research/VC2_MODE_PLAN.md).
 codepairs.py --pools <rom.2> <rom.4> <a2> <a4> [cap]: for one pair, the literals that differ: what moved between them.
+codepairs.py --callers <rom.2> <rom.4> <a2> ...: a routine rom.4 compiled anew, found through its callers' literals.
 With no addresses, every address in plugin/Source's sources in rom.2's code (0x89300000…0x89540000): the routines the
 ports' firmware checks call and hook.
 
@@ -16,6 +17,7 @@ import sys
 from pathlib import Path
 
 from likeat import shape, shapes
+from poolrefs import loads
 from romfile import B, image
 
 SOURCE = Path(__file__).resolve().parents[2] / 'plugin/Source'
@@ -100,9 +102,38 @@ def pools(argv):
         print(f'    {v2:#010x} -> {v4:#010x}')
 
 
+SITE_BEFORE, SITE_AFTER = 12, 4   # instructions around a call site that find it in rom.4
+
+
+def callers(argv):
+    """--callers <rom.2> <rom.4> <a2> ...: a rom.2 routine's address in rom.4 through its callers, for a routine rom.4 has
+    compiled anew (its own shape not found): each place rom.2 loads a2 as a literal is found in rom.4 by the shape of the
+    code around it, and the literal rom.4's same instruction loads is read. One line a routine: the rom.4 addresses its call
+    sites give, with how many gave each; the sites not found in rom.4 once are counted apart."""
+    rom2, rom4 = image(argv[0]), image(argv[1])
+    shaped4, keyed = index(rom4)
+    n = SITE_BEFORE + SITE_AFTER
+    for a2 in (int(a, 16) for a in argv[2:]):
+        votes, lost = collections.Counter(), 0
+        sites, _ = loads(rom2, a2)
+        for site in sites:
+            hits = matches(rom2, site - 2 * SITE_BEFORE, n, shaped4, keyed)
+            at4 = hits[0] + 2 * SITE_BEFORE if len(hits) == 1 else None
+            op = struct.unpack_from('<H', rom4, at4 - B)[0] if at4 else 0
+            if at4 and op >> 12 == 0xD:
+                votes[pool_word(rom4, at4, op)] += 1
+            else:
+                lost += 1
+        said = ', '.join(f'{v:#x} ×{c}' for v, c in votes.most_common()) or 'none'
+        print(f'{a2:#x}: {len(sites)} call sites; rom.4 {said}; {lost} sites not found once')
+
+
 def main(argv):
     if argv[:1] == ['--pools']:
         pools(argv[1:])
+        return
+    if argv[:1] == ['--callers']:
+        callers(argv[1:])
         return
     if len(argv) < 2:
         sys.exit(__doc__)
