@@ -56,7 +56,8 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   `setStoreValue` is the store writer `vocosc` and `mixer` share, `vc2runs.h`'s `initVocoderModule` the init `autonote` and
   `mixer` share. `typed <file.p02>…` (`vc2typed.cpp`) reads the MFX, Chorus, Reverb and COSM blocks through the second bank
   by rom.4's own readers, with `vc2patches.h`'s `p02Data` and `spreadOf` shared with `patches` ("The second descriptor bank,
-  read").
+  read"). `fxprog <rom.2>` (`vc2fxprog.cpp`) runs rom.4's reverb types and holds each program they load to rom.2's ("The
+  effect chip's programs"); `vc2runs.h`'s `fileContents` is the file reader it and `p02Data` share.
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -1446,15 +1447,21 @@ A slot base is the block's Type ID + 4, 3, 2 and 1, as rom.2's (`kXtMfxSlots` an
 Parameter 1 by the names (MFX 0x1be, Chorus 0x242, Reverb 0x275, COSM 0x467). Each block's section has rom.2's number of IDs.
 Past the types: the Reverb table's last two entries (typed IDs 0x8ee…0x917, two more reverb types) are past Reverb Type's
 0–14, so no patch can choose them; and 14 named typed IDs (0x918…0x925) are in no table. The names in that stretch include a
-non-linear reverb's (NLR Type, Envelope T1–T4 and L1–L3) and a delay's (Delay Time, L-R Shift, Feedback). Rom.4 has four
-reverb types rom.2 lacks (11–14, Reverb Type's range 0–14 against rom.2's 11 types).
+non-linear reverb's (NLR Type, Envelope T1–T4 and L1–L3) and a delay's (Delay Time, L-R Shift, Feedback). (Since, "The effect
+chip's programs": the two are rom.2's Plate and Non-Linear, and the 14 are rom.2's Delay's parameters, name for name.)
+~~Rom.4 has four reverb types rom.2 lacks (11–14, Reverb Type's range 0–14 against rom.2's 11 types).~~ Withdrawn
+2026-11-13, "The effect chip's programs": rom.4's Reverb Types are Off, seven new stereo reverbs (1–7), then the V-Synth's
+Room 1–3, Hall 1–3 and Garage (8–14), by rom.4's own list and the programs each loads; types 11–14 are Hall 1–3 and Garage,
+not new ones. The reading took rom.2's numbering for granted.
 
 **The 64 factory patches** (`vc2run <rom.4> typed <file.p02>…`, `vc2typed.cpp`; every block's Type by rom.4's reader, its
 type's typed values by its typed reader; `build/tools/vc2/typed.txt`). **No typed value is outside its descriptor's range.**
 - MFX: 18 of the 42 types: type 0, which has one unnamed typed ID, in 13 patches, then 19 (10) and 1 (9).
 - Chorus: type 0 in 32, then 3 (12), 1 (11), 2 (5), 8 (2), 5 and 6 (1 each).
-- Reverb: 13 of the 15 types (none on 9 or 10): type 4 (11), 1 (10), 7 (9), 6 (8), …, and all four of rom.4's own (11, 12,
-  13, 14: 2, 3, 2, 2 patches).
+- Reverb: 13 of the 15 types (none on 9 or 10): type 4 (11), 1 (10), 7 (9), 6 (8), …, ~~and all four of rom.4's own (11, 12,
+  13, 14: 2, 3, 2, 2 patches)~~ and 11–14 (2, 3, 2, 2 patches). By rom.4's own list ("The effect chip's programs"): 50 of
+  the 64 patches are on the VC-2's seven new stereo reverbs (Stereo Plate 10, OperaHouse 1, StudioSpring 5, Echoes 11,
+  Room 6, Cathedral 8, Church 9), 10 on the V-Synth's (Room 1, Hall 1–3, Garage; none on Room 2 or 3), 4 Off.
 - COSM, by count over 64 patches × 16 zones: COSM 1 is off in 116 zones and on type 8 in 12, two zones a patch; COSM 2 is
   off in 128; the other 896 of each (14 a patch) are on at type 0, a type with one unnamed typed ID. Which zones the two
   are isn't read zone by zone; the tone blocks' first two (zones 0 and 1) are the patches' only edited ones ("The factory
@@ -1464,6 +1471,56 @@ type's typed values by its typed reader; `build/tools/vc2/typed.txt`). **No type
   LFO and Env Depth, Tone and its two depths). That agrees with the COSM run, where the Comb's DSP is the one of 16 types that
   differs and rom.4 has one Comb routine ("COSM in rom.4"). The factory zones on it vary Speed (0…127, 5 values) and nothing
   else.
+
+### The effect chip's programs (2026-11-13, the VC-2 mode's step 1c)
+
+**The driver is the V-Synth's.** rom.2's effect driver pairs by shape in rom.4 (`codepairs.py`), moved by about 0x14cd00:
+the message reader `0x894ac970` → `0x8935fc40`, the start (`0x894ac6a0` → `0x8935f9a0`, `0x894ac780` → `0x8935fa80`,
+`0x894b4a60` → `0x89368280`), the bus primitives (`0x894af400` → `0x89362490`, `0x894af510` → `0x89362610`, `0x894af6a0` →
+`0x893627f0`), the program loader `0x894afa10` → `0x89362b60`, the boot `0x894afc50` → `0x893631b0` and `0x894abcf0` →
+`0x8935ee90`, the Reverb Time `0x894b2bf0` → `0x893663a0`, the reverb's init and apply (`0x894d09b0` → `0x893873d0`,
+`0x894d0b00` → `0x89387520`), the chorus's init `0x894d3350` → `0x8938e420`. Two don't pair: the coefficient write
+`0x894af610` and the sleep `0x894b26a0`. So XtFxControl's way (rom.2's driver in the interpreter, feeding `XtFxChip`)
+carries over to rom.4 with these addresses.
+
+**The programs** (rom.2's from `fxmap.cpp`'s table and boot; rom.4's from its boot's literals and a run; each compared word
+by word, the differing words sorted by the word's fields, HARDWARE_FIRMWARE.md "The word, as I read it"):
+
+| Program | rom.2 | rom.4 | Words equal | The rest |
+|---|---|---|---|---|
+| A: routing, sends, mix, EQ, Master, Output Gain (boot) | `0x897a851c` | `0x895167bc` | 110 of 768 | rewritten: 628 words used against 584, to word 0x2eb against 0x2c5; register, op, coefficient, shift and X differ, the memory field never |
+| B: Chorus, all types (boot) | `0x897a911c` | `0x895173bc` | 745 of 768 | 23: 10 in the register alone, 13 in other fields too; registers renumbered one down (0xec→0xeb, 0xed→0xec, 0xee→0xed, 0xf0→0xef, 0xf1→0xf0; 0x75, 0x77, 0x79 rotated), 11 memory fields, 3 ops, a shift, a coefficient, an X |
+| The 42 MFX types, 307 words each, in rom.2's order at rom.2's place less 0x291d64 | | | 276…307 of 307 (2 identical) | 623 words in all, **only the register field**: 0xea → 0xe9 (601), 0xeb → 0xea (22) |
+| The reverbs rom.2 has, 350 words | eight | moved | 345…349 | **only the register field**: 0xf1 → 0xf0, 13 words in all |
+| The reverbs' transition program, loaded before each type's | `0x897bd1a8` | `0x8952bac4` | 350 of 350 | |
+
+Every register change in the programs rom.4 shares with rom.2 is one down, among 0xea…0xf1 (with the Chorus's 0x75, 0x77
+and 0x79 rotated); what those registers hold, and whether program A's rewrite is why they moved, isn't read here. The MFX's
+and the seven reverbs' arithmetic is otherwise the V-Synth's word for word, and the Chorus's but for 13 words. rom.4's MFX
+names are rom.2's 42 in order but one (EP Multi is "E.Piano Multi").
+
+**The reverb types, run** (`vc2run <rom.4> fxprog <rom.2>`, `vc2fxprog.cpp`; `build/tools/vc2/fxprog.txt`). rom.4's reverb
+init, then each of its table's 17 types set (`0x89387490`), its parameters set to its typed defaults (`0x893874a0`) and
+applied, the chip's registers as plain memory, the program loader hooked to log what it loads and the 42 stubs into the
+kernel answered with 0. Each type loads the transition program, then its own:
+
+| rom.4 Reverb Type (rom.4's list) | Its program |
+|---|---|
+| 0 Off | rom.2's Off |
+| 1 Stereo Plate, 2 Stereo OperaHouse, 3 Stereo StudioSpring, 4 Stereo Echoes, 5 Stereo Room, 6 Stereo Cathedral, 7 Stereo Church | seven new programs (21…96 of 350 words like the closest of rom.2's) |
+| 8 Room 1, 9 Room 2, 10 Room 3, 11 Hall 1, 12 Hall 2, 13 Hall 3, 14 Garage | rom.2's, shared as in rom.2 (Room 2 and Hall 2; Room 3, Hall 3 and Garage), every word equal or differing in the register alone |
+| 15, 16 (in the table, past Reverb Type's 0–14 and rom.4's list) | rom.2's Plate and Non-Linear |
+
+rom.2's Delay is in no type: the table ends at 17 entries (the 18th word is 0), though its 14 parameters (0x918…0x925, rom.2's
+Delay's names in order), its class (a literal at `0x89384358`) and its program (`0x8952c76c`, 345 of 350) are all in rom.4.
+The display's list (`0x89577ee0`, "00:Off" … "14:Garage") and the Reverb Type descriptor agree on 15. rom.4's long names
+(`0x89575dfc`, 68 of 24 bytes, one pointer to it at `0x89923de0`) are the 42 MFX, the Chorus's 9 (Off first), then 17
+reverbs with no Off: the seven stereo ones, Room 1 … Garage, Plate, Non-Linear and Delay, the table's order with Delay after.
+
+So **the VC-2 runs the V-Synth's effect chip programs** for its 42 MFX, its Chorus and the seven V-Synth reverbs it offers,
+renumbered to the slots of a new program A, and adds seven stereo reverbs of its own; the V-Synth's Plate, Non-Linear and
+Delay are there but unreachable from a patch. Not run: rom.4's MFX types loading their programs (the bytes and the names
+are the two sources), its program A and new reverbs on `XtFxChip`, and what the new program A routes where.
 
 
 ## The names sweep
@@ -1500,8 +1557,8 @@ among rom.2's.
   rom.4" gives the pairs by the tables they read).
 - ~~The 64 factory patches' values, read with rom.4's descriptors.~~ Read by rom.4's own routines ("The factory patches, read by
   rom.4"); left: ~~the second descriptor bank (MFX, Chorus, Reverb, COSMs)~~ (read, "The second descriptor bank, read"; left
-  of it: what COSM type 8 and rom.4's four reverb types are, and the typed IDs no table lists) and what the store's eight tone
-  and sixteen envelope blocks are.
+  of it: what COSM type 8 ~~and rom.4's four reverb types~~ is ~~, and the typed IDs no table lists~~; the reverbs and the
+  untabled IDs settled, "The effect chip's programs") and what the store's eight tone and sixteen envelope blocks are.
 - The pitch tracker ("The pitch tracker, run"): run in mode 0, the only one selected, on known signals; its analysis read
   ("The pitch tracker's analysis"), the band-pass, the noise count, the gates, the limits and the fallback held to the
   firmware by the run. Left: the estimator's rules by level, period and peak balance, read in outline only, and the

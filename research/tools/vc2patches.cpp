@@ -90,12 +90,7 @@ uint32_t be32(const std::vector<uint8_t>& f, size_t at) {
 } // namespace
 
 std::vector<uint8_t> p02Data(const char* path) {
-    std::vector<uint8_t> f;
-    if (FILE* fp = std::fopen(path, "rb")) {
-        uint8_t buf[4096];
-        for (size_t n; (n = std::fread(buf, 1, sizeof buf, fp)) > 0;) f.insert(f.end(), buf, buf + n);
-        std::fclose(fp);
-    }
+    const std::vector<uint8_t> f = fileContents(path);
     if (f.size() < kHeaderBytes || f[0] || f[1] != 0x1e || std::memcmp(&f[2], "VC20", 4)) return {};
     if (std::memcmp(&f[0x10], "PATaVC_2", 8)) return {};
     const uint32_t at = be32(f, 0x18), bytes = be32(f, 0x1c);

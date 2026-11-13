@@ -21,6 +21,7 @@
 //   vc2run <rom.4> autonote        kind 6's mode and Auto Note's notes and ratio on sung tones (vc2autonote.cpp)
 //   vc2run <rom.4> mixer           the part's levels and block mixer on known input frames (vc2mixer.cpp)
 //   vc2run <rom.4> typed <file.p02> …   MFX, Chorus, Reverb and COSMs read through the second bank (vc2typed.cpp)
+//   vc2run <rom.4> fxprog <rom.2>  the reverb types' chip programs, against rom.2's (vc2fxprog.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
@@ -42,6 +43,16 @@ bool runF(Machine& m, uint32_t addr, std::initializer_list<uint32_t> args, float
     std::memcpy(&m.cpu.fb[0][4], &fr4, 4);   // call() leaves FPSCR.FR at 0: bank 0 holds FR4, FR5
     std::memcpy(&m.cpu.fb[0][5], &fr5, 4);
     return m.run(addr, args);
+}
+
+std::vector<uint8_t> fileContents(const char* path) {
+    std::vector<uint8_t> f;
+    if (FILE* fp = std::fopen(path, "rb")) {
+        uint8_t buf[4096];
+        for (size_t n; (n = std::fread(buf, 1, sizeof buf, fp)) > 0;) f.insert(f.end(), buf, buf + n);
+        std::fclose(fp);
+    }
+    return f;
 }
 
 bool initVocoderModule(Machine& m) {
@@ -79,7 +90,8 @@ constexpr std::array kRuns{Run{"boot", vc2::boot}, Run{"warp", vc2::warp}, Run{"
                            Run{"osc", vc2::osc}, Run{"analog", vc2::analog}, Run{"band", vc2::band},
                            Run{"solo", vc2::solo}, Run{"lite", vc2::lite}, Run{"tva", vc2::tva},
                            Run{"patches", vc2::patches}, Run{"track", vc2::track}, Run{"vocosc", vc2::vocosc},
-                           Run{"autonote", vc2::autonote}, Run{"mixer", vc2::mixer}, Run{"typed", vc2::typed}};
+                           Run{"autonote", vc2::autonote}, Run{"mixer", vc2::mixer}, Run{"typed", vc2::typed},
+                           Run{"fxprog", vc2::fxprog}};
 
 } // namespace
 
@@ -88,7 +100,7 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "usage: vc2run <rom.4> <run> [args]: boot, warp, ratio, hold, growl, kind6, patches,\n"
                              "       track, vocosc, autonote, mixer, typed;\n"
                              "       vc2run <rom.4> <block> <rom.2>: lfo, env, cosm, osc, analog, band, solo, lite,\n"
-                             "       tva\n");
+                             "       tva, fxprog\n");
         return 2;
     }
     vc2::Machine m(argv[1]);

@@ -2,6 +2,8 @@
 // vc2run's runs, one file each (vc2run.cpp has the table that names them).  Each takes the machine with rom.4 loaded
 // and its own arguments (argv[0] is the run's name), prints what it found, and returns the program's exit status.
 #include "vc2rom.h"
+#include <cstdint>
+#include <vector>
 
 namespace vc2 {
 
@@ -14,6 +16,8 @@ inline constexpr uint32_t kHiresoSize = 0x2d70, kLegacySize = 0x2ce4;
 uint32_t slotOf(Machine& m, uint32_t engine, int slot);
 // A call with fr4 (and fr5) set, as the engines' float arguments are passed
 bool runF(Machine& m, uint32_t addr, std::initializer_list<uint32_t> args, float fr4, float fr5 = 0);
+// A file's bytes, or empty when it can't be read
+std::vector<uint8_t> fileContents(const char* path);
 // The vocoder module's static initializers, the init table's entries 0x898c609c…0x898c6108 (the carriers' rates, the
 // mic's globals, the pitch tracker's setters, C4's period, …); false on a fault
 bool initVocoderModule(Machine& m);
@@ -39,5 +43,6 @@ int vocosc(Machine& m, int argc, char** argv);
 int autonote(Machine& m, int argc, char** argv);
 int mixer(Machine& m, int argc, char** argv);
 int typed(Machine& m, int argc, char** argv);
+int fxprog(Machine& m, int argc, char** argv);
 
 } // namespace vc2

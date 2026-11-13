@@ -79,13 +79,20 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   **The second descriptor bank, 2026-11-13** (`vc2run … typed`; VC2_VOCAL_DESIGNER.md, "The second descriptor bank,
   read"): at `0x895131a8`, rom.2's form; the MFX, Chorus, Reverb and COSM sections placed by the firmware's own pointers and
   their types' tables found and confirmed by the code that loads them; the 64 factory patches' typed values all in range;
-  rom.4 has four reverb types rom.2 lacks, and its COSM type 8 is not the V-Synth's Comb Filter as it stands. Left of it:
-  what COSM type 8 and the four reverbs are, and the typed IDs no table lists.
+  rom.4 has ~~four reverb types rom.2 lacks~~ (withdrawn, "The effect chip's programs": seven new ones, 1–7), and its
+  COSM type 8 is not the V-Synth's Comb Filter as it stands. Left of it: what COSM type 8 ~~and the four reverbs~~ is, and
+  the typed IDs no table lists.
   **The WLF08 wave library, 2026-11-13** (`research/tools/wlflib.py`; VC2_VOCAL_DESIGNER.md, "The wave libraries, read"):
   an index, "VC-2 Wave.bin" (58 waves → 43 key maps → 192 samples), in the V-Synth's own format (its "V-Synth Wave.bin",
   224 one to one); the samples are the last 192 of the 416 preset-area streams, in "VC-2 Preset.bin"'s `"TABLE"`/`"DATA"`
   bank; all held to the link files and the bank with 0 differences, and to rom.4's parsers. Left of it: how a VC-2 wave's
   split is chosen when it plays (the port needs it: a VC-2 wave is a multisample).
+  **The effect chip's programs, 2026-11-13** (`vc2run … fxprog`; VC2_VOCAL_DESIGNER.md, "The effect chip's programs"):
+  rom.2's driver, paired in rom.4; the 42 MFX programs and the V-Synth's reverbs equal but for registers renumbered one
+  down, the Chorus's but for 13 words, the reverbs' transition program equal; program A (routing, mix, EQ, levels)
+  rewritten (110 of 768 words equal). Reverb Types: Off, seven new stereo reverbs, then Room 1–3, Hall 1–3 and Garage;
+  Plate and Non-Linear only past the range, Delay in no type. So the effects go by XtFxChip and XtFxControl as the
+  V-Synth's do, with rom.4's programs. Left of it: program A's routing and the seven new reverbs run on `XtFxChip`.
 - Second sources: the V-Card owner's manual (names and meanings) and the 64 factory patches (the corpus).
 
 ### 2. Shared plumbing (plugin/Source)
