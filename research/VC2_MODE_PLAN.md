@@ -63,6 +63,12 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   (`0x8939fbd0`, not `0x8939ced0`, withdrawn) and the carrier's update to its field, with its law; Growl Keyfollow by octave
   from key 60; Harm Formant the EXT IN's. Left of it: where the Harm Formant's depths and the Wave start offset are read,
   and the Dynamics' law.
+  **Kind 6's pitch source, 2026-11-13** (`vc2run … autonote`; VC2_VOCAL_DESIGNER.md, "Kind 6's pitch source, run"): kind 6
+  always in mode 0 (its mode setter has no caller), so it sings at its note's pitch; every OSC's converter multiplies the
+  note's pitch by the pitch-source getter's ratio; Auto Note On plays C4 bent to the sung pitch (no semitone steps: the
+  detector that would snap it is unreachable, and the Legato Switch's setter only keeps it off); a key's note takes the
+  singer's pitch movement by a depth. Left of it: what sets that depth, Auto Note's 1 against 2 in the tone generator (read,
+  not run), the mailbox's note + 12.
 - Second sources: the V-Card owner's manual (names and meanings) and the 64 factory patches (the corpus).
 
 ### 2. Shared plumbing (plugin/Source)

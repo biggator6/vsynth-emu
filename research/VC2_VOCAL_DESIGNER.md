@@ -45,7 +45,9 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   section `vc2trackstate.cpp`, sharing `vc2track.h`) measures the pitch tracker against no model and fails only on a fault
   ("The pitch tracker, run", "The pitch tracker's analysis"); `vocosc` (`vc2vocosc.cpp`) follows the VOCODER OSC's IDs
   through the builder, the converter and the carrier and fails on a fault or a store write its reader doesn't read back
-  ("The VOCODER OSC's IDs, run"). `patches` shares its store helpers through `vc2patches.h`.
+  ("The VOCODER OSC's IDs, run"). `patches` shares its store helpers through `vc2patches.h`. `autonote`
+  (`vc2autonote.cpp`, sharing `track`'s tones through `vc2track.h`) runs kind 6's mode and Auto Note on sung tones, with the
+  tone generator's calls answered and logged, and fails only on a fault ("Kind 6's pitch source, run").
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -631,11 +633,70 @@ period by autocorrelation:
 | 0 | 200 | ½ | 200.49 | 200.45 |
 | 0 | 300 | 2 | 50.11 | 50.11 |
 
-**Mode 1 is an interval (a harmonizer), mode 0 a pitch: the voice sung at a played note, whatever is sung.** Not traced: which
+**Mode 1 is an interval (a harmonizer), mode 0 a pitch: the voice sung at a played note, whatever is sung.** ~~Not traced: which
 parameter selects the mode (`0x893ec890` and the voice's start have no pool reference, so they are called through something not
 yet found, and the mode word's .data value, 2, is one `0x893ec890` never writes), and where the voice's P comes from (the
-keyboard's note, Auto Note). A pulse train in can leave grains empty: the epochs are period-spaced from where the voice started,
-not placed on pulses (the run first used one and got silence at 300 samples).
+keyboard's note, Auto Note).~~ Settled, "Kind 6's pitch source, run": nothing selects mode 1 (`0x893ec890` has no caller; the
+ring's reset turns the .data 2 into mode 0), and P+0 is the note's pitch, Auto Note's or a key's. A pulse train in can leave
+grains empty: the epochs are period-spaced from where the voice started, not placed on pulses (the run first used one and got
+silence at 300 samples).
+
+### Kind 6's pitch source, run (`autonote`) (2026-11-13, the VC-2 mode's step 1c)
+
+**Kind 6 is always in mode 0, the pitch mode.** The mode setter `0x893ec890` has no caller: no `bsr`, `bra` or pool word
+in the image reaches it. The mode word `0x8993fe54` has one other writer, the mic ring's reset `0x893ec7d0`, which, when the
+word isn't 0, makes it 0 and sets the pitch flag `0x8a0f73d8`. The flag has no other writer. **Run**
+(`vc2run <rom.4> autonote`, `vc2autonote.cpp`): after the vocoder module's init entries (`0x898c609c…0x898c6108`) the word is
+2 and the flag 0; after the ring's reset, 0 and 1. So a kind 6 voice sings at 440 × P+0 whatever the mic sings ("Voice kind 6,
+run": T_out = 44100/(440·P+0)), and mode 1, the interval, is dead code.
+
+**P+0 is the note's pitch.** The voice routine's kind 6 case (from `0x893af2d0`; read) builds P at the voice + 0x104 as kind
+5's does. P+0 is the voice's + 0x1cc: exp2 of the base pitch and its modulation terms with the portamento's value
+(`0x893b1160`) and a further offset added, clamped, times the voice's +0x60 and +0xa6c. Then `0x893ec700(voice + 0xafc, P)`
+copies P+0, +4, +8 and +0xc into the kind 6 object and starts it (a tail branch to `0x893ec8d0`). The voice's +0x60 is the
+converter's block +0xc: the converters by kind (VOCODER's `0x8939db00` at `0x8939dc22`, and at `0x8939d168`, `0x8939e3ba` and
+`0x8939ec1a` the other three, which kind each is not mapped) take powf(2, the pitch) and multiply it by **the pitch-source
+getter `0x89394a40`'s ratio** (read). So the pitch comes from the note, a key's or Auto Note's, bent by that ratio.
+
+**The getter** reads one object for the part, `0x89989748`: +0 the note Auto Note is sounding (−1 for none), +4 how many other
+keys are down, +8 a depth. With a note at +0 it returns Auto Note's ratio, `0x8993fe4c`; with none, `0x893ebc70(+8)`, a bend
+by the singer's movement: 1 − depth × clamp(P_tracked − P_smoothed, ±20)/P_C4, P_smoothed following the tracked period by 0.1
+a call from C4's (all periods in samples). **Run** (the getter called each block, the tracked pitch stepping from 220 to
+247 Hz): depth 0 gives 1 throughout; depth 0.5 gives 1.029 and depth 1 gives 1.058 twenty blocks after the step, back to 1.0
+by the hundredth. So a key's note takes the singer's pitch movement (scoops, vibrato), not the singer's pitch. What sets +8
+is not traced (robot human depth, by its name, is a candidate).
+
+**Auto Note** runs in the input stage (`0x893ebb00`, after the tracker's block). Its On Switch's setter `0x893ebc20` keeps 0
+to 2 at `0x8993fe50`, so the third, empty name is a third state. The state is the note at `0x8993fe3c` (−1), its period
+`0x8993fe40` and the ratio `0x8993fe4c` (1). **Run**, the tone generator's note-on, note-off and keys-held calls (`0x89391dc0`,
+`0x89391e20`, `0x89391db0`) answered and logged, half a second each of 220 Hz, 330 Hz and silence:
+
+| Switch | Keys down | Notes posted | Ratio after 220 Hz, 330 Hz, silence |
+|---|---|---|---|
+| 0 | none | none | 1, 1, 1 |
+| 1 | none | note-on 60 at the first block | 0.84090, 0.63068, 0.63067: C4 × it 220.00, 165.00, 165.00 Hz, the tracked pitch |
+| 1 | one | none | 1, 1, 1 |
+| 2 | one | note-on 60 at the first block | as with 1 and none |
+| 2, then set to 0 | none | note-on 60, then note-off 60 at the next block | 1 after the off |
+
+- **Auto Note plays C4 and bends it to the sung pitch**, with no step to a semitone: its ratio is C4's period (168.5615
+  samples, set by the init entry `0x893ebe50`) over the tracked period, block by block, held through silence. The converters
+  multiply it into the note's pitch, so the note sounds at the sung pitch.
+- **The semitone path is dead.** The path that snaps the tracked period to a note (`0x893ebde0`, a binary search of the
+  128 periods 44100/f(note) at `0x89561150`, note 0 at 5393.97) and posts it runs only when `0x893ef380` says the detector
+  (`0x893ef400`) found a new note. The detector runs only when `0x8993fe48` is set, and nothing sets it: it starts at 0, and its
+  one writer, `0x893ebc60`, the setter the vocoder converter hands the Legato Switch, stores 0 whatever it's given. The
+  detector's flag `0x899d9d34` is written only inside the detector, and its reset `0x893ef3a0`, the note-60 starter
+  `0x893ebda0` and the state reset `0x893ebd20` have no caller. So the Legato Switch does nothing here.
+- **Switch 1 against 2** (read in the tone generator's note-on `0x89392da0(source, part, key, velocity)`, where source 4 is
+  Auto Note's, and in the input stage; the run shows the input stage's half). With 1, the input stage posts nothing while a
+  key is down, and a key's note-on releases a sounding Auto Note note. With 2 it posts regardless. Under either, the tone
+  generator drops a source-4 note while a key is down, puts the key at the object's +0 otherwise, and counts the other keys at
+  +4.
+- The notes go to the tone generator through an OS mailbox (`0x89301830`, `0x8994fec8`), the note plus 12 in the message.
+  What the receiver makes of the 12 is not read.
+- In this run the tracker followed 220 → 330 Hz to **165 Hz**, an octave low, and the tracker's own run shows it too ("The
+  pitch tracker, run"). So Auto Note sings what the tracker hears, octave errors included.
 
 ### The pitch tracker, run (`track`) (2026-11-13, the VC-2 mode's step 1c)
 
@@ -671,7 +732,9 @@ silence, the period read after each block. A run that fails only on a fault: it 
   220.00 Hz. The last pitch is held; it never goes back to the start.
 - **Following**: 110 → 330 Hz in 48 ms, 330 → 110 in 73 ms, 220 → 440 in 20 ms, 440 → 220 in 24 ms. 110 → 880 Hz is not
   followed in a second (it ends at 110.91 Hz), where 880 Hz from the reset's 200 Hz settles in 7 ms: how far it reaches
-  depends on where it is.
+  depends on where it is. Added with Auto Note's run: 220 → 294 Hz (a fourth) in 17 ms and 330 → 220 in 12 ms, but **220 →
+  330 Hz, a fifth up, ends at 165 Hz, an octave low**. Which of the estimator's rules picks it is not traced; a fifth up puts
+  the new period and twice it about equally far from the old one.
 
 Modes 1 to 3, which nothing selects, on the grid of nine pitches (55…880 Hz) at 0.05 and 0.5: mode 1 reaches 55–165 Hz and
 not 220 up, mode 2 110–440 and neither 82.5 down nor 660 up, mode 3 330–880 and not 220 down; each holds its start on noise,
@@ -780,7 +843,9 @@ add #-97` is 0x19f), so a search for literal IDs misses them; `idbuild.py` ("The
 - Then, if either OSC's Type (0x2e5) reads 2, Auto Note On Switch, Legato Switch and robot human depth (÷127, to the setters
   `0x893ebc20`, `0x893ebc60`, and the Formant Template's table at `0x89540904`, 16 entries of 140 bytes, offsets the formant).
   Otherwise those are set to 0. So Auto Note and robot human depth belong to a mic played through an EXT IN-type OSC, not to the
-  vocoder. (Type 2 is EXTIN by rom.4's text table; why the test is 2 and not 3 is not read yet.)
+  vocoder. (Type 2 is EXTIN by rom.4's text table; why the test is 2 and not 3 is not read yet.) Run since ("Kind 6's pitch
+  source, run"): `0x893ebc20` keeps Auto Note's switch, 0–2; `0x893ebc60` stores 0 to the detector's word whatever it's
+  given, so the Legato Switch does nothing.
 - Last, Vocoder Sw and Vocoder Type: `0x893f0600(vocoder, (Type + 1) × Sw)`, and Stereo Process Sw to `0x893f06a0`.
 
 **The vocoder object**, static at `0x89999758`, 0x5a78 bytes, built by `0x893f0490`. It holds two engines, each a C++ object with a
@@ -1071,7 +1136,8 @@ for VariOS, USB External In Type, Pedal $ Assign, Volume Exp Level Ctrl), they a
 
 Two disagreements to settle on the corpus: Modulator Key Mode's text has three values but its descriptor stops at 1, so HOLD is
 out of the descriptor's range; Auto Note On Switch has a 2-bit field and a third, empty name, its range 0–1. Which wins is for the
-64 factory patches and the code that reads the field to say.
+64 factory patches and the code that reads the field to say. (The patches: 0–1 both. The code: Auto Note's setter keeps 0–2, and
+2 differs from 1, "Kind 6's pitch source, run"; so the third state is real in the code and out of the descriptor's range.)
 
 ### The VOCODER OSC type
 
@@ -1263,8 +1329,10 @@ among rom.2's.
   period; the analysis and synthesis groups' delays against HIRESO's 128-sample input latency; the levels the part mixer ramps
   (`0x8999f4d0…`) beyond Direct Sound; ~~the pass the VOCODER OSC's own IDs (0x354…0x361) take into the voice's fields (P+0x30's
   ID among them: run the OSC converter `0x8939ced0` on a patch's block)~~ (run, "The VOCODER OSC's IDs, run"; left of it: where
-  the Harm Formant's LFO and Envelope Depths and the Wave start offset are read, and the Dynamics' law); kind 6's mode
-  parameter and where its P comes from;
+  the Harm Formant's LFO and Envelope Depths and the Wave start offset are read, and the Dynamics' law); ~~kind 6's mode
+  parameter and where its P comes from~~ (run, "Kind 6's pitch source, run": mode 0 always, P+0 the note's pitch bent by the
+  getter's ratio; left of it: what sets the getter object's depth, Auto Note's mode 1 against 2 in the tone generator, read
+  and not run, and what the mailbox's receiver does with the note's 12);
   whether the pedal jack reaches the hold as CC 64.
 - ~~**Nothing here has been run.**~~ Four things have ("rom.4 run in the interpreter"), two of them held to a model bit for bit;
   the rest is still a reading of the code, checked against it by eye and by computed filter responses. rom.4's memory map is in

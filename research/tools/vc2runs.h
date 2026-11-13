@@ -33,5 +33,6 @@ int tva(Machine& m, int argc, char** argv);
 int patches(Machine& m, int argc, char** argv);
 int track(Machine& m, int argc, char** argv);
 int vocosc(Machine& m, int argc, char** argv);
+int autonote(Machine& m, int argc, char** argv);
 
 } // namespace vc2

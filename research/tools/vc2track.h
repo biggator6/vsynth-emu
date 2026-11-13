@@ -2,6 +2,7 @@
 // The pitch tracker run's shared parts (vc2track.cpp): a known signal fed to rom.4's tracker in 32-sample blocks from a
 // reset into a mode, and what it read after each block.  vc2trackstate.cpp reads the tracker's state after the same feed.
 #include "vc2runs.h"
+#include "vc2twin.h"
 #include <vector>
 
 namespace vc2 {
@@ -25,6 +26,8 @@ struct TrackReadings {
     bool ok = false;
 };
 
+// Sample n of an input: a tone of four harmonics falling by 0.6 each (its peak about the level), white noise, or nothing
+double trackSample(const TrackInput& in, long n, Rng& r);
 // The tracker reset into `mode`, then each segment's blocks in turn; ok is false on a fault
 TrackReadings trackReadings(Machine& m, uint32_t mode, const std::vector<TrackSegment>& signal);
 // The tracker's settings, then its state after a few feeds (vc2trackstate.cpp); false on a fault

@@ -48,17 +48,10 @@ constexpr Change kChanges[] = {
     {{TrackKind::tone, 220, kLoud}, {TrackKind::tone, 440, kLoud}},
     {{TrackKind::tone, 440, kLoud}, {TrackKind::tone, 220, kLoud}},
     {{TrackKind::tone, 110, kLoud}, {TrackKind::tone, 880, kLoud}},
+    {{TrackKind::tone, 220, kLoud}, {TrackKind::tone, 330, kLoud}},
+    {{TrackKind::tone, 330, kLoud}, {TrackKind::tone, 220, kLoud}},
+    {{TrackKind::tone, 220, kLoud}, {TrackKind::tone, 294, kLoud}},
 };
-
-// One sample of the input: four harmonics falling by kOvertone each, white noise, or nothing
-double sampleOf(const TrackInput& in, long n, Rng& r) {
-    if (in.kind == TrackKind::silence) return 0;
-    if (in.kind == TrackKind::noise) return in.level * r.in(-1.0f, 1.0f);
-    double v = 0, a = 1;
-    for (int k = 1; k <= kHarmonics; ++k, a *= kOvertone)
-        v += a * std::sin(2 * std::numbers::pi * in.hz * k * (double)n / kTrackRate + k);
-    return in.level * v / 2;
-}
 
 // What a routine returned as a float (call() leaves FPSCR.FR at 0: bank 0 holds FR0)
 double fr0Of(Machine& m) {
@@ -152,6 +145,15 @@ bool everyChange(Machine& m) {
 
 } // namespace
 
+double trackSample(const TrackInput& in, long n, Rng& r) {
+    if (in.kind == TrackKind::silence) return 0;
+    if (in.kind == TrackKind::noise) return in.level * r.in(-1.0f, 1.0f);
+    double v = 0, a = 1;
+    for (int k = 1; k <= kHarmonics; ++k, a *= kOvertone)
+        v += a * std::sin(2 * std::numbers::pi * in.hz * k * (double)n / kTrackRate + k);
+    return in.level * v / 2;
+}
+
 TrackReadings trackReadings(Machine& m, uint32_t mode, const std::vector<TrackSegment>& signal) {
     TrackReadings out;
     Rng r;
@@ -159,7 +161,7 @@ TrackReadings trackReadings(Machine& m, uint32_t mode, const std::vector<TrackSe
     long n = 0;
     for (const TrackSegment& s : signal)
         for (int b = 0; b < s.blocks; ++b) {
-            for (int k = 0; k < kBlock; ++k, ++n) m.setF32(kIn + 4 * (uint32_t)k, (float)sampleOf(s.in, n, r));
+            for (int k = 0; k < kBlock; ++k, ++n) m.setF32(kIn + 4 * (uint32_t)k, (float)trackSample(s.in, n, r));
             if (!m.run(kTrackBlock, {kIn, (uint32_t)kBlock})) return out;
             out.hz.push_back(kTrackRate / m.f32(kTrackPeriod));
             out.ret.push_back(fr0Of(m));
