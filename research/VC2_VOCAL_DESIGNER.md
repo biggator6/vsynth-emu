@@ -35,7 +35,10 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
 - `idbuild.py <lo> <hi> [from] [to]`: where a register comes to hold a value in [lo, hi], following the constant building the
   firmware uses for parameter IDs. How the converter and the OSC dispatch were found.
 - `vc2params.py <lo> <hi>` (rom.4 only): an ID's name, descriptor and value text from rom.4's own tables.
-- `diskls.py [filter]`, `diskls.py get <path> <out>`: the disk image's FAT16 files (`$DISK` for another image).
+- `diskls.py [filter]`, `diskls.py get <path> <out>`: the disk image's FAT16 files (`$DISK` for another image); importable
+  (`all_files`, `read`) since `wlflib.py`.
+- `wlflib.py`: the disk image's two `WLF08` wave indexes read whole and held to their link files and samples, the VC-2's to
+  its sample bank; exits 1 on a difference ("The wave libraries, read").
 - `likeat.py <A> <addr> <n> <B>`: code in B shaped like A's at addr, with what moves when code moves masked out.
 - `vc2run <rom.4> <run>` (C++, build line at the top of `vc2run.cpp`; run through `.claude/tools/buildq.mjs`): rom.4's
   routines in `Sh4Interp`, on `vc2rom.*`'s map; runs `boot`, `warp`, `ratio`, `hold`, `growl`, `kind6`, `track`, one file
@@ -1318,13 +1321,54 @@ assigns) and `Vocoder/Natural`. Where the MIC settings are stored, and whether t
 - `Wave/`: 58 `.w02`, 36 bytes each: a `link` chunk holding a preset wave's number (`VP-330 Saw` is 42) and a 16-character `name`.
   No audio.
 
-The audio is a library after the V-Synth's 416 preset waves: at file offset 0x356d200 of the disk image, header `WLF08`, then
+~~The audio is a library after the V-Synth's 416 preset waves: at file offset 0x356d200 of the disk image, header `WLF08`, then
 `1.01VC2W20050316` and `1.00VC2P20050314`, three section entries, and a count of 0x3a = 58; its data ends at 0x38154d0
-(about 2.7 MB). Not decoded. rom.4 names the drives it is reached by: `V:\Preset.vc2\Patch\`, `V:\Preset.vc2\Wave\`,
+(about 2.7 MB). Not decoded.~~ Withdrawn 2026-11-13 ("The wave libraries, read"): the `WLF08` at 0x356d200 is a 12 KB index,
+"VC-2 Wave.bin"; the audio is the last 192 of the 416 streams, in "VC-2 Preset.bin"; 0x38154d0 is where the V-Synth's own
+index, a second `WLF08` at 0x3810200, ends. rom.4 names the drives it is reached by: `V:\Preset.vc2\Patch\`, `V:\Preset.vc2\Wave\`,
 `A:\Internal.vc2\`, `Z:\Demo.vc2\`, `Z:\TestMode.vc2\`, and `VC-2 Patch.bin`, `VC-2 Preset.bin`, `VC-2 Wave.bin`,
 `VC-2 Project.ini`.
 
 The disk image's root also holds the VC-1's files: `VC1.S10` and `VC1_I1.P10`…`VC1_I8.P10`, 36944 bytes each.
+
+### The wave libraries, read (2026-11-13, the VC-2 mode's step 1c)
+
+The preset area after the partition holds both instruments' waves, each as an index and its samples:
+
+| | The V-Synth's | The VC-2's |
+|---|---|---|
+| Index, `WLF08` | at 0x3810200 (to 0x38154d4), `1.00VSYN2W050316`, `1.00VSYN2P050316`: "V-Synth Wave.bin" (rom.2's string beside `WLF0`) | at 0x356d200 (12 KB), `1.01VC2W20050316`, `1.00VC2P20050314`: "VC-2 Wave.bin" |
+| Waves → maps → samples | 224 → 224 → 224, one to one | 58 (70 splits) → 43 (430 splits) → 192 |
+| Samples | the 416 streams' first 224, each starting on a sector, from 0x178c200 | the last 192, none on a sector, in "VC-2 Preset.bin": `"TABLE"` at 0x2804a00, `"DATA"` at 0x280770b, streams 0x2807711…0x356d097 |
+| Link files | 224 `.w00` in `Internal.prj/Wave` | 58 `.w02` in `Internal.vc2/Wave` |
+
+**The index** (`WLF08`): a section count at +8, two version strings at +0x10 and +0x20, and a 16-byte entry a section from
++0x40 (u16 number, u16 1, u32 offset from the index, u32 size). A section is a u32 count, a u32 index offset (0xc) and a u32
+entry size: 8 means an index of (u32 offset from the section, u32 size), anything else inline entries of that size. Section 1,
+the waves: a 16-character name, then a 4-byte split each (the upper key, a byte, 127 in 67 of the VC-2's 70 and 82, 88 and
+100 once each, and a u16 map number). Section 2, the maps: a name, then a 6-byte split each (the upper key, a byte of 100 to
+127, a level by its values, a u16, 0 in 402 of the 430 and 12 in 28, which by its value may be an octave but isn't read, and
+a u16 sample number). Section 3, the samples: 36-byte paths `VPW\<file>.vpw`. Numbers count from 1. So a VC-2 wave is a
+multisample: `LargeChoVS S` splits at keys 90, 120 and 127 into maps 3, 1 and 2, and the map `LondonChoSt` spreads samples
+52…65 over 14 splits from key 43. **The sample bank** ("VC-2 Preset.bin"): `"TABLE"`, the count in ASCII (`0192`), 60-byte
+entries (a 52-byte file name, u32 size, u32 offset from the end of `"DATA"`), then `"DATA"` and the streams. The index finds
+a sample in it by name: the bank's order is not the index's. **A link file** (`.w00`, `.w02`, 36 bytes): a `link` chunk
+holding the wave's number in its index, and a `name` chunk, its 16 characters.
+
+**Checked** (`research/tools/wlflib.py`, which reads the image through `diskls.py`; `build/tools/vc2/wlflib.txt`): in both
+indexes the sections follow each other, every number is in range, every map and sample is used, and every split list rises
+to key 127. All 282 link files name their wave by its number. Every one of the VC-2's 192 sample paths is in the bank, every
+bank entry lands on a stream, the entries tile `"DATA"` with no gap, and the bank's streams are exactly the 192 not on a
+sector. 0 differences. Seen red: one sample number set to 193 in a copy of the image gives "outside 1..192" and exit 1.
+**The firmware's own reading agrees**: rom.4's parser (`0x8934d12a`) opens "D:\VC-2 Wave.bin", compares 4 bytes with
+`WLF0`, copies the two 16-character version strings and checks each section entry's +2 is 1 and its number 1 to 3. The bank's
+(`0x89350978`) opens "D:\VC-2 Preset.bin", compares 7 bytes with `"TABLE"` and reads the 4-byte count. rom.2 has the same
+five `WLF0` readers (`0x8949a088…`) beside "V-Synth Wave.bin", so the format is the V-Synth's, and the VC-2 adds the split
+maps' use of it (the V-Synth's own index has one split everywhere) and its own bank.
+
+So **the 416 "preset waves" the project's tools read (xt_files, xt_tone) are 224 V-Synth waves and the VC-2's 192 samples**.
+A VC-2 wave plays one of a map's samples by key, which the V-Synth's own waves never needed. How rom.2 finds its 224 streams
+(they have no `"TABLE"`), and how rom.4's player picks a split, are not traced.
 
 ### The factory patches, read by rom.4 (2026-11-13, the VC-2 mode's step 1c)
 
@@ -1464,5 +1508,6 @@ among rom.2's.
   direction state (`0x899d9c70`, `0x899d9c74`), read and not run: the port's harness will settle both; `0x893ef400`, which
   takes the block first when `0x8993fe48` is set; which inputs the frame's words at +4 (kind 6's ring) and +0x14 (the
   tracker) are.
-- The `WLF08` library's format, and whether it is the V-Synth's preset area's format too.
+- ~~The `WLF08` library's format, and whether it is the V-Synth's preset area's format too.~~ Read and checked, both ("The
+  wave libraries, read"). Left: how rom.2 finds its 224 streams, and how rom.4's player picks a map's split.
 - rom.4's sections (code, .data, .bss), and how much of its code is rom.2's.

@@ -62,16 +62,26 @@ def walk(block, path):
             yield from walk(read(c), full)
 
 
-files = walk(img[root:root + roots * 32], '')
-if sys.argv[1:2] == ['get']:
-    wanted, out = sys.argv[2], sys.argv[3]
-    found = [(c, size) for full, c, size in files if full == wanted]
-    if not found:
-        sys.exit(f'diskls.py: no {wanted} in {DISK}')
-    with open(out, 'wb') as f:
-        f.write(read(*found[0]))
-else:
-    needle = sys.argv[1].lower() if len(sys.argv) > 1 else ''
-    for full, c, size in files:
-        if needle in full.lower():
-            print(f'{size:9d} {c:6d} {full}')
+def all_files():
+    """Every file and folder in the partition: (path, first cluster, size)."""
+    return walk(img[root:root + roots * 32], '')
+
+
+def main():
+    files = all_files()
+    if sys.argv[1:2] == ['get']:
+        wanted, out = sys.argv[2], sys.argv[3]
+        found = [(c, size) for full, c, size in files if full == wanted]
+        if not found:
+            sys.exit(f'diskls.py: no {wanted} in {DISK}')
+        with open(out, 'wb') as f:
+            f.write(read(*found[0]))
+    else:
+        needle = sys.argv[1].lower() if len(sys.argv) > 1 else ''
+        for full, c, size in files:
+            if needle in full.lower():
+                print(f'{size:9d} {c:6d} {full}')
+
+
+if __name__ == '__main__':
+    main()
