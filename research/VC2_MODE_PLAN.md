@@ -49,8 +49,9 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   effect ID tables are not in rom.4). **Begun 2026-11-13:** the 64 factory `.p02` read by rom.4's own routines (`vc2run …
   patches`; VC2_VOCAL_DESIGNER.md, "The factory patches, read by rom.4"): the store's common, tone, envelope, LFO and
   arpeggio sections placed, the vocoder block over the corpus (the Modulator Key Mode and Auto Note disagreements settled:
-  0–1 both), and no factory patch on the VOCODER OSC (PCM and EXT IN carriers in the first two tone blocks). Left of it: the
-  second descriptor bank (MFX, Chorus, Reverb, COSMs) and what the eight tone blocks are against sixteen envelope blocks.
+  0–1 both), and no factory patch on the VOCODER OSC (PCM and EXT IN carriers in the first two tone blocks). Left of it: ~~the
+  second descriptor bank (MFX, Chorus, Reverb, COSMs)~~ (read, below) and what the eight tone blocks are against sixteen
+  envelope blocks.
   **The pitch tracker, 2026-11-13:** its routines found (the module `0x893edca0…0x893ef400`) and run on known signals
   (`vc2run … track`; VC2_VOCAL_DESIGNER.md, "The pitch tracker, run"): mode 0 is the only one selected, reaching 65.4 Hz to
   1480 Hz from its start, holding the last pitch through silence and noise, following an octave in 20–24 ms. Its analysis
@@ -75,6 +76,11 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   to MULTI at zone 0's MFX Send × 0.025, the Chorus send 0, DIR untouched; each level eases 3% a block; suspend and resume
   bypass the vocoder. Left of it: what drives the levels' offsets, which voices render into which buffer, the vocoder's
   output scale.
+  **The second descriptor bank, 2026-11-13** (`vc2run … typed`; VC2_VOCAL_DESIGNER.md, "The second descriptor bank,
+  read"): at `0x895131a8`, rom.2's form; the MFX, Chorus, Reverb and COSM sections placed by the firmware's own pointers and
+  their types' tables found and confirmed by the code that loads them; the 64 factory patches' typed values all in range;
+  rom.4 has four reverb types rom.2 lacks, and its COSM type 8 is not the V-Synth's Comb Filter as it stands. Left of it:
+  what COSM type 8 and the four reverbs are, and the typed IDs no table lists.
 - Second sources: the V-Card owner's manual (names and meanings) and the 64 factory patches (the corpus).
 
 ### 2. Shared plumbing (plugin/Source)

@@ -19,9 +19,19 @@ struct Descriptor {
 Descriptor descriptorOf(Machine& m, uint32_t id);
 // An ID's name from rom.4's table (pointers to strings with a leading space)
 std::string paramName(Machine& m, uint32_t id);
+// A .p02's PATa data (its header checked: 0x1e, VC20 at +2, PATaVC_2 at +0x10, the data's offset and length big-endian at
+// +0x18, +0x1c), or empty when it isn't a .p02
+std::vector<uint8_t> p02Data(const char* path);
 // A .p02's data (empty for rom.4's defaults) into rom.4's store at kPatchStore, as its own routines take one; false on a
 // fault
 bool loadStore(Machine& m, const std::vector<uint8_t>& data);
+// Values over the files against a range and a default: lo, hi, how many differ, how many are off the default and outside
+// the range
+struct ValueSpread {
+    int lo, hi;
+    long distinct, off, outside;
+};
+ValueSpread spreadOf(std::vector<int> v, int def, int min, int max);
 // An ID's value into the store by its descriptor (big-endian bits from its offset in the section at `section`, the value
 // plus its centre), then read back by rom.4's reader (kReadValue); false on a fault or when the reader disagrees, said
 bool setStoreValue(Machine& m, uint32_t section, uint32_t id, int value);

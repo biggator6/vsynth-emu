@@ -52,6 +52,16 @@ bool loadStore(Machine& m, const std::vector<uint8_t>& data) {
     return m.run(kToStore, {kPatchStore, kFile});
 }
 
+ValueSpread spreadOf(std::vector<int> v, int def, int min, int max) {
+    if (v.empty()) return {};
+    const auto off = std::ranges::count_if(v, [&](int x) { return x != def; });
+    const auto outside = std::ranges::count_if(v, [&](int x) { return x < min || x > max; });
+    const auto [lo, hi] = std::ranges::minmax(v);
+    std::ranges::sort(v);
+    const auto distinct = std::distance(v.begin(), std::unique(v.begin(), v.end()));
+    return {lo, hi, (long)distinct, (long)off, (long)outside};
+}
+
 bool setStoreValue(Machine& m, uint32_t section, uint32_t id, int value) {
     const Descriptor d = descriptorOf(m, id);
     const int width = d.width < 0 ? -d.width : d.width, total = width + d.bit, bytes = (total + 7) / 8;
@@ -77,7 +87,8 @@ uint32_t be32(const std::vector<uint8_t>& f, size_t at) {
     return (uint32_t)f[at] << 24 | (uint32_t)f[at + 1] << 16 | (uint32_t)f[at + 2] << 8 | f[at + 3];
 }
 
-// A .p02's PATa data, or empty when its header isn't a .p02's
+} // namespace
+
 std::vector<uint8_t> p02Data(const char* path) {
     std::vector<uint8_t> f;
     if (FILE* fp = std::fopen(path, "rb")) {
@@ -91,6 +102,8 @@ std::vector<uint8_t> p02Data(const char* path) {
     if ((size_t)at + bytes > f.size()) return {};
     return {f.begin() + at, f.begin() + at + bytes};
 }
+
+namespace {
 
 // [FW] the store's sections placed so far, each its IDs and its base (where every one of its IDs reads its default in
 // rom.4's default store; research/VC2_VOCAL_DESIGNER.md, "The factory patches"); a read of an ID is at the store + its
@@ -122,14 +135,10 @@ bool sayId(Machine& m, uint32_t id, const std::vector<std::vector<int>>& raws) {
     const Descriptor d = descriptorOf(m, id);
     std::vector<int> v;
     for (const auto& file : raws) v.push_back(file[id]);
-    const auto off = std::ranges::count_if(v, [&](int x) { return x != d.def; });
-    const auto outside = std::ranges::count_if(v, [&](int x) { return x < d.min || x > d.max; });
-    const auto [lo, hi] = std::ranges::minmax(v);
-    std::ranges::sort(v);
-    const auto distinct = std::distance(v.begin(), std::unique(v.begin(), v.end()));
+    const ValueSpread s = spreadOf(v, d.def, d.min, d.max);
     std::printf("%03x  %-32s %5d…%-5d %5d | %5d…%-5d %3ld %3ld %3ld\n", id, paramName(m, id).c_str(), d.min, d.max,
-                d.def, lo, hi, (long)distinct, (long)off, (long)outside);
-    return outside > 0;
+                d.def, s.lo, s.hi, s.distinct, s.off, s.outside);
+    return s.outside > 0;
 }
 
 void sayIds(Machine& m, const std::vector<std::vector<int>>& raws) {

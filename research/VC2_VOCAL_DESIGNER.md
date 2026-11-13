@@ -51,7 +51,9 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   (`vc2mixer.cpp`) runs the part's level routine and its live block mixer on known input frames, the vocoder's block call
   answered, and fails on a fault or a store write its reader doesn't read back ("The part mixer, run"); `vc2patches.h`'s
   `setStoreValue` is the store writer `vocosc` and `mixer` share, `vc2runs.h`'s `initVocoderModule` the init `autonote` and
-  `mixer` share.
+  `mixer` share. `typed <file.p02>…` (`vc2typed.cpp`) reads the MFX, Chorus, Reverb and COSM blocks through the second bank
+  by rom.4's own readers, with `vc2patches.h`'s `p02Data` and `spreadOf` shared with `patches` ("The second descriptor bank,
+  read").
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -1164,8 +1166,9 @@ rom.4 has rom.2's three per-ID tables, in rom.2's formats:
 How each was found: the names table from the pointer to " Vocoder Sw"'s string, walked both ways while the words point at names;
 the descriptors as the place where rom.2's first 48 descriptors (576 bytes) occur byte for byte; the text table as the first pointer
 after the names whose string is ID 0's `0\x02127`. The descriptors were checked by reading the VC-2's own block with them: every
-field from 0x193 to 0x1a5 starts on the bit after the last one ends, and each range matches its text's count but two (below). rom.2's second descriptor bank (8 bytes per ID
-from 0x55d) has not been looked for in rom.4.
+field from 0x193 to 0x1a5 starts on the bit after the last one ends, and each range matches its text's count but two (below). ~~rom.2's second descriptor bank (8 bytes per ID
+from 0x55d) has not been looked for in rom.4.~~ Found 2026-11-13: `0x895131a8`, 8 bytes an ID from 0x56a, right after the first
+("The second descriptor bank, read").
 
 **The IDs are not rom.2's.** rom.4 inserts ChordMemory Switch and Hold at 0x37, and more further on, so every ID from 0x37 up is
 shifted. A `.p02` can't be read with rom.2's IDs or the plugin's descriptors.
@@ -1346,9 +1349,11 @@ where every one of the section's IDs reads its default in rom.4's default store 
 | Beam Type to the arpeggio's End Point | 0x4a6…0x4b3 | 0x117e | 1 |
 | The arpeggio pattern's lines | 0x4b4… | 0x11a6 (or one line before) | 0x22 apart |
 
-Between the common and the first tone block (0x6e…0xfc) are 16-entry tables (the zones' own, by their shape). MFX, Chorus,
+~~Between the common and the first tone block (0x6e…0xfc) are 16-entry tables (the zones' own, by their shape).~~ Withdrawn
+2026-11-13: the firmware's pointing routines put the MFX (+0x6c), Chorus (+0xb0) and Reverb (+0xcc) sections there, and the
+COSMs at +0xd3e and +0xf5e, 16 zones of 34 bytes each ("The second descriptor bank, read"). MFX, Chorus,
 Reverb and the COSMs don't place this way: their parameters are read by type through a second descriptor bank (rom.2's at
-`0x897a56d8`), not yet found in rom.4. rom.4 has no Zone Knob Sets and no Multi Step Modulator ("Master Switch" isn't among its
+`0x897a56d8`), ~~not yet found in rom.4~~ rom.4's at `0x895131a8`. rom.4 has no Zone Knob Sets and no Multi Step Modulator ("Master Switch" isn't among its
 names). **Eight tone blocks against sixteen envelope and LFO blocks** is not settled: what a block is (a zone, as in rom.2)
 needs the code that reads them.
 
@@ -1371,9 +1376,51 @@ is a PCM wave or the EXT IN, under the vocoder block, not the VOCODER OSC.
   third value HOLD, as its descriptor says; Auto Note On Switch is 0 or 1 (1 in 042 Trioinfernl@ alone), never its field's
   third, empty value.
 
-Not done: the second descriptor bank (MFX, Chorus, Reverb, the COSMs' parameters by type), what the eight tone and sixteen
-envelope blocks each are, and what reads the zones' tables. A second source for the names is the V-Card owner's manual, which
-the repo doesn't hold.
+Not done: ~~the second descriptor bank (MFX, Chorus, Reverb, the COSMs' parameters by type)~~ (read, below), what the eight
+tone and sixteen envelope blocks each are, ~~and what reads the zones' tables~~ (no zones' tables: those bytes are the MFX,
+Chorus and Reverb sections). A second source for the names is the V-Card owner's manual, which the repo doesn't hold.
+
+### The second descriptor bank, read (`typed`) (2026-11-13, the VC-2 mode's step 1c)
+
+**The bank.** `0x895131a8`, 8 bytes an ID from 0x56a, right after the first bank (`0x8950f0b0` + 12 × 0x56a), as rom.2's
+follows its own at 0x55d: a slot byte, then the default, min and max as s16 (rom.2's form, XtPatchStore.cpp's `typedOf`).
+rom.4's getter (`0x89324370(section, id, slot base)`) sends an ID from 0x56a on to the typed reader
+`0x8932b460(section, slot base, id)`, which reads the slot (an ID offset from the block's slot base) through the first bank.
+The names table runs to 0x9ab, so the bank holds 0x442 typed IDs, against rom.2's 0x3f8 to its COSMs' last.
+
+**The blocks** (each place from the firmware's pointing routines, beside the tone's `0x89320a50`; each type table loaded by
+code: the first three in one routine, at `0x8935f536`, `0x8935f604`, `0x8935f6a2`, the COSM's by the tone at `0x89399cfa`):
+
+| Block | Type ID | Slot base | Store | Types | Type table | Typed IDs |
+|---|---|---|---|---|---|---|
+| MFX | 0x1b7 (0–41) | 0x1bb | +0x6c (`0x893208d0`) | 42 | `0x895164ec`, 51 entries, 9 spare | 0x56a…0x7c4 |
+| Chorus | 0x23c (0–8) | 0x23f | +0xb0 (`0x89320950`) | 9 | `0x895165b8`, 11 entries, 2 spare | 0x7ce…0x816 |
+| Reverb | 0x270 (0–14) | 0x272 | +0xcc (`0x893209d0`) | 15 | `0x895165e4`, 17 entries | 0x819…0x8ed |
+| COSM 1, 2 | 0x463 (0–16), Switch 0x462 | 0x464 | +0xd3e, +0xf5e, 34 a zone, 16 zones (`0x89320c12`) | 17 | `0x8953fb40` | 0x926…0x9ab |
+
+A slot base is the block's Type ID + 4, 3, 2 and 1, as rom.2's (`kXtMfxSlots` and the rest), and slot 3 is each block's
+Parameter 1 by the names (MFX 0x1be, Chorus 0x242, Reverb 0x275, COSM 0x467). Each block's section has rom.2's number of IDs.
+Past the types: the Reverb table's last two entries (typed IDs 0x8ee…0x917, two more reverb types) are past Reverb Type's
+0–14, so no patch can choose them; and 14 named typed IDs (0x918…0x925) are in no table. The names in that stretch include a
+non-linear reverb's (NLR Type, Envelope T1–T4 and L1–L3) and a delay's (Delay Time, L-R Shift, Feedback). Rom.4 has four
+reverb types rom.2 lacks (11–14, Reverb Type's range 0–14 against rom.2's 11 types).
+
+**The 64 factory patches** (`vc2run <rom.4> typed <file.p02>…`, `vc2typed.cpp`; every block's Type by rom.4's reader, its
+type's typed values by its typed reader; `build/tools/vc2/typed.txt`). **No typed value is outside its descriptor's range.**
+- MFX: 18 of the 42 types: type 0, which has one unnamed typed ID, in 13 patches, then 19 (10) and 1 (9).
+- Chorus: type 0 in 32, then 3 (12), 1 (11), 2 (5), 8 (2), 5 and 6 (1 each).
+- Reverb: 13 of the 15 types (none on 9 or 10): type 4 (11), 1 (10), 7 (9), 6 (8), …, and all four of rom.4's own (11, 12,
+  13, 14: 2, 3, 2, 2 patches).
+- COSM, by count over 64 patches × 16 zones: COSM 1 is off in 116 zones and on type 8 in 12, two zones a patch; COSM 2 is
+  off in 128; the other 896 of each (14 a patch) are on at type 0, a type with one unnamed typed ID. Which zones the two
+  are isn't read zone by zone; the tone blocks' first two (zones 0 and 1) are the patches' only edited ones ("The factory
+  patches, read by rom.4").
+- **COSM type 8 is not the V-Synth's Comb Filter as it stands.** rom.2's type 8 (0x90e–0x914) opens with Octave Select (0–4)
+  and Detune (−100…+100); rom.4's (0x965–0x96b) opens with Intencity and Speed (0–127 each), the same five after them (Detune
+  LFO and Env Depth, Tone and its two depths). That agrees with the COSM run, where the Comb's DSP is the one of 16 types that
+  differs and rom.4 has one Comb routine ("COSM in rom.4"). The factory zones on it vary Speed (0…127, 5 values) and nothing
+  else.
+
 
 ## The names sweep
 
@@ -1408,8 +1455,9 @@ among rom.2's.
   Next there, step 1b: each tone block's rom.2 routine run beside its rom.4 counterpart ("The V-Synth's tables and code in
   rom.4" gives the pairs by the tables they read).
 - ~~The 64 factory patches' values, read with rom.4's descriptors.~~ Read by rom.4's own routines ("The factory patches, read by
-  rom.4"); left: the second descriptor bank (MFX, Chorus, Reverb, COSMs) and what the store's eight tone and sixteen envelope
-  blocks are.
+  rom.4"); left: ~~the second descriptor bank (MFX, Chorus, Reverb, COSMs)~~ (read, "The second descriptor bank, read"; left
+  of it: what COSM type 8 and rom.4's four reverb types are, and the typed IDs no table lists) and what the store's eight tone
+  and sixteen envelope blocks are.
 - The pitch tracker ("The pitch tracker, run"): run in mode 0, the only one selected, on known signals; its analysis read
   ("The pitch tracker's analysis"), the band-pass, the noise count, the gates, the limits and the fallback held to the
   firmware by the run. Left: the estimator's rules by level, period and peak balance, read in outline only, and the

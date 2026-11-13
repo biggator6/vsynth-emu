@@ -20,6 +20,7 @@
 //   vc2run <rom.4> vocosc          the VOCODER OSC's IDs from the store through the builder and converter (vc2vocosc.cpp)
 //   vc2run <rom.4> autonote        kind 6's mode and Auto Note's notes and ratio on sung tones (vc2autonote.cpp)
 //   vc2run <rom.4> mixer           the part's levels and block mixer on known input frames (vc2mixer.cpp)
+//   vc2run <rom.4> typed <file.p02> …   MFX, Chorus, Reverb and COSMs read through the second bank (vc2typed.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
@@ -78,14 +79,14 @@ constexpr std::array kRuns{Run{"boot", vc2::boot}, Run{"warp", vc2::warp}, Run{"
                            Run{"osc", vc2::osc}, Run{"analog", vc2::analog}, Run{"band", vc2::band},
                            Run{"solo", vc2::solo}, Run{"lite", vc2::lite}, Run{"tva", vc2::tva},
                            Run{"patches", vc2::patches}, Run{"track", vc2::track}, Run{"vocosc", vc2::vocosc},
-                           Run{"autonote", vc2::autonote}, Run{"mixer", vc2::mixer}};
+                           Run{"autonote", vc2::autonote}, Run{"mixer", vc2::mixer}, Run{"typed", vc2::typed}};
 
 } // namespace
 
 int main(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: vc2run <rom.4> <run> [args]: boot, warp, ratio, hold, growl, kind6, patches,\n"
-                             "       track, vocosc, autonote, mixer;\n"
+                             "       track, vocosc, autonote, mixer, typed;\n"
                              "       vc2run <rom.4> <block> <rom.2>: lfo, env, cosm, osc, analog, band, solo, lite,\n"
                              "       tva\n");
         return 2;

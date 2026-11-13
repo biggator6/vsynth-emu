@@ -38,5 +38,6 @@ int track(Machine& m, int argc, char** argv);
 int vocosc(Machine& m, int argc, char** argv);
 int autonote(Machine& m, int argc, char** argv);
 int mixer(Machine& m, int argc, char** argv);
+int typed(Machine& m, int argc, char** argv);
 
 } // namespace vc2
