@@ -60,6 +60,9 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   each first is: an object's field map read from the code ("The VariPhrase players and key assign in rom.4").
   `romfile.option` runs a tool's `--option`s and `romfile.images` reads a two-image tool's arguments (codepairs.py's and
   codealign.py's).
+- `vc2run <rom.4> patches [--stores <dir>] <file.p02> …` (`vc2patches.cpp`): the VC-2's patches read by rom.4's own routines,
+  section by section, with each ID's spread over the files; `--stores` writes the stores ("The factory patches, read by
+  rom.4").
 - `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`, `osc`, `analog`, `band`, `solo`, `lite`, `tva`): a block's rom.2
   routines and their rom.4 pairs on two interpreters, its object compared after every call, and the port held beside rom.4's where
   one is linked (`vc2twin.*`, a run per block, `vc2twin<block>.cpp`; `lfo` and `env` link their ports from plugin/Source,
@@ -989,6 +992,58 @@ The audio is a library after the V-Synth's 416 preset waves: at file offset 0x35
 
 The disk image's root also holds the VC-1's files: `VC1.S10` and `VC1_I1.P10`…`VC1_I8.P10`, 36944 bytes each.
 
+### The factory patches, read by rom.4 (2026-11-13, the VC-2 mode's step 1c)
+
+**How.** `vc2run <rom.4> patches <file.p02> …` (`vc2patches.cpp`) reads a `.p02` the project's way, by rom.4's own routines in
+the interpreter, as `XtFiles` and `XtFwPatchReader` read a `.p00` by rom.2's: rom.4's default patch (`0x89325300`, rom.2's
+`0x8947e230`, 0.91 alike by field shape) laid out as a file (`0x89324b10`, rom.2's `0x8947dad0`, 1.00) under the file's
+PATa data (offset +0x20, 0x13a4 bytes), rom.4's file-to-store conversion (`0x89324b20`, rom.2's `0x8947dae0` at 0.50:
+rewritten, as a new file version, `VC20Rev008`, would need), and its reads of each ID (`0x89328580` the bits, `0x8932b050` the
+value; rom.2's `0x894817b0`, `0x89484310`, the same code on rom.4's descriptors). The 64 files (`Internal.vc2/Patch/001`…`064`,
+taken out with `diskls.py`; 065–128 repeat them) in `build/tools/vc2/p02/`, the output in `build/tools/vc2/patches.txt`.
+
+**The store's sections.** As in rom.2, an ID's descriptor gives its place from its section's base, which the caller adds
+(XtPatchStore.cpp's `kSections`). rom.4's sections were mapped to rom.2's by their first IDs' names, and each base found as
+where every one of the section's IDs reads its default in rom.4's default store (`--stores` writes the stores):
+
+| Section | rom.4 IDs | Base | Blocks |
+|---|---|---|---|
+| Common (rom.2's 0x103…, the vocoder block and EQ after it) | 0x120…0x1b5 | 0 | 1 (97 of its 133 IDs read their default there; the default patch sets the rest otherwise) |
+| The tone: rom.2's 0x52 bytes, then the VOCODER OSC's (offsets 0x52…0x7b) | 0x2d3…0x383 | 0xfe | 8, 0x80 apart (rom.2: 16, 0x52 apart) |
+| The envelopes | from 0x384 | 0x4fe | 16, 0x70 apart, to 0xbfe |
+| The LFOs | 0x439…0x461 | 0xbfe | 16, 0x14 apart |
+| Beam Type to the arpeggio's End Point | 0x4a6…0x4b3 | 0x117e | 1 |
+| The arpeggio pattern's lines | 0x4b4… | 0x11a6 (or one line before) | 0x22 apart |
+
+Between the common and the first tone block (0x6e…0xfc) are 16-entry tables (the zones' own, by their shape). MFX, Chorus,
+Reverb and the COSMs don't place this way: their parameters are read by type through a second descriptor bank (rom.2's at
+`0x897a56d8`), not yet found in rom.4. rom.4 has no Zone Knob Sets and no Multi Step Modulator ("Master Switch" isn't among its
+names). **Eight tone blocks against sixteen envelope and LFO blocks** is not settled: what a block is (a zone, as in rom.2)
+needs the code that reads them.
+
+**What the 64 patches use.** Only the first two tone blocks: OSC 1 is PCM in block 1 and EXTIN in block 2 in 42 patches
+(PCM in both in 10; the rest EXTIN or ANALOG in one of them); blocks 3–8 differ from the defaults only in bits no descriptor
+reads, but for the wave number (1 → 0). The envelopes' first two blocks (35 patches both, 27 the first alone); no patch
+edits an LFO. **No factory patch uses the VOCODER OSC type** (OSC 1 and 2 Type take 0…2, never 3), and its parameters are at
+their defaults in all 64; only Harm Formant, its Keyfollow and Style vary (in five patches each). So the factory sounds' carrier
+is a PCM wave or the EXT IN, under the vocoder block, not the VOCODER OSC.
+
+**The vocoder block (IDs 0x193…0x1a5) over the 64:**
+- Vocoder Sw off in 5 (008 Shifter Mod, 017 PolyPShift, 027 monkeybiznes, 044 All Chorus, 057 cheap monks; each with Hold
+  Dump Time 100). Vocoder Type HIRESO in 47, LEGACY in 17.
+- The same in all 64: Vocoder Sound Level and Depth 127, Auto Note Retrigger 0, Split Point 37, robot human depth 0, Stereo
+  Process Sw 1, Unvoice Spread 0.
+- Varying: Direct Sound Level (127 in 031, 62 in 042, else 0), Unvoice Detect (16…50, none at the default 25; most 26),
+  Unvoice Level, Env Attack and Release, Hold Dump Time (0, 4, 100), Formant Shift (0…127, 20 values), Formant Template (12 of
+  the 16).
+- **The two disagreements, settled by the corpus:** Modulator Key Mode is 0 or 1 in every patch (9 at 0), never the text's
+  third value HOLD, as its descriptor says; Auto Note On Switch is 0 or 1 (1 in 042 Trioinfernl@ alone), never its field's
+  third, empty value.
+
+Not done: the second descriptor bank (MFX, Chorus, Reverb, the COSMs' parameters by type), what the eight tone and sixteen
+envelope blocks each are, and what reads the zones' tables. A second source for the names is the V-Card owner's manual, which
+the repo doesn't hold.
+
 ## The names sweep
 
 `names-sweep.mjs` over rom.4 with the VC-2's 64 factory patch names, 58 wave names and the manual's file names
@@ -1016,6 +1071,8 @@ among rom.2's.
 - The VC-2 as its own mode (the user's decision, 2026-11-13): its steps and their state are in `research/VC2_MODE_PLAN.md`.
   Next there, step 1b: each tone block's rom.2 routine run beside its rom.4 counterpart ("The V-Synth's tables and code in
   rom.4" gives the pairs by the tables they read).
-- The 64 factory patches' values, read with rom.4's descriptors (the `.p02` store's layout, as `XtPatchStore` reads a `.p00`'s).
+- ~~The 64 factory patches' values, read with rom.4's descriptors.~~ Read by rom.4's own routines ("The factory patches, read by
+  rom.4"); left: the second descriptor bank (MFX, Chorus, Reverb, COSMs) and what the store's eight tone and sixteen envelope
+  blocks are.
 - The `WLF08` library's format, and whether it is the V-Synth's preset area's format too.
 - rom.4's sections (code, .data, .bss), and how much of its code is rom.2's.
