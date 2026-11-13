@@ -4,24 +4,15 @@
 
 namespace {
 constexpr int kBigDial = 40;   // from this size a knob's name and value are 11, else 10 (UI_DESIGN.md, "The look")
-
-void styleText(juce::Label& l, const juce::Font& font, juce::Colour colour) {
-    l.setFont(font);
-    l.setColour(juce::Label::textColourId, colour);
-    l.setJustificationType(juce::Justification::centred);
-    l.setBorderSize({ 0, 0, 0, 0 });
-    l.setMinimumHorizontalScale(0.8f);
-    l.setInterceptsMouseClicks(false, false);
-}
 }
 
 Knob::Knob(juce::AudioProcessorValueTreeState& state, const juce::String& id, const juce::String& name, int dialSize)
-    : attachment_(*state.getParameter(id), dial_), size_(dialSize) {
+    : attachment_(state, id, dial_), size_(dialSize) {
     const float text = dialSize >= kBigDial ? 11.0f : 10.0f;
     dial_.setRotaryParameters(Look::sweepStart, Look::sweepEnd, true);
     dial_.setTitle(name);
-    styleText(name_, Look::sans(text, "Semibold"), Look::label);
-    styleText(value_, Look::mono(text), Look::text);
+    Look::setTextLook(name_, Look::sans(text, "Semibold"), Look::label);
+    Look::setTextLook(value_, Look::mono(text), Look::text);
     name_.setText(name, juce::dontSendNotification);
     dial_.onValueChange = [this] { showValue(); };
     showValue();
@@ -32,7 +23,7 @@ Knob::Knob(juce::AudioProcessorValueTreeState& state, const juce::String& id, co
 
 void Knob::setModulation(float lo, float hi) {
     auto& props = dial_.getProperties();
-    if (lo == hi) {
+    if (juce::exactlyEqual(lo, hi)) {
         props.remove(Look::modLo);
         props.remove(Look::modHi);
     } else {

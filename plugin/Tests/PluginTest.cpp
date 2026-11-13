@@ -21,6 +21,7 @@
 #include <thread>
 #include <vector>
 #include "TestAppDir.h"
+#include "TestSnapshot.h"
 
 // TEST_ROM_SEARCH=1: where a new instance finds the image, first to last, and what's kept for the next (VSynthEmuTest
 // alone: it stops there).  A symbolic link stands for each copy, so the image's 8 MB isn't copied about.
@@ -633,13 +634,10 @@ int main(int argc, char** argv) {
                 if (auto* panel = dynamic_cast<FxPanel*>(ch)) panel->showPage(std::atoi(page));
         }
         if (const char* tab = std::getenv("TEST_SNAPSHOT_TAB")) editor->showTab(std::atoi(tab));
-        const juce::Image img = ed->createComponentSnapshot(ed->getLocalBounds(), true, 2.0f);
-        juce::File f(juce::File::getCurrentWorkingDirectory().getChildFile(snap));
-        f.deleteFile();
-        juce::FileOutputStream os(f);
-        juce::PNGImageFormat png;
-        if (!os.openedOk() || !png.writeImageToStream(img, os)) { std::fprintf(stderr, "snapshot failed\n"); return 1; }
-        std::printf("snapshot: %s (%dx%d)\n", f.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
+        if (!writeSnapshot(*ed, juce::File::getCurrentWorkingDirectory().getChildFile(snap))) {
+            std::fprintf(stderr, "snapshot failed\n");
+            return 1;
+        }
     }
     // TEST_UI_LAYOUT=1: the editor's layout, then stop (LayoutTest.cpp, moved from here as it stood in v193)
     if (const char* ui = std::getenv("TEST_UI_LAYOUT")) {

@@ -70,6 +70,13 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginEditorZones.cpp
     Source/PluginEditorMsm.cpp
     Source/PluginEditorMatrix.cpp
+    Source/UiLook.cpp
+    Source/UiKnob.cpp
+    Source/UiHeader.cpp
+    Source/UiPageBar.cpp
+    Source/UiPath.cpp
+    Source/UiFooter.cpp
+    Source/UiEditor.cpp
     Source/FxPanel.cpp
     Source/ContentClassifier.cpp
     Source/XtSoloEncoder.cpp
@@ -166,8 +173,10 @@ vse_add_test(VSynthEmuArpTest Tests/ArpTest.cpp Tests/TestMain.cpp)
 # then the Multi Step Modulator's: its parameters, the image's patches with it on, a note, a patch's load stopping it (v193)
 vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.cpp Tests/ZonePluginTest.cpp
              Tests/TestMain.cpp)
+# D, the redesigned editor, drawn and checked as it grows (UI step 1; research/UI_DESIGN.md, "The redesign, D")
+vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest
-                 VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest)
+                 VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest)

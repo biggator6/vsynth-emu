@@ -1,5 +1,6 @@
 // D's look: the faces, and the LookAndFeel's drawing of knobs, switches, boxes and buttons (UI step 1; UiLook.h)
 #include "UiLook.h"
+#include "UiParts.h"
 #include <utility>
 
 namespace Look {
@@ -10,6 +11,20 @@ juce::Font sans(float size, const char* style, float spacing) {
 
 juce::Font mono(float size) {
     return juce::Font(juce::FontOptions().withName(juce::Font::getDefaultMonospacedFontName()).withPointHeight(size));
+}
+
+void setTextLook(juce::Label& l, const juce::Font& font, juce::Colour colour, juce::Justification just) {
+    l.setFont(font);
+    l.setColour(juce::Label::textColourId, colour);
+    l.setJustificationType(just);
+    l.setBorderSize({ 0, 0, 0, 0 });
+    l.setMinimumHorizontalScale(0.8f);
+    l.setInterceptsMouseClicks(false, false);
+}
+
+void showText(juce::Label& l, const juce::String& words, juce::Colour colour) {
+    l.setText(words, juce::dontSendNotification);
+    l.setColour(juce::Label::textColourId, colour);
 }
 
 namespace {
@@ -30,7 +45,7 @@ void arc(juce::Graphics& g, const Circle& k, float a0, float a1, juce::Colour co
 }
 
 // Where the value arc starts: 0 on a range that holds both signs, else the range's start
-float zeroOf(const juce::Slider& s) {
+float zeroOf(juce::Slider& s) {
     return s.getMinimum() < 0.0 && s.getMaximum() > 0.0 ? (float)s.valueToProportionOfLength(0.0) : 0.0f;
 }
 
@@ -39,7 +54,7 @@ juce::Point<float> onCircle(juce::Point<float> c, float r, float angle) {
 }
 
 // The modulation's reach, a ring outside the track, if the knob's owner has set one
-void modRing(juce::Graphics& g, const juce::Slider& s, const Circle& k, float start, float end) {
+void modRing(juce::Graphics& g, juce::Slider& s, const Circle& k, float start, float end) {
     const auto& props = s.getProperties();
     if (!props.contains(modLo) || !props.contains(modHi)) return;
     const float lo = juce::jlimit(0.0f, 1.0f, (float)props[modLo]), hi = juce::jlimit(0.0f, 1.0f, (float)props[modHi]);
@@ -97,30 +112,26 @@ void Feel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, bool, bool
         return;
     }
     const auto pill = r.removeFromLeft(26.0f).withSizeKeepingCentre(26.0f, 14.0f);
-    g.setColour(on ? accent : track);
-    g.fillRoundedRectangle(pill, 7.0f);
+    Ui::fillRounded(g, pill, on ? accent : track, 7.0f);
     const float knobX = on ? pill.getRight() - 7.0f : pill.getX() + 7.0f;
     g.setColour(on ? ground : label);
     g.fillEllipse(juce::Rectangle<float>(10.0f, 10.0f).withCentre({ knobX, pill.getCentreY() }));
-    g.setColour(b.isEnabled() ? text : muted);
-    g.setFont(sans(11.0f, "Semibold"));
-    g.drawText(b.getButtonText(), r.withTrimmedLeft(8.0f), juce::Justification::centredLeft, true);
+    Ui::drawText(g, b.getButtonText(), r.withTrimmedLeft(8.0f).toNearestInt(),
+                 { sans(11.0f, "Semibold"), b.isEnabled() ? text : muted });
 }
 
 // A button: `raised` on a panel, the accent when it is on
 void Feel::drawButtonBackground(juce::Graphics& g, juce::Button& b, const juce::Colour&, bool highlighted, bool down) {
     juce::Colour fill = b.getToggleState() ? accent : raised;
     if (highlighted || down) fill = fill.brighter(down ? 0.15f : 0.08f);
-    g.setColour(b.isEnabled() ? fill : panel);
-    g.fillRoundedRectangle(b.getLocalBounds().toFloat(), 4.0f);
+    Ui::fillRounded(g, b.getLocalBounds().toFloat(), b.isEnabled() ? fill : panel, 4.0f);
 }
 
 // A box: `raised`, its chevron in the names' colour at the right
 // one-off: JUCE's LookAndFeel override; its parameters are JUCE's
 void Feel::drawComboBox(juce::Graphics& g, int w, int h, bool, int, int, int, int, juce::ComboBox& box) {
     const auto r = juce::Rectangle<float>((float)w, (float)h);
-    g.setColour(box.isEnabled() ? raised : panel);
-    g.fillRoundedRectangle(r, 4.0f);
+    Ui::fillRounded(g, r, box.isEnabled() ? raised : panel, 4.0f);
     const juce::Point<float> c(r.getRight() - 12.0f, r.getCentreY());
     juce::Path chevron;
     chevron.startNewSubPath(c.x - 3.0f, c.y - 1.5f);

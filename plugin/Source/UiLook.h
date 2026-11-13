@@ -33,6 +33,12 @@ inline constexpr int inset = 12, gap = 8, radius = 8;
 // The names' face and the values' face, at a size in the drawing's units (a CSS px of the mock-up)
 juce::Font sans(float size, const char* style = "Regular", float spacing = 0.0f);
 juce::Font mono(float size);
+// A label of text alone in a face and colour: no border, no clicks, squeezed to 80% before it is cut
+void setTextLook(juce::Label& l, const juce::Font& font, juce::Colour colour,
+                 juce::Justification just = juce::Justification::centred);
+
+// A label's text now, in the colour that says what it means (a state: ready or not, a name or none)
+void showText(juce::Label& l, const juce::String& words, juce::Colour colour);
 
 // Where a knob's sweep starts and ends: 135° to 405° in the mock-up's angles, from 12 o'clock as JUCE counts them
 inline constexpr float sweepStart = 1.25f * juce::MathConstants<float>::pi;

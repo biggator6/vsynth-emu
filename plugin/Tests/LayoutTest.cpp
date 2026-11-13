@@ -144,13 +144,7 @@ void LayoutCheck::tabClicks() {
     editor->showTab(0);
     if (juce::Component* bar = ed->findChildWithID("tabs")) {
         const auto click = [bar](int x) {
-            using Src = juce::MouseInputSource;
-            const juce::Point<float> at((float)x, (float)bar->getHeight() / 2.0f);
-            const juce::Time now = juce::Time::getCurrentTime();
-            const Src mouse = juce::Desktop::getInstance().getMainMouseSource();
-            bar->mouseDown(juce::MouseEvent(mouse, at, {}, Src::defaultPressure, Src::defaultOrientation,
-                                            Src::defaultRotation, Src::defaultTiltX, Src::defaultTiltY, bar, bar, now,
-                                            at, now, 1, false));
+            pressAt(*bar, { (float)x, (float)bar->getHeight() / 2.0f });
         };
         int seen = 0;
         for (int x = 0; x < bar->getWidth(); x += 4) {

@@ -47,7 +47,12 @@ struct LayoutCheck {
     std::vector<juce::RangedAudioParameter*> params;
     std::set<juce::String> reached;
 
-    explicit LayoutCheck(VSynthEmuProcessor& proc) : p(proc), ed(proc.createEditor()) {
+    // What check() and moveAll() walk: the editor, or, for D, the drawing its window scales (UI step 1)
+    juce::Component* root = nullptr;
+
+    explicit LayoutCheck(VSynthEmuProcessor& proc)
+        : LayoutCheck(proc, std::unique_ptr<juce::AudioProcessorEditor>(proc.createEditor())) {}
+    LayoutCheck(VSynthEmuProcessor& proc, std::unique_ptr<juce::AudioProcessorEditor> e) : p(proc), ed(std::move(e)) {
         editor = dynamic_cast<VSynthEmuEditor*>(ed.get());
         for (juce::Component* ch : ed->getChildren()) if (auto* fp = dynamic_cast<FxPanel*>(ch)) panel = fp;
         if (panel) for (juce::Component* ch : panel->getChildren()) if (auto* v = dynamic_cast<juce::Viewport*>(ch)) view = v;
@@ -151,7 +156,7 @@ struct LayoutCheck {
 
     void check(const juce::String& where) {
         ++states;
-        walk(*ed, [&](juce::Component& c) {
+        walk(root ? *root : *ed, [&](juce::Component& c) {
             checkCards(c, where);
             checkKids(c, where);
         });
@@ -191,11 +196,21 @@ struct LayoutCheck {
 
     void moveAll(const juce::String& where) {
         std::vector<juce::Component*> controls;
-        walk(*ed, [&](juce::Component& c) { for (juce::Component* ch : c.getChildren()) if (ch->isVisible() && isControl(ch) && !dynamic_cast<juce::Label*>(ch)) controls.push_back(ch); });
+        walk(root ? *root : *ed, [&](juce::Component& c) { for (juce::Component* ch : c.getChildren()) if (ch->isVisible() && isControl(ch) && !dynamic_cast<juce::Label*>(ch)) controls.push_back(ch); });
         for (juce::Component* k : controls) {
             const std::function<void()> move = moverOf(k);
             if (move && !changedBy(move)) fail(where + ": " + controlName(k) + " moves no parameter");
         }
+    }
+
+    // The mouse pressed at a point on a component, as a click there sends it (the tab bar's clicks; D's page bar, path
+    // and blocks, UI step 1)
+    static void pressAt(juce::Component& c, juce::Point<float> at) {
+        using Src = juce::MouseInputSource;
+        const juce::Time now = juce::Time::getCurrentTime();
+        const Src mouse = juce::Desktop::getInstance().getMainMouseSource();
+        c.mouseDown(juce::MouseEvent(mouse, at, {}, Src::defaultPressure, Src::defaultOrientation, Src::defaultRotation,
+                                     Src::defaultTiltX, Src::defaultTiltY, &c, &c, now, at, now, 1, false));
     }
 
     // LayoutTest.cpp: the sweeps

@@ -47,6 +47,11 @@ namespace Ui {
         g.setColour(c);
         g.fillRect(r);
     }
+    // A rounded rectangle filled in a colour: D's boxes, chips, switches and keys (UI step 1)
+    inline void fillRounded(juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c, float radius) {
+        g.setColour(c);
+        g.fillRoundedRectangle(r, radius);
+    }
     // The cards' and the Perform column's titles: 11 pt bold, spaced out
     inline juce::Font titleFont() {
         juce::Font f(11.0f, juce::Font::bold);
