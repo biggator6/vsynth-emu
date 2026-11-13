@@ -42,7 +42,8 @@ void Twin::copyToVc2(uint32_t a, uint32_t n) {
 }
 
 bool Twin::callVSynth(uint32_t a2, std::initializer_list<uint32_t> args) {
-    if (vsynth.call(a2, args, kStack)) return true;
+    constexpr uint64_t kSteps = 200'000'000;   // as rom.4's Machine::run allows, where Sh4's own default is 20e9 (73 s)
+    if (vsynth.call(a2, args, kStack, nullptr, kSteps)) return true;
     std::fprintf(stderr, "twin: rom.2 %08x: %s\n", a2, vsynth.error().c_str());
     return false;
 }

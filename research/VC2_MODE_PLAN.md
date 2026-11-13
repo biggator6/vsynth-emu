@@ -24,8 +24,9 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   pointed at rom.4: envelopes, LFOs, pitch, the TVA, the OSC converters, COSM, the analog OSC, the band and SOLO players, key
   assign. Done when each block is "equal" or "differs, here". **In progress** (VC2_VOCAL_DESIGNER.md, "The V-Synth's routines
   in rom.4, run"): the pairs by code shape for every routine the ports name (`codepairs.py`); the LFO and the envelope with
-  its converters run and equal, the ports equal to rom.4 (`vc2run … lfo`, `env`); COSM's note-on, update and TVF filters
-  equal for 14 of 15 types (`vc2run … cosm`), the Comb differs (its note-on case moved out and reads the block otherwise),
+  its converters run and equal, the ports equal to rom.4 (`vc2run … lfo`, `env`); COSM's note-on, update, new block and
+  DSP routines, mono and stereo, equal for 15 of 16 types (`vc2run … cosm`, each image's routines from its own tables by
+  block code), the Comb differs (its note-on case moved out and reads the block otherwise),
   and COSM's 15 converters take another input block in rom.4 (no MSM term, the Matrix read inside); the OSC block's
   arithmetic (exp2, powf, velocity, pitch10, key-follow key) and key state equal (`vc2run … osc`), its wiring (the
   VariPhrase converter, pitch and gain targets, voice update, portamento settings, note setup, bend) rewritten, and its
@@ -36,8 +37,9 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   bytes at +0x94, SOLO's state rearranged past R10), but for SOLO under Robot Voice; key assign equal (in the OSC run);
   LITE's player equal walking forward (`vc2run … lite`), and walking backward once rom.2's six backward reads are made
   rom.4's (the VC-2 reads backward the right way up, the V-Synth inverted); Vari off rewritten (no walk, no beat factor, its
-  mode meaning otherwise: ported from rom.4, not run). Not run: kind 1's mode 1, the period-jump player. Next: COSM's other
-  DSP routines. The wiring (what reads parameters by ID, COSM's
+  mode meaning otherwise: ported from rom.4, not run). Not run: kind 1's mode 1, the period-jump player, the Comb's DSP (rom.4
+  has one Comb routine for mono and stereo), COSM codes 10, 11 and 17 (no converter writes them). Left in 1b: the TVA
+  (the patch TVA's block and the frame on the bus). The wiring (what reads parameters by ID, COSM's
   converters) differs by construction: it is ported from rom.4, not shared, and the Comb and the portamento with it.
 - 1c. Still to map: the pitch tracker (the routines that write `0x899d9bd0`); the VOCODER OSC's IDs (0x354…0x383) into the
   voice's fields; kind 6's mode and where its pitch comes from (Auto Note, Modulator Key Mode, Split Point); the part mixer's

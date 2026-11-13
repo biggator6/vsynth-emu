@@ -142,7 +142,7 @@ time table (`0x8953fb90`, rom.2's `0x897cec24`), and `0x8939aa40`, which reads a
 it is not the V-Synth's envelope time.
 
 **So far: the LFO and the envelope (and its converters) of the VC-2 are the V-Synth's, and the ports serve it as they stand;
-COSM's voice side is too for 14 of its 15 types (below), its converters and the Comb are not; the OSC block's arithmetic
+COSM's voice side is too for 15 of its 16 types (below: note-on, update, new block and every DSP routine, mono and stereo), its converters and the Comb are not; the OSC block's arithmetic
 and key state are, its wiring and portamento are not; the analog OSC's waveforms are, for the 11 the VC-2 has (no SUPER-SAW,
 no FEEDBACK-OSC), its note-on, install, update and converter are not; BACKING's, ENSEMBLE's and SOLO's players are, given
 rom.4's object layout, but for SOLO under Robot Voice; LITE's is walking forward, and walking backward but for its read the
@@ -176,35 +176,54 @@ xt_cosm's 77 addresses (`build/tools/vc2/cosm_pairs.txt`) part three ways.
   by its shape the Matrix read in the converter, where rom.2 is given it). So the VC-2's COSM converters take another input:
   they are to be ported from rom.4 with the converters that read by ID, and compared once their input path is read.
 
-**Run (`vc2run <rom.4> cosm <rom.2>`, `vc2twincosm.cpp`).** No port is linked: xt_cosm holds `XtCosm` to rom.2, so rom.2
-equal to rom.4 is the port equal to rom.4. For each of the 15 types, 200 notes: a block made by rom.2's converter on a random
-input (each word that indexes a table held in its range, as xt_cosm holds it) and given to both images, then the note-on
-with the slot finder hooked in each to hand out four buffers of junk, six updates with new envelope, LFO and pitch values,
-and for the TVF and Dynamic TVF 40 filter blocks of signal; the object, the four buffers and the signal compared after every
-call (`build/tools/vc2/cosm_run.txt`):
+**The DSP routines by block code** (all 21 codes, mono and stereo) are in a table in each image's .data, the chooser
+`0x894eef70`'s: rom.2's at `0x8987c7ec` and `0x8987c840`, rom.4's at `0x8993fb50` and `0x8993fba4` (its image's `0x8991e0ec`
+and `0x8991e140`, found where the words hold its OD routine's address). Each of rom.4's is rom.2's at 0x1426c0, 0x142c40 or
+0x142c10, but DS's mono (`0x894fc570` → `0x893b9ec0`, 0x1426b0) and the Comb's: rom.4 has **one Comb routine for mono and
+stereo** (`0x893b9b40`), where rom.2 has two (`0x894fa8d0`, `0x894faa00`). Output in `build/tools/vc2/cosm_tables2.txt` and
+`cosm_tables4.txt`.
 
-| Codes | Types (by xt_cosm) | Result |
+**Run (`vc2run <rom.4> cosm <rom.2>`, `vc2twincosm.cpp`).** No port is linked: xt_cosm holds `XtCosm` to rom.2, so rom.2
+equal to rom.4 is the port equal to rom.4. For each of the 16 types (the 15 the dispatcher's switch calls and the Speaker
+Simulator's own converter `0x894dcef0`), 100 notes mono and 100 stereo: a block made by rom.2's converter on an input whose
+words are the type's parameters, each drawn in its descriptor's range (the second bank, `0x897a56d8`), and given to both
+images; the note-on with the slot finder hooked in each to hand out four buffers holding a last note's junk; then 40 blocks
+of the type's DSP routine, each image's from its own table, on 32 frames at one of xt_cosm's levels (30,000 to 2.1e9, and 1),
+with an update (new envelope, LFO and pitch values, the pitch in fr4 as well) twice in 14 blocks and a new block
+(`0x894ee4a0` → `0x893aa5d0`, 1.000 alike by field shape) at the ninth one time in two, as xt_cosm's stereo section runs
+them; the output, the object and the four buffers compared after every call (`build/tools/vc2/cosm_run.txt`):
+
+| Codes | Types | Result |
 |---|---|---|
-| 2, 3, 4, 6, 7, 8, 12, 15, 16, 18, 19, 20 | among them the Side Band Filters (7, 8), the Compressor (16), Lo-Fi (19) | 200 notes each, 0 different |
-| 13, 14 | TVF, Dynamic TVF | 200 notes each with 40 filter blocks, 0 different |
+| 1, 2, 3, 4, 5, 6, 7, 8, 12, 13, 14, 15, 16, 18, 19, 20 | OD and DS, Wave Shape, Amp Simulator, Speaker Simulator, Resonator, both Side Band Filters, Dual Filter, TVF, Dynamic TVF, Compressor, Limiter, Frequency Shifter, Lo-Fi, TB Filter | 100 notes each, mono and stereo, 0 different: 120,000 DSP blocks |
 | 9 | Comb Filter | 200 of 200 different at note-on |
 
-So **14 of the 15 types' note-on, update and (for the TVFs) filter are the V-Synth's**, the note-on and update included,
-though rom.4 compiled them anew and 0x40 and 0xc0 bytes smaller. The Comb is not: rom.2's note-on sets it up in place
+Every type's DSP changes its block (each changed 400 of 400 blocks in a count of 10 notes, but the stereo Resonator's,
+Frequency Shifter's and Lo-Fi's 379, 379 and 368: blocks they leave as they were). Seen red: the TVF's mono routine paired with
+rom.4's stereo one (the TVF's notes all differ), a bit of rom.4's DSP state (D + 0x1c) flipped at the 21st block (234 of 320
+notes, every type), and a bit of rom.2's signal alone (317 of 320).
+
+So **15 of the 16 types are the V-Synth's whole on the voice side: note-on, update, new block and DSP, mono and stereo**, the
+note-on and update included, though rom.4 compiled them anew and 0x40 and 0xc0 bytes smaller. The Comb is not: rom.2's
+note-on sets it up in place
 (the case at `0x894ee300`: the octave byte at +0x14 through the octave table to +0xf4, then the delay's whole and fraction),
 rom.4's sends code 9 to a call of `0x893b9d30(object)`; given rom.2's block, rom.4's Comb leaves another word above the
 octave byte at +0x14 and, at +0x2c, a whole number where rom.2 has a ratio near 1 (−40.0 against 1.017). So the VC-2's Comb
 reads its block otherwise, and is settled with rom.4's own Comb converter. (The other types' cases have the same sizes in
 both note-ons' jump tables, `0x894ee118` and `0x893aa288`; only code 9's case moved.)
 
-Two wrong first runs, kept here so they're not made again: random input words past a table's index range (the TVF's filter
-type, an octave) make both images read past the table, into neighbours each image holds its own (the octave table is
-copied for 198 bytes, the filter's kernel table is followed by code), which gave 612 notes "different" and a fault in rom.2's
-own filter. Held in range, they all agree. Seen red: one word of rom.4's copy of the block nudged sets 13 types apart on
-every note (the first Side Band Filter doesn't read that word).
+Wrong runs, kept here so they're not made again: random input words past a table's index range (the TVF's filter type, an
+octave) make both images read past the table, into neighbours each image holds its own (the octave table is copied for 198
+bytes, the filter's kernel table is followed by code), which gave 612 notes "different" and a fault in rom.2's own filter;
+the first run held a list of such words in range, and the run now draws every word in its descriptor's range, which also
+keeps the Amp Simulator's type (0 to 2) from jumping its DSP to junk. The update takes the pitch in fr4: without it, once
+both machines' FPU registers start at 0, the Side Band Filters asked for an endless delay and rom.2's ran to the step limit
+(which rom.2's twin calls didn't have, 20e9 steps, so the first DSP run seemed to hang: they now stop at rom.4's 200e6). Seen
+red, the first run: one word of rom.4's copy of the block nudged sets 13 types apart on every note (the first Side Band Filter
+doesn't read that word).
 
-Not yet run: the types' own DSP routines but the TVFs' (copies by shape, at the common distance), the stereo copies, the
-new-block routine (`0x894ed390` → `0x893a9500`) and the Dynamic TVF's targets apart from note-on.
+Not yet run: the Comb's DSP (rom.4's one routine, on rom.4's own Comb object), the Dynamic TVF's targets apart from note-on,
+and codes 10, 11 and 17, which have routines in both tables but no converter writes.
 
 ### The OSC block in rom.4 (2026-11-13)
 
