@@ -3,7 +3,8 @@
 The XT runs three applications on one OS (`rom.1`): the V-Synth (`rom.2`), the VC-1 "D-50" (`rom.3`) and the VC-2 "Vocal
 Designer" (`rom.4`, header `VAPP2 0.17`, 9.6 MB). The [V-CARD] button switches between them without a restart (XT owner's manual,
 "Starting up V-Card"). This file is the VC-2's, kept apart from HARDWARE_FIRMWARE.md because nothing in it touches the V-Synth's
-ports. Names-first pass only: no routine has been disassembled yet.
+ports. ~~Names-first pass only: no routine has been disassembled yet.~~ That was the first pass; the second and third read the
+code ("The vocoder's code"), and the fourth ran parts of it ("rom.4 run in the interpreter").
 
 Every address below is a CPU address in rom.4's own map unless it says "file offset". Every name and range here comes from one
 source, rom.4's own tables `[FW]`. The second source, the "V-Card owner's manual" that the XT manual defers to for the VC-2, is not
@@ -18,7 +19,8 @@ in the repo (see "Open").
   and zeroes .bss [0x8994fc20, 0x8a1f11c4): the rule `Sh4Interp` uses for rom.2 (the source ends where the copy begins), which
   for rom.4 lands on its header's own word 0x8990c758. So a table at a CPU address in 0x8992e1bc…0x8994fc20 is read at that
   address − 0x21a64 in the file; read in place it is something else. `Sh4Interp::loadRom` and `build/tools/bin/rd` hold rom.2's
-  map, so they can't run or read rom.4 as they stand; `ramrd.py` reads it ("The tools").
+  map, so they can't run or read rom.4 as they stand; `ramrd.py` reads it ("The tools"), and `vc2rom.*` maps it in the
+  interpreter by this header for the research runs ("rom.4 run in the interpreter").
 - The disk image's `Internal.vc2` folder (FAT16 partition), and a preset wave library after the V-Synth's preset waves (below).
 - `research/V-SYNTH_XT_OM.txt`: the VC-2's file names (fig. 07-06) and its one-line description. Nothing on its parameters.
 
@@ -35,6 +37,132 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
 - `vc2params.py <lo> <hi>` (rom.4 only): an ID's name, descriptor and value text from rom.4's own tables.
 - `diskls.py [filter]`, `diskls.py get <path> <out>`: the disk image's FAT16 files (`$DISK` for another image).
 - `likeat.py <A> <addr> <n> <B>`: code in B shaped like A's at addr, with what moves when code moves masked out.
+- `vc2run <rom.4> <run>` (C++, build line at the top of `vc2run.cpp`; run through `.claude/tools/buildq.mjs`): rom.4's
+  routines in `Sh4Interp`, on `vc2rom.*`'s map; runs `boot`, `warp`, `ratio`, `hold`, `growl`, `kind6`, one file each
+  ("rom.4 run in the interpreter"). `warp check` and `growl` hold a model of a routine (`vc2warplaw.cpp`, `vc2growllaw.cpp`)
+  to the firmware bit for bit, and fail when any word differs; `ratio` fails past 2 ulp from powf; `kind6` fails when an
+  output's period is more than a sample from the reading's.
+
+## rom.4 run in the interpreter (2026-11-12, fourth pass)
+
+plugin/Source is unchanged: `Sh4Interp::loadRom` keeps rom.2's map. `research/tools/vc2rom.*` maps rom.4 through the
+interpreter's public `mapRam` and `write` by its own header: the image at 0x89300000, .data [0x8992e1bc, 0x8994fc20) copied from
+0x8990c758, .bss zeroed to 0x8a1f11c4 (refused unless the source ends where the copy begins), with XtFwMachine's stack and heap
+and operator new (`0x89506df4`) answered from the heap. Where a run stands in for the OS it says so; nothing else is hooked but
+the probes named. `boot`: the vocoder's builder `0x893f0490` on its static object, 31,748 steps; both engines' vtables and their
+eight slots are the table under "The vocoder object".
+
+### HIRESO's formant warp, run (`warp`)
+
+Slot 4, `0x893f15d0(engine, side, ratio)`, writes the side's map and nothing else (a diff of the whole engine): 32 floats at
+the engine's +0x2924 (side 1's at +0x2b24), for each synthesis band the fractional analysis band it reads. Its law, read and then
+held to the firmware bit for bit (`warp check`, `vc2warplaw.cpp`: 40,352 cases, both sides, pivots p = 0, 1, 3, 6, 9, 12, 18,
+20, 22, 24, 40, 63 and 127, ratios 0.5…2 every 1/1024 and the floats either side of 0.5, 0.95, 1, 1.05 and 2; 0 bands
+different, and 26,476 with an error of 1e-7 planted in one blend's weight):
+
+- the pivot P = 500 + 172.265625·p Hz (172.27 = 44100/256), p the side's int at +0x2cb4/+0x2cb8 (slot 5's `ftrc` of the
+  template record's second float: 1…24 in the 32 records, 12 in record 0, so P = 2567.2 Hz there);
+- a warp in Hz, piecewise linear, that holds 100 Hz and 11874 Hz (the first and last band centres) and moves P to P·r. Synthesis
+  band b, at centre c_b, reads the analysis at x = (c_b − (A − A·s))/s, with A = 100 when P·r > c_b and 11874 otherwise, and
+  s = (P·r − A)/(P − A);
+- x to a band index by a cubic (`0x893f18ec`…, a0…a3 = −0.80590, 0.0087785, −9.3079e-7, 3.5423e-11): a fit of the centres, not
+  the table, so 100 Hz reads as 0.0627 and 11874 Hz as 31.499;
+- three branches: for r ≤ 0.95 and r ≥ 1.05 that map; between them b + (map − b)·|r − 1|/0.05, so r = 1 is the identity exactly
+  (the cubic alone would read band 0 as 0.0627) and the warp comes in continuously by 0.95 and 1.05.
+
+So with template 0 at r = 2 the bands up to 5.1 kHz read their own frequency over 2.04 (formants up an octave) and the rest are
+squeezed between 5.1 and 11.9 kHz; at r = ½ the bands up to 1.3 kHz read theirs × 1.9 and the rest are stretched to 11.9 kHz.
+
+The ratio, run (`ratio`): the converter's `0x89506e54(2.0, (v − 64)/63)` (v = 0 read as 1) is powf: on all 128 values within 1 ulp of the
+host's powf but for two (v = 31, 87) 2 ulp low, as round-to-zero gives; other bases agree to 7 digits. It wraps the routine
+`0x89509b80` and sets an error word (`0x89add990`, 1100 or 1101) on an infinite or NaN result. So Formant Shift 64 is 1 exactly,
+60…68 (0.957…1.045) fall in the blend, and 0 and 1 both give ½.
+
+What the glue gives slot 4 (`0x893f07a0`, read, not run): it calls slot 4 twice a block, side 0 then side 1. With the vocoder's
++0xc and +0x10 (the EXT IN path's template offsets) both 0, a side gets +4 or +8, both the Formant Shift ratio. Otherwise q =
+`0x899d9d90` over the pitch tracker's period (`0x893ee010`), d = min(q, 2) − 1 for q ≥ 1 and max(2q − 1, 0) − 1 below, and the
+sides get +4 + (+0xc)·d and +8 + (+0x10)·d, each held to [0.5, 2]. Before that it glides the consonant gain, +0x14 += 0.3·
+(+0x18 × its float argument − +0x14).
+
+### The hold's controller, run (`hold`)
+
+The controllers' handler table is built by its own routine (`0x89393370`: an object per controller number, pointers at
+`0x899891e0` + 4·cc), then every controller is sent through the dispatcher `0x89392f90(port, channel, cc, value)`, which calls
+the number's handler through its vtable and then the listeners at `0x899890d0` + 64·(port − 1) + 4·channel. The base handler
+tells a listener list (`0x899826e0`, walked by `0x89390ea0`) that the OS fills; the run gives it an empty one. On both engines:
+
+- CC 64 reaches the engine's slot 6 with its value: every value 0…127, ports 1 and 2, all 16 channels;
+- CC 121 (Reset All Controllers) reaches it with 0;
+- no other controller does.
+
+CC 64's handler (vtable `0x898cd238`, which the builder gives number 64; 66 and 7, 10, 11, 91, 93 get classes of their own)
+lets a value below 64 through only while a per-channel byte at `0x899893e0` is set; every write found sets it to 1, so here all
+pass and slot 6's own threshold at 64 decides. **The hold is the Hold controller, CC 64.** Not run: whether the pedal jack reaches
+it as CC 64, and whether a receive-channel test comes before the dispatcher.
+
+### The growl, run (`growl`)
+
+The carrier (kind 5, `0x893ebfa0`), with +0x3c above 0. Run on a carrier made by its own init (`0x893ebed0(carrier, P)`, which
+zeroes +0x3c and its phase, and starts the saw at 2·(3.997·x(1 − x)) − 1 for x = |rand|/32767: the OS's rand, `0x893018d0`, is
+answered with a fixed number), set by its own update (`0x893ec4d0(carrier, P)`: P+0 gain, P+4 pitch, P+0x20 to +0x3c, P+0x2c the
+balance), after the carriers' rate setter (`0x893ec6a0`, from the init table at `0x898c60a8`: 880/44100 at `0x899d9964`, 44100/440
+at `0x899d9960`, so P+4 is the pitch as a ratio to 440 Hz). The law, held bit for bit to the saw the branch hands its filter (a
+hook at `0x893ec310`; `vc2growllaw.cpp`; 256,000 samples at 55 Hz…10 kHz and growl 0.05…1, 0 different; planted errors in the
+divider's noise test, its rounding and the cosine give 242,948, 127,960 and 256,000):
+
+- a growl oscillator, a phase γ in [−1, 1) at +0x40, whose step (+0x44) is set each time it wraps: the saw's step over n, n =
+  trunc(ratio·440/50), at least 2, and one more when the noise generator's word +0x64 is positive, about half the cycles. The run:
+  2 or 3 at 55 and 110 Hz, 4 or 5 at 220, 8 or 9 at 440, 17 or 18 at 880, 199 or 200 at 10 kHz (trunc(f/50 Hz), less one where
+  the product rounds down: 79 or 80 at 4 kHz). **So the growl is a subharmonic of the note near 50 Hz, f/n, between 50·n/(n + 1)
+  and 50 Hz from 100 Hz up (f/2 or f/3 below), its divider jumping by one at random each cycle: a rough, irregular modulation
+  locked to the saw;**
+- the saw handed on is ½·[wrap(φ + (g/π)·S(γ)) + (1 + g·C(γ))·φ], g at +0x3c, φ the saw's phase, S and C a cubic sine and cosine
+  of πγ (`0x893f3210`: γ folded into ±½, then γ(3 − 4γ²); `0x893f3280`: the same on ½ − |γ|). Half the saw phase-modulated by the
+  growl, half amplitude-modulated by it; at g = 0 it is φ;
+- the noise generator steps after the saw in each sample: +0x64 ← −250·(+0x64) + 127·(+0x68) + 30, then +0x68 ← 252·(+0x68) +
+  (+0x64), 32-bit;
+- the init sets +0x44 to 50 × the rate (0.998), so the first growl cycle starts at the second sample.
+
+Where g comes from (read, not run): the kind 5 update `0x893afff2(voice)` builds P at voice + 0x104 and gives P+0x20 =
+clamp₀¹(P+0x30 + m₁·P+0x34 + m₂·P+0x38) and P+0x2c = clamp₀²(P+0x44 + m₁·P+0x48 + m₂·P+0x4c), m₁ and m₂ two modulators the voice
+points at (+0xa50, +0xa60): the shape of Growl Level and Saw-Noise Mix Balance with their LFO and Envelope Depths. Which ID lands
+at P+0x30 (and where Growl Keyfollow goes) is not traced: the converter hasn't been run.
+
+### Voice kind 6, run (`kind6`)
+
+Kind 6 (written in the EXT IN path; render `0x893ec730(voice + 0xafc, out)`) is a pitch-synchronous (TD-PSOLA) pitch shifter of
+the mic:
+
+- the block mixer writes each block of the mic into a 4096-sample ring (`0x893ec820(input, 32)`: `0x8a0f31d0`, write index
+  `0x8a0f31cc`) and the pitch tracker's period for that block (`0x893ee010`, `0x899d9bd0`, in samples; 551.25, 80 Hz, at the
+  tracker's init) into a 128-block history (`0x8a0f71d4`, which `0x893ec7d0` resets to 44100/440);
+- a voice starts 512 samples behind the write point (`0x893ec8d0`, which sets the flag `0x8a0f73d4` the render needs; a mode
+  change, `0x893ec890`, clears it). An epoch marker steps through the ring by the period recorded for the block it is in. Every
+  T_out samples a grain starts at the latest epoch, two heads in turn, each read with linear interpolation at a rate (+0x64, from
+  P+4) under a window (`0x893f32a0`) twice the shorter of T_in/rate and T_out. The sum goes through a filter set from the period
+  (`0x893ecde0`); where the input stage calls the mic unvoiced its own sample at the read point is mixed in by Unvoice Level
+  (`0x899d9968`); the same value goes to both channels;
+- T_out (`0x893ecd50`, at each grain) is T_in/r, T_in interpolated between the last two epochs and r the glided P+0 (+0x60).
+  With the flag `0x8a0f73d8` set (mode 0 to `0x893ec890`) r is P+0 · T_in · 440/44100 (`0x899d996c`), so T_out =
+  44100/(440·P+0), whatever the input.
+
+Run on the firmware's routines (the globals' setters `0x893ec6a0` and `0x893ecef0` from the init table, the ring's reset and
+mode, a voice by its setter `0x893ec9a0(voice, P)` and start), a two-harmonic wave of period 200 or 300 samples in, the output's
+period by autocorrelation:
+
+| Mode | Input period | P+0 | Output period | The reading |
+|---|---|---|---|---|
+| 1 | 200 | 1, 1.5, ½ | 200.00, 133.33, 400.00 | input/P+0 |
+| 1 | 300 | 2 | 150.03 | 150 |
+| 0 | 200, 300 | 1 | 100.21, 100.24 | 44100/440 = 100.23 |
+| 0 | 200 | ½ | 200.49 | 200.45 |
+| 0 | 300 | 2 | 50.11 | 50.11 |
+
+**Mode 1 is an interval (a harmonizer), mode 0 a pitch: the voice sung at a played note, whatever is sung.** Not traced: which
+parameter selects the mode (`0x893ec890` and the voice's start have no pool reference, so they are called through something not
+yet found, and the mode word's .data value, 2, is one `0x893ec890` never writes), and where the voice's P comes from (the
+keyboard's note, Auto Note). A pulse train in can leave grains empty: the epochs are period-spaced from where the voice started,
+not placed on pulses (the run first used one and got silence at 300 samples).
 
 ## The vocoder's code (2026-11-12, second pass)
 
@@ -51,7 +179,7 @@ add #-97` is 0x19f), so a search for literal IDs misses them; `idbuild.py` ("The
 **The converter, `0x893a72f0(?, part)`.** It reads the vocoder block in this order and hands the results on:
 
 - Formant Shift (0x19f), 0 taken as 1, as (v − 64)/63 into a library call at `0x89506e54` with 2.0: by its arguments 2^((v−64)/63),
-  an octave each way. Not confirmed which library routine that is.
+  an octave each way. ~~Not confirmed which library routine that is.~~ Run: powf ("HIRESO's formant warp, run").
 - Vocoder Sound Level, Vocoder Depth, Unvoice Level and Unvoice Detect (+24), Unvoice Spread, Env Attack, Env Release, Formant
   Template, Hold Dump Time (÷127), Direct Sound Level (÷127). Unvoice Level ÷127 goes to `0x899d9968`, Direct Sound Level ÷127 to
   `0x8999f4e0` (setter `0x893b1eb0`). Where the others go has not been traced.
@@ -180,7 +308,8 @@ through their own states as it goes, and scales the carrier's level by slot 7's 
 below 64 nothing is held (slot 7 returns 1); above, the held envelope h = h·(1 − C) + e·C follows with C from the decreasing
 table `0x89561538` at 50·f + 51 (time constants from about 45 ms to 16 s), freezing past f = 0.99, and slot 7 returns 1 − f.
 Letting go glides back over 100 blocks. Slot 6 is reached from `0x893b1c10` → `0x893f0770`, called from a handler at
-`0x89393980` that compares a 0…127 value with 64: by that, a pedal or switch, probably the Hold pedal. Not proven.
+`0x89393980` that compares a 0…127 value with 64: by that, a pedal or switch, probably the Hold pedal. ~~Not proven.~~ Run: it is
+CC 64's handler, and CC 121 sends it 0 ("The hold's controller, run").
 
 **Slots.** 0 reset (`0x893f24b0`); 1 analysis; 2 and 3 synthesis; 4 the formant parameter p (`+0x2cdc`); 5 settings, which
 reads only +0x00 (the formant ratio) and +0x38 (Hold Dump Time); 6 the hold controller; 7 the hold level. The base class's 5 and
@@ -233,8 +362,9 @@ Stereo does the same per channel, each with its own formant map, template curve 
 
 **Formant Shift moves the bands here** (slot 4, `0x893f15d0(this, side, ratio)`): each synthesis band reads the analysis
 envelope from the band its frequency maps to under the ratio, warped around a pivot of 500 + 172.27 × p Hz (p from the
-template's record, 12 by default), with separate branches for ratios over 1.05, under 0.95 and between. The exact warp is not
-read. `0x893f07a0` (from the glue, `0x893b16f4`) calls it four times, for each side.
+template's record, 12 by default), with separate branches for ratios over 1.05, under 0.95 and between. ~~The exact warp is not
+read.~~ Run and held to a model bit for bit: "HIRESO's formant warp, run". `0x893f07a0` (from the glue, `0x893b16f4`) ~~calls it
+four times, for each side~~ has four call sites, two paths of two: it calls it twice a block, once for each side.
 
 **Formant Template** (slot 5): 32 records of 140 bytes at `0x8956172c`, each three floats (64, 12, 64 in record 0; the second is
 the pivot p) and 32 band gains, record 0 flat. Template T gives the left channel record T and the right record T + 16; the two
@@ -281,9 +411,13 @@ right,
   integer scale.
 
 That is the Saw Wave LPF, Noise LPF and HPF and Saw-Noise balance of the OSC's own parameters, by shape. Which field each
-parameter lands in is not traced, nor the branch taken when the field at +0x3c is positive (`0x893ec240`, which calls
-`0x893f3280` and `0x893f3210`, likely the growl). Kind 6 is written inside the EXT IN path (`0x8939ee5e`); its render is
-`0x893ec730(voice + 0xafc, out)`. Not read.
+parameter lands in is not traced~~, nor the branch taken when the field at +0x3c is positive (`0x893ec240`, which calls
+`0x893f3280` and `0x893f3210`, likely the growl)~~. That branch, run: the growl, a subharmonic near 50 Hz ("The growl, run").
+Kind 6 is written inside the EXT IN path (`0x8939ee5e`); its render is `0x893ec730(voice + 0xafc, out)`. ~~Not read.~~ Run: a
+pitch shifter of the mic ("Voice kind 6, run").
+
+One correction from the run: the carrier's pitch (+0x08, +0x0c, P+4) is a ratio to 440 Hz, and `0x899d9964`, which the step is
+multiplied by, is 880/44100 (set by `0x893ec6a0`), not a modulation.
 
 **The module.** The float-heavy code from about `0x893ea840` to `0x893f3000` (35 KB, 36 routines of 40 or more FPU operations) is
 the carrier, the EXT IN kind 6, the pitch tracker's setters and both engines. The glue (converter setters, block mixers) is in
@@ -403,14 +537,17 @@ among rom.2's.
 - **The V-Card owner's manual.** Every name above has one source. The manual is the second, and the one that says what a value
   means to a player (what LEGACY and HIRESO are, what the 16 formant templates are called).
 - ~~What reads the vocoder block and the VOCODER OSC's IDs.~~ Found, second pass ("The vocoder's code"); the engines mapped in
-  the third (LEGACY, HIRESO). Still open: HIRESO's exact formant warp (slot 4's three branches); whether HIRESO's Depth routine
-  `0x893f22d0` has a computed caller; the per-block value `0x893f07a0` multiplies the consonant gain by, and the glue that calls
-  it; which controller drives the hold (slot 6; a handler at `0x89393980` compares it with 64); the analysis and synthesis
-  groups' delays against HIRESO's 128-sample input latency; the levels the part mixer ramps (`0x8999f4d0…`) beyond Direct
-  Sound; the carrier's growl branch; kind 6; and the pass the VOCODER OSC's own IDs (0x354…0x361) take into the voice's fields.
-- **Nothing here has been run.** Every formula is a reading of the code, checked against it by eye and by computed filter
-  responses. The project's way is a harness: the firmware's routines in `Sh4Interp` against a port. That needs rom.4's memory
-  map in the interpreter first (its own .data copy and .bss, "Sources").
+  the third (LEGACY, HIRESO). Settled by running in the fourth ("rom.4 run in the interpreter"): ~~HIRESO's exact formant warp
+  (slot 4's three branches)~~, ~~which controller drives the hold~~ (CC 64), ~~the carrier's growl branch~~, ~~kind 6~~.
+  Still open: whether HIRESO's Depth routine `0x893f22d0` has a computed caller; the float argument `0x893f07a0` multiplies the
+  consonant gain by, and the glue that calls it; `0x899d9d90`, which the EXT IN path's formant offsets divide by the tracked
+  period; the analysis and synthesis groups' delays against HIRESO's 128-sample input latency; the levels the part mixer ramps
+  (`0x8999f4d0…`) beyond Direct Sound; the pass the VOCODER OSC's own IDs (0x354…0x361) take into the voice's fields (P+0x30's
+  ID among them: run the OSC converter `0x8939ced0` on a patch's block); kind 6's mode parameter and where its P comes from;
+  whether the pedal jack reaches the hold as CC 64.
+- ~~**Nothing here has been run.**~~ Four things have ("rom.4 run in the interpreter"), two of them held to a model bit for bit;
+  the rest is still a reading of the code, checked against it by eye and by computed filter responses. rom.4's memory map is in
+  the interpreter for research (`vc2rom.*`), so the project's way, the firmware's routines against a port, is open to the rest.
 - The 64 factory patches' values, read with rom.4's descriptors (the `.p02` store's layout, as `XtPatchStore` reads a `.p00`'s).
 - The `WLF08` library's format, and whether it is the V-Synth's preset area's format too.
 - rom.4's sections (code, .data, .bss), and how much of its code is rom.2's.
