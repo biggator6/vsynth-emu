@@ -46,6 +46,12 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
   checked unchanged).
+- `codepairs.py <rom.2> <rom.4> [addr …]`: rom.2's routines found in rom.4 by the shape of their code, with the distance
+  each moved; with no addresses, every rom.2 code address in plugin/Source. `--pools <rom.2> <rom.4> <a2> <a4>`: for one pair,
+  the literals that differ. `likeat.py`'s `shape`, `shapes` and `find` are importable for it (its output checked unchanged).
+- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`): a block's rom.2 routines and their rom.4 pairs on two interpreters, its
+  object compared after every call and the port held beside rom.4's (`vc2twin.*`, a run per block, `vc2twin<block>.cpp`); it
+  links the block's port from plugin/Source. Fails on any difference.
 
 ## The V-Synth's tables and code in rom.4 (2026-11-13, the VC-2 mode's step 1a)
 
@@ -75,8 +81,53 @@ their first byte for the run given: the SOLO encoder and its setup (`0x8951e120`
 `0x893da4c0`; the import's `0x89516400`, `0x895164c0`, `0x8952dec0` and on), the clock object's routines (`0x894710e0` →
 `0x89313000`, 484 bytes; `0x894710b0`, `0x894712f0`, `0x89471040`), the OS's allocator and UI calls (`0x89527910` →
 `0x893e4190`, `0x895113a0` → `0x893cdc20`), the reverb time routine (`0x894b2bf0` → `0x893663a0`, 592 bytes), and parts of the
-arpeggio (its event set and clear, note-off, stop, shuffle, tick and pedal check). The tone's routines are not
-("The vocoder's code"): the same tables, compiled anew. Whether they compute the same is step 1b, by running them.
+arpeggio (its event set and clear, note-off, stop, shuffle, tick and pedal check). ~~The tone's routines are not
+("The vocoder's code"): the same tables, compiled anew.~~ Withdrawn the same day: matched by the shape of their code rather
+than their bytes (pool displacements and branch offsets masked), most of the tone's routines are in rom.4, moved; the
+converters that read parameters by ID are not ("The V-Synth's routines in rom.4, run"). Whether they compute the same is step
+1b, by running them.
+
+## The V-Synth's routines in rom.4, run (2026-11-13, the VC-2 mode's step 1b)
+
+**Pairs by code shape.** `codepairs.py` looks for each rom.2 routine named in plugin/Source (982 code addresses) in rom.4 by
+the shape of its first instructions up to its return (`likeat.py`'s shape: what moves when code moves masked out; output in
+`build/tools/vc2/codepairs.txt`): 416 are found once, 76 several times, 477 not, and 11 are too short to look for. The
+distances (rom.2 − rom.4) of those found once cluster in a narrow band, 0x1426c0…0x144cb0 (the most common 0x143920,
+0x143780, 0x143f50, 0x1426c0, 0x143e90): rom.2's tone code is in rom.4 in large pieces moved whole, with code inserted between
+them. The misses are of two kinds: addresses inside routines (hook points, branches written in comments), and the routines
+that read parameters by ID (the COSM types' converters `0x894dc8b0`…, the getter `0x8947d310` past its first 42 bytes), which
+rom.4's own IDs ("The parameter tables") change. `codepairs.py --pools` lists, for one pair, the literals that differ: the
+globals, callees and tables that moved, as the routine itself sees them.
+
+**Run side by side.** `vc2run <rom.4> <block> <rom.2>` runs a block's rom.2 routines and their rom.4 pairs on two
+interpreters with the same arguments and memory (`vc2twin.*`: both have the harness RAM at one address), compares the block's
+whole object between them after every call, and holds the port beside rom.4's as its own check holds it beside rom.2's. A word
+that holds a moved address in each image (a vtable, an installed routine) counts as the same when the pair is one `--pools`
+or `codepairs.py` gives.
+
+| Block | rom.2 → rom.4 | Run | Result |
+|---|---|---|---|
+| LFO (`lfo`) | constructor `0x894f0b40` → `0x893acbf0`, note-on `0x894f0cf0` → `0x893acda0`, tick `0x894f1050` → `0x893ad100`, note-off `0x894f0810` → `0x893ac8c0`, clock `0x894f0fd0` → `0x893ad080` (all 0x143f50 apart) | 20 cases: every wave, rates 0…127, note values with moving clocks, offsets, delay and fade modes, note-offs | 13,920 states, 0 different; the port equal to rom.4 throughout |
+| Envelope (`env`) | constructor `0x894efdb0` → `0x893abe40`, note-on `0x894f0130` → `0x893ac1c0`, tick `0x894efdf0` → `0x893abe80`, note-off `0x894f03e0` → `0x893ac470` (0x143f70 apart) | 10 cases: segments fast to slow, sustain at both ends, both curves, a release from each stage | 11,270 states, 0 different; the port equal to rom.4 |
+| Envelope's converters (`env`) | Time KF scale `0x894df760` → `0x8939a920`, time `0x894df7b0` → `0x8939a970`, pitch depth `0x894e0ce0` → `0x8939c1a0` | xt_env conv's ranges | 1,051,135 returns, 0 different |
+
+What moved, by `--pools` and the runs: the LFO's chaos seed `0x89f91c48` → `0x89999668`; its object's +0x24, `0x89833ef8` →
+`0x898cd490`; the envelope's installed output routine (+0x64), curve 2's `0x894efca0` → `0x893abd30` and curve 0's
+`0x894ef7d0` → `0x893ab860`; the envelope's global `0x89f91c44`, which rom.2's constructor and note-off share, is
+`0x8999965c` in rom.4's constructor and `0x89999660` in its note-off (not yet read why).
+
+Each run was seen red: the LFO with rom.4's chaos seed written a word off (the images part at the output, +0x38) and with the
+port skipping a tick (the port parts from rom.4 at that tick); the converters with rom.4's other time converter in place of
+its pair (782,308 of 1,051,135 returns part).
+
+**rom.4 has a second time converter.** rom.2's `0x894df7b0` has two look-alikes in rom.4: `0x8939a970`, which reads the same
+time table (`0x8953fb90`, rom.2's `0x897cec24`), and `0x8939aa40`, which reads a table of its own 0x100 bytes after it
+(`0x8953fc90`, in 0x120 bytes rom.2 doesn't have before its LFO rate table). What reads through `0x8939aa40` is not traced;
+it is not the V-Synth's envelope time.
+
+**So far: the LFO and the envelope (and its converters) of the VC-2 are the V-Synth's, and the ports serve it as they stand.**
+Still to run: COSM, the OSC block (pitch, TVA, the Matrix), the analog OSC, the band and SOLO players, Vari off and LITE, key
+assign.
 
 **What rom.4 lacks.** Not in it: the Multi Step Modulator (its coarse and grid tables, its object's routines, its terms), the
 arpeggio's note-on, pedal, step, enable and constructor, the MIDI out of the clock, the effect driver's MFX, Chorus and Reverb
@@ -209,10 +260,13 @@ not placed on pulses (the run first used one and got silence at 300 samples).
 
 ## The vocoder's code (2026-11-12, second pass)
 
-Found from what loads the vocoder block's IDs, then followed by hand in `sh4dis.py` listings (`ROM=` rom.4). rom.4 is compiled
+Found from what loads the vocoder block's IDs, then followed by hand in `sh4dis.py` listings (`ROM=` rom.4). ~~rom.4 is compiled
 differently from rom.2: matching rom.2's routines instruction by instruction (pool displacements and branch offsets masked) finds
-none of the tone code, so nothing here can be taken from a rom.2 address. A Ghidra project of rom.4 is in `build/tools/vc2/ghidra`
-(analysed, not yet used). Every address is rom.4's.
+none of the tone code, so nothing here can be taken from a rom.2 address.~~ Withdrawn 2026-11-13: matched the same way over
+every routine the ports name (`codepairs.py`), 416 are in rom.4 once, most of the tone's routines among them, moved whole by
+about 0x143000; what differs is the code that reads parameters by ID. Which routines that first search tried is not recorded.
+("The V-Synth's routines in rom.4, run".) The vocoder's own code below has no rom.2 counterpart. A Ghidra project of rom.4 is
+in `build/tools/vc2/ghidra` (analysed, not yet used). Every address is rom.4's.
 
 **How rom.4 reads a parameter.** As rom.2 does, with its own routines: a pointing routine aims a read object at the part's block
 (`0x893207b0(obj, part)`) or at one OSC's (`0x89320a50(obj, part, osc)`), then the getter `0x89324350(obj, id)` returns the value.

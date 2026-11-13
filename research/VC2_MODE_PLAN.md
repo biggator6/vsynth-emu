@@ -22,7 +22,11 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   2026-11-13** (VC2_VOCAL_DESIGNER.md, "The V-Synth's tables and code in rom.4").
 - 1b. Each block's firmware routine in rom.2 run beside its rom.4 counterpart on the same inputs, by its port's harness
   pointed at rom.4: envelopes, LFOs, pitch, the TVA, the OSC converters, COSM, the analog OSC, the band and SOLO players, key
-  assign. Done when each block is "equal" or "differs, here".
+  assign. Done when each block is "equal" or "differs, here". **In progress** (VC2_VOCAL_DESIGNER.md, "The V-Synth's routines
+  in rom.4, run"): the pairs by code shape for every routine the ports name (`codepairs.py`); the LFO and the envelope with
+  its converters run and equal, the ports equal to rom.4 (`vc2run … lfo`, `env`). Next: COSM, the OSC block (pitch, TVA,
+  Matrix), the analog OSC, the players, key assign. The converters that read parameters by ID differ by construction (rom.4's
+  IDs): they are ported from rom.4, not shared.
 - 1c. Still to map: the pitch tracker (the routines that write `0x899d9bd0`); the VOCODER OSC's IDs (0x354…0x383) into the
   voice's fields; kind 6's mode and where its pitch comes from (Auto Note, Modulator Key Mode, Split Point); the part mixer's
   levels; the 64 factory `.p02` read with rom.4's descriptors; the `WLF08` wave library (58 waves); whether the VC-2 runs

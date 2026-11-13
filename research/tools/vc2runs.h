@@ -21,5 +21,7 @@ int hold(Machine& m, int argc, char** argv);
 int growl(Machine& m, int argc, char** argv);
 int kind6(Machine& m, int argc, char** argv);
 int ratio(Machine& m, int argc, char** argv);
+int lfo(Machine& m, int argc, char** argv);
+int env(Machine& m, int argc, char** argv);
 
 } // namespace vc2

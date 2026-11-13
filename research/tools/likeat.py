@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 """likeat.py <image A> <hex addr> <count> <image B> [hex lo] [hex hi]: where image B has code shaped like image A's
 <count> instructions at addr, with what moves when code moves masked out: PC-relative loads' displacements (mov.w, mov.l,
-mova), bra/bsr offsets and bt/bf targets. Both images map at 0x89300000. rom.4 is compiled differently from rom.2, and
-rom.2's tone routines find no match in it (research/VC2_VOCAL_DESIGNER.md), so a miss here says the code isn't a copy,
-not that the routine isn't there."""
+mova), bra/bsr offsets and bt/bf targets. Both images map at 0x89300000. A miss says the code isn't a copy, not that the
+routine isn't there (rom.4 compiles some of rom.2's routines anew; research/VC2_VOCAL_DESIGNER.md). shape() and shapes()
+are codepairs.py's too."""
 import struct
 import sys
 
-from romfile import B
-
-
-def load(path):
-    with open(path, 'rb') as f:
-        return f.read()
+from romfile import B, image
 
 
 def shape(op):
@@ -25,10 +20,22 @@ def shape(op):
     return op
 
 
-a, at, count, b = load(sys.argv[1]), int(sys.argv[2], 16), int(sys.argv[3]), load(sys.argv[4])
-lo = int(sys.argv[5], 16) - B if len(sys.argv) > 5 else 0
-hi = int(sys.argv[6], 16) - B if len(sys.argv) > 6 else len(b) - 2 * count
-want = [shape(struct.unpack_from('<H', a, at - B + 2 * k)[0]) for k in range(count)]
-hits = [B + o for o in range(lo, hi, 2)
-        if all(shape(struct.unpack_from('<H', b, o + 2 * k)[0]) == want[k] for k in range(count))]
-print(len(hits), 'hits:', ' '.join(hex(h) for h in hits[:20]))
+def shapes(img, addr, count):
+    """The shapes of count instructions at CPU address addr."""
+    return [shape(struct.unpack_from('<H', img, addr - B + 2 * k)[0]) for k in range(count)]
+
+
+def find(a, at, count, b, lo=0, hi=None):
+    """CPU addresses in b where count instructions are shaped as a's at `at`, searched over file offsets [lo, hi)."""
+    hi = len(b) - 2 * count if hi is None else hi
+    want = shapes(a, at, count)
+    return [B + o for o in range(lo, hi, 2)
+            if all(shape(struct.unpack_from('<H', b, o + 2 * k)[0]) == want[k] for k in range(count))]
+
+
+if __name__ == '__main__':
+    a, at, count, b = image(sys.argv[1]), int(sys.argv[2], 16), int(sys.argv[3]), image(sys.argv[4])
+    lo = int(sys.argv[5], 16) - B if len(sys.argv) > 5 else 0
+    hi = int(sys.argv[6], 16) - B if len(sys.argv) > 6 else None
+    hits = find(a, at, count, b, lo, hi)
+    print(len(hits), 'hits:', ' '.join(hex(h) for h in hits[:20]))
