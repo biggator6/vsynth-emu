@@ -107,17 +107,23 @@ runs from the centre to 6 inside the track. Its name is under it, its value unde
 
 ### The steps
 
-Each step is a commit `UI step n: …` on `ui-redesign`, with `TEST_UI_LAYOUT` green and snapshots of what it changed. The
-plugin is whole after every step: no control is left without a place.
+D is new code in files of its own (`Ui*`), beside today's editor, which stays as it stands until D takes its place: the
+plugin keeps today's editor until the last step, and a test program of its own draws and checks D as it grows. Each step
+is a commit `UI step n: …` on `ui-redesign`, with D's snapshots and its layout check.
+
+The first plan split `PluginEditor.cpp` (1,483 lines) by job and changed it a step at a time. Moved as it stood, its parts
+were refused by the kit's guards (2026-11-13: loops repeated with other names, the constructor's parts past 50 statements),
+so splitting it meant rewriting code D replaces whole: the commit and its revert are on the branch.
 
 0. This design and the plan.
-1. `PluginEditor.cpp` (1,483 lines) split by job: what it draws byte for byte the same, the panel plants following the code.
-2. D's look on today's layout: the palette, a LookAndFeel for knobs, sliders, switches, boxes and buttons.
-3. D's frame: the scaled window, the header, the page bar, the signal path with its selection; today's pages hosted in it.
-4. The rack: the Time Trip column, the OSC panels, the COSM panels, AMP.
-5. The lower panel: SELECTED (the envelope editor, the LFO, what reaches the block), DETAILS, ENVELOPES, LFOs.
-6. The MODULATION, PLAY, ZONES and FX pages in D's look; the footer's keyboard with the zones.
-7. Landing: `TEST_UI_LAYOUT` and the plants for D, these sections made the only description, a version number.
+1. D's look and frame: the palette, type and LookAndFeel (knobs, switches, boxes, buttons), a knob made from a parameter's
+   ID, the scaled window, the header, the page bar, the signal path and its selection, the footer; `VSynthEmuEditorTest`
+   draws and checks it.
+2. The rack: the Time Trip column, the OSC panels, the COSM panels, AMP, from tables of which parameter goes where.
+3. The lower panel: SELECTED (the envelope editor, the LFO, what reaches the block), DETAILS, ENVELOPES, LFOs.
+4. The MODULATION, PLAY, ZONES and FX pages; the footer's keyboard with the zones.
+5. Landing: the plugin's editor is D, today's editor files go, `TEST_UI_LAYOUT` and the plants hold D, these sections are
+   the only description, a version number.
 
 After that, each with the user's yes where it needs one: Inter and JetBrains Mono built in (a folder for font files); the
 wave drawn from the loaded wave; the pad sending its controllers; the keyboard playing; dragging a source onto a knob to
