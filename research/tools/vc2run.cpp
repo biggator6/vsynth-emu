@@ -12,6 +12,7 @@
 //   vc2run <rom.4> analog <rom.2>  the analog OSC's waveform routines on a voice rom.2 makes (vc2twinanalog.cpp)
 //   vc2run <rom.4> band <rom.2>    BACKING's and ENSEMBLE's players on waves rom.2 encodes (vc2twinband.cpp)
 //   vc2run <rom.4> solo <rom.2>    SOLO's player on records rom.2's encoder makes (vc2twinsolo.cpp)
+//   vc2run <rom.4> lite <rom.2>    LITE's player on a state set as XtLitePlayer's note-on leaves it (vc2twinlite.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
@@ -61,14 +62,14 @@ constexpr std::array kRuns{Run{"boot", vc2::boot}, Run{"warp", vc2::warp}, Run{"
                            Run{"growl", vc2::growl}, Run{"kind6", vc2::kind6}, Run{"ratio", vc2::ratio},
                            Run{"lfo", vc2::lfo}, Run{"env", vc2::env}, Run{"cosm", vc2::cosm},
                            Run{"osc", vc2::osc}, Run{"analog", vc2::analog}, Run{"band", vc2::band},
-                           Run{"solo", vc2::solo}};
+                           Run{"solo", vc2::solo}, Run{"lite", vc2::lite}};
 
 } // namespace
 
 int main(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: vc2run <rom.4> <run> [args]: boot, warp, ratio, hold, growl, kind6;\n"
-                             "       vc2run <rom.4> <block> <rom.2>: lfo, env, cosm, osc, analog, band, solo\n");
+                             "       vc2run <rom.4> <block> <rom.2>: lfo, env, cosm, osc, analog, band, solo, lite\n");
         return 2;
     }
     vc2::Machine m(argv[1]);

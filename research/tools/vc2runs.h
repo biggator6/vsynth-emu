@@ -28,5 +28,6 @@ int osc(Machine& m, int argc, char** argv);
 int analog(Machine& m, int argc, char** argv);
 int band(Machine& m, int argc, char** argv);
 int solo(Machine& m, int argc, char** argv);
+int lite(Machine& m, int argc, char** argv);
 
 } // namespace vc2

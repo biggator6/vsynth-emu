@@ -33,9 +33,11 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   OSC's 11 waveform routines equal, with and without the sub oscillator (`vc2run … analog`; rom.4's sub-object has 4 bytes
   more at +0x94), its note-on, install, update and converter rewritten, and no SUPER-SAW, FEEDBACK-OSC or X-MOD in rom.4;
   BACKING's, ENSEMBLE's and SOLO's players equal (`vc2run … band`, `solo`) on rom.4's object layout (the OSC object's 4
-  bytes at +0x94, SOLO's state rearranged past R10), but for SOLO under Robot Voice; key assign equal (in the OSC run); Vari
-  off rewritten (no walk, no beat factor). Not run: LITE (kernels the same code, note-on and update not), kind 1's mode 1,
-  the period-jump player. Next: COSM's other DSP routines, and LITE's and Vari off's runs if the ports need them. The wiring (what reads parameters by ID, COSM's
+  bytes at +0x94, SOLO's state rearranged past R10), but for SOLO under Robot Voice; key assign equal (in the OSC run);
+  LITE's player equal walking forward (`vc2run … lite`), and walking backward once rom.2's six backward reads are made
+  rom.4's (the VC-2 reads backward the right way up, the V-Synth inverted); Vari off rewritten (no walk, no beat factor, its
+  mode meaning otherwise: ported from rom.4, not run). Not run: kind 1's mode 1, the period-jump player. Next: COSM's other
+  DSP routines. The wiring (what reads parameters by ID, COSM's
   converters) differs by construction: it is ported from rom.4, not shared, and the Comb and the portamento with it.
 - 1c. Still to map: the pitch tracker (the routines that write `0x899d9bd0`); the VOCODER OSC's IDs (0x354…0x383) into the
   voice's fields; kind 6's mode and where its pitch comes from (Auto Note, Modulator Key Mode, Split Point); the part mixer's

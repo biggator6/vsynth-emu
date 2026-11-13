@@ -17,6 +17,9 @@ Twin::Twin(const char* rom2, Machine& rom4) : vc2(rom4) {
 }
 
 bool Twin::call(uint32_t a2, uint32_t a4, std::initializer_list<uint32_t> args, float fr4, float fr5) {
+    // the same FPU registers in both: what a routine reads before it writes (the stereo Vari off's FR11) is then alike
+    std::memset(vsynth.fb, 0, sizeof vsynth.fb);
+    std::memset(vc2.cpu.fb, 0, sizeof vc2.cpu.fb);
     for (uint32_t* bank : {vsynth.fb[0], vc2.cpu.fb[0]}) {
         std::memcpy(&bank[4], &fr4, 4);
         std::memcpy(&bank[5], &fr5, 4);

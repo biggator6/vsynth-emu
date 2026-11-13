@@ -60,12 +60,14 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   each first is: an object's field map read from the code ("The VariPhrase players and key assign in rom.4").
   `romfile.option` runs a tool's `--option`s and `romfile.images` reads a two-image tool's arguments (codepairs.py's and
   codealign.py's).
-- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`, `osc`, `analog`, `band`, `solo`): a block's rom.2 routines and their
-  rom.4 pairs on two interpreters, its object compared after every call, and the port held beside rom.4's where one is
-  linked (`vc2twin.*`, a run per block, `vc2twin<block>.cpp`; `lfo` and `env` link their ports from plugin/Source, the rest
-  none; `band` and `solo` share `vc2twinplay.*` and link XtFirmware for rom.2's encoders and band load). An object rom.4 lays
-  out otherwise is copied and compared by segments (`Twin::copyMapped`, `differsMapped`). Fails on any difference: `cosm`
-  does, at the Comb ("COSM in rom.4"), `osc` at the pitch ramp ("The OSC block in rom.4"), and `solo` under Robot Voice.
+- `vc2run <rom.4> <block> <rom.2>` (`lfo`, `env`, `cosm`, `osc`, `analog`, `band`, `solo`, `lite`): a block's rom.2 routines
+  and their rom.4 pairs on two interpreters, its object compared after every call, and the port held beside rom.4's where
+  one is linked (`vc2twin.*`, a run per block, `vc2twin<block>.cpp`; `lfo` and `env` link their ports from plugin/Source,
+  the rest none; `band`, `solo` and `lite` share `vc2twinplay.*`, and `band` and `solo` link XtFirmware for rom.2's
+  encoders and band load). An object rom.4 lays out otherwise is copied and compared by segments (`Twin::copyMapped`,
+  `differsMapped`); every call starts both machines' FPU registers at 0. Fails on any difference: `cosm` does, at the Comb
+  ("COSM in rom.4"), `osc` at the pitch ramp ("The OSC block in rom.4"), `solo` under Robot Voice, and `lite` walking
+  backward.
 
 ## The V-Synth's tables and code in rom.4 (2026-11-13, the VC-2 mode's step 1a)
 
@@ -143,8 +145,9 @@ it is not the V-Synth's envelope time.
 COSM's voice side is too for 14 of its 15 types (below), its converters and the Comb are not; the OSC block's arithmetic
 and key state are, its wiring and portamento are not; the analog OSC's waveforms are, for the 11 the VC-2 has (no SUPER-SAW,
 no FEEDBACK-OSC), its note-on, install, update and converter are not; BACKING's, ENSEMBLE's and SOLO's players are, given
-rom.4's object layout, but for SOLO under Robot Voice; key assign is; Vari off is not.** Not run: LITE (its kernels the same
-code, its note-on and update not), kind 1's mode 1, the period-jump player (type 8).
+rom.4's object layout, but for SOLO under Robot Voice; LITE's is walking forward, and walking backward but for its read the
+right way up; key assign is; Vari off is not.** Not run: Vari off (rewritten; read from the code), kind 1's mode 1, the
+period-jump player (type 8).
 
 ### COSM in rom.4 (2026-11-13)
 
@@ -374,22 +377,56 @@ rom.4's pitch (+0x70) flipped at the 51st block (band 5,600 different, SOLO 3,94
 reason: a bit of the pitch's copy at +0x98, which the players write before they read it, and `xtFwSoloPlay`'s rest of the
 note-on left out, which is input to both images alike.
 
-**Not run: Vari off, LITE, kind 1's mode 1, the period-jump player.** No harness drives them alone (xt_tone plays them in a
-whole tone). By the code:
-- **Vari off is the VC-2's own.** rom.4's `0x893c63c0` steps by the pitch (+0x70) alone. rom.2's `0x89509870` steps by the
-  pitch × the walk (+0x7c), and under Tempo Sync or Time Trip (byte 0 & 6) by the beat's factor (`0x8950c280`, `XtBeat`),
-  which rom.4's doesn't call. rom.4 still names OSC 1 and 2 Tempo Sync Sw, Time Trip Sw and Time Trip Beat Keep, so how
-  they reach a Vari-off wave in the VC-2 is open.
-- LITE's kernels are the same code (+0xe8 → +0xec, its beat routine `0x8950c270` → `0x893c8990` moved); its note-on and
-  update read the voice by other offsets (the voice's layout, as the analog install's +0x960 → +0xa40).
+**LITE** (`vc2run <rom.4> lite <rom.2>`, `vc2twinlite.cpp`; no port linked: xt_tone holds `XtLitePlayer` to rom.2; output
+in `build/tools/vc2/lite_run.txt`). Its note-on is a stretch of the voice's (`0x8950b5b0`, at `0x8950b8d0` on the voice's
+registers) and can't be called alone, so each note's state is set in rom.2's player as `XtLitePlayer`'s note-on leaves it
+(the fields `XtLitePlayer.h` lists: heads, windows, period, filter, the loop as floats; the beat's rates and cached loop
+events), copied into rom.4's layout (`kOscMap`), and each image's block routine run 120 times on test waves as the band and
+SOLO runs, the wave between zeroed margins in both machines (the heads read below its start walking backward). Its
+per-mode routines and forward kernels are the same code with no value changed (`--fields`, 1.000). LITE's routine tables
+(`0x8950a870`, `0x8950a890`; rom.4's `0x893c6f00`, `0x893c6f20`) hold three loop modes a way and 0 in the fourth slot, in
+both images, so mode 3 jumps to 0: the run draws 0 to 2.
+
+- Walking forward throughout: **2,400 blocks, 0 different.**
+- Walking backward or still at any point (a step of 0 or less takes the backward kernels): **4,794 of 6,240 blocks
+  differ.** rom.2's backward kernels (`0x8950b1d4` mono, `0x8950b41a` stereo) read each sample negated, FNEG then FADD onto
+  the difference to the next (−x[i] + frac·(x[i−1] − x[i])); rom.4's (`0x893c7864`, `0x893c7aa6`) FSUB with the sample as
+  it is (x[i] + frac·(x[i−1] − x[i])): six places, one for each head, and each channel's in the stereo kernel. **The VC-2's
+  LITE plays backward the right way up; the V-Synth's reads it inverted.** The run's second pass makes rom.2's six reads
+  rom.4's in rom.2's machine (the FNEG a NOP, the FADD an FSUB) and is then equal throughout (8,640 blocks, 0 different).
+  So that is all of LITE's difference.
+
+All 17,280 blocks of the two passes sound (peak 0.47 of full scale). Seen red: the insert at +0x84 (8,640 of 8,640 in both
+passes), the mono routine paired with rom.4's stereo one (7,782 and 6,480), a bit of rom.4's pitch flipped at the 51st
+block (6,738 and 5,040: the forward notes too), four of the six reads patched (the second pass 1,302 different, the stereo
+right channel's). The insert at +0x90 doesn't show (4,794 and 0, as without it): LITE reads nothing in rom.2's +0x90…+0x93
+(the beat's integral, used under Tempo Sync), so only the band run places it.
+
+**Vari off is the VC-2's own; not run.** rom.4's `0x893c63c0` and `0x893c66e0` (paired by the installs' order) are 0.60 and
+0.55 alike by field shape. rom.4's mono routine, read as far as its mode paths: no test of the step's sign before it
+switches on the mode alone, where rom.2's picks a way by the sign; it steps by
+the pitch (+0x70) alone, where rom.2's `0x89509870` steps by the pitch × the walk (+0x7c), and under Tempo Sync or Time Trip
+(byte 0 & 6) by the beat's factor (`0x8950c280`, `XtBeat`), which rom.4's doesn't call; it reads the forward way's fields
+where the OSC object's insert puts them (fraction +0xec, position +0xf0, samples +0xf4, last sample +0xf8, loop +0xfc to
++0x108's rate, mode +0x10c), its fade at +0x124 where rom.2's is, and switches on the mode three ways (its table at
+`0x893c6410`) where rom.2's has six paths by mode and direction. Its mode means something else: run on a state rom.2's way
+(walk 1, forward), its mode 0 branches to the end, so the output stays 0 and the position where it was; with rom.2's mode
++ 1 its mode 1 wraps the position by the loop's length, and with no loop (length 0) never ends (the step limit); mode 3
+jumps into its table's data. So its state is set by rom.4's own converter and note-on, and it is ported from rom.4 rather
+than run beside rom.2's. rom.4 still names OSC 1 and 2 Tempo Sync Sw, Time Trip Sw and Time Trip Beat Keep, so how they
+reach a Vari-off wave in the VC-2 is open.
+
+LITE's note-on and update (`0x8950b5b0` → `0x893c7c30`, `0x8950bbb0` → `0x893c8280`) read the voice by other offsets (the
+voice's layout, as the analog install's +0x960 → +0xa40): wiring, ported from rom.4.
 
 **Key assign** (`XtKeys.h`). The reset, note-on and note-off ran equal in the OSC run (120,000 events, "The OSC block in
 rom.4"), and the highest held key (`0x894d66b0` → `0x89392670`, by shape) ran within them: both images' note-offs call it.
 rom.4 calls it from two more places (`0x89390c9c`, `0x89391de8`) rom.2 has not.
 
 **So BACKING's, ENSEMBLE's and SOLO's players of the VC-2 are the V-Synth's, and `XtMbPlayer` and `XtSoloVoice` serve them
-as they stand, given rom.4's object layout; SOLO under Robot Voice is not; key assign is the V-Synth's; Vari off is the
-VC-2's own.**
+as they stand, given rom.4's object layout; SOLO under Robot Voice is not; LITE's is, with its backward read the right way
+up (six instructions; for the port, a switch in `XtLitePlayer`); key assign is the V-Synth's; Vari off is the VC-2's
+own.**
 
 ## rom.4 run in the interpreter (2026-11-12, fourth pass)
 
