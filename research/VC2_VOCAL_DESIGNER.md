@@ -74,7 +74,10 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   runs rom.4's bank loader and start-up load and finds each sample's stream by rom.4's own lookup ("The sample bank,
   loaded"); `wlflib.py bank VC2 <out>` writes the bank it reads, and `wlflib.py samples VC2` the same from its own
   reading (the bank's table in `wlfbank.py`), to diff with it. `vc2index.h`'s `hookFiles` answers the file calls from
-  several files, one of them read as memory.
+  several files, one of them read as memory. `wavein <rom.2> <index> <bank>` (`vc2wavein.cpp`) runs the start-up load
+  with rom.4's wave reader and store for real and holds what the store keeps of each sample to the plugin's reading
+  (`vc2wavecmp.h`: `xtWaveRead`, whole RDAC blocks, `xtMbBuildBacking`) ("The wave reader, run"); `vc2bankload.h` is the
+  start-up load both it and `bank` run.
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -1563,8 +1566,73 @@ from its own reading: the index's entry, then the bank's `"TABLE"` by the file's
 
 **What the port needs** for a VC-2 sample: its stream by its file name in the bank's table, read as the plugin reads the
 preset area's streams (`xt_files` already holds all 416, these 192 among them, to rom.2's whole-wave routines). Its kind
-comes from the index's byte, not the stream's header. Not covered here: the reader `0x893474d0` itself, answered rather
-than run, and whether rom.2 has its like.
+comes from the index's byte, not the stream's header. Not covered here: ~~the reader `0x893474d0` itself, answered rather
+than run, and whether rom.2 has its like~~ (run since, "The wave reader, run").
+
+### The wave reader, run (2026-11-13, the VC-2 mode's step 1c)
+
+**Whose it is.** rom.4 has six routines that walk a wave's chunk tags (vpfl, vpsc, vplp, vpno, vpdt, data, LIST, name,
+link, vmdl, rdmd). Four are rom.2's, by size and shape (`codealign.py`; 1.0 the same code, near 0 unrelated):
+
+| rom.2 | rom.4 | Alike |
+|---|---|---|
+| `0x894939d0` | `0x89345d70` | 0.97 |
+| `0x89497d40` | `0x8934af60` | 0.96 |
+| `0x89499000` | `0x8934c220` | 0.97 |
+| `0x89496590` | `0x89349750` | 0.64 |
+| `0x89494620` | `0x893469c0` | 0.60 |
+| `0x89494620` | `0x893474d0`, the bank's reader | 0.38 |
+
+`0x89494620` is the routine HARDWARE_FIRMWARE.md's "The XT's load" left unread. Its rom.4 twin `0x893469c0` reads a
+file through the file calls (`0x89336cf0` ×7, `0x89336db0` ×5). The bank's reader is the VC-2's own: it makes no file
+call, and copies a stream's chunks from memory at the place the bank's lookup leaves (`0x8997ad2c`, size `0x8997ad28`).
+
+**Where it puts a wave.** The store is rom.4's wave library (`0x8997c52c`): 128 lists by id & 127, each entry 88 bytes
+and the wave's name, taken from the store's own pool (`0x8997c51c`). The store's setup (`0x89353ac0`) clears the lists and
+gives the pool 32 MB from the OS's allocator (`0x89350c10`). The reader registers the wave there (`0x89356a90` →
+`0x89353b40(library, id, …)`), which looks the id up in its list first and hands an entry it finds to `0x89354490`
+(not read).
+
+**What it stores** (the run, all 192 samples):
+- **Chunks:** kinds 2 (vpsc), 3 (vpno), 4 (vplp), 5 (vpdt), 6, 7, 8 and 10 (the cached loop events), none at 0, 1 or 9.
+  Kinds 6–8 aren't compared.
+- **Fields:** the header, the loop record, the vpno and the vpdt equal the stream's as `xtWaveRead` reads them, field
+  for field and byte for byte, and the frame count with them. So the load keeps a stored vpdt as it is.
+- **Audio, band 0:** decoded over whole RDAC blocks from the data chunk's own bytes. When the frames end inside a block,
+  that last block is decoded from the stream's real bytes past the frames. The decoder (`0x893eb9d0`, over
+  `0x893e6740`/`0x893e6800`, which are rom.2's `0x89529c20`/`0x89529ce0` by `codepairs.py`) pads with zeros only past the
+  bytes it is given (its flush, `0x8935ca10`).
+  `xtWaveRead`'s decoder (`xtFwRdacDecode`) feeds zeros past the frames, so the plugin's audio differs in the last frames
+  (up to 15) of 177 of the 180 samples that end inside a block.
+- **Bands:** the BACKING sample's six bands (0, 2…6) are rebuilt from that audio and equal `xtMbBuildBacking`'s, band 0
+  the full-rate residual in place of the audio. Bands 2…6 are held for that sample alone.
+
+**Run** (`vc2run <rom.4> wavein <rom.2> <index> <bank>`, `vc2wavein.cpp` and `vc2wavecmp.cpp`;
+`build/tools/vc2/wavein.txt`). The start-up load as "The sample bank, loaded" runs it (`vc2bankload.h`), with the reader
+and the store's "held" now run, after the store's own setup. Answered:
+- the kernel's file name for a path (`0x89338c60`), as the part after the path's last `\`; the reader hands it to
+  `0x89345be0`, which drops a "NNN " or "NNN_" number from a name as the card's files have it;
+- the OS's allocator, calloc and free (`0x89300770`, `0x89300910`, `0x89300840`), from a region of their own with
+  nothing freed, as the interpreter's machine answers operator new.
+
+Each sample's store answers (chunk `0x89351ad0`, band `0x89351ff0`, frames `0x89351a10`) were held to the plugin's
+reading of the same stream:
+
+| | |
+|---|---|
+| The start-up load with the reader run | 1; 610,011,895 steps; the allocator 12 calls, 32 MB and 72,512 bytes |
+| The chunks' fields, vpno, vpdt and frames against `xtWaveRead`, 192 samples | 0 differ |
+| Band 0 against `xtWaveRead`'s audio, 191 samples | 14 equal, 177 differ only in their last block of 16 frames, 0 before it |
+| Band 0 against the plugin's decoder over whole blocks | 0 of 191 differ |
+| Sample 181's bands against `xtMbBuildBacking`'s from that audio | equal, every band |
+| Planted: the key read one byte on (+0xb) | all 192 differ |
+| Planted: the bands built from the zero-filled audio | 1 of 1 differs |
+| The bank, splits and splitbytes runs after the load moved to `vc2bankload.*` | as before, byte for byte |
+
+**What the port needs** for a VC-2 sample: its stream read as `xtWaveRead` reads it, but its audio decoded over whole
+blocks (the frames rounded up to 16 where the data holds them), and a BACKING sample's bands built by `xtMbBuildBacking`
+from that audio. The V-Synth's side is left as it was: rom.2's whole-wave routine, as `XtFiles` calls it with the frame
+count, gives the zero-filled tail the plugin has, and what count rom.2's own file reader passes isn't known.
 
 ### The factory patches, read by rom.4 (2026-11-13, the VC-2 mode's step 1c)
 
@@ -1889,6 +1957,7 @@ among rom.2's.
 - ~~The `WLF08` library's format, and whether it is the V-Synth's preset area's format too.~~ Read and checked, both ("The
   wave libraries, read"). Left: how rom.2 finds its 224 streams, ~~and how rom.4's player picks a map's split~~ (found, "A
   VC-2 wave's split, chosen", and what the split's bytes do, "The split's bytes, followed"), ~~and how rom.4's store comes
-  to hold the VC-2's samples under ids 1…192~~ (run, "The sample bank, loaded"; left of it: the wave reader `0x893474d0`
-  itself, and how the OS fills the wave library from the link files).
+  to hold the VC-2's samples under ids 1…192~~ (run, "The sample bank, loaded"; left of it: ~~the wave reader `0x893474d0`
+  itself~~ (run, "The wave reader, run"; left of it: chunk kinds 6–8, and the count rom.2's file reader gives its
+  decoder), and how the OS fills the wave library from the link files).
 - rom.4's sections (code, .data, .bss), and how much of its code is rom.2's.

@@ -27,11 +27,12 @@
 //   vc2run <rom.4> splits <index>  a VC-2 wave's split at every velocity and a map's at every key (vc2split.cpp)
 //   vc2run <rom.4> splitbytes <index>  what reads the bytes a split passes on (vc2splitbytes.cpp)
 //   vc2run <rom.4> bank <index> <bank>  how the store comes to hold each VC-2 sample (vc2bank.cpp)
+//   vc2run <rom.4> wavein <rom.2> <index> <bank>  what the wave reader stores, against xtWaveRead (vc2wavein.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
 //        plugin/Source/XtFwMachine.cpp plugin/Source/XtMultiBandPlayer.cpp plugin/Source/XtFxChip.cpp
-//        plugin/Source/XtFxControl.cpp plugin/Source/XtOsc.cpp -o build/tools/vc2/vc2run
+//        plugin/Source/XtFxControl.cpp plugin/Source/XtOsc.cpp plugin/Source/XtWaveFile.cpp -o build/tools/vc2/vc2run
 #include "vc2runs.h"
 #include <algorithm>
 #include <array>
@@ -123,7 +124,7 @@ constexpr std::array kRuns{Run{"boot", vc2::boot}, Run{"warp", vc2::warp}, Run{"
                            Run{"autonote", vc2::autonote}, Run{"mixer", vc2::mixer}, Run{"typed", vc2::typed},
                            Run{"fxprog", vc2::fxprog}, Run{"fxroute", vc2::fxroute}, Run{"fxreverb", vc2::fxreverb},
                            Run{"splits", vc2::splits}, Run{"splitbytes", vc2::splitbytes},
-                           Run{"bank", vc2::bank}};
+                           Run{"bank", vc2::bank}, Run{"wavein", vc2::wavein}};
 
 } // namespace
 
@@ -132,7 +133,7 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "usage: vc2run <rom.4> <run> [args]: boot, warp, ratio, hold, growl, kind6, patches,\n"
                              "       track, vocosc, autonote, mixer, typed, fxreverb, splits, splitbytes, bank;\n"
                              "       vc2run <rom.4> <block> <rom.2>: lfo, env, cosm, osc, analog, band, solo, lite,\n"
-                             "       tva, fxprog, fxroute\n");
+                             "       tva, fxprog, fxroute, wavein\n");
         return 2;
     }
     vc2::Machine m(argv[1]);
