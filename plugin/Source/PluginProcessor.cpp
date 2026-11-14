@@ -87,61 +87,7 @@ VSynthEmuProcessor::~VSynthEmuProcessor() {
     encodePool_.removeAllJobs(true, -1);   // no deadline: each job hears the stop and ends (PluginEncodes.cpp, v185)
 }
 
-// ─── The firmware image ───────────────────────────────────────────────────────
-
-static const char* const kRomName = "V-SynthXT.rom.2.bin";   // rom.2 as research/ghidra_scripts/unpack_firmware.py writes it
-static const char* const kRomKey  = "romPath";
-static const char* const kPatchFolderKey = "patchFolder";
-
-// What belongs to the plugin and not to a project, whichever format is running: ~/Library/Application Support/V-Synth Emu,
-// or VSE_APP_DIR, so that PluginTest leaves the user's alone.
-static juce::File appDir() {
-    if (const char* d = std::getenv("VSE_APP_DIR")) return juce::File(juce::String::fromUTF8(d));
-    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("Application Support/V-Synth Emu");
-}
-
-static std::unique_ptr<juce::PropertiesFile> appSettings() {
-    juce::PropertiesFile::Options o;
-    o.millisecondsBeforeSaving = -1;   // only when told
-    return std::make_unique<juce::PropertiesFile>(appDir().getChildFile("settings.xml"), o);
-}
-
-// A new instance's search, first to last: VSE_XT_ROM; beside the plugin, never in its bundle, where an added file breaks
-// the signature; the plugin's own folder; the image last chosen by hand, which is how an AU, a VST3 and a standalone, each
-// in a folder of its own, share one.
-void VSynthEmuProcessor::findRom() {
-    juce::StringArray cand;
-    if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(juce::String::fromUTF8(p));
-    cand.add(juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile(kRomName).getFullPathName());
-    cand.add(appDir().getChildFile(kRomName).getFullPathName());
-    cand.add(appSettings()->getValue(kRomKey));
-    for (const auto& c : cand)
-        if (c.isNotEmpty() && juce::File(c).existsAsFile() && openRom(juce::File(c))) return;
-    setStatus("No ROM: choose V-SynthXT.rom.2.bin, or put it next to the plugin");
-}
-
-bool VSynthEmuProcessor::openRom(const juce::File& file) {
-    if (std::string why; !file.existsAsFile() || !xtSynthSetRom(file.getFullPathName().toStdString(), &why)) {
-        setStatus("Not a usable rom.2 image: " + file.getFileName() + (why.empty() ? "" : ": ") + juce::String(why));
-        return false;
-    }
-    apvts.state.setProperty(kRomKey, file.getFullPathName(), nullptr);
-    { const std::lock_guard<std::mutex> lock(fxLock_); romFile_ = file.getFullPathName(); }
-    setStatus("ROM ready");
-    reencode(0);
-    reencode(1);
-    return true;
-}
-
-bool VSynthEmuProcessor::setRomFile(const juce::File& file) {
-    if (!openRom(file)) return false;
-    appDir().createDirectory();
-    auto settings = appSettings();
-    settings->setValue(kRomKey, file.getFullPathName());
-    settings->save();
-    return true;
-}
+// The firmware image's search and the plugin's own folder are in PluginRom.cpp and PluginAppFolder.cpp (v198)
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -407,28 +353,7 @@ void VSynthEmuProcessor::loadFile(const juce::File& file, int osc, bool waveSett
 }
 
 // ─── A V-Synth patch ─────────────────────────────────────────────────────────
-
-bool VSynthEmuProcessor::loadPatch(const juce::File& file, int zone) {
-    if (!xtSynthRomReady()) { setStatus("A patch needs the firmware image"); return false; }
-    juce::MemoryBlock bytes;
-    XtPatchFile patch;
-    std::string why;
-    if (!file.loadFileAsData(bytes) || !xtPatchRead(static_cast<const uint8_t*>(bytes.getData()), bytes.getSize(), patch, &why)) {
-        setStatus(file.getFileName() + ": " + (why.empty() ? juce::String("can't be read") : juce::String(why)));
-        return false;
-    }
-    appDir().createDirectory();
-    auto settings = appSettings();
-    settings->setValue(kPatchFolderKey, file.getParentDirectory().getFullPathName());
-    settings->save();
-    applyPatch(patch.name, patch.store, zone, file.getParentDirectory().getSiblingFile("Wave"));
-    return true;
-}
-
-juce::File VSynthEmuProcessor::lastPatchFolder() const {
-    const juce::File f(appSettings()->getValue(kPatchFolderKey));
-    return f.isDirectory() ? f : juce::File::getSpecialLocation(juce::File::userHomeDirectory);
-}
+// Read from its file, its folder kept, in PluginPatchFiles.cpp (v198)
 
 void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<uint8_t>& store, int zone, const juce::File& waveFolder) {
     XtSynth::Controls c = xtWithPatchArp(store, xtPatchControls(store, zone, xtControls()));   // and its arpeggio (v190)

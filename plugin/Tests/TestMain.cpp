@@ -17,6 +17,16 @@ int testMain(int argc, char** argv, const char* name, const TestRunWith& run) {
     return run(juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]), work, rest);
 }
 
+juce::String thisProgramSays(const juce::StringArray& args) {
+    juce::ChildProcess child;
+    juce::StringArray all { juce::File::getSpecialLocation(juce::File::currentExecutableFile).getFullPathName() };
+    all.addArray(args);
+    if (!child.start(all, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) return "didn't start";
+    const juce::String said = child.readAllProcessOutput();
+    child.waitForProcessToFinish(120000);
+    return said;
+}
+
 int testMain(int argc, char** argv, const char* name, TestRun run) {
     return testMain(argc, argv, name, [run](const juce::File& rom, const juce::File& work, const juce::StringArray&) {
         return run(rom, work);

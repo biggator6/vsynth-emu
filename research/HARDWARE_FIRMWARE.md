@@ -1546,6 +1546,32 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Two known images, rom.2 and rom.4 (2026-11-14, v198) {#two-images}
+
+The VC-2 mode's step 2, second item. Until now the plugin took the first image whose tables loaded and refused any
+other bytes, but nothing asked which firmware a file is: the ports read their tables at rom.2's own addresses, so a
+rom.4 chosen as "the ROM" could have loaded wrong tables without a word. Now `XtSynthRom.cpp` knows two images, each by
+its header's sections (the table in "A firmware image's own header"): the V-Synth XT's rom.2, whose tables the ports read
+as before, and the VC-2's rom.4. Each is held once a process in its own slot by the old rule (the first file loads, a
+copy is taken, other bytes are refused until the host starts again). A file of the other image is refused saying whose
+it is ("it is the VC-2's image, rom.4, not the V-Synth's rom.2"), and one of neither as "a firmware image this plugin
+doesn't know".
+
+The plugin loads both at its start, so switching modes is seamless (the user's decision, 2026-11-14): rom.4 is sought
+at every instance's start, beside the rom.2 it opened first, where the firmware update's unpacker leaves both, then
+where rom.2 is sought (beside the plugin, its own folder, the image last chosen, `setVc2RomFile`), and with no rom.2 at
+all. The search is quiet: a file there that isn't rom.4 is passed over, and the status line is as it was. No port reads
+rom.4 yet; it is taken once the interpreter lays it out (`loadVc2`), where the VC-2 ports' tables will be read, at the
+start and never at a switch.
+
+`PluginProcessor.cpp` (560 lines) was split first, moved as it stood: the image search into `PluginRom.cpp`, the
+plugin's own folder and settings into `PluginAppFolder.cpp`, and a patch's file read into `PluginPatchFiles.cpp`. Its
+`getenv` of `VSE_APP_DIR`, the tests' own path, could only move once the kit's lesson-checks left code moved as it stood
+alone (KWB-163, workflow-bugs.md).
+
+Checked: `VSynthEmuRomTest` 17 of 17, among them rom.4 found beside rom.2 and with none, and each of the three
+refusals; the thirteen `rom-` and `rom4-` plants and the two patch plants that moved, each caught.
+
 ### A firmware image's own header, loaded by (2026-11-14, v197) {#image-header}
 
 `Sh4::loadRom` lays out an image as its header says, so the interpreter takes rom.4 (the VC-2) as it takes rom.2: the

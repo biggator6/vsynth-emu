@@ -155,7 +155,12 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   its loader held, its region to 0x8a020000 as before; `vc2rom.cpp` calls it; fcheck as baseline with all 165 sections
   run, verify.sh clean, seven vc2run runs on rom.4 HEAD's output to the byte, `rd` reading rom.4's .data.
 - The ROM search finds rom.4 beside rom.2; `XtSynthRom.cpp`'s one-image rule made two known images (`VSynthEmuRomTest`, the
-  `rom-` plants).
+  `rom-` plants). The plugin loads both images at its start, so that switching modes is seamless (the user's decision,
+  2026-11-14): each held once a process in its own slot, neither reloaded nor needing a restart at a switch, and the VC-2's
+  tables, when its ports come (step 3), read at that start as rom.2's are. **Done 2026-11-14, v198**
+  (HARDWARE_FIRMWARE.md, "Two known images"): each image known by its header's sections, a file of the other or of
+  neither refused saying so; rom.4 sought at every start, beside rom.2 first and with no rom.2; VSynthEmuRomTest 17/17,
+  the rom- plants moved with their code and four rom4- plants, all caught.
 - rom.4's parameter tables (names, descriptors, value text) read at run time.
 - An audio input: an input or sidechain bus, the mic in the Standalone, External In Type; the panel says when none is
   connected. It also gives the V-Synth's EXT IN OSC its input, so it can come first as a version of its own.

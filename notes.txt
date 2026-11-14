@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Two known images v198 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, second item (the user's "Yes, next item",
+  and "plugin should be able to load both roms so that switching modes is seamless"). XtSynthRom.cpp knows rom.2 (the
+  V-Synth's, whose tables the ports read) and rom.4 (the VC-2's) by their header's sections (Sh4::sectionsOf, public),
+  each held once a process in its own RomInUse by the old rule; a file of the other image is refused saying whose it
+  is, one of neither as no image this plugin knows. Both load at an instance's start: rom.4 sought beside the rom.2 it
+  opened, then where rom.2 is (addPlaces), and with no rom.2 at all; quietly, the status line as it was;
+  setVc2RomFile/hasVc2Rom for the mode to come. No port reads rom.4 yet (loadVc2 lays it out in an interpreter, where its
+  tables will be read). PluginProcessor.cpp (560 lines) split first, moved as it stood: PluginRom.cpp (the search),
+  PluginAppFolder (appDir, appSettings, and keepSetting, the one way a setting is kept), PluginPatchFiles.cpp (loadPatch,
+  lastPatchFolder); its VSE_APP_DIR read could move once the kit's lesson-checks let moved code stand (KWB-163). Check:
+  VSynthEmuRomTest 17/17 (rom.4 beside rom.2, alone by a fresh run of itself through TestMain's thisProgramSays, the
+  three refusals); the rom- plants moved with their code into panel_muts.txt and four new rom4- plants, thirteen and the
+  two patch plants that moved all caught, switch-read too; every one of the 240 plants' code found.
+
 A firmware image by its own header v197 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, first item (the user's
   "proceed with next step if verify.sh comes back clean"). Sh4::loadRom lays out an image as its header at file offset
   0x1c says (.bss, its end, .data's source, .data), so the interpreter takes rom.4 as it takes rom.2; rom.2's sections

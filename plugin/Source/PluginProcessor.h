@@ -95,6 +95,11 @@ public:
     // instance finds it (findRom).  Returns false, with the last image still in use, if the file is not a usable image.
     bool setRomFile(const juce::File& file);
     bool hasRom() const { return xtSynthRomReady(); }
+    // ── The VC-2's firmware (rom.4, v198) ──
+    // Message thread.  Found once rom.2 is open, beside it first (findVc2Rom), or chosen here and kept as rom.2's is.
+    // Returns false, the status saying why, if the file isn't the VC-2's image.  No port reads it yet (the VC-2 mode).
+    bool setVc2RomFile(const juce::File& file);
+    bool hasVc2Rom() const { return xtSynthVc2RomReady(); }
 
     // ── The effects ────────────────────────────────────
     // What the control thread does each time round, also callable from a test: with the Effects switch on and rom.2 here, the chip and its driver come up (the first time) and take
@@ -176,6 +181,7 @@ private:
     void handleAsyncUpdate() override;          // re-encode after an Encode Type / Depth change
     void findRom();
     bool openRom(const juce::File& file);       // for this instance, and kept nowhere but its project
+    void findVc2Rom(const juce::File& rom);     // PluginRom.cpp
 
     // ── Playback state (audio thread, legacy path) ───────────────────────────
     int  playbackPos_  = -1;

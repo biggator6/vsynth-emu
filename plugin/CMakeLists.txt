@@ -129,6 +129,8 @@ target_sources(VSynthEmu PRIVATE
     Source/XtMultiBandPlayer.cpp
     Source/Sh4Interp.cpp
     Source/Sh4Setup.cpp
+    Source/PluginRom.cpp
+    Source/PluginAppFolder.cpp
     Source/XtFirmware.cpp
     Source/XtFwMachine.cpp
     Source/XtFiles.cpp

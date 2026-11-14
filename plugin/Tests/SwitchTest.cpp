@@ -56,13 +56,7 @@ int play(const juce::File& rom, const juce::File& work) {
 
 // This program again, playing both notes in the environment as it now is: all it says, stdout and stderr
 juce::String played(const juce::File& rom, const juce::File& work) {
-    juce::ChildProcess child;
-    const juce::StringArray args { juce::File::getSpecialLocation(juce::File::currentExecutableFile).getFullPathName(),
-                                   rom.getFullPathName(), "--play", work.getFullPathName() };
-    if (!child.start(args, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) return "didn't start";
-    const juce::String said = child.readAllProcessOutput();
-    child.waitForProcessToFinish(120000);
-    return said;
+    return thisProgramSays({ rom.getFullPathName(), "--play", work.getFullPathName() });
 }
 
 // The work folder's files, by name

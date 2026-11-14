@@ -11,3 +11,7 @@ using TestRunWith = std::function<int(const juce::File& rom, const juce::File& w
 // (TestAppDir.h), its work folder `name` in it.  Exits as the run does.
 int testMain(int argc, char** argv, const char* name, TestRun run);
 int testMain(int argc, char** argv, const char* name, const TestRunWith& run);
+
+// This program again, `args` after its path, in this one's environment (its app folder too), for what only a fresh
+// process shows: all it says, stdout and stderr, or "didn't start"
+juce::String thisProgramSays(const juce::StringArray& args);

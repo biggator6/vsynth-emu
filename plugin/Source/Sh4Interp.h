@@ -45,8 +45,12 @@ public:
     // The loaded image's sections as its header gives them, CPU addresses; all 0 before a load.
     struct ImageSections {
         uint32_t bss = 0, bssEnd = 0, dataFrom = 0, data = 0;
+        bool operator==(const ImageSections&) const = default;
     };
     const ImageSections& image() const { return image_; }
+    // An image's sections by its header, from its file's bytes; false unless they are laid out as a firmware image's
+    // are (v198: XtSynthRom.cpp knows an image by them).
+    static bool sectionsOf(const uint8_t* img, size_t size, ImageSections& s);
     // RAM for the caller's buffers, heap and stack (virtual P1 addresses).
     void mapRam(uint32_t addr, uint32_t size);
 

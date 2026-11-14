@@ -40,9 +40,14 @@ struct XtEncoded {
 };
 
 // The user's rom.2 (XtSynthRom.cpp): the tables, once a process, and the firmware for the interpreter.  False if it isn't
-// usable, or (`why` says) isn't the image the process already plays from, and then nothing is written.
+// usable, or (`why` says) is another known image or none, or isn't the image the process already plays from, and then
+// nothing is written.
 bool xtSynthSetRom(const std::string& path, std::string* why = nullptr);
 bool xtSynthRomReady();
+// The user's rom.4, the VC-2's image (v198): known and held once a process as rom.2 is, by the same rule.  No port reads
+// it yet; the VC-2 mode's own (step 3 on) will.
+bool xtSynthSetVc2Rom(const std::string& path, std::string* why = nullptr);
+bool xtSynthVc2RomReady();
 
 // Encodes planar float channels at `sampleRate`.  type: 1 SOLO, 3 BACKING,
 // 5 ENSEMBLE; depth: Encode Depth 0..127 (multi-band attack detection).

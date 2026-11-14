@@ -113,3 +113,18 @@ editor-d-tab-press|            if (onChoose) onChoose((int)i);|            if (o
 # flow lays the controls and the grid's height alike, so nothing overlapped or left its card. Its rows run together:
 editor-d-grid-rows|            y += rowH + kGap;|            y += kGap;|plugin/Source/UiControlGrid.cpp|layout
 editor-d-details-stuck|    if (now != face_) show(now);|    if (now != face_) show(0);|plugin/Source/UiDetails.cpp|layout
+# The firmware image's search, moved with its code from PluginProcessor.cpp into PluginRom.cpp (v198), out of
+# mutate_panel.py's MUTS, by TEST_ROM_SEARCH: the places it looks, their order, VSE_XT_ROM first, a chosen image kept.
+rom-not-beside|cand.add(juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile(name).getFullPathName());|;|plugin/Source/PluginRom.cpp|rom
+rom-order|cand.add(appDir().getChildFile(name).getFullPathName());\n    cand.add(appSettings()->getValue(key));|cand.add(appSettings()->getValue(key));\n    cand.add(appDir().getChildFile(name).getFullPathName());|plugin/Source/PluginRom.cpp|rom
+rom-env-last|if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(juce::String::fromUTF8(p));\n||plugin/Source/PluginRom.cpp|rom
+rom-not-kept|keepSetting(kRomKey, file.getFullPathName());|;|plugin/Source/PluginRom.cpp|rom
+# A patch's waves sought beside its Patch folder, moved with loadPatch into PluginPatchFiles.cpp (v198), out of the MUTS
+patch-wave-folder|file.getParentDirectory().getSiblingFile("Wave")|file.getParentDirectory().getChildFile("Wave")|plugin/Source/PluginPatchFiles.cpp|patch
+# The two known images (v198), by VSynthEmuRomTest: rom.4 found beside the rom.2 opened, each refused as the other's
+# image, a file of neither refused.
+rom4-not-beside|    cand.add(rom.getSiblingFile(kVc2RomName).getFullPathName());\n||plugin/Source/PluginRom.cpp|rom-image
+rom4-not-sought|    findVc2Rom(file);\n||plugin/Source/PluginRom.cpp|rom-image
+rom4-not-alone|    findVc2Rom(juce::File());\n||plugin/Source/PluginRom.cpp|rom-image
+rom-any-image|    out.known = known == std::end(kKnown) ? nullptr : *known;|    out.known = &kVSynth;|plugin/Source/XtSynthRom.cpp|rom-image
+rom-not-the-image|    if (file->known != &image_) {|    if (false) {|plugin/Source/XtSynthRom.cpp|rom-image

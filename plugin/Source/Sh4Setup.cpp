@@ -40,19 +40,20 @@ bool readImageFile(const char* path, std::vector<uint8_t>& out, std::string& why
     return false;
 }
 
-// The image's sections by its header; false unless they are laid out as a firmware image's are: .data's source right
-// below .data, then .bss, inside the image and below the machines' RAM
-bool sectionsOf(const std::vector<uint8_t>& img, Sh4::ImageSections& s) {
-    if (img.size() < kHeaderAt + kHeaderBytes) return false;
-    const uint8_t* h = img.data() + kHeaderAt;
+} // namespace
+
+// The image's sections by its header: laid out as a firmware image's are, .data's source right below .data, then .bss,
+// inside the image and below the machines' RAM
+bool Sh4::sectionsOf(const uint8_t* img, size_t size, ImageSections& s) {
+    if (size < kHeaderAt + kHeaderBytes) return false;
+    const uint8_t* h = img + kHeaderAt;
     s.bss = xtfile::le32(h);
     s.bssEnd = xtfile::le32(h + 12);
     s.dataFrom = xtfile::le32(h + 16);
     s.data = xtfile::le32(h + 20);
     const bool ordered = kImageBase <= s.dataFrom && s.data < s.bss && s.bss < s.bssEnd && s.bssEnd <= kImageLimit;
-    return ordered && s.dataFrom == s.data - (s.bss - s.data) && s.data - kImageBase <= img.size();
+    return ordered && s.dataFrom == s.data - (s.bss - s.data) && s.data - kImageBase <= size;
 }
-} // namespace
 
 void Sh4::addRegion(uint32_t base, uint32_t size) {
     Region* g = new Region{ phys(base), size, std::vector<uint8_t>(size, 0) };
@@ -70,7 +71,7 @@ bool Sh4::loadRom(const char* path) {
     std::vector<uint8_t> img;
     if (!readImageFile(path, img, err)) return false;
     ImageSections s;
-    if (!sectionsOf(img, s)) {
+    if (!sectionsOf(img.data(), img.size(), s)) {
         err = "not a firmware image: its header's sections are not .data's source, .data, then .bss";
         return false;
     }
