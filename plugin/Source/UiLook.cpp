@@ -34,6 +34,11 @@ void panelName(juce::Label& l, const juce::String& name) {
     l.setText(name, juce::dontSendNotification);
 }
 
+void fieldName(juce::Label& l, const juce::String& name) {
+    setTextLook(l, sans(10.0f, "Semibold"), label, juce::Justification::centredLeft);
+    l.setText(name, juce::dontSendNotification);
+}
+
 void showText(juce::Label& l, const juce::String& words, juce::Colour colour) {
     l.setText(words, juce::dontSendNotification);
     l.setColour(juce::Label::textColourId, colour);
@@ -107,11 +112,28 @@ void Feel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float
     arc(g, k, juce::jmin(from, at), juce::jmax(from, at), s.isEnabled() ? accent : dim);
     modRing(g, s, k, start, end);
     if (side >= big) {
-        g.setColour(divider);
-        g.fillEllipse(juce::Rectangle<float>(2.0f * (k.r - 7.0f), 2.0f * (k.r - 7.0f)).withCentre(k.c));
+        Ui::dot(g, k.c, 2.0f * (k.r - 7.0f), divider);
     }
     g.setColour(text);
     g.drawLine(juce::Line<float>(k.c, onCircle(k.c, k.r - 6.0f, at)), side >= big ? 2.0f : 1.6f);
+}
+
+// A bar (UiFields.h): a field, the fill from the range's zero to the value in the bar's track colour, its value's text on
+// it; any other linear slider as JUCE's
+// one-off: JUCE's LookAndFeel override; its parameters are JUCE's
+void Feel::drawLinearSlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float min, float max,
+                            juce::Slider::SliderStyle style, juce::Slider& s) {
+    if (style != juce::Slider::LinearBar) {
+        LookAndFeel_V4::drawLinearSlider(g, x, y, w, h, pos, min, max, style, s);
+        return;
+    }
+    const auto r = juce::Rectangle<int>(x, y, w, h).toFloat();
+    Ui::fillRounded(g, r, field, 3.0f);
+    const float from = r.getX() + zeroOf(s) * r.getWidth();
+    const auto fill = r.withLeft(juce::jmin(from, pos)).withRight(juce::jmax(from, pos));
+    Ui::fillRounded(g, fill, s.findColour(juce::Slider::trackColourId).withAlpha(s.isEnabled() ? 0.6f : 0.25f), 3.0f);
+    Ui::drawText(g, s.getTextFromValue(s.getValue()), r.toNearestInt(),
+                 { mono(10.0f), text, juce::Justification::centred, false });
 }
 
 // A switch: a pill, the accent when on, then its text; or, with the power property, a dot alone
@@ -119,15 +141,13 @@ void Feel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, bool, bool
     const bool on = b.getToggleState();
     auto r = b.getLocalBounds().toFloat();
     if (b.getProperties()[power]) {
-        g.setColour(on ? accent : track);
-        g.fillEllipse(juce::Rectangle<float>(14.0f, 14.0f).withCentre(r.getCentre()));
+        Ui::dot(g, r.getCentre(), 14.0f, on ? accent : track);
         return;
     }
     const auto pill = r.removeFromLeft(26.0f).withSizeKeepingCentre(26.0f, 14.0f);
     Ui::fillRounded(g, pill, on ? accent : track, 7.0f);
     const float knobX = on ? pill.getRight() - 7.0f : pill.getX() + 7.0f;
-    g.setColour(on ? ground : label);
-    g.fillEllipse(juce::Rectangle<float>(10.0f, 10.0f).withCentre({ knobX, pill.getCentreY() }));
+    Ui::dot(g, { knobX, pill.getCentreY() }, 10.0f, on ? ground : label);
     Ui::drawText(g, b.getButtonText(), r.withTrimmedLeft(8.0f).toNearestInt(),
                  { sans(11.0f, "Semibold"), b.isEnabled() ? text : muted });
 }

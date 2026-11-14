@@ -44,6 +44,8 @@ void showText(juce::Label& l, const juce::String& words, juce::Colour colour);
 void paintPanel(juce::Graphics& g, juce::Rectangle<int> bounds, bool selected);
 // A rack panel's name, a label (so the layout's check sees it whole)
 void panelName(juce::Label& l, const juce::String& name);
+// A control's name, over or beside a bar or a box, as a knob's is under it (UI step 3)
+void fieldName(juce::Label& l, const juce::String& name);
 
 // Where a knob's sweep starts and ends: 135° to 405° in the mock-up's angles, from 12 o'clock as JUCE counts them
 inline constexpr float sweepStart = 1.25f * juce::MathConstants<float>::pi;
@@ -59,6 +61,8 @@ public:
     Feel();
     void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h, float pos, float start, float end,
                           juce::Slider&) override;
+    void drawLinearSlider(juce::Graphics&, int x, int y, int w, int h, float pos, float min, float max,
+                          juce::Slider::SliderStyle, juce::Slider&) override;
     void drawToggleButton(juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     void drawButtonBackground(juce::Graphics&, juce::Button&, const juce::Colour&, bool highlighted,
                               bool down) override;

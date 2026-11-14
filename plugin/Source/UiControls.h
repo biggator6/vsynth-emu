@@ -1,6 +1,7 @@
 #pragma once
 // D's controls made straight from a parameter's ID (UI step 2): a box holding a choice's values, attached once it has
-// them; a switch; a knob (UiKnob.h).  A panel keeps what these give it for as long as it shows the controls.
+// them; a switch; a knob (UiKnob.h); and which face a Type parameter shows (UI step 3).  A panel keeps what these give it
+// for as long as it shows the controls.
 #include "UiKnob.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <memory>
@@ -29,5 +30,7 @@ bool box(juce::ComboBox& b, State& state, const juce::String& id, Attached& into
 bool toggle(juce::Button& b, State& state, const juce::String& id, Attached& into);
 // A knob on the parameter, or none if the ID names none (a table row's mistake, which the editor's test reports)
 std::unique_ptr<Knob> knob(State& state, const juce::String& id, const juce::String& name, int dialSize);
+// The face a Type parameter shows: its value, within the faces there are; the first with no Type
+int faceOf(State& state, const juce::String& typeId, int faces);
 
 }

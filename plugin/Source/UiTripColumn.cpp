@@ -21,7 +21,7 @@ void TripPad::paint(juce::Graphics& g) {
     const float x = r.getX() + 8.0f + at * (r.getWidth() - 16.0f);
     g.setColour(Look::mod.withAlpha(at > 0.0f ? 1.0f : 0.35f));
     g.drawLine(x, r.getY() + 6.0f, x, r.getBottom() - 6.0f, 2.0f);
-    g.fillEllipse(juce::Rectangle<float>(12.0f, 12.0f).withCentre({ x, r.getCentreY() }));
+    Ui::dot(g, { x, r.getCentreY() }, 12.0f, Look::mod.withAlpha(at > 0.0f ? 1.0f : 0.35f));
     Ui::drawText(g, getTextFromValue(getValue()), getLocalBounds().reduced(8, 6).removeFromTop(14),
                  { Look::mono(10.0f), Look::muted });
 }

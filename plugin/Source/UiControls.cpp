@@ -24,4 +24,10 @@ std::unique_ptr<Knob> knob(State& state, const juce::String& id, const juce::Str
     return std::make_unique<Knob>(state, id, name, dialSize);
 }
 
+int faceOf(State& state, const juce::String& typeId, int faces) {
+    const auto* type = typeId.isEmpty() ? nullptr : state.getRawParameterValue(typeId);
+    const float value = type != nullptr ? type->load() : 0.0f;
+    return juce::jlimit(0, juce::jmax(0, faces - 1), juce::roundToInt(value));
+}
+
 }

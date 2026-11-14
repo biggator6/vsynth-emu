@@ -2,8 +2,9 @@
 // D"), drawn and checked as it grows (UI step 1).  At its smallest, default and largest sizes its drawing fills the
 // window, scaled whole; on each page, and on SYNTH with each block selected, no control is outside its parent, over
 // another, without a size or cut short (LayoutCheck), and every control moved sets a parameter.  A press on each page's
-// name opens it, on each block selects it, on an effect opens FX.  With a folder: each page, and SYNTH with each block
-// selected, drawn into it.  Exit 0 if every check holds.
+// name opens it, on each block selects it, on an effect opens FX.  The rack's checks (EditorRackTest.cpp) and the lower
+// panel's (EditorLowerTest.cpp).  With a folder: each page, SYNTH with each block selected, and each of the lower
+// panel's views, drawn into it.  Exit 0 if every check holds.
 #include "EditorTest.h"
 #include "LayoutCheck.h"
 #include "TestChecks.h"
@@ -85,6 +86,12 @@ void snapshots(SynthEditor& ed, const juce::File& dir, TestChecks& check) {
         shoot("synth-block" + juce::String(block));
     }
     ed.select(Blocks::kFirstSelected);
+    const juce::StringArray views = ed.lower().list().names();
+    for (int v = 0; v < views.size(); ++v) {
+        ed.lower().showView((LowerPanel::View)v);
+        shoot("synth-view-" + views[v]);
+    }
+    ed.lower().showView(LowerPanel::View::selected);
 }
 
 int editorTest(const juce::File& rom, const juce::File&, const juce::StringArray& rest) {
@@ -99,6 +106,7 @@ int editorTest(const juce::File& rom, const juce::File&, const juce::StringArray
     pagesAndBlocks(l, ed);
     presses(l, ed, check);
     rackChecks(l, ed, p, check);
+    lowerChecks(l, ed, p, check);
     if (!rest.isEmpty()) snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);
     check(l.errors == 0, std::to_string(l.errors) + " layout errors (said above)");
     return check.summary(std::to_string(l.states) + " states, " + std::to_string(l.checked) + " placements, " +

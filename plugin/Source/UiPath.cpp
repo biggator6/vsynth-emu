@@ -1,6 +1,7 @@
 // D's signal path (UiPath.h; UI step 1)
 #include "UiPath.h"
 #include "PluginParamIds.h"
+#include "UiBlockKinds.h"
 #include "UiLook.h"
 #include "UiParts.h"
 
@@ -40,18 +41,9 @@ juce::String ampSetting(State& s, int) {
     return "TVA" + kDot + textOf(s, Params::kTvaLevel);
 }
 
-// Each kind of block: its name, whether its instances are numbered, and the setting shown under the name
-struct KindView {
-    const char* name;
-    bool numbered;
-    juce::String (*setting)(State&, int);
-};
-constexpr KindView kKinds[] = {   // in Blocks::Kind's order
-    { "OSC", true, oscSetting },
-    { "MOD", false, modSetting },
-    { "COSM", true, cosmSetting },
-    { "AMP", false, ampSetting },
-};
+// The setting each kind of block shows under its name, in Blocks::Kind's order
+using Setting = juce::String (*)(State&, int);
+constexpr Setting kSettings[] = { oscSetting, modSetting, cosmSetting, ampSetting };
 
 // The effects' blocks: a name and the switch the chip says ON or OFF of
 struct EffectView {
@@ -104,9 +96,7 @@ void PathBar::setSelected(int block) {
 PathBar::Chips PathBar::laidOut() const {
     Chips chips;
     for (const Blocks::Block& b : Blocks::kPath) {
-        const KindView& k = kKinds[(size_t)b.kind];
-        const juce::String name = k.numbered ? juce::String(k.name) + " " + juce::String(b.index + 1) : k.name;
-        chips.blocks.push_back({ name, k.setting(state_, b.index), {}, true });
+        chips.blocks.push_back({ Blocks::blockName(b), kSettings[(size_t)b.kind](state_, b.index), {}, true });
     }
     for (const EffectView& e : kEffects) {
         const bool on = isOn(state_, e.id);

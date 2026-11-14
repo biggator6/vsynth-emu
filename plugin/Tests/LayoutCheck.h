@@ -215,12 +215,20 @@ struct LayoutCheck {
 
     // The mouse pressed at a point on a component, as a click there sends it (the tab bar's clicks; D's page bar, path
     // and blocks, UI step 1)
-    static void pressAt(juce::Component& c, juce::Point<float> at) {
+    // The mouse at a point of c, having gone down at `from`
+    static juce::MouseEvent mouseAt(juce::Component& c, juce::Point<float> at, juce::Point<float> from) {
         using Src = juce::MouseInputSource;
         const juce::Time now = juce::Time::getCurrentTime();
         const Src mouse = juce::Desktop::getInstance().getMainMouseSource();
-        c.mouseDown(juce::MouseEvent(mouse, at, {}, Src::defaultPressure, Src::defaultOrientation, Src::defaultRotation,
-                                     Src::defaultTiltX, Src::defaultTiltY, &c, &c, now, at, now, 1, false));
+        return juce::MouseEvent(mouse, at, {}, Src::defaultPressure, Src::defaultOrientation, Src::defaultRotation,
+                                Src::defaultTiltX, Src::defaultTiltY, &c, &c, now, from, now, 1, false);
+    }
+    static void pressAt(juce::Component& c, juce::Point<float> at) { c.mouseDown(mouseAt(c, at, at)); }
+    // A press at `from`, a drag to `to` and the release there (D's envelope points, UI step 3)
+    static void dragFrom(juce::Component& c, juce::Point<float> from, juce::Point<float> to) {
+        c.mouseDown(mouseAt(c, from, from));
+        c.mouseDrag(mouseAt(c, to, from));
+        c.mouseUp(mouseAt(c, to, from));
     }
 
     // LayoutTest.cpp: the sweeps

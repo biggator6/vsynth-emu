@@ -83,6 +83,17 @@ target_sources(VSynthEmu PRIVATE
     Source/UiCosmPanel.cpp
     Source/UiTripColumn.cpp
     Source/UiRack.cpp
+    Source/UiTabs.cpp
+    Source/UiBlockKinds.cpp
+    Source/UiDetailTables.cpp
+    Source/UiWatch.cpp
+    Source/UiFields.cpp
+    Source/UiEnvelope.cpp
+    Source/UiLfo.cpp
+    Source/UiRoutes.cpp
+    Source/UiDetails.cpp
+    Source/UiOverviews.cpp
+    Source/UiLowerPanel.cpp
     Source/FxPanel.cpp
     Source/ContentClassifier.cpp
     Source/XtSoloEncoder.cpp
@@ -180,7 +191,8 @@ vse_add_test(VSynthEmuArpTest Tests/ArpTest.cpp Tests/TestMain.cpp)
 vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.cpp Tests/ZonePluginTest.cpp
              Tests/TestMain.cpp)
 # D, the redesigned editor, drawn and checked as it grows (UI step 1; research/UI_DESIGN.md, "The redesign, D")
-vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/TestMain.cpp)
+vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
+             Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest

@@ -57,6 +57,20 @@ namespace Ui {
         g.setColour(c);
         g.strokePath(p, type);
     }
+    // A round dot of a width at a centre, in a colour: D's knob caps, switches, points to drag (UI step 3)
+    inline void dot(juce::Graphics& g, juce::Point<float> centre, float width, juce::Colour c) {
+        g.setColour(c);
+        g.fillEllipse(juce::Rectangle<float>(width, width).withCentre(centre));
+    }
+    // Straight lines through points in their order: D's envelope curves (UI step 3)
+    inline juce::Path polyline(const std::vector<juce::Point<float>>& points) {
+        juce::Path p;
+        for (size_t i = 0; i < points.size(); ++i) {
+            if (i == 0) p.startNewSubPath(points[i]);
+            else p.lineTo(points[i]);
+        }
+        return p;
+    }
     // The cards' and the Perform column's titles: 11 pt bold, spaced out
     inline juce::Font titleFont() {
         juce::Font f(11.0f, juce::Font::bold);

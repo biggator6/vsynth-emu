@@ -58,8 +58,7 @@ void FacedPanel::showFace(int face) {
 }
 
 void FacedPanel::refresh() {
-    const float type = typeId_.isEmpty() ? 0.0f : state_.getRawParameterValue(typeId_)->load();
-    const int face = juce::jlimit(0, (int)knobs_.size() - 1, juce::roundToInt(type));
+    const int face = Controls::faceOf(state_, typeId_, (int)knobs_.size());
     if (face != face_) showFace(face);
 }
 
