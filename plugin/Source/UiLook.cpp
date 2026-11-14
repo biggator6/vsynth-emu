@@ -1,6 +1,7 @@
 // D's look: the faces, and the LookAndFeel's drawing of knobs, switches, boxes and buttons (UI step 1; UiLook.h)
 #include "UiLook.h"
 #include "UiParts.h"
+#include <algorithm>
 #include <utility>
 
 namespace Look {
@@ -118,22 +119,65 @@ void Feel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h, float
     g.drawLine(juce::Line<float>(k.c, onCircle(k.c, k.r - 6.0f, at)), side >= big ? 2.0f : 1.6f);
 }
 
-// A bar (UiFields.h): a field, the fill from the range's zero to the value in the bar's track colour, its value's text on
-// it; any other linear slider as JUCE's
+namespace {
+
+// What a linear slider fills: from its range's zero to its value, across from the left or up from the bottom
+juce::Rectangle<float> fillAcross(juce::Rectangle<float> r, float pos, juce::Slider& s) {
+    const float from = r.getX() + zeroOf(s) * r.getWidth();
+    return r.withLeft(juce::jmin(from, pos)).withRight(juce::jmax(from, pos));
+}
+juce::Rectangle<float> fillUp(juce::Rectangle<float> r, float pos, juce::Slider& s) {
+    const float from = r.getBottom() - zeroOf(s) * r.getHeight();
+    return r.withTop(juce::jmin(from, pos)).withBottom(juce::jmax(from, pos));
+}
+
+juce::Colour fillColour(juce::Slider& s) {
+    return s.findColour(juce::Slider::trackColourId).withAlpha(s.isEnabled() ? 0.6f : 0.25f);
+}
+
+// A bar (UiFields.h): a field, its fill in the bar's track colour, its value's text on it
+void bar(juce::Graphics& g, juce::Rectangle<float> r, juce::Rectangle<float> fill, juce::Slider& s) {
+    Ui::fillRounded(g, r, field, 3.0f);
+    Ui::fillRounded(g, fill, fillColour(s), 3.0f);
+    Ui::drawText(g, s.getTextFromValue(s.getValue()), r.toNearestInt(),
+                 { mono(10.0f), text, juce::Justification::centred, false });
+}
+void barAcross(juce::Graphics& g, juce::Rectangle<float> r, float pos, juce::Slider& s) {
+    bar(g, r, fillAcross(r, pos, s), s);
+}
+void barUp(juce::Graphics& g, juce::Rectangle<float> r, float pos, juce::Slider& s) {
+    bar(g, r, fillUp(r, pos, s), s);
+}
+// A plain slider across (the Effects panel's): a thin track, its fill, a dot at the value
+void lineAcross(juce::Graphics& g, juce::Rectangle<float> r, float pos, juce::Slider& s) {
+    const auto line = r.withSizeKeepingCentre(r.getWidth(), 4.0f);
+    Ui::fillRounded(g, line, track, 2.0f);
+    Ui::fillRounded(g, fillAcross(line, pos, s), fillColour(s), 2.0f);
+    Ui::dot(g, { pos, r.getCentreY() }, 12.0f, text);
+}
+
+// How each linear style D uses is drawn; any other is JUCE's
+struct StyleDrawer {
+    juce::Slider::SliderStyle style;
+    void (*draw)(juce::Graphics&, juce::Rectangle<float>, float, juce::Slider&);
+};
+constexpr StyleDrawer kDrawers[] = { { juce::Slider::LinearBar, barAcross },
+                                     { juce::Slider::LinearBarVertical, barUp },
+                                     { juce::Slider::LinearHorizontal, lineAcross } };
+
+}
+
+// A bar across or upright (UiFields.h; the MSM's steps), or a plain slider across, as kDrawers draws its style
 // one-off: JUCE's LookAndFeel override; its parameters are JUCE's
 void Feel::drawLinearSlider(juce::Graphics& g, int x, int y, int w, int h, float pos, float min, float max,
                             juce::Slider::SliderStyle style, juce::Slider& s) {
-    if (style != juce::Slider::LinearBar) {
+    const auto* d = std::find_if(std::begin(kDrawers), std::end(kDrawers),
+                                 [style](const StyleDrawer& k) { return k.style == style; });
+    if (d == std::end(kDrawers)) {
         LookAndFeel_V4::drawLinearSlider(g, x, y, w, h, pos, min, max, style, s);
         return;
     }
-    const auto r = juce::Rectangle<int>(x, y, w, h).toFloat();
-    Ui::fillRounded(g, r, field, 3.0f);
-    const float from = r.getX() + zeroOf(s) * r.getWidth();
-    const auto fill = r.withLeft(juce::jmin(from, pos)).withRight(juce::jmax(from, pos));
-    Ui::fillRounded(g, fill, s.findColour(juce::Slider::trackColourId).withAlpha(s.isEnabled() ? 0.6f : 0.25f), 3.0f);
-    Ui::drawText(g, s.getTextFromValue(s.getValue()), r.toNearestInt(),
-                 { mono(10.0f), text, juce::Justification::centred, false });
+    d->draw(g, juce::Rectangle<int>(x, y, w, h).toFloat(), pos, s);
 }
 
 // A switch: a pill, the accent when on, then its text; or, with the power property, a dot alone

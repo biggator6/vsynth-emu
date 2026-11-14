@@ -78,6 +78,34 @@ every LFO (5), each its name over its curve or shape; a click on one opens its b
   of the response or the curve; up to five knobs (30), the type's first ones, the rest in DETAILS.
 - **AMP:** Level, Pan, Chorus and Reverb sends (24, the name and value beside each knob).
 
+### The pages
+
+Built in step 4. Each page but SYNTH takes the drawing under the page bar (1200 × 628) and is made by its row of one table
+(`UiPages.cpp`, in the page bar's order); a hidden page draws nothing. Its cards are rack panels' frames with the name at
+the top left and what the card holds besides on its title line (`Card`). Most hold a grid of controls made from a table
+of parameter IDs, each control as its parameter is: a choice a box under its name, a switch a switch, any other a knob,
+a knob a cell (64) and a box or a switch two, a row as high as its tallest (`ControlGrid`, which DETAILS uses too).
+
+- **MODULATION:** the Multi Step Modulator's card down the left (640 wide): its switch, Key Sync and a tab for each track,
+  then the chosen track, made for each track by index (`msmTrackFwId`): its eight settings as a grid, and its 16 steps as
+  upright bars to drag, in `mod`, filled from 0, the steps past its End Point faint. Down the right, the Matrix's card:
+  its eight Controls as rows under the columns' names (Source; Destination 1 and Sens 1; Destination 2 and Sens 2), a row
+  made for each Control by index; and the controller assigns' card, the twelve boxes by the processor's names.
+- **PLAY:** the arpeggio's card and its pattern's down the left; portamento, keys (Voices, Legato, Octave), tune (Coarse,
+  Fine, Bend Up and Down) and tempo (Clock, Tempo) down the right, each a grid from a table. The pattern is a patch's
+  data, no parameter, so it is drawn and not edited: its 16 lines down, each a note or a controller named at the left,
+  its 32 steps across, a played step's cell in the accent by its velocity, a tie a thin bar carrying the line on, the
+  steps past the End Point faint; a line says so when no step plays.
+- **ZONES:** the keys' card: the 128 keys with each zone's range in its colour (the footer's), as a note picks its zone,
+  its number on it, the C keys named every other octave (`UiZoneStrip`, which the Zones tab's map draws with too); and the
+  zones' card, a cell for each of the sixteen made by index: its colour and name, its Range Upper as a bar in its colour,
+  its keys, and what it plays (the panel for zone 1, the patch's as the processor says, or no patch, silent).
+- **FX:** today's Effects panel (`FxPanel`), given D's palette (`Look::cards`; `Ui::Page` and `FxPanel` take a palette,
+  today's by default), so its cards, boxes, switches and sliders are drawn in D's look. A click on MFX, CHORUS or REVERB on
+  the path opens the FX page at that effect's own page.
+
+The footer's keyboard and its zones' ranges are step 1's.
+
 ### The look
 
 | Token | Colour | Used for |
@@ -144,7 +172,9 @@ so splitting it meant rewriting code D replaces whole: the commit and its revert
 3. The lower panel: SELECTED (the envelope editor, the LFO, what reaches the block), DETAILS, ENVELOPES, LFOs. Done
    2026-11-13: `VSynthEmuEditorTest` holds each block's views to its kind's tables, each instance's controls to its own
    parameters, a curve's points to theirs, a route to its block, and the list's and overviews' presses.
-4. The MODULATION, PLAY, ZONES and FX pages; the footer's keyboard with the zones.
+4. The MODULATION, PLAY, ZONES and FX pages; the footer's keyboard with the zones. Done 2026-11-13:
+   `VSynthEmuEditorTest` holds each MSM track, Matrix Control and zone to its own parameters, the FX page's four pages,
+   each effect on the path to its page, and D to every parameter but the engine's three and Scale Tune (745 of 761).
 5. Landing: the plugin's editor is D, today's editor files go, `TEST_UI_LAYOUT` and the plants hold D, these sections are
    the only description, a version number.
 

@@ -4,12 +4,12 @@
 // of eight 274, with the gaps.
 #include "PluginEditor.h"
 #include "PluginParamIds.h"
+#include "UiZoneStrip.h"
 
 using Ui::Page;
 
 namespace {
 
-constexpr int kKeys = 128;
 constexpr int kStripH = 34;      // the keys and their zones
 constexpr int kOctaveH = 12;     // the C keys' names under them
 constexpr int kLineCols = 4;     // the zones' lines, four a row
@@ -19,6 +19,8 @@ Ui::TextStyle numberStyle() {
     return { juce::Font(11.0f, juce::Font::bold), Ui::text, juce::Justification::centred, false };
 }
 Ui::TextStyle octaveStyle() { return { juce::Font(10.0f), Ui::label }; }
+// A zone's band: one zone in two in a lighter shade
+juce::Colour bandOf(int zone) { return Ui::accent.withAlpha(zone % 2 ? 0.35f : 0.65f); }
 Ui::TextStyle lineStyle(bool reached) { return { juce::Font(11.0f), reached ? Ui::text : Ui::line }; }
 
 } // namespace
@@ -34,17 +36,9 @@ void ZoneMap::paint(juce::Graphics& g) {
 // names, every other octave
 void ZoneMap::paintKeys(juce::Graphics& g, juce::Rectangle<int> area) const {
     const auto strip = area.removeFromTop(kStripH);
-    const auto xOf = [&strip](int key) { return strip.getX() + strip.getWidth() * key / kKeys; };
     Ui::fill(g, strip, Ui::surfaceField);
-    for (int z = 0; z < kXtZones; ++z) {
-        const XtZoneKeys k = xtZoneKeys(upper, z);
-        if (k.lo > k.hi) continue;
-        const juce::Rectangle<int> span(xOf(k.lo), strip.getY(), xOf(k.hi + 1) - xOf(k.lo), strip.getHeight());
-        Ui::fill(g, span.reduced(1, 0), Ui::accent.withAlpha(z % 2 ? 0.35f : 0.65f));
-        if (span.getWidth() >= 14) Ui::drawText(g, juce::String(z + 1), span, numberStyle());
-    }
-    for (int key = 0; key < kKeys; key += 24)
-        Ui::drawText(g, Ui::keyName(key), { xOf(key), area.getY(), 40, kOctaveH }, octaveStyle());
+    const ZoneStripLook look { bandOf, numberStyle(), octaveStyle(), 0, 0.0f, kOctaveH };
+    paintZoneStrip(g, strip, upper, look);
 }
 
 // A line a zone, zones 1-4 down the first column: its number, its keys and what it plays, or that no key reaches it

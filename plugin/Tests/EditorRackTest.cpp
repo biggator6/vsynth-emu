@@ -49,6 +49,22 @@ void ownParameters(LayoutCheck& l, VSynthEmuProcessor& p, TestChecks& check, con
     c.panel->refresh();
 }
 
+// The pad's column following each OSC in turn: that OSC's Time Trip switch and Robot each reached by its controls
+void tripColumn(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
+    const auto columns = LayoutCheck::allOf<TripColumn>(ed.drawing());
+    check(columns.size() == 1, "the rack hasn't one Time Trip column");
+    if (columns.empty()) return;
+    TripColumn& column = *columns.front();
+    for (int osc = 0; osc < TripColumn::kOscs; ++osc) {
+        column.follow(osc);
+        const juce::String where = "the pad following OSC " + juce::String(osc + 1);
+        movesOwn(l, column, where, {}, check);
+        for (const juce::String& id : { Params::oscId(osc, Params::kTripSw), Params::oscId(osc, Params::kRobot) })
+            check(l.reached.count(id) == 1, (where + ": nothing moves " + id).toStdString());
+    }
+    column.follow(0);
+}
+
 }
 
 Owner ownerOf(const Blocks::Block& b) {
@@ -101,5 +117,6 @@ void rackChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChec
         LayoutCheck::pressAt(*cosms[i], cosms[i]->nameArea().getCentre().toFloat());
         check(ed.selected() == Blocks::indexOf(Blocks::Kind::cosm, cosm), "a press on a COSM's name doesn't select it");
     }
+    tripColumn(l, ed, check);
     ed.select(Blocks::kFirstSelected);
 }

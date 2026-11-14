@@ -1,6 +1,6 @@
 #pragma once
-// VSynthEmuEditorTest's parts (EditorTest.cpp): the rack's checks, EditorRackTest.cpp (UI step 2), and the lower panel's,
-// EditorLowerTest.cpp (UI step 3), with what they share
+// VSynthEmuEditorTest's parts (EditorTest.cpp): the rack's checks, EditorRackTest.cpp (UI step 2), the lower panel's,
+// EditorLowerTest.cpp (UI step 3), and the pages', EditorPagesTest.cpp (UI step 4), with what they share
 #include "LayoutCheck.h"
 #include "TestChecks.h"
 #include "../Source/UiBlockKinds.h"
@@ -26,3 +26,6 @@ void rackChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChec
 // parameters; a curve's point dragged, a Matrix route appearing and its amount moved, the list's and the overviews'
 // presses
 void lowerChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// The other pages (EditorPagesTest.cpp, UI step 4): each MSM track, Matrix Control and zone made whole and moving its own
+// parameters alone; the FX page's four pages; each effect on the path opening its own
+void pagesChecks(LayoutCheck& l, SynthEditor& ed, TestChecks& check);

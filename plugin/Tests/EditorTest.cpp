@@ -94,6 +94,20 @@ void snapshots(SynthEditor& ed, const juce::File& dir, TestChecks& check) {
     ed.lower().showView(LowerPanel::View::selected);
 }
 
+// Every parameter with a control that has moved it, but those no editor has shown (the engine's three, unread and kept
+// for old sessions, and Scale Tune); with `list`, the parameters no control reaches, said.  How many have one.
+int coverage(LayoutCheck& l, TestChecks& check, bool list) {
+    const juce::StringArray unshown { "pitchShift", "timeStretch", "formantShift" };
+    int have = 0;
+    for (auto* r : l.params) {
+        const juce::String& id = r->paramID;
+        if (l.reached.count(id) != 0) ++have;
+        else if (list) std::printf("no control: %s\n", id.toRawUTF8());
+        else check(unshown.contains(id) || id.startsWith("scaleTune"), ("no control sets " + id).toStdString());
+    }
+    return have;
+}
+
 int editorTest(const juce::File& rom, const juce::File&, const juce::StringArray& rest) {
     TestChecks check { "editor" };
     VSynthEmuProcessor p;
@@ -107,15 +121,14 @@ int editorTest(const juce::File& rom, const juce::File&, const juce::StringArray
     presses(l, ed, check);
     rackChecks(l, ed, p, check);
     lowerChecks(l, ed, p, check);
-    if (rest[0] == "list") {   // the parameters no control of D's reaches (step 5 holds D to today's editor's)
-        for (auto* r : l.params)
-            if (l.reached.count(r->paramID) == 0) std::printf("no control: %s\n", r->paramID.toRawUTF8());
-    } else if (!rest.isEmpty()) {
+    pagesChecks(l, ed, check);
+    const int reached = coverage(l, check, rest[0] == "list");
+    if (rest[0] != "list" && !rest.isEmpty())
         snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);
-    }
     check(l.errors == 0, std::to_string(l.errors) + " layout errors (said above)");
     return check.summary(std::to_string(l.states) + " states, " + std::to_string(l.checked) + " placements, " +
-                         std::to_string(l.reached.size()) + " parameters reached");
+                         std::to_string(reached) + " of " + std::to_string(l.params.size()) +
+                         " parameters have a control");
 }
 
 }

@@ -40,6 +40,6 @@ inline constexpr int kFirstSelected = indexOf(Kind::cosm, 0);
 
 // The page bar's pages, in order; SYNTH is the path, the rack and the lower panel
 inline constexpr std::array<const char*, 5> kPages = { "SYNTH", "MODULATION", "FX", "PLAY", "ZONES" };
-inline constexpr int kSynthPage = 0, kFxPage = 2;
+inline constexpr int kSynthPage = 0, kModulationPage = 1, kFxPage = 2, kPlayPage = 3, kZonesPage = 4;
 
 }

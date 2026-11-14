@@ -6,14 +6,14 @@
 #include "PluginProcessor.h"
 #include "UiBlockKinds.h"
 #include "UiFields.h"
+#include "UiMatrixIds.h"
 #include <memory>
 #include <vector>
 
 class RoutesView : public juce::Component {
 public:
     RoutesView(Controls::State& state, const Blocks::Block& b);
-    static constexpr int kMatrixControls = 8;   // the XT's Matrix Controls (IDs 0x14d…0x174), two destinations each
-    void refresh();                             // the Matrix's rows made again, if a source or destination has moved
+    void refresh();   // the Matrix's rows made again, if a source or destination has moved
     int depths() const { return (int)depths_.size(); }
     int routes() const { return (int)matrix_.size(); }
     Bar* route(int i) const { return matrix_[(size_t)i].get(); }

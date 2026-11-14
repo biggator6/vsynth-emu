@@ -40,21 +40,22 @@ ControlGrid::ControlGrid(Controls::State& state, const Rows& rows) {
     }
 }
 
-// Each control in turn across rows of a width, a row as high as a knob; place(i, its bounds); the height taken
+// Each control in turn across rows of a width, a row as high as its tallest; place(i, its bounds); the height taken
 template <class Place>
 int ControlGrid::flow(int width, Place&& place) const {
-    const int rowH = Knob::heightFor(kDial) + kGap;
-    int x = 0, y = 0;
+    int x = 0, y = 0, rowH = 0;
     for (size_t i = 0; i < controls_.size(); ++i) {
         const int w = cells_[i] * kCell + (cells_[i] - 1) * kGap;
         if (x > 0 && x + w > width) {
             x = 0;
-            y += rowH;
+            y += rowH + kGap;
+            rowH = 0;
         }
         place(i, juce::Rectangle<int>(x, y, w, heights_[i]));
         x += w + kGap;
+        rowH = juce::jmax(rowH, heights_[i]);
     }
-    return controls_.empty() ? 0 : y + rowH - kGap;
+    return y + rowH;
 }
 
 int ControlGrid::heightFor(int width) const {

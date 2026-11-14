@@ -14,14 +14,6 @@ int choiceOf(Controls::State& s, const juce::String& id) {
     return v != nullptr ? juce::roundToInt(v->load()) : 0;
 }
 
-juce::String destId(int control, int dest) {
-    return VSynthEmuProcessor::matrixParamId(control, ("Dest" + juce::String(dest + 1)).toRawUTF8());
-}
-
-juce::String sensId(int control, int dest) {
-    return VSynthEmuProcessor::matrixParamId(control, ("Sens" + juce::String(dest + 1)).toRawUTF8());
-}
-
 }
 
 RoutesView::RoutesView(Controls::State& state, const Blocks::Block& b)
@@ -48,12 +40,13 @@ void RoutesView::makeRoutes() {
     matrix_.clear();
     const juce::StringArray sources = VSynthEmuProcessor::matrixSourceNames();
     const juce::StringArray dests = VSynthEmuProcessor::matrixDestNames();
-    for (int control = 0; control < kMatrixControls; ++control) {
-        const juce::String source = sources[choiceOf(state_, VSynthEmuProcessor::matrixParamId(control, "Source"))];
-        for (int dest = 0; dest < 2; ++dest) {
-            const juce::String to = dests[choiceOf(state_, destId(control, dest))];
+    for (int control = 0; control < Matrix::kControls; ++control) {
+        const juce::String source = sources[choiceOf(state_, Matrix::sourceId(control))];
+        for (int dest = 0; dest < Matrix::kDests; ++dest) {
+            const juce::String to = dests[choiceOf(state_, Matrix::destId(control, dest))];
             if (!Blocks::reaches(block_, to)) continue;
-            matrix_.push_back(std::make_unique<Bar>(state_, sensId(control, dest), source + kArrow + to, Look::mod));
+            const juce::String sens = Matrix::sensId(control, dest);
+            matrix_.push_back(std::make_unique<Bar>(state_, sens, source + kArrow + to, Look::mod));
             addAndMakeVisible(*matrix_.back());
         }
     }
@@ -61,9 +54,11 @@ void RoutesView::makeRoutes() {
 
 void RoutesView::refresh() {
     juce::String now;
-    for (int control = 0; control < kMatrixControls; ++control)
-        now << choiceOf(state_, VSynthEmuProcessor::matrixParamId(control, "Source")) << ','
-            << choiceOf(state_, destId(control, 0)) << ',' << choiceOf(state_, destId(control, 1)) << '|';
+    for (int control = 0; control < Matrix::kControls; ++control) {
+        now << choiceOf(state_, Matrix::sourceId(control));
+        for (int dest = 0; dest < Matrix::kDests; ++dest) now << ',' << choiceOf(state_, Matrix::destId(control, dest));
+        now << '|';
+    }
     if (now == made_) return;
     made_ = now;
     makeRoutes();
