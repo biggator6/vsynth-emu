@@ -10,9 +10,10 @@ constexpr int kRefreshHz = 4;
 }
 
 SynthEditor::SynthEditor(VSynthEmuProcessor& p)
-    : juce::AudioProcessorEditor(&p), header_(p), path_(p.apvts), rack_(p), lower_(p.apvts), footer_(p) {
+    : juce::AudioProcessorEditor(&p), processor_(p), header_(p), path_(p.apvts), rack_(p), lower_(p.apvts), footer_(p) {
     setLookAndFeel(&feel_);
     pageBar_.onChoose = [this](int page) { showPage(page); };
+    pageBar_.keyboardSwitch().onClick = [this] { showKeyboard(pageBar_.keyboardSwitch().getToggleState()); };
     path_.onSelect = [this](int block) { select(block); };
     path_.onEffect = [this](int effect) { showEffect(effect); };
     rack_.onSelect = [this](int block) { select(block); };
@@ -36,14 +37,24 @@ SynthEditor::SynthEditor(VSynthEmuProcessor& p)
         y += h;
     }
     footer_.setBounds(0, Look::height - Look::footerH, Look::width, Look::footerH);
-    drawing_.setBounds(0, 0, Look::width, Look::height);
     setResizable(true, true);
-    setResizeLimits(juce::roundToInt(Look::width * Look::minScale), juce::roundToInt(Look::height * Look::minScale),
-                    juce::roundToInt(Look::width * Look::maxScale), juce::roundToInt(Look::height * Look::maxScale));
-    getConstrainer()->setFixedAspectRatio((double)Look::width / (double)Look::height);
-    setSize(Look::width, Look::height);
+    showKeyboard(p.apvts.state.getProperty(kKeyboardShown, true));
     select(Blocks::kFirstSelected);
     startTimerHz(kRefreshHz);
+}
+
+// The drawing as tall as what shows, the window's limits and aspect by it, and the window resized at its scale
+void SynthEditor::showKeyboard(bool shown) {
+    const float s = getWidth() > 0 ? scale() : 1.0f;
+    const int h = Look::height - (shown ? 0 : Look::footerH);
+    footer_.setVisible(shown);
+    pageBar_.keyboardSwitch().setToggleState(shown, juce::dontSendNotification);
+    processor_.apvts.state.setProperty(kKeyboardShown, shown, nullptr);
+    drawing_.setBounds(0, 0, Look::width, h);
+    setResizeLimits(juce::roundToInt(Look::width * Look::minScale), juce::roundToInt((float)h * Look::minScale),
+                    juce::roundToInt(Look::width * Look::maxScale), juce::roundToInt((float)h * Look::maxScale));
+    getConstrainer()->setFixedAspectRatio((double)Look::width / (double)h);
+    setSize(juce::roundToInt(Look::width * s), juce::roundToInt((float)h * s));
 }
 
 SynthEditor::~SynthEditor() {

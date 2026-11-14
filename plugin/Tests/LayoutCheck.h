@@ -197,7 +197,9 @@ struct LayoutCheck {
         if (!b || (dynamic_cast<juce::TextButton*>(b) && !b->getClickingTogglesState())) return {};   // Load, ROM
         const juce::String text = b->getButtonText();
         if (text.startsWith("OSC ")) return {};   // which OSC the Time Trip column shows
-        if (text == "MFX" || text == "Chorus" || text == "Reverb" || text == "System") return {};
+        // what chooses what shows, and no parameter: the FX page's buttons, the page bar's Keyboard switch (v201)
+        static const juce::StringArray kChoosers { "MFX", "Chorus", "Reverb", "System", "Keyboard" };
+        if (kChoosers.contains(text)) return {};
         if (b->getRadioGroupId() != 0 && b->getToggleState()) return {};   // one of a pair: the other moves it
         return [b] { b->setToggleState(!b->getToggleState(), juce::sendNotificationSync); };
     }

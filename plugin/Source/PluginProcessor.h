@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <array>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "XtSynth.h"
@@ -99,6 +100,20 @@ public:
     std::shared_ptr<const WaveView> waveView(int osc) const;
     int waveViewGen(int osc) const { return waveViewGen_[osc].load(); }   // moves with each view made
 
+    // ── The editor's notes and controllers (PluginProcess.cpp, v201) ─────────
+    // The footer's keys, and the Time Trip pad's controllers, for the synth as if from the host's MIDI: queued here (any
+    // thread but the audio thread), taken at the next block's start, before the host's.  False if the queue is full.
+    bool sendFromEditor(const juce::MidiMessage& m);
+    // Each message the editor has queued, in order and taken: the audio thread's, at a block's start, and a test's
+    template <class Take>
+    void takeFromEditor(Take&& take) {
+        const auto scope = editorFifo_.read(editorFifo_.getNumReady());
+        scope.forEach([&](int i) {
+            const EditorEvent& e = editorEvents_[(size_t)i];
+            take(juce::MidiMessage(e.bytes[0], e.bytes[1], e.bytes[2]));
+        });
+    }
+
     // ── The XT's firmware (rom.2) ────────────────────────────────────────────
     // Message thread.  The image the user chose: used now and kept for every project and plugin format, so a new
     // instance finds it (findRom).  Returns false, with the last image still in use, if the file is not a usable image.
@@ -168,6 +183,13 @@ private:
     mutable juce::CriticalSection viewLock_;
     std::shared_ptr<const WaveView> waveView_[2];
     std::atomic<int> waveViewGen_[2] {};
+    // The editor's queue (v201): a lock-free ring the message thread writes and the audio thread reads
+    struct EditorEvent { uint8_t bytes[3]; };
+    static constexpr int kEditorEvents = 256;
+    juce::AbstractFifo editorFifo_ { kEditorEvents };
+    std::array<EditorEvent, kEditorEvents> editorEvents_ {};
+    void toSynth(const juce::MidiMessage& msg);   // one message to the synth, the host's or the editor's
+    void toFile(const juce::MidiMessage& msg);    // or to the file played without the firmware
     // A patch's zones 2…16: their settings at once, and again with their waves once the pool has encoded them (each wave once, as its own
     // type).  A newer patch discards an older one's.  The store and the wave folder go in the session, for its zones to come back.
     // PluginZones.cpp (v195), with the splits' parameters

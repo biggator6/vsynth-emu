@@ -120,3 +120,13 @@ editor-d-wave-first-only|    for (size_t i = from + 1; i < to; ++i) {|    for (s
 editor-d-wave-stale|    if (gen == viewGen_ && loop == loop_) return;|    if (viewGen_ >= 0 && loop == loop_) return;|plugin/Source/UiOscPanel.cpp|layout
 editor-d-cycles-stale|    if (!cycles_.empty() && now == drawn_) return;|    if (!cycles_.empty()) return;|plugin/Source/UiOscPanel.cpp|layout
 editor-d-cycles-osc1|    const XtSynth::OscControls& o = osc ? c.osc2 : c;|    const XtSynth::OscControls& o = c;|plugin/Source/UiWaveDisplay.cpp|layout
+# The footer's keyboard (v201), by VSynthEmuEditorTest's EditorKeysTest.cpp: a key let go, a black key over the white,
+# the velocity by where on the key, a drag across keys, the editor's queue taken by processBlock, the fold's size and
+# the session keeping it.
+editor-d-keys-no-off|    processor_.sendFromEditor(juce::MidiMessage::noteOff(kChannel, *held_));|    ;|plugin/Source/UiFooter.cpp|layout
+editor-d-keys-white-first|    for (const bool black : { true, false }) {|    for (const bool black : { false, true }) {|plugin/Source/UiFooter.cpp|layout
+editor-d-keys-flat|(y - b.getY())|(b.getY() - b.getY() + y - y)|plugin/Source/UiFooter.cpp|layout
+editor-d-keys-drag-stuck|    if (keyAt(e.position) != held_) press(e.position);|    if (keyAt(e.position) == held_) press(e.position);|plugin/Source/UiFooter.cpp|layout
+editor-d-keys-untaken|        takeFromEditor([this](const juce::MidiMessage& m) { toSynth(m); });|        ;|plugin/Source/PluginProcess.cpp|layout
+editor-d-fold-same-size|    setSize(juce::roundToInt(Look::width * s), juce::roundToInt((float)h * s));|    setSize(juce::roundToInt(Look::width * s), juce::roundToInt((float)Look::height * s));|plugin/Source/UiEditor.cpp|layout
+editor-d-fold-unsaved|    processor_.apvts.state.setProperty(kKeyboardShown, shown, nullptr);|    ;|plugin/Source/UiEditor.cpp|layout

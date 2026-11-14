@@ -171,6 +171,7 @@ int editorTest(const juce::File& rom, const juce::File& work, const juce::String
     lowerChecks(l, ed, p, check);
     pagesChecks(l, ed, check);
     waveChecks(ed, p, work, check);
+    keyChecks(l, ed, p, check);
     const int reached = coverage(l, check, rest[0] == "list");
     if (rest[0] != "list" && !rest.isEmpty())
         snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);

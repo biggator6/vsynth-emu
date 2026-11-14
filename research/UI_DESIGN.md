@@ -19,11 +19,11 @@ kept. Top to bottom, in the drawing's own units:
 | Region | y | Height | Holds |
 |---|---|---|---|
 | Header | 0 | 48 | the wordmark and the build under it; the mode switch, V-SYNTH and VC-2 (VC-2 greyed until the VC-2 mode is in); the patch box (the patch's name, under it in the warning colour what the patch asks for that isn't here, Browse… to load one); the tempo; the Effects switch; the ROM's state and the ROM… button |
-| Page bar | 48 | 34 | SYNTH, MODULATION, FX, PLAY, ZONES; a line saying what a click on a block does |
+| Page bar | 48 | 34 | SYNTH, MODULATION, FX, PLAY, ZONES; a line saying what a click on a block does; the Keyboard switch at its right end (v201) |
 | Signal path | 82 | 52 | OSC 1, OSC 2, MOD, COSM 1, COSM 2, AMP as blocks to click, the selected one filled with the accent; MFX, CHORUS, REVERB with ON or OFF (a click opens its FX page); the Structure box |
 | Rack | 134 | 304 | 12 in from each side, 8 between: the Time Trip column (184 wide), OSC 1 and OSC 2 (310 each), and a column of COSM 1 (116 high), COSM 2 (116) and AMP (the rest) |
 | Lower panel | 438 | 272 | the list (148 wide): SELECTED, DETAILS, ENVELOPES, LFOs; then the chosen view |
-| Footer | 710 | 40 | Keys MONO or POLY and the number of zones (184 wide), the keyboard: 42 white keys with each zone's range in its colour above them |
+| Footer | 710 | 40 | Keys MONO or POLY and the number of zones (184 wide), the keyboard: 42 white keys from C1 with each zone's range in its colour above them. The keys play (v201): a press sends its note to the synth (the processor's editor queue, taken at each block's start before the host's MIDI), its velocity by where on the key, soft at the top and full at the bottom; a drag across keys lets each go for the next; the held key is lit. The Keyboard switch folds the footer away, the window shorter by its 40 at the scale it is drawn, and the session keeps it (the user's choice, 2026-11-14) |
 
 The SYNTH page is the path, the rack and the lower panel. The other pages take everything under the page bar.
 
@@ -217,7 +217,10 @@ Every control is made from its parameter's ID, so a new parameter needs a row in
   rows, its left cards level with its list, and its page buttons both ways; an OSC's display (v200, `EditorWaveTest.cpp`):
   each analog waveform drawn as the oscillator plays it at the settings as they stand, no two alike but X-MOD and SAW on
   OSC 2, a square's picture moved by its Pulse Width, and a loaded wave's view holding the file's own lowest and highest
-  samples, replaced by a newer wave's. With a folder it draws each page, each block and each lower view into it; with
+  samples, replaced by a newer wave's; the footer's keyboard (v201, `EditorKeysTest.cpp`): a white key's and a black
+  key's click as their notes, a press lower on a key louder, a drag across keys letting each go, a press sounding
+  through processBlock, and the fold: the window shorter by the footer, the layout holding, an editor on the folded
+  session opening folded, and back. With a folder it draws each page, each block and each lower view into it; with
   `list` it prints the parameters no control reaches.
 - `mutate_panel.py --editor`: the editor's planted errors, D's (`panel_muts.txt`'s `editor-d-` lines) and the FX page's
   (`editor-fx-`, `editor-row-gap`), each built into `VSynthEmuEditorTest`, to show the check catches it.
@@ -239,7 +242,7 @@ The user's testing notes (2026-11-14): the OSC display drawing the loaded wave a
 v200); the Time Trip column made the XT's pad (the user's choice: a press freezes the wave, circling scrubs it, release
 lets go, sending Time Trip Assign X and Y into the synth as the XT's pad and the iOS app do; Hold; each OSC's Time Trip
 switch and Beat Keep; the circle parameter kept for host automation alone); the footer's keyboard playable, and folding
-away with the window shorter by its height (the user's choice).
+away with the window shorter by its height (the user's choice; done in v201).
 
 Each with the user's yes where it needs one: Inter and JetBrains Mono built in (a folder for font files); the Time Trip
 position on the wave; dragging a source onto a knob to make a Matrix route; the VC-2 mode's pages; the page and the block

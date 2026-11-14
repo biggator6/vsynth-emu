@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The footer's keyboard v201 (2026-11-14): the user's testing notes, "keyboard onscreen does nothing but show zones -
+  should also be clickable for note input while editing sounds and probably should be able to hide/show", and their
+  choice to fold it away. processBlock moved as it stood to PluginProcess.cpp (PluginProcessor.cpp was 560 lines), its
+  message chain made one function, toSynth, for the host's MIDI and the editor's. The editor's queue: sendFromEditor
+  (any thread but the audio thread) into a lock-free ring of 256 three-byte messages, takeFromEditor at each block's
+  start, before the host's MIDI; without the firmware, the file's player takes them the same way (toFile). The
+  footer's keys play: a press its note at a velocity by where on the key (0.25 at the top to full at the bottom), a drag
+  across keys each in turn, a release its note-off, the held key lit; a key held as the editor closes is let go. The
+  Keyboard switch at the page bar's right end folds the footer away, the drawing 710 high and the window shorter by 40
+  at its scale, its limits and aspect with it; the session's state keeps it (keyboardShown). Check: VSynthEmuEditorTest
+  1224/1224 (EditorKeysTest.cpp): a white key's and a black key's click as their notes, a press lower on a key louder, a
+  drag from 60 to 64 as on 60, off 60, on 64, off 64, a pressed key sounding through processBlock on the analog OSC and
+  silence without one, the fold's size and layout, an editor on the folded session opening folded, and back. verify.sh
+  green, every plugintest line bit-identical. Plants: seven new (editor-d-keys-, editor-d-fold-), engine-level followed
+  processBlock to PluginProcess.cpp; --editor and engine-level, 53, all caught.
+
 The OSC display v200 (2026-11-14): the user's testing notes, "osc wav should display waveform in PCM mode and in analog
   mode, display the correct waveform chosen". On PCM the display draws the loaded wave: the processor makes a view of it
   (PluginWaveView.cpp: 512 columns, each its lowest and highest sample, the channels mixed) from the channels

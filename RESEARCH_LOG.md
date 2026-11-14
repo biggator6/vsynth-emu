@@ -3570,6 +3570,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 22, continued (2026-11-14) — v201: the footer's keyboard plays, and folds away
+
+- The keys needed a way into the synth that the audio thread could take without a lock. JUCE's own keyboard state locks, so the editor writes into a small lock-free ring that processBlock empties at the start of each block, before the host's MIDI, through the same message chain the host's notes take.
+- processBlock had to move first: PluginProcessor.cpp was 560 lines, and the kit refuses a line added to a file that long. It moved as it stood, and every PluginTest line stayed bit-identical, which is the proof the move changed nothing. One planted error moved with it.
+- The test presses keys through the footer's own mouse handling and reads what reached the queue, then plays a key through processBlock on the analog oscillator and listens for sound, since a queue nobody empties would pass the first check.
+- Folding the keyboard away changes the window's height and its aspect ratio, so the size limits go with it, and the session keeps the choice: an editor opened on a folded session opens folded.
+
 ### Session 22, continued (2026-11-14) — v200: the OSC display draws what the OSC plays
 
 - The user tested D and sent three notes: the OSC display, the Time Trip column, the keyboard. This is the first. The analog display drew one of six stock shapes from a table (JUNO as a saw, SUPER-SAW as a saw, X-MOD as a square), and nothing told it to redraw when the waveform changed, so it showed whatever it had drawn first.

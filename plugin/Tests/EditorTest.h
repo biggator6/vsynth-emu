@@ -34,3 +34,6 @@ void pagesChecks(LayoutCheck& l, SynthEditor& ed, TestChecks& check);
 // The OSC displays (EditorWaveTest.cpp, v200): the analog oscillator's own cycles at the panel's settings, following them;
 // a loaded wave's view, holding the file's own extremes; test waves are written in `folder`
 void waveChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);
+// The footer's keyboard (EditorKeysTest.cpp, v201): a key's press, drag and release as their notes, a press sounding
+// through processBlock, and the fold
+void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
