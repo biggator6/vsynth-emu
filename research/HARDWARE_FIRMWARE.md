@@ -1546,6 +1546,30 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A firmware image's own header, loaded by (2026-11-14, v197) {#image-header}
+
+`Sh4::loadRom` lays out an image as its header says, so the interpreter takes rom.4 (the VC-2) as it takes rom.2: the
+VC-2 mode's step 2, first item (research/VC2_MODE_PLAN.md). From file offset 0x1c the header holds six words, CPU
+addresses: `.bss`, two not read here, `.bss`'s end, `.data`'s source and `.data`. In both images `.data`'s source lies
+right below `.data`, the same length, and `.bss` follows it:
+
+| Image | `.data`'s source | `.data` | `.bss` | `.bss` end | Region to |
+|---|---|---|---|---|---|
+| rom.2 | `0x89834018` | `0x8985858c` | `0x8987cb00` | `0x8a01ceb4` | `0x8a020000` |
+| rom.4 | `0x8990c758` | `0x8992e1bc` | `0x8994fc20` | `0x8a1f11c4` | `0x8a200000` |
+
+rom.2's four are the very addresses its startup copy and zeroing had written into the loader since the interpreter
+came in (2026-10-28, before v41), read off its code then: so the header and the startup code agree. The image's region runs from 0x89300000 to its top rounded to
+64 KB, which for rom.2 is the 0x8a020000 mapped before, so its map is unchanged. A file whose header doesn't lay out
+that way, or reaches past 0x8c000000 (the machines' RAM), is refused, saying so. `research/tools/vc2rom.cpp` read
+rom.4's header this way for its own loader; that copy is gone, and its `Machine` calls `Sh4::loadRom`. The loader and
+the rest of the interpreter's setup are in `Sh4Setup.cpp`, split out of `Sh4Interp.cpp` as they stood; the paths an
+instruction takes stay in `Sh4Interp.cpp`, where they inline.
+
+Checked: `vc2run`'s analog, autonote, fxprog, fxroute, mixer, track and vocosc runs, which load rom.4 and most of them
+rom.2 too, give HEAD's output to the byte (1,522 lines); `fxchorus` its saved output; the boot run prints rom.4's
+sections from the loader as above.
+
 ### The Chorus's LFO, run (2026-11-13, beside the VC-2 mode's step 1c) {#chorus-lfo-run}
 
 Run to answer whether the VC-2's Chorus has the V-Synth's sides swapped (research/VC2_VOCAL_DESIGNER.md, "The Chorus's

@@ -33,7 +33,7 @@
 //                                          (vc2fxchorus.cpp, vc2fxchorusphase.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
-//        plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
+//        plugin/Source/Sh4Setup.cpp plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
 //        plugin/Source/XtFwMachine.cpp plugin/Source/XtMultiBandPlayer.cpp plugin/Source/XtFxChip.cpp
 //        plugin/Source/XtFxControl.cpp plugin/Source/XtOsc.cpp plugin/Source/XtWaveFile.cpp -o build/tools/vc2/vc2run
 #include "vc2runs.h"
@@ -98,8 +98,8 @@ bool initVocoderModule(Machine& m) {
 
 int boot(Machine& m, int, char**) {
     if (!m.run(kBuild, {kVocoder})) return 1;
-    std::printf("sections: .data %08x..%08x from %08x, .bss to %08x\n", m.sec.data, m.sec.bss, m.sec.dataFrom,
-                m.sec.bssEnd);
+    const Sh4::ImageSections& sec = m.cpu.image();
+    std::printf("sections: .data %08x..%08x from %08x, .bss to %08x\n", sec.data, sec.bss, sec.dataFrom, sec.bssEnd);
     std::printf("built in %llu steps; +0 %08x +0x1c %08x +0x20 %08x\n", (unsigned long long)m.cpu.steps(),
                 m.cpu.rd32(kVocoder), m.cpu.rd32(kVocoder + 0x1c), m.cpu.rd32(kVocoder + 0x20));
     for (const uint32_t engine : {kHireso, kLegacy}) {

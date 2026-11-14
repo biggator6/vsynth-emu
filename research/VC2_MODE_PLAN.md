@@ -150,7 +150,10 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
 ### 2. Shared plumbing (plugin/Source)
 
 - `Sh4Interp::loadRom` by the image's header (`research/tools/vc2rom.cpp`'s rule), rom.2's map unchanged: `fcheck.sh`
-  against its baseline.
+  against its baseline. **Done 2026-11-14, v197** (HARDWARE_FIRMWARE.md, "A firmware image's own header"): the loader
+  and the rest of the interpreter's setup split into `Sh4Setup.cpp`; the header's sections, rom.2's the very addresses
+  its loader held, its region to 0x8a020000 as before; `vc2rom.cpp` calls it; fcheck as baseline with all 165 sections
+  run, verify.sh clean, seven vc2run runs on rom.4 HEAD's output to the byte, `rd` reading rom.4's .data.
 - The ROM search finds rom.4 beside rom.2; `XtSynthRom.cpp`'s one-image rule made two known images (`VSynthEmuRomTest`, the
   `rom-` plants).
 - rom.4's parameter tables (names, descriptors, value text) read at run time.

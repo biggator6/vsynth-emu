@@ -18,9 +18,10 @@ in the repo (see "Open").
   rom.2's stop below 0x8a020000. Its C startup copies .data from ROM [0x8990c758, 0x8992e1bc) to RAM [0x8992e1bc, 0x8994fc20)
   and zeroes .bss [0x8994fc20, 0x8a1f11c4): the rule `Sh4Interp` uses for rom.2 (the source ends where the copy begins), which
   for rom.4 lands on its header's own word 0x8990c758. So a table at a CPU address in 0x8992e1bc…0x8994fc20 is read at that
-  address − 0x21a64 in the file; read in place it is something else. `Sh4Interp::loadRom` and `build/tools/bin/rd` hold rom.2's
-  map, so they can't run or read rom.4 as they stand; `ramrd.py` reads it ("The tools"), and `vc2rom.*` maps it in the
-  interpreter by this header for the research runs ("rom.4 run in the interpreter").
+  address − 0x21a64 in the file; read in place it is something else. ~~`Sh4Interp::loadRom` and `build/tools/bin/rd` hold
+  rom.2's map, so they can't run or read rom.4 as they stand~~ (from v197 `Sh4::loadRom` lays out any image by this header,
+  rom.2's map unchanged: HARDWARE_FIRMWARE.md, "A firmware image's own header"); `ramrd.py` reads it ("The tools"), and
+  `vc2rom.*`'s `Machine` loads it through `Sh4::loadRom` for the research runs ("rom.4 run in the interpreter").
 - The disk image's `Internal.vc2` folder (FAT16 partition), and a preset wave library after the V-Synth's preset waves (below).
 - `research/V-SYNTH_XT_OM.txt`: the VC-2's file names (fig. 07-06) and its one-line description. Nothing on its parameters.
 
@@ -615,8 +616,9 @@ not.
 
 ## rom.4 run in the interpreter (2026-11-12, fourth pass)
 
-plugin/Source is unchanged: `Sh4Interp::loadRom` keeps rom.2's map. `research/tools/vc2rom.*` maps rom.4 through the
-interpreter's public `mapRam` and `write` by its own header: the image at 0x89300000, .data [0x8992e1bc, 0x8994fc20) copied from
+~~plugin/Source is unchanged: `Sh4Interp::loadRom` keeps rom.2's map.~~ (From v197 `Sh4::loadRom` reads the header and
+`vc2rom.*` calls it, its own copy gone: HARDWARE_FIRMWARE.md, "A firmware image's own header".) `research/tools/vc2rom.*`
+mapped rom.4 through the interpreter's public `mapRam` and `write` by its own header: the image at 0x89300000, .data [0x8992e1bc, 0x8994fc20) copied from
 0x8990c758, .bss zeroed to 0x8a1f11c4 (refused unless the source ends where the copy begins), with XtFwMachine's stack and heap
 and operator new (`0x89506df4`) answered from the heap. Where a run stands in for the OS it says so; nothing else is hooked but
 the probes named. `boot`: the vocoder's builder `0x893f0490` on its static object, 31,748 steps; both engines' vtables and their

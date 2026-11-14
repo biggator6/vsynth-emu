@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A firmware image by its own header v197 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, first item (the user's
+  "proceed with next step if verify.sh comes back clean"). Sh4::loadRom lays out an image as its header at file offset
+  0x1c says (.bss, its end, .data's source, .data), so the interpreter takes rom.4 as it takes rom.2; rom.2's sections
+  are the addresses the loader held since it came in, and its region still runs to 0x8a020000 (the top rounded to
+  64 KB); a file whose header isn't laid out so, or reaches the machines' RAM, is refused, saying so. Sh4::image()
+  says where the sections are. Sh4Interp.cpp (517 lines) split first, moved as it stood: the setup (regions, mapRam,
+  the load, bulk reads and writes, faults, hooks) in Sh4Setup.cpp, the hot paths left where they inline; kPageBits and
+  phys private in Sh4Interp.h. research/tools/vc2rom.cpp's own copy of the rule gone, its Machine calling loadRom.
+  Every build of the interpreter takes Sh4Setup.cpp (CMakeLists; build.sh's SH4 list; ab.sh, mutate.sh, fxthreads.sh,
+  fwsteps.sh; the tools' build lines). Check: verify.sh clean, fcheck as baseline with all 165 sections run (672
+  checks), ab vs HEAD 4/4; vc2run's analog, autonote, fxprog, fxroute, mixer, track and vocosc HEAD's output to the
+  byte; rd reads rom.4's .data after its startup. HARDWARE_FIRMWARE.md, "A firmware image's own header".
+
 The editor, D v196 (2026-11-13; UI steps 0 to 5 on ui-redesign): the user's "a new UI with Pigments and Serum as ideas, a
   fresh palette, room for a V-Synth / VC-2 switch", of four mock-ups D ("Yes, build D"), and "Continue to step 5"
   (research/UI_DESIGN.md, the only description of it now). createEditor makes SynthEditor (UiEditor), drawn at 1200 x 750

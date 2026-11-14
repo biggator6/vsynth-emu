@@ -4,7 +4,8 @@
 //   fxchip <rom> <mfx type> <Hz> <slot>   a sine into a frame pair: slot 20 MAIN, 24 the sends, 28 MULTI, 2c DIR
 // Env: FX_AMP (0.01); FX_P="i=v,i=v" MFX params; FX_REV=<type>; FX_IMP=<samples>, an impulse at FX_T0 (1000), listing what comes out of slots a0, a2;
 //      FX_RMS=1 level of a0, a2 per 100 ms; FX_UNK=1.
-// Build: clang++ -std=c++20 -O2 -Iplugin/Source research/tools/fxchip.cpp plugin/Source/Sh4Interp.cpp -o build/tools/fx/fxchip
+// Build: clang++ -std=c++20 -O2 -Iplugin/Source research/tools/fxchip.cpp plugin/Source/Sh4Interp.cpp
+//        plugin/Source/Sh4Setup.cpp -o build/tools/fx/fxchip
 #include "Sh4Interp.h"
 #include <algorithm>
 #include <cmath>

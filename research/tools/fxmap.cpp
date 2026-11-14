@@ -3,7 +3,8 @@
 //   fxmap <rom> mfx <type> [i v]  one MFX type at its defaults (param i = v): each word as fields, and what wrote it
 //   fxmap <rom> boot              boot, Chorus and Reverb through their real entry points: programs loaded, words set going
 // Prints to stdout, for build/ only: a program as words is a listing of the firmware and is never committed.
-// Build: clang++ -std=c++20 -O2 -Iplugin/Source research/tools/fxmap.cpp plugin/Source/Sh4Interp.cpp -o build/tools/fx/fxmap
+// Build: clang++ -std=c++20 -O2 -Iplugin/Source research/tools/fxmap.cpp plugin/Source/Sh4Interp.cpp
+//        plugin/Source/Sh4Setup.cpp -o build/tools/fx/fxmap
 #include "Sh4Interp.h"
 #include <cstdio>
 #include <cstdlib>

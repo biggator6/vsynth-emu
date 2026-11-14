@@ -11,11 +11,6 @@
 
 namespace vc2 {
 
-// rom.4's sections, read from its header words at file offset 0x1c (CPU addresses)
-struct Sections {
-    uint32_t bss = 0, bssEnd = 0, data = 0, dataFrom = 0;
-};
-
 // The harness memory, as XtFwMachine's (CPU addresses, P1)
 inline constexpr uint32_t kRam = 0x8C000000, kRamSize = 0x02000000;
 inline constexpr uint32_t kStack = 0x8C0E0000, kScratch = 0x8C100000, kHeap = 0x8D000000;
@@ -37,7 +32,6 @@ float fmac(float a, float b, float acc);
 class Machine {
 public:
     Sh4 cpu;
-    Sections sec;
     explicit Machine(const std::string& rom);
     [[nodiscard]] bool ok() const { return why.empty(); }
     [[nodiscard]] const std::string& error() const { return why; }

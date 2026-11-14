@@ -31,6 +31,7 @@ source "$(dirname "$0")/env.sh"
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # a run that can't start must never read as a result; no "== name" follows
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
+source "$(dirname "$0")/objects.sh"   # keptObject: the fx ports' objects, by their source and every header
 # A tone port's file, planted under xt_tone; nothing for any other port
 tonefile() {
     case "$1" in
@@ -79,7 +80,7 @@ harnessParts() {   # harnessParts <define> <objdir> <the port's own files, witho
     local f H
     H=$(ls -t "$S"/*.h | head -1)
     for f in "$@" XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware XtFwMachine XtMultiBandPlayer XtSoloVoice \
-             XtSoloEncoder Sh4Interp; do
+             XtSoloEncoder Sh4Interp Sh4Setup; do
         [ "$f.cpp" = "$F" ] && continue
         L+=("$OBJ/$f.o")
         [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] && continue
@@ -96,7 +97,7 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
     L=()
     H=$(ls -t "$S"/*.h | head -1)   # a changed header rebuilds them all
     PARTS=(XtToneCheck XtSynth XtSoloEncoder XtSoloVoice XtLinearPlayer XtLitePlayer XtMultiBandPlayer XtEnvelope XtLfo
-           XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp XtFiles XtWaveFile XtDiskImage XtPatchStore
+           XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp Sh4Setup XtFiles XtWaveFile XtDiskImage XtPatchStore
            XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch
            XtSynthZones XtSynthNotes XtSynthUpdate XtSynthKnobs XtSynthEnvKnobs XtSynthMsm XtMsm XtMsmTrack XtMsmPatch
            XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds)
@@ -112,17 +113,18 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
     [[ "$PORT" == wire* ]] && ARGS=("$C" "${SEED:-2024}") && C=msm
 elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck's baseline; [cases] is not used
     F=XtSoloVoice.cpp; D=XT_FW_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
+    L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197
 elif [ "$PORT" = fx ]; then        # XtFxChip against the reference; [cases] is its samples per type, and XT_FX_STOP stops at the first difference
     F=XtFxChip.cpp; D=XT_FX_MAIN; EXTRA=(-I"$REPO/research/third_party/gearmulator_esp")
     OBJ="$M/fx_obj"; mkdir -p "$OBJ"
-    for f in Sh4Interp XtFxControl; do [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$S/XtFxControl.h" ] && [ "$OBJ/$f.o" -nt "$S/XtFxChip.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -c "$S/$f.cpp" -o "$OBJ/$f.$$.o" && mv "$OBJ/$f.$$.o" "$OBJ/$f.o"; }; done
-    L=("$OBJ/Sh4Interp.o" "$OBJ/XtFxControl.o")
+    for f in Sh4Interp XtFxControl; do keptObject "$OBJ/$f.o" "$S/$f.cpp"; done
+    L=("$OBJ/Sh4Interp.o" "$S/Sh4Setup.cpp" "$OBJ/XtFxControl.o")
 elif [ "$PORT" = fxc ]; then       # XtFxControl against its checks in xt_fx; [cases] is the events of "xt_fx control"
     F=XtFxControl.cpp; D=XT_FX_MAIN; EXTRA=(-I"$REPO/research/third_party/gearmulator_esp")
     OBJ="$M/fx_obj"; mkdir -p "$OBJ"
-    [ "$OBJ/Sh4Interp.o" -nt "$S/Sh4Interp.cpp" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -c "$S/Sh4Interp.cpp" -o "$OBJ/Sh4Interp.$$.o" && mv "$OBJ/Sh4Interp.$$.o" "$OBJ/Sh4Interp.o"; }
-    [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxChip.cpp" ] && [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxControl.h" ] && [ "$OBJ/XtFxChip_main.o" -nt "$S/XtFxChip.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_FX_MAIN "${EXTRA[@]}" -I"$S" -c "$S/XtFxChip.cpp" -o "$OBJ/XtFxChip_main.$$.o" && mv "$OBJ/XtFxChip_main.$$.o" "$OBJ/XtFxChip_main.o"; }
-    L=("$OBJ/Sh4Interp.o" "$OBJ/XtFxChip_main.o")
+    keptObject "$OBJ/Sh4Interp.o" "$S/Sh4Interp.cpp"
+    keptObject "$OBJ/XtFxChip_main.o" "$S/XtFxChip.cpp" -DXT_FX_MAIN "${EXTRA[@]}" -I"$S"
+    L=("$OBJ/Sh4Interp.o" "$S/Sh4Setup.cpp" "$OBJ/XtFxChip_main.o")
 elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
     case "$PORT" in
         ticks) F=XtTempoTicks.cpp ;;
@@ -144,6 +146,7 @@ elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     harnessParts XT_MSM_MAIN msm_obj XtMsm XtMsmTrack XtMsmPatch XtMsmCheck XtMsmCases
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
+    L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197
 elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore)$ ]]; then
     # XtFiles, or with PORT=wavefile XtWaveFile (a wave's chunks), with PORT=diskimage XtDiskImage (the firmware's disk
     # image), with PORT=patchstore XtPatchStore (the store's layout), against fcheck's baseline of xt_files; [cases] is
@@ -160,6 +163,7 @@ elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore)$ ]]; then
         [ "$f" = "$F" ] || L+=("$S/$f")
     done
     L+=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
+    L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197
 elif [ "$PORT" = filesfw ]; then   # the same, with the error in XtFirmware's routines for them
     F=XtFirmware.cpp; D=XT_FILES_MAIN
     OBJ="$M/files_obj"; mkdir -p "$OBJ"

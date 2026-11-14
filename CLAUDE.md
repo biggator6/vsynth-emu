@@ -4,7 +4,8 @@ A JUCE plugin (AU/VST3/Standalone) that plays samples through ports of the
 Roland V-Synth XT's own firmware: its VariPhrase encoders and players, OSC
 converters, envelopes, LFOs, pitch path, key assign, COSM filters, TVA. Algorithms
 are taken from the user's rom.2 (Ghidra) and every port is checked against the
-firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
+firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`; its setup and an image's load in
+`Sh4Setup.cpp`, v197).
 
 ## Rules
 - Firmware is Roland copyright: never commit firmware files, disassembly
@@ -77,7 +78,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
   `PORT=msm`, `msmtrack`, `msmpatch`: xt_msm, XtMsm.cpp, XtMsmTrack.cpp, XtMsmPatch.cpp, with `SEED` its seed;
   `PORT=toneknobs`, `toneenvknobs`, `toneupdate`, `tonezones`, `tonenotes`: xt_tone, XtSynth's parts; `tonefwcpp`, `tonefwh`, `tonecases`, `tonecarry`, `tonepatchids`: xt_tone's own;
   `PORT=wire…`: xt_tone's MSM mode, [cases] its cases (`wiremsm` XtSynthMsm.cpp, `wirecheck` XtToneMsm.cpp, `wirefwmsm` XtToneFwMsm.h, the rest as the tone ports); a header's plant builds every part from a copy of the sources)
-  and runs it, to show the check catches it (a run the error crashes counts, and one it hangs, stopped after MUT_TIMEOUT seconds, default 1500). `mutate_tone.py [cases]`: the list in
+  and runs it, to show the check catches it (a run the error crashes counts, and one it hangs, stopped after MUT_TIMEOUT seconds, default 1500). The objects it keeps between runs are built again when older than their source or any header (`harnessParts`; the fx ports' by `objects.sh`'s `keptObject`, v197). `mutate_tone.py [cases]`: the list in
   `tone_muts.txt` (`name|old|new[|port[|seed]]`; port `solo` for what only `solocmp` reaches; seed for what the default seed's cases don't reach), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
 - `xt_tone <rom> [cases] [seed] [inputs]` (in fcheck; `build/tools/fcheck/bin`): XtSynth's wiring
   against a whole firmware tone. `XT_TONE_FIRST=1`: each case's first difference, `XT_TONE_DUMP=<case>|a`:
@@ -131,8 +132,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`).
 - The ports' tables are the process's, read by every instance without a lock (`XtSynthRom.cpp`, v173): written once, by the first image to load,
   and published by an atomic flag only when all of them are in. Another file is taken only if it holds the same bytes, with nothing written;
   a different image is refused, saying why, until the host starts again. A new table goes in `loadTables` there, never written after.
-- rom.2 maps at 0x89300000; .data/.bss up to 0x8a020000 (the interpreter sets
-  them up). Calls take r4–r7, then the stack; `Sh4::call(addr, {args}, sp)`.
+- An image maps at 0x89300000 as its own header lays it out (v197; HARDWARE_FIRMWARE.md, "A firmware image's own
+  header"): rom.2's .data/.bss up to 0x8a020000, rom.4's to 0x8a200000 (the interpreter sets them up, `Sh4::image()`
+  says where). Calls take r4–r7, then the stack; `Sh4::call(addr, {args}, sp)`.
 - The SH-4 runs round-to-zero (FPSCR.RM), FMAC = product then sum (two
   roundings), denormals flushed. `XtFloat` reproduces this exactly (v62);
   harnesses flush denormals on the host too.

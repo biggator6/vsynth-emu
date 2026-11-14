@@ -24,8 +24,6 @@
 
 namespace {
 constexpr uint32_t kSentinel = 0x8EFFFFF0u;     // return address of call(); never mapped as code
-constexpr uint32_t kPageBits = 12;
-inline uint32_t phys(uint32_t a) { return a & 0x1fffffffu; }
 inline float asF(uint32_t u) { float f; std::memcpy(&f, &u, 4); return f; }
 inline uint32_t asU(float f) { uint32_t u; std::memcpy(&u, &f, 4); return u; }
 inline int32_t s8(uint32_t v) { return (int8_t)(uint8_t)v; }
@@ -40,37 +38,6 @@ inline int32_t ftrcF(double x) {                  // FTRC: truncate, saturate
 
 Sh4::Sh4() : page(1u << (29 - kPageBits), nullptr), hookFilter(1u << 16, 0) {}
 Sh4::~Sh4() { for (Region* g : regions) delete g; }
-
-void Sh4::addRegion(uint32_t base, uint32_t size) {
-    Region* g = new Region{ phys(base), size, std::vector<uint8_t>(size, 0) };
-    regions.push_back(g);
-    for (uint32_t o = 0; o < size; o += 1u << kPageBits) page[(g->base + o) >> kPageBits] = g->mem.data() + o;
-}
-
-void Sh4::mapRam(uint32_t addr, uint32_t size) {
-    addr &= ~((1u << kPageBits) - 1);
-    size = (size + (1u << kPageBits) - 1) & ~((1u << kPageBits) - 1);
-    addRegion(addr, size);
-}
-
-bool Sh4::loadRom(const char* path) {
-    FILE* f = path ? std::fopen(path, "rb") : nullptr;
-    if (!f) { err = "cannot open rom"; return false; }
-    std::fseek(f, 0, SEEK_END);
-    const long sz = std::ftell(f);
-    std::fseek(f, 0, SEEK_SET);
-    const uint32_t base = 0x89300000u, end = 0x8a020000u;   // image, .data and .bss
-    if (sz <= 0 || sz > (long)(end - base)) { std::fclose(f); err = "unexpected rom size"; return false; }
-    addRegion(base, end - base);
-    const bool ok = std::fread(at(base, (uint32_t)sz), 1, (size_t)sz, f) == (size_t)sz;
-    std::fclose(f);
-    if (!ok) { err = "cannot read rom"; return false; }
-    // C startup (entry 0x89300040): .data image ROM [0x89834018, 0x8985858c)
-    // → RAM [0x8985858c, 0x8987cb00); zero [0x8987cb00, 0x8a01ceb4).
-    std::memmove(at(0x8985858cu, 0x8987cb00u - 0x8985858cu), at(0x89834018u, 0x8985858cu - 0x89834018u), 0x8985858cu - 0x89834018u);
-    std::memset(at(0x8987cb00u, 0x8a01ceb4u - 0x8987cb00u), 0, 0x8a01ceb4u - 0x8987cb00u);
-    return true;
-}
 
 SH4_HOT uint8_t* Sh4::at(uint32_t a, uint32_t n) {
     const uint32_t p = phys(a);
@@ -92,24 +59,6 @@ SH4_HOT uint8_t Sh4::rd8(uint32_t a) { uint8_t* p = at(a, 1); if (!p) { fault("r
 SH4_HOT void Sh4::wr32(uint32_t a, uint32_t v) { uint8_t* p = at(a, 4); if (p) std::memcpy(p, &v, 4); else fault("write32", a); }
 SH4_HOT void Sh4::wr16(uint32_t a, uint16_t v) { uint8_t* p = at(a, 2); if (p) std::memcpy(p, &v, 2); else fault("write16", a); }
 SH4_HOT void Sh4::wr8(uint32_t a, uint8_t v) { uint8_t* p = at(a, 1); if (p) *p = v; else fault("write8", a); }
-void Sh4::write(uint32_t a, const void* src, size_t n) {
-    const uint8_t* s = (const uint8_t*)src;
-    for (size_t i = 0; i < n; ) { uint32_t chunk = (uint32_t)std::min<size_t>(n - i, 4096 - ((a + i) & 4095)); uint8_t* p = at(a + (uint32_t)i, chunk); if (!p) { fault("write", a + (uint32_t)i); return; } std::memcpy(p, s + i, chunk); i += chunk; }
-}
-void Sh4::read(uint32_t a, void* dst, size_t n) {
-    uint8_t* d = (uint8_t*)dst;
-    for (size_t i = 0; i < n; ) { uint32_t chunk = (uint32_t)std::min<size_t>(n - i, 4096 - ((a + i) & 4095)); uint8_t* p = at(a + (uint32_t)i, chunk); if (!p) { fault("read", a + (uint32_t)i); std::memset(d + i, 0, n - i); return; } std::memcpy(d + i, p, chunk); i += chunk; }
-}
-
-bool Sh4::fault(const char* what, uint32_t addr) {
-    if (err.empty()) { char b[96]; std::snprintf(b, sizeof b, "%s at %08x (pc %08x)", what, addr, pc); err = b; }
-    return false;
-}
-
-void Sh4::hook(uint32_t addr, std::function<void(Sh4&)> fn) {
-    hooks[addr] = std::move(fn);
-    hookFilter[(addr >> 1) & 0xffff] = 1;
-}
 
 void Sh4::syncRound() {
     const int want = (!forceNearest && (fpscr & 3) == 1) ? FE_TOWARDZERO : FE_TONEAREST;

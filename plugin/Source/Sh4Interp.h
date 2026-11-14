@@ -38,9 +38,15 @@ public:
     Sh4();
     ~Sh4();
 
-    // Maps rom.2 at 0x89300000 and leaves memory as the C startup does
-    // (.data copied from its ROM image, .bss zeroed).
+    // Maps a firmware image (rom.2, rom.4) at 0x89300000 as its own header lays it out, and leaves memory as the C
+    // startup does (.data copied from its source, .bss zeroed); false, error() saying why, if the header isn't one
+    // (v197, Sh4Setup.cpp).
     bool loadRom(const char* path);
+    // The loaded image's sections as its header gives them, CPU addresses; all 0 before a load.
+    struct ImageSections {
+        uint32_t bss = 0, bssEnd = 0, dataFrom = 0, data = 0;
+    };
+    const ImageSections& image() const { return image_; }
     // RAM for the caller's buffers, heap and stack (virtual P1 addresses).
     void mapRam(uint32_t addr, uint32_t size);
 
@@ -85,12 +91,15 @@ public:
     bool forceNearest = false;
 
 private:
+    static constexpr uint32_t kPageBits = 12;
+    static uint32_t phys(uint32_t a) { return a & 0x1fffffffu; }   // the 29-bit physical address P1 and P2 share
     struct Region { uint32_t base, size; std::vector<uint8_t> mem; };
     std::vector<Region*> regions;
     std::vector<uint8_t*> page;                         // 4 KB pages over the 29-bit physical space
     std::unordered_map<uint32_t, std::function<void(Sh4&)>> hooks;
     std::vector<uint8_t> hookFilter;                    // by an address's low bits: a hook may be there (hooks decides)
     std::string err;
+    ImageSections image_;
     uint64_t nsteps = 0;
     int hostRound = -1;
 
