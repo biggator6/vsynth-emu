@@ -91,7 +91,7 @@ void withNote(VSynthEmuProcessor& p, SynthEditor& ed, const juce::String& note) 
     for (Header* h : LayoutCheck::allOf<Header>(ed.drawing())) h->refresh();
 }
 
-// What no parameter would miss (v196, as TEST_UI_LAYOUT had it of today's editor): the build on the header, whole;
+// What no parameter would miss (v196, as TEST_UI_LAYOUT had it of the tabbed editor): the build on the header, whole;
 // Browse..., ROM... and each PCM OSC's Load...; what a patch asks for that isn't here, under its name, and nothing there
 // when it misses nothing
 void chrome(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check) {

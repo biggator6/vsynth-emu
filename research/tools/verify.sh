@@ -44,8 +44,8 @@ checkTest() {
     echo "$o" | tail -1
 }
 if [ $BUILT = 1 ]; then
-    # PluginTest's own modes: the effects' panel, the editor's layout, the ROM search
-    for mode in TEST_FX_PANEL TEST_UI_LAYOUT TEST_ROM_SEARCH; do
+    # PluginTest's own modes: the effects' panel, the ROM search (the editor's layout is VSynthEmuEditorTest's, v196)
+    for mode in TEST_FX_PANEL TEST_ROM_SEARCH; do
         checkTest "$mode=1" build/plugin/VSynthEmuTest "$ROM" analysis/test_files/raw/chord_Cmaj_original.wav
     done
     # A processor closed while its wave is encoding (closed in ms, the next one encodes as before); a project that
@@ -54,7 +54,8 @@ if [ $BUILT = 1 ]; then
     # firmware routines that loop (each way gives up within its step limit);
     # damaged disk images (refused, or each cluster once); the arpeggiator in XtSynth, heard (a note a quarter, two tempos);
     # and its plugin side: its parameters against the firmware, a patch's, a session's, a chord through processBlock (v190);
-    # D, the redesigned editor, as it grows (UI step 1: its sizes, its layout on each page and block, each press's route)
+    # the editor, D (v196, in TEST_UI_LAYOUT's place): its sizes, its layout on each page and block, every control on its
+    # own parameter and every parameter with a control, each press's route
     for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin Editor; do
         checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
     done

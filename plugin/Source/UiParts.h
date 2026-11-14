@@ -1,7 +1,7 @@
 #pragma once
 // What the editor's drawing shares (research/UI_DESIGN.md): drawn text, filled and stroked shapes, a key's name; and the
 // Effects panel's page of titled cards and its joined buttons, drawn in the palette they are given (FxPanel, on D's FX
-// page in Look::cards).  Today's editor's palette and sizes went with it (v196).
+// page in Look::cards).  The tabbed editor's palette and sizes went with it (v196).
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 #include <vector>

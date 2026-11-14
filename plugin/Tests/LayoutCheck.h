@@ -1,7 +1,7 @@
 #pragma once
 // The editor's checks, VSynthEmuEditorTest's (EditorTest.cpp): what one state of the editor must be, and every visible
 // control moved to see which parameter it sets.  Moved from PluginTest.cpp's main (v193), where they were its lambdas;
-// TEST_UI_LAYOUT's sweeps of today's editor went with it (v196).
+// TEST_UI_LAYOUT's sweeps of the tabbed editor went with it (v196).
 #include "../Source/FxPanel.h"
 #include "../Source/PluginProcessor.h"
 #include <cstdio>

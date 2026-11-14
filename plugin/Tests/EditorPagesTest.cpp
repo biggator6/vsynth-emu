@@ -6,6 +6,8 @@
 #include "../Source/PluginParamIds.h"
 #include "../Source/UiModPage.h"
 #include "../Source/UiZonesPage.h"
+#include <algorithm>
+#include <climits>
 
 namespace {
 
@@ -66,8 +68,21 @@ void zones(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
         movesOwn(l, page->cell(z), "zone " + juce::String(z + 1), { zone, kXtZones, z }, check);
 }
 
+// A page's left cards start level with its list, a block's card in the first one's place (sameAs): a card left in its
+// own place sits under an empty one's height (v196; the tabbed editor's shorter page had pushed it off the page)
+void cardsLevel(const FxPanel& fx, int page, TestChecks& check) {
+    int left = INT_MAX, right = INT_MAX;
+    for (const Ui::Page::Card& c : fx.cards) {
+        if (c.bare || c.col < 0 || (c.shown && !c.shown())) continue;
+        int& top = c.col == 0 ? left : right;
+        top = std::min(top, c.bounds.getY());
+    }
+    check(left == right, "FX page " + std::to_string(page) + ": its left cards start at " + std::to_string(left) +
+                             ", its list at " + std::to_string(right));
+}
+
 // A page of the FX page on each of its block's types, as what's on it follows them (v196, as TEST_UI_LAYOUT had it of
-// today's Effects tab): laid out, the list's names and values whole, and room for 15 of its rows
+// the tabbed editor's Effects tab): laid out, the list's names and values whole, and room for 15 of its rows
 void effectTypes(LayoutCheck& l, FxPanel& fx, int page, TestChecks& check) {
     const int types = page < kEffects ? l.p.apvts.getParameter(kTypeOf[page])->getNumSteps() : 1;
     for (int type = 0; type < types; ++type) {
@@ -102,6 +117,7 @@ void effects(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
     for (int page = 0; page < kFxPages && l.view != nullptr; ++page) {
         effectTypes(l, *fx, page, check);
         fx->showPage(page);
+        cardsLevel(*fx, page, check);
         movesOwn(l, *fx, "FX page " + juce::String(page), {}, check);
     }
     pageButtons(l, *fx, check);
