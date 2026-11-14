@@ -5,7 +5,8 @@
 namespace Blocks {
 
 // OSC: ANALOG's other knobs, then what both types share; PCM's wave (its key, time offset, KFs, start, loop, tempo and
-// Beat Keep), then the same.  Each OSC's Time Trip and Robot are the pad's; its LFO's depths are in SELECTED.
+// Robot), then the same.  Each OSC's Time Trip switch and Beat Keep are the pad's (v202); its LFO's depths are in
+// SELECTED.
 const DetailFace kOscDetails[kOscFaces] = {
     { { { { "anaFat", "Fat" }, { "anaFatKF", "Fat KF" }, { "anaFatLfo", "Fat LFO" }, { "anaFatEnv", "Fat Env" },
           { "anaDetune", "Detune" }, { "anaSubOct", "Sub Octave" }, { "anaSubLevel", "Sub Level" },
@@ -14,7 +15,7 @@ const DetailFace kOscDetails[kOscFaces] = {
     { { { { "rootKey", "Key" }, { "oscTimeOffset", "Time Offset" }, { "oscTimeKF", "Time KF" },
           { "oscFormantKF", "Fmt KF" }, { "startOffset", "Start" }, { "loop", "Loop" }, { "loopMode", "Loop Mode" },
           { "loopStart", "Loop Start" }, { "loopEnd", "Loop End" }, { "origTempo", "Tempo" },
-          { "beatKeep", "Beat Keep" }, { "randomPitch", "Random" }, { "oscLevelKF", "Level KF" },
+          { "robot", "Robot" }, { "randomPitch", "Random" }, { "oscLevelKF", "Level KF" },
           { "waveGain", "Gain" }, { "oscVelCurve", "Velo Curve" } } } },
 };
 

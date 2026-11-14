@@ -4,6 +4,7 @@
 // TEST_UI_LAYOUT's sweeps of the tabbed editor went with it (v196).
 #include "../Source/FxPanel.h"
 #include "../Source/PluginProcessor.h"
+#include "../Source/UiLook.h"
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -133,8 +134,9 @@ struct LayoutCheck {
                 fail(where + ": " + controlName(k) + " shows on a card that isn't shown");
     }
 
-    // Whether a control's text is cut short: a label's, a box's or a slider's value (v190), a toggle's as LookAndFeel_V4
-    // draws it, the tick then the text
+    // Whether a control's text is cut short: a label's, a box's or a slider's value (v190), a switch's as D draws it, the
+    // pill and then its text, cut with dots where it doesn't fit (v202: it was LookAndFeel_V4's tick, which passed
+    // "Beat K..." under the Time Trip pad)
     static bool textCut(juce::Component* k) {
         if (auto* l = dynamic_cast<juce::Label*>(k)) return cutShort(*l);
         if (dynamic_cast<juce::ComboBox*>(k) || dynamic_cast<juce::Slider*>(k)) {
@@ -143,10 +145,8 @@ struct LayoutCheck {
         }
         auto* b = dynamic_cast<juce::ToggleButton*>(k);
         if (!b || b->getButtonText().isEmpty()) return false;   // a switch of no text (D's power dots) has none to cut
-        const float size = juce::jmin(15.0f, (float)b->getHeight() * 0.75f);
-        const juce::Font font { juce::FontOptions(size) };
-        const float text = juce::GlyphArrangement::getStringWidth(font, b->getButtonText());
-        return text * 0.7f > (float)(b->getWidth() - juce::roundToInt(size * 1.1f) - 12);
+        const float room = (float)b->getWidth() - Look::switchPillW - Look::switchGap;
+        return juce::GlyphArrangement::getStringWidth(Look::switchFont(), b->getButtonText()) > room;
     }
 
     void checkKids(juce::Component& c, const juce::String& where) {
@@ -197,8 +197,9 @@ struct LayoutCheck {
         if (!b || (dynamic_cast<juce::TextButton*>(b) && !b->getClickingTogglesState())) return {};   // Load, ROM
         const juce::String text = b->getButtonText();
         if (text.startsWith("OSC ")) return {};   // which OSC the Time Trip column shows
-        // what chooses what shows, and no parameter: the FX page's buttons, the page bar's Keyboard switch (v201)
-        static const juce::StringArray kChoosers { "MFX", "Chorus", "Reverb", "System", "Keyboard" };
+        // what chooses what shows, or the editor's own, and no parameter: the FX page's buttons, the page bar's Keyboard
+        // switch (v201), the pad's Hold (v202)
+        static const juce::StringArray kChoosers { "MFX", "Chorus", "Reverb", "System", "Keyboard", "Pad Hold" };
         if (kChoosers.contains(text)) return {};
         if (b->getRadioGroupId() != 0 && b->getToggleState()) return {};   // one of a pair: the other moves it
         return [b] { b->setToggleState(!b->getToggleState(), juce::sendNotificationSync); };

@@ -6,6 +6,22 @@
 #include "../Source/UiBlockKinds.h"
 #include "../Source/UiEditor.h"
 #include <functional>
+#include <vector>
+
+// What the editor has queued for the synth, taken (the keys' notes, the pad's controllers; v201, v202)
+inline std::vector<juce::MidiMessage> taken(VSynthEmuProcessor& p) {
+    std::vector<juce::MidiMessage> got;
+    p.takeFromEditor([&got](const juce::MidiMessage& m) { got.push_back(m); });
+    return got;
+}
+
+// The one T in the editor's drawing (its footer, its pad), or none, and said
+template <class T>
+T* theOne(SynthEditor& ed, const std::string& what, TestChecks& check) {
+    const auto all = LayoutCheck::allOf<T>(ed.drawing());
+    check(all.size() == 1, "the editor hasn't one " + what);
+    return all.size() == 1 ? all.front() : nullptr;
+}
 
 // Which instance of its kind a block is, by the prefixes its kind's parameters take (an OSC's, a COSM's); a kind of one
 // instance has none to hold its controls to (count 0)
@@ -37,3 +53,6 @@ void waveChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder
 // The footer's keyboard (EditorKeysTest.cpp, v201): a key's press, drag and release as their notes, a press sounding
 // through processBlock, and the fold
 void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// The Time Trip pad (EditorPadTest.cpp, v202): a press's, a drag's and a release's controllers by the assigns as they
+// stand, Hold, an assign OFF
+void padChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);

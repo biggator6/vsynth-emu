@@ -1,31 +1,28 @@
 #pragma once
-// D's Time Trip column (research/UI_DESIGN.md, "The rack"; UI step 2): the pad, which sets the Time Trip parameter by
-// where it is pressed across it (the X-Y pad's controllers come in a later step), whose OSC's switches show under it
-// (OSC 1 or OSC 2), and that OSC's Time Trip switch and Robot.
+// D's Time Trip column (research/UI_DESIGN.md, "The rack"; UI step 2, the XT's pad from v202): the pad (UiTripPad.h),
+// sending the XT's pad controllers into the synth; under it Hold, which the session keeps, and the Time Trip switch and
+// Beat Keep of the OSC it follows (OSC 1 or OSC 2).
 #include "PluginProcessor.h"
 #include "UiControls.h"
+#include "UiTripPad.h"
 #include <array>
-
-// The pad: a slider on the Time Trip parameter across its width, drawn as the pad (OFF at its left edge)
-class TripPad : public juce::Slider {
-public:
-    TripPad() : juce::Slider(juce::Slider::LinearHorizontal, juce::Slider::NoTextBox) { setTitle("Time Trip"); }
-    void paint(juce::Graphics&) override;
-};
 
 class TripColumn : public juce::Component {
 public:
     explicit TripColumn(VSynthEmuProcessor& p);
     static constexpr int kOscs = 2;
+    static constexpr const char* kPadHold = "padHold";   // the session's state property
     void follow(int osc);   // whose switches show under the pad
+    TripPad& pad() { return pad_; }
     void paint(juce::Graphics&) override;
     void resized() override;
 
 private:
+    VSynthEmuProcessor& processor_;
     Controls::Attached attached_;
     TripPad pad_;
     std::array<juce::TextButton, kOscs> follow_;
-    std::array<juce::ToggleButton, kOscs> trip_, robot_;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> padAtt_;
+    std::array<juce::ToggleButton, kOscs> trip_, beat_;
+    juce::ToggleButton hold_ { "Pad Hold" };   // the XT's name (CONTROLLERS.md), apart from the arpeggio's Hold
     juce::Label name_;
 };

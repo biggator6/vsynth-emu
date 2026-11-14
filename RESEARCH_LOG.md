@@ -3570,6 +3570,14 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 22, continued (2026-11-14) — v202: the Time Trip pad as the XT's
+
+- The user was right that it made no sense: the column drew a pad, but under it was a horizontal slider on one 0–127 parameter, a finger going round the rim. CONTROLLERS.md says what the XT's pad is: an X-Y surface in polar terms, where touching freezes the wave and circling scrubs it. The plugin's synth already took the XT's pad controllers, firmware-checked since v132, so the pad sends those, through the queue the keyboard uses.
+- X has to go before Y: the synth's pad moves on Y. A planted error that swapped them was caught, as was one that turned the pad upside down.
+- The arpeggio's Hold vanished from the coverage the moment the pad got its own Hold, because the check skips switches that set no parameter by their name. The pad's is now "Pad Hold", the XT's own name for it.
+- The layout check had never measured D's switches: it used JUCE's stock tick box, and "Beat K…" passed. It now uses the same pill width, gap and face D draws with, and it went red on that switch before the fix.
+- One planted error was missed, and it was my test's gap: an assign has two values that mean off, 0 and 32, and the test tried only 0.
+
 ### Session 22, continued (2026-11-14) — v201: the footer's keyboard plays, and folds away
 
 - The keys needed a way into the synth that the audio thread could take without a lock. JUCE's own keyboard state locks, so the editor writes into a small lock-free ring that processBlock empties at the start of each block, before the host's MIDI, through the same message chain the host's notes take.

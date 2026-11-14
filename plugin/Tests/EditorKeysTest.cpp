@@ -15,12 +15,6 @@ constexpr double kRate = 48000.0;
 constexpr int kBlock = 512, kBlocks = 8;
 constexpr float kAnalog = 0.0f, kPcm = 1.0f;                  // OSC Type's values; PCM its default
 
-std::vector<juce::MidiMessage> taken(VSynthEmuProcessor& p) {
-    std::vector<juce::MidiMessage> got;
-    p.takeFromEditor([&got](const juce::MidiMessage& m) { got.push_back(m); });
-    return got;
-}
-
 // The keys' messages as words: "on 60 off 60 "
 std::string said(const std::vector<juce::MidiMessage>& got) {
     std::string s;
@@ -103,10 +97,9 @@ void keyboardFold(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestCh
 } // namespace
 
 void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check) {
-    const auto footers = LayoutCheck::allOf<Footer>(ed.drawing());
-    check(footers.size() == 1, "the editor hasn't one footer");
-    if (footers.empty()) return;
-    keyPresses(*footers.front(), p, check);
-    keySounds(*footers.front(), p, check);
+    Footer* footer = theOne<Footer>(ed, "footer", check);
+    if (footer == nullptr) return;
+    keyPresses(*footer, p, check);
+    keySounds(*footer, p, check);
     keyboardFold(l, ed, p, check);
 }

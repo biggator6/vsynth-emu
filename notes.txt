@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The Time Trip pad v202 (2026-11-14): the user's testing notes, "time trip makes no sense - see controllers.md", and their
+  choice of the XT's pad. The column's pad had been a slider on the Time Trip circle parameter drawn as a pad. Now
+  TripPad (UiTripPad) sends the XT's pad controllers into the synth through the editor's queue, as the XT's own pad and
+  the iOS app send them: Time Trip Assign X then Y (CC82, CC83 by default; 0 and 32 name none, and the pad says so),
+  1…127 across and up. A press is a finger, which freezes the wave; a drag round the circle scrubs it, clockwise
+  forward (XtTripPad, 48 steps a turn); a release sends 0 and 0, unless Pad Hold keeps the finger, which the session
+  keeps (padHold). Under it Pad Hold, then the followed OSC's Time Trip switch and Beat Keep, a row each; Robot went to
+  a PCM OSC's DETAILS in Beat Keep's place. The circle parameter (timeTrip) is a host's to automate, with no control:
+  744 of 761 parameters have one. The layout check now measures a switch's text as D draws it (Look::switchPillW,
+  switchGap, switchFont): it had used JUCE's tick box and passed "Beat K...", and went red on it, 40 times, before the
+  column's rows were made one a switch. Check: VSynthEmuEditorTest 1241/1241 (EditorPadTest.cpp): clicks at the centre,
+  the top right and the bottom left and a drag as their controllers, Pad Hold and the session keeping it, Trip X on
+  CC20 and at 0 and 32, and the column's switches each on the followed OSC's own parameters. verify.sh green. Plants:
+  nine new (editor-d-pad-, editor-d-beat-); --editor, 61, all caught but editor-d-pad-off-sends, which the test missed
+  as it tried only 0 of the two OFF values; with 32 too, caught.
+
 The footer's keyboard v201 (2026-11-14): the user's testing notes, "keyboard onscreen does nothing but show zones -
   should also be clickable for note input while editing sounds and probably should be able to hide/show", and their
   choice to fold it away. processBlock moved as it stood to PluginProcess.cpp (PluginProcessor.cpp was 560 lines), its
