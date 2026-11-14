@@ -111,6 +111,11 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   vpdt and frames equal `xtWaveRead`'s, the BACKING sample's bands `xtMbBuildBacking`'s, and the audio the plugin's
   decoder over whole RDAC blocks. `xtWaveRead`'s audio differs in the last part block of 177 samples, where it feeds
   zeros past the frames. For step 3: a VC-2 sample is read by `xtWaveRead` with its audio decoded over whole blocks.
+  **The V-Synth's own wave load, 2026-11-13** (HARDWARE_FIRMWARE.md, "The V-Synth's wave load, read"): read, not
+  settled. The file reader takes the chunks and skips the audio, a stream apart pumps the audio through the same RDAC
+  decoder object as the VC-2's, and the count it is fed comes from a sample count in code that needs rom.2's store,
+  the preset drive and a task to run. So whether the plugin's zeros in a preset wave's last part block are the
+  V-Synth's is open; the plugin is left as it is.
   **The effect chip's programs, 2026-11-13** (`vc2run … fxprog`; VC2_VOCAL_DESIGNER.md, "The effect chip's programs"):
   rom.2's driver, paired in rom.4; the 42 MFX programs and the V-Synth's reverbs equal but for registers renumbered one
   down, the Chorus's but for 13 words, the reverbs' transition program equal; program A (routing, mix, EQ, levels)

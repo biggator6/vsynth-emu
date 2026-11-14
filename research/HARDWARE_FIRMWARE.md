@@ -1546,6 +1546,42 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The V-Synth's wave load, read (2026-11-13, beside the VC-2 mode's step 1c) {#vsynth-wave-load}
+
+Read to answer one question the VC-2's wave reader raised (research/VC2_VOCAL_DESIGNER.md, "The wave reader, run"): the
+VC-2 decodes a sample's last RDAC block from the stream's real bytes, while `xtFwRdacDecode` feeds zeros past the frames.
+Is the V-Synth's own load like the VC-2's? Not settled; what was read:
+
+- **The per-sample load.** A sample of the V-Synth's index ("V-Synth Wave.bin") loads by path as a VC-2 sample does:
+  `0x8949a810` (rom.4's `0x8934d8d0`) reads the sample's entry, forms `"D:\"` + its path and calls the file reader
+  `0x89494620`. "D:\" is the preset drive, a file system the kernel serves (rom.4 sends a "D:\…" open to the kernel,
+  `0x89336c60`).
+- **The chunks.** `0x89494620` reads a file's chunks through the file read `0x894848b0` into the wave store's blocks
+  (`0x894a3490`, by tag). At `data` it seeks past the chunk (`0x89484970(handle, size, 1)`), and `0x894a3630` finishes
+  the wave's entry. So the audio isn't read there.
+- **The audio, a stream apart.** `0x89499000(path, info)` opens the file, takes vpsc's frames and channels, and at
+  `data` makes the stream's converter (`0x894a3d20`): for an RDAC wave the RDAC decoder object (method table
+  `0x8983175c`, holding the frames at +4, the channels at +8, the block size at +0x10: 16, 32 stereo); otherwise
+  linear converters for 16, 24 and 32 bits, and a rate converter off 44100. The index's loop (`0x8949a75c`…) opens each
+  sample's audio this way and closes it (`0x89499b50`) only to add up sizes.
+- **The pump.** `0x89499a70(handle, dst, count)` reads the file 256 bytes at a time (`0x894848b0`) and feeds each piece
+  to the converter (`0x894a3ee0`) until it has read `count` bytes. Its two callers (`0x894a5418`, `0x894a5cb4`) work the
+  count out from a sample count, by a format code and the rate. They fill buffers in a loop (`0x894a5346` sets two arrays
+  of 2048 words, 0x1400 bytes apart), so they may be a player streaming from disk rather than the fill of sample memory.
+  Which of them fills a preset wave's sample memory isn't found.
+- **The decoder.** The RDAC decoder object is the same code in both images (rom.2's flush `0x894a9800` and feed
+  `0x894a9860`, rom.4's `0x8935ca10` and `0x8935ca70`). Its feed skips RDAC's 8-byte header on its first call and
+  decodes every whole block of the bytes it is given; it never reads the frames at +4. Its flush pads the bytes left
+  over with zeros to a block and decodes that. So the tail is the count's doing: the data chunk's bytes, as rom.4's bank
+  reader gives (rounded up to whole blocks), decode the last block from real bytes; a count from the frames leaves a
+  part block to the flush's zeros, which is what the plugin does.
+
+**Not settled:** which count the V-Synth's fill gives a preset wave, so whether the zeros the plugin decodes in a preset
+wave's last part block are the V-Synth's. A run would need rom.2's wave store, the preset drive's file system and the
+task that pumps the stream, which the harness hasn't. How the index's paths reach the 224 streams is itself open
+(VC2_VOCAL_DESIGNER.md, "The wave libraries, read"). `XtFiles` holds the preset waves to rom.2's whole-wave routine
+(`0x89529c20`) called with the frames, which gives the plugin's zeros. The plugin is left as it is.
+
 ### The zones' splits on the panel (2026-11-12, v195) {#zone-splits}
 
 **The user's request:** "add a zones card to the editor allowing it to show and edit splits". Until now the splits came only
@@ -2248,7 +2284,7 @@ A V-Synth wave (a `.vpw`, a project's `.wav`, a patch's zone wave) now plays on 
 
 **What can't be played as it is.** Two waves, both with events between samples, which only V-Trainer 1.00 wrote. Preset 270's records stop 18/16 of a sample short of its last event, which the reader refuses. Played anyway, the port's player parts from the firmware's (silent where the firmware sounds), so its layout reaches a path not ported. VP9SAMnoise1 reads. But played on it, the port parts from the firmware in about 3% of its notes, from their first block, by an ULP at first and then by a lot. That isn't its event kinds, its controls (time, formant, Energy, the depths, Time Trip, the keys), loops, Start Offset, Playback Mode or Vari, nor memory left in the voice slots by earlier notes (filled with a sentinel, nothing moved). Cause not found. So a wave with events between samples is encoded again on its own events, as v156 and v157 played it, and those two sound as before. (v159: VP9SAMnoise1's cause was its stream's terminator, (256, 0), and it plays as it is; preset 270 stays encoded again, "A SOLO stream's own terminator".)
 
-**The XT's load.** The player reads the `vpdt` where it lies, every offset in it relative to its start (2026-10-28); a band wave's bands are rebuilt from its audio at load (`0x894a9940`). A stored `vpdt` and the XT 2.02's own encode of the same events differ only in the events' flag words, so far as known (30 of Emu_test's 32 SOLO waves, v156). The stored flags are 13 on the first event, 4 on each attack and 14 on the last; the fresh encode writes 4 throughout. The player masks them to 9, 0, 10 and 0, none of which takes a branch. The routine that reads a wave's chunks into memory isn't found. Four of the five that walk the chunk-tag table (`0x897a7de4`) are ruled out: `0x89493d00`…, `0x89496740` and `0x89497f80`… write a file through the OS's write (`0x89484930`); `0x89499000` reads a wave's chunks by tag but parses `vpsc` alone and seeks past the rest to `data`. The fifth, `0x894947ec`…, isn't read (2026-11-13, research/VC2_VOCAL_DESIGNER.md, "The wave reader, run": it is in `0x89494620`, which goes through `0x894848b0` and `0x89484970`, neighbours of the OS's write, not checked; rom.4's file reader `0x893469c0` is 0.60 alike it by shape. rom.4's own load of a VC-2 sample, run, keeps its `vpdt` byte for byte and decodes its audio over whole RDAC blocks from the data's own bytes. rom.2's file reader isn't run). The wave manager's getter `0x8949e850` returns a chunk's block + 0x1c from the wave's entry (`0x8949feb0`: kind 5, the `vpdt`, at +0x34); what fills those blocks isn't found, nor any store into +0x34 after a lookup. So whether the load changes a stored `vpdt` isn't checked. Emu_test was saved whole by the XT (its three `.s00`), and the XT's writer copies each chunk out of memory as it is; whether the XT rewrites wave files it didn't change isn't known.
+**The XT's load.** The player reads the `vpdt` where it lies, every offset in it relative to its start (2026-10-28); a band wave's bands are rebuilt from its audio at load (`0x894a9940`). A stored `vpdt` and the XT 2.02's own encode of the same events differ only in the events' flag words, so far as known (30 of Emu_test's 32 SOLO waves, v156). The stored flags are 13 on the first event, 4 on each attack and 14 on the last; the fresh encode writes 4 throughout. The player masks them to 9, 0, 10 and 0, none of which takes a branch. The routine that reads a wave's chunks into memory isn't found. Four of the five that walk the chunk-tag table (`0x897a7de4`) are ruled out: `0x89493d00`…, `0x89496740` and `0x89497f80`… write a file through the OS's write (`0x89484930`); `0x89499000` reads a wave's chunks by tag but parses `vpsc` alone and seeks past the rest to `data`. The fifth, `0x894947ec`…, isn't read (2026-11-13, research/VC2_VOCAL_DESIGNER.md, "The wave reader, run": it is in `0x89494620`, which goes through ~~`0x894848b0` and `0x89484970`, neighbours of the OS's write, not checked~~ the file read `0x894848b0` and seek `0x89484970` (read since, "The V-Synth's wave load, read": it reads the chunks and seeks past `data`); rom.4's file reader `0x893469c0` is 0.60 alike it by shape. rom.4's own load of a VC-2 sample, run, keeps its `vpdt` byte for byte and decodes its audio over whole RDAC blocks from the data's own bytes. rom.2's file reader isn't run). The wave manager's getter `0x8949e850` returns a chunk's block + 0x1c from the wave's entry (`0x8949feb0`: kind 5, the `vpdt`, at +0x34); what fills those blocks isn't found, nor any store into +0x34 after a lookup. So whether the load changes a stored `vpdt` isn't checked. Emu_test was saved whole by the XT (its three `.s00`), and the XT's writer copies each chunk out of memory as it is; whether the XT rewrites wave files it didn't change isn't known.
 
 **Event kinds** (a flag word & 0xb, the event load `0x8950c7e0`'s +5; the next event's at +6). Only VP9SAMnoise1 has 1, 2 or 3: its events 3 and 4, 1 and 2, with no 4 or 8 bit, V-Trainer's loop markers by the look of it. The forward crossing (`0x8950c970`, shared by SOLO and the band players) branches on 1, 2 and 3, each behind the player's byte 2 bits 0..2. No code writes them: only the crossings, clearing bits. In `xt_tone` byte 2 reads 0 or 0x80 on every player, 233,418 reads. So forward they do nothing. The backward crossing (`0x8950cb60`) has one branch that isn't gated: a 1 met while +3 bit 3 is set (the forward loop turned, Alternate) clears it, turns the walk forward (the walk is negated unless the crossing's type, r5, is 16; SOLO calls it with 4 and the band players with 12) and keeps the event, so the bounce is at the event, not the loop's start. Ported in both players (`XtSoloVoice::crossBackward`, `XtMbPlayer::State::crossBackward`, the plan's `evKind`). 2 and 3 backward, and 1's other branch, are gated as forward. That a 1 or 2 changes nothing (this version's first reading, from the forward crossing) was wrong for this one.
 

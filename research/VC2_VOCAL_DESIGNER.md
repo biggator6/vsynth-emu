@@ -1632,7 +1632,8 @@ reading of the same stream:
 **What the port needs** for a VC-2 sample: its stream read as `xtWaveRead` reads it, but its audio decoded over whole
 blocks (the frames rounded up to 16 where the data holds them), and a BACKING sample's bands built by `xtMbBuildBacking`
 from that audio. The V-Synth's side is left as it was: rom.2's whole-wave routine, as `XtFiles` calls it with the frame
-count, gives the zero-filled tail the plugin has, and what count rom.2's own file reader passes isn't known.
+count, gives the zero-filled tail the plugin has, and what count rom.2's own file reader passes isn't known (read since,
+not settled: HARDWARE_FIRMWARE.md, "The V-Synth's wave load, read").
 
 ### The factory patches, read by rom.4 (2026-11-13, the VC-2 mode's step 1c)
 
@@ -1959,5 +1960,6 @@ among rom.2's.
   VC-2 wave's split, chosen", and what the split's bytes do, "The split's bytes, followed"), ~~and how rom.4's store comes
   to hold the VC-2's samples under ids 1…192~~ (run, "The sample bank, loaded"; left of it: ~~the wave reader `0x893474d0`
   itself~~ (run, "The wave reader, run"; left of it: chunk kinds 6–8, and the count rom.2's file reader gives its
-  decoder), and how the OS fills the wave library from the link files).
+  decoder, read and not settled: HARDWARE_FIRMWARE.md, "The V-Synth's wave load, read"), and how the OS fills the wave
+  library from the link files).
 - rom.4's sections (code, .data, .bss), and how much of its code is rom.2's.
