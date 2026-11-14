@@ -77,7 +77,9 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   several files, one of them read as memory. `wavein <rom.2> <index> <bank>` (`vc2wavein.cpp`) runs the start-up load
   with rom.4's wave reader and store for real and holds what the store keeps of each sample to the plugin's reading
   (`vc2wavecmp.h`: `xtWaveRead`, whole RDAC blocks, `xtMbBuildBacking`) ("The wave reader, run"); `vc2bankload.h` is the
-  start-up load both it and `bank` run.
+  start-up load both it and `bank` run. `cosmgrowl [notes] [plant]` (`vc2cosmgrowl.cpp`) holds COSM type 8, the Growl,
+  converter, update and DSP, to its model (`vc2cosmgrowllaw.*`) bit for bit, and shows its laws ("COSM type 8, the
+  Growl, run").
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -248,8 +250,9 @@ note-on and update included, though rom.4 compiled them anew and 0x40 and 0xc0 b
 note-on sets it up in place
 (the case at `0x894ee300`: the octave byte at +0x14 through the octave table to +0xf4, then the delay's whole and fraction),
 rom.4's sends code 9 to a call of `0x893b9d30(object)`; given rom.2's block, rom.4's Comb leaves another word above the
-octave byte at +0x14 and, at +0x2c, a whole number where rom.2 has a ratio near 1 (−40.0 against 1.017). So the VC-2's Comb
-reads its block otherwise, and is settled with rom.4's own Comb converter. (The other types' cases have the same sizes in
+octave byte at +0x14 and, at +0x2c, a whole number where rom.2 has a ratio near 1 (−40.0 against 1.017). So ~~the VC-2's Comb
+reads its block otherwise, and is settled with rom.4's own Comb converter~~ code 9 in rom.4 is not a Comb at all: it is the
+GROWL, its own type ("COSM type 8, the Growl, run", 2026-11-13). (The other types' cases have the same sizes in
 both note-ons' jump tables, `0x894ee118` and `0x893aa288`; only code 9's case moved.)
 
 Wrong runs, kept here so they're not made again: random input words past a table's index range (the TVF's filter type, an
@@ -262,8 +265,72 @@ both machines' FPU registers start at 0, the Side Band Filters asked for an endl
 red, the first run: one word of rom.4's copy of the block nudged sets 13 types apart on every note (the first Side Band Filter
 doesn't read that word).
 
-Not yet run: the Comb's DSP (rom.4's one routine, on rom.4's own Comb object), the Dynamic TVF's targets apart from note-on,
-and codes 10, 11 and 17, which have routines in both tables but no converter writes.
+Not yet run: ~~the Comb's DSP (rom.4's one routine, on rom.4's own Comb object)~~ (run, "COSM type 8, the Growl, run"),
+the Dynamic TVF's targets apart from note-on, and codes 10, 11 and 17, which have routines in both tables but no converter
+writes.
+
+### COSM type 8, the Growl, run (2026-11-13, the VC-2 mode's step 1c)
+
+**What it is.** rom.4's list of COSM type names has `["GROWL"]` where rom.2's has `["COMB FILTER"]`, between the 2nd Order
+Side Band Filter and the Dual Filter, and rom.4 has no "Comb Filter" string. Its parameters are named Intencity (sic) and
+Speed, then five names the Comb's list had (Detune LFO and Env Depth, Tone and its two depths). It keeps the Comb's block
+code, 9. So the VC-2 replaced the V-Synth's Comb Filter with a growl: the same idea as the VOCODER OSC's growl ("The
+growl, run"), a subharmonic near 50 Hz, done to any signal.
+
+**The routines.** rom.4's COSM converters are called by a dispatcher that switches on the input's +7 (`0x89399982`;
+rom.2's switches on +9); its case 7, type 8, is `0x89398780`. The note-on's code-9 case is `0x893b9d30`, the update's `0x893b9d40`, the DSP
+`0x893b9b40` (one routine for mono and stereo). What each does, all held to the model below:
+- **The converter** reads only Intencity and Speed (the input's +0x10 and +0x12, each plus its Matrix term). It writes
+  code 9; +4 the intensity I/127 (held to 0…127 first); +8 the speed 2·S/128 − 1 (held to 0…128); and 0 in every other
+  field. So the five other parameters do nothing.
+- **The update** sets the DSP's depth (its state's +0xa4) to the intensity, held to 0…1, and its divider factor (+0xa8) to
+  440 ÷ ((s + 1) × 50), the speed s held to −0.9…1. Their LFO and envelope terms take the block's depth fields, which are
+  0. The note-on sets the phase and step to 1.
+- **The DSP**, each sample:
+  - The phase runs −1…1. Each time it reaches 1 it wraps by −2, and its step becomes pitch × 880/44100 ÷ n, with
+    n = trunc(factor × pitch), at least 2, plus 1 when the line's write position is odd. The pitch is the COSM object's
+    +0: the voice's pitch ratio against the wave's root, as the COSM objects of rom.2 and of rom.4's 15 matching types
+    hold it. So the growl runs at 440 × pitch ÷ n ≈ 50(s + 1) Hz. That is a subharmonic of the note only for a wave whose
+    root is A4.
+  - The input goes into two delay lines (L, R) of 3267 samples.
+  - The first tap, 512 samples back, is scaled by 1 + depth · w(0.5 − |phase|), where w(x) = x(3 − 4x²), a sine shape
+    peaking at ±1.
+  - The second tap, at the same place, is moved by w(the phase folded to ±0.5) × depth × 15.95 ÷ pitch samples. It is
+    read with linear interpolation between the sample before the position and the one at it, so at rest it is 513 back.
+  - The output is the sum of the two taps.
+
+**What it does.** At Intencity 0 the output is the input 512 and 513 samples late, summed: 11.6 ms late, +6 dB at low
+frequencies and a null at Nyquist. As Intencity rises, the first tap swings in level from 0 to twice, and the second in
+position by up to ±16 samples (0.36 ms) at pitch 1, less at higher pitches. Both move on the growl's phase, so the sound
+is gated and wobbled at a subharmonic. The divider swaps between two neighbours by the write position's parity, so the
+growl's period jitters between two lengths. Speed sets the growl's frequency:
+
+| Speed | Pitch 0.5 | Pitch 1 | Pitch 2 |
+|---|---|---|---|
+| 0 | 5.0, 5.1 Hz | 5.0 Hz | 5.0 Hz |
+| 32 | 24.4, 27.5 Hz | 24.4, 25.8 Hz | 24.4, 25.1 Hz |
+| 64 | 44.0, 55.0 Hz | 48.8, 55.0 Hz | 48.8, 51.7 Hz |
+| 96 | 73.3, 110 Hz (n = 3, 2) | 73.3, 88.0 Hz | 73.3, 80.0 Hz |
+| 127 | 73.3, 110 Hz (n = 3, 2) | 88.0, 110 Hz | 97.7, 110 Hz |
+
+(the dividers the firmware chose over 200 blocks at Intencity 127, from its step after each). The 12 factory zones on
+type 8 vary Speed alone ("The second descriptor bank, read").
+
+**Run** (`vc2run <rom.4> cosmgrowl [notes] [plant]`, `vc2cosmgrowl.cpp`, the model in `vc2cosmgrowllaw.*`, its constants
+read from rom.4's pools `0x893b9c80` and `0x893b9e94`; `build/tools/vc2/cosmgrowl.txt`). A COSM object is laid as the
+COSM twin lays one, the buffers handed out by the slot finder hook and the Matrix reads answered with zero terms. Over
+200 random notes (Intencity and Speed 0…127, pitch 0.03…4, moved every 9 blocks, signals ±1), 40 blocks each:
+
+| | |
+|---|---|
+| The converter's block, the update's depth and factor, against the model | 0 different |
+| 8000 DSP blocks: output, position, phase, step and both 3267-sample lines, bit for bit | 0 different |
+| Planted: the divider's odd-position step dropped (`plant`) | 132 of 8000 blocks differ |
+| Planted in a copy: the position tap's depth doubled | 4867 of 8000 differ |
+| An impulse at Intencity 0 | 1.0 at frames 512 and 513, both sides, nothing else |
+
+For the port (step 3): a COSM type of its own, `vc2cosmgrowllaw.cpp` held to the firmware, with the plugin's type list
+and parameters named as rom.4 names them.
 
 ### The OSC block in rom.4 (2026-11-13)
 
@@ -1730,7 +1797,8 @@ type's typed values by its typed reader; `build/tools/vc2/typed.txt`). **No type
   off in 128; the other 896 of each (14 a patch) are on at type 0, a type with one unnamed typed ID. Which zones the two
   are isn't read zone by zone; the tone blocks' first two (zones 0 and 1) are the patches' only edited ones ("The factory
   patches, read by rom.4").
-- **COSM type 8 is not the V-Synth's Comb Filter as it stands.** rom.2's type 8 (0x90e–0x914) opens with Octave Select (0–4)
+- **COSM type 8 is not the V-Synth's Comb Filter as it stands.** (It is the GROWL: run since, "COSM type 8, the Growl,
+  run".) rom.2's type 8 (0x90e–0x914) opens with Octave Select (0–4)
   and Detune (−100…+100); rom.4's (0x965–0x96b) opens with Intencity and Speed (0–127 each), the same five after them (Detune
   LFO and Env Depth, Tone and its two depths). That agrees with the COSM run, where the Comb's DSP is the one of 16 types that
   differs and rom.4 has one Comb routine ("COSM in rom.4"). The factory zones on it vary Speed (0…127, 5 values) and nothing
@@ -1947,7 +2015,8 @@ among rom.2's.
   rom.4" gives the pairs by the tables they read).
 - ~~The 64 factory patches' values, read with rom.4's descriptors.~~ Read by rom.4's own routines ("The factory patches, read by
   rom.4"); left: ~~the second descriptor bank (MFX, Chorus, Reverb, COSMs)~~ (read, "The second descriptor bank, read"; left
-  of it: what COSM type 8 ~~and rom.4's four reverb types~~ is ~~, and the typed IDs no table lists~~; the reverbs and the
+  of it: ~~what COSM type 8 is~~ (the Growl, "COSM type 8, the Growl, run"), ~~rom.4's four reverb types~~, ~~and the
+  typed IDs no table lists~~; the reverbs and the
   untabled IDs settled, "The effect chip's programs") and what the store's eight tone and sixteen envelope blocks are.
 - The pitch tracker ("The pitch tracker, run"): run in mode 0, the only one selected, on known signals; its analysis read
   ("The pitch tracker's analysis"), the band-pass, the noise count, the gates, the limits and the fallback held to the
