@@ -13,7 +13,7 @@ Bar::Bar(Controls::State& state, const juce::String& id, const juce::String& nam
     bar_.setSliderSnapsToMousePosition(false);
     Look::fieldName(name_, name);
     addAndMakeVisible(bar_);
-    addAndMakeVisible(name_);
+    if (name.isNotEmpty()) addAndMakeVisible(name_);   // none: a bar in a row whose columns are named over it
 }
 
 void Bar::setNameWidth(int w) {
@@ -21,9 +21,10 @@ void Bar::setNameWidth(int w) {
     resized();
 }
 
+// The name over the bar, or beside it in its width; a bar of no name the whole width
 void Bar::resized() {
     auto r = getLocalBounds();
-    if (nameW_ > 0) {
+    if (nameW_ > 0 || !name_.isVisible()) {
         name_.setBounds(r.removeFromLeft(nameW_));
         bar_.setBounds(r.withSizeKeepingCentre(r.getWidth(), juce::jmin(kBarH, r.getHeight())));
         return;

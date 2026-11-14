@@ -15,12 +15,6 @@ constexpr int kOctaveH = 12;     // the C keys' names under them
 constexpr int kLineCols = 4;     // the zones' lines, four a row
 constexpr int kHalf = kXtZones / 2;
 
-// A key's name, as Roland's: C4 is 60
-juce::String keyName(int key) {
-    static const char* const kNames[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    return juce::String(kNames[key % 12]) + juce::String(key / 12 - 1);
-}
-
 Ui::TextStyle numberStyle() {
     return { juce::Font(11.0f, juce::Font::bold), Ui::text, juce::Justification::centred, false };
 }
@@ -50,7 +44,7 @@ void ZoneMap::paintKeys(juce::Graphics& g, juce::Rectangle<int> area) const {
         if (span.getWidth() >= 14) Ui::drawText(g, juce::String(z + 1), span, numberStyle());
     }
     for (int key = 0; key < kKeys; key += 24)
-        Ui::drawText(g, keyName(key), { xOf(key), area.getY(), 40, kOctaveH }, octaveStyle());
+        Ui::drawText(g, Ui::keyName(key), { xOf(key), area.getY(), 40, kOctaveH }, octaveStyle());
 }
 
 // A line a zone, zones 1-4 down the first column: its number, its keys and what it plays, or that no key reaches it
@@ -61,7 +55,7 @@ void ZoneMap::paintLines(juce::Graphics& g, juce::Rectangle<int> area) const {
         const juce::Rectangle<int> cell(area.getX() + w * (z / rows), area.getY() + h * (z % rows), w - 6, h);
         const XtZoneKeys k = xtZoneKeys(upper, z);
         const bool reached = k.lo <= k.hi;
-        const juce::String keys = reached ? keyName(k.lo) + "-" + keyName(k.hi) + "  " + linesOf(z) : "no keys";
+        const juce::String keys = reached ? Ui::keyName(k.lo) + "-" + Ui::keyName(k.hi) + "  " + linesOf(z) : "no keys";
         Ui::drawText(g, juce::String(z + 1) + "  " + keys, cell, lineStyle(reached));
     }
 }

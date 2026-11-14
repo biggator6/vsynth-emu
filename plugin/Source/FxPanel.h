@@ -12,7 +12,8 @@ struct XtFxParam;
 
 class FxPanel : public Ui::Page, private juce::Timer {
 public:
-    explicit FxPanel(VSynthEmuProcessor& p);
+    // Drawn in today's editor's palette, or another's (D's FX page gives D's, UI step 4)
+    explicit FxPanel(VSynthEmuProcessor& p, const Ui::Palette& palette = Ui::todays);
     ~FxPanel() override;
 
     void showPage(int page);                        // 0 MFX, 1 Chorus, 2 Reverb, 3 System: the tone's sends, the outputs and the system's EQ

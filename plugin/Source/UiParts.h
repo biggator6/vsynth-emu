@@ -57,6 +57,11 @@ namespace Ui {
         g.setColour(c);
         g.strokePath(p, type);
     }
+    // A key's name, as Roland's: C4 is 60 (the Zones tab's, v195; shared with D's ZONES page, UI step 4)
+    inline juce::String keyName(int key) {
+        static const char* const kNames[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        return juce::String(kNames[key % 12]) + juce::String(key / 12 - 1);
+    }
     // A round dot of a width at a centre, in a colour: D's knob caps, switches, points to drag (UI step 3)
     inline void dot(juce::Graphics& g, juce::Point<float> centre, float width, juce::Colour c) {
         g.setColour(c);
@@ -78,6 +83,13 @@ namespace Ui {
         return f;
     }
 
+    // The colours a page of cards is drawn in: today's editor's, or D's (UiLook.h), which D's FX page gives the Effects
+    // panel (UI step 4)
+    struct Palette {
+        juce::Colour ground, card, line, label, text, field, accent;
+    };
+    inline const Palette todays { surfaceApp, surfaceXt, line, label, text, surfaceField, accent };
+
     // ─── A tab's page: cards of rows ──────────────────────────────────────────────
     // Each card is a titled box in column 0 or 1 (or across both, col -1), its
     // rows a list of items: a component with a fixed width, or 0 for a share of
@@ -85,6 +97,7 @@ namespace Ui {
     // show only while shown() holds (the analog oscillator's in the PCM ones').
     class Page : public juce::Component {
     public:
+        const Palette* colours = &todays;                   // what its cards are drawn in
         struct Item { juce::Component* c; int w; };
         struct Row  { std::vector<Item> items; };
         struct Card {
@@ -177,12 +190,12 @@ namespace Ui {
         void paint(juce::Graphics& g) override {
             for (auto& c : cards) {
                 if (c.bare || (c.shown && !c.shown())) continue;
-                g.setColour(Ui::surfaceXt);
+                g.setColour(colours->card);
                 g.fillRect(c.bounds);
-                g.setColour(Ui::line);
+                g.setColour(colours->line);
                 g.drawRect(c.bounds, 1);
                 const auto head = c.bounds.reduced(Ui::pad, 0).withHeight(Ui::cardHeadH);
-                drawText(g, (c.titleFn ? c.titleFn() : c.title).toUpperCase(), head, { titleFont(), Ui::label });
+                drawText(g, (c.titleFn ? c.titleFn() : c.title).toUpperCase(), head, { titleFont(), colours->label });
             }
         }
     };

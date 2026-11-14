@@ -1,6 +1,7 @@
 #pragma once
 // D's look (research/UI_DESIGN.md, "The redesign, D": "The look"): its palette, the drawing's size and regions, its type,
 // and the LookAndFeel that draws knobs, switches, boxes and buttons in it (UI step 1).
+#include "UiParts.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace Look {
@@ -22,6 +23,9 @@ inline const juce::Colour accent  { 0xFFF5A524 };   // value arcs, the selected 
 inline const juce::Colour mod     { 0xFF46C2E0 };   // modulation, LFO curves, Matrix routes, the Time Trip
 inline const juce::Colour ready   { 0xFF5FD28B };   // the ROM's state when it is loaded
 inline const juce::Colour warning { 0xFFE8743B };   // the ROM's state when it isn't
+
+// D's colours as a page of cards takes them: the Effects panel on D's FX page (UI step 4)
+inline const Ui::Palette cards { ground, panel, edge, label, text, field, accent };
 
 // The drawing's own size, scaled whole between these (UI_DESIGN.md, "The window")
 inline constexpr int width = 1200, height = 750;

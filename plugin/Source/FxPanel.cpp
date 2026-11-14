@@ -5,33 +5,34 @@ namespace {
 constexpr int kParamH = 24, kNameW = 130, kValueW = 92, kScrollBarW = 12, kPageButtonsW = 300, kTypeLabelW = 40, kToggleW = 54, kLeftW = 250;
 constexpr int kOutputGain = 0x76;
 
-void styleLabel(juce::Label& l) {
+// Each control styled in the page's palette (today's, or D's on D's FX page)
+void styleLabel(juce::Label& l, const Ui::Palette& c) {
     l.setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
-    l.setColour(juce::Label::textColourId, Ui::label);
+    l.setColour(juce::Label::textColourId, c.label);
     l.setJustificationType(juce::Justification::centredLeft);
     l.setMinimumHorizontalScale(0.7f);
 }
 
-void styleSlider(juce::Slider& s, int textBoxW) {
+void styleSlider(juce::Slider& s, int textBoxW, const Ui::Palette& c) {
     s.setSliderStyle(juce::Slider::LinearHorizontal);
-    s.setColour(juce::Slider::textBoxTextColourId, Ui::text);
-    s.setColour(juce::Slider::textBoxBackgroundColourId, Ui::surfaceField);
-    s.setColour(juce::Slider::textBoxOutlineColourId, Ui::line);
-    s.setColour(juce::Slider::trackColourId, Ui::accent);
+    s.setColour(juce::Slider::textBoxTextColourId, c.text);
+    s.setColour(juce::Slider::textBoxBackgroundColourId, c.field);
+    s.setColour(juce::Slider::textBoxOutlineColourId, c.line);
+    s.setColour(juce::Slider::trackColourId, c.accent);
     s.setTextBoxStyle(juce::Slider::TextBoxRight, false, textBoxW, 20);
 }
 
-void styleToggle(juce::ToggleButton& b) {
-    b.setColour(juce::ToggleButton::textColourId, Ui::text);
-    b.setColour(juce::ToggleButton::tickColourId, Ui::accent);
+void styleToggle(juce::ToggleButton& b, const Ui::Palette& c) {
+    b.setColour(juce::ToggleButton::textColourId, c.text);
+    b.setColour(juce::ToggleButton::tickColourId, c.accent);
 }
 }
 
 FxPanel::Level& FxPanel::addLevel(std::vector<std::unique_ptr<Level>>& to, const char* text, const char* parameter) {
     auto level = std::make_unique<Level>();
     level->label.setText(text, juce::dontSendNotification);
-    styleLabel(level->label);
-    styleSlider(level->slider, 34);
+    styleLabel(level->label, *colours);
+    styleSlider(level->slider, 34, *colours);
     addAndMakeVisible(level->label);
     addAndMakeVisible(level->slider);
     level->att = std::make_unique<SliderAtt>(processor_.apvts, parameter, level->slider);
@@ -41,9 +42,9 @@ FxPanel::Level& FxPanel::addLevel(std::vector<std::unique_ptr<Level>>& to, const
 
 void FxPanel::addBlock(Block& b, const char* onParam, const char* typeParam, int types) {
     b.on.setButtonText("On");
-    styleToggle(b.on);
+    styleToggle(b.on, *colours);
     b.typeLabel.setText("Type", juce::dontSendNotification);
-    styleLabel(b.typeLabel);
+    styleLabel(b.typeLabel, *colours);
     addAndMakeVisible(b.typeLabel);
     addAndMakeVisible(b.on);
     b.onAtt = std::make_unique<ButtonAtt>(processor_.apvts, onParam, b.on);
@@ -52,11 +53,12 @@ void FxPanel::addBlock(Block& b, const char* onParam, const char* typeParam, int
     b.typeAtt = std::make_unique<ComboAtt>(processor_.apvts, typeParam, b.type);
 }
 
-FxPanel::FxPanel(VSynthEmuProcessor& p) : processor_(p) {
+FxPanel::FxPanel(VSynthEmuProcessor& p, const Ui::Palette& palette) : processor_(p) {
+    colours = &palette;
     setOpaque(true);
-    styleLabel(status_);
+    styleLabel(status_, *colours);
     status_.setFont(juce::Font(juce::FontOptions(11.0f)));
-    status_.setColour(juce::Label::textColourId, Ui::text);
+    status_.setColour(juce::Label::textColourId, colours->text);
     addAndMakeVisible(status_);
 
     addBlock(mfx_, "fxMfxOn", "fxMfxType", 42);
@@ -72,8 +74,9 @@ FxPanel::FxPanel(VSynthEmuProcessor& p) : processor_(p) {
     addLevel(tone_, "Chorus Send", "tvaChoSend");
     addLevel(tone_, "Reverb Send", "tvaRevSend");
     addLevel(system_, "Master", "fxMaster");
-    styleSlider(addLevel(system_, "Output Gain", "fxGain").slider, 52);                  // the one level with a unit
-    for (auto* l : { &assignLabel_, &modeLabel_ }) { styleLabel(*l); addAndMakeVisible(*l); }
+    // the one level with a unit
+    styleSlider(addLevel(system_, "Output Gain", "fxGain").slider, 52, *colours);
+    for (auto* l : { &assignLabel_, &modeLabel_ }) { styleLabel(*l, *colours); addAndMakeVisible(*l); }
     assignLabel_.setText("Output Assign", juce::dontSendNotification);
     modeLabel_.setText("Output Mode", juce::dontSendNotification);
     assignBox_.addItemList({ "MULTI", "MAIN", "DIR" }, 1);
@@ -164,7 +167,7 @@ void FxPanel::showBlocks() {
 }
 
 void FxPanel::paint(juce::Graphics& g) {
-    g.fillAll(Ui::surfaceApp);
+    g.fillAll(colours->ground);
     Ui::Page::paint(g);
 }
 
@@ -232,8 +235,8 @@ void FxPanel::refresh() {
 void FxPanel::showParams(const std::vector<XtFxParam>& params) {
     while (rows_.size() < params.size()) {
         auto row = std::make_unique<ParamRow>();
-        styleLabel(row->name);
-        styleSlider(row->value, kValueW);
+        styleLabel(row->name, *colours);
+        styleSlider(row->value, kValueW, *colours);
         grid_.addChildComponent(row->name);
         grid_.addChildComponent(row->value);
         rows_.push_back(std::move(row));

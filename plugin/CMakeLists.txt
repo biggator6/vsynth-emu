@@ -94,6 +94,8 @@ target_sources(VSynthEmu PRIVATE
     Source/UiDetails.cpp
     Source/UiOverviews.cpp
     Source/UiLowerPanel.cpp
+    Source/UiControlGrid.cpp
+    Source/UiCard.cpp
     Source/FxPanel.cpp
     Source/ContentClassifier.cpp
     Source/XtSoloEncoder.cpp

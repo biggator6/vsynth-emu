@@ -1,10 +1,10 @@
-// VSynthEmuEditorTest <rom.2.bin> [snapshot folder]: D, the redesigned editor (research/UI_DESIGN.md, "The redesign,
+// VSynthEmuEditorTest <rom.2.bin> [snapshot folder | list]: D, the redesigned editor (research/UI_DESIGN.md, "The redesign,
 // D"), drawn and checked as it grows (UI step 1).  At its smallest, default and largest sizes its drawing fills the
 // window, scaled whole; on each page, and on SYNTH with each block selected, no control is outside its parent, over
 // another, without a size or cut short (LayoutCheck), and every control moved sets a parameter.  A press on each page's
 // name opens it, on each block selects it, on an effect opens FX.  The rack's checks (EditorRackTest.cpp) and the lower
 // panel's (EditorLowerTest.cpp).  With a folder: each page, SYNTH with each block selected, and each of the lower
-// panel's views, drawn into it.  Exit 0 if every check holds.
+// panel's views, drawn into it; with "list", the parameters no control reaches.  Exit 0 if every check holds.
 #include "EditorTest.h"
 #include "LayoutCheck.h"
 #include "TestChecks.h"
@@ -107,7 +107,12 @@ int editorTest(const juce::File& rom, const juce::File&, const juce::StringArray
     presses(l, ed, check);
     rackChecks(l, ed, p, check);
     lowerChecks(l, ed, p, check);
-    if (!rest.isEmpty()) snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);
+    if (rest[0] == "list") {   // the parameters no control of D's reaches (step 5 holds D to today's editor's)
+        for (auto* r : l.params)
+            if (l.reached.count(r->paramID) == 0) std::printf("no control: %s\n", r->paramID.toRawUTF8());
+    } else if (!rest.isEmpty()) {
+        snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);
+    }
     check(l.errors == 0, std::to_string(l.errors) + " layout errors (said above)");
     return check.summary(std::to_string(l.states) + " states, " + std::to_string(l.checked) + " placements, " +
                          std::to_string(l.reached.size()) + " parameters reached");

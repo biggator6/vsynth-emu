@@ -10,8 +10,6 @@ using Ui::Page;
 
 namespace {
 
-// The XT's ID of track t's setting i: 0…7 its Switch … Destination, 8 on its steps
-int trackId(int t, int i) { return kXtMsmFirstId + 2 + kXtMsmTrackIds * t + i; }
 
 void itemsOf(juce::ComboBox& box, juce::AudioProcessorValueTreeState& apvts, int fwId) {
     if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(msmParamId(fwId))))
@@ -59,7 +57,7 @@ std::vector<juce::Label*> MsmControls::labels() {
 void MsmControls::make(Apvts& apvts) {
     itemsOf(keySync, apvts, kXtMsmFirstId + 1);
     for (int t = 0; t < kTracks; ++t) track.addItem("Track " + juce::String(t + 1), t + 1);
-    for (auto [box, i] : trackBoxList()) itemsOf(*box, apvts, trackId(0, i));
+    for (auto [box, i] : trackBoxList()) itemsOf(*box, apvts, msmTrackFwId(0, i));
     for (juce::ToggleButton* b : { &on, &trackOn, &loop }) {
         b->setColour(juce::ToggleButton::textColourId, Ui::text);
         b->setColour(juce::ToggleButton::tickColourId, Ui::accent);
@@ -82,7 +80,7 @@ void MsmControls::attachTrack(Apvts& apvts, int t) {
     trackButtons.clear();
     trackBoxes.clear();
     trackSliders.clear();
-    const auto id = [t](int i) { return msmParamId(trackId(t, i)); };
+    const auto id = [t](int i) { return msmParamId(msmTrackFwId(t, i)); };
     trackButtons.push_back(std::make_unique<Apvts::ButtonAttachment>(apvts, id(0), trackOn));
     trackButtons.push_back(std::make_unique<Apvts::ButtonAttachment>(apvts, id(1), loop));
     for (auto [box, i] : trackBoxList())

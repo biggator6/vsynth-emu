@@ -101,6 +101,8 @@ const juce::String& msmParamId(int fwId) {
     return i >= 0 && i < (int)kMsmParams.size() ? kMsmParams[(size_t)i].spec.id : none;
 }
 
+int msmTrackFwId(int t, int i) { return kXtMsmFirstId + 2 + kXtMsmTrackIds * t + i; }
+
 void VSynthEmuProcessor::addMsmParams(ParamList& params) {
     for (const MsmParam& p : kMsmParams) params.push_back(Setting::paramOf(p.spec));
 }

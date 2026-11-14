@@ -57,7 +57,7 @@ msm-write-swapped|set(p.spec.id, (float)xtMsmValue(c.msm, p.fwId));|set(kMsmPara
 msm-patch-unstopped|    synth_.msmPatch();|    ;|plugin/Source/PluginMsm.cpp|arpplugin
 msm-patch-not-told|    setPatchControls(c);   // and the|    setControls(c);   // and the|plugin/Source/PluginProcessor.cpp|arpplugin
 msm-editor-wrong-track|juce::jlimit(0, MsmControls::kTracks - 1, msm_.track.getSelectedItemIndex());|(msm_.track.getSelectedItemIndex() + 1) % MsmControls::kTracks;|plugin/Source/PluginEditorMsm.cpp|layout
-msm-editor-one-track|kXtMsmTrackIds * t + i; }|kXtMsmTrackIds * 0 * t + i; }|plugin/Source/PluginEditorMsm.cpp|layout
+msm-editor-one-track|kXtMsmTrackIds * t + i; }|kXtMsmTrackIds * 0 * t + i; }|plugin/Source/PluginMsm.cpp|layout
 msm-editor-unplaced|    p.add(stepsCard(msm_, 1));|    ;|plugin/Source/PluginEditorMsm.cpp|layout
 msm-editor-no-items|        box.addItemList(choice->choices, 1);|        ;|plugin/Source/PluginEditorMsm.cpp|layout
 msm-tab-unnamed|"Play", "MSM", "Matrix"|"Play", "Matrix"|plugin/Source/PluginEditorTabs.cpp|layout
