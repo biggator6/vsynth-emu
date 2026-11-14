@@ -1546,6 +1546,18 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The Chorus's LFO, run (2026-11-13, beside the VC-2 mode's step 1c) {#chorus-lfo-run}
+
+Run to answer whether the VC-2's Chorus has the V-Synth's sides swapped (research/VC2_VOCAL_DESIGNER.md, "The Chorus's
+sides"; `vc2run <rom.4> fxchorus <rom.2> lfo`). Chorus type 1 at its defaults (Rate 5, Depth 10) on `XtFxUnit`: an
+impulse into the Chorus send every 64 samples, each side's delay the centre of its response's taps. The LFO is a
+triangle of about 147,200 samples a cycle (3.34 s at 44.1 kHz; the panel's text for Rate 5 not read), each side's delay
+going from 5 to 48 samples with the other's opposite, their sum 53.0 throughout. It runs on through a reload: the chip
+run on 51,200 samples, then Depth 0, the Chorus Switch off or Chorus Type 2 loaded and set back, and the LFO stands that
+far on plus what `XtFxUnit::settle` runs while the words go in (about 3,100 samples for two reloads of a parameter,
+6,700 for the type). So a patch doesn't restart the Chorus's LFO; its phase is the time since the chip started. That is
+JE-8086's chip on the firmware's program and driver; whether a real XT starts it there too only a capture can say.
+
 ### The V-Synth's wave load, read (2026-11-13, beside the VC-2 mode's step 1c) {#vsynth-wave-load}
 
 Read to answer one question the VC-2's wave reader raised (research/VC2_VOCAL_DESIGNER.md, "The wave reader, run"): the
@@ -4045,7 +4057,7 @@ Changing the draws showed three old ones standing on chance: `bend-block`, `loop
 
 **Run 2,** 59 takes, 22 minutes: every MFX type at its defaults, then each Reverb and Chorus type wet.
 
-**Not done yet.** Nothing cuts or compares the recordings: that belongs with the chip's first version, or with the first capture if it comes sooner. (v121 cuts and checks them; comparing is still to do.) The LFO types start at an unknown phase, so a comparison will have to find it. DIR isn't captured: the digital outputs carry MAIN only.
+**Not done yet.** Nothing cuts or compares the recordings: that belongs with the chip's first version, or with the first capture if it comes sooner. (v121 cuts and checks them; comparing is still to do.) The LFO types start at an unknown phase, so a comparison will have to find it (the Chorus's runs on from the chip's start through every reload, on the chip model: "The Chorus's LFO, run"). DIR isn't captured: the digital outputs carry MAIN only.
 
 ### The effects: a second processor, mapped (2026-11-03, v115)
 

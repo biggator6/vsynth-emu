@@ -141,17 +141,6 @@ void sayRoutes(const char* what, const XtFxChip& rom2, const XtFxChip& rom4, con
     }
 }
 
-// rom.2's effects with `s` over its defaults, through XtFxUnit, settled; null on a fault, said
-std::unique_ptr<XtFxUnit> rom2With(const char* path, const FxSettings& s) {
-    auto u = std::make_unique<XtFxUnit>(path);
-    for (const auto& [id, v] : s) u->control().set(id, v);
-    u->control().loadPatch();
-    u->settle();
-    if (u->ok()) return u;
-    std::printf("fxroute: rom.2's driver: %s\n", u->control().error().c_str());
-    return nullptr;
-}
-
 // The IDs rom.4's driver has read, by name; the typed ones (the second bank's) only counted
 void sayHeard(Machine& m, const std::set<int>& heard) {
     std::printf("rom.4's driver read, at its start:");

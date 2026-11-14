@@ -2,6 +2,7 @@
 // by shape (codepairs.py), and through their callers the coefficient write, the sleep and the reads.
 #include "vc2fxdriver.h"
 #include "vc2patches.h"
+#include <cstdio>
 
 namespace vc2 {
 
@@ -94,13 +95,17 @@ void silence(XtFxChip& chip) {
     for (const unsigned w : kOutsideWords) chip.setGram(w, 0);
 }
 
+void runOn(XtFxChip& chip, int samples) {
+    for (int t = 0; t < samples; ++t) {
+        silence(chip);
+        chip.runFrame();
+    }
+}
+
 std::unique_ptr<XtFxChip> settled(const XtFxChip& chip) {
     constexpr int kSettle = 22050;
     auto c = std::make_unique<XtFxChip>(chip);
-    for (int t = 0; t < kSettle; ++t) {
-        silence(*c);
-        c->runFrame();
-    }
+    runOn(*c, kSettle);
     return c;
 }
 
@@ -116,6 +121,23 @@ std::vector<std::vector<int32_t>> tracesOf(const XtFxChip& chip, unsigned in, st
         for (const unsigned w : words) out[k++].push_back(c->gram(w + 1));
     }
     return out;
+}
+
+// one-off: XtFxChip.cpp's unitLine and PluginTest's reference unit do the same steps, in plugin source, which the
+// research tools leave as it is
+bool loadRom2Fx(XtFxUnit& u, const FxSettings& s) {
+    for (const auto& [id, v] : s) u.control().set(id, v);
+    u.control().loadPatch();
+    u.settle();
+    if (u.ok()) return true;
+    std::printf("rom.2's driver: %s\n", u.control().error().c_str());
+    return false;
+}
+
+std::unique_ptr<XtFxUnit> rom2With(const char* path, const FxSettings& s) {
+    auto u = std::make_unique<XtFxUnit>(path);
+    if (loadRom2Fx(*u, s)) return u;
+    return nullptr;
 }
 
 } // namespace vc2

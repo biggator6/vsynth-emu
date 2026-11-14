@@ -132,13 +132,19 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   effect driver run on an `XtFxChip` (`vc2fxdriver.h`) beside rom.2's `XtFxUnit`, impulses into each GRAM word: MAIN,
   MULTI, the MFX and the returns reach the outputs as on the V-Synth, at its gains; the Reverb's input is a stereo pair
   (0x72, 0x74) fed 6 dB lower, the MFX's input moved to 0x76, 0x78, the system EQ's mid bands are the patch's EQ 1 and
-  EQ 2 on MULTI alone, DIR goes nowhere, and the outside input's right reaches 0x9a alone. Left of it: whether the
-  Chorus's sides are swapped, and what reads 0x90…0x9a outside the chip.
+  EQ 2 on MULTI alone, DIR goes nowhere, and the outside input's right reaches 0x9a alone. Left of it: ~~whether the
+  Chorus's sides are swapped~~ (settled, below), and what reads 0x90…0x9a outside the chip.
   **The new reverbs on XtFxChip, 2026-11-13** (`vc2run … fxreverb`; VC2_VOCAL_DESIGNER.md, "The new reverbs on
   XtFxChip"): the seven, set by rom.4's driver, decay as reverbs, stereo in and out (Church as two, one a side), and
   with their damping at 0 dB their T30 is the panel's Rev Time within 1 to 2% on Plate, OperaHouse, Cathedral and
   Church (Room and StudioSpring short at long settings; Echoes is repeats). Left of it: Room Size, Repeat Time, the
   pre-EQ and Pre Delay's laws; any check against a real VC-2.
+  **The Chorus's sides, 2026-11-13** (`vc2run … fxchorus <rom.2> [lfo]`; VC2_VOCAL_DESIGNER.md, "The Chorus's sides"):
+  Chorus 1 on both images; with Depth 0 rom.4's outs are rom.2's sample for sample; at the defaults both LFOs are one
+  triangle with the sides in antiphase, and lined up rom.4's outs are rom.2's to a unit, its sides as they are or
+  crossed at half a cycle on; the LFO runs free through every reload on both, so nothing but the time since the chip
+  started says which side leads. The VC-2 mode runs rom.4's program B as it stands. Left of it: what program B's 13
+  differing words do, the other Chorus types.
 - Second sources: the V-Card owner's manual (names and meanings) and the 64 factory patches (the corpus).
 
 ### 2. Shared plumbing (plugin/Source)

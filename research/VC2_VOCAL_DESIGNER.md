@@ -63,7 +63,10 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   the chip's side of a measurement (`silence`, `settled`, `tracesOf`) and the Reverb Types' names (`reverbTypeName`), and
   `vc2patches.h` has the second bank's `typedDescriptorOf`. `fxreverb [envelope <type> [time] | damping]`
   (`vc2fxreverb.cpp`) measures the Reverb Types on `XtFxChip` ("The new reverbs on XtFxChip"), its decay by `vc2decay.h`;
-  `vc2runs.h`'s `intArg` reads a run's number arguments. `splits <index>` (`vc2split.cpp`) runs rom.4's wave index parser
+  `vc2runs.h`'s `intArg` reads a run's number arguments. `fxchorus <rom.2> [lfo]` (`vc2fxchorus.cpp`,
+  `vc2fxchorusphase.cpp`, sharing `vc2fxchorus.h`) holds rom.4's Chorus to rom.2's, and with `lfo` its LFO's phase on
+  both images and whether a reload sets it ("The Chorus's sides"); `vc2fxdriver.h`'s `rom2With` and `loadRom2Fx` set up
+  rom.2's effects through `XtFxUnit` for it and `fxroute`, and its `runOn` runs a chip on in silence. `splits <index>` (`vc2split.cpp`) runs rom.4's wave index parser
   and its split readers at every velocity and key ("A VC-2 wave's split, chosen"); `wlflib.py get VC2 <out>` writes the
   index it reads, and `wlflib.py choices VC2` what the rule gives, to diff with it. `splitbytes <index>`
   (`vc2splitbytes.cpp`, its laws in `vc2splitlaws.cpp`) follows the bytes a split passes on into the PCM converter ("The
@@ -1914,9 +1917,11 @@ at its gains. What it changes: the Reverb's input is a stereo pair, for the seve
 from the MFX); the MFX's input moved up a pair to make room; the system EQ's two mid bands are the patch's EQ 1 and EQ 2,
 on MULTI alone; DIR goes nowhere; and the outside input's right side reaches one outgoing word of three. For the port, the
 VC-2 mode's effects can go XtFxControl's way on rom.4's driver, as here, with the frame's eight words where they are.
-Not settled: the Chorus, whose output in the mix differs by up to +3.8 dB, its taps at 17 and 35 samples against rom.2's
+Not settled: ~~the Chorus, whose output in the mix differs by up to +3.8 dB, its taps at 17 and 35 samples against rom.2's
 36 and 16, with their LFOs' phases not lined up between the runs, so whether its sides are swapped isn't known (program B
-differs in 13 words besides its registers); what outside the chip reads 0x90…0x9a; what DIR out carries on the VC-2; what
+differs in 13 words besides its registers)~~ (settled, "The Chorus's sides": the +3.8 dB and the taps were the two LFOs
+at different points of one cycle; lined up, rom.4's Chorus is the V-Synth's to a unit, and crossing its sides is half a
+cycle of its LFO, whose phase only the time since the chip started sets); what outside the chip reads 0x90…0x9a; what DIR out carries on the VC-2; what
 the IDs read that moved nothing do.
 
 ### The new reverbs on XtFxChip (2026-11-13, the VC-2 mode's step 1c)
@@ -1979,6 +1984,46 @@ So **the seven new reverbs run on `XtFxChip` as reverbs**, rom.4's driver loadin
 panel says, given its damping. As with every program here, the chip is JE-8086's and the programs the firmware's; that
 the VC-2 sounds so is not checked against a real one. Not measured: Room Size (four of the seven), Repeat Time, the
 pre-EQ, the Pre Delay's own law, and the seven at sample rates other than 44.1 kHz.
+
+### The Chorus's sides (2026-11-13, the VC-2 mode's step 1c)
+
+**How it was measured.** `vc2run <rom.4> fxchorus <rom.2> [lfo]` (`vc2fxchorus.cpp`, `vc2fxchorusphase.cpp`, sharing
+`vc2fxchorus.h`; `build/tools/vc2/fxchorus.txt`, `fxchorus_lfo.txt`): Chorus type 1 on both images, rom.4's on its own
+driver over an `XtFxChip` (`vc2fxdriver.h`, as in "Program A's routing") and rom.2's on `XtFxUnit`, each settled; an
+impulse into the Chorus send (0x26) and each word's response at the Chorus's outs (0xf0, 0xf2) and the mix (0xa0,
+0xa2), less the trace with none, over 4096 samples, rom.4's words held to rom.2's sample for sample. Depth 0 first, so
+the LFO moves nothing, with Pre Dly Time 50 and with Feedback 98 beside it; then the type's defaults (Rate 5, Depth 10).
+With `lfo`, at the defaults: each side's delay through the LFO's cycle (an impulse every 64 samples for 192,000
+samples, the delay the centre of the response's taps, so a read between two samples gives the fraction), the lag that
+lines rom.4's track up with rom.2's with the sides as they are and crossed, the same to the sample with the whole
+response there; and on each image the chip run on 51,200 samples, a setting reloaded and set back (Depth 0, the Chorus
+Switch off, Chorus Type 2), and the track again.
+
+**With Depth 0 the two are one Chorus.** Each out is rom.2's, 4096 of 4096 samples: the impulse at 5 samples on both
+sides, at 224 with Pre Dly Time 50, and with Feedback 98 its repeats too. The mix carries it 0.012% lower on rom.4, by
+program A's gains.
+
+**At the defaults** the LFO is a triangle on both images, about 147,200 samples a cycle (3.34 s at 44.1 kHz), each
+side's delay going from 5 to 48 samples with the other side's opposite (the two sum to 53.0 throughout). So the runs
+that read taps at 17 and 35 against rom.2's 36 and 16, and a mix up to +3.8 dB apart, had the two LFOs at different
+points of one cycle: rom.4's track is rom.2's 31,296 samples later, 0.0004 samples apart on average. Run on by that,
+rom.4's outs are rom.2's for the first 96 samples on both sides, and 4082 and 4086 of 4096 samples over the whole
+response (correlation +1.0000); the others are a unit apart, but for one sample of the left out, 81,800 against 89,980
+where the taps reach 840,000 to 940,000 (about −40 dB). With the sides crossed, the best lag is rom.2 run on 42,287
+samples, half a cycle (73,583 samples) from the first: 4081 and 4078 of 4096 equal, the others a unit apart. **So the
+outputs can't say whether the sides are swapped**: for a mono send and two sides in antiphase on one triangle, crossing
+them is half a cycle of the LFO, to a unit.
+
+**Nothing but time sets the phase.** On both images the LFO runs on through a reload. rom.4's, run on 51,200 samples and
+reloaded with Depth 0, the Switch off or Type 2 and each set back, stands exactly 51,200 samples on (its track 0.0000
+samples apart); rom.2's 54,336 and 57,920 on, the run and about 3,100 and 6,700 samples that `XtFxUnit::settle` runs the
+chip while the reloads' words go in. So a patch doesn't start the Chorus's LFO: it runs from the chip's start, and which
+side leads at a note is the time since then, on both (HARDWARE_FIRMWARE.md, "The Chorus's LFO, run").
+
+So **rom.4's Chorus is the V-Synth's, its sides as far as anything outside the chip can tell**, and the VC-2 mode runs
+rom.4's program B as it stands. Not read: what program B's 13 differing words do (they leave Depth 0 exact and the LFO's
+track the same to 0.0004 samples; whether they make the units' difference, or the LFOs' states differ by less than a
+sample's step, isn't known), the panel's text for Rate 5 against the cycle measured, and the other Chorus types.
 
 
 ## The names sweep

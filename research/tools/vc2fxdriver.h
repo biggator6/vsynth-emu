@@ -2,8 +2,10 @@
 // rom.4's effect driver in the interpreter, on an XtFxChip (research/VC2_VOCAL_DESIGNER.md, "Program A's routing"), as
 // XtFxControl runs rom.2's: its bus primitives hooked into the chip with the bytes rom.2's send, each word at once (its
 // waits answered at once), and its parameter reads answered from a map over rom.4's defaults.  And the chip's side of a
-// measurement, on either image's chip: silence in, a settled copy, words traced after an impulse.  vc2fxdriver.cpp.
+// measurement, on either image's chip: silence in, a settled copy, words traced after an impulse; and rom.2's effects set
+// up through XtFxUnit, to set beside them.  vc2fxdriver.cpp.
 #include "XtFxChip.h"
+#include "XtFxControl.h"
 #include "vc2runs.h"
 #include <initializer_list>
 #include <map>
@@ -39,11 +41,17 @@ inline constexpr unsigned kOutsideWords[] = {0x11, 0x13, 0x18, 0x1a, 0x1c, 0x1e,
 inline constexpr int32_t kImpulse = 1 << 20;
 // Each of kOutsideWords set to 0, as before a sample with nothing coming in
 void silence(XtFxChip& chip);
+// `samples` samples of silence on `chip` itself
+void runOn(XtFxChip& chip, int samples);
 // A copy of `chip` after half a second of silence
 std::unique_ptr<XtFxChip> settled(const XtFxChip& chip);
 // GRAM words as written each sample (each read one on, after the sample), for `frames` samples after an impulse of
 // `height` (0: none, the baseline) into `in`, on a copy of `chip`; one vector a word
 std::vector<std::vector<int32_t>> tracesOf(const XtFxChip& chip, unsigned in, std::initializer_list<unsigned> words,
                                            int frames, int32_t height = kImpulse);
+// rom.2's effects with `s` (by rom.2's IDs) over its defaults, through XtFxUnit, settled; null on a fault, said
+std::unique_ptr<XtFxUnit> rom2With(const char* path, const FxSettings& s);
+// Each of `s` set on `u` by rom.2's ID, the patch loaded and the chip settled; false on a fault, said
+bool loadRom2Fx(XtFxUnit& u, const FxSettings& s);
 
 } // namespace vc2
