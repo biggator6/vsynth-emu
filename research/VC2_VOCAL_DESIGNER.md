@@ -70,7 +70,11 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   split's bytes, followed"). Shared by them: `vc2index.h`, the index read by rom.4's parser and its readers over every
   wave, velocity and key; `vc2oscinput.h`, the default patch's store, the OSC input builder's record and the note input
   the dispatch and converter take (also `vocosc`'s); and `vc2watch.h`, a read-watch: every load in a stretch of code
-  hooked, and each read of a window of memory kept by the instruction that made it.
+  hooked, and each read of a window of memory kept by the instruction that made it. `bank <index> <bank>` (`vc2bank.cpp`)
+  runs rom.4's bank loader and start-up load and finds each sample's stream by rom.4's own lookup ("The sample bank,
+  loaded"); `wlflib.py bank VC2 <out>` writes the bank it reads, and `wlflib.py samples VC2` the same from its own
+  reading (the bank's table in `wlfbank.py`), to diff with it. `vc2index.h`'s `hookFiles` answers the file calls from
+  several files, one of them read as memory.
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -1467,8 +1471,9 @@ the V-Synth always had these fields. Its fetch fills them neutral, and the VC-2'
 A 12, on 28 splits (keys up to 41 in the four bass maps), plays those bass samples an octave above their root key: block
 +0x08 is 1200 cents at the root key.
 
-**+0xa0 never reaches EVENT's other path.** 179 of the 192 samples are LITE (kind 0); 12 are SOLO (132…137, 179, 180, 182,
-183, 191, 192) and 1 is BACKING (181). Every map holding a VariPhrase sample has one split, and so does every wave holding
+**+0xa0 never reaches EVENT's other path.** 179 of the 192 samples are LITE by the index's kind byte (0; their streams
+are SOLO-encoded, "The sample bank, loaded"); 12 are SOLO (132…137, 179, 180, 182, 183, 191, 192) and 1 is BACKING
+(181). Every map holding a VariPhrase sample has one split, and so does every wave holding
 those maps. Over every wave × velocity × key (950,272), the index's own readers give a VariPhrase sample +0xa0 = 1 every
 time: LITE with 0 ×638,976, LITE with 1 ×98,304, SOLO with 1 ×196,608, BACKING with 1 ×16,384. LITE's block doesn't read
 +0xa0. So the factory waves play EVENT as the V-Synth's do, and the 0 path is the format's, unused.
@@ -1495,8 +1500,71 @@ r0,r0`) found no reader of +0xa4…+0xa6 in either image. The compiler forms the
 | Planted: the shift taken unsigned | 128 of 256 differ (the first run's own error) |
 
 **What the port needs** for a VC-2 wave: `xtOscGain` given the two level bytes and `xtPitchCents` the shift, both by the
-laws above. +0xa0 needs nothing for the factory waves. Not followed here: how the store comes to hold the bank's samples
-under ids 1…192; what the second pitch word (+0x68, from the input's +0x98) is for beyond following the same law.
+laws above. +0xa0 needs nothing for the factory waves. Not followed here: ~~how the store comes to hold the bank's samples
+under ids 1…192~~ (followed since, "The sample bank, loaded"); what the second pitch word (+0x68, from the input's +0x98)
+is for beyond following the same law.
+
+### The sample bank, loaded (2026-11-13, the VC-2 mode's step 1c)
+
+**The bank.** At start-up (`0x8933eea0`), before the index is parsed, rom.4 loads "VC-2 Preset.bin" into a static object
+at `0x89e0f034` (0xf008 bytes, cleared by the static initializer `0x89350af0`). The loader (`0x89350970`) reads 7 bytes and
+compares them with `"TABLE"`, reads the 4-digit ASCII count (at most 1024), and reads that many 60-byte entries to +8 on.
+It sets +0 to 17 + 60 · count, where the streams start in the file (`"TABLE"`, the count and `"DATA"`, which it doesn't
+check), and +4 to the kernel's answer for the file (`0x89336d60` jumps straight to `0x88008fc0`). +4 is the file's base in
+memory: the reader copies a stream's chunks from the place it is given (`0x893476b0`), so the preset area is read as
+memory. "D:\…" files go to the kernel; "Z:\" and "V:\" are rom.4's own (`0x89336c60`).
+
+**The start-up load.** After the parse, `0x8934d2a0` and `0x8934d2d0` open the index again and find its samples' section.
+They open the drive "D:\" (`0x893369c0`) and take the Wave Numbers 1…128 to the wave library (`0x893520a0`, as 2999 + n).
+Each VC-2 wave the library names is loaded whole:
+- `0x8934da70(state, wave)` reads the wave's record (16 + 128 · 4 bytes) and takes each velocity slot's map.
+- `0x8934d9d0(state, map)` reads the map's record (16 + 128 · 6 bytes) and takes each key slot's sample.
+- `0x8934d8d0(state, n)` does nothing if the store already holds id n (`0x89351840`). Otherwise it reads sample n's
+  36-byte entry, shows the wave's name on the display (`0x8933a610`), prints `"D:\"` before the entry's path
+  (`D:\VPW\<file>.vpw`), and calls the wave reader `0x893474d0(path, n, 0)`.
+- The reader looks `path + 7`, the file's name, up in the bank (`0x89350a50`: the first entry that `strncmp` matches over
+  the entry name's length). It keeps the stream's size (`0x8997ad28`) and place (`0x8997ad2c`: the entry's offset + the
+  bank's +0 and +4), reads the stream's chunks from there, and makes the store's object with +0 = n.
+- At the end it closes the index and the drive (`0x893369f0`); a progress word (`0x899344e6`) runs to 100.
+
+So **a VC-2 sample is the store's id n, its number in the index, and its stream is found by its file name**. Every sample
+of every wave the library names comes in at start-up, each once. The library is answered here from the card's link files:
+`Internal.vc2/Wave/001…058`, file k naming wave k, so Wave Number k is VC-2 wave k. How the OS fills the library from them
+(`0x89353130`) is not traced.
+
+**The kind is the index's.** A sample entry is a 32-byte path and 4 bytes; its byte 32 is the kind the sample reader
+gives (`0x89394d10`'s out+0), which the fetch puts at +0xa7 ("The split's bytes, followed"). The V-Synth's own fetch takes
+the stream's header type there instead. The two differ for most of the bank:
+
+| The index's kind byte | The stream's vpsc type | Samples |
+|---|---|---|
+| 0 (LITE) | 1 (SOLO) | 179 |
+| 1 (SOLO) | 1 | 12 |
+| 3 (BACKING) | 3 | 1 |
+
+So the VC-2 plays 179 SOLO-encoded streams (the choirs, the basses, the synth and FM waves) as LITE waves: plain
+samples through LITE's players, their vpdt unused. Only the 13 VariPhrase samples play as VariPhrase.
+
+**Run** (`vc2run <rom.4> bank <index> <bank>`, `vc2bank.cpp`; the bank written by `wlflib.py bank VC2`, 14,059,159 bytes;
+`build/tools/vc2/bank.txt`). The two files answered to rom.4's file calls (`vc2index.h`'s `hookFiles`), the bank's bytes put
+in memory and its base given for `0x89336d60`. rom.4's own routines ran for the bank, the parse and the start-up load,
+with these answered: the drive's open and close, the display's message, the library (as the link files have it), the
+store's "held" (from what has been loaded), and the reader, whose path and id were taken. Then rom.4's find ran on each
+path. Each sample's path, id, place in the file, size and kind byte is printed in the form `wlflib.py samples VC2` prints
+from its own reading: the index's entry, then the bank's `"TABLE"` by the file's name.
+
+| | |
+|---|---|
+| The bank's object after the loader | +0 0x2d11 (17 + 60 × 192), +4 the base given |
+| The start-up load | returns 1; the drive opened once; the reader called 192 times, for 192 different ids |
+| `vc2run … bank` against `wlflib.py samples VC2`, 192 samples | the same, line for line; every place holds a `vpfl` |
+| Planted in wlflib's copy: the place without `"DATA"`'s 6 bytes | all 192 lines differ |
+| wlflib's own check and `choices`, after its bank reading moved to `wlfbank.py` | as before, byte for byte |
+
+**What the port needs** for a VC-2 sample: its stream by its file name in the bank's table, read as the plugin reads the
+preset area's streams (`xt_files` already holds all 416, these 192 among them, to rom.2's whole-wave routines). Its kind
+comes from the index's byte, not the stream's header. Not covered here: the reader `0x893474d0` itself, answered rather
+than run, and whether rom.2 has its like.
 
 ### The factory patches, read by rom.4 (2026-11-13, the VC-2 mode's step 1c)
 
@@ -1820,6 +1888,7 @@ among rom.2's.
   tracker) are.
 - ~~The `WLF08` library's format, and whether it is the V-Synth's preset area's format too.~~ Read and checked, both ("The
   wave libraries, read"). Left: how rom.2 finds its 224 streams, ~~and how rom.4's player picks a map's split~~ (found, "A
-  VC-2 wave's split, chosen", and what the split's bytes do, "The split's bytes, followed"), and how rom.4's store comes to
-  hold the VC-2's samples under ids 1…192.
+  VC-2 wave's split, chosen", and what the split's bytes do, "The split's bytes, followed"), ~~and how rom.4's store comes
+  to hold the VC-2's samples under ids 1…192~~ (run, "The sample bank, loaded"; left of it: the wave reader `0x893474d0`
+  itself, and how the OS fills the wave library from the link files).
 - rom.4's sections (code, .data, .bss), and how much of its code is rom.2's.

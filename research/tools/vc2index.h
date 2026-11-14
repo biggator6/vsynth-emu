@@ -25,17 +25,31 @@ struct IndexChoices {
     std::vector<uint8_t> kind;
 };
 
-struct IndexFile {
+inline constexpr const char* kIndexPath = "D:\\VC-2 Wave.bin";   // [FW] the parser's
+
+// A file the OS's file calls are answered from: its bytes, where the next read is, and the address its bytes are at in
+// the machine's memory when it is read as memory (0 when not)
+struct FileImage {
     std::vector<uint8_t> bytes;
     size_t at = 0;
+    uint32_t mapped = 0;
+};
+struct HookedFile {
+    std::string path;
+    FileImage* file;   // the caller's, which must outlive the machine's runs
 };
 
 // A NUL-ended string in the machine's memory, at most `most` characters
 std::string cString(Machine& m, uint32_t at, size_t most);
-// The kernel answered, the parser's file calls (open 0x89336c60, read 0x89336cf0, seek 0x89336db0, close 0x89336ca0) hooked
-// to `f`, which must outlive the machine's runs, and the parser (0x8934d12a) run on "D:\VC-2 Wave.bin": what it returned,
-// or nothing, with why said as `<who>: …`, when the file is empty or the parser faults
-std::optional<int32_t> parseIndex(Machine& m, IndexFile& f, const char* who);
+// The OS's file calls answered from the files: open by path (0x89336c60; the handle a file's place in the list from 1,
+// -1 for any other path), read 0x89336cf0, seek 0x89336db0, the file's memory 0x89336d60 (its `mapped`), close
+// 0x89336ca0
+void hookFiles(Machine& m, std::vector<HookedFile> files);
+// The parser (0x8934d12a) on the hooked index: what it returned, or nothing, with why said as `<who>: …`, on a fault
+std::optional<int32_t> runParser(Machine& m, const char* who);
+// The kernel answered, the file calls hooked to the index alone, and the parser run: what it returned, or nothing, with
+// why said, when the file is empty or the parser faults
+std::optional<int32_t> parseIndex(Machine& m, FileImage& f, const char* who);
 // The readers over the parsed index, `out` their 16-byte answer; nothing on a fault, a reader that finds nothing, or
 // one that leaves out+0 as it was (0xff written before each call)
 std::optional<IndexChoices> indexChoices(Machine& m, uint32_t out);

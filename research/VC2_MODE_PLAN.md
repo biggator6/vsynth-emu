@@ -99,6 +99,13 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   sample's root key down, so 12 plays an octave up (the port's `xtPitchCents`, its shift 0); the one-split flag only
   changes EVENT on a VariPhrase sample, which the factory index never gives a 0. Both laws equal the firmware over every
   value, 0 different. 179 of the 192 samples are LITE. For step 3: `xtOscGain` and `xtPitchCents` take the bytes.
+  **The sample bank, 2026-11-13** (`vc2run … bank`; VC2_VOCAL_DESIGNER.md, "The sample bank, loaded"): rom.4 loads
+  "VC-2 Preset.bin"'s table at start-up, then every sample of every wave the library names (Wave Numbers 1…128; the
+  link files name waves 1…58), each as the store's id n, its index number, its stream found by its file name and read
+  as memory. Run on the real files and equal to wlflib's own reading, 192 of 192. The kind is the index's byte, not the
+  stream's header: 179 SOLO-encoded streams play as LITE. For step 3: a VC-2 sample is its stream by name, read as the
+  plugin reads the preset area, with the index's kind. Left of it: the wave reader itself (`0x893474d0`), and how the
+  link files fill the library.
   **The effect chip's programs, 2026-11-13** (`vc2run … fxprog`; VC2_VOCAL_DESIGNER.md, "The effect chip's programs"):
   rom.2's driver, paired in rom.4; the 42 MFX programs and the V-Synth's reverbs equal but for registers renumbered one
   down, the Chorus's but for 13 words, the reverbs' transition program equal; program A (routing, mix, EQ, levels)

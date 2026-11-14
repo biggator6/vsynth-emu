@@ -18,16 +18,23 @@ sector. Prints what it found and every difference; exits 1 when there is one. $D
 wlflib.py get <VSYN2|VC2> <out>: the library's bytes, as the firmware's "D:\\... Wave.bin".
 wlflib.py choices <VSYN2|VC2>: each wave's split at every velocity and each map's at every key by the rule the
 firmware's readers are read to keep (the first split whose upper byte is at or above the value), in the form
-`vc2run <rom.4> splits` prints the firmware's own."""
+`vc2run <rom.4> splits` prints the firmware's own.
+wlflib.py bank VC2 <out>: the VC-2's sample bank's bytes, as the firmware's "D:\\VC-2 Preset.bin" (wlfbank.py).
+wlflib.py samples VC2: each sample's path, its stream's place in the bank by its file name, its size and kind byte, in
+the form `vc2run <rom.4> bank` prints the firmware's own; and each stream's vpsc type against the kind byte (exit 1 when
+one differs)."""
+import collections
 import re
 import struct
 import sys
 from dataclasses import dataclass
 
 import diskls
+import wlfbank
 
 img = diskls.img
 SECTOR = 512
+PATH_BYTES = 32   # a sample entry's path, before its kind byte
 
 
 @dataclass
@@ -39,6 +46,7 @@ class Library:
     waves: list   # (name, [(upper velocity, byte, map number)])
     maps: list    # (name, [(upper key, level, a word 0 or 12, sample number)])
     paths: list
+    kinds: list   # each sample entry's byte 32, after its 32-byte path: rom.4's sample reader's out+0
 
 
 def partition_end():
@@ -70,7 +78,7 @@ def library(at):
     tag = 'VSYN2' if 'VSYN2' in versions[0] else 'VC2'
     return Library(at, tag, versions, sections, [(name_of(r), splits(r, 4, '<BBH')) for r in waves],
                    [(name_of(r), splits(r, 6, '<BBHH')) for r in maps],
-                   [p.split(b'\0')[0].decode('latin1') for p in paths])
+                   [p.split(b'\0')[0].decode('latin1') for p in paths], [p[PATH_BYTES] for p in paths])
 
 
 def numbers_problems(what, lists, count, at_field):
@@ -116,13 +124,9 @@ def streams():
 
 
 def vc2_bank_problems(lib):
-    t = img.find(b'"TABLE"', partition_end())
-    count = int(img[t + 7:t + 11])
-    table = [(img[t + 11 + 60 * k:t + 63 + 60 * k].split(b'\0')[0].decode('latin1'),
-              *struct.unpack_from('<II', img, t + 63 + 60 * k)) for k in range(count)]
-    data = t + 11 + 60 * count
-    out = [] if img[data:data + 6] == b'"DATA"' else [f'no "DATA" at {data:#x}']
-    base = data + 6
+    bank = wlfbank.vc2_bank(partition_end())
+    t, table, data, base, count = bank.at, bank.entries, bank.data, bank.base, len(bank.entries)
+    out = [] if img[data:base] == wlfbank.DATA else [f'no "DATA" at {data:#x}']
     starts = {base + offset for _, _, offset in table}
     out += [f'bank entry {n!r}: no stream at its offset'
             for n, _, o in table if img[base + o:base + o + 4] != b'vpfl']
@@ -205,16 +209,46 @@ def say_choices(lib):
         say_ranges('map', k, name, s, lambda x: f'sample {x[3]} (byte {x[1]}, {x[2] & 0xff})')
 
 
+def say_samples(lib):
+    """Each sample's path as rom.4 forms it ("D:\\" + the entry's), its stream's place in the bank's file, its size
+    and its kind byte, in `vc2run … bank`'s form; then the kind bytes against the streams' vpsc types, counted. How
+    many samples have no stream: none in the bank by their name, or one that isn't a vpfl."""
+    bank = wlfbank.vc2_bank(partition_end())
+    by_name = {name: (size, offset) for name, size, offset in bank.entries}
+    pairs, missing = collections.Counter(), 0
+    for n, (path, kind) in enumerate(zip(lib.paths, lib.kinds), 1):
+        size, offset = by_name.get(path.split('\\')[-1], (0, 0))
+        stream = img[bank.base + offset:bank.base + offset + size]
+        tail = '' if size and stream[:4] == b'vpfl' else ' (no vpfl)'
+        missing += 1 if tail else 0
+        pairs[kind, wlfbank.vpsc_type(stream)] += 1
+        print(f'sample {n:3d} {"D:" + chr(92) + path:<34} at +{bank.base - bank.at + offset:#x}, {size} bytes, '
+              f'kind {kind}{tail}')
+    print('the index\'s kind byte against the stream\'s vpsc type: '
+          + ', '.join(f'kind {k} with vpsc {v} ×{c}' for (k, v), c in sorted(pairs.items())), file=sys.stderr)
+    return missing
+
+
+def write_file(path, data):
+    with open(path, 'wb') as f:
+        f.write(data)
+
+
+# The commands that take a library's tag: what each does with the library and the rest of the arguments
+COMMANDS = {
+    'choices': lambda lib, args: say_choices(lib),
+    'samples': lambda lib, args: sys.exit(1 if say_samples(lib) else 0),
+    'get': lambda lib, args: write_file(args[0], library_bytes(lib)),
+    'bank': lambda lib, args: write_file(args[0], wlfbank.bank_bytes(wlfbank.vc2_bank(partition_end()))),
+}
+
+
 def main():
-    if len(sys.argv) > 2 and sys.argv[1] in ('get', 'choices'):
+    if len(sys.argv) > 2 and sys.argv[1] in COMMANDS:
         lib = next((x for x in libraries() if x.tag == sys.argv[2]), None)
         if lib is None:
             sys.exit(f'wlflib.py: no library {sys.argv[2]} (VSYN2 or VC2)')
-        if sys.argv[1] == 'choices':
-            say_choices(lib)
-            return
-        with open(sys.argv[3], 'wb') as f:
-            f.write(library_bytes(lib))
+        COMMANDS[sys.argv[1]](lib, sys.argv[3:])
         return
     starts = libraries()
     problems = [p for lib in starts for p in check(lib)]

@@ -100,7 +100,7 @@ int splits(Machine& m, int argc, char** argv) {
         std::fprintf(stderr, "%s <VC-2 Wave.bin, wlflib.py get VC2>\n", argv[0]);
         return 2;
     }
-    IndexFile f{fileContents(argv[1])};
+    FileImage f{fileContents(argv[1])};
     const std::optional<int32_t> parsed = parseIndex(m, f, argv[0]);
     if (!parsed) return 1;
     const uint32_t out = m.alloc(64);

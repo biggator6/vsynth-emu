@@ -213,7 +213,7 @@ int splitbytes(Machine& m, int argc, char** argv) {
         return 2;
     }
     ReadWatch watch(m, kWatchFrom, kWatchTo);
-    IndexFile f{fileContents(argv[1])};
+    FileImage f{fileContents(argv[1])};
     if (!parseIndex(m, f, argv[0])) return 1;
     const std::optional<IndexChoices> choices = indexChoices(m, kReaderOut);
     if (!choices) return faulted(m);
