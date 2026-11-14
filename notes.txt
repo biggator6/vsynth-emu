@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's parameter tables v199 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, third item (the user's "Yes, next
+  item"). Vc2Params.cpp reads rom.4's names, both descriptor banks and the values' text by rom.4's own IDs, once, in
+  loadVc2 at the start (so a switch of modes reads nothing): vc2ParamName, vc2ParamDesc, vc2TypedDesc, vc2ValueText,
+  nothing answered before they're in. The text is rom.4's routine 0x894fa070 (rom.2's 0x89461a70 by rom.4's IDs) in an
+  interpreter the process holds behind a lock, through XtFxValueText made an image's (XtTextImage: rom.2's quirks
+  rom.2's, rom.4's none yet). XtFxControl.cpp (422 lines) split first, moved as it stood: XtFxValueText.cpp/.h, its
+  45 panel and 58 control plants following (fxc_muts.txt's now name port fxv); the descriptor decoders shared from
+  XtPatchStore.cpp (xtParamDescOf, xtTypedDescOf), the name cleaner from the catalog (xtFirmwareName), the note glyphs
+  (xtNoteText). Check: xt_vc2params in fcheck (ROM4 in env.sh), 0 different against rom.4's names getter, store
+  reader, typed reader and unit wrapper; mutate_vc2.py's ten plants caught (its runner mutlist.run_plants, moved from
+  mutate_msm.py); VSynthEmuRomTest 18/18 (the tables in, with and without rom.2), rom4-no-tables. Found: rom.4's
+  routine has no format for many of the VC-2's own IDs and faults on five (VC2_VOCAL_DESIGNER.md, "rom.4's values as
+  text"), left for the VC-2 panel; a one-value range's store value reads as stored, as rom.2's reader does.
+
 Two known images v198 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, second item (the user's "Yes, next item",
   and "plugin should be able to load both roms so that switching modes is seamless"). XtSynthRom.cpp knows rom.2 (the
   V-Synth's, whose tables the ports read) and rom.4 (the VC-2's) by their header's sections (Sh4::sectionsOf, public),

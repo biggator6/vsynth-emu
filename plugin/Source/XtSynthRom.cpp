@@ -7,6 +7,7 @@
 // other image, or of neither, is refused, saying so.
 #include "XtSynth.h"
 #include "Sh4Interp.h"
+#include "Vc2Params.h"
 #include "XtFiles.h"
 #include "XtFirmware.h"
 #include "XtSoloEncoder.h"
@@ -82,12 +83,9 @@ bool loadTables(const char* path) {
     return true;
 }
 
-// The VC-2's image: no port reads its tables yet (the VC-2 mode's step 3), so it is taken once the interpreter lays it
-// out as its header says
-bool loadVc2(const char* path) {
-    Sh4 machine;
-    return machine.loadRom(path);
-}
+// The VC-2's image: its parameters' names, descriptors and value text (Vc2Params.cpp, v199); the VC-2's ports' tables
+// go here as they come (the VC-2 mode's step 3), read at this start and never at a switch of modes
+bool loadVc2(const char* path) { return vc2LoadParams(path); }
 
 // An image in the tables: loaded by the first file taken, then only compared with.  The lock and what it guards are
 // one object, constinit so that it's there before any instance asks, whatever order the plugin's files start in.

@@ -2,7 +2,7 @@
 # mutate_fx.py [--control] [samples] [name ...]: every deliberate error in fx_muts.txt (or the named ones), each planted in XtFxChip.cpp by mutate.sh (PORT=fx) and run through xt_fx,
 # several at a time.  --control: fxc_muts.txt, in XtFxControl.cpp (PORT=fxc), through xt_fx control, where the number is its events.  One line each: caught and in how many cases (or "stopped",
 # when it crashes or hangs), MISSED, or ERROR when the old text is no longer in the source or the run never started.  It stops first if the run with nothing planted doesn't say 0 different.
-# The lists: name|old|new, with \\n and \\| escaped.
+# The lists: name|old|new[|port], with \\n and \\| escaped; the port fxv for fxc_muts.txt's plants in XtFxValueText.cpp (v199).
 import concurrent.futures as cf, os, re, signal, subprocess, sys
 import mutlist
 D = os.path.dirname(os.path.abspath(__file__))
@@ -12,7 +12,7 @@ if control: args.remove('--control')
 samples = args.pop(0) if args and args[0].isdigit() else ('60' if control else '4096')
 port, listing, source, tag = ('fxc', 'fxc_muts.txt', 'XtFxControl::boot', 'fxc_') if control else ('fx', 'fx_muts.txt', 'XtFxChip::reset', 'fx_')
 env = dict(os.environ, PORT=port, XT_FX_STOP='1')
-muts = mutlist.plants(D + '/' + listing, args, 'mutate_fx')
+muts = mutlist.plants(D + '/' + listing, args, 'mutate_fx', (port,))   # a line's fourth field its port (fxv, v199)
 def results(out): return [l for l in out.splitlines() if re.search(r': \d+ (samples|edits), \d+ different', l)]
 # With nothing planted, which also builds the shared objects.  If this run fails, every plant's would, and would read as caught.
 base = subprocess.run(['bash', D + '/mutate.sh', tag + '_control', source, source, samples, 'different'], env=env, capture_output=True, text=True, timeout=600)
@@ -20,7 +20,9 @@ base_out = base.stdout + base.stderr
 if not results(base_out) or (control and len(results(base_out)) < 8) or any(not re.search(r', 0 different', l) for l in results(base_out)):
     sys.exit('mutate_fx: the run with nothing planted fails, so no plant would mean anything: ' + (base_out.strip().splitlines() or ['no output'])[-1][:120])
 def one(m):
-    p = subprocess.Popen(['bash', D + '/mutate.sh', tag + m[0], m[1], m[2], samples, 'different'], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    p = subprocess.Popen(['bash', D + '/mutate.sh', tag + m[0], m[1], m[2], samples, 'different'],
+                         env=dict(env, PORT=m[3]), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                         start_new_session=True)
     try:
         out, _ = p.communicate(timeout=int(os.environ.get('MUT_TIMEOUT', '150')))
     except subprocess.TimeoutExpired:                  # a planted error can hang the check itself, which counts: the whole group goes, or the binary would run on

@@ -23,6 +23,7 @@ synth() { (cd "$1" && cc XtSynth.cpp $(have XtSynthRom.cpp) \
            $(have XtSynthArp.cpp XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp XtTempoTicks.cpp) \
            $(have XtSynthZones.cpp XtSynthNotes.cpp XtSynthUpdate.cpp XtSynthKnobs.cpp XtSynthEnvKnobs.cpp) \
            $(have XtSynthMsm.cpp XtMsm.cpp XtMsmTrack.cpp) \
+           $(have Vc2Params.cpp) $( [ -f Vc2Params.cpp ] && echo XtFxValueText.cpp XtPatchStore.cpp ) \
            Sh4Interp.cpp $(have Sh4Setup.cpp) -o "$2"); }
 rm -f "$A/old" "$A/new"; synth "$A/src/plugin/Source" "$A/old"; synth "$REPO/plugin/Source" "$A/new"
 [ -x "$A/old" ] && [ -x "$A/new" ] || { echo "ab: build failed"; exit 1; }

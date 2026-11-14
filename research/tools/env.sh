@@ -8,6 +8,7 @@ if [ ! -f "$REPO/research/tools/env.sh" ]; then
     return 1 2> /dev/null || exit 1
 fi
 ROM="${ROM:-$REPO/firmware/unpacked/V-SynthXT.rom.2.bin}"   # the user's rom.2 (gitignored; never commit)
+ROM4="${ROM4:-$(dirname "$ROM")/V-SynthXT.rom.4.bin}"       # the VC-2's rom.4, beside it as the unpacker leaves both (v199)
 WORK="${WORK:-$REPO/build/tools}"                           # binaries, inputs, results (gitignored)
 SDK="${SDK:-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk}"
 TC="${TC:-/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin}"

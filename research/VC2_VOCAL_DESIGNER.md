@@ -1402,6 +1402,43 @@ Screens named in rom.4 and not in rom.2 include `VC-2 MODE MENU`, `Go V-SYNTH!`,
 assigns) and `Vocoder/Natural`. Where the MIC settings are stored, and whether they are the V-Synth's sampling templates (IDs
 0x4f7…0x525 in rom.4, with the pre-effect chain), is not known.
 
+### rom.4's values as text (2026-11-14, v199)
+
+The plugin reads rom.4's three tables at its start (`plugin/Source/Vc2Params.cpp`) and `xt_vc2params` holds them to rom.4's
+own routines (HARDWARE_FIRMWARE.md, "rom.4's parameter tables in the plugin"). The value text is rom.4's routine
+`0x894fa070(id, value, unit)`, which is rom.2's `0x89461a70` by rom.4's IDs; `0x894fa730(id, value)` is its wrapper with the
+unit (exts.w the ID, then `bra 0x894fa070` with r6 = 1), and that wrapper is what a screen's parameter object calls
+(`0x89505b70`, a slot in 21 vtables from `0x8990aa58`, 0xe4 bytes apart). With the unit, the routine adds the ID's string
+after its 3, brackets and all, to any text it gives (1,254 of the 4,946 ends below), but for the ASCII characters' names.
+
+**Where it has no format.** At each ID's lowest and highest value, against the ID's own string (names split by 1, a range by
+2): of 1,714 IDs with a range, 1,269 read as their string's ends and 215 as the bare number where the string has another
+scale; of 297 with names, 290 start at their first name. rom.2's routine on rom.2's IDs, the same way: 1,657 ranged, 1,259
+as the string, 133 bare. Most of the bare ones are the system's (a part's channel 0–15 where the string says 1–16, Device ID),
+in both. Those rom.4 has and rom.2 hasn't, by name:
+- Split Point (0–127, the string C-1…G9).
+- The patch EQ, both bands (Freq 0–26, the string 50…20000 Hz; Q 0–5, 0.5…8.0; Gain 0–30, −15…+15 dB).
+- The pre-effect chain's EQ (Low, Mid 1 and Hi Freq, Gain and Q) and its Compressor Release (0–127, the string −50…+50).
+- OSC 1 and 2 Wave Number (0–999, the string OFF, 1…999) and Harm Formant Style (0–10 against 0…127); Beam Type (0–4, OFF,
+  1…4).
+- Types that count from 1 in the string: Structure Type (1–3), and COSM's Type, Amp Type, Speaker Type and Filter Type.
+- Chord Memory's 48 notes, 0–128, whose string ends in OFF: the top value reads 128.
+
+The VC-2's screens must draw these some other way, or show them bare; which is for the VC-2 mode's panel to settle, as the
+V-Synth's four reverb IDs with no format were (HARDWARE_FIRMWARE.md, "The seven on the manual's scale"). The plugin reads
+them as the routine gives them, and its rom.4 description puts nothing right yet (Vc2Params.cpp's `kVc2Text`).
+
+**Where it faults.** Without the unit it faults at five IDs: the four new reverbs' Room Size (0x827, 0x84a, 0x856, 0x862,
+0–5), whose string is "22 26 32 37 43 48 [m]", one name with spaces where the names should be split by 1, so values 1–5
+run off the list (value 0 reads the whole of it); and COSM's Sample Rate Down (0x999, 0–5) with four names (NOR, NOR1/2,
+NOR1/4, NOR1/8), at 4 and 5. With the unit, Room Size reads its bare number and unit (1[m]…5[m]) and Sample Rate Down still
+faults. On the XT a fault isn't one: the read is of address 1, through null. The plugin's text for a value the routine
+faults on is its number, as for rom.2's (XtFxValueText).
+
+**Note values** come back in the LCD font's codes, as rom.2's (`0x15` 2/1 at 144, an LFO rate's top): 111 of the check's
+values, read by rom.2's glyphs (`xtNoteText`), which xt_fx control measures on rom.2's driver; rom.4's own driver doesn't
+check them.
+
 ## The files
 
 `Internal.vc2` in the disk image holds:

@@ -92,6 +92,9 @@ int xtPatchValue(const std::vector<uint8_t>& store, int id, int zone = 0, int co
 constexpr int kXtMfxSlots = 0x17b, kXtChorusSlots = 0x1ff, kXtReverbSlots = 0x232, kXtCosmSlots = 0x3e9;
 struct XtTypedDesc { int slot, def, min, max; };
 const XtTypedDesc* xtTypedDesc(int id);
+// One descriptor from its bytes, in either bank's form (rom.4's are in rom.2's forms)
+XtParamDesc xtParamDescOf(const uint8_t* p);
+XtTypedDesc xtTypedDescOf(const uint8_t* p);
 int xtPatchTyped(const std::vector<uint8_t>& store, int base, int id, int zone = 0, int cosm = 0);
 // A type's IDs, first and last, from rom.2 (block 0 MFX, 1 Chorus, 2 Reverb, 3 COSM; the tables at 0x897a8218, 0x897a82e4, 0x897a8310, 0x897cebd8).  False past its types.
 bool xtEffectTypeIds(int block, int type, int& first, int& last);

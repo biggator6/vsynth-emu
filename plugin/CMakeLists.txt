@@ -140,6 +140,8 @@ target_sources(VSynthEmu PRIVATE
     Source/XtPatch.cpp
     Source/XtFxChip.cpp
     Source/XtFxControl.cpp
+    Source/XtFxValueText.cpp
+    Source/Vc2Params.cpp
     Source/XtBuildId.cpp
 )
 

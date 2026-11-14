@@ -4,7 +4,7 @@
 # PORT=analog, XtAnalog.cpp; with PORT=analogcosm, XtCosm.cpp, PORT=analogband, XtMultiBandPlayer.cpp, and PORT=analogfw, XtFirmware.cpp, under xt_analog's
 # check (XT_ANALOG_ONLY=pcm, the PCM pass alone, is passed through); with PORT=tone, XtSynth.cpp, PORT=tonecosm, XtCosm.cpp, PORT=toneanalog, XtAnalog.cpp, PORT=toneband, XtMultiBandPlayer.cpp (XtBeat too), PORT=tonecheck, XtToneCheck.cpp, PORT=tonefw, XtFirmware.cpp, PORT=toneosc, XtOsc.cpp, PORT=tonelfo, XtLfo.cpp, PORT=toneenv, XtEnvelope.cpp, and PORT=tonesolo, XtSoloVoice.cpp, PORT=tonelin, XtLinearPlayer.cpp, PORT=tonelite, XtLitePlayer.cpp, PORT=tonepatch, XtPatch.cpp, and PORT=tonefiles, XtFiles.cpp, under xt_tone,
 # on seed $SEED, default 2024; with PORT=solo, XtSoloVoice.cpp under xt_fw solocmp; with PORT=enc, XtSoloEncoder.cpp under
-# xt_enc on fcheck's waves, which prints only those that differ; with PORT=fx, XtFxChip.cpp under xt_fx; with PORT=fxc, XtFxControl.cpp under xt_fx control, [cases] its events) with the first <old> replaced by
+# xt_enc on fcheck's waves, which prints only those that differ; with PORT=fx, XtFxChip.cpp under xt_fx; with PORT=fxc, XtFxControl.cpp under xt_fx control, [cases] its events; PORT=fxv, XtFxValueText.cpp the same) with the first <old> replaced by
 # <new> (exact text), builds xt_cosm (xt_analog, xt_tone, xt_fw, xt_enc) from it in $WORK/mut/<name>, runs it on
 # [cases] (100) and prints the lines matching [pattern] (an extended regex;
 # default every result line).  A check that
@@ -19,6 +19,7 @@
 # v189), under xt_arp; [cases] its random cases, after the presets.
 # PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
+# PORT=vc2params: Vc2Params.cpp (rom.4's parameter tables, v199) under xt_vc2params, on rom.4 ($ROM4).
 # PORT=toneknobs, toneenvknobs, toneupdate, tonezones, tonenotes: XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp, XtSynthUpdate.cpp,
 # XtSynthZones.cpp, XtSynthNotes.cpp under xt_tone (v193: XtSynth's parts by job); tonefwcpp, tonefwh, tonecases,
 # tonecarry: xt_tone's own XtToneFirmware.cpp, XtToneFirmware.h, XtToneCases.cpp, XtToneCarry.cpp; tonepatchids its
@@ -30,6 +31,7 @@ source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # a run that can't start must never read as a result; no "== name" follows
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
+IMAGE="$ROM"   # what the planted binary runs on: rom.2, but rom.4 for PORT=vc2params (v199)
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
 source "$(dirname "$0")/objects.sh"   # keptObject: the fx ports' objects, by their source and every header
 # A tone port's file, planted under xt_tone; nothing for any other port
@@ -100,7 +102,7 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
            XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp Sh4Setup XtFiles XtWaveFile XtDiskImage XtPatchStore
            XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch
            XtSynthZones XtSynthNotes XtSynthUpdate XtSynthKnobs XtSynthEnvKnobs XtSynthMsm XtMsm XtMsmTrack XtMsmPatch
-           XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds)
+           XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds Vc2Params XtFxValueText)
     TONE=(-DXT_TONE_MAIN -DXT_TONE_CHECK -DXT_HARNESS_SWITCHES)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue
@@ -117,14 +119,19 @@ elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck
 elif [ "$PORT" = fx ]; then        # XtFxChip against the reference; [cases] is its samples per type, and XT_FX_STOP stops at the first difference
     F=XtFxChip.cpp; D=XT_FX_MAIN; EXTRA=(-I"$REPO/research/third_party/gearmulator_esp")
     OBJ="$M/fx_obj"; mkdir -p "$OBJ"
-    for f in Sh4Interp XtFxControl; do keptObject "$OBJ/$f.o" "$S/$f.cpp"; done
-    L=("$OBJ/Sh4Interp.o" "$S/Sh4Setup.cpp" "$OBJ/XtFxControl.o")
-elif [ "$PORT" = fxc ]; then       # XtFxControl against its checks in xt_fx; [cases] is the events of "xt_fx control"
-    F=XtFxControl.cpp; D=XT_FX_MAIN; EXTRA=(-I"$REPO/research/third_party/gearmulator_esp")
+    for f in Sh4Interp XtFxControl XtFxValueText; do keptObject "$OBJ/$f.o" "$S/$f.cpp"; done
+    L=("$OBJ/Sh4Interp.o" "$S/Sh4Setup.cpp" "$OBJ/XtFxControl.o" "$OBJ/XtFxValueText.o")
+elif [[ "$PORT" =~ ^(fxc|fxv)$ ]]; then   # XtFxControl (fxv: its values' text, XtFxValueText.cpp, v199) against its
+    # checks in xt_fx; [cases] is the events of "xt_fx control"; the other of the two is a kept object
+    case "$PORT" in
+        fxv) F=XtFxValueText.cpp; KEEP=XtFxControl ;;
+        *) F=XtFxControl.cpp; KEEP=XtFxValueText ;;
+    esac
+    D=XT_FX_MAIN; EXTRA=(-I"$REPO/research/third_party/gearmulator_esp")
     OBJ="$M/fx_obj"; mkdir -p "$OBJ"
-    keptObject "$OBJ/Sh4Interp.o" "$S/Sh4Interp.cpp"
+    for f in Sh4Interp "$KEEP"; do keptObject "$OBJ/$f.o" "$S/$f.cpp"; done
     keptObject "$OBJ/XtFxChip_main.o" "$S/XtFxChip.cpp" -DXT_FX_MAIN "${EXTRA[@]}" -I"$S"
-    L=("$OBJ/Sh4Interp.o" "$S/Sh4Setup.cpp" "$OBJ/XtFxChip_main.o")
+    L=("$OBJ/Sh4Interp.o" "$S/Sh4Setup.cpp" "$OBJ/XtFxChip_main.o" "$OBJ/$KEEP.o")
 elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
     case "$PORT" in
         ticks) F=XtTempoTicks.cpp ;;
@@ -144,6 +151,12 @@ elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     esac
     ARGS=("${SEED:-2024}")
     harnessParts XT_MSM_MAIN msm_obj XtMsm XtMsmTrack XtMsmPatch XtMsmCheck XtMsmCases
+elif [ "$PORT" = vc2params ]; then
+    # rom.4's parameter tables against xt_vc2params, on rom.4 (v199): Vc2Params.cpp; [cases] its values an ID, SEED its seed
+    F=Vc2Params.cpp
+    IMAGE="$ROM4"
+    ARGS=("${SEED:-2024}")
+    harnessParts XT_VC2PARAMS_MAIN vc2_obj Vc2Params Vc2ParamsCheck XtFxValueText
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
     L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197
@@ -213,7 +226,7 @@ if [[ "$F" == *.h ]]; then
         "${TONE[@]}" -c "$M/$N.src/{}.cpp" -o "$M/$N.obj/{}.o" 2>&1 | grep -E " error" && exit 1
 fi
 "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -D$D "${EXTRA[@]}" -I"$S" "$M/$N.cpp" "${L[@]}" -o "$M/$N" 2>&1 | grep -E " error" && exit 1
-[ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # again: a build takes long enough for it to go
+[ -f "$IMAGE" ] || { echo "mutate: no ROM at $IMAGE"; exit 2; }   # again: a build takes long enough for it to go
 echo "== $N"
 if [ "$PORT" = solo ]; then
     B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.out"; rm -rf "${T:?}"; mkdir -p "$T"; i=0
@@ -248,7 +261,7 @@ if [ "$PORT" = enc ]; then
     echo "enc: $(grep -c . "$M/$N.out") waves differ from the baseline"
     exit
 fi
-[ "$PORT" = fxc ] && ARGS=("$C") && C=control
+[[ "$PORT" =~ ^(fxc|fxv)$ ]] && ARGS=("$C") && C=control
 # a run the error hangs is stopped as solocmp's alarm stops one (MUT_TIMEOUT seconds, default 1500): it counts as one that died
-timeout "${MUT_TIMEOUT:-1500}" "$M/$N" "$ROM" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"
+timeout "${MUT_TIMEOUT:-1500}" "$M/$N" "$IMAGE" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"
 st=${PIPESTATUS[0]}; [ "$st" = 124 ] && st=$((128 + 14)); [ "$st" -ge 128 ] && echo "$N: the run died, signal $((st - 128))"

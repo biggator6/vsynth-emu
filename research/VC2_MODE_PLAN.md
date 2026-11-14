@@ -161,7 +161,12 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   (HARDWARE_FIRMWARE.md, "Two known images"): each image known by its header's sections, a file of the other or of
   neither refused saying so; rom.4 sought at every start, beside rom.2 first and with no rom.2; VSynthEmuRomTest 17/17,
   the rom- plants moved with their code and four rom4- plants, all caught.
-- rom.4's parameter tables (names, descriptors, value text) read at run time.
+- rom.4's parameter tables (names, descriptors, value text) read at run time. **Done 2026-11-14, v199**
+  (HARDWARE_FIRMWARE.md, "rom.4's parameter tables in the plugin"): `Vc2Params.cpp`, read in `loadVc2` at the start; the
+  text by rom.4's routine through `XtFxValueText` made an image's (split out of XtFxControl.cpp first); `xt_vc2params` in
+  fcheck, 0 different against rom.4's getter, store reader, typed reader and unit wrapper; ten plants caught. Left for the
+  VC-2 panel: the IDs rom.4's routine has no format for, and the five it faults on (VC2_VOCAL_DESIGNER.md, "rom.4's values
+  as text").
 - An audio input: an input or sidechain bus, the mic in the Standalone, External In Type; the panel says when none is
   connected. It also gives the V-Synth's EXT IN OSC its input, so it can come first as a version of its own.
 

@@ -10,6 +10,7 @@
 #include "TestNote.h"
 #include "../Source/PluginAppFolder.h"
 #include "../Source/PluginProcessor.h"
+#include "../Source/Vc2Params.h"
 #include "../Source/XtFirmware.h"
 #include <cstdint>
 #include <cstdio>
@@ -46,6 +47,13 @@ juce::File otherImage(const juce::File& rom, const juce::File& work) {
     return other.replaceWithData(bytes.getData(), bytes.getSize()) ? other : juce::File();
 }
 
+// rom.4's parameter tables, which its loader reads at the start (v199): each bank's last ID, the last name and a value's
+// text (Vc2Params.h); what they say is xt_vc2params' to check
+bool vc2TablesIn() {
+    return vc2ParamDesc(kVc2FirstTyped - 1) && vc2TypedDesc(kVc2Ids - 1) && !vc2ParamName(kVc2Ids - 1).empty()
+           && !vc2ValueText(0, 0).empty();
+}
+
 // An instance given `file` by `choose` should refuse it, its status saying `says`
 void refuses(TestChecks& check, bool (VSynthEmuProcessor::*choose)(const juce::File&), const juce::File& file,
              const juce::String& says, const std::string& what) {
@@ -63,6 +71,7 @@ void twoImages(TestChecks& check, const juce::File& rom, const juce::File& work,
     check(vc2.existsAsFile() && neither.replaceWithText("not a firmware image"),
           "rom.4 should be beside rom.2, and the test's file written: " + vc2.getFullPathName().toStdString());
     check(VSynthEmuProcessor().hasVc2Rom(), "rom.4 should be found beside the rom.2 an instance opened");
+    check(vc2TablesIn(), "rom.4's parameter tables should be in once rom.4 is (v199)");
     refuses(check, &VSynthEmuProcessor::setRomFile, vc2, "the VC-2's image, rom.4",
             "rom.4 should be refused as rom.2, saying whose it is");
     refuses(check, &VSynthEmuProcessor::setVc2RomFile, rom, "the V-Synth's image, rom.2",
@@ -81,7 +90,7 @@ void vc2Alone(TestChecks& check, const juce::File& rom) {
           "can't link rom.4 in the app folder");
     const juce::String said = thisProgramSays({ rom.getFullPathName(), "--alone" });
     there.deleteFile();
-    check(said.contains("rom.2 no, rom.4 yes"),
+    check(said.contains("rom.2 no, rom.4 yes, its tables in"),
           "rom.4 should be found at a start with no rom.2: \"" + said.trim().toStdString() + "\"");
 }
 
@@ -117,7 +126,8 @@ int main(int argc, char** argv) {
     if (argc == 3 && juce::String(argv[2]) == "--alone") {   // the child, in the parent's app folder (vc2Alone)
         juce::ScopedJuceInitialiser_GUI init;
         VSynthEmuProcessor p;
-        std::printf("rom.2 %s, rom.4 %s\n", p.hasRom() ? "yes" : "no", p.hasVc2Rom() ? "yes" : "no");
+        std::printf("rom.2 %s, rom.4 %s, its tables %s\n", p.hasRom() ? "yes" : "no", p.hasVc2Rom() ? "yes" : "no",
+                    vc2TablesIn() ? "in" : "out");
         return 0;
     }
     return testMain(argc, argv, "rom", romTest);

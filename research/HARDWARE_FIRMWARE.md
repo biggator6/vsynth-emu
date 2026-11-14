@@ -1546,6 +1546,43 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.4's parameter tables in the plugin (2026-11-14, v199) {#vc2-params}
+
+The VC-2 mode's step 2, third item. rom.4 has rom.2's three per-ID tables in rom.2's forms (VC2_VOCAL_DESIGNER.md, "The
+parameter tables"), and the plugin now reads them, by rom.4's own IDs, once at its start: `loadVc2` (XtSynthRom.cpp) calls
+`vc2LoadParams` (`Vc2Params.cpp`), so they are in before rom.4's ready flag goes up and are never read at a switch of modes
+(the user's decision, 2026-11-14). For each of the 2,476 IDs: its name, as the screens show it (up to a footnote's " *", its
+spaces gone; rom.4 has 57 marked); its descriptor, the first bank's 12 bytes below 0x56a or the second's 8 from it
+(`xtParamDescOf`, `xtTypedDescOf`, rom.2's decoders, now shared from XtPatchStore.cpp); and its values' text, by rom.4's own
+routine `0x894fa070` in an interpreter the process holds behind a lock. Every accessor answers nothing until the tables are
+in, and none reads past a table.
+
+**The text.** rom.2's `XtFxValueText` now takes an image's description (`XtTextImage`: the routine, the strings, and where
+its text is put right: an ID run as another's format, the row its unit comes from, the IDs whose text is a time from the
+driver). rom.2's is the user's decisions of 2026-11-04 as before (`xtVSynthText`), its three moved rows a table now; rom.4's
+puts nothing right (`kVc2Text`), so it gives the routine's text, the unit after a bare number, a note value by the LCD's
+glyph (`xtNoteText`, from the same code), and a value the routine faults on as its number. The routine has no format for
+many of the VC-2's own IDs (Split Point, both EQs, the pre-effect EQ, Wave Number's OFF, Chord Memory's OFF, the types that
+count from 1) and faults on the four new reverbs' Room Size and on Sample Rate Down: VC2_VOCAL_DESIGNER.md, "rom.4's values
+as text". What the VC-2's panel shows for them is its step's to settle.
+
+**The check** (`xt_vc2params <rom.4> [cases] [seed]`, `Vc2ParamsCheck.cpp`, in fcheck, under a second): each name against
+the names' getter `0x894f9fc0` (both banks: the table runs on at `0x898b6d40` from 0x56a, and ends at `0x898b7e48`, where
+the next table's code starts); each first-bank descriptor by writing a value where it says into a store of random bits,
+read back by the store's reader `0x8932b050`; each typed one by writing its slot (the block's slot base and the slot's
+first-bank descriptor) and reading it through the typed reader `0x8932b460`; each value's text against the unit wrapper
+`0x894fa730`, which is how a screen's parameter object calls the routine. Each ID's ends, its default and two values drawn
+between; a store's values one past each end too. 0 different: 2,476 names, 8,102 first-bank values (1,381 IDs), 7,630
+typed values (1,090 IDs), 10,080 texts (2,016 IDs, 15 the routine faults on, 111 note values). A store value outside its
+range reads as the default, but for a range of one value (442 dummies), which reads as stored: rom.2's reader's rule too
+(`xtPatchValue`), found here by the first run, whose model lacked it.
+
+`XtFxControl.cpp` (422 lines) was split first, moved as it stood: the values as text into `XtFxValueText.cpp`/`.h`, its 45
+panel plants and 58 control plants following it (`mutate_fx.py --control`'s plants now name a port, `fxv` for this file;
+three of them on the catalog's name cleaner, now `xtFirmwareName` there).
+`mutate_msm.py`'s runner moved into `mutlist.run_plants`, which `mutate_vc2.py` shares. Checked: `mutate_vc2.py`'s ten
+plants in `Vc2Params.cpp`, each caught.
+
 ### Two known images, rom.2 and rom.4 (2026-11-14, v198) {#two-images}
 
 The VC-2 mode's step 2, second item. Until now the plugin took the first image whose tables loaded and refused any

@@ -20,8 +20,10 @@ SARP=($( [ -f XtSynthArp.cpp ] && echo XtSynthArp.cpp XtArpeggio.cpp XtArpeggioS
 # XtSynth's parts split out by job and the Multi Step Modulator in it (v193)
 SARP+=($( [ -f XtSynthMsm.cpp ] && echo XtSynthZones.cpp XtSynthNotes.cpp XtSynthUpdate.cpp XtSynthKnobs.cpp \
        XtSynthEnvKnobs.cpp XtSynthMsm.cpp XtMsm.cpp XtMsmTrack.cpp ))
+# rom.4's parameters, which XtSynthRom.cpp loads (v199), and what they read with: the values' text, the descriptors' form
+V4=($( [ -f Vc2Params.cpp ] && echo Vc2Params.cpp XtFxValueText.cpp ))
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
-rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,classifier_test,rd}
+rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,classifier_test,rd}
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp "${SH4[@]}" -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp "${SH4[@]}" -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp "${SH4[@]}" -o "$O/xt_lfo" &
@@ -33,17 +35,21 @@ cc -ffp-contract=off -DXT_ENCODER_MAIN XtSoloEncoder.cpp "${FW[@]}" XtMultiBandP
    XtMultiBandPlayer.cpp XtSoloVoice.cpp "${SH4[@]}" -o "$O/xt_analog" &
 cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.cpp XtLitePlayer.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
    $( [ -f XtCosm.cpp ] && echo XtCosm.cpp ) $( [ -f XtAnalog.cpp ] && echo XtAnalog.cpp ) "${FW[@]}" \
-   "${SH4[@]}" $( [ -f XtSynthRom.cpp ] && echo XtSynthRom.cpp ) "${SARP[@]}" -o "$O/xt_synth" &
+   "${SH4[@]}" $( [ -f XtSynthRom.cpp ] && echo XtSynthRom.cpp ) "${SARP[@]}" "${V4[@]}" \
+   $( [ -f Vc2Params.cpp ] && echo XtPatchStore.cpp ) -o "$O/xt_synth" &
 [ -f XtToneCheck.cpp ] && cc -DXT_TONE_MAIN -DXT_TONE_CHECK XtToneCheck.cpp XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.cpp XtLitePlayer.cpp XtMultiBandPlayer.cpp XtEnvelope.cpp XtLfo.cpp XtOsc.cpp \
    XtCosm.cpp XtAnalog.cpp "${FW[@]}" "${SH4[@]}" "${VF[@]}" XtPatch.cpp "${SARP[@]}" \
    $( [ -f XtArpeggioPatch.cpp ] && echo XtArpeggioPatch.cpp ) $( [ -f XtSynthMsm.cpp ] && echo XtMsmPatch.cpp ) \
    $( [ -f XtToneMsm.cpp ] && echo XtToneFirmware.cpp XtToneCases.cpp XtToneCarry.cpp XtToneMsm.cpp ) \
    $( [ -f XtTonePatchIds.cpp ] && echo XtTonePatchIds.cpp ) \
-   $( [ -f XtSynthRom.cpp ] && echo XtSynthRom.cpp ) -o "$O/xt_tone" &
+   $( [ -f XtSynthRom.cpp ] && echo XtSynthRom.cpp ) "${V4[@]}" -o "$O/xt_tone" &
+# rom.4's parameter tables against its own routines (v199), on rom.4
+[ -f Vc2ParamsCheck.cpp ] && cc -DXT_VC2PARAMS_MAIN Vc2ParamsCheck.cpp "${V4[@]}" XtPatchStore.cpp "${FW[@]}" \
+   XtMultiBandPlayer.cpp XtSoloVoice.cpp "${SH4[@]}" -o "$O/xt_vc2params" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &
 [ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp XtFxControl.cpp \
-   "${SH4[@]}" -o "$O/xt_fx" &
+   XtFxValueText.cpp "${SH4[@]}" -o "$O/xt_fx" &
 # The arpeggiator against the firmware's own object (v188), on the disk image's patches; the tempo ticks it steps on (v189)
 ARP=(XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp XtArpeggioCheck.cpp XtArpeggioCases.cpp XtTempoTicks.cpp
      XtTempoTicksCheck.cpp XtArpeggioPatch.cpp)

@@ -48,14 +48,8 @@ template <typename T> const T* entryAt(const std::vector<T>& t, int at) {
     return at >= 0 && at < (int)t.size() ? &t[(size_t)at] : nullptr;
 }
 
-// The descriptors: 12 bytes an ID from 0x897a167c, u16 byte offset, s8 width (its size is what counts), u8 bit, u16
-// centre, default, min, max.
-XtParamDesc descOf(const uint8_t* p) {
-    return { u16(p), (int8_t)p[2], p[3], u16(p + 4), u16(p + 6), u16(p + 8), u16(p + 10) };
-}
-// The second bank: 8 bytes an ID from 0x897a56d8, s16 slot, default, min, max.
+// The second bank: 8 bytes an ID from 0x897a56d8 (xtTypedDescOf)
 constexpr int kTypedIds = 0x8d0 + 0x85 - kXtDescIds;   // to the COSMs' last, 0x954
-XtTypedDesc typedOf(const uint8_t* p) { return { p[0], s16(p + 2), s16(p + 4), s16(p + 6) }; }   // the slot is a byte to 0x89481d70
 // A block's types (MFX, Chorus, Reverb, COSM), each its first and last ID, an s16 pair
 constexpr int kTypes[4] = { 42, 9, 11, 17 };
 using IdTable = const std::vector<int16_t>& (*)();
@@ -86,14 +80,22 @@ constexpr XtPatchSectionDef kSections[] = {
 constexpr int kCosmFirst = 0x3e7, kCosmLast = 0x42a, kCosmStride = 0x220;
 } // namespace
 
+// The descriptors: 12 bytes an ID, u16 byte offset, s8 width (its size is what counts), u8 bit, u16 centre, default, min,
+// max (rom.2's from 0x897a167c; rom.4's in the same form, Vc2Params.cpp)
+XtParamDesc xtParamDescOf(const uint8_t* p) {
+    return { u16(p), (int8_t)p[2], p[3], u16(p + 4), u16(p + 6), u16(p + 8), u16(p + 10) };
+}
+// The second bank: 8 bytes an ID, u8 slot (a byte to 0x89481d70), s16 default, min, max
+XtTypedDesc xtTypedDescOf(const uint8_t* p) { return { p[0], s16(p + 2), s16(p + 4), s16(p + 6) }; }
+
 std::span<const XtPatchSectionDef> xtPatchSections() { return kSections; }
 bool xtPatchIsCosm(int id) { return id >= kCosmFirst && id <= kCosmLast; }
 
 const XtParamDesc* xtParamDesc(int id) {
-    return entryAt(romTable<XtParamDesc, 0x897a167c, kXtDescIds, 12, descOf>(), id);
+    return entryAt(romTable<XtParamDesc, 0x897a167c, kXtDescIds, 12, xtParamDescOf>(), id);
 }
 const XtTypedDesc* xtTypedDesc(int id) {
-    return entryAt(romTable<XtTypedDesc, 0x897a56d8, kTypedIds, 8, typedOf>(), id - kXtDescIds);
+    return entryAt(romTable<XtTypedDesc, 0x897a56d8, kTypedIds, 8, xtTypedDescOf>(), id - kXtDescIds);
 }
 
 int xtPatchTyped(const std::vector<uint8_t>& store, int base, int id, int zone, int cosm) {

@@ -682,6 +682,13 @@ ticks: 100 cases, 300000 ms, 2455125 values, 0 different
 presets: 55 cases, 356944 events, 356999 states, 489446 terms: 0 different
 random: 300 cases, 811357 events, 811657 states, 1340938 terms: 0 different
 xt_msm: 0 different
+== xt_vc2params
+before rom.4's tables are in: nothing answered
+names: 2476 IDs, 2476 values against the getter 0x894f9fc0, 0 different
+first bank: 1381 IDs, 8102 values through the reader 0x8932b050, 0 different
+second bank: 1090 IDs, 7630 values through the typed reader 0x8932b460, 0 different
+text: 2016 IDs, 10080 values against the wrapper 0x894fa730 (15 the routine faults on, 111 note values), 0 different
+xt_vc2params: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

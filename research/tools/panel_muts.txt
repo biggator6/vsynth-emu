@@ -128,3 +128,4 @@ rom4-not-sought|    findVc2Rom(file);\n||plugin/Source/PluginRom.cpp|rom-image
 rom4-not-alone|    findVc2Rom(juce::File());\n||plugin/Source/PluginRom.cpp|rom-image
 rom-any-image|    out.known = known == std::end(kKnown) ? nullptr : *known;|    out.known = &kVSynth;|plugin/Source/XtSynthRom.cpp|rom-image
 rom-not-the-image|    if (file->known != &image_) {|    if (false) {|plugin/Source/XtSynthRom.cpp|rom-image
+rom4-no-tables|bool loadVc2(const char* path) { return vc2LoadParams(path); }|bool loadVc2(const char* path) { Sh4 m; return m.loadRom(path); }|plugin/Source/XtSynthRom.cpp|rom-image

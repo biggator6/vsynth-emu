@@ -1,0 +1,15 @@
+# Planted errors in Vc2Params.cpp (rom.4's parameter tables, v199), for mutate_vc2.py: each must make xt_vc2params,
+# on rom.4, say something differs.  name|old|new[|port[|seed]]
+# The tables' places and forms
+names-table|kNames = 0x898b5798;|kNames = 0x898b579c;
+names-short|kLongestName = 40;|kLongestName = 12;
+desc-table|kDescriptors = 0x8950f0b0;|kDescriptors = 0x8950f0bc;
+desc-stride|kDescBytes = 12, kTypedBytes = 8;|kDescBytes = 8, kTypedBytes = 8;
+bank-table|kBank = 0x895131a8;|kBank = 0x895131b0;
+bank-short|kVc2Ids - kVc2FirstTyped, kTypedBytes|kVc2Ids - kVc2FirstTyped - 1, kTypedBytes
+bank-from|entry(&Tables::typed, id - kVc2FirstTyped)|entry(&Tables::typed, id - kVc2FirstTyped + 1)
+# The values' text
+text-routine|kValueText = 0x894fa070;|kValueText = 0x894fa730;
+text-strings|kStrings, kStrings, 0, 0|kStrings + 4, kStrings + 4, 0, 0
+# Never said to be in
+never-in|    loaded_.store(true, std::memory_order_release);\n|

@@ -35,7 +35,8 @@
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source -Iresearch/tools research/tools/vc2*.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/Sh4Setup.cpp plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
 //        plugin/Source/XtFwMachine.cpp plugin/Source/XtMultiBandPlayer.cpp plugin/Source/XtFxChip.cpp
-//        plugin/Source/XtFxControl.cpp plugin/Source/XtOsc.cpp plugin/Source/XtWaveFile.cpp -o build/tools/vc2/vc2run
+//        plugin/Source/XtFxControl.cpp plugin/Source/XtFxValueText.cpp plugin/Source/XtOsc.cpp
+//        plugin/Source/XtWaveFile.cpp -o build/tools/vc2/vc2run
 #include "vc2runs.h"
 #include <algorithm>
 #include <array>
