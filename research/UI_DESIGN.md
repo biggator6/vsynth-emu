@@ -9,7 +9,7 @@ https://claude.ai/artifact/RQFA4HhEHdfSYsMYUdYQvP, the user chose D ("Yes, build
 reference: the numbers below are read from it. The ideas come from Pigments and Serum, their look does not. Nothing here
 changes a parameter or the sound: every control sets a parameter, as today, and `TEST_UI_LAYOUT` holds D to that.
 
-Until step 7 lands, the sections after this one describe the editor as it stands.
+Until step 5 lands, the sections after this one describe the editor as it stands.
 
 ### The window
 
@@ -30,20 +30,41 @@ The SYNTH page is the path, the rack and the lower panel. The other pages take e
 ### The blocks and the lower panel
 
 A click on a block on the path, or on a rack panel's name, selects it: the path fills it, its rack panel's border turns the
-accent, and the lower panel follows it. SELECTED is the block's shape, three columns:
+accent, and the lower panel follows it. The lower panel (built in step 3) is the selected block's name in the accent over
+its list (148 wide: SELECTED, DETAILS, ENVELOPES, LFOs, the chosen one filled), a divider, and the chosen view. What each
+kind of block has is one table (`UiBlockKinds.cpp`): its envelopes, its LFO, the Matrix destinations that land on it, the
+depths its LFO reaches it by, and its DETAILS' faces; each OSC and each COSM is made from its kind's row and its index.
+SELECTED is the block's shape, three columns:
 
 - **Envelope** (392 wide): a tab for each envelope the block has (OSC: Pitch, Time, Formant, Amp; COSM: Env A, Env B; AMP:
-  TVA; MOD: none), the curve (392 × 128) with points to drag, and its knobs (Attack, Decay, Sustain, Release, Depth or
-  Velocity, Key).
-- **LFO** (214 wide): the block's own LFO (OSC n: LFO n; COSM n: LFO 2+n; AMP: LFO 5), its Key Sync, its shape (214 × 76),
-  its waveform box and knobs.
-- **What reaches the block**: a row for each fixed depth (amber dot) and each Matrix route (cyan dot) that lands on it, its
-  amount editable in place, and the place to drop a source to make a Matrix route.
+  TVA; MOD: none), the curve, and a bar for every parameter the envelope has, in rows of six: Attack, Decay, Sustain,
+  Release, Depth, Time KF, then Velo, V-Curve and the A-, D- and R-Velo sensitivities. Bars, not knobs, as an envelope
+  has up to eleven and a knob's name would not fit in a sixth of 392; a bar is filled from its range's zero, its value on
+  it. The curve takes the height the bars leave (about 392 × 146): the attack up to the top, the decay down to the
+  sustain's level, a hold to three quarters, the release to the floor, each time across up to a quarter of the width by
+  its share of its range. Its three points drag: the attack's sets Attack, the decay's Decay across and Sustain up, the
+  release's Release. Of points on one another (Decay 0 and Sustain full put the decay's on the attack's), a press takes
+  the later, which can be drawn off; the earlier would carry it along.
+- **LFO** (214 wide): the block's own LFO (OSC n: LFO n; COSM n: LFO 2+n; AMP: LFO 5), its name and Key Sync, its shape (the
+  height left, about 214 × 90) drawn from its waveform, rate (one to four cycles), delay, fade (in for ON <<, out for ON >>;
+  the fades after a release aren't drawn) and offset, the Wave, Fade Mode and Offset boxes, and the Rate, Delay and Fade
+  knobs. The shape of RND, S&H and CHAOS is drawn through fixed levels: a drawing, not the LFO's values.
+- **What reaches the block** (the rest): a row for each depth its LFO reaches it by (an accent dot: an OSC's pitch, time or
+  PW, formant or Fat and level; AMP's level and pan) and for each Matrix route whose destination lands on it (a `mod` dot:
+  its source → its destination), each amount a bar to drag in place. The Matrix's rows are made again when a source or a
+  destination moves. A COSM's depths are its type's own, on its panel and in DETAILS. A line says when no route lands on
+  the block, or how many more there are than the rows hold, and that the MODULATION page makes them. Dropping a source
+  here to make a route comes later (below).
 
-DETAILS holds the selected block's other settings as today's cards: for an OSC its wave (Encode, Key, Time Offset, the KFs,
-Start Offset), Loop, Tempo sync, the analog oscillator's other knobs, Random pitch, Level KF, LFO depth, Wave gain,
-Velocity curve; for a COSM its type's own rows (today's three-row area); for MOD its switch, type, level and times; for AMP
-the patch TVA's velocity, KF and LFO depths. ENVELOPES and LFOs show every envelope and LFO at once.
+MOD has none of the three, so its SELECTED is its DETAILS. DETAILS holds the selected block's settings that are neither on
+its rack panel nor in SELECTED, from a table of faces by its Type (`UiDetailTables.cpp`), each control as its parameter
+is (a choice a box, a switch a switch, any other a knob), laid across in rows: for an OSC on ANALOG, Fat and its KF, LFO
+and Env, Detune, the sub oscillator, Pitch KF; on PCM, Key, Time Offset, the Time and Formant KFs, Start, Loop and its
+mode and points, Original Tempo and Beat Keep; on both, Random pitch, Level KF, Wave gain and the velocity curve. For a
+COSM, what its type's five knobs and box on its panel leave (the Compressor, the Limiter and the Speaker Simulator have
+nothing more, which a line says); for MOD its switch, type, level and times; for AMP the TVA's KFs and its output. The
+patch TVA's velocity is on its envelope's tab. ENVELOPES shows every envelope at once (13 tiles, seven a row) and LFOs
+every LFO (5), each its name over its curve or shape; a click on one opens its block in SELECTED, at that envelope.
 
 ### The rack
 
@@ -120,7 +141,9 @@ so splitting it meant rewriting code D replaces whole: the commit and its revert
    ID, the scaled window, the header, the page bar, the signal path and its selection, the footer; `VSynthEmuEditorTest`
    draws and checks it.
 2. The rack: the Time Trip column, the OSC panels, the COSM panels, AMP, from tables of which parameter goes where.
-3. The lower panel: SELECTED (the envelope editor, the LFO, what reaches the block), DETAILS, ENVELOPES, LFOs.
+3. The lower panel: SELECTED (the envelope editor, the LFO, what reaches the block), DETAILS, ENVELOPES, LFOs. Done
+   2026-11-13: `VSynthEmuEditorTest` holds each block's views to its kind's tables, each instance's controls to its own
+   parameters, a curve's points to theirs, a route to its block, and the list's and overviews' presses.
 4. The MODULATION, PLAY, ZONES and FX pages; the footer's keyboard with the zones.
 5. Landing: the plugin's editor is D, today's editor files go, `TEST_UI_LAYOUT` and the plants hold D, these sections are
    the only description, a version number.
