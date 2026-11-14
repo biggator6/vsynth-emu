@@ -1,8 +1,7 @@
 #pragma once
-// D, the redesigned editor (research/UI_DESIGN.md, "The redesign, D"; UI steps 1 to 4): drawn at Look::width x
-// Look::height and scaled whole, its aspect kept; the header, the page bar, on SYNTH the signal path, the rack and the
-// lower panel, on each other page its own (UiPages.h), and the footer.  Not yet the plugin's editor:
-// VSynthEmuEditorTest draws and checks it until step 5.
+// D, the plugin's editor from v196 (research/UI_DESIGN.md; UI steps 1 to 5): drawn at Look::width x Look::height and
+// scaled whole, its aspect kept; the header, the page bar, on SYNTH the signal path, the rack and the lower panel, on
+// each other page its own (UiPages.h), and the footer.  VSynthEmuEditorTest draws and checks it.
 #include "PluginProcessor.h"
 #include "UiBlocks.h"
 #include "UiFooter.h"

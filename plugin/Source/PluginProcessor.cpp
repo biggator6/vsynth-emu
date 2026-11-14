@@ -1,5 +1,5 @@
 #include "PluginProcessor.h"
-#include "PluginEditor.h"
+#include "UiEditor.h"
 #include "PluginPatchFiles.h"
 #include "PluginParamIds.h"
 #include "XtPatch.h"
@@ -511,7 +511,7 @@ void VSynthEmuProcessor::parameterChanged(const juce::String& paramID, float /*n
 // ─── Editor / Entry Point ─────────────────────────────────────────────────────
 
 juce::AudioProcessorEditor* VSynthEmuProcessor::createEditor() {
-    return new VSynthEmuEditor(*this);
+    return new SynthEditor(*this);   // D (research/UI_DESIGN.md), from v196
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

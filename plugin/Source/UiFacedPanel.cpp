@@ -9,9 +9,11 @@ FacedPanel::FacedPanel(juce::AudioProcessorValueTreeState& state, const Names& n
     addAndMakeVisible(name_);
     on_.getProperties().set(Look::power, true);
     Controls::toggle(on_, state, names.switchId, attached_);
-    type_.onChange = [this] { refresh(); };
     addAndMakeVisible(on_);
     if (Controls::box(type_, state, names.typeId, attached_)) addAndMakeVisible(type_);   // none: one face, no Type
+    // Only now: the box's first value, as it is attached, would choose the face before the panel has made its knobs,
+    // which then stayed hidden until the Type moved (v196).  The panel shows its face at the end of its own constructor.
+    type_.onChange = [this] { refresh(); };
 }
 
 void FacedPanel::addSub(int face, const juce::String& id) {

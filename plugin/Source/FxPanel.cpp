@@ -5,7 +5,7 @@ namespace {
 constexpr int kParamH = 24, kNameW = 130, kValueW = 92, kScrollBarW = 12, kPageButtonsW = 300, kTypeLabelW = 40, kToggleW = 54, kLeftW = 250;
 constexpr int kOutputGain = 0x76;
 
-// Each control styled in the page's palette (today's, or D's on D's FX page)
+// Each control styled in the page's palette (D's, on its FX page)
 void styleLabel(juce::Label& l, const Ui::Palette& c) {
     l.setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
     l.setColour(juce::Label::textColourId, c.label);
@@ -53,8 +53,8 @@ void FxPanel::addBlock(Block& b, const char* onParam, const char* typeParam, int
     b.typeAtt = std::make_unique<ComboAtt>(processor_.apvts, typeParam, b.type);
 }
 
-FxPanel::FxPanel(VSynthEmuProcessor& p, const Ui::Palette& palette) : processor_(p) {
-    colours = &palette;
+FxPanel::FxPanel(VSynthEmuProcessor& p, const Ui::Palette& palette)
+    : Ui::Page(palette), processor_(p), pageSeg_({ "MFX", "Chorus", "Reverb", "System" }, 1004, palette) {
     setOpaque(true);
     styleLabel(status_, *colours);
     status_.setFont(juce::Font(juce::FontOptions(11.0f)));

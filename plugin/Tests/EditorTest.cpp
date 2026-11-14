@@ -1,17 +1,21 @@
-// VSynthEmuEditorTest <rom.2.bin> [snapshot folder | list]: D, the redesigned editor (research/UI_DESIGN.md, "The redesign,
-// D"), drawn and checked as it grows (UI step 1).  At its smallest, default and largest sizes its drawing fills the
+// VSynthEmuEditorTest <rom.2.bin> [snapshot folder | list]: the plugin's editor, D (research/UI_DESIGN.md), drawn and
+// checked; from v196 in TEST_UI_LAYOUT's place.  At its smallest, default and largest sizes its drawing fills the
 // window, scaled whole; on each page, and on SYNTH with each block selected, no control is outside its parent, over
 // another, without a size or cut short (LayoutCheck), and every control moved sets a parameter.  A press on each page's
-// name opens it, on each block selects it, on an effect opens FX.  The rack's checks (EditorRackTest.cpp) and the lower
-// panel's (EditorLowerTest.cpp).  With a folder: each page, SYNTH with each block selected, and each of the lower
-// panel's views, drawn into it; with "list", the parameters no control reaches.  Exit 0 if every check holds.
+// name opens it, on each block selects it, on an effect opens FX; the header's build and buttons, and a patch's note.
+// The rack's checks (EditorRackTest.cpp), the lower panel's (EditorLowerTest.cpp) and the pages'
+// (EditorPagesTest.cpp).  With a folder: each page, SYNTH with each block selected, and each of the lower panel's views,
+// drawn into it; with "list", the parameters no control reaches.  Exit 0 if every check holds.
 #include "EditorTest.h"
 #include "LayoutCheck.h"
 #include "TestChecks.h"
 #include "TestMain.h"
+#include "TestControls.h"
 #include "TestSnapshot.h"
+#include "../Source/PluginParamIds.h"
 #include "../Source/UiBlocks.h"
 #include "../Source/UiEditor.h"
+#include "../Source/XtBuildId.h"
 #include <cstdlib>
 
 namespace {
@@ -70,6 +74,48 @@ void presses(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
     ed.showPage(Blocks::kSynthPage);
 }
 
+// Whether c is drawn: a size, and it and every parent up to root shown (the editor is on no desktop, so not isShowing)
+bool seen(juce::Component* c, juce::Component& root) {
+    if (c == nullptr || c->getBounds().isEmpty()) return false;
+    for (juce::Component* at = c; at != nullptr && at != &root; at = at->getParentComponent())
+        if (!at->isVisible()) return false;
+    return true;
+}
+
+// A patch's note as a session brings it back, and the header told (its timer's refresh)
+void withNote(VSynthEmuProcessor& p, SynthEditor& ed, const juce::String& note) {
+    p.apvts.state.setProperty("patchNote", note, nullptr);
+    juce::MemoryBlock state;
+    p.getStateInformation(state);
+    p.setStateInformation(state.getData(), (int)state.getSize());
+    for (Header* h : LayoutCheck::allOf<Header>(ed.drawing())) h->refresh();
+}
+
+// What no parameter would miss (v196, as TEST_UI_LAYOUT had it of today's editor): the build on the header, whole;
+// Browse..., ROM... and each PCM OSC's Load...; what a patch asks for that isn't here, under its name, and nothing there
+// when it misses nothing
+void chrome(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check) {
+    const juce::String build = juce::String(xtBuildId()) + "  " + xtBuildTime();
+    const auto labelOf = [&l](const juce::String& text) {
+        return l.firstOf<juce::Label>([&text](juce::Label& x) { return x.getText() == text; });
+    };
+    check(seen(labelOf(build), ed), ("the build, " + build + ", isn't on the header").toStdString());
+    for (const char* text : { "Browse...", "ROM..." })
+        check(seen(l.buttonOf(text), ed), std::string(text) + " isn't on the header");
+    for (int osc = 0; osc < Blocks::kOscs; ++osc) setParam(p, Params::oscId(osc, Params::kOscType), 1.0f);
+    for (FacedPanel* panel : LayoutCheck::allOf<FacedPanel>(ed.drawing())) panel->refresh();   // as the timer does
+    int loads = 0;
+    for (juce::TextButton* b : LayoutCheck::allOf<juce::TextButton>(ed.drawing()))
+        if (b->getButtonText() == "Load..." && seen(b, ed)) ++loads;
+    check(loads == Blocks::kOscs, "each PCM OSC should have its Load..., and " + std::to_string(loads) + " do");
+    const juce::String note = "not here: no wave 12";
+    withNote(p, ed, "no wave 12");
+    check(seen(labelOf(note), ed), "a patch's note isn't under its name");
+    l.check("a patch's note");
+    withNote(p, ed, {});
+    check(!seen(labelOf(note), ed), "a patch's note stays when nothing is missing");
+}
+
 // Each page, and SYNTH with each block selected, into a folder
 void snapshots(SynthEditor& ed, const juce::File& dir, TestChecks& check) {
     check(dir.createDirectory().wasOk(), "can't make " + dir.getFullPathName().toStdString());
@@ -116,9 +162,11 @@ int editorTest(const juce::File& rom, const juce::File&, const juce::StringArray
     SynthEditor& ed = *owned;
     LayoutCheck l(p, std::move(owned));
     l.root = &ed.drawing();
+    freshFaces(ed, check);
     sizes(l, ed, check);
     pagesAndBlocks(l, ed);
     presses(l, ed, check);
+    chrome(l, ed, p, check);
     rackChecks(l, ed, p, check);
     lowerChecks(l, ed, p, check);
     pagesChecks(l, ed, check);

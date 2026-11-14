@@ -97,6 +97,19 @@ void eachFace(VSynthEmuProcessor& p, const juce::String& typeId, int faces, cons
     if (type != nullptr) setParam(p, typeId, was);   // as it was found
 }
 
+// Each panel as the editor opens, before any Type has moved: its face's knobs shown, as many as its table gives (v196:
+// the base set its face while it was being made, before its knobs were, so a fresh editor showed none of them)
+void freshFaces(SynthEditor& ed, TestChecks& check) {
+    for (OscPanel* osc : LayoutCheck::allOf<OscPanel>(ed.drawing()))
+        check(visibleKnobs(*osc) == OscPanel::kTableKnobs,
+              "a fresh OSC panel shows " + std::to_string(visibleKnobs(*osc)) + " knobs, its table " +
+                  std::to_string(OscPanel::kTableKnobs));
+    for (CosmPanel* cosm : LayoutCheck::allOf<CosmPanel>(ed.drawing()))
+        check(visibleKnobs(*cosm) == CosmPanel::tableKnobs(cosm->face()),
+              "a fresh COSM panel shows " + std::to_string(visibleKnobs(*cosm)) + " knobs, its table " +
+                  std::to_string(CosmPanel::tableKnobs(cosm->face())));
+}
+
 void rackChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check) {
     ed.showPage(Blocks::kSynthPage);
     const auto oscs = LayoutCheck::allOf<OscPanel>(ed.drawing());

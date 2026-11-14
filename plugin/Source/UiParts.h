@@ -1,32 +1,15 @@
 #pragma once
-// The editor's design (research/UI_DESIGN.md): its palette and sizes, a page of titled cards, joined buttons. PluginEditor and FxPanel share them.
+// What the editor's drawing shares (research/UI_DESIGN.md): drawn text, filled and stroked shapes, a key's name; and the
+// Effects panel's page of titled cards and its joined buttons, drawn in the palette they are given (FxPanel, on D's FX
+// page in Look::cards).  Today's editor's palette and sizes went with it (v196).
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 #include <vector>
 
 namespace Ui {
-    inline const juce::Colour surfaceApp      { 0xFF1A1A2E };   // window
-    inline const juce::Colour surfaceTitlebar { 0xFF0D0D20 };   // header
-    inline const juce::Colour surfaceStrip    { 0xFF111128 };   // source bar, tab bar
-    inline const juce::Colour surfaceXt       { 0xFF15152E };   // cards, the perform column
-    inline const juce::Colour surfaceField    { 0xFF0D0D1A };   // value boxes, envelope views
-    inline const juce::Colour line            { 0xFF333355 };   // dividers, card borders, knob outline
-    inline const juce::Colour accent          { 0xFF00BFA5 };   // the one interactive colour
-    inline const juce::Colour title           { 0xFF00FF88 };   // the wordmark
-    inline const juce::Colour text            { 0xFFD3D3D3 };   // values (lightgrey)
-    inline const juce::Colour label           { 0xFFADD8E6 };   // names (lightblue)
-
-    inline constexpr int headerH = 40, sourceH = 56, performW = 248, tabH = 38;
+    // A page of cards' sizes: its margin and the gap between cards, a card's title line, a row and the gap under it, the
+    // space under a card's last row, and a row's name
     inline constexpr int pad = 12, gap = 12, cardHeadH = 28, rowH = 26, rowGap = 4, cardFoot = 10, labelW = 84;
-
-    // A value slider on a card: its value box `boxW` wide, in the palette (v190: the editor's constructor's, and the
-    // Arpeggio card's)
-    inline void styleValueSlider(juce::Slider& s, int boxW) {
-        s.setColour(juce::Slider::textBoxTextColourId, text);
-        s.setColour(juce::Slider::textBoxBackgroundColourId, surfaceField);
-        s.setColour(juce::Slider::trackColourId, accent);
-        s.setTextBoxStyle(s.getTextBoxPosition(), false, boxW, 20);
-    }
 
     // How a piece of drawn text looks: its font and colour, where it sits, and whether it is cut with dots if it doesn't fit
     struct TextStyle {
@@ -35,14 +18,13 @@ namespace Ui {
         juce::Justification just = juce::Justification::centredLeft;
         bool dots = true;
     };
-    // Text drawn in a style: the set-up the cards' and the Perform column's titles, the tabs and the Zones tab's map share
-    // (v195, one place for it)
+    // Text drawn in a style: the cards' titles, D's names and values on what it paints (v195, one place for it)
     inline void drawText(juce::Graphics& g, const juce::String& t, juce::Rectangle<int> r, const TextStyle& s) {
         g.setFont(s.font);
         g.setColour(s.colour);
         g.drawText(t, r, s.just, s.dots);
     }
-    // A rectangle filled in a colour: the tab bar's mark, the Zones map's keys (v195)
+    // A rectangle filled in a colour: D's marks and bars (v195)
     inline void fill(juce::Graphics& g, juce::Rectangle<int> r, juce::Colour c) {
         g.setColour(c);
         g.fillRect(r);
@@ -57,7 +39,7 @@ namespace Ui {
         g.setColour(c);
         g.strokePath(p, type);
     }
-    // A key's name, as Roland's: C4 is 60 (the Zones tab's, v195; shared with D's ZONES page, UI step 4)
+    // A key's name, as Roland's: C4 is 60 (the Zones tab's, v195; D's ZONES page, UI step 4)
     inline juce::String keyName(int key) {
         static const char* const kNames[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
         return juce::String(kNames[key % 12]) + juce::String(key / 12 - 1);
@@ -76,28 +58,27 @@ namespace Ui {
         }
         return p;
     }
-    // The cards' and the Perform column's titles: 11 pt bold, spaced out
+    // The cards' titles: 11 pt bold, spaced out
     inline juce::Font titleFont() {
         juce::Font f(11.0f, juce::Font::bold);
         f.setExtraKerningFactor(0.08f);
         return f;
     }
 
-    // The colours a page of cards is drawn in: today's editor's, or D's (UiLook.h), which D's FX page gives the Effects
-    // panel (UI step 4)
+    // The colours a page of cards is drawn in (D's are Look::cards, UiLook.h)
     struct Palette {
         juce::Colour ground, card, line, label, text, field, accent;
     };
-    inline const Palette todays { surfaceApp, surfaceXt, line, label, text, surfaceField, accent };
 
-    // ─── A tab's page: cards of rows ──────────────────────────────────────────────
+    // ─── A page: cards of rows ────────────────────────────────────────────────────
     // Each card is a titled box in column 0 or 1 (or across both, col -1), its
     // rows a list of items: a component with a fixed width, or 0 for a share of
     // what the fixed ones leave. A card may take another's place (sameAs) and
-    // show only while shown() holds (the analog oscillator's in the PCM ones').
+    // show only while shown() holds.
     class Page : public juce::Component {
     public:
-        const Palette* colours = &todays;                   // what its cards are drawn in
+        explicit Page(const Palette& c) : colours(&c) {}
+        const Palette* colours;                             // what its cards are drawn in
         struct Item { juce::Component* c; int w; };
         struct Row  { std::vector<Item> items; };
         struct Card {
@@ -124,15 +105,6 @@ namespace Ui {
         int leftW = 0;                                      // column 0's width; 0: half
 
         Card& add(Card c) { cards.push_back(std::move(c)); return cards.back(); }
-
-        // Take each card's components from wherever they are, visibility kept
-        void adopt() {
-            for (auto& c : cards) {
-                for (auto& i : c.head) if (i.c) addChildComponent(i.c);
-                for (auto& r : c.rows) for (auto& i : r.items) if (i.c) addChildComponent(i.c);
-                for (auto* e : c.extra) addChildComponent(e);
-            }
-        }
 
         static int heightOf(const Card& c) {
             const int body = c.custom ? c.customH : (int)c.rows.size() * (Ui::rowH + Ui::rowGap) - Ui::rowGap;
@@ -200,20 +172,20 @@ namespace Ui {
         }
     };
 
-    // ─── Joined toggle buttons ───────────────────────────────────────────────────
+    // ─── Joined toggle buttons, in a palette's accent and text ───────────────────
     class Segmented : public juce::Component {
     public:
         std::function<void(int)> onChange;
 
-        Segmented(const juce::StringArray& names, int group) {
+        Segmented(const juce::StringArray& names, int group, const Palette& colours) {
             for (int i = 0; i < names.size(); ++i) {
                 auto* b = buttons_.add(new juce::TextButton(names[i]));
                 b->setClickingTogglesState(true);
                 b->setRadioGroupId(group);
                 b->setConnectedEdges((i > 0 ? juce::Button::ConnectedOnLeft : 0) | (i < names.size() - 1 ? juce::Button::ConnectedOnRight : 0));
-                b->setColour(juce::TextButton::buttonOnColourId, Ui::accent);
+                b->setColour(juce::TextButton::buttonOnColourId, colours.accent);
                 b->setColour(juce::TextButton::textColourOnId, juce::Colours::black);
-                b->setColour(juce::TextButton::textColourOffId, Ui::text);
+                b->setColour(juce::TextButton::textColourOffId, colours.text);
                 b->onClick = [this, i] { if (buttons_[i]->getToggleState() && onChange) onChange(i); };
                 addAndMakeVisible(b);
             }

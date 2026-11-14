@@ -9,7 +9,7 @@ namespace {
 // Where each part sits, left to right, in the drawing's units (UI_DESIGN.md, "The window")
 constexpr int kLeft = 16, kModeX = 176, kModeW = 64, kPatchW = 400, kPatchH = 32, kBrowseW = 76, kPatchTagW = 56;
 constexpr int kTempoX = 812, kTempoLabelW = 46, kTempoW = 56, kEffectsW = 84, kRomStateW = 96, kRomW = 60;
-constexpr int kButtonH = 26;
+constexpr int kButtonH = 26, kNoteH = 11;
 constexpr auto kOpen = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
 }
 
@@ -18,6 +18,9 @@ Header::Header(VSynthEmuProcessor& p)
     Look::setTextLook(build_, Look::mono(10.0f), Look::muted, juce::Justification::centredLeft);
     build_.setText(juce::String(xtBuildId()) + "  " + xtBuildTime(), juce::dontSendNotification);
     Look::setTextLook(patchName_, Look::sans(13.0f, "Semibold"), Look::text, juce::Justification::centredLeft);
+    Look::setTextLook(patchNote_, Look::sans(10.0f), Look::warning, juce::Justification::centredLeft);
+    patchNote_.setMinimumHorizontalScale(0.5f);
+    addChildComponent(patchNote_);
     Look::setTextLook(tempo_, Look::mono(11.0f), Look::text);
     Look::setTextLook(romState_, Look::sans(11.0f), Look::label, juce::Justification::centredRight);
     romState_.setMinimumHorizontalScale(0.5f);
@@ -36,6 +39,14 @@ void Header::refresh() {
     const juce::String name = processor_.getPatchName();
     Look::showText(patchName_, name.isNotEmpty() ? name : juce::String("No patch loaded"),
                    name.isNotEmpty() ? Look::text : Look::muted);
+    // What the patch asks for that isn't here (its waves, an OSC's external input), under its name, or nothing
+    const juce::String note = processor_.getPatchNote();
+    patchNote_.setText(note.isNotEmpty() ? "not here: " + note : juce::String(), juce::dontSendNotification);
+    if (note.isNotEmpty() != noted_) {
+        noted_ = note.isNotEmpty();
+        patchNote_.setVisible(noted_);
+        resized();
+    }
     tempo_.setText(processor_.apvts.getParameter("patchTempo")->getCurrentValueAsText(), juce::dontSendNotification);
     Look::showText(romState_, processor_.getStatusText(), processor_.hasRom() ? Look::ready : Look::warning);
 }
@@ -49,7 +60,9 @@ void Header::resized() {
     auto box = patchBox_.reduced(4, 0);
     browse_.setBounds(box.removeFromRight(kBrowseW).withSizeKeepingCentre(kBrowseW, kButtonH));
     box.removeFromLeft(kPatchTagW);
-    patchName_.setBounds(box.withTrimmedRight(8));
+    auto lines = box.withTrimmedRight(8).reduced(0, 2);
+    if (noted_) patchNote_.setBounds(lines.removeFromBottom(kNoteH));
+    patchName_.setBounds(lines);
     tempoBox_ = { kTempoX + kTempoLabelW, mid - 12, kTempoW, 24 };
     tempo_.setBounds(tempoBox_);
     auto right = getLocalBounds().withLeft(tempoBox_.getRight() + 12).withTrimmedRight(Look::inset);

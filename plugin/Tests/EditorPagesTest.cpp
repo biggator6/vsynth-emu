@@ -1,5 +1,6 @@
 // VSynthEmuEditorTest's checks of D's pages under the page bar but SYNTH (EditorTest.h; UI step 4)
 #include "EditorTest.h"
+#include "TestControls.h"
 #include "../Source/FxPanel.h"
 #include "../Source/PluginMsm.h"
 #include "../Source/PluginParamIds.h"
@@ -10,6 +11,8 @@ namespace {
 
 constexpr int kEffects = 3, kFxPages = 4;   // MFX, Chorus, Reverb on the path; and System, on the FX page alone
 constexpr int kMatrixRowIds = 1 + 2 * Matrix::kDests;
+constexpr int kListRows = 15, kParamH = 24;   // the rows the effects' list must have room for, each FxPanel's 24 high
+const char* const kTypeOf[kEffects] = { "fxMfxType", "fxChoType", "fxRevType" };   // each effect's Type
 
 // The prefix two IDs share: an instance's, from two of its own parameters
 juce::String sharedPrefix(const juce::String& a, const juce::String& b) {
@@ -63,16 +66,45 @@ void zones(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
         movesOwn(l, page->cell(z), "zone " + juce::String(z + 1), { zone, kXtZones, z }, check);
 }
 
-// The FX page's four pages, each laid out and its controls moved; an effect pressed on the path opens its own
+// A page of the FX page on each of its block's types, as what's on it follows them (v196, as TEST_UI_LAYOUT had it of
+// today's Effects tab): laid out, the list's names and values whole, and room for 15 of its rows
+void effectTypes(LayoutCheck& l, FxPanel& fx, int page, TestChecks& check) {
+    const int types = page < kEffects ? l.p.apvts.getParameter(kTypeOf[page])->getNumSteps() : 1;
+    for (int type = 0; type < types; ++type) {
+        if (page < kEffects) setParam(l.p, kTypeOf[page], (float)type);
+        fx.showPage(page);
+        const juce::String where = "FX page " + juce::String(page) + " type " + juce::String(type);
+        l.check(where);
+        l.checkList(where);
+        check(l.view->getHeight() >= kListRows * kParamH, (where + ": the list shows too few rows").toStdString());
+    }
+    if (page < kEffects) setParam(l.p, kTypeOf[page], 0.0f);
+}
+
+// The page's buttons open their pages, and follow a page opened another way
+void pageButtons(LayoutCheck& l, FxPanel& fx, TestChecks& check) {
+    juce::Button* chorus = l.buttonOf("Chorus");
+    juce::Button* system = l.buttonOf("System");
+    check(chorus != nullptr && system != nullptr, "no page buttons on the FX page");
+    if (chorus == nullptr || system == nullptr) return;
+    chorus->setToggleState(true, juce::sendNotificationSync);
+    check(fx.page() == 1, "the FX page's Chorus button doesn't open its page");
+    fx.showPage(kFxPages - 1);
+    check(system->getToggleState(), "the FX page's System button doesn't follow its page");
+}
+
+// The FX page's four pages, each on every type, laid out and its controls moved; its buttons; an effect pressed on the
+// path opens its own
 void effects(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
     auto* fx = shownPage<FxPanel>(ed, Blocks::kFxPage, check);
     if (fx == nullptr) return;
-    for (int page = 0; page < kFxPages; ++page) {
+    check(l.view != nullptr, "the FX page has no list");
+    for (int page = 0; page < kFxPages && l.view != nullptr; ++page) {
+        effectTypes(l, *fx, page, check);
         fx->showPage(page);
-        const juce::String where = "FX page " + juce::String(page);
-        l.check(where);
-        movesOwn(l, *fx, where, {}, check);
+        movesOwn(l, *fx, "FX page " + juce::String(page), {}, check);
     }
+    pageButtons(l, *fx, check);
     ed.showPage(Blocks::kSynthPage);
     PathBar* path = LayoutCheck::allOf<PathBar>(ed.drawing()).front();
     const PathBar::Chips chips = path->laidOut();

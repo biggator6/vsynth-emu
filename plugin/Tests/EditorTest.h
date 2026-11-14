@@ -19,6 +19,8 @@ void movesOwn(LayoutCheck& l, juce::Component& root, const juce::String& where, 
 // Each face of a Type in turn: the parameter set, then at(face); the Type left as it was found
 void eachFace(VSynthEmuProcessor& p, const juce::String& typeId, int faces, const std::function<void(int)>& at);
 
+// Each OSC's and COSM's panel as the editor opens: its face's knobs shown, as its table gives them
+void freshFaces(SynthEditor& ed, TestChecks& check);
 // Every instance's panel, on every face of its Type: its table's knobs all there, and its controls moving its own
 // instance's parameters alone; a press on each panel's name selecting its block
 void rackChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);

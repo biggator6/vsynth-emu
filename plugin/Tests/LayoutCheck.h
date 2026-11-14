@@ -1,8 +1,9 @@
 #pragma once
-// TEST_UI_LAYOUT's editor and its checks (LayoutTest.cpp): what one state of the editor must be, and every visible
-// control moved to see which parameter it sets.  Moved from PluginTest.cpp's main (v193), where they were its lambdas.
+// The editor's checks, VSynthEmuEditorTest's (EditorTest.cpp): what one state of the editor must be, and every visible
+// control moved to see which parameter it sets.  Moved from PluginTest.cpp's main (v193), where they were its lambdas;
+// TEST_UI_LAYOUT's sweeps of today's editor went with it (v196).
 #include "../Source/FxPanel.h"
-#include "../Source/PluginEditor.h"
+#include "../Source/PluginProcessor.h"
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -36,11 +37,10 @@ inline juce::Label* boxLabelOf(juce::Component& c) {
     return box;
 }
 
-// The editor under test, what it has found and counted, and the checks and moves; the sweeps are LayoutTest.cpp's
+// The editor under test, what it has found and counted, and the checks and moves
 struct LayoutCheck {
     VSynthEmuProcessor& p;
     std::unique_ptr<juce::AudioProcessorEditor> ed;
-    VSynthEmuEditor* editor = nullptr;
     FxPanel* panel = nullptr;
     juce::Viewport* view = nullptr;
     int errors = 0, states = 0, checked = 0, cosmTypes = 0;
@@ -53,8 +53,8 @@ struct LayoutCheck {
     explicit LayoutCheck(VSynthEmuProcessor& proc)
         : LayoutCheck(proc, std::unique_ptr<juce::AudioProcessorEditor>(proc.createEditor())) {}
     LayoutCheck(VSynthEmuProcessor& proc, std::unique_ptr<juce::AudioProcessorEditor> e) : p(proc), ed(std::move(e)) {
-        editor = dynamic_cast<VSynthEmuEditor*>(ed.get());
-        for (juce::Component* ch : ed->getChildren()) if (auto* fp = dynamic_cast<FxPanel*>(ch)) panel = fp;
+        const std::vector<FxPanel*> panels = allOf<FxPanel>(*ed);   // D's FX page, under its drawing
+        if (!panels.empty()) panel = panels.front();
         if (panel) for (juce::Component* ch : panel->getChildren()) if (auto* v = dynamic_cast<juce::Viewport*>(ch)) view = v;
         for (auto* prm : p.getParameters()) if (auto* r = dynamic_cast<juce::RangedAudioParameter*>(prm)) params.push_back(r);
         cosmTypes = p.apvts.getParameter("cosmType")->getNumSteps();
@@ -191,14 +191,12 @@ struct LayoutCheck {
         }
         if (auto* x = dynamic_cast<juce::ComboBox*>(k)) {
             const juce::String first = x->getItemText(0);
-            if (first == "OSC 1" || first == "COSM 1" || first == "Control 1" || first == "Track 1"
-                || first == VSynthEmuProcessor::assignName(0) || first == "Passthrough (baseline)") return {};
             return [x] { x->setSelectedItemIndex(x->getSelectedItemIndex() == 0 ? 1 : 0, juce::sendNotificationSync); };
         }
         auto* b = dynamic_cast<juce::Button*>(k);
         if (!b || (dynamic_cast<juce::TextButton*>(b) && !b->getClickingTogglesState())) return {};   // Load, ROM
         const juce::String text = b->getButtonText();
-        if (text.startsWith("OSC ") || text.startsWith("COSM ")) return {};   // as the boxes above
+        if (text.startsWith("OSC ")) return {};   // which OSC the Time Trip column shows
         if (text == "MFX" || text == "Chorus" || text == "Reverb" || text == "System") return {};
         if (b->getRadioGroupId() != 0 && b->getToggleState()) return {};   // one of a pair: the other moves it
         return [b] { b->setToggleState(!b->getToggleState(), juce::sendNotificationSync); };
@@ -213,9 +211,8 @@ struct LayoutCheck {
         }
     }
 
-    // The mouse pressed at a point on a component, as a click there sends it (the tab bar's clicks; D's page bar, path
-    // and blocks, UI step 1)
-    // The mouse at a point of c, having gone down at `from`
+    // The mouse at a point of c, having gone down at `from`; pressed there, as a click sends it (D's page bar, path and
+    // blocks, UI step 1)
     static juce::MouseEvent mouseAt(juce::Component& c, juce::Point<float> at, juce::Point<float> from) {
         using Src = juce::MouseInputSource;
         const juce::Time now = juce::Time::getCurrentTime();
@@ -230,14 +227,4 @@ struct LayoutCheck {
         c.mouseDrag(mouseAt(c, to, from));
         c.mouseUp(mouseAt(c, to, from));
     }
-
-    // LayoutTest.cpp: the sweeps
-    void msmTracks();
-    void moveEverywhere();
-    int coverage(const char* ui);
-    void chrome();
-    void effectsAt(const juce::String& at);
-    void atSizes();
-    void tabClicks();
-    void joined();
 };

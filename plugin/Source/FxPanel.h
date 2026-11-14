@@ -1,5 +1,5 @@
 #pragma once
-// The Effects tab: the chip's blocks, and each type's parameters as the firmware's descriptors give them, on the design's cards.  The names, ranges and values' text come from rom.2 at run time, so the page is
+// The editor's FX page: the chip's blocks, and each type's parameters as the firmware's descriptors give them, on the design's cards.  The names, ranges and values' text come from rom.2 at run time, so the page is
 // empty of them until the ROM's loaded.  A slider still holds the firmware's raw number and sends that: its text is all that's the XT's own (XtFxValueText).
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -12,8 +12,8 @@ struct XtFxParam;
 
 class FxPanel : public Ui::Page, private juce::Timer {
 public:
-    // Drawn in today's editor's palette, or another's (D's FX page gives D's, UI step 4)
-    explicit FxPanel(VSynthEmuProcessor& p, const Ui::Palette& palette = Ui::todays);
+    // Drawn in the palette it is given: D's FX page gives Look::cards (UI step 4)
+    FxPanel(VSynthEmuProcessor& p, const Ui::Palette& palette);
     ~FxPanel() override;
 
     void showPage(int page);                        // 0 MFX, 1 Chorus, 2 Reverb, 3 System: the tone's sends, the outputs and the system's EQ
@@ -47,7 +47,7 @@ private:
     juce::Label assignLabel_, modeLabel_;
     juce::ComboBox assignBox_, modeBox_;
     std::unique_ptr<ComboAtt> assignAtt_, modeAtt_;
-    Ui::Segmented pageSeg_ { { "MFX", "Chorus", "Reverb", "System" }, 1004 };
+    Ui::Segmented pageSeg_;   // MFX, Chorus, Reverb, System, in the panel's palette
     juce::String listTitle_;
     juce::Viewport view_;
     juce::Component grid_;

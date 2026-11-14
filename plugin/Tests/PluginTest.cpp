@@ -3,11 +3,11 @@
 // directly on the same input.  Build: cmake --build <dir> --target VSynthEmuTest
 // Run:   VSynthEmuTest <rom.2.bin> <file.wav> [note]
 #include "../Source/PluginProcessor.h"
-#include "../Source/PluginEditor.h"
+#include "../Source/UiEditor.h"
 #include "../Source/FxPanel.h"
 #include "../Source/Sh4Interp.h"
 #include "../Source/XtPatch.h"
-#include "LayoutTest.h"
+#include "TestControls.h"
 #include "../Source/XtVpwFormat.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <algorithm>
@@ -21,6 +21,7 @@
 #include <thread>
 #include <vector>
 #include "TestAppDir.h"
+#include "LayoutCheck.h"
 #include "TestSnapshot.h"
 
 // TEST_ROM_SEARCH=1: where a new instance finds the image, first to last, and what's kept for the next (VSynthEmuTest
@@ -593,62 +594,37 @@ int main(int argc, char** argv) {
     VSynthEmuProcessor p;
     if (!p.setRomFile(juce::File(argv[1]))) { std::fprintf(stderr, "ROM rejected: %s\n", p.getStatusText().toRawUTF8()); return 1; }
     p.prepareToPlay(rate, block);
-    // TEST_SNAPSHOT=file.png: the editor drawn offscreen, for checking the
-    // layout, on the open tab only (TEST_SNAPSHOT_TAB=n: that tab, 0 Oscillator … 6 MSM, 7 Matrix, 8 Effects;
-    // TEST_SNAPSHOT_SIZE=WxH: at that size;
-    // TEST_SNAPSHOT_COSM2=1: the COSM tab, on COSM 2;
-    // TEST_SNAPSHOT_TYPE=n: the COSM tab, COSM 1's type, e.g. 6 for the 2nd Side Band rows;
-    // TEST_SNAPSHOT_ANALOG=1: OSC Type ANALOG, its rows shown;
-    // TEST_SNAPSHOT_OSC2=1: with the OSC rows on OSC 2; =pcm: with OSC 2 on PCM too;
-    // TEST_SNAPSHOT_FX=page: the Effects tab, 0 MFX, 1 Chorus, 2 Reverb, 3 EQ, with TEST_SNAPSHOT_FXTYPE=n the page's block's type)
-    // TEST_SNAPSHOT_PATCH=file.p00: with that patch loaded
+    // TEST_SNAPSHOT=file.png: the editor, D, drawn offscreen (TEST_SNAPSHOT_PAGE=n: that page, 0 SYNTH, 1 MODULATION,
+    // 2 FX, 3 PLAY, 4 ZONES; TEST_SNAPSHOT_BLOCK=n: SYNTH with block n selected, 0 OSC 1 to 5 AMP; TEST_SNAPSHOT_SIZE=WxH:
+    // at that size; TEST_SNAPSHOT_ANALOG=1: OSC 1 on ANALOG; TEST_SNAPSHOT_TYPE=n: COSM 1's type, COSM 1 selected;
+    // TEST_SNAPSHOT_FX=page: the FX page, 0 MFX, 1 Chorus, 2 Reverb, 3 System, with TEST_SNAPSHOT_FXTYPE=n the page's
+    // block's type; TEST_SNAPSHOT_PATCH=file.p00: with that patch loaded).  The editor's checks are VSynthEmuEditorTest's.
     if (const char* f = std::getenv("TEST_SNAPSHOT_PATCH")) p.loadPatch(juce::File::getCurrentWorkingDirectory().getChildFile(f));
     if (const char* snap = std::getenv("TEST_SNAPSHOT")) {
-        if (std::getenv("TEST_SNAPSHOT_ANALOG")) {
-            auto* prm = p.apvts.getParameter("oscType");
-            prm->setValueNotifyingHost(prm->convertTo0to1(0.0f));
-        }
-        if (const char* t = std::getenv("TEST_SNAPSHOT_TYPE")) {
-            auto* prm = p.apvts.getParameter("cosmType");
-            prm->setValueNotifyingHost(prm->convertTo0to1((float)std::atoi(t)));
-        }
-        if (const char* o2 = std::getenv("TEST_SNAPSHOT_OSC2"); o2 && juce::String(o2) == "pcm") {
-            auto* prm = p.apvts.getParameter(VSynthEmuProcessor::oscParamId(1, "oscType"));
-            prm->setValueNotifyingHost(prm->convertTo0to1(1.0f));
-        }
-        std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
-        auto* editor = dynamic_cast<VSynthEmuEditor*>(ed.get());
-        if (std::getenv("TEST_SNAPSHOT_TYPE") || std::getenv("TEST_SNAPSHOT_COSM2")) editor->showTab(3);
-        if (const char* size = std::getenv("TEST_SNAPSHOT_SIZE")) ed->setSize(std::atoi(size), juce::String(size).fromFirstOccurrenceOf("x", false, false).getIntValue());
-        if (std::getenv("TEST_SNAPSHOT_COSM2"))      // the COSM rows switched to COSM 2 (the selector re-attaches them)
-            for (juce::Component* ch : ed->getChildren())
-                if (auto* cb = dynamic_cast<juce::ComboBox*>(ch); cb && cb->getItemText(0) == "COSM 1") cb->setSelectedId(2, juce::sendNotificationSync);
-        if (std::getenv("TEST_SNAPSHOT_OSC2"))       // the OSC rows switched to OSC 2
-            for (juce::Component* ch : ed->getChildren())
-                if (auto* cb = dynamic_cast<juce::ComboBox*>(ch); cb && cb->getItemText(0) == "OSC 1") cb->setSelectedId(2, juce::sendNotificationSync);
-        if (const char* page = std::getenv("TEST_SNAPSHOT_FX")) {
+        if (std::getenv("TEST_SNAPSHOT_ANALOG")) setParam(p, "oscType", 0.0f);
+        const char* type = std::getenv("TEST_SNAPSHOT_TYPE");
+        if (type) setParam(p, "cosmType", (float)std::atoi(type));
+        SynthEditor ed(p);
+        if (const char* size = std::getenv("TEST_SNAPSHOT_SIZE")) ed.setSize(std::atoi(size), juce::String(size).fromFirstOccurrenceOf("x", false, false).getIntValue());
+        if (type) ed.select(Blocks::indexOf(Blocks::Kind::cosm, 0));
+        if (const char* block = std::getenv("TEST_SNAPSHOT_BLOCK")) ed.select(std::atoi(block));
+        if (const char* page = std::getenv("TEST_SNAPSHOT_PAGE")) ed.showPage(std::atoi(page));
+        if (const char* fx = std::getenv("TEST_SNAPSHOT_FX")) {
             static const char* const typeOf[] = { "fxMfxType", "fxChoType", "fxRevType", "fxMfxType" };
-            if (const char* t = std::getenv("TEST_SNAPSHOT_FXTYPE")) { auto* prm = p.apvts.getParameter(typeOf[std::atoi(page) & 3]); prm->setValueNotifyingHost(prm->convertTo0to1((float)std::atoi(t))); }
-            editor->showTab(VSynthEmuEditor::kEffectsTab);
-            for (juce::Component* ch : ed->getChildren())
-                if (auto* panel = dynamic_cast<FxPanel*>(ch)) panel->showPage(std::atoi(page));
+            if (const char* t = std::getenv("TEST_SNAPSHOT_FXTYPE")) setParam(p, typeOf[std::atoi(fx) & 3], (float)std::atoi(t));
+            ed.showEffect(std::atoi(fx));
         }
-        if (const char* tab = std::getenv("TEST_SNAPSHOT_TAB")) editor->showTab(std::atoi(tab));
-        if (!writeSnapshot(*ed, juce::File::getCurrentWorkingDirectory().getChildFile(snap))) {
+        if (!writeSnapshot(ed, juce::File::getCurrentWorkingDirectory().getChildFile(snap))) {
             std::fprintf(stderr, "snapshot failed\n");
             return 1;
         }
-    }
-    // TEST_UI_LAYOUT=1: the editor's layout, then stop (LayoutTest.cpp, moved from here as it stood in v193)
-    if (const char* ui = std::getenv("TEST_UI_LAYOUT")) {
-        return uiLayoutTest(p, ui);
     }
     // TEST_FX_PANEL=1: every page and type of the effects' panel, then stop: it lists the catalog's parameters by name and range, shows each one's value, and a slider sets its parameter.  And what
     // each box says, at each end of the range and the default, against the firmware's own routine, run here with its unit and without; a value's text typed into the box sets it.
     if (std::getenv("TEST_FX_PANEL")) {
         std::unique_ptr<juce::AudioProcessorEditor> ed(p.createEditor());
-        FxPanel* panel = nullptr;
-        for (juce::Component* ch : ed->getChildren()) if (auto* fp = dynamic_cast<FxPanel*>(ch)) panel = fp;
+        const std::vector<FxPanel*> panels = LayoutCheck::allOf<FxPanel>(*ed);   // D's FX page, under its drawing
+        FxPanel* panel = panels.empty() ? nullptr : panels.front();
         juce::Viewport* view = nullptr;
         if (panel) for (juce::Component* ch : panel->getChildren()) if (auto* v = dynamic_cast<juce::Viewport*>(ch)) view = v;
         if (!view) { std::fprintf(stderr, "panel: not found\n"); return 1; }
