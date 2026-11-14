@@ -64,12 +64,40 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
     Source/PluginState.cpp
-    Source/PluginEditor.cpp
-    Source/PluginEditorPlay.cpp
-    Source/PluginEditorTabs.cpp
-    Source/PluginEditorZones.cpp
-    Source/PluginEditorMsm.cpp
-    Source/PluginEditorMatrix.cpp
+    Source/UiLook.cpp
+    Source/UiKnob.cpp
+    Source/UiHeader.cpp
+    Source/UiPageBar.cpp
+    Source/UiPath.cpp
+    Source/UiFooter.cpp
+    Source/UiEditor.cpp
+    Source/UiControls.cpp
+    Source/UiFacedPanel.cpp
+    Source/UiOscPanel.cpp
+    Source/UiCosmPanel.cpp
+    Source/UiTripColumn.cpp
+    Source/UiRack.cpp
+    Source/UiTabs.cpp
+    Source/UiBlockKinds.cpp
+    Source/UiDetailTables.cpp
+    Source/UiWatch.cpp
+    Source/UiFields.cpp
+    Source/UiEnvelope.cpp
+    Source/UiLfo.cpp
+    Source/UiRoutes.cpp
+    Source/UiDetails.cpp
+    Source/UiOverviews.cpp
+    Source/UiLowerPanel.cpp
+    Source/UiControlGrid.cpp
+    Source/UiCard.cpp
+    Source/UiPages.cpp
+    Source/UiMsm.cpp
+    Source/UiMatrix.cpp
+    Source/UiModPage.cpp
+    Source/UiArpPattern.cpp
+    Source/UiPlayPage.cpp
+    Source/UiZoneStrip.cpp
+    Source/UiZonesPage.cpp
     Source/FxPanel.cpp
     Source/ContentClassifier.cpp
     Source/XtSoloEncoder.cpp
@@ -149,7 +177,7 @@ function(vse_add_test name)
     target_include_directories(${name} PRIVATE $<TARGET_PROPERTY:VSynthEmu,INCLUDE_DIRECTORIES>)
     target_compile_definitions(${name} PRIVATE $<TARGET_PROPERTY:VSynthEmu,COMPILE_DEFINITIONS>)
 endfunction()
-vse_add_test(VSynthEmuTest Tests/PluginTest.cpp Tests/LayoutTest.cpp)   # the XT path end to end; the layout (v193)
+vse_add_test(VSynthEmuTest Tests/PluginTest.cpp)   # the XT path end to end
 vse_add_test(VSynthEmuTeardownTest Tests/TeardownTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)   # closed mid-encode
 vse_add_test(VSynthEmuWaveFileTest Tests/WaveFileTest.cpp)     # a wave whose header claims more than its data holds
 vse_add_test(VSynthEmuRestoreTest Tests/RestoreTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)   # reopened, parts gone
@@ -166,8 +194,11 @@ vse_add_test(VSynthEmuArpTest Tests/ArpTest.cpp Tests/TestMain.cpp)
 # then the Multi Step Modulator's: its parameters, the image's patches with it on, a note, a patch's load stopping it (v193)
 vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.cpp Tests/ZonePluginTest.cpp
              Tests/TestMain.cpp)
+# The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
+vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
+             Tests/EditorPagesTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest
-                 VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest)
+                 VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest)

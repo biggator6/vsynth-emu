@@ -335,6 +335,28 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The editor, D v196 (2026-11-13; UI steps 0 to 5 on ui-redesign): the user's "a new UI with Pigments and Serum as ideas, a
+  fresh palette, room for a V-Synth / VC-2 switch", of four mock-ups D ("Yes, build D"), and "Continue to step 5"
+  (research/UI_DESIGN.md, the only description of it now). createEditor makes SynthEditor (UiEditor), drawn at 1200 x 750
+  and scaled whole from 960 x 600 to 1440 x 900: the header, the page bar (SYNTH, MODULATION, FX, PLAY, ZONES), the
+  signal path, the rack (Time Trip, OSC 1 and 2, COSM 1 and 2, AMP), the lower panel (SELECTED, DETAILS, ENVELOPES,
+  LFOs) and the footer's keyboard with the zones. Every control is made from its parameter's ID by a table, an OSC's or a
+  COSM's for each instance by its index; 745 of 761 parameters have one, the tabbed editor's 669 (the 16 left: Scale
+  Tune and the engine's three). The tabbed editor's files went (PluginEditor and its parts, twelve files, 2,427 lines), with
+  TEST_UI_LAYOUT (LayoutTest) and their plants; UiParts.h keeps what D and FxPanel share, Ui::Page and Ui::Segmented in
+  the palette they are given. D's patch box says what a patch asks for that isn't here, as the source bar did. Found
+  landing: a fresh editor showed no knobs on its OSC and COSM panels, as FacedPanel chose its face while its base was
+  made, by the Type box's first value, before the panel's knobs; no check saw it, each having moved a Type first.
+  Check: VSynthEmuEditorTest (in verify.sh, in TEST_UI_LAYOUT's place) 1176/1176, 180 states, 28,343 placements; it
+  took TEST_UI_LAYOUT's checks D's lacked (every effect type's page and list, the FX page's buttons and its cards level
+  with its list, the build line, the load buttons) and a fresh editor's faces, seen red first (0 of 10 and 0 of 5
+  knobs). TEST_FX_PANEL on D's FX page: 985 parameters, 5948 texts as the firmware's. verify.sh green on 403d7f2 with
+  this tree's tools (fcheck as the baseline, every program's line, build id, auval). Plants: 49 went with the tabbed
+  editor's files (34 in mutate_panel.py's MUTS, 15 in panel_muts.txt); D has 29 (panel_muts.txt's editor-d-), the whole
+  list 235. mutate_panel.py --editor with panel-, box-, gain- and msm-editor-one-track: 61 planted, 59 caught. Missed:
+  editor-fx-same-place, as D's taller FX page held a card left in its own place (the test now holds the cards level,
+  caught), and editor-d-grid-wide, withdrawn (wider cells are another layout) for editor-d-grid-rows (caught).
+
 The splits on the panel v195 (2026-11-12): the user's "add a zones card to the editor allowing it to show and edit
   splits" (HARDWARE_FIRMWARE.md, "The zones' splits on the panel"). Each zone's Range Upper key (IDs 0x124…0x133, the
   patch's common) is Controls::zoneUpper, read with zone 1's common from a patch, and the part's table is made again at each

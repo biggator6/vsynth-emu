@@ -6,3 +6,6 @@
 // "msmSwitch", "msmKeySync", then a track's "msm1Switch" … "msm1Dest", "msm1Step1" … "msm1Step16" (tracks 1…4); an empty
 // string past them
 const juce::String& msmParamId(int fwId);
+// The XT's ID of track t's setting i (tracks 0…3): 0…7 its Switch … Destination, 8 on its steps (both editors' tracks;
+// the MSM tab's from v193, D's MODULATION page from UI step 4)
+int msmTrackFwId(int t, int i);

@@ -345,7 +345,9 @@ and effects from it and loads its waves from the project's `Wave` folder.
   vocal (SOLO) and the stereo factory wave 358 (SOLO), with any envelope
   and a note-off (`TEST_ADSR`), and with the OSC knobs and the time and
   formant envelopes set (`TEST_OSC`, `TEST_TENV`, `TEST_FENV`).
-  `TEST_SNAPSHOT=file.png` draws the editor offscreen.
+  `TEST_SNAPSHOT=file.png` draws the editor offscreen: D from v196
+  (research/UI_DESIGN.md), whose layout and controls `VSynthEmuEditorTest`
+  checks.
 - `XtOsc` equals the firmware's VariPhrase converter on 310,545 cases × 6
   values and its exp2 on 17,143 arguments (`xt_osc`, v51).
 - The level path (v53): the velocity curve, the OSC level slots and the

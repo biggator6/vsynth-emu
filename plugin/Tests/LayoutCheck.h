@@ -1,8 +1,9 @@
 #pragma once
-// TEST_UI_LAYOUT's editor and its checks (LayoutTest.cpp): what one state of the editor must be, and every visible
-// control moved to see which parameter it sets.  Moved from PluginTest.cpp's main (v193), where they were its lambdas.
+// The editor's checks, VSynthEmuEditorTest's (EditorTest.cpp): what one state of the editor must be, and every visible
+// control moved to see which parameter it sets.  Moved from PluginTest.cpp's main (v193), where they were its lambdas;
+// TEST_UI_LAYOUT's sweeps of the tabbed editor went with it (v196).
 #include "../Source/FxPanel.h"
-#include "../Source/PluginEditor.h"
+#include "../Source/PluginProcessor.h"
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -36,20 +37,24 @@ inline juce::Label* boxLabelOf(juce::Component& c) {
     return box;
 }
 
-// The editor under test, what it has found and counted, and the checks and moves; the sweeps are LayoutTest.cpp's
+// The editor under test, what it has found and counted, and the checks and moves
 struct LayoutCheck {
     VSynthEmuProcessor& p;
     std::unique_ptr<juce::AudioProcessorEditor> ed;
-    VSynthEmuEditor* editor = nullptr;
     FxPanel* panel = nullptr;
     juce::Viewport* view = nullptr;
     int errors = 0, states = 0, checked = 0, cosmTypes = 0;
     std::vector<juce::RangedAudioParameter*> params;
     std::set<juce::String> reached;
 
-    explicit LayoutCheck(VSynthEmuProcessor& proc) : p(proc), ed(proc.createEditor()) {
-        editor = dynamic_cast<VSynthEmuEditor*>(ed.get());
-        for (juce::Component* ch : ed->getChildren()) if (auto* fp = dynamic_cast<FxPanel*>(ch)) panel = fp;
+    // What check() and moveAll() walk: the editor, or, for D, the drawing its window scales (UI step 1)
+    juce::Component* root = nullptr;
+
+    explicit LayoutCheck(VSynthEmuProcessor& proc)
+        : LayoutCheck(proc, std::unique_ptr<juce::AudioProcessorEditor>(proc.createEditor())) {}
+    LayoutCheck(VSynthEmuProcessor& proc, std::unique_ptr<juce::AudioProcessorEditor> e) : p(proc), ed(std::move(e)) {
+        const std::vector<FxPanel*> panels = allOf<FxPanel>(*ed);   // D's FX page, under its drawing
+        if (!panels.empty()) panel = panels.front();
         if (panel) for (juce::Component* ch : panel->getChildren()) if (auto* v = dynamic_cast<juce::Viewport*>(ch)) view = v;
         for (auto* prm : p.getParameters()) if (auto* r = dynamic_cast<juce::RangedAudioParameter*>(prm)) params.push_back(r);
         cosmTypes = p.apvts.getParameter("cosmType")->getNumSteps();
@@ -82,6 +87,16 @@ struct LayoutCheck {
             return t && is(*t);
         };
         return dynamic_cast<T*>(find(*ed, match));
+    }
+    // Every T under c, in the order the components hold them (D's panels, made one per instance, UI step 2)
+    template <class T>
+    static std::vector<T*> allOf(juce::Component& c) {
+        std::vector<T*> found;
+        for (juce::Component* ch : c.getChildren()) {
+            if (auto* t = dynamic_cast<T*>(ch)) found.push_back(t);
+            for (T* t : allOf<T>(*ch)) found.push_back(t);
+        }
+        return found;
     }
     juce::ComboBox* boxOf(const juce::String& item) {
         return firstOf<juce::ComboBox>([&](juce::ComboBox& x) { return x.getItemText(0) == item; });
@@ -127,7 +142,7 @@ struct LayoutCheck {
             return box && cutShort(*box);
         }
         auto* b = dynamic_cast<juce::ToggleButton*>(k);
-        if (!b) return false;
+        if (!b || b->getButtonText().isEmpty()) return false;   // a switch of no text (D's power dots) has none to cut
         const float size = juce::jmin(15.0f, (float)b->getHeight() * 0.75f);
         const juce::Font font { juce::FontOptions(size) };
         const float text = juce::GlyphArrangement::getStringWidth(font, b->getButtonText());
@@ -151,7 +166,7 @@ struct LayoutCheck {
 
     void check(const juce::String& where) {
         ++states;
-        walk(*ed, [&](juce::Component& c) {
+        walk(root ? *root : *ed, [&](juce::Component& c) {
             checkCards(c, where);
             checkKids(c, where);
         });
@@ -176,14 +191,12 @@ struct LayoutCheck {
         }
         if (auto* x = dynamic_cast<juce::ComboBox*>(k)) {
             const juce::String first = x->getItemText(0);
-            if (first == "OSC 1" || first == "COSM 1" || first == "Control 1" || first == "Track 1"
-                || first == VSynthEmuProcessor::assignName(0) || first == "Passthrough (baseline)") return {};
             return [x] { x->setSelectedItemIndex(x->getSelectedItemIndex() == 0 ? 1 : 0, juce::sendNotificationSync); };
         }
         auto* b = dynamic_cast<juce::Button*>(k);
         if (!b || (dynamic_cast<juce::TextButton*>(b) && !b->getClickingTogglesState())) return {};   // Load, ROM
         const juce::String text = b->getButtonText();
-        if (text.startsWith("OSC ") || text.startsWith("COSM ")) return {};   // as the boxes above
+        if (text.startsWith("OSC ")) return {};   // which OSC the Time Trip column shows
         if (text == "MFX" || text == "Chorus" || text == "Reverb" || text == "System") return {};
         if (b->getRadioGroupId() != 0 && b->getToggleState()) return {};   // one of a pair: the other moves it
         return [b] { b->setToggleState(!b->getToggleState(), juce::sendNotificationSync); };
@@ -191,20 +204,27 @@ struct LayoutCheck {
 
     void moveAll(const juce::String& where) {
         std::vector<juce::Component*> controls;
-        walk(*ed, [&](juce::Component& c) { for (juce::Component* ch : c.getChildren()) if (ch->isVisible() && isControl(ch) && !dynamic_cast<juce::Label*>(ch)) controls.push_back(ch); });
+        walk(root ? *root : *ed, [&](juce::Component& c) { for (juce::Component* ch : c.getChildren()) if (ch->isVisible() && isControl(ch) && !dynamic_cast<juce::Label*>(ch)) controls.push_back(ch); });
         for (juce::Component* k : controls) {
             const std::function<void()> move = moverOf(k);
             if (move && !changedBy(move)) fail(where + ": " + controlName(k) + " moves no parameter");
         }
     }
 
-    // LayoutTest.cpp: the sweeps
-    void msmTracks();
-    void moveEverywhere();
-    int coverage(const char* ui);
-    void chrome();
-    void effectsAt(const juce::String& at);
-    void atSizes();
-    void tabClicks();
-    void joined();
+    // The mouse at a point of c, having gone down at `from`; pressed there, as a click sends it (D's page bar, path and
+    // blocks, UI step 1)
+    static juce::MouseEvent mouseAt(juce::Component& c, juce::Point<float> at, juce::Point<float> from) {
+        using Src = juce::MouseInputSource;
+        const juce::Time now = juce::Time::getCurrentTime();
+        const Src mouse = juce::Desktop::getInstance().getMainMouseSource();
+        return juce::MouseEvent(mouse, at, {}, Src::defaultPressure, Src::defaultOrientation, Src::defaultRotation,
+                                Src::defaultTiltX, Src::defaultTiltY, &c, &c, now, from, now, 1, false);
+    }
+    static void pressAt(juce::Component& c, juce::Point<float> at) { c.mouseDown(mouseAt(c, at, at)); }
+    // A press at `from`, a drag to `to` and the release there (D's envelope points, UI step 3)
+    static void dragFrom(juce::Component& c, juce::Point<float> from, juce::Point<float> to) {
+        c.mouseDown(mouseAt(c, from, from));
+        c.mouseDrag(mouseAt(c, to, from));
+        c.mouseUp(mouseAt(c, to, from));
+    }
 };
