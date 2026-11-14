@@ -1,14 +1,12 @@
 // vc2run <rom.4> splits <index>: how a VC-2 wave's split is chosen when it plays (research/VC2_VOCAL_DESIGNER.md, "A VC-2
-// wave's split, chosen").  rom.4's index parser (0x8934d12a) on the VC-2's WLF08 index (`wlflib.py get VC2 <index>`), its
-// file calls (open 0x89336c60, read 0x89336cf0, seek 0x89336db0, close 0x89336ca0) answered from the file's bytes; then
-// the two readers the PCM converter's new branch (0x8939cba0) calls: each wave's (0x89394b30(wave, velocity, out): out+6
+// wave's split, chosen").  rom.4's index parser on the VC-2's WLF08 index (vc2index.h); then the two readers the PCM converter's new branch (0x8939cba0) calls: each wave's (0x89394b30(wave, velocity, out): out+6
 // the map, out+4 the split's second byte) at every velocity 0…127, and each map's (0x89394c20(map, key, out): out+6 the
 // sample, out+4 and +5 its second and third bytes) at every key, printed as `wlflib.py choices VC2` prints the rule's, so
 // the two diff to nothing when the readers keep it.  And the key a map is read at, the key-follow key (0x8939c910, rom.2's
 // 0x894e12c0), against the port's xtKeyFollowKey over keys, coarse tunes and keyfollows.  Fails on a fault, a reader that
 // finds nothing, or a key that differs.
 #include "XtOsc.h"
-#include "vc2runs.h"
+#include "vc2index.h"
 #include <cstdio>
 #include <cstring>
 #include <functional>
@@ -19,42 +17,9 @@ namespace vc2 {
 
 namespace {
 
-constexpr uint32_t kParse = 0x8934d12a;                         // [FW] (state: +0 the handle, +4 a section's offset)
-constexpr uint32_t kOpen = 0x89336c60, kRead = 0x89336cf0, kSeek = 0x89336db0, kClose = 0x89336ca0;   // [FW]
-constexpr uint32_t kWaveSplit = 0x89394b30, kMapSplit = 0x89394c20;   // [FW] (number, value, out)
-constexpr uint32_t kWaveCount = 0x8993448c, kMapCount = 0x8993448e;   // [FW] u16s the parser sets
 constexpr uint32_t kWaveRecord = 0x89989754, kMapRecord = 0x89989964;  // [FW] where each reader reads its record
 constexpr uint32_t kKeyFollowKey = 0x8939c910;                  // [FW] (key, coarse, keyfollow, centre 60)
-constexpr uint32_t kSampleInfo = 0x89394d10, kSampleCount = 0x89934490;   // [FW] (sample, out); the parser's third count
-constexpr const char* kPath = "D:\\VC-2 Wave.bin";              // [FW] the parser's
 constexpr int kValues = 128, kNameBytes = 16, kCentre = 60;
-
-struct IndexFile {
-    std::vector<uint8_t> bytes;
-    size_t at = 0;
-};
-
-std::string cString(Machine& m, uint32_t at, size_t most) {
-    std::string s;
-    for (char c = (char)m.cpu.rd8(at); c && s.size() < most; c = (char)m.cpu.rd8(++at)) s += c;
-    return s;
-}
-
-// The parser's file calls, on the index's bytes: one handle, 1
-void hookFile(Machine& m, IndexFile& f) {
-    m.cpu.hook(kOpen, [&m](Sh4& c) { c.ret(cString(m, c.r[4], 64) == kPath ? 1u : 0xffffffffu); });
-    m.cpu.hook(kRead, [&m, &f](Sh4& c) {
-        const size_t n = std::min<size_t>(c.r[6], f.bytes.size() - std::min(f.at, f.bytes.size()));
-        m.cpu.write(c.r[5], f.bytes.data() + f.at, n);
-        f.at += n;
-        c.ret((uint32_t)n);
-    });
-    m.cpu.hook(kSeek, [&f](Sh4& c) {
-        f.at = c.r[6] == 0 ? c.r[5] : f.at + (int32_t)c.r[5];
-        c.ret(0);
-    });
-    m.cpu.hook(kClose, [](Sh4& c) { c.ret(0); });
-}
 
 std::string trimmed(std::string s) {
     s.erase(s.find_last_not_of(' ') + 1);
@@ -136,16 +101,11 @@ int splits(Machine& m, int argc, char** argv) {
         return 2;
     }
     IndexFile f{fileContents(argv[1])};
-    answerKernel(m);
-    hookFile(m, f);
-    const uint32_t state = m.alloc(64), out = m.alloc(64);
-    uint32_t parsed = 0;
-    if (f.bytes.empty() || !m.run(kParse, {state}, &parsed)) {
-        std::printf("splits: the parser %s\n", f.bytes.empty() ? "has no file" : m.error().c_str());
-        return 1;
-    }
+    const std::optional<int32_t> parsed = parseIndex(m, f, argv[0]);
+    if (!parsed) return 1;
+    const uint32_t out = m.alloc(64);
     const int waves = m.cpu.rd16(kWaveCount), maps = m.cpu.rd16(kMapCount);
-    std::fprintf(stderr, "the parser: %d, %d waves, %d maps\n", (int32_t)parsed, waves, maps);
+    std::fprintf(stderr, "the parser: %d, %d waves, %d maps\n", *parsed, waves, maps);
     bool ok = waves > 0 && maps > 0;
     for (int w = 1; w <= waves; ++w) {
         const auto at = [&](int v) { return choiceOf(m, kWaveSplit, w, v, out, false); };

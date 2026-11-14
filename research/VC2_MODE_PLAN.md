@@ -91,8 +91,14 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   PCM converter sends a wave the store doesn't hold through new readers: the wave's splits by the note's velocity to a
   map, the map's by the key-follow key (xtKeyFollowKey) to a sample, the first split at or above each, run on the real
   index at every velocity and key and equal to that rule, 0 different; a sample is the store's id 1…192. The wave
-  splits' "upper key" withdrawn: it is velocity. Left of it: what the bytes passed on do (a level, the bass maps' 12),
-  and how the store takes the bank's samples.
+  splits' "upper key" withdrawn: it is velocity. Left of it: ~~what the bytes passed on do (a level, the bass maps' 12)~~
+  (below), and how the store takes the bank's samples.
+  **The split's bytes, 2026-11-13** (`vc2run … splitbytes`; VC2_VOCAL_DESIGNER.md, "The split's bytes, followed"): fields
+  the V-Synth always had, in the OSC's input, which its own fetch fills neutral. The wave split's byte and the map split's
+  are two levels on the OSC's gain through the level curve (the port's `xtOscGain`, its two 127s); the 0 or 12 shifts the
+  sample's root key down, so 12 plays an octave up (the port's `xtPitchCents`, its shift 0); the one-split flag only
+  changes EVENT on a VariPhrase sample, which the factory index never gives a 0. Both laws equal the firmware over every
+  value, 0 different. 179 of the 192 samples are LITE. For step 3: `xtOscGain` and `xtPitchCents` take the bytes.
   **The effect chip's programs, 2026-11-13** (`vc2run … fxprog`; VC2_VOCAL_DESIGNER.md, "The effect chip's programs"):
   rom.2's driver, paired in rom.4; the 42 MFX programs and the V-Synth's reverbs equal but for registers renumbered one
   down, the Chorus's but for 13 words, the reverbs' transition program equal; program A (routing, mix, EQ, levels)
