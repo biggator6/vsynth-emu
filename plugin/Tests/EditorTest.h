@@ -31,3 +31,6 @@ void lowerChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChe
 // The other pages (EditorPagesTest.cpp, UI step 4): each MSM track, Matrix Control and zone made whole and moving its own
 // parameters alone; the FX page's four pages; each effect on the path opening its own
 void pagesChecks(LayoutCheck& l, SynthEditor& ed, TestChecks& check);
+// The OSC displays (EditorWaveTest.cpp, v200): the analog oscillator's own cycles at the panel's settings, following them;
+// a loaded wave's view, holding the file's own extremes; test waves are written in `folder`
+void waveChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);

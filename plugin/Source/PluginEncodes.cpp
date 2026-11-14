@@ -70,6 +70,7 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
         rate = w.rate;
         bits = w.bits;
     }
+    publishWaveView(osc, chans);   // the editor's picture of it (PluginWaveView.cpp, v200)
     const int gen = ++w.gen;
     const juce::String who = osc ? "OSC 2: " : "";
     setStatus(who + "Encoding...");

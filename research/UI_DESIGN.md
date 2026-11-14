@@ -70,8 +70,12 @@ every LFO (5), each its name over its curve or shape; a click on one opens its b
 
 - **Time Trip column:** the pad (162 × 196), whose OSC it follows (1 or 2), Robot and Hold under it.
 - **An OSC panel** (one panel, made for each OSC): On, its name, Type (PCM or ANALOG), the encoding (SOLO, BACKING, ENSEMBLE,
-  LITE) or the analog waveform, the wave's name, Load…; a display (286 × 72): the wave with its loop and the Time Trip
-  position, or the analog waveform; four big knobs (44): Pitch, Time, Formant, Level for PCM, Pitch, Pulse Width, Impact,
+  LITE) or the analog waveform, the wave's name, Load…; a display (286 × 72) of what it plays (v200): on PCM the loaded
+  wave, each of 512 columns its lowest and highest sample (the processor's view, made once as the wave goes to its
+  encode, `PluginWaveView.cpp`), the loop's span shaded in `mod` when Loop is on; on ANALOG three cycles of the plugin's
+  own analog oscillator (`XtAnalogOsc` at A1, its start settled) at the panel's settings, made again when any of them
+  moves, so each waveform, its Pulse Width, Impact, Super-Saw's spread and the rest show as they play (on OSC 2 X-MOD
+  has no depth and draws as SAW, as it plays) (`UiWaveDisplay`); four big knobs (44): Pitch, Time, Formant, Level for PCM, Pitch, Pulse Width, Impact,
   Level for ANALOG; six small (30): Coarse, Fine, Depth, Energy, Velocity Sens, Pitch KF for PCM, Coarse, Fine, PW KF, PW
   LFO, PW Env, Velocity Sens for ANALOG; a line of Vari, Playback Mode and Tempo Sync.
 - **A COSM panel** (one panel, made for each COSM): On, its name, Type, its filter type where it has one; a display (96 × 62)
@@ -210,7 +214,10 @@ Every control is made from its parameter's ID, so a new parameter needs a row in
   own parameters alone, and every parameter with a control but the 16 below; each page's name, block and effect pressed;
   the header's build, Browse…, ROM… and each PCM OSC's Load…, and a patch's note; a curve's points dragged, a route on its
   block, the list's and the overviews' presses; the FX page on every effect type, its list's text whole with room for 15
-  rows, its left cards level with its list, and its page buttons both ways. With a folder it draws each page, each block and each lower view into it; with
+  rows, its left cards level with its list, and its page buttons both ways; an OSC's display (v200, `EditorWaveTest.cpp`):
+  each analog waveform drawn as the oscillator plays it at the settings as they stand, no two alike but X-MOD and SAW on
+  OSC 2, a square's picture moved by its Pulse Width, and a loaded wave's view holding the file's own lowest and highest
+  samples, replaced by a newer wave's. With a folder it draws each page, each block and each lower view into it; with
   `list` it prints the parameters no control reaches.
 - `mutate_panel.py --editor`: the editor's planted errors, D's (`panel_muts.txt`'s `editor-d-` lines) and the FX page's
   (`editor-fx-`, `editor-row-gap`), each built into `VSynthEmuEditorTest`, to show the check catches it.
@@ -228,7 +235,12 @@ Every control is made from its parameter's ID, so a new parameter needs a row in
 
 ### Still to do
 
-Each with the user's yes where it needs one: Inter and JetBrains Mono built in (a folder for font files); the wave drawn
-from the loaded wave; the pad sending its controllers; the keyboard playing; dragging a source onto a knob to make a
-Matrix route; the VC-2 mode's pages; the page and the block kept when the editor's window closes (it opens on SYNTH, with
-COSM 1 selected).
+The user's testing notes (2026-11-14): the OSC display drawing the loaded wave and the chosen analog waveform (done in
+v200); the Time Trip column made the XT's pad (the user's choice: a press freezes the wave, circling scrubs it, release
+lets go, sending Time Trip Assign X and Y into the synth as the XT's pad and the iOS app do; Hold; each OSC's Time Trip
+switch and Beat Keep; the circle parameter kept for host automation alone); the footer's keyboard playable, and folding
+away with the window shorter by its height (the user's choice).
+
+Each with the user's yes where it needs one: Inter and JetBrains Mono built in (a folder for font files); the Time Trip
+position on the wave; dragging a source onto a knob to make a Matrix route; the VC-2 mode's pages; the page and the block
+kept when the editor's window closes (it opens on SYNTH, with COSM 1 selected).

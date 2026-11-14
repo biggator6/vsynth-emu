@@ -64,6 +64,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
     Source/PluginState.cpp
+    Source/PluginWaveView.cpp
     Source/UiLook.cpp
     Source/UiKnob.cpp
     Source/UiHeader.cpp
@@ -98,6 +99,7 @@ target_sources(VSynthEmu PRIVATE
     Source/UiPlayPage.cpp
     Source/UiZoneStrip.cpp
     Source/UiZonesPage.cpp
+    Source/UiWaveDisplay.cpp
     Source/FxPanel.cpp
     Source/ContentClassifier.cpp
     Source/XtSoloEncoder.cpp
@@ -196,7 +198,7 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
              Tests/TestMain.cpp)
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
-             Tests/EditorPagesTest.cpp Tests/TestMain.cpp)
+             Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest

@@ -89,6 +89,15 @@ public:
 
     juce::String getLoadedFileName(int osc = 0) const  { return wave_[osc].name; }
     bool         hasFileLoaded(int osc = 0)    const   { return wave_[osc].loaded.load(); }
+    // A loaded wave as the editor draws it (PluginWaveView.cpp, v200): kViewColumns columns, each its lowest and highest
+    // sample, the channels mixed; made as the wave goes to its encode.  None before one has.  Message thread, as is gen.
+    struct WaveView {
+        static constexpr int kViewColumns = 512;
+        struct Column { float low, high; };
+        std::vector<Column> columns;
+    };
+    std::shared_ptr<const WaveView> waveView(int osc) const;
+    int waveViewGen(int osc) const { return waveViewGen_[osc].load(); }   // moves with each view made
 
     // ── The XT's firmware (rom.2) ────────────────────────────────────────────
     // Message thread.  The image the user chose: used now and kept for every project and plugin format, so a new
@@ -153,6 +162,12 @@ private:
     };
     LoadedWave               wave_[2];
     juce::CriticalSection    bufferLock_;
+    // Each OSC's wave as the editor draws it (PluginWaveView.cpp, v200), made from the channels its encode copies; the
+    // lock is the message thread's alone, never the audio thread's
+    void publishWaveView(int osc, const std::vector<std::vector<float>>& chans);
+    mutable juce::CriticalSection viewLock_;
+    std::shared_ptr<const WaveView> waveView_[2];
+    std::atomic<int> waveViewGen_[2] {};
     // A patch's zones 2…16: their settings at once, and again with their waves once the pool has encoded them (each wave once, as its own
     // type).  A newer patch discards an older one's.  The store and the wave folder go in the session, for its zones to come back.
     // PluginZones.cpp (v195), with the splits' parameters

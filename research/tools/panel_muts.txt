@@ -113,3 +113,10 @@ editor-d-tab-press|            if (onChoose) onChoose((int)i);|            if (o
 # flow lays the controls and the grid's height alike, so nothing overlapped or left its card. Its rows run together:
 editor-d-grid-rows|            y += rowH + kGap;|            y += kGap;|plugin/Source/UiControlGrid.cpp|layout
 editor-d-details-stuck|    if (now != face_) show(now);|    if (now != face_) show(0);|plugin/Source/UiDetails.cpp|layout
+# The OSC displays (v200), by VSynthEmuEditorTest's EditorWaveTest.cpp: a loaded wave's view made and replaced, its
+# columns' extremes, the analog cycles made again as a setting moves, from the OSC's own settings.
+editor-d-wave-unmade|    publishWaveView(osc, chans);|    ;|plugin/Source/PluginEncodes.cpp|layout
+editor-d-wave-first-only|    for (size_t i = from + 1; i < to; ++i) {|    for (size_t i = to; i < to; ++i) {|plugin/Source/PluginWaveView.cpp|layout
+editor-d-wave-stale|    if (gen == viewGen_ && loop == loop_) return;|    if (viewGen_ >= 0 && loop == loop_) return;|plugin/Source/UiOscPanel.cpp|layout
+editor-d-cycles-stale|    if (!cycles_.empty() && now == drawn_) return;|    if (!cycles_.empty()) return;|plugin/Source/UiOscPanel.cpp|layout
+editor-d-cycles-osc1|    const XtSynth::OscControls& o = osc ? c.osc2 : c;|    const XtSynth::OscControls& o = c;|plugin/Source/UiWaveDisplay.cpp|layout

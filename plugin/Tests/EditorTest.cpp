@@ -154,7 +154,7 @@ int coverage(LayoutCheck& l, TestChecks& check, bool list) {
     return have;
 }
 
-int editorTest(const juce::File& rom, const juce::File&, const juce::StringArray& rest) {
+int editorTest(const juce::File& rom, const juce::File& work, const juce::StringArray& rest) {
     TestChecks check { "editor" };
     VSynthEmuProcessor p;
     check(p.setRomFile(rom), "the ROM should load");
@@ -170,6 +170,7 @@ int editorTest(const juce::File& rom, const juce::File&, const juce::StringArray
     rackChecks(l, ed, p, check);
     lowerChecks(l, ed, p, check);
     pagesChecks(l, ed, check);
+    waveChecks(ed, p, work, check);
     const int reached = coverage(l, check, rest[0] == "list");
     if (rest[0] != "list" && !rest.isEmpty())
         snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);

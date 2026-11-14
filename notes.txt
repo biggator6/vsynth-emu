@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The OSC display v200 (2026-11-14): the user's testing notes, "osc wav should display waveform in PCM mode and in analog
+  mode, display the correct waveform chosen". On PCM the display draws the loaded wave: the processor makes a view of it
+  (PluginWaveView.cpp: 512 columns, each its lowest and highest sample, the channels mixed) from the channels
+  encodeWave copies, so a file, a patch and a session's wave all get one, and the editor reads it on the message thread;
+  the loop's span is shaded when Loop is on. On ANALOG it draws three cycles of the plugin's own analog oscillator,
+  XtAnalogOsc at A1 after 64 blocks have settled its start, at the panel's settings (UiWaveDisplay's analogSettings and
+  analogCycles), made again when any of them moves. It had drawn one of six stock shapes, never redrawn when the
+  waveform changed. Check: VSynthEmuEditorTest 1211/1211 (EditorWaveTest.cpp): each of the 14 waveforms on the panel
+  equal to a fresh render at the settings as they stand, no two alike but SAW and X-MOD on OSC 2 (X-MOD has no depth
+  there, and plays as SAW), a square moved by its Pulse Width, a loaded wave's view spanning exactly the file's own
+  lowest and highest samples, read apart, and replaced by a second wave's. verify.sh green. Plants: five new (editor-d-
+  wave-unmade, -wave-first-only, -wave-stale, -cycles-stale, -cycles-osc1); --editor and the teardown- three, 48, all
+  caught.
+
 The editor, D v196 (2026-11-13; UI steps 0 to 5 on ui-redesign): the user's "a new UI with Pigments and Serum as ideas, a
   fresh palette, room for a V-Synth / VC-2 switch", of four mock-ups D ("Yes, build D"), and "Continue to step 5"
   (research/UI_DESIGN.md, the only description of it now). createEditor makes SynthEditor (UiEditor), drawn at 1200 x 750
