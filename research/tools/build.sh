@@ -20,6 +20,10 @@ SARP=($( [ -f XtSynthArp.cpp ] && echo XtSynthArp.cpp XtArpeggio.cpp XtArpeggioS
 # XtSynth's parts split out by job and the Multi Step Modulator in it (v193)
 SARP+=($( [ -f XtSynthMsm.cpp ] && echo XtSynthZones.cpp XtSynthNotes.cpp XtSynthUpdate.cpp XtSynthKnobs.cpp \
        XtSynthEnvKnobs.cpp XtSynthMsm.cpp XtMsm.cpp XtMsmTrack.cpp ))
+# and more of its parts by job (v200): a voice's start, an OSC's, the pad's, a block, the TVA's, the clock's
+SARP+=($( [ -f XtSynthBlock.cpp ] && echo XtSynthStart.cpp XtSynthOscStart.cpp XtSynthTrip.cpp XtSynthBlock.cpp \
+       XtSynthTva.cpp XtSynthClock.cpp ))
+SARP+=($( [ -f XtExtIn.cpp ] && echo XtExtIn.cpp ))   # the EXT IN OSC's player and input (v200)
 # rom.4's parameters, which XtSynthRom.cpp loads (v199), and what they read with: the values' text, the descriptors' form
 V4=($( [ -f Vc2Params.cpp ] && echo Vc2Params.cpp XtFxValueText.cpp ))
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}

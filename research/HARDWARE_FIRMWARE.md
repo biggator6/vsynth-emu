@@ -1546,6 +1546,76 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The EXT IN OSC (2026-11-14, v200) {#ext-in}
+
+The VC-2 mode's step 2, fourth item's first half (VC2_MODE_PLAN.md): OSC Type 2, the external input, on the SH-4's side.
+Until now a patch's EXT IN OSC played as an OSC switched off. It is a voice of kind 4, with its own converter, install,
+note-on, update and player; what it plays is the input as the effect chip hands it back.
+
+**The input.** The audio task points `[0x8987c7a0]` at the block the DMA brought back from the chip + 16 (`0x894daca2`,
+`0xacc60000` + 1024·i + 16): 32 frames of 32 bytes, 8 int32 a frame. The EXT IN player reads words 4 and 5 of each, which
+fits the outside input's copies at GRAM 0x98 and 0x9a in the chip's program (VC2_VOCAL_DESIGNER.md, "Program A's routing";
+not yet traced on the chip's side). Words 0…3 are copied to `0x89cf76f8` (`0x894db220`), the sampling input, unread here.
+
+**The voice.**
+- Converter `0x894e3830`, the PCM one's terms: the pitch (+8 and +0x68) against A4 (its −69000), the Pitch knob (+0xc), the
+  LFO and envelope depths, the level (+0x54, through the level curve with its key follow), its LFO depth (+0x58) and the
+  gain 2^(Wave Gain/6) (+0x5c, with no wave's level factors).
+- Install `0x894f2050`: the player `0x895097d0` at +0x964, and `[0x897d0120]` at +0x9ac, which nothing here reads.
+- Note-on, inline in the note-on switch (`0x894f2ff0`): the pitch ratio (+0x144), the gain target (+0x154) and its start
+  (+0x158, `0x894f3e20`).
+- Update `0x89509780`, after the portamento's tick: +0x144 by `0x894f3960` and +0x154 by `0x894f3dc0`, as they are, with
+  no 70% step.
+- Player `0x895097d0`, each frame: L and R, int32 to float, times the gain, then the gain by FMAC, 1/32 of the way to the
+  target (`0x89509830`). Nothing after it in the renderer (`0x894f28a0`).
+
+**Nothing is bound to it.** A kind-4 voice's modulator pointers (+0x970…+0x98c) stay on the tone's envelope 0, whose output
+is 1, and LFO 0, at 0. The OSC's own four envelopes and LFO have their bound words (+0x68, +0x80) clear, so the tone
+update (`0x894f7638`) never steps them: they hold where their note-on left them. So the pitch takes the pitch envelope's
+full depth and no LFO; the gain target is the gain times the level, with no envelope, and its start is the same (envelope
+0's attack time is 0). Measured in `xt_tone`, all 837 EXT IN voices of 300 cases: the stereo flag (+0x960) is 1, so the
+COSMs and the MOD take their stereo routines, and the root (+0x9a4) is 440.
+
+**In XtSynth** (`XtExtIn.cpp`/`.h`): kind 4 as `XtOscVoice::extIn`, its player `XtExtInPlayer`, and `XtSynth::input`
+(`XtExtInput`), the input as the chip returns it, pushed and taken a block at a time; nothing pushes it yet in the plugin,
+so an EXT IN OSC there is silent (v201 brings the input). `XtPatch` still reads a patch's EXT IN OSC as switched off, and
+the plugin's OSC Type has no third choice, until then.
+
+**The check.** `xt_tone`'s EXT IN mode, `xt_tone rom extin [cases] [seed] [inputs]` (fcheck runs 400 cases), is the
+whole check with EXT IN drawn on about one OSC in three that plays no wave (an odd Original Tempo, a value drawn already),
+zones 2–16 too; the plain run draws none. Both sides are given the same input, `xtExtInTestBlock` (int32 noise over its
+whole range, by frame), through the firmware's `[0x8987c7a0]` (`Firmware::clearBus`) and XtSynth's input (test build
+only). An EXT IN voice's player fields aren't compared (it has none of a PCM voice's), but its cents, Pitch knob, ramp,
+envelopes, LFO, taps and the bus are. Three things the first runs showed, each fixed in the port: the held envelopes and
+LFO, the neutral envelope 0 and LFO 0, and the stereo flag.
+
+It is a mode of its own because `xt_tone` has one random generator for its whole run, and a case draws in its blocks as
+it runs: a case with EXT IN where the same case analog had been runs other draws, so every case after it is another.
+Drawn first in the plain run (one OSC in seven), it gave new cases from the first EXT IN on, at every seed, and with them
+the seeds `tone_muts.txt` gives the plants the default's cases don't reach. With no EXT IN drawn the plain run's lines are
+v199's baseline's, line for line. The new cases showed differences of the check's own, in cases with no EXT IN (at seeds
+10, 13, 16 and 18 of 7,609 cases; eight seeds with none drawn, 0). One is understood: seed 13's case 5067, a SOLO wave
+with Vari off that a released Time Trip's seek to the beat (`0x894f20d2`) put 139,981 samples before its start, and that
+then walks forward. There the firmware's linear player reads `xt_tone`'s memory, another wave's records 270 KB before
+this one's samples, and the port reads zeros. A band player's reads that far off are given zeros on the firmware's side
+(`xtFwHookBandReads`); the linear player's aren't. Not understood: band waves in the playback modes' cases (seeds 10 and
+18, a few parts in 10^6 from the middle of a block on) and seed 16's reverb send (1.3e-33 against 0). Left for a version
+of their own (build.md, v200's entry).
+
+The plants: 15 `extin-` ones, run in the mode (`tone_muts.txt`'s mode field, `mutate.sh`'s `TONE_MODE`), all caught. The
+whole list, 1183: all caught but `check-pad-cc`, missed as since v189. Sixteen read ERROR on the first run, their text
+rewritten by v200's own edits (a PCM OSC's test `pcm()`, EXT IN in the root and the stereo flag, the chase in
+`backOnBeat`); written again on the code as it is, each makes the same mistake and is caught (`zone-wave` by a crash).
+
+**Split first.** `XtSynth.cpp` (2,074 lines), moved as it stood: a voice's start (`XtSynthStart.cpp`), an OSC's
+(`XtSynthOscStart.cpp`), the pad and Time Trip (`XtSynthTrip.cpp`), the block (`XtSynthBlock.cpp`), the TVA's
+(`XtSynthTva.cpp`), the clock's (`XtSynthClock.cpp`) and their constants (`XtSynthConstants.h`); 258 tone plants followed
+their code (port names `tonestart` … `toneconsts`); fcheck as baseline and `ab` 4/4 identical after. Then, to stay inside
+the kit's 50-statement limit: `mixBlock` into a voice's `toneUpdate`, `voiceRender` and `voiceBus`, the Time Trip chase into
+`backOnBeat`, and `oscStart`'s PCM players into `pcmStart`. `startVoice` (151 statements) and `xt_tone`'s
+`XtToneProbe::run` (1,557) keep `one-off` marks: splitting them needs room XtSynth.h and XtToneCheck.cpp don't have, and is
+left as its own job (build.md).
+
 ### rom.4's parameter tables in the plugin (2026-11-14, v199) {#vc2-params}
 
 The VC-2 mode's step 2, third item. rom.4 has rom.2's three per-ID tables in rom.2's forms (VC2_VOCAL_DESIGNER.md, "The

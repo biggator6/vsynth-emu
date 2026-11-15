@@ -18,10 +18,10 @@ struct Rng {
 // XtToneCases.cpp
 int drawTime(Rng& r);
 int drawRate(Rng& r);
-void drawOsc(Rng& r, OscC& o);
+void drawOsc(Rng& r, OscC& o, bool extIn = false);
 void drawCosm(Rng& r, Ctl::Cosm& c);
 void drawMatrix(Rng& r, Ctl& c);
-Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false);
+Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2 = false, bool extIn = false);
 std::unordered_map<int, int> patchOf(const Ctl& c);
 // and the Multi Step Modulator's IDs, 0x48d…0x4ee (v193), beside patchOf's
 std::unordered_map<int, int> withMsmIds(std::unordered_map<int, int> p, const XtMsmSettings& s);
@@ -36,3 +36,7 @@ Ctl toneAlone(Ctl c);
 // xt_tone's MSM mode (XtToneMsm.cpp): `xt_tone <rom> msm [cases] [seed]`
 bool xtToneMsmMode(int argc, char** argv);
 int xtToneMsm(int argc, char** argv);
+// xt_tone's modes, then `run`, the whole check (XtToneCheck.cpp): the MSM mode, or `xt_tone <rom> extin [cases] [seed]
+// [inputs]`, the whole check with EXT IN drawn (v200), which the plain run doesn't draw, so its cases stay as they were
+// (one generator serves the run, so a case drawn otherwise moves every one after it)
+int xtToneMain(int argc, char** argv, int (*run)(int, char**, bool));

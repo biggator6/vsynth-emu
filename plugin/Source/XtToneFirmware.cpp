@@ -1,6 +1,25 @@
 // xt_tone's firmware side (XtToneFirmware.h): its power-on.  Moved from XtToneCheck.cpp as it stood (v193).
 #ifdef XT_TONE_MAIN
 #include "XtToneFirmware.h"
+#include "XtExtIn.h"
+
+namespace {
+constexpr uint32_t kInPointer = 0x8987c7a0;   // [FW] what the EXT IN player reads: the DMA's returned block + 16 (0x894daca2)
+constexpr uint32_t kInBlock = kRam + 0x8000;  // that block here: 32 frames of 32 bytes
+}
+
+// Once a block, before the tones render: the bus cleared, and this block's input (xtExtInTestBlock, XtSynth's too) at
+// words 4 and 5 of each frame, where the pointer says, as the effect chip's DMA leaves it (v200)
+void Firmware::clearBus() {
+    c.write(kBuf, std::vector<uint8_t>(0x400, 0).data(), 0x400);
+    int32_t lr[64];
+    xtExtInTestBlock(frames, lr);
+    for (uint32_t i = 0; i < 32; ++i) {
+        c.wr32(kInBlock + 32 * i + 16, (uint32_t)lr[2 * i]);
+        c.wr32(kInBlock + 32 * i + 20, (uint32_t)lr[2 * i + 1]);
+    }
+    c.wr32(kInPointer, kInBlock + 16);
+}
 
 bool Firmware::open(const char* path) {
         FILE* f = std::fopen(path, "rb");

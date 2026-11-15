@@ -283,7 +283,7 @@ public:
         for (uint32_t i = 0; i < 8; ++i) c.wr32(0x89f91c3c + 4 * i, below[i]);
         return ok;
     }
-    void clearBus() { c.write(kBuf, std::vector<uint8_t>(0x400, 0).data(), 0x400); }
+    void clearBus();   // the bus cleared and the block's input fed, once a block (XtToneFirmware.cpp, from v200)
     // A controller's value, which the next conversion pass reads (0x894e9fe0)
     void setCc(int cc, int value) { c.wr8(kCtl + 0x84 + (uint32_t)cc, (uint8_t)value); }
     void setPressure(int channel) { c.wr8(kCtl + 2, (uint8_t)channel); }

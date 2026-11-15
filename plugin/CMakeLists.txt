@@ -110,6 +110,13 @@ target_sources(VSynthEmu PRIVATE
     Source/XtLinearPlayer.cpp
     Source/XtLitePlayer.cpp
     Source/XtSynth.cpp
+    Source/XtSynthStart.cpp
+    Source/XtSynthOscStart.cpp
+    Source/XtSynthTrip.cpp
+    Source/XtSynthBlock.cpp
+    Source/XtSynthTva.cpp
+    Source/XtSynthClock.cpp
+    Source/XtExtIn.cpp
     Source/XtSynthArp.cpp
     Source/XtSynthZones.cpp
     Source/XtSynthNotes.cpp

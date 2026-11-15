@@ -68,6 +68,14 @@ tonefile() {
         tonecases) echo XtToneCases.cpp ;;
         tonepatchids) echo XtTonePatchIds.cpp ;;
         tonecarry) echo XtToneCarry.cpp ;;
+        tonestart) echo XtSynthStart.cpp ;;
+        toneoscstart) echo XtSynthOscStart.cpp ;;
+        tonetrip) echo XtSynthTrip.cpp ;;
+        toneblock) echo XtSynthBlock.cpp ;;
+        tonetva) echo XtSynthTva.cpp ;;
+        toneclock) echo XtSynthClock.cpp ;;
+        toneconsts) echo XtSynthConstants.h ;;
+        toneextin) echo XtExtIn.cpp ;;
     esac
 }
 # A port whose check is a harness of its own with the patches' reads (xt_arp, xt_msm): its files and those reads, all but
@@ -102,7 +110,8 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
            XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp Sh4Setup XtFiles XtWaveFile XtDiskImage XtPatchStore
            XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch
            XtSynthZones XtSynthNotes XtSynthUpdate XtSynthKnobs XtSynthEnvKnobs XtSynthMsm XtMsm XtMsmTrack XtMsmPatch
-           XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds Vc2Params XtFxValueText)
+           XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds Vc2Params XtFxValueText
+           XtSynthStart XtSynthOscStart XtSynthTrip XtSynthBlock XtSynthTva XtSynthClock XtExtIn)
     TONE=(-DXT_TONE_MAIN -DXT_TONE_CHECK -DXT_HARNESS_SWITCHES)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue
@@ -111,8 +120,10 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
         "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 "${TONE[@]}" -c "$S/$f.cpp" -o "$OBJ/$f.o" 2>&1 | grep -E " error"
     done
     EXTRA=(-DXT_TONE_CHECK "${HARNESS_SWITCHES[@]}")
-    # PORT=wire…: the Multi Step Modulator's wiring, against xt_tone's MSM mode, [cases] its cases (v193)
+    # PORT=wire…: the Multi Step Modulator's wiring, against xt_tone's MSM mode, [cases] its cases (v193); TONE_MODE=extin:
+    # any tone port's plant against xt_tone's EXT IN mode (`xt_tone rom extin [cases] [seed] [inputs]`, v200)
     [[ "$PORT" == wire* ]] && ARGS=("$C" "${SEED:-2024}") && C=msm
+    [ "${TONE_MODE:-}" = extin ] && ARGS=("$C" "${SEED:-2024}" "$WORK/inputs") && C=extin
 elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck's baseline; [cases] is not used
     F=XtSoloVoice.cpp; D=XT_FW_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
     L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197

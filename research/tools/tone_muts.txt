@@ -1,10 +1,10 @@
-stale-porta|    v->porta = XtPitchRamp{};\n|
-seed-shift|oscLfoNoteOn(*v, *v, Z, freeLfo[zone], other ? &other->lfo : nullptr, seed[1]);|oscLfoNoteOn(*v, *v, Z, freeLfo[zone], other ? &other->lfo : nullptr, seed[2]);
-seed-few|    for (float& x : seed) x = drawSeed();|    for (int i = 0; i < 7; ++i) seed[i] = drawSeed();
-voice-end|if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent)|if (v.env.done() && mul(v.cur[0], 2.0f) <= kSilent && v.cur[1] <= kSilent)
+stale-porta|    v->porta = XtPitchRamp{};\n||tonestart
+seed-shift|oscLfoNoteOn(*v, *v, Z, freeLfo[zone], other ? &other->lfo : nullptr, seed[1]);|oscLfoNoteOn(*v, *v, Z, freeLfo[zone], other ? &other->lfo : nullptr, seed[2]);|tonestart
+seed-few|    for (float& x : seed) x = drawSeed();|    for (int i = 0; i < 7; ++i) seed[i] = drawSeed();|tonestart
+voice-end|if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent)|if (v.env.done() && mul(v.cur[0], 2.0f) <= kSilent && v.cur[1] <= kSilent)|tonetva
 lfo-pitch-depth|std::clamp(o.lfoPitchDepth + oscTerm(v, s, xtmsm::OscLfoPitch) + v.mx[dL + 1], -63, 63)|std::clamp(o.lfoTimeDepth + oscTerm(v, s, xtmsm::OscLfoPitch) + v.mx[dL + 1], -63, 63)|toneknobs
 penv-depth|std::clamp(o.pDepth + oscTerm(v, s, xtmsm::OscPenv), -63, 63)|std::clamp(o.tDepth + oscTerm(v, s, xtmsm::OscPenv), -63, 63)|toneknobs
-root-key|s.analog ? 69 : o.rootKey|s.analog ? 60 : o.rootKey|toneknobs
+root-key|s.analog \|\| s.extIn ? 69 : o.rootKey|s.analog \|\| s.extIn ? 60 : o.rootKey|toneknobs
 formant-env|v.mx[OscFormant + dO]), s.fenv.level(), fEnv,|v.mx[OscFormant + dO]), s.tenv.level(), fEnv,|toneknobs
 time-kf|xtOscTime(time, o.oscTimeOffset, o.oscTimeKF, v.note,|xtOscTime(time, o.oscTimeOffset, o.oscFormantKF, v.note,|toneknobs
 energy|g = xtOscEnergy(o.energy);|g = xtOscEnergy(o.energy / 2);|toneknobs
@@ -12,43 +12,43 @@ level-kf|xtOscLevel(knob, o.oscLevelKF, v.note,|xtOscLevel(knob, 0, v.note,|tone
 level-vel|xtVelGain(v.vel, o.oscVelSens, o.oscVelCurve)|xtVelGain(v.vel, ctl.ampVelSens, o.oscVelCurve)|toneknobs
 level-lfo|const int lfo = o.oscLevelLfoDepth + oscTerm(|const int lfo = o.lfoPitchDepth + oscTerm(|toneknobs
 osc2-flag|fatVel, pwVel, &s == &v.osc2, m)|fatVel, pwVel, false, m)|toneknobs
-gain-start|s.curGain = gainTarget(v, s, o, s.oenv.level());                                                  // +0x154 (0x894f3dc0)|s.curGain = gainStart;
-ana-env-swap|s.curGain, gainStart, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared)|s.curGain, gainStart, s.tenv.level(), s.fenv.level(), s.lfo.out(), anaShared)
-ana-update-swap|s.ana.update(analogBlock(v, s, o), A, gt, s.fenv.level(), s.tenv.level(), s.lfo.out());|s.ana.update(analogBlock(v, s, o), A, gt, s.tenv.level(), s.fenv.level(), s.lfo.out());
+gain-start|s.curGain = gainTarget(v, s, o, s.oenv.level());                                                  // +0x154 (0x894f3dc0)|s.curGain = gainStart;|toneoscstart
+ana-env-swap|s.curGain, gainStart, s.fenv.level(), s.tenv.level(), s.lfo.out(), anaShared)|s.curGain, gainStart, s.tenv.level(), s.fenv.level(), s.lfo.out(), anaShared)|toneoscstart
+ana-update-swap|s.ana.update(analogBlock(v, s, o), A, gt, s.fenv.level(), s.tenv.level(), s.lfo.out());|s.ana.update(analogBlock(v, s, o), A, gt, s.tenv.level(), s.fenv.level(), s.lfo.out());|toneblock
 amp-env-sens|k.aSens = o.oASens; k.dSens = o.oDSens; k.rSens = o.oRSens;|k.aSens = o.oASens; k.dSens = o.oRSens; k.rSens = o.oDSens;|toneenvknobs
 amp-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nXtLfoParams XtSynth::lfoParams|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nXtLfoParams XtSynth::lfoParams|toneenvknobs
 osc-env-curve|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 0);\n}\n\nXtEnvParams XtSynth::envParams|return xtEnvAdsr(k, v.note, v.vel, v.relVel, 2);\n}\n\nXtEnvParams XtSynth::envParams|toneenvknobs
 tva-env-rsens|k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens;|k.aSens = Z.aSens; k.dSens = Z.rSens; k.rSens = Z.dSens;|toneenvknobs
 tva-time-kf|k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens; k.timeKF = Z.timeKF;\n    XtEnvParams p = xtEnvAdsr|k.aSens = Z.aSens; k.dSens = Z.dSens; k.rSens = Z.rSens;\n    XtEnvParams p = xtEnvAdsr|toneenvknobs
-tva-level|v->velGain = xtVelGain(v->vel, Z.ampVelSens, Z.ampVelCurve);|v->velGain = 1.0f;
-tva-frames|float frames = 441.0f;|float frames = 440.0f;
-tva-land|xtf::mul(d, kLand) : v.step[c]|xtf::mul(d, 0.03125f) : v.step[c]
-tva-elapsed|v.elapsed += 32.0f;|v.elapsed += 33.0f;
-tva-noattack|constexpr float kNoAttackMs = 0x1.99999ap-4f;|constexpr float kNoAttackMs = 0x1.8p-4f;
+tva-level|v->velGain = xtVelGain(v->vel, Z.ampVelSens, Z.ampVelCurve);|v->velGain = 1.0f;|tonestart
+tva-frames|float frames = 441.0f;|float frames = 440.0f;|tonetva
+tva-land|xtf::mul(d, kLand) : v.step[c]|xtf::mul(d, 0.03125f) : v.step[c]|toneblock
+tva-elapsed|v.elapsed += 32.0f;|v.elapsed += 33.0f;|toneblock
+tva-noattack|constexpr float kNoAttackMs = 0x1.99999ap-4f;|constexpr float kNoAttackMs = 0x1.8p-4f;|toneconsts
 tva-truncate|v.damping = true;\n    v.damp = 1.0f;|v.damping = true;\n    v.damp = 0.5f;
 key-octave|return std::clamp(key + 12 * ctl.octave, 0, 127);|return std::clamp(key + 11 * ctl.octave, 0, 127);
-source-key|shiftKey(Z.mono ? keys.prevMono : keys.prevPoly)|shiftKey(Z.mono ? keys.prevPoly : keys.prevMono)
-porta-legato|Z.portaMode == 1 && !held ? note|Z.portaMode == 1 && held ? note
+source-key|shiftKey(Z.mono ? keys.prevMono : keys.prevPoly)|shiftKey(Z.mono ? keys.prevPoly : keys.prevMono)|tonestart
+porta-legato|Z.portaMode == 1 && !held ? note|Z.portaMode == 1 && held ? note|tonestart
 porta-velo|xtPortaSettings(Z.portamento, Z.portaType, time, Z.portaVeloSens, v.vel)|xtPortaSettings(Z.portamento, Z.portaType, time, 0, v.vel)|toneknobs
-porta-tick|s.porta.tick(1);                               // 0x894f4b00, before the voice update|;
+porta-tick|s.porta.tick(1);                               // 0x894f4b00, before the voice update|;|toneblock
 bend|xtPitchBend(bender, Z.bendUp, Z.bendDown)|xtPitchBend(bender, Z.bendDown, Z.bendUp)|toneknobs
 scale-tune|t.scaleOn = Z.scaleTune;|t.scaleOn = false;|toneknobs
 patch-fine|t.fine = Z.patchFine + (int)(shift - semis * 100L);|t.fine = (int)(shift - semis * 100L);|toneknobs
 pitch-kf|xtPitchCents(key, coarse, 10 * o.pitchKF, fine,|xtPitchCents(key, coarse, 1000, fine,|toneknobs
 release-velocity|v.relVel = v.relHeld;|v.relVel = v.vel;
 lfo-off|        s.lfo.noteOff();\n|
-free-run-tick|            freeLfo[z].tick(1);|            ;
-free-follow|else if (other) s.lfo.noteOnFollow(lfoParams(v, s, o), *other);|
-smooth-walk|s.curWalk = xtOscSmooth(s.curWalk, w);|s.curWalk = w;
-smooth-gain|s.curGain = xtOscSmooth(s.curGain, gt);|s.curGain = gt;
+free-run-tick|            freeLfo[z].tick(1);|            ;|toneblock
+free-follow|else if (other) s.lfo.noteOnFollow(lfoParams(v, s, o), *other);||toneoscstart
+smooth-walk|s.curWalk = xtOscSmooth(s.curWalk, w);|s.curWalk = w;|toneblock
+smooth-gain|s.curGain = xtOscSmooth(s.curGain, gt);|s.curGain = gt;|toneblock
 legato-env|        v.env.update(envParams(v));\n        if (v.on) oscEnvs(v, v, Z, false);\n|        v.env.update(envParams(v));\n
 legato-source|v.srcKey = shiftKey(keys.prevMono);|v.srcKey = shiftKey(keys.prevPoly);
 legato-level|        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);\n|
 live-key|    if (k == s.kfKey) return;|    if (k != s.kfKey) return;|toneknobs
-order-osc|if (v->on) oscStart(*v, *v, Z);\n    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);\n    if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);|if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);\n    if (v->on) oscStart(*v, *v, Z);\n    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);
-order-render|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 0.0f);|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 1.0f);
-mix-skip|if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);|
-cosm-order|                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);
+order-osc|if (v->on) oscStart(*v, *v, Z);\n    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);\n    if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);|if (v->osc2.on) oscStart(*v, v->osc2, Z.osc2);\n    if (v->on) oscStart(*v, *v, Z);\n    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);|tonestart
+order-render|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 0.0f);|                if (!v.osc2.on) std::fill(tmp2, tmp2 + 64, 1.0f);|toneblock
+mix-skip|if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);||toneblock
+cosm-order|                if (v.cs[0].on) v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|                if (v.cs[1].on) v.cs[1].process(tmp, 1.0f);|toneblock
 cosm-tvf-env|else c.tvf.setBlock(cosmBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo);|else c.tvf.setBlock(cosmBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo);
 cosm-tvf-kf|p.keyfollow = c.kf / 10; p.cutoffLfo|p.keyfollow = c.kf; p.cutoffLfo
 cosm-vel|xtCosmVelocity(v.vel, c.envA.velSens, c.envA.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1|xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve), vb = xtCosmVelocity(v.vel, c.envB.velSens, c.envB.velCurve);\n    return v.cs[k].type == 1
@@ -65,17 +65,17 @@ cosm-lim|p.attack = c.limAttack + m[xtmx::CosmPrm1]; p.release = c.limRelease + 
 cosm-ws|p.driveLfo = c.wsDriveLfo + m[xtmx::CosmLfoPrm1]; p.driveEnv = c.wsDriveEnv;|p.driveLfo = c.wsDriveEnv + m[xtmx::CosmLfoPrm1]; p.driveEnv = c.wsDriveLfo;
 cosm-od|p.toneKf = c.odToneKf / 10;|p.toneKf = 0;
 cosm-amp|p.bass = c.ampBass; p.middle = c.ampMiddle;|p.bass = c.ampMiddle; p.middle = c.ampBass;
-cosm-spk|c.spk.noteOn({ Z.cosm[k].spkType });|c.spk.noteOn({ 0 });
-cosm-lfo|if (Z.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], v->blockTempo);|if (Z.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[6], v->blockTempo);
-cosm-update-env|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envA.level(), c.envA.smooth(), c.envB.level(), c.envB.smooth(),|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envB.level(), c.envB.smooth(), c.envA.level(), c.envA.smooth(),
-cosm-comb-root|s.robot \|\| s.analog \|\| !s.on, tune.offset, tune.detune);|s.robot \|\| !s.on, tune.offset, tune.detune);
-robot-any|v->robotKnob = Z.robot && v->on && !v->analog && v->wave->type == 1;|v->robotKnob = Z.robot && v->on && !v->analog;
+cosm-spk|c.spk.noteOn({ Z.cosm[k].spkType });|c.spk.noteOn({ 0 });|tonestart
+cosm-lfo|if (Z.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], v->blockTempo);|if (Z.cosm[k].lfoKeySync) c.lfo.noteOn(clfoParams(*v, k), seed[6], v->blockTempo);|tonestart
+cosm-update-env|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envA.level(), c.envA.smooth(), c.envB.level(), c.envB.smooth(),|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA, c.envB.level(), c.envB.smooth(), c.envA.level(), c.envA.smooth(),|toneblock
+cosm-comb-root|const bool at440 = s.robot \|\| s.analog \|\| s.extIn \|\| !s.on;|const bool at440 = s.robot \|\| s.extIn \|\| !s.on;|tonestart
+robot-any|v->robotKnob = Z.robot && pcm(*v) && v->wave->type == 1;|v->robotKnob = Z.robot && pcm(*v);|tonestart
 loop-mode|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 2);|l.fwdMode = l.bwdMode = std::clamp(o.loopMode, 0, 1);
 loop-switch|l.on = o.loop;|l.on = false;
-mod-flag|v->mod.noteOn(modBlk[zone], stereo(*v), stereo(v->osc2), v->on && v->analog, modShared,|v->mod.noteOn(modBlk[zone], false, false, false, modShared,
+mod-flag|v->mod.noteOn(modBlk[zone], stereo(*v), stereo(v->osc2), v->on && v->analog, modShared,|v->mod.noteOn(modBlk[zone], false, false, false, modShared,|tonestart
 held-live|    Voice::CosmVoice& c = v.cs[k];\n    if (c.type == 4) { c.comb.setBlock|    Voice::CosmVoice& c = v.cs[k];\n    c.hold();\n    if (c.type == 4) { c.comb.setBlock
-held-note-on|        c.hold();\n        if (c.type == 2)\n|        if (c.type == 2)\n
-held-tick|                c.hold();\n                c.update(xtCosmOsc|                c.update(xtCosmOsc
+held-note-on|        c.hold();\n        if (c.type == 2)\n|        if (c.type == 2)\n|tonestart
+held-tick|                c.hold();\n                c.update(xtCosmOsc|                c.update(xtCosmOsc|toneblock
 held-comb|c.comb.setBlock(combBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo)|c.comb.setBlock(combBlock(v, k), c.envB.level(), c.heldLfo, c.envA.level(), c.heldLfo)
 held-sbf|c.sbf.setBlock(sbfBlock(v, k), c.heldB, c.heldLfo, c.heldA, c.heldLfo)|c.sbf.setBlock(sbfBlock(v, k), c.envB.level(), c.heldLfo, c.envA.level(), c.heldLfo)
 held-res|c.res.setBlock(resBlock(v, k), c.heldA, c.heldLfo, c.heldB, c.heldLfo)|c.res.setBlock(resBlock(v, k), c.envA.level(), c.heldLfo, c.envB.level(), c.heldLfo)
@@ -93,19 +93,19 @@ diff-oenv|\|\| n.oASens != o.oASens \|\| n.oDSens != o.oDSens \|\| n.oRSens != o
 diff-key|\|\| n.pitchKF != o.pitchKF \|\| c.pitchSemis != was.pitchSemis;|\|\| c.pitchSemis != was.pitchSemis;
 diff-porta|\|\| c.portaVeloSens != was.portaVeloSens|
 diff-cenv|return a.attack != b.attack \|\| a.decay != b.decay|return a.attack != b.attack
-mod-tone|modShared, (int)(v - voice));|modShared, 0);
-mod-plain|                if (v.mod.plain()) {\n                    if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);\n                } else v.mod.process(tmp, tmp, tmp2);|                if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);
+mod-tone|modShared, (int)(v - voice));|modShared, 0);|tonestart
+mod-plain|                if (v.mod.plain()) {\n                    if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);\n                } else v.mod.process(tmp, tmp, tmp2);|                if (v.osc2.on \|\| (v.structure == 2 && v.cs[1].on)) xtAnalogMix(tmp, tmp2);|toneblock
 mod-convert|    xtModBlock(ctl.mod, modBlk[0]);\n||tonezones
-mod-order|v.mod.process(tmp, tmp, tmp2);|v.mod.process(tmp, tmp2, tmp);
+mod-order|v.mod.process(tmp, tmp, tmp2);|v.mod.process(tmp, tmp2, tmp);|toneblock
 bend-block|    bender = b;\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);|    bender = b;
 mod-any|    if (anyChanged) v.mod.setBlock(modBlk[v.zone]);|    if (c.mod.on != was.mod.on \|\| c.mod.type != was.mod.type \|\| c.mod.level != was.mod.level \|\| c.mod.attack != was.mod.attack \|\| c.mod.release != was.mod.release) v.mod.setBlock(modBlk[v.zone]);
 mod-legato|        v.mod.setBlock(modBlk[v.zone]);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmNewBlock(v, k);|        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmNewBlock(v, k);
 legato-order|        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(Z.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(Z.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);\n        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        if (v.on) oscEnvs(v, v, Z, false);\n        if (v.osc2.on) oscEnvs(v, v.osc2, Z.osc2, false);\n        oscBeat(v, Z);\n        oscBeat(v.osc2, Z.osc2);\n        v.mod.setBlock(modBlk[v.zone]);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n            cosmNewBlock(v, k);                        // as in setControls, before the envelopes' update\n|        for (int k = 0; k < 2; ++k)\n            if (v.cs[k].on) cosmNewBlock(v, k);\n        v.note = key;\n        v.raw = keys.cur;\n        v.srcKey = shiftKey(keys.prevMono);\n        v.vel = vel;\n        v.keyFlags = 7;\n        matrixUpdate(v);                               // for the pad, which moves its source with no update of its own\n        v.rnd = pitchRandom.next(xtRandomPitchDepth(Z.randomPitch));\n        v.osc2.rnd = pitchRandom.next(xtRandomPitchDepth(Z.osc2.randomPitch));\n        v.velGain = xtVelGain(v.vel, Z.ampVelSens, Z.ampVelCurve);\n        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update(envParams(v));\n        if (v.on) oscEnvs(v, v, Z, false);\n        if (v.osc2.on) oscEnvs(v, v.osc2, Z.osc2, false);\n        oscBeat(v, Z);\n        oscBeat(v.osc2, Z.osc2);\n        v.mod.setBlock(modBlk[v.zone]);\n        for (int k = 0; k < 2; ++k) {\n            if (!v.cs[k].on) continue;\n
-sync-input|v.ana.process(tmp, sync, tmp2);|v.ana.process(tmp, 0, tmp2);
-sync-mask|            v.mod.setMask(mask2);|
-sync-la|if (&s == &v.osc2 && modBlk[v.zone].type == 4 && b.code == 10) b.code = 2;|
-struct-latch|v->structure = std::clamp(Z.structure, 0, 2);|v->structure = 0;
-struct-pitch|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA,|c.update(v.curA,
+sync-input|v.ana.process(tmp, sync, tmp2);|v.ana.process(tmp, 0, tmp2);|toneblock
+sync-mask|            v.mod.setMask(mask2);||toneblock
+sync-la|if (&s == &v.osc2 && modBlk[v.zone].type == 4 && b.code == 10) b.code = 2;||toneoscstart
+struct-latch|v->structure = std::clamp(Z.structure, 0, 2);|v->structure = 0;|tonestart
+struct-pitch|c.update(xtCosmOsc(v.structure, k) ? v.osc2.curA : v.curA,|c.update(v.curA,|toneblock
 tva-off-times|        for (float& t : p.time) t = 0.0f;\n||toneenvknobs
 tva-off-level|        p.level[3] = 1.0f;\n||toneenvknobs
 tva-diff|const bool tvaChanged = c.tvaOn != was.tvaOn;|const bool tvaChanged = false;
@@ -113,31 +113,31 @@ tva-off-gain|k.on = Z.tvaOn;|k.on = true;|toneenvknobs
 tva-legato-gain|        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update|        if (Z.on) v.blockTempo = tempoNow();\n        v.env.update
 tva-live-gain|    if (anyChanged) tvaNewBlock(v);                // the velocity as latched\n|
 tva-latch|return xtTvaBlock(k, v.note, v.velGain);|return xtTvaBlock(k, v.note, xtVelGain(v.vel, ctl.ampVelSens, ctl.ampVelCurve));|toneenvknobs
-osc2-render|else pcmBlock(v.osc2, tmp2);|else std::fill(tmp2, tmp2 + 64, 0.0f);
-osc2-plays|return waveOf(zone, osc) != nullptr;|return waveOf(zone, 0) != nullptr;
-osc2-robot|v->osc2.robotKnob = Z.osc2.robot && v->osc2.on && !v->osc2.analog && v->osc2.wave->type == 1;|v->osc2.robotKnob = false;
-osc2-robot-osc1|v->osc2.robotKnob = Z.osc2.robot &&|v->osc2.robotKnob = Z.robot &&
-band-loop-knobs|s.mb.setLoop(waveLoop(s, o));|s.mb.setLoop(waveLoop(s, ctl));
-solo-loop-knobs|s.solo.setLoop(waveLoop(s, o));|s.solo.setLoop(waveLoop(s, ctl));
+osc2-render|else pcmBlock(v.osc2, tmp2);|else std::fill(tmp2, tmp2 + 64, 0.0f);|toneblock
+osc2-plays|return waveOf(zone, osc) != nullptr;|return waveOf(zone, 0) != nullptr;|toneoscstart
+osc2-robot|v->osc2.robotKnob = Z.osc2.robot && pcm(v->osc2) && v->osc2.wave->type == 1;|v->osc2.robotKnob = false;|tonestart
+osc2-robot-osc1|v->osc2.robotKnob = Z.osc2.robot &&|v->osc2.robotKnob = Z.robot &&|tonestart
+band-loop-knobs|s.mb.setLoop(waveLoop(s, o));|s.mb.setLoop(waveLoop(s, ctl));|toneoscstart
+solo-loop-knobs|s.solo.setLoop(waveLoop(s, o));|s.solo.setLoop(waveLoop(s, ctl));|toneoscstart
 loop-frames|const int last = (int)s.wave->frames - 1;|const int last = (int)s.wave->frames - 2;
-mod-stereo2|stereo(*v), stereo(v->osc2), v->on|stereo(*v), false, v->on
-mod-stereo1|modBlk[zone], stereo(*v), stereo(v->osc2)|modBlk[zone], false, stereo(v->osc2)
-band-start-gain|s.mb.setGainXt(gainStart, true);|s.mb.setGainXt(s.curGain, true);
-solo-start-gain|s.solo.resetGain(gainStart);|s.solo.resetGain(s.curGain);
-band-type|s.mb.noteOn(s.wave->wave, s.wave->type,|s.mb.noteOn(s.wave->wave, s.wave->type == 3 ? 5 : 3,
+mod-stereo2|stereo(*v), stereo(v->osc2), v->on|stereo(*v), false, v->on|tonestart
+mod-stereo1|modBlk[zone], stereo(*v), stereo(v->osc2)|modBlk[zone], false, stereo(v->osc2)|tonestart
+band-start-gain|s.mb.setGainXt(gainStart, true);|s.mb.setGainXt(s.curGain, true);|toneoscstart
+solo-start-gain|s.solo.resetGain(gainStart);|s.solo.resetGain(s.curGain);|toneoscstart
+band-type|s.mb.noteOn(s.wave->wave, s.wave->type,|s.mb.noteOn(s.wave->wave, s.wave->type == 3 ? 5 : 3,|toneoscstart
 rates-type|if (s.wave->type == 1) { s.solo.setRates|if (s.wave->type == 3) { s.solo.setRates
-cosm-past-none|v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|v.cs[0].process(tmp, 1.0f);
-cosm-past-always|v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|v.cs[0].process(tmp, 1.0f, tmp2);
-cosm-words-held|        c.holdWords();\n|
-cosm-words-set|            c.tb.setHpWords(c.word8c, c.word90);\n|
-cosm-stereo-never|c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);|c.stereo = false;
-cosm-stereo-osc1|c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);|c.stereo = stereo(*v);
-cosm-stereo-osc2|c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);|c.stereo = stereo(v->osc2);
-cosm-stereo-analog|auto stereo = [](const OscVoice& s) { return s.on && !s.analog && s.wave->channels == 2; };|auto stereo = [](const OscVoice& s) { return s.on && s.wave && s.wave->channels == 2; };
-cosm-stereo-off|auto stereo = [](const OscVoice& s) { return s.on && !s.analog && s.wave->channels == 2; };|auto stereo = [](const OscVoice& s) { return !s.analog && s.wave && s.wave->channels == 2; };
-cosm-past2-none|v.cs[1].process(tmp2, 1.0f, mixPast);|v.cs[1].process(tmp2, 1.0f);
-cosm-past2-kept|        std::copy(tmp, tmp + 3, mixPast);\n|
-fm-tone-0|modShared, (int)(v - voice));|modShared, 0);
+cosm-past-none|v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|v.cs[0].process(tmp, 1.0f);|toneblock
+cosm-past-always|v.cs[0].process(tmp, 1.0f, v.structure != 0 ? tmp2 : nullptr);|v.cs[0].process(tmp, 1.0f, tmp2);|toneblock
+cosm-words-held|        c.holdWords();\n||tonestart
+cosm-words-set|            c.tb.setHpWords(c.word8c, c.word90);\n||tonestart
+cosm-stereo-never|c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);|c.stereo = false;|tonestart
+cosm-stereo-osc1|c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);|c.stereo = stereo(*v);|tonestart
+cosm-stereo-osc2|c.stereo = stereo(xtCosmOsc(v->structure, k) ? v->osc2 : *v);|c.stereo = stereo(v->osc2);|tonestart
+cosm-stereo-analog|return (pcm(s) && s.wave->channels == 2) \|\||return (s.on && !s.extIn && s.wave && s.wave->channels == 2) \|\||tonestart
+cosm-stereo-off|return (pcm(s) && s.wave->channels == 2) \|\||return (!s.analog && !s.extIn && s.wave && s.wave->channels == 2) \|\||tonestart
+cosm-past2-none|v.cs[1].process(tmp2, 1.0f, mixPast);|v.cs[1].process(tmp2, 1.0f);|toneblock
+cosm-past2-kept|        std::copy(tmp, tmp + 3, mixPast);\n||toneblock
+fm-tone-0|modShared, (int)(v - voice));|modShared, 0);|tonestart
 fm-lines-cleared|    for (Voice& v : voice) v.active = false;\n    keysCleared();|    for (Voice& v : voice) v.active = false;\n    std::fill(std::begin(modShared.line), std::end(modShared.line), 0.0f);\n    keysCleared();
 solo-old-mix|recs = xtSoloEncode(pcm.data(), (int)frames, ch);|std::vector<int16_t> x16((size_t)frames); for (long i = 0; i < frames; ++i) x16[(size_t)i] = ch == 2 ? (int16_t)(((int)pcm[(size_t)(2 * i)] + (int)pcm[(size_t)(2 * i + 1)]) >> 1) : pcm[(size_t)i]; recs = xtSoloEncode(x16.data(), (int)frames);
 tvab-cc7|mul(mul(mul(frac(T.level, cc(k.cc7)), frac(T.level, levelAtKey|mul(mul(mul(frac(T.level, cc(k.cc11)), frac(T.level, levelAtKey|toneosc
@@ -166,49 +166,49 @@ tvab-c10|k.cc7 = cc[7]; k.cc11 = cc[11]; k.cc10 = cc[10];|k.cc7 = cc[7]; k.cc11 
 tvab-cc-map|k.cc7 = cc[7]; k.cc11 = cc[11];|k.cc7 = cc[11]; k.cc11 = cc[7];|toneenvknobs
 tvab-cc-update|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n\n// The pressures|}\n\n// The pressures
 tvab-new|    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);\n|    v.mod.setBlock(modBlk[v.zone]);\n|toneupdate
-tvab-bus-start|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus); v->bus[XtBusMultiL] = 1.0f;
-tvab-bus-start-r|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus); v->bus[XtBusMultiR] = v->tb.bus[XtBusMultiL];
-tvab-bus-glide|constexpr float kSendGlide = 0x1.eb851ep-11f;|constexpr float kSendGlide = 0x1.eb8520p-11f;
-tvab-bus-still|e[b] = xtf::mul(xtf::sub(v.tb.bus[b], v.bus[b]), kSendGlide);|e[b] = 0.0f;
-tvab-bus-render|f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(a, v.bus[XtBusMultiL]));|f[FrameMultiL] = (float)((double)a * v.bus[XtBusMultiL] + f[FrameMultiL]);
-tvab-bus-step|            v.bus[XtBusMultiL] = xtf::add(v.bus[XtBusMultiL], e[XtBusMultiL]);\n|
-tvab-trunc-bus|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|{ float* f = frame + kFrameWords * i; f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp)); f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.bus[XtBusMultiR])); }
-tvab-trunc-bus-r|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|{ float* f = frame + kFrameWords * i; f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), v.bus[XtBusMultiL])); f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp)); }
-tvab-trunc-order|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|{ float* f = frame + kFrameWords * i; f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.bus[XtBusMultiL]), v.damp)); f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.bus[XtBusMultiR])); }
-tvag-lfo|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv)|const float x = levelEnv
-tvag-pan|p = mul(v.tlfo.out(), v.tb.panLfoDepth);|p = 0.0f;
-tvag-r|lr[1] = std::clamp(mul(x, add(p, 1.0f)), -1.0f, 1.0f);|lr[1] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);
-tvag-clamp|lr[0] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);|lr[0] = mul(x, sub(1.0f, p));
-tvag-clamp-r|lr[1] = std::clamp(mul(x, add(p, 1.0f)), -1.0f, 1.0f);|lr[1] = mul(x, add(p, 1.0f));
-tvag-order|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv), p = mul(v.tlfo.out(), v.tb.panLfoDepth);\n    lr[0] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv), p = mul(v.tlfo.out(), v.tb.panLfoDepth);\n    lr[0] = std::clamp(mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), mul(levelEnv, sub(1.0f, p))), -1.0f, 1.0f);
-tvag-start|tvaGains(*v, mul(v->env.onsetLevel(), v->tb.level), v->cur);|tvaGains(*v, mul(v->env.level(), v->tb.level), v->cur);
-tvag-done-r|v.cur[0] <= kSilent && v.cur[1] <= kSilent|v.cur[0] <= kSilent
-tvag-step-r|    v.step[1] = div(sub(v.target[1], v.cur[1]), frames);\n    v.elapsed = 0;\n}|    v.step[1] = v.step[0];\n    v.elapsed = 0;\n}
-tvag-note-step-r|    v->step[1] = div(sub(v->target[1], v->cur[1]), frames);|    v->step[1] = v->step[0];
-tvag-land-r|std::fabs(xtf::mul(v.step[c], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];|std::fabs(xtf::mul(v.step[0], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];
+tvab-bus-start|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus); v->bus[XtBusMultiL] = 1.0f;|tonestart
+tvab-bus-start-r|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus); v->bus[XtBusMultiR] = v->tb.bus[XtBusMultiL];|tonestart
+tvab-bus-glide|constexpr float kSendGlide = 0x1.eb851ep-11f;|constexpr float kSendGlide = 0x1.eb8520p-11f;|toneconsts
+tvab-bus-still|e[b] = xtf::mul(xtf::sub(v.tb.bus[b], v.bus[b]), kSendGlide);|e[b] = 0.0f;|toneblock
+tvab-bus-render|f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(a, v.bus[XtBusMultiL]));|f[FrameMultiL] = (float)((double)a * v.bus[XtBusMultiL] + f[FrameMultiL]);|toneblock
+tvab-bus-step|            v.bus[XtBusMultiL] = xtf::add(v.bus[XtBusMultiL], e[XtBusMultiL]);\n||toneblock
+tvab-trunc-bus|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|{ float* f = frame + kFrameWords * i; f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp)); f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.bus[XtBusMultiR])); }|toneblock
+tvab-trunc-bus-r|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|{ float* f = frame + kFrameWords * i; f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), v.bus[XtBusMultiL])); f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp)); }|toneblock
+tvab-trunc-order|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp), xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|{ float* f = frame + kFrameWords * i; f[FrameMultiL] = xtf::add(f[FrameMultiL], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.bus[XtBusMultiL]), v.damp)); f[FrameMultiR] = xtf::add(f[FrameMultiR], xtf::mul(xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp), v.bus[XtBusMultiR])); }|toneblock
+tvag-lfo|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv)|const float x = levelEnv|tonetva
+tvag-pan|p = mul(v.tlfo.out(), v.tb.panLfoDepth);|p = 0.0f;|tonetva
+tvag-r|lr[1] = std::clamp(mul(x, add(p, 1.0f)), -1.0f, 1.0f);|lr[1] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);|tonetva
+tvag-clamp|lr[0] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);|lr[0] = mul(x, sub(1.0f, p));|tonetva
+tvag-clamp-r|lr[1] = std::clamp(mul(x, add(p, 1.0f)), -1.0f, 1.0f);|lr[1] = mul(x, add(p, 1.0f));|tonetva
+tvag-order|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv), p = mul(v.tlfo.out(), v.tb.panLfoDepth);\n    lr[0] = std::clamp(mul(x, sub(1.0f, p)), -1.0f, 1.0f);|const float x = mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), levelEnv), p = mul(v.tlfo.out(), v.tb.panLfoDepth);\n    lr[0] = std::clamp(mul(add(mul(v.tlfo.out(), v.tb.lfoDepth), 1.0f), mul(levelEnv, sub(1.0f, p))), -1.0f, 1.0f);|tonetva
+tvag-start|tvaGains(*v, mul(v->env.onsetLevel(), v->tb.level), v->cur);|tvaGains(*v, mul(v->env.level(), v->tb.level), v->cur);|tonestart
+tvag-done-r|v.cur[0] <= kSilent && v.cur[1] <= kSilent|v.cur[0] <= kSilent|tonetva
+tvag-step-r|    v.step[1] = div(sub(v.target[1], v.cur[1]), frames);\n    v.elapsed = 0;\n}|    v.step[1] = v.step[0];\n    v.elapsed = 0;\n}|tonetva
+tvag-note-step-r|    v->step[1] = div(sub(v->target[1], v->cur[1]), frames);|    v->step[1] = v->step[0];|tonestart
+tvag-land-r|std::fabs(xtf::mul(v.step[c], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];|std::fabs(xtf::mul(v.step[0], 32.0f)) > std::fabs(d) ? xtf::mul(d, kLand) : v.step[c];|toneblock
 tlfo-wave|return xtLfoConvert(Z.tvaLfoWave, rate|return xtLfoConvert(Z.lfoWave, rate|toneenvknobs
 tlfo-rate|withSum(Z.tvaLfoRate, v.mx[xtmx::TvaLfoRate]|withSum(Z.lfoRate, v.mx[xtmx::TvaLfoRate]|toneenvknobs
 tlfo-offset|rate, Z.tvaLfoOffset, Z.tvaLfoDelay|rate, Z.lfoOffset, Z.tvaLfoDelay|toneenvknobs
 tlfo-delay|Z.tvaLfoOffset, Z.tvaLfoDelay, Z.tvaLfoFadeMode|Z.tvaLfoOffset, Z.lfoDelay, Z.tvaLfoFadeMode|toneenvknobs
 tlfo-mode|Z.tvaLfoDelay, Z.tvaLfoFadeMode, Z.tvaLfoFade|Z.tvaLfoDelay, Z.lfoFadeMode, Z.tvaLfoFade|toneenvknobs
 tlfo-fade|Z.tvaLfoFadeMode, Z.tvaLfoFade,|Z.tvaLfoFadeMode, Z.lfoFade,|toneenvknobs
-tlfo-seed|v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);|v->tlfo.noteOn(tlfoParams(*v), seed[6], v->blockTempo);
-tlfo-seed-free|v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo[zone], v->blockTempo);|v->tlfo.noteOnFree(tlfoParams(*v), seed[6], freeTlfo[zone], v->blockTempo);
-tlfo-sync|if (Z.tvaLfoKeySync) v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);\n    else if (other) v->tlfo.noteOnFollow(tlfoParams(*v), other->tlfo);\n    else v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo[zone], v->blockTempo);|v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);
-tlfo-follow|    else if (other) v->tlfo.noteOnFollow(tlfoParams(*v), other->tlfo);\n|
-tlfo-free|v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo[zone], v->blockTempo);|v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeLfo[zone], v->blockTempo);
-tlfo-free-tick|            freeTlfo[z].tick(1);\n|
-tlfo-tick|            v.tlfo.tick(1);\n|
+tlfo-seed|v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);|v->tlfo.noteOn(tlfoParams(*v), seed[6], v->blockTempo);|tonestart
+tlfo-seed-free|v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo[zone], v->blockTempo);|v->tlfo.noteOnFree(tlfoParams(*v), seed[6], freeTlfo[zone], v->blockTempo);|tonestart
+tlfo-sync|if (Z.tvaLfoKeySync) v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);\n    else if (other) v->tlfo.noteOnFollow(tlfoParams(*v), other->tlfo);\n    else v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo[zone], v->blockTempo);|v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);|tonestart
+tlfo-follow|    else if (other) v->tlfo.noteOnFollow(tlfoParams(*v), other->tlfo);\n||tonestart
+tlfo-free|v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeTlfo[zone], v->blockTempo);|v->tlfo.noteOnFree(tlfoParams(*v), seed[5], freeLfo[zone], v->blockTempo);|tonestart
+tlfo-free-tick|            freeTlfo[z].tick(1);\n||toneblock
+tlfo-tick|            v.tlfo.tick(1);\n||toneblock
 tlfo-off|    v.tlfo.noteOff();\n|
 hold-keeps|if (hold < 64) v.keyFlags &= ~2;|v.keyFlags &= ~2;
 hold-middle|if (hold < 64) v.keyFlags &= ~2;|if (hold <= 64) v.keyFlags &= ~2;
 hold-up-middle|if (hold < 64)                             // 0x894d4ec0|if (hold <= 64)                             // 0x894d4ec0
 hold-up-none|                    if (!(v.keyFlags & 7)) voiceOff(v);\n                }\n    }\n    if (number == 66|                }\n    }\n    if (number == 66
 hold-up-down-too|(v.keyFlags & 2) && !(v.keyFlags & 1)) {|(v.keyFlags & 2)) {
-hold-porta|keys.prevPolyHeld \|\| hold >= 64;|keys.prevPolyHeld;
-hold-porta-mono|Z.mono ? keys.prevMonoHeld : keys.prevPolyHeld|Z.mono ? keys.prevMonoHeld \|\| hold >= 64 : keys.prevPolyHeld
+hold-porta|keys.prevPolyHeld \|\| hold >= 64;|keys.prevPolyHeld;|tonestart
+hold-porta-mono|Z.mono ? keys.prevMonoHeld : keys.prevPolyHeld|Z.mono ? keys.prevMonoHeld \|\| hold >= 64 : keys.prevPolyHeld|tonestart
 hold-rel-last|v.relVel = v.relHeld;|v.relVel = lastRelease;
-hold-note-flags|    v->keyFlags = 7;\n|
+hold-note-flags|    v->keyFlags = 7;\n||tonestart
 sost-all-keys|if (!(sost >= 64 && (sostKeys[(v.raw & 127) >> 4] & bit))) v.keyFlags &= ~4;|if (!(sost >= 64)) v.keyFlags &= ~4;
 sost-none|if (!(sost >= 64 && (sostKeys[(v.raw & 127) >> 4] & bit))) v.keyFlags &= ~4;|v.keyFlags &= ~4;
 sost-retakes|if ((sost ^ y) & 0x40) {|{
@@ -300,8 +300,8 @@ mx-tva-pan-clamp|const int p = panAtKey(k.pan, k.panKF, key), c|const int p = le
 mx-beam-assign|beam[i] = n <= 0 \|\| n == 32 \|\| n >= 96 ? 0 : cc[n];|beam[i] = n <= 0 \|\| n >= 96 ? 0 : cc[n];|toneupdate
 mx-note-vel|        v.keyFlags = 7;\n        matrixUpdate(v);|        v.keyFlags = 7;\n        v.mVel = vel;\n        matrixUpdate(v);
 mx-note-key|        v.keyFlags = 7;\n        matrixUpdate(v);|        v.keyFlags = 7;\n        v.mKey = key;\n        matrixUpdate(v);
-mx-note-raw|v->mVel = vel; v->mKey = note; v->mRaw = raw;|v->mVel = vel; v->mKey = note; v->mRaw = note;
-mx-note-oct|v->mVel = vel; v->mKey = note; v->mRaw = raw;|v->mVel = vel; v->mKey = raw; v->mRaw = raw;
+mx-note-raw|v->mVel = vel; v->mKey = note; v->mRaw = raw;|v->mVel = vel; v->mKey = note; v->mRaw = note;|tonestart
+mx-note-oct|v->mVel = vel; v->mKey = note; v->mRaw = raw;|v->mVel = vel; v->mKey = raw; v->mRaw = raw;|tonestart
 mx-update-all|    if (moved) updateAll(v);\n||toneupdate
 mx-live-env|if (envChanged \|\| moved) v.env.update|if (envChanged) v.env.update
 mx-live-penv|if (d.penv \|\| moved) s.penv.update|if (d.penv) s.penv.update
@@ -367,62 +367,62 @@ cx-amp-g|p.gain = c.ampGain + m[xtmx::CosmPrm1];|p.gain = c.ampGain;
 cx-amp-gl|p.gainLfo = c.ampGainLfo + m[xtmx::CosmLfoPrm1];|p.gainLfo = c.ampGainLfo;
 cx-amp-t|p.treble = c.ampTreble + m[xtmx::CosmPrm2];|p.treble = c.ampTreble;
 cx-section|    const int16_t* m = v.mx + (k ? xtmx::Cosm2 : xtmx::Cosm);\n    p.filter = c.filter;|    const int16_t* m = v.mx + xtmx::Cosm;\n    p.filter = c.filter;
-tva-damp-done|    if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }\n    if (v.damping) return;|    if (v.damping) return;\n    if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }
-tempo-tenths|return 3000 * 20 / (t / 10);|return 30000 * 20 / t;
-tempo-readback|: 30000 * 20 / clockPeriod();|: std::clamp(ctl.patchTempo, 200, 2500);
-clock-lfo1|        oscClock(v);\n|
-clock-lfo2|        oscClock(v.osc2);\n|
-clock-cosm|        for (Voice::CosmVoice& c : v.cs) c.lfo.clock(dt);\n|
-clock-tva|        v.tlfo.clock(dt);\n|
-clock-free1|        freeLfo[z].clock(dt);\n|
-clock-free2|        freeLfo2[z].clock(dt);\n|
-clock-free3|        for (XtLfoFree& f : freeClfo[z]) f.clock(dt);\n|
-clock-free5|        freeTlfo[z].clock(dt);\n|
-clock-seconds|constexpr float kBlockSeconds = 0x1.7ca212p-11f;|constexpr float kBlockSeconds = 0x1.7ca214p-11f;
-clock-last|    clockLast = clockBlocks;\n|
-clock-rate|constexpr uint64_t kClockPerBlock = 32 * 24000;|constexpr uint64_t kClockPerBlock = 32 * 24005;
-clock-blocks|    ++clockBlocks;\n|
-sync-solo|if (s.solo.syncOn()) s.solo.addClock(1);|if (s.solo.syncOn()) s.solo.addClock(2);
-sync-mb|else if (s.mb.syncOn()) s.mb.addClock(1);|else if (s.mb.syncOn()) s.mb.addClock(2);
-sync-solo-off|if (s.solo.syncOn()) s.solo.addClock(1);|s.solo.addClock(1);
-sync-mb-off|else if (s.mb.syncOn()) s.mb.addClock(1);|else s.mb.addClock(1);
-trip-solo|if (s.solo.tripOn()) s.solo.setTrip(step);|if (s.solo.tripOn()) s.solo.setTrip(step + 1);
-trip-mb|else if (s.mb.tripOn()) s.mb.setTrip(step);|else if (s.mb.tripOn()) s.mb.setTrip(step + 1);
-trip-solo-off|if (s.solo.tripOn()) s.solo.setTrip(step);|s.solo.setTrip(step);
-trip-mb-off|else if (s.mb.tripOn()) s.mb.setTrip(step);|else s.mb.setTrip(step);
-trip-sw|const bool sync = o.tempoSync, trip = o.timeTrip && pad.on();|const bool sync = o.tempoSync, trip = pad.on();
-sync-sw|const bool sync = o.tempoSync, trip = o.timeTrip && pad.on();|const bool sync = false, trip = o.timeTrip && pad.on();
-trip-note-on|const bool tripNow = o.timeTrip && pad.on();|const bool tripNow = false;
-sync-on-solo|s.solo.setBeatFlags(o.tempoSync, tripNow);|s.solo.setBeatFlags(false, tripNow);
-sync-on-mb|s.mb.setBeatFlags(o.tempoSync, tripNow);|s.mb.setBeatFlags(false, tripNow);
-orig-solo|s.solo.setTempo(tempoWord, (uint32_t)o.origTempo);|s.solo.setTempo(tempoWord, 1200000u);
-orig-mb|s.mb.setTempo(tempoWord, (uint32_t)o.origTempo);|s.mb.setTempo(tempoWord, 1200000u);
-tempo-word|xtf::ftrc(xtf::mul(tempoNow(), 10000.0f))|xtf::ftrc(xtf::mul(120.0f, 10000.0f))
-keep-solo|if (o.beatKeep && s.solo.tripOn() && !trip)|if (s.solo.tripOn() && !trip)
-keep-mb|if (o.beatKeep && s.mb.tripOn() && !trip)|if (s.mb.tripOn() && !trip)
-keep-gain-solo|s.chase = true; s.curGain = 0.0f; s.solo.setGain(0.0f);|s.chase = true; s.solo.setGain(0.0f);
-keep-gain-mb|s.chase = true; s.curGain = 0.0f; s.mb.setGainXt(0.0f);|s.chase = true; s.mb.setGainXt(0.0f);
-keep-fade-solo|s.chase = true; s.curGain = 0.0f; s.solo.setGain(0.0f);|s.chase = true; s.curGain = 0.0f;
-keep-fade-mb|s.chase = true; s.curGain = 0.0f; s.mb.setGainXt(0.0f);|s.chase = true; s.curGain = 0.0f;
-chase-wait-solo|if (s.solo.gainNow() > kSilent) return;|if (s.solo.gainNow() > xtf::mul(kSilent, 2.0f)) return;
-chase-wait-mb|if (s.mb.gainNow() > kSilent) return;|if (s.mb.gainNow() > xtf::mul(kSilent, 2.0f)) return;
-chase-seek-solo|s.solo.seek(s.solo.beat().beatPos >> 5);|
-chase-seek-mb|s.mb.seek(s.mb.beat().beatPos >> 5);|
-chase-end|                    s.chase = false;\n                }|                }
-chase-start|    s.chase = false;                                                                                  // +0x9b0 (0x894f21e6)\n|
-pad-update|    if (pad.on() != was)\n        for (Voice& v : voice)\n            if (v.active) newBlocks(v);\n|
+tva-damp-done|    if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }\n    if (v.damping) return;|    if (v.damping) return;\n    if (v.env.done() && v.cur[0] <= kSilent && v.cur[1] <= kSilent) { v.active = false; return; }|tonetva
+tempo-tenths|return 3000 * 20 / (t / 10);|return 30000 * 20 / t;|toneclock
+tempo-readback|: 30000 * 20 / clockPeriod();|: std::clamp(ctl.patchTempo, 200, 2500);|toneclock
+clock-lfo1|        oscClock(v);\n||toneclock
+clock-lfo2|        oscClock(v.osc2);\n||toneclock
+clock-cosm|        for (Voice::CosmVoice& c : v.cs) c.lfo.clock(dt);\n||toneclock
+clock-tva|        v.tlfo.clock(dt);\n||toneclock
+clock-free1|        freeLfo[z].clock(dt);\n||toneclock
+clock-free2|        freeLfo2[z].clock(dt);\n||toneclock
+clock-free3|        for (XtLfoFree& f : freeClfo[z]) f.clock(dt);\n||toneclock
+clock-free5|        freeTlfo[z].clock(dt);\n||toneclock
+clock-seconds|constexpr float kBlockSeconds = 0x1.7ca212p-11f;|constexpr float kBlockSeconds = 0x1.7ca214p-11f;|toneclock
+clock-last|    clockLast = clockBlocks;\n||toneclock
+clock-rate|constexpr uint64_t kClockPerBlock = 32 * 24000;|constexpr uint64_t kClockPerBlock = 32 * 24005;|toneconsts
+clock-blocks|    ++clockBlocks;\n||toneblock
+sync-solo|if (s.solo.syncOn()) s.solo.addClock(1);|if (s.solo.syncOn()) s.solo.addClock(2);|toneclock
+sync-mb|else if (s.mb.syncOn()) s.mb.addClock(1);|else if (s.mb.syncOn()) s.mb.addClock(2);|toneclock
+sync-solo-off|if (s.solo.syncOn()) s.solo.addClock(1);|s.solo.addClock(1);|toneclock
+sync-mb-off|else if (s.mb.syncOn()) s.mb.addClock(1);|else s.mb.addClock(1);|toneclock
+trip-solo|if (s.solo.tripOn()) s.solo.setTrip(step);|if (s.solo.tripOn()) s.solo.setTrip(step + 1);|tonetrip
+trip-mb|else if (s.mb.tripOn()) s.mb.setTrip(step);|else if (s.mb.tripOn()) s.mb.setTrip(step + 1);|tonetrip
+trip-solo-off|if (s.solo.tripOn()) s.solo.setTrip(step);|s.solo.setTrip(step);|tonetrip
+trip-mb-off|else if (s.mb.tripOn()) s.mb.setTrip(step);|else s.mb.setTrip(step);|tonetrip
+trip-sw|const bool sync = o.tempoSync, trip = o.timeTrip && pad.on();|const bool sync = o.tempoSync, trip = pad.on();|tonetrip
+sync-sw|const bool sync = o.tempoSync, trip = o.timeTrip && pad.on();|const bool sync = false, trip = o.timeTrip && pad.on();|tonetrip
+trip-note-on|const bool tripNow = o.timeTrip && pad.on();|const bool tripNow = false;|toneoscstart
+sync-on-solo|s.solo.setBeatFlags(o.tempoSync, tripNow);|s.solo.setBeatFlags(false, tripNow);|toneoscstart
+sync-on-mb|s.mb.setBeatFlags(o.tempoSync, tripNow);|s.mb.setBeatFlags(false, tripNow);|toneoscstart
+orig-solo|s.solo.setTempo(tempoWord, (uint32_t)o.origTempo);|s.solo.setTempo(tempoWord, 1200000u);|toneoscstart
+orig-mb|s.mb.setTempo(tempoWord, (uint32_t)o.origTempo);|s.mb.setTempo(tempoWord, 1200000u);|toneoscstart
+tempo-word|xtf::ftrc(xtf::mul(tempoNow(), 10000.0f))|xtf::ftrc(xtf::mul(120.0f, 10000.0f))|toneoscstart
+keep-solo|if (o.beatKeep && s.solo.tripOn() && !trip)|if (s.solo.tripOn() && !trip)|tonetrip
+keep-mb|if (o.beatKeep && s.mb.tripOn() && !trip)|if (s.mb.tripOn() && !trip)|tonetrip
+keep-gain-solo|s.chase = true; s.curGain = 0.0f; s.solo.setGain(0.0f);|s.chase = true; s.solo.setGain(0.0f);|tonetrip
+keep-gain-mb|s.chase = true; s.curGain = 0.0f; s.mb.setGainXt(0.0f);|s.chase = true; s.mb.setGainXt(0.0f);|tonetrip
+keep-fade-solo|s.chase = true; s.curGain = 0.0f; s.solo.setGain(0.0f);|s.chase = true; s.curGain = 0.0f;|tonetrip
+keep-fade-mb|s.chase = true; s.curGain = 0.0f; s.mb.setGainXt(0.0f);|s.chase = true; s.curGain = 0.0f;|tonetrip
+chase-wait-solo|if (s.solo.gainNow() > kSilent) return false;|if (s.solo.gainNow() > xtf::mul(kSilent, 2.0f)) return false;|toneblock
+chase-wait-mb|if (s.mb.gainNow() > kSilent) return false;|if (s.mb.gainNow() > xtf::mul(kSilent, 2.0f)) return false;|toneblock
+chase-seek-solo|s.solo.seek(s.solo.beat().beatPos >> 5);||toneblock
+chase-seek-mb|s.mb.seek(s.mb.beat().beatPos >> 5);||toneblock
+chase-end|    s.chase = false;\n    return true;|    return true;|toneblock
+chase-start|    s.chase = false;                                                                                  // +0x9b0 (0x894f21e6)\n||toneoscstart
+pad-update|    if (pad.on() != was)\n        for (Voice& v : voice)\n            if (v.active) newBlocks(v);\n||tonetrip
 beat-live|    if (anyChanged) { oscBeat(v, c); oscBeat(v.osc2, c.osc2); }\n|
 beat-blocks|    oscBeat(v, Z);\n    oscBeat(v.osc2, Z.osc2);\n    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);|    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);|toneupdate
-env-latch|    v->tempo10 = tempo10Now();\n|
+env-latch|    v->tempo10 = tempo10Now();\n||tonestart
 env-amp|xtmx::Osc2Env) + 9;\n    k.tempo10 = v.tempo10;\n|xtmx::Osc2Env) + 9;\n|toneenvknobs
 env-cosm|xtmsm::CosmEnv2);\n    k.tempo10 = v.tempo10;\n|xtmsm::CosmEnv2);\n|toneenvknobs
 env-osc|xtmx::Osc2Env) + 3 * which;\n    k.tempo10 = v.tempo10;\n|xtmx::Osc2Env) + 3 * which;\n|toneenvknobs
 env-tva|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = zc(v);\n    XtEnvKnobs k;\n    k.tempo10 = v.tempo10;\n|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = zc(v);\n    XtEnvKnobs k;\n|toneenvknobs
-block-tempo-off|    if (Z.on) v->blockTempo = tempoNow();\n|    v->blockTempo = tempoNow();\n
-lfo-tempo-osc|if (o.lfoKeySync) s.lfo.noteOn(lfoParams(v, s, o), seed, v.blockTempo);|if (o.lfoKeySync) s.lfo.noteOn(lfoParams(v, s, o), seed, 120.0f);
-lfo-tempo-free|else s.lfo.noteOnFree(lfoParams(v, s, o), seed, free, v.blockTempo);|else s.lfo.noteOnFree(lfoParams(v, s, o), seed, free, 120.0f);
-lfo-tempo-tva|v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);|v->tlfo.noteOn(tlfoParams(*v), seed[5], 120.0f);
-lfo-tempo-cosm|c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], v->blockTempo);|c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], 120.0f);
+block-tempo-off|    if (Z.on) v->blockTempo = tempoNow();\n|    v->blockTempo = tempoNow();\n|tonestart
+lfo-tempo-osc|if (o.lfoKeySync) s.lfo.noteOn(lfoParams(v, s, o), seed, v.blockTempo);|if (o.lfoKeySync) s.lfo.noteOn(lfoParams(v, s, o), seed, 120.0f);|toneoscstart
+lfo-tempo-free|else s.lfo.noteOnFree(lfoParams(v, s, o), seed, free, v.blockTempo);|else s.lfo.noteOnFree(lfoParams(v, s, o), seed, free, 120.0f);|toneoscstart
+lfo-tempo-tva|v->tlfo.noteOn(tlfoParams(*v), seed[5], v->blockTempo);|v->tlfo.noteOn(tlfoParams(*v), seed[5], 120.0f);|tonestart
+lfo-tempo-cosm|c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], v->blockTempo);|c.lfo.noteOn(clfoParams(*v, k), seed[3 + k], 120.0f);|tonestart
 lfo-upd-live|    if (anyChanged) lfoUpdates(v);\n|
 lfo-upd-blocks|    if (moved) updateAll(v);\n    lfoUpdates(v);\n|    if (moved) updateAll(v);\n|toneupdate
 lfo-upd-1|    v.lfo.update(lfoParams(v, v, Z));\n||toneupdate
@@ -709,65 +709,65 @@ solo-cross-out|if (lp[2] > Pi && X > lp[2]) X = lp[2];|if (X > lp[2]) X = lp[2];
 solo-cross-in|if (loopOn) { if (X > lp[1]) X = lp[1]; }\n            else if (lp[1] > Pi && X > lp[1]) X = lp[1];|if (loopOn && lp[1] > Pi && X > lp[1]) X = lp[1];|tonesolo
 solo-cross-b|if (loopOn) { if (lp[3] > X) X = lp[3]; }\n            else if (Pi > lp[3] && lp[3] > X) X = lp[3];|if (loopOn && Pi > lp[3] && lp[3] > X) X = lp[3];|tonesolo
 solo-seek-first|    budget = past ? kUnlimited : budgetOf(seg);|    budget = kUnlimited;|tonesolo
-ext-six-none|clockSix = clockSince ? clockSince : 1;|clockSix = clockSince ? clockSince : 2;
-ext-six-by|if (++clockSeen < 6) return;|if (++clockSeen < 7) return;
-ext-six-seen|    clockSeen = 0;\n    clockSix = clockSince|    clockSeen = 1;\n    clockSix = clockSince
-ext-six-since|    clockSix = clockSince ? clockSince : 1;\n    clockSince = 0;\n|    clockSix = clockSince ? clockSince : 1;\n
-ext-start-seen|    clockSeen = -1;\n    clockSince = 0;\n    clockSix = 125;|    clockSince = 0;\n    clockSix = 125;
-ext-start-since|    clockSeen = -1;\n    clockSince = 0;\n    clockSix = 125;|    clockSeen = -1;\n    clockSix = 125;
-ext-start-six|    clockSeen = -1;\n    clockSince = 0;\n    clockSix = 125;|    clockSeen = -1;\n    clockSince = 0;
-ext-ms-seen|    if (clockSeen < 0) return;\n    if (clockSince++|    if (clockSince++
-ext-ms-wrap|clockSince++ >= 0xffff|clockSince++ >= 0xfffe
-ext-ms-wrap-hi|clockSince++ >= 0xffff|clockSince++ >= 0x10000
-ext-ms-wrap-seen|>= 0xffff) {\n        clockSeen = -1;\n|>= 0xffff) {\n
-ext-ms-wrap-since|        clockSeen = -1;\n        clockSince = 0;\n|        clockSeen = -1;\n
-ext-reader|clockExt ? 150000 / clockSix : 30000 * 20 / clockPeriod()|30000 * 20 / clockPeriod()
-ext-reader-k|150000 / clockSix|151000 / clockSix
-ext-limit-lo|return 200 > t ? 20 : t > 2500 ? 250 : t;|return 200 > t ? 200 : t > 2500 ? 250 : t;
-ext-limit-hi|return 200 > t ? 20 : t > 2500 ? 250 : t;|return 200 > t ? 20 : t > 2500 ? 2500 : t;
-ext-ms-rate|int XtSynth::msDue() const { return (int)((clockMsAcc + 32000) / 44100); }|int XtSynth::msDue() const { return (int)((clockMsAcc + 32000) / 44000); }
+ext-six-none|clockSix = clockSince ? clockSince : 1;|clockSix = clockSince ? clockSince : 2;|toneclock
+ext-six-by|if (++clockSeen < 6) return;|if (++clockSeen < 7) return;|toneclock
+ext-six-seen|    clockSeen = 0;\n    clockSix = clockSince|    clockSeen = 1;\n    clockSix = clockSince|toneclock
+ext-six-since|    clockSix = clockSince ? clockSince : 1;\n    clockSince = 0;\n|    clockSix = clockSince ? clockSince : 1;\n|toneclock
+ext-start-seen|    clockSeen = -1;\n    clockSince = 0;\n    clockSix = 125;|    clockSince = 0;\n    clockSix = 125;|toneclock
+ext-start-since|    clockSeen = -1;\n    clockSince = 0;\n    clockSix = 125;|    clockSeen = -1;\n    clockSix = 125;|toneclock
+ext-start-six|    clockSeen = -1;\n    clockSince = 0;\n    clockSix = 125;|    clockSeen = -1;\n    clockSince = 0;|toneclock
+ext-ms-seen|    if (clockSeen < 0) return;\n    if (clockSince++|    if (clockSince++|toneclock
+ext-ms-wrap|clockSince++ >= 0xffff|clockSince++ >= 0xfffe|toneclock
+ext-ms-wrap-hi|clockSince++ >= 0xffff|clockSince++ >= 0x10000|toneclock
+ext-ms-wrap-seen|>= 0xffff) {\n        clockSeen = -1;\n|>= 0xffff) {\n|toneclock
+ext-ms-wrap-since|        clockSeen = -1;\n        clockSince = 0;\n|        clockSeen = -1;\n|toneclock
+ext-reader|clockExt ? 150000 / clockSix : 30000 * 20 / clockPeriod()|30000 * 20 / clockPeriod()|toneclock
+ext-reader-k|150000 / clockSix|151000 / clockSix|toneclock
+ext-limit-lo|return 200 > t ? 20 : t > 2500 ? 250 : t;|return 200 > t ? 200 : t > 2500 ? 250 : t;|toneclock
+ext-limit-hi|return 200 > t ? 20 : t > 2500 ? 250 : t;|return 200 > t ? 20 : t > 2500 ? 2500 : t;|toneclock
+ext-ms-rate|int XtSynth::msDue() const { return (int)((clockMsAcc + 32000) / 44100); }|int XtSynth::msDue() const { return (int)((clockMsAcc + 32000) / 44000); }|toneclock
 ext-ms-acc|clockMsAcc = (clockMsAcc + kBlockMsByRate) % kRate;|clockMsAcc = (clockMsAcc + kBlockMsByRate + 50) % kRate;|tonearp
-ext-no-ms|        for (int n = msDue(); n > 0; --n) clockMs();\n|
-ext-no-in|{ clockIn(); clockTick(); ++hostDone; }|{ clockTick(); ++hostDone; }
-ext-no-tick|{ clockIn(); clockTick(); ++hostDone; }|{ clockIn(); ++hostDone; }
-ext-no-done|{ clockIn(); clockTick(); ++hostDone; }|{ clockIn(); clockTick(); }
-ext-order|        for (int n = msDue(); n > 0; --n) clockMs();\n        for (int n = clocksDue(); n > 0; --n) { clockIn(); clockTick(); ++hostDone; }\n|        for (int n = clocksDue(); n > 0; --n) { clockIn(); clockTick(); ++hostDone; }\n        for (int n = msDue(); n > 0; --n) clockMs();\n
-host-step|hostBpm * (32.0 * 24.0) / (60.0 * 44100.0)|hostBpm * (32.0 * 24.0) / (60.0 * 44000.0)
-host-at|    hostAt += hostStep();\n|
-host-keep|    if (bpm > 0.0) hostBpm = bpm;\n|    hostBpm = bpm;\n
-host-moving|if (!moving |if (false 
-host-pos|(ppq + ((double)srcFrames - readPos) / 44100.0 * hostBpm / 60.0) * 24.0|ppq * 24.0
-host-24|hostBpm / 60.0) * 24.0;\n    if (std::fabs|hostBpm / 60.0) * 25.0;\n    if (std::fabs
-host-jump|std::fabs(at - hostAt) > 1.0|std::fabs(at - hostAt) > 1e9
-host-jump-ceil|hostDone = (int64_t)std::ceil(at) - 1;   // a locate|hostDone = (int64_t)std::ceil(at);   // a locate
-host-follow|    if (bpm > 0.0) hostBpm = bpm;\n    clockFollow();\n|    if (bpm > 0.0) hostBpm = bpm;\n
+ext-no-ms|        for (int n = msDue(); n > 0; --n) clockMs();\n||toneblock
+ext-no-in|{ clockIn(); clockTick(); ++hostDone; }|{ clockTick(); ++hostDone; }|toneblock
+ext-no-tick|{ clockIn(); clockTick(); ++hostDone; }|{ clockIn(); ++hostDone; }|toneblock
+ext-no-done|{ clockIn(); clockTick(); ++hostDone; }|{ clockIn(); clockTick(); }|toneblock
+ext-order|        for (int n = msDue(); n > 0; --n) clockMs();\n        for (int n = clocksDue(); n > 0; --n) { clockIn(); clockTick(); ++hostDone; }\n|        for (int n = clocksDue(); n > 0; --n) { clockIn(); clockTick(); ++hostDone; }\n        for (int n = msDue(); n > 0; --n) clockMs();\n|toneblock
+host-step|hostBpm * (32.0 * 24.0) / (60.0 * 44100.0)|hostBpm * (32.0 * 24.0) / (60.0 * 44000.0)|toneclock
+host-at|    hostAt += hostStep();\n||toneblock
+host-keep|    if (bpm > 0.0) hostBpm = bpm;\n|    hostBpm = bpm;\n|toneclock
+host-moving|if (!moving |if (false |toneclock
+host-pos|(ppq + ((double)srcFrames - readPos) / 44100.0 * hostBpm / 60.0) * 24.0|ppq * 24.0|toneclock
+host-24|hostBpm / 60.0) * 24.0;\n    if (std::fabs|hostBpm / 60.0) * 25.0;\n    if (std::fabs|toneclock
+host-jump|std::fabs(at - hostAt) > 1.0|std::fabs(at - hostAt) > 1e9|toneclock
+host-jump-ceil|hostDone = (int64_t)std::ceil(at) - 1;   // a locate|hostDone = (int64_t)std::ceil(at);   // a locate|toneclock
+host-follow|    if (bpm > 0.0) hostBpm = bpm;\n    clockFollow();\n|    if (bpm > 0.0) hostBpm = bpm;\n|toneclock
 set-follow|    ctl = c;\n    clockFollow();\n|    ctl = c;\n|tonezones
-follow-source|ctl.clockSource != 0 && hostBpm > 0.0|hostBpm > 0.0
-follow-tempo|ctl.clockSource != 0 && hostBpm > 0.0|ctl.clockSource != 0
-follow-start|    hostDone = (int64_t)std::ceil(hostAt) - 1;\n}|}
-follow-back|    if (ext == clockExt) return;\n    clockExt = ext;\n    if (!ext) return;|    if (!ext) return;\n    clockExt = ext;
-frame-mean|xtf::mul(xtf::add(a, b), 0.5f)|xtf::mul(xtf::add(a, a), 0.5f)
-frame-half|xtf::mul(xtf::add(a, b), 0.5f)|xtf::add(a, b)
-frame-reverb|f[FrameReverb] = xtf::add(f[FrameReverb], xtf::mul(mean, v.bus[XtBusReverb]));|f[FrameReverb] = xtf::add(f[FrameReverb], xtf::mul(mean, v.bus[XtBusChorus]));
-frame-chorus|f[FrameChorus] = xtf::add(f[FrameChorus], xtf::mul(mean, v.bus[XtBusChorus]));|f[FrameChorus] = xtf::add(f[FrameChorus], xtf::mul(mean, v.bus[XtBusReverb]));
-frame-main-l|xtf::mul(a, v.bus[XtBusMainL])|xtf::mul(b, v.bus[XtBusMainL])
-frame-main-r|xtf::mul(b, v.bus[XtBusMainR])|xtf::mul(a, v.bus[XtBusMainR])
-frame-dir-l|xtf::mul(a, v.bus[XtBusDirL])|xtf::mul(a, v.bus[XtBusMainL])
-frame-dir-r|xtf::mul(b, v.bus[XtBusDirR])|xtf::mul(b, v.bus[XtBusMainR])
-bus-step-main|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|for (const int b : { XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);
-bus-step-reverb|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|for (const int b : { XtBusMainL, XtBusMainR, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);
-bus-step-chorus|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb }) v.bus[b] = xtf::add(v.bus[b], e[b]);
-others-target|if (v.bus[b] != 0.0f \|\| v.tb.bus[b] != 0.0f) return true;|if (v.bus[b] != 0.0f) return true;
-others-level|if (v.bus[b] != 0.0f \|\| v.tb.bus[b] != 0.0f) return true;|if (v.tb.bus[b] != 0.0f) return true;
-others-list|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus, XtBusDirL, XtBusDirR }) if (v.bus[b]|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus, XtBusDirL }) if (v.bus[b]
-damp-fade-l|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp),|onBus(frame + kFrameWords * i, xtf::mul(tmp[2 * i], v.cur[0]),
-damp-fade-r|xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|xtf::mul(tmp[2 * i + 1], v.cur[1]));
-dir-updates-l|    v.tb.bus[XtBusDirL] = l;\n|
-dir-updates-r|    v.tb.bus[XtBusDirR] = r;\n|
+follow-source|ctl.clockSource != 0 && hostBpm > 0.0|hostBpm > 0.0|toneclock
+follow-tempo|ctl.clockSource != 0 && hostBpm > 0.0|ctl.clockSource != 0|toneclock
+follow-start|    hostDone = (int64_t)std::ceil(hostAt) - 1;\n}|}|toneclock
+follow-back|    if (ext == clockExt) return;\n    clockExt = ext;\n    if (!ext) return;|    if (!ext) return;\n    clockExt = ext;|toneclock
+frame-mean|xtf::mul(xtf::add(a, b), 0.5f)|xtf::mul(xtf::add(a, a), 0.5f)|toneblock
+frame-half|xtf::mul(xtf::add(a, b), 0.5f)|xtf::add(a, b)|toneblock
+frame-reverb|f[FrameReverb] = xtf::add(f[FrameReverb], xtf::mul(mean, v.bus[XtBusReverb]));|f[FrameReverb] = xtf::add(f[FrameReverb], xtf::mul(mean, v.bus[XtBusChorus]));|toneblock
+frame-chorus|f[FrameChorus] = xtf::add(f[FrameChorus], xtf::mul(mean, v.bus[XtBusChorus]));|f[FrameChorus] = xtf::add(f[FrameChorus], xtf::mul(mean, v.bus[XtBusReverb]));|toneblock
+frame-main-l|xtf::mul(a, v.bus[XtBusMainL])|xtf::mul(b, v.bus[XtBusMainL])|toneblock
+frame-main-r|xtf::mul(b, v.bus[XtBusMainR])|xtf::mul(a, v.bus[XtBusMainR])|toneblock
+frame-dir-l|xtf::mul(a, v.bus[XtBusDirL])|xtf::mul(a, v.bus[XtBusMainL])|toneblock
+frame-dir-r|xtf::mul(b, v.bus[XtBusDirR])|xtf::mul(b, v.bus[XtBusMainR])|toneblock
+bus-step-main|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|for (const int b : { XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|toneblock
+bus-step-reverb|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|for (const int b : { XtBusMainL, XtBusMainR, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|toneblock
+bus-step-chorus|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus }) v.bus[b] = xtf::add(v.bus[b], e[b]);|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb }) v.bus[b] = xtf::add(v.bus[b], e[b]);|toneblock
+others-target|if (v.bus[b] != 0.0f \|\| v.tb.bus[b] != 0.0f) return true;|if (v.bus[b] != 0.0f) return true;|toneblock
+others-level|if (v.bus[b] != 0.0f \|\| v.tb.bus[b] != 0.0f) return true;|if (v.tb.bus[b] != 0.0f) return true;|toneblock
+others-list|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus, XtBusDirL, XtBusDirR }) if (v.bus[b]|for (const int b : { XtBusMainL, XtBusMainR, XtBusReverb, XtBusChorus, XtBusDirL }) if (v.bus[b]|toneblock
+damp-fade-l|onBus(frame + kFrameWords * i, xtf::mul(xtf::mul(tmp[2 * i], v.cur[0]), v.damp),|onBus(frame + kFrameWords * i, xtf::mul(tmp[2 * i], v.cur[0]),|toneblock
+damp-fade-r|xtf::mul(xtf::mul(tmp[2 * i + 1], v.cur[1]), v.damp));|xtf::mul(tmp[2 * i + 1], v.cur[1]));|toneblock
+dir-updates-l|    v.tb.bus[XtBusDirL] = l;\n||tonetva
+dir-updates-r|    v.tb.bus[XtBusDirR] = r;\n||tonetva
 dir-live|if (anyChanged) tvaNewBlock(v); |if (anyChanged) v.tb = tvaBlock(v);
 dir-legato|        tvaNewBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();|        v.tb = tvaBlock(v);\n        if (Z.on) v.blockTempo = tempoNow();
 dir-blocks|    v.mod.setBlock(modBlk[v.zone]);\n    tvaNewBlock(v);|    v.mod.setBlock(modBlk[v.zone]);\n    v.tb = tvaBlock(v);|toneupdate
-noteon-levels|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::begin(v->tb.bus) + 6, v->bus);
+noteon-levels|std::copy(std::begin(v->tb.bus), std::end(v->tb.bus), v->bus);|std::copy(std::begin(v->tb.bus), std::begin(v->tb.bus) + 6, v->bus);|tonestart
 knob-chorus-sum|k.chorusSend = Z.chorusSend + v.msm[xtmsm::ChoSend] + v.mx[ChorusSend];|k.chorusSend = Z.chorusSend + v.msm[xtmsm::ChoSend];|toneenvknobs
 knob-reverb-sum|k.reverbSend = Z.reverbSend + v.msm[xtmsm::RevSend] + v.mx[ReverbSend];|k.reverbSend = Z.reverbSend + v.msm[xtmsm::RevSend];|toneenvknobs
 knob-sends-crossed|k.chorusSend = Z.chorusSend + v.msm[xtmsm::ChoSend] + v.mx[ChorusSend];\n    k.reverbSend = Z.reverbSend +|k.chorusSend = Z.reverbSend + v.msm[xtmsm::ChoSend] + v.mx[ChorusSend];\n    k.reverbSend = Z.chorusSend +|toneenvknobs
@@ -797,15 +797,15 @@ block-gain-sign|T.outGain[db + 48]|T.outGain[48 - db]|toneosc
 block-gain-pow|T.outGains ? T.outGain[db + 48] : (float)std::pow(2.0, (double)div(flt(db), 6.0f))|(float)std::pow(2.0, (double)div(flt(db), 6.0f))|toneosc
 cc-pad-call|    padController(number, x);                      // then 0x894d6f10 gives it to the pad; the queued update is after that\n|
 cc-pad-late|    padController(number, x);                      // then 0x894d6f10 gives it to the pad; the queued update is after that\n    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n}\n|    for (Voice& v : voice)\n        if (v.active) newBlocks(v);\n    padController(number, x);\n}\n
-cc-pad-x|    if (assigned(ctl.assign[10])) pad.setX(value);\n|
-cc-pad-y|    if (assigned(ctl.assign[11])) {\n        int step = 0;\n        if (pad.setY(value, step)) padSteps(step);\n    }\n|
-cc-pad-x-as-y|if (assigned(ctl.assign[10])) pad.setX(value);|if (assigned(ctl.assign[11])) pad.setX(value);
-cc-pad-y-as-x|if (assigned(ctl.assign[11])) {|if (assigned(ctl.assign[10])) {
-cc-pad-steps|        if (pad.setY(value, step)) padSteps(step);\n    }\n}|        pad.setY(value, step);\n    }\n}
-cc-pad-off-0|a != 0 && a != 32 && a == number|a != 32 && a == number
-cc-pad-off-32|a != 0 && a != 32 && a == number|a != 0 && a == number
-cc-pad-both|    if (assigned(ctl.assign[10])) pad.setX(value);\n    if (assigned(ctl.assign[11])) {|    if (assigned(ctl.assign[10])) pad.setX(value);\n    else if (assigned(ctl.assign[11])) {
-knob-steps|    if (moved) padSteps(step);\n|
+cc-pad-x|    if (assigned(ctl.assign[10])) pad.setX(value);\n||tonetrip
+cc-pad-y|    if (assigned(ctl.assign[11])) {\n        int step = 0;\n        if (pad.setY(value, step)) padSteps(step);\n    }\n||tonetrip
+cc-pad-x-as-y|if (assigned(ctl.assign[10])) pad.setX(value);|if (assigned(ctl.assign[11])) pad.setX(value);|tonetrip
+cc-pad-y-as-x|if (assigned(ctl.assign[11])) {|if (assigned(ctl.assign[10])) {|tonetrip
+cc-pad-steps|        if (pad.setY(value, step)) padSteps(step);\n    }\n}|        pad.setY(value, step);\n    }\n}|tonetrip
+cc-pad-off-0|a != 0 && a != 32 && a == number|a != 32 && a == number|tonetrip
+cc-pad-off-32|a != 0 && a != 32 && a == number|a != 0 && a == number|tonetrip
+cc-pad-both|    if (assigned(ctl.assign[10])) pad.setX(value);\n    if (assigned(ctl.assign[11])) {|    if (assigned(ctl.assign[10])) pad.setX(value);\n    else if (assigned(ctl.assign[11])) {|tonetrip
+knob-steps|    if (moved) padSteps(step);\n||tonetrip
 solo-seek-ended|        f0n = f;\n    }\n    anchor = recStart;\n}|        f0n = f;\n    }\n    ended_ = 0;\n    anchor = recStart;\n}|tonesolo
 xy-plus-zero|        if (x == 0) return 0;\n        return x >= 64 ?|        return x >= 64 ?|toneosc
 xy-plus-side|return x >= 64 ? value((x - 64) * 127 / 63) : -value((64 - x) * 127 / 63);|return x >= 64 ? value((x - 64) * 127 / 63) : value((64 - x) * 127 / 63);|toneosc
@@ -823,7 +823,7 @@ tune-robot-factor|s.lite && (s.linear \|\| noteOn) ? 1.0f : tune.factor;|s.lite 
 tune-pitch-offset|const float offset = tuned ? tune.offset : 0.0f, detune|const float offset = 0.0f, detune|toneknobs
 tune-pitch-detune|detune = tuned ? tune.detune : 0.0f;|detune = 0.0f;|toneknobs
 tune-time|const float wFactor = s.lite ? liteFactor : s.variBit \|\| s.syncBit ? tune.factor : 1.0f;|const float wFactor = s.lite ? liteFactor : 1.0f;|toneknobs
-tune-root|s.robot \|\| s.analog \|\| !s.on, tune.offset, tune.detune);|s.robot \|\| s.analog \|\| !s.on);
+tune-root|Z.rootKey, at440, tune.offset, tune.detune);|Z.rootKey, at440);|tonestart
 loop-bwd-mode|l.bwdMode = std::clamp(s.wave->bwdMode, 0, 2);|l.bwdMode = l.fwdMode;
 loop-bwd-start|l.bwdStart = s.wave->bwdStart;|l.bwdStart = a;
 loop-bwd-end|l.bwdEnd = s.wave->bwdEnd;|l.bwdEnd = b;
@@ -884,12 +884,12 @@ lin-seek-frac|    pos = pos16 >> 4;\n    frac = 0.0f;\n|    pos = pos16 >> 4;\n|
 lin-bwd-region|bwd.a = loopCfg.bwdEnd; bwd.b = loopCfg.bwdStart;|bwd.a = loopCfg.bwdStart; bwd.b = loopCfg.bwdEnd;|tonelin
 vari-walk-sync|s.variBit \|\| s.syncBit ? tune.factor : 1.0f|s.variBit ? tune.factor : 1.0f|toneknobs
 vari-walk-factor|s.variBit \|\| s.syncBit ? tune.factor : 1.0f|tune.factor|toneknobs
-vari-walk-live|    s.variBit = o.vari;                                // the voice's|    s.variBit = s.variBit;                                // the voice's
-vari-robot|    v->robot = v->robotKnob && Z.vari;|    v->robot = v->robotKnob;
+vari-walk-live|    s.variBit = o.vari;                                // the voice's|    s.variBit = s.variBit;                                // the voice's|tonetrip
+vari-robot|    v->robot = v->robotKnob && Z.vari;|    v->robot = v->robotKnob;|tonestart
 vari-cents|o.rootKey, s.robotKnob && o.vari);|o.rootKey, s.robot);|toneknobs
-vari-no-linear|    v->linear = !Z.vari &&|    v->linear = false &&
-vari-band|        s.mb.setVari(o.vari);\n|
-vari-robot-follow|        s.solo.setRobot(s.robotKnob && o.vari);|        s.solo.setRobot(s.robot);|tone|777
+vari-no-linear|    v->linear = !Z.vari &&|    v->linear = false &&|tonestart
+vari-band|        s.mb.setVari(o.vari);\n||toneoscstart
+vari-robot-follow|        s.solo.setRobot(s.robotKnob && o.vari);|        s.solo.setRobot(s.robot);|tonetrip|777
 loop-rate-fwd|    l.fwdRate = s.wave->loopRate[0];\n|
 loop-rate-bwd|    l.bwdRate = s.wave->loopRate[1];\n|
 band-vari|if (S.flags0 & 0x20) {|if (false) {|toneband
@@ -908,9 +908,9 @@ solo-robot-event|    curEv = e;\n    robotEv = robot;|    curEv = e;|tonesolo|16
 solo-robot-grains|        if (robotEv) { pw = K(0x44c8745d) / Af;|        if (robot) { pw = K(0x44c8745d) / Af;|tonesolo
 start-clamp|return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);|return frames == 0 ? 0 : (int32_t)(at > frames ? frames - 1 : at);
 start-clamp-none|return frames == 0 ? 0 : (int32_t)(at >= frames ? frames - 1 : at);|return (int32_t)at;
-start-solo|else s.solo.setStart(waveStart(s, o));|else s.solo.setStart(0);
-start-band|        else s.mb.setStart(waveStart(s, o));|        else s.mb.setStart(0);
-start-lin|        s.lin.setStart(waveStart(s, o));|        s.lin.setStart(0);
+start-solo|else s.solo.setStart(waveStart(s, o));|else s.solo.setStart(0);|toneoscstart
+start-band|        else s.mb.setStart(waveStart(s, o));|        else s.mb.setStart(0);|toneoscstart
+start-lin|        s.lin.setStart(waveStart(s, o));|        s.lin.setStart(0);|toneoscstart
 solo-start-stop|const int32_t lo = (f3 & 8) ? 0 : startPos16;|const int32_t lo = 0;|tonesolo
 solo-start-stop-turned|const int32_t lo = (f3 & 8) ? 0 : startPos16;|const int32_t lo = startPos16;|tonesolo
 solo-start-anchor|((f3 & 8) ? 0.0 : startPos16 / 16.0) >= recStart|0.0 >= recStart|tonesolo|31337
@@ -927,16 +927,16 @@ lin-fr11-entry|        float cmp = y ? fr11 : 0.0f;|        float cmp = 0.0f;|to
 lin-hold-floor|    if (!(next > floor)) next = 0.0f;|    if (!(next > 0.0f)) next = 0.0f;|tonelin|9
 check-start|    p[b + 0x22] = o.startOffset;|;|tonepatchids
 patch-start|    o.startOffset = p(b + 0x22);|    o.startOffset = 0;|tonepatch
-lite-kind|    v->lite = v->on && !v->analog && v->wave->type == 0;|    v->lite = false;
-lite-update-smooth|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;|                    s.curA = xtOscSmooth(s.curA, A); s.curF = F; s.curWalk = w; s.curGain = gt;
-lite-update-gain|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = xtOscSmooth(s.curGain, gt);
+lite-kind|    v->lite = pcm(*v) && v->wave->type == 0;|    v->lite = false;|tonestart
+lite-update-smooth|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;|                    s.curA = xtOscSmooth(s.curA, A); s.curF = F; s.curWalk = w; s.curGain = gt;|toneblock
+lite-update-gain|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = gt;|                    s.curA = A; s.curF = F; s.curWalk = w; s.curGain = xtOscSmooth(s.curGain, gt);|toneblock
 lite-walk-factor|const float liteFactor = s.linear \|\| noteOn ? 1.0f : tune.factor;|const float liteFactor = s.linear ? 1.0f : tune.factor;|toneknobs
 lite-walk-off|const float liteFactor = s.linear \|\| noteOn ? 1.0f : tune.factor;|const float liteFactor = noteOn ? 1.0f : tune.factor;|toneknobs
 lite-formant-factor|const float fFactor = s.lite && (s.linear \|\| noteOn) ? 1.0f : tune.factor;|const float fFactor = s.lite && s.linear ? 1.0f : tune.factor;|toneknobs
-lite-root|    if (v->lite) v->root = xtCosmRootHz(Z.rootKey, false, v->wave->tune.offset, v->wave->tune.detune);|    if (v->lite) v->root = xtCosmRootHz(Z.rootKey, false);
-lite-root2|    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(Z.osc2.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);|    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(Z.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);
-lite-start|        s.xfg.setStart(waveStart(s, o));|        s.xfg.setStart(0);
-lite-chase|                        s.xfg.seek(s.xfg.beat().beatPos >> 5);|                        s.xfg.seek(0);
+lite-root|    if (v->lite) v->root = xtCosmRootHz(Z.rootKey, false, v->wave->tune.offset, v->wave->tune.detune);|    if (v->lite) v->root = xtCosmRootHz(Z.rootKey, false);|tonestart
+lite-root2|    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(Z.osc2.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);|    if (v->osc2.lite) v->osc2.root = xtCosmRootHz(Z.rootKey, false, v->osc2.wave->tune.offset, v->osc2.wave->tune.detune);|tonestart
+lite-start|        s.xfg.setStart(waveStart(s, o));|        s.xfg.setStart(0);|toneoscstart
+lite-chase|        s.xfg.seek(s.xfg.beat().beatPos >> 5);|        s.xfg.seek(0);|toneblock
 lite-lin-beat|    beat_.start(tempoCfg, origCfg, liteCfg ? pos * 16 : 0.0f > walk ? frames * 16 : startCfg * 16);|    beat_.start(tempoCfg, origCfg, 0.0f > walk ? frames * 16 : startCfg * 16);|tonelin
 xfg-period|    period = 88200.0f / root;|    period = 44100.0f / root;|tonelite
 xfg-frac|    fracA = formant - (float)xtf::ftrc(formant);|    fracA = 0.0f;|tonelite
@@ -989,13 +989,13 @@ zone-common-matrix|    std::copy(std::begin(ctl.matrix), std::end(ctl.matrix), c
 zone-common-assign|    std::copy(std::begin(ctl.assign), std::end(ctl.assign), c.assign);\n||tonezones
 zone-common-outgain|    c.outGainTg = ctl.outGainTg; c.parallel = ctl.parallel;\n|    c.parallel = ctl.parallel;\n|tonezones
 zone-common-parallel|    c.outGainTg = ctl.outGainTg; c.parallel = ctl.parallel;\n|    c.outGainTg = ctl.outGainTg;\n|tonezones
-zone-follow-lfo|if (&w != v && w.active && w.zone == zone && (!other \|\| w.age > other->age)) other = &w;|if (&w != v && w.active && (!other \|\| w.age > other->age)) other = &w;
-zone-free-lfo|freeLfo[zone], other ? &other->lfo|freeLfo[0], other ? &other->lfo
-zone-free-lfo2|freeLfo2[zone], other ? &other->osc2.lfo|freeLfo2[0], other ? &other->osc2.lfo
-zone-free-clfo|freeClfo[zone][k], v->blockTempo|freeClfo[0][k], v->blockTempo
-zone-free-tlfo|freeTlfo[zone], v->blockTempo|freeTlfo[0], v->blockTempo
-zone-free-tick|            freeLfo[z].tick(1);|            if (!z) freeLfo[z].tick(1);
-zone-modblk-note|    v->mod.noteOn(modBlk[zone], |    v->mod.noteOn(modBlk[0], 
+zone-follow-lfo|if (&w != v && w.active && w.zone == zone && (!other \|\| w.age > other->age)) other = &w;|if (&w != v && w.active && (!other \|\| w.age > other->age)) other = &w;|tonestart
+zone-free-lfo|freeLfo[zone], other ? &other->lfo|freeLfo[0], other ? &other->lfo|tonestart
+zone-free-lfo2|freeLfo2[zone], other ? &other->osc2.lfo|freeLfo2[0], other ? &other->osc2.lfo|tonestart
+zone-free-clfo|freeClfo[zone][k], v->blockTempo|freeClfo[0][k], v->blockTempo|tonestart
+zone-free-tlfo|freeTlfo[zone], v->blockTempo|freeTlfo[0], v->blockTempo|tonestart
+zone-free-tick|            freeLfo[z].tick(1);|            if (!z) freeLfo[z].tick(1);|toneblock
+zone-modblk-note|    v->mod.noteOn(modBlk[zone], |    v->mod.noteOn(modBlk[0], |tonestart
 zone-legato|        const Controls& Z = zc(v);                     // its own zone's|        const Controls& Z = ctl;
 zone-release|void XtSynth::voiceOff(Voice& v) {\n    const Controls& Z = zc(v);|void XtSynth::voiceOff(Voice& v) {\n    const Controls& Z = ctl;
 zone-newblocks|void XtSynth::newBlocks(Voice& v) {\n    const Controls& Z = zc(v);|void XtSynth::newBlocks(Voice& v) {\n    const Controls& Z = ctl;|toneupdate
@@ -1003,15 +1003,15 @@ zone-tva|XtTvaBlock XtSynth::tvaBlock(const Voice& v) const {\n    const Control
 zone-cosm|XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {\n    const Controls& Z = zc(v);|XtTvfBlock XtSynth::cosmBlock(const Voice& v, int k) const {\n    const Controls& Z = ctl;
 zone-env|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = zc(v);|XtEnvParams XtSynth::envParams(const Voice& v) const {\n    const Controls& Z = ctl;|toneenvknobs
 zone-oscenv|XtEnvParams XtSynth::oscEnvParams(const Voice& v, const OscVoice& s, int which, int a, int d, int su, int r) const {\n    const Controls& Z = zc(v);|XtEnvParams XtSynth::oscEnvParams(const Voice& v, const OscVoice& s, int which, int a, int d, int su, int r) const {\n    const Controls& Z = ctl;|toneenvknobs
-zone-start|    const Controls& Z = zc(zone);                      // the zone's, all through the note's start|    const Controls& Z = ctl;
-zone-voice-zone|    v->active = true;\n    v->zone = zone;\n|    v->active = true;\n
-zone-wave|    v->wave = waveOf(zone, 0);|    v->wave = waveOf(zone > 1 ? zone - 1 : zone, 0);
+zone-start|    const Controls& Z = zc(zone);                      // the zone's, all through the note's start|    const Controls& Z = ctl;|tonestart
+zone-voice-zone|    v->active = true;\n    v->zone = zone;\n|    v->active = true;\n|tonestart
+zone-wave|    v->wave = v->extIn ? nullptr : waveOf(zone, 0);|    v->wave = v->extIn ? nullptr : waveOf(zone > 1 ? zone - 1 : zone, 0);|tonestart
 zone-update-new|        if (v.active) liveUpdate(v, zc(v), zoneWas[v.zone], anyChanged);|        if (v.active) liveUpdate(v, ctl, zoneWas[v.zone], anyChanged);|tonezones
 zone-follow|        return;\n    }\n    zonesFollow();\n|        return;\n    }\n|tonezones
 zone-patch-upper|c.zoneUpper[i] = p(0x124 + i);|c.zoneUpper[i] = 127;|tonepatch
 zone-pick-unused|xtZoneOf(ctl.zoneUpper, key)|xtZoneOf(zoneCtl[0].zoneUpper, key)|tonenotes
 zone-pickup-follow|        zonesFollow();\n        for (int z = 1; z < kZones; ++z) xtModBlock(zoneCtl[z].mod, modBlk[z]);|        for (int z = 1; z < kZones; ++z) xtModBlock(zoneCtl[z].mod, modBlk[z]);
-zone-mix-update|            if (v.on) oscUpdate(v, zc(v));|            if (v.on) oscUpdate(v, ctl);
+zone-mix-update|            if (v.on) oscUpdate(v, zc(v));|            if (v.on) oscUpdate(v, ctl);|toneblock
 zone-key-unshifted|    const int key = shiftKey(note), zone = xtZoneOf(ctl.zoneUpper, key);|    const int key = shiftKey(note), zone = xtZoneOf(ctl.zoneUpper, note);|tonenotes
 check-zone-getter|            const auto& P = zone && zoned(id) && zone < zpar.size() && !zpar[zone].empty() ? zpar[zone] : par;|            const auto& P = par;|tonefwcpp
 check-zone-zoned|    static bool zoned(int id) { return (id >= 0x293 && id <= 0x3e8) \|\| (id >= 0x8d0 && id <= 0x954); }|    static bool zoned(int id) { return id >= 0x293 && id <= 0x3e8; }|tonefwh
@@ -1021,30 +1021,30 @@ check-zone-tag-lfo|        for (uint32_t a : { 0x89479720u, 0x89479760u, 0x89479
 check-zone-uppers|    for (int i = 0; i < kXtZones; ++i) p[0x124 + i] = c.zoneUpper[i];\n||tonepatchids
 check-tone-alone|    std::ranges::fill(c.zoneUpper, 127);\n||tonecases
 check-zone-carry|(int)(pv - syn.voice), syn.zc(fw.c.rd8(n.BL + 0x6c6) & 15));|(int)(pv - syn.voice), syn.ctl);|tonecheck
-play-legato-any|    const bool legato1 = prevHeld && Z.playbackMode == 1 && v->on|    const bool legato1 = prev && Z.playbackMode == 1 && v->on
-play-legato-mode|    const bool legato1 = prevHeld && Z.playbackMode == 1 && v->on|    const bool legato1 = prevHeld && Z.playbackMode >= 1 && v->on
-play-legato2-mode|legato2 = prevHeld && Z.osc2.playbackMode == 1 && v->osc2.on|legato2 = prevHeld && Z.playbackMode == 1 && v->osc2.on
-play-legato-end|    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);|    if (legato1 && sameKind(*v, *prev)) legatoTake(*v, *prev);|tone|777
-play-legato2-end|    if (legato2 && sameKind(v->osc2, prev->osc2) && !atEnd(prev->osc2)) legatoTake(v->osc2, prev->osc2);|    if (legato2 && sameKind(v->osc2, prev->osc2)) legatoTake(v->osc2, prev->osc2);
-play-end-start|        return (int8_t)f == 1;|        return f != 0;
-play-end-solo|s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();|s.wave->type == 1 ? 0 : s.mb.endFlag();|tone|777
-play-end-band|s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();|s.wave->type == 1 ? s.solo.endFlag() : 0;
-play-end-lite|        const int f = s.lite ? s.staleEnd : s.linear|        const int f = s.lite ? 0 : s.linear
-play-prev-zone|            if (&w != v && w.active && !w.releasing && w.zone == zone) order[n++] = &w;|            if (&w != v && w.active && !w.releasing) order[n++] = &w;
-play-prev-held|prevHeld = (order[i]->keyFlags & 1) != 0; }|prevHeld = (order[i]->keyFlags & 2) != 0; }
-play-take-gain|    else s.mb.setGainXt(0.0f, true);\n    if (s.lite|    if (s.lite
-play-take-rates|    if (s.lite && !s.linear) { s.xfg.takeRates(s.curA, s.curF, s.curWalk); s.xfg.setGainXt(s.curGain); }|    if (s.lite && !s.linear) { s.xfg.takeRates(s.curA, s.curA, s.curWalk); s.xfg.setGainXt(s.curGain); }
-play-take-lite-linear|    if (s.lite && !s.linear) { s.xfg.takeRates|    if (s.lite) { s.xfg.takeRates
-play-steps-pre|    v->steps = stepCount[zone][0]++;|    v->steps = ++stepCount[zone][0];
-play-steps2|    v->osc2.steps = stepCount[zone][1]++;|    v->osc2.steps = stepCount[zone][0]++;
+play-legato-any|    const bool legato1 = prevHeld && Z.playbackMode == 1 && pcm(*v)|    const bool legato1 = prev && Z.playbackMode == 1 && pcm(*v)|tonestart
+play-legato-mode|    const bool legato1 = prevHeld && Z.playbackMode == 1 && pcm(*v)|    const bool legato1 = prevHeld && Z.playbackMode >= 1 && pcm(*v)|tonestart
+play-legato2-mode|legato2 = prevHeld && Z.osc2.playbackMode == 1 && pcm(v->osc2)|legato2 = prevHeld && Z.playbackMode == 1 && pcm(v->osc2)|tonestart
+play-legato-end|    if (legato1 && sameKind(*v, *prev) && !atEnd(*prev)) legatoTake(*v, *prev);|    if (legato1 && sameKind(*v, *prev)) legatoTake(*v, *prev);|tonestart|777
+play-legato2-end|    if (legato2 && sameKind(v->osc2, prev->osc2) && !atEnd(prev->osc2)) legatoTake(v->osc2, prev->osc2);|    if (legato2 && sameKind(v->osc2, prev->osc2)) legatoTake(v->osc2, prev->osc2);|tonestart
+play-end-start|        return (int8_t)f == 1;|        return f != 0;|tonestart
+play-end-solo|s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();|s.wave->type == 1 ? 0 : s.mb.endFlag();|tonestart|777
+play-end-band|s.wave->type == 1 ? s.solo.endFlag() : s.mb.endFlag();|s.wave->type == 1 ? s.solo.endFlag() : 0;|tonestart
+play-end-lite|        const int f = s.lite ? s.staleEnd : s.linear|        const int f = s.lite ? 0 : s.linear|tonestart
+play-prev-zone|            if (&w != v && w.active && !w.releasing && w.zone == zone) order[n++] = &w;|            if (&w != v && w.active && !w.releasing) order[n++] = &w;|tonestart
+play-prev-held|prevHeld = (order[i]->keyFlags & 1) != 0; }|prevHeld = (order[i]->keyFlags & 2) != 0; }|tonestart
+play-take-gain|    else s.mb.setGainXt(0.0f, true);\n    if (s.lite|    if (s.lite|tonestart
+play-take-rates|    if (s.lite && !s.linear) { s.xfg.takeRates(s.curA, s.curF, s.curWalk); s.xfg.setGainXt(s.curGain); }|    if (s.lite && !s.linear) { s.xfg.takeRates(s.curA, s.curA, s.curWalk); s.xfg.setGainXt(s.curGain); }|tonestart
+play-take-lite-linear|    if (s.lite && !s.linear) { s.xfg.takeRates|    if (s.lite) { s.xfg.takeRates|tonestart
+play-steps-pre|    v->steps = stepCount[zone][0]++;|    v->steps = ++stepCount[zone][0];|tonestart
+play-steps2|    v->osc2.steps = stepCount[zone][1]++;|    v->osc2.steps = stepCount[zone][0]++;|tonestart
 play-step-mod|    if (o.playbackMode == 2) idx = (int)s.steps % (n - 1);|    if (o.playbackMode == 2) idx = (int)s.steps % n;
 play-event-octaves|            const int r = (m + 11) / 12 * 12, k = v.note - 60;|            const int r = (m + 12) / 12 * 12, k = v.note - 60;|tone|11
 play-event-below|            int x = v.note >= 60 ? k : k % r + r;|            int x = v.note >= 60 ? k : k % r;
 play-event-last|    last = at(idx + 1);|    last = at(idx);
 play-step-few|(o.playbackMode == 3 \|\| s.wave->vpnoCount >= 2);|(o.playbackMode == 3 \|\| s.wave->vpnoCount >= 1);
 play-event-ensemble|s.wave->type == 1 \|\| s.wave->type == 3 \|\| s.wave->type == 5)|s.wave->type == 1 \|\| s.wave->type == 3)
-play-loop-bit|        s.mb.setLoopBit(o.loop && !eventPlay(s, o));|        s.mb.setLoopBit(o.loop);
-play-loop-bit-none|        s.mb.setLoopBit(o.loop && !eventPlay(s, o));|
+play-loop-bit|        s.mb.setLoopBit(o.loop && !eventPlay(s, o));|        s.mb.setLoopBit(o.loop);|tonetrip
+play-loop-bit-none|        s.mb.setLoopBit(o.loop && !eventPlay(s, o));||tonetrip
 play-band-events-swap|    if (eventCfg) { S.evStart = evFirstCfg; S.evEnd = evLastCfg; }|    if (eventCfg) { S.evStart = evLastCfg; S.evEnd = evFirstCfg; }|toneband
 play-band-startpos|    S.startPos = eventCfg ? (int)S.rd32(S.entry(S.evStart) + 4) : startCfg * 16;|    S.startPos = eventCfg ? 0 : startCfg * 16;|toneband
 play-band-loop-on|        if (!eventCfg) S.flags0 \|= 1;|        S.flags0 \|= 1;|toneband
@@ -1081,8 +1081,8 @@ rec-next-len|lenOf(past ? seg : seg + 1)|lenOf(seg + 1)|tonesolo
 rec-prev-len|    nextLen16 = (int32_t)std::lround(16.0 * lenOf(seg));   // 0x8950d560|    // 0x8950d560|tonesolo
 read-ev-seg|P.evSeg.push_back((int)((so - seg0) / 12));|P.evSeg.push_back((int)((so - seg0) / 12) + 1);|tonesolo
 read-seg-first|P.segFirst.push_back((int16_t)r16(ro));|P.segFirst.push_back((int16_t)256);|tonesolo|31337
-solo-events-order|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(first, last);|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(last, first);
-solo-loop-bit|        s.solo.setLoopBit(o.loop && !eventPlay(s, o)); // and the Loop bit, which Playback Mode's tails clear\n|
+solo-events-order|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(first, last);|if (waveEvents(v, s, o, first, last)) s.solo.setEvents(last, first);|toneoscstart
+solo-loop-bit|        s.solo.setLoopBit(o.loop && !eventPlay(s, o)); // and the Loop bit, which Playback Mode's tails clear\n||tonetrip
 solo-encode-xt|E->stored \|\| ((own ? marks.size() > 2 : depth >= 0)|E->stored \|\| ((own ? marks.size() > 2 : depth < -1)
 check-solo-loop-ev|            while (ev + 1 < nev && evPos(ev + 1) < pos) ++ev;\n||tonecheck|31337
 check-solo-loop-seg|            while (seg + 12 < segEnd && !(pos < (int)r32(seg + 12 + 8))) seg += 12;\n||tonecheck
@@ -1105,11 +1105,11 @@ xfg-upd-last|    firstF = floatU(start);\n    lastF = floatU(frames - 1);|    fi
 xfg-upd-fwdlen|    fwdLenF = (float)(l.fwdEnd - l.fwdStart);|    fwdLenF = (float)l.fwdEnd;|tonelite
 xfg-upd-mode|    fwdMode = l.on ? l.fwdMode : 0;|    fwdMode = 0;|tonelite
 xfg-upd-mode-bwd|    bwdMode = l.on ? l.bwdMode : 0;|    bwdMode = 0;|tonelite
-lite-update-off|        s.xfg.blockUpdate(rec, s.liteStart, (int32_t)s.wave->frames);\n||tone|12
-lite-update-start|        s.xfg.blockUpdate(rec, s.liteStart, (int32_t)s.wave->frames);|        s.xfg.blockUpdate(rec, waveStart(s, o), (int32_t)s.wave->frames);
-lite-start-lin|        s.liteStart = waveStart(s, o);\n        s.lin.setLite(s.lite);|        s.lin.setLite(s.lite);
-lite-start-xfg|        s.xfg.setStart(waveStart(s, o));\n        s.liteStart = waveStart(s, o);|        s.xfg.setStart(waveStart(s, o));
-lin-update-off|        if (s.lite) s.lin.liteUpdate(rec, s.liteStart, (int32_t)s.wave->frames, s.curWalk);\n||tone|777
+lite-update-off|        s.xfg.blockUpdate(rec, s.liteStart, (int32_t)s.wave->frames);\n||tonetrip|12
+lite-update-start|        s.xfg.blockUpdate(rec, s.liteStart, (int32_t)s.wave->frames);|        s.xfg.blockUpdate(rec, waveStart(s, o), (int32_t)s.wave->frames);|tonetrip
+lite-start-lin|        s.liteStart = waveStart(s, o);\n        s.lin.setLite(s.lite);|        s.lin.setLite(s.lite);|toneoscstart
+lite-start-xfg|        s.xfg.setStart(waveStart(s, o));\n        s.liteStart = waveStart(s, o);|        s.xfg.setStart(waveStart(s, o));|toneoscstart
+lin-update-off|        if (s.lite) s.lin.liteUpdate(rec, s.liteStart, (int32_t)s.wave->frames, s.curWalk);\n||tonetrip|777
 lin-upd-first|    bwd.end = start;\n    fwd.end = frames - 1;|    fwd.end = frames - 1;|tonelin|777
 lin-upd-last|    bwd.end = start;\n    fwd.end = frames - 1;|    bwd.end = start;\n    fwd.end = frames;|tonelin
 lin-upd-mode|        fwd.mode = l.on ? l.fwdMode : 0;|        fwd.mode = 0;|tonelin
@@ -1167,3 +1167,20 @@ msm-ms-none|    msmMs(d);\n||wirearp
 msm-edit-unsynced|    msmSync();\n    for (Voice& v : voice)|    for (Voice& v : voice)|wirezones
 check-msm-unreplayed|        if (asked.empty()) return true;|        asked.clear();\n        if (asked.empty()) return true;|wirefwmsm
 check-msm-unstopped|            if (!fw.stop(n)) return false;\n||wirecheck
+# v200, the EXT IN OSC: through xt_tone's EXT IN mode (mode extin), the only run that draws it
+extin-glide|constexpr float kGlide = 0x1p-5f;|constexpr float kGlide = 0x1p-4f;|toneextin||extin
+extin-no-glide|        gain_ = add(mul(sub(target_, gain_), kGlide), gain_);|        gain_ = target_;|toneextin||extin
+extin-sides|        lr[2 * i + 1] = mul(flt(in[2 * i + 1]), gain_);|        lr[2 * i + 1] = mul(flt(in[2 * i]), gain_);|toneextin||extin
+extin-ring-side|        ring_[2 * (write_ % kFrames) + 1] = lr[2 * i + 1];|        ring_[2 * (write_ % kFrames) + 1] = lr[2 * i];|toneextin||extin
+extin-start|s.ext.noteOn(gainStart, s.curGain);|s.ext.noteOn(0.0f, s.curGain);|toneoscstart||extin
+extin-silent|    if (o.oscType == 2) return true;|    if (o.oscType == 2) return false;|toneoscstart||extin
+extin-update|                    s.ext.setTarget(gt);|                    ;|toneblock||extin
+extin-osc1-silent|                else if (v.extIn) v.ext.block(tmp, in);|                else if (v.extIn) std::fill(tmp, tmp + 64, 0.0f);|toneblock||extin
+extin-envs-tick|            if (v.on && !v.extIn) oscTick(v);|            if (v.on) oscTick(v);|toneblock||extin
+extin-env-neutral|float envOut(const XtOscVoice& s, const XtEnvelope& e) { return s.extIn ? 1.0f : e.level(); }|float envOut(const XtOscVoice& s, const XtEnvelope& e) { return e.level(); }|toneknobs||extin
+extin-lfo-neutral|float lfoOut(const XtOscVoice& s) { return s.extIn ? 0.0f : s.lfo.out(); }|float lfoOut(const XtOscVoice& s) { return s.lfo.out(); }|toneknobs||extin
+extin-gain-env|    const float e = s.extIn ? 1.0f : env;|    const float e = env;|toneknobs||extin
+extin-pitch-a4|s.analog \|\| s.extIn ? 69 : o.rootKey|s.analog ? 69 : o.rootKey|toneknobs||extin
+extin-mono|\|\| (s.on && s.extIn); };|; };|tonestart||extin
+extin-root|s.robot \|\| s.analog \|\| s.extIn \|\| !s.on;|s.robot \|\| s.analog \|\| !s.on;|tonestart||extin
+# (the mode drawing no EXT IN at all differs from nothing: fcheck's baseline sees it, its section's counts then the plain run's)

@@ -4,17 +4,20 @@
 #include "XtToneCases.h"
 #include "XtToneFirmware.h"
 #include <algorithm>
+#include <cstring>
 #include <utility>
 
 // An envelope's time: in one case of eight a note value; an LFO's rate, in one of four
 int drawTime(Rng& r) { return r.one(8) ? r.range(128, 144) : r.range(0, 90); }
 int drawRate(Rng& r) { return r.one(4) ? r.range(128, 144) : r.range(0, 127); }
 
-void drawOsc(Rng& r, OscC& o) {
+void drawOsc(Rng& r, OscC& o, bool extIn) {
     o.on = true;
     o.tempoSync = r.one(3); o.timeTrip = !r.one(4); o.beatKeep = !r.one(4);
     o.origTempo = r.one(3) ? 1200000 : r.range(40, 240) * 10000 + r.range(0, 9999);
-    o.oscType = 0;
+    // EXT IN (v200) in the EXT IN mode alone, on an odd Original Tempo (one OSC in three of those that play no wave): a value
+    // drawn already, so the draws stay the plain run's, whose cases are as they were
+    o.oscType = extIn && o.origTempo % 2 == 1 ? 2 : 0;
     o.oscTime = r.one(2) ? 0 : r.range(-63, 63); o.oscTimeOffset = r.range(0, 2); o.oscTimeKF = r.one(2) ? 0 : 10 * r.range(-20, 20);
     o.oscFormant = r.one(2) ? 0 : r.range(-63, 63); o.oscFormantKF = r.one(2) ? 0 : 10 * r.range(-20, 20); o.energy = r.one(2) ? 0 : r.range(0, 127);
     o.tDepth = r.one(2) ? 0 : r.range(-63, 63); o.fDepth = r.one(2) ? 0 : r.range(-63, 63);
@@ -102,11 +105,11 @@ void drawMatrix(Rng& r, Ctl& c) {
     }
 }
 
-Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2) {
+Ctl drawControls(Rng& r, int g, bool pcm, bool pcm2, bool extIn) {
     Ctl c;
     drawMatrix(r, c);
-    drawOsc(r, c);
-    drawOsc(r, c.osc2);
+    drawOsc(r, c, extIn);
+    drawOsc(r, c.osc2, extIn);
     const auto drawPcm = [&r](OscC& o) {
         o.oscType = 1; o.rootKey = r.range(36, 84);
         o.robot = r.one(4);
@@ -199,5 +202,15 @@ Ctl toneAlone(Ctl c) {
     c.msm.master = 0;
     std::ranges::fill(c.zoneUpper, 127);
     return c;
+}
+
+int xtToneMain(int argc, char** argv, int (*run)(int, char**, bool)) {
+    if (xtToneMsmMode(argc, argv)) return xtToneMsm(argc, argv);
+    const bool extIn = argc > 2 && std::strcmp(argv[2], "extin") == 0;
+    if (extIn) {   // its word taken out: the plain run's arguments follow it
+        std::copy(argv + 3, argv + argc, argv + 2);
+        --argc;
+    }
+    return run(argc, argv, extIn);
 }
 #endif

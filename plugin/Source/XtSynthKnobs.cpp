@@ -19,6 +19,11 @@ int oscTerm(const XtVoice& v, const XtOscVoice& s, int k) {
     return v.msm[oscFirst(v, s) + k];
 }
 
+// What a voice's own modulators read (its +0x970…+0x98c): the OSC's envelopes and LFO, but on an EXT IN voice the tone's
+// envelope 0 and LFO 0, which stand at 1 and 0, as kind 4 has none bound (v200; HARDWARE_FIRMWARE.md, "The EXT IN OSC")
+float envOut(const XtOscVoice& s, const XtEnvelope& e) { return s.extIn ? 1.0f : e.level(); }
+float lfoOut(const XtOscVoice& s) { return s.extIn ? 0.0f : s.lfo.out(); }
+
 // The patch's tuning: Pitch Shift as semitones and the cents left, ±50, on Patch Coarse and Fine; and the Scale Tune
 XtTuning patchTuning(const XtControls& Z) {
     const long shift = std::lround((double)Z.pitchSemis * 100.0);
@@ -66,7 +71,8 @@ void XtSynth::noteTuning(const Voice& v, const OscVoice& s, const OscControls& o
 float XtSynth::noteCents(const Voice& v, const OscVoice& s, const OscControls& o, int key) const {
     int coarse, fine;
     noteTuning(v, s, o, coarse, fine);
-    return xtPitchCents(key, coarse, 10 * o.pitchKF, fine, s.analog ? 69 : o.rootKey, s.robotKnob && o.vari);
+    // the analog and EXT IN converters take the pitch against A4 (0x894e1920, 0x894e3830's −69000)
+    return xtPitchCents(key, coarse, 10 * o.pitchKF, fine, s.analog || s.extIn ? 69 : o.rootKey, s.robotKnob && o.vari);
 }
 
 // The analog converter's block at the voice's note, formed again at every
@@ -117,7 +123,7 @@ void XtSynth::targets(const Voice& v, const OscVoice& s, const OscControls& o, f
     const int pLfo = std::clamp(o.lfoPitchDepth + oscTerm(v, s, xtmsm::OscLfoPitch) + v.mx[dL + 1], -63, 63);
     const float pEnv = withVel(xtPitchDepthCents((float)pDepth), o.pVel);
     const float offset = tuned ? tune.offset : 0.0f, detune = tuned ? tune.detune : 0.0f;
-    A = xtPitchTarget(noteCents(v, s, o, v.note), s.penv.level(), pEnv, s.lfo.out(), xtPitchDepthCents((float)pLfo),
+    A = xtPitchTarget(noteCents(v, s, o, v.note), envOut(s, s.penv), pEnv, lfoOut(s), xtPitchDepthCents((float)pLfo),
                       pitchKnob(v, s, o), s.porta.value(), offset, 1.0f, detune);
     const int formant = o.oscFormant + oscTerm(v, s, xtmsm::OscFormant);
     const float fEnv = withVel(xtOscFormantEnvDepth(o.fDepth + oscTerm(v, s, xtmsm::OscFenv)), o.fVel);
@@ -150,7 +156,8 @@ float XtSynth::gainTarget(const Voice& v, const OscVoice& s, const OscControls& 
     const float level = xtOscLevel(knob, o.oscLevelKF, v.note, xtVelGain(v.vel, o.oscVelSens, o.oscVelCurve));
     const float gain = s.analog ? analogBlock(v, s, o).gain : xtOscGain(o.waveGain);
     const int lfo = o.oscLevelLfoDepth + oscTerm(v, s, xtmsm::OscLfoLevel) + v.mx[dL + 4];
-    return xtOscGainTarget(gain, level, env, s.lfo.out(), xtOscLevelLfoDepth(lfo));
+    const float e = s.extIn ? 1.0f : env;            // envelope 0, whose attack time is 0: the start is the target too
+    return xtOscGainTarget(gain, level, e, lfoOut(s), xtOscLevelLfoDepth(lfo));
 }
 
 // The key-follow key (the OSC's +4), from the coarse word with its terms

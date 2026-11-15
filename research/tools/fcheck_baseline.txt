@@ -312,6 +312,61 @@ tone, the host's clock: 0 notes left off, a read outside memory; 0 band reads fa
 tone, the host's clock: 0 different
 tone, own events: 6 waves, 68 checks
 tone, own events: 0 different
+== xt_tone extin
+tone, the SOLO records of vocal.bin: 0 different of 461, 2 events
+tone, the SOLO records of w358.bin: 0 different of 111, 2 events
+tone, the SOLO records of drum.bin: 0 different of 607, 3 events
+patches: 512, 1558 zones, 1588560 values, 0 different; 448512 of their effects' values, 0 different
+tone: 2242 notes, 1856 taken by a sounding tone, 69 truncated, 198432 blocks, 13165937 checks
+tone: 0 notes left off, a read outside memory; 160048 band reads far from their wave
+tone: 0 different
+tone, a wave on OSC 2: 270 notes, 81 taken by a sounding tone, 33 truncated, 23769 blocks, 2002240 checks
+tone, a wave on OSC 2: 0 notes left off, a read outside memory; 94988 band reads far from their wave
+tone, a wave on OSC 2: 0 different
+tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 227759 checks
+tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, a second update in a tick: 0 different
+tone, the firmware's patches: 284 notes, 64 taken by a sounding tone, 12 truncated, 24324 blocks, 2507387 checks
+tone, the firmware's patches: 0 notes left off, a read outside memory; 14446 band reads far from their wave
+tone, the firmware's patches: 0 different
+tone, a wave's own tuning: 133 notes, 38 taken by a sounding tone, 14 truncated, 11327 blocks, 956304 checks
+tone, a wave's own tuning: 0 notes left off, a read outside memory; 34774 band reads far from their wave
+tone, a wave's own tuning: 0 different
+tone, LITE waves: 134 notes, 40 taken by a sounding tone, 19 truncated, 11467 blocks, 1017888 checks
+tone, LITE waves: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, LITE waves: 0 different
+tone, zones: 109 notes on zones 2 to 16, 13 of those zones
+tone, zones: 132 notes, 35 taken by a sounding tone, 14 truncated, 11811 blocks, 1099874 checks
+tone, zones: 0 notes left off, a read outside memory; 30788 band reads far from their wave
+tone, zones: 0 different
+tone, playback modes: 31 OSCs took an earlier note's player (LEGATO), 1 didn't as it had reached its wave's end; 85 started from an event (STEP, EVENT)
+tone, playback modes: 35 SOLO notes started from an event; 25 moves between a SOLO wave's segments
+tone, playback modes: 190 notes, 9 taken by a sounding tone, 18 truncated, 12383 blocks, 1470893 checks
+tone, playback modes: 1 notes left off, a read outside memory; 37860 band reads far from their wave
+tone, playback modes: 0 different
+tone, SOLO segments: 20 notes started from an event; 179 moves between segments; 0 turns at a kind-1 event; 8 took an earlier note's player
+tone, SOLO segments: 77 notes, 4 taken by a sounding tone, 8 truncated, 3903 blocks, 480961 checks
+tone, SOLO segments: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, SOLO segments: 0 different
+tone, stored waves: 90 of 504 played on their own vpdt (SOLO 61, BACKING 28, ENSEMBLE 1), 0 encoded again as theirs can't be played as it is, 10 skipped
+tone, stored waves: 0 SOLO with a terminator other than (256, 1), 0 cases from their end, 0 grains on it
+tone, stored waves: 172 notes, 6 taken by a sounding tone, 19 truncated, 10106 blocks, 1130433 checks
+tone, stored waves: 0 notes left off, a read outside memory; 178 band reads far from their wave
+tone, stored waves: 0 different
+tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
+tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
+tone, the clock's rate: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, the clock's rate: 0 different
+tone, an outside clock alone: 600 F8s
+tone, an outside clock alone: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 4212 checks
+tone, an outside clock alone: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, an outside clock alone: 0 different
+tone, the host's clock: 21041 clocks
+tone, the host's clock: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 46311 checks
+tone, the host's clock: 0 notes left off, a read outside memory; 0 band reads far from their wave
+tone, the host's clock: 0 different
+tone, own events: 6 waves, 68 checks
+tone, own events: 0 different
 == xt_tone paths
 paths: 770 waves (416 preset waves of the disk image)
 paths: 566 SOLO waves and raw inputs, 79 with attacks, 8 with no firmware result, 6 with no records (XtSynth refuses them); XtSynth's path not the detection's on 0

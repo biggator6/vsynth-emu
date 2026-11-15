@@ -335,6 +335,23 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The EXT IN OSC v200 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, fourth item's first half (the user's "Yes, next
+  item"; the item split in two, VC2_MODE_PLAN.md). OSC Type 2 is a voice of kind 4: XtExtIn's player (0x895097d0, the
+  input's words 4 and 5 of each returned frame at a gain gliding 1/32 a sample) and XtSynth::input; its note-on and
+  update set the pitch and gain target directly; nothing is bound to it, so its OSC's envelopes and LFO hold and it reads
+  the tone's envelope 0 (at 1) and LFO 0 (at 0); stereo, root 440. The plugin pushes no input yet (v201) and XtPatch
+  still reads a patch's EXT IN as off. XtSynth.cpp (2,074 lines) split first by job, moved as it stood (XtSynthStart,
+  XtSynthOscStart, XtSynthTrip, XtSynthBlock, XtSynthTva, XtSynthClock, XtSynthConstants.h; 258 tone plants followed;
+  fcheck as baseline, ab 4/4); mixBlock into toneUpdate/voiceRender/voiceBus, oscStart's pcmStart, backOnBeat.
+  Check: xt_tone's EXT IN mode (`xt_tone rom extin`, fcheck 400 cases) draws EXT IN on about one OSC in three with no
+  wave, both sides fed xtExtInTestBlock, 0 different in every section; the plain run draws none, its lines v199's
+  baseline's, as one generator serves the run and EXT IN in it moved every later case (tried first: new cases at every
+  seed, and on them gaps of the check's own, in build.md); 15 new extin- plants, run in the mode (tone_muts.txt's mode
+  field, mutate.sh's TONE_MODE), all caught; the mode drawing none is fcheck's to see (23 of its section's lines change).
+  The whole list, 1183: all caught but check-pad-cc [gap, v189's]; 16 whose text v200's own edits had rewritten (the
+  pcm() test, EXT IN in the root and stereo, the chase in backOnBeat) read ERROR, written again on the code as it is
+  and all caught, zone-wave by a crash.
+
 rom.4's parameter tables v199 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, third item (the user's "Yes, next
   item"). Vc2Params.cpp reads rom.4's names, both descriptor banks and the values' text by rom.4's own IDs, once, in
   loadVc2 at the start (so a switch of modes reads nothing): vc2ParamName, vc2ParamDesc, vc2TypedDesc, vc2ValueText,

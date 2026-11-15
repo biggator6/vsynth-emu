@@ -77,7 +77,7 @@ struct XtToneProbe {
     static void ccs(XtSynth& s, const int* v, const int* number, int n) { for (int i = 0; i < n; ++i) s.cc[number[i]] = v[i]; }
     static void sources(XtSynth& s, int number, int value) { s.cc[number] = value; }
     static void press(XtSynth& s, int channel, int key, int poly) { s.pressure = channel; if (key >= 0) s.polyPress[key] = poly; }
-    static int run(int argc, char** argv);
+    static int run(int argc, char** argv, bool extIn);
     static XtSynth::OscVoice& osc(XtSynth::Voice& v, int n) { return n ? v.osc2 : static_cast<XtSynth::OscVoice&>(v); }
     static XtEnvelope& env(XtSynth::Voice& v, int e) {
         if (e <= 8) {
@@ -588,9 +588,9 @@ int encodePaths(int n, char** files) {
 
 }  // namespace
 
-int main(int n, char** args) { return xtToneMsmMode(n, args) ? xtToneMsm(n, args) : XtToneProbe::run(n, args); }
-
-int XtToneProbe::run(int argc, char** argv) {
+int main(int n, char** args) { return xtToneMain(n, args, XtToneProbe::run); }
+// one-off: the whole check's case loop (1557 statements), its split by job a version of its own (build.md, v200's entry)
+int XtToneProbe::run(int argc, char** argv, bool extIn) {
     if (argc < 2 || !xtSynthSetRom(argv[1])) { std::fprintf(stderr, "usage: xt_tone rom.2.bin [cases] [seed] [inputs dir] | paths [file ...]\n"); return 2; }
     if (argc > 2 && std::string(argv[2]) == "paths") return encodePaths(argc - 3, argv + 3);
 #if defined(__aarch64__)
@@ -965,7 +965,7 @@ int XtToneProbe::run(int argc, char** argv) {
             wv = band(wv);
             for (size_t i = 0; wv == wv2 && i < pool.size(); ++i) wv = band(&pool[((size_t)(wv - pool.data()) + 1) % pool.size()]);
         }
-        Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr);
+        Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr, extIn);
         if (patchCase) {   // what a patch has, on what the wave has of its own
             const Ctl d = ctl;
             ctl = patchCtl;
@@ -1354,7 +1354,7 @@ int XtToneProbe::run(int argc, char** argv) {
             };
             for (int z = 1; z < 16; ++z) {
                 const TestWave* zw[2] = { r.one(2) ? anyWave() : nullptr, r.one(3) ? anyWave() : nullptr };
-                Ctl zc = drawControls(r, g, zw[0] != nullptr, zw[1] != nullptr);
+                Ctl zc = drawControls(r, g, zw[0] != nullptr, zw[1] != nullptr, extIn);
                 for (int k = 0; k < 2; ++k) {
                     const TestWave* t = zw[k];
                     (k ? zc.osc2.playbackMode : zc.playbackMode) = drawMode(r, t, k ? zc.osc2.vari : zc.vari);   // as the playback cases draw it
@@ -1524,7 +1524,7 @@ int XtToneProbe::run(int argc, char** argv) {
                         const float x = fw.f32(V + f.off);
                         if (!bits(x, f.v)) rep.bad(os + f.name, "fw %.9g port %.9g", x, f.v, blk);
                     }
-                } else {
+                } else if (!s.extIn) {   // a PCM player's (an EXT IN voice, kind 4, has none: the taps and the bus are its check)
                     const VField fs[] = { { "pitch", 0x144, s.curA }, { "formant", 0x148, s.curF }, { "energy", 0x14c, s.curG }, { "walk", 0x150, s.curWalk }, { "pcm gain", 0x154, s.curGain } };
                     for (const VField& f : fs) {
                         if (s.lite && f.off == 0x14c) continue;   // kind 1 has no Energy (0x8950bbb0 leaves +0x14c alone)
