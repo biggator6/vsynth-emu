@@ -36,6 +36,7 @@
 //        plugin/Source/Sh4Setup.cpp plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
 //        plugin/Source/XtFwMachine.cpp plugin/Source/XtMultiBandPlayer.cpp plugin/Source/XtFxChip.cpp
 //        plugin/Source/XtFxControl.cpp plugin/Source/XtFxValueText.cpp plugin/Source/XtOsc.cpp
+//        plugin/Source/XtFxInput.cpp plugin/Source/XtExtIn.cpp
 //        plugin/Source/XtWaveFile.cpp -o build/tools/vc2/vc2run
 #include "vc2runs.h"
 #include <algorithm>
@@ -65,14 +66,6 @@ std::vector<uint8_t> fileContents(const char* path) {
         std::fclose(fp);
     }
     return f;
-}
-
-std::optional<int> intArg(const char* s) {
-    int v = 0;
-    const char* end = s + std::strlen(s);
-    const auto [at, why] = std::from_chars(s, end, v);
-    if (why != std::errc() || at != end) return std::nullopt;
-    return v;
 }
 
 int answerKernel(Machine& m) {

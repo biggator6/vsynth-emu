@@ -2,7 +2,8 @@
 // XtFxValueText): Motif, Duration, Shuffle Resolution, Keyboard Velocity, Octave Range, Grid, End Point and a step's
 // cell (v188, HARDWARE_FIRMWARE.md, "The arpeggiator").  Research only; not in build.sh.  Build from plugin/Source:
 //   $TC/clang++ -isysroot $SDK -std=c++20 -O1 -I. -I$REPO/research/third_party/gearmulator_esp \
-//       $REPO/research/tools/arptext.cpp XtFxControl.cpp XtFxValueText.cpp XtFxChip.cpp Sh4Interp.cpp Sh4Setup.cpp -o $WORK/bin/arptext
+//       $REPO/research/tools/arptext.cpp XtFxControl.cpp XtFxValueText.cpp XtFxChip.cpp Sh4Interp.cpp Sh4Setup.cpp \
+//       XtFxInput.cpp XtExtIn.cpp -o $WORK/bin/arptext
 #include "XtFxControl.h"
 #include <cstdio>
 #include <initializer_list>

@@ -8,6 +8,7 @@
 //
 // Two threads: one control thread, which makes every call marked so (one at a time), and the audio thread, which calls service().  service() takes no lock and allocates nothing.
 #include "XtBus.h"
+#include "XtExtIn.h"
 #include "XtFxValueText.h"
 #include <atomic>
 #include <cstdint>
@@ -86,9 +87,14 @@ private:
     struct Word { uint32_t value; uint16_t index; uint8_t command; };
     struct Batch { std::vector<Word> words; uint32_t waitAfter = 0; };                  // reaches the chip whole; then the chip plays on for waitAfter samples before the next
     static constexpr uint32_t kSlots = 1024;
-    enum Block : uint8_t { BlockSwitches = 1, BlockMfx = 2, BlockChorus = 4, BlockReverb = 8, BlockSystem = 16, BlockAttenuation = 32 };
+    // A message's blocks; BlockInput (v204), External Input Type and Source, has no message, its routing a call of its own
+    enum Block : uint8_t {
+        BlockSwitches = 1, BlockMfx = 2, BlockChorus = 4, BlockReverb = 8,
+        BlockSystem = 16, BlockAttenuation = 32, BlockInput = 64
+    };
 
     void boot();
+    void routeInput();   // the outside input's routing by External Input Type and Source (XtFxInput.cpp, v204)
     bool call(uint32_t fn, std::initializer_list<uint32_t> args = {}, uint32_t* result = nullptr);
     void send(unsigned blocks, bool patch);
     void hooks();
@@ -147,7 +153,13 @@ public:
     // Audio thread: `frames` frames of the output bus (XtSynth::frame, 8 floats a frame, the XT's units) through the chip, and ±1 stereo out.  Mix and DIR come out together, as the plugin has one stereo output.
     // Between the two, the XT's numbers: the frame reaches the chip at Out Gain for TG's −24, a sixteenth, so a tone can be switched between this and the plain path without a jump, and the chip adds +6 dB.
     // So a raw wave comes out of here at ⅛ of the chip's full scale, and XtSynth::busOut plays it at the same level without the chip.  Whether a real XT's outputs do just that, only a capture can say.
+    // At most 32 frames a call, the bus's block.
     void process(const float* frame, float* lr, int frames) override;
+    // Audio thread: the outside input as the converter hands it, int32 L then R a frame at the XT's full scale (±2^31),
+    // pushed before process() takes it with the frame: into the chip's input slots, analog and USB alike (v204)
+    void pushInput(const int32_t* lr, int frames);
+    // What the chip handed back for the EXT IN OSCs in the last process() (XtBus.h): words 4 and 5 of each frame
+    const int32_t* returned() const override { return back_; }
 
     // A float of the bus as the chip takes it (0x894db2b0 truncates to int32; the chip has the top 24 bits), and one of its words as the plugin's ±1, the chip's full scale.
     static int32_t toChip(float x);
@@ -156,6 +168,10 @@ public:
     const XtFxChip& chip() const { return *chip_; }             // for the check
 
 private:
+    void frameIn(const int32_t* in, int i);   // frame i's input into the slots (XtFxInput.cpp)
+    void frameBack(int i);                    // and what the chip hands back of it, after the frame
     std::unique_ptr<XtFxChip> chip_;
     XtFxControl control_;
+    XtExtInput in_;
+    int32_t back_[64] = {};
 };

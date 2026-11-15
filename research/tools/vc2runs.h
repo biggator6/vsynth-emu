@@ -1,6 +1,7 @@
 #pragma once
 // vc2run's runs, one file each (vc2run.cpp has the table that names them).  Each takes the machine with rom.4 loaded
 // and its own arguments (argv[0] is the run's name), prints what it found, and returns the program's exit status.
+#include "XtArgs.h"   // intArg: a run's argument as a whole number, or nothing when it isn't one (plugin/Source, v204)
 #include "vc2rom.h"
 #include <cstdint>
 #include <optional>
@@ -19,8 +20,6 @@ uint32_t slotOf(Machine& m, uint32_t engine, int slot);
 bool runF(Machine& m, uint32_t addr, std::initializer_list<uint32_t> args, float fr4, float fr5 = 0);
 // A file's bytes, or empty when it can't be read
 std::vector<uint8_t> fileContents(const char* path);
-// A run's argument as a whole decimal number, or nothing when it isn't one
-std::optional<int> intArg(const char* s);
 // Every stub into the kernel (rom.4's 0x89301000…0x89302000, each a literal into 0x88000000…, which isn't mapped) answered
 // with 0: the effect driver's waits and its OS calls; how many
 int answerKernel(Machine& m);

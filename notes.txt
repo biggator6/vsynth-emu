@@ -335,6 +335,23 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The input's way in, the chip's side v204 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, fourth item's second half,
+  the first of three (the user's "Yes, next item"; for Effects off the user's "Copy without the chip", v205; the plugin's
+  bus v206). XtFxControl runs the firmware's EXT IN request (0x894a7dd0: External Input Type 0x78, default MONO MIX, and
+  Source 0x7c into the routing's wanted bytes) and event 0x40's routine (0x894aee80) at its start and at each change of
+  the two (BlockInput); XtFxUnit takes the input into the chip's slots (analog 0x10, 0x12 and USB 0x18, 0x1a alike) and
+  hands back words 4 and 5 (GRAM 0x98, 0x9a, top-aligned), which XtSynth::busOut pushes into XtSynth::input
+  (XtFxInput.cpp, XtSynthOut.cpp). XtFxChip runs core 0's last twelve clocks too, which the routing's path is the first
+  to reach. Split first: XtFxChip.cpp's check into XtFxCheck.h and XtFxCheck*.cpp (its arguments on XtArgs.h's intArg,
+  vc2run's moved; its switches on xtSwitch); XtSynth.cpp's busOut and render into XtSynthOut.cpp.
+  Check: xt_fx control against JE-8086's chip with the analog pair's noise and the two settings drawn, 0 different; each
+  Type under each Source against the manual's law (p. 123), 8 of 8; the plain xt_fx with the analog pair, every type 0
+  different; the effects with no input bit for bit as HEAD's (MFX 0, 11, 27, Chorus and Reverb on). Plants: mutate_fx.py
+  100, the 3 new on core 0's tail caught, ran-off and acc-wrap missed as expected, pipeline-b followed the tail's new text
+  and caught; --control 172, the 15 new caught (route-post by a crash), matrix-unflushed missed as since v138, and
+  boot-no-780 missed from now on: the routing's first application at the start writes what the start's 0x894ac780 left
+  different without it (not traced word by word). Not found: what calls the request on the XT.
+
 The EXT IN OSC v203 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, fourth item's first half (the user's "Yes, next
   item"; the item split in two, VC2_MODE_PLAN.md). Committed as 6a1ace1 under v200, which master already had (v200-v202,
   the UI testing notes); its docs and comments renumbered v203 by the commit after it (the user's "New commit, v203"). OSC Type 2 is a voice of kind 4: XtExtIn's player (0x895097d0, the

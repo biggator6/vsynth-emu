@@ -76,6 +76,7 @@ tonefile() {
         toneclock) echo XtSynthClock.cpp ;;
         toneconsts) echo XtSynthConstants.h ;;
         toneextin) echo XtExtIn.cpp ;;
+        toneout) echo XtSynthOut.cpp ;;   # its output, busOut and render (v204)
     esac
 }
 # A port whose check is a harness of its own with the patches' reads (xt_arp, xt_msm): its files and those reads, all but
@@ -98,6 +99,26 @@ harnessParts() {   # harnessParts <define> <objdir> <the port's own files, witho
             && mv "$OBJ/$f.$$.o" "$OBJ/$f.o"
     done
 }
+# xt_fx's parts but the planted one: the ports named and the interpreter, each a kept object in $M/fx_obj; then its check,
+# its own files from v204 (XtFxCheck*.cpp, moved out of XtFxChip.cpp), with the research switches.  The fx ports' plants
+# are in the ports, never in the check.
+fxParts() {   # fxParts <the ports kept, without .cpp ...>
+    D=XT_FX_MAIN
+    EXTRA=(-I"$REPO/research/third_party/gearmulator_esp" "${HARNESS_SWITCHES[@]}")
+    OBJ="$M/fx_obj"
+    mkdir -p "$OBJ"
+    L=("$S/Sh4Setup.cpp")
+    local f src o
+    for f in Sh4Interp "$@"; do
+        keptObject "$OBJ/$f.o" "$S/$f.cpp"
+        L+=("$OBJ/$f.o")
+    done
+    for src in "$S"/XtFxCheck*.cpp; do
+        o="$OBJ/$(basename "$src" .cpp).o"
+        keptObject "$o" "$src" -DXT_FX_MAIN -DXT_HARNESS_SWITCHES -I"$REPO/research/third_party/gearmulator_esp" -I"$S"
+        L+=("$o")
+    done
+}
 TF=$(tonefile "${PORT:-cosm}")
 if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
     F=$TF
@@ -111,7 +132,7 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
            XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch
            XtSynthZones XtSynthNotes XtSynthUpdate XtSynthKnobs XtSynthEnvKnobs XtSynthMsm XtMsm XtMsmTrack XtMsmPatch
            XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds Vc2Params XtFxValueText
-           XtSynthStart XtSynthOscStart XtSynthTrip XtSynthBlock XtSynthTva XtSynthClock XtExtIn)
+           XtSynthStart XtSynthOscStart XtSynthTrip XtSynthBlock XtSynthTva XtSynthClock XtExtIn XtSynthOut)
     TONE=(-DXT_TONE_MAIN -DXT_TONE_CHECK -DXT_HARNESS_SWITCHES)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue
@@ -128,21 +149,17 @@ elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck
     F=XtSoloVoice.cpp; D=XT_FW_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
     L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197
 elif [ "$PORT" = fx ]; then        # XtFxChip against the reference; [cases] is its samples per type, and XT_FX_STOP stops at the first difference
-    F=XtFxChip.cpp; D=XT_FX_MAIN; EXTRA=(-I"$REPO/research/third_party/gearmulator_esp")
-    OBJ="$M/fx_obj"; mkdir -p "$OBJ"
-    for f in Sh4Interp XtFxControl XtFxValueText; do keptObject "$OBJ/$f.o" "$S/$f.cpp"; done
-    L=("$OBJ/Sh4Interp.o" "$S/Sh4Setup.cpp" "$OBJ/XtFxControl.o" "$OBJ/XtFxValueText.o")
-elif [[ "$PORT" =~ ^(fxc|fxv)$ ]]; then   # XtFxControl (fxv: its values' text, XtFxValueText.cpp, v199) against its
-    # checks in xt_fx; [cases] is the events of "xt_fx control"; the other of the two is a kept object
+    F=XtFxChip.cpp
+    fxParts XtFxControl XtFxValueText XtFxInput XtExtIn
+elif [[ "$PORT" =~ ^(fxc|fxv|fxi)$ ]]; then   # XtFxControl (fxv: its values' text, XtFxValueText.cpp, v199; fxi: the
+    # input's way in, XtFxInput.cpp, v204) against its checks in xt_fx; [cases] is the events of "xt_fx control"; the
+    # others of the three are kept objects
     case "$PORT" in
-        fxv) F=XtFxValueText.cpp; KEEP=XtFxControl ;;
-        *) F=XtFxControl.cpp; KEEP=XtFxValueText ;;
+        fxv) F=XtFxValueText.cpp; KEEP=(XtFxControl XtFxInput) ;;
+        fxi) F=XtFxInput.cpp; KEEP=(XtFxControl XtFxValueText) ;;
+        *) F=XtFxControl.cpp; KEEP=(XtFxValueText XtFxInput) ;;
     esac
-    D=XT_FX_MAIN; EXTRA=(-I"$REPO/research/third_party/gearmulator_esp")
-    OBJ="$M/fx_obj"; mkdir -p "$OBJ"
-    for f in Sh4Interp "$KEEP"; do keptObject "$OBJ/$f.o" "$S/$f.cpp"; done
-    keptObject "$OBJ/XtFxChip_main.o" "$S/XtFxChip.cpp" -DXT_FX_MAIN "${EXTRA[@]}" -I"$S"
-    L=("$OBJ/Sh4Interp.o" "$S/Sh4Setup.cpp" "$OBJ/XtFxChip_main.o" "$OBJ/$KEEP.o")
+    fxParts XtFxChip XtExtIn "${KEEP[@]}"
 elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
     case "$PORT" in
         ticks) F=XtTempoTicks.cpp ;;
@@ -272,7 +289,7 @@ if [ "$PORT" = enc ]; then
     echo "enc: $(grep -c . "$M/$N.out") waves differ from the baseline"
     exit
 fi
-[[ "$PORT" =~ ^(fxc|fxv)$ ]] && ARGS=("$C") && C=control
+[[ "$PORT" =~ ^(fxc|fxv|fxi)$ ]] && ARGS=("$C") && C=control
 # a run the error hangs is stopped as solocmp's alarm stops one (MUT_TIMEOUT seconds, default 1500): it counts as one that died
 timeout "${MUT_TIMEOUT:-1500}" "$M/$N" "$IMAGE" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"
 st=${PIPESTATUS[0]}; [ "$st" = 124 ] && st=$((128 + 14)); [ "$st" -ge 128 ] && echo "$N: the run died, signal $((st - 128))"

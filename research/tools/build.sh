@@ -24,6 +24,7 @@ SARP+=($( [ -f XtSynthMsm.cpp ] && echo XtSynthZones.cpp XtSynthNotes.cpp XtSynt
 SARP+=($( [ -f XtSynthBlock.cpp ] && echo XtSynthStart.cpp XtSynthOscStart.cpp XtSynthTrip.cpp XtSynthBlock.cpp \
        XtSynthTva.cpp XtSynthClock.cpp ))
 SARP+=($( [ -f XtExtIn.cpp ] && echo XtExtIn.cpp ))   # the EXT IN OSC's player and input (v203)
+SARP+=($( [ -f XtSynthOut.cpp ] && echo XtSynthOut.cpp ))   # its output, busOut and render (v204)
 # rom.4's parameters, which XtSynthRom.cpp loads (v199), and what they read with: the values' text, the descriptors' form
 V4=($( [ -f Vc2Params.cpp ] && echo Vc2Params.cpp XtFxValueText.cpp ))
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
@@ -52,8 +53,9 @@ cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.
    XtMultiBandPlayer.cpp XtSoloVoice.cpp "${SH4[@]}" -o "$O/xt_vc2params" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &
-[ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp XtFxControl.cpp \
-   XtFxValueText.cpp "${SH4[@]}" -o "$O/xt_fx" &
+# xt_fx: the chip and its check, the check's parts in XtFxCheck*.cpp from v204
+[ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp XtFxCheck*.cpp \
+   XtFxControl.cpp XtFxValueText.cpp XtFxInput.cpp XtExtIn.cpp "${SH4[@]}" -o "$O/xt_fx" &
 # The arpeggiator against the firmware's own object (v188), on the disk image's patches; the tempo ticks it steps on (v189)
 ARP=(XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp XtArpeggioCheck.cpp XtArpeggioCases.cpp XtTempoTicks.cpp
      XtTempoTicksCheck.cpp XtArpeggioPatch.cpp)

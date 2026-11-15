@@ -26,6 +26,7 @@ class XtExtInput {
 public:
     void push(const int32_t* lr, int frames);
     const int32_t* block();   // the next 32 frames, 64 words, until the next call
+    const int32_t* take(int frames);   // the next `frames` of them, at most 32, the same way (XtFxUnit's, a frame at a time)
     void clear();
 
 private:

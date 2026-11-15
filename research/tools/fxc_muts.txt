@@ -60,8 +60,8 @@ flag-mfx|blocks & BlockMfx ? 0x20 : 0|blocks & BlockMfx ? 0x00 : 0
 flag-cho|blocks & BlockChorus ? 0x10 : 0|blocks & BlockChorus ? 0x08 : 0
 flag-rev|blocks & BlockReverb ? 0x08 : 0|blocks & BlockReverb ? 0x10 : 0
 dirty-kept|const unsigned d = dirty_; dirty_ = 0;\n    if (d) send(d, false);|const unsigned d = dirty_;\n    if (d) send(d, false);
-patch-loses-system|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation); dirty_ = 0;|const unsigned d = 0; dirty_ = 0;
-patch-keeps-dirty|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation); dirty_ = 0;|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation);
+patch-loses-system|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput); dirty_ = 0;|const unsigned d = 0; dirty_ = 0;
+patch-keeps-dirty|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput); dirty_ = 0;|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput);
 send-unflushed|    call(0x894ac970, { kThis });\n    flush(0);|    call(0x894ac970, { kThis });
 # The Matrix
 matrix-unapplied|&& changed) call(0x894ad4f0, { kThis });|&& changed) {}
@@ -168,3 +168,19 @@ type-sign|number = negative ? -v : v;|number = v;|fxv
 type-fraction|{ scale /= 10; v += (t[j] - '0') * scale; digits = true; }|{ digits = true; }|fxv
 type-any-number|return rest == t.size() \|\| std::isalpha((unsigned char)t[rest]) \|\| t[rest] == '%';|return true;|fxv
 type-no-percent| \|\| t[rest] == '%';|;|fxv
+# v204: the outside input's routing (XtFxControl.cpp, and fxi, XtFxInput.cpp) and its way through the unit
+route-start|send(BlockSystem, true);\n    routeInput();|send(BlockSystem, true);
+route-block|if (id == 0x78 \|\| id == 0x7c) return BlockInput;|
+route-send|if (blocks & BlockInput) routeInput();|
+route-patch|dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput); dirty_ = 0;|dirty_ & (BlockSystem \| BlockAttenuation); dirty_ = 0;
+route-post|c.hook(0x894aee70, [](Sh4& m) { m.ret(0); });|
+unit-input-taken|in_.take(frames);|in_.take(0);
+unit-input-back|        frameBack(i);\n|
+route-event|    call(0x894aee80);\n||fxi
+in-slot|kAnalogL = 0x10,|kAnalogL = 0x11,|fxi
+in-usb|    chip.setGram(kUsbL, l);\n||fxi
+in-shift|in[2 * i] >> 8, r|in[2 * i] >> 7, r|fxi
+in-right-left|chip.setGram(kAnalogR, r);|chip.setGram(kAnalogR, l);|fxi
+in-pushed|{ in_.push(lr, frames); }|{ (void)lr; (void)frames; }|fxi
+back-slot|kBackL = 0x99,|kBackL = 0x98,|fxi
+back-shift|chip_->gram(kBackL) << 8);|chip_->gram(kBackL) << 7);|fxi

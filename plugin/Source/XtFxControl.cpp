@@ -64,6 +64,7 @@ void XtFxControl::hooks() {
     // Its start also takes something off the tone generator's lists, which aren't set up here and have nothing to do with the chip.
     for (const uint32_t fn : { 0x894d9230u, 0x894d90c0u, 0x894d9020u }) c.hook(fn, [](Sh4& m) { m.ret(0); });
     c.hook(0x89301680, [](Sh4& m) { m.ret(0); });                                 // the end of the system's reader: ID 0x77, to the kernel
+    c.hook(0x894aee70, [](Sh4& m) { m.ret(0); });   // the EXT IN request's post of event 0x40: routeInput runs the event
 }
 
 // The XT's start, from 0x894abd84 and the task's own, 0x894ad560: the driver's state and the chip's first programs.  Then, as messages, what the system says and the first patch.
@@ -72,6 +73,7 @@ void XtFxControl::boot() {
     call(0x894ac6a0, { kThis });
     call(0x894ac780, { kThis });
     send(BlockSystem, true);
+    routeInput();
 }
 
 // ------------------------------------------------------------------ the store
@@ -79,6 +81,7 @@ unsigned XtFxControl::blockOf(int id) {
     if (id == 0x11d || (id >= 0x120 && id <= 0x122)) return BlockSwitches;
     if (id == 0x51e) return BlockAttenuation;
     if (id == 0x3e || id == 0x41 || id == 0x76 || (id >= 0x65 && id <= 0x70)) return BlockSystem;
+    if (id == 0x78 || id == 0x7c) return BlockInput;
     if ((id >= 0x177 && id <= 0x17a)) return BlockMfx;
     if (id >= 0x1fc && id <= 0x1fe) return BlockChorus;
     if (id == 0x230 || id == 0x231) return BlockReverb;
@@ -110,6 +113,7 @@ void XtFxControl::send(unsigned blocks, bool patch) {
     sh4_->wr8(kMessage + 3, (uint8_t)((patch ? 0x80 : 0) | (blocks & BlockSwitches ? 0x40 : 0) | (blocks & BlockMfx ? 0x20 : 0) | (blocks & BlockChorus ? 0x10 : 0) | (blocks & BlockReverb ? 0x08 : 0)));
     call(0x894ac970, { kThis });
     flush(0);
+    if (blocks & BlockInput) routeInput();
 }
 
 void XtFxControl::update() {
@@ -119,7 +123,7 @@ void XtFxControl::update() {
 
 // What isn't a patch's (the system's Master, Output Gain and EQ, and Attenuation) goes as a live edit does.
 void XtFxControl::loadPatch() {
-    const unsigned d = dirty_ & (BlockSystem | BlockAttenuation); dirty_ = 0;
+    const unsigned d = dirty_ & (BlockSystem | BlockAttenuation | BlockInput); dirty_ = 0;
     send(d, true);
 }
 
@@ -220,11 +224,14 @@ float XtFxUnit::fromChip(int32_t word) { return (float)word * 0x1p-23f; }
 
 void XtFxUnit::process(const float* frame, float* lr, int frames) {
     XtFxChip& chip = *chip_;
+    const int32_t* in = in_.take(frames);                                         // the outside input's frames, zeros past what came
     for (int i = 0; i < frames; ++i) {
         control_.service(chip);
         const float* f = frame + 8 * i;
         for (unsigned w = 0; w < 8; ++w) chip.setGram(0x20 + 2 * w, toChip(f[w]));
+        frameIn(in, i);
         chip.runFrame();
+        frameBack(i);
         // what a program wrote at a slot reads one on, once the chip has rotated
         lr[2 * i] = fromChip(chip.gram(0xa1)) + fromChip(chip.gram(0xa5));
         lr[2 * i + 1] = fromChip(chip.gram(0xa3)) + fromChip(chip.gram(0xa7));

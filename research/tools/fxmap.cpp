@@ -2,14 +2,18 @@
 //   fxmap <rom> table             per type: program table, active words, what the update writes, memory operations
 //   fxmap <rom> mfx <type> [i v]  one MFX type at its defaults (param i = v): each word as fields, and what wrote it
 //   fxmap <rom> boot              boot, Chorus and Reverb through their real entry points: programs loaded, words set going
+//   fxmap <rom> input <t> <s>     after the boot, the EXT IN request (0x894a7dd0) with External Input Type t and Source s,
+//                                 then the input routing's event (0x894aee80): what it writes, and the events posted
 // Prints to stdout, for build/ only: a program as words is a listing of the firmware and is never committed.
 // Build: clang++ -std=c++20 -O2 -Iplugin/Source research/tools/fxmap.cpp plugin/Source/Sh4Interp.cpp
 //        plugin/Source/Sh4Setup.cpp -o build/tools/fx/fxmap
 #include "Sh4Interp.h"
+#include "XtArgs.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -78,8 +82,34 @@ void row(int t, const char* name, int np, int lo, int hi, uint32_t fnLoad, uint3
     memOps(lo, hi, wr, rd, ind, top);
     std::printf("%2d|%-20s|%2d|%08x|%08x|%08x|%3d/%3d|%3zu|%3d|%2d|%2d|%2d|%2d|%05x\n", t, name, np, fnLoad, fnUpd, lastTable, act, hi - lo, coefWords.size(), nField, wr, rd, ind, nDly, top);
 }
+// The input routing (HARDWARE_FIRMWARE.md, "The input's way in"): the boot, the routing's bytes cleared as the driver's
+// start clears them (0x894ae960), then the EXT IN request with the two settings and the event it posts.
+int inputRouting(Sh4& c, int type, int source) {
+    static int answer[2];
+    answer[0] = type;
+    answer[1] = source;
+    const auto read = [](Sh4& m) {
+        const int id = (int16_t)m.r[5];
+        m.ret((uint32_t)(id == 0x78 ? answer[0] : id == 0x7c ? answer[1] : 0));
+    };
+    c.hook(0x8947d310, read);
+    c.hook(0x8947d330, read);
+    c.hook(0x894aee70, [](Sh4& m) { std::puts("  event 0x40 posted"); m.ret(0); });
+    c.call(0x894afc50, {}, kSp);
+    c.call(0x894ae960, {}, kSp);
+    resetLog();
+    std::printf("request, type %d source %d\n", type, source);
+    if (!c.call(0x894a7dd0, {}, kSp)) std::printf("  fault: %s\n", c.error().c_str());
+    for (uint32_t a = 0x89ced225; a < 0x89ced235; ++a) std::printf("%s%02x", a == 0x89ced22d ? " | " : " ", c.rd8(a));
+    std::puts("  (wanted | applied)");
+    if (!c.call(0x894aee80, {}, kSp)) std::printf("  fault: %s\n", c.error().c_str());
+    for (const auto& [i, what] : note) std::printf("  %03x %07x  %s\n", i, W[i], what.c_str());
+    std::printf("%d coefficients, %d fields\n", nCoef, nField);
+    return 0;
+}
 } // namespace
 
+// one-off: a research tool's modes, each one's body inline (71 statements before the input mode)
 int main(int argc, char** argv) {
     if (argc < 3) { std::fprintf(stderr, "fxmap <rom> table | mfx <type> [i v]... | boot\n"); return 2; }
     Sh4 c; if (!c.loadRom(argv[1])) { std::fprintf(stderr, "cannot load %s\n", argv[1]); return 1; }
@@ -103,6 +133,8 @@ int main(int argc, char** argv) {
         for (int t = 0; t <= 8; t++) { resetLog(); c.call(0x894d3420, { (uint32_t)t }, kSp); c.call(0x894d3470, { 0 }, kSp); std::printf("type %d: %d coefficients, %d fields\n", t, nCoef, nField); }
         return 0;
     }
+    const auto t = argc > 4 ? intArg(argv[3]) : std::nullopt, s = argc > 4 ? intArg(argv[4]) : std::nullopt;
+    if (what == "input") return t && s ? inputRouting(c, *t, *s) : 2;
     if (what == "table") {
         std::puts("type|name|params|load|update|program|active|coef|field|writes|reads|indirect|offsets|top");
         for (int t = 0; t < 42; t++) {

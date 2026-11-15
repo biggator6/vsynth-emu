@@ -32,9 +32,11 @@ void XtExtInput::push(const int32_t* lr, int frames) {
     if (write_ - read_ > kFrames) read_ = write_ - kFrames;   // a ring overrun keeps the newest
 }
 
-const int32_t* XtExtInput::block() {
+const int32_t* XtExtInput::block() { return take(kBlockFrames); }
+
+const int32_t* XtExtInput::take(int frames) {
     out_.fill(0);
-    const uint32_t n = std::min<uint32_t>(write_ - read_, kBlockFrames);
+    const uint32_t n = std::min<uint32_t>(write_ - read_, (uint32_t)std::clamp(frames, 0, kBlockFrames));
     for (uint32_t i = 0; i < n; ++i, ++read_) {
         out_[2 * i] = ring_[2 * (read_ % kFrames)];
         out_[2 * i + 1] = ring_[2 * (read_ % kFrames) + 1];

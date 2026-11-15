@@ -90,10 +90,15 @@ cond-ready|c.ready \|= 4;|c.ready \|= 8;
 cond-sign|if (acc[0] < 0) c.values \|= 4;|if (acc[0] <= 0) c.values \|= 4;
 cond-gate|(c.negative ? c.skipNeg : c.skipPos) & 1|(c.negative ? c.skipPos : c.skipNeg) & 1
 pipeline|const uint32_t old = (h + 1) & 3;|const uint32_t old = (h + 2) & 3;
-pipeline-b|hist[0][h & 3] = acc[0]; hist[1][h & 3] = acc[1]; h = (h + 1) & 3;\n    }\n    if constexpr|hist[0][h & 3] = acc[0]; h = (h + 1) & 3;\n    }\n    if constexpr
+pipeline-b|hist[0][h & 3] = acc[0]; hist[1][h & 3] = acc[1]; h = (h + 1) & 3;\n    }\n    // The last twelve clocks|hist[0][h & 3] = acc[0]; h = (h + 1) & 3;\n    }\n    // The last twelve clocks
 tail-raw|(t ? 0xffu : 0u)|0u
-tail-host|else if (hostTail_[1] >= 0) {|else if (false) {
+tail-host|else if (hostTail_[K] >= 0) {|else if (false) {
 tail-step|(t - 2) / 2|(t - 2)
 tail-last|if (t < 2) lastIn = sext(iram[(pos + (t ? 0xffu : 0u)) & 255], 24);|if (t < 2) {}
 tail-shift|>> shiftOf(w >> 8 & 3)), 30);|>> 7), 30);
 tail-acc|acc[0] = sext(acc[0] + (int32_t)|acc[1] = sext(acc[0] + (int32_t)
+# v204: core 0's tail, which the outside input's routing reaches (the plain run and the control's against the reference
+# have the analog pair's noise)
+tail-core1-only|for (unsigned t = 0; t < kRun - kDecoded; t++) {|for (unsigned t = 0; K == 1 && t < kRun - kDecoded; t++) {
+tail-core0-words|const uint32_t w = words_[K][|const uint32_t w = words_[1][
+tail-core0-start|    if constexpr (K == 0) pc = kDecoded;\n|    if constexpr (K == 0) pc = kRun - 2;\n

@@ -41,8 +41,8 @@ def run(m, pattern=None):
     tot = re.findall(r'^tone[^:\n]*: (\d+) different', out, re.M)
     return m[0], f'tone: {sum(map(int, tot))} different' if tot else None
 # With nothing planted, an old text put back as it was.  If this run fails, every plant's would, and would read as caught or missed for no reason of its own.
-# (its text in XtSynth.cpp: kLand went to XtSynthConstants.h, v203)
-KEPT = 'void XtSynth::render('
+# (its text in XtSynth.cpp: kLand went to XtSynthConstants.h, v203, and render to XtSynthOut.cpp, v204)
+KEPT = 'void XtSynth::prepare('
 controls = [('zz-control-' + (md + '-' if md else '') + (s or 'default'), KEPT, KEPT, 'tone', s, md)
             for s, md in sorted({(x[4], x[5]) for x in muts if x[3] != 'solo'})]
 controls += [('zz-control-solo', x[1], x[1], 'solo', '', '') for x in muts if x[3] == 'solo'][:1]

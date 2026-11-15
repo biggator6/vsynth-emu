@@ -1546,6 +1546,71 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The input's way in, the chip's side (2026-11-14, v204) {#input-way-in}
+
+The VC-2 mode's step 2, fourth item's second half, the first of its three versions (VC2_MODE_PLAN.md): the outside input
+through the effect chip, as the EXT IN OSC hears it.
+
+**The routing.** The firmware's EXT IN request, `0x894a7dd0`, reads External Input Type (ID 0x78: STEREO L R, MONO MIX,
+MONO L, MONO R; its descriptor's default 1, MONO MIX) and External Input Source (0x7c: Analog (MIC/INPUT), USB Audio;
+default 0; the XT manual, p. 123) into the input routing's wanted bytes at `0x89ced225`: Type to +6 (`0x894af220`), Source
+to +7 (`0x894af240`), and +2, +1, +5 to 0 (`0x894af290`, `0x894af1e0`, `0x894af2b0`), each setter saying whether its byte
+now differs from the applied one. Then it posts event 0x40 (`0x894aee70`: `0x893018a0(0x8987cddc, 0x40)`). The effects
+task's event 0x40 runs `0x894aee80`, which compares each wanted byte with the applied ones at `0x89ced22d` and writes what
+differs through three subroutines (`0x894aee10`, `0x894aea70`, `0x894aecc0`), with 50 ms waits for its fades. Event 0x08's
+handler (`0x894abdb0`) runs it too, after byte 1 by a flag at `0x8987a684`. The driver's start (`0x894ac6a0`, through
+`0x894ae960`) clears the wanted bytes and leaves 0x80 applied, so the first event writes all of it. Run in fxmap (`fxmap rom
+input <type> <source>`): 9 coefficients and 30 fields in program A, words 0x27, 0x34, 0x81…0x8d, 0x8f…0x95, 0xb1…0xb4,
+0xbb…0xbe, 0x16e, 0x172 and 0x21b. Between the settings only a gain matrix differs, analog's in 0xb1…0xb4 and USB's in
+0xbb…0xbe (the other four 0), each a coefficient 0x40 (×1), 0x20 (×½) or 0 at shift code 1:
+
+| Type | 0xb1, 0xb2, 0xb3, 0xb4 |
+|---|---|
+| STEREO L R | 40, 0, 40, 0 |
+| MONO MIX | 20, 20, 20, 20 |
+| MONO L | 0, 0, 40, 40 |
+| MONO R | 40, 40, 0, 0 |
+
+Not found: what calls the request on the XT. Nothing in rom.2 holds a pointer to it, and nothing within 0x894a6000…0x894a9000
+branches to it. The plugin's input is EXT IN's alone, so `XtFxControl` asks at its start and whenever Type or Source
+changes, as a block of its store (`BlockInput`) beside the messages' blocks; a patch keeps it as it keeps the system's.
+
+**The slots.** The converter's input reaches program A at GRAM 0x10, 0x12 (analog) and 0x18, 0x1a (USB), read the sample
+after, as the frame's 0x20… are: in `vc2run fxroute`'s scan an impulse at 0x10 reaches 0x98 a sample after one at 0x11,
+as one at 0x20 reaches the mix a sample after one at 0x21. The outside input's copies for the SH-4 are at 0x98 and 0x9a,
+which read at 0x99, 0x9b once the chip has rotated. Why those are the returned frame's words 4 and 5: the EXT IN player
+reads words 4 and 5 (v203), the sampling routine copies words 0…3 (`0x894db220`), and the sampling pre-effects write 0x90,
+0x92 (v123), so word k comes back from 0x90 + 2k, as the frame goes in at 0x20 + 2k. The DMA's own setup isn't read. A
+word comes back as its 24 bits at the top of an int32, as the frame's way in gives the chip the top 24 of the SH-4's int32
+(`0x894db2b0`).
+
+**In the plugin** (`XtFxInput.cpp`): `XtFxControl::routeInput`, the request then the event's routine; `XtFxUnit::pushInput`,
+the input as the converter hands it (int32 at the XT's full scale) into both pairs of slots, so either Source hears the
+plugin's one input; and `returned()` (`XtBusSink`), words 4 and 5 of each frame, which `XtSynth::busOut` (now in
+`XtSynthOut.cpp`, with `render`) pushes into `XtSynth::input` for the next block. Nothing pushes an input yet (v206), and
+with the Effects switch off nothing hands one back (v205).
+
+**Core 0's tail.** With noise on the analog pair, `XtFxChip` parted from JE-8086's chip at the first sample the noise
+reached the routing, in core 0's accumulator history at the sample's end. `XtFxChip` didn't run core 0's last twelve clocks,
+which had had nothing to do (r0 and r255 stayed 0, and the words before them were empty); the routing's path makes them
+count, and the next sample's first stores read what they leave. Run as core 1's, by core 0's own words: 0 different. The
+plugin's sound with no input is as it was: through `XtFxUnit` against HEAD's sources, MFX 0, 11 and 27 with Chorus and
+Reverb on, a sine on MAIN, MULTI and the sends, the same output to the bit.
+
+**The check.** `xt_fx control`: the driver against JE-8086's chip with the analog pair's noise as well, and External Input
+Type and Source among the edits, 0 different; `readers` with the request's setters and the event in `Rig`'s start;
+`the input through the unit`, each Type under each Source, words 4 and 5 against the manual's law within a word's last bit
+(the chip halves each side on its own for MONO MIX), 8 of 8. The plain `xt_fx`: every type with the analog pair's noise,
+0 different. Plants: `fx_muts.txt`'s three on core 0's tail, `fxc_muts.txt`'s fifteen on the routing and the unit (port
+`fxi`, `XtFxInput.cpp`), all caught. `boot-no-780` is missed from now on: without the start's `0x894ac780` the words now
+end the same, as the routing's first application at the start writes what it left different (not traced word by word).
+Not reached yet: `busOut`'s push, which nothing runs with the unit and an input before v206.
+
+**Split first.** `XtFxChip.cpp` (1,071 lines): its check into `XtFxCheck.h` and seven files by part, moved as it stood
+but for its arguments, now through `argOr` on `intArg` (`XtArgs.h`, moved from vc2run and shared with fxmap), its switches
+through `xtSwitch` and its numbers' text through `realOf`, as lesson-checks asked of the moved lines. `XtSynth.cpp`'s
+`busOut` and `render` into `XtSynthOut.cpp`.
+
 ### The EXT IN OSC (2026-11-14, v203) {#ext-in}
 
 The VC-2 mode's step 2, fourth item's first half (VC2_MODE_PLAN.md): OSC Type 2, the external input, on the SH-4's side.
@@ -4446,7 +4511,7 @@ Those are the parts I trust. It is not finished:
 - Gain. (v123: ×2, as r4 is ½.) The frame reaches slot 0xa0 at ×4 (Master ×2, Output Gain 0 dB ×2), and the tones reach the frame at 1/16 by Out Gain for TG. v40 measured +9.4 dB on the analog output for a raw wave. Not reconciled: DAC scaling and the output stage are in between. XtSynth's level will need a decision.
 - What the SH-4 does between parameter changes. I found no periodic call into a type's class besides the driver's poll (`0x894ac970`) and the tempo's (`0x894acb10`), but I did not trace every vtable entry. If some type's LFO or step is stepped from the SH-4, the design above still holds and the harness would show it.
 - The path from patch and MIDI to these setters beyond `0x894ac0a0`, `0x894ac1c0`, `0x894ac2f0`, `0x894ac3a0`, and a patch change's exact order.
-- The flags in the output routine (`0x894db3e0`), the flags at `0xb0000004`…`6`, the writes at 0xfe00, 0xff00, 0xffff and 0x37fff in B's fixed words, and `0x894aee80`'s input routing (A 0x81…0xbe, 0x91…0x95, 0x1fa, 0x1fe, 0x21b).
+- The flags in the output routine (`0x894db3e0`), the flags at `0xb0000004`…`6`, the writes at 0xfe00, 0xff00, 0xffff and 0x37fff in B's fixed words, and `0x894aee80`'s input routing (A 0x81…0xbe, 0x91…0x95, 0x1fa, 0x1fe, 0x21b). (v204: the routing is read and run, "The input's way in, the chip's side"; its fades' words and what calls its request on the XT are still open.)
 - A real XT. Nothing in this section has been heard or measured on one.
 
 ### The patch TVA's level and pan (2026-11-03, v114)

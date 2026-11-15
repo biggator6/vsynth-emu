@@ -182,8 +182,28 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
     it (its OSC's envelopes and LFO hold, the tone's neutral envelope 0 and LFO 0 in their place), stereo, root 440;
     `xt_tone`'s EXT IN mode (`xt_tone rom extin`) 0 different, the plain run's cases as they were; XtSynth.cpp split first.
   - v204: the input's way in: the plugin's input bus (the Standalone's mic), through the chip's program as on the XT,
-    External In Type and Source by the driver; the panel says when an EXT IN OSC has no input. Open for then: what the
-    plugin does with the Effects switch off, when it doesn't run the chip.
+    External In Type and Source by the driver; the panel says when an EXT IN OSC has no input. With the Effects switch
+    off, when the chip doesn't run, the EXT IN OSC hears the input as the chip's program would hand it back, computed
+    without the chip and held to it by a check (the user's decision, 2026-11-14: "Copy without the chip", over running
+    the chip for the input alone or leaving EXT IN silent with Effects off). Split in three (2026-11-14):
+    - v204, the chip's side: the firmware's EXT IN request (`0x894a7dd0`: External Input Type, ID 0x78, to the input
+      routing's byte 6 at `0x89ced225`; Source, 0x7c, to byte 7; bytes 1, 2 and 5 to 0; then event 0x40 by `0x894aee70`)
+      and the event's routine (`0x894aee80`, which applies what changed, with its fades) run by XtFxControl; the host
+      input into the chip's input slots (analog 0x10, 0x12; USB 0x18, 0x1a) and words 4 and 5 back (GRAM 0x98, 0x9a)
+      into `XtSynth::input`. Checked by `xt_fx control` with an input and the two settings among its events, on
+      JE-8086's chip. What calls the request on the XT isn't found (no pointer to it in rom.2, no branch to it within
+      12 KB): the plugin's input is EXT IN's alone, so it asks at the start and at each change. **Done 2026-11-14**
+      (HARDWARE_FIRMWARE.md, "The input's way in, the chip's side"): `XtFxInput.cpp`; the driver against JE-8086's chip
+      with the analog pair's noise and the two settings drawn, 0 different, once `XtFxChip` ran core 0's last twelve
+      clocks, which the routing's path is the first to reach; each Type under each Source against the manual's law, 8 of
+      8; the effects' sound with no input as it was, to the bit. XtFxChip.cpp's check split into `XtFxCheck*` first, and
+      `XtSynth::busOut` with `render` into `XtSynthOut.cpp`. For v206 besides: the host's input at its own rate, which
+      the chip takes at 44.1 kHz.
+    - v205, Effects off: the copy without the chip, from the routing's coefficients as the driver leaves them, held to
+      `XtFxChip` under every Type and Source.
+    - v206, the plugin: its input bus (the Standalone's mic), OSC Type's third choice, a patch's EXT IN read
+      (`XtPatch`, `xtPatchMissing`), External Input Type and Source as parameters, and the panel's word when an EXT IN
+      OSC has no input.
 
 ### 3. The ports, one version each
 

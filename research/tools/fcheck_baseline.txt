@@ -843,6 +843,7 @@ control's behaviour on the bus: 249 samples, 0 different
 control's value text against the firmware's routine and driver: 159417 samples, 0 different
 control's live edits against a patch: 12 samples, 0 different
 control under threads: 3200 edits, 0 different
-control against the reference: 266919 samples, 0 different
+control against the reference: 266064 samples, 0 different
 the frame into the chip against the firmware's truncation: 51200 samples, 0 different
 the frame through the unit: 9 samples, 0 different
+the input through the unit: 8 samples, 0 different
