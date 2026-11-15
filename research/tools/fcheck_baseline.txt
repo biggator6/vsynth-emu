@@ -271,7 +271,7 @@ tone, a wave on OSC 2: 0 different
 tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 242866 checks
 tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
-tone, the firmware's patches: 718 notes, 165 taken by a sounding tone, 22 truncated, 61605 blocks, 6192466 checks
+tone, the firmware's patches: 718 notes, 165 taken by a sounding tone, 22 truncated, 61605 blocks, 6189694 checks
 tone, the firmware's patches: 0 notes left off, a read outside memory; 62228 band reads far from their wave
 tone, the firmware's patches: 0 different
 tone, a wave's own tuning: 676 notes, 188 taken by a sounding tone, 85 truncated, 59544 blocks, 5483537 checks
@@ -326,7 +326,7 @@ tone, a wave on OSC 2: 0 different
 tone, a second update in a tick: 48 notes, 16 taken by a sounding tone, 0 truncated, 4320 blocks, 227759 checks
 tone, a second update in a tick: 0 notes left off, a read outside memory; 0 band reads far from their wave
 tone, a second update in a tick: 0 different
-tone, the firmware's patches: 284 notes, 64 taken by a sounding tone, 12 truncated, 24324 blocks, 2507387 checks
+tone, the firmware's patches: 284 notes, 64 taken by a sounding tone, 12 truncated, 24324 blocks, 2501417 checks
 tone, the firmware's patches: 0 notes left off, a read outside memory; 14446 band reads far from their wave
 tone, the firmware's patches: 0 different
 tone, a wave's own tuning: 133 notes, 38 taken by a sounding tone, 14 truncated, 11327 blocks, 956304 checks

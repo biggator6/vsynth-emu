@@ -7,7 +7,7 @@ namespace {
 using Ctl = XtSynth::Controls;
 using Osc = XtSynth::OscControls;
 
-constexpr int kThrough = 0, kExternal = 2;
+constexpr int kThrough = 0;
 // XtSynth's COSM type by the firmware's, 1…16 (the type's IDs: the table at 0x897cebd8)
 constexpr int kCosmType[17] = { 0, 13, 12, 14, 15, 7, 5, 6, 4, 2, 0, 1, 10, 11, 8, 9, 3 };
 
@@ -38,9 +38,12 @@ EnvIds envIds(int e) { return { 0x315 + 13 * e }; }
 
 void oscOf(const Read& p, int n, Osc& o) {
     const int b = 0x2a4 + 0x34 * n;
-    // OSC Type 2 is the XT's external input.  There's none here, so it's as an OSC switched off (xtPatchMissing says so)
-    const int type = p(b + 1);
-    o.on = p(b) != 0 && type != kExternal; o.oscType = type == kExternal ? 0 : type; o.waveGain = p(b + 2); o.oscPitch = p(b + 3); o.pitchKF = 10 * p(b + 4);
+    // OSC Type 0 ANALOG, 1 PCM, 2 the XT's external input, which plays as EXT IN from v206 (XtExtIn.h)
+    o.on = p(b) != 0;
+    o.oscType = p(b + 1);
+    o.waveGain = p(b + 2);
+    o.oscPitch = p(b + 3);
+    o.pitchKF = 10 * p(b + 4);
     o.lfoPitchDepth = p(b + 5); o.pDepth = p(b + 6); o.oscCoarse = p(b + 7); o.oscFine = p(b + 8); o.randomPitch = p(b + 9);
     o.oscLevel = p(b + 0xa); o.oscLevelKF = 10 * p(b + 0xb); o.oscLevelLfoDepth = p(b + 0xc);
     o.ana.wave = p(b + 0xd); o.ana.impact = p(b + 0xe); o.ana.pw = p(b + 0xf); o.ana.pwKf = p(b + 0x10); o.ana.pwLfo = p(b + 0x11); o.ana.pwEnv = p(b + 0x12);
@@ -240,16 +243,13 @@ void xtWaveOntoEncoded(const XtWaveFile& w, XtEncoded& e) {
 }
 
 std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone) {
-    std::vector<std::string> m;
-    const Read p { store, zone };
-    for (int n = 0; n < 2; ++n) {
-        const int b = 0x34 * n;
-        const std::string osc = "OSC " + std::to_string(n + 1) + " ";
-        if (p(0x2a4 + b) != 0 && p(0x2a5 + b) == kExternal) m.push_back(osc + "external input");
-    }   // Playback Mode is done on every kind of wave (v156); a LITE wave's converter doesn't read it, on the XT either
-    // The arpeggio is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190); and the
-    // Multi Step Modulator (v193)
-    return m;
+    // Nothing a patch asks for is missing now: an OSC's external input plays as EXT IN (v206), the last of them.  Playback
+    // Mode is done on every kind of wave (v156); a LITE wave's converter doesn't read it, on the XT either.  The arpeggio
+    // is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190); and the Multi Step
+    // Modulator (v193).  Kept as the place a new one is said.
+    (void)store;
+    (void)zone;
+    return {};
 }
 
 std::vector<XtPatchFx> xtPatchEffects(const std::vector<uint8_t>& store) {

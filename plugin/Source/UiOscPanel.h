@@ -10,7 +10,7 @@ class OscPanel : public FacedPanel {
 public:
     OscPanel(VSynthEmuProcessor& p, int osc);
     void refresh() override;   // and the wave's name, if it has moved
-    static constexpr int kTypes = 2;         // OSC Type's values: ANALOG, PCM
+    static constexpr int kTypes = 3;         // OSC Type's values: ANALOG, PCM, EXT IN (v206)
     static constexpr int kTableKnobs = 10;   // the knobs its table gives each Type, each of which must name a parameter
     void resized() override;
 

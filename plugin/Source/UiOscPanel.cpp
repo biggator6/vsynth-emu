@@ -8,7 +8,7 @@
 namespace {
 
 using Controls::KnobRow;
-constexpr int kFaceCount = OscPanel::kTypes, kPcm = 1;   // OSC Type's values: ANALOG 0, PCM 1
+constexpr int kFaceCount = OscPanel::kTypes, kPcm = 1, kExtIn = 2;   // OSC Type's values: ANALOG 0, PCM 1, EXT IN 2
 constexpr int kBigDial = 44, kSmallDial = 30, kBig = 4, kSmall = 6;
 constexpr int kTitleH = 22, kDisplayH = 72, kRowGap = 7, kStatusH = 22;
 
@@ -27,6 +27,11 @@ constexpr OscFace kFaces[kFaceCount] = {
       { { { "oscPitch", "Pitch" }, { "oscTime", "Time" }, { "oscFormant", "Formant" }, { "oscLevel", "Level" } } },
       { { { "oscCoarse", "Coarse" }, { "oscFine", "Fine" }, { "encodeDepth", "Depth" }, { "energy", "Energy" },
           { "oscVelSens", "Vel Sens" }, { "pitchKF", "Pitch KF" } } } },
+    // EXT IN (v206): what its converter reads (HARDWARE_FIRMWARE.md, "The EXT IN OSC"), no box beside Type
+    { "",
+      { { { "oscPitch", "Pitch" }, { "oscCoarse", "Coarse" }, { "oscFine", "Fine" }, { "oscLevel", "Level" } } },
+      { { { "waveGain", "Gain" }, { "pitchKF", "Pitch KF" }, { "pitchEnvDepth", "Env Depth" },
+          { "randomPitch", "Random" }, { "oscLevelKF", "Level KF" }, { "oscVelSens", "Vel Sens" } } } },
 };
 
 // The analog waveforms' shapes, by Analog Waveform's value, as the display draws them
@@ -116,6 +121,12 @@ void OscPanel::paintDisplay(juce::Graphics& g) const {
     Ui::fillRounded(g, display_.toFloat(), Look::field, 6.0f);
     if (face() == kPcm) {
         Ui::drawText(g, wave_, display_.reduced(10, 6).removeFromTop(16), { Look::sans(11.0f), Look::label });
+        return;
+    }
+    if (face() == kExtIn) {   // the outside input, by External In Type (v206)
+        const auto* type = processor_.apvts.getParameter("fxExtInType");
+        const juce::String text = "External input, " + (type ? type->getCurrentValueAsText() : juce::String());
+        Ui::drawText(g, text, display_.reduced(10, 6).removeFromTop(16), { Look::sans(11.0f), Look::label });
         return;
     }
     const int wave = juce::roundToInt(processor_.apvts.getRawParameterValue(id(Params::kAnaWave))->load());

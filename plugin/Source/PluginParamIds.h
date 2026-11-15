@@ -34,7 +34,7 @@ namespace Params {
     // order (SAW so far), Impact 0..40 (0.0–4.0), Pulse Width and Fat with
     // their Keyfollows, LFO and Env depths (PW on the time envelope, Fat on
     // the formant envelope)
-    static const juce::String kOscType       = "oscType";        // ANALOG, PCM
+    static const juce::String kOscType       = "oscType";        // ANALOG, PCM, EXT IN (v206)
     // the OSC Switch, and OSC 2: each of OSC 1's own knobs with "osc2" before
     // it (oscSwitch → osc2OscSwitch, anaWave → osc2AnaWave, lfoRate →
     // osc2LfoRate, encodeType → osc2EncodeType); off by default

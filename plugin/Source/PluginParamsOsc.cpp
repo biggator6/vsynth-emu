@@ -3,6 +3,12 @@
 #include "PluginProcessor.h"
 #include "PluginParamIds.h"
 
+namespace {
+// OSC Type's values as the firmware has them (0 ANALOG, 1 PCM, 2 EXT IN, v206), both OSCs': appended, so a session's
+// value keeps its place
+juce::StringArray oscTypeNames() { return { "ANALOG", "PCM", "EXT IN" }; }
+}
+
 void VSynthEmuProcessor::addOscParams(ParamList& params, const juce::AudioParameterFloatAttributes& twoPlaces) {
     params.push_back(std::make_unique<juce::AudioParameterFloat>(Params::kPatchTempo, "Patch Tempo", juce::NormalisableRange<float>(20.0f, 250.0f, 0.1f), 120.0f));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kClockSource, "Clock Source", juce::StringArray { "INTERNAL", "HOST" }, 0));
@@ -62,7 +68,7 @@ void VSynthEmuProcessor::addOscParams(ParamList& params, const juce::AudioParame
     params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kOscFormant, "Formant", -63, 63, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kOscFormantKF, "Formant KF", juce::NormalisableRange<float>(-200.0f, 200.0f, 10.0f), 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kOscType, "OSC Type", juce::StringArray { "ANALOG", "PCM" }, 1));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kOscType, "OSC Type", oscTypeNames(), 1));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kAnaWave, "Analog Waveform",
         juce::StringArray { "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
                             "SUPER-SAW", "FEEDBACK-OSC", "X-MOD" }, 0));
@@ -147,7 +153,8 @@ void VSynthEmuProcessor::addOsc2Params(ParamList& params, const IntText& noteVal
         params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kOrigTempo), n + "Original Tempo", juce::NormalisableRange<float>(20.0f, 300.0f, 0.0001f), 120.0f, twoPlaces));
         params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kTripSw), n + "Time Trip Switch", true));
         params.push_back(std::make_unique<juce::AudioParameterBool>(oscId(1, Params::kBeatKeep), n + "Beat Keep", true));
-        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kOscType), n + "Type", juce::StringArray { "ANALOG", "PCM" }, 0));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kOscType), n + "Type",
+                                                                      oscTypeNames(), 0));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kAnaWave), n + "Analog Waveform",
             juce::StringArray { "SAW", "SQUARE", "TRIANGLE", "SINE", "RAMP", "JUNO", "HQ-SAW", "HQ-SQUARE", "NOISE", "LA-SAW", "LA-SQUARE",
                                 "SUPER-SAW", "FEEDBACK-OSC", "X-MOD" }, 0));

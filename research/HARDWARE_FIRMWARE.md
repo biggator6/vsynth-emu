@@ -1546,6 +1546,31 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The input's parameters and controls (2026-11-14, v206) {#input-parameters}
+
+The plugin's side of the item, the first of its two versions (VC2_MODE_PLAN.md): the parameters and controls; the audio's
+way in is v207.
+
+**OSC Type** has its third value, EXT IN (2, the firmware's), on both OSCs. A session keeps its OSC Types: the state is
+the parameter tree, whose values are the choices' indexes (JUCE's `AudioProcessorValueTreeState`, its unnormalised
+value), so a saved PCM, 1, is PCM. A host's automation of OSC Type, kept normalized, moves: PCM was 1.0 and is 0.5 now.
+**A patch's EXT IN** reads as EXT IN (`XtPatch`): the 64 presets' OSCs that ask for the external input play it, where
+they were OSCs switched off, and `xtPatchMissing` names nothing now. `xt_tone`'s patch section, the presets' tones on
+both sides: 0 different, its checks fewer by the player fields an EXT IN voice hasn't got; its round trip of every
+zone's values against `patchOf`, 0 different, its exception for the external input gone.
+
+**External In Type and Source** (IDs 0x78, 0x7c) are two host parameters appended after the zones' (`PluginExtIn.cpp`),
+with the firmware's names (`External In Type`, `External In Source`), ranges and defaults (MONO-L+R, Analog) and its
+values' text (STEREO, MONO-L+R, MONO-L, MONO-R; Analog, USB: the routine's own, read off `XtFxValueText`), held to the
+firmware by PluginTest's `TEST_FX` as every effect parameter is; they reach the driver through `kFxKnobs`.
+
+**The controls.** The OSC panel's third face, EXT IN: its converter's terms, Pitch, Coarse, Fine and Level, then Gain
+(Wave Gain), Pitch KF, Env Depth, Random, Level KF and Vel Sens, no box beside Type, and the display saying "External
+input" with External In Type. The FX page's System card has External In Type and Source, where the system's Master and
+Output Gain are; the page's labelled boxes (the tone's Output Assign and Mode too) are one `Choice` by `addChoice`, each
+filled with its parameter's own choices. `VSynthEmuEditorTest`: every page, block and face laid out, the two parameters
+with their controls.
+
 ### The input with the Effects off (2026-11-14, v205) {#input-effects-off}
 
 The second of the item's three versions (VC2_MODE_PLAN.md). With the Effects switch off the plugin runs no chip, and the

@@ -49,7 +49,7 @@ void msmAgainstFirmware(TestChecks& check, VSynthEmuProcessor& p, const juce::Fi
     Firmware fw(rom);
     check(fw.text.ok(), "the firmware's text routine should run");
     const auto& list = p.getParameters();
-    const int first = list.size() - kXtZones - kMsmParams;
+    const int first = list.size() - VSynthEmuProcessor::kAfterZones - kXtZones - kMsmParams;
     for (int id = kXtMsmFirstId; id <= kXtMsmLastId; ++id) {
         auto* prm = dynamic_cast<juce::RangedAudioParameter*>(list[first + id - kXtMsmFirstId]);
         const juce::String want = expectedId(id);

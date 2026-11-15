@@ -114,6 +114,7 @@ public:
     const XtFxCatalog& fxCatalog();
     // The firmware's ID behind one of the plugin's effect parameters, or -1.
     static int fxKnobId(const juce::String& parameter);
+    static constexpr int kAfterZones = 2;   // the parameters appended after the zones' (v206, External In Type and Source)
     // One line for the editor: ROM, encode progress, current encode type.
     juce::String getStatusText() const;
 
@@ -226,6 +227,7 @@ private:
     void writeMsmControls(const XtSynth::Controls& c);
     // The zones' sixteen Range Upper keys, after the MSM's (PluginZones.cpp, v195)
     static void addZoneParams(ParamList& params);
+    static void addExtInParams(ParamList& params);   // PluginExtIn.cpp, v206: External In Type and Source
     void readZoneControls(XtSynth::Controls& c) const;
     void writeZoneControls(const XtSynth::Controls& c);
     void setPatchControls(const XtSynth::Controls& c);

@@ -28,6 +28,19 @@ void styleToggle(juce::ToggleButton& b, const Ui::Palette& c) {
 }
 }
 
+// A labelled box on a parameter's own choices, as a level is a labelled slider
+void FxPanel::addChoice(std::vector<std::unique_ptr<Choice>>& to, const char* text, const char* parameter) {
+    auto choice = std::make_unique<Choice>();
+    choice->label.setText(text, juce::dontSendNotification);
+    styleLabel(choice->label, *colours);
+    if (const auto* p = dynamic_cast<juce::AudioParameterChoice*>(processor_.apvts.getParameter(parameter)))
+        choice->box.addItemList(p->choices, 1);
+    addAndMakeVisible(choice->label);
+    addAndMakeVisible(choice->box);
+    choice->att = std::make_unique<ComboAtt>(processor_.apvts, parameter, choice->box);
+    to.push_back(std::move(choice));
+}
+
 FxPanel::Level& FxPanel::addLevel(std::vector<std::unique_ptr<Level>>& to, const char* text, const char* parameter) {
     auto level = std::make_unique<Level>();
     level->label.setText(text, juce::dontSendNotification);
@@ -76,15 +89,10 @@ FxPanel::FxPanel(VSynthEmuProcessor& p, const Ui::Palette& palette)
     addLevel(system_, "Master", "fxMaster");
     // the one level with a unit
     styleSlider(addLevel(system_, "Output Gain", "fxGain").slider, 52, *colours);
-    for (auto* l : { &assignLabel_, &modeLabel_ }) { styleLabel(*l, *colours); addAndMakeVisible(*l); }
-    assignLabel_.setText("Output Assign", juce::dontSendNotification);
-    modeLabel_.setText("Output Mode", juce::dontSendNotification);
-    assignBox_.addItemList({ "MULTI", "MAIN", "DIR" }, 1);
-    modeBox_.addItemList({ "Mix", "Parallel" }, 1);
-    addAndMakeVisible(assignBox_);
-    addAndMakeVisible(modeBox_);
-    assignAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "outputAssign", assignBox_);
-    modeAtt_ = std::make_unique<ComboAtt>(processor_.apvts, "outputMode", modeBox_);
+    addChoice(toneChoices_, "Output Assign", "outputAssign");
+    addChoice(toneChoices_, "Output Mode", "outputMode");
+    addChoice(systemChoices_, "External In Type", "fxExtInType");
+    addChoice(systemChoices_, "External In Source", "fxExtInSource");
 
     pageSeg_.onChange = [this](int i) { showPage(i); };
     addAndMakeVisible(pageSeg_);
@@ -117,13 +125,21 @@ void FxPanel::buildCards() {
     blockCard(mfx_, "MFX", 0);
     blockCard(chorus_, "Chorus", 1);
     blockCard(reverb_, "Reverb", 2);
+    // A card's rows: its levels, then its boxes
+    const auto rowsOf = [&](std::vector<std::unique_ptr<Level>>& levels,
+                            std::vector<std::unique_ptr<Choice>>& choices) {
+        std::vector<Row> rows;
+        for (auto& l : levels) rows.push_back(row(l->label, l->slider));
+        for (auto& c : choices) rows.push_back(row(c->label, c->box));
+        return rows;
+    };
     Card tone { "Tone" };
     tone.sameAs = firstCard;
-    tone.rows = { row(tone_[0]->label, tone_[0]->slider), row(tone_[1]->label, tone_[1]->slider), row(assignLabel_, assignBox_), row(modeLabel_, modeBox_) };
+    tone.rows = rowsOf(tone_, toneChoices_);
     tone.shown = [this] { return page_ == 3; };
     add(tone);
     Card sys { "System" };
-    sys.rows = { row(system_[0]->label, system_[0]->slider), row(system_[1]->label, system_[1]->slider) };
+    sys.rows = rowsOf(system_, systemChoices_);
     sys.shown = [this] { return page_ == 3; };
     add(sys);
     Card list;
@@ -160,10 +176,11 @@ void FxPanel::showBlocks() {
     const bool sys = page_ == 3;
     for (auto* levels : { &tone_, &system_ })
         for (auto& l : *levels) { l->label.setVisible(sys); l->slider.setVisible(sys); }
-    assignLabel_.setVisible(sys);
-    assignBox_.setVisible(sys);
-    modeLabel_.setVisible(sys);
-    modeBox_.setVisible(sys);
+    for (auto* choices : { &toneChoices_, &systemChoices_ })
+        for (auto& c : *choices) {
+            c->label.setVisible(sys);
+            c->box.setVisible(sys);
+        }
 }
 
 void FxPanel::paint(juce::Graphics& g) {

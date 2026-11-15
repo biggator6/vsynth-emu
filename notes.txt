@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The input's parameters and controls v206 (2026-11-14, on vc2-mode): the plugin's side, the first of two (the user's
+  "Yes, next item"; the audio's way in v207). OSC Type's third value, EXT IN (2), on both OSCs: a session's OSC Types
+  kept (the state holds the choices' indexes), a host's automation of it moved (PCM 1.0 is 0.5). A patch's EXT IN plays
+  as EXT IN (XtPatch; 64 presets' OSCs), xtPatchMissing names nothing. External In Type and Source (0x78, 0x7c) as two
+  host parameters appended after the zones' (PluginExtIn.cpp), the firmware's names, ranges, defaults and text, to the
+  driver by kFxKnobs. The OSC panel's EXT IN face (its converter's ten knobs; the display "External input" and its Type),
+  the FX page's System card's two boxes (its labelled boxes one Choice by addChoice). Check: VSynthEmuEditorTest
+  1202/1202, 747 of 763 parameters with a control; TEST_FX's names, ranges and defaults; xt_tone's patch round trip 0
+  different without its external-input exception, its presets' tones 0 different with fewer checks (fcheck's baseline
+  differs by those counts alone). Plants: mutate_panel.py --editor 44 (4 new: the System card's boxes hidden, given the
+  tone's, on the wrong parameter, an EXT IN knob that names none), the FX page's 11 panel- plants, tone_muts.txt's
+  patch-external on the new read: all caught. VSynthEmuArpPluginTest's MSM and zone parts counted their parameters'
+  places from the list's end, so they count past VSynthEmuProcessor::kAfterZones now, and the zones' part holds the
+  last two, External In Type and Source, to the firmware's names, descriptors and text (zoneplugin 2156/2156, msmplugin
+  9217/9217); their 31 zone- and msm- panel plants run again.
+
 The input with the Effects off v205 (2026-11-14, on vc2-mode): the item's second of three (the user's "Yes, next item";
   "Copy without the chip"). XtExtInCopy (XtExtIn.cpp): the input as program A hands it back, computed without the chip,
   a frame late in the chip's 24 bits: STEREO L R, MONO MIX (L >> 1) + (R >> 1), MONO L, MONO R (measured on XtFxUnit:

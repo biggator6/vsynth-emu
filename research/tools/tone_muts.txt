@@ -842,7 +842,7 @@ patch-envs|const EnvIds pe = envIds(e), te = envIds(e + 1), fe = envIds(e + 2), 
 patch-sens|int aSens() const { return base + 8; }|int aSens() const { return base + 9; }|tonepatch
 patch-lfo|lfoOf(p, 0x3be + 8 * n, o.lfoWave|lfoOf(p, 0x3be + 8 * (n + 1), o.lfoWave|tonepatch
 patch-mono|c.mono = p(0x113) == 0;|c.mono = p(0x113) != 0;|tonepatch
-patch-external|o.on = p(b) != 0 && type != kExternal;|o.on = p(b) != 0;|tonepatch
+patch-external|o.oscType = p(b + 1);|o.oscType = p(b + 1) == 2 ? 0 : p(b + 1);|tonepatch
 patch-cosm-map|{ 0, 13, 12, 14, 15, 7, 5, 6, 4, 2, 0, 1, 10, 11, 8, 9, 3 }|{ 0, 12, 13, 14, 15, 7, 5, 6, 4, 2, 0, 1, 10, 11, 8, 9, 3 }|tonepatch
 patch-cosm-kf|kf(c.tbHpfKf);|;|tonepatch
 patch-cosm-order|&c.wsDrive, &c.wsDriveEnv, &c.wsDriveLfo,|&c.wsDrive, &c.wsDriveLfo, &c.wsDriveEnv,|tonepatch

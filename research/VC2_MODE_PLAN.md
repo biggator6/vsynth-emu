@@ -206,7 +206,13 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
       or the unit by the Effects switch goes to v206.
     - v206, the plugin: its input bus (the Standalone's mic), OSC Type's third choice, a patch's EXT IN read
       (`XtPatch`, `xtPatchMissing`), External Input Type and Source as parameters, and the panel's word when an EXT IN
-      OSC has no input.
+      OSC has no input. Split in two (2026-11-14): v206 the parameters and controls, **Done 2026-11-14**
+      (HARDWARE_FIRMWARE.md, "The input's parameters and controls"): OSC Type's EXT IN, the two settings as host
+      parameters by the firmware's own names, ranges and text, a patch's EXT IN played, the OSC panel's EXT IN face
+      and the FX page's two boxes.
+    - v207, the audio: the plugin's input bus and the Standalone's mic, the host's rate to the chip's 44.1 kHz, the
+      unit (Effects on) or `XtExtInCopy` (off, by External In Type) into `XtSynth::input`, and the panel's word when an
+      EXT IN OSC has no input; PluginTest with an input against XtSynth.
 
 ### 3. The ports, one version each
 

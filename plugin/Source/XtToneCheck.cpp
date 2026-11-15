@@ -315,13 +315,7 @@ void patchRoundTrip(const std::vector<uint8_t>& store, int zone, const Ctl& c, P
     for (const auto& kv : p) {
         const int id = kv.first & 0xffff, k = kv.first >> 16;
         if (own(id)) continue;
-        // OSC Type 2, the external input: here an OSC off and on analog.  The firmware's tone gets the same, so only this can see it
-        const int typeId = id == 0x2a4 || id == 0x2a5 ? 0x2a5 : id == 0x2d8 || id == 0x2d9 ? 0x2d9 : 0;
-        if (typeId && xtPatchValue(store, typeId, zone) == 2) {
-            ++t.values;
-            if (kv.second != 0) { ++t.different; ++t.byId[kv.first]; }
-            continue;
-        }
+        // OSC Type 2, the external input, round-trips as every other value from v206: XtPatch reads it as EXT IN
         int fw;
         if (id >= 0x55d) {
             // A type's parameter: a patch holds only its own type's, and a COSM on Through none

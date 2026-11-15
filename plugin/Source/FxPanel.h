@@ -29,6 +29,7 @@ private:
     using ComboAtt  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
 
     struct Level { juce::Label label; juce::Slider slider; std::unique_ptr<SliderAtt> att; };
+    struct Choice { juce::Label label; juce::ComboBox box; std::unique_ptr<ComboAtt> att; };   // a box on its choices
     struct Block { juce::ToggleButton on; juce::Label typeLabel; juce::ComboBox type; std::unique_ptr<ButtonAtt> onAtt; std::unique_ptr<ComboAtt> typeAtt; std::vector<std::unique_ptr<Level>> levels; };
     struct ParamRow { juce::Label name; juce::Slider value; int id = -1, def = 0; };
 
@@ -38,15 +39,15 @@ private:
     void showBlocks();                              // the cards of the page that's open
     void buildCards();
     Level& addLevel(std::vector<std::unique_ptr<Level>>& to, const char* text, const char* parameter);
+    void addChoice(std::vector<std::unique_ptr<Choice>>& to, const char* text, const char* parameter);
     void addBlock(Block& b, const char* onParam, const char* typeParam, int types);
 
     VSynthEmuProcessor& processor_;
     juce::Label status_;
     Block mfx_, chorus_, reverb_;
     std::vector<std::unique_ptr<Level>> tone_, system_;
-    juce::Label assignLabel_, modeLabel_;
-    juce::ComboBox assignBox_, modeBox_;
-    std::unique_ptr<ComboAtt> assignAtt_, modeAtt_;
+    // the tone's Output Assign and Mode; the system's External In Type and Source (v206)
+    std::vector<std::unique_ptr<Choice>> toneChoices_, systemChoices_;
     Ui::Segmented pageSeg_;   // MFX, Chorus, Reverb, System, in the panel's palette
     juce::String listTitle_;
     juce::Viewport view_;

@@ -41,7 +41,7 @@ static const struct { const char* name; int id; } kFxKnobs[] = {
     { "fxMfxType", 0x177 }, { "fxMfxMaster", 0x178 }, { "fxMfxCho", 0x179 }, { "fxMfxRev", 0x17a },
     { "fxChoType", 0x1fc }, { "fxChoMaster", 0x1fd }, { "fxChoRev", 0x1fe },
     { "fxRevType", 0x230 }, { "fxRevMaster", 0x231 },
-    { "fxMaster", 0x3e }, { "fxGain", 0x76 }
+    { "fxMaster", 0x3e }, { "fxGain", 0x76 }, { "fxExtInType", 0x78 }, { "fxExtInSource", 0x7c }
 };
 
 void VSynthEmuProcessor::fxManualTicks() {
