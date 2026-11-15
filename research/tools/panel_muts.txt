@@ -160,3 +160,32 @@ extin-has-input-always|bool VSynthEmuProcessor::hasInput() const { return getTot
 extin-gate-analog-only|    return std::lround(reads_.oscType->load()) != Params::kOscTypePcm|    return std::lround(reads_.oscType->load()) == 0|plugin/Source/PluginRender.cpp|extin
 extin-prepare-rate|    hostIn_.prepare(sampleRate, synth_.input);|    hostIn_.prepare(44100.0, synth_.input);|plugin/Source/PluginProcessor.cpp|extin
 editor-d-extin-no-word|    return processor_.hasInput() ? juce::String() : "No input: the host gives none, or the input is off";|    return juce::String();|plugin/Source/UiOscPanel.cpp|layout
+# The OSC displays (v200), by VSynthEmuEditorTest's EditorWaveTest.cpp: a loaded wave's view made and replaced, its
+# columns' extremes, the analog cycles made again as a setting moves, from the OSC's own settings.
+editor-d-wave-unmade|    publishWaveView(osc, chans);|    ;|plugin/Source/PluginEncodes.cpp|layout
+editor-d-wave-first-only|    for (size_t i = from + 1; i < to; ++i) {|    for (size_t i = to; i < to; ++i) {|plugin/Source/PluginWaveView.cpp|layout
+editor-d-wave-stale|    if (gen == viewGen_ && loop == loop_) return;|    if (viewGen_ >= 0 && loop == loop_) return;|plugin/Source/UiOscPanel.cpp|layout
+editor-d-cycles-stale|    if (!cycles_.empty() && now == drawn_) return;|    if (!cycles_.empty()) return;|plugin/Source/UiOscPanel.cpp|layout
+editor-d-cycles-osc1|    const XtSynth::OscControls& o = osc ? c.osc2 : c;|    const XtSynth::OscControls& o = c;|plugin/Source/UiWaveDisplay.cpp|layout
+# The footer's keyboard (v201), by VSynthEmuEditorTest's EditorKeysTest.cpp: a key let go, a black key over the white,
+# the velocity by where on the key, a drag across keys, the editor's queue taken by processBlock, the fold's size and
+# the session keeping it.
+editor-d-keys-no-off|    processor_.sendFromEditor(juce::MidiMessage::noteOff(kChannel, *held_));|    ;|plugin/Source/UiFooter.cpp|layout
+editor-d-keys-white-first|    for (const bool black : { true, false }) {|    for (const bool black : { false, true }) {|plugin/Source/UiFooter.cpp|layout
+editor-d-keys-flat|(y - b.getY())|(b.getY() - b.getY() + y - y)|plugin/Source/UiFooter.cpp|layout
+editor-d-keys-drag-stuck|    if (keyAt(e.position) != held_) press(e.position);|    if (keyAt(e.position) == held_) press(e.position);|plugin/Source/UiFooter.cpp|layout
+editor-d-keys-untaken|        takeFromEditor([this](const juce::MidiMessage& m) { toSynth(m); });|        ;|plugin/Source/PluginProcess.cpp|layout
+editor-d-fold-same-size|    setSize(juce::roundToInt(Look::width * s), juce::roundToInt((float)h * s));|    setSize(juce::roundToInt(Look::width * s), juce::roundToInt((float)Look::height * s));|plugin/Source/UiEditor.cpp|layout
+editor-d-fold-unsaved|    processor_.apvts.state.setProperty(kKeyboardShown, shown, nullptr);|    ;|plugin/Source/UiEditor.cpp|layout
+# The Time Trip pad (v202), by VSynthEmuEditorTest's EditorPadTest.cpp and its rack checks: up being up, X before Y, the
+# lift, Pad Hold and the session keeping it, the assigns as they stand and OFF, each OSC's Beat Keep its own, and a
+# switch's name whole (the check measures D's switch since v202).
+editor-d-pad-y-down|value((r.getBottom() - at.y) / r.getHeight())|value((at.y - r.getY()) / r.getHeight())|plugin/Source/UiTripPad.cpp|layout
+editor-d-pad-y-first|    processor_.sendFromEditor(juce::MidiMessage::controllerEvent(kChannel, assigned(kTripX), value.x));\n    processor_.sendFromEditor(juce::MidiMessage::controllerEvent(kChannel, assigned(kTripY), value.y));|    processor_.sendFromEditor(juce::MidiMessage::controllerEvent(kChannel, assigned(kTripY), value.y));\n    processor_.sendFromEditor(juce::MidiMessage::controllerEvent(kChannel, assigned(kTripX), value.x));|plugin/Source/UiTripPad.cpp|layout
+editor-d-pad-no-lift|    send({ 0, 0 });|    ;|plugin/Source/UiTripPad.cpp|layout
+editor-d-pad-hold-ignored|    if (!hold_) lift();|    lift();|plugin/Source/UiTripPad.cpp|layout
+editor-d-pad-fixed-assign|controllerEvent(kChannel, assigned(kTripX), value.x)|controllerEvent(kChannel, 82, value.x)|plugin/Source/UiTripPad.cpp|layout
+editor-d-pad-off-sends|    return cc == kOff \|\| cc == kAlsoOff ? 0 : cc;|    return cc == kOff \|\| cc == kAlsoOff ? cc : cc;|plugin/Source/UiTripPad.cpp|layout
+editor-d-pad-hold-unsaved|        processor_.apvts.state.setProperty(kPadHold, hold_.getToggleState(), nullptr);|        ;|plugin/Source/UiTripColumn.cpp|layout
+editor-d-beat-osc1|Params::oscId(osc, Params::kBeatKeep), attached_|Params::oscId(0, Params::kBeatKeep), attached_|plugin/Source/UiTripColumn.cpp|layout
+editor-d-beat-cut|        beat_[(size_t)osc].setBounds(beat);|        beat_[(size_t)osc].setBounds(beat.withTrimmedLeft(beat.getWidth() / 2));|plugin/Source/UiTripColumn.cpp|layout

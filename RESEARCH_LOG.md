@@ -3570,6 +3570,28 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 22, continued (2026-11-14) — v202: the Time Trip pad as the XT's
+
+- The user was right that it made no sense: the column drew a pad, but under it was a horizontal slider on one 0–127 parameter, a finger going round the rim. CONTROLLERS.md says what the XT's pad is: an X-Y surface in polar terms, where touching freezes the wave and circling scrubs it. The plugin's synth already took the XT's pad controllers, firmware-checked since v132, so the pad sends those, through the queue the keyboard uses.
+- X has to go before Y: the synth's pad moves on Y. A planted error that swapped them was caught, as was one that turned the pad upside down.
+- The arpeggio's Hold vanished from the coverage the moment the pad got its own Hold, because the check skips switches that set no parameter by their name. The pad's is now "Pad Hold", the XT's own name for it.
+- The layout check had never measured D's switches: it used JUCE's stock tick box, and "Beat K…" passed. It now uses the same pill width, gap and face D draws with, and it went red on that switch before the fix.
+- One planted error was missed, and it was my test's gap: an assign has two values that mean off, 0 and 32, and the test tried only 0.
+
+### Session 22, continued (2026-11-14) — v201: the footer's keyboard plays, and folds away
+
+- The keys needed a way into the synth that the audio thread could take without a lock. JUCE's own keyboard state locks, so the editor writes into a small lock-free ring that processBlock empties at the start of each block, before the host's MIDI, through the same message chain the host's notes take.
+- processBlock had to move first: PluginProcessor.cpp was 560 lines, and the kit refuses a line added to a file that long. It moved as it stood, and every PluginTest line stayed bit-identical, which is the proof the move changed nothing. One planted error moved with it.
+- The test presses keys through the footer's own mouse handling and reads what reached the queue, then plays a key through processBlock on the analog oscillator and listens for sound, since a queue nobody empties would pass the first check.
+- Folding the keyboard away changes the window's height and its aspect ratio, so the size limits go with it, and the session keeps the choice: an editor opened on a folded session opens folded.
+
+### Session 22, continued (2026-11-14) — v200: the OSC display draws what the OSC plays
+
+- The user tested D and sent three notes: the OSC display, the Time Trip column, the keyboard. This is the first. The analog display drew one of six stock shapes from a table (JUNO as a saw, SUPER-SAW as a saw, X-MOD as a square), and nothing told it to redraw when the waveform changed, so it showed whatever it had drawn first.
+- Rather than draw fourteen shapes by hand, the display runs the plugin's own analog oscillator for a few cycles at the panel's settings. Every waveform, the Pulse Width and Super-Saw's spread then show as they play, and no table can drift from the port. The check compares the panel's picture with a fresh run, and all fourteen agreed to the last bit, NOISE too, as its generator starts the same each note.
+- Only one pair drew alike, SAW and X-MOD, and that was the oscillator, not the drawing: on OSC 2 X-MOD has no depth, so it plays a plain saw. The check allows that pair and no other.
+- A loaded wave's picture is made once by the processor, from the copy the encode already takes, so a file, a patch and a session all get one without a second read of the audio.
+
 ### Session 22 (2026-11-13) — v196: D, the plugin's editor
 
 - The user wanted a new UI with Pigments and Serum as ideas, not as looks, and a fresh palette. Of four mock-ups on a canvas the user chose D, A's module rack with C's signal path and lower panel. It was built in five steps beside the tabbed editor, each checked by a test program of its own, so the plugin never had half an editor.

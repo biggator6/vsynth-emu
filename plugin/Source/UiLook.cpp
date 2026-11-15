@@ -188,12 +188,16 @@ void Feel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, bool, bool
         Ui::dot(g, r.getCentre(), 14.0f, on ? accent : track);
         return;
     }
-    const auto pill = r.removeFromLeft(26.0f).withSizeKeepingCentre(26.0f, 14.0f);
+    const auto pill = r.removeFromLeft(switchPillW).withSizeKeepingCentre(switchPillW, 14.0f);
     Ui::fillRounded(g, pill, on ? accent : track, 7.0f);
     const float knobX = on ? pill.getRight() - 7.0f : pill.getX() + 7.0f;
     Ui::dot(g, { knobX, pill.getCentreY() }, 10.0f, on ? ground : label);
-    Ui::drawText(g, b.getButtonText(), r.withTrimmedLeft(8.0f).toNearestInt(),
-                 { sans(11.0f, "Semibold"), b.isEnabled() ? text : muted });
+    Ui::drawText(g, b.getButtonText(), r.withTrimmedLeft(switchGap).toNearestInt(),
+                 { switchFont(), b.isEnabled() ? text : muted });
+}
+
+juce::Font switchFont() {
+    return sans(11.0f, "Semibold");
 }
 
 // A button: `raised` on a panel, the accent when it is on

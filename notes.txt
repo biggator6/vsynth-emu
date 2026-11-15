@@ -423,6 +423,52 @@ The EXT IN OSC v203 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, fourth it
   pcm() test, EXT IN in the root and stereo, the chase in backOnBeat) read ERROR, written again on the code as it is
   and all caught, zone-wave by a crash.
 
+The Time Trip pad v202 (2026-11-14): the user's testing notes, "time trip makes no sense - see controllers.md", and their
+  choice of the XT's pad. The column's pad had been a slider on the Time Trip circle parameter drawn as a pad. Now
+  TripPad (UiTripPad) sends the XT's pad controllers into the synth through the editor's queue, as the XT's own pad and
+  the iOS app send them: Time Trip Assign X then Y (CC82, CC83 by default; 0 and 32 name none, and the pad says so),
+  1…127 across and up. A press is a finger, which freezes the wave; a drag round the circle scrubs it, clockwise
+  forward (XtTripPad, 48 steps a turn); a release sends 0 and 0, unless Pad Hold keeps the finger, which the session
+  keeps (padHold). Under it Pad Hold, then the followed OSC's Time Trip switch and Beat Keep, a row each; Robot went to
+  a PCM OSC's DETAILS in Beat Keep's place. The circle parameter (timeTrip) is a host's to automate, with no control:
+  744 of 761 parameters have one. The layout check now measures a switch's text as D draws it (Look::switchPillW,
+  switchGap, switchFont): it had used JUCE's tick box and passed "Beat K...", and went red on it, 40 times, before the
+  column's rows were made one a switch. Check: VSynthEmuEditorTest 1241/1241 (EditorPadTest.cpp): clicks at the centre,
+  the top right and the bottom left and a drag as their controllers, Pad Hold and the session keeping it, Trip X on
+  CC20 and at 0 and 32, and the column's switches each on the followed OSC's own parameters. verify.sh green. Plants:
+  nine new (editor-d-pad-, editor-d-beat-); --editor, 61, all caught but editor-d-pad-off-sends, which the test missed
+  as it tried only 0 of the two OFF values; with 32 too, caught.
+
+The footer's keyboard v201 (2026-11-14): the user's testing notes, "keyboard onscreen does nothing but show zones -
+  should also be clickable for note input while editing sounds and probably should be able to hide/show", and their
+  choice to fold it away. processBlock moved as it stood to PluginProcess.cpp (PluginProcessor.cpp was 560 lines), its
+  message chain made one function, toSynth, for the host's MIDI and the editor's. The editor's queue: sendFromEditor
+  (any thread but the audio thread) into a lock-free ring of 256 three-byte messages, takeFromEditor at each block's
+  start, before the host's MIDI; without the firmware, the file's player takes them the same way (toFile). The
+  footer's keys play: a press its note at a velocity by where on the key (0.25 at the top to full at the bottom), a drag
+  across keys each in turn, a release its note-off, the held key lit; a key held as the editor closes is let go. The
+  Keyboard switch at the page bar's right end folds the footer away, the drawing 710 high and the window shorter by 40
+  at its scale, its limits and aspect with it; the session's state keeps it (keyboardShown). Check: VSynthEmuEditorTest
+  1224/1224 (EditorKeysTest.cpp): a white key's and a black key's click as their notes, a press lower on a key louder, a
+  drag from 60 to 64 as on 60, off 60, on 64, off 64, a pressed key sounding through processBlock on the analog OSC and
+  silence without one, the fold's size and layout, an editor on the folded session opening folded, and back. verify.sh
+  green, every plugintest line bit-identical. Plants: seven new (editor-d-keys-, editor-d-fold-), engine-level followed
+  processBlock to PluginProcess.cpp; --editor and engine-level, 53, all caught.
+
+The OSC display v200 (2026-11-14): the user's testing notes, "osc wav should display waveform in PCM mode and in analog
+  mode, display the correct waveform chosen". On PCM the display draws the loaded wave: the processor makes a view of it
+  (PluginWaveView.cpp: 512 columns, each its lowest and highest sample, the channels mixed) from the channels
+  encodeWave copies, so a file, a patch and a session's wave all get one, and the editor reads it on the message thread;
+  the loop's span is shaded when Loop is on. On ANALOG it draws three cycles of the plugin's own analog oscillator,
+  XtAnalogOsc at A1 after 64 blocks have settled its start, at the panel's settings (UiWaveDisplay's analogSettings and
+  analogCycles), made again when any of them moves. It had drawn one of six stock shapes, never redrawn when the
+  waveform changed. Check: VSynthEmuEditorTest 1211/1211 (EditorWaveTest.cpp): each of the 14 waveforms on the panel
+  equal to a fresh render at the settings as they stand, no two alike but SAW and X-MOD on OSC 2 (X-MOD has no depth
+  there, and plays as SAW), a square moved by its Pulse Width, a loaded wave's view spanning exactly the file's own
+  lowest and highest samples, read apart, and replaced by a second wave's. verify.sh green. Plants: five new (editor-d-
+  wave-unmade, -wave-first-only, -wave-stale, -cycles-stale, -cycles-osc1); --editor and the teardown- three, 48, all
+  caught.
+
 rom.4's parameter tables v199 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, third item (the user's "Yes, next
   item"). Vc2Params.cpp reads rom.4's names, both descriptor banks and the values' text by rom.4's own IDs, once, in
   loadVc2 at the start (so a switch of modes reads nothing): vc2ParamName, vc2ParamDesc, vc2TypedDesc, vc2ValueText,

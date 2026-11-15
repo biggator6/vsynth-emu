@@ -37,6 +37,10 @@ inline constexpr int inset = 12, gap = 8, radius = 8;
 // The names' face and the values' face, at a size in the drawing's units (a CSS px of the mock-up)
 juce::Font sans(float size, const char* style = "Regular", float spacing = 0.0f);
 juce::Font mono(float size);
+// A switch (Feel::drawToggleButton): its pill's width, the gap before its text, and the text's face, which it cuts with
+// dots and never squeezes (v202: the layout check measures a switch's text by them)
+inline constexpr float switchPillW = 26.0f, switchGap = 8.0f;
+juce::Font switchFont();
 // A label of text alone in a face and colour: no border, no clicks, squeezed to 80% before it is cut
 void setTextLook(juce::Label& l, const juce::Font& font, juce::Colour colour,
                  juce::Justification just = juce::Justification::centred);

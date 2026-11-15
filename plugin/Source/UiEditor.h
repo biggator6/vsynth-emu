@@ -28,11 +28,17 @@ public:
     juce::Component* pageView(int page) { return pages_[(size_t)page].get(); }   // none for SYNTH
     juce::Component& drawing() { return drawing_; }   // what the window scales; the checks walk it
     float scale() const { return (float)getWidth() / (float)Look::width; }
+    // The footer's keyboard shown, or folded away with the window shorter by its height at the scale it is drawn (v201,
+    // the user's choice); kept in the session's state, so the editor opens as it was left
+    void showKeyboard(bool shown);
+    bool keyboardShown() const { return footer_.isVisible(); }
+    static constexpr const char* kKeyboardShown = "keyboardShown";   // the state's property
 
     void paint(juce::Graphics&) override;
     void resized() override;
 
 private:
+    VSynthEmuProcessor& processor_;
     Look::Feel feel_;
     juce::Component drawing_;
     Header header_;

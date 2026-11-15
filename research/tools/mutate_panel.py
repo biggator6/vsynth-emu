@@ -19,6 +19,7 @@ CR, CW = 'plugin/Source/PluginControlsRead.cpp', 'plugin/Source/PluginControlsWr
 CC, O2 = 'plugin/Source/PluginCosmControls.cpp', 'plugin/Source/PluginOsc2Controls.cpp'   # their COSM and OSC 2 parts (v190)
 PO = 'plugin/Source/PluginParamsOsc.cpp'   # OSC parameters (v190)
 PZ, PF = 'plugin/Source/PluginZones.cpp', 'plugin/Source/PluginPatchFiles.cpp'   # a patch's zones, its waves' files (v195)
+PR = 'plugin/Source/PluginProcess.cpp'   # processBlock, from PluginProcessor.cpp (v201)
 TEXT='row.value.textFromValueFunction = [values, id = p.id](double v) { return juce::String(values->text(id, (int)std::lround(v))); };\n        '
 TYPE='row.value.valueFromTextFunction = [values, &row, id = p.id, low = p.low, high = p.high](const juce::String& typed) { return (double)values->value(id, low, high, typed.toStdString(), (int)std::lround(row.value.getValue())); };\n        '
 RANGE='row.value.setRange(p.low, p.high, 1.0);'
@@ -130,7 +131,7 @@ MUTS=[
  ('send-swap',CR,'c.chorusSend   = knob(Params::kTvaChoSend);','c.chorusSend   = knob(Params::kTvaRevSend);','fx-bus'),
  ('assign-off',CR,'c.outputAssign = knob(Params::kOutputAssign);',';','fx-assign'),
  ('mode-off',CR,'c.parallel     = knob(Params::kOutputMode) != 0;',';','fx-mode'),
- ('engine-level',PP,'buffer.applyGain(0.125f);',';','rom'),
+ ('engine-level',PR,'buffer.applyGain(0.125f);',';','rom'),
  ('rom-project-kept',PS,'        openRom(juce::File(rom));','        setRomFile(juce::File(rom));','rom'),
  ('rom-read-again',XR,'if (ready() && path == lastTaken_) return true;',';','rom'),
  ('patch-writer',CW,'set(Params::kOscCoarse, c.oscCoarse);','set(Params::kOscCoarse, c.oscFine);','patch'),

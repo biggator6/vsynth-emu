@@ -10,7 +10,8 @@ namespace {
 using Controls::KnobRow;
 constexpr int kFaceCount = OscPanel::kTypes, kPcm = 1, kExtIn = 2;   // OSC Type's values: ANALOG 0, PCM 1, EXT IN 2
 constexpr int kBigDial = 44, kSmallDial = 30, kBig = 4, kSmall = 6;
-constexpr int kTitleH = 22, kDisplayH = 72, kRowGap = 7, kStatusH = 22;
+constexpr int kTitleH = 22, kDisplayH = 72, kRowGap = 7, kStatusH = 22, kNameH = 16;
+constexpr float kPercent = 100.0f;   // Loop Start and End are percents of the wave
 
 // What each Type shows: the box beside Type, the big knobs and the small, as the processor's IDs for OSC 1
 struct OscFace {
@@ -33,24 +34,6 @@ constexpr OscFace kFaces[kFaceCount] = {
       { { { "waveGain", "Gain" }, { "pitchKF", "Pitch KF" }, { "pitchEnvDepth", "Env Depth" },
           { "randomPitch", "Random" }, { "oscLevelKF", "Level KF" }, { "oscVelSens", "Vel Sens" } } } },
 };
-
-// The analog waveforms' shapes, by Analog Waveform's value, as the display draws them
-enum class Shape { saw, ramp, square, triangle, sine, noise };
-constexpr Shape kShapes[] = { Shape::saw, Shape::square, Shape::triangle, Shape::sine, Shape::ramp, Shape::saw,
-                              Shape::saw, Shape::square, Shape::noise, Shape::saw, Shape::square, Shape::saw,
-                              Shape::sine, Shape::square };
-
-double shapeAt(Shape s, double phase, int i) {
-    switch (s) {
-        case Shape::saw: return 1.0 - 2.0 * phase;
-        case Shape::ramp: return 2.0 * phase - 1.0;
-        case Shape::square: return phase < 0.5 ? 1.0 : -1.0;
-        case Shape::triangle: return phase < 0.5 ? 4.0 * phase - 1.0 : 3.0 - 4.0 * phase;
-        case Shape::sine: return std::sin(phase * juce::MathConstants<double>::twoPi);
-        case Shape::noise: return juce::Random((juce::int64)i).nextDouble() * 2.0 - 1.0;
-    }
-    return 0.0;
-}
 
 // Knobs side by side across r, each its share of the width: n of them from `first` on
 void placeRow(const std::vector<std::unique_ptr<Knob>>& knobs, size_t first, size_t n, juce::Rectangle<int> r) {
@@ -91,9 +74,36 @@ void OscPanel::refresh() {
     FacedPanel::refresh();
     const juce::String wave = processor_.hasFileLoaded(osc_) ? processor_.getLoadedFileName(osc_) : "No wave loaded";
     const bool input = processor_.hasInput();
-    if (wave == wave_ && input == input_) return;
-    wave_ = wave;
-    input_ = input;
+    if (wave != wave_ || input != input_) {
+        wave_ = wave;
+        input_ = input;
+        repaint(display_);
+    }
+    if (face() == kPcm) refreshWave();
+    else if (face() != kExtIn) refreshCycles();   // EXT IN draws its words, no cycles
+}
+
+// A PCM OSC's picture: the processor's newest view of its wave and the loop's span, repainted only when either moved
+void OscPanel::refreshWave() {
+    const auto value = [this](const juce::String& name) {
+        return processor_.apvts.getRawParameterValue(id(name))->load();
+    };
+    const WaveDisplay::Loop loop { value(Params::kLoop) >= 0.5f, value(Params::kLoopStart) / kPercent,
+                                   value(Params::kLoopEnd) / kPercent };
+    const int gen = processor_.waveViewGen(osc_);
+    if (gen == viewGen_ && loop == loop_) return;
+    viewGen_ = gen;
+    view_ = processor_.waveView(osc_);
+    loop_ = loop;
+    repaint(display_);
+}
+
+// An analog OSC's picture: the oscillator's own cycles, made again only when a setting it reads has moved
+void OscPanel::refreshCycles() {
+    const WaveDisplay::AnalogSettings now = WaveDisplay::analogSettings(processor_.currentControls(), osc_);
+    if (!cycles_.empty() && now == drawn_) return;
+    drawn_ = now;
+    cycles_ = WaveDisplay::analogCycles(now);
     repaint(display_);
 }
 
@@ -122,14 +132,11 @@ void OscPanel::resized() {
     sync_.setBounds(status.removeFromLeft(64));
 }
 
-// The wave's name for a PCM OSC (the wave itself is drawn in a later step), the waveform's shape for an analog one
+// A PCM OSC: its wave, the loop's span shaded, its name over it; an analog OSC: the oscillator's own cycles (v200);
+// EXT IN: the outside input by External In Type (v206), and why it's silent if there's none (v207)
 void OscPanel::paintDisplay(juce::Graphics& g) const {
     Ui::fillRounded(g, display_.toFloat(), Look::field, 6.0f);
-    if (face() == kPcm) {
-        Ui::drawText(g, wave_, display_.reduced(10, 6).removeFromTop(16), { Look::sans(11.0f), Look::label });
-        return;
-    }
-    if (face() == kExtIn) {   // the outside input, by External In Type (v206), and why it's silent if there's none (v207)
+    if (face() == kExtIn) {
         const auto* type = processor_.apvts.getParameter("fxExtInType");
         const juce::String text = "External input, " + (type ? type->getCurrentValueAsText() : juce::String());
         auto lines = display_.reduced(10, 6);
@@ -137,18 +144,14 @@ void OscPanel::paintDisplay(juce::Graphics& g) const {
         Ui::drawText(g, noInputWord(), lines.removeFromTop(16), { Look::sans(11.0f), Look::warning });
         return;
     }
-    const int wave = juce::roundToInt(processor_.apvts.getRawParameterValue(id(Params::kAnaWave))->load());
-    const Shape shape = kShapes[(size_t)juce::jlimit(0, (int)std::size(kShapes) - 1, wave)];
-    const auto area = display_.reduced(10, 14).toFloat();
-    const int cycles = 3, steps = 240;
-    juce::Path path;
-    for (int i = 0; i <= steps; ++i) {
-        const double t = (double)i / (double)steps, phase = std::fmod(t * (double)cycles, 1.0);
-        const juce::Point<float> pt { area.getX() + (float)t * area.getWidth(),
-                                      area.getCentreY() - 0.5f * area.getHeight() * (float)shapeAt(shape, phase, i) };
-        i == 0 ? path.startNewSubPath(pt) : path.lineTo(pt);
+    if (face() != kPcm) {
+        WaveDisplay::paintCycles(g, display_.reduced(10, 14).toFloat(), cycles_);
+        return;
     }
-    Ui::stroke(g, path, Look::accent, juce::PathStrokeType(2.0f));
+    auto inner = display_.reduced(10, 6);
+    const auto name = inner.removeFromTop(kNameH);
+    if (view_ && processor_.hasFileLoaded(osc_)) WaveDisplay::paintWave(g, inner.toFloat(), *view_, loop_);
+    Ui::drawText(g, wave_, name, { Look::sans(11.0f), Look::label });
 }
 
 void OscPanel::chooseWave() {

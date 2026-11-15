@@ -19,11 +19,11 @@ kept. Top to bottom, in the drawing's own units:
 | Region | y | Height | Holds |
 |---|---|---|---|
 | Header | 0 | 48 | the wordmark and the build under it; the mode switch, V-SYNTH and VC-2 (VC-2 greyed until the VC-2 mode is in); the patch box (the patch's name, under it in the warning colour what the patch asks for that isn't here, Browse… to load one); the tempo; the Effects switch; the ROM's state and the ROM… button |
-| Page bar | 48 | 34 | SYNTH, MODULATION, FX, PLAY, ZONES; a line saying what a click on a block does |
+| Page bar | 48 | 34 | SYNTH, MODULATION, FX, PLAY, ZONES; a line saying what a click on a block does; the Keyboard switch at its right end (v201) |
 | Signal path | 82 | 52 | OSC 1, OSC 2, MOD, COSM 1, COSM 2, AMP as blocks to click, the selected one filled with the accent; MFX, CHORUS, REVERB with ON or OFF (a click opens its FX page); the Structure box |
 | Rack | 134 | 304 | 12 in from each side, 8 between: the Time Trip column (184 wide), OSC 1 and OSC 2 (310 each), and a column of COSM 1 (116 high), COSM 2 (116) and AMP (the rest) |
 | Lower panel | 438 | 272 | the list (148 wide): SELECTED, DETAILS, ENVELOPES, LFOs; then the chosen view |
-| Footer | 710 | 40 | Keys MONO or POLY and the number of zones (184 wide), the keyboard: 42 white keys with each zone's range in its colour above them |
+| Footer | 710 | 40 | Keys MONO or POLY and the number of zones (184 wide), the keyboard: 42 white keys from C1 with each zone's range in its colour above them. The keys play (v201): a press sends its note to the synth (the processor's editor queue, taken at each block's start before the host's MIDI), its velocity by where on the key, soft at the top and full at the bottom; a drag across keys lets each go for the next; the held key is lit. The Keyboard switch folds the footer away, the window shorter by its 40 at the scale it is drawn, and the session keeps it (the user's choice, 2026-11-14) |
 
 The SYNTH page is the path, the rack and the lower panel. The other pages take everything under the page bar.
 
@@ -60,7 +60,7 @@ MOD has none of the three, so its SELECTED is its DETAILS. DETAILS holds the sel
 its rack panel nor in SELECTED, from a table of faces by its Type (`UiDetailTables.cpp`), each control as its parameter
 is (a choice a box, a switch a switch, any other a knob), laid across in rows: for an OSC on ANALOG, Fat and its KF, LFO
 and Env, Detune, the sub oscillator, Pitch KF; on PCM, Key, Time Offset, the Time and Formant KFs, Start, Loop and its
-mode and points, Original Tempo and Beat Keep; on both, Random pitch, Level KF, Wave gain and the velocity curve. For a
+mode and points, Original Tempo and Robot (Beat Keep went under the pad in v202); on both, Random pitch, Level KF, Wave gain and the velocity curve. For a
 COSM, what its type's five knobs and box on its panel leave (the Compressor, the Limiter and the Speaker Simulator have
 nothing more, which a line says); for MOD its switch, type, level and times; for AMP the TVA's KFs and its output. The
 patch TVA's velocity is on its envelope's tab. ENVELOPES shows every envelope at once (13 tiles, seven a row) and LFOs
@@ -68,10 +68,22 @@ every LFO (5), each its name over its curve or shape; a click on one opens its b
 
 ### The rack
 
-- **Time Trip column:** the pad (162 × 196), whose OSC it follows (1 or 2), Robot and Hold under it.
+- **Time Trip column** (v202, the user's choice; CONTROLLERS.md, "Time Trip Pad"): the XT's pad (`UiTripPad`, 164 × 160),
+  which sends the XT's pad controllers into the synth through the editor's queue as the XT's own pad and the iOS app
+  do: Time Trip Assign X then Y (CC82 and CC83 by default), 1…127 across and up. A press is a finger on the pad, which
+  freezes the wave; a drag round its circle scrubs it, clockwise forward, at the same pitch (`XtTripPad` counts the
+  angle, 48 steps a turn); a release sends 0 and 0, lifting the finger, unless Pad Hold keeps it where it is. The
+  finger, a line to it from the centre and its values are drawn; with none, a hint; with an assign OFF, why the pad
+  does nothing. Under it Pad Hold (the editor's, kept in the session; the XT keeps it in the patch, which the plugin
+  doesn't read), then the Time Trip switch and Beat Keep of the OSC it follows (1 or 2), a row each. The pad was at
+  first a slider on the Time Trip circle parameter drawn as a pad; that parameter is a host's to automate now.
 - **An OSC panel** (one panel, made for each OSC): On, its name, Type (PCM or ANALOG), the encoding (SOLO, BACKING, ENSEMBLE,
-  LITE) or the analog waveform, the wave's name, Load…; a display (286 × 72): the wave with its loop and the Time Trip
-  position, or the analog waveform; four big knobs (44): Pitch, Time, Formant, Level for PCM, Pitch, Pulse Width, Impact,
+  LITE) or the analog waveform, the wave's name, Load…; a display (286 × 72) of what it plays (v200): on PCM the loaded
+  wave, each of 512 columns its lowest and highest sample (the processor's view, made once as the wave goes to its
+  encode, `PluginWaveView.cpp`), the loop's span shaded in `mod` when Loop is on; on ANALOG three cycles of the plugin's
+  own analog oscillator (`XtAnalogOsc` at A1, its start settled) at the panel's settings, made again when any of them
+  moves, so each waveform, its Pulse Width, Impact, Super-Saw's spread and the rest show as they play (on OSC 2 X-MOD
+  has no depth and draws as SAW, as it plays) (`UiWaveDisplay`); four big knobs (44): Pitch, Time, Formant, Level for PCM, Pitch, Pulse Width, Impact,
   Level for ANALOG; six small (30): Coarse, Fine, Depth, Energy, Velocity Sens, Pitch KF for PCM, Coarse, Fine, PW KF, PW
   LFO, PW Env, Velocity Sens for ANALOG; a line of Vari, Playback Mode and Tempo Sync.
 - **A COSM panel** (one panel, made for each COSM): On, its name, Type, its filter type where it has one; a display (96 × 62)
@@ -149,7 +161,7 @@ runs from the centre to 6 inside the track. Its name is under it, its value unde
 | The tabbed editor (v144–v195) | In D |
 |---|---|
 | Header, source bar | the header (Load Patch is the patch box's Browse…, the patch's name and what it misses are the patch box's); Load WAV is each OSC panel's Load…; OSC 1/2 goes, both OSCs show; On and Type are the OSC panel's |
-| Perform column | each OSC panel's big knobs and its line (Robot under the pad, for the OSC the pad follows) |
+| Perform column | each OSC panel's big knobs and its line; Robot in a PCM OSC's DETAILS (under the pad until v202) |
 | Oscillator tab | the OSC panels and their DETAILS |
 | Envelopes, LFOs tabs | SELECTED for each block, and ENVELOPES and LFOs |
 | COSM tab | the COSM panels and their DETAILS; LFO 3 and 4 in SELECTED; MOD is a block of its own; Structure is on the path |
@@ -207,10 +219,20 @@ Every control is made from its parameter's ID, so a new parameter needs a row in
   panels showing their faces; at the smallest, default and largest sizes the drawing filling the window, scaled whole; on
   each page, and on SYNTH with each block selected, no control outside its parent, over another, without a size or with
   its text cut short; every control moved, each instance's (each OSC, COSM, MSM track, Matrix Control and zone) moving its
-  own parameters alone, and every parameter with a control but the 16 below; each page's name, block and effect pressed;
+  own parameters alone, and every parameter with a control but the 17 below; each page's name, block and effect pressed;
   the header's build, Browse…, ROM… and each PCM OSC's Load…, and a patch's note; a curve's points dragged, a route on its
   block, the list's and the overviews' presses; the FX page on every effect type, its list's text whole with room for 15
-  rows, its left cards level with its list, and its page buttons both ways. With a folder it draws each page, each block and each lower view into it; with
+  rows, its left cards level with its list, and its page buttons both ways; an OSC's display (v200, `EditorWaveTest.cpp`):
+  each analog waveform drawn as the oscillator plays it at the settings as they stand, no two alike but X-MOD and SAW on
+  OSC 2, a square's picture moved by its Pulse Width, and a loaded wave's view holding the file's own lowest and highest
+  samples, replaced by a newer wave's; the footer's keyboard (v201, `EditorKeysTest.cpp`): a white key's and a black
+  key's click as their notes, a press lower on a key louder, a drag across keys letting each go, a press sounding
+  through processBlock, and the fold: the window shorter by the footer, the layout holding, an editor on the folded
+  session opening folded, and back; the Time Trip pad (v202, `EditorPadTest.cpp`): a click at the centre, the top right
+  and the bottom left and a drag as their controllers (X then Y, up being up, 0 and 0 to lift), Pad Hold keeping the
+  finger and the session keeping Pad Hold, Trip X on another controller and OFF, and the column's switches each on the
+  followed OSC's own parameters; a switch's name measured as D draws it (v202: the check had measured JUCE's tick box,
+  and passed "Beat K…"). With a folder it draws each page, each block and each lower view into it; with
   `list` it prints the parameters no control reaches.
 - `mutate_panel.py --editor`: the editor's planted errors, D's (`panel_muts.txt`'s `editor-d-` lines) and the FX page's
   (`editor-fx-`, `editor-row-gap`), each built into `VSynthEmuEditorTest`, to show the check catches it.
@@ -221,14 +243,21 @@ Every control is made from its parameter's ID, so a new parameter needs a row in
 
 ### Not shown anywhere
 
-16 of the 761 parameters have no control; only a host reaches them:
+17 of the 761 parameters have no control; only a host reaches them:
 
 - Scale Tune (13).
 - The engine's Pitch, Time and Formant (3): unread since v191, kept for old sessions.
+- The Time Trip circle (`timeTrip`, 1): a finger going round the rim, for a host's automation; the pad sends the XT's
+  controllers instead (v202, the user's choice).
 
 ### Still to do
 
-Each with the user's yes where it needs one: Inter and JetBrains Mono built in (a folder for font files); the wave drawn
-from the loaded wave; the pad sending its controllers; the keyboard playing; dragging a source onto a knob to make a
-Matrix route; the VC-2 mode's pages; the page and the block kept when the editor's window closes (it opens on SYNTH, with
-COSM 1 selected).
+The user's testing notes (2026-11-14): the OSC display drawing the loaded wave and the chosen analog waveform (done in
+v200); the Time Trip column made the XT's pad (the user's choice: a press freezes the wave, circling scrubs it, release
+lets go, sending Time Trip Assign X and Y into the synth as the XT's pad and the iOS app do; Hold; each OSC's Time Trip
+switch and Beat Keep; the circle parameter kept for host automation alone; done in v202); the footer's keyboard
+playable, and folding away with the window shorter by its height (the user's choice; done in v201).
+
+Each with the user's yes where it needs one: Inter and JetBrains Mono built in (a folder for font files); the Time Trip
+position on the wave; dragging a source onto a knob to make a Matrix route; the VC-2 mode's pages; the page and the block
+kept when the editor's window closes (it opens on SYNTH, with COSM 1 selected).

@@ -49,7 +49,7 @@ void ownParameters(LayoutCheck& l, VSynthEmuProcessor& p, TestChecks& check, con
     c.panel->refresh();
 }
 
-// The pad's column following each OSC in turn: that OSC's Time Trip switch and Robot each reached by its controls
+// The pad's column following each OSC in turn: that OSC's Time Trip switch and Beat Keep each reached by its controls
 void tripColumn(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
     const auto columns = LayoutCheck::allOf<TripColumn>(ed.drawing());
     check(columns.size() == 1, "the rack hasn't one Time Trip column");
@@ -58,8 +58,8 @@ void tripColumn(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
     for (int osc = 0; osc < TripColumn::kOscs; ++osc) {
         column.follow(osc);
         const juce::String where = "the pad following OSC " + juce::String(osc + 1);
-        movesOwn(l, column, where, {}, check);
-        for (const juce::String& id : { Params::oscId(osc, Params::kTripSw), Params::oscId(osc, Params::kRobot) })
+        movesOwn(l, column, where, ownerOf({ Blocks::Kind::osc, osc }), check);
+        for (const juce::String& id : { Params::oscId(osc, Params::kTripSw), Params::oscId(osc, Params::kBeatKeep) })
             check(l.reached.count(id) == 1, (where + ": nothing moves " + id).toStdString());
     }
     column.follow(0);

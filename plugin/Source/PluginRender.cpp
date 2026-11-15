@@ -24,13 +24,7 @@ void VSynthEmuProcessor::playMidi(const juce::AudioBuffer<float>& buffer, const 
             renderSpan(buffer, inputs, L, R, pos, at);
             pos = at;
         }
-        const auto msg = meta.getMessage();
-        if (msg.isNoteOn()) synth_.noteOn(msg.getNoteNumber(), msg.getFloatVelocity());
-        else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber(), msg.getFloatVelocity());
-        else if (msg.isPitchWheel()) synth_.pitchBend(msg.getPitchWheelValue());
-        else if (msg.isChannelPressure()) synth_.channelPressure(msg.getChannelPressureValue());
-        else if (msg.isAftertouch()) synth_.polyPressure(msg.getNoteNumber(), msg.getAfterTouchValue());
-        else if (msg.isController()) synth_.controller(msg.getControllerNumber(), msg.getControllerValue());   // the mode messages too
+        toSynth(meta.getMessage());   // the one chain the editor's messages take too (PluginProcess.cpp, v201)
     }
     if (pos < numSamples) renderSpan(buffer, inputs, L, R, pos, numSamples);
 }
