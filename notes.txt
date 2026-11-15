@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's unvoiced detector v208 (2026-11-15, on vc2-mode): the VC-2 mode's step 3, the first port's first half (the
+  user's "Yes, next item"; the output stage v209; HARDWARE_FIRMWARE.md, "The VC-2's unvoiced detector"). Vc2Unvoiced:
+  rom.4's input stage 0x893ed040, which both vocoder engines run on the mic's 32-sample blocks, with its part of the reset,
+  the settings' copy and the voiced query, bit for bit through XtFloat, its state rom.4's region word for word
+  (Vc2UnvoicedWords); its coefficients read from rom.4 by loadVc2 at the start (RomTest's vc2TablesIn says so). Nothing
+  in the sound uses it yet. Check: xt_vc2in (Vc2UnvoicedCheck.cpp, in fcheck), the whole region, the flags' ring and the
+  voiced query after every block, 0 different; the host flushes denormals (xtf::flushDenormals, XtFloat.h); every eighth
+  case fades into silence long enough for the filters to give 0. mutate_vc2.py --in: vc2in_muts.txt's 35 plants
+  (PORT=vc2in), each caught; panel_muts.txt's rom4-no-unvoiced. VC2_VOCAL_DESIGNER.md's "five blocks" and "a gain stored
+  in 0x899d99c4" withdrawn in place. Made room first: mutate.sh's harnessParts and fxParts moved as they stood into
+  mutate_parts.sh; its tone parts gained Vc2Unvoiced and XtSinc (v207's, missing from the list). verify.sh passes
+  (fcheck as its baseline, which gained only xt_vc2in's lines; A/B 4/4 identical; rom 18/18; auval); rom4-no-tables and
+  rom4-no-unvoiced caught; a tone plant (tva-truncate) builds and is caught again.
+
 The input's audio v207 (2026-11-15, on vc2-mode): the plugin's side, the second of two, the last of the VC-2 mode's
   step 2, item 4 (the user's "Yes, next item"; HARDWARE_FIRMWARE.md, "The input's audio"). A stereo input bus beside the
   output (off, mono or stereo taken; the Standalone's mic permission). XtHostInput brings the host's rate to 44.1 kHz on

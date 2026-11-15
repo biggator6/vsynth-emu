@@ -224,7 +224,12 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
 
 Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error list and an `fcheck.sh` section.
 
-1. The input stage (unvoiced detector) and the output stage (consonants), both engines'.
+1. The input stage (unvoiced detector) and the output stage (consonants), both engines'. Split in two (2026-11-15):
+   - v208, the input stage (`0x893ed040`, its reset's part, the settings' copy and the voiced query): `Vc2Unvoiced`,
+     xt_vc2in at 0 different, 35 plants caught, its coefficients read by `loadVc2` at the start. **Done 2026-11-15**
+     (HARDWARE_FIRMWARE.md, "The VC-2's unvoiced detector").
+   - v209, the output stage (`0x893ed510` mono, `0x893ed690` stereo): the consonants from the delayed mic, gated by
+     v208's flag.
 2. LEGACY (10 bands): with 3.5, the first vocoder that sounds.
 3. HIRESO (32 bands, multirate): the formant warp's model is its start (`vc2warplaw.cpp`).
 4. The vocoder object and its settings path, with the hold on CC 64.

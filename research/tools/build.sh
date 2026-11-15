@@ -26,10 +26,12 @@ SARP+=($( [ -f XtSynthBlock.cpp ] && echo XtSynthStart.cpp XtSynthOscStart.cpp X
 SARP+=($( [ -f XtExtIn.cpp ] && echo XtExtIn.cpp ))   # the EXT IN OSC's player and input (v203)
 SARP+=($( [ -f XtSynthOut.cpp ] && echo XtSynthOut.cpp ))   # its output, busOut and render (v204)
 SARP+=($( [ -f XtSinc.cpp ] && echo XtSinc.cpp ))   # render's windowed sinc, its own file (v207)
-# rom.4's parameters, which XtSynthRom.cpp loads (v199), and what they read with: the values' text, the descriptors' form
-V4=($( [ -f Vc2Params.cpp ] && echo Vc2Params.cpp XtFxValueText.cpp ))
+# rom.4's parameters, which XtSynthRom.cpp loads (v199), and what they read with: the values' text, the descriptors' form;
+# and the unvoiced detector's coefficients, which it loads too (v208)
+V4=($( [ -f Vc2Params.cpp ] && echo Vc2Params.cpp XtFxValueText.cpp )
+    $( [ -f Vc2Unvoiced.cpp ] && echo Vc2Unvoiced.cpp ))
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
-rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,classifier_test,rd}
+rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,xt_vc2in,classifier_test,rd}
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp "${SH4[@]}" -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp "${SH4[@]}" -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp "${SH4[@]}" -o "$O/xt_lfo" &
@@ -52,6 +54,8 @@ cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.
 # rom.4's parameter tables against its own routines (v199), on rom.4
 [ -f Vc2ParamsCheck.cpp ] && cc -DXT_VC2PARAMS_MAIN Vc2ParamsCheck.cpp "${V4[@]}" XtPatchStore.cpp "${FW[@]}" \
    XtMultiBandPlayer.cpp XtSoloVoice.cpp "${SH4[@]}" -o "$O/xt_vc2params" &
+# rom.4's unvoiced detector against its own (v208), on rom.4
+[ -f Vc2UnvoicedCheck.cpp ] && cc -DXT_VC2IN_MAIN Vc2UnvoicedCheck.cpp Vc2Unvoiced.cpp "${SH4[@]}" -o "$O/xt_vc2in" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &
 # xt_fx: the chip and its check, the check's parts in XtFxCheck*.cpp from v204

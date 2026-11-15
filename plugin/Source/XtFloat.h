@@ -10,8 +10,19 @@
 // zero, as the SH-4 does.
 #include "XtSwitches.h"
 #include <cmath>
+#include <cstdint>
 
 namespace xtf {
+
+// The host's denormals flushed, as the SH-4 does (FPSCR.DN = 1) and the plugin's audio thread does: a harness's first
+// call, so its port and the interpreter both flush (v208; xt_tone, xt_analog and xt_fw still have the block inline)
+inline void flushDenormals() {
+#if defined(__aarch64__)
+    uint64_t fpcr;
+    __asm__ volatile("mrs %0, fpcr" : "=r"(fpcr));
+    __asm__ volatile("msr fpcr, %0" : : "r"(fpcr | (1ull << 24)));   // FPCR.FZ
+#endif
+}
 
 inline bool nearest() { return xtSwitchNearest(); }
 inline float rnd(double x) {

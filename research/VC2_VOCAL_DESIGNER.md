@@ -1066,7 +1066,9 @@ the settings.
 - three biquads, two from `0x895613a0` (10 floats) and one from `0x895613c8` (5 floats), states in `0x899d9988…`. By their
   responses at 44.1 kHz the first two make a highpass near 150–200 Hz (−20 dB and more below 60 Hz), and the third a notch near
   1 kHz with +2.3 dB above it;
-- the block's peak after the highpass, and a running maximum over the last five blocks; 1/256 of it (at least 0.002) is a
+- the block's peak after the highpass, and a running maximum over the last eight blocks (this one and the seven before;
+  "five", as this line said before v208, is withdrawn: the code takes the maximum over `0x899d99a4…0x899d99c0`, eight words,
+  and `Vc2Unvoiced` equals rom.4 with eight in xt_vc2in, a plant of seven caught); 1/256 of it (at least 0.002) is a
   hysteresis;
 - a count of the third filter's output crossing zero, Schmitt-trigger style (it must swing past ± that hysteresis): a
   zero-crossing rate. The last four blocks' counts plus 0.75 of the previous total is compared with the threshold (`0x899d9984`:
@@ -1075,9 +1077,13 @@ the settings.
 - that 0/1 goes into a 20-block ring (`0x8a0f87dc`) and is read five blocks later, so the decision lags 160 samples. It is
   smoothed per sample into 32 floats (`0x899d99dc`, one a sample of the block), rising at 0.002 and falling at 0.001 a sample;
 - beside it, the peak, a peak that decays 1% a block (`0x899d9a68`), and a level with its own attack and release
-  (`0x899d9a6c`) set a gain stored in `0x899d99c4`.
+  (`0x899d9a6c`) set a gain; "a gain stored in `0x899d99c4`", as this line said before v208, is withdrawn: `0x899d99c4` is
+  the block's count scaled by that gain (by the gain × 0.1 over the peak, or by 1.22), the first of the four the vote sums.
+  The whole law, word for word: HARDWARE_FIRMWARE.md, "The VC-2's unvoiced detector" (v208).
 
-Its state is reset by `0x893ecf60` (from the glue's init, `0x893b1688`): Unvoice Detect's store at 50, the rings cleared.
+Its state is reset by `0x893ecf60` (from the glue's init, `0x893b1688`): Unvoice Detect's store at 50, the rings cleared. It
+leaves the second biquad's states and the smoothed decision as they were (v208: a port that cleared them differed from rom.4
+at the first reset after a sound).
 
 **The output stage, `0x893ed510(output, fr4, fr5)` (mono) and `0x893ed690` (stereo): the mic's consonants.** It keeps the mic
 input in a 640-sample ring (`0x8a0f73dc`) and reads it 448 samples back, takes the unvoiced flag five blocks back × fr5 (slot 7's

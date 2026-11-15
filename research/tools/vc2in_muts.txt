@@ -1,0 +1,43 @@
+# Planted errors in Vc2Unvoiced.cpp (the VC-2's unvoiced detector, v208), for mutate_vc2.py --in: each must make
+# xt_vc2in, on rom.4, say something differs.  name|old|new[|port[|seed]]
+# The tables, and the constants rom.4 stores a unit off the nearest float
+table-notch|kNotch = 0x895613c8;|kNotch = 0x895613cc;|vc2in
+decay-nearest|0x3c23d709u|0x3c23d70au|vc2in
+release-nearest|0x3951b716u|0x3951b717u|vc2in
+fall-nearest|0x3a83126eu|0x3a83126fu|vc2in
+reset-level-nearest|0x3e999999u|0x3e99999au|vc2in
+# The filters: a biquad's coefficients and the order of its sums
+second-biquad|biquad(hp + 5, s.bq2|biquad(hp + 4, s.bq2|vc2in
+s1-order|s[0] = add(mul(y, c[3]), add(mul(x, c[1]), s[1]));|s[0] = add(add(mul(y, c[3]), mul(x, c[1])), s[1]);|vc2in
+s2-a1|s[1] = add(mul(x, c[2]), mul(y, c[4]));|s[1] = add(mul(x, c[2]), mul(y, c[3]));|vc2in
+no-notch|const float y3 = biquad(g_coefficients.notch, s.bq3, y2);|const float y3 = y2;|vc2in
+# The block's peak and the Schmitt trigger
+peak-signed|const float magnitude = 0.0f > y2 ? -y2 : y2;|const float magnitude = y2;|vc2in
+peak-kept|s.peaks[0] = 0.0f;|(void)0;|vc2in
+schmitt-sense|y3 > s.schmitt ? -s.hysteresis : s.hysteresis|y3 > s.schmitt ? s.hysteresis : -s.hysteresis|vc2in
+count-two|s.counts[0] = xtf::add(s.counts[0], 1.0f)|s.counts[0] = xtf::add(s.counts[0], 2.0f)|vc2in
+# The block's end: the running maximum, the hysteresis, the level and the count's scale
+peaks-seven|for (int k = Vc2UnvoicedWords::kPeaks - 1; k > 0; --k) m =|for (int k = Vc2UnvoicedWords::kPeaks - 2; k > 0; --k) m =|vc2in
+max-this-block|s.max = m;|s.max = s.peaks[0];|vc2in
+peak-share|0x3b800000u|0x3b000000u|vc2in
+hysteresis-no-least|s.hysteresis = kHysteresisLeast > share ? kHysteresisLeast : share;|s.hysteresis = share;|vc2in
+decay-rate|d = sub(d, mul(sub(d, m), kDecay));|d = sub(d, mul(sub(d, m), kRelease));|vc2in
+no-release|m > s.level ? kDecay : kRelease|m > s.level ? kDecay : kDecay|vc2in
+quiet-step|kQuiet > s.level ? kQuietGain|kHalf > s.level ? kQuietGain|vc2in
+gain-not-doubled|mul(s.level, 2.0f)|mul(s.level, 1.0f)|vc2in
+count-branch|d > div(share, kCountScale)|d < div(share, kCountScale)|vc2in
+count-over-decaying|mul(s.counts[0], div(share, m))|mul(s.counts[0], div(share, d))|vc2in
+# The vote, the ring and the smoothing
+counts-shift|s.counts[k] = s.counts[k - 1];|s.counts[k] = s.counts[0];|vc2in
+carry|kCarry = 0.75f;|kCarry = 0.5f;|vc2in
+held|kHeld = 29.0f;|kHeld = 30.0f;|vc2in
+detect-off-one|flt(s.detect)|flt(s.detect + 1)|vc2in
+late-four|kLate = 5;|kLate = 4;|vc2in
+no-rise|flag > s.smooth[kBlock - 1] ? kHysteresisLeast : kFall|flag > s.smooth[kBlock - 1] ? kFall : kFall|vc2in
+smooth-from-first|float at = s.smooth[kBlock - 1];|float at = s.smooth[0];|vc2in
+# The reset, the settings and the voiced query
+reset-keeps-bq3|s.bq3[0] = s.bq3[1] = 0.0f;|s.bq3[0] = 0.0f;|vc2in
+reset-clears-bq2|s.bq1[0] = s.bq1[1] = 0.0f;|s.bq1[0] = s.bq1[1] = s.bq2[0] = s.bq2[1] = 0.0f;|vc2in
+spread-dropped|s.spread = spread;|s.spread = 0;|vc2in
+voiced-four-back|one - 4 < 0 ? one - 4 + kRing : one - 4|one - 3 < 0 ? one - 3 + kRing : one - 3|vc2in
+voiced-last-only|(flags[(size_t)one] \| flags[(size_t)five]) == 0|flags[(size_t)one] == 0 && five >= 0|vc2in

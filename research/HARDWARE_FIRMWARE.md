@@ -1546,6 +1546,66 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's unvoiced detector (2026-11-15, v208) {#vc2-unvoiced}
+
+The VC-2 mode's step 3, its first port's first half (VC2_MODE_PLAN.md; the output stage, `0x893ed510` and `0x893ed690`,
+is v209's): rom.4's input stage `0x893ed040(input)`, which both vocoder engines run on each 32-sample block of the mic
+before their own work, ported bit for bit as `Vc2Unvoiced` (`Vc2Unvoiced.h`, `.cpp`), with its part of the reset
+`0x893ecf60`, the settings' copy `0x893ed030` and the voiced query `0x893ed3e0`. Its state is rom.4's region
+`0x899d9978…0x899d9a80` (0x108 bytes), kept word for word as `Vc2UnvoicedWords` (the output stage's words in it named as
+theirs), and a ring of 20 ints at `0x8a0f87dc`. Its coefficients, two tables (`0x895613a0`, 10 floats; `0x895613c8`, 5),
+are read from the user's rom.4 by `loadVc2` at the plugin's start (`XtSynthRom.cpp`), never after. Nothing in the sound
+uses it yet: the VC-2's engines are the step's later ports.
+
+**A block.** Each sample goes through two transposed biquads (the highpass), then a third (the notch), each
+`{b0, b1, b2, a1, a2}` with the a's stored negated, in rom.4's order: y = b0·x + s1; s1 = a1·y + (b1·x + s2);
+s2 = b2·x + a2·y, each product rounded before its sum. The block's peak is of |the highpass's output|; a Schmitt trigger
+on the notch's output at ± the hysteresis counts a crossing each time it flips. At the block's end:
+- M, the largest of this block's peak and the seven before (eight words, shifted down a block); the next block's
+  hysteresis is M/256, at least 0.002;
+- a decaying peak D = max(M, D) less 1% of (D − M); a level L moving toward M by 0.01 a block rising, 0.0002 falling; a
+  gain g of 0.25 below L = 0.125, 2L below 0.5, else 1;
+- the block's count scaled: by g·0.1/M when D > g·0.1/1.22, else by 1.22;
+- the vote: this block's scaled count and the three before, plus 0.75 of the last total, against the threshold, which is
+  Unvoice Detect + 24 from the settings, and 29 once a block is called unvoiced, so the call holds. The 0/1 goes into the
+  ring at its index, which moves on; the entry at the index less 5 (the flag of four blocks before this one) is smoothed
+  into 32 floats, a sample at a time, rising 0.002 and falling 0.001 a sample;
+- voiced (`0x893ed3e0`): neither this block's flag nor the one four before it says unvoiced.
+
+rom.4 stores some of its constants a unit off the nearest float (0.01, 0.0002, 0.001 and the reset's 0.3), and the port
+keeps its bit patterns.
+
+**The reset** sets Unvoice Detect's store at 50, Spread at 0, Sound Level at 1, the threshold at 50, the level at 0.3, the
+hysteresis and the trigger at 0.002; the first and third biquads' states, the peaks, the counts, the total, M and D at 0;
+the ring and its index cleared. It leaves the second biquad's states and the smoothed decision as they were, so a reset
+after a sound doesn't start from silence: the check's second case first differed there until the port did the same. The
+check gives new settings after each reset, so the reset's own Detect, Spread and Sound Level are read once by hand: rom.4's
+reset and the port's on a region filled beforehand, all 66 words the same.
+
+**Where the notes were wrong**, withdrawn in place in VC2_VOCAL_DESIGNER.md, "The input stage": the running maximum is over
+eight blocks, not five; and `0x899d99c4` is the scaled count, not the level's gain.
+
+**A count over a peak of 0.** With M at 0 and D still over g·0.1/1.22, the count is multiplied by g·0.1/0: NaN for a count
+of 0, which a silent output gives. The port does there what the SH-4 does, but no input found reaches it: after noise at
+10^-5 to full scale, the filters' output reaches exactly 0 only after 758 to 1,095 blocks of silence (with denormals
+flushed, as the SH-4 does; unflushed, the states sink into denormals and it never does), by which time D, falling 1% a
+block, is far below g·0.1/1.22, at least 0.02.
+
+**The check**, `xt_vc2in <rom.4> [cases] [seed]` (`Vc2UnvoicedCheck.cpp`, in fcheck, under a second): rom.4's reset,
+settings and input stage in Sh4Interp against the port, after every block the whole region word for word, the ring and the
+voiced query. Its inputs: silence, noise from 10^-5 to full scale, sines from 50 Hz to 15 kHz, both together, a loud block
+cut to silence, silences of 150 to 350 blocks, new settings now and then, and every eighth case noise faded into 1,600
+blocks of silence. One port object goes through the cases, as rom.4's region does. The host flushes denormals
+(`xtf::flushDenormals`, `XtFloat.h`, the block xt_tone, xt_analog and xt_fw still have inline). 40 cases, 22,000 blocks, 0
+different at seeds 2024 and 7 (2,298 and 1,600 blocks called unvoiced, 3,023 and 3,620 with a peak of 0). Checked:
+`mutate_vc2.py --in`'s 35 plants in `Vc2Unvoiced.cpp` (`vc2in_muts.txt`, `PORT=vc2in`), each caught. The first run missed
+`peak-kept` (the peak's word not cleared at a block's start), which only a block whose output is exactly 0 can show, and
+the fading cases came in for it.
+
+`mutate.sh` would have reached 302 lines, so it was split first: its kept-objects builders, `harnessParts` and `fxParts`,
+moved as they stood into `mutate_parts.sh`, which it sources, and rom.4's two ports share one branch. Its tone parts gained
+`Vc2Unvoiced`, and `XtSinc`, whose `make` `XtSynth.cpp` calls from v207, which the list lacked.
+
 ### The input's audio (2026-11-15, v207) {#input-audio}
 
 The last of the item's versions (VC2_MODE_PLAN.md, step 2, item 4): the outside input from the plugin's input bus to

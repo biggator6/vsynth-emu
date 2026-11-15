@@ -19,7 +19,8 @@
 # v189), under xt_arp; [cases] its random cases, after the presets.
 # PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
-# PORT=vc2params: Vc2Params.cpp (rom.4's parameter tables, v199) under xt_vc2params, on rom.4 ($ROM4).
+# PORT=vc2params: Vc2Params.cpp (rom.4's parameter tables, v199) under xt_vc2params, PORT=vc2in: Vc2Unvoiced.cpp (its
+# unvoiced detector, v208) under xt_vc2in, on rom.4 ($ROM4).
 # PORT=toneknobs, toneenvknobs, toneupdate, tonezones, tonenotes: XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp, XtSynthUpdate.cpp,
 # XtSynthZones.cpp, XtSynthNotes.cpp under xt_tone (v193: XtSynth's parts by job); tonefwcpp, tonefwh, tonecases,
 # tonecarry: xt_tone's own XtToneFirmware.cpp, XtToneFirmware.h, XtToneCases.cpp, XtToneCarry.cpp; tonepatchids its
@@ -31,7 +32,7 @@ source "$(dirname "$0")/env.sh"
 [ $# -ge 3 ] || { echo "usage: mutate.sh name old new [cases] [pattern]"; exit 2; }
 [ -f "$ROM" ] || { echo "mutate: no ROM at $ROM"; exit 2; }   # a run that can't start must never read as a result; no "== name" follows
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
-IMAGE="$ROM"   # what the planted binary runs on: rom.2, but rom.4 for PORT=vc2params (v199)
+IMAGE="$ROM"   # what the planted binary runs on: rom.2, but rom.4 for PORT=vc2params (v199) and vc2in (v208)
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
 source "$(dirname "$0")/objects.sh"   # keptObject: the fx ports' objects, by their source and every header
 # A tone port's file, planted under xt_tone; nothing for any other port
@@ -79,46 +80,7 @@ tonefile() {
         toneout) echo XtSynthOut.cpp ;;   # its output, busOut and render (v204)
     esac
 }
-# A port whose check is a harness of its own with the patches' reads (xt_arp, xt_msm): its files and those reads, all but
-# the planted one built once into $M/<objdir> with the research switches, a changed header building them again
-harnessParts() {   # harnessParts <define> <objdir> <the port's own files, without .cpp ...>
-    D=$1
-    OBJ="$M/$2"
-    shift 2
-    EXTRA=("${HARNESS_SWITCHES[@]}")
-    mkdir -p "$OBJ"
-    L=()
-    local f H
-    H=$(ls -t "$S"/*.h | head -1)
-    for f in "$@" XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware XtFwMachine XtMultiBandPlayer XtSoloVoice \
-             XtSoloEncoder Sh4Interp Sh4Setup; do
-        [ "$f.cpp" = "$F" ] && continue
-        L+=("$OBJ/$f.o")
-        [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] && continue
-        "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -D"$D" -DXT_HARNESS_SWITCHES -c "$S/$f.cpp" -o "$OBJ/$f.$$.o" \
-            && mv "$OBJ/$f.$$.o" "$OBJ/$f.o"
-    done
-}
-# xt_fx's parts but the planted one: the ports named and the interpreter, each a kept object in $M/fx_obj; then its check,
-# its own files from v204 (XtFxCheck*.cpp, moved out of XtFxChip.cpp), with the research switches.  The fx ports' plants
-# are in the ports, never in the check.
-fxParts() {   # fxParts <the ports kept, without .cpp ...>
-    D=XT_FX_MAIN
-    EXTRA=(-I"$REPO/research/third_party/gearmulator_esp" "${HARNESS_SWITCHES[@]}")
-    OBJ="$M/fx_obj"
-    mkdir -p "$OBJ"
-    L=("$S/Sh4Setup.cpp")
-    local f src o
-    for f in Sh4Interp "$@"; do
-        keptObject "$OBJ/$f.o" "$S/$f.cpp"
-        L+=("$OBJ/$f.o")
-    done
-    for src in "$S"/XtFxCheck*.cpp; do
-        o="$OBJ/$(basename "$src" .cpp).o"
-        keptObject "$o" "$src" -DXT_FX_MAIN -DXT_HARNESS_SWITCHES -I"$REPO/research/third_party/gearmulator_esp" -I"$S"
-        L+=("$o")
-    done
-}
+source "$(dirname "$0")/mutate_parts.sh"   # harnessParts, fxParts: a harness's kept objects (moved as they stood, v208)
 TF=$(tonefile "${PORT:-cosm}")
 if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
     F=$TF
@@ -131,8 +93,8 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
            XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp Sh4Setup XtFiles XtWaveFile XtDiskImage XtPatchStore
            XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch
            XtSynthZones XtSynthNotes XtSynthUpdate XtSynthKnobs XtSynthEnvKnobs XtSynthMsm XtMsm XtMsmTrack XtMsmPatch
-           XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds Vc2Params XtFxValueText
-           XtSynthStart XtSynthOscStart XtSynthTrip XtSynthBlock XtSynthTva XtSynthClock XtExtIn XtSynthOut)
+           XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds Vc2Params XtFxValueText Vc2Unvoiced
+           XtSynthStart XtSynthOscStart XtSynthTrip XtSynthBlock XtSynthTva XtSynthClock XtExtIn XtSynthOut XtSinc)
     TONE=(-DXT_TONE_MAIN -DXT_TONE_CHECK -DXT_HARNESS_SWITCHES)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue
@@ -180,12 +142,15 @@ elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     esac
     ARGS=("${SEED:-2024}")
     harnessParts XT_MSM_MAIN msm_obj XtMsm XtMsmTrack XtMsmPatch XtMsmCheck XtMsmCases
-elif [ "$PORT" = vc2params ]; then
-    # rom.4's parameter tables against xt_vc2params, on rom.4 (v199): Vc2Params.cpp; [cases] its values an ID, SEED its seed
-    F=Vc2Params.cpp
+elif [[ "$PORT" =~ ^(vc2params|vc2in)$ ]]; then
+    # rom.4's ports, on rom.4: its parameter tables, Vc2Params.cpp, against xt_vc2params (v199), [cases] its values an ID;
+    # the unvoiced detector, Vc2Unvoiced.cpp, against xt_vc2in (v208), [cases] its cases; SEED the seed of either
     IMAGE="$ROM4"
     ARGS=("${SEED:-2024}")
-    harnessParts XT_VC2PARAMS_MAIN vc2_obj Vc2Params Vc2ParamsCheck XtFxValueText
+    case "$PORT" in
+        vc2in) F=Vc2Unvoiced.cpp; harnessParts XT_VC2IN_MAIN vc2in_obj Vc2Unvoiced Vc2UnvoicedCheck ;;
+        *) F=Vc2Params.cpp; harnessParts XT_VC2PARAMS_MAIN vc2_obj Vc2Params Vc2ParamsCheck XtFxValueText ;;
+    esac
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
     L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197

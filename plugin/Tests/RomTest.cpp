@@ -11,6 +11,7 @@
 #include "../Source/PluginAppFolder.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/Vc2Params.h"
+#include "../Source/Vc2Unvoiced.h"
 #include "../Source/XtFirmware.h"
 #include <cstdint>
 #include <cstdio>
@@ -47,11 +48,12 @@ juce::File otherImage(const juce::File& rom, const juce::File& work) {
     return other.replaceWithData(bytes.getData(), bytes.getSize()) ? other : juce::File();
 }
 
-// rom.4's parameter tables, which its loader reads at the start (v199): each bank's last ID, the last name and a value's
-// text (Vc2Params.h); what they say is xt_vc2params' to check
+// rom.4's tables, which its loader reads at the start: the parameters' (v199), each bank's last ID, the last name and a
+// value's text (Vc2Params.h), and the unvoiced detector's coefficients (v208, Vc2Unvoiced.h); what they say is
+// xt_vc2params' and xt_vc2in's to check
 bool vc2TablesIn() {
     return vc2ParamDesc(kVc2FirstTyped - 1) && vc2TypedDesc(kVc2Ids - 1) && !vc2ParamName(kVc2Ids - 1).empty()
-           && !vc2ValueText(0, 0).empty();
+           && !vc2ValueText(0, 0).empty() && vc2UnvoicedLoaded();
 }
 
 // An instance given `file` by `choose` should refuse it, its status saying `says`
@@ -71,7 +73,8 @@ void twoImages(TestChecks& check, const juce::File& rom, const juce::File& work,
     check(vc2.existsAsFile() && neither.replaceWithText("not a firmware image"),
           "rom.4 should be beside rom.2, and the test's file written: " + vc2.getFullPathName().toStdString());
     check(VSynthEmuProcessor().hasVc2Rom(), "rom.4 should be found beside the rom.2 an instance opened");
-    check(vc2TablesIn(), "rom.4's parameter tables should be in once rom.4 is (v199)");
+    check(vc2TablesIn(),
+          "rom.4's tables (its parameters', v199; the unvoiced detector's, v208) should be in once rom.4 is");
     refuses(check, &VSynthEmuProcessor::setRomFile, vc2, "the VC-2's image, rom.4",
             "rom.4 should be refused as rom.2, saying whose it is");
     refuses(check, &VSynthEmuProcessor::setVc2RomFile, rom, "the V-Synth's image, rom.2",
