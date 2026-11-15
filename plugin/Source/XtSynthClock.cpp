@@ -1,5 +1,5 @@
 // XtSynth's tempo clock: the clock object's period and readings, the host's transport as an outside clock, and a clock's
-// tick on the tones (moved from XtSynth.cpp as they stood, v200).
+// tick on the tones (moved from XtSynth.cpp as they stood, v203).
 #include "XtSynth.h"
 #include "XtSynthConstants.h"
 #include "XtFloat.h"

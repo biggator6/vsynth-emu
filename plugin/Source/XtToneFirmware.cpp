@@ -9,7 +9,7 @@ constexpr uint32_t kInBlock = kRam + 0x8000;  // that block here: 32 frames of 3
 }
 
 // Once a block, before the tones render: the bus cleared, and this block's input (xtExtInTestBlock, XtSynth's too) at
-// words 4 and 5 of each frame, where the pointer says, as the effect chip's DMA leaves it (v200)
+// words 4 and 5 of each frame, where the pointer says, as the effect chip's DMA leaves it (v203)
 void Firmware::clearBus() {
     c.write(kBuf, std::vector<uint8_t>(0x400, 0).data(), 0x400);
     int32_t lr[64];

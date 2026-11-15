@@ -10,7 +10,7 @@
 # another file than XtSynth.cpp (toneosc, XtOsc.cpp), solo for one only `solocmp` reaches:
 # very short records, or a timer that overflows.  seed is for one the default seed's cases
 # don't happen to reach, so fcheck's run doesn't guard it.  A port wire… (v193) is the Multi Step Modulator's wiring,
-# run through xt_tone's MSM mode (`xt_tone rom msm`), [cases] its cases.  mode extin (v200): through xt_tone's EXT IN
+# run through xt_tone's MSM mode (`xt_tone rom msm`), [cases] its cases.  mode extin (v203): through xt_tone's EXT IN
 # mode (`xt_tone rom extin`), the only run that draws EXT IN.
 import concurrent.futures as cf, os, re, subprocess, sys
 import mutlist
@@ -21,7 +21,7 @@ muts = mutlist.plants(D + '/tone_muts.txt', sys.argv[2:], 'mutate_tone', ('tone'
 script = D + '/mutate.sh'
 subprocess.run(['bash', script, 'zz-base', 'constexpr float kLand', 'constexpr float kLand', '1'], env=env, capture_output=True)   # builds the shared objects
 def plantEnv(m):
-    # its port, and the seed and xt_tone mode (v200: extin, `xt_tone rom extin`) its line gives
+    # its port, and the seed and xt_tone mode (v203: extin, `xt_tone rom extin`) its line gives
     return dict(env, PORT=m[3], **({'SEED': m[4]} if m[4] else {}), **({'TONE_MODE': m[5]} if m[5] else {}))
 def run(m, pattern=None):
     # solocmp: its verdict is DIFFERENT, as a run that dies says nothing with "different" in it, and that counts
@@ -41,7 +41,7 @@ def run(m, pattern=None):
     tot = re.findall(r'^tone[^:\n]*: (\d+) different', out, re.M)
     return m[0], f'tone: {sum(map(int, tot))} different' if tot else None
 # With nothing planted, an old text put back as it was.  If this run fails, every plant's would, and would read as caught or missed for no reason of its own.
-# (its text in XtSynth.cpp: kLand went to XtSynthConstants.h, v200)
+# (its text in XtSynth.cpp: kLand went to XtSynthConstants.h, v203)
 KEPT = 'void XtSynth::render('
 controls = [('zz-control-' + (md + '-' if md else '') + (s or 'default'), KEPT, KEPT, 'tone', s, md)
             for s, md in sorted({(x[4], x[5]) for x in muts if x[3] != 'solo'})]

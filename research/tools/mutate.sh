@@ -121,7 +121,7 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
     done
     EXTRA=(-DXT_TONE_CHECK "${HARNESS_SWITCHES[@]}")
     # PORT=wire…: the Multi Step Modulator's wiring, against xt_tone's MSM mode, [cases] its cases (v193); TONE_MODE=extin:
-    # any tone port's plant against xt_tone's EXT IN mode (`xt_tone rom extin [cases] [seed] [inputs]`, v200)
+    # any tone port's plant against xt_tone's EXT IN mode (`xt_tone rom extin [cases] [seed] [inputs]`, v203)
     [[ "$PORT" == wire* ]] && ARGS=("$C" "${SEED:-2024}") && C=msm
     [ "${TONE_MODE:-}" = extin ] && ARGS=("$C" "${SEED:-2024}" "$WORK/inputs") && C=extin
 elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck's baseline; [cases] is not used

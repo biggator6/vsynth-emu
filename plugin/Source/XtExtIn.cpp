@@ -1,4 +1,4 @@
-// The EXT IN OSC's player and its input: see XtExtIn.h (v200).
+// The EXT IN OSC's player and its input: see XtExtIn.h (v203).
 #include "XtExtIn.h"
 #include "XtFloat.h"
 

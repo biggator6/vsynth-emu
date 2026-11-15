@@ -1,6 +1,6 @@
 #pragma once
 // XtSynth's constants, shared by its parts: the TVA's as rom.2 stores them, the truncate fade's step and the clock's per
-// block (moved from XtSynth.cpp as they stood, v200).
+// block (moved from XtSynth.cpp as they stood, v203).
 #include "XtFloat.h"
 #include <cstdint>
 
@@ -21,6 +21,6 @@ inline float truncateStep() {
 }
 constexpr uint64_t kClockPerBlock = 32 * 24000;   // a block's frames × 24 clocks a quarter × 1000 ms; a clock is clockPeriod() × 44100
 // The XT's control clock: the tone update (envelope step, TVA targets)
-// runs between blocks once per 441 frames (10 ms).  (From XtSynth.h, v200.)
+// runs between blocks once per 441 frames (10 ms).  (From XtSynth.h, v203.)
 constexpr int kTickFrames = 441;
 }  // namespace xtsynth

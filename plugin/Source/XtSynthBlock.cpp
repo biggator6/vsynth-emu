@@ -1,5 +1,5 @@
 // mixBlock, a block of 32 frames: the clocks, then each voice's tone update, its render by its Structure Type and its
-// TVA onto the bus (moved from XtSynth.cpp as it stood, v200, and split into those parts; the EXT IN OSC's in them).
+// TVA onto the bus (moved from XtSynth.cpp as it stood, v203, and split into those parts; the EXT IN OSC's in them).
 #include "XtSynth.h"
 #include "XtSynthConstants.h"
 #include "XtFloat.h"
@@ -87,7 +87,7 @@ void XtSynth::toneUpdate(Voice& v) {
             v.env.tick();
             v.tlfo.tick(1);
             // An OSC's four envelopes and its LFO step only bound (0x894f7638: each +0x68, +0x80), which an EXT IN OSC's are not:
-            // they hold where their note-on left them (v200)
+            // they hold where their note-on left them (v203)
             auto oscTick = [](OscVoice& s) { s.penv.tick(); s.tenv.tick(); s.fenv.tick(); s.oenv.tick(); s.lfo.tick(1); };
             if (v.on && !v.extIn) oscTick(v);
             if (v.osc2.on && !v.osc2.extIn) oscTick(v.osc2);

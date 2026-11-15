@@ -56,7 +56,7 @@ public:
     bool hasSample(int osc = 0) const { return cur[osc] != nullptr; }
     // Any thread, the same way: a patch's zones 2…16 (voices stop).  nullptr: zone 1 alone, every key on it.
     void setZones(std::shared_ptr<const Zones> z);
-    XtExtInput input;   // audio thread: what the EXT IN OSCs play, pushed as the effect chip returns it (XtExtIn.h, v200)
+    XtExtInput input;   // audio thread: what the EXT IN OSCs play, pushed as the effect chip returns it (XtExtIn.h, v203)
     // Audio thread: whether a note on zone 1 would sound (a sample, or an analog
     // waveform the port plays).
     bool canPlay() const { return canPlay(0); }
@@ -178,7 +178,7 @@ private:
     int kHalf = 16, kPhases = 512;
 
     void pickUpSample();
-    void mixBlock(float* lr);      // 32 frames, a voice at a time in its parts (XtSynthBlock.cpp, v200):
+    void mixBlock(float* lr);      // 32 frames, a voice at a time in its parts (XtSynthBlock.cpp, v203):
     void toneUpdate(Voice& v);     // the tone update's, every 441 frames (0x894f75f0)
     void voiceRender(Voice& v, float* tmp, float* tmp2, const int32_t* in);   // the tone by its Structure Type
     void voiceBus(Voice& v, const float* tmp);   // the TVA's render onto the bus (0x894f5720), or the truncate's fade
@@ -244,7 +244,7 @@ private:
     void liveUpdate(Voice& v, const Controls& c, const Controls& was, bool anyChanged);   // a knob's update of a sounding voice, its zone's controls now and before
     void legatoNote(int key, int vel);               // the sounding voice takes a note (0x894dc1e0)
     void oscStart(Voice& v, OscVoice& s, const OscControls& o);   // the voice's OSC note-on
-    void pcmStart(Voice& v, OscVoice& s, const OscControls& o, float gainStart);   // a PCM OSC's player's (v200)
+    void pcmStart(Voice& v, OscVoice& s, const OscControls& o, float gainStart);   // a PCM OSC's player's (v203)
     void oscEnvs(Voice& v, OscVoice& s, const OscControls& o, bool noteOn);   // its envelopes, at note-on or an update
     void oscLfoNoteOn(const Voice& v, OscVoice& s, const OscControls& o, XtLfoFree& free, const XtLfo* other, float seed);   // its LFO
     void truncate(Voice& v);

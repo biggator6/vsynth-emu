@@ -15,7 +15,7 @@ void drawOsc(Rng& r, OscC& o, bool extIn) {
     o.on = true;
     o.tempoSync = r.one(3); o.timeTrip = !r.one(4); o.beatKeep = !r.one(4);
     o.origTempo = r.one(3) ? 1200000 : r.range(40, 240) * 10000 + r.range(0, 9999);
-    // EXT IN (v200) in the EXT IN mode alone, on an odd Original Tempo (one OSC in three of those that play no wave): a value
+    // EXT IN (v203) in the EXT IN mode alone, on an odd Original Tempo (one OSC in three of those that play no wave): a value
     // drawn already, so the draws stay the plain run's, whose cases are as they were
     o.oscType = extIn && o.origTempo % 2 == 1 ? 2 : 0;
     o.oscTime = r.one(2) ? 0 : r.range(-63, 63); o.oscTimeOffset = r.range(0, 2); o.oscTimeKF = r.one(2) ? 0 : 10 * r.range(-20, 20);

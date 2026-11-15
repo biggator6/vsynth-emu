@@ -1,5 +1,5 @@
 #pragma once
-// The EXT IN OSC (v200): OSC Type 2, a voice of kind 4.  Its player (0x895097d0) reads the input as the effect chip
+// The EXT IN OSC (v203): OSC Type 2, a voice of kind 4.  Its player (0x895097d0) reads the input as the effect chip
 // returns it to the SH-4: words 4 and 5 of each 32-byte frame of the block the DMA brought back ([0x8987c7a0], that block
 // + 16, set at 0x894daca2), at the OSC's gain, which glides to its target by 1/32 a sample.  XtExtInput holds that input
 // for XtSynth.  HARDWARE_FIRMWARE.md, "The EXT IN OSC".

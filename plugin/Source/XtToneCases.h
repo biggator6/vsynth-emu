@@ -37,6 +37,6 @@ Ctl toneAlone(Ctl c);
 bool xtToneMsmMode(int argc, char** argv);
 int xtToneMsm(int argc, char** argv);
 // xt_tone's modes, then `run`, the whole check (XtToneCheck.cpp): the MSM mode, or `xt_tone <rom> extin [cases] [seed]
-// [inputs]`, the whole check with EXT IN drawn (v200), which the plain run doesn't draw, so its cases stay as they were
+// [inputs]`, the whole check with EXT IN drawn (v203), which the plain run doesn't draw, so its cases stay as they were
 // (one generator serves the run, so a case drawn otherwise moves every one after it)
 int xtToneMain(int argc, char** argv, int (*run)(int, char**, bool));

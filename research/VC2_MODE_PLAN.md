@@ -175,12 +175,13 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   `[0x8987c7a0]` (the returned block + 16, set at `0x894daca2`), times a gain gliding 1/32 a sample; External In Type and
   Source (IDs 0x78, 0x7c) are the effect driver's, kept at `0x89ced225` +6, +7 and applied by `0x894aee80` as the chip's
   coefficients. So two versions, the SH-4 side first:
-  - v200: the EXT IN OSC held to rom.2 in `xt_tone`: its converter (`0x894e3830`), the voice of kind 4 and its player,
+  - v203 (committed as 6a1ace1 under v200, master's number; renumbered by a new commit): the EXT IN OSC held to rom.2
+    in `xt_tone`: its converter (`0x894e3830`), the voice of kind 4 and its player,
     with XtSynth given an input a block in the returned words' form, both sides fed the same. **Done 2026-11-14**
     (HARDWARE_FIRMWARE.md, "The EXT IN OSC"): `XtExtIn`, kind 4 in XtSynth's start, update and render; nothing bound to
     it (its OSC's envelopes and LFO hold, the tone's neutral envelope 0 and LFO 0 in their place), stereo, root 440;
     `xt_tone`'s EXT IN mode (`xt_tone rom extin`) 0 different, the plain run's cases as they were; XtSynth.cpp split first.
-  - v201: the input's way in: the plugin's input bus (the Standalone's mic), through the chip's program as on the XT,
+  - v204: the input's way in: the plugin's input bus (the Standalone's mic), through the chip's program as on the XT,
     External In Type and Source by the driver; the panel says when an EXT IN OSC has no input. Open for then: what the
     plugin does with the Effects switch off, when it doesn't run the chip.
 

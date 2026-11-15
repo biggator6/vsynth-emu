@@ -20,7 +20,7 @@ int oscTerm(const XtVoice& v, const XtOscVoice& s, int k) {
 }
 
 // What a voice's own modulators read (its +0x970…+0x98c): the OSC's envelopes and LFO, but on an EXT IN voice the tone's
-// envelope 0 and LFO 0, which stand at 1 and 0, as kind 4 has none bound (v200; HARDWARE_FIRMWARE.md, "The EXT IN OSC")
+// envelope 0 and LFO 0, which stand at 1 and 0, as kind 4 has none bound (v203; HARDWARE_FIRMWARE.md, "The EXT IN OSC")
 float envOut(const XtOscVoice& s, const XtEnvelope& e) { return s.extIn ? 1.0f : e.level(); }
 float lfoOut(const XtOscVoice& s) { return s.extIn ? 0.0f : s.lfo.out(); }
 

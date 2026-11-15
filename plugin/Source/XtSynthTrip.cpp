@@ -1,5 +1,5 @@
 // The pad and Time Trip on the sounding voices, and a block's bits to a PCM OSC's player (moved from XtSynth.cpp as they
-// stood, v200).
+// stood, v203).
 #include "XtSynth.h"
 
 #include <algorithm>

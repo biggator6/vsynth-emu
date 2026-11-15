@@ -1167,7 +1167,7 @@ msm-ms-none|    msmMs(d);\n||wirearp
 msm-edit-unsynced|    msmSync();\n    for (Voice& v : voice)|    for (Voice& v : voice)|wirezones
 check-msm-unreplayed|        if (asked.empty()) return true;|        asked.clear();\n        if (asked.empty()) return true;|wirefwmsm
 check-msm-unstopped|            if (!fw.stop(n)) return false;\n||wirecheck
-# v200, the EXT IN OSC: through xt_tone's EXT IN mode (mode extin), the only run that draws it
+# v203, the EXT IN OSC: through xt_tone's EXT IN mode (mode extin), the only run that draws it
 extin-glide|constexpr float kGlide = 0x1p-5f;|constexpr float kGlide = 0x1p-4f;|toneextin||extin
 extin-no-glide|        gain_ = add(mul(sub(target_, gain_), kGlide), gain_);|        gain_ = target_;|toneextin||extin
 extin-sides|        lr[2 * i + 1] = mul(flt(in[2 * i + 1]), gain_);|        lr[2 * i + 1] = mul(flt(in[2 * i]), gain_);|toneextin||extin

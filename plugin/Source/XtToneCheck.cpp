@@ -589,7 +589,7 @@ int encodePaths(int n, char** files) {
 }  // namespace
 
 int main(int n, char** args) { return xtToneMain(n, args, XtToneProbe::run); }
-// one-off: the whole check's case loop (1557 statements), its split by job a version of its own (build.md, v200's entry)
+// one-off: the whole check's case loop (1557 statements), its split by job a version of its own (build.md, v203's entry)
 int XtToneProbe::run(int argc, char** argv, bool extIn) {
     if (argc < 2 || !xtSynthSetRom(argv[1])) { std::fprintf(stderr, "usage: xt_tone rom.2.bin [cases] [seed] [inputs dir] | paths [file ...]\n"); return 2; }
     if (argc > 2 && std::string(argv[2]) == "paths") return encodePaths(argc - 3, argv + 3);

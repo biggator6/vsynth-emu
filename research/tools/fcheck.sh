@@ -56,7 +56,7 @@ part xt_env 'echo "== xt_env"; "$X/xt_env" "$ROM" conv | tail -3'
 for c in "0 127 0 100 40 300 2" "10 60 64 30 50 400 2" "50 90 20 80 120 600 0" "127 127 127 127 200 900 2" "0 0 127 0 5 60 0" "30 70 90 50 80 500 2"; do
   part xt_env "echo \"env $c: \$(\"\$X/xt_env\" \"\$ROM\" $c | tail -1)\""; done
 [ -x "$X/xt_tone" ] && part xt_tone 'echo "== xt_tone"; "$X/xt_tone" "$ROM" 2000 2024 "$WORK/inputs" | grep -v "^  "'
-# The same with EXT IN drawn on OSCs that play no wave (v200): a mode of its own, so the plain run's cases stay as they were
+# The same with EXT IN drawn on OSCs that play no wave (v203): a mode of its own, so the plain run's cases stay as they were
 [ -x "$X/xt_tone" ] && part xt_tone 'echo "== xt_tone extin"
   "$X/xt_tone" "$ROM" extin 400 2024 "$WORK/inputs" | grep -v "^  "'
 # The SOLO encode's two paths and a SOLO wave's own events, on every wave there is: the disk image's preset waves, the project's, the inputs (about a minute, 8 threads)

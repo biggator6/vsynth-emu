@@ -1546,7 +1546,7 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
-### The EXT IN OSC (2026-11-14, v200) {#ext-in}
+### The EXT IN OSC (2026-11-14, v203) {#ext-in}
 
 The VC-2 mode's step 2, fourth item's first half (VC2_MODE_PLAN.md): OSC Type 2, the external input, on the SH-4's side.
 Until now a patch's EXT IN OSC played as an OSC switched off. It is a voice of kind 4, with its own converter, install,
@@ -1578,7 +1578,7 @@ COSMs and the MOD take their stereo routines, and the root (+0x9a4) is 440.
 
 **In XtSynth** (`XtExtIn.cpp`/`.h`): kind 4 as `XtOscVoice::extIn`, its player `XtExtInPlayer`, and `XtSynth::input`
 (`XtExtInput`), the input as the chip returns it, pushed and taken a block at a time; nothing pushes it yet in the plugin,
-so an EXT IN OSC there is silent (v201 brings the input). `XtPatch` still reads a patch's EXT IN OSC as switched off, and
+so an EXT IN OSC there is silent (v204 brings the input). `XtPatch` still reads a patch's EXT IN OSC as switched off, and
 the plugin's OSC Type has no third choice, until then.
 
 **The check.** `xt_tone`'s EXT IN mode, `xt_tone rom extin [cases] [seed] [inputs]` (fcheck runs 400 cases), is the
@@ -1600,11 +1600,11 @@ then walks forward. There the firmware's linear player reads `xt_tone`'s memory,
 this one's samples, and the port reads zeros. A band player's reads that far off are given zeros on the firmware's side
 (`xtFwHookBandReads`); the linear player's aren't. Not understood: band waves in the playback modes' cases (seeds 10 and
 18, a few parts in 10^6 from the middle of a block on) and seed 16's reverb send (1.3e-33 against 0). Left for a version
-of their own (build.md, v200's entry).
+of their own (build.md, v203's entry).
 
 The plants: 15 `extin-` ones, run in the mode (`tone_muts.txt`'s mode field, `mutate.sh`'s `TONE_MODE`), all caught. The
 whole list, 1183: all caught but `check-pad-cc`, missed as since v189. Sixteen read ERROR on the first run, their text
-rewritten by v200's own edits (a PCM OSC's test `pcm()`, EXT IN in the root and the stereo flag, the chase in
+rewritten by v203's own edits (a PCM OSC's test `pcm()`, EXT IN in the root and the stereo flag, the chase in
 `backOnBeat`); written again on the code as it is, each makes the same mistake and is caught (`zone-wave` by a crash).
 
 **Split first.** `XtSynth.cpp` (2,074 lines), moved as it stood: a voice's start (`XtSynthStart.cpp`), an OSC's

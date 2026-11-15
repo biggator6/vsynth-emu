@@ -1,5 +1,5 @@
 // An OSC's start on a voice: whether it plays, its LFO and its player's note-on (moved from XtSynth.cpp as they stood,
-// v200).
+// v203).
 #include "XtSynth.h"
 #include "XtFloat.h"
 
@@ -8,7 +8,7 @@ bool XtSynth::oscPlays(int zone, int osc) const {
     const OscControls& o = osc ? zc(zone).osc2 : zc(zone);
     if (!o.on) return false;
     if (o.oscType == 0) return xtAnalogTablesLoaded() && xtAnalogPlays(o.ana.wave);
-    if (o.oscType == 2) return true;                 // EXT IN plays the input, there or not (v200)
+    if (o.oscType == 2) return true;                 // EXT IN plays the input, there or not (v203)
     return waveOf(zone, osc) != nullptr;
 }
 
@@ -39,7 +39,7 @@ void XtSynth::oscStart(Voice& v, OscVoice& s, const OscControls& o) {
     else pcmStart(v, s, o, gainStart);
 }
 
-// A PCM OSC's player at note-on, its gain from gainStart to the target (split from oscStart, v200)
+// A PCM OSC's player at note-on, its gain from gainStart to the target (split from oscStart, v203)
 void XtSynth::pcmStart(Voice& v, OscVoice& s, const OscControls& o, float gainStart) {
     // the player's tempo (0x894f3110): this OSC's block +0x60 × 10000, against the wave's, and
     // the bits as the block has them, the pad's if it is held

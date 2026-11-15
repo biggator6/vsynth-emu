@@ -36,7 +36,7 @@ struct XtOscVoice {
     bool variBit = true;           // Vari Sw as the voice has it (+0xb4 bit 0x20), what its walk reads: from note-on, then each knob update's end
     bool syncBit = false;          // and Tempo Sync, as the player's byte 0 has it (bit 1), the same way
     bool analog = false;           // OSC Type ANALOG at note-on: the analog oscillator plays
-    bool extIn = false;            // OSC Type EXT IN at note-on: kind 4, the input's player (v200), no wave
+    bool extIn = false;            // OSC Type EXT IN at note-on: kind 4, the input's player (v203), no wave
     const XtEncoded* wave = nullptr;   // the OSC's wave at note-on (a new wave stops the voices)
     int rnd = 0;                   // the note's random pitch offset (+0x6c), 1/10 cent
     XtEnvelope penv, tenv, fenv;   // pitch, time and formant envelopes (curve 0)

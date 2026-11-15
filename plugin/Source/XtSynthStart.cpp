@@ -1,5 +1,5 @@
 // A voice's start: Playback Mode LEGATO's take of an earlier player, and startVoice, the note's whole start (moved from
-// XtSynth.cpp as they stood, v200).
+// XtSynth.cpp as they stood, v203).
 #include "XtSynth.h"
 #include "XtSynthConstants.h"
 #include "XtFloat.h"
@@ -28,7 +28,7 @@ void XtSynth::legatoTake(OscVoice& s, const OscVoice& from) {
 }
 
 // one-off: the firmware's whole note start in its order (151 statements); its split by job needs member functions that
-// XtSynth.h, at its line limit, has no room to declare, and waits for a version of its own (build.md, v200's entry)
+// XtSynth.h, at its line limit, has no room to declare, and waits for a version of its own (build.md, v203's entry)
 void XtSynth::startVoice(int raw, int note, int vel, int zone) {
     const Controls& Z = zc(zone);                      // the zone's, all through the note's start
     xtModBlock(Z.mod, modBlk[zone]);                 // the tables may have loaded since the last knob moved
