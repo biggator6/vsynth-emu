@@ -38,6 +38,9 @@ juce_add_plugin(VSynthEmu
     NEEDS_MIDI_OUTPUT       FALSE
     IS_MIDI_EFFECT          FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    # The Standalone's audio input, which the EXT IN OSCs play (v207): macOS asks once for the microphone
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "V-Synth Emu's EXT IN oscillators play the audio input, as the V-Synth XT's do."
 
     COPY_PLUGIN_AFTER_BUILD TRUE
     # The manifest helper cannot load the ad-hoc-signed bundle on macOS 27
@@ -117,6 +120,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtSynthTva.cpp
     Source/XtSynthClock.cpp
     Source/XtSynthOut.cpp
+    Source/XtSinc.cpp
     Source/XtExtIn.cpp
     Source/XtSynthArp.cpp
     Source/XtSynthZones.cpp
@@ -150,6 +154,8 @@ target_sources(VSynthEmu PRIVATE
     Source/XtFxControl.cpp
     Source/XtFxInput.cpp
     Source/PluginExtIn.cpp
+    Source/PluginRender.cpp
+    Source/XtHostInput.cpp
     Source/XtFxValueText.cpp
     Source/Vc2Params.cpp
     Source/XtBuildId.cpp
@@ -212,8 +218,12 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
              Tests/EditorPagesTest.cpp Tests/TestMain.cpp)
+# The outside input from the plugin's input bus to the EXT IN OSC (v207): the feed alone at each rate, the processor
+# against XtSynth given the input by the law, the Effects off and on
+vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest
-                 VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest)
+                 VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest
+                 VSynthEmuExtInTest)

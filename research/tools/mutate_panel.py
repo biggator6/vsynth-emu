@@ -115,17 +115,18 @@ MUTS=[
  ('note-unnamed',VT,'case 0x15: return "2/1";','','panel'),
  ('note-triplet',VT,'t[1] == 0x17 ? "T"','t[1] == 0x17 ? ""','panel'),
  ('note-dot',VT,"t[1] == '.' ? \".\"","t[1] == '.' ? \"\"",'panel'),
- ('knob-swap',PP,'{ "fxChoMaster", 0x1fd }','{ "fxChoMaster", 0x231 }','fx'),
- ('knob-id-gain',PP,'{ "fxGain", 0x76 }','{ "fxGain", 0x3e }','fx'),
+ ('knob-swap',PE,'{ "fxChoMaster", 0x1fd }','{ "fxChoMaster", 0x231 }','fx'),   # PE from v207, kFxKnobs moved there
+ ('knob-id-gain',PE,'{ "fxGain", 0x76 }','{ "fxGain", 0x3e }','fx'),
  ('state-no-edits',PS,'state.setProperty("fxEdits", edits, nullptr);',';','fx-edit'),
  ('state-no-back',PS,'if (pair.contains("=")) setFxParam(','if (false) setFxParam(','fx-edit'),
- ('no-apply-knobs',PP,'for (const auto& k : kFxKnobs) c.set(k.id, (int)std::lround(apvts.getRawParameterValue(k.name)->load()));',';','fx-live'),
- ('no-apply-edits',PP,'if (v != kFxNoEdit) c.set(id, v); }\n}','}\n}','fx-live'),
+ ('no-apply-knobs',PE,'for (const auto& k : kFxKnobs) c.set(k.id, '
+  '(int)std::lround(apvts.getRawParameterValue(k.name)->load()));',';','fx-live'),
+ ('no-apply-edits',PE,'if (v != kFxNoEdit) c.set(id, v); }\n}','}\n}','fx-live'),
  ('no-tick',PE,'    c.tick();\n',';\n','fx-live'),
  ('no-matrix',PE,'c.setMatrix(synth_.fxMatrix(0), synth_.fxMatrix(1), synth_.fxMatrix(2));',';','fx-matrix'),
  ('no-clock',PE,'c.outsideClock(synth_.fxClockSix());',';','fx-host'),
- ('no-clock-source',PP,'c.set(0x41, synth_.fxClockSix() ? 1 : 0);',';','fx-host'),
- ('no-tempo',PP,'c.set(0x11d, synth_.fxPatchTempo());',';','fx-tempo'),
+ ('no-clock-source',PE,'c.set(0x41, synth_.fxClockSix() ? 1 : 0);',';','fx-host'),
+ ('no-tempo',PE,'c.set(0x11d, synth_.fxPatchTempo());',';','fx-tempo'),
  ('send-swap',CR,'c.chorusSend   = knob(Params::kTvaChoSend);','c.chorusSend   = knob(Params::kTvaRevSend);','fx-bus'),
  ('assign-off',CR,'c.outputAssign = knob(Params::kOutputAssign);',';','fx-assign'),
  ('mode-off',CR,'c.parallel     = knob(Params::kOutputMode) != 0;',';','fx-mode'),
@@ -184,6 +185,7 @@ ENV={
  'teardown':{'_bin':'VSynthEmuTeardownTest'},   # processors closed mid-encode, in the firmware and in Auto's classifier (v185)
  'arp':{'_bin':'VSynthEmuArpTest'},   # XtSynth's arpeggiator heard: its router, ticks and what it sends (v189)
  'arpplugin':{'_bin':'VSynthEmuArpPluginTest'},   # its parameters, a patch's, a session's, through the processor (v190)
+ 'extin':{'_bin':'VSynthEmuExtInTest'},   # the outside input to the EXT IN OSC, the feed and the processor (v207)
  'patch':{'TEST_PATCH_APPLY':'1'},
  'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_term':'8','_mode':'auto'},   # encoded again on its own events: a terminator too short to reach its last event
  'stored':{'TEST_NOTE2':'64,30000','_file':'analysis/projects/Emu_test.prj/Wave/376 Synth014.wav','_mode':'auto'},

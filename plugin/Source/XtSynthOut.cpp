@@ -8,13 +8,19 @@
 
 // What the plugin plays: through the effects if they're in, or the pairs that reach the outs.  Without them MULTI has no MFX, and the sends no effects, to go to.
 // At the XT's level both ways: a full-scale wave, 2^31 in the frame, comes out at ⅛, as it leaves the chip (XtFxUnit), by Out Gain for TG's −24 and the chip's +6 dB.  A power of two moves no bits.
+// The outside input's block (v207) goes the way the bus goes, so the two ways are one decision: into the chip's slots
+// before it runs, or as the chip would hand it back.  Both reach the EXT IN OSCs the next block, a frame late.
 void XtSynth::busOut(float* lr) {
+    XtExtInFeed* feed = input.feed();
+    const int32_t* outside = feed ? feed->block() : nullptr;
     if (XtBusSink* s = sinkOn ? sink.load(std::memory_order_acquire) : nullptr) {
+        if (outside) s->pushInput(outside, 32);
         s->process(frame, lr, 32);
         // what the chip hands back of the input: the EXT IN OSCs' next block (v204; XtExtIn.h, XtBus.h)
         if (const int32_t* back = s->returned()) input.push(back, 32);
         return;
     }
+    if (outside) feed->withoutChip(input, outside);
     for (int i = 0; i < 32; ++i) {
         const float* f = frame + kFrameWords * i;
         lr[2 * i] = (f[FrameMultiL] + f[FrameMainL] + f[FrameDirL]) * 0x1p-34f;
@@ -24,7 +30,7 @@ void XtSynth::busOut(float* lr) {
 
 void XtSynth::render(float* left, float* right, int n) {
     pickUpSample();
-    const int taps = 2 * kHalf;
+    constexpr int kHalf = XtSinc::kHalf;
     const bool direct = std::abs(step - 1.0) < 1e-12;
     for (int j = 0; j < n; ++j) {
         const size_t need = (size_t)std::floor(readPos) + (direct ? 1 : (size_t)kHalf + 1);
@@ -40,21 +46,7 @@ void XtSynth::render(float* left, float* right, int n) {
             readPos += 1.0;
         } else {
             const long i0 = (long)std::floor(readPos);
-            const double f = readPos - (double)i0;
-            const double ph = f * kPhases;
-            const int p0 = std::min((int)ph, kPhases - 1);
-            const float a = (float)(ph - p0);
-            const float* k0 = kernel.data() + (size_t)p0 * taps;
-            const float* k1 = k0 + taps;
-            float l = 0, r = 0;
-            for (int k = 0; k < taps; ++k) {
-                const size_t s = (size_t)(i0 - kHalf + 1 + k);
-                const float w = k0[k] + (k1[k] - k0[k]) * a;
-                l += src[2 * s] * w;
-                r += src[2 * s + 1] * w;
-            }
-            left[j] = l;
-            right[j] = r;
+            sinc.at(src.data(), i0, readPos - (double)i0, left[j], right[j]);
             readPos += step;
         }
     }

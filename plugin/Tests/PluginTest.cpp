@@ -15,7 +15,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
-#include <map>
+#include "TestFx.h"
 #include <set>
 #include <string>
 #include <thread>
@@ -1388,11 +1388,11 @@ int main(int argc, char** argv) {
     // TEST_FX=1: the Effects switch on, so all this goes through the chip: the processor's, and one here on the reference's bus, each started the same way.
     // TEST_FX_KNOBS="fxRevOn=1,fxRevType=4": its parameters; TEST_FX_EDIT="0x80e=20,...": those by the firmware's ID.  TEST_FX_LIVE="frame:name=value,...": then, at
     // that frame's block, a parameter by name or ID, ticking both sides each block as the control thread does.
-    std::unique_ptr<XtFxUnit> refFx;
+    std::unique_ptr<RefEffects> refFx;
     if (std::getenv("TEST_FX")) {
         p.fxManualTicks();
         p.apvts.getParameter("fxOn")->setValueNotifyingHost(1.0f);
-        refFx = std::make_unique<XtFxUnit>(argv[1]);
+        refFx = std::make_unique<RefEffects>(argv[1]);
         // Each of the plugin's effect parameters has the name, range and default the firmware gives its ID.
         Sh4 romImage; romImage.loadRom(argv[1]);
         for (auto* prmBase : p.getParameters())
@@ -1423,9 +1423,7 @@ int main(int argc, char** argv) {
             }
         p.fxTick();
         if (!p.effectsRunning()) { std::fprintf(stderr, "the effects didn't start\n"); return 1; }
-        refFx->control().set(0x11d, ref.fxPatchTempo());
-        refFx->control().loadPatch();
-        refFx->settle();
+        refFx->start(ref);
         {   // What a host's saved state brings back: the edits by ID, in a new processor.
             juce::MemoryBlock saved; p.getStateInformation(saved);
             VSynthEmuProcessor back; back.fxManualTicks(); back.setStateInformation(saved.getData(), (int)saved.getSize());
@@ -1433,7 +1431,7 @@ int main(int argc, char** argv) {
                 for (const auto& pair : juce::StringArray::fromTokens(e, ",", ""))
                     if (back.fxParam((int)std::strtol(pair.upToFirstOccurrenceOf("=", false, false).toRawUTF8(), nullptr, 0), INT_MIN) != pair.fromFirstOccurrenceOf("=", false, false).getIntValue()) { std::fprintf(stderr, "a saved state lost %s\n", pair.toRawUTF8()); return 1; }
         }
-        ref.setBusSink(refFx.get()); ref.useBusSink(true);
+        ref.setBusSink(refFx->unit.get()); ref.useBusSink(true);
     }
 
     const int total = (int)(in.getNumSamples() * rate / rd->sampleRate);
@@ -1501,16 +1499,10 @@ int main(int argc, char** argv) {
                     fxNow[id] = t.value;
                 }
             }
+        buf.clear();   // the input's channels silent, as a host's unused input is (v207: the processor reads them)
         if (refFx) {
             p.fxTick();
-            XtFxControl& c = refFx->control();
-            for (const auto& [id, value] : fxNow) c.set(id, value);
-            c.set(0x11d, ref.fxPatchTempo());
-            c.set(0x41, ref.fxClockSix() ? 1 : 0);
-            c.tick();
-            c.setMatrix(ref.fxMatrix(0), ref.fxMatrix(1), ref.fxMatrix(2));
-            c.outsideClock(ref.fxClockSix());
-            c.pump();
+            refFx->tick(ref, fxNow);   // as the processor's control thread ticks its own (TestFx.h)
         }
         head.bpm = hostBpm;
         head.ppq = hostPpq + (double)done / rate * hostBpm / 60.0;

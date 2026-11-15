@@ -20,20 +20,39 @@ private:
     float gain_ = 0.0f, target_ = 0.0f;   // the player's block +0x84 and +0x80: the voice's +0x158 and +0x154
 };
 
+class XtExtInput;
+
+// Where the outside input comes from (v207): asked at each block's output (XtSynth::busOut) for the block's 32 frames of
+// it, which go into the chip's input slots with the Effects on, and with them off back as the chip would hand them
+// (XtExtInCopy).  Either way they reach the EXT IN OSCs the next block.  The plugin's is XtHostInput.  Audio thread.
+class XtExtInFeed {
+public:
+    virtual ~XtExtInFeed() = default;
+    // This block's 32 frames, int32 L then R at 44.1 kHz and the XT's full scale (±2^31), until the next call
+    virtual const int32_t* block() = 0;
+    // Those frames, `lr`, as program A would hand them back, into what the EXT IN OSCs play next
+    virtual void withoutChip(XtExtInput& to, const int32_t* lr) = 0;
+};
+
 // What the EXT IN players read: the input as the effect chip returns it, int32 L then R a frame at 44.1 kHz, pushed as it
 // comes and taken 32 frames a block.  A block short of frames is zeros past them.  The audio thread's, as XtSynth is.
 class XtExtInput {
 public:
+    static constexpr uint32_t kFrames = 4096;   // the most it holds, a power of two: a push past it keeps the newest
     void push(const int32_t* lr, int frames);
     const int32_t* block();   // the next 32 frames, 64 words, until the next call
     const int32_t* take(int frames);   // the next `frames` of them, at most 32, the same way (XtFxUnit's, a frame at a time)
     void clear();
+    uint32_t held() const { return write_ - read_; }   // the frames pushed and not yet taken
+    // Where the frames come from, if anywhere: XtSynth::busOut asks it each block (v207).  Set before the audio runs.
+    void setFeed(XtExtInFeed* f) { feed_ = f; }
+    XtExtInFeed* feed() const { return feed_; }
 
 private:
-    static constexpr uint32_t kFrames = 4096;   // the ring's frames, a power of two
     std::array<int32_t, 2 * kFrames> ring_ {};
     std::array<int32_t, 64> out_ {};
     uint32_t read_ = 0, write_ = 0;             // frames, counted on; their difference is what's held
+    XtExtInFeed* feed_ = nullptr;
 };
 
 // The outside input as the effect chip's program A hands it back to the SH-4, computed without the chip (v205, the user's

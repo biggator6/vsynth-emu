@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The input's audio v207 (2026-11-15, on vc2-mode): the plugin's side, the second of two, the last of the VC-2 mode's
+  step 2, item 4 (the user's "Yes, next item"; HARDWARE_FIRMWARE.md, "The input's audio"). A stereo input bus beside the
+  output (off, mono or stereo taken; the Standalone's mic permission). XtHostInput brings the host's rate to 44.1 kHz on
+  XtSynth's own windowed sinc (XtSinc, moved from prepare and render as it stood), int32 at the XT's full scale, behind a
+  fixed latency (32 frames at 44.1 kHz, 65 at 48), a span of the host's block at a time before its render. XtSynth::busOut
+  asks it, as XtSynth::input's feed, for each block and sends it the way the bus goes: with the Effects on into the
+  chip's slots before it runs, its returned words into XtSynth::input; off, back as XtExtInCopy by External In Type. Both
+  reach the EXT IN OSCs the next block, aligned. An EXT IN OSC alone renders with no wave; the OSC panel's EXT IN display
+  says when the host gives no input. Made room first, moved as they stood: PluginProcessor.cpp's effects' parameters into
+  PluginEffects.cpp, processBlock's gate and MIDI loop into PluginRender.cpp; PluginTest's TEST_FX reference effects into
+  Tests/TestFx.h. Check: VSynthEmuExtInTest (the feed at nine rates, its words, a sine on time, a 30 kHz tone down; the
+  processor against XtSynth given the input by v205's law, Effects off and on, each Type, mono, none, 48 kHz, big blocks;
+  busOut's push of the returned words held at last, v204's gap); VSynthEmuEditorTest's word; panel_muts.txt's 20 extin-
+  and editor-d-extin-no-word.
+
 The input's parameters and controls v206 (2026-11-14, on vc2-mode): the plugin's side, the first of two (the user's
   "Yes, next item"; the audio's way in v207). OSC Type's third value, EXT IN (2), on both OSCs: a session's OSC Types
   kept (the state holds the choices' indexes), a host's automation of it moved (PCM 1.0 is 0.5). A patch's EXT IN plays

@@ -4,6 +4,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "XtSynth.h"
+#include "XtHostInput.h"
 #include "XtFiles.h"
 #include "XtFxControl.h"
 #include "PluginArp.h"
@@ -32,6 +33,12 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    // The outside input (PluginExtIn.cpp, v207): a stereo input bus beside the output, taken off, mono or stereo.
+    // hasInput, any thread: whether the host gives it any channel, for the EXT IN OSC's word on the panel.
+    bool isBusesLayoutSupported(const BusesLayout& layout) const override;
+    bool hasInput() const;
+    int inputLatency() const { return hostIn_.latency(); }   // XtHostInput's, in frames at 44.1 kHz, for the check
+    long inputFaults() const { return hostIn_.shortBlocks() + hostIn_.overruns(); }   // and what went wrong in it
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -114,6 +121,7 @@ public:
     const XtFxCatalog& fxCatalog();
     // The firmware's ID behind one of the plugin's effect parameters, or -1.
     static int fxKnobId(const juce::String& parameter);
+    static const char* fxKnobOf(int id);   // and the other way: the parameter for a firmware ID, or nullptr (v207)
     static constexpr int kAfterZones = 2;   // the parameters appended after the zones' (v206, External In Type and Source)
     // One line for the editor: ROM, encode progress, current encode type.
     juce::String getStatusText() const;
@@ -122,6 +130,23 @@ public:
 
 private:
     XtSynth synth_;
+    XtHostInput hostIn_;                        // the outside input on its way to synth_'s EXT IN OSCs, its feed (v207)
+    // processBlock's parts, the audio thread's (v207): the input's channels, the rest cleared, and External In Type to
+    // hostIn_ (PluginExtIn.cpp); whether an OSC plays with no wave; the MIDI at its frames with the render between
+    // (PluginRender.cpp); and frames [from, to) of the input in the buffer's first `inputs` channels into hostIn_, then
+    // synth_'s render of them into L and R, which may be those channels: each span read before it's written
+    int inputBlock(juce::AudioBuffer<float>& buffer);
+    bool playsWaveless() const;
+    void playMidi(const juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, int inputs, float* L, float* R);
+    void renderSpan(const juce::AudioBuffer<float>& in, int inputs, float* L, float* R, int from, int to);
+    // The parameters those read each block, looked up once (PluginRender.cpp)
+    struct BlockReads {
+        explicit BlockReads(juce::AudioProcessorValueTreeState& s);
+        std::atomic<float>* oscType;
+        std::atomic<float>* osc2Switch;
+        std::atomic<float>* extInType;
+    };
+    const BlockReads reads_ { apvts };
     std::atomic<bool> xtActive_ { false };      // the XT voices own the output
     std::vector<float> scratch_;                // right channel for a mono output bus
     int tripKnob_ = 0;                          // the Time Trip knob as XtSynth last had it

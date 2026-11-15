@@ -55,8 +55,9 @@ if [ $BUILT = 1 ]; then
     # damaged disk images (refused, or each cluster once); the arpeggiator in XtSynth, heard (a note a quarter, two tempos);
     # and its plugin side: its parameters against the firmware, a patch's, a session's, a chord through processBlock (v190);
     # the editor, D (v196, in TEST_UI_LAYOUT's place): its sizes, its layout on each page and block, every control on its
-    # own parameter and every parameter with a control, each press's route
-    for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin Editor; do
+    # own parameter and every parameter with a control, each press's route; the outside input to the EXT IN OSC (v207):
+    # the feed at nine rates, the processor against XtSynth given the input by the law, the Effects off and on
+    for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin Editor ExtIn; do
         checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
     done
     # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth

@@ -157,7 +157,7 @@ public:
     void process(const float* frame, float* lr, int frames) override;
     // Audio thread: the outside input as the converter hands it, int32 L then R a frame at the XT's full scale (±2^31),
     // pushed before process() takes it with the frame: into the chip's input slots, analog and USB alike (v204)
-    void pushInput(const int32_t* lr, int frames);
+    void pushInput(const int32_t* lr, int frames) override;
     // What the chip handed back for the EXT IN OSCs in the last process() (XtBus.h): words 4 and 5 of each frame
     const int32_t* returned() const override { return back_; }
 

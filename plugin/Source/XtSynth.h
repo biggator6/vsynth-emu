@@ -27,6 +27,7 @@
 #include "XtSoloVoice.h"
 #include "XtLinearPlayer.h"
 #include "XtLitePlayer.h"
+#include "XtSinc.h"
 #include "XtEncoded.h"
 #include "XtSynthControls.h"
 #include "XtSynthVoice.h"
@@ -174,8 +175,7 @@ private:
     size_t srcFrames = 0;
     double readPos = 0;            // in source frames
     double step = 1;               // 44100 / hostRate
-    std::vector<float> kernel;     // polyphase windowed sinc
-    int kHalf = 16, kPhases = 512;
+    XtSinc sinc;                   // polyphase windowed sinc, 44.1 kHz → host rate (XtSinc.h)
 
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames, a voice at a time in its parts (XtSynthBlock.cpp, v203):

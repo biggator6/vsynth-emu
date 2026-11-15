@@ -110,11 +110,24 @@ void freshFaces(SynthEditor& ed, TestChecks& check) {
                   std::to_string(CosmPanel::tableKnobs(cosm->face())));
 }
 
+// The EXT IN display's word when the host gives no input (v207), on one panel, any: nothing with the input there, its
+// word with the bus off; the layout left as it was found
+void noInputWord(OscPanel& osc, VSynthEmuProcessor& p, TestChecks& check) {
+    const auto was = p.getBusesLayout();
+    check(osc.noInputWord().isEmpty(), "with an input the EXT IN display should say nothing of its absence");
+    auto off = was;
+    off.inputBuses.getReference(0) = juce::AudioChannelSet::disabled();
+    const bool taken = p.setBusesLayout(off);
+    check(taken && osc.noInputWord().isNotEmpty(), "with the input off the EXT IN display should say so");
+    p.setBusesLayout(was);
+}
+
 void rackChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check) {
     ed.showPage(Blocks::kSynthPage);
     const auto oscs = LayoutCheck::allOf<OscPanel>(ed.drawing());
     const auto cosms = LayoutCheck::allOf<CosmPanel>(ed.drawing());
     check(oscs.size() == Blocks::kOscs && cosms.size() == Blocks::kCosms, "the rack hasn't a panel for each instance");
+    if (!oscs.empty()) noInputWord(*oscs.front(), p, check);
     for (size_t i = 0; i < oscs.size(); ++i) {
         const int osc = (int)i;
         const juce::String typeId = Params::oscId(osc, Params::kOscType);

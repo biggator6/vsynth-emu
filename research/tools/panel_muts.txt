@@ -134,3 +134,27 @@ editor-fx-choices-hidden|            c->box.setVisible(sys);|            c->box.
 editor-fx-system-boxes|sys.rows = rowsOf(system_, systemChoices_);|sys.rows = rowsOf(system_, toneChoices_);|plugin/Source/FxPanel.cpp|layout
 editor-fx-choice-param|addChoice(systemChoices_, "External In Type", "fxExtInType");|addChoice(systemChoices_, "External In Type", "fxExtInSource");|plugin/Source/FxPanel.cpp|layout
 editor-d-extin-face|{ "waveGain", "Gain" }, { "pitchKF", "Pitch KF" }, { "pitchEnvDepth", "Env Depth" },|{ "waveGain2", "Gain" }, { "pitchKF", "Pitch KF" }, { "pitchEnvDepth", "Env Depth" },|plugin/Source/UiOscPanel.cpp|layout
+# v207: the outside input's audio, by VSynthEmuExtInTest: busOut's two ways (the returned words into XtSynth::input,
+# v204's gap; the copy; the block into the chip before it runs), the feed's words, latency, cutoff and split, the
+# processor's Type, mono input, span order, gate, layouts, input channels and rate; and the OSC panel's word
+extin-busout-no-return|        if (const int32_t* back = s->returned()) input.push(back, 32);|        ;|plugin/Source/XtSynthOut.cpp|extin
+extin-busout-no-copy|    if (outside) feed->withoutChip(input, outside);|    ;|plugin/Source/XtSynthOut.cpp|extin
+extin-busout-late|        if (outside) s->pushInput(outside, 32);\n        s->process(frame, lr, 32);|        s->process(frame, lr, 32);\n        if (outside) s->pushInput(outside, 32);|plugin/Source/XtSynthOut.cpp|extin
+extin-unit-no-input|void XtFxUnit::pushInput(const int32_t* lr, int frames) { in_.push(lr, frames); }|void XtFxUnit::pushInput(const int32_t* lr, int frames) { in_.push(lr, frames - frames); }|plugin/Source/XtFxInput.cpp|extin
+extin-word-scale|constexpr double kFullScale = 2147483648.0;|constexpr double kFullScale = 1073741824.0;|plugin/Source/XtHostInput.cpp|extin
+extin-latency-direct|    latency_ = direct_ ? kBlockFrames :|    latency_ = direct_ ? 0 :|plugin/Source/XtHostInput.cpp|extin
+extin-latency-kernel|kBlockFrames + kHalf + (int)std::ceil(kHalf * perHost) + 2;|kBlockFrames + 2;|plugin/Source/XtHostInput.cpp|extin
+extin-cutoff-other-way|    sinc_.make(0.5 * std::min(1.0, kChipRate / rate) * 0.95);|    sinc_.make(0.5 * std::min(1.0, rate / kChipRate) * 0.95);|plugin/Source/XtHostInput.cpp|extin
+extin-sinc-phase|        const float a = (float)(ph - p0);|        const float a = 0.0f;|plugin/Source/XtSinc.h|extin
+extin-no-feed|        feeds.setFeed(this);\n||plugin/Source/XtHostInput.h|extin
+extin-no-split|        const int n = std::min(to - at, hostIn_.most());|        const int n = to - at;|plugin/Source/PluginExtIn.cpp|extin
+extin-type-unset|    hostIn_.setType((int)std::lround(reads_.extInType->load()));\n||plugin/Source/PluginExtIn.cpp|extin
+extin-mono-one-side|in.getReadPointer(1, at) : l;|in.getReadPointer(1, at) : nullptr;|plugin/Source/PluginExtIn.cpp|extin
+extin-span-after-render|        hostIn_.push(l, r, n);\n        synth_.render(L + at, R + at, n);|        synth_.render(L + at, R + at, n);\n        hostIn_.push(l, r, n);|plugin/Source/PluginExtIn.cpp|extin
+extin-clear-inputs|    for (int ch = inputs; ch < buffer.getNumChannels(); ++ch)|    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)|plugin/Source/PluginExtIn.cpp|extin
+extin-inputs-ignore-layout|std::min({ getTotalNumInputChannels(), kMostInputs, buffer.getNumChannels() })|std::min(kMostInputs, buffer.getNumChannels())|plugin/Source/PluginExtIn.cpp|extin
+extin-layout-no-mono|in.isDisabled() \|\| in == juce::AudioChannelSet::mono() \|\||in.isDisabled() \|\||plugin/Source/PluginExtIn.cpp|extin
+extin-has-input-always|bool VSynthEmuProcessor::hasInput() const { return getTotalNumInputChannels() > 0; }|bool VSynthEmuProcessor::hasInput() const { return true; }|plugin/Source/PluginExtIn.cpp|extin
+extin-gate-analog-only|    return std::lround(reads_.oscType->load()) != Params::kOscTypePcm|    return std::lround(reads_.oscType->load()) == 0|plugin/Source/PluginRender.cpp|extin
+extin-prepare-rate|    hostIn_.prepare(sampleRate, synth_.input);|    hostIn_.prepare(44100.0, synth_.input);|plugin/Source/PluginProcessor.cpp|extin
+editor-d-extin-no-word|    return processor_.hasInput() ? juce::String() : "No input: the host gives none, or the input is off";|    return juce::String();|plugin/Source/UiOscPanel.cpp|layout

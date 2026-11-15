@@ -15,9 +15,12 @@ struct AgainstSynth {
         p.prepareToPlay(rate, block);
         ref = synthOn(rate, p.currentControls());
     }
-    // A block: `midi` through processBlock, `notes` played on XtSynth as the processor plays them, both rendered
-    void block(juce::MidiBuffer& midi, const std::function<void(XtSynth&)>& notes) {
+    // A block: `midi` through processBlock, `notes` played on XtSynth as the processor plays them, both rendered.
+    // `input`, if any, writes the host's outside input into the buffer's first channels first (v207).
+    void block(juce::MidiBuffer& midi, const std::function<void(XtSynth&)>& notes,
+               const std::function<void(juce::AudioBuffer<float>&)>& input = {}) {
         buf.clear();
+        if (input) input(buf);
         proc.processBlock(buf, midi);
         juce::ScopedNoDenormals ftz;
         notes(*ref);

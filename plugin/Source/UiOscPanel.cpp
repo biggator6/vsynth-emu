@@ -90,9 +90,15 @@ void OscPanel::faceShown() {
 void OscPanel::refresh() {
     FacedPanel::refresh();
     const juce::String wave = processor_.hasFileLoaded(osc_) ? processor_.getLoadedFileName(osc_) : "No wave loaded";
-    if (wave == wave_) return;
+    const bool input = processor_.hasInput();
+    if (wave == wave_ && input == input_) return;
     wave_ = wave;
+    input_ = input;
     repaint(display_);
+}
+
+juce::String OscPanel::noInputWord() const {
+    return processor_.hasInput() ? juce::String() : "No input: the host gives none, or the input is off";
 }
 
 void OscPanel::resized() {
@@ -123,10 +129,12 @@ void OscPanel::paintDisplay(juce::Graphics& g) const {
         Ui::drawText(g, wave_, display_.reduced(10, 6).removeFromTop(16), { Look::sans(11.0f), Look::label });
         return;
     }
-    if (face() == kExtIn) {   // the outside input, by External In Type (v206)
+    if (face() == kExtIn) {   // the outside input, by External In Type (v206), and why it's silent if there's none (v207)
         const auto* type = processor_.apvts.getParameter("fxExtInType");
         const juce::String text = "External input, " + (type ? type->getCurrentValueAsText() : juce::String());
-        Ui::drawText(g, text, display_.reduced(10, 6).removeFromTop(16), { Look::sans(11.0f), Look::label });
+        auto lines = display_.reduced(10, 6);
+        Ui::drawText(g, text, lines.removeFromTop(16), { Look::sans(11.0f), Look::label });
+        Ui::drawText(g, noInputWord(), lines.removeFromTop(16), { Look::sans(11.0f), Look::warning });
         return;
     }
     const int wave = juce::roundToInt(processor_.apvts.getRawParameterValue(id(Params::kAnaWave))->load());

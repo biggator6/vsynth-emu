@@ -5,13 +5,12 @@
 #include "XtPatch.h"
 #include "XtVpwFormat.h"
 
-
 // ─── Constructor / Destructor ─────────────────────────────────────────────────
 
 VSynthEmuProcessor::VSynthEmuProcessor()
-    // Instrument: stereo output only, no sidechain input
-    : AudioProcessor(BusesProperties()
-                     .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+    // Instrument: a stereo input for the EXT IN OSCs (v207; a host may turn it off), and a stereo output
+    : AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true)
+                                      .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "VSynthEmu", createParameterLayout())
 {
     for (auto& e : fxEdits_) e.store(kFxNoEdit, std::memory_order_relaxed);
@@ -32,51 +31,11 @@ private:
     VSynthEmuProcessor& owner;
 };
 
-// fxTick is in PluginEffects.cpp (v172)
-bool VSynthEmuProcessor::effectsWanted() const { return apvts.getRawParameterValue(Params::kFxOn)->load() >= 0.5f; }
-
-// The plugin's effect parameters, each the firmware's ID.
-static const struct { const char* name; int id; } kFxKnobs[] = {
-    { "fxMfxOn", 0x120 }, { "fxChoOn", 0x121 }, { "fxRevOn", 0x122 },
-    { "fxMfxType", 0x177 }, { "fxMfxMaster", 0x178 }, { "fxMfxCho", 0x179 }, { "fxMfxRev", 0x17a },
-    { "fxChoType", 0x1fc }, { "fxChoMaster", 0x1fd }, { "fxChoRev", 0x1fe },
-    { "fxRevType", 0x230 }, { "fxRevMaster", 0x231 },
-    { "fxMaster", 0x3e }, { "fxGain", 0x76 }, { "fxExtInType", 0x78 }, { "fxExtInSource", 0x7c }
-};
-
+// fxTick, the effects' parameters by the firmware's ID and the catalog are in PluginEffects.cpp (v172, v207)
 void VSynthEmuProcessor::fxManualTicks() {
     fxManual_ = true;
     if (fxThread_) fxThread_->stopThread(2000);
     fxThread_.reset();
-}
-
-int VSynthEmuProcessor::fxKnobId(const juce::String& parameter) {
-    for (const auto& k : kFxKnobs) if (parameter == k.name) return k.id;
-    return -1;
-}
-
-// All of it to the driver's store, which only takes what's changed.
-void VSynthEmuProcessor::fxApply(XtFxControl& c) {
-    for (const auto& k : kFxKnobs) c.set(k.id, (int)std::lround(apvts.getRawParameterValue(k.name)->load()));
-    c.set(0x11d, synth_.fxPatchTempo());
-    c.set(0x41, synth_.fxClockSix() ? 1 : 0);
-    for (int id = 0; id < kFxIds; ++id) { const int v = fxEdits_[id].load(std::memory_order_relaxed); if (v != kFxNoEdit) c.set(id, v); }
-}
-
-void VSynthEmuProcessor::setFxParam(int id, int value) { if (id >= 0 && id < kFxIds) fxEdits_[id].store(value, std::memory_order_relaxed); }
-
-int VSynthEmuProcessor::fxParam(int id, int fallback) const {
-    const int v = id >= 0 && id < kFxIds ? fxEdits_[id].load(std::memory_order_relaxed) : kFxNoEdit;
-    return v == kFxNoEdit ? fallback : v;
-}
-
-const XtFxCatalog& VSynthEmuProcessor::fxCatalog() {
-    if (!fxCatalog_.ok) {
-        juce::String rom;
-        { const std::lock_guard<std::mutex> lock(fxLock_); rom = romFile_; }
-        if (rom.isNotEmpty()) fxCatalog_ = xtFxCatalog(rom.toRawUTF8());
-    }
-    return fxCatalog_;
 }
 
 VSynthEmuProcessor::~VSynthEmuProcessor() {
@@ -93,6 +52,7 @@ VSynthEmuProcessor::~VSynthEmuProcessor() {
 
 void VSynthEmuProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     synth_.prepare(sampleRate);
+    hostIn_.prepare(sampleRate, synth_.input);   // the outside input at this rate, feeding the EXT IN OSCs (v207)
     scratch_.assign((size_t)std::max(samplesPerBlock, 1) * 2, 0.0f);
     if (!fxThread_ && !fxManual_) { fxThread_ = std::make_unique<FxThread>(*this); fxThread_->startThread(); }
     playbackPos_  = -1;
@@ -107,16 +67,13 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                        juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
-    buffer.clear();
+    const int numIn = inputBlock(buffer);   // the outside input, left in the first channels for the render (v207)
 
-    const int numOut     = buffer.getNumChannels();
+    const int numOut     = std::min(buffer.getNumChannels(), getTotalNumOutputChannels());
     const int numSamples = buffer.getNumSamples();
 
-    // ── The XT's own players: one voice per note, sample-accurate MIDI ───────
-    // (an analog OSC needs the firmware image but no sample)
-    const bool analog = xtSynthRomReady() && (apvts.getRawParameterValue(Params::kOscType)->load() < 0.5f
-                                              || apvts.getRawParameterValue(Params::oscId(1, Params::kOscSwitch))->load() >= 0.5f);
-    if ((xtActive_.load() || analog) && numOut > 0) {
+    // ── The XT's own players: one voice per note, sample-accurate MIDI (PluginRender.cpp) ───────
+    if ((xtActive_.load() || playsWaveless()) && numOut > 0) {
         synth_.setControls(xtControls());
         synth_.useBusSink(apvts.getRawParameterValue(Params::kFxOn)->load() >= 0.5f);
         // The host's transport, for Clock Source HOST (the Standalone has none: the Patch Tempo stands)
@@ -136,25 +93,13 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             if ((int)scratch_.size() < numSamples) scratch_.resize((size_t)numSamples);   // normally sized in prepareToPlay
             R = scratch_.data();
         }
-        int pos = 0;
-        for (const auto meta : midi) {
-            const int at = std::clamp(meta.samplePosition, pos, numSamples);
-            if (at > pos) { synth_.render(L + pos, R + pos, at - pos); pos = at; }
-            const auto msg = meta.getMessage();
-            if (msg.isNoteOn()) synth_.noteOn(msg.getNoteNumber(), msg.getFloatVelocity());
-            else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber(), msg.getFloatVelocity());
-            else if (msg.isPitchWheel()) synth_.pitchBend(msg.getPitchWheelValue());
-            else if (msg.isChannelPressure()) synth_.channelPressure(msg.getChannelPressureValue());
-            else if (msg.isAftertouch()) synth_.polyPressure(msg.getNoteNumber(), msg.getAfterTouchValue());
-            else if (msg.isController()) synth_.controller(msg.getControllerNumber(), msg.getControllerValue());   // the mode messages too
-        }
-        if (pos < numSamples) synth_.render(L + pos, R + pos, numSamples - pos);
+        playMidi(buffer, midi, numIn, L, R);
         if (numOut == 1) for (int i = 0; i < numSamples; ++i) L[i] = 0.5f * (L[i] + R[i]);
         return;
     }
 
-    // ── Without the firmware: the loaded file as it is ──────────────────────────
-    // MIDI: note-on starts playback, note-off decrements voice count
+    // ── Without the firmware: the loaded file as it is; a note-on starts it, the last note-off stops it ──
+    buffer.clear();
     for (const auto meta : midi)
     {
         const auto msg = meta.getMessage();
@@ -375,8 +320,7 @@ void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<u
     for (int k = 0; k < 2; ++k)
         if (auto* p = apvts.getParameter(Params::oscId(k, Params::kEncodeType))) p->setValueNotifyingHost(p->convertTo0to1(0.0f));   // Auto: each wave's own
     for (const auto& fx : xtPatchEffects(store)) {
-        const char* knob = nullptr;
-        for (const auto& k : kFxKnobs) if (k.id == fx.id) knob = k.name;
+        const char* knob = fxKnobOf(fx.id);
         if (!knob) { setFxParam(fx.id, fx.value); continue; }
         if (auto* p = apvts.getParameter(knob)) p->setValueNotifyingHost(p->convertTo0to1((float)fx.value));
     }

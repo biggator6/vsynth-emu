@@ -1546,6 +1546,66 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The input's audio (2026-11-15, v207) {#input-audio}
+
+The last of the item's versions (VC2_MODE_PLAN.md, step 2, item 4): the outside input from the plugin's input bus to
+the EXT IN OSC. None of it is the firmware's: the XT's converter runs at 44.1 kHz into the chip's slots, and what the
+plugin adds is the host's side, so its laws are the plugin's own, each named below.
+
+**The bus.** A stereo input beside the stereo output (`BusesProperties().withInput(...)`, on by default), taken off,
+mono or stereo (`isBusesLayoutSupported`; the output as before, any). The Standalone's device decides: JUCE's player
+tries the device's channels first, so a device with no input gives the bus off and a mono one a mono input, which
+plays on both sides. The Standalone asks for the microphone (`MICROPHONE_PERMISSION_ENABLED`, its text in
+`plugin/CMakeLists.txt`); and JUCE's Standalone mutes an input by default for an instrument with an input and an
+output, to keep a feedback loop out, with its own bar saying so and a button to its settings, so the mic is heard once
+unmuted there. auval passes for the AU instrument with the bus (`aumu VsEm Gato`).
+
+**The host's rate to 44.1 kHz** (`XtHostInput`): the windowed sinc of XtSynth's render, its kernel and taps moved
+into `XtSinc` (moved as they stood; ab.sh's renders against HEAD to the bit), made for the other way: a cutoff of
+0.95 × the lower Nyquist in the host's frames. Frame j of the chip's 44.1 kHz sits at the host's frame j × rate / 44100,
+counted from the frame and not summed, so the result doesn't hang on how the host cuts its blocks. Each side's word is
+an int32 at the XT's full scale, x × 2^31 toward zero, the limits past ±1 and silence for what isn't finite; the chip
+takes its top 24 bits, so a 24-bit sample is exact. At 44.1 kHz a frame is a frame.
+
+**Its latency.** XtSynth's render takes its 32-frame blocks ahead of what it has given (up to a block, and with its
+kernel kHalf, 16, frames more), and the input's kernel makes a frame kHalf host frames after it has them. So the frames
+are held behind a latency fixed at prepare: a block at 44.1 kHz (32 frames, 0.7 ms), and with the kernels
+32 + 16 + ⌈16 × 44100 / rate⌉ + 2 (65 frames at 48 kHz, 139 at 8 kHz, 54 at 192 kHz). A span of the host's block goes
+in just before the render of the same span (`renderSpan`, at most `most()` frames, so what it holds, an `XtExtInput`
+of 4,096 frames, never overruns: a host's block of 8,192 frames at 44.1 kHz is rendered in three).
+
+**The two ways, one decision.** `XtSynth::busOut` asks the input's feed (`XtExtInFeed`, `XtExtInput::feed()`, which the
+processor's `XtHostInput` is) for the block's 32 frames, then sends them the way the bus goes: with the Effects on into
+the chip's slots before it runs the block (`XtFxUnit::pushInput`), whose returned words go into `XtSynth::input` as
+v204 left them; with them off back as the chip would hand them (`XtExtInCopy`, External In Type set each block from
+the parameter). Either way they reach the EXT IN OSCs the next block, a frame late: the two ways are aligned, the input
+heard latency + 33 frames after the host gave it (1.5 ms at 44.1 kHz). Deciding both in busOut keeps them one decision:
+a feed asked at the block's start could see the effects not yet up and the bus then going through them (the control
+thread makes the unit while the audio runs), push both the copy's block and the chip's, and leave the EXT IN OSCs a
+block further behind from then on. A change of the Effects switch costs a frame of the copy's memory, its last frame from
+when it last ran.
+
+**What the processor does.** `inputBlock` keeps the input's channels (at most two) for the render and clears the rest,
+where processBlock cleared the whole buffer before; each span is read before the render writes it, so no copy is made.
+An EXT IN OSC on OSC 1 with no wave now renders (`playsWaveless`: OSC 1's Type anything but PCM, or OSC 2 on), where
+v206 rendered only an analog one or a loaded wave. `hasInput()` is whether the host gives the bus any channel, and the
+OSC panel's EXT IN display says under the Type when it doesn't ("No input: the host gives none, or the input is off"),
+found again on every refresh.
+
+**The check** (`VSynthEmuExtInTest`, in verify.sh): the feed alone, a host sample's word at the limits; at 44.1 kHz each
+frame's word as it came, latency frames late, in host blocks of 1 to most(); at nine rates from 8 to 192 kHz, an XtSynth
+taking its blocks while the host's blocks go in, no block short and nothing overrun; a 1 and a 10 kHz sine at 48 and 96
+kHz the same sine at 44.1 kHz, on time, within 10^-4 of full scale (measured 3.7e-5 at most; the kernel's nearest phase
+alone, not interpolated, is 1.3e-3 off at 10 kHz, the plant that showed a first bound of 10^-3 at 1 kHz too loose); a
+30 kHz tone at 96 kHz 40 dB down. The processor, an EXT
+IN OSC alone and a note, against XtSynth given the input by hand by v205's law (a frame late in the chip's 24 bits) a
+block and a frame behind the processor's latency, sample for sample: the Effects off and on, each Type, a MIDI clock
+in every block so that each is rendered in two spans; a mono input; no input, silent; at 48 kHz against XtSynth fed by
+an XtHostInput of its own; host blocks of 8,192 frames. With the Effects on the reference's effects are started as
+the processor's (`TestFx.h`, PluginTest's TEST_FX's start and tick made one) and hand nothing back, so the processor's
+`busOut` push of the returned words is held at last (v204's gap). VSynthEmuEditorTest: the panel's word with the
+input there and with it off. Plants: panel_muts.txt's 20 `extin-` (kind extin) and `editor-d-extin-no-word`.
+
 ### The input's parameters and controls (2026-11-14, v206) {#input-parameters}
 
 The plugin's side of the item, the first of its two versions (VC2_MODE_PLAN.md): the parameters and controls; the audio's

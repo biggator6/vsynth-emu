@@ -13,6 +13,9 @@ public:
     static constexpr int kTypes = 3;         // OSC Type's values: ANALOG, PCM, EXT IN (v206)
     static constexpr int kTableKnobs = 10;   // the knobs its table gives each Type, each of which must name a parameter
     void resized() override;
+    // What its EXT IN display says under the input's Type when the host gives no input, as the processor finds it on
+    // every paint (v207); empty when there is one
+    juce::String noInputWord() const;
 
 private:
     VSynthEmuProcessor& processor_;
@@ -22,6 +25,7 @@ private:
     juce::TextButton load_ { "Load..." };
     std::unique_ptr<juce::FileChooser> chooser_;
     juce::String wave_;
+    bool input_ = true;   // whether the host gave an input at the last refresh
     juce::Rectangle<int> display_;
 
     juce::String id(const juce::String& name) const;

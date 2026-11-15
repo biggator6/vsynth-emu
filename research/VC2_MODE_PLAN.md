@@ -212,7 +212,13 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
       and the FX page's two boxes.
     - v207, the audio: the plugin's input bus and the Standalone's mic, the host's rate to the chip's 44.1 kHz, the
       unit (Effects on) or `XtExtInCopy` (off, by External In Type) into `XtSynth::input`, and the panel's word when an
-      EXT IN OSC has no input; PluginTest with an input against XtSynth.
+      EXT IN OSC has no input; PluginTest with an input against XtSynth. **Done 2026-11-15** (HARDWARE_FIRMWARE.md,
+      "The input's audio"): a stereo input bus (off, mono or stereo), `XtHostInput` bringing the host's rate to 44.1 kHz
+      on XtSynth's own sinc (`XtSinc`) behind a fixed latency, handed to `XtSynth::busOut` as its feed, which sends each
+      block the way the bus goes, so the two ways are one decision and aligned; an EXT IN OSC alone renders; the OSC
+      panel says when there's no input. `VSynthEmuExtInTest`: the processor against XtSynth given the input by v205's
+      law, Effects off and on, sample for sample (busOut's push of the returned words held at last), and the feed at
+      nine rates.
 
 ### 3. The ports, one version each
 
