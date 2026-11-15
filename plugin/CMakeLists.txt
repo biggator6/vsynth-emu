@@ -163,6 +163,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtFxValueText.cpp
     Source/Vc2Params.cpp
     Source/Vc2Unvoiced.cpp
+    Source/Vc2Consonants.cpp
     Source/XtBuildId.cpp
 )
 

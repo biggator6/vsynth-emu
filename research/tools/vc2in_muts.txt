@@ -1,5 +1,6 @@
-# Planted errors in Vc2Unvoiced.cpp (the VC-2's unvoiced detector, v208), for mutate_vc2.py --in: each must make
-# xt_vc2in, on rom.4, say something differs.  name|old|new[|port[|seed]]
+# Planted errors in Vc2Unvoiced.cpp (the VC-2's unvoiced detector, v208; port vc2in) and Vc2Consonants.cpp (its
+# consonants, v209; port vc2out), for mutate_vc2.py --in: each must make xt_vc2in, on rom.4, say something differs.
+# name|old|new[|port[|seed]]
 # The tables, and the constants rom.4 stores a unit off the nearest float
 table-notch|kNotch = 0x895613c8;|kNotch = 0x895613cc;|vc2in
 decay-nearest|0x3c23d709u|0x3c23d70au|vc2in
@@ -41,3 +42,39 @@ reset-clears-bq2|s.bq1[0] = s.bq1[1] = 0.0f;|s.bq1[0] = s.bq1[1] = s.bq2[0] = s.
 spread-dropped|s.spread = spread;|s.spread = 0;|vc2in
 voiced-four-back|one - 4 < 0 ? one - 4 + kRing : one - 4|one - 3 < 0 ? one - 3 + kRing : one - 3|vc2in
 voiced-last-only|(flags[(size_t)one] \| flags[(size_t)five]) == 0|flags[(size_t)one] == 0 && five >= 0|vc2in
+# The consonants (v209): the constants rom.4 stores, some a unit off the nearest float
+out-rise|0x3b03126fu|0x3b031270u|vc2out
+out-fall-nearest|0x3c23d709u|0x3c23d70au|vc2out
+out-feed-nearest|0x3eb33332u|0x3eb33333u|vc2out
+out-back-nearest|0x3fd33332u|0x3fd33333u|vc2out
+out-gain-nearest|0x3f199999u|0x3f19999au|vc2out
+out-glide|kGlide = 0.03125f;|kGlide = 0.0625f;|vc2out
+out-mic-late|kMicLate = 448,|kMicLate = 416,|vc2out
+out-delay-a|kDelayA = 280,|kDelayA = 279,|vc2out
+out-delay-b|kDelayB = 162;|kDelayB = 161;|vc2out
+# The gate and the highpass
+out-rate-fixed|target > s.gate ? kRise : kFall|target > s.gate ? kRise : kRise|vc2out
+out-gate-no-pull|s.gate = add(mul(sub(target, s.gate), rate), s.gate);|s.gate = add(mul(target, rate), s.gate);|vc2out
+out-hp-s1-back|s.highpass[1] = add(mul(s0, kFeed), s.highpass[1]);|s.highpass[1] = add(mul(s0, kBack), s.highpass[1]);|vc2out
+out-hp-old-s0|add(mul(s0, kBack), s.highpass[1])|add(mul(s0, kBack), s.highpass[0])|vc2out
+out-hp-s0-back|s.highpass[0] = add(mul(y, kFeed), s0);|s.highpass[0] = add(mul(y, kBack), s0);|vc2out
+out-hp-sums|sub(mul(x, s.gate), add(mul(s0, kBack), s.highpass[1]))|sub(sub(mul(x, s.gate), mul(s0, kBack)), s.highpass[1])|vc2out
+out-no-flag|mul(lateFlag(), flagScale)|mul(1.0f, flagScale)|vc2out
+out-no-scale|mul(lateFlag(), flagScale)|lateFlag()|vc2out
+out-mic-wrap|s.micIndex - kMicLate + kMicRing :|s.micIndex - kMicLate + kMicRing - kBlock :|vc2out
+# The allpasses
+out-no-spread|if (s.spread != 0) {|if (false) {|vc2out
+out-no-mirror|buffer[(size_t)(at + Vc2Unvoiced::kAllpass)] = buffer[(size_t)at] = w;|buffer[(size_t)at] = w;|vc2out
+out-allpass-wrap|allpassAt - 1 + kAllpass :|allpassAt - 2 + kAllpass :|vc2out
+out-one-allpass|y = allpass(allpassB, allpassAt, kDelayB, allpass(allpassA, allpassAt, kDelayA, y));|y = allpass(allpassA, allpassAt, kDelayA, y);|vc2out
+# The level and the frames
+out-low-clamp|if (0.0f > wanted) wanted = 0.0f;|if (0.0f > wanted) wanted = 0.01f;|vc2out
+out-high-clamp|else if (wanted > 1.0f) wanted = 1.0f;|else if (wanted > 1.0f) wanted = 0.99f;|vc2out
+out-no-mod|add(s.soundLevel, levelMod)|add(s.soundLevel, 0.0f)|vc2out
+out-no-gain|const float added = mul(y, gain);|const float added = y;|vc2out
+out-one-channel|for (int c = 0; c < channels; ++c)|for (int c = 0; c < 1; ++c)|vc2out
+# The reset's part for them, and the two words it leaves
+out-reset-keeps-mic|std::fill(mic.begin(), mic.end(), 0.0f);|(void)0;|vc2in
+out-reset-keeps-allpass|std::fill(allpassA.begin(), allpassA.end(), 0.0f);|(void)0;|vc2in
+out-reset-index|s.bq3[0] = s.bq3[1] = 0.0f;|s.bq3[0] = s.bq3[1] = 0.0f; allpassAt = 0;|vc2in
+out-reset-level|s.level = kResetLevel;|s.level = kResetLevel; level = 0.0f;|vc2in

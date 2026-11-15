@@ -746,6 +746,7 @@ text: 2016 IDs, 10080 values against the wrapper 0x894fa730 (15 the routine faul
 xt_vc2params: 0 different
 == xt_vc2in
 unvoiced: 40 cases, 22000 blocks (2298 called unvoiced, 3023 with a peak of 0, 0 with the vote not a number), 0 different
+consonants: 22000 blocks (12400 stereo, 10878 with Spread, 10622 with the level's term), 0 different
 xt_vc2in: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks

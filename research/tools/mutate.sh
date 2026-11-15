@@ -20,7 +20,7 @@
 # PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
 # PORT=vc2params: Vc2Params.cpp (rom.4's parameter tables, v199) under xt_vc2params, PORT=vc2in: Vc2Unvoiced.cpp (its
-# unvoiced detector, v208) under xt_vc2in, on rom.4 ($ROM4).
+# unvoiced detector, v208) and PORT=vc2out: Vc2Consonants.cpp (its consonants, v209) under xt_vc2in, on rom.4 ($ROM4).
 # PORT=toneknobs, toneenvknobs, toneupdate, tonezones, tonenotes: XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp, XtSynthUpdate.cpp,
 # XtSynthZones.cpp, XtSynthNotes.cpp under xt_tone (v193: XtSynth's parts by job); tonefwcpp, tonefwh, tonecases,
 # tonecarry: xt_tone's own XtToneFirmware.cpp, XtToneFirmware.h, XtToneCases.cpp, XtToneCarry.cpp; tonepatchids its
@@ -142,13 +142,16 @@ elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     esac
     ARGS=("${SEED:-2024}")
     harnessParts XT_MSM_MAIN msm_obj XtMsm XtMsmTrack XtMsmPatch XtMsmCheck XtMsmCases
-elif [[ "$PORT" =~ ^(vc2params|vc2in)$ ]]; then
+elif [[ "$PORT" =~ ^(vc2params|vc2in|vc2out)$ ]]; then
     # rom.4's ports, on rom.4: its parameter tables, Vc2Params.cpp, against xt_vc2params (v199), [cases] its values an ID;
-    # the unvoiced detector, Vc2Unvoiced.cpp, against xt_vc2in (v208), [cases] its cases; SEED the seed of either
+    # the unvoiced detector, Vc2Unvoiced.cpp (v208), and its consonants, Vc2Consonants.cpp (vc2out, v209), against
+    # xt_vc2in, [cases] its cases; SEED the seed of any
     IMAGE="$ROM4"
     ARGS=("${SEED:-2024}")
+    VC2IN=(Vc2Unvoiced Vc2Consonants Vc2UnvoicedCheck)
     case "$PORT" in
-        vc2in) F=Vc2Unvoiced.cpp; harnessParts XT_VC2IN_MAIN vc2in_obj Vc2Unvoiced Vc2UnvoicedCheck ;;
+        vc2in) F=Vc2Unvoiced.cpp; harnessParts XT_VC2IN_MAIN vc2in_obj "${VC2IN[@]}" ;;
+        vc2out) F=Vc2Consonants.cpp; harnessParts XT_VC2IN_MAIN vc2in_obj "${VC2IN[@]}" ;;
         *) F=Vc2Params.cpp; harnessParts XT_VC2PARAMS_MAIN vc2_obj Vc2Params Vc2ParamsCheck XtFxValueText ;;
     esac
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used

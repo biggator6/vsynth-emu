@@ -1546,6 +1546,56 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's consonants (2026-11-15, v209) {#vc2-consonants}
+
+The second half of the step's first port (VC2_MODE_PLAN.md, step 3.1): rom.4's output stage, `0x893ed510(frames, fr4, fr5)`
+(mono) and `0x893ed690` (stereo), which both engines' block drivers run after the engine and its slot 7, ported bit for bit
+as `Vc2Unvoiced::consonants` (`Vc2Consonants.cpp`). The two routines are the same but for their last store and their own
+copies of the constants, so the port is one routine by its channel count. It shares v208's region: the gate (`0x899d99d8`),
+the filter's two states (`0x899d9a60`, `0x899d9a64`) and the mic ring's index (`0x899d9a70`), named now where v208 called
+them the output stage's words. Its own memory: the mic ring (`0x8a0f73dc`, 640 samples), two allpass buffers (`0x8a0f882c`,
+`0x8a15a2ac`, 100,000 floats each), and two words of rom.4's .data, the level (`0x8993fe5c`) and the allpasses' index
+(`0x8993fe58`), both 0 in the image and touched by no reset. Nothing in the sound uses it yet.
+
+**The mic ring** is written by the part mixer (`0x893b1820`'s two paths, at `0x893b1956` and `0x893b1af6`): each block of
+the mic, its frame's second word × the constant at `0x893b1aa8` (0x2fffffff, a unit under 2^-31), goes to `0x893ed410`'s
+pointer, the ring at its index, with positive NaNs set to 0, and that block is the input stage's input. The output stage reads the ring 448 samples (14 blocks) behind the index and
+moves the index on a block. The part mixer is the step's eighth port; the check writes each block into both rings itself.
+
+**A block.** fr4 is the engine's consonant gain (the vocoder object's +0x14) × 2^31 and fr5 is slot 7's result, as the block
+driver `0x893f0510` forms them.
+- The level's target is Vocoder Sound Level plus the word at `0x89997298` (the third of three ÷127 values `0x893a2e50` writes
+  from `0x893a24d0`'s shorts; not traced further), held to 0…1; the level moves 1/32 of the way to it, once a block.
+- The gate's target is the ring's flag at its index less 5 (the entry the input stage smooths: four blocks before the last)
+  × fr5. Its rate is chosen once a block from the gate as it stands: 0.002 when the target is above it, else 0.01.
+- Each sample, the gate moves by its rate toward the target, and the late mic × the gate goes through a two-state filter:
+  s1 ← 0.35·s0 + s1; y = x·g − (1.65·s0 + s1); s0 ← 0.35·y + s0, each product rounded before its sum.
+- With Unvoice Spread on, y goes through two Schroeder allpasses, gain 0.6, delays 280 and 162 samples: w = (0 − 0.6·d) + x,
+  written at the index and 50,000 on; out = 0.6·w + d. The index falls one a sample and wraps at 50,000, so a read 280 or
+  162 on never wraps.
+- Each channel of the frame (the first only, mono) becomes out × level + y × fr4.
+
+rom.4 stores 0.35, 1.65 and 0.6 a unit off the nearest float, and the port keeps its bit patterns.
+
+**The reset** (`0x893ecf60`) clears the mic ring and both allpass buffers whole, besides v208's words, and leaves the level
+and the allpasses' index as they were.
+
+**Where the notes were wrong**, withdrawn in place in VC2_VOCAL_DESIGNER.md, "The output stage": the ring is the mixer's to
+write, not the output stage's; the gate glides toward the flag × fr5, its rate by which side the target is on, so "toward
+1 at 0.002" holds only for fr5 = 1; "five blocks back" is the flag four blocks before the last; and the delay stages are
+two allpasses.
+
+**The check.** xt_vc2in now runs the whole path a block at a time: the block into both mic rings where `0x893ed410` says,
+the input stage on it, then the output stage on the same random engine frames (at the bus's int32 scale). A case's
+channels, its consonant gain, slot 7's scale (often 1) and the level's term (half the time 0) come from a generator of
+their own, so the input stage's cases are v208's and its line in the baseline is unchanged. After the output stage it
+compares the frames, the whole region, the level and the allpasses' index word for word; after each reset and at each
+case's end, the mic ring and both buffers. 40 cases, 22,000 blocks, 0 different at seeds 2024 and 7 (12,400 and 14,400
+blocks stereo, 10,878 and 10,045 with Spread, 10,622 and 10,900 with the level's term). Checked: `mutate_vc2.py --in`'s
+66 plants, 31 of them new, 27 in `Vc2Consonants.cpp` (port `vc2out`) and four in the reset's part, each caught. The first
+run missed `out-reset-keeps-mic` (the reset leaving the old mic in the ring). That reaches the sound only if the gate opens
+before 14 blocks have written the ring over, so the check now also compares the buffers right after each reset.
+
 ### The VC-2's unvoiced detector (2026-11-15, v208) {#vc2-unvoiced}
 
 The VC-2 mode's step 3, its first port's first half (VC2_MODE_PLAN.md; the output stage, `0x893ed510` and `0x893ed690`,

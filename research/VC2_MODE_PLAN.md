@@ -229,7 +229,9 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      xt_vc2in at 0 different, 35 plants caught, its coefficients read by `loadVc2` at the start. **Done 2026-11-15**
      (HARDWARE_FIRMWARE.md, "The VC-2's unvoiced detector").
    - v209, the output stage (`0x893ed510` mono, `0x893ed690` stereo): the consonants from the delayed mic, gated by
-     v208's flag.
+     v208's flag. `Vc2Unvoiced::consonants` (Vc2Consonants.cpp), xt_vc2in on the whole path at 0 different, 66 plants
+     caught. **Done 2026-11-15** (HARDWARE_FIRMWARE.md, "The VC-2's consonants"). The mic ring's writer, the part
+     mixer's copy at `0x893ed410`'s pointer, is item 8's.
 2. LEGACY (10 bands): with 3.5, the first vocoder that sounds.
 3. HIRESO (32 bands, multirate): the formant warp's model is its start (`vc2warplaw.cpp`).
 4. The vocoder object and its settings path, with the hold on CC 64.

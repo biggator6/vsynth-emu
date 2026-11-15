@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's consonants v209 (2026-11-15, on vc2-mode, after master's v200-v202 were merged in as 76b6c4f): the VC-2 mode's
+  step 3, the first port's second half (the user's "Yes, next item"; HARDWARE_FIRMWARE.md, "The VC-2's consonants").
+  Vc2Unvoiced::consonants (Vc2Consonants.cpp): rom.4's output stage 0x893ed510 (mono) and 0x893ed690 (stereo), one
+  routine by its channel count: the mic 448 samples late through a gate gliding toward the flag kLate back × slot 7's
+  scale, a two-state filter, with Unvoice Spread two allpasses (280 and 162 samples, 0.6), added × the consonant gain to
+  the engine's frames × the gliding Sound Level. Its memory: the mic ring (written at micBlock(), 0x893ed410's pointer,
+  the part mixer's job), the allpasses' doubled buffers, rom.4's two .data words; the reset clears the ring and buffers.
+  The region's output words named (gate, highpass, micIndex). Not in the sound yet. Check: xt_vc2in on the whole path,
+  the input stage's cases as v208's, the frames and words after each block, the buffers after each reset and at a case's
+  end, 0 different; mutate_vc2.py --in, 66 plants (31 new, port vc2out for Vc2Consonants.cpp), each caught.
+  VC2_VOCAL_DESIGNER.md's output stage corrected in place (the ring's writer, the gate's target and rate, the flag's
+  age, the allpasses). verify.sh passes (fcheck as its baseline, which gained only the consonants' line; A/B 4/4
+  identical; auval).
+
 The VC-2's unvoiced detector v208 (2026-11-15, on vc2-mode): the VC-2 mode's step 3, the first port's first half (the
   user's "Yes, next item"; the output stage v209; HARDWARE_FIRMWARE.md, "The VC-2's unvoiced detector"). Vc2Unvoiced:
   rom.4's input stage 0x893ed040, which both vocoder engines run on the mic's 32-sample blocks, with its part of the reset,

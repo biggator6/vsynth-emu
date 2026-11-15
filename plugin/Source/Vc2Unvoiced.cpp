@@ -3,6 +3,7 @@
 #include "Vc2Unvoiced.h"
 #include "Sh4Interp.h"
 #include "XtFloat.h"
+#include <algorithm>
 #include <atomic>
 #include <bit>
 #include <mutex>
@@ -63,15 +64,18 @@ float biquad(const float* c, float* s, float x) {
 bool vc2LoadUnvoiced(const char* path) { return g_coefficients.load(path); }
 bool vc2UnvoicedLoaded() { return g_coefficients.loaded(); }
 
-// 0x893ecf60: what it sets of this region and the flags' ring.  The second biquad's states and the smoothed decision it
-// leaves as they were.
+Vc2Unvoiced::Vc2Unvoiced() : mic(kMicRing), allpassA(2 * kAllpass), allpassB(2 * kAllpass) {}
+
+// 0x893ecf60: what it sets of this region, the mic ring, the flags' ring and the two allpasses.  The second biquad's
+// states and the smoothed decision it leaves as they were.
 void Vc2Unvoiced::reset() {
+    std::fill(mic.begin(), mic.end(), 0.0f);
     flags.fill(0);
-    s.ringIndex = s.outputIndex = 0;
+    s.ringIndex = s.micIndex = 0;
     s.detect = kResetDetect;
     s.spread = 0;
     s.soundLevel = 1.0f;
-    s.outputWord99d8 = s.outputWords9a60[0] = s.outputWords9a60[1] = 0.0f;
+    s.gate = s.highpass[0] = s.highpass[1] = 0.0f;
     s.bq1[0] = s.bq1[1] = 0.0f;
     s.schmitt = s.schmittLast = s.hysteresis = kHysteresisLeast;
     for (float& p : s.peaks) p = 0.0f;
@@ -81,6 +85,14 @@ void Vc2Unvoiced::reset() {
     s.max = s.decaying = 0.0f;
     s.level = kResetLevel;
     s.bq3[0] = s.bq3[1] = 0.0f;
+    std::fill(allpassA.begin(), allpassA.end(), 0.0f);
+    std::fill(allpassB.begin(), allpassB.end(), 0.0f);
+}
+
+// The ring's entry kLate before its index, after the vote has moved the index on: the flag of four blocks before the last
+float Vc2Unvoiced::lateFlag() const {
+    const int late = s.ringIndex - kLate < 0 ? s.ringIndex - kLate + kRing : s.ringIndex - kLate;
+    return xtf::flt(flags[(size_t)late]);
 }
 
 void Vc2Unvoiced::settings(int detectPlus24, int spread, float soundLevel) {
@@ -133,8 +145,7 @@ void Vc2Unvoiced::vote() {
     s.threshold = unvoiced ? kHeld : flt(s.detect);
     flags[(size_t)s.ringIndex] = unvoiced ? 1 : 0;
     s.ringIndex = s.ringIndex + 1 >= kRing ? 0 : s.ringIndex + 1;
-    const int late = s.ringIndex - kLate < 0 ? s.ringIndex - kLate + kRing : s.ringIndex - kLate;
-    const float flag = flt(flags[(size_t)late]);
+    const float flag = lateFlag();
     const float rate = flag > s.smooth[kBlock - 1] ? kHysteresisLeast : kFall;
     float at = s.smooth[kBlock - 1];
     for (float& v : s.smooth) v = at = add(mul(sub(flag, at), rate), at);

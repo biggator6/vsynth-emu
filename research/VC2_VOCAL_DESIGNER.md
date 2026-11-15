@@ -1091,9 +1091,19 @@ result), smooths it per sample (toward 1 at 0.002, toward 0 at 0.01), gates the 
 two-state highpass (coefficients 0.35 and 1.65). With Unvoice Spread on it goes through two delay stages of gain 0.6 on the
 buffers at `0x8a0f882c` and `0x8a15a2ac`. Then per sample:
 
+(v209, ported bit for bit, `Vc2Consonants.cpp`; three readings above withdrawn there. The ring is written by the part mixer,
+not here: it copies each block of the mic, its frame's second word × a unit under 2^-31, to `0x893ed410`'s pointer, at the
+ring's index;
+the output stage reads 448 back and moves the index on a block. The gate glides toward the flag × fr5, its rate chosen once a
+block: 0.002 when the target is above the gate, else 0.01, so "toward 1" and "toward 0" hold only for fr5 = 1. "Five blocks
+back" is the ring's index less 5, after the vote has moved it on: the flag of four blocks before the last. The delay stages
+are two Schroeder allpasses, delays 280 and 162 samples, gain 0.6, each on a buffer that keeps every sample twice, 50,000
+apart. HARDWARE_FIRMWARE.md, "The VC-2's consonants".)
+
 out = engine's output × level + consonants × fr4,
 
-where level is Vocoder Sound Level (`0x899d9980`) plus `0x89997298` (a modulation, not traced), within 0…1, gliding 1/32 a block
+where level is Vocoder Sound Level (`0x899d9980`) plus `0x89997298` (a modulation, not traced; v209: the third of three ÷127
+values `0x893a2e50` writes from `0x893a24d0`'s shorts, at `0x89997290…98`), within 0…1, gliding 1/32 a block
 (`0x8993fe5c`), and fr4 is the vocoder's +0x14 × 2^31. So Unvoice Level and Depth set how much of the mic's own unvoiced sound is
 added (with HIRESO only: +0x14 stays 0 with LEGACY, see HIRESO's "Vocoder Depth"); Unvoice Detect sets how readily a block counts
 as unvoiced; Unvoice Spread diffuses it. The stereo stage does the same into both channels.
