@@ -232,7 +232,12 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      v208's flag. `Vc2Unvoiced::consonants` (Vc2Consonants.cpp), xt_vc2in on the whole path at 0 different, 66 plants
      caught. **Done 2026-11-15** (HARDWARE_FIRMWARE.md, "The VC-2's consonants"). The mic ring's writer, the part
      mixer's copy at `0x893ed410`'s pointer, is item 8's.
-2. LEGACY (10 bands): with 3.5, the first vocoder that sounds.
+2. LEGACY (10 bands): with 3.5, the first vocoder that sounds. Split in two where the firmware divides it (2026-11-15):
+   - v210, the analysis, a function on .bss globals (`0x893ef740`, its init, the rows' reader, the hold's three
+     routines): `Vc2LegacyAnalysis`, xt_vc2legacy at 0 different, 47 plants caught, its tables read by `loadVc2` at the
+     start. **Done 2026-11-15** (HARDWARE_FIRMWARE.md, "LEGACY's analysis").
+   - v211, the object (`0x893f23c0`…`0x893f3000`): its constructor, reset, synthesis (slots 2 and 3, the carrier's bands,
+     the output EQ) and settings (slots 4 to 7, onto v210's hold).
 3. HIRESO (32 bands, multirate): the formant warp's model is its start (`vc2warplaw.cpp`).
 4. The vocoder object and its settings path, with the hold on CC 64.
 5. The VOCODER OSC's carrier (kind 5) and its converter: the growl's model is its start (`vc2growllaw.cpp`).

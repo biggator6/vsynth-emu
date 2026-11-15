@@ -1546,6 +1546,59 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### LEGACY's analysis (2026-11-15, v210) {#legacy-analysis}
+
+The VC-2 mode's step 3.2, LEGACY, split in two where the firmware divides it: the analysis is a function on .bss globals,
+the object (`0x893f23c0`…`0x893f3000`, its synthesis and slots) is v211's. This is rom.4's `0x893ef740(input)`, which
+LEGACY's slot 1 (`0x893f2570`) calls on each 32-sample block of the mic, ported bit for bit as `Vc2LegacyAnalysis`
+(`Vc2LegacyAnalysis.h`, `.cpp`), with its init `0x893ef6a0` (the constructor's and slot 0's), the rows' reader `0x893efa00`
+(the synthesis's) and the hold: the controller `0x893efa70` (slot 6, CC 64's), the dump time `0x893efaf0` (slot 5) and the
+level `0x893efbe0` (slot 7). Its state is rom.4's `0x8a1bd9d4…0x8a1bf1ac` (0x17d8 bytes), kept word for word as
+`Vc2LegacyAnalysisWords`: 32 bands' 15 words, the mic's last two samples, the unvoiced path's 15 words, 32 rows of 32
+samples and the hold's five words. Two more are .data, the dump time (`0x89940254`) and the level (`0x89940258`), both 1.0
+in the image and set by nothing but the hold. Its tables are read from the user's rom.4 by `loadVc2` at the start: the
+band count (`0x89940250`, 10), the bands' five coefficients each at the .data pointer `0x8994024c` (`0x89940184`), and the
+hold's coefficients (`0x89561538`, 101 floats, entries 51…100 reached). Nothing in the sound uses it yet.
+
+**A sample.** u = (x − 2·x₋₁) + x₋₂, the mic's second difference, goes into each of the ten bands:
+- two resonators, y = c0·u + s0, s0 ← c1·y + s1, s1 ← c2·y; then z = s2 + y, s2 ← c3·z + s3, s3 ← c4·z;
+- a peak follower on z, not rectified: e ← 0.993973·e when e > z, else 0.0568395·z + 0.937477·e;
+- the hold: h ← e·take + h·keep, with this block's weights;
+- a lowpass, w = 1.75851e-5·h + 1.98628·w₁ − 0.986351·w₂ (summed in that order), out = (2·w₁ + w) + w₂, into the band's row.
+The row after the bands (row 10) is the unvoiced path, on x itself: a one-pole lowpass (0.197294·x + 0.796334·p), its
+first difference into a leaky one (+ 0.545192 of its last), that one's first difference, then three sections of
+(1 − z⁻¹)² over their own feedback (1.025606, −0.298534; 1.146377, −0.402838; 1.408010, −0.663236). Each product is rounded
+before its sum.
+
+**The hold.** The controller v (0…127) gives f = (v − 64) × the dump time × 1/63. Below 0 the level is 1 and the held
+coefficient 1; otherwise the level is 1 − f, and the coefficient is 0 past 0.99 (frozen), 1 at f = 0, else the table's
+entry trunc(50·f + 51). The dump time (slot 5) sets its word and does the same on the controller as it stands. At each
+block's start the weights come from the controller: from 64 up, take = the coefficient and keep = 1 − it, and the glide
+back is set to 1; below, the glide back falls by 0.01 a block, and while it is above 0 take = 0.01 and keep = 0.99
+(a sample at a time), else take = 1 and keep = 0. So letting go of the pedal brings the bands back over 100 blocks.
+
+The constants are rom.4's bit patterns, several a unit off the nearest float. `0x893efa10`, the block start's weights as a
+routine of their own, has no caller.
+
+**Where the notes stood.** VC2_VOCAL_DESIGNER.md's LEGACY section was read from listings and never run; its analysis and
+hold hold as written, now run (marked there), with the unvoiced path's sections and the order of the hold's weights
+given exactly here.
+
+**The check.** `xt_vc2legacy <rom.4> [cases] [seed]` (`Vc2LegacyCheck.cpp`, in fcheck, about 3 s): both inits, then blocks
+of the input stage's signal (`Vc2CheckRig.h`'s `Vc2Signal`, every eighth case faded to silence) through both analyses,
+with the pedal's 0…127 (127 and 0 most often, 64 and 63 where the hold's branches part) and new dump times (1, 126/127
+and 0 most often) now and then between them. After every block and event it compares the whole state and both .data
+words word for word; after a block besides, a row and sample through the reader and the level through its getter. One
+analysis goes through the cases, as rom.4's globals do. 40 cases, 22,000 blocks, 0 different at seeds 2024 and 7 (959
+and 917 events; 10,533 and 11,090 blocks held, 2,166 and 2,622 frozen, 7,113 and 6,966 gliding back). Checked:
+`mutate_vc2.py --legacy`'s 47 plants (`vc2legacy_muts.txt`, `PORT=vc2legacy`), each caught. The first run missed the
+freeze moved a unit up from 0.99, which no f the inputs give can tell apart, so that plant moves it to 0.995, and the
+dump times' ends are drawn more often, so 126/127 crosses it.
+
+What the two checks share moved into `Vc2CheckRig.h` as it stood (the interpreter, the input, the memory compare, and a
+check's start as `vc2Start`), and Vc2Unvoiced.cpp's loader became `Vc2RomTables<T>` (`Vc2RomTables.h`) with each table as
+a `Vc2Span`, its address and length together; xt_vc2in's output is unchanged.
+
 ### The VC-2's consonants (2026-11-15, v209) {#vc2-consonants}
 
 The second half of the step's first port (VC2_MODE_PLAN.md, step 3.1): rom.4's output stage, `0x893ed510(frames, fr4, fr5)`

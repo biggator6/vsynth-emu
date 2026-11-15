@@ -1,0 +1,55 @@
+# Planted errors in Vc2LegacyAnalysis.cpp (the VC-2's LEGACY analysis, v210; port vc2legacy), for mutate_vc2.py --legacy:
+# each must make xt_vc2legacy, on rom.4, say something differs.  name|old|new[|port[|seed]]
+# The tables
+table-count|count = (int)image.rd32(kCount);|count = (int)image.rd32(kCount) - 1;
+table-pointer|image.rd32(kCoefficientsAt), count|image.rd32(kCoefficientsAt) + 4, count
+table-hold|kHoldTable { 0x89561538, 101 }|kHoldTable { 0x8956153c, 101 }
+table-entry|s.held = g_tables.t.hold[at];|s.held = g_tables.t.hold[at - 1];
+# The constants, a unit off
+let-go-step|0xbc23d709u|0xbc23d70au
+glide-take|0x3c23d709u|0x3c23d70au
+glide-keep|kGlideKeep = std::bit_cast<float>(0x3f7d70a3u)|kGlideKeep = std::bit_cast<float>(0x3f7d70a4u)
+release|0x3f7e750cu|0x3f7e750du
+attack-keep|0x3f6ffe77u|0x3f6ffe78u
+attack-take|0x3d68d088u|0x3d68d089u
+lowpass-in|0x379383afu|0x379383b0u
+lowpass-back1|0x3ffe3e73u|0x3ffe3e74u
+lowpass-back2|0xbf7c8182u|0xbf7c8183u
+path-in|0x3e4a075au|0x3e4a075bu
+path-keep|0x3f4bdc8bu|0x3f4bdc8cu
+path-leak|0x3f0b91b7u|0x3f0b91b8u
+section-two|0x3f92bc7du|0x3f92bc7eu
+section-three-back|0xbf29c9d7u|0xbf29c9d8u
+hold-scale|0x3c820821u|0x3c820822u
+# (no f the inputs give falls within a unit of 0.99, so the freeze moves to 0.995, which a dump time of 126/127 crosses)
+freeze|kFreeze = std::bit_cast<float>(0x3f7d70a3u)|kFreeze = std::bit_cast<float>(0x3f7eb852u)
+table-slope|kTableSlope = 50.0f|kTableSlope = 49.0f
+table-at|kTableAt = 51.0f|kTableAt = 50.0f
+# A band
+second-difference|add(sub(x, mul(s.last, 2.0f)), s.beforeLast)|sub(add(x, s.beforeLast), mul(s.last, 2.0f))
+last-order|        s.beforeLast = s.last;\n        s.last = x;|        s.last = x;\n        s.beforeLast = s.last;
+first-state|const float y = add(mul(c[0], u), st[0]);|const float y = add(mul(c[0], u), st[1]);
+second-input|const float z = add(st[2], y);|const float z = add(st[2], u);
+second-c4|st[3] = mul(c[4], z);|st[3] = mul(c[3], z);
+follower-release|mul(st[11], kRelease)|mul(st[11], kAttackKeep)
+held-weights|add(mul(st[11], s.take), mul(st[12], s.keep))|add(mul(st[11], s.keep), mul(st[12], s.take))
+lowpass-numerator|add(add(mul(w1, 2.0f), w), w2)|add(add(mul(w1, 2.0f), w), w1)
+lowpass-state|st[9] = w1;|st[9] = w;
+# The unvoiced path
+path-lowpass|mul(p[0], kPathKeep)|mul(p[1], kPathKeep)
+path-difference|const float d = sub(lowpassed, p[0]);|const float d = sub(lowpassed, p[1]);
+path-no-second|float y = sub(leaked, p[1]);|float y = leaked;
+section-numerator|y = add(sub(v, mul(a, 2.0f)), b);|y = add(sub(v, mul(a, 2.0f)), a);
+section-state|w[1] = a;|w[1] = v;
+path-input|s.rows[count][i] = unvoiced(x);|s.rows[count][i] = unvoiced(u);
+# The hold
+weights-boundary|if (s.controller >= 64) {|if (s.controller > 64) {
+weights-keep|s.keep = sub(1.0f, s.held);|s.keep = s.held;
+let-go-start|s.letGo = 1.0f;|s.letGo = 0.5f;
+hold-level|level = sub(1.0f, f);|level = sub(1.0f, mul(f, 0.5f));
+hold-freeze|if (f > kFreeze) s.held = 0.0f;|if (f > kFreeze) s.held = 1.0f;
+hold-at-zero|else if (f == 0.0f) s.held = 1.0f;|else if (f == 0.0f) s.held = 0.5f;
+hold-forgets|    s.controller = controller;\n|
+dump-halved|    dump = d;|    dump = d * 0.5f;
+dump-not-applied|    dump = d;\n    holdFrom(s.controller);|    dump = d;
+reset-take|    s = {};\n    s.take = 1.0f;|    s = {};

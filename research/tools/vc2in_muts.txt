@@ -2,7 +2,7 @@
 # consonants, v209; port vc2out), for mutate_vc2.py --in: each must make xt_vc2in, on rom.4, say something differs.
 # name|old|new[|port[|seed]]
 # The tables, and the constants rom.4 stores a unit off the nearest float
-table-notch|kNotch = 0x895613c8;|kNotch = 0x895613cc;|vc2in
+table-notch|kNotch { 0x895613c8, 5 }|kNotch { 0x895613cc, 5 }|vc2in
 decay-nearest|0x3c23d709u|0x3c23d70au|vc2in
 release-nearest|0x3951b716u|0x3951b717u|vc2in
 fall-nearest|0x3a83126eu|0x3a83126fu|vc2in
@@ -11,7 +11,7 @@ reset-level-nearest|0x3e999999u|0x3e99999au|vc2in
 second-biquad|biquad(hp + 5, s.bq2|biquad(hp + 4, s.bq2|vc2in
 s1-order|s[0] = add(mul(y, c[3]), add(mul(x, c[1]), s[1]));|s[0] = add(add(mul(y, c[3]), mul(x, c[1])), s[1]);|vc2in
 s2-a1|s[1] = add(mul(x, c[2]), mul(y, c[4]));|s[1] = add(mul(x, c[2]), mul(y, c[3]));|vc2in
-no-notch|const float y3 = biquad(g_coefficients.notch, s.bq3, y2);|const float y3 = y2;|vc2in
+no-notch|const float y3 = biquad(g_coefficients.t.notch, s.bq3, y2);|const float y3 = y2;|vc2in
 # The block's peak and the Schmitt trigger
 peak-signed|const float magnitude = 0.0f > y2 ? -y2 : y2;|const float magnitude = y2;|vc2in
 peak-kept|s.peaks[0] = 0.0f;|(void)0;|vc2in

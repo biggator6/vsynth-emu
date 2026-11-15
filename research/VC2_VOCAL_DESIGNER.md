@@ -1112,6 +1112,9 @@ as unvoiced; Unvoice Spread diffuses it. The stereo stage does the same into bot
 
 Read from the listings by a forked agent, then checked here: the band count, both coefficient tables, the band gains, the
 response of every band (computed again), the loop bound and the follower's constants. Nothing here has been run.
+(v210: the analysis and the hold, run: `Vc2LegacyAnalysis` equals rom.4 in xt_vc2legacy, and what is written below of them
+holds; the unvoiced path is a one-pole lowpass, its first difference into a leaky one-pole, that one's first difference,
+then the three sections. HARDWARE_FIRMWARE.md, "LEGACY's analysis". The synthesis and the slots are v211's to run.)
 
 **Bands.** 10: the .data word `0x89940250` holds 10 and the synthesis loop's bound is a literal 10 (`0x893f265a`). Each band is
 a second difference of its input, u = x − 2x[n−1] + x[n−2], then two two-pole resonators in transposed form,

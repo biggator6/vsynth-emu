@@ -1,17 +1,14 @@
 // The VC-2's unvoiced detector: see Vc2Unvoiced.h (v208).  Every address is rom.4's; its check is Vc2UnvoicedCheck.cpp's
 // (xt_vc2in).  The arithmetic is the SH-4's (XtFloat): an FMAC is the product rounded, then the sum.
 #include "Vc2Unvoiced.h"
-#include "Sh4Interp.h"
+#include "Vc2RomTables.h"
 #include "XtFloat.h"
 #include <algorithm>
-#include <atomic>
 #include <bit>
-#include <mutex>
 
 namespace {
-constexpr uint32_t kHighpass = 0x895613a0;   // [FW] two biquads: b0, b1, b2, a1, a2 each, the a's negated
-constexpr uint32_t kNotch = 0x895613c8;      // [FW] the third, the same way
-constexpr int kHighpassWords = 10, kNotchWords = 5;
+constexpr Vc2Span kHighpass { 0x895613a0, 10 };   // [FW] two biquads: b0, b1, b2, a1, a2 each, the a's negated
+constexpr Vc2Span kNotch { 0x895613c8, 5 };        // [FW] the third, the same way
 // [FW 0x893ed1b8…0x893ed48c] the constants as rom.4 stores them
 constexpr float kHysteresisLeast = std::bit_cast<float>(0x3b03126fu);   // 0.002: the reset's and the least; the rise
 constexpr float kPeakShare = std::bit_cast<float>(0x3b800000u);         // 1/256 of the peak
@@ -26,30 +23,17 @@ constexpr float kFall = std::bit_cast<float>(0x3a83126eu);              // 0.001
 constexpr float kResetThreshold = 50.0f, kResetLevel = std::bit_cast<float>(0x3e999999u);   // 0.3
 constexpr int kResetDetect = 50, kLate = 5;
 
-// The tables, the process's: read once by the first image to load, published by the flag, then read without a lock
-class Coefficients {
-public:
-    bool load(const char* path);
-    bool loaded() const { return loaded_.load(std::memory_order_acquire); }
-    float highpass[kHighpassWords] {}, notch[kNotchWords] {};   // written before loaded_, never after
-
-private:
-    std::mutex lock_;
-    std::atomic<bool> loaded_ { false };
+// The detector's two coefficient tables, read from the image once (Vc2RomTables)
+struct Coefficients {
+    float highpass[kHighpass.floats] {}, notch[kNotch.floats] {};
+    bool read(Sh4& image) {
+        vc2ReadFloats(image, kHighpass, highpass);
+        vc2ReadFloats(image, kNotch, notch);
+        return true;
+    }
 };
 
-bool Coefficients::load(const char* path) {
-    const std::lock_guard<std::mutex> hold(lock_);
-    if (loaded()) return true;
-    Sh4 image;
-    if (!image.loadRom(path)) return false;
-    for (uint32_t i = 0; i < kHighpassWords; ++i) highpass[i] = std::bit_cast<float>(image.rd32(kHighpass + 4 * i));
-    for (uint32_t i = 0; i < kNotchWords; ++i) notch[i] = std::bit_cast<float>(image.rd32(kNotch + 4 * i));
-    loaded_.store(true, std::memory_order_release);
-    return true;
-}
-
-constinit Coefficients g_coefficients;
+constinit Vc2RomTables<Coefficients> g_coefficients;
 
 // One transposed biquad's sample, as 0x893ed040 orders it: y = b0·x + s1; s1 = (b1·x + s2) + a1·y; s2 = b2·x + a2·y
 float biquad(const float* c, float* s, float x) {
@@ -104,7 +88,7 @@ void Vc2Unvoiced::settings(int detectPlus24, int spread, float soundLevel) {
 // The sample loop: the highpass's two biquads, the block's peak after them, the notch, and the Schmitt trigger at ± the
 // hysteresis, a crossing counted whenever it flips
 float Vc2Unvoiced::runSamples(const float* in) {
-    const float* hp = g_coefficients.highpass;
+    const float* hp = g_coefficients.t.highpass;
     float peak = 0.0f;
     s.peaks[0] = 0.0f;
     s.counts[0] = 0.0f;
@@ -112,7 +96,7 @@ float Vc2Unvoiced::runSamples(const float* in) {
         const float y2 = biquad(hp + 5, s.bq2, biquad(hp, s.bq1, in[i]));
         const float magnitude = 0.0f > y2 ? -y2 : y2;
         if (magnitude > peak) s.peaks[0] = peak = magnitude;
-        const float y3 = biquad(g_coefficients.notch, s.bq3, y2);
+        const float y3 = biquad(g_coefficients.t.notch, s.bq3, y2);
         const float next = y3 > s.schmitt ? -s.hysteresis : s.hysteresis;
         if (0.0f > xtf::mul(next, s.schmittLast)) s.counts[0] = xtf::add(s.counts[0], 1.0f);
         s.schmitt = s.schmittLast = next;

@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+LEGACY's analysis v210 (2026-11-15, on vc2-mode): the VC-2 mode's step 3.2, its first half (the user's "Yes, next item";
+  the object, its synthesis and slots, v211; HARDWARE_FIRMWARE.md, "LEGACY's analysis"). Vc2LegacyAnalysis: rom.4's
+  0x893ef740, a function on .bss globals LEGACY's slot 1 calls, with its init, the rows' reader and the hold (controller,
+  dump time, level: slots 6, 5, 7). Ten bands, each the mic's second difference through two resonators, a peak follower,
+  the hold and a (1, 2, 1) lowpass into a row; row 10 the unvoiced path. Its state rom.4's span word for word
+  (Vc2LegacyAnalysisWords) and two .data words; its tables (the band count, the coefficients by their .data pointer, the
+  hold's) read by loadVc2 at the start (RomTest's vc2TablesIn). Not in the sound yet. Check: xt_vc2legacy (in fcheck,
+  about 3 s), the state after every block and pedal or dump-time event, the reader and the level's getter, 0 different;
+  mutate_vc2.py --legacy, 47 plants (PORT=vc2legacy), each caught; panel_muts.txt's rom4-no-legacy. Made room first:
+  the checks' rig (Vc2CheckRig.h: the interpreter, the input, the compare, vc2Start) out of Vc2UnvoicedCheck.cpp, and
+  Vc2Unvoiced.cpp's loader as Vc2RomTables<T> with Vc2Span tables; xt_vc2in's output unchanged. mutate.sh's tone parts
+  gained Vc2LegacyAnalysis. verify.sh passes (fcheck as its baseline, which gained only xt_vc2legacy's lines; A/B 4/4
+  identical, run again once ab.sh linked LEGACY's file, the one line that had failed; auval); mutate_vc2.py --in's 66
+  caught again; rom4-no-tables, rom4-no-unvoiced and rom4-no-legacy caught.
+
 The VC-2's consonants v209 (2026-11-15, on vc2-mode, after master's v200-v202 were merged in as 76b6c4f): the VC-2 mode's
   step 3, the first port's second half (the user's "Yes, next item"; HARDWARE_FIRMWARE.md, "The VC-2's consonants").
   Vc2Unvoiced::consonants (Vc2Consonants.cpp): rom.4's output stage 0x893ed510 (mono) and 0x893ed690 (stereo), one
