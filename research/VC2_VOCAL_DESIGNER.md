@@ -44,7 +44,8 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
 - `vc2run <rom.4> <run>` (C++, build line at the top of `vc2run.cpp`; run through `.claude/tools/buildq.mjs`): rom.4's
   routines in `Sh4Interp`, on `vc2rom.*`'s map; runs `boot`, `warp`, `ratio`, `hold`, `growl`, `kind6`, `track`, one file
   each ("rom.4 run in the interpreter"). `warp check` and `growl` hold a model of a routine (`vc2warplaw.cpp`,
-  `vc2growllaw.cpp`) to the firmware bit for bit, and fail when any word differs; `ratio` fails past 2 ulp from powf; `kind6`
+  `vc2growllaw.cpp`) to the firmware bit for bit, and fail when any word differs (v213: `warp check` and its model went
+  into the plugin, `vc2HiresoMapOf` held to slot 4 by xt_vc2hireso; `vc2run warp` keeps `diff` and `map`); `ratio` fails past 2 ulp from powf; `kind6`
   fails when an output's period is more than a sample from the reading's; `track` (`vc2track.cpp`, its settings and state
   section `vc2trackstate.cpp`, sharing `vc2track.h`) measures the pitch tracker against no model and fails only on a fault
   ("The pitch tracker, run", "The pitch tracker's analysis"); `vocosc` (`vc2vocosc.cpp`) follows the VOCODER OSC's IDs
@@ -630,7 +631,9 @@ Slot 4, `0x893f15d0(engine, side, ratio)`, writes the side's map and nothing els
 the engine's +0x2924 (side 1's at +0x2b24), for each synthesis band the fractional analysis band it reads. Its law, read and then
 held to the firmware bit for bit (`warp check`, `vc2warplaw.cpp`: 40,352 cases, both sides, pivots p = 0, 1, 3, 6, 9, 12, 18,
 20, 22, 24, 40, 63 and 127, ratios 0.5…2 every 1/1024 and the floats either side of 0.5, 0.95, 1, 1.05 and 2; 0 bands
-different, and 26,476 with an error of 1e-7 planted in one blend's weight):
+different, and 26,476 with an error of 1e-7 planted in one blend's weight; v213: the plugin's port, `vc2HiresoMapOf`,
+equals slot 4 on the same 40,352 maps in xt_vc2hireso, and the model is gone; HARDWARE_FIRMWARE.md, "HIRESO's formant
+warp"):
 
 - the pivot P = 500 + 172.265625·p Hz (172.27 = 44100/256), p the side's int at +0x2cb4/+0x2cb8 (slot 5's `ftrc` of the
   template record's second float: 1…24 in the 32 records, 12 in record 0, so P = 2567.2 Hz there);

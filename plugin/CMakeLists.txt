@@ -167,6 +167,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2LegacyAnalysis.cpp
     Source/Vc2LegacyTables.cpp
     Source/Vc2Legacy.cpp
+    Source/Vc2HiresoTables.cpp
+    Source/Vc2HiresoWarp.cpp
     Source/XtBuildId.cpp
 )
 

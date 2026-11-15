@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+HIRESO's formant warp v213 (2026-11-15, on vc2-mode): step 3.3's first part, the plan's start for HIRESO (the user's
+  "Yes, next item"; HARDWARE_FIRMWARE.md, "HIRESO's formant warp"). vc2HiresoMapOf (Vc2HiresoWarp.cpp): rom.4's slot 4,
+  a side's 32-band map from its pivot field and the Formant Shift ratio, research/tools/vc2warplaw.cpp's law in XtFloat;
+  its constants (the bands' centres, slot 4's pool) in Vc2HiresoTables, read by loadVc2 at the start (RomTest's
+  vc2TablesIn). Not in the sound yet. Check: xt_vc2hireso (Vc2HiresoCheck.cpp, in fcheck, under a second), slot 4 on
+  rom.4's own HIRESO object against the port, the model's 40,352 maps, 0 different; mutate_vc2.py --hireso, 19 plants
+  (ports vc2warp, vc2hitables), each caught; panel_muts.txt's rom4-no-hireso. The model and its `warp check` went with
+  the law: vc2warplaw.cpp/.h gone, vc2run warp keeps diff and map. verify.sh passes (fcheck as its baseline, which
+  gained only xt_vc2hireso's lines; A/B 4/4 identical; auval); the four rom4- loader plants caught; a tone plant links.
+
 LEGACY's stereo synthesis v212 (2026-11-15, on vc2-mode): step 3.2's last part (the user's "Yes, next item";
   HARDWARE_FIRMWARE.md, "LEGACY's stereo synthesis"). Vc2Legacy::stereo: rom.4's slot 3, 0x893f2980, mono's arithmetic
   in another shape: both channels through each band at once, their states interleaved in the band's words, summed as

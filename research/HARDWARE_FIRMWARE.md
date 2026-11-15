@@ -1546,6 +1546,29 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### HIRESO's formant warp (2026-11-15, v213) {#hireso-warp}
+
+The VC-2 mode's step 3.3, HIRESO, begins with its formant warp, as the plan has it; the rest of the engine follows by
+job (the rate filters, the analysis, the object with its settings, hold and envelopes, the mono and stereo syntheses).
+Slot 4, `0x893f15d0(this, side, ratio)`, writes one side's map: for each of the 32 synthesis bands, the fractional
+analysis band whose envelope it reads (side 0's at the object's +0x2924, side 1's at +0x2b24). Ported bit for bit as
+`vc2HiresoMapOf(pivot, ratio)` (`Vc2HiresoWarp.cpp`), XtFloat in slot 4's own order; its law is
+VC2_VOCAL_DESIGNER.md's "HIRESO's formant warp, run", which a research model (`research/tools/vc2warplaw.cpp`) had held
+to slot 4 first. Its constants are read from the user's rom.4 by `loadVc2` at the start, into `Vc2HiresoTables`: the 32
+bands' centres (`0x8994069c`, .data) and slot 4's pool, 13 words from `0x893f18d4` (the pivot's base and step, the high
+and low ends with their negations, the cubic's four, the blend's bounds and width). Nothing in the sound uses it yet.
+
+**The check.** `xt_vc2hireso <rom.4> [cases] [seed]` (`Vc2HiresoCheck.cpp`, in fcheck, under a second): rom.4's HIRESO
+constructor (`0x893f0a10`) on an object in the interpreter's RAM; slot 4 on it for both sides, 13 pivots (the templates'
+1…24 and past them, written into the side's field at +0x2cb4 as slot 5 would) and ratios from 0.5 to 2 every 1/1024 with
+the floats either side of 0.5, 0.95, 1, 1.05 and 2, the map against the port's word for word. 40,352 maps, 0 different,
+the model's own count. Checked: `mutate_vc2.py --hireso`'s 19 plants (`vc2hireso_muts.txt`, ports `vc2warp` and
+`vc2hitables`), each caught; three changes the inputs can't tell apart (the blend's weight above 1 as ratio − 1, band
+0's + −0, a band counted from 0 + 1) are left out, said so in the list.
+
+The research model and its `warp check` went with the law into the plugin: `vc2warplaw.cpp`/`.h` are gone, and
+`vc2run warp` keeps its `diff` and `map`.
+
 ### LEGACY's stereo synthesis (2026-11-15, v212) {#legacy-stereo}
 
 The last of step 3.2: slot 3, `0x893f2980`, ported bit for bit as `Vc2Legacy::stereo` beside the mono synthesis. It is

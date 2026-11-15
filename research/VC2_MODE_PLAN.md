@@ -244,7 +244,14 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      slot 7's level each sample: `Vc2Legacy::stereo`, xt_vc2legacy's object part run a second time at 0 different.
      **Done 2026-11-15** (HARDWARE_FIRMWARE.md, "LEGACY's stereo synthesis"). LEGACY is in, not yet heard: it sounds with
      item 5's carrier and item 4's object.
-3. HIRESO (32 bands, multirate): the formant warp's model is its start (`vc2warplaw.cpp`).
+3. HIRESO (32 bands, multirate): the formant warp's model is its start (`vc2warplaw.cpp`). Split by job (2026-11-15):
+   - v213, the formant warp (slot 4, `0x893f15d0`): `vc2HiresoMapOf`, the model's law in XtFloat, xt_vc2hireso at 0
+     different on the model's 40,352 maps, 19 plants caught; the model went with it. **Done 2026-11-15**
+     (HARDWARE_FIRMWARE.md, "HIRESO's formant warp").
+   - then, a version each as reached: the rate filters (the decimators and interpolators, `0x893efc30`'s objects), the
+     analysis (slot 1, `0x893ed930`), the object (constructor `0x893f0a10`, reset, settings slot 5 with the templates,
+     hold slots 6 and 7, the envelopes `0x893edd10`), the mono synthesis (slot 2, the carrier bank `0x893f1a10`) and the
+     stereo (slot 3).
 4. The vocoder object and its settings path, with the hold on CC 64.
 5. The VOCODER OSC's carrier (kind 5) and its converter: the growl's model is its start (`vc2growllaw.cpp`).
 6. The pitch tracker.

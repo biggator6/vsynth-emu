@@ -1,0 +1,27 @@
+# Planted errors in HIRESO's port, for mutate_vc2.py --hireso: each must make xt_vc2hireso, on rom.4, say something
+# differs.  name|old|new[|port[|seed]]; ports vc2warp (Vc2HiresoWarp.cpp, v213) and vc2hitables (Vc2HiresoTables.cpp).
+# Not planted, as no input tells them apart: the blend's weight above 1 as ratio − 1 (it is ratio + −1, the same number),
+# band 0's + −0 before its weight, and a band counted from 0 + 1 rather than set to 1.
+# The tables
+table-centres|kCentres { 0x8994069c,|kCentres { 0x899406a0,|vc2hitables
+table-pool|kWarpPool = 0x893f18d4;|kWarpPool = 0x893f18d8;|vc2hitables
+table-order|&Vc2HiresoTables::lowNeg, &Vc2HiresoTables::low,|&Vc2HiresoTables::low, &Vc2HiresoTables::lowNeg,|vc2hitables
+# The pivot and the slopes
+pivot-field|add(mul(flt(pivotField), t.pivotStep), t.pivotBase)|add(mul(flt(pivotField + 1), t.pivotStep), t.pivotBase)
+pivot-unmoved|const float pivotOut = mul(pivot, ratio);|const float pivotOut = pivot;
+low-slope|div(add(pivotOut, t.lowNeg), add(pivot, t.lowNeg))|div(add(pivotOut, t.lowNeg), add(pivot, t.highNeg))
+high-slope|div(add(pivotOut, t.highNeg), add(pivot, t.highNeg))|div(add(pivotOut, t.highNeg), add(pivot, t.lowNeg))
+# The warp in Hz and the cubic
+below-swapped|const bool below = pivotOut > cb;|const bool below = pivotOut < cb;
+anchor-swapped|anchor = below ? t.low : t.high;|anchor = below ? t.high : t.low;
+source-order|div(sub(cb, sub(anchor, mul(slope, anchor))), slope)|div(add(sub(cb, anchor), mul(slope, anchor)), slope)
+cubic-order|add(mul(add(mul(x, t.a3), t.a2), x), t.a1)|add(add(mul(mul(x, t.a3), x), mul(t.a2, x)), t.a1)
+cubic-term|add(mul(add(mul(x, t.a3), t.a2), x), t.a1)|add(mul(add(mul(x, t.a2), t.a2), x), t.a1)
+# The blend
+blend-under|ratio > t.under|ratio >= t.under
+blend-over|t.over > ratio|t.over >= ratio
+blend-at-one|ratio <= 1.0f && ratio > t.under|ratio < 1.0f && ratio > t.under
+weight-down|sub(1.0f, ratio)|sub(ratio, 1.0f)
+band-order|add(sub(inner, band), t.a0)|sub(add(inner, t.a0), band)
+band-start|band = b == 0 ? 1.0f : add(band, 1.0f);|band = b == 0 ? 0.0f : add(band, 1.0f);
+fade-as-product|div(mul(add(sub(inner, band), t.a0), weight), t.fade)|mul(mul(add(sub(inner, band), t.a0), weight), 20.0f)

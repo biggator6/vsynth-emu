@@ -7,6 +7,7 @@
 // other image, or of neither, is refused, saying so.
 #include "XtSynth.h"
 #include "Sh4Interp.h"
+#include "Vc2HiresoTables.h"
 #include "Vc2LegacyTables.h"
 #include "Vc2Params.h"
 #include "Vc2Unvoiced.h"
@@ -86,9 +87,12 @@ bool loadTables(const char* path) {
 }
 
 // The VC-2's image: its parameters' names, descriptors and value text (Vc2Params.cpp, v199), the unvoiced detector's
-// coefficients (Vc2Unvoiced.cpp, v208), LEGACY's analysis's tables (Vc2LegacyAnalysis.cpp, v210); the VC-2's other
-// ports' tables go here as they come (the VC-2 mode's step 3), read at this start and never at a switch of modes
-bool loadVc2(const char* path) { return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path); }
+// coefficients (Vc2Unvoiced.cpp, v208), LEGACY's tables (Vc2LegacyTables.cpp, v210, v211), HIRESO's (Vc2HiresoTables.cpp,
+// v213); the VC-2's other ports' tables go here as they come (the VC-2 mode's step 3), read at this start and never at
+// a switch of modes
+bool loadVc2(const char* path) {
+    return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path);
+}
 
 // An image in the tables: loaded by the first file taken, then only compared with.  The lock and what it guards are
 // one object, constinit so that it's there before any instance asks, whatever order the plugin's files start in.
