@@ -1152,6 +1152,10 @@ level as it is plus as it was the sample before, so about 32 × the level. The c
 to 0.5; the reset (slot 0) sets the glide and leaves p. HARDWARE_FIRMWARE.md, "LEGACY's synthesis". The stereo synthesis is
 v212's to run.)
 
+(v212: the stereo synthesis, run: `Vc2Legacy::stereo` equals rom.4, and what is written above of it holds. Besides: its
+row 10 gives both channels the left carrier's level, so the right's unvoiced term rides on the left's loudness; the
+right's level is followed into its own word and nothing reads it. HARDWARE_FIRMWARE.md, "LEGACY's stereo synthesis".)
+
 **Hold** (slot 6 → `0x893efa70(v)`, slot 7 → `0x893efbe0`). A 0…127 controller v: with f = (v − 64)/63 × Hold Dump Time/127,
 below 64 nothing is held (slot 7 returns 1); above, the held envelope h = h·(1 − C) + e·C follows with C from the decreasing
 table `0x89561538` at 50·f + 51 (time constants from about 45 ms to 16 s), freezing past f = 0.99, and slot 7 returns 1 − f.

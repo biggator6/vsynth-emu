@@ -106,7 +106,8 @@ int main(int argc, char** argv) {
     if (!run) return 1;
     Vc2LegacyAnalysis port;
     long different = analysisCases(fw, port, *run);
-    if (!different || !xtSwitch("XT_VC2LEGACY_STOP")) different += vc2LegacySynthesisCases(fw, port, *run);
+    for (int channels = 1; channels <= 2 && (!different || !xtSwitch("XT_VC2LEGACY_STOP")); ++channels)
+        different += vc2LegacySynthesisCases(fw, port, *run, channels);
     std::printf("xt_vc2legacy: %ld different\n", different);
     return 0;
 }

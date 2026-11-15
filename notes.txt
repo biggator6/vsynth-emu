@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+LEGACY's stereo synthesis v212 (2026-11-15, on vc2-mode): step 3.2's last part (the user's "Yes, next item";
+  HARDWARE_FIRMWARE.md, "LEGACY's stereo synthesis"). Vc2Legacy::stereo: rom.4's slot 3, 0x893f2980, mono's arithmetic
+  in another shape: both channels through each band at once, their states interleaved in the band's words, summed as
+  they go; the carriers' levels with slot 7's hold level; mono's EQ on each channel's own states. Found: row 10 gives
+  both channels the left carrier's level (rom.4's own; kept). Not in the sound yet. Check: xt_vc2legacy's object part
+  run a second time by slot 3, its own generator and right carrier, on memory zeroed as the first run's; 0 different;
+  the analysis's and mono's lines unchanged; mutate_vc2.py --legacy, 114 plants (16 stereo), each caught. Made room: the
+  EQ one routine on a channel's states (eqOn) with the glide its own step, the resonators taking their two states.
+  verify.sh passes (fcheck as its baseline, which gained only the stereo line; A/B 4/4 identical; auval); the three
+  rom4- loader plants caught.
+
 LEGACY's synthesis v211 (2026-11-15, on vc2-mode): step 3.2's second half, the object with its mono synthesis (the user's
   "Yes, next item"; the stereo synthesis, slot 3, v212; HARDWARE_FIRMWARE.md, "LEGACY's synthesis"). Vc2Legacy: rom.4's
   constructor 0x893f23c0, reset (slot 0), slot 1 (the analysis), the mono synthesis (slot 2, 0x893f25a0), slots 4 and 5

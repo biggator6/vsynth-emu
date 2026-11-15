@@ -5,9 +5,10 @@
 // on the output, which holds the carrier: its ten bands each the carrier's second difference through a resonator, × 0.5
 // × the analysis's envelope, a second resonator and the band's gain; the carrier's level is followed; the bands' sum × 12
 // with 16 × that level × the analysis's unvoiced row, through a six-section EQ whose first section tilts with the
-// Formant Shift.  The stereo synthesis, slot 3 (0x893f2980), is v212's.  Bit for bit: xt_vc2legacy against rom.4's object
-// in Sh4Interp, its words after every block and event.  HARDWARE_FIRMWARE.md, "LEGACY's synthesis"; VC2_VOCAL_DESIGNER.md,
-// "LEGACY: a 10-band channel vocoder".  Audio thread.
+// Formant Shift.  The stereo synthesis, slot 3 (0x893f2980, v212), is the same in another shape: both channels through
+// each band at once, summed as they go, the levels by slot 7's.  Bit for bit: xt_vc2legacy against rom.4's object in
+// Sh4Interp, its words after every block and event.  HARDWARE_FIRMWARE.md, "LEGACY's synthesis", "LEGACY's stereo
+// synthesis"; VC2_VOCAL_DESIGNER.md, "LEGACY: a 10-band channel vocoder".  Audio thread.
 #include "Vc2LegacyAnalysis.h"
 
 // The object's words from +0x004, as rom.4 lays them out (+0x000 is its vtable)
@@ -34,6 +35,7 @@ public:
     void reset();                               // slot 0: the same but p, which stays
     void analyze(const float* in) { analysis.block(in); }   // slot 1
     void mono(float* frames);                   // slot 2: 32 frames of two words, the carrier in each first, in place
+    void stereo(float* frames);                 // slot 3 (v212): the same frames, a carrier in each word, in place
     void formant(float ratio);                  // slot 4: p = (ratio − 0.0156) / 1.9687
     void settings(float ratio, float dump);     // slot 5: the settings' Formant Shift ratio (+0x00) and dump time (+0x38)
     void hold(int controller) { analysis.hold(controller); }   // slot 6
@@ -44,6 +46,9 @@ public:
 
 private:
     void clear();                               // what the constructor and the reset both clear
-    float band(int b, float u, int i);          // one sample of a carrier band, its row's
-    float eq(float x);                          // the output EQ on one sample
+    float band(int b, float u, int i);          // one sample of a carrier band, mono: its row's
+    void glided(float* tilt);                   // the glide's sample, and the tilt's four coefficients from it
+    // One channel's output EQ on one sample, on its states (mono's and stereo's left: eqLow[0…4], eqHigh[0…9]; stereo's
+    // right: eqLow[5…9], eqHigh[12…21]) with this sample's tilt
+    static float eqOn(float x, float* low, float* high, const float* tilt);
 };

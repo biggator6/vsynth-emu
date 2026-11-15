@@ -22,5 +22,6 @@ float vc2DrawDump(std::mt19937& rng);
 // The analysis's state and its two .data words against rom.4's; empty when they are the same
 std::string vc2LegacyStateDifference(Vc2Fw& fw, const Vc2LegacyAnalysis& port);
 bool vc2LegacyFirst();   // XT_VC2LEGACY_FIRST: say where the first case to differ first does
-// The object's cases (Vc2LegacySynthCheck.cpp), from the analysis's state as its cases left it; the cases that differ
-long vc2LegacySynthesisCases(Vc2Fw& fw, const Vc2LegacyAnalysis& carried, const Vc2Run& run);
+// The object's cases (Vc2LegacySynthCheck.cpp) by its mono synthesis (channels 1) or its stereo (2, v212), from the
+// analysis's state as the last cases left it, which `carried` takes back at the end; the cases that differ
+long vc2LegacySynthesisCases(Vc2Fw& fw, Vc2LegacyAnalysis& carried, const Vc2Run& run, int channels);

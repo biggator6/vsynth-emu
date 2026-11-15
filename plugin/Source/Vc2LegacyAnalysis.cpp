@@ -82,7 +82,7 @@ float Vc2LegacyAnalysis::band(int b, float u) {
     using namespace xtf;
     const float* c = &vc2LegacyTables().coefficients[b * kBandCoefficients];
     float* st = s.bands[b];
-    const float z = vc2SecondResonator(c, st, vc2FirstResonator(c, st, u));
+    const float z = vc2SecondResonator(c, st[2], st[3], vc2FirstResonator(c, st[0], st[1], u));
     st[11] = st[11] > z ? mul(st[11], kRelease) : add(mul(z, kAttackTake), mul(st[11], kAttackKeep));
     st[12] = add(mul(st[11], s.take), mul(st[12], s.keep));
     const float w1 = st[8], w2 = st[9];

@@ -241,7 +241,9 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      different, 98 plants caught (with v210's). Split again by its routines (2026-11-15). **Done 2026-11-15**
      (HARDWARE_FIRMWARE.md, "LEGACY's synthesis").
    - v212, the stereo synthesis (slot 3, `0x893f2980`): left and right through every band together, the sum as it goes,
-     slot 7's level each sample.
+     slot 7's level each sample: `Vc2Legacy::stereo`, xt_vc2legacy's object part run a second time at 0 different.
+     **Done 2026-11-15** (HARDWARE_FIRMWARE.md, "LEGACY's stereo synthesis"). LEGACY is in, not yet heard: it sounds with
+     item 5's carrier and item 4's object.
 3. HIRESO (32 bands, multirate): the formant warp's model is its start (`vc2warplaw.cpp`).
 4. The vocoder object and its settings path, with the hold on CC 64.
 5. The VOCODER OSC's carrier (kind 5) and its converter: the growl's model is its start (`vc2growllaw.cpp`).

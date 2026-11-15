@@ -33,8 +33,8 @@ table-at|kTableAt = 51.0f|kTableAt = 50.0f
 # An analysis band
 second-difference|add(sub(x, mul(s.last, 2.0f)), s.beforeLast)|sub(add(x, s.beforeLast), mul(s.last, 2.0f))
 last-order|        s.beforeLast = s.last;\n        s.last = x;|        s.last = x;\n        s.beforeLast = s.last;
-first-skipped|vc2SecondResonator(c, st, vc2FirstResonator(c, st, u))|vc2SecondResonator(c, st, u)
-second-skipped|vc2SecondResonator(c, st, vc2FirstResonator(c, st, u))|vc2FirstResonator(c, st, u)
+first-skipped|vc2SecondResonator(c, st[2], st[3], vc2FirstResonator(c, st[0], st[1], u))|vc2SecondResonator(c, st[2], st[3], u)
+second-skipped|vc2SecondResonator(c, st[2], st[3], vc2FirstResonator(c, st[0], st[1], u))|vc2FirstResonator(c, st[0], st[1], u)
 band-coefficients|&vc2LegacyTables().coefficients[b * kBandCoefficients]|&vc2LegacyTables().coefficients[(b + 1) * kBandCoefficients]
 follower-release|mul(st[11], kRelease)|mul(st[11], kAttackKeep)
 held-weights|add(mul(st[11], s.take), mul(st[12], s.keep))|add(mul(st[11], s.keep), mul(st[12], s.take))
@@ -104,7 +104,7 @@ tilt-state|low[2] = low[1];|low[2] = low[0];|vc2object
 tilt-output|add(mul(c[3], low[1]), mul(c[2], state))|add(mul(c[3], low[2]), mul(c[2], state))|vc2object
 pole-zero-state|add(mul(low[3], kPoleZero), q)|add(mul(q, kPoleZero), q)|vc2object
 biquad-store|    st[2] = st[1];|    st[2] = st[0];|vc2object
-biquad-order|biquad(&s.eqHigh[3], kBiquads[1], biquad(&s.eqHigh[0], kBiquads[0], low[4]))|biquad(&s.eqHigh[3], kBiquads[0], biquad(&s.eqHigh[0], kBiquads[1], low[4]))|vc2object
+biquad-order|biquad(&high[3], kBiquads[1], biquad(&high[0], kBiquads[0], low[4]))|biquad(&high[3], kBiquads[0], biquad(&high[0], kBiquads[1], low[4]))|vc2object
 last-store|last[1] = last[0];|last[1] = y;|vc2object
 # The constructor, the reset and the settings
 reset-sets-formant|    s.glide = kGlideStart;\n|    s.glide = kGlideStart;\n    s.formant = kFormantStart;\n|vc2object
@@ -112,3 +112,21 @@ reset-no-glide|    s.glide = kGlideStart;\n|    (void)0;\n|vc2object
 reset-keeps-eq|std::fill(std::begin(s.eqHigh), std::end(s.eqHigh), 0.0f);|(void)0;|vc2object
 formant-law|xtf::div(xtf::add(ratio, kFormantOffset), kFormantScale)|xtf::div(ratio, kFormantScale)|vc2object
 settings-dump|    analysis.dumpTime(dump);|    analysis.dumpTime(1.0f);|vc2object
+# The stereo synthesis (v212).  Not planted: the right's unvoiced term on row 10's left sample, which rom.4 gives the
+# same as the right's, both being the left's level
+st-left-states|vc2FirstResonator(c, st[0], st[2], uL)|vc2FirstResonator(c, st[0], st[1], uL)|vc2object
+st-right-input|vc2FirstResonator(c, st[1], st[3], uR)|vc2FirstResonator(c, st[1], st[3], uL)|vc2object
+st-right-second|vc2SecondResonator(c, st[5], st[7], mul(yR, share))|vc2SecondResonator(c, st[5], st[6], mul(yR, share))|vc2object
+st-share|const float share = mul(analysis.row(b, i), kEnvelopeShare);|const float share = analysis.row(b, i);|vc2object
+st-right-difference|uR = add(sub(right, mul(w[3], 2.0f)), w[4])|uR = add(sub(right, mul(w[3], 2.0f)), w[3])|vc2object
+st-carrier-kept|        w[4] = w[3];\n||vc2object
+st-right-gain|sumR = add(mul(vc2SecondResonator(c, st[5], st[7], mul(yR, share)), t.gains[b]), sumR);|sumR = add(vc2SecondResonator(c, st[5], st[7], mul(yR, share)), sumR);|vc2object
+st-sum-start|float sumL = 0.0f, sumR = 0.0f;|float sumL = 0.0f, sumR = 1.0f;|vc2object
+st-no-hold|const float taken = mul(holdLevel(), kLevelTake);|const float taken = kLevelTake;|vc2object
+st-signed|mul(taken, std::fabs(left))|mul(taken, left)|vc2object
+st-right-level|mul(taken, std::fabs(right))|mul(taken, std::fabs(left))|vc2object
+st-right-row|s.rows[kBands][2 * i] = s.rows[kBands][2 * i + 1] = add(levelL, w[2]);|s.rows[kBands][2 * i] = add(levelL, w[2]);\n        s.rows[kBands][2 * i + 1] = add(w[5], w[2]);|vc2object
+st-unvoiced-gain|const float unvoiced = mul(analysis.row(kBands, i), kUnvoicedGain);|const float unvoiced = analysis.row(kBands, i);|vc2object
+st-right-low|kRightLow = 5, kRightHigh = 12;|kRightLow = 6, kRightHigh = 12;|vc2object
+st-right-high|kRightLow = 5, kRightHigh = 12;|kRightLow = 5, kRightHigh = 13;|vc2object
+st-glide-twice|        frames[2 * i] = eqOn(xL, s.eqLow, s.eqHigh, tilt);\n|        frames[2 * i] = eqOn(xL, s.eqLow, s.eqHigh, tilt);\n        glided(tilt);\n|vc2object

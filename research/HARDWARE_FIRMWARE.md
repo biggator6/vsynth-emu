@@ -1546,6 +1546,29 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### LEGACY's stereo synthesis (2026-11-15, v212) {#legacy-stereo}
+
+The last of step 3.2: slot 3, `0x893f2980`, ported bit for bit as `Vc2Legacy::stereo` beside the mono synthesis. It is
+the mono synthesis's arithmetic in another shape, its constants rom.4's own copies of mono's (every one equal to one of
+mono's, read from both pools), with these differences:
+- **Both channels at once.** A carrier in each word of the frame; each band runs left and right together, their states
+  interleaved in the band's 24 words (left at 0, 2, 4, 6; right at 1, 3, 5, 7), and the bands are summed as they go,
+  z × the band's gain onto the sum, where mono keeps rows and sums after. The second resonator's input is y × (envelope
+  × 0.5), where mono's is (envelope × y) × 0.5: the same number, as × 0.5 is exact but past the floats' least.
+- **The carriers' levels** are followed with slot 7's hold level: L ← (hold × 0.000755287) × |x| + 0.998489 × L, the
+  absolute value by fabs, each channel's in its own word (+0x2c0c left, +0x2c18 right). But row 10 takes the left's for
+  both its samples of the frame (its 64 words, two a sample): the right's level is followed and stored, and nothing reads
+  it. That is rom.4's own, and the port keeps it; a right channel's unvoiced term rides on the left carrier's loudness.
+- **The EQ** is mono's, one routine on a channel's states, the left's where mono's are (+0x2c1c's first five, +0x2c7c's
+  first ten), the right's after them (+0x2c30's five, +0x2cac's ten), the glide moved once a sample for both.
+
+**The check.** xt_vc2legacy's object part runs a second time, by slot 3, with its own generator and a carrier of its own
+for the right, on memory zeroed as the first run's was (the constructor leaves the rows, so a run on the first run's
+memory starts with its rows, which the port's new object hasn't). 40 cases, 22,000 blocks, 0 different at seeds 2024 and
+7 (924 and 963 events: 442 and 489 settings; 11,198 and 11,280 blocks held); the analysis's and mono's lines unchanged;
+the whole check about 16 s. The EQ became one routine on a channel's states and the band resonators take their two
+states, for stereo's interleaved ones; both unchanged in what they compute.
+
 ### LEGACY's synthesis (2026-11-15, v211) {#legacy-synthesis}
 
 The second half of step 3.2, split again by its routines: the object with its mono synthesis here, the stereo synthesis
