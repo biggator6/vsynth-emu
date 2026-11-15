@@ -36,6 +36,23 @@ private:
     uint32_t read_ = 0, write_ = 0;             // frames, counted on; their difference is what's held
 };
 
+// The outside input as the effect chip's program A hands it back to the SH-4, computed without the chip (v205, the user's
+// choice for the Effects switch off): words 4 and 5 by External Input Type's law, a frame late, in the chip's 24 bits.
+// Settled, the chip's to the bit (xt_fx control, "the copy without the chip"; HARDWARE_FIRMWARE.md, "The input with the
+// Effects off").  A change of Type takes at once here, where the chip's routing goes through the driver's queue and fades.
+// Source makes no difference to the plugin's one input, which the unit gives both pairs of the chip's slots.  Audio thread.
+class XtExtInCopy {
+public:
+    void setType(int type);   // External Input Type, ID 0x78: 0 STEREO L R, 1 MONO MIX, 2 MONO L, 3 MONO R
+    // `frames` frames of the input, int32 L then R at the XT's full scale, into `to` as the chip would hand them back
+    void into(XtExtInput& to, const int32_t* lr, int frames);
+
+private:
+    int32_t wordOf(int side) const;
+    int type_ = 1;            // the descriptor's default, MONO MIX
+    int32_t last_[2] = {};    // the frame before, in the chip's 24 bits: what goes back now
+};
+
 #ifdef XT_TONE_CHECK
 // xt_tone's input, the same frames to its firmware's tone and to XtSynth: the 32 from frame `from` (the block's first), each
 // word drawn from the frame and side alone, over the whole of int32

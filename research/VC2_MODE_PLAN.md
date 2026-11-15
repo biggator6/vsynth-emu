@@ -200,7 +200,10 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
       `XtSynth::busOut` with `render` into `XtSynthOut.cpp`. For v206 besides: the host's input at its own rate, which
       the chip takes at 44.1 kHz.
     - v205, Effects off: the copy without the chip, from the routing's coefficients as the driver leaves them, held to
-      `XtFxChip` under every Type and Source.
+      `XtFxChip` under every Type and Source. **Done 2026-11-14** (HARDWARE_FIRMWARE.md, "The input with the Effects
+      off"): `XtExtInCopy`, program A's path settled as a law (a frame late; STEREO, MONO MIX each side halved, MONO L,
+      MONO R), measured bit for bit on `XtFxUnit` and held to it in `xt_fx control`, 9 of 9. The plugin's choice of it
+      or the unit by the Effects switch goes to v206.
     - v206, the plugin: its input bus (the Standalone's mic), OSC Type's third choice, a patch's EXT IN read
       (`XtPatch`, `xtPatchMissing`), External Input Type and Source as parameters, and the panel's word when an EXT IN
       OSC has no input.

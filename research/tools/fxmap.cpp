@@ -82,6 +82,29 @@ void row(int t, const char* name, int np, int lo, int hi, uint32_t fnLoad, uint3
     memOps(lo, hi, wr, rd, ind, top);
     std::printf("%2d|%-20s|%2d|%08x|%08x|%08x|%3d/%3d|%3zu|%3d|%2d|%2d|%2d|%2d|%05x\n", t, name, np, fnLoad, fnUpd, lastTable, act, hi - lo, coefWords.size(), nField, wr, rd, ind, nDly, top);
 }
+// A chip word's operation as XtFxChip's decode reads it ((w >> 16) & 0x7c, the 0x34 forms aside), for a listing
+const char* chipOperation(uint32_t w) {
+    static const std::map<unsigned, const char*> names = {
+        { 0x00, "mac" }, { 0x04, "mac=" }, { 0x10, "macB" }, { 0x14, "macB=" }, { 0x08, "store" },
+        { 0x0c, "storeB" }, { 0x18, "store>B" }, { 0x1c, "storeB>B" }, { 0x58, "store+" }, { 0x5c, "storeB+" },
+        { 0x24, "gram" }, { 0x30, "mulcoef" }, { 0x34, "0x34" }, { 0x38, "gram<=" }, { 0x3c, "gram<=B" },
+        { 0x40, "raw" }, { 0x44, "raw=" }, { 0x48, "rect" }, { 0x4c, "rect=" }, { 0x50, "cmp" }, { 0x6c, "fold+" },
+        { 0x78, "fold-" }, { 0x7c, "fold-=" } };
+    const auto it = names.find((w >> 16) & 0x7c);
+    return it == names.end() ? "?" : it->second;
+}
+// Program A's words that touch GRAM (a read, or a store into it), and every word of the routing's region, 0x80…0xc0:
+// index, word, operation, operand, shift code, coefficient
+void listInputPath() {
+    std::puts("program A, the GRAM words and the routing's region:");
+    for (int i = 0; i < 0x400; ++i) {
+        const uint32_t w = W[i], op = (w >> 16) & 0x7c;
+        const bool gram = op == 0x24 || op == 0x38 || op == 0x3c;
+        if (!w || !(gram || (i >= 0x80 && i < 0xc0))) continue;
+        std::printf("  %03x %07x %-8s %02x sh%u c%02x\n", i, w, chipOperation(w), w >> 10 & 255, w >> 8 & 3, w & 255);
+    }
+}
+
 // The input routing (HARDWARE_FIRMWARE.md, "The input's way in"): the boot, the routing's bytes cleared as the driver's
 // start clears them (0x894ae960), then the EXT IN request with the two settings and the event it posts.
 int inputRouting(Sh4& c, int type, int source) {
@@ -105,6 +128,7 @@ int inputRouting(Sh4& c, int type, int source) {
     if (!c.call(0x894aee80, {}, kSp)) std::printf("  fault: %s\n", c.error().c_str());
     for (const auto& [i, what] : note) std::printf("  %03x %07x  %s\n", i, W[i], what.c_str());
     std::printf("%d coefficients, %d fields\n", nCoef, nField);
+    listInputPath();
     return 0;
 }
 } // namespace

@@ -49,6 +49,25 @@ void XtExtInput::clear() {
     out_.fill(0);
 }
 
+void XtExtInCopy::setType(int type) { type_ = std::clamp(type, 0, 3); }
+
+// [FW program A, measured on XtFxChip] each Type's pair, from the frame before: STEREO L R the sides, MONO MIX each side
+// halved on its own and summed (the routing's 0x20 terms, at shift code 1), MONO L the left on both, MONO R the right
+int32_t XtExtInCopy::wordOf(int side) const {
+    const int32_t l = last_[0], r = last_[1], mix = (l >> 1) + (r >> 1);
+    const int32_t laws[4][2] = { { l, r }, { mix, mix }, { l, l }, { r, r } };
+    return (int32_t)((uint32_t)laws[type_][side] << 8);
+}
+
+void XtExtInCopy::into(XtExtInput& to, const int32_t* lr, int frames) {
+    for (int i = 0; i < frames; ++i) {
+        const int32_t back[2] = { wordOf(0), wordOf(1) };
+        to.push(back, 1);
+        last_[0] = lr[2 * i] >> 8;   // the chip has a word's top 24 bits, as XtFxUnit gives it
+        last_[1] = lr[2 * i + 1] >> 8;
+    }
+}
+
 #ifdef XT_TONE_CHECK
 void xtExtInTestBlock(long from, int32_t* lr64) {
     for (int i = 0; i < 2 * kBlockFrames; ++i) {

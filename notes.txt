@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The input with the Effects off v205 (2026-11-14, on vc2-mode): the item's second of three (the user's "Yes, next item";
+  "Copy without the chip"). XtExtInCopy (XtExtIn.cpp): the input as program A hands it back, computed without the chip,
+  a frame late in the chip's 24 bits: STEREO L R, MONO MIX (L >> 1) + (R >> 1), MONO L, MONO R (measured on XtFxUnit:
+  settled, every Type under both Sources, 19,000 frames to full scale, bit for bit). The plugin's choice of it or the unit
+  by the Effects switch is v206's, with the host input. Check: xt_fx control's "the copy without the chip against the
+  chip", 9 of 9 (each Type and Source, a change of Type compared from 100 ms on, the defaults); fxc_muts.txt's eight
+  copy- plants (port fxe) caught.
+
 The input's way in, the chip's side v204 (2026-11-14, on vc2-mode): the VC-2 mode's step 2, fourth item's second half,
   the first of three (the user's "Yes, next item"; for Effects off the user's "Copy without the chip", v205; the plugin's
   bus v206). XtFxControl runs the firmware's EXT IN request (0x894a7dd0: External Input Type 0x78, default MONO MIX, and

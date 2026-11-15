@@ -847,3 +847,4 @@ control against the reference: 266064 samples, 0 different
 the frame into the chip against the firmware's truncation: 51200 samples, 0 different
 the frame through the unit: 9 samples, 0 different
 the input through the unit: 8 samples, 0 different
+the copy without the chip against the chip: 9 samples, 0 different

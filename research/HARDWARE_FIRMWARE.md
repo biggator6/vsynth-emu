@@ -1546,6 +1546,31 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The input with the Effects off (2026-11-14, v205) {#input-effects-off}
+
+The second of the item's three versions (VC2_MODE_PLAN.md). With the Effects switch off the plugin runs no chip, and the
+EXT IN OSC hears the input as program A would hand it back, computed without it (the user's decision, 2026-11-14, over
+running the chip for the input alone or leaving EXT IN silent).
+
+**What program A does with it.** Listed by `fxmap rom input <type> <source>` after the routing: the input read at GRAM
+0x11, 0x13 and 0x19, 0x1b (0x032, 0x036, 0x02c, 0x02e), some 70 words through registers 05…08 and 0x52…0x61 with the
+routing's gain matrix (0xb1…0xb4, 0xbb…0xbe), `mulcoef` words on coefficient registers set by 0x34 forms (the fades'),
+and the copies stored at GRAM 0x96, 0x94 (0x0af, 0x0b0), 0x98 and 0x9a (0x0c2, 0x0c3). Settled, all of it comes to a
+law, measured on `XtFxUnit` over 19,000 frames of noise to full scale with its extremes, every Type under both Sources,
+bit for bit in the chip's 24 bits: a frame late, STEREO L R each side, MONO L the left on both, MONO R the right on both,
+and MONO MIX `(L >> 1) + (R >> 1)` on both, each side halved on its own (the matrix's 0x20 terms at shift code 1). Source
+makes no difference to the plugin's one input, which reaches both pairs of slots.
+
+**In the plugin** (`XtExtInCopy`, `XtExtIn.cpp`): that law, setType by External Input Type, into an `XtExtInput` as the
+returned words are. A change of Type takes at once here; on the chip it goes through the driver's queue and the routing's
+own writes. Which the plugin uses, the unit or the copy, by the Effects switch, is v206's, with the host's input.
+
+**The check.** `xt_fx control`'s `the copy without the chip against the chip`: the copy against `XtFxUnit`'s words 4 and
+5, bit for bit, every Type under each Source over 8,192 frames, then a change to the next Type compared from 100 ms on,
+and the defaults with nothing set (MONO MIX): 9 of 9. Plants: `fxc_muts.txt`'s eight `copy-` (port `fxe`, `XtExtIn.cpp`
+within `xt_fx`), all caught; the default's own guard is the case with nothing set, as it stands in the header, which
+that port doesn't plant.
+
 ### The input's way in, the chip's side (2026-11-14, v204) {#input-way-in}
 
 The VC-2 mode's step 2, fourth item's second half, the first of its three versions (VC2_MODE_PLAN.md): the outside input

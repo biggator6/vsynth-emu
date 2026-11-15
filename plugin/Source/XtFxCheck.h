@@ -240,5 +240,6 @@ void valueText(const char* rom);                                                
 void unitConversion(const char* rom, uint32_t seed);                                    // XtFxCheckUnit.cpp
 void unitLevels(const char* rom, bool print);
 void unitInput(const char* rom);
+void copyWithoutChip(const char* rom, uint32_t seed);                                  // XtFxCheckCopy.cpp, v205
 } // namespace xtfxcheck
 #endif

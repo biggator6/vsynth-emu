@@ -151,15 +151,16 @@ elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck
 elif [ "$PORT" = fx ]; then        # XtFxChip against the reference; [cases] is its samples per type, and XT_FX_STOP stops at the first difference
     F=XtFxChip.cpp
     fxParts XtFxControl XtFxValueText XtFxInput XtExtIn
-elif [[ "$PORT" =~ ^(fxc|fxv|fxi)$ ]]; then   # XtFxControl (fxv: its values' text, XtFxValueText.cpp, v199; fxi: the
-    # input's way in, XtFxInput.cpp, v204) against its checks in xt_fx; [cases] is the events of "xt_fx control"; the
-    # others of the three are kept objects
+elif [[ "$PORT" =~ ^(fxc|fxv|fxi|fxe)$ ]]; then   # XtFxControl (fxv: its values' text, XtFxValueText.cpp, v199; fxi:
+    # the input's way in, XtFxInput.cpp, v204; fxe: the input's ring and its copy without the chip, XtExtIn.cpp, v205)
+    # against its checks in xt_fx; [cases] is the events of "xt_fx control"; the others of the four are kept objects
     case "$PORT" in
-        fxv) F=XtFxValueText.cpp; KEEP=(XtFxControl XtFxInput) ;;
-        fxi) F=XtFxInput.cpp; KEEP=(XtFxControl XtFxValueText) ;;
-        *) F=XtFxControl.cpp; KEEP=(XtFxValueText XtFxInput) ;;
+        fxv) F=XtFxValueText.cpp; KEEP=(XtFxControl XtFxInput XtExtIn) ;;
+        fxi) F=XtFxInput.cpp; KEEP=(XtFxControl XtFxValueText XtExtIn) ;;
+        fxe) F=XtExtIn.cpp; KEEP=(XtFxControl XtFxValueText XtFxInput) ;;
+        *) F=XtFxControl.cpp; KEEP=(XtFxValueText XtFxInput XtExtIn) ;;
     esac
-    fxParts XtFxChip XtExtIn "${KEEP[@]}"
+    fxParts XtFxChip "${KEEP[@]}"
 elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
     case "$PORT" in
         ticks) F=XtTempoTicks.cpp ;;
@@ -289,7 +290,7 @@ if [ "$PORT" = enc ]; then
     echo "enc: $(grep -c . "$M/$N.out") waves differ from the baseline"
     exit
 fi
-[[ "$PORT" =~ ^(fxc|fxv|fxi)$ ]] && ARGS=("$C") && C=control
+[[ "$PORT" =~ ^(fxc|fxv|fxi|fxe)$ ]] && ARGS=("$C") && C=control
 # a run the error hangs is stopped as solocmp's alarm stops one (MUT_TIMEOUT seconds, default 1500): it counts as one that died
 timeout "${MUT_TIMEOUT:-1500}" "$M/$N" "$IMAGE" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"
 st=${PIPESTATUS[0]}; [ "$st" = 124 ] && st=$((128 + 14)); [ "$st" -ge 128 ] && echo "$N: the run died, signal $((st - 128))"

@@ -163,6 +163,7 @@ int main(int argc, char** argv) {
         const uint32_t seed = (uint32_t)argOr(argc, argv, 4, 2024);
         readers(rom, seed); behaviour(rom); valueText(rom); liveEdits(rom, events, seed); threads(rom, events, seed); againstReference(rom, events, seed); unitConversion(rom, seed); unitLevels(rom, false);
         unitInput(rom);
+        copyWithoutChip(rom, seed);
         return 0;
     }
     if (argc > 2 && !std::strcmp(argv[2], "speed")) { speed(rom); return 0; }

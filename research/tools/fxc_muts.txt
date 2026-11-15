@@ -184,3 +184,13 @@ in-right-left|chip.setGram(kAnalogR, r);|chip.setGram(kAnalogR, l);|fxi
 in-pushed|{ in_.push(lr, frames); }|{ (void)lr; (void)frames; }|fxi
 back-slot|kBackL = 0x99,|kBackL = 0x98,|fxi
 back-shift|chip_->gram(kBackL) << 8);|chip_->gram(kBackL) << 7);|fxi
+# v205: the copy without the chip (fxe, XtExtIn.cpp's XtExtInCopy), against XtFxUnit in "the copy without the chip"
+# (its default Type, in XtExtIn.h, which this port doesn't plant, is the check's case with nothing set)
+copy-mix-sum|mix = (l >> 1) + (r >> 1);|mix = (l + r) >> 1;|fxe
+copy-stereo|{ { l, r }, { mix, mix }|{ { r, l }, { mix, mix }|fxe
+copy-mono-l|{ mix, mix }, { l, l }, { r, r } }|{ mix, mix }, { l, r }, { r, r } }|fxe
+copy-mono-r|{ l, l }, { r, r } }|{ l, l }, { l, l } }|fxe
+copy-no-delay|const int32_t back[2] = { wordOf(0), wordOf(1) };|last_[0] = lr[2 * i] >> 8; last_[1] = lr[2 * i + 1] >> 8; const int32_t back[2] = { wordOf(0), wordOf(1) };|fxe
+copy-shift-in|last_[1] = lr[2 * i + 1] >> 8;|last_[1] = lr[2 * i + 1] >> 7;|fxe
+copy-shift-out|return (int32_t)((uint32_t)laws[type_][side] << 8);|return (int32_t)((uint32_t)laws[type_][side] << 7);|fxe
+copy-type-clamp|type_ = std::clamp(type, 0, 3);|type_ = std::clamp(type, 0, 2);|fxe
