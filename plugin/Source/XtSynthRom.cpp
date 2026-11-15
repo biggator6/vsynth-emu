@@ -7,7 +7,7 @@
 // other image, or of neither, is refused, saying so.
 #include "XtSynth.h"
 #include "Sh4Interp.h"
-#include "Vc2LegacyAnalysis.h"
+#include "Vc2LegacyTables.h"
 #include "Vc2Params.h"
 #include "Vc2Unvoiced.h"
 #include "XtFiles.h"

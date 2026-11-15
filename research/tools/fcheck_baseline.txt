@@ -750,6 +750,7 @@ consonants: 22000 blocks (12400 stereo, 10878 with Spread, 10622 with the level'
 xt_vc2in: 0 different
 == xt_vc2legacy
 legacy analysis: 40 cases, 22000 blocks, 959 events (10533 blocks held, 2166 frozen, 7113 gliding back), 0 different
+legacy synthesis: 40 cases, 22000 blocks, 895 events (421 settings, 12012 blocks held), 0 different
 xt_vc2legacy: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks

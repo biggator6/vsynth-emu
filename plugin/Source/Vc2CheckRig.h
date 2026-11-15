@@ -103,6 +103,15 @@ inline std::string vc2FirstDifference(Vc2Fw& fw, uint32_t at, const void* mine, 
     return t;
 }
 
+// A reset on both, rom.4's routine (v211) and the port's reset(), then `difference(fw, port)`; empty when nothing differs
+template <class Port, class Difference>
+std::string vc2ResetOn(Vc2Fw& fw, uint32_t routine, std::initializer_list<uint32_t> args, Port& port,
+                       Difference difference) {
+    if (!fw.call(routine, args)) return "the reset faults: " + fw.cpu.error();
+    port.reset();
+    return difference(fw, port);
+}
+
 // One of the port's buffers against rom.4's at `at`
 inline std::string vc2BufferDifference(Vc2Fw& fw, uint32_t at, const std::vector<float>& mine, const char* what) {
     return vc2FirstDifference(fw, at, mine.data(), mine.size() * sizeof(float), what);

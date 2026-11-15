@@ -1146,6 +1146,12 @@ sample, `+0x2ce0`). By the agent's computation the chain then peaks at 733 Hz wi
 Mono writes the left channel only, buffering each band's 32 samples (rows at +0x004) before summing; stereo runs left and right
 through their own states as it goes, and scales the carrier's level by slot 7's value every sample, which mono doesn't.
 
+(v211: the mono synthesis, the object and its slots but the stereo synthesis, run: `Vc2Legacy` equals rom.4 in xt_vc2legacy,
+and what is written here of them holds, but one term: "16 · (carrier level)" is 16 × the object's row 10, which holds the
+level as it is plus as it was the sample before, so about 32 × the level. The constructor sets p to 0.5000254 and its glide
+to 0.5; the reset (slot 0) sets the glide and leaves p. HARDWARE_FIRMWARE.md, "LEGACY's synthesis". The stereo synthesis is
+v212's to run.)
+
 **Hold** (slot 6 → `0x893efa70(v)`, slot 7 → `0x893efbe0`). A 0…127 controller v: with f = (v − 64)/63 × Hold Dump Time/127,
 below 64 nothing is held (slot 7 returns 1); above, the held envelope h = h·(1 − C) + e·C follows with C from the decreasing
 table `0x89561538` at 50·f + 51 (time constants from about 45 ms to 16 s), freezing past f = 0.99, and slot 7 returns 1 − f.

@@ -7,12 +7,8 @@
 // highs.  Bit for bit: xt_vc2legacy against rom.4 in Sh4Interp, the whole state word for word after every block and
 // event.  HARDWARE_FIRMWARE.md, "LEGACY's analysis"; research/VC2_VOCAL_DESIGNER.md, "LEGACY: a 10-band channel
 // vocoder".  Audio thread.
+#include "Vc2LegacyTables.h"   // its tables, and vc2LoadLegacy that loadVc2 calls at the start
 #include <cstdint>
-
-// rom.4's tables: the bands' coefficients (five floats a band, at the .data pointer 0x8994024c), the band count
-// (0x89940250) and the hold's coefficients (0x89561538), read once by loadVc2 at the start; before them no band runs
-[[nodiscard]] bool vc2LoadLegacy(const char* path);
-bool vc2LegacyLoaded();
 
 // The analysis's state as rom.4 lays it out from 0x8a1bd9d4, word for word
 struct Vc2LegacyAnalysisWords {

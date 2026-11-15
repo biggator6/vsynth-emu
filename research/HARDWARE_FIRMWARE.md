@@ -1546,6 +1546,53 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### LEGACY's synthesis (2026-11-15, v211) {#legacy-synthesis}
+
+The second half of step 3.2, split again by its routines: the object with its mono synthesis here, the stereo synthesis
+(slot 3, `0x893f2980`, a routine of another shape) v212's. Ported bit for bit as `Vc2Legacy` (`Vc2Legacy.h`, `.cpp`):
+the constructor `0x893f23c0` and slots 0 (reset, `0x893f24b0`), 1 (`0x893f2570`, the analysis), 2 (the mono synthesis,
+`0x893f25a0`), 4 (`0x893f2f60`), 5 (`0x893f2f90`), 6 and 7 (the analysis's hold and level). The object is 0x2ce4 bytes, a
+vtable and then the words `Vc2LegacyWords` keeps in rom.4's order: 32 rows of 64 floats (+0x004), 32 bands' 24 states
+(+0x2004), six carrier words (+0x2c04), the EQ's two sets of 24 (+0x2c1c, +0x2c7c), p (+0x2cdc) and its glide (+0x2ce0).
+Its tables join the analysis's in `Vc2LegacyTables` (read by `loadVc2` at the start): the carrier bands' five coefficients
+each (`0x89940744`) and their gains (`0x8994071c`, 1 but the top band's 0.8). The synthesis's band count is a literal 10.
+Nothing in the sound uses it yet.
+
+**The constructor** (given no memory, it takes 0x2ce4 bytes from `0x89506df4`) sets the vtable, runs the analysis's init,
+clears the band states, the carrier's words and both EQ sets, and sets the glide to 0.5 and p to 0.5000254. It leaves the
+rows, which every block writes before it reads them. **The reset** does the same but p, which stays.
+
+**A block, mono** (the carrier in each frame's first word, the output in its place, the second word left):
+- per sample, the carrier's second difference u = (x − 2·x₋₁) + x₋₂; each of the ten bands runs the band's first
+  resonator on it (`Vc2LegacyBand.h`, the analysis's own), then the second on (envelope × y) × 0.5, the envelope the
+  analysis's row for the band and sample, and × the band's gain into the object's row; the carrier's level
+  L ← 0.000755287·|x| + 0.998489·L, and row 10 gets the new L plus the last; the frame's word is set to 0;
+- then each band's row is added into the frames, band 0 first;
+- then per sample: x = 16·(row 10 × the analysis's unvoiced row) + 12·(the frame), and the EQ: the glide moves 1% of the
+  way to 1/(p² + 0.496553); the tilt runs on x's first difference × 3 with four coefficients, each a base plus the glide
+  × a slope, s = c0·s₋₁ + c1·s₋₂ + 3·d and out = c2·s + c3·s₋₁; a one-pole with a zero (1.78987 in, 0.989746 back,
+  −0.993792 zero); a one-pole (0.103563 back); two biquads of one form, y = (x₋₁·b1 + x·b0) − y₋₁·a1 − y₋₂·a2; a last
+  biquad with the numerator (122.312, −244.624, 122.312); × 0.00769623 into the frame.
+
+Slot 4 sets p = (ratio − 0.0156) / 1.9687. Slot 5 calls slot 4 through the vtable with the settings' +0x00 (the
+Formant Shift ratio), then the analysis's dump time with +0x38. The EQ's and the band's constants are rom.4's bit
+patterns, several a unit off the nearest float.
+
+**Where the notes stood.** VC2_VOCAL_DESIGNER.md's LEGACY synthesis holds as written, now run (marked there), but one
+term: the unvoiced path's 16 is on row 10, the level now plus the level before, so about 32 × the level.
+
+**The check.** xt_vc2legacy runs a second part (`Vc2LegacySynthCheck.cpp`, its shared parts in `Vc2LegacyCheck.h`):
+rom.4's constructor on an object in the interpreter's RAM, from the state the analysis's cases leave, as rom.4's globals
+carry it; each case its reset, then blocks of the mic through slot 1 and of a carrier (`Vc2Signal` at the bus's scale,
+the frame's second word something else, so it is seen left) through slot 2, with the settings (a Formant Shift ratio,
+0.5, 1, 2 and between, and a dump time) and the pedal now and then between them. After every block and event it compares
+the object's words, the analysis's state and both .data words; after a block besides, the frames and slot 7's level. Its
+generator is its own, so the analysis's cases and their baseline line are v210's. 40 cases, 22,000 blocks, 0 different
+at seeds 2024 and 7 (895 and 941 events: 421 and 453 settings; 12,012 and 12,473 blocks held); the whole check about 9 s.
+
+What the analysis and the object share moved into `Vc2LegacyTables` (the tables) and `Vc2LegacyBand.h` (the two
+resonators) as they stood, and the checks' reset into the rig as `vc2ResetOn`; xt_vc2legacy's analysis line is unchanged.
+
 ### LEGACY's analysis (2026-11-15, v210) {#legacy-analysis}
 
 The VC-2 mode's step 3.2, LEGACY, split in two where the firmware divides it: the analysis is a function on .bss globals,

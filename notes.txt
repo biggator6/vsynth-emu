@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+LEGACY's synthesis v211 (2026-11-15, on vc2-mode): step 3.2's second half, the object with its mono synthesis (the user's
+  "Yes, next item"; the stereo synthesis, slot 3, v212; HARDWARE_FIRMWARE.md, "LEGACY's synthesis"). Vc2Legacy: rom.4's
+  constructor 0x893f23c0, reset (slot 0), slot 1 (the analysis), the mono synthesis (slot 2, 0x893f25a0), slots 4 and 5
+  (the formant parameter, the settings) and 6, 7 (the analysis's hold). The carrier's ten bands each its second
+  difference through the band's first resonator, × 0.5 × the analysis's envelope, the second and the band's gain; the
+  carrier's level; 12 × the bands' sum plus 16 × row 10 × the unvoiced row through the six-section EQ, its tilt gliding
+  with p. Its words rom.4's from +0x004 (Vc2LegacyWords). Not in the sound yet. Check: xt_vc2legacy's second part
+  (Vc2LegacySynthCheck.cpp, about 9 s with the first), the object in the interpreter's RAM from the analysis's state,
+  its words, the analysis's and the frames after every block and event, 0 different; the analysis's line unchanged;
+  mutate_vc2.py --legacy, 98 plants (ports vc2legacy, vc2tables, vc2object), each caught. Made room first, moved as
+  they stood: LEGACY's tables into Vc2LegacyTables (the synthesis's added), the two resonators into Vc2LegacyBand.h, the
+  checks' reset into the rig (vc2ResetOn). VC2_VOCAL_DESIGNER.md's "16 · (carrier level)" put right in place: row 10
+  holds the level now plus the level before. verify.sh passes (fcheck as its baseline, which gained only the synthesis's
+  line; A/B 4/4 identical; auval); rom4-no-tables, rom4-no-unvoiced and rom4-no-legacy caught; a tone plant links.
+
 LEGACY's analysis v210 (2026-11-15, on vc2-mode): the VC-2 mode's step 3.2, its first half (the user's "Yes, next item";
   the object, its synthesis and slots, v211; HARDWARE_FIRMWARE.md, "LEGACY's analysis"). Vc2LegacyAnalysis: rom.4's
   0x893ef740, a function on .bss globals LEGACY's slot 1 calls, with its init, the rows' reader and the hold (controller,

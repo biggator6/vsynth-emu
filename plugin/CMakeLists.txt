@@ -165,6 +165,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2Unvoiced.cpp
     Source/Vc2Consonants.cpp
     Source/Vc2LegacyAnalysis.cpp
+    Source/Vc2LegacyTables.cpp
+    Source/Vc2Legacy.cpp
     Source/XtBuildId.cpp
 )
 

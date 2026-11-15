@@ -1,11 +1,16 @@
-# Planted errors in Vc2LegacyAnalysis.cpp (the VC-2's LEGACY analysis, v210; port vc2legacy), for mutate_vc2.py --legacy:
-# each must make xt_vc2legacy, on rom.4, say something differs.  name|old|new[|port[|seed]]
+# Planted errors in LEGACY's port, for mutate_vc2.py --legacy: each must make xt_vc2legacy, on rom.4, say something
+# differs.  name|old|new[|port[|seed]]; ports vc2legacy (Vc2LegacyAnalysis.cpp, v210), vc2tables (Vc2LegacyTables.cpp)
+# and vc2object (Vc2Legacy.cpp, v211).  The resonators are Vc2LegacyBand.h's (v211), a header mutate.sh can't plant in
+# for this harness, so their plants are at the call: the analysis's first-skipped and second-skipped, and the
+# synthesis's envelope ones.
 # The tables
-table-count|count = (int)image.rd32(kCount);|count = (int)image.rd32(kCount) - 1;
-table-pointer|image.rd32(kCoefficientsAt), count|image.rd32(kCoefficientsAt) + 4, count
-table-hold|kHoldTable { 0x89561538, 101 }|kHoldTable { 0x8956153c, 101 }
-table-entry|s.held = g_tables.t.hold[at];|s.held = g_tables.t.hold[at - 1];
-# The constants, a unit off
+table-count|count = (int)image.rd32(kCount);|count = (int)image.rd32(kCount) - 1;|vc2tables
+table-pointer|image.rd32(kCoefficientsAt), count|image.rd32(kCoefficientsAt) + 4, count|vc2tables
+table-hold|kHoldTable { 0x89561538,|kHoldTable { 0x8956153c,|vc2tables
+table-carrier|kCarrier { 0x89940744,|kCarrier { 0x89940748,|vc2tables
+table-gains|kGains { 0x8994071c,|kGains { 0x89940720,|vc2tables
+table-entry|s.held = vc2LegacyTables().hold[at];|s.held = vc2LegacyTables().hold[at - 1];
+# The analysis's constants, a unit off
 let-go-step|0xbc23d709u|0xbc23d70au
 glide-take|0x3c23d709u|0x3c23d70au
 glide-keep|kGlideKeep = std::bit_cast<float>(0x3f7d70a3u)|kGlideKeep = std::bit_cast<float>(0x3f7d70a4u)
@@ -25,12 +30,12 @@ hold-scale|0x3c820821u|0x3c820822u
 freeze|kFreeze = std::bit_cast<float>(0x3f7d70a3u)|kFreeze = std::bit_cast<float>(0x3f7eb852u)
 table-slope|kTableSlope = 50.0f|kTableSlope = 49.0f
 table-at|kTableAt = 51.0f|kTableAt = 50.0f
-# A band
+# An analysis band
 second-difference|add(sub(x, mul(s.last, 2.0f)), s.beforeLast)|sub(add(x, s.beforeLast), mul(s.last, 2.0f))
 last-order|        s.beforeLast = s.last;\n        s.last = x;|        s.last = x;\n        s.beforeLast = s.last;
-first-state|const float y = add(mul(c[0], u), st[0]);|const float y = add(mul(c[0], u), st[1]);
-second-input|const float z = add(st[2], y);|const float z = add(st[2], u);
-second-c4|st[3] = mul(c[4], z);|st[3] = mul(c[3], z);
+first-skipped|vc2SecondResonator(c, st, vc2FirstResonator(c, st, u))|vc2SecondResonator(c, st, u)
+second-skipped|vc2SecondResonator(c, st, vc2FirstResonator(c, st, u))|vc2FirstResonator(c, st, u)
+band-coefficients|&vc2LegacyTables().coefficients[b * kBandCoefficients]|&vc2LegacyTables().coefficients[(b + 1) * kBandCoefficients]
 follower-release|mul(st[11], kRelease)|mul(st[11], kAttackKeep)
 held-weights|add(mul(st[11], s.take), mul(st[12], s.keep))|add(mul(st[11], s.keep), mul(st[12], s.take))
 lowpass-numerator|add(add(mul(w1, 2.0f), w), w2)|add(add(mul(w1, 2.0f), w), w1)
@@ -53,3 +58,57 @@ hold-forgets|    s.controller = controller;\n|
 dump-halved|    dump = d;|    dump = d * 0.5f;
 dump-not-applied|    dump = d;\n    holdFrom(s.controller);|    dump = d;
 reset-take|    s = {};\n    s.take = 1.0f;|    s = {};
+# The object (v211): its constants, a unit off
+glide-start|kGlideStart = 0.5f|kGlideStart = 0.25f|vc2object
+formant-start|0x3f0001aau|0x3f0001abu|vc2object
+envelope-share|kEnvelopeShare = 0.5f|kEnvelopeShare = 0.25f|vc2object
+level-keep|0x3f7f9d01u|0x3f7f9d02u|vc2object
+level-take|0x3a45fe74u|0x3a45fe75u|vc2object
+bands-gain|kBandsGain = 12.0f|kBandsGain = 11.0f|vc2object
+unvoiced-gain|kUnvoicedGain = 16.0f|kUnvoicedGain = 15.0f|vc2object
+tilt-offset|0x3efe3c31u|0x3efe3c32u|vc2object
+glide-rate|kGlideRate = k(0x3c23d709u)|kGlideRate = k(0x3c23d70au)|vc2object
+tilt-in|kTiltIn = 3.0f|kTiltIn = 2.0f|vc2object
+tilt-slope|{ k(0x3ffebfe8u), k(0xbd26ce07u) }|{ k(0x3ffebfe8u), k(0xbd26ce08u) }|vc2object
+tilt-base|{ k(0xbef29e64u), k(0x3e7ac531u) }|{ k(0xbef29e65u), k(0x3e7ac531u) }|vc2object
+pole-in|0x3fe51a9cu|0x3fe51a9du|vc2object
+pole-back|0x3f7d5ffau|0x3f7d5ffbu|vc2object
+pole-zero|0xbf7e692cu|0xbf7e692du|vc2object
+pole-two|0x3dd418ebu|0x3dd418ecu|vc2object
+biquad-b0|0x3ea54ea3u|0x3ea54ea4u|vc2object
+biquad-a2|0x3eeea68du|0x3eeea68eu|vc2object
+last-outer|kLastOuter = k(0x42f49fccu)|kLastOuter = k(0x42f49fcdu)|vc2object
+last-middle|0xc3749fccu|0xc3749fcdu|vc2object
+last-back1|0xbff08aeeu|0xbff08aefu|vc2object
+last-back2|0x3f62d93du|0x3f62d93eu|vc2object
+out-gain|0x3bfc30a2u|0x3bfc30a3u|vc2object
+# (a unit off −0.0156 is lost in its sum with a ratio from 0.5 to 2, so the offset moves to about −0.0157)
+formant-offset|0xbc7f9724u|0xbc809724u|vc2object
+formant-scale|0x3ffbfe5bu|0x3ffbfe5cu|vc2object
+# The carrier's bands and level, and the sum
+carrier-difference|add(sub(x, mul(s.carrier[0], 2.0f)), s.carrier[1])|add(sub(x, mul(s.carrier[0], 2.0f)), s.carrier[0])|vc2object
+carrier-order|        s.carrier[1] = s.carrier[0];\n        s.carrier[0] = x;|        s.carrier[0] = x;\n        s.carrier[1] = s.carrier[0];|vc2object
+envelope-sample|mul(mul(analysis.row(b, i), y), kEnvelopeShare)|mul(mul(analysis.row(b, 0), y), kEnvelopeShare)|vc2object
+envelope-skipped|mul(mul(analysis.row(b, i), y), kEnvelopeShare)|mul(y, kEnvelopeShare)|vc2object
+band-gain|return mul(t.gains[b], z);|return z;|vc2object
+level-signed|mul(0.0f > x ? -x : x, kLevelTake)|mul(x, kLevelTake)|vc2object
+level-row|s.rows[kBands][i] = add(level, s.carrier[2]);|s.rows[kBands][i] = level;|vc2object
+out-kept|        frames[2 * i] = 0.0f;\n||vc2object
+sum-skips-band|for (int b = 0; b < kBands; ++b)\n        for (int i|for (int b = 1; b < kBands; ++b)\n        for (int i|vc2object
+unvoiced-row|analysis.row(kBands, i)|analysis.row(kBands - 1, i)|vc2object
+# The EQ
+glide-target|add(mul(s.formant, s.formant), kTiltOffset)|add(s.formant, kTiltOffset)|vc2object
+tilt-fixed|c[n] = add(mul(s.glide, kTilt[n].slope), kTilt[n].base);|c[n] = kTilt[n].base;|vc2object
+tilt-difference|const float d = sub(x, low[0]);|const float d = x;|vc2object
+tilt-state|low[2] = low[1];|low[2] = low[0];|vc2object
+tilt-output|add(mul(c[3], low[1]), mul(c[2], state))|add(mul(c[3], low[2]), mul(c[2], state))|vc2object
+pole-zero-state|add(mul(low[3], kPoleZero), q)|add(mul(q, kPoleZero), q)|vc2object
+biquad-store|    st[2] = st[1];|    st[2] = st[0];|vc2object
+biquad-order|biquad(&s.eqHigh[3], kBiquads[1], biquad(&s.eqHigh[0], kBiquads[0], low[4]))|biquad(&s.eqHigh[3], kBiquads[0], biquad(&s.eqHigh[0], kBiquads[1], low[4]))|vc2object
+last-store|last[1] = last[0];|last[1] = y;|vc2object
+# The constructor, the reset and the settings
+reset-sets-formant|    s.glide = kGlideStart;\n|    s.glide = kGlideStart;\n    s.formant = kFormantStart;\n|vc2object
+reset-no-glide|    s.glide = kGlideStart;\n|    (void)0;\n|vc2object
+reset-keeps-eq|std::fill(std::begin(s.eqHigh), std::end(s.eqHigh), 0.0f);|(void)0;|vc2object
+formant-law|xtf::div(xtf::add(ratio, kFormantOffset), kFormantScale)|xtf::div(ratio, kFormantScale)|vc2object
+settings-dump|    analysis.dumpTime(dump);|    analysis.dumpTime(1.0f);|vc2object

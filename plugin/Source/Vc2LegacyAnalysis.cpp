@@ -1,15 +1,12 @@
 // The VC-2's LEGACY analysis: see Vc2LegacyAnalysis.h (v210).  Every address is rom.4's; the check is xt_vc2legacy's
 // (Vc2LegacyCheck.cpp).  The arithmetic is the SH-4's (XtFloat): an FMAC is the product rounded, then the sum.
 #include "Vc2LegacyAnalysis.h"
-#include "Vc2RomTables.h"
+#include "Vc2LegacyBand.h"
 #include "XtFloat.h"
 #include <bit>
 
 namespace {
-// [FW] .data: the bands' coefficients' pointer and the band count; the hold's coefficients, 51…100 reached
-constexpr uint32_t kCoefficientsAt = 0x8994024c, kCount = 0x89940250;
-constexpr Vc2Span kHoldTable { 0x89561538, 101 };
-constexpr int kBandCoefficients = 5;
+constexpr int kBandCoefficients = Vc2LegacyTables::kCoefficients;
 // [FW 0x893ef898…0x893ef8b8, 0x893efb7c…0x893efbd0] rom.4's bit patterns
 constexpr float kLetGoStep = std::bit_cast<float>(0xbc23d709u);     // −0.01 a block
 constexpr float kGlideTake = std::bit_cast<float>(0x3c23d709u);     // 0.01: the glide back's weights
@@ -32,25 +29,7 @@ constexpr float kSections[3][2] = {
 constexpr float kHoldScale = std::bit_cast<float>(0x3c820821u);     // 1/63
 constexpr float kFreeze = std::bit_cast<float>(0x3f7d70a3u);        // 0.99: past it the held envelope stops
 constexpr float kTableSlope = 50.0f, kTableAt = 51.0f;
-
-struct Tables {
-    int count = 0;   // the bands that run, at most 31: the row after them is the unvoiced path's
-    float coefficients[(Vc2LegacyAnalysisWords::kSlots - 1) * kBandCoefficients] {};
-    float hold[kHoldTable.floats] {};
-    bool read(Sh4& image) {
-        count = (int)image.rd32(kCount);
-        if (count < 0 || count >= Vc2LegacyAnalysisWords::kSlots) return false;
-        vc2ReadFloats(image, { image.rd32(kCoefficientsAt), count * kBandCoefficients }, coefficients);
-        vc2ReadFloats(image, kHoldTable, hold);
-        return true;
-    }
-};
-
-constinit Vc2RomTables<Tables> g_tables;
 } // namespace
-
-bool vc2LoadLegacy(const char* path) { return g_tables.load(path); }
-bool vc2LegacyLoaded() { return g_tables.loaded(); }
 
 void Vc2LegacyAnalysis::reset() {
     s = {};
@@ -70,7 +49,7 @@ void Vc2LegacyAnalysis::holdFrom(int controller) {
     else {
         // f is in (0, 0.99] here, so the entry is 51…100; only a dump time of NaN reaches past it, and leaves it
         const int at = ftrc(add(mul(f, kTableSlope), kTableAt));
-        if (at >= 0 && at < kHoldTable.floats) s.held = g_tables.t.hold[at];
+        if (at >= 0 && at < Vc2LegacyTables::kHoldEntries) s.held = vc2LegacyTables().hold[at];
     }
 }
 
@@ -101,14 +80,9 @@ void Vc2LegacyAnalysis::weights() {
 
 float Vc2LegacyAnalysis::band(int b, float u) {
     using namespace xtf;
-    const float* c = &g_tables.t.coefficients[b * kBandCoefficients];
+    const float* c = &vc2LegacyTables().coefficients[b * kBandCoefficients];
     float* st = s.bands[b];
-    const float y = add(mul(c[0], u), st[0]);
-    st[0] = add(mul(c[1], y), st[1]);
-    st[1] = mul(c[2], y);
-    const float z = add(st[2], y);
-    st[2] = add(mul(c[3], z), st[3]);
-    st[3] = mul(c[4], z);
+    const float z = vc2SecondResonator(c, st, vc2FirstResonator(c, st, u));
     st[11] = st[11] > z ? mul(st[11], kRelease) : add(mul(z, kAttackTake), mul(st[11], kAttackKeep));
     st[12] = add(mul(st[11], s.take), mul(st[12], s.keep));
     const float w1 = st[8], w2 = st[9];
@@ -141,7 +115,7 @@ float Vc2LegacyAnalysis::unvoiced(float x) {
 void Vc2LegacyAnalysis::block(const float* in) {
     using namespace xtf;
     weights();
-    const int count = g_tables.t.count;
+    const int count = vc2LegacyTables().count;
     for (int i = 0; i < kBlock; ++i) {
         const float x = in[i];
         const float u = add(sub(x, mul(s.last, 2.0f)), s.beforeLast);
