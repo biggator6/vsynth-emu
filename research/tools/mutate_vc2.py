@@ -6,8 +6,9 @@
 # (PORT=vc2in, vc2out: the input and output stages, v208, v209), through xt_vc2in, [cases] its cases (8).  --legacy:
 # vc2legacy_muts.txt, in Vc2LegacyAnalysis.cpp (PORT=vc2legacy, LEGACY's analysis, v210), through xt_vc2legacy, [cases]
 # its cases (8).  --hireso: vc2hireso_muts.txt, in Vc2HiresoWarp.cpp, Vc2HiresoTables.cpp, Vc2HiresoRate.cpp,
-# Vc2HiresoAnalysis.cpp and Vc2Hireso.cpp (PORT=vc2warp, vc2hitables, vc2rate, vc2hiana, vc2hiobj: HIRESO's formant
-# warp, v213, rate filters, v214, analysis, v215, and object, v216), through xt_vc2hireso, [cases] its share of the
+# Vc2HiresoAnalysis.cpp, Vc2Hireso.cpp and Vc2HiresoSynth.cpp (PORT=vc2warp, vc2hitables, vc2rate, vc2hiana, vc2hiobj,
+# vc2hisyn: HIRESO's formant warp, v213, rate filters, v214, analysis, v215, object, v216, and mono synthesis, v217),
+# through xt_vc2hireso, [cases] its share of the
 # ratios' grid (8: every fifth) and its other parts' cases.  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys

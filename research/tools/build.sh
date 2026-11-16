@@ -68,6 +68,7 @@ cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.
    $( [ -f Vc2HiresoRate.cpp ] && echo Vc2HiresoRate.cpp Vc2HiresoRateCheck.cpp ) \
    $( [ -f Vc2HiresoAnalysis.cpp ] && echo Vc2HiresoAnalysis.cpp Vc2HiresoAnalysisCheck.cpp Vc2Unvoiced.cpp ) \
    $( [ -f Vc2Hireso.cpp ] && echo Vc2Hireso.cpp Vc2HiresoObjectCheck.cpp ) \
+   $( [ -f Vc2HiresoSynth.cpp ] && echo Vc2HiresoSynth.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2hireso" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &

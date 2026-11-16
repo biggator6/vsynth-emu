@@ -116,6 +116,20 @@ struct Vc2Signal {
     }
 };
 
+inline constexpr float kVc2Bus = 1073741824.0f;   // a carrier's scale, the bus's (2^30)
+
+// The carriers at the bus's scale (v211's, here from v217): the left's in each frame's first word; the right's, when
+// there is one, in the second, else something mono leaves
+inline void vc2CarrierFrames(Vc2Signal& left, Vc2Signal* right, float* frames) {
+    float x[kVc2Block], r[kVc2Block];
+    left.block(x);
+    if (right) right->block(r);
+    for (int i = 0; i < kVc2Block; ++i) {
+        frames[2 * i] = x[i] * kVc2Bus;
+        frames[2 * i + 1] = right ? r[i] * kVc2Bus : -0.5f * x[i];
+    }
+}
+
 // The first word of `bytes` at `at` in rom.4's memory that differs from the port's `mine`, as text; empty when none does
 inline std::string vc2FirstDifference(Vc2Fw& fw, uint32_t at, const void* mine, size_t bytes, const char* what) {
     std::vector<uint32_t> theirs(bytes / 4), ours(bytes / 4);

@@ -13,7 +13,6 @@ using Words = Vc2HiresoWords;
 
 constexpr int kSides = 2;
 constexpr int kBankCleared = 7;                 // [FW] the reset's: a band's first 7 of its 14
-constexpr int kCarrierCoefs = 3;                // [FW] a carrier resonator's, a group's 2n + 1 resonators in turn
 constexpr int kPivotField = 12;                 // [FW] the constructor's, both sides
 constexpr int kTemplates = Tables::kRecords / kSides;   // template T: record T on the left, T + 16 on the right
 constexpr uint32_t kCurveAt[kSides] = { 0x899d9d98, 0x899d9e18 };   // [FW] the RAM curves of templates 16 on
@@ -21,7 +20,7 @@ constexpr int kHoldCentre = 64;                 // [FW] slot 6's: the pedal from
 // [FW] the constructor's settings for slot 5: Env Attack 6, Env Release 18, template 0, Vocoder Depth and Hold Dump Time
 // 1, the pivots the template's
 constexpr Vc2HiresoSettings kDefaults { {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f };
-constexpr Vc2HiresoHoldWords kHoldReset { 0, 1.0f, 0.0f, { 0.0f, 1.0f, 0.0f } };   // [FW] the reset's
+constexpr Vc2HiresoHoldWords kHoldReset { 0, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f };   // [FW] the reset's
 } // namespace
 
 Vc2Hireso::Vc2Hireso() {
@@ -31,7 +30,7 @@ Vc2Hireso::Vc2Hireso() {
     std::ranges::copy(kVc2HiresoEdges, s.edge);
     const Tables& tb = vc2HiresoTables();
     for (int g = 0; g < Words::kGroups; ++g)
-        s.carrierTable[g] = tb.carrierAt + 4 * (uint32_t)(kCarrierCoefs * (2 * s.edge[g] + g));
+        s.carrierTable[g] = tb.carrierAt + 4 * (uint32_t)(Tables::kCoefs * (2 * s.edge[g] + g));   // 2n + 1 a group
     weights();
     for (int k = 0; k < kRates; ++k) rates[k].c = k < kRates / 2 ? tb.decimator : tb.interpolator;
     t.dump = 1.0f;   // the hold's words as the reset left them, which the constructor writes again
@@ -52,7 +51,7 @@ void Vc2Hireso::weights() {
 
 void Vc2Hireso::reset() {
     analysis.clear();
-    for (auto& band : s.bank) std::fill(band, band + kBankCleared, 0.0f);
+    for (int b = 0; b < Words::kBands; ++b) std::fill_n(&s.bank[Words::kBankWords * b], kBankCleared, 0.0f);
     for (auto& row : s.bandWords) std::ranges::fill(row, 0.0f);
     std::fill(s.formant + Words::kBands, s.formant + Words::kSideWords, 0.0f);   // the three rows between the maps
     t.synthesis = 1.0f;
@@ -87,14 +86,38 @@ void Vc2Hireso::formantTemplate(Vc2HiresoSettings& in) {
     const int k = in.formantTemplate;
     if (k < 0) return;
     if (k >= kTemplates) {   // the RAM curves an edit page writes
-        std::ranges::copy(kCurveAt, t.templateAt);
+        for (int side = 0; side < kSides; ++side) {
+            t.templateAt[side] = kCurveAt[side];
+            gains[side] = curves[side];
+        }
         return;
     }
     const Tables& tb = vc2HiresoTables();
     for (int side = 0; side < kSides; ++side) {
         const int record = k + kTemplates * side;
         t.templateAt[side] = tb.templatesAt + Tables::kRecordBytes * (uint32_t)record + Tables::kRecordGains;
+        gains[side] = tb.templateGain[record];
         if (in.pivot[side] < 0) in.pivot[side] = xtf::ftrc(tb.templatePivot[record]);
+    }
+}
+
+void Vc2Hireso::holdGlide() {
+    const float* glide = vc2HiresoTables().glide;
+    Vc2HiresoHoldWords& h = t.hold;
+    if (h.controller >= kHoldCentre) {   // held: the glide back starts at 1, the envelopes taken by the hold's coefficient
+        h.letGo = 1.0f;
+        h.take = h.held;
+        h.keep = sub(1.0f, h.held);
+        return;
+    }
+    h.letGo = add(h.letGo, glide[Tables::kGlideStep]);
+    if (h.letGo > 0.0f) {
+        h.take = glide[Tables::kGlideTake];
+        h.keep = glide[Tables::kGlideKeep];
+    } else {
+        h.letGo = 0.0f;
+        h.take = 1.0f;
+        h.keep = 0.0f;
     }
 }
 

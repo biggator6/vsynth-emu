@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+HIRESO's mono synthesis v217 (2026-11-15, on vc2-mode): step 3.3's fifth part (the user's "Yes, next item";
+  HARDWARE_FIRMWARE.md, "HIRESO's mono synthesis"). Vc2Hireso::mono (Vc2HiresoSynth.cpp): rom.4's slot 2 (0x893f0c60)
+  with its carrier bank (0x893f1a10) and its groups' synthesis (0x893f1b10, inline in slot 2 for two groups). The
+  carrier's mix is decimated twice, and each group's carrier bank runs through the analysis's resonator, now
+  vc2HiresoResonate, exported from Vc2HiresoAnalysis.cpp. Then the envelopes' update and the hold's glide. Each band
+  takes the envelope at its map's fractional band, held, ramped and followed by attack or release, times the carrier
+  row, the template's gain and W. The groups are interpolated back into the frames' first words. The object's
+  synthesis words are named (rows, the bank flat, held, follower, target, letGo, take, keep). The templates' gains
+  are read from rom.4, along with the counts and rate scales (0x895628ac) and the glide (slot 2's pool). The reset's
+  clear leaves part of the carrier bank's states, as rom.4's does. Not in the sound yet; the stereo (slot 3) is next.
+  vc2CarrierFrames and kVc2Bus moved into Vc2CheckRig.h (LEGACY's lines as before). Also fixed a fault from v216: two
+  statements joined on one line in Vc2HiresoTables.cpp by a comment's removal (the same code). Check: xt_vc2hireso's
+  fourth part runs slot 2 after slot 1 on every block, the carrier in each frame's first word, the frames compared
+  besides; 40 cases, 22,000 blocks, 0 different (seeds 2024 and 7); mutate_vc2.py --hireso, 36 new plants, the
+  whole 178 caught (one more not planted, the glide's end at 0, which letGo never reaches); --in 66, --legacy 114.
+
 HIRESO's object v216 (2026-11-15, on vc2-mode): step 3.3's fourth part (the user's "Yes, next item"; HARDWARE_FIRMWARE.md,
   "HIRESO's object"). Vc2Hireso: rom.4's constructor (0x893f0a10) and slots 0 (the reset), 1 (onto the analysis), 4
   (onto v213's warp), 5 (the settings: Env Attack and Release with the high bands' caps, Hold Dump Time, Vocoder Depth,

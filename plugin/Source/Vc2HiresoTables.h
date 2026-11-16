@@ -8,6 +8,8 @@
 struct Vc2HiresoTables {
     static constexpr int kBands = 32, kDecimatorWords = 10, kInterpolatorWords = 11;
     static constexpr int kGroups = 3, kResonatorWords = 6;
+    static constexpr int kCoefs = 3, kStates = 2;   // a resonator's coefficients (a gain, two feedbacks) and states
+    static constexpr int kGlideStep = 0, kGlideTake = 1, kGlideKeep = 2;   // glide's
     static constexpr int kCurve = 101, kRecords = 32, kCarrierWords = 3 * (2 * kBands + kGroups);
     static constexpr int kHoldScale = 0, kHoldFreeze = 1, kHoldBase = 2, kHoldStep = 3, kHoldGain = 4, kHoldWords = 5;
     // [FW] a Formant Template record: three floats (the pivot the second), then its 32 gains
@@ -26,6 +28,13 @@ struct Vc2HiresoTables {
     uint32_t templatesAt = 0;   // where the records start in rom.4, which the object's words keep
     float carrier[kCarrierWords] {};
     uint32_t carrierAt = 0;     // the same for the carrier's coefficients
+    // The synthesis's (v217): each Formant Template record's 32 gains; each group's samples a block and rate scale
+    // (0x895628ac and 0x895628b8, after the records: 8, 16, 32 and 1, 0.5, 0.25); the hold's glide back (slot 2's
+    // pool from 0x893f106c: −0.01 a block, then the take and keep while it glides, 0.01 and 0.99)
+    float templateGain[kRecords][kBands] {};
+    int32_t samples[kGroups] {};
+    float rateScale[kGroups] {};
+    float glide[3] {};
     // The analysis's (v215): each band's two resonators, a gain and two feedbacks each, the three groups' bands in
     // order (0x8993fe84, .data); each group's energy scale (0x8993fe78, .data); the voiced gate's glide up and down
     // (0x893edba4, 0x893edba8, its pool); each band's envelope window in frames (0x8956141c)

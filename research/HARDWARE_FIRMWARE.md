@@ -1546,6 +1546,63 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### HIRESO's mono synthesis (2026-11-15, v217) {#hireso-mono}
+
+Step 3.3's fifth part, ported bit for bit (`Vc2Hireso::mono`, `Vc2HiresoSynth.cpp`): slot 2, `0x893f0c60(this, frames)`, on 32 frames of two words, the carrier in each first. Its parts:
+- the carrier bank, `0x893f1a10(this, in, group)`;
+- the groups' synthesis, `0x893f1b10(this, out, group)`, which slot 2 calls for group 2 and has inline, with the same arithmetic, for groups 1 and 0.
+
+**A block**, in order:
+1. The carrier: each frame's two words × 0.5, decimated 32→16 (`0x893efc80`, the rate filter at +0x2ba4) and 16→8 (`0x893efdb0`, +0x2be8), all on slot 2's stack.
+2. The carrier bank on each group, 2, 1, then 0, on the mic's rates' counterpart: group 2 the full-rate mix, 1 at fs/2, 0 at fs/4.
+3. The analysis's envelopes' update (`0x893edd10`).
+4. The hold's glide. With the pedal at 64 or more: letGo (+0x2d64) 1, take (+0x2d68) the hold's coefficient, keep (+0x2d6c) 1 − it. Otherwise letGo falls by 0.01 (slot 2's pool, `0x893f106c`). While it is above 0, take is 0.01 and keep 0.99; after that letGo is 0, take 1 and keep 0.
+5. Each group's bands into its output (32, 16, 8 samples), group 2 first.
+6. Group 0's output interpolated 8→16 and added into group 1's (`0x893efef0`, +0x2c70). That interpolated 16→32 into each frame's first word, plus group 2's output one sample late (`0x893efe40`, +0x2c2c). The frames' second words stay as they were.
+
+**The carrier bank.** A group's states run from +0x2024 + 56 bytes × its first band:
+- its last input;
+- then two words for each resonator: the lower edge's, then each band's centre's and upper edge's.
+
+The coefficients are read through the group's word at +0x14, three for each resonator in the same order, and the counts come from `0x895628ac` (8, 16, 32). For each sample:
+- d = x − last, then last ← x;
+- each resonator is the analysis's (y = c0·d + s0, s0 ← c1·y + s1, s1 ← c2·y; `vc2HiresoResonate`);
+- band b's row sample (+0x24 + 256 bytes × b) is (lower + centre) + upper, and the upper edge is the next band's lower.
+
+The reset's clear (v216) zeroes 7 words of every 14 from +0x2024, but a group's states are one run of 3 + 4n words. So a reset leaves words 7–13, 21–27, … of that run as they were. That is rom.4's own behaviour, and the port keeps it.
+
+**A group's bands** (`0x893f1b10`). They use the left side's words throughout: map +0x2924, held +0x2724, follower +0x27a4, target +0x2824, gains through +0x2d4c. For each band:
+1. The envelope at the map's fractional band m. i = FTRC(m), f = m − i. If i ≥ 31 the envelope is env(31). Otherwise it is env(i+1)·f + env(i)·(1 − f), env being the analysis's getter `0x893eddf0`.
+2. held ← keep·held + take·e.
+3. A ramp from the last target to the new held, in steps of (held − target) × 1/count.
+4. The coefficient: Env Attack's when the last target is above the follower, else the band's Env Release. It is × the group's rate scale (`0x895628b8`: 1, 0.5, 0.25).
+5. The band's gain: its template gain × W_b.
+6. For each sample: gap = ramp − follower; ramp += step; follower ← gap·coef + follower; out += (row·follower)·gain.
+7. The follower and the ramp's end are kept.
+
+**The words**, named now in `Vc2HiresoWords`:
+- +0x20, a word nothing touches;
+- +0x24, the rows, 64 words a band, the group's count used;
+- +0x2024, the bank;
+- +0x2724, the left's held, follower and target rows;
+- the hold's letGo, take and keep.
+
++0x2d48 (1 at a reset) and the three rows between the maps are still unread by anything ported, so they are likely the stereo's.
+
+**Where the notes stood.** VC2_VOCAL_DESIGNER.md's account of the synthesis holds; it is marked as run. What it didn't say:
+- the carrier's first difference;
+- the attack chosen by the last target against the follower;
+- group 2 a sample late into the sum;
+- the second words left;
+- the reset's partial clear of the bank.
+
+**The check.** xt_vc2hireso's fourth part now runs slot 2 after slot 1 on every block. The carrier (`vc2CarrierFrames`, Vc2CheckRig.h, moved from LEGACY's synthesis check) is a `Vc2Signal` at the bus's scale in each first word, with −0.5 × it in each second, which slot 2 must leave. The frames, the object's words and the analysis's state are compared after it.
+
+Results:
+- seed 2024: 40 cases, 22,000 blocks, 0 different;
+- seed 7: 0 different;
+- `mutate_vc2.py --hireso`: all 36 new plants caught (`vc2hisyn`, the glide's `vc2hiobj`, `vc2hitables`), and the whole list, 178. The `--in` and `--legacy` lists were all caught too (66, 114). One plant can't be told apart, the glide's end taken at 0 itself: from 1, letGo's only start but the reset's 0, it falls in 100 blocks to −3.06e-6 under round to zero, never through 0 exactly.
+
 ### HIRESO's object (2026-11-15, v216) {#hireso-object}
 
 Step 3.3's fourth part, ported bit for bit (`Vc2Hireso`): the constructor `0x893f0a10` and every slot but the synthesis's.

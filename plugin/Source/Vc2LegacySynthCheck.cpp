@@ -48,18 +48,6 @@ std::string objectEventOn(Vc2Fw& fw, Vc2Legacy& engine, std::mt19937& rng, Count
     return objectDifference(fw, engine);
 }
 
-// The carriers at the bus's scale: the left's in each frame's first word; the right's, when there is one, in the
-// second, else something mono leaves
-void carrierFrames(Vc2Signal& left, Vc2Signal* right, float* frames) {
-    float x[kBlock], r[kBlock];
-    left.block(x);
-    if (right) right->block(r);
-    for (int i = 0; i < kBlock; ++i) {
-        frames[2 * i] = x[i] * 1073741824.0f;
-        frames[2 * i + 1] = right ? r[i] * 1073741824.0f : -0.5f * x[i];
-    }
-}
-
 // A block of the mic through slot 1 and of the carriers through the synthesis on both, then the first word that differs
 std::string engineBlockOn(Vc2Fw& fw, Vc2Legacy& engine, const float* mic, float* frames, int channels) {
     fw.cpu.write(kVc2LegacyBlockAt, mic, sizeof(float) * kBlock);
@@ -100,7 +88,7 @@ long vc2LegacySynthesisCases(Vc2Fw& fw, Vc2LegacyAnalysis& carried, const Vc2Run
                 what = objectEventOn(fw, engine, rng, n);
             }
             mic.block(x);
-            carrierFrames(carrier, channels == 2 ? &right : nullptr, frames);
+            vc2CarrierFrames(carrier, channels == 2 ? &right : nullptr, frames);
             if (what.empty()) what = engineBlockOn(fw, engine, x, frames, channels);
             n.held += engine.analysis.s.controller >= 64 ? 1 : 0;
         }

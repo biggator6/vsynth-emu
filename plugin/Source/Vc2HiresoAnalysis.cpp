@@ -18,15 +18,14 @@ constexpr float kNone = -1.0f;   // [FW] a window's search starts below any ener
 
 int samples(int group) { return Words::kBlock >> (Words::kGroups - 1 - group); }
 int stride(int group) { return 1 << (Words::kGroups - 1 - group); }
+} // namespace
 
-// One of a band's two resonators on the difference d: its gain, then its two feedbacks on its two states
-float resonate(const float* c, float* st, float d) {
+float vc2HiresoResonate(const float* c, float* st, float d) {
     const float y = add(mul(c[0], d), st[0]);
     st[0] = add(mul(c[1], y), st[1]);
     st[1] = mul(c[2], y);
     return y;
 }
-} // namespace
 
 void Vc2HiresoAnalysis::clear() {
     std::ranges::fill(s.bank, 0.0f);
@@ -67,8 +66,8 @@ void Vc2HiresoAnalysis::bank(const float* in, int group) {
         float* st = last + 1;
         const float* c = &vc2HiresoTables().resonator[Vc2HiresoTables::kResonatorWords * first];
         for (int b = first; b < end; ++b, st += kStates, c += Vc2HiresoTables::kResonatorWords) {
-            const float y = resonate(c, st, d);
-            const float z = resonate(c + 3, st + 2, d);
+            const float y = vc2HiresoResonate(c, st, d);
+            const float z = vc2HiresoResonate(c + 3, st + 2, d);
             s.rows[b][n] = add(y, z);
         }
     }

@@ -2,7 +2,8 @@
 // zeroed first as the allocator's memory, the analysis's globals with it as at the start.  The constructor (0x893f0a10)
 // on both, once; then each case, after the first, noise on both in the words only the synthesis uses, as it would leave
 // them; slot 0's reset (0x893f0b70) and blocks of Vc2Signal's input (every eighth case a fade)
-// through slot 1 (0x893f0c50), each block's flag drawn as the analysis's check draws it, and now and then before a
+// through slot 1 (0x893f0c50) and of a carrier's frames through slot 2 (0x893f0c60, v217; the carrier in each first
+// word), each block's flag drawn as the analysis's check draws it, and now and then before a
 // block slot 5's settings (0x893f13e0, a drawn struct), the pedal through slot 6 (0x893f1960) or slot 4's warp
 // (0x893f15d0, a side and a ratio).  After every slot the object's words (+0x004…+0x2ba4, the rate filters' states and
 // the words their tables point at, +0x2cb4…+0x2d70), the analysis's state and slot 7's level (0x893f1a00), and after slot
@@ -21,9 +22,10 @@
 namespace {
 constexpr uint32_t kConstruct = 0x893f0a10, kReset = 0x893f0b70, kAnalyze = 0x893f0c50, kWarp = 0x893f15d0;  // [FW]
 constexpr uint32_t kSettings = 0x893f13e0, kHold = 0x893f1960, kLevel = 0x893f1a00;                          // [FW]
+constexpr uint32_t kMono = 0x893f0c60;                                                                       // [FW]
 constexpr uint32_t kObjectBytes = 0x2d70, kRatesAt = 0x2ba4, kRateBytes = 68, kSettingWordsAt = 0x2cb4;    // [FW]
-constexpr uint32_t kObjAt = 0x8C040000, kBlockAt = 0x8C035000;   // in Vc2Fw's RAM
-constexpr int kBlocks = 400, kFadeEvery = 8, kEventOneIn = 8;
+constexpr uint32_t kObjAt = 0x8C040000, kBlockAt = 0x8C035000, kFramesAt = 0x8C036000;   // in Vc2Fw's RAM
+constexpr int kBlocks = 400, kFadeEvery = 8, kEventOneIn = 8, kFrameWords = 2 * Vc2HiresoAnalysis::kBlock;
 
 struct Counts {
     long settings = 0, holds = 0, warps = 0, unvoiced = 0, different = 0;
@@ -100,22 +102,28 @@ std::string warpOn(Vc2Fw& fw, Vc2Hireso& e, std::mt19937& rng, Counts& n) {
 using Event = std::string (*)(Vc2Fw&, Vc2Hireso&, std::mt19937&, Counts&);
 constexpr Event kEvents[] = { settingsOn, holdOn, warpOn };
 
-// A block through both objects' slot 1, then the words that differ
-std::string analyzeOn(Vc2Fw& fw, Vc2Hireso& e, const Vc2Unvoiced& stage, const float* x) {
+// A block of the mic through both objects' slot 1 and of the carrier's frames through slot 2 (v217), then the words
+// that differ and the frames
+std::string objectBlockOn(Vc2Fw& fw, Vc2Hireso& e, const Vc2Unvoiced& stage, const float* x, float* frames) {
     fw.cpu.write(kBlockAt, x, sizeof(float) * Vc2HiresoAnalysis::kBlock);
     if (!fw.call(kAnalyze, { kObjAt, kBlockAt })) return "slot 1 faults: " + fw.cpu.error();
     e.analyze(x, stage.voiced());
-    return hiresoDifference(fw, e);
+    std::string what = hiresoDifference(fw, e);
+    if (!what.empty()) return what;
+    fw.cpu.write(kFramesAt, frames, sizeof(float) * kFrameWords);
+    if (!fw.call(kMono, { kObjAt, kFramesAt })) return "slot 2 faults: " + fw.cpu.error();
+    e.mono(frames);
+    what = vc2FirstDifference(fw, kFramesAt, frames, sizeof(float) * kFrameWords, "slot 2's frames");
+    return what.empty() ? hiresoDifference(fw, e) : what;
 }
 
 // The words only the synthesis reads or writes, noise on both, as a synthesis would leave them for the reset to clear
 // or keep: the port's first, then all its words into rom.4's object
 void scramble(Vc2Fw& fw, Vc2Hireso& e, std::mt19937& rng) {
     const std::pair<float*, size_t> spans[] = {
-        { e.s.synthesis, std::size(e.s.synthesis) }, { &e.s.bank[0][0], sizeof e.s.bank / sizeof(float) },
+        { &e.s.rows[0][0], sizeof e.s.rows / sizeof(float) }, { e.s.bank, std::size(e.s.bank) },
         { &e.s.bandWords[0][0], sizeof e.s.bandWords / sizeof(float) }, { e.s.weight, std::size(e.s.weight) },
-        { e.s.formant, std::size(e.s.formant) }, { &e.t.synthesis, 1 },
-        { e.t.hold.synthesis, std::size(e.t.hold.synthesis) },
+        { e.s.formant, std::size(e.s.formant) }, { &e.t.synthesis, 1 }, { &e.t.hold.letGo, 3 },
     };
     for (const auto& [words, n] : spans)
         for (size_t i = 0; i < n; ++i) words[i] = 2.0f * (float)rng() / 4294967296.0f - 1.0f;
@@ -148,12 +156,15 @@ long vc2HiresoObjectCases(Vc2Fw& fw, const Vc2Run& run) {
     bool unvoiced = false;
     for (int c = 0; c < run.cases; ++c) {
         if (c > 0) scramble(fw, *e, rng);
+        Vc2Signal carrier { std::mt19937(rng()), false };
         const std::string what = vc2AnalysisCase(fw, *e, hiresoDifference, cases, c, [&](const float* x) {
             const bool event = rng() % kEventOneIn == 0;
             const std::string said = event ? kEvents[rng() % std::size(kEvents)](fw, *e, rng, n) : "";
             unvoiced = vc2HiresoFlag(fw, stage, rng, unvoiced);
             n.unvoiced += unvoiced ? 1 : 0;
-            return said.empty() ? analyzeOn(fw, *e, stage, x) : said;
+            float frames[kFrameWords];
+            vc2CarrierFrames(carrier, nullptr, frames);
+            return said.empty() ? objectBlockOn(fw, *e, stage, x, frames) : said;
         });
         if (what.empty()) continue;
         if (!n.different++ && first) std::printf("  object case %d, block %ld: %s\n", c, cases.blocksRun, what.c_str());

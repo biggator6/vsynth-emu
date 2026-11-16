@@ -17,7 +17,6 @@ constexpr uint32_t kClear = 0x893efc30;                                         
 constexpr uint32_t kAnalysisTable = 0x895613f4, kDecimatorTable = 0x895616d8, kInterpolatorTable = 0x89561700;   // [FW]
 constexpr uint32_t kObjAt = 0x8C030000, kInAt = 0x8C031000, kMidAt = 0x8C032000, kOutAt = 0x8C033000;   // Vc2Fw's RAM
 constexpr int kBlocks = 100;
-constexpr float kBus = 1073741824.0f;   // the carrier's scale
 
 struct Buffers {
     float in[64] {}, mid[64] {}, out[64] {};
@@ -44,13 +43,13 @@ constexpr Kind kKinds[] = {
       [](Vc2RateFilter& f, Buffers& b) { vc2Decimate(f, b.in, b.out, 16); } },
     { "the analysis's 16→8", 0x893efdb0, kAnalysisTable, analysisTable, 16, 0, 8, 1.0f,
       [](Vc2RateFilter& f, Buffers& b) { vc2Decimate(f, b.in, b.out, 8); } },
-    { "the carrier's 32→16", 0x893efc80, kDecimatorTable, decimatorTable, 64, 32, 16, kBus,
+    { "the carrier's 32→16", 0x893efc80, kDecimatorTable, decimatorTable, 64, 32, 16, kVc2Bus,
       [](Vc2RateFilter& f, Buffers& b) { vc2DecimateFrames(f, b.in, b.mid, b.out); } },
-    { "the carrier's 16→8", 0x893efdb0, kDecimatorTable, decimatorTable, 16, 0, 8, kBus,
+    { "the carrier's 16→8", 0x893efdb0, kDecimatorTable, decimatorTable, 16, 0, 8, kVc2Bus,
       [](Vc2RateFilter& f, Buffers& b) { vc2Decimate(f, b.in, b.out, 8); } },
-    { "8→16", 0x893efef0, kInterpolatorTable, interpolatorTable, 8, 0, 16, kBus,
+    { "8→16", 0x893efef0, kInterpolatorTable, interpolatorTable, 8, 0, 16, kVc2Bus,
       [](Vc2RateFilter& f, Buffers& b) { vc2InterpolateAdd(f, b.in, b.out); } },
-    { "16→32", 0x893efe40, kInterpolatorTable, interpolatorTable, 16, 32, 64, kBus,
+    { "16→32", 0x893efe40, kInterpolatorTable, interpolatorTable, 16, 32, 64, kVc2Bus,
       [](Vc2RateFilter& f, Buffers& b) { vc2InterpolateFrames(f, b.in, b.mid, b.out); } },
 };
 

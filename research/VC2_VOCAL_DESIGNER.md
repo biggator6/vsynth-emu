@@ -1220,6 +1220,9 @@ ramped across the block, followed with the attack coefficient when rising and th
 (scaled by the group's rate), and out += carrier band × follower × template gain × W_b, where W_b = (−1)^(b+1) · A_b · B_b ·
 50/(A_31 · B_31) from `0x8994059c` and `0x8994061c` (built in the constructor). The groups are interpolated back up and summed.
 Stereo does the same per channel, each with its own formant map, template curve and follower state.
+(v217, mono run and held: as above. The carrier bank works on the carrier's first difference. Attack or release is
+chosen by the last target against the follower. Group 2 joins the sum a sample late, and the frames' second words are
+left as they were. HARDWARE_FIRMWARE.md, "HIRESO's mono synthesis". The stereo is not yet run.)
 
 **Formant Shift moves the bands here** (slot 4, `0x893f15d0(this, side, ratio)`): each synthesis band reads the analysis
 envelope from the band its frequency maps to under the ratio, warped around a pivot of 500 + 172.27 × p Hz (p from the

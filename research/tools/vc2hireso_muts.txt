@@ -62,7 +62,7 @@ last-is-difference|*last = in[n];|*last = d;|vc2hiana
 feedback-own-state|st[0] = add(mul(c[1], y), st[1]);|st[0] = add(mul(c[1], y), st[0]);|vc2hiana
 second-state-of-state|st[1] = mul(c[2], y);|st[1] = mul(c[2], st[0]);|vc2hiana
 resonators-opposed|s.rows[b][n] = add(y, z);|s.rows[b][n] = sub(y, z);|vc2hiana
-resonators-share|resonate(c + 3, st + 2, d)|resonate(c + 3, st + 1, d)|vc2hiana
+resonators-share|vc2HiresoResonate(c + 3, st + 2, d)|vc2HiresoResonate(c + 3, st + 1, d)|vc2hiana
 band-stride|constexpr int kStates = 4;|constexpr int kStates = 5;|vc2hiana
 samples-halved|return Words::kBlock >> (Words::kGroups - 1 - group);|return Words::kBlock >> (Words::kGroups - group);|vc2hiana
 gate-stride|return 1 << (Words::kGroups - 1 - group);|return (1 << (Words::kGroups - 1 - group)) / 2;|vc2hiana
@@ -105,8 +105,8 @@ resonators-at-word|resonatorAt = kResonators.at;|resonatorAt = kResonators.at + 
 ctor-no-reset|    analysis.reset();\n    reset();\n|    analysis.reset();\n|vc2hiobj
 ctor-no-analysis-init|    analysis.reset();\n    reset();\n|    reset();\n|vc2hiobj
 object-edges|    std::ranges::copy(kVc2HiresoEdges, s.edge);\n|    std::ranges::copy(kVc2HiresoEdges, s.edge);\n    s.edge[1] = 21;\n|vc2hiobj
-carrier-table-word|(kCarrierCoefs * (2 * s.edge[g] + g))|(kCarrierCoefs * (2 * s.edge[g]))|vc2hiobj
-carrier-coefs|constexpr int kCarrierCoefs = 3;|constexpr int kCarrierCoefs = 4;|vc2hiobj
+carrier-table-word|(Tables::kCoefs * (2 * s.edge[g] + g))|(Tables::kCoefs * (2 * s.edge[g]))|vc2hiobj
+carrier-coefs|(Tables::kCoefs * (2 * s.edge[g] + g))|((Tables::kCoefs + 1) * (2 * s.edge[g] + g))|vc2hiobj
 weight-sign|xtf::flt(2 * (b & 1) - 1)|xtf::flt(1 - 2 * (b & 1))|vc2hiobj
 weight-last|const int last = Tables::kBands - 1;|const int last = Tables::kBands - 2;|vc2hiobj
 weight-grouping|mul(mul(sign, mul(tb.weightA[b], tb.weightB[b])), scale)|mul(mul(sign, tb.weightA[b]), mul(tb.weightB[b], scale))|vc2hiobj
@@ -117,13 +117,13 @@ default-release|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {
 default-template|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 6, 18, 1, 1.0f, 1.0f }|vc2hiobj
 default-depth|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 6, 18, 0, 0.5f, 1.0f }|vc2hiobj
 default-pivot|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, 11 }, {}, 6, 18, 0, 1.0f, 1.0f }|vc2hiobj
-reset-bank-whole|std::fill(band, band + kBankCleared, 0.0f)|std::fill(band, band + Words::kBankWords, 0.0f)|vc2hiobj
+reset-bank-whole|std::fill_n(&s.bank[Words::kBankWords * b], kBankCleared, 0.0f)|std::fill_n(&s.bank[Words::kBankWords * b], Words::kBankWords, 0.0f)|vc2hiobj
 reset-bank-short|constexpr int kBankCleared = 7;|constexpr int kBankCleared = 6;|vc2hiobj
 reset-keeps-rows|    for (auto& row : s.bandWords) std::ranges::fill(row, 0.0f);\n|\n|vc2hiobj
 reset-clears-map|std::fill(s.formant + Words::kBands, s.formant + Words::kSideWords, 0.0f)|std::fill(s.formant, s.formant + Words::kSideWords, 0.0f)|vc2hiobj
 reset-synthesis-word|    t.synthesis = 1.0f;|    t.synthesis = 0.0f;|vc2hiobj
-reset-hold-synthesis|{ 0, 1.0f, 0.0f, { 0.0f, 1.0f, 0.0f } }|{ 0, 1.0f, 0.0f, { 0.0f, 0.0f, 0.0f } }|vc2hiobj
-reset-held|{ 0, 1.0f, 0.0f, { 0.0f, 1.0f, 0.0f } }|{ 0, 1.0f, 1.0f, { 0.0f, 1.0f, 0.0f } }|vc2hiobj
+reset-hold-synthesis|{ 0, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f }|{ 0, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f }|vc2hiobj
+reset-held|{ 0, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f }|{ 0, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f }|vc2hiobj
 reset-no-clear|    analysis.clear();\n|\n|vc2hiobj
 attack-curve|t.attack = tb.attack[in.attack];|t.attack = tb.release[in.attack];|vc2hiobj
 attack-past-end|in.attack < Tables::kCurve|in.attack <= Tables::kCurve|vc2hiobj
@@ -161,3 +161,43 @@ cap-index|cap[b] = (load & 0xff) / 4;|cap[b] = (load & 0xff) / 4 + 1;|vc2hitable
 pivot-word|kPivotAt = 4;|kPivotAt = 0;|vc2hitables
 templates-at-word|templatesAt = kTemplates;|templatesAt = kTemplates + 4;|vc2hitables
 carrier-at-word|carrierAt = kCarrier.at;|carrierAt = kCarrier.at + 4;|vc2hitables
+# The mono synthesis (v217): Vc2HiresoSynth.cpp (vc2hisyn), the hold's glide in Vc2Hireso.cpp (vc2hiobj), its tables
+# (vc2hitables).  Not planted, as no input tells them apart: the envelope's two terms summed the other way round, and
+# the glide's end taken at 0 itself (from 1, its only start but the reset's 0, it falls in 100 blocks to −3.06e-6
+# under round to zero, never through 0 exactly).
+carriers-swapped|{ quarter, half, mixed }|{ half, quarter, mixed }|vc2hisyn
+no-envelope-update|    analysis.envelopes();\n|\n|vc2hisyn
+no-glide|    holdGlide();\n|\n|vc2hisyn
+outs-swapped|{ quarterOut, halfOut, full }|{ halfOut, quarterOut, full }|vc2hisyn
+interpolators-swapped|vc2InterpolateAdd(rates[kFromQuarter]|vc2InterpolateAdd(rates[kFromHalf]|vc2hisyn
+carrier-no-difference|const float d = sub(in[n], base[0]);   // the first difference|const float d = in[n];|vc2hisyn
+carrier-last-difference|base[0] = in[n];|base[0] = d;|vc2hisyn
+carrier-sum-order|add(add(lower, centre), upper)|add(lower, add(centre, upper))|vc2hisyn
+carrier-no-shared-edge|lower = upper;   // the next band's lower edge|lower = centre;|vc2hisyn
+carrier-states-stride|c += 2 * Tables::kCoefs, st += 2 * Tables::kStates)|c += 2 * Tables::kCoefs, st += Tables::kStates)|vc2hisyn
+carrier-coefs-off|(s.carrierTable[group] - tb.carrierAt) / 4;|(s.carrierTable[group] - tb.carrierAt) / 4 + 3;|vc2hisyn
+envelope-top|return analysis.envelope(Words::kBands - 1);|return analysis.envelope(Words::kBands - 2);|vc2hisyn
+envelope-frac-flipped|add(mul(analysis.envelope(i + 1), frac), mul(analysis.envelope(i), sub(1.0f, frac)))|add(mul(analysis.envelope(i), frac), mul(analysis.envelope(i + 1), sub(1.0f, frac)))|vc2hisyn
+per-sample|xtf::div(1.0f, xtf::flt(n))|xtf::div(1.0f, xtf::flt(n + 1))|vc2hisyn
+rate-scale-ignored|t.attack : t.release[b], scale)|t.attack : t.release[b], 1.0f)|vc2hisyn
+attack-on-falling|target > follower ? t.attack : t.release[b]|target < follower ? t.attack : t.release[b]|vc2hisyn
+held-weights-swapped|held = add(mul(t.hold.keep, held), mul(t.hold.take, e));|held = add(mul(t.hold.take, held), mul(t.hold.keep, e));|vc2hisyn
+ramp-first|const float gap = sub(ramp, f);\n            ramp = add(ramp, step);|ramp = add(ramp, step);\n            const float gap = sub(ramp, f);|vc2hisyn
+follower-not-kept|        follower = f;\n|\n|vc2hisyn
+target-not-kept|        target = ramp;\n|\n|vc2hisyn
+gain-unweighted|mul(gains[kLeft][b], s.weight[b])|gains[kLeft][b]|vc2hisyn
+gains-right|mul(gains[kLeft][b], s.weight[b])|mul(gains[1][b], s.weight[b])|vc2hisyn
+map-right|s.formant + Words::kSideWords * kLeft;|s.formant + Words::kSideWords * 1;|vc2hisyn
+out-not-zeroed|    std::fill_n(out, n, 0.0f);\n|\n|vc2hisyn
+out-grouping|out[i] = add(mul(mul(s.rows[b][i], f), gain), out[i]);|out[i] = add(mul(s.rows[b][i], mul(f, gain)), out[i]);|vc2hisyn
+synthesis-samples|    const int n = tb.samples[group];|    const int n = tb.samples[group] / 2;|vc2hisyn
+glide-held-take|        h.take = h.held;|        h.take = 1.0f;|vc2hiobj
+glide-held-keep|h.keep = sub(1.0f, h.held);|h.keep = h.held;|vc2hiobj
+glide-step|h.letGo = add(h.letGo, glide[Tables::kGlideStep]);|h.letGo = add(h.letGo, mul(2.0f, glide[Tables::kGlideStep]));|vc2hiobj
+glide-take-keep|h.take = glide[Tables::kGlideTake];|h.take = glide[Tables::kGlideKeep];|vc2hiobj
+glide-held-from|if (h.controller >= kHoldCentre) {|if (h.controller > kHoldCentre) {|vc2hiobj
+glide-done-keep|        h.take = 1.0f;\n        h.keep = 0.0f;|        h.take = 1.0f;\n        h.keep = 1.0f;|vc2hiobj
+gains-at|{ record + kRecordGains, kBands }|{ record + kRecordGains + 4, kBands }|vc2hitables
+samples-halved-table|samples[g] = (int32_t)image.rd32(kSamples + 4 * (uint32_t)g);|samples[g] = (int32_t)image.rd32(kSamples + 4 * (uint32_t)g) / 2;|vc2hitables
+rate-scales-at|kRateScales { 0x895628b8,|kRateScales { 0x895628bc,|vc2hitables
+glide-at|kGlide { 0x893f106c, 3 }|kGlide { 0x893f1070, 3 }|vc2hitables

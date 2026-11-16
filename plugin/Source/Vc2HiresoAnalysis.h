@@ -12,6 +12,10 @@
 #include "Vc2HiresoTables.h"
 #include <cstdint>
 
+// A two-pole resonator on the difference d, three coefficients c (a gain, then two feedbacks) and two states st: the
+// analysis's bands' (v215) and the object's carrier bank's (v217), rom.4's arithmetic in both
+float vc2HiresoResonate(const float* c, float* st, float d);
+
 // The analysis's state as rom.4 lays it out from 0x8a1bbd2c, word for word
 struct Vc2HiresoAnalysisWords {
     static constexpr int kBands = 32, kBlock = 32, kFrames = 14, kGroups = 3, kBankStride = 7;
