@@ -756,6 +756,10 @@ silence at 300 samples).
 
 ### Kind 6's pitch source, run (`autonote`) (2026-11-13, the VC-2 mode's step 1c)
 
+(v226: the input stage, Auto Note's setters, the getter and the bend ported bit for bit, every instruction of the live
+paths read: HARDWARE_FIRMWARE.md, "Auto Note and the pitch source". What the run below didn't show: a key held under
+Switch 1 clears Auto Note's state with no note-off of its own, as the key's note-on has already asked for the release.)
+
 **Kind 6 is always in mode 0, the pitch mode.** The mode setter `0x893ec890` has no caller: no `bsr`, `bra` or pool word
 in the image reaches it. The mode word `0x8993fe54` has one other writer, the mic ring's reset `0x893ec7d0`, which, when the
 word isn't 0, makes it 0 and sets the pitch flag `0x8a0f73d8`. The flag has no other writer. **Run**

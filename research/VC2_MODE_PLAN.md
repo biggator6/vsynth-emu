@@ -301,9 +301,12 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      in its RAM in xt_vc2kind6, both modes, the interval (the harmonizer) by the mode setter that nothing calls
      (HARDWARE_FIRMWARE.md, "Voice kind 6"). rom.4's shared math (the cubic, sine, cosine and window) one module,
      `Vc2Math`, the carrier's copies taken out.
-   - then (v226): Auto Note and the pitch source: the input stage's wrapper (`0x893ebb00`: the tracker's block, Auto
-     Note's state and its notes to the tone generator), the On Switch's setter, the pitch-source getter (`0x89394a40`)
-     and its bend by the singer's movement (`0x893ebc70`).
+   - done (v226): Auto Note and the pitch source, `Vc2AutoNote`: the input stage's wrapper (`0x893ebb00`: the
+     tracker's block, Auto Note's state and its notes to the tone generator through an interface), the On Switch's and
+     Legato Switch's setters, the release request, the init, the pitch-source getter (`0x89394a40`) and its bend by the
+     singer's movement (`0x893ebc70`), against rom.4's with the tracker inside in xt_vc2autonote; the semitone detector
+     and snap not ported, as nothing sets their switch (HARDWARE_FIRMWARE.md, "Auto Note and the pitch source").
+     Step 7 is done.
 8. The part mixer (Direct Sound) and the patch EQ.
 
 ### 4. Wiring

@@ -186,6 +186,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2Kind6.cpp
     Source/Vc2Kind6Core.cpp
     Source/Vc2Kind6Tables.cpp
+    Source/Vc2AutoNote.cpp
+    Source/Vc2AutoNoteTables.cpp
     Source/XtBuildId.cpp
 )
 

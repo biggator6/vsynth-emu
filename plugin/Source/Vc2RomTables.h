@@ -52,8 +52,9 @@ inline void vc2ReadPool(Sh4& image, std::span<const Vc2PoolWord> words) {
     for (const auto& [at, out] : words) *out = std::bit_cast<float>(image.rd32(at));
 }
 
-// A port's tables of pool words alone and the shared math routines' pool (v225: the carrier's, kind 6's): `Words(t)`
-// gives each word's address and the float of `t` it fills; one instance, read once as Vc2RomTables reads
+// A port's tables of pool words alone, and the shared math routines' pool when they have one (v225: the carrier's,
+// kind 6's; v226: Auto Note's, without): `Words(t)` gives each word's address and the float of `t` it fills; one
+// instance, read once as Vc2RomTables reads
 template <class Tables, auto Words>
 class Vc2PoolTables {
 public:
@@ -65,7 +66,7 @@ private:
     struct Read : Tables {
         bool read(Sh4& image) {
             vc2ReadPool(image, Words(*this));
-            vc2ReadMathPool(image, this->math);
+            if constexpr (requires(Tables& t) { t.math; }) vc2ReadMathPool(image, this->math);
             return true;
         }
     };

@@ -150,6 +150,24 @@ inline std::string vc2FirstDifference(Vc2Fw& fw, uint32_t at, const void* mine, 
     return t;
 }
 
+// A region of rom.4's memory and the port's words for it, and its name (v226)
+struct Vc2Region {
+    uint32_t at;
+    const void* mine;
+    size_t bytes;
+    const char* what;
+};
+
+// The first of the regions, in order, whose words differ, as vc2FirstDifference says it; empty when none does (v226: kind
+// 6's and Auto Note's checks)
+inline std::string vc2RegionsDifference(Vc2Fw& fw, std::initializer_list<Vc2Region> regions) {
+    for (const Vc2Region& r : regions) {
+        std::string what = vc2FirstDifference(fw, r.at, r.mine, r.bytes, r.what);
+        if (!what.empty()) return what;
+    }
+    return "";
+}
+
 // A reset on both, rom.4's routine (v211) and the port's reset(), then `difference(fw, port)`; empty when nothing differs
 template <class Port, class Difference>
 std::string vc2ResetOn(Vc2Fw& fw, uint32_t routine, std::initializer_list<uint32_t> args, Port& port,

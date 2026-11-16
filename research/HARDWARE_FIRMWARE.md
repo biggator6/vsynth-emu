@@ -1546,6 +1546,49 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Auto Note and the pitch source (2026-11-16, v226) {#vc2-auto-note}
+
+Step 7's second part, ported bit for bit (`Vc2AutoNote`; Vc2AutoNote.cpp): what decides the pitch a VC-2 voice sings at, kind 6's included. VC2_VOCAL_DESIGNER.md, "Kind 6's pitch source, run", ran it on rom.4; this is every instruction of the live paths. With it, step 7 is done.
+
+**The state:**
+- Auto Note's, in .data at 0x8993fe3c (`Vc2AutoNoteWords`): the note it sounds (−1 none), that note's period (C4's; 0 none), a release asked for, the semitone detector's switch, the ratio (1), and the On Switch.
+- The bend's, in .bss at 0x899d994c (`Vc2AutoNoteGlobals`): a flag, the smoothed period, and C4's period. The init's two other words, 44100/440 and 880/44100, are read by nothing.
+- The tone generator's pitch source for the part, 0x89989748 (`Vc2PitchSource`), which its note-on and note-off keep: the key Auto Note's note took (−1 none), how many other keys are down, and the bend's depth. It is read here, never written.
+
+**The input stage** `0x893ebb00(in, n)`, the glue's, a block of the mic:
+1. The tracker's block, which returns the tracked period.
+2. A release asked for: a note-off of the note goes to the tone generator, even when there is none (−1). Only when there was a note is the state cleared: no note, no period, no release, ratio 1.
+3. The On Switch:
+   - 0: nothing more.
+   - 1 with another key down (the object's +4 above 0, which is all `0x89391db0` reads): a sounding note's state is cleared, with no note-off, and nothing more. The tone generator's note-on for that key has already asked for the release (below).
+   - 2, or 1 with no other key: while a note sounds, the ratio becomes its period (C4's) over the tracked one, block by block. With none, a note-on of 60 at level 1 goes to the tone generator's mailbox (`0x89391dc0`, the note + 12), every block until it is posted. Once it is, the state holds note 60 and C4's period.
+
+**The setters:**
+- The On Switch's, `0x893ebc20`, takes 0…2 only when new, and asks for a release if a note sounds.
+- The Legato Switch's, `0x893ebc60`, clears the detector's switch whatever it is given.
+- The release request, `0x893ebcf0`, is the tone generator's, at a key's note-on. With the detector's switch off and a note sounding, it asks for the release.
+- The init, `0x893ebe50`, from the init table, writes C4's period, 168.5615.
+
+**The pitch source:**
+- The getter `0x89394a40(object)`, the four converters', returns Auto Note's ratio while the object says Auto Note's note took a key (+0 ≥ 0). Otherwise it returns the bend on the object's depth.
+- The bend `0x893ebc70(depth)` starts the smoothed period at C4's on its first call. At depth 0 it gives 1. Otherwise, with the movement m = the tracked period − the smoothed one, the smoothed period follows by 0.1 m, and the bend is 1 − depth × clamp(m, ±20) / C4's period.
+
+**Not ported:** the semitone detector `0x893ef400`, its query `0x893ef380` and the snap to a note `0x893ebde0` (with the "new note" path through them, and `0x893ebd20` and `0x893ebda0`, which have no caller). The detector runs only with its switch (0x8993fe48) set, and its one writer, the Legato setter, stores 0. Its query returns the detector's own flag, which only the detector writes. So none of it runs ("Kind 6's pitch source, run"). The switch is kept, and so are its two tests, before the note-on of C4 and in the release request.
+
+**The check, `xt_vc2autonote <rom.4> [cases] [seed]`** (in fcheck at 40 cases, under a second; Vc2AutoNoteCheck.cpp, XT_VC2AUTONOTE_MAIN):
+- rom.4's input stage, with the pitch tracker inside, against the port's (`Vc2Tracker` with `Vc2TrackerAnalysis`). The tracker's static initializers and Auto Note's init run once.
+- Each case runs the tracker's reset on both and draws Auto Note's words: a note sounding or none, a release asked for or not, any switch. The detector's switch stays 0, as rom.4 leaves it.
+- 600 blocks of `Vc2TrackerSignal`, mostly 32 samples. Before each, the tone generator's object is drawn (Auto Note's key or none, other keys, a depth or none), and now and then an event: the On Switch's setter (−1…3), the Legato setter, or the release request. After each block comes the getter.
+- rom.4's note-on and note-off are hooked to log their calls and answer as drawn: posted three blocks in four. The port's host logs and answers the same.
+- After each routine, Auto Note's words, the bend's globals and the tracker's state are compared word for word, along with the calls and the getter's return.
+- Coverage (llvm-cov, 40 cases): every line of the port. Of the branch sides, all but the detector's switch on, which nothing reaches.
+
+Results:
+- seed 2024: 40 cases, 24,000 blocks, 1,890 note-ons posted, 633 refused, 480 note-offs, 12,006 getter ratios, 7,894 bends, 406 switches, 195 releases, 0 different;
+- seed 7: 0 different;
+- `mutate_vc2.py --autonote`: 50 plants (44 in Vc2AutoNote.cpp, 6 in its tables), all caught on the first run. Not planted: the detector's switch's two tests, which no input tells apart, since the switch is never set.
+- Every other list ran again, as `Vc2RomTables.h` (the pool tables' math pool optional) and `Vc2CheckRig.h` (`vc2RegionsDifference`) changed: 138, 152, 217, 45, 10, 66, 114 and 190, all caught.
+
 ### Voice kind 6 (2026-11-16, v225) {#vc2-kind6}
 
 Step 7's first part, ported bit for bit (`Vc2Kind6`; Vc2Kind6.cpp, Vc2Kind6Core.cpp): the mic's pitch shifter, the EXT IN path's voice kind, and the mic ring it reads. Step 7 is split in two by what the module holds: this, then Auto Note and the pitch source (v226). VC2_VOCAL_DESIGNER.md, "Voice kind 6, run", ran it on rom.4 and found it a TD-PSOLA shifter; this is every instruction.

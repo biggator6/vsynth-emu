@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Auto Note and the pitch source v226 (2026-11-16, on vc2-mode): step 7's second part (the user's "Yes, next item";
+  HARDWARE_FIRMWARE.md, "Auto Note and the pitch source"); step 7 done. Vc2AutoNote: Auto Note's .data state
+  (0x8993fe3c...) and the bend's globals (0x899d994c...) word for word; the input stage 0x893ebb00 around the tracker's
+  block (the release, the On Switch's three states, the note-on of 60, C4 bent to the sung pitch), the On Switch's and
+  Legato's setters, the release request, the init, the bend 0x893ebc70 and the pitch-source getter 0x89394a40 on the
+  tone generator's object (Vc2PitchSource, read); the mailbox through Vc2AutoNoteHost; the semitone detector and snap
+  not ported (their switch's one writer stores 0). Vc2AutoNoteTables by Vc2PoolTables (its math pool now optional), in
+  loadVc2 (rom4-no-autonote). The checks' region compare one function, vc2RegionsDifference (kind 6's copy taken out
+  first). xt_vc2autonote (in fcheck, 40 cases): rom.4's input stage with the tracker inside, the note-on and note-off
+  hooked; 0 different at seeds 2024 and 7; every line covered. mutate_vc2.py --autonote: 50 plants, caught; every
+  other list again, caught. Not in the sound yet.
+
 Voice kind 6 v225 (2026-11-16, on vc2-mode): step 7's first part (the user's "Yes, next item"; step 7 split in two,
   v226 Auto Note and the pitch source; HARDWARE_FIRMWARE.md, "Voice kind 6"). Vc2Kind6: the mic's TD-PSOLA pitch
   shifter and the mic ring, rom.4's module 0x893ec700... word for word: Vc2MicRing (the ring 0x8a0f31cc...0x8a0f73dc, the

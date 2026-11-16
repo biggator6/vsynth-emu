@@ -1,5 +1,6 @@
-// xt_vc2tracker's input, and xt_vc2kind6's mic (v225): see Vc2TrackerSignal.h (v224).  Those checks' builds only.
-#if defined(XT_VC2TRACKER_MAIN) || defined(XT_VC2KIND6_MAIN)
+// xt_vc2tracker's input, and xt_vc2kind6's and xt_vc2autonote's mic (v225, v226): see Vc2TrackerSignal.h (v224).
+// Those checks' builds only.
+#if defined(XT_VC2TRACKER_MAIN) || defined(XT_VC2KIND6_MAIN) || defined(XT_VC2AUTONOTE_MAIN)
 #include "Vc2TrackerSignal.h"
 #include <algorithm>
 #include <climits>

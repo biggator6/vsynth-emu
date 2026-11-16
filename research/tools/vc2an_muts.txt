@@ -1,0 +1,55 @@
+# Planted errors in the VC-2's Auto Note and pitch source, for mutate_vc2.py --autonote: each must make xt_vc2autonote,
+# on rom.4, say something differs.  name|old|new[|port[|seed]]; ports vc2an (Vc2AutoNote.cpp, v226) and vc2antables
+# (Vc2AutoNoteTables.cpp).
+# Not planted, as no input tells them apart: the detector's switch's two tests (before the note-on of C4, and in the
+# release request), as rom.4 never sets the switch and the check leaves it 0.
+init-c4-a440|    g.c4Period = t.c4Period;|    g.c4Period = t.a440Period;|vc2an
+init-a440-lost|    g.a440Period = t.a440Period;\n|\n|vc2an
+init-unread-lost|    g.unreadRate = t.unreadRate;\n|\n|vc2an
+clear-note-kept|    w.note = -1;\n    w.period = 0.0f;|    w.period = 0.0f;|vc2an
+clear-period-kept|    w.period = 0.0f;\n    w.release = 0;|    w.release = 0;|vc2an
+clear-release-kept|    w.release = 0;\n    w.ratio = 1.0f;|    w.ratio = 1.0f;|vc2an
+clear-ratio-kept|    w.ratio = 1.0f;\n}|}|vc2an
+release-off-only-sounding|        host.noteOff(w.note);|        if (w.note >= 0) host.noteOff(w.note);|vc2an
+release-ignored|    if (w.release != 0) {|    if (false) {|vc2an
+release-clears-always|        if (w.note >= 0) clear();\n    }\n    if (w.onSwitch == kOff) return;|        clear();\n    }\n    if (w.onSwitch == kOff) return;|vc2an
+switch-off-runs|    if (w.onSwitch == kOff) return;\n|\n|vc2an
+switch-1-ignores-keys|    if (w.onSwitch == kWhileNoKey && source.others > 0) {|    if (false) {|vc2an
+switch-2-gives-way|    if (w.onSwitch == kWhileNoKey && source.others > 0) {|    if (source.others > 0) {|vc2an
+keys-cleared-always|        if (w.note >= 0) clear();\n        return;|        clear();\n        return;|vc2an
+keys-no-return|        if (w.note >= 0) clear();\n        return;\n    }|        if (w.note >= 0) clear();\n    }|vc2an
+ratio-inverted|        w.ratio = div(w.period, tracked);|        w.ratio = div(tracked, w.period);|vc2an
+ratio-no-return|        w.ratio = div(w.period, tracked);\n        return;|        w.ratio = div(w.period, tracked);|vc2an
+ratio-at-zero|    if (w.period > 0.0f) {   // sounding|    if (w.period >= 0.0f) {   // sounding|vc2an
+noteon-c4-61|    if (host.noteOn(kC4, 1.0f)) {|    if (host.noteOn(kC4 + 1, 1.0f)) {|vc2an
+noteon-level|    if (host.noteOn(kC4, 1.0f)) {|    if (host.noteOn(kC4, 0.5f)) {|vc2an
+noteon-unposted|    if (host.noteOn(kC4, 1.0f)) {|    if (host.noteOn(kC4, 1.0f) \|\| true) {|vc2an
+noteon-note-kept|        w.note = kC4;\n|\n|vc2an
+noteon-period-a440|        w.period = g.c4Period;|        w.period = g.a440Period;|vc2an
+set-range-3|    if (on < 0 \|\| on >= kStates \|\| on == w.onSwitch) return;|    if (on < 0 \|\| on > kStates \|\| on == w.onSwitch) return;|vc2an
+set-negative|    if (on < 0 \|\| on >= kStates|    if (on < -1 \|\| on >= kStates|vc2an
+set-same-again| \|\| on == w.onSwitch) return;|) return;|vc2an
+set-no-release|    if (w.period > 0.0f) w.release = 1;\n    w.onSwitch = on;|    w.onSwitch = on;|vc2an
+set-release-always|    if (w.period > 0.0f) w.release = 1;\n    w.onSwitch = on;|    w.release = 1;\n    w.onSwitch = on;|vc2an
+set-kept|    w.onSwitch = on;\n|\n|vc2an
+release-ask-always|    if (w.detector == 0 && w.period > 0.0f) w.release = 1;|    w.release = 1;|vc2an
+bend-per-a440|    const float perC4 = div(1.0f, g.c4Period);|    const float perC4 = div(1.0f, g.a440Period);|vc2an
+bend-start-kept|        g.bendStarted = 1;\n|\n|vc2an
+bend-start-zero|        g.smoothed = g.c4Period;|        g.smoothed = 0.0f;|vc2an
+bend-zero-depth|    if (depth == 0.0f) return 1.0f;\n|\n|vc2an
+bend-unsmoothed|    g.smoothed = add(mul(moved, t.smoothing), g.smoothed);   // FMAC|    g.smoothed = tracker.period();|vc2an
+bend-smoothed-kept|    g.smoothed = add(mul(moved, t.smoothing), g.smoothed);   // FMAC\n|\n|vc2an
+bend-unclamped-high|    if (moved > t.most) {|    if (false) {|vc2an
+bend-unclamped-low|    } else if (t.least > held) {|    } else if (false) {|vc2an
+bend-clamp-10|        held = t.most;|        held = 10.0f;|vc2an
+bend-sign|    return sub(1.0f, mul(mul(depth, held), perC4));|    return add(1.0f, mul(mul(depth, held), perC4));|vc2an
+bend-no-depth|mul(mul(depth, held), perC4)|mul(held, perC4)|vc2an
+getter-bend-always|    return source.note >= 0 ? w.ratio : bend(tracker, source.depth);|    return bend(tracker, source.depth);|vc2an
+getter-from-1|    return source.note >= 0 ? w.ratio|    return source.note > 0 ? w.ratio|vc2an
+getter-ratio-always|    return source.note >= 0 ? w.ratio : bend(tracker, source.depth);|    return w.ratio;|vc2an
+table-smoothing|{ 0x893ebd80, &t.smoothing }|{ 0x893ebd84, &t.smoothing }|vc2antables
+table-most|{ 0x893ebd84, &t.most }|{ 0x893ebd88, &t.most }|vc2antables
+table-least|{ 0x893ebd88, &t.least }|{ 0x893ebd84, &t.least }|vc2antables
+table-c4|{ 0x893ebe98, &t.c4Period }|{ 0x893ebe8c, &t.c4Period }|vc2antables
+table-a440|{ 0x893ebe8c, &t.a440Period }|{ 0x893ebe94, &t.a440Period }|vc2antables
+table-unread|{ 0x893ebe94, &t.unreadRate }|{ 0x893ebe98, &t.unreadRate }|vc2antables

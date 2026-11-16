@@ -772,6 +772,9 @@ xt_vc2tracker: 0 different
 == xt_vc2kind6
 kind 6: 40 cases, 32000 blocks, 83129 renders (25829 in mode 1), 688 starts, 641 updates, 236 modes, 67 resets, 0 different
 xt_vc2kind6: 0 different
+== xt_vc2autonote
+auto note: 40 cases, 24000 blocks, 1890 note-ons posted, 633 refused, 480 note-offs, 12006 getter ratios, 7894 bends, 406 switches, 195 releases, 0 different
+xt_vc2autonote: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

@@ -41,10 +41,9 @@ struct Sides {
 uint32_t voiceAt(int voice) { return kVoicesAt + kVoiceStride * (uint32_t)voice; }
 
 std::string ringDifference(Sides& b) {
-    std::string what = vc2FirstDifference(b.fw, kRingAt, &b.ring.w, sizeof b.ring.w, "the mic ring");
-    if (what.empty()) what = vc2FirstDifference(b.fw, kGlobalsAt, &b.ring.g, sizeof b.ring.g, "the globals");
-    if (what.empty()) what = vc2FirstDifference(b.fw, kModeAt, &b.ring.mode, sizeof b.ring.mode, "the mode word");
-    return what;
+    return vc2RegionsDifference(b.fw, { { kRingAt, &b.ring.w, sizeof b.ring.w, "the mic ring" },
+                                        { kGlobalsAt, &b.ring.g, sizeof b.ring.g, "the globals" },
+                                        { kModeAt, &b.ring.mode, sizeof b.ring.mode, "the mode word" } });
 }
 
 std::string voiceDifference(Sides& b, int voice) {
