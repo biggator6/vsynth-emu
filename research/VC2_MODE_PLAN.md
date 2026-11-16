@@ -261,7 +261,9 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
    - done (v217): the mono synthesis, `Vc2Hireso::mono` (slot 2 `0x893f0c60`, the carrier bank `0x893f1a10`, the
      groups' synthesis `0x893f1b10`), against slot 2 in xt_vc2hireso's fourth part (HARDWARE_FIRMWARE.md, "HIRESO's mono
      synthesis").
-   - then: the stereo synthesis (slot 3, `0x893f1240`, its carrier bank and the stereo rate filters).
+   - done (v218): the stereo synthesis, `Vc2Hireso::stereo` (slot 3 `0x893f1240`, its carrier bank `0x893f1d40`, groups'
+     synthesis `0x893f1ec0` and the stereo rate filters), against slot 3 and each stereo routine in xt_vc2hireso
+     (HARDWARE_FIRMWARE.md, "HIRESO's stereo synthesis"). HIRESO is ported whole; it reaches the sound with step 4.
 4. The vocoder object and its settings path, with the hold on CC 64.
 5. The VOCODER OSC's carrier (kind 5) and its converter: the growl's model is its start (`vc2growllaw.cpp`).
 6. The pitch tracker.

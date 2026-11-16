@@ -20,10 +20,10 @@ int samples(int group) { return Words::kBlock >> (Words::kGroups - 1 - group); }
 int stride(int group) { return 1 << (Words::kGroups - 1 - group); }
 } // namespace
 
-float vc2HiresoResonate(const float* c, float* st, float d) {
+float vc2HiresoResonate(const float* c, float* st, float d, int stride) {
     const float y = add(mul(c[0], d), st[0]);
-    st[0] = add(mul(c[1], y), st[1]);
-    st[1] = mul(c[2], y);
+    st[0] = add(mul(c[1], y), st[stride]);
+    st[stride] = mul(c[2], y);
     return y;
 }
 

@@ -52,15 +52,14 @@ void Vc2Hireso::weights() {
 void Vc2Hireso::reset() {
     analysis.clear();
     for (int b = 0; b < Words::kBands; ++b) std::fill_n(&s.bank[Words::kBankWords * b], kBankCleared, 0.0f);
-    for (auto& row : s.bandWords) std::ranges::fill(row, 0.0f);
-    std::fill(s.formant + Words::kBands, s.formant + Words::kSideWords, 0.0f);   // the three rows between the maps
+    for (Vc2HiresoSideWords Words::* side : kVc2HiresoSides) s.*side = {};
     t.synthesis = 1.0f;
     t.hold = kHoldReset;
 }
 
 void Vc2Hireso::formant(int side, float ratio) {
     const Vc2HiresoMap map = vc2HiresoMapOf(t.pivot[side], ratio);
-    std::ranges::copy(map, s.formant + Words::kSideWords * side);
+    std::ranges::copy(map, s.*kVc2HiresoMaps[side]);
 }
 
 void Vc2Hireso::settings(Vc2HiresoSettings& in) {

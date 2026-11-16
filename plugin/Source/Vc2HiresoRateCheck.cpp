@@ -2,7 +2,8 @@
 // interpreter's RAM.  A kind for each routine and the table its callers give it: the analysis's decimators on its table
 // (0x893efd20 32→16, 0x893efdb0 16→8, 0x895613f4), the carrier's (0x893efc80 with its mix, and 0x893efdb0 again, on
 // 0x895616d8), the interpolators (0x893efef0 8→16 into a buffer that holds something, 0x893efe40 16→32 into frames, on
-// 0x89561700).  Each case clears the object by 0x893efc30 and sets its table, then blocks of Vc2Signal's input, the mic's
+// 0x89561700); the stereo path's four (v218: 0x893eff90, 0x893f0160 on the decimators' table, 0x893f0350, 0x893f0240 on
+// the interpolators').  Each case clears the object by 0x893efc30 and sets its table, then blocks of Vc2Signal's input, the mic's
 // at its scale and the carrier's at the bus's; after every block the outputs and the object's 16 states word for word.
 // XT_VC2HIRESO_FIRST=1 says where the first block to differ does, XT_VC2HIRESO_STOP=1 stops there.  XT_VC2HIRESO_MAIN
 // only.
@@ -51,6 +52,15 @@ constexpr Kind kKinds[] = {
       [](Vc2RateFilter& f, Buffers& b) { vc2InterpolateAdd(f, b.in, b.out); } },
     { "16→32", 0x893efe40, kInterpolatorTable, interpolatorTable, 16, 32, 64, kVc2Bus,
       [](Vc2RateFilter& f, Buffers& b) { vc2InterpolateFrames(f, b.in, b.mid, b.out); } },
+    // the stereo path's (v218), on the tables slot 3 gives them, left and right interleaved
+    { "the stereo carrier's 32→16", 0x893eff90, kDecimatorTable, decimatorTable, 64, 64, 32, kVc2Bus,
+      [](Vc2RateFilter& f, Buffers& b) { vc2DecimateFrames(f, b.in, b.mid, b.out, 2); } },
+    { "the stereo 16→8", 0x893f0160, kDecimatorTable, decimatorTable, 32, 0, 16, kVc2Bus,
+      [](Vc2RateFilter& f, Buffers& b) { vc2Decimate(f, b.in, b.out, 8, 2); } },
+    { "the stereo 8→16", 0x893f0350, kInterpolatorTable, interpolatorTable, 16, 0, 32, kVc2Bus,
+      [](Vc2RateFilter& f, Buffers& b) { vc2InterpolateAdd(f, b.in, b.out, 2); } },
+    { "the stereo 16→32", 0x893f0240, kInterpolatorTable, interpolatorTable, 32, 64, 64, kVc2Bus,
+      [](Vc2RateFilter& f, Buffers& b) { vc2InterpolateFrames(f, b.in, b.mid, b.out, 2); } },
 };
 
 // A block's inputs: the signal's samples at the kind's scale in `in`, and something in the buffers it reads beside or

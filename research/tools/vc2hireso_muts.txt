@@ -32,24 +32,24 @@ table-decimator|kDecimator { 0x895616d8,|kDecimator { 0x895616dc,|vc2hitables
 table-interpolator|kInterpolator { 0x89561700,|kInterpolator { 0x89561704,|vc2hitables
 # The three biquads
 section-a|add(mul(ck[0], sk[0]), y)|add(mul(ck[0], sk[1]), y)|vc2rate
-section-b|add(mul(ck[1], sk[1]), add(|add(mul(ck[1], sk[0]), add(|vc2rate
-section-n|add(mul(ck[2], sk[0]), sk[1])|add(mul(ck[2], sk[1]), sk[1])|vc2rate
-section-sums|add(mul(ck[1], sk[1]), add(mul(ck[0], sk[0]), y))|add(add(mul(ck[1], sk[1]), mul(ck[0], sk[0])), y)|vc2rate
-section-store|        sk[1] = sk[0];\n        sk[0] = w;|        sk[0] = w;\n        sk[1] = sk[0];|vc2rate
+section-b|add(mul(ck[1], sk[ch]), add(|add(mul(ck[1], sk[0]), add(|vc2rate
+section-n|add(mul(ck[2], sk[0]), sk[ch])|add(mul(ck[2], sk[ch]), sk[ch])|vc2rate
+section-sums|add(mul(ck[1], sk[ch]), add(mul(ck[0], sk[0]), y))|add(add(mul(ck[1], sk[ch]), mul(ck[0], sk[0])), y)|vc2rate
+section-store|        sk[ch] = sk[0];\n        sk[0] = w;|        sk[0] = w;\n        sk[ch] = sk[0];|vc2rate
 section-count|kBiquads = 3|kBiquads = 2|vc2rate
 # The interpolators' one-pole and the decimators' choice
-one-pole-coefficient|mul(c[10], s[kOnePole])|mul(c[9], s[kOnePole])|vc2rate
-one-pole-out|const float out = add(s[kOnePole], w);|const float out = w;|vc2rate
-decimate-keeps-first|        sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n]));\n        out[n] = sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n + 1]));|        out[n] = sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n]));\n        sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n + 1]));|vc2rate
-decimate-gain|sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n]));|sections(f.c, f.s, in[2 * n]);|vc2rate
+one-pole-coefficient|mul(c[10], s[kOnePole * ch])|mul(c[9], s[kOnePole * ch])|vc2rate
+one-pole-out|const float out = add(s[kOnePole * ch], w);|const float out = w;|vc2rate
+decimate-keeps-first|            sections(f.c, f.s + x, xtf::mul(f.c[0], in[channels * 2 * n + x]), channels);\n            out[channels * n + x] = sections(|            out[channels * n + x] = sections(f.c, f.s + x, xtf::mul(f.c[0], in[channels * 2 * n + x]), channels);\n            sections(|vc2rate
+decimate-gain|sections(f.c, f.s + x, xtf::mul(f.c[0], in[channels * 2 * n + x]), channels);|sections(f.c, f.s + x, in[channels * 2 * n + x], channels);|vc2rate
 # The carrier's mix and the interpolators' outputs
 mix|kMix = 0.5f|kMix = 0.25f|vc2rate
 mix-one-word|mul(add(frames[2 * i], frames[2 * i + 1]), kMix)|mul(frames[2 * i], kMix)|vc2rate
-interpolate-replaces|out[2 * n] = add(out[2 * n], interpolated(|out[2 * n] = add(0.0f, interpolated(|vc2rate
-interpolate-no-zero|interpolated(f.c, f.s, 0.0f));|interpolated(f.c, f.s, xtf::mul(f.c[0], in[n])));|vc2rate
-frames-no-zero|n % 2 == 0 ? mul(f.c[0], in[n / 2]) : 0.0f|mul(f.c[0], in[n / 2])|vc2rate
-frames-undelayed|frames[2 * n] = add(y, f.s[kDelay]);|frames[2 * n] = add(y, full[n]);|vc2rate
-frames-delays-itself|f.s[kDelay] = full[n];|f.s[kDelay] = y;|vc2rate
+interpolate-replaces|o = add(o, interpolated(f.c, f.s + x, mul(f.c[0], in[channels * n + x]), channels));|o = add(0.0f, interpolated(f.c, f.s + x, mul(f.c[0], in[channels * n + x]), channels));|vc2rate
+interpolate-no-zero|o = add(o, interpolated(f.c, f.s + x, 0.0f, channels));|o = add(o, interpolated(f.c, f.s + x, mul(f.c[0], in[channels * n + x]), channels));|vc2rate
+frames-no-zero|n % 2 == 0 ? mul(f.c[0], in[channels * (n / 2) + x]) : 0.0f|mul(f.c[0], in[channels * (n / 2) + x])|vc2rate
+frames-undelayed|frames[2 * n + x] = add(y, f.s[kDelay * channels + x]);|frames[2 * n + x] = add(y, full[channels * n + x]);|vc2rate
+frames-delays-itself|f.s[kDelay * channels + x] = full[channels * n + x];|f.s[kDelay * channels + x] = y;|vc2rate
 clear-short|std::fill(std::begin(f.s), std::end(f.s), 0.0f);|std::fill(std::begin(f.s), std::begin(f.s) + 7, 0.0f);|vc2rate
 # The analysis (v215): Vc2HiresoAnalysis.cpp (vc2hiana) and its tables (vc2hitables).  Not planted, as no input tells
 # them apart: the groups' banks in another order (each its own states and rows), a window's search from 0 rather than
@@ -59,8 +59,8 @@ frame-wraps-late|s.frame = s.frame + 1 >= Words::kFrames ? 0 : s.frame + 1;|s.fr
 rates-swapped|{ quarter, half, in }|{ half, quarter, in }|vc2hiana
 no-difference|const float d = sub(in[n], *last);|const float d = in[n];|vc2hiana
 last-is-difference|*last = in[n];|*last = d;|vc2hiana
-feedback-own-state|st[0] = add(mul(c[1], y), st[1]);|st[0] = add(mul(c[1], y), st[0]);|vc2hiana
-second-state-of-state|st[1] = mul(c[2], y);|st[1] = mul(c[2], st[0]);|vc2hiana
+feedback-own-state|st[0] = add(mul(c[1], y), st[stride]);|st[0] = add(mul(c[1], y), st[0]);|vc2hiana
+second-state-of-state|st[stride] = mul(c[2], y);|st[stride] = mul(c[2], st[0]);|vc2hiana
 resonators-opposed|s.rows[b][n] = add(y, z);|s.rows[b][n] = sub(y, z);|vc2hiana
 resonators-share|vc2HiresoResonate(c + 3, st + 2, d)|vc2HiresoResonate(c + 3, st + 1, d)|vc2hiana
 band-stride|constexpr int kStates = 4;|constexpr int kStates = 5;|vc2hiana
@@ -119,8 +119,8 @@ default-depth|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {},
 default-pivot|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, 11 }, {}, 6, 18, 0, 1.0f, 1.0f }|vc2hiobj
 reset-bank-whole|std::fill_n(&s.bank[Words::kBankWords * b], kBankCleared, 0.0f)|std::fill_n(&s.bank[Words::kBankWords * b], Words::kBankWords, 0.0f)|vc2hiobj
 reset-bank-short|constexpr int kBankCleared = 7;|constexpr int kBankCleared = 6;|vc2hiobj
-reset-keeps-rows|    for (auto& row : s.bandWords) std::ranges::fill(row, 0.0f);\n|\n|vc2hiobj
-reset-clears-map|std::fill(s.formant + Words::kBands, s.formant + Words::kSideWords, 0.0f)|std::fill(s.formant, s.formant + Words::kSideWords, 0.0f)|vc2hiobj
+reset-keeps-rows|    for (Vc2HiresoSideWords Words::* side : kVc2HiresoSides) s.*side = {};\n|\n|vc2hiobj
+reset-clears-map|    for (Vc2HiresoSideWords Words::* side : kVc2HiresoSides) s.*side = {};|    for (Vc2HiresoSideWords Words::* side : kVc2HiresoSides) s.*side = {};\n    std::ranges::fill(s.mapLeft, 0.0f);|vc2hiobj
 reset-synthesis-word|    t.synthesis = 1.0f;|    t.synthesis = 0.0f;|vc2hiobj
 reset-hold-synthesis|{ 0, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f }|{ 0, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f }|vc2hiobj
 reset-held|{ 0, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f }|{ 0, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f }|vc2hiobj
@@ -148,7 +148,7 @@ hold-curve-index|add(mul(x, k[Tables::kHoldStep]), k[Tables::kHoldBase])|add(mul
 hold-no-gain|t.hold.held = mul(vc2HiresoTables().release[at], k[Tables::kHoldGain]);|t.hold.held = vc2HiresoTables().release[at];|vc2hiobj
 hold-level|t.hold.level = sub(1.0f, x);|t.hold.level = x;|vc2hiobj
 hold-controller-lost|    t.hold.controller = controller;\n|\n|vc2hiobj
-formant-stride|s.formant + Words::kSideWords * side|s.formant + Words::kBands * side|vc2hiobj
+formant-stride|std::ranges::copy(map, s.*kVc2HiresoMaps[side]);|std::ranges::copy(map, s.*kVc2HiresoMaps[0]);|vc2hiobj
 formant-left-pivot|vc2HiresoMapOf(t.pivot[side], ratio)|vc2HiresoMapOf(t.pivot[0], ratio)|vc2hiobj
 attack-at|kAttack { 0x895628d0,|kAttack { 0x895628d4,|vc2hitables
 release-at|kRelease { 0x89562a64,|kRelease { 0x89562a68,|vc2hitables
@@ -165,16 +165,16 @@ carrier-at-word|carrierAt = kCarrier.at;|carrierAt = kCarrier.at + 4;|vc2hitable
 # (vc2hitables).  Not planted, as no input tells them apart: the envelope's two terms summed the other way round, and
 # the glide's end taken at 0 itself (from 1, its only start but the reset's 0, it falls in 100 blocks to −3.06e-6
 # under round to zero, never through 0 exactly).
-carriers-swapped|{ quarter, half, mixed }|{ half, quarter, mixed }|vc2hisyn
+carriers-swapped|{ quarter, half, full }|{ half, quarter, full }|vc2hisyn
 no-envelope-update|    analysis.envelopes();\n|\n|vc2hisyn
 no-glide|    holdGlide();\n|\n|vc2hisyn
-outs-swapped|{ quarterOut, halfOut, full }|{ halfOut, quarterOut, full }|vc2hisyn
+outs-swapped|{ quarterOut, halfOut, fullOut }|{ halfOut, quarterOut, fullOut }|vc2hisyn
 interpolators-swapped|vc2InterpolateAdd(rates[kFromQuarter]|vc2InterpolateAdd(rates[kFromHalf]|vc2hisyn
-carrier-no-difference|const float d = sub(in[n], base[0]);   // the first difference|const float d = in[n];|vc2hisyn
-carrier-last-difference|base[0] = in[n];|base[0] = d;|vc2hisyn
+carrier-no-difference|const float d = sub(v, base[x]);   // the first difference|const float d = v;|vc2hisyn
+carrier-last-difference|base[x] = v;|base[x] = d;|vc2hisyn
 carrier-sum-order|add(add(lower, centre), upper)|add(lower, add(centre, upper))|vc2hisyn
 carrier-no-shared-edge|lower = upper;   // the next band's lower edge|lower = centre;|vc2hisyn
-carrier-states-stride|c += 2 * Tables::kCoefs, st += 2 * Tables::kStates)|c += 2 * Tables::kCoefs, st += Tables::kStates)|vc2hisyn
+carrier-states-stride|c += 2 * Tables::kCoefs, st += 2 * stride)|c += 2 * Tables::kCoefs, st += stride)|vc2hisyn
 carrier-coefs-off|(s.carrierTable[group] - tb.carrierAt) / 4;|(s.carrierTable[group] - tb.carrierAt) / 4 + 3;|vc2hisyn
 envelope-top|return analysis.envelope(Words::kBands - 1);|return analysis.envelope(Words::kBands - 2);|vc2hisyn
 envelope-frac-flipped|add(mul(analysis.envelope(i + 1), frac), mul(analysis.envelope(i), sub(1.0f, frac)))|add(mul(analysis.envelope(i), frac), mul(analysis.envelope(i + 1), sub(1.0f, frac)))|vc2hisyn
@@ -182,14 +182,14 @@ per-sample|xtf::div(1.0f, xtf::flt(n))|xtf::div(1.0f, xtf::flt(n + 1))|vc2hisyn
 rate-scale-ignored|t.attack : t.release[b], scale)|t.attack : t.release[b], 1.0f)|vc2hisyn
 attack-on-falling|target > follower ? t.attack : t.release[b]|target < follower ? t.attack : t.release[b]|vc2hisyn
 held-weights-swapped|held = add(mul(t.hold.keep, held), mul(t.hold.take, e));|held = add(mul(t.hold.take, held), mul(t.hold.keep, e));|vc2hisyn
-ramp-first|const float gap = sub(ramp, f);\n            ramp = add(ramp, step);|ramp = add(ramp, step);\n            const float gap = sub(ramp, f);|vc2hisyn
+ramp-first|const float gap = sub(ramp, f);\n                ramp = add(ramp, step);|ramp = add(ramp, step);\n                const float gap = sub(ramp, f);|vc2hisyn
 follower-not-kept|        follower = f;\n|\n|vc2hisyn
 target-not-kept|        target = ramp;\n|\n|vc2hisyn
-gain-unweighted|mul(gains[kLeft][b], s.weight[b])|gains[kLeft][b]|vc2hisyn
-gains-right|mul(gains[kLeft][b], s.weight[b])|mul(gains[1][b], s.weight[b])|vc2hisyn
-map-right|s.formant + Words::kSideWords * kLeft;|s.formant + Words::kSideWords * 1;|vc2hisyn
-out-not-zeroed|    std::fill_n(out, n, 0.0f);\n|\n|vc2hisyn
-out-grouping|out[i] = add(mul(mul(s.rows[b][i], f), gain), out[i]);|out[i] = add(mul(s.rows[b][i], mul(f, gain)), out[i]);|vc2hisyn
+gain-unweighted|mul(gains[x][b], s.weight[b])|gains[x][b]|vc2hisyn
+gains-right|mul(gains[x][b], s.weight[b])|mul(gains[1][b], s.weight[b])|vc2hisyn
+map-right|envelopeAt((s.*kVc2HiresoMaps[x])[b])|envelopeAt((s.*kVc2HiresoMaps[1])[b])|vc2hisyn
+out-not-zeroed|    std::fill_n(out, channels * n, 0.0f);\n|\n|vc2hisyn
+out-grouping|o = add(mul(mul(s.rows[b][channels * i + x], f), gain), o);|o = add(mul(s.rows[b][channels * i + x], mul(f, gain)), o);|vc2hisyn
 synthesis-samples|    const int n = tb.samples[group];|    const int n = tb.samples[group] / 2;|vc2hisyn
 glide-held-take|        h.take = h.held;|        h.take = 1.0f;|vc2hiobj
 glide-held-keep|h.keep = sub(1.0f, h.held);|h.keep = h.held;|vc2hiobj
@@ -201,3 +201,17 @@ gains-at|{ record + kRecordGains, kBands }|{ record + kRecordGains + 4, kBands }
 samples-halved-table|samples[g] = (int32_t)image.rd32(kSamples + 4 * (uint32_t)g);|samples[g] = (int32_t)image.rd32(kSamples + 4 * (uint32_t)g) / 2;|vc2hitables
 rate-scales-at|kRateScales { 0x895628b8,|kRateScales { 0x895628bc,|vc2hitables
 glide-at|kGlide { 0x893f106c, 3 }|kGlide { 0x893f1070, 3 }|vc2hitables
+# The stereo synthesis (v218): what only the stereo path tells apart, in Vc2HiresoRate.cpp (vc2rate), Vc2HiresoSynth.cpp
+# (vc2hisyn) and Vc2Hireso.cpp (vc2hiobj).
+stereo-copy-mixed|std::copy(frames, frames + 2 * kFull, full);|for (int i = 0; i < 2 * kFull; ++i) full[i] = mul(frames[i], kMix);|vc2rate
+stereo-states-unstrided|float* sk = s + 2 * k * ch;|float* sk = s + 2 * k;|vc2rate
+stereo-one-pole-shared|mul(c[10], s[kOnePole * ch])|mul(c[10], s[kOnePole])|vc2rate
+stereo-delay-shared|f.s[kDelay * channels + x] = full|f.s[kDelay + x] = full|vc2rate
+stereo-out-unpaired|out[channels * n + x] = sections(|out[n + x] = sections(|vc2rate
+stereo-sides-swapped|Vc2HiresoSideWords& side = s.*kVc2HiresoSides[x];|Vc2HiresoSideWords& side = s.*kVc2HiresoSides[1 - x];|vc2hisyn
+stereo-out-half-zeroed|std::fill_n(out, channels * n, 0.0f);|std::fill_n(out, n, 0.0f);|vc2hisyn
+stereo-row-unpaired|s.rows[b][channels * i + x]|s.rows[b][i]|vc2hisyn
+stereo-carrier-states-at|float* st = base + channels + x;|float* st = base + 1 + x;|vc2hisyn
+stereo-carrier-unstrided|vc2HiresoResonate(c, st, d, channels)|vc2HiresoResonate(c, st, d, 1)|vc2hisyn
+stereo-quarter-mono|half, quarter, Vc2HiresoAnalysis::kQuarter, channels);|half, quarter, Vc2HiresoAnalysis::kQuarter, 1);|vc2hisyn
+reset-one-side|    for (Vc2HiresoSideWords Words::* side : kVc2HiresoSides) s.*side = {};|    s.left = {};|vc2hiobj

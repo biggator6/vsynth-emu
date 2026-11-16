@@ -755,9 +755,9 @@ legacy stereo synthesis: 40 cases, 22000 blocks, 924 events (442 settings, 11198
 xt_vc2legacy: 0 different
 == xt_vc2hireso
 hireso warp: 40352 maps (2 sides, 13 pivots, 1552 ratios), 0 different
-hireso rate: 40 cases (6 kinds), 4000 blocks, 0 different
+hireso rate: 40 cases (10 kinds), 4000 blocks, 0 different
 hireso analysis: 40 cases, 22000 blocks (10988 unvoiced), 450 clears, 0 different
-hireso object: 40 cases, 22000 blocks (10806 unvoiced), 951 settings, 879 pedals, 931 warps, 0 different
+hireso object: 40 cases (20 stereo), 22000 blocks (11094 unvoiced), 975 settings, 864 pedals, 900 warps, 0 different
 xt_vc2hireso: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks

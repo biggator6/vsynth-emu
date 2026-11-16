@@ -1546,6 +1546,42 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### HIRESO's stereo synthesis (2026-11-15, v218) {#hireso-stereo}
+
+Step 3.3's last part, ported bit for bit (`Vc2Hireso::stereo`): slot 3, `0x893f1240(this, frames)`, on 32 frames of two words, a carrier in each. It has the same steps as slot 2 ("HIRESO's mono synthesis"), on stereo routines of its own:
+- the decimators `0x893eff90` (32→16, the rate filter at +0x2ba4) and `0x893f0160` (16→8, +0x2be8);
+- the carrier bank `0x893f1d40`;
+- the analysis's envelopes' update, and the hold's glide (its constants in slot 3's own pool, `0x893f1348`, the same words as slot 2's);
+- the groups' synthesis `0x893f1ec0`;
+- the interpolators `0x893f0350` (8→16, +0x2c70) and `0x893f0240` (16→32, +0x2c2c).
+
+**Each stereo routine is the mono one on each channel**, by its arithmetic read instruction for instruction:
+- Samples are interleaved, left then right.
+- So are the states. A rate filter's biquad keeps left s0, right s0, left s1, right s1, and the one-poles and the delays sit at states 12/13 and 14/15. The carrier bank keeps the two last inputs, then each resonator's four states the same way.
+- The first decimator copies the frames as they are into the full-rate carrier (mono mixes each frame × 0.5).
+- The last interpolator writes both words of each frame.
+- In the groups' synthesis, the left channel uses the left side's words and the right the right's.
+
+So the port runs both slots as one routine on one channel or two, and the rate filters, the resonator (`vc2HiresoResonate`, its states' stride) and the carrier bank take the channel count. `0x893f0080`, a stereo 32→16 with no copy, has no caller.
+
+**The right side's words** are the three rows between the maps, which v216 left unnamed:
+- held +0x29a4, follower +0x2a24, target +0x2aa4, map +0x2b24;
+- the gains through +0x2d50;
+- now `Vc2HiresoSideWords` beside the left's at +0x2724.
+
+The reset clears both sides' held, follower and target. +0x2d48, which the reset sets to 1, is read by neither synthesis nor by anything else ported.
+
+**The check.**
+- xt_vc2hireso's rate part has the four stereo routines as kinds, on the tables slot 3 gives them: 10 kinds.
+- Its object part runs the odd cases through slot 3, with a right carrier of their own in each frame's second word.
+
+Results:
+- seed 2024: rate 40 cases, 4,000 blocks; object 40 cases (20 stereo), 22,000 blocks; 0 different;
+- seed 7: 0 different;
+- `mutate_vc2.py --hireso`: the whole list, 190, caught. That includes 12 new plants only the stereo path can show (states unstrided or shared, the copy mixed, the sides crossed, half the output unzeroed), and 29 rewritten for the routines' channel count.
+
+HIRESO is now ported whole: the analysis, the object and both syntheses, bit for bit. It is not in the sound yet: that is the vocoder object's work (VC2_MODE_PLAN.md, step 4).
+
 ### HIRESO's mono synthesis (2026-11-15, v217) {#hireso-mono}
 
 Step 3.3's fifth part, ported bit for bit (`Vc2Hireso::mono`, `Vc2HiresoSynth.cpp`): slot 2, `0x893f0c60(this, frames)`, on 32 frames of two words, the carrier in each first. Its parts:
