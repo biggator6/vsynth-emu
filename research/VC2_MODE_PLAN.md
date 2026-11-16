@@ -264,7 +264,13 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
    - done (v218): the stereo synthesis, `Vc2Hireso::stereo` (slot 3 `0x893f1240`, its carrier bank `0x893f1d40`, groups'
      synthesis `0x893f1ec0` and the stereo rate filters), against slot 3 and each stereo routine in xt_vc2hireso
      (HARDWARE_FIRMWARE.md, "HIRESO's stereo synthesis"). HIRESO is ported whole; it reaches the sound with step 4.
-4. The vocoder object and its settings path, with the hold on CC 64.
+4. The vocoder object and its settings path, with the hold on CC 64. Split in two (2026-11-15):
+   - done (v219): the ground. The engines are one interface, `Vc2Engine`, which LEGACY and HIRESO implement. The
+     vocoder's settings struct is `Vc2VocoderSettings`. The checks' compares are one shared file, `Vc2CheckWords`. The
+     vocoder object's routines are read (HARDWARE_FIRMWARE.md, "The vocoder object, read").
+   - then (v220): `Vc2Vocoder`, the builder, the mode switch with HIRESO's input hook, the settings path with the edit
+     words, the block drivers, the pedal and the glue, against rom.4's own object in a check of its own. The CC 64
+     and CC 121 routing to the pedal belongs to the wiring.
 5. The VOCODER OSC's carrier (kind 5) and its converter: the growl's model is its start (`vc2growllaw.cpp`).
 6. The pitch tracker.
 7. Kind 6 (the mic's pitch shifter: harmonizer and Auto Note) and the mic ring.

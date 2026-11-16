@@ -75,11 +75,11 @@ void Vc2Legacy::reset() {
     clear();
 }
 
-void Vc2Legacy::formant(float ratio) { s.formant = xtf::div(xtf::add(ratio, kFormantOffset), kFormantScale); }
+void Vc2Legacy::formant(int, float ratio) { s.formant = xtf::div(xtf::add(ratio, kFormantOffset), kFormantScale); }
 
-void Vc2Legacy::settings(float ratio, float dump) {
-    formant(ratio);
-    analysis.dumpTime(dump);
+void Vc2Legacy::settings(Vc2VocoderSettings& in) {
+    formant(0, in.ratio[0]);
+    analysis.dumpTime(in.dump);
 }
 
 float Vc2Legacy::band(int b, float u, int i) {

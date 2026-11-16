@@ -11,6 +11,7 @@
 // XT_VC2IN_MAIN only.
 #ifdef XT_VC2IN_MAIN
 #include "Vc2CheckRig.h"
+#include "Vc2CheckWords.h"
 #include "Vc2Unvoiced.h"
 #include "XtSwitches.h"
 #include <algorithm>
@@ -22,9 +23,7 @@
 namespace {
 constexpr uint32_t kReset = 0x893ecf60, kSettings = 0x893ed030, kInput = 0x893ed040, kVoiced = 0x893ed3e0;   // [FW]
 constexpr uint32_t kMicAt = 0x893ed410, kMono = 0x893ed510, kStereo = 0x893ed690;                         // [FW]
-constexpr uint32_t kWords = 0x899d9978, kFlags = 0x8a0f87dc, kMic = 0x8a0f73dc;                           // [FW]
-constexpr uint32_t kAllpassA = 0x8a0f882c, kAllpassB = 0x8a15a2ac;                                        // [FW]
-constexpr uint32_t kAllpassAt = 0x8993fe58, kLevel = 0x8993fe5c, kLevelMod = 0x89997298;                  // [FW]
+constexpr uint32_t kLevelMod = 0x89997298;                                                                // [FW]
 constexpr uint32_t kFramesAt = 0x8C012000;
 constexpr int kBlocks = 400;
 constexpr int kFadeEvery = 8;   // every eighth case fades (Vc2Signal's fades)
@@ -61,13 +60,13 @@ bool settings(Vc2Fw& fw, Vc2Unvoiced& port, std::mt19937& rng) {
 // One block of the mic into both rings and the input stage on both, then the first word that differs
 std::string blockOn(Vc2Fw& fw, Vc2Unvoiced& port, const float* x) {
     uint32_t at = 0;
-    if (!fw.call(kMicAt, {}, &at) || at != kMic + 4 * (uint32_t)port.s.micIndex) return "the mic ring's write point";
+    if (!fw.call(kMicAt, {}, &at) || at != kVc2MicRingAt + 4 * (uint32_t)port.s.micIndex)
+        return "the mic ring's write point";
     fw.cpu.write(at, x, sizeof(float) * Vc2Unvoiced::kBlock);
     std::copy_n(x, Vc2Unvoiced::kBlock, port.micBlock());
     if (!fw.call(kInput, { at })) return "the firmware faults: " + fw.cpu.error();
     port.block(port.micBlock());
-    std::string what = vc2FirstDifference(fw, kWords, &port.s, sizeof port.s, "the region");
-    if (what.empty()) what = vc2FirstDifference(fw, kFlags, port.flags.data(), sizeof port.flags, "the flags' ring");
+    std::string what = vc2UnvoicedDifference(fw, port);
     uint32_t voiced = 0;
     if (what.empty() && (!fw.call(kVoiced, {}, &voiced) || (voiced != 0) != port.voiced())) what = "the voiced query";
     return what;
@@ -86,21 +85,14 @@ std::string consonantsOn(Vc2Fw& fw, Vc2Unvoiced& port, Output& out) {
         return "the output stage faults: " + fw.cpu.error();
     port.consonants(frames, out.channels, out.gain, out.flagScale, out.levelMod);
     std::string what = vc2FirstDifference(fw, kFramesAt, frames, sizeof frames, "the frames");
-    if (what.empty()) what = vc2FirstDifference(fw, kWords, &port.s, sizeof port.s, "the region");
-    if (what.empty()) what = vc2FirstDifference(fw, kLevel, &port.level, 4, "the level");
-    if (what.empty()) what = vc2FirstDifference(fw, kAllpassAt, &port.allpassAt, 4, "the allpasses' index");
+    if (what.empty()) what = vc2UnvoicedDifference(fw, port);
     return what;
 }
 
-// The memory the blocks show only through the frames, after a reset and at a case's end: the mic ring and both
-// allpasses' buffers.  A reset that left the ring would reach the sound only if the gate opened before 14 blocks had
-// written it over, which the cases seldom do.
-std::string buffersDifference(Vc2Fw& fw, const Vc2Unvoiced& port) {
-    std::string what = vc2BufferDifference(fw, kMic, port.mic, "the mic ring");
-    if (what.empty()) what = vc2BufferDifference(fw, kAllpassA, port.allpassA, "allpass A");
-    if (what.empty()) what = vc2BufferDifference(fw, kAllpassB, port.allpassB, "allpass B");
-    return what;
-}
+// The memory the blocks show only through the frames, after a reset and at a case's end (vc2UnvoicedBuffersDifference,
+// Vc2CheckWords.cpp): a reset that left the ring would reach the sound only if the gate opened before 14 blocks had
+// written it over, which the cases seldom do
+std::string buffersDifference(Vc2Fw& fw, const Vc2Unvoiced& port) { return vc2UnvoicedBuffersDifference(fw, port); }
 
 // The flag the last block wrote
 int lastFlag(const Vc2Unvoiced& port) {

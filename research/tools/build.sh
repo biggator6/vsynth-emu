@@ -58,13 +58,17 @@ cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.
 [ -f Vc2ParamsCheck.cpp ] && cc -DXT_VC2PARAMS_MAIN Vc2ParamsCheck.cpp "${V4[@]}" XtPatchStore.cpp "${FW[@]}" \
    XtMultiBandPlayer.cpp XtSoloVoice.cpp "${SH4[@]}" -o "$O/xt_vc2params" &
 # rom.4's unvoiced detector (v208) and its consonants (v209) against its own, on rom.4
-[ -f Vc2UnvoicedCheck.cpp ] && cc -DXT_VC2IN_MAIN Vc2UnvoicedCheck.cpp Vc2Unvoiced.cpp \
+# (the VC-2 checks' shared compares, v219, with each)
+VW=( $( [ -f Vc2CheckWords.cpp ] && echo Vc2CheckWords.cpp ) )
+[ -f Vc2UnvoicedCheck.cpp ] && cc -DXT_VC2IN_MAIN Vc2UnvoicedCheck.cpp Vc2Unvoiced.cpp "${VW[@]}" \
    $( [ -f Vc2Consonants.cpp ] && echo Vc2Consonants.cpp ) "${SH4[@]}" -o "$O/xt_vc2in" &
 # LEGACY's analysis (v210) and its object (v211) against its own, on rom.4
-[ -f Vc2LegacyCheck.cpp ] && cc -DXT_VC2LEGACY_MAIN Vc2LegacyCheck.cpp Vc2LegacyAnalysis.cpp "${SH4[@]}" \
-   $( [ -f Vc2Legacy.cpp ] && echo Vc2Legacy.cpp Vc2LegacyTables.cpp Vc2LegacySynthCheck.cpp ) -o "$O/xt_vc2legacy" &
+[ -f Vc2LegacyCheck.cpp ] && cc -DXT_VC2LEGACY_MAIN Vc2LegacyCheck.cpp Vc2LegacyAnalysis.cpp "${VW[@]}" \
+   "${SH4[@]}" $( [ -f Vc2Legacy.cpp ] && echo Vc2Legacy.cpp Vc2LegacyTables.cpp Vc2LegacySynthCheck.cpp ) \
+   -o "$O/xt_vc2legacy" &
 # HIRESO's formant warp (v213), rate filters (v214), analysis (v215) and object (v216) against its own, on rom.4
 [ -f Vc2HiresoCheck.cpp ] && cc -DXT_VC2HIRESO_MAIN Vc2HiresoCheck.cpp Vc2HiresoWarp.cpp Vc2HiresoTables.cpp \
+   "${VW[@]}" \
    $( [ -f Vc2HiresoRate.cpp ] && echo Vc2HiresoRate.cpp Vc2HiresoRateCheck.cpp ) \
    $( [ -f Vc2HiresoAnalysis.cpp ] && echo Vc2HiresoAnalysis.cpp Vc2HiresoAnalysisCheck.cpp Vc2Unvoiced.cpp ) \
    $( [ -f Vc2Hireso.cpp ] && echo Vc2Hireso.cpp Vc2HiresoObjectCheck.cpp ) \

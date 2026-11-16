@@ -16,15 +16,16 @@
 #include "XtSwitches.h"
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <utility>
 #include <vector>
 
 namespace {
 constexpr uint32_t kConstruct = 0x893f0a10, kReset = 0x893f0b70, kAnalyze = 0x893f0c50, kWarp = 0x893f15d0;  // [FW]
-constexpr uint32_t kSettings = 0x893f13e0, kHold = 0x893f1960, kLevel = 0x893f1a00;                          // [FW]
+constexpr uint32_t kSettings = 0x893f13e0, kHold = 0x893f1960;                                               // [FW]
 constexpr uint32_t kMono = 0x893f0c60, kStereo = 0x893f1240;                                                 // [FW]
-constexpr uint32_t kObjectBytes = 0x2d70, kRatesAt = 0x2ba4, kRateBytes = 68, kSettingWordsAt = 0x2cb4;    // [FW]
+constexpr uint32_t kObjectBytes = 0x2d70;                                                                    // [FW]
 constexpr uint32_t kObjAt = 0x8C040000, kBlockAt = 0x8C035000, kFramesAt = 0x8C036000;   // in Vc2Fw's RAM
 constexpr int kBlocks = 400, kFadeEvery = 8, kEventOneIn = 8, kFrameWords = 2 * Vc2HiresoAnalysis::kBlock;
 
@@ -33,22 +34,7 @@ struct Counts {
 };
 
 // The object's words, its rate filters' states and tables, its analysis's state and slot 7's level against rom.4's
-std::string hiresoDifference(Vc2Fw& fw, const Vc2Hireso& e) {
-    std::string what = vc2FirstDifference(fw, kObjAt + 4, &e.s, sizeof e.s, "the object");
-    for (int k = 0; k < Vc2Hireso::kRates && what.empty(); ++k) {
-        const uint32_t at = kObjAt + kRatesAt + kRateBytes * (uint32_t)k;
-        const Vc2RateFilter& f = e.rates[k];
-        what = vc2FirstDifference(fw, at + 4, f.s, sizeof f.s, "a rate filter's states");
-        if (what.empty()) {
-            const size_t bytes = sizeof(float) * Vc2HiresoTables::kDecimatorWords;
-            what = vc2FirstDifference(fw, fw.cpu.rd32(at), f.c, bytes, "the words a rate filter's table points at");
-        }
-    }
-    if (what.empty()) what = vc2FirstDifference(fw, kObjAt + kSettingWordsAt, &e.t, sizeof e.t, "the settings' words");
-    if (what.empty()) what = vc2HiresoAnalysisDifference(fw, e.analysis);
-    if (what.empty() && !(fw.call(kLevel, { kObjAt }) && vc2SameAsFr0(fw, e.holdLevel()))) what = "slot 7's level";
-    return what;
-}
+std::string hiresoDifference(Vc2Fw& fw, const Vc2Hireso& e) { return vc2HiresoDifference(fw, kObjAt, e); }
 
 // An index into Env Attack's or Release's curve: in range mostly, now and then past it, where slot 5 leaves it
 int drawCurveIndex(std::mt19937& rng) {
@@ -56,11 +42,13 @@ int drawCurveIndex(std::mt19937& rng) {
 }
 
 // A settings struct: a template mostly a record pair's, now and then below 0 or a RAM curve's; the pivots mostly the
-// template's (−1); the vocoder's words noise, which slot 5 doesn't read
-Vc2HiresoSettings drawSettings(std::mt19937& rng) {
-    Vc2HiresoSettings in {};
-    for (uint32_t& w : in.vocoderLow) w = (uint32_t)rng();
-    for (uint32_t& w : in.vocoderHigh) w = (uint32_t)rng();
+// template's (−1); the vocoder's words (+0x00…+0x0c, +0x18…+0x24) noise, which HIRESO's slot 5 doesn't read
+Vc2VocoderSettings drawSettings(std::mt19937& rng) {
+    Vc2VocoderSettings in {};
+    uint32_t noise[8];
+    for (uint32_t& w : noise) w = (uint32_t)rng();
+    std::memcpy(&in.ratio, noise, 4 * sizeof(uint32_t));
+    std::memcpy(&in.soundLevel, noise + 4, 4 * sizeof(uint32_t));
     for (int32_t& p : in.pivot) p = rng() % 4 == 0 ? (int32_t)(rng() % 31) : -1;
     in.attack = drawCurveIndex(rng);
     in.release = drawCurveIndex(rng);
@@ -74,7 +62,7 @@ Vc2HiresoSettings drawSettings(std::mt19937& rng) {
 
 std::string settingsOn(Vc2Fw& fw, Vc2Hireso& e, std::mt19937& rng, Counts& n) {
     ++n.settings;
-    Vc2HiresoSettings in = drawSettings(rng);
+    Vc2VocoderSettings in = drawSettings(rng);
     fw.cpu.write(kVc2Args, &in, sizeof in);
     if (!fw.call(kSettings, { kObjAt, kVc2Args })) return "the settings fault: " + fw.cpu.error();
     e.settings(in);
@@ -140,7 +128,7 @@ void scramble(Vc2Fw& fw, Vc2Hireso& e, std::mt19937& rng) {
     for (const auto& [words, n] : spans)
         for (size_t i = 0; i < n; ++i) words[i] = 2.0f * (float)rng() / 4294967296.0f - 1.0f;
     fw.cpu.write(kObjAt + 4, &e.s, sizeof e.s);
-    fw.cpu.write(kObjAt + kSettingWordsAt, &e.t, sizeof e.t);
+    fw.cpu.write(kObjAt + kVc2HiresoSettingWordsAt, &e.t, sizeof e.t);
 }
 
 // Both constructed, rom.4's over zeros; what differs then

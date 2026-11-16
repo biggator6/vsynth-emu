@@ -155,10 +155,10 @@ elif [[ "$PORT" =~ ^vc2(params|in|out|legacy|tables|object|warp|hitables|rate|hi
     # Vc2HiresoSynth.cpp (vc2hisyn, v217), against xt_vc2hireso; [cases] their cases; SEED any's
     IMAGE="$ROM4"
     ARGS=("${SEED:-2024}")
-    VC2IN=(Vc2Unvoiced Vc2Consonants Vc2UnvoicedCheck)
-    VC2LEG=(Vc2LegacyAnalysis Vc2LegacyTables Vc2Legacy Vc2LegacyCheck Vc2LegacySynthCheck)
+    VC2IN=(Vc2Unvoiced Vc2Consonants Vc2UnvoicedCheck Vc2CheckWords)
+    VC2LEG=(Vc2LegacyAnalysis Vc2LegacyTables Vc2Legacy Vc2LegacyCheck Vc2LegacySynthCheck Vc2CheckWords)
     VC2HI=(Vc2HiresoWarp Vc2HiresoTables Vc2HiresoRate Vc2HiresoAnalysis Vc2Unvoiced Vc2Hireso Vc2HiresoSynth
-           Vc2HiresoCheck Vc2HiresoRateCheck Vc2HiresoAnalysisCheck Vc2HiresoObjectCheck)
+           Vc2HiresoCheck Vc2HiresoRateCheck Vc2HiresoAnalysisCheck Vc2HiresoObjectCheck Vc2CheckWords)
     case "$PORT" in
         vc2warp) F=Vc2HiresoWarp.cpp; harnessParts XT_VC2HIRESO_MAIN vc2hireso_obj "${VC2HI[@]}" ;;
         vc2rate) F=Vc2HiresoRate.cpp; harnessParts XT_VC2HIRESO_MAIN vc2hireso_obj "${VC2HI[@]}" ;;

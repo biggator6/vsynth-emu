@@ -20,10 +20,6 @@
 namespace {
 constexpr uint32_t kInit = 0x893ed8f0, kAnalysis = 0x893ed930, kEnvelopes = 0x893edd10, kEnvelope = 0x893eddf0;  // [FW]
 constexpr uint32_t kClear = 0x893ede50;                                                                 // [FW]
-constexpr uint32_t kWords = 0x8a1bbd2c, kHalfAt = 0x899d9a88, kQuarterAt = 0x899d9ac8;                 // [FW]
-constexpr uint32_t kToHalfStates = 0x899d9aec, kToQuarterStates = 0x899d9b30;   // [FW] after each one's table pointer
-constexpr uint32_t kDecimatorsEnd = 0x899d9b70;                                  // [FW] the second one's end
-constexpr uint32_t kFlags = 0x8a0f87dc;                                          // [FW] the input stage's ring
 constexpr uint32_t kBlockAt = 0x8C034000;   // the mic's block, in Vc2Fw's RAM
 constexpr int kBlocks = 400, kFadeEvery = 8, kFlipOneIn = 6, kClearOneIn = 50, kTwiceOneIn = 8;
 
@@ -55,36 +51,10 @@ std::string hiresoBlockOn(Vc2Fw& fw, Vc2HiresoAnalysis& a, const Vc2Unvoiced& st
 }
 } // namespace
 
-std::string vc2HiresoAnalysisDifference(Vc2Fw& fw, const Vc2HiresoAnalysis& a) {
-    const struct {
-        uint32_t at;
-        const void* mine;
-        size_t bytes;
-        const char* what;
-    } spans[] = {
-        { kWords, &a.s, sizeof a.s, "the state" },
-        { kHalfAt, a.half, sizeof a.half, "the mic at fs/2" },
-        { kQuarterAt, a.quarter, sizeof a.quarter, "the mic at fs/4" },
-        { kToHalfStates, a.toHalf.s, sizeof a.toHalf.s, "the first decimator" },
-        { kToQuarterStates, a.toQuarter.s, sizeof a.toQuarter.s, "the second decimator" },
-    };
-    for (const auto& span : spans) {
-        std::string what = vc2FirstDifference(fw, span.at, span.mine, span.bytes, span.what);
-        if (!what.empty()) return what;
-    }
-    return "";
-}
-
-void vc2HiresoAnalysisZero(Vc2Fw& fw) {
-    const std::vector<uint8_t> zeros(sizeof(Vc2HiresoAnalysisWords));
-    fw.cpu.write(kWords, zeros.data(), zeros.size());
-    fw.cpu.write(kHalfAt, zeros.data(), kDecimatorsEnd - kHalfAt);
-}
-
 bool vc2HiresoFlag(Vc2Fw& fw, Vc2Unvoiced& stage, std::mt19937& rng, bool unvoiced) {
     if (rng() % kFlipOneIn == 0) unvoiced = !unvoiced;
     std::ranges::fill(stage.flags, unvoiced ? 1 : 0);
-    fw.cpu.write(kFlags, stage.flags.data(), sizeof stage.flags);
+    fw.cpu.write(kVc2FlagsAt, stage.flags.data(), sizeof stage.flags);
     return unvoiced;
 }
 

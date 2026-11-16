@@ -111,7 +111,7 @@ reset-sets-formant|    s.glide = kGlideStart;\n|    s.glide = kGlideStart;\n    
 reset-no-glide|    s.glide = kGlideStart;\n|    (void)0;\n|vc2object
 reset-keeps-eq|std::fill(std::begin(s.eqHigh), std::end(s.eqHigh), 0.0f);|(void)0;|vc2object
 formant-law|xtf::div(xtf::add(ratio, kFormantOffset), kFormantScale)|xtf::div(ratio, kFormantScale)|vc2object
-settings-dump|    analysis.dumpTime(dump);|    analysis.dumpTime(1.0f);|vc2object
+settings-dump|    analysis.dumpTime(in.dump);|    analysis.dumpTime(1.0f);|vc2object
 # The stereo synthesis (v212).  Not planted: the right's unvoiced term on row 10's left sample, which rom.4 gives the
 # same as the right's, both being the left's level
 st-left-states|vc2FirstResonator(c, st[0], st[2], uL)|vc2FirstResonator(c, st[0], st[1], uL)|vc2object

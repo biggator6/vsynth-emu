@@ -24,12 +24,8 @@ struct Counts {
     long blocks = 0, events = 0, settings = 0, held = 0, different = 0;
 };
 
-// The object's words and the analysis's state against rom.4's
-std::string objectDifference(Vc2Fw& fw, const Vc2Legacy& engine) {
-    std::string what = vc2FirstDifference(fw, kObjAt + 4, &engine.s, sizeof engine.s, "the object");
-    if (what.empty()) what = vc2LegacyStateDifference(fw, engine.analysis);
-    return what;
-}
+// The object's words and the analysis's state against rom.4's, the object at kObjAt
+std::string objectDifference(Vc2Fw& fw, const Vc2Legacy& engine) { return vc2LegacyDifference(fw, kObjAt, engine); }
 
 // The settings or the pedal on both
 std::string objectEventOn(Vc2Fw& fw, Vc2Legacy& engine, std::mt19937& rng, Counts& n) {
@@ -39,7 +35,10 @@ std::string objectEventOn(Vc2Fw& fw, Vc2Legacy& engine, std::mt19937& rng, Count
         fw.cpu.wr32(kVc2Args, std::bit_cast<uint32_t>(ratio));
         fw.cpu.wr32(kVc2Args + kDumpAt, std::bit_cast<uint32_t>(dump));
         if (!fw.call(kSettings, { kObjAt, kVc2Args })) return "the settings fault: " + fw.cpu.error();
-        engine.settings(ratio, dump);
+        Vc2VocoderSettings in {};   // the two words slot 5 reads; it reads no other
+        in.ratio[0] = ratio;
+        in.dump = dump;
+        engine.settings(in);
         return objectDifference(fw, engine);
     }
     const int controller = vc2DrawController(rng);
@@ -52,7 +51,7 @@ std::string objectEventOn(Vc2Fw& fw, Vc2Legacy& engine, std::mt19937& rng, Count
 std::string engineBlockOn(Vc2Fw& fw, Vc2Legacy& engine, const float* mic, float* frames, int channels) {
     fw.cpu.write(kVc2LegacyBlockAt, mic, sizeof(float) * kBlock);
     if (!fw.call(kAnalyze, { kObjAt, kVc2LegacyBlockAt })) return "slot 1 faults: " + fw.cpu.error();
-    engine.analyze(mic);
+    engine.analyze(mic, true);
     fw.cpu.write(kFramesAt, frames, sizeof(float) * kFrameWords);
     const uint32_t synthesis = channels == 1 ? kMono : kStereo;
     if (!fw.call(synthesis, { kObjAt, kFramesAt })) return "the synthesis faults: " + fw.cpu.error();

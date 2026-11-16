@@ -7,6 +7,7 @@
 // on each channel, the samples and states interleaved.  Bit for bit: xt_vc2hireso against rom.4's object in Sh4Interp,
 // its words after every slot.  HARDWARE_FIRMWARE.md, "HIRESO's object", "HIRESO's mono synthesis", "HIRESO's stereo
 // synthesis"; research/VC2_VOCAL_DESIGNER.md, "HIRESO".  Audio thread, but for the constructor.
+#include "Vc2Engine.h"
 #include "Vc2HiresoAnalysis.h"
 #include "Vc2HiresoWarp.h"
 
@@ -67,37 +68,24 @@ struct Vc2HiresoSettingWords {
 };
 static_assert(sizeof(Vc2HiresoSettingWords) == 0x2d70 - 0x2cb4, "rom.4's layout, +0x2cb4…+0x2d70");
 
-// The settings slot 5 reads, in the vocoder's settings struct as rom.4 lays it out (0x893f06a0's; the words between
-// are the vocoder's, which slot 5 doesn't read)
-struct Vc2HiresoSettings {
-    uint32_t vocoderLow[4];     // +0x00…+0x0c
-    int32_t pivot[2];           // +0x10: each side's pivot, or below 0 for its template's (slot 5 writes it here)
-    uint32_t vocoderHigh[4];    // +0x18…+0x24
-    int32_t attack, release;    // +0x28: Env Attack, Env Release, 0…100 (101 on: left as they stand)
-    int32_t formantTemplate;    // +0x30: 0…15 two records, 16 on the RAM curves, below 0 left as it stands
-    float depth;                // +0x34: Vocoder Depth ÷ 127
-    float dump;                 // +0x38: Hold Dump Time ÷ 127
-};
-static_assert(sizeof(Vc2HiresoSettings) == 0x3c, "rom.4's settings struct, +0x00…+0x3c");
-
-class Vc2Hireso {
+class Vc2Hireso final : public Vc2Engine {
 public:
     static constexpr int kRates = 4;
     // The rate filters by their use in slots 2 and 3: the carrier 32 → 16 and 16 → 8, the output 16 → 32 and 8 → 16
     static constexpr int kToHalf = 0, kToQuarter = 1, kFromHalf = 2, kFromQuarter = 3;
 
     Vc2Hireso();                                  // 0x893f0a10, on memory of zeros
-    void reset();                                 // slot 0: the analysis's clear, the synthesis's states, the hold's
-    void analyze(const float* in, bool voiced) { analysis.block(in, voiced); }   // slot 1
+    void reset() override;                        // slot 0: the analysis's clear, the synthesis's states, the hold's
+    void analyze(const float* in, bool voiced) override { analysis.block(in, voiced); }   // slot 1
     // slot 2 (v217): 32 frames of two words, the carrier in each first, in place; the second words left as they are
-    void mono(float* frames) { synthesis(frames, 1); }
+    void mono(float* frames) override { synthesis(frames, 1); }
     // slot 3 (v218): 32 frames of two words, a carrier in each, in place, the left's on the left side's words and the
     // right's on the right's
-    void stereo(float* frames) { synthesis(frames, 2); }
-    void formant(int side, float ratio);          // slot 4: the side's map from its pivot field and the ratio
-    void settings(Vc2HiresoSettings& in);         // slot 5, which writes the pivots it takes into `in`
-    void hold(int controller);                    // slot 6: the Hold pedal's 0…127
-    float holdLevel() const { return t.hold.level; }   // slot 7
+    void stereo(float* frames) override { synthesis(frames, 2); }
+    void formant(int side, float ratio) override; // slot 4: the side's map from its pivot field and the ratio
+    void settings(Vc2VocoderSettings& in) override;   // slot 5, which writes the pivots it takes into `in`
+    void hold(int controller) override;           // slot 6: the Hold pedal's 0…127
+    float holdLevel() const override { return t.hold.level; }   // slot 7
 
     Vc2HiresoAnalysis analysis;
     Vc2HiresoWords s {};
@@ -111,7 +99,7 @@ public:
 
 private:
     void weights();                               // the constructor's band weights
-    void formantTemplate(Vc2HiresoSettings& in);  // slot 5's Formant Template: the sides' gains and pivots
+    void formantTemplate(Vc2VocoderSettings& in); // slot 5's Formant Template: the sides' gains and pivots
     void synthesis(float* frames, int channels);  // slots 2 and 3, on 1 or 2 channels
     // 0x893f1a10 (stereo 0x893f1d40): a group's carrier bands, into their rows
     void carrierBank(const float* in, int group, int channels);

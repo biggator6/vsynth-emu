@@ -9,6 +9,7 @@
 // each band at once, summed as they go, the levels by slot 7's.  Bit for bit: xt_vc2legacy against rom.4's object in
 // Sh4Interp, its words after every block and event.  HARDWARE_FIRMWARE.md, "LEGACY's synthesis", "LEGACY's stereo
 // synthesis"; VC2_VOCAL_DESIGNER.md, "LEGACY: a 10-band channel vocoder".  Audio thread.
+#include "Vc2Engine.h"
 #include "Vc2LegacyAnalysis.h"
 
 // The object's words from +0x004, as rom.4 lays them out (+0x000 is its vtable)
@@ -29,17 +30,20 @@ struct Vc2Biquad {
     float b0, b1, a1, a2;
 };
 
-class Vc2Legacy {
+class Vc2Legacy final : public Vc2Engine {
 public:
     Vc2Legacy();                                // 0x893f23c0: its analysis's init, the states 0, p and its glide
-    void reset();                               // slot 0: the same but p, which stays
-    void analyze(const float* in) { analysis.block(in); }   // slot 1
-    void mono(float* frames);                   // slot 2: 32 frames of two words, the carrier in each first, in place
-    void stereo(float* frames);                 // slot 3 (v212): the same frames, a carrier in each word, in place
-    void formant(float ratio);                  // slot 4: p = (ratio − 0.0156) / 1.9687
-    void settings(float ratio, float dump);     // slot 5: the settings' Formant Shift ratio (+0x00) and dump time (+0x38)
-    void hold(int controller) { analysis.hold(controller); }   // slot 6
-    float holdLevel() const { return analysis.holdLevel(); }  // slot 7
+    void reset() override;                      // slot 0: the same but p, which stays
+    // slot 1: the mic's block; LEGACY has its own unvoiced path and reads no flag (v219, the vocoder's interface)
+    void analyze(const float* in, bool) override { analysis.block(in); }
+    void mono(float* frames) override;          // slot 2: 32 frames of two words, the carrier in each first, in place
+    void stereo(float* frames) override;        // slot 3 (v212): the same frames, a carrier in each word, in place
+    // slot 4: p = (ratio − 0.0156) / 1.9687, either side's ratio (it reads no side, so the vocoder's second call wins)
+    void formant(int side, float ratio) override;
+    // slot 5: the settings' Formant Shift ratio (+0x00) and Hold Dump Time (+0x38), nothing else
+    void settings(Vc2VocoderSettings& in) override;
+    void hold(int controller) override { analysis.hold(controller); }   // slot 6
+    float holdLevel() const override { return analysis.holdLevel(); }  // slot 7
 
     Vc2LegacyAnalysis analysis;
     Vc2LegacyWords s {};

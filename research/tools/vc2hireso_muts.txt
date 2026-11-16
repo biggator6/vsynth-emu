@@ -112,11 +112,11 @@ weight-last|const int last = Tables::kBands - 1;|const int last = Tables::kBands
 weight-grouping|mul(mul(sign, mul(tb.weightA[b], tb.weightB[b])), scale)|mul(mul(sign, tb.weightA[b]), mul(tb.weightB[b], scale))|vc2hiobj
 weight-reciprocal|xtf::div(tb.weightScale, mul(tb.weightA[last], tb.weightB[last]))|mul(tb.weightScale, xtf::div(1.0f, mul(tb.weightA[last], tb.weightB[last])))|vc2hiobj
 object-rates-swapped|k < kRates / 2 ? tb.decimator : tb.interpolator|k < kRates / 2 ? tb.interpolator : tb.decimator|vc2hiobj
-default-attack|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 7, 18, 0, 1.0f, 1.0f }|vc2hiobj
-default-release|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 6, 17, 0, 1.0f, 1.0f }|vc2hiobj
-default-template|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 6, 18, 1, 1.0f, 1.0f }|vc2hiobj
-default-depth|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 6, 18, 0, 0.5f, 1.0f }|vc2hiobj
-default-pivot|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, 11 }, {}, 6, 18, 0, 1.0f, 1.0f }|vc2hiobj
+default-attack|{ {}, {}, { -1, -1 }, 0, 0, 0, 0, 6, 18, 0, 1.0f, 1.0f }|{ {}, {}, { -1, -1 }, 0, 0, 0, 0, 7, 18, 0, 1.0f, 1.0f }|vc2hiobj
+default-release|{ {}, {}, { -1, -1 }, 0, 0, 0, 0, 6, 18, 0, 1.0f, 1.0f }|{ {}, {}, { -1, -1 }, 0, 0, 0, 0, 6, 17, 0, 1.0f, 1.0f }|vc2hiobj
+default-template|{ {}, {}, { -1, -1 }, 0, 0, 0, 0, 6, 18, 0, 1.0f, 1.0f }|{ {}, {}, { -1, -1 }, 0, 0, 0, 0, 6, 18, 1, 1.0f, 1.0f }|vc2hiobj
+default-depth|{ {}, {}, { -1, -1 }, 0, 0, 0, 0, 6, 18, 0, 1.0f, 1.0f }|{ {}, {}, { -1, -1 }, 0, 0, 0, 0, 6, 18, 0, 0.5f, 1.0f }|vc2hiobj
+default-pivot|{ {}, {}, { -1, -1 }, 0, 0, 0, 0, 6, 18, 0, 1.0f, 1.0f }|{ {}, {}, { -1, 11 }, 0, 0, 0, 0, 6, 18, 0, 1.0f, 1.0f }|vc2hiobj
 reset-bank-whole|std::fill_n(&s.bank[Words::kBankWords * b], kBankCleared, 0.0f)|std::fill_n(&s.bank[Words::kBankWords * b], Words::kBankWords, 0.0f)|vc2hiobj
 reset-bank-short|constexpr int kBankCleared = 7;|constexpr int kBankCleared = 6;|vc2hiobj
 reset-keeps-rows|    for (Vc2HiresoSideWords Words::* side : kVc2HiresoSides) s.*side = {};\n|\n|vc2hiobj

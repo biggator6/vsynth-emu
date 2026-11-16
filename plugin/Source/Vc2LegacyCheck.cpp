@@ -78,13 +78,6 @@ long analysisCases(Vc2Fw& fw, Vc2LegacyAnalysis& port, const Vc2Run& run) {
 }
 } // namespace
 
-std::string vc2LegacyStateDifference(Vc2Fw& fw, const Vc2LegacyAnalysis& port) {
-    std::string what = vc2FirstDifference(fw, kVc2LegacyWords, &port.s, sizeof port.s, "the state");
-    if (what.empty()) what = vc2FirstDifference(fw, kVc2LegacyDumpWord, &port.dump, 4, "the dump time");
-    if (what.empty()) what = vc2FirstDifference(fw, kVc2LegacyLevelWord, &port.level, 4, "the level");
-    return what;
-}
-
 bool vc2LegacyFirst() { return xtSwitch("XT_VC2LEGACY_FIRST") != nullptr; }
 
 int main(int argc, char** argv) {

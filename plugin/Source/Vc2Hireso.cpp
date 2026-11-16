@@ -19,7 +19,7 @@ constexpr uint32_t kCurveAt[kSides] = { 0x899d9d98, 0x899d9e18 };   // [FW] the 
 constexpr int kHoldCentre = 64;                 // [FW] slot 6's: the pedal from 64 up holds
 // [FW] the constructor's settings for slot 5: Env Attack 6, Env Release 18, template 0, Vocoder Depth and Hold Dump Time
 // 1, the pivots the template's
-constexpr Vc2HiresoSettings kDefaults { {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f };
+constexpr Vc2VocoderSettings kDefaults { {}, {}, { -1, -1 }, 0, 0, 0, 0, 6, 18, 0, 1.0f, 1.0f };
 constexpr Vc2HiresoHoldWords kHoldReset { 0, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f };   // [FW] the reset's
 } // namespace
 
@@ -35,7 +35,7 @@ Vc2Hireso::Vc2Hireso() {
     for (int k = 0; k < kRates; ++k) rates[k].c = k < kRates / 2 ? tb.decimator : tb.interpolator;
     t.dump = 1.0f;   // the hold's words as the reset left them, which the constructor writes again
     std::ranges::fill(t.pivot, kPivotField);
-    Vc2HiresoSettings defaults = kDefaults;
+    Vc2VocoderSettings defaults = kDefaults;
     settings(defaults);
 }
 
@@ -62,7 +62,7 @@ void Vc2Hireso::formant(int side, float ratio) {
     std::ranges::copy(map, s.*kVc2HiresoMaps[side]);
 }
 
-void Vc2Hireso::settings(Vc2HiresoSettings& in) {
+void Vc2Hireso::settings(Vc2VocoderSettings& in) {
     const Tables& tb = vc2HiresoTables();
     // the converter's 0…100; one below 0 would read before rom.4's curve, which the port doesn't
     if (in.attack >= 0 && in.attack < Tables::kCurve) t.attack = tb.attack[in.attack];
@@ -81,7 +81,7 @@ void Vc2Hireso::settings(Vc2HiresoSettings& in) {
         if (in.pivot[side] >= 0) t.pivot[side] = in.pivot[side];
 }
 
-void Vc2Hireso::formantTemplate(Vc2HiresoSettings& in) {
+void Vc2Hireso::formantTemplate(Vc2VocoderSettings& in) {
     const int k = in.formantTemplate;
     if (k < 0) return;
     if (k >= kTemplates) {   // the RAM curves an edit page writes

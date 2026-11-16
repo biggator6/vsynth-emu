@@ -1546,6 +1546,68 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The vocoder object, read (2026-11-15, v219) {#vc2-vocoder-object}
+
+Step 4's first part. These are the routines of the vocoder object (static at `0x89999758`, 0x5a78 bytes), read here; v220 ports and runs them.
+
+**Its words:**
+- +0x00, the mode: 0 off, 1 LEGACY, 2 HIRESO;
+- +0x04, the two sides' Formant Shift ratios;
+- +0x0c, their offsets by the tracked pitch;
+- +0x14, the consonants' gain, gliding;
+- +0x18, its target;
+- +0x1c, 1 while HIRESO plays;
+- +0x20, the playing engine's address, 0 for none;
+- +0x24, HIRESO's object;
+- +0x2d94, LEGACY's.
+
+**The builder, `0x893f0490`,** constructs both engines in place. It sets the mode to 0 inline, its word set to 3 first so the switch's "same mode" test can't hold: no engine, LEGACY's empty hook, +0x1c 0. It sets the ratios to 1 and the offsets to 0, and the gain to 0.3 × +0x1c, which is 0.
+
+**The mode switch, `0x893f0600(vocoder, mode)`:**
+- the same mode does nothing;
+- 1 points +0x20 at LEGACY, installs the hook `0x893f0480` (a bare `rts`) at `0x899d9d8c`, and sets +0x1c to 0;
+- 2 points it at HIRESO, installs `0x893ed420`, and sets +0x1c to 1;
+- either then stores the mode and tail-calls the engine's slot 0;
+- any other mode leaves no engine and stores 0.
+
+`0x893f0900` is the same switch on the stored mode, without the "same mode" test.
+
+**HIRESO's hook, `0x893ed420(&input)`,** sets the analysis's input to the mic ring (`0x8a0f73dc`, 640 words) 128 samples behind its write point (`0x899d9a70`). That is HIRESO's latency on the input, and it doesn't read the pointer it was given.
+
+**The block drivers**, `0x893f0510(vocoder, input, frames)` (mono) and `0x893f0580` (stereo, with a null test of the engine between its calls). With no engine they do nothing. Otherwise:
+1. the input stage `0x893ed040(input)`;
+2. the hook on the input's pointer;
+3. slot 1 (the analysis) on it;
+4. slot 2 or 3 on the frames;
+5. slot 7;
+6. the output stage `0x893ed510` or `0x893ed690` on the frames, with fr4 the gain × 2^31 and fr5 slot 7's level.
+
+**The settings path, `0x893f06a0(vocoder, settings)`.** With the edit flag `0x89940274` (.data) clear, it copies the struct's two ratios and two offsets into +0x04…+0x10 and writes −1 into the struct's pivots. With it set:
+- the ratios come from `0x8994025c` and `0x89940260`;
+- the offsets come from `0x8994026c` and `0x89940270`, each where the struct's is not 0;
+- the struct's pivots are written from `0x89940264` and `0x89940268`, and its template set to 16, the RAM curves.
+
+`0x893f0960(flag)` writes the flag, and `0x893f0970(pivot, side, ratio, offset)` a side's three; the edit page's, by what they set. Then, either way:
+- +0x18 = (Unvoice Level × Vocoder Depth) × FLOAT(+0x1c);
+- the input stage gets Unvoice Detect + 24, Unvoice Spread and Sound Level (`0x893ed030`);
+- the engine gets the struct through slot 5.
+
+**The pedal, `0x893f0770(vocoder, value)`:** the engine's slot 6.
+
+**The glue, `0x893f07a0(vocoder, fr4)`.** Each block, it moves the gain: gain += 0.3·(target × fr4 − gain). With both offsets 0 it runs slot 4 on side 0 with ratio 0 and side 1 with ratio 1. Otherwise:
+- q = `0x899d9d90` (100.227, A440's period in samples at 44.1 kHz) ÷ the tracker's period (`0x893ee010`);
+- d = min(q, 2) − 1 for q ≥ 1, else max(2q − 1, 0) − 1;
+- each side's ratio + offset·d is held to [0.5, 2] and given to slot 4.
+
+**LEGACY's slots 4 and 5** read no side and only the struct's ratio and dump time. So under the glue the right side's ratio is the last LEGACY's slot 4 is given, and the one that stays.
+
+**In the port** (v219, its ground):
+- the engines are one interface, `Vc2Engine` (Vc2Engine.h), the base class's eight slots, which `Vc2Legacy` and `Vc2Hireso` implement;
+- the settings struct is `Vc2VocoderSettings`, every word named;
+- the checks' compares of the input stage, LEGACY and HIRESO are one file, `Vc2CheckWords.cpp`, shared by the three checks and the vocoder's to come.
+
+Their lines are the baseline's. The input stage's compares now hold the level and the allpasses' index after every block too.
+
 ### HIRESO's stereo synthesis (2026-11-15, v218) {#hireso-stereo}
 
 Step 3.3's last part, ported bit for bit (`Vc2Hireso::stereo`): slot 3, `0x893f1240(this, frames)`, on 32 frames of two words, a carrier in each. It has the same steps as slot 2 ("HIRESO's mono synthesis"), on stereo routines of its own:

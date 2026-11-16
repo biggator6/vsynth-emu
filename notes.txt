@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The vocoder object's ground v219 (2026-11-15, on vc2-mode): step 4's first part (the user's "Yes, next item"; step 4
+  split in two; HARDWARE_FIRMWARE.md, "The vocoder object, read"). The engines are one interface, Vc2Engine
+  (Vc2Engine.h): rom.4's base class by its eight slots, which Vc2Legacy and Vc2Hireso implement. LEGACY's slot 1 reads
+  no flag, its slot 4 no side, and its slot 5 the struct's ratio and dump time. The vocoder's settings struct is
+  Vc2VocoderSettings, every word named, in Vc2HiresoSettings's place. The checks' compares (the input stage's,
+  LEGACY's, HIRESO's) are one file, Vc2CheckWords.cpp, which the three checks share and the vocoder's will. The
+  vocoder object's routines (0x893f0490…0x893f0a10, HIRESO's hook 0x893ed420) are read. Behaviour unchanged:
+  xt_vc2in, xt_vc2legacy and xt_vc2hireso print their baseline lines; every plant list caught (--in 66,
+  --legacy 114, --hireso 190). Next, v220: Vc2Vocoder itself.
+
 HIRESO's stereo synthesis v218 (2026-11-15, on vc2-mode): step 3.3's last part (the user's "Yes, next item";
   HARDWARE_FIRMWARE.md, "HIRESO's stereo synthesis"). Vc2Hireso::stereo: rom.4's slot 3 (0x893f1240), with its
   carrier bank (0x893f1d40), its groups' synthesis (0x893f1ec0) and the stereo rate filters (0x893eff90, 0x893f0160,
