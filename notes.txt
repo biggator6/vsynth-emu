@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VOCODER OSC's carrier v221 (2026-11-15, on vc2-mode): step 5's first part (the user's "Yes, next item"; step 5
+  split in two, v222 the converter and kind 5's update; HARDWARE_FIRMWARE.md, "The VOCODER OSC's carrier").
+  Vc2Carrier: voice kind 5's render state at the voice + 0xa90, word for word: the init (0x893ebed0, the saw started
+  from the OS clock by 0x893f31a0), the settings (0x893ec450), the update (0x893ec4d0: the balance's gains, the saw's
+  written only below a balance of 1; the noise filters by pitch; the Dynamics on the input stage's peak, the mic's) and
+  the render (0x893ebfa0, the saw's stages, the noise's generator, one-pole and high-pass, the gain's glide, the growl
+  tested once a block). Its 31 pool words in Vc2CarrierTables, read by loadVc2, with a rom4-no-carrier plant.
+  xt_vc2carrier (Vc2CarrierCheck.cpp, in fcheck): 40 cases of 120 blocks with updates and settings between, every
+  word and the frames after each; 0 different at seeds 2024 and 7. mutate_vc2.py --carrier, 90 plants caught (at 40
+  cases; the divider's edges drawn for the one random pitches missed); every other list again (vc2DrawLevel moved
+  into Vc2CheckRig.h), caught. The growl's research model (vc2growllaw.cpp) went into the port; vc2run growl keeps
+  the dividers. The kit's float-phase-or-rate refused the carrier's `float phase;` (rom.4's single precision): KWB-164,
+  the user's "Patch the check", installed (lesson-checks.mjs, the check, its rule; layout.json declares a
+  reproduction), patch .claude/kwb-164-reproduction-fw-line.patch for the user to send. Not in the sound yet.
+
 The vocoder object v220 (2026-11-15, on vc2-mode): step 4's second part (the user's "Yes, next item";
   HARDWARE_FIRMWARE.md, "The vocoder object"). Vc2Vocoder: rom.4's static object (0x89999758) with both engines and
   the stages as members: the builder (0x893f0490), the mode switch (0x893f0600) with HIRESO's hook, the mic ring 128

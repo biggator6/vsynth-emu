@@ -44,7 +44,8 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
 - `vc2run <rom.4> <run>` (C++, build line at the top of `vc2run.cpp`; run through `.claude/tools/buildq.mjs`): rom.4's
   routines in `Sh4Interp`, on `vc2rom.*`'s map; runs `boot`, `warp`, `ratio`, `hold`, `growl`, `kind6`, `track`, one file
   each ("rom.4 run in the interpreter"). `warp check` and `growl` hold a model of a routine (`vc2warplaw.cpp`,
-  `vc2growllaw.cpp`) to the firmware bit for bit, and fail when any word differs (v213: `warp check` and its model went
+  `vc2growllaw.cpp`) to the firmware bit for bit, and fail when any word differs (v221: `growl`'s model went into the
+  plugin as `Vc2Carrier`, held by xt_vc2carrier, and `growl` now prints the dividers alone; v213: `warp check` and its model went
   into the plugin, `vc2HiresoMapOf` held to slot 4 by xt_vc2hireso; `vc2run warp` keeps `diff` and `map`); `ratio` fails past 2 ulp from powf; `kind6`
   fails when an output's period is more than a sample from the reading's; `track` (`vc2track.cpp`, its settings and state
   section `vc2trackstate.cpp`, sharing `vc2track.h`) measures the pitch tracker against no model and fails only on a fault
@@ -685,7 +686,8 @@ state calls for the time and xt_osc hooks as the clock; so a note's saw starts w
 answered here with a fixed number), set by its own update (`0x893ec4d0(carrier, P)`: P+0 gain, P+4 pitch, P+0x20 to +0x3c, P+0x2c the
 balance), after the carriers' rate setter (`0x893ec6a0`, from the init table at `0x898c60a8`: 880/44100 at `0x899d9964`, 44100/440
 at `0x899d9960`, so P+4 is the pitch as a ratio to 440 Hz). The law, held bit for bit to the saw the branch hands its filter (a
-hook at `0x893ec310`; `vc2growllaw.cpp`; 256,000 samples at 55 Hz…10 kHz and growl 0.05…1, 0 different; planted errors in the
+hook at `0x893ec310`; `vc2growllaw.cpp`, in the plugin from v221 as `Vc2Carrier`, held word for word by xt_vc2carrier;
+256,000 samples at 55 Hz…10 kHz and growl 0.05…1, 0 different; planted errors in the
 divider's noise test, its rounding and the cosine give 242,948, 127,960 and 256,000):
 
 - a growl oscillator, a phase γ in [−1, 1) at +0x40, whose step (+0x44) is set each time it wraps: the saw's step over n, n =
@@ -1422,9 +1424,12 @@ carrier). v is the ID's value; the laws hold at all five values tried:
 - **The balance** (Noise and Saw Levels at their defaults, 95 and 101): the saw's gain is Saw Level × b up to b = 1 and Saw
   Level from there, the noise's min(1, Noise Level × (2 − b)) (b = 0, 0.48, 0.98, 1.48, 1.98 give 1, 1, 0.760, 0.386,
   0.0117). So a balance of 64 has both at their levels, and each end fades the other source; the noise's clamp at 1 is on
-  the product, the saw's on the factor (five points each, the form fits them).
-- **The Dynamics** move the two lowpass coefficients from their settings (at velocity 100, gain 1); what level they follow
-  is not read.
+  the product, the saw's on the factor (five points each, the form fits them). (Read in v221: the update writes the saw's
+  gain only below a balance of 1, clamped on the product too; from 1 up the gain keeps what it had, Saw Level from the
+  settings, or the last Level × b when the balance rises during a note.)
+- **The Dynamics** move the two lowpass coefficients from their settings (at velocity 100, gain 1); ~~what level they follow
+  is not read~~ (read and run in v221: the input stage's largest peak of the last eight blocks, `0x899d9a5c`, the mic's;
+  the whole law in HARDWARE_FIRMWARE.md, "The VOCODER OSC's carrier").
 - **The vibrato** is read for every Type: the builder puts its three IDs in the record under ANALOG, PCM, EXTIN and VOCODER
   alike (+0x1c…+0x1e), and the converter's part that reads them comes before its switch by kind (`0x8939fbd0`; read). The
   block's fields were run under VOCODER only. Its depth through the Matrix's getters (`0x893a26b0`, `0x893a28b0`), clamped to

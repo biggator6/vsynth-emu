@@ -33,10 +33,11 @@ V4=($( [ -f Vc2Params.cpp ] && echo Vc2Params.cpp XtFxValueText.cpp )
     $( [ -f Vc2Unvoiced.cpp ] && echo Vc2Unvoiced.cpp ) $( [ -f Vc2LegacyAnalysis.cpp ] && echo Vc2LegacyAnalysis.cpp )
     $( [ -f Vc2LegacyTables.cpp ] && echo Vc2LegacyTables.cpp )
     $( [ -f Vc2HiresoTables.cpp ] && echo Vc2HiresoTables.cpp )
-    $( [ -f Vc2VocoderTables.cpp ] && echo Vc2VocoderTables.cpp ))
+    $( [ -f Vc2VocoderTables.cpp ] && echo Vc2VocoderTables.cpp )
+    $( [ -f Vc2CarrierTables.cpp ] && echo Vc2CarrierTables.cpp ))
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
 rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,xt_vc2in,xt_vc2legacy,xt_vc2hireso,xt_vc2vocoder}
-rm -f "$O"/{classifier_test,rd}
+rm -f "$O"/{xt_vc2carrier,classifier_test,rd}
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp "${SH4[@]}" -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp "${SH4[@]}" -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp "${SH4[@]}" -o "$O/xt_lfo" &
@@ -81,6 +82,9 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 [ -f Vc2VocoderCheck.cpp ] && cc -DXT_VC2VOCODER_MAIN Vc2VocoderCheck.cpp Vc2Vocoder.cpp Vc2VocoderTables.cpp \
    Vc2Unvoiced.cpp Vc2Consonants.cpp Vc2LegacyAnalysis.cpp Vc2Legacy.cpp Vc2LegacyTables.cpp "${VHI[@]}" \
    "${VW[@]}" "${SH4[@]}" -o "$O/xt_vc2vocoder" &
+# The VOCODER OSC's carrier (v221) against rom.4's own routines
+[ -f Vc2CarrierCheck.cpp ] && cc -DXT_VC2CARRIER_MAIN Vc2CarrierCheck.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp \
+   "${SH4[@]}" -o "$O/xt_vc2carrier" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &
 # xt_fx: the chip and its check, the check's parts in XtFxCheck*.cpp from v204

@@ -1546,6 +1546,62 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VOCODER OSC's carrier (2026-11-15, v221) {#vc2-carrier}
+
+Step 5's first part, ported bit for bit (`Vc2Carrier`, Vc2Carrier.cpp): voice kind 5's render state at the voice + 0xa90, 0x6c bytes (`Vc2CarrierWords`), with its four routines. VC2_VOCAL_DESIGNER.md, "The carrier: the VOCODER OSC" and "The growl, run", read it by shape; this is every instruction of it.
+
+**The routines and their callers:**
+- the init `0x893ebed0(carrier, P)`, from the voice's setup (`0x893af1e0`);
+- the settings `0x893ec450(carrier, P)`, from `0x893ae9a2`;
+- the update `0x893ec4d0(carrier, P)`, from kind 5's routine (`0x893b0130`), which writes P+4 just before;
+- the render `0x893ebfa0(carrier, out)`, from the voice's render (`0x893aea34`).
+
+Two near copies have no caller: `0x893ebea0` (an init from a gain and a pitch in fr4 and fr5) and `0x893ec660` (the settings without their null test). The rate setter `0x893ec6a0` is rom.4's first static initializer (`0x898c60a8`): 880/44100 at `0x899d9964`, every carrier's pitch factor, and 44100/440 at `0x899d9960`.
+
+**The init** zeroes the noise generator, the one-pole and the three stages. It copies P's settings (as the settings routine does). It sets gain and its target to P+0, the step and its target to P+4, and the coefficients to the cutoffs as they stand (+0x14 = P+0x0c, +0x20 = P+0x14, +0x28 = P+0x18). The growl oscillator starts at 0 with a step of 50 × the pitch factor, and the growl at 0. The saw starts where `0x893f31a0` puts it: x = |t|/32767, t the OS clock's word (`0x893018d0`) as a short (−32768 stays itself), then 2·(3.997·(1 − x)·x) − 1.
+
+**The settings** copy Saw Wave LPF, Saw Wave Level, Noise LPF, Noise HPF, Noise Level, Dynamics Threshold and Sensitivity from P (+0x0c…+0x1c, +0x24, +0x28) to +0x18, +0x1c, +0x24, +0x2c, +0x30, +0x34, +0x38. With no P they do nothing.
+
+**The update**, with P (none skips this part):
+- the step's and gain's targets and the growl from P+4, P+0 and P+0x20;
+- below a balance of 1 only, the saw's gain = clamp₀¹(Saw Level × b). From 1 up it keeps what it had: Saw Level from the settings, or the last Level × b if the balance has risen during the note;
+- the noise's gain = clamp₀¹((2 − b) × Noise Level).
+
+Then, P or none, from the carrier's own words (p is the step's target):
+- the noise lowpass = Noise LPF, × (0.4 + 0.6286·p) below p = 1;
+- the high-pass's coefficient = clamp₀¹(Noise HPF + 0.389·q − 0.0989·q² − 0.2833), q = p held to [0.25, 2];
+- the Dynamics: with Threshold under 1e-6 they are off, and the noise lowpass is × (1 − 0.3·Sens), the saw's cutoff × (1 − 0.1·Sens). Otherwise x = min(1, peak ÷ (2·Threshold)), d = 2·(0.5·(1 − Sens) + x·Sens), the noise lowpass × (1 + 0.3·(1 − d)), the saw's cutoff × (0.9 + 0.1·d);
+- both then capped at 1.
+
+**The level the Dynamics follow** is the input stage's largest peak of the last eight blocks (`0x893ed3d0`, `0x899d9a5c`, `Vc2Unvoiced::peak`): the mic. VC2_VOCAL_DESIGNER.md had it "not read".
+
+**The render**, 32 samples:
+- the step glides halfway to its target, and the saw's phase steps by step × the pitch factor, wrapping by −2;
+- the growl's test (+0x3c above 0) is made once, at the first sample; the growl's path is "The growl, run"'s, its saw × 0.5 into the stages;
+- the saw through two two-state stages on one coefficient (+0x4c/+0x50, then +0x5c/+0x60 on the first's s1);
+- the noise generator steps; its word × (the noise's gain × 0x2fffffff, 2^-31 an ulp short) through the one-pole (+0x48), then the high-pass stage (+0x54/+0x58), what is left after both states;
+- the gain glides 0.00756 toward its target, then out = (saw × the saw's gain + the high-pass) × gain × 2^31, the same to left and right.
+
+The growl's path has a pool of its own (`0x893ec4ac`…), whose half, −2, glide and 2^31 are the plain path's numbers. The first sample's glide is made before the test, with the plain path's.
+
+**Its tables** (`Vc2CarrierTables`, read by `loadVc2` through `vc2LoadCarrier`): the 31 pool words the routines load, each by its own address.
+
+**The check, `xt_vc2carrier <rom.4> [cases] [seed]`** (in fcheck, under a second; Vc2CarrierCheck.cpp, XT_VC2CARRIER_MAIN). It runs after the rate setter, with the OS clock hooked to a drawn word.
+- Each case: the init from a drawn P and clock, then 120 renders. One render in six has an update or the settings before it, on a drawn P or (one in eight) none, with the input stage's peak drawn into `0x899d9a5c`.
+- P's levels are a parameter's v/127. Its pitch is 19 Hz…10 kHz, with 1 and the high-pass's bounds now and then, and the growl divider's edges (n × 50/440, where the order of the divider's two roundings decides n or n − 1). Growl is off half the time, the Dynamics off a third (and now and then the floor itself), the balance at its centre now and then.
+- After every routine the carrier's words, and after a render its frames, word for word.
+
+Results:
+- seed 2024: 40 cases, 4,800 blocks (2,219 growling), 389 updates (275 with the Dynamics), 409 settings, 103 with no P, 0 different;
+- seed 7: 0 different (2,129 growling);
+- `mutate_vc2.py --carrier`: 90 plants (75 in Vc2Carrier.cpp, 15 in Vc2CarrierTables.cpp). The first run at 12 cases missed three: the saw coefficient's cap and the Dynamics' floor are reached in 40 cases, not 12 (so the list runs at 40, fcheck's count), and the divider's order of roundings only at its edges, which random pitches never hit (so the pitch draw has them).
+
+Not planted, as no input tells them apart: a word of one render pool read from the other's (the same numbers); the sine's x·x·4 as x·4x (× 4 is exact); the growl's divider on noiseA ≥ 0 (noiseA is 0 only before the first sample, and the first growl cycle starts at the second).
+
+The growl's research model (`vc2growllaw.cpp`) went into the port, as the warp's did at v213; `vc2run growl` keeps the dividers it chooses.
+
+Not in the sound yet: P comes from the converter and kind 5's update (v222), and the voice from the wiring.
+
 ### The vocoder object (2026-11-15, v220) {#vc2-vocoder}
 
 Step 4's second part, ported bit for bit (`Vc2Vocoder`, Vc2Vocoder.cpp): the object read in "The vocoder object, read", with both engines and the input and output stages (`Vc2Unvoiced`) as its members. The port has the builder, the mode switch with HIRESO's hook, the settings path with the edit words, the block drivers, the pedal and the glue.

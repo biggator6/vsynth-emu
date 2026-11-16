@@ -1,0 +1,97 @@
+# Planted errors in the VOCODER OSC's carrier's port, for mutate_vc2.py --carrier: each must make xt_vc2carrier, on
+# rom.4, say something differs.  name|old|new[|port[|seed]]; ports vc2car (Vc2Carrier.cpp, v221) and vc2cartables
+# (Vc2CarrierTables.cpp).
+# Not planted, as no input tells them apart: a word of one render pool read from the other's (the plain path's and the
+# growl's half, −2, glide and 2^31 are the same numbers), so the first sample's glide by either pool; the sine's x·x·4
+# as x·4x (× 4 is exact); the growl's divider by noiseA ≥ 0 (noiseA is 0 only before the first sample, and the first
+# growl cycle starts at the second).
+clamp-top|    return v > 1.0f ? 1.0f : v;|    return v > 0.9f ? 0.9f : v;
+clamp-no-floor|    if (0.0f > v) v = 0.0f;\n|
+stage-s1|    st.s1 = add(mul(st.s2, g), st.s1);|    st.s1 = add(mul(st.s2, g), st.s2);
+stage-left|    const float left = sub(sub(x, st.s1), st.s2);|    const float left = sub(x, st.s1);
+stage-s2|    st.s2 = add(mul(left, g), st.s2);|    st.s2 = add(mul(left, g), st.s1);
+sine-fold-up|        x = sub(1.0f, x);|        x = sub(t.foldAt, x);
+sine-fold-down|        x = sub(-1.0f, x);|        x = sub(1.0f, x);
+cosine-no-abs|    const float y = sub(t.foldAt, x < 0.0f ? -x : x);|    const float y = sub(t.foldAt, x);
+noise-251|a * (uint32_t)-250|a * (uint32_t)-251
+noise-128|((b << 7) - b)|(b << 7)
+noise-31|+ 30u;|+ 31u;
+noise-256|((b << 6) - b) * 4u|(b << 6) * 4u
+noise-old-a|* 4u + nextA)|* 4u + a)
+start-no-abs|    const int32_t magnitude = now > 0 ? now : -now;|    const int32_t magnitude = now;
+start-no-short|div(xtf::flt((int16_t)magnitude), t.clockScale)|div(xtf::flt(magnitude), t.clockScale)
+start-logistic-order|mul(mul(sub(1.0f, x), x), t.logistic)|mul(sub(1.0f, x), mul(x, t.logistic))
+start-affine|    return add(mul(r, 2.0f), -1.0f);|    return add(mul(r, 2.0f), -0.5f);
+init-noise-a|    w.noiseA = w.noiseB = 0;|    w.noiseB = 0;
+init-stages|    w.sawA = w.noiseHigh = w.sawB = Vc2CarrierStage {};|    w.sawA = w.sawB = Vc2CarrierStage {};
+init-one-pole|    w.noiseLow = 0.0f;\n|
+init-gain|    w.gain = w.gainTarget = p.gain;|    w.gainTarget = p.gain;
+init-step|    w.step = w.stepTarget = p.pitch;|    w.stepTarget = p.pitch;
+init-saw-coef|    w.sawCoef = p.sawCutoff;|    w.sawCoef = p.sawLevel;
+init-high-coef|    w.noiseHighCoef = p.noiseHighpass;|    w.noiseHighCoef = p.noiseLowpass;
+init-growl-step|mul(t.pitchFactor, t.growlStart)|t.pitchFactor
+init-growl-kept|    w.growl = 0.0f;\n}|}
+init-growl-phase|    w.growlPhase = 0.0f;\n|
+settings-saw-gain|    w.sawGain = p->sawLevel;|    w.sawGain = p->sawCutoff;
+settings-threshold|    w.threshold = p->threshold;|    w.threshold = p->sensitivity;
+settings-noise-gain|    w.noiseGain = p->noiseLevel;\n|
+update-saw-above-1|        if (1.0f > p->balance) w.sawGain|        if (2.0f > p->balance) w.sawGain
+update-noise-level|mul(sub(2.0f, p->balance), p->noiseLevel)|mul(sub(2.0f, p->balance), p->sawLevel)
+update-growl-kept|        w.growl = p->growl;\n|
+update-low-under-2|    if (1.0f > pitch) low|    if (2.0f > pitch) low
+update-low-line|add(mul(pitch, t.lowSlope), t.lowBase)|add(mul(pitch, t.lowBase), t.lowSlope)
+update-high-max|        held = 2.0f;|        held = 1.5f;
+update-high-min|        held = t.minPitch;|        held = 0.5f;
+update-high-linear|add(mul(mul(held, held), t.highA), w.noiseHighpass)|add(mul(held, t.highA), w.noiseHighpass)
+update-high-order|add(add(mul(held, t.highB), square), t.highC)|add(mul(held, t.highB), add(square, t.highC))
+update-dyn-floor|    if (t.floor > w.threshold) {|    if (t.floor >= w.threshold) {
+update-nodyn-low|        lowScale = sub(1.0f, mul(w.sensitivity, t.dynLow));|        lowScale = sub(1.0f, mul(w.sensitivity, t.dynSaw));
+update-nodyn-saw|        sawScale = sub(1.0f, mul(w.sensitivity, t.dynSaw));|        sawScale = 1.0f;
+update-dyn-once|div(peak, mul(w.threshold, 2.0f))|div(peak, w.threshold)
+update-dyn-unclamped|        if (x > 1.0f) x = 1.0f;\n|
+update-dyn-half|mul(add(mul(sub(1.0f, w.sensitivity), t.dynHalf), mul(x, w.sensitivity)), 2.0f)|add(mul(sub(1.0f, w.sensitivity), t.dynHalf), mul(x, w.sensitivity))
+update-dyn-low|        lowScale = add(mul(sub(1.0f, d), t.dynLow), 1.0f);|        lowScale = add(mul(sub(1.0f, d), t.dynLow), t.dynSawBase);
+update-dyn-saw|        sawScale = add(mul(d, t.dynSaw), t.dynSawBase);|        sawScale = add(mul(d, t.dynSaw), 1.0f);
+update-low-unscaled|    w.noiseLowCoef = mul(low, lowScale);|    w.noiseLowCoef = low;
+update-saw-by-low|    w.sawCoef = mul(w.sawCutoff, sawScale);|    w.sawCoef = mul(w.sawCutoff, lowScale);
+update-low-uncapped|    if (w.noiseLowCoef > 1.0f) w.noiseLowCoef = 1.0f;\n|
+update-saw-uncapped|    if (w.sawCoef > 1.0f) w.sawCoef = 1.0f;\n|
+growl-wrap|        w.growlPhase = add(w.growlPhase, t.growl.minusTwo);|        w.growlPhase = add(w.growlPhase, -1.5f);
+growl-divider-1|        if (divider < 2) divider = 2;|        if (divider < 1) divider = 1;
+growl-divider-b|        if (w.noiseA > 0) ++divider;|        if (w.noiseB > 0) ++divider;
+growl-divider-ratio|div(mul(w.step, t.k440), t.k50)|mul(w.step, div(t.k440, t.k50))
+growl-step-of-step|        w.growlStep = div(delta, xtf::flt(divider));|        w.growlStep = div(w.step, xtf::flt(divider));
+growl-level-half|w.growl), 1.0f), w.phase);|w.growl), 0.5f), w.phase);
+growl-shift-no-pi|add(mul(sineOf(t, w.growlPhase), overPi), w.phase)|add(mul(sineOf(t, w.growlPhase), w.growl), w.phase)
+growl-wrap-up|        shifted = add(shifted, t.growl.minusTwo);|        shifted = add(shifted, -1.0f);
+growl-wrap-down|        shifted = add(shifted, 2.0f);|        shifted = add(shifted, 1.0f);
+growl-sum|    return add(shifted, level);|    return add(shifted, w.phase);
+render-growl-at-0|    const bool growls = w.growl > 0.0f;|    const bool growls = w.growl >= 0.0f;
+render-step-jumps|        w.step = add(mul(sub(w.stepTarget, w.step), glide.half), w.step);|        w.step = w.stepTarget;
+render-phase-wrap|        if (!(1.0f > w.phase)) w.phase = add(w.phase, glide.minusTwo);|        if (!(1.0f > w.phase)) w.phase = add(w.phase, -1.0f);
+render-growl-whole|mul(growlSaw(delta, overPi), pool.half)|growlSaw(delta, overPi)
+render-stage-b-input|        stageStep(w.sawB, w.sawA.s1, w.sawCoef);|        stageStep(w.sawB, x, w.sawCoef);
+render-noise-after|        noiseStep(w);\n        w.noiseLow = add(mul(sub(mul(xtf::flt(w.noiseA), noiseScale), w.noiseLow), w.noiseLowCoef), w.noiseLow);|        w.noiseLow = add(mul(sub(mul(xtf::flt(w.noiseA), noiseScale), w.noiseLow), w.noiseLowCoef), w.noiseLow);\n        noiseStep(w);
+render-noise-unscaled|    const float noiseScale = mul(w.noiseGain, t.noiseScale);|    const float noiseScale = t.noiseScale;
+render-one-pole-none|sub(mul(xtf::flt(w.noiseA), noiseScale), w.noiseLow)|mul(xtf::flt(w.noiseA), noiseScale)
+render-high-by-low|stageStep(w.noiseHigh, w.noiseLow, w.noiseHighCoef)|stageStep(w.noiseHigh, w.noiseLow, w.noiseLowCoef)
+render-gain-jumps|        w.gain = add(mul(sub(w.gainTarget, w.gain), pool.glide), w.gain);|        w.gain = w.gainTarget;
+render-saw-first-stage|mul(w.sawB.s1, w.sawGain)|mul(w.sawA.s1, w.sawGain)
+render-no-gain|        const float y = mul(mul(add(mul(w.sawB.s1, w.sawGain), noise), w.gain), pool.toBus);|        const float y = mul(add(mul(w.sawB.s1, w.sawGain), noise), pool.toBus);
+render-left-only|        frames[2 * i] = frames[2 * i + 1] = y;|        frames[2 * i] = y;
+render-overpi-alone|    const float overPi = mul(w.growl, t.overPi);|    const float overPi = t.overPi;
+table-pitch-factor|{ 0x893ec6f8, &pitchFactor }|{ 0x893ec6f0, &pitchFactor }|vc2cartables
+table-growl-start|{ 0x893ec228, &growlStart }|{ 0x893ec4b0, &growlStart }|vc2cartables
+table-noise-scale|{ 0x893ec22c, &noiseScale }|{ 0x893ec238, &noiseScale }|vc2cartables
+table-plain-glide|{ 0x893ec238, &plain.glide }|{ 0x893ec230, &plain.glide }|vc2cartables
+table-growl-bus|{ 0x893ec4c0, &growl.toBus }|{ 0x893ec4b8, &growl.toBus }|vc2cartables
+table-over-pi|{ 0x893ec4a0, &overPi }|{ 0x893ec4b8, &overPi }|vc2cartables
+table-k50|{ 0x893ec4b4, &k50 }|{ 0x893ec4b0, &k50 }|vc2cartables
+table-low-slope|{ 0x893ec6c4, &lowSlope }|{ 0x893ec6c0, &lowSlope }|vc2cartables
+table-high-a|{ 0x893ec6cc, &highA }|{ 0x893ec6d0, &highA }|vc2cartables
+table-floor|{ 0x893ec6d8, &floor }|{ 0x893ec6ec, &floor }|vc2cartables
+table-saw-base|{ 0x893ec6e8, &dynSawBase }|{ 0x893ec6e4, &dynSawBase }|vc2cartables
+table-fold-neg|{ 0x893f3318, &foldNeg }|{ 0x893f32ec, &foldNeg }|vc2cartables
+table-four|{ 0x893f3314, &four }|{ 0x893f3310, &four }|vc2cartables
+table-logistic|{ 0x893f330c, &logistic }|{ 0x893f3310, &logistic }|vc2cartables
+table-clock-scale|{ 0x893f3308, &clockScale }|{ 0x893f330c, &clockScale }|vc2cartables

@@ -3,7 +3,7 @@
 //   vc2run <rom.4> warp ...        HIRESO's slot 4, the formant map (vc2warp.cpp)
 //   vc2run <rom.4> ratio           the Formant Shift ratio's library call against powf (vc2ratio.cpp)
 //   vc2run <rom.4> hold [engine]   which controller reaches the hold (vc2hold.cpp)
-//   vc2run <rom.4> growl [blocks]  the VOCODER OSC's growl branch against its model (vc2growl.cpp)
+//   vc2run <rom.4> growl [blocks]  the VOCODER OSC's growl branch, the dividers it chooses (vc2growl.cpp)
 //   vc2run <rom.4> kind6           voice kind 6 on a wave of known period, its output's period (vc2kind6.cpp)
 //   vc2run <rom.4> lfo <rom.2>     the LFO on both images' routines and the port, side by side (vc2twinlfo.cpp)
 //   vc2run <rom.4> env <rom.2>     the envelope and its converters the same way (vc2twinenv.cpp)

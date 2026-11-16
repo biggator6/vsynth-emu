@@ -54,7 +54,6 @@ struct StageStart {
 };
 std::string startDifference(Vc2Fw& fw, const StageStart& s) { return vocoderDifference(fw, s.v); }
 
-float drawLevel(std::mt19937& rng) { return (float)(rng() % 128) / 127.0f; }
 int drawVocoderMode(std::mt19937& rng) { return rng() % 8 == 0 ? 3 : (int)(rng() % 3); }   // now and then no mode
 
 // The vocoder's whole settings struct, every word as the converter forms it: ratios mostly the ends and 1, offsets
@@ -66,14 +65,14 @@ Vc2VocoderSettings drawVocoderSettings(std::mt19937& rng) {
         in.offset[side] = rng() % 3 == 0 ? (float)((int)(rng() % 9) - 4) / 8.0f : 0.0f;
         in.pivot[side] = rng() % 4 == 0 ? (int32_t)(rng() % 31) : -1;
     }
-    in.soundLevel = drawLevel(rng);
-    in.unvoiceLevel = drawLevel(rng);
+    in.soundLevel = vc2DrawLevel(rng);
+    in.unvoiceLevel = vc2DrawLevel(rng);
     in.spread = (int32_t)(rng() % 2);
     in.detect = 24 + (int32_t)(rng() % 128);
     in.attack = (int32_t)(rng() % 101);
     in.release = (int32_t)(rng() % 101);
     in.formantTemplate = (int32_t)(rng() % 18);
-    in.depth = drawLevel(rng);
+    in.depth = vc2DrawLevel(rng);
     in.dump = vc2DrawDump(rng);
     return in;
 }
@@ -145,7 +144,7 @@ std::string vocoderBlockOn(Vc2Fw& fw, Vc2Vocoder& v, const float* mic, float* fr
     if (!fw.call(kMicAt, {}, &at)) return "the mic ring's write point faults";
     fw.cpu.write(at, mic, sizeof(float) * Vc2Unvoiced::kBlock);
     std::copy_n(mic, Vc2Unvoiced::kBlock, v.stage.micBlock());
-    const float levelMod = rng() % 2 == 0 ? 0.0f : drawLevel(rng);
+    const float levelMod = rng() % 2 == 0 ? 0.0f : vc2DrawLevel(rng);
     fw.cpu.wr32(kLevelModAt, std::bit_cast<uint32_t>(levelMod));
     fw.cpu.write(kFramesAt, frames, sizeof(float) * kFrameWords);
     if (!fw.call(channels == 1 ? kMono : kStereo, { kVocoder, at, kFramesAt }))

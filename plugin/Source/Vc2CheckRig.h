@@ -55,6 +55,9 @@ inline float vc2DrawDump(std::mt19937& rng) {
     return (float)(pick < 0 ? (int)(rng() % 128) : pick) / 127.0f;
 }
 
+// A level as a parameter's 0…127 gives it, v/127 (v220's, here from v221)
+inline float vc2DrawLevel(std::mt19937& rng) { return (float)(rng() % 128) / 127.0f; }
+
 // A Formant Shift ratio, 0.5 to 2: its ends and 1 most often (v211's)
 inline float vc2DrawRatio(std::mt19937& rng) {
     constexpr float kRatios[6] = { 0.5f, 1.0f, 2.0f, -1.0f, -1.0f, -1.0f };   // -1: any

@@ -272,7 +272,14 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      words, the block drivers, the pedal and the glue, against rom.4's own object in xt_vc2vocoder
      (HARDWARE_FIRMWARE.md, "The vocoder object"). The CC 64 and CC 121 routing to the pedal belongs to the wiring.
      Step 4 is done; the vocoder reaches the sound with the wiring.
-5. The VOCODER OSC's carrier (kind 5) and its converter: the growl's model is its start (`vc2growllaw.cpp`).
+5. The VOCODER OSC's carrier (kind 5) and its converter: the growl's model is its start (`vc2growllaw.cpp`). Split in two
+   where the firmware divides it (2026-11-15):
+   - done (v221): the carrier, `Vc2Carrier`, the object at the voice + 0xa90: its init `0x893ebed0` with the phase's
+     start on the OS clock (`0x893f31a0`), settings `0x893ec450`, update `0x893ec4d0` (the balance, the noise filters by
+     pitch, the Dynamics on the input stage's peak) and render `0x893ebfa0` with the growl, against rom.4's routines on
+     a carrier in its RAM in xt_vc2carrier (HARDWARE_FIRMWARE.md, "The VOCODER OSC's carrier").
+   - then (v222): its converter (`0x8939db00`, the VOCODER OSC's part of `0x8939fbd0`) and kind 5's update
+     (`0x893afff0`: the gain, the pitch, the growl and the balance with their modulators), which give the carrier P.
 6. The pitch tracker.
 7. Kind 6 (the mic's pitch shifter: harmonizer and Auto Note) and the mic ring.
 8. The part mixer (Direct Sound) and the patch EQ.
