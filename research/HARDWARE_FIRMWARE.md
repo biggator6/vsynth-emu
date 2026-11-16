@@ -1546,6 +1546,64 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's TVA (2026-11-16, v233) {#vc2-tva}
+
+Step 4.2's TVA (research/VC2_MODE_PLAN.md, "4. Wiring", item 2: "the TVA's render on one stereo pair"), ported bit for bit: `Vc2Tva` (Vc2Tva.cpp, the constants in Vc2TvaTables.cpp), rom.4's TVA object at the tone's +0x19f0, with what it reads of its envelope and LFOs, the fade's step and the OS's call through `Vc2TvaParts`. VC2_VOCAL_DESIGNER.md, "The TVA in rom.4", found it rewritten from rom.2's but for the render's arithmetic; the whole object is about 400 instructions, one version. Every address is rom.4's.
+
+**The object**, 0xc8 bytes (`Vc2TvaWords`):
+
+| Offset | What |
+|---|---|
+| +0x00…+0x50 | the block a note-on or a new block copies in (the tone's input + 0x6e8): +0x00, +0x04, +0x14 the envelope's and LFOs' numbers (the tone's to bind), +0x08 the LFO's depth, +0x0c the level, +0x1c the pan LFO's depth, +0x20…+0x3c eight words the note-on copies, +0x40 a word that above 0 puts +0x48 and +0x4c on the gains and targets (the tone's level test, its +0x54, asks it above 0), +0x48 and +0x4c those two factors |
+| +0x50 | 0x893b25a0's truncation: its fade's end calls the OS |
+| +0x54 | set at a fade's end when +0x58 is; 0x893b2610 answers it |
+| +0x58 | 0x893b25b0's truncation |
+| +0x5c | OSC 1's +0xa40 at the note-on; nothing here reads it |
+| +0x60, +0xc4 | 1 and 0 from the constructor; nothing here reads them |
+| +0x64 | the fade: 1 at a truncation, down to the floor |
+| +0x68, +0x6c | the steps a sample; +0x70, +0x74 the targets; +0x78, +0x7c the gains (left, right) |
+| +0x80…+0x9c | the block's +0x20…+0x3c (rom.2's bus levels), copied at the note-on; nothing here reads them |
+| +0xa0 | samples since the note-on or the last update, 32 a render |
+| +0xa4, +0xa8, +0xac | the envelope, the LFO and the pan LFO, by address (the tone's note-on binds them) |
+| +0xb0, +0xb8, +0xbc | the level × the envelope's output, the LFO's output × its depth, the pan LFO's × its depth |
+| +0xb4 | untouched |
+| +0xc0 | the tone's serial (the tone's note-on) |
+
+**The routines.**
+- `0x893b20b0`, the constructor on a TVA given: +0x50, +0x54, +0x58 and the bindings 0, +0xc4 0.0, +0x60 and the fade 1. Given none it takes 0xc8 bytes from the allocator (`0x89506df4`); the tone always gives one, so that path isn't ported.
+- `0x893b2100(tva, block, flag)`, the note-on: the flag to +0x5c, the block's 0x50 bytes in (rom.4's block-move helper), the elapsed count 0, the three products. The gains start from the envelope's onset (+0x58) × the level and aim at +0xb0: each (1 + +0xb8) × that × (1 − +0xbc) on the left and × (+0xbc + 1) on the right, then × +0x48 and +0x4c when +0x40 is above 0, held within ±1. The steps are (target − gain) over the ramp's ms × 44.1 (a unit low): the envelope's attack (+0x1c) at most 10 ms; with no attack its next stage's (+0x20); with neither 0.1 ms. Then the eight words copied.
+- `0x893b23b0(tva, block)`, the new block: the 0x50 bytes in, then `0x893b1ea0(block)`, which returns at once.
+- `0x893b23d0`, the update: the products again, the targets as at the note-on, and the steps over what is left of the stage (the envelope's +0x6c less the elapsed samples × 1/44.1) × 44.1 when that's under 10 ms, 0.1 ms × 44.1 when none is left, 441 samples in sustain (+0x6c below 0) or from 10 ms on, as rom.2's (`XtSynth::tvaUpdate`); the elapsed count to 0.
+- `0x893b2560`, over: 0 with +0x50 set; else 1 when the envelope's state is 5 and neither gain is above 1.526e−5. The tone's update asks it, then `0x893b2610` (+0x54), and runs the TVA's update only when both answer 0. (v228's table called the update a third end test; it isn't one, though its r0 isn't 0.)
+- `0x893b25c0`, silent (the tone's held(), its +0x60): truncated (+0x50 or +0x58), the fade at or below the floor; else over's answer without over's first test.
+- `0x893b25a0` and `0x893b25b0`, the truncations: the fade to 1, then +0x50 or +0x58 set. The tone's `0x893b3bc0` takes the first, then waits on the OS (`0x893017f0(0x1000)`) while the fade is above 0; its `0x893b3c20` takes the second, whose end its update reads at +0x54.
+- `0x893b2640(tva, in, out)`, the render, 32 frames of one stereo pair, added into `out`:
+  - untruncated: a step that would pass its target in the block (|step × 32| above |target − gain|) is shortened to (target − gain) × 1/32.5 (`0x3cfc0fc1`, to nearest) and written back; then each sample out += in × gain (FMAC: the product, then the sum), the gains stepped after; the gains stored.
+  - truncated with the fade above the floor: each sample the fade less the word at `0x8993eb08`, read each sample; at or below the floor the fade is 0, +0x54 set with +0x58, the OS called (`0x89301830(0x8994fec8, 0x1000)`) with +0x50, and the block's frames from there not written; else out += in × gain × fade.
+  - then the elapsed count + 32.
+- `0x893b2780`: the envelope's output (+0x4c).
+
+Not ported: `0x893b2790`, an untruncated render no `bsr` or word reaches; rom.2's render at `0x893b2870` (dead, "The TVA in rom.4"); `0x893b2820`, a static initializer (its address at `0x898c5f4c`) that sets three globals (`0x8999f508`, `0x8999f50c`, `0x8999f510`) nothing here reads.
+
+**XtSynth's gains don't serve.** `XtSynth::tvaGains` is the same arithmetic in the same order while +0x40 isn't above 0: (LFO × depth + 1) × level, then × (1 − pan) and × (pan + 1), held within ±1. rom.4 multiplies by +0x48 and +0x4c before the hold when it is, and forms it all on the object's own words. One function for both would tie the VC-2's port to rom.2's voice, so `Vc2Tva` has its own, held to rom.4 by its check.
+
+**The port.** The object's words as rom.4 lays them out (`Vc2TvaWords`), so the check compares them whole. The envelope, the LFOs and the fade's step are the parts' answers by rom.4's address; the OS's call is the parts' too, with its event and flags. The constants are each routine's own pool word, read by `loadVc2` at the start (`vc2LoadTva`; the two floors and the two 44.1s are the same values, read where each routine reads them).
+
+**The check, `xt_vc2tva <rom.4> [cases] [seed]`** (in fcheck at 40 cases, under a second; Vc2TvaCheck.cpp, Vc2TvaEvents.cpp, Vc2TvaFakes.cpp, XT_VC2TVA_MAIN):
+- rom.4's routines on a TVA in the interpreter's RAM. The envelopes, LFOs and the fade's step are drawn into the interpreter's memory, where rom.4 reads them; the port's fake parts read the same words there (rom.4's routines write none of them). The OS's call is hooked and logged, and the port's parts log theirs.
+- Each case fills the TVA with the same noise on both sides; then 400 events: constructed, a note-on or a new block on a drawn block, updated, a render of a drawn input into a drawn output, either truncation, or a question (over, stopped, silent, the envelope's level).
+- Before each, the bindings to drawn records (the constructor clears them, and the tone binds before its note-on; the first run faulted on address 0x38 without this), and one time in four each word the routines decide by: the truncations, the fade about the floor, the gains about the floor and at ±1, the targets at or about the gains, the steps at and about the render's test's edge, half of it and the shortened step, the elapsed count, the block's level, depths, +0x40 about 0 and its factors. The records: the envelope's state (5 half the time), its attack about 10 ms, its output and onset at 1 or just under now and then, its stage's time about the elapsed samples and 10 ms on, a fade step that ends the fade within the block or lands it on the floor.
+- After each, the TVA's words, the output, the calls and the answer (r0; fr0 for the level).
+- Not drawn: NaNs, infinities and denormals, where the interpreter's host floats and xtf's doubles can part (a NaN's sign, "The VC-2's OSC voice").
+- Coverage (llvm-cov, 40 cases): every function, line, region and branch of Vc2Tva.cpp.
+
+Results:
+- seed 2024, 40 cases: 16,000 events, 2,405 note-ons, 1,620 updates, 5,347 renders (1,496 fading, 961 fades ended, 559 telling the OS), 88 over, 200 silent; 0 different.
+- seeds 7 and 31337, 400 cases each: 160,000 events each, 0 different.
+- `mutate_vc2.py --tva`: 109 plants (97 in Vc2Tva.cpp, 12 in the constants' addresses), all caught, 16 s. The first run caught 107 of 110: one plant was equivalent (the note-on's bound as `10 < attack`: at exactly 10 both give 10) and was dropped; two were the check's gaps, no gain landing just under 1 before the hold and no fade step landing the fade on the floor itself, which it draws now.
+
+Not in the sound yet: the tone (`Vc2Tone`) reaches it through `Vc2ToneParts`, which a later version gives the ports.
+
 ### The VC-2's OSC voice (2026-11-16, v230) {#vc2-osc-voice}
 
 Step 4.2's first part (research/VC2_MODE_PLAN.md, "4. Wiring"), ported bit for bit: `Vc2OscVoice` (Vc2OscVoice.cpp, Vc2OscVoiceGet.cpp, the kinds' rows in Vc2OscVoiceKinds.cpp, the constants in Vc2OscTables.cpp), the OSC voice's frame, with everything it calls through `Vc2OscParts`. Step 4.2's OSC voice was split by what rom.4 holds (the plan, the same day): this frame; then its note-on by kind (`0x893af0b0`) with the pitch and gain targets; the portamento; the players' installs on rom.4's object; Vari off. Every address is rom.4's.
@@ -1659,7 +1717,7 @@ Step 4's first version (research/VC2_MODE_PLAN.md, "4. Wiring", split the same d
 
 | Slot | Routine | What |
 |---|---|---|
-| +0x0c | `0x893b4940(tone, n)` | the update, in state 2 only, under the lock: envelopes 1–13 (each with its +0x68 set) by `0x893abe80`, LFOs 1–7 (each with its +0x80 set) by `0x893ad100`, each OSC voice by `0x893ae1c0` (+0x20, then +0xba4), the mix's `0x893ade40`, COSM 1's update through its vtable (+0xc) with OSC 1's float at tone+0x1ec; then the TVA's three end tests (`0x893b2560`, `0x893b2610`, `0x893b23d0`): any one set ends the tone (state 4, then the end callback at +0x1b14) |
+| +0x0c | `0x893b4940(tone, n)` | the update, in state 2 only, under the lock: envelopes 1–13 (each with its +0x68 set) by `0x893abe80`, LFOs 1–7 (each with its +0x80 set) by `0x893ad100`, each OSC voice by `0x893ae1c0` (+0x20, then +0xba4), the mix's `0x893ade40`, COSM 1's update through its vtable (+0xc) with OSC 1's float at tone+0x1ec; then the TVA's ~~three end tests (`0x893b2560`, `0x893b2610`, `0x893b23d0`): any one set ends the tone~~ two end tests (`0x893b2560`, `0x893b2610`): either set ends the tone, and with neither the TVA's update (`0x893b23d0`) runs (corrected in v233, "The VC-2's TVA"; Vc2Tone.cpp had it so) (state 4, then the end callback at +0x1b14) |
 | +0x18 | `0x893b4b10(tone, out)` | the whole path, with the render flag set: OSC 2 into `0x89998c20`, OSC 1 into `0x89998b20`, the mix into `0x89998d20`, COSM 1's DSP routine on it, the TVA (`0x893b2640`) into `out` |
 | +0x24 | `0x893b4bb0(tone, out)` | with the render flag set: OSC 1 into `0x89998b20`, then the TVA into `out` |
 | +0x30 | `0x893b4c20(tone, fr4)` | each of the 8 LFOs' clock (`0x893ad080`) |

@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's TVA v233 (2026-11-16, on its own branch v233-vc2-tva from vc2-mode's v231; a side session's task from the
+  VC-2 session, beside v232's OSC note-on; HARDWARE_FIRMWARE.md, "The VC-2's TVA"): step 4.2's TVA, whole in one
+  version. Vc2Tva (Vc2Tva.cpp, the constants in Vc2TvaTables.cpp, read by loadVc2 through vc2LoadTva): rom.4's
+  0xc8-byte TVA at the tone's +0x19f0, its words word for word (Vc2TvaWords); the constructor 0x893b20b0, the note-on
+  0x893b2100, the new block 0x893b23b0, the update 0x893b23d0, over 0x893b2560, stopped 0x893b2610, the truncations
+  0x893b25a0 (its fade's end calls the OS) and 0x893b25b0 (its end sets +0x54), silent 0x893b25c0, the render
+  0x893b2640 (one stereo pair, the shortened step kept, 1/32.5 to nearest; truncated, the fade by 0x8993eb08) and the
+  envelope's level 0x893b2780; the envelope, the LFOs, the fade's step and the OS's call through Vc2TvaParts. The gains
+  are rom.2's arithmetic, but times the block's +0x48 and +0x4c when its +0x40 is above 0: XtSynth's tvaGains doesn't
+  serve. xt_vc2tva (in fcheck, 40 cases): the records drawn in the interpreter's memory, both sides reading them, the
+  OS's call hooked; 16,000 events in 40 cases, 0 different at seeds 2024, 7 and 31337; every line and branch of
+  Vc2Tva.cpp covered. mutate_vc2.py --tva: 109 plants, all caught (the first run's two misses were the check's: a gain
+  just under 1, a fade landing on the floor). Not in the sound yet.
+
 rom.4's tables in one list v231 (2026-11-16, on vc2-mode; a side session's task from the VC-2 session, v230's "Left"):
   the files of the tables XtSynthRom.cpp's loadVc2 loads were listed three times, build.sh's V4, ab.sh's synth() and
   mutate.sh's tone parts, and mutate.sh's lacked every loader from v220 on. Its kept XtSynthRom.o, from before v220,

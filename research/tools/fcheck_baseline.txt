@@ -786,6 +786,9 @@ xt_vc2tone: 0 different
 osc: 40 cases, 16000 events, 1903 note-ons (490 with a sample, 1413 without), 1887 updates, 1977 renders, 934 settings, 928 takes, 2798 getters
 calls: 134 seeks, 211 ramps set, 2004 kinds' routines
 xt_vc2osc: 0 different
+== xt_vc2tva
+tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fading, 961 fades ended, 559 told), 88 over, 200 silent
+xt_vc2tva: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

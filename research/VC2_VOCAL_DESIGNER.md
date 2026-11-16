@@ -616,8 +616,10 @@ envelope's state changed in rom.4 alone (2,744).
 
 **So the VC-2's TVA renders the V-Synth's gains onto one stereo pair, with its last-step constant rounded to nearest and
 its shortened step kept; its eight buses, sends and glide are not there, and its note-on, update, new block, truncated
-path and converter are its own.** For the port: `XtSynth`'s TVA gains serve it given those two changes; its frame does
-not.
+path and converter are its own.** For the port: ~~`XtSynth`'s TVA gains serve it given those two changes; its frame does
+not~~ (withdrawn in v233: rom.4's note-on and update multiply the gains and targets by its block's +0x48 and +0x4c when
+its +0x40 is above 0, which this run never set; the port, `Vc2Tva`, forms them itself, the whole object held to rom.4,
+HARDWARE_FIRMWARE.md, "The VC-2's TVA").
 
 ## rom.4 run in the interpreter (2026-11-12, fourth pass)
 

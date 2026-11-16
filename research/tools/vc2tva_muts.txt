@@ -1,0 +1,118 @@
+# Planted errors in the VC-2's TVA, for mutate_vc2.py --tva: each must make xt_vc2tva, on rom.4, say something differs.
+# name|old|new[|port[|seed]]; ports vc2tva (Vc2Tva.cpp, v233) and vc2tvatables (Vc2TvaTables.cpp: the constants'
+# addresses, each moved to a neighbour holding another value).  Not planted: Vc2Tva.h's layout and kDone (the VC-2
+# ports' route builds the kept objects from the unplanted sources; kDone is planted where the .cpp compares with it),
+# the two floors' addresses for each other and the update's 44.1 for the note-on's (the same values: no input tells
+# them apart), the fade's return for a break (nothing follows the loop), and the note-on's bound on the attack as
+# `10 < attack` (dropped after the first run: at an attack of exactly 10 both give 10; only a NaN, never drawn, parts
+# them).  The first run missed two more, the check's gaps: nothing landed a gain just under 1 (within-top-edge), and no
+# fade step landed the fade on the floor itself (fade-end-edge); the check draws both now.
+depth-at|kDepth = 0x08|kDepth = 0x04|vc2tva
+level-at|kLevel = 0x0c|kLevel = 0x10|vc2tva
+pan-depth-at|kPanDepth = 0x1c|kPanDepth = 0x18|vc2tva
+levels-from|kLevelsFrom = 0x20|kLevelsFrom = 0x24|vc2tva
+panned-at|kPanned = 0x40|kPanned = 0x44|vc2tva
+left-at|kLeft = 0x48|kLeft = 0x44|vc2tva
+right-at|kRight = 0x4c|kRight = 0x48|vc2tva
+faded-event|kFadedEvent = 0x8994fec8|kFadedEvent = 0x8994fecc|vc2tva
+faded-flags|kFadedFlags = 0x1000|kFadedFlags = 0x100|vc2tva
+within-top|    if (x > 1.0f) return 1.0f;|    if (x > 1.0f) return x;|vc2tva
+within-top-edge|    if (x > 1.0f) return 1.0f;|    if (x > 0.999f) return 1.0f;|vc2tva
+within-bottom|    return -1.0f > x ? -1.0f : x;|    return x;|vc2tva
+construct-told|    w.truncatedTold = 0;\n|\n|vc2tva
+construct-stopped|    w.stopped = 0;\n|\n|vc2tva
+construct-truncated|    w.truncated = 0;\n|\n|vc2tva
+construct-envelope|    w.envelope = 0;\n|\n|vc2tva
+construct-lfo|    w.lfo = 0;\n|\n|vc2tva
+construct-pan-lfo|    w.panLfo = 0;\n|\n|vc2tva
+construct-zero|    w.zero = 0.0f;\n|\n|vc2tva
+construct-one|    w.one = 1.0f;\n|\n|vc2tva
+construct-fade|    w.one = 1.0f;\n    w.fade = 1.0f;|    w.one = 1.0f;\n    w.fade = 0.0f;|vc2tva
+level-env-onset|    w.levelEnv = mul(e.out, blockF(kLevel));|    w.levelEnv = mul(e.onset, blockF(kLevel));|vc2tva
+depth-pan-lfo|    w.depth = mul(parts.lfoOut(w.lfo), blockF(kDepth));|    w.depth = mul(parts.lfoOut(w.panLfo), blockF(kDepth));|vc2tva
+pan-lfo|    w.pan = mul(parts.lfoOut(w.panLfo), blockF(kPanDepth));|    w.pan = mul(parts.lfoOut(w.lfo), blockF(kPanDepth));|vc2tva
+aim-depth-pan|    const float x = mul(add(w.depth, 1.0f), level);|    const float x = mul(add(w.pan, 1.0f), level);|vc2tva
+aim-no-one|    const float x = mul(add(w.depth, 1.0f), level);|    const float x = mul(w.depth, level);|vc2tva
+aim-left-sign|    to[0] = mul(x, sub(1.0f, w.pan));|    to[0] = mul(x, add(w.pan, 1.0f));|vc2tva
+aim-right-sign|    to[1] = mul(x, add(w.pan, 1.0f));|    to[1] = mul(x, sub(1.0f, w.pan));|vc2tva
+aim-order|    to[0] = mul(x, sub(1.0f, w.pan));|    to[0] = mul(add(w.depth, 1.0f), mul(level, sub(1.0f, w.pan)));|vc2tva
+aim-panned-edge|    if (blockF(kPanned) > 0.0f) {|    if (blockF(kPanned) >= 0.0f) {|vc2tva
+aim-no-left|        to[0] = mul(to[0], blockF(kLeft));\n|\n|vc2tva
+aim-right-left|        to[1] = mul(to[1], blockF(kRight));|        to[1] = mul(to[1], blockF(kLeft));|vc2tva
+aim-left-unheld|    to[0] = within1(to[0]);\n|\n|vc2tva
+aim-right-unheld|    to[1] = within1(to[1]);\n|\n|vc2tva
+steps-sign|w.step[c] = div(sub(w.target[c], w.gain[c]), samples);|w.step[c] = div(sub(w.gain[c], w.target[c]), samples);|vc2tva
+steps-one|    for (size_t c = 0; c < w.step.size(); ++c) w.step[c] = div(|    for (size_t c = 0; c < 1; ++c) w.step[c] = div(|vc2tva
+note-flag|    w.oscFlag = oscFlag;\n|\n|vc2tva
+note-copy-short|    std::copy_n(block, w.block.size(), w.block.begin());\n    w.elapsed|    std::copy_n(block, w.block.size() - 1, w.block.begin());\n    w.elapsed|vc2tva
+note-elapsed|    w.elapsed = 0.0f;\n    const Vc2TvaEnvelope e = products(parts);\n    // the ramp's|    const Vc2TvaEnvelope e = products(parts);\n    // the ramp's|vc2tva
+note-ms-next|    float ms = e.attack;|    float ms = e.next;|vc2tva
+note-ms-none|e.next == 0.0f ? t.onShortest : e.next;|e.next == 0.0f ? t.onLongest : e.next;|vc2tva
+note-ms-zero|    if (e.attack == 0.0f) ms|    if (e.attack == 1.0f) ms|vc2tva
+note-ms-next-zero|ms = e.next == 0.0f ? t.onShortest|ms = e.next == 1.0f ? t.onShortest|vc2tva
+note-ms-unheld|    else if (!(t.onLongest > e.attack)) ms = t.onLongest;\n|\n|vc2tva
+note-gain-out|    aim(mul(e.onset, blockF(kLevel)), w.gain.data());|    aim(mul(e.out, blockF(kLevel)), w.gain.data());|vc2tva
+note-gain-level|    aim(mul(e.onset, blockF(kLevel)), w.gain.data());|    aim(e.onset, w.gain.data());|vc2tva
+note-steps-ms|    stepsOver(mul(ms, t.onPerMs));|    stepsOver(ms);|vc2tva
+note-levels-short|w.block.begin() + kLevelsFrom / 4, w.levels.size(), w.levels.begin());|w.block.begin() + kLevelsFrom / 4, w.levels.size() - 1, w.levels.begin());|vc2tva
+new-block-short|void Vc2Tva::newBlock(const uint32_t* block) { std::copy_n(block, w.block.size(), |void Vc2Tva::newBlock(const uint32_t* block) { std::copy_n(block, w.block.size() - 1, |vc2tva
+update-gains|    const Vc2TvaEnvelope e = products(parts);\n    aim(w.levelEnv, w.target.data());|    const Vc2TvaEnvelope e = products(parts);\n    aim(w.levelEnv, w.gain.data());|vc2tva
+update-sustain|    float samples = t.upSamples;|    float samples = t.upLongest;|vc2tva
+update-sustain-edge|    if (!(0.0f > e.stageTime)) {|    if (!(0.0f >= e.stageTime)) {|vc2tva
+update-stage-attack|    if (!(0.0f > e.stageTime)) {|    if (!(0.0f > e.attack)) {|vc2tva
+update-elapsed-ms|sub(e.stageTime, mul(w.elapsed, t.perSample));|sub(e.stageTime, w.elapsed);|vc2tva
+update-over-edge|        if (!(left > 0.0f)) samples|        if (!(left >= 0.0f)) samples|vc2tva
+update-over-ms|samples = mul(t.upShortest, t.upPerMs);|samples = t.upShortest;|vc2tva
+update-left-edge|        else if (t.upLongest > left) samples|        else if (t.upLongest >= left) samples|vc2tva
+update-left-ms|samples = mul(left, t.upPerMs);|samples = mul(left, t.perSample);|vc2tva
+update-elapsed|    stepsOver(samples);\n    w.elapsed = 0.0f;|    stepsOver(samples);|vc2tva
+down-left-twice|    return !(w.gain[0] > floor) && !(w.gain[1] > floor);|    return !(w.gain[0] > floor) && !(w.gain[0] > floor);|vc2tva
+down-edge|    return !(w.gain[0] > floor) && !(w.gain[1] > floor);|    return !(w.gain[0] >= floor) && !(w.gain[1] > floor);|vc2tva
+over-truncated|    if (w.truncatedTold != 0 \|\| parts.envelope(w.envelope).state != kDone) return false;|    if (w.truncated != 0 \|\| parts.envelope(w.envelope).state != kDone) return false;|vc2tva
+over-state|    if (w.truncatedTold != 0 \|\| parts.envelope(w.envelope).state != kDone) return false;|    if (w.truncatedTold != 0 \|\| parts.envelope(w.envelope).state != 4) return false;|vc2tva
+over-no-state|    if (w.truncatedTold != 0 \|\| parts.envelope(w.envelope).state != kDone) return false;|    if (w.truncatedTold != 0) return false;|vc2tva
+stopped-word|{ return w.stopped; }|{ return w.truncated; }|vc2tva
+level-onset|{ return parts.envelope(w.envelope).out; }|{ return parts.envelope(w.envelope).onset; }|vc2tva
+told-word|    w.fade = 1.0f;\n    w.truncatedTold = 1;|    w.fade = 1.0f;\n    w.truncated = 1;|vc2tva
+told-fade|    w.fade = 1.0f;\n    w.truncatedTold = 1;|    w.fade = 0.5f;\n    w.truncatedTold = 1;|vc2tva
+truncate-word|    w.fade = 1.0f;\n    w.truncated = 1;|    w.fade = 1.0f;\n    w.truncatedTold = 1;|vc2tva
+truncate-fade|    w.fade = 1.0f;\n    w.truncated = 1;|    w.fade = 0.5f;\n    w.truncated = 1;|vc2tva
+silent-told-only|    if (w.truncatedTold != 0 \|\| w.truncated != 0) return !(w.fade|    if (w.truncatedTold != 0) return !(w.fade|vc2tva
+silent-fade-edge|return !(w.fade > vc2TvaTables().floor);|return !(w.fade >= vc2TvaTables().floor);|vc2tva
+silent-no-state|    return parts.envelope(w.envelope).state == kDone && gainsDown();|    return gainsDown();|vc2tva
+silent-state|    return parts.envelope(w.envelope).state == kDone && gainsDown();|    return parts.envelope(w.envelope).state == 4 && gainsDown();|vc2tva
+render-told-only|    if (w.truncatedTold == 0 && w.truncated == 0) {|    if (w.truncatedTold == 0) {|vc2tva
+render-short-edge|std::fabs(mul(w.step[c], t.frames)) > std::fabs(rest)|std::fabs(mul(w.step[c], t.frames)) >= std::fabs(rest)|vc2tva
+render-short-signed|std::fabs(mul(w.step[c], t.frames)) > std::fabs(rest)|std::fabs(mul(w.step[c], t.frames)) > rest|vc2tva
+render-short-unsigned|std::fabs(mul(w.step[c], t.frames)) > std::fabs(rest)|mul(w.step[c], t.frames) > std::fabs(rest)|vc2tva
+render-short-by|w.step[c] = mul(rest, t.shortened);|w.step[c] = div(rest, t.frames);|vc2tva
+render-short-one|        for (size_t c = 0; c < w.step.size(); ++c) {\n            const float rest|        for (size_t c = 0; c < 1; ++c) {\n            const float rest|vc2tva
+render-left-gain|            out[2 * i] = add(mul(in[2 * i], g0), out[2 * i]);|            out[2 * i] = add(mul(in[2 * i], g1), out[2 * i]);|vc2tva
+render-right-in|            out[2 * i + 1] = add(mul(in[2 * i + 1], g1), out[2 * i + 1]);|            out[2 * i + 1] = add(mul(in[2 * i], g1), out[2 * i + 1]);|vc2tva
+render-step-first|            out[2 * i] = add(mul(in[2 * i], g0), out[2 * i]);|            out[2 * i] = add(mul(in[2 * i], add(g0, w.step[0])), out[2 * i]);|vc2tva
+render-fused|            out[2 * i] = add(mul(in[2 * i], g0), out[2 * i]);|            out[2 * i] = (float)std::fma((double)in[2 * i], (double)g0, (double)out[2 * i]);|vc2tva
+render-left-step|            g0 = add(g0, w.step[0]);|            g0 = add(g0, w.step[1]);|vc2tva
+render-right-step|            g1 = add(g1, w.step[1]);\n|\n|vc2tva
+render-gains-swap|        w.gain = { g0, g1 };|        w.gain = { g1, g0 };|vc2tva
+render-fade-edge|    } else if (w.fade > t.renderFloor) {|    } else if (w.fade >= t.renderFloor) {|vc2tva
+render-elapsed|    w.elapsed = add(w.elapsed, t.frames);\n|\n|vc2tva
+fade-step-sign|        w.fade = sub(w.fade, parts.fadeStep());|        w.fade = add(w.fade, parts.fadeStep());|vc2tva
+fade-end-edge|        if (!(w.fade > floor)) {|        if (!(w.fade >= floor)) {|vc2tva
+fade-end-zero|            w.fade = 0.0f;\n|\n|vc2tva
+fade-stopped-told|            if (w.truncated != 0) w.stopped = 1;|            if (w.truncatedTold != 0) w.stopped = 1;|vc2tva
+fade-told-truncated|            if (w.truncatedTold != 0) parts.setEvent|            if (w.truncated != 0) parts.setEvent|vc2tva
+fade-written-last|            return;\n        }\n        out[2 * i] = |            return;\n        }\n        if (i == kFrames - 1) break;\n        out[2 * i] = |vc2tva
+fade-left-order|        out[2 * i] = add(mul(mul(in[2 * i], w.gain[0]), w.fade), out[2 * i]);|        out[2 * i] = add(mul(in[2 * i], mul(w.gain[0], w.fade)), out[2 * i]);|vc2tva
+fade-right-gain|        out[2 * i + 1] = add(mul(mul(in[2 * i + 1], w.gain[1]), w.fade), out[2 * i + 1]);|        out[2 * i + 1] = add(mul(mul(in[2 * i + 1], w.gain[0]), w.fade), out[2 * i + 1]);|vc2tva
+on-shortest-at|{ 0x893b2398, &t.onShortest }|{ 0x893b239c, &t.onShortest }|vc2tvatables
+on-longest-at|{ 0x893b239c, &t.onLongest }|{ 0x893b2398, &t.onLongest }|vc2tvatables
+on-per-ms-at|{ 0x893b23a0, &t.onPerMs }|{ 0x893b2398, &t.onPerMs }|vc2tvatables
+per-sample-at|{ 0x893b2628, &t.perSample }|{ 0x893b262c, &t.perSample }|vc2tvatables
+up-longest-at|{ 0x893b262c, &t.upLongest }|{ 0x893b2630, &t.upLongest }|vc2tvatables
+up-shortest-at|{ 0x893b2630, &t.upShortest }|{ 0x893b262c, &t.upShortest }|vc2tvatables
+up-per-ms-at|{ 0x893b2634, &t.upPerMs }|{ 0x893b2638, &t.upPerMs }|vc2tvatables
+up-samples-at|{ 0x893b2638, &t.upSamples }|{ 0x893b2634, &t.upSamples }|vc2tvatables
+floor-at|{ 0x893b263c, &t.floor }|{ 0x893b2638, &t.floor }|vc2tvatables
+frames-at|{ 0x893b2840, &t.frames }|{ 0x893b2844, &t.frames }|vc2tvatables
+shortened-at|{ 0x893b2844, &t.shortened }|{ 0x893b2840, &t.shortened }|vc2tvatables
+render-floor-at|{ 0x893b2848, &t.renderFloor }|{ 0x893b2840, &t.renderFloor }|vc2tvatables

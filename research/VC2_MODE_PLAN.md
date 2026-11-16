@@ -361,6 +361,12 @@ version against rom.4's routines with what it calls hooked:
      hooked (HARDWARE_FIRMWARE.md, "The VC-2's OSC voice").
    - next: the kind's note-on (`0x893af0b0` with `0x893af118`, `0x893af420`, the pitch and gain targets
      `0x893af9f0…0x893affc0` and the getters' tails `0x893afeb0`, `0x893afdf0`).
+   - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
+     rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
+     update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its
+     truncated fade and the OS's call) and the envelope's level, against rom.4's in xt_vc2tva with the OS's call hooked
+     (HARDWARE_FIRMWARE.md, "The VC-2's TVA"). XtSynth's TVA gains don't serve it: rom.4 multiplies by the block's +0x48
+     and +0x4c when its +0x40 is above 0, on the object's own words.
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

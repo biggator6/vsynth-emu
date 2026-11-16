@@ -24,7 +24,9 @@
 # v227), through xt_vc2mixer, [cases] its cases (40).  --tone: vc2tone_muts.txt, in Vc2Tone.cpp (PORT=vc2tone: the
 # tone object's frame and its pool, v228), through xt_vc2tone, [cases] its cases (40).  --osc: vc2osc_muts.txt, in
 # Vc2OscVoice.cpp, Vc2OscVoiceGet.cpp, Vc2OscVoiceKinds.cpp and Vc2OscTables.cpp (PORT=vc2osc, vc2oscget, vc2osckinds,
-# vc2osctables: the OSC voice's frame, v230), through xt_vc2osc, [cases] its cases (40).  One line
+# vc2osctables: the OSC voice's frame, v230), through xt_vc2osc, [cases] its cases (40).  --tva: vc2tva_muts.txt, in
+# Vc2Tva.cpp and Vc2TvaTables.cpp (PORT=vc2tva, vc2tvatables: the TVA, v233), through xt_vc2tva, [cases] its cases
+# (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist
@@ -52,6 +54,8 @@ HARNESSES = {
     '--tone': (mutlist.Harness('mutate_vc2', 'xt_vc2tone', 'vc2tone_muts.txt', ('vc2tone', '2024'),
                                'XT_VC2TONE_STOP'), '40'),
     '--osc': (mutlist.Harness('mutate_vc2', 'xt_vc2osc', 'vc2osc_muts.txt', ('vc2osc', '2024'), 'XT_VC2OSC_STOP'),
+              '40'),
+    '--tva': (mutlist.Harness('mutate_vc2', 'xt_vc2tva', 'vc2tva_muts.txt', ('vc2tva', '2024'), 'XT_VC2TVA_STOP'),
               '40'),
 }
 args = sys.argv[1:]

@@ -14,7 +14,7 @@
 # (vc2mixblock), its tables (vc2mixtables) and the shared clamp (vc2mixmath) under xt_vc2mixer; the tone object's frame
 # and its pool (vc2tone, v228) and its note-on (vc2tonenoteon, v229) under xt_vc2tone; the OSC voice's frame (vc2osc,
 # v230), its settings and getters (vc2oscget), its kinds' rows (vc2osckinds) and its constants (vc2osctables) under
-# xt_vc2osc.
+# xt_vc2osc; the TVA (vc2tva, v233) and its constants (vc2tvatables) under xt_vc2tva.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -33,6 +33,7 @@ VC2AN=(Vc2AutoNote Vc2AutoNoteTables Vc2AutoNoteCheck Vc2Tracker Vc2TrackerTable
 VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck Vc2PartMixerFakes)
 VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePortParts Vc2ToneEvents)
 VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscCheck Vc2OscEvents Vc2OscFakes Vc2OscPortParts)
+VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -74,6 +75,8 @@ VC2PORTS=(
     "vc2oscget|Vc2OscVoiceGet.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2osckinds|Vc2OscVoiceKinds.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2osctables|Vc2OscTables.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2tva|Vc2Tva.cpp|XT_VC2TVA_MAIN|vc2tva_obj|VC2TVA"
+    "vc2tvatables|Vc2TvaTables.cpp|XT_VC2TVA_MAIN|vc2tva_obj|VC2TVA"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port
