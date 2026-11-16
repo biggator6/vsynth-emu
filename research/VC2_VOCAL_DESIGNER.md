@@ -854,7 +854,8 @@ and this table is what its first run should give.
 
 ### The pitch tracker's analysis (2026-11-13, the VC-2 mode's step 1c)
 
-Read from the listing (`sh4dis.py` on rom.4, `0x893ee280…0x893ef200`), and each part marked **run** held to the firmware by
+(v223: the frame, the band-pass and the per-sample part below, ported bit for bit: HARDWARE_FIRMWARE.md, "The pitch
+tracker's frame".) Read from the listing (`sh4dis.py` on rom.4, `0x893ee280…0x893ef200`), and each part marked **run** held to the firmware by
 `track`'s last section (`vc2trackstate.cpp`: the settings after the reset, and the state after nine feeds). Levels are the
 input's units (1 full scale); the settings are 16-bit sample values over 32768. It is a time-domain tracker: zero crossings of
 a band-passed signal, timed to a fraction of a sample, validated by their peaks, two half-periods making a period.

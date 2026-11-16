@@ -14,6 +14,7 @@
 #include "../Source/Vc2HiresoTables.h"
 #include "../Source/Vc2LegacyTables.h"
 #include "../Source/Vc2Params.h"
+#include "../Source/Vc2TrackerTables.h"
 #include "../Source/Vc2Unvoiced.h"
 #include "../Source/Vc2VocoderTables.h"
 #include "../Source/XtFirmware.h"
@@ -59,7 +60,7 @@ juce::File otherImage(const juce::File& rom, const juce::File& work) {
 bool vc2TablesIn() {
     return vc2ParamDesc(kVc2FirstTyped - 1) && vc2TypedDesc(kVc2Ids - 1) && !vc2ParamName(kVc2Ids - 1).empty()
            && !vc2ValueText(0, 0).empty() && vc2UnvoicedLoaded() && vc2LegacyLoaded() && vc2HiresoLoaded()
-           && vc2VocoderLoaded() && vc2CarrierLoaded();
+           && vc2VocoderLoaded() && vc2CarrierLoaded() && vc2TrackerLoaded();
 }
 
 // An instance given `file` by `choose` should refuse it, its status saying `says`
@@ -80,8 +81,8 @@ void twoImages(TestChecks& check, const juce::File& rom, const juce::File& work,
           "rom.4 should be beside rom.2, and the test's file written: " + vc2.getFullPathName().toStdString());
     check(VSynthEmuProcessor().hasVc2Rom(), "rom.4 should be found beside the rom.2 an instance opened");
     check(vc2TablesIn(),
-          "rom.4's tables (v199's parameters, v208's detector, LEGACY's, HIRESO's, the vocoder's, the carrier's) "
-          "should be in once rom.4 is");
+          "rom.4's tables (v199's parameters, v208's detector, LEGACY's, HIRESO's, the vocoder's, the carrier's, the "
+          "tracker's) should be in once rom.4 is");
     refuses(check, &VSynthEmuProcessor::setRomFile, vc2, "the VC-2's image, rom.4",
             "rom.4 should be refused as rom.2, saying whose it is");
     refuses(check, &VSynthEmuProcessor::setVc2RomFile, rom, "the V-Synth's image, rom.2",

@@ -34,10 +34,11 @@ V4=($( [ -f Vc2Params.cpp ] && echo Vc2Params.cpp XtFxValueText.cpp )
     $( [ -f Vc2LegacyTables.cpp ] && echo Vc2LegacyTables.cpp )
     $( [ -f Vc2HiresoTables.cpp ] && echo Vc2HiresoTables.cpp )
     $( [ -f Vc2VocoderTables.cpp ] && echo Vc2VocoderTables.cpp )
-    $( [ -f Vc2CarrierTables.cpp ] && echo Vc2CarrierTables.cpp ))
+    $( [ -f Vc2CarrierTables.cpp ] && echo Vc2CarrierTables.cpp )
+    $( [ -f Vc2TrackerTables.cpp ] && echo Vc2TrackerTables.cpp ))
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
 rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,xt_vc2in,xt_vc2legacy,xt_vc2hireso,xt_vc2vocoder}
-rm -f "$O"/{xt_vc2carrier,classifier_test,rd}
+rm -f "$O"/{xt_vc2carrier,xt_vc2tracker,classifier_test,rd}
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp "${SH4[@]}" -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp "${SH4[@]}" -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp "${SH4[@]}" -o "$O/xt_lfo" &
@@ -85,6 +86,9 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 # The VOCODER OSC's carrier (v221), its converter's own part and kind 5's update (v222) against rom.4's own routines
 [ -f Vc2CarrierCheck.cpp ] && cc -DXT_VC2CARRIER_MAIN Vc2CarrierCheck.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp \
    $( [ -f Vc2VocoderOsc.cpp ] && echo Vc2VocoderOsc.cpp Vc2VocoderOscCheck.cpp ) "${SH4[@]}" -o "$O/xt_vc2carrier" &
+# The pitch tracker's frame (v223) against rom.4's own routines
+[ -f Vc2TrackerCheck.cpp ] && cc -DXT_VC2TRACKER_MAIN Vc2TrackerCheck.cpp Vc2Tracker.cpp Vc2TrackerTables.cpp \
+   "${SH4[@]}" -o "$O/xt_vc2tracker" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &
 # xt_fx: the chip and its check, the check's parts in XtFxCheck*.cpp from v204

@@ -283,7 +283,14 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      the carrier P, against rom.4's in xt_vc2carrier's second part (HARDWARE_FIRMWARE.md, "The VOCODER OSC's converter
      and kind 5's update"). The converter's first half, the OSC block it shares with the analog kind, comes with the
      voice in the wiring. Step 5 is done.
-6. The pitch tracker.
+6. The pitch tracker. Split in two by the module's calls (2026-11-16):
+   - done (v223): the frame, `Vc2Tracker`: the module's state word for word, its static initializers, the reset, the mode
+     setter, the getters, and the block entry (`0x893ee280`: the band-pass, the peaks and counters, the fallback
+     period, the noise count, the noisy-hold flag), its crossings through an interface, against rom.4's routines with
+     the crossing routines hooked to record their calls, in xt_vc2tracker (HARDWARE_FIRMWARE.md, "The pitch tracker's
+     frame").
+   - then (v224): the analysis: the crossing routines (`0x893ee570`, `0x893ee7d0`), the onset check (`0x893eea50`), the
+     estimator (`0x893eeb90`) and taking an estimate (`0x893ef110`), and the tracker whole against rom.4's with no hook.
 7. Kind 6 (the mic's pitch shifter: harmonizer and Auto Note) and the mic ring.
 8. The part mixer (Direct Sound) and the patch EQ.
 

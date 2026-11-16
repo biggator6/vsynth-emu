@@ -1,0 +1,66 @@
+# Planted errors in the VC-2's pitch tracker's port, for mutate_vc2.py --tracker: each must make xt_vc2tracker, on rom.4,
+# say something differs.  name|old|new[|port[|seed]]; ports vc2tracker (Vc2Tracker.cpp, v223) and vc2tracktables
+# (Vc2TrackerTables.cpp).
+# Not planted, as no input tells them apart: the peak's test at ≥ (a magnitude equal to the peak changes nothing); the
+# fallback's test at < (one sample later within the block, P unchanged between); the frame's end at ≥ (32-sample blocks
+# never land on 881 itself, and the fewer-sample ones too seldom to rely on).
+stage-low-on-band|    st.low = add(mul(st.band, f), st.low);|    st.low = add(mul(st.band, f), st.band);|vc2tracker
+stage-left-order|    const float left = sub(in, add(st.band, st.low));|    const float left = sub(sub(in, st.low), st.band);|vc2tracker
+stage-band-on-low|    st.band = add(mul(f, left), st.band);|    st.band = add(mul(f, left), st.low);|vc2tracker
+glide-jumps|    s.lowpassF = add(mul(sub(s.lowpassTarget, s.lowpassF), glide), s.lowpassF);|    s.lowpassF = s.lowpassTarget;|vc2tracker
+glide-crossed-target|sub(s.highpassTarget, s.highpassF)|sub(s.lowpassTarget, s.highpassF)|vc2tracker
+glide-by-32|mul(xtf::flt(n), t.glide)|mul(32.0f, t.glide)|vc2tracker
+stage-crossed-f|        trackerStage(s.lowpass, high, s.lowpassF);|        trackerStage(s.lowpass, high, s.highpassF);|vc2tracker
+buffer-band|        s.filtered[1 + i] = s.lowpass.low;|        s.filtered[1 + i] = s.lowpass.band;|vc2tracker
+frame-carries|        s.frameCount = 0;|        s.frameCount -= s.settings.frameLength;|vc2tracker
+frame-peak-lost|        s.lastFramePeak = s.framePeak;\n|\n|vc2tracker
+frame-peak-kept|        s.framePeak = 0.0f;\n    }|    }|vc2tracker
+peak-frame-unkept|            if (magnitude > s.framePeak) s.framePeak = magnitude;\n|\n|vc2tracker
+fallback-longest|s.fallback = s.period;|s.fallback = s.longest;|vc2tracker
+up-uncounted|        ++s.sinceUp;\n|\n|vc2tracker
+gate-30|constexpr int32_t kNoiseGate = 25;|constexpr int32_t kNoiseGate = 30;|vc2tracker
+up-at-zero|        } else if (0.0f > previous) {|        } else if (0.0f >= previous) {|vc2tracker
+down-from-zero|            if (!(0.0f > previous)) crossings_.down(s, previous, now);|            if (0.0f < previous) crossings_.down(s, previous, now);|vc2tracker
+up-swapped|            crossings_.up(s, previous, now);|            crossings_.up(s, now, previous);|vc2tracker
+last-filtered-lost|    s.filtered[0] = previous;\n|\n|vc2tracker
+noise-any-level|std::fabs(x) > s.settings.crossingLevel|std::fabs(x) > 0.0f|vc2tracker
+noise-at-zero|0.0f > mul(x, last)|0.0f >= mul(x, last)|vc2tracker
+noise-last-lost|    s.lastInput = last;\n|\n|vc2tracker
+noise-unsmoothed|add(add(mul(xtf::flt(s.noise), t.half), xtf::flt(count)), t.half)|add(xtf::flt(count), t.half)|vc2tracker
+noise-unrounded|    s.noise = xtf::ftrc(add(add(mul(xtf::flt(s.noise), t.half), xtf::flt(count)), t.half));|    s.noise = xtf::ftrc(add(mul(xtf::flt(s.noise), t.half), xtf::flt(count)));|vc2tracker
+noisy-always-on|    if (s.noisyHoldOn == 0) return;\n|\n|vc2tracker
+noisy-level-400|s.settings.levels[2] > s.recentPeak|s.settings.levels[1] > s.recentPeak|vc2tracker
+noisy-from-16|constexpr int32_t kNoisyFrom = 15;|constexpr int32_t kNoisyFrom = 16;|vc2tracker
+noisy-held-and|(s.lock == 0 \|\| quiet)|(s.lock == 0 && quiet)|vc2tracker
+noisy-moved-kept|        s.noisyHold = quiet ? noisy : 0;|        s.noisyHold = noisy;|vc2tracker
+noisy-held-set|        if (s.noisyHold == 0 && (s.lock == 0 \|\| quiet)) s.noisyHold = noisy;|        if (s.lock == 0 \|\| quiet) s.noisyHold = noisy;|vc2tracker
+reset-follow-1|constexpr int32_t kBoth = 2;|constexpr int32_t kBoth = 1;|vc2tracker
+reset-smoothing-half|    s.smoothing = 1.0f;|    s.smoothing = 0.5f;|vc2tracker
+reset-noisy-kept|    s.noisyHoldOn = s.noisyHold = 1;|    s.noisyHoldOn = 1;|vc2tracker
+reset-crossing-kept|    for (float& w : s.crossing) w = 0.0f;\n|\n|vc2tracker
+reset-halves-kept|    for (float& h : s.halves) h = 0.0f;\n|\n|vc2tracker
+reset-counts-kept|    for (int32_t& c : s.counts) c = 0;\n|\n|vc2tracker
+reset-estimate-kept|    s.estimate = s.analysisBdc = 0.0f;|    s.estimate = 0.0f;|vc2tracker
+reset-failures-kept|    s.failures = s.lock = 0;|    s.lock = 0;|vc2tracker
+reset-since-kept|    s.sinceCrossing = s.lastSince = s.sinceUp = s.sinceDown = 0;|    s.sinceCrossing = s.sinceUp = s.sinceDown = 0;|vc2tracker
+reset-hand-off-kept|    s.handOff = 0;\n|\n|vc2tracker
+mode-invalid-zero|    if (mode < 0 \|\| mode >= kModes) return;|    if (mode < 0 \|\| mode >= kModes) mode = 0;|vc2tracker
+mode-shortest-longest|    s.shortest = limits.shortest;|    s.shortest = limits.longest;|vc2tracker
+mode-fallback-kept|    s.period = s.fallback = m.period;|    s.period = m.period;|vc2tracker
+mode-target-kept|    s.modeHighpass = s.highpassTarget = m.highpass;|    s.modeHighpass = m.highpass;|vc2tracker
+mode-start-target|    s.lowpassF = t.lowpassStart;|    s.lowpassF = m.lowpass;|vc2tracker
+mode-stage-kept|    s.highpass = s.lowpass = Vc2TrackerStage {};|    s.highpass = Vc2TrackerStage {};|vc2tracker
+mode-cf8-kept|    s.analysisCf8 = 0.0f;\n|\n|vc2tracker
+mode-limits-1|&Vc2TrackerSettings::mode0, &Vc2TrackerSettings::mode1|&Vc2TrackerSettings::mode1, &Vc2TrackerSettings::mode1|vc2tracker
+init-settings-lost|    s.settings = t.settings;\n|\n|vc2tracker
+init-rate-lost|    s.rate[1] = t.rate[1];\n|\n|vc2tracker
+table-rate|{ 0x893edffc, &rate[1] }|{ 0x893edff4, &rate[1] }|vc2tracktables
+table-mode2-longest|{ 0x893ef2f0, &s.mode2.longest }|{ 0x893ef300, &s.mode2.longest }|vc2tracktables
+table-mode0-shortest|{ 0x893ef2e8, &s.mode0.shortest }|{ 0x893ef2f8, &s.mode0.shortest }|vc2tracktables
+table-mode0-period|{ 0x893ee420, &modes[0].period }|{ 0x893ee40c, &modes[0].period }|vc2tracktables
+table-mode3-highpass|{ 0x893ee404, &modes[3].highpass }|{ 0x893ee408, &modes[3].highpass }|vc2tracktables
+table-lowpass-start|{ 0x893ee430, &lowpassStart }|{ 0x893ee3d0, &lowpassStart }|vc2tracktables
+table-glide|{ 0x893ee444, &glide }|{ 0x893ee62c, &glide }|vc2tracktables
+table-half|{ 0x893ee62c, &half }|{ 0x893ee444, &half }|vc2tracktables
+table-frame-880|constexpr int32_t kFrameLength = 881;|constexpr int32_t kFrameLength = 880;|vc2tracktables
+table-crossing-level|{ 0x893ef33c, &s.crossingLevel }|{ 0x893ef344, &s.crossingLevel }|vc2tracktables

@@ -23,10 +23,9 @@ constexpr uint32_t kCarrierAt = 0x8C040000, kParamsAt = 0x8C041000, kFramesAt = 
 constexpr int kBlocks = 120, kEventOneIn = 6, kFrameWords = 2 * Vc2Carrier::kFrames;
 
 struct Counts {
-    long blocks = 0, growling = 0, updates = 0, settings = 0, none = 0, dynamics = 0, different = 0;
+    long blocks = 0, growling = 0, updates = 0, settings = 0, none = 0, dynamics = 0;
 };
 
-float unit(std::mt19937& rng) { return (float)rng() / 4294967296.0f; }
 
 // A pitch: 19 Hz…10 kHz, with 1 and the high-pass's bounds now and then, and the growl divider's edges, where the
 // step × 440 ÷ 50 is a whole number n and the order of the divider's rounding decides n or n − 1
@@ -35,7 +34,7 @@ float drawPitch(std::mt19937& rng) {
     const float pitch = kPitches[rng() % 7];
     if (pitch > 0.0f) return pitch;
     if (pitch == 0.0f) return (float)(2 + rng() % 199) * 50.0f / 440.0f;
-    return std::exp2(9.0f * unit(rng) - 4.5f);
+    return std::exp2(9.0f * vc2Unit(rng) - 4.5f);
 }
 
 // A P as kind 5's update leaves it: levels as a parameter's v/127; the pitch drawPitch's; Growl off half the time;
@@ -43,12 +42,12 @@ float drawPitch(std::mt19937& rng) {
 // carrier doesn't read, noise
 Vc2CarrierParams drawCarrierParams(std::mt19937& rng) {
     Vc2CarrierParams p {};
-    p.gain = rng() % 8 == 0 ? 0.0f : 1.2f * unit(rng);
+    p.gain = rng() % 8 == 0 ? 0.0f : 1.2f * vc2Unit(rng);
     p.pitch = drawPitch(rng);
-    p.notRead = unit(rng);
+    p.notRead = vc2Unit(rng);
     for (float* level : { &p.sawCutoff, &p.sawLevel, &p.noiseLowpass, &p.noiseHighpass, &p.noiseLevel, &p.sensitivity })
         *level = vc2DrawLevel(rng);
-    p.growl = rng() % 2 == 0 ? 0.0f : (rng() % 4 == 0 ? 1.0f : unit(rng));
+    p.growl = rng() % 2 == 0 ? 0.0f : (rng() % 4 == 0 ? 1.0f : vc2Unit(rng));
     const int dynamics = (int)(rng() % 6);
     p.threshold = dynamics < 2 ? 0.0f : dynamics == 2 ? vc2CarrierTables().floor : vc2DrawLevel(rng);
     p.balance = rng() % 6 == 0 ? 1.0f : (float)(rng() % 128) / 64.0f;
@@ -56,7 +55,7 @@ Vc2CarrierParams drawCarrierParams(std::mt19937& rng) {
 }
 
 // The input stage's peak: 0 now and then, else mostly low
-float drawPeak(std::mt19937& rng) { return rng() % 4 == 0 ? 0.0f : 1.5f * unit(rng) * unit(rng); }
+float drawPeak(std::mt19937& rng) { return rng() % 4 == 0 ? 0.0f : 1.5f * vc2Unit(rng) * vc2Unit(rng); }
 
 std::string carrierDifference(Vc2Fw& fw, const Vc2Carrier& c) {
     return vc2FirstDifference(fw, kCarrierAt, &c.w, sizeof c.w, "the carrier's words");
@@ -123,22 +122,20 @@ int main(int argc, char** argv) {
     std::mt19937 rng((uint32_t)run->seed);
     Vc2Carrier c;
     Counts n;
-    const bool first = xtSwitch("XT_VC2CARRIER_FIRST") != nullptr;
+    Vc2Tally tally { "XT_VC2CARRIER_FIRST", "XT_VC2CARRIER_STOP" };
     for (int k = 0; k < run->cases; ++k) {
         std::string what = initOn(fw, c, rng, clock);
         for (int b = 0; b < kBlocks && what.empty(); ++b) {
             if (rng() % kEventOneIn == 0) what = paramsEventOn(fw, c, rng, n);
             if (what.empty()) what = renderOn(fw, c, n);
         }
-        if (what.empty()) continue;
-        if (!n.different++ && first) std::printf("  case %d, block %ld: %s\n", k, n.blocks, what.c_str());
-        if (xtSwitch("XT_VC2CARRIER_STOP")) break;   // a plant's run: its first case that differs is enough
+        if (vc2CaseOutcome(tally, what, k, n.blocks)) break;
     }
     std::printf("carrier: %d cases, %ld blocks (%ld growling), %ld updates (%ld with the Dynamics), %ld settings, %ld "
                 "with no P, %ld different\n", run->cases, n.blocks, n.growling, n.updates, n.dynamics, n.settings,
-                n.none, n.different);
+                n.none, tally.different);
     const long osc = vc2VocoderOscCases(fw, *run, clock);   // the second part (v222)
-    std::printf("xt_vc2carrier: %ld different\n", n.different + osc);
+    std::printf("xt_vc2carrier: %ld different\n", tally.different + osc);
     return 0;
 }
 #endif

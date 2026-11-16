@@ -6,6 +6,7 @@
 #include "Sh4Interp.h"
 #include "XtArgs.h"
 #include "XtFloat.h"
+#include "XtSwitches.h"
 #include <bit>
 #include <cmath>
 #include <cstdint>
@@ -54,6 +55,9 @@ inline float vc2DrawDump(std::mt19937& rng) {
     const int pick = kDumps[rng() % 6];
     return (float)(pick < 0 ? (int)(rng() % 128) : pick) / 127.0f;
 }
+
+// A draw in [0, 1) (v221's, here from v223)
+inline float vc2Unit(std::mt19937& rng) { return (float)rng() / 4294967296.0f; }
 
 // A level as a parameter's 0…127 gives it, v/127 (v220's, here from v221)
 inline float vc2DrawLevel(std::mt19937& rng) { return (float)(rng() % 128) / 127.0f; }
@@ -189,6 +193,23 @@ std::string vc2BothOn(Vc2Fw& fw, uint32_t routine, std::initializer_list<uint32_
     if (!fw.call(routine, args)) return std::string(name) + " faults: " + fw.cpu.error();
     mine();
     return differs();
+}
+
+// A check's tally of the cases that differ (v223, the checks' case loops'): its FIRST switch, which says where the first
+// case to differ does, and its STOP switch, which stops there (a plant's run: its first case that differs is enough)
+struct Vc2Tally {
+    const char* firstSwitch;
+    const char* stopSwitch;
+    long different = 0;
+};
+
+// Case c's outcome after `blocks` blocks: nothing when `what` is empty; else counted, the first said under the FIRST
+// switch; true when the STOP switch ends the run there
+inline bool vc2CaseOutcome(Vc2Tally& tally, const std::string& what, int c, long blocks) {
+    if (what.empty()) return false;
+    if (!tally.different++ && xtSwitch(tally.firstSwitch))
+        std::printf("  case %d, block %ld: %s\n", c, blocks, what.c_str());
+    return xtSwitch(tally.stopSwitch) != nullptr;
 }
 
 // One of the port's buffers against rom.4's at `at`

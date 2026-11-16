@@ -1546,6 +1546,48 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The pitch tracker's frame (2026-11-16, v223) {#vc2-tracker-frame}
+
+Step 6's first part, ported bit for bit (`Vc2Tracker`, Vc2Tracker.cpp): the module from `0x893edca0` on its state in rom.4's .bss, 0x899d9b70…0x899d9d1c, 107 words (`Vc2TrackerWords`). VC2_VOCAL_DESIGNER.md, "The pitch tracker, run" and "The pitch tracker's analysis", read it in outline; this is every instruction of the frame. The analysis (the crossing routines, the onset check, the estimator, taking an estimate) is v224's, and the frame hands it each crossing through `Vc2TrackerCrossings`.
+
+**The two static initializers:**
+- `0x893edf90` writes 44100/440 and 880/44100 at 0x899d9b70 and +4. It also sets up HIRESO's decimators, which are HIRESO's port's.
+- The table setter `0x893ef240` writes 0x899d9b78…0x899d9bc4 from its pool (`Vc2TrackerSettings`): each mode's candidate limits (mode 0 678.46 and 29.4 samples, 1 2205 and 220.5, 2 441 and 88.2, 3 147 and 17.64), the periods the band-pass follows (441 and 73.5, the same pool word as mode 2's longest), the frame of 881 samples (an immediate), the estimator's two periods (63, 245) and five levels (200, 400, 600, 1000, 3000 over 32768), the crossing level (50/32768) and the onset level (0.005).
+
+**The mode setter `0x893ee100(mode)`:**
+- Modes outside 0…3 change nothing.
+- Mode 0 reaches its case by an unsigned compare (mode − 1 > 2), and 1…3 by a jump table.
+- Each sets the two f (2πF/44100, from its pool) as the mode's own and as the targets, the period and the fallback, and the candidate limits from the setter's words: mode 0 is 60 and 400 Hz from 220.5 samples, 1 is 20 and 100 Hz from 551.25, 2 is 100 and 300 from 441, 3 is 200 and 800 from 88.2.
+- Every mode starts the coefficients at 20 Hz (high-pass) and 170 Hz (low-pass), clears both stages, and writes 0 at +0xcf8.
+
+**The reset `0x893ee040`** clears the crossing flag and the counters, sets the follow state to 2 (both directions), clears the hand-off, and runs the mode setter with 0. It then clears the twelve peak and crossing words (0x899d9c78…0x899d9ca4), the half-intervals' history, the lock and failures, the last estimate and +0xbdc, the last filtered sample, the three counts and the noise. It sets the smoothing to 1 and the noisy-hold flag and its switch to 1.
+
+**The block entry `0x893ee280(in, n)`**, from the input stage (`0x893ebb1e`), with 32 samples:
+1. Both coefficients glide toward their targets by (target − f) × n × 0.0005.
+2. Each sample goes through two state-variable stages: low += band·f, then band += f·(x − (band + low)), with one rounding on band + low. The first stage (the high-pass f) hands its x − (band + low) to the second (the low-pass f), whose low-pass is written to a buffer of 32 (0x899d9be4). The previous block's last value stays at 0x899d9be0.
+3. The frame count goes up by n. Past 881 it goes back to 0, the frame's peak moves to the last frame's, and the frame's peak is cleared.
+4. Each filtered sample counts one more sample since the last crossing of each kind. Its magnitude raises the peak since the last crossing and the frame's peak. When the samples since the last valid crossing reach the longest candidate, the fallback takes P.
+5. Unless the noise count is over 25, an up crossing (previous < 0 ≤ now) goes to `0x893ee570(previous, now)` and a down one (now < 0 ≤ previous) to `0x893ee7d0`.
+6. The noise count: the raw input's crossings in the block whose sample passes 50/32768, as ⌊new + ½·old + ½⌋.
+7. The noisy-hold flag, when its switch is on. With P at the fallback (held), a clear flag is set to (noise ≥ 15) when unlocked or when the recent peak is under 600/32768. With P moved, a set flag becomes (noise ≥ 15) while that peak is under 600/32768, else 0.
+8. It returns P.
+
+**Nothing reads the noisy-hold flag.** Its getter (`0x893ee020`) and setter (`0x893ee030`, which writes the switch and the flag) have no caller. No word in the image is either's address, and no `bsr`, `bra` or `jsr` from 0x893ed000 to the module's end, the whole reach of a `bsr`, goes to them. The block entry still keeps the flag, and the port keeps it as rom.4 does.
+
+**The check, `xt_vc2tracker <rom.4> [cases] [seed]`** (in fcheck, under a second; Vc2TrackerCheck.cpp, XT_VC2TRACKER_MAIN):
+- It runs both static initializers, then compares the state.
+- Each case runs the reset on both. Now and then, at the case's start and one block in 150, it draws on both the words the analysis writes: the period, the fallback, the lock, the recent peak, the noise count, the samples since a valid crossing, the noisy-hold flag and its switch, the band-pass's targets, and the analysis's own words, so that what the reset and the mode setter clear is seen cleared.
+- Then 600 blocks of `Vc2Signal`'s input (tones, noise, silence; full scale to 1e-5; every eighth case fading out), mostly 32 samples and one in eight fewer. One block in 40 is preceded by the mode setter (−1…4) or the noisy-hold setter.
+- rom.4's two crossing routines are hooked to record their calls (direction, fr4, fr5) and return. The port's crossings go to a recorder.
+- After each routine the state word for word; after a block the returned period, the getter and the two sides' crossings.
+
+Results:
+- seed 2024: 40 cases, 24,000 blocks, 1,535 up and 1,541 down crossings, 309 modes, 290 noisy-hold setters, 0 different;
+- seed 7: 0 different;
+- `mutate_vc2.py --tracker`: 60 plants (50 in Vc2Tracker.cpp, 10 in its tables), all caught; and every other list again, as the checks' rig changed: 152, 45, 10, 66, 114 and 190, all caught. The first run missed one: the noisy-hold flag kept when P has moved and the peak is not quiet. With the crossings hooked nothing resets the samples since a valid crossing, so the fallback took P again within a block of any draw, and the moved branch was hardly reached; the draw now sets that count too.
+
+Not planted, as no input tells them apart: the peak's test at ≥ (a magnitude equal to the peak changes nothing), the fallback's test at < (one sample later, P unchanged meanwhile), and the frame's end at ≥ (32-sample blocks never land on 881 itself).
+
 ### The VOCODER OSC's converter and kind 5's update (2026-11-16, v222) {#vc2-vocoder-osc}
 
 Step 5's second part, ported bit for bit (`Vc2VocoderOsc.cpp`): what the VOCODER OSC's IDs become in P (the voice + 0x104, the OSC block + 0xb0), and what kind 5's update makes of P each update before the carrier's ("The VOCODER OSC's carrier").

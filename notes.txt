@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The pitch tracker's frame v223 (2026-11-16, on vc2-mode): step 6's first part (the user's "Yes, next item"; step 6
+  split in two by the module's calls, v224 the analysis; HARDWARE_FIRMWARE.md, "The pitch tracker's frame").
+  Vc2Tracker: the module's state 0x899d9b70…0x899d9d1c word for word; its static initializers (0x893edf90's two words,
+  the table setter 0x893ef240), the reset 0x893ee040, the mode setter 0x893ee100 (mode 0 by an unsigned compare), the
+  getters and setter, and the block entry 0x893ee280 (the coefficients' glide, the two state-variable stages, the
+  frame peak, the peaks and counters a sample, the fallback, the crossings' tests, the noise count, the noisy-hold
+  flag, which nothing reads: its getter and setter have no caller). Its crossings go to the analysis through
+  Vc2TrackerCrossings. Vc2TrackerTables, read by loadVc2, with a rom4-no-tracker plant. xt_vc2tracker
+  (Vc2TrackerCheck.cpp, in fcheck): rom.4's crossing routines hooked to record their calls, the port's recorded, 40
+  cases of 600 blocks of Vc2Signal with modes, setters and the analysis's words drawn between; the state, the period
+  and the calls after each; 0 different at seeds 2024 and 7. mutate_vc2.py --tracker, 60 plants, caught (one after
+  the draw set the samples since a crossing); every other list again, caught. vc2CaseOutcome and
+  vc2Unit moved into Vc2CheckRig.h (the carrier check's copies taken out). Not in the sound.
+
 The VOCODER OSC's converter and kind 5's update v222 (2026-11-16, on vc2-mode): step 5's second part (the user's "Yes,
   next item"; HARDWARE_FIRMWARE.md, "The VOCODER OSC's converter and kind 5's update"). Vc2VocoderOsc.cpp:
   vc2VocoderOscConvert, the converter 0x8939db00's own part (its P stores: the levels at v/127, Growl Level with the
