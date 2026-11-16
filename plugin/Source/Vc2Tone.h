@@ -7,6 +7,7 @@
 // envelopes, 8 LFOs) through Vc2ToneParts, called in rom.4's order.  The note-on is v229's.  Bit for bit: xt_vc2tone
 // against rom.4's routines in Sh4Interp, every part's routine hooked.  HARDWARE_FIRMWARE.md, "The VC-2's tone object".
 // Audio thread.
+#include "Vc2ToneInput.h"
 #include <array>
 #include <cstdint>
 
@@ -32,7 +33,8 @@ struct Vc2ToneTail {
     uint32_t ended = 0;          // +0x1b14: the routine the update calls when the tone ends
     uint32_t unread2 = 0;        // +0x1b18
     uint32_t zeroed[2] {};       // +0x1b1c, +0x1b20: 0 at construction
-    uint32_t unread3[4] {};      // +0x1b24…+0x1b33
+    int32_t structure = 0;       // +0x1b24: the note-on's input's +0
+    uint32_t render[3] {};       // +0x1b28…+0x1b33: the structure render's member pointer, which nothing calls
     int32_t renders = 0;         // +0x1b34: 0 at construction; the renders run only with it set
 };
 static_assert(sizeof(Vc2ToneTail) == 0x40, "rom.4's layout, the tone's +0x1af8…+0x1b38");
@@ -45,6 +47,18 @@ inline constexpr int kVc2ToneOsc1 = 0, kVc2ToneOsc2 = 1, kVc2ToneCosm1 = 0, kVc2
 struct Vc2ToneBuffers {
     static constexpr int kFloats = 64;
     float a[kFloats], b[kFloats], c[kFloats];
+};
+
+// The envelopes and LFOs a part is bound to, by number (the note-on's)
+template <size_t N>
+struct Vc2ToneBinding {
+    std::array<int32_t, N> envelopes {}, lfos {};
+};
+
+// What a COSM's set-up is given from an OSC (0x893aa590's struct): its +0x1cc, its +0xa80 and its byte +0x58
+struct Vc2ToneCosmSetUp {
+    float value = 0.0f, other = 0.0f;
+    uint8_t byte = 0;
 };
 
 // What the tone calls on its parts and reads from them (each read is a word of the part's rom.4 names)
@@ -82,6 +96,44 @@ public:
     virtual uint32_t oscFlag(int osc) = 0;                 // its +0xa40
     virtual void installMix(bool kind3) = 0;               // 0x893ade90
     virtual uint32_t installCosm(int cosm, uint32_t flag) = 0;   // 0x893aafe0
+    // The note-on's (v229)
+    virtual void noteOnEnvelope(int envelope, const uint32_t* block) = 0;   // 0x893ac1c0
+    virtual void noteOnLfo(int lfo, const uint32_t* block, float x) = 0;     // 0x893acda0
+    virtual void followLfo(int lfo, int tone, const uint32_t* block) = 0;    // 0x893ace60: that tone's LFO of its number
+    virtual uint32_t freeLfo(uint32_t id, int lfo) = 0;    // 0x893ad640: a free object, by its address
+    virtual void attachFree(int lfo, uint32_t free) = 0;   // 0x893acfc0
+    virtual float freeValue(uint32_t free) = 0;            // the free object's +0x10
+    virtual void startFree(int lfo, const uint32_t* block, float value, float x) = 0;   // 0x893acf10
+    virtual bool lfoListed(int lfo) = 0;                   // its +0x60
+    virtual uint32_t lfoFollow(int lfo) = 0;               // its +0x7c
+    virtual void relist(uint32_t follow, uint32_t id, int lfo) = 0;   // 0x893ad780
+    virtual void list(uint32_t id, int lfo) = 0;           // 0x893ad800
+    virtual void markFree(uint32_t free, uint32_t id, int lfo) = 0;   // the free object's +4 and +0
+    virtual void bindOsc(int osc, const Vc2ToneBinding<4>& b) = 0;    // their addresses at +0xa4c…, the flags
+    virtual void bindCosm(int cosm, const Vc2ToneBinding<2>& b) = 0;  // 0x893aa7b0, then the flags
+    virtual void bindTva(int envelope, int lfoA, int lfoB, int32_t serial) = 0;   // +0xa4…+0xac, +0xc0, the flags
+    virtual uint32_t oscWave(int osc) = 0;                 // its +0x104
+    virtual void setOscWave(int osc, uint32_t wave) = 0;
+    virtual void noteOnOsc(int osc, const uint32_t* block, bool legato) = 0;   // 0x893ae370
+    virtual void takePlayer(int osc, int tone) = 0;        // 0x893aee20: that tone's voice's player (+0x15c)
+    virtual void setOsc(int osc, const uint32_t* block) = 0;   // 0x893ae610
+    virtual void noteOnMix(const uint32_t* block, uint32_t flag1, uint32_t flag2) = 0;   // 0x893adbf0
+    virtual Vc2ToneCosmSetUp cosmSetUp(int osc) = 0;       // the OSC's words a COSM's set-up is given
+    virtual void setUpCosm(int cosm, const Vc2ToneCosmSetUp& s, uint32_t flag) = 0;   // 0x893aa590
+    virtual void startCosm(int cosm, const uint32_t* block, int which) = 0;   // 0x893aa0e0
+    virtual void noteOnTva(const uint32_t* block, uint32_t flag) = 0;   // 0x893b2100
+    virtual void enlist() = 0;                             // 0x893ada10, given the tone
+};
+
+class Vc2TonePool;
+
+// What a note-on reads beyond its tone: the two lists it searches for a tone of the same id (0x89999678, else 0x8999967c
+// when that is empty: tones linked through their +4, each node's +0x14 the tone), and another tone's parts
+class Vc2ToneOwner {
+public:
+    virtual ~Vc2ToneOwner() = default;
+    virtual std::array<uint32_t, 2> lists() = 0;   // the two lists' heads, by rom.4's addresses (0 empty)
+    virtual Vc2ToneParts& partsOf(int tone) = 0;
 };
 
 class Vc2Tone {
@@ -103,6 +155,9 @@ public:
     bool held(Vc2ToneParts& parts) const;             // +0x60
     void start();                                     // +0x6c
     void install(Vc2ToneParts& parts);                // 0x893b4060
+    // 0x893b3390 (v229, Vc2ToneNoteOn.cpp): the parts started and bound by the input, the legato's take of the tone
+    // of the input's serial in `pool`; it writes the input's fix-up back
+    void noteOn(Vc2ToneInput& in, Vc2TonePool& pool, Vc2ToneOwner& owner, Vc2ToneParts& parts);
 
     Vc2ToneHead head {};
     Vc2ToneTail tail {};
@@ -121,6 +176,8 @@ public:
     uint32_t addressOf(int index) const { return kBase + Vc2Tone::kSize * (uint32_t)index; }
     uint32_t end() const { return addressOf(kTones); }   // the sentinel's word (0x8993fb44): the pool's end
     Vc2Tone& at(uint32_t address) { return tones[(address - kBase) / Vc2Tone::kSize]; }
+    int indexOf(uint32_t address) const { return (int)((address - kBase) / Vc2Tone::kSize); }
+    int bySerial(int32_t wanted) const;   // the first tone whose +8 is `wanted` (0x893b4340), −1 none
 
     uint32_t head = 0;      // 0x8993fb48: the free list, 0 until the first take
     int32_t serial = 0;     // 0x8993fb4c

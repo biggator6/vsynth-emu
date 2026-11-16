@@ -342,8 +342,12 @@ version against rom.4's routines with what it calls hooked:
      the update, both renders, the clock, the two counts, the level test, held, start and the install pass, against
      rom.4's on its own pool in xt_vc2tone, every part routine hooked (HARDWARE_FIRMWARE.md, "The VC-2's tone object").
      The three structure renders are left out: nothing in rom.4 reaches their table.
-   - next (v229): the note-on (`0x893b3390` with `0x893b4380` and `0x893b4660`, about 1,600 instructions): the parts'
-     note-ons, the key-unsynced LFOs' following, the render flag and the end routine.
+   - done (v229): the note-on, `Vc2Tone::noteOn` (`0x893b3390` with `0x893b4380` and `0x893b4660`): the parts'
+     note-ons and bindings by the input's blocks, the key-unsynced LFOs following a tone of the same id or a free
+     object, the legato's take of the tone of the input's serial, the input's fix-up, the COSMs' set-ups by the
+     structure, the TVA, against rom.4's in xt_vc2tone with the input, the lists and the part words drawn on both sides
+     (HARDWARE_FIRMWARE.md, "The VC-2's tone's note-on"). Step 4.1 is done: the tone's own code, its parts behind an
+     interface.
 2. The tone's parts with rom.4's own wiring, a version each where rom.4 differs from rom.2 (step 1b's list): the OSC
    voice (its block, portamento, the players' install on rom.4's object layout, Vari off), the analog OSC's note-on,
    install, update and converter, COSM's converters and the Growl (type 8), the TVA's render on one stereo pair, and

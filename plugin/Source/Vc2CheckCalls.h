@@ -5,6 +5,12 @@
 #include <string>
 #include <vector>
 
+// How many of a log's calls are of `kind` (v229: the mixer's and the tone's checks' counts)
+template <class Call>
+long vc2CountCalls(const std::vector<Call>& log, int32_t kind) {
+    return (long)std::ranges::count(log, kind, &Call::kind);
+}
+
 // The first call the logs differ at, each side's said by `said(call)` ("none" past a log's end); empty when they don't
 template <class Call, class Said>
 std::string vc2CallsDifference(const std::vector<Call>& rom, const std::vector<Call>& port, Said said) {

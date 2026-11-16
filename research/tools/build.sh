@@ -102,6 +102,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    Vc2MixerBlock.cpp Vc2PartMixerTables.cpp Vc2Math.cpp "${SH4[@]}" -o "$O/xt_vc2mixer" &
 # The tone object's frame (v228) against rom.4's own routines, every part routine hooked
 [ -f Vc2ToneCheck.cpp ] && cc -DXT_VC2TONE_MAIN Vc2ToneCheck.cpp Vc2ToneSides.cpp Vc2ToneFakes.cpp Vc2Tone.cpp \
+   $( [ -f Vc2ToneNoteOn.cpp ] && echo Vc2ToneNoteOn.cpp Vc2TonePortParts.cpp Vc2ToneEvents.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2tone" &
 # The pitch tracker, its frame (v223) and its analysis (v224), against rom.4's own module
 [ -f Vc2TrackerCheck.cpp ] && cc -DXT_VC2TRACKER_MAIN Vc2TrackerCheck.cpp Vc2Tracker.cpp Vc2TrackerTables.cpp \

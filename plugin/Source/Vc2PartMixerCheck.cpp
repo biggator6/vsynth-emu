@@ -12,6 +12,7 @@
 // differ does, XT_VC2MIXER_STOP=1 stops there.  XT_VC2MIXER_MAIN only.
 #ifdef XT_VC2MIXER_MAIN
 #include "Vc2PartMixerCheck.h"
+#include "Vc2CheckCalls.h"
 #include "Vc2PartMixerTables.h"
 #include <algorithm>
 #include <span>
@@ -134,10 +135,9 @@ void drawBlock(MixSides& s, std::mt19937& rng) {
 
 // What rom.4's block called: the carriers' renders, the others', the vocoder
 void tallyCalls(MixSides& s) {
-    const auto count = [&](MixKind kind) { return (long)std::ranges::count(s.rom, (int32_t)kind, &MixCall::kind); };
-    s.n.carriers += count(kRenderCarrier);
-    s.n.renders += count(kRender);
-    s.n.vocoders += count(kVocoder);
+    s.n.carriers += vc2CountCalls(s.rom, kRenderCarrier);
+    s.n.renders += vc2CountCalls(s.rom, kRender);
+    s.n.vocoders += vc2CountCalls(s.rom, kVocoder);
 }
 
 std::string mixBlockOn(MixSides& s, std::mt19937& rng) {

@@ -1,5 +1,8 @@
 # Planted errors in the VC-2's tone object's frame and its pool, for mutate_vc2.py --tone: each must make xt_vc2tone, on
-# rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2tone (Vc2Tone.cpp, v228).
+# rom.4, say something differs.  name|old|new[|port[|seed]]; ports vc2tone (Vc2Tone.cpp, v228) and vc2tonenoteon
+# (Vc2ToneNoteOn.cpp, the note-on, v229).  The note-on's not planted: a legato asking for a serial no tone has (rom.4
+# reads from address 0 there, which the check never draws, so the port's guard against it has no side to compare), and
+# the render flag's clearing at its start (the note-on sets it again at its end, and nothing between reads it).
 # Not planted: Vc2Tone.h's constants (the VC-2 ports' route builds the kept objects from the unplanted sources; each
 # constant is planted where Vc2Tone.cpp uses it), the install pass's read of OSC 1's flag before OSC 2's install (with
 # the installs hooked nothing writes the flag between, so no input tells the two orders apart), and the destructor's
@@ -84,3 +87,64 @@ pool-head-kept|    head = tone.link;\n    tone.construct|    tone.construct|vc2t
 pool-back-ignored|    if (!back) return;\n||vc2tone
 pool-back-link-kept|    tone.link = head;\n    head = addressOf|    head = addressOf|vc2tone
 pool-back-self|    head = addressOf(static_cast<int>(&tone - tones.data()));|    head = tone.head.self;|vc2tone
+noteon-structure-zero|    tail.structure = static_cast<int32_t>(in.at(In::kStructure));|    tail.structure = 0;|vc2tonenoteon
+noteon-render-last|std::min((uint32_t)tail.structure, kLastStructure + 1)|std::min((uint32_t)tail.structure, kLastStructure)|vc2tonenoteon
+noteon-render-lost|    std::ranges::copy(render, tail.render);\n||vc2tonenoteon
+noteon-envelope-0|    for (int envelope = 1; envelope < kEnvelopes; ++envelope) {   // envelope 0 is never started|    for (int envelope = 0; envelope < kEnvelopes; ++envelope) {   // envelope 0 is never started|vc2tonenoteon
+noteon-envelope-block|In::kEnvelopes + In::kEnvelopeStride * (uint32_t)envelope|In::kEnvelopes + In::kEnvelopeStride * (uint32_t)(envelope - 1)|vc2tonenoteon
+noteon-lfos-lost|    noteOnLfos(*this, in, pool, owner, parts);\n||vc2tonenoteon
+lfo-0|    for (int lfo = 1; lfo < Vc2Tone::kLfos; ++lfo) {   // LFO 0 is never started|    for (int lfo = 0; lfo < Vc2Tone::kLfos; ++lfo) {   // LFO 0 is never started|vc2tonenoteon
+lfo-keysync-ignored|        if (block[In::kKeySync / sizeof(uint32_t)] != 0) {|        if (false) {|vc2tonenoteon
+lfo-keysync-inverted|        if (block[In::kKeySync / sizeof(uint32_t)] != 0) {|        if (block[In::kKeySync / sizeof(uint32_t)] == 0) {|vc2tonenoteon
+lfo-noteon-value|            parts.noteOnLfo(lfo, block, x);|            parts.noteOnLfo(lfo, block, 0.0f);|vc2tonenoteon
+lfo-follow-never|        if (same != kNoTone) {|        if (false) {|vc2tonenoteon
+lfo-lists-second-first|heads[0] != 0 ? heads[0] : heads[1]|heads[1] != 0 ? heads[1] : heads[0]|vc2tonenoteon
+lfo-lists-first-only|heads[0] != 0 ? heads[0] : heads[1]|heads[0]|vc2tonenoteon
+lfo-lists-next|node != 0; node = pool.at(node).head.prev) {|node != 0; node = pool.at(node).head.next) {|vc2tonenoteon
+lfo-same-node|return pool.indexOf(tone);|return pool.indexOf(node);|vc2tonenoteon
+lfo-same-any-id|        if (tone != 0 && pool.at(tone).head.id == id) return pool.indexOf(tone);|        if (tone != 0) return pool.indexOf(tone);|vc2tonenoteon
+lfo-free-serial|        const uint32_t free = parts.freeLfo(t.head.id, lfo);|        const uint32_t free = parts.freeLfo((uint32_t)t.head.serial, lfo);|vc2tonenoteon
+lfo-free-attach-lost|        parts.attachFree(lfo, free);\n||vc2tonenoteon
+lfo-free-value|        parts.startFree(lfo, block, parts.freeValue(free), x);|        parts.startFree(lfo, block, x, x);|vc2tonenoteon
+lfo-free-swapped|        parts.startFree(lfo, block, parts.freeValue(free), x);|        parts.startFree(lfo, block, x, parts.freeValue(free));|vc2tonenoteon
+lfo-listed-ignored|        if (parts.lfoListed(lfo)) {|        if (false) {|vc2tonenoteon
+lfo-relist-word|            parts.relist(parts.lfoFollow(lfo), t.head.id, lfo);|            parts.relist(0, t.head.id, lfo);|vc2tonenoteon
+lfo-list-number|            parts.list(t.head.id, lfo);|            parts.list(t.head.id, lfo + 1);|vc2tonenoteon
+lfo-mark-lost|        parts.markFree(free, t.head.id, lfo);\n||vc2tonenoteon
+lfo-mark-number|        parts.markFree(free, t.head.id, lfo);|        parts.markFree(free, t.head.id, lfo + 1);|vc2tonenoteon
+oscbind-one|        parts.bindOsc(osc, bindingOf<4>(in.block(In::kOscs[(size_t)osc]), kOscBinds, &OscBinds::kind));|        parts.bindOsc(osc, bindingOf<4>(in.block(In::kOscs[0]), kOscBinds, &OscBinds::kind));|vc2tonenoteon
+oscbind-kind1-lost|    { 1, { 0x20, 0x28, 0x30, 0x38 }, { 0x40, 0x48, 0x50, 0x58 } },\n||vc2tonenoteon
+oscbind-kind3|    { 3, { 0x20, 0xbc, 0xd4, 0x38 }, { 0x40, 0xc4, 0xd8, 0x58 } },|    { 3, { 0x20, 0x28, 0x30, 0x38 }, { 0x40, 0x48, 0x50, 0x58 } },|vc2tonenoteon
+oscbind-kind4|    { 5, { 0x20, 0xec, 0x100, 0x38 }|    { 4, { 0x20, 0x28, 0x30, 0x38 }, { 0x40, 0x48, 0x50, 0x58 } },\n    { 5, { 0x20, 0xec, 0x100, 0x38 }|vc2tonenoteon
+oscbind-kind5-lfo|{ 0x40, 0xf0, 0x104, 0x58 }|{ 0x40, 0xf0, 0x100, 0x58 }|vc2tonenoteon
+oscbind-kind6-env|    { 6, { 0x20, 0, 0x30, 0x38 }|    { 6, { 0x20, 0x28, 0x30, 0x38 }|vc2tonenoteon
+numbers-zero-read|        if (offsets[k] != 0) numbers[k] =|        numbers[k] =|vc2tonenoteon
+cosmbind-one|        parts.bindCosm(cosm, bindingOf<2>(in.block(In::kCosms[(size_t)cosm]), kCosmBinds, &CosmBinds::type));|        parts.bindCosm(cosm, bindingOf<2>(in.block(In::kCosms[0]), kCosmBinds, &CosmBinds::type));|vc2tonenoteon
+cosmbind-type20|{ 20, { 0x24, 0x34 }, { 0x2c, 0x3c } },|{ 20, { 0x24, 0x34 }, { 0x2c, 0x38 } },|vc2tonenoteon
+cosmbind-type17|{ 17, { 0x20, 0xc }, { 0x28, 0x14 } },|{ 17, { 0xc, 0x20 }, { 0x14, 0x28 } },|vc2tonenoteon
+cosmbind-type4-envb|{ 4, { 0x10, 0 }, { 0x18, 0 } },|{ 4, { 0x10, 0x24 }, { 0x18, 0 } },|vc2tonenoteon
+cosmbind-type5|{ 4, { 0x10, 0 }, { 0x18, 0 } },|{ 4, { 0x10, 0 }, { 0x18, 0 } }, { 5, { 0x10, 0x24 }, { 0x18, 0x2c } },|vc2tonenoteon
+fixup-lost|    if (in.at(In::kMix) == kFixMix && in.at(In::kOscs[kVc2ToneOsc2]) == kFixKind && fixed == kFixFrom) fixed = kFixTo;|    if (false) fixed = kFixTo;|vc2tonenoteon
+fixup-no-kind|in.at(In::kMix) == kFixMix && in.at(In::kOscs[kVc2ToneOsc2]) == kFixKind && fixed == kFixFrom|in.at(In::kMix) == kFixMix && fixed == kFixFrom|vc2tonenoteon
+fixup-to|kFixFrom = 10, kFixTo = 2;|kFixFrom = 10, kFixTo = 3;|vc2tonenoteon
+fixup-after-oscs|    if (in.at(In::kMix) == kFixMix && in.at(In::kOscs[kVc2ToneOsc2]) == kFixKind && fixed == kFixFrom) fixed = kFixTo;\n    noteOnOscs(in, pool, owner, parts);|    noteOnOscs(in, pool, owner, parts);\n    if (in.at(In::kMix) == kFixMix && in.at(In::kOscs[kVc2ToneOsc2]) == kFixKind && fixed == kFixFrom) fixed = kFixTo;|vc2tonenoteon
+legato-switch-ignored|const bool asks = previous != kNoPrevious && block[In::kLegato / sizeof(uint32_t)] != 0 && from != kNoTone;|const bool asks = previous != kNoPrevious && from != kNoTone;|vc2tonenoteon
+legato-kind-ignored|        const bool takes = was && static_cast<int32_t>(block[0]) == was->oscKind(osc)|        const bool takes = was|vc2tonenoteon
+legato-wave-ignored|                           && block[In::kWave / sizeof(uint32_t)] == was->oscWave(osc);|                           && true;|vc2tonenoteon
+legato-flag-false|        parts.noteOnOsc(osc, block, takes);|        parts.noteOnOsc(osc, block, false);|vc2tonenoteon
+legato-take-lost|        parts.takePlayer(osc, from);\n||vc2tonenoteon
+legato-wave-copy-lost|        parts.setOscWave(osc, was->oscWave(osc));\n||vc2tonenoteon
+byserial-none|    return found == tones.end() ? -1 : (int)(found - tones.begin());|    return -1;|vc2tonenoteon
+setosc-block|    parts.setOsc(kVc2ToneOsc2, in.block(In::kOscSet));|    parts.setOsc(kVc2ToneOsc2, in.block(In::kOscSet + 4));|vc2tonenoteon
+mix-flags-swapped|parts.noteOnMix(in.block(In::kMix), parts.oscFlag(kVc2ToneOsc1), parts.oscFlag(kVc2ToneOsc2));|parts.noteOnMix(in.block(In::kMix), parts.oscFlag(kVc2ToneOsc2), parts.oscFlag(kVc2ToneOsc1));|vc2tonenoteon
+cosmsetup-second-always|    const int second = structure == kLastStructure ? kVc2ToneOsc2 : kVc2ToneOsc1;|    const int second = kVc2ToneOsc2;|vc2tonenoteon
+cosmsetup-past-last|    if (structure > kLastStructure) return;|    if (structure > kLastStructure + 1) return;|vc2tonenoteon
+cosmsetup-flag-osc1|        parts.setUpCosm(cosm, parts.cosmSetUp(osc), parts.oscFlag(osc));|        parts.setUpCosm(cosm, parts.cosmSetUp(osc), parts.oscFlag(kVc2ToneOsc1));|vc2tonenoteon
+cosmsetup-which|        parts.startCosm(cosm, in.block(In::kCosms[(size_t)cosm]), cosm);|        parts.startCosm(cosm, in.block(In::kCosms[(size_t)cosm]), 0);|vc2tonenoteon
+tva-lfos-swapped|number(In::kTva), number(In::kTvaLfoA), number(In::kTvaLfoB), head.serial|number(In::kTva), number(In::kTvaLfoB), number(In::kTvaLfoA), head.serial|vc2tonenoteon
+tva-serial-index|number(In::kTvaLfoB), head.serial);|number(In::kTvaLfoB), head.index);|vc2tonenoteon
+tva-noteon-flag|    parts.noteOnTva(in.block(In::kTva), parts.oscFlag(kVc2ToneOsc1));|    parts.noteOnTva(in.block(In::kTva), parts.oscFlag(kVc2ToneOsc2));|vc2tonenoteon
+state-sounding|    head.state = kFromOne;\n    install(parts);|    head.state = kSounding;\n    install(parts);|vc2tonenoteon
+install-lost|    install(parts);\n    tail.renders = 1;|    tail.renders = 1;|vc2tonenoteon
+renders-zero|    tail.renders = 1;\n    parts.enlist();|    tail.renders = 0;\n    parts.enlist();|vc2tonenoteon
+enlist-lost|    tail.renders = 1;\n    parts.enlist();|    tail.renders = 1;|vc2tonenoteon

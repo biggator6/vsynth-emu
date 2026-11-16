@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 tone's note-on v229 (2026-11-16, on vc2-mode): step 4.1's second part (the user's "Yes, next item";
+  HARDWARE_FIRMWARE.md, "The VC-2's tone's note-on"); step 4.1 done. Vc2Tone::noteOn (Vc2ToneNoteOn.cpp): 0x893b3390
+  with 0x893b4380 and 0x893b4660 as tables (an OSC voice's four envelopes and LFOs by its block's kind, a COSM's two by
+  its type), on the input's layout (Vc2ToneInput.h): the structure and its render's member pointer into the tail, the
+  envelopes' and LFOs' note-ons, the key-unsynced LFOs following a tone of the same id on the +4 lists or a free
+  object, the bindings and their flags, the input's fix-up, the OSC voices' note-ons with the legato's take of the tone
+  of the input's serial, the mix, the COSMs' set-ups by the structure, the TVA; through Vc2ToneParts and Vc2ToneOwner.
+  Withdrawn in place: v228's "nothing reads the structure renders' table" scanned a second copy; the live table
+  (0x8993fb14) is copied by the note-on, and still nothing calls through the copy. xt_vc2tone now with note-ons: the
+  tones' part words a mirror in the port's fake parts (one a tone) compared with rom.4's memory, the input, the lists
+  and free objects drawn on both; 0 different at seeds 2024, 7 and 31337; every line covered, one branch side
+  unreachable (a legato asking for a serial no tone has: rom.4 reads from address 0). mutate_vc2.py --tone: 141
+  plants. vc2CountCalls in Vc2CheckCalls.h (the mixer's check's too). Not in the sound yet.
+
 The VC-2's tone object v228 (2026-11-16, on vc2-mode): step 4.1's first part (the user's "Yes, next item"; step 4
   split the same day by what rom.4's tone turned out to be: its own class, rom.2's tone routines unpaired but for the
   constructor; HARDWARE_FIRMWARE.md, "The VC-2's tone object"). Vc2Tone: the tone's own words (head, tail, link, the
