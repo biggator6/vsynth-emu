@@ -712,6 +712,10 @@ Keyfollow added by octave from key 60, and m₁ the envelope, m₂ the LFO ("The
 
 ### Voice kind 6, run (`kind6`)
 
+(v225: the module ported bit for bit, every instruction read: HARDWARE_FIRMWARE.md, "Voice kind 6". What the run below
+left out: the "filter set from the period" is an SVF high-pass at the output's pitch, and below r′ 1 a lift by level
+adds where the grains thin.)
+
 Kind 6 (written in the EXT IN path; render `0x893ec730(voice + 0xafc, out)`) is a pitch-synchronous (TD-PSOLA) pitch shifter of
 the mic:
 

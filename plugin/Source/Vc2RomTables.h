@@ -5,6 +5,8 @@
 // reads as its initial values) and says whether what it read can be used.  loadVc2 (XtSynthRom.cpp) loads each at the
 // start, never at a switch of modes.
 #include "Sh4Interp.h"
+#include "Vc2Math.h"
+#include <array>
 #include <atomic>
 #include <bit>
 #include <cstdint>
@@ -49,3 +51,23 @@ using Vc2PoolWord = std::pair<uint32_t, float*>;
 inline void vc2ReadPool(Sh4& image, std::span<const Vc2PoolWord> words) {
     for (const auto& [at, out] : words) *out = std::bit_cast<float>(image.rd32(at));
 }
+
+// A port's tables of pool words alone and the shared math routines' pool (v225: the carrier's, kind 6's): `Words(t)`
+// gives each word's address and the float of `t` it fills; one instance, read once as Vc2RomTables reads
+template <class Tables, auto Words>
+class Vc2PoolTables {
+public:
+    static bool load(const char* path) { return tables_.load(path); }
+    static bool loaded() { return tables_.loaded(); }
+    static const Tables& get() { return tables_.t; }
+
+private:
+    struct Read : Tables {
+        bool read(Sh4& image) {
+            vc2ReadPool(image, Words(*this));
+            vc2ReadMathPool(image, this->math);
+            return true;
+        }
+    };
+    static inline constinit Vc2RomTables<Read> tables_;
+};

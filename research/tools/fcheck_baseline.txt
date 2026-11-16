@@ -769,6 +769,9 @@ xt_vc2carrier: 0 different
 == xt_vc2tracker
 tracker: 100 cases, 150000 blocks, 34844 up and 34874 down crossings, P moved in 3692, 31553 locked, 20930 of 122979 tone blocks on pitch, 1205 modes, 1251 holds, 38369 noisy, 0 different
 xt_vc2tracker: 0 different
+== xt_vc2kind6
+kind 6: 40 cases, 32000 blocks, 83129 renders (25829 in mode 1), 688 starts, 641 updates, 236 modes, 67 resets, 0 different
+xt_vc2kind6: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

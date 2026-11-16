@@ -182,6 +182,10 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2TrackerTables.cpp
     Source/Vc2TrackerAnalysis.cpp
     Source/Vc2TrackerEstimate.cpp
+    Source/Vc2Math.cpp
+    Source/Vc2Kind6.cpp
+    Source/Vc2Kind6Core.cpp
+    Source/Vc2Kind6Tables.cpp
     Source/XtBuildId.cpp
 )
 

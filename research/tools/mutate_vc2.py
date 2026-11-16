@@ -15,7 +15,9 @@
 # OSC's carrier, v221), through xt_vc2carrier, [cases] its cases (40, fcheck's: the Dynamics' and the caps' edges
 # need them).  --tracker: vc2track_muts.txt, in Vc2Tracker.cpp, Vc2TrackerTables.cpp, Vc2TrackerAnalysis.cpp and
 # Vc2TrackerEstimate.cpp (PORT=vc2tracker, vc2tracktables, vc2trackana, vc2trackest: the pitch tracker's frame, v223,
-# and analysis, v224), through xt_vc2tracker, [cases] its cases (100, fcheck's).  One line
+# and analysis, v224), through xt_vc2tracker, [cases] its cases (100, fcheck's).  --kind6: vc2k6_muts.txt, in
+# Vc2Kind6.cpp, Vc2Kind6Core.cpp, Vc2Kind6Tables.cpp and Vc2Math.cpp (PORT=vc2k6, vc2k6core, vc2k6tables, vc2k6math:
+# voice kind 6 and the mic ring, v225), through xt_vc2kind6, [cases] its cases (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist
@@ -34,6 +36,8 @@ HARNESSES = {
                                   'XT_VC2CARRIER_STOP'), '40'),
     '--tracker': (mutlist.Harness('mutate_vc2', 'xt_vc2tracker', 'vc2track_muts.txt', ('vc2tracker', '2024'),
                                   'XT_VC2TRACKER_STOP'), '100'),
+    '--kind6': (mutlist.Harness('mutate_vc2', 'xt_vc2kind6', 'vc2k6_muts.txt', ('vc2k6', '2024'),
+                                'XT_VC2KIND6_STOP'), '40'),
 }
 args = sys.argv[1:]
 switch = args.pop(0) if args and args[0] in HARNESSES else ''

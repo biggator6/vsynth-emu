@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Voice kind 6 v225 (2026-11-16, on vc2-mode): step 7's first part (the user's "Yes, next item"; step 7 split in two,
+  v226 Auto Note and the pitch source; HARDWARE_FIRMWARE.md, "Voice kind 6"). Vc2Kind6: the mic's TD-PSOLA pitch
+  shifter and the mic ring, rom.4's module 0x893ec700... word for word: Vc2MicRing (the ring 0x8a0f31cc...0x8a0f73dc, the
+  mode word, the globals; its globals' setter, reset, write and the mode setter nothing calls), a voice's object at the
+  voice + 0xafc (setters 0x893ec790/0x893ec700, start 0x893ec8d0, render 0x893ec730: the glides, the filter's targets
+  0x893ecde0, T_out 0x893ecd50, the core 0x893eca10 in Vc2Kind6Core.cpp: epochs, grains on two heads under the window,
+  the lift below r' 1, the SVF high-pass, the unvoiced mix, the gain). rom.4's shared math one module, Vc2Math (the
+  cubic, sine, cosine, window), the carrier's copies taken out; the carrier's and kind 6's tables one reader,
+  Vc2PoolTables; the checks' case loop vc2RunCases. Vc2Kind6Tables in loadVc2 (rom4-no-kind6). xt_vc2kind6 (in
+  fcheck, 40 cases): rom.4's routines on three voices against the port, both modes, 0 different at seeds 2024 and 7;
+  every reachable line covered. mutate_vc2.py --kind6: 138 plants, caught; the carrier's five sine plants moved to
+  Vc2Math.cpp (port vc2math); every other list again, caught. Not in the sound yet.
+
 The pitch tracker's analysis v224 (2026-11-16, on vc2-mode): step 6's second part (the user's "Yes, next item";
   HARDWARE_FIRMWARE.md, "The pitch tracker's analysis"); the tracker is whole, step 6 done. Vc2TrackerAnalysis
   (Vc2TrackerAnalysis.cpp): the crossing routines 0x893ee570/0x893ee7d0 as one routine over a direction table

@@ -1,6 +1,7 @@
 // The VOCODER OSC's carrier: see Vc2Carrier.h (v221).  Each routine's arithmetic in its own order, in XtFloat; every
 // address is rom.4's.
 #include "Vc2Carrier.h"
+#include "Vc2Math.h"
 #include "XtFloat.h"
 
 namespace {
@@ -21,22 +22,6 @@ float stageStep(Vc2CarrierStage& st, float x, float g) {
     const float left = sub(sub(x, st.s1), st.s2);
     st.s2 = add(mul(left, g), st.s2);
     return left;
-}
-
-// 0x893f3210: a phase in [−1, 1) folded into [−0.5, 0.5], then x (3 − 4x²), a sine of πx
-float sineOf(const Vc2CarrierTables& t, float x) {
-    if (x > t.foldAt) {
-        x = sub(1.0f, x);
-    } else if (t.foldNeg > x) {
-        x = sub(-1.0f, x);
-    }
-    return mul(sub(t.three, mul(mul(x, x), t.four)), x);
-}
-
-// 0x893f3280: the same cubic on 0.5 − |x|, a cosine of πx
-float cosineOf(const Vc2CarrierTables& t, float x) {
-    const float y = sub(t.foldAt, x < 0.0f ? -x : x);
-    return mul(sub(t.three, mul(mul(y, y), t.four)), y);
 }
 
 // The noise generator's step, after the saw's each sample: two 32-bit words
@@ -133,8 +118,8 @@ float Vc2Carrier::growlSaw(float delta, float overPi) {
         if (w.noiseA > 0) ++divider;
         w.growlStep = div(delta, xtf::flt(divider));
     }
-    const float level = mul(add(mul(cosineOf(t, w.growlPhase), w.growl), 1.0f), w.phase);
-    float shifted = add(mul(sineOf(t, w.growlPhase), overPi), w.phase);
+    const float level = mul(add(mul(vc2Cosine(t.math, w.growlPhase), w.growl), 1.0f), w.phase);
+    float shifted = add(mul(vc2Sine(t.math, w.growlPhase), overPi), w.phase);
     if (!(1.0f > shifted)) {
         shifted = add(shifted, t.growl.minusTwo);
     } else if (-1.0f > shifted) {

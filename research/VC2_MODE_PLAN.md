@@ -293,7 +293,17 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      over a direction table), the onset check (`0x893eea50`), the estimator (`0x893eeb90`) and taking an estimate
      (`0x893ef110`), and the tracker whole against rom.4's module with no hook, on held tones, pitch steps, noise and
      silence (HARDWARE_FIRMWARE.md, "The pitch tracker's analysis"). Step 6 is done.
-7. Kind 6 (the mic's pitch shifter: harmonizer and Auto Note) and the mic ring.
+7. Kind 6 (the mic's pitch shifter: harmonizer and Auto Note) and the mic ring. Split in two by what the module holds
+   (2026-11-16):
+   - done (v225): the pitch shifter, `Vc2Kind6`, and the mic ring, `Vc2MicRing`: the ring's globals' setter, reset,
+     write and mode setter; a voice's setters, start and render (the glides, the filter's targets, T_out, the core's
+     epochs, grains, two heads under the window, lift, SVF, unvoiced mix and gain), against rom.4's routines on voices
+     in its RAM in xt_vc2kind6, both modes, the interval (the harmonizer) by the mode setter that nothing calls
+     (HARDWARE_FIRMWARE.md, "Voice kind 6"). rom.4's shared math (the cubic, sine, cosine and window) one module,
+     `Vc2Math`, the carrier's copies taken out.
+   - then (v226): Auto Note and the pitch source: the input stage's wrapper (`0x893ebb00`: the tracker's block, Auto
+     Note's state and its notes to the tone generator), the On Switch's setter, the pitch-source getter (`0x89394a40`)
+     and its bend by the singer's movement (`0x893ebc70`).
 8. The part mixer (Direct Sound) and the patch EQ.
 
 ### 4. Wiring

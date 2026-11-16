@@ -227,15 +227,9 @@ int main(int argc, char** argv) {
     std::string what;
     if (!fw.call(kStatic, {}) || !fw.call(kSetter, {})) what = "the static initializers fault: " + fw.cpu.error();
     if (what.empty()) what = trackerDifference(fw, tracker);
-    if (!what.empty()) {
-        std::printf("  after the static initializers: %s\nxt_vc2tracker: 1 different\n", what.c_str());
-        return 0;
-    }
-    std::mt19937 rng((uint32_t)run->seed);
     Vc2Tally tally { "XT_VC2TRACKER_FIRST", "XT_VC2TRACKER_STOP" };
-    for (int c = 0; c < run->cases; ++c) {
-        if (vc2CaseOutcome(tally, trackerCase(b, rng, c % 8 == 7), c, b.n.blocks)) break;
-    }
+    vc2RunCases(*run, tally, what, b.n.blocks,
+                [&](std::mt19937& rng, bool fades) { return trackerCase(b, rng, fades); });
     const Counts& n = b.n;
     std::printf("tracker: %d cases, %ld blocks, %ld up and %ld down crossings, P moved in %ld, %ld locked, "
                 "%ld of %ld tone blocks on pitch, %ld modes, %ld holds, %ld noisy, %ld different\n", run->cases,

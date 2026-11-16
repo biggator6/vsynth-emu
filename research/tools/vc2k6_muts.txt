@@ -1,0 +1,147 @@
+# Planted errors in the VC-2's voice kind 6 and the mic ring, for mutate_vc2.py --kind6: each must make xt_vc2kind6, on
+# rom.4, say something differs.  name|old|new[|port[|seed]]; ports vc2k6 (Vc2Kind6.cpp, v225), vc2k6core
+# (Vc2Kind6Core.cpp), vc2k6tables (Vc2Kind6Tables.cpp) and vc2k6math (Vc2Math.cpp's cubic and window).
+# Not planted, as no input tells them apart or none reaches them: T_out's clamp of the grain's place above 1 (the epoch
+# steps each sample the position passes it, so the place stays under 1) and the filter's cap of 1/T_out at ½ (a T_out
+# under 2 samples is a pitch above 22 kHz, where P+0 stops at 32 × 440 Hz); the grain's and the epoch's tests at ≥
+# (equal only on a whole-sample epoch or T_out); a head's ftrc as a floor (its read point is never negative); an
+# epoch's block from the wrapped epoch (4096 / 32 is the history's 128, so its index is the same); the update's test
+# for no P (without it, it faults); the heads' periods at the start from the last period (the two are equal there).
+globals-a440-unread|    g.a440Period = t.a440Period;|    g.a440Period = t.unreadRate;|vc2k6
+globals-unread-lost|    g.unread = t.unreadRate;\n|\n|vc2k6
+globals-per-a440-lost|    g.perA440 = t.perA440;\n|\n|vc2k6
+reset-write-kept|    w.writeIndex = 0;\n    w.started = 0;\n    w.historyIndex = 0;|    w.started = 0;\n    w.historyIndex = 0;|vc2k6
+reset-started-kept|    w.writeIndex = 0;\n    w.started = 0;\n|    w.writeIndex = 0;\n|vc2k6
+reset-history-index-kept|    w.historyIndex = 0;\n|\n|vc2k6
+reset-mode-1|    if (mode != 0) {|    if (mode != 1) {|vc2k6
+reset-mode-kept|        mode = 0;\n|\n|vc2k6
+reset-pitch-flag-lost|        w.pitchMode = 1;\n|\n|vc2k6
+reset-ring-kept|    for (float& x : w.ring) x = 0.0f;\n|\n|vc2k6
+reset-history-zero|    for (float& p : w.history) p = g.a440Period;|    for (float& p : w.history) p = 0.0f;|vc2k6
+write-period-next|    w.history[w.historyIndex] = period;|    w.history[(w.historyIndex + 1) & kHistoryMask] = period;|vc2k6
+write-at-next|    float* to = &w.ring[w.writeIndex];|    float* to = &w.ring[(w.writeIndex + Vc2Kind6::kBlock) & kRingMask];|vc2k6
+write-history-stuck|    w.historyIndex = (w.historyIndex + 1) & kHistoryMask;\n|\n|vc2k6
+mode-range-2|    if (m < 0 \|\| m >= kModes \|\| m == mode) return;|    if (m < 0 \|\| m > kModes \|\| m == mode) return;|vc2k6
+mode-same-again| \|\| m == mode) return;|) return;|vc2k6
+mode-flag-inverted|    w.pitchMode = m == 0 ? 1 : 0;|    w.pitchMode = m == 0 ? 0 : 1;|vc2k6
+mode-started-kept|    w.pitchMode = m == 0 ? 1 : 0;\n    w.started = 0;|    w.pitchMode = m == 0 ? 1 : 0;|vc2k6
+set-gain-unscaled|    w.gainTarget = mul(p->gain, vc2Kind6Tables().gainScale);|    w.gainTarget = p->gain;|vc2k6
+set-rate-ratio|    w.rateTarget = p->rate;|    w.rateTarget = p->ratio;|vc2k6
+set-level-lost|    w.levelTarget = p->level;\n|\n|vc2k6
+start-behind-256|constexpr int32_t kBehind = 14 << 8;|constexpr int32_t kBehind = 15 << 8;|vc2k6
+start-epoch-zero|    w.epoch = xtf::flt(w.position);|    w.epoch = 0.0f;|vc2k6
+start-period-a440|    w.lastPeriod = w.period = ring.w.history[block];|    w.lastPeriod = w.period = ring.g.a440Period;|vc2k6
+start-gain-kept|    w.gain = 0.0f;\n|\n|vc2k6
+start-ratio-unset|    w.ratio = w.ratioTarget;\n|\n|vc2k6
+start-rate-unset|    w.rate = w.rateTarget;\n|\n|vc2k6
+start-level-unset|    w.level = w.levelTarget;\n|\n|vc2k6
+start-filter-kept|    w.f = w.low = w.band = 0.0f;|    w.low = w.band = 0.0f;|vc2k6
+start-damping-1|    w.damping = t.startDamping;|    w.damping = 1.0f;|vc2k6
+start-head-kept|    w.head = 0;\n|\n|vc2k6
+start-counts-kept|    w.sinceGrain = w.a.count = w.b.count = 0.0f;|    w.sinceGrain = 0.0f;|vc2k6
+start-base-zero|    w.a.base = w.b.base = w.epoch;|    w.a.base = w.b.base = 0.0f;|vc2k6
+start-window-a-half|    w.a.window = 0.0f;|    w.a.window = t.startWindow;|vc2k6
+start-window-b-zero|    w.b.window = t.startWindow;|    w.b.window = 0.0f;|vc2k6
+start-lift-kept|    w.lift = 0.0f;\n|\n|vc2k6
+start-no-length|    grainLength(ring);\n    w.frac = 1.0f;|    w.frac = 1.0f;|vc2k6
+start-frac-zero|    w.frac = 1.0f;|    w.frac = 0.0f;|vc2k6
+start-head-period-lost|    w.a.period = w.b.period = w.period;\n|\n|vc2k6
+start-head-frac-lost|    w.a.frac = w.b.frac = w.frac;\n|\n|vc2k6
+start-not-started|    ring.w.started = 1;\n|\n|vc2k6
+render-runs-always|    if (ring.w.started == 0) return;\n|\n|vc2k6
+render-glide-half|    const float glide = vc2Kind6Tables().glide;|    const float glide = 0.5f;|vc2k6
+render-ratio-jumps|    w.ratio = add(mul(sub(w.ratioTarget, w.ratio), glide), w.ratio);|    w.ratio = w.ratioTarget;|vc2k6
+render-rate-jumps|    w.rate = add(mul(sub(w.rateTarget, w.rate), glide), w.rate);|    w.rate = w.rateTarget;|vc2k6
+render-level-jumps|    w.level = add(mul(sub(w.levelTarget, w.level), glide), w.level);|    w.level = w.levelTarget;|vc2k6
+render-no-filter|    filterTargets();\n    core|    core|vc2k6
+length-no-wrap|    if (w.epoch > now) now = add(now, t.span);|    if (false) now = add(now, t.span);|vc2k6
+length-since-lost|add(w.sinceGrain, w.epoch)), w.period)|w.epoch), w.period)|vc2k6
+length-by-last|div(sub(now, add(w.sinceGrain, w.epoch)), w.period)|div(sub(now, add(w.sinceGrain, w.epoch)), w.lastPeriod)|vc2k6
+length-negative-kept|    if (0.0f > at) {\n        w.frac = between = 0.0f;\n    }\n|\n|vc2k6
+length-in-last|    const float in = add(mul(sub(w.period, w.lastPeriod), between), w.lastPeriod);|    const float in = w.lastPeriod;|vc2k6
+length-in-unclamped|mul(sub(w.period, w.lastPeriod), between)|mul(sub(w.period, w.lastPeriod), at)|vc2k6
+length-pitch-always|    if (ring.w.pitchMode != 0) ratio = mul(mul(ratio, in), ring.g.perA440);|    ratio = mul(mul(ratio, in), ring.g.perA440);|vc2k6
+length-pitch-no-in|mul(mul(ratio, in), ring.g.perA440)|mul(ratio, ring.g.perA440)|vc2k6
+length-effective-target|    w.effective = ratio;|    w.effective = w.ratio;|vc2k6
+length-step-by-length|    w.windowStep = div(t.half, reach > length ? length : reach);|    w.windowStep = div(t.half, length);|vc2k6
+length-reach-no-rate|    const float reach = div(in, w.rate);|    const float reach = in;|vc2k6
+filter-damping-1|    float damping = t.damping;|    float damping = 1.0f;|vc2k6
+filter-from-half|    if (!(1.0f > w.effective)) {|    if (!(0.5f > w.effective)) {|vc2k6
+filter-two-branch|damping = 2.0f > w.effective ? sub(damping, mul(w.level, add(w.effective, -1.0f))) : sub(damping, w.level);|damping = sub(damping, w.level);|vc2k6
+filter-level-off|mul(w.level, add(w.effective, -1.0f))|mul(w.level, w.effective)|vc2k6
+filter-f-uncubed|    float f = mul(vc2Cubic(t.math, x), 2.0f);|    float f = mul(x, 2.0f);|vc2k6
+filter-f-no-double|    float f = mul(vc2Cubic(t.math, x), 2.0f);|    float f = vc2Cubic(t.math, x);|vc2k6
+filter-most-uncapped|    if (f > most) f = most;\n|\n|vc2k6
+filter-most-damping-now|    const float most = sub(t.fMost, damping);|    const float most = sub(t.fMost, w.damping);|vc2k6
+filter-damping-jumps|    w.damping = add(mul(sub(damping, w.damping), t.filterGlide), w.damping);|    w.damping = damping;|vc2k6
+filter-f-jumps|    w.f = add(mul(sub(f, w.f), t.filterGlide), w.f);|    w.f = f;|vc2k6
+epoch-next-last|    const float next = add(w.period, w.epoch);|    const float next = add(w.lastPeriod, w.epoch);|vc2k6core
+epoch-no-wrap-now|    if (w.epoch > now) now = add(now, t.ringSpan);\n    if (next > now) return;|    if (next > now) return;|vc2k6core
+epoch-no-wrap|    w.epoch = t.ringSpan > next ? next : add(next, t.ringBack);|    w.epoch = next;|vc2k6core
+epoch-last-kept|    w.lastPeriod = w.period;\n|\n|vc2k6core
+epoch-block-no-ahead|add(mul(next, t.coreBlock), t.blockAhead)|mul(next, t.coreBlock)|vc2k6core
+epoch-period-kept|    w.period = ring.w.history[block & kHistoryMask];\n|\n|vc2k6core
+grain-since-kept|    w.sinceGrain = sub(w.sinceGrain, lastLength);\n|\n|vc2k6core
+grain-carried-none|    const float carried = mul(w.windowStep, lastLength);|    const float carried = 0.0f;|vc2k6core
+grain-no-length|    grainLength(ring);\n    w.head|    w.head|vc2k6core
+grain-head-kept|    w.head = (int8_t)(w.head ^ 1);\n|\n|vc2k6core
+grain-into-zero|    const float into = mul(w.sinceGrain, w.windowStep);|    const float into = 0.0f;|vc2k6core
+grain-heads-same|    Vc2Kind6Head& other = w.head == 0 ? w.b : w.a;|    Vc2Kind6Head& other = w.head == 0 ? w.a : w.b;|vc2k6core
+grain-other-kept|    other.window = add(carried, into);\n|\n|vc2k6core
+grain-count-zero|    starting.count = w.sinceGrain;|    starting.count = 0.0f;|vc2k6core
+grain-base-position|    starting.base = w.epoch;|    starting.base = xtf::flt(w.position);|vc2k6core
+grain-period-kept|    starting.period = w.lastPeriod;\n|\n|vc2k6core
+grain-frac-kept|    starting.frac = w.frac;\n|\n|vc2k6core
+head-count-after|    const float at = add(mul(w.rate, count), h.base);|    const float at = add(mul(w.rate, h.count), h.base);|vc2k6core
+head-count-kept|    h.count = add(count, 1.0f);\n|\n|vc2k6core
+head-no-rate|add(mul(w.rate, count), h.base)|add(count, h.base)|vc2k6core
+head-next-same|(whole + Vc2MicRingWords::kSamples + 1) & kRingMask|(whole + Vc2MicRingWords::kSamples) & kRingMask|vc2k6core
+head-no-frac|    return add(mul(sub(a1, a0), sub(at, xtf::flt(whole))), a0);|    return a0;|vc2k6core
+core-window-a-always|1.0f > w.a.window ? vc2Window(t.math, w.a.window) : 0.0f|vc2Window(t.math, w.a.window)|vc2k6core
+core-window-b-a|1.0f > w.b.window ? vc2Window(t.math, w.b.window) : 0.0f|1.0f > w.b.window ? vc2Window(t.math, w.a.window) : 0.0f|vc2k6core
+core-since-kept|    w.sinceGrain = add(w.sinceGrain, 1.0f);\n|\n|vc2k6core
+core-window-a-kept|    w.a.window = add(w.a.window, w.windowStep);\n|\n|vc2k6core
+core-window-b-double|    w.b.window = add(w.b.window, w.windowStep);|    w.b.window = add(w.b.window, add(w.windowStep, w.windowStep));|vc2k6core
+core-mix-b-unwindowed|    const float mix = add(mul(sampleB, windowB), mul(windowA, sampleA));|    const float mix = add(sampleB, mul(windowA, sampleA));|vc2k6core
+core-mix-no-a|    const float mix = add(mul(sampleB, windowB), mul(windowA, sampleA));|    const float mix = mul(sampleB, windowB);|vc2k6core
+core-lift-to-2|        if (1.0f > w.effective) {|        if (2.0f > w.effective) {|vc2k6core
+core-lift-gain-1|            float depth = mul(sub(1.0f, w.effective), t.liftGain);|            float depth = sub(1.0f, w.effective);|vc2k6core
+core-lift-uncapped|            if (depth > t.liftMost) depth = t.liftMost;\n|\n|vc2k6core
+core-lift-no-level|mul(std::fabs(mix), mul(depth, w.level))|mul(std::fabs(mix), depth)|vc2k6core
+core-lift-signed|mul(std::fabs(mix), mul(depth, w.level))|mul(mix, mul(depth, w.level))|vc2k6core
+core-lift-jumps|        w.lift = add(mul(sub(lifted, w.lift), t.liftRate), w.lift);|        w.lift = lifted;|vc2k6core
+core-windows-a|        const float windows = add(windowA, windowB);|        const float windows = windowA;|vc2k6core
+core-in-no-lift|        const float in = add(mul(windows, w.lift), mix);|        const float in = mix;|vc2k6core
+core-low-unheld|        w.low = add(mul(w.band, w.f), w.low);|        w.low = mul(w.band, w.f);|vc2k6core
+core-high-no-damping|        const float high = sub(in, add(mul(w.damping, w.band), w.low));|        const float high = sub(in, add(w.band, w.low));|vc2k6core
+core-band-kept|        w.band = add(mul(w.f, high), w.band);\n|\n|vc2k6core
+core-unvoiced-none|        const float u = unvoiced[i];|        const float u = 0.0f;|vc2k6core
+core-raw-next|        const float raw = ring.w.ring[w.position];|        const float raw = ring.w.ring[(w.position + 1) & kRingMask];|vc2k6core
+core-position-kept|        w.position = (w.position + 1) & kRingMask;\n|\n|vc2k6core
+core-unvoice-level-1|mul(mul(raw, u), ring.g.unvoiceLevel)|mul(raw, u)|vc2k6core
+core-voiced-all|mul(sub(1.0f, u), high)|high|vc2k6core
+core-gain-jumps|        w.gain = add(mul(sub(w.gainTarget, w.gain), t.coreBlock), w.gain);|        w.gain = w.gainTarget;|vc2k6core
+core-no-gain|        y = mul(y, w.gain);\n|\n|vc2k6core
+core-right-zero|        out[2 * i + 1] = y;|        out[2 * i + 1] = 0.0f;|vc2k6core
+cubic-three-four|mul(sub(k.three, mul(mul(x, x), k.four)), x)|mul(sub(k.four, mul(mul(x, x), k.four)), x)|vc2k6math
+window-no-fold|    if (u > 1.0f) u = sub(2.0f, u);\n|\n|vc2k6math
+window-half-step|    float u = mul(x, 2.0f);|    float u = x;|vc2k6math
+window-unhalved|    return mul(sub(1.0f, vc2Cubic(k, sub(k.foldAt, u))), k.foldAt);|    return sub(1.0f, vc2Cubic(k, sub(k.foldAt, u)));|vc2k6math
+window-cubic-on-u|vc2Cubic(k, sub(k.foldAt, u))|vc2Cubic(k, u)|vc2k6math
+table-gain-scale|{ 0x893ec9d0, &t.gainScale }|{ 0x893ec9d8, &t.gainScale }|vc2k6tables
+table-glide|{ 0x893ec9d8, &t.glide }|{ 0x893ec9fc, &t.glide }|vc2k6tables
+table-start-damping|{ 0x893eca00, &t.startDamping }|{ 0x893eca04, &t.startDamping }|vc2k6tables
+table-start-window|{ 0x893eca04, &t.startWindow }|{ 0x893eca00, &t.startWindow }|vc2k6tables
+table-core-block|{ 0x893ecd24, &t.coreBlock }|{ 0x893ec9d8, &t.coreBlock }|vc2k6tables
+table-ring-span|{ 0x893ecd30, &t.ringSpan }|{ 0x893ecd34, &t.ringSpan }|vc2k6tables
+table-ring-back|{ 0x893ecd34, &t.ringBack }|{ 0x893ecd30, &t.ringBack }|vc2k6tables
+table-block-ahead|{ 0x893ecd3c, &t.blockAhead }|{ 0x893ec9fc, &t.blockAhead }|vc2k6tables
+table-lift-gain|{ 0x893ecd44, &t.liftGain }|{ 0x893ecd48, &t.liftGain }|vc2k6tables
+table-lift-most|{ 0x893ecd48, &t.liftMost }|{ 0x893ecd44, &t.liftMost }|vc2k6tables
+table-lift-rate|{ 0x893ecd4c, &t.liftRate }|{ 0x893ecd24, &t.liftRate }|vc2k6tables
+table-half|{ 0x893ecf1c, &t.half }|{ 0x893ec9d8, &t.half }|vc2k6tables
+table-damping|{ 0x893ecf20, &t.damping }|{ 0x893ecf1c, &t.damping }|vc2k6tables
+table-f-most|{ 0x893ecf28, &t.fMost }|{ 0x893ecf20, &t.fMost }|vc2k6tables
+table-filter-glide|{ 0x893ecf2c, &t.filterGlide }|{ 0x893ec9d8, &t.filterGlide }|vc2k6tables
+table-a440-period|{ 0x893ecf40, &t.a440Period }|{ 0x893ecf48, &t.a440Period }|vc2k6tables
+table-per-a440|{ 0x893ecf4c, &t.perA440 }|{ 0x893ecf48, &t.perA440 }|vc2k6tables

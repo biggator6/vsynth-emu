@@ -1,6 +1,6 @@
 # Planted errors in the VOCODER OSC's carrier's port, for mutate_vc2.py --carrier: each must make xt_vc2carrier, on
-# rom.4, say something differs.  name|old|new[|port[|seed]]; ports vc2car (Vc2Carrier.cpp, v221) and vc2cartables
-# (Vc2CarrierTables.cpp).
+# rom.4, say something differs.  name|old|new[|port[|seed]]; ports vc2car (Vc2Carrier.cpp, v221), vc2cartables
+# (Vc2CarrierTables.cpp) and vc2math (Vc2Math.cpp, the sine, the cosine and their pool, moved there in v225).
 # Not planted, as no input tells them apart: a word of one render pool read from the other's (the plain path's and the
 # growl's half, −2, glide and 2^31 are the same numbers), so the first sample's glide by either pool; the sine's x·x·4
 # as x·4x (× 4 is exact); the growl's divider by noiseA ≥ 0 (noiseA is 0 only before the first sample, and the first
@@ -10,9 +10,9 @@ clamp-no-floor|    if (0.0f > v) v = 0.0f;\n|
 stage-s1|    st.s1 = add(mul(st.s2, g), st.s1);|    st.s1 = add(mul(st.s2, g), st.s2);
 stage-left|    const float left = sub(sub(x, st.s1), st.s2);|    const float left = sub(x, st.s1);
 stage-s2|    st.s2 = add(mul(left, g), st.s2);|    st.s2 = add(mul(left, g), st.s1);
-sine-fold-up|        x = sub(1.0f, x);|        x = sub(t.foldAt, x);
-sine-fold-down|        x = sub(-1.0f, x);|        x = sub(1.0f, x);
-cosine-no-abs|    const float y = sub(t.foldAt, x < 0.0f ? -x : x);|    const float y = sub(t.foldAt, x);
+sine-fold-up|        x = sub(1.0f, x);|        x = sub(k.foldAt, x);|vc2math
+sine-fold-down|        x = sub(-1.0f, x);|        x = sub(1.0f, x);|vc2math
+cosine-no-abs|sub(k.foldAt, x < 0.0f ? -x : x)|sub(k.foldAt, x)|vc2math
 noise-251|a * (uint32_t)-250|a * (uint32_t)-251
 noise-128|((b << 7) - b)|(b << 7)
 noise-31|+ 30u;|+ 31u;
@@ -62,7 +62,7 @@ growl-divider-b|        if (w.noiseA > 0) ++divider;|        if (w.noiseB > 0) +
 growl-divider-ratio|div(mul(w.step, t.k440), t.k50)|mul(w.step, div(t.k440, t.k50))
 growl-step-of-step|        w.growlStep = div(delta, xtf::flt(divider));|        w.growlStep = div(w.step, xtf::flt(divider));
 growl-level-half|w.growl), 1.0f), w.phase);|w.growl), 0.5f), w.phase);
-growl-shift-no-pi|add(mul(sineOf(t, w.growlPhase), overPi), w.phase)|add(mul(sineOf(t, w.growlPhase), w.growl), w.phase)
+growl-shift-no-pi|add(mul(vc2Sine(t.math, w.growlPhase), overPi), w.phase)|add(mul(vc2Sine(t.math, w.growlPhase), w.growl), w.phase)
 growl-wrap-up|        shifted = add(shifted, t.growl.minusTwo);|        shifted = add(shifted, -1.0f);
 growl-wrap-down|        shifted = add(shifted, 2.0f);|        shifted = add(shifted, 1.0f);
 growl-sum|    return add(shifted, level);|    return add(shifted, w.phase);
@@ -80,21 +80,21 @@ render-saw-first-stage|mul(w.sawB.s1, w.sawGain)|mul(w.sawA.s1, w.sawGain)
 render-no-gain|        const float y = mul(mul(add(mul(w.sawB.s1, w.sawGain), noise), w.gain), pool.toBus);|        const float y = mul(add(mul(w.sawB.s1, w.sawGain), noise), pool.toBus);
 render-left-only|        frames[2 * i] = frames[2 * i + 1] = y;|        frames[2 * i] = y;
 render-overpi-alone|    const float overPi = mul(w.growl, t.overPi);|    const float overPi = t.overPi;
-table-pitch-factor|{ 0x893ec6f8, &pitchFactor }|{ 0x893ec6f0, &pitchFactor }|vc2cartables
-table-growl-start|{ 0x893ec228, &growlStart }|{ 0x893ec4b0, &growlStart }|vc2cartables
-table-noise-scale|{ 0x893ec22c, &noiseScale }|{ 0x893ec238, &noiseScale }|vc2cartables
-table-plain-glide|{ 0x893ec238, &plain.glide }|{ 0x893ec230, &plain.glide }|vc2cartables
-table-growl-bus|{ 0x893ec4c0, &growl.toBus }|{ 0x893ec4b8, &growl.toBus }|vc2cartables
-table-over-pi|{ 0x893ec4a0, &overPi }|{ 0x893ec4b8, &overPi }|vc2cartables
-table-k50|{ 0x893ec4b4, &k50 }|{ 0x893ec4b0, &k50 }|vc2cartables
-table-low-slope|{ 0x893ec6c4, &lowSlope }|{ 0x893ec6c0, &lowSlope }|vc2cartables
-table-high-a|{ 0x893ec6cc, &highA }|{ 0x893ec6d0, &highA }|vc2cartables
-table-floor|{ 0x893ec6d8, &floor }|{ 0x893ec6ec, &floor }|vc2cartables
-table-saw-base|{ 0x893ec6e8, &dynSawBase }|{ 0x893ec6e4, &dynSawBase }|vc2cartables
-table-fold-neg|{ 0x893f3318, &foldNeg }|{ 0x893f32ec, &foldNeg }|vc2cartables
-table-four|{ 0x893f3314, &four }|{ 0x893f3310, &four }|vc2cartables
-table-logistic|{ 0x893f330c, &logistic }|{ 0x893f3310, &logistic }|vc2cartables
-table-clock-scale|{ 0x893f3308, &clockScale }|{ 0x893f330c, &clockScale }|vc2cartables
+table-pitch-factor|{ 0x893ec6f8, &t.pitchFactor }|{ 0x893ec6f0, &t.pitchFactor }|vc2cartables
+table-growl-start|{ 0x893ec228, &t.growlStart }|{ 0x893ec4b0, &t.growlStart }|vc2cartables
+table-noise-scale|{ 0x893ec22c, &t.noiseScale }|{ 0x893ec238, &t.noiseScale }|vc2cartables
+table-plain-glide|{ 0x893ec238, &t.plain.glide }|{ 0x893ec230, &t.plain.glide }|vc2cartables
+table-growl-bus|{ 0x893ec4c0, &t.growl.toBus }|{ 0x893ec4b8, &t.growl.toBus }|vc2cartables
+table-over-pi|{ 0x893ec4a0, &t.overPi }|{ 0x893ec4b8, &t.overPi }|vc2cartables
+table-k50|{ 0x893ec4b4, &t.k50 }|{ 0x893ec4b0, &t.k50 }|vc2cartables
+table-low-slope|{ 0x893ec6c4, &t.lowSlope }|{ 0x893ec6c0, &t.lowSlope }|vc2cartables
+table-high-a|{ 0x893ec6cc, &t.highA }|{ 0x893ec6d0, &t.highA }|vc2cartables
+table-floor|{ 0x893ec6d8, &t.floor }|{ 0x893ec6ec, &t.floor }|vc2cartables
+table-saw-base|{ 0x893ec6e8, &t.dynSawBase }|{ 0x893ec6e4, &t.dynSawBase }|vc2cartables
+table-fold-neg|{ 0x893f3318, &k.foldNeg }|{ 0x893f32ec, &k.foldNeg }|vc2math
+table-four|{ 0x893f3314, &k.four }|{ 0x893f3310, &k.four }|vc2math
+table-logistic|{ 0x893f330c, &t.logistic }|{ 0x893f3310, &t.logistic }|vc2cartables
+table-clock-scale|{ 0x893f3308, &t.clockScale }|{ 0x893f330c, &t.clockScale }|vc2cartables
 # v222: the VOCODER OSC's converter's own part and kind 5's update (port vc2vocosc, Vc2VocoderOsc.cpp) and their
 # constants (vc2cartables). Not planted: the balance's index by OSC & 1 (the OSC byte is 0 or 1).
 vocosc-u8-7bit|uint8_t u8(const uint8_t* in, int at) { return in[at]; }|uint8_t u8(const uint8_t* in, int at) { return (uint8_t)(in[at] & 0x7f); }|vc2vocosc
@@ -149,13 +149,13 @@ kind5-ratio-16|        ratio = t.ratioMax;|        ratio = 16.0f;|vc2vocosc
 kind5-ratio-floor-0|        ratio = t.ratioMin;|        ratio = 0.0f;|vc2vocosc
 kind5-no-carrier|    carrier.update(&p.carrier, peak);\n|\n|vc2vocosc
 kind5-peak-0|    carrier.update(&p.carrier, peak);|    carrier.update(&p.carrier, 0.0f);|vc2vocosc
-table-per-level|{ 0x8939e0a8, &perLevel }|{ 0x8939e0b4, &perLevel }|vc2cartables
-table-velocity-scale|{ 0x8939ddd8, &velocityScale }|{ 0x8939ddb4, &velocityScale }|vc2cartables
-table-sum-scale|{ 0x8939ddb4, &sumScale }|{ 0x8939e0b8, &sumScale }|vc2cartables
-table-keyfollow-scale|{ 0x8939e0b8, &keyfollowScale }|{ 0x8939ddb4, &keyfollowScale }|vc2cartables
-table-balance-scale|{ 0x8939e0c0, &balanceScale }|{ 0x8939e0b4, &balanceScale }|vc2cartables
-table-depth-scale|{ 0x8939c2c0, &depthScale }|{ 0x8939e0c0, &depthScale }|vc2cartables
-table-growl-scale|{ 0x8939e0b4, &growlScale }|{ 0x8939e0c0, &growlScale }|vc2cartables
-table-cents-max|{ 0x893b0254, &centsMax }|{ 0x893b0264, &centsMax }|vc2cartables
-table-per-octave|{ 0x893b025c, &perOctave }|{ 0x8939e0a8, &perOctave }|vc2cartables
-table-ratio-max|{ 0x893b0264, &ratioMax }|{ 0x8939e0c0, &ratioMax }|vc2cartables
+table-per-level|{ 0x8939e0a8, &t.perLevel }|{ 0x8939e0b4, &t.perLevel }|vc2cartables
+table-velocity-scale|{ 0x8939ddd8, &t.velocityScale }|{ 0x8939ddb4, &t.velocityScale }|vc2cartables
+table-sum-scale|{ 0x8939ddb4, &t.sumScale }|{ 0x8939e0b8, &t.sumScale }|vc2cartables
+table-keyfollow-scale|{ 0x8939e0b8, &t.keyfollowScale }|{ 0x8939ddb4, &t.keyfollowScale }|vc2cartables
+table-balance-scale|{ 0x8939e0c0, &t.balanceScale }|{ 0x8939e0b4, &t.balanceScale }|vc2cartables
+table-depth-scale|{ 0x8939c2c0, &t.depthScale }|{ 0x8939e0c0, &t.depthScale }|vc2cartables
+table-growl-scale|{ 0x8939e0b4, &t.growlScale }|{ 0x8939e0c0, &t.growlScale }|vc2cartables
+table-cents-max|{ 0x893b0254, &t.centsMax }|{ 0x893b0264, &t.centsMax }|vc2cartables
+table-per-octave|{ 0x893b025c, &t.perOctave }|{ 0x8939e0a8, &t.perOctave }|vc2cartables
+table-ratio-max|{ 0x893b0264, &t.ratioMax }|{ 0x8939e0c0, &t.ratioMax }|vc2cartables

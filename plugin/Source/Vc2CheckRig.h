@@ -212,6 +212,22 @@ inline bool vc2CaseOutcome(Vc2Tally& tally, const std::string& what, int c, long
     return xtSwitch(tally.stopSwitch) != nullptr;
 }
 
+// A check's cases after its start (v225: the tracker's and kind 6's): a difference at the start, said and counted as
+// one case; else each case on the run's seed, every eighth fading, `oneCase(rng, fades)` saying what differs, through
+// vc2CaseOutcome after `blocks` blocks
+template <class Case>
+void vc2RunCases(const Vc2Run& run, Vc2Tally& tally, const std::string& atStart, const long& blocks, Case oneCase) {
+    if (!atStart.empty()) {
+        std::printf("  at the start: %s\n", atStart.c_str());
+        tally.different = 1;
+        return;
+    }
+    std::mt19937 rng((uint32_t)run.seed);
+    for (int c = 0; c < run.cases; ++c) {
+        if (vc2CaseOutcome(tally, oneCase(rng, c % 8 == 7), c, blocks)) break;
+    }
+}
+
 // One of the port's buffers against rom.4's at `at`
 inline std::string vc2BufferDifference(Vc2Fw& fw, uint32_t at, const std::vector<float>& mine, const char* what) {
     return vc2FirstDifference(fw, at, mine.data(), mine.size() * sizeof(float), what);

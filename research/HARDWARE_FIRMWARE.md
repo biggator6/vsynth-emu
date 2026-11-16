@@ -1546,6 +1546,68 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Voice kind 6 (2026-11-16, v225) {#vc2-kind6}
+
+Step 7's first part, ported bit for bit (`Vc2Kind6`; Vc2Kind6.cpp, Vc2Kind6Core.cpp): the mic's pitch shifter, the EXT IN path's voice kind, and the mic ring it reads. Step 7 is split in two by what the module holds: this, then Auto Note and the pitch source (v226). VC2_VOCAL_DESIGNER.md, "Voice kind 6, run", ran it on rom.4 and found it a TD-PSOLA shifter; this is every instruction.
+
+**The state:**
+- The mic ring, 0x8a0f31cc…0x8a0f73dc (`Vc2MicRingWords`): the write index, 4096 samples, the history's index and 128 periods (the tracker's, one for each block written), the "started" flag, and the pitch-mode flag.
+- The mode word, 0x8993fe54 (.data 2).
+- Four globals at 0x899d9968: Unvoice Level (a converter's, `0x893a73e4`), 440/44100, 44100/440, and 880/44100, which nothing reads.
+- A voice's object at the voice + 0xafc, 0x88 bytes (`Vc2Kind6Words`): the read point, the epoch marker and its two periods, the four targets from P, the head byte, T_out, the time since the grain, the window's step, two heads (`Vc2Kind6Head`: count, window, base, and a period and place written at the grain's start and read by nothing), the grain's place, the four glided values, the SVF's f, damping, band and low, r′, and the lift. +0x20 is neither written nor read.
+
+**The ring:**
+- Its globals' setter `0x893ecef0` (from the init table) writes the three constants.
+- The reset `0x893ec7d0` (the glue's) clears the indexes and "started"; if the mode word isn't 0, it makes it 0 and sets the pitch flag. It zeroes the ring and fills the history with 44100/440.
+- The write `0x893ec820(in, 32)` (the block mixer's) stores the tracker's period (it calls `0x893ee010` itself) in the history, then copies the block in at the write index. The copy doesn't wrap: from a multiple of 32 a block of 32 never passes the end, and that is the one call.
+- The mode setter `0x893ec890(m)` takes 0 or 1 only when new, sets the pitch flag for 0, and clears "started". Nothing calls it.
+
+**A voice:**
+- `0x893ec790(obj, P)`, the update's, copies P+0, +4 and +0xc to the targets and P+8 × 2^31 to the gain's, and does nothing for no P. `0x893ec9a0` is the same without the test and has no caller. `0x893ec700` (the note-on's) is the copy, then the start.
+- The start `0x893ec8d0`:
+  - the read point 512 behind the write point (`+ 0xe00`, masked to 4096), the epoch on it;
+  - both periods from the history at the read point's block;
+  - the glided values at their targets, the gain 0, the SVF cleared with damping 1.2;
+  - the heads at the epoch, the first's window 0 and the second's 0.5;
+  - T_out (below), then the place 1, the heads' period and place;
+  - "started" set. The flag is the ring's, one for every voice.
+- The render `0x893ec730(obj, out)` does nothing at all until a voice has started since the ring's reset or a mode change; it doesn't touch `out`. Otherwise the ratio, rate and level glide by 0.1 toward their targets, the filter's targets are set, and the core runs.
+
+**T_out**, `0x893ecd50`, at the start and at each grain:
+- the grain's place, (position − (time since the grain + epoch)) / the next period, held to [0, 1];
+- T_in, between the last and next periods by it;
+- r′ = P+0 in mode 1, or P+0 × T_in × 440/44100 in mode 0, so T_out = T_in / r′ = 44100 / (440 · P+0) there, whatever the input;
+- the window's step, ½ over the shorter of T_in / rate and T_out.
+
+**The filter's targets**, `0x893ecde0`: the damping is 1.2 below r′ 1, 1.2 − level × (r′ − 1) up to 2, and 1.2 − level above. f is 2 × the cubic of min(1/T_out, ½), a 2 sin(πf₀/fs) at the output's pitch, held under 1.9 − the damping. Both glide by ⅛ a block.
+
+**The core**, `0x893eca10`, a sample at a time:
+1. The epoch steps when the position passes it, by the next period, wrapping at 4096. The next period is the history's at (epoch / 32 + 1.5625) & 127, the block 50 samples past it. `0x893ece80` is the same step on its own, with no caller.
+2. When the time since the grain reaches T_out, a grain starts: the time carries the remainder, T_out is made again, and the head byte flips. The new head's window starts at the time since × the step, its count at the time since, its base at the epoch. The other head's window is set to where its own was carried to.
+3. Each head's window, while under 1, is `0x893f32a0`, ½ (1 − cubic(0.5 − u)) with u = 2x folded about 1, a raised cosine. Then the time since and both windows step on.
+4. Each head reads the ring at base + rate × count (its count then on by one), linearly interpolated, and the two are summed under their windows.
+5. Below r′ 1 (pitched down), a lift follows |mix| × min(10 (1 − r′), 4) × level at 0.0005 a sample, and is added × the windows' sum, where the grains thin.
+6. An SVF (low += band·f; high = in − (damping·band + low); band += f·high) gives its high-pass.
+7. With u the input stage's decision for the sample (0x899d99dc, through `0x893ed500`), the output is (1 − u) × the high-pass + u × the ring at the read point × Unvoice Level. The read point steps on.
+8. The gain glides to its target by 1/32 a sample, multiplies, and the sample goes to both channels.
+
+**rom.4's shared math** (`Vc2Math`): the cubic `0x893f31f0`, x (3 − 4x²); the sine `0x893f3210` and cosine `0x893f3280` around it, which the carrier's port had as copies of their own since v221; and the window. They are now one module on one pool (`Vc2MathPool`, read by `vc2ReadMathPool`). The carrier's and kind 6's tables share one reader, `Vc2PoolTables` (Vc2RomTables.h).
+
+**The check, `xt_vc2kind6 <rom.4> [cases] [seed]`** (in fcheck at 40 cases, under a second; Vc2Kind6Check.cpp, XT_VC2KIND6_MAIN):
+- rom.4's routines on three voices in its RAM against the port's. The globals' setter runs once.
+- Each case clears the voices. Now and then the mode setter (−1…2) runs before the ring's reset, and one case in three sets mode 1 after it (the interval, which rom.4 never selects). Unvoice Level is drawn.
+- 800 blocks of the mic (`Vc2TrackerSignal`) go through the ring's write. The tracker's period is drawn into 0x899d9bd0: the tone's, an octave off, or held. Then every started voice renders on a drawn decision written at 0x899d99dc.
+- One block in 20 has an event first: a set and start with a drawn P, an update with P or none, the mode setter, or the ring's reset.
+- After each routine, the ring, the globals, the mode word and the voice are compared word for word, and after a render the output.
+- Coverage (llvm-cov, 40 cases): every line of the core, and of Vc2Kind6.cpp all but two clamps no input reaches. The grain's place never passes 1, since the epoch steps each sample the position passes it. 1/T_out never passes ½, since T_out under 2 samples is a pitch above 22 kHz and P+0 stops at 32 × 440 Hz.
+
+Results:
+- seed 2024: 40 cases, 32,000 blocks, 83,129 renders (25,829 in mode 1), 688 starts, 641 updates, 236 modes, 67 resets, 0 different;
+- seed 7: 0 different;
+- `mutate_vc2.py --kind6`: 138 plants, all caught on the first run. That is 68 in the ring, the setters, the start, the render, T_out and the filter's targets (vc2k6), 48 in the core (vc2k6core), 5 in the cubic and the window (vc2k6math) and 17 in the tables.
+- The carrier's five plants in the sine, the cosine and their pool moved with the code to Vc2Math.cpp (port vc2math), and its table plants to the words list's form. Every other list ran again, as `Vc2RomTables.h` and `Vc2CheckRig.h` changed: the carrier's 152, the tracker's 217, 45, 10, 66, 114 and 190, all caught.
+- Not planted, as no input tells them apart or none reaches them (the list's head says why for each): the two clamps above, the grain's and the epoch's tests at ≥, a head's ftrc as a floor, an epoch's block from the wrapped epoch, the update's test for no P, and the heads' periods at the start.
+
 ### The pitch tracker's analysis (2026-11-16, v224) {#vc2-tracker-analysis}
 
 Step 6's second part, ported bit for bit (`Vc2TrackerAnalysis`; Vc2TrackerAnalysis.cpp, Vc2TrackerEstimate.cpp): what the frame ({#vc2-tracker-frame}) hands each zero crossing of the band-passed signal. With it the tracker is whole. VC2_VOCAL_DESIGNER.md, "The pitch tracker's analysis", read it in outline; this is every instruction, and two of its statements are corrected there in place.

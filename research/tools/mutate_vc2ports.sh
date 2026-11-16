@@ -7,7 +7,9 @@
 # vocoder object (vc2voc, v220) and its tables (vc2voctables) under xt_vc2vocoder; the VOCODER OSC's carrier (vc2car,
 # v221), its tables (vc2cartables) and its converter's own part and kind 5's update (vc2vocosc, v222) under
 # xt_vc2carrier; the pitch tracker's frame (vc2tracker, v223), its tables (vc2tracktables), its analysis's crossings,
-# onset check and taking (vc2trackana, v224) and its estimator (vc2trackest) under xt_vc2tracker.
+# onset check and taking (vc2trackana, v224) and its estimator (vc2trackest) under xt_vc2tracker; voice kind 6 and the
+# mic ring (vc2k6, v225), its core (vc2k6core), its tables (vc2k6tables) and the shared math (vc2k6math) under
+# xt_vc2kind6, the shared math's sine and cosine (vc2math) under xt_vc2carrier.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -18,8 +20,9 @@ VC2HI=("${VC2HIPORTS[@]}" Vc2Unvoiced Vc2HiresoCheck Vc2HiresoRateCheck Vc2Hires
        Vc2CheckWords)
 VC2VOC=(Vc2Vocoder Vc2VocoderTables Vc2Unvoiced Vc2Consonants Vc2LegacyAnalysis Vc2Legacy Vc2LegacyTables
         "${VC2HIPORTS[@]}" Vc2VocoderCheck Vc2CheckWords)
-VC2CAR=(Vc2Carrier Vc2CarrierTables Vc2CarrierCheck Vc2VocoderOsc Vc2VocoderOscCheck)
+VC2CAR=(Vc2Carrier Vc2CarrierTables Vc2CarrierCheck Vc2VocoderOsc Vc2VocoderOscCheck Vc2Math)
 VC2TRACK=(Vc2Tracker Vc2TrackerTables Vc2TrackerAnalysis Vc2TrackerEstimate Vc2TrackerCheck Vc2TrackerSignal)
+VC2K6=(Vc2Kind6 Vc2Kind6Core Vc2Kind6Tables Vc2Math Vc2Kind6Check Vc2TrackerSignal)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -44,6 +47,11 @@ VC2PORTS=(
     "vc2tracktables|Vc2TrackerTables.cpp|XT_VC2TRACKER_MAIN|vc2track_obj|VC2TRACK"
     "vc2trackana|Vc2TrackerAnalysis.cpp|XT_VC2TRACKER_MAIN|vc2track_obj|VC2TRACK"
     "vc2trackest|Vc2TrackerEstimate.cpp|XT_VC2TRACKER_MAIN|vc2track_obj|VC2TRACK"
+    "vc2math|Vc2Math.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
+    "vc2k6|Vc2Kind6.cpp|XT_VC2KIND6_MAIN|vc2k6_obj|VC2K6"
+    "vc2k6core|Vc2Kind6Core.cpp|XT_VC2KIND6_MAIN|vc2k6_obj|VC2K6"
+    "vc2k6tables|Vc2Kind6Tables.cpp|XT_VC2KIND6_MAIN|vc2k6_obj|VC2K6"
+    "vc2k6math|Vc2Math.cpp|XT_VC2KIND6_MAIN|vc2k6_obj|VC2K6"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port
