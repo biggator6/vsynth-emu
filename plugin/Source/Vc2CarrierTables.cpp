@@ -1,5 +1,5 @@
-// The VOCODER OSC's carrier's constants from rom.4: see Vc2CarrierTables.h (v221).  Every address is rom.4's, each the
-// pool word its routine loads.
+// The VOCODER OSC's constants from rom.4: see Vc2CarrierTables.h (v221, v222).  Every address is rom.4's, each the pool
+// word its routine loads.
 #include "Vc2CarrierTables.h"
 #include "Vc2RomTables.h"
 #include <bit>
@@ -19,6 +19,10 @@ struct Read : Vc2CarrierTables {
             { 0x893ec6e4, &dynLow }, { 0x893ec6e8, &dynSawBase }, { 0x893ec6ec, &dynSaw },
             { 0x893f32ec, &foldAt }, { 0x893f3318, &foldNeg }, { 0x893f3310, &three }, { 0x893f3314, &four },
             { 0x893f3308, &clockScale }, { 0x893f330c, &logistic },
+            { 0x8939e0a8, &perLevel }, { 0x8939ddd8, &velocityScale }, { 0x8939ddb4, &sumScale },
+            { 0x8939e0b4, &growlScale }, { 0x8939e0b8, &keyfollowScale }, { 0x8939e0c0, &balanceScale },
+            { 0x8939c2c0, &depthScale }, { 0x893b0254, &centsMax }, { 0x893b0258, &centsMin },
+            { 0x893b025c, &perOctave }, { 0x893b0264, &ratioMax }, { 0x893b0268, &ratioMin },
         };
         for (const auto& [at, out] : words) *out = std::bit_cast<float>(image.rd32(at));
         return true;

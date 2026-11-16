@@ -177,6 +177,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2VocoderTables.cpp
     Source/Vc2Carrier.cpp
     Source/Vc2CarrierTables.cpp
+    Source/Vc2VocoderOsc.cpp
     Source/XtBuildId.cpp
 )
 

@@ -5,11 +5,12 @@
 // the settings (0x893ec450), each on a drawn P or none, the input stage's peak drawn into 0x899d9a5c.  P's levels are a
 // parameter's v/127, its pitch 19 Hz…10 kHz with the update's bounds now and then, Growl off half the time, the
 // Dynamics off a third.  After every routine the carrier's words (+0x00…+0x68), after a render its frames too, word
-// for word.  XT_VC2CARRIER_FIRST=1 says where the first case to differ does, XT_VC2CARRIER_STOP=1 stops there.
+// for word.  Then its second part (v222, Vc2VocoderOscCheck.cpp): the VOCODER OSC's converter's own part and kind 5's
+// update.  XT_VC2CARRIER_FIRST=1 says where the first case to differ does, XT_VC2CARRIER_STOP=1 stops there.
 // XT_VC2CARRIER_MAIN only.
 #ifdef XT_VC2CARRIER_MAIN
 #include "Vc2Carrier.h"
-#include "Vc2CheckRig.h"
+#include "Vc2CarrierCheck.h"
 #include "XtSwitches.h"
 #include <bit>
 #include <cmath>
@@ -17,7 +18,7 @@
 
 namespace {
 constexpr uint32_t kSetRate = 0x893ec6a0, kInit = 0x893ebed0, kSettings = 0x893ec450, kUpdate = 0x893ec4d0;  // [FW]
-constexpr uint32_t kRender = 0x893ebfa0, kOsClock = 0x893018d0, kPeakAt = 0x899d9a5c;                        // [FW]
+constexpr uint32_t kRender = 0x893ebfa0, kPeakAt = 0x899d9a5c;                                               // [FW]
 constexpr uint32_t kCarrierAt = 0x8C040000, kParamsAt = 0x8C041000, kFramesAt = 0x8C036000;   // in Vc2Fw's RAM
 constexpr int kBlocks = 120, kEventOneIn = 6, kFrameWords = 2 * Vc2Carrier::kFrames;
 
@@ -114,7 +115,7 @@ int main(int argc, char** argv) {
     const auto run = vc2Start(argc, argv, fw, "xt_vc2carrier", vc2LoadCarrier);
     if (!run) return 1;
     int32_t clock = 0;
-    fw.cpu.hook(kOsClock, [&clock](Sh4& cpu) { cpu.ret((uint32_t)clock); });
+    fw.cpu.hook(kVc2OsClock, [&clock](Sh4& cpu) { cpu.ret((uint32_t)clock); });
     if (!fw.call(kSetRate, {})) {
         std::printf("xt_vc2carrier: the rate setter faults: %s\n", fw.cpu.error().c_str());
         return 1;
@@ -136,7 +137,8 @@ int main(int argc, char** argv) {
     std::printf("carrier: %d cases, %ld blocks (%ld growling), %ld updates (%ld with the Dynamics), %ld settings, %ld "
                 "with no P, %ld different\n", run->cases, n.blocks, n.growling, n.updates, n.dynamics, n.settings,
                 n.none, n.different);
-    std::printf("xt_vc2carrier: %ld different\n", n.different);
+    const long osc = vc2VocoderOscCases(fw, *run, clock);   // the second part (v222)
+    std::printf("xt_vc2carrier: %ld different\n", n.different + osc);
     return 0;
 }
 #endif

@@ -278,8 +278,11 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      start on the OS clock (`0x893f31a0`), settings `0x893ec450`, update `0x893ec4d0` (the balance, the noise filters by
      pitch, the Dynamics on the input stage's peak) and render `0x893ebfa0` with the growl, against rom.4's routines on
      a carrier in its RAM in xt_vc2carrier (HARDWARE_FIRMWARE.md, "The VOCODER OSC's carrier").
-   - then (v222): its converter (`0x8939db00`, the VOCODER OSC's part of `0x8939fbd0`) and kind 5's update
-     (`0x893afff0`: the gain, the pitch, the growl and the balance with their modulators), which give the carrier P.
+   - done (v222): its converter's own part (`0x8939db00` from its P stores: `vc2VocoderOscConvert`) and kind 5's update
+     (`0x893afff0`: the gain, the pitch, the growl and the balance with their modulators: `vc2Kind5Update`), which give
+     the carrier P, against rom.4's in xt_vc2carrier's second part (HARDWARE_FIRMWARE.md, "The VOCODER OSC's converter
+     and kind 5's update"). The converter's first half, the OSC block it shares with the analog kind, comes with the
+     voice in the wiring. Step 5 is done.
 6. The pitch tracker.
 7. Kind 6 (the mic's pitch shifter: harmonizer and Auto Note) and the mic ring.
 8. The part mixer (Direct Sound) and the patch EQ.

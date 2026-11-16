@@ -764,6 +764,7 @@ vocoder: 40 cases (20 stereo), 16000 blocks (9416 playing), 324 modes, 649 setti
 xt_vc2vocoder: 0 different
 == xt_vc2carrier
 carrier: 40 cases, 4800 blocks (2219 growling), 389 updates (275 with the Dynamics), 409 settings, 103 with no P, 0 different
+vocoder osc: 40 cases, 1200 updates (ramps running 410, armed 395, off 395), 0 different
 xt_vc2carrier: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks

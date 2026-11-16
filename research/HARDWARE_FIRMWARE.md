@@ -1546,6 +1546,49 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VOCODER OSC's converter and kind 5's update (2026-11-16, v222) {#vc2-vocoder-osc}
+
+Step 5's second part, ported bit for bit (`Vc2VocoderOsc.cpp`): what the VOCODER OSC's IDs become in P (the voice + 0x104, the OSC block + 0xb0), and what kind 5's update makes of P each update before the carrier's ("The VOCODER OSC's carrier").
+
+**The converter `0x8939db00`** (the VOCODER OSC's part of `0x8939fbd0`) works in two halves:
+- The first, to `0x8939de28`, fills the OSC block itself: the pitch from pitch10, the key-follow key, the envelope cents, powf, and the Matrix's OSC Pitch and Level and LFO Pitch and Level sums. These are rom.2's shapes, the OSC block the analog kind has too, so it comes with the VC-2 voice in the wiring. Not ported here.
+- The second, from block + 0xbc, fills P. It uses only constants and the converter's input, so it stands on its own: `vc2VocoderOscConvert`.
+
+**The converter's P**, its input being the note-on's (an 8-byte header with +2 the OSC, +3 the key, +4 the velocity; the record from +8):
+- P+0x0c…+0x1c (the saw's and the noise's cutoffs and levels) and P+0x24, +0x28 (the Dynamics): the record's byte × 1/127, unsigned.
+- P+0x30, Growl Level: clamp₀¹(the Matrix's OSC Time sum ÷ 12000 + the level ÷ 127), the level a signed byte. Then + (key − 60) × Keyfollow×10 ÷ 1200, and clamped to [0, 1] again (the upper bound tested first).
+- P+0x34, its envelope depth: sign·(d/63)² (`0x8939c0b0`) × a velocity factor ÷ 32768. The factor comes from the shared velocity curve (`0x893a7fb0`) on the velocity and the record's curve (+0x70) and sens (+0x72, a halfword).
+- P+0x38, its LFO depth: (d + the Matrix's OSC LFO Time sum) held to ±63, through the same curve, with no velocity factor.
+- P+0x44, the balance: clamp to [0, 2] of (the Matrix's OSC Formant sum ÷ 12000 + the balance ÷ 64).
+- P+0x48 and P+0x4c, its depths: the same as the growl's, with their own velocity curve (+0x7c, +0x7e) and the OSC LFO Formant sum.
+- P+0x50 is 3 on OSC 1 and 7 on OSC 2, and P+0x3c, +0x40 and +0x54 are 0. The converter leaves P+0x00…+0x0b, +0x20 and +0x2c alone.
+
+**So the VOCODER OSC takes its Matrix modulation on the analog OSC's destinations:** Growl on OSC Time (where the analog's PW is) and the balance on OSC Formant (where its Fat is), each LFO depth on the LFO's of the same. Two sources agree on the groups' order: the getter (`0x893a23b0`) returns M + 0xca, slot 1's sum, and XtOsc keeps a sum at M + 0xca + 2·(slot − 1) in rom.2's slot order (Pitch, Time, Formant, Level). The record's two velocity curves and sens (+0x70/+0x72, +0x7c/+0x7e) are not traced to their IDs.
+
+**Kind 5's update `0x893afff0(voice)`**, from `0x893ae310`:
+- P+0x20 = clamp₀¹(P+0x30 + env·P+0x34 + LFO·P+0x38), with env and LFO the outputs of the objects at the voice's +0xa50 (+0x4c) and +0xa60 (+0x38);
+- P+0x2c = clamp to [0, 2] of (P+0x44 + env·P+0x48 + LFO·P+0x4c), from +0xa54 and +0xa64;
+- P+0, the gain = (1 + v₀x30·v₀x100) × v₀x88 × v₀xb0 × v₀x960 (v₀xNN the voice's words);
+- P+4, the pitch = clamp±32(exp2(clamp±6000(v₀x5c + env·v₀x70 + v₀x2c·v₀xfc + ramp + v₀xa70) × 1/1200) × v₀x60 × v₀xa6c). env is [+0xa4c]'s output (+0x4c). ramp is the pitch ramp's value (`0x893b1160` on +0x90c: +0x3c while its +4 is set, 1 if only its +0 is set, else 0);
+- then the carrier's update on P.
+
+The converter's first half writes v₀x5c, +0x60, +0x70, +0x88, +0xb0, +0xfc and +0x100 (the OSC block's +0x08…+0xac).
+
+**The shared routines.** The velocity curve and exp2 (`0x893a8340`) are rom.2's (step 1b's `vc2run osc`), so the port reaches them through `Vc2ToneShared`, an interface the wiring gives XtOsc's ports. The Matrix's sums come in as the two groups the getters return (`Vc2MatrixGroups`). The constants are with the carrier's in `Vc2CarrierTables`: 1/127, 32768, 12000, 127, 1200, 64, 63, ±6000, 1/1200, ±32.
+
+**The check:** xt_vc2carrier's second part (Vc2VocoderOscCheck.cpp), on the first part's interpreter.
+- Each case draws a converter input: the header; the record's VOCODER bytes in their IDs' ranges, and now and then any byte, which the loads' widths and signs must take; Growl Keyfollow 0 half the time and mostly small; the rest 0. It draws the Matrix's two groups too, which hooks on rom.4's four getters give, one case in four with the LFO sums put so that sum + depth lands on ±63 or ±64.
+- P starts as noise on both, so a word the converter leaves stays. rom.4's whole converter runs on the input and the OSC block at the voice + 0x54, the port's own part on the same, then P is compared word for word.
+- Then the carrier's init on both, and 30 of kind 5's updates on a voice of drawn words (the cents across ±6000, the second ratio now and then below 0 for the −32 bound), its five modulators' outputs and the ramp's three states, with the input stage's peak drawn. After each, P and the carrier word for word.
+- The shared routines run as rom.4's own in the interpreter on both sides (`RomShared`), so what is compared is the VOCODER OSC's own arithmetic.
+
+Results:
+- seed 2024: 40 cases, 1,200 updates (ramps running 410, armed 395, off 395), 0 different;
+- seed 7: 0 different;
+- `mutate_vc2.py --carrier`: the list's 62 new plants (52 in Vc2VocoderOsc.cpp, 10 in its constants). The first run missed two, and the draws changed for them. Growl Level's divisor: a Keyfollow drawn over ±200% saturates the growl to 0 or 1 at most keys, which hid the level's own term, so the Keyfollow is now 0 half the time, as in most patches. The LFO depths' −63 bound read as −64: only sum + depth at −64 itself shows it, which random sums rarely hit, so the bounds' edges are now drawn.
+
+The VOCODER OSC is ported but for its share of the OSC block, which comes with the VC-2 voice. Not in the sound yet.
+
 ### The VOCODER OSC's carrier (2026-11-15, v221) {#vc2-carrier}
 
 Step 5's first part, ported bit for bit (`Vc2Carrier`, Vc2Carrier.cpp): voice kind 5's render state at the voice + 0xa90, 0x6c bytes (`Vc2CarrierWords`), with its four routines. VC2_VOCAL_DESIGNER.md, "The carrier: the VOCODER OSC" and "The growl, run", read it by shape; this is every instruction of it.

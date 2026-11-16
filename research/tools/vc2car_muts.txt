@@ -95,3 +95,67 @@ table-fold-neg|{ 0x893f3318, &foldNeg }|{ 0x893f32ec, &foldNeg }|vc2cartables
 table-four|{ 0x893f3314, &four }|{ 0x893f3310, &four }|vc2cartables
 table-logistic|{ 0x893f330c, &logistic }|{ 0x893f3310, &logistic }|vc2cartables
 table-clock-scale|{ 0x893f3308, &clockScale }|{ 0x893f330c, &clockScale }|vc2cartables
+# v222: the VOCODER OSC's converter's own part and kind 5's update (port vc2vocosc, Vc2VocoderOsc.cpp) and their
+# constants (vc2cartables). Not planted: the balance's index by OSC & 1 (the OSC byte is 0 or 1).
+vocosc-u8-7bit|uint8_t u8(const uint8_t* in, int at) { return in[at]; }|uint8_t u8(const uint8_t* in, int at) { return (uint8_t)(in[at] & 0x7f); }|vc2vocosc
+vocosc-s8-unsigned|int s8(const uint8_t* in, int at) { return (int8_t)in[at]; }|int s8(const uint8_t* in, int at) { return in[at]; }|vc2vocosc
+vocosc-s16-byte|    std::memcpy(&v, in + at, sizeof v);|    v = (int16_t)in[at];|vc2vocosc
+vocosc-saw-level-at|{ 0x6d, &Vc2CarrierParams::sawLevel }|{ 0x6c, &Vc2CarrierParams::sawLevel }|vc2vocosc
+vocosc-threshold-at|{ 0x7c, &Vc2CarrierParams::threshold }|{ 0x7d, &Vc2CarrierParams::threshold }|vc2vocosc
+vocosc-growl-at|kGrowlAt = 0x72|kGrowlAt = 0x73|vc2vocosc
+vocosc-follow-at|kGrowlFollowAt = 0x74|kGrowlFollowAt = 0x75|vc2vocosc
+vocosc-growl-lfo-at|kGrowlLfoAt = 0x76|kGrowlLfoAt = 0x77|vc2vocosc
+vocosc-curve-at|kGrowlCurveAt = 0x78|kGrowlCurveAt = 0x79|vc2vocosc
+vocosc-sens-at|kGrowlSensAt = 0x7a|kGrowlSensAt = 0x7c|vc2vocosc
+vocosc-balance-at|kBalanceAt = 0x7e|kBalanceAt = 0x7f|vc2vocosc
+vocosc-balance-lfo-at|kBalanceLfoAt = 0x82|kBalanceLfoAt = 0x83|vc2vocosc
+vocosc-balance-sens-at|kBalanceSensAt = 0x86|kBalanceSensAt = 0x84|vc2vocosc
+vocosc-sums-swapped|kTime = 1, kFormant = 2|kTime = 2, kFormant = 1|vc2vocosc
+vocosc-lfo-pitch|kLfoTime = 2, kLfoFormant = 3|kLfoTime = 1, kLfoFormant = 3|vc2vocosc
+vocosc-depth-62|kDepthMax = 63|kDepthMax = 62|vc2vocosc
+vocosc-key-64|kKeyCentre = 60|kKeyCentre = 64|vc2vocosc
+vocosc-index-swapped|kBalanceIndex[2] = { 3, 7 }|kBalanceIndex[2] = { 7, 3 }|vc2vocosc
+vocosc-curve-unsigned|    return mul(d < 0 ? -x : x, x);|    return mul(x, x);|vc2vocosc
+vocosc-lfo-floor-64|    } else if (d < -kDepthMax) {|    } else if (d < -kDepthMax - 1) {|vc2vocosc
+vocosc-lfo-no-sum|    int d = sum + depth;|    int d = depth;|vc2vocosc
+vocosc-velocity-32767|div(flt((uint16_t)v), vc2CarrierTables().velocityScale)|div(flt((uint16_t)v), 32767.0f)|vc2vocosc
+vocosc-velocity-args|shared.velocity(u8(in, kVelocityAt), s16(in, sensAt), u8(in, curveAt))|shared.velocity(u8(in, kVelocityAt), s16(in, curveAt), u8(in, sensAt))|vc2vocosc
+vocosc-held-no-top|    if (x > top) return top;\n    return 0.0f > x ? 0.0f : x;|    return 0.0f > x ? 0.0f : x;|vc2vocosc
+vocosc-sum-12001|div(flt(sum), vc2CarrierTables().sumScale)|div(flt(sum), 12001.0f)|vc2vocosc
+vocosc-level-no-sum|add(div(flt(sum), vc2CarrierTables().sumScale), div(flt(v), scale))|div(flt(v), scale)|vc2vocosc
+vocosc-follow-top-2|heldBelow(add(div(flt(follow), t.keyfollowScale), growl), 1.0f)|heldBelow(add(div(flt(follow), t.keyfollowScale), growl), 2.0f)|vc2vocosc
+vocosc-no-follow|    m.growl = heldBelow(add(div(flt(follow), t.keyfollowScale), growl), 1.0f);|    m.growl = growl;|vc2vocosc
+vocosc-growl-zero|    m.growlZero[0] = m.growlZero[1] = 0;|    m.growlZero[0] = 0;|vc2vocosc
+vocosc-env-no-velocity|    m.growlEnv = mul(depthCurve(s8(in, kGrowlEnvAt)), growlVelocity);|    m.growlEnv = depthCurve(s8(in, kGrowlEnvAt));|vc2vocosc
+vocosc-balance-growl-velocity|    m.balanceEnv = mul(depthCurve(s8(in, kBalanceEnvAt)), balanceVelocity);|    m.balanceEnv = mul(depthCurve(s8(in, kBalanceEnvAt)), growlVelocity);|vc2vocosc
+vocosc-balance-top-1|t.balanceScale, 2.0f);|t.balanceScale, 1.0f);|vc2vocosc
+vocosc-balance-zero|    m.balanceZero = 0;\n|\n|vc2vocosc
+vocosc-levels-divided|mul(flt(u8(in, level.at)), t.perLevel)|div(flt(u8(in, level.at)), t.growlScale)|vc2vocosc
+kind5-no-floor|    if (0.0f > x) x = 0.0f;\n    return x > top ? top : x;|    return x > top ? top : x;|vc2vocosc
+kind5-terms-order|add(mul(lfo, lfoDepth), add(mul(env, envDepth), base))|add(add(mul(lfo, lfoDepth), mul(env, envDepth)), base)|vc2vocosc
+kind5-growl-top-2|v.growlLfo, m.growlLfo, 1.0f);|v.growlLfo, m.growlLfo, 2.0f);|vc2vocosc
+kind5-balance-crossed|modulated(m.balance, v.balanceEnv, m.balanceEnv, v.balanceLfo, m.balanceLfo, 2.0f)|modulated(m.balance, v.balanceLfo, m.balanceEnv, v.balanceEnv, m.balanceLfo, 2.0f)|vc2vocosc
+kind5-gain-no-one|    const float gain = add(mul(v.gainMod, v.gainModDepth), 1.0f);|    const float gain = mul(v.gainMod, v.gainModDepth);|vc2vocosc
+kind5-gain-two-factors|mul(mul(mul(gain, v.gain[0]), v.gain[1]), v.gain[2])|mul(mul(gain, v.gain[0]), v.gain[1])|vc2vocosc
+kind5-env-no-depth|add(mul(v.pitchEnv, v.pitchEnvDepth), v.cents)|add(v.pitchEnv, v.cents)|vc2vocosc
+kind5-mod-no-mod|add(mul(v.pitchMod, v.pitchModDepth), add(|add(v.pitchModDepth, add(|vc2vocosc
+kind5-no-ramp|    cents = add(add(cents, v.ramp), v.centsOffset);|    cents = add(cents, v.centsOffset);|vc2vocosc
+kind5-no-offset|    cents = add(add(cents, v.ramp), v.centsOffset);|    cents = add(cents, v.ramp);|vc2vocosc
+kind5-cents-5000|        cents = t.centsMax;|        cents = 5000.0f;|vc2vocosc
+kind5-cents-floor|        cents = t.centsMin;|        cents = -5000.0f;|vc2vocosc
+kind5-octave-divided|shared.exp2(mul(cents, t.perOctave))|shared.exp2(div(cents, 1200.0f))|vc2vocosc
+kind5-no-ratio2|mul(mul(shared.exp2(mul(cents, t.perOctave)), v.ratio), v.ratio2)|mul(shared.exp2(mul(cents, t.perOctave)), v.ratio)|vc2vocosc
+kind5-ratio-16|        ratio = t.ratioMax;|        ratio = 16.0f;|vc2vocosc
+kind5-ratio-floor-0|        ratio = t.ratioMin;|        ratio = 0.0f;|vc2vocosc
+kind5-no-carrier|    carrier.update(&p.carrier, peak);\n|\n|vc2vocosc
+kind5-peak-0|    carrier.update(&p.carrier, peak);|    carrier.update(&p.carrier, 0.0f);|vc2vocosc
+table-per-level|{ 0x8939e0a8, &perLevel }|{ 0x8939e0b4, &perLevel }|vc2cartables
+table-velocity-scale|{ 0x8939ddd8, &velocityScale }|{ 0x8939ddb4, &velocityScale }|vc2cartables
+table-sum-scale|{ 0x8939ddb4, &sumScale }|{ 0x8939e0b8, &sumScale }|vc2cartables
+table-keyfollow-scale|{ 0x8939e0b8, &keyfollowScale }|{ 0x8939ddb4, &keyfollowScale }|vc2cartables
+table-balance-scale|{ 0x8939e0c0, &balanceScale }|{ 0x8939e0b4, &balanceScale }|vc2cartables
+table-depth-scale|{ 0x8939c2c0, &depthScale }|{ 0x8939e0c0, &depthScale }|vc2cartables
+table-growl-scale|{ 0x8939e0b4, &growlScale }|{ 0x8939e0c0, &growlScale }|vc2cartables
+table-cents-max|{ 0x893b0254, &centsMax }|{ 0x893b0264, &centsMax }|vc2cartables
+table-per-octave|{ 0x893b025c, &perOctave }|{ 0x8939e0a8, &perOctave }|vc2cartables
+table-ratio-max|{ 0x893b0264, &ratioMax }|{ 0x8939e0c0, &ratioMax }|vc2cartables

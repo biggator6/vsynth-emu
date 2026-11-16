@@ -703,7 +703,8 @@ divider's noise test, its rounding and the cosine give 242,948, 127,960 and 256,
   (+0x64), 32-bit;
 - the init sets +0x44 to 50 × the rate (0.998), so the first growl cycle starts at the second sample.
 
-Where g comes from (read, not run): the kind 5 update `0x893afff2(voice)` builds P at voice + 0x104 and gives P+0x20 =
+Where g comes from (read, not run; run and ported in v222, HARDWARE_FIRMWARE.md, "The VOCODER OSC's converter and
+kind 5's update", where the Matrix sums are its OSC Time and Formant destinations): the kind 5 update `0x893afff2(voice)` builds P at voice + 0x104 and gives P+0x20 =
 clamp₀¹(P+0x30 + m₁·P+0x34 + m₂·P+0x38) and P+0x2c = clamp₀²(P+0x44 + m₁·P+0x48 + m₂·P+0x4c), m₁ and m₂ two modulators the voice
 points at (+0xa50, +0xa60): the shape of Growl Level and Saw-Noise Mix Balance with their LFO and Envelope Depths. ~~Which ID
 lands at P+0x30 (and where Growl Keyfollow goes) is not traced: the converter hasn't been run.~~ Run: Growl Level, with its

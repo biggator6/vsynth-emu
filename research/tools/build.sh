@@ -82,9 +82,9 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 [ -f Vc2VocoderCheck.cpp ] && cc -DXT_VC2VOCODER_MAIN Vc2VocoderCheck.cpp Vc2Vocoder.cpp Vc2VocoderTables.cpp \
    Vc2Unvoiced.cpp Vc2Consonants.cpp Vc2LegacyAnalysis.cpp Vc2Legacy.cpp Vc2LegacyTables.cpp "${VHI[@]}" \
    "${VW[@]}" "${SH4[@]}" -o "$O/xt_vc2vocoder" &
-# The VOCODER OSC's carrier (v221) against rom.4's own routines
+# The VOCODER OSC's carrier (v221), its converter's own part and kind 5's update (v222) against rom.4's own routines
 [ -f Vc2CarrierCheck.cpp ] && cc -DXT_VC2CARRIER_MAIN Vc2CarrierCheck.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp \
-   "${SH4[@]}" -o "$O/xt_vc2carrier" &
+   $( [ -f Vc2VocoderOsc.cpp ] && echo Vc2VocoderOsc.cpp Vc2VocoderOscCheck.cpp ) "${SH4[@]}" -o "$O/xt_vc2carrier" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &
 # xt_fx: the chip and its check, the check's parts in XtFxCheck*.cpp from v204
