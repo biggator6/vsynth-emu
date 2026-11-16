@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The pitch tracker's analysis v224 (2026-11-16, on vc2-mode): step 6's second part (the user's "Yes, next item";
+  HARDWARE_FIRMWARE.md, "The pitch tracker's analysis"); the tracker is whole, step 6 done. Vc2TrackerAnalysis
+  (Vc2TrackerAnalysis.cpp): the crossing routines 0x893ee570/0x893ee7d0 as one routine over a direction table
+  (Vc2TrackerDirection), the onset check 0x893eea50 and taking an estimate 0x893ef110; the estimator 0x893eeb90 in
+  Vc2TrackerEstimate.cpp. The state's words named (Vc2TrackerSide down/up, the crossings' counts, the last candidate
+  and fraction; +0xcf8 read by nothing); the analysis's 36 pool words in Vc2TrackerTables. The pool-word loop of three
+  tables' readers made one (vc2ReadPool, Vc2RomTables.h). xt_vc2tracker made whole: no hook, rom.4's module on both
+  sides, fed Vc2TrackerSignal (held tones 55-1760 Hz with harmonics, pitch steps, noise, silence) with scrambles and
+  jolts around the tone sounding; 100 cases in fcheck, 0 different at seeds 2024 and 7; every line of the port reached,
+  all the analysis's branch sides and 146 of the estimator's 148. mutate_vc2.py --tracker at 100 cases: 217 plants
+  (157 new), caught (two after the draws reached the lock's cap and a count of 4); every other list again, caught.
+  Found on the port: 220 -> 330 Hz ends an octave low by the onset check's too-soon rule (a step up of more than
+  1/0.7 while locked), an octave up escapes it by the loud frame clearing the lock; "at 256 failures" in
+  VC2_VOCAL_DESIGNER.md withdrawn (it is 3, 256 the cap). Not in the sound yet.
+
 The pitch tracker's frame v223 (2026-11-16, on vc2-mode): step 6's first part (the user's "Yes, next item"; step 6
   split in two by the module's calls, v224 the analysis; HARDWARE_FIRMWARE.md, "The pitch tracker's frame").
   Vc2Tracker: the module's state 0x899d9b70…0x899d9d1c word for word; its static initializers (0x893edf90's two words,

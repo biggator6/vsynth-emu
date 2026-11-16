@@ -1546,6 +1546,89 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The pitch tracker's analysis (2026-11-16, v224) {#vc2-tracker-analysis}
+
+Step 6's second part, ported bit for bit (`Vc2TrackerAnalysis`; Vc2TrackerAnalysis.cpp, Vc2TrackerEstimate.cpp): what the frame ({#vc2-tracker-frame}) hands each zero crossing of the band-passed signal. With it the tracker is whole. VC2_VOCAL_DESIGNER.md, "The pitch tracker's analysis", read it in outline; this is every instruction, and two of its statements are corrected there in place.
+
+**The state's words** the frame left unnamed, by what reads them:
+- a side per direction (`Vc2TrackerSide`, down at 0x899d9c88, up at 0x899d9c98): its peak threshold, the peaks of its last two valid crossings (second, last), and the largest peak of the crossings it has refused since (pending);
+- the crossings since the last valid one (0x899d9ca8), and that count at each direction's last valid crossing (0xcac down, 0xcb0 up);
+- the last candidate (0xbdc) and the last valid crossing's fraction of a sample (0xcbc);
+- +0xcf8, which the mode setter clears, is read by nothing in the module.
+
+**A crossing** (`0x893ee570` up, `0x893ee7d0` down). The two are mirror images, ported as one routine over a direction table (`Vc2TrackerDirection`: each one's own words and the other's):
+1. If its direction has had no crossing for the longest candidate, the side's threshold takes the pending peak, and the pending peak decays by 0.68.
+2. The peak since the last crossing must pass 0.68 of the threshold to be valid. The threshold takes the peak if it passes, else decays by 0.68.
+3. The crossings count goes up. The peak since restarts at this sample (up) or its negation (down). The analysis's copy of the samples since the last valid crossing (0xcc4) takes the counter; its old value is kept for step 9.
+4. The recent peak (0xc7c) becomes the largest of the side's pending peak, this peak and the other side's last.
+5. The onset check (below) may make it valid, or not.
+6. Refused: the side's pending peak takes the larger of itself and this peak, and nothing else happens.
+7. Valid: its fraction of a sample is |previous / (now − previous)|. The side's second peak takes its last, and its last takes the held peak (step 4's larger of pending and this).
+8. The first of its direction since the other's (the crossing flag 0 for an up, 1 for a down) goes to the estimator with the fraction, and then to taking its estimate:
+   - Taken by a direction the follow state lets move P (up when follow is 0 or 2, `(follow & 1) == 0`; down when it is 1 or 2, `follow > 0`), P moves. The fallback takes P, the last estimate takes the estimate, and P += (estimate − P) × smoothing, one FMAC.
+   - When the new P lies between 73.5 and 441 samples, the band-pass's targets follow it: the low-pass to 2π/P + 2π·25/44100, the high-pass to ½ · 2π/P.
+   - If follow was 2, it becomes this direction, or the other if the hand-off flag is set. Otherwise a hand-off, with follow on this direction, gives it to the other. The hand-off flag clears.
+9. A second crossing of its direction goes to the history instead. It needs the old value from step 3 over 0, a lock of 3 or less, and the larger of the two sides' second peaks × 1.7 not over this peak; else it returns here, with the counters left running. When it passes:
+   - the other direction's counter takes the samples between;
+   - the history shifts in the two intervals (the older one second, the span newest);
+   - the fraction is kept;
+   - the other side's second peak takes its last, and its last takes its pending.
+10. Steps 8 and 9 end the same way. The counters restart, and the crossing flag says this direction. This direction's count takes the crossings count, which restarts. The other side's pending peak clears.
+
+**The onset check** `0x893eea50(n, peak, &valid)` runs only when locked (a lock over 3):
+- A peak over 0.005 and over 2.3 × the larger of the two sides' second peaks is an onset: the lock and the failures clear.
+- Otherwise, a crossing sooner than 0.7 P after the last of its direction is refused if it is also sooner than 0.8 of the last candidate. Sooner than 0.7 P alone halves the lock.
+- A crossing whose peak failed counts after all if it comes at least 0.85 P after the last of its direction (when the second peaks are over twice its peak) or 0.9 P (otherwise).
+
+**The estimator** `0x893eeb90(direction, fraction)`. The half-interval since the last valid crossing (samples + fraction − the last fraction) shifts into the four-deep history, and the candidate is it plus the half before. Then, in order:
+1. A recent peak under the crossing level (50/32768) clears the lock and returns 0. A candidate outside the mode's limits returns 0.
+2. The sides. Rising means the up side's last peak is above its second while the down side's last is not below its second. Falling means the down side's second is above its last, and with the up side falling too and a noise count over 7 it returns 0. When not rising, a last frame's peak over 3 × the recent peak (2 × when that is under 1000/32768) clears the lock and returns 0.
+3. Locked (over 3): a candidate within 0.96–1.07 P is returned. If instead the last candidate is within it, the hand-off flag is set; within 0.97–1.05 P the last is returned, and the stored candidate is set to 1.0, so the onset check's candidate rule lapses.
+4. Any lock goes straight to the halves' agreement (step 8) with f = 0.8.
+5. Unlocked: follow becomes 2, and a noise count over 10 returns 0. With the recent peak under 3000/32768:
+   - under 400/32768, a falling side, or a candidate over both P and 245 samples, returns 0;
+   - the crossings counted since the last valid one must equal those counted before this direction's last valid one;
+   - the other side's second peak × 0.9 must not be over this side's last;
+   - a candidate over 2 P returns 0 when the other direction's count is over 3.
+6. How far the halves may disagree, f.
+   - Loud (a recent peak of 600/32768 or more): 0.75 for a candidate under P, 0.85 for one over 1.5 P, else 0.8.
+   - Quiet: the sides must not cross (whichever side's last peak is higher must have the higher second), and f is 0.85.
+   - Quiet, a candidate off P (over 1.5 P or under 0.75 P) returns 0 with a noise count of 4 or more. Under 400/32768 it also returns 0 when not rising, when under 63 samples and under P or under 200/32768, and when over 245 samples and over P or under 200/32768. Far off (over 2 P or under P/2), f is 0.9.
+7. A noise count over 4 sets f to 0.9. Unless the candidate is within 0.6–1.8 P, each side's second peak × 0.9 must not be over its last.
+8. The halves' agreement:
+   - The new half and the one two back must be within f of each other both ways, else 0.
+   - If the two before (h0 and h2) are within f both ways too, the candidate is returned.
+   - Otherwise, locked over 30, the candidate is returned when the last candidate is within 0.85 of P both ways and of the candidate both ways. Locked up to 30, 0.
+   - Unlocked, rising and over 200/32768: the candidate if it lies within 0.85–1.3 P, or else whichever of it, twice the older half and twice the new one is nearest P. Twice the new half wins only on an exact tie: if 2·h0 is nearer P than the midpoint h0 + half, it is nearer than 2·half too.
+
+**Taking** `0x893ef110(e)`:
+- 0: the failures go up by one, capped at 256. Locked over 3, the smoothing is ½. From the third failure on, each one halves the lock, sets the high-pass target back to the mode's own, and gives the fallback P. Not taken. (VC2_VOCAL_DESIGNER.md said "at 256 failures": withdrawn there.)
+- Within 0.9–1.1 of the last estimate: the lock goes up by one, capped at 256. Locked over 3, the failures clear and the smoothing is 1. Taken.
+- Unlocked: the smoothing is 1. Taken.
+- Locked, outside 0.25–1.5 P: the smoothing is ½ and the lock clears. Taken.
+
+**The tracker measured on the port** (a scratch program; the port equals rom.4 in xt_vc2tracker):
+- Clean tones at about −10 dBFS, from the reset, in mode 0: 70 to 880 Hz settle on the period exactly (P within 0.01 of a sample) in 11–46 ms. 1400 Hz never leaves the start, 220.5 samples. After the 400 Hz low-pass its peak is about 0.01, which is quiet, and its raw input crosses zero about twice a block, a noise count of 5, so a candidate off P is refused. At 0.5 ("The pitch tracker, run", VC2_VOCAL_DESIGNER.md) it is loud and is reached.
+- 220 → 330 Hz settles an octave low; traced on a copy of the estimator. One period of 330 Hz, 134 samples, is sooner than 0.7 × 200.45 = 140, so the onset check refuses every other crossing. The halves alternate 62 and 206, and the candidate, 268 samples (two periods), agrees with itself.
+- A fourth up (294 Hz, 150 samples) passes that rule, so the line is a step up of more than 1/0.7, about 6.2 semitones, made while locked.
+- An octave up (220 → 440) is followed. The band-pass, still at 110/245 Hz, gives 440 Hz a third of the old peak, so the last frame's peak is over 3 × the recent ones, which clears the lock (estimator step 2), and the too-soon rule only runs locked.
+- That answers "which of the estimator's rules picks it" in VC2_VOCAL_DESIGNER.md, "The pitch tracker, run".
+
+**The check, `xt_vc2tracker <rom.4> [cases] [seed]`**, made whole (in fcheck at 100 cases, about 2 s):
+- No hooks: rom.4's whole module runs on both sides.
+- The input, `Vc2TrackerSignal`: stretches of held tones of 55–1760 Hz with one to five harmonics, 1e-4 to full scale, starting at their level. Half of them step to a new pitch at the same level, half of those within half an octave. Also breathy tones, noise, silence, and Vc2Signal's short stretches.
+- At a case's start and one block in 200, every word is drawn around the tone sounding: the halves an uneven split of its period, P at a multiple of it, the lock none, 1–5, 252–256 or any, the crossings' counts 0–6.
+- One block in 100 a jolt redraws P, the last estimate, the lock and the failures alone, and now and then the halves. That way a lock of 1–3 meets a pitch far from P, which chance draws never reached.
+- After each routine the state is compared word for word; after a block, the period returned and the getter.
+- Line coverage of the port by the check (llvm-cov, seed 2024, 100 cases): every line of both files. Of the branch sides, all of the analysis's 82 and 146 of the estimator's 148. The two left are twice the new half's tie and one quiet-level side (a candidate over 245 samples and P while off P) that some seeds reach.
+
+Results:
+- seed 2024: 100 cases, 150,000 blocks, 34,844 up and 34,874 down crossings, P moved in 3,692 blocks, 31,553 blocks locked, 0 different;
+- seed 7: 0 different;
+- `mutate_vc2.py --tracker`, now at 100 cases: 217 plants, all caught. That is 79 in the crossings, the onset check and taking (vc2trackana), 67 in the estimator (vc2trackest), 51 in the frame and 20 in the tables (10 of them the analysis's pool words). The first run missed two: the lock's cap and the estimator's "over 3" of the other direction's count. The draws reached neither, so they now draw a lock near the cap and counts up to 6.
+- Every other list again, as `Vc2RomTables.h` changed (the pool-word loop of the carrier's, vocoder's and tracker's tables is one function now, `vc2ReadPool`): 152, 45, 10, 66, 114 and 190, all caught.
+- Not planted, as no input tells them apart (the list's head says why for each): the onset check's early return on a valid crossing, a down crossing's peak as |now|, the step's sign, the crossing flag tested against the mark rather than 0, the take's halving on the cap, and the nearest multiple's second return.
+
 ### The pitch tracker's frame (2026-11-16, v223) {#vc2-tracker-frame}
 
 Step 6's first part, ported bit for bit (`Vc2Tracker`, Vc2Tracker.cpp): the module from `0x893edca0` on its state in rom.4's .bss, 0x899d9b70…0x899d9d1c, 107 words (`Vc2TrackerWords`). VC2_VOCAL_DESIGNER.md, "The pitch tracker, run" and "The pitch tracker's analysis", read it in outline; this is every instruction of the frame. The analysis (the crossing routines, the onset check, the estimator, taking an estimate) is v224's, and the frame hands it each crossing through `Vc2TrackerCrossings`.

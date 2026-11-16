@@ -38,19 +38,19 @@ Vc2Tracker::Vc2Tracker(Vc2TrackerCrossings& crossings) : crossings_(crossings) {
 void Vc2Tracker::reset() {
     s.lastUp = 0;
     s.sinceCrossing = s.lastSince = s.sinceUp = s.sinceDown = 0;
-    s.analysisCbc = 0.0f;
+    s.fraction = 0.0f;
     s.frameCount = 0;
     s.follow = kBoth;
     s.handOff = 0;
     setMode(0);
     s.peak = s.recentPeak = s.framePeak = s.lastFramePeak = 0.0f;
-    for (float& w : s.crossing) w = 0.0f;
+    s.down = s.up = Vc2TrackerSide {};
     for (float& h : s.halves) h = 0.0f;
     s.failures = s.lock = 0;
-    s.estimate = s.analysisBdc = 0.0f;
+    s.estimate = s.candidate = 0.0f;
     s.smoothing = 1.0f;
     s.filtered[0] = 0.0f;
-    for (int32_t& c : s.counts) c = 0;
+    s.crossings = s.crossingsAtDown = s.crossingsAtUp = 0;
     s.noise = 0;
     s.lastInput = 0.0f;
     s.noisyHoldOn = s.noisyHold = 1;
@@ -69,7 +69,7 @@ void Vc2Tracker::setMode(int mode) {
     s.lowpassF = t.lowpassStart;
     s.highpassF = t.highpassStart;
     s.highpass = s.lowpass = Vc2TrackerStage {};
-    s.analysisCf8 = 0.0f;
+    s.unread = 0.0f;
 }
 
 void Vc2Tracker::filter(const float* in, int n) {

@@ -289,8 +289,10 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      period, the noise count, the noisy-hold flag), its crossings through an interface, against rom.4's routines with
      the crossing routines hooked to record their calls, in xt_vc2tracker (HARDWARE_FIRMWARE.md, "The pitch tracker's
      frame").
-   - then (v224): the analysis: the crossing routines (`0x893ee570`, `0x893ee7d0`), the onset check (`0x893eea50`), the
-     estimator (`0x893eeb90`) and taking an estimate (`0x893ef110`), and the tracker whole against rom.4's with no hook.
+   - done (v224): the analysis, `Vc2TrackerAnalysis`: the crossing routines (`0x893ee570`, `0x893ee7d0`, one routine
+     over a direction table), the onset check (`0x893eea50`), the estimator (`0x893eeb90`) and taking an estimate
+     (`0x893ef110`), and the tracker whole against rom.4's module with no hook, on held tones, pitch steps, noise and
+     silence (HARDWARE_FIRMWARE.md, "The pitch tracker's analysis"). Step 6 is done.
 7. Kind 6 (the mic's pitch shifter: harmonizer and Auto Note) and the mic ring.
 8. The part mixer (Direct Sound) and the patch EQ.
 

@@ -12,11 +12,11 @@ constexpr uint32_t kPeriodA440 = 0x893f09f8;   // [FW] the static initializer 0x
 
 struct Read : Vc2VocoderTables {
     bool read(Sh4& image) {
-        const std::pair<uint32_t, float*> words[] = {
+        const Vc2PoolWord words[] = {
             { kBuildGain, &buildGain }, { kGainScale, &gainScale }, { kGlide, &glide }, { kMinRatio, &minRatio },
             { kPeriodA440, &periodA440 },
         };
-        for (const auto& [at, out] : words) *out = std::bit_cast<float>(image.rd32(at));
+        vc2ReadPool(image, words);
         uint32_t raw[sizeof edit / 4];
         for (uint32_t i = 0; i < sizeof edit / 4; ++i) raw[i] = image.rd32(kEditAt + 4 * i);
         edit = std::bit_cast<Vc2VocoderEdit>(raw);

@@ -9,6 +9,8 @@
 #include <bit>
 #include <cstdint>
 #include <mutex>
+#include <span>
+#include <utility>
 
 template <class Tables>
 class Vc2RomTables {
@@ -38,4 +40,12 @@ struct Vc2Span {
 // A table's floats from the image
 inline void vc2ReadFloats(Sh4& image, Vc2Span span, float* out) {
     for (int i = 0; i < span.floats; ++i) out[i] = std::bit_cast<float>(image.rd32(span.at + 4 * (uint32_t)i));
+}
+
+// A routine's pool word and the float it fills (v224: the readers' one loop, the carrier's, vocoder's and tracker's)
+using Vc2PoolWord = std::pair<uint32_t, float*>;
+
+// Pool words from the image, each into its float
+inline void vc2ReadPool(Sh4& image, std::span<const Vc2PoolWord> words) {
+    for (const auto& [at, out] : words) *out = std::bit_cast<float>(image.rd32(at));
 }

@@ -180,6 +180,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2VocoderOsc.cpp
     Source/Vc2Tracker.cpp
     Source/Vc2TrackerTables.cpp
+    Source/Vc2TrackerAnalysis.cpp
+    Source/Vc2TrackerEstimate.cpp
     Source/XtBuildId.cpp
 )
 

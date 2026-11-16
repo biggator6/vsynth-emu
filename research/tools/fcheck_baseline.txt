@@ -767,7 +767,7 @@ carrier: 40 cases, 4800 blocks (2219 growling), 389 updates (275 with the Dynami
 vocoder osc: 40 cases, 1200 updates (ramps running 410, armed 395, off 395), 0 different
 xt_vc2carrier: 0 different
 == xt_vc2tracker
-tracker: 40 cases, 24000 blocks, 1535 up and 1541 down crossings, 309 modes, 290 holds, 10365 noisy, 0 different
+tracker: 100 cases, 150000 blocks, 34844 up and 34874 down crossings, P moved in 3692, 31553 locked, 20930 of 122979 tone blocks on pitch, 1205 modes, 1251 holds, 38369 noisy, 0 different
 xt_vc2tracker: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks

@@ -1,9 +1,15 @@
 # Planted errors in the VC-2's pitch tracker's port, for mutate_vc2.py --tracker: each must make xt_vc2tracker, on rom.4,
-# say something differs.  name|old|new[|port[|seed]]; ports vc2tracker (Vc2Tracker.cpp, v223) and vc2tracktables
-# (Vc2TrackerTables.cpp).
+# say something differs.  name|old|new[|port[|seed]]; ports vc2tracker (Vc2Tracker.cpp, v223), vc2tracktables
+# (Vc2TrackerTables.cpp), vc2trackana (Vc2TrackerAnalysis.cpp: the crossings, the onset check and taking, v224) and
+# vc2trackest (Vc2TrackerEstimate.cpp: the estimator).
 # Not planted, as no input tells them apart: the peak's test at ≥ (a magnitude equal to the peak changes nothing); the
 # fallback's test at < (one sample later within the block, P unchanged between); the frame's end at ≥ (32-sample blocks
-# never land on 881 itself, and the fewer-sample ones too seldom to rely on).
+# never land on 881 itself, and the fewer-sample ones too seldom to rely on).  In the analysis: the onset check's
+# `if (valid != 0) return` (what follows only returns or sets valid 1); a down crossing's peak as |now| (−now for
+# now < 0); the step's sign (the fraction's fabs takes it); the estimator path's test as lastUp != mark (lastUp is only
+# ever 0 or 1); the take's halving on `capped ||` (capped failures are 256, past 3).  In the estimator: the nearest
+# multiple's second return (twice the new half wins there only on an exact tie: if 2·h0 is nearer P than the midpoint
+# h0 + half, it is nearer than 2·half too).
 stage-low-on-band|    st.low = add(mul(st.band, f), st.low);|    st.low = add(mul(st.band, f), st.band);|vc2tracker
 stage-left-order|    const float left = sub(in, add(st.band, st.low));|    const float left = sub(sub(in, st.low), st.band);|vc2tracker
 stage-band-on-low|    st.band = add(mul(f, left), st.band);|    st.band = add(mul(f, left), st.low);|vc2tracker
@@ -37,10 +43,11 @@ noisy-held-set|        if (s.noisyHold == 0 && (s.lock == 0 \|\| quiet)) s.noisy
 reset-follow-1|constexpr int32_t kBoth = 2;|constexpr int32_t kBoth = 1;|vc2tracker
 reset-smoothing-half|    s.smoothing = 1.0f;|    s.smoothing = 0.5f;|vc2tracker
 reset-noisy-kept|    s.noisyHoldOn = s.noisyHold = 1;|    s.noisyHoldOn = 1;|vc2tracker
-reset-crossing-kept|    for (float& w : s.crossing) w = 0.0f;\n|\n|vc2tracker
+reset-sides-kept|    s.down = s.up = Vc2TrackerSide {};\n|\n|vc2tracker
 reset-halves-kept|    for (float& h : s.halves) h = 0.0f;\n|\n|vc2tracker
-reset-counts-kept|    for (int32_t& c : s.counts) c = 0;\n|\n|vc2tracker
-reset-estimate-kept|    s.estimate = s.analysisBdc = 0.0f;|    s.estimate = 0.0f;|vc2tracker
+reset-counts-kept|    s.crossings = s.crossingsAtDown = s.crossingsAtUp = 0;|    s.crossings = s.crossingsAtDown = 0;|vc2tracker
+reset-candidate-kept|    s.estimate = s.candidate = 0.0f;|    s.estimate = 0.0f;|vc2tracker
+reset-fraction-kept|    s.fraction = 0.0f;\n|\n|vc2tracker
 reset-failures-kept|    s.failures = s.lock = 0;|    s.lock = 0;|vc2tracker
 reset-since-kept|    s.sinceCrossing = s.lastSince = s.sinceUp = s.sinceDown = 0;|    s.sinceCrossing = s.sinceUp = s.sinceDown = 0;|vc2tracker
 reset-hand-off-kept|    s.handOff = 0;\n|\n|vc2tracker
@@ -50,7 +57,7 @@ mode-fallback-kept|    s.period = s.fallback = m.period;|    s.period = m.period
 mode-target-kept|    s.modeHighpass = s.highpassTarget = m.highpass;|    s.modeHighpass = m.highpass;|vc2tracker
 mode-start-target|    s.lowpassF = t.lowpassStart;|    s.lowpassF = m.lowpass;|vc2tracker
 mode-stage-kept|    s.highpass = s.lowpass = Vc2TrackerStage {};|    s.highpass = Vc2TrackerStage {};|vc2tracker
-mode-cf8-kept|    s.analysisCf8 = 0.0f;\n|\n|vc2tracker
+mode-unread-kept|    s.unread = 0.0f;\n|\n|vc2tracker
 mode-limits-1|&Vc2TrackerSettings::mode0, &Vc2TrackerSettings::mode1|&Vc2TrackerSettings::mode1, &Vc2TrackerSettings::mode1|vc2tracker
 init-settings-lost|    s.settings = t.settings;\n|\n|vc2tracker
 init-rate-lost|    s.rate[1] = t.rate[1];\n|\n|vc2tracker
@@ -64,3 +71,159 @@ table-glide|{ 0x893ee444, &glide }|{ 0x893ee62c, &glide }|vc2tracktables
 table-half|{ 0x893ee62c, &half }|{ 0x893ee444, &half }|vc2tracktables
 table-frame-880|constexpr int32_t kFrameLength = 881;|constexpr int32_t kFrameLength = 880;|vc2tracktables
 table-crossing-level|{ 0x893ef33c, &s.crossingLevel }|{ 0x893ef344, &s.crossingLevel }|vc2tracktables
+ana-pending-undecayed|        own.pending = mul(own.pending, k.decay);\n|\n|vc2trackana
+ana-since-shortest|    if (xtf::flt(s.*d.since) > s.longest) {|    if (xtf::flt(s.*d.since) > s.shortest) {|vc2trackana
+ana-threshold-unfallen|        own.threshold = own.pending;\n|\n|vc2trackana
+ana-threshold-undecayed|    const float fallen = mul(own.threshold, k.decay);|    const float fallen = own.threshold;|vc2trackana
+ana-threshold-not-peak|    own.threshold = valid != 0 ? peak : fallen;|    own.threshold = fallen;|vc2trackana
+ana-crossings-uncounted|    ++s.crossings;\n|\n|vc2trackana
+ana-peak-sign|    s.peak = d.negate ? -now : now;|    s.peak = d.negate ? now : -now;|vc2trackana
+ana-last-since-kept|    s.lastSince = s.sinceCrossing;\n|\n|vc2trackana
+ana-held-pending|    if (peak > held) held = peak;\n|\n|vc2trackana
+ana-recent-own|    s.recentPeak = otherLast > held ? otherLast : held;|    s.recentPeak = held;|vc2trackana
+ana-onset-since-any|    vc2TrackerOnset(s, s.*d.since, peak, valid);|    vc2TrackerOnset(s, s.sinceCrossing, peak, valid);|vc2trackana
+ana-refused-unheld|        own.pending = held;\n        return;|        return;|vc2trackana
+ana-fraction-now|    const float fraction = std::fabs(xtf::div(previous, step));|    const float fraction = std::fabs(xtf::div(now, step));|vc2trackana
+ana-second-kept|    own.second = own.last;\n|\n|vc2trackana
+ana-last-peak|    own.last = held;|    own.last = peak;|vc2trackana
+ana-paths-swapped|    if ((s.lastUp != 0) != (d.mark != 0)) {|    if ((s.lastUp != 0) == (d.mark != 0)) {|vc2trackana
+ana-end-last-since-kept|    s.sinceCrossing = s.lastSince = 0;|    s.sinceCrossing = 0;|vc2trackana
+ana-end-mark-index|    s.lastUp = d.mark;|    s.lastUp = d.index;|vc2trackana
+ana-end-since-kept|    s.*d.since = 0;\n|\n|vc2trackana
+ana-end-crossings-other|    s.*d.crossingsAt = s.crossings;|    s.*d.otherCrossingsAt = s.crossings;|vc2trackana
+ana-end-crossings-kept|    s.crossings = 0;\n|\n|vc2trackana
+ana-end-own-pending|    (s.*d.otherSide).pending = 0.0f;|    (s.*d.side).pending = 0.0f;|vc2trackana
+ana-move-fallback-kept|    s.fallback = s.period;\n    s.estimate = estimate;|    s.estimate = estimate;|vc2trackana
+ana-move-estimate-kept|    s.estimate = estimate;\n    s.period|    s.period|vc2trackana
+ana-move-jumps|    s.period = add(mul(sub(estimate, s.period), s.smoothing), s.period);|    s.period = estimate;|vc2trackana
+ana-move-half|mul(sub(estimate, s.period), s.smoothing)|mul(sub(estimate, s.period), 0.5f)|vc2trackana
+ana-move-no-longest|    if (!(s.period > follow.shortest && follow.longest > s.period)) return;|    if (!(s.period > follow.shortest)) return;|vc2trackana
+ana-move-no-shortest|    if (!(s.period > follow.shortest && follow.longest > s.period)) return;|    if (!(follow.longest > s.period)) return;|vc2trackana
+ana-w-estimate|    const float w = xtf::div(k.twoPi, s.period);|    const float w = xtf::div(k.twoPi, estimate);|vc2trackana
+ana-band-none|    s.lowpassTarget = add(w, k.band);|    s.lowpassTarget = w;|vc2trackana
+ana-highpass-whole|    s.highpassTarget = mul(w, k.half);|    s.highpassTarget = w;|vc2trackana
+ana-moves-any|    if (taken != 0 && d.moves(follow)) {|    if (taken != 0) {|vc2trackana
+ana-up-moves-own|constexpr bool upMoves(int32_t follow) { return (follow & 1) == 0; }|constexpr bool upMoves(int32_t follow) { return follow == 0; }|vc2trackana
+ana-down-moves-own|constexpr bool downMoves(int32_t follow) { return follow > 0; }|constexpr bool downMoves(int32_t follow) { return follow == 1; }|vc2trackana
+ana-follow-no-hand-off|            s.follow = s.handOff != 0 ? d.index ^ 1 : d.index;|            s.follow = d.index;|vc2trackana
+ana-follow-swapped|            s.follow = s.handOff != 0 ? d.index ^ 1 : d.index;|            s.follow = s.handOff != 0 ? d.index : d.index ^ 1;|vc2trackana
+ana-follow-hand-off-kept|            s.handOff = 0;\n            return;|            return;|vc2trackana
+ana-hand-off-ignored|    if (s.handOff != 0 && s.follow == d.index) s.follow = d.index ^ 1;\n|\n|vc2trackana
+ana-hand-off-other|s.handOff != 0 && s.follow == d.index|s.handOff != 0 && s.follow != d.index|vc2trackana
+ana-hand-off-kept|    s.handOff = 0;\n}|}|vc2trackana
+ana-history-zero|    if (!(lastSince > 0)) return false;\n|\n|vc2trackana
+ana-history-other-only|    if (!(recent > second)) recent = second;\n|\n|vc2trackana
+ana-history-locked|    if (s.lock > kLocked) return false;\n|\n|vc2trackana
+ana-history-unscaled|    if (mul(recent, k.history) > peak) return false;|    if (recent > peak) return false;|vc2trackana
+ana-span-whole|    const int32_t span = s.sinceCrossing - lastSince;|    const int32_t span = s.sinceCrossing;|vc2trackana
+ana-span-own|    s.*d.otherSince = span;|    s.*d.since = span;|vc2trackana
+ana-halves-3-kept|    s.halves[3] = s.halves[2];\n|\n|vc2trackana
+ana-halves-1-span|    s.halves[1] = xtf::flt(lastSince);|    s.halves[1] = xtf::flt(span);|vc2trackana
+ana-other-second-kept|    other.second = other.last;\n|\n|vc2trackana
+ana-history-fraction-kept|    s.fraction = fraction;\n    other.last|    other.last|vc2trackana
+ana-other-last-peak|    other.last = other.pending;|    other.last = peak;|vc2trackana
+onset-any-lock|    if (!(s.lock > kLocked)) return;|    if (s.lock == 0) return;|vc2trackana
+onset-up-only|    if (!(s.up.second > s.down.second)) recent = s.down.second;\n|\n|vc2trackana
+onset-no-level|peak > s.settings.onsetLevel && ||vc2trackana
+onset-burst-1|peak > mul(recent, k.burst)|peak > recent|vc2trackana
+onset-failures-kept|        s.failures = 0;\n    } else|    } else|vc2trackana
+onset-soon-whole|mul(s.period, k.soon) > since|s.period > since|vc2trackana
+onset-candidate-whole|mul(s.candidate, k.candidate) > since|s.candidate > since|vc2trackana
+onset-lock-kept|        s.lock >>= 1;\n    }\n    if (valid|    }\n    if (valid|vc2trackana
+onset-late-swapped|recent > mul(peak, 2.0f) ? k.failedLoud : k.failedQuiet|recent > mul(peak, 2.0f) ? k.failedQuiet : k.failedLoud|vc2trackana
+onset-late-whole|    if (mul(s.period, late) > since) return;|    if (s.period > since) return;|vc2trackana
+onset-late-refused|    valid = 1;   // a crossing|    // a crossing|vc2trackana
+take-failures-2|        s.failures += 1;|        s.failures += 2;|vc2trackana
+take-most-255|constexpr int32_t kMost = 256; |constexpr int32_t kMost = 255; |vc2trackana
+take-failures-uncapped|        if (capped) s.failures = kMost;\n|\n|vc2trackana
+take-refused-smoothing-kept|        if (s.lock > kLocked) s.smoothing = k.half;\n        if (capped|        if (capped|vc2trackana
+take-failing-4|        if (capped \|\| s.failures >= kFailing) halveLock(s);|        if (capped \|\| s.failures > kFailing) halveLock(s);|vc2trackana
+take-halve-zero|    s.lock >>= 1;\n    s.highpassTarget|    s.lock = 0;\n    s.highpassTarget|vc2trackana
+take-halve-target-kept|    s.highpassTarget = s.modeHighpass;\n|\n|vc2trackana
+take-halve-fallback-kept|    s.fallback = s.period;\n}|}|vc2trackana
+take-agree-period|estimate > mul(s.estimate, k.agreeBelow)|estimate > mul(s.period, k.agreeBelow)|vc2trackana
+take-agree-any-lock|        if (s.lock > kLocked) {\n            s.failures = 0;|        if (s.lock > 0) {\n            s.failures = 0;|vc2trackana
+take-agree-failures-kept|            s.failures = 0;\n            s.smoothing = 1.0f;|            s.smoothing = 1.0f;|vc2trackana
+take-lock-uncapped|        s.lock = std::min(s.lock + 1, kMost);|        s.lock = s.lock + 1;|vc2trackana
+take-unlocked-far|    if (s.lock == 0) {\n        s.smoothing = 1.0f;\n        return 1;\n    }\n|\n|vc2trackana
+take-far-below-none|mul(s.period, k.far) > estimate \|\| ||vc2trackana
+take-far-above-1|estimate > mul(s.period, k.wide)|estimate > s.period|vc2trackana
+take-far-smoothing-kept|        s.smoothing = k.half;\n        s.lock = 0;|        s.lock = 0;|vc2trackana
+take-far-lock-kept|        s.lock = 0;\n    }\n    return 1;|    }\n    return 1;|vc2trackana
+est-half-no-last|    e.half = sub(add(xtf::flt(s.sinceCrossing), fraction), lastFraction);|    e.half = add(xtf::flt(s.sinceCrossing), fraction);|vc2trackest
+est-half-fractions-swapped|sub(add(xtf::flt(s.sinceCrossing), fraction), lastFraction)|sub(add(xtf::flt(s.sinceCrossing), lastFraction), fraction)|vc2trackest
+est-fraction-kept|    s.fraction = fraction;\n|\n|vc2trackest
+est-shift-3|    s.halves[3] = e.h2;\n|\n|vc2trackest
+est-half-unstored|    s.halves[0] = e.half;\n|\n|vc2trackest
+est-quiet-lock-kept|    if (e.quieter(s.settings.crossingLevel)) {\n        s.lock = 0;|    if (e.quieter(s.settings.crossingLevel)) {|vc2trackest
+est-quiet-level-200|e.quieter(s.settings.crossingLevel)|e.quieter(s.settings.levels[0])|vc2trackest
+est-cand-h1|    e.cand = add(e.half, e.h0);|    e.cand = add(e.half, e.h1);|vc2trackest
+est-candidate-kept|    s.candidate = e.cand;\n|\n|vc2trackest
+est-no-shortest|    if (s.shortest > e.cand \|\| e.cand > s.longest) return 0.0f;|    if (e.cand > s.longest) return 0.0f;|vc2trackest
+est-no-longest|    if (s.shortest > e.cand \|\| e.cand > s.longest) return 0.0f;|    if (s.shortest > e.cand) return 0.0f;|vc2trackest
+est-rising-always|        if (s.up.last > s.up.second) e.rising = true;|        e.rising = true;|vc2trackest
+est-falling-noise-any|        if (s.up.second > s.up.last && s.noise > kNoisyRising) return 0.0f;|        if (s.noise > kNoisyRising) return 0.0f;|vc2trackest
+est-noisy-rising-8|constexpr int32_t kNoisyRising = 7; |constexpr int32_t kNoisyRising = 8; |vc2trackest
+est-falling-never|        e.falling = true;\n|\n|vc2trackest
+est-loud-frame-rising|    if (e.rising) return std::nullopt;\n|\n|vc2trackest
+est-loud-frame-swapped|e.quieter(e.settings().levels[3]) ? 2.0f : e.k.loudFrame|e.quieter(e.settings().levels[3]) ? e.k.loudFrame : 2.0f|vc2trackest
+est-loud-lock-kept|    if (s.lastFramePeak > mul(s.recentPeak, k)) {\n        s.lock = 0;|    if (s.lastFramePeak > mul(s.recentPeak, k)) {|vc2trackest
+est-loud-this-frame|    if (s.lastFramePeak > mul(s.recentPeak, k)) {|    if (s.framePeak > mul(s.recentPeak, k)) {|vc2trackest
+est-locked-no-below|    if (above > e.cand && e.cand > mul(s.period, e.k.lockedBelow)) return e.cand;|    if (above > e.cand) return e.cand;|vc2trackest
+est-hand-no-below|    if (!(above > e.last && e.last > mul(s.period, e.k.lockedBelow))) return std::nullopt;|    if (!(above > e.last)) return std::nullopt;|vc2trackest
+est-hand-off-never|    s.handOff = 1;\n|\n|vc2trackest
+est-hand-no-above|mul(s.period, e.k.handAbove) > e.last && ||vc2trackest
+est-hand-candidate-kept|    s.candidate = 1.0f;\n|\n|vc2trackest
+est-hand-cand|    return e.last;\n}|    return e.cand;\n}|vc2trackest
+est-locked-2|constexpr int32_t kLocked = 3; |constexpr int32_t kLocked = 2; |vc2trackest
+est-follow-kept|    s.follow = kBoth;\n|\n|vc2trackest
+est-noisy-11|constexpr int32_t kNoisy = 10; |constexpr int32_t kNoisy = 11; |vc2trackest
+est-unlocked-level-1000|    if (!e.quieter(t.levels[4])) return std::nullopt;|    if (!e.quieter(t.levels[3])) return std::nullopt;|vc2trackest
+est-unlocked-falling-ok|        if (e.falling) return 0.0f;\n|\n|vc2trackest
+est-unlocked-long-any|        if (e.cand > s.period && e.cand > t.periods[1]) return 0.0f;|        if (e.cand > t.periods[1]) return 0.0f;|vc2trackest
+est-count-other|    if (s.*d.crossingsAt != s.crossings) return 0.0f;|    if (s.*d.otherCrossingsAt != s.crossings) return 0.0f;|vc2trackest
+est-side-own|mul((s.*d.otherSide).second, e.k.side[d.index])|mul((s.*d.side).second, e.k.side[d.index])|vc2trackest
+est-side-085|e.k.side[d.index]|e.k.off|vc2trackest
+est-twice-own|e.cand > mul(s.period, 2.0f) && s.*d.otherCrossingsAt > kTwice|e.cand > mul(s.period, 2.0f) && s.*d.crossingsAt > kTwice|vc2trackest
+est-twice-4|constexpr int32_t kTwice = 3; |constexpr int32_t kTwice = 4; |vc2trackest
+est-off-noise-above|    if (s.noise >= kOffNoise) return 0.0f;|    if (s.noise > kOffNoise) return 0.0f;|vc2trackest
+est-off-rising-any|        if (!e.rising) return 0.0f;\n        if (t.periods|        if (t.periods|vc2trackest
+est-short-no-level|t.periods[0] > e.cand && (s.period > e.cand \|\| e.quieter(t.levels[0]))|t.periods[0] > e.cand && s.period > e.cand|vc2trackest
+est-short-245|t.periods[0] > e.cand && (|t.periods[1] > e.cand && (|vc2trackest
+est-long-63|e.cand > t.periods[1] && (|e.cand > t.periods[0] && (|vc2trackest
+est-loose-no-under|    if (e.cand > mul(s.period, 2.0f) \|\| mul(s.period, e.k.underHalf) > e.cand) e.f = e.k.loose;|    if (e.cand > mul(s.period, 2.0f)) e.f = e.k.loose;|vc2trackest
+est-under-075|mul(s.period, e.k.underHalf)|mul(s.period, e.k.below)|vc2trackest
+est-loud-400|    if (!e.quieter(e.settings().levels[2])) {|    if (!e.quieter(e.settings().levels[1])) {|vc2trackest
+est-loud-below-off|            e.f = e.k.below;|            e.f = e.k.off;|vc2trackest
+est-loud-above-1|    } else if (e.cand > mul(period, e.k.above)) {|    } else if (e.cand > period) {|vc2trackest
+est-sides-one|s.down.last > s.up.last ? s.up.second > s.down.second : s.down.second > s.up.second|s.up.second > s.down.second|vc2trackest
+est-quiet-off-kept|    e.f = e.k.off;\n    if (e.cand|    if (e.cand|vc2trackest
+est-off-no-below|    if (e.cand > mul(period, e.k.above) \|\| mul(period, e.k.below) > e.cand) return offP(e);|    if (e.cand > mul(period, e.k.above)) return offP(e);|vc2trackest
+est-noise-loose-never|    if (s.noise > kLooseNoise) e.f = e.k.loose;\n|\n|vc2trackest
+est-loose-noise-5|constexpr int32_t kLooseNoise = 4; |constexpr int32_t kLooseNoise = 5; |vc2trackest
+est-near-no-below|    if (mul(s.period, e.k.nearAbove) > e.cand && e.cand > mul(s.period, e.k.nearBelow)) return std::nullopt;|    if (mul(s.period, e.k.nearAbove) > e.cand) return std::nullopt;|vc2trackest
+est-near-down-any|    if (mul(s.down.second, e.k.loose) > s.down.last) return 0.0f;\n|\n|vc2trackest
+est-near-up-unscaled|    if (mul(s.up.second, e.k.loose) > s.up.last) return 0.0f;|    if (s.up.second > s.up.last) return 0.0f;|vc2trackest
+est-multiple-any-level|    if (!e.rising \|\| !(s.recentPeak > e.settings().levels[0])) return 0.0f;|    if (!e.rising) return 0.0f;|vc2trackest
+est-multiple-near-p|    if (mul(period, e.k.unlockedAbove) > cand && cand > mul(period, e.k.agree)) return cand;\n|\n|vc2trackest
+est-twice-h1|    const float twiceOld = mul(e.h0, 2.0f);|    const float twiceOld = mul(e.h1, 2.0f);|vc2trackest
+est-multiple-first-cand|    if (apartOld > apart) return apartNew > apart ? cand : twiceNew;|    if (apartOld > apart) return cand;|vc2trackest
+est-agree-one-way|    if (mul(e.half, e.f) > e.h1 \|\| mul(e.h1, e.f) > e.half) return 0.0f;|    if (mul(e.half, e.f) > e.h1) return 0.0f;|vc2trackest
+est-agree-old-one-way|    if (!(mul(e.h0, e.f) > e.h2) && !(mul(e.h2, e.f) > e.h0)) return e.cand;|    if (!(mul(e.h0, e.f) > e.h2)) return e.cand;|vc2trackest
+est-multiple-small-lock|    if (s.lock == 0) return nearestMultiple(e);|    if (s.lock <= kLocked) return nearestMultiple(e);|vc2trackest
+est-long-3|constexpr int32_t kLockedLong = 30; |constexpr int32_t kLockedLong = 3; |vc2trackest
+est-long-p-one-way|    if (!(e.last > mul(s.period, k)) \|\| !(s.period > mul(e.last, k))) return 0.0f;|    if (!(e.last > mul(s.period, k))) return 0.0f;|vc2trackest
+est-long-candidate-any|    if (!(e.last > mul(candidate, k)) \|\| !(candidate > mul(e.last, k))) return 0.0f;\n|\n|vc2trackest
+est-long-last|    return candidate;\n}|    return e.last;\n}|vc2trackest
+est-start-085|    e.f = e.k.start;|    e.f = e.k.off;|vc2trackest
+est-locked-checks|    if (s.lock != 0) return agreement(e);\n|\n|vc2trackest
+table-up-decay|{ 0x893ee654, &crossing[0].decay }|{ 0x893ee8a8, &crossing[0].decay }|vc2tracktables
+table-down-two-pi|{ 0x893eeb44, &crossing[1].twoPi }|{ 0x893eeb4c, &crossing[1].twoPi }|vc2tracktables
+table-down-history|{ 0x893eeb18, &crossing[1].history }|{ 0x893eeb50, &crossing[1].history }|vc2tracktables
+table-burst|{ 0x893eeb6c, &onset.burst }|{ 0x893eeb74, &onset.burst }|vc2tracktables
+table-loud-frame|{ 0x893eedcc, &e.loudFrame }|{ 0x893eedd4, &e.loudFrame }|vc2tracktables
+table-side-down|{ 0x893eee00, &e.side[1] }|{ 0x893eeff0, &e.side[1] }|vc2tracktables
+table-above-18|{ 0x893eeff4, &e.above }|{ 0x893ef010, &e.above }|vc2tracktables
+table-agree|{ 0x893ef20c, &e.agree }|{ 0x893ef208, &e.agree }|vc2tracktables
+table-far-half|{ 0x893ef220, &take.far }|{ 0x893ef228, &take.far }|vc2tracktables
+table-analysis-unread|        readAnalysis(image);\n|\n|vc2tracktables

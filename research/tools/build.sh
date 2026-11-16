@@ -86,8 +86,9 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 # The VOCODER OSC's carrier (v221), its converter's own part and kind 5's update (v222) against rom.4's own routines
 [ -f Vc2CarrierCheck.cpp ] && cc -DXT_VC2CARRIER_MAIN Vc2CarrierCheck.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp \
    $( [ -f Vc2VocoderOsc.cpp ] && echo Vc2VocoderOsc.cpp Vc2VocoderOscCheck.cpp ) "${SH4[@]}" -o "$O/xt_vc2carrier" &
-# The pitch tracker's frame (v223) against rom.4's own routines
+# The pitch tracker, its frame (v223) and its analysis (v224), against rom.4's own module
 [ -f Vc2TrackerCheck.cpp ] && cc -DXT_VC2TRACKER_MAIN Vc2TrackerCheck.cpp Vc2Tracker.cpp Vc2TrackerTables.cpp \
+   $( [ -f Vc2TrackerAnalysis.cpp ] && echo Vc2TrackerAnalysis.cpp Vc2TrackerEstimate.cpp Vc2TrackerSignal.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2tracker" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &

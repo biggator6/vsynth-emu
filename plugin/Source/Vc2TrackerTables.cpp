@@ -2,8 +2,6 @@
 // pool word its routine loads.
 #include "Vc2TrackerTables.h"
 #include "Vc2RomTables.h"
-#include <bit>
-#include <utility>
 
 namespace {
 constexpr int32_t kFrameLength = 881;   // [FW] the table setter's immediate (3 << 8, + 113)
@@ -11,7 +9,7 @@ constexpr int32_t kFrameLength = 881;   // [FW] the table setter's immediate (3 
 struct Read : Vc2TrackerTables {
     bool read(Sh4& image) {
         Vc2TrackerSettings& s = settings;
-        const std::pair<uint32_t, float*> words[] = {   // [FW] each routine's pool
+        const Vc2PoolWord words[] = {   // [FW] each routine's pool
             { 0x893edff4, &rate[0] }, { 0x893edffc, &rate[1] },
             { 0x893ef2e0, &s.mode0.longest }, { 0x893ef2e8, &s.mode0.shortest }, { 0x893ef2f0, &s.follow.longest },
             { 0x893ef2f8, &s.follow.shortest }, { 0x893ef300, &s.mode1.longest }, { 0x893ef308, &s.mode1.shortest },
@@ -27,9 +25,32 @@ struct Read : Vc2TrackerTables {
             { 0x893ee3d0, &highpassStart }, { 0x893ee430, &lowpassStart }, { 0x893ee444, &glide },
             { 0x893ee62c, &half },
         };
-        for (const auto& [at, out] : words) *out = std::bit_cast<float>(image.rd32(at));
+        vc2ReadPool(image, words);
+        readAnalysis(image);
         s.frameLength = kFrameLength;
         return true;
+    }
+
+    // The analysis's pools (v224): the two crossing routines' own, the onset check's, the estimator's, taking's
+    void readAnalysis(Sh4& image) {
+        Vc2TrackerEstimatorPool& e = estimator;
+        const Vc2PoolWord words[] = {   // [FW] each routine's pool
+            { 0x893ee654, &crossing[0].decay }, { 0x893ee8a0, &crossing[0].twoPi }, { 0x893ee8a8, &crossing[0].band },
+            { 0x893ee8ac, &crossing[0].half }, { 0x893ee8bc, &crossing[0].history },
+            { 0x893ee8dc, &crossing[1].decay }, { 0x893eeb44, &crossing[1].twoPi }, { 0x893eeb4c, &crossing[1].band },
+            { 0x893eeb50, &crossing[1].half }, { 0x893eeb18, &crossing[1].history },
+            { 0x893eeb6c, &onset.burst }, { 0x893eeb74, &onset.soon }, { 0x893eeb7c, &onset.candidate },
+            { 0x893eeb80, &onset.failedLoud }, { 0x893eeb84, &onset.failedQuiet },
+            { 0x893eedcc, &e.loudFrame }, { 0x893eedd4, &e.lockedAbove }, { 0x893eedd8, &e.lockedBelow },
+            { 0x893eeddc, &e.handAbove }, { 0x893eede4, &e.handBelow }, { 0x893eede8, &e.start },
+            { 0x893eefe8, &e.side[0] }, { 0x893eee00, &e.side[1] }, { 0x893eefe8, &e.loose }, { 0x893eeff0, &e.off },
+            { 0x893eeff4, &e.above }, { 0x893eeff8, &e.below }, { 0x893ef00c, &e.underHalf },
+            { 0x893ef010, &e.nearAbove },
+            { 0x893ef014, &e.nearBelow }, { 0x893ef208, &e.unlockedAbove }, { 0x893ef20c, &e.agree },
+            { 0x893ef214, &take.agreeBelow }, { 0x893ef218, &take.agreeAbove }, { 0x893ef220, &take.far },
+            { 0x893ef224, &take.wide }, { 0x893ef228, &take.half },
+        };
+        vc2ReadPool(image, words);
     }
 };
 

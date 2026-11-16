@@ -842,8 +842,11 @@ silence, the period read after each block. A run that fails only on a fault: it 
 - **Following**: 110 → 330 Hz in 48 ms, 330 → 110 in 73 ms, 220 → 440 in 20 ms, 440 → 220 in 24 ms. 110 → 880 Hz is not
   followed in a second (it ends at 110.91 Hz), where 880 Hz from the reset's 200 Hz settles in 7 ms: how far it reaches
   depends on where it is. Added with Auto Note's run: 220 → 294 Hz (a fourth) in 17 ms and 330 → 220 in 12 ms, but **220 →
-  330 Hz, a fifth up, ends at 165 Hz, an octave low**. Which of the estimator's rules picks it is not traced; a fifth up puts
-  the new period and twice it about equally far from the old one.
+  330 Hz, a fifth up, ends at 165 Hz, an octave low**. ~~Which of the estimator's rules picks it is not traced~~ Traced in
+  v224 on the port (HARDWARE_FIRMWARE.md, "The pitch tracker's analysis"): not the estimator but the onset check, which,
+  locked, refuses a crossing sooner than 0.7 P after the last of its direction; one period of 330 Hz (134 samples) is under
+  0.7 × 200.45, so every other crossing goes and the candidate is two periods. An octave up escapes it because the band-pass
+  leaves the new pitch a third of the old peak, and the loud last frame clears the lock.
 
 Modes 1 to 3, which nothing selects, on the grid of nine pitches (55…880 Hz) at 0.05 and 0.5: mode 1 reaches 55–165 Hz and
 not 220 up, mode 2 110–440 and neither 82.5 down nor 660 up, mode 3 330–880 and not 220 down; each holds its start on noise,
@@ -855,7 +858,9 @@ and this table is what its first run should give.
 ### The pitch tracker's analysis (2026-11-13, the VC-2 mode's step 1c)
 
 (v223: the frame, the band-pass and the per-sample part below, ported bit for bit: HARDWARE_FIRMWARE.md, "The pitch
-tracker's frame".) Read from the listing (`sh4dis.py` on rom.4, `0x893ee280…0x893ef200`), and each part marked **run** held to the firmware by
+tracker's frame". v224: the rest, the crossings, the onset check, the estimator and taking, read instruction by
+instruction and ported bit for bit: HARDWARE_FIRMWARE.md, "The pitch tracker's analysis", which states every rule this
+section gives in outline; two statements below are corrected by it.) Read from the listing (`sh4dis.py` on rom.4, `0x893ee280…0x893ef200`), and each part marked **run** held to the firmware by
 `track`'s last section (`vc2trackstate.cpp`: the settings after the reset, and the state after nine feeds). Levels are the
 input's units (1 full scale); the settings are 16-bit sample values over 32768. It is a time-domain tracker: zero crossings of
 a band-passed signal, timed to a fraction of a sample, validated by their peaks, two half-periods making a period.
@@ -901,7 +906,8 @@ when the recent peak (`0x899d9c7c`, the largest of the last peaks) is under 50/3
 it), or when this half and the one two back, of the same direction, differ by more than a factor of 0.75 to 0.9 (the factor
 by level, noise count and lock). Past those, rules by level (200, 400, 600, 1000 and 3000 over 32768,
 `0x899d9bb0…0x899d9bc0`), by period (63 and 245 samples, `0x899d9ba4`, `0x899d9ba8`) and by the up and down peaks' balance
-refuse a jump the signal is too quiet for; they are read in outline only. One of them, read in full: unlocked, a candidate
+refuse a jump the signal is too quiet for; ~~they are read in outline only~~ read in full in v224 (HARDWARE_FIRMWARE.md,
+"The pitch tracker's analysis", the estimator's steps 2 to 7). One of them, read in full: unlocked, a candidate
 longer than both the current period and 245 samples (below 180 Hz) is refused while the recent peak is under 400/32768
 (−38 dB), which fits 110 Hz needing −36 dB from the reset's 200 Hz where 220 Hz needs −54 (not run in isolation). When the
 two halves before this one disagree: locked for more than 30 estimates, the candidate stands if it and the last candidate
@@ -913,18 +919,22 @@ nearest P; otherwise there is no estimate.
 (`0x899d9c68`, up to 256) and, locked, sets the smoothing (`0x899d9cd4`) to 1, a jump, and clears the failures. One that
 isn't: unlocked, smoothing 1; locked, outside 0.25–1.5 P, smoothing ½ and the lock cleared; otherwise the smoothing stays.
 Then P += (estimate − P) × smoothing, and the band's targets follow P (above). No estimate counts a failure (`0x899d9c6c`, up
-to 256; locked, it sets the smoothing to ½); at 256 failures and each one after, the lock halves, the high-pass's target goes
-back to the mode's own and the low-pass's does not. **Run:** after 110 Hz then 880 Hz, 256 failures, the high-pass target
+to 256; locked, it sets the smoothing to ½); ~~at 256 failures and each one after~~ from the third failure on, each one
+(withdrawn by v224's reading of `0x893ef110`: it halves at `failures >= 3`, and 256 is only the count's cap, past which it
+halves too; the port's check holds it to rom.4), the lock halves, the high-pass's target goes back to the mode's own (and the
+fallback takes P) and the low-pass's does not. **Run:** after 110 Hz then 880 Hz, 256 failures, the high-pass target
 60 Hz and the low-pass's 136 Hz. Which direction's estimates move P is a state at `0x899d9c70`: both (2: the reset, and set
 again by the estimator whenever it finds no lock), up only (0) or down only (1), taken from the first estimate after a 2; a
-flag the estimator sets (`0x899d9c74`) hands it to the other direction. That last is read, not run.
+flag the estimator sets (`0x899d9c74`) hands it to the other direction. ~~That last is read, not run.~~ Run in v224's
+check, and ported: the flag is set when, locked, the last candidate is within 0.96–1.07 P where this one is not.
 
 So, measured against read:
 - the reach, 65.4 to 1480 Hz, is the candidate's limits, 678.46 to 29.4 samples;
 - the last pitch is held because nothing changes P but an estimate, and silence, noise (its count) and a quiet tone (the
   level) give none;
 - 110 → 880 Hz is never followed because the low-pass stays at the old f0 + 25 Hz (136 Hz), where 880 Hz arrives at a peak of
-  0.0065 and no estimate passes, and the fallback after 256 failures resets only the high-pass; from the reset the low-pass is
+  0.0065 and no estimate passes, and the fallback ~~after 256 failures~~ (from the third failure, v224) resets only the
+  high-pass; from the reset the low-pass is
   at 400 Hz, and 880 Hz at 0.5 passes;
 - the level a tone needs depends on its pitch through the band-pass and the quiet-jump rules.
 

@@ -2,13 +2,11 @@
 // word its routine loads.
 #include "Vc2CarrierTables.h"
 #include "Vc2RomTables.h"
-#include <bit>
-#include <utility>
 
 namespace {
 struct Read : Vc2CarrierTables {
     bool read(Sh4& image) {
-        const std::pair<uint32_t, float*> words[] = {   // [FW] each routine's pool
+        const Vc2PoolWord words[] = {   // [FW] each routine's pool
             { 0x893ec6f8, &pitchFactor }, { 0x893ec228, &growlStart }, { 0x893ec22c, &noiseScale },
             { 0x893ec230, &plain.half }, { 0x893ec234, &plain.minusTwo }, { 0x893ec238, &plain.glide },
             { 0x893ec23c, &plain.toBus }, { 0x893ec4b8, &growl.half }, { 0x893ec4ac, &growl.minusTwo },
@@ -24,7 +22,7 @@ struct Read : Vc2CarrierTables {
             { 0x8939c2c0, &depthScale }, { 0x893b0254, &centsMax }, { 0x893b0258, &centsMin },
             { 0x893b025c, &perOctave }, { 0x893b0264, &ratioMax }, { 0x893b0268, &ratioMin },
         };
-        for (const auto& [at, out] : words) *out = std::bit_cast<float>(image.rd32(at));
+        vc2ReadPool(image, words);
         return true;
     }
 };
