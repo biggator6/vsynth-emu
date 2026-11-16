@@ -1,6 +1,7 @@
 // xt_vc2mixer's fakes: see Vc2PartMixerCheck.h (v227).  XT_VC2MIXER_MAIN only.
 #ifdef XT_VC2MIXER_MAIN
 #include "Vc2PartMixerCheck.h"
+#include "Vc2CheckCalls.h"
 #include <algorithm>
 #include <cfenv>
 #include <utility>
@@ -103,13 +104,9 @@ int32_t mixDrawWord(std::mt19937& rng) {
 }
 
 std::string mixCallsDifference(const std::vector<MixCall>& rom, const std::vector<MixCall>& port) {
-    const auto [a, b] = std::ranges::mismatch(rom, port);
-    if (a == rom.end() && b == port.end()) return "";
-    const auto said = [](const auto& at, const std::vector<MixCall>& log) {
-        if (at == log.end()) return std::string("none");
-        return std::to_string(at->kind) + "/" + std::to_string(at->voice) + "/" + std::to_string(at->arg);
-    };
-    return "the calls, call " + std::to_string(a - rom.begin()) + ": " + said(b, port) + ", against " + said(a, rom);
+    return vc2CallsDifference(rom, port, [](const MixCall& c) {
+        return std::to_string(c.kind) + "/" + std::to_string(c.voice) + "/" + std::to_string(c.arg);
+    });
 }
 
 // The fakes' sums at round to nearest on both sides: rom.4's hooks run in the interpreter's call, at the SH-4's

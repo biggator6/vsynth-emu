@@ -326,6 +326,35 @@ rom.2's); rom.4's IDs as parameters appended after every other, the session's st
 `.p02`'s load; a tab of cards by `research/UI_DESIGN.md`; a plugin test (parameters against rom.4's names and text, a `.p02`
 through the load, a block with a mic signal against the synth); `verify.sh` lines and `mutate_panel.py` plants.
 
+Split (2026-11-16), from what rom.4's tone turned out to be. Of rom.2's tone routines, rom.4 pairs the constructor
+(`0x894f5860` → `0x893b2db0`), the free LFOs' tick and a few of the allocator's (`codepairs.txt`); the note start, the
+tone's note-on, start, update and render and the converter pass have no counterpart. The VC-2's tone is its own object
+(vtable `0x898cd568`, in the mixer's file): its update (+0x0c, `0x893b4940`) ticks the envelopes and LFOs (rom.2's,
+ported) and updates two OSC voices (`0x893ae1c0`); its render (+0x24, `0x893b4bb0`) runs one OSC voice (`0x893ae9f0`)
+into a buffer and then the TVA (`0x893b2640`); its carrier's render (+0x18, `0x893b4b10`) runs two, mixes them
+(`0x893ade50`) and goes through a member pointer before the TVA. Three tasks drive it: the notes' (`0x8938fc0e`, the
+schedule `0x893b1710`), the update's (`0x893953c0…`, the voices' update `0x893b16a0` after the pitch source), and the
+block's (`0x89395ace`: the input frames' pointer, then the part mixer). So the wiring goes bottom-up, as step 3 did, each
+version against rom.4's routines with what it calls hooked:
+1. The tone object's frame: the constructor and every method of the vtable, its parts (OSC voices, COSMs, TVA, envelopes,
+   LFOs) through interfaces, against rom.4's with the parts hooked. Split in two (2026-11-16):
+   - done (v228): `Vc2Tone` and `Vc2TonePool`: the tone's own words, the pool of 24, the constructor and destructor,
+     the update, both renders, the clock, the two counts, the level test, held, start and the install pass, against
+     rom.4's on its own pool in xt_vc2tone, every part routine hooked (HARDWARE_FIRMWARE.md, "The VC-2's tone object").
+     The three structure renders are left out: nothing in rom.4 reaches their table.
+   - next (v229): the note-on (`0x893b3390` with `0x893b4380` and `0x893b4660`, about 1,600 instructions): the parts'
+     note-ons, the key-unsynced LFOs' following, the render flag and the end routine.
+2. The tone's parts with rom.4's own wiring, a version each where rom.4 differs from rom.2 (step 1b's list): the OSC
+   voice (its block, portamento, the players' install on rom.4's object layout, Vari off), the analog OSC's note-on,
+   install, update and converter, COSM's converters and the Growl (type 8), the TVA's render on one stereo pair, and
+   kinds 5 and 6 into the tone (their ports, steps 3.5 and 3.7). The players, envelopes and LFOs are XtSynth's ports.
+3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
+   IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
+   (`xt_vc2tone`, as `xt_tone` for rom.2).
+4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them.
+5. The plugin: the mode switch, rom.4's IDs as parameters appended, the session, a `.p02`'s load, the tab of cards, the
+   plugin test, verify.sh lines and plants.
+
 ### 5. Against the machine
 
 Recordings of the user's XT in VC-2 mode with a known signal into the mic input: for what the firmware can't show (the input's

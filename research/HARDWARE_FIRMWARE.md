@@ -1546,6 +1546,67 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's tone object (2026-11-16, v228) {#vc2-tone-object}
+
+Step 4's first version (research/VC2_MODE_PLAN.md, "4. Wiring", split the same day), ported bit for bit: `Vc2Tone` and `Vc2TonePool` (Vc2Tone.cpp), the tone's frame with its parts through `Vc2ToneParts`. Of rom.2's tone routines rom.4 pairs the constructor (`0x894f5860` → `0x893b2db0`), the free LFOs' tick and a few of the allocator's (`build/tools/vc2/codepairs.txt`); the note start, the tone's note-on, start, update and render, and the converter pass have no counterpart. The VC-2's tone is its own class, in the file that also holds the part mixer. Every address is rom.4's.
+
+**The object**, 0x261c bytes, vtable `0x898cd568`:
+
+| Offset | What | Built by |
+|---|---|---|
+| +0x00, +0x04 | the part's voice list: next, prev (`0x893ad940` appends to `0x899996d0`) | `0x893ad920` |
+| +0x08 | a serial, the pool's count when the tone was taken (`0x8993fb4c`) | the constructor |
+| +0x10 | the tone's index in the pool | the pool's linking |
+| +0x0c | the state: 4 after the base, 0 built, 2 sounding (+0x6c), 4 ended (the update); the destructor tests 1 | |
+| +0x14, +0x18, +0x1c | itself; the vtable (the base's `0x898cd4f0` first); the constructor's argument | |
+| +0x20, +0xba4 | the two OSC voices, 0xb84 bytes each: +0x54 the kind, +0xa3c the sync input, +0xa40 a flag the install pass gives the COSM | `0x893ae070` |
+| +0x1728, +0x188c | the two COSMs, 0x164 bytes each: a vtable at +0x160, the DSP routine's pointer at +0x148 | `0x893aa030` |
+| +0x19f0 | the TVA (rewritten in this file), 0xc8 bytes | `0x893b20b0` |
+| +0x1ab8 | the mix | `0x893adbc0` |
+| +0x1af8…+0x1b37 | the tone's own: +0x1af8 a copy of +0x10, +0x1afc the sync switch, +0x1b00 a sync word, +0x1b14 the end callback, +0x1b1c and +0x1b20 0, +0x1b34 the render flag (0 until the note-on) | |
+| +0x1b38 | 14 envelopes of 0x70, each's +4 its index | `0x8950773a` with `0x893abe40` |
+| +0x2158 | 8 LFOs of 0x98, each's +0x34 its index | `0x8950773a` with `0x893acbf0` |
+| +0x2618 | the pool's link | |
+
+**The pool.** The constructor with no `this` takes a tone from 24 at `0x8999f524`. The free list's head (`0x8993fb48`) is 0 until the first take, which links them: each tone's link (+0x2618) to the next, the last to the sentinel `0x8993fb44`, which holds `0x899d87c4`, the pool's end (24 × 0x261c on); each tone's +8 and +0x10 to its index. A head equal to the sentinel gives no tone. Each take writes the serial (+8) and counts it; +0x10 keeps the index. The destructor (`0x893b2fc0(this, flags)`) with flags bit 0 pushes the tone back. Under the OS lock (`0x893018b0`, `0x893018c0` on `*0x8992e208` + 0x14) throughout.
+
+**The methods** (a vtable entry is 12 bytes, the function at +8):
+
+| Slot | Routine | What |
+|---|---|---|
+| +0x0c | `0x893b4940(tone, n)` | the update, in state 2 only, under the lock: envelopes 1–13 (each with its +0x68 set) by `0x893abe80`, LFOs 1–7 (each with its +0x80 set) by `0x893ad100`, each OSC voice by `0x893ae1c0` (+0x20, then +0xba4), the mix's `0x893ade40`, COSM 1's update through its vtable (+0xc) with OSC 1's float at tone+0x1ec; then the TVA's three end tests (`0x893b2560`, `0x893b2610`, `0x893b23d0`): any one set ends the tone (state 4, then the end callback at +0x1b14) |
+| +0x18 | `0x893b4b10(tone, out)` | the whole path, with the render flag set: OSC 2 into `0x89998c20`, OSC 1 into `0x89998b20`, the mix into `0x89998d20`, COSM 1's DSP routine on it, the TVA (`0x893b2640`) into `out` |
+| +0x24 | `0x893b4bb0(tone, out)` | with the render flag set: OSC 1 into `0x89998b20`, then the TVA into `out` |
+| +0x30 | `0x893b4c20(tone, fr4)` | each of the 8 LFOs' clock (`0x893ad080`) |
+| +0x3c, +0x48 | `0x893b4c70`, `0x893b4ca0` | each OSC voice's `0x893ae6c0`; each's `0x893ae720` when the mask test on +0x1c passes |
+| +0x54 | `0x893b4c00` | the TVA's float at +0x40 above 0 |
+| +0x60 | `0x893b4040` | the TVA's `0x893b25c0` |
+| +0x6c | `0x893b4050` | the state to 2 |
+
+The renders run between `0x893a8320` and `0x893a8330`, which only save and restore fr12–fr15. `0x893b4060` is the install pass: each OSC voice's `0x893ae0f0`, the mix's `0x893ade90` (given OSC 1's +0x54 = 3), each COSM's `0x893aafe0` (given a flag from its OSC). The note-on is `0x893b3390`, with `0x893b4380` and `0x893b4660` (about 1,600 instructions: the envelopes', LFOs' and OSC voices' note-ons, the key-unsynced LFOs' following, the COSMs and the mix): v229's.
+
+**Not reached.** Three structure renders like rom.2's (`0x893b40c0`: OSC 2, OSC 1, the mix, COSM 1, the TVA, no sync; `0x893b4140` and `0x893b4220`, rom.2's Type2 and Type3 orders with the sync words) and an empty one (`0x893b4330`) sit in a table of member pointers at `0x8991e0b0`. No literal or data word anywhere in rom.4 lies in 0x8991df00…0x8991e200 (every 32-bit word at every even offset of the image scanned), so nothing reads the table; the whole path (+0x18) inlines the first. They are not ported.
+
+**The port.**
+- `Vc2Tone` keeps the tone's own words as rom.4 lays them out: the head (+0x00…+0x1f), the tail (+0x1af8…+0x1b37), the link (+0x2618), and the numbers the constructor writes into its envelopes (+4) and LFOs (+0x34). The words the frame doesn't touch keep what the tone's last use left, as in rom.4.
+- Its parts are an interface, `Vc2ToneParts`, called in rom.4's order. The words of a part the frame reads (an envelope's +0x68, an LFO's +0x80 and +0x7c, OSC 1's +0x54, +0xa40 and +0x1cc, the TVA's +0x40) are the interface's questions. The later versions put the parts behind it: XtSynth's envelopes and LFOs, and the OSC voices, COSMs, mix and TVA with rom.4's wiring.
+- `Vc2TonePool` is the pool: the 24 tones, its head and serial, the first take's linking, a full pool's none, and the destructor's return. Its addresses are rom.4's, as its links hold them.
+
+**The check, `xt_vc2tone <rom.4> [cases] [seed]`** (in fcheck at 40 cases, under a second; Vc2ToneCheck.cpp, Vc2ToneSides.cpp and Vc2ToneFakes.cpp, XT_VC2TONE_MAIN):
+- rom.4's routines run in Sh4Interp on its own pool. Every part routine the frame calls (30 of them) and the OS's lock are hooked. Each logs its call, naming the tone and the part from the address it is given, and answers as drawn. COSM 1's vtable, the COSMs' DSP routines and the tail's end routine point at hooked addresses in the interpreter's RAM. The port's fake parts log and answer the same.
+- Each case starts both pools fresh, then runs 400 events on up to 8 tones at once; one case in four lets more live than the pool holds, so a full pool gives none.
+- The events: a tone made or built where it stands; unmade, back to the pool or not, now and then from state 1; updated, its state set to 2 most times, the count with high bits; rendered whole or not, the render flag drawn; clocked; counted, or counted by a mask; asked its level or whether it is held; started; installed; or its head and tail scribbled with drawn words on both sides, so the constructor's zeroing and what it leaves alone can show.
+- Before each event the parts' answers are drawn and written into the tone's part words. After each, the pool's head and serial, the tones' own words (every tone's after a make or an unmake, else the tone's), the calls and the answers are compared.
+- Coverage (llvm-cov, 40 cases): every line, region and branch of Vc2Tone.cpp.
+
+Results:
+- seed 2024: 40 cases, 16,000 events, 1,291 tones made, 1,773 makes refused by a full pool, 847 built in place, 826 unmade (721 back), 2,413 updates run, 1,124 tones ended, 1,287 renders run, 0 different.
+- seeds 7 and 31337, 400 cases each: 0 different.
+- `mutate_vc2.py --tone`: 80 plants in Vc2Tone.cpp, all caught. The first run missed one, the end routine called before the state turns 4: the fake end routine never looked at the tone. rom.4's real one is given the tone, so the check now logs the tone's state as the end routine finds it, on both sides, and the plant is caught.
+- Not planted: the install pass's read of OSC 1's flag before OSC 2's install (with the installs hooked, nothing writes the flag between them, so no input tells the two orders apart), and the destructor's write of the vtable word (nothing else ever writes it).
+
+The calls' compare is one template now, `vc2CallsDifference` (Vc2CheckCalls.h), the mixer's check's and the tone's; the mixer's list ran again with it (84, all caught).
+
 ### The part mixer (2026-11-16, v227) {#vc2-part-mixer}
 
 Step 8, ported bit for bit (`Vc2PartMixer`; Vc2PartMixer.cpp, Vc2MixerBlock.cpp): the block mixer that writes the VC-2's bus frame once a block, from the mic, the part's voices and the vocoder. VC2_VOCAL_DESIGNER.md, "The part mixer, run", ran it on rom.4; this is every instruction of the block `0x893b1820` (both its paths), the level routine `0x893b1480`, the targets `0x893b1ee0` and their setters, suspend and resume, the EXTIN flag's setter and getter, and the reset `0x893b1680`. The patch EQ, the step's other half, is the effect chip's: rom.4's effect driver reads EQ 1 and EQ 2 (0x1af…0x1b4) into program A's mid bands, on MULTI alone, and EQ 1's Gain was measured moving MULTI's path and not MAIN's (VC2_VOCAL_DESIGNER.md, "Program A's routing"). So it comes with rom.4's effects in the wiring.

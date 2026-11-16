@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's tone object v228 (2026-11-16, on vc2-mode): step 4.1's first part (the user's "Yes, next item"; step 4
+  split the same day by what rom.4's tone turned out to be: its own class, rom.2's tone routines unpaired but for the
+  constructor; HARDWARE_FIRMWARE.md, "The VC-2's tone object"). Vc2Tone: the tone's own words (head, tail, link, the
+  envelopes' and LFOs' numbers) word for word; the constructor 0x893b2db0 and destructor 0x893b2fc0, the update, the
+  whole render and the render, the clock, the two counts, the level test, held, start and the install pass, its parts
+  through Vc2ToneParts in rom.4's order. Vc2TonePool: the 24 tones at 0x8999f524, the first take's linking, a full
+  pool's none, the serial, the return. The three structure renders not ported: nothing reaches their table. The note-on
+  (0x893b3390, with 0x893b4380 and 0x893b4660) is v229's. xt_vc2tone (in fcheck, 40 cases): rom.4's routines on its
+  pool with every part routine hooked, the port's fake parts the same, the tones' words scribbled now and then; 0
+  different at seeds 2024, 7 and 31337; every line and branch covered. mutate_vc2.py --tone: 80 plants. The calls'
+  compare made one template (Vc2CheckCalls.h), the mixer's check's too. Not in the sound yet.
+
 The part mixer v227 (2026-11-16, on vc2-mode): step 8 (the user's "Yes, next item"; HARDWARE_FIRMWARE.md, "The part
   mixer"); step 8 done, and with it step 3. Vc2PartMixer: the mixer's .data words (0x8993eac4...), its buffers and
   levels (0x8999f1d0...) and the bypass word word for word; the block 0x893b1820 (both paths by the EXTIN flag: the mic

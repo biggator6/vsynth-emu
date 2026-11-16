@@ -191,6 +191,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2PartMixer.cpp
     Source/Vc2MixerBlock.cpp
     Source/Vc2PartMixerTables.cpp
+    Source/Vc2Tone.cpp
     Source/XtBuildId.cpp
 )
 

@@ -1,0 +1,86 @@
+# Planted errors in the VC-2's tone object's frame and its pool, for mutate_vc2.py --tone: each must make xt_vc2tone, on
+# rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2tone (Vc2Tone.cpp, v228).
+# Not planted: Vc2Tone.h's constants (the VC-2 ports' route builds the kept objects from the unplanted sources; each
+# constant is planted where Vc2Tone.cpp uses it), the install pass's read of OSC 1's flag before OSC 2's install (with
+# the installs hooked nothing writes the flag between, so no input tells the two orders apart), and the destructor's
+# vtable word (it never differs from the constructor's: nothing else writes it).
+build-osc-order|{ Piece::osc1, Piece::osc2, Piece::cosm1|{ Piece::osc2, Piece::osc1, Piece::cosm1|vc2tone
+build-no-mix|Piece::tva, Piece::mix, Piece::envelopes|Piece::tva, Piece::envelopes|vc2tone
+build-lfos-first|Piece::tva, Piece::mix, Piece::envelopes, Piece::lfos };|Piece::tva, Piece::mix, Piece::lfos, Piece::envelopes };|vc2tone
+build-list-kept|    head.next = head.prev = 0;   // the base's list node, 0x893ad920\n||vc2tone
+build-next-only|    head.next = head.prev = 0;|    head.next = 0;|vc2tone
+build-zeroed-one|    tail.zeroed[0] = tail.zeroed[1] = 0;|    tail.zeroed[0] = 0;|vc2tone
+build-vtable-lost|    head.vtable = kVtable;\n    head.self = self;|    head.self = self;|vc2tone
+build-self-lost|    head.self = self;\n||vc2tone
+build-state-kept|    head.state = kBuilt;\n||vc2tone
+build-state-sounding|    head.state = kBuilt;|    head.state = kSounding;|vc2tone
+build-id-lost|    head.id = id;\n||vc2tone
+build-renders-kept|    tail.renders = 0;\n    std::iota|    std::iota|vc2tone
+build-envelope-numbers|std::iota(envelopeIndex.begin(), envelopeIndex.end(), 0);|std::iota(envelopeIndex.begin(), envelopeIndex.end(), 1);|vc2tone
+build-lfo-numbers-lost|    std::iota(lfoIndex.begin(), lfoIndex.end(), 0);\n||vc2tone
+build-index-copy-lost|    tail.index = head.index;\n||vc2tone
+build-index-serial|    tail.index = head.index;|    tail.index = head.serial;|vc2tone
+destroy-unfollow-0|    for (int lfo = 1; lfo < kLfos; ++lfo) {   // LFO 0 is never taken off a list|    for (int lfo = 0; lfo < kLfos; ++lfo) {   // LFO 0 is never taken off a list|vc2tone
+destroy-unfollow-all|        if (parts.lfoFollows(lfo)) parts.unfollow(lfo);|        parts.unfollow(lfo);|vc2tone
+destroy-unfollow-on|        if (parts.lfoFollows(lfo)) parts.unfollow(lfo);|        if (parts.lfoOn(lfo)) parts.unfollow(lfo);|vc2tone
+destroy-unlist-sounding|    parts.unlist(head.state == kFromOne);|    parts.unlist(head.state == kSounding);|vc2tone
+destroy-unlist-after|    parts.unlist(head.state == kFromOne);\n    for (Piece piece : kDestroyOrder) parts.destroy(piece);|    for (Piece piece : kDestroyOrder) parts.destroy(piece);\n    parts.unlist(head.state == kFromOne);|vc2tone
+destroy-cosm-order|{ Piece::lfos, Piece::cosm2, Piece::cosm1 }|{ Piece::lfos, Piece::cosm1, Piece::cosm2 }|vc2tone
+destroy-no-lfos|{ Piece::lfos, Piece::cosm2, Piece::cosm1 }|{ Piece::cosm2, Piece::cosm1 }|vc2tone
+update-any-state|    if (head.state != kSounding) return;\n||vc2tone
+update-built-state|    if (head.state != kSounding) return;|    if (head.state != kBuilt) return;|vc2tone
+update-no-exts|static_cast<int32_t>(static_cast<int16_t>(n))|n|vc2tone
+update-envelope-0|    for (int envelope = 1; envelope < kEnvelopes; ++envelope) {|    for (int envelope = 0; envelope < kEnvelopes; ++envelope) {|vc2tone
+update-envelope-last|envelope < kEnvelopes; ++envelope) {|envelope < kEnvelopes - 1; ++envelope) {|vc2tone
+update-envelopes-all|        if (parts.envelopeOn(envelope)) parts.tickEnvelope(envelope, ticks);|        parts.tickEnvelope(envelope, ticks);|vc2tone
+update-lfo-0|    for (int lfo = 1; lfo < kLfos; ++lfo) {   // nor LFO 0|    for (int lfo = 0; lfo < kLfos; ++lfo) {   // nor LFO 0|vc2tone
+update-lfo-follows|        if (parts.lfoOn(lfo)) parts.tickLfo(lfo, ticks);|        if (parts.lfoFollows(lfo)) parts.tickLfo(lfo, ticks);|vc2tone
+update-lfo-n|parts.tickLfo(lfo, ticks);|parts.tickLfo(lfo, n);|vc2tone
+update-osc-order|    parts.updateOsc(kVc2ToneOsc1, ticks);\n    parts.updateOsc(kVc2ToneOsc2, ticks);|    parts.updateOsc(kVc2ToneOsc2, ticks);\n    parts.updateOsc(kVc2ToneOsc1, ticks);|vc2tone
+update-mix-lost|    parts.updateMix();\n||vc2tone
+update-mix-last|    parts.updateMix();\n    parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|    parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));\n    parts.updateMix();|vc2tone
+update-cosm2|    parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|    parts.updateCosm(kVc2ToneCosm2, parts.oscValue(kVc2ToneOsc1));|vc2tone
+update-cosm-level|parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|parts.updateCosm(kVc2ToneCosm1, parts.tvaLevel());|vc2tone
+update-stopped-unasked|    if (!parts.tvaOver() && !parts.tvaStopped()) {|    if (!parts.tvaOver()) {|vc2tone
+update-tests-order|    if (!parts.tvaOver() && !parts.tvaStopped()) {|    if (!parts.tvaStopped() && !parts.tvaOver()) {|vc2tone
+update-tva-lost|        parts.updateTva();\n        return;|        return;|vc2tone
+update-ended-state|    head.state = kEnded;\n    parts.ended();|    parts.ended();|vc2tone
+update-ended-call-lost|    parts.ended();\n}|}|vc2tone
+update-ended-first|    head.state = kEnded;\n    parts.ended();|    parts.ended();\n    head.state = kEnded;|vc2tone
+whole-flag-ignored|    if (tail.renders == 0) return;\n    parts.renderOsc(kVc2ToneOsc2, b.b);|    parts.renderOsc(kVc2ToneOsc2, b.b);|vc2tone
+whole-osc-order|    parts.renderOsc(kVc2ToneOsc2, b.b);\n    parts.renderOsc(kVc2ToneOsc1, b.a);|    parts.renderOsc(kVc2ToneOsc1, b.a);\n    parts.renderOsc(kVc2ToneOsc2, b.b);|vc2tone
+whole-osc2-buffer|    parts.renderOsc(kVc2ToneOsc2, b.b);|    parts.renderOsc(kVc2ToneOsc2, b.c);|vc2tone
+whole-mix-buffers|    parts.renderMix(b.a, b.b, b.c);|    parts.renderMix(b.b, b.a, b.c);|vc2tone
+whole-cosm2|    parts.renderCosm(kVc2ToneCosm1, b.c);|    parts.renderCosm(kVc2ToneCosm2, b.c);|vc2tone
+whole-cosm-lost|    parts.renderCosm(kVc2ToneCosm1, b.c);\n||vc2tone
+whole-tva-in|    parts.renderTva(b.c, out);|    parts.renderTva(b.a, out);|vc2tone
+render-flag-ignored|    if (tail.renders == 0) return;\n    parts.renderOsc(kVc2ToneOsc1, b.a);\n    parts.renderTva(b.a, out);|    parts.renderOsc(kVc2ToneOsc1, b.a);\n    parts.renderTva(b.a, out);|vc2tone
+render-osc2|    parts.renderOsc(kVc2ToneOsc1, b.a);\n    parts.renderTva(b.a, out);|    parts.renderOsc(kVc2ToneOsc2, b.a);\n    parts.renderTva(b.a, out);|vc2tone
+render-tva-buffer|    parts.renderTva(b.a, out);|    parts.renderTva(b.b, out);|vc2tone
+clock-from-1|    for (int lfo = 0; lfo < kLfos; ++lfo) parts.clockLfo(lfo, x);|    for (int lfo = 1; lfo < kLfos; ++lfo) parts.clockLfo(lfo, x);|vc2tone
+count-osc1-only|    parts.countOsc(kVc2ToneOsc1, x);\n    parts.countOsc(kVc2ToneOsc2, x);|    parts.countOsc(kVc2ToneOsc1, x);|vc2tone
+count-matched-routine|    parts.countOsc(kVc2ToneOsc2, x);|    parts.countOscMatched(kVc2ToneOsc2, x);|vc2tone
+matched-any-ignored|    if (value != kAnyValue && (head.id & mask) != static_cast<uint32_t>(value)) return;|    if ((head.id & mask) != static_cast<uint32_t>(value)) return;|vc2tone
+matched-unmasked|(head.id & mask) != static_cast<uint32_t>(value)|head.id != static_cast<uint32_t>(value)|vc2tone
+matched-order|    parts.countOscMatched(kVc2ToneOsc1, x);\n    parts.countOscMatched(kVc2ToneOsc2, x);|    parts.countOscMatched(kVc2ToneOsc2, x);\n    parts.countOscMatched(kVc2ToneOsc1, x);|vc2tone
+matched-any-value|constexpr int32_t kAnyValue = -1;|constexpr int32_t kAnyValue = -2;|vc2tone
+sounds-at-zero|return parts.tvaLevel() > 0.0f;|return parts.tvaLevel() >= 0.0f;|vc2tone
+held-not|return parts.tvaHeld();|return !parts.tvaHeld();|vc2tone
+start-built|void Vc2Tone::start() { head.state = kSounding; }|void Vc2Tone::start() { head.state = kBuilt; }|vc2tone
+install-kind-not|parts.installMix(parts.oscKind(kVc2ToneOsc1) == kMixKind);|parts.installMix(parts.oscKind(kVc2ToneOsc1) != kMixKind);|vc2tone
+install-kind-osc2|parts.installMix(parts.oscKind(kVc2ToneOsc1) == kMixKind);|parts.installMix(parts.oscFlag(kVc2ToneOsc1) == kMixKind);|vc2tone
+install-kind-2|constexpr int32_t kMixKind = 3;|constexpr int32_t kMixKind = 2;|vc2tone
+install-cosm2-flag|    parts.installCosm(kVc2ToneCosm2, given);|    parts.installCosm(kVc2ToneCosm2, flag);|vc2tone
+install-cosm1-zero|parts.installCosm(kVc2ToneCosm1, flag);|parts.installCosm(kVc2ToneCosm1, 0);|vc2tone
+install-osc2-lost|    parts.installOsc(kVc2ToneOsc2);\n||vc2tone
+install-mix-after|    parts.installMix(parts.oscKind(kVc2ToneOsc1) == kMixKind);\n    const uint32_t given|    const uint32_t given|vc2tone
+pool-full-ignored|    if (head == end()) return nullptr;|    if (head == end() + 1) return nullptr;|vc2tone
+pool-first-link|        head = addressOf(0);|        head = addressOf(1);|vc2tone
+pool-last-tone|        for (int i = 0; i < kTones; ++i) {|        for (int i = 0; i < kTones - 1; ++i) {|vc2tone
+pool-serial-not-index|            tones[(size_t)i].head.serial = tones[(size_t)i].head.index = i;|            tones[(size_t)i].head.index = i;|vc2tone
+pool-index-not-set|            tones[(size_t)i].head.serial = tones[(size_t)i].head.index = i;|            tones[(size_t)i].head.serial = i;|vc2tone
+pool-serial-pre|    tone.head.serial = serial++;|    tone.head.serial = ++serial;|vc2tone
+pool-head-kept|    head = tone.link;\n    tone.construct|    tone.construct|vc2tone
+pool-back-ignored|    if (!back) return;\n||vc2tone
+pool-back-link-kept|    tone.link = head;\n    head = addressOf|    head = addressOf|vc2tone
+pool-back-self|    head = addressOf(static_cast<int>(&tone - tones.data()));|    head = tone.head.self;|vc2tone
