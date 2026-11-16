@@ -27,7 +27,7 @@ synth() { (cd "$1" && cc XtSynth.cpp $(have XtSynthRom.cpp) \
            $(have XtSynthTva.cpp XtSynthClock.cpp XtExtIn.cpp) $(have XtSynthOut.cpp) $(have XtSinc.cpp) \
            $(have Vc2Params.cpp Vc2Unvoiced.cpp Vc2LegacyAnalysis.cpp Vc2LegacyTables.cpp Vc2HiresoTables.cpp) \
            $(have Vc2VocoderTables.cpp Vc2CarrierTables.cpp Vc2TrackerTables.cpp Vc2Kind6Tables.cpp Vc2Math.cpp) \
-           $(have Vc2AutoNoteTables.cpp) $(have Vc2PartMixerTables.cpp) \
+           $(have Vc2AutoNoteTables.cpp) $(have Vc2PartMixerTables.cpp) $(have Vc2OscTables.cpp) \
            $( [ -f Vc2Params.cpp ] && echo XtFxValueText.cpp XtPatchStore.cpp ) \
            Sh4Interp.cpp $(have Sh4Setup.cpp) -o "$2"); }
 rm -f "$A/old" "$A/new"; synth "$A/src/plugin/Source" "$A/old"; synth "$REPO/plugin/Source" "$A/new"

@@ -782,6 +782,10 @@ xt_vc2mixer: 0 different
 tone: 40 cases, 16000 events, 1255 made, 1419 none, 834 built in place, 830 unmade (733 back), 1395 updates, 633 ended, 1207 renders, 0 different
 note-on: 2352 note-ons, 370 players taken, 2895 LFOs following, 5470 free LFOs, 347 inputs fixed
 xt_vc2tone: 0 different
+== xt_vc2osc
+osc: 40 cases, 16000 events, 1903 note-ons (490 with a sample, 1413 without), 1887 updates, 1977 renders, 934 settings, 928 takes, 2798 getters
+calls: 134 seeks, 211 ramps set, 2004 kinds' routines
+xt_vc2osc: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

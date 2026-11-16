@@ -1,0 +1,244 @@
+# Planted errors in the VC-2's OSC voice's frame, for mutate_vc2.py --osc: each must make xt_vc2osc, on rom.4, say
+# something differs.  name|old|new[|port[|seed]]; ports vc2osc (Vc2OscVoice.cpp, v230), vc2oscget (Vc2OscVoiceGet.cpp:
+# the settings and the getters), vc2osckinds (Vc2OscVoiceKinds.cpp: each kind's row) and vc2osctables (Vc2OscTables.cpp:
+# the constants' addresses).  Not planted: the note-on's records at address 0 (a kind past 7: rom.4 reads from address
+# 2 there, which the check never draws), the beyond row's records with it, Vc2OscVoice.h's offsets (the VC-2 ports'
+# route builds the kept objects from the unplanted sources; each is planted where the .cpp files use it), and the
+# install's return after a kind's own install (dropped after the first run: the rows of the kinds that have one, 1 to 3,
+# hold nothing else for the install, so going on past it does nothing).
+ramp-types|{ 0, 2, 1 }|{ 0, 1, 2 }|vc2osc
+depth-word|kDepthWord = 0x1c / 4|kDepthWord = 0x20 / 4|vc2osc
+sample-word|kSampleWord = 0xd4 / 4|kSampleWord = 0xdc / 4|vc2osc
+map-word|kMapWord = 0xdc / 4|kMapWord = 0xd4 / 4|vc2osc
+depth-at|kDepth = 0x70|kDepth = 0x74|vc2osc
+fixed-byte|kFixedByte = 0x138|kFixedByte = 0x139|vc2osc
+fixed-bit|kFixed = 0x10, |kFixed = 0x20, |vc2osc
+ramp-fr4|kRampFr4 = 0xbc|kRampFr4 = 0xc4|vc2osc
+ramp-fr5|kRampFr5 = 0x5c;|kRampFr5 = 0x60;|vc2osc
+fixed-types-6|{ 1, 6, 7, 8 }|{ 1, 5, 7, 8 }|vc2osc
+fixed-types-1|{ 1, 6, 7, 8 }|{ 2, 6, 7, 8 }|vc2osc
+flags-at|kFlags = 0x15c|kFlags = 0x15d|vc2osc
+count-at|kCount = 0x19c|kCount = 0x19e|vc2osc
+matched-at|kMatched = 0x19d|kMatched = 0x19c|vc2osc
+seek-at|kSeekAt = 0x1c0|kSeekAt = 0x1c4|vc2osc
+level-at|kLevel = 0x1e0;|kLevel = 0x1e4;|vc2osc
+kept-insert|0x1d4, 0x1f0, 0x1d8|0x1d4, 0x1ec, 0x1d8|vc2osc
+kept-first|{ 0x1cc, 0x1d0|{ 0x1c8, 0x1d0|vc2osc
+counts-bit|kCounts = 2|kCounts = 1|vc2osc
+matches-bit|kMatches = 4|kMatches = 8|vc2osc
+held-bit|kHeld = 0x80|kHeld = 0x40|vc2osc
+take-gate|kTakeGate = 0xb8|kTakeGate = 0xbc|vc2osc
+source-byte|kSourceByte = 4|kSourceByte = 5|vc2osc
+seek-bit|kSeekBit = 0x20|kSeekBit = 0x10|vc2osc
+seek-shift|kSeekShift = 5|kSeekShift = 4|vc2osc
+render-third|kRenderThird = 0x15c|kRenderThird = 0|vc2osc
+seeks1-type1|{ 0x893cc830, 0x893cc830 }|{ 0x893c6de0, 0x893cc830 }|vc2osc
+seeks1-type2|{ 0x893c6de0, 0x893c6de0 } } };|{ 0x893c6de0, 0x893c6360 } } };|vc2osc
+seeks2-type1|{ { 0x893c6360, 0x893cc630 }, { 0, 0 }|{ { 0x893c6360, 0x893cd090 }, { 0, 0 }|vc2osc
+seeks2-type2|0x893cc630 }, { 0, 0 }, { 0x893cd440|0x893cc630 }, { 0x893cd440, 0x893cd440 }, { 0x893cd440|vc2osc
+seeks2-type3|{ 0, 0 }, { 0x893cd440, 0x893cd440 },|{ 0, 0 }, { 0x893c6360, 0x893cd440 },|vc2osc
+seeks2-type6|{ 0x893c6360, 0x893cc630 }, { 0, 0 }, { 0x893c6360, 0x893cd090 }|{ 0x893cc630, 0x893c6360 }, { 0, 0 }, { 0x893c6360, 0x893cd090 }|vc2osc
+seeks2-type8|{ 0x893c6360, 0x893cd090 } } };|{ 0x893cd090, 0x893c6360 } } };|vc2osc
+installed-order|{ t.installed4, t.installed5, t.installed6 }|{ t.installed4, t.installed6, t.installed5 }|vc2osc
+installed-base|(which - 4)]|(which - 4) % 2]|vc2osc
+build-no-vibrato|    parts.buildVibrato();\n||vc2osc
+build-ramps-two|ramp < kRamps; ++ramp) parts.buildRamp|ramp < 2; ++ramp) parts.buildRamp|vc2osc
+build-sync-kept|    tail.sync = 0;\n||vc2osc
+build-flag-kept|    tail.flag = 0;\n    tail.installed|    tail.installed|vc2osc
+build-installed-kept|    tail.installed = 0.0f;\n||vc2osc
+build-pending-kept|    tail.seekPending = 0;\n}|}|vc2osc
+install-flag-kept|    if (row.clearsFlag) tail.flag = 0;\n||vc2osc
+install-render-kept|    if (row.render != 0) tail.render = row.render;\n||vc2osc
+install-installed-kept|    if (row.installed != 0) tail.installed|    if (false) tail.installed|vc2osc
+update-kind0|    if (kind() == 0) return;\n    const int32_t n16|    const int32_t n16|vc2osc
+update-n-whole|const int32_t n16 = (int16_t)n;|const int32_t n16 = n;|vc2osc
+update-no-vibrato|    parts.updateVibrato(n16);\n||vc2osc
+update-no-wait|    if (row.waits && tail.seekPending != 0) {|    if (false) {|vc2osc
+update-waits-always|    if (row.waits && tail.seekPending != 0) {|    if (tail.seekPending != 0) {|vc2osc
+update-wait-ge|f32(kLevel) > vc2OscTables().waitLevel|f32(kLevel) >= vc2OscTables().waitLevel|vc2osc
+update-wait-no-return|vc2OscTables().waitLevel) return;|vc2OscTables().waitLevel) {}|vc2osc
+update-no-reseek|        reseek(parts);\n||vc2osc
+update-first-after|    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);\n    for (int ramp = 0; ramp < kRamps; ++ramp) {\n        if (row.ticks & (1 << ramp)) parts.tickRamp(ramp, n16);\n    }|    for (int ramp = 0; ramp < kRamps; ++ramp) {\n        if (row.ticks & (1 << ramp)) parts.tickRamp(ramp, n16);\n    }\n    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);|vc2osc
+update-ticks-n|parts.tickRamp(ramp, n16)|parts.tickRamp(ramp, n)|vc2osc
+update-no-update|    if (row.update != 0) parts.kindCall(row.update);\n||vc2osc
+reseek-no-hold|setU8(kFlags, (uint8_t)(was \| kHeld));|setU8(kFlags, was);|vc2osc
+reseek-at-unsigned|(int32_t)u32(kSeekAt) >> kSeekShift|(int32_t)(u32(kSeekAt) >> kSeekShift)|vc2osc
+reseek-bit-inverted|const uint32_t routine = bit ? seek.set : seek.clear;|const uint32_t routine = bit ? seek.clear : seek.set;|vc2osc
+reseek-kind1-types|type < kSeeks1.size()) seek = kSeeks1[type];|type < 2) seek = kSeeks1[type];|vc2osc
+reseek-kind2-index|seek = kSeeks2[type - 1];|seek = kSeeks2[type % 8];|vc2osc
+reseek-kind-swapped|if (kind() == 1 && type < kSeeks1.size())|if (kind() == 2 && type < kSeeks1.size())|vc2osc
+reseek-restore-was|(uint8_t)(now \| kHeld) : (uint8_t)(now & ~kHeld)|(uint8_t)(was \| kHeld) : (uint8_t)(was & ~kHeld)|vc2osc
+reseek-restore-cleared|(was & kHeld) ? (uint8_t)(now \| kHeld) : (uint8_t)(now & ~kHeld)|(uint8_t)(now & ~kHeld)|vc2osc
+reseek-pending-kept|kHeld));\n    tail.seekPending = 0;|kHeld));|vc2osc
+reseek-no-seek|    if (routine != 0) parts.seek(routine, at);\n||vc2osc
+noteon-copy-short|std::memcpy(own.data(), block, kBlockBytes);|std::memcpy(own.data(), block, kBlockBytes - 4);|vc2osc
+noteon-depth-unscaled|mul(std::bit_cast<float>(block[kDepthWord]), t.depthScale)|std::bit_cast<float>(block[kDepthWord])|vc2osc
+noteon-pending-kept|    tail.seekPending = 0;\n    setU32(kLegato, legato);|    setU32(kLegato, legato);|vc2osc
+noteon-legato-kept|    setU32(kLegato, legato);\n||vc2osc
+noteon-flag-kept|    setU32(kLegato, legato);\n    tail.flag = 0;|    setU32(kLegato, legato);|vc2osc
+noteon-flag-any-wave|if (row.flagByWave && u32(kWave) == 1) tail.flag = 1;|if (row.flagByWave) tail.flag = 1;|vc2osc
+noteon-plain-root|        tail.root = 0.0f;\n        tail.rateRatio|        tail.rateRatio|vc2osc
+noteon-plain-ratio|        tail.rateRatio = 1.0f;|        tail.rateRatio = 0.0f;|vc2osc
+noteon-plain-tune|        tail.tune = 0.0f;\n        tail.gainA|        tail.gainA|vc2osc
+noteon-plain-gainA|        tail.gainA = 1.0f;\n        tail.gainB = 1.0f;|        tail.gainB = 1.0f;|vc2osc
+noteon-plain-gainB|        tail.gainB = 1.0f;\n||vc2osc
+noteon-plain-exp2|shared.exp2(0.0f)|shared.exp2(1.0f)|vc2osc
+noteon-plain-kind-call|        parts.noteOnKind(legato);\n        return;|        return;|vc2osc
+noteon-sample-swapped|parts.sample(fromBlock ? block[kSampleWord] : 0)|parts.sample(fromBlock ? block[kMapWord] : 0)|vc2osc
+noteon-flag-not-one|tail.flag = s.flag == 1 ? 1 : 0;|tail.flag = s.flag != 0 ? 1 : 0;|vc2osc
+noteon-ratio-inverted|div(t.rateTop, xtf::flt(s.rate))|div(xtf::flt(s.rate), t.rateTop)|vc2osc
+noteon-fixed-kind1|const bool fixed = kind() == 2 &&|const bool fixed = kind() != 0 &&|vc2osc
+noteon-fixed-ignored|if (keeps && fixed) {|if (keeps) {|vc2osc
+noteon-fixed-hz|        tail.hz = t.sampleHz;|        tail.hz = t.cent;|vc2osc
+noteon-fixed-root-kept|        tail.root = 0.0f;\n        tail.tune = 0.0f;\n        tail.hz|        tail.tune = 0.0f;\n        tail.hz|vc2osc
+noteon-fixed-tune-kept|        tail.tune = 0.0f;\n        tail.hz = t.sampleHz;|        tail.hz = t.sampleHz;|vc2osc
+noteon-root-no-fine|tail.root = add(mul(xtf::flt(m.fine), t.cent), xtf::flt(s.root));|tail.root = xtf::flt(s.root);|vc2osc
+noteon-root-unsigned-fine|xtf::flt(m.fine)|xtf::flt((uint8_t)m.fine)|vc2osc
+noteon-tune-scaled|tail.tune = mul(xtf::flt(m.level), t.cent);|tail.tune = mul(xtf::flt(m.level), t.keyCents);|vc2osc
+noteon-cents-sign|add(sub(mul(xtf::flt(s.key), t.keyCents), tail.root), tail.tune)|sub(sub(mul(xtf::flt(s.key), t.keyCents), tail.root), tail.tune)|vc2osc
+noteon-key-unsigned|xtf::flt(s.key)|xtf::flt((uint8_t)s.key)|vc2osc
+noteon-exponent-base|add(mul(cents, t.perOctave), t.exponentBase)|mul(cents, t.perOctave)|vc2osc
+noteon-hz-no-rate|mul(mul(x, xtf::flt(s.rate)), t.cent)|mul(x, t.cent)|vc2osc
+noteon-hz-order|mul(mul(x, xtf::flt(s.rate)), t.cent)|mul(x, mul(xtf::flt(s.rate), t.cent))|vc2osc
+noteon-gain-sign|mul(-xtf::flt(m.level), t.levelScale)|mul(xtf::flt(m.level), t.levelScale)|vc2osc
+noteon-gain-test|if (!(gain > 0.0f)) {|if (gain < 0.0f) {|vc2osc
+noteon-gain-kept|        tail.gain = 1.0f;\n        gain = 1.0f;|        gain = 1.0f;|vc2osc
+noteon-gainA-unfixed|        tail.gain = 1.0f;\n        gain = 1.0f;\n|        tail.gain = 1.0f;\n|vc2osc
+noteon-sample-kind-call|    tail.gainB = tail.gain;\n    parts.noteOnKind(legato);|    tail.gainB = tail.gain;|vc2osc
+start-ramp-1|parts.startRamp(0,|parts.startRamp(1,|vc2osc
+start-swapped|parts.startRamp(0, f32(kRampFr4), f32(kRampFr5))|parts.startRamp(0, f32(kRampFr5), f32(kRampFr4))|vc2osc
+start-any-kind|    if (vc2OscKindRow(kind()).ramp) parts.startRamp|    parts.startRamp|vc2osc
+count-set|setU8(kCount, (uint8_t)(u8(kCount) + x))|setU8(kCount, (uint8_t)x)|vc2osc
+count-always|    if (u8(kFlags) & kCounts) setU8|    setU8|vc2osc
+matched-added|setU8(kMatched, (uint8_t)x)|setU8(kMatched, (uint8_t)(u8(kMatched) + x))|vc2osc
+legato-two|ramp < kRamps; ++ramp) parts.legatoRamp|ramp < 2; ++ramp) parts.legatoRamp|vc2osc
+render-zero-short|std::fill(out, out + kOut, 0.0f)|std::fill(out, out + kOut / 2, 0.0f)|vc2osc
+render-third|parts.renderBy(tail.render, out, kRenderThird)|parts.renderBy(tail.render, out, tail.sync)|vc2osc
+render-analog-sync|parts.renderBy(tail.renderAnalog, out, tail.sync)|parts.renderBy(tail.renderAnalog, out, kRenderThird)|vc2osc
+render-analog-answer|return parts.renderBy(tail.renderAnalog, out, tail.sync);|parts.renderBy(tail.renderAnalog, out, tail.sync); return 0;|vc2osc
+render-by-answer|parts.renderBy(tail.render, out, kRenderThird); return 0;|return parts.renderBy(tail.render, out, kRenderThird);|vc2osc
+take-gate-ignored|if (u32(kLegato) != 0 && u32(kTakeGate) == 0) return;|if (u32(kTakeGate) == 0) return;|vc2osc
+take-legato-ignored|if (u32(kLegato) != 0 && u32(kTakeGate) == 0) return;|if (false) return;|vc2osc
+take-source-ignored|    if (from.u8(kObject + kSourceByte) == 1) return;\n||vc2osc
+take-short|from.own.data() + (kObject - kOwn), kObjectBytes)|from.own.data() + (kObject - kOwn), kObjectBytes - 4)|vc2osc
+take-none-kept|    for (size_t k = 0; k < kKept.size(); ++k) setU32(kKept[k], kept[k]);\n||vc2osc
+take-level-kept|    setF32(kLevel, 0.0f);\n||vc2osc
+settings-copy-b4|0xfc, 0x100, 0xb4 };|0xfc, 0x100, 0xb8 };|vc2oscget
+settings-copy-5c|0xcc, 0x5c, 0x60|0xcc, 0x60, 0x60|vc2oscget
+settings-scaled-unscaled|setF32(kScaled, mul(settingsWord(s, kScaledFrom), vc2OscTables().settingsScale));|setF32(kScaled, settingsWord(s, kScaledFrom));|vc2oscget
+settings-scaled-from|kScaledFrom = 0x1c|kScaledFrom = 0x70|vc2oscget
+settings-byte-at|kSettingsByte = 4|kSettingsByte = 5|vc2oscget
+settings-byte-kept|        setU8(kByte, bytes[kSettingsByte]);\n||vc2oscget
+settings-beyond-on|        if (kind() >= (uint32_t)kVc2OscKinds) return;\n||vc2oscget
+settings-ramp-always|        if (vc2OscKindRow(kind()).ramp) parts.setRamp|        parts.setRamp|vc2oscget
+settings-ramp-args|parts.setRamp(0, f32(kRampFr4), f32(kRampFr5))|parts.setRamp(0, f32(kRampFr5), f32(kRampFr4))|vc2oscget
+settings-byte-unread|if (bytes[kSettingsByte] != u8(kByte)) {|if (true) {|vc2oscget
+settings-vibrato-from|kVibratoFrom = 0x80|kVibratoFrom = 0x84|vc2oscget
+settings-no-vibrato|    parts.setVibrato(s + kVibratoFrom / 4);\n||vc2oscget
+settings-kind-from|kKindFrom = 0xb0|kKindFrom = 0xb4|vc2oscget
+settings-no-kind|    if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);\n||vc2oscget
+settings-carrier-bytes|kCarrierBytes = 88|kCarrierBytes = 84|vc2oscget
+settings-no-carrier-copy|    std::memcpy(own.data() + (kWave - kOwn), s + kKindFrom / 4, kCarrierBytes);\n||vc2oscget
+settings-no-carrier|    parts.setCarrier(s + kKindFrom / 4);\n||vc2oscget
+formant-wave|kind() == 2 && u32(kWave) == 1 ? f32(kFormant)|kind() == 2 ? f32(kFormant)|vc2oscget
+formant-at|kFormant = 0x68|kFormant = 0x64|vc2oscget
+second-kind|float Vc2OscVoice::second() const { return kind() == 2|float Vc2OscVoice::second() const { return kind() != 0|vc2oscget
+second-at|kSecond = 0x64|kSecond = 0x68|vc2oscget
+pitch-at|kPitch = 0x5c|kPitch = 0x60|vc2oscget
+pitch-depth|kDepth = 0x70|kDepth = 0x6c|vc2oscget
+pitch-vibrato-depth|kVibratoDepth = 0xfc|kVibratoDepth = 0x100|vc2oscget
+pitch-no-env|add(mul(parts.envelopeOut(tail.binds[0]), f32(kDepth)), f32(kPitch))|f32(kPitch)|vc2oscget
+pitch-env-bind|parts.envelopeOut(tail.binds[0])|parts.envelopeOut(tail.binds[1])|vc2oscget
+pitch-no-vibrato|    x = add(mul(parts.vibratoOut(), f32(kVibratoDepth)), x);\n||vc2oscget
+pitch-no-ramp|    x = add(x, parts.rampValue(0));\n||vc2oscget
+pitch-ramp-1|parts.rampValue(0)|parts.rampValue(1)|vc2oscget
+pitch-no-root|    x = add(x, tail.root);\n||vc2oscget
+pitch-most|if (x > t.most) bounded = t.most;|if (x > t.most) bounded = t.least;|vc2oscget
+pitch-least|else if (t.least > x) bounded = t.least;|else if (t.least > x) bounded = x;|vc2oscget
+pitch-bounded-zero|float bounded = x;|float bounded = 0.0f;|vc2oscget
+pitch-tuned-all|way == Vc2OscPitch::tuned ? sub(bounded, tail.tune) : bounded|sub(bounded, tail.tune)|vc2oscget
+pitch-tuned-none|way == Vc2OscPitch::tuned ? sub(bounded, tail.tune) : bounded|bounded|vc2oscget
+pitch-none-on|if (way == Vc2OscPitch::none) return 0.0f;|if (false) return 0.0f;|vc2oscget
+kindformant-routine|kKindFormant = 0x893afeb0|kKindFormant = 0x893afdf0|vc2oscget
+kindformant-wave|kind() == 2 && u32(kWave) == 1 ? parts.kindValue|kind() == 2 ? parts.kindValue|vc2oscget
+kindsecond-kind|return kind() == 2 ? parts.kindValue(kKindSecond)|return kind() == 1 ? parts.kindValue(kKindSecond)|vc2oscget
+level-kind|return kind() != 0 ? f32(kLevel)|return kind() == 2 ? f32(kLevel)|vc2oscget
+level-at|kLevel = 0x1e0, kHalf|kLevel = 0x1dc, kHalf|vc2oscget
+half-at|kHalf = 0x168|kHalf = 0x16a|vc2oscget
+half-unsigned|(int16_t)u32(kHalf)|(uint16_t)u32(kHalf)|vc2oscget
+half-kind|return kind() == 2 ? (int16_t)|return kind() == 1 ? (int16_t)|vc2oscget
+position-shift|kPositionShift = 4|kPositionShift = 3|vc2oscget
+position-unsigned-shift|(int32_t)u32(kPosition) >> kPositionShift|(int32_t)(u32(kPosition) >> kPositionShift)|vc2oscget
+position-kind2|if (kind() == 2) return (uint32_t)samples;|if (kind() == 2) return 0;|vc2oscget
+position-lite-at|kPositionLite = 0x24c|kPositionLite = 0x250|vc2oscget
+position-type0|if (type == 0) return u32(kPositionLite);|if (type == 0) return (uint32_t)samples;|vc2oscget
+position-type1|if (type == 1) return (uint32_t)samples;|if (type == 1) return u32(kPositionLite);|vc2oscget
+position-float-at|kPositionFloat = 0x270|kPositionFloat = 0x274|vc2oscget
+position-float-signed|return (uint32_t)xtf::ftrc(kTwo31 > x ? x : sub(x, kTwo31 + kTwo31));|return (uint32_t)xtf::ftrc(x);|vc2oscget
+position-other-types|if (type != 2) return 0;|if (type > 3) return 0;|vc2oscget
+position-bound|kTwo31 > x ? x|kTwo31 >= x ? x|vc2oscget
+k0-renders|{ .clearsFlag = true, .renders = Render::zero },|{ .clearsFlag = true },|vc2osckinds
+k0-flag|{ .clearsFlag = true, .renders = Render::zero },|{ .renders = Render::zero },|vc2osckinds
+k1-install|.install = 0x893af7a0|.install = 0x893af870|vc2osckinds
+k1-waits|.install = 0x893af7a0, .waits = true,|.install = 0x893af7a0,|vc2osckinds
+k1-ticks|.ticks = kR0 \| kR2, .update = 0x893c8280|.ticks = kR0, .update = 0x893c8280|vc2osckinds
+k1-update|.update = 0x893c8280|.update = 0x893c88b0|vc2osckinds
+k1-records|.update = 0x893c8280, .records = Records::fromBlock,|.update = 0x893c8280,|vc2osckinds
+k1-ramp|      .ramp = true, .settings = 0x893c8390|      .settings = 0x893c8390|vc2osckinds
+k1-settings|.settings = 0x893c8390|.settings = 0x893b0280|vc2osckinds
+k1-pitch|.settings = 0x893c8390, .pitch = Pitch::tuned|.settings = 0x893c8390, .pitch = Pitch::bounded|vc2osckinds
+k2-install|.install = 0x893af870|.install = 0x893af7a0|vc2osckinds
+k2-waits|.install = 0x893af870, .waits = true,|.install = 0x893af870,|vc2osckinds
+k2-ticks|.ticks = kR0 \| kR1 \| kR2|.ticks = kR0 \| kR2|vc2osckinds
+k2-update|.update = 0x893c88b0|.update = 0x893c8280|vc2osckinds
+k2-records|      .records = Records::fromBlock, .settings = 0x893b0280|      .settings = 0x893b0280|vc2osckinds
+k2-ramp|.records = Records::fromBlock, .settings = 0x893b0280,|.records = Records::fromBlock, .ramp = true, .settings = 0x893b0280,|vc2osckinds
+k2-pitch|.settings = 0x893b0280, .pitch = Pitch::tuned|.settings = 0x893b0280, .pitch = Pitch::bounded|vc2osckinds
+k3-install|.install = 0x893c2ad0|.install = 0|vc2osckinds
+k3-update|.update = 0x893c2ce0|.update = 0x893c6260|vc2osckinds
+k3-ramp|.update = 0x893c2ce0, .ramp = true,|.update = 0x893c2ce0,|vc2osckinds
+k3-settings|.settings = 0x893c3460|.settings = 0|vc2osckinds
+k3-renders|.renders = Render::byAnalog|.renders = Render::byRender|vc2osckinds
+k3-pitch|.renders = Render::byAnalog, .pitch = Pitch::bounded|.renders = Render::byAnalog, .pitch = Pitch::tuned|vc2osckinds
+k4-render|.render = 0x893c62e0|.render = 0x893c61e0|vc2osckinds
+k4-installed|.render = 0x893c62e0, .installed = 4|.render = 0x893c62e0, .installed = 5|vc2osckinds
+k4-ticks|.render = 0x893c62e0, .installed = 4, .ticks = kR0,|.render = 0x893c62e0, .installed = 4,|vc2osckinds
+k4-update|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .update = 0x893c6260|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .update = 0x893afff0|vc2osckinds
+k4-flag|.update = 0x893c6260, .flagByWave = true },\n    { .installed = 5|.update = 0x893c6260 },\n    { .installed = 5|vc2osckinds
+k5-installed|{ .installed = 5|{ .installed = 6|vc2osckinds
+k5-update|.update = 0x893afff0|.update = 0x893c6260|vc2osckinds
+k5-ramp|.update = 0x893afff0, .ramp = true,|.update = 0x893afff0,|vc2osckinds
+k5-carrier|.ramp = true, .carrier = true,|.ramp = true,|vc2osckinds
+k5-renders|.renders = Render::carrier|.renders = Render::kind6|vc2osckinds
+k5-pitch|Render::carrier,\n      .pitch = Pitch::bounded|Render::carrier,\n      .pitch = Pitch::none|vc2osckinds
+k6-installed|{ .installed = 6|{ .installed = 5|vc2osckinds
+k6-first|.updateFirst = 0x893c6260, ||vc2osckinds
+k6-ticks|.ticks = kR0 \| kR1, .update = 0x893b0150|.ticks = kR0, .update = 0x893b0150|vc2osckinds
+k6-update|.update = 0x893b0150|.update = 0x893c6260|vc2osckinds
+k6-ramp|.update = 0x893b0150, .ramp = true,|.update = 0x893b0150,|vc2osckinds
+k6-renders|.renders = Render::kind6|.renders = Render::carrier|vc2osckinds
+k6-pitch|.renders = Render::kind6, .pitch = Pitch::bounded|.renders = Render::kind6, .pitch = Pitch::tuned|vc2osckinds
+k7-render|.render = 0x893c61e0|.render = 0x893c62e0|vc2osckinds
+k7-installed|.render = 0x893c61e0, .installed = 4|.render = 0x893c61e0, .installed = 6|vc2osckinds
+k7-update|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .update = 0x893c6260|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .update = 0x893afff0|vc2osckinds
+k7-flag|.update = 0x893c6260, .flagByWave = true },\n    { .clearsFlag|.update = 0x893c6260 },\n    { .clearsFlag|vc2osckinds
+beyond-flag|{ .clearsFlag = true, .records = Records::atZero }|{ .records = Records::atZero }|vc2osckinds
+beyond-renders|{ .clearsFlag = true, .records = Records::atZero }|{ .clearsFlag = true, .records = Records::atZero, .renders = Render::zero }|vc2osckinds
+row-beyond-index|kind < (uint32_t)kVc2OscKinds ? kind : kVc2OscKinds|kind < (uint32_t)kVc2OscKinds ? kind : 0|vc2osckinds
+row-seven-beyond|kind < (uint32_t)kVc2OscKinds ? kind|kind < 7u ? kind|vc2osckinds
+tables-wait|{ 0x893ae3d0, &t.waitLevel }|{ 0x893ae3d4, &t.waitLevel }|vc2osctables
+tables-depth|{ 0x893ae3f4, &t.depthScale }|{ 0x893ae634, &t.depthScale }|vc2osctables
+tables-plainhz|{ 0x893ae48c, &t.plainHz }|{ 0x893ae63c, &t.plainHz }|vc2osctables
+tables-ratetop|{ 0x893ae628, &t.rateTop }|{ 0x893ae630, &t.rateTop }|vc2osctables
+tables-samplehz|{ 0x893ae630, &t.sampleHz }|{ 0x893ae628, &t.sampleHz }|vc2osctables
+tables-cent|{ 0x893ae634, &t.cent }|{ 0x893ae640, &t.cent }|vc2osctables
+tables-base|{ 0x893ae638, &t.exponentBase }|{ 0x893ae63c, &t.exponentBase }|vc2osctables
+tables-keycents|{ 0x893ae63c, &t.keyCents }|{ 0x893ae638, &t.keyCents }|vc2osctables
+tables-octave|{ 0x893ae640, &t.perOctave }|{ 0x893ae644, &t.perOctave }|vc2osctables
+tables-level|{ 0x893ae644, &t.levelScale }|{ 0x893ae640, &t.levelScale }|vc2osctables
+tables-settings|{ 0x893ae87c, &t.settingsScale }|{ 0x893ae634, &t.settingsScale }|vc2osctables
+tables-most|{ 0x893aed7c, &t.most }|{ 0x893aed80, &t.most }|vc2osctables
+tables-least|{ 0x893aed80, &t.least }|{ 0x893aed7c, &t.least }|vc2osctables
+tables-installed4|{ 0x89542390, &t.installed4 }|{ 0x895422f0, &t.installed4 }|vc2osctables
+tables-installed5|{ 0x895422f0, &t.installed5 }|{ 0x895422f4, &t.installed5 }|vc2osctables
+tables-installed6|{ 0x895422f4, &t.installed6 }|{ 0x89542390, &t.installed6 }|vc2osctables

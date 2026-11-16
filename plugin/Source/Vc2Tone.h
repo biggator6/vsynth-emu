@@ -88,7 +88,7 @@ public:
     virtual void renderCosm(int cosm, float* buffer) = 0;  // the DSP routine at its +0x148
     virtual void renderTva(const float* in, float* out) = 0;   // 0x893b2640
     virtual void countOsc(int osc, uint32_t x) = 0;        // 0x893ae6c0: x onto a byte (+0x19c) when its +0x15c bit 1
-    virtual void countOscMatched(int osc, uint32_t x) = 0; // 0x893ae720: the same by bit 2
+    virtual void countOscMatched(int osc, uint32_t x) = 0; // 0x893ae720: x into a byte (+0x19d) when its +0x15c bit 2
     virtual float tvaLevel() = 0;                          // its +0x40
     virtual bool tvaHeld() = 0;                            // 0x893b25c0
     virtual uint32_t installOsc(int osc) = 0;              // 0x893ae0f0

@@ -352,6 +352,15 @@ version against rom.4's routines with what it calls hooked:
    voice (its block, portamento, the players' install on rom.4's object layout, Vari off), the analog OSC's note-on,
    install, update and converter, COSM's converters and the Growl (type 8), the TVA's render on one stereo pair, and
    kinds 5 and 6 into the tone (their ports, steps 3.5 and 3.7). The players, envelopes and LFOs are XtSynth's ports.
+   The OSC voice split by what rom.4 holds (2026-11-16): its frame, then its note-on by kind with the pitch and gain
+   targets ("its block"), the portamento, the players' installs on rom.4's object, Vari off.
+   - done (v230): the OSC voice's frame, `Vc2OscVoice`: its own words (the block's copy, the OSC object a take moves
+     whole, the legato word, the tail), the constructor, the install, the update with the re-seek, the note-on up to the
+     kind's own (`0x893af0b0`), the ramp's start, the counts, the settings, the legato, the render, the getters and the
+     take, each switch on the kind one row of `Vc2OscVoiceKinds.cpp`, against rom.4's in xt_vc2osc with every callee
+     hooked (HARDWARE_FIRMWARE.md, "The VC-2's OSC voice").
+   - next: the kind's note-on (`0x893af0b0` with `0x893af118`, `0x893af420`, the pitch and gain targets
+     `0x893af9f0…0x893affc0` and the getters' tails `0x893afeb0`, `0x893afdf0`).
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

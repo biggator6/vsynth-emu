@@ -17,6 +17,7 @@
 #include "../Source/Vc2TrackerTables.h"
 #include "../Source/Vc2Kind6Tables.h"
 #include "../Source/Vc2AutoNoteTables.h"
+#include "../Source/Vc2OscTables.h"
 #include "../Source/Vc2PartMixerTables.h"
 #include "../Source/Vc2Unvoiced.h"
 #include "../Source/Vc2VocoderTables.h"
@@ -59,13 +60,13 @@ juce::File otherImage(const juce::File& rom, const juce::File& work) {
 // rom.4's tables, which its loader reads at the start: the parameters' (v199), each bank's last ID, the last name and a
 // value's text (Vc2Params.h), the unvoiced detector's coefficients (v208, Vc2Unvoiced.h), LEGACY's tables (v210,
 // Vc2LegacyTables.h), HIRESO's (v213, Vc2HiresoTables.h), the vocoder object's (v220, Vc2VocoderTables.h) and the
-// later ports' (the carrier's, the tracker's, kind 6's, Auto Note's, the part mixer's, v221–v227); what they say is
-// each port's check's to check
+// later ports' (the carrier's, the tracker's, kind 6's, Auto Note's, the part mixer's, v221–v227, the OSC voice's,
+// v230); what they say is each port's check's to check
 bool vc2TablesIn() {
     return vc2ParamDesc(kVc2FirstTyped - 1) && vc2TypedDesc(kVc2Ids - 1) && !vc2ParamName(kVc2Ids - 1).empty()
            && !vc2ValueText(0, 0).empty() && vc2UnvoicedLoaded() && vc2LegacyLoaded() && vc2HiresoLoaded()
            && vc2VocoderLoaded() && vc2CarrierLoaded() && vc2TrackerLoaded() && vc2Kind6Loaded() && vc2AutoNoteLoaded()
-           && vc2MixerLoaded();
+           && vc2MixerLoaded() && vc2OscLoaded();
 }
 
 // An instance given `file` by `choose` should refuse it, its status saying `says`

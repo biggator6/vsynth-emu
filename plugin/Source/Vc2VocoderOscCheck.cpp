@@ -10,6 +10,7 @@
 // the interpreter.  XT_VC2CARRIER_FIRST and XT_VC2CARRIER_STOP as the first part's.  XT_VC2CARRIER_MAIN only.
 #ifdef XT_VC2CARRIER_MAIN
 #include "Vc2CarrierCheck.h"
+#include "Vc2RomShared.h"
 #include "Vc2VocoderOsc.h"
 #include "XtSwitches.h"
 #include <bit>
@@ -18,32 +19,12 @@
 
 namespace {
 constexpr uint32_t kConvert = 0x8939db00, kKind5 = 0x893afff0, kCarrierInit = 0x893ebed0;   // [FW]
-constexpr uint32_t kVelocity = 0x893a7fb0, kExp2 = 0x893a8340, kPeakAt = 0x899d9a5c;        // [FW]
+constexpr uint32_t kPeakAt = 0x899d9a5c;   // [FW]
 constexpr uint32_t kOscGetters[] = { 0x893a23b0, 0x893a2440 }, kLfoGetters[] = { 0x893a26b0, 0x893a28b0 };   // [FW]
 constexpr uint32_t kVoiceAt = 0x8C060000, kInputAt = 0x8C058000, kOscSumsAt = 0x8C05a000;   // in Vc2Fw's RAM
 constexpr uint32_t kLfoSumsAt = 0x8C05a020, kModsAt = 0x8C05b000, kMatrixAt = 0x8C05c000;
 constexpr uint32_t kBlock = 0x54, kP = 0x104, kCarrier = 0xa90, kRamp = 0x90c;   // [FW] in the voice
 constexpr int kInputBytes = 0x108, kUpdates = 30;
-
-// The shared routines as rom.4's own, run in the interpreter between its calls of the VOCODER OSC's routines
-class RomShared final : public Vc2ToneShared {
-public:
-    explicit RomShared(Vc2Fw& fw) : fw_(fw) {}
-    int velocity(int velocity, int sens, int curve) const override {
-        uint32_t r0 = 0;
-        faulted = !fw_.call(kVelocity, { (uint32_t)velocity, (uint32_t)sens, (uint32_t)curve }, &r0) || faulted;
-        return (int)r0;
-    }
-    float exp2(float x) const override {
-        fw_.cpu.fb[0][4] = std::bit_cast<uint32_t>(x);
-        faulted = !fw_.call(kExp2, {}) || faulted;
-        return std::bit_cast<float>(fw_.cpu.fb[0][0]);
-    }
-    mutable bool faulted = false;
-
-private:
-    Vc2Fw& fw_;
-};
 
 struct Counts {
     long cases = 0, updates = 0, ramps[3] = {}, different = 0;

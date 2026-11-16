@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's OSC voice v230 (2026-11-16, on vc2-mode): step 4.2's first part (from the user's "next item", by the
+  session that started this one; HARDWARE_FIRMWARE.md, "The VC-2's OSC voice"). The OSC voice split by what rom.4
+  holds (the plan): its frame now; then its note-on by kind with the pitch and gain targets, the portamento, the
+  players' installs, Vari off. Vc2OscVoice (Vc2OscVoice.cpp, the settings and getters in Vc2OscVoiceGet.cpp, each
+  kind's row in Vc2OscVoiceKinds.cpp, the constants in Vc2OscTables.cpp, read by loadVc2 through vc2LoadOsc): rom.4's
+  0xb84-byte voice, its own bytes (the block's copy, the OSC object a take moves whole at +0x15c, the legato word) and
+  its tail word for word; the constructor 0x893ae070, the install 0x893ae0f0, the update 0x893ae1c0 with the re-seek
+  0x893aeed0, the note-on 0x893ae370 up to the kind's own (0x893af0b0), the ramp's start 0x893ae610, the counts, the
+  settings 0x893ae780, the legato 0x893ae9b0, the render 0x893ae9f0, the getters 0x893aead0…0x893aed60 and the take
+  0x893aee20; what it calls by rom.4's address through Vc2OscParts. xt_vc2osc (in fcheck, 40 cases): two voices, 37
+  callees hooked, 16,000 events in 40 cases; 0 different at seeds 2024, 7 and 31337; every line of the port covered but
+  the records at address 0 (a kind past 7). Found: the pitch getter subtracts +0xa74 for kinds 1 and 2 alone; the
+  matched count writes the byte +0x19d (Vc2Tone.h's comment corrected); kind 7 is kind 4 but for its render. Not
+  drawn: a NaN at +0x270 or +0xa74 (xtf's FTRC and sub give a NaN otherwise than the interpreter). mutate_vc2.py
+  --osc: 236 plants, all caught. RomShared moved to Vc2RomShared.h (xt_vc2carrier's too). Not in the sound yet.
+
 The VC-2 tone's note-on v229 (2026-11-16, on vc2-mode): step 4.1's second part (the user's "Yes, next item";
   HARDWARE_FIRMWARE.md, "The VC-2's tone's note-on"); step 4.1 done. Vc2Tone::noteOn (Vc2ToneNoteOn.cpp): 0x893b3390
   with 0x893b4380 and 0x893b4660 as tables (an OSC voice's four envelopes and LFOs by its block's kind, a COSM's two by

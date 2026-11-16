@@ -1,0 +1,190 @@
+// xt_vc2osc <rom.4> [cases] [seed] (v230): the VC-2's OSC voice, Vc2OscVoice, against rom.4's own routines on two
+// voices in the interpreter's RAM, every routine they call hooked to log and answer as drawn (Vc2OscFakes.cpp), the
+// port's parts the same (Vc2OscPortParts.cpp); exp2 and the block-move helper rom.4's own on both sides.  Each case
+// both voices filled with the same noise, then 400 events (Vc2OscEvents.cpp) on either voice: constructed, installed,
+// updated (the count with high bits), re-sought, a note-on on a block drawn in the interpreter's RAM with its records,
+// the ramp's start, a count or a matched count, the settings from a drawn block, the legato, a render into a buffer of
+// noise, a take of the other voice's object, or a getter.  Before each, the hooked routines' answers, the records and,
+// now and then, the words each routine decides by (the kind, the wave's type, the object's flags and level, the legato
+// and gate words, the pending seek, the render routines, the first binding) drawn and written on both sides.  After
+// each, both voices' own words (+0x54…+0x90c and +0xa38…+0xa90), the calls, the answer and the output.
+// XT_VC2OSC_FIRST=1 says where the first case to differ does, XT_VC2OSC_STOP=1 stops there.  XT_VC2OSC_MAIN only.
+#ifdef XT_VC2OSC_MAIN
+#include "Vc2CheckCalls.h"
+#include "Vc2OscSides.h"
+#include "Vc2OscTables.h"
+#include <bit>
+#include <cmath>
+
+namespace {
+constexpr int kSteps = 400;
+constexpr uint32_t kVibratoOut = 0x2c;   // [FW] the vibrato's output, which the pitch getter reads
+constexpr uint32_t kTail = 0xa38;        // [FW] where the tail is in a voice
+constexpr std::array<uint32_t, 4> kRenders { 0x893c62e0, 0x893c61e0, 0, 0 };   // [FW] the install's two, and two hooked
+constexpr float kTwo31 = 2147483648.0f;
+// [FW] the words each routine decides by: the kind, the wave's type, the block's byte +0x138, the object's flags, the
+// source's byte +4, its seek word, level, +0x168, positions, the legato word, the take's gate, the pitch's three
+constexpr uint32_t kKind = 0x54, kWave = 0x104, kFixed = 0x138, kFlags = 0x15c, kSourceByte = 0x160, kSeekAt = 0x1c0;
+constexpr uint32_t kLevel = 0x1e0, kHalf = 0x168, kPosition = 0x194, kPositionLite = 0x24c, kPositionFloat = 0x270;
+constexpr uint32_t kLegato = 0x908, kGate = 0xb8;
+constexpr std::array<uint32_t, 4> kPitchWords { 0x5c, 0x70, 0xfc, 0xbc };
+// The calls counted over the run, by kind
+constexpr std::array<std::pair<OscKind, long OscCounts::*>, 3> kTallied { {
+    { kSeek, &OscCounts::seeks }, { kSetRamp, &OscCounts::rampsSet }, { kKindCall, &OscCounts::kindCalls } } };
+
+uint32_t drawKind(std::mt19937& rng) {   // 0…7, now and then past 7
+    constexpr std::array<uint32_t, 4> kPast { 8, 9, 100, 0xffffffff };
+    return rng() % 12 == 0 ? kPast[rng() % kPast.size()] : rng() % 8;
+}
+
+// The object's level around the update's wait: at it, a unit either side, 0, or any
+float drawLevel(std::mt19937& rng) {
+    const float wait = vc2OscTables().waitLevel;
+    const std::array<float, 4> near { wait, std::nextafter(wait, INFINITY), std::nextafter(wait, 0.0f), 0.0f };
+    return rng() % 2 ? near[rng() % near.size()] : oscDrawFloat(rng);
+}
+
+uint32_t maybeZero(std::mt19937& rng) { return rng() % 2 ? 0 : (uint32_t)rng(); }
+
+// The words the routines decide by, each drawn one time in four (all of them at a case's start)
+void steer(Vc2OscVoice& o, std::mt19937& rng, bool all) {
+    const auto now = [&] { return all || rng() % 4 == 0; };
+    if (now()) o.setU32(kKind, drawKind(rng));
+    if (now()) o.setU32(kWave, rng() % 8 == 0 ? (uint32_t)rng() : rng() % 10);
+    if (now()) o.setU8(kFixed, (uint8_t)rng());
+    if (now()) o.setU8(kFlags, (uint8_t)rng());
+    if (now()) o.setU8(kSourceByte, rng() % 3 == 0 ? 1 : (uint8_t)rng());
+    if (now()) o.setU32(kSeekAt, (uint32_t)rng());
+    if (now()) o.setF32(kLevel, drawLevel(rng));
+    if (now()) o.setU32(kLegato, maybeZero(rng));
+    if (now()) o.setU32(kGate, maybeZero(rng));
+    for (uint32_t at : { kHalf, kPosition, kPositionLite }) {
+        if (now()) o.setU32(at, (uint32_t)rng());
+    }
+    if (now()) o.setF32(kPositionFloat, oscDrawPosition(rng));
+    for (uint32_t at : kPitchWords) {
+        if (now()) o.setF32(at, oscDrawFloat(rng));
+    }
+    if (now()) o.tail.seekPending = rng() % 2 ? 1 : maybeZero(rng);
+    if (now()) o.tail.root = oscDrawFloat(rng);
+    // no NaN: the pitch getter subtracts it, and xtf::sub's a + (−b) gives a NaN's sign negated where the interpreter's
+    // FSUB keeps it (a NaN's sign alone)
+    if (now()) o.tail.tune = oscDrawFloat(rng, true);
+    if (now()) o.tail.sync = (uint32_t)rng();
+    const uint32_t render = kRenders[rng() % kRenders.size()];
+    if (now()) o.tail.render = render != 0 ? render : oscRenderAt((int)(rng() % kOscRenders));
+    if (now()) o.tail.renderAnalog = oscRenderAt((int)(rng() % kOscRenders));
+    if (now()) o.tail.binds[0] = oscEnvelopeAt((int)(rng() % kOscRecords));
+}
+
+void drawRecords(OscRecords& r, std::mt19937& rng) {
+    constexpr std::array<uint16_t, 5> kRates { 44100, 32000, 22050, 48000, 0 };
+    for (int k = 0; k < kOscRecords; ++k) {
+        Vc2OscSample& s = r.samples[(size_t)k];
+        s.flag = rng() % 3 == 0 ? (uint8_t)rng() : (uint8_t)(rng() % 2);
+        s.rate = rng() % 3 == 0 ? (uint16_t)rng() : kRates[rng() % kRates.size()];
+        s.key = (int8_t)rng();
+        s.root = rng() % 4 == 0 ? (int32_t)rng() : (int32_t)(rng() % 128);
+        r.maps[(size_t)k] = { rng() % 4 == 0 ? (int32_t)rng() : (int32_t)(rng() % 2400) - 1200, (int8_t)rng() };
+        r.envelopes[(size_t)k] = oscDrawFloat(rng);
+    }
+}
+
+// The draws before an event, written on both sides: the answers, the records, the steered words, each voice's own
+// words and tail into rom.4's memory and its vibrato's output
+void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
+    OscDraws& d = s.shared.draws;
+    d.rampValue = oscDrawFloat(rng);
+    d.kindValue = oscDrawFloat(rng);
+    d.vibratoOut = oscDrawFloat(rng);
+    d.rendered = (uint32_t)rng();
+    d.seekFlags = (uint8_t)rng();
+    drawRecords(s.shared.records, rng);
+    oscWriteRecords(s.fw, s.shared.records);
+    for (int v = 0; v < kOscVoices; ++v) {
+        steer(s.voices[(size_t)v], rng, all);
+        oscWriteVoice(s, v);
+        s.fw.cpu.write(oscVoiceAt(v) + kVibratoOut, &d.vibratoOut, sizeof d.vibratoOut);
+    }
+    s.rom.clear();
+    s.shared.calls.clear();
+}
+
+// A case: both voices the same noise, then its events
+std::string oscVoiceCase(OscSides& s, std::mt19937& rng) {
+    for (Vc2OscVoice& o : s.voices) {
+        for (uint8_t& b : o.own) b = (uint8_t)rng();
+        auto* tail = reinterpret_cast<uint32_t*>(&o.tail);
+        for (size_t k = 0; k < sizeof o.tail / 4; ++k) tail[k] = (uint32_t)rng();
+    }
+    const std::span<const OscEvent> events = oscEvents();
+    std::string what;
+    for (int k = 0; k < kSteps && what.empty(); ++k, ++s.n.events) {
+        drawBefore(s, rng, k == 0);
+        what = events[rng() % events.size()](s, rng, (int)(rng() % kOscVoices));
+        for (const auto& [kind, counted] : kTallied) s.n.*counted += vc2CountCalls(s.shared.calls, kind);
+    }
+    return what;
+}
+
+const char* const kOwnNames[kOscVoices] = { "voice 0's own words", "voice 1's own words" };
+const char* const kTailNames[kOscVoices] = { "voice 0's tail", "voice 1's tail" };
+} // namespace
+
+float oscDrawPosition(std::mt19937& rng) {
+    const std::array<float, 4> edges { kTwo31, std::nextafter(kTwo31, 0.0f), 2.0f * kTwo31,
+                                       std::nextafter(2.0f * kTwo31, 0.0f) };
+    if (rng() % 4 == 0) return edges[rng() % edges.size()];
+    return rng() % 2 ? kTwo31 * (0.5f + 1.5f * vc2Unit(rng)) : oscDrawFloat(rng, true);
+}
+
+void oscWriteVoice(OscSides& s, int v) {
+    const Vc2OscVoice& o = s.voices[(size_t)v];
+    s.fw.cpu.write(oscVoiceAt(v) + Vc2OscVoice::kOwn, o.own.data(), o.own.size());
+    s.fw.cpu.write(oscVoiceAt(v) + kTail, &o.tail, sizeof o.tail);
+}
+
+float oscDrawFloat(std::mt19937& rng, bool noNaN) {
+    constexpr std::array<float, 8> kEdges { 0.0f, -0.0f, 1.0f, -1.0f, 3e38f, -3e38f, INFINITY, -INFINITY };
+    constexpr std::array<float, 4> kScales { 1.0f, 100.0f, 10000.0f, 0.001f };
+    if (rng() % 4 == 0) return kEdges[rng() % kEdges.size()];
+    if (!noNaN && rng() % 32 == 0) return NAN;
+    return (2.0f * vc2Unit(rng) - 1.0f) * kScales[rng() % kScales.size()];
+}
+
+std::string oscDifference(OscSides& s) {
+    if (s.romShared.faulted) return "rom.4's exp2 faults for the port";
+    for (int v = 0; v < kOscVoices; ++v) {
+        const Vc2OscVoice& o = s.voices[(size_t)v];
+        const uint32_t at = oscVoiceAt(v);
+        const std::string what = vc2RegionsDifference(
+            s.fw, { { at + Vc2OscVoice::kOwn, o.own.data(), o.own.size(), kOwnNames[v] },
+                    { at + kTail, &o.tail, sizeof o.tail, kTailNames[v] } });
+        if (!what.empty()) return what;
+    }
+    return oscCallsDifference(s.rom, s.shared.calls);
+}
+
+int main(int argc, char** argv) {
+    Vc2Fw fw;
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2osc", vc2LoadOsc);
+    if (!run) return 1;
+    std::array<Vc2OscVoice, kOscVoices> voices {};
+    OscShared shared;
+    std::vector<OscPortParts> parts;
+    for (int v = 0; v < kOscVoices; ++v) parts.emplace_back(v, shared, voices[(size_t)v]);
+    std::vector<OscCall> rom;
+    const RomShared romShared(fw);
+    OscSides s { fw, voices, parts, shared, rom, romShared };
+    oscInstallRom(fw, shared.draws, rom);
+    Vc2Tally tally { "XT_VC2OSC_FIRST", "XT_VC2OSC_STOP" };
+    vc2RunCases(*run, tally, "", s.n.events, [&](std::mt19937& rng, bool) { return oscVoiceCase(s, rng); });
+    const OscCounts& n = s.n;
+    std::printf("osc: %d cases, %ld events, %ld note-ons (%ld with a sample, %ld without), %ld updates, %ld renders, "
+                "%ld settings, %ld takes, %ld getters\n", run->cases, n.events, n.noteOns, n.sampled, n.plain,
+                n.updates, n.renders, n.settings, n.takes, n.getters);
+    std::printf("calls: %ld seeks, %ld ramps set, %ld kinds' routines\n", n.seeks, n.rampsSet, n.kindCalls);
+    std::printf("xt_vc2osc: %ld different\n", tally.different);
+    return 0;
+}
+#endif

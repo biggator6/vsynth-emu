@@ -1,0 +1,181 @@
+// The VC-2's OSC voice's frame: see Vc2OscVoice.h (v230).  Every address is rom.4's; each routine's switch on the kind
+// is a row of Vc2OscVoiceKinds.cpp.  The settings and the getters are Vc2OscVoiceGet.cpp's.
+#include "Vc2OscVoice.h"
+#include "Vc2OscTables.h"
+#include "Vc2OscVoiceKinds.h"
+#include "XtFloat.h"
+
+using xtf::add;
+using xtf::div;
+using xtf::mul;
+using xtf::sub;
+
+namespace {
+// [FW] the ramps' types as the constructor gives them (+0x90c, +0x970, +0x9d4)
+constexpr std::array<int32_t, Vc2OscVoice::kRamps> kRampTypes { 0, 2, 1 };
+// [FW] the note-on's: the block's words it reads (the depth, the sample's and the map's pointers) and the object's
+// byte whose 0x10 marks a sample not pitched from its root (+0x138, the block's +0xe4)
+constexpr int kDepthWord = 0x1c / 4, kSampleWord = 0xd4 / 4, kMapWord = 0xdc / 4;
+constexpr uint32_t kDepth = 0x70, kFixedByte = 0x138, kFixed = 0x10, kRampFr4 = 0xbc, kRampFr5 = 0x5c;
+// [FW] the wave types a fixed sample keeps its 440 at (0x893ae514…0x893ae520)
+constexpr std::array<uint32_t, 4> kFixedTypes { 1, 6, 7, 8 };
+// [FW] the object's words: its flags byte (bit 1 counts, bit 2 the matched count, bit 7 held over a seek), the count
+// and the matched count's bytes, the seek's position word, its level, and the six words a take keeps
+constexpr uint32_t kFlags = 0x15c, kCount = 0x19c, kMatched = 0x19d, kSeekAt = 0x1c0, kLevel = 0x1e0;
+constexpr std::array<uint32_t, 6> kKept { 0x1cc, 0x1d0, 0x1d4, 0x1f0, 0x1d8, 0x1dc };
+constexpr uint8_t kCounts = 2, kMatches = 4, kHeld = 0x80;
+constexpr uint32_t kTakeGate = 0xb8, kSourceByte = 4, kSeekBit = 0x20, kSeekShift = 5, kRenderThird = 0x15c;
+
+// [FW] the re-seek's players by the wave's type: kind 1's (types 0…2), kind 2's (types 1…8), each the routine with the
+// block's bit 0x20 (+0x138) set and with it clear; 0 none
+struct Seek {
+    uint32_t set, clear;
+};
+constexpr std::array<Seek, 3> kSeeks1 { { { 0x893c6360, 0x893c6360 }, { 0x893cc830, 0x893cc830 },
+                                          { 0x893c6de0, 0x893c6de0 } } };
+constexpr std::array<Seek, 8> kSeeks2 { { { 0x893c6360, 0x893cc630 }, { 0, 0 }, { 0x893cd440, 0x893cd440 },
+                                          { 0x893cd440, 0x893cd440 }, { 0x893cd440, 0x893cd440 },
+                                          { 0x893c6360, 0x893cc630 }, { 0, 0 }, { 0x893c6360, 0x893cd090 } } };
+
+float installedOf(int which, const Vc2OscTables& t) {
+    const std::array<float, 3> constants { t.installed4, t.installed5, t.installed6 };
+    return constants[(size_t)(which - 4)];
+}
+} // namespace
+
+void Vc2OscVoice::construct(Vc2OscParts& parts) {
+    parts.buildVibrato();
+    for (int ramp = 0; ramp < kRamps; ++ramp) parts.buildRamp(ramp, kRampTypes[(size_t)ramp]);
+    tail.sync = 0;
+    tail.flag = 0;
+    tail.installed = 0.0f;
+    tail.seekPending = 0;
+}
+
+void Vc2OscVoice::install(Vc2OscParts& parts) {
+    const Vc2OscKindRow& row = vc2OscKindRow(kind());
+    if (row.install != 0) {
+        parts.kindCall(row.install);
+        return;
+    }
+    if (row.clearsFlag) tail.flag = 0;
+    if (row.render != 0) tail.render = row.render;
+    if (row.installed != 0) tail.installed = installedOf(row.installed, vc2OscTables());
+}
+
+void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts) {
+    if (kind() == 0) return;
+    const int32_t n16 = (int16_t)n;
+    parts.updateVibrato(n16);
+    const Vc2OscKindRow& row = vc2OscKindRow(kind());
+    if (row.waits && tail.seekPending != 0) {
+        if (f32(kLevel) > vc2OscTables().waitLevel) return;
+        reseek(parts);
+    }
+    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);
+    for (int ramp = 0; ramp < kRamps; ++ramp) {
+        if (row.ticks & (1 << ramp)) parts.tickRamp(ramp, n16);
+    }
+    if (row.update != 0) parts.kindCall(row.update);
+}
+
+void Vc2OscVoice::reseek(Vc2OscParts& parts) {
+    const uint8_t was = u8(kFlags);
+    setU8(kFlags, (uint8_t)(was | kHeld));
+    const int32_t at = (int32_t)u32(kSeekAt) >> kSeekShift;
+    const uint32_t type = u32(kWave);
+    const bool bit = (u8(kFixedByte) & kSeekBit) != 0;
+    Seek seek { 0, 0 };
+    if (kind() == 1 && type < kSeeks1.size()) seek = kSeeks1[type];
+    if (kind() == 2 && type - 1 < kSeeks2.size()) seek = kSeeks2[type - 1];
+    const uint32_t routine = bit ? seek.set : seek.clear;
+    if (routine != 0) parts.seek(routine, at);
+    const uint8_t now = u8(kFlags);
+    setU8(kFlags, (was & kHeld) ? (uint8_t)(now | kHeld) : (uint8_t)(now & ~kHeld));
+    tail.seekPending = 0;
+}
+
+void Vc2OscVoice::noteOn(const uint32_t* block, uint32_t legato, Vc2OscParts& parts, const Vc2ToneShared& shared) {
+    const Vc2OscTables& t = vc2OscTables();
+    std::memcpy(own.data(), block, kBlockBytes);
+    setF32(kDepth, mul(std::bit_cast<float>(block[kDepthWord]), t.depthScale));
+    tail.seekPending = 0;
+    setU32(kLegato, legato);
+    tail.flag = 0;
+    const Vc2OscKindRow& row = vc2OscKindRow(kind());
+    if (row.flagByWave && u32(kWave) == 1) tail.flag = 1;
+    if (row.records == Vc2OscRecords::none) {
+        tail.root = 0.0f;
+        tail.rateRatio = 1.0f;
+        tail.tune = 0.0f;
+        tail.gainA = 1.0f;
+        tail.gainB = 1.0f;
+        tail.hz = mul(shared.exp2(0.0f), t.plainHz);
+        parts.noteOnKind(legato);
+        return;
+    }
+    const bool fromBlock = row.records == Vc2OscRecords::fromBlock;
+    const Vc2OscSample s = parts.sample(fromBlock ? block[kSampleWord] : 0);
+    const Vc2OscMap m = parts.map(fromBlock ? block[kMapWord] : 0);
+    tail.flag = s.flag == 1 ? 1 : 0;
+    tail.rateRatio = div(t.rateTop, xtf::flt(s.rate));
+    const bool fixed = kind() == 2 && (u8(kFixedByte) & kFixed) != 0;
+    const bool keeps = std::ranges::find(kFixedTypes, u32(kWave)) != kFixedTypes.end();
+    if (keeps && fixed) {
+        tail.root = 0.0f;
+        tail.tune = 0.0f;
+        tail.hz = t.sampleHz;
+    } else {
+        tail.root = add(mul(xtf::flt(m.fine), t.cent), xtf::flt(s.root));
+        tail.tune = mul(xtf::flt(m.level), t.cent);
+        const float cents = add(sub(mul(xtf::flt(s.key), t.keyCents), tail.root), tail.tune);
+        const float x = shared.exp2(add(mul(cents, t.perOctave), t.exponentBase));
+        tail.hz = mul(mul(x, xtf::flt(s.rate)), t.cent);
+    }
+    float gain = shared.exp2(mul(-xtf::flt(m.level), t.levelScale));
+    tail.gain = gain;
+    if (!(gain > 0.0f)) {
+        tail.gain = 1.0f;
+        gain = 1.0f;
+    }
+    tail.gainA = gain;
+    tail.gainB = tail.gain;
+    parts.noteOnKind(legato);
+}
+
+void Vc2OscVoice::start(Vc2OscParts& parts) {
+    if (vc2OscKindRow(kind()).ramp) parts.startRamp(0, f32(kRampFr4), f32(kRampFr5));
+}
+
+void Vc2OscVoice::count(uint32_t x) {
+    if (u8(kFlags) & kCounts) setU8(kCount, (uint8_t)(u8(kCount) + x));
+}
+
+void Vc2OscVoice::countMatched(uint32_t x) {
+    if (u8(kFlags) & kMatches) setU8(kMatched, (uint8_t)x);
+}
+
+void Vc2OscVoice::legato(uint32_t x, Vc2OscParts& parts) {
+    for (int ramp = 0; ramp < kRamps; ++ramp) parts.legatoRamp(ramp, x);
+}
+
+uint32_t Vc2OscVoice::render(float* out, Vc2OscParts& parts) {
+    switch (vc2OscKindRow(kind()).renders) {
+        case Vc2OscRender::zero: std::fill(out, out + kOut, 0.0f); return 0;
+        case Vc2OscRender::byRender: parts.renderBy(tail.render, out, kRenderThird); return 0;
+        case Vc2OscRender::byAnalog: return parts.renderBy(tail.renderAnalog, out, tail.sync);
+        case Vc2OscRender::carrier: parts.renderCarrier(out); return 0;
+        case Vc2OscRender::kind6: parts.renderKind6(out); return 0;
+    }
+    return 0;
+}
+
+void Vc2OscVoice::take(const Vc2OscVoice& from) {
+    if (u32(kLegato) != 0 && u32(kTakeGate) == 0) return;
+    if (from.u8(kObject + kSourceByte) == 1) return;
+    std::array<uint32_t, kKept.size()> kept {};
+    for (size_t k = 0; k < kKept.size(); ++k) kept[k] = u32(kKept[k]);
+    std::memcpy(own.data() + (kObject - kOwn), from.own.data() + (kObject - kOwn), kObjectBytes);
+    for (size_t k = 0; k < kKept.size(); ++k) setU32(kKept[k], kept[k]);
+    setF32(kLevel, 0.0f);
+}

@@ -458,7 +458,9 @@ Waveform (ID 0x2f1, 0…10) to the input's code (the names' order says one for o
 `XtMultiBandPlayer` names) but few of SOLO's (26 of 55), Vari off's (3 of 24) or LITE's (3 once, 14 several times; output
 in `build/tools/vc2/player_pairs.txt`): their shapes hold the object's field offsets, and the object is laid out otherwise
 in rom.4 (below). The installs place them. rom.4's voice setup (`0x893ae0f0`, rom.2's `0x894f2010`) switches on the same
-kinds, with the kind at the voice's +0x54 where rom.2 has it at +0, and three more (5 the VOCODER OSC, 6, 7); its kind 1
+kinds, with the kind at the voice's +0x54 where rom.2 has it at +0, and three more (5 the VOCODER OSC, 6, 7; 7 is kind
+4's install, update and render but for its render routine, `0x893c61e0` for `0x893c62e0`: v230, HARDWARE_FIRMWARE.md,
+"The VC-2's OSC voice"; it is the install, not a setup: kinds 1 to 3 run their own in its place); its kind 1
 install (`0x893af7a0`, rom.2's `0x894f3590`) and kind 2 install (`0x893af870`, rom.2's `0x894f3660`) load the players in
 rom.2's order. `codealign.py --fields` (new) then lines each pair up with the values masked and lists what differs; on pairs
 that run equal it reads 0.90 (COSM's note-on) to 0.98 (SAW). Output in `build/tools/vc2/player_fields.txt`:
@@ -474,7 +476,8 @@ that run equal it reads 0.90 (COSM's note-on) to 0.98 (SAW). Output in `build/to
 | Kind 1's mode 1 | `0x8950d880` → `0x893c9f60`, `0x8950ffd0` → `0x893cc760` | 0.96, 1.00 |
 | Vari off | `0x89509870` → `0x893c63c0`, `0x89509f52` → `0x893c66e0` | 0.60, 0.55 over 0x180 instructions: rewritten |
 
-**The OSC object** (voice + 0xd4: the analog OSC's and the players') has 4 bytes in rom.4 at +0x94 that rom.2's has not:
+**The OSC object** (rom.2's voice + 0xd4, rom.4's voice + 0x15c past its vibrato's 0x54 bytes and the block's copy:
+v230, HARDWARE_FIRMWARE.md, "The VC-2's OSC voice"; the analog OSC's and the players') has 4 bytes in rom.4 at +0x94 that rom.2's has not:
 every offset from +0x98 on is 4 more in rom.4's code (+0x98, +0xa8, +0xe8 in the players, +0xec on in the analog OSC's) and
 +0x84 is not. The band run is equal with the insert at +0x94 and differs with it at +0x88, +0x8c or +0x90 (all 9,680
 calls) or +0x98 (4,800, all of BACKING's); the analog run is equal with it there too (`kOscInsert` in `vc2twin.h`).
