@@ -19,6 +19,7 @@ VC2_TABLES=(
     Vc2PartMixerTables          # the part mixer's (v227)
     Vc2OscTables                # the OSC voice's (v230)
     Vc2TvaTables                # the TVA's (v233)
+    Vc2CosmTables               # COSM's (v234)
 )
 
 # vc2Tables <source dir> [suffix]: the rows' files the tree has, one a line, each with the suffix (.cpp for a source).

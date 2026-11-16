@@ -789,6 +789,9 @@ xt_vc2osc: 0 different
 == xt_vc2tva
 tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fading, 961 fades ended, 559 told), 88 over, 200 silent
 xt_vc2tva: 0 different
+== xt_vc2cosm
+growl: 40 cases, 4800 events: 656 conversions (337 by COSM 2's reader), 148 note-ons, 664 updates, 363 new blocks, 3131 renders (1 with the phase started again)
+xt_vc2cosm: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

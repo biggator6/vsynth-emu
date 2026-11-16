@@ -128,7 +128,7 @@ rom4-not-sought|    findVc2Rom(file);\n||plugin/Source/PluginRom.cpp|rom-image
 rom4-not-alone|    findVc2Rom(juce::File());\n||plugin/Source/PluginRom.cpp|rom-image
 rom-any-image|    out.known = known == std::end(kKnown) ? nullptr : *known;|    out.known = &kVSynth;|plugin/Source/XtSynthRom.cpp|rom-image
 rom-not-the-image|    if (file->known != &image_) {|    if (false) {|plugin/Source/XtSynthRom.cpp|rom-image
-rom4-no-tables|return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path)\n           && vc2LoadVocoder(path) && vc2LoadCarrier(path) && vc2LoadTracker(path) && vc2LoadKind6(path)\n           && vc2LoadAutoNote(path) && vc2LoadMixer(path) && vc2LoadOsc(path) && vc2LoadTva(path);|Sh4 m; return m.loadRom(path);|plugin/Source/XtSynthRom.cpp|rom-image
+rom4-no-tables|return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path)\n           && vc2LoadVocoder(path) && vc2LoadCarrier(path) && vc2LoadTracker(path) && vc2LoadKind6(path)\n           && vc2LoadAutoNote(path) && vc2LoadMixer(path) && vc2LoadOsc(path) && vc2LoadTva(path)\n           && vc2LoadCosm(path);|Sh4 m; return m.loadRom(path);|plugin/Source/XtSynthRom.cpp|rom-image
 # v208: the unvoiced detector's coefficients, loaded with rom.4's parameters at the start; v210: LEGACY's; v213: HIRESO's;
 # v220: the vocoder object's
 rom4-no-unvoiced|&& vc2LoadUnvoiced(path) && vc2LoadLegacy(path)|&& vc2LoadLegacy(path)|plugin/Source/XtSynthRom.cpp|rom-image
@@ -143,9 +143,11 @@ rom4-no-kind6|&& vc2LoadTracker(path) && vc2LoadKind6(path)|&& vc2LoadTracker(pa
 rom4-no-autonote|&& vc2LoadKind6(path)\n           && vc2LoadAutoNote(path) && vc2LoadMixer(path)|&& vc2LoadKind6(path)\n           && vc2LoadMixer(path)|plugin/Source/XtSynthRom.cpp|rom-image
 rom4-no-mixer|&& vc2LoadAutoNote(path) && vc2LoadMixer(path) && vc2LoadOsc(path)|&& vc2LoadAutoNote(path) && vc2LoadOsc(path)|plugin/Source/XtSynthRom.cpp|rom-image
 # v230: the OSC voice's constants, loaded with the rest of rom.4's at the start
-rom4-no-osc|&& vc2LoadMixer(path) && vc2LoadOsc(path) && vc2LoadTva(path);|&& vc2LoadMixer(path) && vc2LoadTva(path);|plugin/Source/XtSynthRom.cpp|rom-image
+rom4-no-osc|&& vc2LoadMixer(path) && vc2LoadOsc(path) && vc2LoadTva(path)|&& vc2LoadMixer(path) && vc2LoadTva(path)|plugin/Source/XtSynthRom.cpp|rom-image
 # v233: the TVA's constants, the same
-rom4-no-tva|&& vc2LoadOsc(path) && vc2LoadTva(path);|&& vc2LoadOsc(path);|plugin/Source/XtSynthRom.cpp|rom-image
+rom4-no-tva|&& vc2LoadOsc(path) && vc2LoadTva(path)\n           && vc2LoadCosm(path);|&& vc2LoadOsc(path)\n           && vc2LoadCosm(path);|plugin/Source/XtSynthRom.cpp|rom-image
+# v234: COSM's constants, loaded with the rest of rom.4's at the start
+rom4-no-cosm|&& vc2LoadTva(path)\n           && vc2LoadCosm(path);|&& vc2LoadTva(path);|plugin/Source/XtSynthRom.cpp|rom-image
 # v206: the FX page's labelled boxes (External In Type and Source on the System card) and the OSC panel's EXT IN face
 editor-fx-choices-hidden|            c->box.setVisible(sys);|            c->box.setVisible(false);|plugin/Source/FxPanel.cpp|layout
 editor-fx-system-boxes|sys.rows = rowsOf(system_, systemChoices_);|sys.rows = rowsOf(system_, toneChoices_);|plugin/Source/FxPanel.cpp|layout

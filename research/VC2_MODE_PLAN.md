@@ -86,7 +86,7 @@ the VC-2 with rom.4's tables and IDs, and the new work narrows to what rom.4 add
   which takes the Comb Filter's place and block code. Two taps 512 back on 3267-sample lines, one moved in level and one
   in position by a phase at a subharmonic of 440 × the pitch ratio, 5…110 Hz by Speed (about 50 Hz at 64), its depth
   Intencity; the other five parameters do nothing. Held to a model bit for bit, 8000 DSP blocks, 0 different. For step 3:
-  a COSM type of its own, ported from `vc2cosmgrowllaw.cpp`.
+  a COSM type of its own, ported from `vc2cosmgrowllaw.cpp` (ported at v234, step 4.2: `Vc2CosmGrowl`).
   **The WLF08 wave library, 2026-11-13** (`research/tools/wlflib.py`; VC2_VOCAL_DESIGNER.md, "The wave libraries, read"):
   an index, "VC-2 Wave.bin" (58 waves → 43 key maps → 192 samples), in the V-Synth's own format (its "V-Synth Wave.bin",
   224 one to one); the samples are the last 192 of the 416 preset-area streams, in "VC-2 Preset.bin"'s `"TABLE"`/`"DATA"`
@@ -367,6 +367,23 @@ version against rom.4's routines with what it calls hooked:
      truncated fade and the OS's call) and the envelope's level, against rom.4's in xt_vc2tva with the OS's call hooked
      (HARDWARE_FIRMWARE.md, "The VC-2's TVA"). XtSynth's TVA gains don't serve it: rom.4 multiplies by the block's +0x48
      and +0x4c when its +0x40 is above 0, on the object's own words.
+   COSM's converters and the Growl split by job (2026-11-16): the Growl; the converters' frame with a first type; the
+   other 14 converters; the COSM object in the tone. XtCosm stays as it is: rom.4 shares its 15 types' voice side and
+   DSP whole (step 1b), so the object's frame calls them.
+   - done (v234): the Growl, `Vc2CosmGrowl`: its converter (`0x89398780`, its Matrix sums through an interface), the
+     note-on's, update's and new block's cases (`0x893b9d30`, `0x893b9d40`, `0x893b9dc0`) with the COSM clamp
+     (`0x893bf240`), and the DSP (`0x893b9b40`, mono and stereo alike), on the COSM object's 0x164 bytes word for word,
+     against rom.4's own routines in xt_vc2cosm with the Matrix readers hooked (HARDWARE_FIRMWARE.md, "The VC-2's COSM
+     type 8, the Growl").
+   - next: the converters' frame: the dispatcher (`0x89399920`: the velocity factors by `0x893a7fb0`, the switch on the
+     input's +7), the input's layout, the Matrix readers (`0x893a2960`, `0x893a2aa0`, the COSM groups' getters
+     `0x893a2350`), with a first type's converter.
+   - then the other 14 converters (rom.4's `0x89397980…0x89399620`, rom.2's `0x894dc8b0…0x894de110` on another input:
+     VC2_VOCAL_DESIGNER.md, "COSM in rom.4"), a few a version, each against rom.4's on the same input.
+   - then the COSM object in the tone: the set-up `0x893aa590`, the note-on `0x893aa0e0` (the clears, the allocator
+     `0x893a8c50`, the start values `0x893a85f0`, the levels it holds, the new block, the code's case), the binding
+     `0x893aa7b0`, the install `0x893aafe0`, the update `0x893aa7d0`, the new block `0x893aa5d0` and the DSP chosen by
+     block code, over XtCosm's types and the Growl: the parts `Vc2ToneParts` names for the COSMs.
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

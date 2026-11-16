@@ -199,6 +199,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscTables.cpp
     Source/Vc2Tva.cpp
     Source/Vc2TvaTables.cpp
+    Source/Vc2CosmGrowl.cpp
+    Source/Vc2CosmTables.cpp
     Source/XtBuildId.cpp
 )
 
