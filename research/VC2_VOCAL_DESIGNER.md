@@ -1194,6 +1194,11 @@ at three rates. The fields 0, 22, 28, 32 are the groups' band edges:
 `0x8993fe78` {1.2, 0.7397, 0.4956}.) The rates change through 8th-order IIR decimators and interpolators, objects of 68 bytes
 (`0x893efc30`; coefficients `0x895616d8` and `0x89561700`, 10 floats each): `0x893efd20` 32→16 and `0x893efdb0` 16→8 on the way
 in, `0x893efef0` 8→16 and `0x893efe40` 16→32 on the way out, with stereo versions.
+(v214, run: "8th-order" and "10 floats each" are withdrawn. The decimators are three cascaded biquads after an input gain,
+ten coefficients; the interpolators the same and a one-pole after, eleven, so `0x89561700` runs eleven floats, to the
+templates at `0x8956172c`. The analysis's two decimators are on a third table, `0x895613f4`, which its init gives them;
+`0x895616d8` and `0x89561700` are the object's. The carrier's own decimator is `0x893efc80`, which mixes each frame's two
+words × 0.5 first. HARDWARE_FIRMWARE.md, "HIRESO's rate filters".)
 
 The 32 band centres (`0x8994069c`) are 100 Hz to 1400 Hz in steps of 130, then steps widening from ×1.097 to ×1.184, up to
 11874 Hz: linear where the voice's formants are, wider above.

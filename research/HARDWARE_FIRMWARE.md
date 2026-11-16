@@ -1546,6 +1546,35 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### HIRESO's rate filters (2026-11-15, v214) {#hireso-rate}
+
+Step 3.3's second part: the filters that take HIRESO's three groups of bands between fs, fs/2 and fs/4, those the
+analysis and the mono path run, ported bit for bit (`Vc2HiresoRate.cpp`); the stereo path's four (`0x893eff90`,
+`0x893f0160`, `0x893f0240`, `0x893f0350`) come with the stereo synthesis, their only caller, and `0x893f0080` has none.
+A filter is a 68-byte object, its coefficients' pointer and 16 states (`Vc2RateFilter`); `0x893efc30` clears the states
+(and, given no object, takes 68 bytes from `0x89506df4`), and the caller sets the pointer. Three tables, read by
+`loadVc2` into `Vc2HiresoTables`: the analysis's (`0x895613f4`, ten floats, given to its two .bss objects by its init
+`0x893ed8f0`), the object's decimators' (`0x895616d8`, ten) and its interpolators' (`0x89561700`, eleven, to the
+templates at `0x8956172c`).
+- **A decimator** (`0x893efd20` 32→16, `0x893efdb0` 16→8): each input × c0, then three biquads, section k's (a, b, n) on
+  its states s0, s1: w = b·s1 + (a·s0 + in), out = w + (n·s0 + s1), then s1 ← s0, s0 ← w; every second output kept.
+- **The carrier's** (`0x893efc80`): each frame's (L + R) × 0.5 into a buffer (the full-rate group's carrier), and that
+  decimated 32→16 as above.
+- **An interpolator** (`0x893efef0` 8→16, `0x893efe40` 16→32): each input × c0 then 0 through the same three biquads and
+  a one-pole on state 6, w = c10·s6 + y, out = s6 + w. 8→16 adds its outputs into the buffer it is given; 16→32 writes
+  the first word of 32 frames, each output plus a full-rate buffer's sample from one sample before, state 7 keeping it.
+
+**Where the notes stood**, withdrawn in place in VC2_VOCAL_DESIGNER.md: the filters are not 8th order (the decimators are
+three biquads, the interpolators three and a one-pole), the interpolators' table is eleven floats, and the analysis's are
+on a table of their own.
+
+**The check.** xt_vc2hireso's second part (`Vc2HiresoRateCheck.cpp`): six kinds, each routine on the table its callers
+give it (the analysis's two, the carrier's 32→16 and its 16→8, the two interpolators), on one filter object in the
+interpreter's RAM, cleared by `0x893efc30` each case, as the port's is; 100 blocks a case of `Vc2Signal`'s input, the mic's
+at its scale and the carrier's at the bus's, the buffers beside holding something. After every block the outputs, the
+buffer beside and the 16 states word for word. 40 cases, 4,000 blocks, 0 different at seeds 2024 and 7. Checked:
+`mutate_vc2.py --hireso`'s 40 plants, 21 of them new (`vc2rate`, `vc2hitables`), each caught.
+
 ### HIRESO's formant warp (2026-11-15, v213) {#hireso-warp}
 
 The VC-2 mode's step 3.3, HIRESO, begins with its formant warp, as the plan has it; the rest of the engine follows by

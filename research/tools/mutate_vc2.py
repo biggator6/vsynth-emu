@@ -5,8 +5,9 @@
 # an ID besides its ends and default (2), a few seconds.  --in: vc2in_muts.txt, in Vc2Unvoiced.cpp and Vc2Consonants.cpp
 # (PORT=vc2in, vc2out: the input and output stages, v208, v209), through xt_vc2in, [cases] its cases (8).  --legacy:
 # vc2legacy_muts.txt, in Vc2LegacyAnalysis.cpp (PORT=vc2legacy, LEGACY's analysis, v210), through xt_vc2legacy, [cases]
-# its cases (8).  --hireso: vc2hireso_muts.txt, in Vc2HiresoWarp.cpp and Vc2HiresoTables.cpp (PORT=vc2warp, vc2hitables:
-# HIRESO's formant warp, v213), through xt_vc2hireso, [cases] its share of the ratios' grid (8: every fifth).  One line
+# its cases (8).  --hireso: vc2hireso_muts.txt, in Vc2HiresoWarp.cpp, Vc2HiresoTables.cpp and Vc2HiresoRate.cpp
+# (PORT=vc2warp, vc2hitables, vc2rate: HIRESO's formant warp, v213, and rate filters, v214), through xt_vc2hireso,
+# [cases] its share of the ratios' grid (8: every fifth) and its rate cases.  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist

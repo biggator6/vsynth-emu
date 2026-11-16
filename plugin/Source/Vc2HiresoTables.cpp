@@ -4,6 +4,9 @@
 
 namespace {
 constexpr Vc2Span kCentres { 0x8994069c, Vc2HiresoTables::kBands };   // [FW] .data
+constexpr Vc2Span kAnalysisRate { 0x895613f4, Vc2HiresoTables::kDecimatorWords };        // [FW]
+constexpr Vc2Span kDecimator { 0x895616d8, Vc2HiresoTables::kDecimatorWords };           // [FW]
+constexpr Vc2Span kInterpolator { 0x89561700, Vc2HiresoTables::kInterpolatorWords };     // [FW]
 constexpr uint32_t kWarpPool = 0x893f18d4;                             // [FW] slot 4's pool, these words in this order
 constexpr float Vc2HiresoTables::* kWarp[] = {
     &Vc2HiresoTables::pivotBase, &Vc2HiresoTables::pivotStep, &Vc2HiresoTables::highNeg, &Vc2HiresoTables::high,
@@ -15,6 +18,9 @@ constexpr float Vc2HiresoTables::* kWarp[] = {
 struct Read : Vc2HiresoTables {
     bool read(Sh4& image) {
         vc2ReadFloats(image, kCentres, centre);
+        vc2ReadFloats(image, kAnalysisRate, analysisRate);
+        vc2ReadFloats(image, kDecimator, decimator);
+        vc2ReadFloats(image, kInterpolator, interpolator);
         uint32_t at = kWarpPool;
         for (float Vc2HiresoTables::* word : kWarp) {
             this->*word = std::bit_cast<float>(image.rd32(at));

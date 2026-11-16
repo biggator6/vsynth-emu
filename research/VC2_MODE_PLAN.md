@@ -248,7 +248,11 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
    - v213, the formant warp (slot 4, `0x893f15d0`): `vc2HiresoMapOf`, the model's law in XtFloat, xt_vc2hireso at 0
      different on the model's 40,352 maps, 19 plants caught; the model went with it. **Done 2026-11-15**
      (HARDWARE_FIRMWARE.md, "HIRESO's formant warp").
-   - then, a version each as reached: the rate filters (the decimators and interpolators, `0x893efc30`'s objects), the
+   - done (v214): the rate filters, `Vc2HiresoRate` (`0x893efc30`'s objects: the decimators `0x893efd20`, `0x893efdb0`
+     and the carrier's `0x893efc80`, the interpolators `0x893efef0`, `0x893efe40`; the stereo path's four come with
+     slot 3), on their three tables from rom.4, against the routines in xt_vc2hireso's second part (HARDWARE_FIRMWARE.md,
+     "HIRESO's rate filters").
+   - then, a version each as reached: the
      analysis (slot 1, `0x893ed930`), the object (constructor `0x893f0a10`, reset, settings slot 5 with the templates,
      hold slots 6 and 7, the envelopes `0x893edd10`), the mono synthesis (slot 2, the carrier bank `0x893f1a10`) and the
      stereo (slot 3).

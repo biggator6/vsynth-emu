@@ -25,3 +25,28 @@ weight-down|sub(1.0f, ratio)|sub(ratio, 1.0f)
 band-order|add(sub(inner, band), t.a0)|sub(add(inner, t.a0), band)
 band-start|band = b == 0 ? 1.0f : add(band, 1.0f);|band = b == 0 ? 0.0f : add(band, 1.0f);
 fade-as-product|div(mul(add(sub(inner, band), t.a0), weight), t.fade)|mul(mul(add(sub(inner, band), t.a0), weight), 20.0f)
+# The rate filters (v214): their tables
+table-analysis-rate|kAnalysisRate { 0x895613f4,|kAnalysisRate { 0x895613f8,|vc2hitables
+table-decimator|kDecimator { 0x895616d8,|kDecimator { 0x895616dc,|vc2hitables
+table-interpolator|kInterpolator { 0x89561700,|kInterpolator { 0x89561704,|vc2hitables
+# The three biquads
+section-a|add(mul(ck[0], sk[0]), y)|add(mul(ck[0], sk[1]), y)|vc2rate
+section-b|add(mul(ck[1], sk[1]), add(|add(mul(ck[1], sk[0]), add(|vc2rate
+section-n|add(mul(ck[2], sk[0]), sk[1])|add(mul(ck[2], sk[1]), sk[1])|vc2rate
+section-sums|add(mul(ck[1], sk[1]), add(mul(ck[0], sk[0]), y))|add(add(mul(ck[1], sk[1]), mul(ck[0], sk[0])), y)|vc2rate
+section-store|        sk[1] = sk[0];\n        sk[0] = w;|        sk[0] = w;\n        sk[1] = sk[0];|vc2rate
+section-count|kBiquads = 3|kBiquads = 2|vc2rate
+# The interpolators' one-pole and the decimators' choice
+one-pole-coefficient|mul(c[10], s[kOnePole])|mul(c[9], s[kOnePole])|vc2rate
+one-pole-out|const float out = add(s[kOnePole], w);|const float out = w;|vc2rate
+decimate-keeps-first|        sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n]));\n        out[n] = sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n + 1]));|        out[n] = sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n]));\n        sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n + 1]));|vc2rate
+decimate-gain|sections(f.c, f.s, xtf::mul(f.c[0], in[2 * n]));|sections(f.c, f.s, in[2 * n]);|vc2rate
+# The carrier's mix and the interpolators' outputs
+mix|kMix = 0.5f|kMix = 0.25f|vc2rate
+mix-one-word|mul(add(frames[2 * i], frames[2 * i + 1]), kMix)|mul(frames[2 * i], kMix)|vc2rate
+interpolate-replaces|out[2 * n] = add(out[2 * n], interpolated(|out[2 * n] = add(0.0f, interpolated(|vc2rate
+interpolate-no-zero|interpolated(f.c, f.s, 0.0f));|interpolated(f.c, f.s, xtf::mul(f.c[0], in[n])));|vc2rate
+frames-no-zero|n % 2 == 0 ? mul(f.c[0], in[n / 2]) : 0.0f|mul(f.c[0], in[n / 2])|vc2rate
+frames-undelayed|frames[2 * n] = add(y, f.s[kDelay]);|frames[2 * n] = add(y, full[n]);|vc2rate
+frames-delays-itself|f.s[kDelay] = full[n];|f.s[kDelay] = y;|vc2rate
+clear-short|std::fill(std::begin(f.s), std::end(f.s), 0.0f);|std::fill(std::begin(f.s), std::begin(f.s) + 7, 0.0f);|vc2rate
