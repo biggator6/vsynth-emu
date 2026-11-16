@@ -46,35 +46,34 @@ std::string analysisOn(Vc2Fw& fw, Vc2LegacyAnalysis& port, const float* x, std::
 }
 
 struct Counts {
-    long blocks = 0, events = 0, held = 0, frozen = 0, gliding = 0, different = 0;
+    long events = 0, held = 0, frozen = 0, gliding = 0, different = 0;
 };
 
 // The analysis's cases, on `port`
 long analysisCases(Vc2Fw& fw, Vc2LegacyAnalysis& port, const Vc2Run& run) {
-    std::mt19937 rng((uint32_t)run.seed);
+    Vc2Cases cases { kInit, kVc2LegacyFadeEvery, kVc2LegacyBlocks, std::mt19937((uint32_t)run.seed) };
+    std::mt19937& rng = cases.rng;
     Counts n;
     for (int c = 0; c < run.cases; ++c) {
-        const bool fades = c % kVc2LegacyFadeEvery == kVc2LegacyFadeEvery - 1;
-        Vc2Signal input { std::mt19937(rng()), fades };
-        std::string what = vc2ResetOn(fw, kInit, {}, port, vc2LegacyStateDifference);
-        float x[Vc2LegacyAnalysis::kBlock];
-        for (int k = 0; k < (fades ? kVc2FadeBlocks : kVc2LegacyBlocks) && what.empty(); ++k, ++n.blocks) {
+        const std::string what = vc2AnalysisCase(fw, port, vc2LegacyStateDifference, cases, c, [&](const float* x) {
+            std::string said;
             if (rng() % 24 == 0) {
                 ++n.events;
-                what = eventOn(fw, port, rng);
+                said = eventOn(fw, port, rng);
             }
-            input.block(x);
-            if (what.empty()) what = analysisOn(fw, port, x, rng);
+            if (said.empty()) said = analysisOn(fw, port, x, rng);
             n.held += port.s.controller >= 64 ? 1 : 0;
             n.frozen += port.s.controller >= 64 && port.s.held == 0.0f ? 1 : 0;
             n.gliding += port.s.letGo > 0.0f && port.s.letGo < 1.0f ? 1 : 0;
-        }
+            return said;
+        });
         if (what.empty()) continue;
-        if (!n.different++ && vc2LegacyFirst()) std::printf("  case %d, block %ld: %s\n", c, n.blocks, what.c_str());
+        if (!n.different++ && vc2LegacyFirst())
+            std::printf("  case %d, block %ld: %s\n", c, cases.blocksRun, what.c_str());
         if (xtSwitch("XT_VC2LEGACY_STOP")) break;   // a plant's run: its first case that differs is enough
     }
     std::printf("legacy analysis: %d cases, %ld blocks, %ld events (%ld blocks held, %ld frozen, %ld gliding back), "
-                "%ld different\n", run.cases, n.blocks, n.events, n.held, n.frozen, n.gliding, n.different);
+                "%ld different\n", run.cases, cases.blocksRun, n.events, n.held, n.frozen, n.gliding, n.different);
     return n.different;
 }
 } // namespace

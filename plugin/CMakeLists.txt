@@ -170,6 +170,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2HiresoTables.cpp
     Source/Vc2HiresoWarp.cpp
     Source/Vc2HiresoRate.cpp
+    Source/Vc2HiresoAnalysis.cpp
     Source/XtBuildId.cpp
 )
 

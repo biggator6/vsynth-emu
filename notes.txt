@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+HIRESO's analysis v215 (2026-11-15, on vc2-mode): step 3.3's third part (the user's "Yes, next item";
+  HARDWARE_FIRMWARE.md, "HIRESO's analysis"). Vc2HiresoAnalysis: rom.4's slot 1 analysis (0x893ed930) on its .bss
+  globals, word for word from 0x8a1bbd2c, with its init (0x893ed8f0), slot 0's clear (0x893ede50), the envelopes'
+  update (0x893edd10) and getter (0x893eddf0). The mic through its two decimators (Vc2HiresoRate); each group's first
+  difference through its bands' two resonators into rows; the voiced gate's glide; the energies into a 14-frame ring;
+  each band's envelope the root of its largest over its window. XtFloat gained fsqrt (FSQRT under round to zero). Its
+  tables (the resonators' 192 floats, the energy scales, the gate's two rates, the windows) in Vc2HiresoTables, read
+  as one table of spans. Not in the sound yet. VC2_VOCAL_DESIGNER.md's windows for the top bands withdrawn in place.
+  The case loop LEGACY's analysis check had is a template both use (vc2AnalysisCase, Vc2Cases; vc2SameAsFr0 moved
+  there), xt_vc2legacy's lines as before. Check: xt_vc2hireso's third part (Vc2HiresoAnalysisCheck.cpp), 40 cases,
+  22,000 blocks, slot 0's clears between them and now and then a second update on a frame, 0 different (seeds 2024
+  and 7); mutate_vc2.py --hireso, 43 new plants (vc2hiana, vc2hitables), each caught.
+
 HIRESO's rate filters v214 (2026-11-15, on vc2-mode): step 3.3's second part (the user's "Yes, next item";
   HARDWARE_FIRMWARE.md, "HIRESO's rate filters"). Vc2HiresoRate.cpp: the 68-byte filter object (Vc2RateFilter), its
   clear (0x893efc30's part), the decimators 32→16 and 16→8 (0x893efd20, 0x893efdb0) and the carrier's mix and 32→16

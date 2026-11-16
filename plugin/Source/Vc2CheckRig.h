@@ -6,6 +6,7 @@
 #include "Sh4Interp.h"
 #include "XtArgs.h"
 #include "XtFloat.h"
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -38,6 +39,9 @@ struct Vc2Fw {
         return ok;
     }
 };
+
+// A getter's float result, as rom.4 leaves it in fr0, against the port's (v211's, here from v215)
+inline bool vc2SameAsFr0(const Vc2Fw& fw, float mine) { return fw.cpu.fb[0][0] == std::bit_cast<uint32_t>(mine); }
 
 // A check's run: its cases and seed
 struct Vc2Run {
@@ -110,6 +114,30 @@ std::string vc2ResetOn(Vc2Fw& fw, uint32_t routine, std::initializer_list<uint32
     if (!fw.call(routine, args)) return "the reset faults: " + fw.cpu.error();
     port.reset();
     return difference(fw, port);
+}
+
+// An analysis's cases (v215, LEGACY's of v210 and HIRESO's): rom.4's init, each case's start; every `fadeEvery`th case
+// fading into silence, the others `blocks` blocks; the cases' draws, and the blocks run
+struct Vc2Cases {
+    uint32_t init;
+    int fadeEvery, blocks;
+    std::mt19937 rng;
+    long blocksRun = 0;
+};
+
+// Case `c` of an analysis's: both reset by rom.4's init and the port's reset(), then the case's blocks of Vc2Signal's
+// input, each through `block(x)`, which says what differs; empty when nothing does
+template <class Port, class Difference, class Block>
+std::string vc2AnalysisCase(Vc2Fw& fw, Port& port, Difference difference, Vc2Cases& cases, int c, Block block) {
+    const bool fades = c % cases.fadeEvery == cases.fadeEvery - 1;
+    Vc2Signal input { std::mt19937(cases.rng()), fades };
+    std::string what = vc2ResetOn(fw, cases.init, {}, port, difference);
+    float x[kVc2Block];
+    for (int k = 0; k < (fades ? kVc2FadeBlocks : cases.blocks) && what.empty(); ++k, ++cases.blocksRun) {
+        input.block(x);
+        what = block(x);
+    }
+    return what;
 }
 
 // One of the port's buffers against rom.4's at `at`

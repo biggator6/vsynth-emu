@@ -12,9 +12,6 @@ inline constexpr uint32_t kVc2LegacyDumpWord = 0x89940254, kVc2LegacyLevelWord =
 inline constexpr uint32_t kVc2LegacyBlockAt = 0x8C011000;   // the mic's block, in Vc2Fw's RAM
 inline constexpr int kVc2LegacyBlocks = 400, kVc2LegacyFadeEvery = 8;   // a case's blocks; every eighth case fades
 
-// A getter's float result, as rom.4 leaves it in fr0, against the port's
-inline bool vc2SameAsFr0(const Vc2Fw& fw, float mine) { return fw.cpu.fb[0][0] == std::bit_cast<uint32_t>(mine); }
-
 // The Hold pedal's 0…127: its two ends most of the time, as a pedal gives; 64 and 63, where the hold's branches part
 int vc2DrawController(std::mt19937& rng);
 // A dump time: its ends most often (127 and 126 put the pedal's hold either side of the freeze at 0.99, 0 holds nothing)

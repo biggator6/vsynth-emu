@@ -1209,7 +1209,8 @@ opposite sign (`0x893eda90`); then per band an energy, scale × Σ (band sample 
 shared detector's: `0x893ed3e0` gives "voiced" when neither the flag 1 block back nor 5 back says unvoiced, and it glides at
 0.001 a sample rising, 0.01 falling. So unvoiced blocks drop out of HIRESO's band envelopes. The envelope (`0x893edd10`, called
 by the synthesis) is the square root of the largest energy in the last N frames, N from `0x8956141c`: 14 for bands 0–25, then
-13, 12, 11 and 10 for the top three: about 10 ms.
+~~13, 12, 11 and 10 for the top three~~ 13, 12, 11, 10, 10 and 10 for bands 26–31 (v215, the table read whole; the rest of this
+paragraph run and held: HARDWARE_FIRMWARE.md, "HIRESO's analysis"): about 10 ms.
 
 **Synthesis** (slot 2 mono `0x893f0c60`, slot 3 stereo `0x893f1240`). The output buffer's carrier is decimated the same way and
 run through the carrier bank (`0x893f1a10`): 2n + 1 resonators a group, a centre one per band and edge ones shared by

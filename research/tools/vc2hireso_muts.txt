@@ -1,5 +1,6 @@
 # Planted errors in HIRESO's port, for mutate_vc2.py --hireso: each must make xt_vc2hireso, on rom.4, say something
-# differs.  name|old|new[|port[|seed]]; ports vc2warp (Vc2HiresoWarp.cpp, v213) and vc2hitables (Vc2HiresoTables.cpp).
+# differs.  name|old|new[|port[|seed]]; ports vc2warp (Vc2HiresoWarp.cpp, v213),
+# vc2hitables (Vc2HiresoTables.cpp), vc2rate (Vc2HiresoRate.cpp, v214) and vc2hiana (Vc2HiresoAnalysis.cpp, v215).
 # Not planted, as no input tells them apart: the blend's weight above 1 as ratio − 1 (it is ratio + −1, the same number),
 # band 0's + −0 before its weight, and a band counted from 0 + 1 rather than set to 1.
 # The tables
@@ -50,3 +51,50 @@ frames-no-zero|n % 2 == 0 ? mul(f.c[0], in[n / 2]) : 0.0f|mul(f.c[0], in[n / 2])
 frames-undelayed|frames[2 * n] = add(y, f.s[kDelay]);|frames[2 * n] = add(y, full[n]);|vc2rate
 frames-delays-itself|f.s[kDelay] = full[n];|f.s[kDelay] = y;|vc2rate
 clear-short|std::fill(std::begin(f.s), std::end(f.s), 0.0f);|std::fill(std::begin(f.s), std::begin(f.s) + 7, 0.0f);|vc2rate
+# The analysis (v215): Vc2HiresoAnalysis.cpp (vc2hiana) and its tables (vc2hitables).  Not planted, as no input tells
+# them apart: the groups' banks in another order (each its own states and rows), a window's search from 0 rather than
+# −1 (no energy is below 0), the gate's glide chosen up when the flag equals its level (the step is then 0), and the
+# decimators on the object's table (0x895616d8), which is the analysis's (0x895613f4) word for word.
+frame-wraps-late|s.frame = s.frame + 1 >= Words::kFrames ? 0 : s.frame + 1;|s.frame = s.frame + 1 > Words::kFrames ? 0 : s.frame + 1;|vc2hiana
+rates-swapped|{ quarter, half, in }|{ half, quarter, in }|vc2hiana
+no-difference|const float d = sub(in[n], *last);|const float d = in[n];|vc2hiana
+last-is-difference|*last = in[n];|*last = d;|vc2hiana
+feedback-own-state|st[0] = add(mul(c[1], y), st[1]);|st[0] = add(mul(c[1], y), st[0]);|vc2hiana
+second-state-of-state|st[1] = mul(c[2], y);|st[1] = mul(c[2], st[0]);|vc2hiana
+resonators-opposed|s.rows[b][n] = add(y, z);|s.rows[b][n] = sub(y, z);|vc2hiana
+resonators-share|resonate(c + 3, st + 2, d)|resonate(c + 3, st + 1, d)|vc2hiana
+band-stride|constexpr int kStates = 4;|constexpr int kStates = 5;|vc2hiana
+samples-halved|return Words::kBlock >> (Words::kGroups - 1 - group);|return Words::kBlock >> (Words::kGroups - group);|vc2hiana
+gate-stride|return 1 << (Words::kGroups - 1 - group);|return (1 << (Words::kGroups - 1 - group)) / 2;|vc2hiana
+gate-rates-swapped|gateRate[flag > s.gateLevel ? 0 : 1]|gateRate[flag > s.gateLevel ? 1 : 0]|vc2hiana
+gate-from-start|g = add(mul(sub(flag, g), rate), g);|g = add(mul(sub(flag, g), rate), s.gateLevel);|vc2hiana
+gate-not-kept|    s.gateLevel = g;\n|\n|vc2hiana
+energy-ungated|const float v = mul(s.rows[b][n], s.gate[n * stride(group)]);|const float v = s.rows[b][n];|vc2hiana
+energy-gate-unstrided|s.gate[n * stride(group)]|s.gate[n]|vc2hiana
+energy-scale-one|energyScale[group]|energyScale[0]|vc2hiana
+energy-unsquared|e = add(mul(v, v), e);|e = add(v, e);|vc2hiana
+new-max-ties|if (e > s.max[b]) {|if (e >= s.max[b]) {|vc2hiana
+new-max-ages|s.max[b] = e;   // the age stands as it was|s.max[b] = e; s.age[b] = vc2HiresoTables().window[b] - 1;|vc2hiana
+age-early|s.age[b]-- == 0|--s.age[b] == 0|vc2hiana
+window-start|int i = s.frame - window + 1;|int i = s.frame - window;|vc2hiana
+window-wrap|if (i < 0) i += Words::kFrames;|if (i < 0) i += Words::kFrames - 1;|vc2hiana
+window-last-wins|if (v > m) {|if (v >= m) {|vc2hiana
+root-nearest|s.envelope[b] = xtf::fsqrt(e);|s.envelope[b] = std::sqrt(e);|vc2hiana
+rescan-root-nearest|s.envelope[band] = xtf::fsqrt(m);|s.envelope[band] = std::sqrt(m);|vc2hiana
+clear-keeps-ring|    std::memset(&s.ring, 0, sizeof s.ring);\n|\n|vc2hiana
+clear-keeps-ages|offsetof(Words, gate) - offsetof(Words, max)|offsetof(Words, age) - offsetof(Words, max)|vc2hiana
+clear-clears-frame|    std::memset(&s.ring, 0, sizeof s.ring);\n|    std::memset(&s.ring, 0, sizeof s.ring);\n    s.frame = 0;\n|vc2hiana
+clear-clears-gate|    std::memset(&s.ring, 0, sizeof s.ring);\n|    std::memset(&s.ring, 0, sizeof s.ring);\n    s.gateLevel = 0.0f;\n|vc2hiana
+reset-uncleared|    clear();\n    s.frame = 0;|    s.frame = 0;|vc2hiana
+reset-keeps-frame|    s.frame = 0;\n|\n|vc2hiana
+reset-keeps-gate|    s.gateLevel = 0.0f;\n|\n|vc2hiana
+reset-clears-rows|std::ranges::fill(s.bank, 0.0f);|std::ranges::fill(s.bank, 0.0f);\n    std::memset(&s.rows, 0, sizeof s.rows);|vc2hiana
+reset-clears-decimators|toHalf.c = toQuarter.c = t.analysisRate;|toHalf.c = toQuarter.c = t.analysisRate;\n    vc2RateClear(toHalf);|vc2hiana
+reset-table-word|t.resonatorAt + 4 * (uint32_t)|t.resonatorAt + (uint32_t)|vc2hiana
+edges|{ 0, 22, 28, 32 }|{ 0, 21, 28, 32 }|vc2hiana
+decimators-interpolating|toHalf.c = toQuarter.c = t.analysisRate;|toHalf.c = toQuarter.c = t.interpolator;|vc2hiana
+resonators-at|kResonators { 0x8993fe84,|kResonators { 0x8993fe88,|vc2hitables
+scales-at|kEnergyScales { 0x8993fe78,|kEnergyScales { 0x8993fe7c,|vc2hitables
+gate-rates-at|kGateRates { 0x893edba4, 2 }|kGateRates { 0x893edba8, 2 }|vc2hitables
+windows-at|kWindows = 0x8956141c;|kWindows = 0x89561420;|vc2hitables
+resonators-at-word|resonatorAt = kResonators.at;|resonatorAt = kResonators.at + 4;|vc2hitables

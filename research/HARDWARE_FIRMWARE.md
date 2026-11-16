@@ -1546,6 +1546,70 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### HIRESO's analysis (2026-11-15, v215) {#hireso-analysis}
+
+Step 3.3's third part, ported bit for bit (`Vc2HiresoAnalysis`):
+- slot 1's analysis, `0x893ed930`, a function on .bss globals;
+- its init `0x893ed8f0`, called only by the constructor;
+- slot 0's clear `0x893ede50`, at a mode change;
+- the envelopes' update `0x893edd10`, which slots 2 and 3 call each block after their carrier bank;
+- the envelopes' getter `0x893eddf0`, which the synthesis reads.
+
+**Where it lives.** `0x8a1bbd2c…0x8a1bd9d4` (`Vc2HiresoAnalysisWords`):
+- the groups' first bands and end, {0, 22, 28, 32};
+- each group's coefficient pointer: `0x8993fe84`, `0x89940094`, `0x89940124`, one run of six floats a band;
+- a word nothing here touches;
+- the bank: a group's words start at 7 × its first band, its last input, then four states a band;
+- each band's row of this block's samples, 32 words;
+- each band's energies, a ring of 14 frames;
+- the frame;
+- each band's largest energy, its root and an age;
+- the gate, a sample at a time, and its level.
+
+Its decimators live beside the input stage's words, from `0x899d9a88`: the mic at fs/2 (16 floats) and fs/4 (8), then the two 68-byte filter objects. The file's static initializer, `0x893edf90`, clears the two objects at C startup. It is the fourth entry of the list at `0x898c60a0`, 12 bytes an entry with the function at +8. It also writes two floats at `0x899d9b70` that nothing reads. No init clears the decimators again, so they run on across inits and clears.
+
+**A block** (`0x893ed930`):
+1. The frame steps, mod 14.
+2. The mic is decimated 32→16 (`0x893efd20`), then 16→8 (`0x893efdb0`), both on `0x895613f4`. That table is the object's decimators' (`0x895616d8`) word for word, a second copy.
+3. `0x893eda90` runs each group: group 2 (bands 28–31) on the mic, group 1 (22–27) at fs/2, group 0 (0–21) at fs/4. For each sample:
+   - d = x − last, then last ← x;
+   - each band's two resonators on d: y = c0·d + s0, s0 ← c1·y + s1, s1 ← c2·y (the second resonator takes c3…c5);
+   - the band's row sample is y + z.
+4. The voiced gate: v is FLOAT of `0x893ed3e0`'s 0 or 1. The rate is 0.001 (`0x893edba4`) when v is above the gate's level, else 0.01 (`0x893edba8`), chosen once a block. Each sample, level ← (v − level)·rate + level, into the gate's 32 words.
+5. Each band's energy, for group 2, then 1 (`0x893edbd0`), then 0 (the same code inline): scale × Σ (row·gate[n × stride])² into the ring at this frame. The scales are `0x8993fe78`'s; the strides are 4, 2 and 1.
+
+The groups' counts and strides (`0x8993fe60`, `0x8993fe6c`) are the block at each rate. The routines' paths for a group of no bands, a count of 0 or a window of 0 can't be reached and are not ported.
+
+**The envelopes** (`0x893edd10`). For each band, e is its energy at this frame:
+- If e is above the band's largest, e becomes the largest and the envelope is √e (FSQRT, round to zero; `xtf::fsqrt`, new in XtFloat.h). The age stands as it was.
+- Otherwise the age is decremented. If it was 0, the band's window is searched again from its oldest frame. The windows are `0x8956141c`'s: 14 frames for bands 0–25, then 13, 12, 11, 10, 10 and 10. The first of equal values wins. The search sets the largest, its root, and the age, the largest's offset from the oldest frame.
+
+So the envelope is the root of the largest energy in the band's last N frames. The countdown reaches 0 on the frame the largest leaves the window. A new largest needs no new age, because it leaves later than the countdown runs. The routine returns 1.0, which its callers don't read.
+
+**Slot 0's clear** (`0x893ede50`) zeroes the bank, the ring and the envelopes' words. The frame and the gate stay as they are. The init (`0x893ed8f0`, through `0x893edee0`) does all that too, zeroes the frame and the gate, writes the groups' words and the decimators' table, and leaves the rows.
+
+Uncalled in rom.4 (no load of their addresses, no branch to them in `0x893ed000…0x893f3000`), so not ported:
+- `0x893eda60`, the frame's step alone;
+- `0x893edc70`, the envelopes' words cleared;
+- `0x893edca0`, one band's search;
+- `0x893ede00`, the sum of bands 0–19's envelopes.
+
+**Where the notes stood.** VC2_VOCAL_DESIGNER.md gave the windows as "13, 12, 11 and 10 for the top three". That is withdrawn in place: bands 26–31 take 13, 12, 11, 10, 10 and 10.
+
+**The check.** xt_vc2hireso's third part (`Vc2HiresoAnalysisCheck.cpp`), on the template it now shares with LEGACY's (`vc2AnalysisCase`, Vc2CheckRig.h). Each case:
+- runs both inits;
+- then 400 blocks of `Vc2Signal`'s input (every eighth case a fade and its 1,600 blocks of silence);
+- before each block, sometimes slot 0's clear;
+- sets each block's flag, drawn in runs, in every word of both input stages' rings (`0x8a0f87dc`, the port's `Vc2Unvoiced`), so `0x893ed3e0` says voiced exactly when it is 0;
+- runs both envelopes' updates after each block, and one block in eight a second time on the same frame. The second run gives each band an energy equal to its largest, as a block played over and over would, which no other input in the check reaches soon enough.
+
+After every block, update and clear, the state, the mic at fs/2 and fs/4 and the decimators' states are compared word for word; after each block, a drawn band's envelope through the getter as well. One port object runs through the cases, as rom.4's globals do.
+
+Results:
+- seed 2024: 40 cases, 22,000 blocks (10,988 unvoiced), 450 clears, 0 different;
+- seed 7: 476 clears, 0 different;
+- `mutate_vc2.py --hireso`: all 43 new plants caught (`vc2hiana`, `vc2hitables`). A first run missed two. One was a tie taken as a new largest, which the second update now reaches. The other put the decimators on the object's table, which is the same numbers; it was replaced by the interpolators' table.
+
 ### HIRESO's rate filters (2026-11-15, v214) {#hireso-rate}
 
 Step 3.3's second part: the filters that take HIRESO's three groups of bands between fs, fs/2 and fs/4, those the
