@@ -83,9 +83,9 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   several files, one of them read as memory. `wavein <rom.2> <index> <bank>` (`vc2wavein.cpp`) runs the start-up load
   with rom.4's wave reader and store for real and holds what the store keeps of each sample to the plugin's reading
   (`vc2wavecmp.h`: `xtWaveRead`, whole RDAC blocks, `xtMbBuildBacking`) ("The wave reader, run"); `vc2bankload.h` is the
-  start-up load both it and `bank` run. `cosmgrowl [notes] [plant]` (`vc2cosmgrowl.cpp`) holds COSM type 8, the Growl,
-  converter, update and DSP, to its model (`vc2cosmgrowllaw.*`) bit for bit, and shows its laws ("COSM type 8, the
-  Growl, run").
+  start-up load both it and `bank` run. `cosmgrowl` (`vc2cosmgrowl.cpp`) shows COSM type 8's laws, the Growl's
+  ("COSM type 8, the Growl, run"); its model, which it held to the converter, update and DSP bit for bit, went into
+  the plugin at v234 (`Vc2CosmGrowl`, held to rom.4's routines by `xt_vc2cosm`).
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -336,7 +336,10 @@ COSM twin lays one, the buffers handed out by the slot finder hook and the Matri
 | An impulse at Intencity 0 | 1.0 at frames 512 and 513, both sides, nothing else |
 
 For the port (step 3): a COSM type of its own, `vc2cosmgrowllaw.cpp` held to the firmware, with the plugin's type list
-and parameters named as rom.4 names them.
+and parameters named as rom.4 names them. Ported (v234, HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl"):
+`Vc2CosmGrowl`, the converter, the note-on's, update's and new block's cases and the DSP held to rom.4's own routines
+word for word by `xt_vc2cosm`; the model went into it, and `vc2run cosmgrowl` keeps the laws alone (the run above was
+the model's, its `[notes] [plant]` gone with it).
 
 ### The OSC block in rom.4 (2026-11-13)
 

@@ -1,0 +1,87 @@
+# Planted errors in the VC-2's COSM ports, for mutate_vc2.py --cosm: each must make xt_vc2cosm, on rom.4, say something
+# differs.  name|old|new[|port[|seed]]; ports vc2growl (Vc2CosmGrowl.cpp, the Growl, v234), vc2cosmtables
+# (Vc2CosmTables.cpp, its pool words) and vc2cosmmath (Vc2Math.cpp, the sine and cosine its taps take).
+# Not planted, as no input tells them apart: the converter's Intencity + 0 (I/127 is never negative, and x + 0 is x
+# under round-to-zero); its Speed as S/128 × 2 (both exact); the clamp's two tests swapped (lo is never above hi); the
+# clamp or the phase's wrap or the second tap's top wrap on a NaN or at exactly 1 or 3267 (never drawn); the cubic's
+# x·x·4 as x·4x (× 4 is exact); the line's read outside it (the port's 0, where a pitch under depth × 15.95 / 3267 sends
+# rom.4 past one wrap, never drawn).
+conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
+conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
+conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
+conv-no-16-bits|    const auto v = static_cast<int16_t>(param + sum);|    const int v = param + sum;
+conv-hold-low|v < 0 ? 0 : v);|v < 0 ? 1 : v);
+conv-hold-high|    return flt(v > most ? most :|    return flt(v > most ? most - 1 :
+conv-first-reader|growlSetting(in.params[0], matrix.sums(in.second != 0, in.matrix)[0]|growlSetting(in.params[0], matrix.sums(false, in.matrix)[0]
+conv-second-reader|growlSetting(in.params[1], matrix.sums(in.second != 0, in.matrix)[1]|growlSetting(in.params[1], matrix.sums(in.second == 1, in.matrix)[1]
+conv-matrix-word|matrix.sums(in.second != 0, in.matrix)[0]|matrix.sums(in.second != 0, in.matrix + 4)[0]
+conv-speed-sum|in.matrix)[1], kSpeedMax)|in.matrix)[0], kSpeedMax)
+conv-speed-param|growlSetting(in.params[1],|growlSetting(in.params[0],
+conv-speed-offset|flt(kSpeedMax)), -1.0f);|flt(kSpeedMax)), -0.99f);
+conv-intensity-scale|    b.intensity = add(div(intensity, flt(kIntensityMax)), 0.0f);|    b.intensity = add(div(intensity, 128.0f), 0.0f);
+conv-lfo-number|    b.intensityLfoNumber = 0;\n|
+conv-env-depth|    b.speedEnv = 0.0f;\n|
+conv-negative-zero|    b.intensityLfo = 0.0f;|    b.intensityLfo = -0.0f;
+conv-speed-number|    b.speedLfoNumber = 0;|    b.speedLfoNumber = 1;
+noteon-phase|    w.phase = 1.0f;\n    w.step = 1.0f;|    w.phase = 0.0f;\n    w.step = 1.0f;
+noteon-step|    w.phase = 1.0f;\n    w.step = 1.0f;|    w.phase = 1.0f;\n    w.step = 0.5f;
+update-no-env|fmac(b.intensityEnv, w.envA, b.intensity)|b.intensity
+update-env-b|fmac(b.intensityEnv, w.envA, b.intensity)|fmac(b.intensityEnv, w.envB, b.intensity)
+update-lfo-b|fmac(b.intensityLfo, w.lfoA,|fmac(b.intensityLfo, w.lfoB,
+update-speed-order|fmac(b.speedLfo, w.lfoB, fmac(b.speedEnv, w.envB, b.speed))|fmac(b.speedEnv, w.envB, fmac(b.speedLfo, w.lfoB, b.speed))
+update-depth-top|b.intensity)), 0.0f, 1.0f);|b.intensity)), 0.0f, 0.99f);
+update-speed-floor|vc2CosmClamp(speed, k.speedFloor, 1.0f)|vc2CosmClamp(speed, -1.0f, 1.0f)
+update-speed-top|vc2CosmClamp(speed, k.speedFloor, 1.0f)|vc2CosmClamp(speed, k.speedFloor, 0.98f)
+update-no-plus-one|mul(add(vc2CosmClamp(speed, k.speedFloor, 1.0f), 1.0f), k.k50)|mul(vc2CosmClamp(speed, k.speedFloor, 1.0f), k.k50)
+update-factor-order|div(k.k440, mul(add(vc2CosmClamp(speed, k.speedFloor, 1.0f), 1.0f), k.k50))|div(div(k.k440, k.k50), add(vc2CosmClamp(speed, k.speedFloor, 1.0f), 1.0f))
+clamp-no-low|    if (lo > x) x = lo;\n|
+clamp-no-high|    if (x > hi) x = hi;\n|
+block-no-update|kCopied);\n    update();|kCopied);
+block-short|sizeof(Vc2CosmGrowlBlock) - sizeof(int32_t);|sizeof(Vc2CosmGrowlBlock) - 2 * sizeof(int32_t);
+block-with-code|    auto* to = reinterpret_cast<char*>(&w.block) + sizeof(int32_t);|    auto* to = reinterpret_cast<char*>(&w.block);
+dsp-swing-pitch|div(mul(w.depth, k.fmScale), w.pitch);|div(mul(w.depth, k.fmScale), 1.0f);
+dsp-swing-depth|div(mul(w.depth, k.fmScale), w.pitch);|div(k.fmScale, w.pitch);
+dsp-restart-never|    if (k.tiny > step) phase = step = 1.0f;|    if (0.0f > step) phase = step = 1.0f;
+dsp-restart-step|    if (k.tiny > step) phase = step = 1.0f;|    if (k.tiny > step) step = 1.0f;
+dsp-wrap-two|            phase = add(phase, k.minusTwo);|            phase = sub(phase, 1.0f);
+dsp-least-divider|constexpr int32_t kLeastDivider = 2;|constexpr int32_t kLeastDivider = 3;
+dsp-odd-even|            if (pos & 1) n =|            if (!(pos & 1)) n =
+dsp-no-odd|            if (pos & 1) n = static_cast<int32_t>(static_cast<uint32_t>(n) + 1u);\n|
+dsp-step-pitch|            step = div(mul(w.pitch, k.rate), flt(n));|            step = div(k.rate, flt(n));
+dsp-divider-round|ftrc(mul(w.factor, w.pitch))|ftrc(add(mul(w.factor, w.pitch), 0.5f))
+dsp-divider-pitch|ftrc(mul(w.factor, w.pitch))|ftrc(w.factor)
+dsp-position-wrap|        pos = pos + 1 >= kLine ? 0 : pos + 1;|        pos = pos + 1 >= kLine ? 1 : pos + 1;
+dsp-write-right|        right[(size_t)pos] = frames[1];|        right[(size_t)pos] = frames[0];
+dsp-tap-back|kLine : pos - kTapBack;|kLine : pos - kTapBack + 1;
+dsp-tap-wrap|pos - kTapBack < 0 ? pos - kTapBack + kLine : pos - kTapBack;|pos - kTapBack < 0 ? pos - kTapBack + kLine - 1 : pos - kTapBack;
+dsp-gain-sine|fmac(vc2Cosine(k.taps, phase), w.depth, 1.0f)|fmac(vc2Sine(k.taps, phase), w.depth, 1.0f)
+dsp-gain-one|fmac(vc2Cosine(k.taps, phase), w.depth, 1.0f)|fmac(vc2Cosine(k.taps, phase), w.depth, 0.5f)
+dsp-level-right|levelR = mul(right[(size_t)tap], gain);|levelR = mul(left[(size_t)tap], gain);
+dsp-second-cosine|fmac(vc2Sine(k.taps, phase), swing, flt(tap))|fmac(vc2Cosine(k.taps, phase), swing, flt(tap))
+dsp-second-swing|fmac(vc2Sine(k.taps, phase), swing, flt(tap))|fmac(vc2Sine(k.taps, phase), 1.0f, flt(tap))
+dsp-wrap-down|            at = add(at, k.minusLine);|            at = add(at, -3266.0f);
+dsp-wrap-up|            at = add(at, k.line);|            at = add(at, 3266.0f);
+dsp-wrap-up-edge|        } else if (0.0f > at) {|        } else if (-1.0f > at) {
+dsp-before-wrap|i - 1 < 0 ? i - 1 + kLine : i - 1;|i - 1 < 0 ? 0 : i - 1;
+dsp-fraction|    const float frac = sub(at, flt(i));|    const float frac = sub(at, flt(j));
+dsp-interp-end|        frames[0] = add(fmac(sub(line(left, i), l), frac, l), levelL);|        frames[0] = add(fmac(sub(l, line(left, i)), frac, line(left, i)), levelL);
+dsp-out-level|        frames[1] = add(fmac(sub(line(right, i), r), frac, r), levelR);|        frames[1] = add(fmac(sub(line(right, i), r), frac, r), levelL);
+dsp-keep-position|    w.position = pos;\n|
+dsp-keep-step|    w.step = step;\n|
+tables-swing|{ 0x893b9c84, &g.fmScale }|{ 0x893b9c88, &g.fmScale }|vc2cosmtables
+tables-tiny|{ 0x893b9c88, &g.tiny }|{ 0x893b9c8c, &g.tiny }|vc2cosmtables
+tables-three|{ 0x893b9c80, &g.taps.three }|{ 0x893b9c90, &g.taps.three }|vc2cosmtables
+tables-fold|{ 0x893b9c8c, &g.taps.foldAt }|{ 0x893b9c80, &g.taps.foldAt }|vc2cosmtables
+tables-four|{ 0x893b9c90, &g.taps.four }|{ 0x893b9c80, &g.taps.four }|vc2cosmtables
+tables-line|{ 0x893b9c94, &g.line }|{ 0x893b9c84, &g.line }|vc2cosmtables
+tables-two|{ 0x893b9c98, &g.minusTwo }|{ 0x893b9ca0, &g.minusTwo }|vc2cosmtables
+tables-rate|{ 0x893b9c9c, &g.rate }|{ 0x893b9c88, &g.rate }|vc2cosmtables
+tables-fold-negative|{ 0x893b9ca0, &g.taps.foldNeg }|{ 0x893b9c98, &g.taps.foldNeg }|vc2cosmtables
+tables-line-negative|{ 0x893b9ca4, &g.minusLine }|{ 0x893b9c98, &g.minusLine }|vc2cosmtables
+tables-floor|{ 0x893b9e94, &g.speedFloor }|{ 0x893b9ca0, &g.speedFloor }|vc2cosmtables
+tables-440|{ 0x893b9e98, &g.k440 }|{ 0x893b9e9c, &g.k440 }|vc2cosmtables
+tables-50|{ 0x893b9e9c, &g.k50 }|{ 0x893b9e98, &g.k50 }|vc2cosmtables
+math-sine-fold|        x = sub(1.0f, x);|        x = sub(0.5f, x);|vc2cosmmath
+math-sine-fold-negative|        x = sub(-1.0f, x);|        x = sub(-0.5f, x);|vc2cosmmath
+math-cubic-three|mul(sub(k.three, mul(mul(x, x), k.four)), x)|mul(sub(k.four, mul(mul(x, x), k.four)), x)|vc2cosmmath
+math-cosine-abs|sub(k.foldAt, x < 0.0f ? -x : x)|sub(k.foldAt, x)|vc2cosmmath

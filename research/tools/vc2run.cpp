@@ -28,7 +28,8 @@
 //   vc2run <rom.4> splitbytes <index>  what reads the bytes a split passes on (vc2splitbytes.cpp)
 //   vc2run <rom.4> bank <index> <bank>  how the store comes to hold each VC-2 sample (vc2bank.cpp)
 //   vc2run <rom.4> wavein <rom.2> <index> <bank>  what the wave reader stores, against xtWaveRead (vc2wavein.cpp)
-//   vc2run <rom.4> cosmgrowl [notes] [plant]  COSM type 8, the Growl, against its model (vc2cosmgrowl.cpp)
+//   vc2run <rom.4> cosmgrowl       COSM type 8, the Growl: an impulse's output and the dividers it chooses
+//                                  (vc2cosmgrowl.cpp)
 //   vc2run <rom.4> fxchorus <rom.2> [lfo]  the Chorus on both images, an impulse at each side, and its LFO's phase
 //                                          (vc2fxchorus.cpp, vc2fxchorusphase.cpp)
 // Prints to stdout, for build/ only.  Every address is rom.4's CPU address unless it says rom.2.

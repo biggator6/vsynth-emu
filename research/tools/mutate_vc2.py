@@ -24,7 +24,9 @@
 # v227), through xt_vc2mixer, [cases] its cases (40).  --tone: vc2tone_muts.txt, in Vc2Tone.cpp (PORT=vc2tone: the
 # tone object's frame and its pool, v228), through xt_vc2tone, [cases] its cases (40).  --osc: vc2osc_muts.txt, in
 # Vc2OscVoice.cpp, Vc2OscVoiceGet.cpp, Vc2OscVoiceKinds.cpp and Vc2OscTables.cpp (PORT=vc2osc, vc2oscget, vc2osckinds,
-# vc2osctables: the OSC voice's frame, v230), through xt_vc2osc, [cases] its cases (40).  One line
+# vc2osctables: the OSC voice's frame, v230), through xt_vc2osc, [cases] its cases (40).  --cosm: vc2cosm_muts.txt,
+# in Vc2CosmGrowl.cpp, Vc2CosmTables.cpp and Vc2Math.cpp's sine and cosine (PORT=vc2growl, vc2cosmtables, vc2cosmmath:
+# the Growl, v234), through xt_vc2cosm, [cases] its cases (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist
@@ -53,6 +55,8 @@ HARNESSES = {
                                'XT_VC2TONE_STOP'), '40'),
     '--osc': (mutlist.Harness('mutate_vc2', 'xt_vc2osc', 'vc2osc_muts.txt', ('vc2osc', '2024'), 'XT_VC2OSC_STOP'),
               '40'),
+    '--cosm': (mutlist.Harness('mutate_vc2', 'xt_vc2cosm', 'vc2cosm_muts.txt', ('vc2growl', '2024'), 'XT_VC2COSM_STOP'),
+               '40'),
 }
 args = sys.argv[1:]
 switch = args.pop(0) if args and args[0] in HARNESSES else ''

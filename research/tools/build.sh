@@ -33,6 +33,7 @@ V4=($(vc2Tables . .cpp))
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
 rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,xt_vc2in,xt_vc2legacy,xt_vc2hireso,xt_vc2vocoder}
 rm -f "$O"/{xt_vc2carrier,xt_vc2tracker,xt_vc2kind6,xt_vc2autonote,xt_vc2mixer,xt_vc2tone,xt_vc2osc,classifier_test,rd}
+rm -f "$O"/xt_vc2cosm
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp "${SH4[@]}" -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp "${SH4[@]}" -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp "${SH4[@]}" -o "$O/xt_lfo" &
@@ -98,6 +99,9 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 # The OSC voice's frame (v230) against rom.4's own routines, every routine it calls hooked
 [ -f Vc2OscCheck.cpp ] && cc -DXT_VC2OSC_MAIN Vc2OscCheck.cpp Vc2OscEvents.cpp Vc2OscFakes.cpp Vc2OscPortParts.cpp \
    Vc2OscVoice.cpp Vc2OscVoiceGet.cpp Vc2OscVoiceKinds.cpp Vc2OscTables.cpp "${SH4[@]}" -o "$O/xt_vc2osc" &
+# COSM (v234): the Growl against rom.4's own routines, the Matrix readers hooked
+[ -f Vc2CosmCheck.cpp ] && cc -DXT_VC2COSM_MAIN Vc2CosmCheck.cpp Vc2CosmGrowl.cpp Vc2CosmTables.cpp Vc2Math.cpp \
+   "${SH4[@]}" -o "$O/xt_vc2cosm" &
 # The pitch tracker, its frame (v223) and its analysis (v224), against rom.4's own module
 [ -f Vc2TrackerCheck.cpp ] && cc -DXT_VC2TRACKER_MAIN Vc2TrackerCheck.cpp Vc2Tracker.cpp Vc2TrackerTables.cpp \
    $( [ -f Vc2TrackerAnalysis.cpp ] && echo Vc2TrackerAnalysis.cpp Vc2TrackerEstimate.cpp Vc2TrackerSignal.cpp ) \

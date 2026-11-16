@@ -335,6 +335,22 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM type 8, the Growl v234 (2026-11-16, on its own branch from vc2-mode's v231; a side session's task from
+  the VC-2 session, beside v232 and v233; HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl"). Step 4.2's COSM
+  part split by job (the plan): the Growl now; then the converters' frame with a first type, the other 14 converters,
+  and the COSM object in the tone over XtCosm's types and the Growl. Vc2CosmGrowl (Vc2CosmGrowl.cpp, the constants in
+  Vc2CosmTables.cpp, read by loadVc2 through vc2LoadCosm): rom.4's converter 0x89398780 (Intencity and Speed with
+  their Matrix sums, two calls of the reader the input's byte +1 picks, through Vc2CosmMatrix), the note-on's case
+  0x893b9d30, the update's 0x893b9d40, the new block's 0x893b9dc0, the COSM clamp 0x893bf240 and the DSP 0x893b9b40,
+  mono and stereo alike, its taps on Vc2Math's sine and cosine with the DSP's own pool words; the COSM object's 0x164
+  bytes word for word, the Growl's named. xt_vc2cosm (in fcheck, 40 cases): the five routines on an object in the
+  interpreter's RAM, the Matrix readers hooked; 0 different at seeds 2024 (4,800 events), 7 and 31337 (48,000 each).
+  mutate_vc2.py --cosm: 79 plants, all caught (the first run missed the sum's hold to 16 bits: sums near 16 bits' ends
+  are drawn since); the 25 rom- and rom4- panel plants, rom4-no-cosm among them, caught. fcheck's diff is
+  xt_vc2cosm's three lines; verify.sh passes every line. Found: the frame's note-on clears D+0x1c…D+0x88, D+0x9c and D+0xa0 and puts the position at
+  3266; its allocator gives codes 7 to 10 four lines of 3267 floats, cleared. The model (vc2cosmgrowllaw.*) went into
+  the port; vc2run cosmgrowl keeps the laws. XtCosm unchanged. Not in the sound yet.
+
 rom.4's tables in one list v231 (2026-11-16, on vc2-mode; a side session's task from the VC-2 session, v230's "Left"):
   the files of the tables XtSynthRom.cpp's loadVc2 loads were listed three times, build.sh's V4, ab.sh's synth() and
   mutate.sh's tone parts, and mutate.sh's lacked every loader from v220 on. Its kept XtSynthRom.o, from before v220,

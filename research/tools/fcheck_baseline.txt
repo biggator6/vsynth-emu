@@ -786,6 +786,9 @@ xt_vc2tone: 0 different
 osc: 40 cases, 16000 events, 1903 note-ons (490 with a sample, 1413 without), 1887 updates, 1977 renders, 934 settings, 928 takes, 2798 getters
 calls: 134 seeks, 211 ramps set, 2004 kinds' routines
 xt_vc2osc: 0 different
+== xt_vc2cosm
+growl: 40 cases, 4800 events: 656 conversions (337 by COSM 2's reader), 148 note-ons, 664 updates, 363 new blocks, 3131 renders (1 with the phase started again)
+xt_vc2cosm: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different
