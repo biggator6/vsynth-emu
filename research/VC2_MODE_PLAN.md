@@ -255,8 +255,10 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
    - done (v215): the analysis, `Vc2HiresoAnalysis` (slot 1's `0x893ed930` on its .bss globals, its init `0x893ed8f0`,
      slot 0's clear `0x893ede50`, the envelopes' update `0x893edd10` and getter `0x893eddf0`), against the routines in
      xt_vc2hireso's third part (HARDWARE_FIRMWARE.md, "HIRESO's analysis").
-   - then, a version each as reached: the object (constructor `0x893f0a10`, reset, settings slot 5 with the templates,
-     hold slots 6 and 7), the mono synthesis (slot 2, the carrier bank `0x893f1a10`) and the
+   - done (v216): the object, `Vc2Hireso` (constructor `0x893f0a10`, slot 0's reset, slots 1 and 4 onto the analysis
+     and the warp, slot 5's settings with the templates, slots 6 and 7's hold), against rom.4's object in
+     xt_vc2hireso's fourth part (HARDWARE_FIRMWARE.md, "HIRESO's object").
+   - then, a version each as reached: the mono synthesis (slot 2, the carrier bank `0x893f1a10`) and the
      stereo (slot 3).
 4. The vocoder object and its settings path, with the hold on CC 64.
 5. The VOCODER OSC's carrier (kind 5) and its converter: the growl's model is its start (`vc2growllaw.cpp`).

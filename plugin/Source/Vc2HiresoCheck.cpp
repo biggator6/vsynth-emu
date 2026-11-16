@@ -4,9 +4,9 @@
 // pivots 1…24 and some past them (written into the side's field, +0x2cb4 and +0x2cb8, as slot 5 would), and ratios from
 // 0.5 to 2 on a grid of 1/1024 (every 40/cases-th of it) with the floats either side of 0.5, 0.95, 1, 1.05 and 2, the
 // branches' bounds.  The grid and the pivots are research/tools/vc2warp.cpp's `warp check`'s, which held the law's first
-// model to slot 4 and moved here with it.  Then the rate filters (v214, Vc2HiresoRateCheck.cpp) and the analysis (v215,
-// Vc2HiresoAnalysisCheck.cpp).  XT_VC2HIRESO_FIRST=1 says where the first map to differ does, XT_VC2HIRESO_STOP=1
-// stops there.  XT_VC2HIRESO_MAIN only.
+// model to slot 4 and moved here with it.  Then the rate filters (v214, Vc2HiresoRateCheck.cpp), the analysis (v215,
+// Vc2HiresoAnalysisCheck.cpp) and the object (v216, Vc2HiresoObjectCheck.cpp).  XT_VC2HIRESO_FIRST=1 says where the
+// first map to differ does, XT_VC2HIRESO_STOP=1 stops there.  XT_VC2HIRESO_MAIN only.
 #ifdef XT_VC2HIRESO_MAIN
 #include "Vc2HiresoCheck.h"
 #include "Vc2HiresoWarp.h"
@@ -85,6 +85,7 @@ int main(int argc, char** argv) {
     long different = n.different;
     if (!different || !stop) different += vc2HiresoRateCases(fw, *run);       // v214
     if (!different || !stop) different += vc2HiresoAnalysisCases(fw, *run);   // v215
+    if (!different || !stop) different += vc2HiresoObjectCases(fw, *run);     // v216
     std::printf("xt_vc2hireso: %ld different\n", different);
     return 0;
 }

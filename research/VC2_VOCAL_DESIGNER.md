@@ -1240,6 +1240,9 @@ Release 18, Template 0, Depth 1.0, Hold Dump Time 1.0.
 
 **Hold** (slots 6 and 7): as LEGACY's, on the envelopes: from 64 up the envelopes follow at 32 × the curve's value at
 51 + 50x (x = (v − 64)/63 × Hold Dump Time), freeze past 0.99, and glide back over 100 blocks after; slot 7 returns 1 − x.
+(v216, run and held with the Formant Template and Env paragraphs above: the curve is Env Release's, `0x89562a64`; below
+64, x < 0, the level is 1 and the hold's coefficient 1; the glide back is the synthesis's, not yet run. HARDWARE_FIRMWARE.md,
+"HIRESO's object".)
 
 **Vocoder Depth.** HIRESO stores it (+0x2d44), and its own reader (`0x893f22d0`, averaging the envelopes over groups of
 trunc((1 − Depth) · 31) + 1 bands) has no caller: no word holds its address and no branch in the module reaches it. Depth does

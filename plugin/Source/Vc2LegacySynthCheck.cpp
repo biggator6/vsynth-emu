@@ -31,18 +31,11 @@ std::string objectDifference(Vc2Fw& fw, const Vc2Legacy& engine) {
     return what;
 }
 
-// A Formant Shift ratio, 0.5 to 2: its ends and 1 most often
-float drawRatio(std::mt19937& rng) {
-    constexpr float kRatios[6] = { 0.5f, 1.0f, 2.0f, -1.0f, -1.0f, -1.0f };   // -1: any
-    const float pick = kRatios[rng() % 6];
-    return pick < 0.0f ? 0.5f + 1.5f * (float)rng() / 4294967296.0f : pick;
-}
-
 // The settings or the pedal on both
 std::string objectEventOn(Vc2Fw& fw, Vc2Legacy& engine, std::mt19937& rng, Counts& n) {
     if (rng() % 2 == 0) {
         ++n.settings;
-        const float ratio = drawRatio(rng), dump = vc2DrawDump(rng);
+        const float ratio = vc2DrawRatio(rng), dump = vc2DrawDump(rng);
         fw.cpu.wr32(kVc2Args, std::bit_cast<uint32_t>(ratio));
         fw.cpu.wr32(kVc2Args + kDumpAt, std::bit_cast<uint32_t>(dump));
         if (!fw.call(kSettings, { kObjAt, kVc2Args })) return "the settings fault: " + fw.cpu.error();

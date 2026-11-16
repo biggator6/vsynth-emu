@@ -40,6 +40,28 @@ struct Vc2Fw {
     }
 };
 
+// The Hold pedal's 0…127: its two ends most of the time, as a pedal gives; 64 and 63, where the hold's branches part
+// (v210's, here from v216, the draws as they were)
+inline int vc2DrawController(std::mt19937& rng) {
+    constexpr int kPicks[10] = { 127, 127, 127, 127, 0, 0, 0, 64, 63, -1 };   // -1: any
+    const int pick = kPicks[rng() % 10];
+    return pick < 0 ? (int)(rng() % 128) : pick;
+}
+
+// A dump time: its ends most often (127 and 126 put the pedal's hold either side of the freeze at 0.99, 0 holds nothing)
+inline float vc2DrawDump(std::mt19937& rng) {
+    constexpr int kDumps[6] = { 127, 126, 0, -1, -1, -1 };   // -1: any
+    const int pick = kDumps[rng() % 6];
+    return (float)(pick < 0 ? (int)(rng() % 128) : pick) / 127.0f;
+}
+
+// A Formant Shift ratio, 0.5 to 2: its ends and 1 most often (v211's)
+inline float vc2DrawRatio(std::mt19937& rng) {
+    constexpr float kRatios[6] = { 0.5f, 1.0f, 2.0f, -1.0f, -1.0f, -1.0f };   // -1: any
+    const float pick = kRatios[rng() % 6];
+    return pick < 0.0f ? 0.5f + 1.5f * (float)rng() / 4294967296.0f : pick;
+}
+
 // A getter's float result, as rom.4 leaves it in fr0, against the port's (v211's, here from v215)
 inline bool vc2SameAsFr0(const Vc2Fw& fw, float mine) { return fw.cpu.fb[0][0] == std::bit_cast<uint32_t>(mine); }
 
@@ -116,12 +138,14 @@ std::string vc2ResetOn(Vc2Fw& fw, uint32_t routine, std::initializer_list<uint32
     return difference(fw, port);
 }
 
-// An analysis's cases (v215, LEGACY's of v210 and HIRESO's): rom.4's init, each case's start; every `fadeEvery`th case
-// fading into silence, the others `blocks` blocks; the cases' draws, and the blocks run
+// An analysis's cases (v215, LEGACY's of v210 and HIRESO's; HIRESO's object's, v216): rom.4's init, each case's start;
+// every `fadeEvery`th case fading into silence, the others `blocks` blocks; the cases' draws; the init's argument, an
+// object's address (0 for an analysis's, whose init takes none); and the blocks run
 struct Vc2Cases {
     uint32_t init;
     int fadeEvery, blocks;
     std::mt19937 rng;
+    uint32_t self = 0;
     long blocksRun = 0;
 };
 
@@ -131,7 +155,7 @@ template <class Port, class Difference, class Block>
 std::string vc2AnalysisCase(Vc2Fw& fw, Port& port, Difference difference, Vc2Cases& cases, int c, Block block) {
     const bool fades = c % cases.fadeEvery == cases.fadeEvery - 1;
     Vc2Signal input { std::mt19937(cases.rng()), fades };
-    std::string what = vc2ResetOn(fw, cases.init, {}, port, difference);
+    std::string what = vc2ResetOn(fw, cases.init, { cases.self }, port, difference);
     float x[kVc2Block];
     for (int k = 0; k < (fades ? kVc2FadeBlocks : cases.blocks) && what.empty(); ++k, ++cases.blocksRun) {
         input.block(x);

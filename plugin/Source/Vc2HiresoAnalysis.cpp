@@ -13,7 +13,6 @@ using xtf::mul;
 using xtf::sub;
 using Words = Vc2HiresoAnalysisWords;
 
-constexpr int32_t kEdges[Words::kGroups + 1] = { 0, 22, 28, 32 };   // [FW] 0x893edee0's: fs/4, fs/2, fs, the end
 constexpr int kStates = 4;   // a band's: its two resonators' two each
 constexpr float kNone = -1.0f;   // [FW] a window's search starts below any energy (0x893edd10's fldi1, fneg)
 
@@ -41,7 +40,7 @@ void Vc2HiresoAnalysis::reset() {
     s.frame = 0;
     std::ranges::fill(s.gate, 0.0f);
     s.gateLevel = 0.0f;
-    std::ranges::copy(kEdges, s.edge);
+    std::ranges::copy(kVc2HiresoEdges, s.edge);
     const Vc2HiresoTables& t = vc2HiresoTables();
     for (int g = 0; g < Words::kGroups; ++g)
         s.table[g] = t.resonatorAt + 4 * (uint32_t)(Vc2HiresoTables::kResonatorWords * s.edge[g]);

@@ -78,18 +78,6 @@ long analysisCases(Vc2Fw& fw, Vc2LegacyAnalysis& port, const Vc2Run& run) {
 }
 } // namespace
 
-int vc2DrawController(std::mt19937& rng) {
-    constexpr int kPicks[10] = { 127, 127, 127, 127, 0, 0, 0, 64, 63, -1 };   // -1: any
-    const int pick = kPicks[rng() % 10];
-    return pick < 0 ? (int)(rng() % 128) : pick;
-}
-
-float vc2DrawDump(std::mt19937& rng) {
-    constexpr int kDumps[6] = { 127, 126, 0, -1, -1, -1 };   // -1: any
-    const int pick = kDumps[rng() % 6];
-    return (float)(pick < 0 ? (int)(rng() % 128) : pick) / 127.0f;
-}
-
 std::string vc2LegacyStateDifference(Vc2Fw& fw, const Vc2LegacyAnalysis& port) {
     std::string what = vc2FirstDifference(fw, kVc2LegacyWords, &port.s, sizeof port.s, "the state");
     if (what.empty()) what = vc2FirstDifference(fw, kVc2LegacyDumpWord, &port.dump, 4, "the dump time");

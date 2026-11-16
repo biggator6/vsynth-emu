@@ -15,18 +15,47 @@
 #include "XtSwitches.h"
 #include <algorithm>
 #include <cstdio>
+#include <vector>
 
 namespace {
 constexpr uint32_t kInit = 0x893ed8f0, kAnalysis = 0x893ed930, kEnvelopes = 0x893edd10, kEnvelope = 0x893eddf0;  // [FW]
 constexpr uint32_t kClear = 0x893ede50;                                                                 // [FW]
 constexpr uint32_t kWords = 0x8a1bbd2c, kHalfAt = 0x899d9a88, kQuarterAt = 0x899d9ac8;                 // [FW]
 constexpr uint32_t kToHalfStates = 0x899d9aec, kToQuarterStates = 0x899d9b30;   // [FW] after each one's table pointer
+constexpr uint32_t kDecimatorsEnd = 0x899d9b70;                                  // [FW] the second one's end
 constexpr uint32_t kFlags = 0x8a0f87dc;                                          // [FW] the input stage's ring
 constexpr uint32_t kBlockAt = 0x8C034000;   // the mic's block, in Vc2Fw's RAM
 constexpr int kBlocks = 400, kFadeEvery = 8, kFlipOneIn = 6, kClearOneIn = 50, kTwiceOneIn = 8;
 
-// The state, the mic at fs/2 and fs/4 and the decimators' states against rom.4's; empty when they are the same
-std::string analysisDifference(Vc2Fw& fw, const Vc2HiresoAnalysis& a) {
+// A routine of no arguments on both, rom.4's and the port's (the envelopes' update, slot 0's clear), then the words
+// that differ
+std::string bothOn(Vc2Fw& fw, Vc2HiresoAnalysis& a, uint32_t routine, void (Vc2HiresoAnalysis::*mine)(),
+                   const std::string& what) {
+    if (!fw.call(routine, {})) return what + " faults: " + fw.cpu.error();
+    (a.*mine)();
+    const std::string differs = vc2HiresoAnalysisDifference(fw, a);
+    return differs.empty() ? "" : "after " + what + ", " + differs;
+}
+
+// One block through both analyses, then both envelopes' updates (now and then a second time on the same frame, which
+// gives each band an energy equal to its largest, as a block played over and over would), each followed by the words
+// that differ, then a drawn band's envelope through the getter
+std::string hiresoBlockOn(Vc2Fw& fw, Vc2HiresoAnalysis& a, const Vc2Unvoiced& stage, const float* x,
+                          std::mt19937& rng) {
+    fw.cpu.write(kBlockAt, x, sizeof(float) * Vc2HiresoAnalysis::kBlock);
+    if (!fw.call(kAnalysis, { kBlockAt })) return "the analysis faults: " + fw.cpu.error();
+    a.block(x, stage.voiced());
+    std::string what = vc2HiresoAnalysisDifference(fw, a);
+    for (int k = rng() % kTwiceOneIn == 0 ? 2 : 1; k > 0 && what.empty(); --k)
+        what = bothOn(fw, a, kEnvelopes, &Vc2HiresoAnalysis::envelopes, "the envelopes");
+    if (!what.empty()) return what;
+    const int band = (int)(rng() % Vc2HiresoAnalysis::kBands);
+    const bool same = fw.call(kEnvelope, { (uint32_t)band }) && vc2SameAsFr0(fw, a.envelope(band));
+    return same ? "" : "the envelope's getter";
+}
+} // namespace
+
+std::string vc2HiresoAnalysisDifference(Vc2Fw& fw, const Vc2HiresoAnalysis& a) {
     const struct {
         uint32_t at;
         const void* mine;
@@ -46,33 +75,18 @@ std::string analysisDifference(Vc2Fw& fw, const Vc2HiresoAnalysis& a) {
     return "";
 }
 
-// A routine of no arguments on both, rom.4's and the port's (the envelopes' update, slot 0's clear), then the words
-// that differ
-std::string bothOn(Vc2Fw& fw, Vc2HiresoAnalysis& a, uint32_t routine, void (Vc2HiresoAnalysis::*mine)(),
-                   const std::string& what) {
-    if (!fw.call(routine, {})) return what + " faults: " + fw.cpu.error();
-    (a.*mine)();
-    const std::string differs = analysisDifference(fw, a);
-    return differs.empty() ? "" : "after " + what + ", " + differs;
+void vc2HiresoAnalysisZero(Vc2Fw& fw) {
+    const std::vector<uint8_t> zeros(sizeof(Vc2HiresoAnalysisWords));
+    fw.cpu.write(kWords, zeros.data(), zeros.size());
+    fw.cpu.write(kHalfAt, zeros.data(), kDecimatorsEnd - kHalfAt);
 }
 
-// One block through both analyses, then both envelopes' updates (now and then a second time on the same frame, which
-// gives each band an energy equal to its largest, as a block played over and over would), each followed by the words
-// that differ, then a drawn band's envelope through the getter
-std::string hiresoBlockOn(Vc2Fw& fw, Vc2HiresoAnalysis& a, const Vc2Unvoiced& stage, const float* x,
-                          std::mt19937& rng) {
-    fw.cpu.write(kBlockAt, x, sizeof(float) * Vc2HiresoAnalysis::kBlock);
-    if (!fw.call(kAnalysis, { kBlockAt })) return "the analysis faults: " + fw.cpu.error();
-    a.block(x, stage.voiced());
-    std::string what = analysisDifference(fw, a);
-    for (int k = rng() % kTwiceOneIn == 0 ? 2 : 1; k > 0 && what.empty(); --k)
-        what = bothOn(fw, a, kEnvelopes, &Vc2HiresoAnalysis::envelopes, "the envelopes");
-    if (!what.empty()) return what;
-    const int band = (int)(rng() % Vc2HiresoAnalysis::kBands);
-    const bool same = fw.call(kEnvelope, { (uint32_t)band }) && vc2SameAsFr0(fw, a.envelope(band));
-    return same ? "" : "the envelope's getter";
+bool vc2HiresoFlag(Vc2Fw& fw, Vc2Unvoiced& stage, std::mt19937& rng, bool unvoiced) {
+    if (rng() % kFlipOneIn == 0) unvoiced = !unvoiced;
+    std::ranges::fill(stage.flags, unvoiced ? 1 : 0);
+    fw.cpu.write(kFlags, stage.flags.data(), sizeof stage.flags);
+    return unvoiced;
 }
-} // namespace
 
 long vc2HiresoAnalysisCases(Vc2Fw& fw, const Vc2Run& run) {
     Vc2Cases cases { kInit, kFadeEvery, kBlocks, std::mt19937((uint32_t)run.seed) };
@@ -83,15 +97,13 @@ long vc2HiresoAnalysisCases(Vc2Fw& fw, const Vc2Run& run) {
     Vc2Unvoiced stage;     // its flags' ring alone, every word the block's flag, for its query
     bool unvoiced = false;
     for (int c = 0; c < run.cases; ++c) {
-        const std::string what = vc2AnalysisCase(fw, a, analysisDifference, cases, c, [&](const float* x) {
+        const std::string what = vc2AnalysisCase(fw, a, vc2HiresoAnalysisDifference, cases, c, [&](const float* x) {
             if (rng() % kClearOneIn == 0) {
                 ++clears;
                 const std::string said = bothOn(fw, a, kClear, &Vc2HiresoAnalysis::clear, "slot 0's clear");
                 if (!said.empty()) return said;
             }
-            if (rng() % kFlipOneIn == 0) unvoiced = !unvoiced;
-            std::ranges::fill(stage.flags, unvoiced ? 1 : 0);
-            fw.cpu.write(kFlags, stage.flags.data(), sizeof stage.flags);
+            unvoiced = vc2HiresoFlag(fw, stage, rng, unvoiced);
             unvoicedBlocks += unvoiced ? 1 : 0;
             return hiresoBlockOn(fw, a, stage, x, rng);
         });

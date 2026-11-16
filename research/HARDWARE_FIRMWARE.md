@@ -1546,6 +1546,83 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### HIRESO's object (2026-11-15, v216) {#hireso-object}
+
+Step 3.3's fourth part, ported bit for bit (`Vc2Hireso`): the constructor `0x893f0a10` and every slot but the synthesis's.
+- slot 0, the reset (`0x893f0b70`);
+- slot 1 onto the analysis (`0x893f0c50` jumps to `0x893ed930`, "HIRESO's analysis");
+- slot 4 onto the formant warp ("HIRESO's formant warp");
+- slot 5, the settings (`0x893f13e0`);
+- slot 6, the Hold pedal (`0x893f1960`), and slot 7, its level (`0x893f1a00`).
+
+The synthesis, slots 2 and 3, comes next. The words only it uses are kept as rom.4 lays them out, unnamed where nothing ported reads them yet.
+
+**The object**, 0x2d70 bytes (`0x89506df4` allocates it when the caller gives none). From +0:
+- +0x000, the vtable (`0x898cd664`, after the base's `0x898cd5f8`);
+- +0x004, the edges {0, 22, 28, 32};
+- +0x014, each group's carrier coefficients' address. They run on from `0x89940278`, three words a resonator and 2n + 1 resonators a group, so a group starts at 3·(2·edge + g) words;
+- +0x020, 2,049 words only the synthesis uses;
+- +0x2024, the carrier bank's 14 words a band;
+- +0x2724, three rows of 32 the reset clears;
+- +0x28a4, the band weights W;
+- +0x2924, the left side's map; three more rows of 32 the reset clears; then the right side's map at +0x2b24;
+- +0x2ba4, four rate filters, two on the object's decimators' table `0x895616d8` and two on the interpolators' `0x89561700`;
+- +0x2cb4, the settings' words: the sides' pivot fields, the attack coefficient, 32 release coefficients, a word nothing touches, Vocoder Depth, a word the reset sets to 1, the sides' template-gains addresses, Hold Dump Time;
+- +0x2d58, the hold's controller, level and coefficient, and three of the synthesis's words.
+
+**The constructor:**
+1. It clears the four rate filters (`0x893efc30`).
+2. It runs the analysis's init (`0x893ed8f0`) and slot 0.
+3. It writes the edges and the carrier addresses.
+4. It builds W_b = (−1)^(b+1) · A_b · B_b · (50 / (A_31 · B_31)). A and B are `0x8994059c` and `0x8994061c`; 50 is from its pool. Each product is rounded in that order.
+5. It points the rate filters at their tables, and writes the hold's words again (Hold Dump Time 1) and both pivot fields 12.
+6. It calls slot 5 with a struct on its stack: Env Attack 6, Env Release 18, template 0, Vocoder Depth 1, Hold Dump Time 1, both pivots −1. The struct's other words are whatever the stack holds, which slot 5 doesn't read.
+
+**Slot 0** clears:
+- the analysis, by its clear (`0x893ede50`);
+- the first 7 of each band's 14 words at +0x2024;
+- the three rows at +0x2724 and the three between the maps;
+
+then sets the hold's words to controller 0, level 1, coefficient 0, and the synthesis's words to 0, 1, 0 (and +0x2d48 to 1).
+
+**Slot 5** reads seven words of the vocoder's settings struct (VC2_VOCAL_DESIGNER.md, "The settings path"):
+- +0x10 and +0x14, the sides' pivots;
+- +0x28 and +0x2c, Env Attack and Release;
+- +0x30, the Formant Template;
+- +0x34, Vocoder Depth;
+- +0x38, Hold Dump Time.
+
+In order:
+1. **Env Attack**, if below 101, picks its curve's value (`0x895628d0`).
+2. **Env Release**, if below 101, picks its curve's value (`0x89562a64`). Each band takes the smaller of that and its cap. The cap is the curve's value at 0 for bands 0–19, and at 1, 3, 6, 10, 14, 17, 20, 22, 24, 25, 26, 27 for bands 20–31. The port reads those indices from slot 5's own loads, `mov #4·index, r0` every 8 bytes from `0x893f145c`.
+3. It stores Hold Dump Time and calls slot 6 through the vtable with the controller as it stands.
+4. It stores Vocoder Depth.
+5. **The Formant Template.** T from 0 to 15 points the left at record T's gains and the right at record T + 16's: `0x8956172c` + 140 bytes a record, + 12. A side whose pivot word is below 0 gets its record's pivot (FTRC of the record's second float), written back into the caller's struct. T of 16 or more points the sides at the RAM curves `0x899d9d98` and `0x899d9e18`. T below 0 leaves them.
+6. Each pivot of 0 or more goes into its side's field.
+
+**Slot 6** keeps the controller, then works out x = (Hold Dump Time · (controller − 64)) · (1/63):
+- x below 0: the level and the coefficient are both 1.
+- Otherwise the level is 1 − x, and the coefficient is:
+  - 0 when x is above 0.99;
+  - 1 when x is 0;
+  - otherwise 32 × Env Release's curve at FTRC(50x + 51).
+
+The constants come from slot 6's pool, `0x893f1c20` on. **Slot 7** returns the level.
+
+**The check.** xt_vc2hireso's fourth part (`Vc2HiresoObjectCheck.cpp`):
+- rom.4's object is on zeroed memory, with the analysis's globals zeroed too, as at the start.
+- Both constructors run once.
+- Each case after the first puts the same noise into the words only the synthesis uses, on both sides, as a synthesis would leave them. Without it no reset plant could show.
+- Then slot 0, and 400 blocks through slot 1 (every eighth case a fade), each block's voiced flag drawn as the analysis's check draws it.
+- One block in eight is preceded by an event: slot 5 with a drawn struct, slot 6 with a pedal value, or slot 4 with a side and a ratio. The struct has the attack and release past 100 now and then, the template below 0 or on the RAM curves now and then, the pivots mostly −1, and noise in the vocoder's words.
+
+After every slot the object's words are compared word for word: the rate filters' states, and the words each filter's table pointer points at. The analysis's state and slot 7's level are compared too, and after slot 5 the struct it writes back.
+
+Results:
+- seed 2024: 40 cases, 22,000 blocks, 973 settings, 871 pedal events, 896 warps, 0 different;
+- seed 7: 0 different;
+- `mutate_vc2.py --hireso`: all 59 new plants caught (`vc2hiobj`, `vc2hitables`), and the whole list, 142, with v215's `edges` planted where the analysis copies the edges in. Four can't be told apart and are not planted: the constructor's dump time and pivot fields (its own slot 5 writes both again), its rate filters on the analysis's table (the same words), and the hold's first branch taken at x = 0 (the second gives the same there).
+
 ### HIRESO's analysis (2026-11-15, v215) {#hireso-analysis}
 
 Step 3.3's third part, ported bit for bit (`Vc2HiresoAnalysis`):

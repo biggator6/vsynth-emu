@@ -63,10 +63,11 @@ cc -DXT_SYNTH_MAIN XtSynth.cpp XtSoloEncoder.cpp XtSoloVoice.cpp XtLinearPlayer.
 # LEGACY's analysis (v210) and its object (v211) against its own, on rom.4
 [ -f Vc2LegacyCheck.cpp ] && cc -DXT_VC2LEGACY_MAIN Vc2LegacyCheck.cpp Vc2LegacyAnalysis.cpp "${SH4[@]}" \
    $( [ -f Vc2Legacy.cpp ] && echo Vc2Legacy.cpp Vc2LegacyTables.cpp Vc2LegacySynthCheck.cpp ) -o "$O/xt_vc2legacy" &
-# HIRESO's formant warp (v213), rate filters (v214) and analysis (v215) against its own, on rom.4
+# HIRESO's formant warp (v213), rate filters (v214), analysis (v215) and object (v216) against its own, on rom.4
 [ -f Vc2HiresoCheck.cpp ] && cc -DXT_VC2HIRESO_MAIN Vc2HiresoCheck.cpp Vc2HiresoWarp.cpp Vc2HiresoTables.cpp \
    $( [ -f Vc2HiresoRate.cpp ] && echo Vc2HiresoRate.cpp Vc2HiresoRateCheck.cpp ) \
    $( [ -f Vc2HiresoAnalysis.cpp ] && echo Vc2HiresoAnalysis.cpp Vc2HiresoAnalysisCheck.cpp Vc2Unvoiced.cpp ) \
+   $( [ -f Vc2Hireso.cpp ] && echo Vc2Hireso.cpp Vc2HiresoObjectCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2hireso" &
 [ -f XtFiles.cpp ] && cc -DXT_FILES_MAIN "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &

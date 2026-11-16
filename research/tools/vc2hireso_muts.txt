@@ -91,10 +91,73 @@ reset-keeps-gate|    s.gateLevel = 0.0f;\n|\n|vc2hiana
 reset-clears-rows|std::ranges::fill(s.bank, 0.0f);|std::ranges::fill(s.bank, 0.0f);\n    std::memset(&s.rows, 0, sizeof s.rows);|vc2hiana
 reset-clears-decimators|toHalf.c = toQuarter.c = t.analysisRate;|toHalf.c = toQuarter.c = t.analysisRate;\n    vc2RateClear(toHalf);|vc2hiana
 reset-table-word|t.resonatorAt + 4 * (uint32_t)|t.resonatorAt + (uint32_t)|vc2hiana
-edges|{ 0, 22, 28, 32 }|{ 0, 21, 28, 32 }|vc2hiana
+edges|    std::ranges::copy(kVc2HiresoEdges, s.edge);\n|    std::ranges::copy(kVc2HiresoEdges, s.edge);\n    s.edge[1] = 21;\n|vc2hiana
 decimators-interpolating|toHalf.c = toQuarter.c = t.analysisRate;|toHalf.c = toQuarter.c = t.interpolator;|vc2hiana
 resonators-at|kResonators { 0x8993fe84,|kResonators { 0x8993fe88,|vc2hitables
 scales-at|kEnergyScales { 0x8993fe78,|kEnergyScales { 0x8993fe7c,|vc2hitables
 gate-rates-at|kGateRates { 0x893edba4, 2 }|kGateRates { 0x893edba8, 2 }|vc2hitables
 windows-at|kWindows = 0x8956141c;|kWindows = 0x89561420;|vc2hitables
 resonators-at-word|resonatorAt = kResonators.at;|resonatorAt = kResonators.at + 4;|vc2hitables
+# The object (v216): Vc2Hireso.cpp (vc2hiobj) and its tables (vc2hitables).  Not planted, as no input tells them apart:
+# the constructor's dump time and pivot fields (its own slot 5 writes both again), its rate filters on the analysis's
+# table (the object's, word for word), the hold's first branch taken at 0 (the second gives the same at 0), and the
+# freeze taken at 0.99 itself (no pedal and dump time give it).
+ctor-no-reset|    analysis.reset();\n    reset();\n|    analysis.reset();\n|vc2hiobj
+ctor-no-analysis-init|    analysis.reset();\n    reset();\n|    reset();\n|vc2hiobj
+object-edges|    std::ranges::copy(kVc2HiresoEdges, s.edge);\n|    std::ranges::copy(kVc2HiresoEdges, s.edge);\n    s.edge[1] = 21;\n|vc2hiobj
+carrier-table-word|(kCarrierCoefs * (2 * s.edge[g] + g))|(kCarrierCoefs * (2 * s.edge[g]))|vc2hiobj
+carrier-coefs|constexpr int kCarrierCoefs = 3;|constexpr int kCarrierCoefs = 4;|vc2hiobj
+weight-sign|xtf::flt(2 * (b & 1) - 1)|xtf::flt(1 - 2 * (b & 1))|vc2hiobj
+weight-last|const int last = Tables::kBands - 1;|const int last = Tables::kBands - 2;|vc2hiobj
+weight-grouping|mul(mul(sign, mul(tb.weightA[b], tb.weightB[b])), scale)|mul(mul(sign, tb.weightA[b]), mul(tb.weightB[b], scale))|vc2hiobj
+weight-reciprocal|xtf::div(tb.weightScale, mul(tb.weightA[last], tb.weightB[last]))|mul(tb.weightScale, xtf::div(1.0f, mul(tb.weightA[last], tb.weightB[last])))|vc2hiobj
+object-rates-swapped|k < kRates / 2 ? tb.decimator : tb.interpolator|k < kRates / 2 ? tb.interpolator : tb.decimator|vc2hiobj
+default-attack|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 7, 18, 0, 1.0f, 1.0f }|vc2hiobj
+default-release|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 6, 17, 0, 1.0f, 1.0f }|vc2hiobj
+default-template|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 6, 18, 1, 1.0f, 1.0f }|vc2hiobj
+default-depth|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, -1 }, {}, 6, 18, 0, 0.5f, 1.0f }|vc2hiobj
+default-pivot|{ {}, { -1, -1 }, {}, 6, 18, 0, 1.0f, 1.0f }|{ {}, { -1, 11 }, {}, 6, 18, 0, 1.0f, 1.0f }|vc2hiobj
+reset-bank-whole|std::fill(band, band + kBankCleared, 0.0f)|std::fill(band, band + Words::kBankWords, 0.0f)|vc2hiobj
+reset-bank-short|constexpr int kBankCleared = 7;|constexpr int kBankCleared = 6;|vc2hiobj
+reset-keeps-rows|    for (auto& row : s.bandWords) std::ranges::fill(row, 0.0f);\n|\n|vc2hiobj
+reset-clears-map|std::fill(s.formant + Words::kBands, s.formant + Words::kSideWords, 0.0f)|std::fill(s.formant, s.formant + Words::kSideWords, 0.0f)|vc2hiobj
+reset-synthesis-word|    t.synthesis = 1.0f;|    t.synthesis = 0.0f;|vc2hiobj
+reset-hold-synthesis|{ 0, 1.0f, 0.0f, { 0.0f, 1.0f, 0.0f } }|{ 0, 1.0f, 0.0f, { 0.0f, 0.0f, 0.0f } }|vc2hiobj
+reset-held|{ 0, 1.0f, 0.0f, { 0.0f, 1.0f, 0.0f } }|{ 0, 1.0f, 1.0f, { 0.0f, 1.0f, 0.0f } }|vc2hiobj
+reset-no-clear|    analysis.clear();\n|\n|vc2hiobj
+attack-curve|t.attack = tb.attack[in.attack];|t.attack = tb.release[in.attack];|vc2hiobj
+attack-past-end|in.attack < Tables::kCurve|in.attack <= Tables::kCurve|vc2hiobj
+release-cap-inverted|t.release[b] = cap > release ? release : cap;|t.release[b] = cap < release ? release : cap;|vc2hiobj
+release-uncapped|t.release[b] = cap > release ? release : cap;|t.release[b] = release;|vc2hiobj
+release-cap-band|tb.release[tb.releaseCap[b]]|tb.release[tb.releaseCap[b > 0 ? b - 1 : b]]|vc2hiobj
+hold-before-dump|    t.dump = in.dump;\n    hold(t.hold.controller);|    hold(t.hold.controller);\n    t.dump = in.dump;|vc2hiobj
+settings-no-hold|    hold(t.hold.controller);   // slot 6 through the vtable, on the dump time as it now stands\n|\n|vc2hiobj
+depth-is-dump|t.depth = in.depth;|t.depth = in.dump;|vc2hiobj
+template-curves-late|if (k >= kTemplates) {|if (k > kTemplates) {|vc2hiobj
+template-right-record|const int record = k + kTemplates * side;|const int record = k + side;|vc2hiobj
+template-no-gains|(uint32_t)record + Tables::kRecordGains;|(uint32_t)record;|vc2hiobj
+template-pivot-zero|if (in.pivot[side] < 0) in.pivot[side]|if (in.pivot[side] <= 0) in.pivot[side]|vc2hiobj
+template-zero-skipped|if (k < 0) return;|if (k <= 0) return;|vc2hiobj
+pivot-zero-skipped|if (in.pivot[side] >= 0) t.pivot[side] = in.pivot[side];|if (in.pivot[side] > 0) t.pivot[side] = in.pivot[side];|vc2hiobj
+curves-swapped|{ 0x899d9d98, 0x899d9e18 }|{ 0x899d9e18, 0x899d9d98 }|vc2hiobj
+hold-centre|constexpr int kHoldCentre = 64;|constexpr int kHoldCentre = 63;|vc2hiobj
+hold-grouping|mul(mul(t.dump, xtf::flt(controller - kHoldCentre)), k[Tables::kHoldScale])|mul(t.dump, mul(xtf::flt(controller - kHoldCentre), k[Tables::kHoldScale]))|vc2hiobj
+hold-freeze-held|        t.hold.held = 0.0f;\n    } else if|        t.hold.held = 1.0f;\n    } else if|vc2hiobj
+hold-zero-held|        t.hold.held = 1.0f;\n    } else {|        t.hold.held = 0.0f;\n    } else {|vc2hiobj
+hold-curve-index|add(mul(x, k[Tables::kHoldStep]), k[Tables::kHoldBase])|add(mul(x, k[Tables::kHoldStep]), sub(k[Tables::kHoldBase], 1.0f))|vc2hiobj
+hold-no-gain|t.hold.held = mul(vc2HiresoTables().release[at], k[Tables::kHoldGain]);|t.hold.held = vc2HiresoTables().release[at];|vc2hiobj
+hold-level|t.hold.level = sub(1.0f, x);|t.hold.level = x;|vc2hiobj
+hold-controller-lost|    t.hold.controller = controller;\n|\n|vc2hiobj
+formant-stride|s.formant + Words::kSideWords * side|s.formant + Words::kBands * side|vc2hiobj
+formant-left-pivot|vc2HiresoMapOf(t.pivot[side], ratio)|vc2HiresoMapOf(t.pivot[0], ratio)|vc2hiobj
+attack-at|kAttack { 0x895628d0,|kAttack { 0x895628d4,|vc2hitables
+release-at|kRelease { 0x89562a64,|kRelease { 0x89562a68,|vc2hitables
+hold-law-at|kHoldLaw { 0x893f1c20, 3 }|kHoldLaw { 0x893f1c24, 3 }|vc2hitables
+weight-a-at|kWeightA { 0x8994059c,|kWeightA { 0x899405a0,|vc2hitables
+weight-b-at|kWeightB { 0x8994061c,|kWeightB { 0x89940620,|vc2hitables
+weight-scale-at|kWeightScale { 0x893f0d30, 1 }|kWeightScale { 0x893f0d34, 1 }|vc2hitables
+capped-from|constexpr int kCappedFrom = 20;|constexpr int kCappedFrom = 21;|vc2hitables
+cap-index|cap[b] = (load & 0xff) / 4;|cap[b] = (load & 0xff) / 4 + 1;|vc2hitables
+pivot-word|kPivotAt = 4;|kPivotAt = 0;|vc2hitables
+templates-at-word|templatesAt = kTemplates;|templatesAt = kTemplates + 4;|vc2hitables
+carrier-at-word|carrierAt = kCarrier.at;|carrierAt = kCarrier.at + 4;|vc2hitables

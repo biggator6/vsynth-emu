@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+HIRESO's object v216 (2026-11-15, on vc2-mode): step 3.3's fourth part (the user's "Yes, next item"; HARDWARE_FIRMWARE.md,
+  "HIRESO's object"). Vc2Hireso: rom.4's constructor (0x893f0a10) and slots 0 (the reset), 1 (onto the analysis), 4
+  (onto v213's warp), 5 (the settings: Env Attack and Release with the high bands' caps, Hold Dump Time, Vocoder Depth,
+  the Formant Template's records and pivots, by the vocoder's settings struct, Vc2HiresoSettings), 6 and 7 (the hold);
+  its words rom.4's from +0x004, the synthesis's kept unnamed. The band weights from two tables; the caps' indices read
+  from slot 5's own loads. Not in the sound yet; the synthesis, slots 2 and 3, next. The three draws LEGACY's checks
+  had (the pedal, the dump time, the ratio) moved into Vc2CheckRig.h, and Vc2Cases takes an object's address for its
+  reset; xt_vc2legacy's lines as before. Check: xt_vc2hireso's fourth part (Vc2HiresoObjectCheck.cpp), both
+  constructors once, then each case noise in the synthesis's words on both, slot 0, and slot 1's blocks with slot 5's
+  settings, the pedal and slot 4 between them; the object's words, the analysis's state, slot 7 and the settings
+  struct word for word after each; 40 cases, 22,000 blocks, 0 different (seeds 2024 and 7); mutate_vc2.py --hireso,
+  59 new plants (vc2hiobj, vc2hitables), each caught; the whole list, 142, caught.
+
 HIRESO's analysis v215 (2026-11-15, on vc2-mode): step 3.3's third part (the user's "Yes, next item";
   HARDWARE_FIRMWARE.md, "HIRESO's analysis"). Vc2HiresoAnalysis: rom.4's slot 1 analysis (0x893ed930) on its .bss
   globals, word for word from 0x8a1bbd2c, with its init (0x893ed8f0), slot 0's clear (0x893ede50), the envelopes'
