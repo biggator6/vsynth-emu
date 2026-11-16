@@ -19,7 +19,9 @@
 # Vc2Kind6.cpp, Vc2Kind6Core.cpp, Vc2Kind6Tables.cpp and Vc2Math.cpp (PORT=vc2k6, vc2k6core, vc2k6tables, vc2k6math:
 # voice kind 6 and the mic ring, v225), through xt_vc2kind6, [cases] its cases (40).  --autonote: vc2an_muts.txt, in
 # Vc2AutoNote.cpp and Vc2AutoNoteTables.cpp (PORT=vc2an, vc2antables: Auto Note and the pitch source, v226), through
-# xt_vc2autonote, [cases] its cases (40).  One line
+# xt_vc2autonote, [cases] its cases (40).  --mixer: vc2mix_muts.txt, in Vc2PartMixer.cpp, Vc2MixerBlock.cpp,
+# Vc2PartMixerTables.cpp and Vc2Math.cpp's clamp (PORT=vc2mix, vc2mixblock, vc2mixtables, vc2mixmath: the part mixer,
+# v227), through xt_vc2mixer, [cases] its cases (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist
@@ -42,6 +44,8 @@ HARNESSES = {
                                 'XT_VC2KIND6_STOP'), '40'),
     '--autonote': (mutlist.Harness('mutate_vc2', 'xt_vc2autonote', 'vc2an_muts.txt', ('vc2an', '2024'),
                                    'XT_VC2AUTONOTE_STOP'), '40'),
+    '--mixer': (mutlist.Harness('mutate_vc2', 'xt_vc2mixer', 'vc2mix_muts.txt', ('vc2mix', '2024'),
+                                'XT_VC2MIXER_STOP'), '40'),
 }
 args = sys.argv[1:]
 switch = args.pop(0) if args and args[0] in HARNESSES else ''

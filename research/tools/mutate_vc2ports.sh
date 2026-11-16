@@ -10,7 +10,8 @@
 # onset check and taking (vc2trackana, v224) and its estimator (vc2trackest) under xt_vc2tracker; voice kind 6 and the
 # mic ring (vc2k6, v225), its core (vc2k6core), its tables (vc2k6tables) and the shared math (vc2k6math) under
 # xt_vc2kind6, the shared math's sine and cosine (vc2math) under xt_vc2carrier; Auto Note and the pitch source (vc2an,
-# v226) and its tables (vc2antables) under xt_vc2autonote.
+# v226) and its tables (vc2antables) under xt_vc2autonote; the part mixer's levels (vc2mix, v227), its block
+# (vc2mixblock), its tables (vc2mixtables) and the shared clamp (vc2mixmath) under xt_vc2mixer.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -26,6 +27,7 @@ VC2TRACK=(Vc2Tracker Vc2TrackerTables Vc2TrackerAnalysis Vc2TrackerEstimate Vc2T
 VC2K6=(Vc2Kind6 Vc2Kind6Core Vc2Kind6Tables Vc2Math Vc2Kind6Check Vc2TrackerSignal)
 VC2AN=(Vc2AutoNote Vc2AutoNoteTables Vc2AutoNoteCheck Vc2Tracker Vc2TrackerTables Vc2TrackerAnalysis Vc2TrackerEstimate
        Vc2TrackerSignal)
+VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck Vc2PartMixerFakes)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -57,6 +59,10 @@ VC2PORTS=(
     "vc2k6math|Vc2Math.cpp|XT_VC2KIND6_MAIN|vc2k6_obj|VC2K6"
     "vc2an|Vc2AutoNote.cpp|XT_VC2AUTONOTE_MAIN|vc2an_obj|VC2AN"
     "vc2antables|Vc2AutoNoteTables.cpp|XT_VC2AUTONOTE_MAIN|vc2an_obj|VC2AN"
+    "vc2mix|Vc2PartMixer.cpp|XT_VC2MIXER_MAIN|vc2mix_obj|VC2MIX"
+    "vc2mixblock|Vc2MixerBlock.cpp|XT_VC2MIXER_MAIN|vc2mix_obj|VC2MIX"
+    "vc2mixtables|Vc2PartMixerTables.cpp|XT_VC2MIXER_MAIN|vc2mix_obj|VC2MIX"
+    "vc2mixmath|Vc2Math.cpp|XT_VC2MIXER_MAIN|vc2mix_obj|VC2MIX"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port

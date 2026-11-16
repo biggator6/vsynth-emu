@@ -308,6 +308,16 @@ Each with its `XT_*_MAIN` harness against rom.4 at 0 different, a planted-error 
      and snap not ported, as nothing sets their switch (HARDWARE_FIRMWARE.md, "Auto Note and the pitch source").
      Step 7 is done.
 8. The part mixer (Direct Sound) and the patch EQ.
+   - done (v227): the part mixer, `Vc2PartMixer`: the block (`0x893b1820`, both paths: the mic and the second input word,
+     the input stage, kind 6's ring, the unvoiced detector when no engine plays, the voices into the carriers' buffer or
+     the other, the detector's ring, the vocoder unless bypassed, the bus frames at three easing levels), the level
+     routine, the targets and their setters, suspend and resume, the EXTIN flag's setter and getter and the reset,
+     against rom.4's in xt_vc2mixer with the voices and calls hooked (HARDWARE_FIRMWARE.md, "The part mixer"). The
+     shared clamp moved into `Vc2Math`.
+   - moved to the wiring: the patch EQ, the effect chip's (rom.4's driver reads it into program A's mid bands, on MULTI
+     alone; VC2_VOCAL_DESIGNER.md, "Program A's routing"), comes with rom.4's effects; and the voices'
+     update and schedule (`0x893b16a0`, `0x893b1710`), which call the voices, come with them. Step 8 is done, and with it
+     step 3.
 
 ### 4. Wiring
 

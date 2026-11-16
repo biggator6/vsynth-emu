@@ -37,10 +37,11 @@ V4=($( [ -f Vc2Params.cpp ] && echo Vc2Params.cpp XtFxValueText.cpp )
     $( [ -f Vc2CarrierTables.cpp ] && echo Vc2CarrierTables.cpp )
     $( [ -f Vc2TrackerTables.cpp ] && echo Vc2TrackerTables.cpp )
     $( [ -f Vc2Kind6Tables.cpp ] && echo Vc2Kind6Tables.cpp Vc2Math.cpp )
-    $( [ -f Vc2AutoNoteTables.cpp ] && echo Vc2AutoNoteTables.cpp ))
+    $( [ -f Vc2AutoNoteTables.cpp ] && echo Vc2AutoNoteTables.cpp )
+    $( [ -f Vc2PartMixerTables.cpp ] && echo Vc2PartMixerTables.cpp ))
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
 rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,xt_vc2in,xt_vc2legacy,xt_vc2hireso,xt_vc2vocoder}
-rm -f "$O"/{xt_vc2carrier,xt_vc2tracker,xt_vc2kind6,xt_vc2autonote,classifier_test,rd}
+rm -f "$O"/{xt_vc2carrier,xt_vc2tracker,xt_vc2kind6,xt_vc2autonote,xt_vc2mixer,classifier_test,rd}
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp "${SH4[@]}" -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp "${SH4[@]}" -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp "${SH4[@]}" -o "$O/xt_lfo" &
@@ -96,6 +97,9 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 [ -f Vc2AutoNoteCheck.cpp ] && cc -DXT_VC2AUTONOTE_MAIN Vc2AutoNoteCheck.cpp Vc2AutoNote.cpp Vc2AutoNoteTables.cpp \
    Vc2Tracker.cpp Vc2TrackerTables.cpp Vc2TrackerAnalysis.cpp Vc2TrackerEstimate.cpp Vc2TrackerSignal.cpp \
    "${SH4[@]}" -o "$O/xt_vc2autonote" &
+# The part mixer (v227) against rom.4's own routines, the voices and the calls it makes hooked
+[ -f Vc2PartMixerCheck.cpp ] && cc -DXT_VC2MIXER_MAIN Vc2PartMixerCheck.cpp Vc2PartMixerFakes.cpp Vc2PartMixer.cpp \
+   Vc2MixerBlock.cpp Vc2PartMixerTables.cpp Vc2Math.cpp "${SH4[@]}" -o "$O/xt_vc2mixer" &
 # The pitch tracker, its frame (v223) and its analysis (v224), against rom.4's own module
 [ -f Vc2TrackerCheck.cpp ] && cc -DXT_VC2TRACKER_MAIN Vc2TrackerCheck.cpp Vc2Tracker.cpp Vc2TrackerTables.cpp \
    $( [ -f Vc2TrackerAnalysis.cpp ] && echo Vc2TrackerAnalysis.cpp Vc2TrackerEstimate.cpp Vc2TrackerSignal.cpp ) \

@@ -954,7 +954,9 @@ So, measured against read:
 1. reads the 32 input frames (`*0x8993eadc`): the word at +4 × 2^-31 into the mic buffer `0x8999f3d0`, +0x14 into
    `0x8999f450`;
 2. clears two stereo buffers, `0x8999f2d0` (the vocoder's) and `0x8999f1d0`;
-3. runs the pitch tracker's input stage (on +0x14), the mic ring (on +4) and, with a vocoder engine, the unvoiced detector;
+3. runs the pitch tracker's input stage (on +0x14), the mic ring (on +4) and, ~~with a vocoder engine~~ with none (v227,
+   ported: the `movt`/`xor` pair inverts the test; with an engine the vocoder's driver runs it on the ring, so once a block
+   either way; HARDWARE_FIRMWARE.md, "The part mixer"), the unvoiced detector;
 4. walks the part's voices (`*0x899996d0`), each rendering into one buffer or the other by what its methods answer (read, not
    run). This is where rom.4's TVA, which renders one stereo pair ("The TVA in rom.4"), lands;
 5. runs the vocoder (`0x893f0580`) on a modulator into the `0x8999f2d0` buffer, unless the bypass flag `0x89934550` is set;
@@ -970,7 +972,8 @@ So, measured against read:
 | DIR L and R | not written | |
 
 The direct signal and the vocoder's modulator depend on a flag `0x8993eacc`, set when zone 0's or zone 1's OSC 1 Type is
-EXTIN. With the flag set, both are the raw mic, the input frame's +4 word. Without it, both come from the other buffer's
+EXTIN (v227: or OSC 1's or OSC 2's, by how `0x89320a50` reads its arguments; unsettled, HARDWARE_FIRMWARE.md, "The part
+mixer"). With the flag set, both are the raw mic, the input frame's +4 word. Without it, both come from the other buffer's
 right channel (the modulator × 2^-31).
 
 **The levels.** Three targets: MULTI's `0x8999f4d0`, MAIN's `0x8999f4dc` and Reverb's `0x8999f4e8`. Each has the level the

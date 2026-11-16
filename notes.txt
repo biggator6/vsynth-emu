@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part mixer v227 (2026-11-16, on vc2-mode): step 8 (the user's "Yes, next item"; HARDWARE_FIRMWARE.md, "The part
+  mixer"); step 8 done, and with it step 3. Vc2PartMixer: the mixer's .data words (0x8993eac4...), its buffers and
+  levels (0x8999f1d0...) and the bypass word word for word; the block 0x893b1820 (both paths by the EXTIN flag: the mic
+  and second input words, the input stage, kind 6's ring, the unvoiced detector when no engine plays, the voices into
+  the carriers' buffer or the other through Vc2MixerVoice, the detector's ring and its NaN clear, the vocoder unless
+  bypassed, the bus frames at three easing levels), the level routine 0x893b1480, the targets 0x893b1ee0 and setters,
+  suspend and resume, the flag's setter and getter, the reset. The patch EQ is the effect chip's (program A's mid
+  bands on MULTI) and the voices' update and schedule call the voices: both moved to the wiring. Corrected: the mixer
+  runs the unvoiced detector with no vocoder engine, not with one. The carrier's clamp now Vc2Math's vc2Clamp01.
+  Vc2PartMixerTables by Vc2PoolTables, in loadVc2 (rom4-no-mixer). xt_vc2mixer (in fcheck, 40 cases): rom.4's
+  routines with the voices' methods and the block's calls hooked (Vc2PartMixerFakes.cpp; the fakes' sums at round
+  to nearest on both sides); 0 different at seeds 2024 and 7, 400 cases each; every line and branch covered.
+  mutate_vc2.py --mixer: 84 plants, caught; --carrier (152) and --kind6 (138) again, caught. Not in the sound yet.
+
 Auto Note and the pitch source v226 (2026-11-16, on vc2-mode): step 7's second part (the user's "Yes, next item";
   HARDWARE_FIRMWARE.md, "Auto Note and the pitch source"); step 7 done. Vc2AutoNote: Auto Note's .data state
   (0x8993fe3c...) and the bend's globals (0x899d994c...) word for word; the input stage 0x893ebb00 around the tracker's

@@ -10,12 +10,6 @@ using xtf::div;
 using xtf::mul;
 using xtf::sub;
 
-// A level held to [0, 1], as the update holds the gains and coefficients: 0 first, then 1 (a NaN passes)
-float clamp01(float v) {
-    if (0.0f > v) v = 0.0f;
-    return v > 1.0f ? 1.0f : v;
-}
-
 // A two-state stage's sample (the saw's two, the noise's high-pass): s1 first, then s2 on what is left, which it returns
 float stageStep(Vc2CarrierStage& st, float x, float g) {
     st.s1 = add(mul(st.s2, g), st.s1);
@@ -76,8 +70,8 @@ void Vc2Carrier::update(const Vc2CarrierParams* p, float peak) {
         w.stepTarget = p->pitch;
         w.gainTarget = p->gain;
         w.growl = p->growl;
-        if (1.0f > p->balance) w.sawGain = clamp01(mul(p->sawLevel, p->balance));
-        w.noiseGain = clamp01(mul(sub(2.0f, p->balance), p->noiseLevel));
+        if (1.0f > p->balance) w.sawGain = vc2Clamp01(mul(p->sawLevel, p->balance));
+        w.noiseGain = vc2Clamp01(mul(sub(2.0f, p->balance), p->noiseLevel));
     }
     const float pitch = w.stepTarget;
     float low = w.noiseLowpass;
@@ -89,7 +83,7 @@ void Vc2Carrier::update(const Vc2CarrierParams* p, float peak) {
         held = t.minPitch;
     }
     const float square = add(mul(mul(held, held), t.highA), w.noiseHighpass);
-    const float high = clamp01(add(add(mul(held, t.highB), square), t.highC));
+    const float high = vc2Clamp01(add(add(mul(held, t.highB), square), t.highC));
     float lowScale = 0.0f, sawScale = 0.0f;
     if (t.floor > w.threshold) {   // no Dynamics: the sensitivity alone lowers both
         lowScale = sub(1.0f, mul(w.sensitivity, t.dynLow));

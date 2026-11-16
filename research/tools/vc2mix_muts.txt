@@ -1,0 +1,90 @@
+# Planted errors in the VC-2's part mixer, for mutate_vc2.py --mixer: each must make xt_vc2mixer, on rom.4, say something
+# differs.  name|old|new[|port[|seed]]; ports vc2mix (Vc2PartMixer.cpp, v227), vc2mixblock (Vc2MixerBlock.cpp),
+# vc2mixtables (Vc2PartMixerTables.cpp) and vc2mixmath (Vc2Math.cpp's clamp).
+# Not planted, as no input tells them apart: the two paths' ease words swapped (0x893b1ab8 and 0x893b1d44 both hold
+# 0.0009375), the level routine's and the targets' pools swapped (both 0.025 and 2147483392), suspend's count set to 1
+# rather than added to (it runs only from 0), and the clamp's ceiling at or above 1 (both give 1).
+levels-extin-first-only|p.oscType[0] == kExtin \|\| p.oscType[1] == kExtin|p.oscType[0] == kExtin|vc2mix
+levels-extin-second-only|p.oscType[0] == kExtin \|\| p.oscType[1] == kExtin|p.oscType[1] == kExtin|vc2mix
+levels-extin-both|p.oscType[0] == kExtin \|\| p.oscType[1] == kExtin|p.oscType[0] == kExtin && p.oscType[1] == kExtin|vc2mix
+levels-direct-from-reverb|b.directSound = mul(xtf::flt(p.direct), t.perLevel);|b.directSound = mul(xtf::flt(p.reverbSend), t.perLevel);|vc2mix
+levels-mfx-lost|    b.mfxSend = mul(xtf::flt(p.mfxSend), t.perLevel);\n|\n|vc2mix
+levels-bypass-ignored|    if (bypass == 0) targetsBy(b, offsets, w.extin, t.pool[0]);|    targetsBy(b, offsets, w.extin, t.pool[0]);|vc2mix
+levels-main-eases|    b.main = b.mainTarget;   // MAIN and Reverb jump to their targets, MULTI eases\n|\n|vc2mix
+levels-reverb-eases|    b.reverb = b.reverbTarget;\n|\n|vc2mix
+levels-multi-jumps|    b.reverb = b.reverbTarget;\n|    b.reverb = b.reverbTarget;\n    b.multi = b.multiTarget;\n|vc2mix
+targets-bypass-ignored|    if (bypass == 0) targetsBy(b, offsets, w.extin, vc2MixerTables().pool[1]);|    targetsBy(b, offsets, w.extin, vc2MixerTables().pool[1]);|vc2mix
+targets-multi-direct-offset|add(b.mfxSend, o.mfx)|add(b.mfxSend, o.direct)|vc2mix
+targets-main-mfx-offset|add(b.directSound, o.direct)|add(b.directSound, o.mfx)|vc2mix
+targets-reverb-of-multi|const float reverb = mul(b.reverbSend, main);|const float reverb = mul(b.reverbSend, multi);|vc2mix
+targets-multi-unclamped|mul(vc2Clamp01(add(b.mfxSend, o.mfx)), pool.scale)|mul(add(b.mfxSend, o.mfx), pool.scale)|vc2mix
+targets-main-unclamped|mul(vc2Clamp01(add(b.directSound, o.direct)), pool.scale)|mul(add(b.directSound, o.direct), pool.scale)|vc2mix
+targets-extin-ignored|    if (extin == 0) return;|    return;|vc2mix
+targets-extin-inverted|    if (extin == 0) return;|    if (extin != 0) return;|vc2mix
+targets-bus-main-lost|    b.mainTarget = mul(main, pool.toBus);\n|\n|vc2mix
+targets-bus-reverb-lost|    b.reverbTarget = mul(reverb, pool.toBus);\n|\n|vc2mix
+targets-multi-on-bus|    b.mainTarget = mul(main, pool.toBus);\n|    b.mainTarget = mul(main, pool.toBus);\n    b.multiTarget = mul(multi, pool.toBus);\n|vc2mix
+suspend-twice|    if (w.suspended != 0) return;\n|\n|vc2mix
+suspend-mark-always|    w.suspendMark = w.extin != 0 ? 1 : 0;|    w.suspendMark = 1;|vc2mix
+suspend-no-bypass|    bypass = 1;|    bypass = 0;|vc2mix
+suspend-saved-swapped|    b.saved[0] = b.multiTarget;\n    b.saved[1] = b.reverbTarget;|    b.saved[0] = b.reverbTarget;\n    b.saved[1] = b.multiTarget;|vc2mix
+suspend-main-kept|    b.multiTarget = b.reverbTarget = b.mainTarget = 0.0f;|    b.multiTarget = b.reverbTarget = 0.0f;|vc2mix
+resume-unguarded|    if (w.suspendMark < 0) return;\n|\n|vc2mix
+resume-guard-zero|    if (w.suspendMark < 0) return;|    if (w.suspendMark <= 0) return;|vc2mix
+resume-mark-kept|    w.suspendMark = -1;\n    b.multiTarget|    b.multiTarget|vc2mix
+resume-bypass-kept|    bypass = 0;\n    w.suspendMark = -1;|    w.suspendMark = -1;|vc2mix
+resume-suspended-kept|    w.suspended = 0;\n|\n|vc2mix
+resume-main-from-reverb|    b.mainTarget = b.saved[2];|    b.mainTarget = b.saved[1];|vc2mix
+reset-order|    parts.resetTracker();\n    parts.resetUnvoiced();|    parts.resetUnvoiced();\n    parts.resetTracker();|vc2mix
+reset-no-ring|    parts.resetRing();\n|\n|vc2mix
+block-count-lost|    ++w.blocks;\n|\n|vc2mixblock
+block-carrier-left-kept|        b.carrier[i].left = b.carrier[i].right = 0.0f;|        b.carrier[i].right = 0.0f;|vc2mixblock
+block-direct-right-kept|        b.direct[i].right = 0.0f;\n|\n|vc2mixblock
+block-direct-left-cleared|        b.direct[i].right = 0.0f;|        b.direct[i].right = b.direct[i].left = 0.0f;|vc2mixblock
+block-mic-word|in[kFrameWords * i + kMicWord]|in[kFrameWords * i]|vc2mixblock
+block-second-word|in[kFrameWords * i + kSecondWord]|in[kFrameWords * i + kSecondWord + 1]|vc2mixblock
+block-mic-to-ring|        b.mic[i] = mul(xtf::flt(in[kFrameWords * i + kMicWord]), t.toFloat);|        b.mic[i] = mul(xtf::flt(in[kFrameWords * i + kMicWord]), t.toRing);|vc2mixblock
+block-stage-on-mic|    parts.inputStage(b.second);|    parts.inputStage(b.mic);|vc2mixblock
+block-ring-on-second|    parts.micRing(b.mic);|    parts.micRing(b.second);|vc2mixblock
+block-unvoiced-with-engine|    if (!parts.engine()) parts.unvoiced(b.mic);|    if (parts.engine()) parts.unvoiced(b.mic);|vc2mixblock
+block-unvoiced-always|    if (!parts.engine()) parts.unvoiced(b.mic);|    parts.unvoiced(b.mic);|vc2mixblock
+block-carried-kept|    w.carried = 0.0f;\n|\n|vc2mixblock
+block-held-asked-extin|    walk(voices, !extin);|    walk(voices, true);|vc2mixblock
+block-held-never|    walk(voices, !extin);|    walk(voices, false);|vc2mixblock
+block-ring-before-voices|    walk(voices, !extin);\n    float* ring = parts.detectorRing();|    float* ring = parts.detectorRing();\n    walk(voices, !extin);|vc2mixblock
+block-ring-direct-left|mul(b.direct[i].right, t.toRing)|mul(b.direct[i].left, t.toRing)|vc2mixblock
+block-ring-to-float|mul(b.direct[i].right, t.toRing)|mul(b.direct[i].right, t.toFloat)|vc2mixblock
+block-ring-extin-direct|extin ? b.mic[i] : mul(b.direct[i].right, t.toRing)|mul(b.direct[i].right, t.toRing)|vc2mixblock
+block-left-not-cleared|        cleared(b.carrier[i].left);\n|\n|vc2mixblock
+block-ring-not-cleared|        cleared(ring[i]);\n|\n|vc2mixblock
+block-clear-every-nan|    if (std::bit_cast<int32_t>(x) > kInfinity) x = 0.0f;|    if (x != x) x = 0.0f;|vc2mixblock
+block-clear-infinity|    if (std::bit_cast<int32_t>(x) > kInfinity) x = 0.0f;|    if (std::bit_cast<int32_t>(x) >= kInfinity) x = 0.0f;|vc2mixblock
+block-vocoder-bypassed|    if (bypass == 0) parts.vocoder(ring, b.carrier);|    parts.vocoder(ring, b.carrier);|vc2mixblock
+block-vocoder-on-mic|parts.vocoder(ring, b.carrier)|parts.vocoder(b.mic, b.carrier)|vc2mixblock
+block-extin-direct|        frames(b.mic, 1, out, t.ease[1]);|        frames(&b.direct[0].right, 2, out, t.ease[1]);|vc2mixblock
+block-direct-stride-one|        frames(&b.direct[0].right, 2, out, t.ease[0]);|        frames(&b.direct[0].right, 1, out, t.ease[0]);|vc2mixblock
+frames-main-step-reverb|    const float stepMain = mul(sub(b.mainTarget, b.main), ease);|    const float stepMain = mul(sub(b.reverbTarget, b.main), ease);|vc2mixblock
+frames-multi-step-sign|sub(b.multiTarget, b.multi)|sub(b.multi, b.multiTarget)|vc2mixblock
+frames-main-right-reverb|        f[1] = mul(d, b.main);|        f[1] = mul(d, b.reverb);|vc2mixblock
+frames-main-stepped-first|        f[0] = mul(d, b.main);   // MAIN L and R\n        f[1] = mul(d, b.main);\n        b.main = add(b.main, stepMain);|        b.main = add(b.main, stepMain);\n        f[0] = mul(d, b.main);\n        f[1] = mul(d, b.main);|vc2mixblock
+frames-reverb-held|        b.reverb = add(b.reverb, stepReverb);\n|\n|vc2mixblock
+frames-chorus-sent|        f[3] = 0.0f;|        f[3] = f[2];|vc2mixblock
+frames-multi-right-left|        f[5] = mul(b.carrier[i].right, b.multi);|        f[5] = mul(b.carrier[i].left, b.multi);|vc2mixblock
+frames-multi-stepped-between|        f[5] = mul(b.carrier[i].right, b.multi);\n        b.multi = add(b.multi, stepMulti);|        b.multi = add(b.multi, stepMulti);\n        f[5] = mul(b.carrier[i].right, b.multi);|vc2mixblock
+frames-dir-written|        b.multi = add(b.multi, stepMulti);\n|        b.multi = add(b.multi, stepMulti);\n        f[6] = 0.0f;\n|vc2mixblock
+walk-carried-not-set|            w.carried = 1.0f;\n|\n|vc2mixblock
+walk-carrier-renders-too|        } else if (!askHeld \|\| !voice->held()) {|        }\n        if (!askHeld \|\| !voice->held()) {|vc2mixblock
+walk-held-renders|        } else if (!askHeld \|\| !voice->held()) {|        } else if (!askHeld \|\| voice->held()) {|vc2mixblock
+walk-held-asked-first|        } else if (!askHeld \|\| !voice->held()) {|        } else if (!voice->held() \|\| !askHeld) {|vc2mixblock
+walk-carrier-into-direct|            voice->renderCarrier(b.carrier);|            voice->renderCarrier(b.direct);|vc2mixblock
+walk-render-into-carrier|            voice->render(b.direct);|            voice->render(b.carrier);|vc2mixblock
+tables-to-float-from-ring|{ 0x893b1a88, &t.toFloat }|{ 0x893b1aa8, &t.toFloat }|vc2mixtables
+tables-to-ring-from-float|{ 0x893b1aa8, &t.toRing }|{ 0x893b1a88, &t.toRing }|vc2mixtables
+tables-per-level-lost|{ 0x893b15d8, &t.perLevel }, |{ 0x893b15f0, &t.perLevel }, |vc2mixtables
+tables-scale-per-level|{ 0x893b15f0, &t.pool[0].scale }|{ 0x893b15d8, &t.pool[0].scale }|vc2mixtables
+tables-targets-bus-lost|        { 0x893b2068, &t.pool[1].scale }, { 0x893b2074, &t.pool[1].toBus },|        { 0x893b2068, &t.pool[1].scale },|vc2mixtables
+tables-targets-scale-lost|        { 0x893b2068, &t.pool[1].scale }, |        |vc2mixtables
+tables-ease-lost|{ 0x893b1ab8, &t.ease[0] }, |{ 0x893b1d44, &t.ease[1] }, |vc2mixtables
+tables-extin-ease-lost|{ 0x893b1ab8, &t.ease[0] }, { 0x893b1d44, &t.ease[1] },|{ 0x893b1ab8, &t.ease[0] },|vc2mixtables
+mix-clamp-no-ceiling|    return v > 1.0f ? 1.0f : v;|    return v;|vc2mixmath
+mix-clamp-no-floor|    if (0.0f > v) v = 0.0f;\n||vc2mixmath

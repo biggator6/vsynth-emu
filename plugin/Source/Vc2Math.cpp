@@ -26,6 +26,11 @@ float vc2Sine(const Vc2MathPool& k, float x) {
 
 float vc2Cosine(const Vc2MathPool& k, float x) { return vc2Cubic(k, sub(k.foldAt, x < 0.0f ? -x : x)); }
 
+float vc2Clamp01(float v) {
+    if (0.0f > v) v = 0.0f;
+    return v > 1.0f ? 1.0f : v;
+}
+
 float vc2Window(const Vc2MathPool& k, float x) {
     float u = mul(x, 2.0f);
     if (u > 1.0f) u = sub(2.0f, u);

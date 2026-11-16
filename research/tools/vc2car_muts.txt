@@ -5,8 +5,8 @@
 # growl's half, −2, glide and 2^31 are the same numbers), so the first sample's glide by either pool; the sine's x·x·4
 # as x·4x (× 4 is exact); the growl's divider by noiseA ≥ 0 (noiseA is 0 only before the first sample, and the first
 # growl cycle starts at the second).
-clamp-top|    return v > 1.0f ? 1.0f : v;|    return v > 0.9f ? 0.9f : v;
-clamp-no-floor|    if (0.0f > v) v = 0.0f;\n|
+clamp-top|    return v > 1.0f ? 1.0f : v;|    return v > 0.9f ? 0.9f : v;|vc2math
+clamp-no-floor|    if (0.0f > v) v = 0.0f;\n||vc2math
 stage-s1|    st.s1 = add(mul(st.s2, g), st.s1);|    st.s1 = add(mul(st.s2, g), st.s2);
 stage-left|    const float left = sub(sub(x, st.s1), st.s2);|    const float left = sub(x, st.s1);
 stage-s2|    st.s2 = add(mul(left, g), st.s2);|    st.s2 = add(mul(left, g), st.s1);

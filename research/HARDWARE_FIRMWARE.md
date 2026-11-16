@@ -1546,6 +1546,99 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part mixer (2026-11-16, v227) {#vc2-part-mixer}
+
+Step 8, ported bit for bit (`Vc2PartMixer`; Vc2PartMixer.cpp, Vc2MixerBlock.cpp): the block mixer that writes the VC-2's bus frame once a block, from the mic, the part's voices and the vocoder. VC2_VOCAL_DESIGNER.md, "The part mixer, run", ran it on rom.4; this is every instruction of the block `0x893b1820` (both its paths), the level routine `0x893b1480`, the targets `0x893b1ee0` and their setters, suspend and resume, the EXTIN flag's setter and getter, and the reset `0x893b1680`. The patch EQ, the step's other half, is the effect chip's: rom.4's effect driver reads EQ 1 and EQ 2 (0x1af…0x1b4) into program A's mid bands, on MULTI alone, and EQ 1's Gain was measured moving MULTI's path and not MAIN's (VC2_VOCAL_DESIGNER.md, "Program A's routing"). So it comes with rom.4's effects in the wiring.
+
+**The state**, word for word:
+- The mixer's words, in .data at 0x8993eac4 (`Vc2MixerWords`):
+  - carried: 1.0 when a voice rendered a carrier this block, else 0. The vocoder's glue reads it.
+  - A word the settings wrapper `0x893b1be0` writes and nothing reads.
+  - The EXTIN flag.
+  - Suspend's mark (−1, or the flag as it was) and its count.
+  - The block stamps of the voices' update and schedule.
+  - The input frames' pointer.
+  - The blocks mixed.
+- The buffers and levels, in .bss at 0x8999f1d0 (`Vc2MixerBuffers`):
+  - Two stereo buffers of 32 frames: the voices' other buffer, whose right channel is the direct signal, and the carriers' buffer, which then holds the vocoder's output.
+  - The mic and the second input word, each × 2^-31.
+  - The three targets, the three settings, the three levels reached, and the three targets suspend keeps.
+- Read here: the bypass word 0x89934550, and the three offsets at 0x89997290 (the tone generator's sums × 1/127).
+
+**The block:**
+1. The block count goes up. The carriers' buffer and the other buffer's right channel are cleared. The other buffer's left channel never is.
+2. The input frames' +4 word (the mic) and +0x14 word go into their buffers, × 2^-31 (0x30000000).
+3. The input stage (`0x893ebb00`: the tracker's block and Auto Note) runs on the second word. Kind 6's ring write runs on the mic.
+4. The unvoiced detector runs on the mic only when the vocoder object's engine word (+0x20) is 0. With an engine, the vocoder's driver runs it on the detector's ring, so it runs once a block either way, unless the vocoder is bypassed.
+5. carried is set to 0. Then each voice in the part's list (`0x899996d0`) is asked through its methods:
+   - If +0x54 says it renders a carrier, +0x18 renders it into the carriers' buffer, and carried becomes 1.
+   - Otherwise, unless +0x60 says it is held, +0x24 renders it into the other buffer. +0x60 is asked only without the EXTIN flag.
+6. The detector's ring (`0x893ed410`) takes the block. With the EXTIN flag that is the mic; without it, the other buffer's right channel × 0x2fffffff (a step under 2^-31).
+7. A positive NaN in the carriers' buffer or the ring is cleared to 0. A positive NaN here is a word above 0x7f800000, compared as an integer. A negative NaN, or an infinity, stays.
+8. Unless bypassed, the vocoder's stereo driver (`0x893f0580`) takes the ring and the carriers' buffer, and writes its output in place.
+9. Each of the 32 bus frames is written:
+
+| Words | Signal | Level |
+|---|---|---|
+| MAIN L and R | the direct signal | MAIN's |
+| Reverb send | the direct signal | Reverb's |
+| Chorus send | 0 | |
+| MULTI L and R | the carriers' buffer | MULTI's |
+| DIR L and R | left as they were | |
+
+The direct signal is the mic with the EXTIN flag, else the other buffer's right channel.
+
+Each level moves by (target − reached) × 0.0009375 a sample; the step is worked out once a block. MAIN's and Reverb's levels move after the frame's MAIN and Reverb words are written, MULTI's after its MULTI words.
+
+**The levels:**
+- **The level routine**, a patch's:
+  - It reads OSC Type (0x2e5) through `0x89320a50(obj, 0, k)`, k 0 and 1, and sets the EXTIN flag when either is 2.
+  - It reads Direct Sound Level (0x195, through the part's block) and the Reverb and MFX Send Levels (0x2e2, 0x2e0), each × 1/127 (0x3c010204).
+  - Unless bypassed, it works out the targets. Then MAIN and Reverb jump to theirs, and MULTI eases.
+- **The targets** (`0x893b1ee0`, the converter's; nothing while bypassed):
+  - MULTI = clamp₀¹(MFX Send + the second offset) × 0.025.
+  - MAIN = clamp₀¹(Direct Sound + the first offset) × 0.025.
+  - Reverb = Reverb Send × MAIN's target.
+  - With the EXTIN flag, MAIN's and Reverb's targets are × 2147483392 (0x4efffffe, a step under 2^31).
+  - The clamp is the carrier's, `vc2Clamp01`, in Vc2Math from v227.
+- **The setters** `0x893b1eb0`, `0x893b1ec0` and `0x893b1ed0` store the Direct Sound, Reverb Send and MFX Send settings.
+- **Suspend** (`0x893b1390`) acts once until resumed. It sets the count to 1, the mark to the EXTIN flag (1 or 0) and the bypass word to 1. It keeps the targets (MULTI, Reverb, MAIN) and zeroes them.
+- **Resume** (`0x893b1410`) acts when the mark isn't −1. It sets the count to 0, the bypass to 0 and the mark to −1, and puts the targets back.
+- **The reset** (`0x893b1680`) runs the tracker's reset, the unvoiced detector's and the ring's.
+
+Two of the level routine's readings stay open. Which OSC each k of `0x89320a50` names is unsettled: "The part mixer, run" read them as zone 0's and zone 1's OSC 1, while the routine reads OSC 1 and OSC 2. The port takes them as the routine reads them (`Vc2MixerParams::oscType`), and the wiring must say which parameters they are.
+
+Not ported here: `0x893b16a0` and `0x893b1710`, which stamp the block count. They drive the voices' update and schedule: each voice's method +0x0c gets the blocks since the last stamp, then the vocoder's glue (`0x893f07a0`) gets carried. They come with the voices, in the wiring.
+
+**Corrected:** the mixer runs the unvoiced detector when there is no vocoder engine, not when there is one (VC2_VOCAL_DESIGNER.md, "The part mixer, run", corrected in place).
+
+**The check, `xt_vc2mixer <rom.4> [cases] [seed]`** (in fcheck at 40 cases, under a second; Vc2PartMixerCheck.cpp with Vc2PartMixerFakes.cpp, XT_VC2MIXER_MAIN):
+- rom.4's routines run in Sh4Interp against the port. The block runs on input frames in the interpreter's RAM, with its pointer set there and up to three voices linked in the part's list.
+- The voices' methods are hooked to answer and render as drawn. The calls the block makes are hooked to log: the input stage, kind 6's ring, the unvoiced detector and its ring, the vocoder's driver, and the reset's three. The port's parts and voices log and answer the same way.
+- The fakes do their own sums at round to nearest on both sides, because rom.4's hooks run inside the interpreter's call, at the SH-4's round to zero.
+- Each block draws:
+  - the input words, now and then 0 or the most negative;
+  - each voice's answers and frames;
+  - whether an engine plays;
+  - what the vocoder adds.
+  A frame's word is now and then a NaN of either sign or an infinity. The bus frames are filled with drawn words first, so DIR's words must stay as they were.
+- One block in ten, an event comes first: the level routine on drawn parameters (its reads hooked to answer them), the targets, suspend or resume, a setter (now and then past [0, 1]), the flag's setter, the reset, or the offsets and the bypass word drawn.
+- After each block and event, the words, the buffers, the bypass word, the detector's ring, the bus frames and the calls are compared word for word.
+- Coverage (llvm-cov, 40 cases): every line and every branch side of the port.
+
+Results:
+- seed 2024: 40 cases, 16,000 blocks (8,387 EXTIN, 7,332 bypassed), 7,982 carriers, 13,598 renders, 8,668 vocoder calls, 1,659 events, 0 different. At 400 cases, 0 different.
+- seed 7, 400 cases: 0 different.
+- `mutate_vc2.py --mixer`: 84 plants (33 in Vc2PartMixer.cpp, 41 in Vc2MixerBlock.cpp, 8 in the tables, 2 in the clamp), all caught on the first run.
+- The carrier's and kind 6's lists ran again, as the clamp moved into Vc2Math.cpp: 152 and 138, all caught.
+- Not planted, because no input tells them apart:
+  - the two paths' ease words swapped (both 0.0009375);
+  - the level routine's and the targets' pools swapped (both 0.025 and 2147483392);
+  - suspend's count set to 1 rather than added to, as it runs only from 0;
+  - the clamp's ceiling at or above 1, as both give 1.
+
+The mixer is not in the sound yet. The wiring (step 4) puts it after the part's voices, with rom.4's effects on the effect chip.
+
 ### Auto Note and the pitch source (2026-11-16, v226) {#vc2-auto-note}
 
 Step 7's second part, ported bit for bit (`Vc2AutoNote`; Vc2AutoNote.cpp): what decides the pitch a VC-2 voice sings at, kind 6's included. VC2_VOCAL_DESIGNER.md, "Kind 6's pitch source, run", ran it on rom.4; this is every instruction of the live paths. With it, step 7 is done.

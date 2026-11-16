@@ -19,3 +19,6 @@ float vc2Cubic(const Vc2MathPool& k, float x);    // 0x893f31f0: x (3 − 4x²)
 float vc2Sine(const Vc2MathPool& k, float x);     // 0x893f3210: x in [−1, 1) folded into [−0.5, 0.5], then the cubic
 float vc2Cosine(const Vc2MathPool& k, float x);   // 0x893f3280: the cubic on 0.5 − |x|
 float vc2Window(const Vc2MathPool& k, float x);   // 0x893f32a0: ½ (1 − cubic(0.5 − u)), u = 2x folded about 1
+// A level held to [0, 1] as rom.4's routines inline it, 0 first, then 1 (a NaN passes): the carrier's update's gains
+// and coefficients (v221), the part mixer's targets (v227)
+float vc2Clamp01(float v);
