@@ -19,10 +19,7 @@
 # v189), under xt_arp; [cases] its random cases, after the presets.
 # PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
-# PORT=vc2params: Vc2Params.cpp (rom.4's parameter tables, v199) under xt_vc2params, PORT=vc2in: Vc2Unvoiced.cpp (its
-# unvoiced detector, v208) and PORT=vc2out: Vc2Consonants.cpp (its consonants, v209) under xt_vc2in, PORT=vc2legacy:
-# Vc2LegacyAnalysis.cpp (LEGACY's analysis, v210), PORT=vc2tables: Vc2LegacyTables.cpp and PORT=vc2object:
-# Vc2Legacy.cpp (its tables and object, v211) under xt_vc2legacy, on rom.4 ($ROM4).
+# PORT=vc2…: rom.4's ports under their checks, on rom.4 ($ROM4): mutate_vc2ports.sh's list (v220).
 # PORT=toneknobs, toneenvknobs, toneupdate, tonezones, tonenotes: XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp, XtSynthUpdate.cpp,
 # XtSynthZones.cpp, XtSynthNotes.cpp under xt_tone (v193: XtSynth's parts by job); tonefwcpp, tonefwh, tonecases,
 # tonecarry: xt_tone's own XtToneFirmware.cpp, XtToneFirmware.h, XtToneCases.cpp, XtToneCarry.cpp; tonepatchids its
@@ -83,6 +80,7 @@ tonefile() {
     esac
 }
 source "$(dirname "$0")/mutate_parts.sh"   # harnessParts, fxParts: a harness's kept objects (moved as they stood, v208)
+source "$(dirname "$0")/mutate_vc2ports.sh"   # vc2Port: rom.4's ports and their checks (moved as they stood, v220)
 TF=$(tonefile "${PORT:-cosm}")
 if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
     F=$TF
@@ -145,34 +143,8 @@ elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     esac
     ARGS=("${SEED:-2024}")
     harnessParts XT_MSM_MAIN msm_obj XtMsm XtMsmTrack XtMsmPatch XtMsmCheck XtMsmCases
-elif [[ "$PORT" =~ ^vc2(params|in|out|legacy|tables|object|warp|hitables|rate|hiana|hiobj|hisyn)$ ]]; then
-    # rom.4's ports, on rom.4: its parameter tables, Vc2Params.cpp, against xt_vc2params (v199), [cases] its values an ID;
-    # the unvoiced detector, Vc2Unvoiced.cpp (v208), and its consonants, Vc2Consonants.cpp (vc2out, v209), against
-    # xt_vc2in; LEGACY's analysis, Vc2LegacyAnalysis.cpp (v210), its tables, Vc2LegacyTables.cpp (vc2tables), and its
-    # object, Vc2Legacy.cpp (vc2object, v211), against xt_vc2legacy; HIRESO's warp, Vc2HiresoWarp.cpp (vc2warp, v213),
-    # its tables, Vc2HiresoTables.cpp (vc2hitables), its rate filters, Vc2HiresoRate.cpp (vc2rate, v214), and its
-    # analysis, Vc2HiresoAnalysis.cpp (vc2hiana, v215), its object, Vc2Hireso.cpp (vc2hiobj, v216), and its synthesis,
-    # Vc2HiresoSynth.cpp (vc2hisyn, v217), against xt_vc2hireso; [cases] their cases; SEED any's
-    IMAGE="$ROM4"
-    ARGS=("${SEED:-2024}")
-    VC2IN=(Vc2Unvoiced Vc2Consonants Vc2UnvoicedCheck Vc2CheckWords)
-    VC2LEG=(Vc2LegacyAnalysis Vc2LegacyTables Vc2Legacy Vc2LegacyCheck Vc2LegacySynthCheck Vc2CheckWords)
-    VC2HI=(Vc2HiresoWarp Vc2HiresoTables Vc2HiresoRate Vc2HiresoAnalysis Vc2Unvoiced Vc2Hireso Vc2HiresoSynth
-           Vc2HiresoCheck Vc2HiresoRateCheck Vc2HiresoAnalysisCheck Vc2HiresoObjectCheck Vc2CheckWords)
-    case "$PORT" in
-        vc2warp) F=Vc2HiresoWarp.cpp; harnessParts XT_VC2HIRESO_MAIN vc2hireso_obj "${VC2HI[@]}" ;;
-        vc2rate) F=Vc2HiresoRate.cpp; harnessParts XT_VC2HIRESO_MAIN vc2hireso_obj "${VC2HI[@]}" ;;
-        vc2hitables) F=Vc2HiresoTables.cpp; harnessParts XT_VC2HIRESO_MAIN vc2hireso_obj "${VC2HI[@]}" ;;
-        vc2hiana) F=Vc2HiresoAnalysis.cpp; harnessParts XT_VC2HIRESO_MAIN vc2hireso_obj "${VC2HI[@]}" ;;
-        vc2hiobj) F=Vc2Hireso.cpp; harnessParts XT_VC2HIRESO_MAIN vc2hireso_obj "${VC2HI[@]}" ;;
-        vc2hisyn) F=Vc2HiresoSynth.cpp; harnessParts XT_VC2HIRESO_MAIN vc2hireso_obj "${VC2HI[@]}" ;;
-        vc2in) F=Vc2Unvoiced.cpp; harnessParts XT_VC2IN_MAIN vc2in_obj "${VC2IN[@]}" ;;
-        vc2out) F=Vc2Consonants.cpp; harnessParts XT_VC2IN_MAIN vc2in_obj "${VC2IN[@]}" ;;
-        vc2legacy) F=Vc2LegacyAnalysis.cpp; harnessParts XT_VC2LEGACY_MAIN vc2legacy_obj "${VC2LEG[@]}" ;;
-        vc2tables) F=Vc2LegacyTables.cpp; harnessParts XT_VC2LEGACY_MAIN vc2legacy_obj "${VC2LEG[@]}" ;;
-        vc2object) F=Vc2Legacy.cpp; harnessParts XT_VC2LEGACY_MAIN vc2legacy_obj "${VC2LEG[@]}" ;;
-        *) F=Vc2Params.cpp; harnessParts XT_VC2PARAMS_MAIN vc2_obj Vc2Params Vc2ParamsCheck XtFxValueText ;;
-    esac
+elif [[ "$PORT" =~ ^vc2 ]]; then   # rom.4's ports, on rom.4 (mutate_vc2ports.sh, v220)
+    vc2Port "$PORT"
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
     L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197

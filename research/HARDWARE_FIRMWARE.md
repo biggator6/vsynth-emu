@@ -1546,6 +1546,51 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The vocoder object (2026-11-15, v220) {#vc2-vocoder}
+
+Step 4's second part, ported bit for bit (`Vc2Vocoder`, Vc2Vocoder.cpp): the object read in "The vocoder object, read", with both engines and the input and output stages (`Vc2Unvoiced`) as its members. The port has the builder, the mode switch with HIRESO's hook, the settings path with the edit words, the block drivers, the pedal and the glue.
+- `Vc2Vocoder::w` is the object's words +0x00…+0x1c (`Vc2VocoderWords`). `engine`, its +0x20, points at `hireso` or `legacy`, or at nothing.
+- The hook is a member function the switch chooses: the block's input as given (LEGACY's), or the mic ring 128 samples back (HIRESO's).
+- The edit page's words are `Vc2VocoderEdit`: 0x1c bytes at `0x8994025c`, the two ratios, the two pivots, the two offsets, then the flag. They start as rom.4's .data holds them: ratios 1, pivots 12, offsets 0, the flag clear.
+
+**Its tables** (`Vc2VocoderTables`, read by `loadVc2` at the start through `vc2LoadVocoder`) are the routines' pool words:
+- the builder's gain, 0.3 (`0x893f0630`);
+- the drivers' 2^31 on the gain (`0x893f063c`);
+- the glue's glide, 0.3 (`0x893f08ec`), and its least ratio, 0.5 (`0x893f08f8`);
+- A440's period, 100.227 (`0x893f09f8`), which the file's static initializer `0x893f09b0` writes to `0x899d9d90`, where the glue reads it;
+- the edit words' start.
+
+**The static initializers.** A fresh interpreter's C startup doesn't run rom.4's static initializers (the list at `0x898c60a0`). So `0x899d9d90`, and the glue's q with it, reads 0 until `0x893f09b0` has run. The check runs it, then the builder.
+
+**Running it settled two things the reading left open:**
+- With no engine the glue returns before the gain's glide, so a gain HIRESO left stays while the vocoder is off. A plant that glides first is caught.
+- With no engine the drivers don't run the input stage either. A plant that runs it is caught.
+
+The reading's one unclear line is now plain: with both offsets 0 the glue gives slot 4 each side's own ratio, +0x04 to side 0 and +0x08 to side 1 (VC2_VOCAL_DESIGNER.md says the same).
+
+**The check, `xt_vc2vocoder <rom.4> [cases] [seed]`** (in fcheck, about 4 s; Vc2VocoderCheck.cpp, XT_VC2VOCODER_MAIN). It runs rom.4's static object after the static initializer and the builder, and the port's built once.
+- Each case resets the input stage on both, then runs 400 blocks of Vc2Signal's mic. The carriers go through the mono driver in the even cases and the stereo in the odd ones, which have a right carrier of their own.
+- Before each block: the glue on both, with a drawn scale (1 three times in four) and a tracker's period of 20…420 samples written to `0x899d9bd0` (what `0x893ee010` returns); the output stage's level word `0x89997298` drawn; the mic written into both mic rings where `0x893ed410` says.
+- One block in ten, an event before it:
+  - a mode switch: 0, 1 or 2, and one in eight 3, no mode;
+  - the settings path, twice as often as the others: a drawn struct, every word;
+  - the pedal;
+  - the edit words: the flag, or a side's three, with sides 0…2.
+- After every event and block, word for word (Vc2CheckWords): the frames, the vocoder's words, the engine's and the hook's words, the edit words, both engines' objects and analyses, and the stages' words. The stages' buffers are compared at a case's end.
+
+Results:
+- seed 2024: 40 cases (20 stereo), 16,000 blocks (9,416 playing), 324 modes, 649 settings, 318 pedals, 356 edits, 0 different;
+- seed 7: 0 different (9,790 playing);
+- `mutate_vc2.py --vocoder`: 45 plants (40 in Vc2Vocoder.cpp, 5 in Vc2VocoderTables.cpp), all caught;
+- the other lists again, as the checks' shared rig changed (`vc2BothOn`, an event on both): the parameters' 10, `--in` 66, `--legacy` 114 and `--hireso` 190, all caught.
+
+Not planted, as no input tells them apart:
+- the builder's mode word at 0 before its switch (the switch then does nothing, which leaves what it would have written);
+- the builder's gain read from another word (it is 0.3 × +0x1c, which the switch to off has just made 0);
+- Unvoice Level × Depth in the other order, and the glue's d + −1 as d − 1 (the same numbers).
+
+The vocoder is not in the sound yet. Later steps feed it: the VOCODER OSC's carrier (step 5), the tracker's period (step 6), the part mixer's mic ring (step 8), and its place after the part's mix, with CC 64 to the pedal (the wiring).
+
 ### The vocoder object, read (2026-11-15, v219) {#vc2-vocoder-object}
 
 Step 4's first part. These are the routines of the vocoder object (static at `0x89999758`, 0x5a78 bytes), read here; v220 ports and runs them.
@@ -1594,7 +1639,7 @@ Step 4's first part. These are the routines of the vocoder object (static at `0x
 
 **The pedal, `0x893f0770(vocoder, value)`:** the engine's slot 6.
 
-**The glue, `0x893f07a0(vocoder, fr4)`.** Each block, it moves the gain: gain += 0.3·(target × fr4 − gain). With both offsets 0 it runs slot 4 on side 0 with ratio 0 and side 1 with ratio 1. Otherwise:
+**The glue, `0x893f07a0(vocoder, fr4)`.** Each block, it moves the gain: gain += 0.3·(target × fr4 − gain). With both offsets 0 it runs slot 4 on side 0 with the ratio at +0x04 and on side 1 with the one at +0x08 (v220: run so). Otherwise:
 - q = `0x899d9d90` (100.227, A440's period in samples at 44.1 kHz) ÷ the tracker's period (`0x893ee010`);
 - d = min(q, 2) − 1 for q ≥ 1, else max(2q − 1, 0) − 1;
 - each side's ratio + offset·d is held to [0.5, 2] and given to slot 4.

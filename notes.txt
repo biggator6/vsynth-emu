@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The vocoder object v220 (2026-11-15, on vc2-mode): step 4's second part (the user's "Yes, next item";
+  HARDWARE_FIRMWARE.md, "The vocoder object"). Vc2Vocoder: rom.4's static object (0x89999758) with both engines and
+  the stages as members: the builder (0x893f0490), the mode switch (0x893f0600) with HIRESO's hook, the mic ring 128
+  samples back (0x893ed420), the settings path (0x893f06a0) with the edit page's words (0x8994025c, 0x893f0960,
+  0x893f0970), the block drivers (0x893f0510, 0x893f0580), the pedal (0x893f0770) and the glue (0x893f07a0). Its
+  tables (Vc2VocoderTables: the pools' 0.3, 2^31, 0.3, 0.5, A440's period, the edit words' start) are read by
+  loadVc2, with a rom4-no-vocoder plant. xt_vc2vocoder (Vc2VocoderCheck.cpp, in fcheck, about 4 s): rom.4's object
+  after its static initializer (0x893f09b0, which a fresh interpreter's startup doesn't run) and the builder, 40 cases
+  of 400 blocks, mono and stereo, with mode switches, settings, the pedal and edits between; every word of both
+  engines, the stages and the frames after each; 0 different at seeds 2024 and 7. mutate_vc2.py --vocoder, 45 plants,
+  caught; the other lists again (the parameters' 10, --in 66, --legacy 114, --hireso 190), caught. mutate.sh's rom.4
+  ports moved as a table into mutate_vc2ports.sh (vc2Port). vc2BothOn (Vc2CheckRig.h): an event on both. Not in the
+  sound yet. Step 4 done; next, step 5, the VOCODER OSC's carrier.
+
 The vocoder object's ground v219 (2026-11-15, on vc2-mode): step 4's first part (the user's "Yes, next item"; step 4
   split in two; HARDWARE_FIRMWARE.md, "The vocoder object, read"). The engines are one interface, Vc2Engine
   (Vc2Engine.h): rom.4's base class by its eight slots, which Vc2Legacy and Vc2Hireso implement. LEGACY's slot 1 reads

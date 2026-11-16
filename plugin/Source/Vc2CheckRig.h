@@ -178,6 +178,16 @@ std::string vc2AnalysisCase(Vc2Fw& fw, Port& port, Difference difference, Vc2Cas
     return what;
 }
 
+// An event on both (v220): rom.4's `routine` on `args` and the port's `mine()`, then `differs()`; that the routine
+// `name`d faulted, or what differs, or nothing
+template <class Mine, class Differs>
+std::string vc2BothOn(Vc2Fw& fw, uint32_t routine, std::initializer_list<uint32_t> args, const char* name, Mine mine,
+                      Differs differs) {
+    if (!fw.call(routine, args)) return std::string(name) + " faults: " + fw.cpu.error();
+    mine();
+    return differs();
+}
+
 // One of the port's buffers against rom.4's at `at`
 inline std::string vc2BufferDifference(Vc2Fw& fw, uint32_t at, const std::vector<float>& mine, const char* what) {
     return vc2FirstDifference(fw, at, mine.data(), mine.size() * sizeof(float), what);

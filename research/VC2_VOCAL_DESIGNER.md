@@ -653,7 +653,8 @@ host's powf but for two (v = 31, 87) 2 ulp low, as round-to-zero gives; other ba
 `0x89509b80` and sets an error word (`0x89add990`, 1100 or 1101) on an infinite or NaN result. So Formant Shift 64 is 1 exactly,
 60…68 (0.957…1.045) fall in the blend, and 0 and 1 both give ½.
 
-What the glue gives slot 4 (`0x893f07a0`, read, not run): it calls slot 4 twice a block, side 0 then side 1. With the vocoder's
+What the glue gives slot 4 (`0x893f07a0`, read, not run; run and ported bit for bit in v220, HARDWARE_FIRMWARE.md, "The
+vocoder object"): it calls slot 4 twice a block, side 0 then side 1. With the vocoder's
 +0xc and +0x10 (the EXT IN path's template offsets) both 0, a side gets +4 or +8, both the Formant Shift ratio. Otherwise q =
 `0x899d9d90` over the pitch tracker's period (`0x893ee010`), d = min(q, 2) − 1 for q ≥ 1 and max(2q − 1, 0) − 1 below, and the
 sides get +4 + (+0xc)·d and +8 + (+0x10)·d, each held to [0.5, 2]. Before that it glides the consonant gain, +0x14 += 0.3·

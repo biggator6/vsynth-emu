@@ -9,7 +9,9 @@
 # Vc2HiresoAnalysis.cpp, Vc2Hireso.cpp and Vc2HiresoSynth.cpp (PORT=vc2warp, vc2hitables, vc2rate, vc2hiana, vc2hiobj,
 # vc2hisyn: HIRESO's formant warp, v213, rate filters, v214, analysis, v215, object, v216, and mono synthesis, v217),
 # through xt_vc2hireso, [cases] its share of the
-# ratios' grid (8: every fifth) and its other parts' cases.  One line
+# ratios' grid (8: every fifth) and its other parts' cases.  --vocoder: vc2voc_muts.txt, in Vc2Vocoder.cpp and
+# Vc2VocoderTables.cpp (PORT=vc2voc, vc2voctables: the vocoder object, v220), through xt_vc2vocoder, [cases] its cases
+# (8).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist
@@ -22,6 +24,8 @@ HARNESSES = {
                                  'XT_VC2LEGACY_STOP'), '8'),
     '--hireso': (mutlist.Harness('mutate_vc2', 'xt_vc2hireso', 'vc2hireso_muts.txt', ('vc2warp', '2024'),
                                  'XT_VC2HIRESO_STOP'), '8'),
+    '--vocoder': (mutlist.Harness('mutate_vc2', 'xt_vc2vocoder', 'vc2voc_muts.txt', ('vc2voc', '2024'),
+                                  'XT_VC2VOCODER_STOP'), '8'),
 }
 args = sys.argv[1:]
 switch = args.pop(0) if args and args[0] in HARNESSES else ''

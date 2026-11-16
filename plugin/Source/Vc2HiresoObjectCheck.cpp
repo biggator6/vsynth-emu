@@ -73,9 +73,8 @@ std::string settingsOn(Vc2Fw& fw, Vc2Hireso& e, std::mt19937& rng, Counts& n) {
 std::string holdOn(Vc2Fw& fw, Vc2Hireso& e, std::mt19937& rng, Counts& n) {
     ++n.holds;
     const int controller = vc2DrawController(rng);
-    if (!fw.call(kHold, { kObjAt, (uint32_t)controller })) return "the hold faults: " + fw.cpu.error();
-    e.hold(controller);
-    return hiresoDifference(fw, e);
+    return vc2BothOn(fw, kHold, { kObjAt, (uint32_t)controller }, "the hold", [&] { e.hold(controller); },
+                     [&] { return hiresoDifference(fw, e); });
 }
 
 std::string warpOn(Vc2Fw& fw, Vc2Hireso& e, std::mt19937& rng, Counts& n) {

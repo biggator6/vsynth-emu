@@ -173,6 +173,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2HiresoAnalysis.cpp
     Source/Vc2Hireso.cpp
     Source/Vc2HiresoSynth.cpp
+    Source/Vc2Vocoder.cpp
+    Source/Vc2VocoderTables.cpp
     Source/XtBuildId.cpp
 )
 

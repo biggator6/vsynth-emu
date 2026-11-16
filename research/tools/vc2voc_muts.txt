@@ -1,0 +1,52 @@
+# Planted errors in the vocoder object's port, for mutate_vc2.py --vocoder: each must make xt_vc2vocoder, on rom.4, say
+# something differs.  name|old|new[|port[|seed]]; ports vc2voc (Vc2Vocoder.cpp, v220) and vc2voctables
+# (Vc2VocoderTables.cpp).
+# Not planted, as no input tells them apart: the builder's mode word at off before its switch (the switch then does
+# nothing, leaving what it would have written); the builder's gain read from another word (it is 0.3 × hiresoOn, which
+# the switch to off has just made 0); Unvoice Level × Depth in the other order, the glue's sum in the other order, and
+# d + −1 as d − 1 (the same numbers); the glue's bound at q = 2 inclusive (no period gives q exactly 2).
+ctor-ratios|    w.ratio[0] = w.ratio[1] = 1.0f;|    w.ratio[0] = w.ratio[1] = 0.5f;
+ctor-gain|    w.gain = mul(xtf::flt(w.hiresoOn), vc2VocoderTables().buildGain);|    w.gain = vc2VocoderTables().buildGain;
+mode-same-again|    if (w.mode == mode) return;|    if (false) return;
+mode-hireso-off|    if (mode < kLegacy \|\| mode > kHireso) {|    if (mode < kLegacy \|\| mode >= kHireso) {
+mode-hook-given|    hook = mode == kHireso ? &Vc2Vocoder::latencyBack : &Vc2Vocoder::asGiven;|    hook = &Vc2Vocoder::asGiven;
+mode-hireso-on|    w.hiresoOn = mode == kHireso ? 1 : 0;|    w.hiresoOn = mode == kLegacy ? 1 : 0;
+mode-no-reset|    engine->reset();\n|
+latency-short|    int at = stage.s.micIndex - kHiresoLatency;|    int at = stage.s.micIndex - kHiresoLatency + 32;
+latency-no-wrap|    if (at < 0) at += Vc2Unvoiced::kMicRing;|    if (at < 0) at = 0;
+edit-ratio-plain|            w.ratio[side] = edit.ratio[side];|            w.ratio[side] = in.ratio[side];
+edit-offset-always|            w.offset[side] = in.offset[side] == 0.0f ? 0.0f : edit.offset[side];|            w.offset[side] = edit.offset[side];
+edit-pivot-template|            in.pivot[side] = edit.pivot[side];|            in.pivot[side] = -1;
+edit-template-0|        in.formantTemplate = kEditTemplate;|        in.formantTemplate = 0;
+plain-pivot-0|            in.pivot[side] = -1;   // the template's|            in.pivot[side] = 0;   // the template's
+target-legacy|    w.target = mul(mul(in.unvoiceLevel, in.depth), xtf::flt(w.hiresoOn));|    w.target = mul(in.unvoiceLevel, in.depth);
+stage-spread-0|    stage.settings(in.detect, in.spread, in.soundLevel);|    stage.settings(in.detect, 0, in.soundLevel);
+settings-engine-none|    if (engine) engine->settings(in);|    if (false) engine->settings(in);
+block-stage-off|    if (!engine) return;\n    stage.block(in);|    if (!engine) {\n        stage.block(in);\n        return;\n    }\n    stage.block(in);
+block-voiced-never|    engine->analyze((this->*hook)(in), stage.voiced());|    engine->analyze((this->*hook)(in), false);
+block-stereo-mono|    if (channels == 1) {|    if (channels != 0) {
+block-gain-unscaled|mul(w.gain, vc2VocoderTables().gainScale)|w.gain
+block-level-1|    const float level = engine->holdLevel();|    const float level = 1.0f;
+block-levelmod-0|level, levelMod);|level, 0.0f);
+hold-none|    if (engine) engine->hold(controller);|    if (false) engine->hold(controller);
+glue-gain-off|    if (!engine) return;\n    const Vc2VocoderTables& tb = vc2VocoderTables();\n    w.gain = add(mul(sub(mul(w.target, scale), w.gain), tb.glide), w.gain);|    const Vc2VocoderTables& tb = vc2VocoderTables();\n    w.gain = add(mul(sub(mul(w.target, scale), w.gain), tb.glide), w.gain);\n    if (!engine) return;
+glue-no-scale|sub(mul(w.target, scale), w.gain)|sub(w.target, w.gain)
+glue-left-offset|    if (w.offset[0] == 0.0f && w.offset[1] == 0.0f) {|    if (w.offset[0] == 0.0f) {
+glue-plain-left|engine->formant(side, w.ratio[side]);|engine->formant(side, w.ratio[0]);
+glue-q-inverse|xtf::div(tb.periodA440, period)|xtf::div(period, tb.periodA440)
+glue-q-unbounded|        d = kMaxRatio;|        d = q;
+glue-below-plain|        d = sub(q, sub(1.0f, q));|        d = q;
+glue-below-mirror|        if (0.0f > d) d = 0.0f;|        if (0.0f > d) d = sub(0.0f, d);
+glue-d-half|    d = add(d, -1.0f);|    d = add(d, -0.5f);
+glue-ratio-1|        float ratio = add(mul(w.offset[side], d), w.ratio[side]);|        float ratio = add(mul(w.offset[side], d), 1.0f);
+glue-max-1.5|            ratio = kMaxRatio;|            ratio = 1.5f;
+glue-min-quarter|            ratio = tb.minRatio;|            ratio = 0.25f;
+glue-side-left|        engine->formant(side, ratio);|        engine->formant(0, ratio);
+edit-side-left-only|    if (side < 0 \|\| side >= kSides) return;|    if (side < 0 \|\| side >= 1) return;
+edit-pivot-side|    edit.pivot[side] = pivot;|    edit.pivot[side] = side;
+edit-offset-ratio|    edit.offset[side] = offset;|    edit.offset[side] = ratio;
+table-edit-at|constexpr uint32_t kEditAt = 0x8994025c;|constexpr uint32_t kEditAt = 0x89940260;|vc2voctables
+table-gain-scale|{ kGainScale, &gainScale }|{ kGlide, &gainScale }|vc2voctables
+table-glide|{ kGlide, &glide }|{ kMinRatio, &glide }|vc2voctables
+table-min-ratio|{ kMinRatio, &minRatio }|{ kGlide, &minRatio }|vc2voctables
+table-period|{ kPeriodA440, &periodA440 }|{ kGainScale, &periodA440 }|vc2voctables

@@ -14,6 +14,7 @@
 #include "../Source/Vc2LegacyTables.h"
 #include "../Source/Vc2Params.h"
 #include "../Source/Vc2Unvoiced.h"
+#include "../Source/Vc2VocoderTables.h"
 #include "../Source/XtFirmware.h"
 #include <cstdint>
 #include <cstdio>
@@ -52,11 +53,12 @@ juce::File otherImage(const juce::File& rom, const juce::File& work) {
 
 // rom.4's tables, which its loader reads at the start: the parameters' (v199), each bank's last ID, the last name and a
 // value's text (Vc2Params.h), the unvoiced detector's coefficients (v208, Vc2Unvoiced.h), LEGACY's tables (v210,
-// Vc2LegacyTables.h) and HIRESO's (v213, Vc2HiresoTables.h); what they say is xt_vc2params', xt_vc2in's, xt_vc2legacy's
-// and xt_vc2hireso's to check
+// Vc2LegacyTables.h), HIRESO's (v213, Vc2HiresoTables.h) and the vocoder object's (v220, Vc2VocoderTables.h); what
+// they say is xt_vc2params', xt_vc2in's, xt_vc2legacy's, xt_vc2hireso's and xt_vc2vocoder's to check
 bool vc2TablesIn() {
     return vc2ParamDesc(kVc2FirstTyped - 1) && vc2TypedDesc(kVc2Ids - 1) && !vc2ParamName(kVc2Ids - 1).empty()
-           && !vc2ValueText(0, 0).empty() && vc2UnvoicedLoaded() && vc2LegacyLoaded() && vc2HiresoLoaded();
+           && !vc2ValueText(0, 0).empty() && vc2UnvoicedLoaded() && vc2LegacyLoaded() && vc2HiresoLoaded()
+           && vc2VocoderLoaded();
 }
 
 // An instance given `file` by `choose` should refuse it, its status saying `says`
@@ -77,7 +79,8 @@ void twoImages(TestChecks& check, const juce::File& rom, const juce::File& work,
           "rom.4 should be beside rom.2, and the test's file written: " + vc2.getFullPathName().toStdString());
     check(VSynthEmuProcessor().hasVc2Rom(), "rom.4 should be found beside the rom.2 an instance opened");
     check(vc2TablesIn(),
-          "rom.4's tables (v199's parameters, v208's detector, LEGACY's, HIRESO's) should be in once rom.4 is");
+          "rom.4's tables (v199's parameters, v208's detector, LEGACY's, HIRESO's, the vocoder's) should be in once "
+          "rom.4 is");
     refuses(check, &VSynthEmuProcessor::setRomFile, vc2, "the VC-2's image, rom.4",
             "rom.4 should be refused as rom.2, saying whose it is");
     refuses(check, &VSynthEmuProcessor::setVc2RomFile, rom, "the V-Synth's image, rom.2",
