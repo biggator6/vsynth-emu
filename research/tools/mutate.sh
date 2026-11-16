@@ -81,6 +81,7 @@ tonefile() {
 }
 source "$(dirname "$0")/mutate_parts.sh"   # harnessParts, fxParts: a harness's kept objects (moved as they stood, v208)
 source "$(dirname "$0")/mutate_vc2ports.sh"   # vc2Port: rom.4's ports and their checks (moved as they stood, v220)
+source "$(dirname "$0")/vc2_tables.sh"   # vc2Tables: rom.4's tables, which XtSynthRom.cpp loads (v231)
 TF=$(tonefile "${PORT:-cosm}")
 if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once)
     F=$TF
@@ -93,9 +94,9 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
            XtOsc XtCosm XtAnalog XtFirmware XtFwMachine Sh4Interp Sh4Setup XtFiles XtWaveFile XtDiskImage XtPatchStore
            XtPatch XtSynthRom XtSynthArp XtArpeggio XtArpeggioStep XtArpeggioMotifs XtTempoTicks XtArpeggioPatch
            XtSynthZones XtSynthNotes XtSynthUpdate XtSynthKnobs XtSynthEnvKnobs XtSynthMsm XtMsm XtMsmTrack XtMsmPatch
-           XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds Vc2Params XtFxValueText Vc2Unvoiced
+           XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds
            XtSynthStart XtSynthOscStart XtSynthTrip XtSynthBlock XtSynthTva XtSynthClock XtExtIn XtSynthOut XtSinc
-           Vc2LegacyAnalysis Vc2LegacyTables Vc2HiresoTables)
+           $(vc2Tables "$S"))   # rom.4's tables, which XtSynthRom.cpp loads: vc2_tables.sh's list (v231)
     TONE=(-DXT_TONE_MAIN -DXT_TONE_CHECK -DXT_HARNESS_SWITCHES)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue

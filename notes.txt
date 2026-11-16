@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's tables in one list v231 (2026-11-16, on vc2-mode; a side session's task from the VC-2 session, v230's "Left"):
+  the files of the tables XtSynthRom.cpp's loadVc2 loads were listed three times, build.sh's V4, ab.sh's synth() and
+  mutate.sh's tone parts, and mutate.sh's lacked every loader from v220 on. Its kept XtSynthRom.o, from before v220,
+  linked; built again (a fresh worktree, or any header newer than it), the clean run of mutate_tone.py failed to link
+  on vc2LoadVocoder, Carrier, Tracker, Kind6, AutoNote, Mixer and Osc, so no tone plant ran. Now one list,
+  research/tools/vc2_tables.sh (VC2_TABLES, a row a loader: its file, then what it needs; vc2Tables <dir> [suffix],
+  the rows a tree has, by its loader's file, as ab.sh's older revisions have fewer), which the three take. build.sh's
+  V4 is the same fourteen files in the same order. Measured: mutate_tone.py 2000 with tone_sw_obj built from nothing
+  (65 objects): its clean runs (default, EXT IN, MSM) 0 different, and seven plants caught, 7 of 7, one a route:
+  tva-truncate (XtSynth.cpp), lfo-pitch-depth (the knobs), voice-end (the TVA), tempo-tenths (the clock),
+  check-zone-start (a header's: every part built again from a copy), extin-glide (EXT IN) and msm-edit-ignored (MSM).
+  A VC-2 port's new loader goes into vc2_tables.sh, as its call goes into loadVc2 (CLAUDE.md).
+
 The VC-2's OSC voice v230 (2026-11-16, on vc2-mode): step 4.2's first part (from the user's "next item", by the
   session that started this one; HARDWARE_FIRMWARE.md, "The VC-2's OSC voice"). The OSC voice split by what rom.4
   holds (the plan): its frame now; then its note-on by kind with the pitch and gain targets, the portamento, the

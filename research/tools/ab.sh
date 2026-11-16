@@ -4,6 +4,7 @@
 # the environment.  One line: "n/4 identical", or each difference in dB.  The TVA
 # Switch is on unless XT_TVA_ON=0, so that the renders go through the TVA.
 source "$(dirname "$0")/env.sh"
+source "$(dirname "$0")/vc2_tables.sh"   # vc2Tables: rom.4's tables, which XtSynthRom.cpp loads (v231)
 export XT_TVA_ON="${XT_TVA_ON:-1}"
 REV=${1:-HEAD}; A="$WORK/ab"; mkdir -p "$A"
 [ -f "$WORK/inputs/vocal.bin" ] || "$PY" "$REPO/research/tools/make_inputs.py" "$WORK/inputs" > /dev/null
@@ -25,10 +26,7 @@ synth() { (cd "$1" && cc XtSynth.cpp $(have XtSynthRom.cpp) \
            $(have XtSynthMsm.cpp XtMsm.cpp XtMsmTrack.cpp) \
            $(have XtSynthStart.cpp XtSynthOscStart.cpp XtSynthTrip.cpp XtSynthBlock.cpp) \
            $(have XtSynthTva.cpp XtSynthClock.cpp XtExtIn.cpp) $(have XtSynthOut.cpp) $(have XtSinc.cpp) \
-           $(have Vc2Params.cpp Vc2Unvoiced.cpp Vc2LegacyAnalysis.cpp Vc2LegacyTables.cpp Vc2HiresoTables.cpp) \
-           $(have Vc2VocoderTables.cpp Vc2CarrierTables.cpp Vc2TrackerTables.cpp Vc2Kind6Tables.cpp Vc2Math.cpp) \
-           $(have Vc2AutoNoteTables.cpp) $(have Vc2PartMixerTables.cpp) $(have Vc2OscTables.cpp) \
-           $( [ -f Vc2Params.cpp ] && echo XtFxValueText.cpp XtPatchStore.cpp ) \
+           $(vc2Tables . .cpp) $( [ -f Vc2Params.cpp ] && echo XtPatchStore.cpp ) \
            Sh4Interp.cpp $(have Sh4Setup.cpp) -o "$2"); }
 rm -f "$A/old" "$A/new"; synth "$A/src/plugin/Source" "$A/old"; synth "$REPO/plugin/Source" "$A/new"
 [ -x "$A/old" ] && [ -x "$A/new" ] || { echo "ab: build failed"; exit 1; }

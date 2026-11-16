@@ -26,20 +26,10 @@ SARP+=($( [ -f XtSynthBlock.cpp ] && echo XtSynthStart.cpp XtSynthOscStart.cpp X
 SARP+=($( [ -f XtExtIn.cpp ] && echo XtExtIn.cpp ))   # the EXT IN OSC's player and input (v203)
 SARP+=($( [ -f XtSynthOut.cpp ] && echo XtSynthOut.cpp ))   # its output, busOut and render (v204)
 SARP+=($( [ -f XtSinc.cpp ] && echo XtSinc.cpp ))   # render's windowed sinc, its own file (v207)
-# rom.4's parameters, which XtSynthRom.cpp loads (v199), and what they read with: the values' text, the descriptors' form;
-# and the unvoiced detector's coefficients (v208), LEGACY's tables (v210; their own file from v211) and HIRESO's (v213),
-# which it loads too
-V4=($( [ -f Vc2Params.cpp ] && echo Vc2Params.cpp XtFxValueText.cpp )
-    $( [ -f Vc2Unvoiced.cpp ] && echo Vc2Unvoiced.cpp ) $( [ -f Vc2LegacyAnalysis.cpp ] && echo Vc2LegacyAnalysis.cpp )
-    $( [ -f Vc2LegacyTables.cpp ] && echo Vc2LegacyTables.cpp )
-    $( [ -f Vc2HiresoTables.cpp ] && echo Vc2HiresoTables.cpp )
-    $( [ -f Vc2VocoderTables.cpp ] && echo Vc2VocoderTables.cpp )
-    $( [ -f Vc2CarrierTables.cpp ] && echo Vc2CarrierTables.cpp )
-    $( [ -f Vc2TrackerTables.cpp ] && echo Vc2TrackerTables.cpp )
-    $( [ -f Vc2Kind6Tables.cpp ] && echo Vc2Kind6Tables.cpp Vc2Math.cpp )
-    $( [ -f Vc2AutoNoteTables.cpp ] && echo Vc2AutoNoteTables.cpp )
-    $( [ -f Vc2PartMixerTables.cpp ] && echo Vc2PartMixerTables.cpp )
-    $( [ -f Vc2OscTables.cpp ] && echo Vc2OscTables.cpp ))
+# rom.4's tables, which XtSynthRom.cpp loads (v199 on), and what they read with: vc2_tables.sh's list (v231); the
+# descriptors' form, XtPatchStore.cpp, is with each program's own
+source "$REPO/research/tools/vc2_tables.sh"
+V4=($(vc2Tables . .cpp))
 rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
 rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,xt_vc2in,xt_vc2legacy,xt_vc2hireso,xt_vc2vocoder}
 rm -f "$O"/{xt_vc2carrier,xt_vc2tracker,xt_vc2kind6,xt_vc2autonote,xt_vc2mixer,xt_vc2tone,xt_vc2osc,classifier_test,rd}

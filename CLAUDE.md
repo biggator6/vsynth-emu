@@ -149,7 +149,9 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`; its se
   `RomInUse` by that rule; a file of the other image, or of neither, is refused, saying so. rom.4 is found beside the rom.2
   an instance opens, then where rom.2 is looked for (`PluginRom.cpp`); no port reads it yet. The plugin loads both images
   at its start, so switching modes is seamless (the user's decision, 2026-11-14): a VC-2 port's tables go in rom.4's
-  loader (`loadVc2`), read at that start, never at a switch.
+  loader (`loadVc2`), read at that start, never at a switch; and its file in `research/tools/vc2_tables.sh` (v231), the
+  one list every program linking XtSynthRom.cpp takes (build.sh's xt_synth, xt_tone and xt_vc2params, ab.sh, mutate.sh's
+  tone ports): a loader missing there links until a kept XtSynthRom.o is built again.
 - An image maps at 0x89300000 as its own header lays it out (v197; HARDWARE_FIRMWARE.md, "A firmware image's own
   header"): rom.2's .data/.bss up to 0x8a020000, rom.4's to 0x8a200000 (the interpreter sets them up, `Sh4::image()`
   says where). Calls take r4–r7, then the stack; `Sh4::call(addr, {args}, sp)`.
