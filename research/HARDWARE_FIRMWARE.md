@@ -1546,6 +1546,70 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM object's frame (2026-11-17, v249) {#vc2-cosm-object-frame}
+
+Step 4.2's COSM object in the tone, its first part (research/VC2_MODE_PLAN.md; the VC-2 session's message, 2026-11-17). rom.4's COSM object is rom.2's: the same routines in the same order, the Growl at code 9 in the Comb's place. Split by what rom.4 holds, as XtCosm splits rom.2's by type: this version the frame that every type shares, ported bit for bit in Vc2CosmObject.cpp; the note-on and new block (v250), then the update and the DSP. Every address is rom.4's, every offset the object's (D = object + 0x58, as rom.2's).
+
+**The object** (`Vc2CosmObjectWords`, 0x164 bytes; two to a tone at +0x1728 and +0x188c; `Vc2CosmGrowlWords` is the Growl's view of the same bytes):
+
+| Offset | What | Whose |
+|---|---|---|
+| +0x000…+0x00f | the set-up's struct: the OSC's +0x1cc (the pitch, which the update writes again), its +0xa80, the flag as 0 or 1, a fourth word | the set-up |
+| +0x010…+0x057 | the block: its code, then the type's words; the install reads its byte +0x14 and word +0x44 | the converters, the note-on and new block |
+| +0x058 | D+0, the code's byte, which the install switches on | the note-on |
+| +0x05c…+0x13f | D+4…, the type's state; the held levels +0x104…+0x110 and the envelopes' rates × 4 +0x11c, +0x120 | the note-on and update |
+| +0x140, +0x144 | the buffer pool a slot came from, and the slot (−1 none) | the note-on's allocator, the destructor |
+| +0x148 | the DSP routine | the install |
+| +0x14c | the install's float for the type and variant | the install; 0 from the constructor |
+| +0x150…+0x15f | envelopes A and B, LFOs A and B: the update reads their +0x4c and +0x54, and +0x38 | the binding |
+| +0x160 | the vtable, `0x898cd478` | the constructor |
+
+**The constructor** `0x893aa030(obj)`: given none, operator new (`0x89506df4`) makes 0x164 bytes; then the vtable and +0x14c 0. The port takes an object in place.
+
+**The set-up** `0x893aa590(obj, struct, flag)` copies the struct's four words, then writes +8 as 1 if the flag is set, else 0. **The binding** `0x893aa7b0(obj, a, b, c, d)` writes the four words, d from the caller's stack.
+
+**The install** `0x893aafe0(obj, flag)` is rom.2's chooser `0x894eef70`:
+- The DSP routine at +0x148: with the flag set, from the stereo table `0x8993fba4`, else the mono table `0x8993fb50`. It reads the table by the code byte as a signed byte, before any test, so a code past 20 reads what lies around the tables.
+- For codes 0…20, a float at +0x14c from 28 for the mono types and variants at `0x895423b4`, then the stereo's 28 straight after (`0x89542424`):
+
+  | Code | Float |
+  |---|---|
+  | 0, 1, 2 | its own, 0…2 |
+  | 3, the Wave Shaper | 3, or 4 for a Type byte (+0x14) of 3 and up |
+  | 4, the Amp Simulator | 5 + its Type byte (+0x14) |
+  | 5…12 (9 the Growl) | 8…15 |
+  | 13, the TVF; 14, the Dynamic TVF | 16 or 19 + the Filter Type (+0x44) / 5, toward zero |
+  | 15…20 | 22…27 |
+
+  The / 5 is a multiply by 0x66666667 and one arithmetic shift of the high word, with the sign bit added. I first took it for / 10, and the check showed index 17 for 18.
+- It returns 1 with the flag set; without it, whether the code byte is 10 (no converter writes 10). That's the flag COSM 2's install takes in Types 1 and 2 (rom.2's "What the chooser returns").
+
+The port reads the two routine tables 128 words either side of their starts and the floats as far as the stereo Amp's at a Type byte of 255 (`Vc2CosmObjectPool`, in Vc2CosmTables, read by `vc2LoadCosm`).
+
+**Found for the next part:**
+- The destructor `0x893aa060` frees the object's slot: by +0x140, `0x89999294` or `0x89999474` + 20 × the slot's word cleared.
+- The pools' static initializer `0x893ab550` runs `0x893a8480` on each.
+- The note-on `0x893aa0e0` clears D's floats, takes the code into +0x10 and its byte into +0x58, sets +0x5c to 3266, then calls the allocator `0x893a8c50` and the start values `0x893a85f0` (with the four bindings on the stack). It holds the bound envelopes' and LFOs' levels and the envelopes' rates × 4, calls the new block `0x893aa5d0`, and switches on the code to each type's start (the Growl's `0x893b9d30`).
+- The new block does nothing unless the block's code is the object's and ≤ 20, then jumps to the type's routine (`0x893a8e50`…, inline for 5 and 15, the Growl's `0x893b9dc0`).
+- The update `0x893aa7d0(obj, pitch)` holds the levels and rates, writes the pitch, and runs each code's case inline (the Growl's `0x893b9d40`).
+
+**The check**, xt_vc2cosm's fifth part (Vc2CosmObjectCheck.cpp), with nothing hooked:
+- rom.4's four routines and the port's on an object in RAM.
+- 60 events a case: the constructor, a set-up (a drawn struct, the flag 0, 1 or any word), a binding (its fourth word on the stack), the install (half the events), or the object drawn again.
+- The install's inputs drawn: the code byte mostly 0…20, now and then any; the Type byte mostly 0…2, now and then 3 (the Wave Shaper's step), up to 22 or any; the Filter Type mostly 0…14, now and then anywhere the floats reach (−84…1,209).
+- After each: the object word for word and, where rom.4 answers, the answer. The set-up's part's routine-on-both is now one template with this part's, `vc2CosmBoth`.
+
+Results:
+- seed 2024, 40 cases: 2,400 events, 1,204 installs (815 with the flag), 321 constructs, 308 set-ups, 313 bindings; 0 different. The other four parts are as they were.
+- seeds 7 and 31337, 400 cases each: 24,000 events each (12,097 and 12,006 installs); 0 different.
+- Coverage, llvm-cov on fcheck's 40 cases: every line of Vc2CosmObject.cpp but the one after its switch, which no kind reaches; the floats' guard is never false. In Vc2CosmTables.cpp everything but `vc2CosmLoaded`, which RomTest calls.
+- `mutate_vc2.py --cosm`: 776 plants, all caught.
+  - 32 are new: 28 on the frame (the vtable and the constructor's two words, the set-up's copy and flag, the binding's order, the switch's last code, the return's code and both its sides, the curve's step, the fives and their sign, nine of the cases' rows, the Type's add, the flag's test, the tables' choice, the code 0 test, the stereo offset) and 4 on the install's tables.
+  - The first run missed one: the Wave Shaper's step at Type 3 tested as > 3, since a Type byte of exactly 3 almost never came up. It is closed by drawing 3. One plant, the switch's last code at 19, didn't compile (the cases' table is sized by it), and is planted on the test instead.
+  - Not planted: the routine tables read by a signed byte made unsigned (an index past the table, out of bounds rather than a difference), and the floats' guard. vc2cosm_muts.txt says why.
+- The loader plants, as Vc2CosmTables.cpp changed: `mutate_panel.py rom4-no-cosm rom4-no-tables`, 2 of 2 caught.
+- fcheck's diff is xt_vc2cosm's new `object:` line. verify.sh passes every line.
+
 ### The VC-2's analog install, update and settings (2026-11-17, v248) {#vc2-analog-update}
 
 Step 4.2's OSC voice, its ninth part (the user's "proceed", 2026-11-17): kind 3's three routines besides its note-on, each the frame's call in its row (v230), whole in one version. Ported bit for bit: Vc2OscAnalogUpdate.cpp (`installAnalog`, `updateAnalog`, `settingsAnalog`, members of the voice beside `noteOnAnalog`). The kinds' row says so (`Vc2OscInstall::analog`, `Vc2OscUpdate::analog`, `Vc2OscSettings::analog`). The analog was the last kind whose install the frame called by address, so that way and the row's address are gone. Every address is rom.4's; every offset the voice's.

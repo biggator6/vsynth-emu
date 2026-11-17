@@ -102,12 +102,7 @@ std::string setupDifference(SetupRig& r) {
 template <class Mine>
 std::string setupBoth(SetupRig& r, uint32_t routine, std::initializer_list<uint32_t> args, const char* what, Mine mine,
                       bool answered = true) {
-    uint32_t r0 = 0;
-    if (!r.fw.call(routine, args, &r0)) return std::string(what) + " faults: " + r.fw.cpu.error();
-    const uint32_t answer = mine();
-    const std::string differs = setupDifference(r);
-    if (!differs.empty()) return std::string(what) + ": " + differs;
-    return answered && r0 != answer ? std::string(what) + "'s answer" : "";
+    return vc2CosmBoth(r.fw, routine, args, { what, answered }, mine, [&r] { return setupDifference(r); });
 }
 
 // A part's record on both, rom.4's `routine` on G and a drawn part, the port's `mine(part)`: 0x893a46f0 alone, or

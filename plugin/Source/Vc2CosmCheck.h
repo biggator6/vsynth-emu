@@ -21,6 +21,28 @@ long vc2MatrixCases(Vc2Fw& fw, const Vc2Run& run);
 // The Matrix set-up's cases (v247, Vc2MatrixSetupCheck.cpp): rom.4's records, assignments, M's init, levels and head
 // and the port's on the same G and M; how many differ
 long vc2MatrixSetupCases(Vc2Fw& fw, const Vc2Run& run);
+// The COSM object's frame's cases (v249, Vc2CosmObjectCheck.cpp): rom.4's constructor, set-up, binding and install and
+// the port's on the same object; how many differ
+long vc2CosmObjectCases(Vc2Fw& fw, const Vc2Run& run);
+
+// What a routine on both sides is called in a difference, and whether its answers are compared
+struct Vc2CosmAsk {
+    const char* what;
+    bool answered = true;
+};
+
+// A routine on both sides (v249: the set-up's part and the object's): rom.4's `routine` on `args`, then the port's
+// `mine()`, its answer; what `differs()` says, else the answers when the ask has them compared
+template <class Mine, class Differs>
+std::string vc2CosmBoth(Vc2Fw& fw, uint32_t routine, std::initializer_list<uint32_t> args, Vc2CosmAsk ask, Mine mine,
+                        Differs differs) {
+    uint32_t r0 = 0;
+    if (!fw.call(routine, args, &r0)) return std::string(ask.what) + " faults: " + fw.cpu.error();
+    const uint32_t answer = mine();
+    const std::string said = differs();
+    if (!said.empty()) return std::string(ask.what) + ": " + said;
+    return ask.answered && r0 != answer ? std::string(ask.what) + "'s answer" : "";
+}
 
 // Words of noise over `x`, a word a draw
 template <class Words>

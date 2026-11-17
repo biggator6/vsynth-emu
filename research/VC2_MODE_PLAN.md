@@ -484,7 +484,18 @@ version against rom.4's routines with what it calls hooked:
    - then the COSM object in the tone: the set-up `0x893aa590`, the note-on `0x893aa0e0` (the clears, the allocator
      `0x893a8c50`, the start values `0x893a85f0`, the levels it holds, the new block, the code's case), the binding
      `0x893aa7b0`, the install `0x893aafe0`, the update `0x893aa7d0`, the new block `0x893aa5d0` and the DSP chosen by
-     block code, over XtCosm's types and the Growl: the parts `Vc2ToneParts` names for the COSMs.
+     block code, over XtCosm's types and the Growl: the parts `Vc2ToneParts` names for the COSMs. Split by what rom.4
+     holds (2026-11-17), as rom.2's object is (XtCosm: each type's note-on case, new block, update and DSP):
+     - done (v249): the frame, `Vc2CosmObject` (Vc2CosmObject.cpp): the object's words (0x164 bytes: the set-up's,
+       the block, D, the pool and slot, the DSP routine and the install's float, the bindings, the vtable), the
+       constructor `0x893aa030`, the set-up, the binding and the install (rom.2's chooser `0x894eef70`: the mono or
+       stereo DSP routine by the code byte, a float per type and variant, its return COSM 2's flag); xt_vc2cosm's
+       fifth part (HARDWARE_FIRMWARE.md, "The VC-2's COSM object's frame").
+     - v250: the note-on and the new block: the clears, the buffer pools (`0x89999294`, `0x89999474`; their initializer
+       `0x893ab550`, the allocator `0x893a8c50`, the destructor `0x893aa060` that frees a slot), the start values
+       `0x893a85f0`, the held levels, the first block, and each code's note-on case and new-block routine.
+     - then the update (the held levels and rates, each code's inline case) and the DSP by code, mono and stereo, over
+       XtCosm's types and the Growl, as many versions as the types take.
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

@@ -115,6 +115,17 @@ struct Vc2CosmSideBandPool {
     float qScale = 0;
 };
 
+// The COSM object's install (v249, Vc2CosmObject.cpp): the DSP routines by the code byte, mono (0x8993fb50) and stereo
+// (0x8993fba4), read at the byte signed, so 128 either side, past code 20 what follows them at the start; and its floats
+// from 0x895423b4, 28 for the mono types and their variants, then the stereo's 28 (0x89542424) and on as far as the
+// stereo Amp's at a Type byte of 255
+struct Vc2CosmObjectPool {
+    static constexpr int kCodeReach = 128, kTypes = 28, kFactors = 289;
+    uint32_t mono[2 * kCodeReach] {};
+    uint32_t stereo[2 * kCodeReach] {};
+    float factors[kFactors] {};
+};
+
 struct Vc2CosmTables {
     static constexpr int kGains = 128;   // [FW] the gain table's words, 0…32768, before the next table's
     Vc2CosmGrowlPool growl {};
@@ -132,6 +143,7 @@ struct Vc2CosmTables {
     float velocityScale = 0;   // 32768: the dispatcher's, a velocity factor's 0…32768 to 0…1 (0x893999ac, v235)
     float limiterScale = 0;    // 32768: the Limiter's, a gain table word's 1 (0x89399270)
     uint16_t gains[kGains] {};   // 0x89541f34: about 32768·(i/127)², the Amp's, Limiter's and TB Filter's (v237)
+    Vc2CosmObjectPool object {};
 };
 
 [[nodiscard]] bool vc2LoadCosm(const char* path);

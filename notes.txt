@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM object's frame v249 (2026-11-17, on its own branch with vc2-mode's 9c2009c merged in; the VC-2
+  session's go-ahead; HARDWARE_FIRMWARE.md, "The VC-2's COSM object's frame"). Split by what rom.4 holds, as XtCosm
+  splits rom.2's: the frame now, the note-on and new block (v250), then the update and the DSP. Vc2CosmObject
+  (Vc2CosmObject.cpp): the object's 0x164 bytes as the frame names them (Vc2CosmObjectWords, the set-up's words
+  Vc2CosmSetUpWords), the constructor 0x893aa030 in place, the set-up 0x893aa590, the binding 0x893aa7b0, and the
+  install 0x893aafe0, rom.2's chooser: the DSP routine from the mono or stereo table by the code byte signed, the float
+  at +0x14c by type and variant (the Wave Shaper's and Amp's Type, the TVF's Filter Type / 5), its return COSM 2's
+  flag; its tables Vc2CosmObjectPool in Vc2CosmTables. xt_vc2cosm's fifth part (Vc2CosmObjectCheck.cpp), nothing
+  hooked; 0 different at seeds 2024, 7 and 31337 once its / 10, read off the multiply, was / 5. The routine-on-both of
+  the set-up's part and this one is vc2CosmBoth (Vc2CosmCheck.h). mutate_vc2.py --cosm: 776 plants (32 new), all
+  caught; the first run's miss, the Wave Shaper's step at Type 3, closed by drawing 3. Not in the sound yet.
+
 The VC-2's analog install, update and settings v248 (2026-11-17, on vc2-mode after v247's merge 9c2009c; the user's
   "proceed"; HARDWARE_FIRMWARE.md, "The VC-2's analog install, update and settings"): step 4.2's OSC voice, its ninth
   part, whole. Vc2OscAnalogUpdate.cpp: the install 0x893c2ad0 (+0xa40 cleared, the render by code into +0xa48 and its
