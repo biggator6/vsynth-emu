@@ -223,6 +223,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2Matrix.cpp
     Source/Vc2MatrixTables.cpp
     Source/Vc2MatrixSources.cpp
+    Source/Vc2MatrixSetup.cpp
     Source/XtBuildId.cpp
 )
 

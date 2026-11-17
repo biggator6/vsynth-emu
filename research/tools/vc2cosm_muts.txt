@@ -40,6 +40,11 @@
 # word's sign, the curve's or a limit's (no word of the 465 rom.4 reads has bit 15 set); the bipolar reading's 0 at 0
 # (the curve's word 129, where 0 would read, is 0); the bipolar's 64 taken by the lower branch (the curve's 0 is 0);
 # the choice's 96 a step higher, up to 110 (96…109 are its cases, found first).
+# v247: M's set-up in vc2matrixsetup (Vc2MatrixSetup.cpp), the destination routines' tabulation and the levels' scale
+# in vc2matrixtables, under xt_vc2cosm's fourth part.  Not planted, as no input tells them apart: the zeros' start a few
+# words on (the curve's words 128…241 are all 0); the sensitivity's reach (the store gives −64…63, the check draws
+# −128…127, past which rom.4 reads on past its tables and the port gives 0); a source and sensitivity's "on" (any
+# nonzero).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -728,3 +733,59 @@ choice-none|kFirstNone = 96,|kFirstNone = 128,|vc2matrixsources
 choice-signed|return source >= kFirstNone ? kOff : kController;|return (uint32_t)source >= kFirstNone ? kOff : kController;|vc2matrixsources
 tables-curve-index|words[Vc2MatrixTables::kDestinations + i];|words[Vc2MatrixTables::kDestinations + i + 1];|vc2matrixtables
 tables-limit-past|int32_t vc2MatrixLimit(int dest) { return tables.t.words[dest]; }|int32_t vc2MatrixLimit(int dest) { return dest < 79 ? tables.t.words[dest] : 0; }|vc2matrixtables
+setup-category-id|kCategory = 0x12c,|kCategory = 0x12d,|vc2matrixsetup
+setup-bend-up|kBendUp = 0x13b,|kBendUp = 0x13c,|vc2matrixsetup
+setup-bend-down|kBendDown = 0x13c,|kBendDown = 0x13b,|vc2matrixsetup
+setup-controls|kControls = 0x16a,|kControls = 0x16b,|vc2matrixsetup
+setup-step|kControlStep = 5;|kControlStep = 4;|vc2matrixsetup
+setup-bend-scale|kBendScale = 1000;|kBendScale = 100;|vc2matrixsetup
+setup-no-source|kNoSource = 32,|kNoSource = 33,|vc2matrixsetup
+setup-last-case|kLastCase = 109;|kLastCase = 108;|vc2matrixsetup
+setup-category-a|kCategoryA = 10,|kCategoryA = 9,|vc2matrixsetup
+setup-category-b|kCategoryB = 11,|kCategoryB = 12,|vc2matrixsetup
+setup-velocity|kVelocity = 107,|kVelocity = 106,|vc2matrixsetup
+setup-keyfollow|kKeyfollow = 108;|kKeyfollow = 109;|vc2matrixsetup
+setup-control2|kControl2 = 1;|kControl2 = 2;|vc2matrixsetup
+setup-beam-ids|{ 0x8b, 0x8c, 0x8d, 0x8e }|{ 0x8b, 0x8d, 0x8c, 0x8e }|vc2matrixsetup
+setup-assign-order|{ 0x8f, 0x90, 0x91|{ 0x90, 0x8f, 0x91|vc2matrixsetup
+setup-assign-pedal|0x95, 0x96, 0xba }|0x95, 0x96, 0xbb }|vc2matrixsetup
+setup-no-beam|kNoBeam = 0xff;|kNoBeam = 0;|vc2matrixsetup
+setup-zeros|kZeros = 128;|kZeros = 120;|vc2matrixsetup
+setup-last-dest|kLastDest = 78;|kLastDest = 77;|vc2matrixsetup
+setup-level-group|kLevelGroup = 2;|kLevelGroup = 3;|vc2matrixsetup
+setup-held-32|return v == kNoSource \|\| v > kLastCase ? 0 : v;|return v > kLastCase ? 0 : v;|vc2matrixsetup
+setup-category-11|(category == kCategoryA \|\| category == kCategoryB)|(category == kCategoryA)|vc2matrixsetup
+setup-category-keyfollow|(v == kVelocity \|\| v == kKeyfollow)|(v == kVelocity)|vc2matrixsetup
+setup-control2-plain|k == kControl2 ? control2Source(v, category) : heldSource(v)|heldSource(v)|vc2matrixsetup
+setup-dest-sens|if (source == 0 \|\| sens == 0 \|\| static_cast|if (source == 0 \|\| static_cast|vc2matrixsetup
+setup-dest-source|if (source == 0 \|\| sens == 0 \|\||if (sens == 0 \|\||vc2matrixsetup
+setup-dest-edge|static_cast<uint32_t>(dest) > kLastDest) return 0;\n    const Vc2MatrixDest|static_cast<uint32_t>(dest) >= kLastDest) return 0;\n    const Vc2MatrixDest|vc2matrixsetup
+setup-uses-or|uses[d.group] = static_cast<uint16_t>(uses[d.group] \| d.bit);|uses[d.group] = d.bit;|vc2matrixsetup
+setup-depth-source|if (source == 0 \|\| static_cast<uint32_t>(dest) > kLastDest) return 0;\n    //|if (static_cast<uint32_t>(dest) > kLastDest) return 0;\n    //|vc2matrixsetup
+setup-held|    if (held) return false;\n||vc2matrixsetup
+setup-head-down|std::memcpy(rec.head + sizeof up, &down|std::memcpy(rec.head + 1, &down|vc2matrixsetup
+setup-uses-init|    int at = kZeros;\n    fromZeros(rec.uses, at);\n||vc2matrixsetup
+setup-source-raw|rec.sources[k] = static_cast<uint8_t>(source);|rec.sources[k] = static_cast<uint8_t>(v);|vc2matrixsetup
+setup-routine-raw|rec.routines[k] = vc2MatrixSourceRoutine(source);|rec.routines[k] = vc2MatrixSourceRoutine(v);|vc2matrixsetup
+setup-dest-ids|static_cast<int16_t>(id + 1 + 2 * j)|static_cast<int16_t>(id + 3 - 2 * j)|vc2matrixsetup
+setup-sens-ids|static_cast<int16_t>(id + 2 + 2 * j)|static_cast<int16_t>(id + 4 - 2 * j)|vc2matrixsetup
+setup-slot-order|rec.slots[2 * k + j];|rec.slots[2 * k + 1 - j];|vc2matrixsetup
+setup-depth-none|slot.depth = vc2MatrixDepth(static_cast<uint8_t>(source), dest, sens);|slot.depth = vc2MatrixDepth(1, dest, sens);|vc2matrixsetup
+setup-beam-zero|g.beams[i] = v == 0 \|\| v == kNoSource ? kNoBeam|g.beams[i] = v == kNoSource ? kNoBeam|vc2matrixsetup
+setup-settings-assigns|    assigns(g);\n    return record(g, part, held);|    return record(g, part, held);|vc2matrixsetup
+setup-init-part|const Vc2MatrixFront& rec = g.parts[links.part];|const Vc2MatrixFront& rec = g.parts[0];|vc2matrixsetup
+setup-init-uses|    std::ranges::copy(rec.uses, m.uses);\n||vc2matrixsetup
+setup-init-slots|    std::ranges::copy(rec.slots, m.slots);\n||vc2matrixsetup
+setup-init-routines|    std::ranges::copy(rec.routines, m.routines);\n||vc2matrixsetup
+setup-init-terms|    fromZeros(m.terms, at);\n||vc2matrixsetup
+setup-init-channel|    links.channel = g.channel;\n||vc2matrixsetup
+setup-init-levels|    links.channel = g.channel;\n    levels(m, refresh);|    links.channel = g.channel;|vc2matrixsetup
+setup-levels-index|vc2MatrixRead(m, group, refresh)[i]|vc2MatrixRead(m, group, refresh)[0]|vc2matrixsetup
+setup-levels-mul|levelsOut.values[i] = xtf::mul(|levelsOut.values[i] = xtf::add(|vc2matrixsetup
+setup-levels-call|    part_.levelsMoved();\n||vc2matrixsetup
+setup-head-part|    if (links.part != part) return;\n||vc2matrixsetup
+tables-dest-shift|{ kOn, (uint32_t)d, kOn, kScratch }|{ kOn, (uint32_t)d + 1, kOn, kScratch }|vc2matrixtables
+tables-dest-bit|dests[d].bit = bits;|dests[d].bit = 1;|vc2matrixtables
+tables-dest-group|dests[d].group = static_cast<uint8_t>(g);|dests[d].group = 0;|vc2matrixtables
+tables-depth-sign|{ kOn, (uint32_t)d, (uint32_t)s }|{ kOn, (uint32_t)d, (uint32_t)-s }|vc2matrixtables
+tables-level-scale|kLevelScale = 0x893a3064;|kLevelScale = 0x893a3068;|vc2matrixtables

@@ -1546,6 +1546,74 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's Matrix set-up (2026-11-17, v247) {#vc2-matrix-setup}
+
+Step 4.2's Matrix, its third part (research/VC2_MODE_PLAN.md; the user's yes, 2026-11-17): how M is made, ported bit for bit in Vc2MatrixSetup.cpp. v245 named "six builders"; they are the pool words of two routines, the second an inlined copy of the first. Every address is rom.4's, every offset its object's.
+
+**G, the Matrix's settings** (`Vc2MatrixSettings`), rom.4's object at `0x89997398`, 0x850 bytes (`0x893a5030` allocates one):
+- +0x000…+0x83f: sixteen part records of 0x84 bytes, each M's front (`Vc2MatrixFront`, which `Vc2MatrixWords` now derives from): +0 and +2 Pitch Bend Range Up and Down × 1000 as int16 (48 × 1000 wraps), then the sources, uses, slots and routines as M has them.
+- +0x840: the channel state's address, which M's +0x168 takes. `0x893a5050` sets it: by Part 1 Receive Switch (ID 0x47) off, `0x893a3010`'s default (`[0x8999738c]`); on, a pointer from the tone generator's channel table by Receive Channel (0x48). Which channel state is the part's, so it is left to step 4.3.
+- +0x844…+0x847: Beam 2 and 3 Assign L, R (IDs 0x8b…0x8e), 0 and 32 stored as 0xff.
+- +0x848…+0x84e: the sources' seven assignments (v245's): Beam 4 L, R, Pad X, Y, Knob 1, 2 and the Pedal (IDs 0x8f, 0x90, 0x91, 0x92, 0x95, 0x96, 0xba), as read.
+
+**Part n's record** `0x893a46f0(G, n)`:
+- Nothing while byte `0x8993d0c0` is set: it returns 0.
+- Otherwise it points the part reader `0x893207b0` at part n's block and reads by ID through the getter `0x89324350` (a value less its descriptor's centre):
+  1. Patch Category (0x12c), then the bend ranges (0x13b, 0x13c) into +0 and +2.
+  2. The uses: 11 words copied from `0x895402f6`, the zeros after the curve.
+  3. For each Matrix Control k (IDs 0x16a + 5k…: Source, Dest 1, Sens 1, Dest 2, Sens 2, read in that order around the slots' calls):
+     - the source held to the choice's: 32 none, and anything past 109 none (the fourteen cases 96…109 are kept, as is anything up to 95). Under Patch Category 10 or 11, Control 2's velocity (107) and keyfollow (108) give none.
+     - the source's byte at +4 + k, and its routine by the choice (`0x893a1c70`, v245's) at +0x64 + 4k.
+     - each slot's destination byte by `0x893a30d0` and its depth by `0x893a36a0`.
+- It returns 1.
+
+**The destination routines**, both a switch on the patch's destination 0…78:
+- `0x893a30d0(source, dest, sens, uses)`: none (0) for no source, no sensitivity or a destination past 78 (unsigned). Otherwise it sets the destination's bit in its group's uses word and returns M's destination. The patch numbers its destinations by OSC, envelope and LFO, M by its groups:
+
+  | Patch's | M's | Group |
+  |---|---|---|
+  | 1…4 (OSC 1) | 1…4 | 0 |
+  | 22…25 (OSC 2) | 5…8 | 1 |
+  | 75…77 (MFX-PRM1…3) | 9…11 | 2 |
+  | 5…16 (OSC 1's envelopes) | 12…23 | 3 |
+  | 17…21 (OSC 1's LFO) | 24…28 | 4 |
+  | 26…37, 38…42 (OSC 2's) | 29…40, 41…45 | 5, 6 |
+  | 43…53, 54…64 (COSM 1, 2) | 46…56, 57…67 | 8, 9 |
+  | 66…71 (TVA envelope, LFO), 65 (TVA-LVL), 72…74 (sends), 78 (TVA-PAN) | 68…73, 74, 75…77, 78 | 10 |
+- `0x893a36a0(source, dest, sens)`: 0 for no source (its low byte) or a destination past 78. Otherwise one of ten 64-word tables at `0x895403e8` + 128 × t (pitch, time, formant, level, the envelopes' and the LFOs' kinds), chosen by the destination: T[s] for s ≥ 0, −T[−s] below, the word unsigned, the answer int16.
+- The port runs both of rom.4's own routines at load, in the tables' image (`Vc2MatrixTables::dests` and `depths`, sensitivities −128…127), as rom.2's `xtFwMatrixTables` does. So neither switch is copied into the source. A store's 7-bit sensitivity gives −64…63; past ±128 rom.4 would read on past its tables, and the port gives 0.
+
+**The assignments and both:**
+- `0x893a50b0(G)`: the system reader `0x89320790`, then the eleven bytes above. It returns 1.
+- `0x893a51c0(G, n)`: the assignments, then part n's record, inlined. `Vc2MatrixSetup::settings` is the two in turn, and the check holds it to rom.4's.
+
+**M's init** `0x893a2ee0(M)`, with interrupts masked:
+1. The record of M's part (+0x16c): its +4…+0x61 (94 bytes, through the block-move helper `0x895061bc`) and its routines into M.
+2. M's +0x84…+0x165 (226 bytes) from `0x895402f6`'s zeros.
+3. G's +0x840 into M's +0x168.
+4. Then **the levels**, the same as `0x893a2e50(M)`: group 2's reader (`0x893a24d0`, v243's) three times, each sum × `0x893a3064` (0x3c0101f3, about 1/127) into `0x89997290`, `0x89997294` and `0x89997298`, the floats v227's part mixer reads, and then `0x893b1ee0`.
+
+It returns 1. **The head**, `0x893a2eb0(M, part, bytes)`: when M's part is `part`, M's +0…+2 take the three bytes (velocity, key, poly key).
+
+**Left for the part (step 4.3):** which channel state (`0x893a5050`), the static M at `0x89997108` and its initializers (`0x893a2fe0`: part 0, head 0, 60, 60; `0x893a3020`), and G's allocation.
+
+**The check**, xt_vc2cosm's fourth part (Vc2MatrixSetupCheck.cpp, its draws in Vc2MatrixSetupDraws.cpp; what it shares with the third in Vc2MatrixCheck.h):
+- G at its own address and M in RAM, the sources' world as the third part's (16 parts), its channel state in two copies, so that G's channel word and M's are drawn apart and both read alike.
+- Hooked, as lying outside M: the two readers' set-up (each leaves a handle the getter knows), the getter, answering both sides from one store of values drawn by each ID's kind at its first reading, and `0x893b1ee0`. The refresh and the sources are rom.4's own.
+- 60 events a case: a record, the assignments, both, M's init, the levels, the head, each destination routine called alone (any source, destinations 0…78, past and negative, sensitivities −128…127), or the store, the state (the held flag one time in four, M's part and words, the world) or G drawn again.
+- After each: G, M with its links (+0x168…+0x16f), the levels, both logs of calls (each read's block and ID, the levels' call) and the answer, word for word.
+
+Results:
+- seed 2024, 40 cases: 2,400 events, 490 records (194 held), 143 assignments, 283 settings, 294 inits, 152 levels, 159 heads, 139 destinations, 300 depths, 29,583 parameter reads; 0 different. The port matched at its first run. The check's own first build read the uses' 22 bytes as whole words, past its array; it now compares 12.
+- seeds 7 and 31337, 400 cases each: 24,000 events each (3,032 and 3,065 inits, 298,047 and 290,282 reads); 0 different. The Growl's, the frame's and the Matrix core's parts are as they were.
+- Coverage, llvm-cov on fcheck's 40 cases: every line of Vc2MatrixSetup.cpp; not run are the sensitivity guard's `return 0` (no store's value reaches it) and the tables' loader's returns for a routine that faults (rom.4's never does), with `vc2MatrixLoaded`, RomTest's.
+- `mutate_vc2.py --cosm`: 744 plants, all caught.
+  - 56 are new: 51 on the set-up (every ID and constant, the source's hold, Control 2's categories, the destination and depth routines' tests and the uses' OR, the record's IDs, slots, head and uses, the beams' none, the settings' assignments, M's init's part, copies, zeros, channel word and levels, the levels' index, product and call, the head's part test) and 5 on the tables' tabulation and the levels' scale.
+  - The first run missed one: M's init without its channel word, since the check drew G's and M's words the same. It is closed by the two channel copies.
+  - Not planted, as no input tells them apart: the zeros' start a few words on (the curve's words 128…241 are all 0), the sensitivity's reach, a source and sensitivity's "on" (any nonzero). vc2cosm_muts.txt says why.
+- The loader plants, as Vc2MatrixTables.cpp changed: `mutate_panel.py rom4-no-matrix rom4-no-tables rom4-no-cosm`, 3 of 3 caught; the plugin's load now runs rom.4's two routines in the loader's image too.
+- fcheck's diff is xt_vc2cosm's new `setup:` line. verify.sh passes every line.
+
 ### The VC-2's sub oscillator's shape (2026-11-17, v246) {#vc2-sub-shape}
 
 Step 4.2's OSC voice, its eighth part (the user's "Yes, both", 2026-11-17: this here, M's set-up as v247 in the COSM session): the sub oscillator's shape, rom.4's `0x893c4020` (0x893c4020…0x893c4a1a, about 1,200 instructions, two switches), which its note-on `0x893c3b90` (v244) calls first. Whole in one version. Ported bit for bit: Vc2OscAnalogShape.cpp (the head, each code's way a row `Vc2OscShapeCode`, the six waves one routine over a way `Vc2OscShapeWay` and a row of words `Vc2OscShapeWave`, the steps), LA-SQUARE's and LA-SAW's way in Vc2OscAnalogLa.cpp beside the note-on's (`shapeLaSquare`, `shapeLaSaw`; the corner's laws `toneCorner` and `keyed` now shared by both), its pool words in Vc2OscAnalogShapePool.h (a member of Vc2OscAnalogPool). Every address is rom.4's; every offset the voice's.
