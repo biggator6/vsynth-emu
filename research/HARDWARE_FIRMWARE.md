@@ -1622,6 +1622,34 @@ Results:
 - The loader plants, as Vc2MatrixTables.cpp changed: `mutate_panel.py rom4-no-matrix rom4-no-tables rom4-no-cosm`, 3 of 3 caught.
 - fcheck's diff is xt_vc2cosm's `matrix:` line. verify.sh passes every line.
 
+### The VC-2's sub oscillator's note-on (2026-11-17, v244) {#vc2-sub-note-on}
+
+Step 4.2's OSC voice, its seventh part: the analog note-on's way with the sub oscillator on (FTRC of the block's +0x138 not 0), rom.4's `0x893c3b90` (about 350 instructions), after the analog note-on's head (v242). Split by what rom.4 holds: its shape `0x893c4020` (rom.2's subShape, about 1,200 instructions: five powf, ten holds, a table at `0x89560064`) is rom.4's by address until its own version. Ported bit for bit: Vc2OscAnalogSub.cpp, each code's way a row (`Vc2OscSubCode`: the phase's move, then its end), its words in Vc2OscAnalog.h, its pool words in Vc2OscAnalogPool.h (`Vc2OscAnalogSubPool`). HQ's clear (`0x893c3570`) is shared with the analog note-on's. Every address is rom.4's; every offset the voice's.
+
+**rom.2's subNoteOn law for law** (XtAnalog.cpp), its words at rom.2's +0x8c as the analog note-on's: the second wave's Pulse Width +0x278/+0x27c (rom.2 +0x1ec/+0x1f0), the level +0x28c/+0x290, the second phase +0x288, RAMP's last segment +0x294, LA's third phase +0x2a8, LA's second steepness +0x2b8/+0x2bc, SQUARE's and JUNO's steepness of each wave +0x2c0/+0x2c4, +0x2c8/+0x2cc. Where rom.2's port takes its +0x20c and +0x214 as 0 (nothing writes them), rom.4 reads +0x298 and +0x2a0 and holds against them (0x893c4a20).
+
+**The routine:**
+1. The shape (`0x893c4020`), then the gain the level × 2^31; Fat's value its target (the second wave's pitch, 2^octaves), the Pulse Width's and the second wave's their targets / 0.002, the level's / (1/32); the phase × Impact below 1.
+2. By the code (the switch at 0x893c3c18; past 10 the phase as it is):
+
+| Code | The phase's move | Its end |
+|---|---|---|
+| 0, 1 HQ | | HQ's clear, then NOISE's end |
+| 2 SAW, 4 TRIANGLE, 6 SINE | + (the Pulse Width held within RAMP's segment) × ½ | the phase and the second wave's |
+| 3 SQUARE | the steepness' values, then that + ½ | the same |
+| 5 RAMP | + 0 | the same |
+| 7 JUNO | the steepness' values, + 0 | the same |
+| 8 NOISE | | the gain the level unscaled, the Pulse Width's value its target, the phase alone |
+| 9, 10 LA | | the steepness' values; the phase (the Pulse Width held against +0x298) × ½ + p + ½; the second wave's Fat × it; the second and third phases (½ held against +0x298, +0x2a0) × ½ less each, × 2 + 2, less 2 above 1 |
+
+   The phase's end: 0 outside 0…1, and the second wave's phase Fat × it (0 with it). NOISE's end can't meet a phase above 1: the head holds the phase to 0…1 and the scale by Impact below 1 keeps it so.
+
+**The check, xt_vc2osc** (its voice part):
+- `0x893c3b90`'s hook is gone, so rom.4's own runs; `0x893c4020` is hooked as a kind's routine.
+- The shape writes nothing in the check, so its outputs (Fat's and the Pulse Width's targets, the second wave's, the level's, RAMP's segment, LA's and SQUARE's steepness targets) and the phase and the two unwritten words are drawn moderate on the voice before every kind-3 note-on (`oscAnalogObject`): noise, or another kind's integers (LITE's positions share these words), can be NaNs that reach `xtf::sub`.
+- The kinds' note-on event picks a third each: the players' kinds, the analog, or the kind as it finds it, so neither's draws take the other's events. LA's codes half the time take Impact below 1 and a large +0x298, where the analog note-on's LA phase passes 1.
+- Coverage (llvm-cov, 40 cases): every line of Vc2OscAnalogSub.cpp, every branch but NOISE's end's phase above 1 (above).
+
 ### The VC-2's Matrix core (2026-11-17, v243) {#vc2-matrix-core}
 
 Step 4.2's Matrix core (research/VC2_MODE_PLAN.md), the user's choice by the VC-2 session's message: rom.4's Matrix object M as a whole, not COSM's share alone. Split by what rom.4 holds, the core first. Ported bit for bit: the refresh `0x893a2230` (`Vc2MatrixCore`, a `Vc2MatrixRefresh`, its sources behind `Vc2MatrixSources`), and every group's reader as a row of v235's `vc2MatrixRead` (`vc2MatrixGroups()`), in Vc2Matrix.cpp. v235's getter `0x893a2350` and COSM's readers are as they were. Every address is rom.4's, every offset M's.

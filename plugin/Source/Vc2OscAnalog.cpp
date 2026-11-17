@@ -13,7 +13,6 @@ using xtf::sub;
 using namespace Vc2OscAnalog;
 
 namespace {
-constexpr uint32_t kSubNoteOn = 0x893c3b90;    // [FW] the sub oscillator's note-on, on the voice
 constexpr uint32_t kLaFirst = 9, kLaCodes = 2;  // [FW] the switch at 0x893c23ca: codes 9 and 10 take LA's way
 constexpr uint32_t kEnvelopeOut = 0x4c, kLfoOut = 0x38;   // [FW] a bound envelope's and LFO's outputs
 constexpr float kOne = 1.0f, kTwo = 2.0f;       // [FW] FLDI1 (fr15), and FLDI1 added to itself
@@ -34,12 +33,6 @@ float sawShape(const Vc2OscVoice& v, float x, const Vc2OscAnalogPool& t) {
 }
 
 float sineShape(const Vc2OscVoice&, float x, const Vc2OscAnalogPool& t) { return mul(x, t.half); }   // [FW] 0x893c29d0
-
-// [FW] 0x893c3570 on the object: HQ's integrator and direction cleared
-void hqClear(Vc2OscVoice& v, float, const Vc2OscAnalogPool&) {
-    v.setF32(kHq, 0.0f);
-    v.setU32(kHqFalling, 0);
-}
 
 // [FW] 0x893c2964…: SQUARE's step by the ratio: none below the least, the first below 1, then the rows', else the top
 float squareStep(float r, const Vc2OscAnalogPool& t) {
@@ -109,6 +102,12 @@ void otherCodes(Vc2OscVoice& v, Vc2OscParts& p, uint32_t code) {
 }
 } // namespace
 
+// [FW] 0x893c3570 on the object: HQ's integrator and direction cleared
+void Vc2OscAnalog::hqClear(Vc2OscVoice& v, float, const Vc2OscAnalogPool&) {
+    v.setF32(kHq, 0.0f);
+    v.setU32(kHqFalling, 0);
+}
+
 float Vc2OscAnalog::sum(const Vc2OscVoice& v, Vc2OscParts& p, uint32_t base, const Vc2OscTargets::Mod& m) {
     float x = add(mul(p.boundFloat(v.tail.binds[m.envelope], kEnvelopeOut), v.f32(m.envelopeDepth)), v.f32(base));
     x = add(mul(p.boundFloat(v.tail.binds[m.lfo], kLfoOut), v.f32(m.lfoDepth)), x);
@@ -128,7 +127,7 @@ void Vc2OscVoice::noteOnAnalog(Vc2OscParts& parts, const Vc2ToneShared& shared) 
     if (kOne > f32(kImpactNow)) setF32(kPhase, mul(f32(kPhase), f32(kImpactNow)));
     if (f32(kPhase) > kOne || 0.0f > f32(kPhase)) setF32(kPhase, 0.0f);
     if (xtf::ftrc(f32(kSubOn)) != 0) {
-        parts.kindCall(kSubNoteOn);
+        subNoteOn(*this, parts, shared);
         return;
     }
     const uint32_t code = u32(kCodeCopy);

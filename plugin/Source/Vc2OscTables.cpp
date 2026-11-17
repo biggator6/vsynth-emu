@@ -44,7 +44,9 @@ auto analogWords(Vc2OscAnalogPool& a) {
         { 0x893c2b10, &a.squareLeast }, { 0x893c2b14, &a.squareFirst }, { 0x893c2b2c, &a.squareTop },
         { 0x893c2b30, &a.edgeScale }, { 0x893c2b18, &st1.bound }, { 0x893c2b1c, &st1.step },
         { 0x893c2b20, &st2.bound }, { 0x893c2b24, &st2.step }, { 0x893c2b28, &st3.bound }, { 0x893c2af8, &st3.step },
-        { 0x893c2b44, &a.noiseSpan }, { 0x893c4a94, &a.withinHalf },
+        { 0x893c2b44, &a.noiseSpan }, { 0x893c4a94, &a.withinHalf }, { 0x893c3c20, &a.sub.fullScale },
+        { 0x893c3c24, &a.sub.step }, { 0x893c3c28, &a.sub.levelStep }, { 0x893c3e7c, &a.sub.half },
+        { 0x893c3e80, &a.sub.wrap },
     });
 }
 // [FW] the players' installs' tables (v238); the Tone Keyfollow's (v242: rom.2's 15, its [3] 0 and [14] 2)

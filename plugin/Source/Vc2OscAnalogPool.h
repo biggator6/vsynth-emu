@@ -20,6 +20,12 @@ struct Vc2OscAnalogLa {
     float hz = 0, step = 0;
 };
 
+// The sub oscillator's note-on's own (v244, 0x893c3b90): 2^31, the gain's scale; 0.002, the shapes'; 1/32, the
+// level's; ½; −2, the phases' wrap
+struct Vc2OscAnalogSubPool {
+    float fullScale = 0, step = 0, levelStep = 0, half = 0, wrap = 0;   // 0x893c3c20, 3c24, 3c28, 3e7c, 3e80
+};
+
 struct Vc2OscAnalogPool {
     float impactPeriod = 0, impactBase = 0;   // 0x893c23f4 100.227, 0x893c23f8 3.05185e−5: the decay's powf
     // LA's way (0x893c2404…): Fat's half and its floor, the Pulse Width's span, the two waveforms' rows, the corner
@@ -38,4 +44,5 @@ struct Vc2OscAnalogPool {
     float noiseSpan = 0;     // 0x893c2b44: 30, NOISE's hold
     float withinHalf = 0;    // 0x893c4a94: 0.5, 0x893c4a20's
     std::array<float, 15> toneKf {};   // 0x89546fbc: the Tone Keyfollow's factor by its value (rom.2's table)
+    Vc2OscAnalogSubPool sub;           // the sub oscillator's note-on's (v244)
 };

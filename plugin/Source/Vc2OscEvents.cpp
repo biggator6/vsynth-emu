@@ -95,6 +95,11 @@ void steerTwoHeads(OscSides& s, std::mt19937& rng, std::array<uint32_t, kOscBloc
 std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
     std::array<uint32_t, kOscBlockWords> block = drawNoteBlock(rng);
     steerTwoHeads(s, rng, block);
+    constexpr uint32_t kAnalog = 3;   // v244: the analog's object words, no NaN for its sub oscillator's note-on
+    if (block[kKindWord] == kAnalog) {
+        oscAnalogObject(s.voices[(size_t)v], rng);
+        oscWriteVoice(s, v);
+    }
     const uint32_t legato = rng() % 3 == 0 ? (uint32_t)rng() : rng() % 2;
     s.fw.cpu.write(kOscBlockAt, block.data(), sizeof block);
     ++s.n.noteOns;

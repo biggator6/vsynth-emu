@@ -28,7 +28,8 @@
 # note-on by kind and its targets, v232; vc2ramp, vc2ramptick, vc2ramptables: its pitch ramp, v236, in
 # Vc2PitchRamp.cpp, Vc2PitchRampTick.cpp and Vc2RampTables.cpp; vc2oscplayers: its players' installs and VariPhrase's
 # note-on, v238, in Vc2OscPlayers.cpp; vc2osclite: LITE's note-on, v240, in Vc2OscLite.cpp; vc2oscanalog and
-# vc2oscanalogla: the analog's note-on, v242, in Vc2OscAnalog.cpp and Vc2OscAnalogLa.cpp), through xt_vc2osc, [cases]
+# vc2oscanalogla: the analog's note-on, v242, in Vc2OscAnalog.cpp and Vc2OscAnalogLa.cpp; vc2oscanalogsub: its sub
+# oscillator's, v244, in Vc2OscAnalogSub.cpp), through xt_vc2osc, [cases]
 # its cases (40).  --tva:
 # vc2tva_muts.txt, in
 # Vc2Tva.cpp and Vc2TvaTables.cpp (PORT=vc2tva, vc2tvatables: the TVA, v233), through xt_vc2tva, [cases] its cases
