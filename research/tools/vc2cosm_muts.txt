@@ -1,34 +1,39 @@
 # Planted errors in the VC-2's COSM ports, for mutate_vc2.py --cosm: each must make xt_vc2cosm, on rom.4, say something
 # differs.  name|old|new[|port[|seed]]; ports vc2growl (Vc2CosmGrowl.cpp, the Growl, v234), vc2cosmtables
-# (Vc2CosmTables.cpp, its pool words) and vc2cosmmath (Vc2Math.cpp, the sine and cosine its taps take).
+# (Vc2CosmTables.cpp, its pool words) and vc2cosmmath (Vc2Math.cpp, the sine and cosine its taps take); vc2cosmconvert
+# (Vc2CosmConvert.cpp, the converters' frame and shared holds, v235), vc2cosmtvf (Vc2CosmTvf.cpp, the TVF's
+# converter), vc2matrix (Vc2Matrix.cpp, the Matrix's getter and readers) and vc2matrixtables (Vc2MatrixTables.cpp).
 # Not planted, as no input tells them apart: the converter's Intencity + 0 (I/127 is never negative, and x + 0 is x
 # under round-to-zero); its Speed as S/128 × 2 (both exact); the clamp's two tests swapped (lo is never above hi); the
 # clamp or the phase's wrap or the second tap's top wrap on a NaN or at exactly 1 or 3267 (never drawn); the cubic's
 # x·x·4 as x·4x (× 4 is exact); the line's read outside it (the port's 0, where a pitch under depth × 15.95 / 3267 sends
-# rom.4 past one wrap, never drawn).
+# rom.4 past one wrap, never drawn).  v235: the dispatcher's velocity factors computed with the switch off (rom.4
+# computes them after the switch's test, and an input the switch leaves off is never read again); the TVF's
+# converter's reads of the Matrix in another order (the port's order is rom.4's by the calls' log, but a plant on it
+# is no one text's change).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
-conv-no-16-bits|    const auto v = static_cast<int16_t>(param + sum);|    const int v = param + sum;
-conv-hold-low|v < 0 ? 0 : v);|v < 0 ? 1 : v);
-conv-hold-high|    return flt(v > most ? most :|    return flt(v > most ? most - 1 :
-conv-first-reader|growlSetting(in.params[0], matrix.sums(in.second != 0, in.matrix)[0]|growlSetting(in.params[0], matrix.sums(false, in.matrix)[0]
-conv-second-reader|growlSetting(in.params[1], matrix.sums(in.second != 0, in.matrix)[1]|growlSetting(in.params[1], matrix.sums(in.second == 1, in.matrix)[1]
+conv-no-16-bits|    const auto v = static_cast<int16_t>(param + sum);|    const int v = param + sum;|vc2cosmconvert
+conv-hold-low|v < 0 ? 0 : v;|v < 0 ? 1 : v;|vc2cosmconvert
+conv-hold-high|    return v > most ? most :|    return v > most ? most - 1 :|vc2cosmconvert
+conv-first-reader|vc2CosmLevel(in.params[0], matrix.sums(in.second != 0, in.matrix)[0]|vc2CosmLevel(in.params[0], matrix.sums(false, in.matrix)[0]
+conv-second-reader|vc2CosmLevel(in.params[1], matrix.sums(in.second != 0, in.matrix)[1]|vc2CosmLevel(in.params[1], matrix.sums(in.second == 1, in.matrix)[1]
 conv-matrix-word|matrix.sums(in.second != 0, in.matrix)[0]|matrix.sums(in.second != 0, in.matrix + 4)[0]
 conv-speed-sum|in.matrix)[1], kSpeedMax)|in.matrix)[0], kSpeedMax)
-conv-speed-param|growlSetting(in.params[1],|growlSetting(in.params[0],
+conv-speed-param|vc2CosmLevel(in.params[1],|vc2CosmLevel(in.params[0],
 conv-speed-offset|flt(kSpeedMax)), -1.0f);|flt(kSpeedMax)), -0.99f);
 conv-intensity-scale|    b.intensity = add(div(intensity, flt(kIntensityMax)), 0.0f);|    b.intensity = add(div(intensity, 128.0f), 0.0f);
-conv-lfo-number|    b.intensityLfoNumber = 0;\n|
-conv-env-depth|    b.speedEnv = 0.0f;\n|
-conv-negative-zero|    b.intensityLfo = 0.0f;|    b.intensityLfo = -0.0f;
-conv-speed-number|    b.speedLfoNumber = 0;|    b.speedLfoNumber = 1;
+conv-no-intensity-mod|    b.intensityMod = Vc2CosmMod {};\n|
+conv-intensity-envelope|    b.intensityMod = Vc2CosmMod {};|    b.intensityMod = Vc2CosmMod { 0.0f, 1, 0.0f, 0 };
+conv-negative-zero|    b.speedMod = Vc2CosmMod {};|    b.speedMod = Vc2CosmMod { -0.0f, 0, 0.0f, 0 };
+conv-speed-number|    b.speedMod = Vc2CosmMod {};|    b.speedMod = Vc2CosmMod { 0.0f, 0, 0.0f, 1 };
 noteon-phase|    w.phase = 1.0f;\n    w.step = 1.0f;|    w.phase = 0.0f;\n    w.step = 1.0f;
 noteon-step|    w.phase = 1.0f;\n    w.step = 1.0f;|    w.phase = 1.0f;\n    w.step = 0.5f;
-update-no-env|fmac(b.intensityEnv, w.envA, b.intensity)|b.intensity
-update-env-b|fmac(b.intensityEnv, w.envA, b.intensity)|fmac(b.intensityEnv, w.envB, b.intensity)
-update-lfo-b|fmac(b.intensityLfo, w.lfoA,|fmac(b.intensityLfo, w.lfoB,
-update-speed-order|fmac(b.speedLfo, w.lfoB, fmac(b.speedEnv, w.envB, b.speed))|fmac(b.speedEnv, w.envB, fmac(b.speedLfo, w.lfoB, b.speed))
+update-no-env|fmac(i.env, w.envA, b.intensity)|b.intensity
+update-env-b|fmac(i.env, w.envA, b.intensity)|fmac(i.env, w.envB, b.intensity)
+update-lfo-b|fmac(i.lfo, w.lfoA,|fmac(i.lfo, w.lfoB,
+update-speed-order|fmac(s.lfo, w.lfoB, fmac(s.env, w.envB, b.speed))|fmac(s.env, w.envB, fmac(s.lfo, w.lfoB, b.speed))
 update-depth-top|b.intensity)), 0.0f, 1.0f);|b.intensity)), 0.0f, 0.99f);
 update-speed-floor|vc2CosmClamp(speed, k.speedFloor, 1.0f)|vc2CosmClamp(speed, -1.0f, 1.0f)
 update-speed-top|vc2CosmClamp(speed, k.speedFloor, 1.0f)|vc2CosmClamp(speed, k.speedFloor, 0.98f)
@@ -85,3 +90,73 @@ math-sine-fold|        x = sub(1.0f, x);|        x = sub(0.5f, x);|vc2cosmmath
 math-sine-fold-negative|        x = sub(-1.0f, x);|        x = sub(-0.5f, x);|vc2cosmmath
 math-cubic-three|mul(sub(k.three, mul(mul(x, x), k.four)), x)|mul(sub(k.four, mul(mul(x, x), k.four)), x)|vc2cosmmath
 math-cosine-abs|sub(k.foldAt, x < 0.0f ? -x : x)|sub(k.foldAt, x)|vc2cosmmath
+disp-off|        block[0] = 0;\n        return;\n    }\n    in.velocity[0]|        block[0] = 1;\n        return;\n    }\n    in.velocity[0]|vc2cosmconvert
+disp-velocity-sens|in.noteVelocity, in.sensA, in.curveA|in.noteVelocity, in.sensB, in.curveA|vc2cosmconvert
+disp-velocity-curve|in.sensA, in.curveA, shared|in.sensA, in.curveB, shared|vc2cosmconvert
+disp-velocity-second|in.sensB, in.curveB, shared)|in.sensA, in.curveB, shared)|vc2cosmconvert
+disp-velocity-key|factorOf(in.noteVelocity, in.sensA|factorOf(in.noteKey, in.sensA|vc2cosmconvert
+disp-velocity-unsigned|static_cast<uint16_t>(shared.velocity|static_cast<int16_t>(shared.velocity|vc2cosmconvert
+disp-velocity-scale|return div(flt(f), vc2CosmTables().velocityScale);|return div(flt(f), 32767.0f);|vc2cosmconvert
+disp-types-past|static_cast<uint32_t>(in.type) - 1u >= static_cast<uint32_t>(kTypes)|static_cast<uint32_t>(in.type) - 1u > static_cast<uint32_t>(kTypes)|vc2cosmconvert
+disp-types-base|static_cast<uint32_t>(in.type) - 1u >=|static_cast<uint32_t>(in.type) >=|vc2cosmconvert
+disp-past-code|        block[0] = 0;\n    } else if|        block[0] = 2;\n    } else if|vc2cosmconvert
+disp-speaker-code|kSpeaker = 4, kSpeakerCode = 5;|kSpeaker = 4, kSpeakerCode = 6;|vc2cosmconvert
+disp-speaker-type|kSpeaker = 4, kSpeakerCode = 5;|kSpeaker = 3, kSpeakerCode = 5;|vc2cosmconvert
+disp-speaker-byte|reinterpret_cast<uint8_t*>(block)[4] =|reinterpret_cast<uint8_t*>(block)[5] =|vc2cosmconvert
+disp-speaker-param|static_cast<uint8_t>(in.params[0]);|static_cast<uint8_t>(in.params[1]);|vc2cosmconvert
+depth-sign|    return mul(depth < 0 ? -x : x, x);|    return mul(x, x);|vc2cosmconvert
+depth-scale|    const float x = div(flt(depth), k63);|    const float x = div(flt(depth), 64.0f);|vc2cosmconvert
+summed-held|d < -kDepthMost ? -kDepthMost : d|d < -kDepthMost ? -kDepthMost + 1 : d|vc2cosmconvert
+summed-top|d > kDepthMost ? kDepthMost :|d > kDepthMost ? kDepthMost - 1 :|vc2cosmconvert
+summed-16-bits|    const int32_t d = depth + sum;|    const auto d = static_cast<int16_t>(depth + sum);|vc2cosmconvert
+mod-lfo-number|vc2CosmSummedDepth(lfo, lfoSum, k63), 0 };|vc2CosmSummedDepth(lfo, lfoSum, k63), 1 };|vc2cosmconvert
+mod-env-velocity|mul(velocity, vc2CosmDepth(env, k63))|vc2CosmDepth(env, k63)|vc2cosmconvert
+tvf-code|constexpr int32_t kCode = 13;|constexpr int32_t kCode = 14;|vc2cosmtvf
+tvf-type|    b.filterType = in.params[kType];|    b.filterType = in.params[kQ];|vc2cosmtvf
+tvf-key-centre|kKeyCentre = 60,|kKeyCentre = 64,|vc2cosmtvf
+tvf-follow-scale|kFollowScale = 10;|kFollowScale = 5;|vc2cosmtvf
+tvf-key-signed|static_cast<int16_t>(in.noteKey - kKeyCentre)|static_cast<int8_t>(in.noteKey - kKeyCentre)|vc2cosmtvf
+tvf-follow-16-bits|static_cast<int16_t>(in.params[kFollow] * kFollowScale)|in.params[kFollow] * kFollowScale|vc2cosmtvf
+tvf-follow-order|div(div(mul(flt(key), flt(follow)), k.percent), k.k127)|div(mul(flt(key), flt(follow)), mul(k.percent, k.k127))|vc2cosmtvf
+tvf-cutoff-scale|div(flt(cutoff), flt(kMost))|div(flt(cutoff), 128.0f)|vc2cosmtvf
+tvf-cutoff-top|    b.cutoff = level > 1.0f ? 1.0f :|    b.cutoff = level > 0.99f ? 0.99f :|vc2cosmtvf
+tvf-cutoff-floor|0.0f > level ? 0.0f : level;|0.0f > level ? 0.01f : level;|vc2cosmtvf
+tvf-cutoff-plus-zero|add(add(keyed, div(flt(cutoff), flt(kMost))), 0.0f)|add(add(keyed, div(flt(cutoff), flt(kMost))), 1e-7f)|vc2cosmtvf
+tvf-cutoff-sum|sum(kCutoffSum), kMost)|sum(kQSum), kMost)|vc2cosmtvf
+tvf-cutoff-param|vc2CosmLevel(in.params[kCutoff]|vc2CosmLevel(in.params[kFollow]|vc2cosmtvf
+tvf-lfo-sum|kCutoffLfoSum = 9,|kCutoffLfoSum = 8,|vc2cosmtvf
+tvf-q-sum|kQSum = 1,|kQSum = 2,|vc2cosmtvf
+tvf-q-lfo-sum|kQLfoSum = 10;|kQLfoSum = 9;|vc2cosmtvf
+tvf-q-env-param|kQLfo = 2, kQEnv = 3,|kQLfo = 2, kQEnv = 2,|vc2cosmtvf
+tvf-cutoff-velocity|in.params[kCutoffEnv], in.velocity[0]|in.params[kCutoffEnv], in.velocity[1]|vc2cosmtvf
+tvf-q-velocity|in.params[kQEnv], in.velocity[1]|in.params[kQEnv], in.velocity[0]|vc2cosmtvf
+tvf-cutoff-envelopes|kCutoffEnvelope[2] = { 9, 11 }|kCutoffEnvelope[2] = { 9, 12 }|vc2cosmtvf
+tvf-q-envelopes|kQEnvelope[2] = { 10, 12 }|kQEnvelope[2] = { 11, 12 }|vc2cosmtvf
+tvf-second|const int second = in.second != 0 ? 1 : 0;|const int second = in.second == 1 ? 1 : 0;|vc2cosmtvf
+tvf-q-scale|mul(flt(q), k.qScale)|mul(flt(q), 1.0f)|vc2cosmtvf
+tvf-q-offset|flt(kMost)), -1.0f);|flt(kMost)), -0.5f);|vc2cosmtvf
+tvf-q-param|vc2CosmLevel(in.params[kQ],|vc2CosmLevel(in.params[kQLfo],|vc2cosmtvf
+tvf-q-lfo-param|in.params[kQLfo], sum(kQLfoSum)|in.params[kQEnv], sum(kQLfoSum)|vc2cosmtvf
+matrix-term|sum += m.terms[k];|sum += m.terms[(k + 1) % 16];|vc2matrix
+matrix-dest|if (m.slots[k].dest == dest)|if (m.slots[k].dest == dest + 1)|vc2matrix
+matrix-slots|k < Vc2MatrixWords::kSlots; ++k) {|k < Vc2MatrixWords::kSlots - 1; ++k) {|vc2matrix
+matrix-limit-top|return sum > most ? most :|return sum > most ? most - 1 :|vc2matrix
+matrix-limit-floor|sum < -most ? -most : sum;|sum < -most ? -most + 1 : sum;|vc2matrix
+matrix-limit-index|limits[dest];|limits[dest - 1];|vc2matrix
+matrix-uses-group|if ((m.uses[g.index] & g.bits) == 0)|if ((m.uses[g.index + 1] & g.bits) == 0)|vc2matrix
+matrix-uses-bits|if ((m.uses[g.index] & g.bits) == 0)|if (m.uses[g.index] == 0)|vc2matrix
+matrix-no-refresh|    refresh.refresh(m);\n||vc2matrix
+matrix-dirty-bits|static_cast<uint16_t>(m.dirty[g.index] & g.bits);|static_cast<uint16_t>(m.dirty[g.index]);|vc2matrix
+matrix-dirty-kept|    m.dirty[g.index] = static_cast<uint16_t>(m.dirty[g.index] & ~bits);\n||vc2matrix
+matrix-dirty-all|m.dirty[g.index] & ~bits);|0);|vc2matrix
+matrix-sum-dest|vc2MatrixSum(m, g.first + k)|vc2MatrixSum(m, g.first + k + 1)|vc2matrix
+matrix-sums-base|int16_t* sums = &m.sums[g.first - 1];|int16_t* sums = &m.sums[g.first];|vc2matrix
+matrix-bit|if (bits & (1u << k)) sums[k]|if (bits & (2u << k)) sums[k]|vc2matrix
+matrix-reader-group|second ? kVc2MatrixCosm2 : kVc2MatrixCosm1|kVc2MatrixCosm1|vc2matrix
+matrix-limits-at|kLimits = 0x89540158;|kLimits = 0x8954015a;|vc2matrixtables
+matrix-limits-step|kLimits + 2 * (uint32_t)d|kLimits + 2 * (uint32_t)(d + 1)|vc2matrixtables
+tables-percent|{ 0x89398da0, &t.tvf.percent }|{ 0x89398da4, &t.tvf.percent }|vc2cosmtables
+tables-tvf-127|{ 0x89398da4, &t.tvf.k127 }|{ 0x89398da0, &t.tvf.k127 }|vc2cosmtables
+tables-tvf-63|{ 0x89398db0, &t.tvf.k63 }|{ 0x89398da0, &t.tvf.k63 }|vc2cosmtables
+tables-q-scale|{ 0x89398db4, &t.tvf.qScale }|{ 0x89398db0, &t.tvf.qScale }|vc2cosmtables
+tables-velocity|{ 0x893999ac, &t.velocityScale }|{ 0x89398da0, &t.velocityScale }|vc2cosmtables

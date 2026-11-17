@@ -15,7 +15,9 @@
 # and its pool (vc2tone, v228) and its note-on (vc2tonenoteon, v229) under xt_vc2tone; the OSC voice's frame (vc2osc,
 # v230), its settings and getters (vc2oscget), its kinds' rows (vc2osckinds) and its constants (vc2osctables) under
 # xt_vc2osc; the TVA (vc2tva, v233) and its constants (vc2tvatables) under xt_vc2tva; the Growl (vc2growl, v234), its
-# constants (vc2cosmtables) and the shared sine and cosine it takes (vc2cosmmath) under xt_vc2cosm.
+# constants (vc2cosmtables) and the shared sine and cosine it takes (vc2cosmmath) under xt_vc2cosm; the converters'
+# frame (vc2cosmconvert, v235), the TVF's converter (vc2cosmtvf), the Matrix's readers (vc2matrix) and its limits
+# (vc2matrixtables) under xt_vc2cosm too.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -35,7 +37,8 @@ VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck 
 VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePortParts Vc2ToneEvents)
 VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscCheck Vc2OscEvents Vc2OscFakes Vc2OscPortParts)
 VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes)
-VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck)
+VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
+         Vc2CosmFrameCheck)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -82,6 +85,10 @@ VC2PORTS=(
     "vc2growl|Vc2CosmGrowl.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmtables|Vc2CosmTables.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmmath|Vc2Math.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2cosmconvert|Vc2CosmConvert.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2cosmtvf|Vc2CosmTvf.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2matrix|Vc2Matrix.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2matrixtables|Vc2MatrixTables.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port

@@ -1,6 +1,7 @@
 // The VC-2's COSM type 8, the GROWL: see Vc2CosmGrowl.h (v234).  Every address is rom.4's; each routine in its order of
 // operations, single precision under the SH-4's rounding (XtFloat), FMAC as a product then a sum.
 #include "Vc2CosmGrowl.h"
+#include "Vc2CosmConvert.h"
 #include "XtFloat.h"
 #include <cstring>
 
@@ -17,12 +18,6 @@ constexpr int32_t kLeastDivider = 2;                  // [FW] the DSP's least di
 constexpr uint32_t kCopied = sizeof(Vc2CosmGrowlBlock) - sizeof(int32_t);   // [FW] the new block's ten words from +4
 
 float fmac(float a, float b, float c) { return add(mul(a, b), c); }
-
-// A parameter plus its Matrix sum, held to 16 bits as rom.4's exts.w holds it, then to 0…most, as a float
-float growlSetting(int16_t param, int16_t sum, int most) {
-    const auto v = static_cast<int16_t>(param + sum);
-    return flt(v > most ? most : v < 0 ? 0 : v);
-}
 } // namespace
 
 float vc2CosmClamp(float x, float lo, float hi) {
@@ -33,18 +28,12 @@ float vc2CosmClamp(float x, float lo, float hi) {
 
 void vc2GrowlConvert(const Vc2CosmInput& in, Vc2CosmGrowlBlock& b, Vc2CosmMatrix& matrix) {
     b.code = Vc2CosmGrowl::kCode;
-    const float intensity = growlSetting(in.params[0], matrix.sums(in.second != 0, in.matrix)[0], kIntensityMax);
+    const float intensity = flt(vc2CosmLevel(in.params[0], matrix.sums(in.second != 0, in.matrix)[0], kIntensityMax));
     b.intensity = add(div(intensity, flt(kIntensityMax)), 0.0f);
-    b.intensityLfo = 0.0f;
-    b.intensityLfoNumber = 0;
-    b.intensityEnv = 0.0f;
-    b.intensityEnvelope = 0;
-    const float speed = growlSetting(in.params[1], matrix.sums(in.second != 0, in.matrix)[1], kSpeedMax);
+    b.intensityMod = Vc2CosmMod {};
+    const float speed = flt(vc2CosmLevel(in.params[1], matrix.sums(in.second != 0, in.matrix)[1], kSpeedMax));
     b.speed = add(div(mul(speed, 2.0f), flt(kSpeedMax)), -1.0f);
-    b.speedLfo = 0.0f;
-    b.speedLfoNumber = 0;
-    b.speedEnv = 0.0f;
-    b.speedEnvelope = 0;
+    b.speedMod = Vc2CosmMod {};
 }
 
 Vc2CosmGrowl::Vc2CosmGrowl() : left(kLine, 0.0f), right(kLine, 0.0f) {}
@@ -57,8 +46,9 @@ void Vc2CosmGrowl::noteOn() {
 void Vc2CosmGrowl::update() {
     const Vc2CosmGrowlPool& k = vc2CosmTables().growl;
     const Vc2CosmGrowlBlock& b = w.block;
-    w.depth = vc2CosmClamp(fmac(b.intensityLfo, w.lfoA, fmac(b.intensityEnv, w.envA, b.intensity)), 0.0f, 1.0f);
-    const float speed = fmac(b.speedLfo, w.lfoB, fmac(b.speedEnv, w.envB, b.speed));
+    const Vc2CosmMod &i = b.intensityMod, &s = b.speedMod;
+    w.depth = vc2CosmClamp(fmac(i.lfo, w.lfoA, fmac(i.env, w.envA, b.intensity)), 0.0f, 1.0f);
+    const float speed = fmac(s.lfo, w.lfoB, fmac(s.env, w.envB, b.speed));
     w.factor = div(k.k440, mul(add(vc2CosmClamp(speed, k.speedFloor, 1.0f), 1.0f), k.k50));
 }
 

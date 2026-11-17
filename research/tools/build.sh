@@ -103,9 +103,11 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 # The TVA (v233) against rom.4's own routines, the OS's call hooked
 [ -f Vc2TvaCheck.cpp ] && cc -DXT_VC2TVA_MAIN Vc2TvaCheck.cpp Vc2TvaEvents.cpp Vc2TvaFakes.cpp Vc2Tva.cpp \
    Vc2TvaTables.cpp "${SH4[@]}" -o "$O/xt_vc2tva" &
-# COSM (v234): the Growl against rom.4's own routines, the Matrix readers hooked
+# COSM (v234): the Growl against rom.4's own routines, the Matrix readers hooked; the converters' frame with the TVF's
+# converter and the Matrix's readers (v235)
 [ -f Vc2CosmCheck.cpp ] && cc -DXT_VC2COSM_MAIN Vc2CosmCheck.cpp Vc2CosmGrowl.cpp Vc2CosmTables.cpp Vc2Math.cpp \
-   "${SH4[@]}" -o "$O/xt_vc2cosm" &
+   $( [ -f Vc2CosmFrameCheck.cpp ] && echo Vc2CosmFrameCheck.cpp Vc2CosmConvert.cpp Vc2CosmTvf.cpp Vc2Matrix.cpp \
+   Vc2MatrixTables.cpp ) "${SH4[@]}" -o "$O/xt_vc2cosm" &
 # The pitch tracker, its frame (v223) and its analysis (v224), against rom.4's own module
 [ -f Vc2TrackerCheck.cpp ] && cc -DXT_VC2TRACKER_MAIN Vc2TrackerCheck.cpp Vc2Tracker.cpp Vc2TrackerTables.cpp \
    $( [ -f Vc2TrackerAnalysis.cpp ] && echo Vc2TrackerAnalysis.cpp Vc2TrackerEstimate.cpp Vc2TrackerSignal.cpp ) \

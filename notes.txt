@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM converters' frame v235 (2026-11-16, on its own branch from vc2-mode's a652243; the VC-2 session's word,
+  from the user's "v232 plus COSM"; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters' frame"). Step 4.2's COSM part's
+  second. vc2CosmConvert (Vc2CosmConvert.cpp): rom.4's dispatcher 0x89399920, the switch byte, the two velocity factors
+  (the curve 0x893a7fb0 through Vc2ToneShared, ÷ 32768), the switch on the type 1…16 through Vc2CosmTypes, the Speaker
+  Simulator's inline case, code 0 past them; the converters' shared holds (vc2CosmLevel, vc2CosmSummedDepth,
+  vc2CosmModOf, the block's modulation words Vc2CosmMod), which the Growl's converter takes now. Vc2CosmInput named
+  whole by its builder 0x89399b10 (Vc2CosmInput.h). vc2TvfConvert (Vc2CosmTvf.cpp): the TVF's converter 0x89398ae0,
+  code 13, four Matrix reads. Vc2Matrix (Vc2Matrix.cpp): M's words to +0x166, the getter 0x893a2350 and COSM's two
+  readers 0x893a2960/0x893a2aa0 as one routine over a group's row, the refresh 0x893a2230 behind Vc2MatrixRefresh (the
+  Matrix core, a part of its own in the plan); the limits in Vc2MatrixTables.cpp (vc2LoadMatrix, rom4-no-matrix).
+  xt_vc2cosm's second part (Vc2CosmFrameCheck.cpp): rom.4's dispatcher on M in its RAM, the readers and getter running,
+  the refresh and the 14 converters not ported hooked; 0 different at seeds 2024 (2,400 events), 7 and 31337 (24,000
+  each). The first run's every case differed: the check hadn't loaded the Matrix's limits. mutate_vc2.py --cosm: 149
+  plants (79 of v234's, 70 new), all caught; the 27 rom- and rom4- panel plants caught. Not in the sound yet.
+
 The VC-2's COSM type 8, the Growl v234 (2026-11-16, on its own branch from vc2-mode's v231; a side session's task from
   the VC-2 session, beside v232 and v233; HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl"). Step 4.2's COSM
   part split by job (the plan): the Growl now; then the converters' frame with a first type, the other 14 converters,
