@@ -1546,6 +1546,52 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's analog install, update and settings (2026-11-17, v248) {#vc2-analog-update}
+
+Step 4.2's OSC voice, its ninth part (the user's "proceed", 2026-11-17): kind 3's three routines besides its note-on, each the frame's call in its row (v230), whole in one version. Ported bit for bit: Vc2OscAnalogUpdate.cpp (`installAnalog`, `updateAnalog`, `settingsAnalog`, members of the voice beside `noteOnAnalog`). The kinds' row says so (`Vc2OscInstall::analog`, `Vc2OscUpdate::analog`, `Vc2OscSettings::analog`). The analog was the last kind whose install the frame called by address, so that way and the row's address are gone. Every address is rom.4's; every offset the voice's.
+
+**One law, each routine's own words.** rom.4's update repeats the note-on's laws on pool words of its own. Their values are the note-on's, but for Fat's 70%, which the note-on doesn't have. So the port keeps one code for each law over a struct of words, read once per routine where it reads them (Vc2OscAnalogPool.h, address rows in Vc2OscTables.cpp):
+- `Vc2OscCodeWords`, the plain codes' (0…8): the note-on's at 0x893c2888…, the update's at 0x893c2e74… and 0x893c3060…30b0. `codeTargets` (Vc2OscAnalog.cpp) is the Pulse Width's target by the code with SQUARE's edge and NOISE's hold, for both. HQ's clear is the note-on's alone.
+- `Vc2OscLaWords`, LA's (9, 10): the note-on's at 0x893c25d0… (its gain's 2^26 and step 0x893c2870, 0x893c2878), the update's at 0x893c338c…33d4, 0x893c34f4, 0x893c34fc. `laTargets` (Vc2OscAnalogLa.cpp) is v242's note-on's LA way up to the steepness, for both. The note-on adds the gain −level × 2^31 and the phases.
+
+**The install** `0x893c2ad0`:
+1. +0xa40 (the tail's flag) is cleared.
+2. With the sub oscillator on (FTRC of +0x138 not 0), it jumps to the sub's own install `0x893c3e60`.
+3. Otherwise, by the code (+0x248), it writes a render routine into +0xa48 and a float from the table at `0x895422f8` into +0xa88. Past 10 it writes nothing more.
+
+| Code | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Render | 3890 | 3580 | 5680 | 5500 | 5f20 | 5260 | 5a90 | 5810 | 2230 | 4fa0 | 4c50 |
+| Sub's render | 3890 | 3580 | 5990 | 5dc0 | 60e0 | 53c0 | 5c90 | 4ac0 | 2230 | 50d0 | 4db0 |
+
+(each 0x893cxxxx). The sub's install takes its floats from `0x89542324`, and past 10 installs NOISE's routine and its float (entry 8).
+
+**The update** `0x893c2ce0`:
+1. The ratio's target (`0x893afb40`) goes into +0x1cc.
+2. With the sub oscillator on, the shape `0x893c4020` runs (v246), and nothing more.
+3. Codes 9 and 10 take LA's targets on the update's words (`0x893c31d0`).
+4. The plain codes take, in rom.4's order:
+   - the gain's target as the targets give it, unscaled;
+   - Fat's half (½ − Fat's sum × ½); its target goes 70% of the way there (rom.2's law), at least its floor;
+   - the Pulse Width's sum on its line, then the code's target (codes 0…8; past 8 none).
+
+   Unlike rom.2's update, rom.4's makes NOISE's hold of 0 into 1, as its note-on does. There's no HQ clear and no current values, which stay the note-on's.
+
+**The settings** `0x893c3460` copy ten words from the settings' +0xb0, the block's layout from its code (+0x104): Fat and its two depths, the Pulse Width and its two, the Slope, the sub level, the Tone and its keyfollow's value. The code, Impact and the sub's switch aren't copied.
+
+**Not ported: `0x893c30c0`.** It is LA's note-on as a function of its own (rom.2's `laNoteOn` shape: LA's targets, −level × 2^31, the phases). No pool word, raw word or `bsr` in rom.4 names it; the note-on (v242) has the same way inline. It's dead code.
+
+**The check, xt_vc2osc** (its voice part):
+- The install's, update's and settings' hooks are gone, so rom.4's own run, and with them the shape and LA's targets. In their place, the analog's 19 render routines that the installs write (above) are hooked as renders, as v238 hooked the players'.
+- Kind-3 voices take the analog's draws at the install's and update's events too (`oscSteerAnalog`; `oscMakeAnalog` makes the voice kind 3 one time in six at an install, one in four at an update). A settings event's copy, or a found voice's noise, can leave a NaN in the sub's switch, whose FTRC the interpreter takes as on and `xtf::ftrc` as off. The first runs showed exactly that: an install of the sub's render against the plain one.
+- A difference now names the routine it follows (`oscBothSides`).
+- NOISE's end's negative phase (v244) is now steered one time in two, since the new draws thinned it.
+
+Results:
+- seed 2024, 40 cases: 0 different; seeds 7 and 31337, 400 cases each: 0 different.
+- Coverage (llvm-cov, seed 2024, 40 cases): every line, region and branch of Vc2OscAnalogUpdate.cpp and of Vc2OscAnalog.cpp. Left unreached is only what was before: the Tone KF index outside its table, and NOISE's end's phase above 1.
+- `mutate_vc2.py --osc`: 995 plants, all caught on the first run. 41 are new: 23 in Vc2OscAnalogUpdate.cpp, 3 on the frame's ways to it, 14 on the update's words and the installs' tables, and the note-on's floor word now read apart. 42 were rewritten where the refactor moved their text (the words into the two structs, the rows' HQ clear, the kinds' row, the frame's two dispatches). The update's words in the note-on's place aren't planted: their values are the same.
+
 ### The VC-2's Matrix set-up (2026-11-17, v247) {#vc2-matrix-setup}
 
 Step 4.2's Matrix, its third part (research/VC2_MODE_PLAN.md; the user's yes, 2026-11-17): how M is made, ported bit for bit in Vc2MatrixSetup.cpp. v245 named "six builders"; they are the pool words of two routines, the second an inlined copy of the first. Every address is rom.4's, every offset its object's.

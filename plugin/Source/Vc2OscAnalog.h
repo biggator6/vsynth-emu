@@ -46,8 +46,13 @@ void hqClear(Vc2OscVoice& v, float, const Vc2OscAnalogPool&);
 // shape writes it inline, on its own pool's ½)
 float within(float x, float m, const Vc2OscAnalogPool& t);
 float withinBy(float x, float m, float half);
-// 0x893c2404…: LA-SQUARE's and LA-SAW's way, by the code (9, 10)
+// 0x893c2404…: LA-SQUARE's and LA-SAW's way, by the code (9, 10); laTargets its targets on a routine's own words, the
+// note-on's and the update's (0x893c31d0, v248)
 void laNoteOn(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s, uint32_t code);
+void laTargets(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s, uint32_t code, const Vc2OscLaWords& t);
+// The plain codes' (0…8) Pulse Width target from x by the code's way, then SQUARE's edge or NOISE's hold, on a
+// routine's own words (the note-on's and the update's, v248); past 8 nothing
+void codeTargets(Vc2OscVoice& v, float x, uint32_t code, const Vc2OscCodeWords& t);
 // 0x893c3b90: the sub oscillator's note-on (v244, Vc2OscAnalogSub.cpp)
 void subNoteOn(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s);
 // The shape's inputs, single as the SH-4 computes them: the ratio × 2, the second wave's pitch ratio (2^Fat's sum),

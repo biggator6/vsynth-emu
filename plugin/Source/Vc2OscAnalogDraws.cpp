@@ -88,15 +88,16 @@ void steerHighWave(Vc2OscVoice& o, std::mt19937& rng) {
 }
 
 // v246: with the sub oscillator on, one time in two a wave five octaves up (steerHighWave); and at HQ and NOISE one
-// time in three a negative phase and Impact, whose product the head keeps and the sub's note-on makes negative again,
-// where their end holds it to 0 (the converter gives no negative Impact; rom.4 holds it all the same)
+// time in two (one in three until v248's draws thinned it) a negative phase and Impact, whose product the head keeps
+// and the sub's note-on makes negative again, where their end holds it to 0 (the converter gives no negative Impact;
+// rom.4 holds it all the same)
 void steerSub(Vc2OscVoice& o, std::mt19937& rng) {
     // [FW] the block's words, the object's phase, and HQ-SQUARE's and NOISE's codes
     constexpr uint32_t kSubOn = 0x138, kCode = 0x104, kImpact = 0x130, kPhase = 0x260, kHqLast = 1, kNoise = 8;
     if (std::trunc(o.f32(kSubOn)) == 0.0f) return;
     if (rng() % 2 == 0) steerHighWave(o, rng);
     const uint32_t code = o.u32(kCode);
-    if ((code <= kHqLast || code == kNoise) && rng() % 3 == 0) {
+    if ((code <= kHqLast || code == kNoise) && rng() % 2 == 0) {
         o.setF32(kImpact, -vc2Unit(rng));
         o.setF32(kPhase, -vc2Unit(rng));
     }
@@ -127,5 +128,11 @@ void oscSteerAnalog(OscSides& s, std::mt19937& rng, int v) {
     }
     if (o.u32(kCode) == kNoise && rng() % 4 == 0) o.setF32(kPw, NAN);
     oscWriteVoice(s, v);
+}
+
+void oscMakeAnalog(OscSides& s, std::mt19937& rng, int v) {
+    constexpr uint32_t kAnalog = 3;   // [FW] the analog's kind
+    s.voices[(size_t)v].setU32(Vc2OscVoice::kKind, kAnalog);
+    oscSteerAnalog(s, rng, v);
 }
 #endif

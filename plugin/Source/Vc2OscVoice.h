@@ -113,6 +113,11 @@ public:
     void noteOnVari(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void noteOnLite(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893c7c30 (v240, Vc2OscLite.cpp)
     void noteOnAnalog(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893c22e0 (v242, Vc2OscAnalog.cpp)
+    // v248 (Vc2OscAnalogUpdate.cpp): the analog's install 0x893c2ad0, update 0x893c2ce0 and settings 0x893c3460
+    // (given the settings' +0xb0)
+    void installAnalog();
+    void updateAnalog(Vc2OscParts& parts, const Vc2ToneShared& shared);
+    void settingsAnalog(const uint32_t* from);
     // 0x893ae610: ramp 0's start, given the ramp's six words (Vc2RampSettings; the tone's input + 0xc)
     void start(const uint32_t* ramp, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void count(uint32_t x);                                // 0x893ae6c0

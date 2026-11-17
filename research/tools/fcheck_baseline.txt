@@ -784,8 +784,8 @@ note-on: 2352 note-ons, 370 players taken, 2895 LFOs following, 5470 free LFOs, 
 xt_vc2tone: 0 different
 == xt_vc2osc
 ramp: 40 cases, 12000 events: 986 built, 1873 started, 943 restarted, 891 legato updates, 4608 ticks (416 gliding, 772 at an end), 1857 values
-osc: 40 cases, 16000 events, 2515 note-ons (429 with a sample, 1235 without), 1655 updates, 1595 renders, 821 settings, 860 takes, 3420 getters
-calls: 315 seeks, 2297 kinds' routines, 97 event lookups, 409 object setups; 2549 ramps gliding after an event
+osc: 40 cases, 16000 events, 2532 note-ons (457 with a sample, 1212 without), 1706 updates, 1678 renders, 820 settings, 882 takes, 3317 getters
+calls: 298 seeks, 1820 kinds' routines, 128 event lookups, 416 object setups; 2660 ramps gliding after an event
 xt_vc2osc: 0 different
 == xt_vc2tva
 tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fading, 961 fades ended, 559 told), 88 over, 200 silent

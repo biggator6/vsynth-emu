@@ -35,17 +35,20 @@ std::string oscDifference(OscSides& s);
 enum class OscAnswer : uint8_t { none, r0, fr0 };
 
 // rom.4's `routine` on `args`, then the port's `mine()` (giving its answer's bits), then what differs, the answers
-// compared as `how` says
+// compared as `how` says; a difference names the routine (v248)
 template <class Mine>
 std::string oscBothSides(OscSides& s, uint32_t routine, std::initializer_list<uint32_t> args, OscAnswer how,
                          Mine mine) {
-    if (!s.fw.call(routine, args)) return "rom.4's routine faults: " + s.fw.cpu.error();
+    char at[24];
+    std::snprintf(at, sizeof at, "%08x: ", routine);
+    if (!s.fw.call(routine, args)) return at + ("rom.4's routine faults: " + s.fw.cpu.error());
     const uint32_t theirs = how == OscAnswer::fr0 ? s.fw.cpu.fb[0][0] : s.fw.cpu.r[0];
     const uint32_t ours = mine();
-    std::string what = oscDifference(s);
-    if (!what.empty() || how == OscAnswer::none || theirs == ours) return what;
+    const std::string what = oscDifference(s);
+    if (!what.empty()) return at + what;
+    if (how == OscAnswer::none || theirs == ours) return what;
     char t[96];
-    std::snprintf(t, sizeof t, "the answer: %08x, against %08x", ours, theirs);
+    std::snprintf(t, sizeof t, "%sthe answer: %08x, against %08x", at, ours, theirs);
     return t;
 }
 // How wide a drawn float may be: anything (NaNs, infinities, ±3e38 among the edges), no NaN, or moderate (0, ±1 and to
@@ -74,6 +77,8 @@ void oscAnalogObject(Vc2OscVoice& o, std::mt19937& rng);
 // v242 (here from v246, Vc2OscAnalogDraws.cpp): the kinds' note-on event's draws for kind 3 on voice `v`: its block
 // words, a pitch near the root, the object's words, the sub oscillator's steers, LA's and NOISE's
 void oscSteerAnalog(OscSides& s, std::mt19937& rng, int v);
+// v248: voice `v` made kind 3 and its words drawn so (the install's and update's events, Vc2OscEvents.cpp)
+void oscMakeAnalog(OscSides& s, std::mt19937& rng, int v);
 // A sample position's float: 2^31 and 2^32 themselves and either side, around them, or any but a NaN
 float oscDrawPosition(std::mt19937& rng);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same

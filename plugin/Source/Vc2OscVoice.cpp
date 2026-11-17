@@ -56,9 +56,9 @@ void Vc2OscVoice::construct(Vc2OscParts& parts) {
 void Vc2OscVoice::install(Vc2OscParts& parts) {
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
     switch (row.installs) {   // a kind's own install runs in the frame's place (v238: LITE's and VariPhrase's ported)
-        case Vc2OscInstall::routine: parts.kindCall(row.install); return;
         case Vc2OscInstall::lite: installLite(parts); return;
         case Vc2OscInstall::vari: installVari(); return;
+        case Vc2OscInstall::analog: installAnalog(); return;   // v248
         case Vc2OscInstall::frame: break;
     }
     if (row.clearsFlag) tail.flag = 0;
@@ -79,7 +79,8 @@ void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& sha
     for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {
         if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);
     }
-    if (row.update != 0) parts.kindCall(row.update);
+    if (row.updates == Vc2OscUpdate::analog) updateAnalog(parts, shared);   // v248
+    else if (row.update != 0) parts.kindCall(row.update);
 }
 
 void Vc2OscVoice::reseek(Vc2OscParts& parts) {

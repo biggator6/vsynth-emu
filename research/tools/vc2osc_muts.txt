@@ -76,7 +76,7 @@ update-wait-ge|f32(kLevel) > vc2OscTables().waitLevel|f32(kLevel) >= vc2OscTable
 update-wait-no-return|vc2OscTables().waitLevel) return;|vc2OscTables().waitLevel) {}|vc2osc
 update-no-reseek|        reseek(parts);\n||vc2osc
 update-first-after|    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);\n    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }|    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }\n    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);|vc2osc
-update-no-update|    if (row.update != 0) parts.kindCall(row.update);\n||vc2osc
+update-no-update|    else if (row.update != 0) parts.kindCall(row.update);\n||vc2osc
 reseek-no-hold|setU8(kFlags, (uint8_t)(was \| kHeld));|setU8(kFlags, was);|vc2osc
 reseek-at-unsigned|(int32_t)u32(kSeekAt) >> kSeekShift|(int32_t)(u32(kSeekAt) >> kSeekShift)|vc2osc
 reseek-bit-inverted|const uint32_t routine = bit ? seek.set : seek.clear;|const uint32_t routine = bit ? seek.clear : seek.set;|vc2osc
@@ -152,7 +152,7 @@ settings-byte-unread|if (bytes[kSettingsByte] != u8(kByte)) {|if (true) {|vc2osc
 settings-vibrato-from|kVibratoFrom = 0x80|kVibratoFrom = 0x84|vc2oscget
 settings-no-vibrato|    parts.setVibrato(s + kVibratoFrom / 4);\n||vc2oscget
 settings-kind-from|kKindFrom = 0xb0|kKindFrom = 0xb4|vc2oscget
-settings-no-kind|    if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);\n||vc2oscget
+settings-no-kind|    else if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);\n||vc2oscget
 settings-carrier-bytes|kCarrierBytes = 88|kCarrierBytes = 84|vc2oscget
 settings-no-carrier-copy|    std::memcpy(own.data() + (kWave - kOwn), s + kKindFrom / 4, kCarrierBytes);\n||vc2oscget
 settings-no-carrier|    parts.setCarrier(s + kKindFrom / 4);\n||vc2oscget
@@ -210,10 +210,10 @@ k2-update|.update = 0x893c88b0|.update = 0x893c8280|vc2osckinds
 k2-records|      .records = Records::fromBlock, .settings = 0x893b0280|      .settings = 0x893b0280|vc2osckinds
 k2-ramp|.records = Records::fromBlock, .settings = 0x893b0280,|.records = Records::fromBlock, .ramp = true, .settings = 0x893b0280,|vc2osckinds
 k2-pitch|.settings = 0x893b0280, .pitch = Pitch::tuned|.settings = 0x893b0280, .pitch = Pitch::bounded|vc2osckinds
-k3-install|.install = 0x893c2ad0|.install = 0|vc2osckinds
-k3-update|.update = 0x893c2ce0|.update = 0x893c6260|vc2osckinds
-k3-ramp|.update = 0x893c2ce0, .ramp = true,|.update = 0x893c2ce0,|vc2osckinds
-k3-settings|.settings = 0x893c3460|.settings = 0|vc2osckinds
+k3-install|.installs = Install::analog, .ticks = kR0|.installs = Install::frame, .ticks = kR0|vc2osckinds
+k3-update|.updates = Vc2OscUpdate::analog, .ramp = true,|.updates = Vc2OscUpdate::routine, .ramp = true,|vc2osckinds
+k3-ramp|.updates = Vc2OscUpdate::analog, .ramp = true,|.updates = Vc2OscUpdate::analog,|vc2osckinds
+k3-settings|.settingsWay = Vc2OscSettings::analog, .renders|.renders|vc2osckinds
 k3-renders|.renders = Render::byAnalog|.renders = Render::byRender|vc2osckinds
 k3-pitch|.renders = Render::byAnalog, .pitch = Pitch::bounded|.renders = Render::byAnalog, .pitch = Pitch::tuned|vc2osckinds
 k4-render|.render = 0x893c62e0|.render = 0x893c61e0|vc2osckinds
@@ -511,7 +511,7 @@ tt-per-step|{ 0x893b1068, &t.factorPerStep }|{ 0x893b1064, &t.factorPerStep }|vc
 tt-glide-end|{ 0x893b1210, &t.glideEnd }|{ 0x893b1218, &t.glideEnd }|vc2ramptables
 tt-per-cent|{ 0x893b1218, &t.tickPerCent }|{ 0x893b0c44, &t.tickPerCent }|vc2ramptables
 rows-at|kRows { 0x89546044, 8 * 3 }|kRows { 0x89546050, 8 * 3 }|vc2ramptables
-k3-installs|.installs = Install::routine, .install = 0x893c2ad0|.installs = Install::frame, .install = 0x893c2ad0|vc2osckinds
+k3-installs|.installs = Install::analog, .ticks = kR0|.installs = Install::vari, .ticks = kR0|vc2osckinds
 install-lite|case Vc2OscInstall::lite: installLite(parts); return;|case Vc2OscInstall::lite: return;|vc2osc
 install-vari|case Vc2OscInstall::vari: installVari(); return;|case Vc2OscInstall::vari: break;|vc2osc
 noteon-vari|case Vc2OscNoteOn::vari: noteOnVari(parts, shared); break;|case Vc2OscNoteOn::vari: break;|vc2oscnoteon
@@ -754,8 +754,8 @@ an-fat-half|sub(t.half, mul(sum(v, p, kFat, kFatMod), t.half))|sub(t.half, sum(v
 an-fat-mod|mul(sum(v, p, kFat, kFatMod), t.half))|mul(sum(v, p, kFat, kPwMod), t.half))|vc2oscanalog
 an-fat-now|    v.setF32(kFatNow, half);\n    if|    if|vc2oscanalog
 an-fat-floor-test|if (!(v.f32(kFatTarget) > t.fatMin)) {|if (v.f32(kFatTarget) > t.fatMin) {|vc2oscanalog
-an-fat-floor-value|v.setF32(kFatTarget, t.step);\n        v.setF32(kFatNow, t.step);|v.setF32(kFatTarget, t.half);\n        v.setF32(kFatNow, t.step);|vc2oscanalog
-an-fat-floor-now|        v.setF32(kFatNow, t.step);\n    }|    }|vc2oscanalog
+an-fat-floor-value|v.setF32(kFatTarget, t.fatFloor);\n        v.setF32(kFatNow, t.fatFloor);|v.setF32(kFatTarget, t.half);\n        v.setF32(kFatNow, t.fatFloor);|vc2oscanalog
+an-fat-floor-now|        v.setF32(kFatNow, t.fatFloor);\n    }|    }|vc2oscanalog
 an-pw-line|add(mul(sum(v, p, kPw, kPwMod), t.pwSpan), t.pwLo)|add(mul(sum(v, p, kPw, kPwMod), t.pwLo), t.pwSpan)|vc2oscanalog
 an-pw-mod|sum(v, p, kPw, kPwMod), t.pwSpan|sum(v, p, kPw, kFatMod), t.pwSpan|vc2oscanalog
 an-sum-env|mul(p.boundFloat(v.tail.binds[m.envelope], kEnvelopeOut), v.f32(m.envelopeDepth))|mul(p.boundFloat(v.tail.binds[m.envelope], kLfoOut), v.f32(m.envelopeDepth))|vc2oscanalog
@@ -764,22 +764,22 @@ an-sum-low|if (0.0f > x) return 0.0f;|if (0.0f > x) return x;|vc2oscanalog
 an-sum-high|return x > kOne ? kOne : x;|return x;|vc2oscanalog
 an-sum-base|v.f32(m.envelopeDepth)), v.f32(base));|v.f32(m.envelopeDepth)), 0.0f);|vc2oscanalog
 an-past-codes|for (uint32_t at : { kFatTarget, kFatNow, kPwTarget, kPwNow })|for (uint32_t at : { kFatNow, kPwTarget, kPwNow })|vc2oscanalog
-an-past-half|kPwNow }) v.setF32(at, t.half);|kPwNow }) v.setF32(at, t.step);|vc2oscanalog
+an-past-half|kPwNow }) v.setF32(at, t.half);|kPwNow }) v.setF32(at, t.fatFloor);|vc2oscanalog
 an-end-copy|    v.setU32(kPwNow, v.u32(kPwTarget));\n}|}|vc2oscanalog
 an-codes-bound|if (code < kCodes.size()) {|if (code < kCodes.size() - 1) {|vc2oscanalog
-an-then|        if (kCodes[code].then) kCodes[code].then(v, x, t);\n||vc2oscanalog
+an-then|    if (kCodes[code].then) kCodes[code].then(v, x, t);\n||vc2oscanalog
 an-pw-line-law|if (c.line) return add(mul(x, (t.*c.line).span), (t.*c.line).lo);|if (c.line) return mul(x, (t.*c.line).span);|vc2oscanalog
 an-pw-shape|return c.shape ? c.shape(v, x, t) : x;|return x;|vc2oscanalog
-an-row-hq0|{ .then = hqClear },                                         // 0 HQ-SAW|{},                                         // 0 HQ-SAW|vc2oscanalog
-an-row-hq1|{ .then = hqClear },                                         // 1 HQ-SQUARE|{},                                         // 1 HQ-SQUARE|vc2oscanalog
+an-row-hq0|{ .clearsHq = true },                                        // 0 HQ-SAW|{},                                        // 0 HQ-SAW|vc2oscanalog
+an-row-hq1|{ .clearsHq = true },                                        // 1 HQ-SQUARE|{},                                        // 1 HQ-SQUARE|vc2oscanalog
 an-row-saw|{ .shape = sawShape }|{ .shape = sineShape }|vc2oscanalog
-an-row-square-line|{ .line = &Vc2OscAnalogPool::square, .then = squareEdge }|{ .line = &Vc2OscAnalogPool::juno, .then = squareEdge }|vc2oscanalog
-an-row-square-edge|{ .line = &Vc2OscAnalogPool::square, .then = squareEdge }|{ .line = &Vc2OscAnalogPool::square }|vc2oscanalog
-an-row-triangle|{ .line = &Vc2OscAnalogPool::triangle }|{ .line = &Vc2OscAnalogPool::ramp }|vc2oscanalog
-an-row-ramp|{ .line = &Vc2OscAnalogPool::ramp }|{ .line = &Vc2OscAnalogPool::juno }|vc2oscanalog
+an-row-square-line|{ .line = &Vc2OscCodeWords::square, .then = squareEdge }|{ .line = &Vc2OscCodeWords::juno, .then = squareEdge }|vc2oscanalog
+an-row-square-edge|{ .line = &Vc2OscCodeWords::square, .then = squareEdge }|{ .line = &Vc2OscCodeWords::square }|vc2oscanalog
+an-row-triangle|{ .line = &Vc2OscCodeWords::triangle }|{ .line = &Vc2OscCodeWords::ramp }|vc2oscanalog
+an-row-ramp|{ .line = &Vc2OscCodeWords::ramp }|{ .line = &Vc2OscCodeWords::juno }|vc2oscanalog
 an-row-sine|{ .shape = sineShape }|{ .shape = sawShape }|vc2oscanalog
-an-row-juno|{ .line = &Vc2OscAnalogPool::juno }|{ .line = &Vc2OscAnalogPool::triangle }|vc2oscanalog
-an-row-noise|{ .then = noiseHold }|{ .then = hqClear }|vc2oscanalog
+an-row-juno|{ .line = &Vc2OscCodeWords::juno }|{ .line = &Vc2OscCodeWords::triangle }|vc2oscanalog
+an-row-noise|{ .then = noiseHold }|{ .clearsHq = true }|vc2oscanalog
 an-hq-value|v.setF32(kHq, 0.0f);|v.setF32(kHq, 1.0f);|vc2oscanalog
 an-hq-falling|    v.setU32(kHqFalling, 0);\n||vc2oscanalog
 an-saw-fold|if (t.half > x) x = sub(kOne, x);|if (t.half > x) x = sub(t.half, x);|vc2oscanalog
@@ -813,56 +813,57 @@ la-kf-ratio|add(mul(ratio, kfRatio), -kOne)|add(ratio, -kOne)|vc2oscanalogla
 la-kf-site|v.f32(kRatio), t.kfRatio, base)|v.f32(kRatio), kOne, base)|vc2oscanalogla
 la-kf-one|-kOne)), kOne), base)|-kOne)), 0.0f), base)|vc2oscanalogla
 la-most-c|return { t.cornerMost, hz, div(hz, t.cornerMost) };|return { c, hz, div(hz, t.cornerMost) };|vc2oscanalogla
-la-most-m|return { t.cornerMost, hz, div(hz, t.cornerMost) };|return { t.cornerMost, hz, t.laHalf };|vc2oscanalogla
+la-most-m|return { t.cornerMost, hz, div(hz, t.cornerMost) };|return { t.cornerMost, hz, t.half };|vc2oscanalogla
 la-two|const float two = mul(hz, kTwo);|const float two = hz;|vc2oscanalogla
-la-two-m|if (two > c) return { two, hz, t.laHalf };|if (two > c) return { two, hz, div(hz, c) };|vc2oscanalogla
-la-two-c|if (two > c) return { two, hz, t.laHalf };|if (two > c) return { c, hz, t.laHalf };|vc2oscanalogla
-la-else-m|return { c, hz, div(hz, c) };|return { c, hz, t.laHalf };|vc2oscanalogla
+la-two-m|if (two > c) return { two, hz, t.half };|if (two > c) return { two, hz, div(hz, c) };|vc2oscanalogla
+la-two-c|if (two > c) return { two, hz, t.half };|if (two > c) return { c, hz, t.half };|vc2oscanalogla
+la-else-m|return { c, hz, div(hz, c) };|return { c, hz, t.half };|vc2oscanalogla
 la-row|t.la[code - kLaFirst];|t.la[0];|vc2oscanalogla
-la-half|float half = sub(t.laHalf, mul(sum(v, p, kFat, kFatMod), t.laHalf));|float half = sub(t.laHalf, sum(v, p, kFat, kFatMod));|vc2oscanalogla
-la-floor|if (!(half > t.laFatMin)) half = t.laFatFloor;|if (half > t.laFatMin) half = t.laFatFloor;|vc2oscanalogla
-la-x|add(mul(sum(v, p, kPw, kPwMod), t.laPwSpan), t.laPwLo)|add(mul(sum(v, p, kPw, kPwMod), t.laPwLo), t.laPwSpan)|vc2oscanalogla
-la-gain-sign|mul(-targets.gain(), t.gainScale)|mul(targets.gain(), t.gainScale)|vc2oscanalogla
-la-gain-scale|mul(-targets.gain(), t.gainScale)|mul(-targets.gain(), t.fullScale)|vc2oscanalogla
+la-half|float half = sub(t.half, mul(sum(v, p, kFat, kFatMod), t.half));|float half = sub(t.half, sum(v, p, kFat, kFatMod));|vc2oscanalogla
+la-floor|if (!(half > t.fatMin)) half = t.fatFloor;|if (half > t.fatMin) half = t.fatFloor;|vc2oscanalogla
+la-x|add(mul(sum(v, p, kPw, kPwMod), t.pwSpan), t.pwLo)|add(mul(sum(v, p, kPw, kPwMod), t.pwLo), t.pwSpan)|vc2oscanalogla
+la-gain-sign|mul(-Vc2OscTargets(v, p, s).gain(), t.gainScale)|mul(Vc2OscTargets(v, p, s).gain(), t.gainScale)|vc2oscanalogla
+la-gain-scale|mul(-Vc2OscTargets(v, p, s).gain(), t.gainScale)|mul(-Vc2OscTargets(v, p, s).gain(), t.cornerMost)|vc2oscanalogla
 la-step|mul(v.f32(kRatio), la.step)|mul(v.f32(kRatio), la.hz)|vc2oscanalogla
-la-pw-target|mul(within(x, c.m, t), t.step)|mul(x, t.step)|vc2oscanalogla
-la-pw-m|within(x, c.m, t)|within(x, t.laHalf, t)|vc2oscanalogla
+la-pw-target|mul(within(x, c.m, vc2OscTables().analog), t.step)|mul(x, t.step)|vc2oscanalogla
+la-pw-m|within(x, c.m, vc2OscTables().analog)|within(x, t.half, vc2OscTables().analog)|vc2oscanalogla
 la-fat-target|v.setF32(kFatTarget, mul(half, t.step));|v.setF32(kFatTarget, half);|vc2oscanalogla
 la-steep|mul(div(c.corner, c.hz), t.step)|mul(div(c.hz, c.corner), t.step)|vc2oscanalogla
-la-gain|mul(-targets.level(), t.fullScale)|mul(-targets.level(), t.gainScale)|vc2oscanalogla
-la-phases|    phases(v, t);\n||vc2oscanalogla
-ph-start|v.setF32(kPhase, t.phaseStart);|v.setF32(kPhase, t.half);|vc2oscanalogla
+la-gain|mul(-Vc2OscTargets(v, p, s).level(), a.fullScale)|mul(-Vc2OscTargets(v, p, s).level(), a.la.gainScale)|vc2oscanalogla
+la-phases|    phases(v, a);\n||vc2oscanalogla
+ph-start|v.setF32(kPhase, a.phaseStart);|v.setF32(kPhase, half);|vc2oscanalogla
 ph-pw-now|v.setF32(kPwNow, div(v.f32(kPwTarget), t.step));|v.setF32(kPwNow, v.f32(kPwTarget));|vc2oscanalogla
 ph-fat-now|v.setF32(kFatNow, div(v.f32(kFatTarget), t.step));|v.setF32(kFatNow, div(v.f32(kFatTarget), t.half));|vc2oscanalogla
 ph-steep-now|v.setF32(kSteepNow, div(v.f32(kSteepTarget), t.step));|v.setF32(kSteepNow, v.f32(kSteepTarget));|vc2oscanalogla
 ph-impact-test|if (kOne > v.f32(kImpactNow)) {|if (kOne < v.f32(kImpactNow)) {|vc2oscanalogla
 ph-impact-mul|ph = mul(ph, v.f32(kImpactNow));|ph = v.f32(kImpactNow);|vc2oscanalogla
-ph-a|add(mul(within(v.f32(kPwNow), v.f32(kUnwritten), t), t.half), t.laHalf)|add(mul(v.f32(kPwNow), t.half), t.laHalf)|vc2oscanalogla
-ph-a-fat|ph = add(mul(a, v.f32(kFatNow)), ph);|ph = add(a, ph);|vc2oscanalogla
+ph-a|add(mul(within(v.f32(kPwNow), v.f32(kUnwritten), a), half), t.half)|add(mul(v.f32(kPwNow), half), t.half)|vc2oscanalogla
+ph-a-fat|ph = add(mul(x, v.f32(kFatNow)), ph);|ph = add(x, ph);|vc2oscanalogla
 ph-bounds-high|if (0.0f > ph \|\| ph > kOne) ph = 0.0f;|if (0.0f > ph) ph = 0.0f;|vc2oscanalogla
 ph-bounds-low|if (0.0f > ph \|\| ph > kOne) ph = 0.0f;|if (ph > kOne) ph = 0.0f;|vc2oscanalogla
-ph-b|add(mul(within(t.half, v.f32(kUnwritten), t), t.half), t.laHalf)|add(mul(t.half, t.half), t.laHalf)|vc2oscanalogla
+ph-b|add(mul(within(half, v.f32(kUnwritten), a), half), t.half)|add(mul(half, half), t.half)|vc2oscanalogla
 ph-z-fat|sub(mul(b, v.f32(kFatNow)), ph)|sub(b, ph)|vc2oscanalogla
 ph-z-ph|sub(mul(b, v.f32(kFatNow)), ph)|mul(b, v.f32(kFatNow))|vc2oscanalogla
-ph-z-one|t.four), kOne);|t.four), 0.0f);|vc2oscanalogla
-ph-wrap|v.setF32(kPhase2, add(z, t.wrap));|v.setF32(kPhase2, z);|vc2oscanalogla
+ph-z-one|a.four), kOne);|a.four), 0.0f);|vc2oscanalogla
+ph-wrap|v.setF32(kPhase2, add(z, a.wrap));|v.setF32(kPhase2, z);|vc2oscanalogla
 ph-wrap-test|if (z > kOne) v.setF32|if (z > t.half) v.setF32|vc2oscanalogla
 w-side|if (half > x) return|if (half < x) return|vc2oscanalogla
 w-low|return m > x ? m : x;|return x;|vc2oscanalogla
 w-high|return x > top ? top : x;|return x;|vc2oscanalogla
 w-top|const float top = sub(kOne, m);|const float top = m;|vc2oscanalogla
 an-pool-period|{ 0x893c23f4, &a.impactPeriod }|{ 0x893c23f8, &a.impactPeriod }|vc2osctables
-an-pool-half|{ 0x893c2888, &a.half }|{ 0x893c2884, &a.half }|vc2osctables
-an-pool-step|{ 0x893c2878, &a.step }|{ 0x893c2874, &a.step }|vc2osctables
-an-pool-saw-lo|{ 0x893c2afc, &a.sawLo }|{ 0x893c2b00, &a.sawLo }|vc2osctables
-an-pool-square-least|{ 0x893c2b10, &a.squareLeast }|{ 0x893c2b14, &a.squareLeast }|vc2osctables
+an-pool-half|kNoteOnCodes { 0x893c2888, 0, 0x893c2894,|kNoteOnCodes { 0x893c2884, 0, 0x893c2894,|vc2osctables
+an-pool-step|0x893c2870, 0x893c2878 };|0x893c2870, 0x893c2874 };|vc2osctables
+an-pool-floor|0x893c2894, 0x893c2878, 0x893c2898|0x893c2894, 0x893c2874, 0x893c2898|vc2osctables
+an-pool-saw-lo|0x893c2af8, 0x893c2afc,|0x893c2af8, 0x893c2b00,|vc2osctables
+an-pool-square-least|0x893c2b10, 0x893c2b14, 0x893c2b2c|0x893c2b14, 0x893c2b14, 0x893c2b2c|vc2osctables
 an-pool-tonekf|kToneKf { 0x89546fbc, 15 }|kToneKf { 0x89546fc0, 15 }|vc2osctables
-an-pool-la-hz|{ 0x893c25e4, &sq.hz }|{ 0x893c2604, &sq.hz }|vc2osctables
-an-pool-noise|{ 0x893c2b44, &a.noiseSpan }|{ 0x893c2b40, &a.noiseSpan }|vc2osctables
+an-pool-la-hz|{ 0x893c25e4, 0x893c25ec,|{ 0x893c2604, 0x893c25ec,|vc2osctables
+an-pool-noise|0x893c2b44 };|0x893c2b40 };|vc2osctables
 an-pool-within|{ 0x893c4a94, &a.withinHalf }|{ 0x893c4a90, &a.withinHalf }|vc2osctables
-an-pool-most|{ 0x893c260c, &a.cornerMost }|{ 0x893c2608, &a.cornerMost }|vc2osctables
+an-pool-most|0x893c2600, 0x893c260c, 0x893c2870|0x893c2600, 0x893c2608, 0x893c2870|vc2osctables
 an-pool-wrap|{ 0x893c2890, &a.wrap }|{ 0x893c288c, &a.wrap }|vc2osctables
-an-pool-juno|{ 0x893c2b3c, &a.juno.lo }|{ 0x893c2b34, &a.juno.lo }|vc2osctables
+an-pool-juno|0x893c2b3c, 0x893c2b40 },|0x893c2b34, 0x893c2b40 },|vc2osctables
 an-pool-read|        vc2ReadPool(image, analogWords(analog));\n||vc2osctables
 tgt-write|v.setF32(at, (this->*target)());|v.setF32(at, 0.0f);|vc2osctargets
 an-noteon-case|        case Vc2OscNoteOn::analog: noteOnAnalog(parts, shared); break;   // 0x893c22e0 (v242, Vc2OscAnalog.cpp)\n||vc2oscnoteon
@@ -990,3 +991,46 @@ shape-pool-sq-kf2|{ 0x893c4a9c, &sq.kf2 }|{ 0x893c4a8c, &sq.kf2 }|vc2osctables
 shape-pool-saw-hz220|{ 0x893c4830, &saw.hz220 }|{ 0x893c4828, &saw.hz220 }|vc2osctables
 shape-pool-sq-corner|{ 0x893c4a84, &sq.corner }|{ 0x893c4a80, &sq.corner }|vc2osctables
 shape-pool-tonekf|kShapeToneKf { 0x89560064, 15 }|kShapeToneKf { 0x89560068, 15 }|vc2osctables
+# v248: the analog's install, update and settings (vc2oscanalogupdate, Vc2OscAnalogUpdate.cpp), the frame's ways to them
+# (vc2osc, vc2oscget, vc2osckinds) and the update's words (vc2osctables).  Not planted: the update's words for the
+# note-on's (the same values but Fat's 70%, which the note-on's struct reads as 0).
+upd-ratio|    setF32(kRatio, Vc2OscTargets(*this, parts, shared).ratio());\n||vc2oscanalogupdate
+upd-sub|        subShape(*this, parts, shared);|        plainUpdate(*this, parts, shared, u32(kCodeCopy));|vc2oscanalogupdate
+upd-la-codes|if (code - kLaFirst < kLaCodes) laTargets|if (code - kLaFirst < 1) laTargets|vc2oscanalogupdate
+upd-la-first|kLaFirst = 9, kLaCodes = 2;   // [FW] 0x893c2d1a|kLaFirst = 8, kLaCodes = 2;   // [FW] 0x893c2d1a|vc2oscanalogupdate
+upd-gain|v.setF32(kGainTarget, Vc2OscTargets(v, p, s).gain());|v.setF32(kGainTarget, Vc2OscTargets(v, p, s).level());|vc2oscanalogupdate
+upd-fat-move|t.fatMove), v.f32(kFatTarget))|t.half), v.f32(kFatTarget))|vc2oscanalogupdate
+upd-fat-to|v.setF32(kFatTarget, add(mul(sub(half, v.f32(kFatTarget)), t.fatMove), v.f32(kFatTarget)));|v.setF32(kFatTarget, half);|vc2oscanalogupdate
+upd-fat-floor|v.setF32(kFatTarget, t.fatFloor);|v.setF32(kFatTarget, t.fatMin);|vc2oscanalogupdate
+upd-fat-test|if (!(v.f32(kFatTarget) > t.fatMin))|if (v.f32(kFatTarget) > t.fatMin)|vc2oscanalogupdate
+upd-half|const float half = sub(t.half, mul(sum(v, p, kFat, kFatMod), t.half));|const float half = sub(t.half, sum(v, p, kFat, kFatMod));|vc2oscanalogupdate
+upd-x|add(mul(sum(v, p, kPw, kPwMod), t.pwSpan), t.pwLo)|add(sum(v, p, kPw, kPwMod), t.pwLo)|vc2oscanalogupdate
+upd-pw-mod|sum(v, p, kPw, kPwMod), t.pwSpan|sum(v, p, kPw, kFatMod), t.pwSpan|vc2oscanalogupdate
+upd-install-flag|    tail.flag = 0;\n    const uint32_t code|    const uint32_t code|vc2oscanalogupdate
+upd-install-renders|tail.renderAnalog = kRenders[code];|tail.renderAnalog = kSubRenders[code];|vc2oscanalogupdate
+upd-install-float|tail.installed = a.installed[code];|tail.installed = a.subInstalled[code];|vc2oscanalogupdate
+upd-install-sub|if (subOn(*this)) {\n        const uint32_t at|if (!subOn(*this)) {\n        const uint32_t at|vc2oscanalogupdate
+upd-install-sub-past|code < kVc2AnalogCodes ? code : kSubPast|code < kVc2AnalogCodes ? code : 0|vc2oscanalogupdate
+upd-install-sub-float|tail.installed = a.subInstalled[at];|tail.installed = a.installed[at];|vc2oscanalogupdate
+upd-install-past|if (code >= kVc2AnalogCodes) return;|if (code >= kVc2AnalogCodes - 1) return;|vc2oscanalogupdate
+upd-install-row|0x893c5810, 0x893c2230, 0x893c4fa0,|0x893c5810, 0x893c2230, 0x893c4c50,|vc2oscanalogupdate
+upd-install-sub-row|0x893c2230, 0x893c50d0, 0x893c4db0|0x893c2230, 0x893c4db0, 0x893c4db0|vc2oscanalogupdate
+upd-settings-copied|0x20, 0x30, 0x38, 0x3c, 0x40 }|0x20, 0x34, 0x38, 0x3c, 0x40 }|vc2oscanalogupdate
+upd-settings-at|setU32(kCode + at, from[at / 4]);|setU32(kCode + at, from[at / 4 + 1]);|vc2oscanalogupdate
+upd-way-update|if (row.updates == Vc2OscUpdate::analog) updateAnalog(parts, shared);   // v248\n    else if (row.update|if (row.update|vc2osc
+upd-way-install|        case Vc2OscInstall::analog: installAnalog(); return;   // v248\n||vc2osc
+upd-way-settings|if (row.settingsWay == Vc2OscSettings::analog) settingsAnalog(s + kKindFrom / 4);   // v248\n    else if (row.settings|if (row.settings|vc2oscget
+upd-pool-fat-move|0x893c2e74, 0x893c2e78, 0x893c2e7c,|0x893c2e74, 0x893c2e74, 0x893c2e7c,|vc2osctables
+upd-pool-floor|0x893c2e7c, 0x893c2e80, 0x893c2e84|0x893c2e7c, 0x893c2e7c, 0x893c2e84|vc2osctables
+upd-pool-pw|0x893c2e84, 0x893c2e88, 0x893c3068|0x893c2e88, 0x893c2e88, 0x893c3068|vc2osctables
+upd-pool-ramp|{ 0x893c3060, 0x893c3064, 0x893c3074,|{ 0x893c3064, 0x893c3064, 0x893c3074,|vc2osctables
+upd-pool-steps|{ 0x893c3084, 0x893c3088, 0x893c308c,|{ 0x893c3088, 0x893c3088, 0x893c308c,|vc2osctables
+upd-pool-noise|0x893c30b0 };|0x893c30ac };|vc2osctables
+upd-la-pool-half|{ 0x893c338c, 0x893c33a0, 0x893c3390,|{ 0x893c3390, 0x893c33a0, 0x893c3390,|vc2osctables
+upd-la-pool-rows|{ 0x893c33ac, 0x893c33b0, 0x893c33cc, 0x893c33d0 }|{ 0x893c33cc, 0x893c33b0, 0x893c33cc, 0x893c33d0 }|vc2osctables
+upd-la-pool-most|0x893c33c8, 0x893c33d4, 0x893c34f4|0x893c33c8, 0x893c33c0, 0x893c34f4|vc2osctables
+upd-la-pool-gain|0x893c33d4, 0x893c34f4, 0x893c34fc|0x893c33d4, 0x893c34fc, 0x893c34fc|vc2osctables
+upd-pool-installed|kAnalogInstalled { 0x895422f8, kVc2AnalogCodes }|kAnalogInstalled { 0x895422fc, kVc2AnalogCodes }|vc2osctables
+upd-pool-sub-installed|kSubInstalled { 0x89542324, kVc2AnalogCodes }|kSubInstalled { 0x895422f8, kVc2AnalogCodes }|vc2osctables
+upd-pool-read-codes|        readCodeWords(image, kUpdateCodes, analog.updateCodes);\n||vc2osctables
+upd-pool-read-la|        readLaWords(image, kUpdateLa, analog.updateLa);\n||vc2osctables

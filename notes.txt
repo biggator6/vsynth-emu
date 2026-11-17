@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's analog install, update and settings v248 (2026-11-17, on vc2-mode after v247's merge 9c2009c; the user's
+  "proceed"; HARDWARE_FIRMWARE.md, "The VC-2's analog install, update and settings"): step 4.2's OSC voice, its ninth
+  part, whole. Vc2OscAnalogUpdate.cpp: the install 0x893c2ad0 (+0xa40 cleared, the render by code into +0xa48 and its
+  float from 0x895422f8 into +0xa88; the sub oscillator's own 0x893c3e60, its renders and 0x89542324, past 10
+  NOISE's), the update 0x893c2ce0 (the ratio, then the shape, LA's targets 0x893c31d0 or the plain codes': the gain,
+  Fat 70% of the way, the Pulse Width by code) and the settings 0x893c3460 (ten words copied). The update's words
+  equal the note-on's but Fat's 70%, so each law is one code over a routine's words: Vc2OscCodeWords (codeTargets)
+  and Vc2OscLaWords (laTargets), read by address rows. The row's ways Vc2OscInstall::analog, Vc2OscUpdate,
+  Vc2OscSettings; Vc2OscInstall::routine gone with its last user. 0x893c30c0 (LA's note-on as a function) is dead
+  code. xt_vc2osc: the three hooks out, the 19 renders the installs write hooked; kind 3's install and update events
+  on the analog's draws (a settings' copy left NaNs at the sub's switch); a difference names its routine. 0 different
+  at seeds 2024, 7 and 31337; the new code covered. mutate_vc2.py --osc: 995 plants (41 new, 42 rewritten where the
+  refactor moved their text), all caught. Not in the sound yet.
+
 The VC-2's Matrix set-up v247 (2026-11-17, on its own branch with vc2-mode's a8452f5 merged in; the user's yes;
   HARDWARE_FIRMWARE.md, "The VC-2's Matrix set-up"). Split by what rom.4 holds: v245's "six builders" are two routines'
   pools. Vc2MatrixSetup (Vc2MatrixSetup.cpp): G, the Matrix's settings at 0x89997398 (Vc2MatrixSettings: sixteen part
