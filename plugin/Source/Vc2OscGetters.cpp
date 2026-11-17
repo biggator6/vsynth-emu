@@ -103,6 +103,18 @@ std::string oscOnGetter(OscSides& s, std::mt19937& rng, int v) {
     return what;
 }
 
+namespace {
+// v240: one time in four the walk's three words (+0x64, +0x78, +0x98) 0, a walk of ±0: LITE's two heads'; from v246 the
+// players' too, where a Vari off start's side goes by the walk's sign (v238's `position-ge` lost its case to v246's
+// draws without it)
+void steerWalkZero(Vc2OscVoice& o, std::mt19937& rng) {
+    constexpr uint32_t kWalkWords[] = { 0x64, 0x78, 0x98 };   // [FW] the walk's and its target's words
+    if (rng() % 4 == 0) {
+        for (uint32_t at : kWalkWords) o.setF32(at, 0.0f);
+    }
+}
+} // namespace
+
 void oscSteerPlayers(OscSides& s, std::mt19937& rng, int v) {
     constexpr uint32_t kKind = 0x54, kWave = 0x104, kFlagsByte = 0x138;   // [FW]
     constexpr uint8_t kVariOff = 0x20;
@@ -111,6 +123,7 @@ void oscSteerPlayers(OscSides& s, std::mt19937& rng, int v) {
     o.setU32(kWave, rng() % 10);
     if (rng() % 4) o.setU8(kFlagsByte, (uint8_t)(o.u8(kFlagsByte) | kVariOff));
     o.tail.flag = rng() % 2;   // v240: the installs' stereo rows, which only a note-on's header gave before
+    steerWalkZero(o, rng);
     oscWriteVoice(s, v);
 }
 
@@ -121,9 +134,8 @@ constexpr uint32_t kLiteFirst = 0x14c, kLiteFrames = 0x150;   // [FW] the block'
 // 0, past the floats or a NaN is drawn again as a real wave's, as Vc2OscEvents.cpp's steerTwoHeads gives a whole
 // note-on (at 0 Hz the walk's start is 0 × ∞, whose FTRC xtf takes otherwise). One time in two a root of 44100 / 2^j
 // Hz, a half period of 2^j samples exactly, with frames a multiple of it, so the walk's start from the last sample is
-// one under a half period's boundary; one time in four the walk's three words (+0x64, +0x78, +0x98) 0, a walk of 0
+// one under a half period's boundary; then a walk of 0 now and then (steerWalkZero)
 void steerHeadsRoot(Vc2OscVoice& o, std::mt19937& rng) {
-    constexpr uint32_t kWalkWords[] = { 0x64, 0x78, 0x98 };   // [FW] the walk target's (0x893afc30)
     constexpr float kLeast = 1e-30f, kMost = 1e30f, kLow = 8.0f, kSpan = 14000.0f, kRate = 44100.0f;
     constexpr uint32_t kHalves = 4096, kShifts = 4;
     if (!(o.tail.hz > kLeast && o.tail.hz < kMost)) o.tail.hz = kLow + kSpan * vc2Unit(rng);
@@ -132,9 +144,7 @@ void steerHeadsRoot(Vc2OscVoice& o, std::mt19937& rng) {
         o.tail.hz = kRate / (float)(1u << j);
         o.setU32(kLiteFrames, (1 + (uint32_t)rng() % kHalves) << j);
     }
-    if (rng() % 4 == 0) {
-        for (uint32_t at : kWalkWords) o.setF32(at, 0.0f);
-    }
+    steerWalkZero(o, rng);
 }
 
 // v240: LITE's note-on (kind 1) on the voice's words: one time in two the first sample and the frames (+0x14c,
@@ -155,74 +165,7 @@ void steerLite(OscSides& s, std::mt19937& rng, int v) {
 }
 } // namespace
 
-std::array<std::pair<uint32_t, uint32_t>, 12> oscAnalogWords(std::mt19937& rng) {
-    constexpr uint32_t kCodes = 11, kPast = 8, kToneKfs = 15;   // [FW] the codes 0…10; the Tone KF table's 15
-    constexpr std::array<float, 6> kSubOn { 1.0f, 2.0f, -1.0f, 0.99f, 1e9f, -0.0f };
-    const uint32_t code = rng() % kPast == 0 ? kCodes + (uint32_t)rng() % kPast : (uint32_t)rng() % kCodes;
-    const float subOn = rng() % 4 == 0 ? kSubOn[rng() % kSubOn.size()] : 0.0f;
-    const float toneKf = (float)(rng() % kToneKfs) + 0.9f * vc2Unit(rng);
-    // Impact as the converter gives it, Impact·4/40: its tenths 0…4, 1 (the default) one time in four; else moderate
-    constexpr uint32_t kTenths = 41;
-    const float tenths = (float)(rng() % kTenths) / 10.0f;
-    const float impact = rng() % 4 == 0 ? 1.0f : rng() % 2 ? tenths : oscDrawFloat(rng, OscRange::moderate);
-    std::array<std::pair<uint32_t, uint32_t>, 12> words { { { 0x104, code }, { 0x138, std::bit_cast<uint32_t>(subOn) },
-                                                           { 0x144, std::bit_cast<uint32_t>(toneKf) },
-                                                           { 0x130, std::bit_cast<uint32_t>(impact) } } };
-    constexpr std::array<uint32_t, 8> kModerate { 0x108, 0x10c, 0x114, 0x11c, 0x120, 0x124, 0x134, 0x140 };
-    for (size_t k = 0; k < kModerate.size(); ++k) {
-        words[4 + k] = { kModerate[k], std::bit_cast<uint32_t>(oscDrawFloat(rng, OscRange::moderate)) };
-    }
-    return words;
-}
-
-void oscAnalogObject(Vc2OscVoice& o, std::mt19937& rng) {
-    // [FW] Fat's and the Pulse Width's targets, the phase, the second wave's Pulse Width target, the level's target,
-    // RAMP's last segment, the two words nothing writes, LA's steepness targets, SQUARE's and JUNO's
-    constexpr std::array<uint32_t, 12> kWords { 0x24c, 0x254, 0x260, 0x278, 0x28c, 0x294, 0x298, 0x2a0, 0x2b0, 0x2b8,
-                                                0x2c0, 0x2c8 };
-    for (uint32_t at : kWords) o.setF32(at, oscDrawFloat(rng, OscRange::moderate));
-}
-
-namespace {
-// v242: one time in two a pitch within an octave of the root, where SQUARE's steps part: the pitch's word (+0x5c), its
-// envelope's and vibrato's depths (+0x70, +0xfc) 0, its factor (+0x60) and the rate's ratio 1, the offset and the
-// pitch ramp's value 0
-void steerNearRoot(Vc2OscVoice& o, std::mt19937& rng) {
-    constexpr uint32_t kPitch = 0x5c, kFactor = 0x60;   // [FW] the cents' and the ratio's words (Vc2OscTargets)
-    constexpr float kOctave = 1200.0f;
-    o.setF32(kPitch, kOctave * (2.0f * vc2Unit(rng) - 1.0f));
-    for (uint32_t at : { 0x70u, 0xfcu }) o.setF32(at, 0.0f);
-    o.setF32(kFactor, 1.0f);
-    o.tail.rateRatio = 1.0f;
-    o.tail.offset = 0.0f;
-    o.ramps[Vc2OscVoice::kPitchRamp].w.value = 0.0f;
-}
-
-// v242: kind 3's, the analog's, block words drawn; a pitch near the root half the time, then half of those SQUARE
-// (code 3), whose steps it parts; the object's words moderate (oscAnalogObject); LA's codes (9, 10) half the time
-// Impact below 1 and +0x298, which the phases' terms are held against, large, where the phase passes 1 (v244); NOISE's
-// (code 8) Pulse Width one time in four a NaN, where its hold meets 0 (FTRC of a NaN: 0 on both sides as a byte; a NaN
-// alone in each product).  Not on the other codes: their sums take it through xtf::sub, whose NaN's sign is the
-// interpreter's FSUB's negated
-void steerAnalog(OscSides& s, std::mt19937& rng, int v) {
-    constexpr uint32_t kAnalog = 3, kPw = 0x11c, kCode = 0x104, kSquare = 3, kNoise = 8, kLaFirst = 9;   // [FW]
-    constexpr uint32_t kImpact = 0x130, kUnwritten = 0x298;                                            // [FW]
-    Vc2OscVoice& o = s.voices[(size_t)v];
-    if (o.kind() != kAnalog) return;
-    for (const auto& [at, bits] : oscAnalogWords(rng)) o.setU32(at, bits);
-    if (rng() % 2) {
-        steerNearRoot(o, rng);
-        if (rng() % 2) o.setU32(kCode, kSquare);
-    }
-    oscAnalogObject(o, rng);
-    if (o.u32(kCode) - kLaFirst < 2 && rng() % 2) {
-        o.setF32(kImpact, 0.5f * vc2Unit(rng));
-        o.setF32(kUnwritten, 2.0f + 100.0f * vc2Unit(rng));
-    }
-    if (o.u32(kCode) == kNoise && rng() % 4 == 0) o.setF32(kPw, NAN);
-    oscWriteVoice(s, v);
-}
-} // namespace
+// v246: oscAnalogWords, oscAnalogObject and oscSteerAnalog, the analog's draws, in Vc2OscAnalogDraws.cpp
 
 // v244: a third each the players' kinds (oscSteerPlayers), the analog (kind 3) and the kind as the event finds it;
 // then LITE's and the analog's own draws by the kind
@@ -232,7 +175,7 @@ std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int v) {
     if (pick == 0) oscSteerPlayers(s, rng, v);
     if (pick == 1) s.voices[(size_t)v].setU32(Vc2OscVoice::kKind, kAnalog);
     steerLite(s, rng, v);
-    steerAnalog(s, rng, v);
+    oscSteerAnalog(s, rng, v);
     ++s.n.noteOns;
     return oscBothSides(s, kKindNoteOn, { oscVoiceAt(v), (uint32_t)rng() }, OscAnswer::none, [&] {
         s.voices[(size_t)v].kindNoteOn(s.parts[(size_t)v], s.romShared);

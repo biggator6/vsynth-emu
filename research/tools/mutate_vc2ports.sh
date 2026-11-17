@@ -46,7 +46,8 @@ VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck 
 VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePortParts Vc2ToneEvents)
 VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2PitchRamp
         Vc2PitchRampTick Vc2RampTables Vc2OscPlayers Vc2OscCheck Vc2OscEvents Vc2OscGetters Vc2OscFakes
-        Vc2OscPortParts Vc2RampCheck Vc2OscRecords Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa Vc2OscAnalogSub)
+        Vc2OscPortParts Vc2RampCheck Vc2OscRecords Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa Vc2OscAnalogSub
+        Vc2OscAnalogShape Vc2OscAnalogDraws)
 VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
          Vc2CosmFrameCheck Vc2CosmConverters Vc2CosmFrameDraws Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive
@@ -99,6 +100,7 @@ VC2PORTS=(
     "vc2oscanalog|Vc2OscAnalog.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscanalogla|Vc2OscAnalogLa.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscanalogsub|Vc2OscAnalogSub.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscanalogshape|Vc2OscAnalogShape.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramp|Vc2PitchRamp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramptick|Vc2PitchRampTick.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramptables|Vc2RampTables.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"

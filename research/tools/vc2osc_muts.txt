@@ -798,16 +798,19 @@ an-square-row-step|? row->step :|? row->bound :|vc2oscanalog
 an-edge|mul(mul(v.f32(kSlope), mul(r, squareStep(r, t))), t.edgeScale)|mul(mul(v.f32(kSlope), squareStep(r, t)), t.edgeScale)|vc2oscanalog
 an-edge-scale|t.edgeScale));|t.sawSlope));|vc2oscanalog
 an-noise-d|const float d = sub(kOne, mul(x, kTwo));|const float d = sub(kOne, x);|vc2oscanalog
-an-noise-low|xtf::ftrc(add(mul(d, t.noiseSpan), kOne))|xtf::ftrc(mul(d, t.noiseSpan))|vc2oscanalog
-an-noise-high|xtf::ftrc(sub(kOne, mul(d, t.noiseSpan)))|xtf::ftrc(add(kOne, mul(d, t.noiseSpan)))|vc2oscanalog
-an-noise-side|const int n = t.half > x ?|const int n = t.half < x ?|vc2oscanalog
+an-noise-low|xtf::ftrc(add(mul(d, span), kOne))|xtf::ftrc(mul(d, span))|vc2oscanalog
+an-noise-high|xtf::ftrc(sub(kOne, mul(d, span)))|xtf::ftrc(add(kOne, mul(d, span)))|vc2oscanalog
+an-noise-side|const int n = half > x ?|const int n = half < x ?|vc2oscanalog
+an-noise-args|holdNoise(v, x, t.half, t.noiseSpan);|holdNoise(v, x, t.half, t.pwSpan);|vc2oscanalog
 an-noise-zero|if (v.u8(kNoiseHold) == 0) v.setU8(kNoiseHold, 1);|if (v.u8(kNoiseHold) == 0) v.setU8(kNoiseHold, 0);|vc2oscanalog
-la-kf-index|t.toneKf[(size_t)i] : 0.0f|t.toneKf[(size_t)(14 - i)] : 0.0f|vc2oscanalogla
+la-kf-index|table[(size_t)i] : 0.0f|table[(size_t)(14 - i)] : 0.0f|vc2oscanalogla
 la-hz|const float hz = mul(v.f32(kRatio), la.hz);|const float hz = mul(v.f32(kRatio), la.step);|vc2oscanalogla
-la-base-pow|s.pow(kTwo, mul(div(v.f32(kTone), t.toneScale), t.toneOctaves))|s.pow(mul(div(v.f32(kTone), t.toneScale), t.toneOctaves), kTwo)|vc2oscanalogla
-la-tone-scale|div(v.f32(kTone), t.toneScale)|div(v.f32(kTone), t.toneOctaves)|vc2oscanalogla
-la-corner|t.toneOctaves)), t.corner);|t.toneOctaves)), t.cornerMost);|vc2oscanalogla
-la-kf-ratio|add(mul(v.f32(kRatio), t.kfRatio), -kOne)|add(v.f32(kRatio), -kOne)|vc2oscanalogla
+la-base-pow|s.pow(kTwo, mul(div(v.f32(kTone), scale), octaves))|s.pow(mul(div(v.f32(kTone), scale), octaves), kTwo)|vc2oscanalogla
+la-tone-scale|div(v.f32(kTone), scale)|div(v.f32(kTone), octaves)|vc2oscanalogla
+la-corner|base = toneCorner(v, s, t.toneScale, t.toneOctaves, t.corner);|base = toneCorner(v, s, t.toneScale, t.toneOctaves, t.cornerMost);|vc2oscanalogla
+la-tone-corner|octaves)), corner);|octaves)), scale);|vc2oscanalogla
+la-kf-ratio|add(mul(ratio, kfRatio), -kOne)|add(ratio, -kOne)|vc2oscanalogla
+la-kf-site|v.f32(kRatio), t.kfRatio, base)|v.f32(kRatio), kOne, base)|vc2oscanalogla
 la-kf-one|-kOne)), kOne), base)|-kOne)), 0.0f), base)|vc2oscanalogla
 la-most-c|return { t.cornerMost, hz, div(hz, t.cornerMost) };|return { c, hz, div(hz, t.cornerMost) };|vc2oscanalogla
 la-most-m|return { t.cornerMost, hz, div(hz, t.cornerMost) };|return { t.cornerMost, hz, t.laHalf };|vc2oscanalogla
@@ -844,7 +847,7 @@ ph-z-ph|sub(mul(b, v.f32(kFatNow)), ph)|mul(b, v.f32(kFatNow))|vc2oscanalogla
 ph-z-one|t.four), kOne);|t.four), 0.0f);|vc2oscanalogla
 ph-wrap|v.setF32(kPhase2, add(z, t.wrap));|v.setF32(kPhase2, z);|vc2oscanalogla
 ph-wrap-test|if (z > kOne) v.setF32|if (z > t.half) v.setF32|vc2oscanalogla
-w-side|if (t.withinHalf > x) return|if (t.withinHalf < x) return|vc2oscanalogla
+w-side|if (half > x) return|if (half < x) return|vc2oscanalogla
 w-low|return m > x ? m : x;|return x;|vc2oscanalogla
 w-high|return x > top ? top : x;|return x;|vc2oscanalogla
 w-top|const float top = sub(kOne, m);|const float top = m;|vc2oscanalogla
@@ -865,8 +868,8 @@ tgt-write|v.setF32(at, (this->*target)());|v.setF32(at, 0.0f);|vc2osctargets
 an-noteon-case|        case Vc2OscNoteOn::analog: noteOnAnalog(parts, shared); break;   // 0x893c22e0 (v242, Vc2OscAnalog.cpp)\n||vc2oscnoteon
 # v244: the sub oscillator's note-on (vc2oscanalogsub, Vc2OscAnalogSub.cpp) and its pool words (vc2osctables).  Not
 # planted: the plain end's phase above 1, which the head's hold to 0…1 and the scale by Impact below 1 never give.
-sub-shape|kShape = 0x893c4020;|kShape = 0x893c4024;|vc2oscanalogsub
-sub-shape-gone|    p.kindCall(kShape);\n||vc2oscanalogsub
+sub-shape-late|    subShape(v, p, s);\n    currents(v, p, s, a.sub);|    currents(v, p, s, a.sub);\n    subShape(v, p, s);|vc2oscanalogsub
+sub-shape-gone|    subShape(v, p, s);\n||vc2oscanalogsub
 sub-gain|v.setF32(kGain, mul(Vc2OscTargets(v, p, s).level(), t.fullScale));|v.setF32(kGain, Vc2OscTargets(v, p, s).level());|vc2oscanalogsub
 sub-fat-now|v.setU32(kFatNow, v.u32(kFatTarget));|v.setU32(kFatNow, v.u32(kPwTarget));|vc2oscanalogsub
 sub-pw-now|v.setF32(kPwNow, div(v.f32(kPwTarget), t.step));|v.setF32(kPwNow, v.f32(kPwTarget));|vc2oscanalogsub
@@ -920,3 +923,70 @@ sub-pool-step|{ 0x893c3c24, &a.sub.step }|{ 0x893c3c28, &a.sub.step }|vc2osctabl
 sub-pool-level|{ 0x893c3c28, &a.sub.levelStep }|{ 0x893c3c24, &a.sub.levelStep }|vc2osctables
 sub-pool-half|{ 0x893c3e7c, &a.sub.half }|{ 0x893c3e80, &a.sub.half }|vc2osctables
 sub-pool-wrap|{ 0x893c3e80, &a.sub.wrap }|{ 0x893c3e7c, &a.sub.wrap }|vc2osctables
+# v246: the sub oscillator's shape (vc2oscanalogshape, Vc2OscAnalogShape.cpp), its LA way (vc2oscanalogla) and its
+# pool words (vc2osctables).  Not planted: the shape's Tone KF table for the note-on's, which holds the same 15 words.
+shape-pow-base|s.pow(kTwo, rawSum(v, p, kFat, kFatMod))|s.pow(rawSum(v, p, kFat, kFatMod), kTwo)|vc2oscanalogshape
+shape-fat-held|s.pow(kTwo, rawSum(v, p, kFat, kFatMod))|s.pow(kTwo, sum(v, p, kFat, kFatMod))|vc2oscanalogshape
+shape-fat-target|    v.setF32(kFatTarget, ratio2);\n||vc2oscanalogshape
+shape-pw-mod|sum(v, p, kPw, kPwMod)|sum(v, p, kPw, kFatMod)|vc2oscanalogshape
+shape-first-gain|v.setF32(kGainTarget, targets.gain());|v.setF32(kGainTarget, targets.level());|vc2oscanalogshape
+shape-first-pw|        v.setF32(kPwTarget, w);\n||vc2oscanalogshape
+shape-gain-scale|mul(targets.gain(), t.gainScale)|targets.gain()|vc2oscanalogshape
+shape-level|mul(v.f32(kSubLevel), t.levelStep)|mul(v.f32(kSubLevel), t.noiseHalf)|vc2oscanalogshape
+shape-ratio-two|{ mul(ratio, kTwo), ratio2, w }|{ ratio, ratio2, w }|vc2oscanalogshape
+shape-row-hq|{ .first = noHold },         // 0 HQ-SAW|{},         // 0 HQ-SAW|vc2oscanalogshape
+shape-row-noise|{ .first = noiseHolds },     // 8 NOISE|{ .first = noHold },     // 8 NOISE|vc2oscanalogshape
+shape-row-la|{ .second = laSquareWay },   // 9 LA-SQUARE|{ .second = laSawWay },   // 9 LA-SQUARE|vc2oscanalogshape
+shape-past|constexpr Vc2OscShapeCode kPast {};|constexpr Vc2OscShapeCode kPast { .first = noHold };|vc2oscanalogshape
+shape-noise-args|holdNoise(v, w, t.noiseHalf, t.noiseSpan)|holdNoise(v, w, t.noiseHalf, t.levelStep)|vc2oscanalogshape
+shape-way-fold|{ .x = folded },                              // 2 SAW|{},                              // 2 SAW|vc2oscanalogshape
+shape-way-sine|{ .x = unlined },                             // 6 SINE|{ .x = folded },                             // 6 SINE|vc2oscanalogshape
+shape-way-square|{ .doubled = true, .end = steepEnds },        // 3 SQUARE|{ .end = steepEnds },        // 3 SQUARE|vc2oscanalogshape
+shape-way-ramp|{ .doubled = true, .end = rampEnds },         // 5 RAMP|{ .doubled = true },         // 5 RAMP|vc2oscanalogshape
+shape-way-juno|{ .doubled = true, .end = steepEnds },        // 7 JUNO|{ .doubled = true },        // 7 JUNO|vc2oscanalogshape
+shape-way-triangle|    {},                                           // 4 TRIANGLE|    { .doubled = true },                                           // 4 TRIANGLE|vc2oscanalogshape
+shape-lined|return add(mul(w, t.line.span), t.line.lo);|return add(mul(w, t.line.lo), t.line.span);|vc2oscanalogshape
+shape-steep-fs|mul(div(t.fs, e1), t.end)|mul(div(e1, t.fs), t.end)|vc2oscanalogshape
+shape-steep2|mul(div(t.fs, e2), t.end)|mul(div(t.fs, e1), t.end)|vc2oscanalogshape
+shape-ramp-end|v.setF32(kRampEnd, mul(div(e1, t.fs), t.end));|v.setF32(kRampEnd, mul(div(e1, t.fs), t.scale));|vc2oscanalogshape
+shape-ramp-end2|v.setF32(kRampEnd2, mul(div(e2, t.fs), t.end));|v.setF32(kRampEnd2, mul(div(e1, t.fs), t.end));|vc2oscanalogshape
+shape-hz|const float f = mul(in.r, t.hz);|const float f = mul(in.ratio2, t.hz);|vc2oscanalogshape
+shape-g|const float g = mul(in.ratio2, f);|const float g = mul(in.r, f);|vc2oscanalogshape
+shape-e2-double|way.doubled ? mul(g, kTwo) : g|way.doubled ? mul(f, kTwo) : g|vc2oscanalogshape
+shape-hold-scale|mul(div(e1, t.fs), t.scale), t.half), t.floor)|mul(div(e1, t.fs), t.floor), t.half), t.floor)|vc2oscanalogshape
+shape-hold-side|mul(div(e1, t.fs), t.scale), t.half)|mul(div(e1, t.fs), t.scale), t.scale)|vc2oscanalogshape
+shape-sw-e2|v.setF32(kSwTarget, mul(withinBy(x, mul(div(e2, t.fs)|v.setF32(kSwTarget, mul(withinBy(x, mul(div(e1, t.fs)|vc2oscanalogshape
+shape-sw-floor|t.scale), t.half), t.floor));\n    shapeSteps|t.scale), t.half), t.scale));\n    shapeSteps|vc2oscanalogshape
+shape-steps-gone|    shapeSteps(v, in, t.step);\n    if (way.end)|    if (way.end)|vc2oscanalogshape
+shape-step-sub|v.setF32(kSubStep, mul(mul(in.r, in.ratio2), step));|v.setF32(kSubStep, mul(in.r, step));|vc2oscanalogshape
+shape-step-la|v.setF32(kLaStep, mul(in.r, step));|v.setF32(kLaStep, mul(in.ratio2, step));|vc2oscanalogshape
+shape-wave-row|vc2OscTables().analog.shape.waves[code - kFirstWave]|vc2OscTables().analog.shape.waves[(code - kFirstWave) % 3]|vc2oscanalogshape
+sla-most|if (c > t.most) c = t.most;|if (c < t.most) c = t.most;|vc2oscanalogla
+sla-hz-above|if (hz > c) c = hz;|if (hz < c) c = hz;|vc2oscanalogla
+sla-m-half|float m = t.half;|float m = t.floor;|vc2oscanalogla
+sla-m|else m = div(holdHz, c);|else m = div(c, holdHz);|vc2oscanalogla
+sla-steep|return { m, mul(div(c, steepHz), kTwo) };|return { m, mul(div(c, steepHz), kOne) };|vc2oscanalogla
+sla-steps|    shapeSteps(v, in, t.step);\n||vc2oscanalogla
+sla-hz|const float hz = mul(in.r, t.hz440);|const float hz = mul(in.r, t.hz220);|vc2oscanalogla
+sla-kf1|in.r, t.kf1, toneCorner|in.r, t.kf2, toneCorner|vc2oscanalogla
+sla-hold-hz|laWave(c1, hz, mul(in.r, t.hz220), hz, t)|laWave(c1, hz, mul(in.r, t.hz440), hz, t)|vc2oscanalogla
+sla-c2-ratio|mul(in.r, in.ratio2), t.kf2,|in.r, t.kf2,|vc2oscanalogla
+sla-pitched|const float pitched = mul(in.ratio2, hz);|const float pitched = hz;|vc2oscanalogla
+sla-steep-den|laWave(c2, hz, pitched, pitched, t)|laWave(c2, hz, pitched, hz, t)|vc2oscanalogla
+sla-cmp-hz|laWave(c2, hz, pitched, pitched, t)|laWave(c2, pitched, pitched, pitched, t)|vc2oscanalogla
+sla-pw-m|mul(withinBy(in.w, one.m, t.half), t.floor)|mul(withinBy(in.w, two.m, t.half), t.floor)|vc2oscanalogla
+sla-sw-m|v.setF32(kSwTarget, mul(withinBy(in.w, two.m, t.half), t.floor));|v.setF32(kSwTarget, mul(withinBy(in.w, one.m, t.half), t.floor));|vc2oscanalogla
+sla-steep-floor|v.setF32(kSteepTarget, mul(one.steep, t.floor));|v.setF32(kSteepTarget, one.steep);|vc2oscanalogla
+sla-steep2|v.setF32(kSteep2Target, mul(two.steep, t.floor));|v.setF32(kSteep2Target, mul(one.steep, t.floor));|vc2oscanalogla
+sla-saw-half|shapeLa(v, s, t, { mul(in.r, t.half), in.ratio2, in.w });|shapeLa(v, s, t, in);|vc2oscanalogla
+sla-square-row|shapeLa(v, s, vc2OscTables().analog.shape.la.front(), in);|shapeLa(v, s, vc2OscTables().analog.shape.la.back(), in);|vc2oscanalogla
+shape-pool-gain|{ 0x893c41f8, &s.head.gainScale }|{ 0x893c41fc, &s.head.gainScale }|vc2osctables
+shape-pool-noise|{ 0x893c41f4, &s.head.noiseSpan }|{ 0x893c41f0, &s.head.noiseSpan }|vc2osctables
+shape-pool-saw-hold|0x893c4520, 0x893c4524,|0x893c4520, 0x893c4534,|vc2osctables
+shape-pool-ramp-half|0x893c4800, 0x893c4804, 0x893c4808|0x893c4800, 0x893c4800, 0x893c4808|vc2osctables
+shape-pool-ramp-end|0x893c480c, 0x893c4810 },|0x893c480c, 0x893c4808 },|vc2osctables
+shape-pool-waves|        readShapeWaves(image, analog.shape.waves);\n||vc2osctables
+shape-pool-sq-kf2|{ 0x893c4a9c, &sq.kf2 }|{ 0x893c4a8c, &sq.kf2 }|vc2osctables
+shape-pool-saw-hz220|{ 0x893c4830, &saw.hz220 }|{ 0x893c4828, &saw.hz220 }|vc2osctables
+shape-pool-sq-corner|{ 0x893c4a84, &sq.corner }|{ 0x893c4a80, &sq.corner }|vc2osctables
+shape-pool-tonekf|kShapeToneKf { 0x89560064, 15 }|kShapeToneKf { 0x89560068, 15 }|vc2osctables

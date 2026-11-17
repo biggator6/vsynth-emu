@@ -48,13 +48,8 @@ void squareEdge(Vc2OscVoice& v, float, const Vc2OscAnalogPool& t) {
     v.setF32(kEdge, mul(mul(v.f32(kSlope), mul(r, squareStep(r, t))), t.edgeScale));
 }
 
-// [FW] 0x893c2a26…: NOISE's hold, 1 + 30·|1 − 2x| samples, as a byte, 1 for 0
-void noiseHold(Vc2OscVoice& v, float x, const Vc2OscAnalogPool& t) {
-    const float d = sub(kOne, mul(x, kTwo));
-    const int n = t.half > x ? xtf::ftrc(add(mul(d, t.noiseSpan), kOne)) : xtf::ftrc(sub(kOne, mul(d, t.noiseSpan)));
-    v.setU8(kNoiseHold, (uint8_t)n);
-    if (v.u8(kNoiseHold) == 0) v.setU8(kNoiseHold, 1);
-}
+// [FW] 0x893c2a26…: NOISE's hold, on this routine's pool words
+void noiseHold(Vc2OscVoice& v, float x, const Vc2OscAnalogPool& t) { holdNoise(v, x, t.half, t.noiseSpan); }
 
 // [FW] each code's way, 0…8 (the switch at 0x893c2868): the Pulse Width's target a line of x, its own law or x, then
 // what else it writes
@@ -108,9 +103,22 @@ void Vc2OscAnalog::hqClear(Vc2OscVoice& v, float, const Vc2OscAnalogPool&) {
     v.setU32(kHqFalling, 0);
 }
 
-float Vc2OscAnalog::sum(const Vc2OscVoice& v, Vc2OscParts& p, uint32_t base, const Vc2OscTargets::Mod& m) {
+// [FW] 0x893c2a26…, 0x893c4140…: NOISE's hold, 1 + 30·|1 − 2x| samples, as a byte, 1 for 0
+void Vc2OscAnalog::holdNoise(Vc2OscVoice& v, float x, float half, float span) {
+    const float d = sub(kOne, mul(x, kTwo));
+    const int n = half > x ? xtf::ftrc(add(mul(d, span), kOne)) : xtf::ftrc(sub(kOne, mul(d, span)));
+    v.setU8(kNoiseHold, (uint8_t)n);
+    if (v.u8(kNoiseHold) == 0) v.setU8(kNoiseHold, 1);
+}
+
+float Vc2OscAnalog::rawSum(const Vc2OscVoice& v, Vc2OscParts& p, uint32_t base, const Vc2OscTargets::Mod& m) {
     float x = add(mul(p.boundFloat(v.tail.binds[m.envelope], kEnvelopeOut), v.f32(m.envelopeDepth)), v.f32(base));
     x = add(mul(p.boundFloat(v.tail.binds[m.lfo], kLfoOut), v.f32(m.lfoDepth)), x);
+    return x;
+}
+
+float Vc2OscAnalog::sum(const Vc2OscVoice& v, Vc2OscParts& p, uint32_t base, const Vc2OscTargets::Mod& m) {
+    const float x = rawSum(v, p, base, m);
     if (0.0f > x) return 0.0f;
     return x > kOne ? kOne : x;
 }
