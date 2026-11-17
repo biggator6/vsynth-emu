@@ -383,11 +383,19 @@ version against rom.4's routines with what it calls hooked:
      (`0x893bf240`), and the DSP (`0x893b9b40`, mono and stereo alike), on the COSM object's 0x164 bytes word for word,
      against rom.4's own routines in xt_vc2cosm with the Matrix readers hooked (HARDWARE_FIRMWARE.md, "The VC-2's COSM
      type 8, the Growl").
-   - next: the converters' frame: the dispatcher (`0x89399920`: the velocity factors by `0x893a7fb0`, the switch on the
-     input's +7), the input's layout, the Matrix readers (`0x893a2960`, `0x893a2aa0`, the COSM groups' getters
-     `0x893a2350`), with a first type's converter.
-   - then the other 14 converters (rom.4's `0x89397980…0x89399620`, rom.2's `0x894dc8b0…0x894de110` on another input:
-     VC2_VOCAL_DESIGNER.md, "COSM in rom.4"), a few a version, each against rom.4's on the same input.
+   - done (v235): the converters' frame: the dispatcher (`0x89399920`: the velocity factors by `0x893a7fb0`, through
+     `Vc2ToneShared`; the switch on the type, the Speaker Simulator's inline), the input's layout (by its builder
+     `0x89399b10`), the Matrix's COSM readers (`0x893a2960`, `0x893a2aa0`) as one routine over a group's row with the
+     getter `0x893a2350` on M's words, the refresh `0x893a2230` behind an interface; the TVF's converter
+     (`0x89398ae0`) the first type; against rom.4's in xt_vc2cosm's second part (HARDWARE_FIRMWARE.md, "The VC-2's
+     COSM converters' frame").
+   - next: the other 14 converters (rom.4's `0x89397980…0x89399620`, rom.2's `0x894dc8b0…0x894de110` on another input:
+     VC2_VOCAL_DESIGNER.md, "COSM in rom.4"), a few a version, each against rom.4's through the dispatcher on the same
+     input, each taking its hook out of xt_vc2cosm's second part.
+   - the Matrix core, a part of its own (every group's, not COSM's alone): the refresh `0x893a2230` (the sources'
+     routines, their terms by the depths and limits, the dirty bits), M's other words and the other groups' readers
+     (the OSC's `0x893a23b0`…, the next group's from `0x893a2bf0`; rows of `vc2MatrixRead` where their shape is the
+     COSM readers', which is read only at their starts), before the part (step 4.3) needs a whole M.
    - then the COSM object in the tone: the set-up `0x893aa590`, the note-on `0x893aa0e0` (the clears, the allocator
      `0x893a8c50`, the start values `0x893a85f0`, the levels it holds, the new block, the code's case), the binding
      `0x893aa7b0`, the install `0x893aafe0`, the update `0x893aa7d0`, the new block `0x893aa5d0` and the DSP chosen by

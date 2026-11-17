@@ -6,11 +6,12 @@
 // a render of drawn frames, an update after new levels and pitch, a new block from a conversion of a drawn input, the
 // pitch moved, the note-on's case, or a conversion alone into a block of noise.  The Matrix readers (0x893a2960,
 // 0x893a2aa0) hooked to log the call and answer the next of two drawn groups of sums, the port's the same.  After each,
-// the whole object, the lines, the frames, the block and the calls, word for word.  XT_VC2COSM_FIRST=1 says where the
-// first case to differ does, XT_VC2COSM_STOP=1 stops there.  XT_VC2COSM_MAIN only.
+// the whole object, the lines, the frames, the block and the calls, word for word.  Then its second part (v235,
+// Vc2CosmFrameCheck.cpp): the converters' frame.  XT_VC2COSM_FIRST=1 says where the first case to differ does,
+// XT_VC2COSM_STOP=1 stops there.  XT_VC2COSM_MAIN only.
 #ifdef XT_VC2COSM_MAIN
 #include "Vc2CheckCalls.h"
-#include "Vc2CheckRig.h"
+#include "Vc2CosmCheck.h"
 #include "Vc2CosmGrowl.h"
 #include <array>
 
@@ -209,7 +210,7 @@ std::string growlEventOn(Vc2Fw& fw, Vc2CosmGrowl& g, GrowlMatrix& m, std::mt1993
 
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2cosm", vc2LoadCosm);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2cosm", vc2LoadCosmAndMatrix);
     if (!run) return 1;
     GrowlMatrix m;
     for (size_t k = 0; k < kReaders.size(); ++k) {
@@ -230,7 +231,8 @@ int main(int argc, char** argv) {
     std::printf("growl: %d cases, %ld events: %ld conversions (%ld by COSM 2's reader), %ld note-ons, %ld updates, %ld "
                 "new blocks, %ld renders (%ld with the phase started again)\n", run->cases, n.events, n.conversions,
                 n.second, n.noteOns, n.updates, n.newBlocks, n.renders, n.restarts);
-    std::printf("xt_vc2cosm: %ld different\n", tally.different);
+    const long frame = vc2CosmFrameCases(fw, *run);   // the second part (v235, Vc2CosmFrameCheck.cpp)
+    std::printf("xt_vc2cosm: %ld different\n", tally.different + frame);
     return 0;
 }
 #endif

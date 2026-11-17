@@ -223,6 +223,9 @@ xt_cosm's 77 addresses (`build/tools/vc2/cosm_pairs.txt`) part three ways.
   has a velocity float at +0x38 it takes a pointer and calls `0x893a2960` with it (which reads the object's +0x1c and +0x94:
   by its shape the Matrix read in the converter, where rom.2 is given it). So the VC-2's COSM converters take another input:
   they are to be ported from rom.4 with the converters that read by ID, and compared once their input path is read.
+  (Read and ported from v234 on: the input whole by its builder `0x89399b10`, the dispatcher, the Matrix's COSM
+  readers `0x893a2960`/`0x893a2aa0` and getter `0x893a2350` on M, which is the note's Matrix object, the Growl's and
+  the TVF's converters; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters' frame".)
 
 **The DSP routines by block code** (all 21 codes, mono and stereo) are in a table in each image's .data, the chooser
 `0x894eef70`'s: rom.2's at `0x8987c7ec` and `0x8987c840`, rom.4's at `0x8993fb50` and `0x8993fba4` (its image's `0x8991e0ec`

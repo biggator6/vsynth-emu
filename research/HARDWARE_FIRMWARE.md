@@ -1546,6 +1546,48 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM converters' frame (2026-11-16, v235) {#vc2-cosm-frame}
+
+Step 4.2's COSM part's second (research/VC2_MODE_PLAN.md), from the VC-2 session's word ("v232 plus COSM"): the frame every COSM converter runs in, with the TVF's converter as its first type. Ported bit for bit: `vc2CosmConvert` and the converters' shared holds (Vc2CosmConvert.cpp), the input named whole (Vc2CosmInput.h), the TVF's converter (Vc2CosmTvf.cpp), and the Matrix object's words, getter and COSM readers (Vc2Matrix.cpp; its limits in Vc2MatrixTables.cpp, read by loadVc2 through `vc2LoadMatrix`).
+
+**The input**, 0x3c bytes, as the builder `0x89399b10(input, note, block, M, zone, COSM)` fills it: +0 the zone; +1 the COSM's number (0, else COSM 2); +2 the key and +3 the velocity, the note's +0xd and +0xf; +6…+0x2f the COSM's 42 bytes from the store (0x89e2003c + the part's byte × 0x540 + the zone × 84 + the COSM × 42: +6 its switch, +7 its type, +8 and +0xa the first velocity curve and sensitivity, +0xc and +0xe the second's, +0x10… the type's parameters in its IDs' order); +0x30, +0x34 the dispatcher's velocity factors; +0x38 the note's Matrix object M. Then it calls the dispatcher with the block. `0x89399b90` takes the note's two bytes again and converts; `0x89399bb0` copies the store's 42 bytes again. The builders are the part's (the conversion by rom.4's IDs), not here.
+
+**The dispatcher** `0x89399920(input, block)`: with the switch (+6) at 0 the block's code is 0 and nothing more. Else the two velocity factors first: the velocity curve `0x893a7fb0(velocity, sensitivity, curve)` (an integer routine of rom.2's `0x894ebd60`'s shape: a sensitivity of 0 or a curve of 7 or more gives 0x8000; else the sensitivity through a table at `0x89542156`, ±200 and past it 0x10000, by the curve's byte table at `0x89541e18`; held to 0…0x8000) ÷ 32768 into +0x30 (+3, +0xa, +8) and +0x34 (+3, +0xe, +0xc). Then the switch on the type, 1…16 (rom.2's switches on +9): the converter of each (rom.4's `0x89397980`…`0x89399620`, the Growl's `0x89398780` at 8, the TVF's `0x89398ae0` at 10), the Speaker Simulator's inline at 4 (code 5, the block's byte +4 the first parameter's low byte); 0 or past 16, code 0. The port takes the curve through `Vc2ToneShared` (v222's: rom.4's own in a check, the shared port in the wiring) and the converters through `Vc2CosmTypes`.
+
+**The Matrix's COSM readers.** M, the note's Matrix object (the tone generator's: the input's +0x38), is read through a reader per group of destinations. Its words, as far as the readers reach:
+
+| Offset | What |
+|---|---|
+| +0x004…+0x00b | each of eight sources' byte, which the refresh gives its routine |
+| +0x00c…+0x021 | by group (11), its destinations a slot names: bit k its k-th (COSM 1's at +0x1c, COSM 2's at +0x1e) |
+| +0x022…+0x061 | 16 slots, two a source: the destination byte (1…78, 0 none), a byte, the depth |
+| +0x064…+0x083 | the sources' routines (the refresh calls them) |
+| +0x084…+0x099 | by group, the destinations to sum again |
+| +0x09a…+0x0a9 | the sources' last values |
+| +0x0aa…+0x0c9 | each slot's term (the refresh: the source × the depth >> 13, held to the destination's limit) |
+| +0x0ca… | the sums by destination from 1 (the OSC's group from +0xca, COSM 1's 46…56 at +0x124, COSM 2's 57…67 at +0x13a, the next group's 68… after) |
+
+- The getter `0x893a2350(M, destination)`: the sum of the terms of every slot naming it, held to ± its limit (a table of 79 words at `0x89540158`: COSM's 127, the LFO depths' 63).
+- COSM 1's reader `0x893a2960(M)`: when a slot names any of its destinations (+0x1c & 0x7ff), the refresh `0x893a2230(M)`, then each of its destinations marked (+0x94 & 0x7ff) cleared and summed again; it returns M + 0x124. COSM 2's `0x893a2aa0` is the same on +0x1e, +0x96, destinations 57… and M + 0x13a. The port's `vc2MatrixRead` is both, by a group's row (`Vc2MatrixGroup`).
+- The refresh `0x893a2230` is the Matrix core's: it calls each source's routine with its byte, keeps the last value, makes each slot's term from its depth and, when any source moved, copies every group's uses into its dirty bits. It serves every group (the OSC's, COSM's, the next), so it comes with the Matrix's own part (the plan's), behind `Vc2MatrixRefresh` here.
+
+**The TVF's converter** `0x89398ae0` (code 13), on Filter Type, Q, Q LFO, Q Env, Cutoff, Cutoff Keyfollow, Cutoff LFO and Cutoff Env (+0x10…+0x1e), four Matrix reads, in this order:
+- +0x34 Filter Type as it stands (an int).
+- +0x1c the Cutoff: Cutoff plus the group's 1st sum, held to 16 bits then 0…127, ÷127, plus (key − 60) × the Keyfollow × 10 (16 bits) ÷ 100 ÷ 127, plus 0, held to 0…1.
+- +0x28 the Cutoff LFO depth plus the 10th sum, held to ±63 on 32 bits (no 16-bit hold here), d/63 × |d/63|; +0x2c its LFO's number 0. +0x20 the Cutoff Env depth (no sum, no hold) by the same law × the first velocity factor; +0x24 its envelope 9 (COSM 2's 11).
+- +4 Q: Q plus the 2nd sum, held as the Cutoff, × 0.984375 ÷ 127 − 1. +0x10 Q LFO with the 11th sum, +0x14 0, +8 Q Env × the second velocity factor, +0xc its envelope 10 (12).
+- +0x18, +0x30 and +0x38… left as they were.
+It is rom.2's `0x894dd870` on another input, so its block is XtCosm's TVF's. The holds, the depth law and a setting's four modulation words (`Vc2CosmMod`: Env depth, envelope, LFO depth, LFO number) are shared with the Growl's converter (`vc2CosmLevel`, `vc2CosmSummedDepth`, `vc2CosmModOf`).
+
+**The check**, xt_vc2cosm's second part (Vc2CosmFrameCheck.cpp, in fcheck with the first at 40 cases): rom.4's dispatcher against `vc2CosmConvert` on M in the interpreter's RAM and its port's words, the readers and getter running on both sides, the refresh hooked to log and to do what a refresh does (one time in two a source moved: new terms, every group's dirty bits its uses), drawn the same on both; the velocity curve rom.4's own on both (`RomShared`); the TVF's and the Growl's converters on both; the other 14 hooked to log their type, the port's `Vc2CosmTypes` the same. Each case M drawn (noise, so a group's sums not marked come back as any 16 bits), then 60 events: an input drawn (the switch off one time in ten; the type half the time the TVF's, a quarter the Growl's, else 0…17 or any byte; curves 0…9; sensitivities at 0, ±199, ±200, 300, within and any; key and velocity now and then past 127; each parameter at its ends, 0, within, past them or any 16 bits), M's uses, slots and terms drawn again one time in four. After each: the input, the block, M and both logs (the refreshes, the hooked converters), word for word.
+
+Results:
+- seed 2024, 40 cases: 2,400 events (1,102 TVF, 544 Growl, 9 Speaker Simulator, 200 of the other types, 261 off, 284 past the types), 4,648 refreshes, 0 different; the Growl's part as it was;
+- seeds 7 and 31337, 400 cases each: 24,000 events each, 0 different.
+- The first run differed at every case: the check loaded COSM's tables alone, so the port's limits were 0 and every sum it made was 0.
+- Coverage (llvm-cov, 40 cases): every function, line and branch of Vc2CosmConvert.cpp, Vc2CosmTvf.cpp and Vc2Matrix.cpp.
+- `mutate_vc2.py --cosm`: 149 plants, all caught: v234's 79 (those on the 16-bit hold and the Growl's modulation words rewritten where the code moved) and 70 new: 21 in the dispatcher and the shared holds, 26 in the TVF's converter, 18 in the Matrix's getter, readers and limits, 5 in the new pool words. The 27 `rom-` and `rom4-` panel plants, the new `rom4-no-matrix` among them, all caught. fcheck's diff is the `frame:` line in xt_vc2cosm's section; verify.sh passes every line.
+
 ### The VC-2's OSC voice's note-on and targets (2026-11-16, v232) {#vc2-osc-note-on}
 
 Step 4.2's OSC voice, its second part (research/VC2_MODE_PLAN.md, "4. Wiring"; "The VC-2's OSC voice", below, the first): the kinds' note-on, `0x893af0b0(voice, legato)`, which v230's note-on ends in, and the targets it and the kinds' updates read, `0x893af9f0…0x893aff60`. Ported bit for bit: `Vc2OscVoice::kindNoteOn` (Vc2OscNoteOn.cpp; each kind's way a field of its row, `Vc2OscNoteOn`, in Vc2OscVoiceKinds.cpp) and `Vc2OscTargets` (Vc2OscTargets.cpp), their constants in Vc2OscTables.cpp. Every address is rom.4's; every offset the voice's.

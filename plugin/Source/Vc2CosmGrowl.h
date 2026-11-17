@@ -8,43 +8,19 @@
 // Bit for bit: xt_vc2cosm against rom.4's routines on an object in Sh4Interp, every word after each.
 // HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl"; research/VC2_VOCAL_DESIGNER.md, "COSM type 8, the Growl,
 // run".  Audio thread.
+#include "Vc2CosmConvert.h"
+#include "Vc2CosmInput.h"
 #include "Vc2CosmTables.h"
 #include <cstdint>
 #include <vector>
-
-// A COSM converter's input as rom.4 lays it out, by what the Growl's converter reads; the rest is the dispatcher's
-// (0x89399920), named with it
-struct Vc2CosmInput {
-    uint8_t head;            // +0x00
-    uint8_t second;          // +0x01: 0 for COSM 1, else COSM 2: which Matrix reader the converter calls
-    uint8_t unread[14];      // +0x02…+0x0f: the dispatcher's (the type at +7, the velocities' at +3 and +8…+0xf)
-    int16_t params[16];      // +0x10…+0x2f: the type's parameters in its IDs' order (the Growl: Intencity, Speed)
-    float velocity[2];       // +0x30, +0x34: the dispatcher's velocity factors
-    uint32_t matrix;         // +0x38: the note's Matrix object M, which the reader is given
-};
-static_assert(sizeof(Vc2CosmInput) == 0x3c, "rom.4's layout, a COSM converter's input");
-
-// The Matrix's sums a COSM's converter adds to its parameters: rom.4's readers, 0x893a2960 (COSM 1) and 0x893a2aa0
-// (COSM 2), each given M, bring its COSM's group of sums up to date and return them, an int16 a parameter
-class Vc2CosmMatrix {
-public:
-    virtual ~Vc2CosmMatrix() = default;
-    virtual const int16_t* sums(bool second, uint32_t matrix) = 0;
-};
 
 // The Growl's block as its converter writes it: the first 0x2c of a COSM's 0x48 bytes, the rest left as they were.
 // The envelopes' and LFOs' numbers are the tone's binding's (0x893b4660: type 9 reads +0x10, +0x20, +0x18, +0x28)
 struct Vc2CosmGrowlBlock {
     int32_t code;                   // +0x00: 9
     float intensity, speed;         // +0x04: Intencity I/127; +0x08: Speed 2·S/128 − 1
-    float intensityEnv;             // +0x0c: Intencity's envelope depth, 0
-    int32_t intensityEnvelope;      // +0x10: its envelope's number, 0
-    float intensityLfo;             // +0x14: its LFO depth, 0
-    int32_t intensityLfoNumber;     // +0x18: its LFO's number, 0
-    float speedEnv;                 // +0x1c: Speed's envelope depth, 0
-    int32_t speedEnvelope;          // +0x20
-    float speedLfo;                 // +0x24: Speed's LFO depth, 0
-    int32_t speedLfoNumber;         // +0x28
+    Vc2CosmMod intensityMod;        // +0x0c…+0x1b: Intencity's depths and numbers, all 0
+    Vc2CosmMod speedMod;            // +0x1c…+0x2b: Speed's, all 0
 };
 static_assert(sizeof(Vc2CosmGrowlBlock) == 0x2c, "rom.4's layout, the Growl's block");
 
