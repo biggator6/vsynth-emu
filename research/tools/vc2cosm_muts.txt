@@ -32,6 +32,9 @@
 # Dropped at v241: v237's types-none (a type the port's table lacks answered as converted): every type the dispatcher
 # hands on is in the table now, so no input reaches that branch; a type the port loses still differs, as the check's
 # own list runs rom.4's converter for it.
+# v243: the Matrix core's refresh and the groups' rows in vc2matrix (Vc2Matrix.cpp), under xt_vc2cosm's third part.
+# Not planted, as no input tells them apart: the refresh's 0 term at a value of 0 left to the law (0 × the depth >> 13,
+# held, is 0 too).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -615,3 +618,45 @@ tables-sbf2-own|{ 0x89398890, &t.sbf2.ownK63 }|{ 0x893985e4, &t.sbf2.ownK63 }|vc
 tables-sbf2-q|{ 0x893985e4, &t.sbf2.qScale }|{ 0x89398890, &t.sbf2.qScale }|vc2cosmtables
 types-sbf1|{ 6, throughLayout<Vc2CosmSbf1Block|{ 4, throughLayout<Vc2CosmSbf1Block|vc2cosmtypes
 types-sbf2|throughLayout<Vc2CosmSbf2Block, vc2Sbf2Convert>|throughLayout<Vc2CosmSbf1Block, vc2Sbf1Convert>|vc2cosmtypes
+core-shift|kTermShift = 13;|kTermShift = 12;|vc2matrix
+core-shift-floor|(s.depth * value) >> kTermShift|(s.depth * value) / (1 << kTermShift)|vc2matrix
+core-hold-top|return static_cast<int16_t>(t > most ? most :|return static_cast<int16_t>(t > most ? most - 1 :|vc2matrix
+core-hold-floor|t >= -most ? t : -most);|t >= -most ? t : -most + 1);|vc2matrix
+core-hold-test|t >= -most ? t : -most);|t > -most + 1 ? t : -most);|vc2matrix
+core-limit-index|limits[s.dest] : 0;|limits[s.dest > 0 ? s.dest - 1 : 0] : 0;|vc2matrix
+core-16-bits|static_cast<int16_t>(sources_.value(|static_cast<int8_t>(sources_.value(|vc2matrix
+core-byte|sources_.value(m.routines[k], m.sources[k])|sources_.value(m.routines[k], m.sources[(k + 1) % kSources])|vc2matrix
+core-routine|sources_.value(m.routines[k],|sources_.value(m.routines[0],|vc2matrix
+core-unchanged|        if (value == m.last[k]) continue;\n||vc2matrix
+core-last|        m.last[k] = value;\n||vc2matrix
+core-moved|        moved = true;\n||vc2matrix
+core-copy-test|if (moved) std::ranges::copy(m.uses, m.dirty);|if (!moved) std::ranges::copy(m.uses, m.dirty);|vc2matrix
+core-copy-from|std::ranges::copy(m.uses, m.dirty);|std::ranges::copy(m.dirty, m.uses);|vc2matrix
+core-slots|j < 2 * k + 2; ++j)|j < 2 * k + 1; ++j)|vc2matrix
+core-slot-first|for (int j = 2 * k;|for (int j = 2 * k + 1;|vc2matrix
+core-sources|for (int k = 0; k < kSources; ++k) {|for (int k = 0; k < kSources - 1; ++k) {|vc2matrix
+groups-0-first|{ { 0, 1, 0xf },|{ { 0, 2, 0xf },|vc2matrix
+groups-0-bits|{ { 0, 1, 0xf },|{ { 0, 1, 0x7 },|vc2matrix
+groups-0-index|{ { 0, 1, 0xf },|{ { 1, 1, 0xf },|vc2matrix
+groups-1-first|{ 1, 5, 0xf }|{ 1, 4, 0xf }|vc2matrix
+groups-1-bits|{ 1, 5, 0xf }|{ 1, 5, 0x1f }|vc2matrix
+groups-1-index|{ 1, 5, 0xf }|{ 0, 5, 0xf }|vc2matrix
+groups-2-first|{ 2, 9, 0x7 }|{ 2, 10, 0x7 }|vc2matrix
+groups-2-bits|{ 2, 9, 0x7 }|{ 2, 9, 0xf }|vc2matrix
+groups-2-index|{ 2, 9, 0x7 }|{ 3, 9, 0x7 }|vc2matrix
+groups-3-first|{ 3, 12, 0xfff }|{ 3, 13, 0xfff }|vc2matrix
+groups-3-bits|{ 3, 12, 0xfff }|{ 3, 12, 0x7ff }|vc2matrix
+groups-3-index|{ 3, 12, 0xfff }|{ 2, 12, 0xfff }|vc2matrix
+groups-4-first|{ 4, 24, 0x1f }|{ 4, 23, 0x1f }|vc2matrix
+groups-4-bits|{ 4, 24, 0x1f }|{ 4, 24, 0xf }|vc2matrix
+groups-4-index|{ 4, 24, 0x1f }|{ 5, 24, 0x1f }|vc2matrix
+groups-5-first|{ 5, 29, 0xfff }|{ 5, 30, 0xfff }|vc2matrix
+groups-5-bits|{ 5, 29, 0xfff }|{ 5, 29, 0x1fff }|vc2matrix
+groups-5-index|{ 5, 29, 0xfff }|{ 4, 29, 0xfff }|vc2matrix
+groups-6-first|{ 6, 41, 0x1f }|{ 6, 40, 0x1f }|vc2matrix
+groups-6-bits|{ 6, 41, 0x1f }|{ 6, 41, 0x3f }|vc2matrix
+groups-6-index|{ 6, 41, 0x1f }|{ 7, 41, 0x1f }|vc2matrix
+groups-10-first|{ 10, 68, 0x7ff }|{ 10, 67, 0x7ff }|vc2matrix
+groups-10-bits|{ 10, 68, 0x7ff }|{ 10, 68, 0xff }|vc2matrix
+groups-10-index|{ 10, 68, 0x7ff }|{ 9, 68, 0x7ff }|vc2matrix
+groups-cosm-order|kVc2MatrixCosm1, kVc2MatrixCosm2,|kVc2MatrixCosm2, kVc2MatrixCosm1,|vc2matrix

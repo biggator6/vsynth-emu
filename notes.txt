@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's Matrix core v243 (2026-11-17, on its own branch, fast-forwarded to vc2-mode's f488b37; the user's choice by
+  the VC-2 session's message; HARDWARE_FIRMWARE.md, "The VC-2's Matrix core"). Split by what rom.4 holds: the core now,
+  the sources' routines (0x893a1de0…0x893a21f0, on M's words past +0x166) and M's set-up next. Vc2MatrixCore
+  (Vc2Matrix.cpp): the refresh 0x893a2230, each source's value by its routine and byte (Vc2MatrixSources), a moved
+  source's two terms its depth × the value >> 13 held to the destination's limit, 0 at 0, every group's dirty bits its
+  uses when one moved; every group's reader a row of vc2MatrixRead (vc2MatrixGroups(): the OSCs', their LFOs', COSM's,
+  0x893a2bf0's 68…78; no reader takes group 7). xt_vc2cosm's third part (Vc2MatrixCheck.cpp): rom.4's refresh,
+  readers and getter against the port, only the sources' routines hooked; 0 different at seeds 2024, 7 and 31337, the
+  first run. The frame's part and it on one template, vc2CosmPart (Vc2CosmCheck.h). mutate_vc2.py --cosm: 625 plants
+  (42 new), all caught; the first run's miss, the floor's test off by one at −limit + 1, closed by drawing the unity
+  depth and answers at the limits' edges. Not in the sound yet.
+
 The VC-2's COSM Side Band Filters v241 (2026-11-16, on its own branch, fast-forwarded to vc2-mode's c2dc9cd; the VC-2
   session's message, the user's yes; HARDWARE_FIRMWARE.md, "The VC-2's COSM Side Band Filters"). Step 4.2's COSM part's
   fifth, the last converters: 0x89398260 (type 6, code 7) and 0x893984e0 (7, 8), vc2Sbf1Convert and vc2Sbf2Convert

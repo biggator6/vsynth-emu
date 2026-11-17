@@ -71,11 +71,7 @@ struct FrameTypes final : Vc2CosmTypes {
 
 // M's words: noise, then the COSM groups' uses (now and then none), slots naming their destinations, terms
 void drawMatrixWords(Vc2MatrixWords& m, std::mt19937& rng, bool all) {
-    if (all) {
-        std::array<uint32_t, sizeof m / 4> noise {};
-        for (uint32_t& w : noise) w = (uint32_t)rng();
-        std::memcpy(&m, noise.data(), sizeof m);
-    }
+    if (all) vc2CosmNoise(m, rng);
     for (int g : { kVc2MatrixCosm1.index, kVc2MatrixCosm2.index })
         m.uses[g] = rng() % 6 == 0 ? (uint16_t)(rng() & ~0x7ffu) : (uint16_t)rng();
     for (Vc2MatrixSlot& s : m.slots)
@@ -93,6 +89,12 @@ struct FrameRig {
     std::vector<FrameCall> types;
     RomShared shared { fw };
     FrameTypes portTypes { reader, shared, types };
+    FrameCounts n;
+    // vc2CosmPart's: rom.4's side hooked, a case's start, an event, the counts said
+    void hook();
+    void start(std::mt19937& rng);
+    std::string event(std::mt19937& rng);
+    void say(const Vc2Run& run) const;
 };
 
 std::string frameDifference(FrameRig& r, const Vc2CosmInput& in, const std::array<uint32_t, kVc2CosmBlockWords>& b) {
@@ -162,23 +164,14 @@ void sayFrameCounts(const Vc2Run& run, const FrameCounts& n) {
                 "%ld refreshes\n", run.cases, n.events, ported.c_str(), n.byType[kSpeaker],
                 types - have - n.byType[kSpeaker], n.off, n.events - n.off - types, n.refreshes);
 }
+
+void FrameRig::hook() { hookFrame(*this); }
+void FrameRig::start(std::mt19937& rng) { drawMatrixWords(m, rng, true); }
+std::string FrameRig::event(std::mt19937& rng) { return frameEvent(*this, rng, n); }
+void FrameRig::say(const Vc2Run& run) const { sayFrameCounts(run, n); }
 } // namespace
 
 bool vc2LoadCosmAndMatrix(const char* path) { return vc2LoadCosm(path) && vc2LoadMatrix(path); }
 
-long vc2CosmFrameCases(Vc2Fw& fw, const Vc2Run& run) {
-    FrameRig r { fw };
-    hookFrame(r);
-    std::mt19937 rng((uint32_t)run.seed + 1);
-    FrameCounts n;
-    Vc2Tally tally { "XT_VC2COSM_FIRST", "XT_VC2COSM_STOP" };
-    for (int c = 0; c < run.cases; ++c) {
-        drawMatrixWords(r.m, rng, true);
-        std::string what;
-        for (int e = 0; e < kEvents && what.empty(); ++e) what = frameEvent(r, rng, n);
-        if (vc2CaseOutcome(tally, what, c, n.events)) break;
-    }
-    sayFrameCounts(run, n);
-    return tally.different;
-}
+long vc2CosmFrameCases(Vc2Fw& fw, const Vc2Run& run) { return vc2CosmPart<FrameRig>(fw, run, 1, kEvents); }
 #endif

@@ -232,7 +232,8 @@ int main(int argc, char** argv) {
                 "new blocks, %ld renders (%ld with the phase started again)\n", run->cases, n.events, n.conversions,
                 n.second, n.noteOns, n.updates, n.newBlocks, n.renders, n.restarts);
     const long frame = vc2CosmFrameCases(fw, *run);   // the second part (v235, Vc2CosmFrameCheck.cpp)
-    std::printf("xt_vc2cosm: %ld different\n", tally.different + frame);
+    const long matrix = vc2MatrixCases(fw, *run);     // the third part (v243, Vc2MatrixCheck.cpp)
+    std::printf("xt_vc2cosm: %ld different\n", tally.different + frame + matrix);
     return 0;
 }
 #endif

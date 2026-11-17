@@ -24,7 +24,7 @@
 # Compressor's and Limiter's (vc2cosmdynamics) and the converters by type (vc2cosmtypes), the Dynamic TVF's with the
 # TVF's (vc2cosmtvf), under xt_vc2cosm; the converters on rom.4's libm (v239): OD/Dist's and the Wave Shaper's
 # (vc2cosmdrive), the Resonator's, Frequency Shifter's and Lo-Fi's (vc2cosmbalanced), under xt_vc2cosm; the Side Band
-# Filters' (vc2cosmsideband, v241), under xt_vc2cosm.
+# Filters' (vc2cosmsideband, v241), under xt_vc2cosm; the Matrix core's refresh and groups (v243) in vc2matrix's file.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -48,7 +48,7 @@ VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc
 VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
          Vc2CosmFrameCheck Vc2CosmConverters Vc2CosmFrameDraws Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive
-         Vc2CosmBalanced Vc2CosmSideBand)
+         Vc2CosmBalanced Vc2CosmSideBand Vc2MatrixCheck)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(

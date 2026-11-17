@@ -442,7 +442,18 @@ version against rom.4's routines with what it calls hooked:
    - the Matrix core, a part of its own (every group's, not COSM's alone): the refresh `0x893a2230` (the sources'
      routines, their terms by the depths and limits, the dirty bits), M's other words and the other groups' readers
      (the OSC's `0x893a23b0`…, the next group's from `0x893a2bf0`; rows of `vc2MatrixRead` where their shape is the
-     COSM readers', which is read only at their starts), before the part (step 4.3) needs a whole M.
+     COSM readers', which is read only at their starts), before the part (step 4.3) needs a whole M. Split by what rom.4
+     holds (2026-11-17): rom.4's Matrix module runs from the set-up's routines (`0x893a1ce0…`, each source's routine
+     by its choice; `0x893a31a0…`, a destination's uses bit and number) through the sources' routines (`0x893a1de0…
+     0x893a21f0`, reading M's words past +0x166: the channel's pointer at +0x168 and a controller's assignment and
+     value through the curve `0x895401f6`) to the core. The core first, then the sources and the set-up.
+   - done (v243): the core, `Vc2MatrixCore` (Vc2Matrix.cpp): the refresh, its sources behind `Vc2MatrixSources`, and
+     every group's reader as a row of `vc2MatrixRead` (all ten have the COSM readers' shape; `0x893a2bf0` has the
+     getter's sum inline for 76…78; no reader takes group 7), against rom.4's in xt_vc2cosm's third part, only the
+     sources' routines hooked (HARDWARE_FIRMWARE.md, "The VC-2's Matrix core").
+   - next: the sources' routines (`0x893a1de0…0x893a21f0`, about sixteen) on M's words past +0x166 and what they read
+     (the channel's controllers, the assignments at `0x89997398`, the curve `0x895401f6`), and M's set-up (the source
+     choice `0x893a1ce0…`, the destination table `0x893a31a0…`, the uses), so the part (step 4.3) can build a whole M.
    - then the COSM object in the tone: the set-up `0x893aa590`, the note-on `0x893aa0e0` (the clears, the allocator
      `0x893a8c50`, the start values `0x893a85f0`, the levels it holds, the new block, the code's case), the binding
      `0x893aa7b0`, the install `0x893aafe0`, the update `0x893aa7d0`, the new block `0x893aa5d0` and the DSP chosen by

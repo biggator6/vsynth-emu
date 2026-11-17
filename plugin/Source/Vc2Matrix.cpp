@@ -1,5 +1,37 @@
-// rom.4's Matrix object, as far as the COSM converters reach it: see Vc2Matrix.h (v235).  Every address is rom.4's.
+// rom.4's Matrix object, as far as the COSM converters reach it, and the Matrix core: see Vc2Matrix.h (v235, v243).
+// Every address is rom.4's.
 #include "Vc2Matrix.h"
+#include <algorithm>
+
+namespace {
+constexpr int kTermShift = 13;   // [FW] a term's depth × value >> 13
+// [FW] the groups' rows, by their readers in Vc2Matrix.h's order
+constexpr Vc2MatrixGroup kGroups[] { { 0, 1, 0xf }, { 1, 5, 0xf }, { 2, 9, 0x7 }, { 3, 12, 0xfff }, { 4, 24, 0x1f },
+                                     { 5, 29, 0xfff }, { 6, 41, 0x1f }, kVc2MatrixCosm1, kVc2MatrixCosm2,
+                                     { 10, 68, 0x7ff } };
+
+// A slot's term for a source's value: depth × value >> 13 (arithmetic), held to ± its destination's limit.  rom.4 reads
+// the limits at any destination byte; past the table's 79 it reads the next table, which no set-up reaches (the port 0)
+int16_t slotTerm(const Vc2MatrixSlot& s, int16_t value) {
+    const int32_t t = (s.depth * value) >> kTermShift;
+    const int32_t most = s.dest < Vc2MatrixTables::kDestinations ? vc2MatrixTables().limits[s.dest] : 0;
+    return static_cast<int16_t>(t > most ? most : t >= -most ? t : -most);
+}
+} // namespace
+
+std::span<const Vc2MatrixGroup> vc2MatrixGroups() { return kGroups; }
+
+void Vc2MatrixCore::refresh(Vc2MatrixWords& m) {
+    bool moved = false;
+    for (int k = 0; k < kSources; ++k) {
+        const auto value = static_cast<int16_t>(sources_.value(m.routines[k], m.sources[k]));
+        if (value == m.last[k]) continue;
+        m.last[k] = value;
+        moved = true;
+        for (int j = 2 * k; j < 2 * k + 2; ++j) m.terms[j] = value == 0 ? 0 : slotTerm(m.slots[j], value);
+    }
+    if (moved) std::ranges::copy(m.uses, m.dirty);
+}
 
 int32_t vc2MatrixSum(const Vc2MatrixWords& m, int dest) {
     int32_t sum = 0;
