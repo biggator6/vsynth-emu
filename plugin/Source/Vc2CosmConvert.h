@@ -11,6 +11,7 @@
 #include <cstdint>
 
 class Vc2ToneShared;
+struct Vc2CosmLevelKeyPool;
 
 inline constexpr int kVc2CosmBlockWords = 0x48 / 4;   // [FW] a COSM's block: its code at +0, the rest by its type
 
@@ -41,6 +42,9 @@ float vc2CosmDepth(int16_t depth, float k63);
 float vc2CosmSummedDepth(int16_t depth, int16_t sum, float k63);
 // A held level 0…127 as 0…1: x/127 + 0, `x` the level as the converter has it (times a factor or not)
 float vc2CosmUnit(float x);
+// A keyfollow's offset: (key − 60) × follow × 10 (each 16 bits, as floats) ÷ `percent` ÷ `by` (v239: vc2CosmKeyed's,
+// and the Resonator's Size's with 12)
+float vc2CosmFollowed(uint8_t key, int16_t follow, float percent, float by);
 // A cutoff and its keyfollow (v237: the TVF's, the Dynamic TVF's and the Dual Filter's 0x893976f0): (key − 60) ×
 // follow × 10 (each 16 bits) ÷ 100 ÷ 127 plus the held level ÷ 127, plus 0, held to 0…1; `percent` and `k127` the
 // converter's own pool words
@@ -50,6 +54,20 @@ float vc2CosmQ(int q, float scale);
 // A gain from rom.4's table (0x89541f34): its word at `index` ÷ `scale`, the converter's own pool word.  rom.4 reads
 // whatever follows the table past its 128 words; no stored setting reaches there, and the port gives 0
 float vc2CosmGain(int index, float scale);
+
+// v239, the laws through rom.4's powf (`shared`'s, Vc2VocoderOsc.h):
+// The keyfollow's ratio: 2 to the (key − 60) × follow × 10 (each 16 bits, their product on 32) ÷ `cents`, 1200
+float vc2CosmKeyScale(uint8_t key, int16_t follow, float cents, const Vc2ToneShared& shared);
+// The level keyfollow (0x89397480, its copy 0x89397510, Lo-Fi's 0x89397870): the held level × `k.scale` ÷ 127 +
+// `k.from`, times the keyfollow's ratio, held to from…1
+float vc2CosmLevelKeyed(int level, uint8_t key, int16_t follow, const Vc2CosmLevelKeyPool& k,
+                        const Vc2ToneShared& shared);
+// The keyed scale (0x89397800, the Frequency Shifter's; the Side Band Filters' Width 0x89397650 the same): the
+// keyfollow's ratio × the held level ÷ 127 + 0, held to 0…1
+float vc2CosmScaled(int level, uint8_t key, int16_t follow, float cents, const Vc2ToneShared& shared);
+// A Dry/Effect Balance (the Resonator's, the Frequency Shifter's, Lo-Fi's): its sum × 100 ÷ 127 (an integer's, toward
+// 0) added, held to 16 bits, then to 0…100, ÷ 100 + 0
+float vc2CosmBalance(int16_t balance, int16_t sum);
 
 // A modulated setting's four words in a block, as the converters lay them: its envelope's depth and number, its LFO's
 // depth and number, which the tone's binding (0x893b4660) reads by the block's code

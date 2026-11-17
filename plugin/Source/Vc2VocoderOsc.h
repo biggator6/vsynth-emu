@@ -22,6 +22,9 @@ public:
     // the pitch ramp's; COSM's converters' too); the wrapper's errno (0x89add990) for an infinite or NaN result isn't
     // the caller's
     virtual float log(float x) const = 0;
+    // 0x89506e54, the library's powf (x to the y), on its core 0x89509b80; the wrapper's errno for an infinite or NaN
+    // result isn't the caller's (v239, COSM's converters')
+    virtual float pow(float x, float y) const = 0;
 };
 
 // The Matrix's sums for the OSC as its two getters give them (rom.4's 0x893a23b0/0x893a2440 and 0x893a26b0/0x893a28b0,

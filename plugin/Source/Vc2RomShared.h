@@ -9,6 +9,7 @@
 class RomShared final : public Vc2ToneShared {
 public:
     static constexpr uint32_t kVelocity = 0x893a7fb0, kExp2 = 0x893a8340, kLog = 0x895065f4;   // [FW]
+    static constexpr uint32_t kPow = 0x89506e54;                                               // [FW] v239
     explicit RomShared(Vc2Fw& fw) : fw_(fw) {}
     int velocity(int velocity, int sens, int curve) const override {
         uint32_t r0 = 0;
@@ -17,12 +18,14 @@ public:
     }
     float exp2(float x) const override { return ofFloat(kExp2, x); }
     float log(float x) const override { return ofFloat(kLog, x); }
+    float pow(float x, float y) const override { return ofFloat(kPow, x, y); }
     mutable bool faulted = false;
 
 private:
-    // rom.4's routine on fr4, its answer in fr0
-    float ofFloat(uint32_t routine, float x) const {
+    // rom.4's routine on fr4 (and fr5), its answer in fr0
+    float ofFloat(uint32_t routine, float x, float y = 0.0f) const {
         fw_.cpu.fb[0][4] = std::bit_cast<uint32_t>(x);
+        fw_.cpu.fb[0][5] = std::bit_cast<uint32_t>(y);
         faulted = !fw_.call(routine, {}) || faulted;
         return std::bit_cast<float>(fw_.cpu.fb[0][0]);
     }

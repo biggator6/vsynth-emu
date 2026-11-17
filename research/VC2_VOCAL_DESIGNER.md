@@ -227,7 +227,8 @@ xt_cosm's 77 addresses (`build/tools/vc2/cosm_pairs.txt`) part three ways.
   readers `0x893a2960`/`0x893a2aa0` and getter `0x893a2350` on M, which is the note's Matrix object, the Growl's and
   the TVF's converters; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters' frame". v237: the Amp Simulator's, Dual
   Filter's, Dynamic TVF's, Compressor's, Limiter's and TB Filter's, "The VC-2's COSM converters, the first batch"; the
-  seven left reach rom.4's powf and logf.)
+  seven left reach rom.4's powf and logf. v239: OD/Dist's, the Wave Shaper's, the Resonator's, the Frequency
+  Shifter's and Lo-Fi's, "The VC-2's COSM converters on rom.4's libm"; the two Side Band Filters are left.)
 
 **The DSP routines by block code** (all 21 codes, mono and stereo) are in a table in each image's .data, the chooser
 `0x894eef70`'s: rom.2's at `0x8987c7ec` and `0x8987c840`, rom.4's at `0x8993fb50` and `0x8993fba4` (its image's `0x8991e0ec`

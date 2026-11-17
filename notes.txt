@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM converters on rom.4's libm v239 (2026-11-16, on its own branch, fast-forwarded to vc2-mode's 319a093;
+  the VC-2 session's message, from the user's "v238 plus COSM"; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters on
+  rom.4's libm"). Step 4.2's COSM part's fourth. The seven left all reach rom.4's powf (0x89506e54) or logf
+  (0x895065f4); split: the five on one helper each now, the two Side Band Filters a version of their own. powf as
+  Vc2ToneShared::pow (Vc2VocoderOsc.h) beside v236's log, rom.4's own in the check (RomShared::pow, Vc2RomShared.h).
+  Ported: OD/Dist 0x89397980 and the Wave Shaper 0x89397cf0 as one routine over a row (Vc2CosmDrive.cpp); the
+  Resonator 0x89398080, the Frequency Shifter 0x893991d0 and Lo-Fi 0x893993f0 as one routine past each one's setting
+  (Vc2CosmBalanced.cpp); the laws in Vc2CosmConvert.cpp: the keyfollow's ratio vc2CosmKeyScale, the level keyfollow
+  vc2CosmLevelKeyed (0x89397480, 0x89397510, 0x89397870), the keyed scale vc2CosmScaled (0x89397800, the Side Band
+  Filters' Width 0x89397650 the same), the offset vc2CosmFollowed (the TVF's keyfollow's, and the Resonator's Size's
+  with 12), the Balance vc2CosmBalance; their pool words in Vc2CosmTables.cpp; the converters by type taking the shared
+  math (Vc2CosmConverters.cpp, its template throughLayout). xt_vc2cosm: 0 different at seeds 2024, 7 and 31337, the
+  first run; RomShared's powf with its arguments swapped, 40 of 40 cases differ. mutate_vc2.py --cosm: 494 plants (143
+  new). Not in the sound yet.
+
 The VC-2's players' installs and VariPhrase's note-on v238 (2026-11-17, on vc2-mode after v237's merge; the user's
   "v238 plus COSM"; HARDWARE_FIRMWARE.md, "The VC-2's players' installs and VariPhrase's note-on"): step 4.2's OSC
   voice, its fourth part, split by what rom.4 holds (LITE's and the analog's note-ons go with their players' ports).

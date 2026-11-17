@@ -1,12 +1,13 @@
-// The VC-2's COSM constants from rom.4: see Vc2CosmTables.h (v234, v235, v237).  Every address is rom.4's, each the pool
-// word its routine loads.
+// The VC-2's COSM constants from rom.4: see Vc2CosmTables.h (v234, v235, v237, v239).  Every address is rom.4's, each
+// the pool word its routine loads.
 #include "Vc2CosmTables.h"
 #include "Vc2RomTables.h"
 
 namespace {
 constexpr uint32_t kGainTable = 0x89541f34;   // [FW] the converters' gain table, u16 each
 
-// [FW] the Growl's DSP's pool and its update's; the TVF's converter's and the dispatcher's; the batch of v237's
+// [FW] the Growl's DSP's pool and its update's; the TVF's converter's and the dispatcher's; the batches of v237 and
+// v239 (a helper's word read into each converter's pool that takes it)
 auto cosmWords(Vc2CosmTables& t) {
     Vc2CosmGrowlPool& g = t.growl;
     return std::to_array<Vc2PoolWord>({
@@ -23,6 +24,13 @@ auto cosmWords(Vc2CosmTables& t) {
         { 0x89397bc0, &t.levelGain.over }, { 0x89397bc4, &t.levelGain.overGain }, { 0x89399270, &t.limiterScale },
         { 0x8939979c, &t.tb.lpfFollow }, { 0x893997a0, &t.tb.lpfFollowFrom }, { 0x893997a4, &t.tb.k63 },
         { 0x893999a0, &t.tb.hpfFollow }, { 0x893999a4, &t.tb.hpfFollowFrom }, { 0x893999ac, &t.tb.gainScale },
+        { 0x89397bcc, &t.od.gainScale }, { 0x893976b0, &t.od.k63 }, { 0x893976b4, &t.od.key.scale },
+        { 0x893976b8, &t.od.key.from }, { 0x893976bc, &t.od.key.cents }, { 0x89397e4c, &t.ws.gainScale },
+        { 0x893976b0, &t.ws.k63 }, { 0x893976b4, &t.ws.key.scale }, { 0x893976b8, &t.ws.key.from },
+        { 0x893976bc, &t.ws.key.cents }, { 0x89397920, &t.resonator.percent }, { 0x8939792c, &t.resonator.twelve },
+        { 0x89397930, &t.resonator.sizeScale }, { 0x893976b0, &t.resonator.k63 }, { 0x89397934, &t.shifter.cents },
+        { 0x89399500, &t.shifter.k63 }, { 0x8939793c, &t.lofi.key.scale }, { 0x89397940, &t.lofi.key.from },
+        { 0x89397934, &t.lofi.key.cents }, { 0x89399500, &t.lofi.k63 },
     });
 }
 

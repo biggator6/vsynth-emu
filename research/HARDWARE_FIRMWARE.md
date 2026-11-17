@@ -1546,6 +1546,39 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM converters on rom.4's libm (2026-11-16, v239) {#vc2-cosm-libm}
+
+Step 4.2's COSM part's fourth (research/VC2_MODE_PLAN.md), from the VC-2 session's message (the user's "v238 plus COSM"): the seven converters left after v237 all reach rom.4's libm. They split by what they hold. Five each have one helper: OD/Dist, the Wave Shaper, the Resonator, the Frequency Shifter and Lo-Fi, done now. The two Side Band Filters, with an HPF, the LPF's square and logf, Sub Detune, an Octave byte, and Detune and Width each with three depths, are a version of their own. Ported bit for bit: OD/Dist's and the Wave Shaper's converters as one routine over a row (Vc2CosmDrive.cpp); the Resonator's, the Frequency Shifter's and Lo-Fi's as one routine past each one's own setting (Vc2CosmBalanced.cpp); the laws they share (Vc2CosmConvert.cpp); their pool words (Vc2CosmTables.cpp, read by loadVc2 through `vc2LoadCosm`, as before). Every address is rom.4's; the input's offsets from +0x10 are the type's parameters in their IDs' order.
+
+**rom.4's powf and logf.** `0x89506e54` is the library's powf (fr4 to the fr5): a wrapper on its core `0x89509b80` that sets errno (`0x89add990`) for an infinite or NaN result. `0x895065f4` is logf (v236's). The converters reach both through their helpers, so the port takes them through `Vc2ToneShared` (Vc2VocoderOsc.h), which now has `pow(x, y)` beside v236's `log`. In the check they are rom.4's own on both sides (`RomShared::pow`, Vc2RomShared.h), as the velocity curve and exp2 are; a port of powf for the wiring is not written yet.
+
+**The laws** (each in rom.4's order of operations; the key is the note's, key − 60 and KF × 10 each 16 bits):
+- The keyfollow's ratio, powf(2, (key − 60) × KF × 10 ÷ 1200), the product an integer's on 32 bits (`mul.l`) (`vc2CosmKeyScale`).
+- The level keyfollow, `0x89397480`, its copy `0x89397510` (the Wave Shaper's) and Lo-Fi's `0x89397870` (its own pool words, the same values): the held level × 0.9 ÷ 127 + 0.1, times the ratio, held to 0.1…1, the floor reloaded from the 0.1's word (`vc2CosmLevelKeyed`).
+- The keyed scale `0x89397800` (the Frequency Shifter's): the ratio × the held level ÷ 127 + 0, held to 0…1. The Side Band Filters' Width helper `0x89397650` is the same code on other pool words (`vc2CosmScaled`).
+- The Resonator's Size, `0x89397760`: (key − 60) × KF × 10 as floats ÷ 100 ÷ 12 (the TVF's keyfollow offset with 12 for 127, `vc2CosmFollowed`), × logf(2) ÷ 1.6 (`0x3fcccccc`, a unit below 1.6), plus the held Size × 2 ÷ 127, less 1, held to ±1.
+- A Dry/Effect Balance (the Resonator's, the Frequency Shifter's, Lo-Fi's): the Matrix sum × 100 ÷ 127 as an integer (by the multiply `0x81020409`, toward 0) added to the Balance, held to 16 bits then 0…100, ÷ 100 + 0 (`vc2CosmBalance`).
+
+**The five** (each block's code at +0, the words not listed left as they were; a setting's four modulation words are `Vc2CosmMod`'s, its Env depth × the first velocity factor with envelope 9, COSM 2's 11, or × the second with 10, 12):
+
+| Type | Converter | Code | Block |
+|---|---|---|---|
+| 1 OD/Dist | `0x89397980` | 1, 2 when Type isn't 0 | +4 the gain table at Drive and the group's 1st sum, held; +8…+0x14 Drive's Env and Drive LFO with the 10th sum; +0x18 Tone and the 2nd sum by the level keyfollow; +0x1c…+0x28 Tone's Env and LFO with the 11th; +0x2c the table at Output Level, not held. Its two paths are the same but for the code |
+| 2 Wave Shaper | `0x89397cf0` | 3 | byte +4 Type; from +8 OD/Dist's words, its Drive Env before its Drive LFO in the input, its Tone through the copy `0x89397510` |
+| 5 Resonator | `0x89398080` | 6 | byte +4 Filter Type; +8 Size and the 1st sum by `0x89397760`; +0xc…+0x18 its depths with the 10th; +0x1c the Balance with the 2nd; +0x20…+0x2c its depths with the 11th |
+| 14 Frequency Shifter | `0x893991d0` | 18 | +4 Effect Depth and the 1st sum by the keyed scale; +8…+0x14 its depths; +0x18 the Balance; +0x1c…+0x28 its depths |
+| 15 Lo-Fi | `0x893993f0` | 19 | bytes +4 Sample Bit Down, +5 Sample Rate Down; +8 Filter and the 1st sum by its level keyfollow; then the Resonator's words |
+
+The depth law's 63: `0x89397450`'s (`0x893976b0`) for OD/Dist, the Wave Shaper and the Resonator, inline on `0x89399500` for the Frequency Shifter and Lo-Fi. Each Matrix order: the setting's sum, its LFO's, then the Balance's or Tone's, its LFO's. Each is rom.2's (`0x894dc8b0`, `0x894dcbf0`, `0x894dcf00`, `0x894ddde0`, `0x894ddf80`) on rom.4's input, so XtCosm's objects play the blocks.
+
+**The check**, xt_vc2cosm's second part: the five types' hooks out and their converters on both sides, the port's through `vc2CosmPortedConvert` with RomShared's powf and logf; their parameters by their ranges (Output Level a table index within it, the Balance 0…100, the Types and Lo-Fi's bytes by theirs). The keyfollows draw any 16 bits now and then, so the ratio overflows to infinity and underflows to 0 and the clamps take both ends. Seen red: the check with RomShared's powf given its arguments the other way round, 40 of 40 cases different.
+
+Results:
+- seed 2024, 40 cases: 2,400 events, 141…161 of each of the 13 types ported (154 OD/Dist, 147 Wave Shaper, 148 Resonator, 156 Frequency Shifter, 148 Lo-Fi), 22 Speaker Simulator, 34 other types, 230 off, 176 past the types; 5,378 refreshes; 0 different, the first run.
+- seeds 7 and 31337, 400 cases each: 24,000 events each (1,406…1,562 of each type), 0 different.
+- `mutate_vc2.py --cosm`: 494 plants, all caught (143 new: 19 on the laws, 20 on the pool words, 42 on OD/Dist's and the Wave Shaper's, 57 on the Resonator's, Frequency Shifter's and Lo-Fi's, 5 on the converters by type; v237's `onBlock` plants renamed with it to `throughLayout`, the TVF's keyfollow order and top and floor made unique where the code moved). The first run had one miss and one error, both the plants': v237's 16-bit hold of the keyfollow had moved into `followOf`, whose `int16_t` return held it still (planted now on the return type), and one new plant didn't compile.
+- `--carrier` 152 of 152 and `--osc` 490 of 490 (the pitch ramp's part with it) caught again, as RomShared and `Vc2ToneShared` changed; the `rom4-no-cosm` and `rom4-no-tables` panel plants caught; fcheck's diff is xt_vc2cosm's `frame:` line; verify.sh passes every line.
+
 ### The VC-2's players' installs and VariPhrase's note-on (2026-11-17, v238) {#vc2-osc-players}
 
 Step 4.2's OSC voice, its fourth part (research/VC2_MODE_PLAN.md, "4. Wiring"): the three routines of rom.4's OSC code between the kinds' note-on and the targets (0x893af420…0x893af9ea), which the frame (v230) reached by address. They are LITE's install `0x893af7a0`, VariPhrase's install `0x893af870` and VariPhrase's own note-on `0x893af420`. Ported bit for bit: Vc2OscPlayers.cpp, each kind's way a field of its row (`Vc2OscInstall`, `Vc2OscNoteOn::vari`), the tables in Vc2OscTables.cpp. LITE's and the analog's own note-ons (`0x893c7c30`, `0x893c22e0`) are in the players' and the analog OSC's code, and go with those ports (the plan's split). Every address is rom.4's; every offset the voice's.

@@ -58,13 +58,14 @@ struct FrameRefresh final : Vc2MatrixRefresh {
     }
 };
 
-// The port's converters: those it has, the rest logged as rom.4's hooks log them
+// The port's converters: those it has, on rom.4's own powf and logf (v239), the rest logged as rom.4's hooks log them
 struct FrameTypes final : Vc2CosmTypes {
     Vc2CosmMatrix& matrix;
+    const Vc2ToneShared& shared;
     std::vector<FrameCall>& log;
-    FrameTypes(Vc2CosmMatrix& m, std::vector<FrameCall>& l) : matrix(m), log(l) {}
+    FrameTypes(Vc2CosmMatrix& m, const Vc2ToneShared& s, std::vector<FrameCall>& l) : matrix(m), shared(s), log(l) {}
     void convert(int type, const Vc2CosmInput& in, uint32_t* block) override {
-        if (!vc2CosmPortedConvert(type, in, block, matrix)) log.push_back({ type });
+        if (!vc2CosmPortedConvert(type, in, block, matrix, shared)) log.push_back({ type });
     }
 };
 
@@ -90,8 +91,8 @@ struct FrameRig {
     Vc2CosmMatrixReader reader { m, port };
     std::vector<FrameCall> hooked;   // rom.4's converters' hooks', then the port's types'
     std::vector<FrameCall> types;
-    FrameTypes portTypes { reader, types };
     RomShared shared { fw };
+    FrameTypes portTypes { reader, shared, types };
 };
 
 std::string frameDifference(FrameRig& r, const Vc2CosmInput& in, const std::array<uint32_t, kVc2CosmBlockWords>& b) {

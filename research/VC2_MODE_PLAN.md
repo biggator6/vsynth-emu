@@ -411,16 +411,27 @@ version against rom.4's routines with what it calls hooked:
      `0x893976f0` (the TVF's Cutoff law), the level's gain `0x89397900` and the gain table `0x89541f34` (129 words), and
      the port's converters by type (`vc2CosmPortedConvert`), against rom.4's in xt_vc2cosm's second part, which keeps
      its own list of the types ported (HARDWARE_FIRMWARE.md, "The VC-2's COSM converters, the first batch").
-   - next: the seven on libm, with `logf` and `powf` behind `Vc2ToneShared` (rom.4's own on both sides of the check, as
-     the velocity curve and exp2 are; `logf` as v236's `Vc2ToneShared::log`, `powf` beside it the same way): the OD/Dist (`0x89397980`, type 1) and the Wave Shaper (`0x89397cf0`, 2) on the
-     level's keyfollow `0x89397480`/`0x89397510` (two copies of one routine: the held level × 0.9/127 + 0.1, times
-     powf(2, its two arguments' product / 1200), held to 0.1…1; read at their starts only) and the gain table; the Resonator (`0x89398080`, 5) on its Size's `0x89397760` (logf(2)); the Frequency Shifter
-     (`0x893991d0`, 14) on `0x89397800` and the Lo-Fi (`0x893993f0`, 15) on `0x89397870`; then the two Side Band
-     Filters (`0x89398260`, 6, and `0x893984e0`, 7: the LPF's `0x893975a0`, powf(x, 2) and logf(2), and the Width's
-     `0x89397650`), the largest, last. One version if they come as alike as v237's did; else the Side Band Filters a
-     version of their own. rom.4 also holds a Speaker Simulator converter of its own (`0x89398070`, rom.2's `0x894dcef0`
-     recompiled) and one that writes code 0 (`0x89397970`): no branch or word in rom.4 reaches either, so neither is
-     ported.
+   - ~~next: the seven on libm~~, with `logf` and `powf` behind `Vc2ToneShared` (rom.4's own on both sides of the
+     check, as the velocity curve and exp2 are; `logf` as v236's `Vc2ToneShared::log`, `powf` beside it the same way):
+     the OD/Dist (`0x89397980`, type 1) and the Wave Shaper (`0x89397cf0`, 2) on the level's keyfollow
+     `0x89397480`/`0x89397510` (two copies of one routine: the held level × 0.9/127 + 0.1, times powf(2, its two
+     arguments' product / 1200), held to 0.1…1) and the gain table; the Resonator (`0x89398080`, 5) on its Size's
+     `0x89397760` (logf(2)); the Frequency Shifter (`0x893991d0`, 14) on `0x89397800` and the Lo-Fi (`0x893993f0`, 15)
+     on `0x89397870`; then the two Side Band Filters (`0x89398260`, 6, and `0x893984e0`, 7: the LPF's `0x893975a0`,
+     powf(x, 2) and logf(2), and the Width's `0x89397650`), the largest, last. One version if they come as alike as
+     v237's did; else the Side Band Filters a version of their own. rom.4 also holds a Speaker Simulator converter of
+     its own (`0x89398070`, rom.2's `0x894dcef0` recompiled) and one that writes code 0 (`0x89397970`): no branch or
+     word in rom.4 reaches either, so neither is ported. Split (2026-11-16, v239): the five on one helper each, then
+     the Side Band Filters a version of their own (an HPF with no sum, the LPF's square and logf, Sub Detune, the
+     Octave byte, and Detune and Width each with three depths).
+   - done (v239): the five, with powf as `Vc2ToneShared::pow`: OD/Dist and the Wave Shaper as one routine over a row
+     (Vc2CosmDrive.cpp), the Resonator, the Frequency Shifter and Lo-Fi as one routine past each one's setting
+     (Vc2CosmBalanced.cpp), the level keyfollow, the keyed scale `0x89397800` (the Width's `0x89397650` the same law)
+     and the Dry/Effect Balance shared (Vc2CosmConvert.cpp), against rom.4's in xt_vc2cosm's second part
+     (HARDWARE_FIRMWARE.md, "The VC-2's COSM converters on rom.4's libm").
+   - next: the two Side Band Filters (`0x89398260`, type 6, code 7; `0x893984e0`, 7, code 8), their LPF's
+     `0x893975a0` (powf(x, 2), logf(2)) and the Width on the keyed scale (`0x89397650`, `vc2CosmScaled`'s law on its
+     own words); with them every converter is ported and xt_vc2cosm's second part hooks none.
    - the Matrix core, a part of its own (every group's, not COSM's alone): the refresh `0x893a2230` (the sources'
      routines, their terms by the depths and limits, the dirty bits), M's other words and the other groups' readers
      (the OSC's `0x893a23b0`…, the next group's from `0x893a2bf0`; rows of `vc2MatrixRead` where their shape is the
