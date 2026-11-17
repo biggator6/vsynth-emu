@@ -11,7 +11,8 @@ using xtf::mul;
 using xtf::sub;
 
 namespace {
-// [FW] the ramps' types as the constructor gives them (+0x90c, +0x970, +0x9d4)
+// [FW] the ramps' types as the constructor gives them (+0x90c, +0x970, +0x9d4); the start starts the pitch's (its pool
+// word 0x893ae878 holds the ramp's start)
 constexpr std::array<int32_t, Vc2OscVoice::kRamps> kRampTypes { 0, 2, 1 };
 // [FW] the note-on's: the block's words it reads (the depth, the wave header's and the loop record's pointers) and the
 // byte whose 0x10 marks a wave not pitched from its root (+0x138, the block's +0xe4)
@@ -45,7 +46,7 @@ float installedOf(int which, const Vc2OscTables& t) {
 
 void Vc2OscVoice::construct(Vc2OscParts& parts) {
     parts.buildVibrato();
-    for (int ramp = 0; ramp < kRamps; ++ramp) parts.buildRamp(ramp, kRampTypes[(size_t)ramp]);
+    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) ramps[ramp].construct(kRampTypes[ramp]);
     tail.sync = 0;
     tail.flag = 0;
     tail.installed = 0.0f;
@@ -63,7 +64,7 @@ void Vc2OscVoice::install(Vc2OscParts& parts) {
     if (row.installed != 0) tail.installed = installedOf(row.installed, vc2OscTables());
 }
 
-void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts) {
+void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& shared) {
     if (kind() == 0) return;
     const int32_t n16 = (int16_t)n;
     parts.updateVibrato(n16);
@@ -73,8 +74,8 @@ void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts) {
         reseek(parts);
     }
     if (row.updateFirst != 0) parts.kindCall(row.updateFirst);
-    for (int ramp = 0; ramp < kRamps; ++ramp) {
-        if (row.ticks & (1 << ramp)) parts.tickRamp(ramp, n16);
+    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {
+        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);
     }
     if (row.update != 0) parts.kindCall(row.update);
 }
@@ -143,8 +144,8 @@ void Vc2OscVoice::noteOn(const uint32_t* block, uint32_t legato, Vc2OscParts& pa
     kindNoteOn(parts, shared);
 }
 
-void Vc2OscVoice::start(Vc2OscParts& parts) {
-    if (vc2OscKindRow(kind()).ramp) parts.startRamp(0, f32(kRampFr4), f32(kRampFr5));
+void Vc2OscVoice::start(const uint32_t* ramp, Vc2OscParts&, const Vc2ToneShared& shared) {
+    if (vc2OscKindRow(kind()).ramp) ramps[kPitchRamp].start(ramp, f32(kRampFr4), f32(kRampFr5), shared);
 }
 
 void Vc2OscVoice::count(uint32_t x) {
@@ -155,8 +156,8 @@ void Vc2OscVoice::countMatched(uint32_t x) {
     if (u8(kFlags) & kMatches) setU8(kMatched, (uint8_t)x);
 }
 
-void Vc2OscVoice::legato(uint32_t x, Vc2OscParts& parts) {
-    for (int ramp = 0; ramp < kRamps; ++ramp) parts.legatoRamp(ramp, x);
+void Vc2OscVoice::legato(const uint32_t* ramp) {
+    for (Vc2PitchRamp& r : ramps) r.legato(ramp);
 }
 
 uint32_t Vc2OscVoice::render(float* out, Vc2OscParts& parts) {

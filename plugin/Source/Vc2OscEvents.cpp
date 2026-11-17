@@ -17,6 +17,7 @@ constexpr int kKindWord = 0, kByteWord = 1, kWaveWord = 0xb0 / 4, kHeaderWord = 
 constexpr int kLoopWord = 0xdc / 4, kFixedWord = 0xe4 / 4;
 constexpr uint32_t kFixedBit = 0x1000;   // the byte +0x138's 0x10, in its word
 constexpr int kKinds = 8, kWaves = 10;
+constexpr uint32_t kCountSign = 0x8000;   // [FW] the update's count is its low half, signed (exts.w)
 using Answer = OscAnswer;
 
 std::string onConstruct(OscSides& s, std::mt19937&, int v) {
@@ -34,10 +35,12 @@ std::string onInstall(OscSides& s, std::mt19937&, int v) {
 }
 
 std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
-    const uint32_t n = rng() % 3 == 0 ? (uint32_t)rng() : rng() % 64;   // now and then high bits, which it drops
+    // now and then high bits, which it drops; its low half never negative (v236: the ramps' tick reads past the factor's
+    // table on a negative count, which the tone never gives)
+    const uint32_t n = rng() % 3 == 0 ? (uint32_t)rng() & ~kCountSign : rng() % 64;
     ++s.n.updates;
     return oscBothSides(s, kUpdate, { oscVoiceAt(v), n }, Answer::none, [&] {
-        s.voices[(size_t)v].update((int32_t)n, s.parts[(size_t)v]);
+        s.voices[(size_t)v].update((int32_t)n, s.parts[(size_t)v], s.romShared);
         return 0u;
     });
 }
@@ -77,9 +80,18 @@ std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
     });
 }
 
+// The six words a ramp's start or legato update is given, drawn into rom.4's RAM (v236: the ramps read them)
+const uint32_t* drawRampWords(OscSides& s, std::mt19937& rng) {
+    const Vc2RampSettings words = oscDrawRampSettings(rng);
+    std::memcpy(s.shared.ramp.data(), &words, sizeof words);
+    s.fw.cpu.write(kOscRampAt, s.shared.ramp.data(), sizeof s.shared.ramp);
+    return s.shared.ramp.data();
+}
+
 std::string onStart(OscSides& s, std::mt19937& rng, int v) {
-    return oscBothSides(s, kStart, { oscVoiceAt(v), (uint32_t)rng() }, Answer::none, [&] {
-        s.voices[(size_t)v].start(s.parts[(size_t)v]);
+    const uint32_t* ramp = drawRampWords(s, rng);
+    return oscBothSides(s, kStart, { oscVoiceAt(v), kOscRampAt }, Answer::none, [&] {
+        s.voices[(size_t)v].start(ramp, s.parts[(size_t)v], s.romShared);
         return 0u;
     });
 }
@@ -102,15 +114,15 @@ std::string onSettings(OscSides& s, std::mt19937& rng, int v) {
     s.fw.cpu.write(kOscSettingsAt, s.shared.settings.data(), sizeof s.shared.settings);
     ++s.n.settings;
     return oscBothSides(s, kSettings, { oscVoiceAt(v), kOscSettingsAt }, Answer::none, [&] {
-        s.voices[(size_t)v].settings(s.shared.settings.data(), s.parts[(size_t)v]);
+        s.voices[(size_t)v].settings(s.shared.settings.data(), s.parts[(size_t)v], s.romShared);
         return 0u;
     });
 }
 
 std::string onLegato(OscSides& s, std::mt19937& rng, int v) {
-    const uint32_t x = (uint32_t)rng();
-    return oscBothSides(s, kLegato, { oscVoiceAt(v), x }, Answer::none, [&] {
-        s.voices[(size_t)v].legato(x, s.parts[(size_t)v]);
+    const uint32_t* ramp = drawRampWords(s, rng);
+    return oscBothSides(s, kLegato, { oscVoiceAt(v), kOscRampAt }, Answer::none, [&] {
+        s.voices[(size_t)v].legato(ramp);
         return 0u;
     });
 }

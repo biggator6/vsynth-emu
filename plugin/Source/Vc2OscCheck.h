@@ -5,6 +5,7 @@
 #include "Vc2CheckRig.h"
 #include "Vc2OscVoice.h"
 #include <array>
+#include <bit>
 #include <map>
 #include <vector>
 
@@ -18,12 +19,14 @@ inline constexpr uint32_t kOscRecordStride = 0x40;
 inline constexpr int kOscRecords = 2;                    // of each kind
 inline constexpr uint32_t kOscRendersAt = 0x8C05c000;    // hooked render routines the tail's +0xa44, +0xa48 point at
 inline constexpr int kOscRenders = 2;
+inline constexpr uint32_t kOscRampAt = 0x8C05d000;       // the six words a ramp's start or legato update reads (v236)
+// [FW] the pitch ramp's value and factor in a voice (+0x90c + 0x3c, + 0x54), which a kind's call logs as it finds them
+inline constexpr uint32_t kOscRampValueAt = 0x948, kOscRampFactorAt = 0x960;
 inline constexpr uint32_t kOscBlockWords = Vc2OscVoice::kBlockBytes / 4, kOscOther = 0xff;
 
 enum OscKind : int32_t {
-    kBuildVibrato, kUpdateVibrato, kSetVibrato, kNoteOnVibrato, kBuildRamp, kTickRamp, kStartRamp, kSetRamp,
-    kLegatoRamp, kRampValue, kKindCall, kKindSettings, kSetCarrier, kInitCarrier, kStartKind6, kRenderBy,
-    kRenderCarrier, kRenderKind6, kSeek,
+    kBuildVibrato, kUpdateVibrato, kSetVibrato, kNoteOnVibrato, kKindCall, kKindSettings, kSetCarrier, kInitCarrier,
+    kStartKind6, kRenderBy, kRenderCarrier, kRenderKind6, kSeek,
 };
 
 // A call as either side made it: what, on which voice, and its arguments (a ramp's number, counts, floats' bits, a
@@ -47,12 +50,10 @@ uint32_t oscLoopAt(int k);
 uint32_t oscEnvelopeAt(int k);
 uint32_t oscLfoAt(int k);
 
-// What the hooked routines answer, drawn once for both sides; the vibrato's two outputs and each ramp's factor, read
-// in place (each ramp's its own, so a target reading the wrong ramp's differs); the flags byte a seek leaves in the
-// object (a player may write it)
+// What the hooked routines answer, drawn once for both sides; the vibrato's two outputs, read in place; the flags byte
+// a seek leaves in the object (a player may write it).  The ramps are the voice's own from v236
 struct OscDraws {
-    float rampValue = 0.0f, vibratoPitch = 0.0f, vibratoLevel = 0.0f;
-    std::array<float, Vc2OscVoice::kRamps> rampFactors {};
+    float vibratoPitch = 0.0f, vibratoLevel = 0.0f;
     uint32_t rendered = 0;
     uint8_t seekFlags = 0;
 };
@@ -62,6 +63,7 @@ struct OscShared {
     OscDraws draws {};
     OscRecords records {};
     std::array<uint32_t, kOscBlockWords> settings {};
+    std::array<uint32_t, sizeof(Vc2RampSettings) / 4> ramp {};
     std::array<float, Vc2OscVoice::kOut> out {};
     std::vector<OscCall> calls {};
 };
@@ -76,14 +78,10 @@ public:
     void noteOnVibrato(const uint8_t* block) override { log(kNoteOnVibrato, wordOf(block)); }
     float vibratoPitch() override { return s_.draws.vibratoPitch; }
     float vibratoLevel() override { return s_.draws.vibratoLevel; }
-    void buildRamp(int ramp, int32_t type) override { log(kBuildRamp, (uint32_t)ramp, (uint32_t)type); }
-    void tickRamp(int ramp, int32_t n) override { log(kTickRamp, (uint32_t)ramp, (uint32_t)n); }
-    void startRamp(int ramp, float a, float b) override { logFloats(kStartRamp, ramp, a, b); }
-    void setRamp(int ramp, float a, float b) override { logFloats(kSetRamp, ramp, a, b); }
-    void legatoRamp(int ramp, uint32_t x) override { log(kLegatoRamp, (uint32_t)ramp, x); }
-    float rampValue(int ramp) override;
-    float rampFactor(int ramp) override { return s_.draws.rampFactors[(size_t)ramp]; }
-    void kindCall(uint32_t routine) override { log(kKindCall, routine); }
+    void kindCall(uint32_t routine) override {   // with the pitch ramp's value and factor, as rom.4's hook logs them
+        const Vc2RampWords& pitch = self_.ramps[Vc2OscVoice::kPitchRamp].w;
+        log(kKindCall, routine, std::bit_cast<uint32_t>(pitch.value), std::bit_cast<uint32_t>(pitch.factor));
+    }
     void kindSettings(uint32_t routine, const uint32_t* from) override { log(kKindSettings, routine, offsetOf(from)); }
     void setCarrier(const uint32_t* p) override { log(kSetCarrier, offsetOf(p)); }
     void initCarrier(const uint8_t* p) override { log(kInitCarrier, wordOf(p)); }
@@ -100,7 +98,6 @@ private:
     void log(OscKind kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
         s_.calls.push_back({ kind, voice_, a, b, c });
     }
-    void logFloats(OscKind kind, int ramp, float a, float b);
     uint32_t offsetOf(const uint32_t* p) const { return (uint32_t)(p - s_.settings.data()) * 4; }
     uint32_t wordOf(const uint8_t* p) const { return (uint32_t)(p - self_.own.data()) + Vc2OscVoice::kOwn; }
     uint32_t outOf(const float* p) const { return p == s_.out.data() ? 1 : kOscOther; }

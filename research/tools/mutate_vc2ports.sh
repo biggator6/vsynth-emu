@@ -14,7 +14,8 @@
 # (vc2mixblock), its tables (vc2mixtables) and the shared clamp (vc2mixmath) under xt_vc2mixer; the tone object's frame
 # and its pool (vc2tone, v228) and its note-on (vc2tonenoteon, v229) under xt_vc2tone; the OSC voice's frame (vc2osc,
 # v230), its settings and getters (vc2oscget), its kinds' rows (vc2osckinds), its constants (vc2osctables), its note-on
-# by kind (vc2oscnoteon, v232) and its targets (vc2osctargets) under xt_vc2osc; the TVA (vc2tva, v233) and its
+# by kind (vc2oscnoteon, v232), its targets (vc2osctargets) and its pitch ramp (vc2ramp, v236), the ramp's tick
+# (vc2ramptick) and constants (vc2ramptables) under xt_vc2osc; the TVA (vc2tva, v233) and its
 # constants (vc2tvatables) under xt_vc2tva; the Growl (vc2growl, v234), its constants (vc2cosmtables) and the shared
 # sine and cosine it takes (vc2cosmmath) under xt_vc2cosm; the converters' frame (vc2cosmconvert, v235), the TVF's
 # converter (vc2cosmtvf), the Matrix's readers (vc2matrix) and its limits (vc2matrixtables) under xt_vc2cosm too.
@@ -35,8 +36,8 @@ VC2AN=(Vc2AutoNote Vc2AutoNoteTables Vc2AutoNoteCheck Vc2Tracker Vc2TrackerTable
        Vc2TrackerSignal)
 VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck Vc2PartMixerFakes)
 VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePortParts Vc2ToneEvents)
-VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2OscCheck Vc2OscEvents
-        Vc2OscGetters Vc2OscFakes Vc2OscPortParts)
+VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2PitchRamp
+        Vc2PitchRampTick Vc2RampTables Vc2OscCheck Vc2OscEvents Vc2OscGetters Vc2OscFakes Vc2OscPortParts Vc2RampCheck)
 VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
          Vc2CosmFrameCheck)
@@ -83,6 +84,9 @@ VC2PORTS=(
     "vc2osctables|Vc2OscTables.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscnoteon|Vc2OscNoteOn.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2osctargets|Vc2OscTargets.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2ramp|Vc2PitchRamp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2ramptick|Vc2PitchRampTick.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2ramptables|Vc2RampTables.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2tva|Vc2Tva.cpp|XT_VC2TVA_MAIN|vc2tva_obj|VC2TVA"
     "vc2tvatables|Vc2TvaTables.cpp|XT_VC2TVA_MAIN|vc2tva_obj|VC2TVA"
     "vc2growl|Vc2CosmGrowl.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"

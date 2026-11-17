@@ -5,10 +5,12 @@
 // install 0x893ae0f0, the update 0x893ae1c0 with the re-seek 0x893aeed0, the note-on 0x893ae370 with the kind's
 // 0x893af0b0 (v232, Vc2OscNoteOn.cpp), the ramp's start 0x893ae610, the counts 0x893ae6c0 and 0x893ae720, the settings
 // 0x893ae780, the legato 0x893ae9b0, the render 0x893ae9f0, the getters 0x893aead0…0x893aed60 and the take 0x893aee20;
-// the targets 0x893af9f0…0x893aff60 the kinds read (v232, Vc2OscTargets.h).  What it calls (the vibrato at +0, the three
-// pitch ramps, each kind's install, update, settings, render and note-on, the players' seeks) through Vc2OscParts; each
-// kind's own routines are later versions'.  Bit for bit: xt_vc2osc against rom.4's routines in Sh4Interp, every callee
-// hooked.  HARDWARE_FIRMWARE.md, "The VC-2's OSC voice".  Audio thread.
+// the targets 0x893af9f0…0x893aff60 the kinds read (v232, Vc2OscTargets.h).  Its three pitch ramps, the portamento, are
+// its own (v236, Vc2PitchRamp.h, +0x90c…+0xa38).  What it calls (the vibrato at +0, each kind's install, update,
+// settings, render and note-on, the players' seeks) through Vc2OscParts; each kind's own routines are later versions'.
+// Bit for bit: xt_vc2osc against rom.4's routines in Sh4Interp, every callee but the ramps hooked.  HARDWARE_FIRMWARE.md,
+// "The VC-2's OSC voice".  Audio thread.
+#include "Vc2PitchRamp.h"
 #include "Vc2VocoderOsc.h"
 #include <array>
 #include <cstdint>
@@ -47,6 +49,7 @@ struct Vc2OscVoiceTail {
     uint32_t seekPending = 0;      // +0xa8c: set, the update waits for the object's level to fall, then re-seeks
 };
 static_assert(sizeof(Vc2OscVoiceTail) == 0x58, "rom.4's layout, the voice's +0xa38…+0xa90");
+static_assert(sizeof(Vc2PitchRamp) == 0x64, "rom.4's layout, a ramp's 0x64 bytes from the voice's +0x90c");
 
 // What the voice calls on its parts and reads from them; a kind's routine by its rom.4 address
 class Vc2OscParts {
@@ -58,13 +61,6 @@ public:
     virtual void noteOnVibrato(const uint8_t* block) = 0;   // 0x893b29e0, given the voice's +0xd4 (v232)
     virtual float vibratoPitch() = 0;                       // its +0x2c, onto the pitch by +0xfc
     virtual float vibratoLevel() = 0;                       // its +0x30, onto the gains by +0x100 (v232)
-    virtual void buildRamp(int ramp, int32_t type) = 0;     // 0x893b0dc0
-    virtual void tickRamp(int ramp, int32_t n) = 0;         // 0x893b0f30
-    virtual void startRamp(int ramp, float a, float b) = 0;   // 0x893b0e10: fr4, fr5
-    virtual void setRamp(int ramp, float a, float b) = 0;     // 0x893b0f20: the same
-    virtual void legatoRamp(int ramp, uint32_t x) = 0;        // 0x893b0e30
-    virtual float rampValue(int ramp) = 0;                    // 0x893b1160
-    virtual float rampFactor(int ramp) = 0;                   // its +0x54, read in place by the gains (v232)
     virtual void kindCall(uint32_t routine) = 0;              // routine(voice): an install, an update, a note-on
     virtual void kindSettings(uint32_t routine, const uint32_t* from) = 0;   // routine(voice, the settings' +0xb0)
     virtual void setCarrier(const uint32_t* p) = 0;           // 0x893ec450(voice + 0xa90, the settings' +0xb0)
@@ -85,19 +81,24 @@ public:
     static constexpr uint32_t kObject = 0x15c, kObjectBytes = 0x7ac, kLegato = 0x908, kKind = 0x54;   // [FW]
     static constexpr uint32_t kWave = 0x104;   // [FW] the block's +0xb0, the wave's type
     static constexpr int kRamps = 3, kSettingsWords = 0xb0 / 4, kOut = 64;
+    // [FW] the ramps by what they glide (+0x90c, +0x970, +0x9d4): the targets read them so, the start and the settings
+    // start the pitch's again
+    static constexpr size_t kPitchRamp = 0, kFormantRamp = 1, kWalkRamp = 2;
 
     void construct(Vc2OscParts& parts);                    // 0x893ae070 on a voice given
     void install(Vc2OscParts& parts);                      // 0x893ae0f0
-    void update(int32_t n, Vc2OscParts& parts);            // 0x893ae1c0
+    void update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893ae1c0
     void reseek(Vc2OscParts& parts);                       // 0x893aeed0
     // 0x893ae370, then the kind's note-on
     void noteOn(const uint32_t* block, uint32_t legato, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893af0b0 (Vc2OscNoteOn.cpp)
-    void start(Vc2OscParts& parts);                        // 0x893ae610: its argument isn't read
+    // 0x893ae610: ramp 0's start, given the ramp's six words (Vc2RampSettings; the tone's input + 0xc)
+    void start(const uint32_t* ramp, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void count(uint32_t x);                                // 0x893ae6c0
     void countMatched(uint32_t x);                         // 0x893ae720
-    void settings(const uint32_t* s, Vc2OscParts& parts);  // 0x893ae780 (Vc2OscVoiceGet.cpp)
-    void legato(uint32_t x, Vc2OscParts& parts);           // 0x893ae9b0
+    // 0x893ae780 (Vc2OscVoiceGet.cpp)
+    void settings(const uint32_t* s, Vc2OscParts& parts, const Vc2ToneShared& shared);
+    void legato(const uint32_t* ramp);                     // 0x893ae9b0: the ramps' legato updates, given their words
     uint32_t render(float* out, Vc2OscParts& parts);       // 0x893ae9f0: kind 3's routine's answer, else 0
     void take(const Vc2OscVoice& from);                    // 0x893aee20, given another voice's object
     // The getters (Vc2OscVoiceGet.cpp)
@@ -121,6 +122,8 @@ public:
     uint32_t kind() const { return u32(kKind); }
 
     std::array<uint8_t, kOwnEnd - kOwn> own {};   // +0x54…+0x90c: the block's copy, the object, the legato word
+    // +0x90c, +0x970, +0x9d4: the pitch ramps (v236), built with types 0, 2 and 1: the pitch's, the formant's, the walk's
+    std::array<Vc2PitchRamp, kRamps> ramps {};
     Vc2OscVoiceTail tail {};                       // +0xa38…+0xa90
 
 private:

@@ -335,6 +335,23 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's portamento v236 (2026-11-17, on vc2-mode after v235's merge; the user's "Yes, v236"; HARDWARE_FIRMWARE.md,
+  "The VC-2's portamento"): step 4.2's OSC voice, its third part. Vc2PitchRamp (Vc2PitchRamp.cpp, the tick in
+  Vc2PitchRampTick.cpp, the constants in Vc2RampTables.cpp, read by loadVc2 through vc2LoadRamp, rom4-no-ramp):
+  rom.4's 0x64-byte pitch ramp word for word, the constructor 0x893b0dc0, the start 0x893b0e10 (six words copied),
+  the restart 0x893b0b10 (the settings' 0x893b0f20 is it), the legato update 0x893b0e30, the tick 0x893b0f30 and the
+  value 0x893b1160; 0x893b11a0 has no caller. Its law, rom.4's own: over 100 ms rom.2's straight line; under it the
+  span held to ±500 cents and type 0 eased in by x⁴ (the VC-2 notes' run of the two images, −60.0, −33.4, now
+  explained), and a gain factor (+0x54) from a table of 8 rows at 0x89546044 over a start's first ticks. Ratio ramps
+  (types 1, 2) in cents through logf: 0x895065f4, its core rom.2's 0x89531b78 instruction for instruction, behind
+  Vc2ToneShared::log, RomShared running rom.4's own. The voice owns its three ramps (+0x90c…+0xa38); Vc2OscParts'
+  seven ramp calls gone; the start's argument is the ramp's six words (v230's "isn't read" withdrawn), the legato's
+  the first four. xt_vc2osc: a ramp part (Vc2RampCheck.cpp) on three ramps in rom.4's RAM before any hook; the voice
+  part with rom.4's own ramps running and compared, the update's count never negative, the kinds' hooks logging the
+  pitch ramp's value and factor. 0 different at seeds 2024, 7 and 31337; the ramp's files covered whole.
+  mutate_vc2.py --osc: 490 plants, all caught (the first run's four misses: three no error, one the check's).
+  rom4-no-ramp caught. fcheck's diff is xt_vc2osc's section. Not in the sound yet.
+
 The VC-2's COSM converters' frame v235 (2026-11-16, on its own branch from vc2-mode's a652243; the VC-2 session's word,
   from the user's "v232 plus COSM"; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters' frame"). Step 4.2's COSM part's
   second. vc2CosmConvert (Vc2CosmConvert.cpp): rom.4's dispatcher 0x89399920, the switch byte, the two velocity factors

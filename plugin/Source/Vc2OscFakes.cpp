@@ -7,9 +7,8 @@
 #include <algorithm>
 
 namespace {
-// [FW] the voice's offsets a callee is given: its three ramps, the object, the carrier, kind 6's object
-constexpr std::array<uint32_t, Vc2OscVoice::kRamps> kRampAt { 0x90c, 0x970, 0x9d4 };
-constexpr uint32_t kCarrier = 0xa90, kKind6 = 0xafc, kNone = 0xffffffff;
+// [FW] the voice's offsets a callee is given: the carrier, kind 6's object (the ramps, its own from v236, aren't hooked)
+constexpr uint32_t kCarrier = 0xa90, kKind6 = 0xafc;
 // [FW] where a record's fields are (Vc2OscVoice.h's): the wave header's, the loop record's
 constexpr uint32_t kHeaderFlag = 2, kHeaderRate = 8, kHeaderKey = 0xa, kHeaderCents = 0x18, kLoopFine = 0x1b;
 constexpr uint32_t kLoopsFrom = 0x100, kEnvelopesFrom = 0x200, kLfosFrom = 0x400, kBoundStride = 0x80;
@@ -19,10 +18,6 @@ int voiceOwning(uint32_t at, uint32_t offset) {
     const uint32_t from = at - offset - kOscVoiceAt;
     const bool one = from % kOscVoiceStride == 0 && from / kOscVoiceStride < (uint32_t)kOscVoices;
     return one ? (int)(from / kOscVoiceStride) : -1;
-}
-uint32_t rampOf(uint32_t at) {   // which ramp of its voice, kNone when none
-    const auto k = std::ranges::find(kRampAt, (at - kOscVoiceAt) % kOscVoiceStride);
-    return k == kRampAt.end() ? kNone : (uint32_t)(k - kRampAt.begin());
 }
 uint32_t asIs(uint32_t x) { return x; }
 uint32_t settingsOffset(uint32_t at) { return at - kOscSettingsAt; }
@@ -45,23 +40,16 @@ void partWord(Sh4& c, OscCall& t, uint32_t) {   // the voice's part at `Offset` 
     t.voice = voiceOwning(c.r[4], Offset);
     t.a = c.r[5] - (c.r[4] - Offset);
 }
-void ramp(Sh4& c, OscCall& t, uint32_t) {
-    const uint32_t r = rampOf(c.r[4]);
-    t.voice = r == kNone ? -1 : voiceOwning(c.r[4], kRampAt[r]);
-    t.a = r;
-}
-void rampN(Sh4& c, OscCall& t, uint32_t at) {
-    ramp(c, t, at);
-    t.b = c.r[5];
-}
-void rampFloats(Sh4& c, OscCall& t, uint32_t at) {
-    ramp(c, t, at);
-    t.b = c.fb[0][4];
-    t.c = c.fb[0][5];
-}
 void routine(Sh4& c, OscCall& t, uint32_t at) {
     self(c, t, at);
     t.a = at;
+}
+// A kind's routine, and the pitch ramp's value and factor as it finds them (v236: its update reads them through the
+// targets, so the ramps' ticks before or after it show)
+void kindRoutine(Sh4& c, OscCall& t, uint32_t at) {
+    routine(c, t, at);
+    t.b = c.rd32(c.r[4] + kOscRampValueAt);
+    t.c = c.rd32(c.r[4] + kOscRampFactorAt);
 }
 void routineSettings(Sh4& c, OscCall& t, uint32_t at) {
     routine(c, t, at);
@@ -82,10 +70,6 @@ void seek(Sh4& c, OscCall& t, uint32_t at) {   // (the object, at), and the obje
 
 // How a hooked routine answers, one shape each: its r0, after what it leaves in fr0 or the object
 uint32_t none(Sh4&, const OscDraws&) { return 0; }
-uint32_t rampAnswer(Sh4& c, const OscDraws& d) {
-    c.fb[0][0] = std::bit_cast<uint32_t>(d.rampValue);
-    return 0;
-}
 uint32_t rendered(Sh4&, const OscDraws& d) { return d.rendered; }
 uint32_t seekFlags(Sh4& c, const OscDraws& d) {   // the seek's object's byte 0, as a player may leave it
     c.write(c.r[4], &d.seekFlags, 1);
@@ -101,19 +85,16 @@ struct OscHook {
 };
 constexpr auto withN = partAnd<0, asIs>;
 constexpr auto withSettings = partAnd<0, settingsOffset>;
-// [FW] every routine the voice's frame and the kind's note-on call
+// [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run)
 const OscHook kHooks[] = {
     { 0x893b29b0, kBuildVibrato, self, none }, { 0x893b2c10, kUpdateVibrato, withN, none },
     { 0x893b2b70, kSetVibrato, withSettings, none }, { 0x893b29e0, kNoteOnVibrato, partWord<0>, none },
-    { 0x893b0dc0, kBuildRamp, rampN, none }, { 0x893b0f30, kTickRamp, rampN, none },
-    { 0x893b0e10, kStartRamp, rampFloats, none }, { 0x893b0f20, kSetRamp, rampFloats, none },
-    { 0x893b0e30, kLegatoRamp, rampN, none }, { 0x893b1160, kRampValue, ramp, rampAnswer },
-    { 0x893af7a0, kKindCall, routine, none }, { 0x893af870, kKindCall, routine, none },
-    { 0x893c2ad0, kKindCall, routine, none }, { 0x893c8280, kKindCall, routine, none },
-    { 0x893c88b0, kKindCall, routine, none }, { 0x893c2ce0, kKindCall, routine, none },
-    { 0x893afff0, kKindCall, routine, none }, { 0x893c6260, kKindCall, routine, none },
-    { 0x893b0150, kKindCall, routine, none }, { 0x893c7c30, kKindCall, routine, none },
-    { 0x893af420, kKindCall, routine, none }, { 0x893c22e0, kKindCall, routine, none },
+    { 0x893af7a0, kKindCall, kindRoutine, none }, { 0x893af870, kKindCall, kindRoutine, none },
+    { 0x893c2ad0, kKindCall, kindRoutine, none }, { 0x893c8280, kKindCall, kindRoutine, none },
+    { 0x893c88b0, kKindCall, kindRoutine, none }, { 0x893c2ce0, kKindCall, kindRoutine, none },
+    { 0x893afff0, kKindCall, kindRoutine, none }, { 0x893c6260, kKindCall, kindRoutine, none },
+    { 0x893b0150, kKindCall, kindRoutine, none }, { 0x893c7c30, kKindCall, kindRoutine, none },
+    { 0x893af420, kKindCall, kindRoutine, none }, { 0x893c22e0, kKindCall, kindRoutine, none },
     { 0x893c8390, kKindSettings, routineSettings, none }, { 0x893b0280, kKindSettings, routineSettings, none },
     { 0x893c3460, kKindSettings, routineSettings, none },
     { 0x893ec450, kSetCarrier, partAnd<kCarrier, settingsOffset>, none },

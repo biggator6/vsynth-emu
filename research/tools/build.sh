@@ -97,10 +97,11 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 [ -f Vc2ToneCheck.cpp ] && cc -DXT_VC2TONE_MAIN Vc2ToneCheck.cpp Vc2ToneSides.cpp Vc2ToneFakes.cpp Vc2Tone.cpp \
    $( [ -f Vc2ToneNoteOn.cpp ] && echo Vc2ToneNoteOn.cpp Vc2TonePortParts.cpp Vc2ToneEvents.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2tone" &
-# The OSC voice's frame (v230) against rom.4's own routines, every routine it calls hooked
+# The OSC voice's frame (v230) against rom.4's own routines, every routine it calls hooked; its ramps (v236) its own
 [ -f Vc2OscCheck.cpp ] && cc -DXT_VC2OSC_MAIN Vc2OscCheck.cpp Vc2OscEvents.cpp Vc2OscFakes.cpp Vc2OscPortParts.cpp \
    Vc2OscVoice.cpp Vc2OscVoiceGet.cpp Vc2OscVoiceKinds.cpp Vc2OscTables.cpp \
    $( [ -f Vc2OscNoteOn.cpp ] && echo Vc2OscNoteOn.cpp Vc2OscTargets.cpp Vc2OscGetters.cpp ) \
+   $( [ -f Vc2PitchRamp.cpp ] && echo Vc2PitchRamp.cpp Vc2PitchRampTick.cpp Vc2RampTables.cpp Vc2RampCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2osc" &
 # The TVA (v233) against rom.4's own routines, the OS's call hooked
 [ -f Vc2TvaCheck.cpp ] && cc -DXT_VC2TVA_MAIN Vc2TvaCheck.cpp Vc2TvaEvents.cpp Vc2TvaFakes.cpp Vc2Tva.cpp \

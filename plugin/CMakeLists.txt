@@ -199,6 +199,9 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscTables.cpp
     Source/Vc2OscNoteOn.cpp
     Source/Vc2OscTargets.cpp
+    Source/Vc2PitchRamp.cpp
+    Source/Vc2PitchRampTick.cpp
+    Source/Vc2RampTables.cpp
     Source/Vc2Tva.cpp
     Source/Vc2TvaTables.cpp
     Source/Vc2CosmGrowl.cpp

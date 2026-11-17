@@ -15,11 +15,6 @@ Record recordAt(const std::array<Record, kOscRecords>& records, uint32_t at, Whe
 }
 } // namespace
 
-float OscPortParts::rampValue(int ramp) {
-    log(kRampValue, (uint32_t)ramp);
-    return s_.draws.rampValue;
-}
-
 uint32_t OscPortParts::renderBy(uint32_t routine, float* out, uint32_t third) {
     log(kRenderBy, routine, outOf(out), third);
     return s_.draws.rendered;
@@ -38,8 +33,4 @@ float OscPortParts::boundFloat(uint32_t part, uint32_t offset) {
 Vc2OscWaveHeader OscPortParts::waveHeader(uint32_t at) { return recordAt(s_.records.headers, at, oscHeaderAt); }
 
 Vc2OscLoopRecord OscPortParts::loopRecord(uint32_t at) { return recordAt(s_.records.loops, at, oscLoopAt); }
-
-void OscPortParts::logFloats(OscKind kind, int ramp, float a, float b) {
-    log(kind, (uint32_t)ramp, std::bit_cast<uint32_t>(a), std::bit_cast<uint32_t>(b));
-}
 #endif

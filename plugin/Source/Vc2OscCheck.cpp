@@ -12,16 +12,16 @@
 #ifdef XT_VC2OSC_MAIN
 #include "Vc2CheckCalls.h"
 #include "Vc2OscSides.h"
+#include "Vc2RampTables.h"
 #include "Vc2OscTables.h"
 #include <bit>
 #include <cmath>
 
 namespace {
 constexpr int kSteps = 400;
-// [FW] what the voice reads of its parts in place: the vibrato's two outputs, a ramp's factor (ramp 0's +0x54, the
-// ramps 0x64 apart)
-constexpr uint32_t kVibratoPitch = 0x2c, kVibratoLevel = 0x30, kRampFactor = 0x960, kRampStride = 0x64;
-constexpr uint32_t kTail = 0xa38;        // [FW] where the tail is in a voice
+// [FW] what the voice reads of its parts in place: the vibrato's two outputs
+constexpr uint32_t kVibratoPitch = 0x2c, kVibratoLevel = 0x30;
+constexpr uint32_t kRamps = 0x90c, kTail = 0xa38;   // [FW] where the ramps (v236) and the tail are in a voice
 // [FW] a bound envelope's words the targets read (+0x1c, at 0 one time in two, +0x2c, +0x4c) and an LFO's (+0x38)
 constexpr std::array<uint32_t, 3> kEnvelopeWords { 0x1c, 0x2c, 0x4c };
 constexpr uint32_t kEnvelopeOut = 0x4c, kLfoOut = 0x38;
@@ -34,13 +34,14 @@ constexpr float kTwo31 = 2147483648.0f;
 constexpr uint32_t kKind = 0x54, kWave = 0x104, kFixed = 0x138, kFlags = 0x15c, kSourceByte = 0x160, kSeekAt = 0x1c0;
 constexpr uint32_t kLevel = 0x1e0, kHalf = 0x168, kPosition = 0x194, kPositionLite = 0x24c, kPositionFloat = 0x270;
 constexpr uint32_t kLegato = 0x908, kGate = 0xb8;
-constexpr std::array<uint32_t, 9> kFloatWords { 0x60, 0x64, 0x6c, 0x78, 0x88, 0x98, 0xb0, 0xbc, 0x100 };
+constexpr std::array<uint32_t, 8> kFloatWords { 0x60, 0x64, 0x6c, 0x78, 0x88, 0x98, 0xb0, 0x100 };
 // [FW] those that reach exp2 through the targets: the pitch, the formant, the pitch envelope's depth, the formant
-// envelope's and LFO's, the vibrato's on the pitch (each the block's word 0x54 below)
-constexpr std::array<uint32_t, 6> kModerateWords { 0x5c, 0x68, 0x70, 0x80, 0xa0, 0xfc };
+// envelope's and LFO's, the vibrato's on the pitch; and where the pitch ramp starts from (+0xbc, v236: the ramp's
+// value is a term of the pitch) (each the block's word 0x54 below)
+constexpr std::array<uint32_t, 7> kModerateWords { 0x5c, 0x68, 0x70, 0x80, 0xa0, 0xfc, 0xbc };
 // The calls counted over the run, by kind
-constexpr std::array<std::pair<OscKind, long OscCounts::*>, 3> kTallied { {
-    { kSeek, &OscCounts::seeks }, { kSetRamp, &OscCounts::rampsSet }, { kKindCall, &OscCounts::kindCalls } } };
+constexpr std::array<std::pair<OscKind, long OscCounts::*>, 2> kTallied { {
+    { kSeek, &OscCounts::seeks }, { kKindCall, &OscCounts::kindCalls } } };
 
 uint32_t drawKind(std::mt19937& rng) {   // 0…7, now and then past 7
     constexpr std::array<uint32_t, 4> kPast { 8, 9, 100, 0xffffffff };
@@ -130,9 +131,8 @@ void drawRecords(OscRecords& r, std::mt19937& rng) {
 // words and tail into rom.4's memory and its vibrato's output
 void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
     OscDraws& d = s.shared.draws;
-    for (float* x : { &d.rampValue, &d.vibratoPitch }) *x = oscDrawFloat(rng, OscRange::moderate);   // into the pitch
+    d.vibratoPitch = oscDrawFloat(rng, OscRange::moderate);   // into the pitch
     d.vibratoLevel = oscDrawFloat(rng);
-    for (float& x : d.rampFactors) x = oscDrawFloat(rng);
     d.rendered = (uint32_t)rng();
     d.seekFlags = (uint8_t)rng();
     drawRecords(s.shared.records, rng);
@@ -143,19 +143,17 @@ void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
         const std::array<std::pair<uint32_t, float>, 2> inPlace { { { kVibratoPitch, d.vibratoPitch },
                                                                      { kVibratoLevel, d.vibratoLevel } } };
         for (const auto& [at, x] : inPlace) s.fw.cpu.write(oscVoiceAt(v) + at, &x, sizeof x);
-        for (size_t ramp = 0; ramp < d.rampFactors.size(); ++ramp) {
-            const uint32_t at = oscVoiceAt(v) + kRampFactor + kRampStride * (uint32_t)ramp;
-            s.fw.cpu.write(at, &d.rampFactors[ramp], sizeof(float));
-        }
     }
     s.rom.clear();
     s.shared.calls.clear();
 }
 
-// A case: both voices the same noise, then its events
+// A case: both voices the same noise, their ramps as glides leave them (each of its built type: the voice restarts the
+// pitch's from its own words, and a ratio's ramp from those would take logf to a NaN), then its events
 std::string oscVoiceCase(OscSides& s, std::mt19937& rng) {
     for (Vc2OscVoice& o : s.voices) {
         for (uint8_t& b : o.own) b = (uint8_t)rng();
+        oscDrawBuiltRamps(o.ramps, rng);
         auto* tail = reinterpret_cast<uint32_t*>(&o.tail);
         for (size_t k = 0; k < sizeof o.tail / 4; ++k) tail[k] = (uint32_t)rng();
     }
@@ -165,11 +163,15 @@ std::string oscVoiceCase(OscSides& s, std::mt19937& rng) {
         drawBefore(s, rng, k == 0);
         what = events[rng() % events.size()](s, rng, (int)(rng() % kOscVoices));
         for (const auto& [kind, counted] : kTallied) s.n.*counted += vc2CountCalls(s.shared.calls, kind);
+        for (const Vc2OscVoice& o : s.voices) {
+            for (const Vc2PitchRamp& r : o.ramps) s.n.gliding += r.w.on != 0 && r.w.state == 2;
+        }
     }
     return what;
 }
 
 const char* const kOwnNames[kOscVoices] = { "voice 0's own words", "voice 1's own words" };
+const char* const kRampNames[kOscVoices] = { "voice 0's ramps", "voice 1's ramps" };
 const char* const kTailNames[kOscVoices] = { "voice 0's tail", "voice 1's tail" };
 } // namespace
 
@@ -183,6 +185,7 @@ float oscDrawPosition(std::mt19937& rng) {
 void oscWriteVoice(OscSides& s, int v) {
     const Vc2OscVoice& o = s.voices[(size_t)v];
     s.fw.cpu.write(oscVoiceAt(v) + Vc2OscVoice::kOwn, o.own.data(), o.own.size());
+    s.fw.cpu.write(oscVoiceAt(v) + kRamps, o.ramps.data(), sizeof o.ramps);
     s.fw.cpu.write(oscVoiceAt(v) + kTail, &o.tail, sizeof o.tail);
 }
 
@@ -213,15 +216,18 @@ std::string oscDifference(OscSides& s) {
         const uint32_t at = oscVoiceAt(v);
         const std::string what = vc2RegionsDifference(
             s.fw, { { at + Vc2OscVoice::kOwn, o.own.data(), o.own.size(), kOwnNames[v] },
+                    { at + kRamps, o.ramps.data(), sizeof o.ramps, kRampNames[v] },
                     { at + kTail, &o.tail, sizeof o.tail, kTailNames[v] } });
         if (!what.empty()) return what;
     }
     return oscCallsDifference(s.rom, s.shared.calls);
 }
 
+static bool loadOscAndRamp(const char* path) { return vc2LoadOsc(path) && vc2LoadRamp(path); }
+
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2osc", vc2LoadOsc);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2osc", loadOscAndRamp);
     if (!run) return 1;
     std::array<Vc2OscVoice, kOscVoices> voices {};
     OscShared shared;
@@ -230,14 +236,16 @@ int main(int argc, char** argv) {
     std::vector<OscCall> rom;
     const RomShared romShared(fw);
     OscSides s { fw, voices, parts, shared, rom, romShared };
-    oscInstallRom(fw, shared.draws, rom);
     Vc2Tally tally { "XT_VC2OSC_FIRST", "XT_VC2OSC_STOP" };
+    oscRampPart(fw, romShared, *run, tally);
+    oscInstallRom(fw, shared.draws, rom);
     vc2RunCases(*run, tally, "", s.n.events, [&](std::mt19937& rng, bool) { return oscVoiceCase(s, rng); });
     const OscCounts& n = s.n;
     std::printf("osc: %d cases, %ld events, %ld note-ons (%ld with a sample, %ld without), %ld updates, %ld renders, "
                 "%ld settings, %ld takes, %ld getters\n", run->cases, n.events, n.noteOns, n.sampled, n.plain,
                 n.updates, n.renders, n.settings, n.takes, n.getters);
-    std::printf("calls: %ld seeks, %ld ramps set, %ld kinds' routines\n", n.seeks, n.rampsSet, n.kindCalls);
+    std::printf("calls: %ld seeks, %ld kinds' routines; %ld ramps gliding after an event\n", n.seeks, n.kindCalls,
+                n.gliding);
     std::printf("xt_vc2osc: %ld different\n", tally.different);
     return 0;
 }

@@ -17,7 +17,6 @@ constexpr size_t kPitchEnvelopeBind = 0, kLevelEnvelopeBind = 3;
 constexpr uint32_t kEnvelopeOut = 0x4c, kEnvelopeHeld = 0x1c, kEnvelopeHeldOut = 0x2c, kLfoOut = 0x38;
 // [FW] the walk's envelope 2 by +0x78 and LFO 2 by +0x98; the formant's envelope 3 by +0x80 and LFO 3 by +0xa0
 constexpr Vc2OscTargets::Mod kWalkMod { 1, 0x78, 5, 0x98 }, kFormantMod { 2, 0x80, 6, 0xa0 };
-constexpr int kPitchRamp = 0, kFormantRamp = 1, kWalkRamp = 2;   // [FW] +0x90c, +0x970, +0x9d4
 // [FW] the walk's factor: the object's flags' 0x02 keeps it; else kind 2 with the block's +0x138 0x20, or kind 1 but
 // for the wave's type 2, take 1
 constexpr uint32_t kFlags = 0x15c, kFixedByte = 0x138;
@@ -39,7 +38,7 @@ float vc2OscBounded(float x, Vc2OscBounds b) {
 float vc2OscPitchSum(const Vc2OscVoice& v, Vc2OscParts& p) {
     float x = add(mul(bind(v, p, kPitchEnvelopeBind, kEnvelopeOut), v.f32(kPitchDepth)), v.f32(kPitch));
     x = add(mul(p.vibratoPitch(), v.f32(kVibratoDepth)), x);
-    x = add(x, p.rampValue(kPitchRamp));
+    x = add(x, v.ramps[Vc2OscVoice::kPitchRamp].value());
     return add(x, v.tail.offset);
 }
 
@@ -69,13 +68,13 @@ float Vc2OscTargets::modulation(const Mod& m) const {
 
 float Vc2OscTargets::walkTarget() const {
     const float sum = modulation(kWalkMod);
-    const float ramp = p_.rampValue(kWalkRamp);
+    const float ramp = v_.ramps[Vc2OscVoice::kWalkRamp].value();
     return vc2OscBounded(mul(ramp, add(v_.f32(kWalkBase), sum)), vc2OscTables().walkTarget);
 }
 
 float Vc2OscTargets::formantTarget() const {
     const float sum = modulation(kFormantMod);
-    const float ramp = p_.rampValue(kFormantRamp);
+    const float ramp = v_.ramps[Vc2OscVoice::kFormantRamp].value();
     const float x = s_.exp2(add(v_.f32(kFormantBase), sum));
     return vc2OscBounded(mul(ramp, x), { kFormantMost, vc2OscTables().formantTargetLeast });
 }
@@ -86,13 +85,13 @@ float Vc2OscTargets::walk() const {
     if (!keeps && v_.kind() == 2 && (v_.u8(kFixedByte) & kFixedBit) != 0) factor = 1.0f;
     if (!keeps && v_.kind() == 1 && v_.u32(Vc2OscVoice::kWave) != 2) factor = 1.0f;
     const float sum = modulation(kWalkMod);
-    const float ramp = p_.rampValue(kWalkRamp);
+    const float ramp = v_.ramps[Vc2OscVoice::kWalkRamp].value();
     return mul(vc2OscBounded(mul(add(v_.f32(kWalkBase), sum), ramp), vc2OscTables().walk), factor);
 }
 
 float Vc2OscTargets::formant() const {
     const float sum = modulation(kFormantMod);
-    const float ramp = p_.rampValue(kFormantRamp);
+    const float ramp = v_.ramps[Vc2OscVoice::kFormantRamp].value();
     const float x = s_.exp2(add(v_.f32(kFormantBase), sum));
     const float r = vc2OscBounded(mul(x, ramp), { kFormantMost, vc2OscTables().formantLeast });
     return mul(v_.tail.formantFactor, r);
@@ -102,7 +101,7 @@ float Vc2OscTargets::levelOne() const { return add(mul(p_.vibratoLevel(), v_.f32
 
 float Vc2OscTargets::gain() const {
     const float g = mul(mul(levelOne(), v_.f32(kLevel)), v_.f32(kGain));
-    return mul(g, p_.rampFactor(kPitchRamp));
+    return mul(g, v_.ramps[Vc2OscVoice::kPitchRamp].factor());
 }
 
 float Vc2OscTargets::level() const {

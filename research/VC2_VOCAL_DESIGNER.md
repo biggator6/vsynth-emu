@@ -380,7 +380,10 @@ are ported from rom.4, as COSM's converters are.
   −16.8, −7.3, −2.6, …). And a fast, wide glide starts at ±500 cents in rom.4 where rom.2 starts at the whole offset (276.2 →
   −770 cents over 114 ms: rom.2 1046, 941, 835, …; rom.4 500, 448, 397, … in about as many ticks; −3584 → 4632 over 7 ms:
   rom.2 −8216, rom.4 −500). **So the VC-2's portamento is its own** (the constructor, restart and tick rewritten): ported
-  from rom.4, its law read from those three; the start, update and value are the V-Synth's.
+  from rom.4, its law read from those three; the start, update and value are the V-Synth's. (v236, ported and read:
+  under 100 ms the span is held to ±500 cents and type 0 eases in with x⁴, which gives this run's −60.0, −33.4; and a
+  gain factor of its own over the first ticks; HARDWARE_FIRMWARE.md, "The VC-2's portamento". The start's shape is
+  the V-Synth's, but it copies the six words it is given and branches into rom.4's restart.)
 
 Seen red: the sensitivity paired with rom.4's velocity curve instead (201 returns part); rom.4's clock a millisecond late
 (every sequence parts, at the key state's time, +0x10).

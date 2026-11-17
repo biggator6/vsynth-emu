@@ -18,6 +18,10 @@ public:
     virtual ~Vc2ToneShared() = default;
     virtual int velocity(int velocity, int sens, int curve) const = 0;   // 0x893a7fb0: a factor 0…32768
     virtual float exp2(float x) const = 0;                                // 0x893a8340
+    // 0x895065f4, the library's logf: its core 0x89509a78 is rom.2's 0x89531b78 instruction for instruction (v236,
+    // the pitch ramp's; COSM's converters' too); the wrapper's errno (0x89add990) for an infinite or NaN result isn't
+    // the caller's
+    virtual float log(float x) const = 0;
 };
 
 // The Matrix's sums for the OSC as its two getters give them (rom.4's 0x893a23b0/0x893a2440 and 0x893a26b0/0x893a28b0,

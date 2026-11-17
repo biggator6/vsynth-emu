@@ -8,7 +8,7 @@
 
 struct OscCounts {
     long events = 0, noteOns = 0, plain = 0, sampled = 0, updates = 0, takes = 0, renders = 0, settings = 0;
-    long getters = 0, seeks = 0, rampsSet = 0, kindCalls = 0;
+    long getters = 0, seeks = 0, kindCalls = 0, gliding = 0;
 };
 
 struct OscSides {
@@ -59,3 +59,10 @@ void oscBlockFloats(std::span<uint32_t> words, std::mt19937& rng);
 float oscDrawPosition(std::mt19937& rng);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same
 void oscWriteVoice(OscSides& s, int v);
+// The ramp part (v236, Vc2RampCheck.cpp): the pitch ramp against rom.4's own, before the voice part hooks anything;
+// its cases counted in `tally`, its counts printed
+void oscRampPart(Vc2Fw& fw, const RomShared& shared, const Vc2Run& run, Vc2Tally& tally);
+// A voice's ramps as glides leave them, each of the type its index is built with (the same file)
+void oscDrawBuiltRamps(std::array<Vc2PitchRamp, Vc2OscVoice::kRamps>& ramps, std::mt19937& rng);
+// The six words a ramp's start or legato update is given (the same)
+Vc2RampSettings oscDrawRampSettings(std::mt19937& rng);

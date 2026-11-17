@@ -24,14 +24,15 @@ constexpr float kTwo31 = 2147483648.0f;   // [FW] 0x893aedc4…0x893aedd0: mov #
 float settingsWord(const uint32_t* s, uint32_t at) { return std::bit_cast<float>(s[at / 4]); }
 } // namespace
 
-void Vc2OscVoice::settings(const uint32_t* s, Vc2OscParts& parts) {
+void Vc2OscVoice::settings(const uint32_t* s, Vc2OscParts& parts, const Vc2ToneShared& shared) {
     for (uint32_t at : kCopied) setU32(at, s[(at - kOwn) / 4]);
     setF32(kScaled, mul(settingsWord(s, kScaledFrom), vc2OscTables().settingsScale));
     const auto* bytes = reinterpret_cast<const uint8_t*>(s);
     if (bytes[kSettingsByte] != u8(kByte)) {
         setU8(kByte, bytes[kSettingsByte]);
         if (kind() >= (uint32_t)kVc2OscKinds) return;
-        if (vc2OscKindRow(kind()).ramp) parts.setRamp(0, f32(kRampFr4), f32(kRampFr5));
+        // [FW] the pitch's ramp again (the pool word 0x893ae90c holds its restart, 0x893b0f20)
+        if (vc2OscKindRow(kind()).ramp) ramps[kPitchRamp].restart(f32(kRampFr4), f32(kRampFr5), shared);
     }
     parts.setVibrato(s + kVibratoFrom / 4);
     const Vc2OscKindRow& row = vc2OscKindRow(kind());

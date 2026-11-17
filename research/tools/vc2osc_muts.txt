@@ -2,7 +2,8 @@
 # differs.  name|old|new[|port[|seed]]; ports vc2osc (Vc2OscVoice.cpp, v230), vc2oscget (Vc2OscVoiceGet.cpp: the
 # settings and the getters), vc2osckinds (Vc2OscVoiceKinds.cpp: each kind's row), vc2osctables (Vc2OscTables.cpp: the
 # constants' addresses), vc2oscnoteon (Vc2OscNoteOn.cpp: the note-on by kind, v232) and vc2osctargets (Vc2OscTargets.cpp:
-# the targets and the pitch's sum, v232).  v232 renamed v230's plants where it renamed their code (the wave header's
+# the targets and the pitch's sum, v232), vc2ramp, vc2ramptick and vc2ramptables (Vc2PitchRamp.cpp, its tick's file and
+# Vc2RampTables.cpp: the pitch ramp, v236; v236 rewrote v230's ramp plants on the voice's own ramps).  v232 renamed v230's plants where it renamed their code (the wave header's
 # and the loop record's fields by rom.2's names and rom.4's use: the offset, the detune, the walk's and the formant's
 # factors) and moved the pitch getter's to the targets, where its sum now is.  Not planted: the note-on's records at
 # address 0 (a kind past 7: rom.4 reads from address 2 there, which the check never draws), the beyond row's records
@@ -15,6 +16,11 @@
 # ratio's pool for the cents' bounds, kind 6's lower bound of the ratio, the walks' bounds and the formants' lower
 # bounds, whose pool words hold the same values (±6000 at 0x893afb38 and 0x893afdd4; −32 at 0x893af370 and 0x893af530;
 # ±5 at 0x893afddc and 0x893affd4; 0.5 at 0x893afde4 and 0x893affe0).
+# Not planted (v236): the legato update's pool for the restart's (its words hold the same values), a negative count
+# or phase (past the factor's table, which the tone never reaches), the ramp's and the tables' headers (their
+# fields are planted where the .cpp files use them), and three dropped after v236's first run: the update's count
+# passed whole to the ramps (the tick takes its low half itself), and the time law's branch under 1 at 0.5 or its time
+# 1 for 2 (any time under 10 gives the step's cap, 65536, so the time there can't show)
 ramp-types|{ 0, 2, 1 }|{ 0, 1, 2 }|vc2osc
 depth-word|kDepthWord = 0x1c / 4|kDepthWord = 0x20 / 4|vc2osc
 header-word|kHeaderWord = 0xd4 / 4|kHeaderWord = 0xdc / 4|vc2osc
@@ -51,7 +57,7 @@ seeks2-type8|{ 0x893c6360, 0x893cd090 } } };|{ 0x893cd090, 0x893c6360 } } };|vc2
 installed-order|{ t.installed4, t.installed5, t.installed6 }|{ t.installed4, t.installed6, t.installed5 }|vc2osc
 installed-base|(which - 4)]|(which - 4) % 2]|vc2osc
 build-no-vibrato|    parts.buildVibrato();\n||vc2osc
-build-ramps-two|ramp < kRamps; ++ramp) parts.buildRamp|ramp < 2; ++ramp) parts.buildRamp|vc2osc
+build-ramps-two|ramp < ramps.size(); ++ramp) ramps[ramp].construct|ramp < 2; ++ramp) ramps[ramp].construct|vc2osc
 build-sync-kept|    tail.sync = 0;\n||vc2osc
 build-flag-kept|    tail.flag = 0;\n    tail.installed|    tail.installed|vc2osc
 build-installed-kept|    tail.installed = 0.0f;\n    tail.seekPending|    tail.seekPending|vc2osc
@@ -67,8 +73,7 @@ update-waits-always|    if (row.waits && tail.seekPending != 0) {|    if (tail.s
 update-wait-ge|f32(kLevel) > vc2OscTables().waitLevel|f32(kLevel) >= vc2OscTables().waitLevel|vc2osc
 update-wait-no-return|vc2OscTables().waitLevel) return;|vc2OscTables().waitLevel) {}|vc2osc
 update-no-reseek|        reseek(parts);\n||vc2osc
-update-first-after|    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);\n    for (int ramp = 0; ramp < kRamps; ++ramp) {\n        if (row.ticks & (1 << ramp)) parts.tickRamp(ramp, n16);\n    }|    for (int ramp = 0; ramp < kRamps; ++ramp) {\n        if (row.ticks & (1 << ramp)) parts.tickRamp(ramp, n16);\n    }\n    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);|vc2osc
-update-ticks-n|parts.tickRamp(ramp, n16)|parts.tickRamp(ramp, n)|vc2osc
+update-first-after|    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);\n    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }|    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }\n    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);|vc2osc
 update-no-update|    if (row.update != 0) parts.kindCall(row.update);\n||vc2osc
 reseek-no-hold|setU8(kFlags, (uint8_t)(was \| kHeld));|setU8(kFlags, was);|vc2osc
 reseek-at-unsigned|(int32_t)u32(kSeekAt) >> kSeekShift|(int32_t)(u32(kSeekAt) >> kSeekShift)|vc2osc
@@ -114,13 +119,13 @@ noteon-factor-test|if (!(factor > 0.0f)) {|if (factor < 0.0f) {|vc2osc
 noteon-factor-kept|        tail.factor = 1.0f;\n        factor = 1.0f;|        factor = 1.0f;|vc2osc
 noteon-walk-unfixed|        tail.factor = 1.0f;\n        factor = 1.0f;\n|        tail.factor = 1.0f;\n|vc2osc
 noteon-wave-kind-call|    tail.formantFactor = tail.factor;\n    kindNoteOn(parts, shared);|    tail.formantFactor = tail.factor;|vc2osc
-start-ramp-1|parts.startRamp(0,|parts.startRamp(1,|vc2osc
-start-swapped|parts.startRamp(0, f32(kRampFr4), f32(kRampFr5))|parts.startRamp(0, f32(kRampFr5), f32(kRampFr4))|vc2osc
-start-any-kind|    if (vc2OscKindRow(kind()).ramp) parts.startRamp|    parts.startRamp|vc2osc
+start-ramp-1|ramps[kPitchRamp].start(ramp,|ramps[kFormantRamp].start(ramp,|vc2osc
+start-swapped|start(ramp, f32(kRampFr4), f32(kRampFr5), shared)|start(ramp, f32(kRampFr5), f32(kRampFr4), shared)|vc2osc
+start-any-kind|    if (vc2OscKindRow(kind()).ramp) ramps[kPitchRamp].start|    ramps[kPitchRamp].start|vc2osc
 count-set|setU8(kCount, (uint8_t)(u8(kCount) + x))|setU8(kCount, (uint8_t)x)|vc2osc
 count-always|    if (u8(kFlags) & kCounts) setU8|    setU8|vc2osc
 matched-added|setU8(kMatched, (uint8_t)x)|setU8(kMatched, (uint8_t)(u8(kMatched) + x))|vc2osc
-legato-two|ramp < kRamps; ++ramp) parts.legatoRamp|ramp < 2; ++ramp) parts.legatoRamp|vc2osc
+legato-two|for (Vc2PitchRamp& r : ramps) r.legato(ramp);|for (size_t r = 0; r < 2; ++r) ramps[r].legato(ramp);|vc2osc
 render-zero-short|std::fill(out, out + kOut, 0.0f)|std::fill(out, out + kOut / 2, 0.0f)|vc2osc
 render-third-sync|parts.renderBy(tail.render, out, kRenderThird)|parts.renderBy(tail.render, out, tail.sync)|vc2osc
 render-analog-sync|parts.renderBy(tail.renderAnalog, out, tail.sync)|parts.renderBy(tail.renderAnalog, out, kRenderThird)|vc2osc
@@ -139,8 +144,8 @@ settings-scaled-from|kScaledFrom = 0x1c|kScaledFrom = 0x70|vc2oscget
 settings-byte-at|kSettingsByte = 4|kSettingsByte = 5|vc2oscget
 settings-byte-kept|        setU8(kByte, bytes[kSettingsByte]);\n||vc2oscget
 settings-beyond-on|        if (kind() >= (uint32_t)kVc2OscKinds) return;\n||vc2oscget
-settings-ramp-always|        if (vc2OscKindRow(kind()).ramp) parts.setRamp|        parts.setRamp|vc2oscget
-settings-ramp-args|parts.setRamp(0, f32(kRampFr4), f32(kRampFr5))|parts.setRamp(0, f32(kRampFr5), f32(kRampFr4))|vc2oscget
+settings-ramp-always|        if (vc2OscKindRow(kind()).ramp) ramps[kPitchRamp].restart|        ramps[kPitchRamp].restart|vc2oscget
+settings-ramp-args|restart(f32(kRampFr4), f32(kRampFr5), shared)|restart(f32(kRampFr5), f32(kRampFr4), shared)|vc2oscget
 settings-byte-unread|if (bytes[kSettingsByte] != u8(kByte)) {|if (true) {|vc2oscget
 settings-vibrato-from|kVibratoFrom = 0x80|kVibratoFrom = 0x84|vc2oscget
 settings-no-vibrato|    parts.setVibrato(s + kVibratoFrom / 4);\n||vc2oscget
@@ -159,8 +164,8 @@ pitch-vibrato-depth|kVibratoDepth = 0xfc|kVibratoDepth = 0x100|vc2osctargets
 pitch-no-env|float x = add(mul(bind(v, p, kPitchEnvelopeBind, kEnvelopeOut), v.f32(kPitchDepth)), v.f32(kPitch));|float x = v.f32(kPitch);|vc2osctargets
 pitch-env-bind|kPitchEnvelopeBind = 0|kPitchEnvelopeBind = 1|vc2osctargets
 pitch-no-vibrato|    x = add(mul(p.vibratoPitch(), v.f32(kVibratoDepth)), x);\n||vc2osctargets
-pitch-no-ramp|    x = add(x, p.rampValue(kPitchRamp));\n||vc2osctargets
-pitch-ramp-1|kPitchRamp = 0,|kPitchRamp = 1,|vc2osctargets
+pitch-no-ramp|    x = add(x, v.ramps[Vc2OscVoice::kPitchRamp].value());\n||vc2osctargets
+pitch-ramp-1|v.ramps[Vc2OscVoice::kPitchRamp].value()|v.ramps[Vc2OscVoice::kFormantRamp].value()|vc2osctargets
 pitch-no-offset|    return add(x, v.tail.offset);|    return x;|vc2osctargets
 bounded-most|if (x > b.most) return b.most;|if (x > b.most) return b.least;|vc2osctargets
 bounded-least|if (b.least > x) return b.least;|if (b.least > x) return x;|vc2osctargets
@@ -328,8 +333,8 @@ formant-mod-env|kFormantMod { 2, 0x80, 6, 0xa0 }|kFormantMod { 1, 0x80, 6, 0xa0 
 formant-mod-env-depth|kFormantMod { 2, 0x80, 6, 0xa0 }|kFormantMod { 2, 0x84, 6, 0xa0 }|vc2osctargets
 formant-mod-lfo|kFormantMod { 2, 0x80, 6, 0xa0 }|kFormantMod { 2, 0x80, 7, 0xa0 }|vc2osctargets
 formant-mod-lfo-depth|kFormantMod { 2, 0x80, 6, 0xa0 }|kFormantMod { 2, 0x80, 6, 0xa4 }|vc2osctargets
-formant-ramp|kFormantRamp = 1, kWalkRamp = 2|kFormantRamp = 2, kWalkRamp = 2|vc2osctargets
-walk-ramp|kFormantRamp = 1, kWalkRamp = 2|kFormantRamp = 1, kWalkRamp = 1|vc2osctargets
+formant-ramp|kFormantRamp].value();\n    const float x = s_.exp2(add(v_.f32(kFormantBase), sum));\n    return|kPitchRamp].value();\n    const float x = s_.exp2(add(v_.f32(kFormantBase), sum));\n    return|vc2osctargets
+walk-ramp|kWalkRamp].value();\n    return vc2OscBounded(mul(ramp, add(|kFormantRamp].value();\n    return vc2OscBounded(mul(ramp, add(|vc2osctargets
 walk-flags-at|kFlags = 0x15c|kFlags = 0x15d|vc2osctargets
 walk-fixed-byte|kFixedByte = 0x138|kFixedByte = 0x139|vc2osctargets
 walk-keeps-bit|kKeepsFactor = 0x02|kKeepsFactor = 0x04|vc2osctargets
@@ -369,12 +374,140 @@ formant-no-factor|    return mul(v_.tail.formantFactor, r);|    return r;|vc2osc
 formant-walk-factor|mul(v_.tail.formantFactor, r)|mul(v_.tail.walkFactor, r)|vc2osctargets
 formant-unbounded|const float r = vc2OscBounded(mul(x, ramp), { kFormantMost, vc2OscTables().formantLeast });|const float r = mul(x, ramp);|vc2osctargets
 levelone-no-one|add(mul(p_.vibratoLevel(), v_.f32(kLevelDepth)), 1.0f)|mul(p_.vibratoLevel(), v_.f32(kLevelDepth))|vc2osctargets
-gain-no-ramp|    return mul(g, p_.rampFactor(kPitchRamp));|    return g;|vc2osctargets
+gain-no-ramp|    return mul(g, v_.ramps[Vc2OscVoice::kPitchRamp].factor());|    return g;|vc2osctargets
 gain-no-level|mul(mul(levelOne(), v_.f32(kLevel)), v_.f32(kGain))|mul(levelOne(), v_.f32(kGain))|vc2osctargets
 gain-order|mul(mul(levelOne(), v_.f32(kLevel)), v_.f32(kGain))|mul(levelOne(), mul(v_.f32(kLevel), v_.f32(kGain)))|vc2osctargets
-gain-ramp-1|p_.rampFactor(kPitchRamp)|p_.rampFactor(kFormantRamp)|vc2osctargets
+gain-ramp-1|v_.ramps[Vc2OscVoice::kPitchRamp].factor()|v_.ramps[Vc2OscVoice::kFormantRamp].factor()|vc2osctargets
 level-held-inverted|bind(v_, p_, kLevelEnvelopeBind, kEnvelopeHeld) == 0.0f|bind(v_, p_, kLevelEnvelopeBind, kEnvelopeHeld) != 0.0f|vc2osctargets
 level-held-swapped|held ? kEnvelopeOut : kEnvelopeHeldOut|held ? kEnvelopeHeldOut : kEnvelopeOut|vc2osctargets
 level-unbounded|const float l = vc2OscBounded(mul(one, mul(envelope, v_.f32(kLevel))), kUnit);|const float l = mul(one, mul(envelope, v_.f32(kLevel)));|vc2osctargets
 level-no-gain|    return mul(v_.f32(kGain), l);|    return l;|vc2osctargets
 level-order|mul(one, mul(envelope, v_.f32(kLevel)))|mul(mul(one, envelope), v_.f32(kLevel))|vc2osctargets
+formant-ramp-factored|kFormantRamp].value();\n    const float x = s_.exp2(add(v_.f32(kFormantBase), sum));\n    const float r|kWalkRamp].value();\n    const float x = s_.exp2(add(v_.f32(kFormantBase), sum));\n    const float r|vc2osctargets
+walk-ramp-factored|kWalkRamp].value();\n    return mul(vc2OscBounded(|kPitchRamp].value();\n    return mul(vc2OscBounded(|vc2osctargets
+ramp-started|kStarted = 1, kDone = 3;|kStarted = 2, kDone = 3;|vc2ramp
+ramp-done|kStarted = 1, kDone = 3;|kStarted = 1, kDone = 2;|vc2ramp
+gates-walk|&Vc2RampSettings::walkOn,|&Vc2RampSettings::formantOn,|vc2ramp
+gates-type0|kGates { nullptr,|kGates { &Vc2RampSettings::walkOn,|vc2ramp
+legato-words-5|kLegatoWords = 4;|kLegatoWords = 5;|vc2ramp
+legato-words-3|kLegatoWords = 4;|kLegatoWords = 3;|vc2ramp
+hold-most|if (w.span > k.spanMost) w.span = k.spanMost;|if (w.span > k.spanMost) w.span = k.spanLeast;|vc2ramp
+hold-least|else if (k.spanLeast > w.span) w.span = k.spanLeast;|else if (k.spanLeast > w.span) w.span = k.spanMost;|vc2ramp
+hold-no-least|    else if (k.spanLeast > w.span) w.span = k.spanLeast;\n||vc2ramp
+time-timed|w.settings.timed == 1 ? w.settings.time|w.settings.timed != 0 ? w.settings.time|vc2ramp
+time-rate-abs|mul(std::fabs(w.span), w.settings.time)|mul(w.span, w.settings.time)|vc2ramp
+time-rate-octave|div(mul(std::fabs(w.span), w.settings.time), k.perOctave)|mul(std::fabs(w.span), w.settings.time)|vc2ramp
+time-under-1-hold|    if (1.0f > time) {\n        holdSpan(w, k);\n|    if (1.0f > time) {\n|vc2ramp
+time-under-1-ease|        w.ease = 1.0f;\n        time = add(1.0f, 1.0f);|        w.ease = 0.0f;\n        time = add(1.0f, 1.0f);|vc2ramp
+time-ease-kept|    } else {\n        w.ease = 0.0f;\n        if (k.slow > time) {|    } else {\n        if (k.slow > time) {|vc2ramp
+time-slow|if (k.slow > time) {|if (k.slow >= time) {|vc2ramp
+time-slow-hold|        if (k.slow > time) {\n            holdSpan(w, k);\n|        if (k.slow > time) {\n|vc2ramp
+time-fast|const bool fast = k.fast > time;|const bool fast = k.fast >= time;|vc2ramp
+time-fast-ease|mul(sub(k.slow, time), k.easeSlope)|mul(sub(time, k.slow), k.easeSlope)|vc2ramp
+time-ease-slope|mul(sub(k.slow, time), k.easeSlope)|sub(k.slow, time)|vc2ramp
+time-fast-double|time = fast ? add(time, time) : k.slow;|time = fast ? time : k.slow;|vc2ramp
+time-slow-time|time = fast ? add(time, time) : k.slow;|time = fast ? add(time, time) : time;|vc2ramp
+step-rate|w.step = div(k.phaseRate, time);|w.step = div(k.phaseEnd, time);|vc2ramp
+step-no-cap|    if (!(k.phaseEnd > w.step)) w.step = k.phaseEnd;\n}|}|vc2ramp
+cents-octave|return mul(octaves, k.perOctave);|return octaves;|vc2ramp
+cents-log2|div(shared.log(x), shared.log(add(1.0f, 1.0f)))|shared.log(x)|vc2ramp
+construct-type|    w.type = type;\n||vc2ramp
+construct-state|    w.state = 0;\n    w.value|    w.value|vc2ramp
+construct-value|    w.value = 0.0f;\n    w.on = 0;|    w.on = 0;|vc2ramp
+construct-on|    w.on = 0;\n    w.factor = 1.0f;\n    w.factorPhase = t.builtPhase;|    w.factor = 1.0f;\n    w.factorPhase = t.builtPhase;|vc2ramp
+construct-factor|    w.factor = 1.0f;\n    w.factorPhase = t.builtPhase;|    w.factorPhase = t.builtPhase;|vc2ramp
+construct-phase|    w.factorPhase = t.builtPhase;\n||vc2ramp
+construct-rise|    w.factorRise = t.builtRise;\n||vc2ramp
+construct-fall|    w.factorFall = t.builtFall;\n||vc2ramp
+start-copy-short|std::memcpy(&w.settings, settings, sizeof w.settings);|std::memcpy(&w.settings, settings, sizeof w.settings - 4);|vc2ramp
+restart-state|    w.state = kStarted;\n||vc2ramp
+restart-given-from|    w.fromGiven = from;\n||vc2ramp
+restart-given-to|    w.toGiven = to;\n||vc2ramp
+restart-cents-from|w.from = w.type != 0 ? centsOf(from, shared, k) : from;|w.from = from;|vc2ramp
+restart-cents-to|w.to = w.type != 0 ? centsOf(to, shared, k) : to;|w.to = to;|vc2ramp
+restart-rising|w.rising = !(w.from > w.to);|w.rising = w.from < w.to;|vc2ramp
+restart-span|w.span = sub(w.to, w.from);|w.span = sub(w.from, w.to);|vc2ramp
+restart-phase-kept|    w.phase = 0.0f;\n    stepFor|    stepFor|vc2ramp
+restart-zero-span|if (w.span == 0.0f) w.phase = k.phaseEnd;|if (false) w.phase = k.phaseEnd;|vc2ramp
+restart-time-zero| \|\| w.settings.time == 0.0f||vc2ramp
+restart-done-state|        w.state = kDone;\n        w.value = done;\n    } else {|        w.value = done;\n    } else {|vc2ramp
+restart-done-value|w.value = done;\n    } else {|w.value = 0.0f;\n    } else {|vc2ramp
+restart-x|add(div(w.phase, k.phaseEnd), -1.0f)|div(w.phase, k.phaseEnd)|vc2ramp
+restart-ratio-cents|mul(mul(x, w.span), t.restartPerCent)|mul(x, w.span)|vc2ramp
+restart-linear|w.type != 0 ? shared.exp2(mul(mul(x, w.span), t.restartPerCent)) : mul(x, w.span)|mul(x, w.span)|vc2ramp
+restart-gate-signed|if ((uint32_t)w.type < kGates.size()) {|if (w.type < (int32_t)kGates.size()) {|vc2ramp
+restart-on-switch|w.settings.on == 1 && (gate|w.settings.on != 0 && (gate|vc2ramp
+restart-on-gate|w.settings.*gate == 1) ? 1 : 0;|w.settings.*gate != 0) ? 1 : 0;|vc2ramp
+restart-factor|    w.factor = 1.0f;\n    w.factorPhase = 0.0f;|    w.factorPhase = 0.0f;|vc2ramp
+restart-factor-phase|    w.factorPhase = 0.0f;\n||vc2ramp
+restart-depth|    w.factorDepth = 1.0f;\n||vc2ramp
+restart-factor-least|if (t.factorLeast > w.step) w.factorStep = t.factorLeast;|if (t.factorLeast > w.step) w.factorStep = t.factorMost;|vc2ramp
+restart-factor-most|else if (w.step > t.factorMost) w.factorStep = t.factorMost;|else if (w.step > t.factorMost) w.factorStep = t.factorLeast;|vc2ramp
+value-on|if (w.on != 0) return w.value;|if (w.on == 1) return w.value;|vc2ramp
+value-off|    return w.type != 0 ? 1.0f : 0.0f;\n}|    return 0.0f;\n}|vc2ramp
+tick-half|kHalf = 4;|kHalf = 3;|vc2ramptick
+tick-states|kIdle = 0, kStarted = 1, kGliding = 2, kDone = 3|kIdle = 0, kStarted = 2, kGliding = 1, kDone = 3|vc2ramptick
+tick-off|    if (w.on == 0) return;\n||vc2ramptick
+tick-n16|const int32_t n16 = (int16_t)n;|const int32_t n16 = n;|vc2ramptick
+tick-factor-type|if (w.type == 0) stepFactor(n16, t);|stepFactor(n16, t);|vc2ramptick
+tick-idle|case kIdle: return;|case kIdle: w.state = kGliding; return;|vc2ramptick
+tick-arm|case kStarted: w.state = kGliding; return;|case kStarted: glide(n16, shared, t); return;|vc2ramptick
+tick-done-value|case kDone: w.value = w.type != 0 ? 1.0f : 0.0f; return;|case kDone: return;|vc2ramptick
+tick-default|        default:   // [FW] 0x893b1140: a state past 3 is done\n            w.state = kDone;\n|        default:   // [FW] 0x893b1140: a state past 3 is done\n|vc2ramptick
+factor-end|if (!(t.factorEnd > w.factorPhase)) {|if (w.factorPhase > t.factorEnd) {|vc2ramptick
+factor-one|        w.factor = 1.0f;\n        return;|        return;|vc2ramptick
+factor-step|add(mul(w.factorStep, xtf::flt(n)), w.factorPhase)|add(w.factorStep, w.factorPhase)|vc2ramptick
+factor-hold|if (p > t.factorEnd) {|if (false) {|vc2ramptick
+factor-hold-kept|        w.factorPhase = t.factorEnd;\n        p = t.factorEnd;|        p = t.factorEnd;|vc2ramptick
+factor-x|const float x = mul(p, t.perPhase);|const float x = div(p, t.factorEnd);|vc2ramptick
+factor-rows|xtf::ftrc(mul(x, t.rowsPerX))|xtf::ftrc(x)|vc2ramptick
+factor-scale-rise|row >= kHalf ? w.factorRise : -w.factorFall|row >= kHalf ? w.factorFall : -w.factorFall|vc2ramptick
+factor-scale-sign|row >= kHalf ? w.factorRise : -w.factorFall|row >= kHalf ? w.factorRise : w.factorFall|vc2ramptick
+factor-d|const float d = sub(x, r.at);|const float d = x;|vc2ramptick
+factor-floor|add(mul(w.factorStep, t.factorPerStep), t.factorFloor)|mul(w.factorStep, t.factorPerStep)|vc2ramptick
+factor-per-step|add(mul(w.factorStep, t.factorPerStep), t.factorFloor)|add(w.factorStep, t.factorFloor)|vc2ramptick
+factor-depth|t.factorFloor), w.factorDepth), w.ease), scale)|t.factorFloor), 1.0f), w.ease), scale)|vc2ramptick
+factor-ease|w.factorDepth), w.ease), scale)|w.factorDepth), 1.0f), scale)|vc2ramptick
+factor-bump-square|add(mul(r.curve, mul(d, d)), r.base)|add(mul(r.curve, d), r.base)|vc2ramptick
+factor-bump-base|add(mul(r.curve, mul(d, d)), r.base)|mul(r.curve, mul(d, d))|vc2ramptick
+factor-one-add|w.factor = add(mul(k, bump), 1.0f);|w.factor = mul(k, bump);|vc2ramptick
+factor-row-last|kLastRow = 7;|kLastRow = 6;|vc2ramptick
+glide-step|w.phase = add(mul(w.step, xtf::flt(n)), w.phase);|w.phase = add(w.step, w.phase);|vc2ramptick
+glide-end|if (!(t.glideEnd > w.phase)) {|if (w.phase > t.glideEnd) {|vc2ramptick
+glide-done-state|        w.state = kDone;\n        w.value = w.type != 0 ? 1.0f : 0.0f;\n        return;\n    }\n    const float x|        w.value = w.type != 0 ? 1.0f : 0.0f;\n        return;\n    }\n    const float x|vc2ramptick
+glide-x|const float x = add(div(w.phase, t.glideEnd), -1.0f);|const float x = div(w.phase, t.glideEnd);|vc2ramptick
+glide-ratio-span|shared.exp2(mul(mul(x, w.span), t.tickPerCent))|shared.exp2(mul(x, t.tickPerCent))|vc2ramptick
+glide-ease-lin|mul(sub(1.0f, w.ease), x)|mul(w.ease, x)|vc2ramptick
+glide-ease-quartic|mul(mul(x2, x2), w.ease)|mul(x2, w.ease)|vc2ramptick
+glide-span|    w.value = mul(sub(mul(sub(1.0f, w.ease), x), mul(mul(x2, x2), w.ease)), w.span);|    w.value = sub(mul(sub(1.0f, w.ease), x), mul(mul(x2, x2), w.ease));|vc2ramptick
+glide-sign|sub(mul(sub(1.0f, w.ease), x), mul(mul(x2, x2), w.ease))|add(mul(sub(1.0f, w.ease), x), mul(mul(x2, x2), w.ease))|vc2ramptick
+rt-per-octave|{ 0x893b0c30, &r.perOctave }|{ 0x893b0c34, &r.perOctave }|vc2ramptables
+rt-slow|{ 0x893b0c34, &r.slow }|{ 0x893b0c40, &r.slow }|vc2ramptables
+rt-span-most|{ 0x893b0c38, &r.spanMost }|{ 0x893b0c3c, &r.spanMost }|vc2ramptables
+rt-span-least|{ 0x893b0c3c, &r.spanLeast }|{ 0x893b0c38, &r.spanLeast }|vc2ramptables
+rt-fast|{ 0x893b0c40, &r.fast }|{ 0x893b0c34, &r.fast }|vc2ramptables
+rt-ease|{ 0x893b0c44, &r.easeSlope }|{ 0x893b0d28, &r.easeSlope }|vc2ramptables
+rt-rate|{ 0x893b0d1c, &r.phaseRate }|{ 0x893b0d20, &r.phaseRate }|vc2ramptables
+rt-end|{ 0x893b0d20, &r.phaseEnd }|{ 0x893b0d1c, &r.phaseEnd }|vc2ramptables
+rt-per-cent|{ 0x893b0d28, &t.restartPerCent }|{ 0x893b0c44, &t.restartPerCent }|vc2ramptables
+rt-factor-least|{ 0x893b0f60, &t.factorLeast }|{ 0x893b0f64, &t.factorLeast }|vc2ramptables
+rt-factor-most|{ 0x893b0f64, &t.factorMost }|{ 0x893b0f60, &t.factorMost }|vc2ramptables
+lt-per-octave|{ 0x893b0f78, &l.perOctave }|{ 0x893b0f7c, &l.perOctave }|vc2ramptables
+lt-slow|{ 0x893b0f7c, &l.slow }|{ 0x893b0f88, &l.slow }|vc2ramptables
+lt-span-most|{ 0x893b0f80, &l.spanMost }|{ 0x893b0f84, &l.spanMost }|vc2ramptables
+lt-span-least|{ 0x893b0f84, &l.spanLeast }|{ 0x893b0f80, &l.spanLeast }|vc2ramptables
+lt-fast|{ 0x893b0f88, &l.fast }|{ 0x893b0f7c, &l.fast }|vc2ramptables
+lt-ease|{ 0x893b0f8c, &l.easeSlope }|{ 0x893b0f70, &l.easeSlope }|vc2ramptables
+lt-rate|{ 0x893b0f90, &l.phaseRate }|{ 0x893b0f6c, &l.phaseRate }|vc2ramptables
+lt-end|{ 0x893b0f6c, &l.phaseEnd }|{ 0x893b0f90, &l.phaseEnd }|vc2ramptables
+bt-phase|{ 0x893b0f6c, &t.builtPhase }|{ 0x893b0f70, &t.builtPhase }|vc2ramptables
+bt-rise|{ 0x893b0f70, &t.builtRise }|{ 0x893b0f74, &t.builtRise }|vc2ramptables
+bt-fall|{ 0x893b0f74, &t.builtFall }|{ 0x893b0f70, &t.builtFall }|vc2ramptables
+tt-factor-end|{ 0x893b1054, &t.factorEnd }|{ 0x893b105c, &t.factorEnd }|vc2ramptables
+tt-per-phase|{ 0x893b1058, &t.perPhase }|{ 0x893b1064, &t.perPhase }|vc2ramptables
+tt-rows|{ 0x893b105c, &t.rowsPerX }|{ 0x893b1054, &t.rowsPerX }|vc2ramptables
+tt-floor|{ 0x893b1064, &t.factorFloor }|{ 0x893b1068, &t.factorFloor }|vc2ramptables
+tt-per-step|{ 0x893b1068, &t.factorPerStep }|{ 0x893b1064, &t.factorPerStep }|vc2ramptables
+tt-glide-end|{ 0x893b1210, &t.glideEnd }|{ 0x893b1218, &t.glideEnd }|vc2ramptables
+tt-per-cent|{ 0x893b1218, &t.tickPerCent }|{ 0x893b0c44, &t.tickPerCent }|vc2ramptables
+rows-at|kRows { 0x89546044, 8 * 3 }|kRows { 0x89546050, 8 * 3 }|vc2ramptables
