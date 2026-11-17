@@ -350,6 +350,25 @@ The VC-2's Matrix set-up v247 (2026-11-17, on its own branch with vc2-mode's a84
   word, closed by drawing G's and M's words apart over two copies of the channel state. Left to the part: 0x893a5050,
   the static M, G's allocation. Not in the sound yet.
 
+The VC-2's sub oscillator's shape v246 (2026-11-17, on vc2-mode after v245's squash; the user's "Yes, both": this
+  here, M's set-up as v247 in the COSM session; HARDWARE_FIRMWARE.md, "The VC-2's sub oscillator's shape"): step 4.2's
+  OSC voice, its eighth part, 0x893c4020 (about 1,200 instructions, two switches) whole. rom.2's subShape law for law
+  but powf(2, x) for expf, and the Pulse Width on the VC-2's line by waveform. Vc2OscAnalogShape.cpp: the head (Fat's
+  pitch ratio by powf on its raw sum, the Pulse Width's sum), each code's way a row (Vc2OscShapeCode: HQ and NOISE
+  the first switch's, the waves and LA the second's after the gain's and level's targets), the six waves one routine
+  over a way (Vc2OscShapeWay: x, doubled Hz, end) and a row of each case's own pool words (Vc2OscShapeWave), the
+  steps. LA's way beside the note-on's in Vc2OscAnalogLa.cpp (shapeLaSquare, shapeLaSaw), the corner's laws
+  (toneCorner, keyed), NOISE's hold (holdNoise) and the hold (withinBy) shared with the note-on. Pool words in
+  Vc2OscAnalogShapePool.h. xt_vc2osc: the shape's hook out, nothing of the analog's hooked; the analog's draws moved
+  to Vc2OscAnalogDraws.cpp. The first runs at seeds 7 and 31337 differed in a NaN's sign (powf's ∞ × a phase of 0
+  into xtf::sub in LA's end), so with the sub on and an LA code Fat's raw sum is drawn within ±120; the sub on one
+  time in two, an LA code a third of those; with the sub on, a wave five octaves up half the time with the Pulse
+  Width just above the holds' scale and Fat 0…3, and at HQ and NOISE a negative phase and Impact a third (the
+  analog's steers with its draws in Vc2OscAnalogDraws.cpp); the players' steer a
+  walk of 0 one time in four (v238's position-ge had lost its case to the shifted draws). 0 different at seeds
+  2024, 7 and 31337; the new code covered. mutate_vc2.py --osc: 954 plants (68 new, 11 rewritten where the refactor
+  moved their text), all caught. Not in the sound yet.
+
 The VC-2's Matrix sources v245 (2026-11-17, on its own branch, fast-forwarded to vc2-mode's 8878381, two commits there,
   squashed into one on vc2-mode after v244 by the user's "Squash into one"; the user's choice, "Sub-osc here, Matrix
   there"; HARDWARE_FIRMWARE.md, "The VC-2's Matrix sources"). Split by what rom.4 holds: the

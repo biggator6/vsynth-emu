@@ -1,7 +1,7 @@
 // The sub oscillator's note-on (v244): rom.4's 0x893c3b90, the analog note-on's way with the sub oscillator on, after
-// its head (Vc2OscAnalog.cpp).  rom.2's subNoteOn (XtAnalog): the shape (0x893c4020, rom.2's subShape; rom.4's by
-// address through Vc2OscParts until its own version) sets the targets, and this the current values from them, the
-// phase by the code and the second wave's in step.  Every address is rom.4's; every offset the voice's.
+// its head (Vc2OscAnalog.cpp).  rom.2's subNoteOn (XtAnalog): the shape (0x893c4020, rom.2's subShape; the port's
+// from v246, Vc2OscAnalogShape.cpp) sets the targets, and this the current values from them, the phase by the code
+// and the second wave's in step.  Every address is rom.4's; every offset the voice's.
 // HARDWARE_FIRMWARE.md, "The VC-2's sub oscillator's note-on".  Audio thread.
 #include "Vc2OscAnalog.h"
 #include "XtFloat.h"
@@ -14,7 +14,6 @@ using xtf::sub;
 using namespace Vc2OscAnalog;
 
 namespace {
-constexpr uint32_t kShape = 0x893c4020;   // [FW] the sub oscillator's shape, on the voice
 constexpr float kOne = 1.0f, kTwo = 2.0f;   // [FW] FLDI1 (fr15), and FLDI1 added to itself
 
 // [FW] 0x893c3ba0…: the gain the level × 2^31; the current values from the targets: Fat's (the second wave's pitch)
@@ -116,7 +115,7 @@ constexpr Vc2OscSubCode kPast {};
 // [FW] 0x893c3b90: the shape, the current values, the phase × Impact below 1, then the code's way
 void Vc2OscAnalog::subNoteOn(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s) {
     const Vc2OscAnalogPool& a = vc2OscTables().analog;
-    p.kindCall(kShape);
+    subShape(v, p, s);
     currents(v, p, s, a.sub);
     float ph = v.f32(kPhase);
     if (kOne > v.f32(kImpactNow)) ph = mul(ph, v.f32(kImpactNow));

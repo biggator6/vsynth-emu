@@ -3,12 +3,9 @@
 // Keyfollow table, a member of Vc2OscTables, read once by loadVc2 at the start.  Each is its routine's own pool word,
 // read where it reads it; the laws are rom.2's (XtAnalog.h) but for the Pulse Width's, which the VC-2 narrows by
 // waveform.  HARDWARE_FIRMWARE.md, "The VC-2's analog note-on".
+#include "Vc2OscAnalogLine.h"
+#include "Vc2OscAnalogShapePool.h"
 #include <array>
-
-// A waveform's Pulse Width target as rom.4 makes it from the sum x: lo + x × span
-struct Vc2OscAnalogLine {
-    float lo = 0, span = 0;
-};
 
 // One of SQUARE's edge steps: below `bound` (a ratio of the pitch), the step
 struct Vc2OscAnalogStep {
@@ -45,4 +42,5 @@ struct Vc2OscAnalogPool {
     float withinHalf = 0;    // 0x893c4a94: 0.5, 0x893c4a20's
     std::array<float, 15> toneKf {};   // 0x89546fbc: the Tone Keyfollow's factor by its value (rom.2's table)
     Vc2OscAnalogSubPool sub;           // the sub oscillator's note-on's (v244)
+    Vc2OscShapePool shape;             // the sub oscillator's shape's (v246, Vc2OscAnalogShapePool.h)
 };

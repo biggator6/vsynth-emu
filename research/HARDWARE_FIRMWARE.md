@@ -1614,6 +1614,42 @@ Results:
 - The loader plants, as Vc2MatrixTables.cpp changed: `mutate_panel.py rom4-no-matrix rom4-no-tables rom4-no-cosm`, 3 of 3 caught; the plugin's load now runs rom.4's two routines in the loader's image too.
 - fcheck's diff is xt_vc2cosm's new `setup:` line. verify.sh passes every line.
 
+### The VC-2's sub oscillator's shape (2026-11-17, v246) {#vc2-sub-shape}
+
+Step 4.2's OSC voice, its eighth part (the user's "Yes, both", 2026-11-17: this here, M's set-up as v247 in the COSM session): the sub oscillator's shape, rom.4's `0x893c4020` (0x893c4020…0x893c4a1a, about 1,200 instructions, two switches), which its note-on `0x893c3b90` (v244) calls first. Whole in one version. Ported bit for bit: Vc2OscAnalogShape.cpp (the head, each code's way a row `Vc2OscShapeCode`, the six waves one routine over a way `Vc2OscShapeWay` and a row of words `Vc2OscShapeWave`, the steps), LA-SQUARE's and LA-SAW's way in Vc2OscAnalogLa.cpp beside the note-on's (`shapeLaSquare`, `shapeLaSaw`; the corner's laws `toneCorner` and `keyed` now shared by both), its pool words in Vc2OscAnalogShapePool.h (a member of Vc2OscAnalogPool). Every address is rom.4's; every offset the voice's.
+
+**rom.2's subShape law for law** (XtAnalog.cpp, `0x89506bf0`), but:
+- rom.4 takes 2^x by powf(2, x) (`0x89506e54`) where rom.2 took expf(x·ln 2): Fat's pitch ratio and each LA corner.
+- The Pulse Width reaches each wave's holds on a line by waveform, as the VC-2's note-on (v242) narrows it: SAW |0.2w − 0.1| (rom.2 |w − ½|), SQUARE and TRIANGLE 0.02 + 0.96w, JUNO 0.05 + 0.9w, RAMP 0.025 + 0.95w; SINE and LA w as rom.2.
+- Each case reads its own pool words: the holds' ½ is 0x893c4a20's (`0x893c4a94`) for the five that call it, RAMP's its own (`0x893c4804`, written inline), LA's each case's (`0x893c4a94`, `0x893c4804`). The values are rom.2's, LA-SQUARE's first keyfollow ratio 2^(9/12)/2 and LA-SAW's 2^(9/12) for both corners included; the shape's Tone Keyfollow table is a copy at `0x89560064`, the same 15 words as the note-on's (`0x89546fbc`).
+
+**The routine:**
+1. Fat's sum unheld (the block's +0x108, its envelope's and LFO's terms, FMAC), 2^it by powf into Fat's target (+0x24c): the second wave's pitch ratio. The Pulse Width's sum held to 0…1.
+2. The first switch (0x893c40c0), codes 0…8: HQ (0, 1) and NOISE (8) the gain's target as the targets give it and the Pulse Width's target the sum; NOISE then its hold on the head's ½ and 30 (v242's law, `holdNoise`). Codes 2…7 and past 8 go on.
+3. The ratio (+0x1cc) read; the gain × 2^26 into its target (+0x1dc); the block's sub level (+0x13c) × 0.002 into the level's target (+0x28c); r = the ratio × 2. The second switch (0x893c41e0) on the code less 2; past 10 nothing more.
+4. The waves (the Hz f = r × 880 for SAW, TRIANGLE and SINE, × 440 for the others; g = the pitch ratio × f; SQUARE, JUNO and RAMP double both):
+
+| Code | x | Holds' scale | Its end |
+|---|---|---|---|
+| 2 SAW | \|0.2w − 0.1\| | 0.35 | |
+| 3 SQUARE | 0.02 + 0.96w | ¼ | each steepness 44100 / its Hz × 0.008 (+0x2c0, +0x2c8) |
+| 4 TRIANGLE | 0.02 + 0.96w | ¼ | |
+| 5 RAMP | 0.025 + 0.95w | ⅛ (its own ½) | each segment its Hz / 44100 × 1/16 (+0x294, +0x29c) |
+| 6 SINE | w | ¼ | |
+| 7 JUNO | 0.05 + 0.9w | ¼ | as SQUARE's |
+
+   Each wave's Pulse Width target (+0x254, the second's +0x278) is x held within its Hz / 44100 × the scale (0x893c4a20's way), × 0.002; the steps, LA's (+0x280) r × 220/44100 and the second wave's (+0x284) r × the pitch ratio × it.
+5. LA-SQUARE (9) on r, LA-SAW (10) on r × ½ (a): the steps; the first corner 156 × 2^(7·Tone/127) × (1 + the Tone KF's factor × (a × its ratio − 1)), the second's on a × the pitch ratio; each at most 20 kHz; the first wave's Hz a × 440, and where that is above the corner the corner becomes it and m is ½, else m is a × 220 over the corner; the second's the same against the first's Hz, its m the pitch ratio × that Hz over its corner; each steepness the corner over its Hz × 2. The Pulse Width targets w held within each m (on the case's ½) × 0.002, the steepness × 0.002 (+0x2b0, +0x2b8).
+
+**The check, xt_vc2osc** (its voice part):
+- `0x893c4020`'s hook is gone, so rom.4's own runs; nothing of the analog's is hooked. Its powf is rom.4's own on both sides (`RomShared`).
+- Its first runs at seeds 7 and 31337 differed in LA's end (+0x2a8, a NaN's sign): Fat's sum, moderate, reaches 2^128, which powf gives as ∞, and ∞ × a phase of 0 is a NaN that LA's end (0x893c3cd0) subtracts, where `xtf::sub`'s NaN sign is FSUB's negated. So with the sub on and an LA code, Fat is drawn within ±40 and its depths within ±0.04, its raw sum within ±120 (the bound outputs are at most 1000). The other codes take Fat's ∞ through products alone and keep the moderate draw.
+- The sub on is drawn one time in two (one in four before), and with it an LA code one time in three, so the LA way is reached at 40 cases; the block's sub level (+0x13c) is drawn moderate, as the shape reads it now. The analog's draws and the kinds' note-on event's steers for it (`oscSteerAnalog`) moved to Vc2OscAnalogDraws.cpp (Vc2OscGetters.cpp was at 242 lines).
+- The first plant run (954 plants) missed three. Two move the ½ that picks a hold's side (`shape-hold-side`; RAMP's own ½ read from the wrong word): the side shows only where the hold passes ¼, a wave's Hz near the rate, and the targets bound the ratio at 32 (the cents at ±6000), so the hold reaches about 0.32 and x must lie just above the scale. So the kinds' note-on event, with the sub on, half the time takes a wave's code (2…7) five octaves up (the ratio 16 to 32) with the Pulse Width 0.1…0.4 alone and Fat 0…3 octaves alone, the second wave's hold past the first's (`steerHighWave`). The third, v244's NOISE's end's negative phase, had lost its case to the new draws: a negative phase and Impact together, which the head keeps and the sub's note-on makes negative again; at HQ and NOISE one time in three now (the converter gives no negative Impact; rom.4 holds it all the same). The second run lost one more to the shifted draws, v238's `position-ge` (a Vari off start's side by the walk's sign, at a walk of exactly 0): the players' steer now takes a walk of 0 one time in four, as LITE's two heads did (`steerWalkZero`).
+- seed 2024, 40 cases: 16,000 events, 2,515 note-ons, 0 different; seeds 7 and 31337, 400 cases each: 160,000 events each (25,471 and 25,118 note-ons), 0 different.
+- `mutate_vc2.py --osc`: 954 plants, all caught on the third run: 68 new (36 in Vc2OscAnalogShape.cpp, 19 in the LA way and the shared laws in Vc2OscAnalogLa.cpp, 10 on the pool words, 3 more on NOISE's hold and the corner's laws now shared), and 11 rewritten where the refactor moved their text (NOISE's hold into `holdNoise`, the corner into `toneCorner` and `keyed`, the hold into `withinBy`, the sub's call of the shape).
+- Coverage (llvm-cov, seed 2024, 40 cases): every line, region and branch of Vc2OscAnalogShape.cpp and of the LA way (179 shapes: 105 waves, 47 LA, the 20 kHz hold 14 times of 94 corners, the Hz above the corner 40); left unreached only what was before, the Tone KF index outside its table (drawn within it) and NOISE's end's phase above 1 (v244).
+
 ### The VC-2's Matrix sources (2026-11-17, v245) {#vc2-matrix-sources}
 
 Step 4.2's Matrix, its second part (research/VC2_MODE_PLAN.md; the user's choice, 2026-11-17: "Sub-osc here, Matrix there"): the sixteen sources' routines the refresh calls and the choice that names one for a source parameter, ported bit for bit in Vc2MatrixSources.cpp. `Vc2MatrixSourceRoutines` is the `Vc2MatrixSources` v243's core calls, on a `Vc2MatrixSourceState`: M, the channel's state, the seven assignments and the part's byte. M's set-up, which writes the routines, bytes, slots and uses, is the next part (below). Every address is rom.4's, every offset M's unless it says otherwise.

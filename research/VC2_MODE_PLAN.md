@@ -387,7 +387,11 @@ version against rom.4's routines with what it calls hooked:
    - done (v244): the sub oscillator's note-on (`0x893c3b90`, about 350 instructions), rom.2's subNoteOn law for law,
      each code's way a row, against rom.4's in xt_vc2osc with its shape hooked (HARDWARE_FIRMWARE.md, "The VC-2's sub
      oscillator's note-on"). Split by what rom.4 holds: the shape (`0x893c4020`, about 1,200 instructions) is next.
-   - then the sub oscillator's shape (`0x893c4020`), the analog's install, update and converter; then Vari off. Beside
+   - done (v246): the sub oscillator's shape (`0x893c4020`, about 1,200 instructions to 0x893c4a1a, two switches),
+     rom.2's subShape law for law with the VC-2's Pulse Width lines, each code's way a row, the six waves one routine
+     over a row of each case's own pool words, LA's way beside the note-on's; against rom.4's in xt_vc2osc with
+     nothing of the analog's hooked (HARDWARE_FIRMWARE.md, "The VC-2's sub oscillator's shape").
+   - then the analog's install, update and converter; then Vari off. Beside
      them, the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf (`0x89506e54`), which the
      wiring gives and nothing has ported yet.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):

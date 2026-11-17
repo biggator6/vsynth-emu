@@ -204,6 +204,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscAnalog.cpp
     Source/Vc2OscAnalogLa.cpp
     Source/Vc2OscAnalogSub.cpp
+    Source/Vc2OscAnalogShape.cpp
     Source/Vc2PitchRamp.cpp
     Source/Vc2PitchRampTick.cpp
     Source/Vc2RampTables.cpp

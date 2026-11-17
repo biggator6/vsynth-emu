@@ -49,8 +49,53 @@ auto analogWords(Vc2OscAnalogPool& a) {
         { 0x893c3e80, &a.sub.wrap },
     });
 }
-// [FW] the players' installs' tables (v238); the Tone Keyfollow's (v242: rom.2's 15, its [3] 0 and [14] 2)
+// [FW] the sub oscillator's shape's (v246): its head's; LA-SQUARE's and LA-SAW's, each case's own
+auto shapeWords(Vc2OscShapePool& s) {
+    auto& [sq, saw] = s.la;
+    return std::to_array<Vc2PoolWord>({
+        { 0x893c41f0, &s.head.noiseHalf }, { 0x893c41f4, &s.head.noiseSpan }, { 0x893c41f8, &s.head.gainScale },
+        { 0x893c41fc, &s.head.levelStep }, { 0x893c4a70, &sq.step },
+        { 0x893c4a78, &sq.hz440 }, { 0x893c4a7c, &sq.toneScale }, { 0x893c4a80, &sq.toneOctaves },
+        { 0x893c4a84, &sq.corner }, { 0x893c4a8c, &sq.kf1 }, { 0x893c4a90, &sq.most }, { 0x893c4a94, &sq.half },
+        { 0x893c4a98, &sq.hz220 }, { 0x893c4a9c, &sq.kf2 }, { 0x893c4aa0, &sq.floor }, { 0x893c480c, &saw.step },
+        { 0x893c47f8, &saw.hz440 }, { 0x893c4818, &saw.toneScale }, { 0x893c481c, &saw.toneOctaves },
+        { 0x893c4820, &saw.corner }, { 0x893c4828, &saw.kf1 }, { 0x893c4828, &saw.kf2 }, { 0x893c482c, &saw.most },
+        { 0x893c4804, &saw.half }, { 0x893c4830, &saw.hz220 }, { 0x893c4808, &saw.floor },
+    });
+}
+// [FW] the shape's waves' words (v246), codes 2…7, each where its case reads it, in Vc2OscShapeWave's order: the
+// line's least and span, the Hz, the rate, the holds' scale and ½, 0.002, the step, the end's word; 0 where the case
+// reads none
+struct ShapeWaveAt {
+    uint32_t lo, span, hz, fs, scale, half, floor, step, end;
+};
+constexpr std::array<ShapeWaveAt, 6> kShapeWaves { {
+    { 0x893c4514, 0x893c4518, 0x893c451c, 0x893c4520, 0x893c4524, 0x893c4a94, 0x893c4528, 0x893c4510, 0 },
+    { 0x893c452c, 0x893c4530, 0x893c4538, 0x893c4520, 0x893c4534, 0x893c4a94, 0x893c4528, 0x893c4510, 0x893c453c },
+    { 0x893c452c, 0x893c4530, 0x893c451c, 0x893c4520, 0x893c4534, 0x893c4a94, 0x893c4528, 0x893c4510, 0 },
+    { 0x893c47f0, 0x893c47f4, 0x893c47f8, 0x893c47fc, 0x893c4800, 0x893c4804, 0x893c4808, 0x893c480c, 0x893c4810 },
+    { 0, 0, 0x893c451c, 0x893c4520, 0x893c4534, 0x893c4a94, 0x893c4528, 0x893c4510, 0 },
+    { 0x893c4540, 0x893c4544, 0x893c4538, 0x893c4520, 0x893c4534, 0x893c4a94, 0x893c4528, 0x893c4510, 0x893c453c },
+} };
+
+void readShapeWave(Sh4& image, const ShapeWaveAt& at, Vc2OscShapeWave& w) {
+    const auto words = std::to_array<Vc2PoolWord>({
+        { at.lo, &w.line.lo }, { at.span, &w.line.span }, { at.hz, &w.hz }, { at.fs, &w.fs }, { at.scale, &w.scale },
+        { at.half, &w.half }, { at.floor, &w.floor }, { at.step, &w.step }, { at.end, &w.end },
+    });
+    for (const auto& [word, out] : words) {
+        if (word != 0) *out = std::bit_cast<float>(image.rd32(word));
+    }
+}
+
+void readShapeWaves(Sh4& image, std::array<Vc2OscShapeWave, kShapeWaves.size()>& waves) {
+    auto wave = waves.begin();
+    for (const ShapeWaveAt& at : kShapeWaves) readShapeWave(image, at, *wave++);
+}
+// [FW] the players' installs' tables (v238); the Tone Keyfollow's (v242: rom.2's 15, its [3] 0 and [14] 2), and the
+// shape's copy (v246, the same 15, other words past them)
 constexpr Vc2Span kLiteInstalled { 0x89542350, 6 }, kVariInstalled { 0x89542368, 10 }, kToneKf { 0x89546fbc, 15 };
+constexpr Vc2Span kShapeToneKf { 0x89560064, 15 };
 
 struct Read : Vc2OscTables {
     bool read(Sh4& image) {
@@ -59,6 +104,9 @@ struct Read : Vc2OscTables {
         vc2ReadFloats(image, kVariInstalled, variInstalled.data());
         vc2ReadPool(image, analogWords(analog));
         vc2ReadFloats(image, kToneKf, analog.toneKf.data());
+        vc2ReadPool(image, shapeWords(analog.shape));
+        readShapeWaves(image, analog.shape.waves);
+        vc2ReadFloats(image, kShapeToneKf, analog.shape.toneKf.data());
         return true;
     }
 };
