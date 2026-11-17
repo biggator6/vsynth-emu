@@ -23,7 +23,8 @@
 # first batch of the other converters (v237): the Dual and TB Filters' (vc2cosmfilters), the Amp Simulator's,
 # Compressor's and Limiter's (vc2cosmdynamics) and the converters by type (vc2cosmtypes), the Dynamic TVF's with the
 # TVF's (vc2cosmtvf), under xt_vc2cosm; the converters on rom.4's libm (v239): OD/Dist's and the Wave Shaper's
-# (vc2cosmdrive), the Resonator's, Frequency Shifter's and Lo-Fi's (vc2cosmbalanced), under xt_vc2cosm.
+# (vc2cosmdrive), the Resonator's, Frequency Shifter's and Lo-Fi's (vc2cosmbalanced), under xt_vc2cosm; the Side Band
+# Filters' (vc2cosmsideband, v241), under xt_vc2cosm.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -47,7 +48,7 @@ VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc
 VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
          Vc2CosmFrameCheck Vc2CosmConverters Vc2CosmFrameDraws Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive
-         Vc2CosmBalanced)
+         Vc2CosmBalanced Vc2CosmSideBand)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -109,6 +110,7 @@ VC2PORTS=(
     "vc2cosmdynamics|Vc2CosmDynamics.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmtypes|Vc2CosmConverters.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmdrive|Vc2CosmDrive.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2cosmsideband|Vc2CosmSideBand.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmbalanced|Vc2CosmBalanced.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
 )
 

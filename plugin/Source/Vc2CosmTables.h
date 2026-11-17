@@ -2,9 +2,10 @@
 // The VC-2's COSM constants from rom.4 (v234): the Growl's, its DSP's and its update's pool words; the dispatcher's and
 // the TVF's converter's (v235); the Dynamic TVF's, the Dual Filter's, the Amp Simulator's, the Compressor's, the
 // Limiter's and the TB Filter's, and the gain table they share (v237); OD/Dist's, the Wave Shaper's, the Resonator's,
-// the Frequency Shifter's and Lo-Fi's (v239); read once by loadVc2 at the start (Vc2RomTables), never after.
-// HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl", "The VC-2's COSM converters' frame", "The VC-2's COSM
-// converters, the first batch", "The VC-2's COSM converters on rom.4's libm".
+// the Frequency Shifter's and Lo-Fi's (v239); the Side Band Filters' (v241); read once by loadVc2 at the start
+// (Vc2RomTables), never after.  HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl", "The VC-2's COSM converters'
+// frame", "The VC-2's COSM converters, the first batch", "The VC-2's COSM converters on rom.4's libm", "The VC-2's COSM
+// Side Band Filters".
 #include "Vc2Math.h"
 #include <cstdint>
 
@@ -96,6 +97,24 @@ struct Vc2CosmLofiPool {
     float k63 = 0;         // 63
 };
 
+// v241's.  The Side Band Filters' shared helpers': the LPF's 0x893975a0 (0x893976c4, 0x893976c8, 0x893976cc,
+// 0x893976d4) and the Width's 0x89397650 (0x893976bc)
+struct Vc2CosmSideBandLaws {
+    float half = 0;        // 0.5: the LPF's ½ × Cutoff ÷ 127 + ½, and its floor
+    float percent = 0;     // 100
+    float twelve = 0;      // 12
+    float quarter = 0;     // 0.25: ln 2 × x² × ¼
+    float widthCents = 0;  // 1200
+};
+
+// Each Side Band Filter's own: its depths' 63, Detune Own's 63 and the second's Q scale.  The first's: 0x89397450's
+// (0x893976b0), Detune Own's inline (0x893985e0); the second's all inline (0x89398890), Q's 0.96875 (0x893985e4)
+struct Vc2CosmSideBandPool {
+    float k63 = 0;
+    float ownK63 = 0;
+    float qScale = 0;
+};
+
 struct Vc2CosmTables {
     static constexpr int kGains = 128;   // [FW] the gain table's words, 0…32768, before the next table's
     Vc2CosmGrowlPool growl {};
@@ -108,6 +127,8 @@ struct Vc2CosmTables {
     Vc2CosmResonatorPool resonator {};
     Vc2CosmShifterPool shifter {};
     Vc2CosmLofiPool lofi {};
+    Vc2CosmSideBandLaws sideBand {};
+    Vc2CosmSideBandPool sbf1 {}, sbf2 {};
     float velocityScale = 0;   // 32768: the dispatcher's, a velocity factor's 0…32768 to 0…1 (0x893999ac, v235)
     float limiterScale = 0;    // 32768: the Limiter's, a gain table word's 1 (0x89399270)
     uint16_t gains[kGains] {};   // 0x89541f34: about 32768·(i/127)², the Amp's, Limiter's and TB Filter's (v237)

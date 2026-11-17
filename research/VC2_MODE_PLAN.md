@@ -434,9 +434,11 @@ version against rom.4's routines with what it calls hooked:
      (Vc2CosmBalanced.cpp), the level keyfollow, the keyed scale `0x89397800` (the Width's `0x89397650` the same law)
      and the Dry/Effect Balance shared (Vc2CosmConvert.cpp), against rom.4's in xt_vc2cosm's second part
      (HARDWARE_FIRMWARE.md, "The VC-2's COSM converters on rom.4's libm").
-   - next: the two Side Band Filters (`0x89398260`, type 6, code 7; `0x893984e0`, 7, code 8), their LPF's
+   - done (v241): the two Side Band Filters (`0x89398260`, type 6, code 7; `0x893984e0`, 7, code 8), their LPF's
      `0x893975a0` (powf(x, 2), logf(2)) and the Width on the keyed scale (`0x89397650`, `vc2CosmScaled`'s law on its
-     own words); with them every converter is ported and xt_vc2cosm's second part hooks none.
+     own words), one routine for their Detune and Width words over a row (Vc2CosmSideBand.cpp); every converter is
+     ported and xt_vc2cosm's second part hooks none (HARDWARE_FIRMWARE.md, "The VC-2's COSM Side Band Filters", with
+     rom.4's whole type map). COSM's converters are done.
    - the Matrix core, a part of its own (every group's, not COSM's alone): the refresh `0x893a2230` (the sources'
      routines, their terms by the depths and limits, the dirty bits), M's other words and the other groups' readers
      (the OSC's `0x893a23b0`…, the next group's from `0x893a2bf0`; rows of `vc2MatrixRead` where their shape is the

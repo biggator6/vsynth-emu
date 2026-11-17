@@ -43,10 +43,17 @@ constexpr std::array<FrameRange, 8> kResonator { { { 0, 2 }, kUnit, kFollow, kDe
 constexpr std::array<FrameRange, 7> kShifter { { kUnit, kFollow, kDepth, kDepth, kBalance, kDepth, kDepth } };
 constexpr std::array<FrameRange, 9> kLofi { { { 0, 15 }, { 0, 5 }, kUnit, kFollow, kDepth, kDepth, kBalance, kDepth,
                                               kDepth } };
-constexpr std::array<FrameTypeDraw, 13> kTypes { { { 1, kOd }, { 2, kWs }, { 3, kAmp }, { 5, kResonator },
-                                                   { 8, kGrowl }, { 9, kDual }, { 10, kTvf }, { 11, kDtvf },
-                                                   { 12, kComp }, { 13, kLim }, { 14, kShifter }, { 15, kLofi },
-                                                   { 16, kTb } } };
+// v241's: the Side Band Filters (HPF or Q, LPF, its Keyfollow, Sub Detune, Octave; Detune and its depths, ±100; Width,
+// its Keyfollow and depths)
+constexpr FrameRange kDetune { -100, 100 };
+constexpr std::array<FrameRange, 14> kSbf1 { { kUnit, kUnit, kFollow, kDetune, { 0, 2 }, kDetune, kDepth, kDepth,
+                                               kDepth, kUnit, kFollow, kDepth, kDepth, kDepth } };
+constexpr std::array<FrameRange, 13> kSbf2 { { kUnit, kUnit, kFollow, { 0, 2 }, kDetune, kDepth, kDepth, kDepth, kUnit,
+                                               kFollow, kDepth, kDepth, kDepth } };
+constexpr std::array<FrameTypeDraw, 15> kTypes { { { 1, kOd }, { 2, kWs }, { 3, kAmp }, { 5, kResonator },
+                                                   { 6, kSbf1 }, { 7, kSbf2 }, { 8, kGrowl }, { 9, kDual },
+                                                   { 10, kTvf }, { 11, kDtvf }, { 12, kComp }, { 13, kLim },
+                                                   { 14, kShifter }, { 15, kLofi }, { 16, kTb } } };
 
 // A setting in its range: its ends, 0, within, past them, or any 16 bits; a table's index its ends (the table's
 // first and last words) or within

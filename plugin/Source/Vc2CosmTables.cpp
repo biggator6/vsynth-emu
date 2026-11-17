@@ -30,7 +30,10 @@ auto cosmWords(Vc2CosmTables& t) {
         { 0x893976bc, &t.ws.key.cents }, { 0x89397920, &t.resonator.percent }, { 0x8939792c, &t.resonator.twelve },
         { 0x89397930, &t.resonator.sizeScale }, { 0x893976b0, &t.resonator.k63 }, { 0x89397934, &t.shifter.cents },
         { 0x89399500, &t.shifter.k63 }, { 0x8939793c, &t.lofi.key.scale }, { 0x89397940, &t.lofi.key.from },
-        { 0x89397934, &t.lofi.key.cents }, { 0x89399500, &t.lofi.k63 },
+        { 0x89397934, &t.lofi.key.cents }, { 0x89399500, &t.lofi.k63 }, { 0x893976c4, &t.sideBand.half },
+        { 0x893976c8, &t.sideBand.percent }, { 0x893976cc, &t.sideBand.twelve }, { 0x893976d4, &t.sideBand.quarter },
+        { 0x893976bc, &t.sideBand.widthCents }, { 0x893976b0, &t.sbf1.k63 }, { 0x893985e0, &t.sbf1.ownK63 },
+        { 0x89398890, &t.sbf2.k63 }, { 0x89398890, &t.sbf2.ownK63 }, { 0x893985e4, &t.sbf2.qScale },
     });
 }
 
