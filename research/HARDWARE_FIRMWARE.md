@@ -1546,6 +1546,82 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's Matrix sources (2026-11-17, v245) {#vc2-matrix-sources}
+
+Step 4.2's Matrix, its second part (research/VC2_MODE_PLAN.md; the user's choice, 2026-11-17: "Sub-osc here, Matrix there"): the sixteen sources' routines the refresh calls and the choice that names one for a source parameter, ported bit for bit in Vc2MatrixSources.cpp. `Vc2MatrixSourceRoutines` is the `Vc2MatrixSources` v243's core calls, on a `Vc2MatrixSourceState`: M, the channel's state, the seven assignments and the part's byte. M's set-up, which writes the routines, bytes, slots and uses, is the next part (below). Every address is rom.4's, every offset M's unless it says otherwise.
+
+**What the sources read.**
+- M's words past +0x166: +0x168, a pointer to the part's channel state C; +0x16c, the part's number (int16).
+- C (`Vc2MatrixChannel`, 0x184 bytes as far as a source reaches): +0 the bend, u16, 0…16383; +2 the channel aftertouch; +4 the poly aftertouch by key, 128 bytes; +0x84 the controllers by number, read as far as +0x84 + 255.
+- The seven controller assignments, bytes at `0x89997398` + 0x848…0x84e. Each is read signed: 0 and 32 give none, and any other number n reads C + 0x84 + n, so a byte from 0x80 on reads the poly aftertouch's bytes.
+- The part table `0x8993d040`, a pointer by part number; the part's byte at +0x24.
+- The curve `0x895401f6`, right after the limits' 79 words: 128 words, 0…8192 by a 7-bit value (64.5 a step), then zeros to word 241 and another table from 242. A byte from 128 on reads past the curve's 128, as rom.4 does.
+
+**The routines**, each called by the refresh with M (r4) and the source's byte (r5); the answer's low 16 bits are the source's value:
+
+| Routine | Source | Value |
+|---|---|---|
+| `0x893a1de0` | off | 0 |
+| `0x893a1df0` | a controller by number | curve[C[0x84 + byte]] |
+| `0x893a1e10` | the bend | C's u16 − 8192 |
+| `0x893a1e30` | aftertouch | curve[max(C[2], C[4 + M's +2])] |
+| `0x893a1e60`, `0x893a1ef0`, `0x893a1f30`, `0x893a1f70`, `0x893a2000`, `0x893a2040`, `0x893a21f0` | assignments 0…6 (+0x848…+0x84e) | curve[C[0x84 + the assignment]], none 0 |
+| `0x893a2080`, `0x893a2130` | assignments 2 and 3, bipolar | of the controller's v: 0 at 0; v ≥ 64, curve[(v − 64) × 127 / 63]; below, −curve[(64 − v) × 127 / 63], the word unsigned |
+| `0x893a1fb0` | the part | curve[(u8)(127 − the part's byte)] |
+| `0x893a1fd0` | keyfollow | 122 × M's +1 − 7320, 0 at key 60 |
+| `0x893a1ff0` | velocity | curve[M's +0] |
+
+The curve is read signed (mov.w) everywhere but the bipolar reading's lower half. No word rom.4 can reach has bit 15 set, so the difference never shows.
+
+**The choice** `0x893a1c70(parameter)`: a source parameter's routine. v243 called the routines it jumps to (`0x893a1ce0…0x893a1db0`) the set-up; they are its cases.
+
+| Parameter | Routine |
+|---|---|
+| 0 | off |
+| 1…95, and any negative | a controller by number |
+| 96 | bend |
+| 97 | aftertouch |
+| 98, 99 | bipolar on assignments 2, 3 |
+| 100, 101, 102 | assignments 2, 3; the part |
+| 103, 104, 105, 106 | assignments 0, 1, 4, 5 |
+| 107, 108, 109 | velocity, keyfollow, assignment 6 |
+| 110 and up | off |
+
+**The limits past 78.** The refresh reads a slot's limit unsigned (`extu.w`) at the limits + 2 × the destination byte, for any byte. Past 78 it reads the curve's words. v243's port gave 0 there; with the curve read as one run with the limits (`Vc2MatrixTables::words`, `vc2MatrixLimit`, `vc2MatrixCurveWord`), it reads what rom.4 reads.
+
+**M's set-up, the next part** (found, not ported):
+- Six builders in 0x893a48xx…0x893a5cxx call the choice through pool words at `0x893a4b80`, `0x893a4f40`, `0x893a5190`, `0x893a5700`, `0x893a5b20` and `0x893a5c60`.
+- They write M's routine words, bytes, slots and uses by two destination routines:
+  - `0x893a30d0(r4, destination, r6, uses)`, a switch of 79 cases from `0x893a31a0` that sets a destination's bit in its group's uses word and returns its number;
+  - `0x893a36a0`, a second switch of 78 cases, to about `0x893a46c0`.
+
+**The check**, xt_vc2cosm's third part (Vc2MatrixCheck.cpp), now with nothing hooked:
+- rom.4's refresh calls its own sixteen routines, on M, the channel state, the assignments and the part table written into its memory before each event.
+- The port's core calls `Vc2MatrixSourceRoutines` on the same state.
+- The draws:
+  - M's routine words among the sixteen, the bend one time in four;
+  - destinations one time in eight any byte;
+  - the bend centred, at an edge of a slot's limit or any 16 bits;
+  - the aftertouches and controllers as MIDI gives them, now and then 0, 1, 63, 64, 65, 127 or any byte;
+  - the assignments 0, 32, a controller or any byte;
+  - the part's number and its byte.
+- The choice is an event of its own, on a parameter drawn among its fourteen cases, 0…127, the edges (0, 1, 95, 96, 110, 127), a byte or any word.
+- After each event: M and the answer (a reader's sums' place, the getter's sum, the choice's routine), word for word.
+
+Results:
+- seed 2024, 40 cases: 2,400 events, 616 refreshes (160 setting the dirty bits), 581 reads, 379 sums, 410 choices, 414 draws; 0 different. The Growl's and the frame's parts are as they were.
+- seeds 7 and 31337, 400 cases each: 24,000 events each (6,026 and 5,901 refreshes, 4,101 and 3,913 choices); 0 different.
+- Coverage, llvm-cov on fcheck's 40 cases:
+  - Vc2Matrix.cpp and Vc2MatrixTables.cpp: every line, but `vc2MatrixLoaded`, which RomTest calls.
+  - Vc2MatrixSources.cpp: every line but two. One is a routine word that is none of the sixteen (the choice writes no other, and rom.4 would jump there); the other is the switch's fall-out after every kind returns.
+- `mutate_vc2.py --cosm`: 688 plants, all caught.
+  - 63 are new: 42 on the sources (each row's kind and assignment, every constant, the aftertouch's max and key, the assignment's sign and its none, the bipolar's three numbers, order, sign and lower index), 19 on the choice (each case's routine, its 0, the none from 96, the negatives) and 2 on the tables (the curve's index, a limit past 78 read as 0, v243's law).
+  - v243's three on the limits now name `vc2MatrixLimit` and the run's step.
+  - v243's core plants are all caught on rom.4's own sources, as they were on the stubs.
+  - Not planted, as no input tells them apart: a word's sign; the bipolar's 0 at 0 and its 64 on either branch (the curve's words 129 and 0 are 0); the choice's 96 moved up to 110. vc2cosm_muts.txt says why.
+- The loader plants, as Vc2MatrixTables.cpp changed: `mutate_panel.py rom4-no-matrix rom4-no-tables rom4-no-cosm`, 3 of 3 caught.
+- fcheck's diff is xt_vc2cosm's `matrix:` line. verify.sh passes every line.
+
 ### The VC-2's Matrix core (2026-11-17, v243) {#vc2-matrix-core}
 
 Step 4.2's Matrix core (research/VC2_MODE_PLAN.md), the user's choice by the VC-2 session's message: rom.4's Matrix object M as a whole, not COSM's share alone. Split by what rom.4 holds, the core first. Ported bit for bit: the refresh `0x893a2230` (`Vc2MatrixCore`, a `Vc2MatrixRefresh`, its sources behind `Vc2MatrixSources`), and every group's reader as a row of v235's `vc2MatrixRead` (`vc2MatrixGroups()`), in Vc2Matrix.cpp. v235's getter `0x893a2350` and COSM's readers are as they were. Every address is rom.4's, every offset M's.

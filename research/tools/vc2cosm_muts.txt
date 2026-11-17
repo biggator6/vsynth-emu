@@ -665,3 +665,66 @@ groups-10-first|{ 10, 68, 0x7ff }|{ 10, 67, 0x7ff }|vc2matrix
 groups-10-bits|{ 10, 68, 0x7ff }|{ 10, 68, 0xff }|vc2matrix
 groups-10-index|{ 10, 68, 0x7ff }|{ 9, 68, 0x7ff }|vc2matrix
 groups-cosm-order|kVc2MatrixCosm1, kVc2MatrixCosm2,|kVc2MatrixCosm2, kVc2MatrixCosm1,|vc2matrix
+src-off|{ 0x893a1de0, Off }|{ 0x893a1de0, Velocity }|vc2matrixsources
+src-controller|{ 0x893a1df0, Controller }|{ 0x893a1df0, Velocity }|vc2matrixsources
+src-bend|{ 0x893a1e10, Bend }|{ 0x893a1e10, Off }|vc2matrixsources
+src-aftertouch|{ 0x893a1e30, Aftertouch }|{ 0x893a1e30, Velocity }|vc2matrixsources
+src-assign-0|{ 0x893a1e60, Assign, 0 }|{ 0x893a1e60, Assign, 1 }|vc2matrixsources
+src-assign-1|{ 0x893a1ef0, Assign, 1 }|{ 0x893a1ef0, Assign, 2 }|vc2matrixsources
+src-assign-2|{ 0x893a1f30, Assign, 2 }|{ 0x893a1f30, Assign, 3 }|vc2matrixsources
+src-assign-3|{ 0x893a1f70, Assign, 3 }|{ 0x893a1f70, Assign, 4 }|vc2matrixsources
+src-part|{ 0x893a1fb0, Part }|{ 0x893a1fb0, Velocity }|vc2matrixsources
+src-keyfollow|{ 0x893a1fd0, Keyfollow }|{ 0x893a1fd0, Velocity }|vc2matrixsources
+src-velocity|{ 0x893a1ff0, Velocity }|{ 0x893a1ff0, Part }|vc2matrixsources
+src-assign-4|{ 0x893a2000, Assign, 4 }|{ 0x893a2000, Assign, 5 }|vc2matrixsources
+src-assign-5|{ 0x893a2040, Assign, 5 }|{ 0x893a2040, Assign, 6 }|vc2matrixsources
+src-bipolar-2|{ 0x893a2080, Bipolar, 2 }|{ 0x893a2080, Bipolar, 3 }|vc2matrixsources
+src-bipolar-3|{ 0x893a2130, Bipolar, 3 }|{ 0x893a2130, Bipolar, 2 }|vc2matrixsources
+src-bipolar-kind|{ 0x893a2080, Bipolar, 2 }|{ 0x893a2080, Assign, 2 }|vc2matrixsources
+src-assign-6|{ 0x893a21f0, Assign, 6 }|{ 0x893a21f0, Assign, 0 }|vc2matrixsources
+src-row-of|if (r.routine == routine) return &r;|if (r.routine == routine) return &kRows[1];|vc2matrixsources
+src-off-value|case Off: return 0;|case Off: return 1;|vc2matrixsources
+src-controller-byte|matrixCurve(channelByte(c, kControllersAt + byte))|matrixCurve(byte)|vc2matrixsources
+src-controllers-at|kControllersAt = 0x84,|kControllersAt = 0x83,|vc2matrixsources
+src-bend-centre|kBendCentre = 8192,|kBendCentre = 8191,|vc2matrixsources
+src-poly-at|kPolyAt = 4;|kPolyAt = 5;|vc2matrixsources
+src-at-key|kPolyAt + s.m->head[2]|kPolyAt + s.m->head[1]|vc2matrixsources
+src-at-max|c.aftertouch > poly ? c.aftertouch : poly|c.aftertouch < poly ? c.aftertouch : poly|vc2matrixsources
+src-at-poly-only|matrixCurve(c.aftertouch > poly ? c.aftertouch : poly)|matrixCurve(poly)|vc2matrixsources
+src-assign-none|kNone = 32;|kNone = 33;|vc2matrixsources
+src-assign-zero|if (number == 0 \|\| number == kNone)|if (number == kNone)|vc2matrixsources
+src-assign-signed|static_cast<int8_t>(s.assigns[(size_t)assign])|static_cast<uint8_t>(s.assigns[(size_t)assign])|vc2matrixsources
+src-assign-none-value|? matrixCurve(v) : 0;|? matrixCurve(v) : 1;|vc2matrixsources
+src-bipolar-none-value|? bipolarValue(v) : 0;|? bipolarValue(v) : 1;|vc2matrixsources
+src-bipolar-centre|kBipolarCentre = 64,|kBipolarCentre = 65,|vc2matrixsources
+src-bipolar-span|kBipolarSpan = 127,|kBipolarSpan = 126,|vc2matrixsources
+src-bipolar-steps|kBipolarSteps = 63,|kBipolarSteps = 64,|vc2matrixsources
+src-bipolar-order|(v - kBipolarCentre) * kBipolarSpan / kBipolarSteps|(v - kBipolarCentre) * (kBipolarSpan / kBipolarSteps)|vc2matrixsources
+src-bipolar-lower|(kBipolarCentre - v) * kBipolarSpan / kBipolarSteps|(kBipolarCentre - v + 1) * kBipolarSpan / kBipolarSteps|vc2matrixsources
+src-bipolar-negative|return -static_cast<int32_t>(|return static_cast<int32_t>(|vc2matrixsources
+src-part-top|kPartTop = 127;|kPartTop = 126;|vc2matrixsources
+src-key-step|kKeyStep = 122,|kKeyStep = 121,|vc2matrixsources
+src-key-at-60|kKeyAt60 = 7320;|kKeyAt60 = 7319;|vc2matrixsources
+src-key-byte|kKeyStep * s.m->head[1]|kKeyStep * s.m->head[0]|vc2matrixsources
+src-velocity-byte|matrixCurve(s.m->head[0])|matrixCurve(s.m->head[1])|vc2matrixsources
+choice-96|{ 96, 0x893a1e10 }|{ 96, 0x893a1e30 }|vc2matrixsources
+choice-97|{ 97, 0x893a1e30 }|{ 97, 0x893a1e10 }|vc2matrixsources
+choice-98|{ 98, 0x893a2080 }|{ 98, 0x893a2130 }|vc2matrixsources
+choice-99|{ 99, 0x893a2130 }|{ 99, 0x893a2080 }|vc2matrixsources
+choice-100|{ 100, 0x893a1f30 }|{ 100, 0x893a1f70 }|vc2matrixsources
+choice-101|{ 101, 0x893a1f70 }|{ 101, 0x893a1f30 }|vc2matrixsources
+choice-102|{ 102, 0x893a1fb0 }|{ 102, 0x893a1fd0 }|vc2matrixsources
+choice-103|{ 103, 0x893a1e60 }|{ 103, 0x893a1ef0 }|vc2matrixsources
+choice-104|{ 104, 0x893a1ef0 }|{ 104, 0x893a1e60 }|vc2matrixsources
+choice-105|{ 105, 0x893a2000 }|{ 105, 0x893a2040 }|vc2matrixsources
+choice-106|{ 106, 0x893a2040 }|{ 106, 0x893a2000 }|vc2matrixsources
+choice-107|{ 107, 0x893a1ff0 }|{ 107, 0x893a1fd0 }|vc2matrixsources
+choice-108|{ 108, 0x893a1fd0 }|{ 108, 0x893a1ff0 }|vc2matrixsources
+choice-109|{ 109, 0x893a21f0 }|{ 109, 0x893a1e60 }|vc2matrixsources
+choice-off|kOff = 0x893a1de0,|kOff = 0x893a1df0,|vc2matrixsources
+choice-controller|kController = 0x893a1df0;|kController = 0x893a1de0;|vc2matrixsources
+choice-zero|    if (source == 0) return kOff;\n||vc2matrixsources
+choice-none|kFirstNone = 96,|kFirstNone = 128,|vc2matrixsources
+choice-signed|return source >= kFirstNone ? kOff : kController;|return (uint32_t)source >= kFirstNone ? kOff : kController;|vc2matrixsources
+tables-curve-index|words[Vc2MatrixTables::kDestinations + i];|words[Vc2MatrixTables::kDestinations + i + 1];|vc2matrixtables
+tables-limit-past|int32_t vc2MatrixLimit(int dest) { return tables.t.words[dest]; }|int32_t vc2MatrixLimit(int dest) { return dest < 79 ? tables.t.words[dest] : 0; }|vc2matrixtables
