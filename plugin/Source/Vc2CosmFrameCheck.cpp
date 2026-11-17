@@ -2,12 +2,12 @@
 // vc2CosmConvert on the same input and block, with the note's Matrix object M in the interpreter's RAM and its port's
 // words beside it.  The Matrix readers and getter run on both sides; the refresh (0x893a2230) is hooked to log and to
 // do what a refresh does, drawn the same on both sides (one time in two a source moved: new terms, every group's dirty
-// bits its uses); the velocity curve is rom.4's own on both (RomShared); the converters the port has run on both
-// (vc2CosmPortedConvert: the TVF's and the Growl's, v237's six), the others are hooked to log their type, the port's
-// Vc2CosmTypes the same.  Each case M drawn, then 60 events: an input drawn (Vc2CosmFrameDraws.cpp: the switch now and
-// then off, the type mostly one the port has, else any, past 16 too; the curves, sensitivities, key, velocity and the
-// type's parameters at and past their ends), M's slots and terms now and then drawn again; after each the input, the
-// block, M and the calls, word for word.  XT_VC2COSM_MAIN only.
+// bits its uses); the velocity curve, powf and logf are rom.4's own on both (RomShared); the converters the port has
+// run on both (vc2CosmPortedConvert: from v241 every one), any the check's list has not are hooked to log their type,
+// the port's Vc2CosmTypes the same.  Each case M drawn, then 60 events: an input drawn (Vc2CosmFrameDraws.cpp: the
+// switch now and then off, the type mostly one the port has, else any, past 16 too; the curves, sensitivities, key,
+// velocity and the type's parameters at and past their ends), M's slots and terms now and then drawn again; after each
+// the input, the block, M and the calls, word for word.  XT_VC2COSM_MAIN only.
 #ifdef XT_VC2COSM_MAIN
 #include "Vc2CheckCalls.h"
 #include "Vc2CosmCheck.h"

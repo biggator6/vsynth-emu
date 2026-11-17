@@ -214,6 +214,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2CosmConverters.cpp
     Source/Vc2CosmDrive.cpp
     Source/Vc2CosmBalanced.cpp
+    Source/Vc2CosmSideBand.cpp
     Source/Vc2Matrix.cpp
     Source/Vc2MatrixTables.cpp
     Source/XtBuildId.cpp

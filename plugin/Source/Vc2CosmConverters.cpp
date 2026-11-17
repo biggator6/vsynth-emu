@@ -1,4 +1,4 @@
-// The VC-2's COSM converters the port has, by type: see Vc2CosmConverters.h (v237, v239).
+// The VC-2's COSM converters the port has, by type: see Vc2CosmConverters.h (v237, v239, v241: every one).
 #include "Vc2CosmConverters.h"
 #include "Vc2CosmBalanced.h"
 #include "Vc2CosmConvert.h"
@@ -6,6 +6,7 @@
 #include "Vc2CosmDynamics.h"
 #include "Vc2CosmFilters.h"
 #include "Vc2CosmGrowl.h"
+#include "Vc2CosmSideBand.h"
 #include "Vc2CosmTvf.h"
 #include <array>
 #include <cstring>
@@ -35,6 +36,8 @@ constexpr auto kConverters = std::to_array<std::pair<int, Convert>>({
     { 2, throughLayout<Vc2CosmWsBlock, vc2WsConvert> },
     { 3, throughLayout<Vc2CosmAmpBlock, vc2AmpConvert> },
     { 5, throughLayout<Vc2CosmResonatorBlock, vc2ResonatorConvert> },
+    { 6, throughLayout<Vc2CosmSbf1Block, vc2Sbf1Convert> },
+    { 7, throughLayout<Vc2CosmSbf2Block, vc2Sbf2Convert> },
     { 8, throughLayout<Vc2CosmGrowlBlock, vc2GrowlConvert> },
     { 9, throughLayout<Vc2CosmDualBlock, vc2DualConvert> },
     { 10, throughLayout<Vc2CosmTvfBlock, vc2TvfConvert> },

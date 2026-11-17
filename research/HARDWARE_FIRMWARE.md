@@ -1546,6 +1546,55 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM Side Band Filters (2026-11-16, v241) {#vc2-cosm-side-band}
+
+Step 4.2's COSM part's fifth (research/VC2_MODE_PLAN.md), from the VC-2 session's message (the user's yes): the two Side Band Filters, the last converters. Ported bit for bit: `vc2Sbf1Convert` and `vc2Sbf2Convert` (Vc2CosmSideBand.cpp), their pool words in Vc2CosmTables.cpp (read by loadVc2 through `vc2LoadCosm`, as before). With them every converter the dispatcher's switch calls is ported, and xt_vc2cosm's second part hooks none. Every address is rom.4's; the input's offsets from +0x10 are the type's parameters in their IDs' order.
+
+**What both make**, by one routine over a row, after their own words and in this order of Matrix calls:
+- Width and the group's 1st sum by the keyed scale: `0x89397650` is v239's `0x89397800` (`vc2CosmScaled`) on its own pool word, 1200 at `0x893976bc`. Then Width Env × the first velocity factor (envelope 9, COSM 2's 11), Width LFO with the 10th sum, and Width Own Env by the depth law, no velocity and no sum.
+- Detune with the 2nd sum × 200 ÷ 127 as an integer (toward 0, the multiply `0x81020409`; the sum's product on 32 bits, only the total held to 16), held to ±100, as it stands (a float of the integer). Then Detune Env × the second factor (envelope 10, 12), Detune LFO with the 11th, and Detune Own Env.
+- Each setting's words: its value, its four modulation words (`Vc2CosmMod`), its Own Env depth (`Vc2CosmSbfSetting`).
+
+**The LPF**, `0x893975a0(Cutoff, KF × 10, key − 60)`, both's: x = (key − 60) × KF × 10 as floats ÷ 100 ÷ 12 (`vc2CosmFollowed` on its words at `0x893976c8`, `0x893976cc`). The Cutoff, no sum, held to 0…127, × ½ ÷ 127 + ½. Then plus, or less when x is below 0, rom.4's powf(x, 2) × logf(2) × ¼ (`0x893976d4`). Held to ½…1, the floor reloaded from the ½'s word (`0x893976c4`). It is rom.2's `0x894dc540` (XtCosm's `sbfLpf`, there by a table of powf's squares) on rom.4's libm.
+
+| Type | Converter | Code | Its own words |
+|---|---|---|---|
+| 6, Side Band Filter 1 | `0x89398260` | 7 | byte +4 Octave Select; +8…+0x37 Detune's and Width's; +0x38 −HPF ÷ 127 + 0 (HPF held to 0…127, no sum); +0x3c the LPF; +0x40 Sub Delay Line Detune held to ±100; +0x44 1 |
+| 7, Side Band Filter 2 | `0x893984e0` | 8 | byte +4 Octave Select; +8 Q × 0.96875 ÷ 127 − 1 (Q held, no sum; `0x893985e4`); +0xc…+0x3b Detune's and Width's; +0x3c the LPF; +0x40 1 |
+
+The first's depths' 63 is `0x89397450`'s (`0x893976b0`) but Detune Own's, inline on `0x893985e0`; the second's are all inline on `0x89398890`. Each is rom.2's (`0x894dd0a0`, `0x894dd2c0`) on rom.4's input, so XtCosm's objects play the blocks.
+
+**rom.4's converters, the whole map** (the dispatcher `0x89399920`'s switch on the input's type; rom.2's map, by the same types, is "COSM: the Dual Filter, and the map of the types"):
+
+| Type | Name | rom.4's converter | Code | The port's | Version |
+|---|---|---|---|---|---|
+| 1 | OD/Dist | `0x89397980` | 1, 2 | `vc2OdConvert` (Vc2CosmDrive.cpp) | v239 |
+| 2 | Wave Shaper | `0x89397cf0` | 3 | `vc2WsConvert` (Vc2CosmDrive.cpp) | v239 |
+| 3 | Amp Simulator | `0x89397eb0` | 4 | `vc2AmpConvert` (Vc2CosmDynamics.cpp) | v237 |
+| 4 | Speaker Simulator | inline in the dispatcher (`0x89398070` uncalled) | 5 | `vc2CosmConvert`'s case | v235 |
+| 5 | Resonator | `0x89398080` | 6 | `vc2ResonatorConvert` (Vc2CosmBalanced.cpp) | v239 |
+| 6 | Side Band Filter 1 | `0x89398260` | 7 | `vc2Sbf1Convert` (Vc2CosmSideBand.cpp) | v241 |
+| 7 | Side Band Filter 2 | `0x893984e0` | 8 | `vc2Sbf2Convert` (Vc2CosmSideBand.cpp) | v241 |
+| 8 | Growl (rom.2's Comb Filter) | `0x89398780` | 9 | `vc2GrowlConvert` (Vc2CosmGrowl.cpp) | v234 |
+| 9 | Dual Filter | `0x893988a0` | 12 | `vc2DualConvert` (Vc2CosmFilters.cpp) | v237 |
+| 10 | TVF | `0x89398ae0` | 13 | `vc2TvfConvert` (Vc2CosmTvf.cpp) | v235 |
+| 11 | Dynamic TVF | `0x89398d40` | 14 | `vc2DtvfConvert` (Vc2CosmTvf.cpp) | v237 |
+| 12 | Compressor | `0x89398fd0` | 15 | `vc2CompConvert` (Vc2CosmDynamics.cpp) | v237 |
+| 13 | Limiter | `0x893990d0` | 16 | `vc2LimConvert` (Vc2CosmDynamics.cpp) | v237 |
+| 14 | Frequency Shifter | `0x893991d0` | 18 | `vc2ShifterConvert` (Vc2CosmBalanced.cpp) | v239 |
+| 15 | Lo-Fi | `0x893993f0` | 19 | `vc2LofiConvert` (Vc2CosmBalanced.cpp) | v239 |
+| 16 | TB Filter | `0x89399620` | 20 | `vc2TbConvert` (Vc2CosmFilters.cpp) | v237 |
+
+The port's table is `vc2CosmPortedConvert` (Vc2CosmConverters.cpp); a type 0 or past 16 gives code 0, and the switch off code 0 (`vc2CosmConvert`).
+
+**The check**, xt_vc2cosm's second part: the two types' hooks out, so none is left; their parameters drawn by their ranges (Detune and Sub Detune ±100, the Octave 0…2), at the ends, 0, within, past them or any 16 bits. The keys and keyfollows reach both signs of x, so the LPF's plus and less and both its holds are taken.
+
+Results:
+- seed 2024, 40 cases: 2,400 events, 109…153 of each of the 15 types with a converter (141 of the first Side Band Filter, 133 of the second), 20 Speaker Simulator, none hooked, 264 off, 161 past the types; 5,567 refreshes; 0 different, the first run.
+- seeds 7 and 31337, 400 cases each: 24,000 events each (1,236…1,387 of each type), 0 different.
+- `mutate_vc2.py --cosm`: 90 new plants (78 on the two converters, their row, the LPF law and Detune's hold, 10 on the pool words, 2 on the converters by type), all caught. One of v237's, a type the port's table lacks answered as converted, could not differ any more: every type the dispatcher hands on is in the table now. It is dropped, saying so; a type the port loses still differs, as the check's own list runs rom.4's converter for it. 583 plants in all.
+- The `rom4-no-cosm` and `rom4-no-tables` panel plants caught; fcheck's diff is xt_vc2cosm's `frame:` line; verify.sh passes every line.
+
 ### The VC-2's COSM converters on rom.4's libm (2026-11-16, v239) {#vc2-cosm-libm}
 
 Step 4.2's COSM part's fourth (research/VC2_MODE_PLAN.md), from the VC-2 session's message (the user's "v238 plus COSM"): the seven converters left after v237 all reach rom.4's libm. They split by what they hold. Five each have one helper: OD/Dist, the Wave Shaper, the Resonator, the Frequency Shifter and Lo-Fi, done now. The two Side Band Filters, with an HPF, the LPF's square and logf, Sub Detune, an Octave byte, and Detune and Width each with three depths, are a version of their own. Ported bit for bit: OD/Dist's and the Wave Shaper's converters as one routine over a row (Vc2CosmDrive.cpp); the Resonator's, the Frequency Shifter's and Lo-Fi's as one routine past each one's own setting (Vc2CosmBalanced.cpp); the laws they share (Vc2CosmConvert.cpp); their pool words (Vc2CosmTables.cpp, read by loadVc2 through `vc2LoadCosm`, as before). Every address is rom.4's; the input's offsets from +0x10 are the type's parameters in their IDs' order.
@@ -9889,7 +9938,9 @@ dispatcher's case 4 (`0x894de5b0`) has the same code inline (code 5, the
 input's +0x12 as the byte +4), and no word, `bsr` or `bra` in rom.2 reaches
 `0x894dcef0`; rom.4 is the same ("The VC-2's COSM converters, the first
 batch"). Their stereo routines, by another table: v104, "COSM: the stereo
-routines".
+routines". rom.4's converters by the same types, every one ported for the
+VC-2 by v241 (type 8 there is the Growl): "The VC-2's COSM Side Band
+Filters".
 
 **The Dual Filter** (COSM Type 9, block code 12).
 

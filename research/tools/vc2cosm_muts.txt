@@ -26,6 +26,12 @@
 # floor (its ratio and level are never below 0); OD/Dist's Type test on its low byte (a Type of 256·n other than 0 is
 # one draw in thousands).  RomShared's powf (Vc2RomShared.h, the check's, a header) planted by hand: its arguments
 # swapped, 40 of 40 cases differ.
+# v241: vc2cosmsideband (Vc2CosmSideBand.cpp, the two Side Band Filters').  Not planted, as no input tells them apart:
+# one filter's pool for the other's (every 63 is the same value, and the first reads no Q scale); the LPF's sign test
+# at x = 0 (its ln 2 × x² × ¼ is 0 there); Detune's 16-bit cast (heldDetune's int16_t parameter holds it again).
+# Dropped at v241: v237's types-none (a type the port's table lacks answered as converted): every type the dispatcher
+# hands on is in the table now, so no input reaches that branch; a type the port loses still differs, as the check's
+# own list runs rom.4's converter for it.
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -375,7 +381,6 @@ types-dtvf|throughLayout<Vc2CosmTvfBlock, vc2DtvfConvert>|throughLayout<Vc2CosmT
 types-tb|{ 16, throughLayout<Vc2CosmTbBlock, vc2TbConvert> },|{ 15, throughLayout<Vc2CosmTbBlock, vc2TbConvert> },|vc2cosmtypes
 types-copy-in|    std::memcpy(&b, block, sizeof b);\n||vc2cosmtypes
 types-copy-out|std::memcpy(block, &b, sizeof b);|std::memcpy(block, &b, sizeof b - 4);|vc2cosmtypes
-types-none|if (convert == nullptr) return false;|if (convert == nullptr) return true;|vc2cosmtypes
 types-match|if (t == type) return convert;|if (t == type + 1) return convert;|vc2cosmtypes
 followed-key|const int16_t k = keyOf(key), f = followOf(follow);|const int16_t k = keyOf(key), f = followOf(follow + 1);|vc2cosmconvert
 keyscale-two|shared.pow(2.0f,|shared.pow(2.1f,|vc2cosmconvert
@@ -520,3 +525,93 @@ types-ws|throughLayout<Vc2CosmWsBlock, vc2WsConvert>|throughLayout<Vc2CosmOdBloc
 types-res|{ 5, throughLayout|{ 6, throughLayout|vc2cosmtypes
 types-shifter|{ 14, throughLayout|{ 7, throughLayout|vc2cosmtypes
 types-lofi|{ 15, throughLayout|{ 7, throughLayout|vc2cosmtypes
+sbf1-code|kSbf1Code = 7,|kSbf1Code = 6,|vc2cosmsideband
+sbf2-code|kSbf2Code = 8;|kSbf2Code = 9;|vc2cosmsideband
+sb-most|constexpr int kMost = 127, kDetuneMost|constexpr int kMost = 126, kDetuneMost|vc2cosmsideband
+detune-most|kDetuneMost = 100,|kDetuneMost = 99,|vc2cosmsideband
+detune-span|kDetuneSpan = 200;|kDetuneSpan = 199;|vc2cosmsideband
+width-envelope|kWidthEnvelope[2] = { 9, 11 }|kWidthEnvelope[2] = { 9, 12 }|vc2cosmsideband
+width-envelope-first|kWidthEnvelope[2] = { 9,|kWidthEnvelope[2] = { 10,|vc2cosmsideband
+detune-envelope|kDetuneEnvelope[2] = { 10, 12 }|kDetuneEnvelope[2] = { 10, 11 }|vc2cosmsideband
+detune-envelope-first|kDetuneEnvelope[2] = { 10,|kDetuneEnvelope[2] = { 9,|vc2cosmsideband
+width-sum|kWidthSum = 0,|kWidthSum = 1,|vc2cosmsideband
+width-lfo-sum|kWidthLfoSum = 9,|kWidthLfoSum = 10,|vc2cosmsideband
+detune-sum|kDetuneSum = 1,|kDetuneSum = 0,|vc2cosmsideband
+detune-lfo-sum|kDetuneLfoSum = 10;|kDetuneLfoSum = 9;|vc2cosmsideband
+lpf-param|kLpf = 1,|kLpf = 2,|vc2cosmsideband
+lpf-follow-param|kLpfFollow = 2,|kLpfFollow = 1,|vc2cosmsideband
+hpf-param|kHpf = 0,|kHpf = 1,|vc2cosmsideband
+sub-detune-param|kSubDetune = 3,|kSubDetune = 4,|vc2cosmsideband
+q-param|kQ = 0;|kQ = 1;|vc2cosmsideband
+sbf1-octave-param|kSbf1 { 4,|kSbf1 { 3,|vc2cosmsideband
+sbf1-detune-param|kSbf1 { 4, 5,|kSbf1 { 4, 6,|vc2cosmsideband
+sbf1-detune-lfo-param|kSbf1 { 4, 5, 6,|kSbf1 { 4, 5, 7,|vc2cosmsideband
+sbf1-detune-own-param|kSbf1 { 4, 5, 6, 7,|kSbf1 { 4, 5, 6, 8,|vc2cosmsideband
+sbf1-detune-env-param|kSbf1 { 4, 5, 6, 7, 8,|kSbf1 { 4, 5, 6, 7, 7,|vc2cosmsideband
+sbf1-width-param|kSbf1 { 4, 5, 6, 7, 8, 9,|kSbf1 { 4, 5, 6, 7, 8, 10,|vc2cosmsideband
+sbf1-width-follow-param|9, 10, 11, 12, 13, &Vc2CosmTables::sbf1|9, 9, 11, 12, 13, &Vc2CosmTables::sbf1|vc2cosmsideband
+sbf1-width-lfo-param|10, 11, 12, 13, &Vc2CosmTables::sbf1|10, 12, 12, 13, &Vc2CosmTables::sbf1|vc2cosmsideband
+sbf1-width-own-param|11, 12, 13, &Vc2CosmTables::sbf1|11, 13, 13, &Vc2CosmTables::sbf1|vc2cosmsideband
+sbf1-width-env-param|12, 13, &Vc2CosmTables::sbf1|12, 12, &Vc2CosmTables::sbf1|vc2cosmsideband
+sbf2-octave-param|kSbf2 { 3,|kSbf2 { 4,|vc2cosmsideband
+sbf2-detune-param|kSbf2 { 3, 4,|kSbf2 { 3, 5,|vc2cosmsideband
+sbf2-detune-lfo-param|kSbf2 { 3, 4, 5,|kSbf2 { 3, 4, 6,|vc2cosmsideband
+sbf2-detune-own-param|kSbf2 { 3, 4, 5, 6,|kSbf2 { 3, 4, 5, 7,|vc2cosmsideband
+sbf2-detune-env-param|kSbf2 { 3, 4, 5, 6, 7,|kSbf2 { 3, 4, 5, 6, 6,|vc2cosmsideband
+sbf2-width-param|kSbf2 { 3, 4, 5, 6, 7, 8,|kSbf2 { 3, 4, 5, 6, 7, 9,|vc2cosmsideband
+sbf2-width-follow-param|8, 9, 10, 11, 12, &Vc2CosmTables::sbf2|8, 8, 10, 11, 12, &Vc2CosmTables::sbf2|vc2cosmsideband
+sbf2-width-lfo-param|9, 10, 11, 12, &Vc2CosmTables::sbf2|9, 11, 11, 12, &Vc2CosmTables::sbf2|vc2cosmsideband
+sbf2-width-own-param|10, 11, 12, &Vc2CosmTables::sbf2|10, 12, 12, &Vc2CosmTables::sbf2|vc2cosmsideband
+sbf2-width-env-param|11, 12, &Vc2CosmTables::sbf2|11, 11, &Vc2CosmTables::sbf2|vc2cosmsideband
+held-detune-top|d > kDetuneMost ? kDetuneMost :|d > kDetuneMost ? kDetuneMost - 1 :|vc2cosmsideband
+held-detune-floor|d < -kDetuneMost ? -kDetuneMost : d;|d < -kDetuneMost ? -kDetuneMost + 1 : d;|vc2cosmsideband
+detune-scale|sum * kDetuneSpan / kMost|sum * kDetuneSpan / 128|vc2cosmsideband
+detune-order|sum * kDetuneSpan / kMost|sum / kMost * kDetuneSpan|vc2cosmsideband
+lpf-half-scale|mul(flt(vc2CosmLevel(lpf, 0, kMost)), k.half)|mul(flt(vc2CosmLevel(lpf, 0, kMost)), k.quarter)|vc2cosmsideband
+lpf-half-offset|flt(kMost)), k.half);|flt(kMost)), k.quarter);|vc2cosmsideband
+lpf-hold|vc2CosmLevel(lpf, 0, kMost)|vc2CosmLevel(lpf, 0, 126)|vc2cosmsideband
+lpf-offset-order|vc2CosmFollowed(key, follow, k.percent, k.twelve)|vc2CosmFollowed(key, follow, k.twelve, k.percent)|vc2cosmsideband
+lpf-square|shared.pow(x, 2.0f)|shared.pow(x, 3.0f)|vc2cosmsideband
+lpf-pow-order|shared.pow(x, 2.0f)|shared.pow(2.0f, x)|vc2cosmsideband
+lpf-log|shared.log(2.0f)|shared.log(2.1f)|vc2cosmsideband
+lpf-quarter|shared.log(2.0f)), k.quarter);|shared.log(2.0f)), k.half);|vc2cosmsideband
+lpf-sign|const float y = 0.0f > x ? sub(base, d) : add(base, d);|const float y = 0.0f > x ? add(base, d) : add(base, d);|vc2cosmsideband
+lpf-sign-plus|const float y = 0.0f > x ? sub(base, d) : add(base, d);|const float y = 0.0f > x ? sub(base, d) : sub(base, d);|vc2cosmsideband
+lpf-top|return y > 1.0f ? 1.0f : k.half > y ? k.half : y;|return y > 0.99f ? 0.99f : k.half > y ? k.half : y;|vc2cosmsideband
+lpf-floor|k.half > y ? k.half : y;|0.0f > y ? 0.0f : y;|vc2cosmsideband
+lpf-key|lpfOf(in.params[kLpf], in.noteKey,|lpfOf(in.params[kLpf], in.noteVelocity,|vc2cosmsideband
+width-no-sum|in.params[r.width], sum(kWidthSum), kMost|in.params[r.width], 0, kMost|vc2cosmsideband
+width-key|vc2CosmScaled(width, in.noteKey,|vc2CosmScaled(width, in.noteVelocity,|vc2cosmsideband
+width-cents|vc2CosmTables().sideBand.widthCents,|1201.0f,|vc2cosmsideband
+width-velocity|in.params[r.widthEnv], in.velocity[0]|in.params[r.widthEnv], in.velocity[1]|vc2cosmsideband
+width-second|kWidthEnvelope[sum.second()]|kWidthEnvelope[0]|vc2cosmsideband
+width-63|sum(kWidthLfoSum), k.k63);|sum(kWidthLfoSum), 64.0f);|vc2cosmsideband
+width-own-63|b.width.own = vc2CosmDepth(in.params[r.widthOwn], k.k63);|b.width.own = vc2CosmDepth(in.params[r.widthOwn], 64.0f);|vc2cosmsideband
+detune-no-sum|detuneOf(in.params[r.detune], sum(kDetuneSum))|detuneOf(in.params[r.detune], 0)|vc2cosmsideband
+detune-velocity|in.params[r.detuneEnv], in.velocity[1]|in.params[r.detuneEnv], in.velocity[0]|vc2cosmsideband
+detune-second|kDetuneEnvelope[sum.second()]|kDetuneEnvelope[0]|vc2cosmsideband
+detune-63|sum(kDetuneLfoSum), k.k63);|sum(kDetuneLfoSum), 64.0f);|vc2cosmsideband
+detune-own-63|b.detune.own = vc2CosmDepth(in.params[r.detuneOwn], k.ownK63);|b.detune.own = vc2CosmDepth(in.params[r.detuneOwn], 64.0f);|vc2cosmsideband
+hpf-sign|div(-flt(vc2CosmLevel(in.params[kHpf]|div(flt(vc2CosmLevel(in.params[kHpf]|vc2cosmsideband
+hpf-offset|flt(kMost)), 0.0f);\n    b.lpf|flt(kMost)), 1e-7f);\n    b.lpf|vc2cosmsideband
+hpf-hold|vc2CosmLevel(in.params[kHpf], 0, kMost)|vc2CosmLevel(in.params[kHpf], 0, 126)|vc2cosmsideband
+sub-detune-held|b.subDetune = flt(heldDetune(in.params[kSubDetune]));|b.subDetune = flt(in.params[kSubDetune]);|vc2cosmsideband
+sbf1-octave-byte|b.octave = static_cast<uint8_t>(in.params[kSbf1.octave]);|b.octave = static_cast<uint8_t>(in.params[kSbf1.octave] & 3);|vc2cosmsideband
+sbf1-one|sideBandBody(kSbf1, in, b.body, matrix, shared);\n    b.one = 1.0f;|sideBandBody(kSbf1, in, b.body, matrix, shared);\n    b.one = 0.5f;|vc2cosmsideband
+sbf2-q-scale|vc2CosmTables().sbf2.qScale)|vc2CosmTables().sideBand.half)|vc2cosmsideband
+sbf2-q-hold|vc2CosmLevel(in.params[kQ], 0, kMost)|vc2CosmLevel(in.params[kQ], 0, 126)|vc2cosmsideband
+sbf2-octave-row|b.octave = static_cast<uint8_t>(in.params[kSbf2.octave]);|b.octave = static_cast<uint8_t>(in.params[kSbf1.octave]);|vc2cosmsideband
+sbf2-one|sideBandBody(kSbf2, in, b.body, matrix, shared);\n    b.one = 1.0f;|sideBandBody(kSbf2, in, b.body, matrix, shared);\n    b.one = 0.5f;|vc2cosmsideband
+sbf2-no-lpf|    b.lpf = lpfOf(in, shared);\n    b.octave = static_cast<uint8_t>(in.params[kSbf2.octave]);|    b.octave = static_cast<uint8_t>(in.params[kSbf2.octave]);|vc2cosmsideband
+tables-sb-half|{ 0x893976c4, &t.sideBand.half }|{ 0x893976d4, &t.sideBand.half }|vc2cosmtables
+tables-sb-percent|{ 0x893976c8, &t.sideBand.percent }|{ 0x893976cc, &t.sideBand.percent }|vc2cosmtables
+tables-sb-twelve|{ 0x893976cc, &t.sideBand.twelve }|{ 0x893976c8, &t.sideBand.twelve }|vc2cosmtables
+tables-sb-quarter|{ 0x893976d4, &t.sideBand.quarter }|{ 0x893976c4, &t.sideBand.quarter }|vc2cosmtables
+tables-sb-cents|{ 0x893976bc, &t.sideBand.widthCents }|{ 0x893976c8, &t.sideBand.widthCents }|vc2cosmtables
+tables-sbf1-63|{ 0x893976b0, &t.sbf1.k63 }|{ 0x893976c8, &t.sbf1.k63 }|vc2cosmtables
+tables-sbf1-own|{ 0x893985e0, &t.sbf1.ownK63 }|{ 0x893985e4, &t.sbf1.ownK63 }|vc2cosmtables
+tables-sbf2-63|{ 0x89398890, &t.sbf2.k63 }|{ 0x893985e4, &t.sbf2.k63 }|vc2cosmtables
+tables-sbf2-own|{ 0x89398890, &t.sbf2.ownK63 }|{ 0x893985e4, &t.sbf2.ownK63 }|vc2cosmtables
+tables-sbf2-q|{ 0x893985e4, &t.sbf2.qScale }|{ 0x89398890, &t.sbf2.qScale }|vc2cosmtables
+types-sbf1|{ 6, throughLayout<Vc2CosmSbf1Block|{ 4, throughLayout<Vc2CosmSbf1Block|vc2cosmtypes
+types-sbf2|throughLayout<Vc2CosmSbf2Block, vc2Sbf2Convert>|throughLayout<Vc2CosmSbf1Block, vc2Sbf1Convert>|vc2cosmtypes
