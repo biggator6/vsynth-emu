@@ -1,6 +1,6 @@
 // The OSC voice's note-on by its kind (v232): rom.4's 0x893af0b0, which the note-on (0x893ae370) ends in.  Each kind's
-// way is its row's (Vc2OscVoiceKinds.cpp): LITE's, VariPhrase's and the analog's own note-ons (0x893c7c30, 0x893af420,
-// 0x893c22e0) are later versions' and go through Vc2OscParts; kinds 4, 5, 6 and 7 are inline here, on the targets.
+// way is its row's (Vc2OscVoiceKinds.cpp): VariPhrase's and LITE's own note-ons (0x893af420, v238; 0x893c7c30, v240)
+// are ported, the analog's (0x893c22e0) a later version's, through Vc2OscParts; kinds 4, 5, 6 and 7 are inline here.
 // Every address is rom.4's.  HARDWARE_FIRMWARE.md, "The VC-2's OSC voice's note-on and targets".
 #include "Vc2OscTables.h"
 #include "Vc2OscTargets.h"
@@ -24,6 +24,7 @@ void Vc2OscVoice::kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
         case Vc2OscNoteOn::one: setF32(kObjectPitch, 1.0f); return;
         case Vc2OscNoteOn::routine: parts.kindCall(row.noteOnRoutine); break;
         case Vc2OscNoteOn::vari: noteOnVari(parts, shared); break;   // 0x893af420 (v238, Vc2OscPlayers.cpp)
+        case Vc2OscNoteOn::lite: noteOnLite(parts, shared); break;   // 0x893c7c30 (v240, Vc2OscLite.cpp)
         case Vc2OscNoteOn::extIn:
             setF32(kObjectPitch, targets.ratioOn(t.noteOn, t.noteOn.ratio));
             setF32(kObjectGain, targets.gain());

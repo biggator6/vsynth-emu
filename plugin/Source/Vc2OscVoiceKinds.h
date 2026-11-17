@@ -10,7 +10,7 @@ enum class Vc2OscRecords : uint8_t { none, fromBlock, atZero };   // the note-on
 enum class Vc2OscPitch : uint8_t { none, bounded, tuned };   // 0x893aeb20: 0; within ±6000; that less +0xa74
 // 0x893af0b0's ways (v232): nothing; +0x1cc at 1; the kind's own note-on; the ratio, gain and level into the object;
 // the gain and ratio into P and the carrier's init; the ratio, rate, gain and level into P and kind 6's start
-enum class Vc2OscNoteOn : uint8_t { none, one, routine, extIn, carrier, kind6, vari };   // vari: v238's port
+enum class Vc2OscNoteOn : uint8_t { none, one, routine, extIn, carrier, kind6, vari, lite };   // v238's, v240's ports
 // 0x893ae0f0's ways (v238): the frame's own; the kind's own install by its address; LITE's and VariPhrase's, ported
 enum class Vc2OscInstall : uint8_t { frame, routine, lite, vari };
 

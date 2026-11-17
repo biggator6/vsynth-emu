@@ -16,12 +16,17 @@ constexpr uint32_t kPairStride = 0x400;
 constexpr std::array<uint32_t, 3> kEnvelopeWords { 0x1c, 0x2c, 0x4c };
 constexpr uint32_t kEnvelopeOut = 0x4c, kLfoOut = 0x38;
 
-// A loop record's tune: within ±12 semitones most often, any word one time in four, and one time in eight about where
-// the factor, 2^(−tune/120000), leaves the floats' range (2^∓126…2^∓151), so the note-on's test of it meets a 0
-int32_t drawTune(std::mt19937& rng) {
+constexpr int32_t kPerOctave = 120000;   // [FW] 0x893ae644's 1/120000: a tune's octaves
+
+// A loop record's tune: within ±12 semitones most often, any word one time in four, and one time in eight far out,
+// where rom.4's exp2 reads its 2^−n past the table's seven words (HARDWARE_FIRMWARE.md, "The VC-2's LITE note-on"):
+// half of those (v240) in the middle of an octave n whose word there is 0 or a NaN (OscRecords::zeroTunes), where the
+// factor, 2^(−tune/120000), meets the note-on's test; the others 126…151 octaves either way (v232's draw, made on a
+// model of exp2 v240 withdrew: none of those octaves gives a 0)
+int32_t drawTune(std::mt19937& rng, std::span<const int32_t> zeros) {
     constexpr std::array<int32_t, 6> kOctaves { 126, 127, 128, 149, 150, 151 };
-    constexpr int32_t kPerOctave = 120000;   // [FW] 0x893ae644's 1/120000
     if (rng() % 8 == 0) {
+        if (!zeros.empty() && rng() % 2) return zeros[rng() % zeros.size()] * kPerOctave + kPerOctave / 2;
         const int32_t sign = rng() % 2 ? 1 : -1;
         return sign * kOctaves[rng() % kOctaves.size()] * kPerOctave + (int32_t)(rng() % 3) - 1;
     }
@@ -29,9 +34,9 @@ int32_t drawTune(std::mt19937& rng) {
 }
 
 // A loop record (v238: its loops, rates and modes as any words; the rates' exp2 stays within ±2.7 octaves)
-Vc2OscLoopRecord drawLoop(std::mt19937& rng) {
+Vc2OscLoopRecord drawLoop(std::mt19937& rng, std::span<const int32_t> zeros) {
     Vc2OscLoopRecord loop;
-    loop.tune = drawTune(rng);
+    loop.tune = drawTune(rng, zeros);
     loop.loopStart = (int32_t)rng();
     loop.loopEnd = (int32_t)rng();
     loop.bwdEnd = (int32_t)rng();
@@ -69,8 +74,27 @@ uint32_t oscEnvelopeAt(int k) { return kOscRecordsAt + kEnvelopesFrom + kBoundSt
 uint32_t oscLfoAt(int k) { return kOscRecordsAt + kLfosFrom + kBoundStride * (uint32_t)k; }
 uint32_t oscPairAt(int k) { return kOscPairsAt + kPairStride * (uint32_t)k; }
 
+void oscFindZeroTunes(Vc2Fw& fw, OscRecords& r) {
+    constexpr uint32_t kTablePool = 0x893a83e4;   // [FW] exp2's path below 0: its 2^−n table's address
+    constexpr int32_t kPast = 7, kLast = 17894;   // [FW] past the table's seven words; to where n × 120000 fits a word
+    const uint32_t table = fw.cpu.rd32(kTablePool);
+    for (int32_t n = kPast; n <= kLast; ++n) {
+        const uint32_t w = fw.cpu.rd32(table + 4 * (uint32_t)n);
+        const float f = std::bit_cast<float>(w);
+        if (f != f || f == 0.0f) r.zeroTunes.push_back(n);
+    }
+}
+
+// The headers' rates: the converter's, then 0
+constexpr std::array<uint16_t, 5> kRates { 44100, 32000, 22050, 48000, 0 };
+
+void oscRealWave(OscRecords& r, int k, std::mt19937& rng) {
+    r.headers[(size_t)k].rate = kRates[rng() % (kRates.size() - 1)];
+    r.headers[(size_t)k].cents = (int32_t)(rng() % 128);
+    r.loops[(size_t)k].tune = (int32_t)(rng() % 2400) - 1200;
+}
+
 void oscDrawRecords(OscRecords& r, std::mt19937& rng) {
-    constexpr std::array<uint16_t, 5> kRates { 44100, 32000, 22050, 48000, 0 };
     for (int k = 0; k < kOscRecords; ++k) {
         Vc2OscWaveHeader& h = r.headers[(size_t)k];
         h.flag = rng() % 3 == 0 ? (uint8_t)rng() : (uint8_t)(rng() % 2);
@@ -78,7 +102,7 @@ void oscDrawRecords(OscRecords& r, std::mt19937& rng) {
         h.rootKey = (int8_t)rng();
         h.cents = rng() % 4 == 0 ? (int32_t)rng() : (int32_t)(rng() % 128);
         h.word1c = (uint32_t)rng();
-        r.loops[(size_t)k] = drawLoop(rng);
+        r.loops[(size_t)k] = drawLoop(rng, r.zeroTunes);
         for (uint32_t word : kEnvelopeWords) r.bound[oscEnvelopeAt(k) + word] = oscDrawFloat(rng);
         if (rng() % 2) r.bound[oscEnvelopeAt(k) + kEnvelopeWords[0]] = 0.0f;
         // the outputs the pitch and the formant take, on their way to exp2

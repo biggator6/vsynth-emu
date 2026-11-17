@@ -220,6 +220,7 @@ int main(int argc, char** argv) {
     if (!run) return 1;
     std::array<Vc2OscVoice, kOscVoices> voices {};
     OscShared shared;
+    oscFindZeroTunes(fw, shared.records);
     std::vector<OscPortParts> parts;
     for (int v = 0; v < kOscVoices; ++v) parts.emplace_back(v, shared, voices[(size_t)v]);
     std::vector<OscCall> rom;

@@ -1,8 +1,8 @@
 #pragma once
-// The OSC voice's constants from rom.4 (v230; the targets' from v232; the players' from v238): its routines' pool
-// words, the three floats its install reads and the players' installs' tables, read once by loadVc2 at the start,
-// never after.  HARDWARE_FIRMWARE.md, "The VC-2's OSC voice", "The VC-2's OSC voice's note-on and targets", "The
-// VC-2's players' installs and VariPhrase's note-on".
+// The OSC voice's constants from rom.4 (v230; the targets' from v232; the players' from v238, LITE's note-on's from
+// v240): its routines' pool words, the three floats its install reads and the players' installs' tables, read once by
+// loadVc2 at the start, never after.  HARDWARE_FIRMWARE.md, "The VC-2's OSC voice", "The VC-2's OSC voice's note-on
+// and targets", "The VC-2's players' installs and VariPhrase's note-on", "The VC-2's LITE note-on".
 #include <array>
 
 // A pair of bounds as rom.4 holds them, each its routine's own pool word
@@ -47,6 +47,16 @@ struct Vc2OscTables {
     std::array<float, 10> variInstalled {};
     float timesTenThousand = 0;     // 0x893af53c: 10000, the block's +0x60 into the object's +0x1a8
     float rateTenths = 0;           // 0x893af7c8: 12000, a loop's rate factor (tenths of a cent) into exp2's octaves
+    // LITE's note-on's (v240): its own copies of those two, Vari off's (type 0) and the two heads' (type 2); 2^32, onto
+    // a word FLOAT read as negative; 88200, over the root's Hz, the heads' period; 0.5, the second window's start; the
+    // filter's rate per Hz of root × pitch
+    float liteTimes = 0;            // 0x893c7d78: 10000
+    float liteTenths = 0;           // 0x893c7f64: 12000
+    float liteHeadsTenths = 0;      // 0x893c81ec: 12000
+    float liteTwo32 = 0;            // 0x893c81e4
+    float litePeriod = 0;           // 0x893c81f0
+    float liteHalf = 0;             // 0x893c81f4
+    float liteFilter = 0;           // 0x893c81f8
 };
 
 [[nodiscard]] bool vc2LoadOsc(const char* path);

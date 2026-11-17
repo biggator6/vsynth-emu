@@ -335,6 +335,24 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's LITE note-on v240 (2026-11-17, on vc2-mode after v239's merge; the user's "Yes, both": the next OSC piece
+  here, the Side Band Filters as v241 in the COSM session; HARDWARE_FIRMWARE.md, "The VC-2's LITE note-on"): step
+  4.2's OSC voice, its fifth part. Vc2OscLite.cpp: LITE's own note-on 0x893c7c30 (the object's head, the targets'
+  tuned ratio, walk and formant targets, gain and level, its byte 0 from the block; by the wave's type Vari off's
+  words, the mode-1 player's range, or the two heads' words by rom.2's XtLitePlayer four bytes up; 0x893cbf40 on the
+  object and the type's seek), each type's way a row, kind 1's row Vc2OscNoteOn::lite, its seven pool words in
+  Vc2OscTables.cpp. What it shares with VariPhrase's note-on one code, Vc2OscPlayers.h (vc2OscPlayerHead,
+  Vc2OscVariOff with vc2OscVariOffOf, vc2OscSetVariOff and vc2OscVariOffStart, vc2OscLoopRate), VariPhrase's
+  rewritten onto it. xt_vc2osc: 0x893c7c30's hook out, 0x893cbf40's in; LITE's two heads on a real wave's root Hz
+  (a whole note-on's records by oscRealWave, the kinds' note-on event's Hz), at 0 Hz the walk's start being 0 × ∞,
+  whose FTRC xtf takes otherwise; LITE's first sample and frames small, a root of 44100 / 2^j Hz with frames its
+  multiple, a walk of 0, its seeks' words the first's; the players' flag drawn. rom.4's exp2 is exp2 only within ±7
+  octaves (its 2^n tables are seven words; past them it reads the next tables), so v232's far tunes never met the
+  note-on's test of the factor (withdrawn in place): the check reads from rom.4 the octaves whose word is 0 or a NaN
+  and draws tunes there. 0 different at seeds 2024, 7 and 31337 (the first run: the backward span taken the wrong
+  way, 28 cases); Vc2OscLite.cpp covered whole. mutate_vc2.py --osc: 705 plants (106 new, 23 rewritten where their
+  code moved, one dropped as equivalent: the two heads always take one value), all caught. Not in the sound yet.
+
 The VC-2's COSM converters on rom.4's libm v239 (2026-11-16, on its own branch, fast-forwarded to vc2-mode's 319a093;
   the VC-2 session's message, from the user's "v238 plus COSM"; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters on
   rom.4's libm"). Step 4.2's COSM part's fourth. The seven left all reach rom.4's powf (0x89506e54) or logf

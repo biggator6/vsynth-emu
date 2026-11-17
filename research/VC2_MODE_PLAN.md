@@ -375,9 +375,14 @@ version against rom.4's routines with what it calls hooked:
      note-on (`0x893af420`), the three in rom.4's OSC code beside the voice (split 2026-11-17 by what rom.4 holds),
      each kind's way a row's field, against rom.4's in xt_vc2osc with the players' renders, setups, lookup and seeks
      hooked (HARDWARE_FIRMWARE.md, "The VC-2's players' installs and VariPhrase's note-on").
-   - then LITE's and the analog's own note-ons (`0x893c7c30`, `0x893c22e0`), in the players' and the analog OSC's
-     code, with those ports on rom.4's object; then Vari off. Beside them, the shared math's logf (`0x895065f4`, its
-     core rom.2's `0x89531b78`) and powf (`0x89506e54`), which the wiring gives and nothing has ported yet.
+   - done (v240): LITE's own note-on (`0x893c7c30`), in the players' code: the object's head and the targets' words,
+     its byte 0 from the block, then by the wave's type Vari off's words, the mode-1 player's range or the two heads'
+     words (rom.2's XtLitePlayer's, four bytes up), `0x893cbf40` on the object and the type's seek, against rom.4's
+     in xt_vc2osc; what it shares with VariPhrase's note-on one code (`Vc2OscPlayers.h`), and the check's LITE
+     note-ons on a real wave's root Hz (HARDWARE_FIRMWARE.md, "The VC-2's LITE note-on").
+   - then the analog's own note-on (`0x893c22e0`), in the analog OSC's code, with that port on rom.4's object; then
+     Vari off. Beside them, the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf
+     (`0x89506e54`), which the wiring gives and nothing has ported yet.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
      update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its

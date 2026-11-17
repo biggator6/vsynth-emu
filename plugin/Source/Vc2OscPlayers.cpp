@@ -1,8 +1,10 @@
 // The OSC voice's players' installs and VariPhrase's note-on (v238): rom.4's OSC code beside the voice, LITE's install
-// 0x893af7a0, VariPhrase's 0x893af870 and VariPhrase's note-on 0x893af420, which the frame (v230) reached by address.
-// The players' own routines (their renders, setups, seeks, updates, the event lookup) stay rom.4's by address through
-// Vc2OscParts.  Every address is rom.4's; every offset the voice's.  HARDWARE_FIRMWARE.md, "The VC-2's players'
-// installs and VariPhrase's note-on".
+// 0x893af7a0, VariPhrase's 0x893af870 and VariPhrase's note-on 0x893af420, which the frame (v230) reached by address;
+// and what VariPhrase's note-on shares with LITE's (v240, Vc2OscPlayers.h; LITE's in Vc2OscLite.cpp).  The players' own
+// routines (their renders, setups, seeks, updates, the event lookup) stay rom.4's by address through Vc2OscParts.
+// Every address is rom.4's; every offset the voice's.  HARDWARE_FIRMWARE.md, "The VC-2's players' installs and
+// VariPhrase's note-on".
+#include "Vc2OscPlayers.h"
 #include "Vc2OscTables.h"
 #include "Vc2OscTargets.h"
 #include "XtFloat.h"
@@ -68,36 +70,18 @@ void setLoop(Vc2OscVoice& v, uint32_t at, uint32_t first, uint32_t second, uint3
 void byEvents(Vc2OscVoice& v, Vc2OscParts& parts) {
     const auto a = (uint32_t)(parts.eventPosition(v.u16(kFrom)) >> 4);
     const auto b = (uint32_t)((parts.eventPosition(v.u16(kTo)) >> 4) - 1);
-    v.setU32(kStart, a);
-    v.setU32(kEnd, b);
-    setLoop(v, kLoop, a, b, b - a);
-    setLoop(v, kBwd, b, a, b - a);
     const uint32_t mode = (v.u8(Vc2OscVoice::kObject) & kEventLoops) != 0 ? 1 : 0;
-    v.setU32(kFwdMode, mode);
-    v.setU32(kBwdMode, mode);
-    v.setF32(kRateFwd, 1.0f);
-    v.setF32(kRateBwd, 1.0f);
+    vc2OscSetVariOff(v, { .start = a, .end = b, .loopStart = a, .loopEnd = b, .bwdEnd = b, .bwdStart = a,
+                          .fwdMode = mode, .bwdMode = mode, .fwdRate = 1.0f, .bwdRate = 1.0f });
     if (v.u16(kSeekTo) != v.u16(kFrom)) parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)));
 }
 
-// [FW] 0x893af660…: the range in samples, the end's less 1; the loop record's loops, its modes by the object's 0x01,
-// its rate factors as exp2(rate / 12000), the backward's times the +0xe0 record's +0x2d0; a seek to the third word
-// when it isn't the first
+// [FW] 0x893af660…: the range in samples, the end's less 1, with the loop record's words; the backward's rate factor
+// times the +0xe0 record's +0x2d0; a seek to the third word when it isn't the first
 void bySamples(Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared) {
-    const Vc2OscTables& t = vc2OscTables();
-    const Vc2OscLoopRecord loop = parts.loopRecord(v.u32(kLoopAt));
-    v.setU32(kStart, v.u32(kFrom));
-    v.setU32(kEnd, v.u32(kTo) - 1);
-    const auto [start, end] = std::pair((uint32_t)loop.loopStart, (uint32_t)loop.loopEnd);
-    const auto [bwdEnd, bwdStart] = std::pair((uint32_t)loop.bwdEnd, (uint32_t)loop.bwdStart);
-    setLoop(v, kLoop, start, end, end - start);
-    setLoop(v, kBwd, bwdEnd, bwdStart, bwdEnd - bwdStart);
-    const bool modes = (v.u8(Vc2OscVoice::kObject) & kLoopModes) != 0;
-    v.setU32(kFwdMode, modes ? (uint32_t)loop.fwdMode : 0);
-    v.setU32(kBwdMode, modes ? (uint32_t)loop.bwdMode : 0);
-    v.setF32(kRateFwd, shared.exp2(div(xtf::flt(loop.rateFwd), t.rateTenths)));
-    const float bwd = shared.exp2(div(xtf::flt(loop.rateBwd), t.rateTenths));
-    v.setF32(kRateBwd, mul(bwd, parts.boundFloat(v.u32(kPairAt), kPairWord)));
+    Vc2OscVariOff w = vc2OscVariOffOf(v, parts, shared, vc2OscTables().rateTenths, { v.u32(kFrom), v.u32(kTo) - 1 });
+    w.bwdRate = mul(w.bwdRate, parts.boundFloat(v.u32(kPairAt), kPairWord));
+    vc2OscSetVariOff(v, w);
     if (v.u32(kSeekTo) != v.u32(kFrom)) parts.seek(kSeek, (int32_t)v.u32(kSeekTo));
 }
 } // namespace
@@ -139,11 +123,7 @@ void Vc2OscVoice::noteOnVari(Vc2OscParts& parts, const Vc2ToneShared& shared) {
         setU16(kCopy16, u16(kFrom));
         setU16(kCopy16 + 2, u16(kTo));
     }
-    setU32(kSelf, parts.address() + kSelfAt);
-    float times = mul(f32(kTimesFrom), vc2OscTables().timesTenThousand);
-    if (!(kTwo31 > times)) times = sub(times, add(kTwo31, kTwo31));
-    setU32(kTimes, (uint32_t)xtf::ftrc(times));
-    setU32(kHeaderWord, parts.waveHeader(u32(kHeaderAt)).word1c);
+    vc2OscPlayerHead(*this, parts, vc2OscTables().timesTenThousand);
     setF32(kPitch, Vc2OscTargets(*this, parts, shared).tunedRatio());
     setF32(kFormant, Vc2OscTargets(*this, parts, shared).formant());
     setU32(kLevel, u32(kLevelFrom));
@@ -155,9 +135,48 @@ void Vc2OscVoice::noteOnVari(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     if (type >= kVariOffTypes.size() || !kVariOffTypes[type] || (u8(kFlagsByte) & kVariOff) == 0) return;
     if (inSamples) bySamples(*this, parts, shared);
     else byEvents(*this, parts);
-    setU32(kOffset, u32(kStartOffset));
-    setF32(kZeroAt, 0.0f);
-    setF32(kOne, 1.0f);
-    setU32(kPosition, 0.0f > f32(kWalk) ? u32(kEnd) : u32(kStart));
-    setU32(kPositionCopy, u32(kPosition));
+    vc2OscVariOffStart(*this);
+}
+
+void vc2OscPlayerHead(Vc2OscVoice& v, Vc2OscParts& parts, float tenThousand) {
+    v.setU32(kSelf, parts.address() + kSelfAt);
+    float times = mul(v.f32(kTimesFrom), tenThousand);
+    if (!(kTwo31 > times)) times = sub(times, add(kTwo31, kTwo31));
+    v.setU32(kTimes, (uint32_t)xtf::ftrc(times));
+    v.setU32(kHeaderWord, parts.waveHeader(v.u32(kHeaderAt)).word1c);
+}
+
+float vc2OscLoopRate(int16_t rate, const Vc2ToneShared& shared, float tenths) {
+    return shared.exp2(div(xtf::flt(rate), tenths));
+}
+
+Vc2OscVariOff vc2OscVariOffOf(const Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared, float tenths,
+                              Vc2OscFrames range) {
+    const Vc2OscLoopRecord loop = parts.loopRecord(v.u32(kLoopAt));
+    const bool modes = (v.u8(Vc2OscVoice::kObject) & kLoopModes) != 0;
+    return { .start = range.first, .end = range.last, .loopStart = (uint32_t)loop.loopStart,
+             .loopEnd = (uint32_t)loop.loopEnd, .bwdEnd = (uint32_t)loop.bwdEnd, .bwdStart = (uint32_t)loop.bwdStart,
+             .fwdMode = modes ? (uint32_t)loop.fwdMode : 0, .bwdMode = modes ? (uint32_t)loop.bwdMode : 0,
+             .fwdRate = vc2OscLoopRate(loop.rateFwd, shared, tenths),
+             .bwdRate = vc2OscLoopRate(loop.rateBwd, shared, tenths) };
+}
+
+void vc2OscSetVariOff(Vc2OscVoice& v, const Vc2OscVariOff& w) {
+    v.setU32(kStart, w.start);
+    v.setU32(kEnd, w.end);
+    setLoop(v, kLoop, w.loopStart, w.loopEnd, w.loopEnd - w.loopStart);
+    setLoop(v, kBwd, w.bwdEnd, w.bwdStart, w.bwdEnd - w.bwdStart);
+    v.setU32(kFwdMode, w.fwdMode);
+    v.setU32(kBwdMode, w.bwdMode);
+    v.setF32(kRateFwd, w.fwdRate);
+    v.setF32(kRateBwd, w.bwdRate);
+}
+
+uint32_t vc2OscVariOffStart(Vc2OscVoice& v) {
+    v.setU32(kOffset, v.u32(kStartOffset));
+    v.setF32(kZeroAt, 0.0f);
+    v.setF32(kOne, 1.0f);
+    v.setU32(kPosition, 0.0f > v.f32(kWalk) ? v.u32(kEnd) : v.u32(kStart));
+    v.setU32(kPositionCopy, v.u32(kPosition));
+    return v.u32(kPosition);
 }

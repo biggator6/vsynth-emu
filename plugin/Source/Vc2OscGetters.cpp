@@ -110,11 +110,54 @@ void oscSteerPlayers(OscSides& s, std::mt19937& rng, int v) {
     o.setU32(kKind, 1 + rng() % 2);
     o.setU32(kWave, rng() % 10);
     if (rng() % 4) o.setU8(kFlagsByte, (uint8_t)(o.u8(kFlagsByte) | kVariOff));
+    o.tail.flag = rng() % 2;   // v240: the installs' stereo rows, which only a note-on's header gave before
     oscWriteVoice(s, v);
 }
 
+namespace {
+constexpr uint32_t kLiteFirst = 0x14c, kLiteFrames = 0x150;   // [FW] the block's first sample and frames (LITE's)
+
+// v240: LITE's two heads (type 2) divide by the root's Hz (the tail's +0xa80), which an earlier note-on left: one at
+// 0, past the floats or a NaN is drawn again as a real wave's, as Vc2OscEvents.cpp's steerTwoHeads gives a whole
+// note-on (at 0 Hz the walk's start is 0 × ∞, whose FTRC xtf takes otherwise). One time in two a root of 44100 / 2^j
+// Hz, a half period of 2^j samples exactly, with frames a multiple of it, so the walk's start from the last sample is
+// one under a half period's boundary; one time in four the walk's three words (+0x64, +0x78, +0x98) 0, a walk of 0
+void steerHeadsRoot(Vc2OscVoice& o, std::mt19937& rng) {
+    constexpr uint32_t kWalkWords[] = { 0x64, 0x78, 0x98 };   // [FW] the walk target's (0x893afc30)
+    constexpr float kLeast = 1e-30f, kMost = 1e30f, kLow = 8.0f, kSpan = 14000.0f, kRate = 44100.0f;
+    constexpr uint32_t kHalves = 4096, kShifts = 4;
+    if (!(o.tail.hz > kLeast && o.tail.hz < kMost)) o.tail.hz = kLow + kSpan * vc2Unit(rng);
+    if (rng() % 2) {
+        const uint32_t j = 1 + (uint32_t)rng() % kShifts;
+        o.tail.hz = kRate / (float)(1u << j);
+        o.setU32(kLiteFrames, (1 + (uint32_t)rng() % kHalves) << j);
+    }
+    if (rng() % 4 == 0) {
+        for (uint32_t at : kWalkWords) o.setF32(at, 0.0f);
+    }
+}
+
+// v240: LITE's note-on (kind 1) on the voice's words: one time in two the first sample and the frames (+0x14c,
+// +0x150) a wave's, below 2^17, where a sample more or less shows as a float, and the first 0 (type 1's range in
+// events); each seek's word (+0x154, +0x158) the first's (+0x14c, +0x150), so no seek; one time in three its two
+// heads (the wave's type 2), steered as above
+void steerLite(OscSides& s, std::mt19937& rng, int v) {
+    constexpr uint32_t kSeekTo = 0x154, kSeekToOne = 0x158, kWaveFrames = 1u << 17;   // [FW]
+    Vc2OscVoice& o = s.voices[(size_t)v];
+    if (o.kind() != 1) return;
+    if (rng() % 2) o.setU32(kLiteFrames, (uint32_t)rng() % kWaveFrames);
+    if (rng() % 2) o.setU32(kLiteFirst, rng() % 2 ? 0 : (uint32_t)rng() % kWaveFrames);
+    if (rng() % 2) o.setU32(kSeekTo, o.u32(kLiteFirst));
+    if (rng() % 2) o.setU32(kSeekToOne, o.u32(kLiteFrames));
+    if (rng() % 3 == 0) o.setU32(Vc2OscVoice::kWave, 2);
+    if (o.u32(Vc2OscVoice::kWave) == 2) steerHeadsRoot(o, rng);
+    oscWriteVoice(s, v);
+}
+} // namespace
+
 std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int v) {
     if (rng() % 2) oscSteerPlayers(s, rng, v);
+    steerLite(s, rng, v);
     ++s.n.noteOns;
     return oscBothSides(s, kKindNoteOn, { oscVoiceAt(v), (uint32_t)rng() }, OscAnswer::none, [&] {
         s.voices[(size_t)v].kindNoteOn(s.parts[(size_t)v], s.romShared);

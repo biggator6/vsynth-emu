@@ -78,8 +78,19 @@ std::array<uint32_t, kOscBlockWords> drawNoteBlock(std::mt19937& rng) {
     return b;
 }
 
+// v240: LITE's two heads (kind 1, the wave's type 2) take their period from the root's Hz, so their note-on reads a
+// real wave's records: at 0 Hz the walk's start is 0 × ∞, a NaN, whose FTRC xtf takes otherwise than the interpreter
+void steerTwoHeads(OscSides& s, std::mt19937& rng, std::array<uint32_t, kOscBlockWords>& b) {
+    if (b[kKindWord] != 1 || b[kWaveWord] != 2) return;
+    oscRealWave(s.shared.records, 0, rng);
+    oscWriteRecords(s.fw, s.shared.records);
+    b[kHeaderWord] = oscHeaderAt(0);
+    b[kLoopWord] = oscLoopAt(0);
+}
+
 std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
-    const std::array<uint32_t, kOscBlockWords> block = drawNoteBlock(rng);
+    std::array<uint32_t, kOscBlockWords> block = drawNoteBlock(rng);
+    steerTwoHeads(s, rng, block);
     const uint32_t legato = rng() % 3 == 0 ? (uint32_t)rng() : rng() % 2;
     s.fw.cpu.write(kOscBlockAt, block.data(), sizeof block);
     ++s.n.noteOns;

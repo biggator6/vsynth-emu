@@ -200,6 +200,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscNoteOn.cpp
     Source/Vc2OscTargets.cpp
     Source/Vc2OscPlayers.cpp
+    Source/Vc2OscLite.cpp
     Source/Vc2PitchRamp.cpp
     Source/Vc2PitchRampTick.cpp
     Source/Vc2RampTables.cpp

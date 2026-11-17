@@ -566,7 +566,9 @@ than run beside rom.2's. rom.4 still names OSC 1 and 2 Tempo Sync Sw, Time Trip 
 reach a Vari-off wave in the VC-2 is open.
 
 LITE's note-on and update (`0x8950b5b0` → `0x893c7c30`, `0x8950bbb0` → `0x893c8280`) read the voice by other offsets (the
-voice's layout, as the analog install's +0x960 → +0xa40): wiring, ported from rom.4.
+voice's layout, as the analog install's +0x960 → +0xa40): wiring, ported from rom.4. (The note-on from v240: in rom.4 a
+routine of its own, not a stretch of the voice's; its two heads' words are rom.2's player's four bytes up, and its Vari
+off words VariPhrase's; HARDWARE_FIRMWARE.md, "The VC-2's LITE note-on".)
 
 **Key assign** (`XtKeys.h`). The reset, note-on and note-off ran equal in the OSC run (120,000 events, "The OSC block in
 rom.4"), and the highest held key (`0x894d66b0` → `0x89392670`, by shape) ran within them: both images' note-offs call it.

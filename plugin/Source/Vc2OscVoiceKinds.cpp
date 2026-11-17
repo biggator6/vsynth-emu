@@ -12,12 +12,12 @@ using Install = Vc2OscInstall;
 constexpr uint8_t kR0 = kVc2OscRamp0, kR1 = kVc2OscRamp1, kR2 = kVc2OscRamp2;
 
 // [FW] kinds 0…7, then a kind past 7.  Kinds 1 and 2's installs (0x893af7a0, 0x893af870) and kind 2's note-on
-// (0x893af420) are ported from v238 (Vc2OscPlayers.cpp)
+// (0x893af420) are ported from v238 (Vc2OscPlayers.cpp), kind 1's note-on (0x893c7c30) from v240 (Vc2OscLite.cpp)
 constexpr std::array<Vc2OscKindRow, kVc2OscKinds + 1> kRows { {
     { .clearsFlag = true, .renders = Render::zero, .noteOn = NoteOn::one },
     { .installs = Install::lite, .waits = true, .ticks = kR0 | kR2, .update = 0x893c8280,
       .records = Records::fromBlock, .ramp = true, .settings = 0x893c8390, .pitch = Pitch::tuned,
-      .noteOn = NoteOn::routine, .noteOnRoutine = 0x893c7c30 },
+      .noteOn = NoteOn::lite },
     { .installs = Install::vari, .waits = true, .ticks = kR0 | kR1 | kR2, .update = 0x893c88b0,
       .records = Records::fromBlock, .settings = 0x893b0280, .pitch = Pitch::tuned, .noteOn = NoteOn::vari },
     { .installs = Install::routine, .install = 0x893c2ad0, .ticks = kR0, .update = 0x893c2ce0, .ramp = true,

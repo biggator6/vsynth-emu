@@ -46,6 +46,8 @@ struct OscRecords {
     std::array<Vc2OscWaveHeader, kOscRecords> headers {};
     std::array<Vc2OscLoopRecord, kOscRecords> loops {};
     std::map<uint32_t, float> bound {};
+    // v240: the octaves n past exp2's table whose word rom.4 reads there is 0 or a NaN (Vc2OscRecords.cpp's drawTune)
+    std::vector<int32_t> zeroTunes {};
 };
 uint32_t oscVoiceAt(int voice);
 // The records' addresses and draws (Vc2OscRecords.cpp, v238; v230's, moved): the headers, loop records, envelopes,
@@ -56,6 +58,11 @@ uint32_t oscEnvelopeAt(int k);
 uint32_t oscLfoAt(int k);
 uint32_t oscPairAt(int k);
 void oscDrawRecords(OscRecords& r, std::mt19937& rng);
+// Its zeroTunes, read from rom.4's memory once at the start
+void oscFindZeroTunes(Vc2Fw& fw, OscRecords& r);
+// v240: header and loop record `k` drawn again as a real wave's: a rate the converter gives, its cents and the tune
+// within an octave, so the note-on's root Hz is finite and above 0
+void oscRealWave(OscRecords& r, int k, std::mt19937& rng);
 
 // What the hooked routines answer, drawn once for both sides; the vibrato's two outputs, read in place; the flags byte
 // a seek leaves in the object (a player may write it); the event lookup's positions, each side taking the next (v238).

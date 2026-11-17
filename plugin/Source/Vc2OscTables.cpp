@@ -4,7 +4,8 @@
 #include "Vc2RomTables.h"
 
 namespace {
-// [FW] the update's, the note-on's, the settings', the pitch getter's and the install's; then the targets'
+// [FW] the update's, the note-on's, the settings', the pitch getter's and the install's; then the targets'; then
+// VariPhrase's note-on's (v238) and LITE's (v240)
 auto oscWords(Vc2OscTables& t) {
     return std::to_array<Vc2PoolWord>({
         { 0x893ae3d0, &t.waitLevel }, { 0x893ae3f4, &t.depthScale }, { 0x893ae48c, &t.plainHz },
@@ -19,7 +20,9 @@ auto oscWords(Vc2OscTables& t) {
         { 0x893af36c, &t.noteOn.ratio.most }, { 0x893af370, &t.noteOn.ratio.least }, { 0x893af530, &t.kind6Least },
         { 0x893afddc, &t.walkTarget.most }, { 0x893afde0, &t.walkTarget.least }, { 0x893affd4, &t.walk.most },
         { 0x893affd8, &t.walk.least }, { 0x893afde4, &t.formantTargetLeast }, { 0x893affe0, &t.formantLeast },
-        { 0x893af53c, &t.timesTenThousand }, { 0x893af7c8, &t.rateTenths },
+        { 0x893af53c, &t.timesTenThousand }, { 0x893af7c8, &t.rateTenths }, { 0x893c7d78, &t.liteTimes },
+        { 0x893c7f64, &t.liteTenths }, { 0x893c81ec, &t.liteHeadsTenths }, { 0x893c81e4, &t.liteTwo32 },
+        { 0x893c81f0, &t.litePeriod }, { 0x893c81f4, &t.liteHalf }, { 0x893c81f8, &t.liteFilter },
     });
 }
 // [FW] the players' installs' tables (v238)

@@ -4,7 +4,8 @@
 # constants' addresses), vc2oscnoteon (Vc2OscNoteOn.cpp: the note-on by kind, v232) and vc2osctargets (Vc2OscTargets.cpp:
 # the targets and the pitch's sum, v232), vc2ramp, vc2ramptick and vc2ramptables (Vc2PitchRamp.cpp, its tick's file and
 # Vc2RampTables.cpp: the pitch ramp, v236; v236 rewrote v230's ramp plants on the voice's own ramps) and
-# vc2oscplayers (Vc2OscPlayers.cpp: LITE's and VariPhrase's installs and VariPhrase's note-on, v238).  v232 renamed v230's plants where it renamed their code (the wave header's
+# vc2oscplayers (Vc2OscPlayers.cpp: LITE's and VariPhrase's installs and VariPhrase's note-on, v238; what VariPhrase's
+# note-on shares with LITE's, v240) and vc2osclite (Vc2OscLite.cpp: LITE's note-on, v240).  v232 renamed v230's plants where it renamed their code (the wave header's
 # and the loop record's fields by rom.2's names and rom.4's use: the offset, the detune, the walk's and the formant's
 # factors) and moved the pitch getter's to the targets, where its sum now is.  Not planted: the note-on's records at
 # address 0 (a kind past 7: rom.4 reads from address 2 there, which the check never draws), the beyond row's records
@@ -277,8 +278,8 @@ tables-walk-least|{ 0x893affd8, &t.walk.least }|{ 0x893affd4, &t.walk.least }|vc
 tables-formant-target|{ 0x893afde4, &t.formantTargetLeast }|{ 0x893afddc, &t.formantTargetLeast }|vc2osctables
 tables-formant|{ 0x893affe0, &t.formantLeast }|{ 0x893affd4, &t.formantLeast }|vc2osctables
 k0-noteon|{ .clearsFlag = true, .renders = Render::zero, .noteOn = NoteOn::one },|{ .clearsFlag = true, .renders = Render::zero },|vc2osckinds
-k1-noteon|.pitch = Pitch::tuned,\n      .noteOn = NoteOn::routine, .noteOnRoutine = 0x893c7c30|.pitch = Pitch::tuned,\n      .noteOn = NoteOn::none, .noteOnRoutine = 0x893c7c30|vc2osckinds
-k1-noteon-routine|.noteOnRoutine = 0x893c7c30|.noteOnRoutine = 0x893af420|vc2osckinds
+k1-noteon|.noteOn = NoteOn::lite },|.noteOn = NoteOn::none },|vc2osckinds
+k1-noteon-vari|.noteOn = NoteOn::lite },|.noteOn = NoteOn::vari },|vc2osckinds
 k2-noteon|.pitch = Pitch::tuned, .noteOn = NoteOn::vari }|.pitch = Pitch::tuned, .noteOn = NoteOn::routine }|vc2osckinds
 k3-noteon-routine|.noteOnRoutine = 0x893c22e0|.noteOnRoutine = 0x893af420|vc2osckinds
 k4-noteon|      .noteOn = NoteOn::extIn },\n    { .installed = 5|      .noteOn = NoteOn::carrier },\n    { .installed = 5|vc2osckinds
@@ -559,7 +560,7 @@ self-at|kSelfAt = 0x108,|kSelfAt = 0x104,|vc2oscplayers
 self-word|kSelf = 0x1a0,|kSelf = 0x19c,|vc2oscplayers
 times-from|kTimesFrom = 0xb4;|kTimesFrom = 0xb0;|vc2oscplayers
 times-split|    if (!(kTwo31 > times)) times = sub(times, add(kTwo31, kTwo31));\n||vc2oscplayers
-times-scale|mul(f32(kTimesFrom), vc2OscTables().timesTenThousand)|f32(kTimesFrom)|vc2oscplayers
+times-scale|mul(v.f32(kTimesFrom), tenThousand)|v.f32(kTimesFrom)|vc2oscplayers
 players-header-word|kHeaderWord = 0x1a4,|kHeaderWord = 0x1ac,|vc2oscplayers
 header-at|kHeaderAt = 0x128,|kHeaderAt = 0x12c,|vc2oscplayers
 pitch-target|setF32(kPitch, Vc2OscTargets(*this, parts, shared).tunedRatio());|setF32(kPitch, Vc2OscTargets(*this, parts, shared).ratio());|vc2oscplayers
@@ -574,12 +575,12 @@ after-update-routine|kAfterUpdate = 0x893c8670,|kAfterUpdate = 0x893c88b0,|vc2os
 type-minus|const uint32_t type = u32(kWave) - 1;|const uint32_t type = u32(kWave);|vc2oscplayers
 varioff-ignored| \|\| (u8(kFlagsByte) & kVariOff) == 0) return;|) return;|vc2oscplayers
 by-samples-swap|if (inSamples) bySamples(*this, parts, shared);|if (!inSamples) bySamples(*this, parts, shared);|vc2oscplayers
-offset|setU32(kOffset, u32(kStartOffset));|setU32(kOffset, u32(kStartOffset + 4));|vc2oscplayers
-zero-at|    setF32(kZeroAt, 0.0f);\n||vc2oscplayers
-one|    setF32(kOne, 1.0f);\n||vc2oscplayers
-position-sign|0.0f > f32(kWalk) ? u32(kEnd) : u32(kStart)|0.0f > f32(kWalk) ? u32(kStart) : u32(kEnd)|vc2oscplayers
-position-ge|0.0f > f32(kWalk)|0.0f >= f32(kWalk)|vc2oscplayers
-position-copy|setU32(kPositionCopy, u32(kPosition));|setU32(kPositionCopy, u32(kStart));|vc2oscplayers
+offset|v.setU32(kOffset, v.u32(kStartOffset));|v.setU32(kOffset, v.u32(kStartOffset + 4));|vc2oscplayers
+zero-at|    v.setF32(kZeroAt, 0.0f);\n||vc2oscplayers
+one|    v.setF32(kOne, 1.0f);\n||vc2oscplayers
+position-sign|0.0f > v.f32(kWalk) ? v.u32(kEnd) : v.u32(kStart)|0.0f > v.f32(kWalk) ? v.u32(kStart) : v.u32(kEnd)|vc2oscplayers
+position-ge|0.0f > v.f32(kWalk)|0.0f >= v.f32(kWalk)|vc2oscplayers
+position-copy|v.setU32(kPositionCopy, v.u32(kPosition));|v.setU32(kPositionCopy, v.u32(kStart));|vc2oscplayers
 seek-routine|kSeek = 0x893c6360;|kSeek = 0x893cc630;|vc2oscplayers
 pair-word|kPairWord = 0x2d0,|kPairWord = 0x2cc,|vc2oscplayers
 loop-at|kLoopAt = 0x130,|kLoopAt = 0x134,|vc2oscplayers
@@ -595,29 +596,139 @@ loop-span|    v.setU32(at + 8, span);\n||vc2oscplayers
 ev-shift|parts.eventPosition(v.u16(kFrom)) >> 4|parts.eventPosition(v.u16(kFrom)) >> 3|vc2oscplayers
 ev-end-minus|(parts.eventPosition(v.u16(kTo)) >> 4) - 1|(parts.eventPosition(v.u16(kTo)) >> 4)|vc2oscplayers
 ev-end-from|parts.eventPosition(v.u16(kTo))|parts.eventPosition(v.u16(kFrom))|vc2oscplayers
-ev-start-end|    v.setU32(kStart, a);\n    v.setU32(kEnd, b);|    v.setU32(kStart, b);\n    v.setU32(kEnd, a);|vc2oscplayers
-ev-fwd-loop|setLoop(v, kLoop, a, b, b - a);|setLoop(v, kLoop, b, a, b - a);|vc2oscplayers
-ev-bwd-loop|setLoop(v, kBwd, b, a, b - a);|setLoop(v, kBwd, a, b, b - a);|vc2oscplayers
-ev-span|setLoop(v, kBwd, b, a, b - a);|setLoop(v, kBwd, b, a, a - b);|vc2oscplayers
+ev-start-end|.start = a, .end = b,|.start = b, .end = a,|vc2oscplayers
+ev-fwd-loop|.loopStart = a, .loopEnd = b,|.loopStart = b, .loopEnd = a,|vc2oscplayers
+ev-bwd-loop|.bwdEnd = b, .bwdStart = a,|.bwdEnd = a, .bwdStart = b,|vc2oscplayers
+fwd-span|w.loopEnd - w.loopStart);|w.loopStart - w.loopEnd);|vc2oscplayers
 ev-mode|const uint32_t mode = (v.u8(Vc2OscVoice::kObject) & kEventLoops) != 0 ? 1 : 0;|const uint32_t mode = 0;|vc2oscplayers
-ev-mode-bwd|    v.setU32(kBwdMode, mode);\n    v.setF32(kRateFwd, 1.0f);|    v.setF32(kRateFwd, 1.0f);|vc2oscplayers
-ev-rates|    v.setF32(kRateFwd, 1.0f);\n    v.setF32(kRateBwd, 1.0f);|    v.setF32(kRateFwd, 1.0f);|vc2oscplayers
+ev-mode-bwd|.bwdMode = mode, .fwdRate|.bwdMode = 0, .fwdRate|vc2oscplayers
+ev-rates|.fwdRate = 1.0f, .bwdRate = 1.0f|.fwdRate = 1.0f, .bwdRate = 0.0f|vc2oscplayers
 ev-seek-test|if (v.u16(kSeekTo) != v.u16(kFrom)) parts.seek|if (v.u16(kSeekTo) != v.u16(kTo)) parts.seek|vc2oscplayers
 ev-seek-pos|parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)));|parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)) >> 4);|vc2oscplayers
 ev-seek-always|    if (v.u16(kSeekTo) != v.u16(kFrom)) parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)));|    parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)));|vc2oscplayers
-sm-start|v.setU32(kStart, v.u32(kFrom));|v.setU32(kStart, v.u32(kFrom) - 1);|vc2oscplayers
-sm-end|v.setU32(kEnd, v.u32(kTo) - 1);|v.setU32(kEnd, v.u32(kTo));|vc2oscplayers
-sm-fwd|setLoop(v, kLoop, start, end, end - start);|setLoop(v, kLoop, end, start, end - start);|vc2oscplayers
-sm-bwd|setLoop(v, kBwd, bwdEnd, bwdStart, bwdEnd - bwdStart);|setLoop(v, kBwd, bwdStart, bwdEnd, bwdEnd - bwdStart);|vc2oscplayers
-sm-bwd-span|bwdEnd - bwdStart);|bwdStart - bwdEnd);|vc2oscplayers
+sm-start|{ v.u32(kFrom), v.u32(kTo) - 1 }|{ v.u32(kFrom) - 1, v.u32(kTo) - 1 }|vc2oscplayers
+sm-end|{ v.u32(kFrom), v.u32(kTo) - 1 }|{ v.u32(kFrom), v.u32(kTo) }|vc2oscplayers
+sm-fwd|setLoop(v, kLoop, w.loopStart, w.loopEnd,|setLoop(v, kLoop, w.loopEnd, w.loopStart,|vc2oscplayers
+sm-bwd|setLoop(v, kBwd, w.bwdEnd, w.bwdStart,|setLoop(v, kBwd, w.bwdStart, w.bwdEnd,|vc2oscplayers
+sm-bwd-span|w.bwdEnd - w.bwdStart);|w.bwdStart - w.bwdEnd);|vc2oscplayers
 sm-modes|const bool modes = (v.u8(Vc2OscVoice::kObject) & kLoopModes) != 0;|const bool modes = true;|vc2oscplayers
 sm-mode-bwd|modes ? (uint32_t)loop.bwdMode : 0|modes ? (uint32_t)loop.fwdMode : 0|vc2oscplayers
-sm-rate-scale|div(xtf::flt(loop.rateFwd), t.rateTenths)|div(xtf::flt(loop.rateFwd), t.timesTenThousand)|vc2oscplayers
-sm-rate-bwd|div(xtf::flt(loop.rateBwd), t.rateTenths)|div(xtf::flt(loop.rateFwd), t.rateTenths)|vc2oscplayers
-sm-pair|mul(bwd, parts.boundFloat(v.u32(kPairAt), kPairWord))|bwd|vc2oscplayers
+sm-rate-scale|vc2OscTables().rateTenths, { v.u32(kFrom)|vc2OscTables().timesTenThousand, { v.u32(kFrom)|vc2oscplayers
+sm-rate-bwd|.bwdRate = vc2OscLoopRate(loop.rateBwd,|.bwdRate = vc2OscLoopRate(loop.rateFwd,|vc2oscplayers
+sm-pair|    w.bwdRate = mul(w.bwdRate, parts.boundFloat(v.u32(kPairAt), kPairWord));\n||vc2oscplayers
 sm-seek-test|if (v.u32(kSeekTo) != v.u32(kFrom)) parts.seek|if (v.u32(kSeekTo) != v.u32(kTo)) parts.seek|vc2oscplayers
 sm-seek-always|    if (v.u32(kSeekTo) != v.u32(kFrom)) parts.seek(kSeek, (int32_t)v.u32(kSeekTo));|    parts.seek(kSeek, (int32_t)v.u32(kSeekTo));|vc2oscplayers
 tables-lite|kLiteInstalled { 0x89542350, 6 }|kLiteInstalled { 0x89542354, 6 }|vc2osctables
 tables-vari|kVariInstalled { 0x89542368, 10 }|kVariInstalled { 0x8954236c, 10 }|vc2osctables
 tables-times|{ 0x893af53c, &t.timesTenThousand }|{ 0x893af7c8, &t.timesTenThousand }|vc2osctables
 tables-rate-tenths|{ 0x893af7c8, &t.rateTenths }|{ 0x893af53c, &t.rateTenths }|vc2osctables
+# v240: what VariPhrase's note-on shares with LITE's (Vc2OscPlayers.cpp's shared functions; v238's plants above that
+# their code moved into were rewritten there, each the same error)
+loop-rate-div|shared.exp2(div(xtf::flt(rate), tenths))|shared.exp2(mul(xtf::flt(rate), tenths))|vc2oscplayers
+set-rate-fwd|v.setF32(kRateFwd, w.fwdRate);|v.setF32(kRateFwd, w.bwdRate);|vc2oscplayers
+set-mode-bwd|v.setU32(kBwdMode, w.bwdMode);|v.setU32(kBwdMode, w.fwdMode);|vc2oscplayers
+set-end|v.setU32(kEnd, w.end);|v.setU32(kEnd, w.start);|vc2oscplayers
+of-mode-fwd|.fwdMode = modes ? (uint32_t)loop.fwdMode : 0|.fwdMode = 0|vc2oscplayers
+of-loop-end|.loopEnd = (uint32_t)loop.loopEnd|.loopEnd = (uint32_t)loop.loopStart|vc2oscplayers
+of-bwd-start|.bwdStart = (uint32_t)loop.bwdStart|.bwdStart = (uint32_t)loop.bwdEnd|vc2oscplayers
+# v240: LITE's note-on (vc2osclite, Vc2OscLite.cpp), its pool words (vc2osctables) and its case (vc2oscnoteon).  Not
+# planted: the two heads' offsets swapped (the note-on gives both the same value, so the swap writes what it did)
+lite-head-gone|    vc2OscPlayerHead(*this, parts, vc2OscTables().liteTimes);\n||vc2osclite
+lite-pitch|setF32(kPitch, targets.tunedRatio());|setF32(kPitch, targets.ratio());|vc2osclite
+lite-walk|setF32(kWalk, targets.walkTarget());|setF32(kWalk, targets.walk());|vc2osclite
+lite-formant|setF32(kFormant, targets.formantTarget());|setF32(kFormant, targets.formant());|vc2osclite
+lite-half-word|    setU16(kHalf, 0);\n||vc2osclite
+lite-pair-copy|setU32(kPairCopy, u32(kPairAt));|setU32(kPairCopy, u32(kLoopAt));|vc2osclite
+lite-gain|setF32(kGain, targets.gain());|setF32(kGain, targets.level());|vc2osclite
+lite-level-out|setF32(kLevelOut, targets.level());|setF32(kLevelOut, targets.gain());|vc2osclite
+lite-cleared|u8(kObject) & (uint8_t)~kCleared|u8(kObject)|vc2osclite
+lite-flag-bit|kFlagBit, tail.flag)|kFlagBit, 0)|vc2osclite
+lite-bits-loop|    for (const auto& [bit, from] : kBits) b = withBit(b, bit, u32(from));\n||vc2osclite
+lite-bit-04|{ 0x04, 0x140 }|{ 0x04, 0x13c }|vc2osclite
+lite-bit-01|{ 0x01, 0x138 }|{ 0x01, 0x13c }|vc2osclite
+lite-bit-02|{ 0x02, 0x13c }|{ 0x02, 0x140 }|vc2osclite
+lite-withbit-clear|b & (uint8_t)~bit|b|vc2osclite
+lite-type-words|type < kWays.size()) kWays[type].words(*this, parts, shared);|type < 2) kWays[type].words(*this, parts, shared);|vc2osclite
+lite-reset|    parts.objectCall(kReset);\n||vc2osclite
+lite-reset-at|kReset = 0x893cbf40|kReset = 0x893cc760|vc2osclite
+lite-seek-test|if (u32(way.to) != u32(way.from)) parts.seek|if (u32(way.to) == u32(way.from)) parts.seek|vc2osclite
+lite-seek-shift|(int32_t)(u32(way.to) << 4)|(int32_t)u32(way.to)|vc2osclite
+lite-way0-seek|{ variOff, 0x893c6360, 0x154, 0x14c }|{ variOff, 0x893c6de0, 0x154, 0x14c }|vc2osclite
+lite-way0-to|{ variOff, 0x893c6360, 0x154, 0x14c }|{ variOff, 0x893c6360, 0x158, 0x14c }|vc2osclite
+lite-way1-seek|{ modeOne, 0x893cc830, 0x158, 0x150 }|{ modeOne, 0x893c6360, 0x158, 0x150 }|vc2osclite
+lite-way1-from|{ modeOne, 0x893cc830, 0x158, 0x150 }|{ modeOne, 0x893cc830, 0x158, 0x14c }|vc2osclite
+lite-way2-seek|{ twoHeads, 0x893c6de0, 0x154, 0x14c }|{ twoHeads, 0x893c6360, 0x154, 0x14c }|vc2osclite
+lite-way2-from|{ twoHeads, 0x893c6de0, 0x154, 0x14c }|{ twoHeads, 0x893c6de0, 0x154, 0x150 }|vc2osclite
+lite-ways-swap|{ { variOff,|{ { twoHeads,|vc2osclite
+lite-vo-first|{ v.u32(kFirst), v.u32(kFrames) - 1 }|{ v.u32(kFrames), v.u32(kFrames) - 1 }|vc2osclite
+lite-vo-last|{ v.u32(kFirst), v.u32(kFrames) - 1 }|{ v.u32(kFirst), v.u32(kFrames) }|vc2osclite
+lite-vo-tenths|vc2OscTables().liteTenths, frames|vc2OscTables().liteTimes, frames|vc2osclite
+lite-vo-bwdmode|    w.bwdMode = v.u8(kBwdModeByte);\n||vc2osclite
+lite-vo-bwdmode-at|kBwdModeByte = 0x148|kBwdModeByte = 0x149|vc2osclite
+lite-vo-pos16|vc2OscVariOffStart(v) << 4|vc2OscVariOffStart(v) << 3|vc2osclite
+lite-vo-start|    v.setU32(kPosition16, vc2OscVariOffStart(v) << 4);\n||vc2osclite
+lite-vo-set|    vc2OscSetVariOff(v, w);\n    v.setU32(kPosition16|    v.setU32(kPosition16|vc2osclite
+lite-one-byte2|    v.setU8(kByte2, 0);\n||vc2osclite
+lite-byte2-at|kByte2 = 0x15e|kByte2 = 0x15f|vc2osclite
+lite-one-samples|const bool inSamples = v.u32(kInSamples) != 0;|const bool inSamples = true;|vc2osclite
+lite-one-bit|kSamplesBit, inSamples ? 1 : 0)|kSamplesBit, 0)|vc2osclite
+lite-one-bit-at|kSamplesBit = 0x80|kSamplesBit = 0x40|vc2osclite
+lite-one-copy32-from|v.setU32(kCopy32, v.u32(kFrom));|v.setU32(kCopy32, v.u32(kTo));|vc2osclite
+lite-one-copy32-to|v.setU32(kCopy32 + 4, v.u32(kTo));|v.setU32(kCopy32 + 4, v.u32(kFrom));|vc2osclite
+lite-one-copy16-from|v.setU16(kCopy16, v.u16(kFrom));|v.setU16(kCopy16, v.u16(kTo));|vc2osclite
+lite-one-copy16-to|v.setU16(kCopy16 + 2, v.u16(kTo));|v.setU16(kCopy16 + 2, v.u16(kFrom));|vc2osclite
+lite-one-level|v.setU32(kLevel, v.u32(kLevelFrom));|v.setU32(kLevel, v.u32(kLevelFrom + 4));|vc2osclite
+lite-copy16-at|kCopy16 = 0x170|kCopy16 = 0x16c|vc2osclite
+lite-copy32-at|kCopy32 = 0x174;|kCopy32 = 0x178;|vc2osclite
+lite-from-at|kFrom = 0x150;|kFrom = 0x14c;|vc2osclite
+lite-th-offset|v.setU32(kOffset, v.u32(kStartOffset));|v.setU32(kOffset, v.u32(kStartOffset + 4));|vc2osclite
+lite-th-firstf|v.setF32(kFirstF, unsignedFloat(v.u32(kFirst)));|v.setF32(kFirstF, xtf::flt((int32_t)v.u32(kFirst)));|vc2osclite
+lite-th-last|v.setF32(kLast, unsignedFloat(v.u32(kFrames) - 1));|v.setF32(kLast, unsignedFloat(v.u32(kFrames)));|vc2osclite
+lite-th-fwdrate|vc2OscLoopRate(loop.rateFwd, shared, t.liteHeadsTenths)|vc2OscLoopRate(loop.rateBwd, shared, t.liteHeadsTenths)|vc2osclite
+lite-th-bwdrate|vc2OscLoopRate(loop.rateBwd, shared, t.liteHeadsTenths)|vc2OscLoopRate(loop.rateFwd, shared, t.liteHeadsTenths)|vc2osclite
+lite-th-period|div(t.litePeriod, v.tail.hz)|div(v.tail.hz, t.litePeriod)|vc2osclite
+lite-th-inv|div(1.0f, period)|div(2.0f, period)|vc2osclite
+lite-th-fraca|v.setF32(kFracA, fraction(v.f32(kFormant)));|v.setF32(kFracA, v.f32(kFormant));|vc2osclite
+lite-th-fracb|v.setF32(kFracB, fraction(v.f32(kFormant)));|v.setF32(kFracB, fraction(v.f32(kPitch)));|vc2osclite
+lite-th-zeros|{ kWinA, kClkA, kFilterL, kFilterR }|{ kWinA, kClkA, kFilterL }|vc2osclite
+lite-th-winb|v.setF32(kWinB, mul(v.f32(kPeriod), t.liteHalf));|v.setF32(kWinB, v.f32(kPeriod));|vc2osclite
+lite-th-clkb|v.setF32(kClkB, mul(v.f32(kPeriod), t.liteHalf));|v.setF32(kClkB, 0.0f);|vc2osclite
+lite-th-filter|mul(mul(v.tail.hz, v.f32(kPitch)), t.liteFilter)|mul(v.tail.hz, t.liteFilter)|vc2osclite
+lite-th-fwdloop|floatLoop(v, kFwdLoop, loop.loopStart, loop.loopEnd,|floatLoop(v, kFwdLoop, loop.loopEnd, loop.loopStart,|vc2osclite
+lite-th-bwdloop|floatLoop(v, kBwdLoop, loop.bwdEnd, loop.bwdStart,|floatLoop(v, kBwdLoop, loop.bwdStart, loop.bwdEnd,|vc2osclite
+lite-th-bwdspan|spanOf(loop.bwdEnd, loop.bwdStart)|spanOf(loop.bwdStart, loop.bwdEnd)|vc2osclite
+lite-th-fwdspan|spanOf(loop.loopEnd, loop.loopStart)|spanOf(loop.loopStart, loop.loopEnd)|vc2osclite
+lite-th-modes|const bool modes = (v.u8(Vc2OscVoice::kObject) & kLoopModes) != 0;|const bool modes = true;|vc2osclite
+lite-th-bwdmode|modes ? (uint32_t)loop.bwdMode : 0|modes ? (uint32_t)loop.fwdMode : 0|vc2osclite
+lite-th-walk-sign|if (v.f32(kWalk) > 0.0f)|if (!(v.f32(kWalk) > 0.0f))|vc2osclite
+lite-th-walk-ge|if (v.f32(kWalk) > 0.0f)|if (v.f32(kWalk) >= 0.0f)|vc2osclite
+lite-th-head-first|v.setU32(kHeadA, v.u32(kFirst));|v.setU32(kHeadA, v.u32(kFrames));|vc2osclite
+lite-th-headb-first|v.setU32(kHeadB, v.u32(kFirst));|v.setU32(kHeadB, 0);|vc2osclite
+lite-th-half|div(v.f32(kPeriod), 2.0f)|v.f32(kPeriod)|vc2osclite
+lite-th-whole|mul(xtf::flt(xtf::ftrc(div(unsignedFloat(v.u32(kFrames) - 1), half))), half)|mul(div(unsignedFloat(v.u32(kFrames) - 1), half), half)|vc2osclite
+lite-th-at-last|unsignedFloat(v.u32(kFrames) - 1), half)|unsignedFloat(v.u32(kFrames)), half)|vc2osclite
+lite-th-heada|v.setU32(kHeadA, (uint32_t)xtf::ftrc(at));|v.setU32(kHeadA, 0);|vc2osclite
+lite-th-headb|v.setU32(kHeadB, (uint32_t)xtf::ftrc(v.f32(kWalkPos)));|v.setU32(kHeadB, (uint32_t)xtf::ftrc(v.f32(kPeriod)));|vc2osclite
+lite-th-pos16|v.setU32(kPosition16, (uint32_t)xtf::ftrc(v.f32(kWalkPos)) << 4);|v.setU32(kPosition16, (uint32_t)xtf::ftrc(v.f32(kWalkPos)));|vc2osclite
+lite-unsigned|(int32_t)x < 0 ? add(f, vc2OscTables().liteTwo32) : f|f|vc2osclite
+lite-fraction|sub(x, xtf::flt(xtf::ftrc(x)))|x|vc2osclite
+lite-period-at|kPeriod = 0x2ac|kPeriod = 0x2a8|vc2osclite
+lite-walkpos-at|kWalkPos = 0x270|kWalkPos = 0x274|vc2osclite
+lite-modes-at|kFwdMode = 0x248, kBwdMode = 0x24c|kFwdMode = 0x24c, kBwdMode = 0x248|vc2osclite
+lite-filter-at|kFilterRate = 0x25c|kFilterRate = 0x260|vc2osclite
+lite-first-at|kFirst = 0x14c|kFirst = 0x150|vc2osclite
+lite-pos16-at|kPosition16 = 0x194|kPosition16 = 0x198|vc2osclite
+lite-pitch-at|kPitch = 0x1cc|kPitch = 0x1d0|vc2osclite
+lite-pair-copy-at|kPairCopy = 0x1c8|kPairCopy = 0x1c4|vc2osclite
+lite-half-at|kHalf = 0x168|kHalf = 0x16a|vc2osclite
+lite-cleared-at|kCleared = 0x10|kCleared = 0x20|vc2osclite
+lite-flag-bit-at|kFlagBit = 0x40|kFlagBit = 0x80|vc2osclite
+lite-loop-modes-at|kLoopModes = 0x01|kLoopModes = 0x02|vc2osclite
+lite-times-pool|{ 0x893c7d78, &t.liteTimes }|{ 0x893c7d7c, &t.liteTimes }|vc2osctables
+lite-tenths-pool|{ 0x893c7f64, &t.liteTenths }|{ 0x893c7f60, &t.liteTenths }|vc2osctables
+lite-heads-tenths-pool|{ 0x893c81ec, &t.liteHeadsTenths }|{ 0x893c81e8, &t.liteHeadsTenths }|vc2osctables
+lite-two32-pool|{ 0x893c81e4, &t.liteTwo32 }|{ 0x893c81e0, &t.liteTwo32 }|vc2osctables
+lite-period-pool|{ 0x893c81f0, &t.litePeriod }|{ 0x893c81f4, &t.litePeriod }|vc2osctables
+lite-half-pool|{ 0x893c81f4, &t.liteHalf }|{ 0x893c81f8, &t.liteHalf }|vc2osctables
+lite-filter-pool|{ 0x893c81f8, &t.liteFilter }|{ 0x893c81f4, &t.liteFilter }|vc2osctables
+lite-noteon-case|        case Vc2OscNoteOn::lite: noteOnLite(parts, shared); break;   // 0x893c7c30 (v240, Vc2OscLite.cpp)\n||vc2oscnoteon
