@@ -22,9 +22,9 @@ constexpr std::array<Vc2OscTargets::Word, 3> kTargets { { { kRatio, &Vc2OscTarge
                                                          { kGainTarget, &Vc2OscTargets::gain },
                                                          { kGain, &Vc2OscTargets::level } } };
 
-// [FW] 0x893c28f0: SAW's, folded to the upper half, × 0.2 + 0.4, widened by the Slope × the ratio × 0.01, at most
-// 1 less that
-float sawShape(const Vc2OscVoice& v, float x, const Vc2OscAnalogPool& t) {
+// [FW] 0x893c28f0, 0x893c2ed0: SAW's, folded to the upper half, × 0.2 + 0.4, widened by the Slope × the ratio × 0.01,
+// at most 1 less that
+float sawShape(const Vc2OscVoice& v, float x, const Vc2OscCodeWords& t) {
     if (t.half > x) x = sub(kOne, x);
     const float s = mul(mul(v.f32(kRatio), v.f32(kSlope)), t.sawSlope);
     const float y = add(add(mul(x, t.sawSpan), s), t.sawLo);
@@ -32,70 +32,79 @@ float sawShape(const Vc2OscVoice& v, float x, const Vc2OscAnalogPool& t) {
     return y > top ? top : y;
 }
 
-float sineShape(const Vc2OscVoice&, float x, const Vc2OscAnalogPool& t) { return mul(x, t.half); }   // [FW] 0x893c29d0
+// [FW] 0x893c29d0, 0x893c2fc0
+float sineShape(const Vc2OscVoice&, float x, const Vc2OscCodeWords& t) { return mul(x, t.half); }
 
-// [FW] 0x893c2964…: SQUARE's step by the ratio: none below the least, the first below 1, then the rows', else the top
-float squareStep(float r, const Vc2OscAnalogPool& t) {
+// [FW] 0x893c2964…, 0x893c2f34…: SQUARE's step by the ratio: none below the least, the first below 1, then the rows',
+// else the top
+float squareStep(float r, const Vc2OscCodeWords& t) {
     if (t.squareLeast > r) return 0.0f;
     if (kOne > r) return t.squareFirst;
     const auto row = std::ranges::find_if(t.squareSteps, [r](const Vc2OscAnalogStep& s) { return s.bound > r; });
     return row != t.squareSteps.end() ? row->step : t.squareTop;
 }
 
-// [FW] 0x893c29b4: SQUARE's edge, the Slope × (the ratio × its step) × 220/44100
-void squareEdge(Vc2OscVoice& v, float, const Vc2OscAnalogPool& t) {
+// [FW] 0x893c29b4, 0x893c2f84: SQUARE's edge, the Slope × (the ratio × its step) × 220/44100
+void squareEdge(Vc2OscVoice& v, float, const Vc2OscCodeWords& t) {
     const float r = v.f32(kRatio);
     v.setF32(kEdge, mul(mul(v.f32(kSlope), mul(r, squareStep(r, t))), t.edgeScale));
 }
 
-// [FW] 0x893c2a26…: NOISE's hold, on this routine's pool words
-void noiseHold(Vc2OscVoice& v, float x, const Vc2OscAnalogPool& t) { holdNoise(v, x, t.half, t.noiseSpan); }
+// [FW] 0x893c2a26…, 0x893c2ff8…: NOISE's hold, on the routine's own words
+void noiseHold(Vc2OscVoice& v, float x, const Vc2OscCodeWords& t) { holdNoise(v, x, t.half, t.noiseSpan); }
 
-// [FW] each code's way, 0…8 (the switch at 0x893c2868): the Pulse Width's target a line of x, its own law or x, then
-// what else it writes
+// [FW] each code's way, 0…8 (the switches at 0x893c2868 and 0x893c2e6a): the Pulse Width's target a line of x, its
+// own law or x, then what else both routines write; HQ's clear the note-on's alone
 struct Vc2OscAnalogCode {
-    Vc2OscAnalogLine Vc2OscAnalogPool::*line = nullptr;
-    float (*shape)(const Vc2OscVoice&, float, const Vc2OscAnalogPool&) = nullptr;
-    void (*then)(Vc2OscVoice&, float, const Vc2OscAnalogPool&) = nullptr;
+    Vc2OscAnalogLine Vc2OscCodeWords::*line = nullptr;
+    float (*shape)(const Vc2OscVoice&, float, const Vc2OscCodeWords&) = nullptr;
+    void (*then)(Vc2OscVoice&, float, const Vc2OscCodeWords&) = nullptr;
+    bool clearsHq = false;
 };
 constexpr std::array<Vc2OscAnalogCode, 9> kCodes { {
-    { .then = hqClear },                                         // 0 HQ-SAW
-    { .then = hqClear },                                         // 1 HQ-SQUARE
+    { .clearsHq = true },                                        // 0 HQ-SAW
+    { .clearsHq = true },                                        // 1 HQ-SQUARE
     { .shape = sawShape },                                       // 2 SAW
-    { .line = &Vc2OscAnalogPool::square, .then = squareEdge },   // 3 SQUARE
-    { .line = &Vc2OscAnalogPool::triangle },                     // 4 TRIANGLE
-    { .line = &Vc2OscAnalogPool::ramp },                         // 5 RAMP
+    { .line = &Vc2OscCodeWords::square, .then = squareEdge },    // 3 SQUARE
+    { .line = &Vc2OscCodeWords::triangle },                      // 4 TRIANGLE
+    { .line = &Vc2OscCodeWords::ramp },                          // 5 RAMP
     { .shape = sineShape },                                      // 6 SINE
-    { .line = &Vc2OscAnalogPool::juno },                         // 7 JUNO
+    { .line = &Vc2OscCodeWords::juno },                          // 7 JUNO
     { .then = noiseHold },                                       // 8 NOISE
 } };
 
-float pwTargetOf(const Vc2OscVoice& v, float x, const Vc2OscAnalogCode& c, const Vc2OscAnalogPool& t) {
+float pwTargetOf(const Vc2OscVoice& v, float x, const Vc2OscAnalogCode& c, const Vc2OscCodeWords& t) {
     if (c.line) return add(mul(x, (t.*c.line).span), (t.*c.line).lo);
     return c.shape ? c.shape(v, x, t) : x;
 }
 
 // [FW] 0x893c2780: Fat's target and value from its sum, at least its floor; the Pulse Width's target by the code's
-// way (past 8 every shape ½); then 0x893c2aa8, its value the target
+// way, HQ's clear (past 8 every shape ½); then 0x893c2aa8, its value the target
 void otherCodes(Vc2OscVoice& v, Vc2OscParts& p, uint32_t code) {
-    const Vc2OscAnalogPool& t = vc2OscTables().analog;
+    const Vc2OscCodeWords& t = vc2OscTables().analog.codes;
     const float half = sub(t.half, mul(sum(v, p, kFat, kFatMod), t.half));
     v.setF32(kFatTarget, half);
     v.setF32(kFatNow, half);
     if (!(v.f32(kFatTarget) > t.fatMin)) {
-        v.setF32(kFatTarget, t.step);
-        v.setF32(kFatNow, t.step);
+        v.setF32(kFatTarget, t.fatFloor);
+        v.setF32(kFatNow, t.fatFloor);
     }
     const float x = add(mul(sum(v, p, kPw, kPwMod), t.pwSpan), t.pwLo);
     if (code < kCodes.size()) {
-        v.setF32(kPwTarget, pwTargetOf(v, x, kCodes[code], t));
-        if (kCodes[code].then) kCodes[code].then(v, x, t);
+        codeTargets(v, x, code, t);
+        if (kCodes[code].clearsHq) hqClear(v, x, vc2OscTables().analog);
     } else {
         for (uint32_t at : { kFatTarget, kFatNow, kPwTarget, kPwNow }) v.setF32(at, t.half);
     }
     v.setU32(kPwNow, v.u32(kPwTarget));
 }
 } // namespace
+
+void Vc2OscAnalog::codeTargets(Vc2OscVoice& v, float x, uint32_t code, const Vc2OscCodeWords& t) {
+    if (code >= kCodes.size()) return;
+    v.setF32(kPwTarget, pwTargetOf(v, x, kCodes[code], t));
+    if (kCodes[code].then) kCodes[code].then(v, x, t);
+}
 
 // [FW] 0x893c3570 on the object: HQ's integrator and direction cleared
 void Vc2OscAnalog::hqClear(Vc2OscVoice& v, float, const Vc2OscAnalogPool&) {

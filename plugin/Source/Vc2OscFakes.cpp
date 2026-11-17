@@ -98,18 +98,17 @@ constexpr auto withN = partAnd<0, asIs>;
 constexpr auto withSettings = partAnd<0, settingsOffset>;
 // [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run), LITE's
 // and VariPhrase's installs and VariPhrase's note-on (v238), LITE's note-on (v240), the analog's (v242) and its sub
-// oscillator's (v244) with its shape (v246): rom.4's own run, and the routines they call hooked
+// oscillator's (v244) with its shape (v246), the analog's install, update and settings (v248): rom.4's own run, and
+// the routines they call hooked
 const OscHook kHooks[] = {
     { 0x893b29b0, kBuildVibrato, self, none }, { 0x893b2c10, kUpdateVibrato, withN, none },
     { 0x893b2b70, kSetVibrato, withSettings, none }, { 0x893b29e0, kNoteOnVibrato, partWord<0>, none },
-    { 0x893c2ad0, kKindCall, kindRoutine, none }, { 0x893c8280, kKindCall, kindRoutine, none },
-    { 0x893c88b0, kKindCall, kindRoutine, none }, { 0x893c2ce0, kKindCall, kindRoutine, none },
+    { 0x893c8280, kKindCall, kindRoutine, none }, { 0x893c88b0, kKindCall, kindRoutine, none },
     { 0x893afff0, kKindCall, kindRoutine, none }, { 0x893c6260, kKindCall, kindRoutine, none },
     { 0x893b0150, kKindCall, kindRoutine, none },
     { 0x893c8670, kKindCall, kindRoutine, none }, { 0x893cc760, kObjectCall, objectRoutine, none },
     { 0x893cbf40, kObjectCall, objectRoutine, none }, { 0x893cc0d0, kEventPosition, eventAt, positions },
     { 0x893c8390, kKindSettings, routineSettings, none }, { 0x893b0280, kKindSettings, routineSettings, none },
-    { 0x893c3460, kKindSettings, routineSettings, none },
     { 0x893ec450, kSetCarrier, partAnd<kCarrier, settingsOffset>, none },
     { 0x893ebed0, kInitCarrier, partWord<kCarrier>, none }, { 0x893ec700, kStartKind6, partWord<kKind6>, none },
     { 0x893c62e0, kRenderBy, renderBy, rendered }, { 0x893c61e0, kRenderBy, renderBy, rendered },
@@ -120,6 +119,18 @@ const OscHook kHooks[] = {
     { 0x893c6e8c, kRenderBy, renderBy, rendered }, { 0x893c9450, kRenderBy, renderBy, rendered },
     { 0x893cadc0, kRenderBy, renderBy, rendered }, { 0x893ca1f0, kRenderBy, renderBy, rendered },
     { 0x893ca8b0, kRenderBy, renderBy, rendered },
+    // v248: the analog's renders its install writes by the code (0x893c2ad0's), then those the sub oscillator's
+    // install adds (0x893c3e60's)
+    { 0x893c3890, kRenderBy, renderBy, rendered }, { 0x893c3580, kRenderBy, renderBy, rendered },
+    { 0x893c5680, kRenderBy, renderBy, rendered }, { 0x893c5500, kRenderBy, renderBy, rendered },
+    { 0x893c5f20, kRenderBy, renderBy, rendered }, { 0x893c5260, kRenderBy, renderBy, rendered },
+    { 0x893c5a90, kRenderBy, renderBy, rendered }, { 0x893c5810, kRenderBy, renderBy, rendered },
+    { 0x893c2230, kRenderBy, renderBy, rendered }, { 0x893c4fa0, kRenderBy, renderBy, rendered },
+    { 0x893c4c50, kRenderBy, renderBy, rendered }, { 0x893c5990, kRenderBy, renderBy, rendered },
+    { 0x893c5dc0, kRenderBy, renderBy, rendered }, { 0x893c60e0, kRenderBy, renderBy, rendered },
+    { 0x893c53c0, kRenderBy, renderBy, rendered }, { 0x893c5c90, kRenderBy, renderBy, rendered },
+    { 0x893c4ac0, kRenderBy, renderBy, rendered }, { 0x893c50d0, kRenderBy, renderBy, rendered },
+    { 0x893c4db0, kRenderBy, renderBy, rendered },
     { kOscRendersAt, kRenderBy, renderBy, rendered }, { kOscRendersAt + 0x10, kRenderBy, renderBy, rendered },
     { 0x893ebfa0, kRenderCarrier, partAnd<kCarrier, outOf>, none },
     { 0x893ec730, kRenderKind6, partAnd<kKind6, outOf>, none },

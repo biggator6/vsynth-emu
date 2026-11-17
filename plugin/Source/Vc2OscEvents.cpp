@@ -31,13 +31,16 @@ std::string onConstruct(OscSides& s, std::mt19937&, int v) {
 
 std::string onInstall(OscSides& s, std::mt19937& rng, int v) {
     // v238: one time in three a player's kind (LITE's and VariPhrase's own installs, by the wave's type), one in six
-    // a kind past 7 (the frame's default row, which clears the flag), else the kind as the event finds it
+    // a kind past 7 (the frame's default row, which clears the flag), one in six the analog (v248: its own install by
+    // the code and the sub oscillator's switch), else the kind as the event finds it
     const uint32_t pick = rng() % 6;
     if (pick < 2) oscSteerPlayers(s, rng, v);
     if (pick == 2) {
         s.voices[(size_t)v].setU32(Vc2OscVoice::kKind, kKinds + rng() % 4);
         oscWriteVoice(s, v);
     }
+    if (pick == 3) oscMakeAnalog(s, rng, v);
+    else oscSteerAnalog(s, rng, v);   // a kind-3 voice found: its words so (a settings' copy leaves noise at +0x138)
     return oscBothSides(s, kInstall, { oscVoiceAt(v) }, Answer::none, [&] {
         s.voices[(size_t)v].install(s.parts[(size_t)v]);
         return 0u;
@@ -48,6 +51,10 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     // now and then high bits, which it drops; its low half never negative (v236: the ramps' tick reads past the factor's
     // table on a negative count, which the tone never gives)
     const uint32_t n = rng() % 3 == 0 ? (uint32_t)rng() & ~kCountSign : rng() % 64;
+    // v248: one time in four the analog (its own update); a kind-3 voice's words drawn as its converter could give
+    // them, as a note-on's are (noise there could be NaNs, whose FTRC and difference the interpreter takes otherwise)
+    if (rng() % 4 == 0) oscMakeAnalog(s, rng, v);
+    else oscSteerAnalog(s, rng, v);
     ++s.n.updates;
     return oscBothSides(s, kUpdate, { oscVoiceAt(v), n }, Answer::none, [&] {
         s.voices[(size_t)v].update((int32_t)n, s.parts[(size_t)v], s.romShared);

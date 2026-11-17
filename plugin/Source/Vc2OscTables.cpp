@@ -25,29 +25,89 @@ auto oscWords(Vc2OscTables& t) {
         { 0x893c81f0, &t.litePeriod }, { 0x893c81f4, &t.liteHalf }, { 0x893c81f8, &t.liteFilter },
     });
 }
-// [FW] the analog note-on's (v242): its head's, LA's, the other codes', SQUARE's steps', NOISE's and 0x893c4a20's
+// [FW] each word where its routine reads it; an address of 0 is a word the routine doesn't read, left 0
+void readWords(Sh4& image, std::span<const Vc2PoolWord> words) {
+    for (const auto& [word, out] : words) {
+        if (word != 0) *out = std::bit_cast<float>(image.rd32(word));
+    }
+}
+
+// [FW] the analog note-on's head's and phases' own (v242), 0x893c4a20's and the sub oscillator's note-on's (v244)
 auto analogWords(Vc2OscAnalogPool& a) {
-    auto& [sq, saw] = a.la;
-    auto& [st1, st2, st3] = a.squareSteps;
     return std::to_array<Vc2PoolWord>({
-        { 0x893c23f4, &a.impactPeriod }, { 0x893c23f8, &a.impactBase }, { 0x893c25d0, &a.laHalf },
-        { 0x893c25d4, &a.laFatMin }, { 0x893c25d8, &a.laFatFloor }, { 0x893c25dc, &a.laPwLo },
-        { 0x893c25e0, &a.laPwSpan }, { 0x893c25e4, &sq.hz }, { 0x893c25ec, &sq.step }, { 0x893c2604, &saw.hz },
-        { 0x893c2608, &saw.step }, { 0x893c25f0, &a.toneScale }, { 0x893c25f4, &a.toneOctaves },
-        { 0x893c25f8, &a.corner }, { 0x893c2600, &a.kfRatio }, { 0x893c260c, &a.cornerMost },
-        { 0x893c2870, &a.gainScale }, { 0x893c2878, &a.step }, { 0x893c2880, &a.fullScale },
-        { 0x893c2884, &a.phaseStart }, { 0x893c2888, &a.half }, { 0x893c288c, &a.four }, { 0x893c2890, &a.wrap },
-        { 0x893c2894, &a.fatMin }, { 0x893c2898, &a.pwLo }, { 0x893c289c, &a.pwSpan }, { 0x893c2af4, &a.sawSlope },
-        { 0x893c2af8, &a.sawSpan }, { 0x893c2afc, &a.sawLo }, { 0x893c2b00, &a.ramp.lo }, { 0x893c2b04, &a.ramp.span },
-        { 0x893c2b08, &a.square.lo }, { 0x893c2b0c, &a.square.span }, { 0x893c2b34, &a.triangle.lo },
-        { 0x893c2b38, &a.triangle.span }, { 0x893c2b3c, &a.juno.lo }, { 0x893c2b40, &a.juno.span },
-        { 0x893c2b10, &a.squareLeast }, { 0x893c2b14, &a.squareFirst }, { 0x893c2b2c, &a.squareTop },
-        { 0x893c2b30, &a.edgeScale }, { 0x893c2b18, &st1.bound }, { 0x893c2b1c, &st1.step },
-        { 0x893c2b20, &st2.bound }, { 0x893c2b24, &st2.step }, { 0x893c2b28, &st3.bound }, { 0x893c2af8, &st3.step },
-        { 0x893c2b44, &a.noiseSpan }, { 0x893c4a94, &a.withinHalf }, { 0x893c3c20, &a.sub.fullScale },
-        { 0x893c3c24, &a.sub.step }, { 0x893c3c28, &a.sub.levelStep }, { 0x893c3e7c, &a.sub.half },
-        { 0x893c3e80, &a.sub.wrap },
+        { 0x893c23f4, &a.impactPeriod }, { 0x893c23f8, &a.impactBase }, { 0x893c2880, &a.fullScale },
+        { 0x893c2884, &a.phaseStart }, { 0x893c288c, &a.four }, { 0x893c2890, &a.wrap },
+        { 0x893c4a94, &a.withinHalf }, { 0x893c3c20, &a.sub.fullScale }, { 0x893c3c24, &a.sub.step },
+        { 0x893c3c28, &a.sub.levelStep }, { 0x893c3e7c, &a.sub.half }, { 0x893c3e80, &a.sub.wrap },
     });
+}
+
+// [FW] the plain codes' words where each routine reads them, in Vc2OscCodeWords' order (0: none): ½, Fat's 70%, least
+// and floor, the Pulse Width's line, SAW's three; RAMP's, SQUARE's, TRIANGLE's and JUNO's lines (least, span); SQUARE's
+// least, first, top and scale, its steps (bound, step); NOISE's 30
+struct CodeWordsAt {
+    uint32_t half, fatMove, fatMin, fatFloor, pwLo, pwSpan, sawSlope, sawSpan, sawLo;
+    std::array<uint32_t, 8> lines;
+    uint32_t squareLeast, squareFirst, squareTop, edgeScale;
+    std::array<uint32_t, 6> steps;
+    uint32_t noiseSpan;
+};
+// the note-on's (v242; its floor the shapes' 0.002, SQUARE's last step SAW's span) and the update's (v248)
+constexpr CodeWordsAt kNoteOnCodes { 0x893c2888, 0, 0x893c2894, 0x893c2878, 0x893c2898, 0x893c289c, 0x893c2af4,
+                                     0x893c2af8, 0x893c2afc,
+                                     { 0x893c2b00, 0x893c2b04, 0x893c2b08, 0x893c2b0c, 0x893c2b34, 0x893c2b38,
+                                       0x893c2b3c, 0x893c2b40 },
+                                     0x893c2b10, 0x893c2b14, 0x893c2b2c, 0x893c2b30,
+                                     { 0x893c2b18, 0x893c2b1c, 0x893c2b20, 0x893c2b24, 0x893c2b28, 0x893c2af8 },
+                                     0x893c2b44 };
+constexpr CodeWordsAt kUpdateCodes { 0x893c2e74, 0x893c2e78, 0x893c2e7c, 0x893c2e80, 0x893c2e84, 0x893c2e88, 0x893c3068,
+                                     0x893c306c, 0x893c3070,
+                                     { 0x893c3060, 0x893c3064, 0x893c3074, 0x893c3078, 0x893c30a0, 0x893c30a4,
+                                       0x893c30a8, 0x893c30ac },
+                                     0x893c307c, 0x893c3080, 0x893c3098, 0x893c309c,
+                                     { 0x893c3084, 0x893c3088, 0x893c308c, 0x893c3090, 0x893c3094, 0x893c306c },
+                                     0x893c30b0 };
+
+void readCodeWords(Sh4& image, const CodeWordsAt& at, Vc2OscCodeWords& w) {
+    auto& [s1, s2, s3] = w.squareSteps;
+    const auto& [rLo, rSpan, sLo, sSpan, tLo, tSpan, jLo, jSpan] = at.lines;
+    const auto& [b1, t1, b2, t2, b3, t3] = at.steps;
+    readWords(image, std::to_array<Vc2PoolWord>({
+        { at.half, &w.half }, { at.fatMove, &w.fatMove }, { at.fatMin, &w.fatMin }, { at.fatFloor, &w.fatFloor },
+        { at.pwLo, &w.pwLo }, { at.pwSpan, &w.pwSpan }, { at.sawSlope, &w.sawSlope }, { at.sawSpan, &w.sawSpan },
+        { at.sawLo, &w.sawLo }, { rLo, &w.ramp.lo }, { rSpan, &w.ramp.span }, { sLo, &w.square.lo },
+        { sSpan, &w.square.span }, { tLo, &w.triangle.lo }, { tSpan, &w.triangle.span }, { jLo, &w.juno.lo },
+        { jSpan, &w.juno.span }, { at.squareLeast, &w.squareLeast }, { at.squareFirst, &w.squareFirst },
+        { at.squareTop, &w.squareTop }, { at.edgeScale, &w.edgeScale }, { b1, &s1.bound }, { t1, &s1.step },
+        { b2, &s2.bound }, { t2, &s2.step }, { b3, &s3.bound }, { t3, &s3.step }, { at.noiseSpan, &w.noiseSpan },
+    }));
+}
+
+// [FW] LA's words where each routine reads them, in Vc2OscLaWords' order: Fat's ½, least and floor, the Pulse Width's
+// line, LA-SQUARE's and LA-SAW's Hz and step, the Tone's three, the keyfollow's ratio, the most, the gain's, the step
+struct LaWordsAt {
+    uint32_t half, fatMin, fatFloor, pwLo, pwSpan;
+    std::array<uint32_t, 4> rows;
+    uint32_t toneScale, toneOctaves, corner, kfRatio, cornerMost, gainScale, step;
+};
+// the note-on's (0x893c2404…, v242) and the update's (0x893c31d0, v248)
+constexpr LaWordsAt kNoteOnLa { 0x893c25d0, 0x893c25d4, 0x893c25d8, 0x893c25dc, 0x893c25e0,
+                                { 0x893c25e4, 0x893c25ec, 0x893c2604, 0x893c2608 },
+                                0x893c25f0, 0x893c25f4, 0x893c25f8, 0x893c2600, 0x893c260c, 0x893c2870, 0x893c2878 };
+constexpr LaWordsAt kUpdateLa { 0x893c338c, 0x893c33a0, 0x893c3390, 0x893c33a4, 0x893c33a8,
+                                { 0x893c33ac, 0x893c33b0, 0x893c33cc, 0x893c33d0 },
+                                0x893c33b8, 0x893c33bc, 0x893c33c0, 0x893c33c8, 0x893c33d4, 0x893c34f4, 0x893c34fc };
+
+void readLaWords(Sh4& image, const LaWordsAt& at, Vc2OscLaWords& w) {
+    auto& [sq, saw] = w.la;
+    const auto& [sqHz, sqStep, sawHz, sawStep] = at.rows;
+    readWords(image, std::to_array<Vc2PoolWord>({
+        { at.half, &w.half }, { at.fatMin, &w.fatMin }, { at.fatFloor, &w.fatFloor }, { at.pwLo, &w.pwLo },
+        { at.pwSpan, &w.pwSpan }, { sqHz, &sq.hz }, { sqStep, &sq.step }, { sawHz, &saw.hz }, { sawStep, &saw.step },
+        { at.toneScale, &w.toneScale }, { at.toneOctaves, &w.toneOctaves }, { at.corner, &w.corner },
+        { at.kfRatio, &w.kfRatio }, { at.cornerMost, &w.cornerMost }, { at.gainScale, &w.gainScale },
+        { at.step, &w.step },
+    }));
 }
 // [FW] the sub oscillator's shape's (v246): its head's; LA-SQUARE's and LA-SAW's, each case's own
 auto shapeWords(Vc2OscShapePool& s) {
@@ -79,13 +139,10 @@ constexpr std::array<ShapeWaveAt, 6> kShapeWaves { {
 } };
 
 void readShapeWave(Sh4& image, const ShapeWaveAt& at, Vc2OscShapeWave& w) {
-    const auto words = std::to_array<Vc2PoolWord>({
+    readWords(image, std::to_array<Vc2PoolWord>({
         { at.lo, &w.line.lo }, { at.span, &w.line.span }, { at.hz, &w.hz }, { at.fs, &w.fs }, { at.scale, &w.scale },
         { at.half, &w.half }, { at.floor, &w.floor }, { at.step, &w.step }, { at.end, &w.end },
-    });
-    for (const auto& [word, out] : words) {
-        if (word != 0) *out = std::bit_cast<float>(image.rd32(word));
-    }
+    }));
 }
 
 void readShapeWaves(Sh4& image, std::array<Vc2OscShapeWave, kShapeWaves.size()>& waves) {
@@ -96,6 +153,8 @@ void readShapeWaves(Sh4& image, std::array<Vc2OscShapeWave, kShapeWaves.size()>&
 // shape's copy (v246, the same 15, other words past them)
 constexpr Vc2Span kLiteInstalled { 0x89542350, 6 }, kVariInstalled { 0x89542368, 10 }, kToneKf { 0x89546fbc, 15 };
 constexpr Vc2Span kShapeToneKf { 0x89560064, 15 };
+// [FW] the analog's installs' floats by code (v248): the install's, the sub oscillator's install's
+constexpr Vc2Span kAnalogInstalled { 0x895422f8, kVc2AnalogCodes }, kSubInstalled { 0x89542324, kVc2AnalogCodes };
 
 struct Read : Vc2OscTables {
     bool read(Sh4& image) {
@@ -103,7 +162,13 @@ struct Read : Vc2OscTables {
         vc2ReadFloats(image, kLiteInstalled, liteInstalled.data());
         vc2ReadFloats(image, kVariInstalled, variInstalled.data());
         vc2ReadPool(image, analogWords(analog));
+        readCodeWords(image, kNoteOnCodes, analog.codes);
+        readCodeWords(image, kUpdateCodes, analog.updateCodes);
+        readLaWords(image, kNoteOnLa, analog.la);
+        readLaWords(image, kUpdateLa, analog.updateLa);
         vc2ReadFloats(image, kToneKf, analog.toneKf.data());
+        vc2ReadFloats(image, kAnalogInstalled, analog.installed.data());
+        vc2ReadFloats(image, kSubInstalled, analog.subInstalled.data());
         vc2ReadPool(image, shapeWords(analog.shape));
         readShapeWaves(image, analog.shape.waves);
         vc2ReadFloats(image, kShapeToneKf, analog.shape.toneKf.data());

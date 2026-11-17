@@ -12,12 +12,16 @@ enum class Vc2OscPitch : uint8_t { none, bounded, tuned };   // 0x893aeb20: 0; w
 // and the carrier's init; the ratio, rate, gain and level into P and kind 6's start; and the kinds' own note-ons,
 // VariPhrase's, LITE's and the analog's (v238, v240, v242; until v242 by their addresses through Vc2OscParts)
 enum class Vc2OscNoteOn : uint8_t { none, one, extIn, carrier, kind6, vari, lite, analog };
-// 0x893ae0f0's ways (v238): the frame's own; the kind's own install by its address; LITE's and VariPhrase's, ported
-enum class Vc2OscInstall : uint8_t { frame, routine, lite, vari };
+// 0x893ae0f0's ways (v238): the frame's own; LITE's and VariPhrase's, ported; the analog's (v248, the last that was a
+// kind's own install by its address)
+enum class Vc2OscInstall : uint8_t { frame, lite, vari, analog };
+// 0x893ae1c0's and 0x893ae780's last steps (v248): the kind's update and settings by their addresses, or the analog's
+// ported
+enum class Vc2OscUpdate : uint8_t { routine, analog };
+enum class Vc2OscSettings : uint8_t { routine, analog };
 
 struct Vc2OscKindRow {
     Vc2OscInstall installs = Vc2OscInstall::frame;   // 0x893ae0f0: its own install in the frame's place, or none
-    uint32_t install = 0;          // the install's routine, by rom.4's address, for Vc2OscInstall::routine
     uint32_t render = 0;           // the install's +0xa44; 0 none
     int installed = 0;             // the install's +0xa88: its constant's kind (4, 5, 6), 0 none
     bool clearsFlag = false;       // the install's default: +0xa40 to 0
@@ -25,10 +29,12 @@ struct Vc2OscKindRow {
     uint32_t updateFirst = 0;      // a routine before the ramps' ticks; 0 none
     uint8_t ticks = 0;             // the ramps the update ticks, by bit
     uint32_t update = 0;           // its update after them; 0 none
+    Vc2OscUpdate updates = Vc2OscUpdate::routine;       // that by its address, or the port's (v248)
     Vc2OscRecords records = Vc2OscRecords::none;   // 0x893ae370
     bool flagByWave = false;       // the note-on's flag from the wave's type (+0x104) at 1
     bool ramp = false;             // 0x893ae610's start, and 0x893ae780's set when the block's byte +4 moves
     uint32_t settings = 0;         // 0x893ae780: its settings routine; 0 none
+    Vc2OscSettings settingsWay = Vc2OscSettings::routine;   // that by its address, or the port's (v248)
     bool carrier = false;          // the settings' copy into +0x104 and the carrier's settings
     Vc2OscRender renders = Vc2OscRender::byRender;   // 0x893ae9f0: its default, +0xa44
     Vc2OscPitch pitch = Vc2OscPitch::none;           // 0x893aeb20
