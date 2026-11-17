@@ -124,6 +124,8 @@ struct Vc2CosmObjectPool {
     uint32_t mono[2 * kCodeReach] {};
     uint32_t stereo[2 * kCodeReach] {};
     float factors[kFactors] {};
+    // The pools' static initializer's three floats (v250, Vc2CosmPools): 0x89999290's, 0x89999654's, 0x89999658's
+    float poolFloats[3] {};
 };
 
 struct Vc2CosmTables {

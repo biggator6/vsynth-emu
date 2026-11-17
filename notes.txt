@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM note-on frame v250 (2026-11-17, on its own branch with vc2-mode's 7cba8ee merged in; the VC-2
+  session's choice (A), adapters over XtCosm; HARDWARE_FIRMWARE.md, "The VC-2's COSM note-on frame"). rom.4's per-type
+  routines are rom.2's opcode for opcode (the TB Filter's five words pool relocations), so the types come in as
+  adapters, a few a version. Vc2CosmNoteOn: the note-on 0x893aa0e0's frame (the clears, the allocator 0x893a8c50,
+  the start values' switch, the held levels and rates, the new block, each code's case) and the new block 0x893aa5d0's,
+  each type's parts a row (Vc2CosmTypeRow): Through, the Speaker Simulator, the Growl (v234's on the object's words).
+  Vc2CosmPools: the pools 0x89999290…, their static initializer 0x893ab550, a slot's take and release, the destructor
+  0x893aa060. xt_vc2cosm's sixth part (Vc2CosmNoteOnCheck.cpp, Vc2CosmNoteOnDraws.cpp), only operator delete hooked;
+  0 different at seeds 2024, 7 and 31337 at the first run. mutate_vc2.py --cosm: 820 plants (44 new), all caught
+  at the first run. Not in the sound yet.
+
 The VC-2's COSM object's frame v249 (2026-11-17, on its own branch with vc2-mode's 9c2009c merged in; the VC-2
   session's go-ahead; HARDWARE_FIRMWARE.md, "The VC-2's COSM object's frame"). Split by what rom.4 holds, as XtCosm
   splits rom.2's: the frame now, the note-on and new block (v250), then the update and the DSP. Vc2CosmObject

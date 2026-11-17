@@ -42,6 +42,8 @@ auto cosmWords(Vc2CosmTables& t) {
         { 0x893976c8, &t.sideBand.percent }, { 0x893976cc, &t.sideBand.twelve }, { 0x893976d4, &t.sideBand.quarter },
         { 0x893976bc, &t.sideBand.widthCents }, { 0x893976b0, &t.sbf1.k63 }, { 0x893985e0, &t.sbf1.ownK63 },
         { 0x89398890, &t.sbf2.k63 }, { 0x89398890, &t.sbf2.ownK63 }, { 0x893985e4, &t.sbf2.qScale },
+        { 0x893ab598, &t.object.poolFloats[0] }, { 0x893ab588, &t.object.poolFloats[1] },
+        { 0x893ab590, &t.object.poolFloats[2] },
     });
 }
 

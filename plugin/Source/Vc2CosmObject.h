@@ -27,7 +27,18 @@ struct Vc2CosmObjectWords {
     uint32_t block048[4];               // +0x048…+0x057
     uint8_t dspCode;                    // +0x058: D+0, the code's byte (the note-on's), the install's switch
     uint8_t unread059[3];
-    uint32_t state[57];                 // +0x05c…+0x13f: D+4…, the type's state (the note-on's and update's)
+    // D+4…: the type's state, its words the frame names (v250); the rest each type's
+    int32_t position;                   // +0x05c: 3266 from the note-on, where the lines were last written
+    std::array<uint32_t, 4> buffers;    // +0x060…+0x06f: a pool slot's buffers (the allocator's; +0x60 0 with none)
+    uint32_t d070;                      // +0x070
+    float cleared[28];                  // +0x074…+0x0e3: D+0x1c…, 0 from the note-on
+    uint32_t d0e4[4];                   // +0x0e4…+0x0f3
+    float cleared0f4[2];                // +0x0f4, +0x0f8: 0 from the note-on
+    uint32_t d0fc[2];                   // +0x0fc, +0x100
+    float held[4];                      // +0x104…+0x113: envelopes A, B and LFOs A, B, held (the note-on's, update's)
+    uint32_t d114[2];                   // +0x114, +0x118
+    float rates[2];                     // +0x11c, +0x120: envelopes A and B's rates × 4 (the note-on's, update's)
+    uint32_t d124[7];                   // +0x124…+0x13f
     uint32_t pool;                      // +0x140: the buffer pool a slot was taken from (the note-on's)
     int32_t slot;                       // +0x144: its slot, −1 for none
     uint32_t routine;                   // +0x148: the DSP routine the install chose
@@ -39,6 +50,8 @@ static_assert(sizeof(Vc2CosmObjectWords) == 0x164, "rom.4's layout, the COSM obj
 
 // 0x893aa030 on an object in place (its allocation, given none, is operator new's): the vtable, +0x14c 0
 void vc2CosmConstruct(Vc2CosmObjectWords& o);
+// The object's vtable word, which the constructor and the destructor write (v250)
+uint32_t vc2CosmVtable();
 // 0x893aa590: the set-up's struct, its flag as 0 or 1
 void vc2CosmSetUp(Vc2CosmObjectWords& o, const Vc2CosmSetUpWords& s, uint32_t flag);
 // 0x893aa7b0: the envelopes' and LFOs' addresses

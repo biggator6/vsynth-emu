@@ -491,11 +491,16 @@ version against rom.4's routines with what it calls hooked:
        constructor `0x893aa030`, the set-up, the binding and the install (rom.2's chooser `0x894eef70`: the mono or
        stereo DSP routine by the code byte, a float per type and variant, its return COSM 2's flag); xt_vc2cosm's
        fifth part (HARDWARE_FIRMWARE.md, "The VC-2's COSM object's frame").
-     - v250: the note-on and the new block: the clears, the buffer pools (`0x89999294`, `0x89999474`; their initializer
-       `0x893ab550`, the allocator `0x893a8c50`, the destructor `0x893aa060` that frees a slot), the start values
-       `0x893a85f0`, the held levels, the first block, and each code's note-on case and new-block routine.
-     - then the update (the held levels and rates, each code's inline case) and the DSP by code, mono and stereo, over
-       XtCosm's types and the Growl, as many versions as the types take.
+     - done (v250): the note-on's and new block's frames, `Vc2CosmNoteOn` (the clears, the allocator `0x893a8c50`, the
+       start values' switch, the held levels and rates, the new block, each code's case), the buffer pools
+       `Vc2CosmPools` (their initializer `0x893ab550`, a slot's take and release, the destructor `0x893aa060`), and the
+       types needing no adapter: Through, the Speaker Simulator, the Growl (HARDWARE_FIRMWARE.md, "The VC-2's COSM
+       note-on frame"). rom.4's per-type routines are rom.2's opcode for opcode (the TB Filter's five words relocations
+       only), so the rest are adapters over XtCosm (the VC-2 session's choice (A), 2026-11-17): one row a type, rom.4's
+       words into XtCosm's class and back, a word XtCosm doesn't hold carried as rom.4's.
+     - next: the types' adapters a few a version (their start values, note-on cases, new blocks; first those with no
+       inline case and no buffers: the Resonator, TVF and Lo-Fi), then the update (the held levels and rates, each
+       code's inline case) and the DSP by code, mono and stereo, over XtCosm's types and the Growl.
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).
