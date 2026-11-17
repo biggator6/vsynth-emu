@@ -4,10 +4,13 @@
 // COSM 2's 0x893a2aa0, as one routine over a group's row: when a slot names any of the group's destinations, the
 // refresh (0x893a2230, the sources read again: behind Vc2MatrixRefresh, the Matrix core's), then each destination it
 // marked summed again, and the group's sums returned.  Bit for bit: xt_vc2cosm's second part against rom.4's own,
-// the refresh hooked.  HARDWARE_FIRMWARE.md, "The VC-2's COSM converters' frame".  The tone generator's thread.
+// the refresh hooked.  The Matrix core (v243): the refresh itself, Vc2MatrixCore, its sources behind Vc2MatrixSources,
+// and every group's row; xt_vc2cosm's third part.  HARDWARE_FIRMWARE.md, "The VC-2's COSM converters' frame", "The
+// VC-2's Matrix core".  The tone generator's thread.
 #include "Vc2CosmInput.h"
 #include "Vc2MatrixTables.h"
 #include <cstdint>
+#include <span>
 
 // A slot: two a source, eight sources
 struct Vc2MatrixSlot {
@@ -40,12 +43,40 @@ struct Vc2MatrixGroup {
 };
 inline constexpr Vc2MatrixGroup kVc2MatrixCosm1 { 8, 46, 0x7ff }, kVc2MatrixCosm2 { 9, 57, 0x7ff };   // [FW]
 
+// Every group's row, by its reader (v243): OSC 1's 0x893a23b0 and OSC 2's 0x893a2440 (Pitch, Time, Formant, Level),
+// 0x893a24d0, 0x893a2550, OSC 1's LFO's 0x893a26b0 and OSC 2's 0x893a28b0 (Rate, Pitch, Time, Formant, Level),
+// 0x893a2750, COSM's two (v235) and 0x893a2bf0, destinations 68…78 (its 76…78 the getter's sum inline).  No reader
+// takes group 7 (uses +0x1a): destinations 1…78 run on through the others
+std::span<const Vc2MatrixGroup> vc2MatrixGroups();
+
 // The refresh the readers call first (0x893a2230): the Matrix core's, which reads the sources again into `terms` and,
 // when one moved, sets every group's dirty bits to its uses
 class Vc2MatrixRefresh {
 public:
     virtual ~Vc2MatrixRefresh() = default;
     virtual void refresh(Vc2MatrixWords& m) = 0;
+};
+
+// The sources' routines the refresh calls (v243): each source's routine (M's +0x64…) with M and its byte (+0x4…),
+// whose answer's low 16 bits are its value; rom.4's at 0x893a1de0…0x893a21f0, reading M's words past +0x166 (the next
+// part's)
+class Vc2MatrixSources {
+public:
+    virtual ~Vc2MatrixSources() = default;
+    virtual int32_t value(uint32_t routine, uint8_t byte) = 0;
+};
+
+// 0x893a2230, the refresh (v243): each source's value again; one that moved has its two slots' terms made again, its
+// depth × the value >> 13 held to ± its destination's limit (0 at a value of 0); when any moved, every group's dirty
+// bits are its uses
+class Vc2MatrixCore final : public Vc2MatrixRefresh {
+public:
+    static constexpr int kSources = 8;   // [FW] two slots each
+    explicit Vc2MatrixCore(Vc2MatrixSources& sources) : sources_(sources) {}
+    void refresh(Vc2MatrixWords& m) override;
+
+private:
+    Vc2MatrixSources& sources_;
 };
 
 int32_t vc2MatrixSum(const Vc2MatrixWords& m, int dest);   // 0x893a2350

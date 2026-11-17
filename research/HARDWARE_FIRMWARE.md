@@ -1546,6 +1546,50 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's Matrix core (2026-11-17, v243) {#vc2-matrix-core}
+
+Step 4.2's Matrix core (research/VC2_MODE_PLAN.md), the user's choice by the VC-2 session's message: rom.4's Matrix object M as a whole, not COSM's share alone. Split by what rom.4 holds, the core first. Ported bit for bit: the refresh `0x893a2230` (`Vc2MatrixCore`, a `Vc2MatrixRefresh`, its sources behind `Vc2MatrixSources`), and every group's reader as a row of v235's `vc2MatrixRead` (`vc2MatrixGroups()`), in Vc2Matrix.cpp. v235's getter `0x893a2350` and COSM's readers are as they were. Every address is rom.4's, every offset M's.
+
+**The Matrix module**, 0x893a1a00…0x893a3300, lies in three layers:
+- **The set-up.** `0x893a1ce0…0x893a1db0` each return a source's routine by its choice: the table at `0x893a1ea0…` names `0x893a1de0`, `0x893a1df0`, `0x893a1e10`, `0x893a1e30`, `0x893a1e60`, `0x893a1ef0`, `0x893a1f30`, `0x893a1f70`, `0x893a1fb0`, `0x893a1fd0`, `0x893a1ff0`, `0x893a2000`, `0x893a2040`, `0x893a2080`, `0x893a2130` and `0x893a21f0`. The destination table `0x893a31a0…`, sixteen bytes a destination, sets one bit in one uses word and returns the destination's number.
+- **The sources.** Each is called by the refresh with M and its byte (+4…). For example, `0x893a2000` reads a controller assignment at `0x89997398` + 0x84c (0 and 32 give 0), then that controller's value at [M + 0x168] + 0x84 + its number, through the curve at `0x895401f6`. So M's words past +0x166 are the sources': the channel's pointer at +0x168 and what lies past it. They are the next part's.
+- **The core**, below.
+
+**The refresh** `0x893a2230(M)`: for each source k of 8:
+- its routine (+0x64 + 4k) with M and its byte (+4 + k); the answer's low 16 bits are its value;
+- a value equal to the last (+0x9a + 2k) leaves everything;
+- else the value is kept, and each of the source's two slots (+0x22 + 4j, j = 2k, 2k + 1) gets its term (+0xaa + 2j): 0 at a value of 0, else the depth × the value on 32 bits >> 13 (arithmetic), held to ± the limit of the slot's destination (`0x89540158`, read at any destination byte; past its 79 words the next table, the sources' curve).
+When any source moved, every group's uses (+0xc…, 11 words) are copied into its dirty bits (+0x84…).
+
+**The readers**, all ten of `vc2MatrixRead`'s shape: the group's uses tested against its bits, the refresh, the dirty bits taken and cleared, each marked destination summed again by the getter in order, and the group's sums returned (M + 0xca + 2 × (first − 1)):
+
+| Reader | Group (uses, dirty) | Bits | Destinations | What |
+|---|---|---|---|---|
+| `0x893a23b0` | 0 (+0x0c, +0x84) | 0x0f | 1…4 | OSC 1: Pitch, Time, Formant, Level |
+| `0x893a2440` | 1 (+0x0e, +0x86) | 0x0f | 5…8 | OSC 2 |
+| `0x893a24d0` | 2 (+0x10, +0x88) | 0x07 | 9…11 | |
+| `0x893a2550` | 3 (+0x12, +0x8a) | 0xfff | 12…23 | |
+| `0x893a26b0` | 4 (+0x14, +0x8c) | 0x1f | 24…28 | OSC 1's LFO: Rate, Pitch, Time, Formant, Level |
+| `0x893a2750` | 5 (+0x16, +0x8e) | 0xfff | 29…40 | |
+| `0x893a28b0` | 6 (+0x18, +0x90) | 0x1f | 41…45 | OSC 2's LFO |
+| `0x893a2960` | 8 (+0x1c, +0x94) | 0x7ff | 46…56 | COSM 1 (v235) |
+| `0x893a2aa0` | 9 (+0x1e, +0x96) | 0x7ff | 57…67 | COSM 2 (v235) |
+| `0x893a2bf0` | 10 (+0x20, +0x98) | 0x7ff | 68…78 | 76…78 summed inline, the getter's sum and hold |
+
+No reader takes group 7 (+0x1a, +0x92): the destinations run on from 45 to 46.
+
+**The check**, xt_vc2cosm's third part (Vc2MatrixCheck.cpp; the frame's part and it now on one template, `vc2CosmPart`):
+- rom.4's refresh, readers and getter run on M in the interpreter's RAM, against the port's on its words; the refresh is no longer hooked here.
+- Only the sources' routines are hooked: four stubs in RAM, M's routine words drawn among them. Each call logs its stub and byte and answers the next of the event's drawn values: the last value (now and then with other high bits), 0, small, a 16-bit end, any 32 bits, or an edge of its first slot's limit (±limit, limit + 1, −limit ± 1). The port's `Vc2MatrixSources` does the same.
+- Each case M is drawn whole: noise, then the slots (destinations 0…78; depths mostly ±127, some any 16 bits, some 8192, under which a term is the value, so the edges reach the holds exactly), uses (now and then none), dirty bits and terms.
+- Then 60 events: a refresh, a group's reader, the getter on a destination, or M drawn again. After each: M, both logs, and the answer (a reader's sums' place, the getter's sum), word for word.
+
+Results:
+- seed 2024, 40 cases: 2,400 events, 733 refreshes (424 setting the dirty bits), 941 reads, 474 sums, 252 draws, 11,312 sources' calls, 0 different; the Growl's and the frame's parts as they were.
+- seeds 7 and 31337, 400 cases each: 24,000 events each (7,177 and 7,176 refreshes, 9,589 and 9,614 reads), 0 different.
+- `mutate_vc2.py --cosm`: 625 plants, all caught; 42 new (17 on the refresh, 25 on the groups' rows; the rows out of the header into Vc2Matrix.cpp, behind `vc2MatrixGroups()`, so a plant reaches them). The first run missed one: the floor's comparison off by one (`t > −limit + 1`), which differs only when a term is −limit + 1 exactly, which the check never drew. It is closed by drawing it: the unity depth and the answers at the limits' edges. Every plant in Vc2Matrix.cpp, v235's with v243's, is caught on the new draws.
+- fcheck's diff is xt_vc2cosm's new `matrix:` line; verify.sh passes every line. No tables file changed, so no loader plant.
+
 ### The VC-2's analog note-on (2026-11-17, v242) {#vc2-analog-note-on}
 
 Step 4.2's OSC voice, its sixth part: the analog OSC's own note-on `0x893c22e0`, kind 3's case of `0x893af0b0`, in the analog OSC's code (0x893c22e0…0x893c2ac2, about 1,000 instructions; step 1b's 0x500 was short of its end). Ported bit for bit: Vc2OscAnalog.cpp (its head and the codes 0…8 and past), Vc2OscAnalogLa.cpp (LA-SQUARE's and LA-SAW's way), Vc2OscAnalog.h (the words), kind 3's row `Vc2OscNoteOn::analog`, its pool words and the Tone Keyfollow table in Vc2OscAnalogPool.h (a member of Vc2OscTables). Its two small callees come with it: `0x893c4a20` (x held within m…1 − m, rom.2's withinM) and `0x893c3570` (HQ's integrator and direction cleared). The sub oscillator's note-on `0x893c3b90` (about 350 instructions, rom.2's subNoteOn) is the next part, rom.4's by address meanwhile. Every address is rom.4's; every offset the voice's.
