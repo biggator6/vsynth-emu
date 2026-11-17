@@ -747,8 +747,8 @@ an-phase-scale-gone|    if (kOne > f32(kImpactNow)) setF32(kPhase, mul(f32(kPhas
 an-phase-top|f32(kPhase) > kOne \|\| 0.0f > f32(kPhase)|0.0f > f32(kPhase)|vc2oscanalog
 an-phase-bottom|f32(kPhase) > kOne \|\| 0.0f > f32(kPhase)|f32(kPhase) > kOne|vc2oscanalog
 an-sub-test|if (xtf::ftrc(f32(kSubOn)) != 0) {|if (f32(kSubOn) != 0.0f) {|vc2oscanalog
-an-sub-call|kSubNoteOn = 0x893c3b90;|kSubNoteOn = 0x893c3b94;|vc2oscanalog
-an-sub-return|        parts.kindCall(kSubNoteOn);\n        return;|        parts.kindCall(kSubNoteOn);|vc2oscanalog
+an-sub-call|        subNoteOn(*this, parts, shared);\n||vc2oscanalog
+an-sub-return|        subNoteOn(*this, parts, shared);\n        return;|        subNoteOn(*this, parts, shared);|vc2oscanalog
 an-la-codes|kLaFirst = 9, kLaCodes = 2;|kLaFirst = 9, kLaCodes = 1;|vc2oscanalog
 an-fat-half|sub(t.half, mul(sum(v, p, kFat, kFatMod), t.half))|sub(t.half, sum(v, p, kFat, kFatMod))|vc2oscanalog
 an-fat-mod|mul(sum(v, p, kFat, kFatMod), t.half))|mul(sum(v, p, kFat, kPwMod), t.half))|vc2oscanalog
@@ -863,3 +863,60 @@ an-pool-juno|{ 0x893c2b3c, &a.juno.lo }|{ 0x893c2b34, &a.juno.lo }|vc2osctables
 an-pool-read|        vc2ReadPool(image, analogWords(analog));\n||vc2osctables
 tgt-write|v.setF32(at, (this->*target)());|v.setF32(at, 0.0f);|vc2osctargets
 an-noteon-case|        case Vc2OscNoteOn::analog: noteOnAnalog(parts, shared); break;   // 0x893c22e0 (v242, Vc2OscAnalog.cpp)\n||vc2oscnoteon
+# v244: the sub oscillator's note-on (vc2oscanalogsub, Vc2OscAnalogSub.cpp) and its pool words (vc2osctables).  Not
+# planted: the plain end's phase above 1, which the head's hold to 0…1 and the scale by Impact below 1 never give.
+sub-shape|kShape = 0x893c4020;|kShape = 0x893c4024;|vc2oscanalogsub
+sub-shape-gone|    p.kindCall(kShape);\n||vc2oscanalogsub
+sub-gain|v.setF32(kGain, mul(Vc2OscTargets(v, p, s).level(), t.fullScale));|v.setF32(kGain, Vc2OscTargets(v, p, s).level());|vc2oscanalogsub
+sub-fat-now|v.setU32(kFatNow, v.u32(kFatTarget));|v.setU32(kFatNow, v.u32(kPwTarget));|vc2oscanalogsub
+sub-pw-now|v.setF32(kPwNow, div(v.f32(kPwTarget), t.step));|v.setF32(kPwNow, v.f32(kPwTarget));|vc2oscanalogsub
+sub-sw-now|v.setF32(kSwNow, div(v.f32(kSwTarget), t.step));|v.setF32(kSwNow, div(v.f32(kPwTarget), t.step));|vc2oscanalogsub
+sub-level-now|div(v.f32(kLevelTarget), t.levelStep)|div(v.f32(kLevelTarget), t.step)|vc2oscanalogsub
+sub-steep-pair|{ kSquareSteep, kSquareSteep2 }) v.setF32(at + 4|{ kSquareSteep }) v.setF32(at + 4|vc2oscanalogsub
+sub-steep-div|v.setF32(at + 4, div(v.f32(at), t.step));|v.setF32(at + 4, v.f32(at));|vc2oscanalogsub
+sub-held-ramp|within(v.f32(kPwNow), v.f32(kRampEnd), a)|within(v.f32(kPwNow), v.f32(kUnwritten), a)|vc2oscanalogsub
+sub-held-half|v.f32(kRampEnd), a), a.sub.half), p);|v.f32(kRampEnd), a), a.sub.half), 0.0f);|vc2oscanalogsub
+sub-square-half|return add(held(v, p, a), a.sub.half);|return held(v, p, a);|vc2oscanalogsub
+sub-square-steep|    steep(v, a.sub);\n    return add(held|    return add(held|vc2oscanalogsub
+sub-zero|return add(p, 0.0f); }|return p; }|vc2oscanalogsub
+sub-juno-steep|    steep(v, a.sub);\n    return plusZero|    return plusZero|vc2oscanalogsub
+sub-phase-bounds|if (0.0f > p \|\| p > kOne) {|if (0.0f > p) {|vc2oscanalogsub
+sub-phase-bounds-low|if (0.0f > p \|\| p > kOne) {|if (p > kOne) {|vc2oscanalogsub
+sub-phase-zero2|        v.setF32(kSubPhase, 0.0f);\n        return;|        return;|vc2oscanalogsub
+sub-subphase|v.setF32(kSubPhase, mul(v.f32(kFatTarget), p));|v.setF32(kSubPhase, p);|vc2oscanalogsub
+sub-plain-gain|v.setF32(kGain, Vc2OscTargets(v, p, s).level());|v.setF32(kGain, Vc2OscTargets(v, p, s).gain());|vc2oscanalogsub
+sub-plain-pw|v.setU32(kPwNow, v.u32(kPwTarget));|v.setU32(kPwNow, v.u32(kSwTarget));|vc2oscanalogsub
+sub-plain-phase|0.0f > ph \|\| ph > kOne ? 0.0f : ph|ph > kOne ? 0.0f : ph|vc2oscanalogsub
+sub-hq-clear|    hqClear(v, ph, vc2OscTables().analog);\n||vc2oscanalogsub
+sub-la-steep|v.setF32(kSteepNow, div(v.f32(kSteepTarget), t.step));|v.setF32(kSteepNow, v.f32(kSteepTarget));|vc2oscanalogsub
+sub-la-steep2|v.setF32(kSteep2Now, div(v.f32(kSteep2Target), t.step));|v.setF32(kSteep2Now, div(v.f32(kSteepTarget), t.step));|vc2oscanalogsub
+sub-la-x|add(add(mul(within(v.f32(kPwNow), v.f32(kUnwritten), a), t.half), p), t.half)|add(add(mul(v.f32(kPwNow), t.half), p), t.half)|vc2oscanalogsub
+sub-la-x-half|t.half), p), t.half);|t.half), p), 0.0f);|vc2oscanalogsub
+sub-la-bounds|if (0.0f > x \|\| x > kOne) x = 0.0f;|if (0.0f > x) x = 0.0f;|vc2oscanalogsub
+sub-la-subphase|v.setF32(kSubPhase, mul(v.f32(kFatTarget), x));|v.setF32(kSubPhase, x);|vc2oscanalogsub
+sub-la-w2|mul(within(t.half, v.f32(kUnwritten), a), t.half)|mul(within(t.half, v.f32(kUnwritten2), a), t.half)|vc2oscanalogsub
+sub-la-ph2|add(mul(sub(w2, x), kTwo), kTwo)|add(mul(sub(w2, x), kTwo), kOne)|vc2oscanalogsub
+sub-la-ph2-x|sub(w2, x)|sub(x, w2)|vc2oscanalogsub
+sub-la-w3|mul(within(t.half, v.f32(kUnwritten2), a), t.half)|mul(within(t.half, v.f32(kUnwritten), a), t.half)|vc2oscanalogsub
+sub-la-ph3|sub(w3, mul(v.f32(kFatTarget), x))|sub(w3, x)|vc2oscanalogsub
+sub-la-ph3-two|mul(v.f32(kFatTarget), x)), kTwo), kTwo)|mul(v.f32(kFatTarget), x)), kTwo), 0.0f)|vc2oscanalogsub
+sub-la-wraps|{ kPhase2, kPhase3 }) {|{ kPhase2 }) {|vc2oscanalogsub
+sub-la-wrap|v.setF32(at, add(v.f32(at), t.wrap));|v.setF32(at, v.f32(at));|vc2oscanalogsub
+sub-la-wrap-test|if (v.f32(at) > kOne) v.setF32|if (v.f32(at) > t.half) v.setF32|vc2oscanalogsub
+sub-impact-test|if (kOne > v.f32(kImpactNow)) ph|if (kOne < v.f32(kImpactNow)) ph|vc2oscanalogsub
+sub-impact-mul|ph = mul(ph, v.f32(kImpactNow));|ph = v.f32(kImpactNow);|vc2oscanalogsub
+sub-code-bound|code < kSubCodes.size() ? kSubCodes[code] : kPast|code < kSubCodes.size() - 1 ? kSubCodes[code] : kPast|vc2oscanalogsub
+sub-move|    if (row.move) ph = row.move(v, ph, a);\n||vc2oscanalogsub
+sub-past-end|void (*end)(Vc2OscVoice&, Vc2OscParts&, const Vc2ToneShared&, float) = phaseEnd;|void (*end)(Vc2OscVoice&, Vc2OscParts&, const Vc2ToneShared&, float) = plainEnd;|vc2oscanalogsub
+sub-row-hq|{ .end = hqEnd },              // 0 HQ-SAW|{ .end = plainEnd },              // 0 HQ-SAW|vc2oscanalogsub
+sub-row-saw|{ .move = held },              // 2 SAW|{ .move = plusZero },              // 2 SAW|vc2oscanalogsub
+sub-row-square|{ .move = squareMove },        // 3 SQUARE|{ .move = held },        // 3 SQUARE|vc2oscanalogsub
+sub-row-ramp|{ .move = plusZero },          // 5 RAMP|{ .move = held },          // 5 RAMP|vc2oscanalogsub
+sub-row-juno|{ .move = junoMove },          // 7 JUNO|{ .move = plusZero },          // 7 JUNO|vc2oscanalogsub
+sub-row-noise|{ .end = plainEnd },           // 8 NOISE|{ .end = hqEnd },           // 8 NOISE|vc2oscanalogsub
+sub-row-la|{ .end = laEnd },              // 9 LA-SQUARE|{ .end = plainEnd },              // 9 LA-SQUARE|vc2oscanalogsub
+sub-pool-full|{ 0x893c3c20, &a.sub.fullScale }|{ 0x893c3c24, &a.sub.fullScale }|vc2osctables
+sub-pool-step|{ 0x893c3c24, &a.sub.step }|{ 0x893c3c28, &a.sub.step }|vc2osctables
+sub-pool-level|{ 0x893c3c28, &a.sub.levelStep }|{ 0x893c3c24, &a.sub.levelStep }|vc2osctables
+sub-pool-half|{ 0x893c3e7c, &a.sub.half }|{ 0x893c3e80, &a.sub.half }|vc2osctables
+sub-pool-wrap|{ 0x893c3e80, &a.sub.wrap }|{ 0x893c3e7c, &a.sub.wrap }|vc2osctables

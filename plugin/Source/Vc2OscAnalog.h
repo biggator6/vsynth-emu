@@ -1,7 +1,8 @@
 #pragma once
 // The analog OSC's note-on (v242): rom.4's 0x893c22e0, kind 3's, in the analog OSC's code; the kinds' note-on reaches
 // it by its row (Vc2OscNoteOn::analog).  Its head and the other codes' way in Vc2OscAnalog.cpp, LA-SQUARE's and
-// LA-SAW's in Vc2OscAnalogLa.cpp; the sub oscillator's note-on (0x893c3b90) is rom.4's by address through Vc2OscParts.
+// LA-SAW's in Vc2OscAnalogLa.cpp, the sub oscillator's note-on (0x893c3b90, v244) in Vc2OscAnalogSub.cpp, whose shape
+// (0x893c4020) is rom.4's by address through Vc2OscParts.
 // rom.4's words are rom.2's analog voice's (XtAnalog.h) at +0x8c, its block's at +0x30.  Every address is rom.4's;
 // every offset the voice's.  HARDWARE_FIRMWARE.md, "The VC-2's analog note-on".  Audio thread.
 #include "Vc2OscTables.h"
@@ -23,12 +24,22 @@ inline constexpr uint32_t kFatNow = 0x250, kPwTarget = 0x254, kPwNow = 0x258, kD
 inline constexpr uint32_t kImpactNow = 0x264, kFlags = 0x268, kEdge = 0x26c, kHq = 0x270, kHqFalling = 0x274;
 inline constexpr uint32_t kLaStep = 0x280, kUnwritten = 0x298, kPhase2 = 0x2a4, kSteepTarget = 0x2b0;
 inline constexpr uint32_t kSteepNow = 0x2b4, kNoiseHold = 0x2d4;
+// [FW] the sub oscillator's (v244): the second wave's Pulse Width target and value, the level's, the second phase,
+// RAMP's last segment, a second word nothing writes (rom.2's +0x214), LA's third phase, the second wave's
+// steepness (LA's), SQUARE's and JUNO's steepness of each wave
+inline constexpr uint32_t kSwTarget = 0x278, kSwNow = 0x27c, kLevelTarget = 0x28c, kLevelNow = 0x290;
+inline constexpr uint32_t kSubPhase = 0x288, kRampEnd = 0x294, kUnwritten2 = 0x2a0, kPhase3 = 0x2a8;
+inline constexpr uint32_t kSteep2Target = 0x2b8, kSteep2Now = 0x2bc, kSquareSteep = 0x2c0, kSquareSteep2 = 0x2c8;
 
 // A shape's sum: the block's word, its envelope × its depth, its LFO × its depth (FMAC, product then sum), held to 0…1
 // (a NaN passing)
 float sum(const Vc2OscVoice& v, Vc2OscParts& p, uint32_t base, const Vc2OscTargets::Mod& m);
+// 0x893c3570 on the object: HQ's integrator and direction 0 (a code's `then`: the rest unread)
+void hqClear(Vc2OscVoice& v, float, const Vc2OscAnalogPool&);
 // 0x893c4a20: x held within m…1 − m, by which side of the half it is on
 float within(float x, float m, const Vc2OscAnalogPool& t);
 // 0x893c2404…: LA-SQUARE's and LA-SAW's way, by the code (9, 10)
 void laNoteOn(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s, uint32_t code);
+// 0x893c3b90: the sub oscillator's note-on (v244, Vc2OscAnalogSub.cpp), its shape 0x893c4020 through Vc2OscParts
+void subNoteOn(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s);
 } // namespace Vc2OscAnalog

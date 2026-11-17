@@ -64,6 +64,10 @@ void oscBlockFloats(std::span<uint32_t> words, std::mt19937& rng);
 // never a NaN (FTRC reads it); the Tone KF's value within its table; the Tone, Fat, the Pulse Width, their depths,
 // Impact and the Slope moderate (NOISE's hold takes FTRC of a sum, and two NaNs in a product are the host's)
 std::array<std::pair<uint32_t, uint32_t>, 12> oscAnalogWords(std::mt19937& rng);
+// v244: the object's words the analog's sub oscillator's shape (0x893c4020, hooked) would write and its note-on reads,
+// drawn moderate on the voice before a kind-3 note-on: noise or another kind's integers there could be NaNs, which
+// reach xtf::sub (Vc2OscGetters.cpp)
+void oscAnalogObject(Vc2OscVoice& o, std::mt19937& rng);
 // A sample position's float: 2^31 and 2^32 themselves and either side, around them, or any but a NaN
 float oscDrawPosition(std::mt19937& rng);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same

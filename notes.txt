@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's sub oscillator's note-on v244 (2026-11-17, on vc2-mode after v243's merge; the user's "Sub-osc here,
+  Matrix there": the Matrix's sources and M's set-up as v245 in the COSM session; HARDWARE_FIRMWARE.md, "The VC-2's sub
+  oscillator's note-on"): step 4.2's OSC voice, its seventh part. Split by what rom.4 holds: the note-on 0x893c3b90
+  (about 350 instructions) in Vc2OscAnalogSub.cpp, its shape 0x893c4020 (about 1,200) hooked until its own version.
+  rom.2's subNoteOn law for law, its words at rom.2's +0x8c (Vc2OscAnalog.h), each code's way a row (Vc2OscSubCode:
+  the phase's move, then its end), its pool words Vc2OscAnalogSubPool; HQ's clear shared with the analog note-on.
+  xt_vc2osc: 0x893c3b90's hook out, 0x893c4020's in; the shape's outputs drawn moderate before each kind-3 note-on
+  (oscAnalogObject); the kinds' note-on event a third each the players', the analog, the kind as found; LA's large
+  +0x298 under Impact below 1. 0 different at seeds 2024, 7 and 31337, the first run; the new code covered but a
+  branch no input reaches. mutate_vc2.py --osc: 886 plants (55 new, 2 rewritten where the sub's call moved), all
+  caught. Not in the sound yet.
+
 The VC-2's Matrix core v243 (2026-11-17, on its own branch, fast-forwarded to vc2-mode's f488b37; the user's choice by
   the VC-2 session's message; HARDWARE_FIRMWARE.md, "The VC-2's Matrix core"). Split by what rom.4 holds: the core now,
   the sources' routines (0x893a1de0…0x893a21f0, on M's words past +0x166) and M's set-up next. Vc2MatrixCore
