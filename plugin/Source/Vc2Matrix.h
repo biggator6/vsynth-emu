@@ -19,14 +19,20 @@ struct Vc2MatrixSlot {
     int16_t depth;       // +2: its depth, which the refresh scales its source by
 };
 
-struct Vc2MatrixWords {
-    static constexpr int kSlots = 16, kGroups = 11;
-    uint8_t head[4];               // +0x000…+0x003
-    uint8_t sources[8];            // +0x004…+0x00b: each source's byte, which the refresh gives its routine
+// M's front, +0x000…+0x083, which a part's record in the Matrix's settings holds the same (v247, Vc2MatrixSetup.h):
+// M's init copies a record's +0x004… into it
+struct Vc2MatrixFront {
+    static constexpr int kSlots = 16, kGroups = 11, kSources = 8;
+    uint8_t head[4];               // +0x000…+0x003: M's the note's velocity, key and poly key; a record's two int16s
+    uint8_t sources[kSources];     // +0x004…+0x00b: each source's byte, which the refresh gives its routine
     uint16_t uses[kGroups];        // +0x00c…+0x021: by group, the destinations a slot names (bit k: its k-th)
     Vc2MatrixSlot slots[kSlots];   // +0x022…+0x061
     uint8_t unread062[2];          // +0x062, +0x063
-    uint32_t routines[8];          // +0x064…+0x083: the sources' routines, which the refresh calls
+    uint32_t routines[kSources];   // +0x064…+0x083: the sources' routines, which the refresh calls
+};
+static_assert(sizeof(Vc2MatrixFront) == 0x84, "rom.4's layout, a part's record and M's front");
+
+struct Vc2MatrixWords : Vc2MatrixFront {
     uint16_t dirty[kGroups];       // +0x084…+0x099: by group, the destinations to sum again (the refresh's)
     int16_t last[8];               // +0x09a…+0x0a9: the sources' last values (the refresh's)
     int16_t terms[kSlots];         // +0x0aa…+0x0c9: each slot's term (the refresh's)

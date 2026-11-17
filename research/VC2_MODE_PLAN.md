@@ -463,9 +463,15 @@ version against rom.4's routines with what it calls hooked:
      (the channel's state) and +0x16c (the part), the seven assignments at `0x89997398` + 0x848 and the curve
      `0x895401f6`, read with the limits as one run (a limit past 78 is the curve's word, as rom.4 reads it); xt_vc2cosm's
      third part with nothing hooked (HARDWARE_FIRMWARE.md, "The VC-2's Matrix sources").
-   - next: M's set-up, so the part (step 4.3) can build a whole M: the six builders (0x893a48xx…0x893a5cxx, calling the
-     choice) and the two destination switches (`0x893a30d0`, 79 cases from `0x893a31a0`, a destination's uses bit and
-     number; `0x893a36a0`, 78 cases), with what the part gives them (the channel's state, the part's number).
+   - done (v247): M's set-up, `Vc2MatrixSetup` (Vc2MatrixSetup.cpp), split by what rom.4 holds. The "six builders"
+     are two routines' pools: part n's record in G (`0x893a46f0`, the Matrix's settings at `0x89997398`, sixteen
+     records of M's front), the system's assignments (`0x893a50b0`) and both (`0x893a51c0`); the destination switches
+     (`0x893a30d0`, `0x893a36a0`) tabulated at load by running rom.4's own; M's init from its part's record
+     (`0x893a2ee0`), with group 2's levels into the part mixer's floats (`0x893a2e50`); a note's head (`0x893a2eb0`).
+     xt_vc2cosm's fourth part, hooking only the parameter reads and `0x893b1ee0` (HARDWARE_FIRMWARE.md, "The VC-2's
+     Matrix set-up"). Left to the part (step 4.3): which channel state G names (`0x893a5050`, by Receive Switch and
+     Channel), the static M at `0x89997108` and its initializers (`0x893a2fe0`, `0x893a3020`), G's allocation
+     (`0x893a5030`). The Matrix is whole but for those.
    - then the COSM object in the tone: the set-up `0x893aa590`, the note-on `0x893aa0e0` (the clears, the allocator
      `0x893a8c50`, the start values `0x893a85f0`, the levels it holds, the new block, the code's case), the binding
      `0x893aa7b0`, the install `0x893aafe0`, the update `0x893aa7d0`, the new block `0x893aa5d0` and the DSP chosen by

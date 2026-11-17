@@ -233,7 +233,8 @@ int main(int argc, char** argv) {
                 n.second, n.noteOns, n.updates, n.newBlocks, n.renders, n.restarts);
     const long frame = vc2CosmFrameCases(fw, *run);   // the second part (v235, Vc2CosmFrameCheck.cpp)
     const long matrix = vc2MatrixCases(fw, *run);     // the third part (v243, Vc2MatrixCheck.cpp)
-    std::printf("xt_vc2cosm: %ld different\n", tally.different + frame + matrix);
+    const long setup = vc2MatrixSetupCases(fw, *run);   // the fourth part (v247, Vc2MatrixSetupCheck.cpp)
+    std::printf("xt_vc2cosm: %ld different\n", tally.different + frame + matrix + setup);
     return 0;
 }
 #endif

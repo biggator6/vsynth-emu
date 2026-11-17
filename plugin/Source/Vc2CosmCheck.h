@@ -18,6 +18,9 @@ bool vc2CosmCheckPorted(int type);
 // The Matrix core's cases on the run's seed (v243, Vc2MatrixCheck.cpp): rom.4's refresh, readers and getter and the
 // port's on the same M; how many differ
 long vc2MatrixCases(Vc2Fw& fw, const Vc2Run& run);
+// The Matrix set-up's cases (v247, Vc2MatrixSetupCheck.cpp): rom.4's records, assignments, M's init, levels and head
+// and the port's on the same G and M; how many differ
+long vc2MatrixSetupCases(Vc2Fw& fw, const Vc2Run& run);
 
 // Words of noise over `x`, a word a draw
 template <class Words>

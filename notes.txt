@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's Matrix set-up v247 (2026-11-17, on its own branch with vc2-mode's a8452f5 merged in; the user's yes;
+  HARDWARE_FIRMWARE.md, "The VC-2's Matrix set-up"). Split by what rom.4 holds: v245's "six builders" are two routines'
+  pools. Vc2MatrixSetup (Vc2MatrixSetup.cpp): G, the Matrix's settings at 0x89997398 (Vc2MatrixSettings: sixteen part
+  records, each M's front, Vc2MatrixFront, which Vc2MatrixWords derives from; the channel's word; the assignments),
+  part n's record from its parameters (0x893a46f0: Patch Category, the bend ranges, each Matrix Control's source held
+  to the choice's, its routine, its slots), the system's assignments (0x893a50b0), both (0x893a51c0), M's init from
+  its part's record (0x893a2ee0) with group 2's levels into the part mixer's floats (0x893a2e50) and a note's head
+  (0x893a2eb0); the parameters through Vc2MatrixParams, 0x893b1ee0 behind Vc2MatrixPart. The destination switches
+  0x893a30d0 and 0x893a36a0 tabulated at load by running rom.4's own in Vc2MatrixTables' image, as xtFwMatrixTables
+  does for rom.2. xt_vc2cosm's fourth part (Vc2MatrixSetupCheck.cpp, Vc2MatrixSetupDraws.cpp, Vc2MatrixCheck.h
+  shared with the third), hooking only the readers, the getter and 0x893b1ee0; 0 different at seeds 2024, 7 and
+  31337. mutate_vc2.py --cosm: 744 plants (56 new), all caught; the first run's miss, M's init without its channel
+  word, closed by drawing G's and M's words apart over two copies of the channel state. Left to the part: 0x893a5050,
+  the static M, G's allocation. Not in the sound yet.
+
 The VC-2's Matrix sources v245 (2026-11-17, on its own branch, fast-forwarded to vc2-mode's 8878381, two commits there,
   squashed into one on vc2-mode after v244 by the user's "Squash into one"; the user's choice, "Sub-osc here, Matrix
   there"; HARDWARE_FIRMWARE.md, "The VC-2's Matrix sources"). Split by what rom.4 holds: the
