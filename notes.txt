@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's Matrix sources v245 (2026-11-17, on its own branch, fast-forwarded to vc2-mode's 8878381, two commits there,
+  squashed into one on vc2-mode after v244 by the user's "Squash into one"; the user's choice, "Sub-osc here, Matrix
+  there"; HARDWARE_FIRMWARE.md, "The VC-2's Matrix sources"). Split by what rom.4 holds: the
+  sources and the choice now, M's set-up (the six builders, the destination switches 0x893a30d0 and 0x893a36a0) next.
+  Vc2MatrixSourceRoutines (Vc2MatrixSources.cpp), v243's Vc2MatrixSources: the sixteen routines 0x893a1de0…0x893a21f0
+  as rows by kind (off, a controller, bend, aftertouch, the seven assignments, two bipolar, the part, keyfollow,
+  velocity) on Vc2MatrixSourceState (M, the channel's state at M's +0x168, the assignments at 0x89997398 + 0x848, the
+  part's byte by M's +0x16c), through the curve 0x895401f6; vc2MatrixSourceRoutine, the choice 0x893a1c70. The limits
+  and the curve read as one run (Vc2MatrixTables::words): a limit past destination 78 is the curve's word, as rom.4
+  reads it, where v243 gave 0. xt_vc2cosm's third part with nothing hooked, the choice an event; 0 different at seeds
+  2024, 7 and 31337. mutate_vc2.py --cosm: 688 plants (63 new), all caught, v243's core plants on rom.4's own
+  sources too. Not in the sound yet.
+
 The VC-2's sub oscillator's note-on v244 (2026-11-17, on vc2-mode after v243's merge; the user's "Sub-osc here,
   Matrix there": the Matrix's sources and M's set-up as v245 in the COSM session; HARDWARE_FIRMWARE.md, "The VC-2's sub
   oscillator's note-on"): step 4.2's OSC voice, its seventh part. Split by what rom.4 holds: the note-on 0x893c3b90

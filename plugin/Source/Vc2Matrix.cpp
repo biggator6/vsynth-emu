@@ -11,10 +11,10 @@ constexpr Vc2MatrixGroup kGroups[] { { 0, 1, 0xf }, { 1, 5, 0xf }, { 2, 9, 0x7 }
                                      { 10, 68, 0x7ff } };
 
 // A slot's term for a source's value: depth × value >> 13 (arithmetic), held to ± its destination's limit.  rom.4 reads
-// the limits at any destination byte; past the table's 79 it reads the next table, which no set-up reaches (the port 0)
+// the limit at any destination byte, past 78 the curve's words (v245), as the port does
 int16_t slotTerm(const Vc2MatrixSlot& s, int16_t value) {
     const int32_t t = (s.depth * value) >> kTermShift;
-    const int32_t most = s.dest < Vc2MatrixTables::kDestinations ? vc2MatrixTables().limits[s.dest] : 0;
+    const int32_t most = vc2MatrixLimit(s.dest);
     return static_cast<int16_t>(t > most ? most : t >= -most ? t : -most);
 }
 } // namespace
@@ -38,7 +38,7 @@ int32_t vc2MatrixSum(const Vc2MatrixWords& m, int dest) {
     for (int k = 0; k < Vc2MatrixWords::kSlots; ++k) {
         if (m.slots[k].dest == dest) sum += m.terms[k];
     }
-    const int32_t most = vc2MatrixTables().limits[dest];
+    const int32_t most = vc2MatrixLimit(dest);
     return sum > most ? most : sum < -most ? -most : sum;
 }
 

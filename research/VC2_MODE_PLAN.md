@@ -458,9 +458,14 @@ version against rom.4's routines with what it calls hooked:
      every group's reader as a row of `vc2MatrixRead` (all ten have the COSM readers' shape; `0x893a2bf0` has the
      getter's sum inline for 76…78; no reader takes group 7), against rom.4's in xt_vc2cosm's third part, only the
      sources' routines hooked (HARDWARE_FIRMWARE.md, "The VC-2's Matrix core").
-   - next: the sources' routines (`0x893a1de0…0x893a21f0`, about sixteen) on M's words past +0x166 and what they read
-     (the channel's controllers, the assignments at `0x89997398`, the curve `0x895401f6`), and M's set-up (the source
-     choice `0x893a1ce0…`, the destination table `0x893a31a0…`, the uses), so the part (step 4.3) can build a whole M.
+   - done (v245): the sixteen sources' routines (`0x893a1de0…0x893a21f0`) and the choice `0x893a1c70` (a source
+     parameter's routine), `Vc2MatrixSourceRoutines` and `vc2MatrixSourceRoutine` (Vc2MatrixSources.cpp), on M's +0x168
+     (the channel's state) and +0x16c (the part), the seven assignments at `0x89997398` + 0x848 and the curve
+     `0x895401f6`, read with the limits as one run (a limit past 78 is the curve's word, as rom.4 reads it); xt_vc2cosm's
+     third part with nothing hooked (HARDWARE_FIRMWARE.md, "The VC-2's Matrix sources").
+   - next: M's set-up, so the part (step 4.3) can build a whole M: the six builders (0x893a48xx…0x893a5cxx, calling the
+     choice) and the two destination switches (`0x893a30d0`, 79 cases from `0x893a31a0`, a destination's uses bit and
+     number; `0x893a36a0`, 78 cases), with what the part gives them (the channel's state, the part's number).
    - then the COSM object in the tone: the set-up `0x893aa590`, the note-on `0x893aa0e0` (the clears, the allocator
      `0x893a8c50`, the start values `0x893a85f0`, the levels it holds, the new block, the code's case), the binding
      `0x893aa7b0`, the install `0x893aafe0`, the update `0x893aa7d0`, the new block `0x893aa5d0` and the DSP chosen by

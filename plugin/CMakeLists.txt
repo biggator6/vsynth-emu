@@ -221,6 +221,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2CosmSideBand.cpp
     Source/Vc2Matrix.cpp
     Source/Vc2MatrixTables.cpp
+    Source/Vc2MatrixSources.cpp
     Source/XtBuildId.cpp
 )
 

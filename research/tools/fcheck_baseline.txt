@@ -793,7 +793,7 @@ xt_vc2tva: 0 different
 == xt_vc2cosm
 growl: 40 cases, 4800 events: 656 conversions (337 by COSM 2's reader), 148 note-ons, 664 updates, 363 new blocks, 3131 renders (1 with the phase started again)
 frame: 40 cases, 2400 events: 132 type 1, 122 type 2, 135 type 3, 133 type 5, 141 type 6, 133 type 7, 153 type 8, 125 type 9, 119 type 10, 127 type 11, 128 type 12, 109 type 13, 153 type 14, 124 type 15, 121 type 16, 20 Speaker Simulator, 0 other types, 264 off, 161 past the types; 5567 refreshes
-matrix: 40 cases, 2400 events: 733 refreshes (424 setting the dirty bits), 941 reads, 474 sums, 252 draws; 11312 sources' calls
+matrix: 40 cases, 2400 events: 616 refreshes (160 setting the dirty bits), 581 reads, 379 sums, 410 choices, 414 draws
 xt_vc2cosm: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
