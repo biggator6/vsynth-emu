@@ -19,6 +19,13 @@
 # Dual's 100 at 0x89397920 for the level gain's, which is the same word); the level's gain's knee as >= 100 ((100/100)²
 # and 1 + 0 are both 1); a level ÷ 127 without its + 0 (never negative: x + 0 is x under round-to-zero); the Own
 # depths' test as > 0 (no Own depth is the first parameter).
+# v239: vc2cosmdrive (Vc2CosmDrive.cpp, OD/Dist's and the Wave Shaper's), vc2cosmbalanced (Vc2CosmBalanced.cpp, the
+# Resonator's, Frequency Shifter's and Lo-Fi's); the libm laws in vc2cosmconvert.  Not planted, as no input tells them
+# apart: a pool of the same values for another (OD/Dist's for the Wave Shaper's, Lo-Fi's level keyfollow for OD/Dist's);
+# the keyfollow ratio's integer product as a float product (exact: its products are below 2^24); the keyed scale's
+# floor (its ratio and level are never below 0); OD/Dist's Type test on its low byte (a Type of 256·n other than 0 is
+# one draw in thousands).  RomShared's powf (Vc2RomShared.h, the check's, a header) planted by hand: its arguments
+# swapped, 40 of 40 cases differ.
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -189,11 +196,11 @@ sums-index|in.matrix)[index]; }|in.matrix)[index + 1]; }|vc2cosmconvert
 keyed-centre|kKeyCentre = 60,|kKeyCentre = 64,|vc2cosmconvert
 keyed-follow-scale|kFollowScale = 10;|kFollowScale = 5;|vc2cosmconvert
 keyed-key-signed|static_cast<int16_t>(key - kKeyCentre)|static_cast<int8_t>(key - kKeyCentre)|vc2cosmconvert
-keyed-follow-16-bits|static_cast<int16_t>(follow * kFollowScale)|follow * kFollowScale|vc2cosmconvert
-keyed-order|div(div(mul(flt(k), flt(f)), percent), k127)|div(mul(flt(k), flt(f)), mul(percent, k127))|vc2cosmconvert
+keyed-follow-16-bits|int16_t followOf(int16_t follow) { return static_cast<int16_t>(follow * kFollowScale); }|int followOf(int16_t follow) { return follow * kFollowScale; }|vc2cosmconvert
+keyed-order|div(div(mul(flt(k), flt(f)), percent), by)|div(mul(flt(k), flt(f)), mul(percent, by))|vc2cosmconvert
 keyed-scale|div(flt(level), flt(kLevelMost))|div(flt(level), 128.0f)|vc2cosmconvert
-keyed-top|    return x > 1.0f ? 1.0f :|    return x > 0.99f ? 0.99f :|vc2cosmconvert
-keyed-floor|0.0f > x ? 0.0f : x;|0.0f > x ? 0.01f : x;|vc2cosmconvert
+keyed-top|flt(kLevelMost))), 0.0f);\n    return x > 1.0f ? 1.0f :|flt(kLevelMost))), 0.0f);\n    return x > 0.99f ? 0.99f :|vc2cosmconvert
+keyed-floor|flt(kLevelMost))), 0.0f);\n    return x > 1.0f ? 1.0f : 0.0f > x ? 0.0f : x;|flt(kLevelMost))), 0.0f);\n    return x > 1.0f ? 1.0f : 0.0f > x ? 0.01f : x;|vc2cosmconvert
 keyed-plus-zero|div(flt(level), flt(kLevelMost))), 0.0f);|div(flt(level), flt(kLevelMost))), 1e-7f);|vc2cosmconvert
 level-most|constexpr int kLevelMost = 127,|constexpr int kLevelMost = 128,|vc2cosmconvert
 unit-offset|return add(div(x, flt(kLevelMost)), 0.0f); }|return add(div(x, flt(kLevelMost)), 1e-7f); }|vc2cosmconvert
@@ -361,12 +368,155 @@ lg-one|k.overGain), 1.0f);|k.overGain), 0.0f);|vc2cosmdynamics
 lg-percent|div(flt(level), k.percent);|div(flt(level), 99.0f);|vc2cosmdynamics
 lg-square|return mul(g, g);|return g;|vc2cosmdynamics
 dyn-most|constexpr int kMost = 127, kOver = 100;|constexpr int kMost = 126, kOver = 100;|vc2cosmdynamics
-types-amp|{ 3, onBlock<Vc2CosmAmpBlock, vc2AmpConvert> },|{ 2, onBlock<Vc2CosmAmpBlock, vc2AmpConvert> },|vc2cosmtypes
-types-no-amp|    { 3, onBlock<Vc2CosmAmpBlock, vc2AmpConvert> },\n||vc2cosmtypes
-types-comp|{ 12, onBlock<Vc2CosmCompBlock, vc2CompConvert> },|{ 13, onBlock<Vc2CosmCompBlock, vc2CompConvert> },|vc2cosmtypes
-types-dtvf|onBlock<Vc2CosmTvfBlock, vc2DtvfConvert>|onBlock<Vc2CosmTvfBlock, vc2TvfConvert>|vc2cosmtypes
-types-tb|{ 16, onBlock<Vc2CosmTbBlock, vc2TbConvert> },|{ 15, onBlock<Vc2CosmTbBlock, vc2TbConvert> },|vc2cosmtypes
+types-amp|{ 3, throughLayout<Vc2CosmAmpBlock, vc2AmpConvert> },|{ 2, throughLayout<Vc2CosmAmpBlock, vc2AmpConvert> },|vc2cosmtypes
+types-no-amp|    { 3, throughLayout<Vc2CosmAmpBlock, vc2AmpConvert> },\n||vc2cosmtypes
+types-comp|{ 12, throughLayout<Vc2CosmCompBlock, vc2CompConvert> },|{ 13, throughLayout<Vc2CosmCompBlock, vc2CompConvert> },|vc2cosmtypes
+types-dtvf|throughLayout<Vc2CosmTvfBlock, vc2DtvfConvert>|throughLayout<Vc2CosmTvfBlock, vc2TvfConvert>|vc2cosmtypes
+types-tb|{ 16, throughLayout<Vc2CosmTbBlock, vc2TbConvert> },|{ 15, throughLayout<Vc2CosmTbBlock, vc2TbConvert> },|vc2cosmtypes
 types-copy-in|    std::memcpy(&b, block, sizeof b);\n||vc2cosmtypes
 types-copy-out|std::memcpy(block, &b, sizeof b);|std::memcpy(block, &b, sizeof b - 4);|vc2cosmtypes
 types-none|if (convert == nullptr) return false;|if (convert == nullptr) return true;|vc2cosmtypes
 types-match|if (t == type) return convert;|if (t == type + 1) return convert;|vc2cosmtypes
+followed-key|const int16_t k = keyOf(key), f = followOf(follow);|const int16_t k = keyOf(key), f = followOf(follow + 1);|vc2cosmconvert
+keyscale-two|shared.pow(2.0f,|shared.pow(2.1f,|vc2cosmconvert
+keyscale-cents|followOf(follow)), cents));|followOf(follow)), 1201.0f));|vc2cosmconvert
+keyscale-key|flt(keyOf(key) * followOf(follow))|flt(keyOf(key + 1) * followOf(follow))|vc2cosmconvert
+levelkeyed-scale|mul(flt(level), k.scale)|mul(flt(level), k.from)|vc2cosmconvert
+levelkeyed-from|flt(kLevelMost)), k.from);|flt(kLevelMost)), 0.0f);|vc2cosmconvert
+levelkeyed-cents|vc2CosmKeyScale(key, follow, k.cents, shared)|vc2CosmKeyScale(key, follow, 1201.0f, shared)|vc2cosmconvert
+levelkeyed-top|return x > 1.0f ? 1.0f : k.from > x ? k.from : x;|return x > 0.99f ? 0.99f : k.from > x ? k.from : x;|vc2cosmconvert
+levelkeyed-floor|k.from > x ? k.from : x;|0.0f > x ? 0.0f : x;|vc2cosmconvert
+levelkeyed-mul|mul(base, vc2CosmKeyScale(|add(base, vc2CosmKeyScale(|vc2cosmconvert
+scaled-unit|vc2CosmUnit(flt(level)));|vc2CosmUnit(flt(level + 1)));|vc2cosmconvert
+scaled-top|vc2CosmUnit(flt(level)));\n    return x > 1.0f ? 1.0f :|vc2CosmUnit(flt(level)));\n    return x > 0.99f ? 0.99f :|vc2cosmconvert
+scaled-cents|vc2CosmKeyScale(key, follow, cents, shared), vc2CosmUnit|vc2CosmKeyScale(key, follow, 1201.0f, shared), vc2CosmUnit|vc2cosmconvert
+balance-scale|sum * kBalanceMost / kLevelMost|sum * kBalanceMost / 128|vc2cosmconvert
+balance-order|sum * kBalanceMost / kLevelMost|sum / kLevelMost * kBalanceMost|vc2cosmconvert
+balance-most|constexpr int kBalanceMost = 100;|constexpr int kBalanceMost = 101;|vc2cosmconvert
+balance-offset|flt(kBalanceMost)), 0.0f);|flt(kBalanceMost)), 1e-7f);|vc2cosmconvert
+balance-hold|vc2CosmLevel(balance, scaled, kBalanceMost)|vc2CosmLevel(balance, scaled, kLevelMost)|vc2cosmconvert
+balance-no-sum|vc2CosmLevel(balance, scaled,|vc2CosmLevel(balance, 0,|vc2cosmconvert
+tables-od-gain|{ 0x89397bcc, &t.od.gainScale }|{ 0x893976b0, &t.od.gainScale }|vc2cosmtables
+tables-od-63|{ 0x893976b0, &t.od.k63 }|{ 0x89397bcc, &t.od.k63 }|vc2cosmtables
+tables-od-scale|{ 0x893976b4, &t.od.key.scale }|{ 0x893976b8, &t.od.key.scale }|vc2cosmtables
+tables-od-from|{ 0x893976b8, &t.od.key.from }|{ 0x893976b4, &t.od.key.from }|vc2cosmtables
+tables-od-cents|{ 0x893976bc, &t.od.key.cents }|{ 0x893976b0, &t.od.key.cents }|vc2cosmtables
+tables-ws-gain|{ 0x89397e4c, &t.ws.gainScale }|{ 0x893976b0, &t.ws.gainScale }|vc2cosmtables
+tables-ws-63|{ 0x893976b0, &t.ws.k63 }|{ 0x89397e4c, &t.ws.k63 }|vc2cosmtables
+tables-ws-scale|{ 0x893976b4, &t.ws.key.scale }|{ 0x893976b8, &t.ws.key.scale }|vc2cosmtables
+tables-ws-from|{ 0x893976b8, &t.ws.key.from }|{ 0x893976b4, &t.ws.key.from }|vc2cosmtables
+tables-ws-cents|{ 0x893976bc, &t.ws.key.cents }|{ 0x893976b0, &t.ws.key.cents }|vc2cosmtables
+tables-res-percent|{ 0x89397920, &t.resonator.percent }|{ 0x8939792c, &t.resonator.percent }|vc2cosmtables
+tables-res-twelve|{ 0x8939792c, &t.resonator.twelve }|{ 0x89397920, &t.resonator.twelve }|vc2cosmtables
+tables-res-scale|{ 0x89397930, &t.resonator.sizeScale }|{ 0x8939792c, &t.resonator.sizeScale }|vc2cosmtables
+tables-res-63|{ 0x893976b0, &t.resonator.k63 }|{ 0x89397920, &t.resonator.k63 }|vc2cosmtables
+tables-shifter-cents|{ 0x89397934, &t.shifter.cents }|{ 0x89399500, &t.shifter.cents }|vc2cosmtables
+tables-shifter-63|{ 0x89399500, &t.shifter.k63 }|{ 0x89397934, &t.shifter.k63 }|vc2cosmtables
+tables-lofi-scale|{ 0x8939793c, &t.lofi.key.scale }|{ 0x89397940, &t.lofi.key.scale }|vc2cosmtables
+tables-lofi-from|{ 0x89397940, &t.lofi.key.from }|{ 0x8939793c, &t.lofi.key.from }|vc2cosmtables
+tables-lofi-cents|{ 0x89397934, &t.lofi.key.cents }|{ 0x89399500, &t.lofi.key.cents }|vc2cosmtables
+tables-lofi-63|{ 0x89399500, &t.lofi.k63 }|{ 0x89397934, &t.lofi.k63 }|vc2cosmtables
+od-code|kOdCode = 1,|kOdCode = 2,|vc2cosmdrive
+od-other-code|kOdOtherCode = 2,|kOdOtherCode = 1,|vc2cosmdrive
+ws-code|kWsCode = 3;|kWsCode = 4;|vc2cosmdrive
+od-type-test|b.code = in.params[kType] == 0 ?|b.code = in.params[kType] <= 0 ?|vc2cosmdrive
+ws-type|b.type = static_cast<uint8_t>(in.params[kType]);|b.type = static_cast<uint8_t>(in.params[kType] & 0x7f);|vc2cosmdrive
+od-level-param|kOd { 1,|kOd { 2,|vc2cosmdrive
+od-drive-param|kOd { 1, 2,|kOd { 1, 5,|vc2cosmdrive
+od-drive-lfo-param|kOd { 1, 2, 3,|kOd { 1, 2, 4,|vc2cosmdrive
+od-drive-env-param|kOd { 1, 2, 3, 4,|kOd { 1, 2, 3, 3,|vc2cosmdrive
+od-tone-param|3, 4, 5, 6, 7, 8, &Vc2CosmTables::od|3, 4, 2, 6, 7, 8, &Vc2CosmTables::od|vc2cosmdrive
+od-follow-param|5, 6, 7, 8, &Vc2CosmTables::od|5, 5, 7, 8, &Vc2CosmTables::od|vc2cosmdrive
+od-tone-lfo-param|6, 7, 8, &Vc2CosmTables::od|6, 8, 8, &Vc2CosmTables::od|vc2cosmdrive
+od-tone-env-param|7, 8, &Vc2CosmTables::od|7, 7, &Vc2CosmTables::od|vc2cosmdrive
+ws-level-param|kWs { 1,|kWs { 0,|vc2cosmdrive
+ws-drive-param|kWs { 1, 2,|kWs { 1, 1,|vc2cosmdrive
+ws-drive-lfo-param|kWs { 1, 2, 4,|kWs { 1, 2, 3,|vc2cosmdrive
+ws-drive-env-param|kWs { 1, 2, 4, 3,|kWs { 1, 2, 4, 4,|vc2cosmdrive
+ws-tone-param|3, 5, 6, 7, 8, &Vc2CosmTables::ws|3, 6, 6, 7, 8, &Vc2CosmTables::ws|vc2cosmdrive
+ws-follow-param|5, 6, 7, 8, &Vc2CosmTables::ws|5, 7, 7, 8, &Vc2CosmTables::ws|vc2cosmdrive
+ws-tone-lfo-param|6, 7, 8, &Vc2CosmTables::ws|6, 6, 8, &Vc2CosmTables::ws|vc2cosmdrive
+ws-tone-env-param|7, 8, &Vc2CosmTables::ws|7, 3, &Vc2CosmTables::ws|vc2cosmdrive
+drive-envelope|kDriveEnvelope[2] = { 9, 11 }|kDriveEnvelope[2] = { 9, 12 }|vc2cosmdrive
+drive-envelope-first|kDriveEnvelope[2] = { 9,|kDriveEnvelope[2] = { 10,|vc2cosmdrive
+tone-envelope|kToneEnvelope[2] = { 10, 12 }|kToneEnvelope[2] = { 10, 11 }|vc2cosmdrive
+tone-envelope-first|kToneEnvelope[2] = { 10,|kToneEnvelope[2] = { 9,|vc2cosmdrive
+drive-sum|kDriveSum = 0,|kDriveSum = 1,|vc2cosmdrive
+drive-lfo-sum|kDriveLfoSum = 9,|kDriveLfoSum = 10,|vc2cosmdrive
+tone-sum|kToneSum = 1,|kToneSum = 0,|vc2cosmdrive
+tone-lfo-sum|kToneLfoSum = 10;|kToneLfoSum = 9;|vc2cosmdrive
+drive-most|constexpr int kMost = 127, kType = 0;|constexpr int kMost = 126, kType = 0;|vc2cosmdrive
+drive-type-param|constexpr int kMost = 127, kType = 0;|constexpr int kMost = 127, kType = 1;|vc2cosmdrive
+drive-level-scale|b.level = vc2CosmGain(in.params[row.level], k.gainScale);|b.level = vc2CosmGain(in.params[row.level], 32767.0f);|vc2cosmdrive
+drive-gain-scale|sum(kDriveSum), kMost), k.gainScale);|sum(kDriveSum), kMost), 32767.0f);|vc2cosmdrive
+drive-velocity|in.params[row.driveEnv], in.velocity[0]|in.params[row.driveEnv], in.velocity[1]|vc2cosmdrive
+tone-velocity|in.params[row.toneEnv], in.velocity[1]|in.params[row.toneEnv], in.velocity[0]|vc2cosmdrive
+drive-63|sum(kDriveLfoSum), k.k63);|sum(kDriveLfoSum), 64.0f);|vc2cosmdrive
+tone-63|sum(kToneLfoSum), k.k63);|sum(kToneLfoSum), 64.0f);|vc2cosmdrive
+tone-key|b.tone = vc2CosmLevelKeyed(tone, in.noteKey,|b.tone = vc2CosmLevelKeyed(tone, in.noteVelocity,|vc2cosmdrive
+drive-second|kDriveEnvelope[sum.second()]|kDriveEnvelope[0]|vc2cosmdrive
+tone-second|kToneEnvelope[sum.second()]|kToneEnvelope[0]|vc2cosmdrive
+tone-no-sum|in.params[row.tone], sum(kToneSum), kMost|in.params[row.tone], 0, kMost|vc2cosmdrive
+drive-held|in.params[row.drive], sum(kDriveSum), kMost|in.params[row.drive], sum(kDriveSum), 126|vc2cosmdrive
+res-code|kResonatorCode = 6,|kResonatorCode = 7,|vc2cosmbalanced
+shifter-code|kShifterCode = 18,|kShifterCode = 17,|vc2cosmbalanced
+lofi-code|kLofiCode = 19;|kLofiCode = 20;|vc2cosmbalanced
+res-setting-param|kResonator { 1,|kResonator { 2,|vc2cosmbalanced
+res-follow-param|kResonator { 1, 2,|kResonator { 1, 3,|vc2cosmbalanced
+res-lfo-param|kResonator { 1, 2, 3,|kResonator { 1, 2, 4,|vc2cosmbalanced
+res-env-param|kResonator { 1, 2, 3, 4,|kResonator { 1, 2, 3, 3,|vc2cosmbalanced
+res-balance-param|kResonator { 1, 2, 3, 4, 5,|kResonator { 1, 2, 3, 4, 6,|vc2cosmbalanced
+res-balance-lfo-param|kResonator { 1, 2, 3, 4, 5, 6,|kResonator { 1, 2, 3, 4, 5, 7,|vc2cosmbalanced
+res-balance-env-param|kResonator { 1, 2, 3, 4, 5, 6, 7 }|kResonator { 1, 2, 3, 4, 5, 6, 6 }|vc2cosmbalanced
+shifter-setting-param|kShifter { 0,|kShifter { 1,|vc2cosmbalanced
+shifter-follow-param|kShifter { 0, 1,|kShifter { 0, 2,|vc2cosmbalanced
+shifter-lfo-param|kShifter { 0, 1, 2,|kShifter { 0, 1, 3,|vc2cosmbalanced
+shifter-env-param|kShifter { 0, 1, 2, 3,|kShifter { 0, 1, 2, 2,|vc2cosmbalanced
+shifter-balance-param|kShifter { 0, 1, 2, 3, 4,|kShifter { 0, 1, 2, 3, 5,|vc2cosmbalanced
+shifter-balance-lfo-param|kShifter { 0, 1, 2, 3, 4, 5,|kShifter { 0, 1, 2, 3, 4, 6,|vc2cosmbalanced
+shifter-balance-env-param|kShifter { 0, 1, 2, 3, 4, 5, 6 }|kShifter { 0, 1, 2, 3, 4, 5, 5 }|vc2cosmbalanced
+lofi-setting-param|kLofi { 2,|kLofi { 3,|vc2cosmbalanced
+lofi-follow-param|kLofi { 2, 3,|kLofi { 2, 4,|vc2cosmbalanced
+lofi-lfo-param|kLofi { 2, 3, 4,|kLofi { 2, 3, 5,|vc2cosmbalanced
+lofi-env-param|kLofi { 2, 3, 4, 5,|kLofi { 2, 3, 4, 4,|vc2cosmbalanced
+lofi-balance-param|kLofi { 2, 3, 4, 5, 6,|kLofi { 2, 3, 4, 5, 7,|vc2cosmbalanced
+lofi-balance-lfo-param|kLofi { 2, 3, 4, 5, 6, 7,|kLofi { 2, 3, 4, 5, 6, 8,|vc2cosmbalanced
+lofi-balance-env-param|kLofi { 2, 3, 4, 5, 6, 7, 8 }|kLofi { 2, 3, 4, 5, 6, 7, 7 }|vc2cosmbalanced
+setting-envelope|kSettingEnvelope[2] = { 9, 11 }|kSettingEnvelope[2] = { 9, 12 }|vc2cosmbalanced
+setting-envelope-first|kSettingEnvelope[2] = { 9,|kSettingEnvelope[2] = { 10,|vc2cosmbalanced
+balance-envelope|kBalanceEnvelope[2] = { 10, 12 }|kBalanceEnvelope[2] = { 10, 11 }|vc2cosmbalanced
+balance-envelope-first|kBalanceEnvelope[2] = { 10,|kBalanceEnvelope[2] = { 9,|vc2cosmbalanced
+setting-sum|kSettingSum = 0,|kSettingSum = 1,|vc2cosmbalanced
+setting-lfo-sum|kSettingLfoSum = 9,|kSettingLfoSum = 10,|vc2cosmbalanced
+balance-sum|kBalanceSum = 1,|kBalanceSum = 0,|vc2cosmbalanced
+balance-lfo-sum|kBalanceLfoSum = 10;|kBalanceLfoSum = 9;|vc2cosmbalanced
+mix-most|constexpr int kMost = 127; |constexpr int kMost = 126; |vc2cosmbalanced
+mix-setting-velocity|in.params[r.env], in.velocity[0]|in.params[r.env], in.velocity[1]|vc2cosmbalanced
+mix-balance-velocity|in.params[r.balanceEnv], in.velocity[1]|in.params[r.balanceEnv], in.velocity[0]|vc2cosmbalanced
+mix-setting-second|kSettingEnvelope[sum.second()]|kSettingEnvelope[0]|vc2cosmbalanced
+mix-balance-second|kBalanceEnvelope[sum.second()]|kBalanceEnvelope[0]|vc2cosmbalanced
+mix-setting-no-sum|in.params[r.setting], sum(kSettingSum), kMost|in.params[r.setting], 0, kMost|vc2cosmbalanced
+mix-balance-no-sum|vc2CosmBalance(in.params[r.balance], sum(kBalanceSum))|vc2CosmBalance(in.params[r.balance], 0)|vc2cosmbalanced
+mix-setting-63|sum(kSettingLfoSum), k63);|sum(kSettingLfoSum), 64.0f);|vc2cosmbalanced
+mix-balance-63|sum(kBalanceLfoSum), k63);|sum(kBalanceLfoSum), 64.0f);|vc2cosmbalanced
+mix-law-follow|in.params[r.follow]);|in.params[r.lfo]);|vc2cosmbalanced
+res-followed-order|vc2CosmFollowed(key, follow, k.percent, k.twelve)|vc2CosmFollowed(key, follow, k.twelve, k.percent)|vc2cosmbalanced
+res-log|shared.log(2.0f)|shared.log(2.1f)|vc2cosmbalanced
+res-scale-ulp|), k.sizeScale);|), 1.6f);|vc2cosmbalanced
+res-log-order|mul(vc2CosmFollowed(key, follow, k.percent, k.twelve), shared.log(2.0f)), k.sizeScale)|vc2CosmFollowed(key, follow, k.percent, k.twelve), mul(shared.log(2.0f), k.sizeScale))|vc2cosmbalanced
+res-two|div(mul(flt(size), 2.0f), flt(kMost))|div(mul(flt(size), 2.0f), 128.0f)|vc2cosmbalanced
+res-offset|flt(kMost))), -1.0f);|flt(kMost))), -0.5f);|vc2cosmbalanced
+res-top|return x > 1.0f ? 1.0f : -1.0f > x ? -1.0f : x;|return x > 0.99f ? 0.99f : -1.0f > x ? -1.0f : x;|vc2cosmbalanced
+res-floor|-1.0f > x ? -1.0f : x;|-0.99f > x ? -0.99f : x;|vc2cosmbalanced
+res-key|resonatorSize(size, in.noteKey, follow, k, shared)|resonatorSize(size, in.noteVelocity, follow, k, shared)|vc2cosmbalanced
+res-type|b.filterType = static_cast<uint8_t>(in.params[0]);|b.filterType = static_cast<uint8_t>(in.params[1]);|vc2cosmbalanced
+shifter-key|vc2CosmScaled(depth, in.noteKey,|vc2CosmScaled(depth, in.noteVelocity,|vc2cosmbalanced
+shifter-cents|follow, k.cents, shared); });|follow, 1201.0f, shared); });|vc2cosmbalanced
+lofi-bit|b.bitDown = static_cast<uint8_t>(in.params[0]);|b.bitDown = static_cast<uint8_t>(in.params[1]);|vc2cosmbalanced
+lofi-rate|b.rateDown = static_cast<uint8_t>(in.params[1]);|b.rateDown = static_cast<uint8_t>(in.params[0]);|vc2cosmbalanced
+lofi-key|vc2CosmLevelKeyed(filter, in.noteKey,|vc2CosmLevelKeyed(filter, in.noteVelocity,|vc2cosmbalanced
+types-od|{ 1, throughLayout<Vc2CosmOdBlock, vc2OdConvert> },|{ 4, throughLayout<Vc2CosmOdBlock, vc2OdConvert> },|vc2cosmtypes
+types-ws|throughLayout<Vc2CosmWsBlock, vc2WsConvert>|throughLayout<Vc2CosmOdBlock, vc2OdConvert>|vc2cosmtypes
+types-res|{ 5, throughLayout|{ 6, throughLayout|vc2cosmtypes
+types-shifter|{ 14, throughLayout|{ 7, throughLayout|vc2cosmtypes
+types-lofi|{ 15, throughLayout|{ 7, throughLayout|vc2cosmtypes

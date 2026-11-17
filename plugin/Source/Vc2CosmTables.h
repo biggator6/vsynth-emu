@@ -1,9 +1,10 @@
 #pragma once
 // The VC-2's COSM constants from rom.4 (v234): the Growl's, its DSP's and its update's pool words; the dispatcher's and
 // the TVF's converter's (v235); the Dynamic TVF's, the Dual Filter's, the Amp Simulator's, the Compressor's, the
-// Limiter's and the TB Filter's, and the gain table they share (v237); read once by loadVc2 at the start (Vc2RomTables),
-// never after.  HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl", "The VC-2's COSM converters' frame", "The
-// VC-2's COSM converters, the first batch".
+// Limiter's and the TB Filter's, and the gain table they share (v237); OD/Dist's, the Wave Shaper's, the Resonator's,
+// the Frequency Shifter's and Lo-Fi's (v239); read once by loadVc2 at the start (Vc2RomTables), never after.
+// HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl", "The VC-2's COSM converters' frame", "The VC-2's COSM
+// converters, the first batch", "The VC-2's COSM converters on rom.4's libm".
 #include "Vc2Math.h"
 #include <cstdint>
 
@@ -60,6 +61,41 @@ struct Vc2CosmTbPool {
     float gainScale = 0;                      // 32768
 };
 
+// v239's.  The level keyfollow's: 0x89397480 and its copy 0x89397510 read 0x893976b4…0x893976bf, Lo-Fi's 0x89397870
+// 0x8939793c, 0x89397940 and 0x89397934
+struct Vc2CosmLevelKeyPool {
+    float scale = 0;       // 0.9: the held level's top above the floor
+    float from = 0;        // 0.1: the floor, added and held to
+    float cents = 0;       // 1200: the keyfollow's per octave
+};
+
+// OD/Dist's (0x89397bcc) and the Wave Shaper's (0x89397e4c), their depths' 0x89397450 (0x893976b0), their Tone's
+struct Vc2CosmDrivePool {
+    float gainScale = 0;   // 32768: a gain table word's 1
+    float k63 = 0;         // 63
+    Vc2CosmLevelKeyPool key {};
+};
+
+// The Resonator's Size, 0x89397760 (0x89397920, 0x8939792c, 0x89397930), and its depths' (0x893976b0)
+struct Vc2CosmResonatorPool {
+    float percent = 0;     // 100
+    float twelve = 0;      // 12
+    float sizeScale = 0;   // 1.6: the keyfollow's ln 2 over it
+    float k63 = 0;         // 63
+};
+
+// The Frequency Shifter's Depth, 0x89397800 (0x89397934), and its depths' (0x89399500)
+struct Vc2CosmShifterPool {
+    float cents = 0;       // 1200
+    float k63 = 0;         // 63
+};
+
+// Lo-Fi's Filter, 0x89397870, and its depths' (0x89399500)
+struct Vc2CosmLofiPool {
+    Vc2CosmLevelKeyPool key {};
+    float k63 = 0;         // 63
+};
+
 struct Vc2CosmTables {
     static constexpr int kGains = 128;   // [FW] the gain table's words, 0…32768, before the next table's
     Vc2CosmGrowlPool growl {};
@@ -68,6 +104,10 @@ struct Vc2CosmTables {
     Vc2CosmAmpPool amp {};
     Vc2CosmLevelGainPool levelGain {};
     Vc2CosmTbPool tb {};
+    Vc2CosmDrivePool od {}, ws {};
+    Vc2CosmResonatorPool resonator {};
+    Vc2CosmShifterPool shifter {};
+    Vc2CosmLofiPool lofi {};
     float velocityScale = 0;   // 32768: the dispatcher's, a velocity factor's 0…32768 to 0…1 (0x893999ac, v235)
     float limiterScale = 0;    // 32768: the Limiter's, a gain table word's 1 (0x89399270)
     uint16_t gains[kGains] {};   // 0x89541f34: about 32768·(i/127)², the Amp's, Limiter's and TB Filter's (v237)

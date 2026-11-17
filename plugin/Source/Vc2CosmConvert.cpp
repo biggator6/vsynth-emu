@@ -15,10 +15,16 @@ constexpr int kSpeaker = 4, kSpeakerCode = 5;                // [FW] its inline 
 constexpr int kDepthMost = 63;                               // [FW] a depth's hold
 constexpr int kLevelMost = 127, kKeyCentre = 60, kFollowScale = 10;   // [FW] a level's hold, the keyfollow's key and ×10
 
+constexpr int kBalanceMost = 100;                            // [FW] a Dry/Effect Balance's hold and ÷
+
 float factorOf(int velocity, int sens, int curve, const Vc2ToneShared& shared) {
     const auto f = static_cast<uint16_t>(shared.velocity(velocity, sens, curve));
     return div(flt(f), vc2CosmTables().velocityScale);
 }
+
+// The keyfollow's key and follow, each 16 bits: key − 60, follow × 10
+int16_t keyOf(uint8_t key) { return static_cast<int16_t>(key - kKeyCentre); }
+int16_t followOf(int16_t follow) { return static_cast<int16_t>(follow * kFollowScale); }
 } // namespace
 
 int vc2CosmLevel(int16_t param, int16_t sum, int most) {
@@ -41,12 +47,35 @@ int Vc2CosmSums::second() const { return in.second != 0 ? 1 : 0; }
 
 float vc2CosmUnit(float x) { return add(div(x, flt(kLevelMost)), 0.0f); }
 
+float vc2CosmFollowed(uint8_t key, int16_t follow, float percent, float by) {
+    const int16_t k = keyOf(key), f = followOf(follow);
+    return div(div(mul(flt(k), flt(f)), percent), by);
+}
+
 float vc2CosmKeyed(int level, uint8_t key, int16_t follow, float percent, float k127) {
-    const auto k = static_cast<int16_t>(key - kKeyCentre);
-    const auto f = static_cast<int16_t>(follow * kFollowScale);
-    const float keyed = div(div(mul(flt(k), flt(f)), percent), k127);
-    const float x = add(add(keyed, div(flt(level), flt(kLevelMost))), 0.0f);
+    const float x = add(add(vc2CosmFollowed(key, follow, percent, k127), div(flt(level), flt(kLevelMost))), 0.0f);
     return x > 1.0f ? 1.0f : 0.0f > x ? 0.0f : x;
+}
+
+float vc2CosmKeyScale(uint8_t key, int16_t follow, float cents, const Vc2ToneShared& shared) {
+    return shared.pow(2.0f, div(flt(keyOf(key) * followOf(follow)), cents));
+}
+
+float vc2CosmLevelKeyed(int level, uint8_t key, int16_t follow, const Vc2CosmLevelKeyPool& k,
+                        const Vc2ToneShared& shared) {
+    const float base = add(div(mul(flt(level), k.scale), flt(kLevelMost)), k.from);
+    const float x = mul(base, vc2CosmKeyScale(key, follow, k.cents, shared));
+    return x > 1.0f ? 1.0f : k.from > x ? k.from : x;
+}
+
+float vc2CosmScaled(int level, uint8_t key, int16_t follow, float cents, const Vc2ToneShared& shared) {
+    const float x = mul(vc2CosmKeyScale(key, follow, cents, shared), vc2CosmUnit(flt(level)));
+    return x > 1.0f ? 1.0f : 0.0f > x ? 0.0f : x;
+}
+
+float vc2CosmBalance(int16_t balance, int16_t sum) {
+    const auto scaled = static_cast<int16_t>(sum * kBalanceMost / kLevelMost);
+    return add(div(flt(vc2CosmLevel(balance, scaled, kBalanceMost)), flt(kBalanceMost)), 0.0f);
 }
 
 float vc2CosmQ(int q, float scale) { return add(div(mul(flt(q), scale), flt(kLevelMost)), -1.0f); }
