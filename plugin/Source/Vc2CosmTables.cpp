@@ -5,6 +5,14 @@
 
 namespace {
 constexpr uint32_t kGainTable = 0x89541f34;   // [FW] the converters' gain table, u16 each
+// [FW] the COSM object's install (v249): its DSP routines, mono and stereo, and its floats
+constexpr uint32_t kMonoRoutines = 0x8993fb50, kStereoRoutines = 0x8993fba4, kObjectFactors = 0x895423b4;
+
+// A table of routines read about its start, as an install reads it by a signed byte
+void readRoutines(Sh4& image, uint32_t table, uint32_t* out) {
+    for (int i = -Vc2CosmObjectPool::kCodeReach; i < Vc2CosmObjectPool::kCodeReach; ++i)
+        out[i + Vc2CosmObjectPool::kCodeReach] = image.rd32(table + 4 * (uint32_t)i);
+}
 
 // [FW] the Growl's DSP's pool and its update's; the TVF's converter's and the dispatcher's; the batches of v237 and
 // v239 (a helper's word read into each converter's pool that takes it)
@@ -41,6 +49,9 @@ struct Read : Vc2CosmTables {
     bool read(Sh4& image) {
         vc2ReadPool(image, cosmWords(*this));
         for (int i = 0; i < kGains; ++i) gains[i] = (uint16_t)image.rd16(kGainTable + 2 * (uint32_t)i);
+        readRoutines(image, kMonoRoutines, object.mono);
+        readRoutines(image, kStereoRoutines, object.stereo);
+        vc2ReadFloats(image, { kObjectFactors, Vc2CosmObjectPool::kFactors }, object.factors);
         return true;
     }
 };

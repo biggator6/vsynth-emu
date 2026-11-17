@@ -45,6 +45,10 @@
 # words on (the curve's words 128…241 are all 0); the sensitivity's reach (the store gives −64…63, the check draws
 # −128…127, past which rom.4 reads on past its tables and the port gives 0); a source and sensitivity's "on" (any
 # nonzero).
+# v249: the COSM object's frame in vc2cosmobject (Vc2CosmObject.cpp), its install's tables in vc2cosmtables, under
+# xt_vc2cosm's fifth part.  Not planted: the routines' table read about its start by a signed byte, made unsigned (an
+# index past the table's 256, read out of bounds rather than a difference), and the floats' guard (no variant the check
+# draws reaches it; a converter's never does).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -789,3 +793,35 @@ tables-dest-bit|dests[d].bit = bits;|dests[d].bit = 1;|vc2matrixtables
 tables-dest-group|dests[d].group = static_cast<uint8_t>(g);|dests[d].group = 0;|vc2matrixtables
 tables-depth-sign|{ kOn, (uint32_t)d, (uint32_t)s }|{ kOn, (uint32_t)d, (uint32_t)-s }|vc2matrixtables
 tables-level-scale|kLevelScale = 0x893a3064;|kLevelScale = 0x893a3068;|vc2matrixtables
+obj-vtable|kVtable = 0x898cd478;|kVtable = 0x898cd47c;|vc2cosmobject
+obj-construct-vtable|    o.vtable = kVtable;\n||vc2cosmobject
+obj-construct-factor|    o.factor = 0.0f;\n||vc2cosmobject
+obj-setup-copy|    o.setUp = s;\n||vc2cosmobject
+obj-setup-flag|o.setUp.flag = flag != 0 ? 1 : 0;|o.setUp.flag = flag;|vc2cosmobject
+obj-bind-order|o.bindings = bindings;|o.bindings = { bindings[1], bindings[0], bindings[2], bindings[3] };|vc2cosmobject
+obj-last-code|if (code >= 0 && code <= kLastCode)|if (code >= 0 && code < kLastCode)|vc2cosmobject
+obj-stereo-on-mono|kStereoOnMono = 10;|kStereoOnMono = 9;|vc2cosmobject
+obj-curve-step|kCurveStep = 3;|kCurveStep = 2;|vc2cosmobject
+obj-fives|kFives = 5;|kFives = 10;|vc2cosmobject
+obj-row-own-0|{ { 0, Own }, { 1, Own },|{ { 1, Own }, { 1, Own },|vc2cosmobject
+obj-row-curve|{ 3, Curve }|{ 3, Own }|vc2cosmobject
+obj-row-type|{ 5, Type }|{ 5, Own }|vc2cosmobject
+obj-row-od|{ 8, Own }|{ 7, Own }|vc2cosmobject
+obj-row-growl|{ 12, Own }|{ 13, Own }|vc2cosmobject
+obj-row-tvf|{ 16, Fives }|{ 16, Own }|vc2cosmobject
+obj-row-dtvf|{ 19, Fives }|{ 18, Fives }|vc2cosmobject
+obj-row-comp|{ 22, Own }|{ 21, Own }|vc2cosmobject
+obj-row-last|{ 27, Own } };|{ 26, Own } };|vc2cosmobject
+obj-curve-edge|o.variant >= kCurveStep ? 1 : 0|o.variant > kCurveStep ? 1 : 0|vc2cosmobject
+obj-type-add|case Type: return c.index + o.variant;|case Type: return c.index + o.variant / 2;|vc2cosmobject
+obj-fives-sign|c.index + o.filterType / kFives|c.index - o.filterType / kFives|vc2cosmobject
+obj-flag-any|const bool stereo = flag != 0;|const bool stereo = flag == 1;|vc2cosmobject
+obj-table-swap|(stereo ? t.stereo : t.mono)|(stereo ? t.mono : t.stereo)|vc2cosmobject
+obj-code-zero|if (code >= 0 && code <= kLastCode)|if (code > 0 && code <= kLastCode)|vc2cosmobject
+obj-stereo-offset|(stereo ? Vc2CosmObjectPool::kTypes : 0)|(stereo ? Vc2CosmObjectPool::kTypes - 1 : 0)|vc2cosmobject
+obj-return-stereo|return stereo ? 1 : code == kStereoOnMono;|return stereo ? 0 : code == kStereoOnMono;|vc2cosmobject
+obj-return-mono|return stereo ? 1 : code == kStereoOnMono;|return stereo ? 1 : 0;|vc2cosmobject
+tables-obj-mono|kMonoRoutines = 0x8993fb50,|kMonoRoutines = 0x8993fb54,|vc2cosmtables
+tables-obj-stereo|kStereoRoutines = 0x8993fba4,|kStereoRoutines = 0x8993fba0,|vc2cosmtables
+tables-obj-factors|kObjectFactors = 0x895423b4;|kObjectFactors = 0x895423b8;|vc2cosmtables
+tables-obj-signed|table + 4 * (uint32_t)i);|table + 4 * (uint32_t)(i + 1));|vc2cosmtables
