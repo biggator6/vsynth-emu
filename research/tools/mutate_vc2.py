@@ -29,8 +29,9 @@
 # Vc2Tva.cpp and Vc2TvaTables.cpp (PORT=vc2tva, vc2tvatables: the TVA, v233), through xt_vc2tva, [cases] its cases
 # (40).  --cosm: vc2cosm_muts.txt, in Vc2CosmGrowl.cpp, Vc2CosmTables.cpp and Vc2Math.cpp's sine and cosine
 # (PORT=vc2growl, vc2cosmtables, vc2cosmmath: the Growl, v234), Vc2CosmConvert.cpp, Vc2CosmTvf.cpp, Vc2Matrix.cpp and
-# Vc2MatrixTables.cpp (vc2cosmconvert, vc2cosmtvf, vc2matrix, vc2matrixtables: the converters' frame, v235), through
-# xt_vc2cosm, [cases] its cases (40).  One line
+# Vc2MatrixTables.cpp (vc2cosmconvert, vc2cosmtvf, vc2matrix, vc2matrixtables: the converters' frame, v235),
+# Vc2CosmFilters.cpp, Vc2CosmDynamics.cpp and Vc2CosmConverters.cpp (vc2cosmfilters, vc2cosmdynamics, vc2cosmtypes: the
+# converters' first batch, v237), through xt_vc2cosm, [cases] its cases (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist

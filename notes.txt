@@ -335,6 +335,24 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM converters, the first batch v237 (2026-11-16, on its own branch from vc2-mode's f3258b4; the VC-2
+  session's task, beside v236's portamento; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters, the first batch"). Step
+  4.2's COSM part's third. The switch's 15 converters left 13 after v235, not 14 (the Speaker Simulator's case is
+  inline); split by what rom.4 holds: six on the shared holds alone now, the seven that reach rom.4's powf (0x89506e54)
+  and logf (0x895065f4) next (the plan's order). Ported: the Amp Simulator 0x89397eb0, the Compressor 0x89398fd0 and the
+  Limiter 0x893990d0 with the level's gain 0x89397900 (Vc2CosmDynamics.cpp); the Dual Filter 0x893988a0 and the TB
+  Filter 0x89399620 (Vc2CosmFilters.cpp); the Dynamic TVF 0x89398d40, the TVF's routine on ten parameters with two Own
+  Env depths, one routine over a row with the TVF's (Vc2CosmTvf.cpp); the shared laws in Vc2CosmConvert.cpp (the sums'
+  calls Vc2CosmSums, the keyfollow vc2CosmKeyed, which the Dual Filter's helper 0x893976f0 is too, vc2CosmQ,
+  vc2CosmUnit, vc2CosmGain); the gain table 0x89541f34 (128 words) and the pool words in Vc2CosmTables.cpp, read by its
+  own reader now; the converters by type, vc2CosmPortedConvert (Vc2CosmConverters.cpp). xt_vc2cosm's second part runs
+  them on both sides, the other seven hooked by the check's own list of the types ported (its draws, by each type's
+  parameters' ranges, in Vc2CosmFrameDraws.cpp); 0 different at seeds 2024 (2,400 events), 7 and 31337 (24,000 each),
+  the first run. mutate_vc2.py --cosm: 351 plants (v235's TVF plants rewritten, 228 new), all caught; the first run
+  missed 2, on the table's last word, as the port had read 129 words and the 129th, the next table's 0, is the port's 0
+  past it. Found: rom.4's 0x89398070 (a Speaker Simulator converter) and 0x89397970 are never called, and rom.2's
+  0x894dcef0 neither: its dispatcher inlines the case too (v78's note withdrawn). Not in the sound yet.
+
 The VC-2's COSM converters' frame v235 (2026-11-16, on its own branch from vc2-mode's a652243; the VC-2 session's word,
   from the user's "v232 plus COSM"; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters' frame"). Step 4.2's COSM part's
   second. vc2CosmConvert (Vc2CosmConvert.cpp): rom.4's dispatcher 0x89399920, the switch byte, the two velocity factors

@@ -1,8 +1,11 @@
 #pragma once
 // The VC-2's COSM constants from rom.4 (v234): the Growl's, its DSP's and its update's pool words; the dispatcher's and
-// the TVF's converter's (v235); read once by loadVc2 at the start (Vc2RomTables), never after.  HARDWARE_FIRMWARE.md,
-// "The VC-2's COSM type 8, the Growl", "The VC-2's COSM converters' frame".
+// the TVF's converter's (v235); the Dynamic TVF's, the Dual Filter's, the Amp Simulator's, the Compressor's, the
+// Limiter's and the TB Filter's, and the gain table they share (v237); read once by loadVc2 at the start (Vc2RomTables),
+// never after.  HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl", "The VC-2's COSM converters' frame", "The
+// VC-2's COSM converters, the first batch".
 #include "Vc2Math.h"
+#include <cstdint>
 
 // The Growl's: the DSP's pool (0x893b9c80…0x893b9ca7) and the update's and new block's (0x893b9e94…0x893b9e9f)
 struct Vc2CosmGrowlPool {
@@ -19,7 +22,7 @@ struct Vc2CosmGrowlPool {
     float k440 = 0, k50 = 0;   // the divider factor, 440 / ((s + 1) × 50)
 };
 
-// The TVF's converter's (0x89398da0…0x89398db7, v235)
+// The TVF's converter's (0x89398da0…0x89398db7, v235), and the Dynamic TVF's (0x89399020…0x89399037, v237)
 struct Vc2CosmTvfPool {
     float percent = 0;     // 100: the keyfollow's per cent
     float k127 = 0;        // 127: the keyfollow's per step
@@ -27,10 +30,47 @@ struct Vc2CosmTvfPool {
     float qScale = 0;      // 0.984375: Q's top below 1
 };
 
+// The Dual Filter's (0x89398b4c, 0x89398b50) and its keyfollow's, 0x893976f0's (0x89397920, 0x89397924)
+struct Vc2CosmDualPool {
+    float qScale = 0;      // 0.984375
+    float k63 = 0;         // 63
+    float percent = 0;     // 100
+    float k127 = 0;        // 127
+};
+
+// The Amp Simulator's (0x893980b4, 0x893980c0) and its depths', 0x89397450's (0x893976b0)
+struct Vc2CosmAmpPool {
+    float bass = 0;        // 4: the Bass's top
+    float gainScale = 0;   // 32768: a gain table word's 1
+    float k63 = 0;         // 63
+};
+
+// The level's gain, 0x89397900's, the Compressor's and the Limiter's (0x89397920, 0x89397bc0, 0x89397bc4)
+struct Vc2CosmLevelGainPool {
+    float percent = 0;     // 100: (L/100)² up to it
+    float over = 0;        // 27: above it, 1 + 3·(L − 100)/27
+    float overGain = 0;    // 3
+};
+
+// The TB Filter's (0x8939979c…0x893997a7, 0x893999a0…0x893999af)
+struct Vc2CosmTbPool {
+    float lpfFollow = 0, lpfFollowFrom = 0;   // 4, −2: the LPF keyfollow's (KF·10 + 200)·4/400 − 2
+    float k63 = 0;                            // 63
+    float hpfFollow = 0, hpfFollowFrom = 0;   // the HPF keyfollow's, the same values
+    float gainScale = 0;                      // 32768
+};
+
 struct Vc2CosmTables {
+    static constexpr int kGains = 128;   // [FW] the gain table's words, 0…32768, before the next table's
     Vc2CosmGrowlPool growl {};
-    Vc2CosmTvfPool tvf {};
+    Vc2CosmTvfPool tvf {}, dtvf {};
+    Vc2CosmDualPool dual {};
+    Vc2CosmAmpPool amp {};
+    Vc2CosmLevelGainPool levelGain {};
+    Vc2CosmTbPool tb {};
     float velocityScale = 0;   // 32768: the dispatcher's, a velocity factor's 0…32768 to 0…1 (0x893999ac, v235)
+    float limiterScale = 0;    // 32768: the Limiter's, a gain table word's 1 (0x89399270)
+    uint16_t gains[kGains] {};   // 0x89541f34: about 32768·(i/127)², the Amp's, Limiter's and TB Filter's (v237)
 };
 
 [[nodiscard]] bool vc2LoadCosm(const char* path);

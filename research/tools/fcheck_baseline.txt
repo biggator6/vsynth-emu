@@ -791,7 +791,7 @@ tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fad
 xt_vc2tva: 0 different
 == xt_vc2cosm
 growl: 40 cases, 4800 events: 656 conversions (337 by COSM 2's reader), 148 note-ons, 664 updates, 363 new blocks, 3131 renders (1 with the phase started again)
-frame: 40 cases, 2400 events: 1102 TVF, 544 Growl, 9 Speaker Simulator, 200 other types, 261 off, 284 past the types; 4648 refreshes
+frame: 40 cases, 2400 events: 224 type 3, 233 type 8, 243 type 9, 241 type 10, 217 type 11, 223 type 12, 223 type 13, 213 type 16, 27 Speaker Simulator, 153 other types, 247 off, 156 past the types; 4564 refreshes
 xt_vc2cosm: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
