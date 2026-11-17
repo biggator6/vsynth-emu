@@ -783,8 +783,8 @@ tone: 40 cases, 16000 events, 1255 made, 1419 none, 834 built in place, 830 unma
 note-on: 2352 note-ons, 370 players taken, 2895 LFOs following, 5470 free LFOs, 347 inputs fixed
 xt_vc2tone: 0 different
 == xt_vc2osc
-osc: 40 cases, 16000 events, 1903 note-ons (490 with a sample, 1413 without), 1887 updates, 1977 renders, 934 settings, 928 takes, 2798 getters
-calls: 134 seeks, 211 ramps set, 2004 kinds' routines
+osc: 40 cases, 16000 events, 2641 note-ons (422 with a sample, 1340 without), 1649 updates, 1693 renders, 876 settings, 840 takes, 3334 getters
+calls: 149 seeks, 215 ramps set, 2752 kinds' routines
 xt_vc2osc: 0 different
 == xt_vc2tva
 tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fading, 961 fades ended, 559 told), 88 over, 200 silent

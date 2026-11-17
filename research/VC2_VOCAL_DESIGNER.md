@@ -356,7 +356,7 @@ the rest, and show which were rewritten:
 | The Matrix's getters | `0x894e7010` → `0x893a23b0`, `0x894e70b0` → `0x893a2440`, `0x894e7320` → `0x893a26b0`, `0x894e7520` → `0x893a28b0` | shape |
 | Pitch ramp | start `0x894f4890` → `0x893b0e10` (41 alike), legato update `0x894f48b0` → `0x893b0e30`, value `0x894f4c00` → `0x893b1160` | shape, `--near` |
 | Pitch ramp, rewritten | constructor `0x894f4860` → `0x893b0dc0` (37 instructions against 22), restart `0x894f4920` → `0x893b0b10` (rom.4's update branches to it), tick `0x894f4b00` → `0x893b0f30` (0x230 bytes against 0x100) | order, run |
-| Rewritten, not run | the VariPhrase converter `0x894e2f20`, the pitch target `0x894f3a00`/`0x894f3ba0`, the gain target `0x894f3dc0`/`0x894f3e20` (rom.2's seven routines 0x894f3a00…0x894f3ec0, 0x5c0 bytes, are three of 0x470 in rom.4 at 0x893afff0…), the voice update's 70% step `0x8950c1b0`, the portamento settings `0x894e66e0`, the note's setup `0x894e4c30` and random seed `0x894e5010`, the bend `0x894e9fe0`, the velocity curve's patch converter `0x894ebed0` | no alike run of more than 12 instructions within 0x400 of their place |
+| Rewritten, not run | the VariPhrase converter `0x894e2f20`, the pitch target `0x894f3a00`/`0x894f3ba0`, the gain target `0x894f3dc0`/`0x894f3e20` (rom.2's seven routines 0x894f3a00…0x894f3ec0, 0x5c0 bytes, are three of 0x470 in rom.4 at 0x893afff0…; **withdrawn, v232:** rom.4's targets are twelve routines at 0x893af9f0…0x893aff60 with their pools to 0x893affe3, two of them copies of the cents nothing calls, and 0x893afff0 is kind 5's update: HARDWARE_FIRMWARE.md, "The VC-2's OSC voice's note-on and targets"), the voice update's 70% step `0x8950c1b0`, the portamento settings `0x894e66e0`, the note's setup `0x894e4c30` and random seed `0x894e5010`, the bend `0x894e9fe0`, the velocity curve's patch converter `0x894ebed0` | no alike run of more than 12 instructions within 0x400 of their place |
 
 The rewritten ones are the wiring: what reads parameters, the Matrix and (in rom.2) the Multi Step Modulator's terms. They
 are ported from rom.4, as COSM's converters are.
@@ -777,7 +777,9 @@ run": T_out = 44100/(440·P+0)), and mode 1, the interval, is dead code.
 
 **P+0 is the note's pitch.** The voice routine's kind 6 case (from `0x893af2d0`; read) builds P at the voice + 0x104 as kind
 5's does. P+0 is the voice's + 0x1cc: exp2 of the base pitch and its modulation terms with the portamento's value
-(`0x893b1160`) and a further offset added, clamped, times the voice's +0x60 and +0xa6c. Then `0x893ec700(voice + 0xafc, P)`
+(`0x893b1160`) and a further offset added, clamped, times the voice's +0x60 and +0xa6c (v232, ported: the ratio on the
+kinds' note-on's pool, its lower bound kind 6's own word; the further offset is the wave's, +0xa70; HARDWARE_FIRMWARE.md,
+"The VC-2's OSC voice's note-on and targets"). Then `0x893ec700(voice + 0xafc, P)`
 copies P+0, +4, +8 and +0xc into the kind 6 object and starts it (a tail branch to `0x893ec8d0`). The voice's +0x60 is the
 converter's block +0xc: the converters by kind (VOCODER's `0x8939db00` at `0x8939dc22`, and at `0x8939d168`, `0x8939e3ba` and
 `0x8939ec1a` the other three, which kind each is not mapped) take powf(2, the pitch) and multiply it by **the pitch-source

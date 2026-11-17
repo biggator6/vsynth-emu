@@ -335,6 +335,27 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's OSC voice's note-on and targets v232 (2026-11-16, on vc2-mode after v233 and v234's merge; the user's "v232
+  plus COSM"; HARDWARE_FIRMWARE.md, "The VC-2's OSC voice's note-on and targets"): step 4.2's OSC voice, its second
+  part. Vc2OscVoice::kindNoteOn (Vc2OscNoteOn.cpp): rom.4's 0x893af0b0, kind 0 the object's pitch at 1, kinds 1 to 3
+  their own note-ons through the parts (LITE's 0x893c7c30, VariPhrase's 0x893af420, the analog's 0x893c22e0), kinds 4
+  and 7 the object's pitch, gain and level, kind 5 the carrier's P and its init, kind 6 its P and its start, then the
+  vibrato's note-on; each kind's way a field of its row (Vc2OscNoteOn in Vc2OscVoiceKinds.cpp). Vc2OscTargets
+  (Vc2OscTargets.cpp): the targets 0x893af9f0…0x893aff60, the cents, the ratio and the two tuned ratios, the walk's and
+  the formant's targets and their factored forms (the getters' tails), the gain and the level, on the bindings' words,
+  the vibrato's and the ramps'; the pitch's sum once, the pitch getter's too (vc2OscPitchSum). Their pool words in
+  Vc2OscTables.cpp. The tail's words named by rom.2's xtWaveTune and rom.4's use: the offset, the detune, the walk's and
+  the formant's factors, the factor; the records the wave header and the loop record (v230's sample, map, root, level
+  and gains withdrawn in place). xt_vc2osc (in fcheck, 40 cases): the kinds' note-on and every target an event, the
+  part outputs they read in place drawn into rom.4's memory, the floats that reach exp2 moderate (rom.4's faults from
+  2^31 or a NaN), the block's floats drawn as floats (which of two NaNs a product keeps is the host's); 0 different at
+  seeds 2024 (16,000 events, 2,641 note-ons), 7 and 31337 (160,000 each); every line of the new files covered.
+  mutate_vc2.py --osc: 363 plants, all caught (v230's renamed with their code; the first run missed eight: four were
+  pool words of equal values, dropped; four the check's, each now drawn: one ramp factor for all three, a factor never
+  0, the position getter's type 3 and its 2^31). rom4-no-osc caught. fcheck's diff is xt_vc2osc's counts. Found:
+  0x893afa50 and 0x893afab0, copies of the cents, have no caller; the plan's "0x893af118" is a delay slot inside
+  0x893af0b0. Not in the sound yet.
+
 The VC-2's COSM type 8, the Growl v234 (2026-11-16, on its own branch from vc2-mode's v231; a side session's task from
   the VC-2 session, beside v232 and v233; HARDWARE_FIRMWARE.md, "The VC-2's COSM type 8, the Growl"). Step 4.2's COSM
   part split by job (the plan): the Growl now; then the converters' frame with a first type, the other 14 converters,

@@ -1,4 +1,4 @@
-// xt_vc2osc's port side: the voice's fake parts (Vc2OscCheck.h, v230), logging each call as rom.4's hooks do and
+// xt_vc2osc's port side: the voice's fake parts (Vc2OscCheck.h, v230, v232), logging each call as rom.4's hooks do and
 // answering from the same draws and records.  XT_VC2OSC_MAIN only.
 #ifdef XT_VC2OSC_MAIN
 #include "Vc2OscCheck.h"
@@ -25,21 +25,19 @@ uint32_t OscPortParts::renderBy(uint32_t routine, float* out, uint32_t third) {
     return s_.draws.rendered;
 }
 
-float OscPortParts::kindValue(uint32_t routine) {
-    log(kKindValue, routine);
-    return s_.draws.kindValue;
-}
-
 void OscPortParts::seek(uint32_t routine, int32_t at) {
     log(kSeek, routine, (uint32_t)at, self_.u8(Vc2OscVoice::kObject));   // the object's flags as the player finds them
     self_.setU8(Vc2OscVoice::kObject, s_.draws.seekFlags);              // and as it leaves them
 }
 
-float OscPortParts::envelopeOut(uint32_t envelope) { return recordAt(s_.records.envelopes, envelope, oscEnvelopeAt); }
+float OscPortParts::boundFloat(uint32_t part, uint32_t offset) {
+    const auto word = s_.records.bound.find(part + offset);
+    return word == s_.records.bound.end() ? 0.0f : word->second;
+}
 
-Vc2OscSample OscPortParts::sample(uint32_t at) { return recordAt(s_.records.samples, at, oscSampleAt); }
+Vc2OscWaveHeader OscPortParts::waveHeader(uint32_t at) { return recordAt(s_.records.headers, at, oscHeaderAt); }
 
-Vc2OscMap OscPortParts::map(uint32_t at) { return recordAt(s_.records.maps, at, oscMapAt); }
+Vc2OscLoopRecord OscPortParts::loopRecord(uint32_t at) { return recordAt(s_.records.loops, at, oscLoopAt); }
 
 void OscPortParts::logFloats(OscKind kind, int ramp, float a, float b) {
     log(kind, (uint32_t)ramp, std::bit_cast<uint32_t>(a), std::bit_cast<uint32_t>(b));

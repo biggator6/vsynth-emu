@@ -359,8 +359,16 @@ version against rom.4's routines with what it calls hooked:
      kind's own (`0x893af0b0`), the ramp's start, the counts, the settings, the legato, the render, the getters and the
      take, each switch on the kind one row of `Vc2OscVoiceKinds.cpp`, against rom.4's in xt_vc2osc with every callee
      hooked (HARDWARE_FIRMWARE.md, "The VC-2's OSC voice").
-   - next: the kind's note-on (`0x893af0b0` with `0x893af118`, `0x893af420`, the pitch and gain targets
-     `0x893af9f0…0x893affc0` and the getters' tails `0x893afeb0`, `0x893afdf0`).
+   - done (v232): the kind's note-on, `0x893af0b0` (kinds 0 and 4 to 7 inline, kinds 1 to 3 their own note-ons, LITE's
+     `0x893c7c30`, VariPhrase's `0x893af420`, the analog's `0x893c22e0`, through the parts), and the targets
+     `0x893af9f0…0x893aff60` (the cents, the ratios, the walk's and the formant's, the gain and the level, the getters'
+     tails among them), each kind's way a field of its row, against rom.4's in xt_vc2osc; the tail's words named by
+     rom.2's and rom.4's use (HARDWARE_FIRMWARE.md, "The VC-2's OSC voice's note-on and targets"). This item's
+     `0x893af118` is no routine: it lies inside `0x893af0b0`, the `nop` in a `bra`'s delay slot after one case's `jsr`
+     (the next case starts at 0x893af120; the switch's table is the halfwords at 0x893af0e0); and the targets end at
+     `0x893aff60`'s pool (`0x893affe0`), not 0x893affc0.
+   - next: the portamento; then the players' installs on rom.4's object (`0x893af7a0`, `0x893af870`) and the three
+     kinds' own note-ons (`0x893c7c30`, `0x893af420`, `0x893c22e0`); then Vari off.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
      update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its

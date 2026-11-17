@@ -13,8 +13,8 @@
 # v226) and its tables (vc2antables) under xt_vc2autonote; the part mixer's levels (vc2mix, v227), its block
 # (vc2mixblock), its tables (vc2mixtables) and the shared clamp (vc2mixmath) under xt_vc2mixer; the tone object's frame
 # and its pool (vc2tone, v228) and its note-on (vc2tonenoteon, v229) under xt_vc2tone; the OSC voice's frame (vc2osc,
-# v230), its settings and getters (vc2oscget), its kinds' rows (vc2osckinds) and its constants (vc2osctables) under
-# xt_vc2osc; the TVA (vc2tva, v233) and its constants (vc2tvatables) under xt_vc2tva; the Growl (vc2growl, v234), its
+# v230), its settings and getters (vc2oscget), its kinds' rows (vc2osckinds), its constants (vc2osctables), its note-on
+# by kind (vc2oscnoteon, v232) and its targets (vc2osctargets) under xt_vc2osc; the TVA (vc2tva, v233) and its constants (vc2tvatables) under xt_vc2tva; the Growl (vc2growl, v234), its
 # constants (vc2cosmtables) and the shared sine and cosine it takes (vc2cosmmath) under xt_vc2cosm.
 
 # Each check's files, without .cpp
@@ -33,7 +33,8 @@ VC2AN=(Vc2AutoNote Vc2AutoNoteTables Vc2AutoNoteCheck Vc2Tracker Vc2TrackerTable
        Vc2TrackerSignal)
 VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck Vc2PartMixerFakes)
 VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePortParts Vc2ToneEvents)
-VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscCheck Vc2OscEvents Vc2OscFakes Vc2OscPortParts)
+VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2OscCheck Vc2OscEvents
+        Vc2OscGetters Vc2OscFakes Vc2OscPortParts)
 VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck)
 
@@ -77,6 +78,8 @@ VC2PORTS=(
     "vc2oscget|Vc2OscVoiceGet.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2osckinds|Vc2OscVoiceKinds.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2osctables|Vc2OscTables.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscnoteon|Vc2OscNoteOn.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2osctargets|Vc2OscTargets.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2tva|Vc2Tva.cpp|XT_VC2TVA_MAIN|vc2tva_obj|VC2TVA"
     "vc2tvatables|Vc2TvaTables.cpp|XT_VC2TVA_MAIN|vc2tva_obj|VC2TVA"
     "vc2growl|Vc2CosmGrowl.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"

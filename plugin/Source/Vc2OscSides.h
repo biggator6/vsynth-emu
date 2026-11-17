@@ -24,11 +24,37 @@ struct OscSides {
 // An event on voice `voice` of both sides, after the draws: what differs, or nothing
 using OscEvent = std::function<std::string(OscSides&, std::mt19937&, int voice)>;
 std::span<const OscEvent> oscEvents();
+std::string oscOnGetter(OscSides& s, std::mt19937& rng, int voice);       // a getter or a target (Vc2OscGetters.cpp)
+std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int voice);   // 0x893af0b0 on its own (the same)
 // The voices' own words and tails against rom.4's memory, then the calls; empty when nothing differs
 std::string oscDifference(OscSides& s);
-// A float drawn for a word the voice compares or adds: its usual range most often, its edges now and then; never a NaN
-// when `noNaN`
-float oscDrawFloat(std::mt19937& rng, bool noNaN = false);
+
+enum class OscAnswer : uint8_t { none, r0, fr0 };
+
+// rom.4's `routine` on `args`, then the port's `mine()` (giving its answer's bits), then what differs, the answers
+// compared as `how` says
+template <class Mine>
+std::string oscBothSides(OscSides& s, uint32_t routine, std::initializer_list<uint32_t> args, OscAnswer how,
+                         Mine mine) {
+    if (!s.fw.call(routine, args)) return "rom.4's routine faults: " + s.fw.cpu.error();
+    const uint32_t theirs = how == OscAnswer::fr0 ? s.fw.cpu.fb[0][0] : s.fw.cpu.r[0];
+    const uint32_t ours = mine();
+    std::string what = oscDifference(s);
+    if (!what.empty() || how == OscAnswer::none || theirs == ours) return what;
+    char t[96];
+    std::snprintf(t, sizeof t, "the answer: %08x, against %08x", ours, theirs);
+    return t;
+}
+// How wide a drawn float may be: anything (NaNs, infinities, ±3e38 among the edges), no NaN, or moderate (0, ±1 and to
+// ±10000: what reaches rom.4's exp2, which reads outside its tables, and faults, from an argument of 2^31 or a NaN)
+enum class OscRange : uint8_t { any, noNaN, moderate };
+// A float drawn for a word the voice compares or adds: its usual range most often, its edges now and then
+float oscDrawFloat(std::mt19937& rng, OscRange range = OscRange::any);
+// The block's float words (a note-on's or the settings') that the targets compute with, drawn as floats rather than
+// left as noise: those that reach exp2 moderate (the pitch, the formant, the pitch envelope's depth, the formant
+// envelope's and LFO's, the vibrato's on the pitch), the others any.  Noise would hand the targets NaNs of random
+// payloads, and which of two NaNs a product keeps is the host's (the interpreter's F(n) * F(m) as compiled), not rom.4's
+void oscBlockFloats(std::span<uint32_t> words, std::mt19937& rng);
 // A sample position's float: 2^31 and 2^32 themselves and either side, around them, or any but a NaN
 float oscDrawPosition(std::mt19937& rng);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same

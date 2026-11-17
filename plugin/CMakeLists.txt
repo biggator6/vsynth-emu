@@ -197,6 +197,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscVoiceGet.cpp
     Source/Vc2OscVoiceKinds.cpp
     Source/Vc2OscTables.cpp
+    Source/Vc2OscNoteOn.cpp
+    Source/Vc2OscTargets.cpp
     Source/Vc2Tva.cpp
     Source/Vc2TvaTables.cpp
     Source/Vc2CosmGrowl.cpp

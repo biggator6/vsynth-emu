@@ -99,7 +99,9 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    "${SH4[@]}" -o "$O/xt_vc2tone" &
 # The OSC voice's frame (v230) against rom.4's own routines, every routine it calls hooked
 [ -f Vc2OscCheck.cpp ] && cc -DXT_VC2OSC_MAIN Vc2OscCheck.cpp Vc2OscEvents.cpp Vc2OscFakes.cpp Vc2OscPortParts.cpp \
-   Vc2OscVoice.cpp Vc2OscVoiceGet.cpp Vc2OscVoiceKinds.cpp Vc2OscTables.cpp "${SH4[@]}" -o "$O/xt_vc2osc" &
+   Vc2OscVoice.cpp Vc2OscVoiceGet.cpp Vc2OscVoiceKinds.cpp Vc2OscTables.cpp \
+   $( [ -f Vc2OscNoteOn.cpp ] && echo Vc2OscNoteOn.cpp Vc2OscTargets.cpp Vc2OscGetters.cpp ) \
+   "${SH4[@]}" -o "$O/xt_vc2osc" &
 # The TVA (v233) against rom.4's own routines, the OS's call hooked
 [ -f Vc2TvaCheck.cpp ] && cc -DXT_VC2TVA_MAIN Vc2TvaCheck.cpp Vc2TvaEvents.cpp Vc2TvaFakes.cpp Vc2Tva.cpp \
    Vc2TvaTables.cpp "${SH4[@]}" -o "$O/xt_vc2tva" &

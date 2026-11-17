@@ -23,8 +23,9 @@
 # Vc2PartMixerTables.cpp and Vc2Math.cpp's clamp (PORT=vc2mix, vc2mixblock, vc2mixtables, vc2mixmath: the part mixer,
 # v227), through xt_vc2mixer, [cases] its cases (40).  --tone: vc2tone_muts.txt, in Vc2Tone.cpp (PORT=vc2tone: the
 # tone object's frame and its pool, v228), through xt_vc2tone, [cases] its cases (40).  --osc: vc2osc_muts.txt, in
-# Vc2OscVoice.cpp, Vc2OscVoiceGet.cpp, Vc2OscVoiceKinds.cpp and Vc2OscTables.cpp (PORT=vc2osc, vc2oscget, vc2osckinds,
-# vc2osctables: the OSC voice's frame, v230), through xt_vc2osc, [cases] its cases (40).  --tva: vc2tva_muts.txt, in
+# Vc2OscVoice.cpp, Vc2OscVoiceGet.cpp, Vc2OscVoiceKinds.cpp, Vc2OscTables.cpp, Vc2OscNoteOn.cpp and Vc2OscTargets.cpp
+# (PORT=vc2osc, vc2oscget, vc2osckinds, vc2osctables: the OSC voice's frame, v230; vc2oscnoteon, vc2osctargets: its
+# note-on by kind and its targets, v232), through xt_vc2osc, [cases] its cases (40).  --tva: vc2tva_muts.txt, in
 # Vc2Tva.cpp and Vc2TvaTables.cpp (PORT=vc2tva, vc2tvatables: the TVA, v233), through xt_vc2tva, [cases] its cases
 # (40).  --cosm: vc2cosm_muts.txt, in Vc2CosmGrowl.cpp, Vc2CosmTables.cpp and Vc2Math.cpp's sine and cosine
 # (PORT=vc2growl, vc2cosmtables, vc2cosmmath: the Growl, v234), through xt_vc2cosm, [cases] its cases (40).  One line

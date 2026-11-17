@@ -18,16 +18,26 @@
 
 namespace {
 constexpr int kSteps = 400;
-constexpr uint32_t kVibratoOut = 0x2c;   // [FW] the vibrato's output, which the pitch getter reads
+// [FW] what the voice reads of its parts in place: the vibrato's two outputs, a ramp's factor (ramp 0's +0x54, the
+// ramps 0x64 apart)
+constexpr uint32_t kVibratoPitch = 0x2c, kVibratoLevel = 0x30, kRampFactor = 0x960, kRampStride = 0x64;
 constexpr uint32_t kTail = 0xa38;        // [FW] where the tail is in a voice
+// [FW] a bound envelope's words the targets read (+0x1c, at 0 one time in two, +0x2c, +0x4c) and an LFO's (+0x38)
+constexpr std::array<uint32_t, 3> kEnvelopeWords { 0x1c, 0x2c, 0x4c };
+constexpr uint32_t kEnvelopeOut = 0x4c, kLfoOut = 0x38;
+constexpr size_t kEnvelopeBinds = 4;
 constexpr std::array<uint32_t, 4> kRenders { 0x893c62e0, 0x893c61e0, 0, 0 };   // [FW] the install's two, and two hooked
 constexpr float kTwo31 = 2147483648.0f;
 // [FW] the words each routine decides by: the kind, the wave's type, the block's byte +0x138, the object's flags, the
-// source's byte +4, its seek word, level, +0x168, positions, the legato word, the take's gate, the pitch's three
+// source's byte +4, its seek word, level, +0x168, positions, the legato word, the take's gate; and the block's floats
+// the pitch, the ramp's start and the targets read
 constexpr uint32_t kKind = 0x54, kWave = 0x104, kFixed = 0x138, kFlags = 0x15c, kSourceByte = 0x160, kSeekAt = 0x1c0;
 constexpr uint32_t kLevel = 0x1e0, kHalf = 0x168, kPosition = 0x194, kPositionLite = 0x24c, kPositionFloat = 0x270;
 constexpr uint32_t kLegato = 0x908, kGate = 0xb8;
-constexpr std::array<uint32_t, 4> kPitchWords { 0x5c, 0x70, 0xfc, 0xbc };
+constexpr std::array<uint32_t, 9> kFloatWords { 0x60, 0x64, 0x6c, 0x78, 0x88, 0x98, 0xb0, 0xbc, 0x100 };
+// [FW] those that reach exp2 through the targets: the pitch, the formant, the pitch envelope's depth, the formant
+// envelope's and LFO's, the vibrato's on the pitch (each the block's word 0x54 below)
+constexpr std::array<uint32_t, 6> kModerateWords { 0x5c, 0x68, 0x70, 0x80, 0xa0, 0xfc };
 // The calls counted over the run, by kind
 constexpr std::array<std::pair<OscKind, long OscCounts::*>, 3> kTallied { {
     { kSeek, &OscCounts::seeks }, { kSetRamp, &OscCounts::rampsSet }, { kKindCall, &OscCounts::kindCalls } } };
@@ -62,31 +72,57 @@ void steer(Vc2OscVoice& o, std::mt19937& rng, bool all) {
         if (now()) o.setU32(at, (uint32_t)rng());
     }
     if (now()) o.setF32(kPositionFloat, oscDrawPosition(rng));
-    for (uint32_t at : kPitchWords) {
+    for (uint32_t at : kFloatWords) {
         if (now()) o.setF32(at, oscDrawFloat(rng));
     }
+    for (uint32_t at : kModerateWords) {
+        if (now()) o.setF32(at, oscDrawFloat(rng, OscRange::moderate));
+    }
     if (now()) o.tail.seekPending = rng() % 2 ? 1 : maybeZero(rng);
-    if (now()) o.tail.root = oscDrawFloat(rng);
-    // no NaN: the pitch getter subtracts it, and xtf::sub's a + (−b) gives a NaN's sign negated where the interpreter's
-    // FSUB keeps it (a NaN's sign alone)
-    if (now()) o.tail.tune = oscDrawFloat(rng, true);
+    for (float* x : { &o.tail.rateRatio, &o.tail.walkFactor, &o.tail.formantFactor }) {
+        if (now()) *x = oscDrawFloat(rng);
+    }
+    // the offset and the detune reach exp2; and no NaN in the detune, which the pitch getter subtracts: xtf::sub's
+    // a + (−b) gives a NaN's sign negated where the interpreter's FSUB keeps it (a NaN's sign alone)
+    for (float* x : { &o.tail.offset, &o.tail.detune }) {
+        if (now()) *x = oscDrawFloat(rng, OscRange::moderate);
+    }
     if (now()) o.tail.sync = (uint32_t)rng();
     const uint32_t render = kRenders[rng() % kRenders.size()];
     if (now()) o.tail.render = render != 0 ? render : oscRenderAt((int)(rng() % kOscRenders));
     if (now()) o.tail.renderAnalog = oscRenderAt((int)(rng() % kOscRenders));
-    if (now()) o.tail.binds[0] = oscEnvelopeAt((int)(rng() % kOscRecords));
+    for (size_t b = 0; b < o.tail.binds.size(); ++b) {   // four envelopes, then four LFOs: every one read somewhere
+        const int k = (int)(rng() % kOscRecords);
+        if (now()) o.tail.binds[b] = b < kEnvelopeBinds ? oscEnvelopeAt(k) : oscLfoAt(k);
+    }
+}
+
+// A loop record's tune: within ±12 semitones most often, any word one time in four, and one time in eight about where
+// the factor, 2^(−tune/120000), leaves the floats' range (2^∓126…2^∓151), so the note-on's test of it meets a 0
+int32_t drawTune(std::mt19937& rng) {
+    constexpr std::array<int32_t, 6> kOctaves { 126, 127, 128, 149, 150, 151 };
+    constexpr int32_t kPerOctave = 120000;   // [FW] 0x893ae644's 1/120000
+    if (rng() % 8 == 0) {
+        const int32_t sign = rng() % 2 ? 1 : -1;
+        return sign * kOctaves[rng() % kOctaves.size()] * kPerOctave + (int32_t)(rng() % 3) - 1;
+    }
+    return rng() % 4 == 0 ? (int32_t)rng() : (int32_t)(rng() % 2400) - 1200;
 }
 
 void drawRecords(OscRecords& r, std::mt19937& rng) {
     constexpr std::array<uint16_t, 5> kRates { 44100, 32000, 22050, 48000, 0 };
     for (int k = 0; k < kOscRecords; ++k) {
-        Vc2OscSample& s = r.samples[(size_t)k];
-        s.flag = rng() % 3 == 0 ? (uint8_t)rng() : (uint8_t)(rng() % 2);
-        s.rate = rng() % 3 == 0 ? (uint16_t)rng() : kRates[rng() % kRates.size()];
-        s.key = (int8_t)rng();
-        s.root = rng() % 4 == 0 ? (int32_t)rng() : (int32_t)(rng() % 128);
-        r.maps[(size_t)k] = { rng() % 4 == 0 ? (int32_t)rng() : (int32_t)(rng() % 2400) - 1200, (int8_t)rng() };
-        r.envelopes[(size_t)k] = oscDrawFloat(rng);
+        Vc2OscWaveHeader& h = r.headers[(size_t)k];
+        h.flag = rng() % 3 == 0 ? (uint8_t)rng() : (uint8_t)(rng() % 2);
+        h.rate = rng() % 3 == 0 ? (uint16_t)rng() : kRates[rng() % kRates.size()];
+        h.rootKey = (int8_t)rng();
+        h.cents = rng() % 4 == 0 ? (int32_t)rng() : (int32_t)(rng() % 128);
+        r.loops[(size_t)k] = { drawTune(rng), (int8_t)rng() };
+        for (uint32_t word : kEnvelopeWords) r.bound[oscEnvelopeAt(k) + word] = oscDrawFloat(rng);
+        if (rng() % 2) r.bound[oscEnvelopeAt(k) + kEnvelopeWords[0]] = 0.0f;
+        // the outputs the pitch and the formant take, on their way to exp2
+        r.bound[oscEnvelopeAt(k) + kEnvelopeOut] = oscDrawFloat(rng, OscRange::moderate);
+        r.bound[oscLfoAt(k) + kLfoOut] = oscDrawFloat(rng, OscRange::moderate);
     }
 }
 
@@ -94,9 +130,9 @@ void drawRecords(OscRecords& r, std::mt19937& rng) {
 // words and tail into rom.4's memory and its vibrato's output
 void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
     OscDraws& d = s.shared.draws;
-    d.rampValue = oscDrawFloat(rng);
-    d.kindValue = oscDrawFloat(rng);
-    d.vibratoOut = oscDrawFloat(rng);
+    for (float* x : { &d.rampValue, &d.vibratoPitch }) *x = oscDrawFloat(rng, OscRange::moderate);   // into the pitch
+    d.vibratoLevel = oscDrawFloat(rng);
+    for (float& x : d.rampFactors) x = oscDrawFloat(rng);
     d.rendered = (uint32_t)rng();
     d.seekFlags = (uint8_t)rng();
     drawRecords(s.shared.records, rng);
@@ -104,7 +140,13 @@ void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
     for (int v = 0; v < kOscVoices; ++v) {
         steer(s.voices[(size_t)v], rng, all);
         oscWriteVoice(s, v);
-        s.fw.cpu.write(oscVoiceAt(v) + kVibratoOut, &d.vibratoOut, sizeof d.vibratoOut);
+        const std::array<std::pair<uint32_t, float>, 2> inPlace { { { kVibratoPitch, d.vibratoPitch },
+                                                                     { kVibratoLevel, d.vibratoLevel } } };
+        for (const auto& [at, x] : inPlace) s.fw.cpu.write(oscVoiceAt(v) + at, &x, sizeof x);
+        for (size_t ramp = 0; ramp < d.rampFactors.size(); ++ramp) {
+            const uint32_t at = oscVoiceAt(v) + kRampFactor + kRampStride * (uint32_t)ramp;
+            s.fw.cpu.write(at, &d.rampFactors[ramp], sizeof(float));
+        }
     }
     s.rom.clear();
     s.shared.calls.clear();
@@ -134,8 +176,8 @@ const char* const kTailNames[kOscVoices] = { "voice 0's tail", "voice 1's tail" 
 float oscDrawPosition(std::mt19937& rng) {
     const std::array<float, 4> edges { kTwo31, std::nextafter(kTwo31, 0.0f), 2.0f * kTwo31,
                                        std::nextafter(2.0f * kTwo31, 0.0f) };
-    if (rng() % 4 == 0) return edges[rng() % edges.size()];
-    return rng() % 2 ? kTwo31 * (0.5f + 1.5f * vc2Unit(rng)) : oscDrawFloat(rng, true);
+    if (rng() % 2 == 0) return edges[rng() % edges.size()];
+    return rng() % 2 ? kTwo31 * (0.5f + 1.5f * vc2Unit(rng)) : oscDrawFloat(rng, OscRange::noNaN);
 }
 
 void oscWriteVoice(OscSides& s, int v) {
@@ -144,12 +186,24 @@ void oscWriteVoice(OscSides& s, int v) {
     s.fw.cpu.write(oscVoiceAt(v) + kTail, &o.tail, sizeof o.tail);
 }
 
-float oscDrawFloat(std::mt19937& rng, bool noNaN) {
+float oscDrawFloat(std::mt19937& rng, OscRange range) {
     constexpr std::array<float, 8> kEdges { 0.0f, -0.0f, 1.0f, -1.0f, 3e38f, -3e38f, INFINITY, -INFINITY };
     constexpr std::array<float, 4> kScales { 1.0f, 100.0f, 10000.0f, 0.001f };
-    if (rng() % 4 == 0) return kEdges[rng() % kEdges.size()];
-    if (!noNaN && rng() % 32 == 0) return NAN;
-    return (2.0f * vc2Unit(rng) - 1.0f) * kScales[rng() % kScales.size()];
+    // moderate: 0, −0, ±1 and to ±1000, so that an output times its depth reaches exp2 below 2·10^6, where its tables'
+    // reads stay in rom.4's memory (the pitch's still pass its ±6000)
+    constexpr std::array<float, 4> kModerateScales { 1.0f, 100.0f, 1000.0f, 0.001f };
+    constexpr size_t kModerateEdges = 4;
+    const bool moderate = range == OscRange::moderate;
+    if (rng() % 4 == 0) return kEdges[rng() % (moderate ? kModerateEdges : kEdges.size())];
+    if (range == OscRange::any && rng() % 32 == 0) return NAN;
+    return (2.0f * vc2Unit(rng) - 1.0f) * (moderate ? kModerateScales : kScales)[rng() % kScales.size()];
+}
+
+void oscBlockFloats(std::span<uint32_t> words, std::mt19937& rng) {
+    for (uint32_t at : kModerateWords) {
+        words[(at - Vc2OscVoice::kOwn) / 4] = std::bit_cast<uint32_t>(oscDrawFloat(rng, OscRange::moderate));
+    }
+    for (uint32_t at : kFloatWords) words[(at - Vc2OscVoice::kOwn) / 4] = std::bit_cast<uint32_t>(oscDrawFloat(rng));
 }
 
 std::string oscDifference(OscSides& s) {

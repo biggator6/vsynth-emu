@@ -13,11 +13,11 @@ using xtf::sub;
 namespace {
 // [FW] the ramps' types as the constructor gives them (+0x90c, +0x970, +0x9d4)
 constexpr std::array<int32_t, Vc2OscVoice::kRamps> kRampTypes { 0, 2, 1 };
-// [FW] the note-on's: the block's words it reads (the depth, the sample's and the map's pointers) and the object's
-// byte whose 0x10 marks a sample not pitched from its root (+0x138, the block's +0xe4)
-constexpr int kDepthWord = 0x1c / 4, kSampleWord = 0xd4 / 4, kMapWord = 0xdc / 4;
+// [FW] the note-on's: the block's words it reads (the depth, the wave header's and the loop record's pointers) and the
+// byte whose 0x10 marks a wave not pitched from its root (+0x138, the block's +0xe4)
+constexpr int kDepthWord = 0x1c / 4, kHeaderWord = 0xd4 / 4, kLoopWord = 0xdc / 4;
 constexpr uint32_t kDepth = 0x70, kFixedByte = 0x138, kFixed = 0x10, kRampFr4 = 0xbc, kRampFr5 = 0x5c;
-// [FW] the wave types a fixed sample keeps its 440 at (0x893ae514…0x893ae520)
+// [FW] the wave types a fixed wave keeps its 440 at (0x893ae514…0x893ae520)
 constexpr std::array<uint32_t, 4> kFixedTypes { 1, 6, 7, 8 };
 // [FW] the object's words: its flags byte (bit 1 counts, bit 2 the matched count, bit 7 held over a seek), the count
 // and the matched count's bytes, the seek's position word, its level, and the six words a take keeps
@@ -105,42 +105,42 @@ void Vc2OscVoice::noteOn(const uint32_t* block, uint32_t legato, Vc2OscParts& pa
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
     if (row.flagByWave && u32(kWave) == 1) tail.flag = 1;
     if (row.records == Vc2OscRecords::none) {
-        tail.root = 0.0f;
+        tail.offset = 0.0f;
         tail.rateRatio = 1.0f;
-        tail.tune = 0.0f;
-        tail.gainA = 1.0f;
-        tail.gainB = 1.0f;
+        tail.detune = 0.0f;
+        tail.walkFactor = 1.0f;
+        tail.formantFactor = 1.0f;
         tail.hz = mul(shared.exp2(0.0f), t.plainHz);
-        parts.noteOnKind(legato);
+        kindNoteOn(parts, shared);
         return;
     }
     const bool fromBlock = row.records == Vc2OscRecords::fromBlock;
-    const Vc2OscSample s = parts.sample(fromBlock ? block[kSampleWord] : 0);
-    const Vc2OscMap m = parts.map(fromBlock ? block[kMapWord] : 0);
-    tail.flag = s.flag == 1 ? 1 : 0;
-    tail.rateRatio = div(t.rateTop, xtf::flt(s.rate));
+    const Vc2OscWaveHeader h = parts.waveHeader(fromBlock ? block[kHeaderWord] : 0);
+    const Vc2OscLoopRecord loop = parts.loopRecord(fromBlock ? block[kLoopWord] : 0);
+    tail.flag = h.flag == 1 ? 1 : 0;
+    tail.rateRatio = div(t.rateTop, xtf::flt(h.rate));
     const bool fixed = kind() == 2 && (u8(kFixedByte) & kFixed) != 0;
     const bool keeps = std::ranges::find(kFixedTypes, u32(kWave)) != kFixedTypes.end();
     if (keeps && fixed) {
-        tail.root = 0.0f;
-        tail.tune = 0.0f;
+        tail.offset = 0.0f;
+        tail.detune = 0.0f;
         tail.hz = t.sampleHz;
     } else {
-        tail.root = add(mul(xtf::flt(m.fine), t.cent), xtf::flt(s.root));
-        tail.tune = mul(xtf::flt(m.level), t.cent);
-        const float cents = add(sub(mul(xtf::flt(s.key), t.keyCents), tail.root), tail.tune);
+        tail.offset = add(mul(xtf::flt(loop.fine), t.cent), xtf::flt(h.cents));
+        tail.detune = mul(xtf::flt(loop.tune), t.cent);
+        const float cents = add(sub(mul(xtf::flt(h.rootKey), t.keyCents), tail.offset), tail.detune);
         const float x = shared.exp2(add(mul(cents, t.perOctave), t.exponentBase));
-        tail.hz = mul(mul(x, xtf::flt(s.rate)), t.cent);
+        tail.hz = mul(mul(x, xtf::flt(h.rate)), t.cent);
     }
-    float gain = shared.exp2(mul(-xtf::flt(m.level), t.levelScale));
-    tail.gain = gain;
-    if (!(gain > 0.0f)) {
-        tail.gain = 1.0f;
-        gain = 1.0f;
+    float factor = shared.exp2(mul(-xtf::flt(loop.tune), t.tuneScale));
+    tail.factor = factor;
+    if (!(factor > 0.0f)) {
+        tail.factor = 1.0f;
+        factor = 1.0f;
     }
-    tail.gainA = gain;
-    tail.gainB = tail.gain;
-    parts.noteOnKind(legato);
+    tail.walkFactor = factor;
+    tail.formantFactor = tail.factor;
+    kindNoteOn(parts, shared);
 }
 
 void Vc2OscVoice::start(Vc2OscParts& parts) {
