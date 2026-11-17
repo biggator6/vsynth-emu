@@ -371,9 +371,13 @@ version against rom.4's routines with what it calls hooked:
      start, restart (the settings' routine), legato update, tick (the glide eased under 100 ms, type 0's gain factor)
      and value, with logf behind `Vc2ToneShared` (rom.2's core, shared); the voice owns its three ramps, xt_vc2osc's
      ramp hooks out and a ramp part of its own (HARDWARE_FIRMWARE.md, "The VC-2's portamento").
-   - next: the players' installs on rom.4's object (`0x893af7a0`, `0x893af870`) and the three kinds' own note-ons
-     (`0x893c7c30`, `0x893af420`, `0x893c22e0`); then Vari off. Beside them, the shared math's logf
-     (`0x895065f4`, its core rom.2's `0x89531b78`), which the wiring gives and nothing has ported yet.
+   - done (v238): the players' installs on rom.4's object (`0x893af7a0`, `0x893af870`) and VariPhrase's own
+     note-on (`0x893af420`), the three in rom.4's OSC code beside the voice (split 2026-11-17 by what rom.4 holds),
+     each kind's way a row's field, against rom.4's in xt_vc2osc with the players' renders, setups, lookup and seeks
+     hooked (HARDWARE_FIRMWARE.md, "The VC-2's players' installs and VariPhrase's note-on").
+   - then LITE's and the analog's own note-ons (`0x893c7c30`, `0x893c22e0`), in the players' and the analog OSC's
+     code, with those ports on rom.4's object; then Vari off. Beside them, the shared math's logf (`0x895065f4`, its
+     core rom.2's `0x89531b78`) and powf (`0x89506e54`), which the wiring gives and nothing has ported yet.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
      update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its

@@ -23,6 +23,7 @@ void Vc2OscVoice::kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
         case Vc2OscNoteOn::none: return;
         case Vc2OscNoteOn::one: setF32(kObjectPitch, 1.0f); return;
         case Vc2OscNoteOn::routine: parts.kindCall(row.noteOnRoutine); break;
+        case Vc2OscNoteOn::vari: noteOnVari(parts, shared); break;   // 0x893af420 (v238, Vc2OscPlayers.cpp)
         case Vc2OscNoteOn::extIn:
             setF32(kObjectPitch, targets.ratioOn(t.noteOn, t.noteOn.ratio));
             setF32(kObjectGain, targets.gain());

@@ -22,11 +22,13 @@ inline constexpr int kOscRenders = 2;
 inline constexpr uint32_t kOscRampAt = 0x8C05d000;       // the six words a ramp's start or legato update reads (v236)
 // [FW] the pitch ramp's value and factor in a voice (+0x90c + 0x3c, + 0x54), which a kind's call logs as it finds them
 inline constexpr uint32_t kOscRampValueAt = 0x948, kOscRampFactorAt = 0x960;
+inline constexpr uint32_t kOscPairsAt = 0x8C05e000;      // the records the block's +0xe0 points at (v238)
+inline constexpr uint32_t kOscPairWord = 0x2d0;          // [FW] the word VariPhrase's note-on reads of one
 inline constexpr uint32_t kOscBlockWords = Vc2OscVoice::kBlockBytes / 4, kOscOther = 0xff;
 
 enum OscKind : int32_t {
     kBuildVibrato, kUpdateVibrato, kSetVibrato, kNoteOnVibrato, kKindCall, kKindSettings, kSetCarrier, kInitCarrier,
-    kStartKind6, kRenderBy, kRenderCarrier, kRenderKind6, kSeek,
+    kStartKind6, kRenderBy, kRenderCarrier, kRenderKind6, kSeek, kObjectCall, kEventPosition,
 };
 
 // A call as either side made it: what, on which voice, and its arguments (a ramp's number, counts, floats' bits, a
@@ -45,22 +47,32 @@ struct OscRecords {
     std::array<Vc2OscLoopRecord, kOscRecords> loops {};
     std::map<uint32_t, float> bound {};
 };
+uint32_t oscVoiceAt(int voice);
+// The records' addresses and draws (Vc2OscRecords.cpp, v238; v230's, moved): the headers, loop records, envelopes,
+// LFOs and the block's +0xe0 records
 uint32_t oscHeaderAt(int k);
 uint32_t oscLoopAt(int k);
 uint32_t oscEnvelopeAt(int k);
 uint32_t oscLfoAt(int k);
+uint32_t oscPairAt(int k);
+void oscDrawRecords(OscRecords& r, std::mt19937& rng);
 
 // What the hooked routines answer, drawn once for both sides; the vibrato's two outputs, read in place; the flags byte
-// a seek leaves in the object (a player may write it).  The ramps are the voice's own from v236
+// a seek leaves in the object (a player may write it); the event lookup's positions, each side taking the next (v238).
+// The ramps are the voice's own from v236
 struct OscDraws {
     float vibratoPitch = 0.0f, vibratoLevel = 0.0f;
     uint32_t rendered = 0;
     uint8_t seekFlags = 0;
+    std::array<int32_t, 3> positions {};
+    uint32_t aside = 0;          // what the lookup leaves in its second word, which its caller drops
+    mutable size_t romTaken = 0;
 };
 
 // What the port's parts share: the answers, the records, the blocks' words, the output and the calls
 struct OscShared {
     OscDraws draws {};
+    size_t positionsTaken = 0;   // the port's side of the event lookup's positions (v238)
     OscRecords records {};
     std::array<uint32_t, kOscBlockWords> settings {};
     std::array<uint32_t, sizeof(Vc2RampSettings) / 4> ramp {};
@@ -93,6 +105,9 @@ public:
     float boundFloat(uint32_t part, uint32_t offset) override;
     Vc2OscWaveHeader waveHeader(uint32_t at) override;
     Vc2OscLoopRecord loopRecord(uint32_t at) override;
+    uint32_t address() override { return oscVoiceAt(voice_); }
+    void objectCall(uint32_t routine) override { log(kObjectCall, routine); }
+    int32_t eventPosition(uint32_t event) override;
 
 private:
     void log(OscKind kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
@@ -112,5 +127,4 @@ void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log);
 void oscWriteRecords(Vc2Fw& fw, const OscRecords& r);
 // The first call the two logs differ at; empty when they don't
 std::string oscCallsDifference(const std::vector<OscCall>& rom, const std::vector<OscCall>& port);
-uint32_t oscVoiceAt(int voice);
 uint32_t oscRenderAt(int k);   // a hooked render routine for the tail's words

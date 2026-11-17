@@ -15,6 +15,8 @@ constexpr uint32_t kSettings = 0x893ae780, kLegato = 0x893ae9b0, kRender = 0x893
 // oscBlockFloats)
 constexpr int kKindWord = 0, kByteWord = 1, kWaveWord = 0xb0 / 4, kHeaderWord = 0xd4 / 4;
 constexpr int kLoopWord = 0xdc / 4, kFixedWord = 0xe4 / 4;
+// [FW] v238: VariPhrase's note-on's +0xe0 record, and its range's start and where it seeks to (the block's +0xe8, +0xf0)
+constexpr int kPairWord = 0xe0 / 4, kFromWord = 0xe8 / 4, kSeekToWord = 0xf0 / 4;
 constexpr uint32_t kFixedBit = 0x1000;   // the byte +0x138's 0x10, in its word
 constexpr int kKinds = 8, kWaves = 10;
 constexpr uint32_t kCountSign = 0x8000;   // [FW] the update's count is its low half, signed (exts.w)
@@ -27,7 +29,15 @@ std::string onConstruct(OscSides& s, std::mt19937&, int v) {
     });
 }
 
-std::string onInstall(OscSides& s, std::mt19937&, int v) {
+std::string onInstall(OscSides& s, std::mt19937& rng, int v) {
+    // v238: one time in three a player's kind (LITE's and VariPhrase's own installs, by the wave's type), one in six
+    // a kind past 7 (the frame's default row, which clears the flag), else the kind as the event finds it
+    const uint32_t pick = rng() % 6;
+    if (pick < 2) oscSteerPlayers(s, rng, v);
+    if (pick == 2) {
+        s.voices[(size_t)v].setU32(Vc2OscVoice::kKind, kKinds + rng() % 4);
+        oscWriteVoice(s, v);
+    }
     return oscBothSides(s, kInstall, { oscVoiceAt(v) }, Answer::none, [&] {
         s.voices[(size_t)v].install(s.parts[(size_t)v]);
         return 0u;
@@ -61,6 +71,8 @@ std::array<uint32_t, kOscBlockWords> drawNoteBlock(std::mt19937& rng) {
     b[kWaveWord] = rng() % 8 == 0 ? (uint32_t)rng() : rng() % kWaves;
     b[kHeaderWord] = oscHeaderAt((int)(rng() % kOscRecords));
     b[kLoopWord] = oscLoopAt((int)(rng() % kOscRecords));
+    b[kPairWord] = oscPairAt((int)(rng() % kOscRecords));   // v238: VariPhrase's note-on reads its +0x2d0
+    if (rng() % 2) b[kSeekToWord] = b[kFromWord];             // v238: no seek when the third is the first
     if (rng() % 2) b[kByteWord] = 0;
     if (rng() % 2) b[kFixedWord] &= ~kFixedBit;
     return b;

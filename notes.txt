@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's players' installs and VariPhrase's note-on v238 (2026-11-17, on vc2-mode after v237's merge; the user's
+  "v238 plus COSM"; HARDWARE_FIRMWARE.md, "The VC-2's players' installs and VariPhrase's note-on"): step 4.2's OSC
+  voice, its fourth part, split by what rom.4 holds (LITE's and the analog's note-ons go with their players' ports).
+  Vc2OscPlayers.cpp: LITE's install 0x893af7a0 and VariPhrase's 0x893af870 (each wave type's render into +0xa44 and
+  its constant from the tables at 0x89542350 and 0x89542368 into +0xa88; Vari off's under the block's 0x20) and
+  VariPhrase's note-on 0x893af420 (the flags into the object, the range's copies, the voice's address at +0x1a0, the
+  targets' tuned ratio, formant and walk, kind 2's two routines; then for Vari off on types 1, 6, 7, 8 the player's
+  words by events through 0x893cc0d0 or by samples from the loop record, the seek, the Start Offset and the position
+  by the walk's sign). Each kind's way a row's field (Vc2OscInstall, Vc2OscNoteOn::vari); the loop record's words by
+  rom.2's names; Vc2OscParts' address, object call and event position. xt_vc2osc: the three routines' hooks out, the
+  players' nine renders, 0x893c8670, 0x893cc760 and the lookup hooked; its records' code in Vc2OscRecords.cpp; the
+  record pointers drawn before every event (kind 5's settings write over them), the players' path steered. 0 different
+  at seeds 2024, 7 and 31337; Vc2OscPlayers.cpp covered whole. Not in the sound yet.
+
 The VC-2's COSM converters, the first batch v237 (2026-11-16, on its own branch from vc2-mode's f3258b4; the VC-2
   session's task, beside v236's portamento; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters, the first batch"). Step
   4.2's COSM part's third. The switch's 15 converters left 13 after v235, not 14 (the Speaker Simulator's case is

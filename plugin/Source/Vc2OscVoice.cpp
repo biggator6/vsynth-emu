@@ -55,9 +55,11 @@ void Vc2OscVoice::construct(Vc2OscParts& parts) {
 
 void Vc2OscVoice::install(Vc2OscParts& parts) {
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
-    if (row.install != 0) {
-        parts.kindCall(row.install);
-        return;
+    switch (row.installs) {   // a kind's own install runs in the frame's place (v238: LITE's and VariPhrase's ported)
+        case Vc2OscInstall::routine: parts.kindCall(row.install); return;
+        case Vc2OscInstall::lite: installLite(parts); return;
+        case Vc2OscInstall::vari: installVari(); return;
+        case Vc2OscInstall::frame: break;
     }
     if (row.clearsFlag) tail.flag = 0;
     if (row.render != 0) tail.render = row.render;

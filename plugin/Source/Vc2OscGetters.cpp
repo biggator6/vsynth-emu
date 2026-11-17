@@ -103,7 +103,18 @@ std::string oscOnGetter(OscSides& s, std::mt19937& rng, int v) {
     return what;
 }
 
+void oscSteerPlayers(OscSides& s, std::mt19937& rng, int v) {
+    constexpr uint32_t kKind = 0x54, kWave = 0x104, kFlagsByte = 0x138;   // [FW]
+    constexpr uint8_t kVariOff = 0x20;
+    Vc2OscVoice& o = s.voices[(size_t)v];
+    o.setU32(kKind, 1 + rng() % 2);
+    o.setU32(kWave, rng() % 10);
+    if (rng() % 4) o.setU8(kFlagsByte, (uint8_t)(o.u8(kFlagsByte) | kVariOff));
+    oscWriteVoice(s, v);
+}
+
 std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int v) {
+    if (rng() % 2) oscSteerPlayers(s, rng, v);
     ++s.n.noteOns;
     return oscBothSides(s, kKindNoteOn, { oscVoiceAt(v), (uint32_t)rng() }, OscAnswer::none, [&] {
         s.voices[(size_t)v].kindNoteOn(s.parts[(size_t)v], s.romShared);

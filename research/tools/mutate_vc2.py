@@ -26,7 +26,8 @@
 # Vc2OscVoice.cpp, Vc2OscVoiceGet.cpp, Vc2OscVoiceKinds.cpp, Vc2OscTables.cpp, Vc2OscNoteOn.cpp and Vc2OscTargets.cpp
 # (PORT=vc2osc, vc2oscget, vc2osckinds, vc2osctables: the OSC voice's frame, v230; vc2oscnoteon, vc2osctargets: its
 # note-on by kind and its targets, v232; vc2ramp, vc2ramptick, vc2ramptables: its pitch ramp, v236, in
-# Vc2PitchRamp.cpp, Vc2PitchRampTick.cpp and Vc2RampTables.cpp), through xt_vc2osc, [cases] its cases (40).  --tva:
+# Vc2PitchRamp.cpp, Vc2PitchRampTick.cpp and Vc2RampTables.cpp; vc2oscplayers: its players' installs and VariPhrase's
+# note-on, v238, in Vc2OscPlayers.cpp), through xt_vc2osc, [cases] its cases (40).  --tva:
 # vc2tva_muts.txt, in
 # Vc2Tva.cpp and Vc2TvaTables.cpp (PORT=vc2tva, vc2tvatables: the TVA, v233), through xt_vc2tva, [cases] its cases
 # (40).  --cosm: vc2cosm_muts.txt, in Vc2CosmGrowl.cpp, Vc2CosmTables.cpp and Vc2Math.cpp's sine and cosine

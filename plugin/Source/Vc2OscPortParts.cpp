@@ -33,4 +33,10 @@ float OscPortParts::boundFloat(uint32_t part, uint32_t offset) {
 Vc2OscWaveHeader OscPortParts::waveHeader(uint32_t at) { return recordAt(s_.records.headers, at, oscHeaderAt); }
 
 Vc2OscLoopRecord OscPortParts::loopRecord(uint32_t at) { return recordAt(s_.records.loops, at, oscLoopAt); }
+
+int32_t OscPortParts::eventPosition(uint32_t event) {   // the next of the drawn positions, as rom.4's hook gives them
+    constexpr uint32_t kLookup = 0x893cc0d0;   // [FW] the routine rom.4's hook logs it as
+    log(kEventPosition, kLookup, event);
+    return s_.draws.positions[s_.positionsTaken++ % s_.draws.positions.size()];
+}
 #endif

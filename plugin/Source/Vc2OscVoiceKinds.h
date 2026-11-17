@@ -10,10 +10,13 @@ enum class Vc2OscRecords : uint8_t { none, fromBlock, atZero };   // the note-on
 enum class Vc2OscPitch : uint8_t { none, bounded, tuned };   // 0x893aeb20: 0; within ±6000; that less +0xa74
 // 0x893af0b0's ways (v232): nothing; +0x1cc at 1; the kind's own note-on; the ratio, gain and level into the object;
 // the gain and ratio into P and the carrier's init; the ratio, rate, gain and level into P and kind 6's start
-enum class Vc2OscNoteOn : uint8_t { none, one, routine, extIn, carrier, kind6 };
+enum class Vc2OscNoteOn : uint8_t { none, one, routine, extIn, carrier, kind6, vari };   // vari: v238's port
+// 0x893ae0f0's ways (v238): the frame's own; the kind's own install by its address; LITE's and VariPhrase's, ported
+enum class Vc2OscInstall : uint8_t { frame, routine, lite, vari };
 
 struct Vc2OscKindRow {
-    uint32_t install = 0;          // 0x893ae0f0: its install, run in its place; 0 none
+    Vc2OscInstall installs = Vc2OscInstall::frame;   // 0x893ae0f0: its own install in the frame's place, or none
+    uint32_t install = 0;          // the install's routine, by rom.4's address, for Vc2OscInstall::routine
     uint32_t render = 0;           // the install's +0xa44; 0 none
     int installed = 0;             // the install's +0xa88: its constant's kind (4, 5, 6), 0 none
     bool clearsFlag = false;       // the install's default: +0xa40 to 0

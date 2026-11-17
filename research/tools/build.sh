@@ -102,6 +102,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    Vc2OscVoice.cpp Vc2OscVoiceGet.cpp Vc2OscVoiceKinds.cpp Vc2OscTables.cpp \
    $( [ -f Vc2OscNoteOn.cpp ] && echo Vc2OscNoteOn.cpp Vc2OscTargets.cpp Vc2OscGetters.cpp ) \
    $( [ -f Vc2PitchRamp.cpp ] && echo Vc2PitchRamp.cpp Vc2PitchRampTick.cpp Vc2RampTables.cpp Vc2RampCheck.cpp ) \
+   $( [ -f Vc2OscPlayers.cpp ] && echo Vc2OscPlayers.cpp Vc2OscRecords.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2osc" &
 # The TVA (v233) against rom.4's own routines, the OS's call hooked
 [ -f Vc2TvaCheck.cpp ] && cc -DXT_VC2TVA_MAIN Vc2TvaCheck.cpp Vc2TvaEvents.cpp Vc2TvaFakes.cpp Vc2Tva.cpp \

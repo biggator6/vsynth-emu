@@ -19,12 +19,24 @@ auto oscWords(Vc2OscTables& t) {
         { 0x893af36c, &t.noteOn.ratio.most }, { 0x893af370, &t.noteOn.ratio.least }, { 0x893af530, &t.kind6Least },
         { 0x893afddc, &t.walkTarget.most }, { 0x893afde0, &t.walkTarget.least }, { 0x893affd4, &t.walk.most },
         { 0x893affd8, &t.walk.least }, { 0x893afde4, &t.formantTargetLeast }, { 0x893affe0, &t.formantLeast },
+        { 0x893af53c, &t.timesTenThousand }, { 0x893af7c8, &t.rateTenths },
     });
 }
+// [FW] the players' installs' tables (v238)
+constexpr Vc2Span kLiteInstalled { 0x89542350, 6 }, kVariInstalled { 0x89542368, 10 };
 
-using Tables = Vc2PoolTables<Vc2OscTables, oscWords>;
+struct Read : Vc2OscTables {
+    bool read(Sh4& image) {
+        vc2ReadPool(image, oscWords(*this));
+        vc2ReadFloats(image, kLiteInstalled, liteInstalled.data());
+        vc2ReadFloats(image, kVariInstalled, variInstalled.data());
+        return true;
+    }
+};
+
+constinit Vc2RomTables<Read> tables;
 } // namespace
 
-bool vc2LoadOsc(const char* path) { return Tables::load(path); }
-bool vc2OscLoaded() { return Tables::loaded(); }
-const Vc2OscTables& vc2OscTables() { return Tables::get(); }
+bool vc2LoadOsc(const char* path) { return tables.load(path); }
+bool vc2OscLoaded() { return tables.loaded(); }
+const Vc2OscTables& vc2OscTables() { return tables.t; }

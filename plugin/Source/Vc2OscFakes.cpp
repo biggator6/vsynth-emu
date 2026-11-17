@@ -9,9 +9,6 @@
 namespace {
 // [FW] the voice's offsets a callee is given: the carrier, kind 6's object (the ramps, its own from v236, aren't hooked)
 constexpr uint32_t kCarrier = 0xa90, kKind6 = 0xafc;
-// [FW] where a record's fields are (Vc2OscVoice.h's): the wave header's, the loop record's
-constexpr uint32_t kHeaderFlag = 2, kHeaderRate = 8, kHeaderKey = 0xa, kHeaderCents = 0x18, kLoopFine = 0x1b;
-constexpr uint32_t kLoopsFrom = 0x100, kEnvelopesFrom = 0x200, kLfosFrom = 0x400, kBoundStride = 0x80;
 
 // The voice owning the part at `offset` a callee is given by `at`; −1 when no voice does
 int voiceOwning(uint32_t at, uint32_t offset) {
@@ -67,12 +64,26 @@ void seek(Sh4& c, OscCall& t, uint32_t at) {   // (the object, at), and the obje
     t.b = c.r[5];
     t.c = byteAt(c, c.r[4]);
 }
+void objectRoutine(Sh4& c, OscCall& t, uint32_t at) {   // a player's routine on the object (v238)
+    t.voice = voiceOwning(c.r[4], Vc2OscVoice::kObject);
+    t.a = at;
+}
+void eventAt(Sh4& c, OscCall& t, uint32_t at) {   // the event lookup's (the object, event, &position, &…) (v238)
+    objectRoutine(c, t, at);
+    t.b = c.r[5];
+}
 
 // How a hooked routine answers, one shape each: its r0, after what it leaves in fr0 or the object
 uint32_t none(Sh4&, const OscDraws&) { return 0; }
 uint32_t rendered(Sh4&, const OscDraws& d) { return d.rendered; }
 uint32_t seekFlags(Sh4& c, const OscDraws& d) {   // the seek's object's byte 0, as a player may leave it
     c.write(c.r[4], &d.seekFlags, 1);
+    return 0;
+}
+uint32_t positions(Sh4& c, const OscDraws& d) {   // the next of the drawn positions, and a word the caller drops
+    const int32_t position = d.positions[d.romTaken++ % d.positions.size()];
+    c.write(c.r[6], &position, sizeof position);
+    c.write(c.r[7], &d.aside, sizeof d.aside);
     return 0;
 }
 
@@ -85,21 +96,29 @@ struct OscHook {
 };
 constexpr auto withN = partAnd<0, asIs>;
 constexpr auto withSettings = partAnd<0, settingsOffset>;
-// [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run)
+// [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run) and LITE's
+// and VariPhrase's installs and VariPhrase's note-on (v238: rom.4's own run, and the routines they call hooked)
 const OscHook kHooks[] = {
     { 0x893b29b0, kBuildVibrato, self, none }, { 0x893b2c10, kUpdateVibrato, withN, none },
     { 0x893b2b70, kSetVibrato, withSettings, none }, { 0x893b29e0, kNoteOnVibrato, partWord<0>, none },
-    { 0x893af7a0, kKindCall, kindRoutine, none }, { 0x893af870, kKindCall, kindRoutine, none },
     { 0x893c2ad0, kKindCall, kindRoutine, none }, { 0x893c8280, kKindCall, kindRoutine, none },
     { 0x893c88b0, kKindCall, kindRoutine, none }, { 0x893c2ce0, kKindCall, kindRoutine, none },
     { 0x893afff0, kKindCall, kindRoutine, none }, { 0x893c6260, kKindCall, kindRoutine, none },
     { 0x893b0150, kKindCall, kindRoutine, none }, { 0x893c7c30, kKindCall, kindRoutine, none },
-    { 0x893af420, kKindCall, kindRoutine, none }, { 0x893c22e0, kKindCall, kindRoutine, none },
+    { 0x893c22e0, kKindCall, kindRoutine, none }, { 0x893c8670, kKindCall, kindRoutine, none },
+    { 0x893cc760, kObjectCall, objectRoutine, none }, { 0x893cc0d0, kEventPosition, eventAt, positions },
     { 0x893c8390, kKindSettings, routineSettings, none }, { 0x893b0280, kKindSettings, routineSettings, none },
     { 0x893c3460, kKindSettings, routineSettings, none },
     { 0x893ec450, kSetCarrier, partAnd<kCarrier, settingsOffset>, none },
     { 0x893ebed0, kInitCarrier, partWord<kCarrier>, none }, { 0x893ec700, kStartKind6, partWord<kKind6>, none },
     { 0x893c62e0, kRenderBy, renderBy, rendered }, { 0x893c61e0, kRenderBy, renderBy, rendered },
+    // v238: the players' renders LITE's and VariPhrase's installs write (Vari off's, kind 1's mode 1, LITE's heads,
+    // SOLO's, BACKING's, ENSEMBLE's, the period-jump player's)
+    { 0x893c63c0, kRenderBy, renderBy, rendered }, { 0x893c66e0, kRenderBy, renderBy, rendered },
+    { 0x893c9f60, kRenderBy, renderBy, rendered }, { 0x893c6e80, kRenderBy, renderBy, rendered },
+    { 0x893c6e8c, kRenderBy, renderBy, rendered }, { 0x893c9450, kRenderBy, renderBy, rendered },
+    { 0x893cadc0, kRenderBy, renderBy, rendered }, { 0x893ca1f0, kRenderBy, renderBy, rendered },
+    { 0x893ca8b0, kRenderBy, renderBy, rendered },
     { kOscRendersAt, kRenderBy, renderBy, rendered }, { kOscRendersAt + 0x10, kRenderBy, renderBy, rendered },
     { 0x893ebfa0, kRenderCarrier, partAnd<kCarrier, outOf>, none },
     { 0x893ec730, kRenderKind6, partAnd<kKind6, outOf>, none },
@@ -108,18 +127,10 @@ const OscHook kHooks[] = {
     { 0x893cd090, kSeek, seek, seekFlags }, { 0x893cd440, kSeek, seek, seekFlags },
 };
 
-template <class T>
-void put(Vc2Fw& fw, uint32_t at, T v) {
-    fw.cpu.write(at, &v, sizeof v);
-}
 } // namespace
 
 uint32_t oscVoiceAt(int voice) { return kOscVoiceAt + kOscVoiceStride * (uint32_t)voice; }
 uint32_t oscRenderAt(int k) { return kOscRendersAt + 0x10 * (uint32_t)k; }
-uint32_t oscHeaderAt(int k) { return kOscRecordsAt + kOscRecordStride * (uint32_t)k; }
-uint32_t oscLoopAt(int k) { return kOscRecordsAt + kLoopsFrom + kOscRecordStride * (uint32_t)k; }
-uint32_t oscEnvelopeAt(int k) { return kOscRecordsAt + kEnvelopesFrom + kBoundStride * (uint32_t)k; }
-uint32_t oscLfoAt(int k) { return kOscRecordsAt + kLfosFrom + kBoundStride * (uint32_t)k; }
 
 void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log) {
     for (const OscHook& h : kHooks) {
@@ -130,19 +141,6 @@ void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log) 
             cpu.ret(h.answer(cpu, draws));
         });
     }
-}
-
-void oscWriteRecords(Vc2Fw& fw, const OscRecords& r) {
-    for (int k = 0; k < kOscRecords; ++k) {
-        const Vc2OscWaveHeader& h = r.headers[(size_t)k];
-        put(fw, oscHeaderAt(k) + kHeaderFlag, h.flag);
-        put(fw, oscHeaderAt(k) + kHeaderRate, h.rate);
-        put(fw, oscHeaderAt(k) + kHeaderKey, h.rootKey);
-        put(fw, oscHeaderAt(k) + kHeaderCents, h.cents);
-        put(fw, oscLoopAt(k), r.loops[(size_t)k].tune);
-        put(fw, oscLoopAt(k) + kLoopFine, r.loops[(size_t)k].fine);
-    }
-    for (const auto& [at, x] : r.bound) put(fw, at, x);
 }
 
 std::string oscCallsDifference(const std::vector<OscCall>& rom, const std::vector<OscCall>& port) {

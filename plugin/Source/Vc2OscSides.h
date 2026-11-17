@@ -8,7 +8,7 @@
 
 struct OscCounts {
     long events = 0, noteOns = 0, plain = 0, sampled = 0, updates = 0, takes = 0, renders = 0, settings = 0;
-    long getters = 0, seeks = 0, kindCalls = 0, gliding = 0;
+    long getters = 0, seeks = 0, kindCalls = 0, gliding = 0, lookups = 0, objectCalls = 0;
 };
 
 struct OscSides {
@@ -26,6 +26,9 @@ using OscEvent = std::function<std::string(OscSides&, std::mt19937&, int voice)>
 std::span<const OscEvent> oscEvents();
 std::string oscOnGetter(OscSides& s, std::mt19937& rng, int voice);       // a getter or a target (Vc2OscGetters.cpp)
 std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int voice);   // 0x893af0b0 on its own (the same)
+// The players' own draws (v238): kind 1 or 2, the wave's type 0…9 and, three times in four, the block's Vari off;
+// VariPhrase's path is a kind, a type and a bit at once, too rare among the other draws (the same file)
+void oscSteerPlayers(OscSides& s, std::mt19937& rng, int voice);
 // The voices' own words and tails against rom.4's memory, then the calls; empty when nothing differs
 std::string oscDifference(OscSides& s);
 
@@ -46,8 +49,9 @@ std::string oscBothSides(OscSides& s, uint32_t routine, std::initializer_list<ui
     return t;
 }
 // How wide a drawn float may be: anything (NaNs, infinities, ±3e38 among the edges), no NaN, or moderate (0, ±1 and to
-// ±10000: what reaches rom.4's exp2, which reads outside its tables, and faults, from an argument of 2^31 or a NaN)
-enum class OscRange : uint8_t { any, noNaN, moderate };
+// ±10000: what reaches rom.4's exp2, which reads outside its tables, and faults, from an argument of 2^31 or a NaN),
+// or about 2^31 / 10000 half the time and else no NaN (v238: a word VariPhrase's note-on takes × 10000 through 2^31)
+enum class OscRange : uint8_t { any, noNaN, moderate, aboutTwo31 };
 // A float drawn for a word the voice compares or adds: its usual range most often, its edges now and then
 float oscDrawFloat(std::mt19937& rng, OscRange range = OscRange::any);
 // The block's float words (a note-on's or the settings') that the targets compute with, drawn as floats rather than

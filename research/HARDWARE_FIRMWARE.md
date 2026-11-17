@@ -1546,6 +1546,60 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's players' installs and VariPhrase's note-on (2026-11-17, v238) {#vc2-osc-players}
+
+Step 4.2's OSC voice, its fourth part (research/VC2_MODE_PLAN.md, "4. Wiring"): the three routines of rom.4's OSC code between the kinds' note-on and the targets (0x893af420…0x893af9ea), which the frame (v230) reached by address. They are LITE's install `0x893af7a0`, VariPhrase's install `0x893af870` and VariPhrase's own note-on `0x893af420`. Ported bit for bit: Vc2OscPlayers.cpp, each kind's way a field of its row (`Vc2OscInstall`, `Vc2OscNoteOn::vari`), the tables in Vc2OscTables.cpp. LITE's and the analog's own note-ons (`0x893c7c30`, `0x893c22e0`) are in the players' and the analog OSC's code, and go with those ports (the plan's split). Every address is rom.4's; every offset the voice's.
+
+**The names, by two sources.** The block's flags byte (+0x138, the block's +0xe4) is rom.2's block +0xb4 byte:
+- its 0x80 is rom.2's Start Offset in samples (v152), and here the note-on takes the range in samples under it, else by events;
+- its 0x20 is Vari off: under it rom.4's installs put in `0x893c63c0`/`0x893c66e0`, the routines VC2_VOCAL_DESIGNER.md pairs with rom.2's Vari off player (`0x89509870`/`0x89509f52`).
+
+The loop record (vplp) is read at rom.2's file reader's offsets (XtFiles.h) and used as they say: +4/+8 the forward loop, +0xc/+0x10 the backward, +0x14/+0x16 the rate factors in tenths of a cent (rom.4: exp2(r/12000)), +0x18/+0x19 the modes. The block's +0xb8 is the Start Offset, as in rom.2. Not named, as one source has them: the header's +0x1c, the block's +0x60 (× 10000 into +0x1a8), the +0xe0 record's +0x2d0, and the routines `0x893c8670` and `0x893cc760`.
+
+**LITE's install** `0x893af7a0`, by the wave's type (past 2 nothing):
+- type 0, Vari off: the render `0x893c63c0`, or `0x893c66e0` with the flag (+0xa40);
+- type 1, kind 1's mode 1: `0x893c9f60`, then `0x893cc760` on the object;
+- type 2, LITE's two heads: `0x893c6e80`, or `0x893c6e8c` with the flag;
+- then +0xa88 from the table at `0x89542350` at the type, 3 more with the flag (1.5e−5, 1e11, 2e−5; 1.7e−5, 1e11, 2.5e−5).
+
+**VariPhrase's install** `0x893af870`, by the wave's type 1…8 (0 and past 8 nothing):
+- 1 and 6: SOLO's block `0x893c9450`, +0xa88 from `0x89542368` at 0 or 1 (5 more with the flag); under the block's Vari off, Vari off's render and LITE's type 0 constant instead;
+- 3: BACKING `0x893cadc0`, at 3;
+- 5: ENSEMBLE `0x893ca1f0`, at 4;
+- 8: the period-jump player `0x893ca8b0`, at 2;
+- 2, 4 and 7: nothing.
+
+**VariPhrase's note-on** `0x893af420` (kind 2's case of `0x893af0b0`), in order:
+1. The block's three flag bytes (+0x138…) into the object's first three.
+2. The range's two ends (+0x13c, +0x140): in samples ×16 into +0x174 and +0x178, else as halfwords into +0x170 and +0x172.
+3. +0x1a0 the voice's own address + 0x108 (the players reach the block through it).
+4. +0x1a8 the block's +0x60 × 10000 as an unsigned integer (FTRC, less 2^32 from 2^31 on).
+5. +0x1a4 the header's +0x1c.
+6. The targets into the object: +0x1cc the tuned ratio (`0x893afd10`), +0x1d0 the formant, +0x1d4 the block's +0x18, +0x1f0 0, +0x1d8 the walk. Then kind 2's update `0x893c88b0` and `0x893c8670`.
+7. Then, only for types 1, 6, 7 and 8 under the block's Vari off, Vari off's player words:
+   - **by events:** each end's position from `0x893cc0d0(object, event, &position, &…)` >> 4, the end's less 1, into the start (+0x26c), end (+0x254), the forward loop (+0x258, +0x25c, their span) and the backward (+0x270 the end, +0x274 the start, their span); the modes 1 with the object's 0x08, else 0; the rates 1. A seek (`0x893c6360`) to the third event's position (+0x144) when it isn't the first.
+   - **by samples:** the start and the end less 1 as they stand; the loop record's loops; its modes under the object's 0x01, else 0; its rates exp2(r/12000), the backward's times the +0xe0 record's +0x2d0. A seek to the third word when it isn't the first.
+   - then +0x250 the Start Offset, +0x248 0, +0x284 1, and the position (+0x24c, and +0x288) the end when the walk is negative, else the start.
+
+**The check, xt_vc2osc** (its voice part):
+- The three routines' hooks are gone, so rom.4's own run. Hooked in their place: `0x893c8670` (as a kind's routine), `0x893cc760` (a routine on the object), and the event lookup `0x893cc0d0`, whose hook answers the next of three drawn positions, the port's parts the same.
+- The nine render routines the installs now write (Vari off's, kind 1's mode 1, LITE's heads, SOLO's, BACKING's, ENSEMBLE's, the period-jump player's) are hooked as the frame's renders, as they are the players' code. The first run, without them, ran into SOLO's real code on noise and faulted.
+- The records: the header's +0x1c, the loop record's every word, and the +0xe0 records' +0x2d0 (no NaN) are drawn and written into rom.4's memory. The records' code moved into Vc2OscRecords.cpp.
+- The three pointers (+0x128, +0x130, +0x134) are drawn before every event. Kind 5's settings copy 88 bytes over them (its P), and a voice steered to kind 2 then took its note-on through them, a state the tone never makes (the first runs at seeds 7 and 31337 faulted there).
+- The block's +0x60 is drawn with no NaN (FTRC). The note-on's block points its +0xe0 at a record, and its seek word is the range's start half the time.
+- The kinds' note-on event steers kind 1 or 2, the wave's type and the block's Vari off half the time, as VariPhrase's path is all three at once. The install event does it one time in three, and one in six it gives a kind past 7, the frame's own row.
+- The block's +0x60 is drawn about 2^31 / 10000 half the time, where the note-on's split at 2^31 shows.
+- Coverage (llvm-cov, 40 cases): every function, line, region and branch of Vc2OscPlayers.cpp.
+
+Results:
+- seed 2024, 40 cases: the voice part's 16,000 events (2,559 note-ons, 159 event lookups, 28 object setups), 0 different (the ramp part's as v236);
+- seeds 7 and 31337, 400 cases each: 0 different.
+- `mutate_vc2.py --osc`: 599 plants, all caught: 100 in Vc2OscPlayers.cpp (the new port, `vc2oscplayers`), the kinds' rows' 8 rewritten and 3 new, the install's and the kinds' note-on's switches, and the 4 new table addresses. The first run missed two, both the check's:
+  - v230's `beyond-flag`: a kind past 7's install clears the flag, which the players' steer had made rare on the install event;
+  - `times-split`: the split at 2^31 needs the word × 10000 between 2^31 and 2^32 + 2^31.
+  Both are drawn since. `rom4-no-osc` and `rom4-no-tables` caught.
+- fcheck's diff: xt_vc2osc's two count lines.
+
 ### The VC-2's COSM converters, the first batch (2026-11-16, v237) {#vc2-cosm-batch1}
 
 Step 4.2's COSM part's third (research/VC2_MODE_PLAN.md): the converters left after v235, a batch a version, from the VC-2 session's task. The dispatcher's switch calls 15 converters (the Speaker Simulator's case is inline), so after the TVF's and the Growl's 13 were left, not the 14 the plan said. Split by what rom.4 holds: six on the shared holds and the depth law alone, and seven that reach rom.4's libm (`powf` `0x89506e54`, a wrapper on `0x89509b80` that sets errno; `logf` `0x895065f4`) through the helpers before the first converter. v237 is the six. Ported bit for bit: the Amp Simulator's, Compressor's and Limiter's converters (Vc2CosmDynamics.cpp), the Dual Filter's and the TB Filter's (Vc2CosmFilters.cpp), the Dynamic TVF's with the TVF's (Vc2CosmTvf.cpp, one routine over a row), the laws they share (Vc2CosmConvert.cpp), their pool words and the gain table (Vc2CosmTables.cpp, read by loadVc2 through `vc2LoadCosm`, as before), and the converters by type (Vc2CosmConverters.cpp, `vc2CosmPortedConvert`). Every address is rom.4's; the input's offsets from +0x10 are the type's parameters in their IDs' order.

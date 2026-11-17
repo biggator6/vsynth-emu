@@ -22,12 +22,22 @@ struct Vc2OscWaveHeader {
     uint16_t rate = 0;     // +0x08: 44000 over it is +0xa6c; it scales +0xa80
     int8_t rootKey = 0;    // +0x0a: the root key, × 100 into +0xa80's exponent
     int32_t cents = 0;     // +0x18: the header's cents, the offset's whole part
+    uint32_t word1c = 0;   // +0x1c: into the object's +0x1a4 at VariPhrase's note-on (v238)
 };
 
-// What it reads of the wave's loop record the block's +0xdc points at (rom.2's voice setup reads the same two)
+// What it reads of the wave's loop record (vplp) the block's +0xdc points at, by rom.2's names (XtFiles.h, its file
+// reader, which reads them at the same offsets) where rom.4's VariPhrase note-on uses them as they say (v238)
 struct Vc2OscLoopRecord {
-    int32_t tune = 0;      // +0x00: 1/100 cent, the detune and the factor 2^(−tune/120000)
-    int8_t fine = 0;       // +0x1b: 1/100 cent onto the offset
+    int32_t tune = 0;        // +0x00: 1/100 cent, the detune and the factor 2^(−tune/120000)
+    int32_t loopStart = 0;   // +0x04: the forward loop, in frames
+    int32_t loopEnd = 0;     // +0x08
+    int32_t bwdEnd = 0;      // +0x0c: the backward loop
+    int32_t bwdStart = 0;    // +0x10
+    int16_t rateFwd = 0;     // +0x14: the loops' rate factors, in tenths of a cent: exp2(rate / 12000)
+    int16_t rateBwd = 0;     // +0x16
+    int8_t fwdMode = 0;      // +0x18: the loops' modes (0 One Shot, 1 One Way, 2 Alternate)
+    int8_t bwdMode = 0;      // +0x19
+    int8_t fine = 0;         // +0x1b: 1/100 cent onto the offset
 };
 
 // The voice's tail, as rom.4 lays it out; rom.2's names for the wave's tuning (XtWaveTune: rom.2's +0x994…+0x9a0)
@@ -71,6 +81,11 @@ public:
     virtual void renderKind6(float* out) = 0;                 // 0x893ec730(voice + 0xafc, out)
     virtual void seek(uint32_t routine, int32_t at) = 0;      // a player's, routine(the object, at)
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
+    // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0); a
+    // player's routine on the object; 0x893cc0d0(the object, event, &position, &…), an event's position ×16
+    virtual uint32_t address() = 0;
+    virtual void objectCall(uint32_t routine) = 0;
+    virtual int32_t eventPosition(uint32_t event) = 0;
     virtual Vc2OscWaveHeader waveHeader(uint32_t at) = 0;
     virtual Vc2OscLoopRecord loopRecord(uint32_t at) = 0;
 };
@@ -92,6 +107,10 @@ public:
     // 0x893ae370, then the kind's note-on
     void noteOn(const uint32_t* block, uint32_t legato, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893af0b0 (Vc2OscNoteOn.cpp)
+    // v238 (Vc2OscPlayers.cpp): LITE's install 0x893af7a0, VariPhrase's 0x893af870 and its note-on 0x893af420
+    void installLite(Vc2OscParts& parts);
+    void installVari();
+    void noteOnVari(Vc2OscParts& parts, const Vc2ToneShared& shared);
     // 0x893ae610: ramp 0's start, given the ramp's six words (Vc2RampSettings; the tone's input + 0xc)
     void start(const uint32_t* ramp, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void count(uint32_t x);                                // 0x893ae6c0
@@ -119,6 +138,8 @@ public:
     void setU32(uint32_t at, uint32_t v) { put(at, v); }
     void setF32(uint32_t at, float v) { put(at, v); }
     void setU8(uint32_t at, uint8_t v) { own[at - kOwn] = v; }
+    uint16_t u16(uint32_t at) const { return get<uint16_t>(at); }
+    void setU16(uint32_t at, uint16_t v) { put(at, v); }
     uint32_t kind() const { return u32(kKind); }
 
     std::array<uint8_t, kOwnEnd - kOwn> own {};   // +0x54…+0x90c: the block's copy, the object, the legato word
