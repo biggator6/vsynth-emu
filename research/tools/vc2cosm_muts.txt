@@ -35,6 +35,11 @@
 # v243: the Matrix core's refresh and the groups' rows in vc2matrix (Vc2Matrix.cpp), under xt_vc2cosm's third part.
 # Not planted, as no input tells them apart: the refresh's 0 term at a value of 0 left to the law (0 × the depth >> 13,
 # held, is 0 too).
+# v245: the sources and the choice in vc2matrixsources (Vc2MatrixSources.cpp), the limits and curve as one run in
+# vc2matrixtables, under xt_vc2cosm's third part on rom.4's own sources.  Not planted, as no input tells them apart: a
+# word's sign, the curve's or a limit's (no word of the 465 rom.4 reads has bit 15 set); the bipolar reading's 0 at 0
+# (the curve's word 129, where 0 would read, is 0); the bipolar's 64 taken by the lower branch (the curve's 0 is 0);
+# the choice's 96 a step higher, up to 110 (96…109 are its cases, found first).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -140,7 +145,7 @@ matrix-dest|if (m.slots[k].dest == dest)|if (m.slots[k].dest == dest + 1)|vc2mat
 matrix-slots|k < Vc2MatrixWords::kSlots; ++k) {|k < Vc2MatrixWords::kSlots - 1; ++k) {|vc2matrix
 matrix-limit-top|return sum > most ? most :|return sum > most ? most - 1 :|vc2matrix
 matrix-limit-floor|sum < -most ? -most : sum;|sum < -most ? -most + 1 : sum;|vc2matrix
-matrix-limit-index|limits[dest];|limits[dest - 1];|vc2matrix
+matrix-limit-index|vc2MatrixLimit(dest);|vc2MatrixLimit(dest - 1);|vc2matrix
 matrix-uses-group|if ((m.uses[g.index] & g.bits) == 0)|if ((m.uses[g.index + 1] & g.bits) == 0)|vc2matrix
 matrix-uses-bits|if ((m.uses[g.index] & g.bits) == 0)|if (m.uses[g.index] == 0)|vc2matrix
 matrix-no-refresh|    refresh.refresh(m);\n||vc2matrix
@@ -152,7 +157,7 @@ matrix-sums-base|int16_t* sums = &m.sums[g.first - 1];|int16_t* sums = &m.sums[g
 matrix-bit|if (bits & (1u << k)) sums[k]|if (bits & (2u << k)) sums[k]|vc2matrix
 matrix-reader-group|second ? kVc2MatrixCosm2 : kVc2MatrixCosm1|kVc2MatrixCosm1|vc2matrix
 matrix-limits-at|kLimits = 0x89540158;|kLimits = 0x8954015a;|vc2matrixtables
-matrix-limits-step|kLimits + 2 * (uint32_t)d|kLimits + 2 * (uint32_t)(d + 1)|vc2matrixtables
+matrix-limits-step|at += sizeof w;|at += 2 * sizeof w;|vc2matrixtables
 tables-percent|{ 0x89398da0, &t.tvf.percent }|{ 0x89398da4, &t.tvf.percent }|vc2cosmtables
 tables-tvf-127|{ 0x89398da4, &t.tvf.k127 }|{ 0x89398da0, &t.tvf.k127 }|vc2cosmtables
 tables-tvf-63|{ 0x89398db0, &t.tvf.k63 }|{ 0x89398da0, &t.tvf.k63 }|vc2cosmtables
@@ -623,7 +628,7 @@ core-shift-floor|(s.depth * value) >> kTermShift|(s.depth * value) / (1 << kTerm
 core-hold-top|return static_cast<int16_t>(t > most ? most :|return static_cast<int16_t>(t > most ? most - 1 :|vc2matrix
 core-hold-floor|t >= -most ? t : -most);|t >= -most ? t : -most + 1);|vc2matrix
 core-hold-test|t >= -most ? t : -most);|t > -most + 1 ? t : -most);|vc2matrix
-core-limit-index|limits[s.dest] : 0;|limits[s.dest > 0 ? s.dest - 1 : 0] : 0;|vc2matrix
+core-limit-index|vc2MatrixLimit(s.dest);|vc2MatrixLimit(s.dest > 0 ? s.dest - 1 : 0);|vc2matrix
 core-16-bits|static_cast<int16_t>(sources_.value(|static_cast<int8_t>(sources_.value(|vc2matrix
 core-byte|sources_.value(m.routines[k], m.sources[k])|sources_.value(m.routines[k], m.sources[(k + 1) % kSources])|vc2matrix
 core-routine|sources_.value(m.routines[k],|sources_.value(m.routines[0],|vc2matrix
