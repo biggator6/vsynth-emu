@@ -394,9 +394,29 @@ version against rom.4's routines with what it calls hooked:
      getter `0x893a2350` on M's words, the refresh `0x893a2230` behind an interface; the TVF's converter
      (`0x89398ae0`) the first type; against rom.4's in xt_vc2cosm's second part (HARDWARE_FIRMWARE.md, "The VC-2's
      COSM converters' frame").
-   - next: the other 14 converters (rom.4's `0x89397980…0x89399620`, rom.2's `0x894dc8b0…0x894de110` on another input:
-     VC2_VOCAL_DESIGNER.md, "COSM in rom.4"), a few a version, each against rom.4's through the dispatcher on the same
-     input, each taking its hook out of xt_vc2cosm's second part.
+   - ~~next: the other 14 converters~~ (rom.4's `0x89397980…0x89399620`, rom.2's `0x894dc8b0…0x894de110` on another
+     input: VC2_VOCAL_DESIGNER.md, "COSM in rom.4"), a few a version, each against rom.4's through the dispatcher on the
+     same input, each taking its hook out of xt_vc2cosm's second part. They were 13, not 14: the switch's 15 cases call
+     15 converters, the Speaker Simulator's (type 4) is inline in the dispatcher and came with v235, and the TVF's and
+     the Growl's were done. Split by what rom.4 holds (2026-11-16): six converters on the shared holds and the depth law
+     alone, and seven that reach rom.4's libm (`powf` `0x89506e54`, `logf` `0x895065f4`) through seven helpers before
+     the first converter (`0x89397450…0x89397900`).
+   - done (v237): the six without libm: the Amp Simulator (`0x89397eb0`, type 3), the Dual Filter (`0x893988a0`, 9), the
+     Dynamic TVF (`0x89398d40`, 11, the TVF's routine on its ten parameters with two Own Env depths), the Compressor
+     (`0x89398fd0`, 12), the Limiter (`0x893990d0`, 13) and the TB Filter (`0x89399620`, 16), with the keyfollow
+     `0x893976f0` (the TVF's Cutoff law), the level's gain `0x89397900` and the gain table `0x89541f34` (129 words), and
+     the port's converters by type (`vc2CosmPortedConvert`), against rom.4's in xt_vc2cosm's second part, which keeps
+     its own list of the types ported (HARDWARE_FIRMWARE.md, "The VC-2's COSM converters, the first batch").
+   - next: the seven on libm, with `logf` and `powf` behind `Vc2ToneShared` (rom.4's own on both sides of the check, as
+     the velocity curve and exp2 are; `logf` as v236's `Vc2ToneShared::log`, `powf` beside it the same way): the OD/Dist (`0x89397980`, type 1) and the Wave Shaper (`0x89397cf0`, 2) on the
+     level's keyfollow `0x89397480`/`0x89397510` (two copies of one routine: the held level × 0.9/127 + 0.1, times
+     powf(2, its two arguments' product / 1200), held to 0.1…1; read at their starts only) and the gain table; the Resonator (`0x89398080`, 5) on its Size's `0x89397760` (logf(2)); the Frequency Shifter
+     (`0x893991d0`, 14) on `0x89397800` and the Lo-Fi (`0x893993f0`, 15) on `0x89397870`; then the two Side Band
+     Filters (`0x89398260`, 6, and `0x893984e0`, 7: the LPF's `0x893975a0`, powf(x, 2) and logf(2), and the Width's
+     `0x89397650`), the largest, last. One version if they come as alike as v237's did; else the Side Band Filters a
+     version of their own. rom.4 also holds a Speaker Simulator converter of its own (`0x89398070`, rom.2's `0x894dcef0`
+     recompiled) and one that writes code 0 (`0x89397970`): no branch or word in rom.4 reaches either, so neither is
+     ported.
    - the Matrix core, a part of its own (every group's, not COSM's alone): the refresh `0x893a2230` (the sources'
      routines, their terms by the depths and limits, the dirty bits), M's other words and the other groups' readers
      (the OSC's `0x893a23b0`…, the next group's from `0x893a2bf0`; rows of `vc2MatrixRead` where their shape is the

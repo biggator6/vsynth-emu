@@ -1546,6 +1546,41 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM converters, the first batch (2026-11-16, v237) {#vc2-cosm-batch1}
+
+Step 4.2's COSM part's third (research/VC2_MODE_PLAN.md): the converters left after v235, a batch a version, from the VC-2 session's task. The dispatcher's switch calls 15 converters (the Speaker Simulator's case is inline), so after the TVF's and the Growl's 13 were left, not the 14 the plan said. Split by what rom.4 holds: six on the shared holds and the depth law alone, and seven that reach rom.4's libm (`powf` `0x89506e54`, a wrapper on `0x89509b80` that sets errno; `logf` `0x895065f4`) through the helpers before the first converter. v237 is the six. Ported bit for bit: the Amp Simulator's, Compressor's and Limiter's converters (Vc2CosmDynamics.cpp), the Dual Filter's and the TB Filter's (Vc2CosmFilters.cpp), the Dynamic TVF's with the TVF's (Vc2CosmTvf.cpp, one routine over a row), the laws they share (Vc2CosmConvert.cpp), their pool words and the gain table (Vc2CosmTables.cpp, read by loadVc2 through `vc2LoadCosm`, as before), and the converters by type (Vc2CosmConverters.cpp, `vc2CosmPortedConvert`). Every address is rom.4's; the input's offsets from +0x10 are the type's parameters in their IDs' order.
+
+**What they share** (each in rom.4's order of operations):
+- A Matrix sum is a call of the reader the input's byte +1 picks, one call a sum, in the converter's order, as a call may refresh M (`Vc2CosmSums`).
+- A level and its sum held to 16 bits, then to 0…127 (`vc2CosmLevel`); a level with no sum is the sign-extended word held the same.
+- The depth law d/63 × |d/63|: inline in most, `0x89397450` (its 63 at `0x893976b0`) by `bsr` in the Amp Simulator's.
+- A cutoff and its keyfollow, (key − 60) × KF × 10 (each 16 bits) ÷ 100 ÷ 127, plus the held level ÷ 127, plus 0, held to 0…1: the TVF's, inline in the Dynamic TVF's, and the Dual Filter's helper `0x893976f0(level, KF × 10, key − 60)` (its 100 and 127 at `0x89397920`, `0x89397924`). One law, `vc2CosmKeyed`, each converter's own pool words. Q × 0.984375 ÷ 127 − 1 (`vc2CosmQ`); a held level ÷ 127 + 0 (`vc2CosmUnit`).
+- The gain table at `0x89541f34`: 128 u16 words, 0…32768, about 32768·(i/127)² (rom.2's at `0x897cfcb8`, XtCosm's), a word ÷ 32768 by each converter's own pool word (`vc2CosmGain`). Three reads have no hold: the Amp Simulator's Output Level, the Limiter's Threshold and the TB Filter's Gain read the table at the parameter as it stands. Past 127 rom.4 reads the next table (0, 368, 736, …); the port gives 0, and no stored setting goes there.
+- The level's gain `0x89397900(L)`: (L/100)² up to 100, else (L − 100)/27 × 3 + 1 (an FMAC, product then sum); the Compressor's and the Limiter's Output Level. Its 100 is the word the Dual Filter's keyfollow reads (`0x89397920`).
+
+**The six** (each block's code at +0, the words not listed left as they were):
+
+| Type | Converter | Code | Block |
+|---|---|---|---|
+| 3 Amp Simulator | `0x89397eb0` | 4 | byte +4 Amp Type; +0x1c Bass held × 4 ÷ 127 + 0; +0x20 Middle held ÷ 127 + 0; +0x24 Treble and the group's 2nd sum, held, × 2 ÷ 127 + 0; +0x28 the table at Output Level; +8 the table at Gain and the 1st sum, held; +0xc…+0x18 Gain Env × the first velocity factor, envelope 9 (COSM 2's 11), Gain LFO and the 10th sum held to ±63, 0 |
+| 9 Dual Filter | `0x893988a0` | 12 | +4 Filter Type; each filter (+8, +0x20): Frequency and its sum (1st, 2nd) by the keyfollow; Env depth × its velocity factor (the first, the second); Q held, no sum, by the Q law; its envelope (9 and 10, COSM 2's 11 and 12); LFO depth and its sum (10th, 11th) held to ±63; 0 |
+| 11 Dynamic TVF | `0x89398d40` | 14 | the TVF's, on ten parameters: Q Own Env after Q LFO, Cutoff Own Env after Cutoff LFO, each by the depth law (no velocity, no sum) into +0x18 and +0x30, the two words the TVF leaves; its pool at `0x89399020…0x89399037`, the TVF's values |
+| 12 Compressor | `0x89398fd0` | 15 | +4 Attack and the 1st sum, +8 Sustain and the 2nd, each held ÷ 127 + 0; +0xc the level's gain of Output Level |
+| 13 Limiter | `0x893990d0` | 16 | +8 the table at Threshold; byte +4 Ratio; +0xc Attack and the 1st sum, +0x10 Release and the 2nd, each held, through the table; +0x14 the level's gain |
+| 16 TB Filter | `0x89399620` | 20 | +8 LPF Cutoff and the 1st sum held ÷ 127 + 0; +0xc (KF × 10 held to ±200, + 200) × 4 ÷ 400 − 2; +0x20…+0x2c LPF Env × the first factor, envelope 9 (11), LPF LFO and the 10th sum held, 0; +0x10 Q and the 2nd sum held ÷ 127 + 0; +0x14 Q Follow held to ±63, + 63, × 2 ÷ 126 − 1; +0x18 HPF Cutoff held ÷ 127 + 0, no sum; +0x1c its keyfollow (the same law, its own words at `0x893999a0`); +0x30…+0x3c HPF Env × the second factor, envelope 10 (12), HPF LFO by the depth law with no sum and no hold, 0; +4 the table at Gain × 2; byte +0x40 the key |
+
+Each is rom.2's converter (`0x894dcd80`, `0x894dd690`, `0x894dda40`, `0x894ddc50`, `0x894ddd20`, `0x894de110`) on rom.4's input, so its block is XtCosm's and XtCosm's objects play it. The order of the Matrix calls: the Amp Simulator's Treble, Gain, Gain LFO; the Dual Filter's Filter 1 Frequency, its LFO, Filter 2's, its LFO; the Dynamic TVF's as the TVF's (Cutoff, its LFO, Q, its LFO); the Compressor's and Limiter's two in their order; the TB Filter's LPF Cutoff, LPF LFO, Q.
+
+**Two converters nothing calls.** rom.4 holds a Speaker Simulator converter of its own at `0x89398070` (code 5, the input's +0x10 as the byte +4: rom.2's `0x894dcef0` recompiled) and one that writes code 0 at `0x89397970`; no word, `bsr` or `bra` at any even offset of rom.4 reaches either (the same scan finds the dispatcher's three callers, `0x89399b66`, `0x89399b9e`, `0x89399c00`). rom.2 is the same: its dispatcher's case 4 (`0x894de5b0`) has the code inline, and nothing reaches `0x894dcef0`, so v78's note that rom.2's converter is "a small function of its own, not inline" is withdrawn where it stands ("COSM: the Dual Filter, and the map of the types").
+
+**The check**, xt_vc2cosm's second part (Vc2CosmFrameCheck.cpp; its draws in Vc2CosmFrameDraws.cpp): the six types' hooks taken out, their converters running on both sides, the port's through `vc2CosmPortedConvert`. The check keeps its own list of the types ported (its draws' table), so a type the port lost or gained differs: the first list was the port's own, and a converter's row taken out of it went unseen. A type is drawn three times in four from the eight ported, else any of 0…17 or any byte; its parameters by their ranges (rom.2's descriptors for the same types, `pnames.py`): the ends, 0, within, past them by 40 or any 16 bits; a table index read without a hold only at its ends or within. The Growl's part is as it was.
+
+Results:
+- seed 2024, 40 cases: 2,400 events (224 Amp Simulator, 233 Growl, 243 Dual Filter, 241 TVF, 217 Dynamic TVF, 223 Compressor, 223 Limiter, 213 TB Filter, 27 Speaker Simulator, 153 other types, 247 off, 156 past the types), 4,564 refreshes, 0 different, the first run;
+- seeds 7 and 31337, 400 cases each: 24,000 events each (2,186…2,331 of each ported type), 0 different.
+- `mutate_vc2.py --cosm`: 351 plants, all caught: v235's 26 on the TVF rewritten where its code became the row's and the keyfollow's, and 228 new (41 on the TVF's and Dynamic TVF's routine and rows, 20 on the shared laws and the sums' calls, 24 on the pool words and the gain table, 80 on the Dual and TB Filters, 54 on the Amp Simulator, Compressor, Limiter and the level's gain, 9 on the converters by type). The first run missed 2 of 351, both on the table's last word: the port took the table as 129 words, the 129th the next table's first, a 0, which is what the port gives past the table, so neither plant could differ. The table is 128 words; the guard planted at 127 and a read one word short are caught.
+- The `rom4-no-cosm` and `rom4-no-tables` panel plants caught; fcheck's diff is xt_vc2cosm's `frame:` line; verify.sh passes every line.
+
 ### The VC-2's portamento (2026-11-17, v236) {#vc2-portamento}
 
 Step 4.2's OSC voice, its third part (research/VC2_MODE_PLAN.md, "4. Wiring"): rom.4's pitch ramp, three in a voice (+0x90c, +0x970, +0x9d4, built with types 0, 2 and 1), which the voice's frame (v230) and the targets (v232) reached through hooks. Ported bit for bit: `Vc2PitchRamp` (Vc2PitchRamp.cpp, the tick in Vc2PitchRampTick.cpp, the constants in Vc2RampTables.cpp, read by loadVc2 through `vc2LoadRamp`), and the voice owns its three. VC2_VOCAL_DESIGNER.md, "The OSC block in rom.4", found the constructor, restart and tick rewritten from rom.2's (`XtPitchRamp`); this is that law, read. Every address is rom.4's.
@@ -8536,7 +8571,8 @@ or update. This is the last COSM type: all sixteen are now ported.
 
 **Parameter**: 0x8ea, Speaker Type 0…11 (shown 1–12), default 0.
 
-**The converter** (`0x894dcef0`): +0 code 5, +4 the type as a byte. The
+**The converter** (`0x894dcef0`; the dispatcher has its code inline and never
+calls it, v237): +0 code 5, +4 the type as a byte. The
 block case (`0x894ee520`) only stores the type (OBJ+0x14). A new type takes
 effect at the next block, with no crossfade.
 
@@ -9760,9 +9796,13 @@ traced. The Side Band converters turned out to write fixed codes (v68), so
 Lo-Fi's 19, v72). The ID ranges are from the table at 0x897cebd8.
 
 All sixteen types are ported and equal the firmware (v61–v78). The Speaker
-Simulator's converter is a small function of its own (`0x894dcef0`), not
-inline as first noted. Their stereo routines, by another table: v104, "COSM:
-the stereo routines".
+Simulator's converter ~~is a small function of its own (`0x894dcef0`), not
+inline as first noted~~: withdrawn at v237. The function is there, but the
+dispatcher's case 4 (`0x894de5b0`) has the same code inline (code 5, the
+input's +0x12 as the byte +4), and no word, `bsr` or `bra` in rom.2 reaches
+`0x894dcef0`; rom.4 is the same ("The VC-2's COSM converters, the first
+batch"). Their stereo routines, by another table: v104, "COSM: the stereo
+routines".
 
 **The Dual Filter** (COSM Type 9, block code 12).
 

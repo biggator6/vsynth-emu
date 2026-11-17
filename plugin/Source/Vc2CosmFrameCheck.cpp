@@ -2,17 +2,20 @@
 // vc2CosmConvert on the same input and block, with the note's Matrix object M in the interpreter's RAM and its port's
 // words beside it.  The Matrix readers and getter run on both sides; the refresh (0x893a2230) is hooked to log and to
 // do what a refresh does, drawn the same on both sides (one time in two a source moved: new terms, every group's dirty
-// bits its uses); the velocity curve is rom.4's own on both (RomShared); the TVF's and the Growl's converters run on
-// both; the other fourteen are hooked to log their type, the port's Vc2CosmTypes the same.  Each case M drawn, then 60
-// events: an input drawn (the switch now and then off, the type mostly the TVF's or the Growl's, else any, past 16
-// too; the curves, sensitivities, key, velocity and parameters at and past their ends), M's slots and terms now and
-// then drawn again; after each the input, the block, M and the calls, word for word.  XT_VC2COSM_MAIN only.
+// bits its uses); the velocity curve is rom.4's own on both (RomShared); the converters the port has run on both
+// (vc2CosmPortedConvert: the TVF's and the Growl's, v237's six), the others are hooked to log their type, the port's
+// Vc2CosmTypes the same.  Each case M drawn, then 60 events: an input drawn (Vc2CosmFrameDraws.cpp: the switch now and
+// then off, the type mostly one the port has, else any, past 16 too; the curves, sensitivities, key, velocity and the
+// type's parameters at and past their ends), M's slots and terms now and then drawn again; after each the input, the
+// block, M and the calls, word for word.  XT_VC2COSM_MAIN only.
 #ifdef XT_VC2COSM_MAIN
 #include "Vc2CheckCalls.h"
 #include "Vc2CosmCheck.h"
-#include "Vc2CosmGrowl.h"
-#include "Vc2CosmTvf.h"
+#include "Vc2CosmConvert.h"
+#include "Vc2CosmConverters.h"
+#include "Vc2CosmTables.h"
 #include "Vc2Matrix.h"
+#include "Vc2MatrixTables.h"
 #include "Vc2RomShared.h"
 #include <array>
 #include <numeric>
@@ -24,11 +27,8 @@ constexpr std::array<uint32_t, 17> kConverters { 0, 0x89397980, 0x89397cf0, 0x89
     0x893984e0, 0x89398780, 0x893988a0, 0x89398ae0, 0x89398d40, 0x89398fd0, 0x893990d0, 0x893991d0, 0x893993f0,
     0x89399620 };
 constexpr std::array<uint32_t, 2> kReaders { 0x893a2960, 0x893a2aa0 };
-constexpr int kGrowl = 8, kTvf = 10, kSpeaker = 4, kEvents = 60, kRefreshCall = 0;
+constexpr int kSpeaker = 4, kEvents = 60, kRefreshCall = 0;
 constexpr uint32_t kInputAt = 0x8C060000, kBlockAt = 0x8C060100, kMatrixAt = 0x8C060200;   // in Vc2Fw's RAM
-// The TVF's parameters' ranges (Filter Type, Q, its LFO and Env depths, Cutoff, Keyfollow, its depths)
-constexpr std::array<std::pair<int, int>, 8> kTvfRanges { { { 0, 11 }, { 0, 127 }, { -63, 63 }, { -63, 63 },
-    { 0, 127 }, { -20, 20 }, { -63, 63 }, { -63, 63 } } };
 
 struct FrameCall {
     int32_t kind;   // 0 a refresh, else a hooked converter's type
@@ -58,59 +58,15 @@ struct FrameRefresh final : Vc2MatrixRefresh {
     }
 };
 
-// The port's converters: the TVF's and the Growl's, the rest logged as rom.4's hooks log them
+// The port's converters: those it has, the rest logged as rom.4's hooks log them
 struct FrameTypes final : Vc2CosmTypes {
     Vc2CosmMatrix& matrix;
     std::vector<FrameCall>& log;
     FrameTypes(Vc2CosmMatrix& m, std::vector<FrameCall>& l) : matrix(m), log(l) {}
-    template <class Block, class Convert>
-    void on(uint32_t* block, const Vc2CosmInput& in, Convert convert) {
-        Block b {};
-        std::memcpy(&b, block, sizeof b);
-        convert(in, b, matrix);
-        std::memcpy(block, &b, sizeof b);
-    }
     void convert(int type, const Vc2CosmInput& in, uint32_t* block) override {
-        if (type == kTvf) on<Vc2CosmTvfBlock>(block, in, vc2TvfConvert);
-        else if (type == kGrowl) on<Vc2CosmGrowlBlock>(block, in, vc2GrowlConvert);
-        else log.push_back({ type });
+        if (!vc2CosmPortedConvert(type, in, block, matrix)) log.push_back({ type });
     }
 };
-
-// A setting in [lo, hi]: its ends, 0, within, past them, or any 16 bits
-int16_t drawParam(std::mt19937& rng, int lo, int hi) {
-    const int span = hi - lo + 1;
-    const std::array<int, 6> picks { lo, hi, 0, lo + (int)(rng() % (uint32_t)span),
-                                     lo - 40 + (int)(rng() % (uint32_t)(span + 80)), (int16_t)rng() };
-    return (int16_t)picks[rng() % picks.size()];
-}
-
-// A sensitivity: 0, the table's end and past it either way, within, or any 16 bits
-int16_t drawSens(std::mt19937& rng) {
-    const std::array<int, 8> picks { 0, 199, 200, -199, -200, 300, (int)(rng() % 399) - 199, (int16_t)rng() };
-    return (int16_t)picks[rng() % picks.size()];
-}
-
-void drawCosmInput(Vc2CosmInput& in, std::mt19937& rng) {
-    std::array<uint32_t, sizeof in / 4> noise {};
-    for (uint32_t& w : noise) w = (uint32_t)rng();
-    std::memcpy(&in, noise.data(), sizeof in);
-    in.second = rng() % 2 ? 0 : (uint8_t)rng();
-    in.on = rng() % 10 == 0 ? 0 : (uint8_t)(1 + rng() % 255);
-    const std::array<uint8_t, 8> types { kTvf, kTvf, kTvf, kTvf, kGrowl, kGrowl, (uint8_t)(rng() % 18),
-                                         (uint8_t)rng() };
-    in.type = types[rng() % types.size()];
-    in.curveA = (uint8_t)(rng() % 10);
-    in.curveB = (uint8_t)(rng() % 10);
-    in.sensA = drawSens(rng);
-    in.sensB = drawSens(rng);
-    in.noteKey = (uint8_t)(rng() % 8 == 0 ? rng() : rng() % 128);
-    in.noteVelocity = (uint8_t)(rng() % 8 == 0 ? rng() : rng() % 128);
-    for (size_t k = 0; k < kTvfRanges.size(); ++k)
-        in.params[k] = drawParam(rng, kTvfRanges[k].first, kTvfRanges[k].second);
-    if (in.type == kGrowl) in.params[1] = drawParam(rng, 0, 127);
-    in.matrix = kMatrixAt;
-}
 
 // M's words: noise, then the COSM groups' uses (now and then none), slots naming their destinations, terms
 void drawMatrixWords(Vc2MatrixWords& m, std::mt19937& rng, bool all) {
@@ -151,7 +107,7 @@ std::string frameDifference(FrameRig& r, const Vc2CosmInput& in, const std::arra
 
 std::string frameEvent(FrameRig& r, std::mt19937& rng, FrameCounts& n) {
     Vc2CosmInput in {};
-    drawCosmInput(in, rng);
+    vc2DrawCosmInput(in, rng, kMatrixAt);
     std::array<uint32_t, kVc2CosmBlockWords> block {};
     for (uint32_t& w : block) w = (uint32_t)rng();
     if (rng() % 4 == 0) drawMatrixWords(r.m, rng, false);
@@ -172,7 +128,8 @@ std::string frameEvent(FrameRig& r, std::mt19937& rng, FrameCounts& n) {
     return what;
 }
 
-// rom.4's side: the refresh moves M's sources in its RAM, the converters not ported log their type
+// rom.4's side: the refresh moves M's sources in its RAM, the converters not ported log their type (by the check's own
+// list, so a type the port lost or gained differs)
 void hookFrame(FrameRig& r) {
     for (uint32_t reader : kReaders) r.fw.cpu.unhook(reader);
     r.fw.cpu.hook(kRefresh, [&r](Sh4& cpu) {
@@ -183,7 +140,7 @@ void hookFrame(FrameRig& r) {
         cpu.ret(0);
     });
     for (size_t t = 1; t < kConverters.size(); ++t) {
-        if (kConverters[t] == 0 || t == kTvf || t == kGrowl) continue;
+        if (kConverters[t] == 0 || vc2CosmCheckPorted((int)t)) continue;
         r.fw.cpu.hook(kConverters[t], [&r, t](Sh4& cpu) {
             r.hooked.push_back({ (int32_t)t });
             cpu.ret(0);
@@ -192,11 +149,17 @@ void hookFrame(FrameRig& r) {
 }
 
 void sayFrameCounts(const Vc2Run& run, const FrameCounts& n) {
-    const long types = std::accumulate(n.byType.begin() + 1, n.byType.begin() + kConverters.size(), 0L);
-    const long ported = n.byType[kTvf] + n.byType[kGrowl] + n.byType[kSpeaker];
-    std::printf("frame: %d cases, %ld events: %ld TVF, %ld Growl, %ld Speaker Simulator, %ld other types, %ld off, "
-                "%ld past the types; %ld refreshes\n", run.cases, n.events, n.byType[kTvf], n.byType[kGrowl],
-                n.byType[kSpeaker], types - ported, n.off, n.events - n.off - types, n.refreshes);
+    std::string ported;
+    long types = 0, have = 0;
+    for (size_t t = 1; t < kConverters.size(); ++t) {
+        types += n.byType[t];
+        if (!vc2CosmCheckPorted((int)t)) continue;
+        have += n.byType[t];
+        ported += (ported.empty() ? "" : ", ") + std::to_string(n.byType[t]) + " type " + std::to_string(t);
+    }
+    std::printf("frame: %d cases, %ld events: %s, %ld Speaker Simulator, %ld other types, %ld off, %ld past the types; "
+                "%ld refreshes\n", run.cases, n.events, ported.c_str(), n.byType[kSpeaker],
+                types - have - n.byType[kSpeaker], n.off, n.events - n.off - types, n.refreshes);
 }
 } // namespace
 

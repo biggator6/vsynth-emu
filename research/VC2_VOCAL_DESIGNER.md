@@ -225,7 +225,9 @@ xt_cosm's 77 addresses (`build/tools/vc2/cosm_pairs.txt`) part three ways.
   they are to be ported from rom.4 with the converters that read by ID, and compared once their input path is read.
   (Read and ported from v234 on: the input whole by its builder `0x89399b10`, the dispatcher, the Matrix's COSM
   readers `0x893a2960`/`0x893a2aa0` and getter `0x893a2350` on M, which is the note's Matrix object, the Growl's and
-  the TVF's converters; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters' frame".)
+  the TVF's converters; HARDWARE_FIRMWARE.md, "The VC-2's COSM converters' frame". v237: the Amp Simulator's, Dual
+  Filter's, Dynamic TVF's, Compressor's, Limiter's and TB Filter's, "The VC-2's COSM converters, the first batch"; the
+  seven left reach rom.4's powf and logf.)
 
 **The DSP routines by block code** (all 21 codes, mono and stereo) are in a table in each image's .data, the chooser
 `0x894eef70`'s: rom.2's at `0x8987c7ec` and `0x8987c840`, rom.4's at `0x8993fb50` and `0x8993fba4` (its image's `0x8991e0ec`
@@ -236,7 +238,8 @@ stereo** (`0x893b9b40`), where rom.2 has two (`0x894fa8d0`, `0x894faa00`). Outpu
 
 **Run (`vc2run <rom.4> cosm <rom.2>`, `vc2twincosm.cpp`).** No port is linked: xt_cosm holds `XtCosm` to rom.2, so rom.2
 equal to rom.4 is the port equal to rom.4. For each of the 16 types (the 15 the dispatcher's switch calls and the Speaker
-Simulator's own converter `0x894dcef0`), 100 notes mono and 100 stereo: a block made by rom.2's converter on an input whose
+Simulator's own converter `0x894dcef0`, which makes its block as the dispatcher's inline case does; nothing calls it, in
+either image: HARDWARE_FIRMWARE.md, "The VC-2's COSM converters, the first batch"), 100 notes mono and 100 stereo: a block made by rom.2's converter on an input whose
 words are the type's parameters, each drawn in its descriptor's range (the second bank, `0x897a56d8`), and given to both
 images; the note-on with the slot finder hooked in each to hand out four buffers holding a last note's junk; then 40 blocks
 of the type's DSP routine, each image's from its own table, on 32 frames at one of xt_cosm's levels (30,000 to 2.1e9, and 1),
