@@ -5,6 +5,7 @@
 // against rom.4's own.  HARDWARE_FIRMWARE.md, "The VC-2's OSC voice's note-on and targets".  Audio thread.
 #include "Vc2OscTables.h"
 #include "Vc2OscVoice.h"
+#include <span>
 
 // rom.4's bounds: the upper first, then the lower, a NaN passing
 float vc2OscBounded(float x, Vc2OscBounds b);
@@ -35,6 +36,13 @@ public:
         size_t lfo;
         uint32_t lfoDepth;
     };
+
+    // A target a note-on writes into one of the voice's words (v242: LITE's and the analog's)
+    struct Word {
+        uint32_t at;
+        float (Vc2OscTargets::*target)() const;
+    };
+    void writeInto(Vc2OscVoice& v, std::span<const Word> words) const;   // each in order
 
 private:
     float modulation(const Mod& m) const;   // the envelope × its depth + the LFO × its depth

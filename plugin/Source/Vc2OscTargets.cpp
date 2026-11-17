@@ -104,6 +104,10 @@ float Vc2OscTargets::gain() const {
     return mul(g, v_.ramps[Vc2OscVoice::kPitchRamp].factor());
 }
 
+void Vc2OscTargets::writeInto(Vc2OscVoice& v, std::span<const Word> words) const {
+    for (const auto& [at, target] : words) v.setF32(at, (this->*target)());
+}
+
 float Vc2OscTargets::level() const {
     const float one = levelOne();
     const bool held = bind(v_, p_, kLevelEnvelopeBind, kEnvelopeHeld) == 0.0f;

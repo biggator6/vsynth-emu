@@ -155,9 +155,66 @@ void steerLite(OscSides& s, std::mt19937& rng, int v) {
 }
 } // namespace
 
+std::array<std::pair<uint32_t, uint32_t>, 12> oscAnalogWords(std::mt19937& rng) {
+    constexpr uint32_t kCodes = 11, kPast = 8, kToneKfs = 15;   // [FW] the codes 0…10; the Tone KF table's 15
+    constexpr std::array<float, 6> kSubOn { 1.0f, 2.0f, -1.0f, 0.99f, 1e9f, -0.0f };
+    const uint32_t code = rng() % kPast == 0 ? kCodes + (uint32_t)rng() % kPast : (uint32_t)rng() % kCodes;
+    const float subOn = rng() % 4 == 0 ? kSubOn[rng() % kSubOn.size()] : 0.0f;
+    const float toneKf = (float)(rng() % kToneKfs) + 0.9f * vc2Unit(rng);
+    // Impact as the converter gives it, Impact·4/40: its tenths 0…4, 1 (the default) one time in four; else moderate
+    constexpr uint32_t kTenths = 41;
+    const float tenths = (float)(rng() % kTenths) / 10.0f;
+    const float impact = rng() % 4 == 0 ? 1.0f : rng() % 2 ? tenths : oscDrawFloat(rng, OscRange::moderate);
+    std::array<std::pair<uint32_t, uint32_t>, 12> words { { { 0x104, code }, { 0x138, std::bit_cast<uint32_t>(subOn) },
+                                                           { 0x144, std::bit_cast<uint32_t>(toneKf) },
+                                                           { 0x130, std::bit_cast<uint32_t>(impact) } } };
+    constexpr std::array<uint32_t, 8> kModerate { 0x108, 0x10c, 0x114, 0x11c, 0x120, 0x124, 0x134, 0x140 };
+    for (size_t k = 0; k < kModerate.size(); ++k) {
+        words[4 + k] = { kModerate[k], std::bit_cast<uint32_t>(oscDrawFloat(rng, OscRange::moderate)) };
+    }
+    return words;
+}
+
+namespace {
+// v242: one time in two a pitch within an octave of the root, where SQUARE's steps part: the pitch's word (+0x5c), its
+// envelope's and vibrato's depths (+0x70, +0xfc) 0, its factor (+0x60) and the rate's ratio 1, the offset and the
+// pitch ramp's value 0
+void steerNearRoot(Vc2OscVoice& o, std::mt19937& rng) {
+    constexpr uint32_t kPitch = 0x5c, kFactor = 0x60;   // [FW] the cents' and the ratio's words (Vc2OscTargets)
+    constexpr float kOctave = 1200.0f;
+    o.setF32(kPitch, kOctave * (2.0f * vc2Unit(rng) - 1.0f));
+    for (uint32_t at : { 0x70u, 0xfcu }) o.setF32(at, 0.0f);
+    o.setF32(kFactor, 1.0f);
+    o.tail.rateRatio = 1.0f;
+    o.tail.offset = 0.0f;
+    o.ramps[Vc2OscVoice::kPitchRamp].w.value = 0.0f;
+}
+
+// v242: the kinds' note-on event one time in four on kind 3, the analog, with its block words drawn; a pitch near the
+// root half the time, then half of those SQUARE (code 3), whose steps it parts; the word LA's phases hold their terms
+// against (+0x298) moderate, now and then large, where the phase passes 1; NOISE's (code 8) Pulse Width one time in
+// four a NaN, where its hold meets 0 (FTRC of a NaN: 0 on both sides as a byte; a NaN alone in each product).  Not on
+// the other codes: their sums take it through xtf::sub, whose NaN's sign is the interpreter's FSUB's negated
+void steerAnalog(OscSides& s, std::mt19937& rng, int v) {
+    constexpr uint32_t kAnalog = 3, kUnwritten = 0x298, kPw = 0x11c, kCode = 0x104, kSquare = 3, kNoise = 8;   // [FW]
+    Vc2OscVoice& o = s.voices[(size_t)v];
+    if (rng() % 4 == 0) o.setU32(Vc2OscVoice::kKind, kAnalog);
+    if (o.kind() != kAnalog) return;
+    for (const auto& [at, bits] : oscAnalogWords(rng)) o.setU32(at, bits);
+    if (rng() % 2) {
+        steerNearRoot(o, rng);
+        if (rng() % 2) o.setU32(kCode, kSquare);
+    }
+    o.setF32(kUnwritten, oscDrawFloat(rng, OscRange::moderate));
+    if (o.u32(kCode) == kNoise && rng() % 4 == 0) o.setF32(kPw, NAN);
+    oscWriteVoice(s, v);
+}
+} // namespace
+
 std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int v) {
     if (rng() % 2) oscSteerPlayers(s, rng, v);
     steerLite(s, rng, v);
+    steerAnalog(s, rng, v);
     ++s.n.noteOns;
     return oscBothSides(s, kKindNoteOn, { oscVoiceAt(v), (uint32_t)rng() }, OscAnswer::none, [&] {
         s.voices[(size_t)v].kindNoteOn(s.parts[(size_t)v], s.romShared);

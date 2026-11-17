@@ -82,6 +82,9 @@ void steer(Vc2OscVoice& o, std::mt19937& rng, bool all) {
         if (now()) o.setU32(at, (uint32_t)rng());
     }
     if (now()) o.setF32(kPositionFloat, oscDrawPosition(rng));
+    // v242: the word the analog's LA phases hold their terms against (0x893c4a20), which nothing writes: no NaN
+    constexpr uint32_t kAnalogUnwritten = 0x298;
+    if (now()) o.setF32(kAnalogUnwritten, oscDrawFloat(rng, OscRange::moderate));
     for (const auto& [at, range] : kFloats) {
         if (now()) o.setF32(at, oscDrawFloat(rng, range));
     }

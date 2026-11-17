@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's analog note-on v242 (2026-11-17, on vc2-mode after v241's merge; the user's "Matrix core too": this here,
+  the Matrix core as v243 in the COSM session; HARDWARE_FIRMWARE.md, "The VC-2's analog note-on"): step 4.2's OSC
+  voice, its sixth part. The analog OSC's own note-on 0x893c22e0, whole (about 1,000 instructions): Vc2OscAnalog.cpp
+  (the head: the code's copy, the targets, Impact and its decay by rom.4's powf, the phase; the sub oscillator's way,
+  0x893c3b90 hooked; the codes 0…8 as rows, past 8 all ½; HQ's clear 0x893c3570 inline), Vc2OscAnalogLa.cpp (LA's
+  corner, gains, shapes and phases, 0x893c4a20 inline), Vc2OscAnalog.h (the words by rom.2's XtAnalog at +0x8c), the
+  pool words and the Tone KF table in Vc2OscAnalogPool.h; kind 3's row Vc2OscNoteOn::analog. Found: the VC-2's
+  Pulse Width is narrower than the V-Synth's by waveform (SAW × 0.2 + 0.4, SQUARE, TRIANGLE, RAMP and JUNO lines).
+  The targets a note-on writes one table, Vc2OscTargets::writeInto (LITE's onto it). xt_vc2osc: 0x893c22e0's hook
+  out, 0x893c3b90's in; kind 3's block words drawn (oscAnalogWords: the Tone KF within its table, no NaN where FTRC
+  reads), a pitch near the root, SQUARE, NOISE's NaN. 0 different at seeds 2024, 7 and 31337; the new code covered
+  but the Tone KF guard. The kinds' note-on's way by address (Vc2OscNoteOn::routine) gone, no kind taking it.
+  mutate_vc2.py --osc: 831 plants (128 new, 6 rewritten where their code moved, v232's two of the dead way gone, three
+  dropped as equivalent), all caught. Not in the sound yet.
+
 The VC-2's COSM Side Band Filters v241 (2026-11-16, on its own branch, fast-forwarded to vc2-mode's c2dc9cd; the VC-2
   session's message, the user's yes; HARDWARE_FIRMWARE.md, "The VC-2's COSM Side Band Filters"). Step 4.2's COSM part's
   fifth, the last converters: 0x89398260 (type 6, code 7) and 0x893984e0 (7, 8), vc2Sbf1Convert and vc2Sbf2Convert

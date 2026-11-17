@@ -8,9 +8,10 @@
 enum class Vc2OscRender : uint8_t { zero, byRender, byAnalog, carrier, kind6 };   // 0x893ae9f0's ways
 enum class Vc2OscRecords : uint8_t { none, fromBlock, atZero };   // the note-on's sample and map: none, +0xd4/+0xdc, 0
 enum class Vc2OscPitch : uint8_t { none, bounded, tuned };   // 0x893aeb20: 0; within ±6000; that less +0xa74
-// 0x893af0b0's ways (v232): nothing; +0x1cc at 1; the kind's own note-on; the ratio, gain and level into the object;
-// the gain and ratio into P and the carrier's init; the ratio, rate, gain and level into P and kind 6's start
-enum class Vc2OscNoteOn : uint8_t { none, one, routine, extIn, carrier, kind6, vari, lite };   // v238's, v240's ports
+// 0x893af0b0's ways (v232): nothing; +0x1cc at 1; the ratio, gain and level into the object; the gain and ratio into P
+// and the carrier's init; the ratio, rate, gain and level into P and kind 6's start; and the kinds' own note-ons,
+// VariPhrase's, LITE's and the analog's (v238, v240, v242; until v242 by their addresses through Vc2OscParts)
+enum class Vc2OscNoteOn : uint8_t { none, one, extIn, carrier, kind6, vari, lite, analog };
 // 0x893ae0f0's ways (v238): the frame's own; the kind's own install by its address; LITE's and VariPhrase's, ported
 enum class Vc2OscInstall : uint8_t { frame, routine, lite, vari };
 
@@ -32,7 +33,6 @@ struct Vc2OscKindRow {
     Vc2OscRender renders = Vc2OscRender::byRender;   // 0x893ae9f0: its default, +0xa44
     Vc2OscPitch pitch = Vc2OscPitch::none;           // 0x893aeb20
     Vc2OscNoteOn noteOn = Vc2OscNoteOn::none;        // 0x893af0b0 (v232)
-    uint32_t noteOnRoutine = 0;    // its own note-on, by rom.4's address; 0 none
 };
 
 inline constexpr int kVc2OscKinds = 8;   // kinds 0…7 have rows of their own

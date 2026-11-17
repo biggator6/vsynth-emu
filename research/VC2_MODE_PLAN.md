@@ -380,9 +380,13 @@ version against rom.4's routines with what it calls hooked:
      words (rom.2's XtLitePlayer's, four bytes up), `0x893cbf40` on the object and the type's seek, against rom.4's
      in xt_vc2osc; what it shares with VariPhrase's note-on one code (`Vc2OscPlayers.h`), and the check's LITE
      note-ons on a real wave's root Hz (HARDWARE_FIRMWARE.md, "The VC-2's LITE note-on").
-   - then the analog's own note-on (`0x893c22e0`), in the analog OSC's code, with that port on rom.4's object; then
-     Vari off. Beside them, the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf
-     (`0x89506e54`), which the wiring gives and nothing has ported yet.
+   - done (v242): the analog's own note-on (`0x893c22e0`, about 1,000 instructions to 0x893c2ac2), in the analog
+     OSC's code, whole: its head, LA-SQUARE's and LA-SAW's way, the other codes' (the VC-2's own Pulse Width laws by
+     waveform) and its small callees `0x893c4a20` and `0x893c3570`, against rom.4's in xt_vc2osc with the sub
+     oscillator's note-on hooked (HARDWARE_FIRMWARE.md, "The VC-2's analog note-on").
+   - then the sub oscillator's note-on (`0x893c3b90`, about 350 instructions), the analog's install, update and
+     converter; then Vari off. Beside them, the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and
+     powf (`0x89506e54`), which the wiring gives and nothing has ported yet.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
      update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its

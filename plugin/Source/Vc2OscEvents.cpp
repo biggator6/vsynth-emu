@@ -75,6 +75,10 @@ std::array<uint32_t, kOscBlockWords> drawNoteBlock(std::mt19937& rng) {
     if (rng() % 2) b[kSeekToWord] = b[kFromWord];             // v238: no seek when the third is the first
     if (rng() % 2) b[kByteWord] = 0;
     if (rng() % 2) b[kFixedWord] &= ~kFixedBit;
+    constexpr uint32_t kAnalog = 3;   // v242: the analog's block words, as its converter could give them
+    if (b[kKindWord] == kAnalog) {
+        for (const auto& [at, bits] : oscAnalogWords(rng)) b[(at - Vc2OscVoice::kOwn) / 4] = bits;
+    }
     return b;
 }
 

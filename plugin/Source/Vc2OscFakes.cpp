@@ -97,15 +97,15 @@ struct OscHook {
 constexpr auto withN = partAnd<0, asIs>;
 constexpr auto withSettings = partAnd<0, settingsOffset>;
 // [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run), LITE's
-// and VariPhrase's installs and VariPhrase's note-on (v238) and LITE's note-on (v240): rom.4's own run, and the
-// routines they call hooked
+// and VariPhrase's installs and VariPhrase's note-on (v238), LITE's note-on (v240) and the analog's (v242, the sub
+// oscillator's note-on 0x893c3b90 hooked in its place): rom.4's own run, and the routines they call hooked
 const OscHook kHooks[] = {
     { 0x893b29b0, kBuildVibrato, self, none }, { 0x893b2c10, kUpdateVibrato, withN, none },
     { 0x893b2b70, kSetVibrato, withSettings, none }, { 0x893b29e0, kNoteOnVibrato, partWord<0>, none },
     { 0x893c2ad0, kKindCall, kindRoutine, none }, { 0x893c8280, kKindCall, kindRoutine, none },
     { 0x893c88b0, kKindCall, kindRoutine, none }, { 0x893c2ce0, kKindCall, kindRoutine, none },
     { 0x893afff0, kKindCall, kindRoutine, none }, { 0x893c6260, kKindCall, kindRoutine, none },
-    { 0x893b0150, kKindCall, kindRoutine, none }, { 0x893c22e0, kKindCall, kindRoutine, none },
+    { 0x893b0150, kKindCall, kindRoutine, none }, { 0x893c3b90, kKindCall, kindRoutine, none },
     { 0x893c8670, kKindCall, kindRoutine, none }, { 0x893cc760, kObjectCall, objectRoutine, none },
     { 0x893cbf40, kObjectCall, objectRoutine, none }, { 0x893cc0d0, kEventPosition, eventAt, positions },
     { 0x893c8390, kKindSettings, routineSettings, none }, { 0x893b0280, kKindSettings, routineSettings, none },

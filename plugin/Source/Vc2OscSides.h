@@ -59,6 +59,11 @@ float oscDrawFloat(std::mt19937& rng, OscRange range = OscRange::any);
 // envelope's and LFO's, the vibrato's on the pitch), the others any.  Noise would hand the targets NaNs of random
 // payloads, and which of two NaNs a product keeps is the host's (the interpreter's F(n) * F(m) as compiled), not rom.4's
 void oscBlockFloats(std::span<uint32_t> words, std::mt19937& rng);
+// v242: the analog note-on's block words (kind 3; Vc2OscGetters.cpp), each the voice's offset and its bits, as its
+// converter could give them: the code 0…10 most often, past now and then; the sub oscillator's switch mostly off,
+// never a NaN (FTRC reads it); the Tone KF's value within its table; the Tone, Fat, the Pulse Width, their depths,
+// Impact and the Slope moderate (NOISE's hold takes FTRC of a sum, and two NaNs in a product are the host's)
+std::array<std::pair<uint32_t, uint32_t>, 12> oscAnalogWords(std::mt19937& rng);
 // A sample position's float: 2^31 and 2^32 themselves and either side, around them, or any but a NaN
 float oscDrawPosition(std::mt19937& rng);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same

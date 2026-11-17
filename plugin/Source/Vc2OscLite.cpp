@@ -27,6 +27,13 @@ constexpr uint32_t kTo = 0x154;
 constexpr uint32_t kPitch = 0x1cc, kFormant = 0x1d0, kLevel = 0x1d4, kWalk = 0x1d8, kGain = 0x1dc, kLevelOut = 0x1e0;
 constexpr uint32_t kPairCopy = 0x1c8, kHalf = 0x168, kPosition16 = 0x194, kByte2 = 0x15e, kCopy16 = 0x170;
 constexpr uint32_t kCopy32 = 0x174;
+// [FW] the targets into the object, in rom.4's order: the tuned ratio (0x893afb80), the walk's (0x893afc30) and the
+// formant's (0x893afca0) targets, the gain (0x893aff30) and the level (0x893aff60)
+constexpr std::array<Vc2OscTargets::Word, 5> kTargets { { { kPitch, &Vc2OscTargets::tunedRatio },
+                                                         { kWalk, &Vc2OscTargets::walkTarget },
+                                                         { kFormant, &Vc2OscTargets::formantTarget },
+                                                         { kGain, &Vc2OscTargets::gain },
+                                                         { kLevelOut, &Vc2OscTargets::level } } };
 // [FW] type 2's words, by rom.2's XtLitePlayer (its P + 4): the loops' modes, the Start Offset, the heads, the
 // filter's rate and state, the heads' fractions, the walk's position, the windows' phases and clocks, the last
 // sample, the forward loop (start, end, span) and its rate, the first sample, the backward loop and its rate, the
@@ -150,14 +157,9 @@ constexpr std::array<Vc2OscLiteWay, 3> kWays { { { variOff, 0x893c6360, 0x154, 0
 // [FW] 0x893c7c30
 void Vc2OscVoice::noteOnLite(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     vc2OscPlayerHead(*this, parts, vc2OscTables().liteTimes);
-    const Vc2OscTargets targets(*this, parts, shared);
-    setF32(kPitch, targets.tunedRatio());
-    setF32(kWalk, targets.walkTarget());
-    setF32(kFormant, targets.formantTarget());
+    Vc2OscTargets(*this, parts, shared).writeInto(*this, kTargets);
     setU16(kHalf, 0);
     setU32(kPairCopy, u32(kPairAt));
-    setF32(kGain, targets.gain());
-    setF32(kLevelOut, targets.level());
     uint8_t b = withBit(u8(kObject) & (uint8_t)~kCleared, kFlagBit, tail.flag);
     for (const auto& [bit, from] : kBits) b = withBit(b, bit, u32(from));
     setU8(kObject, b);

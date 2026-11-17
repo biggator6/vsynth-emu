@@ -25,14 +25,38 @@ auto oscWords(Vc2OscTables& t) {
         { 0x893c81f0, &t.litePeriod }, { 0x893c81f4, &t.liteHalf }, { 0x893c81f8, &t.liteFilter },
     });
 }
-// [FW] the players' installs' tables (v238)
-constexpr Vc2Span kLiteInstalled { 0x89542350, 6 }, kVariInstalled { 0x89542368, 10 };
+// [FW] the analog note-on's (v242): its head's, LA's, the other codes', SQUARE's steps', NOISE's and 0x893c4a20's
+auto analogWords(Vc2OscAnalogPool& a) {
+    auto& [sq, saw] = a.la;
+    auto& [st1, st2, st3] = a.squareSteps;
+    return std::to_array<Vc2PoolWord>({
+        { 0x893c23f4, &a.impactPeriod }, { 0x893c23f8, &a.impactBase }, { 0x893c25d0, &a.laHalf },
+        { 0x893c25d4, &a.laFatMin }, { 0x893c25d8, &a.laFatFloor }, { 0x893c25dc, &a.laPwLo },
+        { 0x893c25e0, &a.laPwSpan }, { 0x893c25e4, &sq.hz }, { 0x893c25ec, &sq.step }, { 0x893c2604, &saw.hz },
+        { 0x893c2608, &saw.step }, { 0x893c25f0, &a.toneScale }, { 0x893c25f4, &a.toneOctaves },
+        { 0x893c25f8, &a.corner }, { 0x893c2600, &a.kfRatio }, { 0x893c260c, &a.cornerMost },
+        { 0x893c2870, &a.gainScale }, { 0x893c2878, &a.step }, { 0x893c2880, &a.fullScale },
+        { 0x893c2884, &a.phaseStart }, { 0x893c2888, &a.half }, { 0x893c288c, &a.four }, { 0x893c2890, &a.wrap },
+        { 0x893c2894, &a.fatMin }, { 0x893c2898, &a.pwLo }, { 0x893c289c, &a.pwSpan }, { 0x893c2af4, &a.sawSlope },
+        { 0x893c2af8, &a.sawSpan }, { 0x893c2afc, &a.sawLo }, { 0x893c2b00, &a.ramp.lo }, { 0x893c2b04, &a.ramp.span },
+        { 0x893c2b08, &a.square.lo }, { 0x893c2b0c, &a.square.span }, { 0x893c2b34, &a.triangle.lo },
+        { 0x893c2b38, &a.triangle.span }, { 0x893c2b3c, &a.juno.lo }, { 0x893c2b40, &a.juno.span },
+        { 0x893c2b10, &a.squareLeast }, { 0x893c2b14, &a.squareFirst }, { 0x893c2b2c, &a.squareTop },
+        { 0x893c2b30, &a.edgeScale }, { 0x893c2b18, &st1.bound }, { 0x893c2b1c, &st1.step },
+        { 0x893c2b20, &st2.bound }, { 0x893c2b24, &st2.step }, { 0x893c2b28, &st3.bound }, { 0x893c2af8, &st3.step },
+        { 0x893c2b44, &a.noiseSpan }, { 0x893c4a94, &a.withinHalf },
+    });
+}
+// [FW] the players' installs' tables (v238); the Tone Keyfollow's (v242: rom.2's 15, its [3] 0 and [14] 2)
+constexpr Vc2Span kLiteInstalled { 0x89542350, 6 }, kVariInstalled { 0x89542368, 10 }, kToneKf { 0x89546fbc, 15 };
 
 struct Read : Vc2OscTables {
     bool read(Sh4& image) {
         vc2ReadPool(image, oscWords(*this));
         vc2ReadFloats(image, kLiteInstalled, liteInstalled.data());
         vc2ReadFloats(image, kVariInstalled, variInstalled.data());
+        vc2ReadPool(image, analogWords(analog));
+        vc2ReadFloats(image, kToneKf, analog.toneKf.data());
         return true;
     }
 };

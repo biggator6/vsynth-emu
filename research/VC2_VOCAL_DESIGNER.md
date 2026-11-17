@@ -464,7 +464,9 @@ flipped at the eighth block (4,077 different).
 
 **So the VC-2's 11 analog waveforms are the V-Synth's, and `XtAnalog`'s routines serve them as they stand, given rom.4's
 sub-object; its note-on, install, update and converter are its own.** Not run: how rom.4's converter maps OSC 1 Analog
-Waveform (ID 0x2f1, 0…10) to the input's code (the names' order says one for one).
+Waveform (ID 0x2f1, 0…10) to the input's code (the names' order says one for one). (The note-on from v242: it runs to
+0x893c2ac2, about 1,000 instructions, past the table's 0x500; rom.2's laws on the words at rom.2's +0x8c, but the
+Pulse Width's target, which the VC-2 narrows by waveform; HARDWARE_FIRMWARE.md, "The VC-2's analog note-on".)
 
 ### The VariPhrase players and key assign in rom.4 (2026-11-13)
 

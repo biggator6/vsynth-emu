@@ -280,8 +280,8 @@ tables-formant|{ 0x893affe0, &t.formantLeast }|{ 0x893affd4, &t.formantLeast }|v
 k0-noteon|{ .clearsFlag = true, .renders = Render::zero, .noteOn = NoteOn::one },|{ .clearsFlag = true, .renders = Render::zero },|vc2osckinds
 k1-noteon|.noteOn = NoteOn::lite },|.noteOn = NoteOn::none },|vc2osckinds
 k1-noteon-vari|.noteOn = NoteOn::lite },|.noteOn = NoteOn::vari },|vc2osckinds
-k2-noteon|.pitch = Pitch::tuned, .noteOn = NoteOn::vari }|.pitch = Pitch::tuned, .noteOn = NoteOn::routine }|vc2osckinds
-k3-noteon-routine|.noteOnRoutine = 0x893c22e0|.noteOnRoutine = 0x893af420|vc2osckinds
+k2-noteon|.pitch = Pitch::tuned, .noteOn = NoteOn::vari }|.pitch = Pitch::tuned, .noteOn = NoteOn::none }|vc2osckinds
+k3-noteon|.noteOn = NoteOn::analog },|.noteOn = NoteOn::none },|vc2osckinds
 k4-noteon|      .noteOn = NoteOn::extIn },\n    { .installed = 5|      .noteOn = NoteOn::carrier },\n    { .installed = 5|vc2osckinds
 k5-noteon|.noteOn = NoteOn::carrier }|.noteOn = NoteOn::extIn }|vc2osckinds
 k6-noteon|.noteOn = NoteOn::kind6 }|.noteOn = NoteOn::carrier }|vc2osckinds
@@ -299,8 +299,6 @@ on-vibrato-at|kVibratoBlock = 0xd4|kVibratoBlock = 0xd8|vc2oscnoteon
 on-one-value|case Vc2OscNoteOn::one: setF32(kObjectPitch, 1.0f); return;|case Vc2OscNoteOn::one: setF32(kObjectPitch, 0.0f); return;|vc2oscnoteon
 on-one-vibrato|case Vc2OscNoteOn::one: setF32(kObjectPitch, 1.0f); return;|case Vc2OscNoteOn::one: setF32(kObjectPitch, 1.0f); break;|vc2oscnoteon
 on-none-vibrato|case Vc2OscNoteOn::none: return;|case Vc2OscNoteOn::none: break;|vc2oscnoteon
-on-routine-no-call|case Vc2OscNoteOn::routine: parts.kindCall(row.noteOnRoutine); break;|case Vc2OscNoteOn::routine: break;|vc2oscnoteon
-on-routine-return|case Vc2OscNoteOn::routine: parts.kindCall(row.noteOnRoutine); break;|case Vc2OscNoteOn::routine: parts.kindCall(row.noteOnRoutine); return;|vc2oscnoteon
 on-extin-pitch|targets.ratioOn(t.noteOn, t.noteOn.ratio));\n            setF32(kObjectGain|targets.tunedRatio());\n            setF32(kObjectGain|vc2oscnoteon
 on-extin-no-gain|            setF32(kObjectGain, targets.gain());\n||vc2oscnoteon
 on-extin-gain-level|setF32(kObjectGain, targets.gain());|setF32(kObjectGain, targets.level());|vc2oscnoteon
@@ -634,13 +632,13 @@ of-bwd-start|.bwdStart = (uint32_t)loop.bwdStart|.bwdStart = (uint32_t)loop.bwdE
 # v240: LITE's note-on (vc2osclite, Vc2OscLite.cpp), its pool words (vc2osctables) and its case (vc2oscnoteon).  Not
 # planted: the two heads' offsets swapped (the note-on gives both the same value, so the swap writes what it did)
 lite-head-gone|    vc2OscPlayerHead(*this, parts, vc2OscTables().liteTimes);\n||vc2osclite
-lite-pitch|setF32(kPitch, targets.tunedRatio());|setF32(kPitch, targets.ratio());|vc2osclite
-lite-walk|setF32(kWalk, targets.walkTarget());|setF32(kWalk, targets.walk());|vc2osclite
-lite-formant|setF32(kFormant, targets.formantTarget());|setF32(kFormant, targets.formant());|vc2osclite
+lite-pitch|{ kPitch, &Vc2OscTargets::tunedRatio }|{ kPitch, &Vc2OscTargets::ratio }|vc2osclite
+lite-walk|{ kWalk, &Vc2OscTargets::walkTarget }|{ kWalk, &Vc2OscTargets::walk }|vc2osclite
+lite-formant|{ kFormant, &Vc2OscTargets::formantTarget }|{ kFormant, &Vc2OscTargets::formant }|vc2osclite
 lite-half-word|    setU16(kHalf, 0);\n||vc2osclite
 lite-pair-copy|setU32(kPairCopy, u32(kPairAt));|setU32(kPairCopy, u32(kLoopAt));|vc2osclite
-lite-gain|setF32(kGain, targets.gain());|setF32(kGain, targets.level());|vc2osclite
-lite-level-out|setF32(kLevelOut, targets.level());|setF32(kLevelOut, targets.gain());|vc2osclite
+lite-gain|{ kGain, &Vc2OscTargets::gain }|{ kGain, &Vc2OscTargets::level }|vc2osclite
+lite-level-out|{ kLevelOut, &Vc2OscTargets::level }|{ kLevelOut, &Vc2OscTargets::gain }|vc2osclite
 lite-cleared|u8(kObject) & (uint8_t)~kCleared|u8(kObject)|vc2osclite
 lite-flag-bit|kFlagBit, tail.flag)|kFlagBit, 0)|vc2osclite
 lite-bits-loop|    for (const auto& [bit, from] : kBits) b = withBit(b, bit, u32(from));\n||vc2osclite
@@ -732,3 +730,136 @@ lite-period-pool|{ 0x893c81f0, &t.litePeriod }|{ 0x893c81f4, &t.litePeriod }|vc2
 lite-half-pool|{ 0x893c81f4, &t.liteHalf }|{ 0x893c81f8, &t.liteHalf }|vc2osctables
 lite-filter-pool|{ 0x893c81f8, &t.liteFilter }|{ 0x893c81f4, &t.liteFilter }|vc2osctables
 lite-noteon-case|        case Vc2OscNoteOn::lite: noteOnLite(parts, shared); break;   // 0x893c7c30 (v240, Vc2OscLite.cpp)\n||vc2oscnoteon
+# v242: the analog note-on (vc2oscanalog, Vc2OscAnalog.cpp; vc2oscanalogla, Vc2OscAnalogLa.cpp), its pool words
+# (vc2osctables), its case (vc2oscnoteon), the targets' writing (vc2osctargets).  Not planted: the second phase's
+# start (+0x2a4 ½), which the note-on writes again from z; the Tone KF index's guard, which the draws never pass. v232's
+# on-routine-no-call and on-routine-return went with the kinds' note-on's routine way, which no kind took after v242.
+# Not planted either: the phase's scale at Impact 1 (> for >=), as × 1 leaves the phase as it is.
+an-code-copy|setU32(kCodeCopy, u32(kCode));|setU32(kCodeCopy, u32(kCode) + 1);|vc2oscanalog
+an-target-ratio|{ kRatio, &Vc2OscTargets::ratio }|{ kRatio, &Vc2OscTargets::tunedRatio }|vc2oscanalog
+an-target-gain|{ kGainTarget, &Vc2OscTargets::gain }|{ kGainTarget, &Vc2OscTargets::level }|vc2oscanalog
+an-target-level|{ kGain, &Vc2OscTargets::level }|{ kGain, &Vc2OscTargets::gain }|vc2oscanalog
+an-flags|    setU32(kFlags, 0);\n||vc2oscanalog
+an-impact|setU32(kImpactNow, u32(kImpact));|setU32(kImpactNow, u32(kSlope));|vc2oscanalog
+an-decay-args|shared.pow(t.impactBase, div(f32(kRatio), t.impactPeriod))|shared.pow(div(f32(kRatio), t.impactPeriod), t.impactBase)|vc2oscanalog
+an-decay-div|div(f32(kRatio), t.impactPeriod)|mul(f32(kRatio), t.impactPeriod)|vc2oscanalog
+an-phase-scale-gone|    if (kOne > f32(kImpactNow)) setF32(kPhase, mul(f32(kPhase), f32(kImpactNow)));\n||vc2oscanalog
+an-phase-top|f32(kPhase) > kOne \|\| 0.0f > f32(kPhase)|0.0f > f32(kPhase)|vc2oscanalog
+an-phase-bottom|f32(kPhase) > kOne \|\| 0.0f > f32(kPhase)|f32(kPhase) > kOne|vc2oscanalog
+an-sub-test|if (xtf::ftrc(f32(kSubOn)) != 0) {|if (f32(kSubOn) != 0.0f) {|vc2oscanalog
+an-sub-call|kSubNoteOn = 0x893c3b90;|kSubNoteOn = 0x893c3b94;|vc2oscanalog
+an-sub-return|        parts.kindCall(kSubNoteOn);\n        return;|        parts.kindCall(kSubNoteOn);|vc2oscanalog
+an-la-codes|kLaFirst = 9, kLaCodes = 2;|kLaFirst = 9, kLaCodes = 1;|vc2oscanalog
+an-fat-half|sub(t.half, mul(sum(v, p, kFat, kFatMod), t.half))|sub(t.half, sum(v, p, kFat, kFatMod))|vc2oscanalog
+an-fat-mod|mul(sum(v, p, kFat, kFatMod), t.half))|mul(sum(v, p, kFat, kPwMod), t.half))|vc2oscanalog
+an-fat-now|    v.setF32(kFatNow, half);\n    if|    if|vc2oscanalog
+an-fat-floor-test|if (!(v.f32(kFatTarget) > t.fatMin)) {|if (v.f32(kFatTarget) > t.fatMin) {|vc2oscanalog
+an-fat-floor-value|v.setF32(kFatTarget, t.step);\n        v.setF32(kFatNow, t.step);|v.setF32(kFatTarget, t.half);\n        v.setF32(kFatNow, t.step);|vc2oscanalog
+an-fat-floor-now|        v.setF32(kFatNow, t.step);\n    }|    }|vc2oscanalog
+an-pw-line|add(mul(sum(v, p, kPw, kPwMod), t.pwSpan), t.pwLo)|add(mul(sum(v, p, kPw, kPwMod), t.pwLo), t.pwSpan)|vc2oscanalog
+an-pw-mod|sum(v, p, kPw, kPwMod), t.pwSpan|sum(v, p, kPw, kFatMod), t.pwSpan|vc2oscanalog
+an-sum-env|mul(p.boundFloat(v.tail.binds[m.envelope], kEnvelopeOut), v.f32(m.envelopeDepth))|mul(p.boundFloat(v.tail.binds[m.envelope], kLfoOut), v.f32(m.envelopeDepth))|vc2oscanalog
+an-sum-lfo|x = add(mul(p.boundFloat(v.tail.binds[m.lfo], kLfoOut), v.f32(m.lfoDepth)), x);|x = add(mul(p.boundFloat(v.tail.binds[m.lfo], kLfoOut), v.f32(m.envelopeDepth)), x);|vc2oscanalog
+an-sum-low|if (0.0f > x) return 0.0f;|if (0.0f > x) return x;|vc2oscanalog
+an-sum-high|return x > kOne ? kOne : x;|return x;|vc2oscanalog
+an-sum-base|v.f32(m.envelopeDepth)), v.f32(base));|v.f32(m.envelopeDepth)), 0.0f);|vc2oscanalog
+an-past-codes|for (uint32_t at : { kFatTarget, kFatNow, kPwTarget, kPwNow })|for (uint32_t at : { kFatNow, kPwTarget, kPwNow })|vc2oscanalog
+an-past-half|kPwNow }) v.setF32(at, t.half);|kPwNow }) v.setF32(at, t.step);|vc2oscanalog
+an-end-copy|    v.setU32(kPwNow, v.u32(kPwTarget));\n}|}|vc2oscanalog
+an-codes-bound|if (code < kCodes.size()) {|if (code < kCodes.size() - 1) {|vc2oscanalog
+an-then|        if (kCodes[code].then) kCodes[code].then(v, x, t);\n||vc2oscanalog
+an-pw-line-law|if (c.line) return add(mul(x, (t.*c.line).span), (t.*c.line).lo);|if (c.line) return mul(x, (t.*c.line).span);|vc2oscanalog
+an-pw-shape|return c.shape ? c.shape(v, x, t) : x;|return x;|vc2oscanalog
+an-row-hq0|{ .then = hqClear },                                         // 0 HQ-SAW|{},                                         // 0 HQ-SAW|vc2oscanalog
+an-row-hq1|{ .then = hqClear },                                         // 1 HQ-SQUARE|{},                                         // 1 HQ-SQUARE|vc2oscanalog
+an-row-saw|{ .shape = sawShape }|{ .shape = sineShape }|vc2oscanalog
+an-row-square-line|{ .line = &Vc2OscAnalogPool::square, .then = squareEdge }|{ .line = &Vc2OscAnalogPool::juno, .then = squareEdge }|vc2oscanalog
+an-row-square-edge|{ .line = &Vc2OscAnalogPool::square, .then = squareEdge }|{ .line = &Vc2OscAnalogPool::square }|vc2oscanalog
+an-row-triangle|{ .line = &Vc2OscAnalogPool::triangle }|{ .line = &Vc2OscAnalogPool::ramp }|vc2oscanalog
+an-row-ramp|{ .line = &Vc2OscAnalogPool::ramp }|{ .line = &Vc2OscAnalogPool::juno }|vc2oscanalog
+an-row-sine|{ .shape = sineShape }|{ .shape = sawShape }|vc2oscanalog
+an-row-juno|{ .line = &Vc2OscAnalogPool::juno }|{ .line = &Vc2OscAnalogPool::triangle }|vc2oscanalog
+an-row-noise|{ .then = noiseHold }|{ .then = hqClear }|vc2oscanalog
+an-hq-value|v.setF32(kHq, 0.0f);|v.setF32(kHq, 1.0f);|vc2oscanalog
+an-hq-falling|    v.setU32(kHqFalling, 0);\n||vc2oscanalog
+an-saw-fold|if (t.half > x) x = sub(kOne, x);|if (t.half > x) x = sub(t.half, x);|vc2oscanalog
+an-saw-fold-gone|    if (t.half > x) x = sub(kOne, x);\n||vc2oscanalog
+an-saw-slope|mul(mul(v.f32(kRatio), v.f32(kSlope)), t.sawSlope)|mul(v.f32(kSlope), t.sawSlope)|vc2oscanalog
+an-saw-span|add(add(mul(x, t.sawSpan), s), t.sawLo)|add(add(mul(x, t.sawLo), s), t.sawSpan)|vc2oscanalog
+an-saw-s|add(add(mul(x, t.sawSpan), s), t.sawLo)|add(mul(x, t.sawSpan), t.sawLo)|vc2oscanalog
+an-saw-top|const float top = sub(kOne, s);|const float top = kOne;|vc2oscanalog
+an-saw-cap|return y > top ? top : y;|return y;|vc2oscanalog
+an-sine|return mul(x, t.half); }|return x; }|vc2oscanalog
+an-square-least|if (t.squareLeast > r) return 0.0f;|if (t.squareLeast > r) return t.squareFirst;|vc2oscanalog
+an-square-first|if (kOne > r) return t.squareFirst;|if (kOne > r) return t.squareTop;|vc2oscanalog
+an-square-bound|return s.bound > r;|return r > s.bound;|vc2oscanalog
+an-square-top|row->step : t.squareTop;|row->step : t.squareFirst;|vc2oscanalog
+an-square-row-step|? row->step :|? row->bound :|vc2oscanalog
+an-edge|mul(mul(v.f32(kSlope), mul(r, squareStep(r, t))), t.edgeScale)|mul(mul(v.f32(kSlope), squareStep(r, t)), t.edgeScale)|vc2oscanalog
+an-edge-scale|t.edgeScale));|t.sawSlope));|vc2oscanalog
+an-noise-d|const float d = sub(kOne, mul(x, kTwo));|const float d = sub(kOne, x);|vc2oscanalog
+an-noise-low|xtf::ftrc(add(mul(d, t.noiseSpan), kOne))|xtf::ftrc(mul(d, t.noiseSpan))|vc2oscanalog
+an-noise-high|xtf::ftrc(sub(kOne, mul(d, t.noiseSpan)))|xtf::ftrc(add(kOne, mul(d, t.noiseSpan)))|vc2oscanalog
+an-noise-side|const int n = t.half > x ?|const int n = t.half < x ?|vc2oscanalog
+an-noise-zero|if (v.u8(kNoiseHold) == 0) v.setU8(kNoiseHold, 1);|if (v.u8(kNoiseHold) == 0) v.setU8(kNoiseHold, 0);|vc2oscanalog
+la-kf-index|t.toneKf[(size_t)i] : 0.0f|t.toneKf[(size_t)(14 - i)] : 0.0f|vc2oscanalogla
+la-hz|const float hz = mul(v.f32(kRatio), la.hz);|const float hz = mul(v.f32(kRatio), la.step);|vc2oscanalogla
+la-base-pow|s.pow(kTwo, mul(div(v.f32(kTone), t.toneScale), t.toneOctaves))|s.pow(mul(div(v.f32(kTone), t.toneScale), t.toneOctaves), kTwo)|vc2oscanalogla
+la-tone-scale|div(v.f32(kTone), t.toneScale)|div(v.f32(kTone), t.toneOctaves)|vc2oscanalogla
+la-corner|t.toneOctaves)), t.corner);|t.toneOctaves)), t.cornerMost);|vc2oscanalogla
+la-kf-ratio|add(mul(v.f32(kRatio), t.kfRatio), -kOne)|add(v.f32(kRatio), -kOne)|vc2oscanalogla
+la-kf-one|-kOne)), kOne), base)|-kOne)), 0.0f), base)|vc2oscanalogla
+la-most-c|return { t.cornerMost, hz, div(hz, t.cornerMost) };|return { c, hz, div(hz, t.cornerMost) };|vc2oscanalogla
+la-most-m|return { t.cornerMost, hz, div(hz, t.cornerMost) };|return { t.cornerMost, hz, t.laHalf };|vc2oscanalogla
+la-two|const float two = mul(hz, kTwo);|const float two = hz;|vc2oscanalogla
+la-two-m|if (two > c) return { two, hz, t.laHalf };|if (two > c) return { two, hz, div(hz, c) };|vc2oscanalogla
+la-two-c|if (two > c) return { two, hz, t.laHalf };|if (two > c) return { c, hz, t.laHalf };|vc2oscanalogla
+la-else-m|return { c, hz, div(hz, c) };|return { c, hz, t.laHalf };|vc2oscanalogla
+la-row|t.la[code - kLaFirst];|t.la[0];|vc2oscanalogla
+la-half|float half = sub(t.laHalf, mul(sum(v, p, kFat, kFatMod), t.laHalf));|float half = sub(t.laHalf, sum(v, p, kFat, kFatMod));|vc2oscanalogla
+la-floor|if (!(half > t.laFatMin)) half = t.laFatFloor;|if (half > t.laFatMin) half = t.laFatFloor;|vc2oscanalogla
+la-x|add(mul(sum(v, p, kPw, kPwMod), t.laPwSpan), t.laPwLo)|add(mul(sum(v, p, kPw, kPwMod), t.laPwLo), t.laPwSpan)|vc2oscanalogla
+la-gain-sign|mul(-targets.gain(), t.gainScale)|mul(targets.gain(), t.gainScale)|vc2oscanalogla
+la-gain-scale|mul(-targets.gain(), t.gainScale)|mul(-targets.gain(), t.fullScale)|vc2oscanalogla
+la-step|mul(v.f32(kRatio), la.step)|mul(v.f32(kRatio), la.hz)|vc2oscanalogla
+la-pw-target|mul(within(x, c.m, t), t.step)|mul(x, t.step)|vc2oscanalogla
+la-pw-m|within(x, c.m, t)|within(x, t.laHalf, t)|vc2oscanalogla
+la-fat-target|v.setF32(kFatTarget, mul(half, t.step));|v.setF32(kFatTarget, half);|vc2oscanalogla
+la-steep|mul(div(c.corner, c.hz), t.step)|mul(div(c.hz, c.corner), t.step)|vc2oscanalogla
+la-gain|mul(-targets.level(), t.fullScale)|mul(-targets.level(), t.gainScale)|vc2oscanalogla
+la-phases|    phases(v, t);\n||vc2oscanalogla
+ph-start|v.setF32(kPhase, t.phaseStart);|v.setF32(kPhase, t.half);|vc2oscanalogla
+ph-pw-now|v.setF32(kPwNow, div(v.f32(kPwTarget), t.step));|v.setF32(kPwNow, v.f32(kPwTarget));|vc2oscanalogla
+ph-fat-now|v.setF32(kFatNow, div(v.f32(kFatTarget), t.step));|v.setF32(kFatNow, div(v.f32(kFatTarget), t.half));|vc2oscanalogla
+ph-steep-now|v.setF32(kSteepNow, div(v.f32(kSteepTarget), t.step));|v.setF32(kSteepNow, v.f32(kSteepTarget));|vc2oscanalogla
+ph-impact-test|if (kOne > v.f32(kImpactNow)) {|if (kOne < v.f32(kImpactNow)) {|vc2oscanalogla
+ph-impact-mul|ph = mul(ph, v.f32(kImpactNow));|ph = v.f32(kImpactNow);|vc2oscanalogla
+ph-a|add(mul(within(v.f32(kPwNow), v.f32(kUnwritten), t), t.half), t.laHalf)|add(mul(v.f32(kPwNow), t.half), t.laHalf)|vc2oscanalogla
+ph-a-fat|ph = add(mul(a, v.f32(kFatNow)), ph);|ph = add(a, ph);|vc2oscanalogla
+ph-bounds-high|if (0.0f > ph \|\| ph > kOne) ph = 0.0f;|if (0.0f > ph) ph = 0.0f;|vc2oscanalogla
+ph-bounds-low|if (0.0f > ph \|\| ph > kOne) ph = 0.0f;|if (ph > kOne) ph = 0.0f;|vc2oscanalogla
+ph-b|add(mul(within(t.half, v.f32(kUnwritten), t), t.half), t.laHalf)|add(mul(t.half, t.half), t.laHalf)|vc2oscanalogla
+ph-z-fat|sub(mul(b, v.f32(kFatNow)), ph)|sub(b, ph)|vc2oscanalogla
+ph-z-ph|sub(mul(b, v.f32(kFatNow)), ph)|mul(b, v.f32(kFatNow))|vc2oscanalogla
+ph-z-one|t.four), kOne);|t.four), 0.0f);|vc2oscanalogla
+ph-wrap|v.setF32(kPhase2, add(z, t.wrap));|v.setF32(kPhase2, z);|vc2oscanalogla
+ph-wrap-test|if (z > kOne) v.setF32|if (z > t.half) v.setF32|vc2oscanalogla
+w-side|if (t.withinHalf > x) return|if (t.withinHalf < x) return|vc2oscanalogla
+w-low|return m > x ? m : x;|return x;|vc2oscanalogla
+w-high|return x > top ? top : x;|return x;|vc2oscanalogla
+w-top|const float top = sub(kOne, m);|const float top = m;|vc2oscanalogla
+an-pool-period|{ 0x893c23f4, &a.impactPeriod }|{ 0x893c23f8, &a.impactPeriod }|vc2osctables
+an-pool-half|{ 0x893c2888, &a.half }|{ 0x893c2884, &a.half }|vc2osctables
+an-pool-step|{ 0x893c2878, &a.step }|{ 0x893c2874, &a.step }|vc2osctables
+an-pool-saw-lo|{ 0x893c2afc, &a.sawLo }|{ 0x893c2b00, &a.sawLo }|vc2osctables
+an-pool-square-least|{ 0x893c2b10, &a.squareLeast }|{ 0x893c2b14, &a.squareLeast }|vc2osctables
+an-pool-tonekf|kToneKf { 0x89546fbc, 15 }|kToneKf { 0x89546fc0, 15 }|vc2osctables
+an-pool-la-hz|{ 0x893c25e4, &sq.hz }|{ 0x893c2604, &sq.hz }|vc2osctables
+an-pool-noise|{ 0x893c2b44, &a.noiseSpan }|{ 0x893c2b40, &a.noiseSpan }|vc2osctables
+an-pool-within|{ 0x893c4a94, &a.withinHalf }|{ 0x893c4a90, &a.withinHalf }|vc2osctables
+an-pool-most|{ 0x893c260c, &a.cornerMost }|{ 0x893c2608, &a.cornerMost }|vc2osctables
+an-pool-wrap|{ 0x893c2890, &a.wrap }|{ 0x893c288c, &a.wrap }|vc2osctables
+an-pool-juno|{ 0x893c2b3c, &a.juno.lo }|{ 0x893c2b34, &a.juno.lo }|vc2osctables
+an-pool-read|        vc2ReadPool(image, analogWords(analog));\n||vc2osctables
+tgt-write|v.setF32(at, (this->*target)());|v.setF32(at, 0.0f);|vc2osctargets
+an-noteon-case|        case Vc2OscNoteOn::analog: noteOnAnalog(parts, shared); break;   // 0x893c22e0 (v242, Vc2OscAnalog.cpp)\n||vc2oscnoteon

@@ -112,6 +112,7 @@ public:
     void installVari();
     void noteOnVari(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void noteOnLite(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893c7c30 (v240, Vc2OscLite.cpp)
+    void noteOnAnalog(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893c22e0 (v242, Vc2OscAnalog.cpp)
     // 0x893ae610: ramp 0's start, given the ramp's six words (Vc2RampSettings; the tone's input + 0xc)
     void start(const uint32_t* ramp, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void count(uint32_t x);                                // 0x893ae6c0

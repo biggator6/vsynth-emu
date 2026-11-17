@@ -1,8 +1,10 @@
 #pragma once
 // The OSC voice's constants from rom.4 (v230; the targets' from v232; the players' from v238, LITE's note-on's from
-// v240): its routines' pool words, the three floats its install reads and the players' installs' tables, read once by
-// loadVc2 at the start, never after.  HARDWARE_FIRMWARE.md, "The VC-2's OSC voice", "The VC-2's OSC voice's note-on
-// and targets", "The VC-2's players' installs and VariPhrase's note-on", "The VC-2's LITE note-on".
+// v240, the analog's from v242): its routines' pool words, the three floats its install reads, the players' installs'
+// tables and the analog's, read once by loadVc2 at the start, never after.  HARDWARE_FIRMWARE.md, "The VC-2's OSC
+// voice", "The VC-2's OSC voice's note-on and targets", "The VC-2's players' installs and VariPhrase's note-on", "The
+// VC-2's LITE note-on", "The VC-2's analog note-on".
+#include "Vc2OscAnalogPool.h"
 #include <array>
 
 // A pair of bounds as rom.4 holds them, each its routine's own pool word
@@ -57,6 +59,7 @@ struct Vc2OscTables {
     float litePeriod = 0;           // 0x893c81f0
     float liteHalf = 0;             // 0x893c81f4
     float liteFilter = 0;           // 0x893c81f8
+    Vc2OscAnalogPool analog;        // the analog note-on's (v242, Vc2OscAnalogPool.h)
 };
 
 [[nodiscard]] bool vc2LoadOsc(const char* path);

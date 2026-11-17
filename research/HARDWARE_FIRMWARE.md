@@ -1546,6 +1546,43 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's analog note-on (2026-11-17, v242) {#vc2-analog-note-on}
+
+Step 4.2's OSC voice, its sixth part: the analog OSC's own note-on `0x893c22e0`, kind 3's case of `0x893af0b0`, in the analog OSC's code (0x893c22e0…0x893c2ac2, about 1,000 instructions; step 1b's 0x500 was short of its end). Ported bit for bit: Vc2OscAnalog.cpp (its head and the codes 0…8 and past), Vc2OscAnalogLa.cpp (LA-SQUARE's and LA-SAW's way), Vc2OscAnalog.h (the words), kind 3's row `Vc2OscNoteOn::analog`, its pool words and the Tone Keyfollow table in Vc2OscAnalogPool.h (a member of Vc2OscTables). Its two small callees come with it: `0x893c4a20` (x held within m…1 − m, rom.2's withinM) and `0x893c3570` (HQ's integrator and direction cleared). The sub oscillator's note-on `0x893c3b90` (about 350 instructions, rom.2's subNoteOn) is the next part, rom.4's by address meanwhile. Every address is rom.4's; every offset the voice's.
+
+**The names, by two sources.** The note-on's laws are rom.2's (XtAnalog.h; its noteOn, shape, laShape, laNoteOn), and the words line up with rom.2's analog voice at +0x8c (+0x88, the object's place, and 4 more past the insert at +0x94, VC2_VOCAL_DESIGNER.md) and its block at +0x30: the ratio +0x1cc (rom.2 +0x144), the gain's target and value +0x1dc/+0x1e0, Fat +0x24c/+0x250, the Pulse Width +0x254/+0x258, the decay +0x25c, the phase +0x260, Impact +0x264, the flags +0x268, SQUARE's edge +0x26c, HQ's integrator +0x270/+0x274, LA's step +0x280, its second phase +0x2a4, its steepness +0x2b0/+0x2b4, NOISE's hold +0x2d4; the block's code +0x104, Fat +0x108 with its depths +0x10c/+0x114, the Pulse Width +0x11c with +0x120/+0x124, Impact +0x130, the Slope +0x134, the sub oscillator's switch +0x138, the Tone +0x140 and its keyfollow +0x144. Fat's envelope and LFO are the tail's binds 1 and 5, the Pulse Width's 2 and 6. The code is rom.2's +0x80: 0 HQ-SAW, 1 HQ-SQUARE, 2 SAW, 3 SQUARE, 4 TRIANGLE, 5 RAMP, 6 SINE, 7 JUNO, 8 NOISE, 9 LA-SQUARE, 10 LA-SAW. Not named, as one source has them: +0x248 (the code's copy) and +0x298, which the note-on reads and doesn't write (rom.2's +0x20c, which rom.2's port takes as 0).
+
+**The routine**, in order:
+1. The code into +0x248; the ratio (`0x893afb40`), gain (`0x893aff30`) and level (`0x893aff60`) into +0x1cc, +0x1dc, +0x1e0; the flags 0; Impact into +0x264; the decay powf(3.05185e−5, ratio / 100.227) by rom.4's powf (rom.2: expf of its log); the phase × Impact below 1, then 0 outside 0…1.
+2. With FTRC of the block's +0x138 not 0, the sub oscillator's note-on `0x893c3b90` and no more.
+3. Codes 9 and 10, LA's way: Fat's half ½ − Fat/2 (at least 0.002 above 0.0039), the Pulse Width's sum on its span; the corner 156 × powf(2, 7·Tone/127) × (1 + the Tone KF's factor × (ratio × 2^(9/12) − 1)), the factor from the table at `0x89546fbc` (rom.2's 15, its [3] 0 and [14] 2) by FTRC of +0x144; at most 20 kHz, at least twice the wave's Hz (ratio × 440 for LA-SQUARE, × 220 for LA-SAW), with m the Hz over the corner, or ½; the gain's target −gain × 2^26, the phase's step ratio × 220/44100 (LA-SAW half that), the Pulse Width's target (held within m) × 0.002, Fat's and the steepness' (corner / Hz) × 0.002, the gain −level × 2^31; the current values the targets / 0.002; the phase ¼, below Impact 1 that × Impact + ((the Pulse Width held against +0x298) × ½ + ½) × Fat, 0 outside 0…1; the second phase (((½ held against +0x298) × ½ + ½) × Fat − the phase) × 4 + 1, less 2 above 1. Then no more.
+4. The other codes: Fat's half into both its words (at least 0.002 above 0.0039), the Pulse Width's sum x on its span (0.00397…0.996), and by the code:
+
+| Code | The Pulse Width's target | rom.2's | Then |
+|---|---|---|---|
+| 0, 1 HQ | x | x | `0x893c3570`: the integrator 0 |
+| 2 SAW | folded to ≥ ½, × 0.2 + 0.4 + s, at most 1 − s (s = ratio × Slope × 0.01) | folded, + s | |
+| 3 SQUARE | 0.02 + 0.96x | x | the edge, Slope × ratio × its step × 220/44100 (the steps rom.2's) |
+| 4 TRIANGLE | 0.01 + 0.48x | x/2 | |
+| 5 RAMP | 0.025 + 0.95x | x | |
+| 6 SINE | x/2 | x/2 | |
+| 7 JUNO | 0.05 + 0.9x | x | |
+| 8 NOISE | x | x | the hold, 1 + 30·\|1 − 2x\|, a byte, 1 for 0 |
+| past 8 | Fat and the Pulse Width all ½ | (no such code) | |
+
+   Then the Pulse Width's value its target.
+
+**So the VC-2's analog Pulse Width is narrower than the V-Synth's by waveform** (the lines' ends for x from 0 to 1: SAW 0.5…0.6 and up by the Slope's term, SQUARE 0.02…0.98, TRIANGLE 0.01…0.49, RAMP 0.025…0.975, JUNO 0.05…0.95), its other laws the V-Synth's. The waveforms' routines, which step 1b's run found equal to rom.2's, take what the note-on gives.
+
+**The check, xt_vc2osc** (its voice part):
+- `0x893c22e0`'s hook is gone, so rom.4's own runs; `0x893c3b90` is hooked as a kind's routine.
+- Kind 3's block words are drawn as its converter could give them (`oscAnalogWords`, a whole note-on's block and the kinds' note-on event alike): the code 0…10 most often, past now and then; the sub oscillator's switch mostly 0, never a NaN (FTRC reads it: the interpreter's NaN is 0x80000000, xtf's 0); the Tone KF's value within its table (past it rom.4 reads other memory, and the first run faulted there at seed 7); the Tone, Fat, the Pulse Width, their depths, Impact and the Slope moderate. +0x298 is drawn with no NaN.
+- The kinds' note-on event takes kind 3 one time in four; half the time a pitch near the root (the pitch word within an octave, its depths 0, its factors 1, the offset and the pitch ramp 0), half of those SQUARE, whose edge steps part there; NOISE's Pulse Width one time in four a NaN, where its hold meets 0 (FTRC of a NaN is 0 as a byte on both sides). Not on the other codes: a NaN reaching `xtf::sub` comes out with its sign the interpreter's FSUB's negated (a first run differed there in 15 cases).
+- Impact is drawn as the converter gives it (Impact·4/40: tenths 0…4, 1 the default one time in four), else moderate.
+- The targets a note-on writes are one table now (`Vc2OscTargets::writeInto`, LITE's and the analog's).
+- With the analog's ported no kind takes the kinds' note-on's way by address any more: `Vc2OscNoteOn::routine` and the row's `noteOnRoutine` are gone, and v232's two plants of that case (`on-routine-no-call`, `on-routine-return`) with them, missed once nothing reached it. Not planted: the phase's scale at Impact 1 (`>` for `>=`), as × 1 leaves the phase as it is; the second phase's start (+0x2a4 ½), which z overwrites.
+- Coverage (llvm-cov, 40 cases): every function, line and region of Vc2OscAnalog.cpp and Vc2OscAnalogLa.cpp, every branch but the Tone KF index's guard (the port's 0 past the table), which no draw passes.
+
 ### The VC-2's COSM Side Band Filters (2026-11-16, v241) {#vc2-cosm-side-band}
 
 Step 4.2's COSM part's fifth (research/VC2_MODE_PLAN.md), from the VC-2 session's message (the user's yes): the two Side Band Filters, the last converters. Ported bit for bit: `vc2Sbf1Convert` and `vc2Sbf2Convert` (Vc2CosmSideBand.cpp), their pool words in Vc2CosmTables.cpp (read by loadVc2 through `vc2LoadCosm`, as before). With them every converter the dispatcher's switch calls is ported, and xt_vc2cosm's second part hooks none. Every address is rom.4's; the input's offsets from +0x10 are the type's parameters in their IDs' order.
