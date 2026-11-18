@@ -781,8 +781,10 @@ xt_vc2autonote: 0 different
 mixer: 40 cases, 16000 blocks (8387 EXTIN, 7332 bypassed), 7982 carriers, 13598 renders, 8668 vocoder calls, 1659 events, 0 different
 xt_vc2mixer: 0 different
 == xt_vc2tone
-tone: 40 cases, 16000 events, 1255 made, 1419 none, 834 built in place, 830 unmade (733 back), 1395 updates, 633 ended, 1207 renders, 0 different
-note-on: 2352 note-ons, 370 players taken, 2895 LFOs following, 5470 free LFOs, 347 inputs fixed
+tone: 40 cases, 16000 events, 1103 made, 1971 none, 647 built in place, 626 unmade (550 back), 1137 updates, 501 ended, 1020 renders, 0 different
+note-on: 1909 note-ons, 360 players taken, 2089 LFOs following, 4474 free LFOs, 437 inputs fixed
+modulators: 653 reads of their bound words
+mix: 1276 plays, blocks by routine: 3383 1448 271 713 392 880 627 538
 xt_vc2tone: 0 different
 == xt_vc2osc
 ramp: 40 cases, 12000 events: 986 built, 1873 started, 943 restarted, 891 legato updates, 4608 ticks (416 gliding, 772 at an end), 1857 values

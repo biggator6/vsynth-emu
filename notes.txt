@@ -344,6 +344,23 @@ The VC-2's part, mapped v270 (2026-11-18, on its own branch from vc2-mode's 668f
   and no slot miscounted; its two controls, a leak and a full pool, are caught. Also placed: G's channel word, the static M,
   event 0x200 (a held C4 for a patch of Category 10 or 11) and the CPU budget.
 
+The VC-2's OSC mix v269 (2026-11-18, after v268, 2322ec1; HARDWARE_FIRMWARE.md, "The VC-2's OSC mix"): step 4.2's tone
+  parts. Vc2ToneMix is rom.4's object at the tone's +0x1ab8, its constructor, note-on, install, empty update and eight
+  renders (four gains, ring product, a delay mono and stereo, a follower mono and stereo, blend, held off), with the delay
+  lines in Vc2ToneMixRings and its constants in Vc2ToneMixTables, read by loadVc2. xt_vc2tone runs rom.4's own routines for
+  it: 0 different at seeds 2024, 7 and 31337. mutate_vc2.py --tone: 439 planted, 144 of them the mix's, 0 missed.
+  rom.4's settings update for it, 0x893add60, is open in the plan. Not in the sound yet.
+
+The VC-2's envelopes and LFOs v268 (2026-11-18, on vc2-mode after 668fea7; HARDWARE_FIRMWARE.md, "The VC-2's envelopes and
+  LFOs"): step 4.2's tone parts. rom.4's envelope and LFO code is rom.2's opcode for opcode, so Vc2ToneEnvelope and
+  Vc2ToneLfo hold rom.4's 0x70- and 0x98-byte objects word for word and run XtEnvelope's and XtLfo's laws on them;
+  Vc2ToneModulators is a tone's 14 and 8, with the words the OSC voice and the TVA read. xt_vc2tone runs rom.4's own
+  constructors, note-ons, ticks and clock for them. The free LFOs' manager (0x8a0c6d84, unfollow with it) stays hooked
+  until v271, which the plan lists routine by routine. XtEnvelope.h and XtLfo.h gain a friend line each, so
+  mutate_tone.py ran whole: 1191 planted, 1186 caught, check-pad-cc missed as since v189, and four ERROR that aren't
+  v268's: plays-no-main, plays-no-dir, plays-level-l and plays-level-r still name XtSynth.cpp, their text in
+  XtSynthOut.cpp since v204. Planted there by hand (PORT=toneout), all four caught.
+
 The VC-2's OSC vibrato v267 (2026-11-18, after v266 on its branch; HARDWARE_FIRMWARE.md, "The VC-2's OSC vibrato"): step
   4.2's OSC voice. Vc2OscVibrato, rom.4's own object on the voice's first 0x54 bytes: its build, note-on, settings and
   update, with its two waves and constants read from rom.4 (Vc2OscTables). rom.2 has no such routine to reuse. xt_vc2osc:

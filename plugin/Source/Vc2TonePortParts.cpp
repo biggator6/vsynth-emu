@@ -13,24 +13,30 @@ uint32_t bits(float x) { return std::bit_cast<uint32_t>(x); }
 int32_t oscCode(int osc) { return tonePartCode(static_cast<Piece>((int)Piece::osc1 + osc), 0); }
 int32_t cosmCode(int cosm) { return tonePartCode(static_cast<Piece>((int)Piece::cosm1 + cosm), 0); }
 int32_t lfoCode(int lfo) { return tonePartCode(Piece::lfos, lfo); }
-const int32_t kMixCode = tonePartCode(Piece::mix, 0), kTvaCode = tonePartCode(Piece::tva, 0);
+const int32_t kTvaCode = tonePartCode(Piece::tva, 0);
 size_t freeIndex(uint32_t free) { return (free - kToneFreeAt) / kToneFreeStride; }
 uint32_t byteOf(int32_t x) { return (uint32_t)x & kByte; }
 } // namespace
 
-void TonePortParts::build(Vc2TonePiece piece) { log(kBuild, tonePartCode(piece, 0)); }
-void TonePortParts::destroy(Vc2TonePiece piece) { log(kDestroy, tonePartCode(piece, 0)); }
+void TonePortParts::build(Vc2TonePiece piece) {
+    if (piece == Piece::envelopes) mods.buildEnvelopes();
+    else if (piece == Piece::lfos) mods.buildLfos(s_.chaos);
+    else if (piece == Piece::mix) mix.construct(tail());
+    else log(kBuild, tonePartCode(piece, 0));
+}
+
+void TonePortParts::destroy(Vc2TonePiece piece) {
+    if (piece == Piece::lfos) mods.destroyLfos();
+    else log(kDestroy, tonePartCode(piece, 0));
+}
+
 void TonePortParts::unfollow(int lfo) { log(kUnfollow, lfoCode(lfo)); }
 void TonePortParts::unlist(bool fromOne) { log(kUnlist, kToneNone, { fromOne ? 1u : 0u }); }
 
-void TonePortParts::tickEnvelope(int envelope, int32_t n) {
-    log(kTickEnvelope, tonePartCode(Piece::envelopes, envelope), { (uint32_t)n });
-}
-
-void TonePortParts::tickLfo(int lfo, int32_t n) { log(kTickLfo, lfoCode(lfo), { (uint32_t)n }); }
-void TonePortParts::clockLfo(int lfo, float x) { log(kClockLfo, lfoCode(lfo), { bits(x) }); }
+void TonePortParts::tickEnvelope(int envelope, int32_t n) { mods.envelopes[(size_t)envelope].tick(n); }
+void TonePortParts::tickLfo(int lfo, int32_t n) { mods.lfos[(size_t)lfo].tick(n); }
+void TonePortParts::clockLfo(int lfo, float x) { mods.lfos[(size_t)lfo].clock(x); }
 void TonePortParts::updateOsc(int osc, int32_t n) { log(kUpdateOsc, oscCode(osc), { (uint32_t)n }); }
-void TonePortParts::updateMix() { log(kUpdateMix, kMixCode); }
 void TonePortParts::updateCosm(int cosm, float x) { log(kUpdateCosm, cosmCode(cosm), { bits(x) }); }
 void TonePortParts::updateTva() { log(kUpdateTva, kTvaCode); }
 
@@ -40,9 +46,7 @@ void TonePortParts::ended() {
 
 void TonePortParts::renderOsc(int osc, float* buffer) { log(kRenderOsc, oscCode(osc), { bufferOf(buffer) }); }
 
-void TonePortParts::renderMix(const float* a, const float* b, float* c) {
-    log(kRenderMix, kMixCode, { bufferOf(a) | bufferOf(b) << 8 | bufferOf(c) << 16 });
-}
+void TonePortParts::renderMix(const float* a, const float* b, float* c) { mix.render(a, b, c, tail(), s_.rings); }
 
 void TonePortParts::renderCosm(int cosm, float* buffer) { log(kRenderCosm, cosmCode(cosm), { bufferOf(buffer) }); }
 
@@ -58,7 +62,7 @@ uint32_t TonePortParts::installOsc(int osc) {
     return s_.draws.installOsc[(size_t)osc];
 }
 
-void TonePortParts::installMix(bool kind3) { log(kInstallMix, kMixCode, { kind3 ? 1u : 0u }); }
+void TonePortParts::installMix(bool kind3) { mix.install(kind3, tail()); }
 
 uint32_t TonePortParts::installCosm(int cosm, uint32_t flag) {
     log(kInstallCosm, cosmCode(cosm), { flag });
@@ -66,12 +70,10 @@ uint32_t TonePortParts::installCosm(int cosm, uint32_t flag) {
 }
 
 void TonePortParts::noteOnEnvelope(int envelope, const uint32_t* block) {
-    log(kNoteOnEnvelope, tonePartCode(Piece::envelopes, envelope), { blockOf(block) });
+    mods.envelopes[(size_t)envelope].noteOn(block);
 }
 
-void TonePortParts::noteOnLfo(int lfo, const uint32_t* block, float x) {
-    log(kNoteOnLfo, lfoCode(lfo), { blockOf(block), bits(x) });
-}
+void TonePortParts::noteOnLfo(int lfo, const uint32_t* block, float x) { mods.lfos[(size_t)lfo].noteOn(block, x); }
 
 void TonePortParts::followLfo(int lfo, int tone, const uint32_t* block) {
     log(kFollowLfo, lfoCode(lfo), { (uint32_t)tone, blockOf(block), (uint32_t)lfo });
@@ -103,8 +105,8 @@ void TonePortParts::markFree(uint32_t free, uint32_t id, int lfo) {
 
 // The bound envelopes on (+0x68 1) and LFOs not (+0x80 0), as each binding leaves them
 void TonePortParts::setFlags(std::span<const int32_t> envelopes, std::span<const int32_t> lfos) {
-    for (int32_t e : envelopes) words.envelopeOn[(size_t)e] = 1;
-    for (int32_t l : lfos) words.lfoOn[(size_t)l] = 0;
+    for (int32_t e : envelopes) mods.envelopes[(size_t)e].w.on = 1;
+    for (int32_t l : lfos) mods.lfos[(size_t)l].w.on = 0;
 }
 
 void TonePortParts::bindOsc(int osc, const Vc2ToneBinding<4>& b) {
@@ -140,7 +142,7 @@ void TonePortParts::takePlayer(int osc, int tone) {
 void TonePortParts::setOsc(int osc, const uint32_t* block) { log(kSetOsc, oscCode(osc), { blockOf(block) }); }
 
 void TonePortParts::noteOnMix(const uint32_t* block, uint32_t flag1, uint32_t flag2) {
-    log(kNoteOnMix, kMixCode, { blockOf(block), flag1, flag2 });
+    mix.noteOn(block, flag1, flag2, tail(), s_.rings);
 }
 
 Vc2ToneCosmSetUp TonePortParts::cosmSetUp(int osc) {

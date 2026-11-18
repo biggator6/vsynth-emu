@@ -424,6 +424,21 @@ version against rom.4's routines with what it calls hooked:
    - done (v267): the vibrato, `Vc2OscVibrato`, on the voice's first 0x54 bytes: the build `0x893b29b0`, the note-on
      `0x893b29e0`, the settings `0x893b2b70` and the update `0x893b2c10`, rom.4's own (rom.2 has no such routine), against
      rom.4's in xt_vc2osc's vibrato part and in the voice, its hooks gone (HARDWARE_FIRMWARE.md, "The VC-2's OSC vibrato").
+   - done (v268): the tone's envelopes and LFOs, `Vc2ToneEnvelope`, `Vc2ToneLfo` and `Vc2ToneModulators`: rom.4's objects
+     word for word over XtEnvelope and XtLfo, whose code rom.4 shares opcode for opcode; constructors, note-ons, ticks, the
+     clock and the words the tone, the OSC voice and the TVA read, against rom.4's own routines in xt_vc2tone
+     (HARDWARE_FIRMWARE.md, "The VC-2's envelopes and LFOs"). Split by what rom.4 holds (the VC-2 session's decision,
+     2026-11-18): the free LFOs' manager is v271.
+   - open (v271): the free LFOs' manager at `0x8a0c6d84` whole: its constructor `0x893ad4c0`, the 384 free objects, and
+     the routines v268 leaves hooked in xt_vc2tone or unported: `unfollow` `0x893ad720`, the take `0x893ad640`, the lists
+     `0x893ad780` and `0x893ad800`, the attach `0x893acfc0`, the free start `0x893acf10`, the follow `0x893ace60`, the free
+     objects' tick (`0x893aca60`, the manager's pass `0x893ad5f0`) and clock (`0x893acba0`, the manager's pass
+     `0x893ad870`), with their hooks out of xt_vc2tone.
+   - done (v269): the tone's OSC mix, `Vc2ToneMix`: rom.4's object at the tone's +0x1ab8, its constructor, note-on, install,
+     empty update and eight renders, and the delay lines `Vc2ToneMixRings`, against rom.4's own routines in xt_vc2tone
+     (HARDWARE_FIRMWARE.md, "The VC-2's OSC mix").
+   - open: the mix's settings update `0x893add60(mix, block)`, which the tone calls at `0x893b32e6`: new targets during a
+     note, by type. Nothing in `Vc2ToneParts` reaches it yet.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
      update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its
@@ -618,7 +633,7 @@ version against rom.4's routines with what it calls hooked:
 
      | Interface | Has a port | No port yet |
      |---|---|---|
-     | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264) | the mix `0x893adbf0`, `0x893ade40`, `0x893ade50`, `0x893ade90`; the voice list `0x893ad9a0`, `0x893ada10`, `0x893ada30`; envelopes `0x893abe80`, `0x893ac1c0`; LFOs `0x893acda0`, `0x893ace60`, `0x893acf10`, `0x893acfc0`, `0x893ad080`, `0x893ad100`, free LFOs `0x893ad640`, `0x893ad720`, `0x893ad780`, `0x893ad800` (the envelope and LFO session's) |
+     | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264); the envelopes and LFOs (v268), the mix (v269) | the voice list `0x893ad9a0`, `0x893ada10`, `0x893ada30`; the mix's settings update `0x893add60`; the free LFOs' manager (v271): `0x893ace60`, `0x893acf10`, `0x893acfc0`, `0x893ad640`, `0x893ad720`, `0x893ad780`, `0x893ad800` |
      | `Vc2OscParts` | carrier and kind 6 on the voice (v266), the vibrato (v267), players' installs, seeks | kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by address (`vc2Kind5Update` and `Vc2Kind6::set` are their ports, for the part's wiring) |
      | `Vc2TvaParts` | the TVA itself | the fade's step, the word at `0x8993eb08`, which the TVA's converter writes (`0x893a67a2`, with a twin from `0x893a6eba`): version 8's; the event is the task's |
      | `Vc2MixerParts` | all nine | none |

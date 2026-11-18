@@ -1546,6 +1546,104 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's OSC mix (2026-11-18, v269) {#vc2-osc-mix}
+
+Step 4.2's tone parts. The mix joins the two OSC voices' buffers in the tone's whole render, before COSM 1 and the TVA. Its object is at the tone's +0x1ab8, 0x5c bytes, and its last 0x1c bytes are the words `Vc2ToneTail` holds from +0x40 on. `Vc2ToneMix` holds the first 0x40 as `Vc2MixWords` and takes the tail by reference. `Vc2ToneMixRings` is the delay lines, one pair a tone by its index.
+
+**The words.**
+
+| Offset | Word |
+|---|---|
+| +0x00 | the block's type |
+| +0x04…+0x13 | the block's four targets |
+| +0x14, +0x18 | the two delay lines' addresses, `0x8a0af984` and `0x8a0bb384` plus the tone's index × 0x7c0 |
+| +0x1c…+0x2b | four gains; the held-off render keeps its two held samples in the first two |
+| +0x2c, +0x30 | the hold, the follower's last level |
+| +0x34 | the delay lines' write position, of 0x1f0 samples |
+| +0x38 | the type's low byte |
+| +0x3c | the OSC voices' flags: 0 neither, 1 both, 2 OSC 1's alone, 3 OSC 2's alone |
+| +0x40 | the tone's index (the tail's) |
+| +0x44, +0x48 | the sync switch and the sync mask |
+| +0x4c…+0x57 | the render's member pointer: delta 0, −1, the routine |
+| +0x58 | the output gain the install chose |
+
+**The routines.** The constructor `0x893adbc0` clears the sync words and the gain. The note-on `0x893adbf0` copies the block, works out the flags and the lines, and starts by type. The install `0x893ade90` chooses the render and its gain from the table at `0x89542394`. The render `0x893ade50` calls what the install chose. The update `0x893ade40` returns at once.
+
+| Type | Note-on | Render | Other render, and when |
+|---|---|---|---|
+| 0 | gains = targets | `0x893e4600` four gains | |
+| 1 | target 0 over full scale, three gains = targets | `0x893e4680` ring product | |
+| 2 | three gains = targets, both lines cleared | `0x893e4740` delay, mono | `0x893e4820` delay, stereo, with either flag |
+| 3 | gain 0 = target 2, hold 0 | `0x893e4250` follower, mono | `0x893e4320` follower, stereo, with either flag |
+| 4 | sync on, two gains 0, hold = target 0 | `0x893adb90` blend, when OSC 1 is kind 3 | `0x893adb30` held off, otherwise |
+| others | sync off | `0x893e4600`, the gain kept | |
+
+**The renders**, on 32 stereo frames of buffers a (OSC 1) and b (OSC 2):
+- Four gains: each channel is a × one gain + b × another, and each gain settles 1/32 of the way to its target after the block.
+- Ring product: (b × g0 + g1) × g2 × a, the three gains ramping over the block.
+- Delay: a goes into a line and is read back (b + full scale) × g0 × 248 / full scale samples behind, between its two nearest samples; the output is (a × g1 + the tap) × g2. Mono uses OSC 2's left channel to move one line and writes the result to both channels.
+- Follower: a × the hold × a ramping gain. The hold moves toward b's level every 4 frames, at a rate set by target 1 while the level falls and by target 0 otherwise. The level is `0x893bf120`'s sum over OSC 2's left channel, the last frame of each 8 counted twice.
+- Blend: a × hold + b × (1 − hold).
+- Held off: a less what it held at the last frame the sync mask marks, × (1 − hold / 2).
+
+**Reading the four-gain render.** It moves its samples in pairs under FPSCR.SZ = 1. By this project's reading of those moves (see "Correction: the interpreter's pair moves"), each OSC's first gain is the left channel's.
+
+**What is left out.**
+- `0x893add60(mix, block)`, a new block's targets during a note, by type, called from the tone at `0x893b32e6`, is outside `Vc2ToneParts` and not ported. The check draws what it would write: new targets between blocks, so the ramps run.
+- `0x893e4400` and `0x893e44d0` sit among the renders, but no code or table refers to them.
+- The mix is not in the sound yet.
+
+**The check.** `xt_vc2tone` no longer hooks `0x893adbc0`, `0x893adbf0`, `0x893ade40`, `0x893ade50` or `0x893ade90`, and it runs the static initializer `0x893e4960`. After each event it compares the mix's words and the tail. After each render it compares buffer c and the tone's two lines, and at a case's end all 48 lines. A new event plays a mix alone: a note-on from a drawn block and flags, the install on noise in the member pointer's first words, then up to 12 blocks. Buffers a and b are drawn within full scale and the targets within 0…1, where a delay stays inside rom.4's lines; a delay's first gain is brought back within 0…1 if the held-off render left a sample there. 0 different at seed 2024 (40 cases) and at seeds 7 and 31337 (400 cases each), with all eight renders reached. New code: every line run but `vc2ToneMixLoaded`, which `VSynthEmuRomTest` calls. `mutate_vc2.py --tone`: 439 planted, 144 of them the mix's, 0 missed. The first run missed seven, as nothing moved the targets during a note and the member pointer's first word was always 0; the check now draws both.
+
+### The VC-2's envelopes and LFOs (2026-11-18, v268) {#vc2-envelopes-lfos}
+
+Step 4.2's tone parts. A tone holds 14 envelopes of 0x70 bytes at +0x1b38 and 8 LFOs of 0x98 bytes at +0x2158. rom.4's code for both is rom.2's. Compared halfword by halfword, the envelope's `0x893ab5b0…0x893ac4a0` (rom.2's, 0x143f70 bytes up) has 1,891 of 1,912 equal: the other 21 are 18 pool halfwords holding addresses and 3 `mova`s reaching the same constant from a pool that moved. The LFO's `0x893ac4f0…0x893ad720` (rom.2's, 0x143f50 up) has 2,286 of 2,328 equal, the other 42 all pool halfwords holding addresses. That is what the code's text says; what holds the port to it is `xt_vc2tone`, which runs rom.4's own routines against the adapters word for word. So `Vc2ToneEnvelope` and `Vc2ToneLfo` hold rom.4's objects word for word, copy the words into `XtEnvelope` and `XtLfo`, run those classes' laws and store the words back. Both classes gain one `friend` line and nothing else.
+
+**The envelope's words.**
+
+| Offset | Word |
+|---|---|
+| +0x00 | stage: −1 built, 0 attack, 1, 2 decay, 3 sustain, 4 release, 5 done |
+| +0x04 | its number in the tone |
+| +0x08…+0x3f | the converter's block: curve, scale, sync, two clock words, 4 times, 5 levels |
+| +0x40, +0x44 | rate, phase |
+| +0x48 | 1 from the constructor, read by nothing here |
+| +0x4c…+0x58 | output, release start, coefficient, onset |
+| +0x5c…+0x67 | the output routine's member pointer, by the curve (`0x893ab860`, `0x893abd30`) |
+| +0x68 | on: the tone ticks it when set |
+| +0x6c | the stage's time |
+
+**The LFO's words.**
+
+| Offset | Word |
+|---|---|
+| +0x00…+0x23 | the delay and fade: state, direction, count, two fade times, delay, two rates, rest, target, amplitude |
+| +0x24 | vtable `0x898cd490` |
+| +0x28, +0x2c | active, the fade mode the note-on took |
+| +0x30 | the amplitude over its full scale, which each tick leaves |
+| +0x34 | its number in the tone |
+| +0x38…+0x48 | output, an unread 0, phase, the random waves' two values |
+| +0x4c…+0x6b | the converter's block: wave, rate, delay, fade, key sync, sync, offset, fade mode |
+| +0x6c, +0x74 | chaos state, tempo |
+| +0x78 | a case by the wave, 0 for the eight waves a converter gives |
+| +0x7c, +0x80 | the free object it follows, on |
+| +0x84…+0x94 | a note value's clock: step, target, time, wrap, count |
+
+**Where rom.4's words ask more than the classes hold.**
+- `XtLfo::noteOn` starts from a base just built, as every rom.2 note does. rom.4's note-on leaves the words as they stand, so the adapter runs rom.4's own order (`0x893acda0`, `0x893acca0`) through XtLfo's `setDir`, `setTimes`, `fadeStart` and `tick`.
+- The tick's amplitude ratio at +0x30 has no member in XtLfo, so the adapter stores it after a tick and only then.
+- The constructors read two values set by rom.4's static initializers: the envelope's start coefficient `0x3c199999` (`0x893ac4a0`) and the LFOs' chaos generator, 0.7 at `0x89999668` (`0x893ad8d0`). Each LFO's chaos state is the generator's next value, made positive.
+
+**What is deliberately not reached.**
+- The envelope's converter (`0x8939a400`) writes curve 0 or 2, scale 1 and sync 0, so curve 1's output (`0x893abcb0`) and the synced rate are not ported.
+- The tone's caller gives at least 1 tick (`0x893b16c8`), so the tick's branch for a negative phase (`0x893ac010`, stage 6) is never taken. The check draws no negative count.
+- `XtEnvelope` reads rom.2's shape table. rom.4's first differs at entry 130, and a segment's position reads entries 0…128 only.
+- Waves 8…12, which name a case at +0x78, come from no converter.
+
+**Left for v271.** The free LFOs' manager at `0x8a0c6d84` (0x8448 bytes, 384 free objects of 0x38 bytes, constructor `0x893ad4c0`) and what reaches it: the take `0x893ad640`, `unfollow` `0x893ad720`, the lists `0x893ad780` and `0x893ad800`, the attach `0x893acfc0`, the free start `0x893acf10`, the follow `0x893ace60`, and the free objects' tick (`0x893aca60`, the manager's pass `0x893ad5f0`) and clock (`0x893acba0`, the manager's pass `0x893ad870`). The seven the tone calls stay hooked in `xt_vc2tone`. The envelopes' and LFOs' note-offs and updates are the part's (step 4.3).
+
+**The check.** `xt_vc2tone` no longer hooks the constructors, `0x893ac1c0`, `0x893abe80`, `0x893acda0`, `0x893ad100` or `0x893ad080`: rom.4's own routines run, and all 14 and 8 objects are compared word for word after every event, with the generator's word. A note-on's blocks are drawn as the converters write them, and `toneBoundOn` holds the words the OSC voice and the TVA read to rom.4's memory.
+
 ### The VC-2's OSC vibrato (2026-11-18, v267) {#vc2-osc-vibrato}
 
 Step 4.2's OSC voice. The vibrato is an object of 0x54 bytes on the voice's first bytes: the build `0x893b29b0`, the note-on `0x893b29e0` (given the voice's +0xd4, the block's +0x80), the settings `0x893b2b70` (given the settings' +0x80) and the update `0x893b2c10`. Its outputs are +0x2c, onto the pitch by the voice's +0xfc, and +0x30, onto the gains by +0x100.

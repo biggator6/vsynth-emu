@@ -12,10 +12,16 @@
 // XT_VC2TONE_MAIN only.
 #ifdef XT_VC2TONE_MAIN
 #include "Vc2ToneSides.h"
+#include "Vc2ToneMixTables.h"
+#include "XtEnvelope.h"
+#include "XtLfo.h"
 #include <algorithm>
 
 namespace {
 constexpr uint32_t kHeadAt = 0x8993fb48;   // [FW] the pool's head and serial, cleared at a case's start
+// [FW] rom.4's static initializers the real parts read: the envelope's start coefficient, the LFOs' generator, the mix's
+// member pointers
+constexpr uint32_t kStaticInits[] = { 0x893ac4a0, 0x893ad8d0, 0x893e4960 };
 constexpr int kSteps = 400, kMaxLive = 8;
 
 // Both pools fresh: rom.4's tones' memory, head and serial cleared, the port's pool new and its parts' words with it
@@ -24,7 +30,11 @@ void toneFreshPools(ToneSides& s) {
     s.fw.cpu.write(Vc2TonePool::kBase, zeros.data(), zeros.size());
     s.fw.cpu.write(kHeadAt, zeros.data(), 2 * sizeof(uint32_t));
     s.pool = Vc2TonePool {};
-    for (TonePortParts& p : s.parts) p.words = {};
+    for (TonePortParts& p : s.parts) {
+        p.words = {};
+        p.mods = {};
+        p.mix = {};
+    }
     s.live.clear();
 }
 
@@ -39,16 +49,26 @@ std::string vc2ToneCase(ToneSides& s, std::mt19937& rng) {
         const bool make = s.live.empty() || ((int)s.live.size() < most && rng() % (fills ? 2 : 6) == 0);
         what = make ? toneMakeOn(s, rng) : events[rng() % events.size()](s, rng);
     }
-    return what;
+    return what.empty() ? toneMixRingsDifference(s) : what;
 }
 
-bool toneNoTables(const char*) { return true; }
+// The mix's constants from rom.4; XtEnvelope's and XtLfo's tables from the rom.2 beside it: rom.4's are the same words as
+// far as they're read
+bool toneLoadTables(const char* path) {
+    std::string rom2 = path;
+    const size_t at = rom2.rfind("rom.4");
+    if (at != std::string::npos) rom2.replace(at, 5, "rom.2");
+    return vc2LoadToneMix(path) && xtEnvLoadTables(rom2.c_str()) && xtLfoLoadTables(rom2.c_str());
+}
 } // namespace
 
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2tone", toneNoTables);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2tone", toneLoadTables);
     if (!run) return 1;
+    for (uint32_t init : kStaticInits) {
+        if (!fw.call(init, {})) return 1;
+    }
     Vc2TonePool pool;
     ToneShared shared;
     shared.pool = &pool;
@@ -68,6 +88,10 @@ int main(int argc, char** argv) {
                 n.inPlace, n.unmakes, n.back, n.updates, n.ends, n.renders, tally.different);
     std::printf("note-on: %ld note-ons, %ld players taken, %ld LFOs following, %ld free LFOs, %ld inputs fixed\n",
                 n.noteOns, n.takes, n.follows, n.frees, n.fixes);
+    std::printf("modulators: %ld reads of their bound words\n", n.bounds);
+    std::printf("mix: %ld plays, blocks by routine:", n.mixPlays);
+    for (long blocks : n.mixBlocks) std::printf(" %ld", blocks);
+    std::printf("\n");
     std::printf("xt_vc2tone: %ld different\n", tally.different);
     return 0;
 }

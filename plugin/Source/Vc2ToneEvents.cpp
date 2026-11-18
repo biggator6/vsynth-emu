@@ -82,7 +82,9 @@ std::string toneUpdateOn(ToneSides& s, std::mt19937& rng) {
     const int i = toneDrawLive(s, rng);
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     if (rng() % 8 != 0) toneBothWord(s, i, kToneStateAt, tone.head.state, Vc2Tone::kSounding);
-    const uint32_t n = rng() % 2 == 0 ? rng() % 64 : (uint32_t)rng();
+    // [FW] 0x893b16c8: the update's caller gives at least 1 tick, so its low half, which the update extends, stays positive
+    constexpr uint32_t kPositiveLowHalf = 0xffff7fff;
+    const uint32_t n = rng() % 2 == 0 ? rng() % 64 : (uint32_t)rng() & kPositiveLowHalf;
     s.n.updates += tone.head.state == Vc2Tone::kSounding;
     std::string what =
         toneOn(s, i, kUpdateAt, { s.pool.addressOf(i), n }, [&] { tone.update((int32_t)n, partsOf(s, i)); });
@@ -95,12 +97,14 @@ std::string toneRenderOn(ToneSides& s, std::mt19937& rng) {
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     toneBothWord(s, i, kToneRendersAt, tone.tail.renders, rng() % 4 == 0 ? 0 : 1);
     s.n.renders += tone.tail.renders != 0;
+    std::string what = toneMixPrepareRender(s, i, rng);
+    if (!what.empty()) return what;
     float* out = s.shared.out.data();
     const std::initializer_list<uint32_t> args = { s.pool.addressOf(i), kToneOutAt };
-    if (rng() % 2 == 0) {
-        return toneOn(s, i, kWholeAt, args, [&] { tone.renderWhole(out, s.shared.buffers, partsOf(s, i)); });
-    }
-    return toneOn(s, i, kRenderAt, args, [&] { tone.render(out, s.shared.buffers, partsOf(s, i)); });
+    what = rng() % 2 == 0
+               ? toneOn(s, i, kWholeAt, args, [&] { tone.renderWhole(out, s.shared.buffers, partsOf(s, i)); })
+               : toneOn(s, i, kRenderAt, args, [&] { tone.render(out, s.shared.buffers, partsOf(s, i)); });
+    return what.empty() ? toneMixRendered(s, i) : what;
 }
 
 std::string toneClockOn(ToneSides& s, std::mt19937& rng) {
@@ -143,15 +147,20 @@ std::string tonePlainOn(ToneSides& s, std::mt19937& rng) {
 }
 
 // The tone's own words as a note-on or another use might leave them: its head and tail drawn on both sides, but the end
-// routine, which rom.4 calls (the link stays: the free list follows it)
+// routine and the mix's member pointer and gain, which rom.4 calls and keeps, and the indexes, a delay line's number (the
+// link stays: the free list follows it)
 std::string toneScribbleOn(ToneSides& s, std::mt19937& rng) {
     const int i = toneDrawLive(s, rng);
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     std::array<uint32_t, (sizeof tone.head + sizeof tone.tail) / sizeof(uint32_t)> words {};
     std::ranges::generate(words, [&] { return rng() % 4 == 0 ? rng() % 8 : (uint32_t)rng(); });
+    const auto mixWords = std::to_array(tone.tail.unread);
     std::memcpy(&tone.head, words.data(), sizeof tone.head);
     std::memcpy(&tone.tail, words.data() + sizeof tone.head / sizeof(uint32_t), sizeof tone.tail);
     tone.tail.ended = kToneEndedAt;
+    std::ranges::copy(mixWords, tone.tail.unread);
+    tone.head.index = (int32_t)(rng() % Vc2ToneMixRings::kTones);
+    tone.tail.index = (int32_t)(rng() % Vc2ToneMixRings::kTones);
     s.fw.cpu.write(s.pool.addressOf(i), &tone.head, sizeof tone.head);
     s.fw.cpu.write(s.pool.addressOf(i) + kToneEndedWordAt - offsetof(Vc2ToneTail, ended), &tone.tail, sizeof tone.tail);
     return toneDifference(s, i);
@@ -166,6 +175,7 @@ std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
     std::string what = vc2BothOn(
         s.fw, kNoteOnAt, { s.pool.addressOf(i), kToneInputAt }, "the note-on",
         [&] { tone.noteOn(s.shared.input, s.pool, s.owner, partsOf(s, i)); }, [&] { return toneDifference(s, -1); });
+    if (what.empty()) what = toneMixRingsOf(s, i);
     s.n.takes += vc2CountCalls(s.rom, kTakePlayer);
     s.n.follows += vc2CountCalls(s.rom, kFollowLfo);
     s.n.frees += vc2CountCalls(s.rom, kFreeLfo);
@@ -173,10 +183,39 @@ std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
     return what;
 }
 
-constexpr ToneEvent kEvents[] = { toneUpdateOn,    toneUpdateOn,  toneRenderOn,    toneRenderOn,   toneUnmakeOn,
-                                  toneInPlaceOn,   toneClockOn,   toneCountOn,     toneMatchedOn,  toneAskOn,
-                                  toneAskOn,       tonePlainOn,   tonePlainOn,     toneScribbleOn, toneNoteOnEvent,
-                                  toneNoteOnEvent, toneNoteOnEvent };
+// What the OSC voice and the TVA read of a tone's envelopes and LFOs (v268), by rom.4's addresses, against rom.4's words
+std::string toneBoundOn(ToneSides& s, std::mt19937& rng) {
+    constexpr uint32_t kBytes[] = { Vc2ToneModulators::kEnvelopeBytes, Vc2ToneModulators::kLfoBytes };
+    using W = Vc2EnvelopeWords;
+    const int i = toneDrawLive(s, rng);
+    const Vc2ToneModulators& m = s.parts[(size_t)i].mods;
+    const uint32_t self = s.pool.addressOf(i);
+    const bool envelope = rng() % 2 == 0;
+    const uint32_t part = envelope ? toneEnvelopeAt(self, (int)(rng() % Vc2Tone::kEnvelopes))
+                                   : toneLfoAt(self, (int)(rng() % Vc2Tone::kLfos));
+    // Any word but its number, which the tone keeps (Vc2Tone::envelopeIndex, lfoIndex) and no part reads by address
+    const uint32_t drawn = (rng() % (kBytes[envelope ? 0 : 1] / sizeof(uint32_t))) * sizeof(uint32_t);
+    const uint32_t number = envelope ? offsetof(W, index) : offsetof(Vc2LfoWords, index);
+    const uint32_t offset = drawn == number ? drawn + sizeof(uint32_t) : drawn;
+    const auto same = [&](float mine, uint32_t at) { return std::bit_cast<uint32_t>(mine) == s.fw.cpu.rd32(at); };
+    ++s.n.bounds;
+    if (!same(m.boundFloat(self, part, offset), part + offset)) return "a bound part's word";
+    if (m.boundFloat(self, self, 0) != 0.0f) return "a word of no bound part";
+    const uint32_t lfo = toneLfoAt(self, (int)(rng() % Vc2Tone::kLfos));
+    if (!same(m.lfoOut(self, lfo), lfo + offsetof(Vc2LfoWords, out))) return "an LFO's output";
+    const uint32_t e = toneEnvelopeAt(self, (int)(rng() % Vc2Tone::kEnvelopes));
+    const Vc2TvaEnvelope tva = m.tvaEnvelope(self, e);
+    const bool agrees = tva.state == (int32_t)s.fw.cpu.rd32(e + offsetof(W, stage))
+                        && same(tva.attack, e + offsetof(W, time)) && same(tva.next, e + offsetof(W, time) + 4)
+                        && same(tva.out, e + offsetof(W, out)) && same(tva.onset, e + offsetof(W, onset))
+                        && same(tva.stageTime, e + offsetof(W, stageTime));
+    return agrees ? "" : "the TVA's envelope";
+}
+
+constexpr ToneEvent kEvents[] = { toneUpdateOn,    toneUpdateOn,    toneRenderOn,  toneRenderOn,   toneUnmakeOn,
+                                  toneInPlaceOn,   toneClockOn,     toneCountOn,   toneMatchedOn,  toneAskOn,
+                                  toneAskOn,       tonePlainOn,     tonePlainOn,   toneScribbleOn, toneNoteOnEvent,
+                                  toneNoteOnEvent, toneNoteOnEvent, toneBoundOn,   toneMixPlayOn,  toneMixPlayOn };
 } // namespace
 
 std::string toneMakeOn(ToneSides& s, std::mt19937& rng) {
