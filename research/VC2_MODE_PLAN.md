@@ -556,6 +556,100 @@ version against rom.4's routines with what it calls hooked:
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).
+   The map (2026-11-18, v270; VC2_VOCAL_DESIGNER.md, "The part's voices and the COSM pools"), read and, for the notes,
+   run on rom.4's own handlers (`vc2run … voices`):
+   - **The three tasks.** All three wait on the OS's events; a port runs them in one order per block.
+
+     | Task | Entry | Wakes on | Does |
+     |---|---|---|---|
+     | Notes | `0x8938fc00` (loop from `0x8938fc66`), object `0x8994fec8` | 0x002 MIDI queue `0x89981918`; 0x004 a tone ended (`0x89390ee0`); 0x008 reset all (`0x89390340` × 3, while `0x89981904` is set); 0x010 the schedule, `0x893b1710` once per count at `0x89981b40` + 0x20; 0x020, 0x040 Auto Note's on and off; 0x080 all notes off; 0x100 `0x893930a0`; 0x200 a held C4 | every note, every voice, every tone made or destroyed |
+     | Update | `0x893952b0`, object `0x8994ff64` | 0x1: the pitch source `0x89394a60`, then the voices' update `0x893b16a0`; 0x2 (a timer, `0x893952a0`): the queue at `0x89989cc4`, each node's +0x0c | envelopes, LFOs, OSC updates; a voice's reconversion |
+     | Block | `0x89395ac0` (`0x89395ace` is inside its prologue) | 4 the input frames (`0x8993eadc`); 2 the mixer `0x893b1820`, then the output's DMA | the part mixer and every tone's render |
+
+   - **The objects** (24 of each, by the voice's number at its +0x40):
+
+     | Object | Where | Bytes | What it is |
+     |---|---|---|---|
+     | Voice V | table `0x895354b0`, from `0x89981b6c` | 0x60 | vtable +0x10 (`0x898cd3dc`), list links +0x14/+0x18, a pointer to its age +0x1c, state +0x2c, channel state +0x34, part +0x3c, number +0x40, its routine on leaving a list +0x44 (`0x89391740`, the virtual destroy, or `0x89391750`, none), flags +0x48, note W +0x4c, conversion set C +0x5c |
+     | Note W | `0x8998a51c` + 0x744 × n (`0x893964f0`) | 0x744 | the tone's input (`Vc2ToneInput`, 0x700 bytes) at +0, tone +0x738, partner +0x73c, id bytes +0x741/+0x742 |
+     | Conversion set C | `0x89997fe8` + 0x6c × n (`0x893a76a0`) | 0x6c | one converter object per block of W, M at +0x68 |
+     | M | `0x89e4741c` + 0x184 × n (`0x893a5d80`) | 0x184 | the note's Matrix (`Vc2MatrixWords`) |
+     | Tone | pool `0x8999f524` (`Vc2TonePool`) | 0x261c | taken by W's constructor, given back by its destructor |
+
+   - **The four lists** at `0x899826e0`: sounding `0x89982594`, free `0x899825e4`, prepared `0x89982634`, reserved
+     `0x89982684`. A voice moves by `0x893919b0` (to prepared), `0x893918e0` (to free), `0x89391930` (to reserved); each
+     runs the voice's +0x44 first, which destroys its tone, so a voice never carries a tone into a list.
+   - **Note start** (`0x89392da0`, source 1…4, 4 being Auto Note's): the key table (`0x89391e90`), then each part node
+     on the channel's list (`0x899890d0` + (source − 1) × 64 + channel × 4), by its vtable's +0x0c: `0x89396a80`. That takes
+     a voice (`0x893969e0` → `0x893905a0`: the free list's first, else the sounding voice of kind 0 with the lowest age,
+     whose tone is destroyed there) and starts the prepared list (`0x89390860`): for each, a legato partner of the same
+     channel state, part and kind; its +0x3c (`0x89397130`: W, the tone, C); the tone's note-on (`0x893965e0`); then while
+     the sum of the tones' costs (`0x893b4020`, plus `0x899826dc`) reaches the budget at `0x899826d8`, stop the oldest
+     (`0x893918e0`); then start the tone (`0x89396630` → `0x893b1cd0`), and join the sounding list. The budget is CPU Power
+     Max for TG (0x530), less 400 for every Patch Category but 6 (`0x89392c60`), ÷ 10⁶.
+   - **Note off** (`0x89392e70` → `0x89396c90`, then `0x89390c00`): `0x89391760` clears the key's flags, the pedals'
+     held bits (`0x89391820`, `0x89391880` when they lift), and at none left the voice's +0x30 (`0x89397280`): C's
+     release (`0x893a7c50`), the tone's key-off (`0x893968b0` → `0x893b3ad0`).
+   - **Legato and truncation.** Mono with Legato on, a key already held, retunes the sounding voice in place (`0x89390b20`,
+     the voice's +0x18, `0x893971f0`) and starts no tone. A new voice that finds a partner passes it to the tone's note-on,
+     which takes its player (`0x893aee20`). `0x89396590` ends a tone: at once when it's silent (`0x893b2fc0`), else
+     by `0x893b3bc0`, the TVA truncated and **the notes' task asleep on event 0x1000 until the block task has rendered the
+     fade**. The port must keep that order: a voice is free only when its tone is gone.
+   - **The conversion pass.** `0x893a7b20` (a note) and `0x893a7cc0` (an update) run C's children into W's blocks: the
+     common +0x04 (`0x893a19c0`, W+0x0c), the OSCs +0x08/+0x0c (`0x893a0040`, W+0x434, +0x53c), the mix +0x10 (`0x8939be40`,
+     W+0x644), 13 envelopes +0x14 (`0x8939a790`, W+0x124…), 5 LFOs +0x48 (`0x8939b750`, W+0x24…), the COSMs +0x5c/+0x60
+     (`0x89399b90`, W+0x658, +0x6a0), the TVA +0x64 (`0x893a68c0`, W+0x6e8); the note's M at +0x68 (made by `0x893a5db0`).
+     Their parameters are cached by ID, per part and zone, by the eleven readers of `0x8939b170` (messages through
+     `0x8939b050`).
+   - **What step 4.2 left.** G's channel word (`0x893a5050`, G+0x840): Part 1 Receive Switch (0x47) off, the word at
+     `0x8999738c`, which no code seen writes (0 after the part's init, so G's word is 0: version 9 must follow what the
+     Matrix's sources do with that); on, the per-channel state of Part 1 Receive Channel (0x48), from the table
+     `0x8950d6e0` by the source byte at `0x8950d6d9`, + 2. **G's allocation** `0x893a5030` has no caller: G is static at
+     `0x89997398`. **The static M** at `0x89997108` is the part's own, for the part mixer's levels: `0x893a3020` (the
+     init table's) builds its update node at +0x170 and its two vtables (`0x898cd448`, `0x898cd460`, each's +0x0c being
+     `0x893a2ee0`), `0x893a2fe0` (the part's init) sets its velocity 0, keys 60, part 0 and channel word and queues the
+     node at `0x89989cc4`. **Event 0x200**: `0x893602e0` (a patch of Category 10 or 11, also `0x893607f0` at a patch's
+     load, and `0x89394340` when the Part channel moves on those) raises it on the notes' task, which plays C4 at
+     velocity 127 from source 3 on node 3's channel, unless `0x89981904` is set; the flag `0x899891d0` says so, and
+     `0x89392c60`'s all notes off (event 0x80) ends it. It is a held note for the vocoder's carrier, with no key down.
+   - **The pool can't run out** (settled; VC2_VOCAL_DESIGNER.md has the proof and the run). `Vc2CosmPools` needs no
+     answer for an empty pool in the wiring.
+   - **What each interface still needs** (ported routines are named by their version where it matters):
+
+     | Interface | Has a port | No port yet |
+     |---|---|---|
+     | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264) | the mix `0x893adbf0`, `0x893ade40`, `0x893ade50`, `0x893ade90`; the voice list `0x893ad9a0`, `0x893ada10`, `0x893ada30`; envelopes `0x893abe80`, `0x893ac1c0`; LFOs `0x893acda0`, `0x893ace60`, `0x893acf10`, `0x893acfc0`, `0x893ad080`, `0x893ad100`, free LFOs `0x893ad640`, `0x893ad720`, `0x893ad780`, `0x893ad800` (the envelope and LFO session's) |
+     | `Vc2OscParts` | carrier and kind 6 on the voice (v266), the vibrato (v267), players' installs, seeks | kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by address (`vc2Kind5Update` and `Vc2Kind6::set` are their ports, for the part's wiring) |
+     | `Vc2TvaParts` | the TVA itself | the fade's step, the word at `0x8993eb08`, which the TVA's converter writes (`0x893a67a2`, with a twin from `0x893a6eba`): version 8's; the event is the task's |
+     | `Vc2MixerParts` | all nine | none |
+     | `Vc2AutoNoteHost` | none | `0x89391dc0` (Auto Note's note + 12, posted when no key holds it), `0x89391e20` |
+     | `Vc2MatrixParams` | `Vc2Params`' descriptors | the readers `0x89320760`, `0x89320790`, `0x893207b0`, `0x89320a50`, `0x89320f60` on the getter `0x89324350`: in the plugin, the host parameters |
+     | `Vc2ToneShared` | `Vc2LibMath` for log and pow | a non-interpreter velocity `0x893a7fb0` and exp2 `0x893a8340`: only `RomShared`, the checks', implements it |
+
+   Split by those, bottom-up, each against rom.4's with what it calls hooked:
+   1. The voices and their lists: V's words, the init (`0x89391270`, `0x89391ba0`), take and steal, the three moves, the
+      reserve (`0x893911b0`), the ended scan (`0x89390ee0`), stop all (`0x89390f40`), the cost sum and budget.
+   2. The tone's remaining methods: the block setters `0x893b3110…0x893b3350`, key-off `0x893b3ad0`, the two truncations
+      `0x893b3bc0` and `0x893b3c20`, the cost `0x893b4020`, the position getters `0x893b3fc0…0x893b4010`, the start
+      `0x893b1cd0` with the voice list's three routines.
+   3. The note W: constructor `0x89396520`, note-on `0x893965e0`, end `0x89396590`, the settings pass `0x89396650`, the
+      update pass `0x893967a0`, the release `0x893968b0`, `0x89396910`, `0x89396950`.
+   4. The key table: `0x89392190`, `0x893920c0`, `0x89391e90`, `0x89391ef0`, `0x89392670` and the held-key queries, held
+      to `XtKeys.h` where rom.2's layout matches (step 1b found key assign equal).
+   5. The assigner: `0x89396a80`, `0x89396c90`, `0x893969e0`, `0x89390860`, mono's `0x89390b20` and `0x89390b90`, the
+      release path, the pedals, on faked voices' virtuals.
+   6. The voice's virtuals (`0x89397130`, `0x893970b0`, `0x893971f0`, `0x89397280`, `0x893972d0`, `0x893973a0`) and the
+      update queue at `0x89989cc4` (`0x89394f30…0x893951b0`).
+   7. C's frame: `0x893a76d0`, `0x893a7a20`, `0x893a7b20`, `0x893a7c50`, `0x893a7cc0`, `0x893a7df0`, `0x893a7f10`, and
+      the note's M (`0x893a5db0`, `0x893a5fe0`, `0x893a6010`, `0x893a61f0`), its children behind an interface.
+   8. C's children with no port, a version each: the common's (`0x893a1940…`), the envelopes' (`0x8939a620…`), the LFOs'
+      (`0x8939b690…`), the mix's (`0x8939bd90…`), the TVA's (`0x893a67d0…`).
+   9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
+      Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
+      event 0x200.
+   10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
+       mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
+       with `xt_vc2tone` playing rom.4's whole tone.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:
