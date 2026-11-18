@@ -49,6 +49,11 @@
 # xt_vc2cosm's fifth part.  Not planted: the routines' table read about its start by a signed byte, made unsigned (an
 # index past the table's 256, read out of bounds rather than a difference), and the floats' guard (no variant the check
 # draws reaches it; a converter's never does).
+# v250: the COSM note-on frame in vc2cosmnoteon (Vc2CosmNoteOn.cpp) and the pools in vc2cosmpools (Vc2CosmPools.cpp),
+# under xt_vc2cosm's sixth part.  Not planted, as no input tells them apart or the check can't reach it: the start
+# values' and the new block's switch limits (no row has a code they part), the allocator's last buffered code (18 has
+# start values, so it isn't drawn), the code byte read signed or not (both give no slot past 127), a full pool (24 slots,
+# one for each of the 24 tones: with none free rom.4 clears where its stack's words point).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -825,3 +830,47 @@ tables-obj-mono|kMonoRoutines = 0x8993fb50,|kMonoRoutines = 0x8993fb54,|vc2cosmt
 tables-obj-stereo|kStereoRoutines = 0x8993fba4,|kStereoRoutines = 0x8993fba0,|vc2cosmtables
 tables-obj-factors|kObjectFactors = 0x895423b4;|kObjectFactors = 0x895423b8;|vc2cosmtables
 tables-obj-signed|table + 4 * (uint32_t)i);|table + 4 * (uint32_t)(i + 1));|vc2cosmtables
+pools-base0|{ 0x89e4b084, 0x89e979a4,|{ 0x89e4b088, 0x89e979a4,|vc2cosmpools
+pools-base1-last|0x8a016744, 0x8a063064 }|0x8a016744, 0x8a063068 }|vc2cosmpools
+pools-step|kSlotStep = 0x330c;|kSlotStep = 0x3308;|vc2cosmpools
+pools-delete-bit|kDeletes = 1;|kDeletes = 2;|vc2cosmpools
+pools-after0|w.after[0] = t.poolFloats[1];|w.after[0] = t.poolFloats[2];|vc2cosmpools
+pools-before|w.before = t.poolFloats[0];|w.before = t.poolFloats[1];|vc2cosmpools
+pools-init-free|            s.inUse = 0;\n||vc2cosmpools
+pools-take-test|if (s.inUse != 0) continue;|if (s.inUse == 0) continue;|vc2cosmpools
+pools-take-mark|        s.inUse = 1;\n||vc2cosmpools
+pools-release|w.pools[pool][(size_t)slot].inUse = 0;|w.pools[pool][(size_t)slot].inUse = 1;|vc2cosmpools
+destroy-vtable|    o.vtable = vc2CosmVtable();\n||vc2cosmpools
+destroy-pool|o.pool < Vc2CosmPoolWords::kPools) pools.release|o.pool < 1) pools.release|vc2cosmpools
+destroy-slot|if (o.slot != -1 &&|if (o.slot > 0 &&|vc2cosmpools
+note-position|kPosition = 3266;|kPosition = 3267;|vc2cosmnoteon
+note-last-code|kLastCode = 20;|kLastCode = 4;|vc2cosmnoteon
+note-first-buffered|kFirstBuffered = 7;|kFirstBuffered = 6;|vc2cosmnoteon
+note-unbuffered-from|kUnbufferedFrom = 4,|kUnbufferedFrom = 3,|vc2cosmnoteon
+note-unbuffered-to|kUnbufferedTo = 7;|kUnbufferedTo = 8;|vc2cosmnoteon
+note-level|kLevel = 0x4c,|kLevel = 0x48,|vc2cosmnoteon
+note-rate|kRate = 0x54,|kRate = 0x50,|vc2cosmnoteon
+note-lfo-level|kLfoLevel = 0x38;|kLfoLevel = 0x3c;|vc2cosmnoteon
+note-rate-scale|kRateScale = 4.0f;|kRateScale = 2.0f;|vc2cosmnoteon
+note-clear|    std::ranges::fill(o.cleared, 0.0f);\n||vc2cosmnoteon
+note-clear-0f4|    std::ranges::fill(o.cleared0f4, 0.0f);\n||vc2cosmnoteon
+note-pool|    o.pool = pool;\n||vc2cosmnoteon
+note-code|    o.code = b.code;\n||vc2cosmnoteon
+note-dsp-code|o.dspCode = static_cast<uint8_t>(b.code);|o.dspCode = static_cast<uint8_t>(b.code >> 8);|vc2cosmnoteon
+note-rates-b|o.rates[1] = xtf::mul(bound_.word(o.bindings[1] + kRate)|o.rates[1] = xtf::mul(bound_.word(o.bindings[0] + kRate)|vc2cosmnoteon
+note-held-b|o.held[1] = bound_.word(o.bindings[1] + kLevel);|o.held[1] = bound_.word(o.bindings[0] + kLevel);|vc2cosmnoteon
+note-held-lfo-a|o.held[2] = bound_.word(o.bindings[2] + kLfoLevel);|o.held[2] = bound_.word(o.bindings[3] + kLfoLevel);|vc2cosmnoteon
+note-held-lfo-b|o.held[3] = bound_.word(o.bindings[3] + kLfoLevel);|o.held[3] = bound_.word(o.bindings[3] + kLevel);|vc2cosmnoteon
+alloc-slot-reset|    o.slot = -1;\n    if (o.pool|    if (o.pool|vc2cosmnoteon
+alloc-pool-test|if (o.pool >= Vc2CosmPoolWords::kPools) return;|if (o.pool >= 1) return;|vc2cosmnoteon
+alloc-zero|        o.buffers[0] = 0;\n||vc2cosmnoteon
+alloc-clear|std::ranges::fill(pools_.buffer(o.pool, o.slot, b), 0.0f);|std::ranges::fill(pools_.buffer(o.pool, o.slot, b), 1.0f);|vc2cosmnoteon
+alloc-clear-count|for (int b = 0; b < static_cast<int>(buffers.size()); ++b)|for (int b = 0; b < 3; ++b)|vc2cosmnoteon
+alloc-buffers|    o.buffers = buffers;\n||vc2cosmnoteon
+speaker-byte|o.variant = static_cast<uint8_t>(b.words[0]);|o.variant = static_cast<uint8_t>(b.words[0] >> 8);|vc2cosmnoteon
+row-speaker|{ 5, nullptr, speakerNewBlock, nullptr }|{ 5, nullptr, nullptr, nullptr }|vc2cosmnoteon
+row-growl-block|growlNewBlock, growlNoteOn }|nullptr, growlNoteOn }|vc2cosmnoteon
+row-growl-case|growlNewBlock, growlNoteOn }|growlNewBlock, nullptr }|vc2cosmnoteon
+newblock-code|if (o.code != b.code \|\| static_cast<uint32_t>(o.code) > kLastCode) return;|if (static_cast<uint32_t>(o.code) > kLastCode) return;|vc2cosmnoteon
+growl-back|    std::memcpy(&o, &n.growl.w, sizeof o);\n||vc2cosmnoteon
+growl-block-copy|std::memcpy(&gb, &b, sizeof gb);|std::memcpy(&gb, &b, 4);|vc2cosmnoteon

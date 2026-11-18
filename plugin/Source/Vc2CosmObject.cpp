@@ -40,6 +40,8 @@ void vc2CosmConstruct(Vc2CosmObjectWords& o) {
     o.factor = 0.0f;
 }
 
+uint32_t vc2CosmVtable() { return kVtable; }
+
 void vc2CosmSetUp(Vc2CosmObjectWords& o, const Vc2CosmSetUpWords& s, uint32_t flag) {
     o.setUp = s;
     o.setUp.flag = flag != 0 ? 1 : 0;

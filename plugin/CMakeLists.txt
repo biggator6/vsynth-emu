@@ -226,6 +226,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2MatrixSources.cpp
     Source/Vc2MatrixSetup.cpp
     Source/Vc2CosmObject.cpp
+    Source/Vc2CosmPools.cpp
+    Source/Vc2CosmNoteOn.cpp
     Source/XtBuildId.cpp
 )
 

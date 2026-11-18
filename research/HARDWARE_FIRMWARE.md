@@ -1546,6 +1546,75 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM note-on frame (2026-11-17, v250) {#vc2-cosm-note-on}
+
+Step 4.2's COSM object in the tone, its second part (research/VC2_MODE_PLAN.md). The VC-2 session chose (A), adapters over XtCosm (2026-11-17), as the plan's "XtCosm stays as it is" had it. Ported bit for bit: the note-on's frame, the new block's frame and the buffer pools (Vc2CosmNoteOn.cpp, Vc2CosmPools.cpp), with the three types whose note-on needs no XtCosm adapter. Every address is rom.4's, every offset the object's.
+
+**rom.4's per-type code is rom.2's.** Each type's new-block routine matches rom.2's opcode for opcode, with PC-relative fields masked:
+
+| Type, code | rom.2 | rom.4 | Opcodes equal |
+|---|---|---|---|
+| Wave Shaper, 3 | `0x894ecee0` | `0x893a9050` | 124 of 124 |
+| Resonator, 6 | `0x894ed0a0` | `0x893a9210` | 112 of 112 |
+| Side Band Filters, 7 and 8 | `0x894ed1a0`, `0x894ed2a0` | `0x893a9310`, `0x893a9410` | 123, 113 of the same |
+| Dual Filter, 12 | `0x894ed5d0` | `0x893a9740` | 187 of 187 |
+| TVF, 13 | `0x894ed8f0` | `0x893a9a60` | 142 of 142 |
+| Frequency Shifter, 18 | `0x894edc80` | `0x893a9df0` | 108 of 108 |
+| Lo-Fi, 19 | `0x894edd60` | `0x893a9ed0` | 142 of 142 |
+| TB Filter, 20 | `0x894fc110` | `0x893b9530` | 461 of 466 |
+
+The TB Filter's five are literal-pool words, not instructions: four .bss addresses of its shared state (rom.2's `0x89fe4e64`… against rom.4's `0x899d87e0`…) and a helper's address (`0x894ec090` against `0x893a8340`). That's relocation only, so the type is rom.2's and its adapter holds. So each type comes in as an adapter: rom.4's object words into XtCosm's class and back around its routines, a word XtCosm doesn't hold carried as rom.4's. The note-on's start values `0x893a85f0`, its allocator and inline cases, the new blocks, the update's inline cases and the DSPs are all per type.
+
+**The note-on** `0x893aa0e0(obj, block, pool)`, in order:
+1. +0x140 the pool (0 for COSM 1, 1 for COSM 2); the block's code into +0x10.
+2. D's floats cleared: +0x74…+0xe0 and +0xf4, +0xf8 (30 words).
+3. +0x5c 3266, the lines' place; the code's byte into +0x58.
+4. **The allocator** `0x893a8c50`: +0x144 −1. Nothing more for a pool past 1. On the code's byte − 7 (signed), codes 7…10 and 15…18 take the pool's first free slot (`0x893a8560`): +0x144 its index, +0x60…+0x6c its four buffers' addresses, each buffer's 3,267 floats cleared. Any other code puts +0x60 at 0.
+5. **The start values** `0x893a85f0(obj, block, D, obj; the four bindings on the stack)`, a switch on the code's byte − 1 to 19. Codes 5, 10, 11, 15 and 16 have no case; the Growl's is `0x893b9d20`, an `rts`; the rest are the types' own.
+6. The bound objects held: envelopes A and B's +0x54 × 4 into +0x11c and +0x120, their +0x4c into +0x104 and +0x108, LFOs A and B's +0x38 into +0x10c and +0x110.
+7. The new block, then a switch on +0x10 (to 20) to each code's own case.
+   - Inline cases: codes 1–4, 7, 8, 12, 14–16 and 18.
+   - Calls: 20, the TB Filter's `0x893b9140`; 9, the Growl's `0x893b9d30`.
+   - None: 0, 5, 6, 10, 11, 13, 17 and 19.
+
+**The new block** `0x893aa5d0(obj, block)`: nothing unless the block's code is the object's and ≤ 20; then the code's routine on block + 4 (`0x893a8e50`… as above; the Speaker Simulator's inline, its byte +4 into +0x14; the Growl's `0x893b9dc0`).
+
+**The pools**, 0x89999290…0x8999965b (`Vc2CosmPoolWords`):
+- Layout: a float, pool 0 at `0x89999294`, pool 1 at `0x89999474`, two floats. Each pool is 24 slots of an in-use word and four buffer addresses.
+- Set-up: the static initializer `0x893ab550` writes the three floats (`0x893ab598`'s, `0x893ab588`'s, `0x893ab590`'s: 0.009375, 100.227, 0.019955), then `0x893a8480` on each pool. That frees every slot and gives slot i its buffers at the pool's four bases + i × 0x330c: pool 0 from `0x89e4b084`, `0x89e979a4`, `0x89ee42c4`, `0x89f30be4`; pool 1 from `0x89f7d504`, `0x89fc9e24`, `0x8a016744`, `0x8a063064`.
+- A fresh interpreter runs no static initializer, so the check calls it.
+- 24 slots is one for each of the 24 tones, so a pool never runs out. With none free, rom.4 would clear where its stack's words point.
+- **The destructor** `0x893aa060(obj, flags)`: the vtable, then the object's slot freed (its pool ≤ 1, its slot not −1), and operator delete (`0x89506438`) with flag bit 0.
+- The port keeps rom.4's addresses in the slots' words and its own floats beside them (`Vc2CosmPools::buffer`).
+
+**The types now:**
+- **Through (0):** nothing.
+- **Speaker Simulator (5):** its new block's byte.
+- **Growl (9):** its start values (an `rts`), its new block and its case, v234's `Vc2CosmGrowl` on the object's words (the same bytes, its view copied in and out). It takes a slot.
+
+`Vc2CosmTypeRow` holds each type's parts. A code with no row does the frame alone; the types XtCosm ports come in as rows of adapters, a few a version.
+
+**The check**, xt_vc2cosm's sixth part (Vc2CosmNoteOnCheck.cpp, its draws in Vc2CosmNoteOnDraws.cpp):
+- Set-up: the pools at their own address, set up by rom.4's static initializer at each case's start. The object, its block and the four bound objects are in RAM; the port's `Vc2CosmBound` reads that memory too. Only operator delete is hooked.
+- The note-on:
+  - Codes: 0, 5 and 9, or codes past 20 whose byte the switches pass (0, 5, 9, 10, 11, 15, 16, 21 and up, with high bits).
+  - The block: the Growl's as its converter gives it.
+  - The pool: 0 or 1, now and then past.
+  - The slot it will take is given noise first on both sides, so the clears show.
+- The other events: a new block alone (its code the object's three times in four), the destructor (flag 0 or 1), the pools' set-up, or the object and bound words drawn again.
+- After each: the object, the pools, the slot's four buffers and the deletes, word for word.
+
+Results:
+- seed 2024, 40 cases: 2,400 events, 926 note-ons (256 taking a slot), 586 new blocks, 297 destroys, 300 pool set-ups; 0 different at the first run. The other five parts are as they were.
+- seeds 7 and 31337, 400 cases each: 24,000 events each (9,084 and 8,955 note-ons); 0 different.
+- Coverage, llvm-cov on fcheck's 40 cases: every line of Vc2CosmNoteOn.cpp and Vc2CosmPools.cpp but a full pool's (the take's −1, the allocator's return with no slot).
+- `mutate_vc2.py --cosm`: 820 plants, all caught at the first run. 44 are new:
+  - 13 on the pools: the bases, the step, the init's floats and free words, a take's test and mark, the release, the destructor's vtable, pool and slot tests, the delete bit.
+  - 31 on the note-on: the position, the clears, the pool and code words, the byte, the bound words and the rate scale, the allocator's reset, pool test, buffered ranges, zero, copy and clears, the Speaker's byte, each row's parts, the new block's code test, the Growl's view and block copy.
+  - Not planted: switch limits no row parts, the allocator's last buffered code (18 isn't drawn), the byte's sign (no slot either way past 127), a full pool. vc2cosm_muts.txt says why.
+- The loader plants, as Vc2CosmTables.cpp changed: `mutate_panel.py rom4-no-cosm rom4-no-tables`, 2 of 2 caught.
+- fcheck's diff is xt_vc2cosm's new `note-on:` line. verify.sh passes every line.
+
 ### The VC-2's COSM object's frame (2026-11-17, v249) {#vc2-cosm-object-frame}
 
 Step 4.2's COSM object in the tone, its first part (research/VC2_MODE_PLAN.md; the VC-2 session's message, 2026-11-17). rom.4's COSM object is rom.2's: the same routines in the same order, the Growl at code 9 in the Comb's place. Split by what rom.4 holds, as XtCosm splits rom.2's by type: this version the frame that every type shares, ported bit for bit in Vc2CosmObject.cpp; the note-on and new block (v250), then the update and the DSP. Every address is rom.4's, every offset the object's (D = object + 0x58, as rom.2's).

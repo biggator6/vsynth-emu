@@ -111,10 +111,8 @@ void ObjectRig::start(std::mt19937& rng) {
     drawInstallWords(o, rng);
 }
 
-std::string ObjectRig::event(std::mt19937& rng) {
-    ++n.events;
-    return kObjectEvents[rng() % kObjectEvents.size()](*this, rng);
-}
+// one-off: each part's own event table, through vc2CosmEvent
+std::string ObjectRig::event(std::mt19937& rng) { return vc2CosmEvent(*this, kObjectEvents, rng); }
 
 // one-off: each part's own report line, in fcheck's baseline in its own words; one printer would rewrite the earlier
 // parts' lines

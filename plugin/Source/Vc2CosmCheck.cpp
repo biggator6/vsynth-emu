@@ -235,7 +235,8 @@ int main(int argc, char** argv) {
     const long matrix = vc2MatrixCases(fw, *run);     // the third part (v243, Vc2MatrixCheck.cpp)
     const long setup = vc2MatrixSetupCases(fw, *run);   // the fourth part (v247, Vc2MatrixSetupCheck.cpp)
     const long object = vc2CosmObjectCases(fw, *run);   // the fifth part (v249, Vc2CosmObjectCheck.cpp)
-    std::printf("xt_vc2cosm: %ld different\n", tally.different + frame + matrix + setup + object);
+    const long noteOn = vc2CosmNoteOnCases(fw, *run);   // the sixth part (v250, Vc2CosmNoteOnCheck.cpp)
+    std::printf("xt_vc2cosm: %ld different\n", tally.different + frame + matrix + setup + object + noteOn);
     return 0;
 }
 #endif

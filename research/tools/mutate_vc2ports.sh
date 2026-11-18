@@ -52,7 +52,8 @@ VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
          Vc2CosmFrameCheck Vc2CosmConverters Vc2CosmFrameDraws Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive
          Vc2CosmBalanced Vc2CosmSideBand Vc2MatrixCheck Vc2MatrixSources Vc2MatrixSetup Vc2MatrixSetupCheck
-         Vc2MatrixSetupDraws Vc2CosmObject Vc2CosmObjectCheck)
+         Vc2MatrixSetupDraws Vc2CosmObject Vc2CosmObjectCheck Vc2CosmPools Vc2CosmNoteOn Vc2CosmNoteOnCheck
+         Vc2CosmNoteOnDraws)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -118,6 +119,8 @@ VC2PORTS=(
     "vc2matrixsources|Vc2MatrixSources.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2matrixsetup|Vc2MatrixSetup.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmobject|Vc2CosmObject.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2cosmpools|Vc2CosmPools.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2cosmnoteon|Vc2CosmNoteOn.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmfilters|Vc2CosmFilters.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmdynamics|Vc2CosmDynamics.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmtypes|Vc2CosmConverters.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
