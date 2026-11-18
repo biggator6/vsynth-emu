@@ -23,3 +23,10 @@ void Vc2CosmAdapter::copyBlock(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b
     std::memcpy(reinterpret_cast<uint8_t*>(&o) + offsetof(Vc2CosmObjectWords, code) + from,
                 reinterpret_cast<const uint8_t*>(&b) + from, bytes);
 }
+
+Vc2CosmBlockWords Vc2CosmAdapter::blockIn(const Vc2CosmObjectWords& o) {
+    Vc2CosmBlockWords b {};
+    b.code = static_cast<int8_t>(o.dspCode);
+    std::memcpy(b.words, reinterpret_cast<const uint8_t*>(&o) + offsetof(Vc2CosmObjectWords, variant), sizeof b.words);
+    return b;
+}

@@ -28,12 +28,13 @@ class Vc2CosmNoteOn;
 struct Vc2CosmBufferedScratch;
 
 // A type's parts the frame calls, any of them none: its start values (0x893a85f0's case), new block (0x893aa5d0's),
-// and its own case of the note-on, which has the block as rom.4's has (v258)
+// its own case of the note-on, which has the block as rom.4's has (v258), and its case of the update (v262)
 struct Vc2CosmTypeRow {
     int32_t code;
     void (*startValues)(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
     void (*newBlock)(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
     void (*noteOnCase)(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
+    void (*update)(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o);
 };
 
 class Vc2CosmNoteOn {
@@ -44,6 +45,8 @@ public:
     void noteOn(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b, uint32_t pool);
     // 0x893aa5d0: a new block, when its code is the object's
     void newBlock(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
+    // 0x893aa7d0 (v262): the bound levels and rates held again, the pitch, then the code's byte's case
+    void update(Vc2CosmObjectWords& o, float pitch);
     // A type's row, or none: the frame's own, then the adapters' (v252, Vc2CosmAdapters)
     static const Vc2CosmTypeRow* rowOf(int32_t code);
     // What the types' start values read beyond the object (v252)

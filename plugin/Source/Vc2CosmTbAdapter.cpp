@@ -48,16 +48,27 @@ void lpfAndHpf(float (&lpf)[4], float (&hpf)[3], const float* seven) {
     std::copy_n(seven, 4, lpf);
     std::copy_n(seven + 4, 3, hpf);
 }
-} // namespace
 
-// The new block (rom.2's 0x894fc110): the block's +4…+0x43 into the object's, rom.4's own, then XtCosmTb's targets on
-// the held levels (slot 1 the LPF's, slot 2 the HPF's) into theirs
-void vc2CosmTbNewBlock(Vc2CosmNoteOn&, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {
-    auto w = std::bit_cast<Vc2CosmTbWords>(o);
-    std::copy_n(b.words, w.block.size(), w.block.begin());
+// XtCosmTb's targets from the block the object holds and the held levels (slot 1 the LPF's, slot 2 the HPF's)
+void tbTargets(Vc2CosmTbWords& w) {
     XtCosmTb tb;
     tb.setBlock(tbBlockOf(w.block), w.held[0], w.held[2], w.held[1], w.held[3]);
     lpfAndHpf(w.lpfTarget, w.hpfTarget, tb.target());
+}
+} // namespace
+
+// The new block (rom.2's 0x894fc110): the block's +4…+0x43 into the object's, rom.4's own, then XtCosmTb's targets
+void vc2CosmTbNewBlock(Vc2CosmNoteOn&, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {
+    auto w = std::bit_cast<Vc2CosmTbWords>(o);
+    std::copy_n(b.words, w.block.size(), w.block.begin());
+    tbTargets(w);
+    o = std::bit_cast<Vc2CosmObjectWords>(w);
+}
+
+// The update's case (rom.2's 0x894fbdc0): XtCosmTb's targets again, on the levels the frame has just held
+void vc2CosmTbUpdate(Vc2CosmNoteOn&, Vc2CosmObjectWords& o) {
+    auto w = std::bit_cast<Vc2CosmTbWords>(o);
+    tbTargets(w);
     o = std::bit_cast<Vc2CosmObjectWords>(w);
 }
 

@@ -335,6 +335,12 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM update v262 (2026-11-18, on its own branch after v260; HARDWARE_FIRMWARE.md, "The VC-2's COSM update").
+  Vc2CosmNoteOn::update (0x893aa7d0): the bound levels and rates held, the pitch, each code's case a row's fifth part, by
+  XtCosm's own update laws on the block the object holds (Vc2CosmAdapter::blockIn); the Side Band Filters' two sums on the
+  object's words. Vc2CosmAdapterBlocks: the block readers, moved as they stood. XtCosm unchanged. 0 different at seeds
+  2024, 7 and 31337. mutate_vc2.py --cosm: 1,273 plants (46 new), all caught. Not in the sound yet.
+
 The VC-2's COSM adapters for the Side Band Filters v260 (2026-11-17, on its own branch after v258; the VC-2 session's
   conditions; HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Side Band Filters"). XtCosmSbf moved out of XtCosm.h as
   it stood into XtCosmSbf.h, as its own step, then five const getters for the words the new blocks and note-on cases

@@ -796,7 +796,7 @@ frame: 40 cases, 2400 events: 132 type 1, 122 type 2, 135 type 3, 133 type 5, 14
 matrix: 40 cases, 2400 events: 616 refreshes (160 setting the dirty bits), 581 reads, 379 sums, 410 choices, 414 draws
 setup: 40 cases, 2400 events: 490 records (194 held), 143 assignments, 283 settings, 294 inits, 152 levels, 159 heads, 139 destinations, 300 depths, 480 draws; 29583 parameter reads
 object: 40 cases, 2400 events: 321 constructs, 308 set-ups, 313 bindings, 1204 installs (815 stereo), 254 draws
-note-on: 40 cases, 2400 events: 868 note-ons (245 taking a slot, 566 adapted), 618 new blocks (235 adapted), 304 destroys, 308 pool set-ups, 302 draws
+note-on: 40 cases, 2400 events: 1179 note-ons (350 taking a slot, 838 adapted), 514 new blocks (231 adapted), 462 updates, 235 destroys, 235 pool set-ups, 237 draws
 xt_vc2cosm: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks

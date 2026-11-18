@@ -15,6 +15,8 @@ void vc2WriteNoteOnState(Sh4& cpu, const Vc2CosmObjectWords& o, const Vc2CosmBlo
 // v252) or one the switches pass (past 20, its byte a type's with no start values or none), its words as that type's
 // converter gives them
 void vc2DrawNoteOnBlock(Vc2CosmBlockWords& b, std::mt19937& rng);
+// A block of a code the port has a type for, as its converter gives it, for an update to follow (v262)
+void vc2DrawPortedBlock(Vc2CosmBlockWords& b, std::mt19937& rng);
 // The block's words as its code's converter gives them, when the port draws its type, for a code given
 // after (v253: rom.4's Lo-Fi indexes its tables by a byte its converter keeps in range)
 void vc2DrawTypeWords(Vc2CosmBlockWords& b, std::mt19937& rng);

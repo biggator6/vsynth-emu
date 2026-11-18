@@ -1546,6 +1546,37 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM update (2026-11-18, v262) {#vc2-cosm-update}
+
+Step 4.2's COSM object, its ninth part (research/VC2_MODE_PLAN.md): the update `0x893aa7d0(obj, pitch in fr4)`, which runs every 10 ms on a sounding COSM. Every address is rom.4's, every offset the object's or its block's.
+
+**The frame:**
+1. The bound levels held again, as at the note-on: envelopes A and B's +0x4c into +0x104 and +0x108, LFOs A and B's +0x38 into +0x10c and +0x110, the envelopes' +0x54 × 4 into +0x11c and +0x120.
+2. The pitch into +0.
+3. A switch on the code's byte − 1, up to 19, to each type's case. Codes 5, 11, 15 and 16 have none, and neither has code 0, which the switch passes over.
+
+**The cases** read the block the object holds and write the targets +0xfc and +0x100:
+- OD/Dist (`0x893aa8bc`, `0x893aa940`), the Wave Shaper (`0x893aa9d0`), the Amp (`0x893aaa50`), the Resonator (`0x893aaa90`), the Dual Filter (`0x893aac20`), the TVF (`0x893aad30`), the Dynamic TVF (`0x893aade0`), the Frequency Shifter (`0x893aaea0`) and Lo-Fi (`0x893aaf40`) are their XtCosm classes' `update`. OD/Dist's Tone floor is 0.1 here, where its new block's is 0.
+- The Side Band Filters (`0x893aab00`, `0x893aab50`): two sums on the object's words. XtCosmSbf's update has the same sums, but the object holds 1 − Detune/2400 where the block held Detune, and no block given to XtCosmSbf can produce that ratio exactly. So the adapter forms the sums itself on the words rom.4 reads.
+- The Growl: `0x893b9d40`, v234's `Vc2CosmGrowl::update`. The TB Filter: `0x893b91e0`, XtCosmTb's targets into their places.
+- Codes 10 and 17 have cases but no converter in rom.4, so the port has no row for them.
+
+**The port:**
+- `Vc2CosmNoteOn::update`, and a fifth part in each `Vc2CosmTypeRow`.
+- `Vc2CosmAdapter::blockIn` gives the block the object holds, under the code's byte, so each type's reader serves its update too.
+- The block readers moved as they stood from Vc2CosmAdapters.cpp, at its line limit, into Vc2CosmAdapterBlocks.cpp.
+
+**The check**, xt_vc2cosm's sixth part: an update event is a note-on of a type the port has, new bound levels and rates, then rom.4's update with a drawn pitch in fr4 against the port's, the object and the pools compared after each.
+
+Results:
+- seed 2024, 40 cases: 462 updates among 1,179 note-ons; 0 different on the first run, with the address and undefined-behaviour sanitizers on. The other five parts are as they were.
+- seeds 7 and 31337, 400 cases each: 4,785 and 4,807 updates; 0 different.
+- Coverage: every line, region and function of the adapter files. Vc2CosmNoteOn.cpp's one region left is a full pool's, as at v250.
+- `mutate_vc2.py --cosm`: 1,273 plants, all caught. 46 are new: the frame, `blockIn`, each row's update, the levels each case takes, the Side Band Filters' sums, the TB's and the Shifter's cases, OD/Dist's Tone floor. 90 more follow the moved readers and the rows' new field.
+- Not planted, as no input tells them apart: the code's byte read from the object's code (an update follows a note-on, which sets both), the block's last word left out of `blockIn` (no update reads it).
+- XtCosm is unchanged. fcheck's diff is xt_vc2cosm's `note-on:` line.
+- verify.sh passes every line but its last build-id check, in both runs: other checkouts' builds replaced the installed AU and VST3 while it ran. `buildid.sh`, run straight after this checkout's own build, passes.
+
 ### The VC-2's COSM adapters: the Side Band Filters (2026-11-17, v260) {#vc2-cosm-adapters-sbf}
 
 Step 4.2's COSM object, its eighth part (research/VC2_MODE_PLAN.md). With these two, every code a converter gives has its start values, new block and note-on case. Codes 10, 11 and 17 have no converter in rom.4. Every address is rom.4's, every offset the object's or its block's.

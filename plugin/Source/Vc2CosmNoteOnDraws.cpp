@@ -177,11 +177,13 @@ constexpr std::array<Vc2CosmBlockDraw, 16> kBlockDraws { { { kOd, drawOdBlock },
                                                            { kLofi, drawLofiBlock },
                                                            { kTb, drawTbBlock } } };
 
+// The codes the port has a type for
+constexpr std::array<int32_t, 18> kPorted { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, kSbf1, kSbf2,
+                                            Vc2CosmGrowl::kCode, kDual, kTvf, kDtvf, kComp, kLim, kFs, kLofi, kTb };
+
 // A code the port has a type for, or one past 20 whose byte the switches pass
 int32_t drawCode(std::mt19937& rng) {
-    const std::array<int32_t, 18> ported { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, kSbf1, kSbf2,
-                                           Vc2CosmGrowl::kCode, kDual, kTvf, kDtvf, kComp, kLim, kFs, kLofi, kTb };
-    if (rng() % 4 != 0) return ported[rng() % ported.size()];
+    if (rng() % 4 != 0) return kPorted[rng() % kPorted.size()];
     const uint8_t low = rng() % 2 ? kPassingBytes[rng() % kPassingBytes.size()] : (uint8_t)(21 + rng() % 235);
     const uint32_t high = rng() % 2 ? 0xffffff00u : (uint32_t)(1 + rng() % 0x7fff) << 8;
     return (int32_t)(high | low);
@@ -201,6 +203,12 @@ void vc2WriteNoteOnState(Sh4& cpu, const Vc2CosmObjectWords& o, const Vc2CosmBlo
 void vc2DrawNoteOnBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
     vc2CosmNoise(b, rng);
     b.code = drawCode(rng);
+    vc2DrawTypeWords(b, rng);
+}
+
+void vc2DrawPortedBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    vc2CosmNoise(b, rng);
+    b.code = kPorted[rng() % kPorted.size()];
     vc2DrawTypeWords(b, rng);
 }
 

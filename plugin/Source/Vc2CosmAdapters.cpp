@@ -1,6 +1,7 @@
 // The COSM types XtCosm ports, adapted to rom.4's object: see Vc2CosmAdapters.h (v252).  Every address is rom.4's,
 // every offset the object's or its block's.  Their access to rom.4's words in Vc2CosmAdapterWords (v255).
 #include "Vc2CosmAdapters.h"
+#include "Vc2CosmAdapterBlocks.h"
 #include "Vc2CosmAdapterWords.h"
 #include "Vc2CosmBufferedAdapters.h"
 #include "XtCosm.h"
@@ -24,40 +25,6 @@ constexpr size_t kCased = 0xe4;     // [FW] D+0x8c…+0x98, the words the note-o
 template <class V>
 void putWord(Vc2CosmObjectWords& o, size_t at, V v) {
     std::memcpy(reinterpret_cast<uint8_t*>(&o) + at, &v, sizeof v);
-}
-
-// [FW] a setting in a block: its value, its Env depth a word on and its LFO depth three (Vc2CosmMod's), or four (the
-// Dual Filter's, its Q between), which its XtCosm block names
-template <class X>
-struct Vc2CosmValueFields {
-    float X::*value;
-    float X::*env;
-    float X::*lfo;
-    int lfoAt = 3;
-};
-
-template <class X>
-void valueAt(X& x, const Vc2CosmBlockWords& b, int at, const Vc2CosmValueFields<X>& f) {
-    x.*f.value = blockFloat(b, at);
-    x.*f.env = blockFloat(b, at + 1);
-    x.*f.lfo = blockFloat(b, at + f.lfoAt);
-}
-
-// [FW] a block's two settings, at words `at` and `secondAt`, into its XtCosm block
-template <class X>
-X settingsAt(const Vc2CosmBlockWords& b, int at, int secondAt, const Vc2CosmValueFields<X>& first,
-             const Vc2CosmValueFields<X>& second) {
-    X x;
-    valueAt(x, b, at, first);
-    valueAt(x, b, secondAt, second);
-    return x;
-}
-
-// [FW] an XtCosm block with its Type, the block's byte +4
-template <class X>
-X withType(X x, const Vc2CosmBlockWords& b) {
-    x.type = static_cast<uint8_t>(b.words[0]);
-    return x;
 }
 
 // XtCosm's note-on with the same levels for the start and the output, so its values are the start values' and its
@@ -109,6 +76,25 @@ void valueNewBlock(Vc2CosmNoteOn&, Vc2CosmObjectWords& o, const Vc2CosmBlockWord
     T.rest(cosm, o, b);
 }
 
+// XtCosm's update on the held levels; a type of one value (XtCosmAmp) takes envelope A's and LFO A's alone
+template <class C>
+void xtCosmUpdate(C& cosm, const Vc2CosmStarts& s) {
+    if constexpr (requires { cosm.update(0.0f, 0.0f, 0.0f); })
+        cosm.update(s.envA, 0.0f, s.lfoA);
+    else
+        cosm.update(s.envA, 0.0f, s.lfoA, s.envB, 0.0f, s.lfoB);
+}
+
+// The type's case of the update (v262): its XtCosm class on the block the object holds, its targets into the object's
+template <const auto& T>
+void valueUpdate(Vc2CosmNoteOn&, Vc2CosmObjectWords& o) {
+    typename std::remove_cvref_t<decltype(T)>::Cosm cosm;
+    const Vc2CosmStarts held = heldOf(o);
+    xtCosmNoteOn(cosm, T.blockOf(blockIn(o)), held);
+    xtCosmUpdate(cosm, held);
+    gettersInto(o.targets, T.targets, cosm);
+}
+
 // A type's new block besides its targets: its Type's byte into +0x14 and `Bytes` of the block's words from +8 into
 // the object's, rom.4's own (the Wave Shaper's, the Amp's, the Resonator's)
 template <class C, size_t Bytes>
@@ -133,62 +119,11 @@ void copyCase(Vc2CosmNoteOn&, Vc2CosmObjectWords& o, const Vc2CosmBlockWords&) {
     for (const Vc2CosmCaseCopy& c : Copies) std::memcpy(bytes + c.to, bytes + c.from, sizeof(float));
 }
 
-// [FW] OD/Dist's block (codes 1, 2; Vc2CosmOdBlock): Drive +4 and Tone +0x18 with their depths, Output Level +0x2c;
-// DS by the code's byte
-XtOdBlock odBlockOf(const Vc2CosmBlockWords& b) {
-    XtOdBlock x = settingsAt<XtOdBlock>(b, 0, 5, { &XtOdBlock::drive, &XtOdBlock::driveEnv, &XtOdBlock::driveLfo },
-                                        { &XtOdBlock::tone, &XtOdBlock::toneEnv, &XtOdBlock::toneLfo });
-    x.level = blockFloat(b, 10);
-    x.ds = static_cast<int8_t>(b.code) == kDs;
-    return x;
-}
-
-// [FW] the Wave Shaper's block (Vc2CosmWsBlock): its Type +4, a byte, Drive +8 and Tone +0x1c with their depths,
-// Output Level +0x30
-XtWsBlock wsBlockOf(const Vc2CosmBlockWords& b) {
-    XtWsBlock x = withType(settingsAt<XtWsBlock>(b, 1, 6, { &XtWsBlock::drive, &XtWsBlock::driveEnv,
-                                                            &XtWsBlock::driveLfo },
-                                                 { &XtWsBlock::tone, &XtWsBlock::toneEnv, &XtWsBlock::toneLfo }), b);
-    x.level = blockFloat(b, 11);
-    return x;
-}
-
 // The Wave Shaper's new block besides (0x893a9050, rom.2's 0x894ecee0): its Type and the block's +8…+0x2f, and
 // XtCosmWs's Level/8, the gain its note-on takes, into +0x40
 void wsRest(const XtCosmWs& ws, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {
     typeAndWords<XtCosmWs, 0x28>(ws, o, b);
     putWord(o, kWsLevel, ws.gain());
-}
-
-// [FW] the Amp Simulator's block (Vc2CosmAmpBlock): its Amp Type +4, a byte, Gain +8 with its depths, Bass +0x1c,
-// Middle +0x20, Treble +0x24, Output Level +0x28
-XtAmpBlock ampBlockOf(const Vc2CosmBlockWords& b) {
-    XtAmpBlock x = withType(XtAmpBlock {}, b);
-    valueAt(x, b, 1, { &XtAmpBlock::gain, &XtAmpBlock::gainEnv, &XtAmpBlock::gainLfo });
-    x.bass = blockFloat(b, 6);
-    x.middle = blockFloat(b, 7);
-    x.treble = blockFloat(b, 8);
-    x.level = blockFloat(b, 9);
-    return x;
-}
-
-// [FW] the Resonator's Type +4, a byte, beside Size +8 and Balance +0x1c with their depths
-XtResBlock resBlockOf(const Vc2CosmBlockWords& b) {
-    return withType(settingsAt<XtResBlock>(b, 1, 6, { &XtResBlock::size, &XtResBlock::sizeEnv,
-                                                      &XtResBlock::sizeLfo },
-                                           { &XtResBlock::balance, &XtResBlock::balanceEnv,
-                                             &XtResBlock::balanceLfo }), b);
-}
-
-// [FW] Lo-Fi's Bit Down +4 and Rate Down +5, signed bytes, beside Filter +8 and Balance +0x1c with their depths
-XtLofiBlock lofiBlockOf(const Vc2CosmBlockWords& b) {
-    XtLofiBlock x = settingsAt<XtLofiBlock>(b, 1, 6, { &XtLofiBlock::filter, &XtLofiBlock::filterEnv,
-                                                       &XtLofiBlock::filterLfo },
-                                            { &XtLofiBlock::balance, &XtLofiBlock::balanceEnv,
-                                              &XtLofiBlock::balanceLfo });
-    x.bitDown = static_cast<int8_t>(b.words[0]);
-    x.rateDown = static_cast<int8_t>(b.words[0] >> 8);
-    return x;
 }
 
 // Lo-Fi's new block besides (0x893a9ed0, rom.2's 0x894edd60): the two bytes into +0x14, +0x15 and the block's
@@ -200,29 +135,6 @@ void lofiRest(const XtCosmLofi& lofi, Vc2CosmObjectWords& o, const Vc2CosmBlockW
     putWord(o, kLofiCoef, lofi.rateCoef());
     putWord(o, kLofiUp, lofi.upScale());
     putWord(o, kLofiDown, lofi.downScale());
-}
-
-// [FW] the Dual Filter's block (Vc2CosmDualBlock, v255): its Filter Type +4, each filter's Frequency with its Env
-// depth, Q and LFO depth from +8 and +0x20
-XtDualBlock dualBlockOf(const Vc2CosmBlockWords& b) {
-    XtDualBlock x = settingsAt<XtDualBlock>(b, 1, 7, { &XtDualBlock::cut1, &XtDualBlock::env1, &XtDualBlock::lfo1, 4 },
-                                            { &XtDualBlock::cut2, &XtDualBlock::env2, &XtDualBlock::lfo2, 4 });
-    x.q1 = blockFloat(b, 3);
-    x.q2 = blockFloat(b, 9);
-    x.mode = static_cast<int32_t>(b.words[0]);
-    return x;
-}
-
-// [FW] the TVF's and the Dynamic TVF's block (Vc2CosmTvfBlock, v255): Q +4 and Cutoff +0x1c with their depths, the
-// Own depths +0x18 and +0x30, the Filter Type +0x34; the Dynamic TVF's by the code's byte
-XtTvfBlock tvfBlockOf(const Vc2CosmBlockWords& b) {
-    XtTvfBlock x = settingsAt<XtTvfBlock>(b, 0, 6, { &XtTvfBlock::q, &XtTvfBlock::qEnv, &XtTvfBlock::qLfo },
-                                          { &XtTvfBlock::cutoff, &XtTvfBlock::cutoffEnv, &XtTvfBlock::cutoffLfo });
-    x.qOwn = blockFloat(b, 5);
-    x.cutoffOwn = blockFloat(b, 11);
-    x.mode = static_cast<int32_t>(b.words[12]);
-    x.dynamic = static_cast<int8_t>(b.code) == kDtvf;
-    return x;
 }
 
 // The TVF's new block besides (0x893a9a60, rom.2's 0x894ed8f0): the block's words +4…+0x17, +0x1c…+0x2f and the
@@ -274,21 +186,21 @@ constexpr Vc2CosmCaseCopy kDualCase[] { { 0x20, kCased + 4 }, { 0x38, kCased + 8
 constexpr Vc2CosmCaseCopy kDtvfCase[] { { 0x28, kCased + 4 }, { 0x40, kCased + 8 } };
 
 constexpr Vc2CosmTypeRow kAdapterRows[] {
-    { kOd, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase> },
-    { kDs, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase> },
-    { kWs, valueStartValues<kWsType>, valueNewBlock<kWsType>, copyCase<kWsCase> },
-    { kAmp, valueStartValues<kAmpType>, valueNewBlock<kAmpType>, copyCase<kAmpCase> },
-    { kResonator, valueStartValues<kResType>, valueNewBlock<kResType>, nullptr },
-    { kSbf1, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase },
-    { kSbf2, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase },
-    { kDual, valueStartValues<kDualType>, valueNewBlock<kDualType>, copyCase<kDualCase> },
-    { kTvf, valueStartValues<kTvfType>, valueNewBlock<kTvfType>, nullptr },
-    { kDtvf, valueStartValues<kDtvfType>, valueNewBlock<kDtvfType>, copyCase<kDtvfCase> },
-    { kLofi, valueStartValues<kLofiType>, valueNewBlock<kLofiType>, nullptr },
-    { kComp, nullptr, vc2CosmCompNewBlock, vc2CosmCompNoteOnCase },   // no start values, nor the Limiter
-    { kLim, nullptr, vc2CosmLimNewBlock, vc2CosmLimNoteOnCase },
-    { kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase },
-    { kTb, nullptr, vc2CosmTbNewBlock, vc2CosmTbNoteOnCase } };   // its start values an rts (0x893b9130)
+    { kOd, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase>, valueUpdate<kOdType> },
+    { kDs, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase>, valueUpdate<kOdType> },
+    { kWs, valueStartValues<kWsType>, valueNewBlock<kWsType>, copyCase<kWsCase>, valueUpdate<kWsType> },
+    { kAmp, valueStartValues<kAmpType>, valueNewBlock<kAmpType>, copyCase<kAmpCase>, valueUpdate<kAmpType> },
+    { kResonator, valueStartValues<kResType>, valueNewBlock<kResType>, nullptr, valueUpdate<kResType> },
+    { kSbf1, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase, vc2CosmSbfUpdate },
+    { kSbf2, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase, vc2CosmSbfUpdate },
+    { kDual, valueStartValues<kDualType>, valueNewBlock<kDualType>, copyCase<kDualCase>, valueUpdate<kDualType> },
+    { kTvf, valueStartValues<kTvfType>, valueNewBlock<kTvfType>, nullptr, valueUpdate<kTvfType> },
+    { kDtvf, valueStartValues<kDtvfType>, valueNewBlock<kDtvfType>, copyCase<kDtvfCase>, valueUpdate<kDtvfType> },
+    { kLofi, valueStartValues<kLofiType>, valueNewBlock<kLofiType>, nullptr, valueUpdate<kLofiType> },
+    { kComp, nullptr, vc2CosmCompNewBlock, vc2CosmCompNoteOnCase, nullptr },   // no start values or update, nor the Limiter
+    { kLim, nullptr, vc2CosmLimNewBlock, vc2CosmLimNoteOnCase, nullptr },
+    { kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase, vc2CosmFsUpdate },
+    { kTb, nullptr, vc2CosmTbNewBlock, vc2CosmTbNoteOnCase, vc2CosmTbUpdate } };   // its start values an rts (0x893b9130)
 } // namespace
 
 std::span<const Vc2CosmTypeRow> vc2CosmAdapterRows() { return kAdapterRows; }

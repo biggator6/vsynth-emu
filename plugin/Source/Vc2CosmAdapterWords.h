@@ -20,4 +20,6 @@ Vc2CosmStarts startsOf(Vc2CosmNoteOn& n, const Vc2CosmObjectWords& o);
 Vc2CosmStarts heldOf(const Vc2CosmObjectWords& o);
 // The block's bytes from `from` into the object's at the same place past its code (+0x10 + from)
 void copyBlock(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b, size_t from, size_t bytes);
+// The block the object holds (+0x14…), as an update reads it, under the code's byte (v262)
+Vc2CosmBlockWords blockIn(const Vc2CosmObjectWords& o);
 } // namespace Vc2CosmAdapter
