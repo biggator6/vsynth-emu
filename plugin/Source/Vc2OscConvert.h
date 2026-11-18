@@ -7,9 +7,11 @@
 // input; the block's key, cents, pitch ratio, envelope and LFO depths, level and gain.  Bit for bit: xt_vc2carrier's
 // third part against rom.4's whole converters.  HARDWARE_FIRMWARE.md, "The VC-2's OSC block converter".  Every
 // address is rom.4's.
+#include "Vc2OscConvertTables.h"
 #include "Vc2VocoderOsc.h"
 #include <array>
 #include <cstdint>
+#include <span>
 
 // A waveform's calibration, four signed bytes a row at rom.4's 0x89e371e0 + 0x1020e + 4·row, rom.2's OSC table
 // +0xc20e from its hidden system IDs 0x528… (HARDWARE_FIRMWARE.md, "The analog calibration"; the same law in both)
@@ -21,16 +23,38 @@ struct Vc2OscCalibration {
 };
 inline constexpr int kVc2OscCalibrationRows = 11;   // [FW] 0x8939c9a0's switch: rows 0…10, past 10 row 0
 
+// The analog oscillator's system words before the rows, at rom.4's 0x89e371e0 + 0x10205…, rom.2's hidden IDs
+// 0x528…0x52e in their order (v256): what the analog converter's second part reads
+struct Vc2OscAnalogSystem {
+    uint8_t sawTone = 0;        // +0x10205: LA Saw Tone
+    uint8_t squareTone = 0;     // +0x10206: LA Square Tone
+    uint8_t sawToneKf = 0;      // +0x10207: LA Saw Tone Keyfollow
+    uint8_t squareToneKf = 0;   // +0x10208: LA Square Tone Keyfollow
+    uint8_t aliasCancel = 0;    // +0x10209: Alias Cancel, the Slopes' switch
+    uint16_t sawSlope = 0;      // +0x1020a: Saw Slope
+    uint16_t squareSlope = 0;   // +0x1020c: Square Slope
+};
+
 // What the converter reads besides its input: the Matrix's groups for the OSC (its getters by the input's OSC); M's
 // bytes +0x182 and +0x183, the pitch's (2·b183 − b182)/127 octaves, rom.2's Pitch ratio's law on its M's D-Beam
-// controllers (+0x180…+0x183) at the same offsets; the pitch source's ratio (0x89394a40 on the tone generator's
-// object 0x89989748, Vc2AutoNote::ratioFor); and the calibration
+// controllers (+0x180…+0x183) at the same offsets, and +0x180 and +0x181, the Pulse Width's (v256); the pitch source's
+// ratio (0x89394a40 on the tone generator's object 0x89989748, Vc2AutoNote::ratioFor); and the calibration
 struct Vc2OscConvertIn {
     Vc2MatrixGroups sums {};
-    std::array<uint8_t, 2> beam {};   // M + 0x182, M + 0x183
+    std::array<uint8_t, 2> beam {};        // M + 0x182, M + 0x183
+    std::array<uint8_t, 2> widthBeam {};   // M + 0x180, M + 0x181
     float pitchSource = 1.0f;
     std::array<Vc2OscCalibration, kVc2OscCalibrationRows> calibration {};
+    Vc2OscAnalogSystem system {};
 };
+
+// The laws the converter's parts share (v256).  A value held to [least, most], the upper bound tested first
+int vc2OscHeld(int v, int least, int most);
+float vc2OscHeld(float v, float least, float most);
+// x ≥ 0 on a curve's lines: the first whose top it doesn't pass, x × slope + offset (FMAC, product then sum)
+float vc2OscOnLines(float x, std::span<const Vc2OscCentsLine> lines);
+// A depth −63…+63 as the converters square it: (d/63)·|d/63|
+float vc2OscDepthSquared(int depth, const Vc2OscConvertTables& t);
 
 // The block's words the part writes (the block the voice + 0x54, rom.4's layout from +0); `wordNN` a word it leaves
 struct Vc2OscBlockHead {

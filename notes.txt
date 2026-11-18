@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's analog converter's second part v256 (2026-11-17, on vc2-mode after the merge of v252 and v253, 5766f4d; the
+  user's "Start v256"; HARDWARE_FIRMWARE.md, "The VC-2's analog converter's second part"): step 4.2's OSC voice. rom.4's
+  0x8939cf70 from its waveform switch to its end writes the block's +0xb0…+0xf3, rom.2's analog block's words 0x30 up:
+  vc2OscAnalogConvert (Vc2OscAnalogConvert.cpp): the waveform's code, Fat 0…1 or, with Sub Octave on, the second wave's
+  pitch by the Detune curve (0x8939c6e0), their depths, the Pulse Width wrapped into 0…126 (0x8939c5e0), Impact, the
+  Slope (0x8939cae0), the Sub Level, LA's Tone and KF. The analog's system words (rom.2's hidden IDs 0x528…0x52e at
+  +0x10205) and M's +0x180/+0x181 join the converter's input. xt_vc2carrier's third part compares the analog's block to
+  +0xf4, its new draws from a generator of their own: 0 different at seeds 2024, 7 and 31337 (2,000 and 2 × 20,000
+  conversions, three in four the analog's); both converter files covered whole. mutate_vc2.py --carrier: 394 plants
+  (132 new), all caught. Not in the sound yet.
+
 The VC-2's COSM adapter for Lo-Fi v253 (2026-11-17, on its own branch after v252; the VC-2 session's choice (a);
   HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: Lo-Fi"). XtCosmLofi moved out of XtCosm.h (964 lines) as it
   stood into XtCosmLofi.h, as its own step, then four const getters for the words its new block forms (the mask,

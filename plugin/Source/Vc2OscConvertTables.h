@@ -25,14 +25,24 @@ struct Vc2OscConvertTables {
     std::array<Vc2OscCentsLine, 4> lines {};   // 0x8939c2e0…0x8939c308; the last one's top unread (0)
     float kfScale = 0;                   // 0x8939cb24: 6e6, a calibration keyfollow's step
     float levelScale = 0;                // 0x8939cb2c: 32768, the level curve's word
+    // The analog converter's second part's (v256)
+    float widthSteps = 0;                // 0x8939c814: 126, the Pulse Width's wrap
+    float detuneKeyScale = 0;            // 0x8939c820: 1/120, the Detune's keyfollow
+    float sumLeast = 0;                  // 0x8939c800: −12000, the Detune with the Matrix's sum
+    float subLowest = 0;                 // 0x8939d890: −2, Sub Octave's first step, in octaves
+    float impactScale = 0, impactPer = 0;   // 0x8939d634, 0x8939d638: 4 and 40, Impact × 4 ÷ 40
+    float slopeScale = 0;                // 0x8939cd7c: 100, a Slope's word
+    // The Detune curve's lines, cents, to 10, 15, 31, 51 and past (0x8939c824…0x8939c84c; its first line's slope and
+    // offset and the second's slope are immediates: 1, 0 and 2); the last one's top unread (0)
+    std::array<Vc2OscCentsLine, 5> detune {};
     std::array<uint8_t, 13> cents {};    // 0x89540114: the cents curve's table, 0…12
-    // 0x89541f34: the level curve, by an index −128…+127 (the calibration's Level byte is read signed: below 0 the
-    // words before it)
-    std::array<uint16_t, 256> level {};
+    // 0x89541f34: the level curve, by an index −128…+255 (the calibration's Level byte is read signed: below 0 the
+    // words before it; the Sub Level byte unsigned: past 127 the words after it)
+    std::array<uint16_t, 384> level {};
 };
 
 [[nodiscard]] bool vc2LoadOscConvert(const char* path);
 bool vc2OscConvertLoaded();
 const Vc2OscConvertTables& vc2OscConvertTables();
-// The level curve's word at an index −128…+127
+// The level curve's word at an index −128…+255
 inline uint16_t vc2OscLevelWord(const Vc2OscConvertTables& t, int index) { return t.level[(size_t)(index + 128)]; }

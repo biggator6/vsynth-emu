@@ -195,21 +195,23 @@ conv-sum-pitch|kPitch = 0, kLevel = 3|kPitch = 1, kLevel = 3|vc2oscconv
 conv-sum-level|kLevel = 3, kLfoPitch|kLevel = 2, kLfoPitch|vc2oscconv
 conv-lfo-pitch|kLfoPitch = 1, kLfoLevel|kLfoPitch = 0, kLfoLevel|vc2oscconv
 conv-lfo-level|kLfoLevel = 4;|kLfoLevel = 3;|vc2oscconv
-conv-held-no-top|    if (v > most) return most;\n|\n|vc2oscconv
+conv-held-no-top|int vc2OscHeld(int v, int least, int most) {\n    if (v > most) return most;\n|int vc2OscHeld(int v, int least, int most) {\n|vc2oscconv
+conv-held-float-no-top|float vc2OscHeld(float v, float least, float most) {\n    if (v > most) return most;\n|float vc2OscHeld(float v, float least, float most) {\n|vc2oscconv
+conv-held-float-no-floor|    return least > v ? least : v;|    return v;|vc2oscconv
 conv-keysum-no-centre|(key - kCentre) * kf; }|key * kf; }|vc2oscconv
 conv-follow-down|(keySum(key, coarse, kf) + kPerKey - 1) / kPerKey|keySum(key, coarse, kf) / kPerKey|vc2oscconv
 conv-follow-nearest|(keySum(key, coarse, kf) + kPerKey - 1) / kPerKey|(keySum(key, coarse, kf) + kPerKey / 2) / kPerKey|vc2oscconv
 conv-follow-second-key|    b.key = followedKey(key, coarse, kf);|    b.key = followedKey(u8(input, kSecondKeyAt), coarse, kf);|vc2oscconv
 conv-cents-no-a4|div(flt((int32_t)(p10 - kA4)), t.perTenth)|div(flt((int32_t)p10), t.perTenth)|vc2oscconv
-conv-cents-no-top|    if (c > t.centsMost) return t.centsMost;\n    return t.centsLeast|    return t.centsLeast|vc2oscconv
-conv-cents-no-floor|    return t.centsLeast > c ? t.centsLeast : c;|    return c;|vc2oscconv
+conv-cents-no-top|t.perTenth), t.centsLeast, t.centsMost)|t.perTenth), t.centsLeast, 1e9f)|vc2oscconv
+conv-cents-no-floor|t.perTenth), t.centsLeast, t.centsMost)|t.perTenth), -1e9f, t.centsMost)|vc2oscconv
 conv-curve-no-sign|        sign = -1;|        sign = 1;|vc2oscconv
 conv-curve-table-lt|if (!(x > t.tableTop))|if (x < t.tableTop)|vc2oscconv
-conv-curve-three-lines|while (line + 1 < t.lines.size()|while (line + 2 < t.lines.size()|vc2oscconv
+conv-curve-three-lines|while (line + 1 < lines.size()|while (line + 2 < lines.size()|vc2oscconv
 conv-curve-nearest|t.cents[(size_t)xtf::ftrc(x)]|t.cents[(size_t)xtf::ftrc(x + 0.5f)]|vc2oscconv
-conv-curve-swapped|mul(add(mul(x, t.lines[line].slope), t.lines[line].offset), flt(sign))|mul(add(mul(x, t.lines[line].offset), t.lines[line].slope), flt(sign))|vc2oscconv
+conv-curve-swapped|add(mul(x, lines[line].slope), lines[line].offset)|add(mul(x, lines[line].offset), lines[line].slope)|vc2oscconv
 conv-index-no-127|kf * k * kLevelTop / kKfDivisor|kf * k / kKfDivisor|vc2oscconv
-conv-index-not-short|heldBetween((int16_t)(follow + level), 0, kLevelTop)|heldBetween(follow + level, 0, kLevelTop)|vc2oscconv
+conv-index-not-short|vc2OscHeld((int16_t)(follow + level), 0, kLevelTop)|vc2OscHeld(follow + level, 0, kLevelTop)|vc2oscconv
 conv-row-past-10|row > kVc2OscCalibrationRows - 1 ? 0 : row|row > kVc2OscCalibrationRows - 1 ? 10 : row|vc2oscconv
 conv-bias-100|p10 - (uint32_t)(c.bias * kPerKey)|p10 - (uint32_t)(c.bias * 100)|vc2oscconv
 conv-kf-swapped|d * (uint32_t)c.upper : (0u - d) * (uint32_t)c.lower|d * (uint32_t)c.lower : (0u - d) * (uint32_t)c.upper|vc2oscconv
@@ -220,22 +222,22 @@ conv-p10-no-fine|p10 = (uint32_t)keySum(key, coarse, kf) + fine;|p10 = (uint32_t
 conv-key-p10-first-key|keySum(u8(input, kSecondKeyAt), coarse, kf)|keySum(key, coarse, kf)|vc2oscconv
 conv-key-cents-p10|    b.keyCents = centsFromA4(keyP10, t);|    b.keyCents = centsFromA4(p10, t);|vc2oscconv
 conv-pitch-sum-unscaled|div(mul(flt(in.sums.osc[kPitch]), t.depthMost), t.sumScale)|div(flt(in.sums.osc[kPitch]), t.sumScale)|vc2oscconv
-conv-pitch-top-64|    if (x > t.depthMost) {|    if (x > t.depthMost + 1.0f) {|vc2oscconv
-conv-pitch-floor-64|    } else if (t.depthLeast > x) {|    } else if (t.depthLeast - 1.0f > x) {|vc2oscconv
+conv-pitch-top-64|vc2OscHeld(x, t.depthLeast, t.depthMost)|vc2OscHeld(x, t.depthLeast, t.depthMost + 1.0f)|vc2oscconv
+conv-pitch-floor-64|vc2OscHeld(x, t.depthLeast, t.depthMost)|vc2OscHeld(x, t.depthLeast - 1.0f, t.depthMost)|vc2oscconv
 conv-beam-swapped|2 * in.beam[1] - in.beam[0]|2 * in.beam[0] - in.beam[1]|vc2oscconv
 conv-beam-single|2 * in.beam[1] - in.beam[0]|in.beam[1] - in.beam[0]|vc2oscconv
 conv-beam-cents|div(flt(beam), t.beamScale)|div(flt(beam), t.perOctave)|vc2oscconv
 conv-no-source|, octaves)), in.pitchSource);|, octaves)), 1.0f);|vc2oscconv
-conv-octaves-127|div(centsCurve(x, t), t.perOctave)|div(centsCurve(x, t), t.beamScale)|vc2oscconv
+conv-octaves-127|t.depthMost), t), t.perOctave)|t.depthMost), t), t.beamScale)|vc2oscconv
 conv-velocity-once|    velocity = mul(velocity, velocity);\n|\n|vc2oscconv
 conv-level-velocity-pitch|vc2VelocityFactor(input, shared, kLevelSensAt, kLevelCurveAt, t.velocityScale)|vc2VelocityFactor(input, shared, kPitchSensAt, kPitchCurveAt, t.velocityScale)|vc2oscconv
-conv-level-no-hold|heldBetween(in.sums.osc[kLevel] + u8(input, kLevelAt), 0, kLevelTop)|in.sums.osc[kLevel] + u8(input, kLevelAt)|vc2oscconv
+conv-level-no-hold|vc2OscHeld(in.sums.osc[kLevel] + u8(input, kLevelAt), 0, kLevelTop)|in.sums.osc[kLevel] + u8(input, kLevelAt)|vc2oscconv
 conv-level-next-word|vc2OscLevelWord(t, index)|vc2OscLevelWord(t, index + 1)|vc2oscconv
 conv-word58|    b.word58 = 0;\n|\n|vc2oscconv
 conv-word40|    b.word40 = 0;\n|\n|vc2oscconv
-conv-level-lfo-unsigned|mul(d >= 0 ? q : -q, q)|mul(q, q)|vc2oscconv
-conv-level-lfo-no-sum|heldBetween(in.sums.lfo[kLfoLevel] + s8(input, kLevelLfoAt), -kDepthMost, kDepthMost)|heldBetween(s8(input, kLevelLfoAt), -kDepthMost, kDepthMost)|vc2oscconv
-conv-pitch-lfo-no-hold|heldBetween(in.sums.lfo[kLfoPitch] + s8(input, kPitchLfoAt), -kDepthMost, kDepthMost)|in.sums.lfo[kLfoPitch] + s8(input, kPitchLfoAt)|vc2oscconv
+conv-level-lfo-unsigned|mul(depth >= 0 ? q : -q, q)|mul(q, q)|vc2oscconv
+conv-level-lfo-no-sum|vc2OscHeld(in.sums.lfo[kLfoLevel] + s8(input, kLevelLfoAt), -kDepthMost, kDepthMost)|vc2OscHeld(s8(input, kLevelLfoAt), -kDepthMost, kDepthMost)|vc2oscconv
+conv-pitch-lfo-no-hold|vc2OscHeld(in.sums.lfo[kLfoPitch] + s8(input, kPitchLfoAt), -kDepthMost, kDepthMost)|in.sums.lfo[kLfoPitch] + s8(input, kPitchLfoAt)|vc2oscconv
 conv-env-no-velocity|mul(centsCurve(flt(s8(input, kPitchEnvAt)), t), velocity)|centsCurve(flt(s8(input, kPitchEnvAt)), t)|vc2oscconv
 conv-gain-db-10|div(flt(s8(input, kWaveGainAt)), t.gainScale)|div(flt(s8(input, kWaveGainAt)), t.perTenth)|vc2oscconv
 conv-gain-no-cal|    b.gain = mul(calibrationGain(row, (uint32_t)s32(input, kPitch10At), in, t), gain);|    b.gain = gain;|vc2oscconv
@@ -274,3 +276,134 @@ convt-cents-at|kCentsAt = 0x89540114|kCentsAt = 0x89540115|vc2oscconvtables
 convt-level-at|kLevelAt = 0x89541f34|kLevelAt = 0x89541f36|vc2oscconvtables
 convt-level-before|kLevelBefore = 128|kLevelBefore = 127|vc2oscconvtables
 convt-cents-short|i < cents.size(); ++i) cents[i]|i + 1 < cents.size(); ++i) cents[i]|vc2oscconvtables
+# v256: the analog converter's second part, Vc2OscAnalogConvert.cpp (port vc2oscanaconv) and its pool words
+ana-code-past|? kCodes[wave] : kCodes[0]|? kCodes[wave] : kCodes[1]|vc2oscanaconv
+ana-code-eleventh|wave < (int)std::size(kCodes)|wave < (int)std::size(kCodes) - 1|vc2oscanaconv
+ana-code-3-4|{ 2, 3, 4, 6, 5,|{ 2, 4, 3, 6, 5,|vc2oscanaconv
+ana-code-6-5|{ 2, 3, 4, 6, 5,|{ 2, 3, 4, 5, 6,|vc2oscanaconv
+ana-code-0-1|7, 0, 1, 8, 10, 9 }|7, 1, 0, 8, 10, 9 }|vc2oscanaconv
+ana-code-10-9|7, 0, 1, 8, 10, 9 }|7, 0, 1, 8, 9, 10 }|vc2oscanaconv
+ana-slope-any-wave|wave > kSquare|wave > kLaSquare|vc2oscanaconv
+ana-slope-alias|s.aliasCancel == 0|s.aliasCancel == 1|vc2oscanaconv
+ana-slope-swapped|wave == kSaw ? s.sawSlope : s.squareSlope|wave == kSaw ? s.squareSlope : s.sawSlope|vc2oscanaconv
+ana-slope-signed|flt(wave == kSaw ? s.sawSlope : s.squareSlope)|flt((int16_t)(wave == kSaw ? s.sawSlope : s.squareSlope))|vc2oscanaconv
+ana-slope-scale|s.squareSlope), t.slopeScale)|s.squareSlope), t.widthSteps)|vc2oscanaconv
+ana-width-sum-scale|div(mul(flt(sum), t.depthMost), t.sumScale)|div(flt(sum), t.sumScale)|vc2oscanaconv
+ana-width-no-knob|t.sumScale), flt(width));|t.sumScale), 0.0f);|vc2oscanaconv
+ana-width-no-top|vc2OscHeld(x, t.depthLeast, t.depthMost)|vc2OscHeld(x, t.depthLeast, 1e9f)|vc2oscanaconv
+ana-width-no-floor|vc2OscHeld(x, t.depthLeast, t.depthMost)|vc2OscHeld(x, -1e9f, t.depthMost)|vc2oscanaconv
+ana-width-beam-whole|div(flt(in.widthBeam[0]), 2.0f)|flt(in.widthBeam[0])|vc2oscanaconv
+ana-width-beam-swapped|sub(flt(in.widthBeam[1]), halved)|sub(flt(in.widthBeam[0]), halved)|vc2oscanaconv
+ana-width-beam-depth|halved), t.depthMost), t.beamScale)|halved), t.beamScale), t.beamScale)|vc2oscanaconv
+ana-width-beam-scale|halved), t.depthMost), t.beamScale)|halved), t.depthMost), t.sumScale)|vc2oscanaconv
+ana-width-follow-steps|mul(flt(kf * k), t.widthSteps)|mul(flt(kf * k), t.depthMost)|vc2oscanaconv
+ana-width-follow-scale|t.widthSteps), t.perOctave)|t.widthSteps), t.sumScale)|vc2oscanaconv
+ana-width-no-follow|add(add(beam, add(follow, held)), t.depthMost)|add(add(beam, held), t.depthMost)|vc2oscanaconv
+ana-width-no-beam|add(add(beam, add(follow, held)), t.depthMost)|add(add(follow, held), t.depthMost)|vc2oscanaconv
+ana-width-no-centre|add(add(beam, add(follow, held)), t.depthMost)|add(beam, add(follow, held))|vc2oscanaconv
+ana-width-no-part|sub(at, flt(whole))|0.0f|vc2oscanaconv
+ana-width-below-no-wrap|whole = whole % kWidthWrap + kWidthWrap;|whole = whole % kWidthWrap;|vc2oscanaconv
+ana-width-below-plain|whole = whole % kWidthWrap + kWidthWrap;|whole = whole + kWidthWrap;|vc2oscanaconv
+ana-width-top-inclusive|whole > kWidthWrap|whole >= kWidthWrap|vc2oscanaconv
+ana-width-above-no-wrap|        whole %= kWidthWrap;\n|        whole += 0;\n|vc2oscanaconv
+ana-width-steps|add(flt(whole), part), t.widthSteps)|add(flt(whole), part), t.beamScale)|vc2oscanaconv
+ana-cents-no-sign|below ? -1.0f : 1.0f|1.0f|vc2oscanaconv
+ana-cents-no-abs|below ? -x : x|x|vc2oscanaconv
+ana-sub-key-scale|mul(flt(kf * k), t.detuneKeyScale)|flt(kf * k)|vc2oscanaconv
+ana-sub-key-octave|t.detuneKeyScale), t.perOctave)|t.detuneKeyScale), t.sumScale)|vc2oscanaconv
+ana-sub-detune-scale|mul(flt(detune), t.sumScale), t.depthMost)|mul(flt(detune), t.depthMost), t.depthMost)|vc2oscanaconv
+ana-sub-no-sum|t.depthMost), flt(sum));|t.depthMost), 0.0f);|vc2oscanaconv
+ana-sub-no-top|vc2OscHeld(x, t.sumLeast, t.sumScale)|vc2OscHeld(x, t.sumLeast, 1e9f)|vc2oscanaconv
+ana-sub-no-floor|vc2OscHeld(x, t.sumLeast, t.sumScale)|vc2OscHeld(x, -1e9f, t.sumScale)|vc2oscanaconv
+ana-sub-depth|mul(div(held, t.sumScale), t.depthMost)|div(held, t.sumScale)|vc2oscanaconv
+ana-sub-cents|div(detuneCents(depth, t), t.perOctave)|detuneCents(depth, t)|vc2oscanaconv
+ana-sub-no-follow|t.perOctave), follow), -1.0f, 1.0f)|t.perOctave), 0.0f), -1.0f, 1.0f)|vc2oscanaconv
+ana-sub-hold-top|follow), -1.0f, 1.0f)|follow), -1.0f, 2.0f)|vc2oscanaconv
+ana-sub-hold-floor|follow), -1.0f, 1.0f)|follow), -2.0f, 1.0f)|vc2oscanaconv
+ana-suboct-first|if (octave == 1)|if (octave == 3)|vc2oscanaconv
+ana-suboct-second|octave == 2 ? -1.0f : 0.0f|octave == 3 ? -1.0f : 0.0f|vc2oscanaconv
+ana-suboct-lowest|return t.subLowest;|return -1.0f;|vc2oscanaconv
+ana-suboct-rest|octave == 2 ? -1.0f : 0.0f|octave == 2 ? -1.0f : 1.0f|vc2oscanaconv
+ana-sub-on|w.subOn = 1.0f;|w.subOn = 0.0f;|vc2oscanaconv
+ana-sub-no-octaves|w.fat = add(octaves, subOctaves(u8(input, kSubOctaveAt), t));|w.fat = octaves;|vc2oscanaconv
+ana-sub-sum-group|in.sums.osc[kOscFat], s16(input, kFatKfAt), f.k, t)|in.sums.osc[kOscWidth], s16(input, kFatKfAt), f.k, t)|vc2oscanaconv
+ana-sub-kf|s16(input, kFatKfAt), f.k, t)|s16(input, kWidthKfAt), f.k, t)|vc2oscanaconv
+ana-sub-detune-byte|detunedOctaves(s8(input, kDetuneAt)|detunedOctaves(s8(input, kFatAt)|vc2oscanaconv
+ana-sub-env-velocity|t.perOctave), f.velocity)|t.perOctave), 1.0f)|vc2oscanaconv
+ana-sub-env-cents|div(detuneCents(flt(s8(input, kFatEnvAt)), t), t.perOctave)|detuneCents(flt(s8(input, kFatEnvAt)), t)|vc2oscanaconv
+ana-sub-env-byte|detuneCents(flt(s8(input, kFatEnvAt)), t)|detuneCents(flt(s8(input, kFatLfoAt)), t)|vc2oscanaconv
+ana-sub-lfo-cents|div(detuneCents(flt(f.lfo), t), t.perOctave)|detuneCents(flt(f.lfo), t)|vc2oscanaconv
+ana-fat-off|w.subOn = 0.0f;|w.subOn = 1.0f;|vc2oscanaconv
+ana-fat-sum-scale|div(flt(in.sums.osc[kOscFat]), t.sumScale)|div(flt(in.sums.osc[kOscFat]), t.beamScale)|vc2oscanaconv
+ana-fat-sum-group|div(flt(in.sums.osc[kOscFat]), t.sumScale)|div(flt(in.sums.osc[kOscWidth]), t.sumScale)|vc2oscanaconv
+ana-fat-scale|div(flt(s8(input, kFatAt)), t.beamScale)|div(flt(s8(input, kFatAt)), t.depthMost)|vc2oscanaconv
+ana-fat-unsigned|div(flt(s8(input, kFatAt)), t.beamScale)|div(flt(u8(input, kFatAt)), t.beamScale)|vc2oscanaconv
+ana-fat-hold-top|vc2OscHeld(x, 0.0f, 1.0f)|vc2OscHeld(x, 0.0f, 2.0f)|vc2oscanaconv
+ana-fat-hold-floor|vc2OscHeld(x, 0.0f, 1.0f)|vc2OscHeld(x, -1.0f, 1.0f)|vc2oscanaconv
+ana-fat-second-top|vc2OscHeld(add(follow, held), 0.0f, 1.0f)|vc2OscHeld(add(follow, held), 0.0f, 2.0f)|vc2oscanaconv
+ana-fat-second-floor|vc2OscHeld(add(follow, held), 0.0f, 1.0f)|vc2OscHeld(add(follow, held), -1.0f, 1.0f)|vc2oscanaconv
+ana-fat-follow-scale|div(flt(s16(input, kFatKfAt) * f.k), t.perOctave)|div(flt(s16(input, kFatKfAt) * f.k), t.sumScale)|vc2oscanaconv
+ana-fat-kf-byte|flt(s16(input, kFatKfAt) * f.k)|flt(s8(input, kFatKfAt) * f.k)|vc2oscanaconv
+ana-fat-env-velocity|mul(vc2OscDepthSquared(s8(input, kFatEnvAt), t), f.velocity)|vc2OscDepthSquared(s8(input, kFatEnvAt), t)|vc2oscanaconv
+ana-fat-env-byte|vc2OscDepthSquared(s8(input, kFatEnvAt), t)|vc2OscDepthSquared(s8(input, kFatLfoAt), t)|vc2oscanaconv
+ana-fat-lfo-plain|w.fatLfo = vc2OscDepthSquared(f.lfo, t);|w.fatLfo = div(flt(f.lfo), t.depthMost);|vc2oscanaconv
+ana-osc-low-bit|u8(input, kOscAt) == 0 ? 0 : 1|u8(input, kOscAt) & 1|vc2oscanaconv
+ana-key-centre|kCentre = 60, kDepthMost|kCentre = 64, kDepthMost|vc2oscanaconv
+ana-key-not-short|(int16_t)(u8(input, kKeyAt) - kCentre)|(int8_t)(u8(input, kKeyAt) - kCentre)|vc2oscanaconv
+ana-impact-scale|mul(flt(s8(input, kImpactAt)), t.impactScale)|flt(s8(input, kImpactAt))|vc2oscanaconv
+ana-impact-per|t.impactScale), t.impactPer)|t.impactScale), t.perOctave)|vc2oscanaconv
+ana-impact-unsigned|flt(s8(input, kImpactAt))|flt(u8(input, kImpactAt))|vc2oscanaconv
+ana-width-sum-group|in.sums.osc[kOscWidth], s16(input, kWidthKfAt)|in.sums.osc[kOscFat], s16(input, kWidthKfAt)|vc2oscanaconv
+ana-width-kf-byte|s16(input, kWidthKfAt), k, in, t)|s8(input, kWidthKfAt), k, in, t)|vc2oscanaconv
+ana-width-unsigned|widthOf(s8(input, kWidthAt)|widthOf(u8(input, kWidthAt)|vc2oscanaconv
+ana-width-env-word-1|kWidthEnvWords[2] = { 2, 6 }|kWidthEnvWords[2] = { 1, 6 }|vc2oscanaconv
+ana-width-env-word-2|kWidthEnvWords[2] = { 2, 6 }|kWidthEnvWords[2] = { 2, 5 }|vc2oscanaconv
+ana-fat-env-word-1|kFatEnvWords[2] = { 3, 7 }|kFatEnvWords[2] = { 2, 7 }|vc2oscanaconv
+ana-fat-env-word-2|kFatEnvWords[2] = { 3, 7 }|kFatEnvWords[2] = { 3, 6 }|vc2oscanaconv
+ana-width-velocity-sens|kWidthSensAt, kWidthCurveAt|kFatSensAt, kWidthCurveAt|vc2oscanaconv
+ana-width-velocity-curve|kWidthSensAt, kWidthCurveAt|kWidthSensAt, kFatCurveAt|vc2oscanaconv
+ana-fat-velocity-sens|kFatSensAt, kFatCurveAt|kWidthSensAt, kFatCurveAt|vc2oscanaconv
+ana-fat-velocity-curve|kFatSensAt, kFatCurveAt|kFatSensAt, kWidthCurveAt|vc2oscanaconv
+ana-width-env-velocity|mul(vc2OscDepthSquared(s8(input, kWidthEnvAt), t), widthVelocity)|vc2OscDepthSquared(s8(input, kWidthEnvAt), t)|vc2oscanaconv
+ana-word-d8|    w.wordD8 = 0;\n|\n|vc2oscanaconv
+ana-word-c4|    w.wordC4 = 0;\n|\n|vc2oscanaconv
+ana-width-lfo-no-sum|in.sums.lfo[kLfoWidth] + s8(input, kWidthLfoAt)|s8(input, kWidthLfoAt)|vc2oscanaconv
+ana-width-lfo-group|in.sums.lfo[kLfoWidth] + s8|in.sums.lfo[kLfoFat] + s8|vc2oscanaconv
+ana-width-lfo-top|s8(input, kWidthLfoAt), -kDepthMost, kDepthMost)|s8(input, kWidthLfoAt), -kDepthMost, 64)|vc2oscanaconv
+ana-width-lfo-floor|s8(input, kWidthLfoAt), -kDepthMost, kDepthMost)|s8(input, kWidthLfoAt), -64, kDepthMost)|vc2oscanaconv
+ana-fat-lfo-no-sum|in.sums.lfo[kLfoFat] + s8(input, kFatLfoAt)|s8(input, kFatLfoAt)|vc2oscanaconv
+ana-fat-lfo-group|in.sums.lfo[kLfoFat] + s8|in.sums.lfo[kLfoWidth] + s8|vc2oscanaconv
+ana-fat-lfo-top|s8(input, kFatLfoAt), -kDepthMost, kDepthMost)|s8(input, kFatLfoAt), -kDepthMost, 64)|vc2oscanaconv
+ana-fat-lfo-floor|s8(input, kFatLfoAt), -kDepthMost, kDepthMost)|s8(input, kFatLfoAt), -64, kDepthMost)|vc2oscanaconv
+ana-sub-switch|u8(input, kSubOctaveAt) != 0 ? subWords : fatWords|u8(input, kSubOctaveAt) > 1 ? subWords : fatWords|vc2oscanaconv
+ana-sub-level-signed|vc2OscLevelWord(t, u8(input, kSubLevelAt))|vc2OscLevelWord(t, s8(input, kSubLevelAt))|vc2oscanaconv
+ana-sub-level-scale|u8(input, kSubLevelAt))), t.velocityScale)|u8(input, kSubLevelAt))), t.beamScale)|vc2oscanaconv
+ana-tone-which|wave == kLaSquare|wave == kSquare|vc2oscanaconv
+ana-tone-swapped|square ? in.system.squareTone : in.system.sawTone|square ? in.system.sawTone : in.system.squareTone|vc2oscanaconv
+ana-tone-kf-swapped|square ? in.system.squareToneKf : in.system.sawToneKf|square ? in.system.sawToneKf : in.system.squareToneKf|vc2oscanaconv
+ana-tone-kf-tone|square ? in.system.squareToneKf : in.system.sawToneKf|square ? in.system.squareTone : in.system.sawTone|vc2oscanaconv
+ana-at-impact|kImpactAt = 0x29|kImpactAt = 0x2b|vc2oscanaconv
+ana-at-width-env|kWidthEnvAt = 0x2f|kWidthEnvAt = 0x2e|vc2oscanaconv
+ana-at-fat-env|kFatEnvAt = 0x39|kFatEnvAt = 0x38|vc2oscanaconv
+ana-at-sub-level|kSubLevelAt = 0x40|kSubLevelAt = 0x41|vc2oscanaconv
+convt-width-steps|{ 0x8939c814, &t.widthSteps }|{ 0x8939c810, &t.widthSteps }|vc2oscconvtables
+convt-detune-key-scale|{ 0x8939c820, &t.detuneKeyScale }|{ 0x8939c824, &t.detuneKeyScale }|vc2oscconvtables
+convt-sum-least|{ 0x8939c800, &t.sumLeast }|{ 0x8939c80c, &t.sumLeast }|vc2oscconvtables
+convt-sub-lowest|{ 0x8939d890, &t.subLowest }|{ 0x8939d634, &t.subLowest }|vc2oscconvtables
+convt-impact-scale|{ 0x8939d634, &t.impactScale }|{ 0x8939d638, &t.impactScale }|vc2oscconvtables
+convt-impact-per|{ 0x8939d638, &t.impactPer }|{ 0x8939d634, &t.impactPer }|vc2oscconvtables
+convt-slope-scale|{ 0x8939cd7c, &t.slopeScale }|{ 0x8939c810, &t.slopeScale }|vc2oscconvtables
+convt-detune0-top|{ 0x8939c824, &t.detune[0].top }|{ 0x8939c828, &t.detune[0].top }|vc2oscconvtables
+convt-detune1-top|{ 0x8939c828, &t.detune[1].top }|{ 0x8939c830, &t.detune[1].top }|vc2oscconvtables
+convt-detune1-offset|{ 0x8939c82c, &t.detune[1].offset }|{ 0x8939c834, &t.detune[1].offset }|vc2oscconvtables
+convt-detune2-top|{ 0x8939c830, &t.detune[2].top }|{ 0x8939c83c, &t.detune[2].top }|vc2oscconvtables
+convt-detune2-offset|{ 0x8939c834, &t.detune[2].offset }|{ 0x8939c82c, &t.detune[2].offset }|vc2oscconvtables
+convt-detune2-slope|{ 0x8939c838, &t.detune[2].slope }|{ 0x8939c844, &t.detune[2].slope }|vc2oscconvtables
+convt-detune3-top|{ 0x8939c83c, &t.detune[3].top }|{ 0x8939c830, &t.detune[3].top }|vc2oscconvtables
+convt-detune3-offset|{ 0x8939c840, &t.detune[3].offset }|{ 0x8939c848, &t.detune[3].offset }|vc2oscconvtables
+convt-detune3-slope|{ 0x8939c844, &t.detune[3].slope }|{ 0x8939c84c, &t.detune[3].slope }|vc2oscconvtables
+convt-detune4-offset|{ 0x8939c848, &t.detune[4].offset }|{ 0x8939c840, &t.detune[4].offset }|vc2oscconvtables
+convt-detune4-slope|{ 0x8939c84c, &t.detune[4].slope }|{ 0x8939c844, &t.detune[4].slope }|vc2oscconvtables
+convt-detune0-slope|detune[0].slope = 1.0f;|detune[0].slope = 2.0f;|vc2oscconvtables
+convt-detune1-slope|detune[1].slope = 2.0f;|detune[1].slope = 1.0f;|vc2oscconvtables
+convt-level-past-127|i < level.size(); ++i) level[i]|i < 256; ++i) level[i]|vc2oscconvtables

@@ -4,6 +4,8 @@
 // interpreter.  XT_VC2CARRIER_MAIN only.
 #include "Vc2CheckRig.h"
 
+struct Vc2OscConvertIn;
+
 constexpr uint32_t kVc2OsClock = 0x893018d0;   // [FW] the OS's millisecond word, which the check's hook answers
 
 // The second part's cases: what differs, counted (0 when nothing does); `clock` is the word the clock's hook answers
@@ -31,6 +33,19 @@ inline void vc2Put16(uint8_t* at, int v) {
     const int16_t h = (int16_t)v;
     std::memcpy(at, &h, sizeof h);
 }
+
+// A halfword in its range mostly, now and then any (v251's, here from v256)
+inline int vc2DrawHalf(std::mt19937& rng, int lo, int hi) {
+    return rng() % 8 == 0 ? (int)(int16_t)rng() : lo + (int)(rng() % (uint32_t)(hi - lo + 1));
+}
+
+// The analog converter's second part's draws (Vc2OscConvertDraws.cpp, v256): what the third part counts of them; the
+// record's analog words into an input and the world's besides; that world into rom.4's memory, M at `matrixAt`
+struct Vc2OscAnalogCounts {
+    long conversions = 0, sub = 0, slope = 0, laSquare = 0;
+};
+void vc2DrawAnalogRecord(std::mt19937& rng, uint8_t* in, Vc2OscConvertIn& world, Vc2OscAnalogCounts& n);
+void vc2WriteAnalogWorld(Vc2Fw& fw, const Vc2OscConvertIn& world, uint32_t matrixAt);
 
 // A converter's two LFO depths: their bytes in the input, and the LFO group's sums each is added to
 struct Vc2LfoEdges {

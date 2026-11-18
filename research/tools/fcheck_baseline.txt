@@ -766,6 +766,7 @@ xt_vc2vocoder: 0 different
 carrier: 40 cases, 4800 blocks (2219 growling), 389 updates (275 with the Dynamics), 409 settings, 103 with no P, 0 different
 vocoder osc: 40 cases, 1200 updates (ramps running 410, armed 395, off 395), 0 different
 osc block: 40 cases, 2000 conversions (491 the VOCODER's; Pitch KF 0 508, 100% 496; rows past 10 192), 0 different
+analog words: 1509 conversions (785 with the sub oscillator, 122 with a Slope, 118 LA-SQUARE's)
 xt_vc2carrier: 0 different
 == xt_vc2tracker
 tracker: 100 cases, 150000 blocks, 34844 up and 34874 down crossings, P moved in 3692, 31553 locked, 20930 of 122979 tone blocks on pitch, 1205 modes, 1251 holds, 38369 noisy, 0 different

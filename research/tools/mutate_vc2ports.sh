@@ -38,7 +38,7 @@ VC2HI=("${VC2HIPORTS[@]}" Vc2Unvoiced Vc2HiresoCheck Vc2HiresoRateCheck Vc2Hires
 VC2VOC=(Vc2Vocoder Vc2VocoderTables Vc2Unvoiced Vc2Consonants Vc2LegacyAnalysis Vc2Legacy Vc2LegacyTables
         "${VC2HIPORTS[@]}" Vc2VocoderCheck Vc2CheckWords)
 VC2CAR=(Vc2Carrier Vc2CarrierTables Vc2CarrierCheck Vc2VocoderOsc Vc2VocoderOscCheck Vc2Math Vc2OscConvert
-        Vc2OscConvertTables Vc2OscConvertCheck)
+        Vc2OscConvertTables Vc2OscConvertCheck Vc2OscAnalogConvert Vc2OscConvertDraws)
 VC2TRACK=(Vc2Tracker Vc2TrackerTables Vc2TrackerAnalysis Vc2TrackerEstimate Vc2TrackerCheck Vc2TrackerSignal)
 VC2K6=(Vc2Kind6 Vc2Kind6Core Vc2Kind6Tables Vc2Math Vc2Kind6Check Vc2TrackerSignal)
 VC2AN=(Vc2AutoNote Vc2AutoNoteTables Vc2AutoNoteCheck Vc2Tracker Vc2TrackerTables Vc2TrackerAnalysis Vc2TrackerEstimate
@@ -77,6 +77,7 @@ VC2PORTS=(
     "vc2vocosc|Vc2VocoderOsc.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
     "vc2oscconv|Vc2OscConvert.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
     "vc2oscconvtables|Vc2OscConvertTables.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
+    "vc2oscanaconv|Vc2OscAnalogConvert.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
     "vc2tracker|Vc2Tracker.cpp|XT_VC2TRACKER_MAIN|vc2track_obj|VC2TRACK"
     "vc2tracktables|Vc2TrackerTables.cpp|XT_VC2TRACKER_MAIN|vc2track_obj|VC2TRACK"
     "vc2trackana|Vc2TrackerAnalysis.cpp|XT_VC2TRACKER_MAIN|vc2track_obj|VC2TRACK"

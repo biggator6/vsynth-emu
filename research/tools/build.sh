@@ -80,10 +80,11 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    Vc2Unvoiced.cpp Vc2Consonants.cpp Vc2LegacyAnalysis.cpp Vc2Legacy.cpp Vc2LegacyTables.cpp "${VHI[@]}" \
    "${VW[@]}" "${SH4[@]}" -o "$O/xt_vc2vocoder" &
 # The VOCODER OSC's carrier (v221), its converter's own part and kind 5's update (v222), the OSC block's converter
-# (v251) against rom.4's own routines
+# (v251) and the analog converter's second part (v256) against rom.4's own routines
 [ -f Vc2CarrierCheck.cpp ] && cc -DXT_VC2CARRIER_MAIN Vc2CarrierCheck.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp \
    $( [ -f Vc2VocoderOsc.cpp ] && echo Vc2VocoderOsc.cpp Vc2VocoderOscCheck.cpp ) \
    $( [ -f Vc2OscConvert.cpp ] && echo Vc2OscConvert.cpp Vc2OscConvertTables.cpp Vc2OscConvertCheck.cpp ) \
+   $( [ -f Vc2OscAnalogConvert.cpp ] && echo Vc2OscAnalogConvert.cpp Vc2OscConvertDraws.cpp ) \
    $( [ -f Vc2Math.cpp ] && echo Vc2Math.cpp ) "${SH4[@]}" -o "$O/xt_vc2carrier" &
 # Voice kind 6, the mic's pitch shifter, and the mic ring (v225) against rom.4's own routines
 [ -f Vc2Kind6Check.cpp ] && cc -DXT_VC2KIND6_MAIN Vc2Kind6Check.cpp Vc2Kind6.cpp Vc2Kind6Core.cpp Vc2Kind6Tables.cpp \

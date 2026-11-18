@@ -1546,6 +1546,52 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's analog converter's second part (2026-11-17, v256) {#vc2-analog-converter-second}
+
+Step 4.2's OSC voice (the user's "Start v256", 2026-11-17). rom.4's analog converter `0x8939cf70` after the part it shares with the VOCODER's (v251, "The VC-2's OSC block converter"): `0x8939d3a2` to its end at `0x8939da96`. It writes the OSC block's +0xb0…+0xf3 and nothing below. The words are rom.2's analog block's (`XtAnalogBlock`, XtAnalog.h) 0x30 up, word for word; rom.4's block has the 0x30 bytes more before them.
+
+| Block | rom.2's | What rom.4 writes |
+|---|---|---|
+| +0xb0 | +0x80 | the routine's code, by the waveform byte (+0x28): 1…10 by `0x8939d3b4`'s switch, 0 and past 10 code 2 |
+| +0xb4, +0xb8, +0xc0 | +0x84, +0x88, +0x90 | Fat, its envelope's and LFO's depths; with Sub Octave on, the second wave's pitch in octaves and its depths |
+| +0xbc, +0xd4 | +0x8c, +0xa4 | the envelopes' numbers: 3 and 2 on OSC 1, 7 and 6 on OSC 2 |
+| +0xc4, +0xd8 | +0x94, +0xa8 | 0 |
+| +0xc8, +0xcc, +0xd0 | +0x98, +0x9c, +0xa0 | the Pulse Width, its envelope's and LFO's depths |
+| +0xdc | +0xac | Impact × 4 ÷ 40 |
+| +0xe0 | +0xb0 | the Slope |
+| +0xe4, +0xe8 | +0xb4, +0xb8 | the sub oscillator's switch (a float, 1 on), the level curve at Sub Level ÷ 32768 |
+| +0xec, +0xf0 | +0xbc, +0xc0 | LA's Tone and its Keyfollow, as floats of their bytes |
+
+rom.4's waveforms stop at 10. rom.2's patch waveforms 11…13 (SUPER-SAW, FEEDBACK-OSC, X-MOD), with the curves of their own its converter gives them, have no case here.
+
+**The laws**, each read from the disassembly and held to rom.4 by the check:
+
+- **The Pulse Width, `0x8939c5e0`** (rom.2's `0x894e0ea0`): x = PW + sum·63/12000, held to ±63; then x + (b181 − b180/2)·63/127 + (key − 60)·KF·126/1200 + 63, with M's bytes +0x180 and +0x181 (rom.2's `XtAnalogMod`'s b0 and b1). The integer part wraps: below 0 it is `n % 126 + 126`, above 126 it is `n % 126`, and 126 itself stays. The fraction goes back on, ÷ 126.
+- **Fat, Sub Octave 0:** sum/12000 + Fat/127, held to 0…1, then + (key − 60)·KF/1200, held to 0…1 again. Its depths are (d/63)·|d/63|, the envelope's × the velocity factor.
+- **The sub oscillator, Sub Octave's byte not 0, `0x8939c6e0`** (rom.2's `0x894e1090`): Detune·12000/63 + sum, held to ±12000, scaled back to ±63, through the Detune curve, ÷ 1200, + (key − 60)·KF·(1/120)/1200, held to ±1. Sub Octave then adds −2 at 1, −1 at 2 and 0 at any other value. The depths go through the same curve, ÷ 1200.
+- **The Detune curve** (in `0x8939c6e0` and twice inline), |d| in cents: d to 10; 2d − 10 to 15; 5d − 55 to 31; 25d − 675 to 51; 50d − 1950 past it, the sign put back. It is rom.2's.
+- **The Slope, `0x8939cae0`:** waveforms 0 and 1 with Alias Cancel on, the Saw or Square Slope ÷ 100; otherwise 0.
+
+**The analog oscillator's system words**, in rom.4's memory just before the calibration rows, at `0x89e371e0` + 0x10205. Two sources agree on them: rom.4's reads here, and rom.2's hidden system IDs 0x528…0x52e in the same order (`XtAnalog.cpp`'s `kAliasCancel`, `kSawSlope`, `kSquSlope`, and `XtAnalog.h`'s block comment for the Tones):
+
+| Offset | ID in rom.2 | Word |
+|---|---|---|
+| +0x10205 | 0x528 | LA Saw Tone, byte |
+| +0x10206 | 0x529 | LA Square Tone, byte |
+| +0x10207 | 0x52a | LA Saw Tone Keyfollow, byte |
+| +0x10208 | 0x52b | LA Square Tone Keyfollow, byte |
+| +0x10209 | 0x52c | Alias Cancel, byte |
+| +0x1020a | 0x52d | Saw Slope, halfword |
+| +0x1020c | 0x52e | Square Slope, halfword |
+
+Waveform 10 (LA-SQUARE) reads the Square pair; every other waveform reads the Saw pair.
+
+**Port.** `vc2OscAnalogConvert` (Vc2OscAnalogConvert.cpp) on the input and the world `vc2OscBlockConvert` was given; `Vc2OscConvertIn` gains M's two bytes (`widthBeam`) and the system words (`Vc2OscAnalogSystem`). Sub Level's byte reads the level curve unsigned, where the calibration's Level reads it signed, so `Vc2OscConvertTables`' curve now spans −128…+255. The three laws both parts use are exported from Vc2OscConvert.cpp: `vc2OscHeld`, `vc2OscOnLines`, `vc2OscDepthSquared`.
+
+**Check.** xt_vc2carrier's third part: the analog's conversions draw the record's analog words, the Matrix's Pulse Width and Fat sums (wide half the time, past their holds), the LFO's two, M's two bytes and the system words from a generator of their own, so v251's draws are as they were, and the block is compared to +0xf4. 0 different at seed 2024 (2,000 conversions, 1,509 the analog's), and at seeds 7 and 31337 (20,000 each, about 15,000 the analog's). llvm-cov: Vc2OscAnalogConvert.cpp and Vc2OscConvert.cpp 100% of regions, lines and branches at 40 cases. `mutate_vc2.py --carrier`: 394 plants, 132 of them new, all caught. The first run missed one, the wrap's test as `>=`: the integer part has to land on exactly 126, which drawn keyfollows almost never do, so one draw in eight now puts the knob at its top with nothing else.
+
+Not in the sound yet.
+
 ### The VC-2's COSM adapters: Lo-Fi (2026-11-17, v253) {#vc2-cosm-adapter-lofi}
 
 Step 4.2's COSM object, its fourth part (research/VC2_MODE_PLAN.md). Lo-Fi (19) comes in as v252's types did, through XtCosmLofi. Its new block writes four words besides its targets, which XtCosmLofi held private. The VC-2 session chose (2026-11-17) four const getters on rom.2's class, so the laws stay in one place:

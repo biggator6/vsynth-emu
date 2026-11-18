@@ -22,9 +22,25 @@ auto convertWords(Vc2OscConvertTables& t) {
     });
 }
 
+// [FW] the analog converter's second part's (v256)
+auto secondPartWords(Vc2OscConvertTables& t) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x8939c814, &t.widthSteps }, { 0x8939c820, &t.detuneKeyScale }, { 0x8939c800, &t.sumLeast },
+        { 0x8939d890, &t.subLowest }, { 0x8939d634, &t.impactScale }, { 0x8939d638, &t.impactPer },
+        { 0x8939cd7c, &t.slopeScale }, { 0x8939c824, &t.detune[0].top },
+        { 0x8939c828, &t.detune[1].top }, { 0x8939c82c, &t.detune[1].offset },
+        { 0x8939c830, &t.detune[2].top }, { 0x8939c834, &t.detune[2].offset }, { 0x8939c838, &t.detune[2].slope },
+        { 0x8939c83c, &t.detune[3].top }, { 0x8939c840, &t.detune[3].offset }, { 0x8939c844, &t.detune[3].slope },
+        { 0x8939c848, &t.detune[4].offset }, { 0x8939c84c, &t.detune[4].slope },
+    });
+}
+
 struct Read : Vc2OscConvertTables {
     bool read(Sh4& image) {
         vc2ReadPool(image, convertWords(*this));
+        vc2ReadPool(image, secondPartWords(*this));
+        detune[0].slope = 1.0f;   // [FW] 0x8939c744: the first line is x itself (+ fldi0's 0)
+        detune[1].slope = 2.0f;   // [FW] 0x8939c75a: fldi1, doubled
         for (uint32_t i = 0; i < cents.size(); ++i) cents[i] = image.rd8(kCentsAt + i);
         for (uint32_t i = 0; i < level.size(); ++i) level[i] = image.rd16(kLevelAt + 2 * (i - kLevelBefore));
         return true;
