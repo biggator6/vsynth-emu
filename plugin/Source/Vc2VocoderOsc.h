@@ -54,6 +54,10 @@ static_assert(sizeof(Vc2VocoderOscP) == 0x58, "rom.4's P, the voice + 0x104…+0
 // and the shared velocity curve.  P+0x00…+0x0b, +0x20 and +0x2c are kind 5's update's.
 void vc2VocoderOscConvert(const uint8_t* input, const Vc2MatrixGroups& sums, const Vc2ToneShared& shared,
                           Vc2VocoderOscP& p);
+// A converter's velocity factor: the shared curve's word on the input's velocity (+4) and a depth's sens (a halfword at
+// sensAt) and curve (a byte at curveAt), unsigned, ÷ scale (32768, each converter's own pool word); the OSC block's
+// converter's too (v251)
+float vc2VelocityFactor(const uint8_t* input, const Vc2ToneShared& shared, int sensAt, int curveAt, float scale);
 
 // The voice's words kind 5's update reads, by their offset in the voice
 struct Vc2Kind5Voice {

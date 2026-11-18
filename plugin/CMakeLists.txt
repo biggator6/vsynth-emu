@@ -161,75 +161,9 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginRender.cpp
     Source/XtHostInput.cpp
     Source/XtFxValueText.cpp
-    Source/Vc2Params.cpp
-    Source/Vc2Unvoiced.cpp
-    Source/Vc2Consonants.cpp
-    Source/Vc2LegacyAnalysis.cpp
-    Source/Vc2LegacyTables.cpp
-    Source/Vc2Legacy.cpp
-    Source/Vc2HiresoTables.cpp
-    Source/Vc2HiresoWarp.cpp
-    Source/Vc2HiresoRate.cpp
-    Source/Vc2HiresoAnalysis.cpp
-    Source/Vc2Hireso.cpp
-    Source/Vc2HiresoSynth.cpp
-    Source/Vc2Vocoder.cpp
-    Source/Vc2VocoderTables.cpp
-    Source/Vc2Carrier.cpp
-    Source/Vc2CarrierTables.cpp
-    Source/Vc2VocoderOsc.cpp
-    Source/Vc2Tracker.cpp
-    Source/Vc2TrackerTables.cpp
-    Source/Vc2TrackerAnalysis.cpp
-    Source/Vc2TrackerEstimate.cpp
-    Source/Vc2Math.cpp
-    Source/Vc2Kind6.cpp
-    Source/Vc2Kind6Core.cpp
-    Source/Vc2Kind6Tables.cpp
-    Source/Vc2AutoNote.cpp
-    Source/Vc2AutoNoteTables.cpp
-    Source/Vc2PartMixer.cpp
-    Source/Vc2MixerBlock.cpp
-    Source/Vc2PartMixerTables.cpp
-    Source/Vc2Tone.cpp
-    Source/Vc2ToneNoteOn.cpp
-    Source/Vc2OscVoice.cpp
-    Source/Vc2OscVoiceGet.cpp
-    Source/Vc2OscVoiceKinds.cpp
-    Source/Vc2OscTables.cpp
-    Source/Vc2OscNoteOn.cpp
-    Source/Vc2OscTargets.cpp
-    Source/Vc2OscPlayers.cpp
-    Source/Vc2OscLite.cpp
-    Source/Vc2OscAnalog.cpp
-    Source/Vc2OscAnalogLa.cpp
-    Source/Vc2OscAnalogSub.cpp
-    Source/Vc2OscAnalogShape.cpp
-    Source/Vc2OscAnalogUpdate.cpp
-    Source/Vc2PitchRamp.cpp
-    Source/Vc2PitchRampTick.cpp
-    Source/Vc2RampTables.cpp
-    Source/Vc2Tva.cpp
-    Source/Vc2TvaTables.cpp
-    Source/Vc2CosmGrowl.cpp
-    Source/Vc2CosmTables.cpp
-    Source/Vc2CosmConvert.cpp
-    Source/Vc2CosmTvf.cpp
-    Source/Vc2CosmFilters.cpp
-    Source/Vc2CosmDynamics.cpp
-    Source/Vc2CosmConverters.cpp
-    Source/Vc2CosmDrive.cpp
-    Source/Vc2CosmBalanced.cpp
-    Source/Vc2CosmSideBand.cpp
-    Source/Vc2Matrix.cpp
-    Source/Vc2MatrixTables.cpp
-    Source/Vc2MatrixSources.cpp
-    Source/Vc2MatrixSetup.cpp
-    Source/Vc2CosmObject.cpp
-    Source/Vc2CosmPools.cpp
-    Source/Vc2CosmNoteOn.cpp
     Source/XtBuildId.cpp
 )
+include(Vc2Sources.cmake)   # the VC-2 mode's ports, rom.4's (v251: moved out of this list as they stood)
 
 # ─── Which build this is ─────────────────────────────────────────────────────
 # Worked out at every build, not at configure, so it can't go stale.  It rewrites the file only when the id changes.

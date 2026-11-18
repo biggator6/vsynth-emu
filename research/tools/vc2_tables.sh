@@ -22,6 +22,7 @@ VC2_TABLES=(
     Vc2CosmTables               # COSM's (v234)
     Vc2MatrixTables             # the Matrix's (v235)
     Vc2RampTables               # the pitch ramp's (v236)
+    Vc2OscConvertTables         # the OSC block's converter's (v251)
 )
 
 # vc2Tables <source dir> [suffix]: the rows' files the tree has, one a line, each with the suffix (.cpp for a source).

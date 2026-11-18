@@ -5,8 +5,8 @@
 # (vc2object, v211) under xt_vc2legacy; HIRESO's warp (vc2warp, v213), tables (vc2hitables), rate filters (vc2rate,
 # v214), analysis (vc2hiana, v215), object (vc2hiobj, v216) and synthesis (vc2hisyn, v217) under xt_vc2hireso; the
 # vocoder object (vc2voc, v220) and its tables (vc2voctables) under xt_vc2vocoder; the VOCODER OSC's carrier (vc2car,
-# v221), its tables (vc2cartables) and its converter's own part and kind 5's update (vc2vocosc, v222) under
-# xt_vc2carrier; the pitch tracker's frame (vc2tracker, v223), its tables (vc2tracktables), its analysis's crossings,
+# v221), its tables (vc2cartables) and its converter's own part and kind 5's update (vc2vocosc, v222), and the OSC
+# block's converter (vc2oscconv, v251) and its constants (vc2oscconvtables), under xt_vc2carrier; the pitch tracker's frame (vc2tracker, v223), its tables (vc2tracktables), its analysis's crossings,
 # onset check and taking (vc2trackana, v224) and its estimator (vc2trackest) under xt_vc2tracker; voice kind 6 and the
 # mic ring (vc2k6, v225), its core (vc2k6core), its tables (vc2k6tables) and the shared math (vc2k6math) under
 # xt_vc2kind6, the shared math's sine and cosine (vc2math) under xt_vc2carrier; Auto Note and the pitch source (vc2an,
@@ -37,7 +37,8 @@ VC2HI=("${VC2HIPORTS[@]}" Vc2Unvoiced Vc2HiresoCheck Vc2HiresoRateCheck Vc2Hires
        Vc2CheckWords)
 VC2VOC=(Vc2Vocoder Vc2VocoderTables Vc2Unvoiced Vc2Consonants Vc2LegacyAnalysis Vc2Legacy Vc2LegacyTables
         "${VC2HIPORTS[@]}" Vc2VocoderCheck Vc2CheckWords)
-VC2CAR=(Vc2Carrier Vc2CarrierTables Vc2CarrierCheck Vc2VocoderOsc Vc2VocoderOscCheck Vc2Math)
+VC2CAR=(Vc2Carrier Vc2CarrierTables Vc2CarrierCheck Vc2VocoderOsc Vc2VocoderOscCheck Vc2Math Vc2OscConvert
+        Vc2OscConvertTables Vc2OscConvertCheck)
 VC2TRACK=(Vc2Tracker Vc2TrackerTables Vc2TrackerAnalysis Vc2TrackerEstimate Vc2TrackerCheck Vc2TrackerSignal)
 VC2K6=(Vc2Kind6 Vc2Kind6Core Vc2Kind6Tables Vc2Math Vc2Kind6Check Vc2TrackerSignal)
 VC2AN=(Vc2AutoNote Vc2AutoNoteTables Vc2AutoNoteCheck Vc2Tracker Vc2TrackerTables Vc2TrackerAnalysis Vc2TrackerEstimate
@@ -74,6 +75,8 @@ VC2PORTS=(
     "vc2car|Vc2Carrier.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
     "vc2cartables|Vc2CarrierTables.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
     "vc2vocosc|Vc2VocoderOsc.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
+    "vc2oscconv|Vc2OscConvert.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
+    "vc2oscconvtables|Vc2OscConvertTables.cpp|XT_VC2CARRIER_MAIN|vc2car_obj|VC2CAR"
     "vc2tracker|Vc2Tracker.cpp|XT_VC2TRACKER_MAIN|vc2track_obj|VC2TRACK"
     "vc2tracktables|Vc2TrackerTables.cpp|XT_VC2TRACKER_MAIN|vc2track_obj|VC2TRACK"
     "vc2trackana|Vc2TrackerAnalysis.cpp|XT_VC2TRACKER_MAIN|vc2track_obj|VC2TRACK"

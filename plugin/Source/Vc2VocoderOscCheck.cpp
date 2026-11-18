@@ -20,7 +20,6 @@
 namespace {
 constexpr uint32_t kConvert = 0x8939db00, kKind5 = 0x893afff0, kCarrierInit = 0x893ebed0;   // [FW]
 constexpr uint32_t kPeakAt = 0x899d9a5c;   // [FW]
-constexpr uint32_t kOscGetters[] = { 0x893a23b0, 0x893a2440 }, kLfoGetters[] = { 0x893a26b0, 0x893a28b0 };   // [FW]
 constexpr uint32_t kVoiceAt = 0x8C060000, kInputAt = 0x8C058000, kOscSumsAt = 0x8C05a000;   // in Vc2Fw's RAM
 constexpr uint32_t kLfoSumsAt = 0x8C05a020, kModsAt = 0x8C05b000, kMatrixAt = 0x8C05c000;
 constexpr uint32_t kBlock = 0x54, kP = 0x104, kCarrier = 0xa90, kRamp = 0x90c;   // [FW] in the voice
@@ -30,29 +29,14 @@ struct Counts {
     long cases = 0, updates = 0, ramps[3] = {}, different = 0;
 };
 
-float within(std::mt19937& rng, float lo, float hi) { return lo + (hi - lo) * (float)rng() / 4294967296.0f; }
-
-// A byte of the record: an ID's range mostly, now and then any byte, which the loads' widths and signs must take
-int drawByte(std::mt19937& rng, int lo, int hi) {
-    return rng() % 8 == 0 ? (int)(rng() % 256) : lo + (int)(rng() % (uint32_t)(hi - lo + 1));
-}
-
-void put16(uint8_t* at, int v) {
-    const int16_t h = (int16_t)v;
-    std::memcpy(at, &h, sizeof h);
-}
-
 // [FW] the record's VOCODER bytes by the input's offset, and their IDs' ranges (VC2_VOCAL_DESIGNER.md, "The VOCODER
 // OSC's IDs, run"): the levels, Growl Level, the depths, the balance, the curves
-struct ByteDraw {
-    int at, lo, hi;
-};
-constexpr ByteDraw kBytes[] = {
+constexpr Vc2ByteDraw kBytes[] = {
     { 0x6c, 0, 127 }, { 0x6d, 0, 127 }, { 0x6e, 0, 127 }, { 0x6f, 0, 127 }, { 0x70, 0, 127 }, { 0x7c, 0, 127 },
     { 0x7d, 0, 127 }, { 0x72, 0, 127 }, { 0x76, -63, 63 }, { 0x77, -63, 63 }, { 0x78, 0, 7 }, { 0x7e, 0, 127 },
     { 0x82, -63, 63 }, { 0x83, -63, 63 }, { 0x84, 0, 7 },
 };
-constexpr ByteDraw kHalfwords[] = { { 0x7a, -200, 200 }, { 0x86, -200, 200 } };   // the velocity sens
+constexpr Vc2ByteDraw kHalfwords[] = { { 0x7a, -200, 200 }, { 0x86, -200, 200 } };   // the velocity sens
 constexpr int kFollowAt = 0x74;   // [FW] Growl Keyfollow ×10, −2000…+2000
 
 // Growl Keyfollow: 0 half the time, as most patches have it, else mostly a little (±20%), now and then any (±200%), so
@@ -69,23 +53,20 @@ void drawInput(std::mt19937& rng, uint8_t* in) {
     in[2] = (uint8_t)(rng() % 2);
     in[3] = (uint8_t)(rng() % 128);
     in[4] = (uint8_t)(1 + rng() % 127);
-    for (const ByteDraw& b : kBytes) in[b.at] = (uint8_t)drawByte(rng, b.lo, b.hi);
-    for (const ByteDraw& h : kHalfwords) put16(in + h.at, h.lo + (int)(rng() % (uint32_t)(h.hi - h.lo + 1)));
-    put16(in + kFollowAt, drawKeyfollow(rng));
+    for (const Vc2ByteDraw& b : kBytes) in[b.at] = (uint8_t)vc2DrawByte(rng, b.lo, b.hi);
+    for (const Vc2ByteDraw& h : kHalfwords) vc2Put16(in + h.at, h.lo + (int)(rng() % (uint32_t)(h.hi - h.lo + 1)));
+    vc2Put16(in + kFollowAt, drawKeyfollow(rng));
     std::memcpy(in + 0x100, &kMatrixAt, sizeof kMatrixAt);
 }
 
 // [FW] the LFO depths' bytes and the LFO group's sums they are added to (LFO Time, LFO Formant)
-constexpr int kLfoDepthAt[2] = { 0x76, 0x82 }, kLfoSum[2] = { 2, 3 };
+constexpr Vc2LfoEdges kLfoEdges { { 0x76, 0x82 }, { 2, 3 } };
 
 // The groups: 0 half the time, else across their ranges; one case in four the LFO sums set so that sum + depth lands
 // on a bound's edge, ±63 or ±64, where the clamp's off-by-one would show
 void drawSums(std::mt19937& rng, const uint8_t* in, Vc2MatrixGroups& s) {
     for (int16_t& v : s.osc) v = rng() % 2 == 0 ? 0 : (int16_t)((int)(rng() % 24001) - 12000);
-    for (int16_t& v : s.lfo) v = rng() % 2 == 0 ? 0 : (int16_t)((int)(rng() % 129) - 64);
-    if (rng() % 4 != 0) return;
-    constexpr int kEdges[4] = { 63, 64, -63, -64 };
-    for (int k = 0; k < 2; ++k) s.lfo[kLfoSum[k]] = (int16_t)(kEdges[rng() % 4] - (int8_t)in[kLfoDepthAt[k]]);
+    vc2DrawLfoSums(rng, in, s.lfo, 64, kLfoEdges);
 }
 
 // [FW] the voice's words kind 5's update reads, by offset, and what is drawn into each (the second ratio now and then
@@ -120,16 +101,16 @@ void putFloat(Vc2Fw& fw, uint32_t at, float v) { fw.cpu.wr32(at, std::bit_cast<u
 // A voice's words, its modulators and its ramp drawn into rom.4's memory and the port's input
 Vc2Kind5Voice drawVoice(Vc2Fw& fw, std::mt19937& rng, Counts& n) {
     Vc2Kind5Voice v {};
-    for (const WordDraw& w : kWords) putFloat(fw, kVoiceAt + w.at, v.*w.field = within(rng, w.lo, w.hi));
-    for (int i = 0; i < 3; ++i) putFloat(fw, kVoiceAt + kGainAt[i], v.gain[i] = within(rng, 0.0f, 1.0f));
+    for (const WordDraw& w : kWords) putFloat(fw, kVoiceAt + w.at, v.*w.field = vc2Within(rng, w.lo, w.hi));
+    for (int i = 0; i < 3; ++i) putFloat(fw, kVoiceAt + kGainAt[i], v.gain[i] = vc2Within(rng, 0.0f, 1.0f));
     for (uint32_t k = 0; k < std::size(kMods); ++k) {
         const uint32_t object = kModsAt + 0x80 * k;
         fw.cpu.wr32(kVoiceAt + kMods[k].pointerAt, object);
-        putFloat(fw, object + kMods[k].outputAt, v.*kMods[k].field = within(rng, kMods[k].lo, 1.0f));
+        putFloat(fw, object + kMods[k].outputAt, v.*kMods[k].field = vc2Within(rng, kMods[k].lo, 1.0f));
     }
     const int ramp = (int)(rng() % 3);   // [FW] 0x893b1160: +4 set gives +0x3c; else +0 set gives 1; else 0
     ++n.ramps[ramp];
-    const float value = within(rng, -300.0f, 300.0f);
+    const float value = vc2Within(rng, -300.0f, 300.0f);
     fw.cpu.wr32(kVoiceAt + kRamp + 4, ramp == 0 ? 1u : 0u);
     fw.cpu.wr32(kVoiceAt + kRamp, ramp == 1 ? 1u : 0u);
     putFloat(fw, kVoiceAt + kRamp + 0x3c, value);
@@ -154,7 +135,7 @@ std::string oscCase(Vc2Fw& fw, std::mt19937& rng, int32_t& clock, Counts& n) {
     fw.cpu.write(kLfoSumsAt, sums.lfo, sizeof sums.lfo);
     Vc2VocoderOscP p {};
     for (uint32_t w = 0; w < sizeof p / 4; ++w) {   // P noise on both, so a word the converter leaves stays as it was
-        const float x = within(rng, -1.0f, 1.0f);
+        const float x = vc2Within(rng, -1.0f, 1.0f);
         std::memcpy(reinterpret_cast<uint8_t*>(&p) + 4 * w, &x, sizeof x);
     }
     fw.cpu.write(kVoiceAt + kP, &p, sizeof p);
@@ -170,7 +151,7 @@ std::string oscCase(Vc2Fw& fw, std::mt19937& rng, int32_t& clock, Counts& n) {
     }
     for (int u = 0; u < kUpdates && what.empty(); ++u, ++n.updates) {
         const Vc2Kind5Voice v = drawVoice(fw, rng, n);
-        const float peak = within(rng, 0.0f, 1.0f);
+        const float peak = vc2Within(rng, 0.0f, 1.0f);
         fw.cpu.wr32(kPeakAt, std::bit_cast<uint32_t>(peak));
         what = vc2BothOn(fw, kKind5, { kVoiceAt }, "kind 5's update",
                          [&] { vc2Kind5Update(v, shared, p, carrier, peak); },
@@ -181,8 +162,7 @@ std::string oscCase(Vc2Fw& fw, std::mt19937& rng, int32_t& clock, Counts& n) {
 } // namespace
 
 long vc2VocoderOscCases(Vc2Fw& fw, const Vc2Run& run, int32_t& clock) {
-    for (const uint32_t getter : kOscGetters) fw.cpu.hook(getter, [](Sh4& cpu) { cpu.ret(kOscSumsAt); });
-    for (const uint32_t getter : kLfoGetters) fw.cpu.hook(getter, [](Sh4& cpu) { cpu.ret(kLfoSumsAt); });
+    vc2HookGroups(fw, kOscSumsAt, kLfoSumsAt);
     std::mt19937 rng((uint32_t)run.seed + 1);
     const bool first = xtSwitch("XT_VC2CARRIER_FIRST") != nullptr;
     Counts n;

@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's OSC block converter v251 (2026-11-17, on vc2-mode after v250's merge 0c07e95; the user's "Yes, both";
+  HARDWARE_FIRMWARE.md, "The VC-2's OSC block converter"): step 4.2's OSC voice, its tenth part. The analog's converter
+  is 0x8939cf70 (OSC Type 0 and past 3 in 0x8939fbd0's switch; 0x8939e300 is PCM's). Its first part, to the waveform
+  switch 0x8939d3b4, and the VOCODER's first half (0x8939db00…0x8939de28) are one code, but for the calibration row
+  0x8939c9a0 is given (the waveform, 0): vc2OscBlockConvert (Vc2OscConvert.cpp) writes the input's two pitch10s and
+  the block's +0x04…+0x68 (key, cents, ratio, envelope and LFO depths, level, gain, the second key's cents), its
+  helpers 0x8939c8a0, 0x8939c910, 0x8939c1a0, 0x8939c0e0, 0x8939c9a0; constants Vc2OscConvertTables.cpp
+  (vc2LoadOscConvert in loadVc2). The input's readers one header (Vc2InputReads.h) and the velocity factor one function
+  (vc2VelocityFactor), both from Vc2VocoderOsc.cpp; the second part's draws and hooks in Vc2CarrierCheck.h. v222's
+  "+0xfc and +0x100" withdrawn in place. xt_vc2carrier's third part (Vc2OscConvertCheck.cpp): rom.4's whole analog and
+  VOCODER converters on drawn inputs, groups, pitch source, M bytes and calibration rows, the block's +0…+0xb0 and the
+  input compared: 0 different at seeds 2024, 7 and 31337 (2,000 and 2 × 20,000 conversions); covered whole.
+  mutate_vc2.py --carrier: 262 plants (110 new, 3 moved to the readers' calls), all caught. plugin/CMakeLists.txt at
+  its limit: the VC-2 sources moved as they stood to plugin/Vc2Sources.cmake. Not in the sound yet.
+
 The VC-2's COSM note-on frame v250 (2026-11-17, on its own branch with vc2-mode's 7cba8ee merged in; the VC-2
   session's choice (A), adapters over XtCosm; HARDWARE_FIRMWARE.md, "The VC-2's COSM note-on frame"). rom.4's per-type
   routines are rom.2's opcode for opcode (the TB Filter's five words pool relocations), so the types come in as

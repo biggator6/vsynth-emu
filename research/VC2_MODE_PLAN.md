@@ -396,7 +396,11 @@ version against rom.4's routines with what it calls hooked:
      note-on's plain codes' and LA's laws one code over each routine's words; `0x893c30c0`, LA's note-on as a
      function, is dead (nothing calls it); against rom.4's in xt_vc2osc with the analog's 19 render routines hooked
      (HARDWARE_FIRMWARE.md, "The VC-2's analog install, update and settings").
-   - then the analog's converter (the OSC converter's kind-3 block); then Vari off. Beside
+   - done (v251): the OSC block's converter, the analog's converter's first part (`0x8939cf70` to its waveform switch
+     `0x8939d3b4`; `0x8939e300` is PCM's) and the VOCODER's first half, one code but for the calibration row:
+     `vc2OscBlockConvert`, the two pitch10s and the block's +0x04…+0x68 with its helpers, against rom.4's whole
+     converters in xt_vc2carrier's third part (HARDWARE_FIRMWARE.md, "The VC-2's OSC block converter").
+   - then the analog's converter's second part (its own words from the block's +0xb0); then Vari off. Beside
      them, the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf (`0x89506e54`), which the
      wiring gives and nothing has ported yet.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):

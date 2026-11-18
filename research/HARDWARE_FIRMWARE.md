@@ -1546,6 +1546,96 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's OSC block converter (2026-11-17, v251) {#vc2-osc-block-converter}
+
+Step 4.2's OSC voice, its tenth part (the user's "Yes, both", 2026-11-17): the OSC converters' first part, which the analog's and the VOCODER's share. Ported bit for bit: `vc2OscBlockConvert` (Vc2OscConvert.cpp). Its constants are in Vc2OscConvertTables.cpp, read by loadVc2 through `vc2LoadOscConvert`. Every address is rom.4's.
+
+**Which converter is the analog's.** The OSC converter 0x8939fbd0 switches on OSC Type (the input's +9):
+- 1 is PCM's, 0x8939e300;
+- 2 is EXTIN's, 0x8939e9e0;
+- 3 is the VOCODER's, 0x8939db00;
+- 0 and anything past 3 are the analog's, 0x8939cf70…0x8939da96.
+
+This version's first plan took 0x8939e300 for the analog's. VC2_VOCAL_DESIGNER.md, "The VOCODER OSC's IDs, run", names the dispatch.
+
+**One part in two converters.** Two stretches of code do the same work:
+- the analog's converter up to its waveform switch (0x8939d3b4, on the record's waveform +0x28, less 1);
+- the VOCODER's first half, up to 0x8939de28.
+
+Both write the same block words in the same order and use the same helpers. The analog inlines two of them (0x8939c8a0's twin for +0x98, and 0x8939c150), where the VOCODER calls them. The one difference is the calibration row given to 0x8939c9a0: the analog gives its waveform byte, the VOCODER gives 0. The analog's second part writes only the block from +0xb0, as the VOCODER's does (its P), so this port of the first part is whole. The port takes the row as an argument (`vc2OscAnalogRow`, `kVc2OscVocoderRow`).
+
+**The input** is the note-on's (0x8939fe08). It holds:
+- an 8-byte header: +2 the OSC, +3 the key, +4 the velocity;
+- the OSC's record from +8;
+- the note's coarse (+0x88, a halfword), fine (+0x90, a word in tenths of a cent) and a second key (+0x9c);
+- M's address at +0x100.
+
+Of the record, the part reads:
+- +0x0a Wave Gain (dB);
+- +0x0c Pitch, and +0x0e Pitch KF (a halfword, 1000 = 100%);
+- +0x10 and +0x11, the pitch's LFO and envelope depths, with the envelope depth's velocity curve and sens at +0x12 and +0x14;
+- +0x1c Level, and +0x1e Level KF;
+- +0x20, the level's LFO depth, with the level's velocity curve and sens at +0x21 and +0x22;
+- +0x28, the waveform.
+
+It writes two words into the input: +0x94 is pitch10, and +0x98 is the same on the second key.
+
+**The block** (the voice + 0x54; `Vc2OscBlockHead`) gets these words:
+
+| Block | What |
+|---|---|
+| +0x04 | the key Pitch KF gives (0x8939c910): ((60 + coarse)·1000 + (key − 60)·KF + 999) / 1000, held to 0…127 |
+| +0x08 | the cents: (pitch10 − 69000) / 10, held to ±6000, the upper bound first |
+| +0x0c | the ratio: powf(2, curve(x)/1200 + (2·M[+0x183] − M[+0x182])/127) × the pitch source, where x = the Matrix's OSC Pitch sum × 63/12000 + Pitch, held to ±63 |
+| +0x1c | the pitch envelope's depth: curve(depth) × the velocity factor (the curve's word / 32768) |
+| +0x20, +0x38 | 1 and 4 on OSC 1, 5 and 8 on OSC 2 (what reads them isn't traced) |
+| +0x34 | the level: T[0x8939c0e0(Level + the OSC Level sum held to 0…127, Level KF, key − 60)] / 32768 × the level's velocity factor squared |
+| +0x3c | the pitch LFO's depth: curve(the LFO Pitch sum + depth, held to ±63) |
+| +0x40, +0x58 | 0 |
+| +0x54 | the level LFO's depth: (d/63)·\|d/63\|, where d = the LFO Level sum + depth, held to ±63 |
+| +0x5c | the gain: powf(2, Wave Gain/6) × the calibration's gain (0x8939c9a0) at pitch10 |
+| +0x68 | the second key's cents, as +0x08 |
+
+**The helpers:**
+- **pitch10** (0x8939c8a0 and its twin) is rom.2's `0x894e1250` law (`xtPitch10`): (60 + coarse)·1000 + (key − 60)·KF + fine. KF 0 and 1000 are formed without the product, which gives the same integer, so the port uses one sum.
+- **The cents curve** (0x8939c1a0): for |x| ≤ 12 it reads the table at 0x89540114 (13 bytes, by FTRC). Above that it follows lines: 50x − 600 to 36, 100x − 2400 to 48, 200x − 7200 to 60, then 400x − 19200. The sign is put back at the end. The lines meet at 36, 48 and 60.
+- **The level's index** (0x8939c0e0): level + trunc(127·KF·k/6000), as a halfword, held to 0…127. The magic divisions by 1000 (0x10624dd3, >> 38) and by 6000 (0x057619f1, >> 39) equal C's division for every int32: all 2^32 were run.
+- **The calibration's gain** (0x8939c9a0):
+  - It reads a row of four signed bytes at 0x89e371e0 + 0x1020e + 4·row: rows 0…10, and row 0 for a row past 10. The bytes are the bias, the upper KF, the lower KF and Level.
+  - d = pitch10 − bias·1000.
+  - The gain is T[Level]/32768 × max(0, 1 + (d ≥ 0 ? d·upper : −d·lower)/6e6).
+  - Level is read signed: below 0 it reads the words before T.
+  - This is rom.2's law, "The analog calibration" (its OSC table +0xc20e, from the hidden IDs 0x528…). The port takes the rows from the wiring, as XtAnalog takes rom.2's descriptors' defaults.
+- **T** is the level curve, u16 words at 0x89541f34. The port reads 256 of them, from 128 words before T.
+
+**What the part reads besides the input:**
+- the Matrix's two groups, by the OSC's getters: 0x893a23b0 or 0x893a2440 for the OSC group (its sums [0] Pitch and [3] Level), and 0x893a26b0 or 0x893a28b0 for the LFO group ([1] Pitch and [4] Level);
+- M's bytes +0x182 and +0x183. rom.2's M keeps its part's D-Beam controllers at +0x180…+0x183, and rom.2's Pitch ratio has the same law on them (`xtPitchRatio`'s beam);
+- the pitch source: 0x89394a40 on 0x89989748, `Vc2AutoNote::ratioFor`;
+- the velocity curve and powf (`Vc2ToneShared`).
+
+The integer sums that can pass 2^31 (pitch10 with any fine, the calibration's step) are done in uint32_t, as the SH-4's registers hold them. The input's readers are now one header (Vc2InputReads.h, from Vc2VocoderOsc.cpp's), as is the velocity factor (`vc2VelocityFactor`, Vc2VocoderOsc.cpp).
+
+**The check:** xt_vc2carrier's third part (Vc2OscConvertCheck.cpp), on the first parts' interpreter.
+- Each case runs 50 conversions. Each conversion:
+  - draws an input: the header; the record's bytes and KFs in their ranges, and now and then any byte, halfword or word; Pitch KF 0 and 1000 a quarter each; the fine 0, a bend's ±2000 cents, or any word; the rest 0, and the two pitch10 words noise;
+  - draws the Matrix's two groups, which hooks on the four getters give (v222's, now `vc2HookGroups`), with the LFO sums' edges now and then (`vc2DrawLfoSums`);
+  - draws the pitch source's ratio, which a hook on 0x89394a40 gives in fr0;
+  - writes M's two bytes and the eleven calibration rows into rom.4's memory, and fills the block with noise on both sides;
+  - runs rom.4's whole analog converter, or one time in four the VOCODER's, and the port's part with that converter's row;
+  - compares the block's +0x00…+0xb0 and the whole input, word for word.
+- The velocity curve and powf are rom.4's own on both sides (`RomShared`).
+
+**Results:**
+- seed 2024: 40 cases, 2,000 conversions (491 the VOCODER's), 0 different;
+- seeds 7 and 31337: 400 cases each, 20,000 conversions each (4,994 and 4,993 the VOCODER's), 0 different;
+- the second part's draws are unchanged by the moved helpers (its fcheck line is the baseline's);
+- llvm-cov: Vc2OscConvert.cpp 100% of regions, lines and branches at 40 cases;
+- `mutate_vc2.py --carrier`: 110 new plants (82 in Vc2OscConvert.cpp, 28 in its constants), and v222's three readers' plants moved to the readers' calls. All 262 caught on the first run.
+- Not planted, as no input tells them apart: the curve's lines by ≥ (they meet at 36, 48 and 60); the integer holds by ≥; the calibration's step by d > 0 (d = 0 gives 0 either way); the level scale's pool word read from the velocity's (both 32768).
+
+Not in the sound yet. The analog converter's second part, its own words from the block's +0xb0 after the waveform switch, is the next version.
+
 ### The VC-2's COSM note-on frame (2026-11-17, v250) {#vc2-cosm-note-on}
 
 Step 4.2's COSM object in the tone, its second part (research/VC2_MODE_PLAN.md). The VC-2 session chose (A), adapters over XtCosm (2026-11-17), as the plan's "XtCosm stays as it is" had it. Ported bit for bit: the note-on's frame, the new block's frame and the buffer pools (Vc2CosmNoteOn.cpp, Vc2CosmPools.cpp), with the three types whose note-on needs no XtCosm adapter. Every address is rom.4's, every offset the object's.
@@ -2921,7 +3011,7 @@ Step 5's second part, ported bit for bit (`Vc2VocoderOsc.cpp`): what the VOCODER
 - P+4, the pitch = clamp±32(exp2(clamp±6000(v₀x5c + env·v₀x70 + v₀x2c·v₀xfc + ramp + v₀xa70) × 1/1200) × v₀x60 × v₀xa6c). env is [+0xa4c]'s output (+0x4c). ramp is the pitch ramp's value (`0x893b1160` on +0x90c: +0x3c while its +4 is set, 1 if only its +0 is set, else 0);
 - then the carrier's update on P.
 
-The converter's first half writes v₀x5c, +0x60, +0x70, +0x88, +0xb0, +0xfc and +0x100 (the OSC block's +0x08…+0xac).
+The converter's first half writes v₀x5c, +0x60, +0x70, +0x88, +0xb0, ~~+0xfc and +0x100 (the OSC block's +0x08…+0xac)~~. **Withdrawn (v251, "The VC-2's OSC block converter"):** it doesn't write +0xfc and +0x100 (the block's +0xa8, +0xac). xt_vc2carrier's third part runs it on a block of noise and compares the block's +0x00…+0xb0 word for word with a port that leaves them, 0 different in 10,478 of the VOCODER's conversions (seeds 2024, 7 and 31337). Its first half writes the block's +0x04…+0x68, that section's table.
 
 **The shared routines.** The velocity curve and exp2 (`0x893a8340`) are rom.2's (step 1b's `vc2run osc`), so the port reaches them through `Vc2ToneShared`, an interface the wiring gives XtOsc's ports. The Matrix's sums come in as the two groups the getters return (`Vc2MatrixGroups`). The constants are with the carrier's in `Vc2CarrierTables`: 1/127, 32768, 12000, 127, 1200, 64, 63, ±6000, 1/1200, ±32.
 

@@ -1,8 +1,8 @@
 // The VOCODER OSC's converter's own part and kind 5's update: see Vc2VocoderOsc.h (v222).  Each routine's arithmetic in
 // its own order, in XtFloat; every address is rom.4's.
 #include "Vc2VocoderOsc.h"
+#include "Vc2InputReads.h"
 #include "XtFloat.h"
-#include <cstring>
 
 namespace {
 using xtf::add;
@@ -10,15 +10,10 @@ using xtf::div;
 using xtf::flt;
 using xtf::mul;
 
-// The converter's input as the SH-4 reads it: little-endian, a byte or a halfword, signed or not by its load
+using vc2in::s16;
+using vc2in::s8;
+using vc2in::u8;
 constexpr int kOscAt = 2, kKeyAt = 3, kVelocityAt = 4;   // [FW] the note-on's header
-uint8_t u8(const uint8_t* in, int at) { return in[at]; }
-int s8(const uint8_t* in, int at) { return (int8_t)in[at]; }
-int s16(const uint8_t* in, int at) {
-    int16_t v = 0;
-    std::memcpy(&v, in + at, sizeof v);
-    return v;
-}
 
 // [FW] the levels at v/127, each the record's byte (the input's +8 on) to its word of P
 struct Level {
@@ -58,12 +53,6 @@ float lfoDepth(int depth, int sum) {
     return depthCurve(d);
 }
 
-// The velocity factor an envelope depth is scaled by: the shared curve's word, unsigned, ÷ 32768
-float velocityFactor(const uint8_t* in, const Vc2ToneShared& shared, int sensAt, int curveAt) {
-    const int v = shared.velocity(u8(in, kVelocityAt), s16(in, sensAt), u8(in, curveAt));
-    return div(flt((uint16_t)v), vc2CarrierTables().velocityScale);
-}
-
 // A value held to [0, top]: the upper bound first, as the converter tests them
 float heldBelow(float x, float top) {
     if (x > top) return top;
@@ -83,19 +72,24 @@ float modulated(float base, float env, float envDepth, float lfo, float lfoDepth
 }
 } // namespace
 
+float vc2VelocityFactor(const uint8_t* in, const Vc2ToneShared& shared, int sensAt, int curveAt, float scale) {
+    const int v = shared.velocity(u8(in, kVelocityAt), s16(in, sensAt), u8(in, curveAt));
+    return div(flt((uint16_t)v), scale);
+}
+
 void vc2VocoderOscConvert(const uint8_t* in, const Vc2MatrixGroups& sums, const Vc2ToneShared& shared,
                           Vc2VocoderOscP& p) {
     const Vc2CarrierTables& t = vc2CarrierTables();
     for (const Level& level : kLevels) p.carrier.*level.field = mul(flt(u8(in, level.at)), t.perLevel);
     Vc2VocoderOscTerms& m = p.terms;
-    const float growlVelocity = velocityFactor(in, shared, kGrowlSensAt, kGrowlCurveAt);
+    const float growlVelocity = vc2VelocityFactor(in, shared, kGrowlSensAt, kGrowlCurveAt, t.velocityScale);
     const float growl = levelWithSum(sums.osc[kTime], s8(in, kGrowlAt), t.growlScale, 1.0f);
     const int32_t follow = (u8(in, kKeyAt) - kKeyCentre) * s16(in, kGrowlFollowAt);   // Keyfollow ×10 by key
     m.growl = heldBelow(add(div(flt(follow), t.keyfollowScale), growl), 1.0f);
     m.growlZero[0] = m.growlZero[1] = 0;
     m.growlEnv = mul(depthCurve(s8(in, kGrowlEnvAt)), growlVelocity);
     m.growlLfo = lfoDepth(s8(in, kGrowlLfoAt), sums.lfo[kLfoTime]);
-    const float balanceVelocity = velocityFactor(in, shared, kBalanceSensAt, kBalanceCurveAt);
+    const float balanceVelocity = vc2VelocityFactor(in, shared, kBalanceSensAt, kBalanceCurveAt, t.velocityScale);
     m.balance = levelWithSum(sums.osc[kFormant], s8(in, kBalanceAt), t.balanceScale, 2.0f);
     m.balanceIndex = kBalanceIndex[u8(in, kOscAt) == 0 ? 0 : 1];
     m.balanceEnv = mul(depthCurve(s8(in, kBalanceEnvAt)), balanceVelocity);

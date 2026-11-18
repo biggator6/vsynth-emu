@@ -11,6 +11,7 @@
 #ifdef XT_VC2CARRIER_MAIN
 #include "Vc2Carrier.h"
 #include "Vc2CarrierCheck.h"
+#include "Vc2OscConvertTables.h"
 #include "XtSwitches.h"
 #include <bit>
 #include <cmath>
@@ -111,7 +112,8 @@ std::string initOn(Vc2Fw& fw, Vc2Carrier& c, std::mt19937& rng, int32_t& clock) 
 
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2carrier", vc2LoadCarrier);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2carrier",
+                              [](const char* rom) { return vc2LoadCarrier(rom) && vc2LoadOscConvert(rom); });
     if (!run) return 1;
     int32_t clock = 0;
     fw.cpu.hook(kVc2OsClock, [&clock](Sh4& cpu) { cpu.ret((uint32_t)clock); });
@@ -135,7 +137,8 @@ int main(int argc, char** argv) {
                 "with no P, %ld different\n", run->cases, n.blocks, n.growling, n.updates, n.dynamics, n.settings,
                 n.none, tally.different);
     const long osc = vc2VocoderOscCases(fw, *run, clock);   // the second part (v222)
-    std::printf("xt_vc2carrier: %ld different\n", tally.different + osc);
+    const long block = vc2OscConvertCases(fw, *run);        // the third (v251)
+    std::printf("xt_vc2carrier: %ld different\n", tally.different + osc + block);
     return 0;
 }
 #endif

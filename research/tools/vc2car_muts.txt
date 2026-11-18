@@ -97,9 +97,9 @@ table-logistic|{ 0x893f330c, &t.logistic }|{ 0x893f3310, &t.logistic }|vc2cartab
 table-clock-scale|{ 0x893f3308, &t.clockScale }|{ 0x893f330c, &t.clockScale }|vc2cartables
 # v222: the VOCODER OSC's converter's own part and kind 5's update (port vc2vocosc, Vc2VocoderOsc.cpp) and their
 # constants (vc2cartables). Not planted: the balance's index by OSC & 1 (the OSC byte is 0 or 1).
-vocosc-u8-7bit|uint8_t u8(const uint8_t* in, int at) { return in[at]; }|uint8_t u8(const uint8_t* in, int at) { return (uint8_t)(in[at] & 0x7f); }|vc2vocosc
-vocosc-s8-unsigned|int s8(const uint8_t* in, int at) { return (int8_t)in[at]; }|int s8(const uint8_t* in, int at) { return in[at]; }|vc2vocosc
-vocosc-s16-byte|    std::memcpy(&v, in + at, sizeof v);|    v = (int16_t)in[at];|vc2vocosc
+vocosc-u8-7bit|mul(flt(u8(in, level.at)), t.perLevel)|mul(flt(u8(in, level.at) & 0x7f), t.perLevel)|vc2vocosc
+vocosc-s8-unsigned|s8(in, kGrowlAt), t.growlScale|u8(in, kGrowlAt), t.growlScale|vc2vocosc
+vocosc-s16-byte|s16(in, kGrowlFollowAt)|s8(in, kGrowlFollowAt)|vc2vocosc
 vocosc-saw-level-at|{ 0x6d, &Vc2CarrierParams::sawLevel }|{ 0x6c, &Vc2CarrierParams::sawLevel }|vc2vocosc
 vocosc-threshold-at|{ 0x7c, &Vc2CarrierParams::threshold }|{ 0x7d, &Vc2CarrierParams::threshold }|vc2vocosc
 vocosc-growl-at|kGrowlAt = 0x72|kGrowlAt = 0x73|vc2vocosc
@@ -118,7 +118,7 @@ vocosc-index-swapped|kBalanceIndex[2] = { 3, 7 }|kBalanceIndex[2] = { 7, 3 }|vc2
 vocosc-curve-unsigned|    return mul(d < 0 ? -x : x, x);|    return mul(x, x);|vc2vocosc
 vocosc-lfo-floor-64|    } else if (d < -kDepthMax) {|    } else if (d < -kDepthMax - 1) {|vc2vocosc
 vocosc-lfo-no-sum|    int d = sum + depth;|    int d = depth;|vc2vocosc
-vocosc-velocity-32767|div(flt((uint16_t)v), vc2CarrierTables().velocityScale)|div(flt((uint16_t)v), 32767.0f)|vc2vocosc
+vocosc-velocity-32767|kGrowlSensAt, kGrowlCurveAt, t.velocityScale)|kGrowlSensAt, kGrowlCurveAt, 32767.0f)|vc2vocosc
 vocosc-velocity-args|shared.velocity(u8(in, kVelocityAt), s16(in, sensAt), u8(in, curveAt))|shared.velocity(u8(in, kVelocityAt), s16(in, curveAt), u8(in, sensAt))|vc2vocosc
 vocosc-held-no-top|    if (x > top) return top;\n    return 0.0f > x ? 0.0f : x;|    return 0.0f > x ? 0.0f : x;|vc2vocosc
 vocosc-sum-12001|div(flt(sum), vc2CarrierTables().sumScale)|div(flt(sum), 12001.0f)|vc2vocosc
@@ -159,3 +159,118 @@ table-growl-scale|{ 0x8939e0b4, &t.growlScale }|{ 0x8939e0c0, &t.growlScale }|vc
 table-cents-max|{ 0x893b0254, &t.centsMax }|{ 0x893b0264, &t.centsMax }|vc2cartables
 table-per-octave|{ 0x893b025c, &t.perOctave }|{ 0x8939e0a8, &t.perOctave }|vc2cartables
 table-ratio-max|{ 0x893b0264, &t.ratioMax }|{ 0x8939e0c0, &t.ratioMax }|vc2cartables
+# v251: the OSC block's converter (port vc2oscconv, Vc2OscConvert.cpp) and its constants (vc2oscconvtables,
+# Vc2OscConvertTables.cpp); v222's three readers, moved to Vc2InputReads.h, planted at their calls. Not planted, as no
+# input tells them apart: the cents curve's lines by ≥ (the curve is continuous at 36, 48 and 60); the integer hold's
+# bounds by ≥ (the bound is the value there); the calibration's step by d > 0 (d = 0 gives 0 either way); the level
+# scale's pool word read from the velocity's (both 32768).
+conv-osc-at|kOscAt = 2, kKeyAt = 3|kOscAt = 1, kKeyAt = 3|vc2oscconv
+conv-key-at|kKeyAt = 3, kWaveGainAt|kKeyAt = 4, kWaveGainAt|vc2oscconv
+conv-gain-at|kWaveGainAt = 0x0a|kWaveGainAt = 0x0b|vc2oscconv
+conv-pitch-at|kPitchAt = 0x0c|kPitchAt = 0x0d|vc2oscconv
+conv-pitch-kf-at|kPitchKfAt = 0x0e|kPitchKfAt = 0x0f|vc2oscconv
+conv-pitch-lfo-at|kPitchLfoAt = 0x10|kPitchLfoAt = 0x11|vc2oscconv
+conv-pitch-env-at|kPitchEnvAt = 0x11|kPitchEnvAt = 0x10|vc2oscconv
+conv-pitch-curve-at|kPitchCurveAt = 0x12|kPitchCurveAt = 0x13|vc2oscconv
+conv-pitch-sens-at|kPitchSensAt = 0x14|kPitchSensAt = 0x16|vc2oscconv
+conv-level-at|kLevelAt = 0x1c|kLevelAt = 0x1d|vc2oscconv
+conv-level-kf-at|kLevelKfAt = 0x1e|kLevelKfAt = 0x1c|vc2oscconv
+conv-level-lfo-at|kLevelLfoAt = 0x20|kLevelLfoAt = 0x21|vc2oscconv
+conv-level-curve-at|kLevelCurveAt = 0x21|kLevelCurveAt = 0x20|vc2oscconv
+conv-level-sens-at|kLevelSensAt = 0x22|kLevelSensAt = 0x24|vc2oscconv
+conv-wave-at|kWaveAt = 0x28|kWaveAt = 0x29|vc2oscconv
+conv-coarse-at|kCoarseAt = 0x88|kCoarseAt = 0x8a|vc2oscconv
+conv-fine-at|kFineAt = 0x90|kFineAt = 0x8c|vc2oscconv
+conv-p10-at|kPitch10At = 0x94|kPitch10At = 0x98|vc2oscconv
+conv-key-p10-at|kKeyPitch10At = 0x98|kKeyPitch10At = 0x9c|vc2oscconv
+conv-second-key-at|kSecondKeyAt = 0x9c|kSecondKeyAt = 0x9d|vc2oscconv
+conv-centre-64|kCentre = 60, kPerKey|kCentre = 64, kPerKey|vc2oscconv
+conv-a4-68000|kA4 = 69000|kA4 = 68000|vc2oscconv
+conv-level-top-126|kLevelTop = 127, kDepthMost|kLevelTop = 126, kDepthMost|vc2oscconv
+conv-depth-62|kDepthMost = 63;|kDepthMost = 62;|vc2oscconv
+conv-kf-5999|kKfDivisor = 6000|kKfDivisor = 5999|vc2oscconv
+conv-env-words-swapped|kPitchEnvWords[2] = { 1, 5 }|kPitchEnvWords[2] = { 5, 1 }|vc2oscconv
+conv-level-env-words|kLevelEnvWords[2] = { 4, 8 }|kLevelEnvWords[2] = { 4, 4 }|vc2oscconv
+conv-sum-pitch|kPitch = 0, kLevel = 3|kPitch = 1, kLevel = 3|vc2oscconv
+conv-sum-level|kLevel = 3, kLfoPitch|kLevel = 2, kLfoPitch|vc2oscconv
+conv-lfo-pitch|kLfoPitch = 1, kLfoLevel|kLfoPitch = 0, kLfoLevel|vc2oscconv
+conv-lfo-level|kLfoLevel = 4;|kLfoLevel = 3;|vc2oscconv
+conv-held-no-top|    if (v > most) return most;\n|\n|vc2oscconv
+conv-keysum-no-centre|(key - kCentre) * kf; }|key * kf; }|vc2oscconv
+conv-follow-down|(keySum(key, coarse, kf) + kPerKey - 1) / kPerKey|keySum(key, coarse, kf) / kPerKey|vc2oscconv
+conv-follow-nearest|(keySum(key, coarse, kf) + kPerKey - 1) / kPerKey|(keySum(key, coarse, kf) + kPerKey / 2) / kPerKey|vc2oscconv
+conv-follow-second-key|    b.key = followedKey(key, coarse, kf);|    b.key = followedKey(u8(input, kSecondKeyAt), coarse, kf);|vc2oscconv
+conv-cents-no-a4|div(flt((int32_t)(p10 - kA4)), t.perTenth)|div(flt((int32_t)p10), t.perTenth)|vc2oscconv
+conv-cents-no-top|    if (c > t.centsMost) return t.centsMost;\n    return t.centsLeast|    return t.centsLeast|vc2oscconv
+conv-cents-no-floor|    return t.centsLeast > c ? t.centsLeast : c;|    return c;|vc2oscconv
+conv-curve-no-sign|        sign = -1;|        sign = 1;|vc2oscconv
+conv-curve-table-lt|if (!(x > t.tableTop))|if (x < t.tableTop)|vc2oscconv
+conv-curve-three-lines|while (line + 1 < t.lines.size()|while (line + 2 < t.lines.size()|vc2oscconv
+conv-curve-nearest|t.cents[(size_t)xtf::ftrc(x)]|t.cents[(size_t)xtf::ftrc(x + 0.5f)]|vc2oscconv
+conv-curve-swapped|mul(add(mul(x, t.lines[line].slope), t.lines[line].offset), flt(sign))|mul(add(mul(x, t.lines[line].offset), t.lines[line].slope), flt(sign))|vc2oscconv
+conv-index-no-127|kf * k * kLevelTop / kKfDivisor|kf * k / kKfDivisor|vc2oscconv
+conv-index-not-short|heldBetween((int16_t)(follow + level), 0, kLevelTop)|heldBetween(follow + level, 0, kLevelTop)|vc2oscconv
+conv-row-past-10|row > kVc2OscCalibrationRows - 1 ? 0 : row|row > kVc2OscCalibrationRows - 1 ? 10 : row|vc2oscconv
+conv-bias-100|p10 - (uint32_t)(c.bias * kPerKey)|p10 - (uint32_t)(c.bias * 100)|vc2oscconv
+conv-kf-swapped|d * (uint32_t)c.upper : (0u - d) * (uint32_t)c.lower|d * (uint32_t)c.lower : (0u - d) * (uint32_t)c.upper|vc2oscconv
+conv-gain-no-floor|    if (0.0f > g) g = 0.0f;\n|\n|vc2oscconv
+conv-gain-no-one|add(div(flt((int32_t)step), t.kfScale), 1.0f)|div(flt((int32_t)step), t.kfScale)|vc2oscconv
+conv-cal-level-7bit|vc2OscLevelWord(t, c.level)|vc2OscLevelWord(t, c.level & 0x7f)|vc2oscconv
+conv-p10-no-fine|p10 = (uint32_t)keySum(key, coarse, kf) + fine;|p10 = (uint32_t)keySum(key, coarse, kf);|vc2oscconv
+conv-key-p10-first-key|keySum(u8(input, kSecondKeyAt), coarse, kf)|keySum(key, coarse, kf)|vc2oscconv
+conv-key-cents-p10|    b.keyCents = centsFromA4(keyP10, t);|    b.keyCents = centsFromA4(p10, t);|vc2oscconv
+conv-pitch-sum-unscaled|div(mul(flt(in.sums.osc[kPitch]), t.depthMost), t.sumScale)|div(flt(in.sums.osc[kPitch]), t.sumScale)|vc2oscconv
+conv-pitch-top-64|    if (x > t.depthMost) {|    if (x > t.depthMost + 1.0f) {|vc2oscconv
+conv-pitch-floor-64|    } else if (t.depthLeast > x) {|    } else if (t.depthLeast - 1.0f > x) {|vc2oscconv
+conv-beam-swapped|2 * in.beam[1] - in.beam[0]|2 * in.beam[0] - in.beam[1]|vc2oscconv
+conv-beam-single|2 * in.beam[1] - in.beam[0]|in.beam[1] - in.beam[0]|vc2oscconv
+conv-beam-cents|div(flt(beam), t.beamScale)|div(flt(beam), t.perOctave)|vc2oscconv
+conv-no-source|, octaves)), in.pitchSource);|, octaves)), 1.0f);|vc2oscconv
+conv-octaves-127|div(centsCurve(x, t), t.perOctave)|div(centsCurve(x, t), t.beamScale)|vc2oscconv
+conv-velocity-once|    velocity = mul(velocity, velocity);\n|\n|vc2oscconv
+conv-level-velocity-pitch|vc2VelocityFactor(input, shared, kLevelSensAt, kLevelCurveAt, t.velocityScale)|vc2VelocityFactor(input, shared, kPitchSensAt, kPitchCurveAt, t.velocityScale)|vc2oscconv
+conv-level-no-hold|heldBetween(in.sums.osc[kLevel] + u8(input, kLevelAt), 0, kLevelTop)|in.sums.osc[kLevel] + u8(input, kLevelAt)|vc2oscconv
+conv-level-next-word|vc2OscLevelWord(t, index)|vc2OscLevelWord(t, index + 1)|vc2oscconv
+conv-word58|    b.word58 = 0;\n|\n|vc2oscconv
+conv-word40|    b.word40 = 0;\n|\n|vc2oscconv
+conv-level-lfo-unsigned|mul(d >= 0 ? q : -q, q)|mul(q, q)|vc2oscconv
+conv-level-lfo-no-sum|heldBetween(in.sums.lfo[kLfoLevel] + s8(input, kLevelLfoAt), -kDepthMost, kDepthMost)|heldBetween(s8(input, kLevelLfoAt), -kDepthMost, kDepthMost)|vc2oscconv
+conv-pitch-lfo-no-hold|heldBetween(in.sums.lfo[kLfoPitch] + s8(input, kPitchLfoAt), -kDepthMost, kDepthMost)|in.sums.lfo[kLfoPitch] + s8(input, kPitchLfoAt)|vc2oscconv
+conv-env-no-velocity|mul(centsCurve(flt(s8(input, kPitchEnvAt)), t), velocity)|centsCurve(flt(s8(input, kPitchEnvAt)), t)|vc2oscconv
+conv-gain-db-10|div(flt(s8(input, kWaveGainAt)), t.gainScale)|div(flt(s8(input, kWaveGainAt)), t.perTenth)|vc2oscconv
+conv-gain-no-cal|    b.gain = mul(calibrationGain(row, (uint32_t)s32(input, kPitch10At), in, t), gain);|    b.gain = gain;|vc2oscconv
+conv-gain-key-p10|calibrationGain(row, (uint32_t)s32(input, kPitch10At), in, t)|calibrationGain(row, (uint32_t)s32(input, kKeyPitch10At), in, t)|vc2oscconv
+conv-osc-low-bit|u8(input, kOscAt) == 0 ? 0 : 1|u8(input, kOscAt) & 1|vc2oscconv
+conv-s8-unsigned|flt(s8(input, kPitchAt))|flt(u8(input, kPitchAt))|vc2oscconv
+conv-s16-byte|s16(input, kLevelKfAt)|s8(input, kLevelKfAt)|vc2oscconv
+conv-s32-half|(uint32_t)s32(input, kFineAt)|(uint32_t)s16(input, kFineAt)|vc2oscconv
+conv-u8-7bit|u8(input, kLevelAt), 0, kLevelTop)|(u8(input, kLevelAt) & 0x7f), 0, kLevelTop)|vc2oscconv
+conv-analog-row-next|{ return u8(input, kWaveAt); }|{ return u8(input, kWaveAt) + 1; }|vc2oscconv
+convt-per-tenth|{ 0x8939d07c, &t.perTenth }|{ 0x8939d084, &t.perTenth }|vc2oscconvtables
+convt-cents-most|{ 0x8939d084, &t.centsMost }|{ 0x8939d07c, &t.centsMost }|vc2oscconvtables
+convt-cents-least|{ 0x8939d310, &t.centsLeast }|{ 0x8939d324, &t.centsLeast }|vc2oscconvtables
+convt-depth-most|{ 0x8939d31c, &t.depthMost }|{ 0x8939d330, &t.depthMost }|vc2oscconvtables
+convt-depth-least|{ 0x8939d324, &t.depthLeast }|{ 0x8939d310, &t.depthLeast }|vc2oscconvtables
+convt-sum-scale|{ 0x8939d320, &t.sumScale }|{ 0x8939d328, &t.sumScale }|vc2oscconvtables
+convt-per-octave|{ 0x8939d328, &t.perOctave }|{ 0x8939d320, &t.perOctave }|vc2oscconvtables
+convt-beam-scale|{ 0x8939d330, &t.beamScale }|{ 0x8939d31c, &t.beamScale }|vc2oscconvtables
+convt-velocity-scale|{ 0x8939d340, &t.velocityScale }|{ 0x8939d320, &t.velocityScale }|vc2oscconvtables
+convt-gain-scale|{ 0x8939d350, &t.gainScale }|{ 0x8939d07c, &t.gainScale }|vc2oscconvtables
+convt-table-top|{ 0x8939c2dc, &t.tableTop }|{ 0x8939c2e0, &t.tableTop }|vc2oscconvtables
+convt-line0-top|{ 0x8939c2e0, &t.lines[0].top }|{ 0x8939c2ec, &t.lines[0].top }|vc2oscconvtables
+convt-line0-offset|{ 0x8939c2e4, &t.lines[0].offset }|{ 0x8939c2f0, &t.lines[0].offset }|vc2oscconvtables
+convt-line0-slope|{ 0x8939c2e8, &t.lines[0].slope }|{ 0x8939c2f4, &t.lines[0].slope }|vc2oscconvtables
+convt-line1-top|{ 0x8939c2ec, &t.lines[1].top }|{ 0x8939c2f8, &t.lines[1].top }|vc2oscconvtables
+convt-line1-offset|{ 0x8939c2f0, &t.lines[1].offset }|{ 0x8939c2fc, &t.lines[1].offset }|vc2oscconvtables
+convt-line1-slope|{ 0x8939c2f4, &t.lines[1].slope }|{ 0x8939c300, &t.lines[1].slope }|vc2oscconvtables
+convt-line2-top|{ 0x8939c2f8, &t.lines[2].top }|{ 0x8939c2e0, &t.lines[2].top }|vc2oscconvtables
+convt-line2-offset|{ 0x8939c2fc, &t.lines[2].offset }|{ 0x8939c304, &t.lines[2].offset }|vc2oscconvtables
+convt-line2-slope|{ 0x8939c300, &t.lines[2].slope }|{ 0x8939c308, &t.lines[2].slope }|vc2oscconvtables
+convt-line3-offset|{ 0x8939c304, &t.lines[3].offset }|{ 0x8939c2fc, &t.lines[3].offset }|vc2oscconvtables
+convt-line3-slope|{ 0x8939c308, &t.lines[3].slope }|{ 0x8939c300, &t.lines[3].slope }|vc2oscconvtables
+convt-kf-scale|{ 0x8939cb24, &t.kfScale }|{ 0x8939cb2c, &t.kfScale }|vc2oscconvtables
+convt-level-scale|{ 0x8939cb2c, &t.levelScale }|{ 0x8939cb24, &t.levelScale }|vc2oscconvtables
+convt-cents-at|kCentsAt = 0x89540114|kCentsAt = 0x89540115|vc2oscconvtables
+convt-level-at|kLevelAt = 0x89541f34|kLevelAt = 0x89541f36|vc2oscconvtables
+convt-level-before|kLevelBefore = 128|kLevelBefore = 127|vc2oscconvtables
+convt-cents-short|i < cents.size(); ++i) cents[i]|i + 1 < cents.size(); ++i) cents[i]|vc2oscconvtables
