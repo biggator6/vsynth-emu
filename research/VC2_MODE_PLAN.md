@@ -508,8 +508,11 @@ version against rom.4's routines with what it calls hooked:
        note-on cases (rom.4's copies of the object's words into D's, `Vc2CosmCaseCopy`); the types of one or two
        values one template (`Vc2CosmValueType`), each through its XtCosm class's own note-on (HARDWARE_FIRMWARE.md,
        "The VC-2's COSM adapters: OD/Dist, the Wave Shaper and the Amp Simulator").
-     - next: the rest of the types' adapters a few a version (the Dual Filter, Dynamic TVF and TB Filter, whose cases
-       hold more; then the buffered ones, the Side Band Filters, Compressor, Limiter and Frequency Shifter), then the
+     - done (v255): the Dual Filter's (12), the Dynamic TVF's (14) and the TB Filter's (20) adapters, the TVF (13)
+       moved onto XtCosmTvf with the Dynamic TVF; the TB Filter's in Vc2CosmTbAdapter.cpp, its new block's targets and
+       note-on case's coefficients XtCosmTb's (HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Dual Filter, the
+       Dynamic TVF and the TB Filter").
+     - next: the buffered types' adapters (the Side Band Filters, Compressor, Limiter and Frequency Shifter), then the
        update (the held levels and rates, each code's inline case) and the DSP by code, mono and stereo, over XtCosm's
        types and the Growl.
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's

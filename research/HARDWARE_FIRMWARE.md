@@ -1546,6 +1546,43 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM adapters: the Dual Filter, the Dynamic TVF and the TB Filter (2026-11-17, v255) {#vc2-cosm-adapters-filters}
+
+Step 4.2's COSM object, its sixth part (research/VC2_MODE_PLAN.md). The three come in through XtCosm's classes, which are unchanged. Every address is rom.4's, every offset the object's or its block's.
+
+**The Dual Filter, 12.**
+- Its block (`Vc2CosmDualBlock`): the Filter Type +4, then each filter's Frequency, Env depth and Q, its LFO depth two words past the Q: from +8 and from +0x20.
+- Start values (`0x893a89f0`): each filter's Frequency with its depths on envelope A and LFO A (the second filter B's), through the TVF's table step `0x893a83f0` capped by its own Q, into D+0xbc and +0xc0. XtCosmDual's.
+- New block (`0x893a9740`): the same on the held levels into +0xfc and +0x100, and the block's +4…+0x37 into +0x14…+0x47.
+- Note-on case (`0x893aa470`): the two Qs (+0x20, +0x38) into D+0x90 and +0x94. XtCosmDual keeps only the first, as `startQ1`; the second is the same copy.
+
+**The Dynamic TVF, 14.**
+- Its start values are the TVF's (`0x893a8a50`, one case for 13 and 14).
+- New block (`0x893a9b80`): the raw sums into the targets, with no clamp or table (XtCosmTvf's `dynamic` path), and the whole block, +4…+0x37, where the TVF's leaves its +0x18 and +0x30.
+- Note-on case (`0x893aa490`): the two Own depths (+0x28, +0x40) into D+0x90 and +0x94.
+- The TVF (13) moved onto XtCosmTvf with it, one block reader for both, in place of v252's calls of `xtTvfQ` and `xtTvfCutoff`. The class's note-on forms the same words from the same laws.
+
+**The TB Filter, 20**, in Vc2CosmTbAdapter.cpp:
+- Its start values `0x893b9130` are an `rts`, so its row has none.
+- New block (`0x893b9530`): the block's +4…+0x43 into +0x14…+0x53, then the targets × 0.01: the LPF's c0, c1, c2 and Q into D+0x3c…+0x48, the HPF's c0, c1 and the gain into D+0x78…+0x80. XtCosmTb's `setBlock` on the held levels, slot 1 the LPF's and slot 2 the HPF's.
+- Note-on case (`0x893b9140`): each target / 0.01 into its coefficient (D+0x1c…+0x28, D+0x5c…+0x64), and the states D+0x2c…+0x38 and D+0x68…+0x74 cleared. The adapter runs XtCosmTb's note-on on the object's copy of the block and the held levels, the same input the new block just used, so the division stays in XtCosm.
+- Its four floats (`0x899d87e0`…`0x899d87ec`) are written by a static initializer, `0x893b98e0`, in the same table as the pools' `0x893ab550`. XtCosmTb holds them as constants. A fresh interpreter runs no static initializer, so the check calls it at each case's start.
+
+**The adapters' files:**
+- A setting's words are now given to `settingsAt` by word: these types' two settings are six words apart, the earlier types' five. The Dual Filter's LFO depth is four words past its value, where the others' is three (`lfoAt`).
+- Vc2CosmAdapters.cpp would have passed 300 lines, so its access to rom.4's words moved as it stood into Vc2CosmAdapterWords.cpp (namespace `Vc2CosmAdapter`).
+
+**The check**, xt_vc2cosm's sixth part: codes 12, 14 and 20 are among its note-ons and new blocks, their blocks drawn as their converters give them. The TB Filter's ranges reach both ways of every branch of its targets at 400 cases: the cutoff's two limits, the Q's two, the HPF's three.
+
+Results:
+- seed 2024, 40 cases: 903 note-ons (529 adapted), 574 new blocks (182 adapted); 0 different on the first run, with the address and undefined-behaviour sanitizers on. The other five parts are as they were.
+- seeds 7 and 31337, 400 cases each: 8,885 and 9,015 note-ons (5,053 and 5,235 adapted), 5,960 and 5,932 new blocks (1,863 and 1,901 adapted); 0 different.
+- Coverage: every line, region and function of Vc2CosmAdapters.cpp, Vc2CosmAdapterWords.cpp and Vc2CosmTbAdapter.cpp.
+- `mutate_vc2.py --cosm`: 1,059 plants, all caught. 119 are new or rewritten: 69 in `vc2cosmadapters` (the settings' words, the three types' fields, values, targets, copies, cases and rows, the TVF's v252 plants following it onto XtCosmTvf), 26 in `vc2cosmtb`, 9 in `vc2cosmwords` (the word access, moved with its plants) and 15 in `vc2xtcosm` (XtCosmDual's, XtCosmTvf's and XtCosmTb's laws under xt_vc2cosm).
+- Two plants that left out one of the TB case's clears were missed at the first run, and can't differ: the frame's note-on has zeroed those words already, and nothing writes them before the case. They're planted as a wrong value instead, and caught.
+- Not planted, as no input tells them apart: the blocks' words only the DSPs read (the Filter Types, the Own depths through XtTvfBlock), the key read unsigned (0…127), and the view's layout (a `static_assert`'s).
+- XtCosm is unchanged. fcheck's diff is xt_vc2cosm's `note-on:` line. verify.sh passes every line.
+
 ### The VC-2's COSM adapters: OD/Dist, the Wave Shaper and the Amp Simulator (2026-11-17, v254) {#vc2-cosm-adapters-drive}
 
 Step 4.2's COSM object, its fifth part (research/VC2_MODE_PLAN.md): the first types with a note-on case of their own, inline in the note-on's switch. They come in as v252's and v253's did, through XtCosm's classes, which are unchanged. Every address is rom.4's, every offset the object's or its block's.

@@ -7,11 +7,13 @@ namespace {
 constexpr int32_t kSpeaker = 5;                     // [FW] the Speaker Simulator's code
 constexpr uint32_t kBoundStride = 0x100;
 constexpr uint32_t kLevel = 0x4c, kRate = 0x54, kLfoLevel = 0x38, kStartLevel = 0x58;   // [FW] the bound objects' words
-// [FW] the bytes whose start values the port has (0, 5, 10, 11, 15, 16 none; 1…4, 6, 9, 13, 19 its rows), none past 20
-constexpr std::array<uint8_t, 14> kPassingBytes { 0, 1, 2, 3, 4, 5, 6, 9, 10, 11, 13, 15, 16, 19 };
+// [FW] the bytes whose start values the port has (0, 5, 10, 11, 15, 16 none; 1…4, 6, 9, 12…14, 19, 20 its rows), none
+// past 20
+constexpr std::array<uint8_t, 17> kPassingBytes { 0, 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20 };
 constexpr int32_t kFirstBuffered = 7;               // [FW] the allocator's: the code's byte − 7, 0…3 and 8…11 take a slot
-// [FW] the adapted types' codes (v252…v254)
-constexpr int32_t kOd = 1, kDs = 2, kWs = 3, kAmp = 4, kResonator = 6, kTvf = 13, kLofi = 19;
+// [FW] the adapted types' codes (v252…v255)
+constexpr int32_t kOd = 1, kDs = 2, kWs = 3, kAmp = 4, kResonator = 6, kDual = 12, kTvf = 13, kDtvf = 14, kLofi = 19;
+constexpr int32_t kTb = 20;
 
 float moderate(std::mt19937& rng, float from, float to) { return from + (to - from) * vc2Unit(rng); }
 
@@ -60,12 +62,43 @@ void drawAmpBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
     for (float most : { 4.0f, 1.0f, 2.0f, 1.0f }) setBlockFloat(b, k++, moderate(rng, 0.0f, most));
 }
 
-// The TVF's converter: Q·0.984375/127 − 1, Cutoff 0…1, their Env, LFO and Own depths within ±1, Filter Type 0…4
+// A Q as the converters give it: Q·0.984375/127 − 1, Q 0…127
+float drawnQ(std::mt19937& rng) { return (float)(rng() % 128) * 0.984375f / 127.0f - 1.0f; }
+
+// The TVF's and the Dynamic TVF's converter: Q, Cutoff 0…1, their Env, LFO and Own depths within ±1, Filter Type 0…4
 void drawTvfBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
-    setBlockFloat(b, 0, (float)(rng() % 128) * 0.984375f / 127.0f - 1.0f);
+    setBlockFloat(b, 0, drawnQ(rng));
     for (int k : { 1, 3, 5, 7, 9, 11 }) setBlockFloat(b, k, moderate(rng, -1.0f, 1.0f));
     setBlockFloat(b, 6, moderate(rng, 0.0f, 1.0f));
     b.words[12] = rng() % 5;
+}
+
+// The Dual Filter's converter (v255): Filter Type 0…2, each filter's Frequency 0…1, Env depth and LFO depth within
+// ±1 and Q, from words 1 and 7
+void drawDualBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    b.words[0] = rng() % 3;
+    for (int at : { 1, 7 }) {
+        setBlockFloat(b, at, moderate(rng, 0.0f, 1.0f));
+        setBlockFloat(b, at + 1, moderate(rng, -1.0f, 1.0f));
+        setBlockFloat(b, at + 2, drawnQ(rng));
+        setBlockFloat(b, at + 4, moderate(rng, -1.0f, 1.0f));
+    }
+}
+
+// A word of a block and the range its converter gives it
+struct Vc2CosmWordRange {
+    int word;
+    float from, to;
+};
+
+// The TB Filter's converter (v255): Gain 0…2, LPF Cutoff 0…1, its Keyfollow ±2, Q 0…1, Q Follow ±1, HPF Cutoff 0…1,
+// its Keyfollow ±2, the Env and LFO depths within ±1; the key 0…127, a byte
+constexpr Vc2CosmWordRange kTbRanges[] { { 0, 0.0f, 2.0f }, { 1, 0.0f, 1.0f }, { 2, -2.0f, 2.0f }, { 3, 0.0f, 1.0f },
+                                         { 4, -1.0f, 1.0f }, { 5, 0.0f, 1.0f }, { 6, -2.0f, 2.0f }, { 7, -1.0f, 1.0f },
+                                         { 9, -1.0f, 1.0f }, { 11, -1.0f, 1.0f }, { 13, -1.0f, 1.0f } };
+void drawTbBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    for (const Vc2CosmWordRange& r : kTbRanges) setBlockFloat(b, r.word, moderate(rng, r.from, r.to));
+    b.words[15] = (b.words[15] & 0xffffff00u) | (rng() % 128);
 }
 
 // The Growl's converter: Intencity I/127, Speed 2·S/128 − 1, its two settings' depths and numbers
@@ -88,19 +121,22 @@ struct Vc2CosmBlockDraw {
     uint8_t code;
     void (*draw)(Vc2CosmBlockWords& b, std::mt19937& rng);
 };
-constexpr std::array<Vc2CosmBlockDraw, 8> kBlockDraws { { { kOd, drawOdBlock },
-                                                          { kDs, drawOdBlock },
-                                                          { kWs, drawWsBlock },
-                                                          { kAmp, drawAmpBlock },
-                                                          { kResonator, drawResBlock },
-                                                          { (uint8_t)Vc2CosmGrowl::kCode, drawGrowlBlock },
-                                                          { kTvf, drawTvfBlock },
-                                                          { kLofi, drawLofiBlock } } };
+constexpr std::array<Vc2CosmBlockDraw, 11> kBlockDraws { { { kOd, drawOdBlock },
+                                                           { kDs, drawOdBlock },
+                                                           { kWs, drawWsBlock },
+                                                           { kAmp, drawAmpBlock },
+                                                           { kResonator, drawResBlock },
+                                                           { (uint8_t)Vc2CosmGrowl::kCode, drawGrowlBlock },
+                                                           { kDual, drawDualBlock },
+                                                           { kTvf, drawTvfBlock },
+                                                           { kDtvf, drawTvfBlock },
+                                                           { kLofi, drawLofiBlock },
+                                                           { kTb, drawTbBlock } } };
 
 // A code the port has a type for, or one past 20 whose byte the switches pass
 int32_t drawCode(std::mt19937& rng) {
-    const std::array<int32_t, 10> ported { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, Vc2CosmGrowl::kCode, kTvf,
-                                           kLofi };
+    const std::array<int32_t, 13> ported { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, Vc2CosmGrowl::kCode, kDual,
+                                           kTvf, kDtvf, kLofi, kTb };
     if (rng() % 4 != 0) return ported[rng() % ported.size()];
     const uint8_t low = rng() % 2 ? kPassingBytes[rng() % kPassingBytes.size()] : (uint8_t)(21 + rng() % 235);
     const uint32_t high = rng() % 2 ? 0xffffff00u : (uint32_t)(1 + rng() % 0x7fff) << 8;

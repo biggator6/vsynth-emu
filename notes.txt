@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM adapters for the Dual Filter, the Dynamic TVF and the TB Filter v255 (2026-11-17, on its own branch
+  after v254; HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Dual Filter, the Dynamic TVF and the TB Filter").
+  Vc2CosmAdapters: rows for codes 12 and 14 by XtCosmDual's and XtCosmTvf's laws, their note-on cases rom.4's copies;
+  the TVF (13) moved onto XtCosmTvf with the Dynamic TVF. Vc2CosmTbAdapter: the TB Filter (20), its new block's targets
+  and note-on case's coefficients XtCosmTb's, on a view of the object's words. Vc2CosmAdapterWords: the adapters' access
+  to rom.4's words, moved as it stood (Vc2CosmAdapters.cpp at its line limit). xt_vc2cosm runs rom.4's static
+  initializer of the TB's floats, 0x893b98e0. XtCosm unchanged. 0 different at seeds 2024, 7 and 31337.
+  mutate_vc2.py --cosm: 1,059 plants (119 new or rewritten), all caught. Not in the sound yet.
+
 The VC-2's COSM adapters for OD/Dist, the Wave Shaper and the Amp Simulator v254 (2026-11-17, on its own branch after
   v253; HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: OD/Dist, the Wave Shaper and the Amp Simulator"). The first
   types with note-on cases of their own. Vc2CosmAdapters: rows for codes 1, 2, 3 and 4, their start values and new

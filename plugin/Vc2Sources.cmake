@@ -69,4 +69,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2CosmPools.cpp
     Source/Vc2CosmNoteOn.cpp
     Source/Vc2CosmAdapters.cpp
+    Source/Vc2CosmAdapterWords.cpp
+    Source/Vc2CosmTbAdapter.cpp
 )
