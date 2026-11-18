@@ -1645,6 +1645,35 @@ Results:
 - `mutate_vc2.py --cosm`: 1,131 plants, all caught. 72 are new: 51 in `vc2cosmbuffered`, 10 in `vc2cosmadapters` (the codes and rows), 1 in `vc2cosmnoteon` (the allocator's last code) and 10 in `vc2xtcosm` (the three classes' laws under xt_vc2cosm).
 - Not planted, as no input tells them apart: which of the Limiter's four words its note-on case reads (all 1), the Compressor's gain and gain target swapped (equal at a note-on), the Ratio read unsigned (0…3).
 
+### The VC-2's logf and powf (2026-11-17, v257) {#vc2-libm}
+
+Step 4.2's shared math (research/VC2_MODE_PLAN.md): rom.4's single-precision `logf` and `powf` as a port, `Vc2LibMath`, on XtFloat, so the wiring can call them without the interpreter. `Vc2ToneShared` still gives rom.4's own routines (`RomShared`) on both sides of the converters' and ramps' checks; **the wiring takes the port next**.
+
+The routines, read from the disassembly:
+- **The wrappers** `0x895065f4` (logf) and `0x89506e54` (powf) call their cores `0x89509a78` and `0x89509b80` and hand back fr0 untouched. All they add is errno at `0x89add990`: 1101 for a NaN answer, 1100 for an infinite one, nothing otherwise. The port leaves errno out; xt_vc2libm holds the firmware's errno to that rule on every call.
+- **Every routine first classes its argument** by the same inline test: the sign, then zero, infinite or NaN. Zero is an `fcmp/eq` with 0, so **a denormal counts as zero**.
+- **logf** (`0x89509a78`, rom.2's `0x89531b78`): NaN and negative give the library's NaN, zero −∞, +∞ itself, exactly 1 gives 0. Otherwise (e + ½)·ln 2 + z·S(z²), where z = (m − √2)/(m + √2) on the mantissa m in [1, 2) and S has 8 coefficients.
+- **exp** (`0x89509928`): NaN gives NaN, zero 1. From an exponent of 15 up it answers 0 or +∞ by the sign, without the series. Otherwise x/ln 2 splits into a whole part and a fraction; a fraction of half an octave or more moves to the nearer whole octave. The answer is P(f·ln 2)/Q(f·ln 2), 7 coefficients each, through ldexp.
+- **ldexp** (`0x8950ae24`) works on the fields alone: NaN stays the library's NaN, ±∞ stays, a denormal or zero gives a signed zero, and a result outside the exponent's range gives ±∞ or a signed zero by n's sign.
+- **powf** (`0x89509b80`) is exp(y · log x), with its own edges:
+
+| x | y | answer |
+|---|---|---|
+| NaN | any, 0 included | NaN |
+| any, 0 included | NaN | NaN |
+| ±0 or denormal | above 0 | +0, whatever x's sign |
+| ±0 or denormal | 0 or below | NaN |
+| anything else | ±0 or denormal | 1 |
+| below 0 | not whole, or infinite | NaN |
+| below 0 | whole | exp(y · log −x), negated when y is odd |
+| 1 | ±∞ | NaN (0 × ∞ reaches exp) |
+
+So this powf parts from C's in several places: `pow(0, 0)`, `pow(NaN, 0)` and `pow(1, ∞)` are NaN here, and `pow(0, y < 0)` is NaN where C gives ∞.
+
+The constants, the NaN's word among them, are read from rom.4 at the start (`Vc2LibMathTables`, by `loadVc2`). The host's denormals must be flushed, as the audio thread's are: the fraction's product in exp is flushed on the SH-4, and an unflushed one moves the series by a unit.
+
+The check, `xt_vc2libm`: each routine against rom.4's own in the interpreter, every answer bit for bit, NaNs' too, on its edges (every pair for powf), draws aimed at its branches, and a sweep of every 4096th float pattern from an offset the seed draws. 0 different at seed 2024 (fcheck's 20,000 draws a routine, 5,352,268 calls) and at seeds 7 and 31337 (200,000 draws, 6,072,268 calls each). Every branch of `Vc2LibMath.cpp` is covered (68 of 68). `mutate_vc2.py --libm`: 106 of 106 plants caught. Twelve other plants changed nothing an input can show: they were run, missed and dropped, and `vc2libm_muts.txt`'s header names the kinds.
+
 ### The VC-2's analog converter's second part (2026-11-17, v256) {#vc2-analog-converter-second}
 
 Step 4.2's OSC voice (the user's "Start v256", 2026-11-17). rom.4's analog converter `0x8939cf70` after the part it shares with the VOCODER's (v251, "The VC-2's OSC block converter"): `0x8939d3a2` to its end at `0x8939da96`. It writes the OSC block's +0xb0…+0xf3 and nothing below. The words are rom.2's analog block's (`XtAnalogBlock`, XtAnalog.h) 0x30 up, word for word; rom.4's block has the 0x30 bytes more before them.

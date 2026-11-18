@@ -76,4 +76,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2CosmAdapterWords.cpp
     Source/Vc2CosmTbAdapter.cpp
     Source/Vc2CosmBufferedAdapters.cpp
+    Source/Vc2LibMath.cpp
+    Source/Vc2LibMathTables.cpp
 )

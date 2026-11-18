@@ -26,7 +26,8 @@
 # TVF's (vc2cosmtvf), under xt_vc2cosm; the converters on rom.4's libm (v239): OD/Dist's and the Wave Shaper's
 # (vc2cosmdrive), the Resonator's, Frequency Shifter's and Lo-Fi's (vc2cosmbalanced), under xt_vc2cosm; the Side Band
 # Filters' (vc2cosmsideband, v241), under xt_vc2cosm; the Matrix core's refresh and groups (v243) in vc2matrix's file;
-# the Matrix's sources (vc2matrixsources, v245), under xt_vc2cosm.
+# the Matrix's sources (vc2matrixsources, v245), under xt_vc2cosm; the library's logf and powf (vc2libm) and their
+# constants (vc2libmtables) under xt_vc2libm.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -56,6 +57,7 @@ VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmT
          Vc2MatrixSetupDraws Vc2CosmObject Vc2CosmObjectCheck Vc2CosmPools Vc2CosmNoteOn Vc2CosmNoteOnCheck
          Vc2CosmNoteOnDraws Vc2CosmAdapters Vc2CosmAdapterWords Vc2CosmTbAdapter Vc2CosmBufferedAdapters XtCosm XtOsc
          XtEnvelope)
+VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -138,6 +140,8 @@ VC2PORTS=(
     "vc2cosmdrive|Vc2CosmDrive.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmsideband|Vc2CosmSideBand.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmbalanced|Vc2CosmBalanced.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2libm|Vc2LibMath.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
+    "vc2libmtables|Vc2LibMathTables.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port

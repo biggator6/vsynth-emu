@@ -35,6 +35,10 @@ rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,xt_vc2in,xt_vc2legacy,xt_v
 rm -f "$O"/{xt_vc2carrier,xt_vc2tracker,xt_vc2kind6,xt_vc2autonote,xt_vc2mixer,xt_vc2tone,xt_vc2osc,classifier_test,rd}
 rm -f "$O"/xt_vc2tva
 rm -f "$O"/xt_vc2cosm
+rm -f "$O"/xt_vc2libm
+# The library's logf and powf against rom.4's own routines
+[ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \
+   "${SH4[@]}" -o "$O/xt_vc2libm" &
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp "${SH4[@]}" -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp "${SH4[@]}" -o "$O/xt_cosm" &
 cc -DXT_LFO_MAIN XtLfo.cpp "${SH4[@]}" -o "$O/xt_lfo" &

@@ -360,6 +360,12 @@ The VC-2's COSM adapters for the Compressor, the Limiter and the Frequency Shift
   A note-on case now gets the block. XtCosm unchanged. 0 different at seeds 2024, 7 and 31337. mutate_vc2.py --cosm:
   1,131 plants (72 new), all caught. The Side Band Filters wait for v260. Not in the sound yet.
 
+The VC-2's logf and powf v257 (2026-11-17, on its own branch from vc2-mode's 5766f4d; HARDWARE_FIRMWARE.md, "The
+  VC-2's logf and powf"). Vc2LibMath: rom.4's logf (0x895065f4), powf (0x89506e54), exp (0x89509928) and ldexp
+  (0x8950ae24) on XtFloat, the constants read by vc2LoadLibMath in loadVc2. xt_vc2libm against rom.4's own routines,
+  every answer bit for bit: 0 different at seeds 2024, 7 and 31337; 68 of 68 branches; mutate_vc2.py --libm 106 of 106
+  caught. Vc2ToneShared still gives rom.4's own routines: the wiring takes the port next.
+
 The VC-2's analog converter's second part v256 (2026-11-17, on vc2-mode after the merge of v252 and v253, 5766f4d; the
   user's "Start v256"; HARDWARE_FIRMWARE.md, "The VC-2's analog converter's second part"): step 4.2's OSC voice. rom.4's
   0x8939cf70 from its waveform switch to its end writes the block's +0xb0…+0xf3, rom.2's analog block's words 0x30 up:

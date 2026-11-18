@@ -39,7 +39,9 @@
 # (PORT=vc2growl, vc2cosmtables, vc2cosmmath: the Growl, v234), Vc2CosmConvert.cpp, Vc2CosmTvf.cpp, Vc2Matrix.cpp and
 # Vc2MatrixTables.cpp (vc2cosmconvert, vc2cosmtvf, vc2matrix, vc2matrixtables: the converters' frame, v235),
 # Vc2CosmFilters.cpp, Vc2CosmDynamics.cpp and Vc2CosmConverters.cpp (vc2cosmfilters, vc2cosmdynamics, vc2cosmtypes: the
-# converters' first batch, v237), through xt_vc2cosm, [cases] its cases (40).  One line
+# converters' first batch, v237), through xt_vc2cosm, [cases] its cases (40).  --libm: vc2libm_muts.txt, in
+# Vc2LibMath.cpp and Vc2LibMathTables.cpp (PORT=vc2libm, vc2libmtables: the library's logf and powf), through
+# xt_vc2libm, [cases] its draws a routine (20000, fcheck's).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist
@@ -72,6 +74,8 @@ HARNESSES = {
               '40'),
     '--cosm': (mutlist.Harness('mutate_vc2', 'xt_vc2cosm', 'vc2cosm_muts.txt', ('vc2growl', '2024'), 'XT_VC2COSM_STOP'),
                '40'),
+    '--libm': (mutlist.Harness('mutate_vc2', 'xt_vc2libm', 'vc2libm_muts.txt', ('vc2libm', '2024'), 'XT_VC2LIBM_STOP'),
+               '20000'),
 }
 args = sys.argv[1:]
 switch = args.pop(0) if args and args[0] in HARNESSES else ''
