@@ -429,11 +429,12 @@ version against rom.4's routines with what it calls hooked:
      clock and the words the tone, the OSC voice and the TVA read, against rom.4's own routines in xt_vc2tone
      (HARDWARE_FIRMWARE.md, "The VC-2's envelopes and LFOs"). Split by what rom.4 holds (the VC-2 session's decision,
      2026-11-18): the free LFOs' manager is v271.
-   - open (v271): the free LFOs' manager at `0x8a0c6d84` whole: its constructor `0x893ad4c0`, the 384 free objects, and
-     the routines v268 leaves hooked in xt_vc2tone or unported: `unfollow` `0x893ad720`, the take `0x893ad640`, the lists
-     `0x893ad780` and `0x893ad800`, the attach `0x893acfc0`, the free start `0x893acf10`, the follow `0x893ace60`, the free
-     objects' tick (`0x893aca60`, the manager's pass `0x893ad5f0`) and clock (`0x893acba0`, the manager's pass
-     `0x893ad870`), with their hooks out of xt_vc2tone.
+   - done (v271): the free LFOs' manager at `0x8a0c6d84` whole, `Vc2FreeLfos`: its constructor `0x893ad4b0`, the 384 free
+     objects, `unfollow` `0x893ad720`, the take `0x893ad640`, the lists `0x893ad780` and `0x893ad800`, the attach
+     `0x893acfc0`, the free start `0x893acf10`, the follow `0x893ace60`, the free objects' tick (`0x893aca60`, the manager's
+     pass `0x893ad5f0`) and clock (`0x893acba0`, the manager's pass `0x893ad870`), their hooks out of xt_vc2tone
+     (HARDWARE_FIRMWARE.md, "The VC-2's free LFOs"). For the wiring: nothing in rom.4 calls the tick pass, so it must not
+     run at each control tick as rom.2's does; the clock pass runs from `0x893b173e`.
    - done (v269): the tone's OSC mix, `Vc2ToneMix`: rom.4's object at the tone's +0x1ab8, its constructor, note-on, install,
      empty update and eight renders, and the delay lines `Vc2ToneMixRings`, against rom.4's own routines in xt_vc2tone
      (HARDWARE_FIRMWARE.md, "The VC-2's OSC mix").

@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's free LFOs v271 (2026-11-18, after vc2-mode's merge of v268 to v270; HARDWARE_FIRMWARE.md, "The VC-2's free
+  LFOs"): step 4.2's tone parts. Vc2FreeLfos is rom.4's manager at 0x8a0c6d84 word for word, its 384 free objects on
+  XtLfoFree's laws; Vc2ToneLfo gains the follow, the attach and the free start. xt_vc2tone runs rom.4's own routines for
+  them: 0 different at seeds 2024, 7 and 31337. mutate_vc2.py --tone: 546 planted, 108 new, 0 missed. Two fixes to v268:
+  the LFO's note-on floors a note value's clocks, and its fade start clears +0x78. Found: nothing in rom.4 calls the free
+  objects' tick pass 0x893ad5f0, so the wiring must not run it. Not in the sound yet.
+
 The VC-2's part, mapped v270 (2026-11-18, on its own branch from vc2-mode's 668fea7; research only, no plugin source;
   VC2_MODE_PLAN.md, step 4.3; VC2_VOCAL_DESIGNER.md, "The part's voices and the COSM pools"): step 4.3's map and its ten
   versions: the three tasks, the 24 voices and four lists, the note and conversion objects, note start and off, legato,

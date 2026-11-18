@@ -44,7 +44,7 @@ std::string vc2ToneCase(ToneSides& s, std::mt19937& rng) {
     const bool fills = rng() % 4 == 0;
     const int most = fills ? Vc2TonePool::kTones + 2 : kMaxLive;
     const std::span<const ToneEvent> events = toneEvents();
-    std::string what;
+    std::string what = toneFreeLfosFresh(s);
     for (int k = 0; k < kSteps && what.empty(); ++k) {
         const bool make = s.live.empty() || ((int)s.live.size() < most && rng() % (fills ? 2 : 6) == 0);
         what = make ? toneMakeOn(s, rng) : events[rng() % events.size()](s, rng);
@@ -75,6 +75,7 @@ int main(int argc, char** argv) {
     std::vector<TonePortParts> parts;
     parts.reserve(Vc2TonePool::kTones);
     for (int tone = 0; tone < Vc2TonePool::kTones; ++tone) parts.emplace_back(tone, shared);
+    shared.parts = &parts;
     TonePortOwner owner(shared, parts);
     std::vector<ToneCall> rom;
     ToneSides s { fw, pool, shared, parts, owner, rom };
@@ -87,7 +88,8 @@ int main(int argc, char** argv) {
                 "%ld updates, %ld ended, %ld renders, %ld different\n", run->cases, n.events, n.makes, n.full,
                 n.inPlace, n.unmakes, n.back, n.updates, n.ends, n.renders, tally.different);
     std::printf("note-on: %ld note-ons, %ld players taken, %ld LFOs following, %ld free LFOs, %ld inputs fixed\n",
-                n.noteOns, n.takes, n.follows, n.frees, n.fixes);
+                n.noteOns, n.takes, shared.follows, shared.takes, n.fixes);
+    std::printf("free LFOs: %ld ticks, %ld clocks\n", n.freeTicks, n.freeClocks);
     std::printf("modulators: %ld reads of their bound words\n", n.bounds);
     std::printf("mix: %ld plays, blocks by routine:", n.mixPlays);
     for (long blocks : n.mixBlocks) std::printf(" %ld", blocks);

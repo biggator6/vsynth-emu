@@ -3,6 +3,7 @@
 // sides), each tone's part words (the port's fake parts' mirror, rom.4's memory), the port's fake parts and their owner,
 // and rom.4's side: every part routine hooked to log and answer.  XT_VC2TONE_MAIN only.
 #include "Vc2CheckRig.h"
+#include "Vc2FreeLfos.h"
 #include "Vc2Tone.h"
 #include "Vc2ToneMix.h"
 #include "Vc2ToneModulators.h"
@@ -12,8 +13,6 @@
 
 inline constexpr uint32_t kToneOutAt = 0x8C036000;     // the renders' output, in Vc2Fw's RAM
 inline constexpr uint32_t kToneInputAt = 0x8C050000;   // the note-on's input, in Vc2Fw's RAM
-inline constexpr uint32_t kToneFreeAt = 0x8C052000;    // the free objects 0x893ad640 gives, 0x20 apart by LFO number
-inline constexpr uint32_t kToneFreeStride = 0x20;
 inline constexpr uint32_t kToneHooksAt = 0x8C042000;   // the hooked routines the tones' words point at, in Vc2Fw's RAM
 inline constexpr uint32_t kToneEndedAt = kToneHooksAt + 0x20;   // the end routine, the tail's word on both sides
 inline constexpr uint32_t kToneBufferAt = 0x89998b20;  // [FW] the renders' three scratch buffers, 0x100 bytes apart
@@ -22,10 +21,10 @@ inline constexpr int kToneNone = -1, kToneUnknown = -2;   // a call's part: the 
 inline constexpr int kToneOut = 4;
 
 enum ToneKind : int32_t {
-    kBuild, kDestroy, kUnfollow, kUnlist, kUpdateOsc, kUpdateCosm,
+    kBuild, kDestroy, kUnlist, kUpdateOsc, kUpdateCosm,
     kTvaOver, kTvaStopped, kUpdateTva, kEnded, kRenderOsc, kRenderCosm, kRenderTva, kCountOsc,
-    kCountOscMatched, kTvaHeld, kInstallOsc, kInstallCosm, kFollowLfo,
-    kFreeLfo, kAttachFree, kStartFree, kRelist, kList, kBindCosm, kNoteOnOsc, kTakePlayer, kSetOsc,
+    kCountOscMatched, kTvaHeld, kInstallOsc, kInstallCosm,
+    kBindCosm, kNoteOnOsc, kTakePlayer, kSetOsc,
     kSetUpCosm, kStartCosm, kNoteOnTva, kEnlist,
 };
 
@@ -42,7 +41,6 @@ struct ToneCall {
 struct ToneDraws {
     bool tvaOver = false, tvaStopped = false, tvaHeld = false;
     std::array<uint32_t, 2> installOsc {}, installCosm {};
-    std::array<float, Vc2Tone::kLfos> freeValue {};   // each free object's +0x10
 };
 
 // [FW] an OSC voice's words the tone reads or writes: +0x54, +0xa40, +0x1cc, +0xa80, the byte +0x58, +0x104, and the
@@ -66,19 +64,23 @@ int32_t tonePartCode(Vc2TonePiece piece, int index);   // a part as a call names
 uint32_t toneEnvelopeAt(uint32_t tone, int envelope);  // rom.4's address of a tone's envelope, LFO
 uint32_t toneLfoAt(uint32_t tone, int lfo);
 
-// What the port's parts share: the answers, the buffers and output, the note-on's input, the free objects' +0 and +4,
-// the calls, the pool, the lists' heads
+class TonePortParts;
+
+// What the port's parts share: the answers, the buffers and output, the note-on's input, the calls, the pool, every
+// tone's parts, the lists' heads
 struct ToneShared {
     ToneDraws draws {};
     Vc2ToneBuffers buffers {};
     std::array<float, Vc2ToneBuffers::kFloats> out {};
     Vc2ToneInput input {};
-    std::array<std::array<uint32_t, 2>, Vc2Tone::kLfos> free {};
     std::vector<ToneCall> calls {};
     Vc2TonePool* pool = nullptr;
+    std::vector<TonePortParts>* parts = nullptr;
     std::array<uint32_t, 2> lists {};
     float chaos = Vc2ToneLfo::kChaosStart;   // the LFOs' constructors' generator, rom.4's word 0x89999668
     Vc2ToneMixRings rings {};                // the mixes' delay lines (v269)
+    Vc2FreeLfos frees {};                    // the free LFOs' manager (v271)
+    long follows = 0, takes = 0;             // the LFOs that followed another tone's, took a free object
 };
 
 // A tone's port parts: answers from the shared draws and its words, the calls logged as its tone's

@@ -168,6 +168,7 @@ std::string toneScribbleOn(ToneSides& s, std::mt19937& rng) {
 
 // The note-on: an input, the legato's tone and the lists drawn; rom.4's 0x893b3390(tone, input) against the port's
 std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
+    if (!toneFreeLfosHaveRoom(s)) return "";
     const int i = s.live[rng() % s.live.size()];
     tonePrepareNoteOn(s, i, rng);
     Vc2Tone& tone = s.pool.tones[(size_t)i];
@@ -177,8 +178,6 @@ std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
         [&] { tone.noteOn(s.shared.input, s.pool, s.owner, partsOf(s, i)); }, [&] { return toneDifference(s, -1); });
     if (what.empty()) what = toneMixRingsOf(s, i);
     s.n.takes += vc2CountCalls(s.rom, kTakePlayer);
-    s.n.follows += vc2CountCalls(s.rom, kFollowLfo);
-    s.n.frees += vc2CountCalls(s.rom, kFreeLfo);
     s.n.fixes += s.shared.input.at(In::kOscs[1] + In::kWave) == kFixed && s.shared.input.at(In::kMix) == kFixMix;
     return what;
 }
@@ -215,7 +214,8 @@ std::string toneBoundOn(ToneSides& s, std::mt19937& rng) {
 constexpr ToneEvent kEvents[] = { toneUpdateOn,    toneUpdateOn,    toneRenderOn,  toneRenderOn,   toneUnmakeOn,
                                   toneInPlaceOn,   toneClockOn,     toneCountOn,   toneMatchedOn,  toneAskOn,
                                   toneAskOn,       tonePlainOn,     tonePlainOn,   toneScribbleOn, toneNoteOnEvent,
-                                  toneNoteOnEvent, toneNoteOnEvent, toneBoundOn,   toneMixPlayOn,  toneMixPlayOn };
+                                  toneNoteOnEvent, toneNoteOnEvent, toneBoundOn,   toneMixPlayOn,  toneMixPlayOn,
+                                  toneFreeTickOn,  toneFreeClockOn };
 } // namespace
 
 std::string toneMakeOn(ToneSides& s, std::mt19937& rng) {

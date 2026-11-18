@@ -54,7 +54,9 @@ void drawLfoBlock(uint32_t* b, std::mt19937& rng) {
     // A note value's clocks, now and then past either end of what the note-on keeps
     const uint32_t clocks = rng() % 4 == 0 ? 1 + rng() % kClocksDrawnPast : kFewestClocks + rng() % kClockChoices;
     b[0] = rng() % kWaves;
-    b[1] = bits(sync ? (float)clocks : kLeastHz + unit * unit * kMostHz);
+    // [FW] 0x893acafa: a free object keeps a note value's whole clocks, so now and then there is a part to lose
+    const float part = rng() % 4 == 0 ? vc2Unit(rng) : 0.0f;
+    b[1] = bits(sync ? (float)clocks + part : kLeastHz + unit * unit * kMostHz);
     b[2] = bits(drawFadeMs(rng));
     b[3] = bits(drawFadeMs(rng));
     b[5] = sync ? 1 : 0;
@@ -128,8 +130,10 @@ void toneDrawModulatorWords(ToneSides& s, int i, std::mt19937& rng) {
         Vc2LfoWords& w = m.lfos[(size_t)l].w;
         const uint32_t at = toneLfoAt(tone, l);
         bothAt(s, at + offsetof(Vc2LfoWords, on), w.on, rng() % 2);
-        bothAt(s, at + offsetof(Vc2LfoWords, follow), w.follow, rng() % 2 == 0 ? 0u : (uint32_t)rng());
+        if (rng() % 8 == 0) bothAt(s, at + offsetof(Vc2LfoWords, follow), w.follow, toneDrawFollow(rng));
         bothAt(s, at + offsetof(Vc2LfoWords, unread3c), w.unread3c, vc2Unit(rng));
+        bothAt(s, at + offsetof(Vc2LfoWords, unread70), w.unread70, (uint32_t)rng());   // a follow copies these two
+        bothAt(s, at + offsetof(Vc2LfoWords, waveCase), w.waveCase, (uint32_t)rng());   // read by no wave a block gives
         if (rng() % 4 == 0) drawClock(s, at, w, rng);
     }
 }
