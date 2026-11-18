@@ -554,13 +554,13 @@ block (6,738 and 5,040: the forward notes too), four of the six reads patched (t
 right channel's). The insert at +0x90 doesn't show (4,794 and 0, as without it): LITE reads nothing in rom.2's +0x90…+0x93
 (the beat's integral, used under Tempo Sync), so only the band run places it.
 
-**Vari off is the VC-2's own; not run.** rom.4's `0x893c63c0` and `0x893c66e0` (paired by the installs' order) are 0.60 and
+**Vari off is the VC-2's own; not run** (run and ported in v261: HARDWARE_FIRMWARE.md, "The VC-2's Vari off"). rom.4's `0x893c63c0` and `0x893c66e0` (paired by the installs' order) are 0.60 and
 0.55 alike by field shape. rom.4's mono routine, read as far as its mode paths: no test of the step's sign before it
 switches on the mode alone, where rom.2's picks a way by the sign; it steps by
 the pitch (+0x70) alone, where rom.2's `0x89509870` steps by the pitch × the walk (+0x7c), and under Tempo Sync or Time Trip
 (byte 0 & 6) by the beat's factor (`0x8950c280`, `XtBeat`), which rom.4's doesn't call; it reads the forward way's fields
 where the OSC object's insert puts them (fraction +0xec, position +0xf0, samples +0xf4, last sample +0xf8, loop +0xfc to
-+0x108's rate, mode +0x10c), its fade at +0x124 where rom.2's is, and switches on the mode three ways (its table at
++0x108's rate, mode +0x10c), ~~its fade at +0x124 where rom.2's is~~ its fade at +0x128, four bytes up from rom.2's like the rest (withdrawn, v261: +0x124 is the stereo render's switch to fold its channels; HARDWARE_FIRMWARE.md, "The VC-2's Vari off"), and switches on the mode three ways (its table at
 `0x893c6410`) where rom.2's has six paths by mode and direction. Its mode means something else: run on a state rom.2's way
 (walk 1, forward), its mode 0 branches to the end, so the output stays 0 and the position where it was; with rom.2's mode
 + 1 its mode 1 wraps the position by the loop's length, and with no loop (length 0) never ends (the step limit); mode 3

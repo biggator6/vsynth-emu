@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's Vari off v261 (2026-11-17, on vc2-mode after v256, 977c9db; the user's "Start Vari off"; HARDWARE_FIRMWARE.md,
+  "The VC-2's Vari off"): step 4.2's OSC voice. rom.4's own two renders for a wave with Vari Sw off, 0x893c63c0 (mono) and
+  0x893c66e0 (stereo): vc2OscVariOffMono and vc2OscVariOffStereo (Vc2OscVariOffRender.cpp), one routine over a way. No
+  direction and no beat, unlike rom.2's player: mode 1 a loop, mode 2 a loop that turns with the way back inverted, the
+  last sample held and faded; the stereo render folds its channels at 70% when the object's +0x124 isn't 0. Two findings
+  withdrawn in place: the voice's +0x10c is the samples' address, not the Start Offset, and the fade is at +0x128.
+  xt_vc2osc's Vari off part (Vc2VariOffCheck.cpp): rom.4's routines on an object and a wave in its RAM: 0 different at
+  seeds 2024, 7 and 31337 (2,400 and 2 × 24,000 blocks). mutate_vc2.py --osc: 1,094 plants (99 new), all caught. Not in
+  the sound yet.
+
 The VC-2's analog converter's second part v256 (2026-11-17, on vc2-mode after the merge of v252 and v253, 5766f4d; the
   user's "Start v256"; HARDWARE_FIRMWARE.md, "The VC-2's analog converter's second part"): step 4.2's OSC voice. rom.4's
   0x8939cf70 from its waveform switch to its end writes the block's +0xb0…+0xf3, rom.2's analog block's words 0x30 up:

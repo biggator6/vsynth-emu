@@ -86,6 +86,8 @@ void oscWriteVoice(OscSides& s, int v);
 // The ramp part (v236, Vc2RampCheck.cpp): the pitch ramp against rom.4's own, before the voice part hooks anything;
 // its cases counted in `tally`, its counts printed
 void oscRampPart(Vc2Fw& fw, const RomShared& shared, const Vc2Run& run, Vc2Tally& tally);
+// The Vari off part (v261, Vc2VariOffCheck.cpp): its two renders against rom.4's, before any hook, the same way
+void oscVariOffPart(Vc2Fw& fw, const Vc2Run& run, Vc2Tally& tally);
 // A voice's ramps as glides leave them, each of the type its index is built with (the same file)
 void oscDrawBuiltRamps(std::array<Vc2PitchRamp, Vc2OscVoice::kRamps>& ramps, std::mt19937& rng);
 // The six words a ramp's start or legato update is given (the same)

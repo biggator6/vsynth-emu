@@ -16,10 +16,10 @@ using xtf::mul;
 using xtf::sub;
 
 namespace {
-// [FW] the block's words: the Start Offset (+0x10c), the loop record's and +0xe0 record's pointers, the level (+0x6c);
+// [FW] the block's words: the samples' address (+0x10c), the loop record's and +0xe0 record's pointers, the level (+0x6c);
 // types 0 and 2: the first sample (+0x14c), the frames (+0x150), type 0's backward mode (+0x148's low byte); type 1:
 // +0x14c set for a range in samples, the range (+0x150, +0x154)
-constexpr uint32_t kStartOffset = 0x10c, kLoopAt = 0x130, kPairAt = 0x134, kLevelFrom = 0x6c;
+constexpr uint32_t kSamplesFrom = 0x10c, kLoopAt = 0x130, kPairAt = 0x134, kLevelFrom = 0x6c;
 constexpr uint32_t kFirst = 0x14c, kFrames = 0x150, kBwdModeByte = 0x148, kInSamples = 0x14c, kFrom = 0x150;
 constexpr uint32_t kTo = 0x154;
 // [FW] the object's words: the pitch, formant, level, walk, gain and level out; the +0xe0 record's copy; a half word
@@ -34,11 +34,11 @@ constexpr std::array<Vc2OscTargets::Word, 5> kTargets { { { kPitch, &Vc2OscTarge
                                                          { kFormant, &Vc2OscTargets::formantTarget },
                                                          { kGain, &Vc2OscTargets::gain },
                                                          { kLevelOut, &Vc2OscTargets::level } } };
-// [FW] type 2's words, by rom.2's XtLitePlayer (its P + 4): the loops' modes, the Start Offset, the heads, the
+// [FW] type 2's words, by rom.2's XtLitePlayer (its P + 4): the loops' modes, the samples' address, the heads, the
 // filter's rate and state, the heads' fractions, the walk's position, the windows' phases and clocks, the last
 // sample, the forward loop (start, end, span) and its rate, the first sample, the backward loop and its rate, the
 // period and its inverse
-constexpr uint32_t kFwdMode = 0x248, kBwdMode = 0x24c, kOffset = 0x250, kHeadA = 0x254, kHeadB = 0x258;
+constexpr uint32_t kFwdMode = 0x248, kBwdMode = 0x24c, kSamples = 0x250, kHeadA = 0x254, kHeadB = 0x258;
 constexpr uint32_t kFilterRate = 0x25c, kFilterL = 0x260, kFilterR = 0x264, kFracA = 0x268, kFracB = 0x26c;
 constexpr uint32_t kWalkPos = 0x270, kWinA = 0x274, kClkA = 0x278, kWinB = 0x27c, kClkB = 0x280, kLast = 0x284;
 constexpr uint32_t kFwdLoop = 0x288, kFwdRate = 0x294, kFirstF = 0x298, kBwdLoop = 0x29c, kBwdRate = 0x2a8;
@@ -121,7 +121,7 @@ void startWalk(Vc2OscVoice& v) {
 void twoHeads(Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared) {
     const Vc2OscTables& t = vc2OscTables();
     const Vc2OscLoopRecord loop = parts.loopRecord(v.u32(kLoopAt));
-    v.setU32(kOffset, v.u32(kStartOffset));
+    v.setU32(kSamples, v.u32(kSamplesFrom));
     v.setF32(kFirstF, unsignedFloat(v.u32(kFirst)));
     v.setF32(kLast, unsignedFloat(v.u32(kFrames) - 1));
     v.setF32(kFwdRate, vc2OscLoopRate(loop.rateFwd, shared, t.liteHeadsTenths));

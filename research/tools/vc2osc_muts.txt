@@ -573,7 +573,7 @@ after-update-routine|kAfterUpdate = 0x893c8670,|kAfterUpdate = 0x893c88b0,|vc2os
 type-minus|const uint32_t type = u32(kWave) - 1;|const uint32_t type = u32(kWave);|vc2oscplayers
 varioff-ignored| \|\| (u8(kFlagsByte) & kVariOff) == 0) return;|) return;|vc2oscplayers
 by-samples-swap|if (inSamples) bySamples(*this, parts, shared);|if (!inSamples) bySamples(*this, parts, shared);|vc2oscplayers
-offset|v.setU32(kOffset, v.u32(kStartOffset));|v.setU32(kOffset, v.u32(kStartOffset + 4));|vc2oscplayers
+offset|v.setU32(kSamples, v.u32(kSamplesFrom));|v.setU32(kSamples, v.u32(kSamplesFrom + 4));|vc2oscplayers
 zero-at|    v.setF32(kZeroAt, 0.0f);\n||vc2oscplayers
 one|    v.setF32(kOne, 1.0f);\n||vc2oscplayers
 position-sign|0.0f > v.f32(kWalk) ? v.u32(kEnd) : v.u32(kStart)|0.0f > v.f32(kWalk) ? v.u32(kStart) : v.u32(kEnd)|vc2oscplayers
@@ -587,7 +587,7 @@ end-at|kEnd = 0x254,|kEnd = 0x258,|vc2oscplayers
 rate-bwd-at|kRateBwd = 0x27c,|kRateBwd = 0x278,|vc2oscplayers
 fwd-mode-at|kFwdMode = 0x268,|kFwdMode = 0x264,|vc2oscplayers
 bwd-mode-at|kBwdMode = 0x280,|kBwdMode = 0x284,|vc2oscplayers
-offset-at|kOffset = 0x250,|kOffset = 0x24c,|vc2oscplayers
+offset-at|kSamples = 0x250,|kSamples = 0x24c,|vc2oscplayers
 zero-at-at|kZeroAt = 0x248,|kZeroAt = 0x244,|vc2oscplayers
 position-copy-at|kPositionCopy = 0x288;|kPositionCopy = 0x28c;|vc2oscplayers
 loop-span|    v.setU32(at + 8, span);\n||vc2oscplayers
@@ -679,7 +679,7 @@ lite-one-level|v.setU32(kLevel, v.u32(kLevelFrom));|v.setU32(kLevel, v.u32(kLeve
 lite-copy16-at|kCopy16 = 0x170|kCopy16 = 0x16c|vc2osclite
 lite-copy32-at|kCopy32 = 0x174;|kCopy32 = 0x178;|vc2osclite
 lite-from-at|kFrom = 0x150;|kFrom = 0x14c;|vc2osclite
-lite-th-offset|v.setU32(kOffset, v.u32(kStartOffset));|v.setU32(kOffset, v.u32(kStartOffset + 4));|vc2osclite
+lite-th-offset|v.setU32(kSamples, v.u32(kSamplesFrom));|v.setU32(kSamples, v.u32(kSamplesFrom + 4));|vc2osclite
 lite-th-firstf|v.setF32(kFirstF, unsignedFloat(v.u32(kFirst)));|v.setF32(kFirstF, xtf::flt((int32_t)v.u32(kFirst)));|vc2osclite
 lite-th-last|v.setF32(kLast, unsignedFloat(v.u32(kFrames) - 1));|v.setF32(kLast, unsignedFloat(v.u32(kFrames)));|vc2osclite
 lite-th-fwdrate|vc2OscLoopRate(loop.rateFwd, shared, t.liteHeadsTenths)|vc2OscLoopRate(loop.rateBwd, shared, t.liteHeadsTenths)|vc2osclite
@@ -1034,3 +1034,103 @@ upd-pool-installed|kAnalogInstalled { 0x895422f8, kVc2AnalogCodes }|kAnalogInsta
 upd-pool-sub-installed|kSubInstalled { 0x89542324, kVc2AnalogCodes }|kSubInstalled { 0x895422f8, kVc2AnalogCodes }|vc2osctables
 upd-pool-read-codes|        readCodeWords(image, kUpdateCodes, analog.updateCodes);\n||vc2osctables
 upd-pool-read-la|        readLaWords(image, kUpdateLa, analog.updateLa);\n||vc2osctables
+# v261: Vari off's renders, Vc2OscVariOffRender.cpp (port vc2oscvarioff), and their pool words
+voff-pitch-at|kPitchAt = 0x70|kPitchAt = 0x74|vc2oscvarioff
+voff-target-at|kTargetAt = 0x80|kTargetAt = 0x7c|vc2oscvarioff
+voff-gain-at|kGainAt = 0x84|kGainAt = 0x88|vc2oscvarioff
+voff-frac-at|kFracAt = 0xec|kFracAt = 0xe8|vc2oscvarioff
+voff-pos-at|kPosAt = 0xf0|kPosAt = 0xe8|vc2oscvarioff
+voff-samples-at|kSamplesAt = 0xf4|kSamplesAt = 0xf8|vc2oscvarioff
+voff-last-at|kLastAt = 0xf8|kLastAt = 0xfc|vc2oscvarioff
+voff-start-at|kStartAt = 0xfc|kStartAt = 0x100|vc2oscvarioff
+voff-end-at|kEndAt = 0x100|kEndAt = 0x104|vc2oscvarioff
+voff-span-at|kSpanAt = 0x104|kSpanAt = 0x100|vc2oscvarioff
+voff-rate-at|kRateAt = 0x108|kRateAt = 0x110|vc2oscvarioff
+voff-mode-at|kModeAt = 0x10c|kModeAt = 0x110|vc2oscvarioff
+voff-fold-at|kFoldAt = 0x124|kFoldAt = 0x120|vc2oscvarioff
+voff-fade-at|kFadeAt = 0x128|kFadeAt = 0x120|vc2oscvarioff
+voff-turn-at|kTurnAt = 0x12c|kTurnAt = 0x120|vc2oscvarioff
+voff-modes-swapped|kLoops = 1, kTurns = 2|kLoops = 2, kTurns = 1|vc2oscvarioff
+voff-frames-31|kFrames = 32|kFrames = 31|vc2oscvarioff
+voff-mono-stride|r.samples + 2u * (uint32_t)i|r.samples + 4u * (uint32_t)i|vc2oscvarioff
+voff-mono-no-gain|const float v = mul(mul(s.l, r.gain), r.t.variOffScale);|const float v = mul(s.l, r.t.variOffScale);|vc2oscvarioff
+voff-mono-scale|const float v = mul(mul(s.l, r.gain), r.t.variOffScale);|const float v = mul(mul(s.l, r.gain), r.t.variOffFold);|vc2oscvarioff
+voff-mono-word-before|kWordAfterStep = true|kWordAfterStep = false|vc2oscvarioff
+voff-stereo-word-after|kWordAfterStep = false|kWordAfterStep = true|vc2oscvarioff
+voff-stereo-stride|r.samples + 4u * (uint32_t)i|r.samples + 2u * (uint32_t)i|vc2oscvarioff
+voff-stereo-left-twice|return { r.wave.at(at), r.wave.at(at + 2u) };|return { r.wave.at(at), r.wave.at(at) };|vc2oscvarioff
+voff-stereo-swapped|return { r.wave.at(at), r.wave.at(at + 2u) };|return { r.wave.at(at + 2u), r.wave.at(at) };|vc2oscvarioff
+voff-stereo-left-gain|return { mul(mul(s.l, r.gain), r.t.variOffScale), mul|return { mul(s.l, r.t.variOffScale), mul|vc2oscvarioff
+voff-stereo-right-gain|mul(mul(s.r, r.gain), r.t.variOffScale) }|mul(s.r, r.t.variOffScale) }|vc2oscvarioff
+voff-stereo-scale|mul(mul(s.r, r.gain), r.t.variOffScale) }|mul(mul(s.r, r.gain), r.t.variOffFold) }|vc2oscvarioff
+voff-fold-left-only|mul(mul(add(s.r, s.l), r.gain), r.t.variOffFold)|mul(mul(s.l, r.gain), r.t.variOffFold)|vc2oscvarioff
+voff-fold-no-gain|mul(mul(add(s.r, s.l), r.gain), r.t.variOffFold)|mul(add(s.r, s.l), r.t.variOffFold)|vc2oscvarioff
+voff-fold-scale|mul(mul(add(s.r, s.l), r.gain), r.t.variOffFold)|mul(mul(add(s.r, s.l), r.gain), r.t.variOffScale)|vc2oscvarioff
+voff-fold-by-one|if (v.u32(objectWord(kFoldAt)) != 0)|if (v.u32(objectWord(kFoldAt)) == 1)|vc2oscvarioff
+voff-put-swapped|    r.out[0] = s.l;\n    r.out[1] = s.r;|    r.out[0] = s.r;\n    r.out[1] = s.l;|vc2oscvarioff
+voff-put-stride|r.out += 2;|r.out += 1;|vc2oscvarioff
+voff-glide-jump|r.gain = add(mul(r.t.variOffGlide, sub(r.target, r.gain)), r.gain);|r.gain = r.target;|vc2oscvarioff
+voff-glide-whole|mul(r.t.variOffGlide, sub(r.target, r.gain))|sub(r.target, r.gain)|vc2oscvarioff
+voff-past-any-loop|return r.end > r.last && r.pos >= r.last;|return r.pos >= r.last;|vc2oscvarioff
+voff-past-strict|r.pos >= r.last;|r.pos > r.last;|vc2oscvarioff
+voff-past-end-equal|return r.end > r.last &&|return r.end >= r.last &&|vc2oscvarioff
+voff-hold-keeps-pos|    r.pos = r.last;\n    r.word = r.last;|    r.word = r.last;|vc2oscvarioff
+voff-hold-keeps-word|    r.pos = r.last;\n    r.word = r.last;|    r.pos = r.last;|vc2oscvarioff
+voff-hold-no-fade|const VariSound faded { mul(s.l, r.fade), mul(s.r, r.fade) };|const VariSound faded = s;|vc2oscvarioff
+voff-hold-right-unfaded|mul(s.r, r.fade) };|s.r };|vc2oscvarioff
+voff-fade-no-step|sub(r.fade, r.t.variOffFade)|r.fade|vc2oscvarioff
+voff-fade-no-floor|r.fade = next > 0.0f ? next : 0.0f;|r.fade = next;|vc2oscvarioff
+voff-step-read-after|const float was = r.frac;|const float was = add(r.frac, r.step);|vc2oscvarioff
+voff-step-keeps-whole|r.frac = sub(moved, flt(whole));|r.frac = moved;|vc2oscvarioff
+voff-step-no-move|    r.pos = plusWord(r.pos, whole);\n||vc2oscvarioff
+voff-step-no-wrap|    while (r.stride > 0 && r.pos > r.limit) r.pos = plusWord(r.pos, -r.stride);\n||vc2oscvarioff
+voff-step-wrap-once|while (r.stride > 0 && r.pos > r.limit)|if (r.stride > 0 && r.pos > r.limit)|vc2oscvarioff
+voff-step-wrap-at|r.pos > r.limit)|r.pos >= r.limit)|vc2oscvarioff
+voff-between-left|add(mul(flt(b.l - a.l), frac), flt(a.l))|flt(a.l)|vc2oscvarioff
+voff-between-right|add(mul(flt(b.r - a.r), frac), flt(a.r))|flt(a.r)|vc2oscvarioff
+voff-inverted-left|return { -f.l, -f.r };|return { f.l, -f.r };|vc2oscvarioff
+voff-inverted-right|return { -f.l, -f.r };|return { -f.l, f.r };|vc2oscvarioff
+voff-loop-no-hold|    if (pastLast(r)) {\n        holdLast<Way>(r);\n        return;\n    }\n    const int32_t one|    const int32_t one|vc2oscvarioff
+voff-loop-next-no-wrap|one > r.end ? plusWord(one, -r.span) : one|one|vc2oscvarioff
+voff-loop-next-at-end|one > r.end ? plusWord|one >= r.end ? plusWord|vc2oscvarioff
+voff-loop-from-next|const VariFrame from = Way::frame(r, r.pos);|const VariFrame from = Way::frame(r, one);|vc2oscvarioff
+voff-turn-up-at-end|if (r.end > r.pos) return|if (r.end >= r.pos) return|vc2oscvarioff
+voff-turn-up-flat|Way::frame(r, plusWord(r.pos, 1)), r.pos };|Way::frame(r, r.pos), r.pos };|vc2oscvarioff
+voff-turn-end-plain|inverted(Way::frame(r, plusWord(r.pos, -1))), r.pos }|Way::frame(r, plusWord(r.pos, -1)), r.pos }|vc2oscvarioff
+voff-turn-end-next|inverted(Way::frame(r, plusWord(r.pos, -1))), r.pos }|inverted(Way::frame(r, plusWord(r.pos, 1))), r.pos }|vc2oscvarioff
+voff-turn-back-limit|if (r.limit > r.pos) {|if (r.limit >= r.pos) {|vc2oscvarioff
+voff-turn-mirror|plusWord(plusWord(r.end, r.end), -r.pos)|plusWord(r.end, -r.pos)|vc2oscvarioff
+voff-turn-back-from-plain|return { inverted(Way::frame(r, m)), inverted(Way::frame(r, plusWord(m, -1))), m };|return { Way::frame(r, m), inverted(Way::frame(r, plusWord(m, -1))), m };|vc2oscvarioff
+voff-turn-back-to-plain|inverted(Way::frame(r, plusWord(m, -1))), m };|Way::frame(r, plusWord(m, -1)), m };|vc2oscvarioff
+voff-turn-back-next|inverted(Way::frame(r, plusWord(m, -1))), m };|inverted(Way::frame(r, plusWord(m, 1))), m };|vc2oscvarioff
+voff-turn-back-word|inverted(Way::frame(r, plusWord(m, -1))), m };|inverted(Way::frame(r, plusWord(m, -1))), r.pos };|vc2oscvarioff
+voff-turn-last-span|const int32_t m = plusWord(r.pos, -r.stride);|const int32_t m = plusWord(r.pos, -r.span);|vc2oscvarioff
+voff-turn-last-from-plain|return { inverted(Way::frame(r, m)), Way::frame(r, plusWord(m, 1)), m };|return { Way::frame(r, m), Way::frame(r, plusWord(m, 1)), m };|vc2oscvarioff
+voff-turn-last-to-inverted|return { inverted(Way::frame(r, m)), Way::frame(r, plusWord(m, 1)), m };|return { inverted(Way::frame(r, m)), inverted(Way::frame(r, plusWord(m, 1))), m };|vc2oscvarioff
+voff-turn-last-word|Way::frame(r, plusWord(m, 1)), m };|Way::frame(r, plusWord(m, 1)), r.pos };|vc2oscvarioff
+voff-turn-no-hold|    if (pastLast(r)) {\n        holdLast<Way>(r);\n        return;\n    }\n    const bool rising|    const bool rising|vc2oscvarioff
+voff-turn-word-any-way|rising && Way::kWordAfterStep ? r.pos : s.word|Way::kWordAfterStep ? r.pos : s.word|vc2oscvarioff
+voff-turn-word-segment|rising && Way::kWordAfterStep ? r.pos : s.word|s.word|vc2oscvarioff
+voff-rate-never|? pitch : mul(pitch, v.f32(objectWord(kRateAt)));|? pitch : pitch;|vc2oscvarioff
+voff-rate-always|return r.start > r.pos|return false && r.start > r.pos|vc2oscvarioff
+voff-rate-start-at|return r.start > r.pos|return r.start >= r.pos|vc2oscvarioff
+voff-rate-top-at|r.pos > top ?|r.pos >= top ?|vc2oscvarioff
+voff-loop-limit-last|    r.limit = r.end;|    r.limit = r.last;|vc2oscvarioff
+voff-loop-stride-one|    r.stride = r.span;|    r.stride = 1;|vc2oscvarioff
+voff-loop-rate-top|stepFrom(v, r, r.end)|stepFrom(v, r, r.last)|vc2oscvarioff
+voff-loop-word-left|    for (int k = 0; k < kFrames; ++k) loopSample<Way>(r);\n    r.word = r.pos;|    for (int k = 0; k < kFrames; ++k) loopSample<Way>(r);|vc2oscvarioff
+voff-turn-reads-pos|    r.pos = (int32_t)v.u32(objectWord(kTurnAt));\n||vc2oscvarioff
+voff-turn-limit|r.limit = plusWord(r.end, r.span);|r.limit = r.end;|vc2oscvarioff
+voff-turn-stride|r.stride = plusWord(r.span, r.span);|r.stride = r.span;|vc2oscvarioff
+voff-turn-rate-top|stepFrom(v, r, r.limit)|stepFrom(v, r, r.end)|vc2oscvarioff
+voff-back-pos-is-pos|v.setU32(objectWord(kPosAt), (uint32_t)r.word);|v.setU32(objectWord(kPosAt), (uint32_t)r.pos);|vc2oscvarioff
+voff-back-no-frac|    v.setF32(objectWord(kFracAt), r.frac);\n||vc2oscvarioff
+voff-back-turn-is-word|v.setU32(objectWord(kTurnAt), (uint32_t)r.pos);|v.setU32(objectWord(kTurnAt), (uint32_t)r.word);|vc2oscvarioff
+voff-back-no-turn|    v.setU32(objectWord(kTurnAt), (uint32_t)r.pos);\n||vc2oscvarioff
+voff-back-no-gain|    v.setF32(objectWord(kGainAt), r.gain);\n||vc2oscvarioff
+voff-back-no-fade|    v.setF32(objectWord(kFadeAt), r.fade);\n||vc2oscvarioff
+voff-silent-word|    r.word = r.pos;\n    const uint32_t mode|    const uint32_t mode|vc2oscvarioff
+voff-pool-scale|{ 0x893c6420, &t.variOffScale }|{ 0x893c6424, &t.variOffScale }|vc2osctables
+voff-pool-fold|{ 0x893c6764, &t.variOffFold }|{ 0x893c6420, &t.variOffFold }|vc2osctables
+voff-pool-glide|{ 0x893c6424, &t.variOffGlide }|{ 0x893c6428, &t.variOffGlide }|vc2osctables
+voff-pool-fade|{ 0x893c6428, &t.variOffFade }|{ 0x893c6424, &t.variOffFade }|vc2osctables

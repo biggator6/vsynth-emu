@@ -30,6 +30,6 @@ Vc2OscVariOff vc2OscVariOffOf(const Vc2OscVoice& v, Vc2OscParts& parts, const Vc
 float vc2OscLoopRate(int16_t rate, const Vc2ToneShared& shared, float tenths);
 // `w` into the object's words
 void vc2OscSetVariOff(Vc2OscVoice& v, const Vc2OscVariOff& w);
-// Then the Start Offset, 0 and 1 beside it, the position the walk's sign starts from (the last if it's below 0, else
+// Then the samples' address, 0 and 1 beside it, the position the walk's sign starts from (the last if it's below 0, else
 // the first) and its copy; the position
 uint32_t vc2OscVariOffStart(Vc2OscVoice& v);

@@ -1546,6 +1546,46 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's Vari off (2026-11-17, v261) {#vc2-vari-off}
+
+Step 4.2's OSC voice (the user's "Start Vari off", 2026-11-17). rom.4's two renders for a wave played with Vari Sw off, `0x893c63c0` (mono) and `0x893c66e0` (stereo), called with the output and the voice's object (+0x15c). They are the VC-2's own: rom.2's Vari-off player (`0x89509870`, `0x89509f52`, `XtLinearPlayer`) has six paths by mode and direction and walks at the pitch × the walk, with the beat's factor under Tempo Sync or Time Trip. These have neither a direction nor a beat. Each block steps by the object's pitch alone, times the loop's rate factor when the block starts inside the loop.
+
+**The object's words** (from the voice's +0x15c), four bytes up from rom.2's player's:
+
+| Object | Word |
+|---|---|
+| +0x70 | the pitch, samples a frame |
+| +0x80, +0x84 | the gain's target and the gain: each frame the gain moves 1/32 of the way |
+| +0xec, +0xf0 | the fraction and the position |
+| +0xf4 | the samples' address |
+| +0xf8 | the last sample |
+| +0xfc, +0x100, +0x104 | the loop's first and last frames and its length |
+| +0x108 | the loop's rate factor |
+| +0x10c | the mode |
+| +0x124 | the stereo render's fold: not 0, the two channels are summed |
+| +0x128 | the fade at the last sample |
+| +0x12c | the position a turning loop runs on |
+
+**The modes** (the switch at `0x893c6410`):
+
+- **0** writes no sample. The block only copies the position to +0x12c.
+- **1, a loop.** Reads frame `pos` and the next, the next past the loop's end taken a length back; the position wraps by the length.
+- **2, a loop that turns.** The position runs on +0x12c up to end + length and wraps by twice the length. Below the loop's end it reads forward. From the end it reads the way back, mirrored about the end, **with the samples inverted**. At the end itself it reads frame `end` against the frame before it, inverted. At the way's end it reads the frame at position − 2·length, inverted, against the next as it is.
+
+In modes 1 and 2, with the loop's end past the last sample, a position at or past the last sample holds it: the sample × the gain × the scale × the fade, the fade falling by a pool constant (`0x893c6428`) a frame to 0. Nothing moves the position off it again.
+
+**The stereo render's three things apart from the mono's.** A frame is two halfwords. With +0x124 not 0 it sums the two interpolated channels and scales by 45875, 70% of the 65536 it otherwise uses, the sum on both outputs. And in mode 2 its position word (+0xf0) is the position before the step where the mono render's is the position after it, on the way up only. Its way of keeping that word is odd: it holds it in `r0_bank` through the block.
+
+**Two findings withdrawn in place.** The voice's +0x10c, which v238 and v240 named the Start Offset, is the samples' address: the note-on copies it to the object's +0xf4, and these renders read every sample through that word, rom.2's "+0xf0 the samples" four bytes up. And the fade is at +0x128, not +0x124 (VC2_VOCAL_DESIGNER.md, "Vari off is the VC-2's own"). The word at +0x124 is what the note-ons fill from the loop record's backward mode (VariPhrase's) or the block's +0x148's low byte (LITE's), and here it folds the channels. How that comes to mean a fold isn't known; the code's use is what is recorded.
+
+**Where the port differs, on purpose.** rom.4's wrap never ends with a loop's length of 0 or less, and a mode past 2 jumps into its switch's table. Neither is drawn in the check. The port's wrap doesn't start and such a mode writes nothing, so the audio thread can't hang on them.
+
+**Port.** `vc2OscVariOffMono` and `vc2OscVariOffStereo` (Vc2OscVariOffRender.cpp): one routine over a way (`VariMono`, `VariStereo`, `VariFold`), on the voice's words; the wave through `Vc2OscSamples`, by the addresses the object holds. The pool words are in `Vc2OscTables`. The voice doesn't call them yet: its renders stay rom.4's by address through `Vc2OscParts` until the wiring.
+
+**Check.** xt_vc2osc's Vari off part (Vc2VariOffCheck.cpp), before the voice part hooks anything: rom.4's two routines on an object and a wave in the interpreter's RAM. Each case a wave of drawn samples and the words drawn about a loop, the rest of the object noise, then 60 blocks of either render, the words drawn again one block in eight; the output and the object's +0x70…+0x130 word for word after each. 0 different at seed 2024 (2,400 blocks), and at seeds 7 and 31337 (24,000 each). llvm-cov: Vc2OscVariOffRender.cpp 100% of regions and lines; of its 39 branches the one not taken is the wrap's guard above, which rom.4 has no way to survive. `mutate_vc2.py --osc`: 1,094 plants, 99 of them new, all caught.
+
+Not in the sound yet.
+
 ### The VC-2's analog converter's second part (2026-11-17, v256) {#vc2-analog-converter-second}
 
 Step 4.2's OSC voice (the user's "Start v256", 2026-11-17). rom.4's analog converter `0x8939cf70` after the part it shares with the VOCODER's (v251, "The VC-2's OSC block converter"): `0x8939d3a2` to its end at `0x8939da96`. It writes the OSC block's +0xb0…+0xf3 and nothing below. The words are rom.2's analog block's (`XtAnalogBlock`, XtAnalog.h) 0x30 up, word for word; rom.4's block has the 0x30 bytes more before them.
@@ -2283,9 +2323,9 @@ Step 4.2's OSC voice, its fifth part (research/VC2_MODE_PLAN.md, "4. Wiring"): L
 2. The targets into the object: +0x1cc the tuned ratio (`0x893afb80`), +0x1d8 the walk's target (`0x893afc30`) and +0x1d0 the formant's (`0x893afca0`), both without the wave's factors where VariPhrase's take them; +0x168 a halfword 0; +0x1c8 the +0xe0 record's pointer (+0x134); +0x1dc the gain (`0x893aff30`), +0x1e0 the level (`0x893aff60`).
 3. The object's byte 0: 0x10 cleared; 0x04, 0x01 and 0x02 the bit 0 of the block's +0x140, +0x138 and +0x13c; 0x40 the flag's (+0xa40).
 4. By the wave's type (+0x104; past 2 nothing):
-   - **0, Vari off:** VariPhrase's Vari off words, by samples: the start the block's +0x14c, the end +0x150 less 1, the loop record's loops, the forward mode under the object's 0x01, the rates exp2(r/12000) (its own 12000, `0x893c7f64`; no +0xe0 factor); but the backward mode is the block's +0x148's low byte, whatever the bit. Then the Start Offset, 0, 1, the position by the walk's sign, its copy, and the position ×16 into +0x194 (the object's +0x38).
+   - **0, Vari off:** VariPhrase's Vari off words, by samples: the start the block's +0x14c, the end +0x150 less 1, the loop record's loops, the forward mode under the object's 0x01, the rates exp2(r/12000) (its own 12000, `0x893c7f64`; no +0xe0 factor); but the backward mode is the block's +0x148's low byte, whatever the bit. Then ~~the Start Offset~~ the samples' address (withdrawn, v261: "The VC-2's Vari off"), 0, 1, the position by the walk's sign, its copy, and the position ×16 into +0x194 (the object's +0x38).
    - **1, the mode-1 player:** the object's byte 2 cleared (& 7, then 0xfb, 0xfd, 0xfe); with the block's +0x14c not 0 the object's 0x80 set and the range (+0x150, +0x154) as words into +0x174, +0x178, else 0x80 clear and as halfwords into +0x170, +0x172; +0x1d4 the block's +0x18.
-   - **2, LITE's two heads:** the words of rom.2's player (`XtLitePlayer.h`) four bytes up, the object's insert at +0x94 (VC2_VOCAL_DESIGNER.md): the Start Offset; the first and last sample as floats, unsigned (FLOAT, then 2^32 from `0x893c81e4` when negative); the rates by its own 12000 (`0x893c81ec`); the period 88200 (`0x893c81f0`) over the root's Hz (+0xa80) and its inverse; the heads' fractions the formant's part past its whole (FTRC, FLOAT, taken off); window A's phase and clock 0, window B's both the period × 0.5 (`0x893c81f4`); the filter's state 0 and its rate the Hz × the pitch × `0x893c81f8` (3.566e−5, about π/2/44100, rom.2's law); the loops as floats, each span the end less the start as a word; the walk's start the first sample when the walk is above 0, else the last whole half period at or below the last sample, the heads there, its position ×16 into +0x194; the modes under the object's 0x01.
+   - **2, LITE's two heads:** the words of rom.2's player (`XtLitePlayer.h`) four bytes up, the object's insert at +0x94 (VC2_VOCAL_DESIGNER.md): ~~the Start Offset~~ the samples' address (withdrawn, v261: "The VC-2's Vari off"); the first and last sample as floats, unsigned (FLOAT, then 2^32 from `0x893c81e4` when negative); the rates by its own 12000 (`0x893c81ec`); the period 88200 (`0x893c81f0`) over the root's Hz (+0xa80) and its inverse; the heads' fractions the formant's part past its whole (FTRC, FLOAT, taken off); window A's phase and clock 0, window B's both the period × 0.5 (`0x893c81f4`); the filter's state 0 and its rate the Hz × the pitch × `0x893c81f8` (3.566e−5, about π/2/44100, rom.2's law); the loops as floats, each span the end less the start as a word; the walk's start the first sample when the walk is above 0, else the last whole half period at or below the last sample, the heads there, its position ×16 into +0x194; the modes under the object's 0x01.
 5. `0x893cbf40` on the object (a player's routine: it resets the mode-1 player's words), whatever the type.
 6. The type's seek, with ×16 the block's word to seek to when it isn't the first: type 0 `0x893c6360` (+0x154 against +0x14c), type 1 `0x893cc830` (+0x158 against +0x150), type 2 `0x893c6de0` (+0x154 against +0x14c), the re-seek's kind 1 routines.
 
@@ -2342,7 +2382,7 @@ Step 4.2's OSC voice, its fourth part (research/VC2_MODE_PLAN.md, "4. Wiring"): 
 - its 0x80 is rom.2's Start Offset in samples (v152), and here the note-on takes the range in samples under it, else by events;
 - its 0x20 is Vari off: under it rom.4's installs put in `0x893c63c0`/`0x893c66e0`, the routines VC2_VOCAL_DESIGNER.md pairs with rom.2's Vari off player (`0x89509870`/`0x89509f52`).
 
-The loop record (vplp) is read at rom.2's file reader's offsets (XtFiles.h) and used as they say: +4/+8 the forward loop, +0xc/+0x10 the backward, +0x14/+0x16 the rate factors in tenths of a cent (rom.4: exp2(r/12000)), +0x18/+0x19 the modes. The block's +0xb8 is the Start Offset, as in rom.2. Not named, as one source has them: the header's +0x1c, the block's +0x60 (× 10000 into +0x1a8), the +0xe0 record's +0x2d0, and the routines `0x893c8670` and `0x893cc760`.
+The loop record (vplp) is read at rom.2's file reader's offsets (XtFiles.h) and used as they say: +4/+8 the forward loop, +0xc/+0x10 the backward, +0x14/+0x16 the rate factors in tenths of a cent (rom.4: exp2(r/12000)), +0x18/+0x19 the modes. ~~The block's +0xb8 is the Start Offset, as in rom.2.~~ (Withdrawn, v261: the block's +0xb8, the voice's +0x10c, is the samples' address. The note-on copies it to the object's +0xf4, and Vari off's renders read every sample through that word, which is rom.2's player's "+0xf0 the samples" four bytes up. "The VC-2's Vari off".) Not named, as one source has them: the header's +0x1c, the block's +0x60 (× 10000 into +0x1a8), the +0xe0 record's +0x2d0, and the routines `0x893c8670` and `0x893cc760`.
 
 **LITE's install** `0x893af7a0`, by the wave's type (past 2 nothing):
 - type 0, Vari off: the render `0x893c63c0`, or `0x893c66e0` with the flag (+0xa40);
@@ -2367,7 +2407,7 @@ The loop record (vplp) is read at rom.2's file reader's offsets (XtFiles.h) and 
 7. Then, only for types 1, 6, 7 and 8 under the block's Vari off, Vari off's player words:
    - **by events:** each end's position from `0x893cc0d0(object, event, &position, &…)` >> 4, the end's less 1, into the start (+0x26c), end (+0x254), the forward loop (+0x258, +0x25c, their span) and the backward (+0x270 the end, +0x274 the start, their span); the modes 1 with the object's 0x08, else 0; the rates 1. A seek (`0x893c6360`) to the third event's position (+0x144) when it isn't the first.
    - **by samples:** the start and the end less 1 as they stand; the loop record's loops; its modes under the object's 0x01, else 0; its rates exp2(r/12000), the backward's times the +0xe0 record's +0x2d0. A seek to the third word when it isn't the first.
-   - then +0x250 the Start Offset, +0x248 0, +0x284 1, and the position (+0x24c, and +0x288) the end when the walk is negative, else the start.
+   - then +0x250 ~~the Start Offset~~ the samples' address (withdrawn, v261, as above), +0x248 0, +0x284 1, and the position (+0x24c, and +0x288) the end when the walk is negative, else the start.
 
 **The check, xt_vc2osc** (its voice part):
 - The three routines' hooks are gone, so rom.4's own run. Hooked in their place: `0x893c8670` (as a kind's routine), `0x893cc760` (a routine on the object), and the event lookup `0x893cc0d0`, whose hook answers the next of three drawn positions, the port's parts the same.

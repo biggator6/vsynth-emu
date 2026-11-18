@@ -404,7 +404,9 @@ version against rom.4's routines with what it calls hooked:
      +0xb0…+0xf3, rom.2's analog block's words 0x30 up, with the Pulse Width `0x8939c5e0`, the Detune's `0x8939c6e0` and
      the Slope `0x8939cae0`, against rom.4's whole converter in xt_vc2carrier's third part (HARDWARE_FIRMWARE.md, "The
      VC-2's analog converter's second part"). The analog OSC is whole but for its renders, which are rom.2's.
-   - then Vari off. Beside it, the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf (`0x89506e54`), which the
+   - done (v261): Vari off's two renders, rom.4's own `0x893c63c0` and `0x893c66e0`, `vc2OscVariOffMono` and
+     `vc2OscVariOffStereo`, against rom.4's in xt_vc2osc's Vari off part (HARDWARE_FIRMWARE.md, "The VC-2's Vari off").
+   - next: kinds 5 and 6 into the tone. Beside it, the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf (`0x89506e54`), which the
      wiring gives and nothing has ported yet.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the

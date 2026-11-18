@@ -231,6 +231,7 @@ int main(int argc, char** argv) {
     OscSides s { fw, voices, parts, shared, rom, romShared };
     Vc2Tally tally { "XT_VC2OSC_FIRST", "XT_VC2OSC_STOP" };
     oscRampPart(fw, romShared, *run, tally);
+    oscVariOffPart(fw, *run, tally);
     oscInstallRom(fw, shared.draws, rom);
     vc2RunCases(*run, tally, "", s.n.events, [&](std::mt19937& rng, bool) { return oscVoiceCase(s, rng); });
     const OscCounts& n = s.n;

@@ -59,6 +59,11 @@ struct Vc2OscTables {
     float litePeriod = 0;           // 0x893c81f0
     float liteHalf = 0;             // 0x893c81f4
     float liteFilter = 0;           // 0x893c81f8
+    // Vari off's renders' (v261): a sample's scale, the folded way's, the gain's glide, the fade's step at the last sample
+    float variOffScale = 0;         // 0x893c6420: 65536
+    float variOffFold = 0;          // 0x893c6764: 45875, 70% of it
+    float variOffGlide = 0;         // 0x893c6424: 1/32
+    float variOffFade = 0;          // 0x893c6428
     Vc2OscAnalogPool analog;        // the analog note-on's (v242, Vc2OscAnalogPool.h)
 };
 

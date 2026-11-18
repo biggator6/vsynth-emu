@@ -46,14 +46,14 @@ constexpr int kVariStereo = 5;
 constexpr std::array<bool, 8> kVariOffTypes { true, false, false, false, false, true, true, true };
 
 // [FW] VariPhrase's note-on's words: the range's two ends and where to seek (the block's +0xe8, +0xec, +0xf0), their
-// copies (×16 in samples, as they stand in events), the block's +0x60 (× 10000 into +0x1a8) and +0xb8 (the Start
-// Offset), the header's, loop record's and +0xe0 record's pointers; the object's player words
+// copies (×16 in samples, as they stand in events), the block's +0x60 (× 10000 into +0x1a8) and +0xb8 (the samples'
+// address), the header's, loop record's and +0xe0 record's pointers; the object's player words
 constexpr uint32_t kFrom = 0x13c, kTo = 0x140, kSeekTo = 0x144, kCopy16 = 0x170, kCopy32 = 0x174;
 constexpr uint32_t kSelf = 0x1a0, kSelfAt = 0x108, kHeaderWord = 0x1a4, kTimes = 0x1a8, kTimesFrom = 0xb4;
-constexpr uint32_t kHeaderAt = 0x128, kLoopAt = 0x130, kPairAt = 0x134, kPairWord = 0x2d0, kStartOffset = 0x10c;
+constexpr uint32_t kHeaderAt = 0x128, kLoopAt = 0x130, kPairAt = 0x134, kPairWord = 0x2d0, kSamplesFrom = 0x10c;
 constexpr uint32_t kPitch = 0x1cc, kFormant = 0x1d0, kLevel = 0x1d4, kLevelFrom = 0x6c, kWalk = 0x1d8, kZero = 0x1f0;
 constexpr uint32_t kUpdate = 0x893c88b0, kAfterUpdate = 0x893c8670, kSeek = 0x893c6360;
-constexpr uint32_t kZeroAt = 0x248, kPosition = 0x24c, kOffset = 0x250, kEnd = 0x254, kLoop = 0x258, kRateFwd = 0x264;
+constexpr uint32_t kZeroAt = 0x248, kPosition = 0x24c, kSamples = 0x250, kEnd = 0x254, kLoop = 0x258, kRateFwd = 0x264;
 constexpr uint32_t kFwdMode = 0x268, kStart = 0x26c, kBwd = 0x270, kRateBwd = 0x27c, kBwdMode = 0x280, kOne = 0x284;
 constexpr uint32_t kPositionCopy = 0x288;
 constexpr float kTwo31 = 2147483648.0f;   // [FW] 0x893af4ae…: mov #79, shll8, shll16, as a float
@@ -173,7 +173,7 @@ void vc2OscSetVariOff(Vc2OscVoice& v, const Vc2OscVariOff& w) {
 }
 
 uint32_t vc2OscVariOffStart(Vc2OscVoice& v) {
-    v.setU32(kOffset, v.u32(kStartOffset));
+    v.setU32(kSamples, v.u32(kSamplesFrom));
     v.setF32(kZeroAt, 0.0f);
     v.setF32(kOne, 1.0f);
     v.setU32(kPosition, 0.0f > v.f32(kWalk) ? v.u32(kEnd) : v.u32(kStart));
