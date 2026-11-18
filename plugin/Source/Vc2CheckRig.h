@@ -62,6 +62,9 @@ inline float vc2Unit(std::mt19937& rng) { return (float)rng() / 4294967296.0f; }
 // A level as a parameter's 0…127 gives it, v/127 (v220's, here from v221)
 inline float vc2DrawLevel(std::mt19937& rng) { return (float)(rng() % 128) / 127.0f; }
 
+// A period from 20 to 1000 samples, by octaves (v223's, here from v266)
+inline float vc2DrawPeriod(std::mt19937& rng) { return 20.0f * std::pow(50.0f, vc2Unit(rng)); }
+
 // A Formant Shift ratio, 0.5 to 2: its ends and 1 most often (v211's)
 inline float vc2DrawRatio(std::mt19937& rng) {
     constexpr float kRatios[6] = { 0.5f, 1.0f, 2.0f, -1.0f, -1.0f, -1.0f };   // -1: any
@@ -76,6 +79,12 @@ inline bool vc2SameAsFr0(const Vc2Fw& fw, float mine) { return fw.cpu.fb[0][0] =
 struct Vc2Run {
     int cases, seed;
 };
+
+// A check's loader: each port's tables it reads, stopping at the first that can't load (v266)
+template <auto... Load>
+bool vc2LoadAll(const char* path) {
+    return (Load(path) && ...);
+}
 
 // A check's start, `name <rom.4> [cases] [seed]`: the host's denormals flushed, as the SH-4 does; the arguments (40 cases,
 // seed 2024); rom.4 in `fw` and the port's tables by `load`.  Nothing, said why, when it can't run.

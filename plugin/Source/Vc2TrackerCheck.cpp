@@ -65,13 +65,10 @@ Vc2TrackerSide drawSide(std::mt19937& rng) {
     return { 0.1f * vc2Unit(rng), 0.1f * vc2Unit(rng), 0.1f * vc2Unit(rng), 0.1f * vc2Unit(rng) };
 }
 
-// A period from 20 to 1000 samples, by octaves
-float drawPeriod(std::mt19937& rng) { return 20.0f * std::pow(50.0f, vc2Unit(rng)); }
-
 // A period near the tone's (none: any), or near a multiple or fraction of it, as an octave error leaves P
 float nearPeriod(std::mt19937& rng, float tonePeriod) {
     constexpr float kMultiples[] = { 0.25f, 0.5f, 0.75f, 1.0f, 1.0f, 1.5f, 2.0f, 4.0f, 5.0f, 6.0f };
-    if (!(tonePeriod > 0.0f) || rng() % 4 == 0) return drawPeriod(rng);
+    if (!(tonePeriod > 0.0f) || rng() % 4 == 0) return vc2DrawPeriod(rng);
     return tonePeriod * kMultiples[rng() % std::size(kMultiples)] * (0.97f + 0.06f * vc2Unit(rng));
 }
 
@@ -125,7 +122,7 @@ void scrambleTracker(Sides& b, std::mt19937& rng, float tonePeriod) {
     s.sinceUp = (int32_t)(rng() % 800);
     s.sinceDown = (int32_t)(rng() % 800);
     s.period = rng() % 4 == 0 ? s.fallback : nearPeriod(rng, tonePeriod);
-    s.fallback = rng() % 2 == 0 ? s.period : drawPeriod(rng);
+    s.fallback = rng() % 2 == 0 ? s.period : vc2DrawPeriod(rng);
     s.recentPeak = 0.05f * vc2Unit(rng);
     s.noise = (int32_t)(rng() % 40);
     s.noisyHold = (int32_t)(rng() % 2);

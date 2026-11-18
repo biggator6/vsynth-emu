@@ -409,7 +409,21 @@ version against rom.4's routines with what it calls hooked:
    - done (v257): the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf (`0x89506e54`),
      `Vc2LibMath`, against rom.4's own in xt_vc2libm (HARDWARE_FIRMWARE.md, "The VC-2's logf and powf"). The wiring
      takes it next: `Vc2ToneShared` still gives rom.4's routines through `RomShared`.
-   - next: kinds 5 and 6 into the tone.
+   - done (v266): kinds 5 and 6 on the OSC voice: `Vc2OscVoice::carrier` at +0xa90 (the init `0x893ebed0`, the settings
+     `0x893ec450`, the render `0x893ebfa0`) and `Vc2OscVoice::kind6` at +0xafc (the start `0x893ec700`, the render
+     `0x893ec730`), their hooks out of xt_vc2osc, rom.4's own run against the port's words (HARDWARE_FIRMWARE.md, "The
+     VC-2's kinds 5 and 6 on the OSC voice"). What they still need from outside the voice, for the part's wiring:
+     - the input stage's peak (`Vc2Unvoiced::peak`, `0x899d9a5c`), for the carrier's Dynamics. Kind 5's update
+       `0x893afff0` still goes by its address through `Vc2OscParts`; `vc2Kind5Update` is its port, not called yet.
+     - the mic ring, one for the whole part (`Vc2OscParts::micRing`, `0x8a0f31cc`): the block mixer writes each block
+       of the mic into it (`Vc2MicRing::write`, `0x893ec820`), with Unvoice Level (`0x899d9968`) set by its converter.
+     - the tracker's period for each of those blocks (`Vc2Tracker`, `0x899d9bd0`), which `Vc2MicRing::write` is given.
+     - the input stage's unvoiced decision for the block (`Vc2OscParts::unvoiced`, `0x899d99dc`), and the OS's
+       millisecond word (`Vc2OscParts::osClock`, `0x893018d0`), where a carrier's phase starts.
+     - kind 6's update `0x893b0150`, which ends in the setter `0x893ec790` (`Vc2Kind6::set`), also by its address still.
+   - done (v267): the vibrato, `Vc2OscVibrato`, on the voice's first 0x54 bytes: the build `0x893b29b0`, the note-on
+     `0x893b29e0`, the settings `0x893b2b70` and the update `0x893b2c10`, rom.4's own (rom.2 has no such routine), against
+     rom.4's in xt_vc2osc's vibrato part and in the voice, its hooks gone (HARDWARE_FIRMWARE.md, "The VC-2's OSC vibrato").
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
      update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its

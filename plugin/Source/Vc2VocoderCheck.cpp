@@ -154,14 +154,12 @@ std::string vocoderBlockOn(Vc2Fw& fw, Vc2Vocoder& v, const float* mic, float* fr
     return what.empty() ? vocoderDifference(fw, v) : what;
 }
 
-bool loadAll(const char* path) {
-    return vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path) && vc2LoadVocoder(path);
-}
 } // namespace
 
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2vocoder", loadAll);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2vocoder",
+                              vc2LoadAll<vc2LoadUnvoiced, vc2LoadLegacy, vc2LoadHireso, vc2LoadVocoder>);
     if (!run) return 1;
     Counts n;
     if (!fw.call(kStatic, {}) || !fw.call(kBuild, { kVocoder })) {

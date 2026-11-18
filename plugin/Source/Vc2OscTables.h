@@ -5,6 +5,7 @@
 // voice", "The VC-2's OSC voice's note-on and targets", "The VC-2's players' installs and VariPhrase's note-on", "The
 // VC-2's LITE note-on", "The VC-2's analog note-on".
 #include "Vc2OscAnalogPool.h"
+#include "Vc2OscVibrato.h"
 #include <array>
 
 // A pair of bounds as rom.4 holds them, each its routine's own pool word
@@ -65,6 +66,7 @@ struct Vc2OscTables {
     float variOffGlide = 0;         // 0x893c6424: 1/32
     float variOffFade = 0;          // 0x893c6428
     Vc2OscAnalogPool analog;        // the analog note-on's (v242, Vc2OscAnalogPool.h)
+    Vc2OscVibratoPool vibrato;      // the vibrato's (v267, Vc2OscVibrato.h)
 };
 
 [[nodiscard]] bool vc2LoadOsc(const char* path);

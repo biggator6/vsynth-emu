@@ -335,6 +335,24 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's OSC vibrato v267 (2026-11-18, after v266 on its branch; HARDWARE_FIRMWARE.md, "The VC-2's OSC vibrato"): step
+  4.2's OSC voice. Vc2OscVibrato, rom.4's own object on the voice's first 0x54 bytes: its build, note-on, settings and
+  update, with its two waves and constants read from rom.4 (Vc2OscTables). rom.2 has no such routine to reuse. xt_vc2osc:
+  a vibrato part before any hook (Vc2OscVibratoCheck.cpp), the four hooks out of the voice part: 0 different at seeds
+  2024, 7 and 31337, every line and branch of Vc2OscVibrato.cpp reached. mutate_vc2.py --osc: 1,204 plants (98 new, 7
+  rewritten), all caught; the rom4- loader plants, 20 of 20. The new draws moved the random stream and v242's
+  ph-bounds-high went uncaught at seed 2024: an LA phase above 1 came up about once in 40 cases, by chance. The analog's
+  draws now make it on purpose (steerLaCode, steerLaPhase), and that plant is caught on all six seeds tried. Not in the
+  sound yet.
+
+The VC-2's kinds 5 and 6 on the OSC voice v266 (2026-11-18, on its own branch from vc2-mode's 668fea7; HARDWARE_FIRMWARE.md,
+  "The VC-2's kinds 5 and 6 on the OSC voice"): step 4.2's OSC voice. Vc2Carrier at the voice's +0xa90 and Vc2Kind6 at its
+  +0xafc are the voice's own: the carrier's init, settings and render and kind 6's start and render. Vc2OscParts gives what
+  they read from outside: the OS's clock, the mic ring and the unvoiced decision. xt_vc2osc: the five hooks out, rom.4's own
+  routines against the port's words, the ring written whole each case (Vc2OscKindsCheck.cpp): 0 different at seeds 2024, 7
+  and 31337. mutate_vc2.py --osc: 1,106 plants (12 new, 5 rewritten), all caught. Kinds 5's and 6's updates still go by
+  address; the plan lists what the wiring owes them. Not in the sound yet.
+
 The effect driver's start and the Matrix's queue checked v265 (2026-11-18, on v259's branch, not merged;
   HARDWARE_FIRMWARE.md, "The effect driver's start against the firmware's own task"). xt_fx's check alone, no plugin code
   changed. XtFxControl's start, each byte on the bus and each wait, against the firmware's own effect task run from its

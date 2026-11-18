@@ -34,6 +34,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2Tone.cpp
     Source/Vc2ToneNoteOn.cpp
     Source/Vc2OscVoice.cpp
+    Source/Vc2OscVibrato.cpp
     Source/Vc2OscVoiceGet.cpp
     Source/Vc2OscVoiceKinds.cpp
     Source/Vc2OscTables.cpp

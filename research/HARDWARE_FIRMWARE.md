@@ -1546,6 +1546,70 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's OSC vibrato (2026-11-18, v267) {#vc2-osc-vibrato}
+
+Step 4.2's OSC voice. The vibrato is an object of 0x54 bytes on the voice's first bytes: the build `0x893b29b0`, the note-on `0x893b29e0` (given the voice's +0xd4, the block's +0x80), the settings `0x893b2b70` (given the settings' +0x80) and the update `0x893b2c10`. Its outputs are +0x2c, onto the pitch by the voice's +0xfc, and +0x30, onto the gains by +0x100.
+
+It is rom.4's own. Two of its static constants, 327.675 and 0.0074, are nowhere in rom.2, so there was no rom.2 routine to reuse. Those constants come from the static initializer `0x893b2d60`, which stores them at `0x8999f514…0x8999f51c`.
+
+| Object | Word |
+|---|---|
+| +0x00, +0x3c | the wave's number, and its address: `0x8993eb0c` + number × 0x804 |
+| +0x04, +0x08, +0x0c | the rate, and the biases added to the wave for the pitch and the level |
+| +0x10 | the rise + the hold, where the fall starts |
+| +0x14 | the time: −delay / scale at a note-on, on by 10 a count |
+| +0x18, +0x1c, +0x20 | the fade's target, the fade, its rate |
+| +0x24, +0x28 | the fall's rate, the step's ratio at the fall |
+| +0x2c, +0x30 | the outputs |
+| +0x34, +0x38 | running; falling |
+| +0x40, +0x44, +0x48 | the phase, the step, the step's target |
+| +0x4c, +0x50 | the scale, and the step's glide, scale² × 0.07 |
+
+**The waves.** Two of 513 floats in .data, the last equal to the first. Neither is a sine. Both reach −1, and they peak at 0.88 and 0.75.
+
+**The note-on.** The scale is 1 + (n − 100) × 0.0074 from n = 100 up, else 1 − (100 − n) × 0.002, n being the block's +0x24. The step's target is rate × 327.675 × scale, held to 1…65535. With a rise above 0 the fade starts at 0 and moves at 10 / rise. Without one the fade starts at 1 and the step at its target, and if the rise and hold come to 0 or less the fade's rate and target are 0. The fall's rate is 1 / fall, 0 for a fall of 0, and 0.1 for a fall below 0. **The phase isn't touched**, so a note's vibrato starts where the last one's stopped.
+
+**The update**, for n counts:
+
+1. The time goes on by 10n. Below 0 the routine stops there: that is the delay.
+2. When fade target × time passes +0x10, the fall starts, once: the fade's rate becomes the fall's × 10, the step's target becomes target × ratio − step, the time restarts from the excess, and the fade's target goes to 0.
+3. Falling, the phase goes on by step + target × min(time × fall rate, 1). Otherwise the step glides to its target and the phase goes on by the step.
+4. A phase above 65535 comes down by 65535, once. Its low 16 bits are the read point: the top 9 pick the sample, the low 9 lie between it and the next.
+5. The fade goes on by (target − fade) × rate × n, and each output is (bias + wave) × fade.
+
+**The settings** take the rate and both biases and set the step's target again, as target × ratio − step when falling, held to 1…65535.
+
+**What the converter gives it.** `0x8939fbd0` writes the block from the row of `0x8953ffd0` for the Vibrato Type: the wave, the biases, the delay, rise and hold. It writes a fall of 0, a ratio of 1 and n as the velocity / 2. So on a note the fall's rate is 0: after the hold the fade stays where it is and the phase runs on at the last step. The check draws wider than that, to reach every branch.
+
+**Where the port differs, on purpose.** Only waves 0 and 1 exist, and no row names another. Past them rom.4 would read whatever follows its table; the port reads the table's last word.
+
+**Check.** xt_vc2osc's vibrato part (`Vc2OscVibratoCheck.cpp`), before any hook: rom.4's four routines on an object in its RAM, 300 events a case, every word compared after each. The voice part then runs rom.4's own vibrato too, with its words compared after every event. Not drawn: NaNs, a negative count, a rise and hold below 0, and a fade's rate above 1 over the count, where the fade runs away to infinities whose NaNs are the host's.
+
+Results: 0 different at seed 2024 (40 cases, 12,000 events) and seeds 7 and 31337 (400 cases, 120,000 events each). Every line, region and branch of `Vc2OscVibrato.cpp` is reached. `mutate_vc2.py --osc`: 1,204 plants (98 new, 7 rewritten), all caught.
+
+Not in the sound yet.
+
+### The VC-2's kinds 5 and 6 on the OSC voice (2026-11-18, v266) {#vc2-osc-kinds-5-6}
+
+Step 4.2's OSC voice. The VOCODER OSC's carrier (`Vc2Carrier`, v221) and the mic's pitch shifter (`Vc2Kind6`, v225) were ports with nothing calling them. They are now the voice's own words, where rom.4 keeps them:
+
+| Voice | Object | What the voice calls |
+|---|---|---|
+| +0xa90…+0xafc | the carrier, kind 5's | the init `0x893ebed0` (note-on, on P at +0x104), the settings `0x893ec450` (on the settings' +0xb0, not the voice's copy), the render `0x893ebfa0` |
+| +0xafc…+0xb84 | the pitch shifter, kind 6's | the set and start `0x893ec700` (note-on, on P at +0x104), the render `0x893ec730` |
+
+**What they read from outside the voice** comes through `Vc2OscParts`: the OS's millisecond word (`0x893018d0`, where a carrier's phase starts), the mic ring (`0x8a0f31cc`) and the input stage's unvoiced decision for the block (`0x899d99dc`, by `0x893ed500`). rom.4 has one ring, which every voice reads.
+
+**Not connected yet.** Kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by their addresses through `Vc2OscParts`. The first reaches the carrier's update, which reads the input stage's peak (`0x899d9a5c`); the second ends in kind 6's setter `0x893ec790`. So in xt_vc2osc a carrier's growl stays 0 and its targets stay as the note-on left them. xt_vc2carrier and xt_vc2kind6 still check those paths on their own.
+
+**Check.** xt_vc2osc no longer hooks the five routines. rom.4's own run on the voices in its RAM, and after every event the carrier's and kind 6's words and the ring's start word are compared with the port's, as the render's output already was. The carriers' rate setter `0x893ec6a0` and kind 6's globals' setter `0x893ecef0` run once at the start. Each case resets the ring, writes all 128 blocks of it, then starts both voices' carrier and pitch shifter; a kind 6 render writes one more block first, with a drawn period and unvoiced decision.
+
+The inputs of kinds 5 and 6 are drawn as a note gives them (`Vc2OscKindsCheck.cpp`): levels 0…1, a ratio's scale 0.5…2. Noise there takes both sides to NaNs, and which NaN a product keeps is the host's, not rom.4's.
+
+Results: 0 different at seed 2024 (40 cases: 193 carrier blocks, 188 kind 6 blocks) and at seeds 7 and 31337 (400 cases: 1,693 and 1,656 carrier blocks, 1,660 and 1,651 kind 6 blocks). No sample was other than finite. Nearly every block sounds: 380 of 381 at seed 2024. `mutate_vc2.py --osc`: 1,106 plants (12 new, 5 rewritten for the new calls), all caught.
+
+Not in the sound yet.
+
 ### The effect driver's start against the firmware's own task (2026-11-18, v265) {#fx-start-task}
 
 Two planted errors `xt_fx control` had missed, `boot-no-780` since v204 and `matrix-unflushed` at the list's 60 events. No code of the plugin changed: both are the check's.

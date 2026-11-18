@@ -19,8 +19,6 @@
 
 namespace {
 constexpr int kSteps = 400;
-// [FW] what the voice reads of its parts in place: the vibrato's two outputs
-constexpr uint32_t kVibratoPitch = 0x2c, kVibratoLevel = 0x30;
 constexpr uint32_t kRamps = 0x90c, kTail = 0xa38;   // [FW] where the ramps (v236) and the tail are in a voice
 constexpr size_t kEnvelopeBinds = 4;
 constexpr std::array<uint32_t, 4> kRenders { 0x893c62e0, 0x893c61e0, 0, 0 };   // [FW] the install's two, and two hooked
@@ -114,12 +112,20 @@ void steer(Vc2OscVoice& o, std::mt19937& rng, bool all) {
     for (const auto& [at, where] : records) o.setU32(at, where((int)(rng() % kOscRecords)));
 }
 
+// The vibrato's outputs as the targets find them, wider than its own update leaves them: the pitch's moderate, as it
+// reaches exp2; the level's any, but within ±1 on kinds 5 and 6, whose gains it reaches.  Its block's words as the
+// converter could write them, which a kind's note-on reads
+void steerVibrato(Vc2OscVoice& o, std::mt19937& rng) {
+    o.vibrato.w.pitch = oscDrawFloat(rng, OscRange::moderate);
+    o.vibrato.w.level = oscIsVoiced(o.kind()) ? 2.0f * vc2Unit(rng) - 1.0f : oscDrawFloat(rng);
+    oscDrawVibratoVoice(o, rng);
+}
+
 // The draws before an event, written on both sides: the answers, the records, the steered words, each voice's own
-// words and tail into rom.4's memory and its vibrato's output
+// words, vibrato and tail into rom.4's memory
 void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
     OscDraws& d = s.shared.draws;
-    d.vibratoPitch = oscDrawFloat(rng, OscRange::moderate);   // into the pitch
-    d.vibratoLevel = oscDrawFloat(rng);
+    d.clock = (int32_t)rng();
     d.rendered = (uint32_t)rng();
     d.seekFlags = (uint8_t)rng();
     for (int32_t& p : d.positions) p = (int32_t)rng();   // v238: the event lookup's, each side from the first
@@ -128,13 +134,12 @@ void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
     s.shared.positionsTaken = 0;
     oscDrawRecords(s.shared.records, rng);
     oscWriteRecords(s.fw, s.shared.records);
-    for (int v = 0; v < kOscVoices; ++v) {
-        steer(s.voices[(size_t)v], rng, all);
-        oscWriteVoice(s, v);
-        const std::array<std::pair<uint32_t, float>, 2> inPlace { { { kVibratoPitch, d.vibratoPitch },
-                                                                     { kVibratoLevel, d.vibratoLevel } } };
-        for (const auto& [at, x] : inPlace) s.fw.cpu.write(oscVoiceAt(v) + at, &x, sizeof x);
+    for (Vc2OscVoice& o : s.voices) {
+        steer(o, rng, all);
+        oscDrawVoicedVoice(o, rng);   // v266: kinds 5 and 6 on what a note gives them
+        steerVibrato(o, rng);         // v267
     }
+    for (int v = 0; v < kOscVoices; ++v) oscWriteVoice(s, v);
     s.rom.clear();
     s.shared.calls.clear();
 }
@@ -145,11 +150,12 @@ std::string oscVoiceCase(OscSides& s, std::mt19937& rng) {
     for (Vc2OscVoice& o : s.voices) {
         for (uint8_t& b : o.own) b = (uint8_t)rng();
         oscDrawBuiltRamps(o.ramps, rng);
+        oscDrawVibratoWords(o.vibrato.w, rng);
         auto* tail = reinterpret_cast<uint32_t*>(&o.tail);
         for (size_t k = 0; k < sizeof o.tail / 4; ++k) tail[k] = (uint32_t)rng();
     }
     const std::span<const OscEvent> events = oscEvents();
-    std::string what;
+    std::string what = oscKindsCase(s, rng);   // v266: the mic ring, and each voice's carrier and kind 6 started
     for (int k = 0; k < kSteps && what.empty(); ++k, ++s.n.events) {
         drawBefore(s, rng, k == 0);
         what = events[rng() % events.size()](s, rng, (int)(rng() % kOscVoices));
@@ -161,6 +167,7 @@ std::string oscVoiceCase(OscSides& s, std::mt19937& rng) {
     return what;
 }
 
+const char* const kVibratoNames[kOscVoices] = { "voice 0's vibrato", "voice 1's vibrato" };
 const char* const kOwnNames[kOscVoices] = { "voice 0's own words", "voice 1's own words" };
 const char* const kRampNames[kOscVoices] = { "voice 0's ramps", "voice 1's ramps" };
 const char* const kTailNames[kOscVoices] = { "voice 0's tail", "voice 1's tail" };
@@ -175,6 +182,7 @@ float oscDrawPosition(std::mt19937& rng) {
 
 void oscWriteVoice(OscSides& s, int v) {
     const Vc2OscVoice& o = s.voices[(size_t)v];
+    s.fw.cpu.write(oscVoiceAt(v), &o.vibrato.w, sizeof o.vibrato.w);
     s.fw.cpu.write(oscVoiceAt(v) + Vc2OscVoice::kOwn, o.own.data(), o.own.size());
     s.fw.cpu.write(oscVoiceAt(v) + kRamps, o.ramps.data(), sizeof o.ramps);
     s.fw.cpu.write(oscVoiceAt(v) + kTail, &o.tail, sizeof o.tail);
@@ -207,7 +215,8 @@ std::string oscDifference(OscSides& s) {
         const Vc2OscVoice& o = s.voices[(size_t)v];
         const uint32_t at = oscVoiceAt(v);
         const std::string what = vc2RegionsDifference(
-            s.fw, { { at + Vc2OscVoice::kOwn, o.own.data(), o.own.size(), kOwnNames[v] },
+            s.fw, { { at, &o.vibrato.w, sizeof o.vibrato.w, kVibratoNames[v] },
+                    { at + Vc2OscVoice::kOwn, o.own.data(), o.own.size(), kOwnNames[v] },
                     { at + kRamps, o.ramps.data(), sizeof o.ramps, kRampNames[v] },
                     { at + kTail, &o.tail, sizeof o.tail, kTailNames[v] } });
         if (!what.empty()) return what;
@@ -215,11 +224,10 @@ std::string oscDifference(OscSides& s) {
     return oscCallsDifference(s.rom, s.shared.calls);
 }
 
-static bool loadOscAndRamp(const char* path) { return vc2LoadOsc(path) && vc2LoadRamp(path); }
-
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2osc", loadOscAndRamp);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2osc",
+                              vc2LoadAll<vc2LoadOsc, vc2LoadRamp, vc2LoadCarrier, vc2LoadKind6>);
     if (!run) return 1;
     std::array<Vc2OscVoice, kOscVoices> voices {};
     OscShared shared;
@@ -232,12 +240,17 @@ int main(int argc, char** argv) {
     Vc2Tally tally { "XT_VC2OSC_FIRST", "XT_VC2OSC_STOP" };
     oscRampPart(fw, romShared, *run, tally);
     oscVariOffPart(fw, *run, tally);
+    oscVibratoPart(fw, *run, tally);
     oscInstallRom(fw, shared.draws, rom);
-    vc2RunCases(*run, tally, "", s.n.events, [&](std::mt19937& rng, bool) { return oscVoiceCase(s, rng); });
+    const std::string setUp = oscKindsSetUp(s);
+    vc2RunCases(*run, tally, setUp, s.n.events, [&](std::mt19937& rng, bool) { return oscVoiceCase(s, rng); });
     const OscCounts& n = s.n;
     std::printf("osc: %d cases, %ld events, %ld note-ons (%ld with a sample, %ld without), %ld updates, %ld renders, "
                 "%ld settings, %ld takes, %ld getters\n", run->cases, n.events, n.noteOns, n.sampled, n.plain,
                 n.updates, n.renders, n.settings, n.takes, n.getters);
+    std::printf("kinds 5 and 6: %ld carriers started, %ld carrier blocks, %ld carrier settings, %ld kind 6 starts, %ld "
+                "kind 6 blocks; %ld of the blocks sounding, %ld not finite\n", n.carrierStarts, n.carrierBlocks,
+                n.carrierSettings, n.kind6Starts, n.kind6Blocks, n.voicedSounding, n.voicedNotFinite);
     std::printf("calls: %ld seeks, %ld kinds' routines, %ld event lookups, %ld object setups; %ld ramps gliding after "
                 "an event\n", n.seeks, n.kindCalls, n.lookups, n.objectCalls, n.gliding);
     std::printf("xt_vc2osc: %ld different\n", tally.different);

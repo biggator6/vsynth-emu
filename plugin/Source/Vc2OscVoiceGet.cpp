@@ -34,13 +34,17 @@ void Vc2OscVoice::settings(const uint32_t* s, Vc2OscParts& parts, const Vc2ToneS
         // [FW] the pitch's ramp again (the pool word 0x893ae90c holds its restart, 0x893b0f20)
         if (vc2OscKindRow(kind()).ramp) ramps[kPitchRamp].restart(f32(kRampFr4), f32(kRampFr5), shared);
     }
-    parts.setVibrato(s + kVibratoFrom / 4);
+    Vc2VibratoBlock rates;
+    std::memcpy(&rates, s + kVibratoFrom / 4, sizeof rates);
+    vibrato.settings(rates);
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
     if (row.settingsWay == Vc2OscSettings::analog) settingsAnalog(s + kKindFrom / 4);   // v248
     else if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);
     if (!row.carrier) return;
     std::memcpy(own.data() + (kWave - kOwn), s + kKindFrom / 4, kCarrierBytes);
-    parts.setCarrier(s + kKindFrom / 4);
+    Vc2CarrierParams given;
+    std::memcpy(&given, s + kKindFrom / 4, sizeof given);
+    carrier.settings(&given);   // 0x893ec450, on the settings' words themselves
 }
 
 float Vc2OscVoice::formant() const { return kind() == 2 && u32(kWave) == 1 ? f32(kFormant) : 0.0f; }

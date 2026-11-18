@@ -58,7 +58,7 @@ seeks2-type6|{ 0x893c6360, 0x893cc630 }, { 0, 0 }, { 0x893c6360, 0x893cd090 }|{ 
 seeks2-type8|{ 0x893c6360, 0x893cd090 } } };|{ 0x893cd090, 0x893c6360 } } };|vc2osc
 installed-order|{ t.installed4, t.installed5, t.installed6 }|{ t.installed4, t.installed6, t.installed5 }|vc2osc
 installed-base|(which - 4)]|(which - 4) % 2]|vc2osc
-build-no-vibrato|    parts.buildVibrato();\n||vc2osc
+build-no-vibrato|    vibrato.build();\n||vc2osc
 build-ramps-two|ramp < ramps.size(); ++ramp) ramps[ramp].construct|ramp < 2; ++ramp) ramps[ramp].construct|vc2osc
 build-sync-kept|    tail.sync = 0;\n||vc2osc
 build-flag-kept|    tail.flag = 0;\n    tail.installed|    tail.installed|vc2osc
@@ -69,7 +69,7 @@ install-render-kept|    if (row.render != 0) tail.render = row.render;\n||vc2osc
 install-installed-kept|    if (row.installed != 0) tail.installed|    if (false) tail.installed|vc2osc
 update-kind0|    if (kind() == 0) return;\n    const int32_t n16|    const int32_t n16|vc2osc
 update-n-whole|const int32_t n16 = (int16_t)n;|const int32_t n16 = n;|vc2osc
-update-no-vibrato|    parts.updateVibrato(n16);\n||vc2osc
+update-no-vibrato|    vibrato.update(n16);\n||vc2osc
 update-no-wait|    if (row.waits && tail.seekPending != 0) {|    if (false) {|vc2osc
 update-waits-always|    if (row.waits && tail.seekPending != 0) {|    if (tail.seekPending != 0) {|vc2osc
 update-wait-ge|f32(kLevel) > vc2OscTables().waitLevel|f32(kLevel) >= vc2OscTables().waitLevel|vc2osc
@@ -150,12 +150,12 @@ settings-ramp-always|        if (vc2OscKindRow(kind()).ramp) ramps[kPitchRamp].r
 settings-ramp-args|restart(f32(kRampFr4), f32(kRampFr5), shared)|restart(f32(kRampFr5), f32(kRampFr4), shared)|vc2oscget
 settings-byte-unread|if (bytes[kSettingsByte] != u8(kByte)) {|if (true) {|vc2oscget
 settings-vibrato-from|kVibratoFrom = 0x80|kVibratoFrom = 0x84|vc2oscget
-settings-no-vibrato|    parts.setVibrato(s + kVibratoFrom / 4);\n||vc2oscget
+settings-no-vibrato|    vibrato.settings(rates);\n||vc2oscget
 settings-kind-from|kKindFrom = 0xb0|kKindFrom = 0xb4|vc2oscget
 settings-no-kind|    else if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);\n||vc2oscget
 settings-carrier-bytes|kCarrierBytes = 88|kCarrierBytes = 84|vc2oscget
 settings-no-carrier-copy|    std::memcpy(own.data() + (kWave - kOwn), s + kKindFrom / 4, kCarrierBytes);\n||vc2oscget
-settings-no-carrier|    parts.setCarrier(s + kKindFrom / 4);\n||vc2oscget
+settings-no-carrier|    carrier.settings(&given);   // 0x893ec450, on the settings' words themselves\n||vc2oscget
 formant-wave|kind() == 2 && u32(kWave) == 1 ? f32(kFormant)|kind() == 2 ? f32(kFormant)|vc2oscget
 formant-at|kFormant = 0x68|kFormant = 0x64|vc2oscget
 time-kind|float Vc2OscVoice::time() const { return kind() == 2|float Vc2OscVoice::time() const { return kind() != 0|vc2oscget
@@ -165,7 +165,7 @@ pitch-depth|kPitchDepth = 0x70|kPitchDepth = 0x6c|vc2osctargets
 pitch-vibrato-depth|kVibratoDepth = 0xfc|kVibratoDepth = 0x100|vc2osctargets
 pitch-no-env|float x = add(mul(bind(v, p, kPitchEnvelopeBind, kEnvelopeOut), v.f32(kPitchDepth)), v.f32(kPitch));|float x = v.f32(kPitch);|vc2osctargets
 pitch-env-bind|kPitchEnvelopeBind = 0|kPitchEnvelopeBind = 1|vc2osctargets
-pitch-no-vibrato|    x = add(mul(p.vibratoPitch(), v.f32(kVibratoDepth)), x);\n||vc2osctargets
+pitch-no-vibrato|    x = add(mul(v.vibrato.w.pitch, v.f32(kVibratoDepth)), x);\n||vc2osctargets
 pitch-no-ramp|    x = add(x, v.ramps[Vc2OscVoice::kPitchRamp].value());\n||vc2osctargets
 pitch-ramp-1|v.ramps[Vc2OscVoice::kPitchRamp].value()|v.ramps[Vc2OscVoice::kFormantRamp].value()|vc2osctargets
 pitch-no-offset|    return add(x, v.tail.offset);|    return x;|vc2osctargets
@@ -305,15 +305,15 @@ on-extin-gain-level|setF32(kObjectGain, targets.gain());|setF32(kObjectGain, tar
 on-extin-no-level|            setF32(kObjectLevel, targets.level());\n||vc2oscnoteon
 on-extin-level-gain|setF32(kObjectLevel, targets.level());|setF32(kObjectLevel, targets.gain());|vc2oscnoteon
 on-carrier-gain|            setF32(kP, targets.gain());\n|            setF32(kP, targets.level());\n|vc2oscnoteon
-on-carrier-pitch|            setF32(kP4, targets.ratioOn(t.noteOn, t.noteOn.ratio));\n            parts.initCarrier|            setF32(kP4, targets.tunedRatio());\n            parts.initCarrier|vc2oscnoteon
-on-carrier-no-init|            parts.initCarrier(at(kP));\n||vc2oscnoteon
-on-carrier-init-at|parts.initCarrier(at(kP))|parts.initCarrier(at(kP4))|vc2oscnoteon
+on-carrier-pitch|            setF32(kP4, targets.ratioOn(t.noteOn, t.noteOn.ratio));\n            carrier.init|            setF32(kP4, targets.tunedRatio());\n            carrier.init|vc2oscnoteon
+on-carrier-no-init|            carrier.init(paramsOf<Vc2CarrierParams>(*this), parts.osClock());   // 0x893ebed0\n||vc2oscnoteon
+on-carrier-init-at|uint32_t offset = kP)|uint32_t offset = kP4)|vc2oscnoteon
 on-kind6-gain|setF32(kP8, targets.gain());|setF32(kP8, targets.level());|vc2oscnoteon
 on-kind6-p-pitch|setF32(kP, f32(kObjectPitch));|setF32(kP, f32(kObjectGain));|vc2oscnoteon
 on-kind6-formant|setF32(kP4, targets.formant());|setF32(kP4, targets.formantTarget());|vc2oscnoteon
 on-kind6-level|setF32(kPc, f32(kKind6Level));|setF32(kPc, 0.0f);|vc2oscnoteon
-on-kind6-no-start|            parts.startKind6(at(kP));\n||vc2oscnoteon
-on-no-vibrato|    parts.noteOnVibrato(at(kVibratoBlock));\n||vc2oscnoteon
+on-kind6-no-start|            kind6.setAndStart(parts.micRing(), paramsOf<Vc2Kind6Params>(*this));   // 0x893ec700\n||vc2oscnoteon
+on-no-vibrato|    vibrato.noteOn(paramsOf<Vc2VibratoBlock>(*this, kVibratoBlock));\n||vc2oscnoteon
 pitch-env-word|kEnvelopeOut = 0x4c|kEnvelopeOut = 0x48|vc2osctargets
 ratio-scale-at|kRatioScale = 0x60|kRatioScale = 0x64|vc2osctargets
 walk-base-at|kWalkBase = 0x64|kWalkBase = 0x68|vc2osctargets
@@ -373,7 +373,7 @@ walk-factor-formant|float factor = v_.tail.walkFactor;|float factor = v_.tail.fo
 formant-no-factor|    return mul(v_.tail.formantFactor, r);|    return r;|vc2osctargets
 formant-walk-factor|mul(v_.tail.formantFactor, r)|mul(v_.tail.walkFactor, r)|vc2osctargets
 formant-unbounded|const float r = vc2OscBounded(mul(x, ramp), { kFormantMost, vc2OscTables().formantLeast });|const float r = mul(x, ramp);|vc2osctargets
-levelone-no-one|add(mul(p_.vibratoLevel(), v_.f32(kLevelDepth)), 1.0f)|mul(p_.vibratoLevel(), v_.f32(kLevelDepth))|vc2osctargets
+levelone-no-one|add(mul(v_.vibrato.w.level, v_.f32(kLevelDepth)), 1.0f)|mul(v_.vibrato.w.level, v_.f32(kLevelDepth))|vc2osctargets
 gain-no-ramp|    return mul(g, v_.ramps[Vc2OscVoice::kPitchRamp].factor());|    return g;|vc2osctargets
 gain-no-level|mul(mul(levelOne(), v_.f32(kLevel)), v_.f32(kGain))|mul(levelOne(), v_.f32(kGain))|vc2osctargets
 gain-order|mul(mul(levelOne(), v_.f32(kLevel)), v_.f32(kGain))|mul(levelOne(), mul(v_.f32(kLevel), v_.f32(kGain)))|vc2osctargets
@@ -1134,3 +1134,117 @@ voff-pool-scale|{ 0x893c6420, &t.variOffScale }|{ 0x893c6424, &t.variOffScale }|
 voff-pool-fold|{ 0x893c6764, &t.variOffFold }|{ 0x893c6420, &t.variOffFold }|vc2osctables
 voff-pool-glide|{ 0x893c6424, &t.variOffGlide }|{ 0x893c6428, &t.variOffGlide }|vc2osctables
 voff-pool-fade|{ 0x893c6428, &t.variOffFade }|{ 0x893c6424, &t.variOffFade }|vc2osctables
+# v266: kinds 5 and 6 on the voice, rom.4's own carrier and pitch shifter against the port's words and output
+kinds-init-clock|parts.osClock());   // 0x893ebed0|parts.osClock() + 1);   // 0x893ebed0|vc2oscnoteon
+kinds-init-no-clock|parts.osClock());   // 0x893ebed0|0);   // 0x893ebed0|vc2oscnoteon
+kinds-start-set-only|kind6.setAndStart(parts.micRing(), paramsOf<Vc2Kind6Params>(*this));|{ const Vc2Kind6Params p6 = paramsOf<Vc2Kind6Params>(*this); kind6.set(&p6); }|vc2oscnoteon
+kinds-start-no-set|kind6.setAndStart(parts.micRing(), paramsOf<Vc2Kind6Params>(*this));|kind6.start(parts.micRing());|vc2oscnoteon
+kinds-settings-word|std::memcpy(&given, s + kKindFrom / 4, sizeof given);|std::memcpy(&given, s + kKindFrom / 4 + 1, sizeof given);|vc2oscget
+kinds-settings-init|carrier.settings(&given);|carrier.init(given, parts.osClock());|vc2oscget
+kinds-render-carrier-gone|case Vc2OscRender::carrier: carrier.render(out); return 0;|case Vc2OscRender::carrier: return 0;|vc2osc
+kinds-render-kind6-gone|case Vc2OscRender::kind6: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;|case Vc2OscRender::kind6: return 0;|vc2osc
+kinds-render-kind6-carrier|case Vc2OscRender::kind6: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;|case Vc2OscRender::kind6: carrier.render(out); return 0;|vc2osc
+kinds-render-carrier-kind6|case Vc2OscRender::carrier: carrier.render(out); return 0;|case Vc2OscRender::carrier: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;|vc2osc
+kinds-render-unvoiced|kind6.render(parts.micRing(), parts.unvoiced(), out)|kind6.render(parts.micRing(), parts.unvoiced() + 1, out)|vc2osc
+kinds-render-answer|carrier.render(out); return 0;|carrier.render(out); return 1;|vc2osc
+# v267: the vibrato, vc2oscvibrato (Vc2OscVibrato.cpp), its pool in vc2osctables, its wiring in the voice.  Not planted,
+# as nothing can show them: the scale's test at 100 by > (both lines give 1 there), the wrap's −65535 as a subtraction of
+# +65535 (the same sum), and a phase at 65535 itself by >= (one value of a float's whole range)
+vib-build-no-pitch|    w.pitch = 0.0f;\n    w.level = 0.0f;\n    w.active = 0;|    w.level = 0.0f;\n    w.active = 0;|vc2oscvibrato
+vib-build-no-level|    w.pitch = 0.0f;\n    w.level = 0.0f;\n    w.active = 0;|    w.pitch = 0.0f;\n    w.active = 0;|vc2oscvibrato
+vib-build-active|    w.level = 0.0f;\n    w.active = 0;|    w.level = 0.0f;\n    w.active = 1;|vc2oscvibrato
+vib-on-wave|w.wave = b.wave;|w.wave = 0;|vc2oscvibrato
+vib-on-fade-target|    w.fadeTarget = 1.0f;\n    w.step = 0.0f;|    w.fadeTarget = 0.0f;\n    w.step = 0.0f;|vc2oscvibrato
+vib-on-no-step|    w.fadeTarget = 1.0f;\n    w.step = 0.0f;\n|    w.fadeTarget = 1.0f;\n|vc2oscvibrato
+vib-on-no-pitch|    w.step = 0.0f;\n    w.pitch = 0.0f;\n|    w.step = 0.0f;\n|vc2oscvibrato
+vib-on-no-level|    w.pitch = 0.0f;\n    w.level = 0.0f;\n    w.falling = 0;|    w.pitch = 0.0f;\n    w.falling = 0;|vc2oscvibrato
+vib-on-no-falling|    w.falling = 0;\n||vc2oscvibrato
+vib-on-wave-at|(uint32_t)b.wave * kVc2VibratoWaveBytes|(uint32_t)b.wave * 0x800|vc2oscvibrato
+vib-on-glide|mul(mul(w.scale, w.scale), t.glide)|mul(w.scale, t.glide)|vc2oscvibrato
+vib-on-target-scale|heldStep(mul(mul(b.rate, t.stepPerRate), w.scale), t.stepMost)|heldStep(mul(b.rate, t.stepPerRate), t.stepMost)|vc2oscvibrato
+vib-on-target-held|w.stepTarget = heldStep(mul(mul(b.rate, t.stepPerRate), w.scale), t.stepMost);|w.stepTarget = mul(mul(b.rate, t.stepPerRate), w.scale);|vc2oscvibrato
+vib-on-pitch-bias|w.pitchBias = b.pitchBias;|w.pitchBias = b.levelBias;|vc2oscvibrato
+vib-on-level-bias|w.levelBias = b.levelBias;|w.levelBias = b.pitchBias;|vc2oscvibrato
+vib-on-rate|    w.rate = b.rate;\n||vc2oscvibrato
+vib-on-time-sign|div(-b.delay, w.scale)|div(b.delay, w.scale)|vc2oscvibrato
+vib-on-time-scale|w.time = div(-b.delay, w.scale);|w.time = -b.delay;|vc2oscvibrato
+vib-on-rise-hold|add(b.rise, b.hold)|b.rise|vc2oscvibrato
+vib-on-ratio|w.stepRatio = b.stepRatio;|w.stepRatio = 1.0f;|vc2oscvibrato
+vib-on-rise-ge|if (b.rise > 0.0f) {|if (b.rise >= 0.0f) {|vc2oscvibrato
+vib-on-rise-fade|    w.fade = 0.0f;\n        w.fadeRate = div(t.riseTen, b.rise);|    w.fade = 1.0f;\n        w.fadeRate = div(t.riseTen, b.rise);|vc2oscvibrato
+vib-on-rise-rate|div(t.riseTen, b.rise)|div(1.0f, b.rise)|vc2oscvibrato
+vib-on-flat-fade|        w.fade = 1.0f;\n        w.step = w.stepTarget;|        w.fade = 0.0f;\n        w.step = w.stepTarget;|vc2oscvibrato
+vib-on-flat-step|        w.step = w.stepTarget;\n||vc2oscvibrato
+vib-on-holds-ge|w.riseHold > 0.0f;|w.riseHold >= 0.0f;|vc2oscvibrato
+vib-on-holds-rate|holds ? 1.0f : 0.0f|holds ? 0.0f : 1.0f|vc2oscvibrato
+vib-on-holds-target|        if (!holds) w.fadeTarget = 0.0f;\n||vc2oscvibrato
+vib-on-fall-zero|    if (b.fall == 0.0f) w.fallRate = 0.0f;\n    else w.fallRate|    w.fallRate|vc2oscvibrato
+vib-on-fall-rate|div(1.0f, b.fall)|div(10.0f, b.fall)|vc2oscvibrato
+vib-on-fall-short|div(1.0f, b.fall) : t.fallShort;|div(1.0f, b.fall) : 0.0f;|vc2oscvibrato
+vib-on-active|    w.active = 1;\n||vc2oscvibrato
+vib-scale-one|kScaleOne = 100|kScaleOne = 101|vc2oscvibrato
+vib-scale-up|t.scaleUp), 1.0f)|t.scaleDown), 1.0f)|vc2oscvibrato
+vib-scale-down|t.scaleDown));|t.scaleUp));|vc2oscvibrato
+vib-scale-sign|return sub(1.0f, mul(|return add(1.0f, mul(|vc2oscvibrato
+vib-held-least|1.0f > x ? 1.0f : x|0.0f > x ? 0.0f : x|vc2oscvibrato
+vib-held-most|return least > most ? most : least;|return least;|vc2oscvibrato
+vib-set-pitch|w.pitchBias = s.pitchBias;|w.pitchBias = s.levelBias;|vc2oscvibrato
+vib-set-level|w.levelBias = s.levelBias;|w.levelBias = s.pitchBias;|vc2oscvibrato
+vib-set-rate|    w.rate = s.rate;\n||vc2oscvibrato
+vib-set-scale|float target = mul(mul(s.rate, t.stepPerRate), w.scale);|float target = mul(s.rate, t.stepPerRate);|vc2oscvibrato
+vib-set-not-falling|    if (w.falling != 0) target = sub(mul(w.stepRatio, target), w.step);\n||vc2oscvibrato
+vib-set-fall-step|target = sub(mul(w.stepRatio, target), w.step);|target = mul(w.stepRatio, target);|vc2oscvibrato
+vib-set-fall-ratio|target = sub(mul(w.stepRatio, target), w.step);|target = sub(target, w.step);|vc2oscvibrato
+vib-set-held|w.stepTarget = heldStep(target, t.stepMost);|w.stepTarget = target;|vc2oscvibrato
+vib-up-active|    if (w.active == 0) return;\n||vc2oscvibrato
+vib-up-count|kCountTime = 10|kCountTime = 9|vc2oscvibrato
+vib-up-delay|    if (0.0f > w.time) return;\n||vc2oscvibrato
+vib-up-delay-ge|if (0.0f > w.time) return;|if (0.0f >= w.time) return;|vc2oscvibrato
+vib-up-fall-at|if (mul(w.fadeTarget, w.time) > w.riseHold) {|if (w.time > w.riseHold) {|vc2oscvibrato
+vib-up-fall-ge|if (mul(w.fadeTarget, w.time) > w.riseHold) {|if (mul(w.fadeTarget, w.time) >= w.riseHold) {|vc2oscvibrato
+vib-up-fall-rate|w.fadeRate = mul(w.fallRate, t.fallTen);|w.fadeRate = w.fallRate;|vc2oscvibrato
+vib-up-fall-step|w.stepTarget = sub(mul(w.stepTarget, w.stepRatio), w.step);|w.stepTarget = mul(w.stepTarget, w.stepRatio);|vc2oscvibrato
+vib-up-fall-ratio|w.stepTarget = sub(mul(w.stepTarget, w.stepRatio), w.step);|w.stepTarget = sub(w.stepTarget, w.step);|vc2oscvibrato
+vib-up-fall-time|        w.time = sub(w.time, w.riseHold);\n||vc2oscvibrato
+vib-up-fall-target|        w.fadeTarget = 0.0f;\n        w.falling = 1;|        w.falling = 1;|vc2oscvibrato
+vib-up-fall-flag|        w.falling = 1;\n||vc2oscvibrato
+vib-up-x|const float x = mul(w.time, w.fallRate);|const float x = w.time;|vc2oscvibrato
+vib-up-x-most|x > 1.0f ? 1.0f : x|x|vc2oscvibrato
+vib-up-fall-phase|add(add(mul(w.stepTarget, x > 1.0f ? 1.0f : x), w.step), w.phase)|add(mul(w.stepTarget, x > 1.0f ? 1.0f : x), w.phase)|vc2oscvibrato
+vib-up-glide|w.step = add(mul(sub(w.stepTarget, w.step), w.glide), w.step);|w.step = w.stepTarget;|vc2oscvibrato
+vib-up-phase|w.phase = add(w.phase, w.step);|w.phase = w.step;|vc2oscvibrato
+vib-up-wrap|    if (w.phase > t.phaseTop) w.phase = add(w.phase, t.phaseBack);\n||vc2oscvibrato
+vib-up-mask|kPhaseMask = 0xffff|kPhaseMask = 0x7fff|vc2oscvibrato
+vib-up-shift|kWholeShift = 7|kWholeShift = 6|vc2oscvibrato
+vib-up-fraction|kFraction = 511|kFraction = 255|vc2oscvibrato
+vib-up-stride|(at >> kWholeShift) * 4|(at >> kWholeShift) * 2|vc2oscvibrato
+vib-up-next|waveWord(sample + 4, t)|waveWord(sample, t)|vc2oscvibrato
+vib-up-between|add(mul(between, t.perStep), first)|add(between, first)|vc2oscvibrato
+vib-up-first|add(mul(between, t.perStep), first)|mul(between, t.perStep)|vc2oscvibrato
+vib-up-no-fade|    w.fade = add(mul(mul(sub(w.fadeTarget, w.fade), w.fadeRate), xtf::flt(n)), w.fade);\n||vc2oscvibrato
+vib-up-fade-n|mul(mul(sub(w.fadeTarget, w.fade), w.fadeRate), xtf::flt(n))|mul(sub(w.fadeTarget, w.fade), w.fadeRate)|vc2oscvibrato
+vib-up-fade-rate|mul(mul(sub(w.fadeTarget, w.fade), w.fadeRate), xtf::flt(n))|mul(sub(w.fadeTarget, w.fade), xtf::flt(n))|vc2oscvibrato
+vib-up-pitch-bias|w.pitch = mul(add(w.pitchBias, wave), w.fade);|w.pitch = mul(wave, w.fade);|vc2oscvibrato
+vib-up-level-bias|w.level = mul(add(w.levelBias, wave), w.fade);|w.level = mul(wave, w.fade);|vc2oscvibrato
+vib-up-pitch-fade|w.pitch = mul(add(w.pitchBias, wave), w.fade);|w.pitch = add(w.pitchBias, wave);|vc2oscvibrato
+vib-up-level-fade|w.level = mul(add(w.levelBias, wave), w.fade);|w.level = add(w.levelBias, wave);|vc2oscvibrato
+vib-up-pitch-is-level|w.pitch = mul(add(w.pitchBias, wave), w.fade);|w.pitch = mul(add(w.levelBias, wave), w.fade);|vc2oscvibrato
+vib-wave-last|t.waves.size() - 1)|t.waves.size() - 2)|vc2oscvibrato
+vib-pool-step|{ 0x893b2d90, &v.stepPerRate }|{ 0x893b2d98, &v.stepPerRate }|vc2osctables
+vib-pool-down|{ 0x893b2d98, &v.scaleDown }|{ 0x893b2d9c, &v.scaleDown }|vc2osctables
+vib-pool-up|{ 0x893b2d9c, &v.scaleUp }|{ 0x893b2d98, &v.scaleUp }|vc2osctables
+vib-pool-glide|{ 0x893b2bf4, &v.glide }|{ 0x893b2c00, &v.glide }|vc2osctables
+vib-pool-most|{ 0x893b2bf8, &v.stepMost }|{ 0x893b2bfc, &v.stepMost }|vc2osctables
+vib-pool-rise|{ 0x893b2bfc, &v.riseTen }|{ 0x893b2c00, &v.riseTen }|vc2osctables
+vib-pool-short|{ 0x893b2c00, &v.fallShort }|{ 0x893b2bf4, &v.fallShort }|vc2osctables
+vib-pool-fall|{ 0x893b2d80, &v.fallTen }|{ 0x893b2d8c, &v.fallTen }|vc2osctables
+vib-pool-top|{ 0x893b2d84, &v.phaseTop }|{ 0x893b2d80, &v.phaseTop }|vc2osctables
+vib-pool-back|{ 0x893b2d88, &v.phaseBack }|{ 0x893b2d84, &v.phaseBack }|vc2osctables
+vib-pool-per|{ 0x893b2d8c, &v.perStep }|{ 0x893b2d80, &v.perStep }|vc2osctables
+vib-waves-at|{ kVc2VibratoWavesAt, (int)vibrato.waves.size() }|{ kVc2VibratoWavesAt + 4, (int)vibrato.waves.size() }|vc2osctables
+vib-waves-half|{ kVc2VibratoWavesAt, (int)vibrato.waves.size() }|{ kVc2VibratoWavesAt, (int)vibrato.waves.size() / 2 }|vc2osctables
+vib-wire-update-n|vibrato.update(n16);|vibrato.update(n);|vc2osc
+vib-wire-settings|vibrato.settings(rates);|vibrato.noteOn(rates);|vc2oscget
+vib-wire-note-on|vibrato.noteOn(paramsOf<Vc2VibratoBlock>(*this, kVibratoBlock));|vibrato.settings(paramsOf<Vc2VibratoBlock>(*this, kVibratoBlock));|vc2oscnoteon
+vib-wire-pitch|mul(v.vibrato.w.pitch, v.f32(kVibratoDepth))|mul(v.vibrato.w.level, v.f32(kVibratoDepth))|vc2osctargets
+vib-wire-level|mul(v_.vibrato.w.level, v_.f32(kLevelDepth))|mul(v_.vibrato.w.pitch, v_.f32(kLevelDepth))|vc2osctargets

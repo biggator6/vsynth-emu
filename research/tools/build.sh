@@ -116,6 +116,9 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2OscAnalogShape.cpp ] && echo Vc2OscAnalogShape.cpp Vc2OscAnalogDraws.cpp ) \
    $( [ -f Vc2OscAnalogUpdate.cpp ] && echo Vc2OscAnalogUpdate.cpp ) \
    $( [ -f Vc2OscVariOffRender.cpp ] && echo Vc2OscVariOffRender.cpp Vc2VariOffCheck.cpp ) \
+   $( [ -f Vc2OscKindsCheck.cpp ] && echo Vc2OscKindsCheck.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp Vc2Kind6.cpp \
+   Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2Math.cpp ) \
+   $( [ -f Vc2OscVibrato.cpp ] && echo Vc2OscVibrato.cpp Vc2OscVibratoCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2osc" &
 # The TVA (v233) against rom.4's own routines, the OS's call hooked
 [ -f Vc2TvaCheck.cpp ] && cc -DXT_VC2TVA_MAIN Vc2TvaCheck.cpp Vc2TvaEvents.cpp Vc2TvaFakes.cpp Vc2Tva.cpp \

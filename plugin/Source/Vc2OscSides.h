@@ -9,6 +9,8 @@
 struct OscCounts {
     long events = 0, noteOns = 0, plain = 0, sampled = 0, updates = 0, takes = 0, renders = 0, settings = 0;
     long getters = 0, seeks = 0, kindCalls = 0, gliding = 0, lookups = 0, objectCalls = 0;
+    long carrierStarts = 0, carrierBlocks = 0, carrierSettings = 0, kind6Starts = 0, kind6Blocks = 0;   // v266
+    long voicedSounding = 0, voicedNotFinite = 0;   // v266: those blocks with a sample that isn't 0, or isn't finite
 };
 
 struct OscSides {
@@ -31,8 +33,26 @@ std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int voice);   // 0x8
 void oscSteerPlayers(OscSides& s, std::mt19937& rng, int voice);
 // The voices' own words and tails against rom.4's memory, then the calls; empty when nothing differs
 std::string oscDifference(OscSides& s);
+// v266 (Vc2OscKindsCheck.cpp): the carrier and kind 6 on the voice.  Once, the static initializers; a case's start, the
+// ring reset and both voices' two parts started as a note starts them; a block of the mic into the ring with the
+// tracker's period and the unvoiced decision; what differs in the ring, or in the two parts and the ring's start word
+std::string oscKindsSetUp(OscSides& s);
+std::string oscKindsCase(OscSides& s, std::mt19937& rng);
+std::string oscMicBlock(OscSides& s, std::mt19937& rng);
+std::string oscRingDifference(OscSides& s);
+std::string oscPartsDifference(OscSides& s);
+void oscCountBlock(OscSides& s, uint32_t kind);   // a rendered block of kind 5 or 6: does it sound, is it finite
+// Kinds 5 and 6, whose inputs are drawn as a note gives them: on a voice of those kinds, in a note-on's block (words
+// from the voice's `below`) and in the settings' block
+bool oscIsVoiced(uint32_t kind);
+void oscDrawVoicedVoice(Vc2OscVoice& o, std::mt19937& rng);
+void oscDrawVoicedWords(std::span<uint32_t> words, std::mt19937& rng, uint32_t below);
+void oscDrawVoicedSettings(std::span<uint32_t> settings, std::mt19937& rng);
 
 enum class OscAnswer : uint8_t { none, r0, fr0 };
+
+// A float drawn evenly in [lo, hi) (v267: kinds 5 and 6's draws, and the vibrato's)
+inline float oscWithin(std::mt19937& rng, float lo, float hi) { return lo + (hi - lo) * vc2Unit(rng); }
 
 // rom.4's `routine` on `args`, then the port's `mine()` (giving its answer's bits), then what differs, the answers
 // compared as `how` says; a difference names the routine (v248)
@@ -83,6 +103,13 @@ void oscMakeAnalog(OscSides& s, std::mt19937& rng, int v);
 float oscDrawPosition(std::mt19937& rng);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same
 void oscWriteVoice(OscSides& s, int v);
+// v267 (Vc2OscVibratoCheck.cpp): the vibrato against rom.4's own, before any hook; its words as a note leaves them; its
+// block drawn into a note-on's or the settings' words, or onto a voice's; its fade's rates held for a count of `n`
+void oscVibratoPart(Vc2Fw& fw, const Vc2Run& run, Vc2Tally& tally);
+void oscDrawVibratoWords(Vc2VibratoWords& w, std::mt19937& rng);
+void oscDrawVibratoBlock(std::span<uint32_t> words, std::mt19937& rng);
+void oscDrawVibratoVoice(Vc2OscVoice& o, std::mt19937& rng);
+void oscHoldVibrato(Vc2VibratoWords& w, int32_t n);
 // The ramp part (v236, Vc2RampCheck.cpp): the pitch ramp against rom.4's own, before the voice part hooks anything;
 // its cases counted in `tally`, its counts printed
 void oscRampPart(Vc2Fw& fw, const RomShared& shared, const Vc2Run& run, Vc2Tally& tally);
