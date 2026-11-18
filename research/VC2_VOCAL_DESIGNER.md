@@ -86,6 +86,9 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   start-up load both it and `bank` run. `cosmgrowl` (`vc2cosmgrowl.cpp`) shows COSM type 8's laws, the Growl's
   ("COSM type 8, the Growl, run"); its model, which it held to the converter, update and DSP bit for bit, went into
   the plugin at v234 (`Vc2CosmGrowl`, held to rom.4's routines by `xt_vc2cosm`).
+- `vc2run <rom.4> voices [events] [seed] [mixed|full|leak|taken]` (`vc2voices.cpp`): the part's own note handlers under random
+  events, the COSM buffer pools counted after each; `leak` and `taken` are controls that must be caught ("The part's voices and
+  the COSM pools").
 - `romtables.py <rom.2> <rom.4> [--window N] [addr …]`: rom.2's tables found in rom.4 by their bytes, with the code in each
   image that loads them; with no addresses, every address constant in plugin/Source's ports. `poolrefs.py`'s search is
   `loads(img, value)` for it, and `romfile.py`'s `image`, `sections` and `offsets` take any image (both tools' old output
@@ -115,6 +118,76 @@ from them); `ROM=firmware/unpacked/V-SynthXT.rom.4.bin` points the image ones at
   `differsMapped`); every call starts both machines' FPU registers at 0. Fails on any difference: `cosm` does, at the Comb
   ("COSM in rom.4"), `osc` at the pitch ramp ("The OSC block in rom.4"), `solo` under Robot Voice, `lite` walking
   backward, and `tva` at its ramp ("The TVA in rom.4").
+
+## The part's voices and the COSM pools (2026-11-18, v270, the VC-2 mode's step 4.3)
+
+The map of the part and its split into versions are in VC2_MODE_PLAN.md, step 4.3. This section holds what that rests on,
+above all the question v264 left open: can rom.4 start a COSM with no free buffer slot?
+
+### The pool can't run out
+
+**It can't.** Each pool has 24 slots, and at most 24 tones exist, each holding at most one slot of each pool. Followed
+through rom.4, each step of that:
+
+1. **A slot is taken in one place.** `0x893a8c50`, for block codes 7…10 and 15…18, is called only by the COSM's note-on
+   `0x893aa0e0`. That is called only by the tone's note-on `0x893b3390`, once per COSM: COSM 1 from pool 0, COSM 2 from pool 1.
+2. **A tone's note-on runs once.** Its only caller is `0x893965e0`, whose only caller is the loop over the prepared voices in
+   `0x89390860`, and the loop empties that list before it returns.
+3. **A slot is given back with its tone.** The tone's destructor `0x893b2fc0` runs `0x893aa060` on both COSMs. As read, only the
+   take writes a COSM's slot word (+0x144), and the run below found every held slot still marked after every event.
+4. **A tone belongs to one voice.** The tone's constructor `0x893b2db0` is called only by the note's `0x89396520`, and that only by
+   the voice's `0x89397130`, into the voice's own note W. There are 24 voices (the table `0x895354b0`).
+5. **A voice's old tone is gone before its new one is made.** A voice reaches the prepared list only through `0x893919b0`,
+   which first runs the voice's +0x44: the virtual destroy `0x893973a0`, then `0x89396590`. That returns only once the tone is
+   destroyed: at once when silent, otherwise after `0x893b3bc0` has slept through the truncated fade. The same holds for a
+   voice stopped (`0x893918e0`) or reserved (`0x89391930`).
+6. **Nothing interleaves.** All of this runs on the notes' task (`0x8938fc00`). `0x89390860` is reached only from the part
+   node's note-on, which only that task calls, so its sleep in step 5 can't let another note start.
+
+Tones still releasing keep their voice and their slots, and count among the 24. Mono legato retunes the sounding voice and
+starts no tone; a new voice that finds a legato partner takes the partner's player (`0x893aee20`), never its slots. So when a
+take runs, at most 23 other tones hold a slot of that pool. rom.4's missing test (v264) is safe, and the wiring needs no answer
+for an empty pool.
+
+**The run.** `vc2run <rom.4> voices [events] [seed] [mixed|full|leak|taken]` (`vc2voices.cpp`) brings the part up by its own
+routines and drives its own handlers: notes from all four sources, the pedal, the mode messages, tones ending, stop all, the
+voices' reserve, the CPU budget, Mono/Poly, Legato, Modulator Key Mode and Auto Note. Each COSM's block code is drawn, mostly
+types with buffers. After every event each slot marked used must be held by exactly one live tone.
+
+| Mode, seeds 2024, 7, 31337 | Events each | Slots taken | Pool found empty | Most tones | Most slots of 48 | Wrong counts |
+|---|---|---|---|---|---|---|
+| `mixed` | 200,000 | 85,169…87,506 | 0 | 23…24 | 38…40 | 0 |
+| `full` (voices kept full) | 200,000 | 164,956…165,085 | 0 | 24 | 45…46 | 0 |
+
+The check can fail, and two controls show it: `leak` (every free lost) found a pool empty at event 67, and `taken` (every slot
+marked used at the start) at the first note. In both rom.4 then wrote through the uninitialised stack words v264 described;
+the run's stack held 0 there, so it faulted at address 0.
+
+**What stays unproven.**
+
+- The run answers the kernel: the fade's wait is taken to its end by hand and no other task runs beside the notes'. Step 6 above
+  rests on reading the callers, not on a run with tasks.
+- A damaged patch with Structure Type 3 (the field has two bits, the range is 0…2) would skip both COSMs' note-ons, so the
+  destructor would free whatever slot word the tone's last use left, possibly one another tone holds. That frees slots and can't
+  exhaust a pool, but two tones could then share buffers. Not run; `0x893a81d0` stores the value it reads, unclamped.
+
+### What step 4.2 left to the part
+
+- **G's channel word** (`0x893a5050`, G's +0x840): with Part 1 Receive Switch (0x47) off, the word at `0x8999738c`; on, the state
+  of Part 1 Receive Channel (0x48) from the table `0x8950d6e0` by the source byte at `0x8950d6d9`, + 2. Only two routines read
+  `0x8999738c` and no code seen writes it: after the part's init it is 0, and so is G's word with the switch off (run). What the
+  Matrix's sources make of a channel word of 0 is open.
+- **G's allocation** `0x893a5030` is `new` of 0x850 bytes with no caller. G is the static object at `0x89997398`.
+- **The static M** at `0x89997108` is the part's own Matrix, whose group 2 feeds the part mixer's levels. `0x893a3020`, from the
+  init table, builds its update node at +0x170 and its two vtables, whose +0x0c is `0x893a2ee0`; `0x893a2fe0`, from the part's
+  init, sets velocity 0, both keys 60, part 0 and the channel word, and queues the node at `0x89989cc4` for the update task.
+- **Event 0x200** (`0x89391e50`, on the notes' task's object `0x8994fec8`): a patch of Category 10 or 11 raises it when loaded
+  (`0x893602e0`, `0x893607f0`), as does a move of the part's channel on such a patch (`0x89394340`). The notes' task then plays C4
+  at velocity 127 from source 3, unless `0x89981904` is set. `0x899891d0` holds "Category is 10 or more". It is a note held with
+  no key down, which all notes off (event 0x80) ends.
+- **The budget** (`0x89392c60`, `0x89391240`): CPU Power Max for TG (ID 0x530, default 600) less 400 for every Category but 6,
+  ÷ 10⁶, in seconds of a block's 725 µs. A tone's cost (`0x893b4020`) is the sum of the floats its parts' installs leave, and
+  CPU Power Offset for Voice (0x531, ÷ 10⁷) is added per tone.
 
 ## The V-Synth's tables and code in rom.4 (2026-11-13, the VC-2 mode's step 1a)
 

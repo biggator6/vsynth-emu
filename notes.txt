@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's part, mapped v270 (2026-11-18, on its own branch from vc2-mode's 668fea7; research only, no plugin source;
+  VC2_MODE_PLAN.md, step 4.3; VC2_VOCAL_DESIGNER.md, "The part's voices and the COSM pools"): step 4.3's map and its ten
+  versions: the three tasks, the 24 voices and four lists, the note and conversion objects, note start and off, legato,
+  truncation, the conversion pass, what each interface still needs. Settled: rom.4 can't start a COSM with no free buffer
+  slot: 24 voices hold at most one tone each, a tone is destroyed before its voice takes another, and all of it runs on the
+  notes' task. New run, vc2run voices: rom.4's own note handlers under random events, 1,200,000 events, no pool found empty
+  and no slot miscounted; its two controls, a leak and a full pool, are caught. Also placed: G's channel word, the static M,
+  event 0x200 (a held C4 for a patch of Category 10 or 11) and the CPU budget.
+
 The VC-2's Vari off v261 (2026-11-17, on vc2-mode after v256, 977c9db; the user's "Start Vari off"; HARDWARE_FIRMWARE.md,
   "The VC-2's Vari off"): step 4.2's OSC voice. rom.4's own two renders for a wave with Vari Sw off, 0x893c63c0 (mono) and
   0x893c66e0 (stereo): vc2OscVariOffMono and vc2OscVariOffStereo (Vc2OscVariOffRender.cpp), one routine over a way. No

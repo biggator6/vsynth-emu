@@ -57,5 +57,6 @@ int bank(Machine& m, int argc, char** argv);
 int wavein(Machine& m, int argc, char** argv);
 int cosmgrowl(Machine& m, int argc, char** argv);
 int fxchorus(Machine& m, int argc, char** argv);
+int voices(Machine& m, int argc, char** argv);
 
 } // namespace vc2
