@@ -8,6 +8,7 @@
 #include "Sh4Interp.h"
 #include "XtArgs.h"
 #include "XtFxChip.h"
+#include "XtFxCheckWords.h"
 #include "XtFxControl.h"
 #include "XtSwitches.h"   // XT_FX_FIRST, XT_FX_STOP, XT_FX_COUNTS, XT_FX_LIVE: read through it, never getenv
 #include "esp_interpreter.h"
@@ -16,6 +17,7 @@
 #include <cctype>
 #include <charconv>
 #include <chrono>
+#include <climits>
 #include <cmath>
 #include <ctime>
 #include <cstdio>
@@ -81,7 +83,12 @@ struct Rig {
             m.ret(0);
         });
     }
-    void bus(uint32_t a, uint8_t v) { chip.hostWrite(a, v); if (ref) ref->hostWrite(a, v); }
+    std::vector<uint32_t>* busLog = nullptr;   // each byte on the bus, its address << 8 | its value (XtFxCheckStart.cpp)
+    void bus(uint32_t a, uint8_t v) {
+        chip.hostWrite(a, v);
+        if (ref) ref->hostWrite(a, v);
+        if (busLog) busLog->push_back(a << 8 | v);
+    }
     void put(uint8_t cmd, int i, uint32_t w) { bus(0x2003, cmd); const uint32_t a = (uint32_t)i * 4; for (uint32_t k = 0; k < 4; k++) bus(a + k, (uint8_t)(w >> (8 * k))); }
     uint32_t get(int i) {
         put(0x37, i, 0);
@@ -161,29 +168,6 @@ struct Rig {
     }
     void input(unsigned m, int32_t v) { chip.setGram(m, v); if (ref) ref->runtime().writeGram(v, (uint8_t)m); }
     void frame() { chip.runFrame(); if (ref) { ref->runProgram(768); ref->sync(); } }
-};
-
-// Noise into every input of both chips, a sample at a time: the frame's eight, the USB pair and (v204) the analog pair the
-// input's routing reads, each at silence, low, mid or enough to saturate, a level held 256 samples
-struct InputNoise {
-    static constexpr unsigned kInputs[] = { 0x20, 0x22, 0x24, 0x26, 0x28, 0x2a, 0x2c, 0x2e, 0x18, 0x1a, 0x10, 0x12 };
-    static constexpr double kLevels[] = { 0.0, 0.002, 0.25, 2.0 };
-    static constexpr int kCount = (int)(sizeof kInputs / sizeof *kInputs);
-    Rng r;
-    double level[kCount] = {};
-    explicit InputNoise(uint32_t seed) : r(seed) {}
-    void into(XtFxChip& chip, Reference& ref, long sample) {
-        if (sample % 256 == 0) {
-            const int w = r.below(kCount);
-            level[w] = kLevels[r.below(4)];
-        }
-        for (int i = 0; i < kCount; i++) {
-            const double v = level[i] * ((int32_t)r.next() / 2147483648.0) * 8388608.0;
-            const auto x = (int32_t)std::clamp(v, -8388608.0, 8388607.0);
-            chip.setGram(kInputs[i], x);
-            ref.runtime().writeGram(x, (uint8_t)kInputs[i]);
-        }
-    }
 };
 
 // Every word of the two states, after the rotation.  Returns the first that differs.
@@ -285,6 +269,9 @@ void againstReference(const char* rom, int randomEvents, uint32_t seed, const Fx
 void readers(const char* rom, uint32_t seed);
 void liveEdits(const char* rom, int events, uint32_t seed, const FxIds& fx = rom2Ids());
 void vc2Control(const char* rom, int events, uint32_t seed);                            // XtFxCheckVc2.cpp
+void rom2Start(const char* rom);                                                        // XtFxCheckStart.cpp
+void rom4Start(const char* rom);
+void matrixThroughQueue(const char* rom);                                               // XtFxCheckQueue.cpp
 void threads(const char* rom, int events, uint32_t seed);                               // XtFxCheckThreads.cpp
 double stepUnderTone(const char* rom, bool honoured, bool patch);
 void changeUnderTone(const char* rom);

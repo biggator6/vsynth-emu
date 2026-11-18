@@ -73,6 +73,8 @@ boot-no-driver|    call(image_.start, { image_.self });\n|
 boot-no-780|    call(image_.startTask, { image_.self });\n|
 boot-no-system|send(BlockSystem, true);|send(0, true);
 boot-no-patch|send(BlockSystem, true);|send(BlockSystem, false);
+boot-task-first|    call(image_.start, { image_.self });\n    call(image_.startTask, { image_.self });|    call(image_.startTask, { image_.self });\n    call(image_.start, { image_.self });
+boot-route-first|    send(BlockSystem, true);\n    routeInput();|    routeInput();\n    send(BlockSystem, true);
 no-null-page|    sh4_->mapRam(0x00000000, 0x00001000);\n|
 # The unit
 unit-gain|const float v = x * 0.0625f;|const float v = x * 0.125f;

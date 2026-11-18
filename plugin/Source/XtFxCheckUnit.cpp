@@ -161,6 +161,8 @@ int main(int argc, char** argv) {
     if (argc > 2 && !std::strcmp(argv[2], "control")) {
         const int events = argOr(argc, argv, 3, 200);
         const uint32_t seed = (uint32_t)argOr(argc, argv, 4, 2024);
+        rom2Start(rom);
+        matrixThroughQueue(rom);
         readers(rom, seed); behaviour(rom); valueText(rom); liveEdits(rom, events, seed); threads(rom, events, seed); againstReference(rom, events, seed); unitConversion(rom, seed); unitLevels(rom, false);
         unitInput(rom);
         copyWithoutChip(rom, seed);

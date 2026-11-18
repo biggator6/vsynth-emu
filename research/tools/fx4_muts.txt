@@ -52,3 +52,5 @@ message-second|sh4_->wr8(image_.message + 1, (uint8_t)second);|sh4_->wr8(image_.
 message-fourth|sh4_->wr8(image_.message + 3, (uint8_t)fourth);|sh4_->wr8(image_.message + 2, (uint8_t)fourth);|fx4c
 call-self|call(image_.takeMessage, { image_.self });|call(image_.takeMessage, { image_.message });|fx4c
 matrix-guard|if (!error_.empty() \|\| !image_.matrixTake) return;|if (!error_.empty()) return;|fx4c
+boot-no-start-task|    call(image_.startTask, { image_.self });\n||fx4c
+boot-task-first|    call(image_.start, { image_.self });\n    call(image_.startTask, { image_.self });|    call(image_.startTask, { image_.self });\n    call(image_.start, { image_.self });|fx4c

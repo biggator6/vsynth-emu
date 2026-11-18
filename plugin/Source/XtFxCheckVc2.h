@@ -2,12 +2,9 @@
 // What xt_fx <rom.4> vc2's parts share: XtFxCheckVc2.cpp the blocks' IDs, the patch EQ and the run, XtFxCheckVc2Hand.cpp
 // rom.4's driver by hand.  XT_FX_MAIN only.
 #ifdef XT_FX_MAIN
-#include "XtFxCheck.h"
+#include "XtFxCheckHand.h"
 
 namespace xtfxcheck {
-// [FW] rom.4's message: the flags of its second byte, then of its fourth
-inline constexpr uint32_t kSystem = 0x20, kAttenuation = 0x10;
-inline constexpr uint32_t kPatch = 0x80, kSwitches = 0x40, kMfx = 0x20, kChorus = 0x10, kReverb = 8;
 struct IdBlock { int first, last; uint32_t second, fourth; };
 // [FW] The check's own list, from rom.4's readers as they were run, so that a row wrong in XtFxImage.cpp shows.  The last
 // three rows are the types' own parameters, each type's table run together.
@@ -23,13 +20,6 @@ inline constexpr int kCategory = 0x12c;   // [FW] the switches' reader reads the
 
 const IdBlock* listedBlock(int id);                                     // the row of kIdBlocks an ID is in, or nullptr
 void editOne(XtFxControl& c, int id, int value, bool asPatch = false);  // one parameter, live or as a patch that has it
-
-// How many of the driver's 2048 words the two hold differently: `a` by anything with a word(i)
-template <typename Words> int wordsApart(const Words& a, const XtFxChip& b) {
-    int d = 0;
-    for (unsigned i = 0; i < 2048; i++) d += (a.word(i) & 0x0fffffff) != (b.word(i) & 0x0fffffff);
-    return d;
-}
 
 void handMessages(const char* rom, int events, uint32_t seed);   // XtFxCheckVc2Hand.cpp
 void handOutsideClock(const char* rom);

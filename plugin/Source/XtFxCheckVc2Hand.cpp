@@ -5,63 +5,8 @@
 #include "XtFxCheckVc2.h"
 
 namespace xtfxcheck {
-namespace {
-// [FW] rom.4's driver as this file knows it, written out apart from XtFxImage.cpp so that an address wrong there shows
-constexpr XtFxImage kHandImage = {
-    .self = 0x89980f24, .message = 0x89980f84, .clock = 0x8995cb40,
-    .descLow = 0x8950f0b0, .descHigh = 0x895131a8, .firstHigh = 0x56a, .ids = 0x9ac,
-    .mfxIds = 0x895164ec, .choIds = 0x895165b8, .revIds = 0x895165e4,
-    .mfxTypes = 42, .choTypes = 9, .revTypes = 15,
-    .staticInit = 0x89368280, .start = 0x8935f9a0, .startTask = 0x8935fa80,
-    .takeMessage = 0x8935fc40, .clockPoll = 0x8935fde0,
-    .matrixTake = 0, .matrixApply = 0, .inputRequest = 0, .inputEvent = 0,
-    .sleep = 0x89365e50, .putWord = 0x89362490, .getWord = 0x89362610,
-    .putCoefficient = 0x893626d0, .putOffset = 0x893627f0,
-    .reads = { 0x89324350, 0x89324370 },
-    .answered = { 0x89362430, 0x89362450, 0x893951b0, 0x89395040, 0x89394fa0, 0x89301610, 0x89391e50 },
-    .idRows = {},
-};
-
-// rom.4's driver by hand: the bus as Rig has it, a store of this file's own and the message's flags written here
-struct HandDriver : Rig {
-    const XtFxImage& im;
-    std::vector<int16_t> store;
-    explicit HandDriver(const char* rom) : Rig(rom, false, kHandImage), im(kHandImage), store((size_t)im.ids) {
-        c.mapRam(0, 0x1000);
-        for (const uint32_t fn : im.answered)
-            if (fn) c.hook(fn, [](Sh4& m) { m.ret(0); });
-        for (int id = 0; id < im.ids; id++) store[(size_t)id] = (int16_t)defaultOf(id);
-        for (const uint32_t fn : im.reads)
-            c.hook(fn, [this](Sh4& m) {
-                const int id = (int16_t)m.r[5];
-                m.ret((uint32_t)(int32_t)(id >= 0 && id < im.ids ? store[(size_t)id] : 0));
-            });
-        call(im.staticInit);
-        call(im.start, { im.self });
-        call(im.startTask, { im.self });
-        message(kSystem, kPatch);
-    }
-    int defaultOf(int id) {
-        if (id >= im.firstHigh) return s16(im.descHigh + 8 * (uint32_t)(id - im.firstHigh) + 2);
-        const uint32_t d = im.descLow + 12 * (uint32_t)id;
-        return (uint16_t)c.rd16(d + 6) - (uint16_t)c.rd16(d + 4);
-    }
-    void message(uint32_t second, uint32_t fourth) {
-        c.wr8(im.message + 1, (uint8_t)second);
-        c.wr8(im.message + 3, (uint8_t)fourth);
-        call(im.takeMessage, { im.self });
-    }
-    // The poll of an outside clock: the clock's object holds its source at +0x40 and the ms over six clocks at +0x48
-    void poll(int sixClocksMs) {
-        c.wr8(im.clock + 0x40, 1);
-        c.wr16(im.clock + 0x48, (uint16_t)sixClocksMs);
-        call(im.clockPoll, { im.self });
-    }
-};
-} // namespace
-
 void handMessages(const char* rom, int events, uint32_t seed) {
-    auto hand = std::make_unique<HandDriver>(rom);
+    auto hand = std::make_unique<HandDriver>(rom, handRom4());
     XtFxControl c(rom, nullptr, vc2Fx());
     Editor ed(rom, c, seed + 500, vc2Ids());
     int tried = 1, different = wordsApart(c, hand->chip) ? 1 : 0;
@@ -108,7 +53,7 @@ void handMessages(const char* rom, int events, uint32_t seed) {
 // it.  Some reading must move the chip's words, or this shows nothing.
 void handOutsideClock(const char* rom) {
     constexpr int kSyncedMfx = 11, kMfxSwitch = 0x13d;
-    auto hand = std::make_unique<HandDriver>(rom);
+    auto hand = std::make_unique<HandDriver>(rom, handRom4());
     XtFxControl c(rom, nullptr, vc2Fx());
     const FxIds& fx = vc2Ids();
     for (const auto& [id, value] : { std::pair { kMfxSwitch, 1 }, std::pair { fx.mfxType, kSyncedMfx } }) {

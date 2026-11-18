@@ -147,6 +147,7 @@ const FxIds& vc2Ids() {
 }
 
 void vc2Control(const char* rom, int events, uint32_t seed) {
+    rom4Start(rom);
     againstReference(rom, events, seed, vc2Ids());
     liveEdits(rom, events, seed, vc2Ids());
     handMessages(rom, events, seed);

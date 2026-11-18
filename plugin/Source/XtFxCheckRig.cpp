@@ -2,6 +2,7 @@
 // stood, v204).  XT_FX_MAIN only.
 #ifdef XT_FX_MAIN
 #include "XtFxCheck.h"
+#include "XtFxCheckNoise.h"
 
 namespace xtfxcheck {
 const char* kRevName[] = { "Off", "Room 1", "Room 2", "Room 3", "Hall 1", "Hall 2", "Hall 3", "Garage", "Plate", "Non-Linear", "Delay" };

@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The effect driver's start and the Matrix's queue checked v265 (2026-11-18, on v259's branch, not merged;
+  HARDWARE_FIRMWARE.md, "The effect driver's start against the firmware's own task"). xt_fx's check alone, no plugin code
+  changed. XtFxControl's start, each byte on the bus and each wait, against the firmware's own effect task run from its
+  entry to its first wait for an event, on rom.2 and rom.4; a Matrix move through the queue on each of the 42 MFX types.
+  0 different at seeds 2024, 7 and 31337. mutate_fx.py --control: 182 of 182 caught, boot-no-780 and matrix-unflushed
+  among them; --vc2: 50 of 50.
+
 rom.4's effect driver v259 (2026-11-17, on its own branch from vc2-mode 5766f4d, not merged; HARDWARE_FIRMWARE.md,
   "rom.4's effect driver"; the plan's step 4.4, with its map and split). XtFxImage: what an image's driver is, rom.2's
   as XtFxControl held it and rom.4's beside it; XtFxControl runs either, rom.2's sections as their baseline. The patch

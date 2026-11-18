@@ -1546,6 +1546,25 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The effect driver's start against the firmware's own task (2026-11-18, v265) {#fx-start-task}
+
+Two planted errors `xt_fx control` had missed, `boot-no-780` since v204 and `matrix-unflushed` at the list's 60 events. No code of the plugin changed: both are the check's.
+
+**The start.** Without the start task (`0x894ac780`) rom.2's start sends 3,502 words where it should send 5,036, and 5 waits where it should have 7, yet every word ends the same and everything sent after the start is the same, as the first message and the input's routing write those words again. So only the bus during the start can show it. The check now runs the firmware's own effect task from its entry to its loop's first wait for an event, then the first message and the routing, and holds XtFxControl's start to it, each byte on the bus and each wait in order, and the words at the end:
+
+| | rom.2 | rom.4 |
+|---|---|---|
+| The task's entry | `0x894ad560` | `0x89360a50` |
+| Its wait for events | `0x89301860` | `0x893017f0` |
+| The kernel settings' routine (event 0x200) | `0x894ace70` | `0x89360110` |
+| Bytes and waits compared | 51,312 | 59,052 |
+
+The task's calls that answer nothing in the check: two to the OS (`0x89300ab0`, `0x89300b10`), one not traced that takes two of the task's objects (`0x8946ebb0`, rom.4's `0x893111b0`), a handler given to the kernel (`0x88008240`), and the kernel settings' routine. XtFxControl has never run that last one, which on the XT writes words A 0x1ed…0x215 before the start task, so this check says nothing about it.
+
+**The Matrix.** `matrix-unflushed` leaves a move's words in the queue until the next message. A random run shows it only if a move lands on a type that answers, which 60 events didn't reach. `XtFxCheckQueue.cpp` moves all three MFX-PRMs on each of the 42 types and back, and holds the chip to the driver's words each time with no later message; the move changes the words of 28 types.
+
+**Results.** 0 different at seeds 2024, 7 and 31337 on both images. `mutate_fx.py --control`: 182 of 182 caught, two new (`boot-task-first`, `boot-route-first`). `mutate_fx.py --vc2`: 50 of 50, two new (`boot-no-start-task`, `boot-task-first`), as rom.4's hand-run start had the same gap.
+
 ### rom.4's effect driver (2026-11-17, v259) {#vc2-fx-driver}
 
 Step 4.4's first part (research/VC2_MODE_PLAN.md, which has the map). rom.4's driver is rom.2's, recompiled and moved, so `XtFxControl` runs either: `XtFxImage` holds what differs, each address a pair of rom.2's and rom.4's, and rom.2's values are the ones the class held.

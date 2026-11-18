@@ -96,13 +96,12 @@ void behaviour(const char* rom) {
     // tick(): a message at a time, so a stream of edits doesn't run ahead of the chip by what the driver's waits add up to, and the last still lands.  And what it sends is what update() or loadPatch() would.
     {
         auto chip = std::make_unique<XtFxChip>(); XtFxControl a(rom); a.set(0x120, 1); a.set(0x177, 11); a.loadPatch();
-        while (!a.drained()) { a.pump(); a.service(*chip); chip->runFrame(); }
+        playQueue(a, *chip, LONG_MAX);
         int tempo = 0;
         for (int i = 0; i < 200; i++) { tempo = 600 + i * 7; a.set(0x11d, tempo); a.tick(); a.pump(); for (int s = 0; s < 441; s++) { a.service(*chip); chip->runFrame(); } }
-        long behind = 0;
-        for (; !a.drained() && behind < 88200; behind++) { a.pump(); a.service(*chip); chip->runFrame(); }
+        long behind = playQueue(a, *chip, 88200);
         a.tick();
-        for (; !a.drained() && behind < 88200; behind++) { a.pump(); a.service(*chip); chip->runFrame(); }
+        behind += playQueue(a, *chip, 88200 - behind);
         if (show) std::printf("  a stream of edits: %.2f s behind at its end\n", (double)behind / 44100.0);
         check(behind < 17640, "a stream of edits runs ahead of the chip");
         XtFxControl b(rom); b.set(0x120, 1); b.set(0x177, 11); b.set(0x11d, tempo); b.loadPatch();

@@ -2,6 +2,7 @@
 // from XtFxChip.cpp as it stood, v204).  XT_FX_MAIN only.
 #ifdef XT_FX_MAIN
 #include "XtFxCheck.h"
+#include "XtFxCheckNoise.h"
 
 namespace xtfxcheck {
 // ------------------------------------------------------------------ the control side
