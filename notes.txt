@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM adapters v252 (2026-11-17, on its own branch after v250; the user's "Yes, both" through the VC-2
+  session; HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Resonator and the TVF"). Vc2CosmAdapters: the
+  first types XtCosm ports as rows of Vc2CosmTypeRow, their start values (0x893a8830, 0x893a8a50) and new blocks
+  (0x893a9210, 0x893a9a60) XtCosm's laws on rom.4's words: XtCosmRes's, xtTvfQ and xtTvfCutoff; each routine's copy of
+  the block rom.4's own (the TVF's leaves +0x18 and +0x30, the Own depths' places, the first run's one difference).
+  XtCosm unchanged; xt_vc2cosm loads rom.2 beside rom.4 for its tables. The VC-2's sources moved from
+  plugin/CMakeLists.txt (at 300 lines) into plugin/Vc2Sources.cmake. 0 different at seeds 2024, 7 and 31337.
+  mutate_vc2.py --cosm: 872 plants (52 new), all caught. Lo-Fi waits for v253 (XtCosmLofi's words are private). Not in the sound yet.
+
 The VC-2's COSM note-on frame v250 (2026-11-17, on its own branch with vc2-mode's 7cba8ee merged in; the VC-2
   session's choice (A), adapters over XtCosm; HARDWARE_FIRMWARE.md, "The VC-2's COSM note-on frame"). rom.4's per-type
   routines are rom.2's opcode for opcode (the TB Filter's five words pool relocations), so the types come in as

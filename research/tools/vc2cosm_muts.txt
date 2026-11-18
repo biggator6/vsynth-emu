@@ -54,6 +54,10 @@
 # values' and the new block's switch limits (no row has a code they part), the allocator's last buffered code (18 has
 # start values, so it isn't drawn), the code byte read signed or not (both give no slot past 127), a full pool (24 slots,
 # one for each of the 24 tones: with none free rom.4 clears where its stack's words point).
+# v252: the Resonator's and the TVF's adapters over XtCosm in vc2cosmadapters (Vc2CosmAdapters.cpp), rowOf's search of
+# them in vc2cosmnoteon, under xt_vc2cosm's sixth part.  Not planted, as no input tells them apart: the Resonator's Type
+# into XtCosm's block (only its DSP reads it, not adapted yet); XtCosmRes's note-on given the envelopes' outputs and
+# rates (the adapter keeps only its start values, and the new block's targets after).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -874,3 +878,55 @@ row-growl-case|growlNewBlock, growlNoteOn }|growlNewBlock, nullptr }|vc2cosmnote
 newblock-code|if (o.code != b.code \|\| static_cast<uint32_t>(o.code) > kLastCode) return;|if (static_cast<uint32_t>(o.code) > kLastCode) return;|vc2cosmnoteon
 growl-back|    std::memcpy(&o, &n.growl.w, sizeof o);\n||vc2cosmnoteon
 growl-block-copy|std::memcpy(&gb, &b, sizeof gb);|std::memcpy(&gb, &b, 4);|vc2cosmnoteon
+adapt-start-level|kStartLevel = 0x58|kStartLevel = 0x4c|vc2cosmadapters
+adapt-lfo-level|kLfoLevel = 0x38|kLfoLevel = 0x3c|vc2cosmadapters
+adapt-starts-lfoa|bound.word(o.bindings[2] + kLfoLevel)|bound.word(o.bindings[3] + kLfoLevel)|vc2cosmadapters
+adapt-starts-envb|bound.word(o.bindings[1] + kStartLevel)|bound.word(o.bindings[0] + kStartLevel)|vc2cosmadapters
+adapt-copy-to|offsetof(Vc2CosmObjectWords, code) + from|offsetof(Vc2CosmObjectWords, code) + from + 4|vc2cosmadapters
+adapt-copy-from|reinterpret_cast<const uint8_t*>(&b) + from|reinterpret_cast<const uint8_t*>(&b) + from + 4|vc2cosmadapters
+adapt-code-res|kResonator = 6|kResonator = 7|vc2cosmadapters
+adapt-code-tvf|kTvf = 13|kTvf = 12|vc2cosmadapters
+res-size|x.size = blockFloat(b, 1);|x.size = blockFloat(b, 2);|vc2cosmadapters
+res-size-env|x.sizeEnv = blockFloat(b, 2);|x.sizeEnv = blockFloat(b, 3);|vc2cosmadapters
+res-size-lfo|x.sizeLfo = blockFloat(b, 4);|x.sizeLfo = blockFloat(b, 5);|vc2cosmadapters
+res-balance|x.balance = blockFloat(b, 6);|x.balance = blockFloat(b, 5);|vc2cosmadapters
+res-balance-env|x.balanceEnv = blockFloat(b, 7);|x.balanceEnv = blockFloat(b, 8);|vc2cosmadapters
+res-balance-lfo|x.balanceLfo = blockFloat(b, 9);|x.balanceLfo = blockFloat(b, 10);|vc2cosmadapters
+res-start-lfo|0.0f, s.lfoA, s.envB, 0.0f|0.0f, s.lfoB, s.envB, 0.0f|vc2cosmadapters
+res-start-envb|0.0f, s.lfoA, s.envB, 0.0f|0.0f, s.lfoA, s.envA, 0.0f|vc2cosmadapters
+res-value-size|o.values[0] = res.size();|o.values[0] = res.balance();|vc2cosmadapters
+res-value-balance|o.values[1] = res.balance();|o.values[1] = res.size();|vc2cosmadapters
+res-held-order|o.held[0], o.held[2], o.held[1], o.held[3]);|o.held[0], o.held[1], o.held[2], o.held[3]);|vc2cosmadapters
+res-target-size|o.targets[0] = res.sizeTarget();|o.targets[0] = res.balanceTarget();|vc2cosmadapters
+res-target-balance|o.targets[1] = res.balanceTarget();|o.targets[1] = res.sizeTarget();|vc2cosmadapters
+res-variant|    o.variant = static_cast<uint8_t>(b.words[0]);\n||vc2cosmadapters
+res-copy-len|copyBlock(o, b, 8, 0x28);|copyBlock(o, b, 8, 0x24);|vc2cosmadapters
+res-copy-start|copyBlock(o, b, 8, 0x28);|copyBlock(o, b, 0xc, 0x24);|vc2cosmadapters
+tvf-q|xtTvfQ(blockFloat(b, 0), blockFloat(b, 1), s.envA|xtTvfQ(blockFloat(b, 2), blockFloat(b, 1), s.envA|vc2cosmadapters
+tvf-q-env|xtTvfQ(blockFloat(b, 0), blockFloat(b, 1), s.envA|xtTvfQ(blockFloat(b, 0), blockFloat(b, 2), s.envA|vc2cosmadapters
+tvf-q-lfo-depth|s.envA, blockFloat(b, 3), s.lfoA|s.envA, blockFloat(b, 4), s.lfoA|vc2cosmadapters
+tvf-q-start-env|s.envA, blockFloat(b, 3), s.lfoA|s.envB, blockFloat(b, 3), s.lfoA|vc2cosmadapters
+tvf-q-start-lfo|s.envA, blockFloat(b, 3), s.lfoA|s.envA, blockFloat(b, 3), s.lfoB|vc2cosmadapters
+tvf-cutoff|xtTvfCutoff(blockFloat(b, 6), blockFloat(b, 7), s.envB|xtTvfCutoff(blockFloat(b, 5), blockFloat(b, 7), s.envB|vc2cosmadapters
+tvf-cutoff-env|xtTvfCutoff(blockFloat(b, 6), blockFloat(b, 7), s.envB|xtTvfCutoff(blockFloat(b, 6), blockFloat(b, 8), s.envB|vc2cosmadapters
+tvf-cutoff-lfo-depth|s.envB, blockFloat(b, 9), s.lfoB|s.envB, blockFloat(b, 10), s.lfoB|vc2cosmadapters
+tvf-cutoff-start-lfo|s.envB, blockFloat(b, 9), s.lfoB|s.envB, blockFloat(b, 9), s.lfoA|vc2cosmadapters
+tvf-cutoff-start-q|s.lfoB, q);|s.lfoB, 0.0f);|vc2cosmadapters
+tvf-value-q|    o.values[0] = q;\n||vc2cosmadapters
+tvf-nb-q|xtTvfQ(blockFloat(b, 0), blockFloat(b, 1), o.held[0]|xtTvfQ(blockFloat(b, 0), blockFloat(b, 2), o.held[0]|vc2cosmadapters
+tvf-nb-q-env|blockFloat(b, 1), o.held[0], blockFloat(b, 3), o.held[2]|blockFloat(b, 1), o.held[1], blockFloat(b, 3), o.held[2]|vc2cosmadapters
+tvf-nb-q-lfo|blockFloat(b, 1), o.held[0], blockFloat(b, 3), o.held[2]|blockFloat(b, 1), o.held[0], blockFloat(b, 3), o.held[3]|vc2cosmadapters
+tvf-nb-cutoff-env|blockFloat(b, 7), o.held[1], blockFloat(b, 9), o.held[3]|blockFloat(b, 7), o.held[0], blockFloat(b, 9), o.held[3]|vc2cosmadapters
+tvf-nb-cutoff-lfo|blockFloat(b, 7), o.held[1], blockFloat(b, 9), o.held[3]|blockFloat(b, 7), o.held[1], blockFloat(b, 9), o.held[2]|vc2cosmadapters
+tvf-nb-cutoff-q|o.held[3], q);|o.held[3], 0.0f);|vc2cosmadapters
+tvf-target-q|    o.targets[0] = q;\n||vc2cosmadapters
+tvf-copy-first|copyBlock(o, b, 4, 0x14);|copyBlock(o, b, 4, 0x10);|vc2cosmadapters
+tvf-copy-own|copyBlock(o, b, 4, 0x14);|copyBlock(o, b, 4, 0x18);|vc2cosmadapters
+tvf-copy-second|copyBlock(o, b, 0x1c, 0x14);|copyBlock(o, b, 0x1c, 0x10);|vc2cosmadapters
+tvf-copy-second-own|copyBlock(o, b, 0x1c, 0x14);|copyBlock(o, b, 0x1c, 0x18);|vc2cosmadapters
+tvf-copy-type|    copyBlock(o, b, 0x34, 4);\n||vc2cosmadapters
+row-res-start|{ kResonator, resStartValues, resNewBlock, nullptr }|{ kResonator, nullptr, resNewBlock, nullptr }|vc2cosmadapters
+row-res-block|{ kResonator, resStartValues, resNewBlock, nullptr }|{ kResonator, resStartValues, nullptr, nullptr }|vc2cosmadapters
+row-tvf-start|{ kTvf, tvfStartValues, tvfNewBlock, nullptr }|{ kTvf, nullptr, tvfNewBlock, nullptr }|vc2cosmadapters
+row-tvf-block|{ kTvf, tvfStartValues, tvfNewBlock, nullptr }|{ kTvf, tvfStartValues, nullptr, nullptr }|vc2cosmadapters
+rowof-adapters|std::span<const Vc2CosmTypeRow>(kRows), vc2CosmAdapterRows() }|std::span<const Vc2CosmTypeRow>(kRows) }|vc2cosmnoteon

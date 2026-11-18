@@ -1546,6 +1546,45 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM adapters: the Resonator and the TVF (2026-11-17, v252) {#vc2-cosm-adapters}
+
+Step 4.2's COSM object in the tone, its third part (research/VC2_MODE_PLAN.md; the VC-2 session's message, 2026-11-17, on the user's "Yes, both"). The first types XtCosm ports come in as adapters (Vc2CosmAdapters.cpp): each a row of `Vc2CosmTypeRow`, its start values and new block XtCosm's laws on rom.4's object words. XtCosm, and rom.2's checks of it, are unchanged. These two come first because they have no inline note-on case and no buffers. Lo-Fi, planned beside them, waits for v253: XtCosmLofi keeps the words its new block writes (D+1, +0x94…+0x9c) private, so its adapter needs getters on XtCosm or those words as rom.4's own. Every address is rom.4's, every offset the object's or its block's.
+
+**What an adapter reads and writes:**
+- The start values (`0x893a85f0`'s case for the code): the bound envelopes' start levels (+0x58; bindings 0 and 1, envelopes A and B) and the LFOs' levels (+0x38; bindings 2 and 3), into +0x114 and +0x118 (D+0xbc, +0xc0). The port reads them through `Vc2CosmBound`.
+- The new block (the code's routine, from `0x893aa5d0`): the held levels (+0x104…+0x110) into the targets +0xfc and +0x100 (D+0xa4, +0xa8). Then some of the block's words into the object at the same place past its code (object + 0x10 + k = block + k). Which ones is each routine's own, so the adapter copies them as rom.4 does.
+- XtCosm's tables are rom.2's, read by `xtCosmLoadTables`. So xt_vc2cosm now loads rom.2 beside rom.4 (the path's last "rom.4" as "rom.2"), as the plugin loads both at its start. rom.4's own pool words give the same on every case drawn.
+
+**The Resonator (6):** start values `0x893a8830` (rom.2's `0x894ec580`), new block `0x893a9210` (rom.2's `0x894ed0a0`).
+- XtCosmRes's laws: Size from the block's Size, its Env and LFO depths (+8, +0xc, +0x14) on envelope A and LFO A. Balance from +0x1c, +0x20 and +0x28 on envelope B and LFO B.
+- The copy: the Type's byte (+4) into +0x14, and +8…+0x2f into +0x18…+0x3f.
+- The Type in XtCosm's block is read only by the DSP, which isn't adapted yet.
+
+**The TVF (13):** start values `0x893a8a50`, new block `0x893a9a60` (rom.2's `0x894ed8f0`).
+- The laws: `xtTvfQ` on Q and its depths (+4, +8, +0x10) with envelope A and LFO A. Then `xtTvfCutoff` on Cutoff and its depths (+0x1c, +0x20, +0x28) with envelope B, LFO B and that Q.
+- The copy: +4…+0x17, +0x1c…+0x2f and the Filter Type +0x34, into +0x14…+0x27, +0x2c…+0x3f and +0x44. Block +0x18 and +0x30 aren't copied: they are where the Dynamic TVF's converter puts its Own Env depths, and the TVF's converter leaves them as they were (v237). The object's +0x28 and +0x40 keep what they held.
+- The first run copied +4…+0x37 whole and differed at +0x28 in case 0. Reading the routine's stores gave the list above.
+
+**The check**, xt_vc2cosm's sixth part (v250's), with the two codes among its note-ons and new blocks:
+- Draws (Vc2CosmNoteOnDraws.cpp), as each converter could give them. The Resonator's block: Type 0…2, Size and the depths within ±1, Balance 0…1. The TVF's: Q on its converter's 128 steps from −1 to −1/64, the depths within ±1, Cutoff 0…1, Filter Type 0…4.
+- Its note-on line now counts the adapted note-ons and new blocks apart.
+- Nothing more is hooked: rom.4's own start values and new blocks run against the adapters.
+
+Results:
+- seed 2024, 40 cases: 919 note-ons (243 adapted), 572 new blocks (66 adapted); 0 different, once the TVF's copy was rom.4's. The other five parts are as they were.
+- seeds 7 and 31337, 400 cases each: 8,977 and 8,903 note-ons (2,644 and 2,655 adapted), 6,053 and 6,045 new blocks (989 and 1,031 adapted); 0 different.
+- Coverage, llvm-cov on fcheck's 40 cases: every line, region and function of Vc2CosmAdapters.cpp.
+- `mutate_vc2.py --cosm`: 872 plants, all caught. 52 are new:
+  - 8 on the frame: the bound words' offsets and bindings, the copy's two sides, the two codes.
+  - 16 on the Resonator: each block word, the start values' arguments, values, held levels' order, targets, the Type's byte and the copy.
+  - 23 on the TVF: each law's words and levels, the start values' Q, the values, targets and the three copies (the whole-span copy among them).
+  - 5 on the rows: each part of each row, and rowOf's search of the adapters.
+  - Not planted: the Resonator's Type in XtCosm's block (only the DSP reads it), and XtCosmRes's note-on given the envelopes' outputs and rates (the adapter keeps only its start values, the new block's targets after). vc2cosm_muts.txt says why.
+- No tables file changed (the adapters read XtCosm's, which rom.2's loader reads), so the rom4- loader plants weren't run.
+- fcheck's diff is xt_vc2cosm's `note-on:` line, with the adapted counts. verify.sh passes every line.
+
+The VC-2's sources moved out of plugin/CMakeLists.txt, which had reached its 300 lines, into plugin/Vc2Sources.cmake, which it includes. A new VC-2 file goes there.
+
 ### The VC-2's COSM note-on frame (2026-11-17, v250) {#vc2-cosm-note-on}
 
 Step 4.2's COSM object in the tone, its second part (research/VC2_MODE_PLAN.md). The VC-2 session chose (A), adapters over XtCosm (2026-11-17), as the plan's "XtCosm stays as it is" had it. Ported bit for bit: the note-on's frame, the new block's frame and the buffer pools (Vc2CosmNoteOn.cpp, Vc2CosmPools.cpp), with the three types whose note-on needs no XtCosm adapter. Every address is rom.4's, every offset the object's.

@@ -498,9 +498,12 @@ version against rom.4's routines with what it calls hooked:
        note-on frame"). rom.4's per-type routines are rom.2's opcode for opcode (the TB Filter's five words relocations
        only), so the rest are adapters over XtCosm (the VC-2 session's choice (A), 2026-11-17): one row a type, rom.4's
        words into XtCosm's class and back, a word XtCosm doesn't hold carried as rom.4's.
-     - next: the types' adapters a few a version (their start values, note-on cases, new blocks; first those with no
-       inline case and no buffers: the Resonator, TVF and Lo-Fi), then the update (the held levels and rates, each
-       code's inline case) and the DSP by code, mono and stereo, over XtCosm's types and the Growl.
+     - done (v252): the first adapters, `Vc2CosmAdapters` (Vc2CosmAdapters.cpp): the Resonator's and the TVF's start
+       values and new blocks, XtCosmRes's laws and `xtTvfQ`, `xtTvfCutoff` on rom.4's words, each routine's copy of
+       the block rom.4's own (HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Resonator and the TVF").
+     - next: the types' adapters a few a version (their start values, note-on cases, new blocks): Lo-Fi (v253; its
+       new block's words are XtCosmLofi's private members), then the rest, then the update (the held levels and rates,
+       each code's inline case) and the DSP by code, mono and stereo, over XtCosm's types and the Growl.
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

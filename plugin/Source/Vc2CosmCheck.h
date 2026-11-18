@@ -9,7 +9,8 @@
 // The frame's cases on the run's seed: rom.4's dispatcher and the port's on the same inputs; how many differ
 long vc2CosmFrameCases(Vc2Fw& fw, const Vc2Run& run);
 
-// The tables both parts read: COSM's pool words and the Matrix's limits
+// The tables the parts read: COSM's pool words and the Matrix's limits from rom.4 at `path`; and (v252) XtCosm's,
+// which the adapted types run on, from the rom.2 beside it (its name with rom.4 as rom.2, as the plugin finds them)
 bool vc2LoadCosmAndMatrix(const char* path);
 
 // Whether the check holds type `type`'s converter ported: its own list, the types it draws parameters for

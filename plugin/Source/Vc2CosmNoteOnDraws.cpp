@@ -7,15 +7,57 @@ namespace {
 constexpr int32_t kSpeaker = 5;                     // [FW] the Speaker Simulator's code
 constexpr uint32_t kBoundStride = 0x100;
 constexpr uint32_t kLevel = 0x4c, kRate = 0x54, kLfoLevel = 0x38, kStartLevel = 0x58;   // [FW] the bound objects' words
-// [FW] the bytes whose types have no start values case (0, 5, 10, 11, 15, 16) or the Growl's (9), and none past 20
-constexpr std::array<uint8_t, 7> kPassingBytes { 0, 5, 9, 10, 11, 15, 16 };
+// [FW] the bytes whose start values the port has (0, 5, 10, 11, 15, 16 none; 6, 9, 13 its rows), and none past 20
+constexpr std::array<uint8_t, 9> kPassingBytes { 0, 5, 6, 9, 10, 11, 13, 15, 16 };
 constexpr int32_t kFirstBuffered = 7;               // [FW] the allocator's: the code's byte − 7, 0…3 and 8…11 take a slot
+constexpr int32_t kResonator = 6, kTvf = 13;        // [FW] the adapted types' codes (v252)
 
 float moderate(std::mt19937& rng, float from, float to) { return from + (to - from) * vc2Unit(rng); }
 
+void setBlockFloat(Vc2CosmBlockWords& b, int k, float v) { b.words[k] = std::bit_cast<uint32_t>(v); }
+
+// The Resonator's converter: Type 0…2, Size within ±1, Balance 0…1, their Env and LFO depths within ±1
+void drawResBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    b.words[0] = rng() % 3;
+    for (int k : { 1, 2, 4, 7, 9 }) setBlockFloat(b, k, moderate(rng, -1.0f, 1.0f));
+    setBlockFloat(b, 6, moderate(rng, 0.0f, 1.0f));
+}
+
+// The TVF's converter: Q·0.984375/127 − 1, Cutoff 0…1, their Env, LFO and Own depths within ±1, Filter Type 0…4
+void drawTvfBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    setBlockFloat(b, 0, (float)(rng() % 128) * 0.984375f / 127.0f - 1.0f);
+    for (int k : { 1, 3, 5, 7, 9, 11 }) setBlockFloat(b, k, moderate(rng, -1.0f, 1.0f));
+    setBlockFloat(b, 6, moderate(rng, 0.0f, 1.0f));
+    b.words[12] = rng() % 5;
+}
+
+// The Growl's converter: Intencity I/127, Speed 2·S/128 − 1, its two settings' depths and numbers
+void drawGrowlBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    Vc2CosmGrowlBlock g {};
+    g.code = b.code;
+    g.intensity = (float)(rng() % 128) / 127.0f;
+    g.speed = moderate(rng, -1.0f, 1.0f);
+    for (Vc2CosmMod* m : { &g.intensityMod, &g.speedMod }) {
+        *m = {};
+        if (rng() % 2 != 0) continue;
+        m->env = moderate(rng, -1.0f, 1.0f);
+        m->lfo = moderate(rng, -1.0f, 1.0f);
+    }
+    std::memcpy(&b, &g, sizeof g);
+}
+
+// Each type's block by the code's byte, its converter's way; another's noise
+struct Vc2CosmBlockDraw {
+    uint8_t code;
+    void (*draw)(Vc2CosmBlockWords& b, std::mt19937& rng);
+};
+constexpr std::array<Vc2CosmBlockDraw, 3> kBlockDraws { { { kResonator, drawResBlock },
+                                                          { (uint8_t)Vc2CosmGrowl::kCode, drawGrowlBlock },
+                                                          { kTvf, drawTvfBlock } } };
+
 // A code the port has a type for, or one past 20 whose byte the switches pass
 int32_t drawCode(std::mt19937& rng) {
-    const std::array<int32_t, 3> ported { 0, kSpeaker, Vc2CosmGrowl::kCode };
+    const std::array<int32_t, 5> ported { 0, kSpeaker, kResonator, Vc2CosmGrowl::kCode, kTvf };
     if (rng() % 4 != 0) return ported[rng() % ported.size()];
     const uint8_t low = rng() % 2 ? kPassingBytes[rng() % kPassingBytes.size()] : (uint8_t)(21 + rng() % 235);
     const uint32_t high = rng() % 2 ? 0xffffff00u : (uint32_t)(1 + rng() % 0x7fff) << 8;
@@ -36,19 +78,8 @@ void vc2WriteNoteOnState(Sh4& cpu, const Vc2CosmObjectWords& o, const Vc2CosmBlo
 void vc2DrawNoteOnBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
     vc2CosmNoise(b, rng);
     b.code = drawCode(rng);
-    if (b.code != Vc2CosmGrowl::kCode) return;
-    // The Growl's converter: Intencity I/127, Speed 2·S/128 − 1, its two settings' depths and numbers
-    Vc2CosmGrowlBlock g {};
-    g.code = b.code;
-    g.intensity = (float)(rng() % 128) / 127.0f;
-    g.speed = moderate(rng, -1.0f, 1.0f);
-    for (Vc2CosmMod* m : { &g.intensityMod, &g.speedMod }) {
-        *m = {};
-        if (rng() % 2 != 0) continue;
-        m->env = moderate(rng, -1.0f, 1.0f);
-        m->lfo = moderate(rng, -1.0f, 1.0f);
-    }
-    std::memcpy(&b, &g, sizeof g);
+    for (const Vc2CosmBlockDraw& d : kBlockDraws)
+        if (d.code == (uint8_t)b.code) d.draw(b, rng);
 }
 
 uint32_t vc2DrawNoteOnPool(std::mt19937& rng) {
