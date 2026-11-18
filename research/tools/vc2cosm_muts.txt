@@ -63,6 +63,26 @@
 # xt_vc2cosm).  XtCosmLofi's getters (XtCosmLofi.h, a header) are planted at their call sites, as a getter's wrong
 # word is the call's.  Not planted, as no input tells them apart: the Bit and Rate Down read unsigned (the converter
 # gives 0…15 and 0…5), XtCosm's clamps of them (rom.4 indexes its tables unclamped, on the same range).
+# v254: OD/Dist's, the Wave Shaper's and the Amp Simulator's adapters and note-on cases in vc2cosmadapters, the
+# Resonator's and Lo-Fi's template made a one-or-two-value type's (the value-, settings-, noteon-, held-, getters-
+# plants; v252's and v253's Resonator and Lo-Fi plants following the code), and XtCosm's laws the three take in
+# vc2xtcosm.  Not planted, as no input tells them apart: the XtCosm blocks' words only the DSPs read (OD/Dist's Output
+# Level and DS flag, the Types through withType, the Amp's Bass, Middle, Treble and Level), and xtCosmNoteOn's choice of
+# the four-word note-on (a plant there doesn't compile).
+# v255: the Dual Filter's, the Dynamic TVF's and the TB Filter's adapters, the TVF's moved onto XtCosmTvf (its v252
+# plants replaced by the atvf- ones): vc2cosmadapters, the word access moved to vc2cosmwords (Vc2CosmAdapterWords.cpp),
+# the TB Filter's in vc2cosmtb (Vc2CosmTbAdapter.cpp), and XtCosm's laws the three take in vc2xtcosm.  Not planted, as
+# no input tells them apart: the blocks' words only the DSPs read (the Filter Types, the Own depths through XtTvfBlock:
+# the case copies the object's), the key read unsigned (0…127), the TB's view's layout (a static_assert's), and either
+# of the TB case's clears left out (the frame's note-on has zeroed those words already: they're planted as a wrong value).
+# v258: the Compressor's, Limiter's and Frequency Shifter's adapters in vc2cosmbuffered (Vc2CosmBufferedAdapters.cpp), their
+# rows in vc2cosmadapters, XtCosm's laws they take in vc2xtcosm, and the allocator's last buffered code, drawn now that
+# 18 has a row.  Not planted, as no input tells them apart: which of the Limiter's four words a note-on case reads (all
+# 1), the Compressor's gain and gain target swapped (equal at a note-on), the Ratio read unsigned (0…3).
+# v260: the Side Band Filters' adapters in vc2cosmbuffered, their rows in vc2cosmadapters, XtCosmSbf's laws they take in
+# vc2xtcosm; XtCosmSbf's getters (XtCosmSbf.h, a header) are planted at their call sites.  Not planted, as no input tells
+# them apart: pitch and root swapped (their product), the case's octave factor left out (the new block has just written
+# it), the note-on's envelope A output (only the detune target reads it, and the new block writes that).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -883,70 +903,56 @@ row-growl-case|growlNewBlock, growlNoteOn }|growlNewBlock, nullptr }|vc2cosmnote
 newblock-code|if (o.code != b.code \|\| static_cast<uint32_t>(o.code) > kLastCode) return;|if (static_cast<uint32_t>(o.code) > kLastCode) return;|vc2cosmnoteon
 growl-back|    std::memcpy(&o, &n.growl.w, sizeof o);\n||vc2cosmnoteon
 growl-block-copy|std::memcpy(&gb, &b, sizeof gb);|std::memcpy(&gb, &b, 4);|vc2cosmnoteon
-adapt-start-level|kStartLevel = 0x58|kStartLevel = 0x4c|vc2cosmadapters
-adapt-lfo-level|kLfoLevel = 0x38|kLfoLevel = 0x3c|vc2cosmadapters
-adapt-starts-lfoa|bound.word(o.bindings[2] + kLfoLevel)|bound.word(o.bindings[3] + kLfoLevel)|vc2cosmadapters
-adapt-starts-envb|bound.word(o.bindings[1] + kStartLevel)|bound.word(o.bindings[0] + kStartLevel)|vc2cosmadapters
-adapt-copy-to|offsetof(Vc2CosmObjectWords, code) + from|offsetof(Vc2CosmObjectWords, code) + from + 4|vc2cosmadapters
-adapt-copy-from|reinterpret_cast<const uint8_t*>(&b) + from|reinterpret_cast<const uint8_t*>(&b) + from + 4|vc2cosmadapters
+adapt-start-level|kStartLevel = 0x58|kStartLevel = 0x4c|vc2cosmwords
+adapt-lfo-level|kLfoLevel = 0x38|kLfoLevel = 0x3c|vc2cosmwords
+adapt-starts-lfoa|bound.word(o.bindings[2] + kLfoLevel)|bound.word(o.bindings[3] + kLfoLevel)|vc2cosmwords
+adapt-starts-envb|bound.word(o.bindings[1] + kStartLevel)|bound.word(o.bindings[0] + kStartLevel)|vc2cosmwords
+adapt-copy-to|offsetof(Vc2CosmObjectWords, code) + from|offsetof(Vc2CosmObjectWords, code) + from + 4|vc2cosmwords
+adapt-copy-from|reinterpret_cast<const uint8_t*>(&b) + from|reinterpret_cast<const uint8_t*>(&b) + from + 4|vc2cosmwords
 adapt-code-res|kResonator = 6|kResonator = 7|vc2cosmadapters
 adapt-code-tvf|kTvf = 13|kTvf = 12|vc2cosmadapters
-pair-first|x.*f.first = blockFloat(b, 1);|x.*f.first = blockFloat(b, 2);|vc2cosmadapters
-pair-first-env|x.*f.firstEnv = blockFloat(b, 2);|x.*f.firstEnv = blockFloat(b, 3);|vc2cosmadapters
-pair-first-lfo|x.*f.firstLfo = blockFloat(b, 4);|x.*f.firstLfo = blockFloat(b, 5);|vc2cosmadapters
-pair-second|x.*f.second = blockFloat(b, 6);|x.*f.second = blockFloat(b, 5);|vc2cosmadapters
-pair-second-env|x.*f.secondEnv = blockFloat(b, 7);|x.*f.secondEnv = blockFloat(b, 8);|vc2cosmadapters
-pair-second-lfo|x.*f.secondLfo = blockFloat(b, 9);|x.*f.secondLfo = blockFloat(b, 10);|vc2cosmadapters
-pair-start-lfo|0.0f, s.lfoA, s.envB, 0.0f|0.0f, s.lfoB, s.envB, 0.0f|vc2cosmadapters
-pair-start-envb|0.0f, s.lfoA, s.envB, 0.0f|0.0f, s.lfoA, s.envA, 0.0f|vc2cosmadapters
-pair-value0|o.values[0] = (cosm.*T.value0)();|o.values[0] = (cosm.*T.value1)();|vc2cosmadapters
-pair-value1|o.values[1] = (cosm.*T.value1)();|o.values[1] = (cosm.*T.value0)();|vc2cosmadapters
-pair-held-order|o.held[0], o.held[2], o.held[1], o.held[3]);|o.held[0], o.held[1], o.held[2], o.held[3]);|vc2cosmadapters
-pair-target0|o.targets[0] = (cosm.*T.target0)();|o.targets[0] = (cosm.*T.target1)();|vc2cosmadapters
-pair-target1|o.targets[1] = (cosm.*T.target1)();|o.targets[1] = (cosm.*T.target0)();|vc2cosmadapters
-pair-rest|    T.rest(cosm, o, b);\n||vc2cosmadapters
+value-at|x.*f.value = blockFloat(b, at);|x.*f.value = blockFloat(b, at + 1);|vc2cosmadapters
+value-env|x.*f.env = blockFloat(b, at + 1);|x.*f.env = blockFloat(b, at + 2);|vc2cosmadapters
+noteon-start-a|cosm.noteOn(block, s.envA, s.envA, 0.0f, s.lfoA, s.envB|cosm.noteOn(block, s.envB, s.envA, 0.0f, s.lfoA, s.envB|vc2cosmadapters
+noteon-out-a|cosm.noteOn(block, s.envA, s.envA, 0.0f, s.lfoA, s.envB|cosm.noteOn(block, s.envA, s.envB, 0.0f, s.lfoA, s.envB|vc2cosmadapters
+noteon-lfo-a|0.0f, s.lfoA, s.envB, s.envB|0.0f, s.lfoB, s.envB, s.envB|vc2cosmadapters
+noteon-start-b|s.lfoA, s.envB, s.envB, 0.0f, s.lfoB|s.lfoA, s.envA, s.envB, 0.0f, s.lfoB|vc2cosmadapters
+noteon-out-b|s.envB, s.envB, 0.0f, s.lfoB|s.envB, s.envA, 0.0f, s.lfoB|vc2cosmadapters
+noteon-lfo-b|0.0f, s.lfoB);|0.0f, s.lfoA);|vc2cosmadapters
+noteon-one-start|cosm.noteOn(block, s.envA, s.envA, 0.0f, s.lfoA);|cosm.noteOn(block, s.envB, s.envA, 0.0f, s.lfoA);|vc2cosmadapters
+noteon-one-out|cosm.noteOn(block, s.envA, s.envA, 0.0f, s.lfoA);|cosm.noteOn(block, s.envA, s.envB, 0.0f, s.lfoA);|vc2cosmadapters
+noteon-one-lfo|cosm.noteOn(block, s.envA, s.envA, 0.0f, s.lfoA);|cosm.noteOn(block, s.envA, s.envA, 0.0f, s.lfoB);|vc2cosmadapters
+held-order|{ o.held[0], o.held[2], o.held[1], o.held[3] }|{ o.held[0], o.held[1], o.held[2], o.held[3] }|vc2cosmwords
+held-env-a|{ o.held[0], o.held[2],|{ o.held[1], o.held[2],|vc2cosmwords
+getters-into|if (getters[k] != nullptr) into[k] =|if (getters[k] != nullptr) into[1 - k] =|vc2cosmadapters
+getters-from|for (size_t k = 0; k < getters.size(); ++k)|for (size_t k = 1; k < getters.size(); ++k)|vc2cosmadapters
+getters-to|k < getters.size(); ++k)|k < 1; ++k)|vc2cosmadapters
+start-into|gettersInto(o.values, T.values, cosm);|gettersInto(o.targets, T.values, cosm);|vc2cosmadapters
+start-levels|xtCosmNoteOn(cosm, T.blockOf(b), startsOf(n, o));|xtCosmNoteOn(cosm, T.blockOf(b), heldOf(o));|vc2cosmadapters
+block-into|gettersInto(o.targets, T.targets, cosm);|gettersInto(o.values, T.targets, cosm);|vc2cosmadapters
+value-rest|    T.rest(cosm, o, b);\n||vc2cosmadapters
 res-fields-size|{ &XtResBlock::size, &XtResBlock::sizeEnv,|{ &XtResBlock::sizeEnv, &XtResBlock::size,|vc2cosmadapters
 res-fields-balance|&XtResBlock::balance, &XtResBlock::balanceEnv,|&XtResBlock::balanceEnv, &XtResBlock::balance,|vc2cosmadapters
-res-value-size|resBlockOf, &XtCosmRes::size, &XtCosmRes::balance,|resBlockOf, &XtCosmRes::balance, &XtCosmRes::balance,|vc2cosmadapters
-res-value-balance|&XtCosmRes::size, &XtCosmRes::balance,|&XtCosmRes::size, &XtCosmRes::size,|vc2cosmadapters
-res-target-size|&XtCosmRes::sizeTarget, &XtCosmRes::balanceTarget,|&XtCosmRes::balanceTarget, &XtCosmRes::balanceTarget,|vc2cosmadapters
-res-target-balance|&XtCosmRes::sizeTarget, &XtCosmRes::balanceTarget,|&XtCosmRes::sizeTarget, &XtCosmRes::sizeTarget,|vc2cosmadapters
-res-variant|    o.variant = static_cast<uint8_t>(b.words[0]);\n||vc2cosmadapters
-res-copy-len|copyBlock(o, b, 8, 0x28);|copyBlock(o, b, 8, 0x24);|vc2cosmadapters
-res-copy-start|copyBlock(o, b, 8, 0x28);|copyBlock(o, b, 0xc, 0x24);|vc2cosmadapters
-tvf-q|xtTvfQ(blockFloat(b, 0), blockFloat(b, 1), s.envA|xtTvfQ(blockFloat(b, 2), blockFloat(b, 1), s.envA|vc2cosmadapters
-tvf-q-env|xtTvfQ(blockFloat(b, 0), blockFloat(b, 1), s.envA|xtTvfQ(blockFloat(b, 0), blockFloat(b, 2), s.envA|vc2cosmadapters
-tvf-q-lfo-depth|s.envA, blockFloat(b, 3), s.lfoA|s.envA, blockFloat(b, 4), s.lfoA|vc2cosmadapters
-tvf-q-start-env|s.envA, blockFloat(b, 3), s.lfoA|s.envB, blockFloat(b, 3), s.lfoA|vc2cosmadapters
-tvf-q-start-lfo|s.envA, blockFloat(b, 3), s.lfoA|s.envA, blockFloat(b, 3), s.lfoB|vc2cosmadapters
-tvf-cutoff|xtTvfCutoff(blockFloat(b, 6), blockFloat(b, 7), s.envB|xtTvfCutoff(blockFloat(b, 5), blockFloat(b, 7), s.envB|vc2cosmadapters
-tvf-cutoff-env|xtTvfCutoff(blockFloat(b, 6), blockFloat(b, 7), s.envB|xtTvfCutoff(blockFloat(b, 6), blockFloat(b, 8), s.envB|vc2cosmadapters
-tvf-cutoff-lfo-depth|s.envB, blockFloat(b, 9), s.lfoB|s.envB, blockFloat(b, 10), s.lfoB|vc2cosmadapters
-tvf-cutoff-start-lfo|s.envB, blockFloat(b, 9), s.lfoB|s.envB, blockFloat(b, 9), s.lfoA|vc2cosmadapters
-tvf-cutoff-start-q|s.lfoB, q);|s.lfoB, 0.0f);|vc2cosmadapters
-tvf-value-q|    o.values[0] = q;\n||vc2cosmadapters
-tvf-nb-q|xtTvfQ(blockFloat(b, 0), blockFloat(b, 1), o.held[0]|xtTvfQ(blockFloat(b, 0), blockFloat(b, 2), o.held[0]|vc2cosmadapters
-tvf-nb-q-env|blockFloat(b, 1), o.held[0], blockFloat(b, 3), o.held[2]|blockFloat(b, 1), o.held[1], blockFloat(b, 3), o.held[2]|vc2cosmadapters
-tvf-nb-q-lfo|blockFloat(b, 1), o.held[0], blockFloat(b, 3), o.held[2]|blockFloat(b, 1), o.held[0], blockFloat(b, 3), o.held[3]|vc2cosmadapters
-tvf-nb-cutoff-env|blockFloat(b, 7), o.held[1], blockFloat(b, 9), o.held[3]|blockFloat(b, 7), o.held[0], blockFloat(b, 9), o.held[3]|vc2cosmadapters
-tvf-nb-cutoff-lfo|blockFloat(b, 7), o.held[1], blockFloat(b, 9), o.held[3]|blockFloat(b, 7), o.held[1], blockFloat(b, 9), o.held[2]|vc2cosmadapters
-tvf-nb-cutoff-q|o.held[3], q);|o.held[3], 0.0f);|vc2cosmadapters
-tvf-target-q|    o.targets[0] = q;\n||vc2cosmadapters
+res-value-size|{ &XtCosmRes::size, &XtCosmRes::balance }|{ &XtCosmRes::balance, &XtCosmRes::balance }|vc2cosmadapters
+res-value-balance|{ &XtCosmRes::size, &XtCosmRes::balance }|{ &XtCosmRes::size, &XtCosmRes::size }|vc2cosmadapters
+res-target-size|{ &XtCosmRes::sizeTarget, &XtCosmRes::balanceTarget }|{ &XtCosmRes::balanceTarget, &XtCosmRes::balanceTarget }|vc2cosmadapters
+res-target-balance|{ &XtCosmRes::sizeTarget, &XtCosmRes::balanceTarget }|{ &XtCosmRes::sizeTarget, &XtCosmRes::sizeTarget }|vc2cosmadapters
+type-variant|    o.variant = static_cast<uint8_t>(b.words[0]);\n||vc2cosmadapters
+type-copy-start|copyBlock(o, b, 8, Bytes);|copyBlock(o, b, 0xc, Bytes - 4);|vc2cosmadapters
+res-copy-len|typeAndWords<XtCosmRes, 0x28>|typeAndWords<XtCosmRes, 0x24>|vc2cosmadapters
 tvf-copy-first|copyBlock(o, b, 4, 0x14);|copyBlock(o, b, 4, 0x10);|vc2cosmadapters
 tvf-copy-own|copyBlock(o, b, 4, 0x14);|copyBlock(o, b, 4, 0x18);|vc2cosmadapters
 tvf-copy-second|copyBlock(o, b, 0x1c, 0x14);|copyBlock(o, b, 0x1c, 0x10);|vc2cosmadapters
 tvf-copy-second-own|copyBlock(o, b, 0x1c, 0x14);|copyBlock(o, b, 0x1c, 0x18);|vc2cosmadapters
 tvf-copy-type|    copyBlock(o, b, 0x34, 4);\n||vc2cosmadapters
-row-res-start|{ kResonator, pairStartValues<kResType>, pairNewBlock<kResType>, nullptr }|{ kResonator, nullptr, pairNewBlock<kResType>, nullptr }|vc2cosmadapters
-row-res-block|{ kResonator, pairStartValues<kResType>, pairNewBlock<kResType>, nullptr }|{ kResonator, pairStartValues<kResType>, nullptr, nullptr }|vc2cosmadapters
-row-tvf-start|{ kTvf, tvfStartValues, tvfNewBlock, nullptr }|{ kTvf, nullptr, tvfNewBlock, nullptr }|vc2cosmadapters
-row-tvf-block|{ kTvf, tvfStartValues, tvfNewBlock, nullptr }|{ kTvf, tvfStartValues, nullptr, nullptr }|vc2cosmadapters
+row-res-start|{ kResonator, valueStartValues<kResType>, valueNewBlock<kResType>, nullptr }|{ kResonator, nullptr, valueNewBlock<kResType>, nullptr }|vc2cosmadapters
+row-res-block|{ kResonator, valueStartValues<kResType>, valueNewBlock<kResType>, nullptr }|{ kResonator, valueStartValues<kResType>, nullptr, nullptr }|vc2cosmadapters
 adapt-code-lofi|kLofi = 19|kLofi = 18|vc2cosmadapters
 adapt-put-at|std::memcpy(reinterpret_cast<uint8_t*>(&o) + at, &v, sizeof v);|std::memcpy(reinterpret_cast<uint8_t*>(&o) + at + 4, &v, sizeof v);|vc2cosmadapters
 lofi-bit-byte|x.bitDown = static_cast<int8_t>(b.words[0]);|x.bitDown = static_cast<int8_t>(b.words[0] >> 8);|vc2cosmadapters
 lofi-rate-byte|x.rateDown = static_cast<int8_t>(b.words[0] >> 8);|x.rateDown = static_cast<int8_t>(b.words[0]);|vc2cosmadapters
 lofi-fields-filter|{ &XtLofiBlock::filter, &XtLofiBlock::filterEnv,|{ &XtLofiBlock::filterEnv, &XtLofiBlock::filter,|vc2cosmadapters
-lofi-fields-lfo|&XtLofiBlock::filterLfo, &XtLofiBlock::balance,|&XtLofiBlock::filterEnv, &XtLofiBlock::balance,|vc2cosmadapters
+lofi-fields-lfo|&XtLofiBlock::filterLfo },|&XtLofiBlock::filterEnv },|vc2cosmadapters
 lofi-fields-balance|&XtLofiBlock::balance, &XtLofiBlock::balanceEnv,|&XtLofiBlock::balanceEnv, &XtLofiBlock::balance,|vc2cosmadapters
 lofi-copy-bytes|copyBlock(o, b, 4, 2);|copyBlock(o, b, 4, 1);|vc2cosmadapters
 lofi-copy|    copyBlock(o, b, 8, 0x28);\n    putWord|    putWord|vc2cosmadapters
@@ -958,16 +964,349 @@ lofi-mask|static_cast<uint8_t>(lofi.rateMask())|static_cast<uint8_t>(0)|vc2cosma
 lofi-coef|putWord(o, kLofiCoef, lofi.rateCoef());|putWord(o, kLofiCoef, lofi.downScale());|vc2cosmadapters
 lofi-up|putWord(o, kLofiUp, lofi.upScale());|putWord(o, kLofiUp, lofi.downScale());|vc2cosmadapters
 lofi-down|putWord(o, kLofiDown, lofi.downScale());|putWord(o, kLofiDown, lofi.upScale());|vc2cosmadapters
-lofi-value-filter|lofiBlockOf, &XtCosmLofi::filter, &XtCosmLofi::balance,|lofiBlockOf, &XtCosmLofi::balance, &XtCosmLofi::balance,|vc2cosmadapters
-lofi-value-balance|&XtCosmLofi::filter, &XtCosmLofi::balance,|&XtCosmLofi::filter, &XtCosmLofi::filter,|vc2cosmadapters
-lofi-target-filter|&XtCosmLofi::filterTarget, &XtCosmLofi::balanceTarget,|&XtCosmLofi::balanceTarget, &XtCosmLofi::balanceTarget,|vc2cosmadapters
-lofi-target-balance|&XtCosmLofi::filterTarget, &XtCosmLofi::balanceTarget,|&XtCosmLofi::filterTarget, &XtCosmLofi::filterTarget,|vc2cosmadapters
-row-lofi-start|{ kLofi, pairStartValues<kLofiType>, pairNewBlock<kLofiType>, nullptr }|{ kLofi, nullptr, pairNewBlock<kLofiType>, nullptr }|vc2cosmadapters
-row-lofi-block|{ kLofi, pairStartValues<kLofiType>, pairNewBlock<kLofiType>, nullptr }|{ kLofi, pairStartValues<kLofiType>, nullptr, nullptr }|vc2cosmadapters
+lofi-value-filter|{ &XtCosmLofi::filter, &XtCosmLofi::balance }|{ &XtCosmLofi::balance, &XtCosmLofi::balance }|vc2cosmadapters
+lofi-value-balance|{ &XtCosmLofi::filter, &XtCosmLofi::balance }|{ &XtCosmLofi::filter, &XtCosmLofi::filter }|vc2cosmadapters
+lofi-target-filter|{ &XtCosmLofi::filterTarget,|{ &XtCosmLofi::balanceTarget,|vc2cosmadapters
+lofi-target-balance|&XtCosmLofi::balanceTarget }, lofiRest|&XtCosmLofi::filterTarget }, lofiRest|vc2cosmadapters
+row-lofi-start|{ kLofi, valueStartValues<kLofiType>, valueNewBlock<kLofiType>, nullptr }|{ kLofi, nullptr, valueNewBlock<kLofiType>, nullptr }|vc2cosmadapters
+row-lofi-block|{ kLofi, valueStartValues<kLofiType>, valueNewBlock<kLofiType>, nullptr }|{ kLofi, valueStartValues<kLofiType>, nullptr, nullptr }|vc2cosmadapters
+adapt-code-od|kOd = 1, kDs = 2|kOd = 21, kDs = 2|vc2cosmadapters
+adapt-code-ds|kDs = 2, kWs = 3|kDs = 22, kWs = 3|vc2cosmadapters
+adapt-code-ws|kWs = 3, kAmp = 4|kWs = 23, kAmp = 4|vc2cosmadapters
+adapt-code-amp|kAmp = 4, kResonator|kAmp = 24, kResonator|vc2cosmadapters
+od-settings-at|settingsAt<XtOdBlock>(b, 0,|settingsAt<XtOdBlock>(b, 1,|vc2cosmadapters
+od-fields-drive|{ &XtOdBlock::drive, &XtOdBlock::driveEnv,|{ &XtOdBlock::driveEnv, &XtOdBlock::drive,|vc2cosmadapters
+od-fields-drive-lfo|&XtOdBlock::driveLfo },|&XtOdBlock::driveEnv },|vc2cosmadapters
+od-fields-tone|{ &XtOdBlock::tone, &XtOdBlock::toneEnv,|{ &XtOdBlock::toneEnv, &XtOdBlock::tone,|vc2cosmadapters
+od-fields-tone-lfo|&XtOdBlock::toneLfo });|&XtOdBlock::toneEnv });|vc2cosmadapters
+od-value-drive|{ &XtCosmOd::drive, &XtCosmOd::tone }|{ &XtCosmOd::tone, &XtCosmOd::tone }|vc2cosmadapters
+od-value-tone|{ &XtCosmOd::drive, &XtCosmOd::tone }|{ &XtCosmOd::drive, &XtCosmOd::drive }|vc2cosmadapters
+od-target-drive|{ &XtCosmOd::driveTarget, &XtCosmOd::toneTarget }|{ &XtCosmOd::toneTarget, &XtCosmOd::toneTarget }|vc2cosmadapters
+od-target-tone|{ &XtCosmOd::driveTarget, &XtCosmOd::toneTarget }|{ &XtCosmOd::driveTarget, &XtCosmOd::driveTarget }|vc2cosmadapters
+ws-settings-at|settingsAt<XtWsBlock>(b, 1,|settingsAt<XtWsBlock>(b, 0,|vc2cosmadapters
+ws-fields-drive|{ &XtWsBlock::drive, &XtWsBlock::driveEnv,|{ &XtWsBlock::driveEnv, &XtWsBlock::drive,|vc2cosmadapters
+ws-fields-drive-lfo|&XtWsBlock::driveLfo },|&XtWsBlock::driveEnv },|vc2cosmadapters
+ws-fields-tone|{ &XtWsBlock::tone, &XtWsBlock::toneEnv,|{ &XtWsBlock::toneEnv, &XtWsBlock::tone,|vc2cosmadapters
+ws-fields-tone-lfo|&XtWsBlock::toneEnv, &XtWsBlock::toneLfo }|&XtWsBlock::toneEnv, &XtWsBlock::toneEnv }|vc2cosmadapters
+ws-level|x.level = blockFloat(b, 11);|x.level = blockFloat(b, 10);|vc2cosmadapters
+ws-copy-len|typeAndWords<XtCosmWs, 0x28>(ws, o, b);|typeAndWords<XtCosmWs, 0x24>(ws, o, b);|vc2cosmadapters
+ws-level-at|kWsLevel = 0x40|kWsLevel = 0x3c|vc2cosmadapters
+ws-level-gain|putWord(o, kWsLevel, ws.gain());|putWord(o, kWsLevel, ws.drive());|vc2cosmadapters
+ws-value-drive|{ &XtCosmWs::drive, &XtCosmWs::tone }|{ &XtCosmWs::tone, &XtCosmWs::tone }|vc2cosmadapters
+ws-value-tone|{ &XtCosmWs::drive, &XtCosmWs::tone }|{ &XtCosmWs::drive, &XtCosmWs::drive }|vc2cosmadapters
+ws-target-drive|{ &XtCosmWs::driveTarget, &XtCosmWs::toneTarget }|{ &XtCosmWs::toneTarget, &XtCosmWs::toneTarget }|vc2cosmadapters
+ws-target-tone|{ &XtCosmWs::driveTarget, &XtCosmWs::toneTarget }|{ &XtCosmWs::driveTarget, &XtCosmWs::driveTarget }|vc2cosmadapters
+amp-value-at|valueAt(x, b, 1, { &XtAmpBlock::gain,|valueAt(x, b, 2, { &XtAmpBlock::gain,|vc2cosmadapters
+amp-fields|&XtAmpBlock::gainEnv, &XtAmpBlock::gainLfo }|&XtAmpBlock::gainLfo, &XtAmpBlock::gainEnv }|vc2cosmadapters
+amp-value|{ &XtCosmAmp::gain, nullptr }|{ nullptr, &XtCosmAmp::gain }|vc2cosmadapters
+amp-target|{ &XtCosmAmp::gainTarget, nullptr }|{ nullptr, &XtCosmAmp::gainTarget }|vc2cosmadapters
+amp-copy-len|typeAndWords<XtCosmAmp, 0x24>|typeAndWords<XtCosmAmp, 0x28>|vc2cosmadapters
+case-gain-at|kCased = 0xe4|kCased = 0xe8|vc2cosmadapters
+case-copy-size|bytes + c.from, sizeof(float));|bytes + c.from, 2);|vc2cosmadapters
+case-copy-way|std::memcpy(bytes + c.to, bytes + c.from,|std::memcpy(bytes + c.from, bytes + c.to,|vc2cosmadapters
+case-od-from|{ { 0x3c, kCased } }|{ { 0x38, kCased } }|vc2cosmadapters
+case-od-to|{ { 0x3c, kCased } }|{ { 0x3c, kCased + 4 } }|vc2cosmadapters
+case-ws-from|{ { kWsLevel, kCased } }|{ { kWsLevel - 4, kCased } }|vc2cosmadapters
+case-amp-level|{ { 0x38, kCased }, { 0x34, kCased + 4 },|{ { 0x34, kCased }, { 0x34, kCased + 4 },|vc2cosmadapters
+case-amp-treble|{ 0x34, kCased + 4 }|{ 0x30, kCased + 4 }|vc2cosmadapters
+case-amp-middle|{ 0x30, kCased + 8 }|{ 0x2c, kCased + 8 }|vc2cosmadapters
+case-amp-bass|{ 0x2c, kCased + 12 }|{ 0x28, kCased + 12 }|vc2cosmadapters
+case-amp-bass-to|{ 0x2c, kCased + 12 }|{ 0x2c, kCased + 8 }|vc2cosmadapters
+row-od-start|{ kOd, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase> }|{ kOd, nullptr, valueNewBlock<kOdType>, copyCase<kOdCase> }|vc2cosmadapters
+row-od-block|{ kOd, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase> }|{ kOd, valueStartValues<kOdType>, nullptr, copyCase<kOdCase> }|vc2cosmadapters
+row-od-case|{ kOd, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase> }|{ kOd, valueStartValues<kOdType>, valueNewBlock<kOdType>, nullptr }|vc2cosmadapters
+row-ds-start|{ kDs, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase> }|{ kDs, nullptr, valueNewBlock<kOdType>, copyCase<kOdCase> }|vc2cosmadapters
+row-ds-block|{ kDs, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase> }|{ kDs, valueStartValues<kOdType>, nullptr, copyCase<kOdCase> }|vc2cosmadapters
+row-ds-case|{ kDs, valueStartValues<kOdType>, valueNewBlock<kOdType>, copyCase<kOdCase> }|{ kDs, valueStartValues<kOdType>, valueNewBlock<kOdType>, nullptr }|vc2cosmadapters
+row-ws-start|{ kWs, valueStartValues<kWsType>, valueNewBlock<kWsType>, copyCase<kWsCase> }|{ kWs, nullptr, valueNewBlock<kWsType>, copyCase<kWsCase> }|vc2cosmadapters
+row-ws-block|{ kWs, valueStartValues<kWsType>, valueNewBlock<kWsType>, copyCase<kWsCase> }|{ kWs, valueStartValues<kWsType>, nullptr, copyCase<kWsCase> }|vc2cosmadapters
+row-ws-case|{ kWs, valueStartValues<kWsType>, valueNewBlock<kWsType>, copyCase<kWsCase> }|{ kWs, valueStartValues<kWsType>, valueNewBlock<kWsType>, nullptr }|vc2cosmadapters
+row-amp-start|{ kAmp, valueStartValues<kAmpType>, valueNewBlock<kAmpType>, copyCase<kAmpCase> }|{ kAmp, nullptr, valueNewBlock<kAmpType>, copyCase<kAmpCase> }|vc2cosmadapters
+row-amp-block|{ kAmp, valueStartValues<kAmpType>, valueNewBlock<kAmpType>, copyCase<kAmpCase> }|{ kAmp, valueStartValues<kAmpType>, nullptr, copyCase<kAmpCase> }|vc2cosmadapters
+row-amp-case|{ kAmp, valueStartValues<kAmpType>, valueNewBlock<kAmpType>, copyCase<kAmpCase> }|{ kAmp, valueStartValues<kAmpType>, valueNewBlock<kAmpType>, nullptr }|vc2cosmadapters
 xt-lofi-mask|mask = T.lofiMask[r];|mask = T.lofiMask[0];|vc2xtcosm
 xt-lofi-coef|coef = T.lofiCoef[r];|coef = T.lofiCoef[0];|vc2xtcosm
 xt-lofi-up|up = T.lofiUp[bit];|up = T.lofiDown[bit];|vc2xtcosm
 xt-lofi-down|down = T.lofiDown[bit];|down = T.lofiUp[bit];|vc2xtcosm
 xt-lofi-filter-floor|fmac(blk.filterEnv, env, blk.filter)), K(0x3dcccccd), 1.0f);|fmac(blk.filterEnv, env, blk.filter)), 0.0f, 1.0f);|vc2xtcosm
 xt-lofi-balance|T.lofiBal[clampi(ftrc(mul(b, 127.0f)), 0, 127)];|T.lofiBal[clampi(ftrc(mul(b, 126.0f)), 0, 127)];|vc2xtcosm
+xt-ws-drive-floor|fmac(blk.driveEnv, env, blk.drive)), 0.0f, 1.0f);|fmac(blk.driveEnv, env, blk.drive)), 0.1f, 1.0f);|vc2xtcosm
+xt-ws-tone-floor|fmac(blk.toneEnv, env, blk.tone)), K(0x3dcccccd), 1.0f);|fmac(blk.toneEnv, env, blk.tone)), 0.0f, 1.0f);|vc2xtcosm
+xt-ws-tone-index|T.lofiBal[clampi(ftrc(mul(t, 127.0f)), 0, 127)];|T.lofiBal[clampi(ftrc(mul(t, 126.0f)), 0, 127)];|vc2xtcosm
+xt-ws-level|lvlT = mul(b.level, 0.125f);|lvlT = mul(b.level, 0.25f);|vc2xtcosm
+xt-od-drive-scale|0.0f, 1.0f), 12.0f, 1.0f);|0.0f, 1.0f), 11.0f, 1.0f);|vc2xtcosm
+xt-od-start-floor|ton = toneOf(env2Start, lfo2, K(0x3dcccccd));|ton = toneOf(env2Start, lfo2, 0.0f);|vc2xtcosm
+xt-od-block-floor|tonT = toneOf(env2, lfo2, 0.0f);|tonT = toneOf(env2, lfo2, K(0x3dcccccd));|vc2xtcosm
+xt-od-guard|if (b.ds != blk.ds) return;|if (b.ds == blk.ds) return;|vc2xtcosm
+xt-amp-gain-scale|0.0f, 1.0f), 7.0f, 1.0f);|0.0f, 1.0f), 6.0f, 1.0f);|vc2xtcosm
+words-float|std::bit_cast<float>(b.words[k])|std::bit_cast<float>(b.words[k + 1])|vc2cosmwords
+value-lfo|x.*f.lfo = blockFloat(b, at + f.lfoAt);|x.*f.lfo = blockFloat(b, at + f.lfoAt + 1);|vc2cosmadapters
+value-lfo-at|int lfoAt = 3;|int lfoAt = 2;|vc2cosmadapters
+settings-first|valueAt(x, b, at, first);|valueAt(x, b, secondAt, first);|vc2cosmadapters
+settings-second|valueAt(x, b, secondAt, second);|valueAt(x, b, at, second);|vc2cosmadapters
+od-second-at|settingsAt<XtOdBlock>(b, 0, 5,|settingsAt<XtOdBlock>(b, 0, 6,|vc2cosmadapters
+ws-second-at|settingsAt<XtWsBlock>(b, 1, 6,|settingsAt<XtWsBlock>(b, 1, 5,|vc2cosmadapters
+res-second-at|settingsAt<XtResBlock>(b, 1, 6,|settingsAt<XtResBlock>(b, 1, 5,|vc2cosmadapters
+lofi-second-at|settingsAt<XtLofiBlock>(b, 1, 6,|settingsAt<XtLofiBlock>(b, 1, 5,|vc2cosmadapters
+od-copy-len|blockWords<XtCosmOd, 0x2c>|blockWords<XtCosmOd, 0x28>|vc2cosmadapters
+words-copy-from|{ copyBlock(o, b, 4, Bytes); }|{ copyBlock(o, b, 8, Bytes - 4); }|vc2cosmadapters
+adapt-code-dual|kDual = 12|kDual = 25|vc2cosmadapters
+adapt-code-dtvf|kDtvf = 14|kDtvf = 26|vc2cosmadapters
+adapt-code-tb|kTb = 20|kTb = 27|vc2cosmadapters
+atvf-q-at|settingsAt<XtTvfBlock>(b, 0, 6,|settingsAt<XtTvfBlock>(b, 1, 6,|vc2cosmadapters
+atvf-cutoff-at|settingsAt<XtTvfBlock>(b, 0, 6,|settingsAt<XtTvfBlock>(b, 0, 5,|vc2cosmadapters
+atvf-fields-q|{ &XtTvfBlock::q, &XtTvfBlock::qEnv,|{ &XtTvfBlock::qEnv, &XtTvfBlock::q,|vc2cosmadapters
+atvf-fields-q-lfo|&XtTvfBlock::qLfo },|&XtTvfBlock::qEnv },|vc2cosmadapters
+atvf-fields-cutoff|{ &XtTvfBlock::cutoff, &XtTvfBlock::cutoffEnv,|{ &XtTvfBlock::cutoffEnv, &XtTvfBlock::cutoff,|vc2cosmadapters
+atvf-fields-cutoff-lfo|&XtTvfBlock::cutoffLfo });|&XtTvfBlock::cutoffEnv });|vc2cosmadapters
+atvf-dynamic|static_cast<int8_t>(b.code) == kDtvf;|static_cast<int8_t>(b.code) == kTvf;|vc2cosmadapters
+atvf-value-q|kTvfType { tvfBlockOf, { &XtCosmTvf::c1,|kTvfType { tvfBlockOf, { &XtCosmTvf::c2,|vc2cosmadapters
+atvf-value-cutoff|kTvfType { tvfBlockOf, { &XtCosmTvf::c1, &XtCosmTvf::c2 }|kTvfType { tvfBlockOf, { &XtCosmTvf::c1, &XtCosmTvf::c1 }|vc2cosmadapters
+atvf-target-q|{ &XtCosmTvf::target1, &XtCosmTvf::target2 }, tvfRest|{ &XtCosmTvf::target2, &XtCosmTvf::target2 }, tvfRest|vc2cosmadapters
+atvf-target-cutoff|{ &XtCosmTvf::target1, &XtCosmTvf::target2 }, tvfRest|{ &XtCosmTvf::target1, &XtCosmTvf::target1 }, tvfRest|vc2cosmadapters
+dtvf-value-q|kDtvfType { tvfBlockOf, { &XtCosmTvf::c1,|kDtvfType { tvfBlockOf, { &XtCosmTvf::c2,|vc2cosmadapters
+dtvf-value-cutoff|kDtvfType { tvfBlockOf, { &XtCosmTvf::c1, &XtCosmTvf::c2 }|kDtvfType { tvfBlockOf, { &XtCosmTvf::c1, &XtCosmTvf::c1 }|vc2cosmadapters
+dtvf-target-q|{ &XtCosmTvf::target1, &XtCosmTvf::target2 },\n|{ &XtCosmTvf::target2, &XtCosmTvf::target2 },\n|vc2cosmadapters
+dtvf-target-cutoff|{ &XtCosmTvf::target1, &XtCosmTvf::target2 },\n|{ &XtCosmTvf::target1, &XtCosmTvf::target1 },\n|vc2cosmadapters
+dtvf-copy-len|blockWords<XtCosmTvf, 0x34>|blockWords<XtCosmTvf, 0x30>|vc2cosmadapters
+case-dtvf-q-from|{ { 0x28, kCased + 4 },|{ { 0x24, kCased + 4 },|vc2cosmadapters
+case-dtvf-q-to|{ { 0x28, kCased + 4 },|{ { 0x28, kCased + 8 },|vc2cosmadapters
+case-dtvf-cut-from|{ 0x40, kCased + 8 }|{ 0x3c, kCased + 8 }|vc2cosmadapters
+case-dtvf-cut-to|{ 0x40, kCased + 8 }|{ 0x40, kCased + 4 }|vc2cosmadapters
+dual-first-at|settingsAt<XtDualBlock>(b, 1, 7,|settingsAt<XtDualBlock>(b, 2, 7,|vc2cosmadapters
+dual-second-at|settingsAt<XtDualBlock>(b, 1, 7,|settingsAt<XtDualBlock>(b, 1, 6,|vc2cosmadapters
+dual-fields-1|{ &XtDualBlock::cut1, &XtDualBlock::env1,|{ &XtDualBlock::env1, &XtDualBlock::cut1,|vc2cosmadapters
+dual-lfo-1|&XtDualBlock::lfo1, 4 }|&XtDualBlock::lfo1, 3 }|vc2cosmadapters
+dual-fields-2|{ &XtDualBlock::cut2, &XtDualBlock::env2,|{ &XtDualBlock::env2, &XtDualBlock::cut2,|vc2cosmadapters
+dual-lfo-2|&XtDualBlock::lfo2, 4 }|&XtDualBlock::lfo2, 3 }|vc2cosmadapters
+dual-q1|x.q1 = blockFloat(b, 3);|x.q1 = blockFloat(b, 9);|vc2cosmadapters
+dual-q2|x.q2 = blockFloat(b, 9);|x.q2 = blockFloat(b, 3);|vc2cosmadapters
+dual-value-1|{ &XtCosmDual::c1, &XtCosmDual::c2 }|{ &XtCosmDual::c2, &XtCosmDual::c2 }|vc2cosmadapters
+dual-value-2|{ &XtCosmDual::c1, &XtCosmDual::c2 }|{ &XtCosmDual::c1, &XtCosmDual::c1 }|vc2cosmadapters
+dual-target-1|{ &XtCosmDual::target1, &XtCosmDual::target2 }|{ &XtCosmDual::target2, &XtCosmDual::target2 }|vc2cosmadapters
+dual-target-2|{ &XtCosmDual::target1, &XtCosmDual::target2 }|{ &XtCosmDual::target1, &XtCosmDual::target1 }|vc2cosmadapters
+dual-copy-len|blockWords<XtCosmDual, 0x34>|blockWords<XtCosmDual, 0x30>|vc2cosmadapters
+case-dual-q1-from|{ { 0x20, kCased + 4 },|{ { 0x1c, kCased + 4 },|vc2cosmadapters
+case-dual-q1-to|{ { 0x20, kCased + 4 },|{ { 0x20, kCased + 8 },|vc2cosmadapters
+case-dual-q2-from|{ 0x38, kCased + 8 } };\nconstexpr Vc2CosmCaseCopy kDtvfCase|{ 0x34, kCased + 8 } };\nconstexpr Vc2CosmCaseCopy kDtvfCase|vc2cosmadapters
+case-dual-q2-to|{ 0x38, kCased + 8 } };\nconstexpr Vc2CosmCaseCopy kDtvfCase|{ 0x38, kCased + 4 } };\nconstexpr Vc2CosmCaseCopy kDtvfCase|vc2cosmadapters
+row-dual-start|{ kDual, valueStartValues<kDualType>, valueNewBlock<kDualType>, copyCase<kDualCase> }|{ kDual, nullptr, valueNewBlock<kDualType>, copyCase<kDualCase> }|vc2cosmadapters
+row-dual-block|{ kDual, valueStartValues<kDualType>, valueNewBlock<kDualType>, copyCase<kDualCase> }|{ kDual, valueStartValues<kDualType>, nullptr, copyCase<kDualCase> }|vc2cosmadapters
+row-dual-case|{ kDual, valueStartValues<kDualType>, valueNewBlock<kDualType>, copyCase<kDualCase> }|{ kDual, valueStartValues<kDualType>, valueNewBlock<kDualType>, nullptr }|vc2cosmadapters
+row-tvf-start|{ kTvf, valueStartValues<kTvfType>, valueNewBlock<kTvfType>, nullptr }|{ kTvf, nullptr, valueNewBlock<kTvfType>, nullptr }|vc2cosmadapters
+row-tvf-block|{ kTvf, valueStartValues<kTvfType>, valueNewBlock<kTvfType>, nullptr }|{ kTvf, valueStartValues<kTvfType>, nullptr, nullptr }|vc2cosmadapters
+row-dtvf-start|{ kDtvf, valueStartValues<kDtvfType>, valueNewBlock<kDtvfType>, copyCase<kDtvfCase> }|{ kDtvf, nullptr, valueNewBlock<kDtvfType>, copyCase<kDtvfCase> }|vc2cosmadapters
+row-dtvf-block|{ kDtvf, valueStartValues<kDtvfType>, valueNewBlock<kDtvfType>, copyCase<kDtvfCase> }|{ kDtvf, valueStartValues<kDtvfType>, nullptr, copyCase<kDtvfCase> }|vc2cosmadapters
+row-dtvf-case|{ kDtvf, valueStartValues<kDtvfType>, valueNewBlock<kDtvfType>, copyCase<kDtvfCase> }|{ kDtvf, valueStartValues<kDtvfType>, valueNewBlock<kDtvfType>, nullptr }|vc2cosmadapters
+row-tb-block|{ kTb, nullptr, vc2CosmTbNewBlock, vc2CosmTbNoteOnCase }|{ kTb, nullptr, nullptr, vc2CosmTbNoteOnCase }|vc2cosmadapters
+row-tb-case|{ kTb, nullptr, vc2CosmTbNewBlock, vc2CosmTbNoteOnCase }|{ kTb, nullptr, vc2CosmTbNewBlock, nullptr }|vc2cosmadapters
+tb-word-gain|{ 0, &XtTbBlock::gain }|{ 1, &XtTbBlock::gain }|vc2cosmtb
+tb-word-lcut|{ 1, &XtTbBlock::lcut }|{ 2, &XtTbBlock::lcut }|vc2cosmtb
+tb-word-lkf|{ 2, &XtTbBlock::lkf }|{ 3, &XtTbBlock::lkf }|vc2cosmtb
+tb-word-q|{ 3, &XtTbBlock::q }|{ 4, &XtTbBlock::q }|vc2cosmtb
+tb-word-qf|{ 4, &XtTbBlock::qf }|{ 5, &XtTbBlock::qf }|vc2cosmtb
+tb-word-hcut|{ 5, &XtTbBlock::hcut }|{ 6, &XtTbBlock::hcut }|vc2cosmtb
+tb-word-hkf|{ 6, &XtTbBlock::hkf }|{ 5, &XtTbBlock::hkf }|vc2cosmtb
+tb-word-lenv|{ 7, &XtTbBlock::lenv }|{ 8, &XtTbBlock::lenv }|vc2cosmtb
+tb-word-llfo|{ 9, &XtTbBlock::llfo }|{ 10, &XtTbBlock::llfo }|vc2cosmtb
+tb-word-henv|{ 11, &XtTbBlock::henv }|{ 12, &XtTbBlock::henv }|vc2cosmtb
+tb-word-hlfo|{ 13, &XtTbBlock::hlfo }|{ 14, &XtTbBlock::hlfo }|vc2cosmtb
+tb-block-key|kTbKey = 15|kTbKey = 14|vc2cosmtb
+tb-lpf-count|std::copy_n(seven, 4, lpf);|std::copy_n(seven, 3, lpf);|vc2cosmtb
+tb-hpf-from|std::copy_n(seven + 4, 3, hpf);|std::copy_n(seven + 3, 3, hpf);|vc2cosmtb
+tb-hpf-count|std::copy_n(seven + 4, 3, hpf);|std::copy_n(seven + 4, 2, hpf);|vc2cosmtb
+tb-copy-len|std::copy_n(b.words, w.block.size(), w.block.begin());|std::copy_n(b.words, w.block.size() - 1, w.block.begin());|vc2cosmtb
+tb-block-held|tb.setBlock(tbBlockOf(w.block), w.held[0], w.held[2], w.held[1], w.held[3]);|tb.setBlock(tbBlockOf(w.block), w.held[0], w.held[1], w.held[2], w.held[3]);|vc2cosmtb
+tb-case-held|tb.noteOn(tbBlockOf(w.block), w.held[0], w.held[2], w.held[1], w.held[3]);|tb.noteOn(tbBlockOf(w.block), w.held[0], w.held[1], w.held[2], w.held[3]);|vc2cosmtb
+tb-targets|lpfAndHpf(w.lpfTarget, w.hpfTarget, tb.target());|lpfAndHpf(w.lpfTarget, w.hpfTarget, tb.coef());|vc2cosmtb
+tb-targets-lpf-at|lpfAndHpf(w.lpfTarget, w.hpfTarget,|lpfAndHpf(w.lpfState, w.hpfTarget,|vc2cosmtb
+tb-coefs|lpfAndHpf(w.lpf, w.hpf, tb.coef());|lpfAndHpf(w.lpf, w.hpf, tb.target());|vc2cosmtb
+tb-coefs-lpf-at|lpfAndHpf(w.lpf, w.hpf,|lpfAndHpf(w.lpfTarget, w.hpf,|vc2cosmtb
+tb-clear-lpf|std::ranges::fill(w.lpfState, 0.0f);|std::ranges::fill(w.lpfState, 1.0f);|vc2cosmtb
+tb-clear-hpf|std::ranges::fill(w.hpfState, 0.0f);|std::ranges::fill(w.hpfState, 1.0f);|vc2cosmtb
+tb-block-back|tb.target());\n    o = std::bit_cast<Vc2CosmObjectWords>(w);|tb.target());|vc2cosmtb
+tb-case-back|w.hpfState, 0.0f);\n    o = std::bit_cast<Vc2CosmObjectWords>(w);|w.hpfState, 0.0f);|vc2cosmtb
+xt-dual-start-1|cur1 = xtTvfCutoff(b.cut1, b.env1, env1Start, b.lfo1, lfo1, b.q1);|cur1 = xtTvfCutoff(b.cut1, b.env1, env1Start, b.lfo1, lfo1, b.q2);|vc2xtcosm
+xt-dual-start-2|cur2 = xtTvfCutoff(b.cut2, b.env2, env2Start, b.lfo2, lfo2, b.q2);|cur2 = xtTvfCutoff(b.cut2, b.env2, env2Start, b.lfo2, lfo2, b.q1);|vc2xtcosm
+xt-dual-target-1|tgt1 = xtTvfCutoff(blk.cut1, blk.env1, env1, blk.lfo1, lfo1, blk.q1);|tgt1 = xtTvfCutoff(blk.cut1, blk.env1, env1, blk.lfo1, lfo1, blk.q2);|vc2xtcosm
+xt-dual-target-2|tgt2 = xtTvfCutoff(blk.cut2, blk.env2, env2, blk.lfo2, lfo2, blk.q2);|tgt2 = xtTvfCutoff(blk.cut2, blk.env2, env2, blk.lfo2, lfo2, blk.q1);|vc2xtcosm
+xt-dtvf-raw-q|tgt1 = fmac(blk.qLfo, qLfo, fmac(blk.qEnv, qEnv, blk.q));|tgt1 = fmac(blk.qLfo, qEnv, fmac(blk.qEnv, qLfo, blk.q));|vc2xtcosm
+xt-dtvf-raw-cutoff|tgt2 = fmac(blk.cutoffLfo, cutLfo, fmac(blk.cutoffEnv, cutEnv, blk.cutoff));|tgt2 = fmac(blk.cutoffLfo, cutEnv, fmac(blk.cutoffEnv, cutLfo, blk.cutoff));|vc2xtcosm
+xt-tvf-q-cap|if (x > -0.015625f) x = -0.015625f;|if (x > -0.03125f) x = -0.03125f;|vc2xtcosm
+xt-tvf-coef-cap|return c > cap ? cap : c;|return c;|vc2xtcosm
+xt-tb-fc|float fc = mul(mul(e, e), 278.0f);|float fc = mul(mul(e, e), 279.0f);|vc2xtcosm
+xt-tb-m|m = add(m, K(0x3f25acee));|m = add(m, 0.6f);|vc2xtcosm
+xt-tb-oct|div(add(flt(blk.key), -60.0f), 24.0f)|div(add(flt(blk.key), -59.0f), 24.0f)|vc2xtcosm
+xt-tb-fc-scale|if (fc > 20000.0f) { fc = 20000.0f; scale = true; }|if (fc > 20000.0f) { fc = 20000.0f; scale = false; }|vc2xtcosm
+xt-tb-hpf|y = mul(y, 13.0f);|y = mul(y, 12.0f);|vc2xtcosm
+xt-tb-gain|t[6] = mul(blk.gain, k01);|t[6] = blk.gain;|vc2xtcosm
+xt-tb-coef|c[i] = div(t[i], K(0x3c23d709));|c[i] = mul(t[i], 100.0f);|vc2xtcosm
+acomp-words-at|kCompWords = 0x14|kCompWords = 0x18|vc2cosmbuffered
+acomp-slews-at|kCompSlews = 0xe4|kCompSlews = 0xe8|vc2cosmbuffered
+acomp-left-at|kCompLeft = 0xf0|kCompLeft = 0xf4|vc2cosmbuffered
+acomp-right-at|kCompRight = 0x124|kCompRight = 0x128|vc2cosmbuffered
+acomp-attack|{ 0, &XtCompBlock::attack }|{ 1, &XtCompBlock::attack }|vc2cosmbuffered
+acomp-sustain|{ 1, &XtCompBlock::sustain }|{ 2, &XtCompBlock::sustain }|vc2cosmbuffered
+acomp-gain|{ 2, &XtCompBlock::gain }|{ 1, &XtCompBlock::gain }|vc2cosmbuffered
+acomp-words-count|floatsInto(o, kCompWords, comp.slews(), 3);|floatsInto(o, kCompWords, comp.slews(), 2);|vc2cosmbuffered
+acomp-slews-count|floatsInto(o, kCompSlews, comp.slews(), 3);|floatsInto(o, kCompSlews, comp.slews(), 2);|vc2cosmbuffered
+acomp-side-target|{ comp.gainTarget(ch), comp.gain(ch), comp.envelope(ch) }|{ comp.envelope(ch), comp.gain(ch), comp.envelope(ch) }|vc2cosmbuffered
+acomp-side-gain|{ comp.gainTarget(ch), comp.gain(ch), comp.envelope(ch) }|{ comp.gainTarget(ch), comp.envelope(ch), comp.envelope(ch) }|vc2cosmbuffered
+acomp-side-env|{ comp.gainTarget(ch), comp.gain(ch), comp.envelope(ch) }|{ comp.gainTarget(ch), comp.gain(ch), comp.gain(ch) }|vc2cosmbuffered
+acomp-side-right|ch == 0 ? kCompLeft : kCompRight|ch == 0 ? kCompLeft : kCompLeft|vc2cosmbuffered
+acomp-channels|for (int ch = 0; ch < 2; ++ch) {|for (int ch = 0; ch < 1; ++ch) {|vc2cosmbuffered
+alim-rates-at|kLimRates = 0x18|kLimRates = 0x1c|vc2cosmbuffered
+alim-gain-at|kLimGain = 0x24|kLimGain = 0x20|vc2cosmbuffered
+alim-slope-at|kLimSlope = 0xe4|kLimSlope = 0xe8|vc2cosmbuffered
+alim-slewgain-at|kLimSlewGain = 0xf8|kLimSlewGain = 0xfc|vc2cosmbuffered
+alim-slews-at|kLimSlews = 0x124|kLimSlews = 0x128|vc2cosmbuffered
+alim-gains-at|kLimGains = 0xe8|kLimGains = 0xec|vc2cosmbuffered
+alim-threshold|{ 1, &XtLimBlock::threshold }|{ 2, &XtLimBlock::threshold }|vc2cosmbuffered
+alim-attack|{ 2, &XtLimBlock::attack }|{ 3, &XtLimBlock::attack }|vc2cosmbuffered
+alim-release|{ 3, &XtLimBlock::release }|{ 4, &XtLimBlock::release }|vc2cosmbuffered
+alim-gain|{ 4, &XtLimBlock::gain }|{ 3, &XtLimBlock::gain }|vc2cosmbuffered
+alim-ratio|x.ratio = static_cast<int8_t>(b.words[0]);|x.ratio = 0;|vc2cosmbuffered
+alim-variant|    o.variant = static_cast<uint8_t>(b.words[0]);\n    floatsInto(o, kLimRates|    floatsInto(o, kLimRates|vc2cosmbuffered
+alim-rates-count|floatsInto(o, kLimRates, lim.slews(), 3);|floatsInto(o, kLimRates, lim.slews(), 2);|vc2cosmbuffered
+alim-slews-count|floatsInto(o, kLimSlews, lim.slews(), 3);|floatsInto(o, kLimSlews, lim.slews(), 2);|vc2cosmbuffered
+alim-gain-word|floatsInto(o, kLimGain, lim.slews() + 3, 1);|floatsInto(o, kLimGain, lim.slews() + 2, 1);|vc2cosmbuffered
+alim-slewgain-word|floatsInto(o, kLimSlewGain, lim.slews() + 3, 1);|floatsInto(o, kLimSlewGain, lim.slews() + 2, 1);|vc2cosmbuffered
+alim-slope|const float slope = lim.slope();|const float slope = lim.slews()[0];|vc2cosmbuffered
+alim-case-count|floatsInto(o, kLimGains, gains.data(), gains.size());|floatsInto(o, kLimGains, gains.data(), 3);|vc2cosmbuffered
+afs-depth|{ 0, &XtFsBlock::depth }|{ 1, &XtFsBlock::depth }|vc2cosmbuffered
+afs-depth-env|{ 1, &XtFsBlock::depthEnv }|{ 2, &XtFsBlock::depthEnv }|vc2cosmbuffered
+afs-depth-lfo|{ 3, &XtFsBlock::depthLfo }|{ 4, &XtFsBlock::depthLfo }|vc2cosmbuffered
+afs-balance|{ 5, &XtFsBlock::balance }|{ 6, &XtFsBlock::balance }|vc2cosmbuffered
+afs-balance-env|{ 6, &XtFsBlock::balanceEnv }|{ 7, &XtFsBlock::balanceEnv }|vc2cosmbuffered
+afs-balance-lfo|{ 8, &XtFsBlock::balanceLfo }|{ 9, &XtFsBlock::balanceLfo }|vc2cosmbuffered
+afs-start-env-a|kFsFloats), s.envA, s.envA,|kFsFloats), s.envB, s.envA,|vc2cosmbuffered
+afs-start-lfo-a|s.envA, 0.0f, s.lfoA, s.envB, s.envB|s.envA, 0.0f, s.lfoB, s.envB, s.envB|vc2cosmbuffered
+afs-start-env-b|s.lfoA, s.envB, s.envB|s.lfoA, s.envA, s.envB|vc2cosmbuffered
+afs-start-lfo-b|s.envB, s.envB, 0.0f, s.lfoB);|s.envB, s.envB, 0.0f, s.lfoA);|vc2cosmbuffered
+afs-value-depth|o.values[0] = fs.depth();|o.values[0] = fs.balance();|vc2cosmbuffered
+afs-value-balance|o.values[1] = fs.balance();|o.values[1] = fs.depth();|vc2cosmbuffered
+afs-held|h.envA, h.lfoA, h.envB, h.lfoB);|h.envA, h.envB, h.lfoA, h.lfoB);|vc2cosmbuffered
+afs-copy-len|kFsBytes = 0x28|kFsBytes = 0x24|vc2cosmbuffered
+afs-copy-from|copyBlock(o, b, 4, kFsBytes);|copyBlock(o, b, 8, kFsBytes - 4);|vc2cosmbuffered
+afs-phase-at|kFsPhase = 0xec|kFsPhase = 0xe8|vc2cosmbuffered
+afs-phase|const float cleared = 0.0f;|const float cleared = 1.0f;|vc2cosmbuffered
+adapt-code-comp|kComp = 15|kComp = 28|vc2cosmadapters
+adapt-code-lim|kLim = 16|kLim = 29|vc2cosmadapters
+adapt-code-fs|kFs = 18|kFs = 30|vc2cosmadapters
+row-comp-block|{ kComp, nullptr, vc2CosmCompNewBlock, vc2CosmCompNoteOnCase }|{ kComp, nullptr, nullptr, vc2CosmCompNoteOnCase }|vc2cosmadapters
+row-comp-case|{ kComp, nullptr, vc2CosmCompNewBlock, vc2CosmCompNoteOnCase }|{ kComp, nullptr, vc2CosmCompNewBlock, nullptr }|vc2cosmadapters
+row-lim-block|{ kLim, nullptr, vc2CosmLimNewBlock, vc2CosmLimNoteOnCase }|{ kLim, nullptr, nullptr, vc2CosmLimNoteOnCase }|vc2cosmadapters
+row-lim-case|{ kLim, nullptr, vc2CosmLimNewBlock, vc2CosmLimNoteOnCase }|{ kLim, nullptr, vc2CosmLimNewBlock, nullptr }|vc2cosmadapters
+row-fs-start|{ kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase }|{ kFs, nullptr, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase }|vc2cosmadapters
+row-fs-block|{ kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase }|{ kFs, vc2CosmFsStartValues, nullptr, vc2CosmFsNoteOnCase }|vc2cosmadapters
+row-fs-case|{ kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase }|{ kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, nullptr }|vc2cosmadapters
+alloc-last-buffered|kBufferedLast = 11|kBufferedLast = 10|vc2cosmnoteon
+xt-comp-factor|fac = fmac(sub(1.0f, b.attack), K(0x3d8f5c29), K(0x3f83d709));|fac = fmac(b.attack, K(0x3d8f5c29), K(0x3f83d709));|vc2xtcosm
+xt-comp-start|add(fac, K(0x49800000))), sub(1.0f, sus));|add(fac, K(0x49800000))), sus);|vc2xtcosm
+xt-comp-env|env[0] = env[1] = fac;|env[0] = env[1] = sus;|vc2xtcosm
+xt-lim-slope|slp = T.limSlope[b.ratio & 3];|slp = T.limSlope[0];|vc2xtcosm
+xt-lim-threshold|thr = fmac(b.threshold, K(0x4d800000), K(0x49800000));|thr = fmac(b.threshold, K(0x4d000000), K(0x49800000));|vc2xtcosm
+xt-lim-attack|att = fmac(sub(1.0f, b.attack), K(0x2e5be6ff), K(0x2cafebfe));|att = fmac(b.attack, K(0x2e5be6ff), K(0x2cafebfe));|vc2xtcosm
+xt-lim-release|rel = fmac(sub(1.0f, b.release), K(0x2e5be6ff), K(0x29e12e13));|rel = fmac(b.release, K(0x2e5be6ff), K(0x29e12e13));|vc2xtcosm
+xt-lim-start|g[0] = s[0] = g[1] = s[1] = 1.0f;|g[0] = s[0] = g[1] = s[1] = 0.5f;|vc2xtcosm
+xt-fs-depth|return fmac(d, K(0x3c4e703b), K(0x3a83126e));|return fmac(d, K(0x3c4e703b), 0.0f);|vc2xtcosm
+xt-fs-depth-floor|fmac(blk.depthEnv, env, blk.depth)), 0.0f, 1.0f);|fmac(blk.depthEnv, env, blk.depth)), 0.1f, 1.0f);|vc2xtcosm
+afs-target-depth|&XtCosmFs::depthTarget, &XtCosmFs::balanceTarget|&XtCosmFs::balanceTarget, &XtCosmFs::balanceTarget|vc2cosmbuffered
+afs-target-balance|&XtCosmFs::depthTarget, &XtCosmFs::balanceTarget|&XtCosmFs::depthTarget, &XtCosmFs::depthTarget|vc2cosmbuffered
+targets-first|o.targets[0] = (cosm.*first)();|o.targets[0] = (cosm.*second)();|vc2cosmbuffered
+targets-second|o.targets[1] = (cosm.*second)();|o.targets[1] = (cosm.*first)();|vc2cosmbuffered
+asbf-code|constexpr int32_t kSbf2 = 8;|constexpr int32_t kSbf2 = 9;|vc2cosmbuffered
+adapt-code-sbf1|kSbf1 = 7, kSbf2|kSbf1 = 31, kSbf2|vc2cosmadapters
+adapt-code-sbf2|kSbf2 = 8, kComp|kSbf2 = 32, kComp|vc2cosmadapters
+row-sbf1-start|{ kSbf1, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase }|{ kSbf1, nullptr, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase }|vc2cosmadapters
+row-sbf1-block|{ kSbf1, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase }|{ kSbf1, vc2CosmSbfStartValues, nullptr, vc2CosmSbfNoteOnCase }|vc2cosmadapters
+row-sbf1-case|{ kSbf1, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase }|{ kSbf1, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, nullptr }|vc2cosmadapters
+row-sbf2-start|{ kSbf2, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase }|{ kSbf2, nullptr, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase }|vc2cosmadapters
+row-sbf2-block|{ kSbf2, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase }|{ kSbf2, vc2CosmSbfStartValues, nullptr, vc2CosmSbfNoteOnCase }|vc2cosmadapters
+row-sbf2-case|{ kSbf2, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase }|{ kSbf2, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, nullptr }|vc2cosmadapters
+asbf1-word-detune|{ 1, &XtSbfBlock::detune }|{ 2, &XtSbfBlock::detune }|vc2cosmbuffered
+asbf1-word-detuneenv|{ 2, &XtSbfBlock::detuneEnv }|{ 3, &XtSbfBlock::detuneEnv }|vc2cosmbuffered
+asbf1-word-detunelfo|{ 4, &XtSbfBlock::detuneLfo }|{ 5, &XtSbfBlock::detuneLfo }|vc2cosmbuffered
+asbf1-word-detuneown|{ 6, &XtSbfBlock::detuneOwn }|{ 5, &XtSbfBlock::detuneOwn }|vc2cosmbuffered
+asbf1-word-width|{ 7, &XtSbfBlock::width }|{ 8, &XtSbfBlock::width }|vc2cosmbuffered
+asbf1-word-widthenv|{ 8, &XtSbfBlock::widthEnv }|{ 9, &XtSbfBlock::widthEnv }|vc2cosmbuffered
+asbf1-word-widthlfo|{ 10, &XtSbfBlock::widthLfo }|{ 11, &XtSbfBlock::widthLfo }|vc2cosmbuffered
+asbf1-word-widthown|{ 12, &XtSbfBlock::widthOwn }|{ 11, &XtSbfBlock::widthOwn }|vc2cosmbuffered
+asbf1-word-hpf|{ 13, &XtSbfBlock::hpf }|{ 12, &XtSbfBlock::hpf }|vc2cosmbuffered
+asbf1-word-subdetune|{ 15, &XtSbfBlock::subDetune }|{ 16, &XtSbfBlock::subDetune }|vc2cosmbuffered
+asbf2-word-q|{ 1, &XtSbfBlock::q }|{ 2, &XtSbfBlock::q }|vc2cosmbuffered
+asbf2-word-detune|{ 2, &XtSbfBlock::detune }|{ 3, &XtSbfBlock::detune }|vc2cosmbuffered
+asbf2-word-detuneenv|{ 3, &XtSbfBlock::detuneEnv }|{ 4, &XtSbfBlock::detuneEnv }|vc2cosmbuffered
+asbf2-word-detunelfo|{ 5, &XtSbfBlock::detuneLfo }|{ 6, &XtSbfBlock::detuneLfo }|vc2cosmbuffered
+asbf2-word-detuneown|{ 7, &XtSbfBlock::detuneOwn }|{ 6, &XtSbfBlock::detuneOwn }|vc2cosmbuffered
+asbf2-word-width|{ 8, &XtSbfBlock::width }|{ 9, &XtSbfBlock::width }|vc2cosmbuffered
+asbf2-word-widthenv|{ 9, &XtSbfBlock::widthEnv }|{ 10, &XtSbfBlock::widthEnv }|vc2cosmbuffered
+asbf2-word-widthlfo|{ 11, &XtSbfBlock::widthLfo }|{ 12, &XtSbfBlock::widthLfo }|vc2cosmbuffered
+asbf2-word-widthown|{ 13, &XtSbfBlock::widthOwn }|{ 12, &XtSbfBlock::widthOwn }|vc2cosmbuffered
+asbf1-word-lpf|{ 14, &XtSbfBlock::lpf },|{ 13, &XtSbfBlock::lpf },|vc2cosmbuffered
+asbf2-word-lpf|{ 14, &XtSbfBlock::lpf } } };|{ 13, &XtSbfBlock::lpf } } };|vc2cosmbuffered
+asbf-second|x.second = second;|x.second = false;|vc2cosmbuffered
+asbf-octave|x.octave = static_cast<int8_t>(b.words[0]);|x.octave = 0;|vc2cosmbuffered
+asbf-floats|second ? floatsOf(b, kSbf2Floats) : floatsOf(b, kSbf1Floats)|second ? floatsOf(b, kSbf1Floats) : floatsOf(b, kSbf2Floats)|vc2cosmbuffered
+asbf-start-env-a|o.setUp.other, s.envA, h.envA,|o.setUp.other, s.envB, h.envA,|vc2cosmbuffered
+asbf-start-lfo-a|0.0f, s.lfoA, s.envB, h.envB,|0.0f, s.lfoB, s.envB, h.envB,|vc2cosmbuffered
+asbf-start-env-b|s.lfoA, s.envB, h.envB,|s.lfoA, s.envA, h.envB,|vc2cosmbuffered
+asbf-out-env-b|s.envB, h.envB, 0.0f, s.lfoB);|s.envB, s.envB, 0.0f, s.lfoB);|vc2cosmbuffered
+asbf-start-lfo-b|h.envB, 0.0f, s.lfoB);|h.envB, 0.0f, s.lfoA);|vc2cosmbuffered
+asbf-root|sbfBlockOf(b), o.setUp.pitch, o.setUp.other,|sbfBlockOf(b), o.setUp.pitch, o.setUp.pitch,|vc2cosmbuffered
+asbf-value-delay|o.values[0] = sbf.delay();|o.values[0] = sbf.width();|vc2cosmbuffered
+asbf-value-width|o.values[1] = sbf.width();|o.values[1] = sbf.delay();|vc2cosmbuffered
+asbf-target-detune|&XtCosmSbf::detuneTarget, &XtCosmSbf::widthTarget|&XtCosmSbf::widthTarget, &XtCosmSbf::widthTarget|vc2cosmbuffered
+asbf-target-width|&XtCosmSbf::detuneTarget, &XtCosmSbf::widthTarget|&XtCosmSbf::detuneTarget, &XtCosmSbf::detuneTarget|vc2cosmbuffered
+asbf-variant|    o.variant = static_cast<uint8_t>(b.words[0]);\n    floatInto(o, kSbfOctave|    floatInto(o, kSbfOctave|vc2cosmbuffered
+asbf-block-octave|    floatInto(o, kSbfOctave, sbf.octaveFactor());\n    if (x.second) {|    if (x.second) {|vc2cosmbuffered
+asbf-which|if (x.second) {|if (!x.second) {|vc2cosmbuffered
+asbf2-q-copy|copyBlock(o, b, 8, 4);|copyBlock(o, b, 8, 3);|vc2cosmbuffered
+asbf2-detune-at|kSbf2Detune = 0x1c|kSbf2Detune = 0x18|vc2cosmbuffered
+asbf2-detune|floatInto(o, kSbf2Detune, sbf.detuneRatio());|floatInto(o, kSbf2Detune, sbf.octaveFactor());|vc2cosmbuffered
+asbf2-copy|copyBlock(o, b, 0x10, 0x34);|copyBlock(o, b, 0x10, 0x30);|vc2cosmbuffered
+asbf1-detune-at|kSbf1Detune = 0x18|kSbf1Detune = 0x1c|vc2cosmbuffered
+asbf1-detune|floatInto(o, kSbf1Detune, sbf.detuneRatio());|floatInto(o, kSbf1Detune, sbf.subRatio());|vc2cosmbuffered
+asbf1-copy|copyBlock(o, b, 0xc, 0x2c);|copyBlock(o, b, 0xc, 0x28);|vc2cosmbuffered
+asbf1-hpf-at|kSbf1Hpf = 0x48|kSbf1Hpf = 0x44|vc2cosmbuffered
+asbf1-hpf|floatInto(o, kSbf1Hpf, sbf.hpfHalf());|floatInto(o, kSbf1Hpf, sbf.subRatio());|vc2cosmbuffered
+asbf1-lpf-copy|copyBlock(o, b, 0x3c, 4);|copyBlock(o, b, 0x3c, 3);|vc2cosmbuffered
+asbf1-sub-at|kSbf1Sub = 0x50|kSbf1Sub = 0x54|vc2cosmbuffered
+asbf1-sub|floatInto(o, kSbf1Sub, sbf.subRatio());|floatInto(o, kSbf1Sub, sbf.hpfHalf());|vc2cosmbuffered
+asbf1-one-copy|copyBlock(o, b, 0x44, 4);|copyBlock(o, b, 0x44, 3);|vc2cosmbuffered
+asbf-gain-at|kSbfGain = 0xe4|kSbfGain = 0xe8|vc2cosmbuffered
+asbf-gain|floatInto(o, kSbfGain, sbf.gain());|floatInto(o, kSbfGain, sbf.level());|vc2cosmbuffered
+asbf-slews-at|kSbfSlews = 0xe8|kSbfSlews = 0xec|vc2cosmbuffered
+asbf-slews-count|floatsInto(o, kSbfSlews, sbf.slews(), 2);|floatsInto(o, kSbfSlews, sbf.slews(), 1);|vc2cosmbuffered
+asbf-third-at|kSbfThird = 0xf0|kSbfThird = 0xf8|vc2cosmbuffered
+asbf-third|second ? sbf.level() : sbf.slews()[2]|second ? sbf.slews()[2] : sbf.level()|vc2cosmbuffered
+asbf-octave-at|kSbfOctave = 0xf4|kSbfOctave = 0xf0|vc2cosmbuffered
+asbf1-level-at|kSbf1Level = 0xf8|kSbf1Level = 0xfc|vc2cosmbuffered
+asbf-own-at|kSbfOwn = 0x124|kSbfOwn = 0x128|vc2cosmbuffered
+asbf-own-from|floatsInto(o, kSbfOwn, sbf.slews() + 3, 2);|floatsInto(o, kSbfOwn, sbf.slews() + 2, 2);|vc2cosmbuffered
+asbf-own-count|floatsInto(o, kSbfOwn, sbf.slews() + 3, 2);|floatsInto(o, kSbfOwn, sbf.slews() + 3, 1);|vc2cosmbuffered
+asbf-delay-at|kSbfDelay = 0x130|kSbfDelay = 0x12c|vc2cosmbuffered
+asbf-delay|floatInto(o, kSbfDelay, sbf.newDelay());|floatInto(o, kSbfDelay, sbf.width());|vc2cosmbuffered
+asbf-fraction-at|kSbfFraction = 0x134|kSbfFraction = 0x138|vc2cosmbuffered
+asbf-fraction|floatInto(o, kSbfFraction, sbf.fractions()[0]);|floatInto(o, kSbfFraction, sbf.width());|vc2cosmbuffered
+asbf1-fraction-at|kSbf1Fraction = 0x138|kSbf1Fraction = 0x13c|vc2cosmbuffered
+asbf1-fraction|floatInto(o, kSbf1Fraction, sbf.fractions()[1]);|floatInto(o, kSbf1Fraction, sbf.fractions()[0]);|vc2cosmbuffered
+asbf-progress-at|kSbfProgress = 0x13c|kSbfProgress = 0x138|vc2cosmbuffered
+asbf-progress|floatInto(o, kSbfProgress, sbf.progress());|floatInto(o, kSbfProgress, sbf.level());|vc2cosmbuffered
+asbf-dc-left-at|kSbfDcLeft = 0x90|kSbfDcLeft = 0x94|vc2cosmbuffered
+asbf-dc-right-at|kSbfDcRight = 0xc8|kSbfDcRight = 0xcc|vc2cosmbuffered
+asbf-dc-left|floatInto(o, kSbfDcLeft, sbf.dcRate());|floatInto(o, kSbfDcLeft, sbf.level());|vc2cosmbuffered
+asbf-dc-right|floatInto(o, kSbfDcRight, sbf.dcRate());|floatInto(o, kSbfDcRight, sbf.level());|vc2cosmbuffered
+asbf-first-only|    if (second) return;\n||vc2cosmbuffered
+xt-sbf-detune|detR = sub(1.0f, mul(b.detune, K(0x39da7419)));|detR = add(1.0f, mul(b.detune, K(0x39da7419)));|vc2xtcosm
+xt-sbf-sub|subR = sub(1.0f, mul(b.subDetune, K(0x39da7419)));|subR = add(1.0f, mul(b.subDetune, K(0x39da7419)));|vc2xtcosm
+xt-sbf-hpf|hpfH = mul(b.hpf, 0.5f);|hpfH = mul(b.hpf, 0.25f);|vc2xtcosm
+xt-sbf-oct|oct = T.oct[clampi(b.octave, 0, 4)];|oct = T.oct[0];|vc2xtcosm
+xt-sbf-detune-target|detT = fmac(b.detuneLfo, lfo1, fmac(b.detuneEnv, env1, detR));|detT = fmac(b.detuneLfo, env1, fmac(b.detuneEnv, lfo1, detR));|vc2xtcosm
+xt-sbf-width-target|widT = fmac(b.widthLfo, lfo2, fmac(b.widthEnv, env2, b.width));|widT = fmac(b.widthLfo, env2, fmac(b.widthEnv, lfo2, b.width));|vc2xtcosm
+xt-sbf-second-top|b.second ? K(0x3f733333) : 1.0f|b.second ? 1.0f : 1.0f|vc2xtcosm
+xt-sbf-delay-top|dly = clampf(div(d, mul(root, pitch)), 0.0f, 3267.0f);|dly = clampf(div(d, mul(root, pitch)), 0.0f, 100.0f);|vc2xtcosm
+xt-sbf-gain|gn = fmac(widT, widT, sub(2.0f,|gn = fmac(widT, widT, sub(1.0f,|vc2xtcosm
+xt-sbf-dc|sl[2]));\n    prog = 1.0f;\n    dcK = K(0x3acb4aec);|sl[2]));\n    prog = 1.0f;\n    dcK = K(0x3acb4aed);|vc2xtcosm
+xt-sbf-fraction|fr[0] = fracOf(dly);|fr[0] = dly;|vc2xtcosm
 rowof-adapters|std::span<const Vc2CosmTypeRow>(kRows), vc2CosmAdapterRows() }|std::span<const Vc2CosmTypeRow>(kRows) }|vc2cosmnoteon

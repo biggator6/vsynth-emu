@@ -130,8 +130,8 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2MatrixSetup.cpp ] && echo Vc2MatrixSetup.cpp Vc2MatrixSetupCheck.cpp Vc2MatrixSetupDraws.cpp ) \
    $( [ -f Vc2CosmObject.cpp ] && echo Vc2CosmObject.cpp Vc2CosmObjectCheck.cpp ) \
    $( [ -f Vc2CosmNoteOn.cpp ] && echo Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmNoteOnCheck.cpp \
-   Vc2CosmNoteOnDraws.cpp ) $( [ -f Vc2CosmAdapters.cpp ] && echo Vc2CosmAdapters.cpp XtCosm.cpp XtOsc.cpp \
-   XtEnvelope.cpp ) \
+   Vc2CosmNoteOnDraws.cpp ) $( [ -f Vc2CosmAdapters.cpp ] && echo Vc2CosmAdapters.cpp Vc2CosmAdapterWords.cpp \
+   Vc2CosmTbAdapter.cpp Vc2CosmBufferedAdapters.cpp XtCosm.cpp XtOsc.cpp XtEnvelope.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2cosm" &
 # The pitch tracker, its frame (v223) and its analysis (v224), against rom.4's own module
 [ -f Vc2TrackerCheck.cpp ] && cc -DXT_VC2TRACKER_MAIN Vc2TrackerCheck.cpp Vc2Tracker.cpp Vc2TrackerTables.cpp \

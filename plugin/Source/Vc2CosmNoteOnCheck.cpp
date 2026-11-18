@@ -2,8 +2,9 @@
 // own address (0x89999290), set up by rom.4's static initializer (0x893ab550); an object, its block and the four bound
 // envelopes and LFOs in the interpreter's RAM, which the port's Vc2CosmBound reads too; only operator delete hooked.
 // Events: a note-on (0x893aa0e0) on the types ported (Through, the Speaker Simulator, the Growl; from v252 the
-// Resonator and the TVF, from v253 Lo-Fi, adapted over XtCosm, counted apart) and codes the
-// switches pass, the slot it takes holding noise first on both sides; a new block alone (0x893aa5d0); the destructor
+// Resonator and the TVF, from v253 Lo-Fi, from v254 OD/Dist, the Wave Shaper and the Amp Simulator with their
+// note-on cases, from v255 the Dual Filter, the Dynamic TVF and the TB Filter, adapted over XtCosm, counted apart) and
+// codes the switches pass, the slot it takes holding noise first on both sides; a new block alone (0x893aa5d0); the destructor
 // (0x893aa060); the pools set up again; the object, its block or the bound words drawn again.  After each: the
 // object, the pools, the slot's four buffers when one was taken, and the deletes, word for word.  Its draws in
 // Vc2CosmNoteOnDraws.cpp.  XT_VC2COSM_MAIN only.
@@ -16,6 +17,7 @@
 namespace {
 constexpr uint32_t kNoteOn = 0x893aa0e0, kNewBlock = 0x893aa5d0, kDestroy = 0x893aa060;   // [FW]
 constexpr uint32_t kPoolsInit = 0x893ab550, kPoolsAt = 0x89999290, kDelete = 0x89506438;   // [FW]
+constexpr uint32_t kTbInit = 0x893b98e0;   // [FW] the static initializer of the TB Filter's floats (v255)
 constexpr int kEvents = 60;
 
 struct NoteOnCounts {
@@ -143,6 +145,7 @@ void NoteOnRig::start(std::mt19937& rng) {
     vc2DrawNoteOnObject(o, rng);
     vc2DrawBound(fw.cpu, rng);
     fw.call(kPoolsInit, {});
+    fw.call(kTbInit, {});   // a fresh interpreter runs no static initializer; XtCosmTb holds these floats as constants
     pools.init();
     filled = -1;
 }

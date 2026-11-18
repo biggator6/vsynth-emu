@@ -7,6 +7,7 @@
 // does the frame alone.  xt_vc2cosm's sixth part.  HARDWARE_FIRMWARE.md, "The VC-2's COSM note-on frame".
 #include "Vc2CosmGrowl.h"
 #include "Vc2CosmPools.h"
+#include <memory>
 
 // A converter's block as the note-on and new block read it: its code, then the type's words (the object's +0x10…)
 struct Vc2CosmBlockWords {
@@ -24,19 +25,21 @@ public:
 };
 
 class Vc2CosmNoteOn;
+struct Vc2CosmBufferedScratch;
 
 // A type's parts the frame calls, any of them none: its start values (0x893a85f0's case), new block (0x893aa5d0's),
-// and its own case of the note-on
+// and its own case of the note-on, which has the block as rom.4's has (v258)
 struct Vc2CosmTypeRow {
     int32_t code;
     void (*startValues)(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
     void (*newBlock)(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
-    void (*noteOnCase)(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o);
+    void (*noteOnCase)(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
 };
 
 class Vc2CosmNoteOn {
 public:
-    Vc2CosmNoteOn(Vc2CosmPools& pools, Vc2CosmBound& bound) : pools_(pools), bound_(bound) {}
+    Vc2CosmNoteOn(Vc2CosmPools& pools, Vc2CosmBound& bound);
+    ~Vc2CosmNoteOn();
     // 0x893aa0e0: a note on the object with the converter's block, its pool COSM 1's (0) or COSM 2's (1)
     void noteOn(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b, uint32_t pool);
     // 0x893aa5d0: a new block, when its code is the object's
@@ -45,6 +48,8 @@ public:
     static const Vc2CosmTypeRow* rowOf(int32_t code);
     // What the types' start values read beyond the object (v252)
     Vc2CosmBound& bound() { return bound_; }
+    // The XtCosm objects the buffered types' laws run on (v258): made here, as their constructors allocate
+    Vc2CosmBufferedScratch& scratch() { return *scratch_; }
 
     Vc2CosmGrowl growl;   // the Growl's parts, on the object's words for each call
 
@@ -53,4 +58,5 @@ private:
     void hold(Vc2CosmObjectWords& o);       // the bound levels and rates
     Vc2CosmPools& pools_;
     Vc2CosmBound& bound_;
+    std::unique_ptr<Vc2CosmBufferedScratch> scratch_;
 };

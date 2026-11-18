@@ -345,6 +345,21 @@ The VC-2's Vari off v261 (2026-11-17, on vc2-mode after v256, 977c9db; the user'
   seeds 2024, 7 and 31337 (2,400 and 2 × 24,000 blocks). mutate_vc2.py --osc: 1,094 plants (99 new), all caught. Not in
   the sound yet.
 
+The VC-2's COSM adapters for the Side Band Filters v260 (2026-11-17, on its own branch after v258; the VC-2 session's
+  conditions; HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Side Band Filters"). XtCosmSbf moved out of XtCosm.h as
+  it stood into XtCosmSbf.h, as its own step, then five const getters for the words the new blocks and note-on cases
+  form. Vc2CosmBufferedAdapters: codes 7 and 8, so every code a converter gives has its start values, new block and
+  note-on case. 0 different at seeds 2024, 7 and 31337. mutate_vc2.py --cosm: 1,227 plants (101 new or rewritten), all
+  caught; mutate_tone.py's Side Band plants (four new, tonecosm): 6 of 6; the four under xt_cosm by hand, 4 of 4. Not in
+  the sound yet.
+
+The VC-2's COSM adapters for the Compressor, the Limiter and the Frequency Shifter v258 (2026-11-17, on its own branch
+  after v255; HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Compressor, the Limiter and the Frequency Shifter").
+  Vc2CosmBufferedAdapters: codes 15, 16 and 18 by XtCosmComp's, XtCosmLim's and XtCosmFs's laws through their getters, on
+  one object of each made with the note-on frame (Vc2CosmBufferedScratch), as those classes allocate when constructed.
+  A note-on case now gets the block. XtCosm unchanged. 0 different at seeds 2024, 7 and 31337. mutate_vc2.py --cosm:
+  1,131 plants (72 new), all caught. The Side Band Filters wait for v260. Not in the sound yet.
+
 The VC-2's analog converter's second part v256 (2026-11-17, on vc2-mode after the merge of v252 and v253, 5766f4d; the
   user's "Start v256"; HARDWARE_FIRMWARE.md, "The VC-2's analog converter's second part"): step 4.2's OSC voice. rom.4's
   0x8939cf70 from its waveform switch to its end writes the block's +0xb0…+0xf3, rom.2's analog block's words 0x30 up:
@@ -355,6 +370,24 @@ The VC-2's analog converter's second part v256 (2026-11-17, on vc2-mode after th
   +0xf4, its new draws from a generator of their own: 0 different at seeds 2024, 7 and 31337 (2,000 and 2 × 20,000
   conversions, three in four the analog's); both converter files covered whole. mutate_vc2.py --carrier: 394 plants
   (132 new), all caught. Not in the sound yet.
+
+The VC-2's COSM adapters for the Dual Filter, the Dynamic TVF and the TB Filter v255 (2026-11-17, on its own branch
+  after v254; HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Dual Filter, the Dynamic TVF and the TB Filter").
+  Vc2CosmAdapters: rows for codes 12 and 14 by XtCosmDual's and XtCosmTvf's laws, their note-on cases rom.4's copies;
+  the TVF (13) moved onto XtCosmTvf with the Dynamic TVF. Vc2CosmTbAdapter: the TB Filter (20), its new block's targets
+  and note-on case's coefficients XtCosmTb's, on a view of the object's words. Vc2CosmAdapterWords: the adapters' access
+  to rom.4's words, moved as it stood (Vc2CosmAdapters.cpp at its line limit). xt_vc2cosm runs rom.4's static
+  initializer of the TB's floats, 0x893b98e0. XtCosm unchanged. 0 different at seeds 2024, 7 and 31337.
+  mutate_vc2.py --cosm: 1,059 plants (119 new or rewritten), all caught. Not in the sound yet.
+
+The VC-2's COSM adapters for OD/Dist, the Wave Shaper and the Amp Simulator v254 (2026-11-17, on its own branch after
+  v253; HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: OD/Dist, the Wave Shaper and the Amp Simulator"). The first
+  types with note-on cases of their own. Vc2CosmAdapters: rows for codes 1, 2, 3 and 4, their start values and new
+  blocks by XtCosmOd's, XtCosmWs's and XtCosmAmp's laws on rom.4's words, their note-on cases rom.4's copies of the
+  object's words into D's (Vc2CosmCaseCopy). v253's pair template a type of one or two values, Vc2CosmValueType, each
+  through its XtCosm class's own note-on (XtCosmOd's setBlock alone refuses a DS block on a fresh object). XtCosm
+  unchanged. 0 different at seeds 2024, 7 and 31337. mutate_vc2.py --cosm: 982 plants (104 new or rewritten), all
+  caught. Not in the sound yet.
 
 The VC-2's COSM adapter for Lo-Fi v253 (2026-11-17, on its own branch after v252; the VC-2 session's choice (a);
   HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: Lo-Fi"). XtCosmLofi moved out of XtCosm.h (964 lines) as it
