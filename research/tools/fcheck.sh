@@ -170,6 +170,8 @@ fi
 [ -x "$X/xt_fx" ] && part xt_fx '"$X/xt_fx" "$ROM" numbers'
 # The effects' control side: the firmware's driver through the queue, against the same driver on the reference
 [ -x "$X/xt_fx" ] && part xt_fx '"$X/xt_fx" "$ROM" control'
+# rom.4's effect driver the same way, on the programs it loads
+[ -x "$X/xt_fx" ] && [ -f "$ROM4" ] && FILES=("$ROM4") && part xt_fx '"$X/xt_fx" "$ROM4" vc2 200 2024'
 wait
 cat "$P"/[0-9][0-9][0-9] > "$O/results.txt"
 if [ $UPDATE = 1 ]; then cp "$O/results.txt" "$B"; keep; echo "fcheck: baseline updated ($(wc -l < "$B") lines)"; exit 0; fi

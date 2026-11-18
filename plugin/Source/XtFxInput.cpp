@@ -17,8 +17,8 @@ constexpr int kBlockFrames = 32;   // the most a process() takes, the bus's bloc
 // start all of it differs, as the driver's start (0x894ae960) leaves 0x80 applied.  What calls the request on the XT isn't
 // found; the plugin's input is EXT IN's alone, so the start asks, and each change of the two.
 void XtFxControl::routeInput() {
-    if (!call(0x894a7dd0)) return;
-    call(0x894aee80);
+    if (!image_.inputRequest || !call(image_.inputRequest)) return;   // an image with no routing mapped asks for none
+    call(image_.inputEvent);
     flush(0);
 }
 

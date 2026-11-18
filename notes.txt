@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's effect driver v259 (2026-11-17, on its own branch from vc2-mode 5766f4d, not merged; HARDWARE_FIRMWARE.md,
+  "rom.4's effect driver"; the plan's step 4.4, with its map and split). XtFxImage: what an image's driver is, rom.2's
+  as XtFxControl held it and rom.4's beside it; XtFxControl runs either, rom.2's sections as their baseline. The patch
+  EQ (0x1af…0x1b4) is read with the switches. A patch of Category 10 or 11 posts an event, answered with nothing.
+  xt_fx <rom.4> vc2: 0 different at seeds 2024, 7 and 31337, in all six parts. mutate_fx.py --vc2: 48 plants, all
+  caught; --control: 178 of 180, the two missed (boot-no-780, matrix-unflushed) missed before this version too. Not
+  in the sound yet: the frame's way through, the outside input and the Matrix's MFX-PRMs are the split's next parts.
+
 The VC-2's COSM adapter for Lo-Fi v253 (2026-11-17, on its own branch after v252; the VC-2 session's choice (a);
   HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: Lo-Fi"). XtCosmLofi moved out of XtCosm.h (964 lines) as it
   stood into XtCosmLofi.h, as its own step, then four const getters for the words its new block forms (the mask,

@@ -514,7 +514,49 @@ version against rom.4's routines with what it calls hooked:
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).
-4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them.
+4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
+   of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
+   The map (2026-11-17), run on rom.4's driver a message flag at a time:
+   - **The driver** is rom.2's, recompiled and moved: the object `0x89980f24`, the message's flags `0x89980f84`, its start
+     `0x89368280`, `0x8935f9a0`, `0x8935fa80`, the reader `0x8935fc40`, the clock's poll `0x8935fde0` on the clock's object
+     `0x8995cb40`, the bus's primitives `0x89362490`, `0x89362610`, `0x893626d0`, `0x893627f0`, the sleep `0x89365e50`, the
+     reads `0x89324350`, `0x89324370`.
+   - **The programs** are rom.4's own, loaded by its driver from its image (VC2_VOCAL_DESIGNER.md, "The effect chip's
+     programs"): program A rewritten, program B 23 words apart, the 42 MFX and the V-Synth's reverbs with registers
+     renumbered, seven new stereo reverbs.
+   - **The message's flags** mean what they mean on rom.2: second byte 0x20 system, 0x10 Attenuation; fourth byte 0x80
+     patch, 0x40 switches, 0x20 MFX, 0x10 Chorus, 0x08 Reverb. No other bit reads or writes anything.
+   - **What each reader reads** (every message also reads IDs 0…2, and on rom.4 0x34):
+
+     | Flag | rom.2's IDs | rom.4's IDs |
+     |---|---|---|
+     | System | 0x3e, 0x41, 0x65…0x70, 0x76 | 0x40, 0x43, 0x67, 0x68, 0x6f…0x72, 0x78, 0x7f |
+     | Attenuation | 0x51e, 0x178 | 0x52b, 0x1b8 |
+     | Switches | 0x11d, 0x120…0x122 | 0x13a, 0x13d…0x13f, **0x1af…0x1b4 (the patch EQ)**, 0x12c |
+     | MFX | 0x177…0x17a, the type's | 0x1b7…0x1ba, the type's |
+     | Chorus | 0x1fc…0x1fe, the type's | 0x23c…0x23e, the type's |
+     | Reverb | 0x230, 0x231, the type's | 0x270, 0x271, the type's |
+
+     A patch reads those and, on rom.4 alone, 0x195 and 0x2e0, 0x2e2, 0x2e5. The Category (0x12c) moves no chip word at any
+     value, but a patch of Category 10 or 11 posts event 0x200 to another task (`0x89391e50`, on the object `0x8994fec8`),
+     which step 4.3 has to place. The system's EQ has no mid bands on rom.4: EQ 1 and EQ 2 are the patch's, read with the
+     switches.
+   - **The types:** 42 MFX and 9 Chorus as on rom.2, 15 Reverb Types against 11, each type's IDs from tables at
+     `0x895164ec`, `0x895165b8`, `0x895165e4`.
+   - **Not mapped, so not run:** rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`) has no literal or
+     branch reaching it, though MFX-PRM1…3 are Matrix destinations; and no reader reads External In Type (0x7a), where
+     rom.2's EXT IN request reads its own.
+   - **XtFxControl** needs only where these are: `XtFxImage` holds them, one row of addresses an image, rom.2's as the
+     class held them.
+
+   Split by those:
+   1. done (v259): the driver by image: `XtFxImage`, XtFxControl on rom.4, the patch EQ's IDs, against JE-8086's chip and
+      against the driver run by hand (HARDWARE_FIRMWARE.md, "rom.4's effect driver").
+   2. The frame's way through on rom.4: the unit, program A's slots for the part mixer's bus frame, its levels and what
+      comes out (DIR goes nowhere; the Reverb's input is a stereo pair).
+   3. The outside input: what reads External In Type and USB External In Type, the routing, and the words back to the
+      SH-4 that the mic path takes.
+   4. The Matrix's MFX-PRMs: where rom.4 sends them, then `setMatrix` on rom.4.
 5. The plugin: the mode switch, rom.4's IDs as parameters appended, the session, a `.p02`'s load, the tab of cards, the
    plugin test, verify.sh lines and plants.
 

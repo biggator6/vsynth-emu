@@ -166,6 +166,10 @@ int main(int argc, char** argv) {
         copyWithoutChip(rom, seed);
         return 0;
     }
+    if (argc > 2 && !std::strcmp(argv[2], "vc2")) {   // rom is rom.4 here (XtFxCheckVc2.cpp)
+        vc2Control(rom, argOr(argc, argv, 3, 200), (uint32_t)argOr(argc, argv, 4, 2024));
+        return 0;
+    }
     if (argc > 2 && !std::strcmp(argv[2], "speed")) { speed(rom); return 0; }
     const int frames = argOr(argc, argv, 2, 8192);
     const uint32_t seed = (uint32_t)argOr(argc, argv, 3, 2024);

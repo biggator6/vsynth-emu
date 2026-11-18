@@ -9,6 +9,7 @@
 // Two threads: one control thread, which makes every call marked so (one at a time), and the audio thread, which calls service().  service() takes no lock and allocates nothing.
 #include "XtBus.h"
 #include "XtExtIn.h"
+#include "XtFxImage.h"
 #include "XtFxValueText.h"
 #include <atomic>
 #include <cstdint>
@@ -33,8 +34,9 @@ public:
         virtual void wait(uint32_t samples) = 0;                                        // the driver sleeps
     };
 
-    // Control thread.  Loads rom.2 and starts the driver as the XT does, with the store at the firmware's defaults.  bus: nullptr for the queue.
-    explicit XtFxControl(const char* romPath, Bus* bus = nullptr);
+    // Control thread.  Loads the image and starts its driver as the XT does, with the store at the firmware's defaults.
+    // bus: nullptr for the queue.  image: rom.2's unless said (XtFxImage.h); romPath must be that image's.
+    explicit XtFxControl(const char* romPath, Bus* bus = nullptr, const XtFxImage& image = xtVSynthFx());
     ~XtFxControl();
     XtFxControl(const XtFxControl&) = delete;
     XtFxControl& operator=(const XtFxControl&) = delete;
@@ -77,6 +79,9 @@ public:
     // For the check: called on the audio thread with each word as it goes to the chip.  Set before the audio thread starts.
     using Observer = void (*)(void* context, uint8_t command, uint16_t index, uint32_t word);
     void observe(Observer observer, void* context) { observer_ = observer; observerContext_ = context; }
+    // For the check: called on the control thread with each parameter ID the driver reads.
+    using ReadObserver = void (*)(void* context, int id);
+    void observeReads(ReadObserver observer, void* context) { readObserver_ = observer; readContext_ = context; }
 
     // Control thread: has the chip got everything?  And the driver's copy of a word.
     bool drained() const { return (!ok() || (backlog_.empty() && open_->words.empty())) && read_.load(std::memory_order_acquire) == write_.load(std::memory_order_relaxed); }
@@ -87,11 +92,7 @@ private:
     struct Word { uint32_t value; uint16_t index; uint8_t command; };
     struct Batch { std::vector<Word> words; uint32_t waitAfter = 0; };                  // reaches the chip whole; then the chip plays on for waitAfter samples before the next
     static constexpr uint32_t kSlots = 1024;
-    // A message's blocks; BlockInput (v204), External Input Type and Source, has no message, its routing a call of its own
-    enum Block : uint8_t {
-        BlockSwitches = 1, BlockMfx = 2, BlockChorus = 4, BlockReverb = 8,
-        BlockSystem = 16, BlockAttenuation = 32, BlockInput = 64
-    };
+    using enum XtFxImage::Block;
 
     void boot();
     void routeInput();   // the outside input's routing by External Input Type and Source (XtFxInput.cpp, v204)
@@ -104,6 +105,7 @@ private:
     void sleep(uint32_t ms);
     void flush(uint32_t waitAfter);
 
+    const XtFxImage& image_;
     std::unique_ptr<Sh4> sh4_;
     Bus* bus_;
     std::string error_;
@@ -124,6 +126,8 @@ private:
     alignas(64) uint32_t waiting_ = 0;                                                  // the audio thread's: samples left to play before the next batch
     Observer observer_ = nullptr;
     void* observerContext_ = nullptr;
+    ReadObserver readObserver_ = nullptr;
+    void* readContext_ = nullptr;
 };
 
 // What the firmware says about the effects' parameters, for an editor: read from rom.2 when it's asked for, so none of it is in this source.  For each type of each block, its

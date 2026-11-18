@@ -27,6 +27,7 @@
 #include <memory>
 #include <new>
 #include <set>
+#include <span>
 #include <string>
 #include <thread>
 
@@ -56,17 +57,29 @@ inline double realOf(const char* s) {
 // The firmware's driver, with the chip's bus at its four primitives.  Each sends what the routine sends, byte for byte (read off 0x894af400, 0x894af510, 0x894af610, 0x894af6a0).
 struct Rig {
     Sh4 c; XtFxChip chip; std::unique_ptr<Reference> ref; uint32_t obj = 0, vt = 0; int mfx = -1; uint64_t readsDiffer = 0; const std::map<int, int>* forced = nullptr;
-    explicit Rig(const char* rom, bool withReference = true) {
+    explicit Rig(const char* rom, bool withReference = true, const XtFxImage& image = xtVSynthFx()) {
         if (withReference) ref = std::make_unique<Reference>();
         if (!c.loadRom(rom)) { std::printf("cannot load %s\n", rom); std::exit(1); }
         c.mapRam(0x8C000000, 0x02000000);
-        c.hook(0x894af3a0, [](Sh4& m) { m.ret(0); }); c.hook(0x894af3c0, [](Sh4& m) { m.ret(0); }); c.hook(0x894b26a0, [](Sh4& m) { m.ret(0); });
-        c.hook(0x894af400, [this](Sh4& m) { put(0x34, (int16_t)m.r[4], m.r[5]); m.ret(0); });
-        c.hook(0x894af510, [this](Sh4& m) { m.ret(get((int16_t)m.r[4])); });
-        c.hook(0x894af610, [this](Sh4& m) { const uint32_t v = (uint16_t)m.r[5], s = m.r[6] & 0xff;
-            put(0x35, (int16_t)m.r[4], (v >> 8 & 0xff) | ((v << 1 & 0xfc) | (s & 3)) << 8 | ((v >> 7 & 1) | (s << 2 & 12)) << 16); m.ret(0); });
-        c.hook(0x894af6a0, [this](Sh4& m) { const int i = (int16_t)m.r[4]; const uint32_t v = m.r[5], a = get(i), b = get(i + 4);
-            put(0x36, i, (a >> 20 & 0xf8) | (v & 0xff) << 8 | (v >> 8 & 0xff) << 16 | ((v >> 16 & 3) | (b >> 24 & 0xc0)) << 24); m.ret(0); });
+        c.hook(image.answered[0], [](Sh4& m) { m.ret(0); });
+        c.hook(image.answered[1], [](Sh4& m) { m.ret(0); });
+        // one-off: the check's own copy of the bus's hooks: sharing XtFxControl's would hide an error in its encodings
+        c.hook(image.sleep, [](Sh4& m) { m.ret(0); });
+        c.hook(image.putWord, [this](Sh4& m) { put(0x34, (int16_t)m.r[4], m.r[5]); m.ret(0); });
+        c.hook(image.getWord, [this](Sh4& m) { m.ret(get((int16_t)m.r[4])); });
+        c.hook(image.putCoefficient, [this](Sh4& m) {
+            const uint32_t v = (uint16_t)m.r[5], s = m.r[6] & 0xff;
+            const uint32_t mid = (v << 1 & 0xfc) | (s & 3), top = (v >> 7 & 1) | (s << 2 & 12);
+            put(0x35, (int16_t)m.r[4], (v >> 8 & 0xff) | mid << 8 | top << 16);
+            m.ret(0);
+        });
+        c.hook(image.putOffset, [this](Sh4& m) {
+            const int i = (int16_t)m.r[4];
+            const uint32_t v = m.r[5], a = get(i), b = get(i + 4);
+            const uint32_t top = (v >> 16 & 3) | (b >> 24 & 0xc0);
+            put(0x36, i, (a >> 20 & 0xf8) | (v & 0xff) << 8 | (v >> 8 & 0xff) << 16 | top << 24);
+            m.ret(0);
+        });
     }
     void bus(uint32_t a, uint8_t v) { chip.hostWrite(a, v); if (ref) ref->hostWrite(a, v); }
     void put(uint8_t cmd, int i, uint32_t w) { bus(0x2003, cmd); const uint32_t a = (uint32_t)i * 4; for (uint32_t k = 0; k < 4; k++) bus(a + k, (uint8_t)(w >> (8 * k))); }
@@ -180,31 +193,70 @@ inline double db(double x) { return x > 0 ? 20 * std::log10(x) : -999.0; }
 // ------------------------------------------------------------------ the control side's edits
 struct Edit { std::vector<std::pair<int, int>> sets; bool patch = false, matrix = false; int prm[3] = {}, clockMs = 0; };
 
+// What the edits go by in one image: its driver, and the IDs of what they move there.
+struct FxIds {
+    const XtFxImage& image;
+    const char* label;                // what the results' lines call this image's control side
+    int mfxType, choType, revType;    // the three Type parameters
+    int clockSource, tempo;
+    std::span<const int> levels;      // the levels, switches and system settings an edit draws from
+    std::span<const int> alone;       // what the firmware's update doesn't take alone: a new patch has them, an edit not
+};
+const FxIds& rom2Ids();   // XtFxCheckControl.cpp
+const FxIds& vc2Ids();    // XtFxCheckVc2.cpp
+
 // Draws edits, from the firmware's own ranges.
 struct Editor {
-    Sh4 rom; XtFxControl& ranges; Rng r; int mfx = 0, cho = 0, rev = 0;
-    Editor(const char* path, XtFxControl& c, uint32_t seed) : ranges(c), r(seed) { rom.loadRom(path); }
+    Sh4 rom; XtFxControl& ranges; Rng r; const FxIds& ids; int mfx = 0, cho = 0, rev = 0;
+    Editor(const char* path, XtFxControl& c, uint32_t seed, const FxIds& fx = rom2Ids()) : ranges(c), r(seed), ids(fx) {
+        rom.loadRom(path);
+    }
     int s16(uint32_t a) { return (int16_t)rom.rd16(a); }
     int draw(int id) { const int lo = ranges.lowest(id), hi = ranges.highest(id); return lo + r.below(hi - lo + 1); }
-    void params(Edit& e, uint32_t table, int type, int n) { const int first = s16(table + 4 * (uint32_t)type), last = s16(table + 4 * (uint32_t)type + 2); for (int i = 0; i < n; i++) { const int id = first + r.below(last - first + 1); e.sets.push_back({ id, draw(id) }); } }
-    Edit mfxType(int t) { Edit e; mfx = t; e.sets.push_back({ 0x177, t }); params(e, kMfxIds, t, 3); return e; }
-    Edit choType(int t) { Edit e; cho = t; e.sets.push_back({ 0x1fc, t }); params(e, kChoIds, t, 3); return e; }
-    Edit revType(int t) { Edit e; rev = t; e.sets.push_back({ 0x230, t }); params(e, kRevIds, t, 3); return e; }
+    void params(Edit& e, uint32_t table, int type, int n) {
+        const int first = s16(table + 4 * (uint32_t)type), last = s16(table + 4 * (uint32_t)type + 2);
+        for (int i = 0; i < n; i++) {
+            const int id = first + r.below(last - first + 1);
+            e.sets.push_back({ id, draw(id) });
+        }
+    }
+    // A change of type: the Type parameter, then three of the new type's own; `current` remembers it for later edits
+    Edit typeEdit(int& current, int typeId, uint32_t table, int t) {
+        current = t;
+        Edit e;
+        e.sets.push_back({ typeId, t });
+        params(e, table, t, 3);
+        return e;
+    }
+    Edit mfxType(int t) { return typeEdit(mfx, ids.mfxType, ids.image.mfxIds, t); }
+    Edit choType(int t) { return typeEdit(cho, ids.choType, ids.image.choIds, t); }
+    Edit revType(int t) { return typeEdit(rev, ids.revType, ids.image.revIds, t); }
     Edit any() {
         Edit e;
-        static const int levels[] = { 0x178, 0x179, 0x17a, 0x1fd, 0x1fe, 0x231, 0x3e, 0x76, 0x51e, 0x11d, 0x120, 0x121,
-                                      0x122, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70,
-                                      0x78, 0x7c };   // and External Input Type and Source (v204)
+        const XtFxImage& im = ids.image;
         switch (r.below(10)) {
-            case 9: e.matrix = true; for (int& v : e.prm) { const int k = r.below(4); v = k == 0 ? 0 : k == 1 ? r.below(128) - 64 : (int)(r.next() % 65535) - 32767; } break;
-            case 0: return mfxType(r.below(42));
-            case 1: return choType(r.below(9));
-            case 2: return revType(r.below(11));
-            case 3: case 4: params(e, kMfxIds, mfx, 1 + r.below(4)); break;
-            case 5: params(e, kChoIds, cho, 1 + r.below(3)); break;
-            case 6: params(e, kRevIds, rev, 1 + r.below(3)); break;
-            case 7: { const int id = levels[r.below((int)(sizeof levels / sizeof *levels))]; e.sets.push_back({ id, draw(id) }); break; }
-            default: e = mfxType(r.below(42)); e.patch = true; break;
+            case 9:
+                e.matrix = true;
+                for (int& v : e.prm) {
+                    const int k = r.below(4);
+                    v = k == 0 ? 0 : k == 1 ? r.below(128) - 64 : (int)(r.next() % 65535) - 32767;
+                }
+                break;
+            case 0: return mfxType(r.below(im.mfxTypes));
+            case 1: return choType(r.below(im.choTypes));
+            case 2: return revType(r.below(im.revTypes));
+            case 3: case 4: params(e, im.mfxIds, mfx, 1 + r.below(4)); break;
+            case 5: params(e, im.choIds, cho, 1 + r.below(3)); break;
+            case 6: params(e, im.revIds, rev, 1 + r.below(3)); break;
+            case 7: {
+                const int id = ids.levels[(size_t)r.below((int)ids.levels.size())];
+                e.sets.push_back({ id, draw(id) });
+                break;
+            }
+            default:
+                e = mfxType(r.below(im.mfxTypes));
+                e.patch = true;
+                break;
         }
         return e;
     }
@@ -229,9 +281,10 @@ void compare(const char* rom, const char* label, int mfxType, int revType, int c
              bool roam);                                                                // XtFxCheckRig.cpp
 void numbers(const char* rom);                                                          // XtFxCheckNumbers.cpp
 void speed(const char* rom);
-void againstReference(const char* rom, int randomEvents, uint32_t seed);                // XtFxCheckControl.cpp
+void againstReference(const char* rom, int randomEvents, uint32_t seed, const FxIds& fx = rom2Ids());   // XtFxCheckControl.cpp
 void readers(const char* rom, uint32_t seed);
-void liveEdits(const char* rom, int events, uint32_t seed);
+void liveEdits(const char* rom, int events, uint32_t seed, const FxIds& fx = rom2Ids());
+void vc2Control(const char* rom, int events, uint32_t seed);                            // XtFxCheckVc2.cpp
 void threads(const char* rom, int events, uint32_t seed);                               // XtFxCheckThreads.cpp
 double stepUnderTone(const char* rom, bool honoured, bool patch);
 void changeUnderTone(const char* rom);
