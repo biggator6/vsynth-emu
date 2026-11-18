@@ -38,8 +38,6 @@ update-lfo-0|    for (int lfo = 1; lfo < kLfos; ++lfo) {   // nor LFO 0|    for 
 update-lfo-follows|        if (parts.lfoOn(lfo)) parts.tickLfo(lfo, ticks);|        if (parts.lfoFollows(lfo)) parts.tickLfo(lfo, ticks);|vc2tone
 update-lfo-n|parts.tickLfo(lfo, ticks);|parts.tickLfo(lfo, n);|vc2tone
 update-osc-order|    parts.updateOsc(kVc2ToneOsc1, ticks);\n    parts.updateOsc(kVc2ToneOsc2, ticks);|    parts.updateOsc(kVc2ToneOsc2, ticks);\n    parts.updateOsc(kVc2ToneOsc1, ticks);|vc2tone
-update-mix-lost|    parts.updateMix();\n||vc2tone
-update-mix-last|    parts.updateMix();\n    parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|    parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));\n    parts.updateMix();|vc2tone
 update-cosm2|    parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|    parts.updateCosm(kVc2ToneCosm2, parts.oscValue(kVc2ToneOsc1));|vc2tone
 update-cosm-level|parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|parts.updateCosm(kVc2ToneCosm1, parts.tvaLevel());|vc2tone
 update-stopped-unasked|    if (!parts.tvaOver() && !parts.tvaStopped()) {|    if (!parts.tvaOver()) {|vc2tone
@@ -308,3 +306,150 @@ mods-tva-out|w.time[1], w.out, w.onset,|w.time[1], w.onset, w.onset,|vc2tonemods
 mods-tva-onset|w.time[1], w.out, w.onset,|w.time[1], w.out, w.out,|vc2tonemods
 mods-tva-stage-time|w.onset, w.stageTime };|w.onset, w.onset };|vc2tonemods
 mods-lfo-out-word|kLfoOut = 0x38;|kLfoOut = 0x3c;|vc2tonemods
+# v269: the tone's OSC mix, ports vc2tonemix (Vc2ToneMix.cpp), vc2tonemixrender (Vc2ToneMixRender.cpp) and vc2tonemixtables
+# (Vc2ToneMixTables.cpp).  Not planted, as nothing can tell them apart: the update 0x893ade40, which returns at once (so
+# v228's two plants on its call are gone), and the render's guard for a routine no install gives.
+mix-block-bytes|kBlockBytes = 5 * sizeof(uint32_t);|kBlockBytes = 4 * sizeof(uint32_t);|vc2tonemix
+mix-no-virtual|kNoVirtual = 0xffffffff;|kNoVirtual = 0;|vc2tonemix
+mix-start-four|Vc2ToneMixRings&) { w.gain = w.target; }|Vc2ToneMixRings&) { std::copy_n(w.target.begin(), 3, w.gain.begin()); }|vc2tonemix
+mix-ring-no-scale|    w.target[0] = xtf::div(w.target[0], vc2ToneMixTables().fullScale);\n||vc2tonemix
+mix-ring-copy|fullScale);\n    std::copy_n(w.target.begin(), 3, w.gain.begin());|fullScale);\n    std::copy_n(w.target.begin(), 2, w.gain.begin());|vc2tonemix
+mix-delay-copy|    std::copy_n(w.target.begin(), 3, w.gain.begin());\n    rings.a|    std::copy_n(w.target.begin(), 2, w.gain.begin());\n    rings.a|vc2tonemix
+mix-delay-keeps-a|    rings.a(w.ringA).fill(0.0f);\n||vc2tonemix
+mix-delay-keeps-b|    rings.b(w.ringB).fill(0.0f);\n||vc2tonemix
+mix-follow-gain|    w.gain[0] = w.target[2];|    w.gain[0] = w.target[0];|vc2tonemix
+mix-follow-hold|    w.gain[0] = w.target[2];\n    w.hold = 0.0f;|    w.gain[0] = w.target[2];|vc2tonemix
+mix-blend-sync|    tail.syncOn = 1;|    tail.syncOn = 0;|vc2tonemix
+mix-blend-gains|    w.gain[0] = w.gain[1] = 0.0f;|    w.gain[0] = 0.0f;|vc2tonemix
+mix-blend-first|    w.gain[0] = w.gain[1] = 0.0f;|    w.gain[1] = 0.0f;|vc2tonemix
+mix-blend-hold|    w.hold = w.target[0];|    w.hold = w.target[1];|vc2tonemix
+mix-other-sync|Vc2ToneTail& tail, Vc2ToneMixRings&) { tail.syncOn = 0; }|Vc2ToneTail& tail, Vc2ToneMixRings&) { tail.syncOn = 1; }|vc2tonemix
+mix-four-gain|{ startFour, { 0, 0 }, { 0, 0 }, false }|{ startFour, { 0, 1 }, { 0, 0 }, false }|vc2tonemix
+mix-four-flag-gain|{ startFour, { 0, 0 }, { 0, 0 }, false }|{ startFour, { 0, 0 }, { 0, 1 }, false }|vc2tonemix
+mix-ring-gain|{ startRing, { 1, 1 }, { 1, 1 }, false }|{ startRing, { 1, 0 }, { 1, 1 }, false }|vc2tonemix
+mix-ring-flag-gain|{ startRing, { 1, 1 }, { 1, 1 }, false }|{ startRing, { 1, 1 }, { 1, 0 }, false }|vc2tonemix
+mix-ring-routine|{ startRing, { 1, 1 }, { 1, 1 }, false }|{ startRing, { 0, 1 }, { 1, 1 }, false }|vc2tonemix
+mix-ring-flag-routine|{ startRing, { 1, 1 }, { 1, 1 }, false }|{ startRing, { 1, 1 }, { 0, 1 }, false }|vc2tonemix
+mix-delay-routine|{ startDelay, { 2, 2 }, { 3, 4 }, false }|{ startDelay, { 3, 2 }, { 3, 4 }, false }|vc2tonemix
+mix-delay-flag-routine|{ startDelay, { 2, 2 }, { 3, 4 }, false }|{ startDelay, { 2, 2 }, { 2, 4 }, false }|vc2tonemix
+mix-delay-gain|{ startDelay, { 2, 2 }, { 3, 4 }, false }|{ startDelay, { 2, 4 }, { 3, 4 }, false }|vc2tonemix
+mix-delay-flag-gain|{ startDelay, { 2, 2 }, { 3, 4 }, false }|{ startDelay, { 2, 2 }, { 3, 2 }, false }|vc2tonemix
+mix-follow-routine|{ startFollow, { 4, 3 }, { 5, 5 }, false }|{ startFollow, { 5, 3 }, { 5, 5 }, false }|vc2tonemix
+mix-follow-flag-routine|{ startFollow, { 4, 3 }, { 5, 5 }, false }|{ startFollow, { 4, 3 }, { 4, 5 }, false }|vc2tonemix
+mix-follow-gain-word|{ startFollow, { 4, 3 }, { 5, 5 }, false }|{ startFollow, { 4, 5 }, { 5, 5 }, false }|vc2tonemix
+mix-follow-flag-gain|{ startFollow, { 4, 3 }, { 5, 5 }, false }|{ startFollow, { 4, 3 }, { 5, 3 }, false }|vc2tonemix
+mix-blend-by-flags|{ startBlend, { 6, 6 }, { 7, 7 }, true }|{ startBlend, { 6, 6 }, { 7, 7 }, false }|vc2tonemix
+mix-blend-routine|{ startBlend, { 6, 6 }, { 7, 7 }, true }|{ startBlend, { 7, 6 }, { 7, 7 }, true }|vc2tonemix
+mix-blend-other-routine|{ startBlend, { 6, 6 }, { 7, 7 }, true }|{ startBlend, { 6, 6 }, { 6, 7 }, true }|vc2tonemix
+mix-blend-gain|{ startBlend, { 6, 6 }, { 7, 7 }, true }|{ startBlend, { 6, 7 }, { 7, 7 }, true }|vc2tonemix
+mix-blend-other-gain|{ startBlend, { 6, 6 }, { 7, 7 }, true }|{ startBlend, { 6, 6 }, { 7, 6 }, true }|vc2tonemix
+mix-other-gain|{ startOther, { 0, kKeepsGain }, { 0, kKeepsGain }, false }|{ startOther, { 0, 0 }, { 0, kKeepsGain }, false }|vc2tonemix
+mix-other-flag-gain|{ startOther, { 0, kKeepsGain }, { 0, kKeepsGain }, false }|{ startOther, { 0, kKeepsGain }, { 0, 0 }, false }|vc2tonemix
+mix-other-routine|{ startOther, { 0, kKeepsGain }, { 0, kKeepsGain }, false }|{ startOther, { 1, kKeepsGain }, { 0, kKeepsGain }, false }|vc2tonemix
+mix-other-flag-routine|{ startOther, { 0, kKeepsGain }, { 0, kKeepsGain }, false }|{ startOther, { 0, kKeepsGain }, { 1, kKeepsGain }, false }|vc2tonemix
+mix-type-bound|(uint32_t)type < std::size(kTypes)|(uint32_t)type < std::size(kTypes) - 1|vc2tonemix
+mix-flags-both|return flag2 != 0 ? 1 : 2;|return flag2 != 0 ? 2 : 1;|vc2tonemix
+mix-flags-second|return flag2 != 0 ? 3 : 0;|return flag2 != 0 ? 0 : 3;|vc2tonemix
+mix-build-sync-on|    tail.syncOn = tail.sync = 0;|    tail.sync = 0;|vc2tonemix
+mix-build-sync|    tail.syncOn = tail.sync = 0;|    tail.syncOn = 0;|vc2tonemix
+mix-build-gain|    tail.unread[kVc2MixGainWord] = 0;\n||vc2tonemix
+mix-type-byte|    w.typeByte[0] = (uint8_t)block[0];\n||vc2tonemix
+mix-flags-lost|    w.flags = flagsOf(flag1, flag2);\n||vc2tonemix
+mix-ring-a-first|    w.ringA = Vc2ToneMixRings::kAAt + offset;|    w.ringA = Vc2ToneMixRings::kAAt;|vc2tonemix
+mix-ring-b-first|    w.ringB = Vc2ToneMixRings::kBAt + offset;|    w.ringB = Vc2ToneMixRings::kBAt;|vc2tonemix
+mix-install-kind|(type.byKind ? !kind3 : w.flags != 0)|(type.byKind ? kind3 : w.flags != 0)|vc2tonemix
+mix-install-flags|(type.byKind ? !kind3 : w.flags != 0)|(type.byKind ? !kind3 : w.flags == 0)|vc2tonemix
+mix-install-delta|    tail.unread[0] = 0;\n||vc2tonemix
+mix-install-virtual|    tail.unread[1] = kNoVirtual;\n||vc2tonemix
+mix-install-gain-lost|    if (pick.gain != kKeepsGain) {|    if (false) {|vc2tonemix
+mixr-ramp-step|step[k] = mul(sub(m.w.target[k], g[k]), vc2ToneMixTables().ramp);|step[k] = mul(sub(m.w.target[k], g[k]), vc2ToneMixTables().settle);|vc2tonemixrender
+mixr-ramp-late|        frame(s, g);\n        for (size_t k = 0; k < g.size(); ++k) g[k] = add(g[k], step[k]);|        for (size_t k = 0; k < g.size(); ++k) g[k] = add(g[k], step[k]);\n        frame(s, g);|vc2tonemixrender
+mixr-ramp-lost|    std::copy_n(g.begin(), kRamped, m.w.gain.begin());\n}|}|vc2tonemixrender
+mixr-four-left-a|mul(m.a[s], g[0])|mul(m.a[s], g[1])|vc2tonemixrender
+mixr-four-left-b|mul(m.b[s], g[2])|mul(m.b[s], g[3])|vc2tonemixrender
+mixr-four-right-a|mul(m.a[s + 1], g[1])|mul(m.a[s + 1], g[0])|vc2tonemixrender
+mixr-four-right-b|mul(m.b[s + 1], g[3])|mul(m.b[s + 1], g[2])|vc2tonemixrender
+mixr-four-settle|const float settle = vc2ToneMixTables().settle;|const float settle = vc2ToneMixTables().ramp;|vc2tonemixrender
+mixr-four-settle-from|g[k] = add(mul(settle, sub(m.w.target[k], g[k])), g[k]);|g[k] = mul(settle, sub(m.w.target[k], g[k]));|vc2tonemixrender
+mixr-four-settle-three|for (size_t k = 0; k < g.size(); ++k) g[k] = add(mul(settle|for (size_t k = 0; k + 1 < g.size(); ++k) g[k] = add(mul(settle|vc2tonemixrender
+mixr-ring-scale|add(mul(m.b[c], g[0]), g[1])|add(mul(m.b[c], g[1]), g[0])|vc2tonemixrender
+mixr-ring-no-offset|mul(mul(add(mul(m.b[c], g[0]), g[1]), g[2]), m.a[c])|mul(mul(mul(m.b[c], g[0]), g[2]), m.a[c])|vc2tonemixrender
+mixr-ring-level|mul(mul(add(mul(m.b[c], g[0]), g[1]), g[2]), m.a[c])|mul(add(mul(m.b[c], g[0]), g[1]), m.a[c])|vc2tonemixrender
+mixr-ring-order|mul(mul(add(mul(m.b[c], g[0]), g[1]), g[2]), m.a[c])|mul(add(mul(m.b[c], g[0]), g[1]), mul(g[2], m.a[c]))|vc2tonemixrender
+mixr-ring-left|for (int c = s; c < s + 2; ++c) m.out[c]|for (int c = s; c < s + 1; ++c) m.out[c]|vc2tonemixrender
+mixr-tap-part|const float part = sub(delay, flt(whole));|const float part = sub(delay, flt(whole + 1));|vc2tonemixrender
+mixr-tap-near|int near = position - whole, far = near - 1;|int near = position - whole + 1, far = near - 1;|vc2tonemixrender
+mixr-tap-far|int near = position - whole, far = near - 1;|int near = position - whole, far = near;|vc2tonemixrender
+mixr-tap-near-wrap|    if (near < 0) near += Vc2ToneMixRings::kSamples;\n||vc2tonemixrender
+mixr-tap-far-wrap|    if (far < 0) far += Vc2ToneMixRings::kSamples;\n||vc2tonemixrender
+mixr-tap-weights|add(mul(ring[(size_t)near], sub(1.0f, part)), mul(ring[(size_t)far], part))|add(mul(ring[(size_t)near], part), mul(ring[(size_t)far], sub(1.0f, part)))|vc2tonemixrender
+mixr-next-wrap|position + 1 >= Vc2ToneMixRings::kSamples ? 0 : position + 1|position + 2 >= Vc2ToneMixRings::kSamples ? 0 : position + 1|vc2tonemixrender
+mixr-next-to|position + 1 >= Vc2ToneMixRings::kSamples ? 0 : position + 1|position + 1 >= Vc2ToneMixRings::kSamples ? 1 : position + 1|vc2tonemixrender
+mixr-mono-write-first|        position = nextPosition(position);\n        ring[(size_t)position] = m.a[s];|        ring[(size_t)position] = m.a[s];\n        position = nextPosition(position);|vc2tonemixrender
+mixr-mono-delay-order|div(mul(mul(add(m.b[s], t.fullScale), g[0]), t.delaySpan), t.fullScale)|div(mul(mul(add(m.b[s], t.fullScale), t.delaySpan), g[0]), t.fullScale)|vc2tonemixrender
+mixr-mono-delay-gain|add(m.b[s], t.fullScale), g[0])|add(m.b[s], t.fullScale), g[1])|vc2tonemixrender
+mixr-mono-delay-right|mul(mul(add(m.b[s], t.fullScale), g[0])|mul(mul(add(m.b[s + 1], t.fullScale), g[0])|vc2tonemixrender
+mixr-mono-dry|add(mul(m.a[s], g[1]), delayedSample(ring, position, delay))|add(mul(m.a[s], g[2]), delayedSample(ring, position, delay))|vc2tonemixrender
+mixr-mono-no-dry|add(mul(m.a[s], g[1]), delayedSample(ring, position, delay))|delayedSample(ring, position, delay)|vc2tonemixrender
+mixr-mono-level|m.out[s] = m.out[s + 1] = mul(wet, g[2]);|m.out[s] = m.out[s + 1] = mul(wet, g[1]);|vc2tonemixrender
+mixr-mono-right|m.out[s] = m.out[s + 1] = mul(wet, g[2]);|m.out[s] = mul(wet, g[2]);|vc2tonemixrender
+mixr-mono-position|        m.out[s] = m.out[s + 1] = mul(wet, g[2]);\n    });\n    m.w.position = position;|        m.out[s] = m.out[s + 1] = mul(wet, g[2]);\n    });|vc2tonemixrender
+mixr-stereo-rings|{ &m.rings.a(m.w.ringA), &m.rings.b(m.w.ringB) }|{ &m.rings.a(m.w.ringA), &m.rings.a(m.w.ringA) }|vc2tonemixrender
+mixr-stereo-depth|const float depth = mul(g[0], t.delaySpan);|const float depth = mul(g[1], t.delaySpan);|vc2tonemixrender
+mixr-stereo-write-left|(*rings[c])[(size_t)position] = m.a[s + c];|(*rings[c])[(size_t)position] = m.a[s];|vc2tonemixrender
+mixr-stereo-moved-left|div(mul(add(m.b[s + c], t.fullScale), depth), t.fullScale)|div(mul(add(m.b[s], t.fullScale), depth), t.fullScale)|vc2tonemixrender
+mixr-stereo-dry|add(mul(m.a[s + c], g[1]), delayedSample(*rings[c], position, delay))|add(mul(m.a[s], g[1]), delayedSample(*rings[c], position, delay))|vc2tonemixrender
+mixr-stereo-tap|delayedSample(*rings[c], position, delay)|delayedSample(*rings[0], position, delay)|vc2tonemixrender
+mixr-stereo-level|m.out[s + c] = mul(wet, g[2]);|m.out[s + c] = mul(wet, g[1]);|vc2tonemixrender
+mixr-stereo-position|            m.out[s + c] = mul(wet, g[2]);\n        }\n    });\n    m.w.position = position;|            m.out[s + c] = mul(wet, g[2]);\n        }\n    });|vc2tonemixrender
+mixr-follower-run|constexpr int kFollowerRun = 8, kHoldFrames = 4;|constexpr int kFollowerRun = 4, kHoldFrames = 4;|vc2tonemixrender
+mixr-hold-frames|constexpr int kFollowerRun = 8, kHoldFrames = 4;|constexpr int kFollowerRun = 8, kHoldFrames = 8;|vc2tonemixrender
+mixr-follower-right|const float x = std::fabs(b[2 * f]);|const float x = std::fabs(b[2 * f + 1]);|vc2tonemixrender
+mixr-follower-signed|const float x = std::fabs(b[2 * f]);|const float x = b[2 * f];|vc2tonemixrender
+mixr-follower-once|        if (f % kFollowerRun == kFollowerRun - 1) sum = add(sum, x);\n||vc2tonemixrender
+mixr-follower-first|if (f % kFollowerRun == kFollowerRun - 1) sum|if (f % kFollowerRun == 0) sum|vc2tonemixrender
+mixr-follower-scale|return mul(vc2ToneMixTables().follower, sum);|return mul(vc2ToneMixTables().ramp, sum);|vc2tonemixrender
+mixr-followed-step|sub(m.w.target[2], gain), t.ramp|sub(m.w.target[1], gain), t.ramp|vc2tonemixrender
+mixr-followed-rising|m.w.level > level ? m.w.target[1] : m.w.target[0]|m.w.level > level ? m.w.target[0] : m.w.target[1]|vc2tonemixrender
+mixr-followed-equal|m.w.level > level ?|m.w.level >= level ?|vc2tonemixrender
+mixr-followed-rate|mul(sub(1.0f, setting), t.rateSpan)|mul(setting, t.rateSpan)|vc2tonemixrender
+mixr-followed-floor|add(mul(sub(1.0f, setting), t.rateSpan), t.rateFloor)|mul(sub(1.0f, setting), t.rateSpan)|vc2tonemixrender
+mixr-followed-span|mul(sub(1.0f, setting), t.rateSpan)|mul(sub(1.0f, setting), t.rateFloor)|vc2tonemixrender
+mixr-followed-level-kept|    m.w.level = level;\n||vc2tonemixrender
+mixr-followed-gain-late|        gain = add(gain, step);\n        const float g = mul(hold, gain);|        const float g = mul(hold, gain);\n        gain = add(gain, step);|vc2tonemixrender
+mixr-followed-left|m.out[2 * f] = mul(m.a[2 * f], g);|m.out[2 * f] = mul(m.a[2 * f + rightOffset], g);|vc2tonemixrender
+mixr-followed-hold-first|if (f % kHoldFrames == kHoldFrames - 1) hold|if (f % kHoldFrames == 0) hold|vc2tonemixrender
+mixr-followed-hold-to|hold = add(mul(sub(level, hold), rate), hold);|hold = mul(sub(level, hold), rate);|vc2tonemixrender
+mixr-followed-gain-kept|    m.w.gain[0] = gain;\n||vc2tonemixrender
+mixr-followed-hold-kept|    m.w.hold = hold;\n||vc2tonemixrender
+mixr-followed-mono|void followedMono(MixBlock& m) { followed(m, 0); }|void followedMono(MixBlock& m) { followed(m, 1); }|vc2tonemixrender
+mixr-followed-stereo|void followedStereo(MixBlock& m) { followed(m, 1); }|void followedStereo(MixBlock& m) { followed(m, 0); }|vc2tonemixrender
+mixr-blend-sides|add(mul(m.a[s], g), mul(m.b[s], other))|add(mul(m.b[s], g), mul(m.a[s], other))|vc2tonemixrender
+mixr-blend-other|other = sub(1.0f, g);|other = g;|vc2tonemixrender
+mixr-blend-left|for (int s = 0; s < kSamples; ++s) m.out[s] = add(mul(m.a[s], g)|for (int s = 0; s < kSamples; s += 2) m.out[s] = add(mul(m.a[s], g)|vc2tonemixrender
+mixr-held-scale|sub(1.0f, mul(g, vc2ToneMixTables().half))|sub(1.0f, mul(g, vc2ToneMixTables().ramp))|vc2tonemixrender
+mixr-held-no-scale|m.out[2 * f + c] = mul(sub(m.a[2 * f + c], held[(size_t)c]), scale);|m.out[2 * f + c] = sub(m.a[2 * f + c], held[(size_t)c]);|vc2tonemixrender
+mixr-held-bit|(m.tail.sync >> f & 1u)|(m.tail.sync >> (31 - f) & 1u)|vc2tonemixrender
+mixr-held-sample|held[(size_t)c] = mul(m.a[2 * f + c], g);|held[(size_t)c] = m.a[2 * f + c];|vc2tonemixrender
+mixr-held-left|held[(size_t)c] = mul(m.a[2 * f + c], g);|held[(size_t)c] = mul(m.a[2 * f], g);|vc2tonemixrender
+mixr-held-one|mul(sub(m.a[2 * f + c], held[(size_t)c]), scale);|mul(sub(m.a[2 * f + c], held[0]), scale);|vc2tonemixrender
+mixr-renders-first|fourGains, ringProduct, delayMono|ringProduct, fourGains, delayMono|vc2tonemixrender
+mixr-renders-delays|delayMono, delayStereo, followedMono|delayStereo, delayMono, followedMono|vc2tonemixrender
+mixr-renders-followed|followedMono, followedStereo, blend|followedStereo, followedMono, blend|vc2tonemixrender
+mixr-renders-last|blend, heldOff,|heldOff, blend,|vc2tonemixrender
+mixt-gain-0|{ kGainsAt, &t.gains[0] }|{ kGainsAt + 4, &t.gains[0] }|vc2tonemixtables
+mixt-gain-1|{ kGainsAt + 4, &t.gains[1] }|{ kGainsAt, &t.gains[1] }|vc2tonemixtables
+mixt-gain-2|{ kGainsAt + 8, &t.gains[2] }|{ kGainsAt, &t.gains[2] }|vc2tonemixtables
+mixt-gain-3|{ kGainsAt + 12, &t.gains[3] }|{ kGainsAt, &t.gains[3] }|vc2tonemixtables
+mixt-gain-4|{ kGainsAt + 16, &t.gains[4] }|{ kGainsAt, &t.gains[4] }|vc2tonemixtables
+mixt-gain-5|{ kGainsAt + 20, &t.gains[5] }|{ kGainsAt, &t.gains[5] }|vc2tonemixtables
+mixt-gain-6|{ kGainsAt + 24, &t.gains[6] }|{ kGainsAt, &t.gains[6] }|vc2tonemixtables
+mixt-gain-7|{ kGainsAt + 28, &t.gains[7] }|{ kGainsAt, &t.gains[7] }|vc2tonemixtables
+mixt-settle|{ 0x893e4670, &t.settle }|{ 0x893e46f0, &t.settle }|vc2tonemixtables
+mixt-ramp|{ 0x893e46f0, &t.ramp }|{ 0x893e4670, &t.ramp }|vc2tonemixtables
+mixt-follower|{ 0x893bf180, &t.follower }|{ 0x893e46f0, &t.follower }|vc2tonemixtables
+mixt-rate-span|{ 0x893e4318, &t.rateSpan }|{ 0x893e431c, &t.rateSpan }|vc2tonemixtables
+mixt-rate-floor|{ 0x893e431c, &t.rateFloor }|{ 0x893e4318, &t.rateFloor }|vc2tonemixtables
+mixt-half|{ 0x893adc6c, &t.half }|{ 0x893e4670, &t.half }|vc2tonemixtables
+mixt-full|{ 0x893add74, &t.fullScale }|{ 0x893e4988, &t.fullScale }|vc2tonemixtables
+mixt-span|{ 0x893e4988, &t.delaySpan }|{ 0x893e46f0, &t.delaySpan }|vc2tonemixtables

@@ -43,6 +43,7 @@ std::string toneWordsDifference(ToneSides& s, int i) {
                                                     { at + kTailAt, &t.tail, sizeof t.tail, "its tail" },
                                                     { at + kLinkAt, &t.link, sizeof t.link, "its link" } });
     if (what.empty()) what = toneModulatorsDifference(s, i);
+    if (what.empty()) what = toneMixDifference(s, i);
     if (what.empty()) what = partWordsDifference(toneReadRom(s.fw, at), s.parts[(size_t)i].words);
     return what.empty() ? what : "tone " + std::to_string(i) + ", " + what;
 }
@@ -74,7 +75,7 @@ void drawToneInput(ToneSides& s, std::mt19937& rng) {
     for (uint32_t l = 0; l < Vc2Tone::kLfos; ++l) in.at(In::kLfos + In::kLfoStride * l + In::kKeySync) = rng() % 2;
     for (uint32_t block : In::kOscs) in.at(block + In::kLegato) = rng() % 2;
     for (uint32_t block : In::kCosms) in.at(block) = rng() % 23;
-    in.at(In::kMix) = rng() % 6;
+    toneDrawMixBlock(in, rng);
     in.at(In::kTva) = rng() % Vc2Tone::kEnvelopes;
     if (rng() % 6 == 0) {   // the fix-up's case
         in.at(In::kMix) = kFixMix;

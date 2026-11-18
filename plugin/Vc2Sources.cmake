@@ -36,6 +36,9 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2ToneEnvelope.cpp
     Source/Vc2ToneLfo.cpp
     Source/Vc2ToneModulators.cpp
+    Source/Vc2ToneMix.cpp
+    Source/Vc2ToneMixRender.cpp
+    Source/Vc2ToneMixTables.cpp
     Source/Vc2OscVoice.cpp
     Source/Vc2OscVoiceGet.cpp
     Source/Vc2OscVoiceKinds.cpp

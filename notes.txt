@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's OSC mix v269 (2026-11-18, after v268, 2322ec1; HARDWARE_FIRMWARE.md, "The VC-2's OSC mix"): step 4.2's tone
+  parts. Vc2ToneMix is rom.4's object at the tone's +0x1ab8, its constructor, note-on, install, empty update and eight
+  renders (four gains, ring product, a delay mono and stereo, a follower mono and stereo, blend, held off), with the delay
+  lines in Vc2ToneMixRings and its constants in Vc2ToneMixTables, read by loadVc2. xt_vc2tone runs rom.4's own routines for
+  it: 0 different at seeds 2024, 7 and 31337. mutate_vc2.py --tone: 439 planted, 144 of them the mix's, 0 missed.
+  rom.4's settings update for it, 0x893add60, is open in the plan. Not in the sound yet.
+
 The VC-2's envelopes and LFOs v268 (2026-11-18, on vc2-mode after 668fea7; HARDWARE_FIRMWARE.md, "The VC-2's envelopes and
   LFOs"): step 4.2's tone parts. rom.4's envelope and LFO code is rom.2's opcode for opcode, so Vc2ToneEnvelope and
   Vc2ToneLfo hold rom.4's 0x70- and 0x98-byte objects word for word and run XtEnvelope's and XtLfo's laws on them;

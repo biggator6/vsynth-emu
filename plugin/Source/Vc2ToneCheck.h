@@ -4,6 +4,7 @@
 // and rom.4's side: every part routine hooked to log and answer.  XT_VC2TONE_MAIN only.
 #include "Vc2CheckRig.h"
 #include "Vc2Tone.h"
+#include "Vc2ToneMix.h"
 #include "Vc2ToneModulators.h"
 #include <array>
 #include <span>
@@ -21,10 +22,10 @@ inline constexpr int kToneNone = -1, kToneUnknown = -2;   // a call's part: the 
 inline constexpr int kToneOut = 4;
 
 enum ToneKind : int32_t {
-    kBuild, kDestroy, kUnfollow, kUnlist, kUpdateOsc, kUpdateMix, kUpdateCosm,
-    kTvaOver, kTvaStopped, kUpdateTva, kEnded, kRenderOsc, kRenderMix, kRenderCosm, kRenderTva, kCountOsc,
-    kCountOscMatched, kTvaHeld, kInstallOsc, kInstallMix, kInstallCosm, kFollowLfo,
-    kFreeLfo, kAttachFree, kStartFree, kRelist, kList, kBindCosm, kNoteOnOsc, kTakePlayer, kSetOsc, kNoteOnMix,
+    kBuild, kDestroy, kUnfollow, kUnlist, kUpdateOsc, kUpdateCosm,
+    kTvaOver, kTvaStopped, kUpdateTva, kEnded, kRenderOsc, kRenderCosm, kRenderTva, kCountOsc,
+    kCountOscMatched, kTvaHeld, kInstallOsc, kInstallCosm, kFollowLfo,
+    kFreeLfo, kAttachFree, kStartFree, kRelist, kList, kBindCosm, kNoteOnOsc, kTakePlayer, kSetOsc,
     kSetUpCosm, kStartCosm, kNoteOnTva, kEnlist,
 };
 
@@ -74,9 +75,10 @@ struct ToneShared {
     Vc2ToneInput input {};
     std::array<std::array<uint32_t, 2>, Vc2Tone::kLfos> free {};
     std::vector<ToneCall> calls {};
-    const Vc2TonePool* pool = nullptr;
+    Vc2TonePool* pool = nullptr;
     std::array<uint32_t, 2> lists {};
     float chaos = Vc2ToneLfo::kChaosStart;   // the LFOs' constructors' generator, rom.4's word 0x89999668
+    Vc2ToneMixRings rings {};                // the mixes' delay lines (v269)
 };
 
 // A tone's port parts: answers from the shared draws and its words, the calls logged as its tone's
@@ -94,7 +96,7 @@ public:
     void tickLfo(int lfo, int32_t n) override;
     void clockLfo(int lfo, float x) override;
     void updateOsc(int osc, int32_t n) override;
-    void updateMix() override;
+    void updateMix() override {}   // [FW] 0x893ade40 returns at once
     float oscValue(int osc) override { return std::bit_cast<float>(words.osc[(size_t)osc].value); }
     void updateCosm(int cosm, float x) override;
     bool tvaOver() override { return answered(kTvaOver, s_.draws.tvaOver); }
@@ -143,8 +145,10 @@ public:
 
     ToneWords words {};
     Vc2ToneModulators mods {};   // the real envelopes and LFOs
+    Vc2ToneMix mix {};           // the real OSC mix (v269)
 
 private:
+    Vc2ToneTail& tail() { return s_.pool->tones[(size_t)tone_].tail; }
     void log(ToneKind kind, int32_t part, std::array<uint32_t, 4> args = {}, bool onTone = true) {
         s_.calls.push_back({ kind, onTone ? tone_ : kToneNone, part, args[0], args[1], args[2], args[3] });
     }

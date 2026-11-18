@@ -24,6 +24,7 @@ VC2_TABLES=(
     Vc2RampTables               # the pitch ramp's (v236)
     Vc2OscConvertTables         # the OSC block's converter's (v251)
     Vc2LibMathTables            # the library's logf and powf
+    Vc2ToneMixTables            # the tone's OSC mix's (v269)
 )
 
 # vc2Tables <source dir> [suffix]: the rows' files the tree has, one a line, each with the suffix (.cpp for a source).

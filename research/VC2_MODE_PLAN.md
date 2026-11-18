@@ -419,6 +419,11 @@ version against rom.4's routines with what it calls hooked:
      `0x893ad780` and `0x893ad800`, the attach `0x893acfc0`, the free start `0x893acf10`, the follow `0x893ace60`, the free
      objects' tick (`0x893aca60`, the manager's pass `0x893ad5f0`) and clock (`0x893acba0`, the manager's pass
      `0x893ad870`), with their hooks out of xt_vc2tone.
+   - done (v269): the tone's OSC mix, `Vc2ToneMix`: rom.4's object at the tone's +0x1ab8, its constructor, note-on, install,
+     empty update and eight renders, and the delay lines `Vc2ToneMixRings`, against rom.4's own routines in xt_vc2tone
+     (HARDWARE_FIRMWARE.md, "The VC-2's OSC mix").
+   - open: the mix's settings update `0x893add60(mix, block)`, which the tone calls at `0x893b32e6`: new targets during a
+     note, by type. Nothing in `Vc2ToneParts` reaches it yet.
    - next: kinds 5 and 6 into the tone.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the

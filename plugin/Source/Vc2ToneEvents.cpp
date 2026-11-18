@@ -97,12 +97,14 @@ std::string toneRenderOn(ToneSides& s, std::mt19937& rng) {
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     toneBothWord(s, i, kToneRendersAt, tone.tail.renders, rng() % 4 == 0 ? 0 : 1);
     s.n.renders += tone.tail.renders != 0;
+    std::string what = toneMixPrepareRender(s, i, rng);
+    if (!what.empty()) return what;
     float* out = s.shared.out.data();
     const std::initializer_list<uint32_t> args = { s.pool.addressOf(i), kToneOutAt };
-    if (rng() % 2 == 0) {
-        return toneOn(s, i, kWholeAt, args, [&] { tone.renderWhole(out, s.shared.buffers, partsOf(s, i)); });
-    }
-    return toneOn(s, i, kRenderAt, args, [&] { tone.render(out, s.shared.buffers, partsOf(s, i)); });
+    what = rng() % 2 == 0
+               ? toneOn(s, i, kWholeAt, args, [&] { tone.renderWhole(out, s.shared.buffers, partsOf(s, i)); })
+               : toneOn(s, i, kRenderAt, args, [&] { tone.render(out, s.shared.buffers, partsOf(s, i)); });
+    return what.empty() ? toneMixRendered(s, i) : what;
 }
 
 std::string toneClockOn(ToneSides& s, std::mt19937& rng) {
@@ -145,15 +147,20 @@ std::string tonePlainOn(ToneSides& s, std::mt19937& rng) {
 }
 
 // The tone's own words as a note-on or another use might leave them: its head and tail drawn on both sides, but the end
-// routine, which rom.4 calls (the link stays: the free list follows it)
+// routine and the mix's member pointer and gain, which rom.4 calls and keeps, and the indexes, a delay line's number (the
+// link stays: the free list follows it)
 std::string toneScribbleOn(ToneSides& s, std::mt19937& rng) {
     const int i = toneDrawLive(s, rng);
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     std::array<uint32_t, (sizeof tone.head + sizeof tone.tail) / sizeof(uint32_t)> words {};
     std::ranges::generate(words, [&] { return rng() % 4 == 0 ? rng() % 8 : (uint32_t)rng(); });
+    const auto mixWords = std::to_array(tone.tail.unread);
     std::memcpy(&tone.head, words.data(), sizeof tone.head);
     std::memcpy(&tone.tail, words.data() + sizeof tone.head / sizeof(uint32_t), sizeof tone.tail);
     tone.tail.ended = kToneEndedAt;
+    std::ranges::copy(mixWords, tone.tail.unread);
+    tone.head.index = (int32_t)(rng() % Vc2ToneMixRings::kTones);
+    tone.tail.index = (int32_t)(rng() % Vc2ToneMixRings::kTones);
     s.fw.cpu.write(s.pool.addressOf(i), &tone.head, sizeof tone.head);
     s.fw.cpu.write(s.pool.addressOf(i) + kToneEndedWordAt - offsetof(Vc2ToneTail, ended), &tone.tail, sizeof tone.tail);
     return toneDifference(s, i);
@@ -168,6 +175,7 @@ std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
     std::string what = vc2BothOn(
         s.fw, kNoteOnAt, { s.pool.addressOf(i), kToneInputAt }, "the note-on",
         [&] { tone.noteOn(s.shared.input, s.pool, s.owner, partsOf(s, i)); }, [&] { return toneDifference(s, -1); });
+    if (what.empty()) what = toneMixRingsOf(s, i);
     s.n.takes += vc2CountCalls(s.rom, kTakePlayer);
     s.n.follows += vc2CountCalls(s.rom, kFollowLfo);
     s.n.frees += vc2CountCalls(s.rom, kFreeLfo);
@@ -207,7 +215,7 @@ std::string toneBoundOn(ToneSides& s, std::mt19937& rng) {
 constexpr ToneEvent kEvents[] = { toneUpdateOn,    toneUpdateOn,    toneRenderOn,  toneRenderOn,   toneUnmakeOn,
                                   toneInPlaceOn,   toneClockOn,     toneCountOn,   toneMatchedOn,  toneAskOn,
                                   toneAskOn,       tonePlainOn,     tonePlainOn,   toneScribbleOn, toneNoteOnEvent,
-                                  toneNoteOnEvent, toneNoteOnEvent, toneBoundOn };
+                                  toneNoteOnEvent, toneNoteOnEvent, toneBoundOn,   toneMixPlayOn,  toneMixPlayOn };
 } // namespace
 
 std::string toneMakeOn(ToneSides& s, std::mt19937& rng) {

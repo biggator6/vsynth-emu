@@ -2,6 +2,7 @@
 // xt_vc2tone's sides (v228, v229): rom.4 and the port side by side, their compare, what each event draws on both, and
 // the events.  XT_VC2TONE_MAIN only.
 #include "Vc2ToneCheck.h"
+#include "Vc2ToneMixRoutines.h"
 #include <random>
 #include <span>
 #include <string>
@@ -16,6 +17,8 @@ struct ToneCounts {
     long events = 0, makes = 0, full = 0, inPlace = 0, unmakes = 0, back = 0, updates = 0, ends = 0, renders = 0;
     long noteOns = 0, takes = 0, follows = 0, frees = 0, fixes = 0;
     long bounds = 0;   // v268: the words the OSC voice and the TVA read
+    long mixPlays = 0;                                     // v269: a mix's note-on, install and blocks run alone
+    std::array<long, kVc2MixRoutines.size()> mixBlocks {};   // and the blocks each of its eight renders ran
 };
 
 // Both sides: rom.4 with its calls' log, the port's pool, its parts (one a tone) and their owner, the tones made
@@ -45,6 +48,17 @@ void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng);
 std::string toneModulatorsDifference(ToneSides& s, int i);
 void toneDrawModulatorBlocks(Vc2ToneInput& in, std::mt19937& rng);
 void toneDrawModulatorWords(ToneSides& s, int i, std::mt19937& rng);
+
+// The real OSC mix (v269, Vc2ToneMixCheck.cpp): tone i's mix's words against rom.4's; the delay lines of tone i, or of
+// every tone; the mix's block of a note-on's input; a render's buffers drawn on both sides, with a routine installed
+// first if the tone has none (rom.4 would call address 0); what a render leaves; and the mix played alone
+std::string toneMixDifference(ToneSides& s, int i);
+std::string toneMixRingsOf(ToneSides& s, int i);
+std::string toneMixRingsDifference(ToneSides& s);
+void toneDrawMixBlock(Vc2ToneInput& in, std::mt19937& rng);
+std::string toneMixPrepareRender(ToneSides& s, int i, std::mt19937& rng);
+std::string toneMixRendered(ToneSides& s, int i);
+std::string toneMixPlayOn(ToneSides& s, std::mt19937& rng);
 
 // A word of tone i's own set on both sides: `mine`, the port's, and rom.4's at the tone's `offset`
 template <class Word>

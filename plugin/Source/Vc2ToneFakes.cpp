@@ -87,10 +87,6 @@ void blockR6(Sh4& c, ToneCall& t) {
     t.a = blk(c.r[5]);
     t.b = c.r[6];
 }
-void blockR6R7(Sh4& c, ToneCall& t) {
-    blockR6(c, t);
-    t.c = c.r[7];
-}
 void blockFr4(Sh4& c, ToneCall& t) {
     t.a = blk(c.r[5]);
     t.b = c.fb[0][4];
@@ -102,7 +98,6 @@ void blockFr4Fr5(Sh4& c, ToneCall& t) {
 void state(Sh4& c, ToneCall& t) { t.a = word(c, c.r[4] + kStateWord); }   // the tone's, as the end routine finds it
 void buf5(Sh4& c, ToneCall& t) { t.a = buf(c.r[5]); }
 void bufs56(Sh4& c, ToneCall& t) { t.a = buf(c.r[5]) | buf(c.r[6]) << 8; }
-void bufs567(Sh4& c, ToneCall& t) { t.a = buf(c.r[5]) | buf(c.r[6]) << 8 | buf(c.r[7]) << 16; }
 void cosmDsp(Sh4& c, ToneCall& t) {   // given its +0x58, its +0x10 and itself: anything else in the second word
     t.a = buf(c.r[7]);
     t.b = c.r[4] == c.r[6] + kCosmD && c.r[5] == c.r[6] + kCosmState ? 0 : 1;
@@ -146,25 +141,25 @@ struct ToneHook {
     void (*decode)(Sh4&, ToneCall&);
     Answer answer;
 };
-// [FW] every routine the tone's frame and note-on call but the envelopes' and LFOs', which run (v268)
+// [FW] every routine the tone's frame and note-on call but the envelopes', the LFOs' (v268) and the mix's (v269), which run
 const ToneHook kHooks[] = {
     { 0x893ae070, kBuild, 4, none, zero }, { 0x893aa030, kBuild, 4, none, zero }, { 0x893b20b0, kBuild, 4, none, zero },
-    { 0x893adbc0, kBuild, 4, none, zero }, { 0x893aa060, kDestroy, 4, none, zero },
+    { 0x893aa060, kDestroy, 4, none, zero },
     { 0x893ad720, kUnfollow, 5, none, zero }, { 0x893ada30, kUnlist, 4, one, zero },
-    { 0x893ad9a0, kUnlist, 4, none, zero }, { 0x893ae1c0, kUpdateOsc, 4, r5, zero }, { 0x893ade40, kUpdateMix, 4, none, zero },
+    { 0x893ad9a0, kUnlist, 4, none, zero }, { 0x893ae1c0, kUpdateOsc, 4, r5, zero },
     { kCosmUpdateAt, kUpdateCosm, 4, fr4, zero }, { 0x893b2560, kTvaOver, 4, none, over },
     { 0x893b2610, kTvaStopped, 4, none, stopped }, { 0x893b23d0, kUpdateTva, 4, none, zero },
     { kToneEndedAt, kEnded, 4, state, zero }, { 0x893ae9f0, kRenderOsc, 4, buf5, zero },
-    { 0x893ade50, kRenderMix, 4, bufs567, zero }, { kCosmDspAt, kRenderCosm, 6, cosmDsp, zero },
+    { kCosmDspAt, kRenderCosm, 6, cosmDsp, zero },
     { 0x893b2640, kRenderTva, 4, bufs56, zero }, { 0x893ae6c0, kCountOsc, 4, r5, zero },
     { 0x893ae720, kCountOscMatched, 4, r5, zero }, { 0x893b25c0, kTvaHeld, 4, none, held },
-    { 0x893ae0f0, kInstallOsc, 4, none, installedOsc }, { 0x893ade90, kInstallMix, 4, r5, zero },
+    { 0x893ae0f0, kInstallOsc, 4, none, installedOsc },
     { 0x893aafe0, kInstallCosm, 4, r5, installedCosm }, { 0x893ace60, kFollowLfo, 4, follow, zero },
     { 0x893ad640, kFreeLfo, 0, r5r6, freeObject }, { 0x893acfc0, kAttachFree, 4, r5, zero },
     { 0x893acf10, kStartFree, 4, blockFr4Fr5, zero }, { 0x893ad780, kRelist, 0, r5r6r7, zero },
     { 0x893ad800, kList, 0, r5r6, zero }, { 0x893aa7b0, kBindCosm, 4, bindCosm, zero },
     { 0x893ae370, kNoteOnOsc, 4, blockR6, zero }, { 0x893aee20, kTakePlayer, 4, player, zero },
-    { 0x893ae610, kSetOsc, 4, block5, zero }, { 0x893adbf0, kNoteOnMix, 4, blockR6R7, zero },
+    { 0x893ae610, kSetOsc, 4, block5, zero },
     { 0x893aa590, kSetUpCosm, 4, setUp, zero }, { 0x893aa0e0, kStartCosm, 4, blockR6, zero },
     { 0x893b2100, kNoteOnTva, 4, blockR6, zero }, { 0x893ada10, kEnlist, 4, none, zero },
 };
