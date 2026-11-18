@@ -71,4 +71,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscConvert.cpp
     Source/Vc2OscConvertTables.cpp
     Source/Vc2CosmAdapters.cpp
+    Source/Vc2LibMath.cpp
+    Source/Vc2LibMathTables.cpp
 )

@@ -335,6 +335,12 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's logf and powf v257 (2026-11-17, on its own branch from vc2-mode's 5766f4d; HARDWARE_FIRMWARE.md, "The
+  VC-2's logf and powf"). Vc2LibMath: rom.4's logf (0x895065f4), powf (0x89506e54), exp (0x89509928) and ldexp
+  (0x8950ae24) on XtFloat, the constants read by vc2LoadLibMath in loadVc2. xt_vc2libm against rom.4's own routines,
+  every answer bit for bit: 0 different at seeds 2024, 7 and 31337; 68 of 68 branches; mutate_vc2.py --libm 106 of 106
+  caught. Vc2ToneShared still gives rom.4's own routines: the wiring takes the port next.
+
 The VC-2's COSM adapter for Lo-Fi v253 (2026-11-17, on its own branch after v252; the VC-2 session's choice (a);
   HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: Lo-Fi"). XtCosmLofi moved out of XtCosm.h (964 lines) as it
   stood into XtCosmLofi.h, as its own step, then four const getters for the words its new block forms (the mask,

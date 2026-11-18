@@ -1,0 +1,120 @@
+# mutate_vc2.py --libm: deliberate errors in Vc2LibMath.cpp and Vc2LibMathTables.cpp, each of which xt_vc2libm must show.
+# name|old|new[|port[|seed]]; the port's vc2libm where a line gives none.
+# Not planted, as no input can show them (each was run and missed, then read): the sign on a zero's or a NaN's class (every
+# routine tests those two before the sign); wholePart's sign (only -0 gains from it, and only == and a subtraction read
+# that); wholePart's limit moved within 2^23…2^24 (FTRC and FLOAT are exact there); logf's mantissa keeping the sign (x
+# is positive by then); exp's limit at 2^14 or 2^16 (the series overflows or underflows to the same answers there);
+# ldexp's sum saturating instead of wrapping and its n = 0 past the ends (n's sign decides, and 0 never leaves them).
+# What every routine asks first
+class-sign|const uint32_t sign = (bits & kSign) ? kNegative : 0;|const uint32_t sign = 0;
+class-zero-first|    if (x == 0.0f) return sign \| kZero;\n|
+class-zero-bits|if (x == 0.0f) return sign \| kZero;|if (bits << 1 == 0) return sign \| kZero;
+class-infinite|    if ((bits & ~kSign) == kExponent) return sign \| kInfinite;\n|
+class-infinite-sign|if ((bits & ~kSign) == kExponent)|if (bits == kExponent)
+class-infinite-unsigned|return sign \| kInfinite;|return kInfinite;
+class-nan|return x == x ? sign : sign \| kNotANumber;|return sign;
+# A float's parts and the whole-part helper
+exponent-bias|(bits & kExponent) >> 23) - 127;|(bits & kExponent) >> 23) - 126;
+series-start|float sum = c[0];\n    for (size_t i = 1;|float sum = c[1];\n    for (size_t i = 1;
+series-from|for (size_t i = 1; i < c.size(); ++i) sum|for (size_t i = 2; i < c.size(); ++i) sum
+series-short|i < c.size(); ++i) sum|i + 1 < c.size(); ++i) sum
+series-fused|sum = xtf::add(xtf::mul(sum, x), c[i]);|sum = (float)((double)sum * x + c[i]);
+series-order|sum = xtf::add(xtf::mul(sum, x), c[i]);|sum = xtf::add(xtf::mul(c[i], x), sum);
+whole-from-early|constexpr uint32_t kWholeFrom = 0x4b000000u;|constexpr uint32_t kWholeFrom = 0x4a800000u;
+whole-floor|xtf::flt(xtf::ftrc(x))|xtf::flt((int)std::floor(x))
+whole-round|xtf::flt(xtf::ftrc(x))|xtf::flt((int)std::lround(x))
+# logf
+log-nan|    if (kind & kNotANumber) return t.notANumber;\n    if (kind & kZero) return t.minusInfinity;|    if (kind & kZero) return t.minusInfinity;
+log-zero|if (kind & kZero) return t.minusInfinity;|if (kind & kZero) return t.infinity;
+log-zero-after|    if (kind & kZero) return t.minusInfinity;\n    if (kind & kNegative) return t.notANumber;|    if (kind & kNegative) return t.notANumber;\n    if (kind & kZero) return t.minusInfinity;
+log-negative|    if (kind & kNegative) return t.notANumber;\n    if (kind & kInfinite) return t.infinity;|    if (kind & kInfinite) return t.infinity;
+log-negative-infinite|    if (kind & kNegative) return t.notANumber;\n    if (kind & kInfinite) return t.infinity;|    if (kind & kInfinite) return t.infinity;\n    if (kind & kNegative) return t.notANumber;
+log-infinite|if (kind & kInfinite) return t.infinity;\n    if (x == t.one)|if (kind & kInfinite) return t.notANumber;\n    if (x == t.one)
+log-one|    if (x == t.one) return t.zero;\n|
+log-one-answer|if (x == t.one) return t.zero;|if (x == t.one) return t.minusZero;
+log-mantissa-exponent|\| kOneExponent);\n    const float octaves|\| 0x3f000000u);\n    const float octaves
+log-half|xtf::add(xtf::flt(unbiasedExponent(bits)), t.half)|xtf::flt(unbiasedExponent(bits))
+log-half-sub|xtf::add(xtf::flt(unbiasedExponent(bits)), t.half)|xtf::sub(xtf::flt(unbiasedExponent(bits)), t.half)
+log-ln2|xtf::add(xtf::flt(unbiasedExponent(bits)), t.half), t.ln2)|xtf::add(xtf::flt(unbiasedExponent(bits)), t.half), t.perLn2)
+log-z-over|xtf::div(xtf::add(mantissa, t.minusRoot2), xtf::add(mantissa, t.root2))|xtf::div(xtf::add(mantissa, t.minusOne), xtf::add(mantissa, t.root2))
+log-z-under|xtf::div(xtf::add(mantissa, t.minusRoot2), xtf::add(mantissa, t.root2))|xtf::div(xtf::add(mantissa, t.minusRoot2), xtf::add(mantissa, t.one))
+log-z-swap|xtf::div(xtf::add(mantissa, t.minusRoot2), xtf::add(mantissa, t.root2))|xtf::div(xtf::add(mantissa, t.root2), xtf::add(mantissa, t.minusRoot2))
+log-z-host|xtf::div(xtf::add(mantissa, t.minusRoot2), xtf::add(mantissa, t.root2))|((mantissa + t.minusRoot2) / (mantissa + t.root2))
+log-square|fmacSeries(t.logSeries, xtf::mul(z, z))|fmacSeries(t.logSeries, z)
+log-last-fused|return xtf::add(xtf::mul(z, fmacSeries(t.logSeries, xtf::mul(z, z))), octaves);|return (float)((double)z * fmacSeries(t.logSeries, xtf::mul(z, z)) + octaves);
+log-last-sub|return xtf::add(xtf::mul(z, fmacSeries(t.logSeries, xtf::mul(z, z))), octaves);|return xtf::sub(xtf::mul(z, fmacSeries(t.logSeries, xtf::mul(z, z))), octaves);
+# exp
+exp-nan|    if (kind & kNotANumber) return t.notANumber;\n    if (kind & kZero) return t.one;|    if (kind & kZero) return t.one;
+exp-zero|if (kind & kZero) return t.one;|if (kind & kZero) return t.zero;
+exp-limit-inside|constexpr int kExpTooLarge = 15,|constexpr int kExpTooLarge = 6,
+exp-limit-sign|return (kind & kNegative) ? t.zero : t.infinity;|return t.infinity;
+exp-limit-swap|return (kind & kNegative) ? t.zero : t.infinity;|return (kind & kNegative) ? t.infinity : t.zero;
+exp-scale|xtf::mul(x, t.perLn2)|xtf::mul(x, t.ln2)
+exp-scale-host|const float inOctaves = xtf::mul(x, t.perLn2);|const float inOctaves = (float)((double)x * t.perLn2 + 1e-9);
+exp-fraction|float fraction = xtf::sub(inOctaves, whole);|float fraction = xtf::sub(whole, inOctaves);
+exp-whole-rounded|int32_t octaves = xtf::ftrc(whole);|int32_t octaves = xtf::ftrc(inOctaves) + (inOctaves < 0.0f);
+exp-large|constexpr int kExpTooLarge = 15, kFractionLarge = -1;|constexpr int kExpTooLarge = 15, kFractionLarge = 0;
+exp-large-low|constexpr int kExpTooLarge = 15, kFractionLarge = -1;|constexpr int kExpTooLarge = 15, kFractionLarge = -2;
+exp-large-test|if (unbiasedExponent(bits) >= kFractionLarge) {|if (unbiasedExponent(bits) > kFractionLarge) {
+exp-below|const bool below = (bits & kSign) != 0;|const bool below = (bits & kSign) == 0;
+exp-toward|fraction = xtf::add(fraction, below ? t.one : t.minusOne);|fraction = xtf::add(fraction, below ? t.minusOne : t.one);
+exp-octave|octaves += below ? -1 : 1;|octaves += below ? 1 : -1;
+exp-octave-none|        octaves += below ? -1 : 1;\n|
+exp-octave-scaled|const float scaled = xtf::mul(fraction, t.ln2);|const float scaled = xtf::mul(fraction, t.perLn2);
+exp-flush|const float scaled = xtf::mul(fraction, t.ln2);|const float scaled = std::fabs(fraction) < 1e-30f ? fraction : xtf::mul(fraction, t.ln2);
+exp-ratio|xtf::div(fmacSeries(t.expOver, scaled), fmacSeries(t.expUnder, scaled))|xtf::div(fmacSeries(t.expUnder, scaled), fmacSeries(t.expOver, scaled))
+exp-ratio-host|xtf::div(fmacSeries(t.expOver, scaled), fmacSeries(t.expUnder, scaled))|(fmacSeries(t.expOver, scaled) / fmacSeries(t.expUnder, scaled))
+exp-octaves|fmacSeries(t.expUnder, scaled)), octaves);|fmacSeries(t.expUnder, scaled)), octaves + 1);
+# ldexp
+ldexp-top|if (field == kExponent) return (bits & kMantissa) ? t.notANumber : infinite;|if (field == kExponent) return infinite;
+ldexp-top-nan|if (field == kExponent) return (bits & kMantissa) ? t.notANumber : infinite;|if (field == kExponent) return t.notANumber;
+ldexp-top-sign|const float infinite = (bits & kSign) ? t.minusInfinity : t.infinity;|const float infinite = t.infinity;
+ldexp-zero-sign|const float zero = (bits & kSign) ? t.minusZero : t.zero;|const float zero = t.zero;
+ldexp-denormal|    if (field == 0) return zero;   // a denormal is a zero here\n|
+ldexp-denormal-kept|if (field == 0) return zero;|if (field == 0) return x;
+ldexp-low|if (exponent > 0 && exponent < kExponentTop)|if (exponent >= 0 && exponent < kExponentTop)
+ldexp-high|if (exponent > 0 && exponent < kExponentTop)|if (exponent > 0 && exponent <= kExponentTop)
+ldexp-high-less|constexpr int kExponentTop = 255;|constexpr int kExponentTop = 254;
+ldexp-sign|return std::bit_cast<float>((bits & (kSign \| kMantissa)) \| ((uint32_t)exponent << 23));|return std::bit_cast<float>((bits & kMantissa) \| ((uint32_t)exponent << 23));
+ldexp-mantissa|return std::bit_cast<float>((bits & (kSign \| kMantissa)) \| ((uint32_t)exponent << 23));|return std::bit_cast<float>((bits & kSign) \| ((uint32_t)exponent << 23));
+ldexp-past-swap|return n >= 0 ? infinite : zero;|return n >= 0 ? zero : infinite;
+ldexp-past-exponent|return n >= 0 ? infinite : zero;|return exponent >= kExponentTop ? infinite : zero;
+# powf
+pow-nan|    if ((ofX \| ofY) & kNotANumber) return t.notANumber;\n|
+pow-nan-x|if ((ofX \| ofY) & kNotANumber) return t.notANumber;|if (ofX & kNotANumber) return t.notANumber;
+pow-nan-y|if ((ofX \| ofY) & kNotANumber) return t.notANumber;|if (ofY & kNotANumber) return t.notANumber;
+pow-zero|    if (ofX & kZero) return (ofY & (kZero \| kNegative)) ? t.notANumber : t.zero;\n|
+pow-zero-zero|return (ofY & (kZero \| kNegative)) ? t.notANumber : t.zero;|return (ofY & kNegative) ? t.notANumber : t.zero;
+pow-zero-negative|return (ofY & (kZero \| kNegative)) ? t.notANumber : t.zero;|return (ofY & kZero) ? t.notANumber : t.zero;
+pow-zero-answer|return (ofY & (kZero \| kNegative)) ? t.notANumber : t.zero;|return (ofY & (kZero \| kNegative)) ? t.notANumber : x;
+pow-power-zero|    if (ofY & kZero) return t.one;\n|
+pow-power-zero-before|    if (ofX & kZero) return (ofY & (kZero \| kNegative)) ? t.notANumber : t.zero;\n    if (ofY & kZero) return t.one;|    if (ofY & kZero) return t.one;\n    if (ofX & kZero) return (ofY & (kZero \| kNegative)) ? t.notANumber : t.zero;
+pow-positive|if (!(ofX & kNegative)) return vc2LibExp(xtf::mul(vc2LibLog(x), y));|if (!(ofX & kNegative)) return vc2LibExp(xtf::mul(vc2LibLog(y), x));
+pow-positive-host|if (!(ofX & kNegative)) return vc2LibExp(xtf::mul(vc2LibLog(x), y));|if (!(ofX & kNegative)) return vc2LibExp(vc2LibLog(x) * y);
+pow-whole|if (wholePart(y) != y \|\| (ofY & kInfinite)) return t.notANumber;|if (ofY & kInfinite) return t.notANumber;
+pow-infinite|if (wholePart(y) != y \|\| (ofY & kInfinite)) return t.notANumber;|if (wholePart(y) != y) return t.notANumber;
+pow-negative-log|const float power = vc2LibExp(xtf::mul(vc2LibLog(-x), y));|const float power = vc2LibExp(xtf::mul(vc2LibLog(x), y));
+pow-negative-host|const float power = vc2LibExp(xtf::mul(vc2LibLog(-x), y));|const float power = vc2LibExp(vc2LibLog(-x) * y);
+pow-half|const float half = vc2LibLdexp(y, -1);|const float half = vc2LibLdexp(y, 1);
+pow-odd|return wholePart(half) == half ? power : -power;|return power;
+pow-odd-swap|return wholePart(half) == half ? power : -power;|return wholePart(half) == half ? -power : power;
+# The constants, each from its own word
+table-nan|{ 0x898c56e8, &t.notANumber }|{ 0x898c56f0, &t.notANumber }|vc2libmtables
+table-zero|{ 0x898c56ec, &t.zero }|{ 0x898c571c, &t.zero }|vc2libmtables
+table-minus-zero|{ 0x898c571c, &t.minusZero }|{ 0x898c56ec, &t.minusZero }|vc2libmtables
+table-infinity|{ 0x898c56f0, &t.infinity }|{ 0x898c5720, &t.infinity }|vc2libmtables
+table-minus-infinity|{ 0x898c5720, &t.minusInfinity }|{ 0x898c56f0, &t.minusInfinity }|vc2libmtables
+table-one|{ 0x898c56f4, &t.one }|{ 0x898c5724, &t.one }|vc2libmtables
+table-minus-one|{ 0x898c5724, &t.minusOne }|{ 0x898c56f4, &t.minusOne }|vc2libmtables
+table-half|{ 0x898c56f8, &t.half }|{ 0x898c56fc, &t.half }|vc2libmtables
+table-ln2|{ 0x898c5718, &t.ln2 }|{ 0x898c5714, &t.ln2 }|vc2libmtables
+table-per-ln2|{ 0x898c5698, &t.perLn2 }|{ 0x898c569c, &t.perLn2 }|vc2libmtables
+table-root2|{ 0x89509b78, &t.root2 }|{ 0x89509b74, &t.root2 }|vc2libmtables
+table-minus-root2|{ 0x89509b74, &t.minusRoot2 }|{ 0x89509b78, &t.minusRoot2 }|vc2libmtables
+table-log-series|kLogSeries { 0x898c56a4, 8 }|kLogSeries { 0x898c56a8, 8 }|vc2libmtables
+table-log-short|kLogSeries { 0x898c56a4, 8 }|kLogSeries { 0x898c56a4, 7 }|vc2libmtables
+table-over|kExpOver { 0x898c5660, 7 }|kExpOver { 0x898c5664, 7 }|vc2libmtables
+table-over-short|kExpOver { 0x898c5660, 7 }|kExpOver { 0x898c5660, 6 }|vc2libmtables
+table-under|kExpUnder { 0x898c567c, 7 }|kExpUnder { 0x898c5680, 7 }|vc2libmtables
+table-under-short|kExpUnder { 0x898c567c, 7 }|kExpUnder { 0x898c567c, 6 }|vc2libmtables
+table-under-is-over|kExpUnder { 0x898c567c, 7 }|kExpUnder { 0x898c5660, 7 }|vc2libmtables

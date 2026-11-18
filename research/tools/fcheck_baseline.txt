@@ -799,6 +799,9 @@ setup: 40 cases, 2400 events: 490 records (194 held), 143 assignments, 283 setti
 object: 40 cases, 2400 events: 321 constructs, 308 set-ups, 313 bindings, 1204 installs (815 stereo), 254 draws
 note-on: 40 cases, 2400 events: 866 note-ons (146 taking a slot, 327 adapted), 559 new blocks (115 adapted), 339 destroys, 303 pool set-ups, 333 draws
 xt_vc2cosm: 0 different
+== xt_vc2libm
+calls: 5352268, answers NaN 1241571, infinite 1048364, zero 1058897, negative 675765; errno written 1725662 times
+xt_vc2libm: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

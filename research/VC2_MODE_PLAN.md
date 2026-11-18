@@ -400,9 +400,10 @@ version against rom.4's routines with what it calls hooked:
      `0x8939d3b4`; `0x8939e300` is PCM's) and the VOCODER's first half, one code but for the calibration row:
      `vc2OscBlockConvert`, the two pitch10s and the block's +0x04…+0x68 with its helpers, against rom.4's whole
      converters in xt_vc2carrier's third part (HARDWARE_FIRMWARE.md, "The VC-2's OSC block converter").
-   - then the analog's converter's second part (its own words from the block's +0xb0); then Vari off. Beside
-     them, the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf (`0x89506e54`), which the
-     wiring gives and nothing has ported yet.
+   - then the analog's converter's second part (its own words from the block's +0xb0); then Vari off.
+   - done (v257): the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf (`0x89506e54`),
+     `Vc2LibMath`, against rom.4's own in xt_vc2libm (HARDWARE_FIRMWARE.md, "The VC-2's logf and powf"). The wiring
+     takes it next: `Vc2ToneShared` still gives rom.4's routines through `RomShared`.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
      update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its
