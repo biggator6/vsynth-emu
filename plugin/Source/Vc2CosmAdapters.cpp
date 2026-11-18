@@ -14,7 +14,7 @@ using namespace Vc2CosmAdapter;
 namespace {
 // [FW] the block codes
 constexpr int32_t kOd = 1, kDs = 2, kWs = 3, kAmp = 4, kResonator = 6, kDual = 12, kTvf = 13, kDtvf = 14, kLofi = 19;
-constexpr int32_t kComp = 15, kLim = 16, kFs = 18, kTb = 20;
+constexpr int32_t kSbf1 = 7, kSbf2 = 8, kComp = 15, kLim = 16, kFs = 18, kTb = 20;
 // [FW] Lo-Fi's words past the block's (v253): the Rate's mask (D+1, a byte), 1/2^Rate, 2^Bit, 2^−Bit (D+0x94…+0x9c)
 constexpr size_t kLofiMask = 0x59, kLofiCoef = 0xec, kLofiUp = 0xf0, kLofiDown = 0xf4;
 constexpr size_t kWsLevel = 0x40;   // [FW] the Wave Shaper's Level/8, past its block's words (v254)
@@ -279,6 +279,8 @@ constexpr Vc2CosmTypeRow kAdapterRows[] {
     { kWs, valueStartValues<kWsType>, valueNewBlock<kWsType>, copyCase<kWsCase> },
     { kAmp, valueStartValues<kAmpType>, valueNewBlock<kAmpType>, copyCase<kAmpCase> },
     { kResonator, valueStartValues<kResType>, valueNewBlock<kResType>, nullptr },
+    { kSbf1, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase },
+    { kSbf2, vc2CosmSbfStartValues, vc2CosmSbfNewBlock, vc2CosmSbfNoteOnCase },
     { kDual, valueStartValues<kDualType>, valueNewBlock<kDualType>, copyCase<kDualCase> },
     { kTvf, valueStartValues<kTvfType>, valueNewBlock<kTvfType>, nullptr },
     { kDtvf, valueStartValues<kDtvfType>, valueNewBlock<kDtvfType>, copyCase<kDtvfCase> },

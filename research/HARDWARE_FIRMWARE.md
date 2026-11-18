@@ -1546,6 +1546,35 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM adapters: the Side Band Filters (2026-11-17, v260) {#vc2-cosm-adapters-sbf}
+
+Step 4.2's COSM object, its eighth part (research/VC2_MODE_PLAN.md). With these two, every code a converter gives has its start values, new block and note-on case. Codes 10, 11 and 17 have no converter in rom.4. Every address is rom.4's, every offset the object's or its block's.
+
+**XtCosmSbf**, on the VC-2 session's conditions (2026-11-17):
+- First, as its own step, XtSbfParams, XtSbfBlock, xtSbfBlock, xtCosmSetKeySquares and XtCosmSbf moved out of XtCosm.h as they stood, into XtCosmSbf.h, which XtCosm.h includes where they were. Three lines were broken at 120 columns. Their code stays in XtCosm.cpp.
+- Then five const getters, read only: `detuneRatio()` (1 − Detune/2400), `subRatio()` (1 − Sub/2400), `hpfHalf()` (HPF/2), `octaveFactor()` (D+0x9c) and `dcRate()` (D+0x38, R's D+0x70).
+
+**The start values** (`0x893a88a0`, `0x893a8960`): the delay 44100 × the octave's factor (`0x89543ad8` by the Octave's byte) × (1 − Detune/2400 + its depths on envelope A and LFO A) / (root × pitch, the object's +4 and +0), within 0…3267, into D+0xbc; the Width with its depths on B, within 0…1 (the second filter's 0…0.95), into D+0xc0.
+
+**The new blocks** (`0x893a9310`, `0x893a9410`): the same sums on the held levels into the targets, with no clamp, the Octave's byte into +0x14 and its factor into D+0x9c, and the block's words into the object's:
+- The first: 1 − Detune/2400 into +0x18 in Detune's place, +0xc…+0x37 as they stand, HPF/2 into +0x48 in the HPF's place, the LPF +0x3c, 1 − Sub/2400 into +0x50 in the Sub Detune's place, and +0x44.
+- The second: Q +8 as it stands, 1 − Detune/2400 into +0x1c, and +0x10…+0x43 as they stand.
+
+**The note-on cases** (`0x893aa310`, `0x893aa3d0`): the gain 2(1 − |w|) + w² from the unclamped Width target; the HPF's or Q's and the LPF's slews; the Own depths' slews; the octave's factor; the level 0; the new delay at the start delay and its fraction; the crossfade finished; the DC follower's rate 0.001551 on both channels. The first also keeps the Sub slew and the second line's fraction.
+
+**The adapter** (Vc2CosmBufferedAdapters.cpp): one routine for each part over both filters, on one more object in `Vc2CosmBufferedScratch`. The Frequency Shifter's targets and the Side Band Filters' now share `targetsOn`.
+
+**The check**, xt_vc2cosm's sixth part: codes 7 and 8 are among its note-ons and new blocks, their blocks drawn as their converters give them. The object's +4 is now drawn as an OSC's root in Hz, as the delay divides by it.
+
+Results:
+- seed 2024, 40 cases: 868 note-ons (245 taking a slot, 566 adapted), 618 new blocks (235 adapted); 0 different on the first run, with the address and undefined-behaviour sanitizers on. The other five parts are as they were.
+- seeds 7 and 31337, 400 cases each: 8,847 and 8,990 note-ons (5,528 and 5,676 adapted), 6,022 and 6,012 new blocks (1,972 and 2,148 adapted); 0 different.
+- Coverage: every line, region and function of Vc2CosmAdapters.cpp and Vc2CosmBufferedAdapters.cpp.
+- `mutate_vc2.py --cosm`: 1,227 plants, all caught. 101 are new or rewritten: 82 in `vc2cosmbuffered`, 8 in `vc2cosmadapters` and 11 in `vc2xtcosm`. The getters are planted at their call sites, as a header can't take a VC-2 port's plant.
+- `mutate_tone.py`: four new tonecosm plants on the words the getters read, with tone_muts' two Side Band wiring plants: 6 of 6 caught at 2,000 cases. The same four under xt_cosm, by hand: 4 of 4 caught, and the clean copy 0 different.
+- Not planted, as no input tells them apart: pitch and root swapped (their product), the case's octave factor left out (the new block has just written it), the note-on's envelope A output (only the detune target reads it, and the new block writes that).
+- fcheck, without `--update` and again with `--full`, which reruns every section: only xt_vc2cosm's `note-on:` line differs, so xt_cosm's and xt_tone's sections equal the baseline. verify.sh passes every line.
+
 ### The VC-2's COSM adapters: the Compressor, the Limiter and the Frequency Shifter (2026-11-17, v258) {#vc2-cosm-adapters-buffered}
 
 Step 4.2's COSM object, its seventh part (research/VC2_MODE_PLAN.md): three of the five types that take a pool slot. XtCosm is unchanged. The Side Band Filters (7, 8) wait for v260: their new blocks and note-on cases write words XtCosmSbf keeps private. Every address is rom.4's, every offset the object's or its block's.

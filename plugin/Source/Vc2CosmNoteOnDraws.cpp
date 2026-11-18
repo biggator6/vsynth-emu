@@ -10,11 +10,12 @@ constexpr uint32_t kBoundStride = 0x100;
 constexpr uint32_t kLevel = 0x4c, kRate = 0x54, kLfoLevel = 0x38, kStartLevel = 0x58;   // [FW] the bound objects' words
 // [FW] the bytes whose start values the port has (0, 5, 10, 11, 15, 16 none; 1…4, 6, 9, 12…14, 18…20 its rows), none
 // past 20
-constexpr std::array<uint8_t, 18> kPassingBytes { 0, 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20 };
+constexpr std::array<uint8_t, 20> kPassingBytes { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19,
+                                                  20 };
 constexpr int32_t kFirstBuffered = 7;               // [FW] the allocator's: the code's byte − 7, 0…3 and 8…11 take a slot
-// [FW] the adapted types' codes (v252…v258)
+// [FW] the adapted types' codes (v252…v260)
 constexpr int32_t kOd = 1, kDs = 2, kWs = 3, kAmp = 4, kResonator = 6, kDual = 12, kTvf = 13, kDtvf = 14, kLofi = 19;
-constexpr int32_t kComp = 15, kLim = 16, kFs = 18, kTb = 20;
+constexpr int32_t kSbf1 = 7, kSbf2 = 8, kComp = 15, kLim = 16, kFs = 18, kTb = 20;
 
 float moderate(std::mt19937& rng, float from, float to) { return from + (to - from) * vc2Unit(rng); }
 
@@ -119,6 +120,26 @@ void drawLimBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
 // The Frequency Shifter's: Depth and Balance 0…1 with their depths, from word 0
 void drawFsBlock(Vc2CosmBlockWords& b, std::mt19937& rng) { drawBlockSettings(b, rng, 0, 0.0f); }
 
+// The Side Band Filters' (v260): the Octave 0…2 as a byte; Detune ±100 and Width 0…1, each with its Env, LFO and Own
+// depths within ±1; the first's HPF −1…0, LPF ½…1 and Sub Detune ±100; the second's Q and LPF ½…1
+constexpr Vc2CosmWordRange kSbf1Ranges[] { { 1, -100.0f, 100.0f }, { 2, -1.0f, 1.0f }, { 4, -1.0f, 1.0f },
+                                           { 6, -1.0f, 1.0f }, { 7, 0.0f, 1.0f }, { 8, -1.0f, 1.0f },
+                                           { 10, -1.0f, 1.0f }, { 12, -1.0f, 1.0f }, { 13, -1.0f, 0.0f },
+                                           { 14, 0.5f, 1.0f }, { 15, -100.0f, 100.0f } };
+constexpr Vc2CosmWordRange kSbf2Ranges[] { { 2, -100.0f, 100.0f }, { 3, -1.0f, 1.0f }, { 5, -1.0f, 1.0f },
+                                           { 7, -1.0f, 1.0f }, { 8, 0.0f, 1.0f }, { 9, -1.0f, 1.0f },
+                                           { 11, -1.0f, 1.0f }, { 13, -1.0f, 1.0f }, { 14, 0.5f, 1.0f } };
+void drawOctave(Vc2CosmBlockWords& b, std::mt19937& rng) { b.words[0] = (b.words[0] & 0xffffff00u) | (rng() % 3); }
+void drawSbf1Block(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    drawOctave(b, rng);
+    drawRanges(b, rng, kSbf1Ranges);
+}
+void drawSbf2Block(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    drawOctave(b, rng);
+    drawRanges(b, rng, kSbf2Ranges);
+    setBlockFloat(b, 1, (float)(rng() % 128) * 0.96875f / 127.0f - 1.0f);
+}
+
 // The Growl's converter: Intencity I/127, Speed 2·S/128 − 1, its two settings' depths and numbers
 void drawGrowlBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
     Vc2CosmGrowlBlock g {};
@@ -139,11 +160,13 @@ struct Vc2CosmBlockDraw {
     uint8_t code;
     void (*draw)(Vc2CosmBlockWords& b, std::mt19937& rng);
 };
-constexpr std::array<Vc2CosmBlockDraw, 14> kBlockDraws { { { kOd, drawOdBlock },
+constexpr std::array<Vc2CosmBlockDraw, 16> kBlockDraws { { { kOd, drawOdBlock },
                                                            { kDs, drawOdBlock },
                                                            { kWs, drawWsBlock },
                                                            { kAmp, drawAmpBlock },
                                                            { kResonator, drawResBlock },
+                                                           { kSbf1, drawSbf1Block },
+                                                           { kSbf2, drawSbf2Block },
                                                            { (uint8_t)Vc2CosmGrowl::kCode, drawGrowlBlock },
                                                            { kDual, drawDualBlock },
                                                            { kTvf, drawTvfBlock },
@@ -156,8 +179,8 @@ constexpr std::array<Vc2CosmBlockDraw, 14> kBlockDraws { { { kOd, drawOdBlock },
 
 // A code the port has a type for, or one past 20 whose byte the switches pass
 int32_t drawCode(std::mt19937& rng) {
-    const std::array<int32_t, 16> ported { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, Vc2CosmGrowl::kCode, kDual,
-                                           kTvf, kDtvf, kComp, kLim, kFs, kLofi, kTb };
+    const std::array<int32_t, 18> ported { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, kSbf1, kSbf2,
+                                           Vc2CosmGrowl::kCode, kDual, kTvf, kDtvf, kComp, kLim, kFs, kLofi, kTb };
     if (rng() % 4 != 0) return ported[rng() % ported.size()];
     const uint8_t low = rng() % 2 ? kPassingBytes[rng() % kPassingBytes.size()] : (uint8_t)(21 + rng() % 235);
     const uint32_t high = rng() % 2 ? 0xffffff00u : (uint32_t)(1 + rng() % 0x7fff) << 8;
@@ -197,6 +220,7 @@ void vc2DrawNoteOnObject(Vc2CosmObjectWords& o, std::mt19937& rng) {
     o.slot = rng() % 3 == 0 ? -1 : (int32_t)(rng() % Vc2CosmPoolWords::kSlots);
     o.pool = rng() % 4 == 0 ? (uint32_t)rng() : (uint32_t)(rng() % 2);
     o.setUp.pitch = moderate(rng, 0.25f, 4.0f);
+    o.setUp.other = moderate(rng, 55.0f, 1760.0f);   // the OSC's root in Hz, the Side Band Filters' delay's (v260)
     for (float& h : o.held) h = moderate(rng, -1.0f, 1.0f);
     Vc2CosmGrowlWords g {};
     std::memcpy(&g, &o, sizeof o);
