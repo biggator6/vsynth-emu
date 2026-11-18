@@ -409,6 +409,16 @@ version against rom.4's routines with what it calls hooked:
    - done (v257): the shared math's logf (`0x895065f4`, its core rom.2's `0x89531b78`) and powf (`0x89506e54`),
      `Vc2LibMath`, against rom.4's own in xt_vc2libm (HARDWARE_FIRMWARE.md, "The VC-2's logf and powf"). The wiring
      takes it next: `Vc2ToneShared` still gives rom.4's routines through `RomShared`.
+   - done (v268): the tone's envelopes and LFOs, `Vc2ToneEnvelope`, `Vc2ToneLfo` and `Vc2ToneModulators`: rom.4's objects
+     word for word over XtEnvelope and XtLfo, whose code rom.4 shares opcode for opcode; constructors, note-ons, ticks, the
+     clock and the words the tone, the OSC voice and the TVA read, against rom.4's own routines in xt_vc2tone
+     (HARDWARE_FIRMWARE.md, "The VC-2's envelopes and LFOs"). Split by what rom.4 holds (the VC-2 session's decision,
+     2026-11-18): the free LFOs' manager is v271.
+   - open (v271): the free LFOs' manager at `0x8a0c6d84` whole: its constructor `0x893ad4c0`, the 384 free objects, and
+     the routines v268 leaves hooked in xt_vc2tone or unported: `unfollow` `0x893ad720`, the take `0x893ad640`, the lists
+     `0x893ad780` and `0x893ad800`, the attach `0x893acfc0`, the free start `0x893acf10`, the follow `0x893ace60`, the free
+     objects' tick (`0x893aca60`, the manager's pass `0x893ad5f0`) and clock (`0x893acba0`, the manager's pass
+     `0x893ad870`), with their hooks out of xt_vc2tone.
    - next: kinds 5 and 6 into the tone.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the

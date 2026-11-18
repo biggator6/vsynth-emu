@@ -15,6 +15,7 @@ inline constexpr uint32_t kToneEndedWordAt = 0x1b14, kToneRendersAt = 0x1b34;
 struct ToneCounts {
     long events = 0, makes = 0, full = 0, inPlace = 0, unmakes = 0, back = 0, updates = 0, ends = 0, renders = 0;
     long noteOns = 0, takes = 0, follows = 0, frees = 0, fixes = 0;
+    long bounds = 0;   // v268: the words the OSC voice and the TVA read
 };
 
 // Both sides: rom.4 with its calls' log, the port's pool, its parts (one a tone) and their owner, the tones made
@@ -38,6 +39,12 @@ void tonePrepare(ToneSides& s, int i, std::mt19937& rng);
 // Before a note-on on tone i besides: the input drawn (the legato's tone and matches, the fix-up's case) and the two
 // lists built from the tones made, on both sides
 void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng);
+
+// The real envelopes and LFOs (v268, Vc2ToneModCheck.cpp): tone i's objects against rom.4's, empty when they agree; the
+// blocks of a note-on's input as the converters write them; and the words the tone reads of them, drawn on both sides
+std::string toneModulatorsDifference(ToneSides& s, int i);
+void toneDrawModulatorBlocks(Vc2ToneInput& in, std::mt19937& rng);
+void toneDrawModulatorWords(ToneSides& s, int i, std::mt19937& rng);
 
 // A word of tone i's own set on both sides: `mine`, the port's, and rom.4's at the tone's `offset`
 template <class Word>

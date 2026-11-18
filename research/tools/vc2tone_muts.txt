@@ -9,7 +9,6 @@
 # vtable word (it never differs from the constructor's: nothing else writes it).
 build-osc-order|{ Piece::osc1, Piece::osc2, Piece::cosm1|{ Piece::osc2, Piece::osc1, Piece::cosm1|vc2tone
 build-no-mix|Piece::tva, Piece::mix, Piece::envelopes|Piece::tva, Piece::envelopes|vc2tone
-build-lfos-first|Piece::tva, Piece::mix, Piece::envelopes, Piece::lfos };|Piece::tva, Piece::mix, Piece::lfos, Piece::envelopes };|vc2tone
 build-list-kept|    head.next = head.prev = 0;   // the base's list node, 0x893ad920\n||vc2tone
 build-next-only|    head.next = head.prev = 0;|    head.next = 0;|vc2tone
 build-zeroed-one|    tail.zeroed[0] = tail.zeroed[1] = 0;|    tail.zeroed[0] = 0;|vc2tone
@@ -29,7 +28,6 @@ destroy-unfollow-on|        if (parts.lfoFollows(lfo)) parts.unfollow(lfo);|    
 destroy-unlist-sounding|    parts.unlist(head.state == kFromOne);|    parts.unlist(head.state == kSounding);|vc2tone
 destroy-unlist-after|    parts.unlist(head.state == kFromOne);\n    for (Piece piece : kDestroyOrder) parts.destroy(piece);|    for (Piece piece : kDestroyOrder) parts.destroy(piece);\n    parts.unlist(head.state == kFromOne);|vc2tone
 destroy-cosm-order|{ Piece::lfos, Piece::cosm2, Piece::cosm1 }|{ Piece::lfos, Piece::cosm1, Piece::cosm2 }|vc2tone
-destroy-no-lfos|{ Piece::lfos, Piece::cosm2, Piece::cosm1 }|{ Piece::cosm2, Piece::cosm1 }|vc2tone
 update-any-state|    if (head.state != kSounding) return;\n||vc2tone
 update-built-state|    if (head.state != kSounding) return;|    if (head.state != kBuilt) return;|vc2tone
 update-no-exts|static_cast<int32_t>(static_cast<int16_t>(n))|n|vc2tone
@@ -148,3 +146,165 @@ state-sounding|    head.state = kFromOne;\n    install(parts);|    head.state = 
 install-lost|    install(parts);\n    tail.renders = 1;|    tail.renders = 1;|vc2tonenoteon
 renders-zero|    tail.renders = 1;\n    parts.enlist();|    tail.renders = 0;\n    parts.enlist();|vc2tonenoteon
 enlist-lost|    tail.renders = 1;\n    parts.enlist();|    tail.renders = 1;|vc2tonenoteon
+# v268: the tone's envelopes and LFOs, ports vc2toneenv (Vc2ToneEnvelope.cpp), vc2tonelfo (Vc2ToneLfo.cpp) and vc2tonemods
+# (Vc2ToneModulators.cpp).  Not planted, as nothing can tell them apart: the LFOs' destructor and its vtable word (nothing
+# else writes it), the order of the envelopes' and LFOs' constructors (neither reads the other's), an envelope's output
+# loaded before a tick (every tick the tone gives forms it again), and the words the adapters carry unread.
+env-built-stage|kBuilt = -1, kShaped = 2;|kBuilt = 0, kShaped = 2;|vc2toneenv
+env-shaped-curve|kBuilt = -1, kShaped = 2;|kBuilt = -1, kShaped = 1;|vc2toneenv
+env-start-level|kStartLevel = 1.0f;|kStartLevel = 0.5f;|vc2toneenv
+env-start-coef|kStartCoef = 0x3c199999;|kStartCoef = 0x3c19999a;|vc2toneenv
+env-block-short|kBlockBytes = 14 * sizeof(uint32_t);|kBlockBytes = 13 * sizeof(uint32_t);|vc2toneenv
+env-no-virtual|kNoVirtual = 0xffffffff;|kNoVirtual = 0;|vc2toneenv
+env-linear-output|kLinearOutput = 0x893ab860|kLinearOutput = 0x893abcb0|vc2toneenv
+env-shaped-output|kShapedOutput = 0x893abd30;|kShapedOutput = 0x893ab860;|vc2toneenv
+env-load-curve|    e.p.curve = w.curve;\n||vc2toneenv
+env-load-scale|    e.p.scale = w.scale;\n||vc2toneenv
+env-load-times|    std::ranges::copy(w.time, e.p.time);\n||vc2toneenv
+env-load-levels|    std::ranges::copy(w.level, e.p.level);\n||vc2toneenv
+env-load-stage|    e.st = w.stage;\n||vc2toneenv
+env-load-rate|    e.rate = w.rate;\n||vc2toneenv
+env-load-phase|    e.phase = w.phase;\n||vc2toneenv
+env-load-coef|    e.coef = w.coef;\n||vc2toneenv
+env-load-onset|    e.onset = w.onset;\n||vc2toneenv
+env-load-stage-time|    e.stT = w.stageTime;\n||vc2toneenv
+env-store-stage|    w.stage = e.st;\n||vc2toneenv
+env-store-rate|    w.rate = e.rate;\n||vc2toneenv
+env-store-phase|    w.phase = e.phase;\n||vc2toneenv
+env-store-out|    w.out = e.out;\n||vc2toneenv
+env-store-coef|    w.coef = e.coef;\n||vc2toneenv
+env-store-onset|    w.onset = e.onset;\n||vc2toneenv
+env-store-stage-time|    w.stageTime = e.stT;\n||vc2toneenv
+env-build-stage-lost|    w.stage = kBuilt;\n||vc2toneenv
+env-build-unread|    w.unread = w.out = w.onset = kStartLevel;|    w.out = w.onset = kStartLevel;|vc2toneenv
+env-build-out|    w.unread = w.out = w.onset = kStartLevel;|    w.unread = w.onset = kStartLevel;|vc2toneenv
+env-build-onset|    w.unread = w.out = w.onset = kStartLevel;|    w.unread = w.out = kStartLevel;|vc2toneenv
+env-build-coef-lost|    w.coef = std::bit_cast<float>(kStartCoef);\n||vc2toneenv
+env-build-on-kept|    w.on = 0;\n||vc2toneenv
+env-note-on-no-block|    std::memcpy(&w.curve, block, kBlockBytes);\n||vc2toneenv
+env-note-on-no-output|    w.output = { 0, kNoVirtual, w.curve == kShaped ? kShapedOutput : kLinearOutput };\n||vc2toneenv
+env-note-on-always-shaped|w.curve == kShaped ? kShapedOutput : kLinearOutput|kShapedOutput|vc2toneenv
+env-note-on-not-run|    e.noteOn(e.p);\n||vc2toneenv
+env-tick-not-run|    e.tick(n);\n||vc2toneenv
+env-tick-once|    e.tick(n);|    e.tick(1);|vc2toneenv
+lfo-vtable|kVtable = 0x898cd490;|kVtable = 0x898cd568;|vc2tonelfo
+lfo-full|kFull = 131072.0f;|kFull = 131071.0f;|vc2tonelfo
+lfo-block-short|kBlockBytes = 8 * sizeof(uint32_t);|kBlockBytes = 7 * sizeof(uint32_t);|vc2tonelfo
+lfo-off-mode|kFirstOffMode = 2;|kFirstOffMode = 3;|vc2tonelfo
+lfo-fewest-clocks|kFewestClocks = 3.0f,|kFewestClocks = 4.0f,|vc2tonelfo
+lfo-most-clocks|kMostClocks = 192.0f;|kMostClocks = 191.0f;|vc2tonelfo
+lfo-phase-span|kPhaseSpan = 65535.0f,|kPhaseSpan = 65536.0f,|vc2tonelfo
+lfo-minute|kMinute = 60.0f,|kMinute = 61.0f,|vc2tonelfo
+lfo-clocks-a-beat|kClocksABeat = 24.0f;|kClocksABeat = 48.0f;|vc2tonelfo
+lfo-load-wave|l.p = { w.wave, w.rate,|l.p = { 0, w.rate,|vc2tonelfo
+lfo-load-rate|l.p = { w.wave, w.rate,|l.p = { w.wave, 1.0f,|vc2tonelfo
+lfo-load-delay|w.rate, w.delayMs, w.fadeMs,|w.rate, 0.0f, w.fadeMs,|vc2tonelfo
+lfo-load-fade|w.rate, w.delayMs, w.fadeMs,|w.rate, w.delayMs, 0.0f,|vc2tonelfo
+lfo-load-offset|w.keySync, w.offset, w.fadeMode, w.sync };|w.keySync, 2, w.fadeMode, w.sync };|vc2tonelfo
+lfo-load-sync|w.keySync, w.offset, w.fadeMode, w.sync };|w.keySync, w.offset, w.fadeMode, 0 };|vc2tonelfo
+lfo-load-state|    l.state = w.state;\n||vc2tonelfo
+lfo-load-direction|    l.dir = w.direction;\n||vc2tonelfo
+lfo-load-count|    l.count = w.count;\n||vc2tonelfo
+lfo-load-fade-in|    l.tIn = w.fadeIn;\n||vc2tonelfo
+lfo-load-fade-out|    l.tOut = w.fadeOut;\n||vc2tonelfo
+lfo-load-delay-word|    l.delay = w.delay;\n||vc2tonelfo
+lfo-load-rate-in|    l.rIn = w.rateIn;\n||vc2tonelfo
+lfo-load-rate-out|    l.rOut = w.rateOut;\n||vc2tonelfo
+lfo-load-rest|    l.rest = w.rest;\n||vc2tonelfo
+lfo-load-target|    l.target = w.target;\n||vc2tonelfo
+lfo-load-amplitude|    l.amp = w.amplitude;\n||vc2tonelfo
+lfo-load-active|    l.active = w.active != 0;\n||vc2tonelfo
+lfo-load-out|    l.o = w.out;\n||vc2tonelfo
+lfo-load-phase|    l.ph = w.phase;\n||vc2tonelfo
+lfo-load-previous|    l.prev = w.previous;\n||vc2tonelfo
+lfo-load-held|    l.hold = w.held;\n||vc2tonelfo
+lfo-load-chaos|    l.x = w.chaos;\n||vc2tonelfo
+lfo-load-clock-step|    l.s84 = w.clockStep;\n||vc2tonelfo
+lfo-load-clock-target|    l.t88 = w.clockTarget;\n||vc2tonelfo
+lfo-load-clock-time|    l.d8c = w.clockTime;\n||vc2tonelfo
+lfo-load-clock-wrap|    l.w90 = w.clockWrap;\n||vc2tonelfo
+lfo-load-clock-count|    l.c94 = w.clockCount;\n||vc2tonelfo
+lfo-store-state|    w.state = (uint8_t)l.state;\n||vc2tonelfo
+lfo-store-direction|    w.direction = (int8_t)l.dir;\n||vc2tonelfo
+lfo-store-count|    w.count = l.count;\n||vc2tonelfo
+lfo-store-fade-in|    w.fadeIn = l.tIn;\n||vc2tonelfo
+lfo-store-fade-out|    w.fadeOut = l.tOut;\n||vc2tonelfo
+lfo-store-delay|    w.delay = l.delay;\n||vc2tonelfo
+lfo-store-rate-in|    w.rateIn = l.rIn;\n||vc2tonelfo
+lfo-store-rate-out|    w.rateOut = l.rOut;\n||vc2tonelfo
+lfo-store-rest|    w.rest = l.rest;\n||vc2tonelfo
+lfo-store-target|    w.target = l.target;\n||vc2tonelfo
+lfo-store-amplitude|    w.amplitude = l.amp;\n||vc2tonelfo
+lfo-store-active|    w.active = l.active ? 1 : 0;\n||vc2tonelfo
+lfo-store-out|    w.out = l.o;\n||vc2tonelfo
+lfo-store-phase|    w.phase = l.ph;\n||vc2tonelfo
+lfo-store-previous|    w.previous = l.prev;\n||vc2tonelfo
+lfo-store-held|    w.held = l.hold;\n||vc2tonelfo
+lfo-store-chaos|    w.chaos = l.x;\n||vc2tonelfo
+lfo-store-clock-target|    w.clockTarget = l.t88;\n||vc2tonelfo
+lfo-store-clock-time|    w.clockTime = l.d8c;\n||vc2tonelfo
+lfo-store-clock-wrap|    w.clockWrap = l.w90;\n||vc2tonelfo
+lfo-store-clock-count|    w.clockCount = l.c94;\n||vc2tonelfo
+lfo-fade-level-lost|    w.fadeLevel = xtf::div(l.amp, kFull);\n||vc2tonelfo
+lfo-fade-level-whole|    w.fadeLevel = xtf::div(l.amp, kFull);|    w.fadeLevel = l.amp;|vc2tonelfo
+lfo-seed-not-read|    seed.x = generator;\n||vc2tonelfo
+lfo-seed-not-kept|    generator = seed.x;\n||vc2tonelfo
+lfo-build-vtable|    w.vtable = kVtable;\n    w.state = 0; |    w.state = 0; |vc2tonelfo
+lfo-build-state|    w.state = 0;                           // the delay and fade's base, 0x893ac550\n||vc2tonelfo
+lfo-build-direction|    w.direction = 1;\n||vc2tonelfo
+lfo-build-count|    w.count = 0;\n||vc2tonelfo
+lfo-build-fade-in|    w.fadeIn = w.fadeOut = w.delay = w.rest = 0.0f;|    w.fadeOut = w.delay = w.rest = 0.0f;|vc2tonelfo
+lfo-build-fade-out|    w.fadeIn = w.fadeOut = w.delay = w.rest = 0.0f;|    w.fadeIn = w.delay = w.rest = 0.0f;|vc2tonelfo
+lfo-build-delay|    w.fadeIn = w.fadeOut = w.delay = w.rest = 0.0f;|    w.fadeIn = w.fadeOut = w.rest = 0.0f;|vc2tonelfo
+lfo-build-rest|    w.fadeIn = w.fadeOut = w.delay = w.rest = 0.0f;|    w.fadeIn = w.fadeOut = w.delay = 0.0f;|vc2tonelfo
+lfo-build-target|    w.target = w.amplitude = kFull;|    w.amplitude = kFull;|vc2tonelfo
+lfo-build-amplitude|    w.target = w.amplitude = kFull;|    w.target = kFull;|vc2tonelfo
+lfo-build-active|    w.active = 0;\n||vc2tonelfo
+lfo-build-out|    w.out = w.unread3c = w.phase = w.previous = w.held = 0.0f;|    w.unread3c = w.phase = w.previous = w.held = 0.0f;|vc2tonelfo
+lfo-build-3c|    w.out = w.unread3c = w.phase = w.previous = w.held = 0.0f;|    w.out = w.phase = w.previous = w.held = 0.0f;|vc2tonelfo
+lfo-build-phase|    w.out = w.unread3c = w.phase = w.previous = w.held = 0.0f;|    w.out = w.unread3c = w.previous = w.held = 0.0f;|vc2tonelfo
+lfo-build-previous|    w.out = w.unread3c = w.phase = w.previous = w.held = 0.0f;|    w.out = w.unread3c = w.phase = w.held = 0.0f;|vc2tonelfo
+lfo-build-held|    w.out = w.unread3c = w.phase = w.previous = w.held = 0.0f;|    w.out = w.unread3c = w.phase = w.previous = 0.0f;|vc2tonelfo
+lfo-build-chaos-signed|    w.chaos = std::fabs(next);|    w.chaos = next;|vc2tonelfo
+lfo-build-follow|    w.waveCase = w.follow = w.on = 0;|    w.waveCase = w.on = 0;|vc2tonelfo
+lfo-build-on|    w.waveCase = w.follow = w.on = 0;|    w.waveCase = w.follow = 0;|vc2tonelfo
+lfo-note-on-no-block|    std::memcpy(&w.wave, block, kBlockBytes);\n||vc2tonelfo
+lfo-note-on-tempo|    w.tempo = tempo;\n||vc2tonelfo
+lfo-note-on-phase-kept|    w.phase = 0.0f;\n    if (w.sync|    if (w.sync|vc2tonelfo
+lfo-note-on-always-clocks|    if (w.sync != 0) {|    if (true) {|vc2tonelfo
+lfo-note-on-target-kept|    w.clockTarget = 0.0f;\n||vc2tonelfo
+lfo-note-on-count-kept|    w.clockCount = 0;\n||vc2tonelfo
+lfo-note-on-no-clamp|        w.rate = w.rate > kMostClocks ? kMostClocks : (kFewestClocks > w.rate ? kFewestClocks : w.rate);\n||vc2tonelfo
+lfo-note-on-step-lost|        w.clockStep = div(kPhaseSpan, w.rate);\n||vc2tonelfo
+lfo-note-on-time-lost|        w.clockTime = div(div(kMinute, tempo), kClocksABeat);\n||vc2tonelfo
+lfo-note-on-mode-lost|    w.mode = (uint32_t)w.fadeMode;\n||vc2tonelfo
+lfo-note-on-direction|    l.setDir(w.fadeMode % 2);|    l.setDir(w.fadeMode / 2);|vc2tonelfo
+lfo-note-on-no-direction|    l.setDir(w.fadeMode % 2);              // 0x893ac830: modes 1 and 3 fade down\n||vc2tonelfo
+lfo-note-on-no-times|    l.setTimes();\n||vc2tonelfo
+lfo-note-on-always-fade|    if (w.fadeMode < kFirstOffMode) l.fadeStart();\n    else l.state = 0;|    l.fadeStart();|vc2tonelfo
+lfo-note-on-never-fade|    if (w.fadeMode < kFirstOffMode) l.fadeStart();\n    else l.state = 0;|    l.state = 0;|vc2tonelfo
+lfo-note-on-state-kept|    else l.state = 0;\n||vc2tonelfo
+lfo-note-on-inactive|    l.active = true;\n||vc2tonelfo
+lfo-note-on-no-tick|    l.tick(0);\n||vc2tonelfo
+lfo-note-on-plain-store|    l.tick(0);\n    storeTicked(l);|    l.tick(0);\n    store(l);|vc2tonelfo
+lfo-tick-not-run|    l.tick(n);\n||vc2tonelfo
+lfo-tick-one|    l.tick(n);|    l.tick(1);|vc2tonelfo
+lfo-tick-plain-store|    l.tick(n);\n    storeTicked(l);|    l.tick(n);\n    store(l);|vc2tonelfo
+lfo-clock-not-run|    l.clock(seconds);\n||vc2tonelfo
+lfo-clock-ticks|    l.clock(seconds);\n    store(l);|    l.clock(seconds);\n    storeTicked(l);|vc2tonelfo
+mods-no-envelopes|    for (Vc2ToneEnvelope& e : envelopes) e.construct();\n||vc2tonemods
+mods-no-lfos|    for (Vc2ToneLfo& l : lfos) l.construct(generator);\n||vc2tonemods
+mods-envelope-offset|std::memcpy(&word, reinterpret_cast<const char*>(&parts[element].w) + offset, sizeof word);|std::memcpy(&word, reinterpret_cast<const char*>(&parts[element].w), sizeof word);|vc2tonemods
+mods-envelope-element|reinterpret_cast<const char*>(&parts[element].w) + offset|reinterpret_cast<const char*>(&parts[0].w) + offset|vc2tonemods
+mods-neither-reads|    if (element >= parts.size()) return false;\n||vc2tonemods
+mods-no-envelope-part|    if (boundWordIn(envelopes, at - kEnvelopesAt, kEnvelopeBytes, offset, word)) return word;\n||vc2tonemods
+mods-no-lfo-part|    boundWordIn(lfos, at - kLfosAt, kLfoBytes, offset, word);\n||vc2tonemods
+mods-lfo-stride|at - kLfosAt, kLfoBytes, offset|at - kLfosAt, kEnvelopeBytes, offset|vc2tonemods
+mods-tva-element|envelopes[(part - self - kEnvelopesAt) / kEnvelopeBytes].w;|envelopes[0].w;|vc2tonemods
+mods-tva-state|return { w.stage, w.time[0],|return { w.rate, w.time[0],|vc2tonemods
+mods-tva-attack|w.stage, w.time[0], w.time[1],|w.stage, w.time[1], w.time[1],|vc2tonemods
+mods-tva-next|w.stage, w.time[0], w.time[1],|w.stage, w.time[0], w.time[0],|vc2tonemods
+mods-tva-out|w.time[1], w.out, w.onset,|w.time[1], w.onset, w.onset,|vc2tonemods
+mods-tva-onset|w.time[1], w.out, w.onset,|w.time[1], w.out, w.out,|vc2tonemods
+mods-tva-stage-time|w.onset, w.stageTime };|w.onset, w.onset };|vc2tonemods
+mods-lfo-out-word|kLfoOut = 0x38;|kLfoOut = 0x3c;|vc2tonemods

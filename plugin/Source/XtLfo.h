@@ -82,6 +82,7 @@ public:
     int clockCount() const { return c94; }
 
 private:
+    friend class Vc2ToneLfo;   // rom.4's LFO is this one on rom.4's words (v268)
     XtLfoParams p;
     // delay/fade base (+0x00…+0x20)
     int state = 0, dir = 1;

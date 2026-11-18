@@ -4,6 +4,7 @@
 // and rom.4's side: every part routine hooked to log and answer.  XT_VC2TONE_MAIN only.
 #include "Vc2CheckRig.h"
 #include "Vc2Tone.h"
+#include "Vc2ToneModulators.h"
 #include <array>
 #include <span>
 #include <vector>
@@ -20,9 +21,9 @@ inline constexpr int kToneNone = -1, kToneUnknown = -2;   // a call's part: the 
 inline constexpr int kToneOut = 4;
 
 enum ToneKind : int32_t {
-    kBuild, kDestroy, kUnfollow, kUnlist, kTickEnvelope, kTickLfo, kClockLfo, kUpdateOsc, kUpdateMix, kUpdateCosm,
+    kBuild, kDestroy, kUnfollow, kUnlist, kUpdateOsc, kUpdateMix, kUpdateCosm,
     kTvaOver, kTvaStopped, kUpdateTva, kEnded, kRenderOsc, kRenderMix, kRenderCosm, kRenderTva, kCountOsc,
-    kCountOscMatched, kTvaHeld, kInstallOsc, kInstallMix, kInstallCosm, kNoteOnEnvelope, kNoteOnLfo, kFollowLfo,
+    kCountOscMatched, kTvaHeld, kInstallOsc, kInstallMix, kInstallCosm, kFollowLfo,
     kFreeLfo, kAttachFree, kStartFree, kRelist, kList, kBindCosm, kNoteOnOsc, kTakePlayer, kSetOsc, kNoteOnMix,
     kSetUpCosm, kStartCosm, kNoteOnTva, kEnlist,
 };
@@ -51,11 +52,9 @@ struct ToneOscWords {
     bool operator==(const ToneOscWords&) const = default;
 };
 
-// [FW] a tone's part words the tone reads or writes: each envelope's +0x68, each LFO's +0x80, +0x7c and +0x60, the
-// OSC voices', the TVA's +0x40 and its +0xa4, +0xa8, +0xac and +0xc0
+// [FW] a tone's hooked parts' words the tone reads or writes: the OSC voices', the TVA's +0x40 and its +0xa4, +0xa8,
+// +0xac and +0xc0 (the envelopes and LFOs are the real ones from v268, Vc2ToneModulators)
 struct ToneWords {
-    std::array<uint32_t, Vc2Tone::kEnvelopes> envelopeOn {};
-    std::array<uint32_t, Vc2Tone::kLfos> lfoOn {}, lfoFollow {}, lfoListed {};
     std::array<ToneOscWords, 2> osc {};
     uint32_t tvaLevel = 0;
     std::array<uint32_t, 4> tvaBinds {};
@@ -77,6 +76,7 @@ struct ToneShared {
     std::vector<ToneCall> calls {};
     const Vc2TonePool* pool = nullptr;
     std::array<uint32_t, 2> lists {};
+    float chaos = Vc2ToneLfo::kChaosStart;   // the LFOs' constructors' generator, rom.4's word 0x89999668
 };
 
 // A tone's port parts: answers from the shared draws and its words, the calls logged as its tone's
@@ -85,12 +85,12 @@ public:
     TonePortParts(int tone, ToneShared& shared) : tone_(tone), s_(shared) {}
     void build(Vc2TonePiece piece) override;
     void destroy(Vc2TonePiece piece) override;
-    bool lfoFollows(int lfo) override { return words.lfoFollow[(size_t)lfo] != 0; }
+    bool lfoFollows(int lfo) override { return mods.lfos[(size_t)lfo].w.follow != 0; }
     void unfollow(int lfo) override;
     void unlist(bool fromOne) override;
-    bool envelopeOn(int envelope) override { return words.envelopeOn[(size_t)envelope] != 0; }
+    bool envelopeOn(int envelope) override { return mods.envelopes[(size_t)envelope].w.on != 0; }
     void tickEnvelope(int envelope, int32_t n) override;
-    bool lfoOn(int lfo) override { return words.lfoOn[(size_t)lfo] != 0; }
+    bool lfoOn(int lfo) override { return mods.lfos[(size_t)lfo].w.on != 0; }
     void tickLfo(int lfo, int32_t n) override;
     void clockLfo(int lfo, float x) override;
     void updateOsc(int osc, int32_t n) override;
@@ -121,8 +121,8 @@ public:
     void attachFree(int lfo, uint32_t free) override;
     float freeValue(uint32_t free) override;
     void startFree(int lfo, const uint32_t* block, float value, float x) override;
-    bool lfoListed(int lfo) override { return words.lfoListed[(size_t)lfo] != 0; }
-    uint32_t lfoFollow(int lfo) override { return words.lfoFollow[(size_t)lfo]; }
+    bool lfoListed(int lfo) override { return mods.lfos[(size_t)lfo].w.sync != 0; }
+    uint32_t lfoFollow(int lfo) override { return mods.lfos[(size_t)lfo].w.follow; }
     void relist(uint32_t follow, uint32_t id, int lfo) override;
     void list(uint32_t id, int lfo) override;
     void markFree(uint32_t free, uint32_t id, int lfo) override;
@@ -142,6 +142,7 @@ public:
     void enlist() override;
 
     ToneWords words {};
+    Vc2ToneModulators mods {};   // the real envelopes and LFOs
 
 private:
     void log(ToneKind kind, int32_t part, std::array<uint32_t, 4> args = {}, bool onTone = true) {

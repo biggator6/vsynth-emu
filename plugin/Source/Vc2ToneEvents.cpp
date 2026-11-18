@@ -82,7 +82,9 @@ std::string toneUpdateOn(ToneSides& s, std::mt19937& rng) {
     const int i = toneDrawLive(s, rng);
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     if (rng() % 8 != 0) toneBothWord(s, i, kToneStateAt, tone.head.state, Vc2Tone::kSounding);
-    const uint32_t n = rng() % 2 == 0 ? rng() % 64 : (uint32_t)rng();
+    // [FW] 0x893b16c8: the update's caller gives at least 1 tick, so its low half, which the update extends, stays positive
+    constexpr uint32_t kPositiveLowHalf = 0xffff7fff;
+    const uint32_t n = rng() % 2 == 0 ? rng() % 64 : (uint32_t)rng() & kPositiveLowHalf;
     s.n.updates += tone.head.state == Vc2Tone::kSounding;
     std::string what =
         toneOn(s, i, kUpdateAt, { s.pool.addressOf(i), n }, [&] { tone.update((int32_t)n, partsOf(s, i)); });
@@ -173,10 +175,39 @@ std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
     return what;
 }
 
-constexpr ToneEvent kEvents[] = { toneUpdateOn,    toneUpdateOn,  toneRenderOn,    toneRenderOn,   toneUnmakeOn,
-                                  toneInPlaceOn,   toneClockOn,   toneCountOn,     toneMatchedOn,  toneAskOn,
-                                  toneAskOn,       tonePlainOn,   tonePlainOn,     toneScribbleOn, toneNoteOnEvent,
-                                  toneNoteOnEvent, toneNoteOnEvent };
+// What the OSC voice and the TVA read of a tone's envelopes and LFOs (v268), by rom.4's addresses, against rom.4's words
+std::string toneBoundOn(ToneSides& s, std::mt19937& rng) {
+    constexpr uint32_t kBytes[] = { Vc2ToneModulators::kEnvelopeBytes, Vc2ToneModulators::kLfoBytes };
+    using W = Vc2EnvelopeWords;
+    const int i = toneDrawLive(s, rng);
+    const Vc2ToneModulators& m = s.parts[(size_t)i].mods;
+    const uint32_t self = s.pool.addressOf(i);
+    const bool envelope = rng() % 2 == 0;
+    const uint32_t part = envelope ? toneEnvelopeAt(self, (int)(rng() % Vc2Tone::kEnvelopes))
+                                   : toneLfoAt(self, (int)(rng() % Vc2Tone::kLfos));
+    // Any word but its number, which the tone keeps (Vc2Tone::envelopeIndex, lfoIndex) and no part reads by address
+    const uint32_t drawn = (rng() % (kBytes[envelope ? 0 : 1] / sizeof(uint32_t))) * sizeof(uint32_t);
+    const uint32_t number = envelope ? offsetof(W, index) : offsetof(Vc2LfoWords, index);
+    const uint32_t offset = drawn == number ? drawn + sizeof(uint32_t) : drawn;
+    const auto same = [&](float mine, uint32_t at) { return std::bit_cast<uint32_t>(mine) == s.fw.cpu.rd32(at); };
+    ++s.n.bounds;
+    if (!same(m.boundFloat(self, part, offset), part + offset)) return "a bound part's word";
+    if (m.boundFloat(self, self, 0) != 0.0f) return "a word of no bound part";
+    const uint32_t lfo = toneLfoAt(self, (int)(rng() % Vc2Tone::kLfos));
+    if (!same(m.lfoOut(self, lfo), lfo + offsetof(Vc2LfoWords, out))) return "an LFO's output";
+    const uint32_t e = toneEnvelopeAt(self, (int)(rng() % Vc2Tone::kEnvelopes));
+    const Vc2TvaEnvelope tva = m.tvaEnvelope(self, e);
+    const bool agrees = tva.state == (int32_t)s.fw.cpu.rd32(e + offsetof(W, stage))
+                        && same(tva.attack, e + offsetof(W, time)) && same(tva.next, e + offsetof(W, time) + 4)
+                        && same(tva.out, e + offsetof(W, out)) && same(tva.onset, e + offsetof(W, onset))
+                        && same(tva.stageTime, e + offsetof(W, stageTime));
+    return agrees ? "" : "the TVA's envelope";
+}
+
+constexpr ToneEvent kEvents[] = { toneUpdateOn,    toneUpdateOn,    toneRenderOn,  toneRenderOn,   toneUnmakeOn,
+                                  toneInPlaceOn,   toneClockOn,     toneCountOn,   toneMatchedOn,  toneAskOn,
+                                  toneAskOn,       tonePlainOn,     tonePlainOn,   toneScribbleOn, toneNoteOnEvent,
+                                  toneNoteOnEvent, toneNoteOnEvent, toneBoundOn };
 } // namespace
 
 std::string toneMakeOn(ToneSides& s, std::mt19937& rng) {

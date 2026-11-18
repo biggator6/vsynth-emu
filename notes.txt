@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's envelopes and LFOs v268 (2026-11-18, on vc2-mode after 668fea7; HARDWARE_FIRMWARE.md, "The VC-2's envelopes and
+  LFOs"): step 4.2's tone parts. rom.4's envelope and LFO code is rom.2's opcode for opcode, so Vc2ToneEnvelope and
+  Vc2ToneLfo hold rom.4's 0x70- and 0x98-byte objects word for word and run XtEnvelope's and XtLfo's laws on them;
+  Vc2ToneModulators is a tone's 14 and 8, with the words the OSC voice and the TVA read. xt_vc2tone runs rom.4's own
+  constructors, note-ons, ticks and clock for them. The free LFOs' manager (0x8a0c6d84, unfollow with it) stays hooked
+  until v271, which the plan lists routine by routine. XtEnvelope.h and XtLfo.h gain a friend line each, so
+  mutate_tone.py ran whole: 1191 planted, 1186 caught, check-pad-cc missed as since v189, and four ERROR that aren't
+  v268's: plays-no-main, plays-no-dir, plays-level-l and plays-level-r still name XtSynth.cpp, their text in
+  XtSynthOut.cpp since v204. Planted there by hand (PORT=toneout), all four caught.
+
 The VC-2's Vari off v261 (2026-11-17, on vc2-mode after v256, 977c9db; the user's "Start Vari off"; HARDWARE_FIRMWARE.md,
   "The VC-2's Vari off"): step 4.2's OSC voice. rom.4's own two renders for a wave with Vari Sw off, 0x893c63c0 (mono) and
   0x893c66e0 (stereo): vc2OscVariOffMono and vc2OscVariOffStereo (Vc2OscVariOffRender.cpp), one routine over a way. No

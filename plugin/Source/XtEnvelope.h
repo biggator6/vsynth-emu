@@ -74,6 +74,7 @@ public:
     float onsetLevel() const { return onset; }
 
 private:
+    friend class Vc2ToneEnvelope;   // rom.4's envelope is this one on rom.4's words (v268)
     XtEnvParams p;
     int st = -1;                    // +0x00
     int rate = 0;                   // +0x40

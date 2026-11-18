@@ -10,30 +10,18 @@ using In = Vc2ToneInput;
 // [FW] the pool's words
 constexpr uint32_t kHeadAt = 0x8993fb48;
 constexpr uint32_t kSerialAt = 0x8993fb4c;
-// [FW] a tone's own words by offset: the tail, the envelopes' and LFOs' numbers, the pool's link; a free object's float
+// [FW] the LFOs' constructors' generator; a tone's own words by offset: the tail, the pool's link; a free object's float
+constexpr uint32_t kChaosAt = 0x89999668;
 constexpr uint32_t kTailAt = 0x1af8;
-constexpr uint32_t kEnvelopeNumber = 4;
-constexpr uint32_t kLfoNumber = 0x34;
 constexpr uint32_t kLinkAt = 0x2618;
 constexpr uint32_t kFreeValue = 0x10;
 constexpr int kListed = 3;                      // the most tones the lists hold
 constexpr uint32_t kNoSerial = 0x7ffffff0;      // a serial no tone of a case reaches
-constexpr uint32_t kFixMix = 4, kFixKind = 3, kFixWave = 10;   // [FW] the note-on's fix-up's case
+constexpr uint32_t kFixMix = 4, kFixKind = 3, kFixWave = 10, kFixedWave = 2;   // [FW] the note-on's fix-up's case
 
 bool drawFlag(std::mt19937& rng) { return rng() % 2 == 0; }
 float drawFloat(std::mt19937& rng) { return 4.0f * vc2Unit(rng) - 2.0f; }
 uint32_t drawBits(std::mt19937& rng) { return std::bit_cast<uint32_t>(drawFloat(rng)); }
-
-// A part's numbers (the envelopes' or the LFOs') against rom.4's words at the part's address + `offset`
-template <size_t N>
-std::string numbersDifference(Vc2Fw& fw, uint32_t tone, uint32_t (*partAt)(uint32_t, int), uint32_t offset,
-                              const std::array<int32_t, N>& mine, const char* what) {
-    for (size_t k = 0; k < N; ++k) {
-        std::string differs = vc2FirstDifference(fw, partAt(tone, (int)k) + offset, &mine[k], sizeof(int32_t), what);
-        if (!differs.empty()) return differs;
-    }
-    return "";
-}
 
 // The first part word rom.4's memory and the port's mirror differ at, as text; empty when none
 std::string partWordsDifference(const ToneWords& rom, const ToneWords& mine) {
@@ -54,18 +42,13 @@ std::string toneWordsDifference(ToneSides& s, int i) {
     std::string what = vc2RegionsDifference(s.fw, { { at, &t.head, sizeof t.head, "its head" },
                                                     { at + kTailAt, &t.tail, sizeof t.tail, "its tail" },
                                                     { at + kLinkAt, &t.link, sizeof t.link, "its link" } });
-    if (what.empty()) what = numbersDifference(s.fw, at, toneEnvelopeAt, kEnvelopeNumber, t.envelopeIndex, "a number");
-    if (what.empty()) what = numbersDifference(s.fw, at, toneLfoAt, kLfoNumber, t.lfoIndex, "an LFO's number");
+    if (what.empty()) what = toneModulatorsDifference(s, i);
     if (what.empty()) what = partWordsDifference(toneReadRom(s.fw, at), s.parts[(size_t)i].words);
     return what.empty() ? what : "tone " + std::to_string(i) + ", " + what;
 }
 
 ToneWords drawWords(std::mt19937& rng) {
     ToneWords w;
-    std::ranges::generate(w.envelopeOn, [&] { return rng() % 2; });
-    std::ranges::generate(w.lfoOn, [&] { return rng() % 2; });
-    std::ranges::generate(w.lfoFollow, [&] { return drawFlag(rng) ? 0u : (uint32_t)rng(); });
-    std::ranges::generate(w.lfoListed, [&] { return rng() % 2; });
     for (ToneOscWords& o : w.osc) {
         o.kind = rng() % 8;
         o.flag = drawFlag(rng) ? rng() % 2 : (uint32_t)rng();
@@ -87,7 +70,7 @@ void drawToneInput(ToneSides& s, std::mt19937& rng) {
     In& in = s.shared.input;
     std::ranges::generate(in.words, [&] { return rng() % 8; });
     in.at(In::kStructure) = rng() % 5 == 0 ? (uint32_t)rng() : rng() % 4;
-    in.at(In::kLfoValue) = drawBits(rng);
+    toneDrawModulatorBlocks(in, rng);
     for (uint32_t l = 0; l < Vc2Tone::kLfos; ++l) in.at(In::kLfos + In::kLfoStride * l + In::kKeySync) = rng() % 2;
     for (uint32_t block : In::kOscs) in.at(block + In::kLegato) = rng() % 2;
     for (uint32_t block : In::kCosms) in.at(block) = rng() % 23;
@@ -98,6 +81,20 @@ void drawToneInput(ToneSides& s, std::mt19937& rng) {
         in.at(In::kOscs[1]) = kFixKind;
         in.at(In::kOscs[1] + In::kWave) = kFixWave;
     }
+}
+
+// The fix-up's case against a legato: the earlier tone's OSC 2 of the fix-up's kind, at the wave before it or after it,
+// so that whether the note-on fixes the input before its OSCs' note-ons decides whether the legato takes the player
+void drawFixedLegato(ToneSides& s, int from, std::mt19937& rng) {
+    In& in = s.shared.input;
+    ToneWords& was = s.parts[(size_t)from].words;
+    was.osc[1].kind = kFixKind;
+    was.osc[1].wave = drawFlag(rng) ? kFixWave : kFixedWave;
+    toneWriteRom(s.fw, s.pool.addressOf(from), was);
+    in.at(In::kMix) = kFixMix;
+    in.at(In::kOscs[1]) = kFixKind;
+    in.at(In::kOscs[1] + In::kWave) = kFixWave;
+    in.at(In::kOscs[1] + In::kLegato) = 1;
 }
 
 // The legato's tone: none, a tone made (its OSCs' kind and +0xb0 matched now and then), or a serial no tone has (with
@@ -115,6 +112,7 @@ void drawPrevious(ToneSides& s, std::mt19937& rng) {
             in.at(In::kOscs[o]) = was.kind;
             in.at(In::kOscs[o] + In::kWave) = was.wave;
         }
+        if (rng() % 4 == 0) drawFixedLegato(s, from, rng);
     }
     if (pick == 2) {
         for (uint32_t block : In::kOscs) in.at(block + In::kLegato) = 0;
@@ -150,8 +148,10 @@ void buildLists(ToneSides& s, int i, std::mt19937& rng) {
 
 std::string toneDifference(ToneSides& s, int only) {
     const Vc2TonePool& p = s.pool;
+    const float& chaos = s.shared.chaos;
     std::string what = vc2RegionsDifference(s.fw, { { kHeadAt, &p.head, sizeof p.head, "the pool's head" },
-                                                    { kSerialAt, &p.serial, sizeof p.serial, "the serial" } });
+                                                    { kSerialAt, &p.serial, sizeof p.serial, "the serial" },
+                                                    { kChaosAt, &chaos, sizeof chaos, "the LFOs' generator" } });
     for (int i = 0; i < Vc2TonePool::kTones && what.empty(); ++i) {
         if (only < 0 || i == only) what = toneWordsDifference(s, i);
     }
@@ -180,6 +180,7 @@ void tonePrepare(ToneSides& s, int i, std::mt19937& rng) {
     }
     s.parts[(size_t)i].words = drawWords(rng);
     toneWriteRom(s.fw, s.pool.addressOf(i), s.parts[(size_t)i].words);
+    toneDrawModulatorWords(s, i, rng);
     s.rom.clear();
     s.shared.calls.clear();
     ++s.n.events;

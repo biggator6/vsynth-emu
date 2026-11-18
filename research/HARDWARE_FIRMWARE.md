@@ -1546,6 +1546,55 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's envelopes and LFOs (2026-11-18, v268) {#vc2-envelopes-lfos}
+
+Step 4.2's tone parts. A tone holds 14 envelopes of 0x70 bytes at +0x1b38 and 8 LFOs of 0x98 bytes at +0x2158. rom.4's code for both is rom.2's. Compared halfword by halfword, the envelope's `0x893ab5b0…0x893ac4a0` (rom.2's, 0x143f70 bytes up) has 1,891 of 1,912 equal: the other 21 are 18 pool halfwords holding addresses and 3 `mova`s reaching the same constant from a pool that moved. The LFO's `0x893ac4f0…0x893ad720` (rom.2's, 0x143f50 up) has 2,286 of 2,328 equal, the other 42 all pool halfwords holding addresses. That is what the code's text says; what holds the port to it is `xt_vc2tone`, which runs rom.4's own routines against the adapters word for word. So `Vc2ToneEnvelope` and `Vc2ToneLfo` hold rom.4's objects word for word, copy the words into `XtEnvelope` and `XtLfo`, run those classes' laws and store the words back. Both classes gain one `friend` line and nothing else.
+
+**The envelope's words.**
+
+| Offset | Word |
+|---|---|
+| +0x00 | stage: −1 built, 0 attack, 1, 2 decay, 3 sustain, 4 release, 5 done |
+| +0x04 | its number in the tone |
+| +0x08…+0x3f | the converter's block: curve, scale, sync, two clock words, 4 times, 5 levels |
+| +0x40, +0x44 | rate, phase |
+| +0x48 | 1 from the constructor, read by nothing here |
+| +0x4c…+0x58 | output, release start, coefficient, onset |
+| +0x5c…+0x67 | the output routine's member pointer, by the curve (`0x893ab860`, `0x893abd30`) |
+| +0x68 | on: the tone ticks it when set |
+| +0x6c | the stage's time |
+
+**The LFO's words.**
+
+| Offset | Word |
+|---|---|
+| +0x00…+0x23 | the delay and fade: state, direction, count, two fade times, delay, two rates, rest, target, amplitude |
+| +0x24 | vtable `0x898cd490` |
+| +0x28, +0x2c | active, the fade mode the note-on took |
+| +0x30 | the amplitude over its full scale, which each tick leaves |
+| +0x34 | its number in the tone |
+| +0x38…+0x48 | output, an unread 0, phase, the random waves' two values |
+| +0x4c…+0x6b | the converter's block: wave, rate, delay, fade, key sync, sync, offset, fade mode |
+| +0x6c, +0x74 | chaos state, tempo |
+| +0x78 | a case by the wave, 0 for the eight waves a converter gives |
+| +0x7c, +0x80 | the free object it follows, on |
+| +0x84…+0x94 | a note value's clock: step, target, time, wrap, count |
+
+**Where rom.4's words ask more than the classes hold.**
+- `XtLfo::noteOn` starts from a base just built, as every rom.2 note does. rom.4's note-on leaves the words as they stand, so the adapter runs rom.4's own order (`0x893acda0`, `0x893acca0`) through XtLfo's `setDir`, `setTimes`, `fadeStart` and `tick`.
+- The tick's amplitude ratio at +0x30 has no member in XtLfo, so the adapter stores it after a tick and only then.
+- The constructors read two values set by rom.4's static initializers: the envelope's start coefficient `0x3c199999` (`0x893ac4a0`) and the LFOs' chaos generator, 0.7 at `0x89999668` (`0x893ad8d0`). Each LFO's chaos state is the generator's next value, made positive.
+
+**What is deliberately not reached.**
+- The envelope's converter (`0x8939a400`) writes curve 0 or 2, scale 1 and sync 0, so curve 1's output (`0x893abcb0`) and the synced rate are not ported.
+- The tone's caller gives at least 1 tick (`0x893b16c8`), so the tick's branch for a negative phase (`0x893ac010`, stage 6) is never taken. The check draws no negative count.
+- `XtEnvelope` reads rom.2's shape table. rom.4's first differs at entry 130, and a segment's position reads entries 0…128 only.
+- Waves 8…12, which name a case at +0x78, come from no converter.
+
+**Left for v271.** The free LFOs' manager at `0x8a0c6d84` (0x8448 bytes, 384 free objects of 0x38 bytes, constructor `0x893ad4c0`) and what reaches it: the take `0x893ad640`, `unfollow` `0x893ad720`, the lists `0x893ad780` and `0x893ad800`, the attach `0x893acfc0`, the free start `0x893acf10`, the follow `0x893ace60`, and the free objects' tick (`0x893aca60`, the manager's pass `0x893ad5f0`) and clock (`0x893acba0`, the manager's pass `0x893ad870`). The seven the tone calls stay hooked in `xt_vc2tone`. The envelopes' and LFOs' note-offs and updates are the part's (step 4.3).
+
+**The check.** `xt_vc2tone` no longer hooks the constructors, `0x893ac1c0`, `0x893abe80`, `0x893acda0`, `0x893ad100` or `0x893ad080`: rom.4's own routines run, and all 14 and 8 objects are compared word for word after every event, with the generator's word. A note-on's blocks are drawn as the converters write them, and `toneBoundOn` holds the words the OSC voice and the TVA read to rom.4's memory.
+
 ### The VC-2's Vari off (2026-11-17, v261) {#vc2-vari-off}
 
 Step 4.2's OSC voice (the user's "Start Vari off", 2026-11-17). rom.4's two renders for a wave played with Vari Sw off, `0x893c63c0` (mono) and `0x893c66e0` (stereo), called with the output and the voice's object (+0x15c). They are the VC-2's own: rom.2's Vari-off player (`0x89509870`, `0x89509f52`, `XtLinearPlayer`) has six paths by mode and direction and walks at the pitch × the walk, with the beat's factor under Tempo Sync or Time Trip. These have neither a direction nor a beat. Each block steps by the object's pitch alone, times the loop's rate factor when the block starts inside the loop.
