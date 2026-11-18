@@ -11,9 +11,13 @@ inline constexpr uint32_t kNoteOnObjectAt = 0x8C075000, kNoteOnBlockAt = 0x8C075
 
 // The object and its block into rom.4's memory
 void vc2WriteNoteOnState(Sh4& cpu, const Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
-// A block: its code one the port has a type for (Through, the Speaker Simulator, the Growl) or one the switches pass
-// (past 20, its byte a type's with no start values or none), its words as that type's converter gives them
+// A block: its code one the port has a type for (Through, the Speaker Simulator, the Growl; the adapted types from
+// v252) or one the switches pass (past 20, its byte a type's with no start values or none), its words as that type's
+// converter gives them
 void vc2DrawNoteOnBlock(Vc2CosmBlockWords& b, std::mt19937& rng);
+// The block's words as its code's converter gives them, when the port draws its type, for a code given
+// after (v253: rom.4's Lo-Fi indexes its tables by a byte its converter keeps in range)
+void vc2DrawTypeWords(Vc2CosmBlockWords& b, std::mt19937& rng);
 // The pool a note-on is given: COSM 1's or 2's mostly, now and then past them
 uint32_t vc2DrawNoteOnPool(std::mt19937& rng);
 // The object: noise, its bindings the four bound objects, its slot none or one of 24, the floats the Growl reads moderate

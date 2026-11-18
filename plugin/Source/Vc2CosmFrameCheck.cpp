@@ -17,6 +17,7 @@
 #include "Vc2Matrix.h"
 #include "Vc2MatrixTables.h"
 #include "Vc2RomShared.h"
+#include "XtCosm.h"
 #include <array>
 #include <numeric>
 
@@ -171,7 +172,12 @@ std::string FrameRig::event(std::mt19937& rng) { return frameEvent(*this, rng, n
 void FrameRig::say(const Vc2Run& run) const { sayFrameCounts(run, n); }
 } // namespace
 
-bool vc2LoadCosmAndMatrix(const char* path) { return vc2LoadCosm(path) && vc2LoadMatrix(path); }
+bool vc2LoadCosmAndMatrix(const char* path) {
+    std::string rom2 = path;
+    const size_t at = rom2.rfind("rom.4");
+    if (at != std::string::npos) rom2.replace(at, 5, "rom.2");
+    return vc2LoadCosm(path) && vc2LoadMatrix(path) && xtCosmLoadTables(rom2.c_str());
+}
 
 long vc2CosmFrameCases(Vc2Fw& fw, const Vc2Run& run) { return vc2CosmPart<FrameRig>(fw, run, 1, kEvents); }
 #endif

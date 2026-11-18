@@ -41,8 +41,10 @@ public:
     void noteOn(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b, uint32_t pool);
     // 0x893aa5d0: a new block, when its code is the object's
     void newBlock(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
-    // A type's row, or none
+    // A type's row, or none: the frame's own, then the adapters' (v252, Vc2CosmAdapters)
     static const Vc2CosmTypeRow* rowOf(int32_t code);
+    // What the types' start values read beyond the object (v252)
+    Vc2CosmBound& bound() { return bound_; }
 
     Vc2CosmGrowl growl;   // the Growl's parts, on the object's words for each call
 

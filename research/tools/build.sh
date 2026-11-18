@@ -117,7 +117,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 # COSM (v234): the Growl against rom.4's own routines, the Matrix readers hooked; the converters' frame with the TVF's
 # converter and the Matrix's readers (v235); the converters by type and v237's six; v239's five; v241's two; the
 # Matrix core's part (v243), on the Matrix's own sources (v245); the Matrix set-up's part (v247); the COSM object's
-# frame's part (v249); the COSM note-on frame's part (v250)
+# frame's part (v249); the COSM note-on frame's part (v250), its types adapted over XtCosm (v252)
 [ -f Vc2CosmCheck.cpp ] && cc -DXT_VC2COSM_MAIN Vc2CosmCheck.cpp Vc2CosmGrowl.cpp Vc2CosmTables.cpp Vc2Math.cpp \
    $( [ -f Vc2CosmFrameCheck.cpp ] && echo Vc2CosmFrameCheck.cpp Vc2CosmConvert.cpp Vc2CosmTvf.cpp Vc2Matrix.cpp \
    Vc2MatrixTables.cpp ) $( [ -f Vc2CosmConverters.cpp ] && echo Vc2CosmConverters.cpp Vc2CosmFrameDraws.cpp \
@@ -128,7 +128,8 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2MatrixSetup.cpp ] && echo Vc2MatrixSetup.cpp Vc2MatrixSetupCheck.cpp Vc2MatrixSetupDraws.cpp ) \
    $( [ -f Vc2CosmObject.cpp ] && echo Vc2CosmObject.cpp Vc2CosmObjectCheck.cpp ) \
    $( [ -f Vc2CosmNoteOn.cpp ] && echo Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmNoteOnCheck.cpp \
-   Vc2CosmNoteOnDraws.cpp ) \
+   Vc2CosmNoteOnDraws.cpp ) $( [ -f Vc2CosmAdapters.cpp ] && echo Vc2CosmAdapters.cpp XtCosm.cpp XtOsc.cpp \
+   XtEnvelope.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2cosm" &
 # The pitch tracker, its frame (v223) and its analysis (v224), against rom.4's own module
 [ -f Vc2TrackerCheck.cpp ] && cc -DXT_VC2TRACKER_MAIN Vc2TrackerCheck.cpp Vc2Tracker.cpp Vc2TrackerTables.cpp \

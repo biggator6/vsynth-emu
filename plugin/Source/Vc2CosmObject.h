@@ -34,9 +34,9 @@ struct Vc2CosmObjectWords {
     float cleared[28];                  // +0x074…+0x0e3: D+0x1c…, 0 from the note-on
     uint32_t d0e4[4];                   // +0x0e4…+0x0f3
     float cleared0f4[2];                // +0x0f4, +0x0f8: 0 from the note-on
-    uint32_t d0fc[2];                   // +0x0fc, +0x100
+    float targets[2];                   // +0x0fc, +0x100: D+0xa4, +0xa8, the two values' targets (the new block's)
     float held[4];                      // +0x104…+0x113: envelopes A, B and LFOs A, B, held (the note-on's, update's)
-    uint32_t d114[2];                   // +0x114, +0x118
+    float values[2];                    // +0x114, +0x118: D+0xbc, +0xc0, the two values (the start values')
     float rates[2];                     // +0x11c, +0x120: envelopes A and B's rates × 4 (the note-on's, update's)
     uint32_t d124[7];                   // +0x124…+0x13f
     uint32_t pool;                      // +0x140: the buffer pool a slot was taken from (the note-on's)

@@ -1,14 +1,17 @@
 // xt_vc2cosm's sixth part (v250): rom.4's COSM note-on frame against Vc2CosmNoteOn and Vc2CosmPools: the pools at their
 // own address (0x89999290), set up by rom.4's static initializer (0x893ab550); an object, its block and the four bound
 // envelopes and LFOs in the interpreter's RAM, which the port's Vc2CosmBound reads too; only operator delete hooked.
-// Events: a note-on (0x893aa0e0) on the types ported (Through, the Speaker Simulator, the Growl) and codes the
+// Events: a note-on (0x893aa0e0) on the types ported (Through, the Speaker Simulator, the Growl; from v252 the
+// Resonator and the TVF, from v253 Lo-Fi, adapted over XtCosm, counted apart) and codes the
 // switches pass, the slot it takes holding noise first on both sides; a new block alone (0x893aa5d0); the destructor
 // (0x893aa060); the pools set up again; the object, its block or the bound words drawn again.  After each: the
 // object, the pools, the slot's four buffers when one was taken, and the deletes, word for word.  Its draws in
 // Vc2CosmNoteOnDraws.cpp.  XT_VC2COSM_MAIN only.
 #ifdef XT_VC2COSM_MAIN
+#include "Vc2CosmAdapters.h"
 #include "Vc2CosmCheck.h"
 #include "Vc2CosmNoteOnDraws.h"
+#include <algorithm>
 
 namespace {
 constexpr uint32_t kNoteOn = 0x893aa0e0, kNewBlock = 0x893aa5d0, kDestroy = 0x893aa060;   // [FW]
@@ -17,7 +20,13 @@ constexpr int kEvents = 60;
 
 struct NoteOnCounts {
     long events = 0, noteOns = 0, slots = 0, newBlocks = 0, destroys = 0, inits = 0, draws = 0;
+    long adaptedNoteOns = 0, adaptedBlocks = 0;   // on a type adapted over XtCosm (v252)
 };
+
+// Whether a code's type is one of the adapters' (Vc2CosmAdapters)
+bool adapted(int32_t code) {
+    return std::ranges::any_of(vc2CosmAdapterRows(), [code](const Vc2CosmTypeRow& r) { return r.code == code; });
+}
 
 // The bound words as the port reads them: the interpreter's, where the check drew them
 struct RamBound final : Vc2CosmBound {
@@ -79,6 +88,7 @@ std::string noteOnEvent(NoteOnRig& r, std::mt19937& rng) {
     r.filled = vc2FillFreeSlot(r.fw.cpu, r.pools, pool, r.block.code, rng);
     r.filledPool = pool;
     r.n.slots += r.filled >= 0;
+    r.n.adaptedNoteOns += adapted(r.block.code);
     return noteOnBoth(r, kNoteOn, { kNoteOnObjectAt, kNoteOnBlockAt, pool }, "the note-on",
                       [&] { r.noteOn.noteOn(r.o, r.block, pool); });
 }
@@ -86,7 +96,11 @@ std::string noteOnEvent(NoteOnRig& r, std::mt19937& rng) {
 std::string newBlockEvent(NoteOnRig& r, std::mt19937& rng) {
     ++r.n.newBlocks;
     vc2DrawNoteOnBlock(r.block, rng);
-    if (rng() % 4 != 0) r.block.code = r.o.code;
+    if (rng() % 4 != 0) {
+        r.block.code = r.o.code;
+        vc2DrawTypeWords(r.block, rng);
+    }
+    r.n.adaptedBlocks += r.block.code == r.o.code && adapted(r.block.code);
     r.filled = -1;
     return noteOnBoth(r, kNewBlock, { kNoteOnObjectAt, kNoteOnBlockAt }, "the new block",
                       [&] { r.noteOn.newBlock(r.o, r.block); });
@@ -139,9 +153,9 @@ std::string NoteOnRig::event(std::mt19937& rng) { return vc2CosmEvent(*this, kNo
 // one-off: each part's own report line, in fcheck's baseline in its own words; one printer would rewrite the earlier
 // parts' lines
 void NoteOnRig::say(const Vc2Run& run) const {
-    std::printf("note-on: %d cases, %ld events: %ld note-ons (%ld taking a slot), %ld new blocks, %ld destroys, %ld "
-                "pool set-ups, %ld draws\n", run.cases, n.events, n.noteOns, n.slots, n.newBlocks, n.destroys, n.inits,
-                n.draws);
+    std::printf("note-on: %d cases, %ld events: %ld note-ons (%ld taking a slot, %ld adapted), %ld new blocks (%ld "
+                "adapted), %ld destroys, %ld pool set-ups, %ld draws\n", run.cases, n.events, n.noteOns, n.slots,
+                n.adaptedNoteOns, n.newBlocks, n.adaptedBlocks, n.destroys, n.inits, n.draws);
 }
 } // namespace
 

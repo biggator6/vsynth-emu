@@ -1,5 +1,6 @@
 // rom.4's COSM note-on frame: see Vc2CosmNoteOn.h (v250).  Every address is rom.4's, every offset the object's.
 #include "Vc2CosmNoteOn.h"
+#include "Vc2CosmAdapters.h"
 #include "XtFloat.h"
 #include <algorithm>
 #include <cstring>
@@ -47,8 +48,9 @@ constexpr Vc2CosmTypeRow kRows[] { { 0, nullptr, nullptr, nullptr }, { 5, nullpt
 } // namespace
 
 const Vc2CosmTypeRow* Vc2CosmNoteOn::rowOf(int32_t code) {
-    for (const Vc2CosmTypeRow& r : kRows)
-        if (r.code == code) return &r;
+    for (std::span<const Vc2CosmTypeRow> rows : { std::span<const Vc2CosmTypeRow>(kRows), vc2CosmAdapterRows() })
+        for (const Vc2CosmTypeRow& r : rows)
+            if (r.code == code) return &r;
     return nullptr;
 }
 
