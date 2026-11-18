@@ -504,9 +504,14 @@ version against rom.4's routines with what it calls hooked:
      - done (v253): Lo-Fi's adapter, with the Resonator's one template (`Vc2CosmPairType`), after XtCosmLofi moved
        into XtCosmLofi.h with four const getters for its new block's words (the VC-2 session's choice, 2026-11-17)
        (HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: Lo-Fi").
-     - next: the rest of the types' adapters a few a version (their start values, note-on cases, new blocks; those
-       with inline cases and buffers now), then the update (the held levels and rates, each code's inline case) and
-       the DSP by code, mono and stereo, over XtCosm's types and the Growl.
+     - done (v254): OD/Dist's (1, 2), the Wave Shaper's (3) and the Amp Simulator's (4) adapters, the first with
+       note-on cases (rom.4's copies of the object's words into D's, `Vc2CosmCaseCopy`); the types of one or two
+       values one template (`Vc2CosmValueType`), each through its XtCosm class's own note-on (HARDWARE_FIRMWARE.md,
+       "The VC-2's COSM adapters: OD/Dist, the Wave Shaper and the Amp Simulator").
+     - next: the rest of the types' adapters a few a version (the Dual Filter, Dynamic TVF and TB Filter, whose cases
+       hold more; then the buffered ones, the Side Band Filters, Compressor, Limiter and Frequency Shifter), then the
+       update (the held levels and rates, each code's inline case) and the DSP by code, mono and stereo, over XtCosm's
+       types and the Growl.
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

@@ -1546,6 +1546,49 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM adapters: OD/Dist, the Wave Shaper and the Amp Simulator (2026-11-17, v254) {#vc2-cosm-adapters-drive}
+
+Step 4.2's COSM object, its fifth part (research/VC2_MODE_PLAN.md): the first types with a note-on case of their own, inline in the note-on's switch. They come in as v252's and v253's did, through XtCosm's classes, which are unchanged. Every address is rom.4's, every offset the object's or its block's.
+
+**The start values** (0x893a85f0's cases), each a value or two on envelope A's start level (+0x58) and LFO A's level (+0x38), then B's, clamped by the COSM clamp `0x893bf240`:
+- OD/Dist, codes 1 and 2 (`0x893a8658`, `0x893a86e0`, the same code): Drive +4 with its Env and LFO depths +8 and +0x10, 1 + 12 × it within 0…1, into D+0xbc; Tone +0x18 with +0x1c and +0x24 within 0.1…1, then the table `0x895438d8` at trunc(127 × it), into D+0xc0. These are XtCosmOd's `driveOf` and `toneOf`.
+- The Wave Shaper, 3 (`0x893a8770`): Drive +8 (+0xc, +0x14) within 0…1; Tone +0x1c (+0x20, +0x28) within 0.1…1, then the table. XtCosmWs's.
+- The Amp Simulator, 4 (`0x893a87f0`): Gain +8 (+0xc, +0x14), 1 + 7 × it within 0…1, into D+0xbc alone. XtCosmAmp's.
+
+**The new blocks** (rom.2's opcode for opcode, from 0x893aa5d0's switch): the same laws on the held levels into the targets +0xfc (and +0x100), and the block's words into the object's with interrupts masked:
+- OD/Dist (`0x893a8e50`, `0x893a8f40`): the block's +4…+0x2f into +0x14…+0x3f. Its Tone is clamped to 0…1 here, where its start values clamp it to 0.1…1: rom.2's quirk, which XtCosmOd keeps.
+- The Wave Shaper (`0x893a9050`): its Type's byte into +0x14, +8…+0x2f into +0x18…+0x3f, and Output Level (+0x30) × 0.125 into +0x40.
+- The Amp (`0x893a9150`): its Amp Type's byte into +0x14, +8…+0x2b into +0x18…+0x3b.
+
+**The note-on cases** (0x893aa0e0's switch on the code, after the new block) copy the object's words into D's. They are the words XtCosm's note-ons end with (`0x894ee142`, `0x894ee160`, `0x894ee170`):
+- OD/Dist (`0x893aa2b2`, `0x893aa2c0`): Output Level (+0x3c) into the gain, D+0x8c.
+- The Wave Shaper (`0x893aa2d0`): Level/8 (+0x40) into D+0x8c.
+- The Amp (`0x893aa2e0`): Level, Treble, Middle and Bass (+0x38, +0x34, +0x30, +0x2c) into the slews D+0x8c…+0x98.
+
+**The adapter** (Vc2CosmAdapters.cpp):
+- v253's pair template is now a type of one or two values, `Vc2CosmValueType`. It holds a type's block reader, its values' and targets' getters (the second none for the Amp), and what its new block writes besides.
+- A block's settings are read by `valueAt`: a value, its Env depth a word on and its LFO depth three, `Vc2CosmMod`'s layout. `settingsAt` reads two of them, five words apart: OD/Dist's from word 0, the others' from word 1.
+- Both parts call the XtCosm class's own note-on, with the same levels as start and output, so its values are the start values' and its targets the new block's. XtCosmOd's `setBlock` takes only a block of the note's own code, and a fresh object's code is OD's, so a DS block given to `setBlock` alone would be refused; the note-on takes the block first.
+- The Wave Shaper's +0x40 is XtCosmWs's gain after that note-on, its Level/8.
+- The note-on cases are rows of copies, `Vc2CosmCaseCopy`: rom.4's own inline code, as the blocks' copies are.
+
+**The check**, xt_vc2cosm's sixth part:
+- Codes 1…4 are among its note-ons and new blocks, their blocks drawn as their converters give them (v239's, v237's): Drive, Tone and Gain 0…1 with depths within ±1, Output Level 0…1, the Wave Shaper's Type 0…5, the Amp's 0…2 with Bass 0…4, Middle 0…1 and Treble 0…2.
+- Codes past 20 with bytes 1…4 run only those types' start values, as rom.4's switch on the code's byte does.
+
+Results:
+- seed 2024, 40 cases: 910 note-ons (481 adapted), 598 new blocks (174 adapted); 0 different on the first run, with the address and undefined-behaviour sanitizers on. The other five parts are as they were.
+- seeds 7 and 31337, 400 cases each: 8,942 and 8,952 note-ons (4,667 and 4,684 adapted), 6,003 and 6,038 new blocks (1,795 and 1,789 adapted); 0 different.
+- Coverage: every line, region and function of Vc2CosmAdapters.cpp.
+- `mutate_vc2.py --cosm`: 982 plants, all caught. 104 are new or rewritten:
+  - 25 on the template: the settings' words, the note-on's levels (both kinds), the held levels' order, the getters' loop and places, the rest, the Type's byte and copy.
+  - 14 follow the Resonator's and Lo-Fi's plants into it: their values, targets, fields, copy and rows.
+  - 19 on OD/Dist, 17 on the Wave Shaper, 9 on the Amp: the codes, the settings' word and fields, the copies, the Level/8's word and getter, values, targets, each row's three parts.
+  - 11 on the note-on cases: D+0x8c's place, the copy's size and way, each word's from and to.
+  - 9 in `vc2xtcosm`, XtCosm.cpp under xt_vc2cosm: the floors, scales and index the three types' laws take, the Level/8, and XtCosmOd's code test.
+  - Not planted, as no input tells them apart: the XtCosm blocks' words only the DSPs read (OD/Dist's Output Level and DS flag, the Types, the Amp's Bass, Middle, Treble and Level), and the choice of the four-word note-on (a plant there doesn't compile).
+- XtCosm is unchanged, so xt_cosm's and xt_tone's sections are reused as they were. fcheck's diff is xt_vc2cosm's `note-on:` line. verify.sh passes every line.
+
 ### The VC-2's COSM adapters: Lo-Fi (2026-11-17, v253) {#vc2-cosm-adapter-lofi}
 
 Step 4.2's COSM object, its fourth part (research/VC2_MODE_PLAN.md). Lo-Fi (19) comes in as v252's types did, through XtCosmLofi. Its new block writes four words besides its targets, which XtCosmLofi held private. The VC-2 session chose (2026-11-17) four const getters on rom.2's class, so the laws stay in one place:
