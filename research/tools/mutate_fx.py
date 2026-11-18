@@ -9,15 +9,21 @@ D = os.path.dirname(os.path.abspath(__file__))
 args = sys.argv[1:]
 control = '--control' in args
 if control: args.remove('--control')
-samples = args.pop(0) if args and args[0].isdigit() else ('60' if control else '4096')
-port, listing, source, tag = ('fxc', 'fxc_muts.txt', 'XtFxControl::boot', 'fxc_') if control else ('fx', 'fx_muts.txt', 'XtFxChip::reset', 'fx_')
+vc2 = '--vc2' in args   # rom.4's driver: fx4_muts.txt under "xt_fx <rom.4> vc2", its six parts
+if vc2: args.remove('--vc2')
+samples = args.pop(0) if args and args[0].isdigit() else ('60' if control or vc2 else '4096')
+port, listing, source, tag = (('fx4c', 'fx4_muts.txt', 'XtFxControl::boot', 'fx4_') if vc2 else
+                              ('fxc', 'fxc_muts.txt', 'XtFxControl::boot', 'fxc_') if control else
+                              ('fx', 'fx_muts.txt', 'XtFxChip::reset', 'fx_'))
+parts = 7 if vc2 else 10 if control else 1   # the result lines a whole run prints
 env = dict(os.environ, PORT=port, XT_FX_STOP='1')
 muts = mutlist.plants(D + '/' + listing, args, 'mutate_fx', (port,))   # a line's fourth field its port (fxv, v199)
 def results(out): return [l for l in out.splitlines() if re.search(r': \d+ (samples|edits), \d+ different', l)]
 # With nothing planted, which also builds the shared objects.  If this run fails, every plant's would, and would read as caught.
 base = subprocess.run(['bash', D + '/mutate.sh', tag + '_control', source, source, samples, 'different'], env=env, capture_output=True, text=True, timeout=600)
 base_out = base.stdout + base.stderr
-if not results(base_out) or (control and len(results(base_out)) < 8) or any(not re.search(r', 0 different', l) for l in results(base_out)):
+clean = [l for l in results(base_out) if re.search(r', 0 different', l)]
+if not clean or len(clean) < parts or len(clean) != len(results(base_out)):
     sys.exit('mutate_fx: the run with nothing planted fails, so no plant would mean anything: ' + (base_out.strip().splitlines() or ['no output'])[-1][:120])
 def one(m):
     p = subprocess.Popen(['bash', D + '/mutate.sh', tag + m[0], m[1], m[2], samples, 'different'],
@@ -30,7 +36,7 @@ def one(m):
         return ('caught ', m[0], 0, 'stopped: it hung')
     lines = results(out)
     if 'not in' in out or ' error' in out or '== ' + tag + m[0] not in out: return ('ERROR  ', m[0], 0, (out.strip().splitlines() or [''])[-1][:110])   # never ran: not a crash of the plant's
-    if control and len(lines) < 8: return ('caught ', m[0], 0, 'stopped: it crashed')
+    if len(lines) < parts: return ('caught ', m[0], 0, 'stopped: it crashed')
     if not lines: return ('ERROR  ', m[0], 0, (out.strip().splitlines() or [''])[-1][:110])
     bad = [l for l in lines if not re.search(r', 0 different', l)]
     return ('caught ' if bad else 'MISSED ', m[0], len(bad), bad[0][:70] if bad else '')

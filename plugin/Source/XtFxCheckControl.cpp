@@ -2,6 +2,7 @@
 // from XtFxChip.cpp as it stood, v204).  XT_FX_MAIN only.
 #ifdef XT_FX_MAIN
 #include "XtFxCheck.h"
+#include "XtFxCheckNoise.h"
 
 namespace xtfxcheck {
 // ------------------------------------------------------------------ the control side
@@ -24,12 +25,22 @@ struct DirectBus : XtFxControl::Bus {
     void wait(uint32_t n) override { for (uint32_t i = 0; i < n; i++) sample(); }
 };
 
-void againstReference(const char* rom, int randomEvents, uint32_t seed) {
+const FxIds& rom2Ids() {
+    static constexpr int kLevels[] = { 0x178, 0x179, 0x17a, 0x1fd, 0x1fe, 0x231, 0x3e, 0x76, 0x51e, 0x11d, 0x120, 0x121,
+                                       0x122, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70,
+                                       0x78, 0x7c };   // and External Input Type and Source (v204)
+    // HARDWARE_FIRMWARE.md, "XtFxControl"
+    static constexpr int kAlone[] = { 0x57b, 0x6bb, 0x6bd, 0x5b7, 0x5dd, 0x634, 0x71e };
+    static const FxIds ids = { xtVSynthFx(), "control", 0x177, 0x1fc, 0x230, 0x41, 0x11d, kLevels, kAlone };
+    return ids;
+}
+
+void againstReference(const char* rom, int randomEvents, uint32_t seed, const FxIds& fx) {
     auto ref = std::make_unique<Reference>(); auto chip = std::make_unique<XtFxChip>();
     InputNoise noise(seed);
     long samples = 0, different = 0, firstAt = -1, words = 0;
     std::string what;
-    XtFxControl queued(rom);
+    XtFxControl queued(rom, nullptr, fx.image);
     const auto sample = [&] {
         noise.into(*chip, *ref, samples);
         queued.service(*chip); chip->runFrame(); ref->runProgram(768); ref->sync(); samples++;
@@ -37,24 +48,46 @@ void againstReference(const char* rom, int randomEvents, uint32_t seed) {
         if (!d.empty()) { if (!different) { firstAt = samples; what = d; } different++; }
     };
     DirectBus bus(*ref); bus.sample = sample;
-    XtFxControl direct(rom, &bus);                                               // starts both: its start's waits run the samples
-    Editor ed(rom, queued, seed);
+    XtFxControl direct(rom, &bus, fx.image);                                     // starts both: its start's waits run the samples
+    Editor ed(rom, queued, seed, fx);
     const auto run = [&](const Edit& e, int after) {
-        apply(queued, e); apply(direct, e);
+        apply(queued, e);
+        apply(direct, e);
         for (int i = 0; i < after; i++) sample();
-        for (unsigned i = 0; i < 2048; i++) if (queued.drained() && (chip->word(i) & 0x0fffffff) != (queued.word(i) & 0x0fffffff)) { words++; break; }
+        if (!queued.drained()) return;
+        for (unsigned i = 0; i < 2048; i++) {
+            if ((chip->word(i) & 0x0fffffff) == (queued.word(i) & 0x0fffffff)) continue;
+            words++;
+            break;
+        }
     };
-    for (int t = 1; t <= 42; t++) { run(ed.mfxType(t % 42), 128); Edit e; ed.params(e, kMfxIds, t % 42, 3); run(e, 128); }
-    for (int t = 1; t <= 9; t++) { run(ed.choType(t % 9), 128); Edit e; ed.params(e, kChoIds, t % 9, 3); run(e, 128); }
-    for (int t = 1; t <= 11; t++) { run(ed.revType(t % 11), 128); Edit e; ed.params(e, kRevIds, t % 11, 3); run(e, 128); }
+    const auto everyType = [&](Edit (Editor::*type)(int), uint32_t table, int count) {
+        for (int t = 1; t <= count; t++) {
+            run((ed.*type)(t % count), 128);
+            Edit e;
+            ed.params(e, table, t % count, 3);
+            run(e, 128);
+        }
+    };
+    everyType(&Editor::mfxType, fx.image.mfxIds, fx.image.mfxTypes);
+    everyType(&Editor::choType, fx.image.choIds, fx.image.choTypes);
+    everyType(&Editor::revType, fx.image.revIds, fx.image.revTypes);
     for (int i = 0; i < randomEvents; i++) {
         run(ed.any(), ed.r.below(4) ? ed.r.below(64) : ed.r.below(2048));
-        if (i % 8 == 3) { Edit e; e.sets.push_back({ 0x41, ed.r.below(4) ? 1 : 0 }); run(e, 16); Edit c; c.clockMs = 60 + ed.r.below(400); run(c, 16); }   // an outside clock, on and off
+        if (i % 8 != 3) continue;
+        Edit source;   // an outside clock, on and off
+        source.sets.push_back({ fx.clockSource, ed.r.below(4) ? 1 : 0 });
+        run(source, 16);
+        Edit clock;
+        clock.clockMs = 60 + ed.r.below(400);
+        run(clock, 16);
     }
     if (different && xtSwitch("XT_FX_FIRST"))
-        std::printf("  control: first at sample %ld, %s\n", firstAt, what.c_str());
-    if (!queued.ok() || !direct.ok()) std::printf("  control: a fault: %s %s\n", queued.error().c_str(), direct.error().c_str());
-    std::printf("control against the reference: %ld samples, %ld different\n", samples, different + words + (queued.ok() && direct.ok() ? 0 : 1));
+        std::printf("  %s: first at sample %ld, %s\n", fx.label, firstAt, what.c_str());
+    const bool ran = queued.ok() && direct.ok();
+    if (!ran) std::printf("  %s: a fault: %s %s\n", fx.label, queued.error().c_str(), direct.error().c_str());
+    const long wrong = different + words + (ran ? 0 : 1);
+    std::printf("%s against the reference: %ld samples, %ld different\n", fx.label, samples, wrong);
 }
 
 // A patch through the firmware's readers, by ID, against Rig's routines one by one.  Where they should differ, the Rig is told what it leaves out: the tempo, and that a Chorus of type Off keeps its
@@ -81,32 +114,44 @@ void readers(const char* rom, uint32_t seed) {
 }
 
 // Edits one at a time through update(), then the same store as a patch into a new control.  Types have their defaults and the edits their own values, so anything set() lost shows.
-void liveEdits(const char* rom, int events, uint32_t seed) {
+void liveEdits(const char* rom, int events, uint32_t seed, const FxIds& fx) {
     int cases = 0, different = 0; std::string first;
+    const auto isAlone = [&](const std::pair<int, int>& x) {
+        return std::ranges::find(fx.alone, x.first) != fx.alone.end();
+    };
     for (int run = 0; run < 12; run++) {
-        XtFxControl live(rom); Editor ed(rom, live, seed + 1000 + (uint32_t)run);
+        XtFxControl live(rom, nullptr, fx.image);
+        Editor ed(rom, live, seed + 1000 + (uint32_t)run, fx);
         for (int i = 0; i < events; i++) {
-            Edit e = ed.any(); e.patch = false;
+            Edit e = ed.any();
+            e.patch = false;
             if (e.matrix) continue;                                              // the Matrix isn't in the store, so a new patch wouldn't have it
             // Nor do these parameters reach the words alone, in the firmware's own update: a new patch has them and a live edit doesn't (HARDWARE_FIRMWARE.md, "XtFxControl").
-            static const int alone[] = { 0x57b, 0x6bb, 0x6bd, 0x5b7, 0x5dd, 0x634, 0x71e };
-            e.sets.erase(std::remove_if(e.sets.begin(), e.sets.end(), [](const std::pair<int, int>& x) { return std::find(std::begin(alone), std::end(alone), x.first) != std::end(alone); }), e.sets.end());
+            std::erase_if(e.sets, isAlone);
             apply(live, e);
         }
-        XtFxControl fresh(rom);
-        for (int id = 0; id < 0x8d0; id++) fresh.set(id, live.get(id));
+        XtFxControl fresh(rom, nullptr, fx.image);
+        for (int id = 0; id < fx.image.ids; id++) fresh.set(id, live.get(id));
         fresh.loadPatch();
         // The firmware leaves two things behind.  Reverb types Off and Delay don't write the pre-EQ (A 0x138…0x156), so it's what the last type left, and a new patch hasn't had one.  So through Reverb 1
         // on both, and back.  And Reverb Delay's note values use the tempo it last heard, which it only hears as the current type.  So the tempo away and back, on both.
-        const int rev = live.get(0x230), tempo = live.get(0x11d);
-        for (XtFxControl* c : { &live, &fresh }) { c->set(0x230, rev == 1 ? 2 : 1); c->update(); c->set(0x230, 1); c->update(); c->set(0x230, rev); c->update(); c->set(0x11d, tempo == 2500 ? tempo - 1 : tempo + 1); c->update(); c->set(0x11d, tempo); c->update(); }
+        const int rev = live.get(fx.revType), tempo = live.get(fx.tempo);
+        const std::pair<int, int> away[] = { { fx.revType, rev == 1 ? 2 : 1 }, { fx.revType, 1 }, { fx.revType, rev },
+                                             { fx.tempo, tempo == 2500 ? tempo - 1 : tempo + 1 }, { fx.tempo, tempo } };
+        for (XtFxControl* c : { &live, &fresh }) {
+            for (const auto& step : away) {
+                Edit e;
+                e.sets.push_back(step);
+                apply(*c, e);
+            }
+        }
         int d = 0; unsigned at = 0; uint32_t x = 0, y = 0;
         for (unsigned i = 0; i < 2048; i++) { const uint32_t a = live.word(i) & 0x0fffffff, b = fresh.word(i) & 0x0fffffff; if (a != b && !d++) { at = i; x = a; y = b; } }
         if (d && first.empty()) { char s[100]; std::snprintf(s, sizeof s, "run %d: %d words, first %03x, live %07x, patch %07x", run, d, at, x, y); first = s; }
         if (!live.ok() || !fresh.ok()) { first = live.error() + fresh.error(); d = 1; }
         if (d && xtSwitch("XT_FX_LIVE")) {
-            std::printf("  run %d, MFX %d, Chorus %d, Reverb %d:", run, live.get(0x177), live.get(0x1fc),
-                        live.get(0x230));
+            std::printf("  run %d, MFX %d, Chorus %d, Reverb %d:", run, live.get(fx.mfxType), live.get(fx.choType),
+                        live.get(fx.revType));
             for (unsigned i = 0; i < 2048; i++) {
                 const uint32_t a = live.word(i) & 0x0fffffff, b = fresh.word(i) & 0x0fffffff;
                 if (a != b) std::printf(" %c%03x %07x/%07x", "AB"[i >> 10], i & 1023, a, b);
@@ -116,7 +161,7 @@ void liveEdits(const char* rom, int events, uint32_t seed) {
         cases++; different += d ? 1 : 0;
     }
     if (different && xtSwitch("XT_FX_FIRST")) std::printf("  live edits: %s\n", first.c_str());
-    std::printf("control's live edits against a patch: %d samples, %d different\n", cases, different);
+    std::printf("%s's live edits against a patch: %d samples, %d different\n", fx.label, cases, different);
 }
 } // namespace xtfxcheck
 #endif

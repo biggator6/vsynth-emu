@@ -899,6 +899,8 @@ through the unit, MULTI R: left -999.00 dB, right -18.09 dB, 1 samples late
 through the unit, DIR L: left -18.08 dB, right -999.00 dB, 1 samples late
 through the unit, DIR R: left -999.00 dB, right -18.08 dB, 1 samples late
 through the unit, MULTI L with the system's EQ on at its defaults: -18.12 dB
+control's start against the firmware's task: 51312 samples, 0 different
+control's Matrix through the queue: 128 samples, 0 different
 control's readers against the routines one by one: 62 samples, 0 different
 control's behaviour on the bus: 249 samples, 0 different
 control's value text against the firmware's routine and driver: 159417 samples, 0 different
@@ -909,3 +911,10 @@ the frame into the chip against the firmware's truncation: 51200 samples, 0 diff
 the frame through the unit: 9 samples, 0 different
 the input through the unit: 8 samples, 0 different
 the copy without the chip against the chip: 9 samples, 0 different
+vc2 control's start against the firmware's task: 59052 samples, 0 different
+vc2 control against the reference: 493298 samples, 0 different
+vc2 control's live edits against a patch: 12 samples, 0 different
+vc2 control's messages against the driver by hand: 1311 samples, 0 different
+vc2 control's outside clock against the driver by hand: 8 samples, 0 different
+vc2 control's blocks' IDs against their readers: 988 samples, 0 different
+vc2 control's patch EQ on the bus: 6 samples, 0 different

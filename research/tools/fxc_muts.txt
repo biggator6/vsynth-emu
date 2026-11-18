@@ -22,7 +22,7 @@ coef-shift|(s & 3)|(s & 1)
 coef-top|(v >> 7 & 1)|(v >> 7 & 0)
 field-low|(a >> 20 & 0xf8)|(a >> 20 & 0x38)
 word-cmd|put(0x34, (uint16_t)m.r[4], m.r[5]);|put(0x34, (uint16_t)m.r[4], m.r[5] \| 1);
-no-kernel|c.hook(0x89301680, [](Sh4& m) { m.ret(0); });|
+no-kernel|kSystemEnd { 0x89301680, 0x89301610 }|kSystemEnd { 0, 0x89301610 }|fxim
 # The driver's sleep
 sleep-none|sleep(m.r[4] & 0xffff);|sleep(0);
 sleep-tenth|sleep(m.r[4] & 0xffff);|sleep((m.r[4] & 0xffff) / 10);
@@ -32,25 +32,25 @@ range-centre|hi = (uint16_t)c.rd16(d + 10) - centre;|hi = (uint16_t)c.rd16(d + 1
 high-default|def = (int16_t)c.rd16(d + 2);|def = (int16_t)c.rd16(d + 4);
 high-range|hi = (int16_t)c.rd16(d + 6);|hi = (int16_t)c.rd16(d + 4);
 clamp-none|std::clamp(value, (int)low_[(size_t)id], (int)high_[(size_t)id])|value
-read-next|const int id = (int16_t)m.r[5]; m.ret(|const int id = (int16_t)m.r[5] + 1; m.ret(
+read-next|const int id = (int16_t)m.r[5];\n        if (readObserver_)|const int id = (int16_t)m.r[5] + 1;\n        if (readObserver_)
 set-always|if (store_[(size_t)id] == v) return;|
 set-lost|dirty_ \|= blockOf(id);|
 # Which block a parameter is in
-block-tempo|id == 0x11d \|\| (id >= 0x120|(id >= 0x120
-block-switch|id <= 0x122)) return BlockSwitches|id <= 0x121)) return BlockSwitches
-block-attn|if (id == 0x51e) return BlockAttenuation;|
-block-master|id == 0x3e \|\| id == 0x41 \|\||id == 0x41 \|\|
-block-gain|id == 0x76 \|\||
-block-eq|id <= 0x70))|id <= 0x6f))
-block-send|(id >= 0x177 && id <= 0x17a)|(id >= 0x177 && id <= 0x179)
-block-cho|id >= 0x1fc && id <= 0x1fe|id >= 0x1fc && id <= 0x1fd
-block-rev|id == 0x230 \|\| id == 0x231|id == 0x230
-block-mfxparam|if (within(kMfxIds, kMfxTypes)) return BlockMfx;|
-block-choparam|if (within(kChoIds, kChoTypes)) return BlockChorus;|
-block-revparam|if (within(kRevIds, kRevTypes)) return BlockReverb;|
-block-lastmfx|within(kMfxIds, kMfxTypes)|within(kMfxIds, kMfxTypes - 1)
-block-lastcho|within(kChoIds, kChoTypes)|within(kChoIds, kChoTypes - 1)
-block-lastrev|within(kRevIds, kRevTypes)|within(kRevIds, kRevTypes - 1)
+block-tempo|{ 0x11d, 0x11d, BlockSwitches }, ||fxim
+block-switch|{ 0x120, 0x122, BlockSwitches }|{ 0x120, 0x121, BlockSwitches }|fxim
+block-attn|{ 0x51e, 0x51e, BlockAttenuation },||fxim
+block-master|{ 0x3e, 0x3e, BlockSystem }, ||fxim
+block-gain|{ 0x76, 0x76, BlockSystem },||fxim
+block-eq|{ 0x65, 0x70, BlockSystem }|{ 0x65, 0x6f, BlockSystem }|fxim
+block-send|{ 0x177, 0x17a, BlockMfx }|{ 0x177, 0x179, BlockMfx }|fxim
+block-cho|{ 0x1fc, 0x1fe, BlockChorus }|{ 0x1fc, 0x1fd, BlockChorus }|fxim
+block-rev|{ 0x230, 0x231, BlockReverb }|{ 0x230, 0x230, BlockReverb }|fxim
+block-mfxparam|if (within(image_.mfxIds, image_.mfxTypes)) return BlockMfx;|
+block-choparam|if (within(image_.choIds, image_.choTypes)) return BlockChorus;|
+block-revparam|if (within(image_.revIds, image_.revTypes)) return BlockReverb;|
+block-lastmfx|within(image_.mfxIds, image_.mfxTypes)|within(image_.mfxIds, image_.mfxTypes - 1)
+block-lastcho|within(image_.choIds, image_.choTypes)|within(image_.choIds, image_.choTypes - 1)
+block-lastrev|within(image_.revIds, image_.revTypes)|within(image_.revIds, image_.revTypes - 1)
 # The firmware's message: which flags mean what
 flag-system|blocks & BlockSystem ? 0x20 : 0|blocks & BlockSystem ? 0x00 : 0
 flag-attn|blocks & BlockAttenuation ? 0x10 : 0|blocks & BlockAttenuation ? 0x00 : 0
@@ -62,17 +62,19 @@ flag-rev|blocks & BlockReverb ? 0x08 : 0|blocks & BlockReverb ? 0x10 : 0
 dirty-kept|const unsigned d = dirty_; dirty_ = 0;\n    if (d) send(d, false);|const unsigned d = dirty_;\n    if (d) send(d, false);
 patch-loses-system|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput); dirty_ = 0;|const unsigned d = 0; dirty_ = 0;
 patch-keeps-dirty|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput); dirty_ = 0;|const unsigned d = dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput);
-send-unflushed|    call(0x894ac970, { kThis });\n    flush(0);|    call(0x894ac970, { kThis });
+send-unflushed|    call(image_.takeMessage, { image_.self });\n    flush(0);|    call(image_.takeMessage, { image_.self });
 # The Matrix
-matrix-unapplied|&& changed) call(0x894ad4f0, { kThis });|&& changed) {}
-matrix-unflushed|if (call(0x894ad4e0, { kThis, kMatrix }, &changed) && changed) call(0x894ad4f0, { kThis });\n    flush(0);|if (call(0x894ad4e0, { kThis, kMatrix }, &changed) && changed) call(0x894ad4f0, { kThis });
+matrix-unapplied|&& changed)\n        call(image_.matrixApply, { image_.self });|&& changed) {}
+matrix-unflushed|call(image_.matrixApply, { image_.self });\n    flush(0);|call(image_.matrixApply, { image_.self });
 matrix-first-only|for (uint32_t i = 0; i < 3; i++) sh4_->wr16(kMatrix|for (uint32_t i = 0; i < 1; i++) sh4_->wr16(kMatrix
 # The start
-boot-no-ctor|    call(0x894b4a60);|
-boot-no-driver|    call(0x894ac6a0, { kThis });\n|
-boot-no-780|    call(0x894ac780, { kThis });\n|
+boot-no-ctor|    call(image_.staticInit);|
+boot-no-driver|    call(image_.start, { image_.self });\n|
+boot-no-780|    call(image_.startTask, { image_.self });\n|
 boot-no-system|send(BlockSystem, true);|send(0, true);
 boot-no-patch|send(BlockSystem, true);|send(BlockSystem, false);
+boot-task-first|    call(image_.start, { image_.self });\n    call(image_.startTask, { image_.self });|    call(image_.startTask, { image_.self });\n    call(image_.start, { image_.self });
+boot-route-first|    send(BlockSystem, true);\n    routeInput();|    routeInput();\n    send(BlockSystem, true);
 no-null-page|    sh4_->mapRam(0x00000000, 0x00001000);\n|
 # The unit
 unit-gain|const float v = x * 0.0625f;|const float v = x * 0.125f;
@@ -91,18 +93,18 @@ tick-no-gate|    if (!drained()) return;\n    if (patchWanted_)|    if (patchWan
 tick-no-patch|    if (patchWanted_) { patchWanted_ = false; loadPatch(); }\n    else update();|    update();
 tick-patch-twice|patchWanted_ = false; loadPatch();|loadPatch();
 tick-no-update|    else update();\n}|}
-clock-no-source|sh4_->wr8(kClock + 0x40, 1);|sh4_->wr8(kClock + 0x40, 0);
-clock-offset|sh4_->wr16(kClock + 0x48, (uint16_t)sixClocksMs);|sh4_->wr16(kClock + 0x4a, (uint16_t)sixClocksMs);
-clock-no-call|    call(0x894acb10, { kThis });\n|
-clock-no-flush|    call(0x894acb10, { kThis });\n    flush(0);|    call(0x894acb10, { kThis });
+clock-no-source|sh4_->wr8(image_.clock + 0x40, 1);|sh4_->wr8(image_.clock + 0x40, 0);
+clock-offset|sh4_->wr16(image_.clock + 0x48, (uint16_t)sixClocksMs);|sh4_->wr16(image_.clock + 0x4a, (uint16_t)sixClocksMs);
+clock-no-call|    call(image_.clockPoll, { image_.self });\n|
+clock-no-flush|    call(image_.clockPoll, { image_.self });\n    flush(0);|    call(image_.clockPoll, { image_.self });
 cat-names-table|kMfxNames = 0x89788c98|kMfxNames = 0x89788cb0
 cat-names-stride|kMfxNames + 24 * (uint32_t)t|kMfxNames + 20 * (uint32_t)t
 cat-first|const int first = (int16_t)rom.rd16(table + 4 * (uint32_t)t), last|const int first = (int16_t)rom.rd16(table + 4 * (uint32_t)t) + 1, last
 cat-last|last = (int16_t)rom.rd16(table + 4 * (uint32_t)t + 2);|last = (int16_t)rom.rd16(table + 4 * (uint32_t)t + 2) - 1;
 cat-last-more|id <= last; ++id|id <= last + 1; ++id
-cat-mfx-table|types(kMfxIds, kMfxTypes, cat.mfx);|types(kChoIds, kChoTypes, cat.mfx);
-cat-cho-table|types(kChoIds, kChoTypes, cat.chorus);|types(kRevIds, kChoTypes, cat.chorus);
-cat-rev-table|types(kRevIds, kRevTypes, cat.reverb);|types(kChoIds, kRevTypes, cat.reverb);
+cat-mfx-table|types(im.mfxIds, im.mfxTypes, cat.mfx);|types(im.choIds, im.choTypes, cat.mfx);
+cat-cho-table|types(im.choIds, im.choTypes, cat.chorus);|types(im.revIds, im.choTypes, cat.chorus);
+cat-rev-table|types(im.revIds, im.revTypes, cat.reverb);|types(im.choIds, im.revTypes, cat.reverb);
 cat-star|if (star != std::string::npos) t.erase(star);||fxv
 cat-space-front|return from == std::string::npos ? std::string() : t.substr(from, to - from + 1);|return from == std::string::npos ? std::string() : t.substr(0, to + 1);|fxv
 cat-space-back|return from == std::string::npos ? std::string() : t.substr(from, to - from + 1);|return from == std::string::npos ? std::string() : t.substr(from);|fxv
@@ -170,13 +172,13 @@ type-any-number|return rest == t.size() \|\| std::isalpha((unsigned char)t[rest]
 type-no-percent| \|\| t[rest] == '%';|;|fxv
 # v204: the outside input's routing (XtFxControl.cpp, and fxi, XtFxInput.cpp) and its way through the unit
 route-start|send(BlockSystem, true);\n    routeInput();|send(BlockSystem, true);
-route-block|if (id == 0x78 \|\| id == 0x7c) return BlockInput;|
+route-block|{ 0x78, 0x78, BlockInput }, { 0x7c, 0x7c, BlockInput },||fxim
 route-send|if (blocks & BlockInput) routeInput();|
 route-patch|dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput); dirty_ = 0;|dirty_ & (BlockSystem \| BlockAttenuation); dirty_ = 0;
-route-post|c.hook(0x894aee70, [](Sh4& m) { m.ret(0); });|
+route-post|kPostEvent { 0x894aee70, 0x89391e50 }|kPostEvent { 0, 0x89391e50 }|fxim
 unit-input-taken|in_.take(frames);|in_.take(0);
 unit-input-back|        frameBack(i);\n|
-route-event|    call(0x894aee80);\n||fxi
+route-event|    call(image_.inputEvent);\n||fxi
 in-slot|kAnalogL = 0x10,|kAnalogL = 0x11,|fxi
 in-usb|    chip.setGram(kUsbL, l);\n||fxi
 in-shift|in[2 * i] >> 8, r|in[2 * i] >> 7, r|fxi

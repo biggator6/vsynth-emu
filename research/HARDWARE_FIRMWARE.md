@@ -1546,6 +1546,25 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The effect driver's start against the firmware's own task (2026-11-18, v265) {#fx-start-task}
+
+Two planted errors `xt_fx control` had missed, `boot-no-780` since v204 and `matrix-unflushed` at the list's 60 events. No code of the plugin changed: both are the check's.
+
+**The start.** Without the start task (`0x894ac780`) rom.2's start sends 3,502 words where it should send 5,036, and 5 waits where it should have 7, yet every word ends the same and everything sent after the start is the same, as the first message and the input's routing write those words again. So only the bus during the start can show it. The check now runs the firmware's own effect task from its entry to its loop's first wait for an event, then the first message and the routing, and holds XtFxControl's start to it, each byte on the bus and each wait in order, and the words at the end:
+
+| | rom.2 | rom.4 |
+|---|---|---|
+| The task's entry | `0x894ad560` | `0x89360a50` |
+| Its wait for events | `0x89301860` | `0x893017f0` |
+| The kernel settings' routine (event 0x200) | `0x894ace70` | `0x89360110` |
+| Bytes and waits compared | 51,312 | 59,052 |
+
+The task's calls that answer nothing in the check: two to the OS (`0x89300ab0`, `0x89300b10`), one not traced that takes two of the task's objects (`0x8946ebb0`, rom.4's `0x893111b0`), a handler given to the kernel (`0x88008240`), and the kernel settings' routine. XtFxControl has never run that last one, which on the XT writes words A 0x1ed…0x215 before the start task, so this check says nothing about it.
+
+**The Matrix.** `matrix-unflushed` leaves a move's words in the queue until the next message. A random run shows it only if a move lands on a type that answers, which 60 events didn't reach. `XtFxCheckQueue.cpp` moves all three MFX-PRMs on each of the 42 types and back, and holds the chip to the driver's words each time with no later message; the move changes the words of 28 types.
+
+**Results.** 0 different at seeds 2024, 7 and 31337 on both images. `mutate_fx.py --control`: 182 of 182 caught, two new (`boot-task-first`, `boot-route-first`). `mutate_fx.py --vc2`: 50 of 50, two new (`boot-no-start-task`, `boot-task-first`), as rom.4's hand-run start had the same gap.
+
 ### The VC-2's COSM DSP: the last four types, and the pools' memory (2026-11-18, v264) {#vc2-cosm-dsp-last}
 
 Step 4.2's COSM object, its eleventh part (research/VC2_MODE_PLAN.md). With the Side Band Filters (7, 8), the Growl (9), the Dynamic TVF (14) and the TB Filter (20), every code a converter gives has its sound. rom.4's routines for the Side Band Filters are rom.2's, instruction for instruction but for the addresses of three helpers, so XtCosm's laws stand. Every address is rom.4's, D is the object's +0x58.
@@ -1717,6 +1736,29 @@ Results:
 - `mutate_tone.py`: four new tonecosm plants on the words the getters read, with tone_muts' two Side Band wiring plants: 6 of 6 caught at 2,000 cases. The same four under xt_cosm, by hand: 4 of 4 caught, and the clean copy 0 different.
 - Not planted, as no input tells them apart: pitch and root swapped (their product), the case's octave factor left out (the new block has just written it), the note-on's envelope A output (only the detune target reads it, and the new block writes that).
 - fcheck, without `--update` and again with `--full`, which reruns every section: only xt_vc2cosm's `note-on:` line differs, so xt_cosm's and xt_tone's sections equal the baseline. verify.sh passes every line.
+
+### rom.4's effect driver (2026-11-17, v259) {#vc2-fx-driver}
+
+Step 4.4's first part (research/VC2_MODE_PLAN.md, which has the map). rom.4's driver is rom.2's, recompiled and moved, so `XtFxControl` runs either: `XtFxImage` holds what differs, each address a pair of rom.2's and rom.4's, and rom.2's values are the ones the class held.
+
+- **The message is the same.** Second byte 0x20 system, 0x10 Attenuation; fourth byte 0x80 patch, 0x40 switches, 0x20 MFX, 0x10 Chorus, 0x08 Reverb. Run a bit at a time, no other bit reads or writes anything.
+- **The patch EQ is read with the switches.** EQ 1 and EQ 2 (IDs 0x1af…0x1b4) are in the switches' reader, so a live edit of one goes as a switches message. The system's reader has no mid bands on rom.4 (0x67, 0x68, 0x6f…0x72).
+- **A patch of Category 10 or 11 posts an event.** The switches' routine calls `0x89391e50`, which posts event 0x200 on the object `0x8994fec8` through the kernel. No chip word moves at any Category. `XtFxControl` answers it with nothing, as it does rom.2's post of event 0x40; what the event does in the tone generator is for step 4.3. The first version faulted here: it took a check that loads a patch of every Category to show it.
+- **Seven MFX parameters don't take a live edit alone**, the seven rom.2 has, at the same types and places (0x588, 0x5c4, 0x5ea, 0x641, 0x6c8, 0x6ca, 0x72b).
+- **Not mapped.** Nothing reaches rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`), so `setMatrix` does nothing on rom.4. No reader reads External In Type (0x7a), so there is no input routing on rom.4 yet.
+
+**The check**, `xt_fx <rom.4> vc2`. Comparing the chip with JE-8086's is blind to what the driver is asked, as both chips hear the same words, so most of it is about the driver:
+
+| Part | Against | Samples at seeds 2024, 7, 31337 | Different |
+|---|---|---|---|
+| The queue into `XtFxChip` | JE-8086's chip, whole state each sample | 493,298, 561,466, 532,276 | 0 |
+| Live edits | the same store loaded as a patch | 12 runs each | 0 |
+| Messages | the driver run by hand from the check's own addresses, every word | 1,311, 1,286, 1,295 | 0 |
+| The outside clock | the same, on readings inside the poll's margin and past it | 8 each | 0 |
+| The blocks' IDs | what each reader reads, and every listed ID counting as a change | 988 each | 0 |
+| The patch EQ | each of the six on the bus, and a patch that has the value | 6 each | 0 |
+
+`mutate_fx.py --vc2`: 48 plants, all caught. The first run of the list missed 13 of 47, and that was the check's fault: the hand-run driver read its addresses from the image under test, and the clock's readings moved no word. `mutate_fx.py --control`: 178 of 180 caught. The two missed, `boot-no-780` and `matrix-unflushed`, are missed the same way on the sources before this version.
 
 ### The VC-2's COSM adapters: the Compressor, the Limiter and the Frequency Shifter (2026-11-17, v258) {#vc2-cosm-adapters-buffered}
 

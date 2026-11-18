@@ -1,0 +1,56 @@
+# Planted errors for rom.4's effect driver, for mutate_fx.py --vc2: name|old|new|port.  Port fx4i: XtFxImage.cpp, fx4c:
+# XtFxControl.cpp, each under "xt_fx <rom.4> vc2".
+# Where rom.4's routines are
+self|kSelf { 0x89ced1b4, 0x89980f24 }|kSelf { 0x89ced1b4, 0x89980f64 }|fx4i
+message|kMessage { 0x89ced200, 0x89980f84 }|kMessage { 0x89ced200, 0x89980f88 }|fx4i
+take-message|kTakeMessage { 0x894ac970, 0x8935fc40 }|kTakeMessage { 0x894ac970, 0x8935fde0 }|fx4i
+start|kStart { 0x894ac6a0, 0x8935f9a0 }|kStart { 0x894ac6a0, 0x8935fa80 }|fx4i
+start-task|kStartTask { 0x894ac780, 0x8935fa80 }|kStartTask { 0x894ac780, 0x8935f9a0 }|fx4i
+static-init|kStaticInit { 0x894b4a60, 0x89368280 }|kStaticInit { 0x894b4a60, 0x89362430 }|fx4i
+put-word|kPutWord { 0x894af400, 0x89362490 }|kPutWord { 0x894af400, 0x89362610 }|fx4i
+get-word|kGetWord { 0x894af510, 0x89362610 }|kGetWord { 0x894af510, 0x89362490 }|fx4i
+put-coefficient|kPutCoefficient { 0x894af610, 0x893626d0 }|kPutCoefficient { 0x894af610, 0x893627f0 }|fx4i
+put-offset|kPutOffset { 0x894af6a0, 0x893627f0 }|kPutOffset { 0x894af6a0, 0x893626d0 }|fx4i
+sleep|kSleep { 0x894b26a0, 0x89365e50 }|kSleep { 0x894b26a0, 0x89362430 }|fx4i
+read|kRead { 0x8947d310, 0x89324350 }|kRead { 0x8947d310, 0x89324370 }|fx4i
+read-typed|kReadTyped { 0x8947d330, 0x89324370 }|kReadTyped { 0x8947d330, 0x89324360 }|fx4i
+clock-poll|kClockPoll { 0x894acb10, 0x8935fde0 }|kClockPoll { 0x894acb10, 0x8935fc40 }|fx4i
+system-end|kSystemEnd { 0x89301680, 0x89301610 }|kSystemEnd { 0x89301680, 0x89301620 }|fx4i
+clock-object|kClock { 0x89979bfc, 0x8995cb40 }|kClock { 0x89979bfc, 0x8995cb44 }|fx4i
+post-event|kPostEvent { 0x894aee70, 0x89391e50 }|kPostEvent { 0x894aee70, 0 }|fx4i
+list-a|kListA { 0x894d9230, 0x893951b0 }|kListA { 0x894d9230, 0x893951b4 }|fx4i
+# rom.4's descriptors and types
+desc-low|kDescLow { 0x897a167c, 0x8950f0b0 }|kDescLow { 0x897a167c, 0x8950f0bc }|fx4i
+desc-high|kDescHigh { 0x897a56d8, 0x895131a8 }|kDescHigh { 0x897a56d8, 0x895131b0 }|fx4i
+first-high|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows)|imageOn(&Place::vc2, 0x55d, 0x9ac, 15, kVc2Rows)|fx4i
+ids-short|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows)|imageOn(&Place::vc2, 0x56a, 0x8d0, 15, kVc2Rows)|fx4i
+rev-types|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows)|imageOn(&Place::vc2, 0x56a, 0x9ac, 11, kVc2Rows)|fx4i
+mfx-table|kMfxIds { 0x897a8218, 0x895164ec }|kMfxIds { 0x897a8218, 0x895164f0 }|fx4i
+cho-table|kChoIds { 0x897a82e4, 0x895165b8 }|kChoIds { 0x897a82e4, 0x895165bc }|fx4i
+rev-table|kRevIds { 0x897a8310, 0x895165e4 }|kRevIds { 0x897a8310, 0x895165e8 }|fx4i
+# Which block each of rom.4's IDs is read by
+row-tempo|{ 0x13a, 0x13a, BlockSwitches }, ||fx4i
+row-switches|{ 0x13d, 0x13f, BlockSwitches }|{ 0x13d, 0x13e, BlockSwitches }|fx4i
+row-eq-gone|{ 0x13d, 0x13f, BlockSwitches }, { 0x1af, 0x1b4, BlockSwitches },|{ 0x13d, 0x13f, BlockSwitches },|fx4i
+row-eq-short|{ 0x1af, 0x1b4, BlockSwitches }|{ 0x1af, 0x1b3, BlockSwitches }|fx4i
+row-eq-block|{ 0x1af, 0x1b4, BlockSwitches }|{ 0x1af, 0x1b4, BlockMfx }|fx4i
+row-attenuation|{ 0x52b, 0x52b, BlockAttenuation }|{ 0x52a, 0x52a, BlockAttenuation }|fx4i
+row-master|{ 0x40, 0x40, BlockSystem }, ||fx4i
+row-clock|{ 0x43, 0x43, BlockSystem }, ||fx4i
+row-output|{ 0x78, 0x78, BlockSystem },|{ 0x76, 0x76, BlockSystem },|fx4i
+row-eq-low|{ 0x67, 0x68, BlockSystem }|{ 0x67, 0x67, BlockSystem }|fx4i
+row-eq-high|{ 0x6f, 0x72, BlockSystem }|{ 0x6f, 0x71, BlockSystem }|fx4i
+row-usb|, { 0x7f, 0x7f, BlockSystem }||fx4i
+row-mfx|{ 0x1b7, 0x1ba, BlockMfx }|{ 0x1b7, 0x1b9, BlockMfx }|fx4i
+row-chorus|{ 0x23c, 0x23e, BlockChorus }|{ 0x23c, 0x23d, BlockChorus }|fx4i
+row-reverb|{ 0x270, 0x271, BlockReverb }|{ 0x270, 0x270, BlockReverb }|fx4i
+# What XtFxControl does with the image
+hook-zero|        if (fn) c.hook(fn, [](Sh4& m) { m.ret(0); });|        c.hook(fn + 2, [](Sh4& m) { m.ret(0); });|fx4c
+read-past|id >= 0 && id < image_.ids ? store_[(size_t)id] : 0));\n    };|id >= 0 && id < image_.ids - 0x200 ? store_[(size_t)id] : 0));\n    };|fx4c
+high-bank|const uint32_t d = image_.descHigh + 8 * (uint32_t)(id - image_.firstHigh);|const uint32_t d = image_.descHigh + 8 * (uint32_t)id;|fx4c
+message-second|sh4_->wr8(image_.message + 1, (uint8_t)second);|sh4_->wr8(image_.message + 2, (uint8_t)second);|fx4c
+message-fourth|sh4_->wr8(image_.message + 3, (uint8_t)fourth);|sh4_->wr8(image_.message + 2, (uint8_t)fourth);|fx4c
+call-self|call(image_.takeMessage, { image_.self });|call(image_.takeMessage, { image_.message });|fx4c
+matrix-guard|if (!error_.empty() \|\| !image_.matrixTake) return;|if (!error_.empty()) return;|fx4c
+boot-no-start-task|    call(image_.startTask, { image_.self });\n||fx4c
+boot-task-first|    call(image_.start, { image_.self });\n    call(image_.startTask, { image_.self });|    call(image_.startTask, { image_.self });\n    call(image_.start, { image_.self });|fx4c
