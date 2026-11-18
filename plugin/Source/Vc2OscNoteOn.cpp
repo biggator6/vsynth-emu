@@ -13,6 +13,14 @@ constexpr uint32_t kObjectPitch = 0x1cc, kObjectGain = 0x1dc, kObjectLevel = 0x1
 // (Vc2Kind6Params), its level the block's +0x18
 constexpr uint32_t kP = 0x104, kP4 = 0x108, kP8 = 0x10c, kPc = 0x110, kKind6Level = 0x6c;
 constexpr uint32_t kVibratoBlock = 0xd4;   // [FW] the block's +0x80: what the vibrato's note-on is given
+
+// P's words as the carrier's init or kind 6's start reads them (v266)
+template <class Params>
+Params paramsOf(const Vc2OscVoice& v) {
+    Params p;
+    std::memcpy(&p, v.at(kP), sizeof p);
+    return p;
+}
 } // namespace
 
 void Vc2OscVoice::kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
@@ -33,7 +41,7 @@ void Vc2OscVoice::kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
         case Vc2OscNoteOn::carrier:
             setF32(kP, targets.gain());
             setF32(kP4, targets.ratioOn(t.noteOn, t.noteOn.ratio));
-            parts.initCarrier(at(kP));
+            carrier.init(paramsOf<Vc2CarrierParams>(*this), parts.osClock());   // 0x893ebed0
             break;
         case Vc2OscNoteOn::kind6:
             setF32(kObjectPitch, targets.ratioOn(t.noteOn, { t.noteOn.ratio.most, t.kind6Least }));
@@ -41,7 +49,7 @@ void Vc2OscVoice::kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
             setF32(kP, f32(kObjectPitch));
             setF32(kP4, targets.formant());
             setF32(kPc, f32(kKind6Level));
-            parts.startKind6(at(kP));
+            kind6.setAndStart(parts.micRing(), paramsOf<Vc2Kind6Params>(*this));   // 0x893ec700
             break;
     }
     parts.noteOnVibrato(at(kVibratoBlock));

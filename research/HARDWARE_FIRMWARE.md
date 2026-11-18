@@ -1546,6 +1546,27 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's kinds 5 and 6 on the OSC voice (2026-11-18, v266) {#vc2-osc-kinds-5-6}
+
+Step 4.2's OSC voice. The VOCODER OSC's carrier (`Vc2Carrier`, v221) and the mic's pitch shifter (`Vc2Kind6`, v225) were ports with nothing calling them. They are now the voice's own words, where rom.4 keeps them:
+
+| Voice | Object | What the voice calls |
+|---|---|---|
+| +0xa90…+0xafc | the carrier, kind 5's | the init `0x893ebed0` (note-on, on P at +0x104), the settings `0x893ec450` (on the settings' +0xb0, not the voice's copy), the render `0x893ebfa0` |
+| +0xafc…+0xb84 | the pitch shifter, kind 6's | the set and start `0x893ec700` (note-on, on P at +0x104), the render `0x893ec730` |
+
+**What they read from outside the voice** comes through `Vc2OscParts`: the OS's millisecond word (`0x893018d0`, where a carrier's phase starts), the mic ring (`0x8a0f31cc`) and the input stage's unvoiced decision for the block (`0x899d99dc`, by `0x893ed500`). rom.4 has one ring, which every voice reads.
+
+**Not connected yet.** Kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by their addresses through `Vc2OscParts`. The first reaches the carrier's update, which reads the input stage's peak (`0x899d9a5c`); the second ends in kind 6's setter `0x893ec790`. So in xt_vc2osc a carrier's growl stays 0 and its targets stay as the note-on left them. xt_vc2carrier and xt_vc2kind6 still check those paths on their own.
+
+**Check.** xt_vc2osc no longer hooks the five routines. rom.4's own run on the voices in its RAM, and after every event the carrier's and kind 6's words and the ring's start word are compared with the port's, as the render's output already was. The carriers' rate setter `0x893ec6a0` and kind 6's globals' setter `0x893ecef0` run once at the start. Each case resets the ring, writes all 128 blocks of it, then starts both voices' carrier and pitch shifter; a kind 6 render writes one more block first, with a drawn period and unvoiced decision.
+
+The inputs of kinds 5 and 6 are drawn as a note gives them (`Vc2OscKindsCheck.cpp`): levels 0…1, a ratio's scale 0.5…2. Noise there takes both sides to NaNs, and which NaN a product keeps is the host's, not rom.4's.
+
+Results: 0 different at seed 2024 (40 cases: 193 carrier blocks, 188 kind 6 blocks) and at seeds 7 and 31337 (400 cases: 1,693 and 1,656 carrier blocks, 1,660 and 1,651 kind 6 blocks). No sample was other than finite. Nearly every block sounds: 380 of 381 at seed 2024. `mutate_vc2.py --osc`: 1,106 plants (12 new, 5 rewritten for the new calls), all caught.
+
+Not in the sound yet.
+
 ### The VC-2's Vari off (2026-11-17, v261) {#vc2-vari-off}
 
 Step 4.2's OSC voice (the user's "Start Vari off", 2026-11-17). rom.4's two renders for a wave played with Vari Sw off, `0x893c63c0` (mono) and `0x893c66e0` (stereo), called with the output and the voice's object (+0x15c). They are the VC-2's own: rom.2's Vari-off player (`0x89509870`, `0x89509f52`, `XtLinearPlayer`) has six paths by mode and direction and walks at the pitch × the walk, with the beat's factor under Tempo Sync or Time Trip. These have neither a direction nor a beat. Each block steps by the object's pitch alone, times the loop's rate factor when the block starts inside the loop.

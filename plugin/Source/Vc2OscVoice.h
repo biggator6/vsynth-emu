@@ -6,10 +6,12 @@
 // 0x893af0b0 (v232, Vc2OscNoteOn.cpp), the ramp's start 0x893ae610, the counts 0x893ae6c0 and 0x893ae720, the settings
 // 0x893ae780, the legato 0x893ae9b0, the render 0x893ae9f0, the getters 0x893aead0…0x893aed60 and the take 0x893aee20;
 // the targets 0x893af9f0…0x893aff60 the kinds read (v232, Vc2OscTargets.h).  Its three pitch ramps, the portamento, are
-// its own (v236, Vc2PitchRamp.h, +0x90c…+0xa38).  What it calls (the vibrato at +0, each kind's install, update,
-// settings, render and note-on, the players' seeks) through Vc2OscParts; each kind's own routines are later versions'.
-// Bit for bit: xt_vc2osc against rom.4's routines in Sh4Interp, every callee but the ramps hooked.  HARDWARE_FIRMWARE.md,
-// "The VC-2's OSC voice".  Audio thread.
+// its own (v236, Vc2PitchRamp.h, +0x90c…+0xa38), and so are kind 5's carrier (+0xa90) and kind 6's pitch shifter (+0xafc,
+// v266).  What it calls (the vibrato at +0, each kind's install, update, settings, render and note-on, the players'
+// seeks) through Vc2OscParts; each kind's own routines are later versions'.  Bit for bit: xt_vc2osc against rom.4's
+// routines in Sh4Interp, every callee but the ramps, the carrier's and kind 6's hooked.  HARDWARE_FIRMWARE.md, "The
+// VC-2's OSC voice".  Audio thread.
+#include "Vc2Kind6.h"
 #include "Vc2PitchRamp.h"
 #include "Vc2VocoderOsc.h"
 #include <array>
@@ -60,6 +62,8 @@ struct Vc2OscVoiceTail {
 };
 static_assert(sizeof(Vc2OscVoiceTail) == 0x58, "rom.4's layout, the voice's +0xa38…+0xa90");
 static_assert(sizeof(Vc2PitchRamp) == 0x64, "rom.4's layout, a ramp's 0x64 bytes from the voice's +0x90c");
+static_assert(sizeof(Vc2Carrier) == 0x6c, "rom.4's layout, the carrier at the voice's +0xa90");
+static_assert(sizeof(Vc2Kind6) == 0x88, "rom.4's layout, kind 6's object at the voice's +0xafc");
 
 // What the voice calls on its parts and reads from them; a kind's routine by its rom.4 address
 class Vc2OscParts {
@@ -73,13 +77,14 @@ public:
     virtual float vibratoLevel() = 0;                       // its +0x30, onto the gains by +0x100 (v232)
     virtual void kindCall(uint32_t routine) = 0;              // routine(voice): an install, an update, a note-on
     virtual void kindSettings(uint32_t routine, const uint32_t* from) = 0;   // routine(voice, the settings' +0xb0)
-    virtual void setCarrier(const uint32_t* p) = 0;           // 0x893ec450(voice + 0xa90, the settings' +0xb0)
-    virtual void initCarrier(const uint8_t* p) = 0;           // 0x893ebed0(voice + 0xa90, the voice's +0x104) (v232)
-    virtual void startKind6(const uint8_t* p) = 0;            // 0x893ec700(voice + 0xafc, the voice's +0x104) (v232)
     virtual uint32_t renderBy(uint32_t routine, float* out, uint32_t third) = 0;   // routine(out, the object, third)
-    virtual void renderCarrier(float* out) = 0;               // 0x893ebfa0(voice + 0xa90, out)
-    virtual void renderKind6(float* out) = 0;                 // 0x893ec730(voice + 0xafc, out)
     virtual void seek(uint32_t routine, int32_t at) = 0;      // a player's, routine(the object, at)
+    // v266: what the voice's carrier and kind 6 read from outside it: the OS's millisecond word (0x893018d0), where a
+    // carrier's phase starts; the mic ring (0x8a0f31cc), which the part's block mixer writes; the input stage's
+    // unvoiced decision for the block, a float a sample (0x899d99dc, by 0x893ed500)
+    virtual int32_t osClock() = 0;
+    virtual Vc2MicRing& micRing() = 0;
+    virtual const float* unvoiced() = 0;
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
     // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0); a
     // player's routine on the object; 0x893cc0d0(the object, event, &position, &…), an event's position ×16
@@ -153,6 +158,8 @@ public:
     // +0x90c, +0x970, +0x9d4: the pitch ramps (v236), built with types 0, 2 and 1: the pitch's, the formant's, the walk's
     std::array<Vc2PitchRamp, kRamps> ramps {};
     Vc2OscVoiceTail tail {};                       // +0xa38…+0xa90
+    Vc2Carrier carrier {};                         // +0xa90…+0xafc: kind 5's (v266)
+    Vc2Kind6 kind6 {};                             // +0xafc…+0xb84: kind 6's (v266)
 
 private:
     template <class T>

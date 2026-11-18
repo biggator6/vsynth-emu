@@ -20,6 +20,7 @@ constexpr int kPairWord = 0xe0 / 4, kFromWord = 0xe8 / 4, kSeekToWord = 0xf0 / 4
 constexpr uint32_t kFixedBit = 0x1000;   // the byte +0x138's 0x10, in its word
 constexpr int kKinds = 8, kWaves = 10;
 constexpr uint32_t kCountSign = 0x8000;   // [FW] the update's count is its low half, signed (exts.w)
+constexpr uint32_t kCarrierKind = 5, kKind6Kind = 6;   // [FW] v266's kinds, counted
 using Answer = OscAnswer;
 
 std::string onConstruct(OscSides& s, std::mt19937&, int v) {
@@ -86,6 +87,7 @@ std::array<uint32_t, kOscBlockWords> drawNoteBlock(std::mt19937& rng) {
     if (b[kKindWord] == kAnalog) {
         for (const auto& [at, bits] : oscAnalogWords(rng)) b[(at - Vc2OscVoice::kOwn) / 4] = bits;
     }
+    if (oscIsVoiced(b[kKindWord])) oscDrawVoicedWords(b, rng, Vc2OscVoice::kOwn);   // v266: as a note gives them
     return b;
 }
 
@@ -113,6 +115,9 @@ std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
     const uint32_t kind = block[kKindWord];
     s.n.sampled += kind == 1 || kind == 2;
     s.n.plain += kind != 1 && kind != 2;
+    if (oscIsVoiced(kind)) oscTameVibrato(s, rng);   // v266: the gain they reach
+    s.n.carrierStarts += kind == kCarrierKind;
+    s.n.kind6Starts += kind == kKind6Kind;
     return oscBothSides(s, kNoteOn, { oscVoiceAt(v), kOscBlockAt, legato }, Answer::none, [&] {
         s.voices[(size_t)v].noteOn(block.data(), legato, s.parts[(size_t)v], s.romShared);
         return 0u;
@@ -150,8 +155,10 @@ std::string onSettings(OscSides& s, std::mt19937& rng, int v) {
     oscBlockFloats(s.shared.settings, rng);
     auto* bytes = reinterpret_cast<uint8_t*>(s.shared.settings.data());
     if (rng() % 2) bytes[4] = s.voices[(size_t)v].u8(0x58);   // the byte +4 as the voice holds it, half the time
+    oscDrawVoicedSettings(s.shared.settings, rng);            // v266: the carrier's levels among them, as a note's
     s.fw.cpu.write(kOscSettingsAt, s.shared.settings.data(), sizeof s.shared.settings);
     ++s.n.settings;
+    s.n.carrierSettings += s.voices[(size_t)v].kind() == kCarrierKind;
     return oscBothSides(s, kSettings, { oscVoiceAt(v), kOscSettingsAt }, Answer::none, [&] {
         s.voices[(size_t)v].settings(s.shared.settings.data(), s.parts[(size_t)v], s.romShared);
         return 0u;
@@ -170,10 +177,18 @@ std::string onRender(OscSides& s, std::mt19937& rng, int v) {
     for (float& x : s.shared.out) x = oscDrawFloat(rng);
     s.fw.cpu.write(kOscOutAt, s.shared.out.data(), sizeof s.shared.out);
     ++s.n.renders;
+    const uint32_t kind = s.voices[(size_t)v].kind();
+    s.n.carrierBlocks += kind == kCarrierKind;
+    s.n.kind6Blocks += kind == kKind6Kind;
+    if (kind == kKind6Kind) {   // v266: the ring goes on under kind 6, as the block mixer feeds it
+        const std::string mic = oscMicBlock(s, rng);
+        if (!mic.empty()) return mic;
+    }
     std::string what = oscBothSides(s, kRender, { oscVoiceAt(v), kOscOutAt }, Answer::r0, [&] {
         return s.voices[(size_t)v].render(s.shared.out.data(), s.parts[(size_t)v]);
     });
     if (!what.empty()) return what;
+    oscCountBlock(s, kind);
     return vc2FirstDifference(s.fw, kOscOutAt, s.shared.out.data(), sizeof s.shared.out, "the output");
 }
 

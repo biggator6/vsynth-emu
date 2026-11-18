@@ -155,7 +155,7 @@ settings-kind-from|kKindFrom = 0xb0|kKindFrom = 0xb4|vc2oscget
 settings-no-kind|    else if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);\n||vc2oscget
 settings-carrier-bytes|kCarrierBytes = 88|kCarrierBytes = 84|vc2oscget
 settings-no-carrier-copy|    std::memcpy(own.data() + (kWave - kOwn), s + kKindFrom / 4, kCarrierBytes);\n||vc2oscget
-settings-no-carrier|    parts.setCarrier(s + kKindFrom / 4);\n||vc2oscget
+settings-no-carrier|    carrier.settings(&given);   // 0x893ec450, on the settings' words themselves\n||vc2oscget
 formant-wave|kind() == 2 && u32(kWave) == 1 ? f32(kFormant)|kind() == 2 ? f32(kFormant)|vc2oscget
 formant-at|kFormant = 0x68|kFormant = 0x64|vc2oscget
 time-kind|float Vc2OscVoice::time() const { return kind() == 2|float Vc2OscVoice::time() const { return kind() != 0|vc2oscget
@@ -305,14 +305,14 @@ on-extin-gain-level|setF32(kObjectGain, targets.gain());|setF32(kObjectGain, tar
 on-extin-no-level|            setF32(kObjectLevel, targets.level());\n||vc2oscnoteon
 on-extin-level-gain|setF32(kObjectLevel, targets.level());|setF32(kObjectLevel, targets.gain());|vc2oscnoteon
 on-carrier-gain|            setF32(kP, targets.gain());\n|            setF32(kP, targets.level());\n|vc2oscnoteon
-on-carrier-pitch|            setF32(kP4, targets.ratioOn(t.noteOn, t.noteOn.ratio));\n            parts.initCarrier|            setF32(kP4, targets.tunedRatio());\n            parts.initCarrier|vc2oscnoteon
-on-carrier-no-init|            parts.initCarrier(at(kP));\n||vc2oscnoteon
-on-carrier-init-at|parts.initCarrier(at(kP))|parts.initCarrier(at(kP4))|vc2oscnoteon
+on-carrier-pitch|            setF32(kP4, targets.ratioOn(t.noteOn, t.noteOn.ratio));\n            carrier.init|            setF32(kP4, targets.tunedRatio());\n            carrier.init|vc2oscnoteon
+on-carrier-no-init|            carrier.init(paramsOf<Vc2CarrierParams>(*this), parts.osClock());   // 0x893ebed0\n||vc2oscnoteon
+on-carrier-init-at|std::memcpy(&p, v.at(kP), sizeof p);|std::memcpy(&p, v.at(kP4), sizeof p);|vc2oscnoteon
 on-kind6-gain|setF32(kP8, targets.gain());|setF32(kP8, targets.level());|vc2oscnoteon
 on-kind6-p-pitch|setF32(kP, f32(kObjectPitch));|setF32(kP, f32(kObjectGain));|vc2oscnoteon
 on-kind6-formant|setF32(kP4, targets.formant());|setF32(kP4, targets.formantTarget());|vc2oscnoteon
 on-kind6-level|setF32(kPc, f32(kKind6Level));|setF32(kPc, 0.0f);|vc2oscnoteon
-on-kind6-no-start|            parts.startKind6(at(kP));\n||vc2oscnoteon
+on-kind6-no-start|            kind6.setAndStart(parts.micRing(), paramsOf<Vc2Kind6Params>(*this));   // 0x893ec700\n||vc2oscnoteon
 on-no-vibrato|    parts.noteOnVibrato(at(kVibratoBlock));\n||vc2oscnoteon
 pitch-env-word|kEnvelopeOut = 0x4c|kEnvelopeOut = 0x48|vc2osctargets
 ratio-scale-at|kRatioScale = 0x60|kRatioScale = 0x64|vc2osctargets
@@ -1134,3 +1134,16 @@ voff-pool-scale|{ 0x893c6420, &t.variOffScale }|{ 0x893c6424, &t.variOffScale }|
 voff-pool-fold|{ 0x893c6764, &t.variOffFold }|{ 0x893c6420, &t.variOffFold }|vc2osctables
 voff-pool-glide|{ 0x893c6424, &t.variOffGlide }|{ 0x893c6428, &t.variOffGlide }|vc2osctables
 voff-pool-fade|{ 0x893c6428, &t.variOffFade }|{ 0x893c6424, &t.variOffFade }|vc2osctables
+# v266: kinds 5 and 6 on the voice, rom.4's own carrier and pitch shifter against the port's words and output
+kinds-init-clock|parts.osClock());   // 0x893ebed0|parts.osClock() + 1);   // 0x893ebed0|vc2oscnoteon
+kinds-init-no-clock|parts.osClock());   // 0x893ebed0|0);   // 0x893ebed0|vc2oscnoteon
+kinds-start-set-only|kind6.setAndStart(parts.micRing(), paramsOf<Vc2Kind6Params>(*this));|{ const Vc2Kind6Params p6 = paramsOf<Vc2Kind6Params>(*this); kind6.set(&p6); }|vc2oscnoteon
+kinds-start-no-set|kind6.setAndStart(parts.micRing(), paramsOf<Vc2Kind6Params>(*this));|kind6.start(parts.micRing());|vc2oscnoteon
+kinds-settings-word|std::memcpy(&given, s + kKindFrom / 4, sizeof given);|std::memcpy(&given, s + kKindFrom / 4 + 1, sizeof given);|vc2oscget
+kinds-settings-init|carrier.settings(&given);|carrier.init(given, parts.osClock());|vc2oscget
+kinds-render-carrier-gone|case Vc2OscRender::carrier: carrier.render(out); return 0;|case Vc2OscRender::carrier: return 0;|vc2osc
+kinds-render-kind6-gone|case Vc2OscRender::kind6: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;|case Vc2OscRender::kind6: return 0;|vc2osc
+kinds-render-kind6-carrier|case Vc2OscRender::kind6: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;|case Vc2OscRender::kind6: carrier.render(out); return 0;|vc2osc
+kinds-render-carrier-kind6|case Vc2OscRender::carrier: carrier.render(out); return 0;|case Vc2OscRender::carrier: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;|vc2osc
+kinds-render-unvoiced|kind6.render(parts.micRing(), parts.unvoiced(), out)|kind6.render(parts.micRing(), parts.unvoiced() + 1, out)|vc2osc
+kinds-render-answer|carrier.render(out); return 0;|carrier.render(out); return 1;|vc2osc

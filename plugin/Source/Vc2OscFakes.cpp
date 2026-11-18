@@ -7,8 +7,7 @@
 #include <algorithm>
 
 namespace {
-// [FW] the voice's offsets a callee is given: the carrier, kind 6's object (the ramps, its own from v236, aren't hooked)
-constexpr uint32_t kCarrier = 0xa90, kKind6 = 0xafc;
+constexpr uint32_t kOsClock = 0x893018d0;   // [FW] the OS's millisecond word, which a carrier's init reads (v266)
 
 // The voice owning the part at `offset` a callee is given by `at`; −1 when no voice does
 int voiceOwning(uint32_t at, uint32_t offset) {
@@ -98,8 +97,8 @@ constexpr auto withN = partAnd<0, asIs>;
 constexpr auto withSettings = partAnd<0, settingsOffset>;
 // [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run), LITE's
 // and VariPhrase's installs and VariPhrase's note-on (v238), LITE's note-on (v240), the analog's (v242) and its sub
-// oscillator's (v244) with its shape (v246), the analog's install, update and settings (v248): rom.4's own run, and
-// the routines they call hooked
+// oscillator's (v244) with its shape (v246), the analog's install, update and settings (v248), and the carrier's init,
+// settings and render and kind 6's start and render (v266): rom.4's own run, and the routines they call hooked
 const OscHook kHooks[] = {
     { 0x893b29b0, kBuildVibrato, self, none }, { 0x893b2c10, kUpdateVibrato, withN, none },
     { 0x893b2b70, kSetVibrato, withSettings, none }, { 0x893b29e0, kNoteOnVibrato, partWord<0>, none },
@@ -109,8 +108,6 @@ const OscHook kHooks[] = {
     { 0x893c8670, kKindCall, kindRoutine, none }, { 0x893cc760, kObjectCall, objectRoutine, none },
     { 0x893cbf40, kObjectCall, objectRoutine, none }, { 0x893cc0d0, kEventPosition, eventAt, positions },
     { 0x893c8390, kKindSettings, routineSettings, none }, { 0x893b0280, kKindSettings, routineSettings, none },
-    { 0x893ec450, kSetCarrier, partAnd<kCarrier, settingsOffset>, none },
-    { 0x893ebed0, kInitCarrier, partWord<kCarrier>, none }, { 0x893ec700, kStartKind6, partWord<kKind6>, none },
     { 0x893c62e0, kRenderBy, renderBy, rendered }, { 0x893c61e0, kRenderBy, renderBy, rendered },
     // v238: the players' renders LITE's and VariPhrase's installs write (Vari off's, kind 1's mode 1, LITE's heads,
     // SOLO's, BACKING's, ENSEMBLE's, the period-jump player's)
@@ -132,8 +129,6 @@ const OscHook kHooks[] = {
     { 0x893c4ac0, kRenderBy, renderBy, rendered }, { 0x893c50d0, kRenderBy, renderBy, rendered },
     { 0x893c4db0, kRenderBy, renderBy, rendered },
     { kOscRendersAt, kRenderBy, renderBy, rendered }, { kOscRendersAt + 0x10, kRenderBy, renderBy, rendered },
-    { 0x893ebfa0, kRenderCarrier, partAnd<kCarrier, outOf>, none },
-    { 0x893ec730, kRenderKind6, partAnd<kKind6, outOf>, none },
     { 0x893c6360, kSeek, seek, seekFlags }, { 0x893cc830, kSeek, seek, seekFlags },
     { 0x893c6de0, kSeek, seek, seekFlags }, { 0x893cc630, kSeek, seek, seekFlags },
     { 0x893cd090, kSeek, seek, seekFlags }, { 0x893cd440, kSeek, seek, seekFlags },
@@ -153,6 +148,7 @@ void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log) 
             cpu.ret(h.answer(cpu, draws));
         });
     }
+    fw.cpu.hook(kOsClock, [&draws](Sh4& cpu) { cpu.ret((uint32_t)draws.clock); });
 }
 
 std::string oscCallsDifference(const std::vector<OscCall>& rom, const std::vector<OscCall>& port) {

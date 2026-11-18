@@ -40,7 +40,9 @@ void Vc2OscVoice::settings(const uint32_t* s, Vc2OscParts& parts, const Vc2ToneS
     else if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);
     if (!row.carrier) return;
     std::memcpy(own.data() + (kWave - kOwn), s + kKindFrom / 4, kCarrierBytes);
-    parts.setCarrier(s + kKindFrom / 4);
+    Vc2CarrierParams given;
+    std::memcpy(&given, s + kKindFrom / 4, sizeof given);
+    carrier.settings(&given);   // 0x893ec450, on the settings' words themselves
 }
 
 float Vc2OscVoice::formant() const { return kind() == 2 && u32(kWave) == 1 ? f32(kFormant) : 0.0f; }

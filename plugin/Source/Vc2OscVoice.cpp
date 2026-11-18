@@ -168,8 +168,8 @@ uint32_t Vc2OscVoice::render(float* out, Vc2OscParts& parts) {
         case Vc2OscRender::zero: std::fill(out, out + kOut, 0.0f); return 0;
         case Vc2OscRender::byRender: parts.renderBy(tail.render, out, kRenderThird); return 0;
         case Vc2OscRender::byAnalog: return parts.renderBy(tail.renderAnalog, out, tail.sync);
-        case Vc2OscRender::carrier: parts.renderCarrier(out); return 0;
-        case Vc2OscRender::kind6: parts.renderKind6(out); return 0;
+        case Vc2OscRender::carrier: carrier.render(out); return 0;                                  // 0x893ebfa0
+        case Vc2OscRender::kind6: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;   // 0x893ec730
     }
     return 0;
 }
