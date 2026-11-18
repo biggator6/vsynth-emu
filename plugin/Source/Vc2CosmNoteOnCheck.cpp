@@ -15,7 +15,7 @@
 #include <algorithm>
 
 namespace {
-constexpr uint32_t kNoteOn = 0x893aa0e0, kNewBlock = 0x893aa5d0, kDestroy = 0x893aa060;   // [FW]
+constexpr uint32_t kNoteOn = 0x893aa0e0, kNewBlock = 0x893aa5d0, kDestroy = 0x893aa060, kUpdate = 0x893aa7d0;   // [FW]
 constexpr uint32_t kPoolsInit = 0x893ab550, kPoolsAt = 0x89999290, kDelete = 0x89506438;   // [FW]
 constexpr uint32_t kTbInit = 0x893b98e0;   // [FW] the static initializer of the TB Filter's floats (v255)
 constexpr int kEvents = 60;
@@ -23,6 +23,7 @@ constexpr int kEvents = 60;
 struct NoteOnCounts {
     long events = 0, noteOns = 0, slots = 0, newBlocks = 0, destroys = 0, inits = 0, draws = 0;
     long adaptedNoteOns = 0, adaptedBlocks = 0;   // on a type adapted over XtCosm (v252)
+    long updates = 0;                             // each after a note-on of a type the port has (v262)
 };
 
 // Whether a code's type is one of the adapters' (Vc2CosmAdapters)
@@ -30,20 +31,13 @@ bool adapted(int32_t code) {
     return std::ranges::any_of(vc2CosmAdapterRows(), [code](const Vc2CosmTypeRow& r) { return r.code == code; });
 }
 
-// The bound words as the port reads them: the interpreter's, where the check drew them
-struct RamBound final : Vc2CosmBound {
-    explicit RamBound(Sh4& c) : cpu(c) {}
-    Sh4& cpu;
-    float word(uint32_t at) override { return std::bit_cast<float>(cpu.rd32(at)); }
-};
-
 struct NoteOnRig {
     explicit NoteOnRig(Vc2Fw& f) : fw(f) {}
     Vc2Fw& fw;
     Vc2CosmObjectWords o {};
     Vc2CosmBlockWords block {};
     Vc2CosmPools pools;
-    RamBound bound { fw.cpu };
+    Vc2CosmRamBound bound { fw.cpu };
     Vc2CosmNoteOn noteOn { pools, bound };
     std::vector<uint32_t> romDeletes, portDeletes;
     int32_t filled = -1;   // the slot the last note-on's noise went into, or −1
@@ -83,9 +77,9 @@ std::string noteOnBoth(NoteOnRig& r, uint32_t routine, std::initializer_list<uin
 
 using NoteOnEvent = std::string (*)(NoteOnRig&, std::mt19937&);
 
-std::string noteOnEvent(NoteOnRig& r, std::mt19937& rng) {
+// A note-on of the block drawn: the slot it will take given noise first
+std::string noteOnOfBlock(NoteOnRig& r, std::mt19937& rng) {
     ++r.n.noteOns;
-    vc2DrawNoteOnBlock(r.block, rng);
     const uint32_t pool = vc2DrawNoteOnPool(rng);
     r.filled = vc2FillFreeSlot(r.fw.cpu, r.pools, pool, r.block.code, rng);
     r.filledPool = pool;
@@ -93,6 +87,22 @@ std::string noteOnEvent(NoteOnRig& r, std::mt19937& rng) {
     r.n.adaptedNoteOns += adapted(r.block.code);
     return noteOnBoth(r, kNoteOn, { kNoteOnObjectAt, kNoteOnBlockAt, pool }, "the note-on",
                       [&] { r.noteOn.noteOn(r.o, r.block, pool); });
+}
+
+std::string noteOnEvent(NoteOnRig& r, std::mt19937& rng) {
+    vc2DrawNoteOnBlock(r.block, rng);
+    return noteOnOfBlock(r, rng);
+}
+
+// The update (v262): a note-on of a type the port has, new bound levels and rates, then 0x893aa7d0 with the pitch in fr4
+std::string updateEvent(NoteOnRig& r, std::mt19937& rng) {
+    vc2DrawPortedBlock(r.block, rng);
+    if (std::string d = noteOnOfBlock(r, rng); !d.empty()) return d;
+    ++r.n.updates;
+    vc2DrawBound(r.fw.cpu, rng);
+    const float pitch = 0.25f + 3.75f * vc2Unit(rng);
+    std::memcpy(&r.fw.cpu.fb[0][4], &pitch, sizeof pitch);
+    return noteOnBoth(r, kUpdate, { kNoteOnObjectAt }, "the update", [&] { r.noteOn.update(r.o, pitch); });
 }
 
 std::string newBlockEvent(NoteOnRig& r, std::mt19937& rng) {
@@ -130,9 +140,10 @@ std::string redrawEvent(NoteOnRig& r, std::mt19937& rng) {
     return "";
 }
 
-// Each event's share of eight
-constexpr std::array<NoteOnEvent, 8> kNoteOnEvents { noteOnEvent, noteOnEvent, noteOnEvent, newBlockEvent,
-                                                     newBlockEvent, destroyEvent, poolsInitEvent, redrawEvent };
+// Each event's share of ten
+constexpr std::array<NoteOnEvent, 10> kNoteOnEvents { noteOnEvent, noteOnEvent, noteOnEvent, newBlockEvent,
+                                                      newBlockEvent, destroyEvent, poolsInitEvent, redrawEvent,
+                                                      updateEvent, updateEvent };
 
 void NoteOnRig::hook() {
     fw.cpu.hook(kDelete, [this](Sh4& c) {
@@ -157,8 +168,8 @@ std::string NoteOnRig::event(std::mt19937& rng) { return vc2CosmEvent(*this, kNo
 // parts' lines
 void NoteOnRig::say(const Vc2Run& run) const {
     std::printf("note-on: %d cases, %ld events: %ld note-ons (%ld taking a slot, %ld adapted), %ld new blocks (%ld "
-                "adapted), %ld destroys, %ld pool set-ups, %ld draws\n", run.cases, n.events, n.noteOns, n.slots,
-                n.adaptedNoteOns, n.newBlocks, n.adaptedBlocks, n.destroys, n.inits, n.draws);
+                "adapted), %ld updates, %ld destroys, %ld pool set-ups, %ld draws\n", run.cases, n.events, n.noteOns,
+                n.slots, n.adaptedNoteOns, n.newBlocks, n.adaptedBlocks, n.updates, n.destroys, n.inits, n.draws);
 }
 } // namespace
 

@@ -106,6 +106,9 @@ void drawTbBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
     b.words[15] = (b.words[15] & 0xffffff00u) | (rng() % 128);
 }
 
+// The Speaker Simulator's (v263): the Speaker Type 0…11, a byte
+void drawSpkBlock(Vc2CosmBlockWords& b, std::mt19937& rng) { b.words[0] = (b.words[0] & 0xffffff00u) | (rng() % 12); }
+
 // The Compressor's converter (v258): Attack and Sustain 0…1, the Level's gain 0…4
 constexpr Vc2CosmWordRange kCompRanges[] { { 0, 0.0f, 1.0f }, { 1, 0.0f, 1.0f }, { 2, 0.0f, 4.0f } };
 void drawCompBlock(Vc2CosmBlockWords& b, std::mt19937& rng) { drawRanges(b, rng, kCompRanges); }
@@ -130,14 +133,18 @@ constexpr Vc2CosmWordRange kSbf2Ranges[] { { 2, -100.0f, 100.0f }, { 3, -1.0f, 1
                                            { 7, -1.0f, 1.0f }, { 8, 0.0f, 1.0f }, { 9, -1.0f, 1.0f },
                                            { 11, -1.0f, 1.0f }, { 13, -1.0f, 1.0f }, { 14, 0.5f, 1.0f } };
 void drawOctave(Vc2CosmBlockWords& b, std::mt19937& rng) { b.words[0] = (b.words[0] & 0xffffff00u) | (rng() % 3); }
+// [FW] each converter's last word, always 1: the DSP's gain is multiplied by it (v264)
+constexpr int kSbf1One = 16, kSbf2One = 15;
 void drawSbf1Block(Vc2CosmBlockWords& b, std::mt19937& rng) {
     drawOctave(b, rng);
     drawRanges(b, rng, kSbf1Ranges);
+    setBlockFloat(b, kSbf1One, 1.0f);
 }
 void drawSbf2Block(Vc2CosmBlockWords& b, std::mt19937& rng) {
     drawOctave(b, rng);
     drawRanges(b, rng, kSbf2Ranges);
     setBlockFloat(b, 1, (float)(rng() % 128) * 0.96875f / 127.0f - 1.0f);
+    setBlockFloat(b, kSbf2One, 1.0f);
 }
 
 // The Growl's converter: Intencity I/127, Speed 2·S/128 − 1, its two settings' depths and numbers
@@ -160,10 +167,11 @@ struct Vc2CosmBlockDraw {
     uint8_t code;
     void (*draw)(Vc2CosmBlockWords& b, std::mt19937& rng);
 };
-constexpr std::array<Vc2CosmBlockDraw, 16> kBlockDraws { { { kOd, drawOdBlock },
+constexpr std::array<Vc2CosmBlockDraw, 17> kBlockDraws { { { kOd, drawOdBlock },
                                                            { kDs, drawOdBlock },
                                                            { kWs, drawWsBlock },
                                                            { kAmp, drawAmpBlock },
+                                                           { (uint8_t)kSpeaker, drawSpkBlock },
                                                            { kResonator, drawResBlock },
                                                            { kSbf1, drawSbf1Block },
                                                            { kSbf2, drawSbf2Block },
@@ -177,11 +185,13 @@ constexpr std::array<Vc2CosmBlockDraw, 16> kBlockDraws { { { kOd, drawOdBlock },
                                                            { kLofi, drawLofiBlock },
                                                            { kTb, drawTbBlock } } };
 
+// The codes the port has a type for
+constexpr std::array<int32_t, 18> kPorted { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, kSbf1, kSbf2,
+                                            Vc2CosmGrowl::kCode, kDual, kTvf, kDtvf, kComp, kLim, kFs, kLofi, kTb };
+
 // A code the port has a type for, or one past 20 whose byte the switches pass
 int32_t drawCode(std::mt19937& rng) {
-    const std::array<int32_t, 18> ported { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, kSbf1, kSbf2,
-                                           Vc2CosmGrowl::kCode, kDual, kTvf, kDtvf, kComp, kLim, kFs, kLofi, kTb };
-    if (rng() % 4 != 0) return ported[rng() % ported.size()];
+    if (rng() % 4 != 0) return kPorted[rng() % kPorted.size()];
     const uint8_t low = rng() % 2 ? kPassingBytes[rng() % kPassingBytes.size()] : (uint8_t)(21 + rng() % 235);
     const uint32_t high = rng() % 2 ? 0xffffff00u : (uint32_t)(1 + rng() % 0x7fff) << 8;
     return (int32_t)(high | low);
@@ -202,6 +212,16 @@ void vc2DrawNoteOnBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
     vc2CosmNoise(b, rng);
     b.code = drawCode(rng);
     vc2DrawTypeWords(b, rng);
+}
+
+void vc2DrawBlockOf(Vc2CosmBlockWords& b, int32_t code, std::mt19937& rng) {
+    vc2CosmNoise(b, rng);
+    b.code = code;
+    vc2DrawTypeWords(b, rng);
+}
+
+void vc2DrawPortedBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    vc2DrawBlockOf(b, kPorted[rng() % kPorted.size()], rng);
 }
 
 void vc2DrawTypeWords(Vc2CosmBlockWords& b, std::mt19937& rng) {

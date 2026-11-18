@@ -1,7 +1,9 @@
 // The Compressor's, Limiter's and Frequency Shifter's adapters: see Vc2CosmBufferedAdapters.h (v258).  Every address
 // is rom.4's, every offset the object's or its block's.
 #include "Vc2CosmBufferedAdapters.h"
+#include "Vc2CosmAdapterBlocks.h"
 #include "Vc2CosmAdapterWords.h"
+#include "XtFloat.h"
 #include <array>
 #include <cstring>
 #include <utility>
@@ -48,12 +50,6 @@ constexpr Vc2CosmBlockFloats<XtFsBlock, 6> kFsFloats { { { 0, &XtFsBlock::depth 
                                                          { 6, &XtFsBlock::balanceEnv },
                                                          { 8, &XtFsBlock::balanceLfo } } };
 
-XtLimBlock limBlockOf(const Vc2CosmBlockWords& b) {
-    XtLimBlock x = floatsOf(b, kLimFloats);
-    x.ratio = static_cast<int8_t>(b.words[0]);
-    return x;
-}
-
 // A new block's two targets: the XtCosm class's setBlock on the held levels, its getters into the object's
 template <class C, class B>
 void targetsOn(C& cosm, const B& block, Vc2CosmObjectWords& o, float (C::*first)() const, float (C::*second)() const) {
@@ -84,13 +80,17 @@ constexpr size_t kSbfGain = 0xe4, kSbfSlews = 0xe8, kSbfThird = 0xf0, kSbfOctave
 constexpr size_t kSbfOwn = 0x124, kSbfDelay = 0x130, kSbfFraction = 0x134, kSbf1Fraction = 0x138, kSbfProgress = 0x13c;
 constexpr size_t kSbfDcLeft = 0x90, kSbfDcRight = 0xc8;   // [FW] D+0x38, R's D+0x70: the DC follower's rate
 
-XtSbfBlock sbfBlockOf(const Vc2CosmBlockWords& b) {
+} // namespace
+
+XtSbfBlock Vc2CosmAdapter::sbfBlockOf(const Vc2CosmBlockWords& b) {
     const bool second = static_cast<int8_t>(b.code) == kSbf2;
     XtSbfBlock x = second ? floatsOf(b, kSbf2Floats) : floatsOf(b, kSbf1Floats);
     x.second = second;
     x.octave = static_cast<int8_t>(b.words[0]);
     return x;
 }
+
+namespace {
 
 // XtCosmSbf's note-on on the bound start levels and the held levels, as rom.4's start values and new block leave them
 void sbfNoteOn(XtCosmSbf& sbf, Vc2CosmNoteOn& n, const Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {
@@ -100,6 +100,14 @@ void sbfNoteOn(XtCosmSbf& sbf, Vc2CosmNoteOn& n, const Vc2CosmObjectWords& o, co
 
 void floatInto(Vc2CosmObjectWords& o, size_t at, float v) { floatsInto(o, at, &v, 1); }
 } // namespace
+
+XtCompBlock Vc2CosmAdapter::compBlockOf(const Vc2CosmBlockWords& b) { return floatsOf(b, kCompFloats); }
+XtFsBlock Vc2CosmAdapter::fsBlockOf(const Vc2CosmBlockWords& b) { return floatsOf(b, kFsFloats); }
+XtLimBlock Vc2CosmAdapter::limBlockOf(const Vc2CosmBlockWords& b) {
+    XtLimBlock x = floatsOf(b, kLimFloats);
+    x.ratio = static_cast<int8_t>(b.words[0]);
+    return x;
+}
 
 // The start values: the delay from Detune and the note's pitch, and the Width, into the object's two values
 void vc2CosmSbfStartValues(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {
@@ -129,6 +137,27 @@ void vc2CosmSbfNewBlock(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBl
     copyBlock(o, b, 0x3c, 4);
     floatInto(o, kSbf1Sub, sbf.subRatio());
     copyBlock(o, b, 0x44, 4);
+}
+
+// XtCosmSbf's update's sum on the object's words from `at`: the value, its Env depth a word on, its LFO depth three on
+float sbfTarget(const Vc2CosmBlockWords& w, int at, float env, float lfo) {
+    const float withEnv = xtf::add(xtf::mul(blockFloat(w, at + 1), env), blockFloat(w, at));
+    return xtf::add(xtf::mul(blockFloat(w, at + 3), lfo), withEnv);
+}
+
+// The update's case: the two sums, on the object's words as the block's Detune has become its ratio there, which no
+// block of XtCosmSbf's can give it: the Detune's from word 1 (the second filter's 2), the Width's six words on
+void vc2CosmSbfUpdate(Vc2CosmNoteOn&, Vc2CosmObjectWords& o) {
+    const Vc2CosmBlockWords w = blockIn(o);
+    const Vc2CosmStarts h = heldOf(o);
+    const int at = w.code == kSbf2 ? 2 : 1;
+    o.targets[0] = sbfTarget(w, at, h.envA, h.lfoA);
+    o.targets[1] = sbfTarget(w, at + 6, h.envB, h.lfoB);
+}
+
+// The update's case: XtCosmFs's targets, the same as its new block's, on the block the object holds
+void vc2CosmFsUpdate(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o) {
+    targetsOn(n.scratch().fs, floatsOf(blockIn(o), kFsFloats), o, &XtCosmFs::depthTarget, &XtCosmFs::balanceTarget);
 }
 
 // The note-on case: what XtCosmSbf's note-on ends with: the slews at the block's, the gain from the Width's target, the

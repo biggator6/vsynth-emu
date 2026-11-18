@@ -15,6 +15,17 @@ void vc2WriteNoteOnState(Sh4& cpu, const Vc2CosmObjectWords& o, const Vc2CosmBlo
 // v252) or one the switches pass (past 20, its byte a type's with no start values or none), its words as that type's
 // converter gives them
 void vc2DrawNoteOnBlock(Vc2CosmBlockWords& b, std::mt19937& rng);
+// The bound words as the port reads them: the interpreter's, where the check drew them
+struct Vc2CosmRamBound final : Vc2CosmBound {
+    explicit Vc2CosmRamBound(Sh4& c) : cpu(c) {}
+    Sh4& cpu;
+    float word(uint32_t at) override { return std::bit_cast<float>(cpu.rd32(at)); }
+};
+
+// A block of a code the port has a type for, as its converter gives it, for an update to follow (v262)
+void vc2DrawPortedBlock(Vc2CosmBlockWords& b, std::mt19937& rng);
+// A block of `code`, as its converter gives it (v263)
+void vc2DrawBlockOf(Vc2CosmBlockWords& b, int32_t code, std::mt19937& rng);
 // The block's words as its code's converter gives them, when the port draws its type, for a code given
 // after (v253: rom.4's Lo-Fi indexes its tables by a byte its converter keeps in range)
 void vc2DrawTypeWords(Vc2CosmBlockWords& b, std::mt19937& rng);

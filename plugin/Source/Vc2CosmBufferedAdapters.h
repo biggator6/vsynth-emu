@@ -17,6 +17,8 @@ struct Vc2CosmBufferedScratch {
 void vc2CosmSbfStartValues(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);   // 0x893a88a0, …8960
 void vc2CosmSbfNewBlock(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);      // 0x893a9310, …9410
 void vc2CosmSbfNoteOnCase(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);    // 0x893aa310, …a3d0
+void vc2CosmSbfUpdate(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o);   // the update's cases 0x893aab00, 0x893aab50 (v262)
+void vc2CosmFsUpdate(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o);    // the update's case 0x893aaea0 (v262)
 
 void vc2CosmCompNewBlock(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);     // 0x893aa6e0
 void vc2CosmCompNoteOnCase(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);   // 0x893aa4b0

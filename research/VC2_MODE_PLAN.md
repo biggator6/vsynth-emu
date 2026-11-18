@@ -530,8 +530,15 @@ version against rom.4's routines with what it calls hooked:
        for the words their new blocks and note-on cases form (the VC-2 session's conditions, 2026-11-17). Every code a
        converter gives now has its start values, new block and note-on case (HARDWARE_FIRMWARE.md, "The VC-2's COSM
        adapters: the Side Band Filters").
-     - next: the update (the held levels and rates, each code's inline case) and the DSP by code, mono and stereo, over
-       XtCosm's types and the Growl.
+     - done (v262): the update `0x893aa7d0`, `Vc2CosmNoteOn::update` and each type's case, a row's fifth part
+       (HARDWARE_FIRMWARE.md, "The VC-2's COSM update").
+     - done (v263): the DSP by code, mono and stereo, for Through and the twelve codes of OD/Dist, the Wave Shaper, the
+       Amp and Speaker Simulators, the Resonator, the Dual Filter, the TVF, the Compressor, the Limiter, the Frequency
+       Shifter and Lo-Fi: `Vc2CosmDsp`, one `XtCosmSection` a COSM (HARDWARE_FIRMWARE.md, "The VC-2's COSM DSP: the first
+       twelve codes").
+     - done (v264): the DSP of the Side Band Filters, the Growl, the Dynamic TVF and the TB Filter, so every code a
+       converter gives has its sound; the rings' ends kept in the pools for the first Side Band Filter's early read
+       (HARDWARE_FIRMWARE.md, "The VC-2's COSM DSP: the last four types, and the pools' memory").
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

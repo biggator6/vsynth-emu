@@ -55,8 +55,8 @@ VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmT
          Vc2CosmFrameCheck Vc2CosmConverters Vc2CosmFrameDraws Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive
          Vc2CosmBalanced Vc2CosmSideBand Vc2MatrixCheck Vc2MatrixSources Vc2MatrixSetup Vc2MatrixSetupCheck
          Vc2MatrixSetupDraws Vc2CosmObject Vc2CosmObjectCheck Vc2CosmPools Vc2CosmNoteOn Vc2CosmNoteOnCheck
-         Vc2CosmNoteOnDraws Vc2CosmAdapters Vc2CosmAdapterWords Vc2CosmTbAdapter Vc2CosmBufferedAdapters XtCosm XtOsc
-         XtEnvelope)
+         Vc2CosmNoteOnDraws Vc2CosmAdapters Vc2CosmAdapterWords Vc2CosmAdapterBlocks Vc2CosmTbAdapter
+         Vc2CosmBufferedAdapters Vc2CosmDsp Vc2CosmDspCheck Vc2CosmDspKinds Vc2CosmDspSlots XtCosm XtOsc XtEnvelope)
 VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
@@ -131,8 +131,10 @@ VC2PORTS=(
     "vc2cosmnoteon|Vc2CosmNoteOn.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmadapters|Vc2CosmAdapters.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmwords|Vc2CosmAdapterWords.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2cosmblocks|Vc2CosmAdapterBlocks.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmtb|Vc2CosmTbAdapter.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmbuffered|Vc2CosmBufferedAdapters.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
+    "vc2cosmdsp|Vc2CosmDsp.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2xtcosm|XtCosm.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmfilters|Vc2CosmFilters.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2cosmdynamics|Vc2CosmDynamics.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"

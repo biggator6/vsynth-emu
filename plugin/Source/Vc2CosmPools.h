@@ -28,14 +28,21 @@ static_assert(sizeof(Vc2CosmPoolWords) == 0x3cc, "rom.4's layout, the COSM pools
 class Vc2CosmPools {
 public:
     static constexpr int kBufferFloats = 3267;   // [FW] a buffer's floats, what the allocator clears
+    static constexpr int kEarlyFloats = 136;     // [FW] how far before its buffer a Side Band Filter's line 2 reads
+    Vc2CosmPools();                              // every slot's floats, so none is made on the tone generator's thread
     // 0x893ab550: the three floats, then each pool's slots free with their buffers' addresses
     void init();
     // 0x893a8560: the first free slot of `pool` taken and its buffers' addresses given, or −1 with none
     int32_t take(uint32_t pool, std::array<uint32_t, 4>& buffers);
     // 0x893a85e0: a slot freed
     void release(uint32_t pool, int32_t slot);
-    // The port's floats of a slot's buffer `k`, made when it is first asked for
+    // The port's floats of a slot's buffer `k`
     std::vector<float>& buffer(uint32_t pool, int32_t slot, int k);
+    // The kEarlyFloats words in front of a slot's buffer `k` (1 or 3) in rom.4's memory, where each pool's buffers lie
+    // end to end: the slot before's buffer `k`, and in front of slot 0 the last slot's buffer k − 1
+    const float* earlyOf(uint32_t pool, int32_t slot, int k) const;
+    // What another slot's line can read of a ring `length` floats long (v264): its end, into the slot's buffer `k`
+    void keepEnd(uint32_t pool, int32_t slot, int k, const float* ring, int length);
 
     Vc2CosmPoolWords w {};
 

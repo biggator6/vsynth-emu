@@ -335,6 +335,27 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM DSP's last four types v264 (2026-11-18, on its own branch after v263; HARDWARE_FIRMWARE.md, "The VC-2's COSM
+  DSP: the last four types, and the pools' memory"). Vc2CosmDsp: the Side Band Filters, the Growl, the Dynamic TVF and the TB
+  Filter, so every code a converter gives has its sound. The first Side Band Filter's line 2 reads up to 136 floats in front
+  of its buffer: each render keeps its rings' ends in the pools (Vc2CosmPools::keepEnd), and the filter reads them back
+  (earlyOf, XtCosmSbf::setEarly); in front of slot 0 lie slot 23's buffers 0 and 2. D+0x8c, +0x90 and +0x98 carry across
+  notes. A full pool: rom.4 plays on four stale stack words, drawn in the check, where the port matches on its own rings.
+  0 different at seeds 2024, 7 and 31337. mutate_vc2.py --cosm: 1,439 plants, all caught. Not in the sound yet.
+
+The VC-2's COSM DSP v263 (2026-11-18, on its own branch after v262; HARDWARE_FIRMWARE.md, "The VC-2's COSM DSP: the first
+  twelve codes"). Vc2CosmDsp: one XtCosmSection a COSM, each code a row, fed the frame's note-on, new block and update;
+  Through and codes 1 to 6, 12, 13, 15, 16, 18 and 19. XtCosm unchanged. The Compressor's, Limiter's and Frequency
+  Shifter's rings equal rom.4's slots with noise in them first. The Side Band Filters, the Growl, the Dynamic TVF and the
+  TB Filter are still to come. 0 different at seeds 2024, 7 and 31337. mutate_vc2.py --cosm: 1,348 plants (75 new), all
+  caught. Not in the sound yet.
+
+The VC-2's COSM update v262 (2026-11-18, on its own branch after v260; HARDWARE_FIRMWARE.md, "The VC-2's COSM update").
+  Vc2CosmNoteOn::update (0x893aa7d0): the bound levels and rates held, the pitch, each code's case a row's fifth part, by
+  XtCosm's own update laws on the block the object holds (Vc2CosmAdapter::blockIn); the Side Band Filters' two sums on the
+  object's words. Vc2CosmAdapterBlocks: the block readers, moved as they stood. XtCosm unchanged. 0 different at seeds
+  2024, 7 and 31337. mutate_vc2.py --cosm: 1,273 plants (46 new), all caught. Not in the sound yet.
+
 The VC-2's Vari off v261 (2026-11-17, on vc2-mode after v256, 977c9db; the user's "Start Vari off"; HARDWARE_FIRMWARE.md,
   "The VC-2's Vari off"): step 4.2's OSC voice. rom.4's own two renders for a wave with Vari Sw off, 0x893c63c0 (mono) and
   0x893c66e0 (stereo): vc2OscVariOffMono and vc2OscVariOffStereo (Vc2OscVariOffRender.cpp), one routine over a way. No

@@ -74,8 +74,10 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscVariOffRender.cpp
     Source/Vc2CosmAdapters.cpp
     Source/Vc2CosmAdapterWords.cpp
+    Source/Vc2CosmAdapterBlocks.cpp
     Source/Vc2CosmTbAdapter.cpp
     Source/Vc2CosmBufferedAdapters.cpp
     Source/Vc2LibMath.cpp
     Source/Vc2LibMathTables.cpp
+    Source/Vc2CosmDsp.cpp
 )

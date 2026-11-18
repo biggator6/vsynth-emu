@@ -39,13 +39,19 @@ void growlNoteOn(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWord
     onGrowl(n, o, [](Vc2CosmGrowl& g) { g.noteOn(); });
 }
 
+// The Growl's case of the update, 0x893b9d40
+void growlUpdate(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o) {
+    onGrowl(n, o, [](Vc2CosmGrowl& g) { g.update(); });
+}
+
 // The Growl's start values, 0x893b9d20: an rts
 void growlStartValues(Vc2CosmNoteOn&, Vc2CosmObjectWords&, const Vc2CosmBlockWords&) {}
 
 // Each ported type's parts: Through none; the Speaker Simulator its new block; the Growl its start values (an rts),
 // new block (0x893b9dc0) and case (0x893b9d30)
-constexpr Vc2CosmTypeRow kRows[] { { 0, nullptr, nullptr, nullptr }, { 5, nullptr, speakerNewBlock, nullptr },
-                                   { Vc2CosmGrowl::kCode, growlStartValues, growlNewBlock, growlNoteOn } };
+constexpr Vc2CosmTypeRow kRows[] { { 0, nullptr, nullptr, nullptr, nullptr },
+                                   { 5, nullptr, speakerNewBlock, nullptr, nullptr },
+                                   { Vc2CosmGrowl::kCode, growlStartValues, growlNewBlock, growlNoteOn, growlUpdate } };
 } // namespace
 
 Vc2CosmNoteOn::Vc2CosmNoteOn(Vc2CosmPools& pools, Vc2CosmBound& bound)
@@ -100,6 +106,15 @@ void Vc2CosmNoteOn::noteOn(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b, ui
     if (static_cast<uint32_t>(o.code) > kLastCode) return;
     const Vc2CosmTypeRow* row = rowOf(o.code);
     if (row != nullptr && row->noteOnCase != nullptr) row->noteOnCase(*this, o, b);
+}
+
+void Vc2CosmNoteOn::update(Vc2CosmObjectWords& o, float pitch) {
+    hold(o);
+    o.setUp.pitch = pitch;
+    const auto code = static_cast<int8_t>(o.dspCode);
+    if (static_cast<uint32_t>(code - 1) > kLastStart) return;   // [FW] the same switch as the start values'
+    const Vc2CosmTypeRow* row = rowOf(code);
+    if (row != nullptr && row->update != nullptr) row->update(*this, o);
 }
 
 void Vc2CosmNoteOn::newBlock(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {
