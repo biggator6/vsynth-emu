@@ -89,6 +89,10 @@
 # (an update follows a note-on, which sets both), the block's last word left out of blockIn (no update reads it).
 # v263: the COSM DSP's first batch in vc2cosmdsp (Vc2CosmDsp.cpp), and XtCosm's rings under xt_vc2cosm's seventh part.  Not
 # planted, as no input tells them apart: the new block's test of a code past 20 (no such note reaches a type with a row).
+# v264: the Side Band Filters, the Growl, the Dynamic TVF and the TB Filter in vc2cosmdsp, the rings' ends and the words in
+# front of a line in vc2cosmpools.  Not planted, as no input tells them apart: the first filter's type number against
+# the second's (5 and 6 play alike), setEarly itself (a header's; its calls are planted), envelope A's rate into the
+# Side Band Filters (XtCosmSbf stores it and reads only B's).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -1370,7 +1374,7 @@ dsp-levels-lfo-a|+ kRate), o.held[2],|+ kRate), o.held[3],|vc2cosmdsp
 dsp-levels-start-b|bound.word(o.bindings[1] + kStartLevel), o.held[1],|bound.word(o.bindings[0] + kStartLevel), o.held[1],|vc2cosmdsp
 dsp-levels-held-b|kStartLevel), o.held[1], bound|kStartLevel), o.held[0], bound|vc2cosmdsp
 dsp-levels-rate-b|bound.word(o.bindings[1] + kRate), o.held[3]|bound.word(o.bindings[0] + kRate), o.held[3]|vc2cosmdsp
-dsp-levels-lfo-b|+ kRate), o.held[3] };|+ kRate), o.held[2] };|vc2cosmdsp
+dsp-levels-lfo-b|+ kRate), o.held[3],|+ kRate), o.held[2],|vc2cosmdsp
 dsp-two-on-start-a|l.startA, l.heldA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateB, l.lfoB);|l.heldA, l.heldA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateB, l.lfoB);|vc2cosmdsp
 dsp-two-on-out-a|l.startA, l.heldA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateB, l.lfoB);|l.startA, l.startA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateB, l.lfoB);|vc2cosmdsp
 dsp-two-on-rate-a|l.startA, l.heldA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateB, l.lfoB);|l.startA, l.heldA, l.rateB, l.lfoA, l.startB, l.heldB, l.rateB, l.lfoB);|vc2cosmdsp
@@ -1401,15 +1405,15 @@ dsp-alone-block|        (s.*Member).setBlock(BlockOf(b));\n||vc2cosmdsp
 dsp-spk-type|x.type = static_cast<uint8_t>(b.words[0]);|x.type = 0;|vc2cosmdsp
 dsp-type|    section_.type = row_->type;\n||vc2cosmdsp
 dsp-stereo|section_.stereo = stereo;|section_.stereo = false;|vc2cosmdsp
-dsp-note-on|    row_->noteOn(section_, b, levelsOf(o, bound));\n||vc2cosmdsp
+dsp-note-on|    row_->noteOn(section_, b, levelsOf(o, bound, word98_));\n||vc2cosmdsp
 dsp-block-code|row_ == nullptr \|\| o.code != b.code \|\||row_ == nullptr \|\||vc2cosmdsp
-dsp-block|    row_->newBlock(section_, b, levelsOf(o, bound));\n||vc2cosmdsp
+dsp-block|    if (row_->newBlock != nullptr) row_->newBlock(section_, b, levelsOf(o, bound));\n||vc2cosmdsp
 dsp-update|if (row_ != nullptr && row_->update != nullptr) row_->update(section_, levelsOf(o, bound));|if (row_ != nullptr && row_->update != nullptr) {}|vc2cosmdsp
-dsp-render|section_.process(lr, 1.0f);|section_.process(lr, 2.0f);|vc2cosmdsp
-dsp-through-note|    if (row_ == nullptr) return;\n||vc2cosmdsp
+dsp-render|section_.process(lr, 1.0f, past);|section_.process(lr, 2.0f, past);|vc2cosmdsp
+dsp-through-note|(o.dspCode));\n    if (row_ == nullptr) return;\n|(o.dspCode));\n|vc2cosmdsp
 dsp-through-block|if (row_ == nullptr \|\| o.code != b.code|if (o.code != b.code|vc2cosmdsp
 dsp-through-update|if (row_ != nullptr && row_->update != nullptr)|if (row_->update != nullptr)|vc2cosmdsp
-dsp-through-render|if (row_ != nullptr) section_.process|section_.process|vc2cosmdsp
+dsp-through-render|    if (row_ == nullptr) return;\n    const bool slotted|    const bool slotted|vc2cosmdsp
 alloc-last-noteon-keep|kBufferedLast = 11, kUnbufferedFrom = 4|kBufferedLast = 11, kUnbufferedFrom = 3|vc2cosmnoteon
 xt-comp-ring-clear|void XtCosmComp::noteOn(const XtCompBlock& b) {\n    w = kLen;                                          // 0xcc2: the first sample goes to 0\n    std::fill(buf.begin(), buf.end(), 0.0f);\n|void XtCosmComp::noteOn(const XtCompBlock& b) {\n    w = kLen;                                          // 0xcc2: the first sample goes to 0\n|vc2xtcosm
 xt-lim-ring-clear|void XtCosmLim::noteOn(const XtLimBlock& b) {\n    w = kLen;                                          // 0xcc2: the first sample goes to 0\n    std::fill(buf.begin(), buf.end(), 0.0f);\n|void XtCosmLim::noteOn(const XtLimBlock& b) {\n    w = kLen;                                          // 0xcc2: the first sample goes to 0\n|vc2xtcosm
@@ -1428,12 +1432,103 @@ dsp-row-type-12|{ 12, 2, Dual::noteOn, Dual::newBlock, Dual::update }|{ 12, 3, D
 dsp-row-update-12|{ 12, 2, Dual::noteOn, Dual::newBlock, Dual::update }|{ 12, 2, Dual::noteOn, Dual::newBlock, nullptr }|vc2cosmdsp
 dsp-row-type-13|{ 13, 0, Tvf::noteOn, Tvf::newBlock, Tvf::update }|{ 13, 2, Tvf::noteOn, Tvf::newBlock, Tvf::update }|vc2cosmdsp
 dsp-row-update-13|{ 13, 0, Tvf::noteOn, Tvf::newBlock, Tvf::update }|{ 13, 0, Tvf::noteOn, Tvf::newBlock, nullptr }|vc2cosmdsp
-dsp-row-type-15|{ 15, 10, Comp::noteOn, Comp::newBlock, nullptr }|{ 15, 11, Comp::noteOn, Comp::newBlock, nullptr }|vc2cosmdsp
-dsp-row-type-16|{ 16, 11, Lim::noteOn, Lim::newBlock, nullptr }|{ 16, 12, Lim::noteOn, Lim::newBlock, nullptr }|vc2cosmdsp
-dsp-row-type-18|{ 18, 8, Fs::noteOn, Fs::newBlock, Fs::update }|{ 18, 9, Fs::noteOn, Fs::newBlock, Fs::update }|vc2cosmdsp
-dsp-row-update-18|{ 18, 8, Fs::noteOn, Fs::newBlock, Fs::update }|{ 18, 8, Fs::noteOn, Fs::newBlock, nullptr }|vc2cosmdsp
-dsp-row-type-19|{ 19, 9, Lofi::noteOn, Lofi::newBlock, Lofi::update }|{ 19, 10, Lofi::noteOn, Lofi::newBlock, Lofi::update }|vc2cosmdsp
-dsp-row-update-19|{ 19, 9, Lofi::noteOn, Lofi::newBlock, Lofi::update }|{ 19, 9, Lofi::noteOn, Lofi::newBlock, nullptr }|vc2cosmdsp
+dsp-row-type-15|{ 15, 10, Comp::noteOn,|{ 15, 11, Comp::noteOn,|vc2cosmdsp
+dsp-row-type-16|{ 16, 11, Lim::noteOn,|{ 16, 12, Lim::noteOn,|vc2cosmdsp
+dsp-row-type-18|{ 18, 8, Fs::noteOn,|{ 18, 9, Fs::noteOn,|vc2cosmdsp
+dsp-row-update-18|Fs::newBlock, Fs::update, twoRings|Fs::newBlock, nullptr, twoRings|vc2cosmdsp
+dsp-row-type-19|{ 19, 9, Lofi::noteOn,|{ 19, 10, Lofi::noteOn,|vc2cosmdsp
+dsp-row-update-19|Lofi::newBlock, Lofi::update, nullptr|Lofi::newBlock, nullptr, nullptr|vc2cosmdsp
 dsp-row-type-4|{ 4, 14, AmpValue::noteOn,|{ 4, 13, AmpValue::noteOn,|vc2cosmdsp
-dsp-row-update-4|AmpValue::newBlock, AmpValue::update }|AmpValue::newBlock, nullptr }|vc2cosmdsp
+dsp-row-update-4|AmpValue::newBlock, AmpValue::update, nullptr|AmpValue::newBlock, nullptr, nullptr|vc2cosmdsp
+dsp-pitch|o.setUp.pitch, o.setUp.other, word98 };|o.setUp.other, o.setUp.other, word98 };|vc2cosmdsp
+dsp-root|o.setUp.pitch, o.setUp.other, word98 };|o.setUp.pitch, o.setUp.pitch, word98 };|vc2cosmdsp
+dsp-sbf-pitch|s.sbf.noteOn(sbfBlockOf(b), l.pitch, l.root,|s.sbf.noteOn(sbfBlockOf(b), l.root, l.root,|vc2cosmdsp
+dsp-sbf-root|s.sbf.noteOn(sbfBlockOf(b), l.pitch, l.root,|s.sbf.noteOn(sbfBlockOf(b), l.pitch, l.pitch,|vc2cosmdsp
+dsp-sbf-on-start-a|l.root, l.startA, l.heldA,|l.root, l.heldA, l.heldA,|vc2cosmdsp
+dsp-sbf-on-held-a|l.root, l.startA, l.heldA,|l.root, l.startA, l.startA,|vc2cosmdsp
+dsp-sbf-on-lfo-a|l.root, l.startA, l.heldA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateB,|l.root, l.startA, l.heldA, l.rateA, l.lfoB, l.startB, l.heldB, l.rateB,|vc2cosmdsp
+dsp-sbf-on-start-b|l.root, l.startA, l.heldA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateB,|l.root, l.startA, l.heldA, l.rateA, l.lfoA, l.heldB, l.heldB, l.rateB,|vc2cosmdsp
+dsp-sbf-on-held-b|l.root, l.startA, l.heldA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateB,|l.root, l.startA, l.heldA, l.rateA, l.lfoA, l.startB, l.startB, l.rateB,|vc2cosmdsp
+dsp-sbf-on-rate-b|l.root, l.startA, l.heldA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateB,|l.root, l.startA, l.heldA, l.rateA, l.lfoA, l.startB, l.heldB, l.rateA,|vc2cosmdsp
+dsp-sbf-on-lfo-b|                     l.lfoB);|                     l.lfoA);|vc2cosmdsp
+dsp-sbf-block-env-a|s.sbf.setBlock(sbfBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.sbf.setBlock(sbfBlockOf(b), l.heldB, l.lfoA, l.heldB, l.lfoB);|vc2cosmdsp
+dsp-sbf-block-lfo-a|s.sbf.setBlock(sbfBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.sbf.setBlock(sbfBlockOf(b), l.heldA, l.lfoB, l.heldB, l.lfoB);|vc2cosmdsp
+dsp-sbf-block-env-b|s.sbf.setBlock(sbfBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.sbf.setBlock(sbfBlockOf(b), l.heldA, l.lfoA, l.heldA, l.lfoB);|vc2cosmdsp
+dsp-sbf-block-lfo-b|s.sbf.setBlock(sbfBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.sbf.setBlock(sbfBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoA);|vc2cosmdsp
+dsp-sbf-up-pitch|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoA, l.heldB, l.rateB, l.lfoB);|s.sbf.update(l.root, l.heldA, l.rateA, l.lfoA, l.heldB, l.rateB, l.lfoB);|vc2cosmdsp
+dsp-sbf-up-env-a|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoA, l.heldB, l.rateB, l.lfoB);|s.sbf.update(l.pitch, l.heldB, l.rateA, l.lfoA, l.heldB, l.rateB, l.lfoB);|vc2cosmdsp
+dsp-sbf-up-lfo-a|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoA, l.heldB, l.rateB, l.lfoB);|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoB, l.heldB, l.rateB, l.lfoB);|vc2cosmdsp
+dsp-sbf-up-env-b|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoA, l.heldB, l.rateB, l.lfoB);|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoA, l.heldA, l.rateB, l.lfoB);|vc2cosmdsp
+dsp-sbf-up-rate-b|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoA, l.heldB, l.rateB, l.lfoB);|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoA, l.heldB, l.rateA, l.lfoB);|vc2cosmdsp
+dsp-sbf-up-lfo-b|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoA, l.heldB, l.rateB, l.lfoB);|s.sbf.update(l.pitch, l.heldA, l.rateA, l.lfoA, l.heldB, l.rateB, l.lfoA);|vc2cosmdsp
+dsp-tb-on-env-a|s.tb.noteOn(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.noteOn(tbBlockOf(b), l.heldB, l.lfoA, l.heldB, l.lfoB);|vc2cosmdsp
+dsp-tb-on-lfo-a|s.tb.noteOn(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.noteOn(tbBlockOf(b), l.heldA, l.lfoB, l.heldB, l.lfoB);|vc2cosmdsp
+dsp-tb-on-env-b|s.tb.noteOn(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.noteOn(tbBlockOf(b), l.heldA, l.lfoA, l.heldA, l.lfoB);|vc2cosmdsp
+dsp-tb-on-lfo-b|s.tb.noteOn(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.noteOn(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoA);|vc2cosmdsp
+dsp-tb-block-env-a|s.tb.setBlock(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.setBlock(tbBlockOf(b), l.heldB, l.lfoA, l.heldB, l.lfoB);|vc2cosmdsp
+dsp-tb-block-lfo-a|s.tb.setBlock(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.setBlock(tbBlockOf(b), l.heldA, l.lfoB, l.heldB, l.lfoB);|vc2cosmdsp
+dsp-tb-block-env-b|s.tb.setBlock(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.setBlock(tbBlockOf(b), l.heldA, l.lfoA, l.heldA, l.lfoB);|vc2cosmdsp
+dsp-tb-block-lfo-b|s.tb.setBlock(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.setBlock(tbBlockOf(b), l.heldA, l.lfoA, l.heldB, l.lfoA);|vc2cosmdsp
+dsp-tb-up-env-a|s.tb.update(l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.update(l.heldB, l.lfoA, l.heldB, l.lfoB);|vc2cosmdsp
+dsp-tb-up-lfo-a|s.tb.update(l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.update(l.heldA, l.lfoB, l.heldB, l.lfoB);|vc2cosmdsp
+dsp-tb-up-env-b|s.tb.update(l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.update(l.heldA, l.lfoA, l.heldA, l.lfoB);|vc2cosmdsp
+dsp-tb-up-lfo-b|s.tb.update(l.heldA, l.lfoA, l.heldB, l.lfoB);|s.tb.update(l.heldA, l.lfoA, l.heldB, l.lfoA);|vc2cosmdsp
+dsp-tb-hp|        s.tb.setHpWords(s.word8c, s.word90);\n||vc2cosmdsp
+dsp-tb-hp-swap|s.tb.setHpWords(s.word8c, s.word90);|s.tb.setHpWords(s.word90, s.word8c);|vc2cosmdsp
+dsp-dtvf-note|{ 14, 1, dynamicNoteOn,|{ 14, 1, Tvf::noteOn,|vc2cosmdsp
+dsp-dtvf-level|s.tvf.cutoffOwnSlewed(), l.word98);|s.tvf.cutoffOwnSlewed(), 0.0f);|vc2cosmdsp
+dsp-dtvf-q|s.tvf.setFollower(s.tvf.qOwnSlewed(),|s.tvf.setFollower(s.tvf.cutoffOwnSlewed(),|vc2cosmdsp
+dsp-dtvf-cut|s.tvf.qOwnSlewed(), s.tvf.cutoffOwnSlewed(), l.word98|s.tvf.qOwnSlewed(), s.tvf.qOwnSlewed(), l.word98|vc2cosmdsp
+dsp-dtvf-type|{ 14, 1, dynamicNoteOn,|{ 14, 0, dynamicNoteOn,|vc2cosmdsp
+dsp-row-update-14|dynamicNoteOn, Tvf::newBlock, Tvf::update,|dynamicNoteOn, Tvf::newBlock, nullptr,|vc2cosmdsp
+dsp-row-update-7|{ 7, 5, SideBand::noteOn, SideBand::newBlock, SideBand::update,|{ 7, 5, SideBand::noteOn, SideBand::newBlock, nullptr,|vc2cosmdsp
+dsp-row-update-8|{ 8, 6, SideBand::noteOn, SideBand::newBlock, SideBand::update,|{ 8, 6, SideBand::noteOn, SideBand::newBlock, nullptr,|vc2cosmdsp
+dsp-row-rings-7|sideBandRings, firstBandWord98 }|nullptr, firstBandWord98 }|vc2cosmdsp
+dsp-row-rings-8|sideBandRings, secondBandWord98 }|nullptr, secondBandWord98 }|vc2cosmdsp
+dsp-row-word98-7|sideBandRings, firstBandWord98 }|sideBandRings, secondBandWord98 }|vc2cosmdsp
+dsp-row-word98-8|sideBandRings, secondBandWord98 }|sideBandRings, firstBandWord98 }|vc2cosmdsp
+dsp-row-growl|    { Vc2CosmGrowl::kCode, kGrowlType, nullptr, nullptr, nullptr },\n||vc2cosmdsp
+dsp-row-type-20|{ 20, 3, TbFilter::noteOn,|{ 20, 2, TbFilter::noteOn,|vc2cosmdsp
+dsp-row-update-20|TbFilter::newBlock, TbFilter::update }|TbFilter::newBlock, nullptr }|vc2cosmdsp
+dsp-row-rings-15|twoRings<&XtCosmSection::comp>, compWord98|nullptr, compWord98|vc2cosmdsp
+dsp-row-rings-16|twoRings<&XtCosmSection::lim>, limWord98|nullptr, limWord98|vc2cosmdsp
+dsp-row-rings-18|twoRings<&XtCosmSection::fs> }|nullptr }|vc2cosmdsp
+dsp-row-word98-4|nullptr, ampWord98 }|nullptr, nullptr }|vc2cosmdsp
+dsp-row-word98-14|nullptr, dynamicWord98 }|nullptr, nullptr }|vc2cosmdsp
+dsp-row-word98-15|twoRings<&XtCosmSection::comp>, compWord98 }|twoRings<&XtCosmSection::comp> }|vc2cosmdsp
+dsp-row-word98-16|twoRings<&XtCosmSection::lim>, limWord98 }|twoRings<&XtCosmSection::lim> }|vc2cosmdsp
+dsp-row-word98-19|nullptr, lofiWord98 }|nullptr, nullptr }|vc2cosmdsp
+dsp-word98-amp|return s.amp.slews()[3];|return s.amp.slews()[2];|vc2cosmdsp
+dsp-word98-comp|return s.comp.gainTarget(0);|return s.comp.gainTarget(1);|vc2cosmdsp
+dsp-word98-lim|return s.lim.gain(1);|return s.lim.gain(0);|vc2cosmdsp
+dsp-word98-lofi|return s.lofi.upScale();|return s.lofi.downScale();|vc2cosmdsp
+dsp-word98-dtvf|return s.tvf.level();|return 0.0f;|vc2cosmdsp
+dsp-word98-first|return s.sbf.slews()[2];|return s.sbf.slews()[1];|vc2cosmdsp
+dsp-word98-second|return s.sbf.level();|return s.sbf.slews()[2];|vc2cosmdsp
+dsp-first-8c|section_.word8c = std::bit_cast<float>(o.d0e4[0]);|section_.word8c = 0.0f;|vc2cosmdsp
+dsp-first-90|section_.word90 = std::bit_cast<float>(o.d0e4[1]);|section_.word90 = 0.0f;|vc2cosmdsp
+dsp-first-98|word98_ = std::bit_cast<float>(o.d0e4[3]);|word98_ = 0.0f;|vc2cosmdsp
+dsp-noted|        noted_ = true;\n||vc2cosmdsp
+dsp-hold|    section_.holdWords();\n||vc2cosmdsp
+dsp-carry-98|    if (row_ != nullptr && row_->word98 != nullptr) word98_ = row_->word98(section_);\n||vc2cosmdsp
+dsp-growl-left|        std::ranges::fill(growl_.left, 0.0f);\n||vc2cosmdsp
+dsp-growl-right|        std::ranges::fill(growl_.right, 0.0f);\n||vc2cosmdsp
+dsp-growl-words|        std::memcpy(&growl_.w, &o, sizeof o);\n||vc2cosmdsp
+dsp-growl-render|        growl_.render(lr);\n||vc2cosmdsp
+dsp-growl-back|        std::memcpy(&o, &growl_.w, sizeof o);\n||vc2cosmdsp
+dsp-growl-ring|growl_.right.data(), nullptr }, Vc2CosmGrowl::kLine|growl_.left.data(), nullptr }, Vc2CosmGrowl::kLine|vc2cosmdsp
+dsp-early-left|        section_.sbf.setEarly(1, pools_.earlyOf(o.pool, o.slot, 1));\n||vc2cosmdsp
+dsp-early-right|        section_.sbf.setEarly(3, pools_.earlyOf(o.pool, o.slot, 3));\n||vc2cosmdsp
+dsp-early-swap|setEarly(1, pools_.earlyOf(o.pool, o.slot, 1));|setEarly(1, pools_.earlyOf(o.pool, o.slot, 3));|vc2cosmdsp
+dsp-early-no-slot|if (slotted && row_->rings == sideBandRings) {|if (row_->rings == sideBandRings) {|vc2cosmdsp
+dsp-keep-no-slot|    if (!slotted) return;\n||vc2cosmdsp
+dsp-keep|pools_.keepEnd(o.pool, o.slot, k, kept.lines[(size_t)k], kept.length);|(void)k;|vc2cosmdsp
+dsp-rings-two|{ (s.*Member).buffer(0), nullptr, (s.*Member).buffer(1), nullptr }|{ (s.*Member).buffer(1), nullptr, (s.*Member).buffer(0), nullptr }|vc2cosmdsp
+dsp-rings-band|{ s.sbf.buffer(0), s.sbf.buffer(1), s.sbf.buffer(2), s.sbf.buffer(3) }|{ s.sbf.buffer(0), s.sbf.buffer(3), s.sbf.buffer(2), s.sbf.buffer(1) }|vc2cosmdsp
+pools-early-last|first ? Vc2CosmPoolWords::kSlots - 1 : slot - 1|first ? 0 : slot - 1|vc2cosmpools
+pools-early-slot|first ? Vc2CosmPoolWords::kSlots - 1 : slot - 1|first ? Vc2CosmPoolWords::kSlots - 1 : slot|vc2cosmpools
+pools-early-buffer|first ? k - 1 : k|first ? k : k|vc2cosmpools
+pools-early-same|first ? k - 1 : k|first ? k - 1 : k - 1|vc2cosmpools
+pools-early-end|.data() + kBufferFloats - kEarlyFloats;|.data() + kBufferFloats - kEarlyFloats - 1;|vc2cosmpools
+pools-keep-dest|buffer(pool, slot, k).begin() + from);|buffer(pool, slot, k).begin() + from - 1);|vc2cosmpools
 rowof-adapters|std::span<const Vc2CosmTypeRow>(kRows), vc2CosmAdapterRows() }|std::span<const Vc2CosmTypeRow>(kRows) }|vc2cosmnoteon

@@ -80,13 +80,17 @@ constexpr size_t kSbfGain = 0xe4, kSbfSlews = 0xe8, kSbfThird = 0xf0, kSbfOctave
 constexpr size_t kSbfOwn = 0x124, kSbfDelay = 0x130, kSbfFraction = 0x134, kSbf1Fraction = 0x138, kSbfProgress = 0x13c;
 constexpr size_t kSbfDcLeft = 0x90, kSbfDcRight = 0xc8;   // [FW] D+0x38, R's D+0x70: the DC follower's rate
 
-XtSbfBlock sbfBlockOf(const Vc2CosmBlockWords& b) {
+} // namespace
+
+XtSbfBlock Vc2CosmAdapter::sbfBlockOf(const Vc2CosmBlockWords& b) {
     const bool second = static_cast<int8_t>(b.code) == kSbf2;
     XtSbfBlock x = second ? floatsOf(b, kSbf2Floats) : floatsOf(b, kSbf1Floats);
     x.second = second;
     x.octave = static_cast<int8_t>(b.words[0]);
     return x;
 }
+
+namespace {
 
 // XtCosmSbf's note-on on the bound start levels and the held levels, as rom.4's start values and new block leave them
 void sbfNoteOn(XtCosmSbf& sbf, Vc2CosmNoteOn& n, const Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {

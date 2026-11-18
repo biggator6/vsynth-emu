@@ -1,6 +1,7 @@
 // rom.4's COSM buffer pools: see Vc2CosmPools.h (v250).  Every address is rom.4's.
 #include "Vc2CosmPools.h"
 #include "Vc2CosmTables.h"
+#include <algorithm>
 
 namespace {
 // [FW] each pool's four buffers, the first slot's, and the step to the next slot's (3,267 floats)
@@ -9,6 +10,12 @@ constexpr std::array<std::array<uint32_t, 4>, Vc2CosmPoolWords::kPools> kBases {
 constexpr uint32_t kSlotStep = 0x330c;
 constexpr uint32_t kDeletes = 1;   // [FW] the destructor's flag bit for operator delete
 } // namespace
+
+Vc2CosmPools::Vc2CosmPools() {
+    for (auto& pool : own_)
+        for (auto& slot : pool)
+            for (std::vector<float>& b : slot) b.assign(kBufferFloats, 0.0f);
+}
 
 void Vc2CosmPools::init() {
     const Vc2CosmObjectPool& t = vc2CosmTables().object;
@@ -37,9 +44,18 @@ int32_t Vc2CosmPools::take(uint32_t pool, std::array<uint32_t, 4>& buffers) {
 void Vc2CosmPools::release(uint32_t pool, int32_t slot) { w.pools[pool][(size_t)slot].inUse = 0; }
 
 std::vector<float>& Vc2CosmPools::buffer(uint32_t pool, int32_t slot, int k) {
-    std::vector<float>& b = own_[pool][(size_t)slot][(size_t)k];
-    if (b.empty()) b.resize(kBufferFloats);
-    return b;
+    return own_[pool][(size_t)slot][(size_t)k];
+}
+
+const float* Vc2CosmPools::earlyOf(uint32_t pool, int32_t slot, int k) const {
+    const bool first = slot == 0;
+    const auto before = static_cast<size_t>(first ? Vc2CosmPoolWords::kSlots - 1 : slot - 1);
+    return own_[pool][before][static_cast<size_t>(first ? k - 1 : k)].data() + kBufferFloats - kEarlyFloats;
+}
+
+void Vc2CosmPools::keepEnd(uint32_t pool, int32_t slot, int k, const float* ring, int length) {
+    const int from = kBufferFloats - kEarlyFloats;
+    std::copy(ring + from, ring + length, buffer(pool, slot, k).begin() + from);
 }
 
 bool vc2CosmDestroy(Vc2CosmObjectWords& o, Vc2CosmPools& pools, uint32_t flags) {

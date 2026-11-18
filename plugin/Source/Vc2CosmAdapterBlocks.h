@@ -17,4 +17,6 @@ XtTvfBlock tvfBlockOf(const Vc2CosmBlockWords& b);
 XtCompBlock compBlockOf(const Vc2CosmBlockWords& b);
 XtLimBlock limBlockOf(const Vc2CosmBlockWords& b);
 XtFsBlock fsBlockOf(const Vc2CosmBlockWords& b);
+XtSbfBlock sbfBlockOf(const Vc2CosmBlockWords& b);   // v264, as those
+XtTbBlock tbBlockOf(const Vc2CosmBlockWords& b);     // v264, Vc2CosmTbAdapter.cpp
 } // namespace Vc2CosmAdapter

@@ -525,7 +525,9 @@ version against rom.4's routines with what it calls hooked:
        Amp and Speaker Simulators, the Resonator, the Dual Filter, the TVF, the Compressor, the Limiter, the Frequency
        Shifter and Lo-Fi: `Vc2CosmDsp`, one `XtCosmSection` a COSM (HARDWARE_FIRMWARE.md, "The VC-2's COSM DSP: the first
        twelve codes").
-     - next: the DSP of the Side Band Filters, the Growl, the Dynamic TVF and the TB Filter.
+     - done (v264): the DSP of the Side Band Filters, the Growl, the Dynamic TVF and the TB Filter, so every code a
+       converter gives has its sound; the rings' ends kept in the pools for the first Side Band Filter's early read
+       (HARDWARE_FIRMWARE.md, "The VC-2's COSM DSP: the last four types, and the pools' memory").
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

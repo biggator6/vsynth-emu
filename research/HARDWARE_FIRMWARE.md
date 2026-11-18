@@ -1546,6 +1546,44 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM DSP: the last four types, and the pools' memory (2026-11-18, v264) {#vc2-cosm-dsp-last}
+
+Step 4.2's COSM object, its eleventh part (research/VC2_MODE_PLAN.md). With the Side Band Filters (7, 8), the Growl (9), the Dynamic TVF (14) and the TB Filter (20), every code a converter gives has its sound. rom.4's routines for the Side Band Filters are rom.2's, instruction for instruction but for the addresses of three helpers, so XtCosm's laws stand. Every address is rom.4's, D is the object's +0x58.
+
+**What crosses from one COSM to another.** rom.4's delay lines are memory, not objects, and three things reach across them:
+
+1. *The first Side Band Filter's line 2 reads in front of its buffer.* When its delay × the Sub Detune passes 3267 the taps reach up to 136 floats before the buffer. Each pool's four arrays of 24 buffers lie end to end (3,267 floats a buffer; pool 0's arrays at `0x89e4b084`, `0x89e979a4`, `0x89ee42c4`, `0x89f30be4`, pool 1's from `0x89f7d504`), so:
+
+   | The line | What lies in front of it |
+   |---|---|
+   | Slot 1…23, buffer 1 or 3 | the end of the slot before's buffer 1 or 3 |
+   | Slot 0, buffer 1 | the end of slot 23's buffer 0, in the same pool |
+   | Slot 0, buffer 3 | the end of slot 23's buffer 2, in the same pool |
+
+   That memory can belong to any type's note, sounding or long finished. So after each render a COSM with a slot keeps its rings' last 136 floats in the pool (`Vc2CosmPools::keepEnd`), and a first Side Band Filter copies what lies in front of its lines from there before each block (`earlyOf`, `XtCosmSbf::setEarly`). XtCosm's own rings stay where they are; on the V-Synth the words stay 0, as before.
+2. *D+0x8c, +0x90 and +0x98 survive a note-on.* The stereo TB Filter's R stage starts from the first two (`XtCosmSection::holdWords`, as XtSynth does), and the Dynamic TVF's follower from the third, whatever the last note's type left there: the Amp's fourth slew, the Compressor's gain target, the Limiter's R gain (1 after a mono note), Lo-Fi's 2^Bit, the Dynamic TVF's level, the first Side Band Filter's Sub slew or the second's level. Before any note the words are the object's own.
+3. *The Growl's state is the object's words*, and its lines are cleared at each note-on, as the allocator clears the slot.
+
+**A pool with no free slot.** rom.4 doesn't test for it. The slot routine `0x893a8560` returns −1 and writes nothing; the allocator `0x893a8c50` stores the −1 at +0x144, copies four uninitialised words of its own stack to +0x60…+0x6c as buffer addresses, and clears 3,267 floats at each. The note-on, new block and DSP then run on those addresses, and the destructor frees nothing. On the XT that writes wherever the stale words point.
+
+It shouldn't arise. A tone's COSM 1 always gives pool 0 and COSM 2 pool 1, a COSM takes at most one slot per note, the tone's destructor (`0x893b2fc0`) frees it, and there are 24 tones to 24 slots a pool. That comes from reading the callers: the note object's constructor `0x89396520` makes the tone, `0x893965e0` is the only caller of the tone's note-on `0x893b3390`, and `0x89396590` ends the note, unmaking the tone or passing it to `0x893b3bc0`, which I did not read. I did not trace every path to `0x893965e0`, so this is reasoning and not a proof that a note object is never started twice.
+
+The check doesn't rest on that reasoning. It fills every slot and runs rom.4's own note-on, new block, updates, DSP and destructor on four drawn stale buffers with zeros in front of them. The port, with no slot, plays on its own cleared rings and reads zeros in front of its lines, and it gives rom.4's frames, state and rings bit for bit. If the stale words on a real XT pointed at live memory, or at nothing, rom.4 would overwrite it or fault; the port doesn't model that.
+
+**The check**, xt_vc2cosm's seventh part, now on all eighteen kinds with 150 events a case:
+- The slot a note takes is drawn: slot 0, slot 23, any slot, or none free.
+- The words in front of a slot's lines are noise on both sides, or what the last note left there. A *long note* renders 104 blocks so that its rings are written to their ends, and the next note is a first Side Band Filter in the next slot (slot 23's successor being slot 0), with a delay near the line's end.
+- A note-on's rings are compared as well, so a type that failed to clear them shows at once.
+- The first Side Band Filter's and second's blocks now carry the word their converters always write, 1 (+0x44, +0x40), which scales the DSP's gain.
+
+Results:
+- seed 2024, 40 cases, address and undefined-behaviour sanitizers on: 693 notes, 106 long, 59 on slot 0, 72 on stale ends, 28 with no slot, 14,894 renders, 299,963 state words, 1,928 rings; 0 different.
+- seeds 7 and 31337, 400 cases each: 6,654 and 6,563 notes, 533 and 503 on slot 0, 205 and 188 with no slot, 171,202 and 170,064 renders; 0 different.
+- Coverage: every line and function of Vc2CosmDsp.cpp and Vc2CosmPools.cpp. One region of Vc2CosmDsp.cpp is left, the new block's test of a code past 20, which no note reaches.
+- `mutate_vc2.py --cosm`: 1,439 plants, all caught, 91 more than v263's. The first full run missed 28, most of them because no note had yet written its rings' ends; the long notes and the steered next note are what catch them. Not planted, as no input tells them apart: the first filter's type number against the second's (5 and 6 play alike) and envelope A's rate into the Side Band Filters, which XtCosmSbf stores and never reads. `setEarly` is in a header, so its two calls are planted instead.
+- XtCosmSbf.h gains `setEarly` and makes `kGuard` public, and nothing else in XtCosm changes. fcheck's diff is xt_vc2cosm's `dsp:` line alone, so xt_cosm's and xt_tone's sections equal the baseline. `mutate_tone.py` at 2,000 cases: the six plants on XtCosmSbf's wiring and words caught, with the five others the same name search picked up.
+- verify.sh passes every line, and fcheck's keys test passes.
+
 ### The VC-2's COSM DSP: the first twelve codes (2026-11-18, v263) {#vc2-cosm-dsp}
 
 Step 4.2's COSM object, its tenth part (research/VC2_MODE_PLAN.md): the sound of a COSM by the code's byte, mono and stereo. Every address is rom.4's, D is the object's +0x58. rom.4 calls the routine its install `0x893aafe0` chose, stored at +0x148, as `routine(D, object + 0x10, object, frames)`, on 32 interleaved frames in the XT's units.

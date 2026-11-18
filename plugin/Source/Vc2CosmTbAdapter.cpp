@@ -1,6 +1,7 @@
 // The TB Filter's adapter (v255): its new block and note-on case over XtCosmTb on rom.4's object, see
 // Vc2CosmAdapters.h.  Its start values are an rts (0x893b9130).  Every address is rom.4's, every offset the object's.
 #include "Vc2CosmAdapters.h"
+#include "Vc2CosmAdapterBlocks.h"
 #include "XtCosm.h"
 #include <algorithm>
 #include <array>
@@ -56,6 +57,13 @@ void tbTargets(Vc2CosmTbWords& w) {
     lpfAndHpf(w.lpfTarget, w.hpfTarget, tb.target());
 }
 } // namespace
+
+// A converter's block as XtCosmTb's, from its words +4…+0x43 (v264, the DSP's)
+XtTbBlock Vc2CosmAdapter::tbBlockOf(const Vc2CosmBlockWords& b) {
+    std::array<uint32_t, 16> words;
+    std::copy_n(b.words, words.size(), words.begin());
+    return ::tbBlockOf(words);
+}
 
 // The new block (rom.2's 0x894fc110): the block's +4…+0x43 into the object's, rom.4's own, then XtCosmTb's targets
 void vc2CosmTbNewBlock(Vc2CosmNoteOn&, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {

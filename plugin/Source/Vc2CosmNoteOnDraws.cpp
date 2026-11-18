@@ -133,14 +133,18 @@ constexpr Vc2CosmWordRange kSbf2Ranges[] { { 2, -100.0f, 100.0f }, { 3, -1.0f, 1
                                            { 7, -1.0f, 1.0f }, { 8, 0.0f, 1.0f }, { 9, -1.0f, 1.0f },
                                            { 11, -1.0f, 1.0f }, { 13, -1.0f, 1.0f }, { 14, 0.5f, 1.0f } };
 void drawOctave(Vc2CosmBlockWords& b, std::mt19937& rng) { b.words[0] = (b.words[0] & 0xffffff00u) | (rng() % 3); }
+// [FW] each converter's last word, always 1: the DSP's gain is multiplied by it (v264)
+constexpr int kSbf1One = 16, kSbf2One = 15;
 void drawSbf1Block(Vc2CosmBlockWords& b, std::mt19937& rng) {
     drawOctave(b, rng);
     drawRanges(b, rng, kSbf1Ranges);
+    setBlockFloat(b, kSbf1One, 1.0f);
 }
 void drawSbf2Block(Vc2CosmBlockWords& b, std::mt19937& rng) {
     drawOctave(b, rng);
     drawRanges(b, rng, kSbf2Ranges);
     setBlockFloat(b, 1, (float)(rng() % 128) * 0.96875f / 127.0f - 1.0f);
+    setBlockFloat(b, kSbf2One, 1.0f);
 }
 
 // The Growl's converter: Intencity I/127, Speed 2·S/128 − 1, its two settings' depths and numbers

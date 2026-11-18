@@ -1,6 +1,7 @@
 #pragma once
 // The Side Band Filters, XtCosm's COSM types 6 and 7 (block codes 7 and 8): their parameters, block and object, moved
 // from XtCosm.h as they stood (v260); XtCosm.h includes this, and their code stays in XtCosm.cpp.
+#include <algorithm>
 #include <vector>
 
 // The Side Band Filters (COSM Types 6 and 7, block codes 7 and 8): the input
@@ -108,8 +109,12 @@ public:
     float octaveFactor() const { return oct; }       // D+0x9c
     float dcRate() const { return dcK; }             // D+0x38, R's D+0x70
 
-private:
+    // Line 2's taps reach up to kGuard words before its buffer.  The V-Synth's stay 0; the VC-2's are given what lies
+    // there in rom.4's memory, before each block (v264; i 1, R's 3, as `buffer`)
     static constexpr int kGuard = 136;
+    void setEarly(int i, const float* words) { std::copy_n(words, kGuard, (i == 1 ? buf2 : buf4).begin()); }
+
+private:
     XtSbfBlock blk;
     float detR = 1.0f, subR = 1.0f, hpfH = 0;        // the block copy's 1 − Detune/2400, 1 − Sub/2400, HPF/2
     float pitch = 1.0f, root = 440.0f, oct = 2.0f;
