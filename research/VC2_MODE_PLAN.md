@@ -521,7 +521,11 @@ version against rom.4's routines with what it calls hooked:
        adapters: the Side Band Filters").
      - done (v262): the update `0x893aa7d0`, `Vc2CosmNoteOn::update` and each type's case, a row's fifth part
        (HARDWARE_FIRMWARE.md, "The VC-2's COSM update").
-     - next (v263): the DSP by code, mono and stereo, over XtCosm's types and the Growl.
+     - done (v263): the DSP by code, mono and stereo, for Through and the twelve codes of OD/Dist, the Wave Shaper, the
+       Amp and Speaker Simulators, the Resonator, the Dual Filter, the TVF, the Compressor, the Limiter, the Frequency
+       Shifter and Lo-Fi: `Vc2CosmDsp`, one `XtCosmSection` a COSM (HARDWARE_FIRMWARE.md, "The VC-2's COSM DSP: the first
+       twelve codes").
+     - next: the DSP of the Side Band Filters, the Growl, the Dynamic TVF and the TB Filter.
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

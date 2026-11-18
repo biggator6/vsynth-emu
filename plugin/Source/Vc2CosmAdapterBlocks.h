@@ -13,4 +13,8 @@ XtResBlock resBlockOf(const Vc2CosmBlockWords& b);
 XtLofiBlock lofiBlockOf(const Vc2CosmBlockWords& b);
 XtDualBlock dualBlockOf(const Vc2CosmBlockWords& b);
 XtTvfBlock tvfBlockOf(const Vc2CosmBlockWords& b);
+// The buffered types' (v263; Vc2CosmBufferedAdapters.cpp)
+XtCompBlock compBlockOf(const Vc2CosmBlockWords& b);
+XtLimBlock limBlockOf(const Vc2CosmBlockWords& b);
+XtFsBlock fsBlockOf(const Vc2CosmBlockWords& b);
 } // namespace Vc2CosmAdapter

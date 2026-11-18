@@ -106,6 +106,9 @@ void drawTbBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
     b.words[15] = (b.words[15] & 0xffffff00u) | (rng() % 128);
 }
 
+// The Speaker Simulator's (v263): the Speaker Type 0…11, a byte
+void drawSpkBlock(Vc2CosmBlockWords& b, std::mt19937& rng) { b.words[0] = (b.words[0] & 0xffffff00u) | (rng() % 12); }
+
 // The Compressor's converter (v258): Attack and Sustain 0…1, the Level's gain 0…4
 constexpr Vc2CosmWordRange kCompRanges[] { { 0, 0.0f, 1.0f }, { 1, 0.0f, 1.0f }, { 2, 0.0f, 4.0f } };
 void drawCompBlock(Vc2CosmBlockWords& b, std::mt19937& rng) { drawRanges(b, rng, kCompRanges); }
@@ -160,10 +163,11 @@ struct Vc2CosmBlockDraw {
     uint8_t code;
     void (*draw)(Vc2CosmBlockWords& b, std::mt19937& rng);
 };
-constexpr std::array<Vc2CosmBlockDraw, 16> kBlockDraws { { { kOd, drawOdBlock },
+constexpr std::array<Vc2CosmBlockDraw, 17> kBlockDraws { { { kOd, drawOdBlock },
                                                            { kDs, drawOdBlock },
                                                            { kWs, drawWsBlock },
                                                            { kAmp, drawAmpBlock },
+                                                           { (uint8_t)kSpeaker, drawSpkBlock },
                                                            { kResonator, drawResBlock },
                                                            { kSbf1, drawSbf1Block },
                                                            { kSbf2, drawSbf2Block },
@@ -206,10 +210,14 @@ void vc2DrawNoteOnBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
     vc2DrawTypeWords(b, rng);
 }
 
-void vc2DrawPortedBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+void vc2DrawBlockOf(Vc2CosmBlockWords& b, int32_t code, std::mt19937& rng) {
     vc2CosmNoise(b, rng);
-    b.code = kPorted[rng() % kPorted.size()];
+    b.code = code;
     vc2DrawTypeWords(b, rng);
+}
+
+void vc2DrawPortedBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    vc2DrawBlockOf(b, kPorted[rng() % kPorted.size()], rng);
 }
 
 void vc2DrawTypeWords(Vc2CosmBlockWords& b, std::mt19937& rng) {

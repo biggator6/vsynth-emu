@@ -31,20 +31,13 @@ bool adapted(int32_t code) {
     return std::ranges::any_of(vc2CosmAdapterRows(), [code](const Vc2CosmTypeRow& r) { return r.code == code; });
 }
 
-// The bound words as the port reads them: the interpreter's, where the check drew them
-struct RamBound final : Vc2CosmBound {
-    explicit RamBound(Sh4& c) : cpu(c) {}
-    Sh4& cpu;
-    float word(uint32_t at) override { return std::bit_cast<float>(cpu.rd32(at)); }
-};
-
 struct NoteOnRig {
     explicit NoteOnRig(Vc2Fw& f) : fw(f) {}
     Vc2Fw& fw;
     Vc2CosmObjectWords o {};
     Vc2CosmBlockWords block {};
     Vc2CosmPools pools;
-    RamBound bound { fw.cpu };
+    Vc2CosmRamBound bound { fw.cpu };
     Vc2CosmNoteOn noteOn { pools, bound };
     std::vector<uint32_t> romDeletes, portDeletes;
     int32_t filled = -1;   // the slot the last note-on's noise went into, or −1

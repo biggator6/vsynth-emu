@@ -29,6 +29,9 @@ long vc2CosmObjectCases(Vc2Fw& fw, const Vc2Run& run);
 // The COSM note-on frame's cases (v250, Vc2CosmNoteOnCheck.cpp): rom.4's note-on, new block, destructor and pools and
 // the port's on the same object and pools; how many differ
 long vc2CosmNoteOnCases(Vc2Fw& fw, const Vc2Run& run);
+// The COSM DSP's cases (v263, Vc2CosmDspCheck.cpp): rom.4's own DSP routines and Vc2CosmDsp on the same notes, blocks,
+// updates and frames, the output and the state compared; how many differ
+long vc2CosmDspCases(Vc2Fw& fw, const Vc2Run& run);
 
 // An event of a part's table, each entry its share (v250: the object's part and the note-on's): counted, then run
 template <class Rig, size_t N>

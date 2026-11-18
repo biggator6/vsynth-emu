@@ -1,6 +1,7 @@
 // The Compressor's, Limiter's and Frequency Shifter's adapters: see Vc2CosmBufferedAdapters.h (v258).  Every address
 // is rom.4's, every offset the object's or its block's.
 #include "Vc2CosmBufferedAdapters.h"
+#include "Vc2CosmAdapterBlocks.h"
 #include "Vc2CosmAdapterWords.h"
 #include "XtFloat.h"
 #include <array>
@@ -49,12 +50,6 @@ constexpr Vc2CosmBlockFloats<XtFsBlock, 6> kFsFloats { { { 0, &XtFsBlock::depth 
                                                          { 6, &XtFsBlock::balanceEnv },
                                                          { 8, &XtFsBlock::balanceLfo } } };
 
-XtLimBlock limBlockOf(const Vc2CosmBlockWords& b) {
-    XtLimBlock x = floatsOf(b, kLimFloats);
-    x.ratio = static_cast<int8_t>(b.words[0]);
-    return x;
-}
-
 // A new block's two targets: the XtCosm class's setBlock on the held levels, its getters into the object's
 template <class C, class B>
 void targetsOn(C& cosm, const B& block, Vc2CosmObjectWords& o, float (C::*first)() const, float (C::*second)() const) {
@@ -101,6 +96,14 @@ void sbfNoteOn(XtCosmSbf& sbf, Vc2CosmNoteOn& n, const Vc2CosmObjectWords& o, co
 
 void floatInto(Vc2CosmObjectWords& o, size_t at, float v) { floatsInto(o, at, &v, 1); }
 } // namespace
+
+XtCompBlock Vc2CosmAdapter::compBlockOf(const Vc2CosmBlockWords& b) { return floatsOf(b, kCompFloats); }
+XtFsBlock Vc2CosmAdapter::fsBlockOf(const Vc2CosmBlockWords& b) { return floatsOf(b, kFsFloats); }
+XtLimBlock Vc2CosmAdapter::limBlockOf(const Vc2CosmBlockWords& b) {
+    XtLimBlock x = floatsOf(b, kLimFloats);
+    x.ratio = static_cast<int8_t>(b.words[0]);
+    return x;
+}
 
 // The start values: the delay from Detune and the note's pitch, and the Width, into the object's two values
 void vc2CosmSbfStartValues(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {

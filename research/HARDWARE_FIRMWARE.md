@@ -1546,6 +1546,40 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM DSP: the first twelve codes (2026-11-18, v263) {#vc2-cosm-dsp}
+
+Step 4.2's COSM object, its tenth part (research/VC2_MODE_PLAN.md): the sound of a COSM by the code's byte, mono and stereo. Every address is rom.4's, D is the object's +0x58. rom.4 calls the routine its install `0x893aafe0` chose, stored at +0x148, as `routine(D, object + 0x10, object, frames)`, on 32 interleaved frames in the XT's units.
+
+**The port:** `Vc2CosmDsp` holds one `XtCosmSection` a COSM, as XtSynth does for the V-Synth (the VC-2 session's choice, 2026-11-18), so each DSP law stays in one place and XtCosm is unchanged. A table of rows, `Vc2CosmDspRow`, gives each code its XtCosm type and what its object does at the frame's note-on, new block and update, from the levels the frame holds (`Vc2CosmDspLevels`). All the objects are made once, with the COSM: about 160 KB each, about 7.5 MB for 48 COSMs, and nothing allocates on the audio thread.
+
+| Code | Type | Code | Type |
+|---|---|---|---|
+| 0 | Through (no row: the frames pass as they came) | 6 | Resonator |
+| 1, 2 | OD/Dist | 12 | Dual Filter |
+| 3 | Wave Shaper | 13 | TVF |
+| 4 | Amp Simulator | 15, 16 | Compressor, Limiter |
+| 5 | Speaker Simulator | 18, 19 | Frequency Shifter, Lo-Fi |
+
+Every one of these routines gives rom.4's frames and state through rom.2's law, so none had to be ported from rom.4 as the Growl was.
+
+**Not here yet:** the Side Band Filters (7, 8), the Growl (9), the Dynamic TVF (14) and the TB Filter (20). Until they have rows, those codes render as Through. The Dynamic TVF's follower (D+0x98) and the TB Filter's words (D+0x8c, +0x90) carry across notes, and the Growl's lines live in `Vc2CosmNoteOn`.
+
+**The buffers.** rom.4's belong to pool slots, not to COSMs, so per-COSM buffers hold only if nothing an earlier user of the slot left there can be read:
+- Codes 7…10 and 15…18 take a slot, and the note-on (the allocator `0x893a8c50`) clears all four of its 3267-float buffers each time.
+- The Compressor, the Limiter and the Frequency Shifter stay inside those buffers. The check puts noise in the slot before each note-on and compares the rings with XtCosm's, so per-COSM buffers are equivalent for these three.
+- **The Side Band Filters are different.** Their second line can read up to 136 samples before its buffer, in the neighbouring slot's memory, which this note-on doesn't clear. XtCosmSbf reads zeros there (`kGuard`). Their DSP needs its own decision when it comes.
+- A note-on that gets no slot isn't drawn: the tone passes pool 0 or 1 alone, and each pool's 24 slots serve the 24 tones, so a COSM always finds one.
+
+**The check**, xt_vc2cosm's seventh part (`Vc2CosmDspCheck.cpp`): rom.4's own note-on, install, new block, update and DSP routines against the port's, nothing hooked. Each case runs 60 events on one object: renders at peaks from 1 to 2.1e9, updates with a drawn pitch and new bound levels, new blocks (one in four of another type's code, which rom.4 leaves alone), and new notes after the destructor, so a note follows another type on the same object. After each, the frames, the state through XtCosm's getters against rom.4's D words, and now and then the rings against the slot's buffers. The envelopes' rates are drawn as an envelope gives them, 0.2…1 of 1/32: the DSP's values step by 4 × the rate, and diverge past it.
+
+Results:
+- seed 2024, 40 cases, address and undefined-behaviour sanitizers on: 221 notes, 1,596 renders, 370 updates, 213 new blocks, 31,390 state words, 35 rings; 0 different.
+- seeds 7 and 31337, 400 cases each: 2,347 and 2,404 notes, 15,794 and 15,656 renders, 321,281 and 321,189 state words; 0 different.
+- Coverage: every line, region and function of Vc2CosmDsp.cpp and the two adapter files it changed.
+- `mutate_vc2.py --cosm`: 1,348 plants, all caught, 75 of them new. Not planted, as no input tells them apart: the new block's test of a code past 20 (no such note reaches a type with a row).
+- XtCosm is unchanged. fcheck's diff is xt_vc2cosm's own: the new `dsp:` line, and the `note-on:` line, as that part's draws now give the Speaker Simulator's block its real Types.
+- verify.sh passes every line, and fcheck's keys test passes.
+
 ### The VC-2's COSM update (2026-11-18, v262) {#vc2-cosm-update}
 
 Step 4.2's COSM object, its ninth part (research/VC2_MODE_PLAN.md): the update `0x893aa7d0(obj, pitch in fr4)`, which runs every 10 ms on a sounding COSM. Every address is rom.4's, every offset the object's or its block's.
