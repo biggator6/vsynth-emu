@@ -37,7 +37,7 @@ float vc2OscBounded(float x, Vc2OscBounds b) {
 
 float vc2OscPitchSum(const Vc2OscVoice& v, Vc2OscParts& p) {
     float x = add(mul(bind(v, p, kPitchEnvelopeBind, kEnvelopeOut), v.f32(kPitchDepth)), v.f32(kPitch));
-    x = add(mul(p.vibratoPitch(), v.f32(kVibratoDepth)), x);
+    x = add(mul(v.vibrato.w.pitch, v.f32(kVibratoDepth)), x);
     x = add(x, v.ramps[Vc2OscVoice::kPitchRamp].value());
     return add(x, v.tail.offset);
 }
@@ -97,7 +97,7 @@ float Vc2OscTargets::formant() const {
     return mul(v_.tail.formantFactor, r);
 }
 
-float Vc2OscTargets::levelOne() const { return add(mul(p_.vibratoLevel(), v_.f32(kLevelDepth)), 1.0f); }
+float Vc2OscTargets::levelOne() const { return add(mul(v_.vibrato.w.level, v_.f32(kLevelDepth)), 1.0f); }
 
 float Vc2OscTargets::gain() const {
     const float g = mul(mul(levelOne(), v_.f32(kLevel)), v_.f32(kGain));

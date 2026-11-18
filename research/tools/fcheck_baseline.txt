@@ -787,9 +787,10 @@ xt_vc2tone: 0 different
 == xt_vc2osc
 ramp: 40 cases, 12000 events: 986 built, 1873 started, 943 restarted, 891 legato updates, 4608 ticks (416 gliding, 772 at an end), 1857 values
 vari off: 40 cases, 2400 blocks (1201 mono, 1199 stereo, 361 of them folded; 254 silent, 807 loops, 1339 turning; 714 with the loop past the last sample)
-osc: 40 cases, 16000 events, 2459 note-ons (374 with a sample, 1222 without), 1695 updates, 1723 renders, 879 settings, 851 takes, 3307 getters
-kinds 5 and 6: 202 carriers started, 193 carrier blocks, 93 carrier settings, 185 kind 6 starts, 188 kind 6 blocks; 380 of the blocks sounding, 0 not finite
-calls: 295 seeks, 1604 kinds' routines, 108 event lookups, 399 object setups; 2842 ramps gliding after an event
+vibrato: 40 cases, 12000 events, 8280 updates (4378 falling, 4099 with a pitch)
+osc: 40 cases, 16000 events, 2548 note-ons (397 with a sample, 1265 without), 1668 updates, 1672 renders, 828 settings, 829 takes, 3413 getters
+kinds 5 and 6: 219 carriers started, 174 carrier blocks, 92 carrier settings, 226 kind 6 starts, 181 kind 6 blocks; 352 of the blocks sounding, 0 not finite
+calls: 331 seeks, 1733 kinds' routines, 135 event lookups, 413 object setups; 2633 ramps gliding after an event
 xt_vc2osc: 0 different
 == xt_vc2tva
 tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fading, 961 fades ended, 559 told), 88 over, 200 silent

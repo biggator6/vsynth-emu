@@ -15,7 +15,6 @@ int voiceOwning(uint32_t at, uint32_t offset) {
     const bool one = from % kOscVoiceStride == 0 && from / kOscVoiceStride < (uint32_t)kOscVoices;
     return one ? (int)(from / kOscVoiceStride) : -1;
 }
-uint32_t asIs(uint32_t x) { return x; }
 uint32_t settingsOffset(uint32_t at) { return at - kOscSettingsAt; }
 uint32_t outOf(uint32_t at) { return at == kOscOutAt ? 1 : kOscOther; }
 uint8_t byteAt(Sh4& cpu, uint32_t at) {
@@ -24,18 +23,8 @@ uint8_t byteAt(Sh4& cpu, uint32_t at) {
     return b;
 }
 
-// How a hooked routine's arguments read into its call, one shape each: the voice's part at `Offset` in r4 and r5 read
+// How a hooked routine's arguments read into its call, one shape each
 void self(Sh4& c, OscCall& t, uint32_t) { t.voice = voiceOwning(c.r[4], 0); }
-template <uint32_t Offset, uint32_t (*Read)(uint32_t)>
-void partAnd(Sh4& c, OscCall& t, uint32_t) {
-    t.voice = voiceOwning(c.r[4], Offset);
-    t.a = Read(c.r[5]);
-}
-template <uint32_t Offset>
-void partWord(Sh4& c, OscCall& t, uint32_t) {   // the voice's part at `Offset` and a word of the voice in r5
-    t.voice = voiceOwning(c.r[4], Offset);
-    t.a = c.r[5] - (c.r[4] - Offset);
-}
 void routine(Sh4& c, OscCall& t, uint32_t at) {
     self(c, t, at);
     t.a = at;
@@ -93,15 +82,12 @@ struct OscHook {
     void (*decode)(Sh4&, OscCall&, uint32_t);
     uint32_t (*answer)(Sh4&, const OscDraws&);
 };
-constexpr auto withN = partAnd<0, asIs>;
-constexpr auto withSettings = partAnd<0, settingsOffset>;
 // [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run), LITE's
 // and VariPhrase's installs and VariPhrase's note-on (v238), LITE's note-on (v240), the analog's (v242) and its sub
-// oscillator's (v244) with its shape (v246), the analog's install, update and settings (v248), and the carrier's init,
-// settings and render and kind 6's start and render (v266): rom.4's own run, and the routines they call hooked
+// oscillator's (v244) with its shape (v246), the analog's install, update and settings (v248), the carrier's init,
+// settings and render and kind 6's start and render (v266) and the vibrato's four (v267): rom.4's own run, and the
+// routines they call hooked
 const OscHook kHooks[] = {
-    { 0x893b29b0, kBuildVibrato, self, none }, { 0x893b2c10, kUpdateVibrato, withN, none },
-    { 0x893b2b70, kSetVibrato, withSettings, none }, { 0x893b29e0, kNoteOnVibrato, partWord<0>, none },
     { 0x893c8280, kKindCall, kindRoutine, none }, { 0x893c88b0, kKindCall, kindRoutine, none },
     { 0x893afff0, kKindCall, kindRoutine, none }, { 0x893c6260, kKindCall, kindRoutine, none },
     { 0x893b0150, kKindCall, kindRoutine, none },

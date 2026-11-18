@@ -29,10 +29,7 @@ inline constexpr uint32_t kOscBlockWords = Vc2OscVoice::kBlockBytes / 4, kOscOth
 inline constexpr uint32_t kOscKindPAt = 0x8C05f000;      // P as a case's start gives the carrier and kind 6 (v266)
 inline constexpr uint32_t kOscMicAt = 0x8C05f800;        // a block of the mic on its way into the ring (v266)
 
-enum OscKind : int32_t {
-    kBuildVibrato, kUpdateVibrato, kSetVibrato, kNoteOnVibrato, kKindCall, kKindSettings, kRenderBy, kSeek, kObjectCall,
-    kEventPosition,
-};
+enum OscKind : int32_t { kKindCall, kKindSettings, kRenderBy, kSeek, kObjectCall, kEventPosition };
 
 // A call as either side made it: what, on which voice, and its arguments (a ramp's number, counts, floats' bits, a
 // routine's address, a settings word's offset in the settings' block or a word's in the voice, the output as 1, a
@@ -67,11 +64,10 @@ void oscFindZeroTunes(Vc2Fw& fw, OscRecords& r);
 // within an octave, so the note-on's root Hz is finite and above 0
 void oscRealWave(OscRecords& r, int k, std::mt19937& rng);
 
-// What the hooked routines answer, drawn once for both sides; the vibrato's two outputs, read in place; the flags byte
-// a seek leaves in the object (a player may write it); the event lookup's positions, each side taking the next (v238).
-// The ramps are the voice's own from v236
+// What the hooked routines answer, drawn once for both sides; the flags byte a seek leaves in the object (a player may
+// write it); the event lookup's positions, each side taking the next (v238).  The ramps are the voice's own from v236,
+// the vibrato from v267
 struct OscDraws {
-    float vibratoPitch = 0.0f, vibratoLevel = 0.0f;
     uint32_t rendered = 0;
     uint8_t seekFlags = 0;
     std::array<int32_t, 3> positions {};
@@ -98,12 +94,6 @@ struct OscShared {
 class OscPortParts final : public Vc2OscParts {
 public:
     OscPortParts(int voice, OscShared& shared, Vc2OscVoice& self) : voice_(voice), s_(shared), self_(self) {}
-    void buildVibrato() override { log(kBuildVibrato); }
-    void updateVibrato(int32_t n) override { log(kUpdateVibrato, (uint32_t)n); }
-    void setVibrato(const uint32_t* settings) override { log(kSetVibrato, offsetOf(settings)); }
-    void noteOnVibrato(const uint8_t* block) override { log(kNoteOnVibrato, wordOf(block)); }
-    float vibratoPitch() override { return s_.draws.vibratoPitch; }
-    float vibratoLevel() override { return s_.draws.vibratoLevel; }
     void kindCall(uint32_t routine) override {   // with the pitch ramp's value and factor, as rom.4's hook logs them
         const Vc2RampWords& pitch = self_.ramps[Vc2OscVoice::kPitchRamp].w;
         log(kKindCall, routine, std::bit_cast<uint32_t>(pitch.value), std::bit_cast<uint32_t>(pitch.factor));
@@ -126,7 +116,6 @@ private:
         s_.calls.push_back({ kind, voice_, a, b, c });
     }
     uint32_t offsetOf(const uint32_t* p) const { return (uint32_t)(p - s_.settings.data()) * 4; }
-    uint32_t wordOf(const uint8_t* p) const { return (uint32_t)(p - self_.own.data()) + Vc2OscVoice::kOwn; }
     uint32_t outOf(const float* p) const { return p == s_.out.data() ? 1 : kOscOther; }
     int voice_;
     OscShared& s_;

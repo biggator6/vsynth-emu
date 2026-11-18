@@ -25,7 +25,7 @@ using Answer = OscAnswer;
 
 std::string onConstruct(OscSides& s, std::mt19937&, int v) {
     return oscBothSides(s, kConstruct, { oscVoiceAt(v) }, Answer::r0, [&] {
-        s.voices[(size_t)v].construct(s.parts[(size_t)v]);
+        s.voices[(size_t)v].construct();
         return oscVoiceAt(v);   // the constructor answers its voice
     });
 }
@@ -56,6 +56,8 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     // them, as a note-on's are (noise there could be NaNs, whose FTRC and difference the interpreter takes otherwise)
     if (rng() % 4 == 0) oscMakeAnalog(s, rng, v);
     else oscSteerAnalog(s, rng, v);
+    oscHoldVibrato(s.voices[(size_t)v].vibrato.w, (int16_t)n);   // v267: a count this long can't overshoot its fade
+    oscWriteVoice(s, v);
     ++s.n.updates;
     return oscBothSides(s, kUpdate, { oscVoiceAt(v), n }, Answer::none, [&] {
         s.voices[(size_t)v].update((int32_t)n, s.parts[(size_t)v], s.romShared);
@@ -88,6 +90,7 @@ std::array<uint32_t, kOscBlockWords> drawNoteBlock(std::mt19937& rng) {
         for (const auto& [at, bits] : oscAnalogWords(rng)) b[(at - Vc2OscVoice::kOwn) / 4] = bits;
     }
     if (oscIsVoiced(b[kKindWord])) oscDrawVoicedWords(b, rng, Vc2OscVoice::kOwn);   // v266: as a note gives them
+    oscDrawVibratoBlock(b, rng);                                                     // v267: the same
     return b;
 }
 
@@ -115,7 +118,10 @@ std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
     const uint32_t kind = block[kKindWord];
     s.n.sampled += kind == 1 || kind == 2;
     s.n.plain += kind != 1 && kind != 2;
-    if (oscIsVoiced(kind)) oscTameVibrato(s, rng);   // v266: the gain they reach
+    if (oscIsVoiced(kind)) {   // v266: the level reaches their gains
+        s.voices[(size_t)v].vibrato.w.level = 2.0f * vc2Unit(rng) - 1.0f;
+        oscWriteVoice(s, v);
+    }
     s.n.carrierStarts += kind == kCarrierKind;
     s.n.kind6Starts += kind == kKind6Kind;
     return oscBothSides(s, kNoteOn, { oscVoiceAt(v), kOscBlockAt, legato }, Answer::none, [&] {
@@ -156,6 +162,7 @@ std::string onSettings(OscSides& s, std::mt19937& rng, int v) {
     auto* bytes = reinterpret_cast<uint8_t*>(s.shared.settings.data());
     if (rng() % 2) bytes[4] = s.voices[(size_t)v].u8(0x58);   // the byte +4 as the voice holds it, half the time
     oscDrawVoicedSettings(s.shared.settings, rng);            // v266: the carrier's levels among them, as a note's
+    oscDrawVibratoBlock(s.shared.settings, rng);              // v267: the vibrato's rate and biases
     s.fw.cpu.write(kOscSettingsAt, s.shared.settings.data(), sizeof s.shared.settings);
     ++s.n.settings;
     s.n.carrierSettings += s.voices[(size_t)v].kind() == kCarrierKind;

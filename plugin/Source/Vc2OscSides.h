@@ -51,6 +51,9 @@ void oscDrawVoicedSettings(std::span<uint32_t> settings, std::mt19937& rng);
 
 enum class OscAnswer : uint8_t { none, r0, fr0 };
 
+// A float drawn evenly in [lo, hi) (v267: kinds 5 and 6's draws, and the vibrato's)
+inline float oscWithin(std::mt19937& rng, float lo, float hi) { return lo + (hi - lo) * vc2Unit(rng); }
+
 // rom.4's `routine` on `args`, then the port's `mine()` (giving its answer's bits), then what differs, the answers
 // compared as `how` says; a difference names the routine (v248)
 template <class Mine>
@@ -100,10 +103,13 @@ void oscMakeAnalog(OscSides& s, std::mt19937& rng, int v);
 float oscDrawPosition(std::mt19937& rng);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same
 void oscWriteVoice(OscSides& s, int v);
-// The vibrato's two outputs as drawn, into voice `v` in rom.4's memory; and drawn again within ±1 for kinds 5 and 6,
-// whose gains they reach, on both voices (v266)
-void oscWriteVibrato(OscSides& s, int v);
-void oscTameVibrato(OscSides& s, std::mt19937& rng);
+// v267 (Vc2OscVibratoCheck.cpp): the vibrato against rom.4's own, before any hook; its words as a note leaves them; its
+// block drawn into a note-on's or the settings' words, or onto a voice's; its fade's rates held for a count of `n`
+void oscVibratoPart(Vc2Fw& fw, const Vc2Run& run, Vc2Tally& tally);
+void oscDrawVibratoWords(Vc2VibratoWords& w, std::mt19937& rng);
+void oscDrawVibratoBlock(std::span<uint32_t> words, std::mt19937& rng);
+void oscDrawVibratoVoice(Vc2OscVoice& o, std::mt19937& rng);
+void oscHoldVibrato(Vc2VibratoWords& w, int32_t n);
 // The ramp part (v236, Vc2RampCheck.cpp): the pitch ramp against rom.4's own, before the voice part hooks anything;
 // its cases counted in `tally`, its counts printed
 void oscRampPart(Vc2Fw& fw, const RomShared& shared, const Vc2Run& run, Vc2Tally& tally);

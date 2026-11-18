@@ -44,8 +44,8 @@ float installedOf(int which, const Vc2OscTables& t) {
 }
 } // namespace
 
-void Vc2OscVoice::construct(Vc2OscParts& parts) {
-    parts.buildVibrato();
+void Vc2OscVoice::construct() {
+    vibrato.build();
     for (size_t ramp = 0; ramp < ramps.size(); ++ramp) ramps[ramp].construct(kRampTypes[ramp]);
     tail.sync = 0;
     tail.flag = 0;
@@ -69,7 +69,7 @@ void Vc2OscVoice::install(Vc2OscParts& parts) {
 void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& shared) {
     if (kind() == 0) return;
     const int32_t n16 = (int16_t)n;
-    parts.updateVibrato(n16);
+    vibrato.update(n16);
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
     if (row.waits && tail.seekPending != 0) {
         if (f32(kLevel) > vc2OscTables().waitLevel) return;

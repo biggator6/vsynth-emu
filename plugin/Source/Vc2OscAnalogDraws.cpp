@@ -102,6 +102,26 @@ void steerSub(Vc2OscVoice& o, std::mt19937& rng) {
         o.setF32(kPhase, -vc2Unit(rng));
     }
 }
+
+// v267: one time in two the sub oscillator off, whose note-on otherwise takes the place of LA's, and Fat alone and well
+// below 0, which makes the LA phases' Fat term large: the phase then passes 1, where the note-on sets it to 0.  The
+// moderate draws reached that about once in 40 cases, too rarely to rely on
+void steerLaPhase(Vc2OscVoice& o, std::mt19937& rng) {
+    constexpr uint32_t kSubOn = 0x138, kFat = 0x108, kFatEnvelope = 0x10c, kFatLfo = 0x114;   // [FW] the block's words
+    if (rng() % 2) return;
+    o.setF32(kSubOn, 0.0f);
+    o.setF32(kFat, -4.0f - 8.0f * vc2Unit(rng));
+    for (uint32_t at : { kFatEnvelope, kFatLfo }) o.setF32(at, 0.0f);
+}
+
+// v267: one time in six an LA code with the sub oscillator off, so that LA's own note-on comes up in every run; with the
+// sub on it would need steerSubFat's Fat, which these words weren't drawn with
+void steerLaCode(Vc2OscVoice& o, std::mt19937& rng) {
+    constexpr uint32_t kCode = 0x104, kSubOn = 0x138, kLaFirst = 9, kLaCodes = 2;   // [FW]
+    if (rng() % 6 != 0) return;
+    o.setU32(kCode, kLaFirst + (uint32_t)rng() % kLaCodes);
+    o.setF32(kSubOn, 0.0f);
+}
 } // namespace
 
 // v242: kind 3's, the analog's, block words drawn; a pitch near the root half the time, then half of those SQUARE
@@ -122,9 +142,11 @@ void oscSteerAnalog(OscSides& s, std::mt19937& rng, int v) {
     }
     oscAnalogObject(o, rng);
     steerSub(o, rng);
+    steerLaCode(o, rng);
     if (o.u32(kCode) - kLaFirst < 2 && rng() % 2) {
         o.setF32(kImpact, 0.5f * vc2Unit(rng));
         o.setF32(kUnwritten, 2.0f + 100.0f * vc2Unit(rng));
+        steerLaPhase(o, rng);
     }
     if (o.u32(kCode) == kNoise && rng() % 4 == 0) o.setF32(kPw, NAN);
     oscWriteVoice(s, v);

@@ -158,8 +158,20 @@ constexpr Vc2Span kShapeToneKf { 0x89560064, 15 };
 // [FW] the analog's installs' floats by code (v248): the install's, the sub oscillator's install's
 constexpr Vc2Span kAnalogInstalled { 0x895422f8, kVc2AnalogCodes }, kSubInstalled { 0x89542324, kVc2AnalogCodes };
 
+// [FW] the vibrato's (v267): the three its static initializer 0x893b2d60 stores, then its routines' own pool words
+auto vibratoWords(Vc2OscVibratoPool& v) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x893b2d90, &v.stepPerRate }, { 0x893b2d98, &v.scaleDown }, { 0x893b2d9c, &v.scaleUp },
+        { 0x893b2bf4, &v.glide }, { 0x893b2bf8, &v.stepMost }, { 0x893b2bfc, &v.riseTen }, { 0x893b2c00, &v.fallShort },
+        { 0x893b2d80, &v.fallTen }, { 0x893b2d84, &v.phaseTop }, { 0x893b2d88, &v.phaseBack },
+        { 0x893b2d8c, &v.perStep },
+    });
+}
+
 struct Read : Vc2OscTables {
     bool read(Sh4& image) {
+        vc2ReadPool(image, vibratoWords(vibrato));
+        vc2ReadFloats(image, { kVc2VibratoWavesAt, (int)vibrato.waves.size() }, vibrato.waves.data());
         vc2ReadPool(image, oscWords(*this));
         vc2ReadFloats(image, kLiteInstalled, liteInstalled.data());
         vc2ReadFloats(image, kVariInstalled, variInstalled.data());

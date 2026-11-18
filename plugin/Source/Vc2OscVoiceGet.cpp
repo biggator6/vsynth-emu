@@ -34,7 +34,9 @@ void Vc2OscVoice::settings(const uint32_t* s, Vc2OscParts& parts, const Vc2ToneS
         // [FW] the pitch's ramp again (the pool word 0x893ae90c holds its restart, 0x893b0f20)
         if (vc2OscKindRow(kind()).ramp) ramps[kPitchRamp].restart(f32(kRampFr4), f32(kRampFr5), shared);
     }
-    parts.setVibrato(s + kVibratoFrom / 4);
+    Vc2VibratoBlock rates;
+    std::memcpy(&rates, s + kVibratoFrom / 4, sizeof rates);
+    vibrato.settings(rates);
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
     if (row.settingsWay == Vc2OscSettings::analog) settingsAnalog(s + kKindFrom / 4);   // v248
     else if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);

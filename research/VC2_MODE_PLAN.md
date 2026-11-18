@@ -421,6 +421,9 @@ version against rom.4's routines with what it calls hooked:
      - the input stage's unvoiced decision for the block (`Vc2OscParts::unvoiced`, `0x899d99dc`), and the OS's
        millisecond word (`Vc2OscParts::osClock`, `0x893018d0`), where a carrier's phase starts.
      - kind 6's update `0x893b0150`, which ends in the setter `0x893ec790` (`Vc2Kind6::set`), also by its address still.
+   - done (v267): the vibrato, `Vc2OscVibrato`, on the voice's first 0x54 bytes: the build `0x893b29b0`, the note-on
+     `0x893b29e0`, the settings `0x893b2b70` and the update `0x893b2c10`, rom.4's own (rom.2 has no such routine), against
+     rom.4's in xt_vc2osc's vibrato part and in the voice, its hooks gone (HARDWARE_FIRMWARE.md, "The VC-2's OSC vibrato").
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
      update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its

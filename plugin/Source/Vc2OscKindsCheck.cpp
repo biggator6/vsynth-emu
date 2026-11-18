@@ -27,26 +27,24 @@ constexpr std::array<uint32_t, 5> kCarrierLevels { 0x110, 0x114, 0x118, 0x11c, 0
 constexpr uint32_t kSettingsWordsBelow = 0x54;   // [FW] a voice's word lies this far above its place in the settings
 constexpr float kFormantDepth = 0.001f;          // with an output of up to ±1000, an octave of the formant
 
-float within(std::mt19937& rng, float lo, float hi) { return lo + (hi - lo) * vc2Unit(rng); }
-
 // The words as a note gives them, each put at its voice offset
 template <class Put>
 void drawNoteWords(Put put, std::mt19937& rng) {
-    put(kRatioScale, within(rng, 0.5f, 2.0f));
+    put(kRatioScale, oscWithin(rng,0.5f, 2.0f));
     put(kLevel, vc2Unit(rng));
     put(kGain, vc2Unit(rng));
-    put(kLevelDepth, within(rng, -1.0f, 1.0f));
+    put(kLevelDepth, oscWithin(rng,-1.0f, 1.0f));
     put(kKind6Level, vc2Unit(rng));
-    put(kFormantBase, within(rng, -1.0f, 1.0f));
-    put(kFormantEnvelope, within(rng, -kFormantDepth, kFormantDepth));
-    put(kFormantLfo, within(rng, -kFormantDepth, kFormantDepth));
+    put(kFormantBase, oscWithin(rng,-1.0f, 1.0f));
+    put(kFormantEnvelope, oscWithin(rng,-kFormantDepth, kFormantDepth));
+    put(kFormantLfo, oscWithin(rng,-kFormantDepth, kFormantDepth));
     for (uint32_t at : kCarrierLevels) put(at, vc2DrawLevel(rng));
 }
 
 Vc2CarrierParams drawCarrierP(std::mt19937& rng) {
     Vc2CarrierParams p {};
     p.gain = vc2Unit(rng);
-    p.pitch = within(rng, 0.25f, 4.0f);
+    p.pitch = oscWithin(rng,0.25f, 4.0f);
     for (float* level : { &p.sawCutoff, &p.sawLevel, &p.noiseLowpass, &p.noiseHighpass, &p.noiseLevel }) {
         *level = vc2DrawLevel(rng);
     }
@@ -54,14 +52,14 @@ Vc2CarrierParams drawCarrierP(std::mt19937& rng) {
 }
 
 Vc2Kind6Params drawKind6P(std::mt19937& rng) {
-    return { within(rng, 0.25f, 4.0f), within(rng, 0.5f, 2.0f), vc2Unit(rng), vc2Unit(rng) };
+    return { oscWithin(rng,0.25f, 4.0f), oscWithin(rng,0.5f, 2.0f), vc2Unit(rng), vc2Unit(rng) };
 }
 
 // A block of the mic into the ring on both sides, with the tracker's period and the unvoiced decision for it
 std::string writeMic(OscSides& s, std::mt19937& rng) {
     std::array<float, Vc2Kind6::kBlock> mic {};
     const float level = vc2Unit(rng);
-    for (float& x : mic) x = within(rng, -level, level);
+    for (float& x : mic) x = oscWithin(rng,-level, level);
     const float period = vc2DrawPeriod(rng);
     s.fw.cpu.write(kOscMicAt, mic.data(), sizeof mic);
     s.fw.cpu.write(kPeriodAt, &period, sizeof period);
@@ -129,8 +127,8 @@ std::string oscKindsCase(OscSides& s, std::mt19937& rng) {
 void oscDrawVoicedVoice(Vc2OscVoice& o, std::mt19937& rng) {
     if (!oscIsVoiced(o.kind())) return;
     drawNoteWords([&](uint32_t at, float x) { o.setF32(at, x); }, rng);
-    o.tail.rateRatio = within(rng, 0.5f, 2.0f);
-    o.tail.formantFactor = within(rng, 0.5f, 2.0f);
+    o.tail.rateRatio = oscWithin(rng,0.5f, 2.0f);
+    o.tail.formantFactor = oscWithin(rng,0.5f, 2.0f);
 }
 
 void oscDrawVoicedWords(std::span<uint32_t> words, std::mt19937& rng, uint32_t below) {

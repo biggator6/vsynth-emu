@@ -14,11 +14,12 @@ constexpr uint32_t kObjectPitch = 0x1cc, kObjectGain = 0x1dc, kObjectLevel = 0x1
 constexpr uint32_t kP = 0x104, kP4 = 0x108, kP8 = 0x10c, kPc = 0x110, kKind6Level = 0x6c;
 constexpr uint32_t kVibratoBlock = 0xd4;   // [FW] the block's +0x80: what the vibrato's note-on is given
 
-// P's words as the carrier's init or kind 6's start reads them (v266)
+// The voice's words at `offset` as a part reads them: P for the carrier's init and kind 6's start (v266), the block's
+// +0x80 for the vibrato's note-on (v267)
 template <class Params>
-Params paramsOf(const Vc2OscVoice& v) {
+Params paramsOf(const Vc2OscVoice& v, uint32_t offset = kP) {
     Params p;
-    std::memcpy(&p, v.at(kP), sizeof p);
+    std::memcpy(&p, v.at(offset), sizeof p);
     return p;
 }
 } // namespace
@@ -52,5 +53,5 @@ void Vc2OscVoice::kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
             kind6.setAndStart(parts.micRing(), paramsOf<Vc2Kind6Params>(*this));   // 0x893ec700
             break;
     }
-    parts.noteOnVibrato(at(kVibratoBlock));
+    vibrato.noteOn(paramsOf<Vc2VibratoBlock>(*this, kVibratoBlock));
 }
