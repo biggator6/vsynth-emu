@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's COSM adapter for Lo-Fi v253 (2026-11-17, on its own branch after v252; the VC-2 session's choice (a);
+  HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: Lo-Fi"). XtCosmLofi moved out of XtCosm.h (964 lines) as it
+  stood into XtCosmLofi.h, as its own step, then four const getters for the words its new block forms (the mask,
+  1/2^Rate, 2^Bit, 2^−Bit); xt_cosm's and xt_tone's fcheck sections equal the baseline. Vc2CosmAdapters: Lo-Fi's row
+  (0x893a8bb0, 0x893a9ed0), the Resonator's and Lo-Fi's parts one template, Vc2CosmPairType. xt_vc2cosm's new blocks
+  draw their words for the code they're given (vc2DrawTypeWords): rom.4 indexes Lo-Fi's tables unclamped. 0 different
+  at seeds 2024, 7 and 31337. mutate_vc2.py --cosm: 908 plants (51 new or rewritten), all caught; mutate_tone.py's
+  Lo-Fi plants (four new, tonecosm): 11 of 11; the four under xt_cosm by hand, 4 of 4. Not in the sound yet.
+
 The VC-2's COSM adapters v252 (2026-11-17, on its own branch after v250; the user's "Yes, both" through the VC-2
   session; HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Resonator and the TVF"). Vc2CosmAdapters: the
   first types XtCosm ports as rows of Vc2CosmTypeRow, their start values (0x893a8830, 0x893a8a50) and new blocks

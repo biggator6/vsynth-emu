@@ -1184,3 +1184,8 @@ extin-pitch-a4|s.analog \|\| s.extIn ? 69 : o.rootKey|s.analog ? 69 : o.rootKey|
 extin-mono|\|\| (s.on && s.extIn); };|; };|tonestart||extin
 extin-root|s.robot \|\| s.analog \|\| s.extIn \|\| !s.on;|s.robot \|\| s.analog \|\| !s.on;|tonestart||extin
 # (the mode drawing no EXT IN at all differs from nothing: fcheck's baseline sees it, its section's counts then the plain run's)
+# v253, XtCosmLofi moved into XtCosmLofi.h: its new block's words, the four its getters give the VC-2's adapter, in XtCosm.cpp
+lofi-xt-mask|mask = T.lofiMask[r];|mask = T.lofiMask[0];|tonecosm
+lofi-xt-coef|coef = T.lofiCoef[r];|coef = T.lofiCoef[0];|tonecosm
+lofi-xt-up|up = T.lofiUp[bit];|up = T.lofiDown[bit];|tonecosm
+lofi-xt-down|down = T.lofiDown[bit];|down = T.lofiUp[bit];|tonecosm

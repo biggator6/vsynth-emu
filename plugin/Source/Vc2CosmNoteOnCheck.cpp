@@ -2,7 +2,7 @@
 // own address (0x89999290), set up by rom.4's static initializer (0x893ab550); an object, its block and the four bound
 // envelopes and LFOs in the interpreter's RAM, which the port's Vc2CosmBound reads too; only operator delete hooked.
 // Events: a note-on (0x893aa0e0) on the types ported (Through, the Speaker Simulator, the Growl; from v252 the
-// Resonator and the TVF, adapted over XtCosm, counted apart) and codes the
+// Resonator and the TVF, from v253 Lo-Fi, adapted over XtCosm, counted apart) and codes the
 // switches pass, the slot it takes holding noise first on both sides; a new block alone (0x893aa5d0); the destructor
 // (0x893aa060); the pools set up again; the object, its block or the bound words drawn again.  After each: the
 // object, the pools, the slot's four buffers when one was taken, and the deletes, word for word.  Its draws in
@@ -96,7 +96,10 @@ std::string noteOnEvent(NoteOnRig& r, std::mt19937& rng) {
 std::string newBlockEvent(NoteOnRig& r, std::mt19937& rng) {
     ++r.n.newBlocks;
     vc2DrawNoteOnBlock(r.block, rng);
-    if (rng() % 4 != 0) r.block.code = r.o.code;
+    if (rng() % 4 != 0) {
+        r.block.code = r.o.code;
+        vc2DrawTypeWords(r.block, rng);
+    }
     r.n.adaptedBlocks += r.block.code == r.o.code && adapted(r.block.code);
     r.filled = -1;
     return noteOnBoth(r, kNewBlock, { kNoteOnObjectAt, kNoteOnBlockAt }, "the new block",
