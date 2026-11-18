@@ -2,18 +2,19 @@
 #ifdef XT_VC2COSM_MAIN
 #include "Vc2CosmCheck.h"
 #include "Vc2CosmNoteOnDraws.h"
+#include <span>
 
 namespace {
 constexpr int32_t kSpeaker = 5;                     // [FW] the Speaker Simulator's code
 constexpr uint32_t kBoundStride = 0x100;
 constexpr uint32_t kLevel = 0x4c, kRate = 0x54, kLfoLevel = 0x38, kStartLevel = 0x58;   // [FW] the bound objects' words
-// [FW] the bytes whose start values the port has (0, 5, 10, 11, 15, 16 none; 1…4, 6, 9, 12…14, 19, 20 its rows), none
+// [FW] the bytes whose start values the port has (0, 5, 10, 11, 15, 16 none; 1…4, 6, 9, 12…14, 18…20 its rows), none
 // past 20
-constexpr std::array<uint8_t, 17> kPassingBytes { 0, 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20 };
+constexpr std::array<uint8_t, 18> kPassingBytes { 0, 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20 };
 constexpr int32_t kFirstBuffered = 7;               // [FW] the allocator's: the code's byte − 7, 0…3 and 8…11 take a slot
-// [FW] the adapted types' codes (v252…v255)
+// [FW] the adapted types' codes (v252…v258)
 constexpr int32_t kOd = 1, kDs = 2, kWs = 3, kAmp = 4, kResonator = 6, kDual = 12, kTvf = 13, kDtvf = 14, kLofi = 19;
-constexpr int32_t kTb = 20;
+constexpr int32_t kComp = 15, kLim = 16, kFs = 18, kTb = 20;
 
 float moderate(std::mt19937& rng, float from, float to) { return from + (to - from) * vc2Unit(rng); }
 
@@ -96,10 +97,27 @@ struct Vc2CosmWordRange {
 constexpr Vc2CosmWordRange kTbRanges[] { { 0, 0.0f, 2.0f }, { 1, 0.0f, 1.0f }, { 2, -2.0f, 2.0f }, { 3, 0.0f, 1.0f },
                                          { 4, -1.0f, 1.0f }, { 5, 0.0f, 1.0f }, { 6, -2.0f, 2.0f }, { 7, -1.0f, 1.0f },
                                          { 9, -1.0f, 1.0f }, { 11, -1.0f, 1.0f }, { 13, -1.0f, 1.0f } };
+void drawRanges(Vc2CosmBlockWords& b, std::mt19937& rng, std::span<const Vc2CosmWordRange> ranges) {
+    for (const Vc2CosmWordRange& r : ranges) setBlockFloat(b, r.word, moderate(rng, r.from, r.to));
+}
 void drawTbBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
-    for (const Vc2CosmWordRange& r : kTbRanges) setBlockFloat(b, r.word, moderate(rng, r.from, r.to));
+    drawRanges(b, rng, kTbRanges);
     b.words[15] = (b.words[15] & 0xffffff00u) | (rng() % 128);
 }
+
+// The Compressor's converter (v258): Attack and Sustain 0…1, the Level's gain 0…4
+constexpr Vc2CosmWordRange kCompRanges[] { { 0, 0.0f, 1.0f }, { 1, 0.0f, 1.0f }, { 2, 0.0f, 4.0f } };
+void drawCompBlock(Vc2CosmBlockWords& b, std::mt19937& rng) { drawRanges(b, rng, kCompRanges); }
+
+// The Limiter's: the Ratio 0…3 as a byte, Threshold, Attack and Release 0…1, the Level's gain 0…4
+constexpr Vc2CosmWordRange kLimRanges[] { { 1, 0.0f, 1.0f }, { 2, 0.0f, 1.0f }, { 3, 0.0f, 1.0f }, { 4, 0.0f, 4.0f } };
+void drawLimBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
+    b.words[0] = (b.words[0] & 0xffffff00u) | (rng() % 4);
+    drawRanges(b, rng, kLimRanges);
+}
+
+// The Frequency Shifter's: Depth and Balance 0…1 with their depths, from word 0
+void drawFsBlock(Vc2CosmBlockWords& b, std::mt19937& rng) { drawBlockSettings(b, rng, 0, 0.0f); }
 
 // The Growl's converter: Intencity I/127, Speed 2·S/128 − 1, its two settings' depths and numbers
 void drawGrowlBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
@@ -121,7 +139,7 @@ struct Vc2CosmBlockDraw {
     uint8_t code;
     void (*draw)(Vc2CosmBlockWords& b, std::mt19937& rng);
 };
-constexpr std::array<Vc2CosmBlockDraw, 11> kBlockDraws { { { kOd, drawOdBlock },
+constexpr std::array<Vc2CosmBlockDraw, 14> kBlockDraws { { { kOd, drawOdBlock },
                                                            { kDs, drawOdBlock },
                                                            { kWs, drawWsBlock },
                                                            { kAmp, drawAmpBlock },
@@ -130,13 +148,16 @@ constexpr std::array<Vc2CosmBlockDraw, 11> kBlockDraws { { { kOd, drawOdBlock },
                                                            { kDual, drawDualBlock },
                                                            { kTvf, drawTvfBlock },
                                                            { kDtvf, drawTvfBlock },
+                                                           { kComp, drawCompBlock },
+                                                           { kLim, drawLimBlock },
+                                                           { kFs, drawFsBlock },
                                                            { kLofi, drawLofiBlock },
                                                            { kTb, drawTbBlock } } };
 
 // A code the port has a type for, or one past 20 whose byte the switches pass
 int32_t drawCode(std::mt19937& rng) {
-    const std::array<int32_t, 13> ported { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, Vc2CosmGrowl::kCode, kDual,
-                                           kTvf, kDtvf, kLofi, kTb };
+    const std::array<int32_t, 16> ported { 0, kOd, kDs, kWs, kAmp, kSpeaker, kResonator, Vc2CosmGrowl::kCode, kDual,
+                                           kTvf, kDtvf, kComp, kLim, kFs, kLofi, kTb };
     if (rng() % 4 != 0) return ported[rng() % ported.size()];
     const uint8_t low = rng() % 2 ? kPassingBytes[rng() % kPassingBytes.size()] : (uint8_t)(21 + rng() % 235);
     const uint32_t high = rng() % 2 ? 0xffffff00u : (uint32_t)(1 + rng() % 0x7fff) << 8;

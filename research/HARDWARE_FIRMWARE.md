@@ -1546,6 +1546,36 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's COSM adapters: the Compressor, the Limiter and the Frequency Shifter (2026-11-17, v258) {#vc2-cosm-adapters-buffered}
+
+Step 4.2's COSM object, its seventh part (research/VC2_MODE_PLAN.md): three of the five types that take a pool slot. XtCosm is unchanged. The Side Band Filters (7, 8) wait for v260: their new blocks and note-on cases write words XtCosmSbf keeps private. Every address is rom.4's, every offset the object's or its block's.
+
+**The Compressor, 15.** It has no start values.
+- New block (inline, `0x893aa6e0`): the attack factor 1.03 + 0.07 × (1 − Attack) into +0x14, Sustain (+8) into +0x18, the gain (+0xc) into +0x1c.
+- Note-on case (`0x893aa4b0`): those three into the slews D+0x8c…+0x94. Sustain × 2^27 / (factor + 2^20) + 1 − Sustain into each channel's gain target and gain (D+0x98, +0x9c; R's D+0xcc, +0xd0), the factor into each channel's envelope (D+0xa0, R's D+0xd4).
+
+**The Limiter, 16.** It has no start values.
+- New block (`0x893a9c90`): the Ratio's byte into +0x14, the threshold and two rates into +0x18…+0x20 and again into D+0xcc…+0xd4, the gain into +0x24 and D+0xa0, and the slope (`0x89543af4` by the Ratio) into D+0x8c.
+- Note-on case (`0x893aa530`): both channels' gains and smoothed gains at 1, D+0x90…+0x9c.
+
+**The Frequency Shifter, 18.**
+- Start values (`0x893a8b30`): 0.0126 × Depth + 0.001, Depth with its depths on envelope A and LFO A within 0…1, into D+0xbc; Balance with its depths on B within 0…1 into D+0xc0.
+- New block (`0x893a9df0`): the same on the held levels into the targets, and the block's +4…+0x2b into +0x14…+0x3b.
+- Note-on case (`0x893aa550`): the phase, D+0x94, cleared.
+
+**The adapter** (Vc2CosmBufferedAdapters.cpp):
+- XtCosmComp, XtCosmLim and XtCosmFs allocate their buffers when constructed, so a temporary per call, as the earlier types use, would allocate on the tone generator's thread. One object of each is made with the note-on frame, `Vc2CosmBufferedScratch` behind `Vc2CosmNoteOn::scratch`. What the adapters read from these objects depends only on what each call gives them.
+- A note-on case now gets the block, as rom.4's has it. The Compressor's needs Attack, which the object keeps only as the factor.
+
+**The check**, xt_vc2cosm's sixth part: codes 15, 16 and 18 are among its note-ons and new blocks, their blocks drawn as their converters give them, the slot each takes given noise first. With 18 drawn, the allocator's last buffered code can be planted, which v250 couldn't.
+
+Results:
+- seed 2024, 40 cases: 892 note-ons (189 taking a slot, 564 adapted), 617 new blocks (219 adapted); 0 different, with the address and undefined-behaviour sanitizers on. The other five parts are as they were.
+- seeds 7 and 31337, 400 cases each: 9,065 and 9,018 note-ons (5,571 and 5,458 adapted), 5,919 and 6,029 new blocks (2,113 and 2,023 adapted); 0 different.
+- Coverage: every line, region and function of Vc2CosmBufferedAdapters.cpp and the other adapter files. Vc2CosmNoteOn.cpp's one region left is a full pool's, as at v250.
+- `mutate_vc2.py --cosm`: 1,131 plants, all caught. 72 are new: 51 in `vc2cosmbuffered`, 10 in `vc2cosmadapters` (the codes and rows), 1 in `vc2cosmnoteon` (the allocator's last code) and 10 in `vc2xtcosm` (the three classes' laws under xt_vc2cosm).
+- Not planted, as no input tells them apart: which of the Limiter's four words its note-on case reads (all 1), the Compressor's gain and gain target swapped (equal at a note-on), the Ratio read unsigned (0…3).
+
 ### The VC-2's COSM adapters: the Dual Filter, the Dynamic TVF and the TB Filter (2026-11-17, v255) {#vc2-cosm-adapters-filters}
 
 Step 4.2's COSM object, its sixth part (research/VC2_MODE_PLAN.md). The three come in through XtCosm's classes, which are unchanged. Every address is rom.4's, every offset the object's or its block's.

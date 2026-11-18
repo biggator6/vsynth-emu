@@ -512,9 +512,12 @@ version against rom.4's routines with what it calls hooked:
        moved onto XtCosmTvf with the Dynamic TVF; the TB Filter's in Vc2CosmTbAdapter.cpp, its new block's targets and
        note-on case's coefficients XtCosmTb's (HARDWARE_FIRMWARE.md, "The VC-2's COSM adapters: the Dual Filter, the
        Dynamic TVF and the TB Filter").
-     - next: the buffered types' adapters (the Side Band Filters, Compressor, Limiter and Frequency Shifter), then the
-       update (the held levels and rates, each code's inline case) and the DSP by code, mono and stereo, over XtCosm's
-       types and the Growl.
+     - done (v258): the Compressor's (15), the Limiter's (16) and the Frequency Shifter's (18) adapters,
+       `Vc2CosmBufferedAdapters`, on XtCosm objects made once with the note-on frame (HARDWARE_FIRMWARE.md, "The VC-2's
+       COSM adapters: the Compressor, the Limiter and the Frequency Shifter").
+     - next: the Side Band Filters (7, 8; v260, XtCosmSbf into its own header, then const getters, the VC-2 session's
+       conditions of 2026-11-17), then the update (the held levels and rates, each code's inline case) and the DSP by
+       code, mono and stereo, over XtCosm's types and the Growl.
 3. The part: the notes (the mailbox, note start and off, the allocator, legato, truncation), the conversion by rom.4's
    IDs, the three tasks with the mixer, the vocoder, the tracker and Auto Note: `Vc2Synth`, against rom.4's whole tone
    (`xt_vc2tone`, as `xt_tone` for rom.2).

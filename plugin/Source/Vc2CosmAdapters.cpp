@@ -2,6 +2,7 @@
 // every offset the object's or its block's.  Their access to rom.4's words in Vc2CosmAdapterWords (v255).
 #include "Vc2CosmAdapters.h"
 #include "Vc2CosmAdapterWords.h"
+#include "Vc2CosmBufferedAdapters.h"
 #include "XtCosm.h"
 #include <array>
 #include <cstddef>
@@ -13,7 +14,7 @@ using namespace Vc2CosmAdapter;
 namespace {
 // [FW] the block codes
 constexpr int32_t kOd = 1, kDs = 2, kWs = 3, kAmp = 4, kResonator = 6, kDual = 12, kTvf = 13, kDtvf = 14, kLofi = 19;
-constexpr int32_t kTb = 20;
+constexpr int32_t kComp = 15, kLim = 16, kFs = 18, kTb = 20;
 // [FW] Lo-Fi's words past the block's (v253): the Rate's mask (D+1, a byte), 1/2^Rate, 2^Bit, 2^−Bit (D+0x94…+0x9c)
 constexpr size_t kLofiMask = 0x59, kLofiCoef = 0xec, kLofiUp = 0xf0, kLofiDown = 0xf4;
 constexpr size_t kWsLevel = 0x40;   // [FW] the Wave Shaper's Level/8, past its block's words (v254)
@@ -127,7 +128,7 @@ struct Vc2CosmCaseCopy {
 };
 
 template <const auto& Copies>
-void copyCase(Vc2CosmNoteOn&, Vc2CosmObjectWords& o) {
+void copyCase(Vc2CosmNoteOn&, Vc2CosmObjectWords& o, const Vc2CosmBlockWords&) {
     auto* bytes = reinterpret_cast<uint8_t*>(&o);
     for (const Vc2CosmCaseCopy& c : Copies) std::memcpy(bytes + c.to, bytes + c.from, sizeof(float));
 }
@@ -282,6 +283,9 @@ constexpr Vc2CosmTypeRow kAdapterRows[] {
     { kTvf, valueStartValues<kTvfType>, valueNewBlock<kTvfType>, nullptr },
     { kDtvf, valueStartValues<kDtvfType>, valueNewBlock<kDtvfType>, copyCase<kDtvfCase> },
     { kLofi, valueStartValues<kLofiType>, valueNewBlock<kLofiType>, nullptr },
+    { kComp, nullptr, vc2CosmCompNewBlock, vc2CosmCompNoteOnCase },   // no start values, nor the Limiter
+    { kLim, nullptr, vc2CosmLimNewBlock, vc2CosmLimNoteOnCase },
+    { kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase },
     { kTb, nullptr, vc2CosmTbNewBlock, vc2CosmTbNoteOnCase } };   // its start values an rts (0x893b9130)
 } // namespace
 

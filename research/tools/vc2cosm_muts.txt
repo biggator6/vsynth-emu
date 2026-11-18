@@ -75,6 +75,10 @@
 # no input tells them apart: the blocks' words only the DSPs read (the Filter Types, the Own depths through XtTvfBlock:
 # the case copies the object's), the key read unsigned (0…127), the TB's view's layout (a static_assert's), and either
 # of the TB case's clears left out (the frame's note-on has zeroed those words already: they're planted as a wrong value).
+# v258: the Compressor's, Limiter's and Frequency Shifter's adapters in vc2cosmbuffered (Vc2CosmBufferedAdapters.cpp), their
+# rows in vc2cosmadapters, XtCosm's laws they take in vc2xtcosm, and the allocator's last buffered code, drawn now that
+# 18 has a row.  Not planted, as no input tells them apart: which of the Limiter's four words a note-on case reads (all
+# 1), the Compressor's gain and gain target swapped (equal at a note-on), the Ratio read unsigned (0…3).
 conv-code|    b.code = Vc2CosmGrowl::kCode;|    b.code = 8;
 conv-intensity-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 126, kSpeedMax = 128;
 conv-speed-max|constexpr int kIntensityMax = 127, kSpeedMax = 128;|constexpr int kIntensityMax = 127, kSpeedMax = 127;
@@ -1133,4 +1137,76 @@ xt-tb-fc-scale|if (fc > 20000.0f) { fc = 20000.0f; scale = true; }|if (fc > 2000
 xt-tb-hpf|y = mul(y, 13.0f);|y = mul(y, 12.0f);|vc2xtcosm
 xt-tb-gain|t[6] = mul(blk.gain, k01);|t[6] = blk.gain;|vc2xtcosm
 xt-tb-coef|c[i] = div(t[i], K(0x3c23d709));|c[i] = mul(t[i], 100.0f);|vc2xtcosm
+acomp-words-at|kCompWords = 0x14|kCompWords = 0x18|vc2cosmbuffered
+acomp-slews-at|kCompSlews = 0xe4|kCompSlews = 0xe8|vc2cosmbuffered
+acomp-left-at|kCompLeft = 0xf0|kCompLeft = 0xf4|vc2cosmbuffered
+acomp-right-at|kCompRight = 0x124|kCompRight = 0x128|vc2cosmbuffered
+acomp-attack|{ 0, &XtCompBlock::attack }|{ 1, &XtCompBlock::attack }|vc2cosmbuffered
+acomp-sustain|{ 1, &XtCompBlock::sustain }|{ 2, &XtCompBlock::sustain }|vc2cosmbuffered
+acomp-gain|{ 2, &XtCompBlock::gain }|{ 1, &XtCompBlock::gain }|vc2cosmbuffered
+acomp-words-count|floatsInto(o, kCompWords, comp.slews(), 3);|floatsInto(o, kCompWords, comp.slews(), 2);|vc2cosmbuffered
+acomp-slews-count|floatsInto(o, kCompSlews, comp.slews(), 3);|floatsInto(o, kCompSlews, comp.slews(), 2);|vc2cosmbuffered
+acomp-side-target|{ comp.gainTarget(ch), comp.gain(ch), comp.envelope(ch) }|{ comp.envelope(ch), comp.gain(ch), comp.envelope(ch) }|vc2cosmbuffered
+acomp-side-gain|{ comp.gainTarget(ch), comp.gain(ch), comp.envelope(ch) }|{ comp.gainTarget(ch), comp.envelope(ch), comp.envelope(ch) }|vc2cosmbuffered
+acomp-side-env|{ comp.gainTarget(ch), comp.gain(ch), comp.envelope(ch) }|{ comp.gainTarget(ch), comp.gain(ch), comp.gain(ch) }|vc2cosmbuffered
+acomp-side-right|ch == 0 ? kCompLeft : kCompRight|ch == 0 ? kCompLeft : kCompLeft|vc2cosmbuffered
+acomp-channels|for (int ch = 0; ch < 2; ++ch) {|for (int ch = 0; ch < 1; ++ch) {|vc2cosmbuffered
+alim-rates-at|kLimRates = 0x18|kLimRates = 0x1c|vc2cosmbuffered
+alim-gain-at|kLimGain = 0x24|kLimGain = 0x20|vc2cosmbuffered
+alim-slope-at|kLimSlope = 0xe4|kLimSlope = 0xe8|vc2cosmbuffered
+alim-slewgain-at|kLimSlewGain = 0xf8|kLimSlewGain = 0xfc|vc2cosmbuffered
+alim-slews-at|kLimSlews = 0x124|kLimSlews = 0x128|vc2cosmbuffered
+alim-gains-at|kLimGains = 0xe8|kLimGains = 0xec|vc2cosmbuffered
+alim-threshold|{ 1, &XtLimBlock::threshold }|{ 2, &XtLimBlock::threshold }|vc2cosmbuffered
+alim-attack|{ 2, &XtLimBlock::attack }|{ 3, &XtLimBlock::attack }|vc2cosmbuffered
+alim-release|{ 3, &XtLimBlock::release }|{ 4, &XtLimBlock::release }|vc2cosmbuffered
+alim-gain|{ 4, &XtLimBlock::gain }|{ 3, &XtLimBlock::gain }|vc2cosmbuffered
+alim-ratio|x.ratio = static_cast<int8_t>(b.words[0]);|x.ratio = 0;|vc2cosmbuffered
+alim-variant|    o.variant = static_cast<uint8_t>(b.words[0]);\n||vc2cosmbuffered
+alim-rates-count|floatsInto(o, kLimRates, lim.slews(), 3);|floatsInto(o, kLimRates, lim.slews(), 2);|vc2cosmbuffered
+alim-slews-count|floatsInto(o, kLimSlews, lim.slews(), 3);|floatsInto(o, kLimSlews, lim.slews(), 2);|vc2cosmbuffered
+alim-gain-word|floatsInto(o, kLimGain, lim.slews() + 3, 1);|floatsInto(o, kLimGain, lim.slews() + 2, 1);|vc2cosmbuffered
+alim-slewgain-word|floatsInto(o, kLimSlewGain, lim.slews() + 3, 1);|floatsInto(o, kLimSlewGain, lim.slews() + 2, 1);|vc2cosmbuffered
+alim-slope|const float slope = lim.slope();|const float slope = lim.slews()[0];|vc2cosmbuffered
+alim-case-count|floatsInto(o, kLimGains, gains.data(), gains.size());|floatsInto(o, kLimGains, gains.data(), 3);|vc2cosmbuffered
+afs-depth|{ 0, &XtFsBlock::depth }|{ 1, &XtFsBlock::depth }|vc2cosmbuffered
+afs-depth-env|{ 1, &XtFsBlock::depthEnv }|{ 2, &XtFsBlock::depthEnv }|vc2cosmbuffered
+afs-depth-lfo|{ 3, &XtFsBlock::depthLfo }|{ 4, &XtFsBlock::depthLfo }|vc2cosmbuffered
+afs-balance|{ 5, &XtFsBlock::balance }|{ 6, &XtFsBlock::balance }|vc2cosmbuffered
+afs-balance-env|{ 6, &XtFsBlock::balanceEnv }|{ 7, &XtFsBlock::balanceEnv }|vc2cosmbuffered
+afs-balance-lfo|{ 8, &XtFsBlock::balanceLfo }|{ 9, &XtFsBlock::balanceLfo }|vc2cosmbuffered
+afs-start-env-a|kFsFloats), s.envA, s.envA,|kFsFloats), s.envB, s.envA,|vc2cosmbuffered
+afs-start-lfo-a|0.0f, s.lfoA, s.envB|0.0f, s.lfoB, s.envB|vc2cosmbuffered
+afs-start-env-b|s.lfoA, s.envB, s.envB|s.lfoA, s.envA, s.envB|vc2cosmbuffered
+afs-start-lfo-b|0.0f, s.lfoB);|0.0f, s.lfoA);|vc2cosmbuffered
+afs-value-depth|o.values[0] = fs.depth();|o.values[0] = fs.balance();|vc2cosmbuffered
+afs-value-balance|o.values[1] = fs.balance();|o.values[1] = fs.depth();|vc2cosmbuffered
+afs-held|h.envA, h.lfoA, h.envB, h.lfoB);|h.envA, h.envB, h.lfoA, h.lfoB);|vc2cosmbuffered
+afs-target-depth|o.targets[0] = fs.depthTarget();|o.targets[0] = fs.balanceTarget();|vc2cosmbuffered
+afs-target-balance|o.targets[1] = fs.balanceTarget();|o.targets[1] = fs.depthTarget();|vc2cosmbuffered
+afs-copy-len|kFsBytes = 0x28|kFsBytes = 0x24|vc2cosmbuffered
+afs-copy-from|copyBlock(o, b, 4, kFsBytes);|copyBlock(o, b, 8, kFsBytes - 4);|vc2cosmbuffered
+afs-phase-at|kFsPhase = 0xec|kFsPhase = 0xe8|vc2cosmbuffered
+afs-phase|const float cleared = 0.0f;|const float cleared = 1.0f;|vc2cosmbuffered
+adapt-code-comp|kComp = 15|kComp = 28|vc2cosmadapters
+adapt-code-lim|kLim = 16|kLim = 29|vc2cosmadapters
+adapt-code-fs|kFs = 18|kFs = 30|vc2cosmadapters
+row-comp-block|{ kComp, nullptr, vc2CosmCompNewBlock, vc2CosmCompNoteOnCase }|{ kComp, nullptr, nullptr, vc2CosmCompNoteOnCase }|vc2cosmadapters
+row-comp-case|{ kComp, nullptr, vc2CosmCompNewBlock, vc2CosmCompNoteOnCase }|{ kComp, nullptr, vc2CosmCompNewBlock, nullptr }|vc2cosmadapters
+row-lim-block|{ kLim, nullptr, vc2CosmLimNewBlock, vc2CosmLimNoteOnCase }|{ kLim, nullptr, nullptr, vc2CosmLimNoteOnCase }|vc2cosmadapters
+row-lim-case|{ kLim, nullptr, vc2CosmLimNewBlock, vc2CosmLimNoteOnCase }|{ kLim, nullptr, vc2CosmLimNewBlock, nullptr }|vc2cosmadapters
+row-fs-start|{ kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase }|{ kFs, nullptr, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase }|vc2cosmadapters
+row-fs-block|{ kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase }|{ kFs, vc2CosmFsStartValues, nullptr, vc2CosmFsNoteOnCase }|vc2cosmadapters
+row-fs-case|{ kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, vc2CosmFsNoteOnCase }|{ kFs, vc2CosmFsStartValues, vc2CosmFsNewBlock, nullptr }|vc2cosmadapters
+alloc-last-buffered|kBufferedLast = 11|kBufferedLast = 10|vc2cosmnoteon
+xt-comp-factor|fac = fmac(sub(1.0f, b.attack), K(0x3d8f5c29), K(0x3f83d709));|fac = fmac(b.attack, K(0x3d8f5c29), K(0x3f83d709));|vc2xtcosm
+xt-comp-start|add(fac, K(0x49800000))), sub(1.0f, sus));|add(fac, K(0x49800000))), sus);|vc2xtcosm
+xt-comp-env|env[0] = env[1] = fac;|env[0] = env[1] = sus;|vc2xtcosm
+xt-lim-slope|slp = T.limSlope[b.ratio & 3];|slp = T.limSlope[0];|vc2xtcosm
+xt-lim-threshold|thr = fmac(b.threshold, K(0x4d800000), K(0x49800000));|thr = fmac(b.threshold, K(0x4d000000), K(0x49800000));|vc2xtcosm
+xt-lim-attack|att = fmac(sub(1.0f, b.attack), K(0x2e5be6ff), K(0x2cafebfe));|att = fmac(b.attack, K(0x2e5be6ff), K(0x2cafebfe));|vc2xtcosm
+xt-lim-release|rel = fmac(sub(1.0f, b.release), K(0x2e5be6ff), K(0x29e12e13));|rel = fmac(b.release, K(0x2e5be6ff), K(0x29e12e13));|vc2xtcosm
+xt-lim-start|g[0] = s[0] = g[1] = s[1] = 1.0f;|g[0] = s[0] = g[1] = s[1] = 0.5f;|vc2xtcosm
+xt-fs-depth|return fmac(d, K(0x3c4e703b), K(0x3a83126e));|return fmac(d, K(0x3c4e703b), 0.0f);|vc2xtcosm
+xt-fs-depth-floor|fmac(blk.depthEnv, env, blk.depth)), 0.0f, 1.0f);|fmac(blk.depthEnv, env, blk.depth)), 0.1f, 1.0f);|vc2xtcosm
 rowof-adapters|std::span<const Vc2CosmTypeRow>(kRows), vc2CosmAdapterRows() }|std::span<const Vc2CosmTypeRow>(kRows) }|vc2cosmnoteon

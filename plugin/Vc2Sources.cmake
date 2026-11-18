@@ -71,4 +71,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2CosmAdapters.cpp
     Source/Vc2CosmAdapterWords.cpp
     Source/Vc2CosmTbAdapter.cpp
+    Source/Vc2CosmBufferedAdapters.cpp
 )

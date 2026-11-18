@@ -1,6 +1,7 @@
 // rom.4's COSM note-on frame: see Vc2CosmNoteOn.h (v250).  Every address is rom.4's, every offset the object's.
 #include "Vc2CosmNoteOn.h"
 #include "Vc2CosmAdapters.h"
+#include "Vc2CosmBufferedAdapters.h"
 #include "XtFloat.h"
 #include <algorithm>
 #include <cstring>
@@ -34,7 +35,7 @@ void growlNewBlock(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWo
     onGrowl(n, o, [&gb](Vc2CosmGrowl& g) { g.newBlock(gb); });
 }
 
-void growlNoteOn(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o) {
+void growlNoteOn(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords&) {
     onGrowl(n, o, [](Vc2CosmGrowl& g) { g.noteOn(); });
 }
 
@@ -46,6 +47,10 @@ void growlStartValues(Vc2CosmNoteOn&, Vc2CosmObjectWords&, const Vc2CosmBlockWor
 constexpr Vc2CosmTypeRow kRows[] { { 0, nullptr, nullptr, nullptr }, { 5, nullptr, speakerNewBlock, nullptr },
                                    { Vc2CosmGrowl::kCode, growlStartValues, growlNewBlock, growlNoteOn } };
 } // namespace
+
+Vc2CosmNoteOn::Vc2CosmNoteOn(Vc2CosmPools& pools, Vc2CosmBound& bound)
+    : pools_(pools), bound_(bound), scratch_(std::make_unique<Vc2CosmBufferedScratch>()) {}
+Vc2CosmNoteOn::~Vc2CosmNoteOn() = default;
 
 const Vc2CosmTypeRow* Vc2CosmNoteOn::rowOf(int32_t code) {
     for (std::span<const Vc2CosmTypeRow> rows : { std::span<const Vc2CosmTypeRow>(kRows), vc2CosmAdapterRows() })
@@ -94,7 +99,7 @@ void Vc2CosmNoteOn::noteOn(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b, ui
     newBlock(o, b);
     if (static_cast<uint32_t>(o.code) > kLastCode) return;
     const Vc2CosmTypeRow* row = rowOf(o.code);
-    if (row != nullptr && row->noteOnCase != nullptr) row->noteOnCase(*this, o);
+    if (row != nullptr && row->noteOnCase != nullptr) row->noteOnCase(*this, o, b);
 }
 
 void Vc2CosmNoteOn::newBlock(Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b) {

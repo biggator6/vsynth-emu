@@ -63,7 +63,7 @@ void vc2CosmTbNewBlock(Vc2CosmNoteOn&, Vc2CosmObjectWords& o, const Vc2CosmBlock
 
 // The note-on case (the end of rom.2's 0x894fbd20): XtCosmTb's note-on on the object's block and held levels, its
 // coefficients (the targets / 0.01) into the object's, and the states rom.4 clears (the frame clears the rest)
-void vc2CosmTbNoteOnCase(Vc2CosmNoteOn&, Vc2CosmObjectWords& o) {
+void vc2CosmTbNoteOnCase(Vc2CosmNoteOn&, Vc2CosmObjectWords& o, const Vc2CosmBlockWords&) {
     auto w = std::bit_cast<Vc2CosmTbWords>(o);
     XtCosmTb tb;
     tb.noteOn(tbBlockOf(w.block), w.held[0], w.held[2], w.held[1], w.held[3]);

@@ -15,4 +15,4 @@
 std::span<const Vc2CosmTypeRow> vc2CosmAdapterRows();
 // The TB Filter's new block (0x893b9530) and note-on case (0x893b9140), its row's parts (v255)
 void vc2CosmTbNewBlock(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
-void vc2CosmTbNoteOnCase(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o);
+void vc2CosmTbNoteOnCase(Vc2CosmNoteOn& n, Vc2CosmObjectWords& o, const Vc2CosmBlockWords& b);
