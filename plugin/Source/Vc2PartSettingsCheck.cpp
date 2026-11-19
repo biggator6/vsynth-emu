@@ -11,8 +11,8 @@ namespace {
 using Settings = Vc2PartSettings;
 using Block = Vc2ParamBlock;
 constexpr uint32_t kHeldAt = 0x8993d0c0, kGetter = 0x89324350, kTypedGetter = 0x89324370;    // [FW]
-constexpr uint32_t kOscBlock = 0x893a04e0;                   // [FW] the OSC block's reader, hooked (v288)
 constexpr int16_t kCosmTypeId = 0x463;                       // [FW] a COSM input's type, 0…16 (the run table's)
+constexpr int16_t kOscTypeIds[] = { 0x2e5, 0x319 };          // [FW] the OSCs' Types, drawn 0…3 half the time (v289)
 constexpr uint32_t kLfoWords = 0x3200, kTvaWords = 0x1804;   // the tables' words; the bytes past them by hand
 constexpr uint32_t kHandle = 0x01000000;                     // a handle: block << 16, part << 8, kind << 2, COSM
 
@@ -60,7 +60,7 @@ std::string settingsDifference(SettingsSides& s) {
         { kEnvelopesAt, &t.envelopes, sizeof t.envelopes, "envelopes" }, { kLfosAt, &t.lfos, kLfoWords, "LFOs" },
         { kMixesAt, &t.mixes, sizeof t.mixes, "mix" }, { kTvasAt, &t.tvas, kTvaWords, "TVAs" },
         { kBytesAt, &t.bytes, sizeof t.bytes, "bytes" }, { kCosmsAt, &t.cosms, sizeof t.cosms, "COSM inputs" },
-        { kOscsAt, &t.oscs, sizeof t.oscs, "OSCs" } });
+        { kOscsAt, &t.oscs, sizeof t.oscs, "OSCs" }, { kStepsAt, &t.steps, sizeof t.steps, "step counts" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
@@ -107,21 +107,20 @@ std::string settingsCase(SettingsSides& s, std::mt19937& rng) {
 }
 
 // The second part (v287), on the seed after the run's: the part's bytes and the COSM inputs', v287's tables noise
-long settingsCosmPart(SettingsSides& s, const Vc2Run& run) {
-    SettingsCounts& n = s.n;
-    const long different = vc2CheckPart(run, 1, { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" }, n.moreEvents,
-        [&](std::mt19937& rng) { return settingsCaseOf<kCosmEvents, offsetof(Vc2PartRows, oscs), 5>(s, rng,
-                                                                       n.moreEvents, n.moreCalls); });
+void sayCosmPart(const SettingsCounts& n) {
     const auto& e = n.byEvent;
     std::printf("COSM inputs: %ld events: bytes %ld, %ld rows; COSM inputs %ld, %ld rows, %ld velocity rows (%ld "
                 "reads)\n", n.moreEvents, e[16], e[17], e[18], e[19], e[20], n.moreCalls);
-    return different;
 }
+
+const SettingsPartRow kCosmPart { 1, &SettingsCounts::moreEvents, &SettingsCounts::moreCalls,
+                                  settingsCaseOf<kCosmEvents, offsetof(Vc2PartRows, oscs), 5>, sayCosmPart };
 
 // The further parts, in turn on the seeds after the run's
 long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
-    const long cosms = settingsCosmPart(s, run);
-    return cosms + settingsOscPart(s, run);
+    long different = settingsRunPart(s, run, kCosmPart);
+    for (const SettingsPartRow& p : kOscPartRows) different += settingsRunPart(s, run, p);
+    return different;
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
@@ -155,6 +154,7 @@ int32_t SettingsStore::value(const SettingsCall& c) const {
     const uint32_t pick = h & 7, v = h >> 3;
     if (c.block == kOscBlockCall) return v % 64 == 0 ? 0 : pick < 6 ? 1 : (int32_t)(h | 0x100);
     if (c.id == kCosmTypeId) return (int32_t)(v % Vc2PartSettingsTables::kCosmTypes);
+    if (std::ranges::count(kOscTypeIds, c.id) != 0 && pick < 4) return (int32_t)(v % 4);
     if (pick < 4) return (int32_t)(v % 128);
     if (pick < 6) return (int32_t)(v % 129) - 64;
     return pick == 6 ? kEdges[v % std::size(kEdges)] : (int32_t)(h * 2654435761u);
@@ -164,6 +164,15 @@ int32_t SettingsReads::read(const SettingsCall& c) {
     log.push_back(c);
     if (++reads == flipAt) flags[flipFlag] = 1;
     return store.value(c);
+}
+
+long settingsRunPart(SettingsSides& s, const Vc2Run& run, const SettingsPartRow& p) {
+    SettingsCounts& n = s.n;
+    if (p.start) p.start(s);
+    const long different = vc2CheckPart(run, p.offset, { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" }, n.*p.events,
+        [&](std::mt19937& rng) { return p.oneCase(s, rng, n.*p.events, n.*p.calls); });
+    p.say(n);
+    return different;
 }
 
 uint32_t SettingsSides::romRead(Sh4& c, const SettingsCall& call) {
@@ -189,7 +198,8 @@ SettingsSides::SettingsSides(Vc2Fw& rig) : fw(rig) {
             c.ret(romRead(c, { (int32_t)(h >> 16 & 0xff), (int32_t)(h >> 8 & 0xff), (int32_t)(h >> 2 & 0x3f),
                                (int32_t)(h & 3), (int16_t)c.r[5] }));
         });
-    // The OSC block's reader (v288): its part, kind and OSC, the table's address unread
+    // The OSC block's reader (v288), until the fourth part takes the hook off: its part, kind and OSC, the table's
+    // address unread
     fw.cpu.hook(kOscBlock, [this](Sh4& c) {
         c.ret(romRead(c, { kOscBlockCall, (int32_t)c.r[5], (int32_t)c.r[6], (int32_t)c.r[7], 0 }));
     });

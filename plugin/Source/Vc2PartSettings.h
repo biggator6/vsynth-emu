@@ -10,6 +10,7 @@
 // sound yet.  Bit for bit: xt_vc2settings.  HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID".  The notes' task.
 #include <array>
 #include <cstdint>
+#include <functional>
 
 // The read objects a reader sets up, each a block of parameters the getter 0x89324350 reads by ID: the part's
 // (0x893207b0), the system's three (0x89320790, 0x89320760, 0x89320f60) and a note kind's three (0x89320a50,
@@ -23,9 +24,6 @@ public:
     virtual int32_t value(Vc2ParamBlock block, int part, int kind, int16_t id) = 0;
     // The typed getter on a COSM's block, by the part, kind and COSM (v287)
     virtual int32_t cosmValue(int part, int kind, int cosm, int16_t id) = 0;
-    // The OSC block's own reader 0x893a04e0 (its table's block of the part, kind and OSC), until its port (v288's
-    // part reader calls it; v289 ports it)
-    virtual bool oscBlock(int part, int kind, int osc) = 0;
     // rom.4's flag byte 0x8993d0c0 + `flag`, a task's hold on the tables
     virtual bool held(int flag) = 0;
 };
@@ -42,7 +40,13 @@ struct Vc2PartRows {
     std::array<uint8_t, 0x5400> cosms {};       // 0x89e2003c: 0x540 a part, 84 a kind, 42 a COSM input (v287)
     // 0x89e371e0: 0x1020 a part (a 32-byte header, then 0x100 a kind, 0x80 an OSC), then the systems' (v288)
     std::array<uint8_t, 0x1023c> oscs {};
+    // 0x89989c84: the OSCs' step counts, a halfword by kind and OSC, part 0's alone (the update queue follows); the
+    // OSC block's reader clears one when its Wave Number changes (v289)
+    std::array<uint8_t, 64> steps {};
 };
+
+// The OSC block's reader the part's reader calls for each kind and OSC, false to stop (v289)
+using Vc2OscBlockReader = std::function<bool(int kind, int osc)>;
 
 class Vc2PartSettings {
 public:
@@ -70,9 +74,15 @@ public:
     void oscTrailer(Vc2PartRows& t);                                // 0x893a1000
     void oscCalibration(Vc2PartRows& t);                            // 0x893a1060
     bool oscs(Vc2PartRows& t, int part);                            // 0x893a1410
+    // v289: the part's reader with the block reader given (oscs gives oscBlock; xt_vc2settings' third part a fake),
+    // and the OSC block's reader, Vc2PartSettingsOscBlock.cpp
+    bool oscRows(Vc2PartRows& t, int part, const Vc2OscBlockReader& block);
+    bool oscBlock(Vc2PartRows& t, int part, int kind, int osc);     // 0x893a04e0
 
 private:
     void velocityPair(uint8_t* curve, uint8_t* depth, int part, int kind, int envelope);
+    static uint8_t* oscBlockAt(Vc2PartRows& t, int part, int kind, int osc);   // v289
+    void waveNumber(Vc2PartRows& t, uint8_t* at, int32_t v, int part, int kind, int osc);
     void oscHeader(uint8_t* row, int part);
     bool oscVelocityRow(uint8_t* block, int part, int kind, int osc);
     Vc2PartParams& p_;

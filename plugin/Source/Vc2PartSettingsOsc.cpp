@@ -74,13 +74,20 @@ bool Vc2PartSettings::oscVelocityRow(uint8_t* block, int part, int kind, int osc
     return !p_.held(kHeldEnvelope);
 }
 
-bool Vc2PartSettings::oscs(Vc2PartRows& t, int part) {
+uint8_t* Vc2PartSettings::oscBlockAt(Vc2PartRows& t, int part, int kind, int osc) {
+    return t.oscs.data() + kOscPart * part + kBlocksAt + kOscKind * kind + kOscBytes * osc;
+}
+
+bool Vc2PartSettings::oscRows(Vc2PartRows& t, int part, const Vc2OscBlockReader& block) {
     if (p_.held(kHeldCommon)) return false;
     uint8_t* row = t.oscs.data() + kOscPart * part;
     oscHeader(row, part);
     if (p_.held(kHeldCommon)) return false;
     return everyRow(kOscs, [&](int kind, int osc) {
-        uint8_t* block = row + kBlocksAt + kOscKind * kind + kOscBytes * osc;
-        return p_.oscBlock(part, kind, osc) && oscVelocityRow(block, part, kind, osc);
+        return block(kind, osc) && oscVelocityRow(oscBlockAt(t, part, kind, osc), part, kind, osc);
     });
+}
+
+bool Vc2PartSettings::oscs(Vc2PartRows& t, int part) {
+    return oscRows(t, part, [&](int kind, int osc) { return oscBlock(t, part, kind, osc); });
 }

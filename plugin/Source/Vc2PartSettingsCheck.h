@@ -15,8 +15,11 @@ inline constexpr uint32_t kCommonsAt = 0x89997090, kEnvelopesAt = 0x89e2765c, kL
 inline constexpr uint32_t kMixesAt = 0x89e32a60, kTvasAt = 0x89e4987c, kControlsAt = 0x89997fcc;
 inline constexpr uint32_t kBytesAt = 0x89998a14, kCosmsAt = 0x89e2003c;   // v287's
 inline constexpr uint32_t kOscsAt = 0x89e371e0;                            // v288's
+inline constexpr uint32_t kStepsAt = 0x89989c84;                           // v289's: part 0's step counts
 inline constexpr int kSettingsParts = 16, kSettingsKinds = 16, kEventsACase = 400;
-// The OSC block's reader 0x893a04e0 as the log has it, a block past the read objects' (v288)
+// [FW] The OSC block's reader, hooked in the first three parts (v288), and its call as the log has it then, a block
+// past the read objects'
+inline constexpr uint32_t kOscBlock = 0x893a04e0;
 inline constexpr int32_t kOscBlockCall = 8;
 
 struct SettingsCall {
@@ -50,9 +53,6 @@ public:
     int32_t cosmValue(int part, int kind, int cosm, int16_t id) override {
         return reads_.read({ (int32_t)Vc2ParamBlock::kCosm, part, kind, cosm, id });
     }
-    bool oscBlock(int part, int kind, int osc) override {
-        return reads_.read({ kOscBlockCall, part, kind, osc, 0 }) != 0;
-    }
     bool held(int flag) override { return reads_.flags[flag] != 0; }
 
 private:
@@ -63,7 +63,8 @@ struct SettingsCounts {
     long events = 0, calls = 0, gaveUp = 0, flipped = 0;
     long moreEvents = 0, moreCalls = 0;   // the second part's (v287)
     long oscEvents = 0, oscCalls = 0;     // the third's (v288)
-    std::array<long, 24> byEvent {};
+    long blockEvents = 0, blockCalls = 0; // the fourth's (v289)
+    std::array<long, 26> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -87,17 +88,37 @@ std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std
 // The draws before an event: the store's seed, now and then a held flag, now and then one of the first `flipped`
 // flags set after a read
 void settingsDraw(SettingsSides& s, std::mt19937& rng, uint32_t flipped);
-// The third part (v288): the OSC table's readers
-long settingsOscPart(SettingsSides& s, const Vc2Run& run);
+// A further part (v289): its seed's offset from the run's, its counts, a case of its events, its line, and what it
+// does first
+struct SettingsPartRow {
+    uint32_t offset;
+    long SettingsCounts::*events;
+    long SettingsCounts::*calls;
+    std::string (*oneCase)(SettingsSides&, std::mt19937&, long&, long&);
+    void (*say)(const SettingsCounts&);
+    void (*start)(SettingsSides&) = nullptr;
+};
+// Its cases, its line, how many differ
+long settingsRunPart(SettingsSides& s, const Vc2Run& run, const SettingsPartRow& p);
+// The third part (v288): the OSC table's readers, the block reader hooked; the fourth (v289): rom.4's own
+// (Vc2PartSettingsOscCheck.cpp)
+extern const SettingsPartRow kOscPartRows[2];
 
 using SettingsEvent = std::string (*)(SettingsSides&, std::mt19937&);
 
-template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
-std::string partEvent(SettingsSides& s, std::mt19937& rng) {
+// A part's reader on a drawn part, the port's side `mine(part)` (v289)
+template <uint32_t Routine, uint32_t TableAt, size_t Counted, class Mine>
+std::string partEventWith(SettingsSides& s, std::mt19937& rng, const Mine& mine) {
     const int part = (int)(rng() % kSettingsParts);
     ++s.n.byEvent[Counted];
     return settingsOnBoth(s, { Routine, "a part's reader", vc2R0 }, { TableAt, (uint32_t)part },
-                          [&] { return (uint32_t)(s.settings.*Member)(s.rows, part); });
+                          [&] { return (uint32_t)mine(part); });
+}
+
+template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
+std::string partEvent(SettingsSides& s, std::mt19937& rng) {
+    const auto mine = [&](int part) { return (s.settings.*Member)(s.rows, part); };
+    return partEventWith<Routine, TableAt, Counted>(s, rng, mine);
 }
 
 template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
@@ -143,6 +164,7 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
     s.fw.cpu.write(kBytesAt, &t.bytes, sizeof t.bytes);
     s.fw.cpu.write(kCosmsAt, &t.cosms, sizeof t.cosms);
     s.fw.cpu.write(kOscsAt, &t.oscs, sizeof t.oscs);
+    s.fw.cpu.write(kStepsAt, &t.steps, sizeof t.steps);
     std::string what;
     for (int k = 0; k < kEventsACase && what.empty(); ++k, ++events) {
         settingsDraw(s, rng, Flipped);

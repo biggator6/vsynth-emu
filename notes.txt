@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's settings by ID, the OSC block's reader v289 (2026-11-19, on claude/vc2-part-4-3 after v288;
+  HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the OSC block's reader"): step 4.3's seventeenth version,
+  item 9's fourth part. On Vc2PartSettings (Vc2PartSettingsOscBlock.cpp): rom.4's 0x893a04e0, its 63 reads as rows
+  of an ID, its step by OSC, a place and a store in rom.4's order (Random Pitch Depth by its switch's law, Start
+  Offset a word, Time Offset read late), the Wave Number's change clearing part 0's step count (Vc2PartRows::steps,
+  0x89989c84; the VC-2 takes part 0 alone there), kind 0's Type 2 taking the Harm Formant's three. The part's reader
+  calls it (oscRows takes the block reader, so v288's check part keeps its fake). xt_vc2settings gains a fourth part:
+  0 different at seeds 2024, 7 and 31337, the first three parts' lines unchanged; mutate_vc2.py --settings 255
+  planted, 0 missed.
+  Not in the sound yet.
+
 The VC-2 part's settings by ID, the OSC table v288 (2026-11-19, on claude/vc2-part-4-3 after v287;
   HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the OSC table"): step 4.3's sixteenth version, item 9's
   third part. On Vc2PartSettings (Vc2PartSettingsOsc.cpp): the OSC table's systems' readers (the trailer, the

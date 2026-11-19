@@ -1546,6 +1546,61 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's settings by ID: the OSC block's reader (2026-11-19, v289) {#vc2-part-settings-osc-block}
+
+Step 4.3's seventeenth version (VC2_MODE_PLAN.md, step 4.3, item 9's fourth part): `0x893a04e0`, the reader v288's
+part reader calls for each kind's two OSC blocks, on `Vc2PartSettings` (`Vc2PartSettingsOscBlock.cpp`) and checked by
+`xt_vc2settings`' fourth part.
+
+**The reader** (`0x893a04e0(table, part, kind, osc)`, flag 1 tested before and after). It reads the kind's first
+block (`0x89320a50`) into the block at +0x1020 × the part + 32 + 0x100 × the kind + 0x80 × the OSC. OSC 2's IDs are
+OSC 1's + 52 for most. The Vibrato's step is 4, the carrier's 14. Detune and the Sub Oscillator's step 3, and the
+Harm Formant's 5, are taken once for any OSC past 1. In rom.4's order:
+- Switch, Type, Wave Gain, Pitch (0x2e4…0x2e7) into +0, +1, +2, +4; Pitch Keyfollow × 100 into the halfword +6; its
+  LFO and Envelope Depths and Coarse Tune into +8, +9, +0xe; Fine Tune × 10 into +0x10;
+- Random Pitch Depth (0x2ed) into the halfword +0x12 by a switch of 30: cents × 10, 0…9 by tens, 10…19 by hundreds
+  from 100, 20…29 by thousands from 2000, and anything past 29 (as unsigned) 12000;
+- Level, its Keyfollow × 10, its LFO Depth into +0x14, +0x16, +0x18; the Vibrato's Type, Rate, Depth (0x37c…) into
+  +0x1c…+0x1e;
+- the analog's Waveform, Impact, Pulse Width (0x2f1…) into +0x20…+0x22, its Keyfollow × 10 into +0x24, its LFO and
+  Envelope Depths into +0x26, +0x27; Fat, its Keyfollow × 10, LFO and Envelope Depths into +0x2c, +0x2e, +0x30, +0x31;
+- Detune and the Sub Oscillator's Octave and Level (0x34d…) into +0x36…+0x38;
+- the carrier's fourteen (0x354…: Saw Wave LPF cutoff, Level, Noise LPF and HPF cutoffs and Level, the Dynamics'
+  Threshold and Sensitivity, Growl Level, its Keyfollow × 10, LFO and Envelope Depths, the Saw-Noise Mix Balance and
+  its two depths) into +0x64…+0x68, +0x74, +0x75, +0x6a, +0x6c, +0x6e, +0x6f, +0x76, +0x7a, +0x7b;
+- the Wave Number (0x2fe) into the halfword +0x3c. When it changes, the OSC's step count goes to 0: a halfword at
+  `0x89989c84` + 64 × the part + 4 × the kind + 2 × the OSC, which the OSC block's converter reads (`0x8939fe66`);
+- Start Offset (0x306) into the word +0x40; Time, its Keyfollow × 10, its LFO and Envelope Depths into +0x44, +0x46,
+  +0x48, +0x49; Formant and its three likewise into +0x4e, +0x50, +0x52, +0x53; Tempo Sync, Robot Voice, Playback
+  Mode, Loop, Vari and Energy into +0x58…+0x5c and +0x5e; Time Offset (0x30b, read here, after Energy) into +0x5d;
+  Time Trip and its Beat Keep into +0x5f, +0x60;
+- for kind 0, when +1 (the Type) is 2: the Harm Formant, its Keyfollow × 10 and its Style (0x371, 0x372, 0x375) into
+  +0x4e, +0x50 and +0x5e, over the Formant's and Energy's.
+
+**Part 0 alone.** The step counts hold part 0's 64 bytes; the update queue (v279) follows at `0x89989cc4`. For a part
+past 0, rom.4 would clear a halfword over the queue and what follows it. Its handler `0x89392830` takes no part but 0
+before the readers run, and `0x89392750` clears part 0's counts. The port keeps part 0's (`Vc2PartRows::steps`) and
+writes nothing for another part.
+
+**The port.** The reads are rows of an ID, its step by OSC, a place and a store (byte, halfword, × 10, × 100, word,
+Random Pitch Depth's law), in rom.4's order. The part's reader is now `oscRows` given a block reader: `oscs` gives
+`oscBlock`, and the check's third part a fake, so its v288 line stands. `Vc2PartParams::oscBlock` is gone.
+
+**The check.** It is `xt_vc2settings`' fourth part, on the seed three after the run's. The hook on `0x893a04e0` comes
+off, so rom.4's own reader runs. Each case is noise in every table and the step counts, then 400 events: the block
+reader (part 0; kind 0 one time in four; OSC 0 or 1) and the part's reader on part 0. Before each, a block's Wave
+Number is set half the time to what the store will answer, so that it stays. The store gives the Types 0…3 half the
+time, so kind 0's Type 2 is met. The step counts are compared in every part. The further parts are now rows
+(`SettingsPartRow`) run by one routine.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first three parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsOscBlock.cpp` is reached but the guard on a part past 0, never drawn.
+- `mutate_vc2.py --settings`: 255 plants, none missed; v289's 48 new. Not planted: the read's part (part 0 alone is
+  given) and a once-past-OSC-1 step taken by the OSC (the same for OSCs 0 and 1).
+- The check caught one slip of mine on its first run: values 20…29 of Random Pitch Depth count from 2000, so 25 gives
+  7000.
+
 ### The VC-2 part's settings by ID: the OSC table (2026-11-19, v288) {#vc2-part-settings-osc}
 
 Step 4.3's sixteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's third part): the OSC table's readers, on

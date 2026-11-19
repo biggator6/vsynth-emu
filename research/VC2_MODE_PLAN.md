@@ -731,6 +731,11 @@ version against rom.4's routines with what it calls hooked:
         `0x893a04e0` behind `Vc2PartParams::oscBlock`; xt_vc2settings' third part (HARDWARE_FIRMWARE.md, "The VC-2
         part's settings by ID: the OSC table"). Left: the OSC block's reader (v289), the mode row, `0x893a72f0`, the
         dispatchers, the Category and budget and the nodes.
+      - the OSC block's reader done (v289): `0x893a04e0`, its 63 reads as rows in rom.4's order, Random Pitch Depth's
+        switch as its law, the Wave Number's change clearing part 0's step count (`0x89989c84`), kind 0's Type 2 taking
+        the Harm Formant's three; xt_vc2settings' fourth part (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID:
+        the OSC block's reader"). The VC-2 takes part 0 alone on this path (the handler `0x89392830`). Left: the mode
+        row, `0x893a72f0`, the dispatchers, the Category and budget and the nodes.
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.

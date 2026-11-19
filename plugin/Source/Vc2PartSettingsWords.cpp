@@ -10,6 +10,8 @@ void put16(uint8_t* at, int32_t v) {
     std::memcpy(at, &h, sizeof h);
 }
 
+void put32(uint8_t* at, int32_t v) { std::memcpy(at, &v, sizeof v); }
+
 int32_t times(int32_t v, int32_t by) {
     return static_cast<int32_t>(static_cast<uint32_t>(v) * static_cast<uint32_t>(by));
 }

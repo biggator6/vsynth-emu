@@ -1,11 +1,13 @@
 # Planted errors in the VC-2 part's settings by ID, for mutate_vc2.py --settings: each must make xt_vc2settings, on
 # rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2settings (Vc2PartSettings.cpp, v286),
-# vc2settingstables (Vc2PartSettingsTables.cpp, v287), vc2settingswords (Vc2PartSettingsWords.cpp) and vc2settingsosc
-# (Vc2PartSettingsOsc.cpp, v288).  Not planted: the depth law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways
-# give ±100), its byte casts within ±32 (the same there), the curve's test at 7 (7 either way), the products' 32-bit
-# wrap (no read reaches it), what Vc2PartSettings.h and Vc2PartSettingsWords.h hold (the held flags' numbers are
-# planted where each is tested), the OSC header's +1 and +5 one byte wider (what the next store overwrites), the
-# loader's test of the twelve IDs (rom.4's are never 0).
+# vc2settingstables (Vc2PartSettingsTables.cpp, v287), vc2settingswords (Vc2PartSettingsWords.cpp), vc2settingsosc
+# (Vc2PartSettingsOsc.cpp, v288) and vc2settingsblock (Vc2PartSettingsOscBlock.cpp, v289).  Not planted: the depth
+# law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
+# the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
+# Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
+# one byte wider (what the next store overwrites), the loader's test of the twelve IDs (rom.4's are never 0); in the
+# block reader, its part (the check gives part 0 alone, as rom.4's handler does) and the guard on a part past 0, and a
+# once-past-OSC-1 step taken by the OSC (the same for OSCs 0 and 1, all the part's reader gives).
 kinds|    for (int kind = 0; kind < kKinds; ++kind)|    for (int kind = 0; kind < kKinds - 1; ++kind)|vc2settingswords
 envelope-rows|kEnvelopes = 13, kLfos = 5;|kEnvelopes = 12, kLfos = 5;|vc2settings
 lfo-rows|kEnvelopes = 13, kLfos = 5;|kEnvelopes = 13, kLfos = 4;|vc2settings
@@ -179,9 +181,11 @@ osc-twelve-tens|times(get(ids[k]), kTen) : 0)|get(ids[k]) : 0)|vc2settingsosc
 osc-before|    if (p_.held(kHeldCommon)) return false;\n    uint8_t* row = t.oscs|    uint8_t* row = t.oscs|vc2settingsosc
 osc-after|    oscHeader(row, part);\n    if (p_.held(kHeldCommon)) return false;\n|    oscHeader(row, part);\n|vc2settingsosc
 osc-row-part|t.oscs.data() + kOscPart * part;|t.oscs.data() + kOscPart * (part & 7);|vc2settingsosc
-osc-block-stop|return p_.oscBlock(part, kind, osc) &&|return (p_.oscBlock(part, kind, osc) \|\| true) &&|vc2settingsosc
-osc-block-args|p_.oscBlock(part, kind, osc)|p_.oscBlock(part, osc, kind)|vc2settingsosc
-osc-block-after|p_.oscBlock(part, kind, osc) && oscVelocityRow(block, part, kind, osc)|oscVelocityRow(block, part, kind, osc) && p_.oscBlock(part, kind, osc)|vc2settingsosc
+osc-block-stop|return block(kind, osc) &&|return (block(kind, osc) \|\| true) &&|vc2settingsosc
+osc-block-args|return block(kind, osc) &&|return block(osc, kind) &&|vc2settingsosc
+osc-block-after|block(kind, osc) && oscVelocityRow(oscBlockAt(t, part, kind, osc), part, kind, osc)|oscVelocityRow(oscBlockAt(t, part, kind, osc), part, kind, osc) && block(kind, osc)|vc2settingsosc
+osc-own-block-args|{ return oscBlock(t, part, kind, osc); }|{ return oscBlock(t, part, osc, kind); }|vc2settingsosc
+osc-own-block-stop|{ return oscBlock(t, part, kind, osc); }|{ return oscBlock(t, part, kind, osc) \|\| true; }|vc2settingsosc
 osc-velocity-before|    if (p_.held(kHeldEnvelope)) return false;\n    for (size_t k|    for (size_t k|vc2settingsosc
 osc-velocity-flag|    if (p_.held(kHeldEnvelope)) return false;\n    for (size_t k|    if (p_.held(kHeldKind)) return false;\n    for (size_t k|vc2settingsosc
 osc-velocity-after|    return !p_.held(kHeldEnvelope);|    return true;|vc2settingsosc
@@ -213,3 +217,49 @@ osc-group-off-middle|{ 60, 0, 0, 127 }|{ 60, 0, 1, 127 }|vc2settingsosc
 osc-group-off-last|{ 60, 0, 0, 127 }|{ 60, 0, 0, 126 }|vc2settingsosc
 osc-group-length|kGroupLength = 11,|kGroupLength = 10,|vc2settingsosc
 osc-group-stride|kGroupStride = 4;|kGroupStride = 3;|vc2settingsosc
+block-held-before|    if (p_.held(kHeldKind)) return false;\n    uint8_t* block|    uint8_t* block|vc2settingsblock
+block-held-flag|    if (p_.held(kHeldKind)) return false;\n    uint8_t* block|    if (p_.held(kHeldEnvelope)) return false;\n    uint8_t* block|vc2settingsblock
+block-held-after|    return !p_.held(kHeldKind);|    return true;|vc2settingsblock
+block-kind-a|p_.value(Block::kKindA, part, kind, oscReadId|p_.value(Block::kKindB, part, kind, oscReadId|vc2settingsblock
+block-first-id|{ 0x2e4, 52, false, 0x00, put8 },|{ 0x2e3, 52, false, 0x00, put8 },|vc2settingsblock
+block-first-order|{ 0x2e4, 52, false, 0x00, put8 }, { 0x2e5, 52, false, 0x01, put8 },|{ 0x2e5, 52, false, 0x01, put8 }, { 0x2e4, 52, false, 0x00, put8 },|vc2settingsblock
+block-type-at|{ 0x2e5, 52, false, 0x01, put8 }|{ 0x2e5, 52, false, 0x03, put8 }|vc2settingsblock
+block-hundreds-row|{ 0x2e8, 52, false, 0x06, hundreds }|{ 0x2e8, 52, false, 0x06, tens }|vc2settingsblock
+block-hundreds|put16(at, times(v, 100));|put16(at, times(v, 99));|vc2settingsblock
+block-tens|put16(at, times(v, 10));|put16(at, times(v, 11));|vc2settingsblock
+block-random-row|{ 0x2ed, 52, false, 0x12, randomPitch }|{ 0x2ed, 52, false, 0x12, put16 }|vc2settingsblock
+block-random-tens|{ 10, 10, 0 }|{ 10, 10, 1 }|vc2settingsblock
+block-random-tens-end|{ 10, 10, 0 }|{ 9, 10, 0 }|vc2settingsblock
+block-random-hundreds|{ 20, 100, 9 }|{ 20, 100, 10 }|vc2settingsblock
+block-random-hundreds-step|{ 20, 100, 9 }|{ 20, 99, 9 }|vc2settingsblock
+block-random-thousands|{ 30, 1000, 18 }|{ 30, 1000, 19 }|vc2settingsblock
+block-random-thousands-end|{ 30, 1000, 18 }|{ 29, 1000, 18 }|vc2settingsblock
+block-random-past|kRandomPast = 12000;|kRandomPast = 11000;|vc2settingsblock
+block-random-signed|const auto u = static_cast<uint32_t>(v);|const auto u = static_cast<uint32_t>(v < 0 ? 0 : v);|vc2settingsblock
+block-step-52|{ 0x2f1, 52, false, 0x20, put8 }|{ 0x2f1, 51, false, 0x20, put8 }|vc2settingsblock
+block-vibrato-step|{ 0x37c, 4, false, 0x1c, put8 }|{ 0x37c, 3, false, 0x1c, put8 }|vc2settingsblock
+block-vibrato-at|{ 0x37e, 4, false, 0x1e, put8 }|{ 0x37e, 4, false, 0x1f, put8 }|vc2settingsblock
+block-detune-step|{ 0x34d, 3, true, 0x36, put8 }|{ 0x34d, 2, true, 0x36, put8 }|vc2settingsblock
+block-carrier-step|{ 0x354, 14, false, 0x64, put8 }|{ 0x354, 13, false, 0x64, put8 }|vc2settingsblock
+block-carrier-at|{ 0x359, 14, false, 0x74, put8 }|{ 0x359, 14, false, 0x69, put8 }|vc2settingsblock
+block-carrier-tens|{ 0x35c, 14, false, 0x6c, tens }|{ 0x35c, 14, false, 0x6c, put16 }|vc2settingsblock
+block-wave-id|kWave = { 0x2fe, 52, false, 0x3c, put16 };|kWave = { 0x2fd, 52, false, 0x3c, put16 };|vc2settingsblock
+block-wave-at|kWave = { 0x2fe, 52, false, 0x3c, put16 };|kWave = { 0x2fe, 52, false, 0x3e, put16 };|vc2settingsblock
+block-wave-test-wide|if (static_cast<uint16_t>(v) == was) return;|if (v == was) return;|vc2settingsblock
+block-wave-test-never|if (static_cast<uint16_t>(v) == was) return;|if (v == was - 0x10000) return;|vc2settingsblock
+block-wave-old-late|    std::memcpy(&was, at, sizeof was);\n    put16(at, v);|    put16(at, v);\n    std::memcpy(&was, at, sizeof was);|vc2settingsblock
+block-step-osc|kStepPart = 64, kStepKind = 4, kStepOsc = 2;|kStepPart = 64, kStepKind = 4, kStepOsc = 1;|vc2settingsblock
+block-step-kind|kStepPart = 64, kStepKind = 4, kStepOsc = 2;|kStepPart = 64, kStepKind = 2, kStepOsc = 2;|vc2settingsblock
+block-step-narrow|put16(t.steps.data() + step, 0);|put8(t.steps.data() + step, 0);|vc2settingsblock
+block-start-word|{ 0x306, 52, false, 0x40, put32 }|{ 0x306, 52, false, 0x40, put16 }|vc2settingsblock
+block-time-offset-order|{ 0x315, 52, false, 0x5e, put8 },\n    { 0x30b, 52, false, 0x5d, put8 },|{ 0x30b, 52, false, 0x5d, put8 },\n    { 0x315, 52, false, 0x5e, put8 },|vc2settingsblock
+block-last|{ 0x317, 52, false, 0x60, put8 }|{ 0x318, 52, false, 0x60, put8 }|vc2settingsblock
+block-harm-any-kind|if (kind == kHarmKind && block[kTypeAt] == kHarmType)|if (block[kTypeAt] == kHarmType)|vc2settingsblock
+block-harm-kind|kHarmKind = 0,|kHarmKind = 1,|vc2settingsblock
+block-harm-type|kHarmType = 2,|kHarmType = 3,|vc2settingsblock
+block-harm-type-at|kTypeAt = 1;|kTypeAt = 0;|vc2settingsblock
+block-harm-step|{ 0x371, 5, true, 0x4e, put8 }|{ 0x371, 4, true, 0x4e, put8 }|vc2settingsblock
+block-harm-tens|{ 0x372, 5, true, 0x50, tens }|{ 0x372, 5, true, 0x50, put16 }|vc2settingsblock
+block-harm-style|{ 0x375, 5, true, 0x5e, put8 }|{ 0x374, 5, true, 0x5e, put8 }|vc2settingsblock
+block-once|const int n = r.once ? (osc != 0 ? 1 : 0) : osc;|const int n = r.once ? 0 : osc;|vc2settingsblock
+put32-short|void put32(uint8_t* at, int32_t v) { std::memcpy(at, &v, sizeof v); }|void put32(uint8_t* at, int32_t v) { std::memcpy(at, &v, 3); }|vc2settingswords

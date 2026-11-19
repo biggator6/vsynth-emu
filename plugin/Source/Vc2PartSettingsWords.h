@@ -10,6 +10,7 @@ constexpr int kHeldCommon = 0, kHeldKind = 1, kHeldEnvelope = 2, kHeldLfo = 3;  
 
 void put8(uint8_t* at, int32_t v);
 void put16(uint8_t* at, int32_t v);
+void put32(uint8_t* at, int32_t v);   // v289
 // A product in 32 bits, as mul.l keeps it
 int32_t times(int32_t v, int32_t by);
 // Each kind's `rows` rows in turn, the first that gives up stopping the rest
