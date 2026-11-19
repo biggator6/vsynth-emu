@@ -137,9 +137,9 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow, &kCategoryPartRow,
                                       &kStaticPartRow, &kSystemPartRow })
         different += settingsRunPart(s, run, *p);
-    for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow, &kRoutingPartRow })
+    for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow, &kRoutingPartRow, &kReloadPartRow })
         different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kReloadPartRow);
+    return different + settingsRunPart(s, run, kControllerPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {

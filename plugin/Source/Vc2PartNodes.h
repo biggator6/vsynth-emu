@@ -56,6 +56,8 @@ struct Vc2PartNodes {
     static uint32_t addressOf(int source, int part) {
         return kNodesAt + static_cast<uint32_t>(sizeof(Vc2PartNode) * (kParts * (source - 1) + part));
     }
+    // (v301) a node by its address, as a list links it
+    const Vc2PartNode& node(uint32_t address) const { return nodes[(address - kNodesAt) / sizeof(Vc2PartNode)]; }
     // 0x89393100: the node at `node` onto `channel`'s list of `source` (less 1), or none
     void move(uint32_t node, int32_t source, int32_t channel);
     // 0x893932c0 and 0x89393310: the node's part object given its class, the part's glides reset

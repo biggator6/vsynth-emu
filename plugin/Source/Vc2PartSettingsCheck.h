@@ -10,6 +10,7 @@
 #include "Vc2LibMathTables.h"
 #include "Vc2KeysTables.h"
 #include "Vc2MatrixTables.h"
+#include "Vc2PartControllers.h"
 #include "Vc2PartSettingsCalls.h"
 #include "Vc2PartSettingsTables.h"
 #include <span>
@@ -117,9 +118,10 @@ struct SettingsCounts {
     long receiveEvents = 0, receiveCalls = 0;                                   // the twelfth's (v298)
     long routingEvents = 0, routingCalls = 0;                                   // the thirteenth's (v299)
     long reloadEvents = 0, reloadCalls = 0;                                     // the fourteenth's (v300)
+    long controllerEvents = 0, controllerCalls = 0;                             // the fifteenth's (v301)
     // from v298 the twelfth's controllers and held notes heard at 50 and 51, from v299 the thirteenth's all notes off
-    // at 54, from v300 the fourteenth's removes made held at 62
-    std::array<long, 63> byEvent {};
+    // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66
+    std::array<long, 67> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -139,6 +141,8 @@ struct SettingsSides {
     Vc2StaticMatrix staticM {};       // v295
     Vc2Keys keys {};                  // v297: v276's keys, which a node's class install resets
     Vc2PartReloads reloads { mine.flags, outs };   // v300
+    std::array<Vc2TripFront, kSettingsParts> trips {};   // v301: the parts' trip objects, the port's
+    uint8_t tripAnswer = 0;                              // v301: the trip's move's answer, drawn for both sides
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -216,6 +220,8 @@ extern const SettingsPartRow kReceivePartRow;
 extern const SettingsPartRow kRoutingPartRow;
 // The fourteenth (v300): the reload objects (Vc2PartReloadsCheck.cpp)
 extern const SettingsPartRow kReloadPartRow;
+// The fifteenth (v301): the controllers (Vc2PartControllersCheck.cpp)
+extern const SettingsPartRow kControllerPartRow;
 // v291's to v293's parts' noise stops before v294's word
 inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
 // v294's and v295's parts' noise stops before v296's words

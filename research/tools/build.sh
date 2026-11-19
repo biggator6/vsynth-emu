@@ -80,6 +80,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    $( [ -f Vc2PartSettingsReceive.cpp ] && echo Vc2PartSettingsReceive.cpp Vc2PartSettingsReceiveCheck.cpp ) \
    $( [ -f Vc2PartSettingsRoutingCheck.cpp ] && echo Vc2PartSettingsRoutingCheck.cpp ) \
    $( [ -f Vc2PartReloads.cpp ] && echo Vc2PartReloads.cpp Vc2PartReloadsCheck.cpp ) \
+   $( [ -f Vc2PartControllers.cpp ] && echo Vc2PartControllers.cpp Vc2PartControllersCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2settings" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \

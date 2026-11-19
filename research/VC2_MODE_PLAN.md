@@ -803,6 +803,13 @@ version against rom.4's routines with what it calls hooked:
          `0x8939b050`; the queue's add and remove and the part's read through `Vc2ReloadParts`; xt_vc2settings'
          fourteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's reload objects"). Next: the controllers
          (`0x89392f90`, `0x89394440`), then the part's init (`0x8939b200`, `0x89393370`) and the MIDI dispatcher.
+       - the controllers done (v301): `Vc2PartControllers`, the controller `0x89392f90` (the number's object's virtual,
+         then each node on the source's channel's list through the part's controller) and the part's controller
+         `0x89394440` (Time Trip Assign X and Y on the part's trip object, Reset All Controllers its rest); the number's
+         objects, a word's first byte, the part table and the trip object's `0x893b0610` and `0x893b0460` through
+         `Vc2ControllerParts`; xt_vc2settings' fifteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's controllers").
+         Next: the part's init (`0x89393370`, which makes the 128 number objects, and `0x8939b200`), the Time Trip
+         object (`0x893b0610`, `0x893b0460`), then the MIDI dispatcher `0x8938fed0`.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

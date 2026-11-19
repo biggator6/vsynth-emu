@@ -1546,6 +1546,54 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's controllers (2026-11-19, v301) {#vc2-part-controllers}
+
+Step 4.3's twenty-ninth version (VC2_MODE_PLAN.md, step 4.3, item 10's sixth part): the controller the Category
+(v294), the receive channel (v298), the notes' task's event 0x80 and the MIDI dispatcher send, and the part's
+controller it runs, on a new `Vc2PartControllers` (`Vc2PartControllers.h/.cpp`), checked by `xt_vc2settings`'
+fifteenth part.
+
+**The controller** `0x89392f90(source, channel, number, value)`, its source counting from 1 (so v294's and v298's
+`controller(3, …)` are source 3's, the receive channel's the source whose node changed): first the number's object
+(`[0x899891e0 + 4 × number]`, 128 of them, made by the part's init `0x89393370`, item 10's next) is given the source and
+channel through its virtual (the object's vtable at +4, the function at the vtable's +0x14, `this` moved by its +0xc);
+then each node on the list of the source (less 1) and channel (`0x899890d0`, v293's; a channel of −1 reads the list
+before, the last channel's of the source before) gives the first byte of its word (+8) as a part to the part's
+controller with the number and value.
+
+**The part's controller** `0x89394440(part, number, value)`, three tests each made, so a number may match more than one:
+- **Time Trip Assign X** (v296's byte `0x89989404`): the part's trip object (the part table `0x8993d040`, v245's), the
+  value as a signed byte: with the trip not under way (its +8 0) or the value above 0, the pad's X (+0x20) is the value;
+  else the trip object's `0x893b0610(trip, 0, X, Y)` and the part's byte (+0x24) at rest, 127.
+- **Time Trip Assign Y** (`0x89989405`): the trip not under way, a value above 0 is the pad's Y (+0x21) and, with X above
+  0, `0x893b0610(trip, 1, X, Y)`; under way, a value above 0 is Y and the part's byte is `0x893b0460(trip, X, Y)`'s
+  answer, else `0x893b0610(trip, 0, X, Y)` and 127.
+- **Reset All Controllers** (121): `0x893b0610(trip, 0, 0, 0)` and 127.
+
+The trip object's fields are read as they stand at each test. `0x893b0610` and `0x893b0460` are the VC-2's Time Trip
+object's (with `0x893b0690`, `0x893b0790` and `0x893b1780` under them), a port of their own to come. `0x893943c0` (a
+part's trip at rest alone) is not ported: nothing calls it.
+
+The number's objects, a word's first byte, the part table and the trip object's two routines go out through
+`Vc2ControllerParts`; the trip object's front is `Vc2TripFront`.
+
+**The check.** `xt_vc2settings`' fifteenth part, on the seed fourteen after the run's. rom.4's 128 number objects are
+made at addresses of the check's own, one vtable whose +0x14 is a hooked address logging the number; the part table
+points at 16 trip objects' fronts in scratch memory; each node's word points at a byte of its own with a part 0…15.
+Each case gives every table noise, the nodes noise with their lists drawn as `xt_vc2keys`' second part draws them, and
+the trip objects noise. Before each event Time Trip Assign X and Y are drawn (0…127, 121 or −1, now and then the same),
+now and then a part's trip object's flag (0, 1 or any), X and Y, and the trip's move's answer. The trip object's two
+routines are hooked to log; the earlier parts' hook on the controller is taken off. Events: the controller (a source
+1…4, a channel 0…15 or, from source 2, −1; a number Time Trip Assign X or Y or 121 half the time, else 0…127) and the
+part's controller alone (any number). After each, the tables, the trip objects and the calls. Not drawn: a
+controller's number past 0…127 (rom.4 reads past its table).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first fourteen parts' lines as they were.
+- Every line and branch of `Vc2PartControllers.cpp` is reached.
+- `mutate_vc2.py --settings`: 623 plants, none missed; v301's 30 new. `mutate_vc2.py --keys` (`Vc2PartNodes.h`'s
+  `node`): 105, none missed.
+
 ### The VC-2 part's reload objects (2026-11-19, v300) {#vc2-part-reload-objects}
 
 Step 4.3's twenty-eighth version (VC2_MODE_PLAN.md, step 4.3, item 10's fifth part): what the parameters' messages
@@ -1663,8 +1711,8 @@ parameters' message (kind 4, v297) runs for part 0, on `Vc2PartSettings` (`Vc2Pa
   `0x89988620`; for source 4 its channel 0's table whatever the channel (the code for s = 3 is unrolled with the
   channel 0).
 - For part 0 alone, if source 3's node's channel changed: with the old channel not −1, three controllers from source
-  index 3 on the old channel (`0x89392f90`: 121 Reset All Controllers with 0, 123 All Notes Off with −1, 120 All
-  Sound Off with 0); then with the new channel not −1, the held note's word (`0x899891d0`, v294's) picks: 0, all notes
+  3 on the old channel (`0x89392f90`, whose source counts from 1, v301: 121 Reset All Controllers with 0, 123 All Notes
+  Off with −1, 120 All Sound Off with 0); then with the new channel not −1, the held note's word (`0x899891d0`, v294's) picks: 0, all notes
   off (`0x89391e30`, the notes' task's event 0x80); else the held note's event `0x89391e50` (event 0x200 to the notes'
   task, `0x8994fec8`, whose way sounds key 60 at 127 by `0x89392da0` on source 4's channel when `0x89981904` is 0).
 - It answers 1 on every way.

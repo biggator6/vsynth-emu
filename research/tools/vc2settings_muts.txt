@@ -18,7 +18,8 @@
 # 1) and vc2partreloads (Vc2PartReloads.cpp, v300; not the fire's state while it reads, as the read is hooked and
 # nothing looks at the state then, nor the OS base's vtable, which the object's overwrites, nor the request's test of
 # its posted word: posted, the switch after it ends as the test's way does, asked with the remove held once if it was
-# reading and nothing posted again).  Not planted: the depth
+# reading and nothing posted again) and vc2partcontrollers (Vc2PartControllers.cpp, v301; not the Y way's set with the
+# trip stopped given its Y field for the value, which it has just stored).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -619,3 +620,33 @@ reload-message-reading|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2
 reload-message-past|s < std::size(kWays) ? kWays[s] : kWays[kAsked]|s < std::size(kWays) ? kWays[s] : kWays[kIdle]|vc2partreloads
 tables-reload-float|{ 0x8939b390, &reloadFloats[0] }|{ 0x8939b394, &reloadFloats[0] }|vc2settingstables
 tables-reload-order|{ 0x8939b380, &reloadFloats[1] }, { 0x8939b388, &reloadFloats[2] }|{ 0x8939b388, &reloadFloats[1] }, { 0x8939b380, &reloadFloats[2] }|vc2settingstables
+ctl-no-number|    parts_.numberChanged(number, source, channel);\n|\n|vc2partcontrollers
+ctl-number-args|parts_.numberChanged(number, source, channel);|parts_.numberChanged(number, channel, source);|vc2partcontrollers
+ctl-list|Vc2PartNodes::kChannels * (source - 1) + channel;|Vc2PartNodes::kChannels * (source - 1) + (channel & 7);|vc2partcontrollers
+ctl-list-walk|at != 0; at = nodes_.node(at).next)|at != 0; at = 0)|vc2partcontrollers
+ctl-part-byte|partController(parts_.firstByte(nodes_.node(at).word8), number, value);|partController(parts_.firstByte(nodes_.node(at).word8) & 7, number, value);|vc2partcontrollers
+ctl-part-args|partController(parts_.firstByte(nodes_.node(at).word8), number, value);|partController(parts_.firstByte(nodes_.node(at).word8), value, number);|vc2partcontrollers
+padx-moving|    if (t.moving == 0 \|\| v > 0) {|    if (t.moving == 0 && v > 0) {|vc2partcontrollers
+padx-sign|    if (t.moving == 0 \|\| v > 0) {|    if (t.moving == 0 \|\| v >= 0) {|vc2partcontrollers
+padx-store|        t.x = v;\n        return;|        t.y = v;\n        return;|vc2partcontrollers
+padx-stop|    parts_.tripSet(at, kStop, t.x, t.y);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::padY|    parts_.tripSet(at, kStart, t.x, t.y);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::padY|vc2partcontrollers
+padx-level|    t.level = kRest;\n}\n\nvoid Vc2PartControllers::padY|    t.level = 0;\n}\n\nvoid Vc2PartControllers::padY|vc2partcontrollers
+pady-moving|    if (t.moving == 0) {\n        if (v <= 0) return;|    if (t.moving != 0) {\n        if (v <= 0) return;|vc2partcontrollers
+pady-off-sign|        if (v <= 0) return;|        if (v < 0) return;|vc2partcontrollers
+pady-off-store|        t.y = v;\n        if (t.x > 0)|        if (t.x > 0)|vc2partcontrollers
+pady-off-x|        if (t.x > 0) parts_.tripSet(at, kStart, t.x, v);|        if (t.x >= 0) parts_.tripSet(at, kStart, t.x, v);|vc2partcontrollers
+pady-off-start|parts_.tripSet(at, kStart, t.x, v);|parts_.tripSet(at, kStop, t.x, v);|vc2partcontrollers
+pady-on-sign|    if (v > 0) {\n        t.y = v;\n        t.level|    if (v >= 0) {\n        t.y = v;\n        t.level|vc2partcontrollers
+pady-on-store|        t.y = v;\n        t.level = parts_.tripMove|        t.level = parts_.tripMove|vc2partcontrollers
+pady-move-level|        t.level = parts_.tripMove(at, t.x, v);|        parts_.tripMove(at, t.x, v);|vc2partcontrollers
+pady-move-args|parts_.tripMove(at, t.x, v);|parts_.tripMove(at, v, t.x);|vc2partcontrollers
+pady-stop|    parts_.tripSet(at, kStop, t.x, t.y);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::rest|    parts_.tripSet(at, kStop, t.y, t.x);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::rest|vc2partcontrollers
+rest-zero|parts_.tripSet(at, kStop, 0, 0);|parts_.tripSet(at, kStop, 0, 1);|vc2partcontrollers
+rest-level|parts_.trip(at).level = kRest;|parts_.trip(at).level = 0;|vc2partcontrollers
+ctl-rest|constexpr uint8_t kRest = 127;|constexpr uint8_t kRest = 126;|vc2partcontrollers
+ctl-reset-all|constexpr int32_t kResetAll = 121;|constexpr int32_t kResetAll = 120;|vc2partcontrollers
+ctl-start|constexpr int32_t kStop = 0, kStart = 1;|constexpr int32_t kStop = 0, kStart = 2;|vc2partcontrollers
+ctl-match-x|{ rows_.tripAssigns[0], rows_.tripAssigns[1], kResetAll }|{ rows_.tripAssigns[1], rows_.tripAssigns[1], kResetAll }|vc2partcontrollers
+ctl-ways|{ &Vc2PartControllers::padX, &Vc2PartControllers::padY, &Vc2PartControllers::rest }|{ &Vc2PartControllers::padY, &Vc2PartControllers::padX, &Vc2PartControllers::rest }|vc2partcontrollers
+ctl-ways-count|for (size_t k = 0; k < std::size(kWays); ++k)|for (size_t k = 0; k + 1 < std::size(kWays); ++k)|vc2partcontrollers
+ctl-first-match|if (number == matches[k]) (this->*kWays[k])(part, value);|if (number == matches[k]) {\n            (this->*kWays[k])(part, value);\n            break;\n        }|vc2partcontrollers
