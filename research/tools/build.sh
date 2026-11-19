@@ -38,12 +38,16 @@ rm -f "$O"/xt_vc2cosm
 rm -f "$O"/xt_vc2libm
 rm -f "$O"/xt_vc2voices
 rm -f "$O"/xt_vc2notes
+rm -f "$O"/xt_vc2keys
 # The part's voices and their lists (v272) against rom.4's own routines, the destroys, end test and cost hooked
 [ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
    Vc2PartVoicesFakes.cpp Vc2PartVoices.cpp Vc2PartVoicesTables.cpp "${SH4[@]}" -o "$O/xt_vc2voices" &
 # The part's notes W (v275) against rom.4's own routines, every tone method they reach hooked
 [ -f Vc2NotesCheck.cpp ] && cc -DXT_VC2NOTES_MAIN Vc2NotesCheck.cpp Vc2NotesEvents.cpp Vc2NotesFakes.cpp \
    Vc2Notes.cpp "${SH4[@]}" -o "$O/xt_vc2notes" &
+# The part's keys (v276) against rom.4's own routines, the OS clock hooked
+[ -f Vc2KeysCheck.cpp ] && cc -DXT_VC2KEYS_MAIN Vc2KeysCheck.cpp Vc2KeysEvents.cpp Vc2Keys.cpp Vc2KeysTables.cpp \
+   "${SH4[@]}" -o "$O/xt_vc2keys" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \
    "${SH4[@]}" -o "$O/xt_vc2libm" &

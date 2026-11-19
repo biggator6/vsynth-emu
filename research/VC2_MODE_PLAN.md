@@ -666,6 +666,11 @@ version against rom.4's routines with what it calls hooked:
         nothing calls. The notes' task sets the hook word to `0x893901a0` (version 10's).
    4. The key table: `0x89392190`, `0x893920c0`, `0x89391e90`, `0x89391ef0`, `0x89392670` and the held-key queries, held
       to `XtKeys.h` where rom.2's layout matches (step 1b found key assign equal).
+      - done (v276): `Vc2Keys`, the 66 key tables and the 129 portamento keys with every routine of theirs (the reset,
+        the pedals, the clear, the velocity factor, the five queries, the portamento keys' constructor, reset, note-on,
+        note-off and two initializers), the portamento keys' laws `XtKeyState`'s; their tables `Vc2KeysTables`;
+        `xt_vc2keys` (HARDWARE_FIRMWARE.md, "The VC-2 part's keys"). Left to the assigner: the voice's held bits
+        (`0x89391760`, `0x89391820`, `0x89391880`) and who aims a portamento key at its own channel's table.
    5. The assigner: `0x89396a80`, `0x89396c90`, `0x893969e0`, `0x89390860`, mono's `0x89390b20` and `0x89390b90`, the
       release path, the pedals, on faked voices' virtuals.
    6. The voice's virtuals (`0x89397130`, `0x893970b0`, `0x893971f0`, `0x89397280`, `0x893972d0`, `0x893973a0`) and the

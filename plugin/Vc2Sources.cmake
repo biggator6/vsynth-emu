@@ -93,4 +93,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2PartVoices.cpp
     Source/Vc2PartVoicesTables.cpp
     Source/Vc2Notes.cpp
+    Source/Vc2Keys.cpp
+    Source/Vc2KeysTables.cpp
 )

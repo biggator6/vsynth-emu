@@ -819,6 +819,10 @@ xt_vc2voices: 0 different
 notes: 40 cases, 16000 events: 1964 constructors, 2023 note-ons (1375 with a partner), 993 ends, 983 and 1056 passes, 1032 releases, 1070 truncations once, 1017 starts and 1005 copies', 985 placements, 947 positions, 940 and 1001 of the tone's routines, 984 initializers
 their calls: 1964 makes, 817 end tests, 1365 unmakes, 1030 truncations (577 at once), 2023 tone note-ons, 2022 starts, 68469 block setters, 1032 key-offs, 947 positions, 940 hooks
 xt_vc2notes: 0 different
+== xt_vc2keys
+keys: 40 cases, 16000 events: 682 inits, 663 resets, 1311 note-ons (56 at the most), 1370 note-offs (96 releasing), 673 Holds, 1475 Sostenutos (720 latching or clearing), 689 clears, 632 velocity factors
+queries: 1410 highest in a range (588 found), 695 highest, 709 sets, 641 fills, 677 tests; glides: 654 constructors, 677 resets, 1353 note-ons, 1397 note-offs (485 found); initializers: 94, 96 and 102
+xt_vc2keys: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

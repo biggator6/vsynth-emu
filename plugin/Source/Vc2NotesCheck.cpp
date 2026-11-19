@@ -12,9 +12,9 @@
 // XT_VC2NOTES_STOP=1 stops there.  XT_VC2NOTES_MAIN only.
 #ifdef XT_VC2NOTES_MAIN
 #include "Vc2CheckCalls.h"
+#include "Vc2CheckMain.h"
 #include "Vc2NotesCheck.h"
 #include <cstring>
-#include <memory>
 
 namespace {
 using N = Vc2Notes;
@@ -144,13 +144,7 @@ std::string notesDifference(NoteSides& s) {
 }
 
 int main(int argc, char** argv) {
-    Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2notes", vc2LoadAll<>);
-    if (!run) return 1;
-    const auto s = std::make_unique<NoteSides>(fw);
-    Vc2Tally tally { "XT_VC2NOTES_FIRST", "XT_VC2NOTES_STOP" };
-    vc2RunCases(*run, tally, "", s->n.events, [&](std::mt19937& rng, bool) { return notesCase(*s, rng); });
-    sayNoteCounts(*run, s->n, tally.different);
-    return 0;
+    const Vc2CheckStart start { "xt_vc2notes", vc2LoadAll<>, { "XT_VC2NOTES_FIRST", "XT_VC2NOTES_STOP" } };
+    return vc2CheckMain<NoteSides>(argc, argv, start, notesCase, sayNoteCounts);
 }
 #endif

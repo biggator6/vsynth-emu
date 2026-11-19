@@ -1546,6 +1546,94 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's keys (2026-11-19, v276) {#vc2-part-keys}
+
+Step 4.3's fourth version (VC2_MODE_PLAN.md, step 4.3, item 4). `Vc2Keys` holds the part's key tables and the
+portamento's keys word for word, the span `0x89982720…0x899888ac`. Its routines are bit for bit against rom.4's own in
+`xt_vc2keys`.
+
+**The key tables K**, 0x134 bytes each. There are 64, one by source (0…3) and channel at `0x89982720` + 0x1340 × source +
+0x134 × channel, and two of the part's own: `0x89988620`, which code beyond the keys sets up, and `0x89988754`. A
+table's words:
+
+| Offset | What |
+|---|---|
+| +0x000 | the channel's state, by address: rom.4's table `0x8950d6e0` (16 words a row) by the source's row at `0x8950d6d9` (sources 0…2 row 0, source 3 row 1), + 2 |
+| +0x004, +0x005 | the source and channel it was set up for |
+| +0x006 | the velocity curve, one of eight at `0x89535518`, 128 bytes each |
+| +0x007, +0x008 | the last note-on's key, and its velocity through the curve |
+| +0x009, +0x00a | the last note-off's key, and its velocity as given |
+| +0x00c…+0x01b | the keys held, a bitmap: key k at bit k & 15 of halfword k >> 4 |
+| +0x01c…+0x09b | each key's note-ons, held at 255 |
+| +0x09c…+0x11b | each key's note-offs, held at 255 |
+| +0x11c, +0x11d | the Hold and Sostenuto pedals' values |
+| +0x120…+0x12f | the keys held when Sostenuto went down |
+| +0x130 | 0xff after a reset |
+| +0x131 | 1 after a note-on, 0 after a note-off |
+
+A key stays held until its note-offs are as many as its note-ons. A note-off with no note-on counted leaves the counts
+alone.
+
+The tables' routines:
+- the init `0x893920c0(K, source, channel)`;
+- the reset `0x89392040`, which marks +0x130 and clears Sostenuto, the latched keys, the held keys and the counts;
+- the static initializer `0x89392190`, which inits the 64 tables channel by channel and resets `0x89988754` inline (the
+  table at `0x89988620` it leaves alone);
+- the note-on `0x89391e90` and note-off `0x89391ef0`;
+- the Hold `0x89391f60`, which stores the value;
+- the Sostenuto `0x89391f70`: when the value's bit 6 differs from the last, it latches the held keys from 64 up (signed)
+  and clears the latched keys below, then stores the value;
+- the clear `0x89391fe0` (the held keys and counts only);
+- the velocity factor `0x89392280`: the curve's velocity squared over 127² (the pool word `0x89392400`), rounded to zero.
+  Nothing calls it.
+
+**The held keys' queries** take any bitmap.
+- `0x89392670(bits, lo, hi)`: the highest key held from hi down to lo, or −1. In hi's own halfword it ignores lo: a key
+  there below lo is still found. Every caller gives 0 and 127.
+- `0x893925e0`: the same over 0…127. `0x89392630` sets lo…hi. `0x893925a0` sets every key. `0x893925b0` tests for any.
+  These four have no caller.
+
+**The portamento's keys P**, 0x24 bytes each: 128 at `0x89987420` (source s, channel c, n of 2 at 0x480 × s + 0x48 × c +
+0x24 × n) and `0x89988888`, the own table's. Their layout is rom.2's `XtKeyState`'s, and so are their laws: the note-on
+`0x893922d0` (the key is the table's +7, the clock the OS's `0x893018d0`) and the note-off `0x89392360` (the table's +9
+against the sounding key, the highest held by `0x89392670`). Beyond rom.2's there are three words:
+- +0 is the table;
+- +8 is pointed at +4 by the constructor `0x893922b0`, which calls operator new when given none;
+- +0x1e is the time since the note-on before, held at 0xffff.
+
+The note-off passes its caller's r5 and r6 to the query, and every caller (`0x89396cc0`, `0x89396cfe`) gives 0 and 127,
+so the port's note-off takes none. Its other routines:
+- the reset `0x893923c0` (the keys 60, the held flags 0, the window 32);
+- the static initializer `0x89392410`. It aims every P of source s at the table of source s and channel 0, whatever its
+  own channel, and the own P at `0x89988754`; its branch for a negative source, with `0x89988620`, is never taken;
+- the array's `0x89392560` (`0x8950773a` with the constructor on the 128, then the own P's +8).
+
+`0x89392750`, which clears 16 pairs of halfwords on a base it is given, has no caller and is not ported.
+
+**The check.** `xt_vc2keys` runs rom.4's own routines on the span, with only the OS clock hooked, to answer the ms an
+event draws.
+
+Each case starts from noise. Every table's curve is one of the eight. Every glide is aimed at a table, with its held
+flags 0 or 1 and its clock below 2^30. Then come 400 events:
+- a table's init, reset, note-on, note-off, Hold, Sostenuto, clear and velocity factor;
+- the five queries, on a table's held or latched keys;
+- a glide's constructor, reset, note-on and note-off;
+- one event in 50, an initializer.
+
+Before each event, a table's counts and held bit for a key are drawn, and the event takes that table and key half the
+time. A table's held keys, Sostenuto and curve, or a glide's words, are drawn now and then. After each event, the span is
+compared word for word, then the answer.
+
+Not drawn:
+- keys and note-on velocities past 127, and ranges below 0 or past 127 (rom.4 reads and writes beyond the table there);
+- held flags other than 0 and 1 (no routine writes another);
+- clocks 2^30 apart (`XtKeyState`'s difference is an int's).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2Keys.cpp` is reached.
+- `mutate_vc2.py --keys`: 78 planted, 0 missed.
+
 ### The VC-2 part's notes (2026-11-19, v275) {#vc2-part-notes}
 
 Step 4.3's third version (VC2_MODE_PLAN.md, step 4.3, item 3). A note W is what a voice plays: the tone's input and the

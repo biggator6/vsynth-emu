@@ -28,7 +28,8 @@
 # Filters' (vc2cosmsideband, v241), under xt_vc2cosm; the Matrix core's refresh and groups (v243) in vc2matrix's file;
 # the Matrix's sources (vc2matrixsources, v245), under xt_vc2cosm; the library's logf and powf (vc2libm) and their
 # constants (vc2libmtables) under xt_vc2libm; the part's voices and their lists (vc2voices, v272) and their constants
-# (vc2voicestables) under xt_vc2voices; the part's notes W (vc2notes, v275) under xt_vc2notes.
+# (vc2voicestables) under xt_vc2voices; the part's notes W (vc2notes, v275) under xt_vc2notes; the part's keys
+# (vc2keys, v276) and their tables (vc2keystables) under xt_vc2keys.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -64,6 +65,7 @@ VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmT
 VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck)
 VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEvents Vc2PartVoicesFakes)
 VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
+VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -163,6 +165,8 @@ VC2PORTS=(
     "vc2voices|Vc2PartVoices.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
     "vc2voicestables|Vc2PartVoicesTables.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
     "vc2notes|Vc2Notes.cpp|XT_VC2NOTES_MAIN|vc2notes_obj|VC2NOTES"
+    "vc2keys|Vc2Keys.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
+    "vc2keystables|Vc2KeysTables.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port

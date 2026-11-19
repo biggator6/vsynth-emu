@@ -1,6 +1,7 @@
 // xt_vc2notes' events (v275): each of the notes' routines on both sides, rom.4's then the port's, and what differs
 // after: the notes' words, the tones' routines, the calls and the answer.  XT_VC2NOTES_MAIN only.
 #ifdef XT_VC2NOTES_MAIN
+#include "Vc2CheckMain.h"
 #include "Vc2NotesCheck.h"
 
 namespace {
@@ -12,14 +13,8 @@ constexpr uint32_t kNoteBytes = sizeof(Vc2NoteWords);   // [FW] the placement's 
 template <class Mine>
 std::string notesOnBoth(NoteSides& s, uint32_t routine, std::initializer_list<uint32_t> args, const char* name,
                         bool answers, Mine mine) {
-    uint32_t ours = 0;
-    return vc2BothOn(s.fw, routine, args, name, [&] { ours = mine(); }, [&] {
-        const std::string what = notesDifference(s);
-        if (!what.empty() || !answers || s.fw.cpu.r[0] == ours) return what;
-        char t[96];
-        std::snprintf(t, sizeof t, "%s answers %08x, against %08x", name, ours, s.fw.cpu.r[0]);
-        return std::string(t);
-    });
+    const Vc2CheckRoutine r { routine, name, answers ? vc2R0 : nullptr };
+    return vc2BothAnswer(s.fw, r, args, mine, [&] { return notesDifference(s); });
 }
 
 uint32_t notesAny(NoteSides& s, std::mt19937& rng) { return s.port.addressOf(rng() % N::kNotes); }

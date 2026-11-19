@@ -1,0 +1,84 @@
+# Planted errors in the VC-2 part's keys, for mutate_vc2.py --keys: each must make xt_vc2keys, on rom.4, say something
+# differs.  name|old|new[|port[|seed]]; ports vc2keys (Vc2Keys.cpp, v276) and vc2keystables (Vc2KeysTables.cpp: the
+# tables' addresses, each moved to a neighbour holding another value).
+# Not planted: the highest bit's start below 15 (it reads before the bits' table), a table's index by channel and source
+# swapped (past the 64 tables), and Vc2Keys.h's layout (the VC-2 ports' route builds the kept objects from the unplanted
+# sources).
+init-source|    source = (uint8_t)src;|    source = (uint8_t)ch;|vc2keys
+init-number|    number = (uint8_t)ch;|    number = (uint8_t)src;|vc2keys
+init-row|keysTab().states[keysTab().sources[src] * Vc2Keys::kChannels + ch]|keysTab().states[(src & 1) * Vc2Keys::kChannels + ch]|vc2keys
+init-offset|constexpr uint32_t kChannelOffset = 2;|constexpr uint32_t kChannelOffset = 0;|vc2keys
+init-curve-kept|    curve = 0;\n    reset();|    reset();|vc2keys
+init-no-reset|    curve = 0;\n    reset();|    curve = 0;|vc2keys
+reset-mark|kMost = 0xff, kWasReset = 0xff;|kMost = 0xff, kWasReset = 0x7f;|vc2keys
+reset-sostenuto-kept|    sostenuto = 0;\n    latched|    latched|vc2keys
+reset-latched-kept|    latched = keysTab().zero;\n    clear();|    clear();|vc2keys
+reset-no-clear|    latched = keysTab().zero;\n    clear();|    latched = keysTab().zero;|vc2keys
+count-most|kMost = 0xff, kWasReset = 0xff;|kMost = 0xfe, kWasReset = 0xff;|vc2keys
+count-wraps|    if (++count == 0) count = kMost;|    if (++count == 0) count = 1;|vc2keys
+on-key|    onKey = (int8_t)key;|    onKey = (int8_t)velocity;|vc2keys
+on-velocity-raw|    onVelocity = keysTab().curves[curve * 128u + velocity];|    onVelocity = (uint8_t)velocity;|vc2keys
+on-curve-row|    onVelocity = keysTab().curves[curve * 128u + velocity];|    onVelocity = keysTab().curves[curve * 64u + velocity];|vc2keys
+on-last|    lastOn = 1;|    lastOn = 0;|vc2keys
+on-count-wraps|    countUp(ons[key]);|    ++ons[key];|vc2keys
+on-held-bit|    keyWord(held, key) \|= keyBit(key);|    keyWord(held, key) \|= keyBit(key + 1);|vc2keys
+key-word|{ return bits[key >> 4]; }|{ return bits[(key >> 4) ^ 1]; }|vc2keys
+off-key|    offKey = (int8_t)key;|    offKey = (int8_t)velocity;|vc2keys
+off-velocity|    offVelocity = (uint8_t)velocity;|    offVelocity = (uint8_t)(velocity >> 1);|vc2keys
+off-last|    lastOn = 0;|    lastOn = 1;|vc2keys
+off-test|    if (ons[key] == 0) return;|    if (ons[key] == 1) return;|vc2keys
+off-no-test|    if (ons[key] == 0) return;|    (void)0;|vc2keys
+off-count-wraps|    countUp(offs[key]);|    ++offs[key];|vc2keys
+off-release-at-most|    if (offs[key] == ons[key]) keyWord|    if (offs[key] >= ons[key]) keyWord|vc2keys
+off-release-bit|&= (uint16_t)~keyBit(key);|&= (uint16_t)~keyBit(key ^ 1);|vc2keys
+hold-flag|{ hold = (uint8_t)value; }|{ hold = (uint8_t)(value != 0); }|vc2keys
+sost-bit|constexpr uint32_t kSostenutoBit = 0x40;|constexpr uint32_t kSostenutoBit = 0x80;|vc2keys
+sost-down|constexpr int32_t kSostenutoDown = 64;|constexpr int32_t kSostenutoDown = 65;|vc2keys
+sost-up-kept|? held : keysTab().zero;|? held : latched;|vc2keys
+sost-swapped|? held : keysTab().zero;|? keysTab().zero : held;|vc2keys
+sost-stored|    sostenuto = (uint8_t)value;\n}|    sostenuto = (uint8_t)(value & 0x7f);\n}|vc2keys
+sost-unsigned|latched = value >= kSostenutoDown ?|latched = (uint32_t)value >= kSostenutoDown ?|vc2keys
+clear-held-kept|    held = keysTab().zero;\n    ons.fill(0);|    ons.fill(0);|vc2keys
+clear-offs-kept|    offs.fill(0);|    (void)0;|vc2keys
+factor-square|xtf::flt(v * v)|xtf::flt(v * (v + 1))|vc2keys
+factor-nearest|return xtf::div(xtf::flt(v * v), keysTab().divisor);|return xtf::flt(v * v) / keysTab().divisor;|vc2keys
+highest-word|    int32_t word = hi >> 4;|    int32_t word = (hi >> 4) ^ 1;|vc2keys
+highest-mask|keysTab().masks[(size_t)(hi & 15)]|keysTab().masks[15]|vc2keys
+highest-first-lo|if (first != 0) return at + highestBit(first);|if (first != 0) return std::max(at + highestBit(first), lo);|vc2keys
+highest-scan-lo|for (at -= 1; at >= lo; at -= 16) {|for (at -= 1; at > lo; at -= 16) {|vc2keys
+highest-found-lo|return found >= lo ? found : kNone;|return found;|vc2keys
+highest-none|    return kNone;\n}\n\nint32_t vc2KeysHighest|    return 0;\n}\n\nint32_t vc2KeysHighest|vc2keys
+highest-bit|    while ((w & keysTab().bits[(size_t)b]) == 0) --b;\n    return b;|    while ((w & keysTab().bits[(size_t)b]) == 0) --b;\n    return b - (b == 15);|vc2keys
+highest-all-range|return vc2KeysHighestIn(bits, 0, 127); }|return vc2KeysHighestIn(bits, 1, 127); }|vc2keys
+set-end|for (int32_t k = lo; k <= hi; ++k)|for (int32_t k = lo; k < hi; ++k)|vc2keys
+fill-word|bits.fill(0xffff);|bits.fill(0x7fff);|vc2keys
+any-test|return w != 0; });|return w > 1; });|vc2keys
+glide-list|constexpr uint32_t kListOffset = 4;|constexpr uint32_t kListOffset = 8;|vc2keys
+glide-middle|constexpr int8_t kMiddle = 60;|constexpr int8_t kMiddle = 64;|vc2keys
+glide-window|constexpr uint8_t kWindow = 0x20;|constexpr uint8_t kWindow = 0x1f;|vc2keys
+glide-reset-held|    prevPolyHeld = 0;\n    lastPolyHeld = 0;|    prevPolyHeld = 0;\n    lastPolyHeld = 1;|vc2keys
+glide-reset-mono|    prevMono = kMiddle;|    prevMono = kMiddle - 1;|vc2keys
+glide-since-most|constexpr uint32_t kSinceMost = 0xffff;|constexpr uint32_t kSinceMost = 0xfffe;|vc2keys
+glide-since|const uint32_t dt = (uint32_t)ms - (uint32_t)lastMs;|const uint32_t dt = (uint32_t)ms - (uint32_t)lastMs + 1;|vc2keys
+glide-on-key|    s.noteOn(keys.onKey, ms);|    s.noteOn(keys.offKey, ms);|vc2keys
+glide-off-key|s.noteOff(keys.offKey);|s.noteOff(keys.onKey);|vc2keys
+glide-state-window|    s.window = g.window;|    s.window = g.window + 1;|vc2keys
+glide-state-held|    std::ranges::copy(keys.held, s.held);|    std::ranges::copy(keys.latched, s.held);|vc2keys
+glide-state-flag|    s.prevPolyHeld = g.prevPolyHeld != 0;|    s.prevPolyHeld = g.lastPolyHeld != 0;|vc2keys
+glide-keep-flag|    g.lastMonoHeld = s.lastMonoHeld;|    g.lastMonoHeld = s.prevMonoHeld;|vc2keys
+glide-keep-key|    g.key = (int8_t)s.cur;|    g.key = (int8_t)s.lastMono;|vc2keys
+table-at|return kTablesAt + kSourceBytes * source + kTableBytes * channel;|return kTablesAt + kSourceBytes * source + kTableBytes * (channel ^ 1);|vc2keys
+table-owned|{ { kSpareAt, &spare }, { kOwnAt, &own } }|{ { kSpareAt, &own }, { kOwnAt, &spare } }|vc2keys
+glide-owned|return address == kOwnGlideAt ? ownGlide :|return address == kOwnGlideAt ? glides[0] :|vc2keys
+static-own|    own.reset();\n}|    spare.reset();\n}|vc2keys
+glides-table|glides[n].table = tableAt(n / perSource, 0);|glides[n].table = tableAt(n / perSource, n % 16);|vc2keys
+glides-own-table|    ownGlide.table = kOwnAt;|    ownGlide.table = kSpareAt;|vc2keys
+glides-own-reset|    ownGlide.reset();\n    ownGlide.table|    ownGlide.table|vc2keys
+construct-own|    ownGlide.construct(kOwnGlideAt);|    ownGlide.construct(kOwnAt);|vc2keys
+construct-stride|glides[n].construct(kGlidesAt + kGlideBytes * n);|glides[n].construct(kGlidesAt + kGlideBytes * n + 4);|vc2keys
+tables-curves|{ 0x89535518, curves.data(),|{ 0x89535519, curves.data(),|vc2keystables
+tables-masks|{ 0x89535918, masks.data(),|{ 0x8953591a, masks.data(),|vc2keystables
+tables-zero|{ 0x89535958, zero.data(),|{ 0x89535938, zero.data(),|vc2keystables
+tables-sources|{ 0x8950d6d9, sources.data(),|{ 0x8950d6d8, sources.data(),|vc2keystables
+tables-states|{ 0x8950d6e0, states.data(),|{ 0x8950d6e4, states.data(),|vc2keystables
+tables-divisor|constexpr uint32_t kDivisorAt = 0x89392400;|constexpr uint32_t kDivisorAt = 0x89392404;|vc2keystables

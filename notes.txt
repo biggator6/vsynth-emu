@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's keys v276 (2026-11-19, on claude/vc2-part-4-3 after v275; HARDWARE_FIRMWARE.md, "The VC-2 part's keys"):
+  step 4.3's fourth version. Vc2Keys is rom.4's 66 key tables (0x134 bytes: by source and channel, and the part's own
+  two) and 129 portamento keys (0x24 bytes, rom.2's XtKeyState's layout and laws), word for word: the tables' init,
+  reset, static initializer, note-on, note-off (a key held until its note-offs are as many as its note-ons), Hold,
+  Sostenuto, clear and velocity factor; the held keys' five queries; the portamento keys' constructor, reset, note-on,
+  note-off and two initializers. Their tables in Vc2KeysTables, read by loadVc2. New check xt_vc2keys (in fcheck),
+  only the OS clock hooked: 0 different at seeds 2024, 7 and 31337; mutate_vc2.py --keys 78 planted, 0 missed. And
+  Vc2CheckMain.h, a VC-2 check's main and its both-sides event, xt_vc2notes' and xt_vc2keys' (--notes still 55 of 55).
+  Found: the highest-key query ignores its low bound in the top key's own halfword; every caller gives 0 and 127. Not
+  in the sound yet.
+
 The VC-2 part's notes v275 (2026-11-19, on claude/vc2-part-4-3 after vc2-mode's eb3878f with v273 and v274 merged;
   HARDWARE_FIRMWARE.md, "The VC-2 part's notes"): step 4.3's third version. Vc2Notes is rom.4's 24 notes W of 0x744
   bytes and the hook word beside them, word for word, the links rom.4's addresses: the placement, the constructor (a
