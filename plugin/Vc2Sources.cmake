@@ -105,4 +105,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2SetCommon.cpp
     Source/Vc2SetEnvelope.cpp
     Source/Vc2SetEnvelopeTables.cpp
+    Source/Vc2SetChildHead.cpp
+    Source/Vc2SetLfo.cpp
 )

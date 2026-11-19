@@ -705,6 +705,10 @@ version against rom.4's routines with what it calls hooked:
         copy, release and the block writer `0x8939a3d0` with the Matrix's sums, the time curve, its quarter and the
         key's factor; their tables `Vc2SetEnvelopeTables`; xt_vc2sets' third part (HARDWARE_FIRMWARE.md, "The VC-2
         part's sets' envelopes").
+      - the LFOs' done (v283): `Vc2SetLfos`, the 120 words, constructor, conversion, update, copy and the block writer
+        `0x8939b590` (the waveform, the rate by note value or by the rate table with the Matrix's sum `0x8939b450`, the
+        two depths squared, two switches, the key sync); what they share with the envelopes in `Vc2SetChildHead`;
+        xt_vc2sets' fourth part (HARDWARE_FIRMWARE.md, "The VC-2 part's sets' LFOs").
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

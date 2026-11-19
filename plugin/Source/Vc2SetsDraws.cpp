@@ -3,10 +3,10 @@
 // by kind) in its memory, and the port's own (C, M, W, G, the part's M).  Not drawn: a part's number past 15 (G holds
 // 16 records), a voice's number past 23 (M's pool holds 24), C's M outside the pool.  XT_VC2SETS_MAIN only.
 #ifdef XT_VC2SETS_MAIN
-#include "Vc2SetsCheck.h"
+#include "Vc2SetsChildCheck.h"
 
 namespace {
-constexpr uint32_t kParts = 16, kFewParts = 4, kKinds = 4;
+constexpr uint32_t kParts = 16, kFewParts = 4, kKinds = 4, kSums = 64;
 constexpr uint16_t kBendCentre = 8192;   // [FW] a channel's bend at rest
 
 uint32_t anyOf(uint32_t at, uint32_t bytes, std::mt19937& rng) { return at + bytes * (rng() % kSetsObjects); }
@@ -101,5 +101,34 @@ uint32_t setsCall(SetSides& s, std::mt19937& rng) {
     const uint32_t words[3] = { voice + kSetsVoiceWords, voice + kSetsByteAt, (uint32_t)rng() };
     s.fw.cpu.write(kVc2Args, words, sizeof words);
     return kVc2Args;
+}
+
+void setsPartWordsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all, const SetPartTable& t, SetWordsDraw draw) {
+    for (uint32_t p = 0; p < kParts; ++p)
+        for (uint32_t k = 0; k < kKinds; ++k) {
+            if (!all && rng() % 16) continue;
+            for (uint32_t i = 0; i < t.perKind; ++i) {
+                const std::array<uint16_t, 5> words = draw(rng);
+                fw.cpu.write(t.at + t.part * p + t.kind * k + kSetsPartWordsBytes * i, words.data(), sizeof words);
+            }
+        }
+}
+
+// A sum: 0, small, the ends of a byte's range, wider, any
+void setsSumsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all) {
+    for (uint32_t k = 0; k < kSums; ++k) {
+        if (!all && rng() % 4) continue;
+        const auto sums = std::to_array<int16_t>({ 0, (int16_t)(rng() % 21 - 10), 127, -127,
+                                                  (int16_t)(rng() % 601 - 300), (int16_t)rng() });
+        fw.cpu.wr16(kSetsSumsAt + 2 * k, (uint16_t)setsOneOf(sums, rng));
+    }
+}
+
+void setsHookReaders(SetSides& s, std::span<const uint32_t> readers) {
+    for (const uint32_t reader : readers)
+        s.fw.cpu.hook(reader, [&s, reader](Sh4& c) {
+            s.rom.push_back({ kSetMatrixSum, reader, { c.r[4] } });
+            c.ret(kSetsSumsAt);
+        });
 }
 #endif

@@ -7,7 +7,7 @@
 // commons' words; after each the commons, W and the answer.  XT_VC2SETS_MAIN only.
 #ifdef XT_VC2SETS_MAIN
 #include "Vc2SetCommon.h"
-#include "Vc2SetsCheck.h"
+#include "Vc2SetsChildCheck.h"
 
 namespace {
 using Commons = Vc2SetCommons;
@@ -15,10 +15,8 @@ constexpr int kParts = 16;
 // [FW] the common's routines, which the sets' part hooks
 constexpr uint32_t kRoutines[] = { 0x893a1940, 0x893a1960, 0x893a19b0, 0x893a19c0, 0x893a19e0, 0x893a1a10 };
 
-struct CommonCounts {
+struct CommonCounts : SetChildCounts<7> {
     static constexpr const char* kPool = "the commons";
-    long events = 0, calls = 0;
-    std::array<long, 7> byEvent {};
 };
 
 using CommonSides = SetChildSides<Commons, CommonCounts>;

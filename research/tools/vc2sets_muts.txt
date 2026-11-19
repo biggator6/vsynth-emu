@@ -3,7 +3,9 @@
 # and vc2notematrix (Vc2NoteMatrix.cpp).  Not planted: the make's test of M's address (never 0: a base plus a multiple),
 # the bend's test of 0 (the two other ways give 0 there too). The envelopes (vc2setenvelope, vc2setenvtables, v282), not planted: the time curve's
 # hold at 12000 (the time table tops out at 3035), the outside period's cast as signed (every period past 32767
-# gives under 200 either way), the release's note value scale for the writer's (both 600000).
+# gives under 200 either way), the release's note value scale for the writer's (both 600000).  What the envelopes and
+# LFOs share (vc2setchildhead, Vc2SetChildHead.cpp, v283) and the LFOs (vc2setlfo, Vc2SetLfo.cpp); the pool's
+# conversion, update and copy, a template in Vc2SetChildHead.h, planted at what they call (a header has no port here).
 sets-first-child|kFirstChild = 0x04;|kFirstChild = 0x08;|vc2sets
 sets-osc-stride|kOscStride = In::kOscs[1] - In::kOscs[0],|kOscStride = In::kOscs[1] - In::kOscs[0] + 4,|vc2sets
 sets-cosm-stride|kCosmStride = In::kCosms[1] - In::kCosms[0];|kCosmStride = In::kCosms[1] - In::kCosms[0] + 4;|vc2sets
@@ -189,20 +191,13 @@ block-eleven|    block[11] = floatWord(kOne);\n|\n|vc2setenvelope
 block-thirteen|    block[13] = floatWord(kZero);\n|\n|vc2setenvelope
 block-sustain-off|block[12] = floatWord(on ? sustain : kOne);|block[12] = floatWord(sustain);|vc2setenvelope
 sustain-scale|xtf::div(xtf::flt(envelopeTables().levels[w.sustain]), envelopeTables().levelScale)|xtf::mul(xtf::flt(envelopeTables().levels[w.sustain]), envelopeTables().levelScale)|vc2setenvelope
-env-part-at|std::memcpy(&w.on, words.data(), sizeof words);|std::memcpy(&w.attack, words.data(), sizeof words - 1);|vc2setenvelope
-env-part-kind|reads.envelopeOf(reads.firstByte(v.part), w.kind, w.index)|reads.envelopeOf(reads.firstByte(v.part), w.index, w.kind)|vc2setenvelope
-make-kind|w.kind = static_cast<uint8_t>(c.kind);|w.kind = static_cast<uint8_t>(c.index);|vc2setenvelope
-make-index|w.index = static_cast<uint8_t>(c.index);|w.index = static_cast<uint8_t>(c.kind);|vc2setenvelope
 make-matrix|    w.matrix = c.matrix;\n|\n|vc2setenvelope
-make-key|    w.key = v.key;\n    w.velocity = v.byte43;\n    w.releaseVelocity|    w.velocity = v.byte43;\n    w.releaseVelocity|vc2setenvelope
-make-velocity|    w.velocity = v.byte43;\n    w.releaseVelocity|    w.velocity = v.byte42;\n    w.releaseVelocity|vc2setenvelope
 make-release-velocity|w.releaseVelocity = kCentreVelocity;|w.releaseVelocity = 0;|vc2setenvelope
-make-part|    fromPart(w, c.call, reads);\n|\n|vc2setenvelope
+make-part|    vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::envelopeOf, c.call, reads);\n|\n|vc2setenvelope
+make-made|    vc2ChildMade(vc2ChildBytes(w), c, reads);\n|\n|vc2setenvelope
+make-words|&Vc2SetReads::envelopeOf, c.call|&Vc2SetReads::lfoOf, c.call|vc2setenvelope
 make-tempo|    w.tempo = tempoOf(reads.clock());\n|\n|vc2setenvelope
 make-block|    w.tempo = tempoOf(reads.clock());\n    blockOf(w, block, reads);|    w.tempo = tempoOf(reads.clock());|vc2setenvelope
-convert-key|    w.key = v.key;\n    w.velocity = v.byte43;\n    blockOf|    w.velocity = v.byte43;\n    blockOf|vc2setenvelope
-convert-velocity|    w.velocity = v.byte43;\n    blockOf|    blockOf|vc2setenvelope
-update-key|    fromPart(at(envelope), call, reads);|    at(envelope).key = 0;\n    fromPart(at(envelope), call, reads);|vc2setenvelope
 release-store|w.releaseVelocity = static_cast<uint8_t>(velocity);|w.releaseVelocity = 64;|vc2setenvelope
 release-on|block[8] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale|block[8] = floatWord(w.on == 0 ? releaseTime(w, envelopeTables().releaseScale|vc2setenvelope
 release-word|block[8] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale|block[7] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale|vc2setenvelope
@@ -214,3 +209,51 @@ tables-release-scale|{ 0x8939a8f4, &releaseScale }|{ 0x8939a67c, &releaseScale }
 tables-level-scale|{ 0x8939a67c, &levelScale }|{ 0x8939a66c, &levelScale }|vc2setenvtables
 tables-cents|{ 0x8939ab50, &cents }|{ 0x8939ab58, &cents }|vc2setenvtables
 tables-unit|{ 0x8939ab58, &unit }|{ 0x8939ab50, &unit }|vc2setenvtables
+tables-rates|vc2ReadFloats(image, { 0x8953fdb0,|vc2ReadFloats(image, { 0x8953fdb4,|vc2setenvtables
+tables-depth-top|{ 0x8939b624, &depthTop }|{ 0x8939b628, &depthTop }|vc2setenvtables
+tables-depth-scale|{ 0x8939b628, &depthScale }|{ 0x8939b624, &depthScale }|vc2setenvtables
+head-kind|object[kKind] = static_cast<uint8_t>(c.kind);|object[kKind] = static_cast<uint8_t>(c.index);|vc2setchildhead
+head-index|object[kIndex] = static_cast<uint8_t>(c.index);|object[kIndex] = static_cast<uint8_t>(c.kind);|vc2setchildhead
+head-made-voice|    vc2ChildVoice(object, c.call, reads);\n|\n|vc2setchildhead
+head-key|object[kKey] = v.key;|object[kKey] = v.byte42;|vc2setchildhead
+head-velocity|object[kVelocity] = v.byte43;|object[kVelocity] = v.key;|vc2setchildhead
+head-key-at|kKind = 0, kIndex = 1, kKey = 2,|kKind = 0, kIndex = 1, kKey = 4,|vc2setchildhead
+head-part-at|std::memcpy(object + kPartWords, words.data(), sizeof words);|std::memcpy(object + kPartWords + 1, words.data(), sizeof words - 1);|vc2setchildhead
+head-part-short|std::memcpy(object + kPartWords, words.data(), sizeof words);|std::memcpy(object + kPartWords, words.data(), sizeof words - 2);|vc2setchildhead
+head-part-kind|object[kKind], object[kIndex])|object[kIndex], object[kKind])|vc2setchildhead
+head-part-which|(reads.*of)(reads.firstByte(v.part),|(reads.*of)(0,|vc2setchildhead
+lfo-note-from|kNoteFrom = 128, kTop = 127;|kNoteFrom = 129, kTop = 127;|vc2setlfo
+lfo-top|kNoteFrom = 128, kTop = 127;|kNoteFrom = 128, kTop = 126;|vc2setlfo
+lfo-last-summed|kLastSummed = 4;|kLastSummed = 3;|vc2setlfo
+lfo-wave-table|kWaves { 1, 0, 2, 3, 6, 4, 5, 7 };|kWaves { 1, 0, 2, 3, 4, 6, 5, 7 };|vc2setlfo
+lfo-wave-else|kWaves[w.wave] : 1;|kWaves[w.wave] : 0;|vc2setlfo
+lfo-wave-size|w.wave < kWaves.size()|w.wave < kWaves.size() - 1|vc2setlfo
+lfo-first-most|kFirstSwitchMost = 4,|kFirstSwitchMost = 5,|vc2setlfo
+lfo-first-else|kFirstSwitchElse = 2;|kFirstSwitchElse = 1;|vc2setlfo
+lfo-first-test|b <= kFirstSwitchMost ?|b < kFirstSwitchMost ?|vc2setlfo
+lfo-second-most|kSecondSwitchMost = 3;|kSecondSwitchMost = 4;|vc2setlfo
+lfo-second-low|b >= 1 && b <= kSecondSwitchMost|b >= 2 && b <= kSecondSwitchMost|vc2setlfo
+lfo-sum-first|{ 0x893a26b0, 0 }|{ 0x893a28b0, 0 }|vc2setlfo
+lfo-sum-cosm|{ 0x893a2960, 0x10 }|{ 0x893a2960, 0x12 }|vc2setlfo
+lfo-sum-cosm-two|{ 0x893a2aa0, 0x10 }|{ 0x893a2aa0, 0xe }|vc2setlfo
+lfo-sum-last|{ 0x893a2bf0, 6 }|{ 0x893a2bf0, 4 }|vc2setlfo
+lfo-sum-index|if (index <= kLastSummed)|if (index < kLastSummed)|vc2setlfo
+lfo-sum-matrix|reads.matrixSum(kRateSums[index].routine, matrix,|reads.matrixSum(kRateSums[index].routine, 0,|vc2setlfo
+lfo-hold-low|static_cast<int32_t>(rate) + sum, 0, kTop)|static_cast<int32_t>(rate) + sum, 1, kTop)|vc2setlfo
+lfo-rate-wide|static_cast<int32_t>(rate) + sum|static_cast<int32_t>(static_cast<uint16_t>(rate)) + sum|vc2setlfo
+lfo-depth-top|xtf::div(xtf::flt(x), lfoTables().depthTop)|xtf::mul(xtf::flt(x), lfoTables().depthTop)|vc2setlfo
+lfo-depth-square|xtf::mul(xtf::mul(q, q), lfoTables().depthScale)|xtf::mul(q, lfoTables().depthScale)|vc2setlfo
+lfo-depth-order|xtf::mul(xtf::mul(q, q), lfoTables().depthScale)|xtf::mul(q, xtf::mul(q, lfoTables().depthScale))|vc2setlfo
+lfo-note-ticks|notes[w.rate - kNoteFrom]|notes[(w.rate - kNoteFrom) ^ 1]|vc2setlfo
+lfo-note-flag|block[5] = note ? 1 : 0;|block[5] = 0;|vc2setlfo
+lfo-rate-table|rates[lfoRate(w.rate, w.matrix, w.index, reads)]|rates[lfoRate(w.rate, w.matrix, w.index, reads) ^ 1]|vc2setlfo
+lfo-block-depth-a|block[2] = lfoWord(depthOf(w.depthA));|block[2] = lfoWord(depthOf(w.depthB));|vc2setlfo
+lfo-block-depth-b|block[3] = lfoWord(depthOf(w.depthB));|block[3] = lfoWord(depthOf(w.depthA));|vc2setlfo
+lfo-block-first|block[6] = firstSwitch(w.byte0a);|block[6] = firstSwitch(w.byte0c);|vc2setlfo
+lfo-block-second|block[7] = secondSwitch(w.byte0c);|block[7] = secondSwitch(w.byte0a);|vc2setlfo
+lfo-block-sync|block[4] = w.sync != 0;|block[4] = w.sync;|vc2setlfo
+lfo-make-made|    vc2ChildMade(vc2ChildBytes(w), c, reads);\n|\n|vc2setlfo
+lfo-make-matrix|    w.matrix = c.matrix;\n|\n|vc2setlfo
+lfo-make-part|    vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::lfoOf, c.call, reads);\n|\n|vc2setlfo
+lfo-make-words|&Vc2SetReads::lfoOf, c.call|&Vc2SetReads::envelopeOf, c.call|vc2setlfo
+lfo-make-block|c.call, reads);\n    blockOf(w, block, reads);|c.call, reads);|vc2setlfo

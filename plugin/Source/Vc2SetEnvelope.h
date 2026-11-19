@@ -8,8 +8,8 @@
 // 0x8939a780 is a bare return.  The part's words, the clock and the Matrix's sums through Vc2SetReads; the tables
 // Vc2SetEnvelopeTables'.  Bit for bit: xt_vc2sets' third part.  HARDWARE_FIRMWARE.md, "The VC-2 part's sets'
 // envelopes".  The notes' task.
-#include "Vc2NoteMatrix.h"
-#include "Vc2PoolOf.h"
+#include "Vc2SetChildHead.h"
+#include <cstddef>
 
 struct Vc2EnvelopeWords {
     uint8_t kind = 0;               // +0x00: the note's
@@ -33,29 +33,18 @@ struct Vc2EnvelopeWords {
     uint32_t matrix = 0;            // +0x18: the note's M
 };
 static_assert(sizeof(Vc2EnvelopeWords) == 0x1c, "rom.4's layout, an envelope of C's");
+static_assert(offsetof(Vc2EnvelopeWords, on) == 6, "the part's words where Vc2SetChildHead puts them");
 
-// [FW] the pool at 0x89e2543c, 13 a voice
-class Vc2SetEnvelopes : public Vc2PoolOf<Vc2EnvelopeWords, 24 * 13, 0x89e2543c> {
+// [FW] the pool at 0x89e2543c, 13 a voice, placed by 0x8939a620(28, number, index); the conversion 0x8939a790, update
+// 0x8939a7b0 and copy 0x8939a800 the pool's (Vc2SetChildHead)
+class Vc2SetEnvelopes
+    : public Vc2SetChildPool<Vc2SetEnvelopes, Vc2EnvelopeWords, 13, 0x89e2543c, &Vc2SetReads::envelopeOf> {
 public:
-    static constexpr uint32_t kPerVoice = 13;
-    static constexpr int kBlockWords = 14;
-
-    // 0x8939a620(28, number, index)
-    uint32_t placeOf(uint32_t number, uint32_t index) const { return addressOf(kPerVoice * number + index); }
     // 0x8939a690 on the call's object: its kind, index and M, the voice's two bytes, the part's words, the tempo, then
     // the block (the call's block in W, which `block` is)
     void construct(const Vc2SetChildCall& c, uint32_t* block, Vc2SetReads& reads);
-    // 0x8939a790: the voice's two bytes again, then the block
-    void convert(uint32_t envelope, const Vc2SetCall& call, uint32_t* block, Vc2SetReads& reads);
-    // 0x8939a7b0: the part's words again
-    void update(uint32_t envelope, const Vc2SetCall& call, Vc2SetReads& reads);
-    // 0x8939a800: the block
-    void copy(uint32_t envelope, uint32_t* block, Vc2SetReads& reads) { blockOf(at(envelope), block, reads); }
     // 0x8939a810: the release's velocity, then the block's release time again
     void release(uint32_t envelope, uint32_t velocity, uint32_t* block, Vc2SetReads& reads);
     // 0x8939a3d0: the block, and the key's factor
     static void blockOf(Vc2EnvelopeWords& w, uint32_t* block, Vc2SetReads& reads);
-
-private:
-    static void fromPart(Vc2EnvelopeWords& w, const Vc2SetCall& call, Vc2SetReads& reads);
 };

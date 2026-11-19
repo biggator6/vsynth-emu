@@ -63,6 +63,8 @@ public:
     virtual uint8_t modeOf(uint32_t part, uint32_t kind) = 0;
     virtual std::array<uint16_t, 3> commonOf(uint32_t part) = 0;
     virtual std::array<uint16_t, 5> envelopeOf(uint32_t part, uint32_t kind, uint32_t index) = 0;
+    // the part's five words an LFO takes (0x89e2f85c + 800 × part + 50 × kind + 10 × index, v283)
+    virtual std::array<uint16_t, 5> lfoOf(uint32_t part, uint32_t kind, uint32_t index) = 0;
     virtual Vc2SetClock clock() = 0;
     virtual int16_t matrixSum(uint32_t reader, uint32_t matrix, uint32_t offset) = 0;
 };

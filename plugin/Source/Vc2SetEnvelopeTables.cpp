@@ -4,15 +4,18 @@
 
 namespace {
 struct Read : Vc2SetEnvelopeTables {
-    // The tables and the pool words; usable when the scales are positive and the time of the top value isn't 0
+    // The tables and the pool words; usable when the scales are positive and the time and rate of the top value aren't 0
     bool read(Sh4& image) {
         image.read(0x89542134, notes.data(), sizeof notes);
         image.read(0x89541f34, levels.data(), sizeof levels);
         image.read(0x8953fc90, times.data(), sizeof times);
+        vc2ReadFloats(image, { 0x8953fdb0, static_cast<int>(rates.size()) }, rates.data());
         vc2ReadPool(image, std::to_array<Vc2PoolWord>({ { 0x8939a66c, &noteScale }, { 0x8939a8f4, &releaseScale },
                                                           { 0x8939a67c, &levelScale }, { 0x8939ab50, &cents },
-                                                          { 0x8939ab58, &unit } }));
-        return noteScale > 0 && releaseScale > 0 && levelScale > 0 && cents > 0 && unit > 0 && times[127] != 0;
+                                                          { 0x8939ab58, &unit }, { 0x8939b624, &depthTop },
+                                                          { 0x8939b628, &depthScale } }));
+        const bool scales = noteScale > 0 && releaseScale > 0 && levelScale > 0 && depthTop > 0 && depthScale > 0;
+        return scales && cents > 0 && unit > 0 && times[127] != 0 && rates[127] != 0;
     }
 };
 constinit Vc2RomTables<Read> tables;

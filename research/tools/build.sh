@@ -57,6 +57,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    $( [ -f Vc2SetCommonCheck.cpp ] && echo Vc2SetCommon.cpp Vc2SetCommonCheck.cpp ) \
    $( [ -f Vc2SetEnvelopeCheck.cpp ] && echo Vc2SetEnvelope.cpp Vc2SetEnvelopeTables.cpp Vc2SetEnvelopeCheck.cpp \
       Vc2LibMath.cpp Vc2LibMathTables.cpp ) \
+   $( [ -f Vc2SetLfoCheck.cpp ] && echo Vc2SetChildHead.cpp Vc2SetLfo.cpp Vc2SetLfoCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2sets" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \

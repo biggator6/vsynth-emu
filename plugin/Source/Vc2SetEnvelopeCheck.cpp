@@ -8,20 +8,17 @@
 // of 0 in an envelope (the note value's 0 / 0 would be a NaN whose payload is the host's).  XT_VC2SETS_MAIN only.
 #ifdef XT_VC2SETS_MAIN
 #include "Vc2SetEnvelope.h"
-#include "Vc2SetsCheck.h"
+#include "Vc2SetsChildCheck.h"
 
 namespace {
 using Envelopes = Vc2SetEnvelopes;
-constexpr int kParts = 16, kKinds = 4, kSums = 64;
 // [FW] the envelope's routines, which the sets' part hooks; the Matrix group's readers, which this part hooks
 constexpr uint32_t kRoutines[] = { 0x8939a620, 0x8939a690, 0x8939a780, 0x8939a790, 0x8939a7b0, 0x8939a800,
                                    0x8939a810 };
 constexpr uint32_t kReaders[] = { 0x893a2550, 0x893a2750, 0x893a2960, 0x893a2aa0, 0x893a2bf0 };
 
-struct EnvelopeCounts {
+struct EnvelopeCounts : SetChildCounts<8> {
     static constexpr const char* kPool = "the envelopes";
-    long events = 0, calls = 0;
-    std::array<long, 8> byEvent {};
 };
 
 using EnvelopeSides = SetChildSides<Envelopes, EnvelopeCounts>;
@@ -67,12 +64,6 @@ void envelopeClock(Vc2Fw& fw, std::mt19937& rng) {
     fw.cpu.wr16(kSetsClockAt + 0x48, (uint16_t)(aimed ? 150000 / tempo : 1 + rng() % 65535));
 }
 
-int16_t envelopeSum(std::mt19937& rng) {
-    const auto sums = std::to_array<int16_t>({ 0, (int16_t)(rng() % 21 - 10), 127, -127,
-                                              (int16_t)(rng() % 601 - 300), (int16_t)rng() });
-    return setsOneOf(sums, rng);
-}
-
 void envelopeWordsOf(Vc2EnvelopeWords& w, std::mt19937& rng) {
     setsNoise(w, rng);
     w.index = (uint8_t)(rng() % 4 ? rng() % 13 : rng());
@@ -88,41 +79,11 @@ void envelopeWordsOf(Vc2EnvelopeWords& w, std::mt19937& rng) {
 
 void envelopeDraw(EnvelopeSides& e, std::mt19937& rng, bool all) {
     setsDraw(e.s, rng, all);
-    for (uint32_t p = 0; p < (uint32_t)kParts; ++p)
-        for (uint32_t k = 0; k < (uint32_t)kKinds; ++k) {
-            if (!all && rng() % 16) continue;
-            for (uint32_t i = 0; i < Envelopes::kPerVoice; ++i) {
-                const std::array<uint16_t, 5> words = envelopeWordsDrawn(rng);
-                const uint32_t at = kSetsEnvelopePart * p + kSetsEnvelopeKind * k + kSetsEnvelopeIndex * i;
-                e.s.fw.cpu.write(kSetsEnvelopesAt + at, words.data(), sizeof words);
-            }
-        }
+    setsPartWordsDrawn(e.s.fw, rng, all, kSetsEnvelopeTable, envelopeWordsDrawn);
     if (all || rng() % 8 == 0) envelopeClock(e.s.fw, rng);
-    for (uint32_t k = 0; k < (uint32_t)kSums; ++k)
-        if (all || rng() % 4 == 0) e.s.fw.cpu.wr16(kSetsSumsAt + 2 * k, (uint16_t)envelopeSum(rng));
+    setsSumsDrawn(e.s.fw, rng, all);
     for (Vc2EnvelopeWords& w : e.port.items)
         if (all || rng() % 8 == 0) envelopeWordsOf(w, rng);
-}
-
-std::string envelopePlaceEvent(EnvelopeSides& e, std::mt19937& rng) {
-    const uint32_t n = rng() % 256, i = rng() % 16;
-    ++e.n.byEvent[0];
-    const Vc2CheckRoutine r { 0x8939a620, "the envelope's placement", vc2R0 };
-    return setsChildOnBoth(e.s, e.region(EnvelopeCounts::kPool), r, { 28, n, i }, [&] { return e.port.placeOf(n, i); });
-}
-
-std::string envelopeMakeEvent(EnvelopeSides& e, std::mt19937& rng) {
-    const uint32_t at = setsCall(e.s, rng);
-    const Vc2SetChildCall c { e.any(rng), setsCallAt(e.s, at), anyEnvelopeBlock(rng), (uint32_t)rng(),
-                              rng() % 8 ? rng() % kKinds : (uint32_t)rng(), rng() % 8 ? rng() % 13 : rng() % 16 };
-    e.s.fw.cpu.wr32(kVc2Sp, c.kind);
-    e.s.fw.cpu.wr32(kVc2Sp + 4, c.index);
-    ++e.n.byEvent[1];
-    const Vc2CheckRoutine r { 0x8939a690, "the envelope's constructor", vc2R0 };
-    return setsChildOnBoth(e.s, e.region(EnvelopeCounts::kPool), r, { c.object, at, c.noteAt, c.matrix }, [&] {
-        e.port.construct(c, setsPortWords(e.s, c.noteAt), e.s.parts);
-        return c.object;
-    });
 }
 
 std::string envelopeReleaseEvent(EnvelopeSides& e, std::mt19937& rng) {
@@ -137,9 +98,9 @@ std::string envelopeReleaseEvent(EnvelopeSides& e, std::mt19937& rng) {
 
 // [FW] the events by routine; the copy and the block writer 0x8939a3d0 alone, the same work
 const EnvelopeEvent kEvents[] = {
-    envelopePlaceEvent,
-    envelopeMakeEvent,
-    envelopeMakeEvent,
+    setsPlaceEvent<EnvelopeSides, 0x8939a620, 28, 0>,
+    setsMakeEvent<EnvelopeSides, anyEnvelopeBlock, 0x8939a690, 1, Envelopes::kPerVoice>,
+    setsMakeEvent<EnvelopeSides, anyEnvelopeBlock, 0x8939a690, 1, Envelopes::kPerVoice>,
     setsEndEvent<EnvelopeSides, 0x8939a780, 2>,
     setsConvertEvent<EnvelopeSides, &Envelopes::convert, anyEnvelopeBlock, 0x8939a790, 3>,
     setsConvertEvent<EnvelopeSides, &Envelopes::convert, anyEnvelopeBlock, 0x8939a790, 3>,
@@ -161,11 +122,7 @@ void sayEnvelopeCounts(const EnvelopeCounts& n) {
 } // namespace
 
 long vc2SetEnvelopePart(SetSides& s, const Vc2Run& run) {
-    for (const uint32_t reader : kReaders)
-        s.fw.cpu.hook(reader, [&s, reader](Sh4& c) {
-            s.rom.push_back({ kSetMatrixSum, reader, { c.r[4] } });
-            c.ret(kSetsSumsAt);
-        });
-    return setsChildPart<EnvelopeSides, envelopeDraw, envelopeEvents, sayEnvelopeCounts>(s, run, 2, kRoutines);
+    return setsChildPart<EnvelopeSides, envelopeDraw, envelopeEvents, sayEnvelopeCounts>(s, run, 2, kRoutines,
+                                                                                          kReaders);
 }
 #endif

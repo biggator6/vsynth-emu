@@ -11,7 +11,7 @@
 #include "Vc2CheckCalls.h"
 #include "Vc2LibMathTables.h"
 #include "Vc2SetEnvelopeTables.h"
-#include "Vc2SetsCheck.h"
+#include "Vc2SetsChildCheck.h"
 #include <algorithm>
 #include <cstring>
 
@@ -198,11 +198,18 @@ std::array<uint16_t, 3> SetPortParts::commonOf(uint32_t part) {
     return words;
 }
 
-std::array<uint16_t, 5> SetPortParts::envelopeOf(uint32_t part, uint32_t kind, uint32_t index) {
+std::array<uint16_t, 5> SetPortParts::partWords(const SetPartTable& t, uint32_t part, uint32_t kind, uint32_t index) {
     std::array<uint16_t, 5> words;
-    const uint32_t at = kSetsEnvelopePart * part + kSetsEnvelopeKind * kind + kSetsEnvelopeIndex * index;
-    fw_.cpu.read(kSetsEnvelopesAt + at, words.data(), sizeof words);
+    fw_.cpu.read(t.at + t.part * part + t.kind * kind + kSetsPartWordsBytes * index, words.data(), sizeof words);
     return words;
+}
+
+std::array<uint16_t, 5> SetPortParts::envelopeOf(uint32_t part, uint32_t kind, uint32_t index) {
+    return partWords(kSetsEnvelopeTable, part, kind, index);
+}
+
+std::array<uint16_t, 5> SetPortParts::lfoOf(uint32_t part, uint32_t kind, uint32_t index) {
+    return partWords(kSetsLfoTable, part, kind, index);
 }
 
 Vc2SetClock SetPortParts::clock() {
@@ -219,7 +226,9 @@ int16_t SetPortParts::matrixSum(uint32_t reader, uint32_t matrix, uint32_t offse
     return (int16_t)fw_.cpu.rd16(kSetsSumsAt + offset);
 }
 
-long vc2SetsFurther(SetSides& s, const Vc2Run& run) { return vc2SetCommonPart(s, run) + vc2SetEnvelopePart(s, run); }
+long vc2SetsFurther(SetSides& s, const Vc2Run& run) {
+    return vc2SetCommonPart(s, run) + vc2SetEnvelopePart(s, run) + vc2SetLfoPart(s, run);
+}
 
 uint32_t* setsPortWords(SetSides& s, uint32_t at) {
     auto* notes = reinterpret_cast<uint8_t*>(s.notes.notes.data());

@@ -2,6 +2,7 @@
 // rom.4's order; the floats through XtFloat, as the SH-4 rounds.
 #include "Vc2SetEnvelope.h"
 #include "Vc2LibMath.h"
+#include "Vc2SetChildHead.h"
 #include "Vc2SetEnvelopeTables.h"
 #include "XtFloat.h"
 #include <algorithm>
@@ -145,36 +146,14 @@ void Vc2SetEnvelopes::blockOf(Vc2EnvelopeWords& w, uint32_t* block, Vc2SetReads&
     block[13] = floatWord(kZero);
 }
 
-void Vc2SetEnvelopes::fromPart(Vc2EnvelopeWords& w, const Vc2SetCall& call, Vc2SetReads& reads) {
-    const Vc2SetVoice v = reads.voiceAt(call.channelAt);
-    const std::array<uint16_t, 5> words = reads.envelopeOf(reads.firstByte(v.part), w.kind, w.index);
-    std::memcpy(&w.on, words.data(), sizeof words);   // +6…+0xf, as rom.4 writes the five halfwords
-}
-
 void Vc2SetEnvelopes::construct(const Vc2SetChildCall& c, uint32_t* block, Vc2SetReads& reads) {
     Vc2EnvelopeWords& w = at(c.object);
-    w.kind = static_cast<uint8_t>(c.kind);
-    w.index = static_cast<uint8_t>(c.index);
+    vc2ChildMade(vc2ChildBytes(w), c, reads);
     w.matrix = c.matrix;
-    const Vc2SetVoice v = reads.voiceAt(c.call.channelAt);
-    w.key = v.key;
-    w.velocity = v.byte43;
     w.releaseVelocity = kCentreVelocity;
-    fromPart(w, c.call, reads);
+    vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::envelopeOf, c.call, reads);
     w.tempo = tempoOf(reads.clock());
     blockOf(w, block, reads);
-}
-
-void Vc2SetEnvelopes::convert(uint32_t envelope, const Vc2SetCall& call, uint32_t* block, Vc2SetReads& reads) {
-    Vc2EnvelopeWords& w = at(envelope);
-    const Vc2SetVoice v = reads.voiceAt(call.channelAt);
-    w.key = v.key;
-    w.velocity = v.byte43;
-    blockOf(w, block, reads);
-}
-
-void Vc2SetEnvelopes::update(uint32_t envelope, const Vc2SetCall& call, Vc2SetReads& reads) {
-    fromPart(at(envelope), call, reads);
 }
 
 void Vc2SetEnvelopes::release(uint32_t envelope, uint32_t velocity, uint32_t* block, Vc2SetReads& reads) {

@@ -1546,6 +1546,71 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's sets' LFOs (2026-11-19, v283) {#vc2-set-lfos}
+
+Step 4.3's eleventh version (VC2_MODE_PLAN.md, step 4.3, item 8's third child): C's five LFOs a voice. `Vc2SetLfos`
+is bit for bit against rom.4's own in `xt_vc2sets`' fourth part.
+
+**Its words.** There are 120 LFOs of 20 bytes from `0x899962b0`, 5 a voice (`0x8939b690(20, number, index)`: 100 ×
+the number + 20 × the index).
+- +0…+3 are laid out as an envelope's: the note's kind, the index, the voice's key (+0x41) and its +0x43.
+- +6…+0xf hold the part's five words for it, from `0x89e2f85c` + 800 × the part + 50 × the kind + 10 × the index.
+  As bytes they are: the waveform, a byte unread, the rate (signed, +8), a switch, a depth, a switch, a depth and
+  the key sync.
+- +0x10 holds the note's M.
+
+**The block.** Each LFO converts an LFO block of the note's input, W+0x44 + 0x20 × the index (the input's blocks
+2…6). The writer is `0x8939b590`, its writes in this order:
+- +0x14 and +4, the rate. **From 128 on it is a note value:** +0x14 takes 1, and +4 the value's ticks as a float
+  (the envelopes' table `0x89542134`). **Below 128** +0x14 takes 0, and +4 the rate table `0x8953fdb0` (128 floats)
+  by `0x8939b450`: the rate plus the LFO's Matrix sum, a 32-bit sum of the two signed halves held to 0…127. LFO 0
+  reads the group reader `0x893a26b0` +0, 1 `0x893a28b0` +0, 2 the first COSM's `0x893a2960` +0x10, 3 the second's
+  `0x893a2aa0` +0x10, and 4 `0x893a2bf0` +6; an index past 4 has no sum.
+- +0, the waveform's code by its byte (`0x8939b3b0`): 1 → 0, 2 → 2, 3 → 3, 4 → 6, 5 → 4, 6 → 5, 7 → 7, else 1.
+- +0x18, the switch at +0xa: 0…4 as it is, else 2 (`0x8939b510`).
+- +8, the depth at +0xb: (x / 127)² × 10000 in single precision, divided, squared, then scaled (the pool words
+  `0x8939b624` and `0x8939b628`).
+- +0x1c, the switch at +0xc: 1…3 as it is, else 0 (inline).
+- +0xc, the depth at +0xd, the same way.
+- +0x10, 1 when the key sync's byte isn't 0.
+
+**The routines.**
+- **The constructor `0x8939b6c0(lfo, call, block, M; the kind and index on the stack)`** writes the kind, index and
+  M, the voice's two bytes and the part's words, then the block.
+- **The conversion `0x8939b750`** writes the voice's two bytes again, then the block. **The update `0x8939b770`**
+  writes the part's words again. **The copy `0x8939b7c0`** is the writer alone. **The end `0x8939b740`** is a bare
+  return.
+- These are the envelopes' routines but for the block and the envelope's tempo and release velocity. The port says so:
+  `Vc2SetChildHead` holds the head bytes, the voice's two, the part's words by a reader, and the pool's conversion,
+  update and copy on a child's writer, the envelopes now on it as well.
+- The rate table and the two pool words join `Vc2SetEnvelopeTables` (loadVc2), which refuses an image whose rate of
+  127 is 0 or whose depth words aren't positive.
+
+**The check.** It is xt_vc2sets' fourth part, on the seed after the envelopes'. It hooks the five readers the rates
+take, which log the M they're given and answer one run of drawn sums. The sets' part's hooks on the LFO's routines are
+taken off.
+
+The draws, beyond the sets' part's:
+- the parts' LFO words for 16 parts, 4 kinds and 5 indices; the LFOs' own words, the index past 4 now and then;
+- a waveform's byte 0…8 or any; a rate of 0, 1, 126…129, 255, any of 0…255 or below 0; the switches one past their
+  range or any; the depths at the square's edges or any; the key sync 0, 1, 2 or any;
+- the sums as the envelopes': 0, small, ±127, ±300 or any.
+
+Not drawn: a rate past 255, a note value past the table's 128 entries, where rom.4 reads whatever follows the table.
+
+Each case is noise in the LFOs, then 400 events: the placement, the constructor, the end, the conversion, the update,
+the copy and the writer alone.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the earlier parts' lines as they were.
+- Every line and branch of `Vc2SetLfo.cpp` and `Vc2SetChildHead.cpp` is reached.
+- `mutate_vc2.py --sets`: 251 plants, none missed. The LFOs' 35, the shared head's 10 and three more in the tables are
+  new; the envelopes' plants on code that moved into the head were planted there again.
+
+The children's check steps are now in their own header, `Vc2SetsChildCheck.h`, as Vc2SetsCheck.h had reached the
+300-line limit. The placement and constructor events are templates there too, with the part's words' and the sums'
+draws and the readers' hooks, and each part's counts are `SetChildCounts` with its pool's name.
+
 ### The VC-2 part's sets' envelopes (2026-11-19, v282) {#vc2-set-envelopes}
 
 Step 4.3's tenth version (VC2_MODE_PLAN.md, step 4.3, item 8's second child): C's 13 envelopes a voice.
