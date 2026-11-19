@@ -9,14 +9,16 @@
 // Vc2PartParams.  Not in the
 // sound yet.  Bit for bit: xt_vc2settings.  HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID".  The notes' task.
 #include "Vc2Engine.h"
+#include "Vc2PartNodes.h"
 #include <array>
 #include <cstdint>
 #include <functional>
 
 // The read objects a reader sets up, each a block of parameters the getter 0x89324350 reads by ID: the part's
 // (0x893207b0), the system's three (0x89320790, 0x89320760, 0x89320f60) and a note kind's three (0x89320a50,
-// 0x89320ad0, 0x89320b70); and a COSM's (0x89320c10, v287), which the typed getter 0x89324370 reads
-enum class Vc2ParamBlock : uint8_t { kPart, kSystem, kSystemB, kSystemC, kKindA, kKindB, kKindC, kCosm };
+// 0x89320ad0, 0x89320b70); and a COSM's (0x89320c10, v287), which the typed getter 0x89324370 reads; and (v291) one
+// never set up, Auto Note's switch's second with flag 0 held: rom.4 reads through the stack's leftover word
+enum class Vc2ParamBlock : uint8_t { kPart, kSystem, kSystemB, kSystemC, kKindA, kKindB, kKindC, kCosm, kLeftover };
 
 class Vc2PartParams {
 public:
@@ -45,6 +47,9 @@ struct Vc2PartRows {
     // OSC block's reader clears one when its Wave Number changes (v289)
     std::array<uint8_t, 64> steps {};
     float robot = 0.0f;   // 0x89997fdc: robot human depth ÷ 127 when a kind's OSC is EXTIN, else 0 (v290)
+    // 0x89995390: the parts' settings, 32 a part (v278's): the key's offset, mono, Legato, Patch Tempo, the zones'
+    // upper keys, Vocoder Sw, Split Point, Modulator Key Mode (v291)
+    std::array<uint8_t, 512> modes {};
 };
 
 // What the vocoder reader hands on (v290): kind 6's Unvoice Level, the part mixer's setters and targets, Auto Note's
@@ -61,6 +66,9 @@ public:
     virtual void setAutoNoteLegato() = 0;                                    // 0x893ebc60, given 0
     virtual void setVocoderMode(int32_t mode) = 0;                           // 0x893b1c00 → 0x893f0600
     virtual void vocoderSettings(Vc2VocoderSettings& s, int32_t stereo) = 0; // 0x893b1be0 → 0x893f06a0
+    // v291, the mode row's: All Sound Off to `source`'s `channel`, a message 120 made (0x89393c00) and handed on
+    // (0x89393ba0, its last argument 0)
+    virtual void allSoundOff(int source, int32_t channel) = 0;
 };
 
 // The OSC block's reader the part's reader calls for each kind and OSC, false to stop (v289)
@@ -98,8 +106,12 @@ public:
     bool oscBlock(Vc2PartRows& t, int part, int kind, int osc);     // 0x893a04e0
     // v290, Vc2PartSettingsVocoder.cpp: the vocoder's settings, the mixer's levels and Auto Note's switch
     bool vocoder(Vc2PartRows& t, int part, Vc2SettingsParts& out);  // 0x893a72f0
+    // v291, Vc2PartSettingsModes.cpp: the mode row (All Sound Off to the part's nodes' channels) and Auto Note's switch
+    bool modes(Vc2PartRows& t, int part, const Vc2PartNodes& nodes, Vc2SettingsParts& out);   // 0x89396f70
+    void autoNoteSwitch(Vc2SettingsParts& out);                                                // 0x89396f90
 
 private:
+    void zoneUppers(uint8_t* at, int part);                         // 0x89320870 (v291)
     void velocityPair(uint8_t* curve, uint8_t* depth, int part, int kind, int envelope);
     static uint8_t* oscBlockAt(Vc2PartRows& t, int part, int kind, int osc);   // v289
     void waveNumber(Vc2PartRows& t, uint8_t* at, int32_t v, int part, int kind, int osc);

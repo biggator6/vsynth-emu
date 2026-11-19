@@ -1546,6 +1546,64 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's settings by ID: the mode row and Auto Note's switch (2026-11-19, v291) {#vc2-part-settings-modes}
+
+Step 4.3's nineteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's sixth part): the dispatcher's first reader,
+`0x89396f70(0x89995390, part)`, and Auto Note's switch `0x89396f90`, which the Category routine `0x89392c60` calls last.
+Both are on `Vc2PartSettings` (`Vc2PartSettingsModes.cpp`) and checked by `xt_vc2settings`' sixth part. Their calls out
+go through `Vc2SettingsParts`.
+
+**The mode row** (`0x89396e20(table, part)`; `0x89396f70` wraps it and answers the same, as 0 or 1). It fills the
+parts' settings, 32 bytes a part from `0x89995390` (v278's "the parts' settings": the assigner reads +0 as the key's
+offset). Flag 0 is tested first (`0x89396dc0`, which then sets up the part's block, `0x893207b0`), and the reads are:
+- +0 = 12 × Octave Shift (0x12f), a byte; +1 = 1 when Mono/Poly (0x130) is 0, MONO; +2 = Legato Switch (0x131);
+  the halfword +4 = Patch Tempo (0x13a);
+- +6…+0x14: the zones' upper keys by `0x89320870`, Zone 1 Range Upper (0x141) to Zone 15's, each the most of it and
+  those before it (from 0, signed); +0x15 = 127 for zone 16;
+- +0x17 = Split Point (0x1a1); then Modulator Key Mode (0x1a2) and Vocoder Sw (0x193), in that order.
+
+When the Mode differs from +0x18 (read as a signed byte), or Vocoder Sw is 0 and +0x16 is not, each of the part's
+nodes for sources 1, 2 and 3 (`0x899888d0` + 0x100 × (source − 1) + 16 × part, `Vc2PartNodes`) whose channel byte
+(+0xd) is 0 or more is sent All Sound Off: `0x89393c00(&msg, 120)` makes the message, and `0x89393ba0(&msg, source,
+channel, 0)` hands it on. That routine doesn't read the message: with its last word 0 and the word `0x899891d0` clear it
+clears the key table of that source and channel (v276's `0x89391fe0`), calls `0x89393000(source, channel)` and
+truncates the table's voices (v278's `0x89390d50`); item 10 wires it. rom.4 also tests each node's address for 0, which
+none is. Then +0x18 = the Mode and +0x16 = Vocoder Sw. It answers flag 0 clear, tested again at the end.
+
+**The nodes** (`Vc2PartNodes.h`): 64 of 16 bytes from `0x899888d0`, one a source (1…4) and part. As far as read: +0
+the next node on its channel's list (the lists at `0x899890d0`), +4 an object, +8 a word given to `0x89390f70` and
+`0x89390fd0`, +0xc the source less 1, +0xd the channel (−1 none), +0xe an index into the objects' table `0x89535458`.
+Their init (`0x89393370`, part 0's four alone) and routines (`0x89393100`, `0x893932c0`, `0x89393310`) are item 9's
+nodes version.
+
+**Auto Note's switch** (`0x89396f90`, given the mode rows' address, which it doesn't read). It reads part 0 alone:
+- flag 1, then kind 0's first OSC's Type (0x2e5) through `0x89396df0` (`0x89320a50`); flag 1 again, then kind 1's;
+  either test giving up ends it with nothing called;
+- when either Type is EXTIN (2): Auto Note On Switch (0x19c) and Legato Switch (0x131, read and dropped) from part 0's
+  block, set up only if flag 0 is clear. With flag 0 held rom.4 reads both through the read object's word as the
+  stack left it: the port reads them through `Vc2ParamBlock::kLeftover`;
+- Auto Note's switch (`0x893ebc20`) gets the On Switch, or 0, and its legato setter (`0x893ebc60`) 0.
+
+v290's vocoder reader does the same with its own reads; this is the copy the Category routine calls.
+
+**The check.** It is `xt_vc2settings`' sixth part, on the seed five after the run's, so the first five parts' draws
+and lines are as they were. Each case is noise in every table and in the 64 nodes, then 400 events: the wrapper or
+the row on a drawn part, or Auto Note's switch. The message's two routines are hooked to log the number, and the
+source, channel and last word, among the reads; Auto Note's two setters keep v290's hooks; the port's All Sound Off
+logs the same through `SettingsPortOuts`. In this part the store draws Modulator Key Mode 0…2 and Vocoder Sw 0…1 half
+the time, and half the time each event sets +0x18 and +0x16 to what the store will answer, so the Mode is held and
+Vocoder Sw goes off often enough. Before each Auto Note's switch the stack word its second read object leaves is given
+a handle of its own (`kLeftoverHandle`), which the getter's hook logs as the leftover's block. The mode rows and the
+nodes are compared as memory in every part; v290's part's noise now stops before the mode rows.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first five parts' lines as they were. At seed
+  2024: 5,372 wrappers, 5,364 rows and 5,264 Auto Note switches, 8,885 All Sound Offs and 116 reads through the
+  leftover object.
+- Every line and branch of `Vc2PartSettingsModes.cpp` is reached.
+- `mutate_vc2.py --settings`: 357 plants, none missed; v291's 60 new. `Vc2PartNodes.h`'s `of` is planted at its
+  call, by the source and part it is given.
+
 ### The VC-2 part's settings by ID: the vocoder reader (2026-11-19, v290) {#vc2-part-settings-vocoder}
 
 Step 4.3's eighteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's fifth part): `0x893a72f0(0x89997fdc, part)`, the

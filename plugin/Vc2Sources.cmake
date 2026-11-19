@@ -115,4 +115,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2PartSettingsOsc.cpp
     Source/Vc2PartSettingsOscBlock.cpp
     Source/Vc2PartSettingsVocoder.cpp
+    Source/Vc2PartSettingsModes.cpp
 )

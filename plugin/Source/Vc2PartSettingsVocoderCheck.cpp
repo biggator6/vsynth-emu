@@ -1,5 +1,5 @@
 // xt_vc2settings' fifth part (v290): the vocoder reader 0x893a72f0 against rom.4's, on the seed four after the run's,
-// every table noise; rom.4's powf its own, its callees hooked to log their values among the reads (the part mixer's
+// every table to robot human depth's word noise (v291's mode rows not); rom.4's powf its own, its callees hooked to log their values among the reads (the part mixer's
 // setters' floats and its targets, Auto Note's two setters, the vocoder's mode, the settings struct word for word but
 // the pivots, and the stereo flag), the port's calls out the same through SettingsPortOuts; robot human depth's word
 // and Unvoice Level's compared as memory.  XT_VC2SETTINGS_MAIN only.
@@ -11,30 +11,24 @@ constexpr uint32_t kVocoderReader = 0x893a72f0, kSettingsWrapper = 0x893b1be0;  
 constexpr int16_t kAutoNoteId = 0x19c;                                        // [FW] read with an EXTIN OSC alone
 constexpr int kFirstOffset = 2;                                               // [FW] the settings' first offset
 
-// A callee's value: a float's bits in fr4, a word in r4, or none
-uint32_t floatArgument(Sh4& c) { return c.fb[(c.fpscr >> 21) & 1][4]; }
-uint32_t wordArgument(Sh4& c) { return c.r[4]; }
-uint32_t noArgument(Sh4&) { return 0; }
+// A callee's call, its code in the log `What` with its value: a float's bits in fr4, a word in r4, or none
+template <int32_t What>
+SettingsCall floatArgument(Sh4& c) { return { What, 0, 0, 0, (int32_t)c.fb[(c.fpscr >> 21) & 1][4] }; }
+template <int32_t What>
+SettingsCall wordArgument(Sh4& c) { return { What, 0, 0, 0, (int32_t)c.r[4] }; }
+template <int32_t What>
+SettingsCall noArgument(Sh4&) { return { What, 0, 0, 0, 0 }; }
 
-// [FW] a callee: its address, its call's code in the log, where its value is
-struct VocoderCallee {
-    uint32_t at;
-    int32_t what;
-    uint32_t (*value)(Sh4&);
-};
-constexpr VocoderCallee kCallees[] = {
-    { 0x893b1eb0, kOutDirect, floatArgument }, { 0x893b1ec0, kOutReverb, floatArgument },
-    { 0x893b1ed0, kOutMfx, floatArgument }, { 0x893b1ee0, kOutTargets, noArgument },
-    { 0x893ebc20, kOutAutoNote, wordArgument }, { 0x893ebc60, kOutLegato, wordArgument },
-    { 0x893b1c00, kOutMode, wordArgument },
+// [FW] the callees: their addresses, their calls
+constexpr SettingsCallee kCallees[] = {
+    { 0x893b1eb0, floatArgument<kOutDirect> }, { 0x893b1ec0, floatArgument<kOutReverb> },
+    { 0x893b1ed0, floatArgument<kOutMfx> }, { 0x893b1ee0, noArgument<kOutTargets> },
+    { 0x893ebc20, wordArgument<kOutAutoNote> }, { 0x893ebc60, wordArgument<kOutLegato> },
+    { 0x893b1c00, wordArgument<kOutMode> },
 };
 
 void hookCallees(SettingsSides& s) {
-    for (const VocoderCallee& k : kCallees)
-        s.fw.cpu.hook(k.at, [&s, k](Sh4& c) {
-            logOut(s.rom.log, k.what, k.value(c));
-            c.ret(0);
-        });
+    settingsHookCallees(s, kCallees);
     s.fw.cpu.hook(kSettingsWrapper, [&s](Sh4& c) {
         uint32_t words[kSettingsWords];
         for (int k = 0; k < kSettingsWords; ++k) words[k] = c.rd32(c.r[4] + 4 * (uint32_t)k);
@@ -64,6 +58,6 @@ void sayVocoderPart(const SettingsCounts& n) {
 } // namespace
 
 const SettingsPartRow kVocoderPartRow { 4, &SettingsCounts::vocoderEvents, &SettingsCounts::vocoderCalls,
-                                        settingsCaseOf<kVocoderEvents, sizeof(Vc2PartRows), 5>, sayVocoderPart,
+                                        settingsCaseOf<kVocoderEvents, offsetof(Vc2PartRows, modes), 5>, sayVocoderPart,
                                         hookCallees };
 #endif

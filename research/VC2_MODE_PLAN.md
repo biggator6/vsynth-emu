@@ -742,6 +742,13 @@ version against rom.4's routines with what it calls hooked:
         depth, the vocoder's mode and settings, through `Vc2SettingsParts`; xt_vc2settings' fifth part
         (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the vocoder reader"). Left: the mode row, `0x89396f90`,
         the dispatchers, the Category and budget and the nodes.
+      - the mode row and Auto Note's switch done (v291): `0x89396f70` (`0x89396e20`), the parts' settings at
+        `0x89995390` (the key's offset, mono, Legato, Patch Tempo, the zones' upper keys by `0x89320870`, Vocoder Sw,
+        Split Point, Modulator Key Mode), All Sound Off to the part's nodes' channels when the Mode moves or Vocoder Sw
+        goes off, through `Vc2SettingsParts`; the nodes' words (`Vc2PartNodes`); `0x89396f90`, an EXTIN OSC on kind 0
+        or 1 taking the part's Auto Note On Switch; xt_vc2settings' sixth part (HARDWARE_FIRMWARE.md, "The VC-2 part's
+        settings by ID: the mode row and Auto Note's switch"). Left: the dispatchers, the Category and budget and the
+        nodes.
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.

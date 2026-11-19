@@ -840,6 +840,7 @@ COSM inputs: 16000 events: bytes 3269, 3112 rows; COSM inputs 3189, 3187 rows, 3
 OSC table: 16000 events: 5355 trailers, 5363 calibrations, 5282 parts (2024457 reads)
 OSC blocks: 16000 events: 8002 blocks, 7998 parts (15088147 reads)
 vocoder: 16000 events, 3479 with an EXTIN OSC, 542 with a template's offsets (576640 calls)
+modes: 16000 events: 5372 wrappers, 5364 rows, 5264 Auto Note switches; 8885 All Sound Offs, 116 reads through a leftover object (264903 calls)
 settings: 40 cases, 16000 events: 1040 commons; envelopes 978, 1018 rows; LFOs 959, 987 rows, 1023 systems; mix 970, 1021 rows; TVAs 930, 992 rows, 1042 velocity rows, 1055 trailers, 992 routes, 969 controls; laws 1018 curves, 1006 depths (2097110 reads)
 xt_vc2settings: 0 different
 == xt_tone msm

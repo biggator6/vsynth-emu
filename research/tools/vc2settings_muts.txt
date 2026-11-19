@@ -1,8 +1,9 @@
 # Planted errors in the VC-2 part's settings by ID, for mutate_vc2.py --settings: each must make xt_vc2settings, on
 # rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2settings (Vc2PartSettings.cpp, v286),
 # vc2settingstables (Vc2PartSettingsTables.cpp, v287), vc2settingswords (Vc2PartSettingsWords.cpp), vc2settingsosc
-# (Vc2PartSettingsOsc.cpp, v288), vc2settingsblock (Vc2PartSettingsOscBlock.cpp, v289) and vc2settingsvocoder
-# (Vc2PartSettingsVocoder.cpp, v290).  Not planted: the depth
+# (Vc2PartSettingsOsc.cpp, v288), vc2settingsblock (Vc2PartSettingsOscBlock.cpp, v289), vc2settingsvocoder
+# (Vc2PartSettingsVocoder.cpp, v290) and vc2settingsmodes (Vc2PartSettingsModes.cpp, v291; Vc2PartNodes.h's `of`
+# planted at its call, by the source and part it's given).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -307,3 +308,63 @@ tables-records-bytes|kRecordBytes = 140,|kRecordBytes = 136,|vc2settingstables
 tables-records-shift|kShiftAt = 8;|kShiftAt = 4;|vc2settingstables
 tables-pool-base|{ 0x893a75ec, &shiftBase }|{ 0x893a75f0, &shiftBase }|vc2settingstables
 tables-pool-127|{ 0x893a75f8, &per127 }|{ 0x893a75f0, &per127 }|vc2settingstables
+modes-octave-id|kOctave = 0x12f,|kOctave = 0x12e,|vc2settingsmodes
+modes-monopoly-id|kMonoPoly = 0x130,|kMonoPoly = 0x132,|vc2settingsmodes
+modes-legato-id|kLegato = 0x131;|kLegato = 0x132;|vc2settingsmodes
+modes-tempo-id|kTempo = 0x13a,|kTempo = 0x13b,|vc2settingsmodes
+modes-zone-id|kZoneUpper = 0x141,|kZoneUpper = 0x142,|vc2settingsmodes
+modes-split-id|kSplit = 0x1a1,|kSplit = 0x1a3,|vc2settingsmodes
+modes-keymode-id|kKeyMode = 0x1a2,|kKeyMode = 0x1a3,|vc2settingsmodes
+modes-vocoder-id|kVocoderSw = 0x193;|kVocoderSw = 0x194;|vc2settingsmodes
+modes-autonote-id|kAutoNote = 0x19c,|kAutoNote = 0x19d,|vc2settingsmodes
+modes-type-id|kOscType = 0x2e5;|kOscType = 0x2e6;|vc2settingsmodes
+modes-bytes|kModeBytes = 32,|kModeBytes = 30,|vc2settingsmodes
+modes-key-at|kKeyAt = 0,|kKeyAt = 3,|vc2settingsmodes
+modes-mono-at|kMonoAt = 1,|kMonoAt = 3,|vc2settingsmodes
+modes-legato-at|kLegatoAt = 2,|kLegatoAt = 3,|vc2settingsmodes
+modes-tempo-at|kTempoAt = 4,|kTempoAt = 2,|vc2settingsmodes
+modes-zones-at|kZonesAt = 6,|kZonesAt = 7,|vc2settingsmodes
+modes-split-at|kSplitAt = 0x17;|kSplitAt = 0x19;|vc2settingsmodes
+modes-vocoder-at|kVocoderAt = 0x16,|kVocoderAt = 0x19,|vc2settingsmodes
+modes-keymode-at|kKeyModeAt = 0x18;|kKeyModeAt = 0x19;|vc2settingsmodes
+modes-zones|kZones = 15,|kZones = 14,|vc2settingsmodes
+modes-sources-fewer|kSources = 3,|kSources = 2,|vc2settingsmodes
+modes-sources-more|kSources = 3,|kSources = 4,|vc2settingsmodes
+modes-part-zero|kPartZero = 0,|kPartZero = 1,|vc2settingsmodes
+modes-first-kind|kFirstKind = 0,|kFirstKind = 2,|vc2settingsmodes
+modes-second-kind|kSecondKind = 1;|kSecondKind = 2;|vc2settingsmodes
+modes-top-key|kTopKey = 127,|kTopKey = 126,|vc2settingsmodes
+modes-octave-keys|kOctaveKeys = 12,|kOctaveKeys = 11,|vc2settingsmodes
+modes-extin|kExtin = 2;|kExtin = 3;|vc2settingsmodes
+modes-most-from|    int32_t most = 0;|    int32_t most = -1;|vc2settingsmodes
+modes-most-running|most = std::max(most, p_.value(|most = std::max(0, p_.value(|vc2settingsmodes
+modes-zone-top|    put8(at + kZones, kTopKey);\n|\n|vc2settingsmodes
+modes-held|    if (p_.held(kHeldCommon)) return false;\n    const auto get|    if (p_.held(kHeldKind)) return false;\n    const auto get|vc2settingsmodes
+modes-held-after|    return !p_.held(kHeldCommon);|    return true;|vc2settingsmodes
+modes-block|return p_.value(Block::kPart, part, 0, id); };|return p_.value(Block::kKindA, part, 0, id); };|vc2settingsmodes
+modes-mono|get(kMonoPoly) == 0 ? 1 : 0|get(kMonoPoly) != 0 ? 1 : 0|vc2settingsmodes
+modes-tempo-width|    put16(row + kTempoAt, get(kTempo));|    put8(row + kTempoAt, get(kTempo));|vc2settingsmodes
+modes-split-store|    put8(row + kSplitAt, get(kSplit));\n|\n|vc2settingsmodes
+modes-read-order|    const int32_t mode = get(kKeyMode);\n    const int32_t vocoder = get(kVocoderSw);|    const int32_t vocoder = get(kVocoderSw);\n    const int32_t mode = get(kKeyMode);|vc2settingsmodes
+modes-moved-sign|static_cast<int8_t>(row[kKeyModeAt]) != mode|static_cast<uint8_t>(row[kKeyModeAt]) != mode|vc2settingsmodes
+modes-moved-only|if (moved \|\| (vocoder == 0 && row[kVocoderAt] != 0))|if (moved)|vc2settingsmodes
+modes-went-off-new|if (moved \|\| (vocoder == 0 && row[kVocoderAt] != 0))|if (moved \|\| vocoder == 0)|vc2settingsmodes
+modes-went-off-old|if (moved \|\| (vocoder == 0 && row[kVocoderAt] != 0))|if (moved \|\| row[kVocoderAt] != 0)|vc2settingsmodes
+modes-channel-test|            if (channel >= 0) out.allSoundOff|            if (channel > 0) out.allSoundOff|vc2settingsmodes
+modes-source-from|for (int source = 1; source <= kSources; ++source)|for (int source = 2; source <= kSources; ++source)|vc2settingsmodes
+modes-source-told|out.allSoundOff(source, channel);|out.allSoundOff(source - 1, channel);|vc2settingsmodes
+modes-node-part|nodes.of(source, part).channel|nodes.of(source, 0).channel|vc2settingsmodes
+modes-node-source|nodes.of(source, part).channel|nodes.of(source + 1, part).channel|vc2settingsmodes
+modes-keymode-store|    put8(row + kKeyModeAt, mode);\n|\n|vc2settingsmodes
+modes-vocoder-store|    put8(row + kVocoderAt, vocoder);\n|\n|vc2settingsmodes
+modes-autonote-held-first|    if (p_.held(kHeldKind)) return;\n    const int32_t first|    if (p_.held(kHeldCommon)) return;\n    const int32_t first|vc2settingsmodes
+modes-autonote-held-second|    if (p_.held(kHeldKind)) return;\n    const int32_t second|    const int32_t second|vc2settingsmodes
+modes-autonote-block|p_.value(Block::kKindA, kPartZero, kFirstKind, kOscType)|p_.value(Block::kKindB, kPartZero, kFirstKind, kOscType)|vc2settingsmodes
+modes-autonote-first|first == kExtin \|\| second == kExtin|second == kExtin|vc2settingsmodes
+modes-autonote-second|first == kExtin \|\| second == kExtin|first == kExtin|vc2settingsmodes
+modes-leftover|p_.held(kHeldCommon) ? Block::kLeftover : Block::kPart|Block::kPart|vc2settingsmodes
+modes-leftover-flag|p_.held(kHeldCommon) ? Block::kLeftover|p_.held(kHeldKind) ? Block::kLeftover|vc2settingsmodes
+modes-autonote-legato-read|        p_.value(block, kPartZero, 0, kLegato);   // read, its answer tested and dropped\n|\n|vc2settingsmodes
+modes-autonote-off|    int32_t on = 0;|    int32_t on = 1;|vc2settingsmodes
+modes-autonote-set|    out.setAutoNote(on);|    out.setAutoNote(on != 0);|vc2settingsmodes
+modes-autonote-legato|    out.setAutoNoteLegato();\n|\n|vc2settingsmodes

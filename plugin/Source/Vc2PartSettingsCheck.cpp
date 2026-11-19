@@ -16,7 +16,6 @@ constexpr int16_t kCosmTypeId = 0x463;                       // [FW] a COSM inpu
 // side of the templates' 16
 constexpr std::pair<int16_t, uint32_t> kNarrowIds[] = { { 0x2e5, 4 }, { 0x319, 4 }, { 0x1a0, 18 } };
 constexpr uint32_t kLfoWords = 0x3200, kTvaWords = 0x1804;   // the tables' words; the bytes past them by hand
-constexpr uint32_t kHandle = 0x01000000;                     // a handle: block << 16, part << 8, kind << 2, COSM
 
 // [FW] the read objects' set-ups, by block
 struct SetUp {
@@ -64,7 +63,8 @@ std::string settingsDifference(SettingsSides& s) {
         { kBytesAt, &t.bytes, sizeof t.bytes, "bytes" }, { kCosmsAt, &t.cosms, sizeof t.cosms, "COSM inputs" },
         { kOscsAt, &t.oscs, sizeof t.oscs, "OSCs" }, { kStepsAt, &t.steps, sizeof t.steps, "step counts" },
         { kRobotAt, &t.robot, sizeof t.robot, "robot human depth" },
-        { kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel, "Unvoice Level" } });
+        { kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel, "Unvoice Level" },
+        { kModesAt, &t.modes, sizeof t.modes, "mode rows" }, { kNodesAt, &s.nodes, sizeof s.nodes, "nodes" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
@@ -124,7 +124,8 @@ const SettingsPartRow kCosmPart { 1, &SettingsCounts::moreEvents, &SettingsCount
 long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     long different = settingsRunPart(s, run, kCosmPart);
     for (const SettingsPartRow& p : kOscPartRows) different += settingsRunPart(s, run, p);
-    return different + settingsRunPart(s, run, kVocoderPartRow);
+    different += settingsRunPart(s, run, kVocoderPartRow);
+    return different + settingsRunPart(s, run, kModePartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
@@ -160,6 +161,8 @@ int32_t SettingsStore::value(const SettingsCall& c) const {
     if (c.id == kCosmTypeId) return (int32_t)(v % Vc2PartSettingsTables::kCosmTypes);
     for (const auto& [id, values] : kNarrowIds)
         if (c.id == id && pick < 4) return (int32_t)(v % values);
+    for (const auto& [id, values] : narrow)
+        if (c.id == id && pick < 4) return (int32_t)(v % values);
     if (pick < 4) return (int32_t)(v % 128);
     if (pick < 6) return (int32_t)(v % 129) - 64;
     return pick == 6 ? kEdges[v % std::size(kEdges)] : (int32_t)(h * 2654435761u);
@@ -178,6 +181,14 @@ long settingsRunPart(SettingsSides& s, const Vc2Run& run, const SettingsPartRow&
         [&](std::mt19937& rng) { return p.oneCase(s, rng, n.*p.events, n.*p.calls); });
     p.say(n);
     return different;
+}
+
+void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> callees) {
+    for (const SettingsCallee& k : callees)
+        s.fw.cpu.hook(k.at, [&s, k](Sh4& c) {
+            s.rom.log.push_back(k.called(c));
+            c.ret(0);
+        });
 }
 
 void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value) {
@@ -204,7 +215,7 @@ SettingsSides::SettingsSides(Vc2Fw& rig) : fw(rig) {
             const uint32_t part = byPart ? (c.r[5] & 0xff) << 8 : 0;
             const uint32_t kind = u.block >= Block::kKindA ? (c.r[6] & 0x3f) << 2 : 0;
             const uint32_t cosm = u.block == Block::kCosm ? c.r[7] & 3 : 0;
-            c.wr32(c.r[4] + 4, kHandle | (uint32_t)u.block << 16 | part | kind | cosm);
+            c.wr32(c.r[4] + 4, kSettingsHandle | (uint32_t)u.block << 16 | part | kind | cosm);
             c.ret(0);
         });
     // Both getters (the typed one's type, r6, is the store's to know): the handle's read

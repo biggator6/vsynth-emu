@@ -10,6 +10,7 @@
 #include "Vc2PartSettings.h"
 #include "Vc2PartSettingsTables.h"
 #include <bit>
+#include <span>
 #include <cstring>
 #include <vector>
 
@@ -20,6 +21,13 @@ inline constexpr uint32_t kBytesAt = 0x89998a14, kCosmsAt = 0x89e2003c;   // v28
 inline constexpr uint32_t kOscsAt = 0x89e371e0;                            // v288's
 inline constexpr uint32_t kStepsAt = 0x89989c84;                           // v289's: part 0's step counts
 inline constexpr uint32_t kRobotAt = 0x89997fdc, kUnvoiceLevelAt = 0x899d9968;   // v290's
+inline constexpr uint32_t kModesAt = 0x89995390, kNodesAt = 0x899888d0;           // v291's: the mode rows, the nodes
+// A read object's handle the set-ups' hooks leave: this, the block << 16, part << 8, kind << 2, COSM; and (v291) the
+// one rom.4's stack is given where Auto Note's switch reads through a read object never set up, a block past the
+// OSC block's call
+inline constexpr uint32_t kSettingsHandle = 0x01000000;
+inline constexpr int32_t kLeftoverCall = 9;
+inline constexpr uint32_t kLeftoverHandle = kSettingsHandle | (uint32_t)kLeftoverCall << 16;
 inline constexpr int kSettingsParts = 16, kSettingsKinds = 16, kEventsACase = 400;
 // [FW] The OSC block's reader, hooked in the first three parts (v288), and its call as the log has it then, a block
 // past the read objects'
@@ -32,9 +40,11 @@ struct SettingsCall {
 };
 
 // The parameters' values, one draw per event: by a hash of the seed and the read, mostly a byte's or a depth's, now
-// and then at the laws' edges or any word; the OSC block's reader's answer mostly 1, now and then 0 or any word
+// and then at the laws' edges or any word; the OSC block's reader's answer mostly 1, now and then 0 or any word; a
+// part's own IDs drawn within a few values half the time (v291's, after the run's)
 struct SettingsStore {
     uint32_t seed = 0;
+    std::span<const std::pair<int16_t, uint32_t>> narrow {};
     int32_t value(const SettingsCall& c) const;
 };
 
@@ -52,7 +62,8 @@ class SettingsPortParams final : public Vc2PartParams {
 public:
     explicit SettingsPortParams(SettingsReads& reads) : reads_(reads) {}
     int32_t value(Vc2ParamBlock block, int part, int kind, int16_t id) override {
-        return reads_.read({ (int32_t)block, part, kind, 0, id });
+        const int32_t code = block == Vc2ParamBlock::kLeftover ? kLeftoverCall : (int32_t)block;
+        return reads_.read({ code, part, kind, 0, id });
     }
     int32_t cosmValue(int part, int kind, int cosm, int16_t id) override {
         return reads_.read({ (int32_t)Vc2ParamBlock::kCosm, part, kind, cosm, id });
@@ -68,6 +79,9 @@ private:
 // stack's leftovers there, which the settings path writes before reading), the stereo flag as index 15
 inline constexpr int32_t kOutDirect = 10, kOutReverb = 11, kOutMfx = 12, kOutTargets = 13, kOutAutoNote = 14;
 inline constexpr int32_t kOutLegato = 15, kOutMode = 16, kOutSettings = 17;
+// The mode row's (v291): a message made, its number as the ID; one handed on, its source, channel and last word as
+// the part, kind and COSM; All Sound Off's number
+inline constexpr int32_t kOutMessage = 18, kOutSoundOff = 19, kSoundOffNumber = 120;
 inline constexpr int kSettingsWords = 15, kStereoIndex = 15;
 void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value);
 void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int32_t stereo);
@@ -90,6 +104,10 @@ public:
         std::memcpy(words, &s, sizeof words);
         logSettingsWords(log_, words, stereo);
     }
+    void allSoundOff(int source, int32_t channel) override {
+        logOut(log_, kOutMessage, kSoundOffNumber);
+        log_.push_back({ kOutSoundOff, source, channel, 0, 0 });
+    }
 
 private:
     std::vector<SettingsCall>& log_;
@@ -101,7 +119,8 @@ struct SettingsCounts {
     long oscEvents = 0, oscCalls = 0;     // the third's (v288)
     long blockEvents = 0, blockCalls = 0; // the fourth's (v289)
     long vocoderEvents = 0, vocoderCalls = 0, extin = 0, offsets = 0;   // the fifth's (v290)
-    std::array<long, 27> byEvent {};
+    long modeEvents = 0, modeCalls = 0, soundOffs = 0, leftovers = 0;   // the sixth's (v291)
+    std::array<long, 30> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -114,6 +133,7 @@ struct SettingsSides {
     SettingsPortParams params { mine };
     Vc2PartSettings settings { params };
     SettingsPortOuts outs { mine };   // v290
+    Vc2PartNodes nodes {};            // v291
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -126,6 +146,13 @@ std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std
 // The draws before an event: the store's seed, now and then a held flag, now and then one of the first `flipped`
 // flags set after a read
 void settingsDraw(SettingsSides& s, std::mt19937& rng, uint32_t flipped);
+// A callee hooked on rom.4's side (v290's, shared from v291): its address and its call as the log has it; each answers
+// 0 when hooked by settingsHookCallees
+struct SettingsCallee {
+    uint32_t at;
+    SettingsCall (*called)(Sh4&);
+};
+void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> callees);
 // A further part (v289): its seed's offset from the run's, its counts, a case of its events, its line, and what it
 // does first
 struct SettingsPartRow {
@@ -142,6 +169,8 @@ long settingsRunPart(SettingsSides& s, const Vc2Run& run, const SettingsPartRow&
 // (Vc2PartSettingsOscCheck.cpp); the fifth (v290): the vocoder reader (Vc2PartSettingsVocoderCheck.cpp)
 extern const SettingsPartRow kOscPartRows[2];
 extern const SettingsPartRow kVocoderPartRow;
+// The sixth (v291): the mode row and Auto Note's switch (Vc2PartSettingsModesCheck.cpp)
+extern const SettingsPartRow kModePartRow;
 
 using SettingsEvent = std::string (*)(SettingsSides&, std::mt19937&);
 
@@ -206,6 +235,8 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
     s.fw.cpu.write(kStepsAt, &t.steps, sizeof t.steps);
     s.fw.cpu.write(kRobotAt, &t.robot, sizeof t.robot);
     s.fw.cpu.write(kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel);
+    s.fw.cpu.write(kModesAt, &t.modes, sizeof t.modes);
+    s.fw.cpu.write(kNodesAt, &s.nodes, sizeof s.nodes);
     std::string what;
     for (int k = 0; k < kEventsACase && what.empty(); ++k, ++events) {
         settingsDraw(s, rng, Flipped);
