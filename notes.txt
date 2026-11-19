@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's reload objects v300 (2026-11-19, on claude/vc2-part-4-3 after v299; HARDWARE_FIRMWARE.md, "The VC-2
+  part's reload objects"): step 4.3's twenty-eighth version, item 10's fifth part. Vc2PartReloads (Vc2PartReloads.h,
+  .cpp): rom.4's 16 reload objects of 24 bytes at 0x89996120 (OS timer nodes: links, the queue's word, the vtable
+  0x898cd430, the part, the state, the posted word) and the three floats after them; the static initializer 0x8939b350
+  with the constructor 0x8939b260, the cancel 0x8939ae50 (the held flags 0x8993d0c0…c4 set around the queue's
+  remove), the run 0x8939af10, the request 0x8939af40, the fire 0x8939b020 and the notes' message 0x8939b050; the
+  queue's add and remove and the part's read through Vc2ReloadParts, the floats read by Vc2PartSettingsTables.
+  xt_vc2settings gains a fourteenth part (Vc2PartReloadsCheck.cpp): 0 different at seeds 2024, 7 and 31337, the first
+  thirteen parts' lines unchanged; mutate_vc2.py --settings 593 planted, 0 missed; mutate_panel.py
+  rom4-no-partsettings caught. Not in the sound yet.
+
 The VC-2 part's routing reset v299 (2026-11-19, on claude/vc2-part-4-3 after v298; HARDWARE_FIRMWARE.md, "The VC-2
   part's routing reset"): step 4.3's twenty-seventh version, item 10's fourth part. On Vc2PartSettings
   (Vc2PartSettingsReceive.cpp, beside the receive channel it calls): rom.4's 0x89393e30 (ChordMemory Switch, ID 55 on

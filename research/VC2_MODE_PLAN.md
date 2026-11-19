@@ -797,6 +797,12 @@ version against rom.4's routines with what it calls hooked:
          source 1 the held class), answering 1; xt_vc2settings' thirteenth part (HARDWARE_FIRMWARE.md, "The VC-2
          part's routing reset"). Next: the reload task (`0x8939af10`, `0x8939af40`, `0x8939ae50`), then the
          controllers.
+       - the reload objects done (v300): `Vc2PartReloads`, rom.4's 16 OS timer objects at `0x89996120` and the three
+         floats after them, the static initializer `0x8939b350` with the constructor `0x8939b260`, the cancel
+         `0x8939ae50`, the run `0x8939af10`, the request `0x8939af40`, the fire `0x8939b020` and the notes' message
+         `0x8939b050`; the queue's add and remove and the part's read through `Vc2ReloadParts`; xt_vc2settings'
+         fourteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's reload objects"). Next: the controllers
+         (`0x89392f90`, `0x89394440`), then the part's init (`0x8939b200`, `0x89393370`) and the MIDI dispatcher.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

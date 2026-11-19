@@ -84,7 +84,7 @@ VC2SETTINGS=(Vc2PartSettings Vc2PartSettingsCheck Vc2SetChildHead Vc2PartSetting
     Vc2PartSettingsCategory Vc2PartSettingsCategoryCheck Vc2StaticMatrix Vc2StaticMatrixCheck
     Vc2PartSettingsSystem Vc2PartSettingsSystemCheck Vc2PartSettingsMessages Vc2PartSettingsMessagesCheck
     Vc2PartNodes Vc2Keys Vc2KeysTables Vc2PartSettingsReceive Vc2PartSettingsReceiveCheck
-    Vc2PartSettingsRoutingCheck)
+    Vc2PartSettingsRoutingCheck Vc2PartReloads Vc2PartReloadsCheck)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -215,6 +215,7 @@ VC2PORTS=(
     "vc2settingssystem|Vc2PartSettingsSystem.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
     "vc2settingsmessages|Vc2PartSettingsMessages.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
     "vc2settingsreceive|Vc2PartSettingsReceive.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2partreloads|Vc2PartReloads.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port

@@ -123,4 +123,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2PartSettingsSystem.cpp
     Source/Vc2PartSettingsMessages.cpp
     Source/Vc2PartSettingsReceive.cpp
+    Source/Vc2PartReloads.cpp
 )

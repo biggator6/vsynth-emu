@@ -1546,6 +1546,56 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's reload objects (2026-11-19, v300) {#vc2-part-reload-objects}
+
+Step 4.3's twenty-eighth version (VC2_MODE_PLAN.md, step 4.3, item 10's fifth part): what the parameters' messages
+call the reload task's request and run (v297) and the part node's notes call the parameters' message (v278), on a new
+`Vc2PartReloads` (`Vc2PartReloads.h/.cpp`), checked by `xt_vc2settings`' fourteenth part.
+
+**The objects.** 16 of 24 bytes from `0x89996120`, one a part, each an OS timer node: its links (+0, +4, to itself
+off the queue), the queue's word (+8), its vtable (+0xc, `0x898cd430`, whose +0x14 is the fire), the part it reads
+(+0x10), its state (+0x11: 0 idle, 1 asked, 2 reading) and its posted word (+0x14: on the OS's queue `0x8994fc24`). After
+them three floats at `0x899962a0`: 44100/440, 0.019955 and 0.009375 (no direct reader found).
+
+**The routines.** In each, the queue's add is `0x893004a0(0x8994fc24, object)` and its remove `0x89300640(…)`, both
+OS calls:
+- The static initializer `0x8939b350`: the three floats from its pool, then the array builder `0x8950773a` making each
+  object in place by `0x8939b260`. That one, given an object (it allocates 24 bytes when given 0, which nothing does),
+  runs the OS base `0x893002a0` (the links to itself, the base's vtable `0x898c6ba8`) and then writes its own vtable.
+- The cancel `0x8939ae50`: the five held flags `0x8993d0c0…c4` set to 1, the remove, the flags 0. The flags make a
+  reader on another task give up while the object leaves the queue.
+- The run `0x8939af10` (v297's kinds 5, 6, 10…13): reading → the cancel; idle; then the part's read (v292's
+  `0x8939b170`), its answer.
+- The request `0x8939af40` (v297's part message): if posted, reading → the cancel's held remove, then idle; then by
+  its state (a braf table), 1 nothing, 2 the held remove and then as 0, 0 or past 2 asked, and posted (the word set
+  first) unless it is.
+- The fire `0x8939b020`, the vtable's +0x14, which the queue runs: not idle → reading, the part's read, idle; then not
+  posted; it answers 0.
+- The message `0x8939b050` (v278's `readParameters`, by its braf table): idle nothing; asked (or past 2) idle and the
+  part's read now (`0x8939b0a0`); reading, the remove alone (no flags). Its answer goes unread (idle's is 0x48, the
+  table's word).
+- Not ported, as nothing in rom.4 calls them: `0x8939ae90` (the remove alone), `0x8939aea0` (a request without the
+  posted word's test) and the init `0x8939af00` (part, state 0, not posted); part 0's object is set up by
+  `0x8939b200`, the start of the part's init, item 10's.
+
+The held flags are given to `Vc2PartReloads` as `Vc2HeldFlags`, the bytes `Vc2PartParams::held` reads; the add, the
+remove and the part's read go out through `Vc2ReloadParts`; the floats are read by `Vc2PartSettingsTables`.
+
+**The check.** `xt_vc2settings`' fourteenth part, on the seed thirteen after the run's: rom.4's own routines on its
+own objects, the queue's add and remove hooked to log (the remove with the held flags as they stand in rom.4's memory,
+the port's as they stand in its own), the part's read hooked to log and answer as drawn; the eleventh part's hooks on
+the request and the run taken off. Each case gives every table, the objects and the floats noise; each object's part
+is 0…15, its state 0, 1 or 2 mostly (now and then any byte), its posted word 0, 1 or any, and before each event the
+object's words are drawn so half the time. Events: the static initializer one time in 32, else the constructor, the
+cancel, the run, the request, the fire or the message on a drawn object. After each, the tables, the objects, the
+floats, the held flags byte by byte and the calls, and the run's and the fire's answers.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first thirteen parts' lines as they were.
+- Every line and branch of `Vc2PartReloads.cpp` is reached.
+- `mutate_vc2.py --settings`: 593 plants, none missed; v300's 36 new (two in the floats' reads). `mutate_panel.py
+  rom4-no-partsettings` caught.
+
 ### The VC-2 part's routing reset (2026-11-19, v299) {#vc2-part-routing-reset}
 
 Step 4.3's twenty-seventh version (VC2_MODE_PLAN.md, step 4.3, item 10's fourth part): the routine kind 0's

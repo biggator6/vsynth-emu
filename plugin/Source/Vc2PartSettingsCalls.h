@@ -2,6 +2,7 @@
 // xt_vc2settings' calls as both sides log them (Vc2PartSettingsCheck.h's until v295): a read (the read object's block,
 // part and kind, and the ID) or a call out (a block past the reads' and its words), and the port's calls out, each
 // logged as rom.4's hooks log theirs.  XT_VC2SETTINGS_MAIN only.
+#include "Vc2PartReloads.h"
 #include "Vc2PartSettings.h"
 #include "Vc2StaticMatrix.h"
 #include <array>
@@ -38,6 +39,14 @@ inline constexpr int32_t kOutTruncateAll = 32, kOutStopVoices = 33;
 // The receive channel's (v298): the held note's event; and the system's fourth block's reads, a block past the calls
 // out's
 inline constexpr int32_t kOutHeldNoteOn = 34, kSystemDCall = 35;
+// The reload objects' (v300): the queue's add and remove (the object as the ID; the remove's held flags as the kind,
+// the first four bytes', and the COSM, the fifth's), the part's read (the part as the ID)
+inline constexpr int32_t kOutPost = 36, kOutUnpost = 37, kOutReadPart = 38;
+// The held flags as a log carries them
+inline SettingsCall settingsUnposted(const uint8_t* held, uint32_t object) {
+    const auto low = (int32_t)(held[0] | held[1] << 8 | held[2] << 16 | (uint32_t)held[3] << 24);
+    return { kOutUnpost, 0, low, held[4], (int32_t)object };
+}
 inline constexpr int kSettingsWords = 15, kStereoIndex = 15;
 void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value);
 void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int32_t stereo);
@@ -45,9 +54,16 @@ void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int
 // The port's calls out: each logged as rom.4's hooks log theirs, Unvoice Level kept to compare with rom.4's word; and
 // (v292) the Matrix set-up's 0x893b1ee0, the mixer's targets, which the dispatchers' set-up routines never reach
 class SettingsPortOuts final : public Vc2SettingsParts, public Vc2MatrixPart, public Vc2StaticMatrixParts,
-                               public Vc2NodeParts {
+                               public Vc2NodeParts, public Vc2ReloadParts {
 public:
-    explicit SettingsPortOuts(std::vector<SettingsCall>& log) : log_(log) {}
+    SettingsPortOuts(std::vector<SettingsCall>& log, const Vc2HeldFlags& held) : log_(log), held_(held) {}
+    bool readAnswer = false;   // v300: the part's read's answer, drawn for both sides
+    void post(uint32_t object) override { logOut(log_, kOutPost, object); }
+    void unpost(uint32_t object) override { log_.push_back(settingsUnposted(held_.data(), object)); }
+    bool readPart(int part) override {
+        logOut(log_, kOutReadPart, (uint32_t)part);
+        return readAnswer;
+    }
     float unvoiceLevel = 0.0f;
     std::array<bool, 2> answers {};   // v297: the receive channel's and the routing reset's, drawn for both sides
     std::function<bool()> receiving {};   // v298: the port's own receive channel, where rom.4's runs its own
@@ -102,4 +118,5 @@ public:
 
 private:
     std::vector<SettingsCall>& log_;
+    const Vc2HeldFlags& held_;
 };

@@ -15,7 +15,10 @@
 # source 3 as it was, so the test of a change after them says none either way; nor the glides' table by the channel
 # moved onto, which past 15 is −1, the spare table either way; v299's routing reset there too: not its move's channel
 # alone, as with no source a node ends on no channel whatever the channel, nor the receive channel's answer, always
-# 1).  Not planted: the depth
+# 1) and vc2partreloads (Vc2PartReloads.cpp, v300; not the fire's state while it reads, as the read is hooked and
+# nothing looks at the state then, nor the OS base's vtable, which the object's overwrites, nor the request's test of
+# its posted word: posted, the switch after it ends as the test's way does, asked with the remove held once if it was
+# reading and nothing posted again).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -580,3 +583,39 @@ routing-no-receive|    receiveChannel(w, kPartZero);\n    w.nodes.install|    w.
 routing-receive-part|    receiveChannel(w, kPartZero);\n    w.nodes.install|    receiveChannel(w, 1);\n    w.nodes.install|vc2settingsreceive
 routing-class|Vc2NodeClass::kHeld, w.keys);\n    return true;|Vc2NodeClass::kPlain, w.keys);\n    return true;|vc2settingsreceive
 routing-class-node|w.nodes.install(Vc2PartNodes::addressOf(1, kPartZero)|w.nodes.install(Vc2PartNodes::addressOf(2, kPartZero)|vc2settingsreceive
+reload-class|constexpr uint32_t kReloadClass = 0x898cd430;|constexpr uint32_t kReloadClass = 0x898c6ba8;|vc2partreloads
+reload-next|n = { object, object, n.word8, kReloadClass };|n = { 0, object, n.word8, kReloadClass };|vc2partreloads
+reload-prev|n = { object, object, n.word8, kReloadClass };|n = { object, 0, n.word8, kReloadClass };|vc2partreloads
+reload-word8|n = { object, object, n.word8, kReloadClass };|n = { object, object, 0, kReloadClass };|vc2partreloads
+reload-floats|floats = vc2PartSettingsTables().reloadFloats;|floats = vc2PartSettingsTables().staticFloats;|vc2partreloads
+reload-objects|for (uint32_t k = 0; k < kObjects; ++k) construct(|for (uint32_t k = 0; k < kObjects - 1; ++k) construct(|vc2partreloads
+reload-at|objects[(object - kAt) / sizeof(Vc2Reload)]|objects[(object - kAt) / sizeof(Vc2Reload) % 8]|vc2partreloads
+reload-held|    held_.fill(kHeld);\n    parts_.unpost(object);|    held_.fill(kFree);\n    parts_.unpost(object);|vc2partreloads
+reload-free|    parts_.unpost(object);\n    held_.fill(kFree);|    parts_.unpost(object);\n    held_.fill(kHeld);|vc2partreloads
+reload-held-order|    held_.fill(kHeld);\n    parts_.unpost(object);|    parts_.unpost(object);\n    held_.fill(kHeld);|vc2partreloads
+reload-stop-state|if (at(object).state == kReading) unpostHeld(object);|if (at(object).state == kAsked) unpostHeld(object);|vc2partreloads
+reload-cancel|void Vc2PartReloads::cancel(uint32_t object) { unpostHeld(object); }|void Vc2PartReloads::cancel(uint32_t object) { unpostNow(object); }|vc2partreloads
+reload-run-stop|bool Vc2PartReloads::run(uint32_t object) {\n    stopReading(object);|bool Vc2PartReloads::run(uint32_t object) {|vc2partreloads
+reload-run-idle|    r.state = kIdle;\n    return parts_.readPart(r.part);|    return parts_.readPart(r.part);|vc2partreloads
+reload-post-asked|    r.state = kAsked;\n    if (r.posted != 0) return;|    r.state = kReading;\n    if (r.posted != 0) return;|vc2partreloads
+reload-post-test|    if (r.posted != 0) return;\n    r.posted = 1;|    if (r.posted == 1) return;\n    r.posted = 1;|vc2partreloads
+reload-post-mark|    r.posted = 1;\n    parts_.post(object);|    r.posted = 2;\n    parts_.post(object);|vc2partreloads
+reload-post-call|    r.posted = 1;\n    parts_.post(object);\n}|    r.posted = 1;\n}|vc2partreloads
+reload-repost|void Vc2PartReloads::repost(uint32_t object) {\n    unpostHeld(object);|void Vc2PartReloads::repost(uint32_t object) {\n    unpostNow(object);|vc2partreloads
+reload-request-asked|{ &Vc2PartReloads::post, &Vc2PartReloads::ignore, &Vc2PartReloads::repost }|{ &Vc2PartReloads::post, &Vc2PartReloads::post, &Vc2PartReloads::repost }|vc2partreloads
+reload-request-idle|{ &Vc2PartReloads::post, &Vc2PartReloads::ignore, &Vc2PartReloads::repost }|{ &Vc2PartReloads::ignore, &Vc2PartReloads::ignore, &Vc2PartReloads::repost }|vc2partreloads
+reload-request-reading|{ &Vc2PartReloads::post, &Vc2PartReloads::ignore, &Vc2PartReloads::repost }|{ &Vc2PartReloads::post, &Vc2PartReloads::ignore, &Vc2PartReloads::post }|vc2partreloads
+reload-request-past|r.state < std::size(kWays) ? kWays[r.state] : kWays[kIdle]|r.state < std::size(kWays) ? kWays[r.state] : kWays[kAsked]|vc2partreloads
+reload-request-posted-idle|        stopReading(object);\n        r.state = kIdle;\n    }|        stopReading(object);\n    }|vc2partreloads
+reload-fire-test|    if (r.state != kIdle) {\n        r.state = kReading;|    if (r.state == kAsked) {\n        r.state = kReading;|vc2partreloads
+reload-fire-read|        r.state = kReading;\n        parts_.readPart(r.part);\n        r.state = kIdle;|        r.state = kReading;\n        r.state = kIdle;|vc2partreloads
+reload-fire-idle|        parts_.readPart(r.part);\n        r.state = kIdle;\n    }|        parts_.readPart(r.part);\n    }|vc2partreloads
+reload-fire-posted|    r.posted = 0;\n    return 0;|    r.posted = 1;\n    return 0;|vc2partreloads
+reload-fire-answer|    r.posted = 0;\n    return 0;|    r.posted = 0;\n    return 1;|vc2partreloads
+reload-read-now-idle|    r.state = kIdle;\n    parts_.readPart(r.part);\n}|    parts_.readPart(r.part);\n}|vc2partreloads
+reload-message-idle|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostNow }|{ &Vc2PartReloads::readNow, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostNow }|vc2partreloads
+reload-message-asked|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostNow }|{ &Vc2PartReloads::ignore, &Vc2PartReloads::ignore, &Vc2PartReloads::unpostNow }|vc2partreloads
+reload-message-reading|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostNow }|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostHeld }|vc2partreloads
+reload-message-past|s < std::size(kWays) ? kWays[s] : kWays[kAsked]|s < std::size(kWays) ? kWays[s] : kWays[kIdle]|vc2partreloads
+tables-reload-float|{ 0x8939b390, &reloadFloats[0] }|{ 0x8939b394, &reloadFloats[0] }|vc2settingstables
+tables-reload-order|{ 0x8939b380, &reloadFloats[1] }, { 0x8939b388, &reloadFloats[2] }|{ 0x8939b388, &reloadFloats[1] }, { 0x8939b380, &reloadFloats[2] }|vc2settingstables

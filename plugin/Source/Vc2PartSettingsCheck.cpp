@@ -10,7 +10,7 @@
 namespace {
 using Settings = Vc2PartSettings;
 using Block = Vc2ParamBlock;
-constexpr uint32_t kHeldAt = 0x8993d0c0, kGetter = 0x89324350, kTypedGetter = 0x89324370;    // [FW]
+constexpr uint32_t kGetter = 0x89324350, kTypedGetter = 0x89324370;    // [FW]
 // [FW] IDs drawn within a few values: a COSM input's type always, 0…16 (the run table's); half the time the OSCs'
 // Types 0…3 (v289), Formant Template 0…17 (v290), either side of the templates' 16
 constexpr SettingsNarrow kNarrowIds[] = { { 0x463, Vc2PartSettingsTables::kCosmTypes, kAlways },
@@ -137,8 +137,9 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow, &kCategoryPartRow,
                                       &kStaticPartRow, &kSystemPartRow })
         different += settingsRunPart(s, run, *p);
-    for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow }) different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kRoutingPartRow);
+    for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow, &kRoutingPartRow })
+        different += settingsRunPart(s, run, *p);
+    return different + settingsRunPart(s, run, kReloadPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {

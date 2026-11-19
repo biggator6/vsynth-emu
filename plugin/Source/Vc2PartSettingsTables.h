@@ -18,6 +18,9 @@ struct Vc2PartSettingsTables {
     // The static M's three floats (v295): its +0x288, +0x28c and +0x194, from 0x893a3020's pool (0x893a3098, 0x893a30a0,
     // 0x893a30a4)
     std::array<float, 3> staticFloats {};
+    // The reload objects' file's three floats (v300): 0x899962a0, +4, +8, from 0x8939b350's pool (0x8939b390,
+    // 0x8939b380, 0x8939b388)
+    std::array<float, 3> reloadFloats {};
 };
 
 [[nodiscard]] bool vc2LoadPartSettings(const char* path);

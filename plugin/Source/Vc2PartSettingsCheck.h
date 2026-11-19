@@ -28,6 +28,8 @@ inline constexpr uint32_t kHeldNoteAt = 0x899891d0;                             
 inline constexpr uint32_t kTripAssignsAt = 0x89989404, kPatchRemainAt = 0x899826fd, kVoiceCountsAt = 0x8993d02c;
 // v299's: ChordMemory Switch's last read, the channels' Hold-release bytes
 inline constexpr uint32_t kChordMemoryAt = 0x8993d03c, kHoldLiftsAt = 0x899893e0;
+// The held flags (Vc2PartSettingsCheck.cpp's until v300, when the reload objects' part reads them too)
+inline constexpr uint32_t kHeldAt = 0x8993d0c0;
 // A read object's handle the set-ups' hooks leave: this, the block << 16, part << 8, kind << 2, COSM; and (v291) the
 // one rom.4's stack is given where Auto Note's switch reads through a read object never set up, a block past the
 // OSC block's call
@@ -114,9 +116,10 @@ struct SettingsCounts {
     long messageEvents = 0, messageCalls = 0;                                   // the eleventh's (v297)
     long receiveEvents = 0, receiveCalls = 0;                                   // the twelfth's (v298)
     long routingEvents = 0, routingCalls = 0;                                   // the thirteenth's (v299)
+    long reloadEvents = 0, reloadCalls = 0;                                     // the fourteenth's (v300)
     // from v298 the twelfth's controllers and held notes heard at 50 and 51, from v299 the thirteenth's all notes off
-    // at 54
-    std::array<long, 55> byEvent {};
+    // at 54, from v300 the fourteenth's removes made held at 62
+    std::array<long, 63> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -128,13 +131,14 @@ struct SettingsSides {
     SettingsReads rom {}, mine {};
     SettingsPortParams params { mine };
     Vc2PartSettings settings { params };
-    SettingsPortOuts outs { mine.log };   // v290
+    SettingsPortOuts outs { mine.log, mine.flags };   // v290; the flags the reload objects hold, v300
     Vc2PartNodes nodes {};            // v291
     Vc2MatrixSettings g {};           // v292: G, and v247's set-up on the same reads
     SettingsMatrixParams matrixParams { mine };
     Vc2MatrixSetup setup { matrixParams, outs };
     Vc2StaticMatrix staticM {};       // v295
     Vc2Keys keys {};                  // v297: v276's keys, which a node's class install resets
+    Vc2PartReloads reloads { mine.flags, outs };   // v300
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -210,6 +214,8 @@ extern const SettingsPartRow kMessagePartRow;
 extern const SettingsPartRow kReceivePartRow;
 // The thirteenth (v299): the routing's reset (Vc2PartSettingsRoutingCheck.cpp)
 extern const SettingsPartRow kRoutingPartRow;
+// The fourteenth (v300): the reload objects (Vc2PartReloadsCheck.cpp)
+extern const SettingsPartRow kReloadPartRow;
 // v291's to v293's parts' noise stops before v294's word
 inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
 // v294's and v295's parts' noise stops before v296's words
