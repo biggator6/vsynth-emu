@@ -673,6 +673,13 @@ version against rom.4's routines with what it calls hooked:
         (`0x89391760`, `0x89391820`, `0x89391880`) and who aims a portamento key at its own channel's table.
    5. The assigner: `0x89396a80`, `0x89396c90`, `0x893969e0`, `0x89390860`, mono's `0x89390b20` and `0x89390b90`, the
       release path, the pedals, on faked voices' virtuals.
+      - first half done (v277): `Vc2Assigner`, the start `0x89390860` (the partner, the voice's +0x3c, the note-on,
+        the cost against the budget, the start, the prepared list spliced onto the sounding list's front), the class
+        builder `0x893969e0`, the partner `0x89390720`, the matching test `0x893913a0`, mono's retunes, the truncation
+        of a part's voices `0x893907d0` and a voice's `0x89391a50` with `0x89391a90` and `0x89391aa0`; xt_vc2voices'
+        second part (HARDWARE_FIRMWARE.md, "The VC-2 part's assigner, its first part"). The second half next: the part
+        node's note start `0x89396a80` and note-off `0x89396c90`, the note-off over the voices `0x89390c00`, the pedals
+        (`0x89390cd0`, `0x89390d10`…) and the voice's held bits (`0x89391760`, `0x89391820`, `0x89391880`).
    6. The voice's virtuals (`0x89397130`, `0x893970b0`, `0x893971f0`, `0x89397280`, `0x893972d0`, `0x893973a0`) and the
       update queue at `0x89989cc4` (`0x89394f30…0x893951b0`).
    7. C's frame: `0x893a76d0`, `0x893a7a20`, `0x893a7b20`, `0x893a7c50`, `0x893a7cc0`, `0x893a7df0`, `0x893a7f10`, and

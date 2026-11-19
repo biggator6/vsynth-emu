@@ -19,12 +19,18 @@ inline constexpr uint32_t kVoicesDestroyEntry = 0x24, kVoicesEndedEntry = 0x60; 
 inline constexpr uint32_t kVoicesCostAt = 0x893b4020;                               // [FW] the tone's cost
 inline constexpr int kVoicesNotes = 24, kVoicesTones = 24;
 
-enum VoicesKind : int32_t { kVoicesDestroy, kVoicesEnded, kVoicesCost };
+// The calls logged; from v277 the assigner's besides (its part, Vc2AssignCheck.cpp)
+enum VoicesKind : int32_t {
+    kVoicesDestroy, kVoicesEnded, kVoicesCost, kVoicesPrepare, kVoicesRetune, kVoicesNoteOn, kVoicesStartNote,
+    kVoicesTruncateOnce, kVoicesWait, kVoicesKinds
+};
 
-// A call as either side made it: what, the routine it reached and the object it was given
+// A call as either side made it: what, the routine it reached and the object it was given, and from v277 the arguments
+// after it (the registers past r4, then the stack's words)
 struct VoicesCall {
     int32_t kind;
     uint32_t routine, object;
+    std::array<uint32_t, 7> more {};
     bool operator==(const VoicesCall&) const = default;
 };
 
@@ -48,6 +54,9 @@ struct VoicesDraws {
     const VoicesAnswer& next(size_t& at);
     void restart(uint32_t seed);
 };
+
+// The call to a vtable's slot as rom.4 makes it: the routine the slot reaches and the object adjusted by its word
+VoicesCall voicesSlotCall(Vc2Fw& fw, int32_t kind, uint32_t object, uint32_t vtable, uint32_t slot);
 
 // What a destroy leaves in a voice at `self`, by the answer
 void voicesApplyDestroy(Vc2VoiceNode& v, uint32_t self, const VoicesAnswer& a);
@@ -108,3 +117,9 @@ std::vector<uint32_t> voicesOf(VoicesSides& s, uint32_t list);
 void voicesInstallRom(Vc2Fw& fw, VoicesDraws& draws, std::vector<VoicesCall>& log);
 // The first call the two logs differ at; empty when they don't
 std::string voicesCallsDifference(const std::vector<VoicesCall>& rom, const std::vector<VoicesCall>& port);
+// The draws before an event (every voice's words at a case's first), and the notes' kinds and tones in rom.4's memory
+void voicesSteer(VoicesSides& s, std::mt19937& rng, bool all);
+void voicesDrawNotes(Vc2Fw& fw, std::mt19937& rng);
+// The assigner's part (v277, Vc2AssignCheck.cpp), after the voices' cases on its own generator: its cases' count
+// that differ, its counts said
+long vc2AssignPart(VoicesSides& s, const Vc2Run& run);

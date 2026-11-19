@@ -814,6 +814,7 @@ calls: 5352268, answers NaN 1241571, infinite 1048364, zero 1058897, negative 67
 xt_vc2libm: 0 different
 == xt_vc2voices
 voices: 40 cases, 16000 events, 701 inits, 2649 takes (2479 from free, 78 stolen, 92 none), 2700 moves, 1318 reserves, 1367 ended scans (6235 end tests), 647 stop alls, 1967 stops, 1992 costs, 2699 budgets; 12863 destroys; 5264 splices, 554 lists dealt
+assigner: 16000 events: 2637 starts and 2671 builds (3557 voices prepared, 1287 with a partner, 4854 destroys), 1378 partners, 1308 tests, 1319 and 1371 retunes, 1340 truncations of a note, 1332 of a voice, 1286 orders cleared, 1358 states set
 xt_vc2voices: 0 different
 == xt_vc2notes
 notes: 40 cases, 16000 events: 1964 constructors, 2023 note-ons (1375 with a partner), 993 ends, 983 and 1056 passes, 1032 releases, 1070 truncations once, 1017 starts and 1005 copies', 985 placements, 947 positions, 940 and 1001 of the tone's routines, 984 initializers

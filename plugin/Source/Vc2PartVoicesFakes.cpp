@@ -30,16 +30,16 @@ VoicesAnswer drawAnswer(std::mt19937& rng) {
     return a;
 }
 
-// The routine a vtable's slot reaches and the object it is given
-VoicesCall slotCall(Vc2Fw& fw, int32_t kind, uint32_t object, uint32_t vtable, uint32_t slot) {
-    return { kind, fw.cpu.rd32(vtable + slot + kEntryRoutine), object + fw.cpu.rd32(vtable + slot) };
-}
-
 const char* kindName(int32_t kind) {
-    constexpr const char* kNames[3] = { "destroy", "end test", "cost" };
+    constexpr const char* kNames[kVoicesKinds] = { "destroy", "end test", "cost", "prepare", "retune", "note-on",
+                                                   "note's start", "truncation once", "queue's wait" };
     return kNames[kind];
 }
 } // namespace
+
+VoicesCall voicesSlotCall(Vc2Fw& fw, int32_t kind, uint32_t object, uint32_t vtable, uint32_t slot) {
+    return { kind, fw.cpu.rd32(vtable + slot + kEntryRoutine), object + fw.cpu.rd32(vtable + slot) };
+}
 
 const VoicesAnswer& VoicesDraws::next(size_t& at) {
     while (drawn.size() <= at) drawn.push_back(drawAnswer(rng));
@@ -61,7 +61,7 @@ void voicesApplyDestroy(Vc2VoiceNode& v, uint32_t self, const VoicesAnswer& a) {
 }
 
 void VoicesPortParts::destroy(uint32_t voice) {
-    log_.push_back(slotCall(fw_, kVoicesDestroy, voice, port_.at(voice).vtable, kVoicesDestroyEntry));
+    log_.push_back(voicesSlotCall(fw_, kVoicesDestroy, voice, port_.at(voice).vtable, kVoicesDestroyEntry));
     voicesApplyDestroy(port_.at(voice), voice, draws_.next(draws_.port));
 }
 
@@ -72,7 +72,8 @@ int8_t VoicesPortParts::kindOf(uint32_t note) {
 }
 
 bool VoicesPortParts::ended(uint32_t tone) {
-    log_.push_back(slotCall(fw_, kVoicesEnded, tone, fw_.cpu.rd32(tone + kVoicesToneVtable), kVoicesEndedEntry));
+    const uint32_t vtable = fw_.cpu.rd32(tone + kVoicesToneVtable);
+    log_.push_back(voicesSlotCall(fw_, kVoicesEnded, tone, vtable, kVoicesEndedEntry));
     return draws_.next(draws_.port).ended != 0;
 }
 
@@ -107,8 +108,10 @@ void voicesInstallRom(Vc2Fw& fw, VoicesDraws& draws, std::vector<VoicesCall>& lo
 
 std::string voicesCallsDifference(const std::vector<VoicesCall>& rom, const std::vector<VoicesCall>& port) {
     return vc2CallsDifference(rom, port, [](const VoicesCall& c) {
-        char t[80];
-        std::snprintf(t, sizeof t, "the %s %08x (%08x)", kindName(c.kind), c.routine, c.object);
+        char t[160];
+        const auto& m = c.more;
+        std::snprintf(t, sizeof t, "the %s %08x (%08x %08x %08x %08x %08x %08x %08x %08x)", kindName(c.kind), c.routine,
+                      c.object, m[0], m[1], m[2], m[3], m[4], m[5], m[6]);
         return std::string(t);
     });
 }

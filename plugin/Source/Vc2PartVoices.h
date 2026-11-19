@@ -61,6 +61,9 @@ struct Vc2VoiceGlobals {
 };
 static_assert(sizeof(Vc2VoiceGlobals) == 0x28, "rom.4's layout, 0x899826d4…0x899826fc");
 
+// The update queue's node's constructor 0x89394f30 on a node given: its vtable, its links to itself
+void vc2ConstructNode(Vc2VoiceNode& n, uint32_t self);
+
 // What the voices call and read beyond themselves
 class Vc2VoiceParts {
 public:
@@ -113,6 +116,8 @@ public:
     // A head's or a voice's words by its address; a voice's address by its index
     Vc2VoiceNode& at(uint32_t address);
     uint32_t addressOf(int voice) const;
+    Vc2Voice& voice(uint32_t address);   // a voice's whole words, by its address (a voice's, never a head's)
+    uint32_t ageOf(uint32_t voice);      // the word its +0x1c points at
 
     std::array<Vc2Voice, kVoices> voices {};
     std::array<Vc2VoiceNode, kLists> heads {};
@@ -124,5 +129,4 @@ private:
     void leave(uint32_t voice, Vc2VoiceParts& parts);
     void move(uint32_t voice, int list, uint8_t state, Vc2VoiceParts& parts);
     void stopped(uint32_t voice, int list, uint8_t state, Vc2VoiceParts& parts);
-    uint32_t ageOf(uint32_t voice);
 };

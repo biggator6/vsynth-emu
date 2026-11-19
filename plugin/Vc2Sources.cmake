@@ -95,4 +95,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2Notes.cpp
     Source/Vc2Keys.cpp
     Source/Vc2KeysTables.cpp
+    Source/Vc2Assigner.cpp
 )

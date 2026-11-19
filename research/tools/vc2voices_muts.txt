@@ -12,7 +12,7 @@ at-head|/ kHeadBytes % kLists];|/ 0x60 % kLists];|vc2voices
 static-unread|    g.unread1 = t.unread[1];|    g.unread1 = t.unread[2];|vc2voices
 static-unread-last|    g.unread0 = t.unread[0];\n|\n|vc2voices
 static-head-vtable|        heads[k].vtable = kVoiceVtable;\n|\n|vc2voices
-init-node|        constructNode(v, self);\n|\n|vc2voices
+init-node|        vc2ConstructNode(v, self);\n|\n|vc2voices
 init-vtable|        v.vtable = kVoiceVtable;\n        v.number|        v.vtable = kNodeVtable;\n        v.number|vc2voices
 init-number|        v.number = (uint8_t)n;|        v.number = (uint8_t)(n + 1);|vc2voices
 init-age|        v.age = kZeroAge;\n        v.leave = kStayOnLeave;|        v.age = self;\n        v.leave = kStayOnLeave;|vc2voices
@@ -97,3 +97,48 @@ budget-at|{ 0x8939138c, &t.budget }|{ 0x89391370, &t.budget }|vc2voicestables
 unread0-at|{ 0x893914b4, &t.unread[0] }|{ 0x893914ac, &t.unread[0] }|vc2voicestables
 unread1-at|{ 0x893914a4, &t.unread[1] }|{ 0x893914b4, &t.unread[1] }|vc2voicestables
 unread2-at|{ 0x893914ac, &t.unread[2] }|{ 0x893914a4, &t.unread[2] }|vc2voicestables
+# The assigner's first part (v277), through xt_vc2voices' second part.  Not planted: the class builder's start with no
+# test (with no voice prepared the start does nothing: the same), and Vc2Assigner.h's constants.
+assign-same-table|return n.channel == parts.tableOf(call.message) && n.part|return n.channel != 0 && n.part|vc2assign
+assign-same-part|&& n.part == call.part && (n.updated|&& n.part >= call.part && (n.updated|vc2assign
+assign-same-update|(n.updated & kUpdateAsked) == 0|(n.updated & 2) == 0|vc2assign
+assign-same-state|&& n.state == 0 && (uint8_t)parts.kindOf(n.note) == call.kind;|&& n.state <= 1 && (uint8_t)parts.kindOf(n.note) == call.kind;|vc2assign
+assign-same-kind-signed|&& (uint8_t)parts.kindOf(n.note) == call.kind;|&& (uint32_t)parts.kindOf(n.note) == call.kind;|vc2assign
+assign-marked-bit|constexpr uint32_t kMarked = 0x20000000;|constexpr uint32_t kMarked = 0x40000000;|vc2assign
+assign-marked-goes-on|        if (found.marked) break;|        (void)0;|vc2assign
+assign-matching-none|    return false;\n}\n\nvoid Vc2Assigner::splice|    return true;\n}\n\nvoid Vc2Assigner::splice|vc2assign
+assign-splice-empty|    if (first == prepared) return;|    (void)0;|vc2assign
+assign-splice-last|    v.at(last).next = head;|    v.at(last).next = sounding;|vc2assign
+assign-splice-first|    v.at(first).prev = sounding;|    v.at(first).prev = prepared;|vc2assign
+assign-splice-head|    v.at(head).prev = last;|    v.at(head).prev = first;|vc2assign
+assign-splice-kept|    v.at(prepared).next = prepared;\n    v.at(prepared).prev = prepared;|    v.at(prepared).prev = prepared;|vc2assign
+assign-legato-found|Vc2Legato legato { (uint8_t)(p.voice != 0), (uint8_t)p.marked,|Vc2Legato legato { 1, (uint8_t)p.marked,|vc2assign
+assign-legato-marked|(uint8_t)p.marked, (uint8_t)call.onByte };|0, (uint8_t)call.onByte };|vc2assign
+assign-legato-byte|legato.onByte = (uint8_t)parts.onByteOf(v.at(p.voice).note);|legato.onByte = (uint8_t)(parts.onByteOf(v.at(p.voice).note) + 1);|vc2assign
+assign-note-on-partner|const uint32_t partnerNote = p.voice != 0 ? v.at(p.voice).note : 0;|const uint32_t partnerNote = 0;|vc2assign
+assign-note-on-byte|parts.noteOn(v.at(voice).note, partnerNote, (int8_t)legato.onByte);|parts.noteOn(v.at(voice).note, partnerNote, (uint8_t)legato.onByte);|vc2assign
+assign-cost-order|        const float mine = v.cost(voice, parts);\n        float total = xtf::add(v.costOf(v.g.lists[V::kSounding], parts), mine);|        float total = v.costOf(v.g.lists[V::kSounding], parts);\n        total = xtf::add(total, v.cost(voice, parts));|vc2assign
+assign-budget-test|while (!(v.g.budget > total))|while (v.g.budget < total)|vc2assign
+assign-budget-kept|total = xtf::sub(total, v.cost(stolen, parts));|(void)v.cost(stolen, parts);|vc2assign
+assign-budget-reserved|            v.toFree(stolen, parts);|            v.toReserved(stolen, parts);|vc2assign
+assign-start-note|parts.startNote(v.at(voice).note);|parts.startNote(v.at(voice).note + 4);|vc2assign
+assign-no-splice|    splice(v);\n}|}|vc2assign
+assign-build-class|        w.node.vtable = kNoteVtable;|        w.node.vtable = V::kVoiceVtable;|vc2assign
+assign-build-byte50|        w.byte50 = 0;|        w.byte50 = 1;|vc2assign
+assign-build-byte52|constexpr uint8_t kClassByte52 = 0xff;|constexpr uint8_t kClassByte52 = 0x7f;|vc2assign
+assign-build-leave|        w.node.leave = V::kDestroyOnLeave;|        w.node.leave = V::kStayOnLeave;|vc2assign
+assign-build-node|        vc2ConstructNode(w.node, voice);|        (void)w;|vc2assign
+assign-build-start|    if (v.preparedAny()) start(call, v, parts);|    if (voice != 0) start(call, v, parts);|vc2assign
+assign-retune-state|n.part != call.part \|\| n.state != 0) continue;|n.part != call.part \|\| n.state > 1) continue;|vc2assign
+assign-retune-kind|if ((parts.kindOf(n.note) == kOneOfKind) != kindOne) continue;|if ((parts.kindOf(n.note) == kOneOfKind) == kindOne) continue;|vc2assign
+assign-retune-part|n.channel != parts.tableOf(call.message) \|\| n.part != call.part \|\| n.state != 0|n.channel != parts.tableOf(call.message) \|\| n.state != 0|vc2assign
+assign-retune-value|parts.retune(voice, call.message, call.part, value);|parts.retune(voice, call.message, call.part, value & 0xff);|vc2assign
+assign-trunc-part|if (n.channel != parts.tableOf(call.message) \|\| n.part != call.part) continue;|if (n.channel != parts.tableOf(call.message)) continue;|vc2assign
+assign-trunc-kind|if ((uint8_t)parts.kindOf(n.note) != call.kind) continue;|if ((uint8_t)parts.kindOf(n.note) == 2) continue;|vc2assign
+assign-trunc-queue|parts.waitQueue(kQueuesAt + kQueueBytes * n.queue, voice);|parts.waitQueue(kQueuesAt + kQueueBytes * (n.queue & 1), voice);|vc2assign
+assign-trunc-voice-none|if (v.at(voice).note != 0) parts.truncateOnce(v.at(voice).note);|parts.truncateOnce(v.at(voice).note);|vc2assign
+assign-clear-bit|constexpr uint32_t kTruncated = 0xbfffffff;|constexpr uint32_t kTruncated = 0xdfffffff;|vc2assign
+assign-clear-first|for (uint32_t& order : n.order) order &= kTruncated;|n.order[0] &= kTruncated;|vc2assign
+assign-clear-own|if (n.age == voice + kOrderAt \|\| n.age == voice + kOrderAt + kOrderBytes) n.state|if (n.age == voice + kOrderAt) n.state|vc2assign
+assign-clear-state|constexpr uint8_t kTruncatedState = 1;|constexpr uint8_t kTruncatedState = 3;|vc2assign
+assign-set-state|{ v.at(voice).state = (uint8_t)state; }|{ v.at(voice).state = (uint8_t)(state & 3); }|vc2assign

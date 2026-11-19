@@ -29,7 +29,8 @@
 # the Matrix's sources (vc2matrixsources, v245), under xt_vc2cosm; the library's logf and powf (vc2libm) and their
 # constants (vc2libmtables) under xt_vc2libm; the part's voices and their lists (vc2voices, v272) and their constants
 # (vc2voicestables) under xt_vc2voices; the part's notes W (vc2notes, v275) under xt_vc2notes; the part's keys
-# (vc2keys, v276) and their tables (vc2keystables) under xt_vc2keys.
+# (vc2keys, v276) and their tables (vc2keystables) under xt_vc2keys; the assigner's first part (vc2assign, v277)
+# under xt_vc2voices, its second part.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -63,7 +64,8 @@ VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmT
          Vc2CosmNoteOnDraws Vc2CosmAdapters Vc2CosmAdapterWords Vc2CosmAdapterBlocks Vc2CosmTbAdapter
          Vc2CosmBufferedAdapters Vc2CosmDsp Vc2CosmDspCheck Vc2CosmDspKinds Vc2CosmDspSlots XtCosm XtOsc XtEnvelope)
 VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck)
-VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEvents Vc2PartVoicesFakes)
+VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEvents Vc2PartVoicesFakes
+           Vc2Assigner Vc2AssignCheck Vc2AssignEvents)
 VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents)
 
@@ -164,6 +166,7 @@ VC2PORTS=(
     "vc2libmtables|Vc2LibMathTables.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
     "vc2voices|Vc2PartVoices.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
     "vc2voicestables|Vc2PartVoicesTables.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
+    "vc2assign|Vc2Assigner.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
     "vc2notes|Vc2Notes.cpp|XT_VC2NOTES_MAIN|vc2notes_obj|VC2NOTES"
     "vc2keys|Vc2Keys.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
     "vc2keystables|Vc2KeysTables.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"

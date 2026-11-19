@@ -1546,6 +1546,83 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's assigner, its first part (2026-11-19, v277) {#vc2-part-assigner}
+
+Step 4.3's fifth version (VC2_MODE_PLAN.md, step 4.3, item 5's first half): the routines that start the voices prepared
+for a note, on the voices and lists of v272. `Vc2Assigner` is bit for bit against rom.4's own in `xt_vc2voices`' second
+part.
+
+**What a note is started from.** The assigner's routines are given a message, a part, a byte, a word they pass on, and
+a kind.
+- **The message** is a portamento key P (v276); P+0 is its key table, which a voice keeps at its +0x34.
+- **A voice of the same note** is a sounding voice with that key table and part, and a note of that kind (W+0x742,
+  compared as an unsigned byte with the whole register). For a legato partner it must also have its +0x30 bit 0 clear
+  and its state 0.
+
+**The start `0x89390860(message, part, byte, word; kind on the stack)`.** For each voice on the prepared list, in order:
+1. **A legato partner** among the sounding voices of the same note: the last one found, or the first whose age word
+   has bit 29 set. `0x89390720` is this search out of line, writing the bit to its fourth argument; nothing calls it.
+2. **The voice's +0x3c virtual** (a note's `0x89397130`, which makes its note, tone and conversion set). It is given
+   the message, the part and the byte. On the stack it gets a struct of three bytes, then the word and the kind. The
+   struct's bytes: a partner found, its bit 29, and the byte (the partner's note's +0x740 when there is one).
+3. **The note's note-on `0x893965e0`**, given the partner's note (or 0) and the struct's byte, sign-extended.
+4. **The cost.** The new tone's (`0x893b4020` plus the offset at `0x899826dc`) is added to the sounding list's sum,
+   where only the first voice of kind 1 counts. While the budget at `0x899826d8` is not greater than the total, the
+   oldest sounding voice of kind 0 is stopped (`0x893918e0`) and its cost taken off; with none left, the loop ends.
+5. **The note's start `0x89396630`.**
+
+Then the prepared list is moved onto the sounding list's front, in order. The sum reads the sounding list before that
+move, so a voice prepared earlier in the same pass does not count against a later one's budget. These are the inline
+copies of v272's out-of-line routines (the cost, the sum, the oldest, the stop), now with a caller.
+
+**The other routines.**
+- **The class builder `0x893969e0(unread, message, part, byte; word and kind on the stack)`.** It takes a voice
+  (v272's take) and, when there is one, builds a note's voice in place:
+  - the update queue's node (`0x89394f30`, v272's node constructor);
+  - the vtable `0x898cd1a8`, then `0x898cd3dc` over it;
+  - +0x50 set to 0 and +0x52 to 0xff;
+  - +0x44 set to the destroy on leave.
+
+  Then, if anything is prepared (`0x89390850`), it runs the start.
+- **The matching test `0x893913a0`**: a voice of the same note, as a legato partner must be.
+- **Mono's retunes `0x89390b20`** (notes not of kind 1) **and `0x89390b90`** (kind 1, a copy nothing calls). Each calls
+  the +0x18 virtual of every sounding voice with the key table, part and state 0, whatever its update bit.
+- **The truncation of a part's voices `0x893907d0`.** For each sounding voice with the key table, the part and the
+  kind, it runs the voice's truncation, then the update queue's wait (`0x893951b0` on the queue `0x89989cc4` + 36 × the
+  voice's +0x0c).
+- **A voice's truncation `0x89391a50`.** It runs the note's truncation once (`0x89396910`) when the voice has a note,
+  then `0x89391aa0`: both orders' bit 30 cleared, and the state set to 1 when the age points at the voice's own
+  orders. `0x89391a90` sets the state.
+
+**`Sh4::call` sets r4 to r7 alone.** A check that calls a routine with arguments on the stack writes them at `kVc2Sp`
+itself, as `xt_vc2cosm`'s binding did.
+
+**The check.** `xt_vc2voices` gains a second part, run after the voices' cases on the seed's next, so their lines stay
+as they were. It hooks, beyond the voices' destroys, end test and cost:
+- the +0x3c and +0x18 virtuals of both voice classes;
+- the note's note-on, start and truncation once;
+- the queue's wait.
+
+Each hook logs its arguments into the voices' log, now with room for them; a +0x3c's stack struct is logged packed,
+with the two stack words after it. A +0x3c writes the voice's note as drawn. The draws:
+- four messages, each aimed at one of three key tables;
+- each voice's key table one of those three or another, its part 0 to 2, its update bit, its queue and its queue's
+  links;
+- the notes' +0x740 bytes;
+- a target note, which up to four sounding voices are made to be (some with their age word's bit 29 set) and which a
+  call takes half the time. Without it, two voices of one note were too rare: the first marked partner was never told
+  from the last.
+
+Each case starts from noise and rom.4's three inits, then 400 events: the start and the class builder (twice as often),
+the partner, the test, the two retunes, the truncation of a part's voices, a voice's truncation, the orders' clear and
+the state's setter.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- At 40 cases: 3,557 voices prepared, 1,287 with a partner, and 4,854 destroys.
+- Every line and branch of `Vc2Assigner.cpp` is reached.
+- `mutate_vc2.py --voices`: the assigner's 43 plants and v272's 92, none missed.
+
 ### The VC-2 part's keys (2026-11-19, v276) {#vc2-part-keys}
 
 Step 4.3's fourth version (VC2_MODE_PLAN.md, step 4.3, item 4). `Vc2Keys` holds the part's key tables and the

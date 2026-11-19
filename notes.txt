@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's assigner, its first part v277 (2026-11-19, on claude/vc2-part-4-3 after v276; HARDWARE_FIRMWARE.md, "The
+  VC-2 part's assigner, its first part"): step 4.3's fifth version. Vc2Assigner on v272's voices: the start (for each
+  prepared voice its legato partner, the voice's +0x3c, the note's note-on, the cost against the budget with the oldest
+  kind-0 voices stopped, the note's start; then the prepared list onto the sounding list's front), the class builder,
+  the partner, the matching test, mono's two retunes, the truncation of a part's voices and of a voice. xt_vc2voices
+  gains a second part, the assigner's, on the seed's next (its first part's lines as they were): 0 different at seeds
+  2024, 7 and 31337; mutate_vc2.py --voices 135 planted (43 new), 0 missed. Vc2PartVoices exposes vc2ConstructNode,
+  voice() and ageOf(); the voices' call log holds the arguments. Found: the start's cost sum reads the sounding list
+  before the prepared ones join it; Sh4::call sets r4 to r7 alone, so a stack argument is written by the check. Not in
+  the sound yet.
+
 The VC-2 part's keys v276 (2026-11-19, on claude/vc2-part-4-3 after v275; HARDWARE_FIRMWARE.md, "The VC-2 part's keys"):
   step 4.3's fourth version. Vc2Keys is rom.4's 66 key tables (0x134 bytes: by source and channel, and the part's own
   two) and 129 portamento keys (0x24 bytes, rom.2's XtKeyState's layout and laws), word for word: the tables' init,
